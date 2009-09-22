@@ -407,7 +407,6 @@ typedef struct mptsas_slots {
 	m_raidconfig_t		m_raidconfig[MPTSAS_MAX_RAIDCONFIGS];
 	uint8_t			m_num_raid_configs;
 	uint16_t		m_tags;
-	uint32_t		m_buffer;
 	size_t			m_size;
 	uint16_t		m_n_slots;
 	mptsas_cmd_t		*m_slot[1];
@@ -791,6 +790,7 @@ typedef struct mptsas {
 	/*
 	 * Event recording
 	 */
+	uint8_t			m_event_index;
 	uint32_t		m_event_number;
 	uint32_t		m_event_mask[4];
 	mptsas_event_entry_t	m_events[MPTSAS_EVENT_QUEUE_SIZE];
@@ -1237,6 +1237,7 @@ int mptsas_set_ioc_params(mptsas_t *mpt);
 int mptsas_get_manufacture_page5(mptsas_t *mpt);
 int mptsas_get_sas_port_page0(mptsas_t *mpt, uint32_t page_address,
     uint64_t *sas_wwn, uint8_t *portwidth);
+int mptsas_get_bios_page3(mptsas_t *mpt,  uint32_t *bios_version);
 
 /*
  * RAID functions

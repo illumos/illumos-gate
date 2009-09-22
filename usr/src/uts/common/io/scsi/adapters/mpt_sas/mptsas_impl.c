@@ -304,7 +304,6 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 	int			rval = DDI_SUCCESS, config_flags = 0;
 	mptsas_cmd_t		*cmd;
 	struct scsi_pkt		*pkt;
-	uint32_t		reply_index;
 	pMpi2ConfigReply_t	reply;
 	uint16_t		iocstatus = 0;
 	uint32_t		iocloginfo;
@@ -429,18 +428,16 @@ mptsas_access_config_page(mptsas_t *mpt, uint8_t action, uint8_t page_type,
 	 * if this reply is an ADDRESS reply.
 	 */
 	if (config_flags & MPTSAS_ADDRESS_REPLY) {
-		reply_index = mpt->m_free_index;
 		ddi_put32(mpt->m_acc_free_queue_hdl,
-		    &((uint32_t *)(void *)mpt->m_free_queue)[reply_index],
+		    &((uint32_t *)(void *)mpt->m_free_queue)[mpt->m_free_index],
 		    cmd->cmd_rfm);
 		(void) ddi_dma_sync(mpt->m_dma_free_queue_hdl, 0, 0,
 		    DDI_DMA_SYNC_FORDEV);
-		if (++reply_index == mpt->m_free_queue_depth) {
-			reply_index = 0;
+		if (++mpt->m_free_index == mpt->m_free_queue_depth) {
+			mpt->m_free_index = 0;
 		}
-		mpt->m_free_index = reply_index;
 		ddi_put32(mpt->m_datap, &mpt->m_reg->ReplyFreeHostIndex,
-		    reply_index);
+		    mpt->m_free_index);
 		config_flags &= (~MPTSAS_ADDRESS_REPLY);
 	}
 
@@ -578,18 +575,16 @@ page_done:
 	 * if this reply is an ADDRESS reply.
 	 */
 	if (config_flags & MPTSAS_ADDRESS_REPLY) {
-		reply_index = mpt->m_free_index;
 		ddi_put32(mpt->m_acc_free_queue_hdl,
-		    &((uint32_t *)(void *)mpt->m_free_queue)[reply_index],
+		    &((uint32_t *)(void *)mpt->m_free_queue)[mpt->m_free_index],
 		    cmd->cmd_rfm);
 		(void) ddi_dma_sync(mpt->m_dma_free_queue_hdl, 0, 0,
 		    DDI_DMA_SYNC_FORDEV);
-		if (++reply_index == mpt->m_free_queue_depth) {
-			reply_index = 0;
+		if (++mpt->m_free_index == mpt->m_free_queue_depth) {
+			mpt->m_free_index = 0;
 		}
-		mpt->m_free_index = reply_index;
 		ddi_put32(mpt->m_datap, &mpt->m_reg->ReplyFreeHostIndex,
-		    reply_index);
+		    mpt->m_free_index);
 	}
 
 	if (cmd->cmd_dmahandle != NULL) {
@@ -1086,7 +1081,7 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 	mptsas_cmd_t				*cmd;
 	struct scsi_pkt				*pkt;
 	mptsas_slots_t				*slots = mpt->m_active;
-	uint32_t				request_desc_low, int_mask;
+	uint32_t				request_desc_low;
 
 	/*
 	 * Can't start another task management routine.
@@ -1137,22 +1132,14 @@ mptsas_ioc_task_management(mptsas_t *mpt, int task_type, uint16_t dev_handle,
 	ddi_put8(mpt->m_acc_req_frame_hdl, &task->TaskType, task_type);
 
 	/*
-	 * Get the current interrupt mask.  When re-enabling ints, set mask to
-	 * saved value.
-	 */
-	int_mask = ddi_get32(mpt->m_datap, &mpt->m_reg->HostInterruptMask);
-
-	/*
 	 * Send TM request using High Priority Queue.
 	 */
-	MPTSAS_DISABLE_INTR(mpt);
 	(void) ddi_dma_sync(mpt->m_dma_req_frame_hdl, 0, 0,
 	    DDI_DMA_SYNC_FORDEV);
 	request_desc_low = (cmd->cmd_slot << 16) +
 	    MPI2_REQ_DESCRIPT_FLAGS_HIGH_PRIORITY;
 	MPTSAS_START_CMD(mpt, request_desc_low, 0);
 	rval = mptsas_poll(mpt, cmd, MPTSAS_POLL_TIME);
-	ddi_put32(mpt->m_datap, &mpt->m_reg->HostInterruptMask, int_mask);
 
 	if (pkt->pkt_reason == CMD_INCOMPLETE)
 		rval = FALSE;
@@ -1751,6 +1738,54 @@ mptsas_get_sas_io_unit_page(mptsas_t *mpt)
 			return (rval);
 		}
 	}
+
+	return (rval);
+}
+
+static int
+mptsas_biospage_3_cb(mptsas_t *mpt, caddr_t page_memp,
+    ddi_acc_handle_t accessp, uint16_t iocstatus, uint32_t iocloginfo,
+    va_list ap)
+{
+#ifndef __lock_lint
+	_NOTE(ARGUNUSED(ap))
+#endif
+	pMpi2BiosPage3_t	sasbiospage;
+	int			rval = DDI_SUCCESS;
+	uint32_t		*bios_version;
+
+	if ((iocstatus != MPI2_IOCSTATUS_SUCCESS) &&
+	    (iocstatus != MPI2_IOCSTATUS_CONFIG_INVALID_PAGE)) {
+		mptsas_log(mpt, CE_WARN, "mptsas_get_bios_page3 header: "
+		    "IOCStatus=0x%x, IOCLogInfo=0x%x", iocstatus, iocloginfo);
+		rval = DDI_FAILURE;
+		return (rval);
+	}
+	bios_version = va_arg(ap, uint32_t *);
+	sasbiospage = (pMpi2BiosPage3_t)page_memp;
+	*bios_version = ddi_get32(accessp, &sasbiospage->BiosVersion);
+
+	return (rval);
+}
+
+/*
+ * Request MPI configuration page BIOS page 3 to get BIOS version.  Since all
+ * other information in this page is not needed, just ignore it.
+ */
+int
+mptsas_get_bios_page3(mptsas_t *mpt, uint32_t *bios_version)
+{
+	int rval = DDI_SUCCESS;
+
+	ASSERT(mutex_owned(&mpt->m_mutex));
+
+	/*
+	 * Get the header and config page.  reply contains the reply frame,
+	 * which holds status info for the request.
+	 */
+	rval = mptsas_access_config_page(mpt,
+	    MPI2_CONFIG_ACTION_PAGE_READ_CURRENT, MPI2_CONFIG_PAGETYPE_BIOS, 3,
+	    0, mptsas_biospage_3_cb, bios_version);
 
 	return (rval);
 }

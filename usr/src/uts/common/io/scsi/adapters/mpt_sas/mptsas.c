@@ -490,7 +490,7 @@ static struct dev_ops mptsas_ops = {
 };
 
 
-#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.17"
+#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.18"
 #define	CDATE "MPTSAS was compiled on "__DATE__
 /* LINTED E_STATIC_UNUSED */
 static char *MPTWASCOMPILEDON = CDATE;
@@ -3229,6 +3229,14 @@ alloc_tag:
 		}
 		cmd->cmd_active_timeout = cmd->cmd_pkt->pkt_time;
 
+		/*
+		 * If initial timout is less than or equal to one tick, bump
+		 * the timeout by a tick so that command doesn't timeout before
+		 * its allotted time.
+		 */
+		if (cmd->cmd_active_timeout <= mptsas_scsi_watchdog_tick) {
+			cmd->cmd_active_timeout += mptsas_scsi_watchdog_tick;
+		}
 		return (TRUE);
 	} else {
 		int i;
@@ -4503,18 +4511,29 @@ static int
 mptsas_wait_intr(mptsas_t *mpt, int polltime)
 {
 	int				cnt;
-	uint32_t			reply_index;
 	pMpi2ReplyDescriptorsUnion_t	reply_desc_union;
+	uint32_t			int_mask;
 
 	NDBG5(("mptsas_wait_intr"));
+
+	mpt->m_polled_intr = 1;
+
+	/*
+	 * Get the current interrupt mask.  When re-enabling ints, set mask to
+	 * saved value.
+	 */
+	int_mask = ddi_get32(mpt->m_datap, &mpt->m_reg->HostInterruptMask);
+	MPTSAS_DISABLE_INTR(mpt);
 
 	/*
 	 * Keep polling for at least (polltime * 1000) seconds
 	 */
-	reply_index = mpt->m_post_index;
 	for (cnt = 0; cnt < polltime; cnt++) {
+		(void) ddi_dma_sync(mpt->m_dma_post_queue_hdl, 0, 0,
+		    DDI_DMA_SYNC_FORCPU);
+
 		reply_desc_union = (pMpi2ReplyDescriptorsUnion_t)
-		    MPTSAS_GET_NEXT_REPLY(mpt, reply_index);
+		    MPTSAS_GET_NEXT_REPLY(mpt, mpt->m_post_index);
 
 		if (ddi_get32(mpt->m_acc_post_queue_hdl,
 		    &reply_desc_union->Words.Low) == 0xFFFFFFFF ||
@@ -4523,27 +4542,34 @@ mptsas_wait_intr(mptsas_t *mpt, int polltime)
 			drv_usecwait(1000);
 			continue;
 		}
-		mpt->m_polled_intr = 1;
 		/*
 		 * The reply is valid, process it according to its
-		 * type.  Also, set a flag for updated the reply index
-		 * after they've all been processed.
+		 * type.
 		 */
 		mptsas_process_intr(mpt, reply_desc_union);
 
-		if (++reply_index == mpt->m_post_queue_depth) {
-			reply_index = 0;
+		if (++mpt->m_post_index == mpt->m_post_queue_depth) {
+			mpt->m_post_index = 0;
 		}
-		/*
-		 * Update the global reply index
-		 */
-		mpt->m_post_index = reply_index;
-		ddi_put32(mpt->m_datap,
-		    &mpt->m_reg->ReplyPostHostIndex, reply_index);
 
+		ddi_put32(mpt->m_datap,
+		    &mpt->m_reg->ReplyPostHostIndex, mpt->m_post_index);
+
+		mpt->m_polled_intr = 0;
+		/*
+		 * Re-enable interrupts and quit.
+		 */
+		ddi_put32(mpt->m_datap, &mpt->m_reg->HostInterruptMask,
+		    int_mask);
 		return (TRUE);
 
 	}
+
+	/*
+	 * Clear polling flag, re-enable interrupts and quit.
+	 */
+	mpt->m_polled_intr = 0;
+	ddi_put32(mpt->m_datap, &mpt->m_reg->HostInterruptMask, int_mask);
 	return (FALSE);
 }
 
@@ -4623,7 +4649,7 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 {
 	pMpi2AddressReplyDescriptor_t	address_reply;
 	pMPI2DefaultReply_t		reply;
-	uint32_t			reply_addr, reply_index;
+	uint32_t			reply_addr;
 	uint16_t			SMID;
 	mptsas_slots_t			*slots = mpt->m_active;
 	mptsas_cmd_t			*cmd = NULL;
@@ -4746,19 +4772,17 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 			/*
 			 * Return the reply frame to the free queue.
 			 */
-			reply_index = mpt->m_free_index;
 			ddi_put32(mpt->m_acc_free_queue_hdl,
 			    &((uint32_t *)(void *)
-			    mpt->m_free_queue)[reply_index], reply_addr);
+			    mpt->m_free_queue)[mpt->m_free_index], reply_addr);
 			(void) ddi_dma_sync(mpt->m_dma_free_queue_hdl, 0, 0,
 			    DDI_DMA_SYNC_FORDEV);
-			if (++reply_index == mpt->m_free_queue_depth) {
-				reply_index = 0;
+			if (++mpt->m_free_index == mpt->m_free_queue_depth) {
+				mpt->m_free_index = 0;
 			}
-			mpt->m_free_index = reply_index;
 
 			ddi_put32(mpt->m_datap,
-			    &mpt->m_reg->ReplyFreeHostIndex, reply_index);
+			    &mpt->m_reg->ReplyFreeHostIndex, mpt->m_free_index);
 		}
 		return;
 	default:
@@ -4769,17 +4793,16 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 	/*
 	 * Return the reply frame to the free queue.
 	 */
-	reply_index = mpt->m_free_index;
 	ddi_put32(mpt->m_acc_free_queue_hdl,
-	    &((uint32_t *)(void *)mpt->m_free_queue)[reply_index],
+	    &((uint32_t *)(void *)mpt->m_free_queue)[mpt->m_free_index],
 	    reply_addr);
 	(void) ddi_dma_sync(mpt->m_dma_free_queue_hdl, 0, 0,
 	    DDI_DMA_SYNC_FORDEV);
-	if (++reply_index == mpt->m_free_queue_depth) {
-		reply_index = 0;
+	if (++mpt->m_free_index == mpt->m_free_queue_depth) {
+		mpt->m_free_index = 0;
 	}
-	mpt->m_free_index = reply_index;
-	ddi_put32(mpt->m_datap, &mpt->m_reg->ReplyFreeHostIndex, reply_index);
+	ddi_put32(mpt->m_datap, &mpt->m_reg->ReplyFreeHostIndex,
+	    mpt->m_free_index);
 
 	if (cmd->cmd_flags & CFLAG_FW_CMD)
 		return;
@@ -4796,19 +4819,7 @@ mptsas_handle_address_reply(mptsas_t *mpt,
 		 */
 		cmd->cmd_flags &= ~CFLAG_RETRY;
 	} else {
-		struct scsi_pkt *pkt = CMD2PKT(cmd);
-
-		ASSERT((cmd->cmd_flags & CFLAG_COMPLETED) == 0);
-		cmd->cmd_linkp = NULL;
-		cmd->cmd_flags |= CFLAG_FINISHED;
-		cmd->cmd_flags &= ~CFLAG_IN_TRANSPORT;
-
-		if (pkt && pkt->pkt_comp) {
-			cmd->cmd_flags |= CFLAG_COMPLETED;
-			mutex_exit(&mpt->m_mutex);
-			mptsas_pkt_comp(pkt, cmd);
-			mutex_enter(&mpt->m_mutex);
-		}
+		mptsas_doneq_add(mpt, cmd);
 	}
 }
 
@@ -5136,7 +5147,6 @@ static uint_t
 mptsas_intr(caddr_t arg1, caddr_t arg2)
 {
 	mptsas_t			*mpt = (void *)arg1;
-	uint32_t			reply_index;
 	pMpi2ReplyDescriptorsUnion_t	reply_desc_union;
 	uchar_t				did_reply = FALSE;
 
@@ -5157,9 +5167,16 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 	}
 
 	/*
-	 * Save the current reply post host index value.
+	 * If polling, interrupt was triggered by some shared interrupt because
+	 * IOC interrupts are disabled during polling, so polling routine will
+	 * handle any replies.  Considering this, if polling is happening,
+	 * return with interrupt unclaimed.
 	 */
-	reply_index = mpt->m_post_index;
+	if (mpt->m_polled_intr) {
+		mutex_exit(&mpt->m_mutex);
+		mptsas_log(mpt, CE_WARN, "mpt_sas: Unclaimed interrupt");
+		return (DDI_INTR_UNCLAIMED);
+	}
 
 	/*
 	 * Read the istat register.
@@ -5168,14 +5185,14 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 		/*
 		 * read fifo until empty.
 		 */
-		(void) ddi_dma_sync(mpt->m_dma_post_queue_hdl, 0, 0,
-		    DDI_DMA_SYNC_FORCPU);
 #ifndef __lock_lint
 		_NOTE(CONSTCOND)
 #endif
 		while (TRUE) {
+			(void) ddi_dma_sync(mpt->m_dma_post_queue_hdl, 0, 0,
+			    DDI_DMA_SYNC_FORCPU);
 			reply_desc_union = (pMpi2ReplyDescriptorsUnion_t)
-			    MPTSAS_GET_NEXT_REPLY(mpt, reply_index);
+			    MPTSAS_GET_NEXT_REPLY(mpt, mpt->m_post_index);
 
 			if (ddi_get32(mpt->m_acc_post_queue_hdl,
 			    &reply_desc_union->Words.Low) == 0xFFFFFFFF ||
@@ -5193,10 +5210,9 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 
 			mptsas_process_intr(mpt, reply_desc_union);
 
-			if (++reply_index == mpt->m_post_queue_depth) {
-				reply_index = 0;
+			if (++mpt->m_post_index == mpt->m_post_queue_depth) {
+				mpt->m_post_index = 0;
 			}
-			mpt->m_post_index = reply_index;
 		}
 
 		/*
@@ -5205,14 +5221,9 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 		 */
 		if (did_reply) {
 			ddi_put32(mpt->m_datap,
-			    &mpt->m_reg->ReplyPostHostIndex, reply_index);
+			    &mpt->m_reg->ReplyPostHostIndex, mpt->m_post_index);
 		}
 	} else {
-		if (mpt->m_polled_intr) {
-			mpt->m_polled_intr = 0;
-			mutex_exit(&mpt->m_mutex);
-			return (DDI_INTR_CLAIMED);
-		}
 		mutex_exit(&mpt->m_mutex);
 		return (DDI_INTR_UNCLAIMED);
 	}
@@ -5241,10 +5252,6 @@ mptsas_intr(caddr_t arg1, caddr_t arg2)
 	 */
 	if (mpt->m_waitq != NULL) {
 		mptsas_restart_waitq(mpt);
-	}
-
-	if (mpt->m_polled_intr) {
-		mpt->m_polled_intr = 0;
 	}
 
 	mutex_exit(&mpt->m_mutex);
@@ -5999,7 +6006,7 @@ mptsas_record_event(void *args)
 	i = (uint8_t)(event / 32);
 	j = (uint8_t)(event % 32);
 	if ((i < 4) && ((1 << j) & mpt->m_event_mask[i])) {
-		i = mpt->m_event_number;
+		i = mpt->m_event_index;
 		mpt->m_events[i].Type = event;
 		mpt->m_events[i].Number = ++mpt->m_event_number;
 		bzero(mpt->m_events[i].Data, MPTSAS_MAX_EVENT_DATA_LENGTH * 4);
@@ -6025,7 +6032,7 @@ mptsas_record_event(void *args)
 			if (++i == MPTSAS_EVENT_QUEUE_SIZE) {
 				i = 0;
 			}
-			mpt->m_event_number = i;
+			mpt->m_event_index = (uint8_t)i;
 
 			/*
 			 * Set flag to send the event.
@@ -6686,7 +6693,7 @@ mptsas_handle_event(void *args)
 	m_replyh_arg_t			*replyh_arg;
 	pMpi2EventNotificationReply_t	eventreply;
 	uint32_t			event, iocloginfo, rfm;
-	uint32_t			status, reply_index;
+	uint32_t			status;
 	uint8_t				port;
 	mptsas_t			*mpt;
 	uint_t				iocstatus;
@@ -7146,24 +7153,23 @@ mptsas_handle_event(void *args)
 		break;
 	}
 	default:
-		mptsas_log(mpt, CE_NOTE, "mptsas%d: unknown event %x received",
-		    mpt->m_instance, event);
+		NDBG20(("mptsas%d: unknown event %x received",
+		    mpt->m_instance, event));
 		break;
 	}
 
 	/*
 	 * Return the reply frame to the free queue.
 	 */
-	reply_index = mpt->m_free_index;
 	ddi_put32(mpt->m_acc_free_queue_hdl,
-	    &((uint32_t *)(void *)mpt->m_free_queue)[reply_index], rfm);
+	    &((uint32_t *)(void *)mpt->m_free_queue)[mpt->m_free_index], rfm);
 	(void) ddi_dma_sync(mpt->m_dma_free_queue_hdl, 0, 0,
 	    DDI_DMA_SYNC_FORDEV);
-	if (++reply_index == mpt->m_free_queue_depth) {
-		reply_index = 0;
+	if (++mpt->m_free_index == mpt->m_free_queue_depth) {
+		mpt->m_free_index = 0;
 	}
-	mpt->m_free_index = reply_index;
-	ddi_put32(mpt->m_datap, &mpt->m_reg->ReplyFreeHostIndex, reply_index);
+	ddi_put32(mpt->m_datap, &mpt->m_reg->ReplyFreeHostIndex,
+	    mpt->m_free_index);
 	mutex_exit(&mpt->m_mutex);
 }
 
@@ -7766,18 +7772,11 @@ mptsas_doneq_add(mptsas_t *mpt, mptsas_cmd_t *cmd)
 	/*
 	 * only add scsi pkts that have completion routines to
 	 * the doneq.  no intr cmds do not have callbacks.
-	 * run the callback on an ARQ pkt immediately.  This
-	 * frees the ARQ for other check conditions.
 	 */
-	if (pkt->pkt_comp && !(cmd->cmd_flags & CFLAG_CMDARQ)) {
+	if (pkt && (pkt->pkt_comp)) {
 		*mpt->m_donetail = cmd;
 		mpt->m_donetail = &cmd->cmd_linkp;
 		mpt->m_doneq_len++;
-	} else if (pkt->pkt_comp && (cmd->cmd_flags & CFLAG_CMDARQ)) {
-		cmd->cmd_flags |= CFLAG_COMPLETED;
-		mutex_exit(&mpt->m_mutex);
-		mptsas_pkt_comp(pkt, cmd);
-		mutex_enter(&mpt->m_mutex);
 	}
 }
 
@@ -9308,7 +9307,6 @@ mptsas_do_passthru(mptsas_t *mpt, uint8_t *request, uint8_t *reply,
 	Mpi2SCSIIOReply_t		rep_msg;
 	int				i, status = 0, pt_flags = 0, rv = 0;
 	int				rvalue;
-	uint32_t			reply_index;
 	uint8_t				function;
 
 	ASSERT(mutex_owned(&mpt->m_mutex));
@@ -9551,18 +9549,16 @@ out:
 	 * if this reply is an ADDRESS reply.
 	 */
 	if (pt_flags & MPTSAS_ADDRESS_REPLY) {
-		reply_index = mpt->m_free_index;
 		ddi_put32(mpt->m_acc_free_queue_hdl,
-		    &((uint32_t *)(void *)mpt->m_free_queue)[reply_index],
+		    &((uint32_t *)(void *)mpt->m_free_queue)[mpt->m_free_index],
 		    cmd->cmd_rfm);
 		(void) ddi_dma_sync(mpt->m_dma_free_queue_hdl, 0, 0,
 		    DDI_DMA_SYNC_FORDEV);
-		if (++reply_index == mpt->m_free_queue_depth) {
-			reply_index = 0;
+		if (++mpt->m_free_index == mpt->m_free_queue_depth) {
+			mpt->m_free_index = 0;
 		}
-		mpt->m_free_index = reply_index;
 		ddi_put32(mpt->m_datap, &mpt->m_reg->ReplyFreeHostIndex,
-		    reply_index);
+		    mpt->m_free_index);
 	}
 	if (cmd && (cmd->cmd_flags & CFLAG_PREPARED)) {
 		mptsas_remove_cmd(mpt, cmd);
@@ -9745,7 +9741,6 @@ mptsas_lookup_pci_data(mptsas_t *mpt, mptsas_adapter_data_t *adapter_data)
 {
 	int	*reg_data;
 	uint_t	reglen;
-	char	*fw_rev;
 
 	/*
 	 * Lookup the 'reg' property and extract the other data
@@ -9782,24 +9777,9 @@ mptsas_lookup_pci_data(mptsas_t *mpt, mptsas_adapter_data_t *adapter_data)
 	}
 
 	/*
-	 * Lookup the 'firmware-version' property and extract the data
+	 * Saved in the mpt->m_fwversion
 	 */
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, mpt->m_dip,
-	    DDI_PROP_DONTPASS, "firmware-version", &fw_rev) ==
-	    DDI_PROP_SUCCESS) {
-		/*
-		 * Version is a string of 4 bytes which fits into the DWORD
-		 */
-		(void) strcpy((char *)&adapter_data->MpiFirmwareVersion,
-		    fw_rev);
-		ddi_prop_free(fw_rev);
-	} else {
-		/*
-		 * If we can't determine the PCI data then we fill in FF's for
-		 * the data to indicate this.
-		 */
-		adapter_data->MpiFirmwareVersion = 0xFFFFFFFF;
-	}
+	adapter_data->MpiFirmwareVersion = mpt->m_fwversion;
 }
 
 static void
@@ -9810,9 +9790,12 @@ mptsas_read_adapter_data(mptsas_t *mpt, mptsas_adapter_data_t *adapter_data)
 	mptsas_lookup_pci_data(mpt, adapter_data);
 	adapter_data->AdapterType = MPTIOCTL_ADAPTER_TYPE_SAS2;
 	adapter_data->PCIDeviceHwId = (uint32_t)mpt->m_devid;
+	adapter_data->PCIDeviceHwRev = (uint32_t)mpt->m_revid;
 	adapter_data->SubSystemId = (uint32_t)mpt->m_ssid;
 	adapter_data->SubsystemVendorId = (uint32_t)mpt->m_svid;
 	(void) strcpy((char *)&adapter_data->DriverVersion[0], driver_verstr);
+	adapter_data->BiosVersion = 0;
+	(void) mptsas_get_bios_page3(mpt, &adapter_data->BiosVersion);
 }
 
 static void
@@ -10138,8 +10121,15 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 {
 	ddi_dma_cookie_t	cookie;
 	uint32_t		i;
+	mptsas_slots_t		*new_active;
 
 	if (first_time == FALSE) {
+		/*
+		 * De-allocate buffers before re-allocating them using the
+		 * latest IOC facts.
+		 */
+		mptsas_hba_fini(mpt);
+
 		/*
 		 * Setup configuration space
 		 */
@@ -10164,53 +10154,78 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	 */
 	if (mptsas_ioc_reset(mpt) == MPTSAS_RESET_FAIL) {
 		mptsas_log(mpt, CE_WARN, "hard reset failed!");
-		return (DDI_FAILURE);
+		goto fail;
 	}
 	/*
-	 * Do some initilization only needed during attach
+	 * IOC facts can change after a diag reset so all buffers that are
+	 * based on these numbers must be de-allocated and re-allocated.  Get
+	 * new IOC facts each time chip is initialized.
 	 */
-	if (first_time) {
-		/*
-		 * Get ioc facts from adapter
-		 */
-		if (mptsas_ioc_get_facts(mpt) == DDI_FAILURE) {
-			mptsas_log(mpt, CE_WARN, "mptsas_ioc_get_facts "
-			    "failed");
+	if (mptsas_ioc_get_facts(mpt) == DDI_FAILURE) {
+		mptsas_log(mpt, CE_WARN, "mptsas_ioc_get_facts "
+		    "failed");
+		goto fail;
+	}
+	/*
+	 * Re-allocate active slots here if not the first reset.  Since
+	 * m_active could have a different number of slots allocated after a
+	 * reset, just de-allocate the old m_active structure and re-allocate a
+	 * new one.  Save the tables and IR info from the old m_active.
+	 */
+	if (first_time == FALSE) {
+		new_active = kmem_zalloc(MPTSAS_SLOTS_SIZE(mpt), KM_SLEEP);
+		if (new_active == NULL) {
+			mptsas_log(mpt, CE_WARN, "Re-alloc of active slots "
+			    "failed!");
 			goto fail;
+		} else {
+			new_active->m_n_slots = (mpt->m_max_requests - 2);
+			new_active->m_size = MPTSAS_SLOTS_SIZE(mpt);
+			new_active->m_tags = 1;
+			new_active->m_tgttbl = mpt->m_active->m_tgttbl;
+			new_active->m_smptbl = mpt->m_active->m_smptbl;
+			new_active->m_num_raid_configs =
+			    mpt->m_active->m_num_raid_configs;
+			for (i = 0; i < new_active->m_num_raid_configs; i++) {
+				new_active->m_raidconfig[i] =
+				    mpt->m_active->m_raidconfig[i];
+			}
+			kmem_free(mpt->m_active, mpt->m_active->m_size);
+			mpt->m_active = new_active;
 		}
+	}
 
-		/*
-		 * Allocate request message frames
-		 */
-		if (mptsas_alloc_request_frames(mpt) == DDI_FAILURE) {
-			mptsas_log(mpt, CE_WARN, "mptsas_alloc_request_frames "
-			    "failed");
-			goto fail;
-		}
-		/*
-		 * Allocate reply free queue
-		 */
-		if (mptsas_alloc_free_queue(mpt) == DDI_FAILURE) {
-			mptsas_log(mpt, CE_WARN, "mptsas_alloc_free_queue "
-			    "failed!");
-			goto fail;
-		}
-		/*
-		 * Allocate reply descriptor post queue
-		 */
-		if (mptsas_alloc_post_queue(mpt) == DDI_FAILURE) {
-			mptsas_log(mpt, CE_WARN, "mptsas_alloc_post_queue "
-			    "failed!");
-			goto fail;
-		}
-		/*
-		 * Allocate reply message frames
-		 */
-		if (mptsas_alloc_reply_frames(mpt) == DDI_FAILURE) {
-			mptsas_log(mpt, CE_WARN, "mptsas_alloc_reply_frames "
-			    "failed!");
-			goto fail;
-		}
+	/*
+	 * Allocate request message frames
+	 */
+	if (mptsas_alloc_request_frames(mpt) == DDI_FAILURE) {
+		mptsas_log(mpt, CE_WARN, "mptsas_alloc_request_frames "
+		    "failed");
+		goto fail;
+	}
+	/*
+	 * Allocate reply free queue
+	 */
+	if (mptsas_alloc_free_queue(mpt) == DDI_FAILURE) {
+		mptsas_log(mpt, CE_WARN, "mptsas_alloc_free_queue "
+		    "failed!");
+		goto fail;
+	}
+	/*
+	 * Allocate reply descriptor post queue
+	 */
+	if (mptsas_alloc_post_queue(mpt) == DDI_FAILURE) {
+		mptsas_log(mpt, CE_WARN, "mptsas_alloc_post_queue "
+		    "failed!");
+		goto fail;
+	}
+	/*
+	 * Allocate reply message frames
+	 */
+	if (mptsas_alloc_reply_frames(mpt) == DDI_FAILURE) {
+		mptsas_log(mpt, CE_WARN, "mptsas_alloc_reply_frames "
+		    "failed!");
+		goto fail;
 	}
 
 	/*
@@ -10226,14 +10241,9 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 
 	/*
 	 * Initialize reply post index and request index.  Reply free index is
-	 * initialized after the next loop.  m_tags must only be initialized if
-	 * this is not the first time because m_active is not allocated if this
-	 * is the first time.
+	 * initialized after the next loop.
 	 */
 	mpt->m_post_index = 0;
-	if (!first_time) {
-		mpt->m_active->m_tags = 1;
-	}
 
 	/*
 	 * Initialize the Reply Free Queue with the physical addresses of our
@@ -10280,7 +10290,7 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	 * is complete, get the base WWID.
 	 */
 
-	if (first_time) {
+	if (first_time == TRUE) {
 		if (mptsas_set_initiator_mode(mpt)) {
 			mptsas_log(mpt, CE_WARN, "mptsas_set_initiator_mode "
 			    "failed!");
@@ -10297,7 +10307,7 @@ mptsas_init_chip(mptsas_t *mpt, int first_time)
 	/*
 	 * enable events
 	 */
-	if (first_time != TRUE) {
+	if (first_time == FALSE) {
 		if (mptsas_ioc_enable_event_notification(mpt)) {
 			goto fail;
 		}
