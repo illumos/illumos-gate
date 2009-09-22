@@ -3282,16 +3282,16 @@ isnst_monitor_default_portal_list(void)
 	 * c) the default portal has gone offline
 	 */
 	if (isns_portals_changed ||
-	    (default_portal_online &&
+	    ((new_portal_list_size != 0) &&
 	    (isnst_find_default_portals(new_portal_list) !=
 	    num_default_portals)) ||
-	    (! default_portal_online && num_default_portals > 0)) {
+	    ((new_portal_list_size == 0) && (num_default_portals > 0))) {
 
 		isnst_clear_default_portals();
 		isnst_copy_portal_list(&isns_tpg_portals,
 		    &isns_all_portals);
 		num_tpg_portals = avl_numnodes(&isns_all_portals);
-		if (default_portal_online) {
+		if (new_portal_list_size != 0) {
 			num_default_portals =
 			    isnst_add_default_portals(new_portal_list);
 		}
