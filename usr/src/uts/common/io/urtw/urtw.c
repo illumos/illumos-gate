@@ -3539,7 +3539,7 @@ urtw_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	if ((type & IEEE80211_FC0_TYPE_MASK) == IEEE80211_FC0_TYPE_DATA) {
 		buf[3] = urtw_rate2rtl(MAX(2, urtw_get_rate(ic)));
 	} else
-		buf[3] = sc->sc_currate;
+		buf[3] = 0;
 
 	if (sc->sc_hwrev & URTW_HWREV_8187) {
 		buf[8] = 3;		/* CW minimum  */
