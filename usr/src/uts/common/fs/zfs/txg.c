@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <sys/zfs_context.h>
 #include <sys/txg_impl.h>
 #include <sys/dmu_impl.h>
+#include <sys/dmu_tx.h>
 #include <sys/dsl_pool.h>
 #include <sys/callb.h>
 
@@ -57,6 +58,9 @@ txg_init(dsl_pool_t *dp, uint64_t txg)
 		for (i = 0; i < TXG_SIZE; i++) {
 			cv_init(&tx->tx_cpu[c].tc_cv[i], NULL, CV_DEFAULT,
 			    NULL);
+			list_create(&tx->tx_cpu[c].tc_callbacks[i],
+			    sizeof (dmu_tx_callback_t),
+			    offsetof(dmu_tx_callback_t, dcb_node));
 		}
 	}
 
@@ -96,9 +100,14 @@ txg_fini(dsl_pool_t *dp)
 		int i;
 
 		mutex_destroy(&tx->tx_cpu[c].tc_lock);
-		for (i = 0; i < TXG_SIZE; i++)
+		for (i = 0; i < TXG_SIZE; i++) {
 			cv_destroy(&tx->tx_cpu[c].tc_cv[i]);
+			list_destroy(&tx->tx_cpu[c].tc_callbacks[i]);
+		}
 	}
+
+	if (tx->tx_commit_cb_taskq != NULL)
+		taskq_destroy(tx->tx_commit_cb_taskq);
 
 	kmem_free(tx->tx_cpu, max_ncpus * sizeof (tx_cpu_t));
 
@@ -229,6 +238,17 @@ txg_rele_to_quiesce(txg_handle_t *th)
 }
 
 void
+txg_register_callbacks(txg_handle_t *th, list_t *tx_callbacks)
+{
+	tx_cpu_t *tc = th->th_cpu;
+	int g = th->th_txg & TXG_MASK;
+
+	mutex_enter(&tc->tc_lock);
+	list_move_tail(&tc->tc_callbacks[g], tx_callbacks);
+	mutex_exit(&tc->tc_lock);
+}
+
+void
 txg_rele_to_sync(txg_handle_t *th)
 {
 	tx_cpu_t *tc = th->th_cpu;
@@ -275,6 +295,55 @@ txg_quiesce(dsl_pool_t *dp, uint64_t txg)
 		while (tc->tc_count[g] != 0)
 			cv_wait(&tc->tc_cv[g], &tc->tc_lock);
 		mutex_exit(&tc->tc_lock);
+	}
+}
+
+static void
+txg_do_callbacks(list_t *cb_list)
+{
+	dmu_tx_do_callbacks(cb_list, 0);
+
+	list_destroy(cb_list);
+
+	kmem_free(cb_list, sizeof (list_t));
+}
+
+/*
+ * Dispatch the commit callbacks registered on this txg to worker threads.
+ */
+static void
+txg_dispatch_callbacks(dsl_pool_t *dp, uint64_t txg)
+{
+	int c;
+	tx_state_t *tx = &dp->dp_tx;
+	list_t *cb_list;
+
+	for (c = 0; c < max_ncpus; c++) {
+		tx_cpu_t *tc = &tx->tx_cpu[c];
+		/* No need to lock tx_cpu_t at this point */
+
+		int g = txg & TXG_MASK;
+
+		if (list_is_empty(&tc->tc_callbacks[g]))
+			continue;
+
+		if (tx->tx_commit_cb_taskq == NULL) {
+			/*
+			 * Commit callback taskq hasn't been created yet.
+			 */
+			tx->tx_commit_cb_taskq = taskq_create("tx_commit_cb",
+			    max_ncpus, minclsyspri, max_ncpus, max_ncpus * 2,
+			    TASKQ_PREPOPULATE);
+		}
+
+		cb_list = kmem_alloc(sizeof (list_t), KM_SLEEP);
+		list_create(cb_list, sizeof (dmu_tx_callback_t),
+		    offsetof(dmu_tx_callback_t, dcb_node));
+
+		list_move_tail(&tc->tc_callbacks[g], cb_list);
+
+		(void) taskq_dispatch(tx->tx_commit_cb_taskq, (task_func_t *)
+		    txg_do_callbacks, cb_list, TQ_SLEEP);
 	}
 }
 
@@ -351,6 +420,11 @@ txg_sync_thread(dsl_pool_t *dp)
 		tx->tx_syncing_txg = 0;
 		rw_exit(&tx->tx_suspend);
 		cv_broadcast(&tx->tx_sync_done_cv);
+
+		/*
+		 * Dispatch commit callbacks to worker threads.
+		 */
+		txg_dispatch_callbacks(dp, txg);
 	}
 }
 

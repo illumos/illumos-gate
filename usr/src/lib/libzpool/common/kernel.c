@@ -794,6 +794,8 @@ kernel_fini(void)
 {
 	spa_fini();
 
+	system_taskq_fini();
+
 	close(random_fd);
 	close(urandom_fd);
 

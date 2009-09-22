@@ -272,3 +272,10 @@ system_taskq_init(void)
 	system_taskq = taskq_create("system_taskq", 64, minclsyspri, 4, 512,
 	    TASKQ_DYNAMIC | TASKQ_PREPOPULATE);
 }
+
+void
+system_taskq_fini(void)
+{
+	taskq_destroy(system_taskq);
+	system_taskq = NULL; /* defensive */
+}

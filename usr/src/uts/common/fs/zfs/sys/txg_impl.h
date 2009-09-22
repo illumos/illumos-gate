@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@ struct tx_cpu {
 	kmutex_t	tc_lock;
 	kcondvar_t	tc_cv[TXG_SIZE];
 	uint64_t	tc_count[TXG_SIZE];
+	list_t		tc_callbacks[TXG_SIZE]; /* commit cb list */
 	char		tc_pad[16];
 };
 
@@ -64,6 +65,8 @@ typedef struct tx_state {
 
 	kthread_t	*tx_sync_thread;
 	kthread_t	*tx_quiesce_thread;
+
+	taskq_t		*tx_commit_cb_taskq; /* commit callback taskq */
 } tx_state_t;
 
 #ifdef	__cplusplus

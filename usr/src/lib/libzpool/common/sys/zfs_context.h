@@ -332,6 +332,7 @@ extern void	taskq_destroy(taskq_t *);
 extern void	taskq_wait(taskq_t *);
 extern int	taskq_member(taskq_t *, void *);
 extern void	system_taskq_init(void);
+extern void	system_taskq_fini(void);
 
 #define	XVA_MAPSIZE	3
 #define	XVA_MAGIC	0x78766174
