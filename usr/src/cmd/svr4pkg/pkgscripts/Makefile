@@ -50,12 +50,20 @@ SCRIPTS = $(CLASS_ACTION_SCRIPTS) $(PROG)
 include $(SRC)/cmd/svr4pkg/Makefile.svr4pkg
 CLOBBERFILES += $(CLASS_ACTION_SCRIPTS)
 
+ROOTLINKS=	$(ROOTCLASS_SCR_DIR)/i.CONFIG.prsv
+PRESRV=		$(ROOTCLASS_SCR_DIR)/i.preserve
+
 LDLIBS  +=      -lpkg
 
 .KEEP_STATE:
+
 all:	$(PROG) $(CLASS_ACTION_SCRIPTS)
 
 install: all $(ROOTCLASS_SCR_FILES) $(ROOTADMIN_SRC_FILE) \
-	    $(ROOTPKGMNFST)
+	$(ROOTPKGMNFST) $(ROOTLINKS)
+
+$(ROOTLINKS): $(ROOTCLASS_SCR_FILES)
+	$(RM) $@
+	$(LN) $(PRESRV) $@
 
 include $(SRC)/cmd/svr4pkg/Makefile.svr4pkg.targ
