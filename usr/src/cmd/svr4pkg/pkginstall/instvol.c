@@ -1226,10 +1226,34 @@ domerg(struct cfextra **extlist, int part, int nparts,
 				*srcp = ept->ainfo.local;
 				if (is_partial_inst() != 0) {
 					if (*srcp[0] == '~') {
-						/* translate source pathname */
-						*srcp = srcpath(instdir,
-							extlist[i]->map_path,
-							part, nparts);
+						/* Done only for C style */
+						char *tmp_ptr;
+						tmp_ptr = extlist[i]->map_path;
+						if (ept->ftype != 'f') {
+							/*
+							 * translate source
+							 * pathname
+							 */
+							*srcp =
+							    srcpath(instdir,
+							    tmp_ptr,
+							    part,
+							    nparts);
+						} else {
+						/*
+						 * instdir has the absolute path
+						 * to saveSpoolInstallDir for
+						 * the package. This is only
+						 * useful for 'e','v' types.
+						 *
+						 * For 'f', we generate the
+						 * absolute src path with the
+						 * help of install root and the
+						 * basedir.
+						 */
+							*srcp = trans_srcp_pi(
+							    ept->ainfo.local);
+						}
 					} else {
 						*srcp = extlist[i]->map_path;
 					}

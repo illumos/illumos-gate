@@ -228,6 +228,7 @@ extern char	*qreason __P((int caller, int retcode, int started,
 			int includeZonename));
 extern char	*qstrdup __P((char *s));
 extern char	*srcpath __P((char *d, char *p, int part, int nparts));
+extern char	*trans_srcp_pi __P((char *local_path));
 extern int	copyf __P((char *from, char *to, time_t mytime));
 extern int	copyFile __P((int, int, char *, char *, struct stat *, long));
 extern int	openLocal __P((char *a_path, int a_oflag, char *a_tmpdir));
