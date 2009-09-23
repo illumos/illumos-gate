@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Opl Platform specific functions.
@@ -27,8 +27,6 @@
  * 	called when :
  *	machine_type == MTYPE_OPL
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -588,7 +586,10 @@ print_opl_memory_line(int lsb, struct cs_status *cs_stat, int ngrps,
 	 * Obtain "mirror-mode" property from pseudo-mc.
 	 * cs_stat[0].dimms/i_factor represents interleave factor per
 	 * pseudo-mc node. Must use cs_stat[0].dimms since this will yield
-	 * interleave factor even if some DIMMs are isolated.
+	 * interleave factor even if some DIMMs are isolated, except for
+	 * the case where the entire memory group has been deconfigured (eg. due
+	 * to DIMM failure); in this case, we use the second memory group
+	 * (i.e. cs_stat[1]).
 	 *
 	 * Mirror mode:
 	 *   interleave factor = (# of DIMMs on cs_stat[0]/4)
@@ -597,7 +598,10 @@ print_opl_memory_line(int lsb, struct cs_status *cs_stat, int ngrps,
 	 *   interleave factor = (# of DIMMs on cs_stat[0]/2)
 	 */
 
-	interleave = cs_stat[0].dimms/i_factor;
+	if (cs_stat[0].dimms == 0)
+		interleave = cs_stat[1].dimms/i_factor;
+	else
+		interleave = cs_stat[0].dimms/i_factor;
 
 
 	for (i = 0; i < ngrps; i++) {
