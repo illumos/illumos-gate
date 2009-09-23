@@ -110,6 +110,7 @@ static kcondvar_t rndpool_read_cv; /* serializes poll/read syscalls */
 static int num_waiters;		/* #threads waiting to read from /dev/random */
 
 static struct pollhead rnd_pollhead;
+/* LINTED E_STATIC_UNUSED */
 static timeout_id_t kcf_rndtimeout_id;
 static crypto_mech_type_t rngmech_type = CRYPTO_MECH_INVALID;
 rnd_stats_t rnd_stats;
@@ -287,7 +288,8 @@ notify_done(void *arg, int rv)
 static int
 rngprov_getbytes_nblk(uint8_t *ptr, size_t len)
 {
-	int rv, blen, total_bytes;
+	int rv, total_bytes;
+	size_t blen;
 	uchar_t *rndbuf;
 	kcf_provider_desc_t *pd;
 	kcf_req_params_t params;
@@ -425,7 +427,7 @@ rngprov_task(void *arg)
 static int
 rnd_get_bytes(uint8_t *ptr, size_t len, extract_type_t how)
 {
-	int bytes;
+	size_t bytes;
 	size_t got;
 
 	ASSERT(mutex_owned(&rndpool_lock));
@@ -581,8 +583,8 @@ typedef struct rndmag_pad_s
 static int
 rnd_generate_pseudo_bytes(rndmag_pad_t *rmp, uint8_t *ptr, size_t len)
 {
-	size_t bytes = len;
-	int nblock, size;
+	size_t bytes = len, size;
+	int nblock;
 	uint32_t oblocks;
 	uint32_t tempout[HASHSIZE/BYTES_IN_WORD];
 	uint32_t seed[HASHSIZE/BYTES_IN_WORD];

@@ -23,12 +23,14 @@
  * Use is subject to license terms.
  */
 
+
 #ifndef _KERNEL
 #include <strings.h>
 #include <limits.h>
 #include <assert.h>
 #include <security/cryptoki.h>
-#endif
+#endif	/* _KERNEL */
+
 
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -37,42 +39,84 @@
 #include <sys/crypto/impl.h>
 #include <sys/byteorder.h>
 
+#ifdef __amd64
+#include <sys/x86_archext.h>	/* x86_feature, X86_*, CPUID_* */
+
+#ifndef _KERNEL
+#include <sys/cpuvar.h>		/* cpu_t, CPU */
+#include <sys/disp.h>		/* kpreempt_disable(), kpreempt_enable */
+/* Workaround for no XMM kernel thread save/restore */
+#define	KPREEMPT_DISABLE	kpreempt_disable()
+#define	KPREEMPT_ENABLE		kpreempt_enable()
+
+#else
+#include <sys/auxv.h>		/* getisax() */
+#include <sys/auxv_386.h>	/* AV_386_PCLMULQDQ bit */
+#define	KPREEMPT_DISABLE
+#define	KPREEMPT_ENABLE
+#endif	/* _KERNEL */
+
+extern void gcm_mul_pclmulqdq(uint64_t *x_in, uint64_t *y, uint64_t *res);
+static int intel_pclmulqdq_instruction_present(void);
+#endif	/* __amd64 */
+
 struct aes_block {
 	uint64_t a;
 	uint64_t b;
 };
 
+
+/*
+ * gcm_mul()
+ * Perform a carry-less multiplication (that is, use XOR instead of the
+ * multiply operator) on *x_in and *y and place the result in *res.
+ *
+ * Byte swap the input (*x_in and *y) and the output (*res).
+ *
+ * Note: x_in, y, and res all point to 16-byte numbers (an array of two
+ * 64-bit integers).
+ */
 void
 gcm_mul(uint64_t *x_in, uint64_t *y, uint64_t *res)
 {
-	uint64_t R = { 0xe100000000000000ULL };
-	struct aes_block z = { 0, 0 };
-	struct aes_block v;
-	uint64_t x;
-	int i, j;
+#ifdef __amd64
+	if (intel_pclmulqdq_instruction_present()) {
+		KPREEMPT_DISABLE;
+		gcm_mul_pclmulqdq(x_in, y, res);
+		KPREEMPT_ENABLE;
+	} else
+#endif	/* __amd64 */
+	{
+		static const uint64_t R = 0xe100000000000000ULL;
+		struct aes_block z = {0, 0};
+		struct aes_block v;
+		uint64_t x;
+		int i, j;
 
-	v.a = ntohll(y[0]);
-	v.b = ntohll(y[1]);
+		v.a = ntohll(y[0]);
+		v.b = ntohll(y[1]);
 
-	for (j = 0; j < 2; j++) {
-		x = ntohll(x_in[j]);
-		for (i = 0; i < 64; i++, x <<= 1) {
-			if (x & 0x8000000000000000ULL) {
-				z.a ^= v.a;
-				z.b ^= v.b;
-			}
-			if (v.b & 1ULL) {
-				v.b = (v.a << 63)|(v.b >> 1);
-				v.a = (v.a >> 1) ^ R;
-			} else {
-				v.b = (v.a << 63)|(v.b >> 1);
-				v.a = v.a >> 1;
+		for (j = 0; j < 2; j++) {
+			x = ntohll(x_in[j]);
+			for (i = 0; i < 64; i++, x <<= 1) {
+				if (x & 0x8000000000000000ULL) {
+					z.a ^= v.a;
+					z.b ^= v.b;
+				}
+				if (v.b & 1ULL) {
+					v.b = (v.a << 63)|(v.b >> 1);
+					v.a = (v.a >> 1) ^ R;
+				} else {
+					v.b = (v.a << 63)|(v.b >> 1);
+					v.a = v.a >> 1;
+				}
 			}
 		}
+		res[0] = htonll(z.a);
+		res[1] = htonll(z.b);
 	}
-	res[0] = htonll(z.a);
-	res[1] = htonll(z.b);
 }
+
 
 #define	GHASH(c, d, t) \
 	xor_block((uint8_t *)(d), (uint8_t *)(c)->gcm_ghash); \
@@ -674,3 +718,47 @@ gcm_set_kmflag(gcm_ctx_t *ctx, int kmflag)
 {
 	ctx->gcm_kmflag = kmflag;
 }
+
+
+#ifdef __amd64
+/*
+ * Return 1 if executing on Intel with PCLMULQDQ instructions,
+ * otherwise 0 (i.e., Intel without PCLMULQDQ or AMD64).
+ * Cache the result, as the CPU can't change.
+ *
+ * Note: the userland version uses getisax().  The kernel version uses
+ * global variable x86_feature or the output of cpuid_insn().
+ */
+static int
+intel_pclmulqdq_instruction_present(void)
+{
+	static int	cached_result = -1;
+
+	if (cached_result == -1) { /* first time */
+#ifdef _KERNEL
+#ifdef X86_PCLMULQDQ
+		cached_result = (x86_feature & X86_PCLMULQDQ) != 0;
+#else
+		if (cpuid_getvendor(CPU) == X86_VENDOR_Intel) {
+			struct cpuid_regs	cpr;
+			cpu_t			*cp = CPU;
+
+			cpr.cp_eax = 1; /* Function 1: get processor info */
+			(void) cpuid_insn(cp, &cpr);
+			cached_result = ((cpr.cp_ecx &
+			    CPUID_INTC_ECX_PCLMULQDQ) != 0);
+		} else {
+			cached_result = 0;
+		}
+#endif	/* X86_PCLMULQDQ */
+#else
+		uint_t		ui = 0;
+
+		(void) getisax(&ui, 1);
+		cached_result = (ui & AV_386_PCLMULQDQ) != 0;
+#endif	/* _KERNEL */
+	}
+
+	return (cached_result);
+}
+#endif	/* __amd64 */

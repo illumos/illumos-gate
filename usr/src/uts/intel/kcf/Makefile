@@ -19,15 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the Kernel Cryptographic
 #	Framework core module.
 #
-#	intel implementation architecture dependent
+#	Intel implementation architecture dependent
 #
 
 #
@@ -40,8 +38,11 @@ COM_DIR = $(COMMONBASE)/crypto
 #	Define the module and object file sets.
 #
 MODULE		= kcf
-OBJECTS		= $(KCF_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(KCF_OBJS:%.o=$(LINTS_DIR)/%.ln)
+KCF_OBJS_32	=
+KCF_OBJS_64	= gcm_intel.o
+KCF_OBJS	+= $(KCF_OBJS_$(CLASS))
+OBJECTS		= $(KCF_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
@@ -63,16 +64,15 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
-LINTTAGS	+= -erroff=E_STATIC_UNUSED
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+
 LINTTAGS	+= -I$(COM_DIR)
 
 #
 # Linkage dependencies
 #
 
-CFLAGS += $(CCVERBOSE) -I$(COM_DIR)
+CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
+AS_CPPFLAGS	+= -I../../$(PLATFORM)
 
 #
 #	Default build targets.
@@ -99,3 +99,10 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
+
+$(OBJS_DIR)/%.o: $(COM_DIR)/modes/amd64/%.s
+	$(COMPILE.s) -o $@ $(COM_DIR)/modes/amd64/${@F:.o=.s}
+	$(POST_PROCESS_O)
+
+$(OBJS_DIR)/%.ln: $(COM_DIR)/modes/amd64/%.s
+	@($(LHEAD) $(LINT.s) $(COM_DIR)/modes/amd64/${@F:.ln=.s} $(LTAIL))

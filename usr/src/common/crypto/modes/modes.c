@@ -153,7 +153,7 @@ crypto_get_ptrs(crypto_data_t *out, void **iov_or_mp, offset_t *current_offset,
 			*current_offset = offset + amt;
 		} else {
 			/* one block spans two mblks */
-			*out_data_1_len = mp->b_wptr - p;
+			*out_data_1_len = _PTRDIFF(mp->b_wptr, p);
 			if ((mp = mp->b_cont) == NULL)
 				return;
 			*out_data_2 = mp->b_rptr;
