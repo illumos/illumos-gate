@@ -57,16 +57,14 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Thread setup portions of this code derived from
- * OpenSSL 0.9.4 file mt/mttest.c examples
+ * OpenSSL 0.9.x file mt/mttest.c examples
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,16 +90,22 @@ static void (*ERR_free_strings_fn)() = NULL;
 static void (*CRYPTO_set_locking_callback_fn)() = NULL;
 static void (*CRYPTO_set_id_callback_fn)() = NULL;
 static void (*X509_NAME_free_fn)() = NULL;
+static int (*CRYPTO_num_locks_fn)() = NULL;
+static void *(*OPENSSL_malloc_fn)() = NULL;
+static void (*OPENSSL_free_fn)() = NULL;
 
 static void solaris_locking_callback(int, int, char *, int);
 static unsigned long solaris_thread_id(void);
-static void thread_setup(void);
+static boolean_t thread_setup(void);
 /* LINTED E_STATIC_UNUSED */
 static void thread_cleanup(void);
 
 mutex_t init_lock = DEFAULTMUTEX;
-static mutex_t lock_cs[CRYPTO_NUM_LOCKS];
-static long lock_count[CRYPTO_NUM_LOCKS];
+static mutex_t *lock_cs;
+static long *lock_count;
+
+static boolean_t libssl_loaded = B_FALSE;
+static boolean_t libcrypto_loaded = B_FALSE;
 
 void
 libssl_load()
@@ -161,7 +165,8 @@ libssl_load()
 		if (X509_NAME_free_fn == NULL)
 			goto libssl_err;
 
-		thread_setup();
+		if (thread_setup() == B_FALSE)
+			goto libssl_err;
 
 		libssl_loaded = B_TRUE;
 	}
@@ -172,18 +177,75 @@ libssl_err:
 	(void) mutex_unlock(&init_lock);
 }
 
-static void
+void
+libcrypto_load()
+{
+	void *dldesc;
+
+	(void) mutex_lock(&init_lock);
+	if (libcrypto_loaded) {
+		(void) mutex_unlock(&init_lock);
+		return;
+	}
+
+	dldesc = dlopen(LIBCRYPTO, RTLD_LAZY);
+	if (dldesc != NULL) {
+		CRYPTO_num_locks_fn = (int(*)())dlsym(dldesc,
+		    "CRYPTO_num_locks");
+		if (CRYPTO_num_locks_fn == NULL)
+			goto libcrypto_err;
+
+		/*
+		 * OPENSSL_free is really a macro, so we
+		 * need to reference the actual symbol,
+		 * which is CRYPTO_free.
+		 */
+		OPENSSL_free_fn = (void(*)())dlsym(dldesc,
+		    "CRYPTO_free");
+		if (OPENSSL_free_fn == NULL)
+			goto libcrypto_err;
+
+		/*
+		 * OPENSSL_malloc is really a macro, so we
+		 * need to reference the actual symbol,
+		 * which is CRYPTO_malloc.
+		 */
+		OPENSSL_malloc_fn = (void *(*)())dlsym(dldesc,
+		    "CRYPTO_malloc");
+		if (OPENSSL_malloc_fn == NULL)
+			goto libcrypto_err;
+
+		libcrypto_loaded = B_TRUE;
+	}
+	(void) mutex_unlock(&init_lock);
+	return;
+libcrypto_err:
+	(void) dlclose(dldesc);
+	(void) mutex_unlock(&init_lock);
+}
+
+static boolean_t
 thread_setup(void)
 {
 	int i;
 
-	for (i = 0; i < CRYPTO_NUM_LOCKS; i++) {
+	if ((lock_cs = OPENSSL_malloc_fn(CRYPTO_num_locks_fn() *
+	    sizeof (mutex_t))) == NULL)
+		return (B_FALSE);
+	if ((lock_count = OPENSSL_malloc_fn(CRYPTO_num_locks_fn() *
+	    sizeof (long))) == NULL) {
+		OPENSSL_free_fn(lock_cs);
+		return (B_FALSE);
+	}
+
+	for (i = 0; i < CRYPTO_num_locks_fn(); i++) {
 		lock_count[i] = 0;
 		(void) mutex_init(&(lock_cs[i]), USYNC_THREAD, NULL);
 	}
 
 	CRYPTO_set_id_callback_fn((unsigned long (*)())solaris_thread_id);
 	CRYPTO_set_locking_callback_fn((void (*)())solaris_locking_callback);
+	return (B_TRUE);
 }
 
 static void
@@ -194,8 +256,10 @@ thread_cleanup(void)
 	(void) mutex_lock(&init_lock);
 	CRYPTO_set_locking_callback_fn(NULL);
 	CRYPTO_set_id_callback_fn(NULL);
-	for (i = 0; i < CRYPTO_NUM_LOCKS; i++)
+	for (i = 0; i < CRYPTO_num_locks_fn(); i++)
 		(void) mutex_destroy(&(lock_cs[i]));
+	OPENSSL_free_fn(lock_cs);
+	OPENSSL_free_fn(lock_count);
 	(void) mutex_unlock(&init_lock);
 }
 
@@ -223,9 +287,11 @@ solaris_thread_id(void)
 void
 print_asn1_name(FILE *file, const unsigned char *buf, long buflen)
 {
-	libssl_load();
+	libcrypto_load();
+	if (libcrypto_loaded)
+		libssl_load();
 
-	if (libssl_loaded) {
+	if (libssl_loaded && libcrypto_loaded) {
 		X509_NAME *x509name = NULL;
 		const unsigned char *p;
 

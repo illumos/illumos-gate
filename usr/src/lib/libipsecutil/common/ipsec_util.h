@@ -196,12 +196,18 @@ extern int dbgstr2num(char *);
 extern int parsedbgopts(char *);
 
 /*
- * OpenSSL library
+ * SSL library (OpenSSL)
  */
 #define	LIBSSL	"libssl.so"
 
 void libssl_load(void);
-boolean_t libssl_loaded;
+
+/*
+ * crypto library (OpenSSL)
+ */
+#define	LIBCRYPTO	"libcrypto.so"
+
+void libcrypto_load(void);
 
 /*
  * functions to manipulate the kmcookie-label mapping file
