@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -164,8 +162,11 @@ interpret_ah(int flags, uint8_t *hdr, int iplen, int fraglen)
 		(void) sprintf(get_line((char *)&ah->ah_replay - dlc_header, 4),
 		    "Replay = %u", ntohl(aligned_ah->ah_replay));
 
-		/* * 2 for two hex digits per auth_data byte. */
-		buff = malloc(auth_data_len * 2);
+		/*
+		 * 2 for two hex digits per auth_data byte
+		 * plus one byte for trailing null byte.
+		 */
+		buff = malloc(auth_data_len * 2 + 1);
 		if (buff != NULL) {
 			int i;
 
