@@ -211,7 +211,6 @@ mac_priv_prop_t nge_priv_props[] = {
 	{"_poll_busy_time", MAC_PROP_PERM_RW},
 	{"_rx_intr_hwater", MAC_PROP_PERM_RW},
 	{"_rx_intr_lwater", MAC_PROP_PERM_RW},
-	{"_tx_n_intr", MAC_PROP_PERM_RW}
 };
 
 #define	NGE_MAX_PRIV_PROPS \
@@ -2044,21 +2043,6 @@ nge_set_priv_prop(nge_t *ngep, const char *pr_name, uint_t pr_valsize,
 		}
 		return (err);
 	}
-	if (strcmp(pr_name, "_tx_n_intr") == 0) {
-		if (pr_val == NULL) {
-			err = EINVAL;
-			return (err);
-		}
-		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
-		if (result < 1 || result > 10000) {
-			err = EINVAL;
-		} else {
-			ngep->param_tx_n_intr = (uint32_t)result;
-			goto reprogram;
-		}
-		return (err);
-	}
-
 	err = ENOTSUP;
 	return (err);
 
@@ -2115,12 +2099,6 @@ nge_get_priv_prop(nge_t *ngep, const char *pr_name, uint_t pr_flags,
 	}
 	if (strcmp(pr_name, "_rx_intr_lwater") == 0) {
 		value = (is_default ? 8 : ngep->param_rx_intr_lwater);
-		err = 0;
-		goto done;
-	}
-	if (strcmp(pr_name, "_tx_n_intr") == 0) {
-		value = (is_default ? NGE_TX_N_INTR :
-		    ngep->param_tx_n_intr);
 		err = 0;
 		goto done;
 	}
@@ -2190,6 +2168,19 @@ nge_wake_factotum(nge_t *ngep)
 	mutex_exit(ngep->softlock);
 }
 
+void
+nge_interrupt_optimize(nge_t *ngep)
+{
+	uint32_t tx_pkts;
+	tx_pkts = ngep->statistics.sw_statistics.xmit_count - ngep->tpkts_last;
+	ngep->tpkts_last = ngep->statistics.sw_statistics.xmit_count;
+	if ((tx_pkts > NGE_POLL_TUNE) &&
+	    (tx_pkts <= NGE_POLL_MAX))
+		ngep->tfint_threshold = (tx_pkts / NGE_POLL_ENTER);
+	else
+		ngep->tfint_threshold = NGE_TFINT_DEFAULT;
+}
+
 /*
  * High-level cyclic handler
  *
@@ -2209,6 +2200,7 @@ nge_chip_cyclic(void *arg)
 		return;
 
 	case NGE_CHIP_RUNNING:
+		nge_interrupt_optimize(ngep);
 		break;
 
 	case NGE_CHIP_FAULT:
@@ -2461,6 +2453,9 @@ nge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	ngep->param_poll_quiet_time = NGE_POLL_QUIET_TIME;
 	ngep->param_poll_busy_time = NGE_POLL_BUSY_TIME;
+	ngep->tfint_threshold = NGE_TFINT_DEFAULT;
+	ngep->poll = B_FALSE;
+	ngep->ch_intr_mode = B_FALSE;
 
 	/*
 	 * param_rx_intr_hwater/param_rx_intr_lwater: ackets received
@@ -2470,11 +2465,6 @@ nge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ngep->param_rx_intr_hwater = 1;
 	ngep->param_rx_intr_lwater = 8;
 
-	/*
-	 * param_tx_n_intr: Per N tx packets to do tx recycle in poll mode.
-	 * Bounds: min 1, max 10000.
-	 */
-	ngep->param_tx_n_intr = NGE_TX_N_INTR;
 
 	infop = (chip_info_t *)&ngep->chipinfo;
 	nge_chip_cfg_init(ngep, infop, B_FALSE);

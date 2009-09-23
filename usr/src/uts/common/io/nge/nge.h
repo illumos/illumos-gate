@@ -147,8 +147,7 @@ extern int secpolicy_net_config(const cred_t *, boolean_t);
 #define	VTAG_SIZE		4
 #endif
 
-#define	NGE_HALFTICK		268435456LL		/* 2**28 ns!	*/
-#define	NGE_CYCLIC_PERIOD	(4*NGE_HALFTICK)	/*    ~0.5s	*/
+#define	NGE_CYCLIC_PERIOD	(1000000000)
 
 #define	NGE_DEFAULT_MTU		1500
 #define	NGE_DEFAULT_SDU		1518
@@ -191,9 +190,12 @@ extern int secpolicy_net_config(const cred_t *, boolean_t);
 #define	NGE_MAX_DMA_HDR		(4*1024)
 
 /* Used by interrupt moderation */
+#define	NGE_TFINT_DEFAULT	32
+#define	NGE_POLL_TUNE		80000
+#define	NGE_POLL_ENTER		10000
+#define	NGE_POLL_MAX		1280000
 #define	NGE_POLL_QUIET_TIME	100
 #define	NGE_POLL_BUSY_TIME	2
-#define	NGE_TX_N_INTR		128
 
 /*
  * NGE-specific ioctls ...
@@ -655,7 +657,7 @@ struct nge_desc_attr	{
 	uint32_t (*rxd_check)(const void *, size_t *);
 
 	void (*txd_fill)(void *, const ddi_dma_cookie_t *, size_t,
-			uint32_t, boolean_t);
+			uint32_t, boolean_t, boolean_t);
 
 	uint32_t (*txd_check)(const void *);
 };
@@ -755,7 +757,8 @@ typedef struct nge {
 	uint32_t		recv_count;
 	uint32_t		quiet_time;
 	uint32_t		busy_time;
-	uint32_t		stint_count;
+	uint64_t		tpkts_last;
+	uint32_t		tfint_threshold;
 	uint32_t		sw_intr_intv;
 	nge_mac_addr_t		cur_uni_addr;
 	uint32_t		rx_datahwm;
@@ -829,7 +832,6 @@ typedef struct nge {
 	int			param_poll_busy_time;
 	int			param_rx_intr_hwater;
 	int			param_rx_intr_lwater;
-	int			param_tx_n_intr;
 } nge_t;
 
 extern const nge_ksindex_t nge_statistics[];
@@ -1044,7 +1046,7 @@ extern void nge_sum_rxd_fill(void *, const ddi_dma_cookie_t *, size_t);
 extern uint32_t nge_sum_rxd_check(const void *, size_t *);
 
 extern void nge_sum_txd_fill(void *, const ddi_dma_cookie_t *,
-				size_t, uint32_t, boolean_t);
+				size_t, uint32_t, boolean_t, boolean_t);
 extern uint32_t nge_sum_txd_check(const void *);
 
 /*
@@ -1055,7 +1057,7 @@ extern void nge_hot_rxd_fill(void *, const ddi_dma_cookie_t *, size_t);
 extern uint32_t nge_hot_rxd_check(const void *, size_t *);
 
 extern void nge_hot_txd_fill(void *, const ddi_dma_cookie_t *,
-				size_t, uint32_t, boolean_t);
+				size_t, uint32_t, boolean_t, boolean_t);
 extern uint32_t nge_hot_txd_check(const void *);
 
 #ifdef __cplusplus

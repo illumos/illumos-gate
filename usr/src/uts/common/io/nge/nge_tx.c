@@ -80,6 +80,12 @@ nge_tx_recycle_all(nge_t *ngep)
 
 		NGE_TXSWD_RECYCLE(ssbdp);
 	}
+	if (ngep->nge_mac_state == NGE_MAC_STARTED &&
+	    ngep->resched_needed == 1) {
+			ngep->resched_needed = 0;
+			mac_tx_update(ngep->mh);
+	}
+
 }
 
 static size_t
@@ -178,8 +184,13 @@ nge_tx_recycle(nge_t *ngep, boolean_t is_intr)
 	used = nslots - free - used;
 
 	ASSERT(slot == NEXT_INDEX(next, free, nslots));
+	if (used == 0) {
+		ngep->watchdog = 0;
+		mutex_exit(srp->tc_lock);
+		return;
+	}
 
-	if (used > srp->tx_hwmark)
+	if (used > srp->tx_hwmark && ngep->resched_needed == 0)
 		used = srp->tx_hwmark;
 
 	nge_tx_desc_sync(ngep, slot, used, DDI_DMA_SYNC_FORKERNEL);
@@ -223,6 +234,11 @@ nge_tx_recycle(nge_t *ngep, boolean_t is_intr)
 	 * at this point, there must be at least one place NOT free
 	 * we're not about to free more places than were claimed!
 	 */
+
+	if (free == 0) {
+		mutex_exit(srp->tc_lock);
+		return;
+	}
 
 	mutex_enter(srp->tx_lock);
 
@@ -317,7 +333,8 @@ nge_tx_start(nge_t *ngep, uint32_t slotnum)
 		 * counter may not get reset on a partial reclaim; but the
 		 * large trigger threshold makes false positives unlikely
 		 */
-		ngep->watchdog ++;
+		if (ngep->watchdog == 0)
+			ngep->watchdog = 1;
 
 		mode_cntl.mode_val = nge_reg_get32(ngep, NGE_MODE_CNTL);
 		mode_cntl.mode_bits.txdm = NGE_SET;
@@ -343,6 +360,7 @@ nge_send_copy(nge_t *ngep, mblk_t *mp, send_ring_t *srp)
 	mblk_t *bp;
 	void *hw_sbd_p;
 	sw_tx_sbd_t *ssbdp;
+	boolean_t tfint;
 
 	hcksum_retrieve(mp, NULL, NULL, NULL, NULL,
 	    NULL, NULL, &flags);
@@ -361,6 +379,7 @@ nge_send_copy(nge_t *ngep, mblk_t *mp, send_ring_t *srp)
 	 * This is the point of no return!
 	 */
 
+	tfint = ((start_index % ngep->tfint_threshold) == 0);
 	bp = mp;
 	totlen = 0;
 	ssbdp = &srp->sw_sbds[start_index];
@@ -384,7 +403,7 @@ nge_send_copy(nge_t *ngep, mblk_t *mp, send_ring_t *srp)
 	hw_sbd_p = DMA_VPTR(ssbdp->desc);
 
 	ngep->desc_attr.txd_fill(hw_sbd_p, &ssbdp->pbuf.cookie, totlen,
-	    flags, B_TRUE);
+	    flags, B_TRUE, tfint);
 	nge_tx_desc_sync(ngep, start_index, bds, DDI_DMA_SYNC_FORDEV);
 
 	ssbdp->flags = CONTROLER_OWN;
@@ -427,6 +446,7 @@ nge_send_mapped(nge_t *ngep, mblk_t *mp, size_t fragno)
 	nge_dmah_node_t	*dmer;
 	nge_dmah_list_t dmah_list;
 	ddi_dma_cookie_t cookie[NGE_MAX_COOKIES * NGE_MAP_FRAGS];
+	boolean_t tfint;
 
 	srp = ngep->send;
 	nslots = srp->desc.nslots;
@@ -522,16 +542,18 @@ nge_send_mapped(nge_t *ngep, mblk_t *mp, size_t fragno)
 	for (i = slot - 1, j = end_index; start_index - j != 0;
 	    j = PREV(j, nslots), --i)	{
 
+		tfint = ((j % ngep->tfint_threshold) == 0);
 		hw_sbd_p = DMA_VPTR(srp->sw_sbds[j].desc);
 		ngep->desc_attr.txd_fill(hw_sbd_p, cookie + i,
-		    cookie[i].dmac_size, 0, end);
+		    cookie[i].dmac_size, 0, end, tfint);
 
 		end = B_FALSE;
 	}
 
 	hw_sbd_p = DMA_VPTR(srp->sw_sbds[j].desc);
+	tfint = ((j % ngep->tfint_threshold) == 0);
 	ngep->desc_attr.txd_fill(hw_sbd_p, cookie + i, cookie[i].dmac_size,
-	    flags, end);
+	    flags, end, tfint);
 
 	nge_tx_desc_sync(ngep, start_index, slot, DDI_DMA_SYNC_FORDEV);
 
@@ -710,7 +732,7 @@ nge_sum_txd_check(const void *hwd)
 
 void
 nge_hot_txd_fill(void *hwdesc, const ddi_dma_cookie_t *cookie,
-	size_t length, uint32_t sum_flag, boolean_t end)
+	size_t length, uint32_t sum_flag, boolean_t end, boolean_t tfint)
 {
 	hot_tx_bd * hw_sbd_p = hwdesc;
 
@@ -736,6 +758,8 @@ nge_hot_txd_fill(void *hwdesc, const ddi_dma_cookie_t *cookie,
 	/*
 	 * indicating the end of BDs
 	 */
+	if (tfint)
+		hw_sbd_p->control_status.control_sum_bits.inten = NGE_SET;
 	if (end)
 		hw_sbd_p->control_status.control_sum_bits.end = NGE_SET;
 
@@ -747,7 +771,7 @@ nge_hot_txd_fill(void *hwdesc, const ddi_dma_cookie_t *cookie,
 
 void
 nge_sum_txd_fill(void *hwdesc, const ddi_dma_cookie_t *cookie,
-	size_t length, uint32_t sum_flag, boolean_t end)
+	size_t length, uint32_t sum_flag, boolean_t end, boolean_t tfint)
 {
 	sum_tx_bd * hw_sbd_p = hwdesc;
 
@@ -772,6 +796,8 @@ nge_sum_txd_fill(void *hwdesc, const ddi_dma_cookie_t *cookie,
 	/*
 	 * indicating the end of BDs
 	 */
+	if (tfint)
+		hw_sbd_p->control_status.control_sum_bits.inten = NGE_SET;
 	if (end)
 		hw_sbd_p->control_status.control_sum_bits.end = NGE_SET;
 
