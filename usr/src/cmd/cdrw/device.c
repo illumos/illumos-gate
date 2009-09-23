@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <fcntl.h>
@@ -360,9 +358,15 @@ hald_findname(char *symname)
 	char **udi, *path = NULL;
 	int ndevs = 0, i;
 
-	/* We already have a raw path just return that */
-	if (symname[0] == '/')
-		return (symname);
+	/*
+	 * We already have a raw path lets return it in a copied buffer
+	 * as our caller assumes that they need to free memory.
+	 */
+	if (symname[0] == '/') {
+		path = my_zalloc(strlen(symname) + 1);
+		(void) strlcpy(path, symname, (strlen(symname) + 1));
+		return (path);
+	}
 
 	/* Get the raw device from the hal record */
 	if (vol_running != 0) {
