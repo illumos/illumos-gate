@@ -1009,6 +1009,21 @@ mac_unicast_primary_info(mac_handle_t mh, char *client_name, boolean_t *in_use)
 }
 
 /*
+ * Return the current destination MAC address of the specified MAC.
+ */
+boolean_t
+mac_dst_get(mac_handle_t mh, uint8_t *addr)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	rw_enter(&mip->mi_rw_lock, RW_READER);
+	if (mip->mi_dstaddr_set)
+		bcopy(mip->mi_dstaddr, addr, mip->mi_type->mt_addr_length);
+	rw_exit(&mip->mi_rw_lock);
+	return (mip->mi_dstaddr_set);
+}
+
+/*
  * Add the specified MAC client to the list of clients which opened
  * the specified MAC.
  */
@@ -3494,9 +3509,15 @@ mblk_t *
 mac_header(mac_handle_t mh, const uint8_t *daddr, uint32_t sap, mblk_t *payload,
     size_t extra_len)
 {
-	mac_impl_t *mip = (mac_impl_t *)mh;
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+	const uint8_t	*hdr_daddr;
 
-	return (mip->mi_type->mt_ops.mtops_header(mip->mi_addr, daddr, sap,
+	/*
+	 * If the MAC is point-to-point with a fixed destination address, then
+	 * we must always use that destination in the MAC header.
+	 */
+	hdr_daddr = (mip->mi_dstaddr_set ? mip->mi_dstaddr : daddr);
+	return (mip->mi_type->mt_ops.mtops_header(mip->mi_addr, hdr_daddr, sap,
 	    mip->mi_pdata, payload, extra_len));
 }
 
@@ -4180,9 +4201,15 @@ mac_unmark_exclusive(mac_handle_t mh)
 }
 
 /*
- * Set the MTU for the specified device. The function returns EBUSY if
- * another MAC client prevents the caller to become the exclusive client.
- * Returns EAGAIN if the client is started.
+ * Set the MTU for the specified MAC.  Note that this mechanism depends on
+ * the driver calling mac_maxsdu_update() to update the link MTU if it was
+ * successful in setting its MTU.
+ *
+ * Note that there is potential for improvement here.  A better model might be
+ * to not require drivers to call mac_maxsdu_update(), but rather have this
+ * function update mi_sdu_max and send notifications if the driver setprop
+ * callback succeeds.  This would remove the burden and complexity from
+ * drivers.
  */
 int
 mac_set_mtu(mac_handle_t mh, uint_t new_mtu, uint_t *old_mtu_arg)
@@ -4190,32 +4217,15 @@ mac_set_mtu(mac_handle_t mh, uint_t new_mtu, uint_t *old_mtu_arg)
 	mac_impl_t *mip = (mac_impl_t *)mh;
 	uint_t old_mtu;
 	int rv;
-	boolean_t exclusive = B_FALSE;
 
 	i_mac_perim_enter(mip);
 
-	if ((mip->mi_callbacks->mc_callbacks & MC_SETPROP) == 0 ||
-	    (mip->mi_callbacks->mc_callbacks & MC_GETPROP) == 0) {
+	if (!(mip->mi_callbacks->mc_callbacks & (MC_SETPROP|MC_GETPROP))) {
 		rv = ENOTSUP;
 		goto bail;
 	}
 
-	if ((rv = mac_mark_exclusive(mh)) != 0)
-		goto bail;
-	exclusive = B_TRUE;
-
-	if (mip->mi_active > 0) {
-		/*
-		 * The MAC instance is started, for example due to the
-		 * presence of a promiscuous clients. Fail the operation
-		 * since the MAC's MTU cannot be changed while the NIC
-		 * is started.
-		 */
-		rv = EAGAIN;
-		goto bail;
-	}
-
-	mac_sdu_get(mh, NULL, &old_mtu);
+	old_mtu = mip->mi_sdu_max;
 
 	if (old_mtu != new_mtu) {
 		rv = mip->mi_callbacks->mc_setprop(mip->mi_driver,
@@ -4223,8 +4233,6 @@ mac_set_mtu(mac_handle_t mh, uint_t new_mtu, uint_t *old_mtu_arg)
 	}
 
 bail:
-	if (exclusive)
-		mac_unmark_exclusive(mh);
 	i_mac_perim_exit(mip);
 
 	if (rv == 0 && old_mtu_arg != NULL)

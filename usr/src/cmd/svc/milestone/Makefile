@@ -40,6 +40,7 @@ FSMANIFESTS= $(FSSVCS:%=$(ROOTSVCSYSTEMFILESYSTEM)/%)
 
 NETSVCS= \
 	network-initial.xml \
+	network-iptun.xml \
 	network-loopback.xml \
 	network-physical.xml \
 	network-routing-setup.xml \
@@ -104,6 +105,7 @@ SVCMETHOD=\
 	manifest-import \
 	net-loopback \
 	net-init \
+	net-iptun \
 	net-nwam \
 	net-physical \
 	net-routing-setup \

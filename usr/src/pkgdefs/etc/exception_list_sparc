@@ -87,6 +87,7 @@ usr/include/sys/mac_flow_impl.h		sparc
 usr/include/sys/mac_impl.h		sparc
 usr/include/sys/mac_provider.h		sparc
 usr/include/sys/mac_soft_ring.h		sparc
+usr/include/inet/iptun.h		sparc
 #
 # Private GLDv3 userland libraries and headers
 #
@@ -95,6 +96,7 @@ usr/include/libdlaggr.h		sparc
 usr/include/libdlether.h	sparc
 usr/include/libdlflow.h		sparc
 usr/include/libdlflow_impl.h	sparc
+usr/include/libdliptun.h	sparc
 usr/include/libdlmgmt.h		sparc
 usr/include/libdlsim.h		sparc
 usr/include/libdlstat.h		sparc
@@ -360,7 +362,6 @@ usr/include/inet/ip_impl.h		sparc
 usr/include/inet/ip_ndp.h		sparc
 usr/include/inet/ip2mac.h		sparc
 usr/include/inet/ip2mac_impl.h		sparc
-usr/include/inet/tun.h			sparc
 usr/include/protocols/ripngd.h		sparc
 usr/include/libmail.h			sparc
 usr/include/s_string.h			sparc
@@ -379,7 +380,6 @@ usr/include/sys/sha1.h			sparc
 usr/include/sys/sha1_consts.h		sparc
 usr/include/sys/sha2.h			sparc
 usr/include/sys/sha2_consts.h		sparc
-usr/include/inet/tun.h			sparc
 #
 # The following are win and graphics related also ignore and do NOT replace.
 #

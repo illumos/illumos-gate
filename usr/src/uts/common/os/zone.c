@@ -245,6 +245,13 @@
 #include <net/if.h>
 #include <sys/cpucaps.h>
 #include <vm/seg.h>
+#include <sys/mac.h>
+
+/* List of data link IDs which are accessible from the zone */
+typedef struct zone_dl {
+	datalink_id_t	zdl_id;
+	list_node_t	zdl_linkage;
+} zone_dl_t;
 
 /*
  * cv used to signal that all references to the zone have been released.  This
@@ -350,10 +357,9 @@ static kmutex_t mount_lock;
 const char * const zone_default_initname = "/sbin/init";
 static char * const zone_prefix = "/zone/";
 static int zone_shutdown(zoneid_t zoneid);
-static int zone_add_datalink(zoneid_t, char *);
-static int zone_remove_datalink(zoneid_t, char *);
-static int zone_check_datalink(zoneid_t *, char *);
-static int zone_list_datalink(zoneid_t, int *, char *);
+static int zone_add_datalink(zoneid_t, datalink_id_t);
+static int zone_remove_datalink(zoneid_t, datalink_id_t);
+static int zone_list_datalink(zoneid_t, int *, datalink_id_t *);
 
 typedef boolean_t zsd_applyfn_t(kmutex_t *, boolean_t, zone_t *, zone_key_t);
 
@@ -2002,6 +2008,7 @@ zone_free(zone_t *zone)
 
 	zone_free_zsd(zone);
 	zone_free_datasets(zone);
+	list_destroy(&zone->zone_dl_list);
 
 	if (zone->zone_rootvp != NULL)
 		VN_RELE(zone->zone_rootvp);
@@ -3795,6 +3802,8 @@ zone_create(const char *zone_name, const char *zone_root,
 	    offsetof(struct zsd_entry, zsd_linkage));
 	list_create(&zone->zone_datasets, sizeof (zone_dataset_t),
 	    offsetof(zone_dataset_t, zd_linkage));
+	list_create(&zone->zone_dl_list, sizeof (zone_dl_t),
+	    offsetof(zone_dl_t, zdl_linkage));
 	rw_init(&zone->zone_mlps.mlpl_rwlock, NULL, RW_DEFAULT, NULL);
 
 	if (flags & ZCF_NET_EXCL) {
@@ -5488,6 +5497,7 @@ long
 zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 {
 	zone_def zs;
+	int err;
 
 	switch (cmd) {
 	case ZONE_CREATE:
@@ -5553,15 +5563,28 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 		return (zone_version((int *)arg1));
 	case ZONE_ADD_DATALINK:
 		return (zone_add_datalink((zoneid_t)(uintptr_t)arg1,
-		    (char *)arg2));
+		    (datalink_id_t)(uintptr_t)arg2));
 	case ZONE_DEL_DATALINK:
 		return (zone_remove_datalink((zoneid_t)(uintptr_t)arg1,
-		    (char *)arg2));
-	case ZONE_CHECK_DATALINK:
-		return (zone_check_datalink((zoneid_t *)arg1, (char *)arg2));
+		    (datalink_id_t)(uintptr_t)arg2));
+	case ZONE_CHECK_DATALINK: {
+		zoneid_t	zoneid;
+		boolean_t	need_copyout;
+
+		if (copyin(arg1, &zoneid, sizeof (zoneid)) != 0)
+			return (EFAULT);
+		need_copyout = (zoneid == ALL_ZONES);
+		err = zone_check_datalink(&zoneid,
+		    (datalink_id_t)(uintptr_t)arg2);
+		if (err == 0 && need_copyout) {
+			if (copyout(&zoneid, arg1, sizeof (zoneid)) != 0)
+				err = EFAULT;
+		}
+		return (err == 0 ? 0 : set_errno(err));
+	}
 	case ZONE_LIST_DATALINK:
 		return (zone_list_datalink((zoneid_t)(uintptr_t)arg1,
-		    (int *)arg2, (char *)arg3));
+		    (int *)arg2, (datalink_id_t *)(uintptr_t)arg3));
 	default:
 		return (set_errno(EINVAL));
 	}
@@ -5978,78 +6001,63 @@ zone_find_by_any_path(const char *path, boolean_t treat_abs)
 	return (zone);
 }
 
-/* List of data link names which are accessible from the zone */
-struct dlnamelist {
-	char			dlnl_name[LIFNAMSIZ];
-	struct dlnamelist	*dlnl_next;
-};
-
-
 /*
- * Check whether the datalink name (dlname) itself is present.
- * Return true if found.
+ * Finds a zone_dl_t with the given linkid in the given zone.  Returns the
+ * zone_dl_t pointer if found, and NULL otherwise.
  */
-static boolean_t
-zone_dlname(zone_t *zone, char *dlname)
+static zone_dl_t *
+zone_find_dl(zone_t *zone, datalink_id_t linkid)
 {
-	struct dlnamelist *dlnl;
-	boolean_t found = B_FALSE;
+	zone_dl_t *zdl;
+
+	ASSERT(mutex_owned(&zone->zone_lock));
+	for (zdl = list_head(&zone->zone_dl_list); zdl != NULL;
+	    zdl = list_next(&zone->zone_dl_list, zdl)) {
+		if (zdl->zdl_id == linkid)
+			break;
+	}
+	return (zdl);
+}
+
+static boolean_t
+zone_dl_exists(zone_t *zone, datalink_id_t linkid)
+{
+	boolean_t exists;
 
 	mutex_enter(&zone->zone_lock);
-	for (dlnl = zone->zone_dl_list; dlnl != NULL; dlnl = dlnl->dlnl_next) {
-		if (strncmp(dlnl->dlnl_name, dlname, LIFNAMSIZ) == 0) {
-			found = B_TRUE;
-			break;
-		}
-	}
+	exists = (zone_find_dl(zone, linkid) != NULL);
 	mutex_exit(&zone->zone_lock);
-	return (found);
+	return (exists);
 }
 
 /*
- * Add an data link name for the zone. Does not check for duplicates.
+ * Add an data link name for the zone.
  */
 static int
-zone_add_datalink(zoneid_t zoneid, char *dlname)
+zone_add_datalink(zoneid_t zoneid, datalink_id_t linkid)
 {
-	struct dlnamelist *dlnl;
+	zone_dl_t *zdl;
 	zone_t *zone;
 	zone_t *thiszone;
-	int err;
 
-	dlnl = kmem_zalloc(sizeof (struct dlnamelist), KM_SLEEP);
-	if ((err = copyinstr(dlname, dlnl->dlnl_name, LIFNAMSIZ, NULL)) != 0) {
-		kmem_free(dlnl, sizeof (struct dlnamelist));
-		return (set_errno(err));
-	}
-
-	thiszone = zone_find_by_id(zoneid);
-	if (thiszone == NULL) {
-		kmem_free(dlnl, sizeof (struct dlnamelist));
+	if ((thiszone = zone_find_by_id(zoneid)) == NULL)
 		return (set_errno(ENXIO));
-	}
 
-	/*
-	 * Verify that the datalink name isn't already used by a different
-	 * zone while allowing duplicate entries for the same zone (e.g. due
-	 * to both using IPv4 and IPv6 on an interface)
-	 */
+	/* Verify that the datalink ID doesn't already belong to a zone. */
 	mutex_enter(&zonehash_lock);
 	for (zone = list_head(&zone_active); zone != NULL;
 	    zone = list_next(&zone_active, zone)) {
-		if (zone->zone_id == zoneid)
-			continue;
-
-		if (zone_dlname(zone, dlnl->dlnl_name)) {
+		if (zone_dl_exists(zone, linkid)) {
 			mutex_exit(&zonehash_lock);
 			zone_rele(thiszone);
-			kmem_free(dlnl, sizeof (struct dlnamelist));
-			return (set_errno(EPERM));
+			return (set_errno((zone == thiszone) ? EEXIST : EPERM));
 		}
 	}
+
+	zdl = kmem_zalloc(sizeof (*zdl), KM_SLEEP);
+	zdl->zdl_id = linkid;
 	mutex_enter(&thiszone->zone_lock);
-	dlnl->dlnl_next = thiszone->zone_dl_list;
-	thiszone->zone_dl_list = dlnl;
+	list_insert_head(&thiszone->zone_dl_list, zdl);
 	mutex_exit(&thiszone->zone_lock);
 	mutex_exit(&zonehash_lock);
 	zone_rele(thiszone);
@@ -6057,150 +6065,106 @@ zone_add_datalink(zoneid_t zoneid, char *dlname)
 }
 
 static int
-zone_remove_datalink(zoneid_t zoneid, char *dlname)
+zone_remove_datalink(zoneid_t zoneid, datalink_id_t linkid)
 {
-	struct dlnamelist *dlnl, *odlnl, **dlnlp;
+	zone_dl_t *zdl;
 	zone_t *zone;
-	int err;
+	int err = 0;
 
-	dlnl = kmem_zalloc(sizeof (struct dlnamelist), KM_SLEEP);
-	if ((err = copyinstr(dlname, dlnl->dlnl_name, LIFNAMSIZ, NULL)) != 0) {
-		kmem_free(dlnl, sizeof (struct dlnamelist));
-		return (set_errno(err));
-	}
-	zone = zone_find_by_id(zoneid);
-	if (zone == NULL) {
-		kmem_free(dlnl, sizeof (struct dlnamelist));
+	if ((zone = zone_find_by_id(zoneid)) == NULL)
 		return (set_errno(EINVAL));
-	}
 
 	mutex_enter(&zone->zone_lock);
-	/* Look for match */
-	dlnlp = &zone->zone_dl_list;
-	while (*dlnlp != NULL) {
-		if (strncmp(dlnl->dlnl_name, (*dlnlp)->dlnl_name,
-		    LIFNAMSIZ) == 0)
-			goto found;
-		dlnlp = &((*dlnlp)->dlnl_next);
+	if ((zdl = zone_find_dl(zone, linkid)) == NULL) {
+		err = ENXIO;
+	} else {
+		list_remove(&zone->zone_dl_list, zdl);
+		kmem_free(zdl, sizeof (zone_dl_t));
 	}
 	mutex_exit(&zone->zone_lock);
 	zone_rele(zone);
-	kmem_free(dlnl, sizeof (struct dlnamelist));
-	return (set_errno(ENXIO));
-
-found:
-	odlnl = *dlnlp;
-	*dlnlp = (*dlnlp)->dlnl_next;
-	kmem_free(odlnl, sizeof (struct dlnamelist));
-
-	mutex_exit(&zone->zone_lock);
-	zone_rele(zone);
-	kmem_free(dlnl, sizeof (struct dlnamelist));
-	return (0);
+	return (err == 0 ? 0 : set_errno(err));
 }
 
 /*
- * Using the zoneidp as ALL_ZONES, we can lookup which zone is using datalink
- * name (dlname); otherwise we just check if the specified zoneidp has access
- * to the datalink name.
+ * Using the zoneidp as ALL_ZONES, we can lookup which zone has been assigned
+ * the linkid.  Otherwise we just check if the specified zoneidp has been
+ * assigned the supplied linkid.
  */
-static int
-zone_check_datalink(zoneid_t *zoneidp, char *dlname)
+int
+zone_check_datalink(zoneid_t *zoneidp, datalink_id_t linkid)
 {
-	zoneid_t id;
-	char *dln;
 	zone_t *zone;
-	int err = 0;
-	boolean_t allzones = B_FALSE;
+	int err = ENXIO;
 
-	if (copyin(zoneidp, &id, sizeof (id)) != 0) {
-		return (set_errno(EFAULT));
+	if (*zoneidp != ALL_ZONES) {
+		if ((zone = zone_find_by_id(*zoneidp)) != NULL) {
+			if (zone_dl_exists(zone, linkid))
+				err = 0;
+			zone_rele(zone);
+		}
+		return (err);
 	}
-	dln = kmem_zalloc(LIFNAMSIZ, KM_SLEEP);
-	if ((err = copyinstr(dlname, dln, LIFNAMSIZ, NULL)) != 0) {
-		kmem_free(dln, LIFNAMSIZ);
-		return (set_errno(err));
-	}
 
-	if (id == ALL_ZONES)
-		allzones = B_TRUE;
-
-	/*
-	 * Check whether datalink name is already used.
-	 */
 	mutex_enter(&zonehash_lock);
 	for (zone = list_head(&zone_active); zone != NULL;
 	    zone = list_next(&zone_active, zone)) {
-		if (allzones || (id == zone->zone_id)) {
-			if (!zone_dlname(zone, dln))
-				continue;
-			if (allzones)
-				err = copyout(&zone->zone_id, zoneidp,
-				    sizeof (*zoneidp));
-
-			mutex_exit(&zonehash_lock);
-			kmem_free(dln, LIFNAMSIZ);
-			return (err ? set_errno(EFAULT) : 0);
+		if (zone_dl_exists(zone, linkid)) {
+			*zoneidp = zone->zone_id;
+			err = 0;
+			break;
 		}
 	}
-
-	/* datalink name is not found in any active zone. */
 	mutex_exit(&zonehash_lock);
-	kmem_free(dln, LIFNAMSIZ);
-	return (set_errno(ENXIO));
+	return (err);
 }
 
 /*
- * Get the names of the datalinks assigned to a zone.
- * Here *nump is the number of datalinks, and the assumption
- * is that the caller will guarantee that the the supplied buffer is
- * big enough to hold at least #*nump datalink names, that is,
- * LIFNAMSIZ X *nump
- * On return, *nump will be the "new" number of datalinks, if it
- * ever changed.
+ * Get the list of datalink IDs assigned to a zone.
+ *
+ * On input, *nump is the number of datalink IDs that can fit in the supplied
+ * idarray.  Upon return, *nump is either set to the number of datalink IDs
+ * that were placed in the array if the array was large enough, or to the
+ * number of datalink IDs that the function needs to place in the array if the
+ * array is too small.
  */
 static int
-zone_list_datalink(zoneid_t zoneid, int *nump, char *buf)
+zone_list_datalink(zoneid_t zoneid, int *nump, datalink_id_t *idarray)
 {
-	int num, dlcount;
+	uint_t num, dlcount;
 	zone_t *zone;
-	struct dlnamelist *dlnl;
-	char *ptr;
+	zone_dl_t *zdl;
+	datalink_id_t *idptr = idarray;
 
 	if (copyin(nump, &dlcount, sizeof (dlcount)) != 0)
 		return (set_errno(EFAULT));
-
-	zone = zone_find_by_id(zoneid);
-	if (zone == NULL) {
+	if ((zone = zone_find_by_id(zoneid)) == NULL)
 		return (set_errno(ENXIO));
-	}
 
 	num = 0;
 	mutex_enter(&zone->zone_lock);
-	ptr = buf;
-	for (dlnl = zone->zone_dl_list; dlnl != NULL; dlnl = dlnl->dlnl_next) {
+	for (zdl = list_head(&zone->zone_dl_list); zdl != NULL;
+	    zdl = list_next(&zone->zone_dl_list, zdl)) {
 		/*
-		 * If the list changed and the new number is bigger
-		 * than what the caller supplied, just count, don't
-		 * do copyout
+		 * If the list is bigger than what the caller supplied, just
+		 * count, don't do copyout.
 		 */
 		if (++num > dlcount)
 			continue;
-		if (copyout(dlnl->dlnl_name, ptr, LIFNAMSIZ) != 0) {
+		if (copyout(&zdl->zdl_id, idptr, sizeof (*idptr)) != 0) {
 			mutex_exit(&zone->zone_lock);
 			zone_rele(zone);
 			return (set_errno(EFAULT));
 		}
-		ptr += LIFNAMSIZ;
+		idptr++;
 	}
 	mutex_exit(&zone->zone_lock);
 	zone_rele(zone);
 
 	/* Increased or decreased, caller should be notified. */
 	if (num != dlcount) {
-		if (copyout(&num, nump, sizeof (num)) != 0) {
+		if (copyout(&num, nump, sizeof (num)) != 0)
 			return (set_errno(EFAULT));
-		}
 	}
 	return (0);
 }
@@ -6237,21 +6201,54 @@ zone_find_by_id_nolock(zoneid_t zoneid)
  * Walk the datalinks for a given zone
  */
 int
-zone_datalink_walk(zoneid_t zoneid, int (*cb)(const char *, void *), void *data)
+zone_datalink_walk(zoneid_t zoneid, int (*cb)(datalink_id_t, void *),
+    void *data)
 {
-	zone_t *zone;
-	struct dlnamelist *dlnl;
-	int ret = 0;
+	zone_t		*zone;
+	zone_dl_t	*zdl;
+	datalink_id_t	*idarray;
+	uint_t		idcount = 0;
+	int		i, ret = 0;
 
 	if ((zone = zone_find_by_id(zoneid)) == NULL)
 		return (ENOENT);
 
+	/*
+	 * We first build an array of linkid's so that we can walk these and
+	 * execute the callback with the zone_lock dropped.
+	 */
 	mutex_enter(&zone->zone_lock);
-	for (dlnl = zone->zone_dl_list; dlnl != NULL; dlnl = dlnl->dlnl_next) {
-		if ((ret = (*cb)(dlnl->dlnl_name, data)) != 0)
+	for (zdl = list_head(&zone->zone_dl_list); zdl != NULL;
+	    zdl = list_next(&zone->zone_dl_list, zdl)) {
+		idcount++;
+	}
+
+	if (idcount == 0) {
+		mutex_exit(&zone->zone_lock);
+		zone_rele(zone);
+		return (0);
+	}
+
+	idarray = kmem_alloc(sizeof (datalink_id_t) * idcount, KM_NOSLEEP);
+	if (idarray == NULL) {
+		mutex_exit(&zone->zone_lock);
+		zone_rele(zone);
+		return (ENOMEM);
+	}
+
+	for (i = 0, zdl = list_head(&zone->zone_dl_list); zdl != NULL;
+	    i++, zdl = list_next(&zone->zone_dl_list, zdl)) {
+		idarray[i] = zdl->zdl_id;
+	}
+
+	mutex_exit(&zone->zone_lock);
+
+	for (i = 0; i < idcount && ret == 0; i++) {
+		if ((ret = (*cb)(idarray[i], data)) != 0)
 			break;
 	}
-	mutex_exit(&zone->zone_lock);
+
 	zone_rele(zone);
+	kmem_free(idarray, sizeof (datalink_id_t) * idcount);
 	return (ret);
 }

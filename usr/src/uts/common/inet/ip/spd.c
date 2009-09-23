@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)spd.c	1.61	08/07/15 SMI"
-
 /*
  * IPsec Security Policy Database.
  *
@@ -70,7 +68,8 @@
 #include <inet/ipsecesp.h>
 #include <inet/ipdrop.h>
 #include <inet/ipclassifier.h>
-#include <inet/tun.h>
+#include <inet/iptun.h>
+#include <inet/iptun/iptun_impl.h>
 
 static void ipsec_update_present_flags(ipsec_stack_t *);
 static ipsec_act_t *ipsec_act_wildcard_expand(ipsec_act_t *, uint_t *,
@@ -96,6 +95,7 @@ static void ipsid_fini(netstack_t *);
 #define	SEL_PORT_POLICY	0x0001
 #define	SEL_IS_ICMP	0x0002
 #define	SEL_TUNNEL_MODE	0x0004
+#define	SEL_POST_FRAG	0x0008
 
 /* Return values for ipsec_init_inbound_sel(). */
 typedef enum { SELRET_NOMEM, SELRET_BADPKT, SELRET_SUCCESS, SELRET_TUNFRAG}
@@ -668,12 +668,6 @@ ipsec_stack_init(netstackid_t stackid, netstack_t *ns)
 	ip_drop_init(ipss);
 	ip_drop_register(&ipss->ipsec_spd_dropper, "IPsec SPD");
 
-	/* Set function to dummy until tun is loaded */
-	rw_init(&ipss->ipsec_itp_get_byaddr_rw_lock, NULL, RW_DEFAULT, NULL);
-	rw_enter(&ipss->ipsec_itp_get_byaddr_rw_lock, RW_WRITER);
-	ipss->ipsec_itp_get_byaddr = itp_get_byaddr_dummy;
-	rw_exit(&ipss->ipsec_itp_get_byaddr_rw_lock);
-
 	/* IP's IPsec code calls the packet dropper */
 	ip_drop_register(&ipss->ipsec_dropper, "IP IPsec processing");
 
@@ -1029,41 +1023,6 @@ ipsec_clone_system_policy(netstack_t *ns)
 }
 
 /*
- * Generic "do we have IPvN policy" answer.
- */
-boolean_t
-iph_ipvN(ipsec_policy_head_t *iph, boolean_t v6)
-{
-	int i, hval;
-	uint32_t valbit;
-	ipsec_policy_root_t *ipr;
-	ipsec_policy_t *ipp;
-
-	if (v6) {
-		valbit = IPSL_IPV6;
-		hval = IPSEC_AF_V6;
-	} else {
-		valbit = IPSL_IPV4;
-		hval = IPSEC_AF_V4;
-	}
-
-	ASSERT(RW_LOCK_HELD(&iph->iph_lock));
-	for (ipr = iph->iph_root; ipr < &(iph->iph_root[IPSEC_NTYPES]); ipr++) {
-		if (ipr->ipr_nonhash[hval] != NULL)
-			return (B_TRUE);
-		for (i = 0; i < ipr->ipr_nchains; i++) {
-			for (ipp = ipr->ipr_hash[i].hash_head; ipp != NULL;
-			    ipp = ipp->ipsp_hash.hash_next) {
-				if (ipp->ipsp_sel->ipsl_key.ipsl_valid & valbit)
-					return (B_TRUE);
-			}
-		}
-	}
-
-	return (B_FALSE);
-}
-
-/*
  * Extract the string from ipsec_policy_failure_msgs[type] and
  * log it.
  *
@@ -1387,7 +1346,7 @@ ipsec_act_wildcard_expand(ipsec_act_t *act, uint_t *nact, netstack_t *ns)
  * Extract the parts of an ipsec_prot_t from an old-style ipsec_req_t.
  */
 static void
-ipsec_prot_from_req(ipsec_req_t *req, ipsec_prot_t *ipp)
+ipsec_prot_from_req(const ipsec_req_t *req, ipsec_prot_t *ipp)
 {
 	bzero(ipp, sizeof (*ipp));
 	/*
@@ -1417,7 +1376,7 @@ ipsec_prot_from_req(ipsec_req_t *req, ipsec_prot_t *ipp)
  * Extract a new-style action from a request.
  */
 void
-ipsec_actvec_from_req(ipsec_req_t *req, ipsec_act_t **actp, uint_t *nactp,
+ipsec_actvec_from_req(const ipsec_req_t *req, ipsec_act_t **actp, uint_t *nactp,
     netstack_t *ns)
 {
 	struct ipsec_act act;
@@ -2778,12 +2737,13 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 	boolean_t port_policy_present = (sel_flags & SEL_PORT_POLICY);
 	boolean_t is_icmp = (sel_flags & SEL_IS_ICMP);
 	boolean_t tunnel_mode = (sel_flags & SEL_TUNNEL_MODE);
+	boolean_t post_frag = (sel_flags & SEL_POST_FRAG);
 
 	ASSERT((ipha == NULL && ip6h != NULL) ||
 	    (ipha != NULL && ip6h == NULL));
 
 	if (ip6h != NULL) {
-		if (is_icmp)
+		if (is_icmp || tunnel_mode)
 			outer_hdr_len = ((uint8_t *)ip6h) - mp->b_rptr;
 
 		check_proto = IPPROTO_ICMPV6;
@@ -2827,7 +2787,7 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 			return (SELRET_TUNFRAG);
 		}
 	} else {
-		if (is_icmp)
+		if (is_icmp || tunnel_mode)
 			outer_hdr_len = ((uint8_t *)ipha) - mp->b_rptr;
 		check_proto = IPPROTO_ICMP;
 		sel->ips_isv4 = B_TRUE;
@@ -2849,7 +2809,7 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 
 	if ((nexthdr != IPPROTO_TCP && nexthdr != IPPROTO_UDP &&
 	    nexthdr != IPPROTO_SCTP && nexthdr != check_proto) ||
-	    (!port_policy_present && tunnel_mode)) {
+	    (!port_policy_present && !post_frag && tunnel_mode)) {
 		sel->ips_remote_port = sel->ips_local_port = 0;
 		ipsec_freemsg_chain(spare_mp);
 		return (SELRET_SUCCESS);
@@ -3875,6 +3835,30 @@ ipsec_ipr_flush(ipsec_policy_head_t *php, ipsec_policy_root_t *ipr,
 		}
 		ipr->ipr_hash[chain].hash_head = NULL;
 	}
+}
+
+/*
+ * Create and insert inbound or outbound policy associated with actp for the
+ * address family fam into the policy head ph.  Returns B_TRUE if policy was
+ * inserted, and B_FALSE otherwise.
+ */
+boolean_t
+ipsec_polhead_insert(ipsec_policy_head_t *ph, ipsec_act_t *actp, uint_t nact,
+    int fam, int ptype, netstack_t *ns)
+{
+	ipsec_selkey_t		sel;
+	ipsec_policy_t		*pol;
+	ipsec_policy_root_t	*pr;
+
+	bzero(&sel, sizeof (sel));
+	sel.ipsl_valid = (fam == IPSEC_AF_V4 ? IPSL_IPV4 : IPSL_IPV6);
+	if ((pol = ipsec_policy_create(&sel, actp, nact, IPSEC_PRIO_SOCKET,
+	    NULL, ns)) != NULL) {
+		pr = &ph->iph_root[ptype];
+		HASHLIST_INSERT(pol, ipsp_hash, pr->ipr_nonhash[fam]);
+		ipsec_insert_always(&ph->iph_rulebyid, pol);
+	}
+	return (pol != NULL);
 }
 
 void
@@ -5472,26 +5456,24 @@ ipsec_unregister_prov_update(void)
  * inner-packet contents.
  */
 mblk_t *
-ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
-    ip6_t *inner_ipv6, ipha_t *outer_ipv4, ip6_t *outer_ipv6, int outer_hdr_len,
-    netstack_t *ns)
+ipsec_tun_outbound(mblk_t *mp, iptun_t *iptun, ipha_t *inner_ipv4,
+    ip6_t *inner_ipv6, ipha_t *outer_ipv4, ip6_t *outer_ipv6, int outer_hdr_len)
 {
-	ipsec_tun_pol_t *itp = atp->tun_itp;
 	ipsec_policy_head_t *polhead;
 	ipsec_selector_t sel;
 	mblk_t *ipsec_mp, *ipsec_mp_head, *nmp;
 	ipsec_out_t *io;
 	boolean_t is_fragment;
 	ipsec_policy_t *pol;
+	ipsec_tun_pol_t *itp = iptun->iptun_itp;
+	netstack_t *ns = iptun->iptun_ns;
 	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
 	ASSERT(outer_ipv6 != NULL && outer_ipv4 == NULL ||
 	    outer_ipv4 != NULL && outer_ipv6 == NULL);
 	/* We take care of inners in a bit. */
 
-	/* No policy on this tunnel - let global policy have at it. */
-	if (itp == NULL || !(itp->itp_flags & ITPF_P_ACTIVE))
-		return (mp);
+	ASSERT(itp != NULL && (itp->itp_flags & ITPF_P_ACTIVE));
 	polhead = itp->itp_policy;
 
 	bzero(&sel, sizeof (sel));
@@ -5568,8 +5550,7 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 			ASSERT(mp->b_cont == NULL);
 
 			/*
-			 * If we get here, we have a full
-			 * fragment chain
+			 * If we get here, we have a full fragment chain
 			 */
 
 			oiph = (ipha_t *)mp->b_rptr;
@@ -5701,7 +5682,12 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 	 */
 	io->ipsec_out_polhead = polhead;
 	io->ipsec_out_policy = pol;
-	io->ipsec_out_zoneid = atp->tun_zoneid;
+	/*
+	 * NOTE: There is a subtle difference between iptun_zoneid and
+	 * iptun_connp->conn_zoneid explained in iptun_conn_create().  When
+	 * interacting with the ip module, we must use conn_zoneid.
+	 */
+	io->ipsec_out_zoneid = iptun->iptun_connp->conn_zoneid;
 	io->ipsec_out_v4 = (outer_ipv4 != NULL);
 	io->ipsec_out_secure = B_TRUE;
 
@@ -5860,20 +5846,18 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 	boolean_t retval, port_policy_present, is_icmp, global_present;
 	in6_addr_t tmpaddr;
 	ipaddr_t tmp4;
+	uint8_t flags, *inner_hdr;
 	ipsec_stack_t *ipss = ns->netstack_ipsec;
-	uint8_t flags, *holder, *outer_hdr;
 
 	sel.ips_is_icmp_inv_acq = 0;
 
 	if (outer_ipv4 != NULL) {
 		ASSERT(outer_ipv6 == NULL);
-		outer_hdr = (uint8_t *)outer_ipv4;
 		global_present = ipss->ipsec_inbound_v4_policy_present;
 	} else {
-		outer_hdr = (uint8_t *)outer_ipv6;
+		ASSERT(outer_ipv6 != NULL);
 		global_present = ipss->ipsec_inbound_v6_policy_present;
 	}
-	ASSERT(outer_hdr != NULL);
 
 	ASSERT(inner_ipv4 != NULL && inner_ipv6 == NULL ||
 	    inner_ipv4 == NULL && inner_ipv6 != NULL);
@@ -5898,6 +5882,11 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 
 		port_policy_present = ((itp->itp_flags &
 		    ITPF_P_PER_PORT_SECURITY) ? B_TRUE : B_FALSE);
+		/*
+		 * NOTE:  Even if our policy is transport mode, set the
+		 * SEL_TUNNEL_MODE flag so ipsec_init_inbound_sel() can
+		 * do the right thing w.r.t. outer headers.
+		 */
 		flags = ((port_policy_present ? SEL_PORT_POLICY : SEL_NONE) |
 		    (is_icmp ? SEL_IS_ICMP : SEL_NONE) | SEL_TUNNEL_MODE);
 
@@ -5939,18 +5928,31 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 			 * If we get here, we have a full fragment chain.
 			 * Reacquire headers and selectors from first fragment.
 			 */
-			if (inner_ipv4 != NULL) {
-				inner_ipv4 = (ipha_t *)message->b_cont->b_rptr;
-				ASSERT(message->b_cont->b_wptr -
-				    message->b_cont->b_rptr > sizeof (ipha_t));
+			inner_hdr = message->b_cont->b_rptr;
+			if (outer_ipv4 != NULL) {
+				inner_hdr += IPH_HDR_LENGTH(
+				    (ipha_t *)message->b_cont->b_rptr);
 			} else {
-				inner_ipv6 = (ip6_t *)message->b_cont->b_rptr;
-				ASSERT(message->b_cont->b_wptr -
-				    message->b_cont->b_rptr > sizeof (ip6_t));
+				inner_hdr += ip_hdr_length_v6(message->b_cont,
+				    (ip6_t *)message->b_cont->b_rptr);
 			}
-			/* Use SEL_NONE so we always get ports! */
+			ASSERT(inner_hdr <= message->b_cont->b_wptr);
+
+			if (inner_ipv4 != NULL) {
+				inner_ipv4 = (ipha_t *)inner_hdr;
+				inner_ipv6 = NULL;
+			} else {
+				inner_ipv6 = (ip6_t *)inner_hdr;
+				inner_ipv4 = NULL;
+			}
+
+			/*
+			 * Use SEL_TUNNEL_MODE to take into account the outer
+			 * header.  Use SEL_POST_FRAG so we always get ports.
+			 */
 			rc = ipsec_init_inbound_sel(&sel, message->b_cont,
-			    inner_ipv4, inner_ipv6, SEL_NONE);
+			    inner_ipv4, inner_ipv6,
+			    SEL_TUNNEL_MODE | SEL_POST_FRAG);
 			switch (rc) {
 			case SELRET_SUCCESS:
 				/*
@@ -6098,15 +6100,6 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 		return (B_FALSE);
 	}
 
-	/*
-	 * The following assertion is valid because only the tun module alters
-	 * the mblk chain - stripping the outer header by advancing mp->b_rptr.
-	 */
-	ASSERT(is_icmp || ((*data_mp)->b_datap->db_base <= outer_hdr &&
-	    outer_hdr < (*data_mp)->b_rptr));
-	holder = (*data_mp)->b_rptr;
-	(*data_mp)->b_rptr = outer_hdr;
-
 	if (is_icmp) {
 		/*
 		 * For ICMP packets, "outer_ipvN" is set to the outer header
@@ -6150,8 +6143,6 @@ ipsec_tun_inbound(mblk_t *ipsec_mp, mblk_t **data_mp, ipsec_tun_pol_t *itp,
 		}
 	}
 
-	(*data_mp)->b_rptr = holder;
-
 	if (ipsec_mp != NULL)
 		freeb(ipsec_mp);
 
@@ -6184,8 +6175,14 @@ tunnel_compare(const void *arg1, const void *arg2)
 void
 itp_free(ipsec_tun_pol_t *node, netstack_t *ns)
 {
-	IPPH_REFRELE(node->itp_policy, ns);
-	IPPH_REFRELE(node->itp_inactive, ns);
+	if (node->itp_policy != NULL) {
+		IPPH_REFRELE(node->itp_policy, ns);
+		node->itp_policy = NULL;
+	}
+	if (node->itp_inactive != NULL) {
+		IPPH_REFRELE(node->itp_inactive, ns);
+		node->itp_inactive = NULL;
+	}
 	mutex_destroy(&node->itp_lock);
 	kmem_free(node, sizeof (*node));
 }
@@ -6335,15 +6332,44 @@ nomem:
 }
 
 /*
- * We can't call the tun_t lookup function until tun is
- * loaded, so create a dummy function to avoid symbol
- * lookup errors on boot.
+ * Given two addresses, find a tunnel instance's IPsec policy heads.
+ * Returns NULL on failure.
  */
-/* ARGSUSED */
 ipsec_tun_pol_t *
-itp_get_byaddr_dummy(uint32_t *laddr, uint32_t *faddr, int af, netstack_t *ns)
+itp_get_byaddr(uint32_t *laddr, uint32_t *faddr, int af, ip_stack_t *ipst)
 {
-	return (NULL);  /* Always return NULL. */
+	conn_t *connp;
+	iptun_t *iptun;
+	ipsec_tun_pol_t *itp = NULL;
+
+	/* Classifiers are used to "src" being foreign. */
+	if (af == AF_INET) {
+		connp = ipcl_iptun_classify_v4((ipaddr_t *)faddr,
+		    (ipaddr_t *)laddr, ipst);
+	} else {
+		ASSERT(af == AF_INET6);
+		ASSERT(!IN6_IS_ADDR_V4MAPPED((in6_addr_t *)laddr));
+		ASSERT(!IN6_IS_ADDR_V4MAPPED((in6_addr_t *)faddr));
+		connp = ipcl_iptun_classify_v6((in6_addr_t *)faddr,
+		    (in6_addr_t *)laddr, ipst);
+	}
+
+	if (connp == NULL)
+		return (NULL);
+
+	if (IPCL_IS_IPTUN(connp)) {
+		iptun = connp->conn_iptun;
+		if (iptun != NULL) {
+			itp = iptun->iptun_itp;
+			if (itp != NULL) {
+				/* Braces due to the macro's nature... */
+				ITP_REFHOLD(itp);
+			}
+		}  /* Else itp is already NULL. */
+	}
+
+	CONN_DEC_REF(connp);
+	return (itp);
 }
 
 /*

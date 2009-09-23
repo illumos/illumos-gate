@@ -198,6 +198,7 @@ domcaps:* 0444 root sys
 evtchn:* 0666 root sys
 privcmd:* 0666 root sys
 xenbus:* 0666 root sys
+iptunq:* 0640 root sys
 fm:* 0644 root sys
 amd_iommu:* 0644 root sys
 xpvtap:* 0666 root sys

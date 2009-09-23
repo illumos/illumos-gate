@@ -95,7 +95,8 @@ extern void		dls_mac_active_clear(dls_link_t *);
 extern void		dls_create_str_kstats(dld_str_t *);
 extern int		dls_stat_update(kstat_t *, dls_link_t *, int);
 extern int		dls_stat_create(const char *, int, const char *,
-			    int (*)(struct kstat *, int), void *, kstat_t **);
+			    zoneid_t, int (*)(struct kstat *, int), void *,
+			    kstat_t **);
 
 extern int		dls_devnet_open_by_dev(dev_t, dls_link_t **,
 			    dls_dl_handle_t *);

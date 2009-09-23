@@ -138,6 +138,7 @@ i_dladm_get_simnet_info_persist(dladm_handle_t handle,
 	dladm_conf_t conf;
 	dladm_status_t status;
 	char macstr[ETHERADDRL * 3];
+	char simnetpeer[MAXLINKNAMELEN];
 	uint64_t u64;
 	boolean_t mac_fixed;
 
@@ -164,11 +165,13 @@ i_dladm_get_simnet_info_persist(dladm_handle_t handle,
 	(void) dladm_aggr_str2macaddr(macstr, &mac_fixed, attrp->sna_mac_addr);
 
 	/* Peer field is optional and only set when peer is attached */
-	if (dladm_get_conf_field(handle, conf, FSIMNETPEER, &u64,
-	    sizeof (u64)) == DLADM_STATUS_OK)
-		attrp->sna_peer_link_id = (datalink_id_t)u64;
-	else
+	if (dladm_get_conf_field(handle, conf, FSIMNETPEER, simnetpeer,
+	    sizeof (simnetpeer)) == DLADM_STATUS_OK) {
+		status = dladm_name2info(handle, simnetpeer,
+		    &attrp->sna_peer_link_id, NULL, NULL, NULL);
+	} else {
 		attrp->sna_peer_link_id = DATALINK_INVALID_LINKID;
+	}
 done:
 	dladm_destroy_conf(handle, conf);
 	return (status);
@@ -223,7 +226,7 @@ i_dladm_simnet_update_conf(dladm_handle_t handle, datalink_id_t simnet_id,
 {
 	dladm_status_t status;
 	dladm_conf_t conf;
-	uint64_t u64;
+	char simnetpeer[MAXLINKNAMELEN];
 
 	status = dladm_read_conf(handle, simnet_id, &conf);
 	if (status != DLADM_STATUS_OK)
@@ -232,12 +235,12 @@ i_dladm_simnet_update_conf(dladm_handle_t handle, datalink_id_t simnet_id,
 	/* First clear previous peer if any in configuration */
 	(void) dladm_unset_conf_field(handle, conf, FSIMNETPEER);
 	if (peer_simnet_id != DATALINK_INVALID_LINKID) {
-		u64 = peer_simnet_id;
 		if ((status = dladm_datalink_id2info(handle,
-		    peer_simnet_id, NULL, NULL, NULL, NULL,
-		    0)) == DLADM_STATUS_OK)
+		    peer_simnet_id, NULL, NULL, NULL, simnetpeer,
+		    sizeof (simnetpeer))) == DLADM_STATUS_OK) {
 			status = dladm_set_conf_field(handle, conf,
-			    FSIMNETPEER, DLADM_TYPE_UINT64, &u64);
+			    FSIMNETPEER, DLADM_TYPE_STR, simnetpeer);
+		}
 		if (status != DLADM_STATUS_OK)
 			goto fail;
 	}
@@ -357,9 +360,9 @@ dladm_simnet_delete(dladm_handle_t handle, datalink_id_t simnet_id,
 	}
 
 	if (flags & DLADM_OPT_PERSIST) {
+		(void) dladm_remove_conf(handle, simnet_id);
 		(void) dladm_destroy_datalink_id(handle, simnet_id,
 		    DLADM_OPT_PERSIST);
-		(void) dladm_remove_conf(handle, simnet_id);
 
 		/* Update any attached peer configuration */
 		if (prevattr.sna_peer_link_id != DATALINK_INVALID_LINKID)

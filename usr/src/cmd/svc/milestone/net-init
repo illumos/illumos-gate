@@ -69,11 +69,6 @@ encr=`/usr/bin/awk -F: '/^root:/ {print $2}' /etc/shadow`
 [ -z "$encr" ] || /usr/sbin/ndd -set /dev/tcp tcp_1948_phrase $encr
 unset encr
 
-#
-# Get values for TCP_STRONG_ISS, ACCEPT6TO4RELAY and RELAY6TO4ADDR.
-#
-[ -f /etc/default/inetinit ] && . /etc/default/inetinit
-
 # Set the SDP system Policy.  This needs to happen after basic
 # networking is up but before any networking services that might
 # want to use SDP are enabled
@@ -90,84 +85,9 @@ fi
 # See /etc/default/inetinit for settings and further info on TCP_STRONG_ISS.
 # If not set, use TCP's internal default setting.
 #
+[ -f /etc/default/inetinit ] && . /etc/default/inetinit
 if [ $TCP_STRONG_ISS ]; then
 	/usr/sbin/ndd -set /dev/tcp tcp_strong_iss $TCP_STRONG_ISS
-fi
-
-#
-# Configure tunnels which were deferred by /lib/svc/method/net-physical
-# (the svc:/network/physical service) since it depends on the tunnel endpoints
-# being reachable i.e. routing must be running.
-#
-# WARNING: you may wish to turn OFF forwarding if you haven't already, because
-# of various possible security vulnerabilities when configuring tunnels for
-# Virtual Private Network (VPN) construction.
-#
-# Also, if names are used in the /etc/hostname.ip.tun* file, those names
-# have to be in either DNS (and DNS is used) or in /etc/hosts, because this
-# file is executed before NIS or NIS+ is started.
-#
-
-#
-# IPv4 tunnels
-# The second component of the name must be either "ip" or "ip6".
-#
-interface_names="`/usr/bin/ls /etc/hostname.ip*.*[0-9] 2>/dev/null | \
-    /usr/bin/grep '/etc/hostname\.ip6\{0,1\}\.'`"
-if [ -n "$interface_names" ]; then
-	(
-		echo "configuring IPv4 tunnels:\c"
-		# Extract the part after the first '.'
-		set -- `for intr in $interface_names; do \
-		    /usr/bin/expr //$intr : '[^.]*\.\(.*\)$'; done`
-		while [ $# -ge 1 ]; do
-			# Skip empty files
-			if [ ! -s /etc/hostname\.$1 ]; then
-				shift
-				continue
-			fi
-			/usr/sbin/ifconfig $1 plumb
-			while read ifcmds; do
-				if [ -n "$ifcmds" ]; then
-					/usr/sbin/ifconfig $1 inet $ifcmds
-				fi
-			done </etc/hostname\.$1 >/dev/null
-			echo " $1\c"
-			shift
-		done
-		echo "."
-	)
-fi
-
-#
-# IPv6 Tunnels
-# The second component of the name must be either "ip" or "ip6".
-#
-interface_names="`/usr/bin/ls /etc/hostname6.ip*.*[0-9] 2>/dev/null | \
-    /usr/bin/grep '/etc/hostname6\.ip6\{0,1\}\.'`"
-if [ -n "$interface_names" ]; then
-	(
-		echo "configuring IPv6 tunnels:\c"
-		# Extract the part after the first '.'
-		set -- `for intr in $interface_names; do \
-		    /usr/bin/expr //$intr : '[^.]*\.\(.*\)$'; done`
-		while [ $# -ge 1 ]; do
-			# Skip empty files
-			if [ ! -s /etc/hostname6\.$1 ]; then
-				shift
-				continue
-			fi
-			/usr/sbin/ifconfig $1 inet6 plumb
-			while read ifcmds; do
-				if [ -n "$ifcmds" ]; then
-					/usr/sbin/ifconfig $1 inet6 $ifcmds
-				fi
-			done </etc/hostname6\.$1 > /dev/null
-			echo " $1\c"
-			shift
-		done
-		echo "."
-	)
 fi
 
 # Clear exit status.

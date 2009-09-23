@@ -42,6 +42,7 @@
 #include <sys/ethernet.h>
 #include <sys/vlan.h>
 #include <sys/zone.h>
+#include <inet/iptun.h>
 #include <sys/byteorder.h>
 #include <limits.h>
 #include <inet/ip.h>
@@ -51,12 +52,12 @@
 #include "at.h"
 #include "snoop.h"
 
-static uint_t ether_header_len(char *), fddi_header_len(char *),
-	tr_header_len(char *), ib_header_len(char *), ipnet_header_len(char *);
-static uint_t interpret_ether(), interpret_fddi(), interpret_tr();
-static uint_t interpret_ib(int, char *, int, int),
-	interpret_ipnet(int, char *, int, int);
+static headerlen_fn_t ether_header_len, fddi_header_len, tr_header_len,
+    ib_header_len, ipnet_header_len, ipv4_header_len, ipv6_header_len;
+static interpreter_fn_t interpret_ether, interpret_fddi, interpret_tr,
+    interpret_ib, interpret_ipnet, interpret_iptun;
 static void addr_copy_swap(struct ether_addr *, struct ether_addr *);
+static int tr_machdr_len(char *, int *, int *);
 
 interface_t *interface;
 interface_t INTERFACES[] = {
@@ -85,6 +86,18 @@ interface_t INTERFACES[] = {
 	{ DL_IPNET, INT_MAX, 1, 1, IPV4_VERSION, IPV6_VERSION,
 	    ipnet_header_len, interpret_ipnet, B_TRUE },
 
+	/* IPv4 tunnel */
+	{ DL_IPV4, 0, 9, 1, IPPROTO_ENCAP, IPPROTO_IPV6,
+	    ipv4_header_len, interpret_iptun, B_FALSE },
+
+	/* IPv6 tunnel */
+	{ DL_IPV6, 0, 40, 1, IPPROTO_ENCAP, IPPROTO_IPV6,
+	    ipv6_header_len, interpret_iptun, B_FALSE },
+
+	/* 6to4 tunnel */
+	{ DL_6TO4, 0, 9, 1, IPPROTO_ENCAP, IPPROTO_IPV6,
+	    ipv4_header_len, interpret_iptun, B_FALSE },
+
 	{ (uint_t)-1, 0, 0, 0, 0, NULL, NULL, B_FALSE }
 };
 
@@ -110,11 +123,9 @@ static int datalen;			/* current data buffer length */
 static const struct ether_addr all_isis_rbridges = ALL_ISIS_RBRIDGES;
 
 uint_t
-interpret_ether(flags, e, elen, origlen)
-	int flags;
-	struct ether_header *e;
-	int elen, origlen;
+interpret_ether(int flags, char *header, int elen, int origlen)
 {
+	struct ether_header *e = (struct ether_header *)header;
 	uchar_t *off, *ieeestart;
 	int len;
 	int ieee8023 = 0;
@@ -138,10 +149,11 @@ interpret_ether(flags, e, elen, origlen)
 	}
 inner_pkt:
 	if (origlen < 14) {
-		if (flags & F_SUM)
+		if (flags & F_SUM) {
 			(void) sprintf(get_sum_line(),
-			"RUNT (short packet - %d bytes)",
-			origlen);
+			    "RUNT (short packet - %d bytes)",
+			    origlen);
+		}
 		if (flags & F_DTAIL)
 			show_header("RUNT:  ", "Short packet", origlen);
 		return (elen);
@@ -373,10 +385,13 @@ inner_pkt:
  *           a VLAN header otherwise.
  */
 uint_t
-ether_header_len(e)
-char *e;
+ether_header_len(char *e, size_t msgsize)
 {
 	uint16_t ether_type = 0;
+
+	if (msgsize < sizeof (struct ether_header))
+		return (0);
+
 	e += (offsetof(struct ether_header, ether_type));
 
 	GETINT16(ether_type, e);
@@ -623,8 +638,7 @@ ETHERTYPE_PUP,	"Xerox PUP",
 };
 
 char *
-print_fc(type)
-uint_t type;
+print_fc(uint_t type)
 {
 
 	switch (type) {
@@ -636,8 +650,7 @@ uint_t type;
 }
 
 char *
-print_smtclass(type)
-uint_t type;
+print_smtclass(uint_t type)
 {
 	switch (type) {
 		case 0x01: return ("NIF");
@@ -657,8 +670,7 @@ uint_t type;
 
 }
 char *
-print_smttype(type)
-uint_t type;
+print_smttype(uint_t type)
 {
 	switch (type) {
 		case 0x01: return ("Announce");
@@ -669,8 +681,7 @@ uint_t type;
 
 }
 char *
-print_ethertype(type)
-	int type;
+print_ethertype(int type)
 {
 	int i;
 
@@ -793,10 +804,7 @@ print_sr(struct tr_ri *rh)
 }
 
 uint_t
-interpret_tr(flags, e, elen, origlen)
-	int flags;
-	caddr_t	e;
-	int elen, origlen;
+interpret_tr(int flags, caddr_t e, int elen, int origlen)
 {
 	struct tr_header *mh;
 	struct tr_ri *rh;
@@ -808,7 +816,6 @@ interpret_tr(flags, e, elen, origlen)
 	extern char *dst_name, *src_name;
 	int ethertype;
 	int is_llc = 0, is_snap = 0, source_routing = 0;
-	int tr_machdr_len(char *, int *, int *);
 	int blen = MAX(origlen, 17800);
 
 	if (data != NULL && datalen != 0 && datalen < blen) {
@@ -824,10 +831,11 @@ interpret_tr(flags, e, elen, origlen)
 	}
 
 	if (origlen < ACFCDASA_LEN) {
-		if (flags & F_SUM)
+		if (flags & F_SUM) {
 			(void) sprintf(get_sum_line(),
-			"RUNT (short packet - %d bytes)",
-			origlen);
+			    "RUNT (short packet - %d bytes)",
+			    origlen);
+		}
 		if (flags & F_DTAIL)
 			show_header("RUNT:  ", "Short packet", origlen);
 		return (elen);
@@ -842,8 +850,8 @@ interpret_tr(flags, e, elen, origlen)
 	if (is_llc = tr_machdr_len(e, &maclen, &source_routing)) {
 		snaphdr = (struct llc_snap_hdr *)(e + maclen);
 		if (snaphdr->d_lsap == LSAP_SNAP &&
-			snaphdr->s_lsap == LSAP_SNAP &&
-			snaphdr->control == CNTL_LLC_UI) {
+		    snaphdr->s_lsap == LSAP_SNAP &&
+		    snaphdr->control == CNTL_LLC_UI) {
 			is_snap = 1;
 		}
 	}
@@ -852,7 +860,7 @@ interpret_tr(flags, e, elen, origlen)
 	    sizeof (struct ether_addr)) == 0)
 		dst_name = "(broadcast)";
 	else if (memcmp(&mh->dhost, &tokenbroadcastaddr2,
-		sizeof (struct ether_addr)) == 0)
+	    sizeof (struct ether_addr)) == 0)
 		dst_name = "(mac broadcast)";
 	else if (mh->dhost.ether_addr_octet[0] & TR_FN_ADDR)
 		dst_name = "(functional)";
@@ -894,72 +902,74 @@ interpret_tr(flags, e, elen, origlen)
 
 		if (is_llc) {
 			if (is_snap) {
-				(void) sprintf(get_sum_line(),
-				"TR LLC w/SNAP Type=%04X (%s), size=%d bytes",
-				ethertype,
-				print_ethertype(ethertype),
-				origlen);
+				(void) sprintf(get_sum_line(), "TR LLC w/SNAP "
+				    "Type=%04X (%s), size=%d bytes",
+				    ethertype,
+				    print_ethertype(ethertype),
+				    origlen);
 			} else {
-				(void) sprintf(get_sum_line(),
-				"TR LLC, but no SNAP encoding, size = %d bytes",
-				origlen);
+				(void) sprintf(get_sum_line(), "TR LLC, but no "
+				    "SNAP encoding, size = %d bytes",
+				    origlen);
 			}
 		} else {
 			(void) sprintf(get_sum_line(),
-				"TR MAC FC=%02X (%s), size = %d bytes",
-				fc, print_fc(fc), origlen);
+			    "TR MAC FC=%02X (%s), size = %d bytes",
+			    fc, print_fc(fc), origlen);
 		}
 	}
 
 	if (flags & F_DTAIL) {
-	show_header("TR:  ", "TR Header", elen);
-	show_space();
-	(void) sprintf(get_line(0, 0),
-		"Packet %d arrived at %d:%02d:%d.%05d",
-		pi_frame,
-		pi_time_hour, pi_time_min, pi_time_sec,
-		pi_time_usec / 10);
-	(void) sprintf(get_line(0, 0),
-		"Packet size = %d bytes",
-		elen);
-	(void) sprintf(get_line(0, 1),
-		"Frame Control = %02x (%s)",
-		fc, print_fc(fc));
-	(void) sprintf(get_line(2, 6),
-		"Destination = %s, %s",
-		printether(&mh->dhost),
-		print_etherinfo(&mh->dhost));
-	(void) sprintf(get_line(8, 6),
-		"Source      = %s, %s",
-		printether(&mh->shost),
-		print_etherinfo(&mh->shost));
+		show_header("TR:  ", "TR Header", elen);
+		show_space();
+		(void) sprintf(get_line(0, 0),
+		    "Packet %d arrived at %d:%02d:%d.%05d",
+		    pi_frame,
+		    pi_time_hour, pi_time_min, pi_time_sec,
+		    pi_time_usec / 10);
+		(void) sprintf(get_line(0, 0),
+		    "Packet size = %d bytes",
+		    elen);
+		(void) sprintf(get_line(0, 1),
+		    "Frame Control = %02x (%s)",
+		    fc, print_fc(fc));
+		(void) sprintf(get_line(2, 6),
+		    "Destination = %s, %s",
+		    printether(&mh->dhost),
+		    print_etherinfo(&mh->dhost));
+		(void) sprintf(get_line(8, 6),
+		    "Source      = %s, %s",
+		    printether(&mh->shost),
+		    print_etherinfo(&mh->shost));
 
-	if (source_routing)
-		sprintf(get_line(ACFCDASA_LEN, rh->len), print_sr(rh));
+		if (source_routing)
+			sprintf(get_line(ACFCDASA_LEN, rh->len), print_sr(rh));
 
-	if (is_llc) {
-		(void) sprintf(get_line(maclen, 1),
-			"Dest   Service Access Point = %02x",
-			snaphdr->d_lsap);
-		(void) sprintf(get_line(maclen+1, 1),
-			"Source Service Access Point = %02x",
-			snaphdr->s_lsap);
-		(void) sprintf(get_line(maclen+2, 1),
-			"Control = %02x",
-			snaphdr->control);
-		if (is_snap)
-			(void) sprintf(get_line(maclen+3, 3),
-				"SNAP Protocol Id = %02x%02x%02x",
-				snaphdr->org[0], snaphdr->org[1],
-				snaphdr->org[2]);
-	}
+		if (is_llc) {
+			(void) sprintf(get_line(maclen, 1),
+			    "Dest   Service Access Point = %02x",
+			    snaphdr->d_lsap);
+			(void) sprintf(get_line(maclen+1, 1),
+			    "Source Service Access Point = %02x",
+			    snaphdr->s_lsap);
+			(void) sprintf(get_line(maclen+2, 1),
+			    "Control = %02x",
+			    snaphdr->control);
+			if (is_snap) {
+				(void) sprintf(get_line(maclen+3, 3),
+				    "SNAP Protocol Id = %02x%02x%02x",
+				    snaphdr->org[0], snaphdr->org[1],
+				    snaphdr->org[2]);
+			}
+		}
 
-	if (is_snap)
-		(void) sprintf(get_line(maclen+6, 2),
-		"SNAP Type = %04X (%s)",
-		ethertype, print_ethertype(ethertype));
+		if (is_snap) {
+			(void) sprintf(get_line(maclen+6, 2),
+			    "SNAP Type = %04X (%s)",
+			    ethertype, print_ethertype(ethertype));
+		}
 
-	show_space();
+		show_space();
 	}
 
 	/* go to the next protocol layer */
@@ -997,7 +1007,7 @@ interpret_tr(flags, e, elen, origlen)
  *		0: mac frame
  *		1: llc frame
  */
-int
+static int
 tr_machdr_len(char *e, int *lenp, int *source_routing)
 {
 	struct tr_header *mh;
@@ -1023,8 +1033,7 @@ tr_machdr_len(char *e, int *lenp, int *source_routing)
 }
 
 uint_t
-tr_header_len(e)
-char	*e;
+tr_header_len(char *e, size_t msgsize)
 {
 	struct llc_snap_hdr *snaphdr;
 	int len = 0, source_routing;
@@ -1032,10 +1041,13 @@ char	*e;
 	if (tr_machdr_len(e, &len, &source_routing) == 0)
 		return (len);		/* it's a MAC frame */
 
+	if (msgsize < sizeof (struct llc_snap_hdr))
+		return (0);
+
 	snaphdr = (struct llc_snap_hdr *)(e + len);
 	if (snaphdr->d_lsap == LSAP_SNAP &&
-			snaphdr->s_lsap == LSAP_SNAP &&
-			snaphdr->control == CNTL_LLC_UI)
+	    snaphdr->s_lsap == LSAP_SNAP &&
+	    snaphdr->control == CNTL_LLC_UI)
 		len += LLC_SNAP_HDR_LEN;	/* it's a SNAP frame */
 	else
 		len += LLC_HDR1_LEN;
@@ -1051,10 +1063,7 @@ struct fddi_header {
 };
 
 uint_t
-interpret_fddi(flags, e, elen, origlen)
-	int flags;
-	caddr_t	e;
-	int elen, origlen;
+interpret_fddi(int flags, caddr_t e, int elen, int origlen)
 {
 	struct fddi_header fhdr, *f = &fhdr;
 	char *off;
@@ -1078,10 +1087,11 @@ interpret_fddi(flags, e, elen, origlen)
 	}
 
 	if (origlen < 13) {
-		if (flags & F_SUM)
+		if (flags & F_SUM) {
 			(void) sprintf(get_sum_line(),
-			"RUNT (short packet - %d bytes)",
-			origlen);
+			    "RUNT (short packet - %d bytes)",
+			    origlen);
+		}
 		if (flags & F_DTAIL)
 			show_header("RUNT:  ", "Short packet", origlen);
 		return (elen);
@@ -1151,86 +1161,89 @@ interpret_fddi(flags, e, elen, origlen)
 		if (is_llc) {
 			if (is_snap) {
 				(void) sprintf(get_sum_line(),
-				"FDDI LLC Type=%04X (%s), size = %d bytes",
-				ethertype,
-				print_ethertype(ethertype),
-				origlen);
+				    "FDDI LLC Type=%04X (%s), size = %d bytes",
+				    ethertype,
+				    print_ethertype(ethertype),
+				    origlen);
 			} else {
-				(void) sprintf(get_sum_line(),
-				"LLC, but no SNAP encoding, size = %d bytes",
-				origlen);
+				(void) sprintf(get_sum_line(), "LLC, but no "
+				    "SNAP encoding, size = %d bytes",
+				    origlen);
 			}
 		} else if (is_smt) {
-			(void) sprintf(get_sum_line(),
-		"SMT Type=%02X (%s), Class = %02X (%s), size = %d bytes",
-			*(uchar_t *)(data+1), print_smttype(*(data+1)), *data,
-			print_smtclass(*data), origlen);
+			(void) sprintf(get_sum_line(), "SMT Type=%02X (%s), "
+			    "Class = %02X (%s), size = %d bytes",
+			    *(uchar_t *)(data+1), print_smttype(*(data+1)),
+			    *data, print_smtclass(*data), origlen);
 		} else {
 			(void) sprintf(get_sum_line(),
-				"FC=%02X (%s), size = %d bytes",
-				f->fc, print_fc(f->fc), origlen);
+			    "FC=%02X (%s), size = %d bytes",
+			    f->fc, print_fc(f->fc), origlen);
 		}
 	}
 
 	if (flags & F_DTAIL) {
-	show_header("FDDI:  ", "FDDI Header", elen);
-	show_space();
-	(void) sprintf(get_line(0, 0),
-		"Packet %d arrived at %d:%02d:%d.%05d",
-		pi_frame,
-		pi_time_hour, pi_time_min, pi_time_sec,
-		pi_time_usec / 10);
-	(void) sprintf(get_line(0, 0),
-		"Packet size = %d bytes",
-		elen, elen);
-	(void) sprintf(get_line(0, 6),
-		"Destination = %s, %s",
-		printether(&f->dhost),
-		print_etherinfo(&f->dhost));
-	(void) sprintf(get_line(6, 6),
-		"Source      = %s, %s",
-		printether(&f->shost),
-		print_etherinfo(&f->shost));
+		show_header("FDDI:  ", "FDDI Header", elen);
+		show_space();
+		(void) sprintf(get_line(0, 0),
+		    "Packet %d arrived at %d:%02d:%d.%05d",
+		    pi_frame,
+		    pi_time_hour, pi_time_min, pi_time_sec,
+		    pi_time_usec / 10);
+		(void) sprintf(get_line(0, 0),
+		    "Packet size = %d bytes",
+		    elen, elen);
+		(void) sprintf(get_line(0, 6),
+		    "Destination = %s, %s",
+		    printether(&f->dhost),
+		    print_etherinfo(&f->dhost));
+		(void) sprintf(get_line(6, 6),
+		    "Source      = %s, %s",
+		    printether(&f->shost),
+		    print_etherinfo(&f->shost));
 
-	if (is_llc) {
-		(void) sprintf(get_line(12, 2),
-			"Frame Control = %02x (%s)",
-			f->fc, print_fc(f->fc));
-		(void) sprintf(get_line(12, 2),
-			"Dest   Service Access Point = %02x",
-			f->dsap);
-		(void) sprintf(get_line(12, 2),
-			"Source Service Access Point = %02x",
-			f->ssap);
-		(void) sprintf(get_line(12, 2),
-			"Control = %02x",
-			f->ctl);
-		if (is_snap)
+		if (is_llc) {
 			(void) sprintf(get_line(12, 2),
-				"Protocol Id = %02x%02x%02x",
-				f->proto_id[0], f->proto_id[1], f->proto_id[2]);
-	} else if (is_smt) {
-		(void) sprintf(get_line(12, 2),
-			"Frame Control = %02x (%s)",
-			f->fc, print_fc(f->fc));
-		(void) sprintf(get_line(12, 2),
-			"Class = %02x (%s)",
-			(uchar_t)*data, print_smtclass(*data));
-		(void) sprintf(get_line(12, 2),
-			"Type = %02x (%s)",
-			*(uchar_t *)(data+1), print_smttype(*(data+1)));
-	} else {
-		(void) sprintf(get_line(12, 2),
-			"FC=%02X (%s), size = %d bytes",
-			f->fc, print_fc(f->fc), origlen);
-	}
+			    "Frame Control = %02x (%s)",
+			    f->fc, print_fc(f->fc));
+			(void) sprintf(get_line(12, 2),
+			    "Dest   Service Access Point = %02x",
+			    f->dsap);
+			(void) sprintf(get_line(12, 2),
+			    "Source Service Access Point = %02x",
+			    f->ssap);
+			(void) sprintf(get_line(12, 2),
+			    "Control = %02x",
+			    f->ctl);
+			if (is_snap) {
+				(void) sprintf(get_line(12, 2),
+				    "Protocol Id = %02x%02x%02x",
+				    f->proto_id[0], f->proto_id[1],
+				    f->proto_id[2]);
+			}
+		} else if (is_smt) {
+			(void) sprintf(get_line(12, 2),
+			    "Frame Control = %02x (%s)",
+			    f->fc, print_fc(f->fc));
+			(void) sprintf(get_line(12, 2),
+			    "Class = %02x (%s)",
+			    (uchar_t)*data, print_smtclass(*data));
+			(void) sprintf(get_line(12, 2),
+			    "Type = %02x (%s)",
+			    *(uchar_t *)(data+1), print_smttype(*(data+1)));
+		} else {
+			(void) sprintf(get_line(12, 2),
+			    "FC=%02X (%s), size = %d bytes",
+			    f->fc, print_fc(f->fc), origlen);
+		}
 
-	if (is_snap)
-		(void) sprintf(get_line(12, 2),
-		"LLC Type = %04X (%s)",
-		ethertype, print_ethertype(ethertype));
+		if (is_snap) {
+			(void) sprintf(get_line(12, 2),
+			    "LLC Type = %04X (%s)",
+			    ethertype, print_ethertype(ethertype));
+		}
 
-	show_space();
+		show_space();
 	}
 
 	/* go to the next protocol layer */
@@ -1257,9 +1270,12 @@ interpret_fddi(flags, e, elen, origlen)
 }
 
 uint_t
-fddi_header_len(char *e)
+fddi_header_len(char *e, size_t msgsize)
 {
 	struct fddi_header fhdr, *f = &fhdr;
+
+	if (msgsize < sizeof (struct fddi_header))
+		return (0);
 
 	(void) memcpy(&f->fc, e, sizeof (f->fc));
 	(void) memcpy(&f->dhost, e+1, sizeof (struct ether_addr));
@@ -1286,18 +1302,17 @@ fddi_header_len(char *e)
  * Print the given Ethernet address
  */
 char *
-printether(p)
-	struct ether_addr *p;
+printether(struct ether_addr *p)
 {
 	static char buf[256];
 
 	sprintf(buf, "%x:%x:%x:%x:%x:%x",
-		p->ether_addr_octet[0],
-		p->ether_addr_octet[1],
-		p->ether_addr_octet[2],
-		p->ether_addr_octet[3],
-		p->ether_addr_octet[4],
-		p->ether_addr_octet[5]);
+	    p->ether_addr_octet[0],
+	    p->ether_addr_octet[1],
+	    p->ether_addr_octet[2],
+	    p->ether_addr_octet[3],
+	    p->ether_addr_octet[4],
+	    p->ether_addr_octet[5]);
 
 	return (buf);
 }
@@ -1489,8 +1504,7 @@ ether_ouiname(uint32_t oui)
  * Print the additional Ethernet address info
  */
 static char *
-print_etherinfo(eaddr)
-	struct ether_addr *eaddr;
+print_etherinfo(struct ether_addr *eaddr)
 {
 	uint_t addr = 0;
 	char *p = (char *)&addr + 1;
@@ -1546,9 +1560,7 @@ static uchar_t	endianswap[] = {
 };
 
 static void
-addr_copy_swap(pd, ps)
-	struct ether_addr	*pd;
-	struct ether_addr	*ps;
+addr_copy_swap(struct ether_addr *pd, struct ether_addr *ps)
 {
 	pd->ether_addr_octet[0] = endianswap[ps->ether_addr_octet[0]];
 	pd->ether_addr_octet[1] = endianswap[ps->ether_addr_octet[1]];
@@ -1560,7 +1572,7 @@ addr_copy_swap(pd, ps)
 
 /* ARGSUSED */
 uint_t
-ib_header_len(char *hdr)
+ib_header_len(char *hdr, size_t msgsize)
 {
 	return (IPOIB_HDRSIZE);
 }
@@ -1571,7 +1583,6 @@ interpret_ib(int flags, char *header, int elen, int origlen)
 	struct ipoib_header *hdr = (struct ipoib_header *)header;
 	char *off;
 	int len;
-	extern char *dst_name;
 	unsigned short ethertype;
 	int blen = MAX(origlen, 4096);
 
@@ -1647,8 +1658,9 @@ interpret_ib(int flags, char *header, int elen, int origlen)
 	return (elen);
 }
 
+/* ARGSUSED */
 uint_t
-ipnet_header_len(char *hdr)
+ipnet_header_len(char *hdr, size_t msgsize)
 {
 	return (sizeof (dl_ipnetinfo_t));
 }
@@ -1727,4 +1739,64 @@ interpret_ipnet(int flags, char *header, int elen, int origlen)
 	}
 
 	return (0);
+}
+
+uint_t
+ipv4_header_len(char *hdr, size_t msgsize)
+{
+	return (msgsize < sizeof (ipha_t) ? 0 : IPH_HDR_LENGTH((ipha_t *)hdr));
+}
+
+/*
+ * The header length needs to include all potential extension headers, as the
+ * caller expects to use this length as an offset to the inner network layer
+ * header to be used as a filter offset.  IPsec headers aren't passed up here,
+ * and neither are fragmentation headers.
+ */
+uint_t
+ipv6_header_len(char *hdr, size_t msgsize)
+{
+	ip6_t		*ip6hdr = (ip6_t *)hdr;
+	ip6_hbh_t	*exthdr;
+	uint_t		hdrlen = sizeof (ip6_t), exthdrlen;
+	char		*pptr;
+	uint8_t		nxt;
+
+	if (msgsize < sizeof (ip6_t))
+		return (0);
+
+	nxt = ip6hdr->ip6_nxt;
+	pptr = (char *)(ip6hdr + 1);
+
+	while (nxt != IPPROTO_ENCAP && nxt != IPPROTO_IPV6) {
+		switch (nxt) {
+		case IPPROTO_HOPOPTS:
+		case IPPROTO_DSTOPTS:
+		case IPPROTO_ROUTING:
+			if (msgsize < hdrlen + sizeof (ip6_hbh_t))
+				return (0);
+			exthdr = (ip6_hbh_t *)pptr;
+			exthdrlen = 8 + exthdr->ip6h_len * 8;
+			hdrlen += exthdrlen;
+			pptr += exthdrlen;
+			nxt = exthdr->ip6h_nxt;
+			break;
+		default:
+			/*
+			 * This is garbage, there's no way to know where the
+			 * inner IP header is.
+			 */
+			return (0);
+		}
+	}
+
+	return (hdrlen);
+}
+
+/* ARGSUSED */
+uint_t
+interpret_iptun(int flags, char *header, int elen, int origlen)
+{
+	(void) interpret_ip(flags, (struct ip *)header, elen);
+	return (elen);
 }

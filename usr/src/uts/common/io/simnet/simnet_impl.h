@@ -26,6 +26,7 @@
 #ifndef	_SYS_SIMNET_IMPL_H
 #define	_SYS_SIMNET_IMPL_H
 
+#include <sys/types.h>
 #include <sys/list.h>
 #include <sys/mutex.h>
 #include <sys/mac.h>
@@ -65,6 +66,7 @@ typedef struct simnet_dev {
 	list_node_t		sd_listnode;
 	uint_t			sd_type;	/* WiFi, Ethernet etc. */
 	datalink_id_t		sd_link_id;
+	zoneid_t		sd_zoneid;	/* zone where created */
 	struct simnet_dev	*sd_peer_dev;	/* Attached peer, if any */
 	uint_t			sd_flags;	/* Device flags SDF_* */
 	uint_t			sd_refcount;

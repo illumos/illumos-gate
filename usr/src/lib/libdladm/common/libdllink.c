@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -379,28 +379,6 @@ dladm_linkduplex2str(link_duplex_t duplex, char *buf)
 }
 
 /*
- * Set zoneid of a given link. Note that this function takes a link name
- * argument instead of a linkid, because a data-link (and its linkid) could
- * be created implicitly as the result of this function.
- */
-dladm_status_t
-dladm_setzid(dladm_handle_t handle, const char *dlname, char *zone_name)
-{
-	datalink_id_t	linkid;
-	dladm_status_t	status = DLADM_STATUS_OK;
-
-	/* If the link does not exist, it is a ppa-hacked vlan. */
-	status = dladm_name2info(handle, dlname, &linkid, NULL, NULL, NULL);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	status = dladm_set_linkprop(handle, linkid, "zone", &zone_name, 1,
-	    DLADM_OPT_ACTIVE);
-
-	return (status);
-}
-
-/*
  * Case 1: rename an existing link1 to a link2 that does not exist.
  * Result: <linkid1, link2>
  */
@@ -409,7 +387,6 @@ i_dladm_rename_link_c1(dladm_handle_t handle, datalink_id_t linkid1,
     const char *link1, const char *link2, uint32_t flags)
 {
 	dld_ioc_rename_t	dir;
-	dladm_conf_t		conf;
 	dladm_status_t		status = DLADM_STATUS_OK;
 
 	/*
@@ -428,24 +405,9 @@ i_dladm_rename_link_c1(dladm_handle_t handle, datalink_id_t linkid1,
 	}
 
 	status = dladm_remap_datalink_id(handle, linkid1, link2);
-	if (status != DLADM_STATUS_OK)
-		goto done;
-
-	/*
-	 * Flush the current mapping to persistent configuration.
-	 */
-	if ((flags & DLADM_OPT_PERSIST) &&
-	    (((status = dladm_read_conf(handle, linkid1, &conf)) !=
-	    DLADM_STATUS_OK) ||
-	    ((status = dladm_write_conf(handle, conf)) != DLADM_STATUS_OK))) {
-		(void) dladm_remap_datalink_id(handle, linkid1, link1);
-	}
-done:
-	if (flags & DLADM_OPT_ACTIVE) {
-		if (status != DLADM_STATUS_OK) {
-			(void) strlcpy(dir.dir_link, link1, MAXLINKNAMELEN);
-			(void) ioctl(dladm_dld_fd(handle), DLDIOC_RENAME, &dir);
-		}
+	if (status != DLADM_STATUS_OK && (flags & DLADM_OPT_ACTIVE)) {
+		(void) strlcpy(dir.dir_link, link1, MAXLINKNAMELEN);
+		(void) ioctl(dladm_dld_fd(handle), DLDIOC_RENAME, &dir);
 	}
 	return (status);
 }
@@ -586,9 +548,9 @@ i_dladm_rename_link_c2(dladm_handle_t handle, datalink_id_t linkid1,
 	/*
 	 * Delete link1 and mark link2 up.
 	 */
+	(void) dladm_remove_conf(handle, linkid1);
 	(void) dladm_destroy_datalink_id(handle, linkid1, DLADM_OPT_ACTIVE |
 	    DLADM_OPT_PERSIST);
-	(void) dladm_remove_conf(handle, linkid1);
 	(void) dladm_up_datalink_id(handle, linkid2);
 
 	/*
@@ -801,9 +763,8 @@ i_dladm_phys_delete(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 		    DLADM_OPT_PERSIST);
 	}
 
-	(void) dladm_destroy_datalink_id(handle, linkid, DLADM_OPT_PERSIST);
 	(void) dladm_remove_conf(handle, linkid);
-
+	(void) dladm_destroy_datalink_id(handle, linkid, DLADM_OPT_PERSIST);
 done:
 	del_phys_arg->rval = status;
 	return (DLADM_WALK_CONTINUE);

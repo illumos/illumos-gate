@@ -205,7 +205,7 @@ DRV_KMODS	+= aggr arp audio bl bofi clone cn conskbd consms cpuid
 DRV_KMODS	+= crypto cryptoadm devinfo dump
 DRV_KMODS	+= dtrace fasttrap fbt lockstat profile sdt systrace dcpc
 DRV_KMODS	+= fssnap icmp icmp6 ip ip6 ipnet ipsecah
-DRV_KMODS	+= ipsecesp iwscn keysock kmdb kstat ksyms llc1
+DRV_KMODS	+= ipsecesp iptun iptunq iwscn keysock kmdb kstat ksyms llc1
 DRV_KMODS	+= lofi
 DRV_KMODS	+= log logindmux kssl mm nca physmem pm poll pool
 DRV_KMODS	+= pseudo ptc ptm pts ptsl ramdisk random rsm rts sad
@@ -370,10 +370,10 @@ FS_KMODS	+= ctfs objfs sharefs dcfs smbfs
 #
 #	Streams Modules (/kernel/strmod):
 #
-STRMOD_KMODS	+= 6to4tun atun bufmod connld dedump ldterm ms pckt pfmod
+STRMOD_KMODS	+= bufmod connld dedump ldterm ms pckt pfmod
 STRMOD_KMODS	+= pipemod ptem redirmod rpcmod rlmod telmod timod
 STRMOD_KMODS	+= spppasyn spppcomp
-STRMOD_KMODS	+= tirdwr ttcompat tun
+STRMOD_KMODS	+= tirdwr ttcompat
 STRMOD_KMODS	+= usbkbm usbms usb_ah
 STRMOD_KMODS	+= drcompat
 STRMOD_KMODS	+= cryptmod
@@ -498,7 +498,10 @@ DACF_KMODS	+= net_dacf
 #
 #	MAC-Type Plugin Modules (/kernel/mac)
 #
+MAC_KMODS	+= mac_6to4
 MAC_KMODS	+= mac_ether
+MAC_KMODS	+= mac_ipv4
+MAC_KMODS	+= mac_ipv6
 MAC_KMODS	+= mac_wifi
 MAC_KMODS	+= mac_ib
 

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains a routine used to validate a ifconfig-style interface
@@ -92,7 +90,7 @@ getppa(const char *bp, int bpsize, uint_t *ppa)
 	for (tp = ep; tp >= bp && isdigit(*tp); tp--)
 		/* Null body */;
 
-	if (*tp == '.' || *tp == ':') {
+	if (*tp == ':') {
 		errno = EINVAL;
 		return (-1);
 	}
@@ -103,75 +101,34 @@ getppa(const char *bp, int bpsize, uint_t *ppa)
 
 /*
  * Given an ifconfig-style inet relative-path interface specification
- * (e.g: hme.[module].[module][PPA]:2), validate its form and decompose the
- * contents into a dynamically allocated ifspec_t.
+ * (e.g: bge0:2), validate its form and decompose the contents into a
+ * dynamically allocated ifspec_t.
  *
  * Returns ifspec_t for success, NULL pointer if spec is malformed.
  */
 boolean_t
 ifparse_ifspec(const char *ifname, ifspec_t *ifsp)
 {
-	char		*mp, *ep, *lp, *tp;
-	char		*ifnamecp;
-	size_t		iflen;
-	boolean_t	have_ppa = B_FALSE;
+	char	*lp, *tp;
+	char	ifnamecp[LIFNAMSIZ];
 
-	iflen = strlen(ifname);
-	if (iflen > LIFNAMSIZ) {
+	/* snag a copy we can modify */
+	if (strlcpy(ifnamecp, ifname, LIFNAMSIZ) >= LIFNAMSIZ) {
 		errno = EINVAL;
 		return (B_FALSE);
 	}
-
-	/* snag a copy we can modify */
-	ifnamecp = alloca(iflen + 1);
-	(void) strlcpy(ifnamecp, ifname, iflen + 1);
 
 	ifsp->ifsp_lunvalid = B_FALSE;
 
 	/*
 	 * An interface name must have the format of:
-	 * dev[.module[.module...]][ppa][:lun]
-	 *
-	 * where the ppa must be specified at the end of the interface name.
-	 * e.g. ip.foo.tun0
+	 * dev[ppa][:lun]
 	 *
 	 * lun - logical unit number.
-	 *
-	 * Produce substrings for each grouping, starting first with modules,
-	 * then lun, devname, and finally ppa.
 	 */
-
-	/* Any modules? */
-	mp = strchr(ifnamecp, '.');
 
 	/* Any logical units? */
 	lp = strchr(ifnamecp, ':');
-
-	if (lp != NULL && mp != NULL && lp < mp) {
-		errno = EINVAL;
-		return (B_FALSE);
-	}
-
-	ifsp->ifsp_modcnt = 0;
-	if (mp != NULL) {
-		*mp++ = '\0';
-		if (lp != NULL)
-			*lp = '\0';
-		while (mp != NULL && ifsp->ifsp_modcnt <= IFSP_MAXMODS) {
-			if ((ep = strchr(mp, '.')) != NULL)
-				*ep++ = '\0';
-			(void) strlcpy(ifsp->ifsp_mods[ifsp->ifsp_modcnt++],
-			    mp, LIFNAMSIZ);
-			mp = ep;
-		}
-		if (lp != NULL)
-			*lp = ':';
-		if (ifsp->ifsp_modcnt > IFSP_MAXMODS) {
-			errno = E2BIG;
-			return (B_FALSE);
-		}
-	}
-
 	if (lp != NULL) {
 		if (getlun(lp, strlen(lp), &ifsp->ifsp_lun) != 0)
 			return (B_FALSE);
@@ -180,25 +137,17 @@ ifparse_ifspec(const char *ifname, ifspec_t *ifsp)
 
 	(void) strlcpy(ifsp->ifsp_devnm, ifnamecp, LIFNAMSIZ);
 
-	/*
-	 * Find ppa - has to be part of devname or if modules exist part of
-	 * last module name.
-	 */
-	if (ifsp->ifsp_modcnt != 0 &&
-	    getppa(ifsp->ifsp_mods[ifsp->ifsp_modcnt - 1],
-	    strlen(ifsp->ifsp_mods[ifsp->ifsp_modcnt - 1]),
-	    &ifsp->ifsp_ppa) == 0) {
-		have_ppa = B_TRUE;
-	} else if (ifsp->ifsp_modcnt == 0 &&
-	    getppa(ifsp->ifsp_devnm, strlen(ifsp->ifsp_devnm),
-	    &ifsp->ifsp_ppa) == 0) {
-		have_ppa = B_TRUE;
-
-		/* strip the ppa off of the device name if present */
-		for (tp = &ifsp->ifsp_devnm[strlen(ifsp->ifsp_devnm) - 1];
-		    tp >= ifsp->ifsp_devnm && isdigit(*tp); tp--)
-			*tp = '\0';
+	/* Find ppa  */
+	if (getppa(ifsp->ifsp_devnm, strlen(ifsp->ifsp_devnm),
+	    &ifsp->ifsp_ppa) != 0) {
+		return (B_FALSE);
 	}
 
-	return (have_ppa);
+	/* strip the ppa off of the device name if present */
+	for (tp = &ifsp->ifsp_devnm[strlen(ifsp->ifsp_devnm) - 1];
+	    tp >= ifsp->ifsp_devnm && isdigit(*tp); tp--) {
+		*tp = '\0';
+	}
+
+	return (B_TRUE);
 }

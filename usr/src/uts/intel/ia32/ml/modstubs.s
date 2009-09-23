@@ -1289,6 +1289,16 @@ fcnname/**/_info:							\
 	END_MODULE(softmac);
 #endif
 
+#ifndef IPTUN_MODULE
+	MODULE(iptun,drv);
+	STUB(iptun, iptun_create, nomod_einval);
+	STUB(iptun, iptun_delete, nomod_einval);
+	STUB(iptun, iptun_set_policy, nomod_void) ;
+	STUB(iptun, iptun_set_g_q, nomod_einval);
+	STUB(iptun, iptun_clear_g_q, nomod_void);
+	END_MODULE(iptun);
+#endif
+
 /*
  * Stubs for kssl, the kernel SSL proxy
  */

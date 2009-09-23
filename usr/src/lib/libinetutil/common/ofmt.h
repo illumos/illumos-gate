@@ -165,7 +165,7 @@ typedef struct ofmt_field_s {
  * for the handle are freed by ofmt_close();
  */
 typedef struct ofmt_state_s *ofmt_handle_t;
-extern ofmt_status_t ofmt_open(const char *, ofmt_field_t *, uint_t,
+extern ofmt_status_t ofmt_open(const char *, const ofmt_field_t *, uint_t,
     uint_t, ofmt_handle_t *);
 
 #define	OFMT_PARSABLE	0x00000001 /* machine parsable mode */

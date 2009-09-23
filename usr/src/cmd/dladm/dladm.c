@@ -40,6 +40,7 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <priv.h>
+#include <limits.h>
 #include <termios.h>
 #include <pwd.h>
 #include <auth_attr.h>
@@ -55,6 +56,7 @@
 #include <libdlvlan.h>
 #include <libdlvnic.h>
 #include <libdlether.h>
+#include <libdliptun.h>
 #include <libdlsim.h>
 #include <libdlbridge.h>
 #include <libinetutil.h>
@@ -192,6 +194,8 @@ static cmdfunc_t do_delete_simnet, do_show_simnet, do_up_simnet;
 static cmdfunc_t do_show_usage;
 static cmdfunc_t do_create_bridge, do_modify_bridge, do_delete_bridge;
 static cmdfunc_t do_add_bridge, do_remove_bridge, do_show_bridge;
+static cmdfunc_t do_create_iptun, do_modify_iptun, do_delete_iptun;
+static cmdfunc_t do_show_iptun, do_up_iptun, do_down_iptun;
 
 static void 	do_up_vnic_common(int, char **, const char *, boolean_t);
 
@@ -209,6 +213,12 @@ static void	get_link_stats(const char *, pktsum_t *);
 static uint64_t	get_ifspeed(const char *, boolean_t);
 static const char	*get_linkstate(const char *, boolean_t, char *);
 static const char	*get_linkduplex(const char *, boolean_t, char *);
+
+static iptun_type_t	iptun_gettypebyname(char *);
+static const char	*iptun_gettypebyvalue(iptun_type_t);
+static dladm_status_t	print_iptun(dladm_handle_t, datalink_id_t,
+			    show_state_t *);
+static int	print_iptun_walker(dladm_handle_t, datalink_id_t, void *);
 
 static int	show_etherprop(dladm_handle_t, datalink_id_t, void *);
 static void	show_ether_xprop(void *, dladm_ether_info_t *);
@@ -288,6 +298,17 @@ static cmd_t	cmds[] = {
 	{ "show-vlan",		do_show_vlan,
 	    "    show-vlan        [-pP] [-o <field>,..] [<link>]\n"	},
 	{ "up-vlan",		do_up_vlan,		NULL		},
+	{ "create-iptun",	do_create_iptun,
+	    "    create-iptun     [-t] -T <type> "
+	    "[-a {local|remote}=<addr>,...] <link>]" },
+	{ "delete-iptun",	do_delete_iptun,
+	    "    delete-iptun     [-t] <link>"				},
+	{ "modify-iptun",	do_modify_iptun,
+	    "    modify-iptun     [-t] -a {local|remote}=<addr>,... <link>" },
+	{ "show-iptun",		do_show_iptun,
+	    "    show-iptun       [-pP] [-o <field>,..] [<link>]\n"	},
+	{ "up-iptun",		do_up_iptun,		NULL		},
+	{ "down-iptun",		do_down_iptun,		NULL		},
 	{ "delete-phys",	do_delete_phys,
 	    "    delete-phys      <link>"				},
 	{ "show-phys",		do_show_phys,
@@ -380,6 +401,34 @@ static const struct option show_lopts[] = {
 	{ 0, 0, 0, 0 }
 };
 
+static const struct option iptun_lopts[] = {
+	{"output",	required_argument,	0, 'o'},
+	{"tunnel-type",	required_argument,	0, 'T'},
+	{"address",	required_argument,	0, 'a'},
+	{"root-dir",	required_argument,	0, 'R'},
+	{"parsable",	no_argument,		0, 'p'},
+	{"parseable",	no_argument,		0, 'p'},
+	{"persistent",	no_argument,		0, 'P'},
+	{ 0, 0, 0, 0 }
+};
+
+static char * const iptun_addropts[] = {
+#define	IPTUN_LOCAL	0
+	"local",
+#define	IPTUN_REMOTE	1
+	"remote",
+	NULL};
+
+static const struct {
+	const char	*type_name;
+	iptun_type_t	type_value;
+} iptun_types[] = {
+	{"ipv4",	IPTUN_TYPE_IPV4},
+	{"ipv6",	IPTUN_TYPE_IPV6},
+	{"6to4",	IPTUN_TYPE_6TO4},
+	{NULL,		0}
+};
+
 static const struct option prop_longopts[] = {
 	{"temporary",	no_argument,		0, 't'  },
 	{"output",	required_argument,	0, 'o'  },
@@ -410,6 +459,7 @@ static const struct option wifi_longopts[] = {
 	{"file",	required_argument,	0, 'f'  },
 	{ 0, 0, 0, 0 }
 };
+
 static const struct option showeth_lopts[] = {
 	{"parsable",	no_argument,		0, 'p'	},
 	{"parseable",	no_argument,		0, 'p'	},
@@ -492,7 +542,7 @@ typedef struct ether_fields_buf_s
 	char	eth_rem_fault[16];
 } ether_fields_buf_t;
 
-static ofmt_field_t ether_fields[] = {
+static const ofmt_field_t ether_fields[] = {
 /* name,	field width,	offset	    callback */
 { "LINK",	16,
 	offsetof(ether_fields_buf_t, eth_link), print_default_cb},
@@ -534,7 +584,7 @@ typedef enum {
 	LINK_S_OERRORS
 } link_s_field_index_t;
 
-static ofmt_field_t link_s_fields[] = {
+static const ofmt_field_t link_s_fields[] = {
 /* name,	field width,	index,		callback	*/
 { "LINK",	15,		LINK_S_LINK,	print_link_stats_cb},
 { "IPACKETS",	10,		LINK_S_IPKTS,	print_link_stats_cb},
@@ -572,7 +622,7 @@ typedef struct link_fields_buf_s {
 /*
  * structures for 'dladm show-link'
  */
-static ofmt_field_t link_fields[] = {
+static const ofmt_field_t link_fields[] = {
 /* name,	field width,	index,	callback */
 { "LINK",	12,
 	offsetof(link_fields_buf_t, link_name), print_default_cb},
@@ -611,7 +661,7 @@ typedef struct laggr_args_s {
 	boolean_t		laggr_parsable;
 } laggr_args_t;
 
-static ofmt_field_t laggr_fields[] = {
+static const ofmt_field_t laggr_fields[] = {
 /* name,	field width,	offset,	callback */
 { "LINK",	16,
 	offsetof(laggr_fields_buf_t, laggr_name), print_default_cb},
@@ -641,7 +691,7 @@ typedef enum {
 	AGGR_X_PORTSTATE
 } aggr_x_field_index_t;
 
-static ofmt_field_t aggr_x_fields[] = {
+static const ofmt_field_t aggr_x_fields[] = {
 /* name,	field width,	index		callback */
 { "LINK",	12,	AGGR_X_LINK,		print_xaggr_cb},
 { "PORT",	15,	AGGR_X_PORT,		print_xaggr_cb},
@@ -667,7 +717,7 @@ typedef enum {
 	AGGR_S_OPKTDIST
 } aggr_s_field_index_t;
 
-static ofmt_field_t aggr_s_fields[] = {
+static const ofmt_field_t aggr_s_fields[] = {
 { "LINK",		12,	AGGR_S_LINK, print_aggr_stats_cb},
 { "PORT",		10,	AGGR_S_PORT, print_aggr_stats_cb},
 { "IPACKETS",		8,	AGGR_S_IPKTS, print_aggr_stats_cb},
@@ -693,7 +743,7 @@ typedef enum {
 	AGGR_L_EXPIRED
 } aggr_l_field_index_t;
 
-static ofmt_field_t aggr_l_fields[] = {
+static const ofmt_field_t aggr_l_fields[] = {
 /* name,		field width,	index */
 { "LINK",		12,	AGGR_L_LINK,		print_lacp_cb},
 { "PORT",		13,	AGGR_L_PORT,		print_lacp_cb},
@@ -710,7 +760,7 @@ static ofmt_field_t aggr_l_fields[] = {
  * structures for 'dladm show-phys'
  */
 
-static ofmt_field_t phys_fields[] = {
+static const ofmt_field_t phys_fields[] = {
 /* name,	field width,	offset */
 { "LINK",	13,
 	offsetof(link_fields_buf_t, link_name), print_default_cb},
@@ -741,7 +791,7 @@ typedef enum {
 	PHYS_M_CLIENT
 } phys_m_field_index_t;
 
-static ofmt_field_t phys_m_fields[] = {
+static const ofmt_field_t phys_m_fields[] = {
 /* name,	field width,	offset */
 { "LINK",	13,	PHYS_M_LINK,	print_phys_one_mac_cb},
 { "SLOT",	9,	PHYS_M_SLOT,	print_phys_one_mac_cb},
@@ -763,7 +813,7 @@ typedef enum {
 	PHYS_H_CLIENTS
 } phys_h_field_index_t;
 
-static ofmt_field_t phys_h_fields[] = {
+static const ofmt_field_t phys_h_fields[] = {
 { "LINK",	13,	PHYS_H_LINK,	print_phys_one_hwgrp_cb},
 { "GROUP",	9,	PHYS_H_GROUP,	print_phys_one_hwgrp_cb},
 { "GROUPTYPE",	7,	PHYS_H_GRPTYPE,	print_phys_one_hwgrp_cb},
@@ -775,7 +825,7 @@ static ofmt_field_t phys_h_fields[] = {
 /*
  * structures for 'dladm show-vlan'
  */
-static ofmt_field_t vlan_fields[] = {
+static const ofmt_field_t vlan_fields[] = {
 { "LINK",	16,
 	offsetof(link_fields_buf_t, link_name), print_default_cb},
 { "VID",	9,
@@ -834,7 +884,7 @@ typedef enum {
 	LINKPROP_POSSIBLE
 } linkprop_field_index_t;
 
-static ofmt_field_t linkprop_fields[] = {
+static const ofmt_field_t linkprop_fields[] = {
 /* name,	field width,  index */
 { "LINK",	13,	LINKPROP_LINK,		print_linkprop_cb},
 { "PROPERTY",	16,	LINKPROP_PROPERTY,	print_linkprop_cb},
@@ -882,7 +932,7 @@ typedef struct secobj_fields_buf_s {
 	char			ss_val[30];
 } secobj_fields_buf_t;
 
-static ofmt_field_t secobj_fields[] = {
+static const ofmt_field_t secobj_fields[] = {
 { "OBJECT",	21,
 	offsetof(secobj_fields_buf_t, ss_obj_name), print_default_cb},
 { "CLASS",	21,
@@ -905,7 +955,7 @@ typedef struct vnic_fields_buf_s
 	char vnic_vid[6];
 } vnic_fields_buf_t;
 
-static ofmt_field_t vnic_fields[] = {
+static const ofmt_field_t vnic_fields[] = {
 { "LINK",		13,
 	offsetof(vnic_fields_buf_t, vnic_link),	print_default_cb},
 { "OVER",		13,
@@ -932,7 +982,7 @@ typedef struct simnet_fields_buf_s
 	char simnet_otherlink[DLPI_LINKNAME_MAX];
 } simnet_fields_buf_t;
 
-static ofmt_field_t simnet_fields[] = {
+static const ofmt_field_t simnet_fields[] = {
 { "LINK",		12,
 	offsetof(simnet_fields_buf_t, simnet_name), print_default_cb},
 { "MEDIA",		20,
@@ -958,7 +1008,7 @@ typedef struct  usage_fields_buf_s {
 	char	usage_bandwidth[14];
 } usage_fields_buf_t;
 
-static ofmt_field_t usage_fields[] = {
+static const ofmt_field_t usage_fields[] = {
 { "LINK",	13,
 	offsetof(usage_fields_buf_t, usage_link), print_default_cb},
 { "DURATION",	11,
@@ -990,7 +1040,7 @@ typedef struct  usage_l_fields_buf_s {
 	char	usage_l_bandwidth[14];
 } usage_l_fields_buf_t;
 
-static ofmt_field_t usage_l_fields[] = {
+static const ofmt_field_t usage_l_fields[] = {
 /* name,	field width,	offset */
 { "LINK",	13,
 	offsetof(usage_l_fields_buf_t, usage_l_link), print_default_cb},
@@ -1006,6 +1056,34 @@ static ofmt_field_t usage_l_fields[] = {
 	offsetof(usage_l_fields_buf_t, usage_l_bandwidth), print_default_cb},
 { NULL,		0, 0, NULL}}
 ;
+
+/* IPTUN_*FLAG_INDEX values are indices into iptun_flags below. */
+enum { IPTUN_SFLAG_INDEX, IPTUN_IFLAG_INDEX, IPTUN_NUM_FLAGS };
+
+/*
+ * structures for 'dladm show-iptun'
+ */
+typedef struct iptun_fields_buf_s {
+	char	iptun_name[MAXLINKNAMELEN];
+	char	iptun_type[5];
+	char	iptun_laddr[NI_MAXHOST];
+	char	iptun_raddr[NI_MAXHOST];
+	char	iptun_flags[IPTUN_NUM_FLAGS + 1];
+} iptun_fields_buf_t;
+
+static const ofmt_field_t iptun_fields[] = {
+{ "LINK",	16,
+	offsetof(iptun_fields_buf_t, iptun_name), print_default_cb },
+{ "TYPE",	6,
+	offsetof(iptun_fields_buf_t, iptun_type), print_default_cb },
+{ "FLAGS",	7,
+	offsetof(iptun_fields_buf_t, iptun_flags), print_default_cb },
+{ "LOCAL",	20,
+	offsetof(iptun_fields_buf_t, iptun_laddr), print_default_cb },
+{ "REMOTE",	20,
+	offsetof(iptun_fields_buf_t, iptun_raddr), print_default_cb },
+{ NULL, 0, 0, NULL}
+};
 
 /*
  * structures for 'dladm show-bridge'.  These are based on sections 14.8.1.1.3
@@ -1265,7 +1343,7 @@ usage(void)
 	if (handle != NULL)
 		dladm_close(handle);
 
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int
@@ -1298,15 +1376,14 @@ main(int argc, char *argv[])
 			cmdp->c_fn(argc - 1, &argv[1], cmdp->c_usage);
 
 			dladm_close(handle);
-			exit(0);
+			return (EXIT_SUCCESS);
 		}
 	}
 
 	(void) fprintf(stderr, gettext("%s: unknown subcommand '%s'\n"),
 	    progname, argv[1]);
 	usage();
-
-	return (0);
+	return (EXIT_FAILURE);
 }
 
 /*ARGSUSED*/
@@ -1932,12 +2009,8 @@ done:
 		 * and should be removed once 6399681 is fixed.
 		 */
 		if (status == DLADM_STATUS_NOTSUP) {
-			(void) fprintf(stderr,
-			    gettext("%s: add operation failed: %s\n"),
-			    progname,
-			    gettext("link capabilities don't match"));
-			dladm_close(handle);
-			exit(ENOTSUP);
+			die("add operation failed: link capabilities don't "
+			    "match");
 		} else if (status == DLADM_STATUS_NONOTIF) {
 			die("not all links have link up/down detection; must "
 			    "use -f (see dladm(1M))");
@@ -2439,11 +2512,10 @@ do_init_phys(int argc, char *argv[], const char *use)
 	    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
 }
 
-
 /*
  * Print the active topology information.
  */
-static dladm_status_t
+void
 print_link_topology(show_state_t *state, datalink_id_t linkid,
     datalink_class_t class, link_fields_buf_t *lbuf)
 {
@@ -2460,46 +2532,43 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 	case DATALINK_CLASS_ETHERSTUB:
 		status = dladm_bridge_getlink(handle, linkid, lbuf->link_bridge,
 		    sizeof (lbuf->link_bridge));
-		if (status == DLADM_STATUS_OK)
-			break;
-		if (status != DLADM_STATUS_NOTFOUND)
-			return (status);
+		if (status != DLADM_STATUS_OK &&
+		    status != DLADM_STATUS_NOTFOUND)
+			(void) strcpy(lbuf->link_bridge, "?");
 		break;
 	}
 
-	status = DLADM_STATUS_OK;
 	switch (class) {
 	case DATALINK_CLASS_VLAN: {
 		dladm_vlan_attr_t	vinfo;
 
-		status = dladm_vlan_info(handle, linkid, &vinfo, flags);
-		if (status != DLADM_STATUS_OK)
+		if (dladm_vlan_info(handle, linkid, &vinfo, flags) !=
+		    DLADM_STATUS_OK) {
+			(void) strcpy(lbuf->link_over, "?");
 			break;
-		status = dladm_datalink_id2info(handle, vinfo.dv_linkid, NULL,
-		    NULL, NULL, lbuf->link_over, sizeof (lbuf->link_over));
+		}
+		if (dladm_datalink_id2info(handle, vinfo.dv_linkid, NULL, NULL,
+		    NULL, lbuf->link_over, sizeof (lbuf->link_over)) !=
+		    DLADM_STATUS_OK)
+			(void) strcpy(lbuf->link_over, "?");
 		break;
 	}
-
 	case DATALINK_CLASS_AGGR: {
 		dladm_aggr_grp_attr_t	ginfo;
 		int			i;
 
-		lbuf->link_over[0] = '\0';
-
-		status = dladm_aggr_info(handle, linkid, &ginfo, flags);
-		if (status != DLADM_STATUS_OK)
-			break;
-
-		if (ginfo.lg_nports == 0) {
-			status = DLADM_STATUS_BADVAL;
+		if (dladm_aggr_info(handle, linkid, &ginfo, flags) !=
+		    DLADM_STATUS_OK || ginfo.lg_nports == 0) {
+			(void) strcpy(lbuf->link_over, "?");
 			break;
 		}
 		for (i = 0; i < ginfo.lg_nports; i++) {
-			status = dladm_datalink_id2info(handle,
+			if (dladm_datalink_id2info(handle,
 			    ginfo.lg_ports[i].lp_linkid, NULL, NULL, NULL,
-			    tmpbuf, sizeof (tmpbuf));
-			if (status != DLADM_STATUS_OK)
+			    tmpbuf, sizeof (tmpbuf)) != DLADM_STATUS_OK) {
+				(void) strcpy(lbuf->link_over, "?");
 				break;
+			}
 			(void) strlcat(lbuf->link_over, tmpbuf,
 			    sizeof (lbuf->link_over));
 			if (i != (ginfo.lg_nports - 1)) {
@@ -2510,39 +2579,43 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 		free(ginfo.lg_ports);
 		break;
 	}
-
 	case DATALINK_CLASS_VNIC: {
 		dladm_vnic_attr_t	vinfo;
 
-		status = dladm_vnic_info(handle, linkid, &vinfo, flags);
-		if (status == DLADM_STATUS_OK)
-			status = dladm_datalink_id2info(handle,
-			    vinfo.va_link_id, NULL, NULL, NULL, lbuf->link_over,
-			    sizeof (lbuf->link_over));
+		if (dladm_vnic_info(handle, linkid, &vinfo, flags) !=
+		    DLADM_STATUS_OK) {
+			(void) strcpy(lbuf->link_over, "?");
+			break;
+		}
+		if (dladm_datalink_id2info(handle, vinfo.va_link_id, NULL, NULL,
+		    NULL, lbuf->link_over, sizeof (lbuf->link_over)) !=
+		    DLADM_STATUS_OK)
+			(void) strcpy(lbuf->link_over, "?");
 		break;
 	}
-
 	case DATALINK_CLASS_BRIDGE: {
 		datalink_id_t *dlp;
 		uint_t i, nports;
 
-		status = dladm_datalink_id2info(handle, linkid, NULL, NULL,
-		    NULL, tmpbuf, sizeof (tmpbuf));
-		if (status != DLADM_STATUS_OK)
+		if (dladm_datalink_id2info(handle, linkid, NULL, NULL,
+		    NULL, tmpbuf, sizeof (tmpbuf)) != DLADM_STATUS_OK) {
+			(void) strcpy(lbuf->link_over, "?");
 			break;
+		}
 		if (tmpbuf[0] != '\0')
 			tmpbuf[strlen(tmpbuf) - 1] = '\0';
 		dlp = dladm_bridge_get_portlist(tmpbuf, &nports);
 		if (dlp == NULL) {
-			status = DLADM_STATUS_BADVAL;
+			(void) strcpy(lbuf->link_over, "?");
 			break;
 		}
-		lbuf->link_over[0] = '\0';
 		for (i = 0; i < nports; i++) {
-			status = dladm_datalink_id2info(handle, dlp[i], NULL,
-			    NULL, NULL, tmpbuf, sizeof (tmpbuf));
-			if (status != DLADM_STATUS_OK)
+			if (dladm_datalink_id2info(handle, dlp[i], NULL,
+			    NULL, NULL, tmpbuf, sizeof (tmpbuf)) !=
+			    DLADM_STATUS_OK) {
+				(void) strcpy(lbuf->link_over, "?");
 				break;
+			}
 			(void) strlcat(lbuf->link_over, tmpbuf,
 			    sizeof (lbuf->link_over));
 			if (i != nports - 1) {
@@ -2557,17 +2630,21 @@ print_link_topology(show_state_t *state, datalink_id_t linkid,
 	case DATALINK_CLASS_SIMNET: {
 		dladm_simnet_attr_t	slinfo;
 
-		status = dladm_simnet_info(handle, linkid, &slinfo, flags);
-		if (status == DLADM_STATUS_OK &&
-		    slinfo.sna_peer_link_id != DATALINK_INVALID_LINKID)
-			status = dladm_datalink_id2info(handle,
+		if (dladm_simnet_info(handle, linkid, &slinfo, flags) !=
+		    DLADM_STATUS_OK) {
+			(void) strcpy(lbuf->link_over, "?");
+			break;
+		}
+		if (slinfo.sna_peer_link_id != DATALINK_INVALID_LINKID) {
+			if (dladm_datalink_id2info(handle,
 			    slinfo.sna_peer_link_id, NULL, NULL, NULL,
-			    lbuf->link_over, sizeof (lbuf->link_over));
+			    lbuf->link_over, sizeof (lbuf->link_over)) !=
+			    DLADM_STATUS_OK)
+				(void) strcpy(lbuf->link_over, "?");
+		}
 		break;
 	}
 	}
-
-	return (status);
 }
 
 static dladm_status_t
@@ -2641,10 +2718,7 @@ link_mtu:
 		(void) get_linkstate(link, B_TRUE, lbuf->link_state);
 	}
 
-	status = print_link_topology(state, linkid, class, lbuf);
-	if (status != DLADM_STATUS_OK)
-		goto done;
-
+	print_link_topology(state, linkid, class, lbuf);
 done:
 	return (status);
 }
@@ -2661,14 +2735,8 @@ show_link(dladm_handle_t dh, datalink_id_t linkid, void *arg)
 	 * first get all the link attributes into lbuf;
 	 */
 	bzero(&lbuf, sizeof (link_fields_buf_t));
-	status = print_link(state, linkid, &lbuf);
-
-	if (status != DLADM_STATUS_OK)
-		goto done;
-
-	ofmt_print(state->ls_ofmt, &lbuf);
-
-done:
+	if ((status = print_link(state, linkid, &lbuf)) == DLADM_STATUS_OK)
+		ofmt_print(state->ls_ofmt, &lbuf);
 	state->ls_status = status;
 	return (DLADM_WALK_CONTINUE);
 }
@@ -2713,7 +2781,7 @@ show_link_stats(dladm_handle_t dh, datalink_id_t linkid, void *arg)
 {
 	char			link[DLPI_LINKNAME_MAX];
 	datalink_class_t	class;
-	show_state_t		*state = (show_state_t *)arg;
+	show_state_t		*state = arg;
 	pktsum_t		stats, diff_stats;
 	dladm_phys_attr_t	dpa;
 	link_args_t		largs;
@@ -2776,7 +2844,6 @@ print_aggr_info(show_grp_state_t *state, const char *link,
 		    sizeof (lbuf.laggr_addrpolicy), "auto");
 	}
 
-
 	(void) dladm_aggr_lacpmode2str(ginfop->lg_lacp_mode,
 	    lbuf.laggr_lacpactivity);
 	(void) dladm_aggr_lacptimer2str(ginfop->lg_lacp_timer,
@@ -2793,28 +2860,21 @@ static boolean_t
 print_xaggr_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 {
 	const laggr_args_t 	*l = ofarg->ofmt_cbarg;
-	int 			portnum;
 	boolean_t		is_port = (l->laggr_lport >= 0);
-	static char		tmpbuf[DLADM_STRSIZE];
-	dladm_aggr_port_attr_t *portp;
+	char			tmpbuf[DLADM_STRSIZE];
+	const char		*objname;
+	dladm_aggr_port_attr_t	*portp;
 	dladm_phys_attr_t	dpa;
-	dladm_status_t		*stat, status = DLADM_STATUS_OK;
-
-	stat = l->laggr_status;
 
 	if (is_port) {
-		portnum = l->laggr_lport;
-		portp = &(l->laggr_ginfop->lg_ports[portnum]);
-		if ((status = dladm_datalink_id2info(handle,
-		    portp->lp_linkid, NULL, NULL, NULL, buf, bufsize)) !=
-		    DLADM_STATUS_OK) {
-			goto err;
-		}
-
-		if ((status = dladm_phys_info(handle, portp->lp_linkid,
-		    &dpa, DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
-			goto err;
-		}
+		portp = &(l->laggr_ginfop->lg_ports[l->laggr_lport]);
+		if (dladm_phys_info(handle, portp->lp_linkid, &dpa,
+		    DLADM_OPT_ACTIVE) != DLADM_STATUS_OK)
+			objname = "?";
+		else
+			objname = dpa.dp_dev;
+	} else {
+		objname = l->laggr_link;
 	}
 
 	switch (ofarg->ofmt_id) {
@@ -2823,36 +2883,25 @@ print_xaggr_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		    (is_port && !l->laggr_parsable ? " " : l->laggr_link));
 		break;
 	case AGGR_X_PORT:
-		if (is_port)
-			break;
-		*stat = DLADM_STATUS_OK;
-		return (B_TRUE);
-
-	case AGGR_X_SPEED:
 		if (is_port) {
-			(void) snprintf(buf, bufsize, "%uMb",
-			    (uint_t)((get_ifspeed(dpa.dp_dev,
-			    B_FALSE)) / 1000000ull));
-		} else {
-			(void) snprintf(buf, bufsize, "%uMb",
-			    (uint_t)((get_ifspeed(l->laggr_link,
-			    B_TRUE)) / 1000000ull));
+			if (dladm_datalink_id2info(handle, portp->lp_linkid,
+			    NULL, NULL, NULL, buf, bufsize) != DLADM_STATUS_OK)
+				(void) sprintf(buf, "?");
 		}
 		break;
 
+	case AGGR_X_SPEED:
+		(void) snprintf(buf, bufsize, "%uMb",
+		    (uint_t)((get_ifspeed(objname, !is_port)) / 1000000ull));
+		break;
+
 	case AGGR_X_DUPLEX:
-		if (is_port)
-			(void) get_linkduplex(dpa.dp_dev, B_FALSE, tmpbuf);
-		else
-			(void) get_linkduplex(l->laggr_link, B_TRUE, tmpbuf);
+		(void) get_linkduplex(objname, !is_port, tmpbuf);
 		(void) strlcpy(buf, tmpbuf, bufsize);
 		break;
 
 	case AGGR_X_STATE:
-		if (is_port)
-			(void) get_linkstate(dpa.dp_dev,  B_FALSE, tmpbuf);
-		else
-			(void) get_linkstate(l->laggr_link, B_TRUE, tmpbuf);
+		(void) get_linkstate(objname, !is_port, tmpbuf);
 		(void) strlcpy(buf, tmpbuf, bufsize);
 		break;
 	case AGGR_X_ADDRESS:
@@ -2870,7 +2919,7 @@ print_xaggr_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		break;
 	}
 err:
-	*stat = status;
+	*(l->laggr_status) = DLADM_STATUS_OK;
 	return (B_TRUE);
 }
 
@@ -2912,22 +2961,13 @@ print_lacp_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 	int			portnum;
 	boolean_t		is_port = (l->laggr_lport >= 0);
 	dladm_aggr_port_attr_t	*portp;
-	dladm_status_t		*stat, status;
 	aggr_lacp_state_t	*lstate;
 
-	if (!is_port) {
+	if (!is_port)
 		return (B_FALSE); /* cannot happen! */
-	}
-
-	stat = l->laggr_status;
 
 	portnum = l->laggr_lport;
 	portp = &(l->laggr_ginfop->lg_ports[portnum]);
-
-	if ((status = dladm_datalink_id2info(handle, portp->lp_linkid,
-	    NULL, NULL, NULL, buf, bufsize)) != DLADM_STATUS_OK) {
-			goto err;
-	}
 	lstate = &(portp->lp_lacp_state);
 
 	switch (ofarg->ofmt_id) {
@@ -2937,10 +2977,9 @@ print_lacp_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		break;
 
 	case AGGR_L_PORT:
-		/*
-		 * buf already contains portname as a result of the
-		 * earlier call to dladm_datalink_id2info().
-		 */
+		if (dladm_datalink_id2info(handle, portp->lp_linkid, NULL, NULL,
+		    NULL, buf, bufsize) != DLADM_STATUS_OK)
+			(void) sprintf(buf, "?");
 		break;
 
 	case AGGR_L_AGGREGATABLE:
@@ -2974,11 +3013,7 @@ print_lacp_cb(ofmt_arg_t *ofarg, char *buf, uint_t bufsize)
 		break;
 	}
 
-	*stat = DLADM_STATUS_OK;
-	return (B_TRUE);
-
-err:
-	*stat = status;
+	*(l->laggr_status) = DLADM_STATUS_OK;
 	return (B_TRUE);
 }
 
@@ -3309,14 +3344,9 @@ do_show_link(int argc, char *argv[], const char *use)
 	if (optind == (argc-1)) {
 		uint32_t	f;
 
-		if (strlcpy(linkname, argv[optind], MAXLINKNAMELEN)
-		    >= MAXLINKNAMELEN) {
-			(void) fprintf(stderr,
-			    gettext("%s: link name too long\n"),
-			    progname);
-			dladm_close(handle);
-			exit(1);
-		}
+		if (strlcpy(linkname, argv[optind], MAXLINKNAMELEN) >=
+		    MAXLINKNAMELEN)
+			die("link name too long");
 		if ((status = dladm_name2info(handle, linkname, &linkid, &f,
 		    NULL, NULL)) != DLADM_STATUS_OK) {
 			die_dlerr(status, "link %s is not valid", linkname);
@@ -3403,7 +3433,7 @@ do_show_aggr(int argc, char *argv[], const char *use)
 	    "link,port,ipackets,rbytes,opackets,obytes,ipktdist,opktdist";
 	char			*all_extended_fields =
 	    "link,port,speed,duplex,state,address,portstate";
-	ofmt_field_t		*pf;
+	const ofmt_field_t	*pf;
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
 	uint_t			ofmtflags = 0;
@@ -3747,6 +3777,338 @@ print_phys_hwgrp(show_state_t *state, datalink_id_t linkid, char *link)
 	    print_phys_hwgrp_callback));
 }
 
+/*
+ * Parse the "local=<laddr>,remote=<raddr>" sub-options for the -a option of
+ * *-iptun subcommands.
+ */
+static void
+iptun_process_addrarg(char *addrarg, iptun_params_t *params)
+{
+	char *addrval;
+
+	while (*addrarg != '\0') {
+		switch (getsubopt(&addrarg, iptun_addropts, &addrval)) {
+		case IPTUN_LOCAL:
+			params->iptun_param_flags |= IPTUN_PARAM_LADDR;
+			if (strlcpy(params->iptun_param_laddr, addrval,
+			    sizeof (params->iptun_param_laddr)) >=
+			    sizeof (params->iptun_param_laddr))
+				die("tunnel source address is too long");
+			break;
+		case IPTUN_REMOTE:
+			params->iptun_param_flags |= IPTUN_PARAM_RADDR;
+			if (strlcpy(params->iptun_param_raddr, addrval,
+			    sizeof (params->iptun_param_raddr)) >=
+			    sizeof (params->iptun_param_raddr))
+				die("tunnel destination address is too long");
+			break;
+		default:
+			die("invalid address type: %s", addrval);
+			break;
+		}
+	}
+}
+
+/*
+ * Convenience routine to process iptun-create/modify/delete subcommand
+ * arguments.
+ */
+static void
+iptun_process_args(int argc, char *argv[], const char *opts,
+    iptun_params_t *params, uint32_t *flags, char *name, const char *use)
+{
+	int	option;
+	char	*altroot = NULL;
+
+	if (params != NULL)
+		bzero(params, sizeof (*params));
+	*flags = DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST;
+
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, opts, iptun_lopts, NULL)) !=
+	    -1) {
+		switch (option) {
+		case 'a':
+			iptun_process_addrarg(optarg, params);
+			break;
+		case 'R':
+			altroot = optarg;
+			break;
+		case 't':
+			*flags &= ~DLADM_OPT_PERSIST;
+			break;
+		case 'T':
+			params->iptun_param_type = iptun_gettypebyname(optarg);
+			if (params->iptun_param_type == IPTUN_TYPE_UNKNOWN)
+				die("unknown tunnel type: %s", optarg);
+			params->iptun_param_flags |= IPTUN_PARAM_TYPE;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+			break;
+		}
+	}
+
+	/* Get the required tunnel name argument. */
+	if (argc - optind != 1)
+		usage();
+
+	if (strlcpy(name, argv[optind], MAXLINKNAMELEN) >= MAXLINKNAMELEN)
+		die("tunnel name is too long");
+
+	if (altroot != NULL)
+		altroot_cmd(altroot, argc, argv);
+}
+
+static void
+do_create_iptun(int argc, char *argv[], const char *use)
+{
+	iptun_params_t	params;
+	dladm_status_t	status;
+	uint32_t	flags;
+	char		name[MAXLINKNAMELEN];
+
+	iptun_process_args(argc, argv, ":a:R:tT:", &params, &flags, name,
+	    use);
+
+	status = dladm_iptun_create(handle, name, &params, flags);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "could not create tunnel");
+}
+
+static void
+do_delete_iptun(int argc, char *argv[], const char *use)
+{
+	uint32_t	flags;
+	datalink_id_t	linkid;
+	dladm_status_t	status;
+	char		name[MAXLINKNAMELEN];
+
+	iptun_process_args(argc, argv, ":R:t", NULL, &flags, name, use);
+
+	status = dladm_name2info(handle, name, &linkid, NULL, NULL, NULL);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "could not delete tunnel");
+	status = dladm_iptun_delete(handle, linkid, flags);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "could not delete tunnel");
+}
+
+static void
+do_modify_iptun(int argc, char *argv[], const char *use)
+{
+	iptun_params_t	params;
+	uint32_t	flags;
+	dladm_status_t	status;
+	char		name[MAXLINKNAMELEN];
+
+	iptun_process_args(argc, argv, ":a:R:t", &params, &flags, name, use);
+
+	if ((status = dladm_name2info(handle, name, &params.iptun_param_linkid,
+	    NULL, NULL, NULL)) != DLADM_STATUS_OK)
+		die_dlerr(status, "could not modify tunnel");
+	status = dladm_iptun_modify(handle, &params, flags);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "could not modify tunnel");
+}
+
+static void
+do_show_iptun(int argc, char *argv[], const char *use)
+{
+	char		option;
+	datalink_id_t	linkid;
+	uint32_t	flags = DLADM_OPT_ACTIVE;
+	char		*name = NULL;
+	dladm_status_t	status;
+	const char	*fields_str = NULL;
+	show_state_t	state;
+	ofmt_handle_t	ofmt;
+	ofmt_status_t	oferr;
+	uint_t		ofmtflags = 0;
+
+	bzero(&state, sizeof (state));
+	opterr = 0;
+	while ((option = getopt_long(argc, argv, ":pPo:",
+	    iptun_lopts, NULL)) != -1) {
+		switch (option) {
+		case 'o':
+			fields_str = optarg;
+			break;
+		case 'p':
+			state.ls_parsable = B_TRUE;
+			ofmtflags = OFMT_PARSABLE;
+			break;
+		case 'P':
+			flags = DLADM_OPT_PERSIST;
+			break;
+		default:
+			die_opterr(optopt, option, use);
+			break;
+		}
+	}
+
+	/*
+	 * Get the optional tunnel name argument.  If there is one, it must
+	 * be the last thing remaining on the command-line.
+	 */
+	if (argc - optind > 1)
+		die(gettext(use));
+	if (argc - optind == 1)
+		name = argv[optind];
+
+	oferr = ofmt_open(fields_str, iptun_fields, ofmtflags,
+	    DLADM_DEFAULT_COL, &ofmt);
+	dladm_ofmt_check(oferr, state.ls_parsable, ofmt);
+
+	state.ls_ofmt = ofmt;
+	state.ls_flags = flags;
+
+	if (name == NULL) {
+		(void) dladm_walk_datalink_id(print_iptun_walker, handle,
+		    &state, DATALINK_CLASS_IPTUN, DATALINK_ANY_MEDIATYPE,
+		    flags);
+		status = state.ls_status;
+	} else {
+		if ((status = dladm_name2info(handle, name, &linkid, NULL, NULL,
+		    NULL)) == DLADM_STATUS_OK)
+			status = print_iptun(handle, linkid, &state);
+	}
+
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "unable to obtain tunnel status");
+}
+
+/* ARGSUSED */
+static void
+do_up_iptun(int argc, char *argv[], const char *use)
+{
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
+	dladm_status_t	status = DLADM_STATUS_OK;
+
+	/*
+	 * Get the optional tunnel name argument.  If there is one, it must
+	 * be the last thing remaining on the command-line.
+	 */
+	if (argc - optind > 1)
+		usage();
+	if (argc - optind == 1) {
+		status = dladm_name2info(handle, argv[optind], &linkid, NULL,
+		    NULL, NULL);
+	}
+	if (status == DLADM_STATUS_OK)
+		status = dladm_iptun_up(handle, linkid);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "unable to configure IP tunnel links");
+}
+
+/* ARGSUSED */
+static void
+do_down_iptun(int argc, char *argv[], const char *use)
+{
+	datalink_id_t	linkid = DATALINK_ALL_LINKID;
+	dladm_status_t	status = DLADM_STATUS_OK;
+
+	/*
+	 * Get the optional tunnel name argument.  If there is one, it must
+	 * be the last thing remaining on the command-line.
+	 */
+	if (argc - optind > 1)
+		usage();
+	if (argc - optind == 1) {
+		status = dladm_name2info(handle, argv[optind], &linkid, NULL,
+		    NULL, NULL);
+	}
+	if (status == DLADM_STATUS_OK)
+		status = dladm_iptun_down(handle, linkid);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "unable to bring down IP tunnel links");
+}
+
+static iptun_type_t
+iptun_gettypebyname(char *typestr)
+{
+	int i;
+
+	for (i = 0; iptun_types[i].type_name != NULL; i++) {
+		if (strncmp(iptun_types[i].type_name, typestr,
+		    strlen(iptun_types[i].type_name)) == 0) {
+			return (iptun_types[i].type_value);
+		}
+	}
+	return (IPTUN_TYPE_UNKNOWN);
+}
+
+static const char *
+iptun_gettypebyvalue(iptun_type_t type)
+{
+	int i;
+
+	for (i = 0; iptun_types[i].type_name != NULL; i++) {
+		if (iptun_types[i].type_value == type)
+			return (iptun_types[i].type_name);
+	}
+	return (NULL);
+}
+
+static dladm_status_t
+print_iptun(dladm_handle_t dh, datalink_id_t linkid, show_state_t *state)
+{
+	dladm_status_t		status;
+	iptun_params_t		params;
+	iptun_fields_buf_t	lbuf;
+	const char		*laddr;
+	const char		*raddr;
+
+	params.iptun_param_linkid = linkid;
+	status = dladm_iptun_getparams(dh, &params, state->ls_flags);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	/* LINK */
+	status = dladm_datalink_id2info(dh, linkid, NULL, NULL, NULL,
+	    lbuf.iptun_name, sizeof (lbuf.iptun_name));
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	/* TYPE */
+	(void) strlcpy(lbuf.iptun_type,
+	    iptun_gettypebyvalue(params.iptun_param_type),
+	    sizeof (lbuf.iptun_type));
+
+	/* FLAGS */
+	(void) memset(lbuf.iptun_flags, '-', IPTUN_NUM_FLAGS);
+	lbuf.iptun_flags[IPTUN_NUM_FLAGS] = '\0';
+	if (params.iptun_param_flags & IPTUN_PARAM_IPSECPOL)
+		lbuf.iptun_flags[IPTUN_SFLAG_INDEX] = 's';
+	if (params.iptun_param_flags & IPTUN_PARAM_IMPLICIT)
+		lbuf.iptun_flags[IPTUN_IFLAG_INDEX] = 'i';
+
+	/* LOCAL */
+	if (params.iptun_param_flags & IPTUN_PARAM_LADDR)
+		laddr = params.iptun_param_laddr;
+	else
+		laddr = (state->ls_parsable) ? "" : "--";
+	(void) strlcpy(lbuf.iptun_laddr, laddr, sizeof (lbuf.iptun_laddr));
+
+	/* REMOTE */
+	if (params.iptun_param_flags & IPTUN_PARAM_RADDR)
+		raddr = params.iptun_param_raddr;
+	else
+		raddr = (state->ls_parsable) ? "" : "--";
+	(void) strlcpy(lbuf.iptun_raddr, raddr, sizeof (lbuf.iptun_raddr));
+
+	ofmt_print(state->ls_ofmt, &lbuf);
+
+	return (DLADM_STATUS_OK);
+}
+
+static int
+print_iptun_walker(dladm_handle_t dh, datalink_id_t linkid, void *arg)
+{
+	((show_state_t *)arg)->ls_status = print_iptun(dh, linkid, arg);
+	return (DLADM_WALK_CONTINUE);
+}
+
 static dladm_status_t
 print_phys(show_state_t *state, datalink_id_t linkid)
 {
@@ -3868,7 +4230,7 @@ do_show_phys(int argc, char *argv[], const char *use)
 	char		*all_mac_fields = "link,slot,address,inuse,client";
 	char		*all_hwgrp_fields =
 	    "link,group,grouptype,rings,clients";
-	ofmt_field_t	*pf;
+	const ofmt_field_t *pf;
 	ofmt_handle_t	ofmt;
 	ofmt_status_t	oferr;
 	uint_t		ofmtflags = 0;
@@ -4414,7 +4776,7 @@ print_vnic(show_vnic_state_t *state, datalink_id_t linkid)
 	if (!is_etherstub &&
 	    dladm_datalink_id2info(handle, vnic->va_link_id, NULL, NULL,
 	    NULL, devname, sizeof (devname)) != DLADM_STATUS_OK)
-		return (DLADM_STATUS_BADARG);
+		(void) sprintf(devname, "?");
 
 	state->vs_found = B_TRUE;
 	if (state->vs_stats) {
@@ -4517,7 +4879,7 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 	dladm_status_t		status;
 	boolean_t		o_arg = B_FALSE;
 	char			*fields_str = NULL;
-	ofmt_field_t		*pf;
+	const ofmt_field_t	*pf;
 	char			*all_e_fields = "link";
 	ofmt_handle_t		ofmt;
 	ofmt_status_t		oferr;
@@ -6401,7 +6763,7 @@ done:
 	dladm_free_props(proplist);
 	if (status != DLADM_STATUS_OK) {
 		dladm_close(handle);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -6803,7 +7165,7 @@ do_delete_secobj(int argc, char **argv, const char *use)
 
 	if (status != DLADM_STATUS_OK || pstatus != DLADM_STATUS_OK) {
 		dladm_close(handle);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -8265,7 +8627,7 @@ altroot_cmd(char *altroot, int argc, char *argv[])
 	(void) fprintf(fp, "%s\n", SMF_DLADM_UPGRADE_MSG);
 	(void) fclose(fp);
 	dladm_close(handle);
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 /*

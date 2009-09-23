@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,7 @@
 #include <sys/modctl.h>
 #include <sys/vnic.h>
 #include <sys/vnic_impl.h>
-#include <sys/priv_names.h>
+#include <sys/policy.h>
 
 /* module description */
 #define	VNIC_LINKINFO		"Virtual NIC"
@@ -49,13 +49,13 @@ static int vnic_ioc_modify(void *, intptr_t, int, cred_t *, int *);
 
 static dld_ioc_info_t vnic_ioc_list[] = {
 	{VNIC_IOC_CREATE, DLDCOPYINOUT, sizeof (vnic_ioc_create_t),
-	    vnic_ioc_create, {PRIV_SYS_DL_CONFIG}},
+	    vnic_ioc_create, secpolicy_dl_config},
 	{VNIC_IOC_DELETE, DLDCOPYIN, sizeof (vnic_ioc_delete_t),
-	    vnic_ioc_delete, {PRIV_SYS_DL_CONFIG}},
+	    vnic_ioc_delete, secpolicy_dl_config},
 	{VNIC_IOC_INFO, DLDCOPYINOUT, sizeof (vnic_ioc_info_t),
-	    vnic_ioc_info, {NULL}},
+	    vnic_ioc_info, NULL},
 	{VNIC_IOC_MODIFY, DLDCOPYIN, sizeof (vnic_ioc_modify_t),
-	    vnic_ioc_modify, {PRIV_SYS_DL_CONFIG}},
+	    vnic_ioc_modify, secpolicy_dl_config}
 };
 
 DDI_DEFINE_STREAM_OPS(vnic_dev_ops, nulldev, nulldev, vnic_attach, vnic_detach,
@@ -266,7 +266,7 @@ create:
 	err = vnic_dev_create(create_arg->vc_vnic_id, create_arg->vc_link_id,
 	    &mac_addr_type, &mac_len, mac_addr, &mac_slot, mac_prefix_len,
 	    create_arg->vc_vid, &create_arg->vc_resource_props,
-	    create_arg->vc_flags, &diag);
+	    create_arg->vc_flags, &diag, cred);
 	if (err != 0)
 		goto bail;
 
@@ -309,7 +309,7 @@ vnic_ioc_delete(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	vnic_ioc_delete_t *delete_arg = karg;
 
-	return (vnic_dev_delete(delete_arg->vd_vnic_id, 0));
+	return (vnic_dev_delete(delete_arg->vd_vnic_id, 0, cred));
 }
 
 /* ARGSUSED */
@@ -318,5 +318,5 @@ vnic_ioc_info(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	vnic_ioc_info_t *info_arg = karg;
 
-	return (vnic_info(&info_arg->vi_info));
+	return (vnic_info(&info_arg->vi_info, cred));
 }

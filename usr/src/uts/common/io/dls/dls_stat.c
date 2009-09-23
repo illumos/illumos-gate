@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,14 +103,15 @@ dls_stat_update(kstat_t *ksp, dls_link_t *dlp, int rw)
 
 int
 dls_stat_create(const char *module, int instance, const char *name,
-    int (*update)(struct kstat *, int), void *private, kstat_t **kspp)
+    zoneid_t zoneid, int (*update)(struct kstat *, int), void *private,
+    kstat_t **kspp)
 {
 	kstat_t		*ksp;
 	kstat_named_t	*knp;
 	uint_t		i;
 
-	if ((ksp = kstat_create(module, instance, name, "net",
-	    KSTAT_TYPE_NAMED, STAT_INFO_COUNT + 2, 0)) == NULL) {
+	if ((ksp = kstat_create_zone(module, instance, name, "net",
+	    KSTAT_TYPE_NAMED, STAT_INFO_COUNT + 2, 0, zoneid)) == NULL) {
 		return (EINVAL);
 	}
 

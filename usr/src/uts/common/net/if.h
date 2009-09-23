@@ -681,54 +681,6 @@ typedef struct ifa_msghdr {
 	int	ifam_metric;	/* value of ipif_metric */
 } ifa_msghdr_t;
 
-/* currently tunnels only support IPv4 or IPv6 */
-enum ifta_proto {
-	IFTAP_INVALID,
-	IFTAP_IPV4,
-	IFTAP_IPV6
-};
-
-#define	IFTUN_SECINFOLEN 8	/* In units of 32-bit words. */
-#define	IFTUN_VERSION 1		/* Current version number. */
-
-/*
- * Used by tunneling module to get/set a tunnel parameters using
- * SIOCTUN[SG]PARAM.
- *
- * There is a version number and an array of uint32_t at the end of this
- * ioctl because in a perfect world, the ipsec_req_t would be inside
- * tun_addreq.  Since this file is independent of IP (and IPsec), I have to
- * just leave room there, and have the appropriate handlers deal with the
- * security information.
- *
- * In the future, the sockaddr types and the ta_vers could be used together
- * to determine the nature of the security information that is at the end
- * of this ioctl.
- */
-struct iftun_req {
-	char		ifta_lifr_name[LIFNAMSIZ]; /* if name */
-	struct sockaddr_storage ifta_saddr;	/* source address */
-	struct sockaddr_storage ifta_daddr;	/* destination address */
-	uint_t		ifta_flags;		/* See below */
-	/* IP version information is read only */
-	enum ifta_proto	ifta_upper;		/* IP version above tunnel */
-	enum ifta_proto	ifta_lower;		/* IP version below tunnel */
-	uint_t		ifta_vers;		/* Version number */
-	uint32_t	ifta_secinfo[IFTUN_SECINFOLEN]; /* Security prefs. */
-	int16_t		ifta_encap_lim;		/* Encapsulation limit */
-	uint8_t		ifta_hop_limit;		/* Hop limit */
-	uint8_t		ifta_spare0;		/* Pad to 64-bit boundary */
-	uint32_t	ifta_spare1;
-};
-
-/* ifta_flags are set to indicate which members are valid */
-#define	IFTUN_SRC			0x01
-#define	IFTUN_DST			0x02
-#define	IFTUN_SECURITY			0x04	/* Pay attention to secinfo */
-#define	IFTUN_ENCAP			0x08	/* Pay attention to encap */
-#define	IFTUN_HOPLIMIT			0x10	/* Pay attention to hoplimit */
-#define	IFTUN_COMPLEX_SECURITY		0x20	/* Policy too big for ioctl */
-
 #endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
 
 /*

@@ -582,11 +582,14 @@ softmac_create_datalink(softmac_t *softmac)
 	/*
 	 * Create the GLDv3 datalink.
 	 */
-	if ((!(softmac->smac_flags & SOFTMAC_NOSUPP)) &&
-	    ((err = dls_devnet_create(softmac->smac_mh, linkid)) != 0)) {
-		cmn_err(CE_WARN, "dls_devnet_create failed for %s",
-		    softmac->smac_devname);
-		return (err);
+	if (!(softmac->smac_flags & SOFTMAC_NOSUPP)) {
+		err = dls_devnet_create(softmac->smac_mh, linkid,
+		    crgetzoneid(CRED()));
+		if (err != 0) {
+			cmn_err(CE_WARN, "dls_devnet_create failed for %s",
+			    softmac->smac_devname);
+			return (err);
+		}
 	}
 
 	if (linkid == DATALINK_INVALID_LINKID) {
@@ -988,7 +991,8 @@ softmac_destroy(dev_info_t *dip, dev_t dev)
 		 */
 		if (!(smac_flags & (SOFTMAC_GLDV3 | SOFTMAC_NOSUPP))) {
 			if ((err = mac_disable_nowait(smac_mh)) != 0) {
-				(void) dls_devnet_create(smac_mh, linkid);
+				(void) dls_devnet_create(smac_mh, linkid,
+				    crgetzoneid(CRED()));
 				goto error;
 			}
 			/*

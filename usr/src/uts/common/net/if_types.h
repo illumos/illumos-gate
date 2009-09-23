@@ -1,5 +1,5 @@
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -38,7 +38,6 @@
 #ifndef	_NET_IF_TYPES_H
 #define	_NET_IF_TYPES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* from UCB 8.3 (Berkeley) 4/28/95 */
 
 #ifdef	__cplusplus
@@ -106,6 +105,9 @@ extern "C" {
 #define	IFT_PROPVIRTUAL	0x35		/* Proprietary Virtual/internal */
 #define	IFT_PROPMUX	0x36		/* Proprietary Multiplexing */
 #define	IFT_IB		0xc7		/* Infiniband */
+#define	IFT_IPV4	0xc8		/* IPv4 tunnel */
+#define	IFT_IPV6	0xc9		/* IPV6 tunnel */
+#define	IFT_6TO4	0xca		/* 6to4 tunnel */
 
 #ifdef	__cplusplus
 }

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ZONE_H
 #define	_ZONE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/zone.h>
@@ -67,10 +65,10 @@ extern int	zone_enter(zoneid_t);
 extern int	zone_list(zoneid_t *, uint_t *);
 extern int	zone_shutdown(zoneid_t);
 extern int	zone_version(int *);
-extern int	zone_add_datalink(zoneid_t, char *);
-extern int	zone_remove_datalink(zoneid_t, char *);
-extern int	zone_check_datalink(zoneid_t *, char *);
-extern int	zone_list_datalink(zoneid_t, int *, char *);
+extern int	zone_add_datalink(zoneid_t, datalink_id_t);
+extern int	zone_remove_datalink(zoneid_t, datalink_id_t);
+extern int	zone_check_datalink(zoneid_t *, datalink_id_t);
+extern int	zone_list_datalink(zoneid_t, int *, datalink_id_t *);
 
 #ifdef	__cplusplus
 }

@@ -64,8 +64,6 @@
 #include <limits.h>
 #include <dirent.h>
 #include <uuid/uuid.h>
-#include <libdlpi.h>
-
 #include <fcntl.h>
 #include <door.h>
 #include <macros.h>
@@ -76,11 +74,12 @@
 #include <libscf.h>
 #include <procfs.h>
 #include <strings.h>
-
 #include <pool.h>
 #include <sys/pool.h>
 #include <sys/priocntl.h>
 #include <sys/fsspriocntl.h>
+#include <libdladm.h>
+#include <libdllink.h>
 
 #include "zoneadm.h"
 
@@ -2483,7 +2482,10 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 	int err;
 	boolean_t in_alt_root;
 	zone_iptype_t iptype;
-	dlpi_handle_t dh;
+	dladm_handle_t dh;
+	dladm_status_t status;
+	datalink_id_t linkid;
+	char errmsg[DLADM_STRSIZE];
 
 	in_alt_root = zonecfg_in_alt_root();
 	if (in_alt_root)
@@ -2556,27 +2558,25 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 			}
 
 			/*
-			 * Verify that the physical interface can be opened.
+			 * Verify that the datalink exists and that it isn't
+			 * already assigned to a zone.
 			 */
-			err = dlpi_open(nwiftab.zone_nwif_physical, &dh, 0);
-			if (err != DLPI_SUCCESS) {
+			if ((status = dladm_open(&dh)) == DLADM_STATUS_OK) {
+				status = dladm_name2info(dh,
+				    nwiftab.zone_nwif_physical, &linkid, NULL,
+				    NULL, NULL);
+				dladm_close(dh);
+			}
+			if (status != DLADM_STATUS_OK) {
 				(void) fprintf(stderr,
 				    gettext("WARNING: skipping network "
-				    "interface '%s' which cannot be opened: "
-				    "dlpi error (%s).\n"),
+				    "interface '%s': %s\n"),
 				    nwiftab.zone_nwif_physical,
-				    dlpi_strerror(err));
+				    dladm_status2str(status, errmsg));
 				break;
-			} else {
-				dlpi_close(dh);
 			}
-			/*
-			 * Verify whether the physical interface is already
-			 * used by a zone.
-			 */
 			dl_owner_zid = ALL_ZONES;
-			if (zone_check_datalink(&dl_owner_zid,
-			    nwiftab.zone_nwif_physical) != 0)
+			if (zone_check_datalink(&dl_owner_zid, linkid) != 0)
 				break;
 
 			/*

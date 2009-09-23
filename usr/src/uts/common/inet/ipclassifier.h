@@ -81,8 +81,8 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 #define	IPCL_UDPCONN		0x00000008	/* From udp_conn_cache */
 #define	IPCL_RAWIPCONN		0x00000010	/* From rawip_conn_cache */
 #define	IPCL_RTSCONN		0x00000020	/* From rts_conn_cache */
-#define	IPCL_ISV6		0x00000040	/* AF_INET6 */
-#define	IPCL_IPTUN		0x00000080	/* Has "tun" plumbed above it */
+/* Unused			0x00000040 */
+#define	IPCL_IPTUN		0x00000080	/* iptun module above us */
 #define	IPCL_NONSTR		0x00001000	/* A non-STREAMS socket */
 #define	IPCL_IN_SQUEUE		0x10000000	/* Waiting squeue to finish */
 
@@ -136,9 +136,7 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 	((connp)->conn_flags & IPCL_RTSCONN)
 
 #define	IPCL_IS_IPTUN(connp)						\
-	(((connp)->conn_ulp == IPPROTO_ENCAP ||				\
-	(connp)->conn_ulp == IPPROTO_IPV6) &&				\
-	((connp)->conn_flags & IPCL_IPTUN))
+	((connp)->conn_flags & IPCL_IPTUN)
 
 #define	IPCL_IS_NONSTR(connp)	((connp)->conn_flags & IPCL_NONSTR)
 
@@ -182,12 +180,14 @@ struct conn_s {
 		struct udp_s	*cp_udp;	/* Pointer to the udp struct */
 		struct icmp_s	*cp_icmp;	/* Pointer to rawip struct */
 		struct rts_s	*cp_rts;	/* Pointer to rts struct */
+		struct iptun_s	*cp_iptun;	/* Pointer to iptun_t */
 		void		*cp_priv;
 	} conn_proto_priv;
 #define	conn_tcp	conn_proto_priv.cp_tcp
 #define	conn_udp	conn_proto_priv.cp_udp
 #define	conn_icmp	conn_proto_priv.cp_icmp
 #define	conn_rts	conn_proto_priv.cp_rts
+#define	conn_iptun	conn_proto_priv.cp_iptun
 #define	conn_priv	conn_proto_priv.cp_priv
 
 	kcondvar_t	conn_cv;
@@ -391,7 +391,7 @@ struct connf_s {
 	 * is B_TRUE and conn_ref is being decremented. This is to	\
 	 * account for the mblk being currently processed.		\
 	 */								\
-	if ((connp)->conn_ref <= 0 ||					\
+	if ((connp)->conn_ref == 0 ||					\
 	    ((connp)->conn_ref == 1 && (connp)->conn_on_sqp))		\
 		cmn_err(CE_PANIC, "CONN_DEC_REF: connp(%p) has ref "	\
 			"= %d\n", (void *)(connp), (connp)->conn_ref);	\
@@ -525,6 +525,24 @@ struct connf_s {
 	(IN6_ARE_ADDR_EQUAL(&(connp)->conn_remv6, &(faddr)) &&	\
 	(connp)->conn_fport == (fport))))))
 
+#define	IPCL_IPTUN_HASH(laddr, faddr)					\
+	((ntohl(laddr) ^ ((ntohl(faddr) << 24) | (ntohl(faddr) >> 8))) % \
+	ipcl_iptun_fanout_size)
+
+#define	IPCL_IPTUN_HASH_V6(laddr, faddr)				\
+	IPCL_IPTUN_HASH((laddr)->s6_addr32[0] ^ (laddr)->s6_addr32[1] ^	\
+	    (faddr)->s6_addr32[2] ^ (faddr)->s6_addr32[3],		\
+	    (faddr)->s6_addr32[0] ^ (faddr)->s6_addr32[1] ^		\
+	    (laddr)->s6_addr32[2] ^ (laddr)->s6_addr32[3])
+
+#define	IPCL_IPTUN_MATCH(connp, laddr, faddr)			\
+	(_IPCL_V4_MATCH((connp)->conn_srcv6, (laddr)) &&	\
+	_IPCL_V4_MATCH((connp)->conn_remv6, (faddr)))
+
+#define	IPCL_IPTUN_MATCH_V6(connp, laddr, faddr)		\
+	(IN6_ARE_ADDR_EQUAL(&(connp)->conn_srcv6, (laddr)) &&	\
+	IN6_ARE_ADDR_EQUAL(&(connp)->conn_remv6, (faddr)))
+
 #define	IPCL_TCP_EAGER_INIT(connp, protocol, src, rem, ports) {		\
 	(connp)->conn_flags |= (IPCL_TCP4|IPCL_EAGER);			\
 	IN6_IPADDR_TO_V4MAPPED(src, &(connp)->conn_srcv6);		\
@@ -536,7 +554,7 @@ struct connf_s {
 }
 
 #define	IPCL_TCP_EAGER_INIT_V6(connp, protocol, src, rem, ports) {	\
-	(connp)->conn_flags |= (IPCL_TCP6|IPCL_EAGER|IPCL_ISV6);	\
+	(connp)->conn_flags |= (IPCL_TCP6|IPCL_EAGER);			\
 	(connp)->conn_srcv6 = src;					\
 	(connp)->conn_remv6 = rem;					\
 	(connp)->conn_ports = ports;					\
@@ -598,6 +616,8 @@ conn_t *ipcl_classify_v6(mblk_t *, uint8_t, uint_t, zoneid_t, ip_stack_t *);
 conn_t *ipcl_classify(mblk_t *, zoneid_t, ip_stack_t *);
 conn_t *ipcl_classify_raw(mblk_t *, uint8_t, zoneid_t, uint32_t, ipha_t *,
 	    ip_stack_t *);
+conn_t *ipcl_iptun_classify_v4(ipaddr_t *, ipaddr_t *, ip_stack_t *);
+conn_t *ipcl_iptun_classify_v6(in6_addr_t *, in6_addr_t *, ip_stack_t *);
 void	ipcl_globalhash_insert(conn_t *);
 void	ipcl_globalhash_remove(conn_t *);
 void	ipcl_walk(pfv_t, void *, ip_stack_t *);

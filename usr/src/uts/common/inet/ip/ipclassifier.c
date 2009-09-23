@@ -70,6 +70,7 @@
  *	ipcl_proto_fanout:	IPv4 protocol fanout
  *	ipcl_proto_fanout_v6:	IPv6 protocol fanout
  *	ipcl_udp_fanout:	contains all UDP connections
+ *	ipcl_iptun_fanout:	contains all IP tunnel connections
  *	ipcl_globalhash_fanout:	contains all connections
  *
  * The ipcl_globalhash_fanout is used for any walkers (like snmp and Clustering)
@@ -268,6 +269,7 @@
 #include <inet/sctp/sctp_impl.h>
 #include <inet/rawip_impl.h>
 #include <inet/rts_impl.h>
+#include <inet/iptun/iptun_impl.h>
 
 #include <sys/cpuvar.h>
 
@@ -305,6 +307,13 @@ uint_t ipcl_udp_fanout_size = 16384;
 
 /* Raw socket fanout size.  Must be a power of 2. */
 uint_t ipcl_raw_fanout_size = 256;
+
+/*
+ * The IPCL_IPTUN_HASH() function works best with a prime table size.  We
+ * expect that most large deployments would have hundreds of tunnels, and
+ * thousands in the extreme case.
+ */
+uint_t ipcl_iptun_fanout_size = 6143;
 
 /*
  * Power of 2^N Primes useful for hashing for N of 0-28,
@@ -464,6 +473,7 @@ ipcl_init(ip_stack_t *ipst)
 	ipst->ips_ipcl_bind_fanout_size = ipcl_bind_fanout_size;
 	ipst->ips_ipcl_udp_fanout_size = ipcl_udp_fanout_size;
 	ipst->ips_ipcl_raw_fanout_size = ipcl_raw_fanout_size;
+	ipst->ips_ipcl_iptun_fanout_size = ipcl_iptun_fanout_size;
 
 	ASSERT(ipst->ips_ipcl_conn_fanout == NULL);
 
@@ -505,6 +515,13 @@ ipcl_init(ip_stack_t *ipst)
 	    ipst->ips_ipcl_udp_fanout_size * sizeof (connf_t), KM_SLEEP);
 	for (i = 0; i < ipst->ips_ipcl_udp_fanout_size; i++) {
 		mutex_init(&ipst->ips_ipcl_udp_fanout[i].connf_lock, NULL,
+		    MUTEX_DEFAULT, NULL);
+	}
+
+	ipst->ips_ipcl_iptun_fanout = kmem_zalloc(
+	    ipst->ips_ipcl_iptun_fanout_size * sizeof (connf_t), KM_SLEEP);
+	for (i = 0; i < ipst->ips_ipcl_iptun_fanout_size; i++) {
+		mutex_init(&ipst->ips_ipcl_iptun_fanout[i].connf_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
 	}
 
@@ -580,6 +597,14 @@ ipcl_destroy(ip_stack_t *ipst)
 	kmem_free(ipst->ips_ipcl_udp_fanout, ipst->ips_ipcl_udp_fanout_size *
 	    sizeof (connf_t));
 	ipst->ips_ipcl_udp_fanout = NULL;
+
+	for (i = 0; i < ipst->ips_ipcl_iptun_fanout_size; i++) {
+		ASSERT(ipst->ips_ipcl_iptun_fanout[i].connf_head == NULL);
+		mutex_destroy(&ipst->ips_ipcl_iptun_fanout[i].connf_lock);
+	}
+	kmem_free(ipst->ips_ipcl_iptun_fanout,
+	    ipst->ips_ipcl_iptun_fanout_size * sizeof (connf_t));
+	ipst->ips_ipcl_iptun_fanout = NULL;
 
 	for (i = 0; i < ipst->ips_ipcl_raw_fanout_size; i++) {
 		ASSERT(ipst->ips_ipcl_raw_fanout[i].connf_head == NULL);
@@ -1022,6 +1047,66 @@ ipcl_proto_insert_v6(conn_t *connp, uint8_t protocol)
 }
 
 /*
+ * Because the classifier is used to classify inbound packets, the destination
+ * address is meant to be our local tunnel address (tunnel source), and the
+ * source the remote tunnel address (tunnel destination).
+ */
+conn_t *
+ipcl_iptun_classify_v4(ipaddr_t *src, ipaddr_t *dst, ip_stack_t *ipst)
+{
+	connf_t	*connfp;
+	conn_t	*connp;
+
+	/* first look for IPv4 tunnel links */
+	connfp = &ipst->ips_ipcl_iptun_fanout[IPCL_IPTUN_HASH(*dst, *src)];
+	mutex_enter(&connfp->connf_lock);
+	for (connp = connfp->connf_head; connp != NULL;
+	    connp = connp->conn_next) {
+		if (IPCL_IPTUN_MATCH(connp, *dst, *src))
+			break;
+	}
+	if (connp != NULL)
+		goto done;
+
+	mutex_exit(&connfp->connf_lock);
+
+	/* We didn't find an IPv4 tunnel, try a 6to4 tunnel */
+	connfp = &ipst->ips_ipcl_iptun_fanout[IPCL_IPTUN_HASH(*dst,
+	    INADDR_ANY)];
+	mutex_enter(&connfp->connf_lock);
+	for (connp = connfp->connf_head; connp != NULL;
+	    connp = connp->conn_next) {
+		if (IPCL_IPTUN_MATCH(connp, *dst, INADDR_ANY))
+			break;
+	}
+done:
+	if (connp != NULL)
+		CONN_INC_REF(connp);
+	mutex_exit(&connfp->connf_lock);
+	return (connp);
+}
+
+conn_t *
+ipcl_iptun_classify_v6(in6_addr_t *src, in6_addr_t *dst, ip_stack_t *ipst)
+{
+	connf_t	*connfp;
+	conn_t	*connp;
+
+	/* Look for an IPv6 tunnel link */
+	connfp = &ipst->ips_ipcl_iptun_fanout[IPCL_IPTUN_HASH_V6(dst, src)];
+	mutex_enter(&connfp->connf_lock);
+	for (connp = connfp->connf_head; connp != NULL;
+	    connp = connp->conn_next) {
+		if (IPCL_IPTUN_MATCH_V6(connp, dst, src)) {
+			CONN_INC_REF(connp);
+			break;
+		}
+	}
+	mutex_exit(&connfp->connf_lock);
+	return (connp);
+}
+
+/*
  * This function is used only for inserting SCTP raw socket now.
  * This may change later.
  *
@@ -1068,6 +1153,50 @@ ipcl_sctp_hash_insert(conn_t *connp, in_port_t lport)
 	} else {
 		IPCL_HASH_INSERT_CONNECTED(connfp, connp);
 	}
+	return (0);
+}
+
+static int
+ipcl_iptun_hash_insert(conn_t *connp, ipaddr_t src, ipaddr_t dst,
+    ip_stack_t *ipst)
+{
+	connf_t	*connfp;
+	conn_t	*tconnp;
+
+	connfp = &ipst->ips_ipcl_iptun_fanout[IPCL_IPTUN_HASH(src, dst)];
+	mutex_enter(&connfp->connf_lock);
+	for (tconnp = connfp->connf_head; tconnp != NULL;
+	    tconnp = tconnp->conn_next) {
+		if (IPCL_IPTUN_MATCH(tconnp, src, dst)) {
+			/* A tunnel is already bound to these addresses. */
+			mutex_exit(&connfp->connf_lock);
+			return (EADDRINUSE);
+		}
+	}
+	IPCL_HASH_INSERT_CONNECTED_LOCKED(connfp, connp);
+	mutex_exit(&connfp->connf_lock);
+	return (0);
+}
+
+static int
+ipcl_iptun_hash_insert_v6(conn_t *connp, const in6_addr_t *src,
+    const in6_addr_t *dst, ip_stack_t *ipst)
+{
+	connf_t	*connfp;
+	conn_t	*tconnp;
+
+	connfp = &ipst->ips_ipcl_iptun_fanout[IPCL_IPTUN_HASH_V6(src, dst)];
+	mutex_enter(&connfp->connf_lock);
+	for (tconnp = connfp->connf_head; tconnp != NULL;
+	    tconnp = tconnp->conn_next) {
+		if (IPCL_IPTUN_MATCH_V6(tconnp, src, dst)) {
+			/* A tunnel is already bound to these addresses. */
+			mutex_exit(&connfp->connf_lock);
+			return (EADDRINUSE);
+		}
+	}
+	IPCL_HASH_INSERT_CONNECTED_LOCKED(connfp, connp);
+	mutex_exit(&connfp->connf_lock);
 	return (0);
 }
 
@@ -1162,6 +1291,9 @@ ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
 	IN6_IPADDR_TO_V4MAPPED(src, &connp->conn_srcv6);
 	connp->conn_lport = lport;
 
+	if (IPCL_IS_IPTUN(connp))
+		return (ipcl_iptun_hash_insert(connp, src, INADDR_ANY, ipst));
+
 	switch (protocol) {
 	default:
 		if (is_system_labeled() &&
@@ -1224,15 +1356,18 @@ int
 ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
     uint16_t lport)
 {
-	connf_t	*connfp;
-	int	ret = 0;
+	connf_t		*connfp;
+	int		ret = 0;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
-	ASSERT(connp);
-
-	connp->conn_ulp = protocol;
+	ASSERT(connp != NULL);	connp->conn_ulp = protocol;
 	connp->conn_srcv6 = *src;
 	connp->conn_lport = lport;
+
+	if (IPCL_IS_IPTUN(connp)) {
+		return (ipcl_iptun_hash_insert_v6(connp, src, &ipv6_all_zeros,
+		    ipst));
+	}
 
 	switch (protocol) {
 	default:
@@ -1323,6 +1458,9 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 	    "dst = %s, ports = %x, protocol = %x", (void *)connp,
 	    inet_ntoa_r(src, sbuf), inet_ntoa_r(rem, rbuf),
 	    ports, protocol));
+
+	if (IPCL_IS_IPTUN(connp))
+		return (ipcl_iptun_hash_insert(connp, src, rem, ipst));
 
 	switch (protocol) {
 	case IPPROTO_TCP:
@@ -1432,6 +1570,9 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 	in_port_t	lport;
 	int		ret = 0;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
+
+	if (IPCL_IS_IPTUN(connp))
+		return (ipcl_iptun_hash_insert_v6(connp, src, rem, ipst));
 
 	switch (protocol) {
 	case IPPROTO_TCP:
@@ -1715,6 +1856,11 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		    ("ipcl_classify: cant find udp conn_t for ports : %x %x",
 		    lport, fport));
 		break;
+
+	case IPPROTO_ENCAP:
+	case IPPROTO_IPV6:
+		return (ipcl_iptun_classify_v4(&ipha->ipha_src,
+		    &ipha->ipha_dst, ipst));
 	}
 
 	return (NULL);
@@ -1915,6 +2061,10 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		    ("ipcl_classify_v6: cant find udp conn_t for ports : %x %x",
 		    lport, fport));
 		break;
+	case IPPROTO_ENCAP:
+	case IPPROTO_IPV6:
+		return (ipcl_iptun_classify_v6(&ip6h->ip6_src,
+		    &ip6h->ip6_dst, ipst));
 	}
 
 	return (NULL);

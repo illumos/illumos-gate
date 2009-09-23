@@ -149,6 +149,7 @@ ipcl_bind_fanout_size
 ipcl_conn_hash_maxsize
 ipcl_conn_hash_memfactor
 ipcl_conn_hash_size
+ipcl_iptun_fanout_size
 ipcl_raw_fanout_size
 ipcl_udp_fanout_size
 ipif_loopback_name
@@ -170,6 +171,10 @@ ipsec_policy_failure_msgs
 ipsec_sel_cache
 ipsec_spd_hashsize
 ipsec_weird_null_inbound_policy
+iptunq_info
+iptunq_modinfo
+iptunq_rinit
+iptunq_winit
 ipv4_forward_suffix
 ipv4info
 ipv6_all_hosts_mcast

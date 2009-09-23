@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -29,8 +29,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rarpd.c  Reverse-ARP server.
@@ -240,9 +238,8 @@ main(int argc, char *argv[])
 			error("out of memory");
 		}
 
-		if (!ifparse_ifspec(buf, &ifsp) || ifsp.ifsp_modcnt != 0) {
+		if (!ifparse_ifspec(buf, &ifsp))
 			error("invalid interface specification");
-		}
 
 		if (ifsp.ifsp_lunvalid) {
 			(void) snprintf(ifdev->ldevice,

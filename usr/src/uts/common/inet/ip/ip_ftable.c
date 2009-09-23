@@ -1057,8 +1057,7 @@ create_irecache:
 	switch (ire->ire_type) {
 	case IRE_IF_NORESOLVER:
 		/* create ire_cache for ire_addr endpoint */
-		if (dst_ill->ill_phys_addr_length != IP_ADDR_LEN &&
-		    dst_ill->ill_resolver_mp == NULL) {
+		if (dst_ill->ill_resolver_mp == NULL) {
 			ip1dbg(("ire_forward: dst_ill %p "
 			    "for IRE_IF_NORESOLVER ire %p has "
 			    "no ill_resolver_mp\n",

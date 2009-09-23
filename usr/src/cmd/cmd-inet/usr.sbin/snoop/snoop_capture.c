@@ -448,7 +448,7 @@ scan(char *buf, int len, int filter, int cap, int old, void (*proc)(),
 
 		header_okay = 1;
 		if (!filter ||
-		    want_packet(pktp,
+		    want_packet((uchar_t *)pktp,
 		    nhdrp->sbh_msglen,
 		    nhdrp->sbh_origlen)) {
 			count++;

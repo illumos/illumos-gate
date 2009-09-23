@@ -97,6 +97,8 @@
 #include <libcontract_priv.h>
 #include <sys/contract/process.h>
 #include <sys/ctfs.h>
+#include <libdladm.h>
+#include <sys/dls_mgmt.h>
 
 #include <libzonecfg.h>
 #include "zoneadmd.h"
@@ -772,6 +774,10 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 	char cmdbuf[MAXPATHLEN];
 	fs_callback_t cb;
 	brand_handle_t bh;
+	zone_iptype_t iptype;
+	boolean_t links_loaded = B_FALSE;
+	dladm_status_t status;
+	char errmsg[DLADM_STRSIZE];
 	int err;
 
 	if (brand_prestatechg(zlogp, zstate, Z_BOOT) != 0)
@@ -859,6 +865,22 @@ zone_bootup(zlog_t *zlogp, const char *bootargs, int zstate)
 	}
 
 	/*
+	 * Exclusive stack zones interact with the dlmgmtd running in the
+	 * global zone.  dladm_zone_boot() tells dlmgmtd that this zone is
+	 * booting, and loads its datalinks from the zone's datalink
+	 * configuration file.
+	 */
+	if (vplat_get_iptype(zlogp, &iptype) == 0 && iptype == ZS_EXCLUSIVE) {
+		status = dladm_zone_boot(dld_handle, zoneid);
+		if (status != DLADM_STATUS_OK) {
+			zerror(zlogp, B_FALSE, "unable to load zone datalinks: "
+			    " %s", dladm_status2str(status, errmsg));
+			goto bad;
+		}
+		links_loaded = B_TRUE;
+	}
+
+	/*
 	 * If there is a brand 'boot' callback, execute it now to give the
 	 * brand one last chance to do any additional setup before the zone
 	 * is booted.
@@ -895,6 +917,8 @@ bad:
 	 * state, RUNNING, and then invoke the hook as if we're halting.
 	 */
 	(void) brand_poststatechg(zlogp, ZONE_STATE_RUNNING, Z_HALT);
+	if (links_loaded)
+		(void) dladm_zone_halt(dld_handle, zoneid);
 	return (-1);
 }
 

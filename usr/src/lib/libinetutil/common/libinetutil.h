@@ -43,15 +43,11 @@ extern "C" {
 
 #if !defined(_KERNEL) && !defined(_BOOT)
 
-#define	IFSP_MAXMODS	9	/* Max modules that can be pushed on if */
-
 typedef struct {
 	uint_t		ifsp_ppa;	/* Physical Point of Attachment */
 	uint_t		ifsp_lun;	/* Logical Unit number */
 	boolean_t	ifsp_lunvalid;	/* TRUE if lun is valid */
-	int		ifsp_modcnt;	/* Number of modules to be pushed */
 	char		ifsp_devnm[LIFNAMSIZ];	/* only the device name */
-	char		ifsp_mods[IFSP_MAXMODS][LIFNAMSIZ]; /* table of mods */
 } ifspec_t;
 
 extern boolean_t ifparse_ifspec(const char *, ifspec_t *);

@@ -2890,6 +2890,28 @@ if $ZCAT $cpiodir/generic.root$ZFIX | cpio -it 2>/dev/null | \
 fi
 
 #
+# The Clearview IP Tunneling project changes the format of the
+# /etc/dladm/datalink.conf file.  The conversion is done in the
+# dlmgmtd daemon, so there is no backwards conversion when bfu'ing
+# backwards.  The solution is to have bfu save the old file away when
+# bfu'ing across this project, and restore it when bfu'ing back.
+#
+datalink_file=$root/etc/dladm/datalink.conf
+datalink_backup=$root/etc/dladm/datalink.conf.bfusave
+datalink_action=none
+if [[ -f $datalink_file ]]; then
+	iptun_exists=false
+	if archive_file_exists generic.kernel "kernel/drv/iptun.conf"; then
+		iptun_exists=true
+	fi
+	if [[ ! -f $root/kernel/drv/iptun.conf ]] && $iptun_exists; then
+		datalink_action=save
+	elif [[ -f $root/kernel/drv/iptun.conf ]] && ! $iptun_exists; then
+	    	datalink_action=restore
+	fi
+fi
+
+#
 # Check whether the build is boot-archive or ufsboot sparc
 # boot based on the existence of a generic.boot archive
 #
@@ -7860,6 +7882,25 @@ mondo_loop() {
 	rm -f $root/kernel/drv/softmac
 	rm -f $root/kernel/drv/sparcv9/softmac
 	rm -f $root/kernel/drv/amd64/softmac
+	rm -f $root/kernel/drv/iptun.conf
+	rm -f $root/kernel/drv/iptun
+	rm -f $root/kernel/drv/sparcv9/iptun
+	rm -f $root/kernel/drv/amd64/iptun
+	rm -f $root/kernel/drv/iptunq.conf
+	rm -f $root/kernel/drv/iptunq
+	rm -f $root/kernel/drv/sparcv9/iptunq
+	rm -f $root/kernel/drv/amd64/iptunq
+
+	# Remove obsolete tunneling STREAMS modules
+	rm -f $root/kernel/strmod/6to4tun
+	rm -f $root/kernel/strmod/sparcv9/6to4tun
+	rm -f $root/kernel/strmod/amd64/6to4tun
+	rm -f $root/kernel/strmod/atun
+	rm -f $root/kernel/strmod/sparcv9/atun
+	rm -f $root/kernel/strmod/amd64/atun	
+	rm -f $root/kernel/strmod/tun
+	rm -f $root/kernel/strmod/sparcv9/tun
+	rm -f $root/kernel/strmod/amd64/tun
 
 	#
 	# Remove libtopo platform XML files that have been replaced by propmap
@@ -7951,6 +7992,12 @@ mondo_loop() {
 		do
 			rm -f $root/$manpage
 		done
+	fi
+
+	if [[ $datalink_action = "save" ]]; then
+		cp -p $datalink_file $datalink_backup
+	elif [[ $datalink_action = "restore" && -f $datalink_backup ]]; then
+		mv $datalink_backup $datalink_file
 	fi
 
 	# End of pre-archive extraction hacks.

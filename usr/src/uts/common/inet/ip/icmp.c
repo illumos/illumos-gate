@@ -1664,7 +1664,6 @@ icmp_open(int family, cred_t *credp, int *err, int flags)
 		icmp->icmp_max_hdr_len = IPV6_HDR_LEN;
 		icmp->icmp_ttl = (uint8_t)is->is_ipv6_hoplimit;
 		connp->conn_af_isv6 = B_TRUE;
-		connp->conn_flags |= IPCL_ISV6;
 	} else {
 		icmp->icmp_ipversion = IPV4_VERSION;
 		icmp->icmp_family = AF_INET;
@@ -1673,7 +1672,6 @@ icmp_open(int family, cred_t *credp, int *err, int flags)
 		icmp->icmp_max_hdr_len = IP_SIMPLE_HDR_LENGTH;
 		icmp->icmp_ttl = (uint8_t)is->is_ipv4_ttl;
 		connp->conn_af_isv6 = B_FALSE;
-		connp->conn_flags &= ~IPCL_ISV6;
 	}
 	icmp->icmp_multicast_ttl = IP_DEFAULT_MULTICAST_TTL;
 	icmp->icmp_pending_op = -1;

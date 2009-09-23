@@ -284,10 +284,8 @@ mac_flow_dcmd_output(uintptr_t addr, uint_t flags, uint_t args)
 		    fe.fe_flags, flow_flag_bits);
 		mdb_snprintf(flow_type, 2 * FLOW_MAX_TYPE, "%hb",
 		    fe.fe_type, flow_type_bits);
-		mdb_printf("%?p %-24s %10s %10s "
-		    "%20s %4d\n",
-		    addr, fe.fe_flow_name, flow_type, flow_flags,
-		    func_name, fe.fe_zoneid);
+		mdb_printf("%?p %-24s %10s %10s %20s\n",
+		    addr, fe.fe_flow_name, flow_type, flow_flags, func_name);
 		break;
 	}
 	case MAC_FLOW_RX: {

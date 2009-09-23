@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,6 +27,7 @@
  * Flows ioctls implementation.
  */
 
+#include <sys/cred.h>
 #include <sys/dld.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_client.h>
@@ -94,11 +95,15 @@ dld_walk_flow_cb(mac_flowinfo_t *finfo, void *arg)
  * ENOSPC is returned a bigger buffer is needed.
  */
 int
-dld_walk_flow(dld_ioc_walkflow_t *wf, intptr_t uaddr)
+dld_walk_flow(dld_ioc_walkflow_t *wf, intptr_t uaddr, cred_t *credp)
 {
 	flowinfo_state_t	state;
 	mac_flowinfo_t		finfo;
 	int			err = 0;
+
+	/* For now, one can only view flows from the global zone. */
+	if (crgetzoneid(credp) != GLOBAL_ZONEID)
+		return (EPERM);
 
 	state.fi_bufsize = wf->wf_len;
 	state.fi_fl = (uchar_t *)uaddr + sizeof (*wf);

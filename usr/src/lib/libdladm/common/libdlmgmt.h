@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,8 @@ extern "C" {
 #define	DLMGMT_CMD_DESTROYCONF		(DLMGMT_CMD_BASE + 10)
 #define	DLMGMT_CMD_GETATTR		(DLMGMT_CMD_BASE + 11)
 #define	DLMGMT_CMD_LINKPROP_GETNEXT	(DLMGMT_CMD_BASE + 12)
+#define	DLMGMT_CMD_ZONEBOOT		(DLMGMT_CMD_BASE + 13)
+#define	DLMGMT_CMD_ZONEHALT		(DLMGMT_CMD_BASE + 14)
 
 typedef struct dlmgmt_door_createid_s {
 	int			ld_cmd;
@@ -153,6 +155,11 @@ typedef struct dlmgmt_linkprop_getnext_retval_s {
 	char			lr_attrval[MAXLINKATTRVALLEN];
 } dlmgmt_linkprop_getnext_retval_t;
 
+typedef struct dlmgmt_door_zone_s {
+	int			ld_cmd;
+	zoneid_t		ld_zoneid;
+} dlmgmt_door_zoneboot_t, dlmgmt_door_zonehalt_t;
+
 typedef struct dlmgmt_retval_s	dlmgmt_remapid_retval_t,
 				dlmgmt_upid_retval_t,
 				dlmgmt_destroyid_retval_t,
@@ -160,7 +167,9 @@ typedef struct dlmgmt_retval_s	dlmgmt_remapid_retval_t,
 				dlmgmt_unsetattr_retval_t,
 				dlmgmt_writeconf_retval_t,
 				dlmgmt_removeconf_retval_t,
-				dlmgmt_destroyconf_retval_t;
+				dlmgmt_destroyconf_retval_t,
+				dlmgmt_zoneboot_retval_t,
+				dlmgmt_zonehalt_retval_t;
 
 typedef struct dlmgmt_linkid_retval_s	dlmgmt_createid_retval_t;
 

@@ -54,16 +54,9 @@ SUNWprivate_1.1 {
 	icfg_get_netmask;
 	icfg_get_subnet;
 	icfg_get_token;
-	icfg_get_tunnel_dest;
-	icfg_get_tunnel_encaplimit;
-	icfg_get_tunnel_hoplimit;
-	icfg_get_tunnel_lower;
-	icfg_get_tunnel_src;
-	icfg_get_tunnel_upper;
 	icfg_is_logical;
 	icfg_iterate_if;
 	icfg_open;
-	icfg_refresh_tunnel_cache;
 	icfg_set_addr;
 	icfg_set_broadcast;
 	icfg_set_dest_addr;
@@ -75,10 +68,6 @@ SUNWprivate_1.1 {
 	icfg_set_prefixlen;
 	icfg_set_subnet;
 	icfg_set_token;
-	icfg_set_tunnel_dest;
-	icfg_set_tunnel_encaplimit;
-	icfg_set_tunnel_hoplimit;
-	icfg_set_tunnel_src;
 	icfg_sockaddr_to_str;
 	icfg_str_to_sockaddr;
     local:

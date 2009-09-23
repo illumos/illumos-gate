@@ -363,6 +363,7 @@ f none lib/svc/method/ldap-client 0555 root bin
 f none lib/svc/method/manifest-import 0555 root bin
 f none lib/svc/method/mpxio-upgrade 0555 root bin
 f none lib/svc/method/net-init 0555 root bin
+f none lib/svc/method/net-iptun 0555 root bin
 f none lib/svc/method/net-loopback 0555 root bin
 f none lib/svc/method/net-nwam	0555 root bin
 f none lib/svc/method/net-physical 0555 root bin
@@ -506,6 +507,7 @@ f manifest var/svc/manifest/network/inetd.xml 0444 root sys
 f manifest var/svc/manifest/network/inetd-upgrade.xml 0444 root sys
 f seedmanifest var/svc/manifest/network/dlmgmt.xml 0444 root sys
 f manifest var/svc/manifest/network/network-initial.xml 0444 root sys
+f manifest var/svc/manifest/network/network-iptun.xml 0444 root sys
 f manifest var/svc/manifest/network/network-loopback.xml 0444 root sys
 f manifest var/svc/manifest/network/network-physical.xml 0444 root sys
 f manifest var/svc/manifest/network/network-routing-setup.xml 0444 root sys

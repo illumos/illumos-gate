@@ -293,7 +293,8 @@ tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
 	tsol_tpc_t	*dst_rhtp;
 	zoneid_t	zoneid;
 
-	*effective_cred = NULL;
+	if (effective_cred != NULL)
+		*effective_cred = NULL;
 	ASSERT(version == IPV4_VERSION ||
 	    (version == IPV6_VERSION &&
 	    !IN6_IS_ADDR_V4MAPPED((in6_addr_t *)dst)));
@@ -425,10 +426,12 @@ tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
 	 * label flags.
 	 */
 	if (newtsl != NULL) {
-		*effective_cred = copycred_from_tslabel(credp,
-		    newtsl, KM_NOSLEEP);
+		if (effective_cred != NULL) {
+			*effective_cred = copycred_from_tslabel(credp,
+			    newtsl, KM_NOSLEEP);
+		}
 		label_rele(newtsl);
-		if (*effective_cred == NULL) {
+		if (effective_cred != NULL && *effective_cred == NULL) {
 			TPC_RELE(dst_rhtp);
 			return (ENOMEM);
 		}

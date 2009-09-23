@@ -376,9 +376,14 @@ privilege PRIV_SYS_MOUNT
 	only control mounts performed from within said zone.
 	Outside the global zone, the "nodevices" option is always forced.
 
+privilege PRIV_SYS_IPTUN_CONFIG
+
+	Allows a process to configure IP tunnel links.
+
 privilege PRIV_SYS_DL_CONFIG
 
-	Allows a process to configure a system's datalink interfaces.
+	Allows a process to configure all classes of datalinks, including
+	configuration allowed by PRIV_SYS_IPTUN_CONFIG.
 
 privilege PRIV_SYS_IP_CONFIG
 

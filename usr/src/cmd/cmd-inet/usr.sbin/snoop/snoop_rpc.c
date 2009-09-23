@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/errno.h>
@@ -64,7 +61,6 @@ static void rpc_detail_reply(int, int, struct cache_struct *, char *, int len);
 static void print_creds(int);
 static void print_verif(int);
 static void stash_xid(ulong_t, int, int, int, int);
-int valid_rpc(char *, int);
 
 #define	LAST_FRAG ((ulong_t)1 << 31)
 
@@ -87,7 +83,7 @@ interpret_rpc(int flags, char *rpc, int fraglen, int type)
 	if (setjmp(xdr_err)) {
 		if (flags & F_DTAIL)
 			(void) sprintf(get_line(0, 0),
-				"----  short frame ---");
+			    "----  short frame ---");
 		return (fraglen);
 	}
 
@@ -106,9 +102,10 @@ interpret_rpc(int flags, char *rpc, int fraglen, int type)
 		vers = getxdr_long();
 		proc = getxdr_long();
 		stash_xid(xid, pi_frame, prog, vers, proc);
-		if (!(flags & (F_SUM | F_DTAIL)))
+		if (!(flags & (F_SUM | F_DTAIL))) {
 			protoprint(flags, CALL, xid, prog, vers, proc,
-				rpc, fraglen);
+			    rpc, fraglen);
+		}
 	} else {
 		x = find_xid(xid);
 	}
@@ -117,10 +114,10 @@ interpret_rpc(int flags, char *rpc, int fraglen, int type)
 		switch (direction) {
 		case CALL:
 			(void) sprintf(get_sum_line(),
-				"RPC C XID=%lu PROG=%d (%s) VERS=%d PROC=%d",
-				xid,
-				prog, nameof_prog(prog),
-				vers, proc);
+			    "RPC C XID=%lu PROG=%d (%s) VERS=%d PROC=%d",
+			    xid,
+			    prog, nameof_prog(prog),
+			    vers, proc);
 			if (getxdr_long() == RPCSEC_GSS) { /* Cred auth type */
 				extract_rpcsec_gss_cred_info(xid);
 				/* RPCSEC_GSS cred auth data */
@@ -132,7 +129,7 @@ interpret_rpc(int flags, char *rpc, int fraglen, int type)
 			xdr_skip(RNDUP(getxdr_long()));	/* Verf auth data */
 
 			protoprint(flags, CALL, xid, prog, vers, proc,
-				rpc, fraglen);
+			    rpc, fraglen);
 			break;
 
 		case REPLY:
@@ -141,7 +138,7 @@ interpret_rpc(int flags, char *rpc, int fraglen, int type)
 				(void) sprintf(lp, "RPC R XID=%lu", xid);
 			else
 				(void) sprintf(lp, "RPC R (#%d) XID=%lu",
-					x->xid_frame, xid);
+				    x->xid_frame, xid);
 
 			lp += strlen(lp);
 			status = getxdr_long();
@@ -152,18 +149,18 @@ interpret_rpc(int flags, char *rpc, int fraglen, int type)
 				xdr_skip(RNDUP(getxdr_long()));
 				astat = getxdr_long();
 				(void) sprintf(lp, " %s",
-					nameof_astat(astat));
+				    nameof_astat(astat));
 				lp += strlen(lp);
 
 				switch (astat) {
 				case SUCCESS:
 					if (x) {
 						protoprint(flags, REPLY,
-							xid,
-							x->xid_prog,
-							x->xid_vers,
-							x->xid_proc,
-							rpc, fraglen);
+						    xid,
+						    x->xid_prog,
+						    x->xid_vers,
+						    x->xid_proc,
+						    rpc, fraglen);
 					}
 					break;
 
@@ -173,8 +170,8 @@ interpret_rpc(int flags, char *rpc, int fraglen, int type)
 					lo = getxdr_long();
 					hi = getxdr_long();
 					(void) sprintf(lp,
-						" (low=%d, high=%d)",
-						lo, hi);
+					    " (low=%d, high=%d)",
+					    lo, hi);
 					break;
 
 				case GARBAGE_ARGS:
@@ -193,14 +190,14 @@ interpret_rpc(int flags, char *rpc, int fraglen, int type)
 					hi = getxdr_long();
 					(void) sprintf(lp,
 					" Vers mismatch (low=%d, high=%d)",
-						lo, hi);
+					    lo, hi);
 					break;
 
 				case AUTH_ERROR:
 					why = getxdr_u_long();
 					(void) sprintf(lp,
-						" Can't authenticate (%s)",
-						nameof_why(why));
+					    " Can't authenticate (%s)",
+					    nameof_why(why));
 					break;
 				}
 			}
@@ -213,23 +210,23 @@ interpret_rpc(int flags, char *rpc, int fraglen, int type)
 		show_space();
 		if (type == IPPROTO_TCP) {	/* record mark */
 			(void) sprintf(get_line(markpos, markpos+4),
-				"Record Mark: %s fragment, length = %d",
-				recmark & LAST_FRAG ? "last" : "",
-				recmark & ~LAST_FRAG);
+			    "Record Mark: %s fragment, length = %d",
+			    recmark & LAST_FRAG ? "last" : "",
+			    recmark & ~LAST_FRAG);
 		}
 
 		(void) sprintf(get_line(0, 0),
-			"Transaction id = %lu",
-			xid);
+		    "Transaction id = %lu",
+		    xid);
 		(void) sprintf(get_line(0, 0),
-			"Type = %d (%s)",
-			direction,
-			direction == CALL ? "Call":"Reply");
+		    "Type = %d (%s)",
+		    direction,
+		    direction == CALL ? "Call":"Reply");
 
 		switch (direction) {
 		case CALL:
 			rpc_detail_call(flags, xid, rpcvers,
-				prog, vers, proc, rpc, fraglen);
+			    prog, vers, proc, rpc, fraglen);
 			break;
 		case REPLY:
 			rpc_detail_reply(flags, xid, x, rpc, fraglen);
@@ -248,11 +245,11 @@ rpc_detail_call(int flags, int xid, int rpcvers, int prog, int vers, int proc,
 	char *nameof_prog();
 
 	(void) sprintf(get_line(pos, getxdr_pos()),
-		"RPC version = %d",
-		rpcvers);
+	    "RPC version = %d",
+	    rpcvers);
 	(void) sprintf(get_line(pos, getxdr_pos()),
-		"Program = %d (%s), version = %d, procedure = %d",
-		prog, nameof_prog(prog), vers, proc);
+	    "Program = %d (%s), version = %d, procedure = %d",
+	    prog, nameof_prog(prog), vers, proc);
 	print_creds(xid);
 	print_verif(CALL);
 	show_trailer();
@@ -314,8 +311,8 @@ print_creds(int xid)
 	flavor  = getxdr_long();
 	authlen = getxdr_long();
 	(void) sprintf(get_line(pos, getxdr_pos()),
-		"Credentials: Flavor = %d (%s), len = %d bytes",
-		flavor, nameof_flavor(flavor), authlen);
+	    "Credentials: Flavor = %d (%s), len = %d bytes",
+	    flavor, nameof_flavor(flavor), authlen);
 	if (authlen <= 0)
 		return;
 
@@ -327,8 +324,8 @@ print_creds(int xid)
 		uid = getxdr_u_long();
 		gid = getxdr_u_long();
 		(void) sprintf(get_line(pos, getxdr_pos()),
-			"   Uid = %d, Gid = %d",
-			uid, gid);
+		    "   Uid = %d, Gid = %d",
+		    uid, gid);
 		len = getxdr_u_long();
 		line = get_line(pos, len * 4);
 		if (len == 0)
@@ -347,24 +344,24 @@ print_creds(int xid)
 	case AUTH_DES:
 		namekind = getxdr_u_long();
 		(void) sprintf(get_line(pos, getxdr_pos()),
-			"   Name kind = %d (%s)",
-			namekind,
-			namekind == ADN_FULLNAME ?
-				"fullname" : "nickname");
-			switch (namekind) {
-			case ADN_FULLNAME:
-				(void) showxdr_string(64,
-					"   Network name = %s");
-				(void) showxdr_hex(8,
-				"   Conversation key = 0x%s (DES encrypted)");
-				(void) showxdr_hex(4,
-				"   Window = 0x%s (DES encrypted)");
-				break;
+		    "   Name kind = %d (%s)",
+		    namekind,
+		    namekind == ADN_FULLNAME ?
+		    "fullname" : "nickname");
+		switch (namekind) {
+		case ADN_FULLNAME:
+			(void) showxdr_string(64,
+			    "   Network name = %s");
+			(void) showxdr_hex(8,
+			    "   Conversation key = 0x%s (DES encrypted)");
+			(void) showxdr_hex(4,
+			    "   Window = 0x%s (DES encrypted)");
+			break;
 
-			case ADN_NICKNAME:
-				(void) showxdr_hex(4, "   Nickname = 0x%s");
-				break;
-			};
+		case ADN_NICKNAME:
+			(void) showxdr_hex(4, "   Nickname = 0x%s");
+			break;
+		};
 		break;
 
 	case RPCSEC_GSS:
@@ -386,8 +383,8 @@ print_verif(int direction)
 	flavor = getxdr_long();
 	verlen = getxdr_long();
 	(void) sprintf(get_line(pos, getxdr_pos()),
-		"Verifier   : Flavor = %d (%s), len = %d bytes",
-		flavor, nameof_flavor(flavor), verlen);
+	    "Verifier   : Flavor = %d (%s), len = %d bytes",
+	    flavor, nameof_flavor(flavor), verlen);
 	if (verlen == 0)
 		return;
 
@@ -396,7 +393,7 @@ print_verif(int direction)
 		(void) showxdr_hex(8, "   Timestamp = 0x%s (DES encrypted)");
 		if (direction == CALL)
 			(void) showxdr_hex(4,
-				"   Window    = 0x%s (DES encrypted)");
+			    "   Window    = 0x%s (DES encrypted)");
 		else
 			(void) showxdr_hex(4, "   Nickname  = 0x%s");
 		break;
@@ -622,14 +619,14 @@ rpc_detail_reply(int flags, int xid, struct cache_struct *x, char *data,
 
 	if (x) {
 		(void) sprintf(get_line(0, 0),
-			"This is a reply to frame %d",
-			x->xid_frame);
+		    "This is a reply to frame %d",
+		    x->xid_frame);
 	}
 	pos = getxdr_pos();
 	status = getxdr_long();
 	(void) sprintf(get_line(pos, getxdr_pos()),
-		"Status = %d (%s)",
-		status, status ? "Denied" : "Accepted");
+	    "Status = %d (%s)",
+	    status, status ? "Denied" : "Accepted");
 
 	switch (status) {
 	case MSG_ACCEPTED:
@@ -637,16 +634,16 @@ rpc_detail_reply(int flags, int xid, struct cache_struct *x, char *data,
 		pos = getxdr_pos();
 		astat = getxdr_long();
 		(void) sprintf(get_line(pos, getxdr_pos()),
-			"Accept status = %d (%s)",
-			astat, nameof_astat(astat));
+		    "Accept status = %d (%s)",
+		    astat, nameof_astat(astat));
 
 		switch (astat) {
 		case SUCCESS:
 			if (x) {
 				show_trailer();
 				protoprint(flags, REPLY, xid,
-					x->xid_prog, x->xid_vers, x->xid_proc,
-					data, len);
+				    x->xid_prog, x->xid_vers, x->xid_proc,
+				    data, len);
 			}
 			break;
 		case PROG_UNAVAIL :
@@ -668,10 +665,10 @@ rpc_detail_reply(int flags, int xid, struct cache_struct *x, char *data,
 		pos = getxdr_pos();
 		rstat = getxdr_long();
 		(void) sprintf(get_line(pos, getxdr_pos()),
-			"Reject status = %d (%s)",
-			rstat,
-			rstat ? "can't authenticate"
-				: "version mismatch");
+		    "Reject status = %d (%s)",
+		    rstat,
+		    rstat ? "can't authenticate"
+		    : "version mismatch");
 
 		switch (rstat) {
 		case RPC_MISMATCH:
@@ -681,8 +678,8 @@ rpc_detail_reply(int flags, int xid, struct cache_struct *x, char *data,
 		case AUTH_ERROR:
 			why = getxdr_u_long();
 			(void) sprintf(get_line(pos, getxdr_pos()),
-				"   Why = %d (%s)",
-				why, nameof_why(why));
+			    "   Why = %d (%s)",
+			    why, nameof_why(why));
 			break;
 		}
 		break;
@@ -712,7 +709,7 @@ valid_rpc(char *rpc, int rpclen)
 			break;
 		case REPLY:
 			if (xdr_u_int(&xdrm,
-					(uint_t *)&msg.rm_reply.rp_stat) &&
+			    (uint_t *)&msg.rm_reply.rp_stat) &&
 			    (msg.rm_reply.rp_stat == MSG_ACCEPTED ||
 			    msg.rm_reply.rp_stat == MSG_DENIED))
 				return (1);

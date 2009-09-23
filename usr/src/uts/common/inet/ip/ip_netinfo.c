@@ -1517,7 +1517,6 @@ ip_ni_queue_func_impl(injection_t *inject,  boolean_t out)
 	conn = ipcl_conn_create(IPCL_IPCCONN, KM_NOSLEEP, ipst->ips_netstack);
 	if (conn != NULL) {
 		if (inject->inj_isv6) {
-			conn->conn_flags |= IPCL_ISV6;
 			conn->conn_af_isv6 = B_TRUE;
 			conn->conn_src_preferences = IPV6_PREFER_SRC_DEFAULT;
 			conn->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;

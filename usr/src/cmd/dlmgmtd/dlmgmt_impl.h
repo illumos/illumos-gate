@@ -61,8 +61,11 @@ typedef struct dlmgmt_link_s {
 	datalink_class_t	ll_class;
 	uint32_t		ll_media;
 	datalink_id_t		ll_linkid;
-	avl_node_t		ll_node_by_name;
-	avl_node_t		ll_node_by_id;
+	zoneid_t		ll_zoneid;
+	boolean_t		ll_onloan;
+	avl_node_t		ll_name_node;
+	avl_node_t		ll_id_node;
+	avl_node_t		ll_loan_node;
 	uint32_t		ll_flags;
 	uint32_t		ll_gen;		/* generation number */
 } dlmgmt_link_t;
@@ -77,21 +80,25 @@ typedef struct dlmgmt_dlconf_s {
 	datalink_class_t	ld_class;
 	uint32_t		ld_media;
 	int			ld_id;
+	zoneid_t		ld_zoneid;
 	uint32_t		ld_gen;
 	avl_node_t		ld_node;
 } dlmgmt_dlconf_t;
 
 extern boolean_t	debug;
 extern const char	*progname;
+extern char		cachefile[];
 extern dladm_handle_t	dld_handle;
-
+extern datalink_id_t	dlmgmt_nextlinkid;
 extern avl_tree_t	dlmgmt_name_avl;
 extern avl_tree_t	dlmgmt_id_avl;
+extern avl_tree_t	dlmgmt_loan_avl;
 extern avl_tree_t	dlmgmt_dlconf_avl;
 
 boolean_t	linkattr_equal(dlmgmt_linkattr_t **, const char *, void *,
 		    size_t);
-int		linkattr_unset(dlmgmt_linkattr_t **, const char *);
+dlmgmt_linkattr_t *linkattr_find(dlmgmt_linkattr_t *, const char *);
+void		linkattr_unset(dlmgmt_linkattr_t **, const char *);
 int		linkattr_set(dlmgmt_linkattr_t **, const char *, void *,
 		    size_t, dladm_datatype_t);
 int		linkattr_get(dlmgmt_linkattr_t **, const char *, void **,
@@ -100,12 +107,14 @@ int		linkprop_getnext(dlmgmt_linkattr_t **, const char *,
 		    char **, void **, size_t *, dladm_datatype_t *);
 
 void		link_destroy(dlmgmt_link_t *);
-dlmgmt_link_t	*link_by_id(datalink_id_t);
-dlmgmt_link_t	*link_by_name(const char *);
+int		link_activate(dlmgmt_link_t *);
+boolean_t	link_is_visible(dlmgmt_link_t *, zoneid_t);
+dlmgmt_link_t	*link_by_id(datalink_id_t, zoneid_t);
+dlmgmt_link_t	*link_by_name(const char *, zoneid_t);
 int		dlmgmt_create_common(const char *, datalink_class_t,
-		    uint32_t, uint32_t, dlmgmt_link_t **);
+		    uint32_t, zoneid_t, uint32_t, dlmgmt_link_t **);
 int		dlmgmt_destroy_common(dlmgmt_link_t *, uint32_t);
-void		dlmgmt_getattr_common(dlmgmt_linkattr_t **, const char *,
+int		dlmgmt_getattr_common(dlmgmt_linkattr_t **, const char *,
 		    dlmgmt_getattr_retval_t *);
 
 void		dlmgmt_advance(dlmgmt_link_t *);
@@ -113,24 +122,26 @@ void		dlmgmt_table_lock(boolean_t);
 void		dlmgmt_table_unlock();
 
 int		dlconf_create(const char *, datalink_id_t, datalink_class_t,
-		    uint32_t, dlmgmt_dlconf_t **);
+		    uint32_t, zoneid_t, dlmgmt_dlconf_t **);
 void		dlconf_destroy(dlmgmt_dlconf_t *);
 void		dlmgmt_advance_dlconfid(dlmgmt_dlconf_t *);
 void		dlmgmt_dlconf_table_lock(boolean_t);
 void		dlmgmt_dlconf_table_unlock(void);
 
-int		dlmgmt_generate_name(const char *, char *, size_t);
+int		dlmgmt_generate_name(const char *, char *, size_t, zoneid_t);
 
-int		dlmgmt_linktable_init(void);
+void		dlmgmt_linktable_init(void);
 void		dlmgmt_linktable_fini(void);
 
+int		dlmgmt_zone_init(zoneid_t);
+int		dlmgmt_elevate_privileges(void);
+int		dlmgmt_drop_privileges();
 void		dlmgmt_handler(void *, char *, size_t, door_desc_t *, uint_t);
 void		dlmgmt_log(int, const char *, ...);
-int		dlmgmt_write_db_entry(datalink_id_t, uint32_t);
-int		dlmgmt_delete_db_entry(datalink_id_t, uint32_t);
-int 		dlmgmt_db_init(void);
-
-#define	DLMGMT_TMPFS_DIR	"/etc/svc/volatile/dladm"
+int		dlmgmt_write_db_entry(const char *, dlmgmt_link_t *, uint32_t);
+int		dlmgmt_delete_db_entry(dlmgmt_link_t *, uint32_t);
+int 		dlmgmt_db_init(zoneid_t);
+void		dlmgmt_db_fini(zoneid_t);
 
 #ifdef  __cplusplus
 }

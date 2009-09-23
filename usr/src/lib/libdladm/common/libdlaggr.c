@@ -59,26 +59,7 @@ static uchar_t	zero_mac[] = {0, 0, 0, 0, 0, 0};
 	(((mac) != NULL) && (bcmp(zero_mac, (mac), ETHERADDRL) != 0) &&	\
 	(!(mac)[0] & 0x01))
 
-#define	PORT_DELIMITER	'.'
-
-#define	WRITE_PORT(portstr, portid, size) {			\
-	char pstr[LINKID_STR_WIDTH + 2];			\
-	(void) snprintf(pstr, LINKID_STR_WIDTH + 2, "%d%c",	\
-	    (portid), PORT_DELIMITER);				\
-	(void) strlcat((portstr), pstr, (size));		\
-}
-
-#define	READ_PORT(portstr, portid, status) {			\
-	errno = 0;						\
-	(status) = DLADM_STATUS_OK;				\
-	(portid) = (int)strtol((portstr), &(portstr), 10);	\
-	if (errno != 0 || *(portstr) != PORT_DELIMITER) {	\
-		(status) = DLADM_STATUS_REPOSITORYINVAL;	\
-	} else {						\
-		/* Skip the delimiter. */			\
-		(portstr)++;					\
-	}							\
-}
+#define	PORT_DELIMITER	":"
 
 typedef struct dladm_aggr_modify_attr {
 	uint32_t	ld_policy;
@@ -135,6 +116,35 @@ static dladm_aggr_port_state_t port_states[] = {
 
 #define	NPORT_STATES	\
 	(sizeof (port_states) / sizeof (dladm_aggr_port_state_t))
+
+static dladm_status_t
+write_port(dladm_handle_t handle, char *portstr, datalink_id_t portid,
+    size_t portstrsize)
+{
+	char		pname[MAXLINKNAMELEN + 1];
+	dladm_status_t	status;
+
+	if ((status = dladm_datalink_id2info(handle, portid, NULL, NULL, NULL,
+	    pname, sizeof (pname))) != DLADM_STATUS_OK)
+		return (status);
+	(void) strlcat(pname, PORT_DELIMITER, sizeof (pname));
+	if (strlcat(portstr, pname, portstrsize) >= portstrsize)
+		status = DLADM_STATUS_TOOSMALL;
+	return (status);
+}
+
+static dladm_status_t
+read_port(dladm_handle_t handle, char **portstr, datalink_id_t *portid)
+{
+	dladm_status_t	status;
+	char		*pname;
+
+	if ((pname = strtok(*portstr, PORT_DELIMITER)) == NULL)
+		return (DLADM_STATUS_REPOSITORYINVAL);
+	*portstr += (strlen(pname) + 1);
+	status = dladm_name2info(handle, pname, portid, NULL, NULL, NULL);
+	return (status);
+}
 
 static int
 i_dladm_aggr_ioctl(dladm_handle_t handle, int cmd, void *ptr)
@@ -259,7 +269,7 @@ i_dladm_aggr_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 {
 	dladm_conf_t	conf;
 	uint32_t	nports, i;
-	char		*portstr, *next;
+	char		*portstr = NULL, *next;
 	dladm_status_t	status;
 	uint64_t	u64;
 	int		size;
@@ -323,36 +333,30 @@ i_dladm_aggr_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 	nports = (uint32_t)u64;
 	attrp->lg_nports = nports;
 
-	size = nports * (LINKID_STR_WIDTH + 1) + 1;
+	size = nports * (MAXLINKNAMELEN + 1) + 1;
 	if ((portstr = calloc(1, size)) == NULL) {
 		status = DLADM_STATUS_NOMEM;
 		goto done;
 	}
 
 	status = dladm_get_conf_field(handle, conf, FPORTS, portstr, size);
-	if (status != DLADM_STATUS_OK) {
-		free(portstr);
+	if (status != DLADM_STATUS_OK)
 		goto done;
-	}
 
 	if ((attrp->lg_ports = malloc(nports *
 	    sizeof (dladm_aggr_port_attr_t))) == NULL) {
-		free(portstr);
 		status = DLADM_STATUS_NOMEM;
 		goto done;
 	}
 
 	for (next = portstr, i = 0; i < nports; i++) {
-		READ_PORT(next, attrp->lg_ports[i].lp_linkid, status);
-		if (status != DLADM_STATUS_OK) {
-			free(portstr);
+		if ((status = read_port(handle, &next,
+		    &attrp->lg_ports[i].lp_linkid)) != DLADM_STATUS_OK)
 			free(attrp->lg_ports);
-			goto done;
-		}
 	}
-	free(portstr);
 
 done:
+	free(portstr);
 	dladm_destroy_conf(handle, conf);
 	return (status);
 }
@@ -406,7 +410,7 @@ i_dladm_aggr_add_rmv(dladm_handle_t handle, datalink_id_t linkid,
 	 * First, update the persistent configuration if requested.  We only
 	 * need to update the FPORTS and FNPORTS fields of this aggregation.
 	 * Note that FPORTS is a list of port linkids separated by
-	 * PORT_DELIMITER ('.').
+	 * PORT_DELIMITER (':').
 	 */
 	if (flags & DLADM_OPT_PERSIST) {
 		status = dladm_read_conf(handle, linkid, &conf);
@@ -430,7 +434,7 @@ i_dladm_aggr_add_rmv(dladm_handle_t handle, datalink_id_t linkid,
 			goto destroyconf;
 		}
 
-		size = orig_nports * (LINKID_STR_WIDTH + 1) + 1;
+		size = orig_nports * (MAXLINKNAMELEN + 1) + 1;
 		if ((orig_portstr = calloc(1, size)) == NULL) {
 			status = dladm_errno2status(errno);
 			goto destroyconf;
@@ -444,7 +448,7 @@ i_dladm_aggr_add_rmv(dladm_handle_t handle, datalink_id_t linkid,
 		result_nports = (cmd == LAIOC_ADD) ? orig_nports + nports :
 		    orig_nports;
 
-		size = result_nports * (LINKID_STR_WIDTH + 1) + 1;
+		size = result_nports * (MAXLINKNAMELEN + 1) + 1;
 		if ((portstr = calloc(1, size)) == NULL) {
 			status = dladm_errno2status(errno);
 			goto destroyconf;
@@ -456,8 +460,14 @@ i_dladm_aggr_add_rmv(dladm_handle_t handle, datalink_id_t linkid,
 		 */
 		if (cmd == LAIOC_ADD) {
 			(void) strlcpy(portstr, orig_portstr, size);
-			for (i = 0; i < nports; i++)
-				WRITE_PORT(portstr, ports[i].lp_linkid, size);
+			for (i = 0; i < nports; i++) {
+				status = write_port(handle, portstr,
+				    ports[i].lp_linkid, size);
+				if (status != DLADM_STATUS_OK) {
+					free(portstr);
+					goto destroyconf;
+				}
+			}
 		} else {
 			char *next;
 			datalink_id_t portid;
@@ -468,7 +478,7 @@ i_dladm_aggr_add_rmv(dladm_handle_t handle, datalink_id_t linkid,
 				 * Read the portids from the old configuration
 				 * one by one.
 				 */
-				READ_PORT(next, portid, status);
+				status = read_port(handle, &next, &portid);
 				if (status != DLADM_STATUS_OK) {
 					free(portstr);
 					goto destroyconf;
@@ -483,7 +493,12 @@ i_dladm_aggr_add_rmv(dladm_handle_t handle, datalink_id_t linkid,
 						break;
 				}
 				if (i == nports) {
-					WRITE_PORT(portstr, portid, size);
+					status = write_port(handle, portstr,
+					    portid, size);
+					if (status != DLADM_STATUS_OK) {
+						free(portstr);
+						goto destroyconf;
+					}
 				} else {
 					remove++;
 				}
@@ -724,16 +739,10 @@ i_dladm_aggr_up(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 	if ((status = dladm_up_datalink_id(handle, linkid)) !=
 	    DLADM_STATUS_OK) {
 		laioc_delete_t ioc;
+
 		ioc.ld_linkid = linkid;
 		(void) i_dladm_aggr_ioctl(handle, LAIOC_DELETE, &ioc);
-		goto done;
 	}
-
-	/*
-	 * Reset the active linkprop of this specific link.
-	 */
-	(void) dladm_init_linkprop(handle, linkid, B_FALSE);
-
 done:
 	free(attr.lg_ports);
 	free(ports);
@@ -1028,14 +1037,19 @@ dladm_aggr_persist_aggr_conf(dladm_handle_t handle, const char *link,
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
-	size = nports * (LINKID_STR_WIDTH + 1) + 1;
+	size = nports * MAXLINKNAMELEN + 1;
 	if ((portstr = calloc(1, size)) == NULL) {
 		status = DLADM_STATUS_NOMEM;
 		goto done;
 	}
 
-	for (i = 0; i < nports; i++)
-		WRITE_PORT(portstr, ports[i].lp_linkid, size);
+	for (i = 0; i < nports; i++) {
+		status = write_port(handle, portstr, ports[i].lp_linkid, size);
+		if (status != DLADM_STATUS_OK) {
+			free(portstr);
+			goto done;
+		}
+	}
 	status = dladm_set_conf_field(handle, conf, FPORTS, DLADM_TYPE_STR,
 	    portstr);
 	free(portstr);
@@ -1404,9 +1418,9 @@ dladm_aggr_delete(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
 		if (arg.isheld)
 			return (DLADM_STATUS_LINKBUSY);
 
+		(void) dladm_remove_conf(handle, linkid);
 		(void) dladm_destroy_datalink_id(handle, linkid,
 		    DLADM_OPT_PERSIST);
-		(void) dladm_remove_conf(handle, linkid);
 	}
 
 	return (DLADM_STATUS_OK);

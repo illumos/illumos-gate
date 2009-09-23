@@ -26,6 +26,7 @@
 #ifndef _LIBDLADM_IMPL_H
 #define	_LIBDLADM_IMPL_H
 
+#include <sys/types.h>
 #include <sys/mac.h>
 #include <sys/mac_flow.h>
 #include <libdladm.h>

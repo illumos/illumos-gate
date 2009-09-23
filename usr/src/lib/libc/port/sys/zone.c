@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <sys/types.h>
@@ -220,27 +218,26 @@ zone_version(int *version)
 	return (syscall(SYS_zone, ZONE_VERSION, version));
 }
 
-
 int
-zone_add_datalink(zoneid_t zoneid, char *dlname)
+zone_add_datalink(zoneid_t zoneid, datalink_id_t linkid)
 {
-	return (syscall(SYS_zone, ZONE_ADD_DATALINK, zoneid, dlname));
+	return (syscall(SYS_zone, ZONE_ADD_DATALINK, zoneid, linkid));
 }
 
 int
-zone_remove_datalink(zoneid_t zoneid, char *dlname)
+zone_remove_datalink(zoneid_t zoneid, datalink_id_t linkid)
 {
-	return (syscall(SYS_zone, ZONE_DEL_DATALINK, zoneid, dlname));
+	return (syscall(SYS_zone, ZONE_DEL_DATALINK, zoneid, linkid));
 }
 
 int
-zone_check_datalink(zoneid_t *zoneidp, char *dlname)
+zone_check_datalink(zoneid_t *zoneidp, datalink_id_t linkid)
 {
-	return (syscall(SYS_zone, ZONE_CHECK_DATALINK, zoneidp, dlname));
+	return (syscall(SYS_zone, ZONE_CHECK_DATALINK, zoneidp, linkid));
 }
 
 int
-zone_list_datalink(zoneid_t zoneid, int *dlnump, char *buf)
+zone_list_datalink(zoneid_t zoneid, int *dlnump, datalink_id_t *linkids)
 {
-	return (syscall(SYS_zone, ZONE_LIST_DATALINK, zoneid, dlnump, buf));
+	return (syscall(SYS_zone, ZONE_LIST_DATALINK, zoneid, dlnump, linkids));
 }

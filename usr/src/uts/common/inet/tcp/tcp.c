@@ -9295,7 +9295,7 @@ tcp_create_common(queue_t *q, cred_t *credp, boolean_t isv6,
 	tcp = connp->conn_tcp;
 
 	if (isv6) {
-		connp->conn_flags |= (IPCL_TCP6|IPCL_ISV6);
+		connp->conn_flags |= IPCL_TCP6;
 		connp->conn_send = ip_output_v6;
 		connp->conn_af_isv6 = B_TRUE;
 		connp->conn_pkt_isv6 = B_TRUE;

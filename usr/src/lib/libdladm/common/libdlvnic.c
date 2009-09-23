@@ -187,6 +187,7 @@ i_dladm_vnic_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 	dladm_conf_t conf;
 	dladm_status_t status;
 	char macstr[ETHERADDRL * 3];
+	char linkover[MAXLINKNAMELEN];
 	uint64_t u64;
 	datalink_class_t class;
 
@@ -195,10 +196,19 @@ i_dladm_vnic_info_persist(dladm_handle_t handle, datalink_id_t linkid,
 	    DLADM_STATUS_OK)
 		return (status);
 
-	status = dladm_get_conf_field(handle, conf, FLINKOVER, &u64,
-	    sizeof (u64));
-	attrp->va_link_id = ((status == DLADM_STATUS_OK) ?
-	    (datalink_id_t)u64 : DATALINK_INVALID_LINKID);
+	status = dladm_get_conf_field(handle, conf, FLINKOVER, linkover,
+	    sizeof (linkover));
+	if (status != DLADM_STATUS_OK) {
+		/*
+		 * This isn't an error, etherstubs don't have a FLINKOVER
+		 * property.
+		 */
+		attrp->va_link_id = DATALINK_INVALID_LINKID;
+	} else {
+		if ((status = dladm_name2info(handle, linkover,
+		    &attrp->va_link_id, NULL, NULL, NULL)) != DLADM_STATUS_OK)
+			goto done;
+	}
 
 	status = dladm_get_conf_field(handle, conf, FHWRINGS,
 	    &attrp->va_hwrings, sizeof (boolean_t));
@@ -509,7 +519,6 @@ dladm_vnic_delete(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
 {
 	dladm_status_t status;
 	datalink_class_t class;
-	dladm_vnic_attr_t attr;
 
 	if (flags == 0)
 		return (DLADM_STATUS_BADARG);
@@ -528,10 +537,6 @@ dladm_vnic_delete(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
 	}
 
 	if ((flags & DLADM_OPT_ACTIVE) != 0) {
-		status = dladm_vnic_info(handle, linkid, &attr,
-		    DLADM_OPT_ACTIVE);
-		if (status != DLADM_STATUS_OK)
-			return (status);
 		status = i_dladm_vnic_delete_sys(handle, linkid);
 		if (status == DLADM_STATUS_OK) {
 			(void) dladm_set_linkprop(handle, linkid, NULL, NULL, 0,
@@ -544,9 +549,9 @@ dladm_vnic_delete(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
 		}
 	}
 	if ((flags & DLADM_OPT_PERSIST) != 0) {
+		(void) dladm_remove_conf(handle, linkid);
 		(void) dladm_destroy_datalink_id(handle, linkid,
 		    DLADM_OPT_PERSIST);
-		(void) dladm_remove_conf(handle, linkid);
 	}
 	return (dladm_bridge_refresh(handle, linkid));
 }
@@ -589,6 +594,7 @@ dladm_vnic_persist_conf(dladm_handle_t handle, const char *name,
 	dladm_conf_t conf = DLADM_INVALID_CONF;
 	dladm_status_t status;
 	char macstr[ETHERADDRL * 3];
+	char linkover[MAXLINKNAMELEN];
 	uint64_t u64;
 
 	if ((status = dladm_create_conf(handle, name, attrp->va_vnic_id,
@@ -596,9 +602,12 @@ dladm_vnic_persist_conf(dladm_handle_t handle, const char *name,
 		return (status);
 
 	if (attrp->va_link_id != DATALINK_INVALID_LINKID) {
-		u64 = attrp->va_link_id;
+		status = dladm_datalink_id2info(handle, attrp->va_link_id, NULL,
+		    NULL, NULL, linkover, sizeof (linkover));
+		if (status != DLADM_STATUS_OK)
+			goto done;
 		status = dladm_set_conf_field(handle, conf, FLINKOVER,
-		    DLADM_TYPE_UINT64, &u64);
+		    DLADM_TYPE_STR, linkover);
 		if (status != DLADM_STATUS_OK)
 			goto done;
 	}

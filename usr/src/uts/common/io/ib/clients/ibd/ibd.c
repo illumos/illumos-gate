@@ -44,13 +44,12 @@
 #include <sys/sysmacros.h>	/* for offsetof */
 #include <sys/disp.h>		/* for async thread pri */
 #include <sys/atomic.h>		/* for atomic_add*() */
-#include <sys/ethernet.h>	/* for ETHERTYPE_IP */
+#include <sys/ethernet.h>	/* for ETHERTYPE_IPV6 */
 #include <netinet/in.h>		/* for netinet/ip.h below */
 #include <netinet/ip.h>		/* for struct ip */
 #include <netinet/udp.h>	/* for struct udphdr */
 #include <inet/common.h>	/* for inet/ip.h below */
 #include <inet/ip.h>		/* for ipha_t */
-#include <inet/ip_if.h>		/* for IP6_DL_SAP */
 #include <inet/ip6.h>		/* for ip6_t */
 #include <inet/tcp.h>		/* for tcph_t */
 #include <netinet/icmp6.h>	/* for icmp6_t */
@@ -5698,7 +5697,7 @@ ibd_send(ibd_state_t *state, mblk_t *mp)
 	 * For ND6 packets, padding is at the front of the source lladdr.
 	 * Insert the padding at front.
 	 */
-	if (ntohs(ipibp->ipib_rhdr.ipoib_type) == IP6_DL_SAP) {
+	if (ntohs(ipibp->ipib_rhdr.ipoib_type) == ETHERTYPE_IPV6) {
 		if (MBLKL(mp) < sizeof (ib_header_info_t) + IPV6_HDR_LEN) {
 			if (!pullupmsg(mp, IPV6_HDR_LEN +
 			    sizeof (ib_header_info_t))) {
@@ -6231,7 +6230,7 @@ ibd_process_rx(ibd_state_t *state, ibd_rwqe_t *rwqe, ibt_wc_t *wc)
 	 * the padding from such packets.
 	 */
 	ipibp = (ipoib_hdr_t *)((uchar_t *)mp->b_rptr + sizeof (ipoib_pgrh_t));
-	if (ntohs(ipibp->ipoib_type) == IP6_DL_SAP) {
+	if (ntohs(ipibp->ipoib_type) == ETHERTYPE_IPV6) {
 		if (MBLKL(mp) < sizeof (ipoib_hdr_t) + IPV6_HDR_LEN) {
 			if (!pullupmsg(mp, IPV6_HDR_LEN +
 			    sizeof (ipoib_hdr_t))) {

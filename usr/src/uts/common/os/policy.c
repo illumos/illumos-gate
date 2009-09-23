@@ -1736,10 +1736,21 @@ secpolicy_dl_config(const cred_t *cr)
 {
 	if (PRIV_POLICY_ONLY(cr, PRIV_SYS_NET_CONFIG, B_FALSE))
 		return (secpolicy_net_config(cr, B_FALSE));
-	return (PRIV_POLICY(cr, PRIV_SYS_DL_CONFIG, B_FALSE, EPERM,
-	    NULL));
+	return (PRIV_POLICY(cr, PRIV_SYS_DL_CONFIG, B_FALSE, EPERM, NULL));
 }
 
+/*
+ * PRIV_SYS_DL_CONFIG is a superset of PRIV_SYS_IPTUN_CONFIG.
+ */
+int
+secpolicy_iptun_config(const cred_t *cr)
+{
+	if (PRIV_POLICY_ONLY(cr, PRIV_SYS_NET_CONFIG, B_FALSE))
+		return (secpolicy_net_config(cr, B_FALSE));
+	if (PRIV_POLICY_ONLY(cr, PRIV_SYS_DL_CONFIG, B_FALSE))
+		return (secpolicy_dl_config(cr));
+	return (PRIV_POLICY(cr, PRIV_SYS_IPTUN_CONFIG, B_FALSE, EPERM, NULL));
+}
 
 /*
  * Map IP pseudo privileges to actual privileges.
@@ -2276,26 +2287,6 @@ secpolicy_xvm_control(const cred_t *cr)
 	if (PRIV_POLICY(cr, PRIV_XVM_CONTROL, B_FALSE, EPERM, NULL))
 		return (EPERM);
 	return (0);
-}
-
-/*
- * secpolicy_dld_ioctl
- *
- * Determine if the subject has permission to use certain dld ioctls.
- * Each ioctl should require a limited number of privileges. A large
- * number indicates a poor design.
- */
-int
-secpolicy_dld_ioctl(const cred_t *cr, const char *dld_priv, const char *msg)
-{
-	int rv;
-
-	if ((rv = priv_getbyname(dld_priv, 0)) >= 0) {
-		return (PRIV_POLICY(cr, rv, B_FALSE, EPERM, msg));
-	}
-	/* priv_getbyname() returns -ve errno */
-	return (-rv);
-
 }
 
 /*

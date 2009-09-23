@@ -202,10 +202,12 @@ struct ip_stack {
 	struct connf_s	*ips_ipcl_proto_fanout_v6;
 	struct connf_s	*ips_ipcl_udp_fanout;
 	struct connf_s	*ips_ipcl_raw_fanout;
+	struct connf_s	*ips_ipcl_iptun_fanout;
 	uint_t		ips_ipcl_conn_fanout_size;
 	uint_t		ips_ipcl_bind_fanout_size;
 	uint_t		ips_ipcl_udp_fanout_size;
 	uint_t		ips_ipcl_raw_fanout_size;
+	uint_t		ips_ipcl_iptun_fanout_size;
 	struct connf_s	*ips_ipcl_globalhash_fanout;
 	int		ips_conn_g_index;
 

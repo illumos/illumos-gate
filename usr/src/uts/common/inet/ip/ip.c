@@ -98,7 +98,7 @@
 #include <inet/sadb.h>
 #include <inet/ipsec_impl.h>
 #include <sys/iphada.h>
-#include <inet/tun.h>
+#include <inet/iptun/iptun_impl.h>
 #include <inet/ipdrop.h>
 #include <inet/ip_netinfo.h>
 
@@ -1268,12 +1268,8 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 			MISC_CMD, ip_sioctl_tonlink, NULL },
 	/* 146 */ { SIOCTMYSITE, sizeof (struct sioc_addrreq), 0,
 			MISC_CMD, ip_sioctl_tmysite, NULL },
-	/* 147 */ { SIOCGTUNPARAM, sizeof (struct iftun_req), 0,
-			TUN_CMD, ip_sioctl_tunparam, NULL },
-	/* 148 */ { SIOCSTUNPARAM, sizeof (struct iftun_req),
-		    IPI_PRIV | IPI_WR,
-		    TUN_CMD, ip_sioctl_tunparam, NULL },
-
+	/* 147 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
+	/* 148 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 	/* IPSECioctls handled in ip_sioctl_copyin_setup itself */
 	/* 149 */ { SIOCFIPSECONFIG, 0, IPI_PRIV, MISC_CMD, NULL, NULL },
 	/* 150 */ { SIOCSIPSECONFIG, 0, IPI_PRIV, MISC_CMD, NULL, NULL },
@@ -1354,10 +1350,6 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 int ip_ndx_ioctl_count = sizeof (ip_ndx_ioctl_table) / sizeof (ip_ioctl_cmd_t);
 
 ip_ioctl_cmd_t ip_misc_ioctl_table[] = {
-	{ OSIOCGTUNPARAM, sizeof (struct old_iftun_req),
-		IPI_GET_CMD, TUN_CMD, ip_sioctl_tunparam, NULL },
-	{ OSIOCSTUNPARAM, sizeof (struct old_iftun_req), IPI_PRIV | IPI_WR,
-		TUN_CMD, ip_sioctl_tunparam, NULL },
 	{ I_LINK,	0, IPI_PRIV | IPI_WR | IPI_PASS_DOWN, 0, NULL, NULL },
 	{ I_UNLINK,	0, IPI_PRIV | IPI_WR | IPI_PASS_DOWN, 0, NULL, NULL },
 	{ I_PLINK,	0, IPI_PRIV | IPI_WR | IPI_PASS_DOWN, 0, NULL, NULL },
@@ -2371,6 +2363,26 @@ icmp_inbound_self_encap_error(mblk_t *mp, int iph_hdr_length, int hdr_length)
 }
 
 /*
+ * Fanout for ICMP errors containing IP-in-IPv4 packets.  Returns B_TRUE if a
+ * tunnel consumed the message, and B_FALSE otherwise.
+ */
+static boolean_t
+icmp_inbound_iptun_fanout(mblk_t *first_mp, ipha_t *ripha, ill_t *ill,
+    ip_stack_t *ipst)
+{
+	conn_t	*connp;
+
+	if ((connp = ipcl_iptun_classify_v4(&ripha->ipha_src, &ripha->ipha_dst,
+	    ipst)) == NULL)
+		return (B_FALSE);
+
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
+	connp->conn_recv(connp, first_mp, NULL);
+	CONN_DEC_REF(connp);
+	return (B_TRUE);
+}
+
+/*
  * Try to pass the ICMP message upstream in case the ULP cares.
  *
  * If the packet that caused the ICMP error is secure, we send
@@ -2378,14 +2390,10 @@ icmp_inbound_self_encap_error(mblk_t *mp, int iph_hdr_length, int hdr_length)
  * valid association. ipha in the code below points to the
  * IP header of the packet that caused the error.
  *
- * We handle ICMP_FRAGMENTATION_NEEDED(IFN) message differently
- * in the context of IPsec. Normally we tell the upper layer
- * whenever we send the ire (including ip_bind), the IPsec header
- * length in ire_ipsec_overhead. TCP can deduce the MSS as it
- * has both the MTU (ire_max_frag) and the ire_ipsec_overhead.
- * Similarly, we pass the new MTU icmph_du_mtu and TCP does the
- * same thing. As TCP has the IPsec options size that needs to be
- * adjusted, we just pass the MTU unchanged.
+ * For IPsec cases, we let the next-layer-up (which has access to
+ * cached policy on the conn_t, or can query the SPD directly)
+ * subtract out any IPsec overhead if they must.  We therefore make no
+ * adjustments here for IPsec overhead.
  *
  * IFN could have been generated locally or by some router.
  *
@@ -2461,6 +2469,21 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 		ii = NULL;
 	}
 
+	/*
+	 * We need a separate IP header with the source and destination
+	 * addresses reversed to do fanout/classification because the ipha in
+	 * the ICMP error is in the form we sent it out.
+	 */
+	ripha.ipha_src = ipha->ipha_dst;
+	ripha.ipha_dst = ipha->ipha_src;
+	ripha.ipha_protocol = ipha->ipha_protocol;
+	ripha.ipha_version_and_hdr_length = ipha->ipha_version_and_hdr_length;
+
+	ip2dbg(("icmp_inbound_error: proto %d %x to %x: %d/%d\n",
+	    ripha.ipha_protocol, ntohl(ipha->ipha_src),
+	    ntohl(ipha->ipha_dst),
+	    icmph->icmph_type, icmph->icmph_code));
+
 	switch (ipha->ipha_protocol) {
 	case IPPROTO_UDP:
 		/*
@@ -2478,22 +2501,11 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 		}
 		up = (uint16_t *)((uchar_t *)ipha + hdr_length);
 
-		/*
-		 * Attempt to find a client stream based on port.
-		 * Note that we do a reverse lookup since the header is
-		 * in the form we sent it out.
-		 * The ripha header is only used for the IP_UDP_MATCH and we
-		 * only set the src and dst addresses and protocol.
-		 */
-		ripha.ipha_src = ipha->ipha_dst;
-		ripha.ipha_dst = ipha->ipha_src;
-		ripha.ipha_protocol = ipha->ipha_protocol;
+		/* Attempt to find a client stream based on port. */
 		((uint16_t *)&ports)[0] = up[1];
 		((uint16_t *)&ports)[1] = up[0];
-		ip2dbg(("icmp_inbound_error: UDP %x:%d to %x:%d: %d/%d\n",
-		    ntohl(ipha->ipha_src), ntohs(up[0]),
-		    ntohl(ipha->ipha_dst), ntohs(up[1]),
-		    icmph->icmph_type, icmph->icmph_code));
+		ip2dbg(("icmp_inbound_error: UDP ports %d to %d\n",
+		    ntohs(up[0]), ntohs(up[1])));
 
 		/* Have to change db_type after any pullupmsg */
 		DB_TYPE(mp) = M_CTL;
@@ -2548,18 +2560,7 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 			ipha = (ipha_t *)&icmph[1];
 		}
 		up = (uint16_t *)((uchar_t *)ipha + hdr_length);
-		/*
-		 * Find a SCTP client stream for this packet.
-		 * Note that we do a reverse lookup since the header is
-		 * in the form we sent it out.
-		 * The ripha header is only used for the matching and we
-		 * only set the src and dst addresses, protocol, and version.
-		 */
-		ripha.ipha_src = ipha->ipha_dst;
-		ripha.ipha_dst = ipha->ipha_src;
-		ripha.ipha_protocol = ipha->ipha_protocol;
-		ripha.ipha_version_and_hdr_length =
-		    ipha->ipha_version_and_hdr_length;
+		/* Find a SCTP client stream for this packet. */
 		((uint16_t *)&ports)[0] = up[1];
 		((uint16_t *)&ports)[1] = up[0];
 
@@ -2632,7 +2633,6 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 			ii->ipsec_in_rill_index =
 			    recv_ill->ill_phyint->phyint_ifindex;
 		}
-		ip2dbg(("icmp_inbound_error: ipsec\n"));
 
 		if (!ipsec_loaded(ipss)) {
 			ip_proto_not_sup(q, first_mp, 0, zoneid, ipst);
@@ -2649,18 +2649,8 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 		ip_fanout_proto_again(first_mp, ill, recv_ill, NULL);
 		return;
 	}
-	default:
-		/*
-		 * The ripha header is only used for the lookup and we
-		 * only set the src and dst addresses and protocol.
-		 */
-		ripha.ipha_src = ipha->ipha_dst;
-		ripha.ipha_dst = ipha->ipha_src;
-		ripha.ipha_protocol = ipha->ipha_protocol;
-		ip2dbg(("icmp_inbound_error: proto %d %x to %x: %d/%d\n",
-		    ripha.ipha_protocol, ntohl(ipha->ipha_src),
-		    ntohl(ipha->ipha_dst),
-		    icmph->icmph_type, icmph->icmph_code));
+	case IPPROTO_ENCAP:
+	case IPPROTO_IPV6:
 		if (ipha->ipha_protocol == IPPROTO_ENCAP) {
 			ipha_t *in_ipha;
 
@@ -2684,12 +2674,9 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 			 * we did for the outer header.
 			 */
 			in_ipha = (ipha_t *)((uchar_t *)ipha + hdr_length);
-			if ((IPH_HDR_VERSION(in_ipha) != IPV4_VERSION)) {
+			if ((IPH_HDR_VERSION(in_ipha) != IPV4_VERSION) ||
+			    IPH_HDR_LENGTH(in_ipha) < sizeof (ipha_t))
 				goto discard_pkt;
-			}
-			if (IPH_HDR_LENGTH(in_ipha) < sizeof (ipha_t)) {
-				goto discard_pkt;
-			}
 			/* Check for Self-encapsulated tunnels */
 			if (in_ipha->ipha_src == ipha->ipha_src &&
 			    in_ipha->ipha_dst == ipha->ipha_dst) {
@@ -2715,33 +2702,16 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 				return;
 			}
 		}
-		if ((ipha->ipha_protocol == IPPROTO_ENCAP ||
-		    ipha->ipha_protocol == IPPROTO_IPV6) &&
-		    icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED &&
-		    ii != NULL &&
-		    ii->ipsec_in_loopback &&
-		    ii->ipsec_in_secure) {
-			/*
-			 * For IP tunnels that get a looped-back
-			 * ICMP_FRAGMENTATION_NEEDED message, adjust the
-			 * reported new MTU to take into account the IPsec
-			 * headers protecting this configured tunnel.
-			 *
-			 * This allows the tunnel module (tun.c) to blindly
-			 * accept the MTU reported in an ICMP "too big"
-			 * message.
-			 *
-			 * Non-looped back ICMP messages will just be
-			 * handled by the security protocols (if needed),
-			 * and the first subsequent packet will hit this
-			 * path.
-			 */
-			icmph->icmph_du_mtu = htons(ntohs(icmph->icmph_du_mtu) -
-			    ipsec_in_extra_length(first_mp));
-		}
-		/* Have to change db_type after any pullupmsg */
-		DB_TYPE(mp) = M_CTL;
 
+		DB_TYPE(mp) = M_CTL;
+		if (icmp_inbound_iptun_fanout(first_mp, &ripha, ill, ipst))
+			return;
+		/*
+		 * No IP tunnel is interested, fallthrough and see
+		 * if a raw socket will want it.
+		 */
+		/* FALLTHRU */
+	default:
 		ip_fanout_proto(q, first_mp, ill, &ripha, 0, mctl_present,
 		    ip_policy, recv_ill, zoneid);
 		return;
@@ -3931,7 +3901,7 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 	}
 	arh = (arh_t *)mp->b_cont->b_rptr;
 	/* Is it one we are interested in? */
-	if (BE16_TO_U16(arh->arh_proto) == IP6_DL_SAP) {
+	if (BE16_TO_U16(arh->arh_proto) == ETHERTYPE_IPV6) {
 		isv6 = B_TRUE;
 		bcopy((char *)&arh[1] + (arh->arh_hlen & 0xFF), &v6src,
 		    IPV6_ADDR_LEN);
@@ -4355,23 +4325,6 @@ ip_bind_ipsec_policy_set(conn_t *connp, mblk_t *policy_mp)
 	return (B_TRUE);
 }
 
-static void
-ip_bind_post_handling(conn_t *connp, mblk_t *mp, boolean_t ire_requested)
-{
-	/*
-	 * Pass the IPsec headers size in ire_ipsec_overhead.
-	 * We can't do this in ip_bind_get_ire because the policy
-	 * may not have been inherited at that point in time and hence
-	 * conn_out_enforce_policy may not be set.
-	 */
-	if (ire_requested && connp->conn_out_enforce_policy &&
-	    mp != NULL && DB_TYPE(mp) == IRE_DB_REQ_TYPE) {
-		ire_t *ire = (ire_t *)mp->b_rptr;
-		ASSERT(MBLKL(mp) >= sizeof (ire_t));
-		ire->ire_ipsec_overhead = conn_ipsec_length(connp);
-	}
-}
-
 /*
  * Upper level protocols (ULP) pass through bind requests to IP for inspection
  * and to arrange for power-fanout assist.  The ULP is identified by
@@ -4411,7 +4364,6 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 	ipa_conn_t	*ac;
 	uchar_t		*ucp;
 	mblk_t		*mp1;
-	boolean_t	ire_requested;
 	int		error = 0;
 	int		protocol;
 	ipa_conn_x_t	*acx;
@@ -4502,9 +4454,7 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 	/*
 	 * Check for trailing mps.
 	 */
-
 	mp1 = mp->b_cont;
-	ire_requested = (mp1 != NULL && DB_TYPE(mp1) == IRE_DB_REQ_TYPE);
 
 	switch (tbr->ADDR_length) {
 	default:
@@ -4550,8 +4500,6 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 	ASSERT(error != EINPROGRESS);
 	if (error != 0)
 		goto bad_addr;
-
-	ip_bind_post_handling(connp, mp->b_cont, ire_requested);
 
 	/* Send it home. */
 	mp->b_datap->db_type = M_PCPROTO;
@@ -4753,12 +4701,6 @@ ip_proto_bind_laddr_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
     ipaddr_t src_addr, uint16_t lport, boolean_t fanout_insert)
 {
 	int error;
-	mblk_t	*mp = NULL;
-	boolean_t ire_requested;
-
-	if (ire_mpp)
-		mp = *ire_mpp;
-	ire_requested = (mp != NULL && DB_TYPE(mp) == IRE_DB_REQ_TYPE);
 
 	ASSERT(!connp->conn_af_isv6);
 	connp->conn_pkt_isv6 = B_FALSE;
@@ -4766,12 +4708,8 @@ ip_proto_bind_laddr_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
 
 	error = ip_bind_laddr_v4(connp, ire_mpp, protocol, src_addr, lport,
 	    fanout_insert);
-	if (error == 0) {
-		ip_bind_post_handling(connp, ire_mpp ? *ire_mpp : NULL,
-		    ire_requested);
-	} else if (error < 0) {
+	if (error < 0)
 		error = -TBADADDR;
-	}
 	return (error);
 }
 
@@ -5286,12 +5224,6 @@ ip_proto_bind_connected_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
     boolean_t fanout_insert, boolean_t verify_dst, cred_t *cr)
 {
 	int error;
-	mblk_t	*mp = NULL;
-	boolean_t ire_requested;
-
-	if (ire_mpp)
-		mp = *ire_mpp;
-	ire_requested = (mp != NULL && DB_TYPE(mp) == IRE_DB_REQ_TYPE);
 
 	ASSERT(!connp->conn_af_isv6);
 	connp->conn_pkt_isv6 = B_FALSE;
@@ -5302,12 +5234,8 @@ ip_proto_bind_connected_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
 		lport = connp->conn_lport;
 	error = ip_bind_connected_v4(connp, ire_mpp, protocol,
 	    src_addrp, lport, dst_addr, fport, fanout_insert, verify_dst, cr);
-	if (error == 0) {
-		ip_bind_post_handling(connp, ire_mpp ? *ire_mpp : NULL,
-		    ire_requested);
-	} else if (error < 0) {
+	if (error < 0)
 		error = -TBADADDR;
-	}
 	return (error);
 }
 
@@ -6414,10 +6342,6 @@ ipsec_in_is_secure(mblk_t *ipsec_mp)
  * is used to negotiate SAs as SAs will be added only after
  * verifying the policy.
  *
- * NOTE : If the packet was tunneled and not multicast we only send
- * to it the first match. Unlike TCP and UDP fanouts this doesn't fall
- * back to delivering packets to AF_INET6 raw sockets.
- *
  * IPQoS Notes:
  * Once we have determined the client, invoke IPPF processing.
  * Policy processing takes place only if the callout_position, IPP_LOCAL_IN,
@@ -6439,7 +6363,6 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 	mblk_t	*mp1, *first_mp1;
 	uint_t	protocol = ipha->ipha_protocol;
 	ipaddr_t dst;
-	boolean_t one_only;
 	mblk_t *first_mp = mp;
 	boolean_t secure;
 	uint32_t ill_index;
@@ -6459,13 +6382,6 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 		secure = B_FALSE;
 	}
 	dst = ipha->ipha_dst;
-	/*
-	 * If the packet was tunneled and not multicast we only send to it
-	 * the first match.
-	 */
-	one_only = ((protocol == IPPROTO_ENCAP || protocol == IPPROTO_IPV6) &&
-	    !CLASSD(dst));
-
 	shared_addr = (zoneid == ALL_ZONES);
 	if (shared_addr) {
 		/*
@@ -6533,12 +6449,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 
 	CONN_INC_REF(connp);
 	first_connp = connp;
-
-	/*
-	 * Only send message to one tunnel driver by immediately
-	 * terminating the loop.
-	 */
-	connp = one_only ? NULL : connp->conn_next;
+	connp = connp->conn_next;
 
 	for (;;) {
 		while (connp != NULL) {
@@ -6584,12 +6495,14 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 			freemsg(first_mp1);
 		} else {
 			/*
-			 * Don't enforce here if we're an actual tunnel -
-			 * let "tun" do it instead.
+			 * Enforce policy like any other conn_t.  Note that
+			 * IP-in-IP packets don't come through here, but
+			 * through ip_iptun_input() or
+			 * icmp_inbound_iptun_fanout().  IPsec policy for such
+			 * packets is enforced in the iptun module.
 			 */
-			if (!IPCL_IS_IPTUN(connp) &&
-			    (CONN_INBOUND_POLICY_PRESENT(connp, ipss) ||
-			    secure)) {
+			if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) ||
+			    secure) {
 				first_mp1 = ipsec_check_inbound_policy
 				    (first_mp1, connp, ipha, NULL,
 				    mctl_present);
@@ -6685,19 +6598,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 
 		freemsg(first_mp);
 	} else {
-		if (IPCL_IS_IPTUN(connp)) {
-			/*
-			 * Tunneled packet.  We enforce policy in the tunnel
-			 * module itself.
-			 *
-			 * Send the WHOLE packet up (incl. IPSEC_IN) without
-			 * a policy check.
-			 * FIXME to use conn_recv for tun later.
-			 */
-			putnext(rq, first_mp);
-			CONN_DEC_REF(connp);
-			return;
-		}
+		ASSERT(!IPCL_IS_IPTUN(connp));
 
 		if ((CONN_INBOUND_POLICY_PRESENT(connp, ipss) || secure)) {
 			first_mp = ipsec_check_inbound_policy(first_mp, connp,
@@ -8595,8 +8496,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
 			return;
 		}
 		case IRE_IF_NORESOLVER: {
-			if (dst_ill->ill_phys_addr_length != IP_ADDR_LEN &&
-			    dst_ill->ill_resolver_mp == NULL) {
+			if (dst_ill->ill_resolver_mp == NULL) {
 				ip1dbg(("ip_newroute: dst_ill %p "
 				    "for IRE_IF_NORESOLVER ire %p has "
 				    "no ill_resolver_mp\n",
@@ -9312,8 +9212,7 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 		case IRE_IF_NORESOLVER: {
 			/* We have what we need to build an IRE_CACHE. */
 
-			if ((dst_ill->ill_phys_addr_length != IP_ADDR_LEN) &&
-			    (dst_ill->ill_resolver_mp == NULL)) {
+			if (dst_ill->ill_resolver_mp == NULL) {
 				ip1dbg(("ip_newroute_ipif: dst_ill %p "
 				    "for IRE_IF_NORESOLVER ire %p has "
 				    "no ill_resolver_mp\n",
@@ -9884,7 +9783,6 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 
 	/* Minor tells us which /dev entry was opened */
 	if (isv6) {
-		connp->conn_flags |= IPCL_ISV6;
 		connp->conn_af_isv6 = B_TRUE;
 		ip_setpktversion(connp, isv6, B_FALSE, ipst);
 		connp->conn_src_preferences = IPV6_PREFER_SRC_DEFAULT;
@@ -10174,15 +10072,10 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 	uint_t ah_req = 0;
 	uint_t esp_req = 0;
 	uint_t se_req = 0;
-	ipsec_selkey_t sel;
 	ipsec_act_t *actp = NULL;
 	uint_t nact;
-	ipsec_policy_t *pin4 = NULL, *pout4 = NULL;
-	ipsec_policy_t *pin6 = NULL, *pout6 = NULL;
-	ipsec_policy_root_t *pr;
 	ipsec_policy_head_t *ph;
-	int fam;
-	boolean_t is_pol_reset;
+	boolean_t is_pol_reset, is_pol_inserted = B_FALSE;
 	int error = 0;
 	netstack_t	*ns = connp->conn_netstack;
 	ip_stack_t	*ipst = ns->netstack_ip;
@@ -10300,63 +10193,31 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 		goto enomem;
 
 	/*
-	 * Always allocate IPv4 policy entries, since they can also
-	 * apply to ipv6 sockets being used in ipv4-compat mode.
+	 * Always insert IPv4 policy entries, since they can also apply to
+	 * ipv6 sockets being used in ipv4-compat mode.
 	 */
-	bzero(&sel, sizeof (sel));
-	sel.ipsl_valid = IPSL_IPV4;
-
-	pin4 = ipsec_policy_create(&sel, actp, nact, IPSEC_PRIO_SOCKET, NULL,
-	    ipst->ips_netstack);
-	if (pin4 == NULL)
+	if (!ipsec_polhead_insert(ph, actp, nact, IPSEC_AF_V4,
+	    IPSEC_TYPE_INBOUND, ns))
+		goto enomem;
+	is_pol_inserted = B_TRUE;
+	if (!ipsec_polhead_insert(ph, actp, nact, IPSEC_AF_V4,
+	    IPSEC_TYPE_OUTBOUND, ns))
 		goto enomem;
 
-	pout4 = ipsec_policy_create(&sel, actp, nact, IPSEC_PRIO_SOCKET, NULL,
-	    ipst->ips_netstack);
-	if (pout4 == NULL)
-		goto enomem;
-
+	/*
+	 * We're looking at a v6 socket, also insert the v6-specific
+	 * entries.
+	 */
 	if (connp->conn_af_isv6) {
-		/*
-		 * We're looking at a v6 socket, also allocate the
-		 * v6-specific entries...
-		 */
-		sel.ipsl_valid = IPSL_IPV6;
-		pin6 = ipsec_policy_create(&sel, actp, nact,
-		    IPSEC_PRIO_SOCKET, NULL, ipst->ips_netstack);
-		if (pin6 == NULL)
+		if (!ipsec_polhead_insert(ph, actp, nact, IPSEC_AF_V6,
+		    IPSEC_TYPE_INBOUND, ns))
 			goto enomem;
-
-		pout6 = ipsec_policy_create(&sel, actp, nact,
-		    IPSEC_PRIO_SOCKET, NULL, ipst->ips_netstack);
-		if (pout6 == NULL)
+		if (!ipsec_polhead_insert(ph, actp, nact, IPSEC_AF_V6,
+		    IPSEC_TYPE_OUTBOUND, ns))
 			goto enomem;
-
-		/*
-		 * .. and file them away in the right place.
-		 */
-		fam = IPSEC_AF_V6;
-		pr = &ph->iph_root[IPSEC_TYPE_INBOUND];
-		HASHLIST_INSERT(pin6, ipsp_hash, pr->ipr_nonhash[fam]);
-		ipsec_insert_always(&ph->iph_rulebyid, pin6);
-		pr = &ph->iph_root[IPSEC_TYPE_OUTBOUND];
-		HASHLIST_INSERT(pout6, ipsp_hash, pr->ipr_nonhash[fam]);
-		ipsec_insert_always(&ph->iph_rulebyid, pout6);
 	}
 
 	ipsec_actvec_free(actp, nact);
-
-	/*
-	 * File the v4 policies.
-	 */
-	fam = IPSEC_AF_V4;
-	pr = &ph->iph_root[IPSEC_TYPE_INBOUND];
-	HASHLIST_INSERT(pin4, ipsp_hash, pr->ipr_nonhash[fam]);
-	ipsec_insert_always(&ph->iph_rulebyid, pin4);
-
-	pr = &ph->iph_root[IPSEC_TYPE_OUTBOUND];
-	HASHLIST_INSERT(pout4, ipsp_hash, pr->ipr_nonhash[fam]);
-	ipsec_insert_always(&ph->iph_rulebyid, pout4);
 
 	/*
 	 * If the requests need security, set enforce_policy.
@@ -10388,14 +10249,8 @@ enomem:
 	mutex_exit(&connp->conn_lock);
 	if (actp != NULL)
 		ipsec_actvec_free(actp, nact);
-	if (pin4 != NULL)
-		IPPOL_REFRELE(pin4, ipst->ips_netstack);
-	if (pout4 != NULL)
-		IPPOL_REFRELE(pout4, ipst->ips_netstack);
-	if (pin6 != NULL)
-		IPPOL_REFRELE(pin6, ipst->ips_netstack);
-	if (pout6 != NULL)
-		IPPOL_REFRELE(pout6, ipst->ips_netstack);
+	if (is_pol_inserted)
+		ipsec_polhead_flush(ph, ns);
 	return (ENOMEM);
 }
 
@@ -12958,6 +12813,25 @@ slow_done:
 #undef  rptr
 }
 
+static boolean_t
+ip_iptun_input(mblk_t *ipsec_mp, mblk_t *data_mp, ipha_t *ipha, ill_t *ill,
+    ire_t *ire, ip_stack_t *ipst)
+{
+	conn_t	*connp;
+
+	ASSERT(ipsec_mp == NULL || ipsec_mp->b_cont == data_mp);
+
+	if ((connp = ipcl_classify_v4(data_mp, ipha->ipha_protocol,
+	    IP_SIMPLE_HDR_LENGTH, ire->ire_zoneid, ipst)) != NULL) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
+		connp->conn_recv(connp, ipsec_mp != NULL ? ipsec_mp : data_mp,
+		    NULL);
+		CONN_DEC_REF(connp);
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
 /* ARGSUSED */
 static mblk_t *
 ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
@@ -14715,14 +14589,6 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 			ill = (ill_t *)q->q_ptr;
 			ill_fastpath_ack(ill, mp);
 			return (B_TRUE);
-		case SIOCSTUNPARAM:
-		case OSIOCSTUNPARAM:
-			/* Go through qwriter_ip */
-			break;
-		case SIOCGTUNPARAM:
-		case OSIOCGTUNPARAM:
-			ip_rput_other(NULL, q, mp, NULL);
-			return (B_TRUE);
 		default:
 			putnext(q, mp);
 			return (B_TRUE);
@@ -14793,18 +14659,7 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 		ip1dbg(("got iocnak "));
 		iocp = (struct iocblk *)mp->b_rptr;
 		switch (iocp->ioc_cmd) {
-		case SIOCSTUNPARAM:
-		case OSIOCSTUNPARAM:
-			/*
-			 * Since this is on the ill stream we unconditionally
-			 * bump up the refcount
-			 */
-			ill_refhold(ill);
-			qwriter_ip(ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
-			return (B_TRUE);
 		case DL_IOC_HDR_INFO:
-		case SIOCGTUNPARAM:
-		case OSIOCGTUNPARAM:
 			ip_rput_other(NULL, q, mp, NULL);
 			return (B_TRUE);
 		default:
@@ -14838,9 +14693,6 @@ ip_rput(queue_t *q, mblk_t *mp)
 		dl = (union DL_primitives *)mp->b_rptr;
 		if (DB_TYPE(mp) != M_PCPROTO ||
 		    dl->dl_primitive == DL_UNITDATA_IND) {
-			/*
-			 * SIOC[GS]TUNPARAM ioctls can come here.
-			 */
 			inet_freemsg(mp);
 			TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
 			    "ip_rput_end: q %p (%S)", q, "uninit");
@@ -15478,6 +15330,17 @@ local:
 			/* ire has been released by ip_sctp_input */
 			ire = NULL;
 			continue;
+		case IPPROTO_ENCAP:
+		case IPPROTO_IPV6:
+			ASSERT(first_mp == mp);
+			if (ip_iptun_input(NULL, mp, ipha, ill, ire, ipst))
+				break;
+			/*
+			 * If there was no IP tunnel data-link bound to
+			 * receive this packet, then we fall through to
+			 * allow potential raw sockets bound to either of
+			 * these protocols to pick it up.
+			 */
 		default:
 			ip_proto_input(q, first_mp, ipha, ire, ill, 0);
 			continue;
@@ -16435,10 +16298,12 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 * available, but we know the ioctl is pending on ill_wq.)
 		 */
 		uint_t	paddrlen, paddroff;
+		uint8_t	*addr;
 
 		paddrreq = ill->ill_phys_addr_pend;
 		paddrlen = ((dl_phys_addr_ack_t *)mp->b_rptr)->dl_addr_length;
 		paddroff = ((dl_phys_addr_ack_t *)mp->b_rptr)->dl_addr_offset;
+		addr = mp->b_rptr + paddroff;
 
 		ill_dlpi_done(ill, DL_PHYS_ADDR_REQ);
 		if (paddrreq == DL_IPV6_TOKEN) {
@@ -16448,14 +16313,23 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * XXX Temporary hack - currently, all known tokens
 			 * are 64 bits, so I'll cheat for the moment.
 			 */
-			bcopy(mp->b_rptr + paddroff,
-			    &ill->ill_token.s6_addr32[2], paddrlen);
+			bcopy(addr, &ill->ill_token.s6_addr32[2], paddrlen);
 			ill->ill_token_length = paddrlen;
 			break;
 		} else if (paddrreq == DL_IPV6_LINK_LAYER_ADDR) {
 			ASSERT(ill->ill_nd_lla_mp == NULL);
 			ill_set_ndmp(ill, mp, paddroff, paddrlen);
 			mp = NULL;
+			break;
+		} else if (paddrreq == DL_CURR_DEST_ADDR) {
+			ASSERT(ill->ill_dest_addr_mp == NULL);
+			ill->ill_dest_addr_mp = mp;
+			ill->ill_dest_addr = addr;
+			mp = NULL;
+			if (ill->ill_isv6) {
+				ill_setdesttoken(ill);
+				ipif_setdestlinklocal(ill->ill_ipif);
+			}
 			break;
 		}
 
@@ -16482,22 +16356,18 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		}
 
 		ill->ill_phys_addr_mp = mp;
-		ill->ill_phys_addr = mp->b_rptr + paddroff;
+		ill->ill_phys_addr = (paddrlen == 0 ? NULL : addr);
 		mp = NULL;
 
 		/*
-		 * If paddrlen is zero, the DLPI provider doesn't support
-		 * physical addresses.  The other two tests were historical
-		 * workarounds for bugs in our former PPP implementation, but
-		 * now other things have grown dependencies on them -- e.g.,
-		 * the tun module specifies a dl_addr_length of zero in its
-		 * DL_BIND_ACK, but then specifies an incorrect value in its
-		 * DL_PHYS_ADDR_ACK.  These bogus checks need to be removed,
-		 * but only after careful testing ensures that all dependent
-		 * broken DLPI providers have been fixed.
+		 * If paddrlen or ill_phys_addr_length is zero, the DLPI
+		 * provider doesn't support physical addresses.  We check both
+		 * paddrlen and ill_phys_addr_length because sppp (PPP) does
+		 * not have physical addresses, but historically adversises a
+		 * physical address length of 0 in its DL_INFO_ACK, but 6 in
+		 * its DL_PHYS_ADDR_ACK.
 		 */
-		if (paddrlen == 0 || ill->ill_phys_addr_length == 0 ||
-		    ill->ill_phys_addr_length == IP_ADDR_LEN) {
+		if (paddrlen == 0 || ill->ill_phys_addr_length == 0) {
 			ill->ill_phys_addr = NULL;
 		} else if (paddrlen != ill->ill_phys_addr_length) {
 			ip0dbg(("DL_PHYS_ADDR_ACK: got addrlen %d, expected %d",
@@ -16514,17 +16384,9 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			ill_set_ndmp(ill, mp_hw, paddroff, paddrlen);
 		}
 
-		/*
-		 * Set the interface token.  If the zeroth interface address
-		 * is unspecified, then set it to the link local address.
-		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&ill->ill_token))
-			(void) ill_setdefaulttoken(ill);
-
-		ASSERT(ill->ill_ipif->ipif_id == 0);
-		if (ipif != NULL &&
-		    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr)) {
-			(void) ipif_setlinklocal(ipif);
+		if (ill->ill_isv6) {
+			ill_setdefaulttoken(ill);
+			ipif_setlinklocal(ill->ill_ipif);
 		}
 		break;
 	}
@@ -16608,7 +16470,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 /*
  * ip_rput_other is called by ip_rput to handle messages modifying the global
- * state in IP. Normally called as writer. Exception SIOCGTUNPARAM (shared)
+ * state in IP.  If 'ipsq' is non-NULL, caller is writer on it.
  */
 /* ARGSUSED */
 void
@@ -16616,8 +16478,6 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 {
 	ill_t		*ill = q->q_ptr;
 	struct iocblk	*iocp;
-	mblk_t		*mp1;
-	conn_t		*connp = NULL;
 
 	ip1dbg(("ip_rput_other "));
 	if (ipsq != NULL) {
@@ -16643,168 +16503,29 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			return;
 		ipif_all_down_tail(ipsq, q, mp, NULL);
 		break;
-	case M_IOCACK:
+	case M_IOCNAK: {
 		iocp = (struct iocblk *)mp->b_rptr;
-		ASSERT(iocp->ioc_cmd != DL_IOC_HDR_INFO);
-		switch (iocp->ioc_cmd) {
-		case SIOCSTUNPARAM:
-		case OSIOCSTUNPARAM:
-			ASSERT(ipsq != NULL);
-			/*
-			 * Finish socket ioctl passed through to tun.
-			 * We should have an IOCTL waiting on this.
-			 */
-			mp1 = ipsq_pending_mp_get(ipsq, &connp);
-			if (ill->ill_isv6) {
-				struct iftun_req *ta;
 
-				/*
-				 * if a source or destination is
-				 * being set, try and set the link
-				 * local address for the tunnel
-				 */
-				ta = (struct iftun_req *)mp->b_cont->
-				    b_cont->b_rptr;
-				if (ta->ifta_flags & (IFTUN_SRC | IFTUN_DST)) {
-					ipif_set_tun_llink(ill, ta);
-				}
-
-			}
-			if (mp1 != NULL) {
-				/*
-				 * Now copy back the b_next/b_prev used by
-				 * mi code for the mi_copy* functions.
-				 * See ip_sioctl_tunparam() for the reason.
-				 * Also protect against missing b_cont.
-				 */
-				if (mp->b_cont != NULL) {
-					mp->b_cont->b_next =
-					    mp1->b_cont->b_next;
-					mp->b_cont->b_prev =
-					    mp1->b_cont->b_prev;
-				}
-				inet_freemsg(mp1);
-				ASSERT(connp != NULL);
-				ip_ioctl_finish(CONNP_TO_WQ(connp), mp,
-				    iocp->ioc_error, NO_COPYOUT, ipsq);
-			} else {
-				ASSERT(connp == NULL);
-				putnext(q, mp);
-			}
-			break;
-		case SIOCGTUNPARAM:
-		case OSIOCGTUNPARAM:
-			/*
-			 * This is really M_IOCDATA from the tunnel driver.
-			 * convert back and complete the ioctl.
-			 * We should have an IOCTL waiting on this.
-			 */
-			mp1 = ill_pending_mp_get(ill, &connp, iocp->ioc_id);
-			if (mp1) {
-				/*
-				 * Now copy back the b_next/b_prev used by
-				 * mi code for the mi_copy* functions.
-				 * See ip_sioctl_tunparam() for the reason.
-				 * Also protect against missing b_cont.
-				 */
-				if (mp->b_cont != NULL) {
-					mp->b_cont->b_next =
-					    mp1->b_cont->b_next;
-					mp->b_cont->b_prev =
-					    mp1->b_cont->b_prev;
-				}
-				inet_freemsg(mp1);
-				if (iocp->ioc_error == 0)
-					mp->b_datap->db_type = M_IOCDATA;
-				ASSERT(connp != NULL);
-				ip_ioctl_finish(CONNP_TO_WQ(connp), mp,
-				    iocp->ioc_error, COPYOUT, NULL);
-			} else {
-				ASSERT(connp == NULL);
-				putnext(q, mp);
-			}
-			break;
-		default:
-			break;
+		ASSERT(iocp->ioc_cmd == DL_IOC_HDR_INFO);
+		/*
+		 * If this was the first attempt, turn off the fastpath
+		 * probing.
+		 */
+		mutex_enter(&ill->ill_lock);
+		if (ill->ill_dlpi_fastpath_state == IDS_INPROGRESS) {
+			ill->ill_dlpi_fastpath_state = IDS_FAILED;
+			mutex_exit(&ill->ill_lock);
+			ill_fastpath_nack(ill);
+			ip1dbg(("ip_rput: DLPI fastpath off on interface %s\n",
+			    ill->ill_name));
+		} else {
+			mutex_exit(&ill->ill_lock);
 		}
+		freemsg(mp);
 		break;
-	case M_IOCNAK:
-		iocp = (struct iocblk *)mp->b_rptr;
-
-		switch (iocp->ioc_cmd) {
-			int mode;
-
-		case DL_IOC_HDR_INFO:
-			/*
-			 * If this was the first attempt, turn off the
-			 * fastpath probing.
-			 */
-			mutex_enter(&ill->ill_lock);
-			if (ill->ill_dlpi_fastpath_state == IDS_INPROGRESS) {
-				ill->ill_dlpi_fastpath_state = IDS_FAILED;
-				mutex_exit(&ill->ill_lock);
-				ill_fastpath_nack(ill);
-				ip1dbg(("ip_rput: DLPI fastpath off on "
-				    "interface %s\n",
-				    ill->ill_name));
-			} else {
-				mutex_exit(&ill->ill_lock);
-			}
-			freemsg(mp);
-			break;
-			case SIOCSTUNPARAM:
-		case OSIOCSTUNPARAM:
-			ASSERT(ipsq != NULL);
-			/*
-			 * Finish socket ioctl passed through to tun
-			 * We should have an IOCTL waiting on this.
-			 */
-			/* FALLTHRU */
-		case SIOCGTUNPARAM:
-		case OSIOCGTUNPARAM:
-			/*
-			 * This is really M_IOCDATA from the tunnel driver.
-			 * convert back and complete the ioctl.
-			 * We should have an IOCTL waiting on this.
-			 */
-			if (iocp->ioc_cmd == SIOCGTUNPARAM ||
-			    iocp->ioc_cmd == OSIOCGTUNPARAM) {
-				mp1 = ill_pending_mp_get(ill, &connp,
-				    iocp->ioc_id);
-				mode = COPYOUT;
-				ipsq = NULL;
-			} else {
-				mp1 = ipsq_pending_mp_get(ipsq, &connp);
-				mode = NO_COPYOUT;
-			}
-			if (mp1 != NULL) {
-				/*
-				 * Now copy back the b_next/b_prev used by
-				 * mi code for the mi_copy* functions.
-				 * See ip_sioctl_tunparam() for the reason.
-				 * Also protect against missing b_cont.
-				 */
-				if (mp->b_cont != NULL) {
-					mp->b_cont->b_next =
-					    mp1->b_cont->b_next;
-					mp->b_cont->b_prev =
-					    mp1->b_cont->b_prev;
-				}
-				inet_freemsg(mp1);
-				if (iocp->ioc_error == 0)
-					iocp->ioc_error = EINVAL;
-				ASSERT(connp != NULL);
-				ip_ioctl_finish(CONNP_TO_WQ(connp), mp,
-				    iocp->ioc_error, mode, ipsq);
-			} else {
-				ASSERT(connp == NULL);
-				putnext(q, mp);
-			}
-			break;
-		default:
-			break;
-		}
+	}
 	default:
+		ASSERT(0);
 		break;
 	}
 }
@@ -17364,6 +17085,19 @@ ip_fanout_proto_again(mblk_t *ipsec_mp, ill_t *ill, ill_t *recv_ill, ire_t *ire)
 			ip_sctp_input(mp, ipha, ill, B_TRUE, ire,
 			    ipsec_mp, 0, ill->ill_rq, dst);
 			break;
+		case IPPROTO_ENCAP:
+		case IPPROTO_IPV6:
+			if (ip_iptun_input(ipsec_mp, mp, ipha, ill, ire,
+			    ill->ill_ipst)) {
+				/*
+				 * If we made it here, we don't need to worry
+				 * about the raw-socket/protocol fanout.
+				 */
+				if (ire_need_rele)
+					ire_refrele(ire);
+				break;
+			}
+			/* else FALLTHRU */
 		default:
 			ip_proto_input(ill->ill_rq, ipsec_mp, ipha, ire,
 			    recv_ill, 0);
@@ -20508,7 +20242,6 @@ ip_unbind(conn_t *connp)
 	connp->conn_mlp_type = mlptSingle;
 
 	ipcl_hash_remove(connp);
-
 }
 
 /*
@@ -27081,10 +26814,6 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 			extract_funcp = ip_extract_arpreq;
 			break;
 
-		case TUN_CMD:
-			extract_funcp = ip_extract_tunreq;
-			break;
-
 		case MSFILT_CMD:
 			extract_funcp = ip_extract_msfilter;
 			break;
@@ -27392,14 +27121,6 @@ nak:
 		if (mp->b_wptr - mp->b_rptr < sizeof (uint32_t))
 			break;
 
-		if (((ipsec_info_t *)mp->b_rptr)->ipsec_info_type ==
-		    TUN_HELLO) {
-			ASSERT(connp != NULL);
-			connp->conn_flags |= IPCL_IPTUN;
-			freeb(mp);
-			return;
-		}
-
 		/* M_CTL messages are used by ARP to tell us things. */
 		if ((mp->b_wptr - mp->b_rptr) < sizeof (arc_t))
 			break;
@@ -27490,6 +27211,7 @@ nak:
 			ASSERT(!IPCL_IS_TCP(connp));
 			ASSERT(!IPCL_IS_UDP(connp));
 			ASSERT(!IPCL_IS_RAWIP(connp));
+			ASSERT(!IPCL_IS_IPTUN(connp));
 
 			/* The case of AH and ESP */
 			qreply(q, mp);

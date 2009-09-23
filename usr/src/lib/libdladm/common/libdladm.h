@@ -115,6 +115,11 @@ typedef enum {
 	DLADM_STATUS_VIDINVAL,
 	DLADM_STATUS_NONOTIF,
 	DLADM_STATUS_TRYAGAIN,
+	DLADM_STATUS_IPTUNTYPE,
+	DLADM_STATUS_IPTUNTYPEREQD,
+	DLADM_STATUS_BADIPTUNLADDR,
+	DLADM_STATUS_BADIPTUNRADDR,
+	DLADM_STATUS_ADDRINUSE,
 	DLADM_STATUS_BADTIMEVAL,
 	DLADM_STATUS_INVALIDMACADDR,
 	DLADM_STATUS_INVALIDMACADDRNIC,
@@ -240,6 +245,8 @@ extern dladm_status_t	dladm_usage_summary(int (*)(dladm_usage_t *, void *),
 			    int, char *, void *);
 extern dladm_status_t	dladm_usage_dates(int (*)(dladm_usage_t *, void *),
 			    int, char *, char *, void *);
+extern dladm_status_t	dladm_zone_boot(dladm_handle_t, zoneid_t);
+extern dladm_status_t	dladm_zone_halt(dladm_handle_t, zoneid_t);
 
 #ifdef	__cplusplus
 }

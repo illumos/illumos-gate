@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _INET_IPSEC_IMPL_H
 #define	_INET_IPSEC_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <inet/ip.h>
 #include <inet/ipdrop.h>
@@ -743,9 +741,6 @@ struct ipsec_stack {
 
 	/* Packet dropper for generic SPD drops. */
 	ipdropper_t		ipsec_spd_dropper;
-	krwlock_t		ipsec_itp_get_byaddr_rw_lock;
-	ipsec_tun_pol_t		*(*ipsec_itp_get_byaddr)
-	    (uint32_t *, uint32_t *, int, netstack_t *);
 
 /* ipdrop.c */
 	kstat_t			*ipsec_ip_drop_kstat;
@@ -888,10 +883,12 @@ extern boolean_t ipsec_policy_delete(ipsec_policy_head_t *,
     ipsec_selkey_t *, int, netstack_t *);
 extern int ipsec_policy_delete_index(ipsec_policy_head_t *, uint64_t,
     netstack_t *);
+extern boolean_t ipsec_polhead_insert(ipsec_policy_head_t *, ipsec_act_t *,
+    uint_t, int, int, netstack_t *);
 extern void ipsec_polhead_flush(ipsec_policy_head_t *, netstack_t *);
 extern int ipsec_copy_polhead(ipsec_policy_head_t *, ipsec_policy_head_t *,
     netstack_t *);
-extern void ipsec_actvec_from_req(ipsec_req_t *, ipsec_act_t **, uint_t *,
+extern void ipsec_actvec_from_req(const ipsec_req_t *, ipsec_act_t **, uint_t *,
     netstack_t *);
 extern void ipsec_actvec_free(ipsec_act_t *, uint_t);
 extern int ipsec_req_from_head(ipsec_policy_head_t *, ipsec_req_t *, int);
@@ -927,17 +924,14 @@ extern void ipsec_insert_always(avl_tree_t *tree, void *new_node);
 
 extern int32_t ipsec_act_ovhd(const ipsec_act_t *act);
 
-
-extern boolean_t iph_ipvN(ipsec_policy_head_t *, boolean_t);
-
 /*
  * Tunnel-support SPD functions and variables.
  */
-struct tun_s;	/* Defined in inet/tun.h. */
+struct iptun_s;	/* Defined in inet/iptun/iptun_impl.h. */
 extern boolean_t ipsec_tun_inbound(mblk_t *, mblk_t **,  ipsec_tun_pol_t *,
     ipha_t *, ip6_t *, ipha_t *, ip6_t *, int, netstack_t *);
-extern mblk_t *ipsec_tun_outbound(mblk_t *, struct tun_s *, ipha_t *,
-    ip6_t *, ipha_t *, ip6_t *, int, netstack_t *);
+extern mblk_t *ipsec_tun_outbound(mblk_t *, struct iptun_s *, ipha_t *,
+    ip6_t *, ipha_t *, ip6_t *, int);
 extern void itp_free(ipsec_tun_pol_t *, netstack_t *);
 extern ipsec_tun_pol_t *create_tunnel_policy(char *, int *, uint64_t *,
     netstack_t *);
@@ -946,8 +940,8 @@ extern void itp_unlink(ipsec_tun_pol_t *, netstack_t *);
 extern void itp_walk(void (*)(ipsec_tun_pol_t *, void *, netstack_t *),
     void *, netstack_t *);
 
-extern ipsec_tun_pol_t *itp_get_byaddr_dummy(uint32_t *, uint32_t *,
-    int, netstack_t *);
+extern ipsec_tun_pol_t *itp_get_byaddr(uint32_t *, uint32_t *, int,
+    ip_stack_t *);
 
 /*
  * IPsec AH/ESP functions called from IP or the common SADB code in AH.

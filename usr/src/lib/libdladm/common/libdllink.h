@@ -119,7 +119,6 @@ extern dladm_status_t	dladm_walk(dladm_walkcb_t *, dladm_handle_t, void *,
 extern dladm_status_t	dladm_mac_walk(dladm_walkcb_t *, void *);
 extern dladm_status_t	dladm_info(dladm_handle_t, datalink_id_t,
 			    dladm_attr_t *);
-extern dladm_status_t	dladm_setzid(dladm_handle_t, const char *, char *);
 
 extern dladm_status_t	dladm_rename_link(dladm_handle_t, const char *,
 			    const char *);

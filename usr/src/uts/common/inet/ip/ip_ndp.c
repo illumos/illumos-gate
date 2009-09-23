@@ -177,12 +177,26 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 	if (ill->ill_net_type == IRE_IF_RESOLVER) {
 		template = nce_udreq_alloc(ill);
 	} else {
-		if (ill->ill_resolver_mp == NULL) {
-			freeb(mp);
-			return (EINVAL);
+		if (ill->ill_phys_addr_length == IPV6_ADDR_LEN &&
+		    ill->ill_mactype != DL_IPV6) {
+			/*
+			 * We create a nce_res_mp with the IP nexthop address
+			 * as the destination address if the physical length
+			 * is exactly 16 bytes for point-to-multipoint links
+			 * that do their own resolution from IP to link-layer
+			 * address.
+			 */
+			template = ill_dlur_gen((uchar_t *)addr,
+			    ill->ill_phys_addr_length, ill->ill_sap,
+			    ill->ill_sap_length);
+		} else {
+			if (ill->ill_resolver_mp == NULL) {
+				freeb(mp);
+				return (EINVAL);
+			}
+			ASSERT((ill->ill_net_type == IRE_IF_NORESOLVER));
+			template = copyb(ill->ill_resolver_mp);
 		}
-		ASSERT((ill->ill_net_type == IRE_IF_NORESOLVER));
-		template = copyb(ill->ill_resolver_mp);
 	}
 	if (template == NULL) {
 		freeb(mp);
@@ -1229,7 +1243,7 @@ ndp_noresolver(ill_t *ill, const in6_addr_t *dst)
 
 	err = ndp_lookup_then_add_v6(ill,
 	    B_FALSE,	/* NCE fastpath is per ill; don't match across group */
-	    NULL,	/* hardware address */
+	    ill->ill_dest_addr,	/* hardware address is NULL in most cases */
 	    dst,
 	    &ipv6_all_ones,
 	    &ipv6_all_zeros,
@@ -3672,14 +3686,18 @@ ndp_add_v4(ill_t *ill, const in_addr_t *addr, uint16_t flags,
 	} else if (ill->ill_net_type == IRE_IF_NORESOLVER) {
 		/*
 		 * NORESOLVER entries are always created in the REACHABLE
-		 * state. We create a nce_res_mp with the IP nexthop address
-		 * in the destination address in the DLPI hdr if the
-		 * physical length is exactly 4 bytes.
-		 *
-		 * XXX not clear which drivers set ill_phys_addr_length to
-		 * IP_ADDR_LEN.
+		 * state.
 		 */
-		if (ill->ill_phys_addr_length == IP_ADDR_LEN) {
+		if (ill->ill_phys_addr_length == IP_ADDR_LEN &&
+		    ill->ill_mactype != DL_IPV4 &&
+		    ill->ill_mactype != DL_6TO4) {
+			/*
+			 * We create a nce_res_mp with the IP nexthop address
+			 * as the destination address if the physical length
+			 * is exactly 4 bytes for point-to-multipoint links
+			 * that do their own resolution from IP to link-layer
+			 * address (e.g. IP over X.25).
+			 */
 			template = ill_dlur_gen((uchar_t *)addr,
 			    ill->ill_phys_addr_length,
 			    ill->ill_sap, ill->ill_sap_length);

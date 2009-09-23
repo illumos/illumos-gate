@@ -858,50 +858,33 @@ dls_link_setzid(const char *name, zoneid_t zid)
 		goto done;
 
 	/*
-	 * Check whether this dlp is used by its own zones, if yes,
-	 * we cannot change its zoneid.
+	 * Check whether this dlp is used by its own zone.  If yes, we cannot
+	 * change its zoneid.
 	 */
 	if (dlp->dl_zone_ref != 0) {
 		err = EBUSY;
 		goto done;
 	}
 
+	dlp->dl_zid = zid;
+
 	if (zid == GLOBAL_ZONEID) {
 		/*
-		 * Move the link from the local zone to the global zone,
-		 * and release the reference to this link.  At the same time
-		 * reset the link's active state so that an aggregation is
-		 * allowed to be created over it.
+		 * The link is moving from a non-global zone to the global
+		 * zone, so we need to release the reference that was held
+		 * when the link was originally assigned to the non-global
+		 * zone.
 		 */
-		dlp->dl_zid = zid;
-		dls_mac_active_clear(dlp);
 		dls_link_rele(dlp);
-		goto done;
-	} else if (old_zid == GLOBAL_ZONEID) {
-		/*
-		 * Move the link from the global zone to the local zone,
-		 * and hold a reference to this link.  Also, set the link
-		 * to the "active" state so that the global zone is
-		 * not able to create an aggregation over this link.
-		 * TODO: revisit once we allow creating aggregations
-		 * within a local zone.
-		 */
-		if ((err = dls_mac_active_set(dlp)) != 0) {
-			if (err != ENXIO)
-				err = EBUSY;
-			goto done;
-		}
-		dlp->dl_zid = zid;
-		return (0);
-	} else {
-		/*
-		 * Move the link from a local zone to another local zone.
-		 */
-		dlp->dl_zid = zid;
 	}
 
 done:
-	dls_link_rele(dlp);
+	/*
+	 * We only keep the reference to this link open if the link has
+	 * successfully moved from the global zone to a non-global zone.
+	 */
+	if (err != 0 || old_zid != GLOBAL_ZONEID)
+		dls_link_rele(dlp);
 	return (err);
 }
 

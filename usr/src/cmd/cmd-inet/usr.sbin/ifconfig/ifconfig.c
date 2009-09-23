@@ -14,15 +14,14 @@
 #include <compat.h>
 #include <libdlpi.h>
 #include <libdllink.h>
+#include <libdliptun.h>
+#include <libdllink.h>
 #include <inet/ip.h>
 #include <inet/ipsec_impl.h>
 
 #define	LOOPBACK_IF	"lo0"
 #define	NONE_STR	"none"
 #define	ARP_MOD_NAME	"arp"
-#define	TUN_NAME	"tun"
-#define	ATUN_NAME	"atun"
-#define	TUN6TO4_NAME	"6to4tun"
 #define	IPMPSTUB	(void *)-1
 
 typedef struct if_flags {
@@ -84,12 +83,16 @@ static const if_appflags_t if_appflags_tbl[] = {
 	{  NULL,		0,			0 }
 };
 
-static struct	lifreq lifr;
+static dladm_handle_t	dlh;
+boolean_t		dlh_opened;
+static struct		lifreq lifr;
 /* current interface name a particular function is accessing */
-static char	name[LIFNAMSIZ];
+static char		name[LIFNAMSIZ];
 /* foreach interface saved name */
-static char	origname[LIFNAMSIZ];
-static int	setaddr;
+static char		origname[LIFNAMSIZ];
+static int		setaddr;
+static boolean_t	ipsec_policy_set;
+static boolean_t	ipsec_auth_covered;
 
 /*
  * Make sure the algorithm variables hold more than the sizeof an algorithm
@@ -176,10 +179,9 @@ static boolean_t	in_getmask(struct sockaddr_in *saddr,
 static int	in_getprefixlen(char *addr, boolean_t slash, int plen);
 static boolean_t	in_prefixlentomask(int prefixlen, int maxlen,
 			    uchar_t *mask);
-static int	settaddr(char *, int (*)(icfg_handle_t,
-			    const struct sockaddr *, socklen_t));
 static void	status(void);
 static void	ifstatus(const char *);
+static void	tun_status(datalink_id_t);
 static void	usage(void);
 static int	strioctl(int s, int cmd, void *buf, int buflen);
 static int	setifdhcp(const char *caller, const char *ifname,
@@ -187,9 +189,7 @@ static int	setifdhcp(const char *caller, const char *ifname,
 static int	ip_domux2fd(int *, int *, int *, int *, int *);
 static int	ip_plink(int, int, int, int, int);
 static int	modop(char *arg, char op);
-static int	find_all_global_interfaces(struct lifconf *lifcp, char **buf,
-		    int64_t lifc_flags);
-static int	find_all_zone_interfaces(struct lifconf *lifcp, char **buf,
+static int	find_all_interfaces(struct lifconf *lifcp, char **buf,
 		    int64_t lifc_flags);
 static int	create_ipmp(const char *grname, int af, const char *ifname,
 		    boolean_t implicit);
@@ -197,6 +197,9 @@ static int	create_ipmp_peer(int af, const char *ifname);
 static void	start_ipmp_daemon(void);
 static boolean_t ifaddr_up(ifaddrlistx_t *ifaddrp);
 static boolean_t ifaddr_down(ifaddrlistx_t *ifaddrp);
+static dladm_status_t	ifconfig_dladm_open(const char *, datalink_class_t,
+		    datalink_id_t *);
+static void	dladmerr_exit(dladm_status_t status, const char *str);
 
 #define	max(a, b)	((a) < (b) ? (b) : (a))
 
@@ -359,8 +362,8 @@ struct afswtch *afp;	/* the address family being set or asked about */
 int
 main(int argc, char *argv[])
 {
-	int64_t lifc_flags;
-	char *default_ip_str;
+	int64_t		lifc_flags;
+	char		*default_ip_str;
 
 	lifc_flags = LIFC_NOXMIT|LIFC_TEMPORARY|LIFC_ALLZONES|LIFC_UNDER_IPMP;
 
@@ -510,23 +513,12 @@ foreachinterface(void (*func)(), int argc, char *argv[], int af,
 	buf = NULL;
 	/*
 	 * Special case:
-	 * ifconfig -a plumb should find all network interfaces
-	 * in the machine for the global zone.
-	 * For non-global zones, only find the assigned interfaces.
-	 * Also, there is no need to  SIOCGLIF* ioctls, since
-	 * those interfaces have already been plumbed
+	 * ifconfig -a plumb should find all network interfaces in the current
+	 * zone.
 	 */
 	if (argc > 0 && (strcmp(*argv, "plumb") == 0)) {
-		if (getzoneid() == GLOBAL_ZONEID) {
-			if (find_all_global_interfaces(&lifc, &buf,
-			    lifc_flags) != 0)
-				return;
-		} else {
-			if (find_all_zone_interfaces(&lifc, &buf,
-			    lifc_flags) != 0)
-				return;
-		}
-		if (lifc.lifc_len == 0)
+		if (find_all_interfaces(&lifc, &buf, lifc_flags) != 0 ||
+		    lifc.lifc_len == 0)
 			return;
 		plumball = 1;
 	} else {
@@ -657,38 +649,6 @@ foreachinterface(void (*func)(), int argc, char *argv[], int af,
 	}
 	if (buf != NULL)
 		free(buf);
-}
-
-static void
-tun_reality_check(void)
-{
-	struct iftun_req treq;
-	ipsec_req_t *ipsr;
-
-	(void) strncpy(treq.ifta_lifr_name, name, sizeof (treq.ifta_lifr_name));
-	if (strchr(name, ':') != NULL) {
-		/* Return, we don't need to check. */
-		return;
-	}
-	if (ioctl(s, SIOCGTUNPARAM, (caddr_t)&treq) < 0 ||
-	    !(treq.ifta_flags & IFTUN_SECURITY) ||
-	    (treq.ifta_flags & IFTUN_COMPLEX_SECURITY)) {
-		/*
-		 * Either not a tunnel (the SIOCGTUNPARAM fails on
-		 * non-tunnels), the security flag is not set, or
-		 * this is a tunnel with ipsecconf(1M)-set policy.
-		 * Regardless, return.
-		 */
-		return;
-	}
-
-	ipsr = (ipsec_req_t *)&treq.ifta_secinfo;
-
-	if (ipsr->ipsr_esp_req != 0 &&
-	    ipsr->ipsr_esp_auth_alg == SADB_AALG_NONE &&
-	    ipsr->ipsr_ah_req == 0)
-		(void) fprintf(stderr, "ifconfig: WARNING - tunnel with "
-		    "only ESP and no authentication.\n");
 }
 
 /*
@@ -869,7 +829,10 @@ ifconfig(int argc, char *argv[], int af, struct lifreq *lifrp)
 	}
 
 	/* Check to see if there's a security hole in the tunnel setup. */
-	tun_reality_check();
+	if (ipsec_policy_set && !ipsec_auth_covered) {
+		(void) fprintf(stderr, "ifconfig: WARNING: tunnel with only "
+		    "ESP and no authentication.\n");
+	}
 }
 
 /* ARGSUSED */
@@ -1061,7 +1024,7 @@ parsenum(char *num)
  * this isn't common to ipseckey.c.
  *
  * NOTE: Static buffer in this function for the return value.  Since ifconfig
- *	 isn't multithreaded, this isn't a huge problem.
+ *       isn't multithreaded, this isn't a huge problem.
  */
 
 #define	NBUF_SIZE 20	/* Enough to print a large integer. */
@@ -1146,52 +1109,34 @@ parsealg(char *algname, int proto_num)
 
 enum ipsec_alg_type { ESP_ENCR_ALG = 1, ESP_AUTH_ALG, AH_AUTH_ALG };
 
-boolean_t first_set_tun = _B_TRUE;
-boolean_t encr_alg_set = _B_FALSE;
-
-/*
- * Need global for multiple calls to set_tun_algs
- * because we accumulate algorithm selections over
- * the lifetime of this ifconfig(1M) invocation.
- */
-static struct iftun_req treq_tun;
-
 static int
 set_tun_algs(int which_alg, int alg)
 {
-	ipsec_req_t *ipsr;
+	boolean_t	encr_alg_set = _B_FALSE;
+	iptun_params_t	params;
+	dladm_status_t	status;
+	ipsec_req_t	*ipsr;
 
-	(void) strncpy(treq_tun.ifta_lifr_name, name,
-	    sizeof (treq_tun.ifta_lifr_name));
-	if (strchr(name, ':') != NULL) {
-		errno = EPERM;
-		Perror0_exit("Tunnel params on logical interfaces");
-	}
-	if (ioctl(s, SIOCGTUNPARAM, (caddr_t)&treq_tun) < 0) {
-		if (errno == EOPNOTSUPP || errno == EINVAL)
-			Perror0_exit("Not a tunnel");
-		else Perror0_exit("SIOCGTUNPARAM");
-	}
+	if ((status = ifconfig_dladm_open(name, DATALINK_CLASS_IPTUN,
+	    &params.iptun_param_linkid)) != DLADM_STATUS_OK)
+		goto done;
 
-	ipsr = (ipsec_req_t *)&treq_tun.ifta_secinfo;
+	status = dladm_iptun_getparams(dlh, &params, DLADM_OPT_ACTIVE);
+	if (status != DLADM_STATUS_OK)
+		goto done;
 
-	if (treq_tun.ifta_vers != IFTUN_VERSION) {
-		(void) fprintf(stderr,
-		    "Kernel tunnel secinfo version mismatch.\n");
-		exit(1);
-	}
+	ipsr = &params.iptun_param_secinfo;
 
 	/*
 	 * If I'm just starting off this ifconfig, I want a clean slate,
 	 * otherwise, I've captured the current tunnel security settings.
 	 * In the case of continuation, I merely add to the settings.
 	 */
-	if (first_set_tun) {
-		first_set_tun = _B_FALSE;
+	if (!(params.iptun_param_flags & IPTUN_PARAM_SECINFO))
 		(void) memset(ipsr, 0, sizeof (*ipsr));
-	}
 
-	treq_tun.ifta_flags = IFTUN_SECURITY;
+	/* We're only modifying the IPsec information */
+	params.iptun_param_flags = IPTUN_PARAM_SECINFO;
 
 	switch (which_alg) {
 	case ESP_ENCR_ALG:
@@ -1243,11 +1188,19 @@ set_tun_algs(int which_alg, int alg)
 		/* Will never hit DEFAULT */
 	}
 
-	if (ioctl(s, SIOCSTUNPARAM, (caddr_t)&treq_tun) < 0) {
-		Perror2_exit("set tunnel security properties",
-		    treq_tun.ifta_lifr_name);
-	}
+	status = dladm_iptun_modify(dlh, &params, DLADM_OPT_ACTIVE);
 
+done:
+	if (status != DLADM_STATUS_OK)
+		dladmerr_exit(status, name);
+	else {
+		ipsec_policy_set = _B_TRUE;
+		if ((ipsr->ipsr_esp_req != 0 &&
+		    ipsr->ipsr_esp_auth_alg != SADB_AALG_NONE) ||
+		    (ipsr->ipsr_ah_req != 0 &&
+		    ipsr->ipsr_auth_alg != SADB_AALG_NONE))
+			ipsec_auth_covered = _B_TRUE;
+	}
 	return (0);
 }
 
@@ -1678,10 +1631,7 @@ setifether(char *addr, int64_t param)
 static void
 print_ifether(char *ifname)
 {
-	int		protocol;
-	icfg_if_t	interface;
-	icfg_handle_t	handle;
-	int		fd;
+	int fd;
 
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
 
@@ -1704,36 +1654,19 @@ print_ifether(char *ifname)
 	if (lifr.lifr_flags & (IFF_VIRTUAL|IFF_IPMP))
 		return;
 
-	/*
-	 * We must be careful to set if_protocol based on the current
-	 * properties of the interface.  For instance, if "ip.tun0" is
-	 * configured only as an IPv6 tunnel, then if_protocol must be
-	 * set to AF_INET6 or icfg_get_tunnel_lower() will fail and
-	 * we will falsely conclude that it's not a tunnel.
-	 */
-	interface.if_protocol = AF_INET;
-	if (lifr.lifr_flags & IFF_IPV6)
-		interface.if_protocol = AF_INET6;
-
-	(void) strncpy(interface.if_name, ifname, sizeof (interface.if_name));
-
-	if (icfg_open(&handle, &interface) == ICFG_SUCCESS) {
-		if (icfg_get_tunnel_lower(handle, &protocol) == ICFG_SUCCESS) {
-			/* Tunnel op succeeded -- it's a tunnel so skip */
-			icfg_close(handle);
-			return;
-		}
-		icfg_close(handle);
-	}
+	/* IP tunnels also don't have Ethernet-like MAC addresses */
+	if (ifconfig_dladm_open(ifname, DATALINK_CLASS_IPTUN, NULL) ==
+	    DLADM_STATUS_OK)
+		return;
 
 	dlpi_print_address(ifname);
 }
 
 /*
- * static int find_all_global_interfaces(struct lifconf *lifcp, char **buf,
+ * static int find_all_interfaces(struct lifconf *lifcp, char **buf,
  *     int64_t lifc_flags)
  *
- * It finds all data links for the global zone.
+ * It finds all active data links.
  *
  * It takes in input a pointer to struct lifconf to receive interfaces
  * informations, a **char to hold allocated buffer, and a lifc_flags.
@@ -1743,32 +1676,23 @@ print_ifether(char *ifname)
  * -1 = problem
  */
 static int
-find_all_global_interfaces(struct lifconf *lifcp, char **buf,
-    int64_t lifc_flags)
+find_all_interfaces(struct lifconf *lifcp, char **buf, int64_t lifc_flags)
 {
 	unsigned bufsize;
 	int n;
 	ni_t *nip;
 	struct lifreq *lifrp;
-	dladm_handle_t dld_handle;
 	dladm_status_t status;
-	char errmsg[DLADM_STRSIZE];
 
-	if ((status = dladm_open(&dld_handle)) != DLADM_STATUS_OK) {
-		(void) fprintf(stderr,
-		    "ifconfig: find_all_global_interfaces failed: %s\n",
-		    dladm_status2str(status, errmsg));
-		return (-1);
+	if (!dlh_opened) {
+		status = ifconfig_dladm_open(NULL, 0, NULL);
+		if (status != DLADM_STATUS_OK)
+			dladmerr_exit(status, "unable to open dladm handle");
 	}
 
-	(void) dlpi_walk(ni_entry, dld_handle, 0);
+	(void) dlpi_walk(ni_entry, dlh, 0);
 
-	dladm_close(dld_handle);
-
-	/*
-	 * Now, translate the linked list into
-	 * a struct lifreq buffer
-	 */
+	/* Now, translate the linked list into a struct lifreq buffer */
 	if (num_ni == 0) {
 		lifcp->lifc_family = AF_UNSPEC;
 		lifcp->lifc_flags = lifc_flags;
@@ -1793,92 +1717,6 @@ find_all_global_interfaces(struct lifconf *lifcp, char **buf,
 		ni_list = nip->ni_next;
 		free(nip);
 	}
-	return (0);
-}
-
-/*
- * static int find_all_zone_interfaces(struct lifconf *lifcp, char **buf,
- *     int64_t lifc_flags)
- *
- * It finds all interfaces for an exclusive-IP zone, that is all the interfaces
- * assigned to it.
- *
- * It takes in input a pointer to struct lifconf to receive interfaces
- * informations, a **char to hold allocated buffer, and a lifc_flags.
- *
- * Return values:
- *  0 = everything OK
- * -1 = problem
- */
-static int
-find_all_zone_interfaces(struct lifconf *lifcp, char **buf, int64_t lifc_flags)
-{
-	zoneid_t zoneid;
-	unsigned bufsize;
-	char *dlnames, *ptr;
-	struct lifreq *lifrp;
-	int num_ni_saved, i;
-
-	zoneid = getzoneid();
-
-	num_ni = 0;
-	if (zone_list_datalink(zoneid, &num_ni, NULL) != 0)
-		Perror0_exit("find_all_interfaces: list interfaces failed");
-again:
-	/* this zone doesn't have any data-links */
-	if (num_ni == 0) {
-		lifcp->lifc_family = AF_UNSPEC;
-		lifcp->lifc_flags = lifc_flags;
-		lifcp->lifc_len = 0;
-		lifcp->lifc_buf = NULL;
-		return (0);
-	}
-
-	dlnames = malloc(num_ni * LIFNAMSIZ);
-	if (dlnames == NULL)
-		Perror0_exit("find_all_interfaces: out of memory");
-	num_ni_saved = num_ni;
-
-	if (zone_list_datalink(zoneid, &num_ni, dlnames) != 0)
-		Perror0_exit("find_all_interfaces: list interfaces failed");
-
-	if (num_ni_saved < num_ni) {
-		/* list increased, try again */
-		free(dlnames);
-		goto again;
-	}
-
-	/* this zone doesn't have any data-links now */
-	if (num_ni == 0) {
-		free(dlnames);
-		lifcp->lifc_family = AF_UNSPEC;
-		lifcp->lifc_flags = lifc_flags;
-		lifcp->lifc_len = 0;
-		lifcp->lifc_buf = NULL;
-		return (0);
-	}
-
-	bufsize = num_ni * sizeof (struct lifreq);
-	if ((*buf = malloc(bufsize)) == NULL) {
-		free(dlnames);
-		Perror0_exit("find_all_interfaces: malloc failed");
-	}
-
-	lifrp = (struct lifreq *)*buf;
-	ptr = dlnames;
-	for (i = 0; i < num_ni; i++) {
-		if (strlcpy(lifrp->lifr_name, ptr, LIFNAMSIZ) >=
-		    LIFNAMSIZ)
-			Perror0_exit("find_all_interfaces: overflow");
-		ptr += LIFNAMSIZ;
-		lifrp++;
-	}
-
-	free(dlnames);
-	lifcp->lifc_family = AF_UNSPEC;
-	lifcp->lifc_flags = lifc_flags;
-	lifcp->lifc_len = bufsize;
-	lifcp->lifc_buf = *buf;
 	return (0);
 }
 
@@ -2619,10 +2457,7 @@ modop(char *arg, char op)
 	 */
 	if (op == MODREMOVE_OP &&
 	    (strcmp(mod.mod_name, ARP_MOD_NAME) == 0 ||
-	    strcmp(mod.mod_name, IP_MOD_NAME) == 0 ||
-	    strcmp(mod.mod_name, TUN_NAME) == 0 ||
-	    strcmp(mod.mod_name, ATUN_NAME) == 0 ||
-	    strcmp(mod.mod_name, TUN6TO4_NAME) == 0)) {
+	    strcmp(mod.mod_name, IP_MOD_NAME) == 0)) {
 		(void) fprintf(stderr, "ifconfig: cannot remove %s\n",
 		    mod.mod_name);
 		exit(1);
@@ -2668,6 +2503,19 @@ modop(char *arg, char op)
 	    orig_arpid));
 }
 
+static int
+modify_tun(iptun_params_t *params)
+{
+	dladm_status_t status;
+
+	if ((status = ifconfig_dladm_open(name, DATALINK_CLASS_IPTUN,
+	    &params->iptun_param_linkid)) == DLADM_STATUS_OK)
+		status = dladm_iptun_modify(dlh, params, DLADM_OPT_ACTIVE);
+	if (status != DLADM_STATUS_OK)
+		dladmerr_exit(status, name);
+	return (0);
+}
+
 /*
  * Set tunnel source address
  */
@@ -2675,7 +2523,12 @@ modop(char *arg, char op)
 static int
 setiftsrc(char *addr, int64_t param)
 {
-	return (settaddr(addr, icfg_set_tunnel_src));
+	iptun_params_t params;
+
+	params.iptun_param_flags = IPTUN_PARAM_LADDR;
+	(void) strlcpy(params.iptun_param_laddr, addr,
+	    sizeof (params.iptun_param_laddr));
+	return (modify_tun(&params));
 }
 
 /*
@@ -2685,56 +2538,27 @@ setiftsrc(char *addr, int64_t param)
 static int
 setiftdst(char *addr, int64_t param)
 {
-	return (settaddr(addr, icfg_set_tunnel_dest));
+	iptun_params_t params;
+
+	params.iptun_param_flags = IPTUN_PARAM_RADDR;
+	(void) strlcpy(params.iptun_param_raddr, addr,
+	    sizeof (params.iptun_param_raddr));
+	return (modify_tun(&params));
 }
 
-/*
- * sets tunnels src|dst address.  settaddr() expects the following:
- * addr: Points to a printable string containing the address to be
- *       set, e.g. 129.153.128.110.
- * fn:   Pointer to a libinetcfg routine that will do the actual work.
- *       The only valid functions are icfg_set_tunnel_src and
- *       icfg_set_tunnel_dest.
- */
 static int
-settaddr(char *addr,
-    int (*fn)(icfg_handle_t, const struct sockaddr *, socklen_t))
+set_tun_prop(const char *propname, char *value)
 {
-	icfg_handle_t handle;
-	icfg_if_t interface;
-	struct sockaddr_storage laddr;
-	int lower;
-	int rc;
+	dladm_status_t	status;
+	datalink_id_t	linkid;
 
-	if (strchr(name, ':') != NULL) {
-		errno = EPERM;
-		Perror0_exit("Tunnel params on logical interfaces");
+	status = ifconfig_dladm_open(name, DATALINK_CLASS_IPTUN, &linkid);
+	if (status == DLADM_STATUS_OK) {
+		status = dladm_set_linkprop(dlh, linkid, propname, &value, 1,
+		    DLADM_OPT_ACTIVE);
 	}
-	(void) strncpy(interface.if_name, name, sizeof (interface.if_name));
-	interface.if_protocol = SOCKET_AF(af);
-
-	/* Open interface. */
-	if ((rc = icfg_open(&handle, &interface)) != ICFG_SUCCESS)
-		Perror0_exit((char *)icfg_errmsg(rc));
-
-	rc = icfg_get_tunnel_lower(handle, &lower);
-	if (rc != ICFG_SUCCESS)
-		Perror0_exit((char *)icfg_errmsg(rc));
-
-	if (lower == AF_INET) {
-		in_getaddr(addr, (struct sockaddr *)&laddr, NULL);
-	} else {
-		in6_getaddr(addr, (struct sockaddr *)&laddr, NULL);
-	}
-
-	/* Call fn to do the real work, and close the interface. */
-	rc = (*fn)(handle, (struct sockaddr *)&laddr,
-	    sizeof (struct sockaddr_storage));
-	icfg_close(handle);
-
-	if (rc != ICFG_SUCCESS)
-		Perror0_exit((char *)icfg_errmsg(rc));
-
+	if (status != DLADM_STATUS_OK)
+		dladmerr_exit(status, name);
 	return (0);
 }
 
@@ -2743,35 +2567,7 @@ settaddr(char *addr,
 static int
 set_tun_encap_limit(char *arg, int64_t param)
 {
-	short limit;
-	icfg_if_t interface;
-	icfg_handle_t handle;
-	int rc;
-
-	if (strchr(name, ':') != NULL) {
-		errno = EPERM;
-		Perror0_exit("Tunnel params on logical interfaces");
-	}
-
-	if ((sscanf(arg, "%hd", &limit) != 1) || (limit < 0) ||
-	    (limit > 255)) {
-		errno = EINVAL;
-		Perror0_exit("Invalid encapsulation limit");
-	}
-
-	/* Open interface for configuration. */
-	(void) strncpy(interface.if_name, name, sizeof (interface.if_name));
-	interface.if_protocol = SOCKET_AF(af);
-	if (icfg_open(&handle, &interface) != ICFG_SUCCESS)
-		Perror0_exit("couldn't open interface");
-
-	rc = icfg_set_tunnel_encaplimit(handle, (int)limit);
-	icfg_close(handle);
-
-	if (rc != ICFG_SUCCESS)
-		Perror0_exit("Could not configure tunnel encapsulation limit");
-
-	return (0);
+	return (set_tun_prop("encaplimit", arg));
 }
 
 /* Disable encapsulation limit. */
@@ -2779,28 +2575,7 @@ set_tun_encap_limit(char *arg, int64_t param)
 static int
 clr_tun_encap_limit(char *arg, int64_t param)
 {
-	icfg_if_t interface;
-	icfg_handle_t handle;
-	int rc;
-
-	if (strchr(name, ':') != NULL) {
-		errno = EPERM;
-		Perror0_exit("Tunnel params on logical interfaces");
-	}
-
-	/* Open interface for configuration. */
-	(void) strncpy(interface.if_name, name, sizeof (interface.if_name));
-	interface.if_protocol = SOCKET_AF(af);
-	if (icfg_open(&handle, &interface) != ICFG_SUCCESS)
-		Perror0_exit("couldn't open interface");
-
-	rc = icfg_set_tunnel_encaplimit(handle, -1);
-	icfg_close(handle);
-
-	if (rc != ICFG_SUCCESS)
-		Perror0_exit((char *)icfg_errmsg(rc));
-
-	return (0);
+	return (set_tun_encap_limit("-1", 0));
 }
 
 /* Set tunnel hop limit. */
@@ -2808,37 +2583,7 @@ clr_tun_encap_limit(char *arg, int64_t param)
 static int
 set_tun_hop_limit(char *arg, int64_t param)
 {
-	unsigned short limit;
-	icfg_if_t interface;
-	icfg_handle_t handle;
-	int rc;
-
-	if (strchr(name, ':') != NULL) {
-		errno = EPERM;
-		Perror0_exit("Tunnel params on logical interfaces");
-	}
-
-	/*
-	 * Check limit here since it's really only an 8-bit unsigned quantity.
-	 */
-	if ((sscanf(arg, "%hu", &limit) != 1) || (limit > 255)) {
-		errno = EINVAL;
-		Perror0_exit("Invalid hop limit");
-	}
-
-	/* Open interface for configuration. */
-	(void) strncpy(interface.if_name, name, sizeof (interface.if_name));
-	interface.if_protocol = SOCKET_AF(af);
-	if (icfg_open(&handle, &interface) != ICFG_SUCCESS)
-		Perror0_exit("couldn't open interface");
-
-	rc = icfg_set_tunnel_hoplimit(handle, (uint8_t)limit);
-	icfg_close(handle);
-
-	if (rc != ICFG_SUCCESS)
-		Perror0_exit("Could not configure tunnel hop limit");
-
-	return (0);
+	return (set_tun_prop("hoplimit", arg));
 }
 
 /* Set zone ID */
@@ -3066,8 +2811,9 @@ ifstatus(const char *ifname)
 static void
 status(void)
 {
-	struct afswtch *p = afp;
-	uint64_t flags;
+	struct afswtch	*p = afp;
+	uint64_t	flags;
+	datalink_id_t	linkid;
 
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
 	if (ioctl(s, SIOCGLIFFLAGS, (caddr_t)&lifr) < 0) {
@@ -3093,6 +2839,10 @@ status(void)
 		return;
 
 	ifstatus(name);
+
+	if (ifconfig_dladm_open(name, DATALINK_CLASS_IPTUN, &linkid) ==
+	    DLADM_STATUS_OK)
+		tun_status(linkid);
 
 	if (p != NULL) {
 		(*p->af_status)(1, flags);
@@ -3219,28 +2969,20 @@ configinfo(char *null, int64_t param)
 		}
 	}
 
-	(void) printf("\n");
+	(void) putchar('\n');
 	return (0);
 }
 
 static void
-print_tsec(struct iftun_req *tparams)
+print_tsec(iptun_params_t *params)
 {
 	ipsec_req_t *ipsr;
 
 	(void) printf("\ttunnel security settings  ");
-	/*
-	 * Deal with versioning, for now just point
-	 * an ipsec_req_t at ifta_secinfo.  If versions
-	 * change, something else will overlay ifta_secinfo.
-	 */
-	assert(tparams->ifta_vers == IFTUN_VERSION);
-
-	if (tparams->ifta_flags & IFTUN_COMPLEX_SECURITY) {
-		(void) printf("-->  use 'ipsecconf -ln -i %s'",
-		    tparams->ifta_lifr_name);
+	if (!(params->iptun_param_flags & IPTUN_PARAM_SECINFO)) {
+		(void) printf("-->  use 'ipsecconf -ln -i %s'", name);
 	} else {
-		ipsr = (ipsec_req_t *)(&tparams->ifta_secinfo);
+		ipsr = &params->iptun_param_secinfo;
 		if (ipsr->ipsr_ah_req & IPSEC_PREF_REQUIRED) {
 			(void) printf("ah (%s)  ",
 			    rparsealg(ipsr->ipsr_auth_alg, IPSEC_PROTO_AH));
@@ -3256,117 +2998,81 @@ print_tsec(struct iftun_req *tparams)
 }
 
 static void
-tun_status(void)
+tun_status(datalink_id_t linkid)
 {
-	icfg_if_t interface;
-	int rc;
-	icfg_handle_t handle;
-	int protocol;
-	char srcbuf[INET6_ADDRSTRLEN];
-	char dstbuf[INET6_ADDRSTRLEN];
-	boolean_t tabbed;
-	uint8_t hoplimit;
-	int16_t encaplimit;
-	struct sockaddr_storage taddr;
-	socklen_t socklen = sizeof (taddr);
+	iptun_params_t	params;
+	char		propval[DLADM_PROP_VAL_MAX];
+	char		*valptr[1];
+	uint_t		valcnt = 1;
+	boolean_t	tabbed = _B_FALSE;
 
-	(void) strncpy(interface.if_name, name, sizeof (interface.if_name));
-	interface.if_protocol = SOCKET_AF(af);
-	if ((rc = icfg_open(&handle, &interface)) != ICFG_SUCCESS)
-		Perror0_exit((char *)icfg_errmsg(rc));
+	params.iptun_param_linkid = linkid;
 
-	/*
-	 * only print tunnel info for lun 0.  If ioctl fails, assume
-	 * we are not a tunnel
-	 */
-	if (strchr(name, ':') != NULL ||
-	    icfg_get_tunnel_lower(handle, &protocol) != ICFG_SUCCESS) {
-		icfg_close(handle);
+	/* If dladm_iptun_getparams() fails, assume we are not a tunnel. */
+	assert(dlh_opened);
+	if (dladm_iptun_getparams(dlh, &params, DLADM_OPT_ACTIVE) !=
+	    DLADM_STATUS_OK)
 		return;
-	}
 
-	switch (protocol) {
-	case AF_INET:
+	switch (params.iptun_param_type) {
+	case IPTUN_TYPE_IPV4:
+	case IPTUN_TYPE_6TO4:
 		(void) printf("\tinet");
 		break;
-	case AF_INET6:
+	case IPTUN_TYPE_IPV6:
 		(void) printf("\tinet6");
 		break;
 	default:
-		Perror0_exit("\ttunnel: Illegal lower stream\n\t");
+		dladmerr_exit(DLADM_STATUS_IPTUNTYPE, name);
 		break;
 	}
 
-	rc = icfg_get_tunnel_src(handle, (struct sockaddr *)&taddr, &socklen);
-	if (rc == ICFG_NOT_SET) {
-		(void) strlcpy(srcbuf, (protocol == AF_INET) ? "0.0.0.0" :
-		    "::", sizeof (srcbuf));
-	} else if (rc != ICFG_SUCCESS) {
-		Perror0_exit((char *)icfg_errmsg(rc));
-	} else {
-		rc = icfg_sockaddr_to_str(protocol, (struct sockaddr *)&taddr,
-		    srcbuf, sizeof (srcbuf));
-		if (rc != ICFG_SUCCESS) {
-			Perror0_exit((char *)icfg_errmsg(rc));
-		}
-	}
-
-	(void) printf(" tunnel src %s ", srcbuf);
-
-	rc = icfg_get_tunnel_dest(handle, (struct sockaddr *)&taddr, &socklen);
-	if (rc == ICFG_NOT_SET) {
-		(void) printf("\n");
-	} else {
-		rc = icfg_sockaddr_to_str(protocol, (struct sockaddr *)&taddr,
-		    dstbuf, sizeof (dstbuf));
-		if (rc != ICFG_SUCCESS) {
-			Perror0_exit((char *)icfg_errmsg(rc));
-		}
-		(void) printf("tunnel dst %s\n", dstbuf);
-	}
-
-	if (handle->ifh_tunnel_params != NULL &&
-	    (handle->ifh_tunnel_params->ifta_flags & IFTUN_SECURITY))
-		print_tsec(handle->ifh_tunnel_params);
-
 	/*
-	 * tabbed indicates tabbed and printed.  Use it tell us whether
-	 * to tab and that we've printed something here, so we need a
-	 * newline
+	 * There is always a source address.  If it hasn't been explicitly
+	 * set, the API will pass back a buffer containing the unspecified
+	 * address.
 	 */
-	tabbed = _B_FALSE;
+	(void) printf(" tunnel src %s ", params.iptun_param_laddr);
 
-	if (icfg_get_tunnel_hoplimit(handle, &hoplimit) == ICFG_SUCCESS) {
-		(void) printf("\ttunnel hop limit %d ", hoplimit);
+	if (params.iptun_param_flags & IPTUN_PARAM_RADDR)
+		(void) printf("tunnel dst %s\n", params.iptun_param_raddr);
+	else
+		(void) putchar('\n');
+
+	if (params.iptun_param_flags & IPTUN_PARAM_IPSECPOL)
+		print_tsec(&params);
+
+	valptr[0] = propval;
+	if (dladm_get_linkprop(dlh, linkid, DLADM_PROP_VAL_CURRENT, "hoplimit",
+	    (char **)valptr, &valcnt) == DLADM_STATUS_OK) {
+		(void) printf("\ttunnel hop limit %s ", propval);
 		tabbed = _B_TRUE;
 	}
 
-	if ((protocol == AF_INET6) &&
-	    (icfg_get_tunnel_encaplimit(handle, &encaplimit) ==
-	    ICFG_SUCCESS)) {
+	if (dladm_get_linkprop(dlh, linkid, DLADM_PROP_VAL_CURRENT,
+	    "encaplimit", (char **)valptr, &valcnt) == DLADM_STATUS_OK) {
+		uint32_t elim;
+
 		if (!tabbed) {
-			(void) printf("\t");
+			(void) putchar('\t');
 			tabbed = _B_TRUE;
 		}
-		if (encaplimit >= 0) {
-			(void) printf("tunnel encapsulation limit %d",
-			    encaplimit);
-		} else {
+		elim = strtol(propval, NULL, 10);
+		if (elim > 0)
+			(void) printf("tunnel encapsulation limit %s", propval);
+		else
 			(void) printf("tunnel encapsulation limit disabled");
-		}
 	}
 
 	if (tabbed)
-		(void) printf("\n");
-
-	icfg_close(handle);
+		(void) putchar('\n');
 }
 
 static void
 in_status(int force, uint64_t flags)
 {
-	struct sockaddr_in *sin, *laddr;
-	struct	sockaddr_in netmask = { AF_INET };
+	struct sockaddr_in	*sin, *laddr;
+	struct sockaddr_in	netmask = { AF_INET };
 
 	if (debug)
 		(void) printf("in_status(%s) flags 0x%llx\n", name, flags);
@@ -3374,9 +3080,6 @@ in_status(int force, uint64_t flags)
 	/* only print status for IPv4 interfaces */
 	if (!(flags & IFF_IPV4))
 		return;
-
-	/* if the interface is a tunnel, print the tunnel status */
-	tun_status();
 
 	if (!(flags & IFF_NOLOCAL)) {
 		(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
@@ -3468,17 +3171,14 @@ in_status(int force, uint64_t flags)
 static void
 in6_status(int force, uint64_t flags)
 {
-	char abuf[INET6_ADDRSTRLEN];
-	struct sockaddr_in6 *sin6, *laddr6;
+	char			abuf[INET6_ADDRSTRLEN];
+	struct sockaddr_in6	*sin6, *laddr6;
 
 	if (debug)
 		(void) printf("in6_status(%s) flags 0x%llx\n", name, flags);
 
 	if (!(flags & IFF_IPV6))
 		return;
-
-	/* if the interface is a tunnel, print the tunnel status */
-	tun_status();
 
 	if (!(flags & IFF_NOLOCAL)) {
 		(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
@@ -4014,9 +3714,6 @@ ifplumb(const char *linkname, const char *ifname, boolean_t genppa, int af)
 	/*
 	 * This interface does use ARP, so set up a separate stream
 	 * from the interface to ARP.
-	 *
-	 * Note: modules specified by the user are pushed
-	 * only on the interface stream, not on the ARP stream.
 	 */
 	if (debug)
 		(void) printf("ifconfig: ifplumb: interface %s", ifname);
@@ -4251,6 +3948,7 @@ inetplumb(char *arg, int64_t param)
 	char		*strptr;
 	boolean_t	islo;
 	zoneid_t	zoneid;
+	datalink_id_t	linkid;
 
 	strptr = strchr(name, ':');
 	islo = (strcmp(name, LOOPBACK_IF) == 0);
@@ -4280,16 +3978,19 @@ inetplumb(char *arg, int64_t param)
 	}
 
 	/*
-	 * For global zone, check if the interface is used by a non-global
-	 * zone, note that the non-global zones doesn't need this check,
-	 * because zoneadm has taken care of this when the zone boots.
+	 * If we're in the global zone and we're plumbing a datalink, make
+	 * sure that the datalink is not assigned to a non-global zone.  Note
+	 * that the non-global zones don't need this check, because zoneadm
+	 * has taken care of this when the zones boot.
 	 */
 	zoneid = getzoneid();
-	if (zoneid == GLOBAL_ZONEID) {
+	if (zoneid == GLOBAL_ZONEID &&
+	    ifconfig_dladm_open(name, DATALINK_CLASS_ALL, &linkid) ==
+	    DLADM_STATUS_OK) {
 		int ret;
 
 		zoneid = ALL_ZONES;
-		ret = zone_check_datalink(&zoneid, name);
+		ret = zone_check_datalink(&zoneid, linkid);
 		if (ret == 0) {
 			char zonename[ZONENAME_MAX];
 
@@ -4531,6 +4232,44 @@ ifaddr_down(ifaddrlistx_t *ifaddrp)
 	return (ifaddr_op(ifaddrp, _B_FALSE));
 }
 
+/*
+ * Open the global libdladm handle "dlh" if it isn't already opened.  The
+ * caller may optionally supply a link name to obtain its linkid.  If a link
+ * of a specific class or classes is required, reqclass specifies the class
+ * mask.
+ */
+static dladm_status_t
+ifconfig_dladm_open(const char *name, datalink_class_t reqclass,
+    datalink_id_t *linkid)
+{
+	dladm_status_t status = DLADM_STATUS_OK;
+	datalink_class_t class;
+
+	if (!dlh_opened) {
+		if ((status = dladm_open(&dlh)) != DLADM_STATUS_OK)
+			return (status);
+		dlh_opened = _B_TRUE;
+	}
+	if (name != NULL) {
+		status = dladm_name2info(dlh, name, linkid, NULL, &class, NULL);
+		if (status == DLADM_STATUS_OK) {
+			if (!(class & reqclass))
+				status = DLADM_STATUS_LINKINVAL;
+		}
+	}
+	return (status);
+}
+
+void
+dladmerr_exit(dladm_status_t status, const char *str)
+{
+	char errstr[DLADM_STRSIZE];
+
+	(void) fprintf(stderr, "%s: %s\n", str,
+	    dladm_status2str(status, errstr));
+	exit(1);
+}
+
 void
 Perror0(const char *cmd)
 {
@@ -4542,7 +4281,6 @@ Perror0_exit(const char *cmd)
 {
 	Perror0(cmd);
 	exit(1);
-	/* NOTREACHED */
 }
 
 void

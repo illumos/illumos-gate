@@ -1037,8 +1037,8 @@ mount_one_dev_symlink_cb(void *arg, const char *source, const char *target)
 	return (di_prof_add_symlink(prof, source, target));
 }
 
-static int
-get_iptype(zlog_t *zlogp, zone_iptype_t *iptypep)
+int
+vplat_get_iptype(zlog_t *zlogp, zone_iptype_t *iptypep)
 {
 	zone_dochandle_t handle;
 
@@ -1103,7 +1103,7 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 		goto cleanup;
 	}
 
-	if (get_iptype(zlogp, &iptype) < 0) {
+	if (vplat_get_iptype(zlogp, &iptype) < 0) {
 		zerror(zlogp, B_TRUE, "unable to determine ip-type");
 		goto cleanup;
 	}
@@ -2535,7 +2535,7 @@ zdlerror(zlog_t *zlogp, dladm_status_t err, const char *dlname, const char *str)
 }
 
 static int
-add_datalink(zlog_t *zlogp, char *zone_name, char *dlname)
+add_datalink(zlog_t *zlogp, char *zone_name, datalink_id_t linkid, char *dlname)
 {
 	dladm_status_t err;
 
@@ -2548,25 +2548,11 @@ add_datalink(zlog_t *zlogp, char *zone_name, char *dlname)
 	}
 
 	/* Set zoneid of this link. */
-	err = dladm_setzid(dld_handle, dlname, zone_name);
+	err = dladm_set_linkprop(dld_handle, linkid, "zone", &zone_name, 1,
+	    DLADM_OPT_ACTIVE);
 	if (err != DLADM_STATUS_OK) {
 		zdlerror(zlogp, err, dlname,
 		    "WARNING: unable to add network interface");
-		return (-1);
-	}
-
-	return (0);
-}
-
-static int
-remove_datalink(zlog_t *zlogp, char *dlname)
-{
-	dladm_status_t err;
-
-	err = dladm_setzid(dld_handle, dlname, GLOBAL_ZONENAME);
-	if (err != DLADM_STATUS_OK) {
-		zdlerror(zlogp, err, dlname,
-		    "unable to release network interface");
 		return (-1);
 	}
 	return (0);
@@ -2584,6 +2570,7 @@ configure_exclusive_network_interfaces(zlog_t *zlogp)
 	struct zone_nwiftab nwiftab;
 	char rootpath[MAXPATHLEN];
 	char path[MAXPATHLEN];
+	datalink_id_t linkid;
 	di_prof_t prof = NULL;
 	boolean_t added = B_FALSE;
 
@@ -2637,8 +2624,10 @@ configure_exclusive_network_interfaces(zlog_t *zlogp)
 		 * created in that case.  The /dev/net entry is always
 		 * accessible.
 		 */
-		if (add_datalink(zlogp, zone_name, nwiftab.zone_nwif_physical)
-		    == 0) {
+		if (dladm_name2info(dld_handle, nwiftab.zone_nwif_physical,
+		    &linkid, NULL, NULL, NULL) == DLADM_STATUS_OK &&
+		    add_datalink(zlogp, zone_name, linkid,
+		    nwiftab.zone_nwif_physical) == 0) {
 			added = B_TRUE;
 		} else {
 			(void) zonecfg_endnwifent(handle);
@@ -2662,104 +2651,25 @@ configure_exclusive_network_interfaces(zlog_t *zlogp)
 	return (0);
 }
 
-/*
- * Get the list of the data-links from kernel, and try to remove it
- */
 static int
-unconfigure_exclusive_network_interfaces_run(zlog_t *zlogp, zoneid_t zoneid)
+unconfigure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
 {
-	char *dlnames, *ptr;
-	int dlnum, dlnum_saved, i;
+	int dlnum = 0;
 
-	dlnum = 0;
+	/*
+	 * The kernel shutdown callback for the dls module should have removed
+	 * all datalinks from this zone.  If any remain, then there's a
+	 * problem.
+	 */
 	if (zone_list_datalink(zoneid, &dlnum, NULL) != 0) {
 		zerror(zlogp, B_TRUE, "unable to list network interfaces");
 		return (-1);
 	}
-again:
-	/* this zone doesn't have any data-links */
-	if (dlnum == 0)
-		return (0);
-
-	dlnames = malloc(dlnum * LIFNAMSIZ);
-	if (dlnames == NULL) {
-		zerror(zlogp, B_TRUE, "memory allocation failed");
+	if (dlnum != 0) {
+		zerror(zlogp, B_FALSE,
+		    "datalinks remain in zone after shutdown");
 		return (-1);
 	}
-	dlnum_saved = dlnum;
-
-	if (zone_list_datalink(zoneid, &dlnum, dlnames) != 0) {
-		zerror(zlogp, B_TRUE, "unable to list network interfaces");
-		free(dlnames);
-		return (-1);
-	}
-	if (dlnum_saved < dlnum) {
-		/* list increased, try again */
-		free(dlnames);
-		goto again;
-	}
-	ptr = dlnames;
-	for (i = 0; i < dlnum; i++) {
-		/* Remove access control information */
-		if (remove_datalink(zlogp, ptr) != 0) {
-			free(dlnames);
-			return (-1);
-		}
-		ptr += LIFNAMSIZ;
-	}
-	free(dlnames);
-	return (0);
-}
-
-/*
- * Get the list of the data-links from configuration, and try to remove it
- */
-static int
-unconfigure_exclusive_network_interfaces_static(zlog_t *zlogp)
-{
-	zone_dochandle_t handle;
-	struct zone_nwiftab nwiftab;
-
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zerror(zlogp, B_TRUE, "getting zone configuration handle");
-		return (-1);
-	}
-	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
-		zerror(zlogp, B_FALSE, "invalid configuration");
-		zonecfg_fini_handle(handle);
-		return (-1);
-	}
-	if (zonecfg_setnwifent(handle) != Z_OK) {
-		zonecfg_fini_handle(handle);
-		return (0);
-	}
-	for (;;) {
-		if (zonecfg_getnwifent(handle, &nwiftab) != Z_OK)
-			break;
-		/* Remove access control information */
-		if (remove_datalink(zlogp, nwiftab.zone_nwif_physical)
-		    != 0) {
-			(void) zonecfg_endnwifent(handle);
-			zonecfg_fini_handle(handle);
-			return (-1);
-		}
-	}
-	(void) zonecfg_endnwifent(handle);
-	zonecfg_fini_handle(handle);
-	return (0);
-}
-
-/*
- * Remove the access control information from the kernel for the exclusive
- * network interfaces.
- */
-static int
-unconfigure_exclusive_network_interfaces(zlog_t *zlogp, zoneid_t zoneid)
-{
-	if (unconfigure_exclusive_network_interfaces_run(zlogp, zoneid) != 0) {
-		return (unconfigure_exclusive_network_interfaces_static(zlogp));
-	}
-
 	return (0);
 }
 
@@ -4071,7 +3981,7 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	if (zonecfg_in_alt_root())
 		resolve_lofs(zlogp, rootpath, sizeof (rootpath));
 
-	if (get_iptype(zlogp, &iptype) < 0) {
+	if (vplat_get_iptype(zlogp, &iptype) < 0) {
 		zerror(zlogp, B_TRUE, "unable to determine ip-type");
 		return (-1);
 	}
@@ -4407,7 +4317,7 @@ vplat_bringup(zlog_t *zlogp, zone_mnt_t mount_cmd, zoneid_t zoneid)
 	if (mount_cmd == Z_MNT_BOOT) {
 		zone_iptype_t iptype;
 
-		if (get_iptype(zlogp, &iptype) < 0) {
+		if (vplat_get_iptype(zlogp, &iptype) < 0) {
 			zerror(zlogp, B_TRUE, "unable to determine ip-type");
 			lofs_discard_mnttab();
 			return (-1);
@@ -4513,6 +4423,8 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	char cmdbuf[MAXPATHLEN];
 	char brand[MAXNAMELEN];
 	brand_handle_t bh = NULL;
+	dladm_status_t status;
+	char errmsg[DLADM_STRSIZE];
 	ushort_t flags;
 
 	kzone = zone_name;
@@ -4583,7 +4495,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 
 		if (zone_getattr(zoneid, ZONE_ATTR_FLAGS, &flags,
 		    sizeof (flags)) < 0) {
-			if (get_iptype(zlogp, &iptype) < 0) {
+			if (vplat_get_iptype(zlogp, &iptype) < 0) {
 				zerror(zlogp, B_TRUE, "unable to determine "
 				    "ip-type");
 				goto error;
@@ -4610,6 +4522,12 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 				zerror(zlogp, B_FALSE, "unable to unconfigure "
 				    "network interfaces in zone");
 				goto error;
+			}
+			status = dladm_zone_halt(dld_handle, zoneid);
+			if (status != DLADM_STATUS_OK) {
+				zerror(zlogp, B_FALSE, "unable to notify "
+				    "dlmgmtd of zone halt: %s",
+				    dladm_status2str(status, errmsg));
 			}
 			break;
 		}

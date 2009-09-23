@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the 6to4 tunneling streams 
+#	This makefile drives the production of the mac_ipv6 plugin 
 #	kernel module.
-#
-#	SPARC architecture dependent
 #
 
 #
@@ -39,15 +35,15 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= 6to4tun
-OBJECTS		= $(6TO4TUN_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(6TO4TUN_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_STRMOD_DIR)/$(MODULE)
+MODULE		= mac_ipv6
+OBJECTS		= $(MAC_IPV6_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(MAC_IPV6_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MAC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sparc/Makefile.sparc
+include $(UTSBASE)/intel/Makefile.intel
 
 #
 #	Define targets
@@ -57,14 +53,13 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# lint pass one enforcement
+#	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
+LDFLAGS		+= -dy -Nmisc/mac -Nmac/mac_ipv4
 
-#
-#	depends on tun
-#
-LDFLAGS		+= -dy -Nstrmod/tun
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.
@@ -90,4 +85,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sparc/Makefile.targ
+include $(UTSBASE)/intel/Makefile.targ

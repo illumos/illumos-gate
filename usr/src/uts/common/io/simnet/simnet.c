@@ -74,13 +74,13 @@ static uint8_t *mcastaddr_lookup(simnet_dev_t *, const uint8_t *);
 
 static dld_ioc_info_t simnet_ioc_list[] = {
 	{SIMNET_IOC_CREATE, DLDCOPYINOUT, sizeof (simnet_ioc_create_t),
-	    simnet_ioc_create, {PRIV_SYS_DL_CONFIG}},
+	    simnet_ioc_create, secpolicy_dl_config},
 	{SIMNET_IOC_DELETE, DLDCOPYIN, sizeof (simnet_ioc_delete_t),
-	    simnet_ioc_delete, {PRIV_SYS_DL_CONFIG}},
+	    simnet_ioc_delete, secpolicy_dl_config},
 	{SIMNET_IOC_INFO, DLDCOPYINOUT, sizeof (simnet_ioc_info_t),
-	    simnet_ioc_info, {NULL}},
+	    simnet_ioc_info, NULL},
 	{SIMNET_IOC_MODIFY, DLDCOPYIN, sizeof (simnet_ioc_modify_t),
-	    simnet_ioc_modify, {PRIV_SYS_DL_CONFIG}},
+	    simnet_ioc_modify, secpolicy_dl_config}
 };
 
 DDI_DEFINE_STREAM_OPS(simnet_dev_ops, nulldev, nulldev, simnet_attach,
@@ -397,6 +397,7 @@ simnet_ioc_create(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 
 	sdev->sd_type = create_arg->sic_type;
 	sdev->sd_link_id = create_arg->sic_link_id;
+	sdev->sd_zoneid = crgetzoneid(cred);
 	sdev->sd_refcount++;
 	mutex_init(&sdev->sd_instlock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&sdev->sd_threadwait, NULL, CV_DRIVER, NULL);
@@ -420,7 +421,8 @@ simnet_ioc_create(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		goto exit;
 	}
 
-	if ((err = dls_devnet_create(sdev->sd_mh, sdev->sd_link_id)) != 0) {
+	if ((err = dls_devnet_create(sdev->sd_mh, sdev->sd_link_id,
+	    crgetzoneid(cred))) != 0) {
 		simnet_dev_unref(sdev);
 		goto exit;
 	}
@@ -473,6 +475,12 @@ simnet_ioc_modify(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		return (ENOENT);
 	}
 
+	if (sdev->sd_zoneid != crgetzoneid(cred)) {
+		rw_exit(&simnet_dev_lock);
+		simnet_dev_unref(sdev);
+		return (ENOENT);
+	}
+
 	if (sdev->sd_link_id == modify_arg->sim_peer_link_id) {
 		/* Cannot peer with self */
 		rw_exit(&simnet_dev_lock);
@@ -488,13 +496,21 @@ simnet_ioc_modify(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		return (0);
 	}
 
-	if (modify_arg->sim_peer_link_id != DATALINK_INVALID_LINKID &&
-	    (sdev_peer = simnet_dev_lookup(modify_arg->sim_peer_link_id)) ==
-	    NULL) {
-		/* Peer simnet device not available */
-		rw_exit(&simnet_dev_lock);
-		simnet_dev_unref(sdev);
-		return (ENOENT);
+	if (modify_arg->sim_peer_link_id != DATALINK_INVALID_LINKID) {
+		sdev_peer = simnet_dev_lookup(modify_arg->sim_peer_link_id);
+		if (sdev_peer == NULL) {
+			/* Peer simnet device not available */
+			rw_exit(&simnet_dev_lock);
+			simnet_dev_unref(sdev);
+			return (ENOENT);
+		}
+		if (sdev_peer->sd_zoneid != sdev->sd_zoneid) {
+			/* The two peers must be in the same zone (for now). */
+			rw_exit(&simnet_dev_lock);
+			simnet_dev_unref(sdev);
+			simnet_dev_unref(sdev_peer);
+			return (EACCES);
+		}
 	}
 
 	/* First remove any previous peer */
@@ -530,6 +546,12 @@ simnet_ioc_delete(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	rw_enter(&simnet_dev_lock, RW_WRITER);
 	if ((sdev = simnet_dev_lookup(delete_arg->sid_link_id)) == NULL) {
 		rw_exit(&simnet_dev_lock);
+		return (ENOENT);
+	}
+
+	if (sdev->sd_zoneid != crgetzoneid(cred)) {
+		rw_exit(&simnet_dev_lock);
+		simnet_dev_unref(sdev);
 		return (ENOENT);
 	}
 
@@ -570,7 +592,8 @@ simnet_ioc_delete(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	return (err);
 fail:
 	/* Re-create simnet instance and add any previous peer */
-	(void) dls_devnet_create(sdev->sd_mh, sdev->sd_link_id);
+	(void) dls_devnet_create(sdev->sd_mh, sdev->sd_link_id,
+	    crgetzoneid(cred));
 	sdev->sd_flags &= ~SDF_SHUTDOWN;
 
 	ASSERT(sdev->sd_peer_dev == NULL);
@@ -599,6 +622,10 @@ simnet_ioc_info(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	simnet_ioc_info_t *info_arg = karg;
 	simnet_dev_t *sdev;
+
+	/* Make sure that the simnet link is visible from the caller's zone. */
+	if (!dls_devnet_islinkvisible(info_arg->sii_link_id, crgetzoneid(cred)))
+		return (ENOENT);
 
 	rw_enter(&simnet_dev_lock, RW_READER);
 	if ((sdev = simnet_dev_lookup(info_arg->sii_link_id)) == NULL) {

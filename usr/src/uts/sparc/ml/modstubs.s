@@ -1200,9 +1200,9 @@ stubs_base:
 	MODULE(dld,drv);
 	STUB(dld, dld_init_ops, nomod_void);
 	STUB(dld, dld_fini_ops, nomod_void);
+	STUB(dld, dld_autopush, nomod_minus_one);
 	STUB(dld, dld_ioc_register, nomod_einval);
 	STUB(dld, dld_ioc_unregister, nomod_void);
-	STUB(dld, dld_autopush, nomod_minus_one);
 	END_MODULE(dld);
 #endif
 
@@ -1231,6 +1231,16 @@ stubs_base:
 	STUB(softmac, softmac_rele_device, nomod_void);
 	STUB(softmac, softmac_recreate, nomod_void);
 	END_MODULE(softmac);
+#endif
+
+#ifndef IPTUN_MODULE
+	MODULE(iptun,drv);
+	STUB(iptun, iptun_create, nomod_einval);
+	STUB(iptun, iptun_delete, nomod_einval);
+	STUB(iptun, iptun_set_policy, nomod_einval);
+	STUB(iptun, iptun_set_g_q, nomod_einval);
+	STUB(iptun, iptun_clear_g_q, nomod_void);
+	END_MODULE(iptun);
 #endif
 
 /*

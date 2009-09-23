@@ -276,9 +276,6 @@ typedef struct ipsec_out_s {
  * NOTE: Keysock_hello is simply an ipsec_info_t
  */
 
-/* TUN_HELLO is just like KEYSOCK_HELLO, except for tunnels to talk with IP. */
-#define	TUN_HELLO		KEYSOCK_HELLO
-
 /*
  * KEYSOCK_HELLO_ACK is sent by a consumer to acknowledge a KEYSOCK_HELLO.
  * It contains the PF_KEYv2 sa_type, so keysock can redirect PF_KEY messages

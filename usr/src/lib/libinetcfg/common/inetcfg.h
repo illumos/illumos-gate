@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INETCFG_H
 #define	_INETCFG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -40,12 +37,11 @@ extern "C" {
 /* error codes */
 #define	ICFG_SUCCESS	0	/* API was successful */
 #define	ICFG_FAILURE	1	/* Generic failure */
-#define	ICFG_NOT_TUNNEL	2	/* Tunnel operation attempted on non-tunnel */
-#define	ICFG_NOT_SET	3	/* Could not return non-existent value */
-#define	ICFG_BAD_ADDR	4	/* Invalid address */
-#define	ICFG_BAD_PROT	5	/* Wrong protocol family for operation */
-#define	ICFG_DAD_FAILED	6	/* Duplicate address detection failure */
-#define	ICFG_DAD_FOUND	7	/* Duplicate address detected */
+#define	ICFG_NOT_SET	2	/* Could not return non-existent value */
+#define	ICFG_BAD_ADDR	3	/* Invalid address */
+#define	ICFG_BAD_PROT	4	/* Wrong protocol family for operation */
+#define	ICFG_DAD_FAILED	5	/* Duplicate address detection failure */
+#define	ICFG_DAD_FOUND	6	/* Duplicate address detected */
 
 #define	ICFG_NERR	(ICFG_DAD_FOUND + 1)
 
@@ -61,25 +57,11 @@ typedef struct icfg_if {
 typedef struct icfg_handle {
 	int ifh_sock;				/* socket to interface */
 	icfg_if_t ifh_interface;		/* interface definition */
-	struct iftun_req *ifh_tunnel_params;	/* tunnel parameters */
 } *icfg_handle_t;
 
 extern const char *icfg_errmsg(int);
 extern int icfg_open(icfg_handle_t *, const icfg_if_t *);
 extern void icfg_close(icfg_handle_t);
-extern int icfg_refresh_tunnel_cache(icfg_handle_t);
-extern int icfg_set_tunnel_dest(icfg_handle_t, const struct sockaddr *,
-    socklen_t);
-extern int icfg_set_tunnel_src(icfg_handle_t, const struct sockaddr *,
-    socklen_t);
-extern int icfg_set_tunnel_hoplimit(icfg_handle_t, uint8_t);
-extern int icfg_set_tunnel_encaplimit(icfg_handle_t, int16_t);
-extern int icfg_get_tunnel_dest(icfg_handle_t, struct sockaddr *, socklen_t *);
-extern int icfg_get_tunnel_src(icfg_handle_t, struct sockaddr *, socklen_t *);
-extern int icfg_get_tunnel_hoplimit(icfg_handle_t, uint8_t *);
-extern int icfg_get_tunnel_encaplimit(icfg_handle_t, int16_t *);
-extern int icfg_get_tunnel_lower(icfg_handle_t, int *);
-extern int icfg_get_tunnel_upper(icfg_handle_t, int *);
 extern int icfg_set_flags(icfg_handle_t, uint64_t);
 extern int icfg_set_metric(icfg_handle_t, int);
 extern int icfg_set_mtu(icfg_handle_t, uint_t);

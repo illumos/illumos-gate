@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the 6to4 tunneling streams 
+#	This makefile drives the production of the mac_ipv4 plugin 
 #	kernel module.
-#
-#	intel implementation architecture dependent
 #
 
 #
@@ -39,10 +34,10 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= 6to4tun
-OBJECTS		= $(6TO4TUN_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(6TO4TUN_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_STRMOD_DIR)/$(MODULE)
+MODULE		= mac_ipv4
+OBJECTS		= $(MAC_IPV4_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(MAC_IPV4_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MAC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
@@ -57,9 +52,13 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	depends on tun
+#	Overrides.
 #
-LDFLAGS		+= -dy -Nstrmod/tun
+CFLAGS		+= $(CCVERBOSE)
+LDFLAGS		+= -dy -Nmisc/mac
+
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 
 #
 #	Default build targets.

@@ -83,23 +83,14 @@ flow_stat_init(kstat_named_t *knp)
 static int
 flow_stat_update(kstat_t *ksp, int rw)
 {
-	flow_entry_t		*fep = ksp->ks_private;
-	flow_stats_t 		*fsp = &fep->fe_flowstats;
-	kstat_named_t		*knp = ksp->ks_data;
-	uint64_t		*statp;
-	zoneid_t		zid;
-	int			i;
+	flow_entry_t	*fep = ksp->ks_private;
+	flow_stats_t 	*fsp = &fep->fe_flowstats;
+	kstat_named_t	*knp = ksp->ks_data;
+	uint64_t	*statp;
+	int		i;
 
 	if (rw != KSTAT_READ)
 		return (EACCES);
-
-	zid = getzoneid();
-	if (zid != GLOBAL_ZONEID && zid != fep->fe_zoneid) {
-		for (i = 0; i < FS_SIZE; i++, knp++)
-			knp->value.ui64 = 0;
-
-		return (0);
-	}
 
 	for (i = 0; i < FS_SIZE; i++, knp++) {
 		statp = (uint64_t *)
@@ -117,8 +108,12 @@ flow_stat_create(flow_entry_t *fep)
 	kstat_named_t	*knp;
 	uint_t		nstats = FS_SIZE;
 
-	ksp = kstat_create("unix", 0, (char *)fep->fe_flow_name, "flow",
-	    KSTAT_TYPE_NAMED, nstats, 0);
+	/*
+	 * Fow now, flow entries are only manipulated and visible from the
+	 * global zone.
+	 */
+	ksp = kstat_create_zone("unix", 0, (char *)fep->fe_flow_name, "flow",
+	    KSTAT_TYPE_NAMED, nstats, 0, GLOBAL_ZONEID);
 	if (ksp == NULL)
 		return;
 
@@ -204,13 +199,6 @@ mac_flow_create(flow_desc_t *fd, mac_resource_props_t *mrp, char *name,
 
 	flent->fe_client_cookie = client_cookie;
 	flent->fe_type = type;
-
-	/*
-	 * As flow creation is only allowed in global zone, this will
-	 * always set fe_zoneid to GLOBAL_ZONEID, and dls_add_flow() will
-	 * later set the right value.
-	 */
-	flent->fe_zoneid = getzoneid();
 
 	/* Save flow desc */
 	bcopy(fd, &flent->fe_flow_desc, sizeof (*fd));
@@ -905,8 +893,10 @@ mac_flow_get_client_cookie(flow_entry_t *flent)
  * Forward declarations.
  */
 static uint32_t	flow_l2_hash(flow_tab_t *, flow_state_t *);
+static uint32_t	flow_l2_hash_fe(flow_tab_t *, flow_entry_t *);
 static int	flow_l2_accept(flow_tab_t *, flow_state_t *);
 static uint32_t	flow_ether_hash(flow_tab_t *, flow_state_t *);
+static uint32_t	flow_ether_hash_fe(flow_tab_t *, flow_entry_t *);
 static int	flow_ether_accept(flow_tab_t *, flow_state_t *);
 
 /*
@@ -936,15 +926,15 @@ mac_flow_tab_create(flow_ops_t *ops, flow_mask_t mask, uint_t size,
 	ft->ft_mip = mip;
 
 	/*
-	 * Optimization for DL_ETHER media.
+	 * Optimizations for DL_ETHER media.
 	 */
 	if (mip->mi_info.mi_nativemedia == DL_ETHER) {
 		if (new_ops->fo_hash == flow_l2_hash)
 			new_ops->fo_hash = flow_ether_hash;
-
+		if (new_ops->fo_hash_fe == flow_l2_hash_fe)
+			new_ops->fo_hash_fe = flow_ether_hash_fe;
 		if (new_ops->fo_accept[0] == flow_l2_accept)
 			new_ops->fo_accept[0] = flow_ether_accept;
-
 	}
 	*ftp = ft;
 }
@@ -1213,13 +1203,6 @@ mac_link_flow_add(datalink_id_t linkid, char *flow_name,
 		err = ENOTSUP;
 		goto bail;
 	}
-
-	/*
-	 * Save the zoneid of the underlying link in the flow entry,
-	 * this is needed to prevent non-global zone from getting
-	 * statistics information of global zone.
-	 */
-	flent->fe_zoneid = dlp->dl_zid;
 
 	/*
 	 * Add the subflow to the subflow table. Also instantiate the flow
@@ -1524,8 +1507,26 @@ mac_link_flow_info(char *flow_name, mac_flowinfo_t *finfo)
 	return (0);
 }
 
-#define	HASH_MAC_VID(a, v, s) \
+/*
+ * Hash function macro that takes an Ethernet address and VLAN id as input.
+ */
+#define	HASH_ETHER_VID(a, v, s)	\
 	((((uint32_t)(a)[3] + (a)[4] + (a)[5]) ^ (v)) % (s))
+
+/*
+ * Generic layer-2 address hashing function that takes an address and address
+ * length as input.  This is the DJB hash function.
+ */
+static uint32_t
+flow_l2_addrhash(uint8_t *addr, size_t addrlen, size_t htsize)
+{
+	uint32_t	hash = 5381;
+	size_t		i;
+
+	for (i = 0; i < addrlen; i++)
+		hash = ((hash << 5) + hash) + addr[i];
+	return (hash % htsize);
+}
 
 #define	PKT_TOO_SMALL(s, end) ((s)->fs_mp->b_wptr < (end))
 
@@ -1559,9 +1560,8 @@ flow_l2_match(flow_tab_t *ft, flow_entry_t *flent, flow_state_t *s)
 static uint32_t
 flow_l2_hash(flow_tab_t *ft, flow_state_t *s)
 {
-	flow_l2info_t		*l2 = &s->fs_l2info;
-
-	return (HASH_MAC_VID(l2->l2_daddr, l2->l2_vid, ft->ft_size));
+	return (flow_l2_addrhash(s->fs_l2info.l2_daddr,
+	    ft->ft_mip->mi_type->mt_addr_length, ft->ft_size));
 }
 
 /*
@@ -1622,7 +1622,16 @@ flow_ether_hash(flow_tab_t *ft, flow_state_t *s)
 
 	evhp = (struct ether_vlan_header *)l2->l2_start;
 	l2->l2_daddr = evhp->ether_dhost.ether_addr_octet;
-	return (HASH_MAC_VID(l2->l2_daddr, l2->l2_vid, ft->ft_size));
+	return (HASH_ETHER_VID(l2->l2_daddr, l2->l2_vid, ft->ft_size));
+}
+
+static uint32_t
+flow_ether_hash_fe(flow_tab_t *ft, flow_entry_t *flent)
+{
+	flow_desc_t	*fd = &flent->fe_flow_desc;
+
+	ASSERT((fd->fd_mask & FLOW_LINK_VID) != 0 || fd->fd_vid == 0);
+	return (HASH_ETHER_VID(fd->fd_dst_mac, fd->fd_vid, ft->ft_size));
 }
 
 /* ARGSUSED */
@@ -1661,20 +1670,13 @@ flow_ether_accept(flow_tab_t *ft, flow_state_t *s)
 static int
 flow_l2_accept_fe(flow_tab_t *ft, flow_entry_t *flent)
 {
-	int		i;
 	flow_desc_t	*fd = &flent->fe_flow_desc;
 
 	/*
-	 * Dest address is mandatory.
+	 * Dest address is mandatory, and 0 length addresses are not yet
+	 * supported.
 	 */
-	if ((fd->fd_mask & FLOW_LINK_DST) == 0)
-		return (EINVAL);
-
-	for (i = 0; i < fd->fd_mac_len; i++) {
-		if (fd->fd_dst_mac[i] != 0)
-			break;
-	}
-	if (i == fd->fd_mac_len || fd->fd_mac_len < ETHERADDRL)
+	if ((fd->fd_mask & FLOW_LINK_DST) == 0 || fd->fd_mac_len == 0)
 		return (EINVAL);
 
 	if ((fd->fd_mask & FLOW_LINK_VID) != 0) {
@@ -1700,8 +1702,9 @@ flow_l2_hash_fe(flow_tab_t *ft, flow_entry_t *flent)
 {
 	flow_desc_t	*fd = &flent->fe_flow_desc;
 
-	ASSERT((fd->fd_mask & FLOW_LINK_VID) != 0 || fd->fd_vid == 0);
-	return (HASH_MAC_VID(fd->fd_dst_mac, fd->fd_vid, ft->ft_size));
+	ASSERT((fd->fd_mask & FLOW_LINK_VID) == 0 && fd->fd_vid == 0);
+	return (flow_l2_addrhash(fd->fd_dst_mac,
+	    ft->ft_mip->mi_type->mt_addr_length, ft->ft_size));
 }
 
 /*

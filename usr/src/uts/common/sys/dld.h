@@ -202,7 +202,7 @@ typedef struct dld_ioc_rename {
 
 typedef struct dld_ioc_zid {
 	zoneid_t	diz_zid;
-	char		diz_link[MAXLINKNAMELEN];
+	datalink_id_t	diz_linkid;
 } dld_ioc_zid_t;
 
 /*
@@ -418,7 +418,7 @@ int	dld_add_flow(datalink_id_t, char *, flow_desc_t *,
     mac_resource_props_t *);
 int	dld_remove_flow(char *);
 int	dld_modify_flow(char *, mac_resource_props_t *);
-int	dld_walk_flow(dld_ioc_walkflow_t *, intptr_t);
+int	dld_walk_flow(dld_ioc_walkflow_t *, intptr_t, cred_t *);
 
 #endif
 

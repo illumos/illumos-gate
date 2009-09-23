@@ -106,7 +106,6 @@
 #include <inet/sadb.h>
 #include <sys/kmem.h>
 #include <inet/ipsec_impl.h>
-#include <inet/tun.h>
 
 static uint_t		srcid_nextid(ip_stack_t *);
 static srcid_map_t	**srcid_lookup_addr(const in6_addr_t *addr,

@@ -732,7 +732,8 @@ bridge_find_name(const char *bridge)
 }
 
 static int
-bridge_create(datalink_id_t linkid, const char *bridge, bridge_inst_t **bipc)
+bridge_create(datalink_id_t linkid, const char *bridge, bridge_inst_t **bipc,
+    cred_t *cred)
 {
 	bridge_inst_t *bip, *bipnew;
 	bridge_mac_t *bmp = NULL;
@@ -781,7 +782,8 @@ lookup_retry:
 	 * No extra locking is needed here.
 	 */
 	if (!(bmp->bm_flags & BMF_DLS)) {
-		if ((err = dls_devnet_create(bmp->bm_mh, linkid)) != 0)
+		err = dls_devnet_create(bmp->bm_mh, linkid, crgetzoneid(cred));
+		if (err != 0)
 			goto fail_create;
 		bmp->bm_flags |= BMF_DLS;
 	}
@@ -3095,8 +3097,8 @@ bridge_ioctl(queue_t *wq, mblk_t *mp)
 		/* LINTED: alignment */
 		bnb = (bridge_newbridge_t *)mp->b_cont->b_rptr;
 		bnb->bnb_name[MAXNAMELEN-1] = '\0';
-		if ((rc = bridge_create(bnb->bnb_linkid,
-		    bnb->bnb_name, &bip)) != 0)
+		rc = bridge_create(bnb->bnb_linkid, bnb->bnb_name, &bip, cr);
+		if (rc != 0)
 			break;
 
 		rw_enter(&bip->bi_rwlock, RW_WRITER);

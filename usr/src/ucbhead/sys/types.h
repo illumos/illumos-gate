@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,8 +40,6 @@
 
 #ifndef	_SYS_TYPES_H
 #define	_SYS_TYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Include fixed width type declarations proposed by the ISO/JTC1/SC22/WG14 C
@@ -351,6 +348,8 @@ typedef id_t	projid_t;		/* project ID type	*/
 typedef	id_t	poolid_t;		/* pool ID type		*/
 typedef id_t	zoneid_t;		/* zone ID type		*/
 typedef id_t	ctid_t;			/* contract ID type	*/
+
+typedef uint32_t datalink_id_t;
 
 typedef ulong_t	dev_t;			/* expanded device type	*/
 

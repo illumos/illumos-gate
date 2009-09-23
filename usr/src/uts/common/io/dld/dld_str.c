@@ -44,7 +44,7 @@ static void	str_destructor(void *, void *);
 static mblk_t	*str_unitdata_ind(dld_str_t *, mblk_t *, boolean_t);
 static void	str_notify_promisc_on_phys(dld_str_t *);
 static void	str_notify_promisc_off_phys(dld_str_t *);
-static void	str_notify_phys_addr(dld_str_t *, const uint8_t *);
+static void	str_notify_phys_addr(dld_str_t *, uint_t, const uint8_t *);
 static void	str_notify_link_up(dld_str_t *);
 static void	str_notify_link_down(dld_str_t *);
 static void	str_notify_capab_reneg(dld_str_t *);
@@ -1517,7 +1517,7 @@ str_notify_promisc_off_phys(dld_str_t *dsp)
  * DL_NOTIFY_IND: DL_NOTE_PHYS_ADDR
  */
 static void
-str_notify_phys_addr(dld_str_t *dsp, const uint8_t *addr)
+str_notify_phys_addr(dld_str_t *dsp, uint_t addr_type, const uint8_t *addr)
 {
 	mblk_t		*mp;
 	dl_notify_ind_t	*dlip;
@@ -1537,7 +1537,7 @@ str_notify_phys_addr(dld_str_t *dsp, const uint8_t *addr)
 	dlip = (dl_notify_ind_t *)mp->b_rptr;
 	dlip->dl_primitive = DL_NOTIFY_IND;
 	dlip->dl_notification = DL_NOTE_PHYS_ADDR;
-	dlip->dl_data = DL_CURR_PHYS_ADDR;
+	dlip->dl_data = addr_type;
 	dlip->dl_addr_offset = sizeof (dl_notify_ind_t);
 	dlip->dl_addr_length = addr_length + sizeof (uint16_t);
 
@@ -1707,7 +1707,16 @@ str_notify(void *arg, mac_notify_type_t type)
 		/*
 		 * Send the appropriate DL_NOTIFY_IND.
 		 */
-		str_notify_phys_addr(dsp, addr);
+		str_notify_phys_addr(dsp, DL_CURR_PHYS_ADDR, addr);
+		break;
+
+	case MAC_NOTE_DEST:
+		/*
+		 * Only send up DL_NOTE_DEST_ADDR if the link has a
+		 * destination address.
+		 */
+		if (mac_dst_get(dsp->ds_mh, addr))
+			str_notify_phys_addr(dsp, DL_CURR_DEST_ADDR, addr);
 		break;
 
 	case MAC_NOTE_LOWLINK:

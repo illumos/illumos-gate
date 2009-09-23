@@ -89,6 +89,7 @@
 	<device match="zfs" />
 
 	<!-- Devices to create in exclusive IP zone only -->
+	<device match="dld" ip-type="exclusive" />
 	<device match="icmp" ip-type="exclusive" />
 	<device match="icmp6" ip-type="exclusive" />
 	<device match="ip" ip-type="exclusive" />
@@ -104,6 +105,7 @@
 	<device match="ipsecesp" ip-type="exclusive" />
 	<device match="ipstate" ip-type="exclusive" />
 	<device match="ipsync" ip-type="exclusive" />
+	<device match="iptunq" ip-type="exclusive" />
 	<device match="keysock" ip-type="exclusive" />
 	<device match="rawip" ip-type="exclusive" />
 	<device match="rawip6" ip-type="exclusive" />

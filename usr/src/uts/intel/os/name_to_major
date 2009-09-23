@@ -157,3 +157,5 @@ intel_nhm 262
 simnet 263
 acpinex 264
 bridge 265
+iptun 266
+iptunq 267

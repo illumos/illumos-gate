@@ -20,10 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 # This script configures IP routing.
 
@@ -183,22 +181,6 @@ else
 	    setprop routeadm/default-ipv4-routing = false
 	if [ "$ipv4_routing_set" = "false" ]; then
 		/sbin/routeadm -b -d ipv4-routing -u
-	fi
-fi
-
-#
-# Set 6to4 Relay Router communication support policy and, if applicable,
-# the destination Relay Router IPv4 address.  See /etc/default/inetinit for
-# setting and further info on ACCEPT6TO4RELAY and RELAY6TO4ADDR.
-# If ACCEPT6TO4RELAY=NO, the default value in the kernel will
-# be used.
-#
-ACCEPT6TO4RELAY=`echo "$ACCEPT6TO4RELAY" | /usr/bin/tr '[A-Z]' '[a-z]'`
-if [ "$ACCEPT6TO4RELAY" = yes ]; then
-	if [ "$RELAY6TO4ADDR" ]; then
-		/usr/sbin/6to4relay -e -a $RELAY6TO4ADDR
-	else
-		/usr/sbin/6to4relay -e
 	fi
 fi
 

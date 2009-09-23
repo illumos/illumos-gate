@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,8 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <stddef.h>
-
+#include <unistd.h>
+#include <stropts.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/vlan.h>
@@ -557,14 +558,13 @@ want_packet(uchar_t *pkt, int len, int origlen)
 	uchar_t **offp;		/* current offset */
 	uchar_t *opkt = NULL;
 	uint_t olen;
-	uint_t ethertype = 0;
 
 	sp = stack;
 	*sp = 1;
 	base = pkt;
 	offp = offstack;
 
-	header_size = (*interface->header_len)((char *)pkt);
+	header_size = (*interface->header_len)((char *)pkt, len);
 
 	for (op = oplist; *op; op++) {
 		switch ((enum optype) *op) {
@@ -839,7 +839,7 @@ want_packet(uchar_t *pkt, int len, int origlen)
 			}
 			/* align */
 			(void) memcpy(&rpcmsg, rpc, 24);
-			if (!valid_rpc(&rpcmsg, 24)) {
+			if (!valid_rpc((char *)&rpcmsg, 24)) {
 				if (sp >= &stack[MAXSS])
 					return (0);
 				*(++sp) = 0;
@@ -1379,6 +1379,27 @@ static match_type_t ipnet_match_types[] = {
 	0,		0,  0, 0,		 0,	0
 };
 
+static match_type_t iptun_match_types[] = {
+	"ip",		0,  1, IPPROTO_ENCAP,	-1,	OP_OFFSET_ETHERTYPE,
+	"ip6",		0,  1, IPPROTO_IPV6,	-1,	OP_OFFSET_ETHERTYPE,
+	"tcp",		9,  1, IPPROTO_TCP,	0,	OP_OFFSET_LINK,
+	"tcp",		6,  1, IPPROTO_TCP,	1,	OP_OFFSET_LINK,
+	"udp",		9,  1, IPPROTO_UDP,	0,	OP_OFFSET_LINK,
+	"udp",		6,  1, IPPROTO_UDP,	1,	OP_OFFSET_LINK,
+	"icmp",		9,  1, IPPROTO_ICMP,	0,	OP_OFFSET_LINK,
+	"icmp6",	6,  1, IPPROTO_ICMPV6,	1,	OP_OFFSET_LINK,
+	"ospf",		9,  1, IPPROTO_OSPF,	0,	OP_OFFSET_LINK,
+	"ospf",		6,  1, IPPROTO_OSPF,	1,	OP_OFFSET_LINK,
+	"ip-in-ip",	9,  1, IPPROTO_ENCAP,	0,	OP_OFFSET_LINK,
+	"esp",		9,  1, IPPROTO_ESP,	0,	OP_OFFSET_LINK,
+	"esp",		6,  1, IPPROTO_ESP,	1,	OP_OFFSET_LINK,
+	"ah",		9,  1, IPPROTO_AH,	0,	OP_OFFSET_LINK,
+	"ah",		6,  1, IPPROTO_AH,	1,	OP_OFFSET_LINK,
+	"sctp",		9,  1, IPPROTO_SCTP,	0,	OP_OFFSET_LINK,
+	"sctp",		6,  1, IPPROTO_SCTP,	1,	OP_OFFSET_LINK,
+	0,		0,  0, 0,		0,	0
+};
+
 static void
 generate_check(match_type_t match_types[], int index, int type)
 {
@@ -1421,6 +1442,11 @@ comparison(char *s)
 		break;
 	case DL_IPNET:
 		match_types = ipnet_match_types;
+		break;
+	case DL_IPV4:
+	case DL_IPV6:
+	case DL_6TO4:
+		match_types = iptun_match_types;
 		break;
 	default:
 		return (0);
@@ -1892,15 +1918,6 @@ ethertype_match(int val)
 	    interface->mac_type == DL_CSMACD) {
 		emitop(OP_OFFSET_POP);
 	}
-}
-
-static void
-ipnettype_match(int val)
-{
-	int ipnet_offset = interface->network_type_offset;
-
-	emitop(OP_OFFSET_ETHERTYPE);
-	compare_value(ipnet_offset, 2, val);
 }
 
 /*

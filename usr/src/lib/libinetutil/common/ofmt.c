@@ -167,11 +167,12 @@ splitfree(split_t *sp)
  * Open a handle to be used for printing formatted output.
  */
 ofmt_status_t
-ofmt_open(const char *str, ofmt_field_t *template, uint_t flags,
+ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
     uint_t maxcols, ofmt_handle_t *ofmt)
 {
 	split_t		*sp;
 	uint_t		i, j, of_index;
+	const ofmt_field_t *ofp;
 	ofmt_field_t	*of;
 	ofmt_state_t	*os;
 	int		nfields = 0;
@@ -192,7 +193,7 @@ ofmt_open(const char *str, ofmt_field_t *template, uint_t flags,
 	}
 	if (template == NULL)
 		return (OFMT_ENOTEMPLATE);
-	for (of = template; of->of_name != NULL; of++)
+	for (ofp = template; ofp->of_name != NULL; ofp++)
 		nfields++;
 	/*
 	 * split str into the columns selected, or construct the

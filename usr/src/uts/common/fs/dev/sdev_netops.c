@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,16 +44,6 @@
 struct vnodeops		*devnet_vnodeops;
 
 /*
- * Called by zone_walk_datalink() to see if the given link name belongs to the
- * given zone.  Returns 0 to continue the walk, -1 if the link name is found.
- */
-static int
-devnet_validate_name(const char *link, void *arg)
-{
-	return ((strcmp(link, arg) == 0) ? -1 : 0);
-}
-
-/*
  * Check if a net sdev_node is still valid - i.e. it represents a current
  * network link.
  * This serves two purposes
@@ -65,19 +55,19 @@ devnet_validate_name(const char *link, void *arg)
 int
 devnet_validate(struct sdev_node *dv)
 {
-	char *nm = dv->sdev_name;
 	datalink_id_t linkid;
+	zoneid_t zoneid;
 
 	ASSERT(!(dv->sdev_flags & SDEV_STALE));
 	ASSERT(dv->sdev_state == SDEV_READY);
 
-	if (SDEV_IS_GLOBAL(dv)) {
-		return ((dls_mgmt_get_linkid(nm, &linkid) != 0) ?
-		    SDEV_VTOR_INVALID : SDEV_VTOR_VALID);
-	} else {
-		return ((zone_datalink_walk(getzoneid(), devnet_validate_name,
-		    nm) == -1) ? SDEV_VTOR_VALID : SDEV_VTOR_INVALID);
-	}
+	if (dls_mgmt_get_linkid(dv->sdev_name, &linkid) != 0)
+		return (SDEV_VTOR_INVALID);
+	if (SDEV_IS_GLOBAL(dv))
+		return (SDEV_VTOR_VALID);
+	zoneid = getzoneid();
+	return (zone_check_datalink(&zoneid, linkid) == 0 ?
+	    SDEV_VTOR_VALID : SDEV_VTOR_INVALID);
 }
 
 /*
@@ -219,14 +209,19 @@ failed:
 }
 
 static int
-devnet_filldir_datalink(const char *link, void *arg)
+devnet_filldir_datalink(datalink_id_t linkid, void *arg)
 {
-	struct sdev_node *ddv = arg;
-	struct vattr vattr;
-	struct sdev_node *dv;
-	dls_dl_handle_t ddh = NULL;
+	struct sdev_node	*ddv = arg;
+	struct vattr		vattr;
+	struct sdev_node	*dv;
+	dls_dl_handle_t		ddh = NULL;
+	char			link[MAXLINKNAMELEN];
 
 	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+
+	if (dls_mgmt_get_linkinfo(linkid, link, NULL, NULL, NULL) != 0)
+		return (0);
+
 	if ((dv = sdev_cache_lookup(ddv, (char *)link)) != NULL)
 		goto found;
 
@@ -259,7 +254,6 @@ static void
 devnet_filldir(struct sdev_node *ddv)
 {
 	sdev_node_t	*dv, *next;
-	char		link[MAXLINKNAMELEN];
 	datalink_id_t	linkid;
 
 	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
@@ -302,12 +296,8 @@ devnet_filldir(struct sdev_node *ddv)
 		do {
 			linkid = dls_mgmt_get_next(linkid, DATALINK_CLASS_ALL,
 			    DATALINK_ANY_MEDIATYPE, DLMGMT_ACTIVE);
-
-			if ((linkid != DATALINK_INVALID_LINKID) &&
-			    (dls_mgmt_get_linkinfo(linkid, link,
-			    NULL, NULL, NULL) == 0)) {
-				(void) devnet_filldir_datalink(link, ddv);
-			}
+			if (linkid != DATALINK_INVALID_LINKID)
+				(void) devnet_filldir_datalink(linkid, ddv);
 		} while (linkid != DATALINK_INVALID_LINKID);
 	} else {
 		(void) zone_datalink_walk(getzoneid(),

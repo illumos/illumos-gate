@@ -41,7 +41,7 @@ extern "C" {
 
 #define	S_RING_NAMELEN 64
 
-#define	MAX_SR_FANOUT	32
+#define	MAX_SR_FANOUT	24
 
 extern boolean_t mac_soft_ring_enable;
 extern boolean_t mac_latency_optimize;

@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdio.h>
 #include <string.h>
@@ -97,7 +94,6 @@ interpret_ip(int flags, const struct ip *ip, int fraglen)
 		return (iplen);
 	}
 
-	/* XXX Should this count for mix-and-match v4/v6 encapsulations? */
 	if (encap_levels == 0)
 		total_encap_levels = 0;
 	encap_levels++;
@@ -124,10 +120,8 @@ interpret_ip(int flags, const struct ip *ip, int fraglen)
 	if (morefrag || fragoffset != 0)
 		isfrag = B_TRUE;
 
-	if (encap_levels == 1) {
-		src_name = addrtoname(AF_INET, &ip->ip_src);
-		dst_name = addrtoname(AF_INET, &ip->ip_dst);
-	} /* Else we already have the src_name and dst_name we want! */
+	src_name = addrtoname(AF_INET, &ip->ip_src);
+	dst_name = addrtoname(AF_INET, &ip->ip_dst);
 
 	if (flags & F_SUM) {
 		if (isfrag) {
@@ -370,17 +364,19 @@ interpret_ipv6(int flags, const ip6_t *ip6h, int fraglen)
 
 		version = ntohl(ip6h->ip6_vcf) >> 28;
 
-		if (strcmp(src_name, src_addrstr) == 0)
+		if (strcmp(src_name, src_addrstr) == 0) {
 			print_srcname[0] = '\0';
-		else
+		} else {
 			snprintf(print_srcname, sizeof (print_srcname),
-				", %s", src_name);
+			    ", %s", src_name);
+		}
 
-		if (strcmp(dst_name, dst_addrstr) == 0)
+		if (strcmp(dst_name, dst_addrstr) == 0) {
 			print_dstname[0] = '\0';
-		else
+		} else {
 			snprintf(print_dstname, sizeof (print_dstname),
-				", %s", dst_name);
+			    ", %s", dst_name);
+		}
 
 		show_header("IPv6:   ", "IPv6 Header", iplen);
 		show_space();

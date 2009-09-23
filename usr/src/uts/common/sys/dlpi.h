@@ -277,6 +277,7 @@ typedef struct dl_ipnetinfo {
 #define	DL_WIFI		0x80000004ul	/* IEEE 802.11 */
 #define	DL_IPNET	0x80000005ul	/* ipnet(7D) link */
 #define	SUNW_DL_IPMP	0x80000006ul	/* IPMP stub interface */
+#define	DL_6TO4		0x80000007ul	/* 6to4 Tunnel Link */
 
 /*
  * DLPI provider service supported.
@@ -361,6 +362,7 @@ typedef struct dl_ipnetinfo {
 #define	DL_CURR_PHYS_ADDR	0x02	/* current physical address */
 #define	DL_IPV6_TOKEN		0x03	/* IPv6 interface token */
 #define	DL_IPV6_LINK_LAYER_ADDR	0x04	/* Neighbor Discovery format */
+#define	DL_CURR_DEST_ADDR	0x05	/* current destination address */
 
 /*
  * DLPI flag definitions

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LIBDLPI_IMPL_H
 #define	_LIBDLPI_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libdlpi.h>
 #include <sys/sysmacros.h>
@@ -44,11 +42,6 @@ extern "C" {
  * Maximum SAP length, in bytes.
  */
 #define	DLPI_SAPLEN_MAX	4
-
-/*
- * Maximum number of modules that can be pushed onto a device stream.
- */
-#define	DLPI_MODS_MAX	9
 
 /*
  * Number of elements in 'arr'.
@@ -124,10 +117,6 @@ typedef struct dlpi_impl_s {
 	uint_t		dli_sap;	/* bound SAP value */
 	boolean_t 	dli_sapbefore;	/* true if SAP precedes address */
 	uint_t		dli_ppa;	/* physical point of attachment */
-	uint_t		dli_mod_cnt;	/* number of modules to be pushed */
-	uint_t		dli_mod_pushed;	/* number of modules pushed */
-	char   		dli_modlist[DLPI_MODS_MAX][DLPI_LINKNAME_MAX];
-					/* array of mods */
 	uint_t		dli_mactype;	/* mac type */
 	uint_t		dli_oflags;	/* flags set at open */
 	uint_t		dli_note_processing;

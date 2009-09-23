@@ -125,11 +125,13 @@ extern char *prot_nest_prefix;
 
 extern char *get_sum_line(void);
 extern char *get_detail_line(int, int);
+extern int want_packet(uchar_t *, int, int);
 extern void set_vlan_id(int);
 extern struct timeval prev_time;
 extern void process_pkt(struct sb_hdr *, char *, int, int);
 extern char *getflag(int, int, char *, char *);
 extern void show_header(char *, char *, int);
+extern void show_count(void);
 extern void xdr_init(char *, int);
 extern char *get_line(int, int);
 extern int get_line_remain(void);
@@ -263,6 +265,7 @@ extern char *tohex(char *p, int len);
 extern char *printether(struct ether_addr *);
 extern char *print_ethertype(int);
 extern const char *arp_htype(int);
+extern int valid_rpc(char *, int);
 
 /*
  * Describes characteristics of the Media Access Layer.
@@ -283,6 +286,8 @@ extern const char *arp_htype(int);
  * and only use a user space filter if the filter expression
  * cannot be expressed in kernel space.
  */
+typedef uint_t (interpreter_fn_t)(int, char *, int, int);
+typedef uint_t (headerlen_fn_t)(char *, size_t);
 typedef struct interface {
 	uint_t		mac_type;
 	uint_t		mtu_size;
@@ -290,8 +295,8 @@ typedef struct interface {
 	size_t		network_type_len;
 	uint_t		network_type_ip;
 	uint_t		network_type_ipv6;
-	uint_t		(*header_len)(char *);
-	uint_t 		(*interpreter)(int, char *, int, int);
+	headerlen_fn_t	*header_len;
+	interpreter_fn_t *interpreter;
 	boolean_t	try_kernel_filter;
 } interface_t;
 

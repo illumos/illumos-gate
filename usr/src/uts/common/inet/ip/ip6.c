@@ -90,7 +90,7 @@
 #include <inet/ipsec_info.h>
 #include <inet/sadb.h>
 #include <inet/ipsec_impl.h>
-#include <inet/tun.h>
+#include <inet/iptun/iptun_impl.h>
 #include <inet/sctp_ip.h>
 #include <sys/pattr.h>
 #include <inet/ipclassifier.h>
@@ -195,8 +195,6 @@ static int	ip_bind_connected_v6(conn_t *, mblk_t **, uint8_t, in6_addr_t *,
     boolean_t, boolean_t, cred_t *);
 static boolean_t ip_bind_get_ire_v6(mblk_t **, ire_t *, const in6_addr_t *,
     iulp_t *, ip_stack_t *);
-static void	ip_bind_post_handling_v6(conn_t *, mblk_t *, boolean_t,
-    boolean_t, ip_stack_t *);
 static int	ip_bind_laddr_v6(conn_t *, mblk_t **, uint8_t,
     const in6_addr_t *, uint16_t, boolean_t);
 static void	ip_fanout_proto_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
@@ -222,7 +220,7 @@ static areq_t	ipv6_areq_template = {
 	AR_ENTRY_QUERY,				/* cmd */
 	sizeof (areq_t)+(2*IPV6_ADDR_LEN),	/* name offset */
 	sizeof (areq_t),	/* name len (filled by ill_arp_alloc) */
-	IP6_DL_SAP,		/* protocol, from arps perspective */
+	ETHERTYPE_IPV6,		/* protocol, from arps perspective */
 	sizeof (areq_t),	/* target addr offset */
 	IPV6_ADDR_LEN,		/* target addr_length */
 	0,			/* flags */
@@ -725,6 +723,26 @@ icmp_inbound_too_big_v6(queue_t *q, mblk_t *mp, ill_t *ill, ill_t *inill,
 }
 
 /*
+ * Fanout for ICMPv6 errors containing IP-in-IPv6 packets.  Returns B_TRUE if a
+ * tunnel consumed the message, and B_FALSE otherwise.
+ */
+static boolean_t
+icmp_inbound_iptun_fanout_v6(mblk_t *first_mp, ip6_t *rip6h, ill_t *ill,
+    ip_stack_t *ipst)
+{
+	conn_t	*connp;
+
+	if ((connp = ipcl_iptun_classify_v6(&rip6h->ip6_src, &rip6h->ip6_dst,
+	    ipst)) == NULL)
+		return (B_FALSE);
+
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
+	connp->conn_recv(connp, first_mp, NULL);
+	CONN_DEC_REF(connp);
+	return (B_TRUE);
+}
+
+/*
  * Fanout received ICMPv6 error packets to the transports.
  * Assumes the IPv6 plus ICMPv6 headers have been pulled up but nothing else.
  */
@@ -784,6 +802,15 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	/* Set message type, must be done after pullups */
 	mp->b_datap->db_type = M_CTL;
 
+	/*
+	 * We need a separate IP header with the source and destination
+	 * addresses reversed to do fanout/classification because the ip6h in
+	 * the ICMPv6 error is in the form we sent it out.
+	 */
+	rip6h.ip6_src = ip6h->ip6_dst;
+	rip6h.ip6_dst = ip6h->ip6_src;
+	rip6h.ip6_nxt = nexthdr;
+
 	/* Try to pass the ICMP message to clients who need it */
 	switch (nexthdr) {
 	case IPPROTO_UDP: {
@@ -795,17 +822,8 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		    mp->b_wptr) {
 			break;
 		}
-		/*
-		 * Attempt to find a client stream based on port.
-		 * Note that we do a reverse lookup since the header is
-		 * in the form we sent it out.
-		 * The rip6h header is only used for the IPCL_UDP_MATCH_V6
-		 * and we only set the src and dst addresses and nexthdr.
-		 */
+		/* Attempt to find a client stream based on port. */
 		up = (uint16_t *)((uchar_t *)ip6h + hdr_length);
-		rip6h.ip6_src = ip6h->ip6_dst;
-		rip6h.ip6_dst = ip6h->ip6_src;
-		rip6h.ip6_nxt = nexthdr;
 		((uint16_t *)&ports)[0] = up[1];
 		((uint16_t *)&ports)[1] = up[0];
 
@@ -827,10 +845,7 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		 * Attempt to find a client stream based on port.
 		 * Note that we do a reverse lookup since the header is
 		 * in the form we sent it out.
-		 * The rip6h header is only used for the IP_TCP_*MATCH_V6 and
-		 * we only set the src and dst addresses and nexthdr.
 		 */
-
 		tcpha = (tcpha_t *)((char *)ip6h + hdr_length);
 		connp = ipcl_tcp_lookup_reversed_ipv6(ip6h, tcpha,
 		    TCPS_LISTEN, ill->ill_phyint->phyint_ifindex, ipst);
@@ -958,10 +973,11 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			 * we need to adjust the MTU to take into account
 			 * the IPsec overhead.
 			 */
-			if (ii != NULL)
+			if (ii != NULL) {
 				icmp6->icmp6_mtu = htonl(
 				    ntohl(icmp6->icmp6_mtu) -
 				    ipsec_in_extra_length(first_mp));
+			}
 		} else {
 			/*
 			 * Self-encapsulated case. As in the ipv4 case,
@@ -1037,15 +1053,14 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			    mctl_present, zoneid);
 			return;
 		}
+		if (icmp_inbound_iptun_fanout_v6(first_mp, &rip6h, ill, ipst))
+			return;
+		/*
+		 * No IP tunnel is associated with this error.  Perhaps a raw
+		 * socket will want it.
+		 */
 		/* FALLTHRU */
 	default:
-		/*
-		 * The rip6h header is only used for the lookup and we
-		 * only set the src and dst addresses and nexthdr.
-		 */
-		rip6h.ip6_src = ip6h->ip6_dst;
-		rip6h.ip6_dst = ip6h->ip6_src;
-		rip6h.ip6_nxt = nexthdr;
 		ip_fanout_proto_v6(q, first_mp, &rip6h, ill, inill, nexthdr, 0,
 		    IP6_NO_IPPOLICY, mctl_present, zoneid);
 		return;
@@ -2160,29 +2175,6 @@ bad_addr:
 	return (mp);
 }
 
-static void
-ip_bind_post_handling_v6(conn_t *connp, mblk_t *mp,
-    boolean_t version_changed, boolean_t ire_requested, ip_stack_t *ipst)
-{
-	/* Update conn_send and pktversion if v4/v6 changed */
-	if (version_changed) {
-		ip_setpktversion(connp, connp->conn_pkt_isv6, B_TRUE, ipst);
-	}
-
-	/*
-	 * Pass the IPSEC headers size in ire_ipsec_overhead.
-	 * We can't do this in ip_bind_insert_ire because the policy
-	 * may not have been inherited at that point in time and hence
-	 * conn_out_enforce_policy may not be set.
-	 */
-	if (ire_requested && connp->conn_out_enforce_policy &&
-	    mp != NULL && DB_TYPE(mp) == IRE_DB_REQ_TYPE) {
-		ire_t *ire = (ire_t *)mp->b_rptr;
-		ASSERT(MBLKL(mp) >= sizeof (ire_t));
-		ire->ire_ipsec_overhead = (conn_ipsec_length(connp));
-	}
-}
-
 /*
  * Here address is verified to be a valid local address.
  * If the IRE_DB_REQ_TYPE mp is present, a multicast
@@ -2375,20 +2367,9 @@ int
 ip_proto_bind_laddr_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
     const in6_addr_t *v6srcp, uint16_t lport, boolean_t fanout_insert)
 {
-	int error;
-	boolean_t ire_requested;
-	mblk_t *mp = NULL;
-	boolean_t orig_pkt_isv6 = connp->conn_pkt_isv6;
+	int		error;
+	boolean_t	orig_pkt_isv6 = connp->conn_pkt_isv6;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	/*
-	 * Note that we allow connect to broadcast and multicast
-	 * address when ire_requested is set. Thus the ULP
-	 * has to check for IRE_BROADCAST and multicast.
-	 */
-	if (mpp)
-		mp = *mpp;
-	ire_requested = (mp && DB_TYPE(mp) == IRE_DB_REQ_TYPE);
 
 	ASSERT(connp->conn_af_isv6);
 	connp->conn_ulp = protocol;
@@ -2416,8 +2397,8 @@ ip_proto_bind_laddr_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 		connp->conn_pkt_isv6 = B_TRUE;
 	}
 
-	ip_bind_post_handling_v6(connp, mpp ? *mpp : NULL,
-	    orig_pkt_isv6 != connp->conn_pkt_isv6, ire_requested, ipst);
+	if (orig_pkt_isv6 != connp->conn_pkt_isv6)
+		ip_setpktversion(connp, connp->conn_pkt_isv6, B_TRUE, ipst);
 	return (0);
 
 bad_addr:
@@ -2913,16 +2894,7 @@ ip_proto_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 {
 	int error = 0;
 	boolean_t orig_pkt_isv6 = connp->conn_pkt_isv6;
-	boolean_t ire_requested;
 	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
-
-	/*
-	 * Note that we allow connect to broadcast and multicast
-	 * address when ire_requested is set. Thus the ULP
-	 * has to check for IRE_BROADCAST and multicast.
-	 */
-	ASSERT(mpp != NULL);
-	ire_requested = (*mpp != NULL && DB_TYPE(*mpp) == IRE_DB_REQ_TYPE);
 
 	ASSERT(connp->conn_af_isv6);
 	connp->conn_ulp = protocol;
@@ -2969,8 +2941,8 @@ ip_proto_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 		connp->conn_pkt_isv6 = B_TRUE;
 	}
 
-	ip_bind_post_handling_v6(connp, mpp ? *mpp : NULL,
-	    orig_pkt_isv6 != connp->conn_pkt_isv6, ire_requested, ipst);
+	if (orig_pkt_isv6 != connp->conn_pkt_isv6)
+		ip_setpktversion(connp, connp->conn_pkt_isv6, B_TRUE, ipst);
 
 	/* Send it home. */
 	return (0);
@@ -3082,8 +3054,6 @@ ip_add_info_v6(mblk_t *mp, ill_t *ill, const in6_addr_t *dst)
  * can be more than one stream bound to a particular
  * protocol.  When this is the case, normally each one gets a copy
  * of any incoming packets.
- * However, if the packet was tunneled and not multicast we only send to it
- * the first match.
  *
  * Zones notes:
  * Packets will be distributed to streams in all zones. This is really only
@@ -3099,7 +3069,6 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 	mblk_t	*mp1, *first_mp1;
 	in6_addr_t dst = ip6h->ip6_dst;
 	in6_addr_t src = ip6h->ip6_src;
-	boolean_t one_only;
 	mblk_t *first_mp = mp;
 	boolean_t secure, shared_addr;
 	conn_t	*connp, *first_connp, *next_connp;
@@ -3114,13 +3083,6 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 	} else {
 		secure = B_FALSE;
 	}
-
-	/*
-	 * If the packet was tunneled and not multicast we only send to it
-	 * the first match.
-	 */
-	one_only = ((nexthdr == IPPROTO_ENCAP || nexthdr == IPPROTO_IPV6) &&
-	    !IN6_IS_ADDR_MULTICAST(&dst));
 
 	shared_addr = (zoneid == ALL_ZONES);
 	if (shared_addr) {
@@ -3169,16 +3131,7 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 	 * XXX: Fix the multiple protocol listeners case. We should not
 	 * be walking the conn->next list here.
 	 */
-	if (one_only) {
-		/*
-		 * Only send message to one tunnel driver by immediately
-		 * terminating the loop.
-		 */
-		connp = NULL;
-	} else {
-		connp = connp->conn_next;
-
-	}
+	connp = connp->conn_next;
 	for (;;) {
 		while (connp != NULL) {
 			if (IPCL_PROTO_MATCH_V6(connp, nexthdr, ip6h, ill,
@@ -3235,13 +3188,10 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 
 			freemsg(mp1);
 		} else {
-			/*
-			 * Don't enforce here if we're a tunnel - let "tun" do
-			 * it instead.
-			 */
-			if (!IPCL_IS_IPTUN(connp) &&
-			    (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) ||
-			    secure)) {
+			ASSERT(!IPCL_IS_IPTUN(connp));
+
+			if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) ||
+			    secure) {
 				first_mp1 = ipsec_check_inbound_policy(
 				    first_mp1, connp, NULL, ip6h, mctl_present);
 			}
@@ -3312,24 +3262,9 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 
 		freemsg(first_mp);
 	} else {
-		if (IPCL_IS_IPTUN(connp)) {
-			/*
-			 * Tunneled packet.  We enforce policy in the tunnel
-			 * module itself.
-			 *
-			 * Send the WHOLE packet up (incl. IPSEC_IN) without
-			 * a policy check.
-			 */
-			putnext(rq, first_mp);
-			CONN_DEC_REF(connp);
-			return;
-		}
-		/*
-		 * Don't enforce here if we're a tunnel - let "tun" do
-		 * it instead.
-		 */
-		if (nexthdr != IPPROTO_ENCAP && nexthdr != IPPROTO_IPV6 &&
-		    (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || secure)) {
+		ASSERT(!IPCL_IS_IPTUN(connp));
+
+		if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || secure) {
 			first_mp = ipsec_check_inbound_policy(first_mp, connp,
 			    NULL, ip6h, mctl_present);
 			if (first_mp == NULL) {
@@ -6452,8 +6387,8 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		 */
 		if (ill->ill_mactype == DL_ETHER &&
 		    (hlen = MBLKHEAD(mp)) >= sizeof (struct ether_header) &&
-		    (ucp = mp->b_rptr)[-1] == (IP6_DL_SAP & 0xFF) &&
-		    ucp[-2] == (IP6_DL_SAP >> 8)) {
+		    (ucp = mp->b_rptr)[-1] == (ETHERTYPE_IPV6 & 0xFF) &&
+		    ucp[-2] == (ETHERTYPE_IPV6 >> 8)) {
 			if (hlen >= sizeof (struct ether_vlan_header) &&
 			    ucp[-5] == 0 && ucp[-6] == 0x81)
 				ucp -= sizeof (struct ether_vlan_header);
@@ -6517,16 +6452,6 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 			ill = (ill_t *)q->q_ptr;
 			ill_fastpath_ack(ill, mp);
 			return;
-
-		case SIOCGTUNPARAM:
-		case OSIOCGTUNPARAM:
-			ip_rput_other(NULL, q, mp, NULL);
-			return;
-
-		case SIOCSTUNPARAM:
-		case OSIOCSTUNPARAM:
-			/* Go through qwriter */
-			break;
 		default:
 			putnext(q, mp);
 			return;
@@ -6557,22 +6482,7 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		iocp = (struct iocblk *)mp->b_rptr;
 		switch (iocp->ioc_cmd) {
 		case DL_IOC_HDR_INFO:
-		case SIOCGTUNPARAM:
-		case OSIOCGTUNPARAM:
 			ip_rput_other(NULL, q, mp, NULL);
-			return;
-
-		case SIOCSTUNPARAM:
-		case OSIOCSTUNPARAM:
-			mutex_enter(&ill->ill_lock);
-			if (ill->ill_state_flags & ILL_CONDEMNED) {
-				mutex_exit(&ill->ill_lock);
-				freemsg(mp);
-				return;
-			}
-			ill_refhold_locked(ill);
-			mutex_exit(&ill->ill_lock);
-			qwriter_ip(ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
 			return;
 		default:
 			break;
@@ -6894,6 +6804,26 @@ ipsec_early_ah_v6(queue_t *q, mblk_t *first_mp, boolean_t mctl_present,
 	return (B_TRUE);
 }
 
+static boolean_t
+ip_iptun_input_v6(mblk_t *ipsec_mp, mblk_t *data_mp,
+    size_t hdr_len, uint8_t nexthdr, zoneid_t zoneid, ill_t *ill,
+    ip_stack_t *ipst)
+{
+	conn_t	*connp;
+
+	ASSERT(ipsec_mp == NULL || ipsec_mp->b_cont == data_mp);
+
+	connp = ipcl_classify_v6(data_mp, nexthdr, hdr_len, zoneid, ipst);
+	if (connp != NULL) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
+		connp->conn_recv(connp, ipsec_mp != NULL ? ipsec_mp : data_mp,
+		    NULL);
+		CONN_DEC_REF(connp);
+		return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
 /*
  * Validate the IPv6 mblk for alignment.
  */
@@ -6975,7 +6905,6 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	ire_t		*ire = NULL;
 	ill_t		*ill = inill;
 	ill_t		*outill;
-	ipif_t		*ipif;
 	uint8_t		*whereptr;
 	uint8_t		nexthdr;
 	uint16_t	remlen;
@@ -7152,32 +7081,6 @@ drop_pkt:		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		}
 		zoneid = GLOBAL_ZONEID;
 		goto ipv6forus;
-	}
-
-	ipif = ill->ill_ipif;
-
-	/*
-	 * If a packet was received on an interface that is a 6to4 tunnel,
-	 * incoming IPv6 packets, with a 6to4 addressed IPv6 destination, must
-	 * be checked to have a 6to4 prefix (2002:V4ADDR::/48) that is equal to
-	 * the 6to4 prefix of the address configured on the receiving interface.
-	 * Otherwise, the packet was delivered to this interface in error and
-	 * the packet must be dropped.
-	 */
-	if ((ill->ill_is_6to4tun) && IN6_IS_ADDR_6TO4(&ip6h->ip6_dst)) {
-
-		if (!IN6_ARE_6TO4_PREFIX_EQUAL(&ipif->ipif_v6lcl_addr,
-		    &ip6h->ip6_dst)) {
-			if (ip_debug > 2) {
-				/* ip1dbg */
-				pr_addr_dbg("ip_rput_data_v6: received 6to4 "
-				    "addressed packet which is not for us: "
-				    "%s\n", AF_INET6, &ip6h->ip6_dst);
-			}
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(first_mp);
-			return;
-		}
 	}
 
 	/*
@@ -7822,8 +7725,22 @@ tcp_fanout:
 					    inill, hdr_len, mctl_present, 0,
 					    zoneid, dl_mp);
 			}
+			goto proto_fanout;
 		}
+		case IPPROTO_ENCAP:
+		case IPPROTO_IPV6:
+			if (ip_iptun_input_v6(mctl_present ? first_mp : NULL,
+			    mp, pkt_len - remlen, nexthdr, zoneid, ill, ipst)) {
+				return;
+			}
+			/*
+			 * If there was no IP tunnel data-link bound to
+			 * receive this packet, then we fall through to
+			 * allow potential raw sockets bound to either of
+			 * these protocols to pick it up.
+			 */
 			/* FALLTHRU */
+proto_fanout:
 		default: {
 			/*
 			 * Handle protocols with which IPv6 is less intimate.
@@ -9084,7 +9001,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 #endif
 
 	/*
-	 * M_CTL comes from 6 places
+	 * M_CTL comes from 5 places
 	 *
 	 * 1) TCP sends down IPSEC_OUT(M_CTL) for detached connections
 	 *    both V4 and V6 datagrams.
@@ -9099,8 +9016,6 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 	 *
 	 * 5) AH/ESP send down IPSEC_CTL(M_CTL) to be relayed to hardware for
 	 *    IPsec hardware acceleration support.
-	 *
-	 * 6) TUN_HELLO.
 	 *
 	 * We need to handle (1)'s IPv6 case and (3) here.  For the
 	 * IPv4 case in (1), and (2), IPSEC processing has already
@@ -11695,34 +11610,6 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 		ip0dbg(("ip_xmit_v6: ire_to_ill failed\n"));
 		freemsg(mp);
 		return;
-	}
-
-	/*
-	 * If a packet is to be sent out an interface that is a 6to4
-	 * tunnel, outgoing IPv6 packets, with a 6to4 addressed IPv6
-	 * destination, must be checked to have a 6to4 prefix
-	 * (2002:V4ADDR::/48) that is NOT equal to the 6to4 prefix of
-	 * address configured on the sending interface.  Otherwise,
-	 * the packet was delivered to this interface in error and the
-	 * packet must be dropped.
-	 */
-	if ((ill->ill_is_6to4tun) && IN6_IS_ADDR_6TO4(&ip6h->ip6_dst)) {
-		ipif_t *ipif = ill->ill_ipif;
-
-		if (IN6_ARE_6TO4_PREFIX_EQUAL(&ipif->ipif_v6lcl_addr,
-		    &ip6h->ip6_dst)) {
-			if (ip_debug > 2) {
-				/* ip1dbg */
-				pr_addr_dbg("ip_xmit_v6: attempting to "
-				    "send 6to4 addressed IPv6 "
-				    "destination (%s) out the wrong "
-				    "interface.\n", AF_INET6,
-				    &ip6h->ip6_dst);
-			}
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
-			freemsg(mp);
-			return;
-		}
 	}
 
 	/* Flow-control check has been done in ip_wput_ire_v6 */

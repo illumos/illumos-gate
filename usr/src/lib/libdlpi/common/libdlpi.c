@@ -55,7 +55,6 @@ static int i_dlpi_open(const char *, int *, uint_t, boolean_t);
 static int i_dlpi_style1_open(dlpi_impl_t *);
 static int i_dlpi_style2_open(dlpi_impl_t *);
 static int i_dlpi_checkstyle(dlpi_impl_t *, t_uscalar_t);
-static int i_dlpi_remove_ppa(char *);
 static int i_dlpi_attach(dlpi_impl_t *);
 static void i_dlpi_passive(dlpi_impl_t *);
 
@@ -134,7 +133,6 @@ int
 dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 {
 	int		retval, on = 1;
-	int		cnt;
 	ifspec_t	ifsp;
 	dlpi_impl_t  	*dip;
 
@@ -165,14 +163,6 @@ dlpi_open(const char *linkname, dlpi_handle_t *dhp, uint_t flags)
 	dip->dli_note_processing = B_FALSE;
 	if (getenv("DLPI_DEVONLY") != NULL)
 		dip->dli_oflags |= DLPI_DEVONLY;
-
-	if (!(flags & DLPI_DEVIPNET)) {
-		dip->dli_mod_cnt = ifsp.ifsp_modcnt;
-		for (cnt = 0; cnt != dip->dli_mod_cnt; cnt++) {
-			(void) strlcpy(dip->dli_modlist[cnt],
-			    ifsp.ifsp_mods[cnt], DLPI_LINKNAME_MAX);
-		}
-	}
 
 	/* Copy linkname provided to the function. */
 	if (strlcpy(dip->dli_linkname, linkname, sizeof (dip->dli_linkname)) >=
@@ -1140,45 +1130,18 @@ i_dlpi_style1_open(dlpi_impl_t *dip)
 	int		retval, save_errno;
 	int		fd;
 
-	/*
-	 * In order to support open of syntax like device[.module[.module...]]
-	 * where modules need to be pushed onto the device stream, open only
-	 * device name, otherwise open the full linkname.
-	 */
-	retval = i_dlpi_open((dip->dli_mod_cnt != 0) ?
-	    dip->dli_provider : dip->dli_linkname, &fd,
-	    dip->dli_oflags, B_TRUE);
-
-	if (retval != DLPI_SUCCESS) {
-		dip->dli_mod_pushed = 0;
+	retval = i_dlpi_open(dip->dli_linkname, &fd, dip->dli_oflags, B_TRUE);
+	if (retval != DLPI_SUCCESS)
 		return (retval);
-	}
 	dip->dli_fd = fd;
-
-	/*
-	 * Try to push modules (if any) onto the device stream. If I_PUSH
-	 * fails, we increment count of modules pushed (dli_mod_pushed)
-	 * expecting it is last module to be pushed and thus will be pushed
-	 * in i_dlpi_style2_open().
-	 */
-	for (dip->dli_mod_pushed = 0; dip->dli_mod_pushed < dip->dli_mod_cnt;
-	    dip->dli_mod_pushed++) {
-		if (ioctl(fd, I_PUSH,
-		    dip->dli_modlist[dip->dli_mod_pushed]) == -1) {
-			dip->dli_mod_pushed++;
-			return (DLPI_FAILURE);
-		}
-	}
 
 	if ((retval = i_dlpi_checkstyle(dip, DL_STYLE1)) != DLPI_SUCCESS) {
 		save_errno = errno;
 		(void) close(dip->dli_fd);
 		errno = save_errno;
-		dip->dli_mod_pushed = 0;
-		return (retval);
 	}
 
-	return (DLPI_SUCCESS);
+	return (retval);
 }
 
 /*
@@ -1190,45 +1153,10 @@ i_dlpi_style2_open(dlpi_impl_t *dip)
 	int 		fd;
 	int 		retval, save_errno;
 
-	/*
-	 * If style 1 open failed, we need to determine how far it got and
-	 * finish up the open() call as a style 2 open.
-	 *
-	 * If no modules were pushed (mod_pushed == 0), then we need to
-	 * open it as a style 2 link.
-	 *
-	 * If the pushing of the last module failed, we need to
-	 * try pushing it as a style 2 module. Decrement dli_mod_pushed
-	 * count so it can be pushed onto the stream.
-	 *
-	 * Otherwise we failed during the push of an intermediate module and
-	 * must fail out and close the link.
-	 */
-	if (dip->dli_mod_pushed == 0) {
-		if ((retval = i_dlpi_open(dip->dli_provider, &fd,
-		    dip->dli_oflags, B_FALSE)) != DLPI_SUCCESS) {
-			return (retval);
-		}
-		dip->dli_fd = fd;
-	} else if (dip->dli_mod_pushed == dip->dli_mod_cnt) {
-		if (i_dlpi_remove_ppa(dip->dli_modlist[dip->dli_mod_cnt - 1])
-		    != DLPI_SUCCESS)
-			return (DLPI_ELINKNAMEINVAL);
-
-		dip->dli_mod_pushed--;
-		fd = dip->dli_fd;
-	} else {
-		return (DLPI_ELINKNAMEINVAL);
-	}
-
-	/* Try and push modules (if any) onto the device stream. */
-	for (; dip->dli_mod_pushed < dip->dli_mod_cnt; dip->dli_mod_pushed++) {
-		if (ioctl(fd, I_PUSH,
-		    dip->dli_modlist[dip->dli_mod_pushed]) == -1) {
-			retval = DL_SYSERR;
-			goto failure;
-		}
-	}
+	retval = i_dlpi_open(dip->dli_provider, &fd, dip->dli_oflags, B_FALSE);
+	if (retval != DLPI_SUCCESS)
+		return (retval);
+	dip->dli_fd = fd;
 
 	/*
 	 * Special case: DLPI_SERIAL flag (synchronous serial lines) is not a
@@ -1248,10 +1176,8 @@ i_dlpi_style2_open(dlpi_impl_t *dip)
 		return (DLPI_SUCCESS);
 
 attach:
-	if ((retval = i_dlpi_attach(dip)) != DLPI_SUCCESS)
-		goto failure;
-
-	return (DLPI_SUCCESS);
+	if ((retval = i_dlpi_attach(dip)) == DLPI_SUCCESS)
+		return (DLPI_SUCCESS);
 
 failure:
 	save_errno = errno;
@@ -1275,25 +1201,6 @@ i_dlpi_checkstyle(dlpi_impl_t *dip, t_uscalar_t style)
 		retval = DLPI_EBADLINK;
 
 	return (retval);
-}
-
-/*
- * Remove PPA from end of linkname.
- * Return DLPI_SUCCESS if found, else return DLPI_FAILURE.
- */
-static int
-i_dlpi_remove_ppa(char *linkname)
-{
-	int i = strlen(linkname) - 1;
-
-	if (i == -1 || !isdigit(linkname[i--]))
-		return (DLPI_FAILURE);
-
-	while (i >= 0 && isdigit(linkname[i]))
-		i--;
-
-	linkname[i + 1] = '\0';
-	return (DLPI_SUCCESS);
 }
 
 /*
@@ -1842,6 +1749,13 @@ i_dlpi_notifyind_process(dlpi_impl_t *dip, dl_notify_ind_t *dlnotifyindp)
 		notifinfo.dni_size = dlnotifyindp->dl_data;
 		break;
 	case DL_NOTE_PHYS_ADDR:
+		/*
+		 * libdlpi currently only supports notifications for
+		 * DL_CURR_PHYS_ADDR.
+		 */
+		if (dlnotifyindp->dl_data != DL_CURR_PHYS_ADDR)
+			return (DLPI_ENOTENOTSUP);
+
 		dataoff = dlnotifyindp->dl_addr_offset;
 		datalen = dlnotifyindp->dl_addr_length;
 

@@ -63,7 +63,6 @@
 #include <inet/ipdrop.h>
 #include <inet/ipclassifier.h>
 #include <inet/sctp_ip.h>
-#include <inet/tun.h>
 
 /*
  * This source file contains Security Association Database (SADB) common
@@ -6618,12 +6617,9 @@ ipsec_tun_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 			 * Reset "sel" to indicate inner selectors.  Pass
 			 * inner PF_KEY address extensions for this to happen.
 			 */
-			err = ipsec_get_inverse_acquire_sel(sel,
-			    innsrcext, inndstext, diagnostic);
-			if (err != 0) {
-				ITP_REFRELE(itp, ns);
+			if ((err = ipsec_get_inverse_acquire_sel(sel,
+			    innsrcext, inndstext, diagnostic)) != 0)
 				return (err);
-			}
 			/*
 			 * Now look for a tunnel policy based on those inner
 			 * selectors.  (Common code is below.)
@@ -6637,13 +6633,9 @@ ipsec_tun_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 			 * configured - return to indicate a global policy
 			 * check is needed.
 			 */
-			if (itp != NULL) {
-				ITP_REFRELE(itp, ns);
-			}
 			return (0);
 		} else if (itp->itp_flags & ITPF_P_TUNNEL) {
 			/* Tunnel mode set with no inner selectors. */
-			ITP_REFRELE(itp, ns);
 			return (ENOENT);
 		}
 		/*
@@ -6661,7 +6653,6 @@ ipsec_tun_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 	*ppp = ipsec_find_policy_head(NULL, polhead,
 	    IPSEC_TYPE_INBOUND, sel, ns);
 	rw_exit(&polhead->iph_lock);
-	ITP_REFRELE(itp, ns);
 
 	/*
 	 * Don't default to global if we didn't find a matching policy entry.
@@ -6745,7 +6736,6 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 	ipsec_selector_t sel, isel;
 	mblk_t *retmp;
 	ip_stack_t	*ipst = ns->netstack_ip;
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	/* Normalize addresses */
 	if (sadb_addrcheck(NULL, (mblk_t *)samsg, (sadb_ext_t *)srcext, 0, ns)
@@ -6838,16 +6828,14 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 		break;
 	case IPPROTO_ENCAP:
 	case IPPROTO_IPV6:
-		rw_enter(&ipss->ipsec_itp_get_byaddr_rw_lock, RW_READER);
 		/*
 		 * Assume sel.ips_remote_addr_* has the right address at
 		 * that exact position.
 		 */
-		itp = ipss->ipsec_itp_get_byaddr(
-		    (uint32_t *)(&sel.ips_local_addr_v6),
-		    (uint32_t *)(&sel.ips_remote_addr_v6),
-		    src->sin6_family, ns);
-		rw_exit(&ipss->ipsec_itp_get_byaddr_rw_lock);
+		itp = itp_get_byaddr((uint32_t *)(&sel.ips_local_addr_v6),
+		    (uint32_t *)(&sel.ips_remote_addr_v6), src->sin6_family,
+		    ipst);
+
 		if (innsrcext == NULL) {
 			/*
 			 * Transport-mode tunnel, make sure we fake out isel
@@ -6895,6 +6883,9 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 	    samsg->sadb_msg_seq, samsg->sadb_msg_pid, ns);
 	if (pp != NULL) {
 		IPPOL_REFRELE(pp, ns);
+	}
+	if (itp != NULL) {
+		ITP_REFRELE(itp, ns);
 	}
 	if (retmp != NULL) {
 		return (retmp);

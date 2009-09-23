@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,7 @@
 
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
-#include <sys/priv_names.h>
+#include <sys/policy.h>
 
 /*
  * Process a LAIOC_MODIFY request.
@@ -114,7 +114,8 @@ aggr_ioc_create(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	force = create_arg->lc_force;
 
 	rc = aggr_grp_create(create_arg->lc_linkid, create_arg->lc_key, nports,
-	    ports, policy, mac_fixed, force, mac_addr, lacp_mode, lacp_timer);
+	    ports, policy, mac_fixed, force, mac_addr, lacp_mode, lacp_timer,
+	    cred);
 
 done:
 	kmem_free(ports, ports_size);
@@ -127,7 +128,7 @@ aggr_ioc_delete(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	laioc_delete_t *delete_arg = karg;
 
-	return (aggr_grp_delete(delete_arg->ld_linkid));
+	return (aggr_grp_delete(delete_arg->ld_linkid, cred));
 }
 
 typedef struct aggr_ioc_info_state {
@@ -195,21 +196,14 @@ static int
 aggr_ioc_info(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	laioc_info_t *info_argp = karg;
-	datalink_id_t linkid;
 	aggr_ioc_info_state_t state;
-
-	/*
-	 * linkid of the group to return. Must not be DATALINK_INVALID_LINKID.
-	 */
-	if ((linkid = info_argp->li_group_linkid) == DATALINK_INVALID_LINKID)
-		return (EINVAL);
 
 	state.bytes_left = info_argp->li_bufsize - sizeof (laioc_info_t);
 	state.where = (uchar_t *)arg + sizeof (laioc_info_t);
 	state.mode = mode;
 
-	return (aggr_grp_info(linkid, &state, aggr_ioc_info_new_grp,
-	    aggr_ioc_info_new_port));
+	return (aggr_grp_info(info_argp->li_group_linkid, &state,
+	    aggr_ioc_info_new_grp, aggr_ioc_info_new_port, cred));
 }
 
 static int
@@ -264,17 +258,16 @@ aggr_ioc_remove(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 
 static dld_ioc_info_t aggr_ioc_list[] = {
 	{LAIOC_CREATE, DLDCOPYIN, sizeof (laioc_create_t), aggr_ioc_create,
-	    {PRIV_SYS_DL_CONFIG}},
+	    secpolicy_dl_config},
 	{LAIOC_DELETE, DLDCOPYIN, sizeof (laioc_delete_t), aggr_ioc_delete,
-	    {PRIV_SYS_DL_CONFIG}},
-	{LAIOC_INFO, DLDCOPYINOUT, sizeof (laioc_info_t), aggr_ioc_info,
-	    {NULL}},
+	    secpolicy_dl_config},
+	{LAIOC_INFO, DLDCOPYINOUT, sizeof (laioc_info_t), aggr_ioc_info, NULL},
 	{LAIOC_ADD, DLDCOPYIN, sizeof (laioc_add_rem_t), aggr_ioc_add,
-	    {PRIV_SYS_DL_CONFIG}},
+	    secpolicy_dl_config},
 	{LAIOC_REMOVE, DLDCOPYIN, sizeof (laioc_add_rem_t), aggr_ioc_remove,
-	    {PRIV_SYS_DL_CONFIG}},
+	    secpolicy_dl_config},
 	{LAIOC_MODIFY, DLDCOPYIN, sizeof (laioc_modify_t), aggr_ioc_modify,
-	    {PRIV_SYS_DL_CONFIG}}
+	    secpolicy_dl_config}
 };
 
 int

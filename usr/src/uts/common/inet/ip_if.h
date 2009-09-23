@@ -38,10 +38,6 @@ extern "C" {
 
 #define	IP_LOOPBACK_MTU	(8*1024)
 
-/* DLPI SAPs are in host byte order for all systems */
-#define	IP_DL_SAP	0x0800
-#define	IP6_DL_SAP	0x86dd
-
 #ifdef	_KERNEL
 /*
  * Interface flags actually represent the state/properties of 3 different
@@ -187,7 +183,8 @@ extern	time_t	ill_frag_timeout(ill_t *, time_t);
 extern	int	ill_init(queue_t *, ill_t *);
 extern	void	ill_refresh_bcast(ill_t *);
 extern	void	ill_restart_dad(ill_t *, boolean_t);
-extern	boolean_t	ill_setdefaulttoken(ill_t *);
+extern	void	ill_setdefaulttoken(ill_t *);
+extern	void	ill_setdesttoken(ill_t *);
 extern	int	ill_set_phys_addr(ill_t *, mblk_t *);
 extern	int	ill_replumb(ill_t *, mblk_t *);
 extern	void	ill_set_ndmp(ill_t *, mblk_t *, uint_t, uint_t);
@@ -268,8 +265,8 @@ extern	void	ill_update_source_selection(ill_t *);
 extern	ipif_t	*ipif_select_source_v6(ill_t *, const in6_addr_t *, boolean_t,
     uint32_t, zoneid_t);
 extern	boolean_t	ipif_cant_setlinklocal(ipif_t *);
-extern	int	ipif_setlinklocal(ipif_t *);
-extern	void	ipif_set_tun_llink(ill_t *, struct iftun_req *);
+extern	void	ipif_setlinklocal(ipif_t *);
+extern	void	ipif_setdestlinklocal(ipif_t *);
 extern	ipif_t	*ipif_lookup_on_ifindex(uint_t, boolean_t, zoneid_t, queue_t *,
     mblk_t *, ipsq_func_t, int *, ip_stack_t *);
 extern	ipif_t	*ipif_get_next_ipif(ipif_t *curr, ill_t *ill);
@@ -296,7 +293,6 @@ typedef	int	ip_extract_func_t(queue_t *, mblk_t *, const ip_ioctl_cmd_t *,
     cmd_info_t *, ipsq_func_t);
 
 extern	ip_extract_func_t ip_extract_arpreq, ip_extract_lifreq;
-extern	ip_extract_func_t ip_extract_tunreq;
 
 extern	int	ip_addr_availability_check(ipif_t *);
 extern	void	ip_ll_subnet_defaults(ill_t *, mblk_t *);
@@ -431,9 +427,6 @@ extern int ip_sioctl_tonlink(ipif_t *, sin_t *, queue_t *, mblk_t *,
 extern int ip_sioctl_tmysite(ipif_t *, sin_t *, queue_t *, mblk_t *,
     ip_ioctl_cmd_t *, void *);
 extern int ip_sioctl_tmyaddr(ipif_t *, sin_t *, queue_t *, mblk_t *,
-    ip_ioctl_cmd_t *, void *);
-
-extern int ip_sioctl_tunparam(ipif_t *, sin_t *, queue_t *, mblk_t *,
     ip_ioctl_cmd_t *, void *);
 
 extern int ip_sioctl_get_binding(ipif_t *, sin_t *, queue_t *,

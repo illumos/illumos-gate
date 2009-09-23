@@ -89,7 +89,6 @@ struct Pf_ext_packetfilt pf;
 static int vlanid = 0;
 
 static void usage(void);
-void show_count();
 static void snoop_sigrecover(int sig, siginfo_t *info, void *p);
 static char *protmalloc(size_t);
 static void resetperm(void);

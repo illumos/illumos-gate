@@ -57,6 +57,7 @@ extern "C" {
 #define	AGGR_IOC	0x0A66
 #define	VNIC_IOC	0x0171
 #define	SIMNET_IOC	0x5132
+#define	IPTUN_IOC	0x454A
 #define	BRIDGE_IOC	0xB81D
 
 /* GLDv3 modules use these macros to generate unique ioctl commands */
@@ -64,6 +65,7 @@ extern "C" {
 #define	AGGRIOC(cmdid)		DLD_IOC_CMD(AGGR_IOC, (cmdid))
 #define	VNICIOC(cmdid)		DLD_IOC_CMD(VNIC_IOC, (cmdid))
 #define	SIMNETIOC(cmdid)	DLD_IOC_CMD(SIMNET_IOC, (cmdid))
+#define	IPTUNIOC(cmdid)		DLD_IOC_CMD(IPTUN_IOC, (cmdid))
 #define	BRIDGEIOC(cmdid)	DLD_IOC_CMD(BRIDGE_IOC, (cmdid))
 
 #ifdef _KERNEL
@@ -82,16 +84,14 @@ extern "C" {
  * callback function does not need to copyin/out its own data.
  */
 
-/* Maximum number of Privileges */
-#define	DLD_MAX_PRIV	16
-
 typedef int (dld_ioc_func_t)(void *, intptr_t, int, cred_t *, int *);
+typedef int (dld_ioc_priv_func_t)(const cred_t *);
 typedef struct dld_ioc_info {
 	uint_t		di_cmd;
 	uint_t		di_flags;
 	size_t		di_argsize;
 	dld_ioc_func_t	*di_func;
-	const char	*di_priv[DLD_MAX_PRIV];
+	dld_ioc_priv_func_t *di_priv_func;
 } dld_ioc_info_t;
 
 /* Values for di_flags */

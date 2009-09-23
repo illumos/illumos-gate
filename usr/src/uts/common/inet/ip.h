@@ -471,6 +471,13 @@ typedef enum {
 #define	ICMP_ADDRESS_MASK_REQUEST	17
 #define	ICMP_ADDRESS_MASK_REPLY		18
 
+/* Evaluates to true if the ICMP type is an ICMP error */
+#define	ICMP_IS_ERROR(type)	(		\
+	(type) == ICMP_DEST_UNREACHABLE ||	\
+	(type) == ICMP_SOURCE_QUENCH ||		\
+	(type) == ICMP_TIME_EXCEEDED ||		\
+	(type) == ICMP_PARAM_PROBLEM)
+
 /* ICMP_TIME_EXCEEDED codes */
 #define	ICMP_TTL_EXCEEDED		0
 #define	ICMP_REASSEMBLY_TIME_EXCEEDED	1
@@ -563,7 +570,7 @@ typedef struct ipha_s {
 
 struct ill_s;
 
-typedef	boolean_t ip_v6intfid_func_t(struct ill_s *, in6_addr_t *);
+typedef	void ip_v6intfid_func_t(struct ill_s *, in6_addr_t *);
 typedef	boolean_t ip_v6mapinfo_func_t(uint_t, uint8_t *, uint8_t *, uint32_t *,
     in6_addr_t *);
 typedef boolean_t ip_v4mapinfo_func_t(uint_t, uint8_t *, uint8_t *, uint32_t *,
@@ -573,9 +580,12 @@ typedef boolean_t ip_v4mapinfo_func_t(uint_t, uint8_t *, uint8_t *, uint32_t *,
 typedef struct ip_m_s {
 	t_uscalar_t		ip_m_mac_type;	/* From <sys/dlpi.h> */
 	int			ip_m_type;	/* From <net/if_types.h> */
+	t_uscalar_t		ip_m_ipv4sap;
+	t_uscalar_t		ip_m_ipv6sap;
 	ip_v4mapinfo_func_t	*ip_m_v4mapinfo;
 	ip_v6mapinfo_func_t	*ip_m_v6mapinfo;
 	ip_v6intfid_func_t	*ip_m_v6intfid;
+	ip_v6intfid_func_t	*ip_m_v6destintfid;
 } ip_m_t;
 
 /*
@@ -595,12 +605,10 @@ typedef struct ip_m_s {
 #define	MEDIA_V6MINFO(ip_m, plen, bphys, maddr, hwxp, v6ptr) \
 	(((ip_m)->ip_m_v6mapinfo != NULL) && \
 	(*(ip_m)->ip_m_v6mapinfo)(plen, bphys, maddr, hwxp, v6ptr))
-#define	MEDIA_V6INTFID(ip_m, ill, v6ptr) \
-	(((ip_m)->ip_m_v6intfid != NULL) && \
-	(*(ip_m)->ip_m_v6intfid)(ill, v6ptr))
+/* ip_m_v6*intfid return void and are never NULL */
+#define	MEDIA_V6INTFID(ip_m, ill, v6ptr) (ip_m)->ip_m_v6intfid(ill, v6ptr)
 #define	MEDIA_V6DESTINTFID(ip_m, ill, v6ptr) \
-	(((ip_m)->ip_m_v6destintfid != NULL) && \
-	(*(ip_m)->ip_m_v6destintfid)(ill, v6ptr))
+	(ip_m)->ip_m_v6destintfid(ill, v6ptr)
 
 /* Router entry types */
 #define	IRE_BROADCAST		0x0001	/* Route entry for broadcast address */
@@ -1959,12 +1967,14 @@ typedef struct ill_s {
 	mblk_t	*ill_promiscoff_mp;	/* for ill_leave_allmulti() */
 	mblk_t	*ill_dlpi_deferred;	/* b_next chain of control messages */
 	mblk_t	*ill_ardeact_mp;	/* deact mp from ipmp_ill_activate() */
+	mblk_t	*ill_dest_addr_mp;	/* mblk which holds ill_dest_addr */
 	mblk_t	*ill_replumb_mp;	/* replumb mp from ill_replumb() */
 	mblk_t	*ill_phys_addr_mp;	/* mblk which holds ill_phys_addr */
 #define	ill_last_mp_to_free	ill_phys_addr_mp
 
 	cred_t	*ill_credp;		/* opener's credentials */
 	uint8_t	*ill_phys_addr;		/* ill_phys_addr_mp->b_rptr + off */
+	uint8_t *ill_dest_addr;		/* ill_dest_addr_mp->b_rptr + off */
 
 	uint_t	ill_state_flags;	/* see ILL_* flags above */
 
@@ -1978,15 +1988,15 @@ typedef struct ill_s {
 		ill_ifname_pending : 1,
 		ill_join_allmulti : 1,
 		ill_logical_down : 1,
-		ill_is_6to4tun : 1,	/* Interface is a 6to4 tunnel */
-
 		ill_dl_up : 1,
+
 		ill_up_ipifs : 1,
 		ill_note_link : 1,	/* supports link-up notification */
 		ill_capab_reneg : 1, /* capability renegotiation to be done */
 		ill_dld_capab_inprog : 1, /* direct dld capab call in prog */
+
 		ill_need_recover_multicast : 1,
-		ill_pad_to_bit_31 : 18;
+		ill_pad_to_bit_31 : 19;
 
 	/* Following bit fields protected by ill_lock */
 	uint_t
@@ -1997,7 +2007,10 @@ typedef struct ill_s {
 
 		ill_arp_bringup_pending : 1,
 		ill_arp_extend : 1,	/* ARP has DAD extensions */
-		ill_pad_bit_31 : 26;
+		ill_manual_token : 1,	/* system won't override ill_token */
+		ill_manual_linklocal : 1, /* system won't auto-conf linklocal */
+
+		ill_pad_bit_31 : 24;
 
 	/*
 	 * Used in SIOCSIFMUXID and SIOCGIFMUXID for 'ifconfig unplumb'.
@@ -2030,7 +2043,7 @@ typedef struct ill_s {
 	mblk_t	*ill_capab_reset_mp;	/* Preallocated mblk for capab reset */
 
 	/*
-	 * New fields for IPv6
+	 * Fields for IPv6
 	 */
 	uint8_t	ill_max_hops;	/* Maximum hops for any logical interface */
 	uint_t	ill_max_mtu;	/* Maximum MTU for any logical interface */
@@ -2038,7 +2051,8 @@ typedef struct ill_s {
 	uint32_t ill_reachable_time;	/* Value for ND algorithm in msec */
 	uint32_t ill_reachable_retrans_time; /* Value for ND algorithm msec */
 	uint_t	ill_max_buf;		/* Max # of req to buffer for ND */
-	in6_addr_t	ill_token;
+	in6_addr_t	ill_token;	/* IPv6 interface id */
+	in6_addr_t	ill_dest_token;	/* Destination IPv6 interface id */
 	uint_t		ill_token_length;
 	uint32_t	ill_xmit_count;		/* ndp max multicast xmits */
 	mib2_ipIfStatsEntry_t	*ill_ip_mib;	/* ver indep. interface mib */
@@ -2071,7 +2085,7 @@ typedef struct ill_s {
 	uint8_t		*ill_nd_lla;	/* Link Layer Address */
 	uint_t		ill_nd_lla_len;	/* Link Layer Address length */
 	/*
-	 * We now have 3 phys_addr_req's sent down. This field keeps track
+	 * We have 4 phys_addr_req's sent down. This field keeps track
 	 * of which one is pending.
 	 */
 	t_uscalar_t	ill_phys_addr_pend; /* which dl_phys_addr_req pending */
@@ -2183,6 +2197,8 @@ typedef struct ill_s {
  *							absence of ipsq writer.
  * ill_phys_addr_mp		ipsq + down ill		only when ill is up
  * ill_phys_addr		ipsq + down ill		only when ill is up
+ * ill_dest_addr_mp		ipsq + down ill		only when ill is up
+ * ill_dest_addr		ipsq + down ill		only when ill is up
  *
  * ill_state_flags		ill_lock		ill_lock
  * exclusive bit flags		ipsq_t			ipsq_t
@@ -2210,6 +2226,7 @@ typedef struct ill_s {
  * report partially updated results without executing in the ipsq.
  * ill_token			ipsq + ill_lock		ill_lock
  * ill_token_length		ipsq + ill_lock		ill_lock
+ * ill_dest_token		ipsq + down ill		only when ill is up
  * ill_xmit_count		ipsq + down ill		write once
  * ill_ip6_mib			ipsq + down ill		only when ill is up
  * ill_icmp6_mib		ipsq + down ill		only when ill is up
@@ -2277,14 +2294,13 @@ typedef struct ip_ioctl_cmd_s {
  *
  * IF_CMD		1	old style ifreq cmd
  * LIF_CMD		2	new style lifreq cmd
- * TUN_CMD		3	tunnel related
- * ARP_CMD		4	arpreq cmd
- * XARP_CMD		5	xarpreq cmd
- * MSFILT_CMD		6	multicast source filter cmd
- * MISC_CMD		7	misc cmd (not a more specific one above)
+ * ARP_CMD		3	arpreq cmd
+ * XARP_CMD		4	xarpreq cmd
+ * MSFILT_CMD		5	multicast source filter cmd
+ * MISC_CMD		6	misc cmd (not a more specific one above)
  */
 
-enum { IF_CMD = 1, LIF_CMD, TUN_CMD, ARP_CMD, XARP_CMD, MSFILT_CMD, MISC_CMD };
+enum { IF_CMD = 1, LIF_CMD, ARP_CMD, XARP_CMD, MSFILT_CMD, MISC_CMD };
 
 #define	IPI_DONTCARE	0	/* For ioctl encoded values that don't matter */
 
@@ -2649,7 +2665,6 @@ typedef struct ire_s {
 	uint32_t	ire_ihandle;	/* Associate interface IREs to cache */
 	ipif_t		*ire_ipif;	/* the interface that this ire uses */
 	uint32_t	ire_flags;	/* flags related to route (RTF_*) */
-	uint_t ire_ipsec_overhead;	/* IPSEC overhead */
 	/*
 	 * Neighbor Cache Entry for IPv6; arp info for IPv4
 	 */
@@ -3431,7 +3446,7 @@ extern boolean_t ip_md_hcksum_attr(struct multidata_s *, struct pdesc_s *,
 			uint32_t, uint32_t, uint32_t, uint32_t);
 extern boolean_t ip_md_zcopy_attr(struct multidata_s *, struct pdesc_s *,
 			uint_t);
-extern	void	ip_unbind(conn_t *connp);
+extern void	ip_unbind(conn_t *);
 
 extern void tnet_init(void);
 extern void tnet_fini(void);

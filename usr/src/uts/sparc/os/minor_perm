@@ -189,5 +189,6 @@ physmem:* 0600 root sys
 sdp:sdp 0666 root sys
 nsmb:* 0666 root sys
 bmc:bmc 0666 root sys
+iptunq:* 0640 root sys
 fm:* 0644 root sys
 clone:bridge 0666 root sys

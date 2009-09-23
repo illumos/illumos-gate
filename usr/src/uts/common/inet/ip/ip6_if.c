@@ -65,7 +65,6 @@
 #include <inet/ip_ndp.h>
 #include <inet/ip_if.h>
 #include <inet/ip6_asp.h>
-#include <inet/tun.h>
 #include <inet/ipclassifier.h>
 #include <inet/sctp_ip.h>
 
@@ -1146,26 +1145,23 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 }
 
 /*
- * Derive a token from the link layer address.
+ * Derive an interface id from the link layer address.
  */
-boolean_t
+void
 ill_setdefaulttoken(ill_t *ill)
 {
-	int		i;
-	in6_addr_t	v6addr, v6mask;
+	if (!ill->ill_manual_token) {
+		bzero(&ill->ill_token, sizeof (ill->ill_token));
+		MEDIA_V6INTFID(ill->ill_media, ill, &ill->ill_token);
+		ill->ill_token_length = IPV6_TOKEN_LEN;
+	}
+}
 
-	if (!MEDIA_V6INTFID(ill->ill_media, ill, &v6addr))
-		return (B_FALSE);
-
-	(void) ip_plen_to_mask_v6(IPV6_TOKEN_LEN, &v6mask);
-
-	for (i = 0; i < 4; i++)
-		v6mask.s6_addr32[i] = v6mask.s6_addr32[i] ^
-		    (uint32_t)0xffffffff;
-
-	V6_MASK_COPY(v6addr, v6mask, ill->ill_token);
-	ill->ill_token_length = IPV6_TOKEN_LEN;
-	return (B_TRUE);
+void
+ill_setdesttoken(ill_t *ill)
+{
+	bzero(&ill->ill_dest_token, sizeof (ill->ill_dest_token));
+	MEDIA_V6DESTINTFID(ill->ill_media, ill, &ill->ill_dest_token);
 }
 
 /*
@@ -1183,123 +1179,27 @@ ipif_get_linklocal(in6_addr_t *dest, const in6_addr_t *token)
 }
 
 /*
- * Set a nice default address for either automatic tunnels tsrc/96 or
- * 6to4 tunnels 2002:<tsrc>::1/64
+ * Set a default IPv6 address for a 6to4 tunnel interface 2002:<tsrc>::1/16
  */
 static void
-ipif_set_tun_auto_addr(ipif_t *ipif, struct iftun_req *ta)
+ipif_set6to4addr(ipif_t *ipif)
 {
-	sin6_t	sin6;
-	sin_t	*sin;
-	ill_t	*ill = ipif->ipif_ill;
-	tun_t *tp = (tun_t *)ill->ill_wq->q_next->q_ptr;
+	ill_t		*ill = ipif->ipif_ill;
+	struct in_addr	v4phys;
 
-	if (ta->ifta_saddr.ss_family != AF_INET ||
-	    (ipif->ipif_flags & IPIF_UP) || !ipif->ipif_isv6 ||
-	    (ta->ifta_flags & IFTUN_SRC) == 0)
+	ASSERT(ill->ill_mactype == DL_6TO4);
+	ASSERT(ill->ill_phys_addr_length == sizeof (struct in_addr));
+	ASSERT(ipif->ipif_isv6);
+
+	if (ipif->ipif_flags & IPIF_UP)
 		return;
 
-	/*
-	 * Check the tunnel type by examining q_next->q_ptr
-	 */
-	if (tp->tun_flags & TUN_AUTOMATIC) {
-		/* this is an automatic tunnel */
-		(void) ip_plen_to_mask_v6(IPV6_ABITS - IP_ABITS,
-		    &ipif->ipif_v6net_mask);
-		bzero(&sin6, sizeof (sin6_t));
-		sin = (sin_t *)&ta->ifta_saddr;
-		V4_PART_OF_V6(sin6.sin6_addr) = sin->sin_addr.s_addr;
-		sin6.sin6_family = AF_INET6;
-		(void) ip_sioctl_addr(ipif, (sin_t *)&sin6,
-		    NULL, NULL, NULL, NULL);
-	} else if (tp->tun_flags & TUN_6TO4) {
-		/* this is a 6to4 tunnel */
-		(void) ip_plen_to_mask_v6(IPV6_PREFIX_LEN,
-		    &ipif->ipif_v6net_mask);
-		sin = (sin_t *)&ta->ifta_saddr;
-		/* create a 6to4 address from the IPv4 tsrc */
-		IN6_V4ADDR_TO_6TO4(&sin->sin_addr, &sin6.sin6_addr);
-		sin6.sin6_family = AF_INET6;
-		(void) ip_sioctl_addr(ipif, (sin_t *)&sin6,
-		    NULL, NULL, NULL, NULL);
-	} else {
-		ip1dbg(("ipif_set_tun_auto_addr: Unknown tunnel type"));
-		return;
-	}
-}
-
-/*
- * Set link local for ipif_id 0 of a configured tunnel based on the
- * tsrc or tdst parameter
- * For tunnels over IPv4 use the IPv4 address prepended with 32 zeros as
- * the token.
- * For tunnels over IPv6 use the low-order 64 bits of the "inner" IPv6 address
- * as the token for the "outer" link.
- */
-void
-ipif_set_tun_llink(ill_t *ill, struct iftun_req *ta)
-{
-	ipif_t		*ipif;
-	sin_t		*sin;
-	in6_addr_t	*s6addr;
-
-	ASSERT(IAM_WRITER_ILL(ill));
-
-	/* The first ipif must be id zero. */
-	ipif = ill->ill_ipif;
-	ASSERT(ipif->ipif_id == 0);
-
-	/* no link local for automatic tunnels */
-	if (!(ipif->ipif_flags & IPIF_POINTOPOINT)) {
-		ipif_set_tun_auto_addr(ipif, ta);
-		return;
-	}
-
-	if ((ta->ifta_flags & IFTUN_DST) &&
-	    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6pp_dst_addr)) {
-		sin6_t  sin6;
-
-		ASSERT(!(ipif->ipif_flags & IPIF_UP));
-		bzero(&sin6, sizeof (sin6_t));
-		if ((ta->ifta_saddr.ss_family == AF_INET)) {
-			sin = (sin_t *)&ta->ifta_daddr;
-			V4_PART_OF_V6(sin6.sin6_addr) =
-			    sin->sin_addr.s_addr;
-		} else {
-			s6addr =
-			    &((sin6_t *)&ta->ifta_daddr)->sin6_addr;
-			sin6.sin6_addr.s6_addr32[3] = s6addr->s6_addr32[3];
-			sin6.sin6_addr.s6_addr32[2] = s6addr->s6_addr32[2];
-		}
-		ipif_get_linklocal(&ipif->ipif_v6pp_dst_addr,
-		    &sin6.sin6_addr);
-		ipif->ipif_v6subnet = ipif->ipif_v6pp_dst_addr;
-	}
-	if ((ta->ifta_flags & IFTUN_SRC)) {
-		ASSERT(!(ipif->ipif_flags & IPIF_UP));
-
-		/* Set the token if it isn't already set */
-		if (IN6_IS_ADDR_UNSPECIFIED(&ill->ill_token)) {
-			if ((ta->ifta_saddr.ss_family == AF_INET)) {
-				sin = (sin_t *)&ta->ifta_saddr;
-				V4_PART_OF_V6(ill->ill_token) =
-				    sin->sin_addr.s_addr;
-			} else {
-				s6addr =
-				    &((sin6_t *)&ta->ifta_saddr)->sin6_addr;
-				ill->ill_token.s6_addr32[3] =
-				    s6addr->s6_addr32[3];
-				ill->ill_token.s6_addr32[2] =
-				    s6addr->s6_addr32[2];
-			}
-			ill->ill_token_length = IPV6_TOKEN_LEN;
-		}
-		/*
-		 * Attempt to set the link local address if it isn't set.
-		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr))
-			(void) ipif_setlinklocal(ipif);
-	}
+	(void) ip_plen_to_mask_v6(16, &ipif->ipif_v6net_mask);
+	bcopy(ill->ill_phys_addr, &v4phys, sizeof (struct in_addr));
+	IN6_V4ADDR_TO_6TO4(&v4phys, &ipif->ipif_v6lcl_addr);
+	ipif->ipif_v6src_addr = ipif->ipif_v6lcl_addr;
+	V6_MASK_COPY(ipif->ipif_v6lcl_addr, ipif->ipif_v6net_mask,
+	    ipif->ipif_v6subnet);
 }
 
 /*
@@ -1322,9 +1222,8 @@ ipif_cant_setlinklocal(ipif_t *ipif)
 
 /*
  * Generate a link-local address from the token.
- * Return zero if the address was set, or non-zero if it couldn't be set.
  */
-int
+void
 ipif_setlinklocal(ipif_t *ipif)
 {
 	ill_t		*ill = ipif->ipif_ill;
@@ -1332,22 +1231,57 @@ ipif_setlinklocal(ipif_t *ipif)
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
+	/*
+	 * ill_manual_linklocal is set when the link-local address was
+	 * manually configured.
+	 */
+	if (ill->ill_manual_linklocal)
+		return;
+
+	/*
+	 * IPv6 interfaces over 6to4 tunnels are special.  They do not have
+	 * link-local addresses, but instead have a single automatically
+	 * generated global address.
+	 */
+	if (ill->ill_mactype == DL_6TO4) {
+		ipif_set6to4addr(ipif);
+		return;
+	}
+
 	if (ipif_cant_setlinklocal(ipif))
-		return (-1);
+		return;
 
 	ov6addr = ipif->ipif_v6lcl_addr;
 	ipif_get_linklocal(&ipif->ipif_v6lcl_addr, &ill->ill_token);
 	sctp_update_ipif_addr(ipif, ov6addr);
 	(void) ip_plen_to_mask_v6(IPV6_LL_PREFIXLEN, &ipif->ipif_v6net_mask);
-	V6_MASK_COPY(ipif->ipif_v6lcl_addr, ipif->ipif_v6net_mask,
-	    ipif->ipif_v6subnet);
+	if (IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6pp_dst_addr)) {
+		V6_MASK_COPY(ipif->ipif_v6lcl_addr, ipif->ipif_v6net_mask,
+		    ipif->ipif_v6subnet);
+	}
 
 	if (ipif->ipif_flags & IPIF_NOLOCAL) {
 		ipif->ipif_v6src_addr = ipv6_all_zeros;
 	} else {
 		ipif->ipif_v6src_addr = ipif->ipif_v6lcl_addr;
 	}
-	return (0);
+}
+
+/*
+ * Set the destination link-local address for a point-to-point IPv6
+ * interface with a destination interface id (IP tunnels are such
+ * interfaces).
+ */
+void
+ipif_setdestlinklocal(ipif_t *ipif)
+{
+	ill_t	*ill = ipif->ipif_ill;
+
+	ASSERT(IAM_WRITER_ILL(ill));
+	if (IN6_IS_ADDR_UNSPECIFIED(&ill->ill_dest_token))
+		return;
+	ipif_get_linklocal(&ipif->ipif_v6pp_dst_addr, &ill->ill_dest_token);
+	ipif->ipif_v6subnet = ipif->ipif_v6pp_dst_addr;
 }
 
 /*
@@ -1374,6 +1308,9 @@ ipif_ndp_setup_multicast(ipif_t *ipif, nce_t **ret_nce)
 
 	if (ret_nce != NULL)
 		*ret_nce = NULL;
+
+	if (ipif->ipif_flags & IPIF_POINTOPOINT)
+		return (0);
 
 	/*
 	 * IPMP meta-interfaces don't have any inherent multicast mappings,
@@ -2818,6 +2755,7 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 {
 	mblk_t	*v6token_mp = NULL;
 	mblk_t	*v6lla_mp = NULL;
+	mblk_t	*dest_mp = NULL;
 	mblk_t	*phys_mp = NULL;
 	mblk_t	*info_mp = NULL;
 	mblk_t	*attach_mp = NULL;
@@ -2843,6 +2781,15 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 			goto bad;
 		((dl_phys_addr_req_t *)v6lla_mp->b_rptr)->dl_addr_type =
 		    DL_IPV6_LINK_LAYER_ADDR;
+	}
+
+	if (ill->ill_mactype == DL_IPV4 || ill->ill_mactype == DL_IPV6) {
+		dest_mp = ip_dlpi_alloc(sizeof (dl_phys_addr_req_t) +
+		    sizeof (t_scalar_t), DL_PHYS_ADDR_REQ);
+		if (dest_mp == NULL)
+			goto bad;
+		((dl_phys_addr_req_t *)dest_mp->b_rptr)->dl_addr_type =
+		    DL_CURR_DEST_ADDR;
 	}
 
 	/*
@@ -2913,10 +2860,12 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	}
 	ill_dlpi_send(ill, bind_mp);
 	ill_dlpi_send(ill, info_mp);
-	if (ill->ill_isv6) {
+	if (v6token_mp != NULL)
 		ill_dlpi_send(ill, v6token_mp);
+	if (v6lla_mp != NULL)
 		ill_dlpi_send(ill, v6lla_mp);
-	}
+	if (dest_mp != NULL)
+		ill_dlpi_send(ill, dest_mp);
 	ill_dlpi_send(ill, phys_mp);
 	ill_dlpi_send(ill, notify_mp);
 	ill_dlpi_send(ill, unbind_mp);
@@ -2929,6 +2878,7 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 bad:
 	freemsg(v6token_mp);
 	freemsg(v6lla_mp);
+	freemsg(dest_mp);
 	freemsg(phys_mp);
 	freemsg(info_mp);
 	freemsg(attach_mp);
@@ -3111,11 +3061,7 @@ ipif_up_done_v6(ipif_t *ipif)
 		    ipst);
 	}
 
-	/*
-	 * Set up the IRE_IF_RESOLVER or IRE_IF_NORESOLVER, as appropriate.
-	 * Note that atun interfaces have an all-zero ipif_v6subnet.
-	 * Thus we allow a zero subnet as long as the mask is non-zero.
-	 */
+	/* Set up the IRE_IF_RESOLVER or IRE_IF_NORESOLVER, as appropriate. */
 	if (stq != NULL && !(ipif->ipif_flags & IPIF_NOXMIT) &&
 	    !(IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6subnet) &&
 	    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6net_mask))) {
@@ -3151,62 +3097,6 @@ ipif_up_done_v6(ipif_t *ipif)
 		    NULL,
 		    NULL,
 		    ipst);
-	}
-
-	/*
-	 * Setup 2002::/16 route, if this interface is a 6to4 tunnel
-	 */
-	if (IN6_IS_ADDR_6TO4(&ipif->ipif_v6lcl_addr) &&
-	    (ill->ill_is_6to4tun)) {
-		/*
-		 * Destination address is 2002::/16
-		 */
-#ifdef	_BIG_ENDIAN
-		const in6_addr_t prefix_addr = { 0x20020000U, 0, 0, 0 };
-		const in6_addr_t prefix_mask = { 0xffff0000U, 0, 0, 0 };
-#else
-		const in6_addr_t prefix_addr = { 0x00000220U, 0, 0, 0 };
-		const in6_addr_t prefix_mask = { 0x0000ffffU, 0, 0, 0 };
-#endif /* _BIG_ENDIAN */
-		char	buf2[INET6_ADDRSTRLEN];
-		ire_t *isdup;
-		in6_addr_t *first_addr = &ill->ill_ipif->ipif_v6lcl_addr;
-
-		/*
-		 * check to see if this route has already been added for
-		 * this tunnel interface.
-		 */
-		isdup = ire_ftable_lookup_v6(first_addr, &prefix_mask, 0,
-		    IRE_IF_NORESOLVER, ill->ill_ipif, NULL, ALL_ZONES, 0, NULL,
-		    (MATCH_IRE_SRC | MATCH_IRE_MASK), ipst);
-
-		if (isdup == NULL) {
-			ip1dbg(("ipif_up_done_v6: creating if IRE %d for %s",
-			    IRE_IF_NORESOLVER, inet_ntop(AF_INET6, &v6addr,
-			    buf2, sizeof (buf2))));
-
-			*irep++ = ire_create_v6(
-			    &prefix_addr,		/* 2002:: */
-			    &prefix_mask,		/* ffff:: */
-			    &ipif->ipif_v6lcl_addr, 	/* src addr */
-			    NULL, 			/* gateway */
-			    &ipif->ipif_mtu, 		/* max_frag */
-			    NULL, 			/* no src nce */
-			    NULL, 			/* no rfq */
-			    ill->ill_wq, 		/* stq */
-			    IRE_IF_NORESOLVER,		/* type */
-			    ipif,			/* interface */
-			    NULL,			/* v6cmask */
-			    0,
-			    0,
-			    RTF_UP,
-			    &ire_uinfo_null,
-			    NULL,
-			    NULL,
-			    ipst);
-		} else {
-			ire_refrele(isdup);
-		}
 	}
 
 	/* If an earlier ire_create failed, get out now */

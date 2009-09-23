@@ -95,6 +95,7 @@
 #include <sys/devinfo_impl.h>
 #include <sys/dumpadm.h>
 #include <sys/mntio.h>
+#include <inet/iptun.h>
 #include <sys/zcons.h>
 #include <sys/usb/clients/hid/hid.h>
 #include <sys/pm.h>
@@ -863,8 +864,6 @@ const struct ioc {
 	{ (uint_t)SIOCTMYADDR,		"SIOCTMYADDR",	"sioc_addrreq" },
 	{ (uint_t)SIOCTONLINK,		"SIOCTONLINK",	"sioc_addrreq" },
 	{ (uint_t)SIOCTMYSITE,		"SIOCTMYSITE",	"sioc_addrreq" },
-	{ (uint_t)SIOCGTUNPARAM,        "SIOCGTUNPARAM",        "iftun_req" },
-	{ (uint_t)SIOCSTUNPARAM,        "SIOCSTUNPARAM",        "iftun_req" },
 	{ (uint_t)SIOCFIPSECONFIG,	"SIOCFIPSECONFIG",	NULL },
 	{ (uint_t)SIOCSIPSECONFIG,	"SIOCSIPSECONFIG",	NULL },
 	{ (uint_t)SIOCDIPSECONFIG,	"SIOCDIPSECONFIG",	NULL },
@@ -1414,6 +1413,13 @@ const struct ioc {
 		NULL},
 	{ (uint_t)DINFOIDENT,		"DINFOIDENT",
 		NULL},
+
+	{ (uint_t)IPTUN_CREATE,	"IPTUN_CREATE",	"iptun_kparams_t"},
+	{ (uint_t)IPTUN_DELETE,	"IPTUN_DELETE", "datalink_id_t"},
+	{ (uint_t)IPTUN_MODIFY, "IPTUN_MODIFY", "iptun_kparams_t"},
+	{ (uint_t)IPTUN_INFO,	"IPTUN_INFO",	NULL},
+	{ (uint_t)IPTUN_SET_6TO4RELAY, "IPTUN_SET_6TO4RELAY",	NULL},
+	{ (uint_t)IPTUN_GET_6TO4RELAY, "IPTUN_GET_6TO4RELAY",	NULL},
 
 	/* zcons ioctls */
 	{ (uint_t)ZC_HOLDSLAVE,		"ZC_HOLDSLAVE",		NULL },

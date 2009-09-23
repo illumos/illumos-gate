@@ -1,0 +1,139 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# This service configures IP tunnel links and IP interfaces over IP
+# tunnels.
+#
+
+. /lib/svc/share/smf_include.sh
+
+#
+# Configure tunnels which were deferred by /lib/svc/method/net-physical (the
+# svc:/network/physical service) since it depends on the tunnel source
+# addresses being available.
+#
+# WARNING: you may wish to turn OFF forwarding if you haven't already, because
+# of various possible security vulnerabilities when configuring tunnels for
+# Virtual Private Network (VPN) construction.
+#
+# Also, if names are used in the /etc/hostname*.* files, those names have to
+# be in either DNS (and DNS is used) or in /etc/hosts, because this file is
+# executed before NIS or NIS+ is started.
+#
+
+#
+# get_tunnel_links: print the names of the tunnel links currently configured
+# on the running system.
+#
+get_tunnel_links ()
+{
+	/sbin/dladm show-iptun -p -o link
+}
+
+# plumb_tunnel <intf_name> <net_type> <intf_file>
+plumb_tunnel ()
+{
+	/sbin/ifconfig $1 $2 plumb
+	while read ifcmds; do
+  	if [ -n "$ifcmds" ]; then
+		/sbin/ifconfig $1 $2 $ifcmds
+	fi
+	done < $3 > /dev/null
+	/sbin/ifconfig $1 $2 up
+}
+
+case "$1" in
+start)
+	# First, bring up tunnel links
+	/sbin/dladm up-iptun
+
+	#
+	# Get the list of IP tunnel interfaces we'll need to configure.  These
+	# are comprised of IP interfaces over the tunnels we've just brought
+	# up in the above dladm command, and the implicit tunnels named "ip.*"
+	# that we'll also create for backward compatibility.  When we build
+	# the list of implicit tunnels, we have to make sure that they're not
+	# different kinds of links that are simply named "ip.*".
+	#
+	tunnel_links=`get_tunnel_links`
+	implicit_tunnel_names=`/usr/bin/ls -1 /etc/hostname.ip*.*[0-9] \
+	    /etc/hostname6.ip*.*[0-9] 2> /dev/null | /usr/bin/cut -f2- -d. | \
+	    /usr/bin/sort -u`
+	for intf_name in $implicit_tunnel_names; do
+		/sbin/dladm show-link -pP $intf_name > /dev/null 2>&1
+		if [ $? -ne 0 ]; then
+	    		implicit_tunnels="$implicit_tunnels $intf_name"
+		fi
+	done
+	tunnel_interfaces=`for intf in $tunnel_links $implicit_tunnels; do \
+	    echo $intf; done | /usr/bin/sort -u`
+
+	for intf_name in $tunnel_interfaces; do
+		if [ -f /etc/hostname.$intf_name ]; then
+			plumb_tunnel $intf_name inet /etc/hostname.$intf_name
+		fi
+		if [ -f /etc/hostname6.$intf_name ]; then
+			plumb_tunnel $intf_name inet6 /etc/hostname6.$intf_name
+		fi
+	done
+
+	#
+	# Set 6to4 Relay Router communication support policy and, if
+	# applicable, the destination Relay Router IPv4 address.  See
+	# /etc/default/inetinit for setting and further info on
+	# ACCEPT6TO4RELAY and RELAY6TO4ADDR.  If ACCEPT6TO4RELAY=NO, the
+	# default value in the kernel will be used.
+	#
+	[ -f /etc/default/inetinit ] && . /etc/default/inetinit
+	ACCEPT6TO4RELAY=`echo "$ACCEPT6TO4RELAY" | /usr/bin/tr '[A-Z]' '[a-z]'`
+	if [ "$ACCEPT6TO4RELAY" = yes ]; then
+		if [ "$RELAY6TO4ADDR" ]; then
+			/usr/sbin/6to4relay -e -a $RELAY6TO4ADDR
+		else
+			/usr/sbin/6to4relay -e
+		fi
+	fi
+	;;
+
+stop)
+	tunnel_links=`get_tunnel_links`
+
+	# Unplumb IP interfaces
+	for tun in $tunnel_links; do
+		/sbin/ifconfig $tun unplumb > /dev/null 2>&1
+		/sbin/ifconfig $tun inet6 unplumb > /dev/null 2>&1
+	done
+
+	# Take down the IP tunnel links
+	/sbin/dladm down-iptun
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+
+exit $SMF_EXIT_OK

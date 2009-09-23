@@ -19,16 +19,12 @@
 # CDDL HEADER END
 #
 #
-# uts/sparc/tun/Makefile
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the configured tunneling
-#	streams kernel module.
-#
-#	SPARC architecture dependent
+#	This makefile drives the production of the mac_6to4 plugin 
+#	kernel module.
 #
 
 #
@@ -39,17 +35,10 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= tun
-OBJECTS		= $(TUN_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(TUN_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_STRMOD_DIR)/$(MODULE)
-
-#
-# Extra for $(MODULE).check target
-#
-# Need to remove ipddi.o since it has non-static defines for _init etc.
-IP_CHECK_OBJS	= $(IP_OBJS:ipddi.o=ip.o)
-EXTRA_CHECK_OBJS = $(IP_CHECK_OBJS:%=../ip/$(OBJS_DIR)/%)
+MODULE		= mac_6to4
+OBJECTS		= $(MAC_6TO4_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(MAC_6TO4_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MAC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
@@ -64,23 +53,13 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# lint pass one enforcement
+#	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
+LDFLAGS		+= -dy -Nmisc/mac -Nmac/mac_ipv4
 
-#
-#	depends on ip and ip6
-#
-LDFLAGS		+= -dy -Ndrv/ip -Ndrv/ip6
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 #
 #	Default build targets.
@@ -89,11 +68,11 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 
 def:		$(DEF_DEPS)
 
-all:		$(ALL_DEPS) $(SISCHECK_DEPS)
+all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS) $(SISCLEAN_DEPS)
+clean:		$(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS) $(SISCLEAN_DEPS)
+clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
@@ -101,7 +80,7 @@ modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
-install:	$(INSTALL_DEPS) $(SISCHECK_DEPS)
+install:	$(INSTALL_DEPS)
 
 #
 #	Include common targets.

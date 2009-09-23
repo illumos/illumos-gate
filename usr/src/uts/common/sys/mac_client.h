@@ -146,6 +146,8 @@ extern int mac_unicast_primary_set(mac_handle_t, const uint8_t *);
 extern void mac_unicast_primary_get(mac_handle_t, uint8_t *);
 extern void mac_unicast_primary_info(mac_handle_t, char *, boolean_t *);
 
+extern boolean_t mac_dst_get(mac_handle_t, uint8_t *);
+
 extern int mac_addr_random(mac_client_handle_t, uint_t, uint8_t *,
     mac_diag_t *);
 

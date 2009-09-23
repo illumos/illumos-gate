@@ -7460,14 +7460,12 @@ udp_do_open(cred_t *credp, boolean_t isv6, int flags)
 		udp->udp_max_hdr_len = IPV6_HDR_LEN + UDPH_SIZE;
 		udp->udp_ttl = us->us_ipv6_hoplimit;
 		connp->conn_af_isv6 = B_TRUE;
-		connp->conn_flags |= IPCL_ISV6;
 	} else {
 		udp->udp_family = AF_INET;
 		udp->udp_ipversion = IPV4_VERSION;
 		udp->udp_max_hdr_len = IP_SIMPLE_HDR_LENGTH + UDPH_SIZE;
 		udp->udp_ttl = us->us_ipv4_ttl;
 		connp->conn_af_isv6 = B_FALSE;
-		connp->conn_flags &= ~IPCL_ISV6;
 	}
 
 	udp->udp_multicast_ttl = IP_DEFAULT_MULTICAST_TTL;

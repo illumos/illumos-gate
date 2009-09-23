@@ -287,7 +287,6 @@ typedef struct zone_cmd_rval {
 
 struct pool;
 struct brand;
-struct dlnamelist;
 
 /*
  * Structure to record list of ZFS datasets exported to a zone.
@@ -429,7 +428,7 @@ typedef struct zone {
 	/*
 	 * zone_dl_list is protected by zone_lock
 	 */
-	struct dlnamelist *zone_dl_list;
+	list_t		zone_dl_list;
 	netstack_t	*zone_netstack;
 	struct cpucap	*zone_cpucap;	/* CPU caps data */
 	/*
@@ -465,7 +464,8 @@ extern zone_t *zone_find_by_any_path(const char *, boolean_t);
 extern zone_t *zone_find_by_path(const char *);
 extern zoneid_t getzoneid(void);
 extern zone_t *zone_find_by_id_nolock(zoneid_t);
-extern int zone_datalink_walk(zoneid_t, int (*)(const char *, void *), void *);
+extern int zone_datalink_walk(zoneid_t, int (*)(datalink_id_t, void *), void *);
+extern int zone_check_datalink(zoneid_t *, datalink_id_t);
 
 /*
  * Zone-specific data (ZSD) APIs

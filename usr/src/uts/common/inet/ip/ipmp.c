@@ -2059,14 +2059,12 @@ ipmp_phyint_get_kstats(phyint_t *phyi, uint64_t kstats[])
 	const char	*name;
 	kstat_t		*ksp;
 	kstat_named_t	*kn;
+	ip_stack_t	*ipst = PHYINT_TO_IPST(phyi);
+	zoneid_t	zoneid;
 
 	bzero(kstats, sizeof (kstats[0]) * IPMP_KSTAT_MAX);
-
-	/*
-	 * NOTE: ALL_ZONES here assumes that there's at most one link
-	 * with a given name on a given system (safe for now).
-	 */
-	ksp = kstat_hold_byname("link", 0, phyi->phyint_name, ALL_ZONES);
+	zoneid = netstackid_to_zoneid(ipst->ips_netstack->netstack_stackid);
+	ksp = kstat_hold_byname("link", 0, phyi->phyint_name, zoneid);
 	if (ksp == NULL)
 		return;
 

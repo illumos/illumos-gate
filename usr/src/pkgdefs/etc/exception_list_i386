@@ -98,6 +98,7 @@ usr/include/sys/mac_flow_impl.h		i386
 usr/include/sys/mac_impl.h		i386
 usr/include/sys/mac_provider.h		i386
 usr/include/sys/mac_soft_ring.h		i386
+usr/include/inet/iptun.h		i386
 #
 # Private GLDv3 userland libraries and headers
 #
@@ -106,6 +107,7 @@ usr/include/libdlaggr.h		i386
 usr/include/libdlether.h	i386
 usr/include/libdlflow.h		i386
 usr/include/libdlflow_impl.h	i386
+usr/include/libdliptun.h	i386
 usr/include/libdlmgmt.h		i386
 usr/include/libdlsim.h		i386
 usr/include/libdlstat.h		i386
@@ -371,7 +373,6 @@ usr/include/inet/ip_impl.h		i386
 usr/include/inet/ip_ndp.h		i386
 usr/include/inet/ip2mac.h		i386
 usr/include/inet/ip2mac_impl.h		i386
-usr/include/inet/tun.h			i386
 usr/include/protocols/ripngd.h		i386
 usr/include/libmail.h			i386
 usr/include/s_string.h			i386
@@ -390,7 +391,6 @@ usr/include/sys/sha1.h			i386
 usr/include/sys/sha1_consts.h		i386
 usr/include/sys/sha2.h			i386
 usr/include/sys/sha2_consts.h		i386
-usr/include/inet/tun.h			i386
 #
 # Filtering out directories not shipped
 #

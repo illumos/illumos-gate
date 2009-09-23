@@ -364,6 +364,8 @@ DRV_KMODS	+= qlt
 DRV_KMODS	+= iscsit
 DRV_KMODS	+= ncall nsctl sdbc nskern sv
 DRV_KMODS	+= ii rdc rdcsrv rdcstub 
+DRV_KMODS	+= iptun
+DRV_KMODS	+= iptunq
 
 #
 # Don't build some of these for OpenSolaris, since they will be
@@ -530,10 +532,10 @@ FS_KMODS	+= smbfs
 #
 #	Streams Modules (/kernel/strmod):
 #
-STRMOD_KMODS	+= 6to4tun atun bufmod connld dedump ldterm pckt pfmod pipemod
+STRMOD_KMODS	+= bufmod connld dedump ldterm pckt pfmod pipemod
 STRMOD_KMODS	+= ptem redirmod rpcmod rlmod telmod timod
 STRMOD_KMODS	+= spppasyn spppcomp
-STRMOD_KMODS	+= tirdwr ttcompat tun
+STRMOD_KMODS	+= tirdwr ttcompat
 STRMOD_KMODS	+= usbkbm
 STRMOD_KMODS	+= usbms
 STRMOD_KMODS	+= usb_ah
@@ -717,7 +719,10 @@ PCBE_KMODS	+= p123_pcbe p4_pcbe opteron_pcbe core_pcbe
 #
 #	MAC-Type Plugin Modules (/kernel/mac)
 #
+MAC_KMODS	+= mac_6to4
 MAC_KMODS	+= mac_ether
+MAC_KMODS	+= mac_ipv4
+MAC_KMODS	+= mac_ipv6
 MAC_KMODS	+= mac_wifi
 MAC_KMODS	+= mac_ib
 

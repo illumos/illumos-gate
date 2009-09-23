@@ -42,6 +42,7 @@
 #include <sys/cmn_err.h>
 #include <sys/suntpi.h>
 #include <sys/policy.h>
+#include <sys/dls.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -56,12 +57,13 @@
 #include <inet/proto_set.h>
 #include <inet/nd.h>
 #include <inet/ip_if.h>
-#include <inet/tun.h>
 #include <inet/optcom.h>
 #include <inet/ipsec_info.h>
 #include <inet/ipsec_impl.h>
 #include <inet/spdsock.h>
 #include <inet/sadb.h>
+#include <inet/iptun.h>
+#include <inet/iptun/iptun_impl.h>
 
 #include <sys/isa_defs.h>
 
@@ -2782,58 +2784,6 @@ spdsock_updatealg(queue_t *q, mblk_t *mp, spd_ext_t *extv[])
 }
 
 /*
- * With a reference-held ill, dig down and find an instance of "tun", and
- * assign its tunnel policy pointer, while reference-holding it.  Also,
- * release ill's refrence when finished.
- *
- * We'll be messing with q_next, so be VERY careful.
- */
-static void
-find_tun_and_set_itp(ill_t *ill, ipsec_tun_pol_t *itp)
-{
-	queue_t *q;
-	tun_t *tun;
-
-	/* Don't bother if this ill is going away. */
-	if (ill->ill_flags & ILL_CONDEMNED) {
-		ill_refrele(ill);
-		return;
-	}
-
-
-	q = ill->ill_wq;
-	claimstr(q);	/* Lighter-weight than freezestr(). */
-
-	do {
-		/* Use strcmp() because "tun" is bounded. */
-		if (strcmp(q->q_qinfo->qi_minfo->mi_idname, "tun") == 0) {
-			/* Aha!  Got it. */
-			tun = (tun_t *)q->q_ptr;
-			if (tun != NULL) {
-				mutex_enter(&tun->tun_lock);
-				if (tun->tun_itp != itp) {
-					ASSERT(tun->tun_itp == NULL);
-					ITP_REFHOLD(itp);
-					tun->tun_itp = itp;
-				}
-				mutex_exit(&tun->tun_lock);
-				goto release_and_return;
-			}
-			/*
-			 * Else assume this is some other module named "tun"
-			 * and move on, hoping we find one that actually has
-			 * something in q_ptr.
-			 */
-		}
-		q = q->q_next;
-	} while (q != NULL);
-
-release_and_return:
-	releasestr(ill->ill_wq);
-	ill_refrele(ill);
-}
-
-/*
  * Sort through the mess of polhead options to retrieve an appropriate one.
  * Returns NULL if we send an spdsock error.  Returns a valid pointer if we
  * found a valid polhead.  Returns ALL_ACTIVE_POLHEADS (aka. -1) or
@@ -2852,7 +2802,7 @@ get_appropriate_polhead(queue_t *q, mblk_t *mp, spd_if_t *tunname, int spdid,
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
 	netstack_t *ns = ss->spdsock_spds->spds_netstack;
 	uint64_t gen;	/* Placeholder */
-	ill_t *v4, *v6;
+	datalink_id_t linkid;
 
 	active = (spdid == SPD_ACTIVE);
 	*itpp = NULL;
@@ -2895,19 +2845,13 @@ get_appropriate_polhead(queue_t *q, mblk_t *mp, spd_if_t *tunname, int spdid,
 			}
 		}
 		/*
-		 * Troll the plumbed tunnels and see if we have a
-		 * match.  We need to do this always in case we add
-		 * policy AFTER plumbing a tunnel.
+		 * Troll the plumbed tunnels and see if we have a match.  We
+		 * need to do this always in case we add policy AFTER plumbing
+		 * a tunnel.
 		 */
-		v4 = ill_lookup_on_name(tname, B_FALSE, B_FALSE, NULL,
-		    NULL, NULL, &errno, NULL, ns->netstack_ip);
-		if (v4 != NULL)
-			find_tun_and_set_itp(v4, itp);
-		v6 = ill_lookup_on_name(tname, B_FALSE, B_TRUE, NULL,
-		    NULL, NULL, &errno, NULL, ns->netstack_ip);
-		if (v6 != NULL)
-			find_tun_and_set_itp(v6, itp);
-		ASSERT(itp != NULL);
+		if (dls_mgmt_get_linkid(tname, &linkid) == 0)
+			iptun_set_policy(linkid, itp);
+
 		*itpp = itp;
 		/* For spdsock dump state, set the polhead's name. */
 		if (msgtype == SPD_DUMP) {

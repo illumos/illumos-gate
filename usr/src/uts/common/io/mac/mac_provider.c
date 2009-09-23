@@ -251,6 +251,7 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 		if (mregp->m_dst_addr != NULL) {
 			bcopy(mregp->m_dst_addr, mip->mi_dstaddr,
 			    mip->mi_type->mt_addr_length);
+			mip->mi_dstaddr_set = B_TRUE;
 		}
 	} else if (mregp->m_src_addr != NULL) {
 		goto fail;
@@ -262,20 +263,31 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	 * driver can update this information by calling
 	 * mac_pdata_update().
 	 */
-	if (mregp->m_pdata != NULL) {
+	if (mip->mi_type->mt_ops.mtops_ops & MTOPS_PDATA_VERIFY) {
 		/*
-		 * Verify that the plugin supports MAC plugin data and that
-		 * the supplied data is valid.
+		 * Verify if the supplied plugin data is valid.  Note that
+		 * even if the caller passed in a NULL pointer as plugin data,
+		 * we still need to verify if that's valid as the plugin may
+		 * require plugin data to function.
 		 */
-		if (!(mip->mi_type->mt_ops.mtops_ops & MTOPS_PDATA_VERIFY))
-			goto fail;
 		if (!mip->mi_type->mt_ops.mtops_pdata_verify(mregp->m_pdata,
 		    mregp->m_pdata_size)) {
 			goto fail;
 		}
-		mip->mi_pdata = kmem_alloc(mregp->m_pdata_size, KM_SLEEP);
-		bcopy(mregp->m_pdata, mip->mi_pdata, mregp->m_pdata_size);
-		mip->mi_pdata_size = mregp->m_pdata_size;
+		if (mregp->m_pdata != NULL) {
+			mip->mi_pdata =
+			    kmem_alloc(mregp->m_pdata_size, KM_SLEEP);
+			bcopy(mregp->m_pdata, mip->mi_pdata,
+			    mregp->m_pdata_size);
+			mip->mi_pdata_size = mregp->m_pdata_size;
+		}
+	} else if (mregp->m_pdata != NULL) {
+		/*
+		 * The caller supplied non-NULL plugin data, but the plugin
+		 * does not recognize plugin data.
+		 */
+		err = EINVAL;
+		goto fail;
 	}
 
 	/*
@@ -848,6 +860,20 @@ mac_unicst_update(mac_handle_t mh, const uint8_t *addr)
 	 * Send a MAC_NOTE_UNICST notification.
 	 */
 	i_mac_notify(mip, MAC_NOTE_UNICST);
+}
+
+void
+mac_dst_update(mac_handle_t mh, const uint8_t *addr)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+
+	if (mip->mi_type->mt_addr_length == 0)
+		return;
+
+	i_mac_perim_enter(mip);
+	bcopy(addr, mip->mi_dstaddr, mip->mi_type->mt_addr_length);
+	i_mac_perim_exit(mip);
+	i_mac_notify(mip, MAC_NOTE_DEST);
 }
 
 /*

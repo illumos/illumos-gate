@@ -26,6 +26,7 @@
 #ifndef	_SYS_VNIC_IMPL_H
 #define	_SYS_VNIC_IMPL_H
 
+#include <sys/cred.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_client.h>
 #include <sys/mac_client_priv.h>
@@ -72,17 +73,17 @@ typedef struct vnic_s {
 
 extern int vnic_dev_create(datalink_id_t, datalink_id_t, vnic_mac_addr_type_t *,
     int *, uchar_t *, int *, uint_t, uint16_t, mac_resource_props_t *,
-    uint32_t, vnic_ioc_diag_t *);
+    uint32_t, vnic_ioc_diag_t *, cred_t *);
 extern int vnic_dev_modify(datalink_id_t, uint_t, vnic_mac_addr_type_t,
     uint_t, uchar_t *, uint_t, mac_resource_props_t *);
-extern int vnic_dev_delete(datalink_id_t, uint32_t);
+extern int vnic_dev_delete(datalink_id_t, uint32_t, cred_t *);
 
 extern void vnic_dev_init(void);
 extern void vnic_dev_fini(void);
 extern uint_t vnic_dev_count(void);
 extern dev_info_t *vnic_get_dip(void);
 
-extern int vnic_info(vnic_info_t *);
+extern int vnic_info(vnic_info_t *, cred_t *);
 
 #ifdef	__cplusplus
 }

@@ -388,6 +388,7 @@ struct mac_impl_s {
 	kmutex_t		mi_lock;
 	uint8_t			mi_addr[MAXMACADDRLEN];	/* mi_rw_lock */
 	uint8_t			mi_dstaddr[MAXMACADDRLEN]; /* mi_rw_lock */
+	boolean_t		mi_dstaddr_set;
 
 	/*
 	 * The mac perimeter. All client initiated create/modify operations

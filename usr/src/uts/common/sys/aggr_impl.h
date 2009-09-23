@@ -27,6 +27,7 @@
 #define	_SYS_AGGR_IMPL_H
 
 #include <sys/types.h>
+#include <sys/cred.h>
 #include <sys/mac_ether.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_client.h>
@@ -152,6 +153,7 @@ typedef struct aggr_grp_s {
 	aggr_port_t	*lg_ports;		/* list of configured ports */
 	aggr_port_t	*lg_mac_addr_port;
 	mac_handle_t	lg_mh;
+	zoneid_t	lg_zoneid;
 	uint_t		lg_nattached_ports;
 	krwlock_t	lg_tx_lock;
 	uint_t		lg_ntx_ports;
@@ -235,12 +237,12 @@ extern void aggr_grp_init(void);
 extern void aggr_grp_fini(void);
 extern int aggr_grp_create(datalink_id_t, uint32_t, uint_t, laioc_port_t *,
     uint32_t, boolean_t, boolean_t, uchar_t *, aggr_lacp_mode_t,
-    aggr_lacp_timer_t);
-extern int aggr_grp_delete(datalink_id_t);
+    aggr_lacp_timer_t, cred_t *);
+extern int aggr_grp_delete(datalink_id_t, cred_t *);
 extern void aggr_grp_free(aggr_grp_t *);
 
 extern int aggr_grp_info(datalink_id_t, void *, aggr_grp_info_new_grp_fn_t,
-    aggr_grp_info_new_port_fn_t);
+    aggr_grp_info_new_port_fn_t, cred_t *);
 extern void aggr_grp_notify(aggr_grp_t *, uint32_t);
 extern boolean_t aggr_grp_attach_port(aggr_grp_t *, aggr_port_t *);
 extern boolean_t aggr_grp_detach_port(aggr_grp_t *, aggr_port_t *);

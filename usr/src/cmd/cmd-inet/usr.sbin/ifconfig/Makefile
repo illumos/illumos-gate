@@ -37,7 +37,7 @@ COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:%.o=%.c)
 SRCS=		$(LOCALSRCS) $(COMMONSRCS)
 
 CPPFLAGS +=	-I$(CMDINETCOMMONDIR) -I$(SRC)/common/net/dhcp
-LDLIBS +=       -ldhcpagent -ldlpi -linetutil -linetcfg -lipmp -ldladm
+LDLIBS +=       -ldhcpagent -ldlpi -linetutil -lipmp -ldladm
 LINTFLAGS +=	-m
 
 ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)

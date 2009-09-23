@@ -54,7 +54,6 @@ extern "C" {
 
 #include <ipmp_mpathd.h>
 #include <ipmp_admin.h>
-#include <inetcfg.h>
 #include <libinetutil.h>
 #include <alloca.h>
 

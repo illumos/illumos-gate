@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _SYS_NETSTACK_H
@@ -59,26 +59,27 @@ typedef id_t	netstackid_t;
  *
  * The order of these is important for some modules both for
  * the creation (which done in ascending order) and destruction (which is
- * done ine in decending order).
+ * done in in decending order).
  */
 #define	NS_ALL		-1	/* Match all */
-#define	NS_STR		0	/* autopush list etc */
-#define	NS_HOOK		1
-#define	NS_NETI		2
-#define	NS_ARP		3
-#define	NS_IP		4
-#define	NS_ICMP		5
-#define	NS_UDP		6
-#define	NS_TCP		7
-#define	NS_SCTP		8
-#define	NS_RTS		9
-#define	NS_IPSEC	10
-#define	NS_KEYSOCK	11
-#define	NS_SPDSOCK	12
-#define	NS_IPSECAH	13
-#define	NS_IPSECESP	14
-#define	NS_TUN		15
-#define	NS_IPNET	16
+#define	NS_DLS		0
+#define	NS_IPTUN	1
+#define	NS_STR		2	/* autopush list etc */
+#define	NS_HOOK		3
+#define	NS_NETI		4
+#define	NS_ARP		5
+#define	NS_IP		6
+#define	NS_ICMP		7
+#define	NS_UDP		8
+#define	NS_TCP		9
+#define	NS_SCTP		10
+#define	NS_RTS		11
+#define	NS_IPSEC	12
+#define	NS_KEYSOCK	13
+#define	NS_SPDSOCK	14
+#define	NS_IPSECAH	15
+#define	NS_IPSECESP	16
+#define	NS_IPNET	17
 #define	NS_MAX		(NS_IPNET+1)
 
 /*
@@ -136,6 +137,8 @@ struct netstack {
 	union {
 		void	*nu_modules[NS_MAX];
 		struct {
+			struct dls_stack	*nu_dls;
+			struct iptun_stack	*nu_iptun;
 			struct str_stack	*nu_str;
 			struct hook_stack	*nu_hook;
 			struct neti_stack	*nu_neti;
@@ -151,11 +154,12 @@ struct netstack {
 			struct spd_stack	*nu_spdsock;
 			struct ipsecah_stack	*nu_ipsecah;
 			struct ipsecesp_stack	*nu_ipsecesp;
-			struct tun_stack	*nu_tun;
 			struct ipnet_stack	*nu_ipnet;
 		} nu_s;
 	} netstack_u;
 #define	netstack_modules	netstack_u.nu_modules
+#define	netstack_dls		netstack_u.nu_s.nu_dls
+#define	netstack_iptun		netstack_u.nu_s.nu_iptun
 #define	netstack_str		netstack_u.nu_s.nu_str
 #define	netstack_hook		netstack_u.nu_s.nu_hook
 #define	netstack_neti		netstack_u.nu_s.nu_neti
@@ -171,7 +175,6 @@ struct netstack {
 #define	netstack_spdsock	netstack_u.nu_s.nu_spdsock
 #define	netstack_ipsecah	netstack_u.nu_s.nu_ipsecah
 #define	netstack_ipsecesp	netstack_u.nu_s.nu_ipsecesp
-#define	netstack_tun		netstack_u.nu_s.nu_tun
 #define	netstack_ipnet		netstack_u.nu_s.nu_ipnet
 
 	nm_state_t	netstack_m_state[NS_MAX]; /* module state */

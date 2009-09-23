@@ -2698,7 +2698,8 @@ mactype_unregister(const char *ident)
 	}
 	ASSERT(mtp == (mactype_t *)val);
 
-	kmem_free(mtp->mt_brdcst_addr, mtp->mt_addr_length);
+	if (mtp->mt_brdcst_addr != NULL)
+		kmem_free(mtp->mt_brdcst_addr, mtp->mt_addr_length);
 	kmem_free(mtp, sizeof (mactype_t));
 done:
 	mutex_exit(&i_mactype_lock);

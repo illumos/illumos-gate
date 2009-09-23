@@ -54,6 +54,7 @@
 #include <sys/mac_flow.h>
 #include <inttypes.h>
 #include <sys/ethernet.h>
+#include <inet/iptun.h>
 #include <net/wpa.h>
 #include <sys/sysmacros.h>
 #include <sys/vlan.h>
@@ -146,6 +147,7 @@ static pd_setf_t	do_set_zone, do_set_rate_prop,
 			set_stp_prop, set_bridge_forward, set_bridge_pvid;
 
 static pd_checkf_t	do_check_zone, do_check_autopush, do_check_rate,
+			do_check_hoplimit, do_check_encaplim,
 			i_dladm_uint32_check, do_check_maxbw, do_check_cpus,
 			do_check_priority, check_stp_prop, check_bridge_pvid;
 
@@ -328,6 +330,10 @@ static link_attr_t link_attr[] = {
 	{ MAC_PROP_BIND_CPU,	sizeof (mac_resource_props_t),	"cpus"},
 
 	{ MAC_PROP_TAGMODE,	sizeof (link_tagmode_t),	"tagmode"},
+
+	{ MAC_PROP_IPTUN_HOPLIMIT, sizeof (uint32_t),	"hoplimit"},
+
+	{ MAC_PROP_IPTUN_ENCAPLIMIT, sizeof (uint32_t),	"encaplimit"},
 
 	{ MAC_PROP_PVID,	sizeof (uint16_t),	"default_tag"},
 
@@ -552,6 +558,14 @@ static prop_desc_t	prop_table[] = {
 	    NULL, 0,
 	    DATALINK_CLASS_PHYS | DATALINK_CLASS_AGGR | DATALINK_CLASS_VNIC,
 	    DL_ETHER },
+
+	{ "hoplimit", { "", 0 }, NULL, 0,
+	    i_dladm_set_public_prop, i_dladm_range_get, i_dladm_uint32_get,
+	    do_check_hoplimit, 0, DATALINK_CLASS_IPTUN, DATALINK_ANY_MEDIATYPE},
+
+	{ "encaplimit", { "", 0 }, NULL, 0,
+	    i_dladm_set_public_prop, i_dladm_range_get, i_dladm_uint32_get,
+	    do_check_encaplim, 0, DATALINK_CLASS_IPTUN, DL_IPV6},
 
 	{ "forward", { "1", 1 },
 	    link_01_vals, VALCNT(link_01_vals),
@@ -1360,7 +1374,6 @@ do_set_zone(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 {
 	dladm_status_t		status = DLADM_STATUS_OK;
 	zoneid_t		zid_old, zid_new;
-	char			link[MAXLINKNAMELEN];
 	char			*cp;
 	dld_ioc_macprop_t	*dip;
 	dld_ioc_zid_t		*dzp;
@@ -1380,75 +1393,25 @@ do_set_zone(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 	free(dip);
 
 	zid_new = dzp->diz_zid;
-	(void) strlcpy(link, dzp->diz_link, MAXLINKNAMELEN);
-
-	/* Do nothing if setting to current value */
 	if (zid_new == zid_old)
+		return (DLADM_STATUS_OK);
+
+	if ((status = i_dladm_set_public_prop(handle, pdp, linkid, vdp, val_cnt,
+	    flags, media)) != DLADM_STATUS_OK)
 		return (status);
 
-	if (zid_new != GLOBAL_ZONEID) {
-		/*
-		 * If the new zoneid is the global zone, we could destroy
-		 * the link (in the case of an implicitly-created VLAN) as a
-		 * result of setting the zoneid. In that case, we defer the
-		 * operation to the end of this function to avoid recreating
-		 * the VLAN and getting a different linkid during the rollback
-		 * if other operation fails.
-		 *
-		 * Otherwise, this operation will hold a reference to the
-		 * link and prevent a link renaming, so we need to do it
-		 * before other operations.
-		 */
-		status = i_dladm_set_public_prop(handle, pdp, linkid, vdp,
-		    val_cnt, flags, media);
-		if (status != DLADM_STATUS_OK)
-			return (status);
-	}
-
+	/*
+	 * It is okay to fail to update the /dev entry (some vanity-named
+	 * links do not have a /dev entry).
+	 */
 	if (zid_old != GLOBAL_ZONEID) {
-		if (zone_remove_datalink(zid_old, link) != 0 &&
-		    errno != ENXIO) {
-			status = dladm_errno2status(errno);
-			goto rollback1;
-		}
-
-		/*
-		 * It is okay to fail to update the /dev entry (some
-		 * vanity-named links do not have a /dev entry).
-		 */
 		(void) i_dladm_update_deventry(handle, zid_old, linkid,
 		    B_FALSE);
 	}
-
-	if (zid_new != GLOBAL_ZONEID) {
-		if (zone_add_datalink(zid_new, link) != 0) {
-			status = dladm_errno2status(errno);
-			goto rollback2;
-		}
-
+	if (zid_new != GLOBAL_ZONEID)
 		(void) i_dladm_update_deventry(handle, zid_new, linkid, B_TRUE);
-	} else {
-		status = i_dladm_set_public_prop(handle, pdp, linkid, vdp,
-		    val_cnt, flags, media);
-		if (status != DLADM_STATUS_OK)
-			goto rollback2;
-	}
 
 	return (DLADM_STATUS_OK);
-
-rollback2:
-	if (zid_old != GLOBAL_ZONEID)
-		(void) i_dladm_update_deventry(handle, zid_old, linkid, B_TRUE);
-	if (zid_old != GLOBAL_ZONEID)
-		(void) zone_add_datalink(zid_old, link);
-rollback1:
-	if (zid_new != GLOBAL_ZONEID) {
-		dzp->diz_zid = zid_old;
-		(void) i_dladm_set_public_prop(handle, pdp, linkid, vdp,
-		    val_cnt, flags, media);
-	}
-
-	return (status);
 }
 
 /* ARGSUSED */
@@ -1457,7 +1420,6 @@ do_check_zone(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
     char **prop_val, uint_t val_cnt, val_desc_t *vdp, datalink_media_t media)
 {
 	char		*zone_name;
-	char		linkname[MAXLINKNAMELEN];
 	zoneid_t	zoneid;
 	dladm_status_t	status = DLADM_STATUS_OK;
 	dld_ioc_zid_t	*dzp;
@@ -1469,17 +1431,7 @@ do_check_zone(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 	if (dzp == NULL)
 		return (DLADM_STATUS_NOMEM);
 
-	if ((status = dladm_datalink_id2info(handle, linkid, NULL, NULL, NULL,
-	    linkname, MAXLINKNAMELEN)) != DLADM_STATUS_OK) {
-		goto done;
-	}
-
 	zone_name = (prop_val != NULL) ? *prop_val : GLOBAL_ZONENAME;
-	if (strlen(linkname) > MAXLINKNAMELEN) {
-		status = DLADM_STATUS_BADVAL;
-		goto done;
-	}
-
 	if ((zoneid = getzoneidbyname(zone_name)) == -1) {
 		status = DLADM_STATUS_BADVAL;
 		goto done;
@@ -1503,7 +1455,7 @@ do_check_zone(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 	(void) memset(dzp, 0, sizeof (dld_ioc_zid_t));
 
 	dzp->diz_zid = zoneid;
-	(void) strlcpy(dzp->diz_link, linkname, MAXLINKNAMELEN);
+	dzp->diz_linkid = linkid;
 
 	vdp->vd_val = (uintptr_t)dzp;
 	return (DLADM_STATUS_OK);
@@ -2349,7 +2301,7 @@ do_set_radio(dladm_handle_t handle, datalink_id_t linkid,
 /* ARGSUSED */
 static dladm_status_t
 do_set_radio_prop(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
-    val_desc_t *vdp, uint_t val_cnt, uint_t fags, datalink_media_t media)
+    val_desc_t *vdp, uint_t val_cnt, uint_t flags, datalink_media_t media)
 {
 	dladm_wlan_radio_t radio = (dladm_wlan_radio_t)vdp->vd_val;
 	dladm_status_t status;
@@ -2360,6 +2312,50 @@ do_set_radio_prop(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
 	status = do_set_radio(handle, linkid, &radio);
 
 	return (status);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+do_check_hoplimit(dladm_handle_t handle, prop_desc_t *pdp,
+    datalink_id_t linkid, char **prop_val, uint_t val_cnt, val_desc_t *vdp,
+    datalink_media_t media)
+{
+	int32_t	hlim;
+	char	*ep;
+
+	if (val_cnt != 1)
+		return (DLADM_STATUS_BADVALCNT);
+
+	errno = 0;
+	hlim = strtol(*prop_val, &ep, 10);
+	if (errno != 0 || ep == *prop_val || hlim < 1 ||
+	    hlim > (int32_t)UINT8_MAX)
+		return (DLADM_STATUS_BADVAL);
+	vdp->vd_val = hlim;
+	return (DLADM_STATUS_OK);
+}
+
+/* ARGSUSED */
+static dladm_status_t
+do_check_encaplim(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
+    char **prop_val, uint_t val_cnt, val_desc_t *vdp, datalink_media_t media)
+{
+	int32_t	elim;
+	char	*ep;
+
+	if (media != DL_IPV6)
+		return (DLADM_STATUS_BADARG);
+
+	if (val_cnt != 1)
+		return (DLADM_STATUS_BADVALCNT);
+
+	errno = 0;
+	elim = strtol(*prop_val, &ep, 10);
+	if (errno != 0 || ep == *prop_val || elim < 0 ||
+	    elim > (int32_t)UINT8_MAX)
+		return (DLADM_STATUS_BADVAL);
+	vdp->vd_val = elim;
+	return (DLADM_STATUS_OK);
 }
 
 static dladm_status_t

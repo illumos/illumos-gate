@@ -210,12 +210,7 @@ extern "C" {
 #define	SIOCTMYSITE	_IOWR('i', 146, struct sioc_addrreq)
 							/* In this site? */
 
-#define	SIOCGTUNPARAM	_IOR('i',  147, struct iftun_req)
-							/* get tunnel */
-							/* parameters */
-#define	SIOCSTUNPARAM	_IOW('i',  148, struct iftun_req)
-							/* set tunnel */
-							/* parameters */
+/* 147 and 148 were SIOC*TUNPARAM ioctls.  Feel free to re-use. */
 
 #define	SIOCFIPSECONFIG	_IOW('i',  149, 0)		/* Flush Policy  */
 #define	SIOCSIPSECONFIG	_IOW('i',  150, 0)		/* Set Policy */

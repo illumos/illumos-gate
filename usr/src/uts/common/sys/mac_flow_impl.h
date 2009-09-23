@@ -319,7 +319,6 @@ struct flow_entry_s {					/* Protected by */
 	kstat_t			*fe_ksp;
 	flow_stats_t		fe_flowstats;
 	boolean_t		fe_desc_logged;
-	zoneid_t		fe_zoneid;
 	uint64_t		fe_nic_speed;
 };
 

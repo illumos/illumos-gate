@@ -360,7 +360,6 @@ dmfe:*
 mxfe:*
 bmc:bmc
 dld:*
-aggr:*
 smbios:smbios
 zfs:*
 zfs:zfs
@@ -386,6 +385,7 @@ domcaps:*
 evtchn:*
 privcmd:*
 xenbus:*
+iptunq:*
 fm:*
 amd_iommu:*
 xpvtap:*

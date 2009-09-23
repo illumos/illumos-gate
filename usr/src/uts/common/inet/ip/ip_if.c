@@ -84,7 +84,6 @@
 #include <inet/ip_ndp.h>
 #include <inet/ip_if.h>
 #include <inet/ip_impl.h>
-#include <inet/tun.h>
 #include <inet/sctp_ip.h>
 #include <inet/ip_netinfo.h>
 
@@ -196,9 +195,13 @@ static void	ill_set_phys_addr_tail(ipsq_t *, queue_t *, mblk_t *, void *);
 static void	ill_replumb_tail(ipsq_t *, queue_t *, mblk_t *, void *);
 
 static ip_v6intfid_func_t ip_ether_v6intfid, ip_ib_v6intfid;
+static ip_v6intfid_func_t ip_ipv4_v6intfid, ip_ipv6_v6intfid;
 static ip_v6intfid_func_t ip_ipmp_v6intfid, ip_nodef_v6intfid;
+static ip_v6intfid_func_t ip_ipv4_v6destintfid, ip_ipv6_v6destintfid;
 static ip_v6mapinfo_func_t ip_ether_v6mapinfo, ip_ib_v6mapinfo;
+static ip_v6mapinfo_func_t ip_nodef_v6mapinfo;
 static ip_v4mapinfo_func_t ip_ether_v4mapinfo, ip_ib_v4mapinfo;
+static ip_v4mapinfo_func_t ip_nodef_v4mapinfo;
 static void	ipif_save_ire(ipif_t *, ire_t *);
 static void	ipif_remove_ire(ipif_t *, ire_t *);
 static void 	ip_cgtp_bcast_add(ire_t *, ire_t *, ip_stack_t *);
@@ -439,21 +442,36 @@ static ipha_t icmp_ipha = {
 static uchar_t	ip_six_byte_all_ones[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 static ip_m_t   ip_m_tbl[] = {
-	{ DL_ETHER, IFT_ETHER, ip_ether_v4mapinfo, ip_ether_v6mapinfo,
-	    ip_ether_v6intfid },
-	{ DL_CSMACD, IFT_ISO88023, ip_ether_v4mapinfo, ip_ether_v6mapinfo,
+	{ DL_ETHER, IFT_ETHER, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    ip_ether_v4mapinfo, ip_ether_v6mapinfo, ip_ether_v6intfid,
 	    ip_nodef_v6intfid },
-	{ DL_TPB, IFT_ISO88024, ip_ether_v4mapinfo, ip_ether_v6mapinfo,
+	{ DL_CSMACD, IFT_ISO88023, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    ip_ether_v4mapinfo, ip_ether_v6mapinfo, ip_nodef_v6intfid,
 	    ip_nodef_v6intfid },
-	{ DL_TPR, IFT_ISO88025, ip_ether_v4mapinfo, ip_ether_v6mapinfo,
+	{ DL_TPB, IFT_ISO88024, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    ip_ether_v4mapinfo, ip_ether_v6mapinfo, ip_nodef_v6intfid,
 	    ip_nodef_v6intfid },
-	{ DL_FDDI, IFT_FDDI, ip_ether_v4mapinfo, ip_ether_v6mapinfo,
-	    ip_ether_v6intfid },
-	{ DL_IB, IFT_IB, ip_ib_v4mapinfo, ip_ib_v6mapinfo,
-	    ip_ib_v6intfid },
-	{ SUNW_DL_VNI, IFT_OTHER, NULL, NULL, NULL },
-	{ SUNW_DL_IPMP, IFT_OTHER, NULL, NULL, ip_ipmp_v6intfid },
-	{ DL_OTHER, IFT_OTHER, ip_ether_v4mapinfo, ip_ether_v6mapinfo,
+	{ DL_TPR, IFT_ISO88025, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    ip_ether_v4mapinfo, ip_ether_v6mapinfo, ip_nodef_v6intfid,
+	    ip_nodef_v6intfid },
+	{ DL_FDDI, IFT_FDDI, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    ip_ether_v4mapinfo, ip_ether_v6mapinfo, ip_ether_v6intfid,
+	    ip_nodef_v6intfid },
+	{ DL_IB, IFT_IB, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    ip_ib_v4mapinfo, ip_ib_v6mapinfo, ip_ib_v6intfid,
+	    ip_nodef_v6intfid },
+	{ DL_IPV4, IFT_IPV4, IPPROTO_ENCAP, IPPROTO_IPV6, ip_nodef_v4mapinfo,
+	    ip_nodef_v6mapinfo, ip_ipv4_v6intfid, ip_ipv4_v6destintfid },
+	{ DL_IPV6, IFT_IPV6, IPPROTO_ENCAP, IPPROTO_IPV6, ip_nodef_v4mapinfo,
+	    ip_nodef_v6mapinfo, ip_ipv6_v6intfid, ip_ipv6_v6destintfid },
+	{ DL_6TO4, IFT_6TO4, IPPROTO_ENCAP, IPPROTO_IPV6, ip_nodef_v4mapinfo,
+	    ip_nodef_v6mapinfo, ip_ipv4_v6intfid, ip_nodef_v6intfid },
+	{ SUNW_DL_VNI, IFT_OTHER, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    NULL, NULL, ip_nodef_v6intfid, ip_nodef_v6intfid },
+	{ SUNW_DL_IPMP, IFT_OTHER, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    NULL, NULL, ip_ipmp_v6intfid, ip_nodef_v6intfid },
+	{ DL_OTHER, IFT_OTHER, ETHERTYPE_IP, ETHERTYPE_IPV6,
+	    ip_ether_v4mapinfo, ip_ether_v6mapinfo, ip_nodef_v6intfid,
 	    ip_nodef_v6intfid }
 };
 
@@ -1058,22 +1076,17 @@ ill_dlur_gen(uchar_t *addr, uint_t addr_length, t_uscalar_t sap,
 }
 
 /*
- * Add the 'mp' to the list of pending mp's headed by ill_pending_mp
- * Return an error if we already have 1 or more ioctls in progress.
- * This is used only for non-exclusive ioctls. Currently this is used
- * for SIOC*ARP and SIOCGTUNPARAM ioctls. Most set ioctls are exclusive
- * and thus need to use ipsq_pending_mp_add.
+ * Add the 'mp' to the list of pending mp's headed by ill_pending_mp.  Return
+ * an error if we already have 1 or more ioctls in progress.  This is only
+ * needed for SIOCG*ARP.
  */
 boolean_t
 ill_pending_mp_add(ill_t *ill, conn_t *connp, mblk_t *add_mp)
 {
 	ASSERT(MUTEX_HELD(&ill->ill_lock));
 	ASSERT((add_mp->b_next == NULL) && (add_mp->b_prev == NULL));
-	/*
-	 * M_IOCDATA from ioctls, M_IOCTL from tunnel ioctls.
-	 */
-	ASSERT((add_mp->b_datap->db_type == M_IOCDATA) ||
-	    (add_mp->b_datap->db_type == M_IOCTL));
+	/* We should only see M_IOCDATA arp ioctls here. */
+	ASSERT(add_mp->b_datap->db_type == M_IOCDATA);
 
 	ASSERT(MUTEX_HELD(&connp->conn_lock));
 	/*
@@ -1180,12 +1193,12 @@ ipsq_pending_mp_add(conn_t *connp, ipif_t *ipif, queue_t *q, mblk_t *add_mp,
 	ASSERT(ipx->ipx_current_ipif != NULL);
 
 	/*
-	 * M_IOCDATA from ioctls, M_IOCTL from tunnel ioctls,
-	 * M_ERROR/M_HANGUP/M_PROTO/M_PCPROTO from the driver.
+	 * M_IOCDATA from ioctls, M_ERROR/M_HANGUP/M_PROTO/M_PCPROTO from the
+	 * driver.
 	 */
-	ASSERT((DB_TYPE(add_mp) == M_IOCDATA) || (DB_TYPE(add_mp) == M_IOCTL) ||
-	    (DB_TYPE(add_mp) == M_ERROR) || (DB_TYPE(add_mp) == M_HANGUP) ||
-	    (DB_TYPE(add_mp) == M_PROTO) || (DB_TYPE(add_mp) == M_PCPROTO));
+	ASSERT((DB_TYPE(add_mp) == M_IOCDATA) || (DB_TYPE(add_mp) == M_ERROR) ||
+	    (DB_TYPE(add_mp) == M_HANGUP) || (DB_TYPE(add_mp) == M_PROTO) ||
+	    (DB_TYPE(add_mp) == M_PCPROTO));
 
 	if (connp != NULL) {
 		ASSERT(MUTEX_HELD(&connp->conn_lock));
@@ -5304,10 +5317,7 @@ ip_ll_subnet_defaults(ill_t *ill, mblk_t *mp)
 	 * second DL_INFO_ACK we are recieving in response to the
 	 * DL_INFO_REQ sent in ipif_set_values.
 	 */
-	if (ill->ill_isv6)
-		ill->ill_sap = IP6_DL_SAP;
-	else
-		ill->ill_sap = IP_DL_SAP;
+	ill->ill_sap = (ill->ill_isv6) ? ipm->ip_m_ipv6sap : ipm->ip_m_ipv4sap;
 	/*
 	 * Set ipif_mtu which is used to set the IRE's
 	 * ire_max_frag value. The driver could have sent
@@ -5360,14 +5370,19 @@ ip_ll_subnet_defaults(ill_t *ill, mblk_t *mp)
 		else
 			ill->ill_flags |= ILLF_NOARP;
 
-		if (ill->ill_phys_addr_length == 0) {
-			if (ill->ill_media->ip_m_mac_type == SUNW_DL_VNI) {
-				ill->ill_ipif->ipif_flags |= IPIF_NOXMIT;
-			} else {
-				/* pt-pt supports multicast. */
-				ill->ill_flags |= ILLF_MULTICAST;
-				ill->ill_ipif->ipif_flags |= IPIF_POINTOPOINT;
-			}
+		if (ill->ill_mactype == SUNW_DL_VNI) {
+			ill->ill_ipif->ipif_flags |= IPIF_NOXMIT;
+		} else if (ill->ill_phys_addr_length == 0 ||
+		    ill->ill_mactype == DL_IPV4 ||
+		    ill->ill_mactype == DL_IPV6) {
+			/*
+			 * The underying link is point-to-point, so mark the
+			 * interface as such.  We can do IP multicast over
+			 * such a link since it transmits all network-layer
+			 * packets to the remote side the same way.
+			 */
+			ill->ill_flags |= ILLF_MULTICAST;
+			ill->ill_ipif->ipif_flags |= IPIF_POINTOPOINT;
 		}
 	} else {
 		ill->ill_net_type = IRE_IF_RESOLVER;
@@ -8089,80 +8104,6 @@ ipsq_flush(ill_t *ill)
 }
 
 /*
- * Parse an iftun_req structure coming down SIOC[GS]TUNPARAM ioctls,
- * refhold and return the associated ipif
- */
-/* ARGSUSED */
-int
-ip_extract_tunreq(queue_t *q, mblk_t *mp, const ip_ioctl_cmd_t *ipip,
-    cmd_info_t *ci, ipsq_func_t func)
-{
-	boolean_t exists;
-	struct iftun_req *ta;
-	ipif_t  *ipif;
-	ill_t   *ill;
-	boolean_t isv6;
-	mblk_t  *mp1;
-	int error;
-	conn_t  *connp;
-	ip_stack_t  *ipst;
-
-	/* Existence verified in ip_wput_nondata */
-	mp1 = mp->b_cont->b_cont;
-	ta = (struct iftun_req *)mp1->b_rptr;
-	/*
-	 * Null terminate the string to protect against buffer
-	 * overrun. String was generated by user code and may not
-	 * be trusted.
-	 */
-	ta->ifta_lifr_name[LIFNAMSIZ - 1] = '\0';
-
-	connp = Q_TO_CONN(q);
-	isv6 = connp->conn_af_isv6;
-	ipst = connp->conn_netstack->netstack_ip;
-
-	/* Disallows implicit create */
-	ipif = ipif_lookup_on_name(ta->ifta_lifr_name,
-	    mi_strlen(ta->ifta_lifr_name), B_FALSE, &exists, isv6,
-	    connp->conn_zoneid, CONNP_TO_WQ(connp), mp, func, &error, ipst);
-	if (ipif == NULL)
-		return (error);
-
-	if (ipif->ipif_id != 0) {
-		/*
-		 * We really don't want to set/get tunnel parameters
-		 * on virtual tunnel interfaces.  Only allow the
-		 * base tunnel to do these.
-		 */
-		ipif_refrele(ipif);
-		return (EINVAL);
-	}
-
-	/*
-	 * Send down to tunnel mod for ioctl processing.
-	 * Will finish ioctl in ip_rput_other().
-	 */
-	ill = ipif->ipif_ill;
-	if (ill->ill_net_type == IRE_LOOPBACK) {
-		ipif_refrele(ipif);
-		return (EOPNOTSUPP);
-	}
-
-	if (ill->ill_wq == NULL) {
-		ipif_refrele(ipif);
-		return (ENXIO);
-	}
-	/*
-	 * Mark the ioctl as coming from an IPv6 interface for
-	 * tun's convenience.
-	 */
-	if (ill->ill_isv6)
-		ta->ifta_flags |= 0x80000000;
-	ci->ci_ipif = ipif;
-	return (0);
-}
-
-/*
  * Parse an ifreq or lifreq struct coming down ioctls and refhold
  * and return the associated ipif.
  * Return value:
@@ -9284,61 +9225,6 @@ ip_sioctl_tmysite(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
     ip_ioctl_cmd_t *ipip, void *ifreq)
 {
 	return (ENXIO);
-}
-
-/* ARGSUSED */
-int
-ip_sioctl_tunparam(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
-    ip_ioctl_cmd_t *ipip, void *dummy_ifreq)
-{
-	ill_t		*ill;
-	mblk_t		*mp1;
-	conn_t		*connp;
-	boolean_t	success;
-
-	ip1dbg(("ip_sioctl_tunparam(%s:%u %p)\n",
-	    ipif->ipif_ill->ill_name, ipif->ipif_id, (void *)ipif));
-	/* ioctl comes down on an conn */
-	ASSERT(!(q->q_flag & QREADR) && q->q_next == NULL);
-	connp = Q_TO_CONN(q);
-
-	mp->b_datap->db_type = M_IOCTL;
-
-	/*
-	 * Send down a copy. (copymsg does not copy b_next/b_prev).
-	 * The original mp contains contaminated b_next values due to 'mi',
-	 * which is needed to do the mi_copy_done. Unfortunately if we
-	 * send down the original mblk itself and if we are popped due to an
-	 * an unplumb before the response comes back from tunnel,
-	 * the streamhead (which does a freemsg) will see this contaminated
-	 * message and the assertion in freemsg about non-null b_next/b_prev
-	 * will panic a DEBUG kernel.
-	 */
-	mp1 = copymsg(mp);
-	if (mp1 == NULL)
-		return (ENOMEM);
-
-	ill = ipif->ipif_ill;
-	mutex_enter(&connp->conn_lock);
-	mutex_enter(&ill->ill_lock);
-	if (ipip->ipi_cmd == SIOCSTUNPARAM || ipip->ipi_cmd == OSIOCSTUNPARAM) {
-		success = ipsq_pending_mp_add(connp, ipif, CONNP_TO_WQ(connp),
-		    mp, 0);
-	} else {
-		success = ill_pending_mp_add(ill, connp, mp);
-	}
-	mutex_exit(&ill->ill_lock);
-	mutex_exit(&connp->conn_lock);
-
-	if (success) {
-		ip1dbg(("sending down tunparam request "));
-		putnext(ill->ill_wq, mp1);
-		return (EINPROGRESS);
-	} else {
-		/* The conn has started closing */
-		freemsg(mp1);
-		return (EINTR);
-	}
 }
 
 /*
@@ -11118,33 +11004,16 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		}
 	}
 
-	if (ipif->ipif_isv6 && IN6_IS_ADDR_6TO4(&v6addr) &&
-	    !ill->ill_is_6to4tun) {
-		queue_t *wqp = ill->ill_wq;
-
-		/*
-		 * The local address of this interface is a 6to4 address,
-		 * check if this interface is in fact a 6to4 tunnel or just
-		 * an interface configured with a 6to4 address.  We are only
-		 * interested in the former.
-		 */
-		if (wqp != NULL) {
-			while ((wqp->q_next != NULL) &&
-			    (wqp->q_next->q_qinfo != NULL) &&
-			    (wqp->q_next->q_qinfo->qi_minfo != NULL)) {
-
-				if (wqp->q_next->q_qinfo->qi_minfo->mi_idnum
-				    == TUN6TO4_MODID) {
-					/* set for use in IP */
-					ill->ill_is_6to4tun = 1;
-					break;
-				}
-				wqp = wqp->q_next;
-			}
-		}
-	}
-
 	ipif_set_default(ipif);
+
+	/*
+	 * If we've just manually set the IPv6 link-local address (0th ipif),
+	 * tag the ill so that future updates to the interface ID don't result
+	 * in this address getting automatically reconfigured from under the
+	 * administrator.
+	 */
+	if (ipif->ipif_isv6 && ipif->ipif_id == 0)
+		ill->ill_manual_linklocal = 1;
 
 	/*
 	 * When publishing an interface address change event, we only notify
@@ -12607,6 +12476,11 @@ ip_sioctl_token_tail(ipif_t *ipif, sin6_t *sin6, int addrlen, queue_t *q,
 	mutex_enter(&ill->ill_lock);
 	V6_MASK_COPY(v6addr, v6mask, ill->ill_token);
 	ill->ill_token_length = addrlen;
+	ill->ill_manual_token = 1;
+
+	/* Reconfigure the link-local address based on this new token */
+	ipif_setlinklocal(ill->ill_ipif);
+
 	mutex_exit(&ill->ill_lock);
 
 	if (need_up) {
@@ -15180,12 +15054,10 @@ ipif_get_name(const ipif_t *ipif, char *buf, int len)
 }
 
 /*
- * Find an IPIF based on the name passed in.  Names can be of the
- * form <phys> (e.g., le0), <phys>:<#> (e.g., le0:1),
- * The <phys> string can have forms like <dev><#> (e.g., le0),
- * <dev><#>.<module> (e.g. le0.foo), or <dev>.<module><#> (e.g. ip.tun3).
- * When there is no colon, the implied unit id is zero. <phys> must
- * correspond to the name of an ILL.  (May be called as writer.)
+ * Find an IPIF based on the name passed in.  Names can be of the form <phys>
+ * (e.g., le0) or <phys>:<#> (e.g., le0:1).  When there is no colon, the
+ * implied unit id is zero. <phys> must correspond to the name of an ILL.
+ * (May be called as writer.)
  */
 static ipif_t *
 ipif_lookup_on_name(char *name, size_t namelen, boolean_t do_alloc,
@@ -18808,12 +18680,8 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 	 * Pick a default sap until we get the DL_INFO_ACK back from
 	 * the driver.
 	 */
-	if (ill->ill_sap == 0) {
-		if (ill->ill_isv6)
-			ill->ill_sap = IP6_DL_SAP;
-		else
-			ill->ill_sap = IP_DL_SAP;
-	}
+	ill->ill_sap = (ill->ill_isv6) ? ill->ill_media->ip_m_ipv6sap :
+	    ill->ill_media->ip_m_ipv4sap;
 
 	ill->ill_ifname_pending = 1;
 	ill->ill_ifname_pending_err = 0;
@@ -19573,13 +19441,12 @@ ill_ipsec_capab_send_all(uint_t sa_type, mblk_t *mp, ipsa_t *sa,
  * Derive an interface id from the link layer address.
  * Knows about IEEE 802 and IEEE EUI-64 mappings.
  */
-static boolean_t
+static void
 ip_ether_v6intfid(ill_t *ill, in6_addr_t *v6addr)
 {
 	char		*addr;
 
-	if (ill->ill_phys_addr_length != ETHERADDRL)
-		return (B_FALSE);
+	ASSERT(ill->ill_phys_addr_length == ETHERADDRL);
 
 	/* Form EUI-64 like address */
 	addr = (char *)&v6addr->s6_addr32[2];
@@ -19588,14 +19455,12 @@ ip_ether_v6intfid(ill_t *ill, in6_addr_t *v6addr)
 	addr[3] = (char)0xff;
 	addr[4] = (char)0xfe;
 	bcopy(ill->ill_phys_addr + 3, addr + 5, 3);
-	return (B_TRUE);
 }
 
 /* ARGSUSED */
-static boolean_t
+static void
 ip_nodef_v6intfid(ill_t *ill, in6_addr_t *v6addr)
 {
-	return (B_FALSE);
 }
 
 typedef struct ipmp_ifcookie {
@@ -19608,7 +19473,7 @@ typedef struct ipmp_ifcookie {
  * Construct a pseudo-random interface ID for the IPMP interface that's both
  * predictable and (almost) guaranteed to be unique.
  */
-static boolean_t
+static void
 ip_ipmp_v6intfid(ill_t *ill, in6_addr_t *v6addr)
 {
 	zone_t		*zp;
@@ -19640,8 +19505,6 @@ ip_ipmp_v6intfid(ill_t *ill, in6_addr_t *v6addr)
 	addr = &v6addr->s6_addr8[8];
 	bcopy(hash + 8, addr, sizeof (uint64_t));
 	addr[0] &= ~0x2;				/* set local bit */
-
-	return (B_TRUE);
 }
 
 /* ARGSUSED */
@@ -19695,16 +19558,31 @@ ip_ether_v4mapinfo(uint_t phys_length, uint8_t *bphys_addr, uint8_t *maddr,
 	return (B_TRUE);
 }
 
+/* ARGSUSED */
+static boolean_t
+ip_nodef_v4mapinfo(uint_t phys_length, uint8_t *bphys_addr, uint8_t *maddr,
+    uint32_t *hw_start, ipaddr_t *extract_mask)
+{
+	return (B_FALSE);
+}
+
+/* ARGSUSED */
+static boolean_t
+ip_nodef_v6mapinfo(uint_t lla_length, uint8_t *bphys_addr, uint8_t *maddr,
+    uint32_t *hw_start, in6_addr_t *v6_extract_mask)
+{
+	return (B_FALSE);
+}
+
 /*
  * Derive IPoIB interface id from the link layer address.
  */
-static boolean_t
+static void
 ip_ib_v6intfid(ill_t *ill, in6_addr_t *v6addr)
 {
 	char		*addr;
 
-	if (ill->ill_phys_addr_length != 20)
-		return (B_FALSE);
+	ASSERT(ill->ill_phys_addr_length == 20);
 	addr = (char *)&v6addr->s6_addr32[2];
 	bcopy(ill->ill_phys_addr + 12, addr, 8);
 	/*
@@ -19719,7 +19597,6 @@ ip_ib_v6intfid(ill_t *ill, in6_addr_t *v6addr)
 	 * bit set to 1.
 	 */
 	addr[0] |= 2;			/* Set Universal/Local bit to 1 */
-	return (B_TRUE);
 }
 
 /*
@@ -19802,6 +19679,58 @@ ip_ib_v4mapinfo(uint_t phys_length, uint8_t *bphys_addr, uint8_t *maddr,
 	*(maddr + 8) = *(bphys_addr + 8);
 	*(maddr + 9) = *(bphys_addr + 9);
 	return (B_TRUE);
+}
+
+/*
+ * Derive IPv6 interface id from an IPv4 link-layer address (e.g. from an IPv4
+ * tunnel).  The IPv4 address simply get placed in the lower 4 bytes of the
+ * IPv6 interface id.  This is a suggested mechanism described in section 3.7
+ * of RFC4213.
+ */
+static void
+ip_ipv4_genv6intfid(ill_t *ill, uint8_t *physaddr, in6_addr_t *v6addr)
+{
+	ASSERT(ill->ill_phys_addr_length == sizeof (ipaddr_t));
+	v6addr->s6_addr32[2] = 0;
+	bcopy(physaddr, &v6addr->s6_addr32[3], sizeof (ipaddr_t));
+}
+
+/*
+ * Derive IPv6 interface id from an IPv6 link-layer address (e.g. from an IPv6
+ * tunnel).  The lower 8 bytes of the IPv6 address simply become the interface
+ * id.
+ */
+static void
+ip_ipv6_genv6intfid(ill_t *ill, uint8_t *physaddr, in6_addr_t *v6addr)
+{
+	in6_addr_t *v6lladdr = (in6_addr_t *)physaddr;
+
+	ASSERT(ill->ill_phys_addr_length == sizeof (in6_addr_t));
+	bcopy(&v6lladdr->s6_addr32[2], &v6addr->s6_addr32[2], 8);
+}
+
+static void
+ip_ipv6_v6intfid(ill_t *ill, in6_addr_t *v6addr)
+{
+	ip_ipv6_genv6intfid(ill, ill->ill_phys_addr, v6addr);
+}
+
+static void
+ip_ipv6_v6destintfid(ill_t *ill, in6_addr_t *v6addr)
+{
+	ip_ipv6_genv6intfid(ill, ill->ill_dest_addr, v6addr);
+}
+
+static void
+ip_ipv4_v6intfid(ill_t *ill, in6_addr_t *v6addr)
+{
+	ip_ipv4_genv6intfid(ill, ill->ill_phys_addr, v6addr);
+}
+
+static void
+ip_ipv4_v6destintfid(ill_t *ill, in6_addr_t *v6addr)
+{
+	ip_ipv4_genv6intfid(ill, ill->ill_dest_addr, v6addr);
 }
 
 /*
@@ -19926,6 +19855,7 @@ ill_set_phys_addr(ill_t *ill, mblk_t *mp)
 	ASSERT(IAM_WRITER_IPSQ(ipsq));
 
 	if (dlindp->dl_data != DL_IPV6_LINK_LAYER_ADDR &&
+	    dlindp->dl_data != DL_CURR_DEST_ADDR &&
 	    dlindp->dl_data != DL_CURR_PHYS_ADDR) {
 		/* Changing DL_IPV6_TOKEN is not yet supported */
 		return (0);
@@ -19992,16 +19922,30 @@ ill_set_phys_addr_tail(ipsq_t *ipsq, queue_t *q, mblk_t *addrmp, void *dummy)
 		freemsg(addrmp2);
 		break;
 
+	case DL_CURR_DEST_ADDR:
+		freemsg(ill->ill_dest_addr_mp);
+		ill->ill_dest_addr = addrmp->b_rptr + addroff;
+		ill->ill_dest_addr_mp = addrmp;
+		if (ill->ill_isv6) {
+			ill_setdesttoken(ill);
+			ipif_setdestlinklocal(ill->ill_ipif);
+		}
+		freemsg(addrmp2);
+		break;
+
 	case DL_CURR_PHYS_ADDR:
 		freemsg(ill->ill_phys_addr_mp);
 		ill->ill_phys_addr = addrmp->b_rptr + addroff;
 		ill->ill_phys_addr_mp = addrmp;
 		ill->ill_phys_addr_length = addrlen;
-
 		if (ill->ill_isv6 && !(ill->ill_flags & ILLF_XRESOLV))
 			ill_set_ndmp(ill, addrmp2, addroff, addrlen);
 		else
 			freemsg(addrmp2);
+		if (ill->ill_isv6) {
+			ill_setdefaulttoken(ill);
+			ipif_setlinklocal(ill->ill_ipif);
+		}
 		break;
 	default:
 		ASSERT(0);

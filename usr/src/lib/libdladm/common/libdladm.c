@@ -52,6 +52,7 @@ static media_type_t media_type_table[] =  {
 	{ DL_IB,	"Infiniband" },
 	{ DL_IPV4,	"IPv4Tunnel" },
 	{ DL_IPV6,	"IPv6Tunnel" },
+	{ DL_6TO4,	"6to4Tunnel" },
 	{ DL_CSMACD,	"CSMA/CD" },
 	{ DL_TPB,	"TokenBus" },
 	{ DL_TPR,	"TokenRing" },
@@ -351,6 +352,21 @@ dladm_status2str(dladm_status_t status, char *buf)
 	case DLADM_STATUS_OPTMISSING:
 		s = "optional software not installed";
 		break;
+	case DLADM_STATUS_IPTUNTYPE:
+		s = "invalid IP tunnel type";
+		break;
+	case DLADM_STATUS_IPTUNTYPEREQD:
+		s = "IP tunnel type required";
+		break;
+	case DLADM_STATUS_BADIPTUNLADDR:
+		s = "invalid local IP tunnel address";
+		break;
+	case DLADM_STATUS_BADIPTUNRADDR:
+		s = "invalid remote IP tunnel address";
+		break;
+	case DLADM_STATUS_ADDRINUSE:
+		s = "address already in use";
+		break;
 	default:
 		s = "<unknown error>";
 		break;
@@ -399,6 +415,8 @@ dladm_errno2status(int err)
 		return (DLADM_STATUS_FLOW_INCOMPATIBLE);
 	case EALREADY:
 		return (DLADM_STATUS_FLOW_IDENTICAL);
+	case EADDRINUSE:
+		return (DLADM_STATUS_ADDRINUSE);
 	default:
 		return (DLADM_STATUS_FAILED);
 	}
@@ -572,6 +590,9 @@ dladm_class2str(datalink_class_t class, char *buf)
 		break;
 	case DATALINK_CLASS_ETHERSTUB:
 		s = "etherstub";
+		break;
+	case DATALINK_CLASS_IPTUN:
+		s = "iptun";
 		break;
 	case DATALINK_CLASS_SIMNET:
 		s = "simnet";
@@ -747,7 +768,7 @@ dladm_valid_linkname(const char *link)
 	size_t		len = strlen(link);
 	const char	*cp;
 
-	if (len + 1 >= MAXLINKNAMELEN)
+	if (len >= MAXLINKNAMELEN)
 		return (B_FALSE);
 
 	/*
@@ -758,10 +779,10 @@ dladm_valid_linkname(const char *link)
 
 	/*
 	 * The legal characters in a link name are:
-	 * alphanumeric (a-z,  A-Z,  0-9), and the underscore ('_').
+	 * alphanumeric (a-z,  A-Z,  0-9), underscore ('_'), and '.'.
 	 */
 	for (cp = link; *cp != '\0'; cp++) {
-		if ((isalnum(*cp) == 0) && (*cp != '_'))
+		if ((isalnum(*cp) == 0) && (*cp != '_') && (*cp != '.'))
 			return (B_FALSE);
 	}
 

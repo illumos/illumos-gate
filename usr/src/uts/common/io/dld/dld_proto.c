@@ -839,43 +839,46 @@ proto_physaddr_req(dld_str_t *dsp, mblk_t *mp)
 {
 	dl_phys_addr_req_t *dlp = (dl_phys_addr_req_t *)mp->b_rptr;
 	queue_t		*q = dsp->ds_wq;
-	t_uscalar_t	dl_err;
-	char		*addr;
+	t_uscalar_t	dl_err = 0;
+	char		*addr = NULL;
 	uint_t		addr_length;
 
 	if (MBLKL(mp) < sizeof (dl_phys_addr_req_t)) {
 		dl_err = DL_BADPRIM;
-		goto failed;
+		goto done;
 	}
 
 	if (dsp->ds_dlstate == DL_UNATTACHED ||
 	    DL_ACK_PENDING(dsp->ds_dlstate)) {
 		dl_err = DL_OUTSTATE;
-		goto failed;
-	}
-
-	if (dlp->dl_addr_type != DL_CURR_PHYS_ADDR &&
-	    dlp->dl_addr_type != DL_FACT_PHYS_ADDR) {
-		dl_err = DL_UNSUPPORTED;
-		goto failed;
+		goto done;
 	}
 
 	addr_length = dsp->ds_mip->mi_addr_length;
 	if (addr_length > 0) {
 		addr = kmem_alloc(addr_length, KM_SLEEP);
-		if (dlp->dl_addr_type == DL_CURR_PHYS_ADDR)
+		switch (dlp->dl_addr_type) {
+		case DL_CURR_PHYS_ADDR:
 			mac_unicast_primary_get(dsp->ds_mh, (uint8_t *)addr);
-		else
+			break;
+		case DL_FACT_PHYS_ADDR:
 			bcopy(dsp->ds_mip->mi_unicst_addr, addr, addr_length);
-
-		dlphysaddrack(q, mp, addr, (t_uscalar_t)addr_length);
-		kmem_free(addr, addr_length);
-	} else {
-		dlphysaddrack(q, mp, NULL, 0);
+			break;
+		case DL_CURR_DEST_ADDR:
+			if (!mac_dst_get(dsp->ds_mh, (uint8_t *)addr))
+				dl_err = DL_NOTSUPPORTED;
+			break;
+		default:
+			dl_err = DL_UNSUPPORTED;
+		}
 	}
-	return;
-failed:
-	dlerrorack(q, mp, DL_PHYS_ADDR_REQ, dl_err, 0);
+done:
+	if (dl_err == 0)
+		dlphysaddrack(q, mp, addr, (t_uscalar_t)addr_length);
+	else
+		dlerrorack(q, mp, DL_PHYS_ADDR_REQ, dl_err, 0);
+	if (addr != NULL)
+		kmem_free(addr, addr_length);
 }
 
 /*
@@ -1108,7 +1111,8 @@ proto_notify_req(dld_str_t *dsp, mblk_t *mp)
 	    DL_NOTE_LINK_DOWN |
 	    DL_NOTE_CAPAB_RENEG |
 	    DL_NOTE_FASTPATH_FLUSH |
-	    DL_NOTE_SPEED;
+	    DL_NOTE_SPEED |
+	    DL_NOTE_SDU_SIZE;
 
 	if (MBLKL(mp) < sizeof (dl_notify_req_t)) {
 		dl_err = DL_BADPRIM;

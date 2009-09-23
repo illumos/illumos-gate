@@ -124,7 +124,7 @@ struct kmem_cache *rt_entry_cache;
  * ire_marks
  *	- bucket lock protects this.
  *
- * ire_ipsec_overhead/ire_ll_hdr_length
+ * ire_ll_hdr_length
  *
  *	- Place holder for returning the information to the upper layers
  *	  when IRE_DB_REQ comes down.
@@ -790,14 +790,6 @@ ip_ire_req(queue_t *q, mblk_t *mp)
 			bcopy(&(sire->ire_uinfo), &(inire->ire_uinfo),
 			    sizeof (iulp_t));
 		}
-
-		/*
-		 * As we don't lookup global policy here, we may not
-		 * pass the right size if per-socket policy is not
-		 * present. For these cases, path mtu discovery will
-		 * do the right thing.
-		 */
-		inire->ire_ipsec_overhead = conn_ipsec_length(Q_TO_CONN(q));
 
 		/* Pass the latest setting of the ip_path_mtu_discovery */
 		inire->ire_frag_flag |=

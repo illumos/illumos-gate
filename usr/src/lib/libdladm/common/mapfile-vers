@@ -45,7 +45,6 @@ SUNWprivate_1.1 {
 	dladm_door_fd;
 	dladm_info;
 	dladm_walk;
-	dladm_setzid;
 	dladm_status2str;
 	dladm_linkstate2str;
 	dladm_linkduplex2str;
@@ -108,6 +107,14 @@ SUNWprivate_1.1 {
 	dladm_wlan_str2auth;
 	dladm_wlan_str2bsstype;
 	dladm_wlan_str2linkstatus;
+	dladm_iptun_create;
+	dladm_iptun_delete;
+	dladm_iptun_modify;
+	dladm_iptun_getparams;
+	dladm_iptun_up;
+	dladm_iptun_down;
+	dladm_iptun_set6to4relay;
+	dladm_iptun_get6to4relay;
 	dladm_vlan_create;
 	dladm_vlan_delete;
 	dladm_vlan_up;
@@ -156,6 +163,8 @@ SUNWprivate_1.1 {
 	dladm_walk_usage_time;
 	dladm_usage_summary;
 	dladm_usage_dates;
+	dladm_zone_boot;
+	dladm_zone_halt;
 
 	dladm_flow_add;
 	dladm_flow_remove;

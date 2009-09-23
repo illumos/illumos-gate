@@ -100,6 +100,7 @@ int secpolicy_idmap(const cred_t *);
 int secpolicy_ip(const cred_t *, int, boolean_t);
 int secpolicy_ip_config(const cred_t *, boolean_t);
 int secpolicy_dl_config(const cred_t *);
+int secpolicy_iptun_config(const cred_t *);
 int secpolicy_ipc_access(const cred_t *, const struct kipc_perm *, mode_t);
 int secpolicy_ipc_config(const cred_t *);
 int secpolicy_ipc_owner(const cred_t *, const struct kipc_perm *);
@@ -163,7 +164,6 @@ void secpolicy_fs_mount_clearopts(cred_t *, struct vfs *);
 int secpolicy_setid_setsticky_clear(vnode_t *, vattr_t *,
     const vattr_t *, cred_t *);
 int secpolicy_xvattr(xvattr_t *, uid_t, cred_t *, vtype_t);
-int secpolicy_dld_ioctl(const cred_t *, const char *, const char *);
 int secpolicy_xvm_control(const cred_t *);
 
 int secpolicy_basic_exec(const cred_t *, vnode_t *);

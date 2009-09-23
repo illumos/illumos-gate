@@ -100,6 +100,36 @@ fi
 #
 /sbin/ifconfig -auD4 netmask + broadcast +
 
+is_iptun ()
+{
+	intf=$1
+	# Is this a persistent IP tunnel link?
+	/sbin/dladm show-iptun -P $intf > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		return 0
+	fi
+	# Is this an implicit IP tunnel (i.e., ip.tun0)
+	ORIGIFS="$IFS"
+	IFS="$IFS."
+	set -- $intf
+	IFS="$ORIGIFS"
+	if [ $# -eq 2 -a \( "$1" = "ip" -o "$1" = "ip6" \) ]; then
+		#
+		# It looks like one, but another type of link might be
+		# using a name that looks like an implicit IP tunnel.
+		# If dladm show-link -P finds it, then it's not an IP
+		# tunnel.
+		#
+		/sbin/dladm show-link -Pp $intf > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			return 1
+		else
+			return 0
+		fi
+	fi
+	return 1
+}
+
 #
 # All the IPv4 and IPv6 interfaces are plumbed before doing any
 # interface configuration.  This prevents errors from plumb failures
@@ -126,6 +156,11 @@ if [ "$interface_names" != "/etc/hostname.*[0-9]" ]; then
 			shift
 		done
 		shift
+
+		# skip IP tunnel interfaces plumbed by net-iptun.
+		if is_iptun $intf_name; then
+			continue
+		fi
 
 	        read one rest < /etc/hostname.$intf_name
 		if [ "$one" = ipmp ]; then
@@ -155,6 +190,11 @@ if [ "$interface_names" != "/etc/hostname6.*[0-9]" ]; then
 			shift
 		done
 		shift
+
+		# skip IP tunnel interfaces plumbed by net-iptun.
+		if is_iptun $intf_name; then
+			continue
+		fi
 
 	        read one rest < /etc/hostname6.$intf_name
 		if [ "$one" = ipmp ]; then

@@ -24,6 +24,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/cred.h>
 #include <sys/sysmacros.h>
 #include <sys/conf.h>
 #include <sys/cmn_err.h>
@@ -319,7 +320,8 @@ int
 vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
     vnic_mac_addr_type_t *vnic_addr_type, int *mac_len, uchar_t *mac_addr,
     int *mac_slot, uint_t mac_prefix_len, uint16_t vid,
-    mac_resource_props_t *mrp, uint32_t flags, vnic_ioc_diag_t *diag)
+    mac_resource_props_t *mrp, uint32_t flags, vnic_ioc_diag_t *diag,
+    cred_t *credp)
 {
 	vnic_t *vnic;
 	mac_register_t *mac;
@@ -492,7 +494,8 @@ vnic_dev_create(datalink_id_t vnic_id, datalink_id_t linkid,
 	if (!is_anchor)
 		mac_set_upper_mac(vnic->vn_mch, vnic->vn_mh);
 
-	if ((err = dls_devnet_create(vnic->vn_mh, vnic->vn_id)) != 0) {
+	err = dls_devnet_create(vnic->vn_mh, vnic->vn_id, crgetzoneid(credp));
+	if (err != 0) {
 		VERIFY(is_anchor || mac_margin_remove(vnic->vn_lower_mh,
 		    vnic->vn_margin) == 0);
 		(void) mac_unregister(vnic->vn_mh);
@@ -553,7 +556,7 @@ vnic_dev_modify(datalink_id_t vnic_id, uint_t modify_mask,
 
 /* ARGSUSED */
 int
-vnic_dev_delete(datalink_id_t vnic_id, uint32_t flags)
+vnic_dev_delete(datalink_id_t vnic_id, uint32_t flags, cred_t *credp)
 {
 	vnic_t *vnic = NULL;
 	mod_hash_val_t val;
@@ -582,7 +585,8 @@ vnic_dev_delete(datalink_id_t vnic_id, uint32_t flags)
 	 * any new claims on mac_impl_t.
 	 */
 	if ((rc = mac_disable(vnic->vn_mh)) != 0) {
-		(void) dls_devnet_create(vnic->vn_mh, vnic_id);
+		(void) dls_devnet_create(vnic->vn_mh, vnic_id,
+		    crgetzoneid(credp));
 		rw_exit(&vnic_lock);
 		return (rc);
 	}
@@ -866,10 +870,14 @@ vnic_m_getprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
 }
 
 int
-vnic_info(vnic_info_t *info)
+vnic_info(vnic_info_t *info, cred_t *credp)
 {
 	vnic_t		*vnic;
 	int		err;
+
+	/* Make sure that the VNIC link is visible from the caller's zone. */
+	if (!dls_devnet_islinkvisible(info->vn_vnic_id, crgetzoneid(credp)))
+		return (ENOENT);
 
 	rw_enter(&vnic_lock, RW_WRITER);
 

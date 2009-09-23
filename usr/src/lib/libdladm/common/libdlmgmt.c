@@ -31,6 +31,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <strings.h>
+#include <zone.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/aggr.h>
@@ -606,4 +607,28 @@ dladm_destroy_conf(dladm_handle_t handle, dladm_conf_t conf)
 
 	(void) dladm_door_call(handle, &destroyconf, sizeof (destroyconf),
 	    &retval, sizeof (retval));
+}
+
+dladm_status_t
+dladm_zone_boot(dladm_handle_t handle, zoneid_t zoneid)
+{
+	dlmgmt_door_zoneboot_t		zoneboot;
+	dlmgmt_zoneboot_retval_t	retval;
+
+	zoneboot.ld_cmd = DLMGMT_CMD_ZONEBOOT;
+	zoneboot.ld_zoneid = zoneid;
+	return (dladm_door_call(handle, &zoneboot, sizeof (zoneboot), &retval,
+	    sizeof (retval)));
+}
+
+dladm_status_t
+dladm_zone_halt(dladm_handle_t handle, zoneid_t zoneid)
+{
+	dlmgmt_door_zonehalt_t		zonehalt;
+	dlmgmt_zonehalt_retval_t	retval;
+
+	zonehalt.ld_cmd = DLMGMT_CMD_ZONEHALT;
+	zonehalt.ld_zoneid = zoneid;
+	return (dladm_door_call(handle, &zonehalt, sizeof (zonehalt), &retval,
+	    sizeof (retval)));
 }
