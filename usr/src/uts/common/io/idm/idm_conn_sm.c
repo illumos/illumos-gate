@@ -566,6 +566,11 @@ idm_state_s4_in_login(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		idm_update_state(ic, CS_S9_INIT_ERROR, event_ctx);
 		break;
 	case CE_LOGIN_FAIL_SND_DONE:
+		pdu = (idm_pdu_t *)event_ctx->iec_info;
+		/* restore client callback */
+		pdu->isp_callback =  ic->ic_client_callback;
+		ic->ic_client_callback = NULL;
+		idm_pdu_complete(pdu, pdu->isp_status);
 		(void) idm_notify_client(ic, CN_LOGIN_FAIL, NULL);
 		idm_update_state(ic, CS_S9_INIT_ERROR, event_ctx);
 		break;

@@ -1055,6 +1055,14 @@ request_fail:
 		nvlist_free(lsm->icl_response_nvlist);
 		lsm->icl_response_nvlist = NULL;
 	}
+	/* Make sure we already set the login error */
+	if (ict->ict_login_sm.icl_login_resp_err_class ==
+	    ISCSI_STATUS_CLASS_SUCCESS) {
+		SET_LOGIN_ERROR(ict,
+		    ISCSI_STATUS_CLASS_TARGET_ERR,
+		    ISCSI_LOGIN_STATUS_TARGET_ERROR);
+	}
+	iscsit_login_sm_event(ict, ILE_LOGIN_RESP_READY, NULL);
 }
 
 
