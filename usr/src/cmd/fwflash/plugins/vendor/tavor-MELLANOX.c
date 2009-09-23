@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,13 +48,10 @@
 #include "../hdrs/MELLANOX.h"
 #include "../hdrs/tavor_ib.h"
 
-
-
 char vendor[] = "MELLANOX\0";
 
 extern int errno;
 extern struct vrfyplugin *verifier;
-extern uint16_t crc16(uint8_t *image, uint32_t size);
 
 
 /* required functions for this plugin */
@@ -78,6 +75,7 @@ vendorvrfy(struct devicelist *devicenode)
 	int		i = 0, a, b, c, d;
 	char		temppsid[17];
 	char		rawpsid[16];
+	int		offset;
 
 	encap = (struct ib_encap_ident *)devicenode->ident->encap_ident;
 
@@ -88,14 +86,25 @@ vendorvrfy(struct devicelist *devicenode)
 	 */
 	firmware = verifier->fwimage;
 
-	/* sector_sz is stored as Log_2 of the real value */
-	sector_sz = 1 << MLXSWAPBITS32(firmware[FLASH_IS_SECTOR_SIZE_OFFSET/4]);
+	/*
+	 * The actual location of log2_sector_sz can be calculated
+	 * by adding 0x32 to the value that is written in the
+	 * log2_sector_sz_ptr field.  The log2_sector_sz_ptr is located
+	 * at 0x16 byte offset in Invariant Sector.
+	 */
+	offset = FLASH_IS_SECTOR_SIZE_OFFSET +
+	    MLXSWAPBITS32(firmware[FLASH_IS_SECT_SIZE_PTR/4]);
+
+	sector_sz = 1 << MLXSWAPBITS32(firmware[offset/4]);
 
 	if (sector_sz != encap->sector_sz) {
 		logmsg(MSG_ERROR,
 		    gettext("%s firmware image verifier: "
-		    "Invariant Sector is invalid\n"),
-		    verifier->vendor);
+		    "Invariant Sector is invalid\n"), verifier->vendor);
+		logmsg(MSG_ERROR, gettext("Mis-match in sector size: "
+		    "device's 0x%X file 0x%X\n"), encap->sector_sz, sector_sz);
+		logmsg(MSG_ERROR, gettext("Firmware image file is not "
+		    "appropriate for this device.\n"));
 		/* this is fatal */
 		return (FWFLASH_FAILURE);
 	}
@@ -105,7 +114,7 @@ vendorvrfy(struct devicelist *devicenode)
 		logmsg(MSG_ERROR,
 		    gettext("%s firmware image verifier: "
 		    "Unable to allocate memory for Primary Pointer "
-		    "Sector verification\n"));
+		    "Sector verification\n"), verifier->vendor);
 		return (FWFLASH_FAILURE);
 	}
 	bcopy(&firmware[sector_sz / 4], vps, sizeof (struct mlx_xps));
@@ -131,35 +140,50 @@ vendorvrfy(struct devicelist *devicenode)
 	 * invalid we reject the image.
 	 */
 
-	if (encap->info.mlx_psid != NULL) {
-		bzero(temppsid, 17);
-		bcopy(vps->vsdpsid+0xd0, &rawpsid, 16);
+	bzero(temppsid, 17);
+	bcopy(vps->vsdpsid+0xd0, &rawpsid, 16);
 
-#if !defined(_LITTLE_ENDIAN)
-		for (i = 0; i < 16; i += 4) {
-			temppsid[i]   = rawpsid[i+3];
-			temppsid[i+1] = rawpsid[i+2];
-			temppsid[i+2] = rawpsid[i+1];
-			temppsid[i+3] = rawpsid[i];
-		}
-		logmsg(MSG_INFO,
-		    "tavor: have raw '%s', want munged '%s'\n",
-		    rawpsid, temppsid);
+#if defined(_LITTLE_ENDIAN)
+	for (i = 0; i < 16; i += 4) {
+		temppsid[i]   = rawpsid[i+3];
+		temppsid[i+1] = rawpsid[i+2];
+		temppsid[i+2] = rawpsid[i+1];
+		temppsid[i+3] = rawpsid[i];
+	}
+	logmsg(MSG_INFO,
+	    "tavor: have raw '%s', want munged '%s'\n",
+	    rawpsid, temppsid);
 #else
-		bcopy(vps->vsdpsid+0xd0, &temppsid, 16);
+	bcopy(vps->vsdpsid+0xd0, &temppsid, 16);
 #endif
+	logmsg(MSG_INFO, "tavor_vrfy: PSID file '%s' HCA's PSID '%s'\n",
+	    (temppsid != NULL) ? temppsid : "(null)",
+	    (encap->info.mlx_psid != NULL) ? encap->info.mlx_psid : "(null)");
+
+	if (encap->info.mlx_psid != NULL) {
+		int resp;
 		if (strncmp(encap->info.mlx_psid, temppsid, 16) != 0) {
 			logmsg(MSG_ERROR,
 			    gettext("%s firmware image verifier: "
 			    "firmware image file %s is not appropriate "
-			    "for device\n"
+			    "for device "
 			    "%s (PSID file %s vs PSID device %s)\n"),
 			    verifier->vendor, verifier->imgfile,
-			    encap->info.mlx_psid,
-			    ((temppsid != NULL) ? temppsid : "(null)"));
+			    devicenode->drvname,
+			    ((temppsid != NULL) ? temppsid : "(null)"),
+			    encap->info.mlx_psid);
 
-			free(vps);
-			return (FWFLASH_FAILURE);
+			logmsg(MSG_ERROR,
+			    gettext("Do you want to continue? (Y/N): "));
+			(void) fflush(stdin);
+			resp = getchar();
+			if (resp != 'Y' && resp != 'y') {
+				free(vps);
+				logmsg(MSG_ERROR, gettext("Not proceeding with "
+				    "flash operation of %s on %s"),
+				    verifier->imgfile, devicenode->drvname);
+				return (FWFLASH_FAILURE);
+			}
 		} else {
 			logmsg(MSG_INFO,
 			    "%s firmware image verifier: HCA PSID (%s) "
@@ -226,14 +250,14 @@ vendorvrfy(struct devicelist *devicenode)
 		    verifier->vendor);
 	} else {
 
-		logmsg(MSG_ERROR,
+		logmsg(MSG_INFO,
 		    gettext("%s firmware image verifier: "
 		    "Primary Firmware Image Info pointer is invalid "
 		    "(0x%04x)\nChecking GUID section.....\n"),
 		    verifier->vendor, vp_imginfo);
 
 		if (check_guid_ptr(vfi) == FWFLASH_FAILURE) {
-			logmsg(MSG_ERROR,
+			logmsg(MSG_INFO,
 			    gettext("%s firmware image verifier: "
 			    "Primary Firmware Image GUID section "
 			    "is invalid\n"),
@@ -267,14 +291,14 @@ vendorvrfy(struct devicelist *devicenode)
 		    "Secondary Firmware Image Info pointer is valid\n",
 		    verifier->vendor);
 	} else {
-		logmsg(MSG_ERROR,
+		logmsg(MSG_INFO,
 		    gettext("%s firmware image verifier: "
 		    "Secondary Firmware Image Info pointer is invalid "
 		    "(0x%04x)\nChecking GUID section.....\n"),
 		    verifier->vendor, vp_imginfo);
 
 		if (check_guid_ptr(vfi) == FWFLASH_FAILURE) {
-			logmsg(MSG_ERROR,
+			logmsg(MSG_INFO,
 			    gettext("%s firmware image verifier: "
 			    "Secondary Firmware Image GUID section "
 			    "is invalid\n"),
@@ -285,6 +309,9 @@ vendorvrfy(struct devicelist *devicenode)
 
 	free(vfi);
 
+	if (i == 2)
+		logmsg(MSG_WARN, gettext("%s firmware image verifier: "
+		    "FAILED\n"), verifier->vendor);
 
 	return ((i == 2) ? (FWFLASH_FAILURE) : (FWFLASH_SUCCESS));
 }

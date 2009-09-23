@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -631,7 +631,7 @@ fw_identify(int start)
 		if ((newdev = calloc(1, sizeof (struct devicelist)))
 		    == NULL) {
 			logmsg(MSG_ERROR,
-			    gettext("%s identification function unable "
+			    gettext("tavor identification function: unable "
 			    "to allocate space for device entry\n"));
 			di_devfs_path_free(devpath);
 			return (rv);
@@ -852,6 +852,8 @@ tavor_identify(struct devicelist *thisdev)
 
 	thisdev->ident->encap_ident = manuf;
 
+	bzero(&init_ioctl, sizeof (tavor_flash_init_ioctl_t));
+	bzero(&cfi, sizeof (cfi_t));
 	/*
 	 * Inform driver that this command supports the Intel Extended
 	 * CFI command set.
@@ -897,7 +899,10 @@ tavor_identify(struct devicelist *thisdev)
 			return (FWFLASH_FAILURE);
 		}
 		/* set some defaults */
+		manuf->sector_sz = TAVOR_FLASH_SECTOR_SZ_DEFAULT;
 		manuf->device_sz = TAVOR_FLASH_DEVICE_SZ_DEFAULT;
+		logmsg(MSG_INFO, "tavor_identify: CMDSET is AMD, SectorSz "
+		    "are default \n");
 	} else {
 		if (manuf->cmd_set != TAVOR_FLASH_AMD_CMDSET &&
 		    manuf->cmd_set != TAVOR_FLASH_INTEL_CMDSET) {
@@ -911,9 +916,10 @@ tavor_identify(struct devicelist *thisdev)
 		manuf->sector_sz = ((cfi.cfi_char[0x30] << 8) |
 		    cfi.cfi_char[0x2F]) << 8;
 		manuf->device_sz = 0x1 << cfi.cfi_char[0x27];
+		logmsg(MSG_INFO, "tavor_identify: SectorSz is from CFI Data\n");
 	}
 
-	logmsg(MSG_INFO, "sector_sz: 0x%08x\ndevice_sz: 0x%08x\n",
+	logmsg(MSG_INFO, "tavor_identify: sector_sz: 0x%08x dev_sz: 0x%08x\n",
 	    manuf->sector_sz, manuf->device_sz);
 
 	manuf->state |= FWFLASH_IB_STATE_MMAP;
@@ -922,6 +928,10 @@ tavor_identify(struct devicelist *thisdev)
 	manuf->fw_rev.major = init_ioctl.tf_fwrev.tfi_maj;
 	manuf->fw_rev.minor = init_ioctl.tf_fwrev.tfi_min;
 	manuf->fw_rev.subminor = init_ioctl.tf_fwrev.tfi_sub;
+
+	logmsg(MSG_INFO, "tavor_identify: pn_len %d hwpn %s \n",
+	    init_ioctl.tf_pn_len,
+	    (init_ioctl.tf_pn_len != 0) ? init_ioctl.tf_hwpn : "(null)");
 
 	if (((thisdev->ident->vid = calloc(1, MLX_VPR_VIDLEN + 1)) == NULL) ||
 	    ((thisdev->ident->revid = calloc(1, MLX_VPR_REVLEN + 1)) == NULL)) {
@@ -944,7 +954,7 @@ tavor_identify(struct devicelist *thisdev)
 	 * firmware version details.
 	 */
 
-	snprintf(thisdev->ident->revid, MLX_VPR_REVLEN, "%d.%d.%04d",
+	snprintf(thisdev->ident->revid, MLX_VPR_REVLEN, "%d.%d.%03d",
 	    manuf->fw_rev.major, manuf->fw_rev.minor,
 	    manuf->fw_rev.subminor);
 
@@ -1716,7 +1726,8 @@ tavor_blast_image(int fd, int prisec, uint32_t hcafia, uint32_t sectsz,
 
 	if ((prisec != 1) && (prisec != 2)) {
 		logmsg(MSG_ERROR,
-		    "tavor: invalid image number requested (%d)\n");
+		    gettext("tavor: invalid image number requested (%d)\n"),
+		    prisec);
 		return (FWFLASH_FAILURE);
 	}
 

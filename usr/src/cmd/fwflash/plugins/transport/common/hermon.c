@@ -865,7 +865,7 @@ cnx_identify(struct devicelist *thisdev)
 	 * Until we find out otherwise, add it onto the end of the
 	 * firmware version details.
 	 */
-	snprintf(thisdev->ident->revid, MLX_VPR_REVLEN, "%d.%d.%04d",
+	snprintf(thisdev->ident->revid, MLX_VPR_REVLEN, "%d.%d.%03d",
 	    manuf->hwfw_img_info.fw_rev.major,
 	    manuf->hwfw_img_info.fw_rev.minor,
 	    manuf->hwfw_img_info.fw_rev.subminor);
@@ -1732,7 +1732,7 @@ cnx_parse_img_info(int *buf, uint32_t byte_size, cnx_img_info_t *img_info,
 			img_info->fw_rev.subminor =
 			    tmp & CNX_MASK_FW_VER_SUBMIN;
 
-			logmsg(MSG_INFO, "FW_VER: %d.%d.%d\n",
+			logmsg(MSG_INFO, "FW_VER: %d.%d.%03d\n",
 			    img_info->fw_rev.major, img_info->fw_rev.minor,
 			    img_info->fw_rev.subminor);
 			break;

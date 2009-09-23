@@ -108,6 +108,8 @@ vendorvrfy(struct devicelist *devicenode)
 	}
 
 	if (handle->hwfw_match == 0) {
+		int resp;
+
 		if (handle->pn_len != 0) {
 			/* HW VPD exist and a mismatch was found */
 			logmsg(MSG_ERROR, gettext("hermon: Please verify that "
@@ -117,13 +119,22 @@ vendorvrfy(struct devicelist *devicenode)
 			logmsg(MSG_ERROR, gettext("hermon: Unable to verify "
 			    "firmware is appropriate for the hardware\n"));
 		}
-		return (FWFLASH_FAILURE);
-	}
-	logmsg(MSG_INFO, "%s firmware image verifier: HCA PSID (%s) "
-	    "matches firmware image %s's PSID\n", verifier->vendor,
-	    handle->info.mlx_psid, verifier->imgfile);
+		logmsg(MSG_ERROR, gettext("Do you want to continue? (Y/N): "));
+		(void) fflush(stdin);
+		resp = getchar();
+		if (resp != 'Y' && resp != 'y') {
+			logmsg(MSG_ERROR, gettext("Not proceeding with "
+			    "flash operation of %s on %s"),
+			    verifier->imgfile, devicenode->drvname);
+			return (FWFLASH_FAILURE);
+		}
+	} else {
+		logmsg(MSG_INFO, "%s firmware image verifier: HCA PSID (%s) "
+		    "matches firmware image %s's PSID\n", verifier->vendor,
+		    handle->info.mlx_psid, verifier->imgfile);
 
-	cnx_display_fwver(handle);
+		cnx_display_fwver(handle);
+	}
 
 	return (FWFLASH_SUCCESS);
 }
@@ -171,12 +182,12 @@ cnx_display_fwver(ib_cnx_encap_ident_t *handle)
 	logmsg(MSG_INFO, "hermon: verify: cnx_display_fwver\n");
 
 	(void) fprintf(stdout, gettext("  The current HCA firmware version "
-	    "is    : %d.%d.%04d\n"),
+	    "is    : %d.%d.%03d\n"),
 	    handle->hwfw_img_info.fw_rev.major,
 	    handle->hwfw_img_info.fw_rev.minor,
 	    handle->hwfw_img_info.fw_rev.subminor);
 	(void) fprintf(stdout, gettext("  Will be updated to HCA firmware "
-	    "ver of : %d.%d.%04d\n"),
+	    "ver of : %d.%d.%03d\n"),
 	    handle->file_img_info.fw_rev.major,
 	    handle->file_img_info.fw_rev.minor,
 	    handle->file_img_info.fw_rev.subminor);
