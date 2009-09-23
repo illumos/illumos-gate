@@ -13407,6 +13407,7 @@ fcp_offline_child(struct fcp_lun *plun, child_info_t *cip, int lcount,
 static void
 fcp_remove_child(struct fcp_lun *plun)
 {
+	int circ;
 	ASSERT(MUTEX_HELD(&plun->lun_mutex));
 
 	if (fcp_is_child_present(plun, plun->lun_cip) == FC_SUCCESS) {
@@ -13417,6 +13418,18 @@ fcp_remove_child(struct fcp_lun *plun)
 			mutex_exit(&plun->lun_mutex);
 			mutex_exit(&plun->lun_tgt->tgt_mutex);
 			mutex_exit(&plun->lun_tgt->tgt_port->port_mutex);
+			mdi_devi_enter(
+			    plun->lun_tgt->tgt_port->port_dip, &circ);
+			mdi_hold_path(PIP(plun->lun_cip));
+			mdi_devi_exit_phci(
+			    plun->lun_tgt->tgt_port->port_dip, circ);
+			(void) mdi_pi_offline(PIP(plun->lun_cip),
+			    NDI_DEVI_REMOVE);
+			mdi_devi_enter_phci(
+			    plun->lun_tgt->tgt_port->port_dip, &circ);
+			mdi_rele_path(PIP(plun->lun_cip));
+			mdi_devi_exit_phci(
+			    plun->lun_tgt->tgt_port->port_dip, circ);
 			FCP_TRACE(fcp_logq,
 			    plun->lun_tgt->tgt_port->port_instbuf,
 			    fcp_trace, FCP_BUF_LEVEL_3, 0,
