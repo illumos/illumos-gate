@@ -316,8 +316,17 @@ CTFMERGE_GENUNIX 	= \
 # built will be used as the label.  If no ID is available, or if patch mode
 # is not being used, the value of $VERSION will be used.
 #
+# For the ease of developers dropping modules onto possibly unrelated systems,
+# you can set NO_GENUNIX_MERGE= in the environment to skip uniquifying against
+# genunix.
+#
+NO_GENUNIX_UNIQUIFY=$(POUND_SIGN)
+SKIP_GENUNIX_UNIQUIFY=no
+$(NO_GENUNIX_UNIQUIFY)SKIP_GENUNIX_UNIQUIFY=yes
+
 CTFMERGE_UNIQUIFY_AGAINST_GENUNIX	= \
 	@label="-L VERSION" ; \
+	uniq= ; \
 	if [ -z "$(PATCH_BUILD)" ] ; then \
 		uniq="-D BASE" ; \
 		set -- `$(CTFFINDMOD) -n -r -t $(PMTMO_FILE) $@` ; \
@@ -328,10 +337,15 @@ CTFMERGE_UNIQUIFY_AGAINST_GENUNIX	= \
 			fi ; \
 		fi ; \
 	fi ; \
-	mergecmd="$(CTFMERGE) $(CTFMRGFLAGS)" ; \
-	cmd="$$mergecmd $$label -d $(CTFMERGE_GENUNIX) $$uniq -o $@" ; \
-	echo $$cmd "$(OBJECTS) $(CTFEXTRAOBJS)" ; \
-	$$cmd $(OBJECTS) $(CTFEXTRAOBJS)
+	if [ "$(SKIP_GENUNIX_UNIQUIFY)" = "yes" ]; then \
+		uniq= ; \
+	else \
+		uniq="-d $(CTFMERGE_GENUNIX) $$uniq" ; \
+	fi ; \
+	cmd="$(CTFMERGE) $(CTFMRGFLAGS) $$label $$uniq" ; \
+	cmd="$$cmd -o $@ $(OBJECTS) $(CTFEXTRAOBJS)" ; \
+	echo $$cmd ; \
+	$$cmd
 
 #
 # Used to merge the genunix module.  genunix has special requirements in
