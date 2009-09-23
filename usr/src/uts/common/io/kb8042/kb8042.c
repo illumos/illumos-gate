@@ -55,6 +55,7 @@
 #include <sys/promif.h>
 #include <sys/beep.h>
 #include <sys/inttypes.h>
+#include <sys/policy.h>
 
 /*
  * For any keyboard, there is a unique code describing the position
@@ -663,13 +664,24 @@ static int
 kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag, cred_t *credp)
 {
 	struct kb8042	*kb8042;
-	int err;
+	int err = 0;
 	int initial_leds;
 	int initial_led_mask;
 
 	kb8042 = &Kdws;
 
 	mutex_enter(&kb8042->w_hw_mutex);
+	if (qp->q_ptr) {
+		kb8042->w_dev = *devp;
+		mutex_exit(&kb8042->w_hw_mutex);
+		return (0);
+	}
+
+	if (secpolicy_console(credp) != 0) {
+		mutex_exit(&kb8042->w_hw_mutex);
+		return (EPERM);
+	}
+
 	while (kb8042->suspended) {
 		if (cv_wait_sig(&kb8042->suspend_cv, &kb8042->w_hw_mutex) ==
 		    0) {
@@ -679,11 +691,6 @@ kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag, cred_t *credp)
 	}
 
 	kb8042->w_dev = *devp;
-
-	if (qp->q_ptr) {
-		mutex_exit(&kb8042->w_hw_mutex);
-		return (0);
-	}
 	qp->q_ptr = (caddr_t)kb8042;
 	WR(qp)->q_ptr = qp->q_ptr;
 	if (!kb8042->w_qp)
@@ -694,12 +701,12 @@ kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag, cred_t *credp)
 	mutex_exit(&kb8042->w_hw_mutex);
 
 	kb8042_get_initial_leds(kb8042, &initial_leds, &initial_led_mask);
-	err = kbtrans_streams_init(qp, sflag, credp,
+	err = kbtrans_streams_init(qp, sflag,
 	    (struct kbtrans_hardware *)kb8042, &kb8042_callbacks,
 	    &kb8042->hw_kbtrans,
 	    initial_leds, initial_led_mask);
 	if (err != 0)
-		return (err);
+		goto out;
 
 	kbtrans_streams_set_keyboard(kb8042->hw_kbtrans, KB_PC, &keyindex_pc);
 
@@ -723,6 +730,7 @@ kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	kbtrans_streams_enable(kb8042->hw_kbtrans);
 
+out:
 	mutex_enter(&kb8042->w_hw_mutex);
 	ASSERT(kb8042->ops > 0);
 	kb8042->ops--;
@@ -730,7 +738,7 @@ kb8042_open(queue_t *qp, dev_t *devp, int flag, int sflag, cred_t *credp)
 		cv_broadcast(&kb8042->ops_cv);
 	mutex_exit(&kb8042->w_hw_mutex);
 
-	return (0);
+	return (err);
 }
 
 /*ARGSUSED1*/

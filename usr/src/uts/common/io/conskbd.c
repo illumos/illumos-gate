@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -563,10 +563,13 @@ conskbdopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 	 */
 	conskbd_consqueue = q;
 
+	if (secpolicy_console(crp) != 0)
+		return (EPERM);
+
 	/*
 	 * initialize kbtrans module for conskbd
 	 */
-	err = kbtrans_streams_init(q, sflag, crp, (struct kbtrans_hardware *)
+	err = kbtrans_streams_init(q, sflag, (struct kbtrans_hardware *)
 	    &conskbd, &conskbd_callbacks, &conskbd.conskbd_kbtrans, 0, 0);
 	if (err != 0)
 		return (err);

@@ -226,7 +226,6 @@ int
 kbtrans_streams_init(
 	queue_t 			*q,
 	int 				sflag,
-	cred_t				*crp,
 	struct kbtrans_hardware 	*hw,
 	struct kbtrans_callbacks 	*hw_cb,
 	struct kbtrans 			**ret_kbd,
@@ -235,7 +234,6 @@ kbtrans_streams_init(
 {
 	struct kbtrans *upper;
 	struct kbtrans_lower *lower;
-	int err;
 	kthread_t *tid;
 
 	/*
@@ -251,17 +249,6 @@ kbtrans_streams_init(
 	if (!kbtrans_repeat_rate) {
 		kbtrans_repeat_rate = (hz+29)/30;
 		kbtrans_repeat_delay = hz/2;
-	}
-
-	/*
-	 * Only allow open requests to succeed for privileged users.  This
-	 * necessary to prevent users from pushing the this module again
-	 * on the stream associated with /dev/kbd.
-	 */
-	err = secpolicy_console(crp);
-
-	if (err != 0) {
-		return (err);
 	}
 
 	switch (sflag) {

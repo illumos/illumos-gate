@@ -46,7 +46,6 @@
 #include <sys/kbtrans.h>
 #include <sys/usb/clients/usbkbm/usbkbm.h>
 #include <sys/beep.h>
-#include <sys/policy.h>
 #include <sys/inttypes.h>
 
 /* debugging information */
@@ -392,14 +391,6 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 		return (0); /* already opened */
 	}
 
-	/*
-	 * Only allow open requests to succeed for privileged users.  This
-	 * necessary to prevent users from pushing the "usbkbm" module again
-	 * on the stream associated with /dev/kbd.
-	 */
-	if (secpolicy_console(crp) != 0)
-		return (EPERM);
-
 	switch (sflag) {
 
 	case MODOPEN:
@@ -436,7 +427,7 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 	q->q_ptr = (caddr_t)usbkbmd;
 	WR(q)->q_ptr = (caddr_t)usbkbmd;
 
-	error = kbtrans_streams_init(q, sflag, crp,
+	error = kbtrans_streams_init(q, sflag,
 	    (struct kbtrans_hardware *)usbkbmd, &kbd_usb_callbacks,
 	    &usbkbmd->usbkbm_kbtrans, usbkbm_led_state, 0);
 

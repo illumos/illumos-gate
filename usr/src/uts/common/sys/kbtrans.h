@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_KBTRANS_H
 #define	_SYS_KBTRANS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Interface between hardware keyboard driver and generic keyboard
@@ -101,9 +99,6 @@ struct kbtrans_callbacks {
  *   	- int sflag
  *        	sflag from the streams open routine
  *
- *   	- cred_t *crp
- *        	credentials from open
- *
  *   	- struct kbtrans_hardware *hw
  *       	hardware-specific data, passed to hardware callbacks
  *
@@ -122,9 +117,8 @@ struct kbtrans_callbacks {
  *        	retain the existing state of NumLock across the transition
  *       	from firmware to the OS.
  */
-extern int kbtrans_streams_init(queue_t *, int, cred_t *,
-	struct kbtrans_hardware *, struct kbtrans_callbacks *,
-	struct kbtrans **, int, int);
+extern int kbtrans_streams_init(queue_t *, int, struct kbtrans_hardware *,
+	struct kbtrans_callbacks *, struct kbtrans **, int, int);
 
 /*
  * kbtrans_streams_fini():
