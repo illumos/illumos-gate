@@ -20,27 +20,33 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 BRAND=		sn1
 PROGS=		sn1_boot
 XMLDOCS=	config.xml platform.xml
 TEMPLATES=	SUNWsn1.xml
+CLOBBERFILES=	$(PROGS)
 
 all:	$(PROGS)
 
+include $(SRC)/cmd/Makefile.cmd
 include ../../Makefile.brand
+
+POFILES=	$(PROGS:%=%.po)
+POFILE=		sn1_zone.po
+
+$(POFILE): $(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
 
 lint:
 
 clean:
-	-$(RM) $(PROGS)
+	-$(RM) $(PROGS) $(POFILES) $(POFILE)
 
 install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
 
-clobber: clean
-	-$(RM) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
+include $(SRC)/cmd/Makefile.targ

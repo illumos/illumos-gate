@@ -49,14 +49,12 @@ include ../../Makefile.brand
 CPPFLAGS +=	-I/usr/include/libxml2 -D_REENTRANT
 LDLIBS += -lzonecfg -luutil
 
-POFILES=	$(PROGS:%=%.po)
+POFILES=	$(PROGS:%=%.po) common.po
 POFILE=		native_zone.po
 
 $(POFILE): $(POFILES)
 	$(RM) $@
-	$(BUILDPO.pofiles)
-
-_msg: $(MSGDOMAINPOFILE)
+	$(CAT) $(POFILES) > $@
 
 lint: lint_PROG
 
@@ -64,7 +62,6 @@ install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ROOTSHARED) \
 	$(ETCUSER)
 
 clean:
-	-$(RM) $(PROGS)
+	-$(RM) $(PROGS) $(POFILES) $(POFILE)
 
-include $(SRC)/Makefile.msg.targ
 include $(SRC)/cmd/Makefile.targ

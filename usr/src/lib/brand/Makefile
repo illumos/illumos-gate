@@ -35,7 +35,7 @@ i386_SUBDIRS= lx
 i386_MSGSUBDIRS= lx
 
 SUBDIRS= sn1 native $($(MACH)_SUBDIRS)
-MSGSUBDIRS= $($(MACH)_MSGSUBDIRS)
+MSGSUBDIRS= native $($(MACH)_MSGSUBDIRS)
 
 all :=		TARGET= all
 install :=	TARGET= install
