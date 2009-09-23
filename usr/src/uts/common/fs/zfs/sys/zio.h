@@ -243,6 +243,39 @@ typedef struct zio_prop {
 	uint8_t			zp_ndvas;
 } zio_prop_t;
 
+typedef struct zio_cksum_report zio_cksum_report_t;
+
+typedef void zio_cksum_finish_f(zio_cksum_report_t *rep,
+    const void *good_data);
+typedef void zio_cksum_free_f(void *cbdata, size_t size);
+
+struct zio_bad_cksum;				/* defined in zio_checksum.h */
+
+struct zio_cksum_report {
+	struct zio_cksum_report *zcr_next;
+	nvlist_t		*zcr_ereport;
+	nvlist_t		*zcr_detector;
+
+	void			*zcr_cbdata;
+	size_t			zcr_cbinfo;	/* passed to zcr_free() */
+	uint64_t		zcr_length;
+	zio_cksum_finish_f	*zcr_finish;
+	zio_cksum_free_f	*zcr_free;
+
+	/* internal use only */
+	struct zio_bad_cksum	*zcr_ckinfo;	/* information from failure */
+};
+
+typedef void zio_vsd_cksum_report_f(zio_t *zio, zio_cksum_report_t *zcr,
+    void *arg);
+
+zio_vsd_cksum_report_f	zio_vsd_default_cksum_report;
+
+typedef struct zio_vsd_ops {
+	zio_done_func_t		*vsd_free;
+	zio_vsd_cksum_report_f	*vsd_cksum_report;
+} zio_vsd_ops_t;
+
 typedef struct zio_gang_node {
 	zio_gbh_phys_t		*gn_gbh;
 	struct zio_gang_node	*gn_child[SPA_GBH_NBLKPTRS];
@@ -313,7 +346,8 @@ struct zio {
 	/* Stuff for the vdev stack */
 	vdev_t		*io_vd;
 	void		*io_vsd;
-	zio_done_func_t	*io_vsd_free;
+	const zio_vsd_ops_t *io_vsd_ops;
+
 	uint64_t	io_offset;
 	uint64_t	io_deadline;
 	avl_node_t	io_offset_node;
@@ -339,6 +373,7 @@ struct zio {
 	kcondvar_t	io_cv;
 
 	/* FMA state */
+	zio_cksum_report_t *io_cksum_report;
 	uint64_t	io_ena;
 };
 
@@ -446,6 +481,22 @@ extern void zio_handle_panic_injection(spa_t *spa, char *tag);
 extern int zio_handle_fault_injection(zio_t *zio, int error);
 extern int zio_handle_device_injection(vdev_t *vd, zio_t *zio, int error);
 extern int zio_handle_label_injection(zio_t *zio, int error);
+
+/*
+ * Checksum ereport functions
+ */
+extern void zfs_ereport_start_checksum(spa_t *spa, vdev_t *vd, struct zio *zio,
+    uint64_t offset, uint64_t length, void *arg, struct zio_bad_cksum *info);
+extern void zfs_ereport_finish_checksum(zio_cksum_report_t *report,
+    const void *good_data, const void *bad_data, boolean_t drop_if_identical);
+
+extern void zfs_ereport_send_interim_checksum(zio_cksum_report_t *report);
+extern void zfs_ereport_free_checksum(zio_cksum_report_t *report);
+
+/* If we have the good data in hand, this function can be used */
+extern void zfs_ereport_post_checksum(spa_t *spa, vdev_t *vd,
+    struct zio *zio, uint64_t offset, uint64_t length,
+    const void *good_data, const void *bad_data, struct zio_bad_cksum *info);
 
 #ifdef	__cplusplus
 }

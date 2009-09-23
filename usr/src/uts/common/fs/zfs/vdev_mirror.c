@@ -60,6 +60,11 @@ vdev_mirror_map_free(zio_t *zio)
 	kmem_free(mm, offsetof(mirror_map_t, mm_child[mm->mm_children]));
 }
 
+static const zio_vsd_ops_t vdev_mirror_vsd_ops = {
+	vdev_mirror_map_free,
+	zio_vsd_default_cksum_report
+};
+
 static mirror_map_t *
 vdev_mirror_map_alloc(zio_t *zio)
 {
@@ -117,7 +122,7 @@ vdev_mirror_map_alloc(zio_t *zio)
 	}
 
 	zio->io_vsd = mm;
-	zio->io_vsd_free = vdev_mirror_map_free;
+	zio->io_vsd_ops = &vdev_mirror_vsd_ops;
 	return (mm);
 }
 

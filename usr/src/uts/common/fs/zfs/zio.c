@@ -1879,6 +1879,32 @@ zio_vdev_io_done(zio_t *zio)
 	return (ZIO_PIPELINE_CONTINUE);
 }
 
+/*
+ * For non-raidz ZIOs, we can just copy aside the bad data read from the
+ * disk, and use that to finish the checksum ereport later.
+ */
+static void
+zio_vsd_default_cksum_finish(zio_cksum_report_t *zcr,
+    const void *good_buf)
+{
+	/* no processing needed */
+	zfs_ereport_finish_checksum(zcr, good_buf, zcr->zcr_cbdata, B_FALSE);
+}
+
+/*ARGSUSED*/
+void
+zio_vsd_default_cksum_report(zio_t *zio, zio_cksum_report_t *zcr, void *ignored)
+{
+	void *buf = zio_buf_alloc(zio->io_size);
+
+	bcopy(zio->io_data, buf, zio->io_size);
+
+	zcr->zcr_cbinfo = zio->io_size;
+	zcr->zcr_cbdata = buf;
+	zcr->zcr_finish = zio_vsd_default_cksum_finish;
+	zcr->zcr_free = zio_buf_free;
+}
+
 static int
 zio_vdev_io_assess(zio_t *zio)
 {
@@ -1891,7 +1917,7 @@ zio_vdev_io_assess(zio_t *zio)
 		spa_config_exit(zio->io_spa, SCL_ZIO, zio);
 
 	if (zio->io_vsd != NULL) {
-		zio->io_vsd_free(zio);
+		zio->io_vsd_ops->vsd_free(zio);
 		zio->io_vsd = NULL;
 	}
 
@@ -2001,6 +2027,8 @@ zio_checksum_generate(zio_t *zio)
 static int
 zio_checksum_verify(zio_t *zio)
 {
+	zio_bad_cksum_t info;
+
 	blkptr_t *bp = zio->io_bp;
 	int error;
 
@@ -2015,11 +2043,12 @@ zio_checksum_verify(zio_t *zio)
 		ASSERT(zio->io_prop.zp_checksum == ZIO_CHECKSUM_LABEL);
 	}
 
-	if ((error = zio_checksum_error(zio)) != 0) {
+	if ((error = zio_checksum_error(zio, &info)) != 0) {
 		zio->io_error = error;
 		if (!(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
-			zfs_ereport_post(FM_EREPORT_ZFS_CHECKSUM,
-			    zio->io_spa, zio->io_vd, zio, 0, 0);
+			zfs_ereport_start_checksum(zio->io_spa,
+			    zio->io_vd, zio, zio->io_offset,
+			    zio->io_size, NULL, &info);
 		}
 	}
 
@@ -2201,6 +2230,14 @@ zio_done(zio_t *zio)
 
 		if (!(zio->io_flags & ZIO_FLAG_CANFAIL) && !zio->io_reexecute)
 			zio->io_reexecute |= ZIO_REEXECUTE_SUSPEND;
+
+		/*
+		 * Here is a possibly good place to attempt to do
+		 * either combinatorial reconstruction or error correction
+		 * based on checksums.  It also might be a good place
+		 * to send out preliminary ereports before we suspend
+		 * processing.
+		 */
 	}
 
 	/*
@@ -2296,6 +2333,20 @@ zio_done(zio_t *zio)
 	ASSERT(zio_walk_children(zio) == NULL);
 	ASSERT(zio->io_reexecute == 0);
 	ASSERT(zio->io_error == 0 || (zio->io_flags & ZIO_FLAG_CANFAIL));
+
+	/* Report any checksum errors, since the IO is complete */
+	while (zio->io_cksum_report != NULL) {
+		zio_cksum_report_t *rpt = zio->io_cksum_report;
+
+		zio->io_cksum_report = rpt->zcr_next;
+		rpt->zcr_next = NULL;
+
+		/* only pass in our data buffer if we've succeeded. */
+		rpt->zcr_finish(rpt,
+		    (zio->io_error == 0) ? zio->io_data : NULL);
+
+		zfs_ereport_free_checksum(rpt);
+	}
 
 	/*
 	 * It is the responsibility of the done callback to ensure that this

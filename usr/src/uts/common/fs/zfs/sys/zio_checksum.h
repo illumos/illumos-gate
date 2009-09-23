@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,15 @@ typedef struct zio_checksum_info {
 	char		*ci_name;	/* descriptive name */
 } zio_checksum_info_t;
 
+typedef struct zio_bad_cksum {
+	zio_cksum_t		zbc_expected;
+	zio_cksum_t		zbc_actual;
+	const char		*zbc_checksum_name;
+	uint8_t			zbc_byteswapped;
+	uint8_t			zbc_injected;
+	uint8_t			zbc_has_cksum;	/* expected/actual valid */
+} zio_bad_cksum_t;
+
 extern zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS];
 
 /*
@@ -64,7 +73,7 @@ extern zio_checksum_t zio_checksum_SHA256;
 
 extern void zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
     void *data, uint64_t size);
-extern int zio_checksum_error(zio_t *zio);
+extern int zio_checksum_error(zio_t *zio, zio_bad_cksum_t *out);
 
 #ifdef	__cplusplus
 }

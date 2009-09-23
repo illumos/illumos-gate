@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,16 +151,17 @@ zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,
 }
 
 int
-zio_checksum_error(zio_t *zio)
+zio_checksum_error(zio_t *zio, zio_bad_cksum_t *info)
 {
 	blkptr_t *bp = zio->io_bp;
 	uint_t checksum = (bp == NULL ? zio->io_prop.zp_checksum :
 	    (BP_IS_GANG(bp) ? ZIO_CHECKSUM_GANG_HEADER : BP_GET_CHECKSUM(bp)));
 	int byteswap;
-	void *data = zio->io_data;
+	int error;
 	uint64_t size = (bp == NULL ? zio->io_size :
 	    (BP_IS_GANG(bp) ? SPA_GANGBLOCKSIZE : BP_GET_PSIZE(bp)));
 	uint64_t offset = zio->io_offset;
+	void *data = zio->io_data;
 	zio_block_tail_t *zbt = (zio_block_tail_t *)((char *)data + size) - 1;
 	zio_checksum_info_t *ci = &zio_checksum_table[checksum];
 	zio_cksum_t actual_cksum, expected_cksum, verifier;
@@ -196,11 +197,22 @@ zio_checksum_error(zio_t *zio)
 		ci->ci_func[byteswap](data, size, &actual_cksum);
 	}
 
+	info->zbc_expected = expected_cksum;
+	info->zbc_actual = actual_cksum;
+	info->zbc_checksum_name = ci->ci_name;
+	info->zbc_byteswapped = byteswap;
+	info->zbc_injected = 0;
+	info->zbc_has_cksum = 1;
+
 	if (!ZIO_CHECKSUM_EQUAL(actual_cksum, expected_cksum))
 		return (ECKSUM);
 
-	if (zio_injection_enabled && !zio->io_error)
-		return (zio_handle_fault_injection(zio, ECKSUM));
+	if (zio_injection_enabled && !zio->io_error &&
+	    (error = zio_handle_fault_injection(zio, ECKSUM)) != 0) {
+
+		info->zbc_injected = 1;
+		return (error);
+	}
 
 	return (0);
 }
