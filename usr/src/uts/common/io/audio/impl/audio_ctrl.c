@@ -28,6 +28,7 @@
 #include <sys/sysmacros.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/atomic.h>
 
 #include "audio_impl.h"
 
@@ -264,15 +265,14 @@ audio_dev_add_soft_volume(audio_dev_t *d)
  * values since they have changed.
  *
  * There will be a routine that allows a client to register
- * a callback. All callbacks registered to this device should
- * get called from this routine.
+ * a callback.   For now we just update the serial number.
  *
  * d                - The device that needs updates.
  */
 void
 audio_dev_update_controls(audio_dev_t *d)
 {
-	auclnt_notify_dev(d);
+	atomic_inc_uint(&d->d_serial);
 }
 
 

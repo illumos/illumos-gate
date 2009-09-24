@@ -78,7 +78,6 @@ struct ossclient {
 struct ossdev {
 	audio_dev_t		*d_dev;
 
-	uint_t			d_modify_cnt;	/* flag apps of ctrl changes */
 	uint_t			d_nctrl;	/* num actual controls */
 	uint_t			d_nalloc;	/* num allocated controls */
 	audio_ctrl_t		**d_ctrls;	/* array of control handles */
@@ -1345,12 +1344,7 @@ static int
 sound_mixer_info(audio_client_t *c, mixer_info *mi)
 {
 	audio_dev_t	*d;
-	ossdev_t	*odev;
-	ossclient_t	*sc;
 	const char	*name;
-
-	sc = auclnt_get_private(c);
-	odev = sc->o_ossdev;
 
 	d = auclnt_get_dev(c);
 
@@ -1358,7 +1352,7 @@ sound_mixer_info(audio_client_t *c, mixer_info *mi)
 	(void) snprintf(mi->id, sizeof (mi->id), "%s", name);
 	(void) snprintf(mi->name, sizeof (mi->name), "%s", name);
 	(void) snprintf(mi->handle, sizeof (mi->handle), "%s", name);
-	mi->modify_counter = odev->d_modify_cnt;
+	mi->modify_counter = (int)auclnt_dev_get_serial(d);
 	mi->card_number = auclnt_get_dev_index(d);
 	mi->port_number = 0;
 	return (0);
@@ -1438,7 +1432,7 @@ sndctl_mixerinfo(audio_client_t *c, oss_mixerinfo *mi)
 	(void) snprintf(mi->name, sizeof (mi->name), "%s", name);
 	(void) snprintf(mi->id, sizeof (mi->id), "%s", name);
 	(void) snprintf(mi->handle, sizeof (mi->handle), "%s", name);
-	mi->modify_counter = odev->d_modify_cnt;
+	mi->modify_counter = (int)auclnt_dev_get_serial(d);
 	mi->card_number = auclnt_get_dev_index(d);
 	mi->legacy_device = auclnt_get_dev_number(d);
 	if (mi->legacy_device >= 0) {
@@ -1922,19 +1916,6 @@ static void
 oss_input(audio_client_t *c)
 {
 	auclnt_pollwakeup(c, POLLIN | POLLRDNORM);
-}
-
-static void
-oss_notify(audio_client_t *c)
-{
-	audio_dev_t	*d;
-	ossdev_t	*odev;
-
-	d = auclnt_get_dev(c);
-	if ((odev = auclnt_get_dev_minor_data(d, AUDIO_MINOR_DSP)) == NULL) {
-		return;
-	}
-	odev->d_modify_cnt++;
 }
 
 static int
@@ -2578,7 +2559,6 @@ static struct audio_client_ops oss_ops = {
 	NULL,		/* mmap */
 	oss_input,
 	oss_output,
-	NULL,		/* notify */
 	NULL,		/* drain */
 };
 
@@ -2595,7 +2575,6 @@ static struct audio_client_ops ossmix_ops = {
 	NULL,   /* mmap */
 	NULL,	/* input */
 	NULL,   /* output */
-	oss_notify,
 	NULL,	/* drain */
 	NULL,	/* wput */
 	NULL,	/* wsrv */
@@ -2615,7 +2594,6 @@ static struct audio_client_ops sndstat_ops = {
 	NULL,	/* mmap */
 	NULL,	/* input */
 	NULL,	/* output */
-	NULL,	/* notify */
 	NULL,	/* drain */
 	NULL,	/* wput */
 	NULL,	/* wsrv */

@@ -680,7 +680,7 @@ audio1575_count(void *arg)
 
 	mutex_enter(&statep->lock);
 	audio1575_update_port(port);
-	val = port->count + port->picb;
+	val = port->count + (port->picb / port->nchan);
 	mutex_exit(&statep->lock);
 
 	return (val);

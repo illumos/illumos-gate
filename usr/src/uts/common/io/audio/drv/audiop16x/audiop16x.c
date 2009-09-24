@@ -564,21 +564,9 @@ p16x_alloc_port(p16x_dev_t *dev, int num)
 	}
 
 	/*
-	 * We choose 6 fragments for a specific reason.	 Since the
-	 * device only has full and half interrupts, and since the
-	 * framework will try to queue up 4 frags automatically, this
-	 * ensures that we will be able to queue all 4 fragments, and
-	 * it avoids a potential underrun that you would get with 8
-	 * fragments.  (More than 8 fragments is guaranteed to cause
-	 * underruns in Boomer.)
-	 *
-	 * Boomer needs to get smarter about dealing with devices with
-	 * fewer fragment counts.  This device, for instance, should
-	 * really be represented with just two fragments.  That wll
-	 * cause an infinite loop in Boomer, when Boomer tries to
-	 * queue up 4 fragments.
+	 * This needs the very latest Boomer changes.
 	 */
-	port->nfrags = 6;
+	port->nfrags = 2;
 	port->fragfr = 48000 / port->intrs;
 	/*
 	 * The device operates in pairs of dwords at a time, for

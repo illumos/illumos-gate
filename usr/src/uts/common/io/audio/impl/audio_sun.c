@@ -539,7 +539,7 @@ devaudio_input(audio_client_t *c)
 
 	while (auclnt_get_count(sp) >= count) {
 
-		if ((!canputnext(rq)) ||
+		if ((!canput(rq)) ||
 		    ((mp = allocb(nbytes, BPRI_MED)) == NULL)) {
 			/*
 			 * This will apply back pressure to the
@@ -560,7 +560,7 @@ devaudio_input(audio_client_t *c)
 
 		(void) auclnt_consume_data(sp, (caddr_t)mp->b_wptr, count);
 		mp->b_wptr += nbytes;
-		putnext(rq, mp);
+		(void) putq(rq, mp);
 	}
 }
 
@@ -968,14 +968,12 @@ devaudio_ioc_getdev(queue_t *wq, audio_client_t *c, mblk_t *mp)
 static int
 devaudio_sigpoll(audio_client_t *c, void *arg)
 {
-	daproc_t	*proc = arg;
-	daclient_t	*dc;
+	pid_t		pid = (pid_t)(uintptr_t)arg;
 
 	if (auclnt_get_minor_type(c) == AUDIO_MINOR_DEVAUDIOCTL) {
-		dc = auclnt_get_private(c);
 		/* we only need to notify peers in our own process */
-		if ((dc != NULL) && (dc->dc_proc == proc)) {
-			(void) putnextctl1(auclnt_get_rq(c), M_PCSIG, SIGPOLL);
+		if (auclnt_get_pid(c) == pid) {
+			(void) putctl1(auclnt_get_rq(c), M_PCSIG, SIGPOLL);
 		}
 	}
 	return (AUDIO_WALK_CONTINUE);
@@ -995,7 +993,8 @@ devaudio_drain(audio_client_t *c)
 	while ((mp = mplist) != NULL) {
 		mplist = mp->b_next;
 		mp->b_next = NULL;
-		miocack(auclnt_get_wq(c), mp, 0, 0);
+		mioc2ack(mp, NULL, 0, 0);
+		(void) putq(auclnt_get_rq(c), mp);
 	}
 }
 
@@ -1025,7 +1024,7 @@ devaudio_output(audio_client_t *c)
 
 	if (eofs) {
 		auclnt_dev_walk_clients(auclnt_get_dev(c),
-		    devaudio_sigpoll, proc);
+		    devaudio_sigpoll, (void *)(uintptr_t)auclnt_get_pid(c));
 	}
 }
 
@@ -1337,6 +1336,21 @@ devaudio_wput(audio_client_t *c, mblk_t *mp)
 }
 
 static void
+devaudio_rsrv(audio_client_t *c)
+{
+	queue_t		*rq = auclnt_get_rq(c);
+	mblk_t		*mp;
+
+	while ((mp = getq(rq)) != NULL) {
+
+		if ((queclass(mp) != QPCTL) && (!canputnext(rq))) {
+			return;
+		}
+		putnext(rq, mp);
+	}
+}
+
+static void
 devaudio_wsrv(audio_client_t *c)
 {
 	queue_t		*wq = auclnt_get_wq(c);
@@ -1421,10 +1435,10 @@ static struct audio_client_ops devaudio_ops = {
 	NULL,	/* mmap */
 	devaudio_input,
 	devaudio_output,
-	NULL,	/* notify */
 	devaudio_drain,
 	devaudio_wput,
-	devaudio_wsrv
+	devaudio_wsrv,
+	devaudio_rsrv
 };
 
 static struct audio_client_ops devaudioctl_ops = {
@@ -1440,9 +1454,9 @@ static struct audio_client_ops devaudioctl_ops = {
 	NULL,	/* mmap */
 	NULL,	/* output */
 	NULL,	/* input */
-	NULL,	/* notify */
 	NULL,	/* drain */
 	devaudioctl_wput,
+	NULL,
 	NULL,
 };
 

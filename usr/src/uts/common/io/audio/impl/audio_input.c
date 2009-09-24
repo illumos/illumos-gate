@@ -141,7 +141,6 @@ void
 auimpl_input_callback(audio_engine_t *eng)
 {
 	int		fragfr = eng->e_fragfr;
-	boolean_t	overrun;
 	audio_client_t	*c;
 
 	/* consume all fragments in the buffer */
@@ -187,9 +186,6 @@ auimpl_input_callback(audio_engine_t *eng)
 				eng->e_errors++;
 				sp->s_errors += count - space;
 				count = space;
-				overrun = B_TRUE;
-			} else {
-				overrun = B_FALSE;
 			}
 
 			auimpl_produce_fragment(sp, count);
@@ -199,13 +195,9 @@ auimpl_input_callback(audio_engine_t *eng)
 
 			mutex_exit(&sp->s_lock);
 
-			mutex_enter(&c->c_lock);
-			if (overrun) {
-				c->c_do_notify = B_TRUE;
+			if (c->c_input != NULL) {
+				c->c_input(c);
 			}
-			c->c_do_input = B_TRUE;
-			cv_broadcast(&c->c_cv);
-			mutex_exit(&c->c_lock);
 		}
 
 		/*

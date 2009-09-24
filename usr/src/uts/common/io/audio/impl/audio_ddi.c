@@ -33,6 +33,7 @@
 #include <sys/mkdev.h>
 #include <sys/conf.h>
 #include <sys/note.h>
+#include <sys/atomic.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
@@ -183,7 +184,7 @@ audio_open(dev_t *devp, int oflag, int otyp, cred_t *credp)
 	/* now we can receive upcalls */
 	auimpl_client_activate(c);
 
-	auclnt_notify_dev(c->c_dev);
+	atomic_inc_uint(&c->c_dev->d_serial);
 
 	return (0);
 }
@@ -244,7 +245,7 @@ audio_stropen(queue_t *rq, dev_t *devp, int oflag, int sflag, cred_t *credp)
 	/* now we can receive upcalls */
 	auimpl_client_activate(c);
 
-	auclnt_notify_dev(c->c_dev);
+	atomic_inc_uint(&c->c_dev->d_serial);
 
 	return (0);
 }
@@ -289,7 +290,7 @@ audio_strclose(queue_t *rq, int flag, cred_t *credp)
 	auimpl_client_destroy(c);
 
 	/* notify peers that a change has occurred */
-	auclnt_notify_dev(d);
+	atomic_inc_uint(&d->d_serial);
 
 	/* now we can drop the release we had on the device */
 	auimpl_dev_release(d);
@@ -340,7 +341,7 @@ audio_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	auimpl_client_destroy(c);
 
 	/* notify peers that a change has occurred */
-	auclnt_notify_dev(d);
+	atomic_inc_uint(&d->d_serial);
 
 	/* now we can drop the release we had on the device */
 	auimpl_dev_release(d);
@@ -441,6 +442,21 @@ audio_wsrv(queue_t *wq)
 	return (0);
 }
 
+static int
+audio_rsrv(queue_t *rq)
+{
+	audio_client_t	*c;
+
+	c = rq->q_ptr;
+	if (c->c_rsrv) {
+		c->c_rsrv(c);
+	} else {
+		flushq(rq, FLUSHALL);
+	}
+	return (0);
+}
+
+
 static struct dev_ops audio_dev_ops = {
 	DEVO_REV,		/* rev */
 	0,			/* refcnt */
@@ -488,7 +504,7 @@ audio_init_ops(struct dev_ops *devops, const char *name)
 	helper->minfo.mi_idnum = 0;	/* only for strlog(1M) */
 	helper->minfo.mi_idname = helper->name;
 	helper->minfo.mi_minpsz = 0;
-	helper->minfo.mi_maxpsz = 2048;
+	helper->minfo.mi_maxpsz = 8192;
 	helper->minfo.mi_hiwat = 65536;
 	helper->minfo.mi_lowat = 32768;
 
@@ -500,8 +516,8 @@ audio_init_ops(struct dev_ops *devops, const char *name)
 	helper->wqinit.qi_minfo = &helper->minfo;
 	helper->wqinit.qi_mstat = NULL;
 
-	helper->rqinit.qi_putp = NULL;
-	helper->rqinit.qi_srvp = NULL;
+	helper->rqinit.qi_putp = putq;
+	helper->rqinit.qi_srvp = audio_rsrv;
 	helper->rqinit.qi_qopen = audio_stropen;
 	helper->rqinit.qi_qclose = audio_strclose;
 	helper->rqinit.qi_qadmin = NULL;

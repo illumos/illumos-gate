@@ -288,7 +288,6 @@ auimpl_output_callback_impl(audio_engine_t *eng)
 		int		avail;
 		int		used;
 		int		offset;
-		boolean_t	underrun = B_FALSE;
 		boolean_t	drained = B_FALSE;
 		audio_client_t	*c = sp->s_client;
 
@@ -378,7 +377,6 @@ auimpl_output_callback_impl(audio_engine_t *eng)
 					drained = B_TRUE;
 				}
 			} else {
-				underrun = B_TRUE;
 				sp->s_errors += need;
 				eng->e_stream_underruns++;
 			}
@@ -397,17 +395,20 @@ auimpl_output_callback_impl(audio_engine_t *eng)
 		 * chance of deadlock.
 		 */
 
-		mutex_enter(&c->c_lock);
-		c->c_do_output = B_TRUE;
+		/*
+		 * NB: The only lock we are holding now is the engine
+		 * lock.  But the client can't go away because the
+		 * closer would have to get the engine lock to remove
+		 * the client's stream from engine.  So we're safe.
+		 */
 
-		if (underrun)
-			c->c_do_notify = B_TRUE;
+		if (c->c_output != NULL) {
+			c->c_output(c);
+		}
 
-		if (drained)
-			c->c_do_drain = B_TRUE;
-
-		cv_broadcast(&c->c_cv);
-		mutex_exit(&c->c_lock);
+		if (drained && (c->c_drain != NULL)) {
+			c->c_drain(c);
+		}
 	}
 
 	/*
@@ -450,7 +451,7 @@ auimpl_output_callback(audio_engine_t *eng)
 	cnt = eng->e_head - eng->e_tail;
 
 	/* stay a bit ahead */
-	while (cnt < (fragfr * 4)) {
+	while (cnt < ((fragfr * 3) / 2)) {
 		auimpl_output_callback_impl(eng);
 		cnt = eng->e_head - eng->e_tail;
 	}

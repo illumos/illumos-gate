@@ -674,10 +674,6 @@ auimpl_set_gain_master(audio_stream_t *sp, uint8_t gain)
 		sp->s_gain_eff = sp->s_gain_scaled;
 	}
 	mutex_exit(&sp->s_lock);
-
-	/*
-	 * No need to notify clients, since they can't see this update.
-	 */
 }
 
 int
@@ -743,7 +739,7 @@ auclnt_set_gain(audio_stream_t *sp, uint8_t gain)
 	}
 	mutex_exit(&sp->s_lock);
 
-	auclnt_notify_dev(sp->s_client->c_dev);
+	atomic_inc_uint(&sp->s_client->c_dev->d_serial);
 }
 
 uint8_t
@@ -771,7 +767,7 @@ auclnt_set_muted(audio_stream_t *sp, boolean_t muted)
 	}
 	mutex_exit(&sp->s_lock);
 
-	auclnt_notify_dev(sp->s_client->c_dev);
+	atomic_inc_uint(&sp->s_client->c_dev->d_serial);
 }
 
 boolean_t
@@ -832,7 +828,7 @@ auclnt_set_paused(audio_stream_t *sp)
 
 	auclnt_stop(sp);
 
-	auclnt_notify_dev(sp->s_client->c_dev);
+	atomic_inc_uint(&sp->s_client->c_dev->d_serial);
 }
 
 void
@@ -973,64 +969,6 @@ audio_stream_fini(audio_stream_t *sp)
 	}
 }
 
-void
-auimpl_client_task(void *arg)
-{
-	audio_client_t		*c = arg;
-
-	mutex_enter(&c->c_lock);
-
-	for (;;) {
-		if (c->c_closing) {
-			break;
-		}
-
-		if (c->c_do_output) {
-			c->c_do_output = B_FALSE;
-
-			mutex_exit(&c->c_lock);
-			if (c->c_output != NULL)
-				c->c_output(c);
-			mutex_enter(&c->c_lock);
-			continue;
-		}
-
-		if (c->c_do_input) {
-			c->c_do_input = B_FALSE;
-
-			mutex_exit(&c->c_lock);
-			if (c->c_input != NULL)
-				c->c_input(c);
-			mutex_enter(&c->c_lock);
-			continue;
-		}
-
-		if (c->c_do_notify) {
-			c->c_do_notify = B_FALSE;
-
-			mutex_exit(&c->c_lock);
-			if (c->c_notify != NULL)
-				c->c_notify(c);
-			mutex_enter(&c->c_lock);
-			continue;
-		}
-
-		if (c->c_do_drain) {
-			c->c_do_drain = B_FALSE;
-
-			mutex_exit(&c->c_lock);
-			if (c->c_drain != NULL)
-				c->c_drain(c);
-			mutex_enter(&c->c_lock);
-			continue;
-		}
-
-		/* if we got here, we had no work to do */
-		cv_wait(&c->c_cv, &c->c_lock);
-	}
-	mutex_exit(&c->c_lock);
-}
-
 int
 auclnt_start_drain(audio_client_t *c)
 {
@@ -1084,8 +1022,6 @@ auimpl_client_create(dev_t dev)
 	list_t			*list = &auimpl_clients;
 	minor_t			minor;
 	audio_dev_t		*d;
-	char			scratch[80];
-	static uint64_t		unique = 0;
 
 	/* validate minor number */
 	minor = getminor(dev) & AUDIO_MN_TYPE_MASK;
@@ -1119,14 +1055,6 @@ auimpl_client_create(dev_t dev)
 	c->c_origminor =	getminor(dev);
 	c->c_ops =		*ops;
 
-	(void) snprintf(scratch, sizeof (scratch), "auclnt%" PRIx64,
-	    atomic_inc_64_nv(&unique));
-	c->c_tq = ddi_taskq_create(NULL, scratch, 1, TASKQ_DEFAULTPRI, 0);
-	if (c->c_tq == NULL) {
-		audio_dev_warn(d, "client taskq_create failed");
-		goto failed;
-	}
-
 	/*
 	 * We hold the client lock here.
 	 */
@@ -1153,9 +1081,6 @@ auimpl_client_create(dev_t dev)
 
 failed:
 	auimpl_dev_release(d);
-	if (c->c_tq != NULL) {
-		ddi_taskq_destroy(c->c_tq);
-	}
 	audio_stream_fini(&c->c_ostream);
 	audio_stream_fini(&c->c_istream);
 	mutex_destroy(&c->c_lock);
@@ -1178,8 +1103,6 @@ auimpl_client_destroy(audio_client_t *c)
 	/* release the device reference count */
 	auimpl_dev_release(c->c_dev);
 	c->c_dev = NULL;
-
-	ddi_taskq_destroy(c->c_tq);
 
 	mutex_destroy(&c->c_lock);
 	cv_destroy(&c->c_cv);
@@ -1223,12 +1146,7 @@ auclnt_close(audio_client_t *c)
 	while (c->c_refcnt) {
 		cv_wait(&c->c_cv, &c->c_lock);
 	}
-	c->c_closing = B_TRUE;
-	cv_broadcast(&c->c_cv);
 	mutex_exit(&c->c_lock);
-
-	/* make sure taskq has drained */
-	ddi_taskq_wait(c->c_tq);
 
 	/* release any engines that we were holding */
 	auimpl_engine_close(&c->c_ostream);
@@ -1284,6 +1202,12 @@ auclnt_release(audio_client_t *c)
 	if (c->c_refcnt == 0)
 		cv_broadcast(&c->c_cv);
 	mutex_exit(&c->c_lock);
+}
+
+unsigned
+auclnt_dev_get_serial(audio_dev_t *d)
+{
+	return (d->d_serial);
 }
 
 void
@@ -1354,12 +1278,6 @@ auclnt_open(audio_client_t *c, unsigned fmts, int oflag)
 		if (rv != 0) {
 			goto done;
 		}
-	}
-
-	if (ddi_taskq_dispatch(c->c_tq, auimpl_client_task, c, DDI_NOSLEEP) !=
-	    DDI_SUCCESS) {
-		audio_dev_warn(d, "unable to start client taskq");
-		rv = ENOMEM;
 	}
 
 done:
@@ -1508,24 +1426,6 @@ auclnt_get_dev_capab(audio_dev_t *dev)
 	/* AC3: deal with formats that don't support mixing */
 
 	return (caps);
-}
-
-void
-auclnt_notify_dev(audio_dev_t *dev)
-{
-	list_t *l = &dev->d_clients;
-	audio_client_t *c;
-
-	rw_enter(&auimpl_client_lock, RW_READER);
-	for (c = list_head(l); c != NULL; c = list_next(l, c)) {
-		if (!c->c_is_active)
-			continue;
-		mutex_enter(&c->c_lock);
-		c->c_do_notify = B_TRUE;
-		cv_broadcast(&c->c_cv);
-		mutex_exit(&c->c_lock);
-	}
-	rw_exit(&auimpl_client_lock);
 }
 
 uint64_t

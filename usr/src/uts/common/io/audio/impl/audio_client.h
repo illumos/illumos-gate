@@ -47,11 +47,11 @@ typedef struct audio_client_ops {
 	int		(*aco_mmap)(audio_client_t *, ...);
 	void		(*aco_input)(audio_client_t *);
 	void		(*aco_output)(audio_client_t *);
-	void		(*aco_notify)(audio_client_t *);
 	void		(*aco_drain)(audio_client_t *);
 
 	void		(*aco_wput)(audio_client_t *, mblk_t *);
 	void		(*aco_wsrv)(audio_client_t *);
+	void		(*aco_rsrv)(audio_client_t *);
 } audio_client_ops_t;
 
 void *auclnt_get_private(audio_client_t *);
@@ -149,7 +149,6 @@ cred_t *auclnt_get_cred(audio_client_t *);
 audio_dev_t *auclnt_get_dev(audio_client_t *);
 audio_dev_t *auclnt_hold_dev_by_index(int);
 void auclnt_release_dev(audio_dev_t *);
-void auclnt_notify_dev(audio_dev_t *);
 int auclnt_get_dev_index(audio_dev_t *);
 int auclnt_get_dev_number(audio_dev_t *);
 void auclnt_set_dev_number(audio_dev_t *, int);
@@ -175,6 +174,14 @@ unsigned auclnt_get_dev_capab(audio_dev_t *);
  */
 void auclnt_dev_walk_clients(audio_dev_t *,
     int (*)(audio_client_t *, void *), void *);
+
+/*
+ * This is used to check for updates to volume and control status.
+ * Its a polling-based interface because that's what our clients (OSS)
+ * need, and its far lighter weight than forcing an asynchronous
+ * callback on everything.
+ */
+unsigned auclnt_dev_get_serial(audio_dev_t *);
 
 /*
  * Audio control functions for use by clients.
