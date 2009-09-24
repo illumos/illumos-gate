@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -239,13 +239,15 @@ rwlock_init(rwlock_t *rwlp, int type, void *arg)
 int
 rwlock_destroy(rwlock_t *rwlp)
 {
+	ulwp_t *self = curthread;
+
 	/*
 	 * Once destroyed, we can no longer be holding a read or write lock.
 	 * We can do nothing about other threads that are holding read locks.
 	 */
-	sigoff(curthread);
+	sigoff(self);
 	rwl_entry(rwlp)->rd_count = 0;
-	sigon(curthread);
+	sigon(self);
 	rwlp->rwlock_magic = 0;
 	tdb_sync_obj_deregister(rwlp);
 	return (0);

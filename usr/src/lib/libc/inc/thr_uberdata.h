@@ -609,6 +609,7 @@ typedef struct ulwp {
 	char		ul_sync_obj_reg;	/* tdb_sync_obj_register() */
 	char		ul_qtype;	/* MX or CV */
 	char		ul_cv_wake;	/* != 0: just wake up, don't requeue */
+	int		ul_rtld;	/* thread is running inside ld.so.1 */
 	int		ul_usropts;	/* flags given to thr_create() */
 	void		*(*ul_startpc)(void *); /* start func (thr_create()) */
 	void		*ul_startarg;	/* argument for start function */
@@ -1021,6 +1022,7 @@ typedef struct ulwp32 {
 	char		ul_sync_obj_reg;	/* tdb_sync_obj_register() */
 	char		ul_qtype;	/* MX or CV */
 	char		ul_cv_wake;	/* != 0: just wake up, don't requeue */
+	int		ul_rtld;	/* thread is running inside ld.so.1 */
 	int		ul_usropts;	/* flags given to thr_create() */
 	caddr32_t	ul_startpc;	/* start func (thr_create()) */
 	caddr32_t	ul_startarg;	/* argument for start function */
@@ -1254,7 +1256,10 @@ extern	void	do_exit_critical(void);
  * of the signal mask must also be deferred.
  */
 #define	sigoff(self)	(self->ul_sigdefer++)
-extern	void	sigon(ulwp_t *);
+#define	sigon(self)						\
+	(void) ((--self->ul_sigdefer == 0 &&			\
+	    self->ul_curplease && self->ul_critical == 0)?	\
+	    (do_exit_critical(), 0) : 0)
 
 /* these are exported functions */
 extern	void	_sigoff(void);

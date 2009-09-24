@@ -583,13 +583,14 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    ulwp.ul_td_evbuf.eventnum,
 	    prt_addr(ulwp.ul_td_evbuf.eventdata, 0));
 
-	HD("td'enable  sync'reg   qtype      cv_wake    usropts");
-	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d ",
+	HD("td'enable  sync'reg   qtype      cv_wake    rtld       usropts");
+	mdb_printf(OFFSTR "%-10d %-10d %-10d %-10d %-10d ",
 	    OFFSET(ul_td_events_enable),
 	    ulwp.ul_td_events_enable,
 	    ulwp.ul_sync_obj_reg,
 	    ulwp.ul_qtype,
-	    ulwp.ul_cv_wake);
+	    ulwp.ul_cv_wake,
+	    ulwp.ul_rtld);
 	mdb_printf(ulwp.ul_usropts? "0x%x\n" : "%d\n",
 	    ulwp.ul_usropts);
 

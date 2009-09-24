@@ -1785,8 +1785,8 @@ force_continue(ulwp_t *ulwp)
 }
 
 /*
- * Suspend an lwp with lwp_suspend(), then move it to a safe
- * point, that is, to a point where ul_critical is zero.
+ * Suspend an lwp with lwp_suspend(), then move it to a safe point,
+ * that is, to a point where ul_critical and ul_rtld are both zero.
  * On return, the ulwp_lock() is dropped as with ulwp_unlock().
  * If 'link_dropped' is non-NULL, then 'link_lock' is held on entry.
  * If we have to drop link_lock, we store 1 through link_dropped.
@@ -1823,7 +1823,8 @@ safe_suspend(ulwp_t *ulwp, uchar_t whystopped, int *link_dropped)
 	spin_lock_clear(&ulwp->ul_spinlock);
 
 top:
-	if (ulwp->ul_critical == 0 || ulwp->ul_stopping) {
+	if ((ulwp->ul_critical == 0 && ulwp->ul_rtld == 0) ||
+	    ulwp->ul_stopping) {
 		/* thread is already safe */
 		ulwp->ul_stop |= whystopped;
 	} else {
@@ -2147,6 +2148,7 @@ thr_kill(thread_t tid, int sig)
 
 /*
  * Exit a critical section, take deferred actions if necessary.
+ * Called from exit_critical() and from sigon().
  */
 void
 do_exit_critical()
@@ -2155,7 +2157,12 @@ do_exit_critical()
 	int sig;
 
 	ASSERT(self->ul_critical == 0);
-	if (self->ul_dead)
+
+	/*
+	 * Don't suspend ourself or take a deferred signal while dying
+	 * or while executing inside the dynamic linker (ld.so.1).
+	 */
+	if (self->ul_dead || self->ul_rtld)
 		return;
 
 	while (self->ul_pleasestop ||
@@ -2214,6 +2221,7 @@ _ti_bind_guard(int flags)
 	self->ul_bindflags |= bindflag;
 	if ((flags & (THR_FLG_NOLOCK | THR_FLG_REENTER)) == THR_FLG_NOLOCK) {
 		sigoff(self);	/* see no signals while holding ld_lock */
+		self->ul_rtld++;	/* don't suspend while in ld.so.1 */
 		(void) mutex_lock(&udp->ld_lock);
 	}
 	enter_critical(self);
@@ -2239,6 +2247,7 @@ _ti_bind_clear(int flags)
 	if ((flags & (THR_FLG_NOLOCK | THR_FLG_REENTER)) == THR_FLG_NOLOCK) {
 		if (MUTEX_OWNED(&udp->ld_lock, self)) {
 			(void) mutex_unlock(&udp->ld_lock);
+			self->ul_rtld--;
 			sigon(self);	/* reenable signals */
 		}
 	}
@@ -2275,28 +2284,18 @@ _ti_critical(void)
 void
 _sigoff(void)
 {
-	sigoff(curthread);
+	ulwp_t *self = curthread;
+
+	sigoff(self);
 }
 
 void
 _sigon(void)
 {
-	sigon(curthread);
-}
-
-void
-sigon(ulwp_t *self)
-{
-	int sig;
+	ulwp_t *self = curthread;
 
 	ASSERT(self->ul_sigdefer > 0);
-	if (--self->ul_sigdefer == 0) {
-		if ((sig = self->ul_cursig) != 0 && self->ul_critical == 0) {
-			self->ul_cursig = 0;
-			take_deferred_signal(sig);
-			ASSERT(self->ul_cursig == 0);
-		}
-	}
+	sigon(self);
 }
 
 int

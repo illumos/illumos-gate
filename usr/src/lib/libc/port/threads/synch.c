@@ -2670,25 +2670,30 @@ lmutex_unlock(mutex_t *mp)
 void
 sig_mutex_lock(mutex_t *mp)
 {
-	sigoff(curthread);
+	ulwp_t *self = curthread;
+
+	sigoff(self);
 	(void) mutex_lock(mp);
 }
 
 void
 sig_mutex_unlock(mutex_t *mp)
 {
+	ulwp_t *self = curthread;
+
 	(void) mutex_unlock(mp);
-	sigon(curthread);
+	sigon(self);
 }
 
 int
 sig_mutex_trylock(mutex_t *mp)
 {
+	ulwp_t *self = curthread;
 	int error;
 
-	sigoff(curthread);
+	sigoff(self);
 	if ((error = mutex_trylock(mp)) != 0)
-		sigon(curthread);
+		sigon(self);
 	return (error);
 }
 
