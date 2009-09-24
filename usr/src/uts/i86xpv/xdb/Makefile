@@ -22,10 +22,9 @@
 #
 # uts/i86xpv/xdb/Makefile
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	i86xpv architecture dependent
 #
@@ -56,6 +55,13 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
+
+#
+#	Overrides
+#
+DEF_BUILDS	= $(DEF_BUILDS64)
+ALL_BUILDS	= $(ALL_BUILDS64)
+
 #
 #	Default build targets.
 #
@@ -71,7 +77,7 @@ clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-modlintlib:	$(MODLINTLIB_DEPS)
+modlintlib:	$(MODLINTLIB_DEPS) lint32
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 

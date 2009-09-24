@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -56,6 +56,12 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
+#	Overrides
+#
+DEF_BUILDS	= $(DEF_BUILDS64)
+ALL_BUILDS	= $(ALL_BUILDS64)
+
+#
 # Module depends on VNIC.
 #
 LDFLAGS		+= -dy -N drv/vnic -N misc/mac
@@ -85,7 +91,7 @@ clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-modlintlib:	$(MODLINTLIB_DEPS)
+modlintlib:	$(MODLINTLIB_DEPS) lint32
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 

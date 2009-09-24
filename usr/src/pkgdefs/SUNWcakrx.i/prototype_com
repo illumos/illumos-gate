@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -68,24 +68,18 @@ f none platform/i86xpv/kernel/drv/pit_beep 755 root sys
 f none platform/i86xpv/kernel/drv/pit_beep.conf 644 root sys
 f none platform/i86xpv/kernel/drv/privcmd 755 root sys
 f none platform/i86xpv/kernel/drv/rootnex 755 root sys
-f none platform/i86xpv/kernel/drv/xdb 755 root sys
 f none platform/i86xpv/kernel/drv/xdf 755 root sys
 f none platform/i86xpv/kernel/drv/xenbus 755 root sys
 f none platform/i86xpv/kernel/drv/xencons 755 root sys
 f none platform/i86xpv/kernel/drv/xencons.conf 644 root sys
-f none platform/i86xpv/kernel/drv/xnbe 755 root sys
-f none platform/i86xpv/kernel/drv/xnbo 755 root sys
-f none platform/i86xpv/kernel/drv/xnbu 755 root sys
 f none platform/i86xpv/kernel/drv/xnf 755 root sys
 f none platform/i86xpv/kernel/drv/xpvd 755 root sys
-f none platform/i86xpv/kernel/drv/xpvtap 755 root sys
 d none platform/i86xpv/kernel/mach 755 root sys
 f none platform/i86xpv/kernel/mach/xpv_psm 755 root sys
 f none platform/i86xpv/kernel/mach/xpv_uppc 755 root sys
 d none platform/i86xpv/kernel/misc 755 root sys
 f none platform/i86xpv/kernel/misc/gfx_private 755 root sys
 f none platform/i86xpv/kernel/misc/pcie 755 root sys
-f none platform/i86xpv/kernel/misc/xnb 755 root sys
 f none platform/i86xpv/kernel/misc/xpv_autoconfig 755 root sys
 d none platform/i86xpv/kernel/tod 755 root sys
 f none platform/i86xpv/kernel/tod/xpvtod 755 root sys

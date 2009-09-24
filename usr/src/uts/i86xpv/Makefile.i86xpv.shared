@@ -64,6 +64,9 @@ LINT_LIB	 = $(LINT_LIB_DIR)/llib-lunix.ln
 DBOOT_LINT_LIB	 = $(LINT_LIB_DIR)/llib-ldboot.ln
 GEN_LINT_LIB	 = $(GEN_LINT_LIB_DIR)/llib-lgenunix.ln
 
+LINT32_DIRS	 = $(LINT32_BUILDS:%=$(UTSBASE)/$(PLATFORM)/lint-libs/%)
+LINT32_FILES	 = $(LINT32_DIRS:%=%/llib-l$(MODULE).ln)
+
 #
 #	Include the makefiles which define build rule templates, the
 #	collection of files per module, and a few specific flags. Note

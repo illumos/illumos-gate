@@ -20,10 +20,9 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the xnbu
 #	network driver kernel module.
@@ -57,6 +56,12 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
+#	Overrides
+#
+DEF_BUILDS	= $(DEF_BUILDS64)
+ALL_BUILDS	= $(ALL_BUILDS64)
+
+#
 # Driver depends on xnb and mac.
 #
 LDFLAGS		+= -dy -N misc/xnb -N misc/mac
@@ -82,7 +87,7 @@ clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-modlintlib:	$(MODLINTLIB_DEPS)
+modlintlib:	$(MODLINTLIB_DEPS) lint32
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
