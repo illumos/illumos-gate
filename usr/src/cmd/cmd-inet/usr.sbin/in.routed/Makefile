@@ -1,7 +1,6 @@
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -57,6 +56,11 @@ lint	:=	LDLIBS += -lkstat
 # suppression directive on SPARC.
 LINTFLAGS +=	-erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 
+CTFCONVERT_HOOK = && $(CTFCONVERT_O)
+CTFMERGE_HOOK = && $(CTFMERGE) -L VERSION -o $@ $(ROUTEDOBJS)
+$(ROUTEDOBJS) := CFLAGS += $(CTF_FLAGS)
+$(RTQUERYOBJS) := CFLAGS += $(CTF_FLAGS)
+
 .KEEP_STATE:
 
 .PARALLEL: $(ROUTEDPROG) $(RTQUERYOBJS)
@@ -68,11 +72,11 @@ $(POFILE): $(POFILES)
 	cat $(POFILES) > $@
 
 $(ROUTEDPROG):	$(ROUTEDOBJS)
-	$(LINK.c) -o $@ $(ROUTEDOBJS) $(LDLIBS)
+	$(LINK.c) -o $@ $(ROUTEDOBJS) $(LDLIBS) $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 
 $(RTQUERYPROG): $(RTQUERYOBJS)
-	$(LINK.c) -o $@ $(RTQUERYOBJS) $(LDLIBS) -lresolv
+	$(LINK.c) -o $@ $(RTQUERYOBJS) $(LDLIBS) -lresolv $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 
 lint:

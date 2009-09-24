@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -1228,6 +1228,10 @@ rtm_add(struct rt_msghdr *rtm,
 static void
 rtm_lose(struct rt_msghdr *rtm, struct rt_addrinfo *info)
 {
+	struct rt_spare new, *rts, *losing_rts = NULL;
+	struct rt_entry *rt;
+	int i, spares;
+
 	if (INFO_GATE(info) == NULL || INFO_GATE(info)->ss_family != AF_INET) {
 		trace_act("ignore %s without gateway",
 		    rtm_type_name(rtm->rtm_type));
@@ -1235,6 +1239,36 @@ rtm_lose(struct rt_msghdr *rtm, struct rt_addrinfo *info)
 		return;
 	}
 
+	rt = rtfind(S_ADDR(INFO_DST(info)));
+	if (rt != NULL) {
+		spares = 0;
+		for (i = 0; i < rt->rt_num_spares;  i++) {
+			rts = &rt->rt_spares[i];
+			if (rts->rts_gate == S_ADDR(INFO_GATE(info))) {
+				losing_rts = rts;
+				continue;
+			}
+			if (rts->rts_gate != 0 && rts->rts_ifp != &dummy_ifp)
+				spares++;
+		}
+	}
+	if (rt == NULL || losing_rts == NULL) {
+		trace_act("Ignore RTM_LOSING because no route found"
+		    " for %s through %s",
+		    naddr_ntoa(S_ADDR(INFO_DST(info))),
+		    naddr_ntoa(S_ADDR(INFO_GATE(info))));
+		return;
+	}
+	if (spares == 0) {
+		trace_act("Got RTM_LOSING, but no alternatives to gw %s."
+		    " deprecating route to metric 15",
+		    naddr_ntoa(S_ADDR(INFO_GATE(info))));
+		new = *losing_rts;
+		new.rts_metric = HOPCNT_INFINITY - 1;
+		rtchange(rt, rt->rt_state, &new, 0);
+		return;
+	}
+	trace_act("Got RTM_LOSING. Found a route with %d alternates", spares);
 	if (rdisc_ok)
 		rdisc_age(S_ADDR(INFO_GATE(info)));
 	age(S_ADDR(INFO_GATE(info)));
@@ -2254,7 +2288,6 @@ rtfind(in_addr_t dst)
 	dst_sock.sin_addr.s_addr = dst;
 	return ((struct rt_entry *)rhead->rnh_matchaddr(&dst_sock, rhead));
 }
-
 
 /* add a route to the table */
 void
