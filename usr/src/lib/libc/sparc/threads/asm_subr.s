@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,11 @@
 	retl
 	ta	ST_GETPSR
 	SET_SIZE(_getpsr)
+
+	ENTRY(_do_fix_align)
+	retl
+	ta	ST_FIX_ALIGN
+	SET_SIZE(_do_fix_align)
 #endif
 
 	ENTRY(_getfsr)

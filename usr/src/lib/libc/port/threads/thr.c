@@ -1434,6 +1434,26 @@ libc_init(void)
 	self->ul_adaptive_spin = thread_adaptive_spin;
 	self->ul_queue_spin = thread_queue_spin;
 
+#if defined(__sparc) && !defined(_LP64)
+	if (self->ul_misaligned) {
+		/*
+		 * Tell the kernel to fix up ldx/stx instructions that
+		 * refer to non-8-byte aligned data instead of giving
+		 * the process an alignment trap and generating SIGBUS.
+		 *
+		 * Programs compiled for 32-bit sparc with the Studio SS12
+		 * compiler get this done for them automatically (in _init()).
+		 * We do it here for the benefit of programs compiled with
+		 * other compilers, like gcc.
+		 *
+		 * This is necessary for the _THREAD_LOCKS_MISALIGNED=1
+		 * environment variable horrible hack to work.
+		 */
+		extern void _do_fix_align(void);
+		_do_fix_align();
+	}
+#endif
+
 	/*
 	 * When we have initialized the primary link map, inform
 	 * the dynamic linker about our interface functions.

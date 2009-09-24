@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include "thr_uberdata.h"
@@ -161,13 +159,18 @@ ultos(uint64_t n, int base, char *s)
 void
 lock_error(const mutex_t *mp, const char *who, void *cv, const char *msg)
 {
-	/* take a snapshot of the mutex before it changes (we hope!) */
-	mutex_t mcopy = *mp;
+	mutex_t mcopy;
 	char buf[800];
 	uberdata_t *udp;
 	ulwp_t *self;
 	lwpid_t lwpid;
 	pid_t pid;
+
+	/*
+	 * Take a snapshot of the mutex before it changes (we hope!).
+	 * Use memcpy() rather than 'mcopy = *mp' in case mp is unaligned.
+	 */
+	(void) memcpy(&mcopy, mp, sizeof (mcopy));
 
 	/* avoid recursion deadlock */
 	if ((self = __curthread()) != NULL) {
@@ -246,8 +249,7 @@ lock_error(const mutex_t *mp, const char *who, void *cv, const char *msg)
 void
 rwlock_error(const rwlock_t *rp, const char *who, const char *msg)
 {
-	/* take a snapshot of the rwlock before it changes (we hope) */
-	rwlock_t rcopy = *rp;
+	rwlock_t rcopy;
 	uint32_t rwstate;
 	char buf[800];
 	uberdata_t *udp;
@@ -255,6 +257,12 @@ rwlock_error(const rwlock_t *rp, const char *who, const char *msg)
 	lwpid_t lwpid;
 	pid_t pid;
 	int process;
+
+	/*
+	 * Take a snapshot of the rwlock before it changes (we hope!).
+	 * Use memcpy() rather than 'rcopy = *rp' in case rp is unaligned.
+	 */
+	(void) memcpy(&rcopy, rp, sizeof (rcopy));
 
 	/* avoid recursion deadlock */
 	if ((self = __curthread()) != NULL) {
