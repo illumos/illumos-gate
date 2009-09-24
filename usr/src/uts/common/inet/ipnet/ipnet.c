@@ -59,12 +59,17 @@
 #include <sys/list.h>
 #include <sys/ksynch.h>
 #include <sys/hook_event.h>
+#include <sys/sdt.h>
 #include <sys/stropts.h>
 #include <sys/sysmacros.h>
 #include <inet/ip.h>
+#include <inet/ip_if.h>
 #include <inet/ip_multi.h>
 #include <inet/ip6.h>
 #include <inet/ipnet.h>
+#include <net/bpf.h>
+#include <net/bpfdesc.h>
+#include <net/dlt.h>
 
 static struct module_info ipnet_minfo = {
 	1,		/* mi_idnum */
@@ -116,6 +121,7 @@ static const int	IPNET_MINOR_LO = 1; 	/* minor number for /dev/lo0 */
 static const int 	IPNET_MINOR_MIN = 2; 	/* start of dynamic minors */
 static dl_info_ack_t	ipnet_infoack = IPNET_INFO_ACK_INIT;
 static ipnet_acceptfn_t	ipnet_accept, ipnet_loaccept;
+static bpf_itap_fn_t	ipnet_itap;
 
 static void	ipnet_input(mblk_t *);
 static int	ipnet_wput(queue_t *, mblk_t *);
@@ -137,16 +143,18 @@ static int	ipnet_join_allmulti(ipnetif_t *, ipnet_stack_t *);
 static void	ipnet_leave_allmulti(ipnetif_t *, ipnet_stack_t *);
 static int	ipnet_nicevent_cb(hook_event_token_t, hook_data_t, void *);
 static void	ipnet_nicevent_task(void *);
-static ipnetif_t *ipnet_create_if(const char *, uint64_t, ipnet_stack_t *);
-static void	ipnet_remove_if(ipnetif_t *, ipnet_stack_t *);
+static ipnetif_t *ipnetif_create(const char *, uint64_t, ipnet_stack_t *,
+    uint64_t);
+static void	ipnetif_remove(ipnetif_t *, ipnet_stack_t *);
 static ipnetif_addr_t *ipnet_match_lif(ipnetif_t *, lif_if_t, boolean_t);
-static ipnetif_t *ipnet_if_getby_index(uint64_t, ipnet_stack_t *);
-static ipnetif_t *ipnet_if_getby_dev(dev_t, ipnet_stack_t *);
-static boolean_t ipnet_if_in_zone(ipnetif_t *, zoneid_t, ipnet_stack_t *);
-static void	ipnet_if_zonecheck(ipnetif_t *, ipnet_stack_t *);
+static ipnetif_t *ipnetif_getby_index(uint64_t, ipnet_stack_t *);
+static ipnetif_t *ipnetif_getby_dev(dev_t, ipnet_stack_t *);
+static boolean_t ipnetif_in_zone(ipnetif_t *, zoneid_t, ipnet_stack_t *);
+static void	ipnetif_zonecheck(ipnetif_t *, ipnet_stack_t *);
 static int	ipnet_populate_if(net_handle_t, ipnet_stack_t *, boolean_t);
-static int 	ipnet_if_compare_name(const void *, const void *);
-static int 	ipnet_if_compare_index(const void *, const void *);
+static int 	ipnetif_compare_name(const void *, const void *);
+static int 	ipnetif_compare_name_zone(const void *, const void *);
+static int 	ipnetif_compare_index(const void *, const void *);
 static void	ipnet_add_ifaddr(uint64_t, ipnetif_t *, net_handle_t);
 static void	ipnet_delete_ifaddr(ipnetif_addr_t *, ipnetif_t *, boolean_t);
 static void	ipnetif_refhold(ipnetif_t *);
@@ -156,6 +164,15 @@ static void	ipnet_walkers_dec(ipnet_stack_t *);
 static void	ipnet_register_netihook(ipnet_stack_t *);
 static void	*ipnet_stack_init(netstackid_t, netstack_t *);
 static void	ipnet_stack_fini(netstackid_t, void *);
+static void	ipnet_dispatch(void *);
+static int	ipobs_bounce_func(hook_event_token_t, hook_data_t, void *);
+static void	ipnet_bpfattach(ipnetif_t *);
+static void	ipnet_bpfdetach(ipnetif_t *);
+static int	ipnet_bpf_bounce(hook_event_token_t, hook_data_t, void *);
+static void	ipnet_bpf_probe_shared(ipnet_stack_t *);
+static void	ipnet_bpf_release_shared(ipnet_stack_t *);
+static ipnetif_t *ipnetif_clone_create(ipnetif_t *, zoneid_t);
+static void	ipnetif_clone_release(ipnetif_t *);
 
 static struct qinit ipnet_rinit = {
 	NULL,		/* qi_putp */
@@ -194,6 +211,23 @@ static struct modlinkage modlinkage = {
 };
 
 /*
+ * This structure contains the template data (names and type) that is
+ * copied, in bulk, into the new kstats structure created by net_kstat_create.
+ * No actual statistical information is stored in this instance of the
+ * ipnet_kstats_t structure.
+ */
+static ipnet_kstats_t stats_template = {
+	{ "duplicationFail",	KSTAT_DATA_UINT64 },
+	{ "dispatchOk",		KSTAT_DATA_UINT64 },
+	{ "dispatchFail",	KSTAT_DATA_UINT64 },
+	{ "dispatchHeaderDrop",	KSTAT_DATA_UINT64 },
+	{ "dispatchDupDrop",	KSTAT_DATA_UINT64 },
+	{ "dispatchDeliver",	KSTAT_DATA_UINT64 },
+	{ "acceptOk",		KSTAT_DATA_UINT64 },
+	{ "acceptFail",		KSTAT_DATA_UINT64 }
+};
+
+/*
  * Walk the list of physical interfaces on the machine, for each
  * interface create a new ipnetif_t and add any addresses to it. We
  * need to do the walk twice, once for IPv4 and once for IPv6.
@@ -203,7 +237,7 @@ static struct modlinkage modlinkage = {
  * ipnet_stack_init(), since ipnet_stack_init() cannot fail.
  */
 static int
-ipnet_if_init(void)
+ipnetif_init(void)
 {
 	netstack_handle_t	nh;
 	netstack_t		*ns;
@@ -229,8 +263,8 @@ ipnet_if_init(void)
 int
 _init(void)
 {
-	int ret;
-	boolean_t netstack_registered = B_FALSE;
+	int		ret;
+	boolean_t	netstack_registered = B_FALSE;
 
 	if ((ipnet_major = ddi_name_to_major("ipnet")) == (major_t)-1)
 		return (ENODEV);
@@ -254,7 +288,7 @@ _init(void)
 	netstack_register(NS_IPNET, ipnet_stack_init, NULL, ipnet_stack_fini);
 	netstack_registered = B_TRUE;
 
-	if ((ret = ipnet_if_init()) == 0)
+	if ((ret = ipnetif_init()) == 0)
 		ret = mod_install(&modlinkage);
 done:
 	if (ret != 0) {
@@ -272,7 +306,7 @@ done:
 int
 _fini(void)
 {
-	int err;
+	int	err;
 
 	if ((err = mod_remove(&modlinkage)) != 0)
 		return (err);
@@ -327,6 +361,24 @@ ipnet_register_netihook(ipnet_stack_t *ips)
 			    " in zone %d: %d", zoneid, ret);
 		}
 	}
+
+	/*
+	 * Create a local set of kstats for each zone.
+	 */
+	ips->ips_kstatp = net_kstat_create(netid, "ipnet", 0, "ipnet_stats",
+	    "misc", KSTAT_TYPE_NAMED,
+	    sizeof (ipnet_kstats_t) / sizeof (kstat_named_t), 0);
+	if (ips->ips_kstatp != NULL) {
+		bcopy(&stats_template, &ips->ips_stats,
+		    sizeof (ips->ips_stats));
+		ips->ips_kstatp->ks_data = &ips->ips_stats;
+		ips->ips_kstatp->ks_private =
+		    (void *)(uintptr_t)ips->ips_netstack->netstack_stackid;
+		kstat_install(ips->ips_kstatp);
+	} else {
+		cmn_err(CE_WARN, "net_kstat_create(%s,%s,%s) failed",
+		    "ipnet", "ipnet_stats", "misc");
+	}
 }
 
 /*
@@ -338,13 +390,13 @@ ipnet_register_netihook(ipnet_stack_t *ips)
 static int
 ipnet_populate_if(net_handle_t nd, ipnet_stack_t *ips, boolean_t isv6)
 {
-	phy_if_t		phyif;
-	lif_if_t		lif;
-	ipnetif_t		*ipnetif;
-	char			name[LIFNAMSIZ];
-	boolean_t		new_if = B_FALSE;
-	uint64_t		ifflags;
-	int			ret = 0;
+	phy_if_t	phyif;
+	lif_if_t	lif;
+	ipnetif_t	*ipnetif;
+	char		name[LIFNAMSIZ];
+	boolean_t	new_if = B_FALSE;
+	uint64_t	ifflags;
+	int		ret = 0;
 
 	/*
 	 * If ipnet_register_netihook() was unable to initialize this
@@ -368,8 +420,10 @@ ipnet_populate_if(net_handle_t nd, ipnet_stack_t *ips, boolean_t isv6)
 	    phyif = net_phygetnext(nd, phyif)) {
 		if (net_getifname(nd, phyif, name, LIFNAMSIZ) != 0)
 			continue;
-		if ((ipnetif = ipnet_if_getby_index(phyif, ips)) == NULL) {
-			ipnetif = ipnet_create_if(name, phyif, ips);
+		ifflags =  0;
+		(void) net_getlifflags(nd, phyif, 0, &ifflags);
+		if ((ipnetif = ipnetif_getby_index(phyif, ips)) == NULL) {
+			ipnetif = ipnetif_create(name, phyif, ips, ifflags);
 			if (ipnetif == NULL) {
 				ret = ENOMEM;
 				goto done;
@@ -432,7 +486,7 @@ ipnet_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 static int
 ipnet_devinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
-	int error = DDI_FAILURE;
+	int	error = DDI_FAILURE;
 
 	switch (infocmd) {
 	case DDI_INFO_DEVT2INSTANCE:
@@ -485,7 +539,6 @@ ipnet_open(queue_t *rq, dev_t *dev, int oflag, int sflag, cred_t *crp)
 	ipnet->ipnet_minor = (minor_t)id_alloc(ipnet_minor_space);
 	ipnet->ipnet_zoneid = zoneid;
 	ipnet->ipnet_dlstate = DL_UNBOUND;
-	ipnet->ipnet_sap = 0;
 	ipnet->ipnet_ns = ns;
 
 	/*
@@ -499,9 +552,9 @@ ipnet_open(queue_t *rq, dev_t *dev, int oflag, int sflag, cred_t *crp)
 		ipnet->ipnet_acceptfn = ipnet_loaccept;
 	} else {
 		ipnet->ipnet_acceptfn = ipnet_accept;
-		ipnet->ipnet_if = ipnet_if_getby_dev(*dev, ips);
+		ipnet->ipnet_if = ipnetif_getby_dev(*dev, ips);
 		if (ipnet->ipnet_if == NULL ||
-		    !ipnet_if_in_zone(ipnet->ipnet_if, zoneid, ips)) {
+		    !ipnetif_in_zone(ipnet->ipnet_if, zoneid, ips)) {
 			err = ENODEV;
 			goto done;
 		}
@@ -519,7 +572,7 @@ ipnet_open(queue_t *rq, dev_t *dev, int oflag, int sflag, cred_t *crp)
 	 * unregister in close() for the last open client.
 	 */
 	if (list_head(&ips->ips_str_list) == list_tail(&ips->ips_str_list))
-		ipobs_register_hook(ns, ipnet_input);
+		ips->ips_hook = ipobs_register_hook(ns, ipnet_input);
 	mutex_exit(&ips->ips_walkers_lock);
 
 done:
@@ -555,10 +608,13 @@ ipnet_close(queue_t *rq)
 	if (ipnet->ipnet_if != NULL)
 		ipnetif_refrele(ipnet->ipnet_if);
 	id_free(ipnet_minor_space, ipnet->ipnet_minor);
-	kmem_free(ipnet, sizeof (*ipnet));
 
-	if (list_is_empty(&ips->ips_str_list))
-		ipobs_unregister_hook(ips->ips_netstack, ipnet_input);
+	if (list_is_empty(&ips->ips_str_list)) {
+		ipobs_unregister_hook(ips->ips_netstack, ips->ips_hook);
+		ips->ips_hook = NULL;
+	}
+
+	kmem_free(ipnet, sizeof (*ipnet));
 
 	mutex_exit(&ips->ips_walkers_lock);
 	netstack_rele(ips->ips_netstack);
@@ -599,7 +655,7 @@ ipnet_wput(queue_t *q, mblk_t *mp)
 static int
 ipnet_rsrv(queue_t *q)
 {
-	mblk_t *mp;
+	mblk_t	*mp;
 
 	while ((mp = getq(q)) != NULL) {
 		ASSERT(DB_TYPE(mp) == M_DATA);
@@ -616,7 +672,7 @@ ipnet_rsrv(queue_t *q)
 static void
 ipnet_ioctl(queue_t *q, mblk_t *mp)
 {
-	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
+	struct iocblk	*iocp = (struct iocblk *)mp->b_rptr;
 
 	switch (iocp->ioc_cmd) {
 	case DLIOCRAW:
@@ -639,7 +695,7 @@ static void
 ipnet_iocdata(queue_t *q, mblk_t *mp)
 {
 	struct iocblk	*iocp = (struct iocblk *)mp->b_rptr;
-	ipnet_t		*ipnet = q->q_ptr;
+	ipnet_t	*ipnet = q->q_ptr;
 
 	switch (iocp->ioc_cmd) {
 	case DLIOCIPNETINFO:
@@ -652,7 +708,7 @@ ipnet_iocdata(queue_t *q, mblk_t *mp)
 		miocack(q, mp, 0, DL_IPNETINFO_VERSION);
 		break;
 	default:
-	iocnak:
+iocnak:
 		miocnak(q, mp, 0, EINVAL);
 		break;
 	}
@@ -717,23 +773,32 @@ ipnet_inforeq(queue_t *q, mblk_t *mp)
 static void
 ipnet_bindreq(queue_t *q, mblk_t *mp)
 {
-	union   DL_primitives *dlp = (union DL_primitives *)mp->b_rptr;
-	int32_t sap;
-	ipnet_t	*ipnet = q->q_ptr;
+	union DL_primitives	*dlp = (union DL_primitives *)mp->b_rptr;
+	ipnet_t			*ipnet = q->q_ptr;
 
 	if (MBLKL(mp) < DL_BIND_REQ_SIZE) {
 		dlerrorack(q, mp, DL_BIND_REQ, DL_BADPRIM, 0);
 		return;
 	}
 
-	sap = dlp->bind_req.dl_sap;
-	if (sap != IPV4_VERSION && sap != IPV6_VERSION && sap != 0) {
+	switch (dlp->bind_req.dl_sap) {
+	case 0 :
+		ipnet->ipnet_family = AF_UNSPEC;
+		break;
+	case IPV4_VERSION :
+		ipnet->ipnet_family = AF_INET;
+		break;
+	case IPV6_VERSION :
+		ipnet->ipnet_family = AF_INET6;
+		break;
+	default :
 		dlerrorack(q, mp, DL_BIND_REQ, DL_BADSAP, 0);
-	} else {
-		ipnet->ipnet_sap = sap;
-		ipnet->ipnet_dlstate = DL_IDLE;
-		dlbindack(q, mp, sap, 0, 0, 0, 0);
+		return;
+		/*NOTREACHED*/
 	}
+
+	ipnet->ipnet_dlstate = DL_IDLE;
+	dlbindack(q, mp, dlp->bind_req.dl_sap, 0, 0, 0, 0);
 }
 
 static void
@@ -750,7 +815,7 @@ ipnet_unbindreq(queue_t *q, mblk_t *mp)
 		dlerrorack(q, mp, DL_UNBIND_REQ, DL_OUTSTATE, 0);
 	} else {
 		ipnet->ipnet_dlstate = DL_UNBOUND;
-		ipnet->ipnet_sap = 0;
+		ipnet->ipnet_family = AF_UNSPEC;
 		dlokack(q, mp, DL_UNBIND_REQ);
 	}
 }
@@ -907,8 +972,14 @@ ipnet_leave_allmulti(ipnetif_t *ipnetif, ipnet_stack_t *ips)
 	mutex_exit(&ips->ips_event_lock);
 }
 
+/*
+ * Allocate a new mblk_t and put a dl_ipnetinfo_t in it.
+ * The structure it copies the header information from,
+ * hook_pkt_observe_t, is constructed using network byte
+ * order in ipobs_hook(), so there is no conversion here.
+ */
 static mblk_t *
-ipnet_addheader(ipobs_hook_data_t *ihd, mblk_t *mp)
+ipnet_addheader(hook_pkt_observe_t *hdr, mblk_t *mp)
 {
 	mblk_t		*dlhdr;
 	dl_ipnetinfo_t	*dl;
@@ -919,10 +990,13 @@ ipnet_addheader(ipobs_hook_data_t *ihd, mblk_t *mp)
 	}
 	dl = (dl_ipnetinfo_t *)dlhdr->b_rptr;
 	dl->dli_version = DL_IPNETINFO_VERSION;
-	dl->dli_len = htons(sizeof (*dl));
-	dl->dli_ipver = ihd->ihd_ipver;
-	dl->dli_srczone = BE_64((uint64_t)ihd->ihd_zsrc);
-	dl->dli_dstzone = BE_64((uint64_t)ihd->ihd_zdst);
+	dl->dli_family = hdr->hpo_family;
+	dl->dli_htype = hdr->hpo_htype;
+	dl->dli_pktlen = hdr->hpo_pktlen;
+	dl->dli_ifindex = hdr->hpo_ifindex;
+	dl->dli_grifindex = hdr->hpo_grifindex;
+	dl->dli_zsrc = hdr->hpo_zsrc;
+	dl->dli_zdst = hdr->hpo_zdst;
 	dlhdr->b_wptr += sizeof (*dl);
 	dlhdr->b_cont = mp;
 
@@ -989,16 +1063,17 @@ ipnet_get_addrtype(ipnet_t *ipnet, ipnet_addrp_t *addr)
 }
 
 /*
- * Verify if the packet contained in ihd should be passed up to the
+ * Verify if the packet contained in hdr should be passed up to the
  * ipnet client stream.
  */
 static boolean_t
-ipnet_accept(ipnet_t *ipnet, ipobs_hook_data_t *ihd, ipnet_addrp_t *src,
+ipnet_accept(ipnet_t *ipnet, hook_pkt_observe_t *hdr, ipnet_addrp_t *src,
     ipnet_addrp_t *dst)
 {
 	boolean_t		obsif;
 	uint64_t		ifindex = ipnet->ipnet_if->if_index;
-	ipnet_addrtype_t	srctype, dsttype;
+	ipnet_addrtype_t	srctype;
+	ipnet_addrtype_t	dsttype;
 
 	srctype = ipnet_get_addrtype(ipnet, src);
 	dsttype = ipnet_get_addrtype(ipnet, dst);
@@ -1008,7 +1083,13 @@ ipnet_accept(ipnet_t *ipnet, ipobs_hook_data_t *ihd, ipnet_addrp_t *src,
 	 * matches ours, it's on the interface we're observing.  (Thus,
 	 * observing on the group ifindex matches all ifindexes in the group.)
 	 */
-	obsif = (ihd->ihd_ifindex == ifindex || ihd->ihd_grifindex == ifindex);
+	obsif = (ntohl(hdr->hpo_ifindex) == ifindex ||
+	    ntohl(hdr->hpo_grifindex) == ifindex);
+
+	DTRACE_PROBE5(ipnet_accept__addr,
+	    ipnet_addrtype_t, srctype, ipnet_addrp_t *, src,
+	    ipnet_addrtype_t, dsttype, ipnet_addrp_t *, dst,
+	    boolean_t, obsif);
 
 	/*
 	 * Do not allow an ipnet stream to see packets that are not from or to
@@ -1019,8 +1100,8 @@ ipnet_accept(ipnet_t *ipnet, ipobs_hook_data_t *ihd, ipnet_addrp_t *src,
 	 */
 	if (ipnet->ipnet_zoneid != GLOBAL_ZONEID &&
 	    dsttype != IPNETADDR_MBCAST) {
-		if (ipnet->ipnet_zoneid != ihd->ihd_zsrc &&
-		    ipnet->ipnet_zoneid != ihd->ihd_zdst)
+		if (ipnet->ipnet_zoneid != ntohl(hdr->hpo_zsrc) &&
+		    ipnet->ipnet_zoneid != ntohl(hdr->hpo_zdst))
 			return (B_FALSE);
 	}
 
@@ -1029,7 +1110,7 @@ ipnet_accept(ipnet_t *ipnet, ipobs_hook_data_t *ihd, ipnet_addrp_t *src,
 	 * packet's IP version.
 	 */
 	if (!(ipnet->ipnet_flags & IPNET_PROMISC_SAP) &&
-	    ipnet->ipnet_sap != ihd->ihd_ipver)
+	    ipnet->ipnet_family != hdr->hpo_family)
 		return (B_FALSE);
 
 	/* If the destination address is ours, then accept the packet. */
@@ -1057,48 +1138,59 @@ ipnet_accept(ipnet_t *ipnet, ipobs_hook_data_t *ihd, ipnet_addrp_t *src,
 }
 
 /*
- * Verify if the packet contained in ihd should be passed up to the ipnet
+ * Verify if the packet contained in hdr should be passed up to the ipnet
  * client stream that's in IPNET_LOMODE.
  */
 /* ARGSUSED */
 static boolean_t
-ipnet_loaccept(ipnet_t *ipnet, ipobs_hook_data_t *ihd, ipnet_addrp_t *src,
+ipnet_loaccept(ipnet_t *ipnet, hook_pkt_observe_t *hdr, ipnet_addrp_t *src,
     ipnet_addrp_t *dst)
 {
-	if (ihd->ihd_htype != IPOBS_HOOK_LOCAL)
-		return (B_FALSE);
+	if (hdr->hpo_htype != IPOBS_HOOK_LOCAL) {
+		/*
+		 * ipnet_if is only NULL for IPNET_MINOR_LO devices.
+		 */
+		if (ipnet->ipnet_if == NULL)
+			return (B_FALSE);
+	}
 
 	/*
 	 * An ipnet stream must not see packets that are not from/to its zone.
 	 */
 	if (ipnet->ipnet_zoneid != GLOBAL_ZONEID) {
-		if (ipnet->ipnet_zoneid != ihd->ihd_zsrc &&
-		    ipnet->ipnet_zoneid != ihd->ihd_zdst)
+		if (ipnet->ipnet_zoneid != ntohl(hdr->hpo_zsrc) &&
+		    ipnet->ipnet_zoneid != ntohl(hdr->hpo_zdst))
 			return (B_FALSE);
 	}
 
-	return (ipnet->ipnet_sap == 0 || ipnet->ipnet_sap == ihd->ihd_ipver);
+	return (ipnet->ipnet_family == AF_UNSPEC ||
+	    ipnet->ipnet_family == hdr->hpo_family);
 }
 
 static void
 ipnet_dispatch(void *arg)
 {
 	mblk_t			*mp = arg;
-	ipobs_hook_data_t	*ihd = (ipobs_hook_data_t *)mp->b_rptr;
+	hook_pkt_observe_t	*hdr = (hook_pkt_observe_t *)mp->b_rptr;
 	ipnet_t			*ipnet;
 	mblk_t			*netmp;
 	list_t			*list;
-	ipnet_stack_t		*ips = ihd->ihd_stack->netstack_ipnet;
-	ipnet_addrp_t		src, dst;
+	ipnet_stack_t		*ips;
+	ipnet_addrp_t		src;
+	ipnet_addrp_t		dst;
 
-	if (ihd->ihd_ipver == IPV4_VERSION) {
-		src.iap_family = dst.iap_family = AF_INET;
-		src.iap_addr4 = &((ipha_t *)(ihd->ihd_mp->b_rptr))->ipha_src;
-		dst.iap_addr4 = &((ipha_t *)(ihd->ihd_mp->b_rptr))->ipha_dst;
+	ips = ((netstack_t *)hdr->hpo_ctx)->netstack_ipnet;
+
+	netmp = hdr->hpo_pkt->b_cont;
+	src.iap_family = hdr->hpo_family;
+	dst.iap_family = hdr->hpo_family;
+
+	if (hdr->hpo_family == AF_INET) {
+		src.iap_addr4 = &((ipha_t *)(netmp->b_rptr))->ipha_src;
+		dst.iap_addr4 = &((ipha_t *)(netmp->b_rptr))->ipha_dst;
 	} else {
-		src.iap_family = dst.iap_family = AF_INET6;
-		src.iap_addr6 = &((ip6_t *)(ihd->ihd_mp->b_rptr))->ip6_src;
-		dst.iap_addr6 = &((ip6_t *)(ihd->ihd_mp->b_rptr))->ip6_dst;
+		src.iap_addr6 = &((ip6_t *)(netmp->b_rptr))->ip6_src;
+		dst.iap_addr6 = &((ip6_t *)(netmp->b_rptr))->ip6_dst;
 	}
 
 	ipnet_walkers_inc(ips);
@@ -1106,23 +1198,26 @@ ipnet_dispatch(void *arg)
 	list = &ips->ips_str_list;
 	for (ipnet = list_head(list); ipnet != NULL;
 	    ipnet = list_next(list, ipnet)) {
-		if (!(*ipnet->ipnet_acceptfn)(ipnet, ihd, &src, &dst))
+		if (!(*ipnet->ipnet_acceptfn)(ipnet, hdr, &src, &dst)) {
+			IPSK_BUMP(ips, ik_acceptFail);
 			continue;
+		}
+		IPSK_BUMP(ips, ik_acceptOk);
 
 		if (list_next(list, ipnet) == NULL) {
-			netmp = ihd->ihd_mp;
-			ihd->ihd_mp = NULL;
+			netmp = hdr->hpo_pkt->b_cont;
+			hdr->hpo_pkt->b_cont = NULL;
 		} else {
-			if ((netmp = dupmsg(ihd->ihd_mp)) == NULL &&
-			    (netmp = copymsg(ihd->ihd_mp)) == NULL) {
-				atomic_inc_64(&ips->ips_drops);
+			if ((netmp = dupmsg(hdr->hpo_pkt->b_cont)) == NULL &&
+			    (netmp = copymsg(hdr->hpo_pkt->b_cont)) == NULL) {
+				IPSK_BUMP(ips, ik_duplicationFail);
 				continue;
 			}
 		}
 
 		if (ipnet->ipnet_flags & IPNET_INFO) {
-			if ((netmp = ipnet_addheader(ihd, netmp)) == NULL) {
-				atomic_inc_64(&ips->ips_drops);
+			if ((netmp = ipnet_addheader(hdr, netmp)) == NULL) {
+				IPSK_BUMP(ips, ik_dispatchHeaderDrop);
 				continue;
 			}
 		}
@@ -1130,31 +1225,56 @@ ipnet_dispatch(void *arg)
 		if (ipnet->ipnet_rq->q_first == NULL &&
 		    canputnext(ipnet->ipnet_rq)) {
 			putnext(ipnet->ipnet_rq, netmp);
+			IPSK_BUMP(ips, ik_dispatchDeliver);
 		} else if (canput(ipnet->ipnet_rq)) {
 			(void) putq(ipnet->ipnet_rq, netmp);
+			IPSK_BUMP(ips, ik_dispatchDeliver);
 		} else {
 			freemsg(netmp);
-			atomic_inc_64(&ips->ips_drops);
+			IPSK_BUMP(ips, ik_dispatchPutDrop);
 		}
 	}
 
 	ipnet_walkers_dec(ips);
 
-	freemsg(ihd->ihd_mp);
 	freemsg(mp);
 }
 
 static void
 ipnet_input(mblk_t *mp)
 {
-	ipobs_hook_data_t  *ihd = (ipobs_hook_data_t *)mp->b_rptr;
+	hook_pkt_observe_t	*hdr = (hook_pkt_observe_t *)mp->b_rptr;
+	ipnet_stack_t		*ips;
+
+	ips = ((netstack_t *)hdr->hpo_ctx)->netstack_ipnet;
 
 	if (ddi_taskq_dispatch(ipnet_taskq, ipnet_dispatch, mp, DDI_NOSLEEP) !=
 	    DDI_SUCCESS) {
-		atomic_inc_64(&ihd->ihd_stack->netstack_ipnet->ips_drops);
-		freemsg(ihd->ihd_mp);
+		IPSK_BUMP(ips, ik_dispatchFail);
 		freemsg(mp);
+	} else {
+		IPSK_BUMP(ips, ik_dispatchOk);
 	}
+}
+
+static ipnetif_t *
+ipnet_alloc_if(ipnet_stack_t *ips)
+{
+	ipnetif_t	*ipnetif;
+
+	if ((ipnetif = kmem_zalloc(sizeof (*ipnetif), KM_NOSLEEP)) == NULL)
+		return (NULL);
+
+	mutex_init(&ipnetif->if_addr_lock, NULL, MUTEX_DEFAULT, 0);
+	list_create(&ipnetif->if_ip4addr_list, sizeof (ipnetif_addr_t),
+	    offsetof(ipnetif_addr_t, ifa_link));
+	list_create(&ipnetif->if_ip6addr_list, sizeof (ipnetif_addr_t),
+	    offsetof(ipnetif_addr_t, ifa_link));
+	mutex_init(&ipnetif->if_reflock, NULL, MUTEX_DEFAULT, 0);
+
+	ipnetif->if_stackp = ips;
+
+	return (ipnetif);
 }
 
 /*
@@ -1163,35 +1283,33 @@ ipnet_input(mblk_t *mp)
  * containing ipnetif's for this stack instance.
  */
 static ipnetif_t *
-ipnet_create_if(const char *name, uint64_t index, ipnet_stack_t *ips)
+ipnetif_create(const char *name, uint64_t index, ipnet_stack_t *ips,
+    uint64_t ifflags)
 {
 	ipnetif_t	*ipnetif;
 	avl_index_t	where = 0;
 	minor_t		ifminor;
 
 	/*
-	 * Because ipnet_create_if() can be called from a NIC event
+	 * Because ipnetif_create() can be called from a NIC event
 	 * callback, it should not block.
 	 */
 	ifminor = (minor_t)id_alloc_nosleep(ipnet_minor_space);
 	if (ifminor == (minor_t)-1)
 		return (NULL);
-	if ((ipnetif = kmem_zalloc(sizeof (*ipnetif), KM_NOSLEEP)) == NULL) {
+	if ((ipnetif = ipnet_alloc_if(ips)) == NULL) {
 		id_free(ipnet_minor_space, ifminor);
 		return (NULL);
 	}
 
 	(void) strlcpy(ipnetif->if_name, name, LIFNAMSIZ);
-	ipnetif->if_index = index;
-
-	mutex_init(&ipnetif->if_addr_lock, NULL, MUTEX_DEFAULT, 0);
-	list_create(&ipnetif->if_ip4addr_list, sizeof (ipnetif_addr_t),
-	    offsetof(ipnetif_addr_t, ifa_link));
-	list_create(&ipnetif->if_ip6addr_list, sizeof (ipnetif_addr_t),
-	    offsetof(ipnetif_addr_t, ifa_link));
+	ipnetif->if_index = (uint_t)index;
+	ipnetif->if_zoneid = netstack_get_zoneid(ips->ips_netstack);
 	ipnetif->if_dev = makedevice(ipnet_major, ifminor);
-	mutex_init(&ipnetif->if_reflock, NULL, MUTEX_DEFAULT, 0);
+
 	ipnetif->if_refcnt = 1;
+	if ((ifflags & IFF_LOOPBACK) != 0)
+		ipnetif->if_flags = IPNETIF_LOOPBACK;
 
 	mutex_enter(&ips->ips_avl_lock);
 	VERIFY(avl_find(&ips->ips_avl_by_index, &index, &where) == NULL);
@@ -1199,12 +1317,17 @@ ipnet_create_if(const char *name, uint64_t index, ipnet_stack_t *ips)
 	VERIFY(avl_find(&ips->ips_avl_by_name, (void *)name, &where) == NULL);
 	avl_insert(&ips->ips_avl_by_name, ipnetif, where);
 	mutex_exit(&ips->ips_avl_lock);
+	/*
+	 * Now that the interface can be found by lookups back into ipnet,
+	 * allowing for sanity checking, call the BPF attach.
+	 */
+	ipnet_bpfattach(ipnetif);
 
 	return (ipnetif);
 }
 
 static void
-ipnet_remove_if(ipnetif_t *ipnetif, ipnet_stack_t *ips)
+ipnetif_remove(ipnetif_t *ipnetif, ipnet_stack_t *ips)
 {
 	ipnet_t	*ipnet;
 
@@ -1220,25 +1343,34 @@ ipnet_remove_if(ipnetif_t *ipnetif, ipnet_stack_t *ips)
 	avl_remove(&ips->ips_avl_by_index, ipnetif);
 	avl_remove(&ips->ips_avl_by_name, ipnetif);
 	mutex_exit(&ips->ips_avl_lock);
-	/* Release the reference we implicitly held in ipnet_create_if(). */
+	/*
+	 * Now that the interface can't be found, do a BPF detach
+	 */
+	ipnet_bpfdetach(ipnetif);
+	/*
+	 * Release the reference we implicitly held in ipnetif_create().
+	 */
 	ipnetif_refrele(ipnetif);
 }
 
 static void
 ipnet_purge_addrlist(list_t *addrlist)
 {
-	ipnetif_addr_t *ifa;
+	ipnetif_addr_t	*ifa;
 
 	while ((ifa = list_head(addrlist)) != NULL) {
 		list_remove(addrlist, ifa);
+		if (ifa->ifa_shared != NULL)
+			ipnetif_clone_release(ifa->ifa_shared);
 		kmem_free(ifa, sizeof (*ifa));
 	}
 }
 
 static void
-ipnet_free_if(ipnetif_t *ipnetif)
+ipnetif_free(ipnetif_t *ipnetif)
 {
 	ASSERT(ipnetif->if_refcnt == 0);
+	ASSERT(ipnetif->if_sharecnt == 0);
 
 	/* Remove IPv4/v6 address lists from the ipnetif */
 	ipnet_purge_addrlist(&ipnetif->if_ip4addr_list);
@@ -1247,7 +1379,8 @@ ipnet_free_if(ipnetif_t *ipnetif)
 	list_destroy(&ipnetif->if_ip6addr_list);
 	mutex_destroy(&ipnetif->if_addr_lock);
 	mutex_destroy(&ipnetif->if_reflock);
-	id_free(ipnet_minor_space, getminor(ipnetif->if_dev));
+	if (ipnetif->if_dev != 0)
+		id_free(ipnet_minor_space, getminor(ipnetif->if_dev));
 	kmem_free(ipnetif, sizeof (*ipnetif));
 }
 
@@ -1270,11 +1403,12 @@ ipnet_add_ifaddr(uint64_t lif, ipnetif_t *ipnetif, net_handle_t nd)
 	if (net_getlifaddr(nd, phyif, lif, 1, &type, &addr) != 0 ||
 	    net_getlifzone(nd, phyif, lif, &zoneid) != 0)
 		return;
+
 	if ((ifaddr = kmem_alloc(sizeof (*ifaddr), KM_NOSLEEP)) == NULL)
 		return;
-
 	ifaddr->ifa_zone = zoneid;
 	ifaddr->ifa_id = lif;
+	ifaddr->ifa_shared = NULL;
 
 	switch (addr.ss_family) {
 	case AF_INET:
@@ -1295,6 +1429,12 @@ ipnet_add_ifaddr(uint64_t lif, ipnetif_t *ipnetif, net_handle_t nd)
 	}
 
 	mutex_enter(&ipnetif->if_addr_lock);
+	if (zoneid != ipnetif->if_zoneid) {
+		ipnetif_t *ifp2;
+
+		ifp2 = ipnetif_clone_create(ipnetif, zoneid);
+		ifaddr->ifa_shared = ifp2;
+	}
 	list_insert_tail(addr.ss_family == AF_INET ?
 	    &ipnetif->if_ip4addr_list : &ipnetif->if_ip6addr_list, ifaddr);
 	mutex_exit(&ipnetif->if_addr_lock);
@@ -1304,6 +1444,9 @@ static void
 ipnet_delete_ifaddr(ipnetif_addr_t *ifaddr, ipnetif_t *ipnetif, boolean_t isv6)
 {
 	mutex_enter(&ipnetif->if_addr_lock);
+	if (ifaddr->ifa_shared != NULL)
+		ipnetif_clone_release(ifaddr->ifa_shared);
+
 	list_remove(isv6 ?
 	    &ipnetif->if_ip6addr_list : &ipnetif->if_ip4addr_list, ifaddr);
 	mutex_exit(&ipnetif->if_addr_lock);
@@ -1311,14 +1454,22 @@ ipnet_delete_ifaddr(ipnetif_addr_t *ifaddr, ipnetif_t *ipnetif, boolean_t isv6)
 }
 
 static void
-ipnet_plumb_ev(uint64_t ifindex, const char *ifname, ipnet_stack_t *ips,
-    boolean_t isv6)
+ipnet_plumb_ev(ipnet_nicevent_t *ipne, ipnet_stack_t *ips, boolean_t isv6)
 {
 	ipnetif_t	*ipnetif;
 	boolean_t	refrele_needed = B_TRUE;
+	uint64_t	ifflags;
+	uint64_t	ifindex;
+	char		*ifname;
 
-	if ((ipnetif = ipnet_if_getby_index(ifindex, ips)) == NULL) {
-		ipnetif = ipnet_create_if(ifname, ifindex, ips);
+	ifflags = 0;
+	ifname = ipne->ipne_ifname;
+	ifindex = ipne->ipne_ifindex;
+
+	(void) net_getlifflags(ipne->ipne_protocol, ifindex, 0, &ifflags);
+
+	if ((ipnetif = ipnetif_getby_index(ifindex, ips)) == NULL) {
+		ipnetif = ipnetif_create(ifname, ifindex, ips, ifflags);
 		refrele_needed = B_FALSE;
 	}
 	if (ipnetif != NULL) {
@@ -1343,7 +1494,7 @@ ipnet_unplumb_ev(uint64_t ifindex, ipnet_stack_t *ips, boolean_t isv6)
 {
 	ipnetif_t	*ipnetif;
 
-	if ((ipnetif = ipnet_if_getby_index(ifindex, ips)) == NULL)
+	if ((ipnetif = ipnetif_getby_index(ifindex, ips)) == NULL)
 		return;
 
 	mutex_enter(&ipnetif->if_addr_lock);
@@ -1358,7 +1509,7 @@ ipnet_unplumb_ev(uint64_t ifindex, ipnet_stack_t *ips, boolean_t isv6)
 	 */
 	ipnetif->if_flags &= isv6 ? ~IPNETIF_IPV6PLUMBED : ~IPNETIF_IPV4PLUMBED;
 	if (!(ipnetif->if_flags & (IPNETIF_IPV4PLUMBED | IPNETIF_IPV6PLUMBED)))
-		ipnet_remove_if(ipnetif, ips);
+		ipnetif_remove(ipnetif, ips);
 	ipnetif_refrele(ipnetif);
 }
 
@@ -1369,7 +1520,7 @@ ipnet_lifup_ev(uint64_t ifindex, uint64_t lifindex, net_handle_t nd,
 	ipnetif_t	*ipnetif;
 	ipnetif_addr_t	*ifaddr;
 
-	if ((ipnetif = ipnet_if_getby_index(ifindex, ips)) == NULL)
+	if ((ipnetif = ipnetif_getby_index(ifindex, ips)) == NULL)
 		return;
 	if ((ifaddr = ipnet_match_lif(ipnetif, lifindex, isv6)) != NULL) {
 		/*
@@ -1390,7 +1541,7 @@ ipnet_lifdown_ev(uint64_t ifindex, uint64_t lifindex, ipnet_stack_t *ips,
 	ipnetif_t	*ipnetif;
 	ipnetif_addr_t	*ifaddr;
 
-	if ((ipnetif = ipnet_if_getby_index(ifindex, ips)) == NULL)
+	if ((ipnetif = ipnetif_getby_index(ifindex, ips)) == NULL)
 		return;
 	if ((ifaddr = ipnet_match_lif(ipnetif, lifindex, isv6)) != NULL)
 		ipnet_delete_ifaddr(ifaddr, ipnetif, isv6);
@@ -1399,7 +1550,7 @@ ipnet_lifdown_ev(uint64_t ifindex, uint64_t lifindex, ipnet_stack_t *ips,
 	 * Make sure that open streams on this ipnetif are still allowed to
 	 * have it open.
 	 */
-	ipnet_if_zonecheck(ipnetif, ips);
+	ipnetif_zonecheck(ipnetif, ips);
 }
 
 /*
@@ -1446,8 +1597,7 @@ ipnet_nicevent_task(void *arg)
 	mutex_enter(&ips->ips_event_lock);
 	switch (ipne->ipne_event) {
 	case NE_PLUMB:
-		ipnet_plumb_ev(ipne->ipne_ifindex, ipne->ipne_ifname, ips,
-		    isv6);
+		ipnet_plumb_ev(ipne, ips, isv6);
 		break;
 	case NE_UNPLUMB:
 		ipnet_unplumb_ev(ipne->ipne_ifindex, ips, isv6);
@@ -1486,7 +1636,7 @@ ipnet_if_getdev(char *name, zoneid_t zoneid)
 	ips = ns->netstack_ipnet;
 	mutex_enter(&ips->ips_avl_lock);
 	if ((ipnetif = avl_find(&ips->ips_avl_by_name, name, NULL)) != NULL) {
-		if (ipnet_if_in_zone(ipnetif, zoneid, ips))
+		if (ipnetif_in_zone(ipnetif, zoneid, ips))
 			dev = ipnetif->if_dev;
 	}
 	mutex_exit(&ips->ips_avl_lock);
@@ -1496,7 +1646,7 @@ ipnet_if_getdev(char *name, zoneid_t zoneid)
 }
 
 static ipnetif_t *
-ipnet_if_getby_index(uint64_t id, ipnet_stack_t *ips)
+ipnetif_getby_index(uint64_t id, ipnet_stack_t *ips)
 {
 	ipnetif_t	*ipnetif;
 
@@ -1508,7 +1658,7 @@ ipnet_if_getby_index(uint64_t id, ipnet_stack_t *ips)
 }
 
 static ipnetif_t *
-ipnet_if_getby_dev(dev_t dev, ipnet_stack_t *ips)
+ipnetif_getby_dev(dev_t dev, ipnet_stack_t *ips)
 {
 	ipnetif_t	*ipnetif;
 	avl_tree_t	*tree;
@@ -1530,7 +1680,7 @@ static ipnetif_addr_t *
 ipnet_match_lif(ipnetif_t *ipnetif, lif_if_t lid, boolean_t isv6)
 {
 	ipnetif_addr_t	*ifaddr;
-	list_t		*list;
+	list_t	*list;
 
 	mutex_enter(&ipnetif->if_addr_lock);
 	list = isv6 ? &ipnetif->if_ip6addr_list : &ipnetif->if_ip4addr_list;
@@ -1552,10 +1702,12 @@ ipnet_stack_init(netstackid_t stackid, netstack_t *ns)
 	ips = kmem_zalloc(sizeof (*ips), KM_SLEEP);
 	ips->ips_netstack = ns;
 	mutex_init(&ips->ips_avl_lock, NULL, MUTEX_DEFAULT, 0);
-	avl_create(&ips->ips_avl_by_index, ipnet_if_compare_index,
+	avl_create(&ips->ips_avl_by_index, ipnetif_compare_index,
 	    sizeof (ipnetif_t), offsetof(ipnetif_t, if_avl_by_index));
-	avl_create(&ips->ips_avl_by_name, ipnet_if_compare_name,
+	avl_create(&ips->ips_avl_by_name, ipnetif_compare_name,
 	    sizeof (ipnetif_t), offsetof(ipnetif_t, if_avl_by_name));
+	avl_create(&ips->ips_avl_by_shared, ipnetif_compare_name_zone,
+	    sizeof (ipnetif_t), offsetof(ipnetif_t, if_avl_by_shared));
 	mutex_init(&ips->ips_walkers_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&ips->ips_walkers_cv, NULL, CV_DRIVER, NULL);
 	list_create(&ips->ips_str_list, sizeof (ipnet_t),
@@ -1571,6 +1723,12 @@ ipnet_stack_fini(netstackid_t stackid, void *arg)
 	ipnet_stack_t	*ips = arg;
 	ipnetif_t	*ipnetif, *nipnetif;
 
+	if (ips->ips_kstatp != NULL) {
+		zoneid_t zoneid;
+
+		zoneid = netstackid_to_zoneid(stackid);
+		net_kstat_delete(net_zoneidtonetid(zoneid), ips->ips_kstatp);
+	}
 	if (ips->ips_ndv4 != NULL) {
 		VERIFY(net_hook_unregister(ips->ips_ndv4, NH_NIC_EVENTS,
 		    ips->ips_nicevents) == 0);
@@ -1586,8 +1744,9 @@ ipnet_stack_fini(netstackid_t stackid, void *arg)
 	for (ipnetif = avl_first(&ips->ips_avl_by_index); ipnetif != NULL;
 	    ipnetif = nipnetif) {
 		nipnetif = AVL_NEXT(&ips->ips_avl_by_index, ipnetif);
-		ipnet_remove_if(ipnetif, ips);
+		ipnetif_remove(ipnetif, ips);
 	}
+	avl_destroy(&ips->ips_avl_by_shared);
 	avl_destroy(&ips->ips_avl_by_index);
 	avl_destroy(&ips->ips_avl_by_name);
 	mutex_destroy(&ips->ips_avl_lock);
@@ -1601,7 +1760,7 @@ ipnet_stack_fini(netstackid_t stackid, void *arg)
 static boolean_t
 ipnet_addrs_in_zone(list_t *addrlist, zoneid_t zoneid)
 {
-	ipnetif_addr_t *ifa;
+	ipnetif_addr_t	*ifa;
 
 	for (ifa = list_head(addrlist); ifa != NULL;
 	    ifa = list_next(addrlist, ifa)) {
@@ -1613,9 +1772,9 @@ ipnet_addrs_in_zone(list_t *addrlist, zoneid_t zoneid)
 
 /* Should the supplied ipnetif be visible from the supplied zoneid? */
 static boolean_t
-ipnet_if_in_zone(ipnetif_t *ipnetif, zoneid_t zoneid, ipnet_stack_t *ips)
+ipnetif_in_zone(ipnetif_t *ipnetif, zoneid_t zoneid, ipnet_stack_t *ips)
 {
-	int ret;
+	int	ret;
 
 	/*
 	 * The global zone has visibility into all interfaces in the global
@@ -1645,7 +1804,7 @@ ipnet_if_in_zone(ipnetif_t *ipnetif, zoneid_t zoneid, ipnet_stack_t *ips)
  * case, send the ipnet_t an M_HANGUP.
  */
 static void
-ipnet_if_zonecheck(ipnetif_t *ipnetif, ipnet_stack_t *ips)
+ipnetif_zonecheck(ipnetif_t *ipnetif, ipnet_stack_t *ips)
 {
 	list_t	*strlist = &ips->ips_str_list;
 	ipnet_t	*ipnet;
@@ -1655,7 +1814,7 @@ ipnet_if_zonecheck(ipnetif_t *ipnetif, ipnet_stack_t *ips)
 	    ipnet = list_next(strlist, ipnet)) {
 		if (ipnet->ipnet_if != ipnetif)
 			continue;
-		if (!ipnet_if_in_zone(ipnetif, ipnet->ipnet_zoneid, ips))
+		if (!ipnetif_in_zone(ipnetif, ipnet->ipnet_zoneid, ips))
 			(void) putnextctl(ipnet->ipnet_rq, M_HANGUP);
 	}
 	ipnet_walkers_dec(ips);
@@ -1664,7 +1823,7 @@ ipnet_if_zonecheck(ipnetif_t *ipnetif, ipnet_stack_t *ips)
 void
 ipnet_walk_if(ipnet_walkfunc_t *cb, void *arg, zoneid_t zoneid)
 {
-	ipnetif_t 		*ipnetif;
+	ipnetif_t		*ipnetif;
 	list_t			cbdata;
 	ipnetif_cbdata_t	*cbnode;
 	netstack_t		*ns;
@@ -1687,7 +1846,7 @@ ipnet_walk_if(ipnet_walkfunc_t *cb, void *arg, zoneid_t zoneid)
 	mutex_enter(&ips->ips_avl_lock);
 	for (ipnetif = avl_first(&ips->ips_avl_by_index); ipnetif != NULL;
 	    ipnetif = avl_walk(&ips->ips_avl_by_index, ipnetif, AVL_AFTER)) {
-		if (!ipnet_if_in_zone(ipnetif, zoneid, ips))
+		if (!ipnetif_in_zone(ipnetif, zoneid, ips))
 			continue;
 		cbnode = kmem_zalloc(sizeof (ipnetif_cbdata_t), KM_SLEEP);
 		(void) strlcpy(cbnode->ic_ifname, ipnetif->if_name, LIFNAMSIZ);
@@ -1706,20 +1865,35 @@ ipnet_walk_if(ipnet_walkfunc_t *cb, void *arg, zoneid_t zoneid)
 }
 
 static int
-ipnet_if_compare_index(const void *index_ptr, const void *ipnetifp)
+ipnetif_compare_index(const void *index_ptr, const void *ipnetifp)
 {
-	int64_t index1 = *((int64_t *)index_ptr);
-	int64_t index2 = (int64_t)((ipnetif_t *)ipnetifp)->if_index;
+	int64_t	index1 = *((int64_t *)index_ptr);
+	int64_t	index2 = (int64_t)((ipnetif_t *)ipnetifp)->if_index;
 
 	return (SIGNOF(index2 - index1));
 }
 
 static int
-ipnet_if_compare_name(const void *name_ptr, const void *ipnetifp)
+ipnetif_compare_name(const void *name_ptr, const void *ipnetifp)
 {
-	int res;
+	int	res;
 
 	res = strcmp(((ipnetif_t *)ipnetifp)->if_name, name_ptr);
+	return (SIGNOF(res));
+}
+
+static int
+ipnetif_compare_name_zone(const void *key_ptr, const void *ipnetifp)
+{
+	const uintptr_t	*ptr = key_ptr;
+	const ipnetif_t	*ifp;
+	int		res;
+
+	ifp = ipnetifp;
+	res = ifp->if_zoneid - ptr[0];
+	if (res != 0)
+		return (SIGNOF(res));
+	res = strcmp(ifp->if_name, (char *)ptr[1]);
 	return (SIGNOF(res));
 }
 
@@ -1735,9 +1909,9 @@ static void
 ipnetif_refrele(ipnetif_t *ipnetif)
 {
 	mutex_enter(&ipnetif->if_reflock);
-	ASSERT(ipnetif->if_refcnt != 0);
+	ASSERT(ipnetif->if_refcnt > 0);
 	if (--ipnetif->if_refcnt == 0)
-		ipnet_free_if(ipnetif);
+		ipnetif_free(ipnetif);
 	else
 		mutex_exit(&ipnetif->if_reflock);
 }
@@ -1758,4 +1932,586 @@ ipnet_walkers_dec(ipnet_stack_t *ips)
 	if (--ips->ips_walkers_cnt == 0)
 		cv_broadcast(&ips->ips_walkers_cv);
 	mutex_exit(&ips->ips_walkers_lock);
+}
+
+/*ARGSUSED*/
+static int
+ipobs_bounce_func(hook_event_token_t token, hook_data_t info, void *arg)
+{
+	hook_pkt_observe_t	*hdr;
+	pfv_t			func = (pfv_t)arg;
+	mblk_t			*mp;
+
+	hdr = (hook_pkt_observe_t *)info;
+	mp = dupmsg(hdr->hpo_pkt);
+	if (mp == NULL) {
+		mp = copymsg(hdr->hpo_pkt);
+		if (mp == NULL)  {
+			netstack_t *ns = hdr->hpo_ctx;
+			ipnet_stack_t *ips = ns->netstack_ipnet;
+
+			IPSK_BUMP(ips, ik_dispatchDupDrop);
+			return (0);
+		}
+	}
+
+	hdr = (hook_pkt_observe_t *)mp->b_rptr;
+	hdr->hpo_pkt = mp;
+
+	func(mp);
+
+	return (0);
+}
+
+hook_t *
+ipobs_register_hook(netstack_t *ns, pfv_t func)
+{
+	ip_stack_t	*ipst = ns->netstack_ip;
+	char		name[32];
+	hook_t		*hook;
+
+	HOOK_INIT(hook, ipobs_bounce_func, "", (void *)func);
+	VERIFY(hook != NULL);
+
+	/*
+	 * To register multiple hooks with he same callback function,
+	 * a unique name is needed.
+	 */
+	(void) snprintf(name, sizeof (name), "ipobserve_%p", hook);
+	hook->h_name = strdup(name);
+
+	(void) net_hook_register(ipst->ips_ip4_observe_pr, NH_OBSERVE, hook);
+	(void) net_hook_register(ipst->ips_ip6_observe_pr, NH_OBSERVE, hook);
+
+	return (hook);
+}
+
+void
+ipobs_unregister_hook(netstack_t *ns, hook_t *hook)
+{
+	ip_stack_t	*ipst = ns->netstack_ip;
+
+	(void) net_hook_unregister(ipst->ips_ip4_observe_pr, NH_OBSERVE, hook);
+
+	(void) net_hook_unregister(ipst->ips_ip6_observe_pr, NH_OBSERVE, hook);
+
+	strfree(hook->h_name);
+
+	hook_free(hook);
+}
+
+/* ******************************************************************** */
+/* BPF Functions below							*/
+/* ******************************************************************** */
+
+/*
+ * Convenience function to make mapping a zoneid to an ipnet_stack_t easy.
+ */
+static ipnet_stack_t *
+ipnet_find_by_zoneid(zoneid_t zoneid)
+{
+	netstack_t	*ns;
+
+	VERIFY((ns = netstack_find_by_zoneid(zoneid)) != NULL);
+	return (ns->netstack_ipnet);
+}
+
+/*
+ * Rather than weave the complexity of what needs to be done for a BPF
+ * device attach or detach into the code paths of where they're used,
+ * it is presented here in a couple of simple functions, along with
+ * other similar code.
+ *
+ * The refrele/refhold here provide the means by which it is known
+ * when the clone structures can be free'd.
+ */
+static void
+ipnet_bpfdetach(ipnetif_t *ifp)
+{
+	if (ifp->if_stackp->ips_bpfdetach_fn != NULL) {
+		ifp->if_stackp->ips_bpfdetach_fn((uintptr_t)ifp);
+		ipnetif_refrele(ifp);
+	}
+}
+
+static void
+ipnet_bpfattach(ipnetif_t *ifp)
+{
+	if (ifp->if_stackp->ips_bpfattach_fn != NULL) {
+		ipnetif_refhold(ifp);
+		ifp->if_stackp->ips_bpfattach_fn((uintptr_t)ifp, DL_IPNET,
+		    ifp->if_zoneid, BPR_IPNET);
+	}
+}
+
+/*
+ * Set the functions to call back to when adding or removing an interface so
+ * that BPF can keep its internal list of these up to date.
+ */
+void
+ipnet_set_bpfattach(bpf_attach_fn_t attach, bpf_detach_fn_t detach,
+    zoneid_t zoneid, bpf_itap_fn_t tapfunc, bpf_provider_reg_fn_t provider)
+{
+	ipnet_stack_t	*ips;
+	ipnetif_t	*ipnetif;
+	avl_tree_t	*tree;
+	ipnetif_t	*next;
+
+	if (zoneid == GLOBAL_ZONEID) {
+		ipnet_itap = tapfunc;
+	}
+
+	VERIFY((ips = ipnet_find_by_zoneid(zoneid)) != NULL);
+
+	/*
+	 * If we're setting a new attach function, call it for every
+	 * mac that has already been attached.
+	 */
+	if (attach != NULL && ips->ips_bpfattach_fn == NULL) {
+		ASSERT(detach != NULL);
+		if (provider != NULL) {
+			(void) provider(&bpf_ipnet);
+		}
+		/*
+		 * The call to ipnet_bpfattach() calls into bpf`bpfattach
+		 * which then wants to resolve the link name into a link id.
+		 * For ipnet, this results in a call back to
+		 * ipnet_get_linkid_byname which also needs to lock and walk
+		 * the AVL tree. Thus the call to ipnet_bpfattach needs to
+		 * be made without the avl_lock held.
+		 */
+		mutex_enter(&ips->ips_event_lock);
+		ips->ips_bpfattach_fn = attach;
+		ips->ips_bpfdetach_fn = detach;
+		mutex_enter(&ips->ips_avl_lock);
+		tree = &ips->ips_avl_by_index;
+		for (ipnetif = avl_first(tree); ipnetif != NULL;
+		    ipnetif = next) {
+			ipnetif_refhold(ipnetif);
+			mutex_exit(&ips->ips_avl_lock);
+			ipnet_bpfattach(ipnetif);
+			mutex_enter(&ips->ips_avl_lock);
+			next = avl_walk(tree, ipnetif, AVL_AFTER);
+			ipnetif_refrele(ipnetif);
+		}
+		mutex_exit(&ips->ips_avl_lock);
+		ipnet_bpf_probe_shared(ips);
+		mutex_exit(&ips->ips_event_lock);
+
+	} else if (attach == NULL && ips->ips_bpfattach_fn != NULL) {
+		ASSERT(ips->ips_bpfdetach_fn != NULL);
+		mutex_enter(&ips->ips_event_lock);
+		ips->ips_bpfattach_fn = NULL;
+		mutex_enter(&ips->ips_avl_lock);
+		tree = &ips->ips_avl_by_index;
+		for (ipnetif = avl_first(tree); ipnetif != NULL;
+		    ipnetif = next) {
+			ipnetif_refhold(ipnetif);
+			mutex_exit(&ips->ips_avl_lock);
+			ipnet_bpfdetach((ipnetif_t *)ipnetif);
+			mutex_enter(&ips->ips_avl_lock);
+			next = avl_walk(tree, ipnetif, AVL_AFTER);
+			ipnetif_refrele(ipnetif);
+		}
+		mutex_exit(&ips->ips_avl_lock);
+		ipnet_bpf_release_shared(ips);
+		ips->ips_bpfdetach_fn = NULL;
+		mutex_exit(&ips->ips_event_lock);
+
+		if (provider != NULL) {
+			(void) provider(&bpf_ipnet);
+		}
+	}
+}
+
+/*
+ * The list of interfaces available via ipnet is private for each zone,
+ * so the AVL tree of each zone must be searched for a given name, even
+ * if all names are unique.
+ */
+int
+ipnet_open_byname(const char *name, ipnetif_t **ptr, zoneid_t zoneid)
+{
+	ipnet_stack_t	*ips;
+	ipnetif_t	*ipnetif;
+
+	ASSERT(ptr != NULL);
+	VERIFY((ips = ipnet_find_by_zoneid(zoneid)) != NULL);
+
+	mutex_enter(&ips->ips_avl_lock);
+	ipnetif = avl_find(&ips->ips_avl_by_name, (char *)name, NULL);
+	if (ipnetif != NULL) {
+		ipnetif_refhold(ipnetif);
+	}
+	mutex_exit(&ips->ips_avl_lock);
+
+	*ptr = ipnetif;
+
+	if (ipnetif == NULL)
+		return (ESRCH);
+	return (0);
+}
+
+void
+ipnet_close_byhandle(ipnetif_t *ifp)
+{
+	ASSERT(ifp != NULL);
+	ipnetif_refrele(ifp);
+}
+
+const char *
+ipnet_name(ipnetif_t *ifp)
+{
+	ASSERT(ifp != NULL);
+	return (ifp->if_name);
+}
+
+/*
+ * To find the linkid for a given name, it is necessary to know which zone
+ * the interface name belongs to and to search the avl tree for that zone
+ * as there is no master list of all interfaces and which zone they belong
+ * to. It is assumed that the caller of this function is somehow already
+ * working with the ipnet interfaces and hence the ips_event_lock is held.
+ * When BPF calls into this function, it is doing so because of an event
+ * in ipnet, and thus ipnet holds the ips_event_lock. Thus the datalink id
+ * value returned has meaning without the need for grabbing a hold on the
+ * owning structure.
+ */
+int
+ipnet_get_linkid_byname(const char *name, uint_t *idp, zoneid_t zoneid)
+{
+	ipnet_stack_t	*ips;
+	ipnetif_t	*ifp;
+
+	VERIFY((ips = ipnet_find_by_zoneid(zoneid)) != NULL);
+	ASSERT(mutex_owned(&ips->ips_event_lock));
+
+	mutex_enter(&ips->ips_avl_lock);
+	ifp = avl_find(&ips->ips_avl_by_name, (void *)name, NULL);
+	if (ifp != NULL)
+		*idp = (uint_t)ifp->if_index;
+
+	/*
+	 * Shared instance zone?
+	 */
+	if (netstackid_to_zoneid(zoneid_to_netstackid(zoneid)) != zoneid) {
+		uintptr_t key[2] = { zoneid, (uintptr_t)name };
+
+		ifp = avl_find(&ips->ips_avl_by_shared, (void *)key, NULL);
+		if (ifp != NULL)
+			*idp = (uint_t)ifp->if_index;
+	}
+
+	mutex_exit(&ips->ips_avl_lock);
+
+	if (ifp == NULL)
+		return (ESRCH);
+	return (0);
+}
+
+/*
+ * Strictly speaking, there is no such thing as a "client" in ipnet, like
+ * there is in mac. BPF only needs to have this because it is required as
+ * part of interfacing correctly with mac. The reuse of the original
+ * ipnetif_t as a client poses no danger, so long as it is done with its
+ * own ref-count'd hold that is given up on close.
+ */
+int
+ipnet_client_open(ipnetif_t *ptr, ipnetif_t **result)
+{
+	ASSERT(ptr != NULL);
+	ASSERT(result != NULL);
+	ipnetif_refhold(ptr);
+	*result = ptr;
+
+	return (0);
+}
+
+void
+ipnet_client_close(ipnetif_t *ptr)
+{
+	ASSERT(ptr != NULL);
+	ipnetif_refrele(ptr);
+}
+
+/*
+ * This is called from BPF when it needs to start receiving packets
+ * from ipnet.
+ *
+ * The use of the ipnet_t structure here is somewhat lightweight when
+ * compared to how it is used elsewhere but it already has all of the
+ * right fields in it, so reuse here doesn't seem out of order. Its
+ * primary purpose here is to provide the means to store pointers for
+ * use when ipnet_promisc_remove() needs to be called.
+ *
+ * This should never be called for the IPNET_MINOR_LO device as it is
+ * never created via ipnetif_create.
+ */
+/*ARGSUSED*/
+int
+ipnet_promisc_add(void *handle, uint_t how, void *data, uintptr_t *mhandle,
+    int flags)
+{
+	ip_stack_t	*ipst;
+	netstack_t	*ns;
+	ipnetif_t	*ifp;
+	ipnet_t		*ipnet;
+	char		name[32];
+	int		error;
+
+	ifp = (ipnetif_t *)handle;
+	ns = netstack_find_by_zoneid(ifp->if_zoneid);
+
+	if ((how == DL_PROMISC_PHYS) || (how == DL_PROMISC_MULTI)) {
+		error = ipnet_join_allmulti(ifp, ns->netstack_ipnet);
+		if (error != 0)
+			return (error);
+	} else {
+		return (EINVAL);
+	}
+
+	ipnet = kmem_zalloc(sizeof (*ipnet), KM_SLEEP);
+	ipnet->ipnet_if = ifp;
+	ipnet->ipnet_ns = ns;
+	ipnet->ipnet_flags = flags;
+
+	if ((ifp->if_flags & IPNETIF_LOOPBACK) != 0) {
+		ipnet->ipnet_acceptfn = ipnet_loaccept;
+	} else {
+		ipnet->ipnet_acceptfn = ipnet_accept;
+	}
+
+	/*
+	 * To register multiple hooks with the same callback function,
+	 * a unique name is needed.
+	 */
+	HOOK_INIT(ipnet->ipnet_hook, ipnet_bpf_bounce, "", ipnet);
+	(void) snprintf(name, sizeof (name), "ipnet_promisc_%p",
+	    ipnet->ipnet_hook);
+	ipnet->ipnet_hook->h_name = strdup(name);
+	ipnet->ipnet_data = data;
+	ipnet->ipnet_zoneid = ifp->if_zoneid;
+
+	ipst = ns->netstack_ip;
+
+	error = net_hook_register(ipst->ips_ip4_observe_pr, NH_OBSERVE,
+	    ipnet->ipnet_hook);
+	if (error != 0)
+		goto regfail;
+
+	error = net_hook_register(ipst->ips_ip6_observe_pr, NH_OBSERVE,
+	    ipnet->ipnet_hook);
+	if (error != 0) {
+		(void) net_hook_unregister(ipst->ips_ip4_observe_pr,
+		    NH_OBSERVE, ipnet->ipnet_hook);
+		goto regfail;
+	}
+
+	*mhandle = (uintptr_t)ipnet;
+
+	return (0);
+
+regfail:
+	cmn_err(CE_WARN, "net_hook_register failed: %d", error);
+	strfree(ipnet->ipnet_hook->h_name);
+	hook_free(ipnet->ipnet_hook);
+	return (error);
+}
+
+void
+ipnet_promisc_remove(void *data)
+{
+	ip_stack_t	*ipst;
+	ipnet_t		*ipnet;
+	hook_t		*hook;
+
+	ipnet = data;
+	ipst = ipnet->ipnet_ns->netstack_ip;
+	hook = ipnet->ipnet_hook;
+
+	VERIFY(net_hook_unregister(ipst->ips_ip4_observe_pr, NH_OBSERVE,
+	    hook) == 0);
+
+	VERIFY(net_hook_unregister(ipst->ips_ip6_observe_pr, NH_OBSERVE,
+	    hook) == 0);
+
+	strfree(hook->h_name);
+
+	hook_free(hook);
+
+	kmem_free(ipnet, sizeof (*ipnet));
+}
+
+/*
+ * arg here comes from the ipnet_t allocated in ipnet_promisc_add.
+ * An important field from that structure is "ipnet_data" that
+ * contains the "data" pointer passed into ipnet_promisc_add: it needs
+ * to be passed back to bpf when we call into ipnet_itap.
+ *
+ * ipnet_itap is set by ipnet_set_bpfattach, which in turn is called
+ * from BPF.
+ */
+/*ARGSUSED*/
+static int
+ipnet_bpf_bounce(hook_event_token_t token, hook_data_t info, void *arg)
+{
+	hook_pkt_observe_t	*hdr;
+	ipnet_addrp_t		src;
+	ipnet_addrp_t		dst;
+	ipnet_stack_t		*ips;
+	ipnet_t			*ipnet;
+	mblk_t			*netmp;
+	mblk_t			*mp;
+
+	hdr = (hook_pkt_observe_t *)info;
+	mp = hdr->hpo_pkt;
+	ipnet = (ipnet_t *)arg;
+	ips = ((netstack_t *)hdr->hpo_ctx)->netstack_ipnet;
+
+	netmp = hdr->hpo_pkt->b_cont;
+	src.iap_family = hdr->hpo_family;
+	dst.iap_family = hdr->hpo_family;
+
+	if (hdr->hpo_family == AF_INET) {
+		src.iap_addr4 = &((ipha_t *)(netmp->b_rptr))->ipha_src;
+		dst.iap_addr4 = &((ipha_t *)(netmp->b_rptr))->ipha_dst;
+	} else {
+		src.iap_addr6 = &((ip6_t *)(netmp->b_rptr))->ip6_src;
+		dst.iap_addr6 = &((ip6_t *)(netmp->b_rptr))->ip6_dst;
+	}
+
+	if (!(*ipnet->ipnet_acceptfn)(ipnet, hdr, &src, &dst)) {
+		IPSK_BUMP(ips, ik_acceptFail);
+		return (0);
+	}
+	IPSK_BUMP(ips, ik_acceptOk);
+
+	ipnet_itap(ipnet->ipnet_data, mp,
+	    hdr->hpo_htype == IPOBS_HOOK_OUTBOUND,
+	    ntohs(hdr->hpo_pktlen) + (mp->b_wptr - mp->b_rptr));
+
+	return (0);
+}
+
+/*
+ * clone'd ipnetif_t's are created when a shared IP instance zone comes
+ * to life and configures an IP address. The model that BPF uses is that
+ * each interface must have a unique pointer and each interface must be
+ * representative of what it can capture. They are limited to one DLT
+ * per interface and one zone per interface. Thus every interface that
+ * can be seen in a zone must be announced via an attach to bpf. For
+ * shared instance zones, this means the ipnet driver needs to detect
+ * when an address is added to an interface in a zone for the first
+ * time (and also when the last address is removed.)
+ */
+static ipnetif_t *
+ipnetif_clone_create(ipnetif_t *ifp, zoneid_t zoneid)
+{
+	uintptr_t	key[2] = { zoneid, (uintptr_t)ifp->if_name };
+	ipnet_stack_t	*ips = ifp->if_stackp;
+	avl_index_t	where = 0;
+	ipnetif_t	*newif;
+
+	mutex_enter(&ips->ips_avl_lock);
+	newif = avl_find(&ips->ips_avl_by_shared, (void *)key, &where);
+	if (newif != NULL) {
+		ipnetif_refhold(newif);
+		newif->if_sharecnt++;
+		mutex_exit(&ips->ips_avl_lock);
+		return (newif);
+	}
+
+	newif = ipnet_alloc_if(ips);
+	if (newif == NULL) {
+		mutex_exit(&ips->ips_avl_lock);
+		return (NULL);
+	}
+
+	newif->if_refcnt = 1;
+	newif->if_sharecnt = 1;
+	newif->if_zoneid = zoneid;
+	(void) strlcpy(newif->if_name, ifp->if_name, LIFNAMSIZ);
+	newif->if_flags = ifp->if_flags & IPNETIF_LOOPBACK;
+	newif->if_index = ifp->if_index;
+
+	avl_insert(&ips->ips_avl_by_shared, newif, where);
+	mutex_exit(&ips->ips_avl_lock);
+
+	ipnet_bpfattach(newif);
+
+	return (newif);
+}
+
+static void
+ipnetif_clone_release(ipnetif_t *ipnetif)
+{
+	boolean_t	dofree = B_FALSE;
+	boolean_t	doremove = B_FALSE;
+	ipnet_stack_t	*ips = ipnetif->if_stackp;
+
+	mutex_enter(&ipnetif->if_reflock);
+	ASSERT(ipnetif->if_refcnt > 0);
+	if (--ipnetif->if_refcnt == 0)
+		dofree = B_TRUE;
+	ASSERT(ipnetif->if_sharecnt > 0);
+	if (--ipnetif->if_sharecnt == 0)
+		doremove = B_TRUE;
+	mutex_exit(&ipnetif->if_reflock);
+	if (doremove) {
+		mutex_enter(&ips->ips_avl_lock);
+		avl_remove(&ips->ips_avl_by_shared, ipnetif);
+		mutex_exit(&ips->ips_avl_lock);
+		ipnet_bpfdetach(ipnetif);
+	}
+	if (dofree) {
+		ASSERT(ipnetif->if_sharecnt == 0);
+		ipnetif_free(ipnetif);
+	}
+}
+
+/*
+ * Called when BPF loads, the goal is to tell BPF about all of the interfaces
+ * in use by zones that have a shared IP stack. These interfaces are stored
+ * in the ips_avl_by_shared tree. Note that if there are 1000 bge0's in use
+ * as bge0:1 through to bge0:1000, then this would be represented by a single
+ * bge0 on that AVL tree.
+ */
+static void
+ipnet_bpf_probe_shared(ipnet_stack_t *ips)
+{
+	ipnetif_t	*next;
+	ipnetif_t	*ifp;
+
+	mutex_enter(&ips->ips_avl_lock);
+
+	for (ifp = avl_first(&ips->ips_avl_by_shared); ifp != NULL;
+	    ifp = next) {
+		ipnetif_refhold(ifp);
+		mutex_exit(&ips->ips_avl_lock);
+		ipnet_bpfattach(ifp);
+		mutex_enter(&ips->ips_avl_lock);
+		next = avl_walk(&ips->ips_avl_by_shared, ifp, AVL_AFTER);
+		ipnetif_refrele(ifp);
+	}
+	mutex_exit(&ips->ips_avl_lock);
+}
+
+static void
+ipnet_bpf_release_shared(ipnet_stack_t *ips)
+{
+	ipnetif_t	*next;
+	ipnetif_t	*ifp;
+
+	mutex_enter(&ips->ips_avl_lock);
+
+	for (ifp = avl_first(&ips->ips_avl_by_shared); ifp != NULL;
+	    ifp = next) {
+		ipnetif_refhold(ifp);
+		mutex_exit(&ips->ips_avl_lock);
+		ipnet_bpfdetach(ifp);
+		mutex_enter(&ips->ips_avl_lock);
+		next = avl_walk(&ips->ips_avl_by_shared, ifp, AVL_AFTER);
+		ipnetif_refrele(ifp);
+	}
+	mutex_exit(&ips->ips_avl_lock);
 }

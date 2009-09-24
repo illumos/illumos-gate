@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,8 +131,8 @@ static network_table_t ib_network_mapping_table[] = {
 };
 
 static network_table_t ipnet_network_mapping_table[] = {
-	{ "ip", (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION) },
-	{ "ip6", (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION) },
+	{ "ip", (DL_IPNETINFO_VERSION << 8 | AF_INET) },
+	{ "ip6", (DL_IPNETINFO_VERSION << 8 | AF_INET6) },
 	{ "NULL", -1 }
 
 };
@@ -157,35 +157,35 @@ static transport_table_t ether_transport_mapping_table[] = {
 };
 
 static transport_table_t ipnet_transport_mapping_table[] = {
-	{IPPROTO_TCP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	{IPPROTO_TCP, (DL_IPNETINFO_VERSION << 8 | AF_INET),
 	    IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_TCP, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	{IPPROTO_TCP, (DL_IPNETINFO_VERSION << 8 | AF_INET6),
 	    IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_UDP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	{IPPROTO_UDP, (DL_IPNETINFO_VERSION << 8 | AF_INET),
 	    IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_UDP, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	{IPPROTO_UDP, (DL_IPNETINFO_VERSION << 8 | AF_INET6),
 	    IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_OSPF, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	{IPPROTO_OSPF, (DL_IPNETINFO_VERSION << 8 | AF_INET),
 	    IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_OSPF, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	{IPPROTO_OSPF, (DL_IPNETINFO_VERSION << 8 | AF_INET6),
 	    IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_SCTP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	{IPPROTO_SCTP, (DL_IPNETINFO_VERSION << 8 | AF_INET),
 	    IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_SCTP, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	{IPPROTO_SCTP, (DL_IPNETINFO_VERSION << 8 | AF_INET6),
 	    IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_ICMP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	{IPPROTO_ICMP, (DL_IPNETINFO_VERSION << 8 | AF_INET),
 	    IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_ICMPV6, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	{IPPROTO_ICMPV6, (DL_IPNETINFO_VERSION << 8 | AF_INET6),
 	    IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_ENCAP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	{IPPROTO_ENCAP, (DL_IPNETINFO_VERSION << 8 | AF_INET),
 	    IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_ESP, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	{IPPROTO_ESP, (DL_IPNETINFO_VERSION << 8 | AF_INET),
 	    IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_ESP, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	{IPPROTO_ESP, (DL_IPNETINFO_VERSION << 8 | AF_INET6),
 	    IPV6_TYPE_HEADER_OFFSET},
-	{IPPROTO_AH, (DL_IPNETINFO_VERSION << 8 | IPV4_VERSION),
+	{IPPROTO_AH, (DL_IPNETINFO_VERSION << 8 | AF_INET),
 	    IPV4_TYPE_HEADER_OFFSET},
-	{IPPROTO_AH, (DL_IPNETINFO_VERSION << 8 | IPV6_VERSION),
+	{IPPROTO_AH, (DL_IPNETINFO_VERSION << 8 | AF_INET6),
 	    IPV6_TYPE_HEADER_OFFSET},
 	{-1, 0, 0}	/* must be the final entry */
 };
@@ -228,8 +228,8 @@ datalink_t	dl;
 #define	IPV6_SRCADDR_OFFSET	(dl.dl_link_header_len + 8)
 #define	IPV6_DSTADDR_OFFSET	(dl.dl_link_header_len + 24)
 
-#define	IPNET_SRCZONE_OFFSET 8
-#define	IPNET_DSTZONE_OFFSET 16
+#define	IPNET_SRCZONE_OFFSET 16
+#define	IPNET_DSTZONE_OFFSET 20
 
 static int inBrace = 0, inBraceOR = 0;
 static int foundOR = 0;
@@ -577,15 +577,15 @@ pf_compare_value_mask_generic(int offset, uint_t len, uint_t val, int mask,
 }
 
 /*
- * Like pf_compare_value() but compare on a 64-bit zoneid value.
+ * Like pf_compare_value() but compare on a 32-bit zoneid value.
  * The argument val passed in is in network byte order.
  */
 static void
-pf_compare_zoneid(int offset, uint64_t val)
+pf_compare_zoneid(int offset, uint32_t val)
 {
 	int i;
 
-	for (i = 0; i < sizeof (uint64_t) / 2; i ++) {
+	for (i = 0; i < sizeof (uint32_t) / 2; i ++) {
 		pf_emit(ENF_PUSHWORD + offset / 2 + i);
 		pf_emit(ENF_PUSHLIT | ENF_EQ);
 		pf_emit(((uint16_t *)&val)[i]);
@@ -950,7 +950,7 @@ pf_netaddr_match(which, netname)
  * The zoneid passed in is in network byte order.
  */
 static void
-pf_match_zone(enum direction which, uint64_t zoneid)
+pf_match_zone(enum direction which, uint32_t zoneid)
 {
 	if (dl.dl_type != DL_IPNET)
 		pr_err("zone filter option unsupported on media");
@@ -1440,7 +1440,7 @@ pf_primary()
 			next();
 			if (tokentype != NUMBER)
 				pr_err("zoneid expected after inet");
-			pf_match_zone(dir, BE_64((uint64_t)(tokenval)));
+			pf_match_zone(dir, BE_32((uint32_t)(tokenval)));
 			opstack++;
 			next();
 			break;

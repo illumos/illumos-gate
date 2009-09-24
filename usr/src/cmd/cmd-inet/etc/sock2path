@@ -54,3 +54,5 @@
 	29	4	1	/dev/spdsock
 
 	31	1	0	trill
+	32	1	0	sockpfp
+	32	4	0	sockpfp

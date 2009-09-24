@@ -3531,56 +3531,6 @@ extern int	ip_cgtp_filter_is_registered(netstackid_t);
 #endif
 
 /*
- * IP observability hook support
- */
-
-/*
- * ipobs_hooktype_t describes the hook types supported
- * by the ip module. IPOBS_HOOK_LOCAL refers to packets
- * which are looped back internally within the ip module.
- */
-
-typedef enum ipobs_hook_type {
-	IPOBS_HOOK_LOCAL,
-	IPOBS_HOOK_OUTBOUND,
-	IPOBS_HOOK_INBOUND
-} ipobs_hook_type_t;
-
-typedef void ipobs_cbfunc_t(mblk_t *);
-
-typedef struct ipobs_cb {
-	ipobs_cbfunc_t	*ipobs_cbfunc;
-	list_node_t	ipobs_cbnext;
-} ipobs_cb_t;
-
-/*
- * This structure holds the data passed back from the ip module to
- * observability consumers.
- *
- * ihd_mp	  Pointer to the IP packet.
- * ihd_zsrc	  Source zoneid; set to ALL_ZONES when unknown.
- * ihd_zdst	  Destination zoneid; set to ALL_ZONES when unknown.
- * ihd_htype	  IPobs hook type, see above for the defined types.
- * ihd_ipver	  IP version of the packet.
- * ihd_ifindex	  Interface index that the packet was received/sent over.
- *		  For local packets, this is the index of the interface
- *		  associated with the local destination address.
- * ihd_grifindex  IPMP group interface index (zero unless ihd_ifindex
- *		  is an IPMP underlying interface).
- * ihd_stack	  Netstack the packet is from.
- */
-typedef struct ipobs_hook_data {
-	mblk_t			*ihd_mp;
-	zoneid_t		ihd_zsrc;
-	zoneid_t		ihd_zdst;
-	ipobs_hook_type_t	ihd_htype;
-	uint16_t		ihd_ipver;
-	uint64_t		ihd_ifindex;
-	uint64_t 		ihd_grifindex;
-	netstack_t		*ihd_stack;
-} ipobs_hook_data_t;
-
-/*
  * Per-ILL Multidata Transmit capabilities.
  */
 struct ill_mdt_capab_s {
@@ -3725,10 +3675,10 @@ extern void tcp_wput(queue_t *, mblk_t *);
 extern int	ip_fill_mtuinfo(struct in6_addr *, in_port_t,
 	struct ip6_mtuinfo *, netstack_t *);
 extern	ipif_t *conn_get_held_ipif(conn_t *, ipif_t **, int *);
-extern void ipobs_register_hook(netstack_t *, ipobs_cbfunc_t *);
-extern void ipobs_unregister_hook(netstack_t *, ipobs_cbfunc_t *);
-extern void ipobs_hook(mblk_t *, int, zoneid_t, zoneid_t, const ill_t *, int,
-    uint32_t, ip_stack_t *);
+extern hook_t *ipobs_register_hook(netstack_t *, pfv_t);
+extern void ipobs_unregister_hook(netstack_t *, hook_t *);
+extern void ipobs_hook(mblk_t *, int, zoneid_t, zoneid_t, const ill_t *,
+    ip_stack_t *);
 typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 
 /*

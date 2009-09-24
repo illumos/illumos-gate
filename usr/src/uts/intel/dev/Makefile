@@ -61,6 +61,7 @@ MODSTUBS_DIR	 = $(OBJS_DIR)
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -Nfs/devfs -Nmisc/dls
 INC_PATH	+= -I$(UTSBASE)/common/fs/zfs
+INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 
 #
 #	Default build targets.

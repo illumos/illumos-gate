@@ -213,6 +213,7 @@ DRV_KMODS_32	+= audiovia97
 DRV_KMODS	+= bl 
 DRV_KMODS	+= bge
 DRV_KMODS	+= bofi
+DRV_KMODS	+= bpf
 DRV_KMODS	+= bridge
 DRV_KMODS	+= bscbus
 DRV_KMODS	+= bscv
@@ -729,6 +730,7 @@ MAC_KMODS	+= mac_ib
 #
 # socketmod (kernel/socketmod)
 #
+SOCKET_KMODS	+= sockpfp
 SOCKET_KMODS	+= socksctp
 SOCKET_KMODS    += socksdp
 

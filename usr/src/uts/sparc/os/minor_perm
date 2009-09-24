@@ -192,3 +192,4 @@ bmc:bmc 0666 root sys
 iptunq:* 0640 root sys
 fm:* 0644 root sys
 clone:bridge 0666 root sys
+bpf:bpf 0666 root sys

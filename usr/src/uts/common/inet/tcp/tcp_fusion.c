@@ -536,7 +536,10 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	if (tcp_loopback_needs_ip(tcp, ns) ||
 	    tcp_loopback_needs_ip(peer_tcp, ns) ||
 	    IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN, ipst) ||
-	    list_head(&ipst->ips_ipobs_cb_list) != NULL) {
+	    (tcp->tcp_ipversion == IPV4_VERSION &&
+	    ipst->ips_ip4_observe.he_interested) ||
+	    (tcp->tcp_ipversion == IPV6_VERSION &&
+	    ipst->ips_ip6_observe.he_interested)) {
 		TCP_STAT(tcps, tcp_fusion_aborted);
 		tcp->tcp_refuse = B_TRUE;
 		peer_tcp->tcp_refuse = B_TRUE;

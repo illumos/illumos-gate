@@ -60,6 +60,8 @@ static krwlock_t	i_dls_devnet_lock;
 static mod_hash_t	*i_dls_devnet_id_hash;
 static mod_hash_t	*i_dls_devnet_hash;
 
+bpf_attach_fn_t		dls_bpfattach_fn = NULL;
+bpf_detach_fn_t		dls_bpfdetach_fn = NULL;
 boolean_t		devnet_need_rebuild;
 
 #define	VLAN_HASHSZ	67	/* prime */
@@ -1217,7 +1219,6 @@ dls_devnet_macname2linkid(const char *macname, datalink_id_t *linkidp)
 	return (0);
 }
 
-
 /*
  * Get linkid for the given dev.
  */
@@ -1656,6 +1657,19 @@ dls_devnet_create(mac_handle_t mh, datalink_id_t linkid, zoneid_t zoneid)
 			return (err);
 		}
 	}
+	/*
+	 * Tell BPF it is here, if BPF is there
+	 */
+	if (dls_bpfattach_fn != NULL) {
+		/*
+		 * The zoneid is passed in explicitly to prevent the need to
+		 * do a lookup in dls using the linkid. Such a lookup would need
+		 * to use the same hash table that gets used for walking when
+		 * dls_set_bpfattach() is called.
+		 */
+		dls_bpfattach_fn((uintptr_t)mh, mac_type(mh),
+		    dlp->dl_zid, BPR_MAC);
+	}
 	mac_perim_exit(mph);
 	return (err);
 }
@@ -1683,6 +1697,12 @@ dls_devnet_destroy(mac_handle_t mh, datalink_id_t *idp, boolean_t wait)
 	err = dls_devnet_unset(mac_name(mh), idp, wait);
 	if (err != 0 && err != ENOENT)
 		return (err);
+
+	/*
+	 * Tell BPF that the link is going away, if BPF is there.
+	 */
+	if (dls_bpfdetach_fn != NULL)
+		dls_bpfdetach_fn((uintptr_t)mh);
 
 	mac_perim_enter_by_mh(mh, &mph);
 	err = dls_link_rele_by_name(mac_name(mh));
@@ -1780,4 +1800,37 @@ datalink_id_t
 dls_devnet_linkid(dls_dl_handle_t ddh)
 {
 	return (ddh->dd_linkid);
+}
+
+/*ARGSUSED*/
+static uint_t
+i_dls_bpfattach_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
+{
+	dls_link_t		*dlp = (dls_link_t *)val;
+
+	dls_bpfattach_fn((uintptr_t)dlp->dl_mh, mac_type(dlp->dl_mh),
+	    dlp->dl_zid, BPR_MAC);
+
+	return (MH_WALK_CONTINUE);
+}
+
+/*
+ * Set the functions to call back to when adding or removing a mac so that
+ * BPF can keep its internal list of these up to date.
+ */
+void
+dls_set_bpfattach(bpf_attach_fn_t attach, bpf_detach_fn_t detach)
+{
+	bpf_attach_fn_t		old = dls_bpfattach_fn;
+
+	dls_bpfattach_fn = attach;
+	dls_bpfdetach_fn = detach;
+
+	/*
+	 * If we're setting a new attach function, call it for every
+	 * mac that has already been attached.
+	 */
+	if (attach != NULL && old == NULL) {
+		mod_hash_walk(i_dls_link_hash, i_dls_bpfattach_walker, NULL);
+	}
 }

@@ -6563,13 +6563,13 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 	}
 
 	/* IP observability hook. */
-	if (ipst->ips_ipobs_enabled) {
+	if (ipst->ips_ip6_observe.he_interested) {
 		zoneid_t dzone;
 
 		dzone = ip_get_zoneid_v6(&ip6h->ip6_dst, mp, ill, ipst,
 		    ALL_ZONES);
-		ipobs_hook(mp, IPOBS_HOOK_INBOUND, ALL_ZONES, dzone, ill,
-		    IPV6_VERSION, 0, ipst);
+		ipobs_hook(mp, IPOBS_HOOK_INBOUND, ALL_ZONES, dzone,
+		    ill, ipst);
 	}
 
 	if ((ip6h->ip6_vcf & IPV6_VERS_AND_FLOW_MASK) ==
@@ -10179,7 +10179,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 	if (first_mp == NULL)
 		return;
 
-	if (ipst->ips_ipobs_enabled) {
+	if (ipst->ips_ip6_observe.he_interested) {
 		zoneid_t szone, dzone, lookup_zoneid = ALL_ZONES;
 		zoneid_t stackzoneid = netstackid_to_zoneid(
 		    ipst->ips_netstack->netstack_stackid);
@@ -10194,8 +10194,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 			lookup_zoneid = zoneid;
 		dzone = ip_get_zoneid_v6(&ip6h->ip6_dst, mp, ill, ipst,
 		    lookup_zoneid);
-		ipobs_hook(mp, IPOBS_HOOK_LOCAL, szone, dzone, ill,
-		    IPV6_VERSION, 0, ipst);
+		ipobs_hook(mp, IPOBS_HOOK_LOCAL, szone, dzone, ill, ipst);
 	}
 
 	DTRACE_IP7(receive, mblk_t *, first_mp, conn_t *, NULL, void_ip_t *,
@@ -11885,14 +11884,23 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 				}
 			}
 
-			if (ipst->ips_ipobs_enabled) {
+			if (ipst->ips_ip6_observe.he_interested) {
 				zoneid_t	szone;
 
 				szone = ip_get_zoneid_v6(&ip6h->ip6_src,
 				    mp_ip6h, out_ill, ipst, ALL_ZONES);
+
+				/*
+				 * The IP observability hook expects b_rptr to
+				 * be where the IPv6 header starts, so advance
+				 * past the link layer header.
+				 */
+				if (fp_prepend)
+					mp_ip6h->b_rptr += hlen;
 				ipobs_hook(mp_ip6h, IPOBS_HOOK_OUTBOUND, szone,
-				    ALL_ZONES, out_ill, IPV6_VERSION,
-				    fp_prepend ? hlen : 0, ipst);
+				    ALL_ZONES, out_ill, ipst);
+				if (fp_prepend)
+					mp_ip6h->b_rptr -= hlen;
 			}
 
 			/*

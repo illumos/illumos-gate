@@ -135,6 +135,38 @@ typedef int (*so_proto_fallback_func_t)(sock_lower_handle_t, queue_t *,
     boolean_t, so_proto_quiesced_cb_t);
 
 /*
+ * These functions return EOPNOTSUPP and are intended for the sockfs
+ * developer that doesn't wish to supply stubs for every function themselves.
+ */
+extern int sock_accept_notsupp(sock_lower_handle_t, sock_lower_handle_t,
+    sock_upper_handle_t, cred_t *);
+extern int sock_bind_notsupp(sock_lower_handle_t, struct sockaddr *,
+    socklen_t, cred_t *);
+extern int sock_listen_notsupp(sock_lower_handle_t, int, cred_t *);
+extern int sock_connect_notsupp(sock_lower_handle_t,
+    const struct sockaddr *, socklen_t, sock_connid_t *, cred_t *);
+extern int sock_getpeername_notsupp(sock_lower_handle_t, struct sockaddr *,
+    socklen_t *, cred_t *);
+extern int sock_getsockname_notsupp(sock_lower_handle_t, struct sockaddr *,
+    socklen_t *, cred_t *);
+extern int sock_getsockopt_notsupp(sock_lower_handle_t, int, int, void *,
+    socklen_t *, cred_t *);
+extern int sock_setsockopt_notsupp(sock_lower_handle_t, int, int,
+    const void *, socklen_t, cred_t *);
+extern int sock_send_notsupp(sock_lower_handle_t, mblk_t *,
+    struct nmsghdr *, cred_t *);
+extern int sock_send_uio_notsupp(sock_lower_handle_t, uio_t *,
+    struct nmsghdr *, cred_t *);
+extern int sock_recv_uio_notsupp(sock_lower_handle_t, uio_t *,
+    struct nmsghdr *, cred_t *);
+extern short sock_poll_notsupp(sock_lower_handle_t, short, int, cred_t *);
+extern int sock_shutdown_notsupp(sock_lower_handle_t, int, cred_t *);
+extern void sock_clr_flowctrl_notsupp(sock_lower_handle_t);
+extern int sock_ioctl_notsupp(sock_lower_handle_t, int, intptr_t, int,
+    int32_t *, cred_t *);
+extern int sock_close_notsupp(sock_lower_handle_t, int, cred_t *);
+
+/*
  * Upcalls and related information
  */
 

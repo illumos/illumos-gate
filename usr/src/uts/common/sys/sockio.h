@@ -310,6 +310,9 @@ extern "C" {
 
 #define	SIOCSQPTR	_IOWR('i', 184, int)    /* set q_ptr of stream */
 
+#define	SIOCGIFHWADDR	_IOWR('i', 185, int)	/* PF_PACKET */
+#define	SIOCGSTAMP	_IOWR('i', 186, struct timeval)	/* PF_PACKET */
+
 #ifdef	__cplusplus
 }
 #endif

@@ -1679,6 +1679,12 @@ secpolicy_net_rawaccess(const cred_t *cr)
 	return (PRIV_POLICY(cr, PRIV_NET_RAWACCESS, B_FALSE, EACCES, NULL));
 }
 
+int
+secpolicy_net_observability(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_NET_OBSERVABILITY, B_FALSE, EACCES, NULL));
+}
+
 /*
  * Need this privilege for accessing the ICMP device
  */

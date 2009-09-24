@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@ extern "C" {
 #define	NH_LOOPBACK_IN	"LOOPBACK_IN"
 #define	NH_LOOPBACK_OUT	"LOOPBACK_OUT"
 #define	NH_NIC_EVENTS	"NIC_EVENTS"
+#define	NH_OBSERVE	"OBSERVING"
 
 /*
  * Network NIC hardware checksum capability

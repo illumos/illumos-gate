@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -56,6 +54,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -N misc/dls -N misc/mac
+INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 
 #
 # For now, disable these lint checks; maintainers should endeavor

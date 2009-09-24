@@ -386,6 +386,9 @@ struct ip_stack {
 	hook_family_t	ips_ipv4root;
 	hook_family_t	ips_ipv6root;
 
+	net_handle_t		ips_ipv4_net_data;
+	net_handle_t		ips_ipv6_net_data;
+
 	/*
 	 * Hooks for firewalling
 	 */
@@ -394,35 +397,34 @@ struct ip_stack {
 	hook_event_t		ips_ip4_forwarding_event;
 	hook_event_t		ips_ip4_loopback_in_event;
 	hook_event_t		ips_ip4_loopback_out_event;
-	hook_event_t		ips_ip4_nic_events;
 	hook_event_t		ips_ip6_physical_in_event;
 	hook_event_t		ips_ip6_physical_out_event;
 	hook_event_t		ips_ip6_forwarding_event;
 	hook_event_t		ips_ip6_loopback_in_event;
 	hook_event_t		ips_ip6_loopback_out_event;
-	hook_event_t		ips_ip6_nic_events;
 
 	hook_event_token_t	ips_ipv4firewall_physical_in;
 	hook_event_token_t	ips_ipv4firewall_physical_out;
 	hook_event_token_t	ips_ipv4firewall_forwarding;
 	hook_event_token_t	ips_ipv4firewall_loopback_in;
 	hook_event_token_t	ips_ipv4firewall_loopback_out;
-	hook_event_token_t	ips_ipv4nicevents;
 	hook_event_token_t	ips_ipv6firewall_physical_in;
 	hook_event_token_t	ips_ipv6firewall_physical_out;
 	hook_event_token_t	ips_ipv6firewall_forwarding;
 	hook_event_token_t	ips_ipv6firewall_loopback_in;
 	hook_event_token_t	ips_ipv6firewall_loopback_out;
+
+	hook_event_t		ips_ip4_nic_events;
+	hook_event_t		ips_ip6_nic_events;
+	hook_event_token_t	ips_ipv4nicevents;
 	hook_event_token_t	ips_ipv6nicevents;
 
-	net_handle_t		ips_ipv4_net_data;
-	net_handle_t		ips_ipv6_net_data;
-
-	boolean_t		ips_ipobs_enabled;
-	list_t			ips_ipobs_cb_list;
-	kmutex_t		ips_ipobs_cb_lock;
-	uint_t			ips_ipobs_cb_nwalkers;
-	kcondvar_t		ips_ipobs_cb_cv;
+	net_handle_t		ips_ip4_observe_pr;
+	net_handle_t		ips_ip6_observe_pr;
+	hook_event_t		ips_ip4_observe;
+	hook_event_t		ips_ip6_observe;
+	hook_event_token_t	ips_ipv4observing;
+	hook_event_token_t	ips_ipv6observing;
 
 	struct __ldi_ident	*ips_ldi_ident;
 

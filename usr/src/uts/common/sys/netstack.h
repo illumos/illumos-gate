@@ -232,6 +232,7 @@ extern netstack_t *netstack_find_by_stackid(netstackid_t);
 extern netstack_t *netstack_find_by_zoneid(zoneid_t);
 
 extern zoneid_t netstackid_to_zoneid(netstackid_t);
+extern zoneid_t netstack_get_zoneid(netstack_t *);
 extern netstackid_t zoneid_to_netstackid(zoneid_t);
 
 extern netstack_t *netstack_get_current(void);

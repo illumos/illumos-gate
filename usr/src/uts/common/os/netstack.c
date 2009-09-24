@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1277,6 +1277,12 @@ zoneid_to_netstackid(zoneid_t zoneid)
 		return (GLOBAL_ZONEID);
 	else
 		return (zoneid);
+}
+
+zoneid_t
+netstack_get_zoneid(netstack_t *ns)
+{
+	return (netstackid_to_zoneid(ns->netstack_stackid));
 }
 
 /*

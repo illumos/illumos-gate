@@ -5454,13 +5454,21 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 	    ipst->ips_ipv4firewall_physical_out, NULL, ill, ipha, mp, mp,
 	    ll_multicast, ipst);
 	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-	if (ipst->ips_ipobs_enabled && mp != NULL) {
+	if (ipst->ips_ip4_observe.he_interested && mp != NULL) {
 		zoneid_t szone;
 
 		szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
 		    ipst, ALL_ZONES);
+
+		/*
+		 * The IP observability hook expects b_rptr to be
+		 * where the IP header starts, so advance past the
+		 * link layer header.
+		 */
+		mp->b_rptr += ire_fp_mp_len;
 		ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
-		    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len, ipst);
+		    ALL_ZONES, ill, ipst);
+		mp->b_rptr -= ire_fp_mp_len;
 	}
 
 	if (mp == NULL)

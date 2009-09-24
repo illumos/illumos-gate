@@ -227,6 +227,7 @@ DRV_KMODS	+= nsmb
 DRV_KMODS	+= fm
 DRV_KMODS	+= nulldriver
 DRV_KMODS	+= bridge trill
+DRV_KMODS	+= bpf
 
 #
 # Don't build some of these for OpenSolaris, since they will be
@@ -508,6 +509,7 @@ MAC_KMODS	+= mac_ib
 #
 # socketmod (kernel/socketmod)
 #
+SOCKET_KMODS	+= sockpfp
 SOCKET_KMODS	+= socksctp
 SOCKET_KMODS	+= socksdp
 

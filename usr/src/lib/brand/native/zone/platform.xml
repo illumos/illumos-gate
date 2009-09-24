@@ -44,6 +44,7 @@
 
 	<!-- Devices to create under /dev -->
 	<device match="arp" />
+	<device match="bpf" />
 	<device match="conslog" />
 	<device match="cpu/self/cpuid" />
 	<device match="crypto" />

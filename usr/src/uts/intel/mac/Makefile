@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -56,6 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy
+INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 
 LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN

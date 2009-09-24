@@ -422,6 +422,12 @@ mac_name(mac_handle_t mh)
 	return (((mac_impl_t *)mh)->mi_name);
 }
 
+int
+mac_type(mac_handle_t mh)
+{
+	return (((mac_impl_t *)mh)->mi_type->mt_type);
+}
+
 char *
 mac_client_name(mac_client_handle_t mch)
 {
@@ -2647,6 +2653,7 @@ mac_promisc_add(mac_client_handle_t mch, mac_client_promisc_type_t type,
 	mpip->mpi_no_phys = ((flags & MAC_PROMISC_FLAGS_NO_PHYS) != 0);
 	mpip->mpi_strip_vlan_tag =
 	    ((flags & MAC_PROMISC_FLAGS_VLAN_TAG_STRIP) != 0);
+	mpip->mpi_no_copy = ((flags & MAC_PROMISC_FLAGS_NO_COPY) != 0);
 
 	mcbi = &mip->mi_promisc_cb_info;
 	mutex_enter(mcbi->mcbi_lockp);
@@ -2823,6 +2830,17 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 	}
 
 	srs = flent->fe_tx_srs;
+	/*
+	 * This is to avoid panics with PF_PACKET that can call mac_tx()
+	 * against an interface that is not capable of sending. A rewrite
+	 * of the mac datapath is required to remove this limitation.
+	 */
+	if (srs == NULL) {
+		if (!(flag & MAC_TX_NO_HOLD))
+			MAC_TX_RELE(mcip, mytx);
+		freemsgchain(mp_chain);
+		return (NULL);
+	}
 	srs_tx = &srs->srs_tx;
 	if (srs_tx->st_mode == SRS_TX_DEFAULT &&
 	    (srs->srs_state & SRS_ENQUEUED) == 0 &&
@@ -3254,18 +3272,28 @@ static void
 mac_promisc_dispatch_one(mac_promisc_impl_t *mpip, mblk_t *mp,
     boolean_t loopback)
 {
-	mblk_t *mp_copy;
+	mblk_t *mp_copy, *mp_next;
 
-	mp_copy = copymsg(mp);
-	if (mp_copy == NULL)
-		return;
+	if (!mpip->mpi_no_copy || mpip->mpi_strip_vlan_tag) {
+		mp_copy = copymsg(mp);
+		if (mp_copy == NULL)
+			return;
+
+		if (mpip->mpi_strip_vlan_tag) {
+			mp_copy = mac_strip_vlan_tag_chain(mp_copy);
+			if (mp_copy == NULL)
+				return;
+		}
+		mp_next = NULL;
+	} else {
+		mp_copy = mp;
+		mp_next = mp->b_next;
+	}
 	mp_copy->b_next = NULL;
 
-	if (mpip->mpi_strip_vlan_tag) {
-		if ((mp_copy = mac_strip_vlan_tag_chain(mp_copy)) == NULL)
-			return;
-	}
 	mpip->mpi_fn(mpip->mpi_arg, NULL, mp_copy, loopback);
+	if (mp_copy == mp)
+		mp->b_next = mp_next;
 }
 
 /*

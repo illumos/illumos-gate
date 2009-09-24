@@ -96,8 +96,8 @@
 /*
  * Offset for the source and destination zoneid in the ipnet header.
  */
-#define	IPNET_SRCZONE_OFFSET 8
-#define	IPNET_DSTZONE_OFFSET 16
+#define	IPNET_SRCZONE_OFFSET 16
+#define	IPNET_DSTZONE_OFFSET 20
 
 int eaddr;	/* need ethernet addr */
 
@@ -1047,17 +1047,13 @@ compare_value_mask(uint_t offset, uint_t len, uint_t val, int mask)
  * byte order.
  */
 static void
-compare_value_zone(uint_t offset, uint64_t val)
+compare_value_zone(uint_t offset, uint32_t val)
 {
 	int i;
 
-	for (i = 0; i < sizeof (uint64_t) / 4; i++) {
-		load_const(ntohl(((uint32_t *)&val)[i]));
-		load_value(offset + i * 4, 4);
-		emitop(OP_EQ);
-		if (i != 0)
-			emitop(OP_AND);
-	}
+	load_const(ntohl(((uint32_t *)&val)[i]));
+	load_value(offset + i * 4, 4);
+	emitop(OP_EQ);
 }
 
 /* Emit an operator into the code array */
@@ -1728,7 +1724,7 @@ ipaddr_match(enum direction which, char *hostname, int inet_type)
  * Match on zoneid. The arg zone passed in is in network byte order.
  */
 static void
-zone_match(enum direction which, uint64_t zone)
+zone_match(enum direction which, uint32_t zone)
 {
 
 	switch (which) {
@@ -2546,7 +2542,7 @@ primary()
 			next();
 			if (tokentype != NUMBER)
 				pr_err("zoneid expected");
-			zone_match(dir, BE_64((uint64_t)(tokenval)));
+			zone_match(dir, BE_32((uint32_t)(tokenval)));
 			opstack++;
 			next();
 			break;

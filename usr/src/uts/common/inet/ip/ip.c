@@ -5745,6 +5745,7 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	 * protocols are going away have been run, meaning that we can
 	 * now set about starting to clean things up.
 	 */
+	ipobs_fini(ipst);
 	ipv4_hook_destroy(ipst);
 	ipv6_hook_destroy(ipst);
 	ip_net_destroy(ipst);
@@ -5829,7 +5830,6 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	mutex_destroy(&ipst->ips_ip_addr_avail_lock);
 	rw_destroy(&ipst->ips_ill_g_lock);
 
-	ipobs_fini(ipst);
 	ip_ire_fini(ipst);
 	ip6_asp_free(ipst);
 	conn_drain_fini(ipst);
@@ -6032,11 +6032,11 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	ipst->ips_ip_src_id = 1;
 	rw_init(&ipst->ips_srcid_lock, NULL, RW_DEFAULT, NULL);
 
-	ipobs_init(ipst);
 	ip_net_init(ipst, ns);
 	ipv4_hook_init(ipst);
 	ipv6_hook_init(ipst);
 	ipmp_init(ipst);
+	ipobs_init(ipst);
 
 	/*
 	 * Create the taskq dispatcher thread and initialize related stuff.
@@ -13957,13 +13957,20 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	    ip6_t *, NULL, int, 0);
 
 	if (mp != NULL) {
-		if (ipst->ips_ipobs_enabled) {
+		if (ipst->ips_ip4_observe.he_interested) {
 			zoneid_t szone;
 
 			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
 			    ipst, ALL_ZONES);
+			/*
+			 * The IP observability hook expects b_rptr to be
+			 * where the IP header starts, so advance past the
+			 * link layer header.
+			 */
+			mp->b_rptr += hlen;
 			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
-			    ALL_ZONES, ill, IPV4_VERSION, hlen, ipst);
+			    ALL_ZONES, ill, ipst);
+			mp->b_rptr -= hlen;
 		}
 		ILL_SEND_TX(stq_ill, ire, dst, mp, IP_DROP_ON_NO_DESC, NULL);
 	}
@@ -15046,7 +15053,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			continue;
 		}
 
-		if (ipst->ips_ipobs_enabled) {
+		if (ipst->ips_ip4_observe.he_interested) {
 			zoneid_t dzone;
 
 			/*
@@ -15055,7 +15062,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			 */
 			dzone = ip_get_zoneid_v4(dst, mp, ipst, ALL_ZONES);
 			ipobs_hook(mp, IPOBS_HOOK_INBOUND, ALL_ZONES, dzone,
-			    ill, IPV4_VERSION, 0, ipst);
+			    ill, ipst);
 		}
 
 		/*
@@ -22495,7 +22502,7 @@ another:;
 		if (mp == NULL)
 			goto release_ire_and_ill;
 
-		if (ipst->ips_ipobs_enabled) {
+		if (ipst->ips_ip4_observe.he_interested) {
 			zoneid_t szone;
 
 			/*
@@ -22506,7 +22513,7 @@ another:;
 			szone = ip_get_zoneid_v4(ipha->ipha_src, mp, ipst,
 			    ALL_ZONES);
 			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone, ALL_ZONES,
-			    ire->ire_ipif->ipif_ill, IPV4_VERSION, 0, ipst);
+			    ire->ire_ipif->ipif_ill, ipst);
 		}
 		mp->b_prev = SET_BPREV_FLAG(IPP_LOCAL_OUT);
 		DTRACE_PROBE2(ip__xmit__1, mblk_t *, mp, ire_t *, ire);
@@ -24901,7 +24908,7 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 	if (first_mp == NULL)
 		return;
 
-	if (ipst->ips_ipobs_enabled) {
+	if (ipst->ips_ip4_observe.he_interested) {
 		zoneid_t szone, dzone, lookup_zoneid = ALL_ZONES;
 		zoneid_t stackzoneid = netstackid_to_zoneid(
 		    ipst->ips_netstack->netstack_stackid);
@@ -24915,8 +24922,7 @@ ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
 			lookup_zoneid = zoneid;
 		szone = ip_get_zoneid_v4(ipha->ipha_src, mp, ipst,
 		    lookup_zoneid);
-		ipobs_hook(mp, IPOBS_HOOK_LOCAL, szone, dzone, ill,
-		    IPV4_VERSION, 0, ipst);
+		ipobs_hook(mp, IPOBS_HOOK_LOCAL, szone, dzone, ill, ipst);
 	}
 
 	DTRACE_IP7(receive, mblk_t *, first_mp, conn_t *, NULL, void_ip_t *,
@@ -29805,121 +29811,81 @@ ip_get_zoneid_v6(in6_addr_t *addr, mblk_t *mp, const ill_t *ill,
 /*
  * IP obserability hook support functions.
  */
-
 static void
 ipobs_init(ip_stack_t *ipst)
 {
-	ipst->ips_ipobs_enabled = B_FALSE;
-	list_create(&ipst->ips_ipobs_cb_list, sizeof (ipobs_cb_t),
-	    offsetof(ipobs_cb_t, ipobs_cbnext));
-	mutex_init(&ipst->ips_ipobs_cb_lock, NULL, MUTEX_DEFAULT, NULL);
-	ipst->ips_ipobs_cb_nwalkers = 0;
-	cv_init(&ipst->ips_ipobs_cb_cv, NULL, CV_DRIVER, NULL);
+	netid_t id;
+
+	id = net_getnetidbynetstackid(ipst->ips_netstack->netstack_stackid);
+
+	ipst->ips_ip4_observe_pr = net_protocol_lookup(id, NHF_INET);
+	VERIFY(ipst->ips_ip4_observe_pr != NULL);
+
+	ipst->ips_ip6_observe_pr = net_protocol_lookup(id, NHF_INET6);
+	VERIFY(ipst->ips_ip6_observe_pr != NULL);
 }
 
 static void
 ipobs_fini(ip_stack_t *ipst)
 {
-	ipobs_cb_t *cb;
 
-	mutex_enter(&ipst->ips_ipobs_cb_lock);
-	while (ipst->ips_ipobs_cb_nwalkers != 0)
-		cv_wait(&ipst->ips_ipobs_cb_cv, &ipst->ips_ipobs_cb_lock);
-
-	while ((cb = list_head(&ipst->ips_ipobs_cb_list)) != NULL) {
-		list_remove(&ipst->ips_ipobs_cb_list, cb);
-		kmem_free(cb, sizeof (*cb));
-	}
-	list_destroy(&ipst->ips_ipobs_cb_list);
-	mutex_exit(&ipst->ips_ipobs_cb_lock);
-	mutex_destroy(&ipst->ips_ipobs_cb_lock);
-	cv_destroy(&ipst->ips_ipobs_cb_cv);
+	net_protocol_release(ipst->ips_ip4_observe_pr);
+	net_protocol_release(ipst->ips_ip6_observe_pr);
 }
 
+/*
+ * hook_pkt_observe_t is composed in network byte order so that the
+ * entire mblk_t chain handed into hook_run can be used as-is.
+ * The caveat is that use of the fields, such as the zone fields,
+ * requires conversion into host byte order first.
+ */
 void
 ipobs_hook(mblk_t *mp, int htype, zoneid_t zsrc, zoneid_t zdst,
-    const ill_t *ill, int ipver, uint32_t hlen, ip_stack_t *ipst)
+    const ill_t *ill, ip_stack_t *ipst)
 {
-	mblk_t *mp2;
-	ipobs_cb_t *ipobs_cb;
-	ipobs_hook_data_t *ihd;
-	uint64_t grifindex = 0;
+	hook_pkt_observe_t *hdr;
+	uint64_t grifindex;
+	mblk_t *imp;
+
+	imp = allocb(sizeof (*hdr), BPRI_HI);
+	if (imp == NULL)
+		return;
+
+	hdr = (hook_pkt_observe_t *)imp->b_rptr;
+	/*
+	 * b_wptr is set to make the apparent size of the data in the mblk_t
+	 * to exclude the pointers at the end of hook_pkt_observer_t.
+	 */
+	imp->b_wptr = imp->b_rptr + sizeof (dl_ipnetinfo_t);
+	imp->b_cont = mp;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
 	if (IS_UNDER_IPMP(ill))
 		grifindex = ipmp_ill_get_ipmp_ifindex(ill);
+	else
+		grifindex = 0;
 
-	mutex_enter(&ipst->ips_ipobs_cb_lock);
-	ipst->ips_ipobs_cb_nwalkers++;
-	mutex_exit(&ipst->ips_ipobs_cb_lock);
-	for (ipobs_cb = list_head(&ipst->ips_ipobs_cb_list); ipobs_cb != NULL;
-	    ipobs_cb = list_next(&ipst->ips_ipobs_cb_list, ipobs_cb)) {
-		mp2 = allocb(sizeof (ipobs_hook_data_t), BPRI_HI);
-		if (mp2 != NULL) {
-			ihd = (ipobs_hook_data_t *)mp2->b_rptr;
-			if (((ihd->ihd_mp = dupmsg(mp)) == NULL) &&
-			    ((ihd->ihd_mp = copymsg(mp)) == NULL)) {
-				freemsg(mp2);
-				continue;
-			}
-			ihd->ihd_mp->b_rptr += hlen;
-			ihd->ihd_htype = htype;
-			ihd->ihd_ipver = ipver;
-			ihd->ihd_zsrc = zsrc;
-			ihd->ihd_zdst = zdst;
-			ihd->ihd_ifindex = ill->ill_phyint->phyint_ifindex;
-			ihd->ihd_grifindex = grifindex;
-			ihd->ihd_stack = ipst->ips_netstack;
-			mp2->b_wptr += sizeof (*ihd);
-			ipobs_cb->ipobs_cbfunc(mp2);
-		}
+	hdr->hpo_version = 1;
+	hdr->hpo_htype = htype;
+	hdr->hpo_pktlen = htons((ushort_t)msgdsize(mp));
+	hdr->hpo_ifindex = htonl(ill->ill_phyint->phyint_ifindex);
+	hdr->hpo_grifindex = htonl(grifindex);
+	hdr->hpo_zsrc = htonl(zsrc);
+	hdr->hpo_zdst = htonl(zdst);
+	hdr->hpo_pkt = imp;
+	hdr->hpo_ctx = ipst->ips_netstack;
+
+	if (ill->ill_isv6) {
+		hdr->hpo_family = AF_INET6;
+		(void) hook_run(ipst->ips_ipv6_net_data->netd_hooks,
+		    ipst->ips_ipv6observing, (hook_data_t)hdr);
+	} else {
+		hdr->hpo_family = AF_INET;
+		(void) hook_run(ipst->ips_ipv4_net_data->netd_hooks,
+		    ipst->ips_ipv4observing, (hook_data_t)hdr);
 	}
-	mutex_enter(&ipst->ips_ipobs_cb_lock);
-	ipst->ips_ipobs_cb_nwalkers--;
-	if (ipst->ips_ipobs_cb_nwalkers == 0)
-		cv_broadcast(&ipst->ips_ipobs_cb_cv);
-	mutex_exit(&ipst->ips_ipobs_cb_lock);
-}
 
-void
-ipobs_register_hook(netstack_t *ns, pfv_t func)
-{
-	ipobs_cb_t   *cb;
-	ip_stack_t *ipst = ns->netstack_ip;
-
-	cb = kmem_alloc(sizeof (*cb), KM_SLEEP);
-
-	mutex_enter(&ipst->ips_ipobs_cb_lock);
-	while (ipst->ips_ipobs_cb_nwalkers != 0)
-		cv_wait(&ipst->ips_ipobs_cb_cv, &ipst->ips_ipobs_cb_lock);
-	ASSERT(ipst->ips_ipobs_cb_nwalkers == 0);
-
-	cb->ipobs_cbfunc = func;
-	list_insert_head(&ipst->ips_ipobs_cb_list, cb);
-	ipst->ips_ipobs_enabled = B_TRUE;
-	mutex_exit(&ipst->ips_ipobs_cb_lock);
-}
-
-void
-ipobs_unregister_hook(netstack_t *ns, pfv_t func)
-{
-	ipobs_cb_t	*curcb;
-	ip_stack_t	*ipst = ns->netstack_ip;
-
-	mutex_enter(&ipst->ips_ipobs_cb_lock);
-	while (ipst->ips_ipobs_cb_nwalkers != 0)
-		cv_wait(&ipst->ips_ipobs_cb_cv, &ipst->ips_ipobs_cb_lock);
-
-	for (curcb = list_head(&ipst->ips_ipobs_cb_list); curcb != NULL;
-	    curcb = list_next(&ipst->ips_ipobs_cb_list, curcb)) {
-		if (func == curcb->ipobs_cbfunc) {
-			list_remove(&ipst->ips_ipobs_cb_list, curcb);
-			kmem_free(curcb, sizeof (*curcb));
-			break;
-		}
-	}
-	if (list_is_empty(&ipst->ips_ipobs_cb_list))
-		ipst->ips_ipobs_enabled = B_FALSE;
-	mutex_exit(&ipst->ips_ipobs_cb_lock);
+	imp->b_cont = NULL;
+	freemsg(imp);
 }

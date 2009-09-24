@@ -159,3 +159,4 @@ acpinex 264
 bridge 265
 iptun 266
 iptunq 267
+bpf 268

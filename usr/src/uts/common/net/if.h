@@ -436,6 +436,7 @@ struct	ifreq {
 		char	ifru_oname[IFNAMSIZ];	/* other if name */
 		struct	sockaddr ifru_broadaddr;
 		int	ifru_index;		/* interface index */
+		uint_t	ifru_mtu;
 		short	ifru_flags;
 		int	ifru_metric;
 		char	ifru_data[1];		/* interface dependent data */
@@ -487,6 +488,7 @@ struct	ifreq {
 #define	ifr_data	ifr_ifru.ifru_data	/* for use by interface */
 #define	ifr_enaddr	ifr_ifru.ifru_enaddr	/* ethernet address */
 #define	ifr_index	ifr_ifru.ifru_index	/* interface index */
+#define	ifr_mtu		ifr_ifru.ifru_mtu	/* mtu */
 /* For setting ppa */
 #define	ifr_ppa		ifr_ifru.ifru_ppaflags.ifrup_ppa
 

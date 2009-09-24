@@ -311,6 +311,16 @@ ipv4_hook_init(ip_stack_t *ipst)
 		cmn_err(CE_NOTE, "ipv4_hook_init: "
 		    "net_event_register failed for ipv4/nic_events");
 	}
+
+	HOOK_EVENT_INIT(&ipst->ips_ip4_observe, NH_OBSERVE);
+	ipst->ips_ip4_observe.he_flags = HOOK_RDONLY;
+	ipst->ips_ipv4observing = net_event_register(
+	    ipst->ips_ipv4_net_data, &ipst->ips_ip4_observe);
+	if (ipst->ips_ipv4observing == NULL) {
+		cmn_err(CE_NOTE, "ipv4_hook_init: "
+		    "net_event_register failed for ipv4/observe");
+	}
+
 }
 
 void
@@ -344,6 +354,11 @@ ipv4_hook_shutdown(ip_stack_t *ipst)
 	if (ipst->ips_ipv4nicevents != NULL) {
 		(void) net_event_shutdown(ipst->ips_ipv4_net_data,
 		    &ipst->ips_ip4_nic_events);
+	}
+
+	if (ipst->ips_ipv4observing != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_observe);
 	}
 
 	(void) net_family_shutdown(ipst->ips_ipv4_net_data,
@@ -387,6 +402,12 @@ ipv4_hook_destroy(ip_stack_t *ipst)
 		if (net_event_unregister(ipst->ips_ipv4_net_data,
 		    &ipst->ips_ip4_nic_events) == 0)
 			ipst->ips_ipv4nicevents = NULL;
+	}
+
+	if (ipst->ips_ipv4observing != NULL) {
+		if (net_event_unregister(ipst->ips_ipv4_net_data,
+		    &ipst->ips_ip4_observe) == 0)
+			ipst->ips_ipv4observing = NULL;
 	}
 
 	(void) net_family_unregister(ipst->ips_ipv4_net_data,
@@ -455,6 +476,15 @@ ipv6_hook_init(ip_stack_t *ipst)
 		cmn_err(CE_NOTE, "ipv6_hook_init: "
 		    "net_event_register failed for ipv6/nic_events");
 	}
+
+	HOOK_EVENT_INIT(&ipst->ips_ip6_observe, NH_OBSERVE);
+	ipst->ips_ip6_observe.he_flags = HOOK_RDONLY;
+	ipst->ips_ipv6observing = net_event_register(
+	    ipst->ips_ipv6_net_data, &ipst->ips_ip6_observe);
+	if (ipst->ips_ipv6observing == NULL) {
+		cmn_err(CE_NOTE, "ipv6_hook_init: "
+		    "net_event_register failed for ipv6/observe");
+	}
 }
 
 void
@@ -488,6 +518,11 @@ ipv6_hook_shutdown(ip_stack_t *ipst)
 	if (ipst->ips_ipv6nicevents != NULL) {
 		(void) net_event_shutdown(ipst->ips_ipv6_net_data,
 		    &ipst->ips_ip6_nic_events);
+	}
+
+	if (ipst->ips_ipv6observing != NULL) {
+		(void) net_event_shutdown(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_observe);
 	}
 
 	(void) net_family_shutdown(ipst->ips_ipv6_net_data,
@@ -531,6 +566,12 @@ ipv6_hook_destroy(ip_stack_t *ipst)
 		if (net_event_unregister(ipst->ips_ipv6_net_data,
 		    &ipst->ips_ip6_nic_events) == 0)
 			ipst->ips_ipv6nicevents = NULL;
+	}
+
+	if (ipst->ips_ipv6observing != NULL) {
+		if (net_event_unregister(ipst->ips_ipv6_net_data,
+		    &ipst->ips_ip6_observe) == 0)
+			ipst->ips_ipv6observing = NULL;
 	}
 
 	(void) net_family_unregister(ipst->ips_ipv6_net_data,
@@ -1424,18 +1465,33 @@ ipv6_getlifzone(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata,
 	    neti->netd_stack->nts_netstack->netstack_ip, zoneid));
 }
 
+/*
+ * The behaviour here mirrors that for the SIOCFLIFFLAGS ioctl where the
+ * union of all of the relevant flags is returned.
+ */
 static int
 ip_getlifflags_impl(sa_family_t family, phy_if_t phy_ifdata, lif_if_t ifdata,
     ip_stack_t *ipst, uint64_t *flags)
 {
+	phyint_t *phyi;
 	ipif_t *ipif;
+	ill_t *ill;
+
+	ill = ill_lookup_on_ifindex(phy_ifdata,
+	    (family == AF_INET6), NULL, NULL, NULL, NULL, ipst);
+	if (ill == NULL)
+		return (-1);
+	phyi = ill->ill_phyint;
 
 	ipif = ipif_getby_indexes((uint_t)phy_ifdata,
 	    UNMAP_IPIF_ID((uint_t)ifdata), (family == AF_INET6), ipst);
-	if (ipif == NULL)
+	if (ipif == NULL) {
+		ill_refrele(ill);
 		return (-1);
-	*flags = ipif->ipif_flags;
+	}
+	*flags = ipif->ipif_flags | ill->ill_flags | phyi->phyint_flags;
 	ipif_refrele(ipif);
+	ill_refrele(ill);
 	return (0);
 }
 

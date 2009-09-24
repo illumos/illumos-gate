@@ -221,6 +221,9 @@ $(USR_FS_DIR)/%:	$(OBJS_DIR)/% $(USR_FS_DIR) FRC
 $(USR_SCHED_DIR)/%:	$(OBJS_DIR)/% $(USR_SCHED_DIR) FRC
 	$(INS.file)
 
+$(USR_SOCK_DIR)/%:	$(OBJS_DIR)/% $(USR_SOCK_DIR) FRC
+	$(INS.file)
+
 $(USR_STRMOD_DIR)/%:	$(OBJS_DIR)/% $(USR_STRMOD_DIR) FRC
 	$(INS.file)
 

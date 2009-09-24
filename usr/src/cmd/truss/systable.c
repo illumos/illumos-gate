@@ -1500,9 +1500,10 @@ const char * const afcodes[] = {
 	"NCA",		/* 28 */
 	"POLICY",	/* 29 */
 	"RDS",		/* 30 */
-	"TRILL"		/* 31 */
+	"TRILL",	/* 31 */
+	"PACKET"	/* 32 */
 };
-#if MAX_AFCODES != 32
+#if MAX_AFCODES != 33
 #error Need to update address-family table
 #endif
 

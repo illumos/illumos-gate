@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,6 +109,57 @@ struct hook_nic_event_int {
 	hook_nic_event_t	hnei_event;
 };
 typedef struct hook_nic_event_int hook_nic_event_int_t;
+
+/*
+ * This structure holds the data passed back from the ip module to
+ * observability consumers.
+ *
+ * Externally exposed fields, that must match the order and size of
+ * dl_ipnetinfo_t in <sys/dlpi.h> are:
+ * hpo_version    Version number for this header
+ * hpo_family     Address family of the attached packet
+ * hpo_htype      IPobs hook type
+ * hpo_pktlen     Length of the attached packet
+ * hpo_ifindex    Interface index that the packet was received/sent over.
+ *                For local packets, this is the index of the interface
+ *                associated with the local destination address.
+ * hpo_grifindex  IPMP group interface index (zero unless ihd_ifindex
+ *                is an IPMP underlying interface).
+ * hpo_zsrc       Source zoneid; set to ALL_ZONES when unknown.
+ * hpo_zdst       Destination zoneid; set to ALL_ZONES when unknown.
+ *
+ * Fields used internally are:
+ * hpo_pkt        Pointer to the mblk_t containig this structure with
+ *                the real packet found at b_cont
+ */
+typedef struct hook_pkt_observe_s {
+	uint8_t		hpo_version;
+	uint8_t		hpo_family;
+	uint16_t	hpo_htype;
+	uint32_t	hpo_pktlen;
+	uint32_t	hpo_ifindex;
+	uint32_t	hpo_grifindex;
+	uint32_t	hpo_zsrc;
+	uint32_t	hpo_zdst;
+	/*
+	 * Fields used internally are below.
+	 */
+	mblk_t		*hpo_pkt;
+	void		*hpo_ctx;
+} hook_pkt_observe_t;
+
+/*
+ * ipobs_hooktype_t describes the hook types supported
+ * by the ip module. IPOBS_HOOK_LOCAL refers to packets
+ * which are looped back internally within the ip module.
+ */
+
+typedef enum ipobs_hook_type {
+	IPOBS_HOOK_INBOUND = 0,
+	IPOBS_HOOK_OUTBOUND = 1,
+	IPOBS_HOOK_LOCAL = 2
+} ipobs_hook_type_t;
+
 
 #ifdef	__cplusplus
 }

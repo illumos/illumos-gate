@@ -1689,15 +1689,15 @@ interpret_ipnet(int flags, char *header, int elen, int origlen)
 		datalen = blen;
 	}
 
-	if (dl.dli_srczone == ALL_ZONES)
+	if (dl.dli_zsrc == ALL_ZONES)
 		sprintf(szone, "Unknown");
 	else
-		sprintf(szone, "%llu", BE_64(dl.dli_srczone));
+		sprintf(szone, "%lu", BE_32(dl.dli_zsrc));
 
-	if (dl.dli_dstzone == ALL_ZONES)
+	if (dl.dli_zdst == ALL_ZONES)
 		sprintf(dzone, "Unknown");
 	else
-		sprintf(dzone, "%llu", BE_64(dl.dli_dstzone));
+		sprintf(dzone, "%lu", BE_32(dl.dli_zdst));
 
 	if (flags & F_SUM) {
 		(void) snprintf(get_sum_line(), MAXLINE,
@@ -1718,20 +1718,20 @@ interpret_ipnet(int flags, char *header, int elen, int origlen)
 		(void) snprintf(get_line(0, 0), get_line_remain(),
 		    "dli_version = %d", dl.dli_version);
 		(void) snprintf(get_line(0, 0), get_line_remain(),
-		    "dli_type = %d", dl.dli_ipver);
+		    "dli_family = %d", dl.dli_family);
 		(void) snprintf(get_line(0, 2), get_line_remain(),
-		    "dli_srczone = %s", szone);
+		    "dli_zsrc = %s", szone);
 		(void) snprintf(get_line(0, 2), get_line_remain(),
-		    "dli_dstzone = %s", dzone);
+		    "dli_zdst = %s", dzone);
 		show_space();
 	}
 	memcpy(data, off, len);
 
-	switch (dl.dli_ipver) {
-	case IPV4_VERSION:
+	switch (dl.dli_family) {
+	case AF_INET:
 		(void) interpret_ip(flags, (struct ip *)data, len);
 		break;
-	case IPV6_VERSION:
+	case AF_INET6:
 		(void) interpret_ipv6(flags, (ip6_t *)data, len);
 		break;
 	default:

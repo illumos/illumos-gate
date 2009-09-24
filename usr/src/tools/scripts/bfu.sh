@@ -809,6 +809,37 @@ update_aac_conf()
 	mv -f /tmp/aac.conf.$$ $conffile
 }
 
+update_etc_inet_sock2path()
+{
+	#
+	# The PF_PACKET module may need to be added to the configuration
+	# file socket sockets.
+	#
+	# When being added to the system, the socket itself will remain
+	# inactive until the next reboot when soconfig is run. When being
+	# removed, the kernel configuration stays active until the system
+	# is rebooted and the sockets will continue to work until it is
+	# unloaded from the kernel, after which applications will fail.
+	#
+	sockfile=$rootprefix/etc/inet/sock2path
+	xgrep=/usr/xpg4/bin/grep
+
+	${ZCAT} ${cpiodir}/generic.usr$ZFIX | cpio -it 2>/dev/null |
+	    ${xgrep} -q sockpfp
+	if [ $? -eq 1 ] ; then
+		${xgrep} -v -E '^	32	[14]	0	sockpfp' \
+		    ${sockfile} > /tmp/sock2path.tmp.$$
+		cp /tmp/sock2path.tmp.$$ ${sockfile}
+	else
+		if ! ${xgrep} -q -E \
+		    '^	31	[14]	0	sockpfp' ${sockfile}; then
+			echo '' >> ${sockfile}
+			echo '	32	1	0	sockpfp' >> ${sockfile}
+			echo '	32	4	0	sockpfp' >> ${sockfile}
+		fi
+	fi
+}
+
 # update x86 version mpt.conf for property tape
 mpttapeprop='[ 	]*tape[ 	]*=[ 	]*"sctp"[ 	]*;'
 update_mptconf_i386()
@@ -8524,6 +8555,8 @@ mondo_loop() {
 	fixup_isa_bfu
 
 	update_aac_conf
+
+	update_etc_inet_sock2path
 
 	if [ $target_isa = i386 ]; then
 	    update_mptconf_i386

@@ -77,6 +77,7 @@ typedef struct mac_promisc_impl_s {			/* Protected by */
 	boolean_t			mpi_no_tx_loop;	/* WO */
 	boolean_t			mpi_no_phys;	/* WO */
 	boolean_t			mpi_strip_vlan_tag;	/* WO */
+	boolean_t			mpi_no_copy;	/* WO */
 } mac_promisc_impl_t;
 
 typedef union mac_tx_percpu_s {

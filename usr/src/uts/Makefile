@@ -140,6 +140,8 @@ COMMON_HDRDIRS= common/avs \
 		common/inet/ipf/netinet \
 		common/inet/kssl \
 		common/inet/nca \
+		common/inet/sockmods/netpacket \
+		common/io/bpf/net \
 		common/ipp \
 		common/net \
 		common/netinet \

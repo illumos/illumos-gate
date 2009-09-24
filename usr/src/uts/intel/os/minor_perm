@@ -203,3 +203,4 @@ fm:* 0644 root sys
 amd_iommu:* 0644 root sys
 xpvtap:* 0666 root sys
 clone:bridge 0666 root sys
+bpf:bpf 0666 root sys

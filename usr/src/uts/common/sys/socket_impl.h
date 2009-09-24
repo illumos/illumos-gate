@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,8 +33,6 @@
 
 #ifndef	_SYS_SOCKET_IMPL_H
 #define	_SYS_SOCKET_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -104,6 +101,28 @@ struct sockaddr_storage {
 	char		_ss_pad2[_SS_PAD2SIZE];
 };
 #endif	/* !defined(_XPG4_2) || defined(_XPG6) || defined(__EXTENSIONS__) */
+
+/*
+ * To be compatible with the Linux interfaces used, this structure is
+ * placed in socket_impl.h so that an include for <sys/socket.h> will
+ * pickup this structure. This structure is for use with PF_PACKET
+ * sockets.
+ */
+struct sockaddr_ll {
+	uint16_t	sll_family;
+	uint16_t	sll_protocol;
+	int32_t		sll_ifindex;
+	uint16_t	sll_hatype;
+	uint8_t		sll_pkttype;
+	uint8_t		sll_halen;
+	uint8_t		sll_addr[8];
+};
+
+#define	LINUX_SLL_HOST		0
+#define	LINUX_SLL_BROADCAST	1
+#define	LINUX_SLL_MULTICAST	2
+#define	LINUX_SLL_OTHERHOST	3
+#define	LINUX_SLL_OUTGOING	4
 
 #ifdef	__cplusplus
 }

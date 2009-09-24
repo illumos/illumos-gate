@@ -541,7 +541,7 @@ NETI_OBJS +=	neti_impl.o neti_mod.o neti_stack.o
 
 KEYSOCK_OBJS +=	keysockddi.o keysock.o keysock_opt_data.o
 
-IPNET_OBJS += ipnet.o
+IPNET_OBJS +=	ipnet.o ipnet_bpf.o
 
 SPDSOCK_OBJS += spdsockddi.o spdsock.o spdsock_opt_data.o
 
@@ -572,6 +572,8 @@ SDP_SOCK_MOD_OBJS += sockmod_sdp.o socksdp.o socksdpsubr.o
 
 SCTP_SOCK_MOD_OBJS += sockmod_sctp.o socksctp.o socksctpsubr.o
 
+PFP_SOCK_MOD_OBJS += sockmod_pfp.o
+
 RDS_OBJS +=	rdsddi.o rdssubr.o rds_opt.o rds_ioctl.o
 
 RDSIB_OBJS +=	rdsib.o rdsib_ib.o rdsib_cm.o rdsib_ep.o rdsib_buf.o \
@@ -595,6 +597,8 @@ TCL_OBJS +=	ticlts.o
 TL_OBJS +=	tl.o
 
 DUMP_OBJS +=	dump.o
+
+BPF_OBJS +=	bpf.o bpf_filter.o bpf_mod.o bpf_dlt.o bpf_mac.o
 
 CLONE_OBJS +=	clone.o
 
@@ -1218,7 +1222,8 @@ SPEC_OBJS +=	specsubr.o	specvfsops.o	specvnops.o
 SOCK_OBJS +=	socksubr.o	sockvfsops.o	sockparams.o	\
 		socksyscalls.o	socktpi.o	sockstr.o	sockssl.o \
 		sockcommon_vnops.o	sockcommon_subr.o \
-		sockcommon_sops.o	sockcommon.o		socknotify.o \
+		sockcommon_sops.o	sockcommon.o	\
+		sock_notsupp.o	socknotify.o \
 		nl7c.o		nl7curi.o	nl7chttp.o	nl7clogd.o \
 		nl7cnca.o	sodirect.o
 

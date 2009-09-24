@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #   This makefile drives the production of the ipnet driver 
@@ -75,6 +75,11 @@ LINTTAGS        += -erroff=E_PTRDIFF_OVERFLOW
 # Depends on ip, neti, and hook.
 #
 LDFLAGS		+= -dy -Ndrv/ip -Nmisc/neti -Nmisc/hook
+
+#
+# To get the BPF header files
+#
+INC_PATH += -I$(UTSBASE)/common/io/bpf
 
 #
 #   Default build targets.

@@ -377,6 +377,8 @@ COMMON_SUBDIRS= \
 	SUNWosdem \
 	SUNWypr \
 	SUNWypu \
+	SUNWpacketh \
+	SUNWpacketu \
 	SUNWpamsc \
 	SUNWpapi \
 	SUNWpcan \

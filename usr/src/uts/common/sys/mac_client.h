@@ -102,6 +102,7 @@ typedef enum {
 #define	MAC_PROMISC_FLAGS_NO_TX_LOOP		0x0001
 #define	MAC_PROMISC_FLAGS_NO_PHYS		0x0002
 #define	MAC_PROMISC_FLAGS_VLAN_TAG_STRIP	0x0004
+#define	MAC_PROMISC_FLAGS_NO_COPY		0x0008
 
 /* flags passed to mac_tx() */
 #define	MAC_DROP_ON_NO_DESC	0x01 /* freemsg() if no tx descs */
@@ -156,8 +157,6 @@ extern void mac_addr_factory_release(mac_client_handle_t, uint_t);
 extern void mac_addr_factory_value(mac_handle_t, int, uchar_t *, uint_t *,
     char *, boolean_t *);
 extern uint_t mac_addr_factory_num(mac_handle_t);
-
-extern uint_t mac_addr_len(mac_handle_t);
 
 extern mac_tx_notify_handle_t mac_client_tx_notify(mac_client_handle_t,
     mac_tx_notify_t, void *);

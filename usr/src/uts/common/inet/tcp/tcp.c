@@ -16897,11 +16897,13 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	mutex_exit(&tcp->tcp_non_sq_lock);
 
 	/* Check to see if this connection wants to be re-fused. */
-	if (tcp->tcp_refuse && !ipst->ips_ipobs_enabled) {
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
+	if (tcp->tcp_refuse) {
+		if (tcp->tcp_ipversion == IPV4_VERSION &&
+		    !ipst->ips_ip4_observe.he_interested) {
 			tcp_fuse(tcp, (uchar_t *)&tcp->tcp_saved_ipha,
 			    &tcp->tcp_saved_tcph);
-		} else {
+		} else if (tcp->tcp_ipversion == IPV6_VERSION &&
+		    !ipst->ips_ip6_observe.he_interested) {
 			tcp_fuse(tcp, (uchar_t *)&tcp->tcp_saved_ip6h,
 			    &tcp->tcp_saved_tcph);
 		}
@@ -18639,13 +18641,21 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 	DTRACE_IP_FASTPATH(mp, ipha, ill, ipha, NULL);
 
 	if (mp != NULL) {
-		if (ipst->ips_ipobs_enabled) {
+		if (ipst->ips_ip4_observe.he_interested) {
 			zoneid_t szone;
 
 			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
 			    ipst, ALL_ZONES);
+
+			/*
+			 * The IP observability hook expects b_rptr to be
+			 * where the IP header starts, so advance past the
+			 * link layer header.
+			 */
+			mp->b_rptr += ire_fp_mp_len;
 			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
-			    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len, ipst);
+			    ALL_ZONES, ill, ipst);
+			mp->b_rptr -= ire_fp_mp_len;
 		}
 
 		ILL_SEND_TX(ill, ire, connp, mp, 0, NULL);
@@ -20440,7 +20450,10 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 		atomic_add_32(&ire->ire_ipif->ipif_ob_pkt_count, obsegs);
 	ire->ire_last_used_time = lbolt;
 
-	if (ipst->ips_ipobs_enabled) {
+	if ((tcp->tcp_ipversion == IPV4_VERSION &&
+	    ipst->ips_ip4_observe.he_interested) ||
+	    (tcp->tcp_ipversion == IPV6_VERSION &&
+	    ipst->ips_ip6_observe.he_interested)) {
 		multidata_t *dlmdp = mmd_getmultidata(md_mp_head);
 		pdesc_t *dl_pkt;
 		pdescinfo_t pinfo;
@@ -20453,7 +20466,7 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 			if ((nmp = mmd_transform_link(dl_pkt)) == NULL)
 				continue;
 			ipobs_hook(nmp, IPOBS_HOOK_OUTBOUND, szone,
-			    ALL_ZONES, ill, tcp->tcp_ipversion, 0, ipst);
+			    ALL_ZONES, ill, ipst);
 			freemsg(nmp);
 		}
 	}
@@ -20634,13 +20647,17 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 	DTRACE_IP_FASTPATH(mp, ipha, ill, ipha, NULL);
 
 	if (mp != NULL) {
-		if (ipst->ips_ipobs_enabled) {
+		if (ipst->ips_ip4_observe.he_interested) {
 			zoneid_t szone;
 
 			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
 			    ipst, ALL_ZONES);
+			if (ire_fp_mp_len != 0)
+				mp->b_rptr += ire_fp_mp_len;
 			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
-			    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len, ipst);
+			    ALL_ZONES, ill, ipst);
+			if (ire_fp_mp_len != 0)
+				mp->b_rptr -= ire_fp_mp_len;
 		}
 
 		ILL_SEND_TX(ill, ire, tcp->tcp_connp, mp, 0, NULL);

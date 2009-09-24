@@ -19,11 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #
 #	This makefile drives the production of the mac_ib MAC-Type plugin 
 #	kernel module.
@@ -59,6 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy -N misc/mac
+INC_PATH	+= -I$(UTSBASE)/common/io/bpf
 
 #
 #	Default build targets.

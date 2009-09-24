@@ -57,11 +57,13 @@ extern "C" {
 
 typedef struct dl_ipnetinfo {
 	uint8_t		dli_version;	/* DL_IPNETINFO_* version */
-	uint8_t		dli_ipver;	/* packet IP header version */
-	uint16_t	dli_len;	/* length of dl_ipnetinfo_t */
-	uint32_t	dli_pad;	/* alignment pad */
-	uint64_t	dli_srczone; 	/* packet source zone ID (if any) */
-	uint64_t	dli_dstzone;	/* packet dest zone ID (if any) */
+	uint8_t		dli_family;	/* packet IP header version */
+	uint16_t	dli_htype;
+	uint32_t	dli_pktlen;	/* length of dl_ipnetinfo_t */
+	uint32_t	dli_ifindex;
+	uint32_t	dli_grifindex;
+	uint32_t	dli_zsrc; 	/* packet source zone ID (if any) */
+	uint32_t	dli_zdst;	/* packet dest zone ID (if any) */
 } dl_ipnetinfo_t;
 
 /*

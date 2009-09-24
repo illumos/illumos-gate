@@ -34,6 +34,8 @@
 #include <sys/modhash.h>
 #include <sys/kstat.h>
 #include <net/if.h>
+#include <net/bpf.h>
+#include <net/bpfdesc.h>
 #include <sys/dlpi.h>
 
 #ifdef	__cplusplus
@@ -84,6 +86,7 @@ extern void		dls_link_add(dls_link_t *, uint32_t, dld_str_t *);
 extern void		dls_link_remove(dls_link_t *, dld_str_t *);
 extern int		dls_link_header_info(dls_link_t *, mblk_t *,
 			    mac_header_info_t *);
+extern int		dls_link_getzid(const char *, zoneid_t *);
 extern int		dls_link_setzid(const char *, zoneid_t);
 extern dev_info_t	*dls_link_devinfo(dev_t);
 extern dev_t		dls_link_dev(dls_link_t *);
@@ -126,6 +129,10 @@ extern void		dls_mgmt_init(void);
 extern void		dls_mgmt_fini(void);
 
 extern int		dls_mgmt_get_phydev(datalink_id_t, dev_t *);
+
+extern bpf_attach_fn_t	dls_bpfattach_fn;
+extern bpf_detach_fn_t	dls_bpfdetach_fn;
+extern void		dls_set_bpfattach(bpf_attach_fn_t, bpf_detach_fn_t);
 
 #ifdef	__cplusplus
 }

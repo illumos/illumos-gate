@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,11 +36,39 @@ extern "C" {
 #include <sys/list.h>
 #include <netinet/in.h>
 #include <net/if.h>
+#include <net/bpf.h>
 #include <sys/avl.h>
 #include <sys/neti.h>
+#include <sys/hook_event.h>
+#include <sys/zone.h>
+#include <sys/kstat.h>
+
+typedef struct ipnet_kstats_s	{
+	kstat_named_t	ik_duplicationFail;
+	kstat_named_t	ik_dispatchOk;
+	kstat_named_t	ik_dispatchFail;
+	kstat_named_t	ik_dispatchHeaderDrop;
+	kstat_named_t	ik_dispatchDupDrop;
+	kstat_named_t	ik_dispatchPutDrop;
+	kstat_named_t	ik_dispatchDeliver;
+	kstat_named_t	ik_acceptOk;
+	kstat_named_t	ik_acceptFail;
+} ipnet_kstats_t;
+
+#define	IPSK_BUMP(_x, _y)	(_x)->ips_stats._y.value.ui64++
 
 /*
  * Structure used to hold information for both IPv4 and IPv6 addresses.
+ *
+ * When ifa_shared is non-NULL, it points to a "fake" ipnetif_t structure
+ * that represents the network interface for each zone that shares its
+ * network stack. This is used by BPF to build a list of interface names
+ * present in each zone. Multiple ipnetif_addr_t's may point to a single
+ * ipnetif_t using ifa_shared. The typical case is the global zone has
+ * a bge0 that other zones use as bge0:1, bge0:2, etc. In ipnet, the
+ * ipnetif_addr_t's that store the IP address for bge0:1, etc, would
+ * point to an ipnetif_t stored in the if_avl_by_shared tree that has
+ * the name "bge0".
  */
 typedef struct ipnetif_addr {
 	union {
@@ -51,6 +79,7 @@ typedef struct ipnetif_addr {
 	zoneid_t	ifa_zone;
 	uint64_t	ifa_id;
 	list_node_t	ifa_link;
+	struct ipnetif	*ifa_shared;
 } ipnetif_addr_t;
 #define	ifa_ip4addr	ifa_addr.ifau_ip4addr
 #define	ifa_ip6addr	ifa_addr.ifau_ip6addr
@@ -60,11 +89,19 @@ typedef struct ipnetif_addr {
  * The structure holds both IPv4 and IPv6 addresses, the address lists are
  * protected by a mutex. The ipnetif structures are held per stack instance
  * within avl trees indexed on name and ip index.
+ *
+ * if_avl_by_shared is used by zones that share their instance of IP with
+ * other zones. It is used to store ipnetif_t structures. An example of this
+ * is the global zone sharing its instance of IP with other local zones.
+ * In this case, if_avl_by_shared is a tree of names that are in active use
+ * by zones using a shared instance of IP.
+ * The value in if_sharecnt represents the number of ipnetif_addr_t's that
+ * point to it.
  */
 typedef struct ipnetif {
 	char		if_name[LIFNAMSIZ];
 	uint_t		if_flags;
-	uint64_t	if_index;
+	uint_t		if_index;
 	kmutex_t	if_addr_lock;	/* protects both addr lists */
 	list_t		if_ip4addr_list;
 	list_t		if_ip6addr_list;
@@ -73,7 +110,11 @@ typedef struct ipnetif {
 	dev_t		if_dev;
 	uint_t		if_multicnt;	/* protected by ips_event_lock */
 	kmutex_t	if_reflock;	/* protects if_refcnt */
-	uint_t		if_refcnt;
+	int		if_refcnt;	/* if_reflock */
+	zoneid_t	if_zoneid;
+	avl_node_t	if_avl_by_shared;	/* protected by ips_avl_lock */
+	struct ipnet_stack *if_stackp;
+	int		if_sharecnt;	/* protected by if_reflock */
 } ipnetif_t;
 
 /* if_flags */
@@ -81,6 +122,7 @@ typedef struct ipnetif {
 #define	IPNETIF_IPV6PLUMBED	0x02
 #define	IPNETIF_IPV4ALLMULTI	0x04
 #define	IPNETIF_IPV6ALLMULTI	0x08
+#define	IPNETIF_LOOPBACK	0x10
 
 /*
  * Structure used by the accept callback function.  This is simply an address
@@ -99,7 +141,7 @@ typedef struct ipnet_addrp {
 
 struct ipnet;
 struct ipobs_hook_data;
-typedef boolean_t ipnet_acceptfn_t(struct ipnet *, struct ipobs_hook_data *,
+typedef boolean_t ipnet_acceptfn_t(struct ipnet *, struct hook_pkt_observe_s *,
     ipnet_addrp_t *, ipnet_addrp_t *);
 
 /*
@@ -111,12 +153,14 @@ typedef struct ipnet {
 	minor_t		ipnet_minor;	/* minor number for this instance */
 	ipnetif_t	*ipnet_if;	/* ipnetif for this open instance */
 	zoneid_t	ipnet_zoneid;	/* zoneid the device was opened in */
-	uint16_t	ipnet_flags;	/* see below */
-	t_scalar_t	ipnet_sap;	/* sap this instance is bound to */
+	uint_t		ipnet_flags;	/* see below */
+	t_scalar_t	ipnet_family;	/* protocol family of this instance */
 	t_uscalar_t	ipnet_dlstate;	/* dlpi state */
 	list_node_t	ipnet_next;	/* list next member */
 	netstack_t	*ipnet_ns;	/* netstack of zone we were opened in */
 	ipnet_acceptfn_t *ipnet_acceptfn; /* accept callback function pointer */
+	hook_t		*ipnet_hook;	/* hook token to unregister */
+	void		*ipnet_data;	/* value to pass back to bpf_itap */
 } ipnet_t;
 
 /* ipnet_flags */
@@ -159,7 +203,12 @@ typedef struct ipnet_stack {
 	kcondvar_t	ips_walkers_cv;
 	uint_t		ips_walkers_cnt;
 	list_t		ips_str_list;
-	uint64_t	ips_drops;
+	kstat_t		*ips_kstatp;
+	ipnet_kstats_t	ips_stats;
+	bpf_attach_fn_t	ips_bpfattach_fn;
+	bpf_detach_fn_t	ips_bpfdetach_fn;
+	avl_tree_t	ips_avl_by_shared;
+	hook_t		*ips_hook;
 } ipnet_stack_t;
 
 /*
@@ -191,8 +240,22 @@ typedef struct ipnet_stack {
 }
 
 typedef void ipnet_walkfunc_t(const char *, void *, dev_t);
-extern void ipnet_walk_if(ipnet_walkfunc_t *, void *, zoneid_t);
-extern dev_t ipnet_if_getdev(char *, zoneid_t);
+
+extern int	ipnet_client_open(ipnetif_t *, ipnetif_t **);
+extern void	ipnet_client_close(ipnetif_t *);
+extern void	ipnet_close_byhandle(ipnetif_t *);
+extern int	ipnet_get_linkid_byname(const char *, datalink_id_t *,
+    zoneid_t);
+extern dev_t	ipnet_if_getdev(char *, zoneid_t);
+extern const char *ipnet_name(ipnetif_t *);
+extern int	ipnet_open_byname(const char *, ipnetif_t **, zoneid_t);
+extern int	ipnet_promisc_add(void *, uint_t, void *, uintptr_t *, int);
+extern void	ipnet_promisc_remove(void *);
+extern void	ipnet_set_bpfattach(bpf_attach_fn_t, bpf_detach_fn_t,
+    zoneid_t, bpf_itap_fn_t, bpf_provider_reg_fn_t);
+extern void	ipnet_walk_if(ipnet_walkfunc_t *, void *, zoneid_t);
+
+extern bpf_provider_t	bpf_ipnet;
 
 #ifdef __cplusplus
 }
