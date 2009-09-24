@@ -116,6 +116,7 @@ static crypto_mech_type_t rngmech_type = CRYPTO_MECH_INVALID;
 rnd_stats_t rnd_stats;
 static boolean_t rng_prov_found = B_TRUE;
 static boolean_t rng_ok_to_log = B_TRUE;
+static boolean_t rngprov_task_idle = B_TRUE;
 
 static void rndc_addbytes(uint8_t *, size_t);
 static void rndc_getbytes(uint8_t *ptr, size_t len);
@@ -414,6 +415,7 @@ rngprov_task(void *arg)
 
 	ASSERT(len <= MAXEXTRACTBYTES);
 	(void) rngprov_getbytes(tbuf, len, B_TRUE);
+	rngprov_task_idle = B_TRUE;
 }
 
 /*
@@ -891,13 +893,34 @@ rnd_handler(void *arg)
 	}
 
 	if (num_waiters > 0)
+		/*
+		 * Note: len has no relationship with how many bytes
+		 * a poll thread needs.
+		 */
 		len = MAXEXTRACTBYTES;
 	else if (rnbyte_cnt < RNDPOOLSIZE)
 		len = MINEXTRACTBYTES;
 
-	if (len > 0) {
-		(void) taskq_dispatch(system_taskq, rngprov_task,
-		    (void *)(uintptr_t)len, TQ_NOSLEEP);
+	/*
+	 * Only one thread gets to set rngprov_task_idle at a given point
+	 * of time and the order of the writes is defined. Also, it is OK
+	 * if we read an older value of it and skip the dispatch once
+	 * since we will get the correct value during the next time here.
+	 * So, no locking is needed here.
+	 */
+	if (len > 0 && rngprov_task_idle) {
+		rngprov_task_idle = B_FALSE;
+
+		/*
+		 * It is OK if taskq_dispatch fails here. We will retry
+		 * the next time around. Meanwhile, a thread doing a
+		 * read() will go to the provider directly, if the
+		 * cache becomes empty.
+		 */
+		if (taskq_dispatch(system_taskq, rngprov_task,
+		    (void *)(uintptr_t)len, TQ_NOSLEEP | TQ_NOQUEUE) == 0) {
+			rngprov_task_idle = B_TRUE;
+		}
 	}
 
 	mutex_enter(&rndpool_lock);
