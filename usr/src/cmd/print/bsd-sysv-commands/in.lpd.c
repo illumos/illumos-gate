@@ -317,7 +317,7 @@ parse_cf(papi_service_t svc, char *cf, char **files)
 				}
 				break;
 			case 'q': {	/* Solaris priority */
-				int i = atoi(optarg);
+				int i = atoi(++entry);
 
 				i = 100 - (i * 2.5);
 				if ((i < 1) || (i > 100))
