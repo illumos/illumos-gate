@@ -21,7 +21,7 @@
 #
 # uts/sparc/smbfs/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the smbfs (Server 
@@ -64,6 +64,16 @@ CLEANFILES	+= $(MODSTUBS_O)
 C99MODE		= $(C99_ENABLE)
 INC_PATH	+= -I$(UTSBASE)/common/fs/smbclnt
 LDFLAGS         += -dy -Ndrv/nsmb
+
+LINTTAGS	+= -erroff=E_FUNC_RET_ALWAYS_IGNOR2
+LINTTAGS	+= -erroff=E_FUNC_RET_MAYBE_IGNORED2
+# Until CR 4994570 is fixed...
+LINTTAGS	+= -erroff=E_BAD_FORMAT_ARG_TYPE2
+
+# The mb_put/md_get functions are intentionally used with and without
+# return value checks, so filter those out like LGREP.2 does.
+LGREP.nsmb =	egrep -v ' ignored: (mb_put|md_get)'
+LTAIL	+=	2>&1 | $(LGREP.2) | $(LGREP.nsmb) || true
 
 #
 #	Default build targets.
