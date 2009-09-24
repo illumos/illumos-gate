@@ -226,17 +226,14 @@ s_print_request(char *m, MESG *md)
 					rp->request->title =
 					    Strdup(*rp->request->file_list);
 				else {
-					char *r;
-
-					if (r = strrchr(
-					    *rp->request->file_list, '/'))
-						r++;
-					else
-						r = *rp->request->file_list;
-
+					/*
+					 * In case of standard input
+					 * the title page should be
+					 * 'standard input'
+					 */
 					rp->request->title = malloc(25);
 					sprintf(rp->request->title,
-					    "%-.24s", r);
+					    "%-.24s", "standard input");
 				}
 			}
 
