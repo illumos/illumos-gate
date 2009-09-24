@@ -34,6 +34,8 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <libgen.h>
+#include <errno.h>
 #include <string.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -242,7 +244,11 @@ z_add_inherited_file_system(char *a_inheritedFileSystem)
 boolean_t
 z_path_is_inherited(char *a_path, char a_ftype, char *a_rootDir)
 {
-	int		n;
+	int	n;
+	char	*cp, *path2use;
+	char	real_path[PATH_MAX];
+	char	path_copy[PATH_MAX];
+	boolean_t found = B_FALSE;
 
 	/* entry assertions */
 
@@ -263,11 +269,38 @@ z_path_is_inherited(char *a_path, char a_ftype, char *a_rootDir)
 	}
 
 	/*
-	 * if a_path resides on an inherited filesystem then
+	 * The loop below represents our best effort to identify real path of
+	 * a file, which doesn't need to exist. realpath() returns error for
+	 * nonexistent path, therefore we need to cut off trailing components
+	 * of path until we get path which exists and can be resolved by
+	 * realpath(). Lookup of "/dir/symlink/nonexistent-file" would fail
+	 * to resolve symlink without this.
+	 */
+	(void) strlcpy(path_copy, a_path, PATH_MAX);
+	for (cp = dirname(path_copy); strlen(cp) > 1; cp = dirname(cp)) {
+		if (realpath(cp, real_path) != NULL) {
+			found = B_TRUE;
+			break;
+		} else if (errno != ENOENT)
+			break;
+	}
+	if (found) {
+		/*
+		 * In the loop above we always strip trailing path component,
+		 * so the type of real_path is always 'd'.
+		 */
+		a_ftype = 'd';
+		path2use = real_path;
+	} else {
+		path2use = a_path;
+	}
+
+	/*
+	 * if path resides on an inherited filesystem then
 	 * it must be read-only.
 	 */
 
-	if (z_isPathWritable(a_path) != 0) {
+	if (z_isPathWritable(path2use) != 0) {
 		return (B_FALSE);
 	}
 
@@ -286,22 +319,22 @@ z_path_is_inherited(char *a_path, char a_ftype, char *a_rootDir)
 	/* advance past given root directory if path begins with it */
 
 	n = strlen(a_rootDir);
-	if (strncmp(a_rootDir, a_path, n) == 0) {
+	if (strncmp(a_rootDir, path2use, n) == 0) {
 		char	*p;
 
 		/* advance past the root path */
 
-		p = a_path + n;
+		p = path2use + n;
 
 		/* go back to the first occurance of the path separator */
 
-		while ((*p != '/') && (p > a_path)) {
+		while ((*p != '/') && (p > path2use)) {
 			p--;
 		}
 
 		/* use this location in the path to compare */
 
-		a_path = p;
+		path2use = p;
 	}
 
 	/*
@@ -326,7 +359,7 @@ z_path_is_inherited(char *a_path, char a_ftype, char *a_rootDir)
 			fslen--;
 		}
 
-		if (strncmp(a_path, inheritedFileSystems[n], fslen) == 0) {
+		if (strncmp(path2use, inheritedFileSystems[n], fslen) == 0) {
 			_z_echoDebug(DBG_PATHS_IS_INHERITED, a_path,
 			    inheritedFileSystems[n]);
 			return (B_TRUE);

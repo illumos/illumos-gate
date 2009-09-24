@@ -262,10 +262,27 @@ sync_server(int argc, char **argv)
 {
 	int c;
 	char *root = NULL;
+	char *dryrundir = NULL;
 	boolean_t quit = B_FALSE;
 
-	while ((c = getopt(argc, argv, "R:q")) != EOF) {
+	/*
+	 * Options:
+	 *   -q: Tell pkgserv daemon to quit.
+	 *   -R: Alternate root specification.
+	 *   -D: Dryrun directory specification.
+	 *
+	 * -R and -D help pkgadm to locate IPC files used for communication
+	 * with pkgserv daemon. They should not be used together, though
+	 * nothing prevents you from doing so. If you use both at once
+	 * then IPC files will be searched in $ROOTDIR/$DRYRUNDIR directory.
+	 * So if you want to terminate dryrun pkgserv process, you should
+	 * always use only -D option.
+	 */
+	while ((c = getopt(argc, argv, "D:R:q")) != EOF) {
 		switch (c) {
+		case 'D':
+			dryrundir = optarg;
+			break;
 		case 'R':
 			root = optarg;
 			break;
@@ -277,15 +294,15 @@ sync_server(int argc, char **argv)
 		}
 	}
 
-	if (!pkgsync_needed(root, NULL, quit))
+	if (!pkgsync_needed(root, dryrundir, quit))
 		return (0);
 
 	set_PKGpaths(root);
-	set_cfdir(NULL);
+	set_cfdir(dryrundir);
 
 	if (pkgWlock(1) == 1) {
 		/* Flush the log file */
-		(void) pkgsync(root, NULL, quit);
+		(void) pkgsync(root, dryrundir, quit);
 		(void) relslock();
 		return (0);
 	}

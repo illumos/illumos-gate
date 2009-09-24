@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <libgen.h>
 #include <string.h>
 #include <wait.h>
 #include <signal.h>
@@ -952,7 +953,7 @@ get_mntinfo(int map_client, char *vfstab_file)
 				 */
 				if (strcmp(vfs->vfs_mountp, "/") == 0) {
 					(void) strcpy(client_mountp,
-								install_root);
+					    install_root);
 				} else {
 					(void) snprintf(client_mountp,
 						sizeof (client_mountp), "%s%s",
@@ -1004,7 +1005,7 @@ get_mntinfo(int map_client, char *vfstab_file)
 	qsort(fs_tab, fs_tab_used, sizeof (struct fstable *), fs_tab_ent_comp);
 	if (strcmp(fs_tab[fs_tab_used-1]->name, rn) != 0) {
 		progerr(ERR_MNT_NOROOT, fs_tab[fs_tab_used-1]->name, rn, errno,
-				strerror(errno));
+		    strerror(errno));
 		return (1);
 	} else {
 		return (0);
@@ -1055,21 +1056,33 @@ fsys(char *path)
 {
 	register int i;
 	char	real_path[PATH_MAX];
-	char	*path2use = NULL;
-	char	*cp = NULL;
+	char	path_copy[PATH_MAX];
+	char	*path2use;
+	char	*cp;
 	int	pathlen;
+	boolean_t found = B_FALSE;
 
-	path2use = path;
-
-	real_path[0] = '\0';
-
-	(void) realpath(path, real_path);
-
-	if (real_path[0]) {
-		cp = strstr(path, real_path);
-		if (cp != path || cp == NULL)
-			path2use = real_path;
+	/*
+	 * The loop below represents our best effort to identify real path of
+	 * a file, which doesn't need to exist. realpath() returns error for
+	 * nonexistent path, therefore we need to cut off trailing components
+	 * of path until we get path which exists and can be resolved by
+	 * realpath(). Lookup of "/dir/symlink/nonexistent-file" would fail
+	 * to resolve symlink without this.
+	 */
+	(void) strlcpy(path_copy, path, PATH_MAX);
+	for (cp = dirname(path_copy); strlen(cp) > 1; cp = dirname(cp)) {
+		if (realpath(cp, real_path) != NULL) {
+			found = B_TRUE;
+			break;
+		} else if (errno != ENOENT)
+			break;
 	}
+	if (found)
+		path2use = real_path;
+	else
+		/* fall back to original path in case of unexpected failure */
+		path2use = path;
 
 	pathlen = strlen(path2use);
 
