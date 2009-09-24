@@ -1014,7 +1014,7 @@ devaudio_output(audio_client_t *c)
 
 	mutex_enter(&dc->dc_lock);
 	while (((eof = list_head(&dc->dc_eofcnt)) != NULL) &&
-	    (eof->tail < tail)) {
+	    (eof->tail <= tail)) {
 		list_remove(&dc->dc_eofcnt, eof);
 		kmem_free(eof, sizeof (*eof));
 		eofs++;
@@ -1344,6 +1344,11 @@ devaudio_rsrv(audio_client_t *c)
 	while ((mp = getq(rq)) != NULL) {
 
 		if ((queclass(mp) != QPCTL) && (!canputnext(rq))) {
+			/*
+			 * Put it back in the queue so we can apply
+			 * backpressure properly.
+			 */
+			(void) putbq(rq, mp);
 			return;
 		}
 		putnext(rq, mp);
@@ -1457,7 +1462,7 @@ static struct audio_client_ops devaudioctl_ops = {
 	NULL,	/* drain */
 	devaudioctl_wput,
 	NULL,
-	NULL,
+	devaudio_rsrv
 };
 
 void
