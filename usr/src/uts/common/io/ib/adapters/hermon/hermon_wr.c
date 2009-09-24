@@ -77,7 +77,7 @@ hermon_post_send_ud(hermon_state_t *state, hermon_qphdl_t qp,
 	uint32_t			head, tail, next_tail, qsize_msk;
 	uint32_t			hdrmwqes;
 	uint32_t			nopcode, fence, immed_data = 0;
-	hermon_hw_wqe_sgl_t		*ds;
+	hermon_hw_wqe_sgl_t		*ds, *old_ds;
 	ibt_wr_ds_t			*sgl;
 	uint32_t			nds, dnds;
 	int				i, j, last_ds, num_ds, status;
@@ -142,9 +142,11 @@ post_next:
 	 */
 	if (wr->wr_opcode == IBT_WRC_SEND_LSO) {
 		int total_len;
-		hermon_hw_wqe_sgl_t *old_ds;
 
 		nopcode = HERMON_WQE_SEND_NOPCODE_LSO;
+		if (wr->wr.ud_lso.lso_hdr_sz > 60) {
+			nopcode |= (1 << 6);	/* ReRead bit must be set */
+		}
 		dest = wr->wr.ud_lso.lso_ud_dest;
 		ah = (hermon_ahhdl_t)dest->ud_ah;
 		if (ah == NULL) {
@@ -159,21 +161,11 @@ post_next:
 			status = IBT_QP_SGL_LEN_INVALID;
 			goto done;
 		}
-		bcopy(wr->wr.ud_lso.lso_hdr, (uint32_t *)ds + 1,
-		    wr->wr.ud_lso.lso_hdr_sz);
 		old_ds = ds;
-		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)ds + total_len);
-		for (i = 0; i < nds; i++) {
-			if (sgl[i].ds_len == 0)
-				continue;
-			HERMON_WQE_BUILD_DATA_SEG_SEND(&ds[num_ds], &sgl[i]);
-			num_ds++;
-			i++;
-			break;
-		}
-		membar_producer();
-		HERMON_WQE_BUILD_LSO(qp, old_ds, wr->wr.ud_lso.lso_mss,
+		bcopy(wr->wr.ud_lso.lso_hdr, (uint32_t *)old_ds + 1,
 		    wr->wr.ud_lso.lso_hdr_sz);
+		ds = (hermon_hw_wqe_sgl_t *)((uintptr_t)ds + total_len);
+		i = 0;
 	} else if (wr->wr_opcode == IBT_WRC_SEND) {
 		if (wr->wr_flags & IBT_WR_SEND_IMMED) {
 			nopcode = HERMON_WQE_SEND_NOPCODE_SENDI;
@@ -215,6 +207,13 @@ post_next:
 		 */
 		last_ds--;
 		HERMON_WQE_BUILD_DATA_SEG_SEND(&ds[last_ds], &sgl[j]);
+	}
+
+	membar_producer();
+
+	if (wr->wr_opcode == IBT_WRC_SEND_LSO) {
+		HERMON_WQE_BUILD_LSO(qp, old_ds, wr->wr.ud_lso.lso_mss,
+		    wr->wr.ud_lso.lso_hdr_sz);
 	}
 
 	fence = (wr->wr_flags & IBT_WR_SEND_FENCE) ? 1 : 0;

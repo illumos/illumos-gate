@@ -2377,8 +2377,9 @@ hermon_soft_state_init(hermon_state_t *state)
 	if (state->hs_devlim.log_max_gso_sz) {
 		hca_attr->hca_max_lso_size =
 		    (1 << state->hs_devlim.log_max_gso_sz);
-		/* More work needed in hermon_post_send for larger values */
-		hca_attr->hca_max_lso_hdr_size = 0x2c;	/* IPv4 only */
+		/* 64 = ctrl & datagram seg, 4 = LSO seg, 16 = 1 SGL */
+		hca_attr->hca_max_lso_hdr_size =
+		    state->hs_devlim.max_desc_sz_sq - (64 + 4 + 16);
 	}
 
 	caps |= IBT_HCA_WQE_SIZE_INFO;
