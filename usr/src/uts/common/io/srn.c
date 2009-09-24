@@ -544,7 +544,7 @@ srn_notify(int type, int event)
 	for (clone = 0; clone < SRN_MAX_CLONE; clone++) {
 		if (srn.srn_type[clone] == type) {
 #ifdef DEBUG
-			if (type == SRN_TYPE_APM) {
+			if (type == SRN_TYPE_APM && !srn.srn_fault[clone]) {
 				ASSERT(srn.srn_pending[clone].ae_type == 0);
 				ASSERT(srn_poll_cnt[clone] == 0);
 				ASSERT(srn.srn_delivered[clone] == 0);
