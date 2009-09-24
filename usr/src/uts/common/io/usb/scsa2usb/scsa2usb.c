@@ -2973,11 +2973,13 @@ scsa2usb_cmd_transport(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 		    pkt->pkt_cdbp[0], cmd);
 	}
 
-	/* just accept the command */
+	/* just accept the command or return error */
 	if (transport == SCSA2USB_JUST_ACCEPT) {
 		SCSA2USB_SET_PKT_DO_COMP_STATE(scsa2usbp);
 
 		return (TRAN_ACCEPT);
+	} else if (transport == SCSA2USB_REJECT) {
+		return (TRAN_FATAL_ERROR);
 	}
 
 	/* check command set next */
@@ -3105,7 +3107,7 @@ scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
 			unsigned int bufsize;
 			int count;
 
-			if (cmd->cmd_cdb[1] & evpd)
+			if (cmd->cmd_pkt->pkt_cdbp[1] & evpd)
 				return (SCSA2USB_REJECT);
 
 			scsa2usb_fake_inquiry(scsa2usbp, inq);
