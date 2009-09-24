@@ -2052,8 +2052,21 @@ Use is subject to license terms.
     </token>
     <token id="groups">
     </token>
+    <!--
+    	the iport token take a single argument of type uint16_t
+	if there are any other tokens following it that have arguments
+	the last of the iport tokens in the event description must
+	be followed by a dummy iport token that is optional.
+	This is to ensure proper structure alignment across all
+	compliers and architectures.
+    -->
+    <token id="iport">
+    </token>
     <!-- pseudo token; in_addr and in_port of peer -->
     <token id="in_peer">
+    </token>
+    <!-- pseudo token; specified in_addr -->
+    <token id="in_remote">
     </token>
     <token id="ipc">
     </token>

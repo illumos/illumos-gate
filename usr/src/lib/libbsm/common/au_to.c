@@ -935,16 +935,32 @@ au_to_in_addr_ex(struct in6_addr *addr)
 {
 	token_t *token;
 	adr_t adr;
-	char data_header = AUT_IN_ADDR_EX;
 
-	if ((token = get_token(sizeof (char) + sizeof (struct in6_addr)))
-	    == NULL) {
-		return (NULL);
+	if (IN6_IS_ADDR_V4MAPPED(addr)) {
+		ipaddr_t in4;
+
+		/*
+		 * An IPv4-mapped IPv6 address is really an IPv4 address
+		 * in IPv6 format.
+		 */
+
+		IN6_V4MAPPED_TO_IPADDR(addr, in4);
+		return (au_to_in_addr((struct in_addr *)&in4));
+
+	} else {
+		char data_header = AUT_IN_ADDR_EX;
+		int32_t	type = AU_IPv6;
+
+		if ((token = get_token(sizeof (char) + sizeof (int32_t) +
+		    sizeof (struct in6_addr))) == NULL) {
+			return (NULL);
+		}
+
+		adr_start(&adr, token->tt_data);
+		adr_char(&adr, &data_header, 1);
+		adr_int32(&adr, &type, 1);
+		adr_char(&adr, (char *)addr, sizeof (struct in6_addr));
 	}
-
-	adr_start(&adr, token->tt_data);
-	adr_char(&adr, &data_header, 1);
-	adr_char(&adr, (char *)addr, sizeof (struct in6_addr));
 
 	return (token);
 }

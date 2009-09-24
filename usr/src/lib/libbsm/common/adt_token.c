@@ -911,6 +911,77 @@ adt_to_in_peer(datadef *def, void *p_data, int required,
 	}
 }
 
+/*
+ * ADT_IN_REMOTE dummy token
+ *
+ * Similar to ADT_IN_PEER except the input is
+ * an IP address type (ADT_IPv4 | ADT_IPv6) and an address V4/V6
+ */
+
+/* ARGSUSED */
+static void
+adt_to_in_remote(datadef *def, void *p_data, int required,
+    struct adt_event_state *event, char *notUsed)
+{
+	int32_t	type;
+
+	DPRINTF(("    adt_to_in_remote dd_datatype=%d\n", def->dd_datatype));
+
+	type = ((union convert *)p_data)->tuint32;
+
+	if (type ==  0) {
+		if (required == 0) {
+			return;
+		}
+		/* required and not specified */
+		adt_write_syslog("adt_to_in_remote required address not "
+		    "specified", 0);
+		type = ADT_IPv4;
+	}
+	p_data = adt_adjust_address(p_data, sizeof (int32_t),
+	    sizeof (uint32_t));
+
+	switch (type) {
+	case ADT_IPv4:
+		(void) au_write(event->ae_event_handle, au_to_in_addr(
+		    (struct in_addr *)&(((union convert *)p_data)->tuint32)));
+		break;
+	case ADT_IPv6:
+		(void) au_write(event->ae_event_handle, au_to_in_addr_ex(
+		    (struct in6_addr *)&(((union convert *)p_data)->tuint32)));
+		break;
+	default:
+		adt_write_syslog("adt_to_in_remote invalid type", EINVAL);
+		return;
+	}
+}
+
+/*
+ * adt_to_iport takes a uint16_t IP port.
+ */
+
+/* ARGSUSED */
+static void
+adt_to_iport(datadef *def, void *p_data, int required,
+    struct adt_event_state *event, char *notUsed)
+{
+	ushort_t port;
+
+	DPRINTF(("  adt_to_iport dd_datatype=%d\n", def->dd_datatype));
+
+	port = ((union convert *)p_data)->tuint16;
+
+	if (port == 0) {
+		if (required == 0) {
+			return;
+		}
+		/* required and not specified */
+		adt_write_syslog("adt_to_iport no required port", 0);
+	}
+	(void) au_write(event->ae_event_handle, au_to_iport(port));
+
+}
+
 
 /*
  *	This is a compact table that defines only the tokens that are
@@ -920,7 +991,7 @@ adt_to_in_peer(datadef *def, void *p_data, int required,
  * adt_xlate.h), and the -AUT_PATH value.
  */
 
-#define	MAX_TOKEN_JMP 18
+#define	MAX_TOKEN_JMP 20
 
 static struct token_jmp token_table[MAX_TOKEN_JMP] =
 {
@@ -928,6 +999,8 @@ static struct token_jmp token_table[MAX_TOKEN_JMP] =
 	{ADT_CMD_ALT, adt_to_cmd1},
 	{AUT_FMRI, adt_to_frmi},
 	{ADT_IN_PEER, adt_to_in_peer},
+	{ADT_IN_REMOTE, adt_to_in_remote},
+	{AUT_IPORT, adt_to_iport},
 	{AUT_LABEL, adt_to_label},
 	{AUT_NEWGROUPS, adt_to_newgroups},
 	{AUT_PATH, adt_to_path},

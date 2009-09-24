@@ -596,10 +596,11 @@ sub generateTableC {
 	#	  'groups'      	=> 'AUT_GROUPS',	# not defined
 	#	  'header'      	=> 'AUT_HEADER',	# not defined
 		  'in_peer'     	=> 'ADT_IN_PEER',	# dummy token id
+		  'in_remote'     	=> 'ADT_IN_REMOTE',	# dummy token id
 		  'tid'          	=> 'AUT_TID',
 	#	  'ipc'         	=> 'AUT_IPC',		# not defined
 	#	  'ipc_perm'    	=> 'AUT_IPC_PERM',	# not defined
-	#	  'iport'		=> 'AUT_IPORT',		# not defined
+		  'iport'		=> 'AUT_IPORT',
 		  'label'		=> 'AUT_LABEL',
 		  'newgroups'   	=> 'AUT_NEWGROUPS',
 	#	  'opaque'      	=> 'AUT_OPAQUE',	# not defined

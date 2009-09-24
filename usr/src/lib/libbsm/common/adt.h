@@ -21,7 +21,7 @@
 /*
  * adt.h
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This is a contract private interface and is subject to change
@@ -48,8 +48,8 @@ extern "C" {
 /*
  * terminal id types
  */
-#define	ADT_IPv4	0
-#define	ADT_IPv6	1
+#define	ADT_IPv4	1
+#define	ADT_IPv6	2
 
 /*
  * for adt_set_user(): ADT_NEW if creating a session for a newly
