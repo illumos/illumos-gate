@@ -937,7 +937,7 @@ extern "C" {
 	nb_pci_getl(0, 16, 1, 0xc0, 0))
 #define	NRECFGLOG_RD(branch)	(nb_chipset == INTEL_NB_5400 ? \
 	nb_pci_getl(0, (branch) ? 22 : 21, 1, 0x74, 0) : \
-	nb_pci_getl(0, 16, 1, 0xc4, 0))
+	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0x74 : 0xc4, 0))
 #define	NRECFBDA_RD(branch)	(nb_chipset == INTEL_NB_5400 ? \
 	nb_pci_getl(0, (branch) ? 22 : 21, 1, 0xc4, 0) : \
 	nb_pci_getl(0, 16, 1, nb_chipset == INTEL_NB_7300 ? 0xc4 : 0xc8, 0))
@@ -1370,12 +1370,16 @@ extern "C" {
 
 #define	DMIR_RANKS(dmir, rank0, rank1, rank2, rank3) \
 	if (nb_chipset == INTEL_NB_5000P || nb_chipset == INTEL_NB_5000X || \
-	    nb_chipset == INTEL_NB_5000V || nb_chipset == INTEL_NB_5000Z || \
-	    nb_chipset == INTEL_NB_5100) { \
-		rank0 = (dmir) & 3; \
-		rank1 = ((dmir) >> 3) & 3; \
-		rank2 = ((dmir) >> 6) & 3; \
-		rank3 = ((dmir) >> 9) & 3; \
+	    nb_chipset == INTEL_NB_5000V || nb_chipset == INTEL_NB_5000Z) { \
+		rank0 = (dmir) & 0x7; \
+		rank1 = ((dmir) >> 3) & 0x7; \
+		rank2 = ((dmir) >> 6) & 0x7; \
+		rank3 = ((dmir) >> 9) & 0x7; \
+	} else if (nb_chipset == INTEL_NB_5100) { \
+		rank0 = (dmir) & 0x7; \
+		rank1 = ((dmir) >> 4) & 0x7; \
+		rank2 = ((dmir) >> 8) & 0x7; \
+		rank3 = ((dmir) >> 12) & 0x7; \
 	} else { \
 		rank0 = (dmir) & 0xf; \
 		rank1 = ((dmir) >> 4) & 0xf; \

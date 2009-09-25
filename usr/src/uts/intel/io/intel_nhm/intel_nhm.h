@@ -103,6 +103,10 @@ extern "C" {
 	((reg) & (1 << (8 + (channel))) != 0)
 #define	MC_CONTROL_ECCEN(reg) (((reg) >> 1) & 1)
 #define	MC_CONTROL_CLOSED_PAGE(reg) ((reg) & 1)
+#define	MC_CONTROL_DIVBY3(reg) ((reg >> 6) &1)
+
+#define	NUM_CACHELINE_BITS	6	/* Cachelines are 64B */
+
 /*
  * MC_STATUS
  */
@@ -137,7 +141,17 @@ extern "C" {
 #define	REMOVE_7(reg)	(((reg) >> 25) & 1)
 #define	REMOVE_8(reg)	(((reg) >> 26) & 1)
 #define	CH_ADDRESS_OFFSET(reg) \
-	((int64_t)(((uint64_t)(reg) & 0x00ffffff) << 40) >> 40)
+	(int64_t)((uint64_t)(reg) & 0x00ffffff)
+#define	CH_ADDRESS_SOFFSET(reg) \
+	((int64_t)(((uint64_t)(reg) & 0x00ffffff) << 40) >>40)
+/* SAG offset covers SA[39:16] so granularity is 2^16 = 64KB */
+#define	SAG_OFFSET_GRANULARITY	16
+/* 24-bit mask for TTMAD_CR_SAG_CH*.OFFSET */
+#define	SAG_OFFSET_SIZE_MASK	0xffffffULL
+/* 16-bit mask for lower bits not covered by CREG value (SA[15:0]) */
+#define	SAG_OFFSET_ADDR_MASK	0xffffULL
+#define	CACHELINE_ADDR_MASK	0x3fULL	/* 6-bit mask */
+
 /*
  * MC_RIR_LIMIT_CH
  */
@@ -145,11 +159,23 @@ extern "C" {
 /*
  * MC_RIR_WAY_CH
  */
-#define	RIR_OFFSET(reg) ((int64_t)(((uint64_t)(reg) & 0x3ff0) << 50) >> 54)
-#define	RIR_RANK(reg) ((reg) & 0xf)
+#define	RIR_OFFSET(reg)	(int64_t)((uint64_t)(reg >> 4)& 0x3ff)
+#define	RIR_SOFFSET(reg)	((int64_t)(((uint64_t)(reg) & 0x3ff0) << 50) \
+				    >> 54)
+#define	RIR_DIMM_RANK(reg)	((reg) & 0xf)
+#define	RIR_RANK(reg)	((reg) & 0x3)
+#define	RIR_DIMM(reg)	((reg)>>2 & 0x03)
+#define	RIR_OFFSET_SIZE_MASK	0x3ff
 
 #define	MAX_RIR_WAY 4
 
+#define	RIR_LIMIT_GRANULARITY	28
+#define	RIR_OFFSET_ADDR_MASK	0xfffffffULL	/* 28-bit mask */
+#define	RIR_INTLV_PGOPEN_BIT	12	/* Rank interleaving */
+#define	RIR_INTLV_PGOPEN_MASK	0xfffULL	/* 12-bit mask */
+#define	RIR_INTLV_PGCLS_BIT	6	/* Rank interleaving */
+#define	RIR_INTLV_PGCLS_MASK	0x3fULL	/* 6-bit mask */
+#define	RIR_INTLV_SIZE_MASK	0x3ULL
 /*
  * MC_RAS_ENABLES
  */
@@ -198,9 +224,22 @@ extern "C" {
 #define	SAD_DRAM_MODE(sad) (((sad) >> 1) & 3)
 #define	SAD_DRAM_RULE_ENABLE(sad) ((sad) & 1)
 
-#define	SAD_INTERLEAVE(list, num) (((list) >> ((num) * 4)) & 0x3)
-#define	INTERLEAVE_NWAY 8
-#define	MAX_SAD_DRAM_RULE 8
+/*
+ * from SAD_DRAM_RULE*.MODE
+ */
+#define	DIRECT	0
+#define	XOR	1
+#define	MOD3	2
+#define	SAD_INTERLEAVE(list, num)	(((list) >> ((num) * 4)) & 0x3)
+#define	INTERLEAVE_NWAY	8
+#define	MAX_SAD_DRAM_RULE	8
+
+#define	SAD_LIMIT_GRANULARITY	26
+#define	SAD_LIMIT_ADDR_MASK	0x3ffffffULL
+#define	SAD_INTLV_DIRECT_BIT	6
+#define	SAD_INTLV_XOR_BIT	16
+#define	SAD_INTLV_SIZE_MASK	0x7ULL
+#define	SAD_INTLV_ADDR_MASK	0x3fULL
 
 /*
  * TAD_DRAM_RULE
@@ -214,6 +253,57 @@ extern "C" {
 #define	MAX_TAD_DRAM_RULE 8
 
 #define	VRANK_SZ 0x40000000
+
+typedef struct sad {
+	uint64_t limit;
+	uint32_t node_list;
+	uint32_t node_tgt[INTERLEAVE_NWAY];
+	char mode;
+	char enable;
+	char interleave;
+} sad_t;
+
+typedef struct tad {
+	uint64_t limit;
+	uint32_t pkg_list;
+	uint32_t pkg_tgt[INTERLEAVE_NWAY];
+	char mode;
+	char enable;
+	char interleave;
+} tad_t;
+
+typedef struct sag_ch {
+	uint32_t offset;
+	int32_t soffset;
+	char divby3;
+	char remove6;
+	char remove7;
+	char remove8;
+} sag_ch_t;
+
+typedef struct rir_way {
+	uint16_t offset;
+	int16_t soffset;
+	uint8_t	rank;
+	uint8_t dimm;
+	uint8_t dimm_rank;
+	uint64_t rlimit;
+} way_t;
+
+typedef struct rir {
+	uint64_t limit;
+	way_t way[MAX_RIR_WAY];
+	char interleave;
+} rir_t;
+
+typedef struct dod_type {
+	int NUMCol;
+	int NUMRow;
+	int NUMRank;
+	int NUMBank;
+	int DIMMPresent;
+	int RankOffset;
+} dod_t;
 
 /*
  * MC_CHANNEL_MAPPER

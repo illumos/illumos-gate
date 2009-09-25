@@ -287,6 +287,26 @@ extern "C" {
 #define	MSR_MC_MISC_MEM_SYNDROME	0xffffffff00000000ULL
 #define	MSR_MC_MISC_MEM_SYNDROME_SHIFT	32
 
+#define	OFFSET_ROW_BANK_COL	0x8000000000000000ULL
+#define	OFFSET_RANK_SHIFT	52
+#define	OFFSET_RAS_SHIFT	32
+#define	OFFSET_BANK_SHIFT	24
+#define	TCODE_OFFSET(rank, bank, ras, cas) (OFFSET_ROW_BANK_COL | \
+	((uint64_t)(rank) << OFFSET_RANK_SHIFT) | \
+	((uint64_t)(ras) << OFFSET_RAS_SHIFT) | \
+	((uint64_t)(bank) << OFFSET_BANK_SHIFT) | (cas))
+
+#define	MAX_CAS_MASK	0xFFFFFF
+#define	MAX_BANK_MASK	0xFF
+#define	MAX_RAS_MASK	0xFFFFF
+#define	MAX_RANK_MASK	0x7FF
+#define	TCODE_OFFSET_RANK(tcode) \
+	(((tcode) >> OFFSET_RANK_SHIFT) & MAX_RANK_MASK)
+#define	TCODE_OFFSET_RAS(tcode) (((tcode) >> OFFSET_RAS_SHIFT) & MAX_RAS_MASK)
+#define	TCODE_OFFSET_BANK(tcode) \
+	(((tcode) >> OFFSET_BANK_SHIFT) & MAX_BANK_MASK)
+#define	TCODE_OFFSET_CAS(tcode) ((tcode) & MAX_CAS_MASK)
+
 #ifdef __cplusplus
 }
 #endif

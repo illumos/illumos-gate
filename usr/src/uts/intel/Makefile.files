@@ -303,14 +303,3 @@ MCAMD_OBJS	+= \
 	mcamd_dimmcfg.o \
 	mcamd_subr.o \
 	mcamd_pcicfg.o
-
-#
-# Intel 5000/5400/7300 MCH module
-#
-INTEL_NB5000_OBJS += \
-	intel_nb5000.o \
-	intel_nbdrv.o \
-	dimm_addr.o \
-	nb_pci_cfg.o \
-	nb5000_init.o
-

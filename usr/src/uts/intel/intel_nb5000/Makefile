@@ -17,22 +17,25 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+
+#
+# Intel 5000/5100/5400/7300 chipset memory controller hub (MCH) module
 #
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE = ../..
+UTSCLOSED = ../../../../closed/uts
 
 #
 #       Define the module and object file sets.
 #
 MODULE		= intel_nb5000
 #
-OBJECTS		= $(INTEL_NB5000_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(INTEL_NB5000_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 SRCDIR		= $(UTSBASE)/intel/io/intel_nb5000
 CONF_SRCDIR	= $(UTSBASE)/intel/io/intel_nb5000
@@ -41,6 +44,23 @@ CONF_SRCDIR	= $(UTSBASE)/intel/io/intel_nb5000
 #       Include common rules.
 #
 include ../Makefile.intel
+
+#
+# The list of object files is defined here, rather than in Makefile.files,
+# because the "$(CLOSED_BUILD)" macro has not been defined at the time
+# Makefile.files is processed.
+#
+INTEL_NB5000_OBJS += \
+	intel_nb5000.o \
+	intel_nbdrv.o \
+	dimm_addr.o \
+	nb_pci_cfg.o \
+	nb5000_init.o
+
+$(CLOSED_BUILD)INTEL_NB5000_OBJS += memtrans.o
+
+OBJECTS		= $(INTEL_NB5000_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(INTEL_NB5000_OBJS:%.o=$(LINTS_DIR)/%.ln)
 
 #
 #       Define targets
@@ -76,3 +96,4 @@ $(OBJECTS): $(OBJS_DIR) $(MCAMD_OFF_H)
 #       Include common targets.
 #
 include ../Makefile.targ
+$(CLOSED_BUILD)include $(UTSCLOSED)/intel/Makefile.rules

@@ -32,128 +32,12 @@
 #include <sys/cmn_err.h>
 #include <sys/sunddi.h>
 #include <sys/mc_intel.h>
-#include "dimm_addr.h"
 #include "nb_log.h"
 #include "rank.h"
 #include "dimm_phys.h"
 #include "nb5000.h"
 
-struct dimm_geometry **dimm_geometry;
 struct rank_base *rank_base;
-
-uint64_t
-dimm_getphys(int branch, int rank, int bank, int ras, int cas)
-{
-	uint8_t i;
-	int num_ranks_per_branch;
-	uint64_t m;
-	uint64_t pa;
-	struct rank_base *rp;
-	struct rank_geometry *rgp;
-
-	/* max number of ranks per branch */
-	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
-	    NB_5100_RANKS_PER_CHANNEL :
-	    nb_dimms_per_channel * nb_channels_per_branch;
-	ASSERT(rank < num_ranks_per_branch);
-	rp = &rank_base[(branch * num_ranks_per_branch) + rank];
-	rgp = (struct rank_geometry *)rp->rank_geometry;
-	if (rgp == NULL)
-		return (-1LL);
-	pa = rp->base;
-
-	for (i = 0, m = 1; bank; i++, m <<= 1) {
-		if ((bank & m) != 0 && rgp->bank[i] != 0xff) {
-			pa += 1 << rgp->bank[i];
-			bank &= ~m;
-		}
-	}
-	for (i = 0, m = 1; cas; i++, m <<= 1) {
-		if ((cas & m) != 0 && rgp->col[i] != 0xff) {
-			pa += 1 << rgp->col[i];
-			cas &= ~m;
-		}
-	}
-	for (i = 0, m = 1; ras; i++, m <<= 1) {
-		if ((ras & m) != 0 && rgp->row[i] != 0xff) {
-			pa += 1 << rgp->row[i];
-			ras &= ~m;
-		}
-	}
-	if (rp->interleave > 1) {
-		i = 0;
-		if (rp->branch_interleave) {
-			if (branch) {
-				pa += 1 << rgp->interleave[i];
-			}
-			i++;
-		}
-		if ((rp->way & 1) != 0)
-			pa += 1 << rgp->interleave[i];
-		i++;
-		if ((rp->way & 2) != 0)
-			pa += 1 << rgp->interleave[i];
-	}
-	if (rp->hole && pa >= rp->hole)
-		pa += rp->hole_size;
-	return (pa);
-}
-
-uint64_t
-dimm_getoffset(int branch, int rank, int bank, int ras, int cas)
-{
-	uint8_t i;
-	int num_ranks_per_branch;
-	uint64_t m;
-	uint64_t offset;
-	struct dimm_geometry *dgp;
-	struct rank_geometry *rgp;
-	struct rank_base *rp;
-	uint64_t pa;
-	uint64_t cal_pa;
-
-	/* max number of ranks per branch */
-	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
-	    NB_5100_RANKS_PER_CHANNEL :
-	    nb_dimms_per_channel * nb_channels_per_branch;
-	ASSERT(rank < num_ranks_per_branch);
-	rp = &rank_base[(branch * num_ranks_per_branch) + rank];
-	dgp = dimm_geometry[(branch * nb_dimms_per_channel) +
-	    nb_rank2dimm(branch, rank)];
-	if (dgp == NULL)
-		return (TCODE_OFFSET(rank, bank, ras, cas));
-	rgp = (struct rank_geometry *)&dgp->rank_geometry[0];
-	offset = 0;
-	pa = dimm_getphys(branch, rank, bank, ras, cas) & PAGEMASK;
-
-	for (i = 0, m = 1; bank; i++, m <<= 1) {
-		if ((bank & m) != 0 && rgp->bank[i] != 0xff) {
-			offset += 1 << rgp->bank[i];
-			bank &= ~m;
-		}
-	}
-	for (i = 0, m = 1; cas; i++, m <<= 1) {
-		if ((cas & m) != 0 && rgp->col[i] != 0xff) {
-			offset += 1 << rgp->col[i];
-			cas &= ~m;
-		}
-	}
-	for (i = 0, m = 1; ras; i++, m <<= 1) {
-		if ((ras & m) != 0 && rgp->row[i] != 0xff) {
-			offset += 1 << rgp->row[i];
-			ras &= ~m;
-		}
-	}
-	cal_pa = rp->base + (offset * rp->interleave);
-	if (rp->hole && cal_pa >= rp->hole)
-		cal_pa += rp->hole_size;
-	cal_pa &= PAGEMASK;
-
-	if (pa != cal_pa) {
-		return (-1LL);
-	}
-	return (offset & PAGEMASK);
-}
 
 static int
 fmri2unum(nvlist_t *nvl, mc_unum_t *unump)
@@ -195,8 +79,6 @@ fmri2unum(nvlist_t *nvl, mc_unum_t *unump)
 		else if (strcmp(hcnm, "rank") == 0)
 			unump->unum_rank = (int)v;
 	}
-
-	unump->unum_offset = offset;
 
 	return (1);
 }
@@ -245,14 +127,18 @@ inb_unumtopa(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 			return (CMI_SUCCESS);
 		unump = &unum;
 	}
-	if (unump->unum_offset & OFFSET_ROW_BANK_COL) {
-		pa = dimm_getphys(unump->unum_mc,
-		    TCODE_OFFSET_RANK(unump->unum_offset),
-		    TCODE_OFFSET_BANK(unump->unum_offset),
-		    TCODE_OFFSET_RAS(unump->unum_offset),
-		    TCODE_OFFSET_CAS(unump->unum_offset));
-		if (pa == -1LL)
+	if ((unump->unum_offset & OFFSET_ROW_BANK_COL)) {
+		if (&dimm_getphys) {
+			pa = dimm_getphys(unump->unum_mc,
+			    TCODE_OFFSET_RANK(unump->unum_offset),
+			    TCODE_OFFSET_BANK(unump->unum_offset),
+			    TCODE_OFFSET_RAS(unump->unum_offset),
+			    TCODE_OFFSET_CAS(unump->unum_offset));
+			if (pa >= MAXPHYS_ADDR)
+				return (CMIERR_MC_NOADDR);
+		} else {
 			return (CMIERR_MC_NOADDR);
+		}
 		*pap = pa;
 		return (CMI_SUCCESS);
 	}
@@ -277,8 +163,6 @@ dimm_init()
 {
 	int num_ranks_per_branch;
 
-	dimm_geometry = kmem_zalloc(sizeof (void *) *
-	    nb_number_memory_controllers * nb_dimms_per_channel, KM_SLEEP);
 
 	/* max number of ranks per branch */
 	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
@@ -294,9 +178,6 @@ dimm_fini()
 {
 	int num_ranks_per_branch;
 
-	kmem_free(dimm_geometry, sizeof (void *) *
-	    nb_number_memory_controllers * nb_dimms_per_channel);
-	dimm_geometry = 0;
 
 	/* max number of ranks per branch */
 	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
@@ -309,48 +190,18 @@ dimm_fini()
 }
 
 void
-dimm_add_geometry(int branch, int dimm, int nbanks, int width, int ncolumn,
-    int nrow)
-{
-	int i;
-	for (i = 0; i < dimm_types; i++) {
-		if (dimm_data[i].row_nbits == nrow &&
-		    dimm_data[i].col_nbits == ncolumn &&
-		    dimm_data[i].width == width &&
-		    (1 << dimm_data[i].bank_nbits) == nbanks) {
-			dimm_geometry[(branch * nb_dimms_per_channel) + dimm] =
-			    &dimm_data[i];
-			break;
-		}
-	}
-}
-
-void
 dimm_add_rank(int branch, int rank, int branch_interleave, int way,
     uint64_t base, uint32_t hole, uint32_t hole_size, int interleave,
     uint64_t limit)
 {
-	struct dimm_geometry *dimm;
 	struct rank_base *rp;
-	int interleave_nbits;
 	int num_ranks_per_branch;
-
-	dimm = dimm_geometry[(branch * nb_dimms_per_channel) +
-	    nb_rank2dimm(branch, rank)];
 
 	/* max number of ranks per branch */
 	num_ranks_per_branch = (nb_chipset == INTEL_NB_5100) ?
 	    NB_5100_RANKS_PER_CHANNEL :
 	    nb_dimms_per_channel * nb_channels_per_branch;
 	rp = &rank_base[(branch * num_ranks_per_branch) + rank];
-	if (interleave == 1)
-		interleave_nbits = 0;
-	else if (interleave == 2)
-		interleave_nbits = 1;
-	else if (interleave == 4)
-		interleave_nbits = 2;
-	else
-		interleave_nbits = 3;
 	rp->branch_interleave = branch_interleave;
 	rp->way = way;
 	rp->base = base;
@@ -358,10 +209,6 @@ dimm_add_rank(int branch, int rank, int branch_interleave, int way,
 	rp->hole_size = hole_size;
 	rp->interleave = interleave;
 	rp->limit = limit;
-	if (dimm)
-		rp->rank_geometry = &dimm->rank_geometry[interleave_nbits];
-	else
-		rp->rank_geometry = 0;
 }
 
 static const cmi_mc_ops_t inb_mc_ops = {

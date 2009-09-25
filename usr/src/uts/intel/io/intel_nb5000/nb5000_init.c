@@ -809,9 +809,6 @@ nb_ddr2_dimms_init(find_dimm_label_t *label_function)
 			dimmpp[j] = nb_ddr2_dimm_init(i, j, start_rank);
 			if (dimmpp[j]) {
 				nb_ndimm ++;
-				dimm_add_geometry(i, j, dimmpp[j]->nbanks,
-				    dimmpp[j]->width, dimmpp[j]->ncolumn,
-				    dimmpp[j]->nrow);
 				if (label_function) {
 					label_function->label_function(
 					    (i * nb_dimms_per_channel) + j,
@@ -875,9 +872,6 @@ nb_fbd_dimms_init(find_dimm_label_t *label_function)
 			dimmpp[j] = nb_fbd_dimm_init(k, j, mtr);
 			if (dimmpp[j]) {
 				nb_ndimm ++;
-				dimm_add_geometry(i, j, dimmpp[j]->nbanks,
-				    dimmpp[j]->width, dimmpp[j]->ncolumn,
-				    dimmpp[j]->nrow);
 				if (label_function) {
 					label_function->label_function(
 					    (k * nb_dimms_per_channel) + j,

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,6 @@ struct rank_base {
 	int branch_interleave;
 	int way;
 	int interleave;
-	void *rank_geometry;
 };
 
 extern struct rank_base *rank_base;

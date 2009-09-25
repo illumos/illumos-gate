@@ -28,48 +28,25 @@
 #include <sys/time.h>
 #include <sys/fm/protocol.h>
 #include <sys/cpu_module_impl.h>
+#include <sys/mc_intel.h>
 #include "intel_nhm.h"
 #include "nhm_log.h"
-
-struct sad {
-	uint64_t limit;
-	uint32_t node_list;
-	char mode;
-	char enable;
-	char interleave;
-} sad[MAX_SAD_DRAM_RULE];
-
-struct tad {
-	uint64_t limit;
-	uint32_t pkg_list;
-	char mode;
-	char enable;
-	char interleave;
-} tad[MAX_CPU_NODES][MAX_TAD_DRAM_RULE];
-
-struct sag_ch {
-	int32_t offset;
-	char divby3;
-	char remove6;
-	char remove7;
-	char remove8;
-} sag_ch[MAX_CPU_NODES][CHANNELS_PER_MEMORY_CONTROLLER][MAX_TAD_DRAM_RULE];
-
-struct rir {
-	uint64_t limit;
-	struct rir_way {
-		int16_t offset;
-		uint8_t	rank;
-		uint64_t rlimit;
-	} way[MAX_RIR_WAY];
-	char interleave;
-} rir[MAX_CPU_NODES][CHANNELS_PER_MEMORY_CONTROLLER][MAX_TAD_DRAM_RULE];
+#include "mem_addr.h"
 
 char closed_page;
 char ecc_enabled;
+char divby3_enabled;
 char lockstep[2];
 char mirror_mode[2];
 char spare_channel[2];
+sad_t sad[MAX_SAD_DRAM_RULE];
+tad_t tad[MAX_CPU_NODES][MAX_TAD_DRAM_RULE];
+sag_ch_t sag_ch[MAX_CPU_NODES][CHANNELS_PER_MEMORY_CONTROLLER]
+	[MAX_TAD_DRAM_RULE];
+rir_t rir[MAX_CPU_NODES][CHANNELS_PER_MEMORY_CONTROLLER]
+	[MAX_TAD_DRAM_RULE];
+dod_t dod_reg[MAX_CPU_NODES][CHANNELS_PER_MEMORY_CONTROLLER]
+	[MAX_DIMMS_PER_CHANNEL];
 
 static int
 channel_in_interleave(int node, int channel, int rule, int *way_p,
@@ -185,7 +162,7 @@ channel_address(int node, int channel, int rule, uint64_t addr)
 	if (lockstep[node] || mirror_mode[node])
 		channel = 0;
 	caddr = (((addr >> 16) +
-	    (int64_t)sag_ch[node][channel][rule].offset) << 16) |
+	    (int64_t)sag_ch[node][channel][rule].soffset) << 16) |
 	    (addr & 0xffc0);
 	if (sag_ch[node][channel][rule].remove8) {
 		caddr = ((caddr >> 1) & ~0xff) | (caddr & 0xff);
@@ -205,8 +182,8 @@ channel_address(int node, int channel, int rule, uint64_t addr)
 }
 
 int
-address_to_channel(int node, uint64_t addr, int write, uint64_t *channel_addrp,
-    int *interleave_p)
+address_to_channel(int node, uint64_t addr, int write,
+    int *log_chan, uint64_t *channel_addrp, int *interleave_p)
 {
 	int i;
 	int channel = -1;
@@ -233,10 +210,14 @@ address_to_channel(int node, uint64_t addr, int write, uint64_t *channel_addrp,
 			default:
 				return (-1);
 			}
+			/* get logical channel number */
 			channel = TAD_INTERLEAVE(tad[node][i].pkg_list, way);
+			if (log_chan)
+				*log_chan = channel;
+
 			if (channel_addrp) {
-				*channel_addrp = channel_address(node, channel,
-				    i, addr);
+				*channel_addrp = channel_address(node,
+				    channel, i, addr);
 			}
 			if (interleave_p)
 				*interleave_p = tad[node][i].interleave;
@@ -257,7 +238,7 @@ address_to_channel(int node, uint64_t addr, int write, uint64_t *channel_addrp,
 		case 4:
 			channel = 2;
 			break;
-		case 3:			/* mirror PCH0 and PCH1 */
+		case 3:		/* mirror PCH0 and PCH1 */
 			if (!write) {
 				if (((addr >> 24) & 1) ^ ((addr >> 12) & 1) ^
 				    ((addr >> 6) & 1))
@@ -266,10 +247,10 @@ address_to_channel(int node, uint64_t addr, int write, uint64_t *channel_addrp,
 					channel = 0;
 			}
 			break;
-		case 5:			/* sparing PCH0 to PCH2 */
+		case 5:		/* sparing PCH0 to PCH2 */
 			channel = 0;
 			break;
-		case 6:			/* sparing PCH1 to PCH2 */
+		case 6:		/* sparing PCH1 to PCH2 */
 			channel = 1;
 			break;
 		}
@@ -287,20 +268,19 @@ channels_interleave(uint64_t addr)
 	node = address_to_node(addr, &sinterleave);
 	if (sinterleave == 1) {
 		channels = 0;
-		(void) address_to_channel(node, addr, 0, 0, &channels);
+		(void) address_to_channel(node, addr, 0, 0, 0, &channels);
 	} else {
 		channels = 0;
 		channels1 = 0;
-		(void) address_to_channel(0, addr, 0, 0, &channels);
-		(void) address_to_channel(1, addr, 0, 0, &channels1);
+		(void) address_to_channel(0, addr, 0, 0, 0, &channels);
+		(void) address_to_channel(1, addr, 0, 0, 0, &channels1);
 		channels += channels1;
 	}
 	return (channels);
 }
 
-
 int
-caddr_to_dimm(int node, int channel, uint64_t caddr, int *rank_p,
+channel_addr_to_dimm(int node, int channel, uint64_t caddr, int *rank_p,
     uint64_t *rank_addr_p)
 {
 	int i;
@@ -449,7 +429,7 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 	base = 0;
 	for (i = 0; i < MAX_TAD_DRAM_RULE && found == 0; i++) {
 		for (way = 0; way < MAX_RIR_WAY; way++) {
-			if (rir[node][channel][i].way[way].rank == rank) {
+			if (rir[node][channel][i].way[way].dimm_rank == rank) {
 				rlimit = rir[node][channel][i].way[way].rlimit;
 				if (rlimit && rank_addr >= rlimit)
 					continue;
@@ -457,7 +437,7 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 					caddr = (rank_addr & ~0x3f) *
 					    rir[node][channel][i].interleave -
 					    (int64_t)rir[node][channel][i].
-					    way[way].offset * VRANK_SZ;
+					    way[way].soffset * VRANK_SZ;
 					cbaddr = caddr;
 					caddr += way << 6;
 					caddr |= rank_addr & 0x3f;
@@ -465,7 +445,7 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 					caddr = (rank_addr & ~0xfff) *
 					    rir[node][channel][i].interleave -
 					    (int64_t)rir[node][channel][i].
-					    way[way].offset * VRANK_SZ;
+					    way[way].soffset * VRANK_SZ;
 					cbaddr = caddr;
 					caddr += way << 12;
 					caddr |= rank_addr & 0xfff;
@@ -519,9 +499,10 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 				addr = ((addr & ~0xff) << 1) | (addr & 0xff);
 				baddr = ((baddr & ~0xff) << 1) | (baddr & 0xc0);
 			}
-			addr -= (int64_t)sag_ch[node][lchannel][i].offset << 16;
+			addr -= (int64_t)sag_ch[node][lchannel][i].soffset <<
+			    16;
 			baddr -= (int64_t)
-			    sag_ch[node][lchannel][i].offset << 16;
+			    sag_ch[node][lchannel][i].soffset << 16;
 			if (addr < tad[node][i].limit) {
 				sinterleave = socket_interleave(addr,
 				    node, channel, i, &way);
@@ -620,7 +601,6 @@ dimm_to_addr(int node, int channel, int rank, uint64_t rank_addr,
 	}
 	return (addr);
 }
-
 /*ARGSUSED*/
 static cmi_errno_t
 nhm_patounum(void *arg, uint64_t pa, uint8_t valid_hi, uint8_t valid_lo,
@@ -630,25 +610,49 @@ nhm_patounum(void *arg, uint64_t pa, uint8_t valid_hi, uint8_t valid_lo,
 	int channel;
 	int dimm;
 	int rank;
+	int log_chan;
+	uint64_t bank, row, column;
 	uint64_t caddr, raddr;
 
 	node = address_to_node(pa, 0);
-	if (node == -1)
+	if (node == -1) {
 		return (CMIERR_UNKNOWN);
-	channel = address_to_channel(node, pa, syndtype, &caddr, 0);
-	if (channel == -1)
+	}
+	channel = address_to_channel(node, pa, syndtype, &log_chan, &caddr, 0);
+	if (channel == -1) {
 		return (CMIERR_UNKNOWN);
-	dimm = caddr_to_dimm(node, channel, caddr, &rank, &raddr);
-	if (dimm == -1)
+	}
+	/*
+	 * If driver was built with closed tree present then we will have Intel
+	 * proprietary functions caddr_to_dimm and rankaddr_to_dimm for finding
+	 * dimm/bank/row/column address otherwise we just locate dimm and
+	 * offset.
+	 */
+	if (&caddr_to_dimm)
+		dimm = caddr_to_dimm(node, log_chan, caddr, &rank, &raddr);
+	else
+		dimm = channel_addr_to_dimm(node, log_chan, caddr, &rank,
+		    &raddr);
+	if (dimm == -1) {
 		return (CMIERR_UNKNOWN);
 
+	}
 	unump->unum_board = 0;
 	unump->unum_chip = node;
 	unump->unum_mc = 0;
 	unump->unum_chan = channel;
 	unump->unum_cs = dimm;
 	unump->unum_rank = rank;
-	unump->unum_offset = raddr;
+
+	if (&rankaddr_to_dimm) {
+		if (rankaddr_to_dimm(raddr, node, channel, dimm, 0, &bank, &row,
+		    &column) != DDI_SUCCESS) {
+			return (CMIERR_UNKNOWN);
+		};
+		unump->unum_offset = TCODE_OFFSET(rank, bank, row, column);
+	} else {
+		unump->unum_offset = raddr;
+	}
 
 	return (CMI_SUCCESS);
 }
@@ -661,22 +665,26 @@ nhm_unumtopa(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 	cmi_errno_t rt;
 	int node;
 	int channel;
+	int log_chan;
 	int rank;
 	int i;
 	nvlist_t **hcl, *hcsp;
 	uint_t npr;
-	uint64_t rank_addr;
+	uint64_t offset;
 	char *hcnm, *hcid;
 	long v;
+	uint64_t row, bank, col;
+	int dimm;
+	uint64_t rank_addr;
 
 	if (unump == NULL) {
 		if (nvlist_lookup_nvlist(nvl, FM_FMRI_HC_SPECIFIC,
 		    &hcsp) != 0)
 			return (CMIERR_UNKNOWN);
 		if (nvlist_lookup_uint64(hcsp,
-		    "asru-" FM_FMRI_HC_SPECIFIC_OFFSET, &rank_addr) != 0 &&
+		    "asru-" FM_FMRI_HC_SPECIFIC_OFFSET, &offset) != 0 &&
 		    nvlist_lookup_uint64(hcsp, FM_FMRI_HC_SPECIFIC_OFFSET,
-		    &rank_addr) != 0) {
+		    &offset) != 0) {
 			if (nvlist_lookup_uint64(hcsp,
 			    "asru-" FM_FMRI_HC_SPECIFIC_PHYSADDR, &pa) == 0 ||
 			    nvlist_lookup_uint64(hcsp,
@@ -691,6 +699,7 @@ nhm_unumtopa(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 			return (CMIERR_UNKNOWN);
 		node = -1;
 		channel = -1;
+		dimm = -1;
 		rank = -1;
 		for (i = 0; i < npr; i++) {
 			if (nvlist_lookup_string(hcl[i], FM_FMRI_HC_NAME,
@@ -703,19 +712,41 @@ nhm_unumtopa(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 				node = (int)v;
 			else if (strcmp(hcnm, "dram-channel") == 0)
 				channel = (int)v;
+			else if (strcmp(hcnm, "dimm") == 0)
+				dimm = (int)v;
 			else if (strcmp(hcnm, "rank") == 0)
 				rank = (int)v;
 		}
-		if (node == -1 || channel == -1 || rank == -1)
+		if (node == -1 || channel == -1 || dimm == -1 || rank == -1)
 			return (CMIERR_UNKNOWN);
 	} else {
 		node = unump->unum_chip;
 		channel = unump->unum_chan;
 		rank = unump->unum_rank;
-		rank_addr = unump->unum_offset;
+		dimm = unump->unum_cs;
+		offset = unump->unum_offset;
 	}
-	pa = dimm_to_addr(node, channel, rank, rank_addr, 0, 0, 0, 0, 0, 0, 0,
-	    0);
+
+	/*
+	 * If driver was built with closed tree present then we will have Intel
+	 * proprietary functions dimm_to_rankaddr for finding
+	 * physical address.
+	 */
+	if (&dimm_to_rankaddr && (offset & OFFSET_ROW_BANK_COL) != 0) {
+		row = TCODE_OFFSET_RAS(offset);
+		bank = TCODE_OFFSET_BANK(offset);
+		col = TCODE_OFFSET_CAS(offset);
+		rank_addr = dimm_to_rankaddr(node, channel, dimm, row,
+		    bank, col, &log_chan);
+		pa = rankaddr_to_phyaddr(node, log_chan, dimm, rank,
+		    rank_addr);
+	} else if ((offset & OFFSET_ROW_BANK_COL) == 0) {
+		pa = dimm_to_addr(node, channel, rank, offset, 0, 0, 0, 0, 0,
+		    0, 0, 0);
+	} else {
+		pa = -1LL;
+	}
+
 	if (pa == -1) {
 		rt = CMIERR_UNKNOWN;
 	} else {
@@ -810,7 +841,7 @@ set_rank(int socket, int channel, int rule, int way, int rank,
 		return;
 	for (k = 0; k <= rule; k++) {
 		for (l = 0; l < way; l++) {
-			if (rir[socket][channel][k].way[l].rank == rank &&
+			if (rir[socket][channel][k].way[l].dimm_rank == rank &&
 			    rir[socket][channel][k].way[l].rlimit == 0) {
 				rir[socket][channel][k].way[l].rlimit =
 				    rank_addr;
@@ -837,6 +868,7 @@ mem_reg_init()
 	uint8_t	rank;
 	uint64_t base;
 	int ras_dev = 0;
+	uint32_t dod_value;
 
 	nhm_slot = choose_cpu(&nhm_lastslot);
 
@@ -847,6 +879,10 @@ mem_reg_init()
 		sad[i].mode = SAD_DRAM_MODE(sad_dram_rule);
 		sad[i].node_list = SAD_INTERLEAVE_LIST_RD(nhm_slot, i);
 		sad[i].interleave = sad_interleave(sad[i].node_list);
+		for (j = 0; j < INTERLEAVE_NWAY; j++) {
+			sad[i].node_tgt[j] = (sad[i].node_list >>
+			    (j * 4)) & 0x3;
+		}
 	}
 
 	for (i = nhm_slot; i < nhm_lastslot; i++) {
@@ -871,6 +907,10 @@ mem_reg_init()
 			tad[i][j].mode = TAD_DRAM_MODE(tad_dram_rule);
 			tad[i][j].pkg_list =
 			    TAD_INTERLEAVE_LIST_RD(i, j);
+			for (k = 0; k < INTERLEAVE_NWAY; k++) {
+				tad[i][j].pkg_tgt[k] = ((tad[i][j].pkg_list >>
+				    (k * 4)) & 0x3);
+			}
 			if (mirror_mode[i] || lockstep[i]) {
 				tad[i][j].interleave = 1;
 			} else {
@@ -889,6 +929,8 @@ mem_reg_init()
 				sagch = MC_SAG_RD(i, j, k);
 				sag_ch[i][j][k].offset =
 				    CH_ADDRESS_OFFSET(sagch);
+				sag_ch[i][j][k].soffset =
+				    CH_ADDRESS_SOFFSET(sagch);
 				sag_ch[i][j][k].divby3 = DIVBY3(sagch);
 				sag_ch[i][j][k].remove6 = REMOVE_6(sagch);
 				sag_ch[i][j][k].remove7 = REMOVE_7(sagch);
@@ -900,31 +942,49 @@ mem_reg_init()
 					rir_way = MC_RIR_WAY_RD(i, j, m);
 					rir[i][j][k].way[l].offset =
 					    RIR_OFFSET(rir_way);
+					rir[i][j][k].way[l].soffset =
+					    RIR_SOFFSET(rir_way);
 					rir[i][j][k].way[l].rank =
 					    RIR_RANK(rir_way);
+					rir[i][j][k].way[l].dimm =
+					    RIR_DIMM(rir_way);
+					rir[i][j][k].way[l].dimm_rank =
+					    RIR_DIMM_RANK(rir_way);
 					rir[i][j][k].way[l].rlimit = 0;
 					m++;
 				}
-				rank = rir[i][j][k].way[0].rank;
-				if (rank == rir[i][j][k].way[1].rank &&
-				    rank == rir[i][j][k].way[2].rank &&
-				    rank == rir[i][j][k].way[3].rank) {
+				rank = rir[i][j][k].way[0].dimm_rank;
+				if (rank == rir[i][j][k].way[1].dimm_rank &&
+				    rank == rir[i][j][k].way[2].dimm_rank &&
+				    rank == rir[i][j][k].way[3].dimm_rank) {
 					rir[i][j][k].interleave = 1;
-				} else if (rank == rir[i][j][k].way[1].rank ||
-				    rank == rir[i][j][k].way[2].rank ||
-				    rank == rir[i][j][k].way[3].rank) {
+				} else if
+				    (rank == rir[i][j][k].way[1].dimm_rank ||
+				    rank == rir[i][j][k].way[2].dimm_rank ||
+				    rank == rir[i][j][k].way[3].dimm_rank) {
 					rir[i][j][k].interleave = 2;
 				} else {
 					rir[i][j][k].interleave = 4;
 				}
 				for (l = 0; l < MAX_RIR_WAY; l++) {
 					set_rank(i, j, k, l,
-					    rir[i][j][k].way[l].rank,
-					    ((rir[i][j][k].way[l].offset +
+					    rir[i][j][k].way[l].dimm_rank,
+					    ((rir[i][j][k].way[l].soffset +
 					    base) /
 					    rir[i][j][k].interleave));
 				}
 				base = rir[i][j][k].limit;
+			}
+			for (k = 0; k < MAX_DIMMS_PER_CHANNEL; k++) {
+				dod_value = MC_DOD_RD(i, j, k);
+				dod_reg[i][j][k].NUMCol = NUMCOL(dod_value);
+				dod_reg[i][j][k].NUMRow = NUMROW(dod_value);
+				dod_reg[i][j][k].NUMBank = NUMBANK(dod_value);
+				dod_reg[i][j][k].NUMRank = NUMRANK(dod_value);
+				dod_reg[i][j][k].DIMMPresent =
+				    DIMMPRESENT(dod_value);
+				dod_reg[i][j][k].RankOffset =
+				    RANKOFFSET(dod_value);
 			}
 		}
 	}
@@ -934,4 +994,5 @@ mem_reg_init()
 		ecc_enabled = MC_CONTROL_ECCEN(mc_control);
 	else if ((MC_STATUS_RD(nhm_slot) & WS_ECC_ENABLED) != 0)
 		ecc_enabled = 1;
+	divby3_enabled = MC_CONTROL_DIVBY3(mc_control);
 }

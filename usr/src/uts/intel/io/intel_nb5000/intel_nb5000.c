@@ -132,10 +132,30 @@ fat_memory_error(const nb_regs_t *rp, void *data)
 		sp->bank = (nrecmema >> 12) & BANK_MASK;
 		sp->cas = (nrecmemb >> 16) & CAS_MASK;
 		sp->ras = nrecmemb & RAS_MASK;
-		sp->pa = dimm_getphys(sp->branch, sp->rank, sp->bank, sp->ras,
-		    sp->cas);
-		sp->offset = dimm_getoffset(sp->branch, sp->rank, sp->bank,
-		    sp->ras, sp->cas);
+		/*
+		 * If driver was built with closed tree present then we will
+		 * have Intel proprietary code for finding physaddr
+		 */
+		if (&dimm_getphys) {
+			sp->pa = dimm_getphys((uint16_t)sp->branch,
+			    (uint16_t)sp->rank, (uint64_t)sp->bank,
+			    (uint64_t)sp->ras, (uint64_t)sp->cas);
+			if (sp->pa >= MAXPHYS_ADDR)
+				sp->pa = -1ULL;
+		} else {
+			sp->pa = -1ULL;
+		}
+		/*
+		 * If there is an offset decoder use it otherwise encode
+		 * rank/bank/ras/cas
+		 */
+		if (&dimm_getoffset) {
+			sp->offset = dimm_getoffset(sp->branch, sp->rank,
+			    sp->bank, sp->ras, sp->cas);
+		} else {
+			sp->offset = TCODE_OFFSET(sp->rank, sp->bank, sp->ras,
+			    sp->cas);
+		}
 	} else {
 		if ((ferr_fat_fbd & ERR_FAT_FBD_M3) != 0)
 			intr = "nb.fbd.otf";	/* thermal temp > Tmid M3 */
@@ -300,10 +320,26 @@ nf_memory_error(const nb_regs_t *rp, void *data)
 		}
 	}
 	if (sp->ras != -1) {
-		sp->pa = dimm_getphys(sp->branch, sp->rank, sp->bank, sp->ras,
-		    sp->cas);
-		sp->offset = dimm_getoffset(sp->branch, sp->rank, sp->bank,
-		    sp->ras, sp->cas);
+		/*
+		 * If driver was built with closed tree present then we will
+		 * have Intel proprietary code for finding physaddr
+		 */
+		if (&dimm_getphys) {
+			sp->pa = dimm_getphys((uint16_t)sp->branch,
+			    (uint16_t)sp->rank, (uint64_t)sp->bank,
+			    (uint64_t)sp->ras, (uint64_t)sp->cas);
+			if (sp->pa >= MAXPHYS_ADDR)
+				sp->pa = -1ULL;
+		} else {
+			sp->pa = -1ULL;
+		}
+		if (&dimm_getoffset) {
+			sp->offset = dimm_getoffset(sp->branch, sp->rank,
+			    sp->bank, sp->ras, sp->cas);
+		} else {
+			sp->offset = TCODE_OFFSET(sp->rank, sp->bank, sp->ras,
+			    sp->cas);
+		}
 	}
 	return (intr);
 }
@@ -450,10 +486,26 @@ nf_mem_error(const nb_regs_t *rp, void *data)
 		}
 	}
 	if (sp->ras != -1) {
-		sp->pa = dimm_getphys(sp->branch, sp->rank, sp->bank, sp->ras,
-		    sp->cas);
-		sp->offset = dimm_getoffset(sp->branch, sp->rank, sp->bank,
-		    sp->ras, sp->cas);
+		/*
+		 * If driver was built with closed tree present then we will
+		 * have Intel proprietary code for finding physaddr
+		 */
+		if (&dimm_getphys) {
+			sp->pa = dimm_getphys((uint16_t)sp->branch,
+			    (uint16_t)sp->rank, (uint64_t)sp->bank,
+			    (uint64_t)sp->ras, (uint64_t)sp->cas);
+			if (sp->pa >= MAXPHYS_ADDR)
+				sp->pa = -1ULL;
+		} else {
+			sp->pa = -1ULL;
+		}
+		if (&dimm_getoffset) {
+			sp->offset = dimm_getoffset(sp->branch, sp->rank,
+			    sp->bank, sp->ras, sp->cas);
+		} else {
+			sp->offset = TCODE_OFFSET(sp->rank, sp->bank, sp->ras,
+			    sp->cas);
+		}
 	}
 	return (intr);
 }

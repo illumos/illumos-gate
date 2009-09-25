@@ -537,17 +537,20 @@ prop fault.cpu.intel.quickpath.mem_parity@motherboard/chip/memory-controller (1)
 
 event ereport.cpu.intel.quickpath.mem_addr_parity@motherboard/chip/memory-controller {within(1s)};
 event fault.cpu.intel.quickpath.mem_addr_parity@
-    motherboard/chip/memory-controller/dram-channel/dimm;
-event fault.cpu.intel.quickpath.mem_addr_parity@
     motherboard/chip/memory-controller;
+event fault.cpu.intel.quickpath.mem_addr_parity@CHIPDIMM;
+event fault.cpu.intel.quickpath.mem_addr_parity@CHIPDIMM/rank;
 
 prop fault.cpu.intel.quickpath.mem_addr_parity@
     motherboard/chip/memory-controller (1)->
     ereport.cpu.intel.quickpath.mem_addr_parity@motherboard/chip/memory-controller;
 
-prop fault.cpu.intel.quickpath.mem_addr_parity@
-    motherboard/chip/memory-controller/dram-channel/dimm
-    { payloadprop_contains("resource", asru(motherboard/chip/memory-controller/dram-channel/dimm)) } (1)->
+prop fault.cpu.intel.quickpath.mem_addr_parity@CHIPDIMM
+    { payloadprop_contains("resource", asru(CHIPDIMM)) } (1)->
+    ereport.cpu.intel.quickpath.mem_addr_parity@motherboard/chip/memory-controller;
+
+prop fault.cpu.intel.quickpath.mem_addr_parity@CHIPDIMM/rank
+    { payloadprop_contains("resource", asru(CHIPDIMM/rank)) } (1)->
     ereport.cpu.intel.quickpath.mem_addr_parity@motherboard/chip/memory-controller;
 
 event ereport.cpu.intel.quickpath.mem_bad_addr@motherboard/chip/memory-controller {within(1s)};
@@ -571,18 +574,17 @@ prop fault.cpu.intel.quickpath.mem_bad_id@motherboard/chip/memory-controller (1)
     ereport.cpu.intel.quickpath.mem_bad_id@motherboard/chip/memory-controller;
 
 event ereport.cpu.intel.quickpath.mem_redundant@motherboard/chip/memory-controller {within(1s)};
-engine serd.cpu.intel.quickpath.mem_redundant@
-    motherboard/chip/memory-controller/dram-channel/dimm,
-    N=2, T=72h;
-event fault.cpu.intel.quickpath.mem_redundant@
-    motherboard/chip/memory-controller/dram-channel/dimm,
-    engine=serd.cpu.intel.quickpath.mem_redundant@
-    motherboard/chip/memory-controller/dram-channel/dimm;
+engine serd.cpu.intel.quickpath.mem_redundant@CHIPDIMM, N=2, T=72h;
+event fault.cpu.intel.quickpath.mem_redundant@CHIPDIMM,
+    engine=serd.cpu.intel.quickpath.mem_redundant@CHIPDIMM;
 
-prop fault.cpu.intel.quickpath.mem_redundant@
-    motherboard/chip/memory-controller/dram-channel/dimm
-    { payloadprop_contains("resource",
-    asru(motherboard/chip/memory-controller/dram-channel/dimm)) } (1)->
+event error.cpu.intel.quickpath.mem_redundant@CHIPDIMM/rank;
+
+prop fault.cpu.intel.quickpath.mem_redundant@CHIPDIMM (1)->
+    error.cpu.intel.quickpath.mem_redundant@CHIPDIMM/rank
+    { is_under(CHIPDIMM, CHIPDIMM/rank) };
+prop error.cpu.intel.quickpath.mem_redundant@CHIPDIMM/rank
+    { CONTAINS_RANK } (1)->
     ereport.cpu.intel.quickpath.mem_redundant@
     motherboard/chip/memory-controller;
 

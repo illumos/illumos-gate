@@ -382,6 +382,21 @@ gintel_ereport_add_logout(cmi_hdl_t hdl, nvlist_t *ereport,
 			fm_payload_set(ereport, FM_FMRI_MEM_PHYSADDR,
 			    DATA_TYPE_UINT64, addr, NULL);
 			(void) cmi_mc_patounum(addr, 0, 0, synd, 0, &unum);
+			if (unum.unum_offset != -1ULL &&
+			    (unum.unum_offset & OFFSET_ROW_BANK_COL) != 0) {
+				fm_payload_set(ereport,
+				    FM_EREPORT_PAYLOAD_NAME_BANK,
+				    DATA_TYPE_INT32,
+				    TCODE_OFFSET_BANK(unum.unum_offset), NULL);
+				fm_payload_set(ereport,
+				    FM_EREPORT_PAYLOAD_NAME_CAS,
+				    DATA_TYPE_INT32,
+				    TCODE_OFFSET_CAS(unum.unum_offset), NULL);
+				fm_payload_set(ereport,
+				    FM_EREPORT_PAYLOAD_NAME_RAS,
+				    DATA_TYPE_INT32,
+				    TCODE_OFFSET_RAS(unum.unum_offset), NULL);
+			}
 		}
 		resource = gintel_ereport_create_resource_elem(nva, &unum);
 		fm_payload_set(ereport, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
