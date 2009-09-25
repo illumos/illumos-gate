@@ -381,9 +381,24 @@ SUPPORTED_TYPES_OUT:
 			if (hdlp->ih_type == DDI_INTR_TYPE_MSIX) {
 				if (!(msix_p = i_ddi_get_msix(hdlp->ih_dip))) {
 					msix_p = pci_msix_init(hdlp->ih_dip);
-					if (msix_p)
+					if (msix_p) {
 						i_ddi_set_msix(hdlp->ih_dip,
 						    msix_p);
+					} else {
+						DDI_INTR_NEXDBG((CE_CONT,
+						    "pci_common_intr_ops: MSI-X"
+						    "table initilization failed"
+						    ", rdip 0x%p inum 0x%x\n",
+						    (void *)rdip,
+						    hdlp->ih_inum));
+
+						(void) (*psm_intr_ops)(rdip,
+						    hdlp,
+						    PSM_INTR_OP_FREE_VECTORS,
+						    NULL);
+
+						return (DDI_FAILURE);
+					}
 				}
 			}
 

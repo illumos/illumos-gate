@@ -152,6 +152,8 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 		uintptr_t	off;
 		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(dip);
 
+		ASSERT(msix_p != NULL);
+
 		/* Offset into the "inum"th entry in the MSI-X table */
 		off = (uintptr_t)msix_p->msix_tbl_addr +
 		    (inum  * PCI_MSIX_VECTOR_SIZE);
@@ -516,6 +518,8 @@ apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 		uint32_t	mask;
 		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
 
+		ASSERT(msix_p != NULL);
+
 		/* Offset into "inum"th entry in the MSI-X table & mask it */
 		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
 		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
@@ -563,6 +567,8 @@ apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 		ddi_intr_msix_t	*msix_p;
 
 		msix_p = i_ddi_get_msix(rdip);
+
+		ASSERT(msix_p != NULL);
 
 		/* Offset into "inum"th entry in the MSI-X table & clear mask */
 		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
