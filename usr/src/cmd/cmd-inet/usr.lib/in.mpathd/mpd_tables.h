@@ -426,11 +426,13 @@ extern struct phyint_group *phyint_group_lookup(const char *pg_name);
 extern void phyint_group_insert(struct phyint_group *pg);
 extern void phyint_group_delete(struct phyint_group *pg);
 extern void phyint_group_refresh_state(struct phyint_group *pg);
+extern void phyint_standby_refresh_inactive(struct phyint *pi);
 extern void phyint_check_for_repair(struct phyint *pi);
 extern void phyint_transition_to_running(struct phyint *pi);
 extern void phyint_activate_another(struct phyint *pi);
 extern int phyint_offline(struct phyint *pi, unsigned int);
 extern int phyint_undo_offline(struct phyint *pi);
+extern boolean_t phyint_is_functioning(struct phyint *pi);
 
 extern void logint_init_from_k(struct phyint_instance *pii, char *li_name);
 extern void logint_delete(struct logint *li);

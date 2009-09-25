@@ -409,19 +409,6 @@ phyint_create(char *pi_name, struct phyint_group *pg, uint_t ifindex,
 	 */
 	phyint_insert(pi, pg);
 
-	/*
-	 * If the interface is offline, we set the state to PI_OFFLINE.
-	 * Otherwise, optimistically consider this interface running.  Later
-	 * (in process_link_state_changes()), we will adjust this to match the
-	 * current state of the link.  Further, if test addresses are
-	 * subsequently assigned, we will transition to PI_NOTARGETS and then
-	 * to either PI_RUNNING or PI_FAILED depending on the probe results.
-	 */
-	if (flags & IFF_OFFLINE)
-		phyint_chstate(pi, PI_OFFLINE);
-	else
-		phyint_transition_to_running(pi); /* calls phyint_chstate() */
-
 	return (pi);
 }
 
@@ -774,12 +761,38 @@ retry:
 		return (NULL);
 	}
 
+	/*
+	 * NOTE: the change_pif_flags() implementation requires a phyint
+	 * instance before it can function, so a number of tasks that would
+	 * otherwise be done in phyint_create() are deferred to here.
+	 */
 	if (pi_created) {
 		/*
+		 * If the interface is offline, set the state to PI_OFFLINE.
+		 * Otherwise, optimistically consider this interface running.
+		 * Later (in process_link_state_changes()), we will adjust
+		 * this to match the current state of the link.  Further, if
+		 * test addresses are subsequently assigned, we will
+		 * transition to PI_NOTARGETS and then to either PI_RUNNING or
+		 * PI_FAILED depending on the probe results.
+		 */
+		if (pi->pi_flags & IFF_OFFLINE) {
+			phyint_chstate(pi, PI_OFFLINE);
+		} else {
+			/* calls phyint_chstate() */
+			phyint_transition_to_running(pi);
+		}
+
+		/*
+		 * If this a standby phyint, determine whether it should be
+		 * IFF_INACTIVE.
+		 */
+		if (pi->pi_flags & IFF_STANDBY)
+			phyint_standby_refresh_inactive(pi);
+
+		/*
 		 * If this phyint does not have a unique hardware address in its
-		 * group, offline it.  (The change_pif_flags() implementation
-		 * requires that we defer this until after the phyint_instance
-		 * is created.)
+		 * group, offline it.
 		 */
 		if (phyint_lookup_hwaddr(pi, _B_TRUE) != NULL) {
 			pi->pi_hwaddrdup = _B_TRUE;
@@ -1313,6 +1326,7 @@ phyint_inst_update_from_k(struct phyint_instance *pii)
 static void
 phyint_delete(struct phyint *pi)
 {
+	boolean_t active;
 	struct phyint *pi2;
 	struct phyint_group *pg = pi->pi_group;
 
@@ -1369,6 +1383,27 @@ phyint_delete(struct phyint *pi)
 		assert(pi2->pi_hwaddrdup);
 		(void) phyint_undo_offline(pi2);
 	}
+
+	/*
+	 * If the interface was in a named group and was either an active
+	 * standby or the last active interface, try to activate another
+	 * interface to compensate.
+	 */
+	if (pg != phyint_anongroup) {
+		active = _B_FALSE;
+		for (pi2 = pg->pg_phyint; pi2 != NULL; pi2 = pi2->pi_pgnext) {
+			if (phyint_is_functioning(pi2) &&
+			    !(pi2->pi_flags & IFF_INACTIVE)) {
+				active = _B_TRUE;
+				break;
+			}
+		}
+
+		if (!active ||
+		    (pi->pi_flags & (IFF_STANDBY|IFF_INACTIVE)) == IFF_STANDBY)
+			phyint_activate_another(pi);
+	}
+
 	phyint_link_close(pi);
 	free(pi);
 }
@@ -2525,7 +2560,6 @@ reset_pii_probes(struct phyint_instance *pii, struct target *tg)
 			pii->pii_probes[i].pr_target = NULL;
 		}
 	}
-
 }
 
 /*
@@ -2642,7 +2676,7 @@ phyint_inst_other(struct phyint_instance *pii)
 /*
  * Check whether a phyint is functioning.
  */
-static boolean_t
+boolean_t
 phyint_is_functioning(struct phyint *pi)
 {
 	if (pi->pi_state == PI_RUNNING)
@@ -2653,7 +2687,7 @@ phyint_is_functioning(struct phyint *pi)
 /*
  * Check whether a phyint is usable.
  */
-static boolean_t
+boolean_t
 phyint_is_usable(struct phyint *pi)
 {
 	if (logint_upcount(pi) == 0)

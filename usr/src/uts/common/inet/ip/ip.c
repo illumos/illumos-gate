@@ -5707,8 +5707,10 @@ ip_stack_shutdown(netstackid_t stackid, void *arg)
 	printf("ip_stack_shutdown(%p, stack %d)\n", (void *)ipst, stackid);
 #endif
 
-	/* Get rid of loopback interfaces and their IREs */
-	ip_loopback_cleanup(ipst);
+	/*
+	 * Perform cleanup for special interfaces (loopback and IPMP).
+	 */
+	ip_interface_cleanup(ipst);
 
 	/*
 	 * The *_hook_shutdown()s start the process of notifying any

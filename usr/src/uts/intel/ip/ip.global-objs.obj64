@@ -23,7 +23,6 @@
 # Use is subject to license terms.
 #
 
-IP_MAJ
 cb_inet_devops
 cl_inet_bind
 cl_inet_connect2

@@ -20042,108 +20042,205 @@ ill_replumb_tail(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy)
 	}
 }
 
-major_t IP_MAJ;
-#define	IP	"ip"
+/*
+ * Issue ioctl `cmd' on `lh'; caller provides the initial payload in `buf'
+ * which is `bufsize' bytes.  On success, zero is returned and `buf' updated
+ * as per the ioctl.  On failure, an errno is returned.
+ */
+static int
+ip_ioctl(ldi_handle_t lh, int cmd, void *buf, uint_t bufsize, cred_t *cr)
+{
+	int rval;
+	struct strioctl iocb;
 
-#define	UDP6DEV		"/devices/pseudo/udp6@0:udp6"
-#define	UDPDEV		"/devices/pseudo/udp@0:udp"
+	iocb.ic_cmd = cmd;
+	iocb.ic_timout = 15;
+	iocb.ic_len = bufsize;
+	iocb.ic_dp = buf;
+
+	return (ldi_ioctl(lh, I_STR, (intptr_t)&iocb, FKIOCTL, cr, &rval));
+}
 
 /*
- * Issue REMOVEIF ioctls to have the loopback interfaces
- * go away.  Other interfaces are either I_LINKed or I_PLINKed;
- * the former going away when the user-level processes in the zone
- * are killed  * and the latter are cleaned up by the stream head
- * str_stack_shutdown callback that undoes all I_PLINKs.
+ * Issue an SIOCGLIFCONF for address family `af' and store the result into a
+ * dynamically-allocated `lifcp' that will be `bufsizep' bytes on success.
  */
-void
-ip_loopback_cleanup(ip_stack_t *ipst)
+static int
+ip_lifconf_ioctl(ldi_handle_t lh, int af, struct lifconf *lifcp,
+    uint_t *bufsizep, cred_t *cr)
 {
-	int error;
-	ldi_handle_t	lh = NULL;
-	ldi_ident_t	li = NULL;
-	int		rval;
-	cred_t		*cr;
-	struct strioctl iocb;
-	struct lifreq	lifreq;
+	int err;
+	struct lifnum lifn;
 
-	IP_MAJ = ddi_name_to_major(IP);
+	bzero(&lifn, sizeof (lifn));
+	lifn.lifn_family = af;
+	lifn.lifn_flags = LIFC_UNDER_IPMP;
 
-#ifdef NS_DEBUG
-	(void) printf("ip_loopback_cleanup() stackid %d\n",
-	    ipst->ips_netstack->netstack_stackid);
-#endif
+	if ((err = ip_ioctl(lh, SIOCGLIFNUM, &lifn, sizeof (lifn), cr)) != 0)
+		return (err);
 
-	bzero(&lifreq, sizeof (lifreq));
-	(void) strcpy(lifreq.lifr_name, ipif_loopback_name);
+	/*
+	 * Pad the interface count to account for additional interfaces that
+	 * may have been configured between the SIOCGLIFNUM and SIOCGLIFCONF.
+	 */
+	lifn.lifn_count += 4;
+	bzero(lifcp, sizeof (*lifcp));
+	lifcp->lifc_flags = LIFC_UNDER_IPMP;
+	lifcp->lifc_family = af;
+	lifcp->lifc_len = *bufsizep = lifn.lifn_count * sizeof (struct lifreq);
+	lifcp->lifc_buf = kmem_zalloc(*bufsizep, KM_SLEEP);
 
-	error = ldi_ident_from_major(IP_MAJ, &li);
-	if (error) {
-#ifdef DEBUG
-		printf("ip_loopback_cleanup: lyr ident get failed error %d\n",
-		    error);
-#endif
+	err = ip_ioctl(lh, SIOCGLIFCONF, lifcp, sizeof (*lifcp), cr);
+	if (err != 0) {
+		kmem_free(lifcp->lifc_buf, *bufsizep);
+		return (err);
+	}
+
+	return (0);
+}
+
+/*
+ * Helper for ip_interface_cleanup() that removes the loopback interface.
+ */
+static void
+ip_loopback_removeif(ldi_handle_t lh, boolean_t isv6, cred_t *cr)
+{
+	int err;
+	struct lifreq lifr;
+
+	bzero(&lifr, sizeof (lifr));
+	(void) strcpy(lifr.lifr_name, ipif_loopback_name);
+
+	err = ip_ioctl(lh, SIOCLIFREMOVEIF, &lifr, sizeof (lifr), cr);
+	if (err != 0) {
+		ip0dbg(("ip_loopback_removeif: IP%s SIOCLIFREMOVEIF failed: "
+		    "error %d\n", isv6 ? "v6" : "v4", err));
+	}
+}
+
+/*
+ * Helper for ip_interface_cleanup() that ensures no IP interfaces are in IPMP
+ * groups and that IPMP data addresses are down.  These conditions must be met
+ * so that IPMP interfaces can be I_PUNLINK'd, as per ip_sioctl_plink_ipmp().
+ */
+static void
+ip_ipmp_cleanup(ldi_handle_t lh, boolean_t isv6, cred_t *cr)
+{
+	int af = isv6 ? AF_INET6 : AF_INET;
+	int i, nifs;
+	int err;
+	uint_t bufsize;
+	uint_t lifrsize = sizeof (struct lifreq);
+	struct lifconf lifc;
+	struct lifreq *lifrp;
+
+	if ((err = ip_lifconf_ioctl(lh, af, &lifc, &bufsize, cr)) != 0) {
+		cmn_err(CE_WARN, "ip_ipmp_cleanup: cannot get interface list "
+		    "(error %d); any IPMP interfaces cannot be shutdown", err);
 		return;
 	}
 
-	cr = zone_get_kcred(netstackid_to_zoneid(
-	    ipst->ips_netstack->netstack_stackid));
+	nifs = lifc.lifc_len / lifrsize;
+	for (lifrp = lifc.lifc_req, i = 0; i < nifs; i++, lifrp++) {
+		err = ip_ioctl(lh, SIOCGLIFFLAGS, lifrp, lifrsize, cr);
+		if (err != 0) {
+			cmn_err(CE_WARN, "ip_ipmp_cleanup: %s: cannot get "
+			    "flags: error %d", lifrp->lifr_name, err);
+			continue;
+		}
+
+		if (lifrp->lifr_flags & IFF_IPMP) {
+			if ((lifrp->lifr_flags & (IFF_UP|IFF_DUPLICATE)) == 0)
+				continue;
+
+			lifrp->lifr_flags &= ~IFF_UP;
+			err = ip_ioctl(lh, SIOCSLIFFLAGS, lifrp, lifrsize, cr);
+			if (err != 0) {
+				cmn_err(CE_WARN, "ip_ipmp_cleanup: %s: cannot "
+				    "bring down (error %d); IPMP interface may "
+				    "not be shutdown", lifrp->lifr_name, err);
+			}
+
+			/*
+			 * Check if IFF_DUPLICATE is still set -- and if so,
+			 * reset the address to clear it.
+			 */
+			err = ip_ioctl(lh, SIOCGLIFFLAGS, lifrp, lifrsize, cr);
+			if (err != 0 || !(lifrp->lifr_flags & IFF_DUPLICATE))
+				continue;
+
+			err = ip_ioctl(lh, SIOCGLIFADDR, lifrp, lifrsize, cr);
+			if (err != 0 || (err = ip_ioctl(lh, SIOCGLIFADDR,
+			    lifrp, lifrsize, cr)) != 0) {
+				cmn_err(CE_WARN, "ip_ipmp_cleanup: %s: cannot "
+				    "reset DAD (error %d); IPMP interface may "
+				    "not be shutdown", lifrp->lifr_name, err);
+			}
+			continue;
+		}
+
+		lifrp->lifr_groupname[0] = '\0';
+		err = ip_ioctl(lh, SIOCSLIFGROUPNAME, lifrp, lifrsize, cr);
+		if (err != 0) {
+			cmn_err(CE_WARN, "ip_ipmp_cleanup: %s: cannot leave "
+			    "IPMP group (error %d); associated IPMP interface "
+			    "may not be shutdown", lifrp->lifr_name, err);
+			continue;
+		}
+	}
+
+	kmem_free(lifc.lifc_buf, bufsize);
+}
+
+#define	UDPDEV		"/devices/pseudo/udp@0:udp"
+#define	UDP6DEV		"/devices/pseudo/udp6@0:udp6"
+
+/*
+ * Remove the loopback interfaces and prep the IPMP interfaces to be torn down.
+ * Non-loopback interfaces are either I_LINK'd or I_PLINK'd; the former go away
+ * when the user-level processes in the zone are killed and the latter are
+ * cleaned up by str_stack_shutdown().
+ */
+void
+ip_interface_cleanup(ip_stack_t *ipst)
+{
+	ldi_handle_t	lh;
+	ldi_ident_t	li;
+	cred_t		*cr;
+	int		err;
+	int		i;
+	char		*devs[] = { UDP6DEV, UDPDEV };
+	netstackid_t	stackid = ipst->ips_netstack->netstack_stackid;
+
+	if ((err = ldi_ident_from_major(ddi_name_to_major("ip"), &li)) != 0) {
+		cmn_err(CE_WARN, "ip_interface_cleanup: cannot get ldi ident:"
+		    " error %d", err);
+		return;
+	}
+
+	cr = zone_get_kcred(netstackid_to_zoneid(stackid));
 	ASSERT(cr != NULL);
-	error = ldi_open_by_name(UDP6DEV, FREAD|FWRITE, cr, &lh, li);
-	if (error) {
-#ifdef DEBUG
-		printf("ip_loopback_cleanup: open of UDP6DEV failed error %d\n",
-		    error);
-#endif
-		goto out;
-	}
-	iocb.ic_cmd = SIOCLIFREMOVEIF;
-	iocb.ic_timout = 15;
-	iocb.ic_len = sizeof (lifreq);
-	iocb.ic_dp = (char *)&lifreq;
 
-	error = ldi_ioctl(lh, I_STR, (intptr_t)&iocb, FKIOCTL, cr, &rval);
-	/* LINTED - statement has no consequent */
-	if (error) {
-#ifdef NS_DEBUG
-		printf("ip_loopback_cleanup: ioctl SIOCLIFREMOVEIF failed on "
-		    "UDP6 error %d\n", error);
-#endif
-	}
-	(void) ldi_close(lh, FREAD|FWRITE, cr);
-	lh = NULL;
+	/*
+	 * NOTE: loop executes exactly twice and is hardcoded to know that the
+	 * first iteration is IPv6.  (Unrolling yields repetitious code, hence
+	 * the loop.)
+	 */
+	for (i = 0; i < 2; i++) {
+		err = ldi_open_by_name(devs[i], FREAD|FWRITE, cr, &lh, li);
+		if (err != 0) {
+			cmn_err(CE_WARN, "ip_interface_cleanup: cannot open %s:"
+			    " error %d", devs[i], err);
+			continue;
+		}
 
-	error = ldi_open_by_name(UDPDEV, FREAD|FWRITE, cr, &lh, li);
-	if (error) {
-#ifdef NS_DEBUG
-		printf("ip_loopback_cleanup: open of UDPDEV failed error %d\n",
-		    error);
-#endif
-		goto out;
-	}
+		ip_loopback_removeif(lh, i == 0, cr);
+		ip_ipmp_cleanup(lh, i == 0, cr);
 
-	iocb.ic_cmd = SIOCLIFREMOVEIF;
-	iocb.ic_timout = 15;
-	iocb.ic_len = sizeof (lifreq);
-	iocb.ic_dp = (char *)&lifreq;
-
-	error = ldi_ioctl(lh, I_STR, (intptr_t)&iocb, FKIOCTL, cr, &rval);
-	/* LINTED - statement has no consequent */
-	if (error) {
-#ifdef NS_DEBUG
-		printf("ip_loopback_cleanup: ioctl SIOCLIFREMOVEIF failed on "
-		    "UDP error %d\n", error);
-#endif
-	}
-	(void) ldi_close(lh, FREAD|FWRITE, cr);
-	lh = NULL;
-
-out:
-	/* Close layered handles */
-	if (lh)
 		(void) ldi_close(lh, FREAD|FWRITE, cr);
-	if (li)
-		ldi_ident_release(li);
+	}
 
+	ldi_ident_release(li);
 	crfree(cr);
 }
 

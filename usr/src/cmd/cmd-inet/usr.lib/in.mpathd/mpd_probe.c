@@ -910,10 +910,10 @@ incoming_echo_reply(struct phyint_instance *pii, struct pr_icmp *reply,
 			pg->pg_fdt = pg->pg_probeint * (NUM_PROBE_FAILS + 2);
 			last_fdt_bumpup_time = gethrtime();
 			if (pg != phyint_anongroup) {
-				logerr("Cannot meet requested failure detection"
-				    " time of %d ms on (%s %s) new failure"
-				    " detection time for group \"%s\" is %d"
-				    " ms\n", user_failure_detection_time,
+				logtrace("Cannot meet requested failure"
+				    " detection time of %d ms on (%s %s) new"
+				    " failure detection time for group \"%s\""
+				    " is %d ms\n", user_failure_detection_time,
 				    AF_STR(pii->pii_af), pii->pii_name,
 				    pg->pg_name, pg->pg_fdt);
 			}
@@ -931,10 +931,10 @@ incoming_echo_reply(struct phyint_instance *pii, struct pr_icmp *reply,
 			    user_failure_detection_time);
 			pg->pg_probeint = pg->pg_fdt / (NUM_PROBE_FAILS + 2);
 			if (pg != phyint_anongroup) {
-				logerr("Improved failure detection time %d ms "
-				    "on (%s %s) for group \"%s\"\n", pg->pg_fdt,
-				    AF_STR(pii->pii_af), pii->pii_name,
-				    pg->pg_name);
+				logtrace("Improved failure detection time %d ms"
+				    " on (%s %s) for group \"%s\"\n",
+				    pg->pg_fdt, AF_STR(pii->pii_af),
+				    pii->pii_name, pg->pg_name);
 			}
 			if (user_failure_detection_time == pg->pg_fdt) {
 				/* Avoid any truncation or rounding errors */
@@ -1356,7 +1356,7 @@ phyint_activate_another(struct phyint *pi)
 		return;
 
 	for (pi2 = pi->pi_group->pg_phyint; pi2 != NULL; pi2 = pi2->pi_pgnext) {
-		if (pi == pi2 || pi2->pi_state != PI_RUNNING ||
+		if (pi == pi2 || !phyint_is_functioning(pi2) ||
 		    !(pi2->pi_flags & IFF_INACTIVE))
 			continue;
 
@@ -1412,12 +1412,11 @@ phyint_transition_to_running(struct phyint *pi)
 			if (!(pi2->pi_flags & IFF_STANDBY))
 				nnonstandby++;
 
-			if (pi2->pi_state == PI_RUNNING) {
-				if (!(pi2->pi_flags & IFF_INACTIVE)) {
-					nactive++;
-					if (pi2->pi_flags & IFF_STANDBY)
-						actstandbypi = pi2;
-				}
+			if (phyint_is_functioning(pi2) &&
+			    !(pi2->pi_flags & IFF_INACTIVE)) {
+				nactive++;
+				if (pi2->pi_flags & IFF_STANDBY)
+					actstandbypi = pi2;
 			}
 		}
 	}
@@ -1444,6 +1443,47 @@ phyint_transition_to_running(struct phyint *pi)
 	 * Update the group state to account for the change.
 	 */
 	phyint_group_refresh_state(pi->pi_group);
+}
+
+/*
+ * Adjust IFF_INACTIVE on the provided `pi' to trend the group configuration
+ * to have at least one active interface and as many active interfaces as
+ * non-standby interfaces.
+ */
+void
+phyint_standby_refresh_inactive(struct phyint *pi)
+{
+	struct phyint *pi2;
+	uint_t nactive = 0, nnonstandby = 0;
+
+	/*
+	 * All phyints in the anonymous group are effectively in their own
+	 * group and thus active regardless of whether they're marked standby.
+	 */
+	if (pi->pi_group == phyint_anongroup) {
+		(void) change_pif_flags(pi, 0, IFF_INACTIVE);
+		return;
+	}
+
+	/*
+	 * If the phyint isn't functioning we can't consider it.
+	 */
+	if (!phyint_is_functioning(pi))
+		return;
+
+	for (pi2 = pi->pi_group->pg_phyint; pi2 != NULL; pi2 = pi2->pi_pgnext) {
+		if (!(pi2->pi_flags & IFF_STANDBY))
+			nnonstandby++;
+
+		if (phyint_is_functioning(pi2) &&
+		    !(pi2->pi_flags & IFF_INACTIVE))
+			nactive++;
+	}
+
+	if (nactive == 0 || nactive < nnonstandby)
+		(void) change_pif_flags(pi, 0, IFF_INACTIVE);
+	else if (nactive > nnonstandby)
+		(void) change_pif_flags(pi, IFF_INACTIVE, 0);
 }
 
 /*

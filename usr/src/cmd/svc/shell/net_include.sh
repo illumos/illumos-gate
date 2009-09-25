@@ -141,41 +141,6 @@ in_list()
 }
 
 #
-# get_inactive_ifname groupname
-#
-# Return the name of an inactive interface in `groupname', if one exists.
-#
-get_inactive_ifname()
-{
-	ORIGIFS="$IFS"
-	/sbin/ipmpstat -gP -o groupname,interfaces |
-	while IFS=: read groupname ifnames; do
-		#
-		# Skip other IPMP groups.
-	        #
-		[ "$groupname" != "$1" ] && continue
-
-		#
-		# Standby interfaces are always enclosed in ()'s, so look
-		# for the first interface name starting with a "(", and
-		# strip those off.
-		#
-		IFS=" "
-		for ifname in $ifnames; do
-			case "$ifname" in
-			'('*)	IFS="()"
-				echo $ifname
-				IFS="$ORIGIFS"
-				return
-				;;
-			*)	;;
-			esac
-		done
-	done
-	IFS="$ORIGIFS"
-}
-
-#
 # get_groupifname groupname
 #
 # Return the IPMP meta-interface name for the group, if it exists.
@@ -304,37 +269,6 @@ get_group_for_type()
 }
 
 #
-# get_standby_for_type interface type list
-#
-# Look through the set of hostname files associated with the same physical
-# interface as "interface", and print the standby value ("standby",
-# "-standby", or nothing).  Only hostname files associated with the
-# physical interface or logical interface zero can set this flag.
-#
-get_standby_for_type()
-{
-	physical=`get_physical $1`
-	type=$2
-
-	#
-	# The last setting of "standby" or "-standby" is the one that
-	# counts, which is the reason for the second while loop.
-	#
-	shift 2
-	for ifname in "$@"; do
-		if if_comp "$physical" $ifname; then 
-			get_hostname_ipmpinfo $ifname $type standby -standby
-		fi
-	done | while :; do
-		read keyword || {
-		    	echo "$iftype"
-			break
-		}
-		iftype="$keyword"
-	done
-}
-
-#
 # get_group interface
 #
 # If there is both an inet and inet6 version of an interface, the group
@@ -346,21 +280,6 @@ get_group()
 	group=`get_group_for_type $1 inet6 $inet6_list`
 	[ -z "$group" ] && group=`get_group_for_type $1 inet $inet_list`
 	echo $group
-}
-
-#
-# is_standby interface
-#
-# If there is both an inet and inet6 version of an interface, the
-# "standby" or "-standby" flag could be set in either set of hostname
-# files.  Since inet6 is configured after inet, if there's a setting in
-# both files, inet6 wins.
-#
-is_standby()
-{
-	standby=`get_standby_for_type $1 inet6 $inet6_list`
-	[ -z "$standby" ] && standby=`get_standby_for_type $1 inet $inet_list`
-	[ "$standby" = "standby" ]
 }
 
 #
@@ -544,23 +463,21 @@ move_addresses()
 
 		#
 		# The hostname files are processed twice.  In the first
-		# pass, we are looking for all commands that apply
-		# to the non-additional interface address.  These may be
-		# scattered over several files.  We won't know
-		# whether the address represents a failover address
-		# or not until we've read all the files associated with the
-		# interface.
+		# pass, we are looking for all commands that apply to the
+		# non-additional interface address.  These may be
+		# scattered over several files.  We won't know whether the
+		# address represents a failover address or not until we've
+		# read all the files associated with the interface.
 		#
 		# In the first pass through the hostname files, all
-		# additional logical interface commands are removed.
-		# The remaining commands are concatenated together and
-		# passed to ifparse to determine whether the 
-		# non-additional logical interface address is a failover
-		# address.  If it as a failover address, the
-		# address may not be the first item on the line,
-		# so we can't just substitute "addif" for "set".
-		# We prepend an "addif $zaddr" command, and let
-		# the embedded "set" command set the address later.	
+		# additional logical interface commands are removed.  The
+		# remaining commands are concatenated together and passed
+		# to ifparse to determine whether the non-additional
+		# logical interface address is a failover address.  If it
+		# as a failover address, the address may not be the first
+		# item on the line, so we can't just substitute "addif"
+		# for "set".  We prepend an "addif $zaddr" command, and
+		# let the embedded "set" command set the address later.
 		#
 		/sbin/ifparse -f $type `
 			for item in $list; do
@@ -591,23 +508,10 @@ move_addresses()
 			done
 		fi
 
-		#
-		# Check if this was an active interface in the group.  If so,
-		# activate another IP interface (if possible)
-		#
-		is_standby $ifname || inactive=`get_inactive_ifname $group`
-		[ -n "$inactive" ] && /sbin/ifconfig $inactive $type -standby
-
 		in_list physical_comp $ifname $processed || { 
 			processed="$processed $ifname"
-			echo " $ifname (moved to $grifname\c"	   > /dev/msglog
-			if [ -n "$inactive" ]; then
-				echo " and cleared 'standby' on\c" > /dev/msglog
-				echo " $inactive to compensate\c"  > /dev/msglog
-			fi
-			echo ")\c"				   > /dev/msglog
+			echo " $ifname (moved to $grifname)\c" > /dev/msglog
 		}
-		inactive=""
 	done
 	echo "." >/dev/msglog
 }

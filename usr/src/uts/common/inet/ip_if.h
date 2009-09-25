@@ -214,7 +214,7 @@ extern	int	ill_up_ipifs(ill_t *, queue_t *, mblk_t *);
 extern uint_t	ill_appaddr_cnt(const ill_t *);
 extern uint_t	ill_ptpaddr_cnt(const ill_t *);
 
-extern	void	ip_loopback_cleanup(ip_stack_t *);
+extern	void	ip_interface_cleanup(ip_stack_t *);
 extern	void	ipif_get_name(const ipif_t *, char *, int);
 extern	ipif_t	*ipif_getby_indexes(uint_t, uint_t, boolean_t, ip_stack_t *);
 extern	void	ipif_init(ip_stack_t *);
