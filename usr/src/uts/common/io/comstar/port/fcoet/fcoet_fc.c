@@ -297,7 +297,7 @@ fcoet_xfer_scsi_data(fct_cmd_t *cmd, stmf_data_buf_t *dbuf, uint32_t ioflags)
 		if (idx != frm_num - 1) {
 			FFM_F_CTL(0x800008, frm);
 		} else {
-			FFM_F_CTL(0x880008, frm);
+			FFM_F_CTL(0x880008 | (data_size - left_size), frm);
 		}
 
 		FFM_OXID(cmd->cmd_oxid, frm);
