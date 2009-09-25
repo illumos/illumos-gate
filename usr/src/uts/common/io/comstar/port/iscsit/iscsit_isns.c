@@ -200,6 +200,14 @@ uint32_t	isns_message_buf_size = ISNSP_MAX_PDU_SIZE;
  */
 int	isns_initial_delay = ISNS_INITIAL_DELAY;
 
+/*
+ * Because of a bug in the isns server, we cannot send a modify
+ * operation that changes the target's TPGTs. So just replace all.
+ * If the iSNS server does not have this bug, clear this flag.
+ * Changes take effect on each modify_target operation
+ */
+boolean_t isns_modify_must_replace = B_TRUE;
+
 /* If PDU sizes ever go over the following, we need to rearchitect */
 #define	ISNST_MAX_MSG_SIZE (16 * ISNSP_MAX_PDU_SIZE)
 
@@ -326,7 +334,7 @@ isnst_add_default_pg(isns_pdu_t *pdu, size_t pdu_size,
 
 static int
 isnst_add_tpg_pg(isns_pdu_t *pdu, size_t pdu_size,
-    isns_target_info_t *ti, avl_tree_t *null_portal_list);
+    isns_tpgt_t *tig, avl_tree_t *null_portal_list);
 
 static int
 isnst_add_null_pg(isns_pdu_t *pdu, size_t pdu_size,
@@ -658,6 +666,9 @@ isnst_create_target_info(iscsit_tgt_t *target)
 	iscsit_portal_t		*tp;
 	char			*str;
 
+	/* Cannot hold the iscsit_isns_mutex here! */
+	ASSERT(! mutex_owned(&iscsit_isns_mutex));
+
 	ti = kmem_zalloc(sizeof (isns_target_info_t), KM_SLEEP);
 	list_create(&ti->ti_tpgt_list,
 	    sizeof (isns_tpgt_t), offsetof(isns_tpgt_t, ti_tpgt_ln));
@@ -738,6 +749,10 @@ iscsit_isns_register(iscsit_tgt_t *target)
 {
 	isns_target_t		*itarget, tmptgt;
 	avl_index_t		where;
+	isns_target_info_t	*ti;
+
+	/* Create TI struct outside of isns_mutex */
+	ti = isnst_create_target_info(target);
 
 	mutex_enter(&iscsit_isns_mutex);
 
@@ -753,8 +768,8 @@ iscsit_isns_register(iscsit_tgt_t *target)
 	}
 
 	/* Copy the target info so it will last beyond deregister */
-	itarget->target_info = isnst_create_target_info(target);
-	idm_refcnt_hold(&itarget->target_info->ti_refcnt);
+	itarget->target_info = ti;
+	idm_refcnt_hold(&ti->ti_refcnt);
 
 	isns_targets_changed = B_TRUE;
 
@@ -812,13 +827,17 @@ iscsit_isns_deregister(iscsit_tgt_t *target)
 void
 iscsit_isns_target_update(iscsit_tgt_t *target)
 {
-	isns_target_t	*itarget, tmptgt;
+	isns_target_t		*itarget, tmptgt;
+	isns_target_info_t	*ti;
+
+	/* Create new TI struct outside of isns_mutex */
+	ti = isnst_create_target_info(target);
 
 	mutex_enter(&iscsit_isns_mutex);
 
 	/*
 	 * If iscsit calls us to modify a target, that target should
-	 * already exist in the isns_svr_list
+	 * already exist in the isns_svr_list.
 	 */
 	tmptgt.target = target;
 	itarget = avl_find(&isns_target_list, &tmptgt, NULL);
@@ -829,8 +848,19 @@ iscsit_isns_target_update(iscsit_tgt_t *target)
 		 * completely registered when it comes online.
 		 */
 		mutex_exit(&iscsit_isns_mutex);
+		/* Remove the old target_info struct */
+		isnst_clear_target_info_cb(ti);
 		return;
 	}
+
+	/* Remove the old target_info struct */
+	idm_refcnt_rele(&itarget->target_info->ti_refcnt);
+	idm_refcnt_async_wait_ref(&itarget->target_info->ti_refcnt,
+	    (idm_refcnt_cb_t *)&isnst_clear_target_info_cb);
+
+	/* Link to new target_info struct */
+	itarget->target_info = ti;
+	idm_refcnt_hold(&ti->ti_refcnt);
 
 	itarget->target_update_needed = B_TRUE;
 
@@ -1178,7 +1208,8 @@ retry_replace_all:
 				/* See if last non-deleted target */
 				isns_target_t	*jtarget;
 				ASSERT(itarget->target_registered);
-				for (jtarget = avl_first(&svr->svr_target_list);
+				for (jtarget =
+				    avl_first(&svr->svr_target_list);
 				    jtarget != NULL;
 				    jtarget = AVL_NEXT(&svr->svr_target_list,
 				    jtarget)) {
@@ -1224,6 +1255,16 @@ retry_replace_all:
 			if (!itarget->target_registered ||
 			    itarget->target_update_needed) {
 
+				/*
+				 * Because of a bug in the isns
+				 * server, we cannot send a modify
+				 * operation that changes the target's
+				 * TPGTs. So just replace all.
+				 */
+				if (isns_modify_must_replace) {
+					svr->svr_reset_needed = B_TRUE;
+					goto retry_replace_all;
+				}
 				/* Try to update existing info for one tgt */
 				rc = isnst_update_one_server(svr,
 				    itarget,
@@ -1447,6 +1488,7 @@ isnst_copy_global_status_changes(void)
 				itarget = avl_find(
 				    &svr->svr_target_list,
 				    &tmptgt, NULL);
+
 				if (itarget == NULL) {
 					/* Add a new target */
 					(void) isnst_latch_to_target_list(
@@ -1455,9 +1497,17 @@ isnst_copy_global_status_changes(void)
 					/* Modify existing target */
 					itarget->target_update_needed =
 					    B_TRUE;
+					/* Remove link to old target_info */
+					idm_refcnt_rele(
+					    &itarget->target_info->ti_refcnt);
+					/* Link to new target_info struct */
+					itarget->target_info =
+					    ttarget->target_info;
+					idm_refcnt_hold(
+					    &itarget->target_info->ti_refcnt);
 				}
-				ttarget->target_update_needed = B_FALSE;
 			}
+			ttarget->target_update_needed = B_FALSE;
 			ttarget = AVL_NEXT(&isns_target_list, ttarget);
 		}
 	}
@@ -1840,6 +1890,7 @@ isnst_reg_pdu_add_pg(isns_pdu_t *pdu, size_t pdu_size, isns_target_t *itarget)
 	isns_target_info_t	*ti;
 	isns_tpgt_t		*tig;
 
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
 
 	ti = itarget->target_info;
 
@@ -1854,6 +1905,7 @@ isnst_reg_pdu_add_pg(isns_pdu_t *pdu, size_t pdu_size, isns_target_t *itarget)
 	 * For each target, we start with the full portal list,
 	 * and then remove portals as we add them to TPGTs for this target.
 	 * At the end, all the remaining portals go into the "null pg".
+	 * We use the "null_portals" list to track this.
 	 */
 	avl_create(&null_portals, isnst_portal_avl_compare,
 	    sizeof (isns_portal_t), offsetof(isns_portal_t, portal_node));
@@ -1871,8 +1923,8 @@ isnst_reg_pdu_add_pg(isns_pdu_t *pdu, size_t pdu_size, isns_target_t *itarget)
 				break;
 			}
 		} else {
-			/* Add portal info from this target's TPGT entries */
-			if (isnst_add_tpg_pg(pdu, pdu_size, ti,
+			/* Add portal info from this TPGT's entries */
+			if (isnst_add_tpg_pg(pdu, pdu_size, tig,
 			    &null_portals) != 0) {
 				rval = 1;
 				break;
@@ -1890,45 +1942,40 @@ isnst_reg_pdu_add_pg(isns_pdu_t *pdu, size_t pdu_size, isns_target_t *itarget)
 	return (rval);
 }
 
+/* Write one TPGT's info into the PDU */
 static int
 isnst_add_tpg_pg(isns_pdu_t *pdu, size_t pdu_size,
-    isns_target_info_t *ti, avl_tree_t *null_portal_list)
+    isns_tpgt_t *tig, avl_tree_t *null_portal_list)
 {
-	isns_tpgt_t		*tig;
 	isns_tpgt_addr_t	*tip;
 	int			rval = 0;
 
-	tig = list_head(&ti->ti_tpgt_list);
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
 	ASSERT(tig->ti_tpgt_tag != ISCSIT_DEFAULT_TPGT);
 
-	do {
-		/* Write one TPGT's info into the PDU */
+	/* Portal Group Tag */
+	if (isnst_add_attr(pdu, pdu_size,
+	    ISNS_PG_TAG_ATTR_ID, 4, 0, tig->ti_tpgt_tag) != 0) {
+		rval = 1;
+		goto pg_done;
+	}
 
-		/* Portal Group Tag */
-		if (isnst_add_attr(pdu, pdu_size,
-		    ISNS_PG_TAG_ATTR_ID, 4, 0, tig->ti_tpgt_tag) != 0) {
+	tip = list_head(&tig->ti_portal_list);
+	ASSERT(tip != NULL);
+	do {
+		/* PG Portal Addr and PG Portal Port */
+		if (isnst_add_portal_attr(pdu, pdu_size,
+		    ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
+		    ISNS_PG_PORTAL_PORT_ATTR_ID,
+		    &tip->portal_addr, B_FALSE /* ESI */) != 0) {
 			rval = 1;
 			goto pg_done;
 		}
+		isnst_remove_from_portal_list(&tip->portal_addr,
+		    null_portal_list);
 
-		tip = list_head(&tig->ti_portal_list);
-		ASSERT(tip != NULL);
-		do {
-			/* PG Portal Addr and PG Portal Port */
-			if (isnst_add_portal_attr(pdu, pdu_size,
-			    ISNS_PG_PORTAL_IP_ADDR_ATTR_ID,
-			    ISNS_PG_PORTAL_PORT_ATTR_ID,
-			    &tip->portal_addr, B_FALSE /* ESI */) != 0) {
-				rval = 1;
-				goto pg_done;
-			}
-			isnst_remove_from_portal_list(&tip->portal_addr,
-			    null_portal_list);
-
-			tip = list_next(&tig->ti_portal_list, tip);
-		} while (tip != NULL);
-		tig = list_next(&ti->ti_tpgt_list, tig);
-	} while (tig != NULL);
+		tip = list_next(&tig->ti_portal_list, tip);
+	} while (tip != NULL);
 
 pg_done:
 	return (rval);
@@ -1939,6 +1986,34 @@ isnst_add_default_pg(isns_pdu_t *pdu, size_t pdu_size,
     avl_tree_t *null_portal_list)
 {
 	isns_portal_t *iportal;
+
+	ASSERT(ISNS_GLOBAL_LOCK_HELD());
+
+	if (num_default_portals == 0) {
+		/*
+		 * It is OK for a target with default-portals to be
+		 * online from an STMF perspective and yet all
+		 * default portals are down.  if other (non-default)
+		 * portals do exist, we will still announce the target
+		 * to the isns server.  In this case, we will specify
+		 * all the active non-default portals as NULL portals.
+		 * This is an OK state.
+		 *
+		 * There is a corner case if non-default portals have
+		 * been marked online but the targets that use them
+		 * are not fully online yet, AND all the default portals
+		 * are down.  In this case, the iSNS server will receive
+		 * a DevAttrReg pdu that announces both non-default
+		 * portals and default-portal-only targets.  In other
+		 * words, there may be no target that has an active
+		 * portal. The iSNS spec does not forbid this case.
+		 *
+		 * Both of the above cases are somewhat theoretical.
+		 * If the default portals are down we probably cannot
+		 * get any messages through to the iSNS server anyway.
+		 */
+		return (0);
+	}
 
 	/* Portal Group Tag */
 	if (isnst_add_attr(pdu, pdu_size,
@@ -1970,6 +2045,11 @@ isnst_add_null_pg(isns_pdu_t *pdu, size_t pdu_size,
     avl_tree_t *null_portal_list)
 {
 	isns_portal_t *iportal;
+
+	/* If all portals accounted for, no NULL PG needed */
+	if (avl_numnodes(null_portal_list) == 0) {
+		return (0);
+	}
 
 	/* NULL Portal Group Tag means no access via these portals. */
 	if (isnst_add_attr(pdu, pdu_size,
@@ -2283,7 +2363,8 @@ isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
     isns_pdu_t *rsp, size_t rsp_size)
 {
 	uint16_t	func_id;
-	uint16_t	payload_len, rsp_payload_len;
+	int		payload_len, rsp_payload_len;
+	int		status;
 	isns_resp_t	*resp;
 	uint8_t		*pp;
 	isns_tlv_t	*attr;
@@ -2308,6 +2389,26 @@ isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
 		return (-1);
 	}
 
+	/* Find the start of all operational parameters */
+	rsp_payload_len = isnst_pdu_get_op(rsp, &pp);
+	/*
+	 * Make sure isnst_pdu_get_op didn't encounter an error
+	 * in the attributes.
+	 */
+	if (pp == NULL) {
+		return (-1);
+	}
+
+	/* verify response transaction id */
+	if (ntohs(rsp->xid) != ntohs(pdu->xid)) {
+		return (-1);
+	}
+
+	/* check the error code */
+	resp = (isns_resp_t *)((void *)&rsp->payload[0]);
+
+	status = ntohl(resp->status);
+
 	/* validate response function id */
 	func_id = ntohs(rsp->func_id);
 	switch (ntohs(pdu->func_id)) {
@@ -2316,30 +2417,28 @@ isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
 			return (-1);
 		}
 
+		/* Only look through response if msg status says OK */
+		if (status != 0) {
+			break;
+		}
 		/*
 		 * Get the ESI interval returned by the server.  It could
 		 * be different than what we asked for.  We never know which
 		 * portal a request may come in on, and any server could demand
-		 * any interval. We'll simply keep track of the largest interval
-		 * for use in monitoring.
+		 * any interval. We'll simply keep track of the largest
+		 * interval for use in monitoring.
 		 */
 
-		rsp_payload_len = isnst_pdu_get_op(rsp, &pp);
 		attr = (isns_tlv_t *)((void *)pp);
-
-		/*
-		 * Make sure isnst_pdu_get_op didn't encounter an error
-		 * in the attributes.
-		 */
-		if (pp == NULL) {
-			return (-1);
-		}
-
-		while (rsp_payload_len) {
+		while (rsp_payload_len >= 8) {
 			attr_len = ntohl(attr->attr_len);
 			attr_id = ntohl(attr->attr_id);
-
 			if (attr_id == ISNS_ESI_INTERVAL_ATTR_ID) {
+				if (attr_len != 4 ||
+				    attr_len > rsp_payload_len - 8) {
+					/* Mal-formed packet */
+					break;
+				}
 				esi_interval =
 				    ntohl(*((uint32_t *)
 				    ((void *)(&attr->attr_value))));
@@ -2349,7 +2448,6 @@ isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
 
 				break;
 			}
-
 			rsp_payload_len -= (8 + attr_len);
 			attr = (isns_tlv_t *)
 			    ((void *)((uint8_t *)attr + attr_len + 8));
@@ -2362,32 +2460,73 @@ isnst_verify_rsp(iscsit_isns_svr_t *svr, isns_pdu_t *pdu,
 		}
 		break;
 	case ISNS_DEV_ATTR_QRY:
+		/* Keepalive Response */
 		if (func_id != ISNS_DEV_ATTR_QRY_RSP) {
 			return (-1);
 		}
-		break;
 
+		if (status == 0) {
+			boolean_t	found_eid = B_FALSE;
+
+			/* Scan the operational parameters */
+			attr = (isns_tlv_t *)((void *)pp);
+			while (rsp_payload_len >= 8) {
+				attr_len = ntohl(attr->attr_len);
+				attr_id = ntohl(attr->attr_id);
+				if (attr_id == ISNS_EID_ATTR_ID &&
+				    attr_len > 0 &&
+				    attr_len <= rsp_payload_len - 8) {
+					/*
+					 * If the isns server knows us, the
+					 * response will include our EID in
+					 * the operational parameters, i.e.
+					 * after the delimiter.
+					 * Just receiving this pattern
+					 * is good enough to tell the isns
+					 * server still knows us.
+					 */
+					found_eid = B_TRUE;
+					break;
+				}
+
+				rsp_payload_len -= (8 + attr_len);
+				attr = (isns_tlv_t *)
+				    ((void *)((uint8_t *)attr + attr_len + 8));
+			}
+			if (! found_eid) {
+				status = ISNS_RSP_NO_SUCH_ENTRY;
+			}
+		}
+		if (status == ISNS_RSP_NO_SUCH_ENTRY) {
+			char	server_buf[IDM_SA_NTOP_BUFSIZ];
+			/*
+			 * The iSNS server has forgotten about us.
+			 * We will re-register everything.
+			 * This can happen e.g. if ESI probes time out,
+			 * or if the iSNS server does a factory reset.
+			 */
+			ISNST_LOG(CE_WARN, "iscsit: iSNS server %s"
+			    " forgot about us and has to be reminded.",
+			    idm_sa_ntop(&svr->svr_sa,
+			    server_buf, sizeof (server_buf)));
+			/* isnst_retry_registration will trigger the reset */
+		}
+
+		break;
 
 	default:
 		ASSERT(0);
 		break;
 	}
 
-	/* verify response transaction id */
-	if (ntohs(rsp->xid) != ntohs(pdu->xid)) {
-		return (-1);
-	}
-
-
-	/* check the error code */
-	resp = (isns_resp_t *)((void *)&rsp->payload[0]);
-
 	/* Update the last time we heard from this server */
-	if (resp->status == 0) {
+	if (status == 0) {
 		svr->svr_last_msg = ddi_get_lbolt();
 	}
 
-	return (ntohl(resp->status));
+
+
+	return (status);
 }
 
 static uint16_t
@@ -3252,6 +3391,8 @@ isnst_set_server_status(iscsit_isns_svr_t *svr, boolean_t registered)
 			} else {
 				/* Other tgts marked registered */
 				itarget->target_registered = B_TRUE;
+				/* No updates needed -- clean slate */
+				itarget->target_update_needed = B_FALSE;
 			}
 			itarget = next_target;
 		}
