@@ -890,7 +890,9 @@ kidmap_get_extend(idmap_get_handle_t *get_handle)
  * stat - status of the get request
  * uid  - POSIX UID if stat == IDMAP_SUCCESS
  *
- * Note: The output parameters will be set by idmap_get_mappings()
+ * Notes:
+ * The output parameters will be set by idmap_get_mappings()
+ * The sid_prefix is copied.
  */
 idmap_stat
 kidmap_batch_getuidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
@@ -908,6 +910,9 @@ kidmap_batch_getuidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
 		*stat = IDMAP_SUCCESS;
 		return (IDMAP_SUCCESS);
 	}
+
+	/* Get a copy of sid_prefix */
+	sid_prefix = kidmap_find_sid_prefix(sid_prefix);
 
 	if (get_handle->mapping_num >= get_handle->mapping_size)
 		kidmap_get_extend(get_handle);
@@ -946,7 +951,9 @@ kidmap_batch_getuidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
  * stat - status of the get request
  * gid  - POSIX GID if stat == IDMAP_SUCCESS
  *
- * Note: The output parameters will be set by idmap_get_mappings()
+ * Notes:
+ * The output parameters will be set by idmap_get_mappings()
+ * The sid_prefix is copied.
  */
 idmap_stat
 kidmap_batch_getgidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
@@ -964,6 +971,9 @@ kidmap_batch_getgidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
 		*stat = IDMAP_SUCCESS;
 		return (IDMAP_SUCCESS);
 	}
+
+	/* Get a copy of sid_prefix */
+	sid_prefix = kidmap_find_sid_prefix(sid_prefix);
 
 	if (get_handle->mapping_num >= get_handle->mapping_size)
 		kidmap_get_extend(get_handle);
@@ -1004,7 +1014,9 @@ kidmap_batch_getgidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
  * pid     - POSIX UID if stat == IDMAP_SUCCESS and is_user == 1
  *           POSIX GID if stat == IDMAP_SUCCESS and is_user == 0
  *
- * Note: The output parameters will be set by idmap_get_mappings()
+ * Notes:
+ * The output parameters will be set by idmap_get_mappings()
+ * The sid_prefix is copied.
  */
 idmap_stat
 kidmap_batch_getpidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
@@ -1023,6 +1035,8 @@ kidmap_batch_getpidbysid(idmap_get_handle_t *get_handle, const char *sid_prefix,
 		return (IDMAP_SUCCESS);
 	}
 
+	/* Get a copy of sid_prefix */
+	sid_prefix = kidmap_find_sid_prefix(sid_prefix);
 
 	if (get_handle->mapping_num >= get_handle->mapping_size)
 		kidmap_get_extend(get_handle);
