@@ -1,0 +1,77 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
+
+SUNWprivate {
+    global:
+	SMHBA_RegisterLibrary;
+	Sun_sasGetNumberOfAdapters;
+	Sun_sasLoadLibrary;
+	Sun_sasFreeLibrary;
+	Sun_sasRefreshInformation;
+	Sun_sasRefreshAdapterConfiguration;
+	Sun_sasCloseAdapter;
+	Sun_sasFreeLibrary;
+	Sun_sasGetAdapterAttributes;
+	Sun_sasGetAdapterName;
+	Sun_sasGetAdapterPortAttributes;
+	Sun_sasGetDiscoveredPortAttributes;
+	Sun_sasGetLUNStatistics;
+	Sun_sasGetNumberOfAdapters;
+	Sun_sasGetNumberOfPorts;
+	Sun_sasSetPersistentBinding;
+	Sun_sasGetPersistentBinding;
+	Sun_sasGetPhyStatistics;
+	Sun_sasGetPortAttributesByWWN;
+	Sun_sasGetPortType;
+	Sun_sasGetProtocolStatistics;
+	Sun_sasGetSASPhyAttributes;
+	Sun_sasGetTargetMapping;
+	Sun_sasGetVendorLibraryAttributes;
+	Sun_sasGetVersion;
+	Sun_sasScsiReadCapacity;
+	Sun_sasScsiReportLUNs;
+	Sun_sasScsiInquiry;
+	Sun_sasLoadLibrary;
+	Sun_sasSendSMPPassThru;
+	Sun_sasOpenAdapter;
+	FreeHBA;
+    local:
+	*;
+};

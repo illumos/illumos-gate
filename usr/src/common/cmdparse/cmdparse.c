@@ -536,7 +536,16 @@ cmdParse(int argc, char *argv[], synTables_t synTable, void *callArgs,
 		switch (opt) {
 			case '?':
 				subUsage(DETAIL_USAGE, subcommand);
-				exit(0);
+				/*
+				 * getopt can return a '?' when no
+				 * option letters match string. Check for
+				 * the 'real' '?' in optopt.
+				 */
+				if (optopt == '?') {
+					exit(0);
+				} else {
+					exit(1);
+				}
 			default:
 				cmdOptions[i].optval = opt;
 				if (optarg) {

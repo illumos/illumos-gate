@@ -36,3 +36,17 @@
 # Include ISA independent files (prototype_com)
 #
 !include prototype_com
+#
+#
+# List files which are i386 specific here
+#
+# source locations relative to the prototype file
+#
+#
+# SUNWsmhba
+d none usr/lib/sparcv9 0755 root bin
+f none usr/lib/sparcv9/libSMHBAAPI.so.1 0755 root bin
+s none usr/lib/sparcv9/libSMHBAAPI.so=libSMHBAAPI.so.1
+f none usr/lib/sparcv9/llib-lSMHBAAPI.ln 0644 root bin
+f none usr/lib/sparcv9/libsun_sas.so.1 0755 root bin
+s none usr/lib/sparcv9/libsun_sas.so=libsun_sas.so.1

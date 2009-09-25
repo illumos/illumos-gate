@@ -22,21 +22,43 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# This required package information file contains a list of package contents.
-# The 'pkgmk' command uses this file to identify the contents of a package
-# and their location on the development machine when building the package.
-# Can be created via a text editor or through use of the 'pkgproto' command.
 
-#!search <pathname pathname ...>	# where to find pkg objects
-#!include <filename>			# include another 'prototype' file
-#!default <mode> <owner> <group>	# default used if not specified on entry
-#!<param>=<value>			# puts parameter in pkg environment
 
-#
-#
-i copyright
-i pkginfo
-i depend
-i i.preserve
-d none etc 0755 root sys
-e preserve etc/smhba.conf 0644 root sys
+LIBRARY =	libSMHBAAPI.a
+VERS =		.1
+OBJECTS	=	SMHBAAPILIB.o
+CONFIGFILE=	smhba.conf
+ROOTETC=	$(ROOT)/etc
+
+include ../../Makefile.lib
+
+HETCFILES=	$(CONFIGFILE:%=$(ROOTETC)/%)
+HETCFILES:=	FILEMODE= 644
+HETCFILES:=	OWNER= root
+HETCFILES:=	GROUP= sys
+
+LIBS =		$(DYNLIB) $(LINTLIB)
+SRCDIR=		../common
+
+INCS +=		-I$(SRCDIR)
+INCS +=		-I$(SRC)/lib/hbaapi/common
+CFLAGS +=	-DSOLARIS
+CFLAGS +=	-DVERSION='"Version 1"'
+CFLAGS +=	-DUSESYSLOG
+CPPFLAGS +=	$(INCS)
+CPPFLAGS +=	-DPOSIX_THREADS
+
+LDLIBS +=	-lc
+
+$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
+
+$(ROOTETC)/%:	../common/%
+	$(INS.file)
+
+.KEEP_STATE:
+
+all:	$(LIBS) $(HETCFILES)
+
+lint: lintcheck
+
+include ../../Makefile.targ

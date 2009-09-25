@@ -34,6 +34,18 @@
 
 #
 #
-i copyright
 i pkginfo
 i depend
+i copyright
+d none usr 0755 root sys
+d none usr/lib 0755 root bin
+f none usr/lib/libSMHBAAPI.so.1 0755 root bin
+s none usr/lib/libSMHBAAPI.so=libSMHBAAPI.so.1
+f none usr/lib/llib-lSMHBAAPI 0644 root bin
+f none usr/lib/llib-lSMHBAAPI.ln 0644 root bin
+f none usr/lib/libsun_sas.so.1 0755 root bin
+s none usr/lib/libsun_sas.so=libsun_sas.so.1
+d none usr/sbin 0755 root bin
+f none usr/sbin/sasinfo 0555 root bin
+d none usr/include 0755 root bin
+f none usr/include/smhbaapi.h 0644 root bin

@@ -353,6 +353,7 @@ COMMON_SUBDIRS=		\
 	runat		\
 	sa		\
 	saf		\
+	sasinfo		\
 	savecore	\
 	sbdadm		\
 	script		\
@@ -686,6 +687,7 @@ MSGSUBDIRS=		\
 	rmformat	\
 	rmmount		\
 	rmvolmgr	\
+	sasinfo		\
 	sbdadm		\
 	scadm		\
 	script		\

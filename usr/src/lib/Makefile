@@ -147,7 +147,9 @@ SUBDIRS += \
 	nametoaddr	\
 	ncad_addr	\
 	hbaapi		\
+	smhba		\
 	sun_fc		\
+	sun_sas		\
 	gss_mechs/mech_krb5	.WAIT	\
 	libkrb5	.WAIT	\
 	krb5	.WAIT	\
@@ -486,6 +488,7 @@ HDRSUBDIRS=		\
 	smbsrv		\
 	scsi		\
 	hbaapi		\
+	smhba		\
 	libima		\
 	libsun_ima	\
 	mpapi		\
