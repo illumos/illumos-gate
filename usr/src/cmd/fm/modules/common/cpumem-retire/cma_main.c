@@ -406,8 +406,8 @@ static void
 cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 {
 	char *uuid = NULL;
-	nvlist_t **nva;
-	uint_t nvc = 0;
+	nvlist_t **nva, **save_nva;
+	uint_t nvc = 0, save_nvc;
 	uint_t keepopen;
 	int err = 0;
 	nvlist_t *asru = NULL;
@@ -421,7 +421,8 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 		return;
 	}
 
-	keepopen = nvc;
+	save_nvc = keepopen = nvc;
+	save_nva = nva;
 	while (nvc-- != 0 && (strcmp(class, FM_LIST_SUSPECT_CLASS) != 0 ||
 	    !fmd_case_uuclosed(hdl, uuid))) {
 		nvlist_t *nvl = *nva++;
@@ -451,6 +452,24 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 			}
 			if (err == CMA_RA_SUCCESS)
 				keepopen--;
+		}
+	}
+
+	/*
+	 * Run though again to catch any new faults in list.updated.
+	 */
+	while (save_nvc-- != 0 && (strcmp(class, FM_LIST_UPDATED_CLASS) == 0)) {
+		nvlist_t *nvl = *save_nva++;
+		const cma_subscriber_t *subr;
+		int has_fault;
+
+		if ((subr = nvl2subr(hdl, nvl, &asru)) == NULL)
+			continue;
+		if (subr->subr_func != NULL) {
+			has_fault = fmd_nvl_fmri_has_fault(hdl, asru,
+			    FMD_HAS_FAULT_ASRU, NULL);
+			if (has_fault == 1)
+				err = subr->subr_func(hdl, nvl, asru, uuid, 0);
 		}
 	}
 

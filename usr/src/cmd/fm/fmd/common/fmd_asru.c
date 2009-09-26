@@ -441,7 +441,7 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	boolean_t faulty = FMD_B_FALSE, unusable = FMD_B_FALSE;
 	int ps;
 	boolean_t repaired = FMD_B_FALSE, replaced = FMD_B_FALSE;
-	boolean_t acquitted = FMD_B_FALSE;
+	boolean_t acquitted = FMD_B_FALSE, resolved = FMD_B_FALSE;
 	nvlist_t *flt, *flt_copy, *asru;
 	char *case_uuid = NULL, *case_code = NULL;
 	fmd_asru_t *ap;
@@ -481,17 +481,20 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	    &replaced);
 	(void) nvlist_lookup_boolean_value(nvl, FM_RSRC_ASRU_ACQUITTED,
 	    &acquitted);
+	(void) nvlist_lookup_boolean_value(nvl, FM_RSRC_ASRU_RESOLVED,
+	    &resolved);
 
 	/*
-	 * Attempt to recreate the case in either the CLOSED or REPAIRED state
-	 * (depending on whether the faulty bit is still set).
+	 * Attempt to recreate the case in CLOSED, REPAIRED or RESOLVED state
+	 * (depending on whether the faulty/resolved bits are set).
 	 * If the case is already present, fmd_case_recreate() will return it.
 	 * If not, we'll create a new orphaned case. Either way,  we use the
 	 * ASRU event to insert a suspect into the partially-restored case.
 	 */
 	fmd_module_lock(fmd.d_rmod);
 	cp = fmd_case_recreate(fmd.d_rmod, NULL, faulty ? FMD_CASE_CLOSED :
-	    FMD_CASE_REPAIRED, case_uuid, case_code);
+	    resolved ? FMD_CASE_RESOLVED : FMD_CASE_REPAIRED, case_uuid,
+	    case_code);
 	fmd_case_hold(cp);
 	fmd_module_unlock(fmd.d_rmod);
 	if (nvlist_lookup_int64_array(nvl, FM_SUSPECT_DIAG_TIME, &diag_time,
@@ -581,6 +584,8 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 		alp->al_reason = FMD_ASRU_REPAIRED;
 	else if (acquitted)
 		alp->al_reason = FMD_ASRU_ACQUITTED;
+	else
+		alp->al_reason = FMD_ASRU_REMOVED;
 
 	TRACE((FMD_DBG_ASRU, "asru %s recreated as %p (%s)", alp->al_uuid,
 	    (void *)ap, _fmd_asru_snames[ap->asru_flags & FMD_ASRU_STATE]));
@@ -712,6 +717,9 @@ fmd_asru_repair_if_aged(fmd_asru_link_t *alp, void *arg)
 	int err;
 	fmd_asru_rep_arg_t fara;
 
+	if (!(alp->al_flags & FMD_ASRU_FAULTY))
+		return;
+
 	/*
 	 * Checking for aged resources only happens on the diagnosing side
 	 * not on a proxy.
@@ -740,10 +748,55 @@ fmd_asru_repair_if_aged(fmd_asru_link_t *alp, void *arg)
 	}
 }
 
+/*ARGSUSED*/
+void
+fmd_asru_check_if_aged(fmd_asru_link_t *alp, void *arg)
+{
+	struct timeval tv;
+	fmd_log_t *lp;
+	hrtime_t hrt;
+
+	/*
+	 * Case must be in resolved state for this to be called. So modified
+	 * time on resource cache entry should be the time the resolve occurred.
+	 * Return 0 if not yet hit rsrc.aged.
+	 */
+	fmd_time_gettimeofday(&tv);
+	lp = fmd_log_open(alp->al_asru->asru_root, alp->al_uuid, FMD_LOG_ASRU);
+	if (lp == NULL)
+		return;
+	hrt = (hrtime_t)(tv.tv_sec - lp->log_stat.st_mtime);
+	fmd_log_rele(lp);
+	if (hrt * NANOSEC < fmd.d_asrus->ah_lifetime)
+		*(int *)arg = 0;
+}
+
+/*ARGSUSED*/
+void
+fmd_asru_most_recent(fmd_asru_link_t *alp, void *arg)
+{
+	fmd_log_t *lp;
+	uint64_t hrt;
+
+	/*
+	 * Find most recent modified time of a set of resource cache entries.
+	 */
+	lp = fmd_log_open(alp->al_asru->asru_root, alp->al_uuid, FMD_LOG_ASRU);
+	if (lp == NULL)
+		return;
+	hrt = lp->log_stat.st_mtime;
+	fmd_log_rele(lp);
+	if (*(uint64_t *)arg < hrt)
+		*(uint64_t *)arg = hrt;
+}
+
 void
 fmd_asru_clear_aged_rsrcs()
 {
+	int check_if_aged = 1;
 	fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_repair_if_aged, NULL);
+	fmd_case_hash_apply(fmd.d_cases, fmd_case_discard_resolved,
+	    &check_if_aged);
 }
 
 fmd_asru_hash_t *
@@ -1298,6 +1351,22 @@ fmd_asru_repaired(fmd_asru_link_t *alp, void *arg)
 }
 
 /*
+ * Discard the case associated with this alp if it is in resolved state.
+ * Called on "fmadm flush".
+ */
+/*ARGSUSED*/
+void
+fmd_asru_flush(fmd_asru_link_t *alp, void *arg)
+{
+	int check_if_aged = 0;
+	int *rval = (int *)arg;
+
+	if (alp->al_case)
+		fmd_case_discard_resolved(alp->al_case, &check_if_aged);
+	*rval = 0;
+}
+
+/*
  * This is only called for proxied faults. Set various flags so we can
  * find the nature of the transport from the resource cache code.
  */
@@ -1459,7 +1528,8 @@ fmd_asru_logevent(fmd_asru_link_t *alp)
 	nvl = fmd_protocol_rsrc_asru(_fmd_asru_events[faulty | (unusable << 1)],
 	    alp->al_asru_fmri, cip->ci_uuid, cip->ci_code, faulty, unusable,
 	    message, alp->al_event, &cip->ci_tv, repaired, replaced, acquitted,
-	    cip->ci_diag_de == NULL ? cip->ci_mod->mod_fmri : cip->ci_diag_de);
+	    cip->ci_state == FMD_CASE_RESOLVED, cip->ci_diag_de == NULL ?
+	    cip->ci_mod->mod_fmri : cip->ci_diag_de);
 
 	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
 	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
@@ -1525,7 +1595,9 @@ fmd_asru_clrflags(fmd_asru_link_t *alp, uint_t sflag, uint8_t reason)
 	nstate = alp->al_flags & FMD_ASRU_STATE;
 
 	if (nstate == ostate) {
-		if (reason > alp->al_reason) {
+		if (reason > alp->al_reason &&
+		    ((fmd_case_impl_t *)alp->al_case)->ci_state <
+		    FMD_CASE_REPAIRED) {
 			alp->al_reason = reason;
 			fmd_asru_logevent(alp);
 			(void) pthread_cond_broadcast(&ap->asru_cv);
@@ -1558,6 +1630,18 @@ fmd_asru_clrflags(fmd_asru_link_t *alp, uint_t sflag, uint8_t reason)
 	(void) pthread_mutex_unlock(&ap->asru_lock);
 
 	return (1);
+}
+
+/*ARGSUSED*/
+void
+fmd_asru_log_resolved(fmd_asru_link_t *alp, void *unused)
+{
+	fmd_asru_t *ap = alp->al_asru;
+
+	(void) pthread_mutex_lock(&ap->asru_lock);
+	fmd_asru_logevent(alp);
+	(void) pthread_cond_broadcast(&ap->asru_cv);
+	(void) pthread_mutex_unlock(&ap->asru_lock);
 }
 
 /*

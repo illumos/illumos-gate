@@ -139,7 +139,8 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	/*
 	 * If disabled, we don't do retire. We still do unretires though
 	 */
-	if (global_disable && strcmp(class, FM_LIST_SUSPECT_CLASS) == 0) {
+	if (global_disable && (strcmp(class, FM_LIST_SUSPECT_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_UPDATED_CLASS) == 0)) {
 		fmd_hdl_debug(hdl, "rio_recv: retire disabled\n");
 		return;
 	}
@@ -222,6 +223,51 @@ rio_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 					    " di_unretire_device failed:"
 					    " error: %d %s", error, path);
 					rval = -1;
+				}
+			}
+		}
+	}
+	/*
+	 * Run through again to handle new faults in a list.updated.
+	 */
+	for (f = 0; f < nfaults; f++) {
+		if (nvlist_lookup_boolean_value(faults[f], FM_SUSPECT_RETIRE,
+		    &rtr) == 0 && !rtr) {
+			fmd_hdl_debug(hdl, "rio_recv: retire suppressed");
+			continue;
+		}
+
+		if (nvlist_lookup_nvlist(faults[f], FM_FAULT_ASRU,
+		    &asru) != 0) {
+			fmd_hdl_debug(hdl, "rio_recv: no asru in fault");
+			continue;
+		}
+
+		scheme = NULL;
+		if (nvlist_lookup_string(asru, FM_FMRI_SCHEME, &scheme) != 0 ||
+		    strcmp(scheme, FM_FMRI_SCHEME_DEV) != 0) {
+			fmd_hdl_debug(hdl, "rio_recv: not \"dev\" scheme: %s",
+			    scheme ? scheme : "<NULL>");
+			continue;
+		}
+
+		if (fault_exception(hdl, faults[f]))
+			continue;
+
+		if (nvlist_lookup_string(asru, FM_FMRI_DEV_PATH,
+		    &path) != 0 || path[0] == '\0') {
+			fmd_hdl_debug(hdl, "rio_recv: no dev path in asru");
+			continue;
+		}
+
+		if (strcmp(class, FM_LIST_UPDATED_CLASS) == 0) {
+			if (fmd_nvl_fmri_has_fault(hdl, asru,
+			    FMD_HAS_FAULT_ASRU, NULL) == 1) {
+				error = di_retire_device(path, &drt, 0);
+				if (error != 0) {
+					fmd_hdl_debug(hdl, "rio_recv:"
+					    " di_retire_device failed:"
+					    " error: %d %s", error, path);
 				}
 			}
 		}

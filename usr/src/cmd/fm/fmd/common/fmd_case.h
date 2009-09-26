@@ -96,6 +96,7 @@ typedef struct fmd_case_impl {
 #define	FMD_CF_RESOLVED		0x10	/* case has been resolved */
 #define	FMD_CF_INVISIBLE	0x20	/* case should be invisible */
 #define	FMD_CF_DELETING		0x40	/* case is about to be deleted */
+#define	FMD_CF_RES_CMPL		0x80	/* transition to resolved is complete */
 
 /*
  * ci_proxy_asru flags record if we created a new asru on the proxy side and
@@ -160,6 +161,7 @@ extern int fmd_case_acquit(fmd_case_t *);
 extern int fmd_case_contains(fmd_case_t *, fmd_event_t *);
 extern int fmd_case_orphaned(fmd_case_t *);
 extern void fmd_case_repair_replay(void);
+extern void fmd_case_discard_resolved(fmd_case_t *, void *);
 
 #ifdef	__cplusplus
 }

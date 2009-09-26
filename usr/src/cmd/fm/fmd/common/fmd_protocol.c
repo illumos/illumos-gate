@@ -206,7 +206,7 @@ fmd_protocol_rsrc_asru(const char *class,
     nvlist_t *fmri, const char *uuid, const char *code,
     boolean_t faulty, boolean_t unusable, boolean_t message, nvlist_t *event,
     struct timeval *tvp, boolean_t repaired, boolean_t replaced,
-    boolean_t acquitted, nvlist_t *diag_de)
+    boolean_t acquitted, boolean_t resolved, nvlist_t *diag_de)
 {
 	nvlist_t *nvl;
 	int64_t tod[2];
@@ -233,6 +233,7 @@ fmd_protocol_rsrc_asru(const char *class,
 	err |= nvlist_add_boolean_value(nvl, FM_RSRC_ASRU_REPAIRED, repaired);
 	err |= nvlist_add_boolean_value(nvl, FM_RSRC_ASRU_REPLACED, replaced);
 	err |= nvlist_add_boolean_value(nvl, FM_RSRC_ASRU_ACQUITTED, acquitted);
+	err |= nvlist_add_boolean_value(nvl, FM_RSRC_ASRU_RESOLVED, resolved);
 	err |= nvlist_add_boolean_value(nvl, FM_RSRC_ASRU_UNUSABLE, unusable);
 	err |= nvlist_add_boolean_value(nvl, FM_SUSPECT_MESSAGE, message);
 	err |= nvlist_add_int64_array(nvl, FM_SUSPECT_DIAG_TIME, tod, 2);

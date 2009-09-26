@@ -288,6 +288,7 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "rpc.api.prog", &fmd_conf_uint32, "100170" },	/* FMD_API rpc program num */
 { "rpc.rcvsize", &fmd_conf_size, "128k" },	/* rpc receive buffer size */
 { "rpc.sndsize", &fmd_conf_size, "128k" },	/* rpc send buffer size */
+{ "rsrc.pollperiod", &fmd_conf_time, "1h" },	/* aged rsrcs poller period */
 { "rsrc.age", &fmd_conf_time, "30d" },		/* max age of old rsrc log */
 { "rsrc.zero", &fmd_conf_bool, "false" },	/* zero rsrc cache on start? */
 { "schemedir", &fmd_conf_string, _fmd_scheme_path }, /* path for scheme mods */
@@ -705,12 +706,12 @@ fmd_gc(fmd_t *dp, id_t id, hrtime_t hrt)
 static void
 fmd_clear_aged_rsrcs(fmd_t *dp, id_t id, hrtime_t hrt)
 {
-	hrtime_t delta;
+	hrtime_t period;
 
 	fmd_asru_clear_aged_rsrcs();
-	(void) fmd_conf_getprop(dp->d_conf, "rsrc.age", &delta);
+	(void) fmd_conf_getprop(dp->d_conf, "rsrc.pollperiod", &period);
 	(void) fmd_timerq_install(dp->d_timers, dp->d_rmod->mod_timerids,
-	    (fmd_timer_f *)fmd_clear_aged_rsrcs, dp, NULL, delta/10);
+	    (fmd_timer_f *)fmd_clear_aged_rsrcs, dp, NULL, period);
 }
 
 /*

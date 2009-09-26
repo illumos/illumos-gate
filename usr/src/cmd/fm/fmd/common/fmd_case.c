@@ -220,6 +220,39 @@ fmd_case_hash_apply(fmd_case_hash_t *chp,
 }
 
 static void
+fmd_case_hash_apply_except_current(fmd_case_hash_t *chp,
+    void (*func)(fmd_case_t *, void *), void *arg, fmd_case_t *current)
+{
+	fmd_case_impl_t *cp, **cps, **cpp;
+	uint_t cpc, i;
+
+	(void) pthread_rwlock_rdlock(&chp->ch_lock);
+
+	cps = cpp = fmd_alloc(chp->ch_count * sizeof (fmd_case_t *), FMD_SLEEP);
+	cpc = chp->ch_count;
+
+	for (i = 0; i < chp->ch_hashlen; i++) {
+		for (cp = chp->ch_hash[i]; cp != NULL; cp = cp->ci_next)
+			if (cp != (fmd_case_impl_t *)current)
+				*cpp++ = fmd_case_tryhold(cp);
+			else
+				*cpp++ = cp;
+	}
+
+	ASSERT(cpp == cps + cpc);
+	(void) pthread_rwlock_unlock(&chp->ch_lock);
+
+	for (i = 0; i < cpc; i++) {
+		if (cps[i] != NULL && cps[i] != (fmd_case_impl_t *)current) {
+			func((fmd_case_t *)cps[i], arg);
+			fmd_case_rele((fmd_case_t *)cps[i]);
+		}
+	}
+
+	fmd_free(cps, cpc * sizeof (fmd_case_t *));
+}
+
+static void
 fmd_case_code_hash_insert(fmd_case_hash_t *chp, fmd_case_impl_t *cip)
 {
 	uint_t h = fmd_strhash(cip->ci_code) % chp->ch_hashlen;
@@ -453,6 +486,12 @@ fmd_case_mkevent(fmd_case_t *cp, const char *class)
 	return (nvl);
 }
 
+static int fmd_case_match_on_faulty_overlap = 1;
+static int fmd_case_match_on_acquit_overlap = 1;
+static int fmd_case_auto_acquit_isolated = 1;
+static int fmd_case_auto_acquit_non_acquitted = 1;
+static int fmd_case_too_recent = 10; /* time in seconds */
+
 static boolean_t
 fmd_case_compare_elem(nvlist_t *nvl, nvlist_t *xnvl, const char *elem)
 {
@@ -498,82 +537,377 @@ done:
 }
 
 static int
-fmd_case_match_suspect(fmd_case_susp_t *cis, fmd_case_susp_t *xcis)
+fmd_case_match_suspect(nvlist_t *nvl1, nvlist_t *nvl2)
 {
 	char *class, *new_class;
 
-	if (!fmd_case_compare_elem(cis->cis_nvl, xcis->cis_nvl, FM_FAULT_ASRU))
+	if (!fmd_case_compare_elem(nvl1, nvl2, FM_FAULT_ASRU))
 		return (0);
-	if (!fmd_case_compare_elem(cis->cis_nvl, xcis->cis_nvl,
-	    FM_FAULT_RESOURCE))
+	if (!fmd_case_compare_elem(nvl1, nvl2, FM_FAULT_RESOURCE))
 		return (0);
-	if (!fmd_case_compare_elem(cis->cis_nvl, xcis->cis_nvl, FM_FAULT_FRU))
+	if (!fmd_case_compare_elem(nvl1, nvl2, FM_FAULT_FRU))
 		return (0);
-	(void) nvlist_lookup_string(xcis->cis_nvl, FM_CLASS, &class);
-	(void) nvlist_lookup_string(cis->cis_nvl, FM_CLASS, &new_class);
+	(void) nvlist_lookup_string(nvl2, FM_CLASS, &class);
+	(void) nvlist_lookup_string(nvl1, FM_CLASS, &new_class);
 	return (strcmp(class, new_class) == 0);
 }
 
+typedef struct {
+	int	*fcms_countp;
+	int	fcms_maxcount;
+	fmd_case_impl_t *fcms_cip;
+	uint8_t *fcms_new_susp_state;
+	uint8_t *fcms_old_susp_state;
+	uint8_t *fcms_old_match_state;
+} fcms_t;
+#define	SUSPECT_STATE_FAULTY				0x1
+#define	SUSPECT_STATE_ISOLATED				0x2
+#define	SUSPECT_STATE_REMOVED				0x4
+#define	SUSPECT_STATE_ACQUITED				0x8
+#define	SUSPECT_STATE_REPAIRED				0x10
+#define	SUSPECT_STATE_REPLACED				0x20
+#define	SUSPECT_STATE_NO_MATCH				0x1
+
 /*
- * see if an identical suspect list already exists in the cache
+ * This is called for each suspect in the old case. Compare it against each
+ * suspect in the new case, setting fcms_old_susp_state and fcms_new_susp_state
+ * as appropriate. fcms_new_susp_state will left as 0 if the suspect is not
+ * found in the old case.
  */
-static int
-fmd_case_check_for_dups(fmd_case_t *cp)
+static void
+fmd_case_match_suspects(fmd_asru_link_t *alp, void *arg)
 {
-	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp, *xcip;
-	fmd_case_hash_t *chp = fmd.d_cases;
-	fmd_case_susp_t *xcis, *cis;
-	int match = 0, match_susp;
-	uint_t h;
+	fcms_t *fcmsp = (fcms_t *)arg;
+	fmd_case_impl_t *cip = fcmsp->fcms_cip;
+	fmd_case_susp_t *cis;
+	int i = 0;
+	int state = fmd_asru_al_getstate(alp);
 
-	(void) pthread_rwlock_rdlock(&chp->ch_lock);
+	if (*fcmsp->fcms_countp >= fcmsp->fcms_maxcount)
+		return;
 
-	/*
-	 * Find all cases with this code
-	 */
-	h = fmd_strhash(cip->ci_code) % chp->ch_hashlen;
-	for (xcip = chp->ch_code_hash[h]; xcip != NULL;
-	    xcip = xcip->ci_code_next) {
-		/*
-		 * only look for any cases (apart from this one)
-		 * whose code and number of suspects match
-		 */
-		if (xcip == cip || fmd_case_tryhold(xcip) == NULL)
-			continue;
-		if (strcmp(xcip->ci_code, cip->ci_code) != 0 ||
-		    xcip->ci_nsuspects != cip->ci_nsuspects) {
-			fmd_case_rele((fmd_case_t *)xcip);
-			continue;
-		}
+	if (!(state & FMD_ASRU_PRESENT) || (!(state & FMD_ASRU_FAULTY) &&
+	    alp->al_reason == FMD_ASRU_REMOVED))
+		fcmsp->fcms_old_susp_state[*fcmsp->fcms_countp] =
+		    SUSPECT_STATE_REMOVED;
+	else if ((state & FMD_ASRU_UNUSABLE) && (state & FMD_ASRU_FAULTY))
+		fcmsp->fcms_old_susp_state[*fcmsp->fcms_countp] =
+		    SUSPECT_STATE_ISOLATED;
+	else if (state & FMD_ASRU_FAULTY)
+		fcmsp->fcms_old_susp_state[*fcmsp->fcms_countp] =
+		    SUSPECT_STATE_FAULTY;
+	else if (alp->al_reason == FMD_ASRU_REPLACED)
+		fcmsp->fcms_old_susp_state[*fcmsp->fcms_countp] =
+		    SUSPECT_STATE_REPLACED;
+	else if (alp->al_reason == FMD_ASRU_ACQUITTED)
+		fcmsp->fcms_old_susp_state[*fcmsp->fcms_countp] =
+		    SUSPECT_STATE_ACQUITED;
+	else
+		fcmsp->fcms_old_susp_state[*fcmsp->fcms_countp] =
+		    SUSPECT_STATE_REPAIRED;
 
-		/*
-		 * For each suspect in one list, check if there
-		 * is an identical suspect in the other list
-		 */
-		match = 1;
-		for (xcis = xcip->ci_suspects; xcis != NULL;
-		    xcis = xcis->cis_next) {
-			match_susp = 0;
-			for (cis = cip->ci_suspects; cis != NULL;
-			    cis = cis->cis_next) {
-				if (fmd_case_match_suspect(cis, xcis) == 1) {
-					match_susp = 1;
-					break;
-				}
-			}
-			if (match_susp == 0) {
-				match = 0;
+	for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next, i++)
+		if (fmd_case_match_suspect(cis->cis_nvl, alp->al_event) == 1)
+			break;
+	if (cis != NULL)
+		fcmsp->fcms_new_susp_state[i] =
+		    fcmsp->fcms_old_susp_state[*fcmsp->fcms_countp];
+	else
+		fcmsp->fcms_old_match_state[*fcmsp->fcms_countp] |=
+		    SUSPECT_STATE_NO_MATCH;
+	(*fcmsp->fcms_countp)++;
+}
+
+typedef struct {
+	int	*fca_do_update;
+	fmd_case_impl_t *fca_cip;
+} fca_t;
+
+/*
+ * Re-fault all acquitted suspects that are still present in the new list.
+ */
+static void
+fmd_case_fault_acquitted_matching(fmd_asru_link_t *alp, void *arg)
+{
+	fca_t *fcap = (fca_t *)arg;
+	fmd_case_impl_t *cip = fcap->fca_cip;
+	fmd_case_susp_t *cis;
+	int state = fmd_asru_al_getstate(alp);
+
+	if (!(state & FMD_ASRU_FAULTY) &&
+	    alp->al_reason == FMD_ASRU_ACQUITTED) {
+		for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next)
+			if (fmd_case_match_suspect(cis->cis_nvl,
+			    alp->al_event) == 1)
 				break;
-			}
-		}
-		fmd_case_rele((fmd_case_t *)xcip);
-		if (match) {
-			(void) pthread_rwlock_unlock(&chp->ch_lock);
-			return (1);
+		if (cis != NULL) {
+			(void) fmd_asru_setflags(alp, FMD_ASRU_FAULTY);
+			*fcap->fca_do_update = 1;
 		}
 	}
-	(void) pthread_rwlock_unlock(&chp->ch_lock);
-	return (0);
+}
+
+/*
+ * Re-fault all suspects that are still present in the new list.
+ */
+static void
+fmd_case_fault_all_matching(fmd_asru_link_t *alp, void *arg)
+{
+	fca_t *fcap = (fca_t *)arg;
+	fmd_case_impl_t *cip = fcap->fca_cip;
+	fmd_case_susp_t *cis;
+	int state = fmd_asru_al_getstate(alp);
+
+	if (!(state & FMD_ASRU_FAULTY)) {
+		for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next)
+			if (fmd_case_match_suspect(cis->cis_nvl,
+			    alp->al_event) == 1)
+				break;
+		if (cis != NULL) {
+			(void) fmd_asru_setflags(alp, FMD_ASRU_FAULTY);
+			*fcap->fca_do_update = 1;
+		}
+	}
+}
+
+/*
+ * Acquit all suspects that are no longer present in the new list.
+ */
+static void
+fmd_case_acquit_no_match(fmd_asru_link_t *alp, void *arg)
+{
+	fca_t *fcap = (fca_t *)arg;
+	fmd_case_impl_t *cip = fcap->fca_cip;
+	fmd_case_susp_t *cis;
+	int state = fmd_asru_al_getstate(alp);
+
+	if (state & FMD_ASRU_FAULTY) {
+		for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next)
+			if (fmd_case_match_suspect(cis->cis_nvl,
+			    alp->al_event) == 1)
+				break;
+		if (cis == NULL) {
+			(void) fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
+			    FMD_ASRU_ACQUITTED);
+			*fcap->fca_do_update = 1;
+		}
+	}
+}
+
+/*
+ * Acquit all isolated suspects.
+ */
+static void
+fmd_case_acquit_isolated(fmd_asru_link_t *alp, void *arg)
+{
+	int *do_update = (int *)arg;
+	int state = fmd_asru_al_getstate(alp);
+
+	if ((state & FMD_ASRU_PRESENT) && (state & FMD_ASRU_UNUSABLE) &&
+	    (state & FMD_ASRU_FAULTY)) {
+		(void) fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
+		    FMD_ASRU_ACQUITTED);
+		*do_update = 1;
+	}
+}
+
+/*
+ * Acquit suspect which matches specified nvlist
+ */
+static void
+fmd_case_acquit_suspect(fmd_asru_link_t *alp, void *arg)
+{
+	nvlist_t *nvl = (nvlist_t *)arg;
+	int state = fmd_asru_al_getstate(alp);
+
+	if ((state & FMD_ASRU_FAULTY) &&
+	    fmd_case_match_suspect(nvl, alp->al_event) == 1)
+		(void) fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
+		    FMD_ASRU_ACQUITTED);
+}
+
+typedef struct {
+	fmd_case_impl_t *fccd_cip;
+	uint8_t *fccd_new_susp_state;
+	uint8_t *fccd_new_match_state;
+	int *fccd_discard_new;
+	int *fccd_adjust_new;
+} fccd_t;
+
+/*
+ * see if a matching suspect list already exists in the cache
+ */
+static void
+fmd_case_check_for_dups(fmd_case_t *old_cp, void *arg)
+{
+	fccd_t *fccdp = (fccd_t *)arg;
+	fmd_case_impl_t *new_cip = fccdp->fccd_cip;
+	fmd_case_impl_t *old_cip = (fmd_case_impl_t *)old_cp;
+	int i, count = 0, do_update = 0, got_isolated_overlap = 0;
+	int got_faulty_overlap = 0;
+	int got_acquit_overlap = 0;
+	boolean_t too_recent;
+	uint64_t most_recent = 0;
+	fcms_t fcms;
+	fca_t fca;
+	uint8_t *new_susp_state;
+	uint8_t *old_susp_state;
+	uint8_t *old_match_state;
+
+	new_susp_state = alloca(new_cip->ci_nsuspects * sizeof (uint8_t));
+	for (i = 0; i < new_cip->ci_nsuspects; i++)
+		new_susp_state[i] = 0;
+	old_susp_state = alloca(old_cip->ci_nsuspects * sizeof (uint8_t));
+	for (i = 0; i < old_cip->ci_nsuspects; i++)
+		old_susp_state[i] = 0;
+	old_match_state = alloca(old_cip->ci_nsuspects * sizeof (uint8_t));
+	for (i = 0; i < old_cip->ci_nsuspects; i++)
+		old_match_state[i] = 0;
+
+	/*
+	 * Compare with each suspect in the existing case.
+	 */
+	fcms.fcms_countp = &count;
+	fcms.fcms_maxcount = old_cip->ci_nsuspects;
+	fcms.fcms_cip = new_cip;
+	fcms.fcms_new_susp_state = new_susp_state;
+	fcms.fcms_old_susp_state = old_susp_state;
+	fcms.fcms_old_match_state = old_match_state;
+	fmd_asru_hash_apply_by_case(fmd.d_asrus, (fmd_case_t *)old_cip,
+	    fmd_case_match_suspects, &fcms);
+
+	/*
+	 * If we have some faulty, non-isolated suspects that overlap, then most
+	 * likely it is the suspects that overlap in the suspect lists that are
+	 * to blame. So we can consider this to be a match.
+	 */
+	for (i = 0; i < new_cip->ci_nsuspects; i++)
+		if (new_susp_state[i] == SUSPECT_STATE_FAULTY)
+			got_faulty_overlap = 1;
+	if (got_faulty_overlap && fmd_case_match_on_faulty_overlap)
+		goto got_match;
+
+	/*
+	 * If we have no faulty, non-isolated suspects in the old case, but we
+	 * do have some acquitted suspects that overlap, then most likely it is
+	 * the acquitted suspects that overlap in the suspect lists that are
+	 * to blame. So we can consider this to be a match.
+	 */
+	for (i = 0; i < new_cip->ci_nsuspects; i++)
+		if (new_susp_state[i] == SUSPECT_STATE_ACQUITED)
+			got_acquit_overlap = 1;
+	for (i = 0; i < old_cip->ci_nsuspects; i++)
+		if (old_susp_state[i] == SUSPECT_STATE_FAULTY)
+			got_acquit_overlap = 0;
+	if (got_acquit_overlap && fmd_case_match_on_acquit_overlap)
+		goto got_match;
+
+	/*
+	 * Check that all suspects in the new list are present in the old list.
+	 * Return if we find one that isn't.
+	 */
+	for (i = 0; i < new_cip->ci_nsuspects; i++)
+		if (new_susp_state[i] == 0)
+			return;
+
+	/*
+	 * Check that all suspects in the old list are present in the new list
+	 * *or* they are isolated or removed/replaced (which would explain why
+	 * they are not present in the new list). Return if we find one that is
+	 * faulty and unisolated or repaired or acquitted, and that is not
+	 * present in the new case.
+	 */
+	for (i = 0; i < old_cip->ci_nsuspects; i++)
+		if (old_match_state[i] == SUSPECT_STATE_NO_MATCH &&
+		    (old_susp_state[i] == SUSPECT_STATE_FAULTY ||
+		    old_susp_state[i] == SUSPECT_STATE_ACQUITED ||
+		    old_susp_state[i] == SUSPECT_STATE_REPAIRED))
+			return;
+
+got_match:
+	/*
+	 * If the old case is already in repaired/resolved state, we can't
+	 * do anything more with it, so keep the new case, but acquit some
+	 * of the suspects if appropriate.
+	 */
+	if (old_cip->ci_state >= FMD_CASE_REPAIRED) {
+		if (fmd_case_auto_acquit_non_acquitted) {
+			*fccdp->fccd_adjust_new = 1;
+			for (i = 0; i < new_cip->ci_nsuspects; i++) {
+				fccdp->fccd_new_susp_state[i] |=
+				    new_susp_state[i];
+				if (new_susp_state[i] == 0)
+					fccdp->fccd_new_susp_state[i] =
+					    SUSPECT_STATE_NO_MATCH;
+			}
+		}
+		return;
+	}
+
+	/*
+	 * Otherwise discard the new case and keep the old, again updating the
+	 * state of the suspects as appropriate
+	 */
+	*fccdp->fccd_discard_new = 1;
+	fca.fca_cip = new_cip;
+	fca.fca_do_update = &do_update;
+
+	/*
+	 * See if new case occurred within fmd_case_too_recent seconds of the
+	 * most recent modification to the old case and if so don't do
+	 * auto-acquit. This avoids problems if a flood of ereports come in and
+	 * they don't all get diagnosed before the first case causes some of
+	 * the devices to be isolated making it appear that an isolated device
+	 * was in the suspect list.
+	 */
+	fmd_asru_hash_apply_by_case(fmd.d_asrus, old_cp,
+	    fmd_asru_most_recent, &most_recent);
+	too_recent = (new_cip->ci_tv.tv_sec - most_recent <
+	    fmd_case_too_recent);
+
+	if (got_faulty_overlap) {
+		/*
+		 * Acquit any suspects not present in the new list, plus
+		 * any that are are present but are isolated.
+		 */
+		fmd_asru_hash_apply_by_case(fmd.d_asrus, old_cp,
+		    fmd_case_acquit_no_match, &fca);
+		if (fmd_case_auto_acquit_isolated && !too_recent)
+			fmd_asru_hash_apply_by_case(fmd.d_asrus, old_cp,
+			    fmd_case_acquit_isolated, &do_update);
+	} else if (got_acquit_overlap) {
+		/*
+		 * Re-fault the acquitted matching suspects and acquit all
+		 * isolated suspects.
+		 */
+		if (fmd_case_auto_acquit_isolated && !too_recent) {
+			fmd_asru_hash_apply_by_case(fmd.d_asrus, old_cp,
+			    fmd_case_fault_acquitted_matching, &fca);
+			fmd_asru_hash_apply_by_case(fmd.d_asrus, old_cp,
+			    fmd_case_acquit_isolated, &do_update);
+		}
+	} else if (fmd_case_auto_acquit_isolated) {
+		/*
+		 * To get here, there must be no faulty or acquitted suspects,
+		 * but there must be at least one isolated suspect. Just acquit
+		 * non-matching isolated suspects. If there are no matching
+		 * isolated suspects, then re-fault all matching suspects.
+		 */
+		for (i = 0; i < new_cip->ci_nsuspects; i++)
+			if (new_susp_state[i] == SUSPECT_STATE_ISOLATED)
+				got_isolated_overlap = 1;
+		if (!got_isolated_overlap)
+			fmd_asru_hash_apply_by_case(fmd.d_asrus, old_cp,
+			    fmd_case_fault_all_matching, &fca);
+		fmd_asru_hash_apply_by_case(fmd.d_asrus, old_cp,
+		    fmd_case_acquit_no_match, &fca);
+	}
+
+	/*
+	 * If we've updated anything in the old case, call fmd_case_update()
+	 */
+	if (do_update)
+		fmd_case_update(old_cp);
 }
 
 /*
@@ -610,22 +944,49 @@ fmd_case_convict(fmd_case_t *cp)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
 	fmd_asru_hash_t *ahp = fmd.d_asrus;
-
+	int discard_new = 0, i;
 	fmd_case_susp_t *cis;
 	fmd_asru_link_t *alp;
+	uint8_t *new_susp_state;
+	uint8_t *new_match_state;
+	int adjust_new = 0;
+	fccd_t fccd;
 
 	(void) pthread_mutex_lock(&cip->ci_lock);
 	if (cip->ci_code == NULL)
 		(void) fmd_case_mkcode(cp);
 	else if (cip->ci_precanned)
 		fmd_case_code_hash_insert(fmd.d_cases, cip);
-	if (fmd_case_check_for_dups(cp) == 1) {
+
+	/*
+	 * First we must see if any matching cases already exist.
+	 */
+	new_susp_state = alloca(cip->ci_nsuspects * sizeof (uint8_t));
+	for (i = 0; i < cip->ci_nsuspects; i++)
+		new_susp_state[i] = 0;
+	new_match_state = alloca(cip->ci_nsuspects * sizeof (uint8_t));
+	for (i = 0; i < cip->ci_nsuspects; i++)
+		new_match_state[i] = 0;
+	fccd.fccd_cip = cip;
+	fccd.fccd_adjust_new = &adjust_new;
+	fccd.fccd_new_susp_state = new_susp_state;
+	fccd.fccd_new_match_state = new_match_state;
+	fccd.fccd_discard_new = &discard_new;
+	fmd_case_hash_apply_except_current(fmd.d_cases, fmd_case_check_for_dups,
+	    &fccd, cp);
+
+	if (discard_new) {
+		/*
+		 * We've found an existing case that is a match and it is not
+		 * already in repaired or resolved state. So we can close this
+		 * one as a duplicate.
+		 */
 		(void) pthread_mutex_unlock(&cip->ci_lock);
 		return (1);
 	}
 
 	/*
-	 * no suspect list already exists  - allocate new cache entries
+	 * Allocate new cache entries
 	 */
 	for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next) {
 		if ((alp = fmd_asru_hash_create_entry(ahp,
@@ -638,6 +999,45 @@ fmd_case_convict(fmd_case_t *cp)
 		alp->al_asru->asru_flags |= FMD_ASRU_PRESENT;
 		(void) fmd_asru_clrflags(alp, FMD_ASRU_UNUSABLE, 0);
 		(void) fmd_asru_setflags(alp, FMD_ASRU_FAULTY);
+	}
+
+	if (adjust_new) {
+		int some_suspect = 0, some_not_suspect = 0;
+
+		/*
+		 * There is one or more matching case but they are already in
+		 * repaired or resolved state. So we need to keep the new
+		 * case, but we can adjust it. Repaired/removed/replaced
+		 * suspects are unlikely to be to blame (unless there are
+		 * actually two separate faults). So if we have a combination of
+		 * repaired/replaced/removed suspects and acquitted suspects in
+		 * the old lists, then we should acquit in the new list those
+		 * that were repaired/replaced/removed in the old.
+		 */
+		for (i = 0; i < cip->ci_nsuspects; i++) {
+			if ((new_susp_state[i] & SUSPECT_STATE_REPLACED) ||
+			    (new_susp_state[i] & SUSPECT_STATE_REPAIRED) ||
+			    (new_susp_state[i] & SUSPECT_STATE_REMOVED) ||
+			    (new_match_state[i] & SUSPECT_STATE_NO_MATCH))
+				some_not_suspect = 1;
+			else
+				some_suspect = 1;
+		}
+		if (some_suspect && some_not_suspect) {
+			for (cis = cip->ci_suspects, i = 0; cis != NULL;
+			    cis = cis->cis_next, i++)
+				if ((new_susp_state[i] &
+				    SUSPECT_STATE_REPLACED) ||
+				    (new_susp_state[i] &
+				    SUSPECT_STATE_REPAIRED) ||
+				    (new_susp_state[i] &
+				    SUSPECT_STATE_REMOVED) ||
+				    (new_match_state[i] &
+				    SUSPECT_STATE_NO_MATCH))
+					fmd_asru_hash_apply_by_case(fmd.d_asrus,
+					    cp, fmd_case_acquit_suspect,
+					    cis->cis_nvl);
+		}
 	}
 
 	(void) pthread_mutex_unlock(&cip->ci_lock);
@@ -934,8 +1334,6 @@ fmd_case_recreate(fmd_module_t *mp, fmd_xprt_t *xp,
 	fmd_case_impl_t *cip = fmd_zalloc(sizeof (fmd_case_impl_t), FMD_SLEEP);
 	fmd_case_impl_t *eip;
 
-	ASSERT(state < FMD_CASE_RESOLVED);
-
 	(void) pthread_mutex_init(&cip->ci_lock, NULL);
 	fmd_buf_hash_create(&cip->ci_bufs);
 
@@ -987,11 +1385,12 @@ fmd_case_recreate(fmd_module_t *mp, fmd_xprt_t *xp,
 
 			/*
 			 * When recreating an orphan case, state passed in may
-			 * either be CLOSED (faulty) or REPAIRED (!faulty). If
+			 * be CLOSED (faulty) or REPAIRED/RESOLVED (!faulty). If
 			 * any suspects are still CLOSED (faulty) then the
 			 * overall state needs to be CLOSED.
 			 */
-			if (cip->ci_state == FMD_CASE_REPAIRED &&
+			if ((cip->ci_state == FMD_CASE_REPAIRED ||
+			    cip->ci_state == FMD_CASE_RESOLVED) &&
 			    state == FMD_CASE_CLOSED)
 				cip->ci_state = FMD_CASE_CLOSED;
 			(void) pthread_mutex_unlock(&cip->ci_lock);
@@ -1397,13 +1796,8 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 		 * using fmd_xprt_uuresolved().
 		 */
 		if (flags & FMD_CF_RESOLVED) {
-			if (cip->ci_xprt != NULL) {
+			if (cip->ci_xprt != NULL)
 				fmd_list_delete(&cip->ci_mod->mod_cases, cip);
-			} else {
-				fmd_module_lock(cip->ci_mod);
-				fmd_list_delete(&cip->ci_mod->mod_cases, cip);
-				fmd_module_unlock(cip->ci_mod);
-			}
 		} else {
 			fmd_asru_hash_apply_by_case(fmd.d_asrus, cp,
 			    fmd_case_unusable_and_present,
@@ -1414,9 +1808,6 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 				fmd_xprt_uuresolved(cip->ci_xprt, cip->ci_uuid);
 				break;
 			}
-			fmd_module_lock(cip->ci_mod);
-			fmd_list_delete(&cip->ci_mod->mod_cases, cip);
-			fmd_module_unlock(cip->ci_mod);
 		}
 
 		cip->ci_state = FMD_CASE_RESOLVED;
@@ -1455,9 +1846,6 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 			return;
 		}
 
-		fmd_module_lock(cip->ci_mod);
-		fmd_list_delete(&cip->ci_mod->mod_cases, cip);
-		fmd_module_unlock(cip->ci_mod);
 		resolved = 1;
 		break;
 	}
@@ -1482,17 +1870,73 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 	}
 
 	if (resolved) {
-		/*
-		 * If we transitioned to RESOLVED, adjust the reference count to
-		 * reflect our removal from fmd.d_rmod->mod_cases above.  If the
-		 * caller has not placed an additional hold on the case, it
-		 * will now be freed.
-		 */
-		(void) pthread_mutex_lock(&cip->ci_lock);
-		fmd_asru_hash_delete_case(fmd.d_asrus, cp);
-		(void) pthread_mutex_unlock(&cip->ci_lock);
-		fmd_case_rele(cp);
+		if (cip->ci_xprt != NULL) {
+			/*
+			 * If we transitioned to RESOLVED, adjust the reference
+			 * count to reflect our removal from
+			 * fmd.d_rmod->mod_cases above.  If the caller has not
+			 * placed an additional hold on the case, it will now
+			 * be freed.
+			 */
+			(void) pthread_mutex_lock(&cip->ci_lock);
+			fmd_asru_hash_delete_case(fmd.d_asrus, cp);
+			(void) pthread_mutex_unlock(&cip->ci_lock);
+			fmd_case_rele(cp);
+		} else {
+			fmd_asru_hash_apply_by_case(fmd.d_asrus, cp,
+			    fmd_asru_log_resolved, NULL);
+			(void) pthread_mutex_lock(&cip->ci_lock);
+			/* mark as "ready to be discarded */
+			cip->ci_flags |= FMD_CF_RES_CMPL;
+			(void) pthread_mutex_unlock(&cip->ci_lock);
+		}
 	}
+}
+
+/*
+ * Discard any case if it is in RESOLVED state (and if check_if_aged argument
+ * is set if all suspects have passed the rsrc.aged time).
+ */
+void
+fmd_case_discard_resolved(fmd_case_t *cp, void *arg)
+{
+	int check_if_aged = *(int *)arg;
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+
+	/*
+	 * First check if case has completed transition to resolved.
+	 */
+	(void) pthread_mutex_lock(&cip->ci_lock);
+	if (!(cip->ci_flags & FMD_CF_RES_CMPL)) {
+		(void) pthread_mutex_unlock(&cip->ci_lock);
+		return;
+	}
+
+	/*
+	 * Now if check_is_aged is set, see if all suspects have aged.
+	 */
+	if (check_if_aged) {
+		int aged = 1;
+
+		fmd_asru_hash_apply_by_case(fmd.d_asrus, cp,
+		    fmd_asru_check_if_aged, &aged);
+		if (!aged) {
+			(void) pthread_mutex_unlock(&cip->ci_lock);
+			return;
+		}
+	}
+
+	/*
+	 * Finally discard the case, clearing FMD_CF_RES_CMPL so we don't
+	 * do it twice.
+	 */
+	fmd_module_lock(cip->ci_mod);
+	fmd_list_delete(&cip->ci_mod->mod_cases, cip);
+	fmd_module_unlock(cip->ci_mod);
+	fmd_asru_hash_delete_case(fmd.d_asrus, cp);
+	cip->ci_flags &= ~FMD_CF_RES_CMPL;
+	(void) pthread_mutex_unlock(&cip->ci_lock);
+	fmd_case_rele(cp);
 }
 
 /*
@@ -1964,7 +2408,7 @@ fmd_case_setcode(fmd_case_t *cp, char *code)
 }
 
 /*ARGSUSED*/
-void
+static void
 fmd_case_repair_replay_case(fmd_case_t *cp, void *arg)
 {
 	int not_faulty = 0;
@@ -1977,6 +2421,11 @@ fmd_case_repair_replay_case(fmd_case_t *cp, void *arg)
 
 	if (cip->ci_state < FMD_CASE_SOLVED || cip->ci_xprt != NULL)
 		return;
+
+	if (cip->ci_state == FMD_CASE_RESOLVED) {
+		cip->ci_flags |= FMD_CF_RES_CMPL;
+		return;
+	}
 
 	fmd_asru_hash_apply_by_case(fmd.d_asrus, cp, fmd_case_faulty, &faulty);
 	fmd_asru_hash_apply_by_case(fmd.d_asrus, cp, fmd_case_not_faulty,
@@ -1991,9 +2440,6 @@ fmd_case_repair_replay_case(fmd_case_t *cp, void *arg)
 		fmd_asru_hash_apply_by_case(fmd.d_asrus, cp,
 		    fmd_case_unusable_and_present, &any_unusable_and_present);
 		if (!any_unusable_and_present) {
-			fmd_module_lock(cip->ci_mod);
-			fmd_list_delete(&cip->ci_mod->mod_cases, cip);
-			fmd_module_unlock(cip->ci_mod);
 			cip->ci_state = FMD_CASE_RESOLVED;
 
 			TRACE((FMD_DBG_CASE, "replay sending list.repaired %s",
@@ -2007,10 +2453,7 @@ fmd_case_repair_replay_case(fmd_case_t *cp, void *arg)
 			TRACE((FMD_DBG_CASE, "replay sending list.resolved %s",
 			    cip->ci_uuid));
 			fmd_case_publish(cp, FMD_CASE_RESOLVED);
-			(void) pthread_mutex_lock(&cip->ci_lock);
-			fmd_asru_hash_delete_case(fmd.d_asrus, cp);
-			(void) pthread_mutex_unlock(&cip->ci_lock);
-			fmd_case_rele(cp);
+			cip->ci_flags |= FMD_CF_RES_CMPL;
 		} else {
 			TRACE((FMD_DBG_CASE, "replay sending list.repaired %s",
 			    cip->ci_uuid));

@@ -500,7 +500,22 @@ fmd_adm_rsrcflush_1_svc(char *name, int *rvp, struct svc_req *req)
 {
 	int err = FMD_ADM_ERR_RSRCNOTF;
 
-	fmd_adm_do_repair(name, req, &err, FMD_ASRU_REPAIRED, NULL);
+	/*
+	 * If anyone does an fmadm flush command, discard any resolved
+	 * cases that were being retained for historic diagnosis.
+	 */
+	if (fmd_rpc_deny(req))
+		err = FMD_ADM_ERR_PERM;
+	else {
+		fmd_asru_hash_apply_by_asru(fmd.d_asrus, name,
+		    fmd_asru_flush, &err);
+		fmd_asru_hash_apply_by_label(fmd.d_asrus, name,
+		    fmd_asru_flush, &err);
+		fmd_asru_hash_apply_by_fru(fmd.d_asrus, name,
+		    fmd_asru_flush, &err);
+		fmd_asru_hash_apply_by_rsrc(fmd.d_asrus, name,
+		    fmd_asru_flush, &err);
+	}
 	*rvp = err;
 	return (TRUE);
 }

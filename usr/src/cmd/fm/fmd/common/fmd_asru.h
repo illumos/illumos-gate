@@ -195,6 +195,7 @@ typedef struct {
 	char *fara_uuid;	/* uuid can be passed in for comparison */
 } fmd_asru_rep_arg_t;
 extern void fmd_asru_repaired(fmd_asru_link_t *, void *);
+extern void fmd_asru_flush(fmd_asru_link_t *, void *);
 
 typedef struct {
 	int	*faus_countp;
@@ -225,8 +226,11 @@ extern void fmd_asru_close_status(fmd_asru_link_t *alp, void *arg);
 
 extern int fmd_asru_setflags(fmd_asru_link_t *, uint_t);
 extern int fmd_asru_clrflags(fmd_asru_link_t *, uint_t, uint8_t);
+extern void fmd_asru_log_resolved(fmd_asru_link_t *, void *);
 extern int fmd_asru_al_getstate(fmd_asru_link_t *);
 extern int fmd_asru_getstate(fmd_asru_t *);
+extern void fmd_asru_check_if_aged(fmd_asru_link_t *, void *);
+void fmd_asru_most_recent(fmd_asru_link_t *, void *);
 
 #ifdef	__cplusplus
 }

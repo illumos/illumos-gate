@@ -122,6 +122,7 @@ extern "C" {
 #define	FM_RSRC_ASRU_REPAIRED		"repaired"
 #define	FM_RSRC_ASRU_REPLACED		"replaced"
 #define	FM_RSRC_ASRU_ACQUITTED		"acquitted"
+#define	FM_RSRC_ASRU_RESOLVED		"resolved"
 #define	FM_RSRC_ASRU_UNUSABLE		"unusable"
 #define	FM_RSRC_ASRU_EVENT		"event"
 

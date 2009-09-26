@@ -591,48 +591,6 @@ merge_name_list(name_list_t **list, name_list_t *new, int add_pct)
 	return (rt);
 }
 
-/*
- * compare entries in two lists return true if the two lists have identical
- * content. The two lists may not have entries in the same order, so we compare
- * the size of the list as well as trying to find every entry from one list in
- * the other.
- */
-static int
-cmp_name_list(name_list_t *lxp1, name_list_t *lxp2)
-{
-	name_list_t *lp1, *lp2;
-	int l1 = 0, l2 = 0, common = 0;
-
-	lp2 = lxp2;
-	while (lp2) {
-		l2++;
-		lp2 = lp2->next;
-		if (lp2 == lxp2)
-			break;
-	}
-	lp1 = lxp1;
-	while (lp1) {
-		l1++;
-		lp2 = lxp2;
-		while (lp2) {
-			if (strcmp(lp2->name, lp1->name) == 0) {
-				common++;
-				break;
-			}
-			lp2 = lp2->next;
-			if (lp2 == lxp2)
-				break;
-		}
-		lp1 = lp1->next;
-		if (lp1 == lxp1)
-			break;
-	}
-	if (l1 == l2 && l2 == common)
-		return (0);
-	else
-		return (1);
-}
-
 static name_list_t *
 alloc_name_list(char *name, uint8_t pct)
 {
@@ -648,24 +606,6 @@ alloc_name_list(char *name, uint8_t pct)
 	nlp->status = 0;
 	nlp->label = NULL;
 	return (nlp);
-}
-
-static void
-free_name_list(name_list_t *list)
-{
-	name_list_t *next = list;
-	name_list_t *lp;
-
-	if (list) {
-		do {
-			lp = next;
-			next = lp->next;
-			if (lp->label)
-				free(lp->label);
-			free(lp->name);
-			free(lp);
-		} while (next != list);
-	}
 }
 
 static status_record_t *
@@ -863,64 +803,6 @@ catalog_new_record(uurec_t *uurec_p, char *msgid, name_list_t *class,
 		add_list(status_rec_p, status_rec_p->asru, &status_asru_list);
 }
 
-/*
- * add uuid and diagnoses time to an existing record for similar fault on the
- * same fru
- */
-static void
-catalog_merge_record(status_record_t *status_rec_p, uurec_t *uurec_p,
-    name_list_t *asru, name_list_t *resource, name_list_t *serial,
-    boolean_t not_suppressed)
-{
-	uurec_t *uurec1_p;
-
-	status_rec_p->nrecs++;
-	/* add uurec in time order */
-	if (status_rec_p->uurec->sec > uurec_p->sec) {
-		uurec_p->next = status_rec_p->uurec;
-		uurec_p->prev = NULL;
-		status_rec_p->uurec = uurec_p;
-	} else {
-		uurec1_p = status_rec_p->uurec;
-		while (uurec1_p->next && uurec1_p->next->sec <= uurec_p->sec)
-			uurec1_p = uurec1_p->next;
-		if (uurec1_p->next)
-			uurec1_p->next->prev = uurec_p;
-		uurec_p->next = uurec1_p->next;
-		uurec_p->prev = uurec1_p;
-		uurec1_p->next = uurec_p;
-	}
-	status_rec_p->not_suppressed |= not_suppressed;
-	uurec_p->asru = merge_name_list(&status_rec_p->asru, asru, 0);
-	(void) merge_name_list(&status_rec_p->resource, resource, 0);
-	(void) merge_name_list(&status_rec_p->serial, serial, 0);
-}
-
-static status_record_t *
-record_in_catalog(name_list_t *class, name_list_t *fru,
-    char *msgid, hostid_t *host)
-{
-	sr_list_t *status_rec_p;
-	status_record_t *srp = NULL;
-
-	status_rec_p = status_rec_list;
-	while (status_rec_p) {
-		srp = status_rec_p->status_record;
-		if (host == srp->host &&
-		    cmp_name_list(class, srp->class) == 0 &&
-		    cmp_name_list(fru, srp->fru) == 0 &&
-		    strcmp(msgid, srp->msgid) == 0)
-			break;
-		if (status_rec_p->next == status_rec_list) {
-			srp = NULL;
-			break;
-		} else {
-			status_rec_p = status_rec_p->next;
-		}
-	}
-	return (srp);
-}
-
 static void
 get_serial_no(nvlist_t *nvl, name_list_t **serial_p, uint8_t pct)
 {
@@ -993,6 +875,15 @@ extract_record_info(nvlist_t *nvl, name_list_t **class_p,
 			(void) merge_name_list(fru_p, nlp, 1);
 		}
 		get_serial_no(lfru, serial_p, lpct);
+	} else if (nvlist_lookup_nvlist(nvl, FM_FAULT_RESOURCE, &rsrc) != 0) {
+		/*
+		 * No FRU or resource. But we want to display the repair status
+		 * somehow, so create a dummy FRU field.
+		 */
+		nlp = alloc_name_list(dgettext("FMD", "None"), lpct);
+		nlp->status = status & ~(FM_SUSPECT_UNUSABLE |
+		    FM_SUSPECT_DEGRADED);
+		(void) merge_name_list(fru_p, nlp, 1);
 	}
 	if (nvlist_lookup_nvlist(nvl, FM_FAULT_ASRU, &lasru) == 0) {
 		name = get_nvl2str_topo(lasru);
@@ -1029,7 +920,6 @@ add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid)
 	name_list_t *asru = NULL, *fru = NULL, *serial = NULL;
 	nvlist_t **nva;
 	uint8_t *ba;
-	status_record_t *status_rec_p;
 	uurec_t *uurec_p;
 	hostid_t *host;
 	boolean_t not_suppressed = 1;
@@ -1066,19 +956,8 @@ add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid)
 	uurec_p->event = NULL;
 	(void) nvlist_dup(nvl, &uurec_p->event, 0);
 	host = find_hostid(nvl);
-	if (not_suppressed && !opt_g)
-		status_rec_p = NULL;
-	else
-		status_rec_p = record_in_catalog(class, fru, msgid, host);
-	if (status_rec_p) {
-		catalog_merge_record(status_rec_p, uurec_p, asru, resource,
-		    serial, not_suppressed);
-		free_name_list(class);
-		free_name_list(fru);
-	} else {
-		catalog_new_record(uurec_p, msgid, class, fru, asru,
-		    resource, serial, not_suppressed, host);
-	}
+	catalog_new_record(uurec_p, msgid, class, fru, asru,
+	    resource, serial, not_suppressed, host);
 }
 
 static void
@@ -1473,10 +1352,17 @@ print_sup_record(status_record_t *srp, int opt_i, int full)
 	}
 	if (full || srp->fru == NULL || srp->asru == NULL) {
 		if (srp->resource) {
-			print_name_list(srp->resource,
-			    dgettext("FMD", "Problem in  :"),
-			    NULL, full ? 0 : max_display, 0, print_rsrc_status,
-			    full);
+			status = asru_same_status(srp->resource);
+			if (status != -1) {
+				print_name_list(srp->resource,
+				    dgettext("FMD", "Problem in  :"), NULL,
+				    full ? 0 : max_display, 0, NULL, full);
+				print_rsrc_status(status, "             ");
+			} else
+				print_name_list(srp->resource,
+				    dgettext("FMD", "Problem in  :"),
+				    NULL, full ? 0 : max_display, 0,
+				    print_rsrc_status, full);
 		}
 	}
 	if (srp->fru) {
