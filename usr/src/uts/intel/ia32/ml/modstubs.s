@@ -1256,6 +1256,7 @@ fcnname/**/_info:							\
 	MODULE(dld,drv);
 	STUB(dld, dld_init_ops, nomod_void);
 	STUB(dld, dld_fini_ops, nomod_void);
+	STUB(dld, dld_devt_to_instance, nomod_minus_one);
 	STUB(dld, dld_autopush, nomod_minus_one);
 	STUB(dld, dld_ioc_register, nomod_einval);
 	STUB(dld, dld_ioc_unregister, nomod_void);

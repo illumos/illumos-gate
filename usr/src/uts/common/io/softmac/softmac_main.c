@@ -326,19 +326,49 @@ softmac_create(dev_info_t *dip, dev_t dev)
 		return (ENXIO);
 	}
 
-	ppa = ddi_get_instance(dip);
-	(void) snprintf(devname, MAXNAMELEN, "%s%d", ddi_driver_name(dip), ppa);
+	if (GLDV3_DRV(ddi_driver_major(dip))) {
+		minor_t minor = getminor(dev);
+		/*
+		 * For GLDv3, we don't care about the DLPI style 2
+		 * compatibility node.  (We know that all such devices
+		 * have style 1 nodes.)
+		 */
+		if ((strcmp(ddi_driver_name(dip), "clone") == 0) ||
+		    (getmajor(dev) == ddi_name_to_major("clone")) ||
+		    (minor == 0)) {
+			return (0);
+		}
 
-	/*
-	 * We expect legacy devices have at most two minor nodes - one style-1
-	 * and one style-2.
-	 */
-	if (!GLDV3_DRV(ddi_driver_major(dip)) &&
-	    i_ddi_minor_node_count(dip, DDI_NT_NET) > 2) {
-		cmn_err(CE_WARN, "%s has more than 2 minor nodes; unsupported",
-		    devname);
-		return (ENOTSUP);
+		/*
+		 * Likewise, we know that the minor number for DLPI style 1
+		 * nodes is constrained to a maximum value.
+		 */
+		if (minor >= DLS_MAX_MINOR) {
+			return (ENOTSUP);
+		}
+		/*
+		 * Otherwise we can decode the instance from the minor number,
+		 * which allows for situations with multiple mac instances
+		 * for a single dev_info_t.
+		 */
+		ppa = DLS_MINOR2INST(minor);
+	} else {
+		/*
+		 * For legacy drivers, we just have to limit them to
+		 * two minor nodes, one style 1 and one style 2, and
+		 * we assume the ddi_get_instance() is the PPA.
+		 * Drivers that need more flexibility should be ported
+		 * to GLDv3.
+		 */
+		ppa = ddi_get_instance(dip);
+		if (i_ddi_minor_node_count(dip, DDI_NT_NET) > 2) {
+			cmn_err(CE_WARN, "%s has more than 2 minor nodes; "
+			    "unsupported", devname);
+			return (ENOTSUP);
+		}
 	}
+
+	(void) snprintf(devname, MAXNAMELEN, "%s%d", ddi_driver_name(dip), ppa);
 
 	/*
 	 * Check whether the softmac for the specified device already exists
@@ -373,24 +403,13 @@ softmac_create(dev_info_t *dip, dev_t dev)
 		softmac->smac_uppa = ppa;
 
 		/*
-		 * Note that for GLDv3 devices, we create devfs minor nodes
-		 * for VLANs as well. Assume a GLDv3 driver on which only
-		 * a VLAN is created. During the detachment of this device
-		 * instance, the following would happen:
-		 * a. the pre-detach callback softmac_destroy() succeeds.
-		 *    Because the physical link itself is not in use,
-		 *    softmac_destroy() succeeds and destroys softmac_t;
-		 * b. the device detach fails in mac_unregister() because
-		 *    this MAC is still used by a VLAN.
-		 * c. the post-attach callback is then called which leads
-		 *    us here. Note that ddi_minor_node_count() returns 3
-		 *    (including the minior node of the VLAN). In that case,
-		 *    we must correct the minor node count to 2 as that is
-		 *    the count of minor nodes that go through post-attach.
+		 * For GLDv3, we ignore the style 2 node (see the logic
+		 * above on that), and we should have exactly one attach
+		 * per MAC instance (possibly more than one per dev_info_t).
 		 */
 		if (GLDV3_DRV(ddi_driver_major(dip))) {
 			softmac->smac_flags |= SOFTMAC_GLDV3;
-			softmac->smac_cnt = 2;
+			softmac->smac_cnt = 1;
 		} else {
 			softmac->smac_cnt =
 			    i_ddi_minor_node_count(dip, DDI_NT_NET);
@@ -926,7 +945,25 @@ softmac_destroy(dev_info_t *dip, dev_t dev)
 	mac_handle_t		smac_mh;
 	uint32_t		smac_flags;
 
-	ppa = ddi_get_instance(dip);
+	if (GLDV3_DRV(ddi_driver_major(dip))) {
+		minor_t minor = getminor(dev);
+		/*
+		 * For an explanation of this logic, see the
+		 * equivalent code in softmac_create.
+		 */
+		if ((strcmp(ddi_driver_name(dip), "clone") == 0) ||
+		    (getmajor(dev) == ddi_name_to_major("clone")) ||
+		    (minor == 0)) {
+			return (0);
+		}
+		if (minor >= DLS_MAX_MINOR) {
+			return (ENOTSUP);
+		}
+		ppa = DLS_MINOR2INST(minor);
+	} else {
+		ppa = ddi_get_instance(dip);
+	}
+
 	(void) snprintf(devname, MAXNAMELEN, "%s%d", ddi_driver_name(dip), ppa);
 
 	/*
@@ -1467,7 +1504,24 @@ softmac_hold_device(dev_t dev, dls_dev_handle_t *ddhp)
 	const char	*drvname;
 	char		devname[MAXNAMELEN];
 	softmac_t	*softmac;
-	int		ppa, err;
+	int		ppa, err, inst;
+
+	drvname = ddi_major_to_name(getmajor(dev));
+
+	/*
+	 * Exclude non-physical network device instances, for example, aggr0.
+	 */
+	if (!NETWORK_DRV(getmajor(dev)) || (strcmp(drvname, "aggr") == 0) ||
+	    (strcmp(drvname, "vnic") == 0)) {
+		return (ENOENT);
+	}
+
+	/*
+	 * We have to lookup the device instance using getinfo(9e).
+	 */
+	inst = dev_to_instance(dev);
+	if (inst < 0)
+		return (ENOENT);
 
 	if ((ppa = getminor(dev) - 1) > 1000)
 		return (ENOENT);
@@ -1476,20 +1530,8 @@ softmac_hold_device(dev_t dev, dls_dev_handle_t *ddhp)
 	 * First try to hold this device instance to force the MAC
 	 * to be registered.
 	 */
-	if ((dip = ddi_hold_devi_by_instance(getmajor(dev), ppa, 0)) == NULL)
+	if ((dip = ddi_hold_devi_by_instance(getmajor(dev), inst, 0)) == NULL)
 		return (ENOENT);
-
-	drvname = ddi_driver_name(dip);
-
-	/*
-	 * Exclude non-physical network device instances, for example, aggr0.
-	 */
-	if ((ddi_driver_major(dip) != getmajor(dev)) ||
-	    !NETWORK_DRV(getmajor(dev)) || (strcmp(drvname, "aggr") == 0) ||
-	    (strcmp(drvname, "vnic") == 0)) {
-		ddi_release_devi(dip);
-		return (ENOENT);
-	}
 
 	/*
 	 * This is a network device; wait for its softmac to be registered.

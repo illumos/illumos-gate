@@ -768,7 +768,8 @@ dls_link_devinfo(dev_t dev)
 
 	if ((drv = ddi_major_to_name(getmajor(dev))) == NULL)
 		return (NULL);
-	(void) snprintf(macname, MAXNAMELEN, "%s%d", drv, getminor(dev) - 1);
+	(void) snprintf(macname, MAXNAMELEN, "%s%d", drv,
+	    DLS_MINOR2INST(getminor(dev)));
 
 	/*
 	 * The code below assumes that the name constructed above is the

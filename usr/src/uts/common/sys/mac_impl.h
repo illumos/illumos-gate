@@ -38,6 +38,27 @@
 extern "C" {
 #endif
 
+/*
+ * This is the first minor number available for MAC provider private
+ * use.  This makes it possible to deliver a driver that is both a MAC
+ * provider and a regular character/block device.  See PSARC 2009/380
+ * for more detail about the construction of such devices.  The value
+ * chosen leaves half of the 32-bit minor numbers (which are really
+ * only 18 bits wide) available for driver private use.  Drivers can
+ * easily identify their private number by the presence of this value
+ * in the bits that make up the minor number, since its just the
+ * highest bit available for such minor numbers.
+ */
+#define	MAC_PRIVATE_MINOR		((MAXMIN32 + 1) / 2)
+
+/*
+ * The maximum minor number that corresponds to a real instance.  This
+ * limits the number of physical ports that a mac provider can offer.
+ * Note that this macro must be synchronized with DLS_MAX_MINOR in
+ * <sys/dls.h>
+ */
+#define	MAC_MAX_MINOR			1000
+
 typedef struct mac_margin_req_s	mac_margin_req_t;
 
 struct mac_margin_req_s {

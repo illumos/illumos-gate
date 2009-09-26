@@ -43,7 +43,7 @@ extern "C" {
 /*
  * MAC Information (text emitted by modinfo(1m))
  */
-#define	MAC_INFO	"MAC Services v1.20"
+#define	MAC_INFO	"MAC Services"
 
 /*
  * MAC-Type version identifier.  This is used by mactype_alloc() and
@@ -66,8 +66,6 @@ typedef	struct __mac_group_handle	*mac_group_handle_t;
 #define	DATALINK_INVALID_LINKID	0
 #define	DATALINK_ALL_LINKID	0
 #define	DATALINK_MAX_LINKID	0xffffffff
-
-#define	MAC_MAX_MINOR	1000
 
 typedef enum {
 	LINK_STATE_UNKNOWN = -1,

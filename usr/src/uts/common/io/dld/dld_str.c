@@ -129,6 +129,7 @@ static void		dld_taskq_dispatch(void);
 typedef struct i_dld_str_state_s {
 	major_t		ds_major;
 	minor_t		ds_minor;
+	int		ds_instance;
 	dev_info_t	*ds_dip;
 } i_dld_str_state_t;
 
@@ -152,8 +153,10 @@ i_dld_str_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 		 * walk if we find a matching stream -- even if we fail
 		 * to obtain the devinfo.
 		 */
-		if (mh != NULL)
+		if (mh != NULL) {
 			statep->ds_dip = mac_devinfo_get(mh);
+			statep->ds_instance = mac_minor(mh) - 1;
+		}
 		return (MH_WALK_TERMINATE);
 	}
 	return (MH_WALK_CONTINUE);
@@ -177,13 +180,58 @@ dld_finddevinfo(dev_t dev)
 	state.ds_minor = getminor(dev);
 	state.ds_major = getmajor(dev);
 	state.ds_dip = NULL;
+	state.ds_instance = -1;
 
 	mod_hash_walk(str_hashp, i_dld_str_walker, &state);
 	return (state.ds_dip);
 }
 
+int
+dld_devt_to_instance(dev_t dev)
+{
+	minor_t			minor;
+	i_dld_str_state_t	state;
+
+	/*
+	 * GLDv3 numbers DLPI style 1 node as the instance number + 1.
+	 * Minor number 0 is reserved for the DLPI style 2 unattached
+	 * node.
+	 */
+
+	if ((minor = getminor(dev)) == 0)
+		return (-1);
+
+	/*
+	 * Check for style 2 unassociated node, this is quick and
+	 * easy.  Note that this doesn't *necessarily* work for legacy
+	 * devices, but this code is only called within the
+	 * getinfo(9e) implementation for true GLDv3 devices, so it
+	 * doesn't matter.
+	 */
+	if (minor > 0 && minor <= DLS_MAX_MINOR) {
+		return (DLS_MINOR2INST(minor));
+	}
+
+	state.ds_minor = getminor(dev);
+	state.ds_major = getmajor(dev);
+	state.ds_dip = NULL;
+	state.ds_instance = -1;
+
+	mod_hash_walk(str_hashp, i_dld_str_walker, &state);
+	return (state.ds_instance);
+}
+
 /*
  * devo_getinfo: getinfo(9e)
+ *
+ * NB: This may be called for a provider before the provider's
+ * instances are attached.  Hence, if a particular provider needs a
+ * special mapping (the mac instance != ddi_get_instance()), then it
+ * may need to provide its own implmentation using the
+ * MAC_MINOR_TO_INSTANCE() function, and translating the returned mac
+ * instance to a devinfo instance.  For dev_t's where the minor number
+ * is too large (i.e. > MAC_MAX_MINOR), the provider can call this
+ * function indirectly via the mac_getinfo() function.
  */
 /*ARGSUSED*/
 int

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * MAC Services Module
@@ -157,16 +155,9 @@ mac_stat_create(mac_impl_t *mip)
 	major_t		major = getmajor(mip->mi_phy_dev);
 
 	count = MAC_MOD_NKSTAT + MAC_NKSTAT + mip->mi_type->mt_statcount;
-	if (!GLDV3_DRV(major)) {
-		ksp = kstat_create((const char *)ddi_major_to_name(major),
-		    getminor(mip->mi_phy_dev) - 1, MAC_KSTAT_NAME,
-		    MAC_KSTAT_CLASS, KSTAT_TYPE_NAMED, count, 0);
-	} else {
-		major = ddi_driver_major(mip->mi_dip);
-		ksp = kstat_create((const char *)ddi_major_to_name(major),
-		    mip->mi_minor - 1, MAC_KSTAT_NAME,
-		    MAC_KSTAT_CLASS, KSTAT_TYPE_NAMED, count, 0);
-	}
+	ksp = kstat_create((const char *)ddi_major_to_name(major),
+	    getminor(mip->mi_phy_dev) - 1, MAC_KSTAT_NAME,
+	    MAC_KSTAT_CLASS, KSTAT_TYPE_NAMED, count, 0);
 	if (ksp == NULL)
 		return;
 

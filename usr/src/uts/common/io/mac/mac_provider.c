@@ -40,6 +40,7 @@
 #include <sys/mac_client_impl.h>
 #include <sys/mac_client_priv.h>
 #include <sys/mac_soft_ring.h>
+#include <sys/dld.h>
 #include <sys/modctl.h>
 #include <sys/fs/dv_node.h>
 #include <sys/thread.h>
@@ -315,7 +316,7 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 		mip->mi_phy_dev = mip->mi_capab_legacy.ml_dev;
 	} else {
 		mip->mi_phy_dev = makedevice(ddi_driver_major(mip->mi_dip),
-		    ddi_get_instance(mip->mi_dip) + 1);
+		    mip->mi_minor);
 	}
 
 	/*
@@ -823,6 +824,33 @@ mac_link_redo(mac_handle_t mh, link_state_t link)
 	 * made.
 	 */
 	i_mac_notify(mip, MAC_NOTE_LINK);
+}
+
+/* MINOR NODE HANDLING */
+
+/*
+ * Given a dev_t, return the instance number (PPA) associated with it.
+ * Drivers can use this in their getinfo(9e) implementation to lookup
+ * the instance number (i.e. PPA) of the device, to use as an index to
+ * their own array of soft state structures.
+ *
+ * Returns -1 on error.
+ */
+int
+mac_devt_to_instance(dev_t devt)
+{
+	return (dld_devt_to_instance(devt));
+}
+
+/*
+ * This function returns the first minor number that is available for
+ * driver private use.  All minor numbers smaller than this are
+ * reserved for GLDv3 use.
+ */
+minor_t
+mac_private_minor(void)
+{
+	return (MAC_PRIVATE_MINOR);
 }
 
 /* OTHER CONTROL INFORMATION */

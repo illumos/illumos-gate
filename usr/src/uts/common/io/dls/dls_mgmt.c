@@ -1068,13 +1068,14 @@ dls_devnet_hold_by_dev(dev_t dev, dls_dl_handle_t *ddhp)
 	if ((drv = ddi_major_to_name(getmajor(dev))) == NULL)
 		return (EINVAL);
 
-	(void) snprintf(name, sizeof (name), "%s%d", drv, getminor(dev) - 1);
+	(void) snprintf(name, sizeof (name), "%s%d", drv,
+	    DLS_MINOR2INST(getminor(dev)));
 
 	/*
 	 * Hold this link to prevent it being detached in case of a
 	 * GLDv3 physical link.
 	 */
-	if (getminor(dev) - 1 < MAC_MAX_MINOR)
+	if (DLS_MINOR2INST(getminor(dev)) < DLS_MAX_MINOR)
 		(void) softmac_hold_device(dev, &ddh);
 
 	rw_enter(&i_dls_devnet_lock, RW_WRITER);
@@ -1179,7 +1180,7 @@ dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp)
 	if ((major = ddi_name_to_major(drv)) == (major_t)-1)
 		return (ENOENT);
 
-	phy_dev = makedevice(major, (minor_t)ppa + 1);
+	phy_dev = makedevice(major, DLS_PPA2MINOR(ppa));
 	if (softmac_hold_device(phy_dev, &ddh) != 0)
 		return (ENOENT);
 
@@ -1232,7 +1233,7 @@ dls_devnet_dev2linkid(dev_t dev, datalink_id_t *linkidp)
 		return (EINVAL);
 
 	(void) snprintf(macname, sizeof (macname), "%s%d", drv,
-	    getminor(dev) - 1);
+	    DLS_MINOR2INST(getminor(dev)));
 	return (dls_devnet_macname2linkid(macname, linkidp));
 }
 

@@ -50,19 +50,6 @@ extern "C" {
 #define	MAC_VERSION	0x2
 
 /*
- * This is the first minor number available for MAC provider private
- * use.  This makes it possible to deliver a driver that is both a MAC
- * provider and a regular character/block device.  See PSARC 2009/380
- * for more detail about the construction of such devices.  The value
- * chosen leaves half of the 32-bit minor numbers (which are really
- * only 18 bits wide) available for driver private use.  Drivers can
- * easily identify their private number by the presence of this value
- * in the bits that make up the minor number, since its just the
- * highest bit available for such minor numbers.
- */
-#define	MAC_PRIVATE_MINOR	((MAXMIN32 + 1) / 2)
-
-/*
  * Opaque handle types
  */
 typedef struct __mac_rule_handle	*mac_rule_handle_t;
@@ -481,6 +468,8 @@ extern int			mac_margin_add(mac_handle_t, uint32_t *,
 				    boolean_t);
 extern void			mac_init_ops(struct dev_ops *, const char *);
 extern void			mac_fini_ops(struct dev_ops *);
+extern int			mac_devt_to_instance(dev_t);
+extern minor_t			mac_private_minor(void);
 
 extern mactype_register_t	*mactype_alloc(uint_t);
 extern void			mactype_free(mactype_register_t *);
