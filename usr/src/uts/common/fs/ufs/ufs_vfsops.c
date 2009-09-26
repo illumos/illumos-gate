@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2053,7 +2053,7 @@ ufs_vget(struct vfs *vfsp, struct vnode **vpp, struct fid *fidp)
 	 * it to the caller, presumably NFS, as it's no longer valid.
 	 */
 	if (ip->i_gen != ufid->ufid_gen || ip->i_mode == 0 ||
-	    (ip->i_flag & IDEL)) {
+	    (ip->i_nlink <= 0)) {
 		VN_RELE(ITOV(ip));
 		error = EINVAL;
 		goto errout;
