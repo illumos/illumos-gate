@@ -123,7 +123,6 @@ typedef struct raidz_map {
 	uintptr_t rm_reports;		/* # of referencing checksum reports */
 	uint8_t	rm_freed;		/* map no longer has referencing ZIO */
 	uint8_t	rm_ecksuminjected;	/* checksum error was injected */
-	uint64_t rm_skipped;		/* Skipped sectors for padding */
 	raidz_col_t rm_col[1];		/* Flexible array of I/O columns */
 } raidz_map_t;
 
@@ -258,17 +257,19 @@ static void
 vdev_raidz_map_free(raidz_map_t *rm)
 {
 	int c;
-	size_t size = rm->rm_asize;	/* will hold data-size after the loop */
+	size_t size;
 
 	for (c = 0; c < rm->rm_firstdatacol; c++) {
-		size -= rm->rm_col[c].rc_size;
-
 		zio_buf_free(rm->rm_col[c].rc_data, rm->rm_col[c].rc_size);
 
 		if (rm->rm_col[c].rc_gdata != NULL)
 			zio_buf_free(rm->rm_col[c].rc_gdata,
 			    rm->rm_col[c].rc_size);
 	}
+
+	size = 0;
+	for (c = rm->rm_firstdatacol; c < rm->rm_cols; c++)
+		size += rm->rm_col[c].rc_size;
 
 	if (rm->rm_datacopy != NULL)
 		zio_buf_free(rm->rm_datacopy, size);
@@ -295,9 +296,8 @@ vdev_raidz_cksum_free(void *arg, size_t ignored)
 	raidz_map_t *rm = arg;
 
 	ASSERT3U(rm->rm_reports, >, 0);
-	ASSERT3U(rm->rm_freed, !=, 0);
 
-	if (--rm->rm_reports == 0)
+	if (--rm->rm_reports == 0 && rm->rm_freed != 0)
 		vdev_raidz_map_free(rm);
 }
 
@@ -398,26 +398,25 @@ vdev_raidz_cksum_report(zio_t *zio, zio_cksum_report_t *zcr, void *arg)
 	rm->rm_reports++;
 	ASSERT3U(rm->rm_reports, >, 0);
 
-	if (rm->rm_reports != 1)
+	if (rm->rm_datacopy != NULL)
 		return;
 
 	/*
-	 * It's the first time we're called, so we need to copy the data
-	 * aside; there's no guarantee that our zio's buffer won't be
-	 * re-used for something else.
+	 * It's the first time we're called for this raidz_map_t, so we need
+	 * to copy the data aside; there's no guarantee that our zio's buffer
+	 * won't be re-used for something else.
 	 *
-	 * Our parity data is already in seperate buffers, so there's no need
+	 * Our parity data is already in separate buffers, so there's no need
 	 * to copy them.
 	 */
-	ASSERT3P(rm->rm_datacopy, ==, NULL);
 
-	/* rm_asize includes the parity blocks; subtract them out */
-	size = rm->rm_asize;
-	for (c = 0; c < rm->rm_firstdatacol; c++)
-		size -= rm->rm_col[c].rc_size;
+	size = 0;
+	for (c = rm->rm_firstdatacol; c < rm->rm_cols; c++)
+		size += rm->rm_col[c].rc_size;
 
 	buf = rm->rm_datacopy = zio_buf_alloc(size);
-	for (; c < rm->rm_cols; c++) {
+
+	for (c = rm->rm_firstdatacol; c < rm->rm_cols; c++) {
 		raidz_col_t *col = &rm->rm_col[c];
 
 		bcopy(col->rc_data, buf, col->rc_size);
