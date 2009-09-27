@@ -67,6 +67,8 @@
 #define	REG_CH1_PADDR		0x88
 #define	REG_CH1_BUFSZ		0x8C
 #define	REG_CH1_FRAGSZ		0x8E
+#define	REG_SPDIF_STAT		0x90
+#define	REG_MISC2		0x92
 
 #define	FUNCTRL0_CH1_RST	BIT(19)
 #define	FUNCTRL0_CH0_RST	BIT(18)
@@ -101,6 +103,11 @@
 #define	FUNCTRL1_UART_EN	BIT(2)
 #define	FUNCTRL1_JYSTK_EN	BIT(1)
 
+#define	CHFORMAT_CHB3D5C	BIT(31)		/* 5 channel surround */
+#define	CHFORMAT_CHB3D		BIT(29)		/* 4 channel surround */
+#define	CHFORMAT_VER_MASK	(0x1f << 24)
+#define	CHFORMAT_VER_033	0
+#define	CHFORMAT_VER_037	1
 #define	CHFORMAT_CH1_MASK	(0x3 << 2)
 #define	CHFORMAT_CH1_16ST	(0x3 << 2)
 #define	CHFORMAT_CH1_16MO	(0x2 << 2)
@@ -112,6 +119,10 @@
 #define	CHFORMAT_CH0_8ST	(0x1 << 0)
 #define	CHFORMAT_CH0_8MO	(0x0 << 0)
 
+#define	INTCTRL_MDL_MASK	(0xffU << 24)
+#define	INTCTRL_MDL_068		(0x28 << 24)
+#define	INTCTRL_MDL_055		(0x8 << 24)
+#define	INTCTRL_MDL_039		(0x4 << 24)
 #define	INTCTRL_TDMA_EN		BIT(18)
 #define	INTCTRL_CH1_EN		BIT(17)
 #define	INTCTRL_CH0_EN		BIT(16)
@@ -130,26 +141,47 @@
 #define	INTSTAT_CH1_INT		BIT(1)
 #define	INTSTAT_CH0_INT		BIT(0)
 
+#define	LEGACY_NXCHG		BIT(31)
+#define	LEGACY_CHB3D6C		BIT(15)	/* 6 channel surround */
+#define	LEGACY_CENTR2LN		BIT(14)	/* line in as center out */
+#define	LEGACY_BASS2LN		BIT(13)	/* line in as lfe */
+#define	LEGACY_EXBASSEN		BIT(12)	/* external bass input enable */
+
 #define	MISC_PWD		BIT(31)	/* power down */
 #define	MISC_RESET		BIT(30)
+#define	MISC_N4SPK3D		BIT(26)	/* 4 channel emulation */
 #define	MISC_ENDBDAC		BIT(23)	/* dual dac */
 #define	MISC_XCHGDAC		BIT(22)	/* swap front/rear dacs */
+#define	MISC_SPD32SEL		BIT(21)	/* 32-bit SPDIF (default 16-bit) */
 #define	MISC_FM_EN		BIT(19)	/* enable legacy FM */
+#define	MISC_SPDF_AC97		BIT(15)	/* spdif out 44.1k (0), 48 k (1) */
+#define	MISC_ENCENTER		BIT(7)	/* enable center */
+#define	MISC_REAR2LN		BIT(6)	/* send rear to line in */
 
 #define	MIX2_FMMUTE		BIT(7)
 #define	MIX2_WSMUTE		BIT(6)
+#define	MIX2_SPK4		BIT(5)	/* line-in is rear out */
+#define	MIX2_REAR2FRONT		BIT(4)	/* swap front and rear */
 #define	MIX2_WAVEIN_L		BIT(3)	/* for recording wave out */
 #define	MIX2_WAVEIN_R		BIT(2)	/* for recording wave out */
+#define	MIX2_X3DEN		BIT(1)	/* 3D surround enable */
+#define	MIX2_CDPLAY		BIT(0)	/* spdif-in PCM to DAC */
 
 #define	MIX3_RAUXREN		BIT(7)
 #define	MIX3_RAUXLEN		BIT(6)
 #define	MIX3_VAUXRM		BIT(5)	/* r-aux mute */
 #define	MIX3_VAUXLM		BIT(4)	/* l-aux mute */
 #define	MIX3_VADCMIC_MASK	(0x7 << 1)	/* rec mic volume */
+#define	MIX3_CEN2MIC		BIT(2)
 #define	MIX3_MICGAINZ		BIT(0)	/* mic gain */
 
 #define	VAUX_L_MASK		0xf0
 #define	VAUX_R_MASK		0x0f
+
+#define	MISC2_CHB3D8C		BIT(5)	/* 8 channel surround */
+#define	MISC2_SPD32FMT		BIT(4)	/* spdif at 32 kHz */
+#define	MISC2_ADC2SPDIF		BIT(3)	/* send adc to spdif out */
+#define	MISC2_SHAREADC		BIT(2)	/* use adc for cen/lfe */
 
 /* Indexes via SBINDEX */
 #define	IDX_MASTER_LEFT		0x30
@@ -237,6 +269,7 @@ struct cmpci_port {
 	unsigned		nfrags;
 	unsigned		nframes;
 	unsigned		bufsz;
+	unsigned		nchan;
 
 	boolean_t		capture;
 	boolean_t		open;
@@ -279,8 +312,8 @@ struct cmpci_dev {
 #define	MDL_CM8338A		2
 #define	MDL_CM8338B		3
 #define	MDL_CM8768		4
-	char			*chip_name;
-	int			chiprev;
+
+	int			maxch;
 
 	boolean_t		suspended;
 
@@ -294,7 +327,6 @@ struct cmpci_dev {
  * giving a total address space of 256K.  Note, however, that we will restrict
  * this further when we do fragment and memory allocation.
  */
-#define	CMPCI_BUF_LEN	(65536)
 #define	DEFINTS		175
 
 #define	GET8(dev, offset)	\

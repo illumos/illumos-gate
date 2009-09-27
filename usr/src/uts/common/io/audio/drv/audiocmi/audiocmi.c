@@ -29,22 +29,28 @@
  * This file is part of Open Sound System
  *
  * Copyright (C) 4Front Technologies 1996-2008.
- *
- * This software is released under CDDL 1.0 source license.
- * See the COPYING file included in the main directory of this source
- * distribution for the license terms and conditions.
  */
 
 #include <sys/audio/audio_driver.h>
 #include <sys/note.h>
 #include <sys/pci.h>
+#include <sys/sysmacros.h>
 #include "audiocmi.h"
 
 /*
- * Note: The original 4Front driver had support SPDIF, dual dac, and
- * multichannel surround options.  However, we haven't got any cards
- * with these advanced features available on them for testing, so
- * we're just going to support basic analog stereo for now.
+ * Note: The original 4Front driver had support SPDIF and dual dac
+ * options.  Dual dac support is probably not terribly useful. SPDIF
+ * on the other hand might be quite useful, we just don't have a card
+ * that supports it at present.  Some variants of the chip are also
+ * capable of jack retasking, but we're electing to punt on supporting
+ * that as well, for now (we don't have any cards that would benefit
+ * from this feature.)
+ *
+ * Note that surround support requires the use of the second DMA
+ * engine, and that the same second DMA engine is the only way one can
+ * capture from SPDIF.  Rather than support a lot more complexity in
+ * the driver, we we will probably just punt on ever supporting
+ * capture of SPDIF.  (SPDIF playback should be doable, however.)
  *
  * Adding back support for the advanced features would be an
  * interesting project for someone with access to suitable hardware.
@@ -156,9 +162,67 @@ cmpci_reset_port(cmpci_port_t *port)
 	SET32(dev, REG_FUNCTRL1, port->fc1_rate_mask);
 	SET32(dev, REG_CHFORMAT, port->chformat_mask);
 
+	if ((port->num == 1) && (dev->maxch > 2)) {
+		CLR32(dev, REG_LEGACY, LEGACY_NXCHG);
+
+		if (port->nchan > 2) {
+			SET32(dev, REG_MISC, MISC_XCHGDAC);
+			CLR32(dev, REG_MISC, MISC_N4SPK3D);
+		} else {
+			CLR32(dev, REG_MISC, MISC_XCHGDAC);
+			SET32(dev, REG_MISC, MISC_N4SPK3D);
+		}
+
+		switch (port->nchan) {
+		case 2:
+			if (dev->maxch >= 8) {
+				CLR8(dev, REG_MISC2, MISC2_CHB3D8C);
+			}
+			if (dev->maxch >= 6) {
+				CLR32(dev, REG_CHFORMAT, CHFORMAT_CHB3D5C);
+				CLR32(dev, REG_LEGACY, LEGACY_CHB3D6C);
+			}
+			if (dev->maxch >= 4) {
+				CLR32(dev, REG_CHFORMAT, CHFORMAT_CHB3D);
+			}
+			break;
+		case 4:
+			if (dev->maxch >= 8) {
+				CLR8(dev, REG_MISC2, MISC2_CHB3D8C);
+			}
+			if (dev->maxch >= 6) {
+				CLR32(dev, REG_CHFORMAT, CHFORMAT_CHB3D5C);
+				CLR32(dev, REG_LEGACY, LEGACY_CHB3D6C);
+				CLR32(dev, REG_MISC, MISC_ENCENTER);
+				CLR32(dev, REG_LEGACY, LEGACY_EXBASSEN);
+			}
+			SET32(dev, REG_CHFORMAT, CHFORMAT_CHB3D);
+			break;
+		case 6:
+			if (dev->maxch >= 8) {
+				CLR8(dev, REG_MISC2, MISC2_CHB3D8C);
+			}
+			SET32(dev, REG_CHFORMAT, CHFORMAT_CHB3D5C);
+			SET32(dev, REG_LEGACY, LEGACY_CHB3D6C);
+			CLR32(dev, REG_MISC, MISC_ENCENTER);
+			CLR32(dev, REG_LEGACY, LEGACY_EXBASSEN);
+			CLR32(dev, REG_CHFORMAT, CHFORMAT_CHB3D);
+			break;
+
+		case 8:
+			SET8(dev, REG_MISC2, MISC2_CHB3D8C);
+			CLR32(dev, REG_MISC, MISC_ENCENTER);
+			CLR32(dev, REG_LEGACY, LEGACY_EXBASSEN);
+			CLR32(dev, REG_CHFORMAT, CHFORMAT_CHB3D5C);
+			CLR32(dev, REG_LEGACY, LEGACY_CHB3D6C);
+			CLR32(dev, REG_CHFORMAT, CHFORMAT_CHB3D);
+			break;
+		}
+	}
+
 	PUT32(dev, port->reg_paddr, port->paddr);
-	PUT16(dev, port->reg_bufsz, port->nframes - 1);
-	PUT16(dev, port->reg_fragsz, port->fragfr - 1);
+	PUT16(dev, port->reg_bufsz, (port->bufsz / 4) - 1);
+	PUT16(dev, port->reg_fragsz, (port->fragfr *  port->nchan / 2) - 1);
 
 	/* Analog output */
 	if (port->capture) {
@@ -198,36 +262,16 @@ cmpci_open(void *arg, int flag, uint_t *fragfrp, uint_t *nfp, caddr_t *bufp)
 {
 	cmpci_port_t *port = arg;
 	cmpci_dev_t *dev = port->dev;
-	int intrs;
+
+	_NOTE(ARGUNUSED(flag));
 
 	mutex_enter(&dev->mutex);
-
-	if (flag & ENGINE_INPUT) {
-		intrs = dev->rintrs;
-	} else {
-		intrs = dev->pintrs;
-	}
-
-	/*
-	 * Calculate fragfr, nfrags, buf.
-	 *
-	 * 48 as minimum is chosen to ensure that we will have at
-	 * least 4 fragments.  512 is just an arbitrary limit, and at
-	 * the smallest frame size will result in no more than 176
-	 * fragments.
-	 */
-	intrs = min(512, max(48, intrs));
-
-	port->fragfr = (48000 / intrs);
-	port->nfrags = CMPCI_BUF_LEN / (port->fragfr * 4);
-	port->nframes = port->nfrags * port->fragfr;
-	port->count = 0;
-	port->bufsz = port->nframes * 4;
 
 	*fragfrp = port->fragfr;
 	*nfp = port->nfrags;
 	*bufp = port->kaddr;
 
+	port->count = 0;
 	port->open = B_TRUE;
 
 	cmpci_reset_port(port);
@@ -259,11 +303,12 @@ cmpci_update_port(cmpci_port_t *port)
 	if ((dev->suspended) || (!port->open))
 		return;
 
-	offset = GET32(dev, port->reg_paddr) - port->paddr;
+	/* this gives us the offset in dwords */
+	offset = (port->bufsz / 4) - (GET16(dev, port->reg_bufsz) + 1);
 
-	/* check for wrap */
+	/* check for wrap - note that the count is given in dwords */
 	if (offset < port->offset) {
-		count = (port->bufsz - port->offset) + offset;
+		count = ((port->bufsz / 4) - port->offset) + offset;
 	} else {
 		count = offset - port->offset;
 	}
@@ -281,12 +326,16 @@ cmpci_count(void *arg)
 	mutex_enter(&dev->mutex);
 	cmpci_update_port(port);
 
-	/* 4 is from 16-bit stereo */
-	count = port->count / 4;
+	/* the count is in dwords */
+	count = port->count;
+
 	mutex_exit(&dev->mutex);
 
-	/* NB: 2 because each sample is 2 bytes wide */
-	return (count);
+	/*
+	 * convert dwords to frames - unfortunately this requires a
+	 * divide
+	 */
+	return (count / (port->nchan / 2));
 }
 
 
@@ -718,10 +767,26 @@ cmpci_format(void *unused)
 }
 
 static int
-cmpci_channels(void *unused)
+cmpci_channels(void *arg)
 {
-	_NOTE(ARGUNUSED(unused));
-	return (2);
+	cmpci_port_t *port = arg;
+
+	return (port->nchan);
+}
+
+static void
+cmpci_chinfo(void *arg, int chan, unsigned *offset, unsigned *incr)
+{
+	cmpci_port_t *port = arg;
+	static const int map8ch[] = { 0, 1, 4, 5, 2, 3, 6, 7 };
+	static const int map4ch[] = { 0, 1, 2, 3 };
+
+	if (port->nchan <= 4) {
+		*offset = map4ch[chan];
+	} else {
+		*offset = map8ch[chan];
+	}
+	*incr = port->nchan;
 }
 
 static int
@@ -761,19 +826,31 @@ audio_engine_ops_t cmpci_engine_ops = {
 	cmpci_rate,
 	cmpci_sync,
 	cmpci_qlen,
-	NULL,
+	cmpci_chinfo,
 };
 
 static int
 cmpci_init(cmpci_dev_t *dev)
 {
 	audio_dev_t	*adev = dev->adev;
+	int		playch;
+	int		intrs;
 
 	dev->pintrs = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
 	    DDI_PROP_DONTPASS, "play-interrupts", DEFINTS);
 
 	dev->rintrs = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
 	    DDI_PROP_DONTPASS, "record-interrupts", DEFINTS);
+
+	playch  = ddi_prop_get_int(DDI_DEV_T_ANY, dev->dip,
+	    DDI_PROP_DONTPASS, "channels", dev->maxch);
+
+	if ((playch % 2) || (playch < 2) || (playch > dev->maxch)) {
+		audio_dev_warn(adev,
+		    "Invalid channels property (%d), resetting to %d",
+		    playch, dev->maxch);
+		playch = dev->maxch;
+	}
 
 	for (int i = 0; i < PORT_MAX; i++) {
 
@@ -815,6 +892,8 @@ cmpci_init(cmpci_dev_t *dev)
 			port->capture = B_TRUE;
 			port->fc1_rate_mask = FUNCTRL1_ADC_RATE_48K;
 			port->chformat_mask = CHFORMAT_CH0_16ST;
+			port->nchan = 2;
+			intrs = dev->rintrs;
 			break;
 
 		case 1:
@@ -832,15 +911,45 @@ cmpci_init(cmpci_dev_t *dev)
 			port->capture = B_FALSE;
 			port->fc1_rate_mask = FUNCTRL1_DAC_RATE_48K;
 			port->chformat_mask = CHFORMAT_CH1_16ST;
+			port->nchan = playch;
+			intrs = dev->pintrs;
 			break;
 		}
+
+		/*
+		 * Calculate fragfr, nfrags, buf.
+		 *
+		 * 48 as minimum is chosen to ensure that we will have
+		 * at least 4 fragments.  512 is just an arbitrary
+		 * limit, and at the smallest frame size will result
+		 * in no more than 176 fragments.
+		 */
+		intrs = min(512, max(48, intrs));
+
+		/*
+		 * Two fragments are enough to get ping-pong buffers.
+		 * The hardware could support considerably more than
+		 * this, but it just wastes memory.
+		 */
+		port->nfrags = 2;
+
+		/*
+		 * For efficiency, we'd like to have the fragments
+		 * evenly divisble by 64 bytes.  Since frames are
+		 * already evenly divisble by 4 (16-bit stereo), this
+		 * is adequate.  For a typical configuration (175 Hz
+		 * requested) this will translate to 166 Hz.
+		 */
+		port->fragfr = P2ROUNDUP((48000 / intrs), 16);
+		port->nframes = port->nfrags * port->fragfr;
+		port->bufsz = port->nframes * port->nchan * 2;
 
 		if (ddi_dma_alloc_handle(dev->dip, &dma_attr, DDI_DMA_DONTWAIT,
 		    NULL, &port->dmah) != DDI_SUCCESS) {
 			audio_dev_warn(adev, "ch%d: dma hdl alloc failed", i);
 			return (DDI_FAILURE);
 		}
-		if (ddi_dma_mem_alloc(port->dmah, CMPCI_BUF_LEN, &buf_attr,
+		if (ddi_dma_mem_alloc(port->dmah, port->bufsz, &buf_attr,
 		    DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL, &port->kaddr,
 		    &rlen, &port->acch) != DDI_SUCCESS) {
 			audio_dev_warn(adev, "ch%d: dma mem allcoc failed", i);
@@ -978,35 +1087,48 @@ cmpci_attach(dev_info_t *dip)
 	}
 
 	/* setup some initial values */
+	dev->maxch = 2;
 	audio_dev_set_description(adev, "C-Media PCI Audio");
 	switch (device) {
 	case CMEDIA_CM8738:
-		/* Crazy 8738 detection scheme */
-		val = GET32(dev, REG_INTCTRL) & 0x1F000000;
+		/*
+		 * Crazy 8738 detection scheme.  Reviewing multiple
+		 * different open sources gives multiple different
+		 * answers here.  Its unclear how accurate this is.
+		 * The approach taken here is a bit conservative in
+		 * assigning multiple channel support, but for users
+		 * with newer 8768 cards should offer the best
+		 * capability.
+		 */
+		val = GET32(dev, REG_INTCTRL) & INTCTRL_MDL_MASK;
 		if (val == 0) {
 
-			if (GET32(dev, REG_CHFORMAT & 0x1F000000)) {
-				audio_dev_set_version(adev, "CM8738-037");
+			if (GET32(dev, REG_CHFORMAT & CHFORMAT_VER_MASK)) {
+				audio_dev_set_version(adev, "CMI-8738-037");
+				dev->maxch = 4;
 			} else {
-				audio_dev_set_version(adev, "CM8738-033");
+				audio_dev_set_version(adev, "CMI-8738-033");
 			}
-		} else if (val & 0x0C000000) {
-			audio_dev_set_version(adev, "CMI8768");
-		} else if (val & 0x08000000) {
-			audio_dev_set_version(adev, "CMI8738-055");
-		} else if (val & 0x04000000) {
-			audio_dev_set_version(adev, "CMI8738-039");
+		} else if ((val & INTCTRL_MDL_068) == INTCTRL_MDL_068) {
+			audio_dev_set_version(adev, "CMI-8768");
+			dev->maxch = 8;
+		} else if ((val & INTCTRL_MDL_055) == INTCTRL_MDL_055) {
+			audio_dev_set_version(adev, "CMI-8738-055");
+			dev->maxch = 6;
+		} else if ((val & INTCTRL_MDL_039) == INTCTRL_MDL_039) {
+			audio_dev_set_version(adev, "CMI-8738-039");
+			dev->maxch = 4;
 		} else {
-			audio_dev_set_version(adev, "CMI8738");
+			audio_dev_set_version(adev, "CMI-8738");
 		}
 		break;
 
 	case CMEDIA_CM8338A:
-		audio_dev_set_version(dev->adev, "CM8338A");
+		audio_dev_set_version(dev->adev, "CMI-8338");
 		break;
 
 	case CMEDIA_CM8338B:
-		audio_dev_set_version(dev->adev, "CM8338B");
+		audio_dev_set_version(dev->adev, "CMI-8338B");
 		break;
 	}
 
