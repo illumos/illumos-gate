@@ -507,6 +507,10 @@ hald_runner_run_method(HalDevice *device,
                                               msg, &call, INT_MAX))
     DIE (("No memory"));
 
+  /* the connection was disconnected */
+  if (call == NULL)
+    goto error;
+
   hd = malloc(sizeof(HelperData));
   hd->d = device;
   hd->cb = cb;
