@@ -109,4 +109,7 @@ gboolean hal_util_is_mounted_by_hald (const char *mount_point);
 void
 hal_util_branch_claim (HalDeviceStore *store, HalDevice *root, dbus_bool_t claimed, const char *service, int uid);
 
+gboolean
+is_valid_interface_name (const char *name);
+
 #endif /* UTIL_H */

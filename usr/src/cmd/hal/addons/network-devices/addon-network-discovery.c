@@ -1,11 +1,10 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -198,8 +197,11 @@ nds_filter_function(DBusConnection *connection, DBusMessage *message,
 	} else if (dbus_message_is_method_call(message,
 				DBUS_INTERFACE, "DisablePrinterScanningViaSNMP")) {
 		rc = nds_DisablePrinterScanningViaSNMP(ctx);
-	} else
+	} else {
+		/* bypass not-handled messages */
 		HAL_WARNING(("Unknown DBus message: %s, %s ", member, path));
+		return (DBUS_HANDLER_RESULT_NOT_YET_HANDLED);
+	}
 
 	if (dbus_error_is_set(&error))
 		dbus_error_free(&error);
