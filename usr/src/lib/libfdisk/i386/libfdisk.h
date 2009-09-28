@@ -268,7 +268,7 @@ typedef struct ext_part
 #define	fdisk_is_dos_extended(id) (((id) == EXTDOS) || ((id) == FDISK_EXTLBA))
 
 extern int fdisk_is_linux_swap(ext_part_t *epp, uint32_t part_start,
-    off_t *lsm_offset);
+    uint64_t *lsm_offset);
 extern int libfdisk_init(ext_part_t **epp, char *devstr, struct ipart *parttab,
     int opflag);
 extern int libfdisk_reset(ext_part_t *epp);

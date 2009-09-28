@@ -253,6 +253,7 @@ static char QNXstr[] = "QNX 4.x";
 static char QNX2str[] = "QNX part 2";
 static char QNX3str[] = "QNX part 3";
 static char LINNATstr[] = "Linux native";
+static char LINSWAPstr[] = "Linux swap";
 static char NTFSVOL1str[] = "NT volset 1";
 static char NTFSVOL2str[] = "NT volset 2";
 static char BSDstr[] = "BSD OS";
@@ -695,7 +696,6 @@ static void ext_read_valid_part_id(uchar_t *partid);
 static int ext_read_valid_partition_start(uint32_t *begsec);
 static void ext_read_valid_partition_size(uint32_t begsec, uint32_t *endsec);
 static void ext_part_menu();
-static int is_linux_swap(uint32_t part_start, off_t *lsm_offset);
 static void add_logical_drive();
 static void delete_logical_drive();
 static void ext_print_help_menu();
@@ -1430,57 +1430,6 @@ dev_mboot_write(off_t sect, char *buff, int bootsiz)
 		if (Table[new_pt].systid != SUNIXOS &&
 		    Table[new_pt].systid != SUNIXOS2)
 			continue;
-
-#ifdef i386
-
-		/*
-		 * Check if a solaris old partition is there in the new table.
-		 * If so, this could potentially have been a linux swap.
-		 * Check to see if the linux swap magic is there, and destroy
-		 * the magic if there is one.
-		 */
-		if (Table[new_pt].systid == SUNIXOS) {
-			off_t lsmo;
-			char *lsm_buf;
-
-			if ((lsm_buf = calloc(1, sectsiz)) == NULL) {
-				fprintf(stderr, "Could not allocate memory\n");
-				exit(1);
-			}
-
-			if (is_linux_swap(Table[new_pt].relsect, &lsmo) == 0) {
-				if (lseek(Dev, lsmo, SEEK_SET) < 0) {
-					fprintf(stderr, "Error seeking on "
-					    "%s\n", Dfltdev);
-					exit(1);
-				}
-
-				if (read(Dev, lsm_buf, sectsiz) < sectsiz) {
-					fprintf(stderr, "Error reading on "
-					    "%s\n", Dfltdev);
-					exit(1);
-				}
-
-				bzero(lsm_buf + sectsiz -
-				    LINUX_SWAP_MAGIC_LENGTH,
-				    LINUX_SWAP_MAGIC_LENGTH);
-
-				if (lseek(Dev, lsmo, SEEK_SET) < 0) {
-					fprintf(stderr, "Error seeking on "
-					    "%s\n", Dfltdev);
-					exit(1);
-				}
-
-				if (write(Dev, lsm_buf, sectsiz) < sectsiz) {
-					fprintf(stderr, "Error writing on "
-					    "%s\n", Dfltdev);
-					exit(1);
-				}
-			}
-			free(lsm_buf);
-		}
-
-#endif
 
 		/* Does the old table have an exact entry for the new entry? */
 		for (old_pt = 0; old_pt < FD_NUMPART; old_pt++) {
@@ -2262,6 +2211,11 @@ load(int funct, char *file)
 				fdisk_add_logical_drive(epp, begsec, endsec,
 				    id);
 				return;
+			} else {
+				(void) fprintf(stderr,
+				    "fdisk: Invalid entry could not be "
+				    "inserted:\n        \"%s\"\n", file);
+				exit(1);
 			}
 		}
 #endif
@@ -2971,6 +2925,17 @@ pcreate(void)
 			break;
 		case 'e':	/* Extended partition, need extended int13 */
 		case 'E':
+#ifdef i386
+			if (ext_part_present) {
+				printf(Q_LINE);
+				printf(E_LINE);
+				fprintf(stderr,
+				    "Extended partition already exists\n");
+				fprintf(stderr, "Press enter to continue\n");
+				ext_read_input(s);
+				continue;
+			}
+#endif
 			tsystid = FDISK_EXTLBA;
 			break;
 		case 'f':
@@ -3718,6 +3683,11 @@ disptbl(void)
 			break;
 		case SUNIXOS:
 			type = SUstr;
+#ifdef i386
+			if (fdisk_is_linux_swap(epp, Table[i].relsect,
+			    NULL) == 0)
+				type = LINSWAPstr;
+#endif
 			break;
 		case SUNIXOS2:
 			type = SU2str;
@@ -5469,6 +5439,7 @@ ext_print_logical_drive_layout()
 	int sysid;
 	unsigned int startcyl, endcyl, length, percent, remainder;
 	logical_drive_t *temp;
+	uint32_t part_start;
 	struct ipart *fpart;
 	char namebuff[255];
 	int numcyl = fdisk_get_disk_geom(epp, PHYSGEOM, NCYL);
@@ -5500,7 +5471,22 @@ ext_print_logical_drive_layout()
 		/* Print the logical drive details */
 		fpart = &temp->parts[0];
 		sysid = fpart->systid;
-		id_to_name(sysid, namebuff);
+		/*
+		 * Check if partition id 0x82 is Solaris
+		 * or a Linux swap. Print the string
+		 * accordingly.
+		 */
+		if (sysid == SUNIXOS) {
+			part_start = temp->abs_secnum +
+			    temp->logdrive_offset;
+			if (fdisk_is_linux_swap(epp, part_start,
+			    NULL) == 0)
+				strcpy(namebuff, LINSWAPstr);
+			else
+				strcpy(namebuff, SUstr);
+		} else {
+			id_to_name(sysid, namebuff);
+		}
 		startcyl = temp->begcyl;
 		endcyl = temp->endcyl;
 		if (startcyl == endcyl) {
@@ -5603,60 +5589,4 @@ ext_part_menu()
 		}
 	}
 }
-#endif
-
-#ifdef i386
-
-static int
-is_linux_swap(uint32_t part_start, off_t *lsm_offset)
-{
-	int		i;
-	int		rval = -1;
-	off_t		seek_offset;
-	uint32_t	linux_pg_size;
-	char		*buf, *linux_swap_magic;
-	/*
-	 * Known linux kernel page sizes
-	 * The linux swap magic is found as the last 10 bytes of a disk chunk
-	 * at the beginning of the linux swap partition whose size is that of
-	 * kernel page size.
-	 */
-	uint32_t	linux_pg_size_arr[] = {4096, };
-
-	if ((buf = calloc(1, sectsiz)) == NULL) {
-		return (ENOMEM);
-	}
-
-	linux_swap_magic = buf + sectsiz - LINUX_SWAP_MAGIC_LENGTH;
-
-	for (i = 0; i < sizeof (linux_pg_size_arr)/sizeof (uint32_t); i++) {
-		linux_pg_size = linux_pg_size_arr[i];
-		seek_offset = linux_pg_size/sectsiz - 1;
-		seek_offset += part_start;
-		seek_offset *= sectsiz;
-
-		if ((rval = lseek(Dev, seek_offset, SEEK_SET)) < 0) {
-			break;
-		}
-
-		if ((rval = read(Dev, buf, sectsiz)) < sectsiz) {
-			rval = EIO;
-			break;
-		}
-
-		if ((strncmp(linux_swap_magic, "SWAP-SPACE",
-		    LINUX_SWAP_MAGIC_LENGTH) == 0) ||
-		    (strncmp(linux_swap_magic, "SWAPSPACE2",
-		    LINUX_SWAP_MAGIC_LENGTH) == 0)) {
-			/* Found a linux swap */
-			rval = 0;
-			*lsm_offset = seek_offset;
-			break;
-		}
-	}
-
-	free(buf);
-	return (rval);
-}
-
 #endif

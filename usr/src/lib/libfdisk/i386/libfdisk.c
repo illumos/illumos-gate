@@ -235,7 +235,7 @@ libfdisk_fini(ext_part_t **epp)
 }
 
 int
-fdisk_is_linux_swap(ext_part_t *epp, uint32_t part_start, off_t *lsm_offset)
+fdisk_is_linux_swap(ext_part_t *epp, uint32_t part_start, uint64_t *lsm_offset)
 {
 	int		i;
 	int		rval = -1;
@@ -243,6 +243,8 @@ fdisk_is_linux_swap(ext_part_t *epp, uint32_t part_start, off_t *lsm_offset)
 	uint32_t	linux_pg_size;
 	char		*buf, *linux_swap_magic;
 	int		sec_sz = fdisk_get_disk_geom(epp, PHYSGEOM, SSIZE);
+	off_t		label_offset;
+
 	/*
 	 * Known linux kernel page sizes
 	 * The linux swap magic is found as the last 10 bytes of a disk chunk
@@ -255,6 +257,28 @@ fdisk_is_linux_swap(ext_part_t *epp, uint32_t part_start, off_t *lsm_offset)
 		return (ENOMEM);
 	}
 
+	/*
+	 * Check if there is a sane Solaris VTOC
+	 * If there is a valid vtoc, no need to lookup
+	 * for the linux swap signature.
+	 */
+	label_offset = (part_start + DK_LABEL_LOC) * sec_sz;
+	if ((rval = lseek(epp->dev_fd, label_offset, SEEK_SET)) < 0)
+		goto done;
+
+	if ((rval = read(epp->dev_fd, buf, sec_sz)) < sec_sz) {
+		rval = EIO;
+		goto done;
+	}
+
+
+	if ((((struct dk_label *)buf)->dkl_magic == DKL_MAGIC) &&
+	    (((struct dk_label *)buf)->dkl_vtoc.v_sanity == VTOC_SANE)) {
+		rval = -1;
+		goto done;
+	}
+
+	/* No valid vtoc, so check for linux swap signature */
 	linux_swap_magic = buf + sec_sz - LINUX_SWAP_MAGIC_LENGTH;
 
 	for (i = 0; i < sizeof (linux_pg_size_arr)/sizeof (uint32_t); i++) {
@@ -278,11 +302,13 @@ fdisk_is_linux_swap(ext_part_t *epp, uint32_t part_start, off_t *lsm_offset)
 		    LINUX_SWAP_MAGIC_LENGTH) == 0)) {
 			/* Found a linux swap */
 			rval = 0;
-			*lsm_offset = seek_offset;
+			if (lsm_offset != NULL)
+				*lsm_offset = (uint64_t)seek_offset;
 			break;
 		}
 	}
 
+done:
 	free(buf);
 	return (rval);
 }
@@ -295,12 +321,13 @@ fdisk_get_solaris_part(ext_part_t *epp, int *pnum, uint32_t *begsec,
 	uint32_t part_start;
 	int pno;
 	int rval = -1;
-	off_t lsmo = 0;
 
 	for (pno = 5; temp != NULL; temp = temp->next, pno++) {
 		if (fdisk_is_solaris_part(LE_8(temp->parts[0].systid))) {
 			part_start = temp->abs_secnum + temp->logdrive_offset;
-			if (fdisk_is_linux_swap(epp, part_start, &lsmo) == 0) {
+			if ((temp->parts[0].systid == SUNIXOS) &&
+			    (fdisk_is_linux_swap(epp, part_start,
+			    NULL) == 0)) {
 				continue;
 			}
 			*pnum = pno;
@@ -1112,13 +1139,8 @@ fdisk_commit_ext_part(ext_part_t *epp)
 	int ld_count;
 	uint32_t abs_secnum;
 	int check_mounts = 0;
-	off_t lsmo;
-	char *lsm_buf;
 
 	if ((ebr_buf = (unsigned char *)malloc(sectsize)) == NULL) {
-		return (ENOMEM);
-	}
-	if ((lsm_buf = calloc(1, sectsize)) == NULL) {
 		return (ENOMEM);
 	}
 
@@ -1162,9 +1184,6 @@ fdisk_commit_ext_part(ext_part_t *epp)
 		if (ebr_buf) {
 			free(ebr_buf);
 		}
-		if (lsm_buf) {
-			free(lsm_buf);
-		}
 		return (rval);
 	}
 
@@ -1189,9 +1208,6 @@ skip_check_mounts:
 			if (ebr_buf) {
 				free(ebr_buf);
 			}
-			if (lsm_buf) {
-				free(lsm_buf);
-			}
 			return (FDISK_SUCCESS);
 		}
 
@@ -1202,56 +1218,6 @@ skip_check_mounts:
 		 */
 		for (temp = epp->ld_head, ld_count = 0; temp != NULL;
 		    temp = temp->next, ld_count++) {
-			/*
-			 * Check if the current partition is a solaris old
-			 * partition. In that case, check if it was previously
-			 * a linux swap. If so, overwrite the linux swap magic.
-			 */
-			if (temp->parts[0].systid == SUNIXOS) {
-				uint32_t secnum = temp->abs_secnum +
-				    temp->logdrive_offset;
-				if (fdisk_is_linux_swap(epp, secnum,
-				    &lsmo) == 0) {
-					if ((rval = lseek(epp->dev_fd, lsmo,
-					    SEEK_SET)) < 0) {
-						if (ld_count) {
-							break;
-						}
-						goto error;
-					}
-
-					if (read(epp->dev_fd, lsm_buf,
-					    sectsize) < sectsize) {
-						rval = EIO;
-						if (ld_count) {
-							break;
-						}
-						goto error;
-					}
-
-					bzero(lsm_buf + sectsize -
-					    LINUX_SWAP_MAGIC_LENGTH,
-					    LINUX_SWAP_MAGIC_LENGTH);
-
-					if ((rval = lseek(epp->dev_fd, lsmo,
-					    SEEK_SET)) < 0) {
-						if (ld_count) {
-							break;
-						}
-						goto error;
-					}
-
-					if ((rval = write(epp->dev_fd, lsm_buf,
-					    sectsize)) < sectsize) {
-						rval = EIO;
-						if (ld_count) {
-							break;
-						}
-						goto error;
-					}
-				}
-			}
-
 			if (ld_count == 0) {
 				abs_secnum = epp->ext_beg_sec;
 			} else {
@@ -1292,9 +1258,6 @@ skip_check_mounts:
 error:
 	if (ebr_buf) {
 		free(ebr_buf);
-	}
-	if (lsm_buf) {
-		free(lsm_buf);
 	}
 	return (rval);
 }

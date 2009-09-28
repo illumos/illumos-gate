@@ -478,6 +478,9 @@ get_solaris_part(int fd, struct ipart *ipart)
 	(void) memcpy(&boot_sec, mbr, sizeof (struct mboot));
 	free(mbr);
 
+#ifdef i386
+	(void) extpart_init(&epp);
+#endif
 	for (i = 0; i < FD_NUMPART; i++) {
 		int	ipc;
 
@@ -491,7 +494,6 @@ get_solaris_part(int fd, struct ipart *ipart)
 		if (fdisk_is_dos_extended(ip.systid) && (ext_part_found == 0)) {
 			/* We support only one extended partition per disk */
 			ext_part_found = 1;
-			(void) extpart_init(&epp);
 			rval = fdisk_get_solaris_part(epp, &pno, &relsec,
 			    &numsec);
 			if (rval == FDISK_SUCCESS) {
@@ -517,7 +519,6 @@ get_solaris_part(int fd, struct ipart *ipart)
 				    sizeof (struct ipart));
 				bcopy(&ip, ipart, sizeof (struct ipart));
 			}
-			libfdisk_fini(&epp);
 			continue;
 		}
 #endif
@@ -525,9 +526,16 @@ get_solaris_part(int fd, struct ipart *ipart)
 		/*
 		 * we are interested in Solaris and EFI partition types
 		 */
+#ifdef i386
+		if ((ip.systid == SUNIXOS &&
+		    (fdisk_is_linux_swap(epp, lel(ip.relsect), NULL) != 0)) ||
+		    ip.systid == SUNIXOS2 ||
+		    ip.systid == EFI_PMBR) {
+#else
 		if (ip.systid == SUNIXOS ||
 		    ip.systid == SUNIXOS2 ||
 		    ip.systid == EFI_PMBR) {
+#endif
 			/*
 			 * if the disk has an EFI label, nhead and nsect may
 			 * be zero.  This test protects us from FPE's, and
@@ -550,6 +558,10 @@ get_solaris_part(int fd, struct ipart *ipart)
 			break;
 		}
 	}
+
+#ifdef i386
+	libfdisk_fini(&epp);
+#endif
 
 	if (!found) {
 		err_print("Solaris fdisk partition not found\n");
@@ -686,6 +698,9 @@ copy_solaris_part(struct ipart *ipart)
 
 	(void) memcpy(&mboot, mbr, sizeof (struct mboot));
 
+#ifdef i386
+	(void) extpart_init(&epp);
+#endif
 	for (i = 0; i < FD_NUMPART; i++) {
 		int	ipc;
 
@@ -699,7 +714,6 @@ copy_solaris_part(struct ipart *ipart)
 		if (fdisk_is_dos_extended(ip.systid) && (ext_part_found == 0)) {
 			/* We support only one extended partition per disk */
 			ext_part_found = 1;
-			(void) extpart_init(&epp);
 			rval = fdisk_get_solaris_part(epp, &pno, &relsec,
 			    &numsec);
 			if (rval == FDISK_SUCCESS) {
@@ -720,14 +734,21 @@ copy_solaris_part(struct ipart *ipart)
 				ip.numsect = numsec;
 				bcopy(&ip, ipart, sizeof (struct ipart));
 			}
-			libfdisk_fini(&epp);
 			continue;
 		}
 #endif
 
+
+#ifdef i386
+		if ((ip.systid == SUNIXOS &&
+		    (fdisk_is_linux_swap(epp, lel(ip.relsect), NULL) != 0)) ||
+		    ip.systid == SUNIXOS2 ||
+		    ip.systid == EFI_PMBR) {
+#else
 		if (ip.systid == SUNIXOS ||
 		    ip.systid == SUNIXOS2 ||
 		    ip.systid == EFI_PMBR) {
+#endif
 			solaris_offset = lel(ip.relsect);
 			bcopy(&ip, ipart, sizeof (struct ipart));
 
@@ -751,6 +772,9 @@ copy_solaris_part(struct ipart *ipart)
 			break;
 		}
 	}
+#ifdef i386
+	libfdisk_fini(&epp);
+#endif
 
 	(void) close(fd);
 	free(mbr);
@@ -799,6 +823,9 @@ auto_solaris_part(struct dk_label *label)
 
 	(void) memcpy(&mboot, mbr, sizeof (struct mboot));
 
+#ifdef i386
+	(void) extpart_init(&epp);
+#endif
 	for (i = 0; i < FD_NUMPART; i++) {
 		int	ipc;
 
@@ -812,7 +839,6 @@ auto_solaris_part(struct dk_label *label)
 		if (fdisk_is_dos_extended(ip.systid) && (ext_part_found == 0)) {
 			/* We support only one extended partition per disk */
 			ext_part_found = 1;
-			(void) extpart_init(&epp);
 			rval = fdisk_get_solaris_part(epp, &pno, &relsec,
 			    &numsec);
 			if (rval == FDISK_SUCCESS) {
@@ -830,7 +856,6 @@ auto_solaris_part(struct dk_label *label)
 				}
 				solaris_offset = relsec;
 			}
-			libfdisk_fini(&epp);
 			continue;
 		}
 #endif
@@ -840,9 +865,18 @@ auto_solaris_part(struct dk_label *label)
 		 * the label may be zero.  This protects us from FPE's, and
 		 * format still seems to work happily
 		 */
+
+
+#ifdef i386
+		if ((ip.systid == SUNIXOS &&
+		    (fdisk_is_linux_swap(epp, lel(ip.relsect), NULL) != 0)) ||
+		    ip.systid == SUNIXOS2 ||
+		    ip.systid == EFI_PMBR) {
+#else
 		if (ip.systid == SUNIXOS ||
 		    ip.systid == SUNIXOS2 ||
 		    ip.systid == EFI_PMBR) {
+#endif
 			if ((label->dkl_nhead != 0) &&
 			    (label->dkl_nsect != 0)) {
 				label->dkl_pcyl = lel(ip.numsect) /
@@ -866,6 +900,9 @@ auto_solaris_part(struct dk_label *label)
 		}
 	}
 
+#ifdef i386
+	libfdisk_fini(&epp);
+#endif
 	(void) close(fd);
 	free(mbr);
 	return (0);

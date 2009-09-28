@@ -2251,6 +2251,30 @@ cmlb_is_linux_swap(struct cmlb_lun *cl, uint32_t part_start, void *tg_cookie)
 		return (ENOMEM);
 	}
 
+	/*
+	 * Check if there is a sane Solaris VTOC
+	 * If there is a valid vtoc, no need to lookup
+	 * for the linux swap signature.
+	 */
+	mutex_exit(CMLB_MUTEX(cl));
+	rval = DK_TG_READ(cl, buf, part_start + DK_LABEL_LOC,
+	    sec_sz, tg_cookie);
+	mutex_enter(CMLB_MUTEX(cl));
+	if (rval != 0) {
+		cmlb_dbg(CMLB_ERROR,  cl,
+		    "cmlb_is_linux_swap: disk vtoc read err\n");
+		rval = EIO;
+		goto done;
+	}
+
+	if ((((struct dk_label *)buf)->dkl_magic == DKL_MAGIC) &&
+	    (((struct dk_label *)buf)->dkl_vtoc.v_sanity == VTOC_SANE)) {
+		rval = -1;
+		goto done;
+	}
+
+
+	/* No valid vtoc, so check for linux swap signature */
 	linux_swap_magic = buf + sec_sz - 10;
 
 	for (i = 0; i < sizeof (linux_pg_size_arr)/sizeof (uint32_t); i++) {
@@ -2279,6 +2303,7 @@ cmlb_is_linux_swap(struct cmlb_lun *cl, uint32_t part_start, void *tg_cookie)
 		}
 	}
 
+done:
 	kmem_free(buf, sec_sz);
 	return (rval);
 }
@@ -2331,7 +2356,6 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 	struct ipart	*efdp2 = &eparts[1];
 	int		ext_part_exists = 0;
 	int		ld_count = 0;
-	int		is_linux_swap;
 #endif
 
 	ASSERT(cl != NULL);
@@ -2536,17 +2560,11 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 				cl->cl_fmap[j].fmap_systid = systid;
 				ld_count++;
 
-				is_linux_swap = 0;
-				if (efdp1->systid == SUNIXOS) {
-					if (cmlb_is_linux_swap(cl, abs_secnum,
-					    tg_cookie) == 0) {
-						is_linux_swap = 1;
-					}
-				}
-
-				if ((efdp1->systid == SUNIXOS) ||
-				    (efdp1->systid == SUNIXOS2)) {
-					if ((uidx == -1) && (!is_linux_swap)) {
+				if ((efdp1->systid == SUNIXOS &&
+				    (cmlb_is_linux_swap(cl, abs_secnum,
+				    tg_cookie) != 0)) ||
+				    efdp1->systid == SUNIXOS2) {
+					if (uidx == -1) {
 						uidx = 0;
 						solaris_offset = abs_secnum;
 						solaris_size = ext_numsect;
@@ -2575,14 +2593,10 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 		 */
 		if ((uidx == -1) || (fdp->bootid == ACTIVE)) {
 #if defined(__i386) || defined(__amd64)
-			is_linux_swap = 0;
-			if (fdp->systid == SUNIXOS) {
-				if (cmlb_is_linux_swap(cl, relsect,
-				    tg_cookie) == 0) {
-					is_linux_swap = 1;
-				}
-			}
-			if (!is_linux_swap) {
+			if (fdp->systid != SUNIXOS ||
+			    (fdp->systid == SUNIXOS &&
+			    (cmlb_is_linux_swap(cl, relsect,
+			    tg_cookie) != 0))) {
 #endif
 				uidx = i;
 				solaris_offset = relsect;

@@ -63,6 +63,9 @@
 #include <zlib.h>
 #include <sys/lockfs.h>
 #include <sys/filio.h>
+#ifdef i386
+#include <libfdisk.h>
+#endif
 
 #if !defined(_OPB)
 #include <sys/ucode.h>
@@ -4869,6 +4872,11 @@ get_partition(char *device)
 	struct mboot *mboot;
 	char boot_sect[SECTOR_SIZE];
 	char *wholedisk, *slice;
+#ifdef i386
+	ext_part_t *epp;
+	uint32_t secnum, numsec;
+	int rval, pno;
+#endif
 
 	/* form whole disk (p0) */
 	slice = device + strlen(device) - 2;
@@ -4882,11 +4890,33 @@ get_partition(char *device)
 
 	/* read boot sector */
 	fd = open(wholedisk, O_RDONLY);
-	free(wholedisk);
 	if (fd == -1 || read(fd, boot_sect, SECTOR_SIZE) != SECTOR_SIZE) {
 		return (partno);
 	}
 	(void) close(fd);
+
+#ifdef i386
+	/* Read/Initialize extended partition information */
+	if ((rval = libfdisk_init(&epp, wholedisk, NULL, FDISK_READ_DISK))
+	    != FDISK_SUCCESS) {
+		switch (rval) {
+			/*
+			 * FDISK_EBADLOGDRIVE and FDISK_ENOLOGDRIVE can
+			 * be considered as soft errors and hence
+			 * we do not return
+			 */
+			case FDISK_EBADLOGDRIVE:
+				break;
+			case FDISK_ENOLOGDRIVE:
+				break;
+			default:
+				free(wholedisk);
+				return (partno);
+				break;
+		}
+	}
+#endif
+	free(wholedisk);
 
 	/* parse fdisk table */
 	mboot = (struct mboot *)((void *)boot_sect);
@@ -4898,14 +4928,32 @@ get_partition(char *device)
 				partno = i;
 				break;
 			}
+#ifdef i386
+		} else if (fdisk_is_dos_extended(part->systid)) {
+			rval = fdisk_get_solaris_part(epp, &pno, &secnum,
+			    &numsec);
+			if (rval == FDISK_SUCCESS) {
+				partno = pno - 1;
+				break;
+			}
+#endif
 		} else {	/* look for solaris partition, old and new */
+#ifdef i386
+			if ((part->systid == SUNIXOS &&
+			    (fdisk_is_linux_swap(epp, part->relsect,
+			    NULL) != 0)) || part->systid == SUNIXOS2) {
+#else
 			if (part->systid == SUNIXOS ||
 			    part->systid == SUNIXOS2) {
+#endif
 				partno = i;
 				break;
 			}
 		}
 	}
+#ifdef i386
+	libfdisk_fini(&epp);
+#endif
 	return (partno);
 }
 
@@ -7226,7 +7274,7 @@ zfs_get_physical(char *special, char ***physarray, int *n)
 		if (strncmp(lp->line, "/dev/dsk/", strlen("/dev/dsk/")) != 0 &&
 		    strncmp(lp->line, "/dev/rdsk/",
 		    strlen("/dev/rdsk/")) != 0)  {
-			(void) snprintf(dsk, sizeof (dsk), "/dev/dsk/%s",
+			(void) snprintf(dsk, sizeof (dsk), "/dev/rdsk/%s",
 			    lp->line);
 		} else {
 			(void) strlcpy(dsk, lp->line, sizeof (dsk));
