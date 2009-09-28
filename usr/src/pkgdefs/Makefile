@@ -323,6 +323,7 @@ COMMON_SUBDIRS= \
 	SUNWixgbe \
 	SUNWkrbr \
 	SUNWkrbu \
+	SUNWlatencytop \
 	SUNWldskint \
 	SUNWlibsasl \
 	SUNWllc \
