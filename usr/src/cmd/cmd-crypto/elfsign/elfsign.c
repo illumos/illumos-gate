@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Developer command for adding the signature section to an ELF object
@@ -212,7 +210,7 @@ main(int argc, char **argv)
 	 *	  because getopt does that for us.
 	 */
 	while (!errflag && (c = getopt(argc - 1, argv + 1, opts)) != EOF) {
-		if (strchr("ceFihkPr", c) != NULL)
+		if (strchr("ceFihkPTr", c) != NULL)
 			cryptodebug("c=%c, '%s'", c, optarg);
 		else
 			cryptodebug("c=%c", c);
@@ -737,6 +735,17 @@ do_gen_esa(char *object)
 		return (ret);
 	ret = EXIT_SIGN_FAILED;
 
+	if (cmd_info.token_label &&
+	    !elfcertlib_settoken(cmd_info.ess, cmd_info.token_label)) {
+		es_error(gettext("Unable to access token: %s"),
+		    cmd_info.token_label);
+		ret = EXIT_SIGN_FAILED;
+		goto clean_esa;
+	}
+
+	if ((ret = setcertpath()) != EXIT_OKAY)
+		goto clean_esa;
+
 	/*
 	 * Find the certificate we need to sign the activation file with.
 	 */
@@ -1016,7 +1025,7 @@ do_verify(char *object)
 	kmfrv = f; \
 	if (kmfrv != KMF_OK) { \
 		char *e = NULL; \
-		(void) KMF_GetKMFErrorString(kmfrv, &e); \
+		(void) kmf_get_kmf_error_str(kmfrv, &e); \
 		cryptoerror(LOG_STDERR, \
 			gettext("Failed to %s: %s\n"), \
 			s, (e ? e : "unknown error")); \
@@ -1029,17 +1038,23 @@ create_csr(char *dn)
 {
 	KMF_RETURN kmfrv = KMF_OK;
 	KMF_HANDLE_T kmfhandle = NULL;
-	KMF_CREATEKEYPAIR_PARAMS kp_params;
 	KMF_KEY_HANDLE pubk, prik;
 	KMF_X509_NAME csrSubject;
 	KMF_CSR_DATA csr;
 	KMF_ALGORITHM_INDEX sigAlg = KMF_ALGID_MD5WithRSA;
 	KMF_DATA signedCsr = { NULL, 0 };
-	KMF_CONFIG_PARAMS config;
 	char *err;
+	KMF_ATTRIBUTE	attrlist[16];
+	KMF_ENCODE_FORMAT	format;
+	KMF_KEYSTORE_TYPE	kstype;
+	KMF_KEY_ALG	keytype;
+	uint32_t	keylength;
+	KMF_CREDENTIAL	cred;
+	char	*pin = NULL;
+	int	numattr;
 
-	if ((kmfrv = KMF_Initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
-		(void) KMF_GetKMFErrorString(kmfrv, &err);
+	if ((kmfrv = kmf_initialize(&kmfhandle, NULL, NULL)) != KMF_OK) {
+		(void) kmf_get_kmf_error_str(kmfrv, &err);
 		cryptoerror(LOG_STDERR,
 		    gettext("Error initializing KMF: %s\n"),
 		    (err ? err : "unknown error"));
@@ -1049,82 +1064,109 @@ create_csr(char *dn)
 	}
 	(void) memset(&csr, 0, sizeof (csr));
 	(void) memset(&csrSubject, 0, sizeof (csrSubject));
-	(void) memset(&kp_params, 0, sizeof (kp_params));
 
 	if (cmd_info.privpath != NULL) {
-		kp_params.kstype = KMF_KEYSTORE_OPENSSL;
-		kp_params.sslparms.keyfile = cmd_info.privpath;
-		kp_params.sslparms.format = KMF_FORMAT_ASN1;
-	} else if (cmd_info.token_label != NULL) {
+		kstype = KMF_KEYSTORE_OPENSSL;
+		format = KMF_FORMAT_ASN1;
+	} else {
+		boolean_t	readonly;
+		/* args checking verified (cmd_info.token_label != NULL) */
 
 		/* Get a PIN to store the private key in the token */
-		char *pin = getpin();
+		pin = getpin();
 
 		if (pin == NULL) {
-			(void) KMF_Finalize(kmfhandle);
+			(void) kmf_finalize(kmfhandle);
 			return (KMF_ERR_AUTH_FAILED);
 		}
 
-		kp_params.kstype = KMF_KEYSTORE_PK11TOKEN;
-		kp_params.cred.cred = pin;
-		kp_params.cred.credlen = strlen(pin);
+		kstype = KMF_KEYSTORE_PK11TOKEN;
+		readonly = B_FALSE;
 
-		(void) memset(&config, 0, sizeof (config));
-		config.kstype = KMF_KEYSTORE_PK11TOKEN;
-		config.pkcs11config.label = cmd_info.token_label;
-		config.pkcs11config.readonly = FALSE;
-		kmfrv = KMF_ConfigureKeystore(kmfhandle, &config);
+		numattr = 0;
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_TOKEN_LABEL_ATTR, cmd_info.token_label,
+		    strlen(cmd_info.token_label));
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_READONLY_ATTR, &readonly, sizeof (readonly));
+		kmfrv = kmf_configure_keystore(kmfhandle, numattr, attrlist);
 		if (kmfrv != KMF_OK) {
 			goto cleanup;
 		}
 	}
 
 	/* Create the RSA keypair */
-	kp_params.keytype = KMF_RSA;
-	kp_params.keylength = ES_DEFAULT_KEYSIZE;
+	keytype = KMF_RSA;
+	keylength = ES_DEFAULT_KEYSIZE;
+	(void) memset(&prik, 0, sizeof (prik));
+	(void) memset(&pubk, 0, sizeof (pubk));
 
-	kmfrv = KMF_CreateKeypair(kmfhandle, &kp_params, &prik, &pubk);
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_KEYALG_ATTR, &keytype, sizeof (keytype));
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_KEYLENGTH_ATTR, &keylength, sizeof (keylength));
+	if (pin != NULL) {
+		cred.cred = pin;
+		cred.credlen = strlen(pin);
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_CREDENTIAL_ATTR, &cred, sizeof (KMF_CREDENTIAL));
+	}
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_PRIVKEY_HANDLE_ATTR, &prik, sizeof (KMF_KEY_HANDLE));
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_PUBKEY_HANDLE_ATTR, &pubk, sizeof (KMF_KEY_HANDLE));
+	if (kstype == KMF_KEYSTORE_OPENSSL) {
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_KEY_FILENAME_ATTR, cmd_info.privpath,
+		    strlen(cmd_info.privpath));
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_ENCODE_FORMAT_ATTR, &format, sizeof (format));
+	}
+
+	kmfrv = kmf_create_keypair(kmfhandle, numattr, attrlist);
 	if (kmfrv != KMF_OK) {
-		(void) KMF_GetKMFErrorString(kmfrv, &err);
-		if (err != NULL) {
-			cryptoerror(LOG_STDERR,
-			    gettext("Create RSA keypair failed: %s"), err);
-			free(err);
-		}
+		(void) kmf_get_kmf_error_str(kmfrv, &err);
+		cryptoerror(LOG_STDERR,
+		    gettext("Create RSA keypair failed: %s"),
+		    (err ? err : "unknown error"));
+		free(err);
 		goto cleanup;
 	}
 
-	kmfrv = KMF_DNParser(dn, &csrSubject);
+	kmfrv = kmf_dn_parser(dn, &csrSubject);
 	if (kmfrv != KMF_OK) {
-		(void) KMF_GetKMFErrorString(kmfrv, &err);
-		if (err != NULL) {
-			cryptoerror(LOG_STDERR,
-			    gettext("Error parsing subject name: %s\n"), err);
-			free(err);
-		}
+		(void) kmf_get_kmf_error_str(kmfrv, &err);
+		cryptoerror(LOG_STDERR,
+		    gettext("Error parsing subject name: %s\n"),
+		    (err ? err : "unknown error"));
+		free(err);
 		goto cleanup;
 	}
 
-	SET_VALUE(KMF_SetCSRPubKey(kmfhandle, &pubk, &csr), "keypair");
+	SET_VALUE(kmf_set_csr_pubkey(kmfhandle, &pubk, &csr), "keypair");
 
-	SET_VALUE(KMF_SetCSRVersion(&csr, 2), "version number");
+	SET_VALUE(kmf_set_csr_version(&csr, 2), "version number");
 
-	SET_VALUE(KMF_SetCSRSubjectName(&csr, &csrSubject), "subject name");
+	SET_VALUE(kmf_set_csr_subject(&csr, &csrSubject), "subject name");
 
-	SET_VALUE(KMF_SetCSRSignatureAlgorithm(&csr, sigAlg),
-	    "SignatureAlgorithm");
+	SET_VALUE(kmf_set_csr_sig_alg(&csr, sigAlg), "SignatureAlgorithm");
 
-	if ((kmfrv = KMF_SignCSR(kmfhandle, &csr, &prik, &signedCsr)) ==
+	if ((kmfrv = kmf_sign_csr(kmfhandle, &csr, &prik, &signedCsr)) ==
 	    KMF_OK) {
-		kmfrv = KMF_CreateCSRFile(&signedCsr, KMF_FORMAT_PEM,
+		kmfrv = kmf_create_csr_file(&signedCsr, KMF_FORMAT_PEM,
 		    cmd_info.cert);
 	}
 
 cleanup:
-	(void) KMF_FreeKMFKey(kmfhandle, &prik);
-	(void) KMF_FreeData(&signedCsr);
-	(void) KMF_FreeSignedCSR(&csr);
-	(void) KMF_Finalize(kmfhandle);
+	(void) kmf_free_kmf_key(kmfhandle, &prik);
+	(void) kmf_free_data(&signedCsr);
+	(void) kmf_free_signed_csr(&csr);
+	(void) kmf_finalize(kmfhandle);
 
 	return (kmfrv);
 }

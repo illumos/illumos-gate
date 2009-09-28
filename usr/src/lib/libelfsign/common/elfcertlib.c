@@ -82,6 +82,9 @@ static ELFCert_t elfcertlib_allocatecert(void);
 boolean_t
 elfcertlib_verifycert(ELFsign_t ess, ELFCert_t cert)
 {
+	KMF_ATTRIBUTE	attrlist[8];
+	int		numattr;
+
 	KMF_RETURN rv;
 	if ((cert->c_verified == E_OK) || (cert->c_verified == E_IS_TA)) {
 		return (B_TRUE);
@@ -99,9 +102,15 @@ elfcertlib_verifycert(ELFsign_t ess, ELFCert_t cert)
 	(void) pthread_mutex_unlock(&ca_mutex);
 
 	if (CACERT != NULL) {
-		rv = KMF_VerifyCertWithCert(ess->es_kmfhandle,
-		    (const KMF_DATA *)&cert->c_cert,
-		    (const KMF_DATA *)&CACERT->c_cert.certificate);
+		numattr = 0;
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_CERT_DATA_ATTR, &cert->c_cert.certificate,
+		    sizeof (KMF_DATA));
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_SIGNER_CERT_DATA_ATTR, &CACERT->c_cert.certificate,
+		    sizeof (KMF_DATA));
+
+		rv = kmf_verify_cert(ess->es_kmfhandle, numattr, attrlist);
 		if (rv == KMF_OK) {
 			if (ess->es_certCAcallback != NULL)
 				(ess->es_certvercallback)(ess->es_callbackctx,
@@ -112,9 +121,15 @@ elfcertlib_verifycert(ELFsign_t ess, ELFCert_t cert)
 	}
 
 	if (OBJCACERT != NULL) {
-		rv = KMF_VerifyCertWithCert(ess->es_kmfhandle,
-		    (const KMF_DATA *)&cert->c_cert,
-		    (const KMF_DATA *)&OBJCACERT->c_cert.certificate);
+		numattr = 0;
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_CERT_DATA_ATTR, &cert->c_cert.certificate,
+		    sizeof (KMF_DATA));
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_SIGNER_CERT_DATA_ATTR, &OBJCACERT->c_cert.certificate,
+		    sizeof (KMF_DATA));
+
+		rv = kmf_verify_cert(ess->es_kmfhandle, numattr, attrlist);
 		if (rv == KMF_OK) {
 			if (ess->es_certCAcallback != NULL)
 				(ess->es_certvercallback)(ess->es_callbackctx,
@@ -145,7 +160,6 @@ elfcertlib_getcert(ELFsign_t ess, char *cert_pathname,
 {
 	KMF_RETURN rv;
 	ELFCert_t	cert = NULL;
-	KMF_FINDCERT_PARAMS fcparams;
 	KMF_X509_DER_CERT certbuf[2];
 	uint32_t ncerts;
 	boolean_t ret = B_FALSE;
@@ -181,31 +195,58 @@ elfcertlib_getcert(ELFsign_t ess, char *cert_pathname,
 	}
 
 	for (plp = pathlist; *plp; plp++) {
-		(void) memset(&fcparams, 0, sizeof (fcparams));
-		fcparams.kstype = KMF_KEYSTORE_OPENSSL;
-		fcparams.sslparms.certfile = *plp;
-		fcparams.subject = signer_DN;
+		KMF_ATTRIBUTE	attrlist[8];
+		KMF_KEYSTORE_TYPE	kstype;
+		KMF_CERT_VALIDITY	certvalidity;
+		int		numattr;
+
+		kstype = KMF_KEYSTORE_OPENSSL;
+		certvalidity = KMF_ALL_CERTS;
 		ncerts = 2;
 
-		rv = KMF_FindCert(ess->es_kmfhandle, &fcparams, certbuf,
-		    &ncerts);
+		numattr = 0;
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_X509_DER_CERT_ATTR, certbuf,
+		    sizeof (KMF_X509_DER_CERT));
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_COUNT_ATTR, &ncerts, sizeof (uint32_t));
+		if (signer_DN != NULL) {
+			kmf_set_attr_at_index(attrlist, numattr++,
+			    KMF_SUBJECT_NAME_ATTR, signer_DN,
+			    strlen(signer_DN));
+		}
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_CERT_VALIDITY_ATTR, &certvalidity,
+		    sizeof (KMF_CERT_VALIDITY));
+		kmf_set_attr_at_index(attrlist, numattr++,
+		    KMF_CERT_FILENAME_ATTR, *plp, strlen (*plp));
+
+		rv = kmf_find_cert(ess->es_kmfhandle, numattr, attrlist);
+
 		if (rv != KMF_OK)
 			continue;
-		if (ncerts > 1 && signer_DN == NULL) {
-			/* There can be only one */
-			cryptodebug("elfcertlib_getcert: "
-			    "too many certificates found in %s",
-			    cert_pathname);
-			goto cleanup;
-		}
-		/* found it, cache subject and issuer */
+		/* found one */
 		cert->c_cert = certbuf[0];
-		rv = KMF_GetCertSubjectNameString(ess->es_kmfhandle,
+		if (ncerts > 1) {
+			/* release any extras */
+			kmf_free_kmf_cert(ess->es_kmfhandle, &certbuf[1]);
+			if (signer_DN == NULL) {
+				/* There can be only one */
+				cryptodebug("elfcertlib_getcert: "
+				    "too many certificates found in %s",
+				    cert_pathname);
+				goto cleanup;
+			}
+		}
+		/* cache subject and issuer */
+		rv = kmf_get_cert_subject_str(ess->es_kmfhandle,
 		    &cert->c_cert.certificate, &cert->c_subject);
 		if (rv != KMF_OK)
 			goto cleanup;
 
-		rv = KMF_GetCertIssuerNameString(ess->es_kmfhandle,
+		rv = kmf_get_cert_issuer_str(ess->es_kmfhandle,
 		    &cert->c_cert.certificate, &cert->c_issuer);
 		if (rv != KMF_OK)
 			goto cleanup;
@@ -262,17 +303,39 @@ cleanup:
 boolean_t
 elfcertlib_loadprivatekey(ELFsign_t ess, ELFCert_t cert, const char *pathname)
 {
-	KMF_RETURN rv = KMF_OK;
-	uint32_t nkeys = 2;
-	KMF_FINDKEY_PARAMS fkparams;
+	KMF_RETURN	rv = KMF_OK;
 	KMF_KEY_HANDLE	keybuf[2];
+	KMF_ATTRIBUTE	attrlist[16];
+	uint32_t	nkeys;
+	KMF_KEYSTORE_TYPE	kstype;
+	KMF_KEY_ALG	keytype;
+	KMF_KEY_CLASS	keyclass;
+	KMF_ENCODE_FORMAT	format;
+	int		numattr;
 
-	(void) memset(&fkparams, 0, sizeof (fkparams));
-	fkparams.keyclass = KMF_ASYM_PRI;
-	fkparams.kstype = KMF_KEYSTORE_OPENSSL;
-	fkparams.sslparms.keyfile = (char *)pathname;
+	kstype = KMF_KEYSTORE_OPENSSL;
+	nkeys = 2;
+	keytype = KMF_KEYALG_NONE;
+	keyclass = KMF_ASYM_PRI;
+	format = KMF_FORMAT_UNDEF;
 
-	rv = KMF_FindKey(ess->es_kmfhandle, &fkparams, keybuf, &nkeys);
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEY_HANDLE_ATTR,
+	    keybuf, sizeof (KMF_KEY_HANDLE));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_COUNT_ATTR,
+	    &nkeys, sizeof (uint32_t));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEYALG_ATTR,
+	    &keytype, sizeof (keytype));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEYCLASS_ATTR,
+	    &keyclass, sizeof (keyclass));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_ENCODE_FORMAT_ATTR,
+	    &format, sizeof (format));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEY_FILENAME_ATTR,
+	    (char *)pathname, strlen(pathname));
+
+	rv = kmf_find_key(ess->es_kmfhandle, numattr, attrlist);
 	if (rv != KMF_OK)
 		return (B_FALSE);
 	if (nkeys != 1) {
@@ -299,35 +362,18 @@ boolean_t
 elfcertlib_loadtokenkey(ELFsign_t ess, ELFCert_t cert,
     const char *token_label, const char *pin)
 {
-	KMF_RETURN rv = KMF_OK;
-	KMF_FINDKEY_PARAMS fkparams;
-	KMF_CONFIG_PARAMS cfgparams;
-	uint32_t nkeys = 1;
-	char *idstr = NULL;
-	char *err = NULL;
-
-	(void) memset(&fkparams, 0, sizeof (fkparams));
-	(void) memset(&cfgparams, 0, sizeof (cfgparams));
-
-	cfgparams.kstype = KMF_KEYSTORE_PK11TOKEN;
-	cfgparams.pkcs11config.label = (char *)token_label;
-	cfgparams.pkcs11config.readonly = B_TRUE;
-	rv = KMF_ConfigureKeystore(ess->es_kmfhandle, &cfgparams);
-	if (rv != KMF_OK) {
-		if (KMF_GetKMFErrorString(rv, &err) == KMF_OK) {
-			cryptodebug("Error configuring token access:"
-			    " %s\n", err);
-			free(err);
-		}
-		return (B_FALSE);
-	}
-
-	fkparams.idstr = idstr;
-	fkparams.kstype = KMF_KEYSTORE_PK11TOKEN;
-	fkparams.keyclass = KMF_ASYM_PRI;
-	fkparams.cred.cred = (char *)pin;
-	fkparams.cred.credlen = (pin != NULL ? strlen(pin) : 0);
-	fkparams.pkcs11parms.private = B_TRUE;
+	KMF_RETURN	rv;
+	char		*idstr = NULL;
+	char		*kmferr;
+	KMF_ATTRIBUTE	attrlist[16];
+	uint32_t	nkeys;
+	KMF_KEYSTORE_TYPE	kstype;
+	KMF_KEY_ALG	keytype;
+	KMF_KEY_CLASS	keyclass;
+	KMF_ENCODE_FORMAT	format;
+	KMF_CREDENTIAL	pincred;
+	boolean_t	tokenbool, privatebool;
+	int		numattr;
 
 	/*
 	 * We will search for the key based on the ID attribute
@@ -335,31 +381,64 @@ elfcertlib_loadtokenkey(ELFsign_t ess, ELFCert_t cert,
 	 * a SHA-1 hash of the public modulus shared by the
 	 * key and the certificate.
 	 */
-	rv = KMF_GetCertIDString(&cert->c_cert.certificate, &idstr);
+	rv = kmf_get_cert_id_str(&cert->c_cert.certificate, &idstr);
 	if (rv != KMF_OK) {
-		if (KMF_GetKMFErrorString(rv, &err) == KMF_OK) {
-			cryptodebug("Error getting ID from cert: %s\n", err);
-			free(err);
-		}
+		(void) kmf_get_kmf_error_str(rv, &kmferr);
+		cryptodebug("Error getting ID from cert: %s\n",
+		    (kmferr ? kmferr : "Unrecognized KMF error"));
+		free(kmferr);
 		return (B_FALSE);
 	}
-	fkparams.idstr = idstr;
 
-	rv = KMF_FindKey(ess->es_kmfhandle, &fkparams,
-	    &cert->c_privatekey, &nkeys);
-	if (rv != KMF_OK || nkeys != 1) {
-		if (KMF_GetKMFErrorString(rv, &err) == KMF_OK) {
-			cryptodebug("Error finding private key: %s\n", err);
-			free(err);
-		}
-		free(idstr);
+	kstype = KMF_KEYSTORE_PK11TOKEN;
+	nkeys = 1;
+	keytype = KMF_KEYALG_NONE;
+	keyclass = KMF_ASYM_PRI;
+	format = KMF_FORMAT_UNDEF;
+	pincred.cred = (char *)pin;
+	pincred.credlen = strlen(pin);
+	tokenbool = B_FALSE;
+	privatebool = B_TRUE;
+
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype, sizeof (kstype));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEY_HANDLE_ATTR,
+	    &cert->c_privatekey, sizeof (KMF_KEY_HANDLE));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_COUNT_ATTR,
+	    &nkeys, sizeof (uint32_t));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEYALG_ATTR,
+	    &keytype, sizeof (keytype));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEYCLASS_ATTR,
+	    &keyclass, sizeof (keyclass));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_ENCODE_FORMAT_ATTR,
+	    &format, sizeof (format));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_IDSTR_ATTR,
+	    idstr, strlen(idstr));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_CREDENTIAL_ATTR,
+	    &pincred, sizeof (KMF_CREDENTIAL));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_TOKEN_BOOL_ATTR,
+	    &tokenbool, sizeof (tokenbool));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_PRIVATE_BOOL_ATTR,
+	    &privatebool, sizeof (privatebool));
+
+	rv = kmf_find_key(ess->es_kmfhandle, numattr, attrlist);
+	free(idstr);
+	if (rv != KMF_OK) {
+		(void) kmf_get_kmf_error_str(rv, &kmferr);
+		cryptodebug("Error finding private key: %s\n",
+		    (kmferr ? kmferr : "Unrecognized KMF error"));
+		free(kmferr);
+		return (B_FALSE);
+	}
+	if (nkeys != 1) {
+		cryptodebug("Error finding private key: No key found\n");
 		return (B_FALSE);
 	}
 	cryptodebug("key found in %s", token_label);
 	cryptodebug("elfcertlib_loadprivatekey = 0x%.8X",
 	    &cert->c_privatekey);
 
-	free(idstr);
 	return (B_TRUE);
 }
 
@@ -384,10 +463,12 @@ elfcertlib_sign(ELFsign_t ess, ELFCert_t cert,
 	const uchar_t *data, size_t data_len,
 	uchar_t *sig, size_t *sig_len)
 {
-	KMF_RETURN ret = KMF_OK;
-	KMF_DATA tobesigned;
-	KMF_DATA signature;
-	uchar_t	 der_data[sizeof (MD5_DER_PREFIX) + MD5_DIGEST_LENGTH];
+	KMF_RETURN	ret;
+	KMF_DATA	tobesigned;
+	KMF_DATA	signature;
+	uchar_t		der_data[sizeof (MD5_DER_PREFIX) + MD5_DIGEST_LENGTH];
+	KMF_ATTRIBUTE	attrlist[8];
+	int		numattr;
 
 	if (ess->es_version <= FILESIG_VERSION2) {
 		/* compatibility: take MD5 hash of SHA1 hash */
@@ -420,17 +501,28 @@ elfcertlib_sign(ELFsign_t ess, ELFCert_t cert,
 	signature.Data = (uchar_t *)sig;
 	signature.Length = *sig_len;
 
-	ret = KMF_SignDataWithKey(ess->es_kmfhandle,
-	    &cert->c_privatekey, (KMF_OID *)&KMFOID_RSA,
-	    &tobesigned, &signature);
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_KEYSTORE_TYPE_ATTR, &(cert->c_privatekey.kstype),
+	    sizeof (KMF_KEYSTORE_TYPE));
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_KEY_HANDLE_ATTR, &cert->c_privatekey, sizeof (KMF_KEY_HANDLE));
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_OID_ATTR, (KMF_OID *)&KMFOID_RSA, sizeof (KMF_OID));
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_DATA_ATTR, &tobesigned, sizeof (KMF_DATA));
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_OUT_DATA_ATTR, &signature, sizeof (KMF_DATA));
+
+	ret = kmf_sign_data(ess->es_kmfhandle, numattr, attrlist);
 
 	if (ret != KMF_OK) {
-		char *err;
-		if (KMF_GetKMFErrorString(ret, &err) == KMF_OK &&
-		    err != NULL) {
-			cryptodebug("Error signing data: %s\n", err);
-			free(err);
-		}
+		char	*kmferr;
+
+		(void) kmf_get_kmf_error_str(ret, &kmferr);
+		cryptodebug("Error signing data: %s\n",
+		    (kmferr ? kmferr : "Unrecognized KMF error"));
+		free(kmferr);
 		*sig_len = 0;
 		return (B_FALSE);
 	}
@@ -459,6 +551,9 @@ elfcertlib_verifysig(ELFsign_t ess, ELFCert_t cert,
 	KMF_DATA	indata;
 	KMF_DATA	insig;
 	KMF_ALGORITHM_INDEX algid;
+	KMF_ATTRIBUTE	attrlist[8];
+	KMF_KEYSTORE_TYPE	kstype;
+	int		numattr;
 
 	indata.Data = (uchar_t *)data;
 	indata.Length = data_len;
@@ -476,9 +571,21 @@ elfcertlib_verifysig(ELFsign_t ess, ELFCert_t cert,
 	 * all validation within the FIPS-140 boundary for
 	 * the Cryptographic Framework.
 	 */
-	rv = KMF_VerifyDataWithCert(ess->es_kmfhandle,
-	    KMF_KEYSTORE_PK11TOKEN, algid,
-	    &indata, &insig, &cert->c_cert.certificate);
+	kstype = KMF_KEYSTORE_PK11TOKEN;
+
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_KEYSTORE_TYPE_ATTR,
+	    &kstype,  sizeof (kstype));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_DATA_ATTR,
+	    &indata, sizeof (KMF_DATA));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_IN_SIGN_ATTR,
+	    &insig, sizeof (KMF_DATA));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_SIGNER_CERT_DATA_ATTR,
+	    (KMF_DATA *)(&cert->c_cert.certificate), sizeof (KMF_DATA));
+	kmf_set_attr_at_index(attrlist, numattr++, KMF_ALGORITHM_INDEX_ATTR,
+	    &algid, sizeof (algid));
+
+	rv = kmf_verify_data(ess->es_kmfhandle, numattr, attrlist);
 
 	return ((rv == KMF_OK));
 }
@@ -519,7 +626,7 @@ elfcertlib_init(ELFsign_t ess)
 	boolean_t rc = B_TRUE;
 	KMF_RETURN rv;
 	if (ess->es_kmfhandle == NULL) {
-		rv = KMF_Initialize(&ess->es_kmfhandle, NULL, NULL);
+		rv = kmf_initialize(&ess->es_kmfhandle, NULL, NULL);
 		if (rv != KMF_OK) {
 			cryptoerror(LOG_ERR,
 			    "unable to initialize KMF library");
@@ -532,7 +639,7 @@ elfcertlib_init(ELFsign_t ess)
 void
 elfcertlib_fini(ELFsign_t ess)
 {
-	(void) KMF_Finalize(ess->es_kmfhandle);
+	(void) kmf_finalize(ess->es_kmfhandle);
 }
 
 /*
@@ -541,15 +648,25 @@ elfcertlib_fini(ELFsign_t ess)
 boolean_t
 elfcertlib_settoken(ELFsign_t ess, char *token)
 {
-	boolean_t rc = B_TRUE;
-	KMF_RETURN rv;
-	KMF_CONFIG_PARAMS cfgparams;
+	boolean_t	rc = B_TRUE;
+	KMF_RETURN	rv;
+	KMF_ATTRIBUTE	attrlist[8];
+	KMF_KEYSTORE_TYPE	kstype;
+	boolean_t	readonly;
+	int	numattr;
 
-	(void) memset(&cfgparams, 0, sizeof (cfgparams));
-	cfgparams.kstype = KMF_KEYSTORE_PK11TOKEN;
-	cfgparams.pkcs11config.label = token;
-	cfgparams.pkcs11config.readonly = B_TRUE;
-	rv = KMF_ConfigureKeystore(ess->es_kmfhandle, &cfgparams);
+	kstype = KMF_KEYSTORE_PK11TOKEN;
+	readonly = B_TRUE;
+
+	numattr = 0;
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_KEYSTORE_TYPE_ATTR, &kstype, sizeof (kstype));
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_TOKEN_LABEL_ATTR, token, strlen(token));
+	kmf_set_attr_at_index(attrlist, numattr++,
+	    KMF_READONLY_ATTR, &readonly, sizeof (readonly));
+
+	rv = kmf_configure_keystore(ess->es_kmfhandle, numattr, attrlist);
 	if (rv != KMF_OK) {
 		cryptoerror(LOG_ERR, "unable to select token\n");
 		rc = B_FALSE;
@@ -636,8 +753,8 @@ elfcertlib_freecert(ELFsign_t ess, ELFCert_t cert)
 	free(cert->c_subject);
 	free(cert->c_issuer);
 
-	KMF_FreeKMFCert(ess->es_kmfhandle, &cert->c_cert);
-	KMF_FreeKMFKey(ess->es_kmfhandle, &cert->c_privatekey);
+	kmf_free_kmf_cert(ess->es_kmfhandle, &cert->c_cert);
+	kmf_free_kmf_key(ess->es_kmfhandle, &cert->c_privatekey);
 
 	free(cert);
 }
