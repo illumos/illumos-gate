@@ -4244,7 +4244,7 @@ mac_set_mtu(mac_handle_t mh, uint_t new_mtu, uint_t *old_mtu_arg)
 {
 	mac_impl_t *mip = (mac_impl_t *)mh;
 	uint_t old_mtu;
-	int rv;
+	int rv = 0;
 
 	i_mac_perim_enter(mip);
 
