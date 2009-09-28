@@ -1126,8 +1126,20 @@ md_unit_decopen(
 
 	/* teardown kstat, return success */
 	if (! (ui->ui_lock & MD_UL_OPEN)) {
-		mutex_exit(&ui->ui_mx);
-		md_kstat_destroy(mnum);
+
+		/*
+		 * We have a race condition inherited from specfs between
+		 * open() and close() calls. This results in the kstat
+		 * for a pending I/O being torn down, and then a panic.
+		 * To avoid this, only tear the kstat down if there are
+		 * no other readers on this device.
+		 */
+		if (ui->ui_readercnt > 1) {
+			mutex_exit(&ui->ui_mx);
+		} else {
+			mutex_exit(&ui->ui_mx);
+			md_kstat_destroy(mnum);
+		}
 		return (0);
 	}
 
