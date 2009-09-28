@@ -94,6 +94,8 @@ static ulong_t ereport_qlen = 0;
 static size_t ereport_size = 0;
 static int ereport_cols = 80;
 
+extern void fastreboot_disable_highpil(void);
+
 /*
  * Common fault management kstats to record ereport generation
  * failures
@@ -374,6 +376,9 @@ fm_panic(const char *format, ...)
 	va_list ap;
 
 	(void) casptr((void *)&fm_panicstr, NULL, (void *)format);
+#if defined(__i386) || defined(__amd64)
+	fastreboot_disable_highpil();
+#endif /* __i386 || __amd64 */
 	va_start(ap, format);
 	vpanic(format, ap);
 	va_end(ap);
