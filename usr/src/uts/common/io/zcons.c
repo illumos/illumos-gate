@@ -172,6 +172,7 @@
 #include <sys/zcons.h>
 #include <sys/vnode.h>
 #include <sys/fs/snode.h>
+#include <sys/zone.h>
 
 static int zc_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int zc_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -328,38 +329,11 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-/*
- * This is a convenience function that clears a device's autopush configuration.
- * It is meant to be used on the slave side of the console.  Unlike calling
- * kstr_autopush() directly, this function outputs a warning via cmn_err() if
- * kstr_autopush() fails.  'dip' must be non-NULL in debug builds.  Both
- * 'major' and 'minor' must be valid.
- */
-static void
-zc_clearautopush(dev_info_t *dip, major_t major, minor_t minor)
-{
-	char *devicepathp;
-
-	if (kstr_autopush(CLR_AUTOPUSH, &major, &minor, NULL, NULL, NULL) !=
-	    0 && zcons_debug != 0) {
-		devicepathp = (char *)kmem_alloc(MAXPATHLEN * sizeof (char),
-		    KM_SLEEP);
-		(void) ddi_pathname(dip, devicepathp);
-		cmn_err(CE_NOTE, "zc_detach: could not clear sad configuration "
-		    "for device %s\n", devicepathp);
-		kmem_free(devicepathp, MAXPATHLEN * sizeof (char));
-	}
-}
-
 static int
 zc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	zc_state_t *zcs;
 	int instance;
-	major_t major;
-	minor_t minor;
-	minor_t lastminor;
-	uint_t anchorindex;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -369,38 +343,20 @@ zc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	/*
-	 * Set up sad(7D) so that the necessary STREAMS modules will be in place
-	 * when the slave is opened.  A wrinkle is that 'ptem' must be anchored
-	 * in place (see streamio(7i)) because we always want the console to
-	 * have terminal semantics.
-	 */
-	minor = instance << 1 | ZC_SLAVE_MINOR;
-	lastminor = 0;
-	major = ddi_driver_major(dip);
-	anchorindex = 1;
-	if (kstr_autopush(SET_AUTOPUSH, &major, &minor, &lastminor,
-	    &anchorindex, zcons_mods) != 0)
-		goto commonfail;
-
-	/*
 	 * Create the master and slave minor nodes.
 	 */
-	if ((ddi_create_minor_node(dip, ZCONS_SLAVE_NAME, S_IFCHR, minor,
-	    DDI_PSEUDO, 0) == DDI_FAILURE) ||
+	if ((ddi_create_minor_node(dip, ZCONS_SLAVE_NAME, S_IFCHR,
+	    instance << 1 | ZC_SLAVE_MINOR, DDI_PSEUDO, 0) == DDI_FAILURE) ||
 	    (ddi_create_minor_node(dip, ZCONS_MASTER_NAME, S_IFCHR,
-	    instance << 1 | ZC_MASTER_MINOR, DDI_PSEUDO, 0) == DDI_FAILURE))
-		goto failwithautopush;
+	    instance << 1 | ZC_MASTER_MINOR, DDI_PSEUDO, 0) == DDI_FAILURE)) {
+		ddi_remove_minor_node(dip, NULL);
+		ddi_soft_state_free(zc_soft_state, instance);
+		return (DDI_FAILURE);
+	}
 
 	VERIFY((zcs = ddi_get_soft_state(zc_soft_state, instance)) != NULL);
 	zcs->zc_devinfo = dip;
 	return (DDI_SUCCESS);
-
-failwithautopush:
-	zc_clearautopush(dip, major, minor);
-	ddi_remove_minor_node(dip, NULL);
-commonfail:
-	ddi_soft_state_free(zc_soft_state, instance);
-	return (DDI_FAILURE);
 }
 
 static int
@@ -421,13 +377,6 @@ zc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		DBG1("zc_detach: device (dip=%p) still open\n", (void *)dip);
 		return (DDI_FAILURE);
 	}
-
-	/*
-	 * Clear the sad configuration so that reattaching doesn't fail to
-	 * set up sad configuration.
-	 */
-	zc_clearautopush(dip, ddi_driver_major(dip), instance << 1 |
-	    ZC_SLAVE_MINOR);
 
 	ddi_remove_minor_node(dip, NULL);
 	ddi_soft_state_free(zc_soft_state, instance);
@@ -570,6 +519,10 @@ zc_slave_open(zc_state_t *zcs,
 {
 	mblk_t *mop;
 	struct stroptions *sop;
+	major_t major;
+	minor_t minor;
+	minor_t lastminor;
+	uint_t anchorindex;
 
 	/*
 	 * The slave side can be opened as many times as needed.
@@ -577,6 +530,22 @@ zc_slave_open(zc_state_t *zcs,
 	if ((zcs->zc_state & ZC_STATE_SOPEN) != 0) {
 		ASSERT((rqp != NULL) && (WR(rqp)->q_ptr == zcs));
 		return (0);
+	}
+
+	/*
+	 * Set up sad(7D) so that the necessary STREAMS modules will be in
+	 * place.  A wrinkle is that 'ptem' must be anchored
+	 * in place (see streamio(7i)) because we always want the console to
+	 * have terminal semantics.
+	 */
+	minor = ddi_get_instance(zcs->zc_devinfo) << 1 | ZC_SLAVE_MINOR;
+	major = ddi_driver_major(zcs->zc_devinfo);
+	lastminor = 0;
+	anchorindex = 1;
+	if (kstr_autopush(SET_AUTOPUSH, &major, &minor, &lastminor,
+	    &anchorindex, zcons_mods) != 0) {
+		DBG("zc_slave_open(): kstr_autopush() failed\n");
+		return (EIO);
 	}
 
 	if ((mop = allocb(sizeof (struct stroptions), BPRI_MED)) == NULL) {
@@ -659,6 +628,8 @@ zc_close(queue_t *rqp, int flag, cred_t *credp)
 	queue_t *wqp;
 	mblk_t	*bp;
 	zc_state_t *zcs;
+	major_t major;
+	minor_t minor;
 
 	zcs = (zc_state_t *)rqp->q_ptr;
 
@@ -704,6 +675,15 @@ zc_close(queue_t *rqp, int flag, cred_t *credp)
 
 		qprocsoff(rqp);
 		WR(rqp)->q_ptr = rqp->q_ptr = NULL;
+
+		/*
+		 * Clear the sad configuration so that reopening doesn't fail
+		 * to set up sad configuration.
+		 */
+		major = ddi_driver_major(zcs->zc_devinfo);
+		minor = ddi_get_instance(zcs->zc_devinfo) << 1 | ZC_SLAVE_MINOR;
+		(void) kstr_autopush(CLR_AUTOPUSH, &major, &minor, NULL, NULL,
+		    NULL);
 	}
 
 	return (0);
@@ -799,6 +779,15 @@ zc_wput(queue_t *qp, mblk_t *mp)
 			}
 
 			/*
+			 * The process that passed the ioctl must be running in
+			 * the global zone.
+			 */
+			if (curzone != global_zone) {
+				miocack(qp, mp, 0, EINVAL);
+				return;
+			}
+
+			/*
 			 * The calling process must pass a file descriptor for
 			 * the slave device.
 			 */
@@ -844,6 +833,15 @@ zc_wput(queue_t *qp, mblk_t *mp)
 			}
 			if (zcs->zc_slave_vnode == NULL) {
 				miocack(qp, mp, 0, 0);
+				return;
+			}
+
+			/*
+			 * The process that passed the ioctl must be running in
+			 * the global zone.
+			 */
+			if (curzone != global_zone) {
+				miocack(qp, mp, 0, EINVAL);
 				return;
 			}
 
