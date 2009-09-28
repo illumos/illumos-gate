@@ -261,6 +261,9 @@ pi_get_chassisid(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node)
 		topo_mod_dprintf(mod, "pi_get_chassis: chassis-id = %s\n", id);
 		return (topo_mod_strdup(mod, id));
 	}
+	if (hc_name != NULL) {
+		topo_mod_strfree(mod, hc_name);
+	}
 
 	/*
 	 * Search the PRI for nodes of type MD_STR_COMPONENT and find the

@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Some topology creation routines may need to defer completing enumeration
@@ -46,8 +45,8 @@
 #include <fm/topo_hc.h>
 #include "pi_impl.h"
 
-static uu_list_pool_t	*defer_pool;
-static uu_list_t	*defer_list;
+static uu_list_pool_t	*defer_pool = NULL;
+static uu_list_t	*defer_list = NULL;
 
 struct pi_defernode_s {
 	uu_list_node_t	defer_node;
@@ -194,6 +193,8 @@ pi_defer_exec(topo_mod_t *mod, md_t *mdp)
 
 	uu_list_destroy(defer_list);
 	uu_list_pool_destroy(defer_pool);
+	defer_list = NULL;
+	defer_pool = NULL;
 
 	return (0);
 }
@@ -213,6 +214,7 @@ pi_deferlist_create(topo_mod_t *mod)
 	defer_list = uu_list_create(defer_pool, NULL, 0);
 	if (defer_list == NULL) {
 		uu_list_pool_destroy(defer_pool);
+		defer_pool = NULL;
 		topo_mod_seterrno(mod, EMOD_NOMEM);
 		return (-1);
 	}

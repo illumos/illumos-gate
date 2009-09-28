@@ -100,8 +100,8 @@ nvlist_t *pi_meths;
  * single thread and a single invocation at a time for an enumerator.  This
  * makes using a file-global safe.
  */
-static uu_list_pool_t	*walker_pool;
-static uu_list_t	*walker_list;
+static uu_list_pool_t	*walker_pool = NULL;
+static uu_list_t	*walker_list = NULL;
 
 struct pi_walkernode_s {
 	uu_list_node_t	walker_node;
@@ -704,6 +704,7 @@ pi_walkerlist_create(topo_mod_t *mod)
 	walker_list = uu_list_create(walker_pool, NULL, 0);
 	if (walker_list == NULL) {
 		uu_list_pool_destroy(walker_pool);
+		walker_pool = NULL;
 		return (-1);
 	}
 
@@ -732,6 +733,8 @@ pi_walkerlist_destroy(topo_mod_t *mod)
 	}
 	uu_list_destroy(walker_list);
 	uu_list_pool_destroy(walker_pool);
+	walker_list = NULL;
+	walker_pool = NULL;
 }
 
 
