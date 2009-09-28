@@ -83,6 +83,7 @@ typedef struct sata_address sata_address_t;
 #define	SATA_ADDR_PMPORT	0x08	/* Port Multiplier's device port */
 #define	SATA_ADDR_CNTRL		0x10	/* Controller */
 #define	SATA_ADDR_PMULT		0x20	/* Port Multiplier */
+#define	SATA_ADDR_PMULT_SPEC	0x40	/* Port Multiplier Specific */
 
 /*
  * SATA port status and control register block.
@@ -114,6 +115,7 @@ struct sata_pmult_gscr {
 	uint32_t	gscr1;		/* Resrved Information register */
 	uint32_t	gscr2;		/* Port Information register */
 	uint32_t	gscr64;		/* Feature register */
+	uint32_t	resv[4];	/* Reseved */
 };
 
 typedef struct sata_pmult_gscr sata_pmult_gscr_t;
@@ -136,8 +138,7 @@ typedef struct sata_pmult_gscr sata_pmult_gscr_t;
  *	a value specific for a reported event.
  */
 #define	SATA_DEVICE_REV_1	1
-#define	SATA_DEVICE_REV_2	2
-#define	SATA_DEVICE_REV		SATA_DEVICE_REV_2
+#define	SATA_DEVICE_REV		SATA_DEVICE_REV_1
 
 struct sata_device
 {
@@ -146,9 +147,6 @@ struct sata_device
 	uint32_t	satadev_state;		/* Port or device state */
 	uint32_t	satadev_type;		/* Attached device type */
 	struct sata_port_scr satadev_scr; 	/* Port status and ctrl regs */
-	struct sata_pmult_gscr satadev_gscr;	/* Port multiplier specific */
-						/* global status and control */
-						/* registers */
 	uint32_t	satadev_add_info;	/* additional information, */
 						/* function specific */
 };
@@ -746,7 +744,7 @@ void	sata_free_error_retrieval_pkt(sata_pkt_t *);
 sata_pkt_t *sata_get_rdwr_pmult_pkt(dev_info_t *, sata_device_t *, uint8_t,
     uint32_t, uint32_t);
 void	sata_free_rdwr_pmult_pkt(sata_pkt_t *);
-int	sata_check_pmult_blacklist(sata_device_t *);
+void	sata_register_pmult(dev_info_t *, sata_device_t *, sata_pmult_gscr_t *);
 void	sata_free_dma_resources(sata_pkt_t *);
 
 /*

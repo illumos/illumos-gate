@@ -110,7 +110,7 @@ static	int ahci_write_pmult(ahci_ctl_t *, ahci_addr_t *, uint8_t, uint32_t);
 static	int ahci_update_pmult_pscr(ahci_ctl_t *, ahci_addr_t *,
     sata_device_t *);
 static	int ahci_update_pmult_gscr(ahci_ctl_t *, ahci_addr_t *,
-    sata_device_t *);
+    sata_pmult_gscr_t *);
 static	int ahci_initialize_pmult(ahci_ctl_t *, ahci_port_t *, ahci_addr_t *,
     sata_device_t *);
 static	int ahci_initialize_pmport(ahci_ctl_t *, ahci_port_t *, ahci_addr_t *);
@@ -1087,7 +1087,7 @@ ahci_register_sata_hba_tran(ahci_ctl_t *ahci_ctlp, uint32_t cap_status)
 	/* Allocate memory for the sata_hba_tran  */
 	sata_hba_tran = kmem_zalloc(sizeof (sata_hba_tran_t), KM_SLEEP);
 
-	sata_hba_tran->sata_tran_hba_rev = SATA_TRAN_HBA_REV_3;
+	sata_hba_tran->sata_tran_hba_rev = SATA_TRAN_HBA_REV;
 	sata_hba_tran->sata_tran_hba_dip = ahci_ctlp->ahcictl_dip;
 	sata_hba_tran->sata_tran_hba_dma_attr =
 	    &ahci_ctlp->ahcictl_buffer_dma_attr;
@@ -1254,7 +1254,7 @@ ahci_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 		/* port mutliplier is removed. */
 		AHCIDBG(AHCIDBG_PMULT, ahci_ctlp,
 		    "ahci_tran_probe_port: "
-		    "port-pmult is removed from port %s", portstr);
+		    "pmult is removed from port %s", portstr);
 		mutex_exit(&ahci_portp->ahciport_mutex);
 		return (SATA_FAILURE);
 	}
@@ -1264,8 +1264,9 @@ ahci_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 	 * 1. A controller port.
 	 *    A controller port should be ready here.
 	 * 2. A port multiplier.
-	 *    If it has not been initialized, initialized it. If it is
-	 *    initilaized, we need check the status of all its device ports.
+	 *    SATA_ADDR_PMULT_SPEC - if it is not initialized yet, initialize
+	 *    it and register the port multiplier to the framework.
+	 *    SATA_ADDR_PMULT - check the status of all its device ports.
 	 * 3. A port multiplier port.
 	 *    If it has not been initialized, initialized it.
 	 *
@@ -1273,29 +1274,22 @@ ahci_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 	 * initialization because we cannot do these time-consuming jobs in an
 	 * interrupt context.
 	 */
-	if (AHCI_ADDR_IS_PORT(&addr)) {
-		if (ahci_portp->ahciport_device_type == SATA_DTYPE_PMULT) {
-			AHCI_ADDR_SET_PMULT(&pmult_addr, port);
-			port_state = ahci_portp->ahciport_port_state;
-			/* SATA Framework's first probe? */
-			if (!(port_state & SATA_DSTATE_PMULT_INIT)) {
-				/* Initialize registers on a port multiplier */
-				rval_init = ahci_initialize_pmult(ahci_ctlp,
-				    ahci_portp, &pmult_addr, sd);
-				if (rval_init != AHCI_SUCCESS) {
-					AHCIDBG(AHCIDBG_PMULT, ahci_ctlp,
-					    "ahci_tran_probe_port: "
-					    "pmult initialization failed.",
-					    NULL);
-					mutex_exit(&ahci_portp->ahciport_mutex);
-					return (SATA_FAILURE);
-				}
-			}
+	if (sd->satadev_addr.qual & SATA_ADDR_PMULT_SPEC) {
+		AHCI_ADDR_SET_PMULT(&pmult_addr, port);
+		/* Initialize registers on a port multiplier */
+		rval_init = ahci_initialize_pmult(ahci_ctlp,
+		    ahci_portp, &pmult_addr, sd);
+		if (rval_init != AHCI_SUCCESS) {
+			AHCIDBG(AHCIDBG_PMULT, ahci_ctlp,
+			    "ahci_tran_probe_port: "
+			    "pmult initialization failed.", NULL);
+			mutex_exit(&ahci_portp->ahciport_mutex);
+			return (SATA_FAILURE);
 		}
-	} else if (AHCI_ADDR_IS_PMULT(&addr)) {
+	} else if (sd->satadev_addr.qual & SATA_ADDR_PMULT) {
 		/* Check pmports hotplug events */
 		(void) ahci_probe_pmult(ahci_ctlp, ahci_portp, &addr);
-	} else if (AHCI_ADDR_IS_PMPORT(&addr)) {
+	} else if (sd->satadev_addr.qual & SATA_ADDR_PMPORT) {
 		if (ahci_probe_pmport(ahci_ctlp, ahci_portp,
 		    &addr, sd) != AHCI_SUCCESS) {
 			rval = SATA_FAILURE;
@@ -1393,19 +1387,8 @@ ahci_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 
 out:
 	/* Register update only fails while probing a pmult/pmport */
-	if (AHCI_ADDR_IS_PORT(&addr)) {
+	if (AHCI_ADDR_IS_PORT(&addr) || AHCI_ADDR_IS_PMULT(&addr)) {
 		ahci_update_sata_registers(ahci_ctlp, port, sd);
-		if (ahci_portp->ahciport_device_type == SATA_DTYPE_PMULT)
-			if (port_state & SATA_STATE_READY)
-				if (ahci_update_pmult_gscr(ahci_ctlp,
-				    &pmult_addr, sd) != AHCI_SUCCESS)
-					rval = SATA_FAILURE;
-	} else if (AHCI_ADDR_IS_PMULT(&addr)) {
-		ahci_update_sata_registers(ahci_ctlp, port, sd);
-		if (port_state & SATA_STATE_READY)
-			if (ahci_update_pmult_gscr(ahci_ctlp,
-			    &addr, sd) != AHCI_SUCCESS)
-				rval = SATA_FAILURE;
 	} else if (AHCI_ADDR_IS_PMPORT(&addr)) {
 		if (port_state & SATA_STATE_READY)
 			if (ahci_update_pmult_pscr(ahci_ctlp,
@@ -1451,8 +1434,7 @@ ahci_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 {
 	ahci_ctl_t *ahci_ctlp;
 	ahci_port_t *ahci_portp;
-	ahci_addr_t addr, addr_pmult;
-	sata_device_t sdevice;
+	ahci_addr_t addr;
 	uint8_t	cport = spkt->satapkt_device.satadev_addr.cport;
 	uint8_t port;
 	char portstr[10];
@@ -1487,28 +1469,6 @@ ahci_tran_start(dev_info_t *dip, sata_pkt_t *spkt)
 			return (SATA_TRAN_PORT_ERROR);
 		}
 
-		/* Port multiplier and pmport are correctly initialized? */
-		if (!(ahci_portp->ahciport_port_state &
-		    SATA_DSTATE_PMULT_INIT)) {
-			AHCI_ADDR_SET_PMULT(&addr_pmult, port);
-			if (!ddi_in_panic() ||
-			    ahci_initialize_pmult(ahci_ctlp, ahci_portp,
-			    &addr_pmult, &sdevice) != AHCI_SUCCESS) {
-				spkt->satapkt_reason = SATA_PKT_PORT_ERROR;
-				spkt->satapkt_device.satadev_type =
-				    AHCIPORT_GET_DEV_TYPE(ahci_portp, &addr);
-				spkt->satapkt_device.satadev_state =
-				    AHCIPORT_GET_STATE(ahci_portp, &addr);
-				ahci_update_sata_registers(ahci_ctlp, port,
-				    &spkt->satapkt_device);
-				AHCIDBG(AHCIDBG_ERRS, ahci_ctlp,
-				    "ahci_tran_start returning PORT_ERROR "
-				    "while pmult is not initialized "
-				    "at port %d", port);
-				mutex_exit(&ahci_portp->ahciport_mutex);
-				return (SATA_TRAN_PORT_ERROR);
-			}
-		}
 		if (!(AHCIPORT_GET_STATE(ahci_portp, &addr) &
 		    SATA_STATE_READY)) {
 			if (!ddi_in_panic() ||
@@ -4107,12 +4067,12 @@ ahci_write_pmult(ahci_ctl_t *ahci_ctlp, ahci_addr_t *addrp,
  */
 static int
 ahci_update_pmult_gscr(ahci_ctl_t *ahci_ctlp, ahci_addr_t *addrp,
-    sata_device_t *sd)
+    sata_pmult_gscr_t *sg)
 {
-	READ_PMULT(addrp, SATA_PMULT_GSCR0, &sd->satadev_gscr.gscr0, err);
-	READ_PMULT(addrp, SATA_PMULT_GSCR1, &sd->satadev_gscr.gscr1, err);
-	READ_PMULT(addrp, SATA_PMULT_GSCR2, &sd->satadev_gscr.gscr2, err);
-	READ_PMULT(addrp, SATA_PMULT_GSCR64, &sd->satadev_gscr.gscr64, err);
+	READ_PMULT(addrp, SATA_PMULT_GSCR0, &sg->gscr0, err);
+	READ_PMULT(addrp, SATA_PMULT_GSCR1, &sg->gscr1, err);
+	READ_PMULT(addrp, SATA_PMULT_GSCR2, &sg->gscr2, err);
+	READ_PMULT(addrp, SATA_PMULT_GSCR64, &sg->gscr64, err);
 
 	return (AHCI_SUCCESS);
 
@@ -4151,6 +4111,7 @@ static int
 ahci_initialize_pmult(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
     ahci_addr_t *addrp, sata_device_t *sd)
 {
+	sata_pmult_gscr_t sg;
 	uint32_t gscr64;
 	uint8_t port = addrp->aa_port;
 
@@ -4193,16 +4154,16 @@ ahci_initialize_pmult(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	/*
 	 * Fetch the number of device ports of the port multiplier
 	 */
-	if (ahci_update_pmult_gscr(ahci_ctlp, addrp, sd) != AHCI_SUCCESS)
+	if (ahci_update_pmult_gscr(ahci_ctlp, addrp, &sg) != AHCI_SUCCESS)
 		return (AHCI_FAILURE);
 
-	/* If it's not in the blacklist, use the value in GSCR2 */
-	if (sata_check_pmult_blacklist(sd) == SATA_FAILURE)
-		sd->satadev_add_info = sd->satadev_gscr.gscr2 &
-		    SATA_PMULT_PORTNUM_MASK;
+	/* Register the port multiplier to SATA Framework. */
+	mutex_exit(&ahci_portp->ahciport_mutex);
+	sata_register_pmult(ahci_ctlp->ahcictl_dip, sd, &sg);
+	mutex_enter(&ahci_portp->ahciport_mutex);
 
 	ahci_portp->ahciport_pmult_info->ahcipmi_num_dev_ports =
-	    sd->satadev_add_info;
+	    sd->satadev_add_info & SATA_PMULT_PORTNUM_MASK;
 
 	AHCIDBG(AHCIDBG_INFO|AHCIDBG_PMULT, ahci_ctlp,
 	    "port %d: pmult sub-port number updated to %x.", port,
@@ -9695,6 +9656,7 @@ ahci_get_ahci_addr(ahci_ctl_t *ahci_ctlp, sata_device_t *sd,
 		ahci_addrp->aa_qual = AHCI_ADDR_PORT;
 		break;
 	case SATA_ADDR_PMULT:
+	case SATA_ADDR_PMULT_SPEC:
 		ahci_addrp->aa_qual = AHCI_ADDR_PMULT;
 		break;
 	case SATA_ADDR_DPMPORT:

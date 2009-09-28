@@ -131,7 +131,7 @@ static	void sata_inject_pkt_fault(sata_pkt_t *, int *, int);
 
 #define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
 
-static char sata_rev_tag[] = {"1.45"};
+static char sata_rev_tag[] = {"1.46"};
 
 /*
  * SATA cb_ops functions
@@ -264,7 +264,7 @@ static	void sata_probe_pmports(sata_hba_inst_t *, uint8_t);
 static 	int sata_reprobe_port(sata_hba_inst_t *, sata_device_t *, int);
 static 	int sata_reprobe_pmult(sata_hba_inst_t *, sata_device_t *, int);
 static 	int sata_reprobe_pmport(sata_hba_inst_t *, sata_device_t *, int);
-static	void sata_alloc_pmult(sata_hba_inst_t *, sata_device_t *);
+static	int sata_alloc_pmult(sata_hba_inst_t *, sata_device_t *);
 static	void sata_free_pmult(sata_hba_inst_t *, sata_device_t *);
 static 	int sata_add_device(dev_info_t *, sata_hba_inst_t *, sata_device_t *);
 static	int sata_offline_device(sata_hba_inst_t *, sata_device_t *,
@@ -1856,30 +1856,61 @@ sata_free_rdwr_pmult_pkt(sata_pkt_t *sata_pkt)
 }
 
 /*
- * Search a port multiplier in the blacklist and update the flags if a match
- * is found.
+ * Register a port multiplier to framework.
+ * 1) Store the GSCR values in the previous allocated pmult_info strctures.
+ * 2) Search in the blacklist and update the number of the device ports of the
+ * port multiplier.
  *
- * Returns:
- * SATA_SUCCESS if any matched entry is found.
- * SATA_FAILURE if no matched entry is found.
+ * Void return.
  */
-int
-sata_check_pmult_blacklist(sata_device_t *sd)
+void
+sata_register_pmult(dev_info_t *dip, sata_device_t *sd, sata_pmult_gscr_t *sg)
 {
+	sata_hba_inst_t *sata_hba_inst = NULL;
+	sata_pmult_info_t *pmultinfo;
 	sata_pmult_bl_t *blp;
+	int cport = sd->satadev_addr.cport;
+
+	mutex_enter(&sata_mutex);
+	for (sata_hba_inst = sata_hba_list; sata_hba_inst != NULL;
+	    sata_hba_inst = sata_hba_inst->satahba_next) {
+		if (SATA_DIP(sata_hba_inst) == dip)
+			if (sata_hba_inst->satahba_attached == 1)
+				break;
+	}
+	mutex_exit(&sata_mutex);
+	/* HBA not attached? */
+	if (sata_hba_inst == NULL)
+		return;
+
+	/* Number of pmports */
+	sd->satadev_add_info = sg->gscr2 & SATA_PMULT_PORTNUM_MASK;
+
+	/* Check the blacklist */
 	for (blp = sata_pmult_blacklist; blp->bl_gscr0; blp++) {
-		if (sd->satadev_gscr.gscr0 != blp->bl_gscr0 && blp->bl_gscr0)
+		if (sg->gscr0 != blp->bl_gscr0 && blp->bl_gscr0)
 			continue;
-		if (sd->satadev_gscr.gscr1 != blp->bl_gscr1 && blp->bl_gscr1)
+		if (sg->gscr1 != blp->bl_gscr1 && blp->bl_gscr1)
 			continue;
-		if (sd->satadev_gscr.gscr2 != blp->bl_gscr2 && blp->bl_gscr2)
+		if (sg->gscr2 != blp->bl_gscr2 && blp->bl_gscr2)
 			continue;
 
 		cmn_err(CE_WARN, "!Port multiplier is on the blacklist.");
 		sd->satadev_add_info = blp->bl_flags;
-		return (SATA_SUCCESS);
+		break;
 	}
-	return (SATA_FAILURE);
+
+	/* Register the port multiplier GSCR */
+	mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
+	pmultinfo = SATA_PMULT_INFO(sata_hba_inst, cport);
+	if (pmultinfo != NULL) {
+		pmultinfo->pmult_gscr = *sg;
+		pmultinfo->pmult_num_dev_ports =
+		    sd->satadev_add_info & SATA_PMULT_PORTNUM_MASK;
+		SATADBG1(SATA_DBG_PMULT, sata_hba_inst,
+		    "Port multiplier registered at port %d", cport);
+	}
+	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
 }
 
 /*
@@ -9223,7 +9254,9 @@ sata_probe_ports(sata_hba_inst_t *sata_hba_inst)
 			mutex_exit(&cportinfo->cport_mutex);
 
 			/* Allocate sata_pmult_info and sata_pmport_info */
-			sata_alloc_pmult(sata_hba_inst, &sata_device);
+			if (sata_alloc_pmult(sata_hba_inst, &sata_device) !=
+			    SATA_SUCCESS)
+				continue;
 
 			/* Log the information of the port multiplier */
 			sata_show_pmult_info(sata_hba_inst, &sata_device);
@@ -10041,7 +10074,9 @@ retry_probe:
 		    cportinfo->cport_addr.cport);
 
 		mutex_exit(&cportinfo->cport_mutex);
-		sata_alloc_pmult(sata_hba_inst, sata_device);
+		if (sata_alloc_pmult(sata_hba_inst, sata_device) !=
+		    SATA_SUCCESS)
+			return (SATA_FAILURE);
 		sata_show_pmult_info(sata_hba_inst, sata_device);
 		mutex_enter(&cportinfo->cport_mutex);
 
@@ -10236,21 +10271,17 @@ sata_reprobe_pmult(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device,
 	 * registers, so it is still necessary to update the information of
 	 * all drives attached to the previous port multiplier afterwards.
 	 */
-	if ((sata_device->satadev_gscr.gscr0 != pmultinfo->pmult_gscr.gscr0) ||
-	    (sata_device->satadev_gscr.gscr1 != pmultinfo->pmult_gscr.gscr1) ||
-	    (sata_device->satadev_gscr.gscr2 != pmultinfo->pmult_gscr.gscr2)) {
+	/* Device changed: PMult -> another PMult */
+	mutex_exit(&cportinfo->cport_mutex);
+	sata_free_pmult(sata_hba_inst, sata_device);
+	if (sata_alloc_pmult(sata_hba_inst, sata_device) != SATA_SUCCESS)
+		return (SATA_FAILURE);
+	mutex_enter(&cportinfo->cport_mutex);
 
-		/* Device changed: PMult -> another PMult */
-		mutex_exit(&cportinfo->cport_mutex);
-		sata_free_pmult(sata_hba_inst, sata_device);
-		sata_alloc_pmult(sata_hba_inst, sata_device);
-		mutex_enter(&cportinfo->cport_mutex);
-
-		SATADBG1(SATA_DBG_PMULT, sata_hba_inst,
-		    "SATA port multiplier [changed] at port %d", cport);
-		sata_log(sata_hba_inst, CE_WARN,
-		    "SATA port multiplier detected at port %d", cport);
-	}
+	SATADBG1(SATA_DBG_PMULT, sata_hba_inst,
+	    "SATA port multiplier [changed] at port %d", cport);
+	sata_log(sata_hba_inst, CE_WARN,
+	    "SATA port multiplier detected at port %d", cport);
 
 	/*
 	 * Mark all the port multiplier port behind the port
@@ -10571,16 +10602,18 @@ retry_probe_pmport:
  *
  * NOTE: No Mutex should be hold.
  */
-static void
+static int
 sata_alloc_pmult(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 {
 	dev_info_t *dip = SATA_DIP(sata_hba_inst);
 	sata_cport_info_t *cportinfo = NULL;
 	sata_pmult_info_t *pmultinfo = NULL;
 	sata_pmport_info_t *pmportinfo = NULL;
+	sata_device_t sd;
 	dev_t minor_number;
 	char name[16];
 	uint8_t cport = sata_device->satadev_addr.cport;
+	int rval;
 	int npmport;
 
 	cportinfo = SATA_CPORT_INFO(sata_hba_inst, cport);
@@ -10600,8 +10633,34 @@ sata_alloc_pmult(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 	pmultinfo->pmult_addr = sata_device->satadev_addr;
 	pmultinfo->pmult_addr.qual = SATA_ADDR_PMULT;
 	pmultinfo->pmult_state = SATA_STATE_PROBING;
-	pmultinfo->pmult_gscr = sata_device->satadev_gscr;
-	pmultinfo->pmult_num_dev_ports = sata_device->satadev_add_info;
+
+	/*
+	 * Probe the port multiplier with qualifier SATA_ADDR_PMULT_SPEC,
+	 * The HBA driver should initialize and register the port multiplier,
+	 * sata_register_pmult() will fill following fields,
+	 *   + sata_pmult_info.pmult_gscr
+	 *   + sata_pmult_info.pmult_num_dev_ports
+	 */
+	sd.satadev_addr = sata_device->satadev_addr;
+	sd.satadev_addr.qual = SATA_ADDR_PMULT_SPEC;
+	mutex_exit(&cportinfo->cport_mutex);
+	rval = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), &sd);
+	mutex_enter(&cportinfo->cport_mutex);
+
+	if (rval != SATA_SUCCESS ||
+	    (sd.satadev_type != SATA_DTYPE_PMULT) ||
+	    !(sd.satadev_state & SATA_DSTATE_PMULT_INIT)) {
+		SATA_CPORTINFO_PMULT_INFO(cportinfo) = NULL;
+		kmem_free(pmultinfo, sizeof (sata_pmult_info_t));
+		cportinfo->cport_state = SATA_PSTATE_FAILED;
+		cportinfo->cport_dev_type = SATA_DTYPE_UNKNOWN;
+		mutex_exit(&cportinfo->cport_mutex);
+		SATADBG1(SATA_DBG_PMULT, sata_hba_inst,
+		    "sata_alloc_pmult: failed to initialize pmult "
+		    "at port %d.", cport)
+		return (SATA_FAILURE);
+	}
 
 	/* Initialize pmport_info structure */
 	for (npmport = 0; npmport < pmultinfo->pmult_num_dev_ports;
@@ -10642,6 +10701,7 @@ sata_alloc_pmult(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 	pmultinfo->pmult_state |= (SATA_STATE_PROBED|SATA_STATE_READY);
 
 	mutex_exit(&cportinfo->cport_mutex);
+	return (SATA_SUCCESS);
 }
 
 /*
@@ -11544,6 +11604,7 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 
 /*
  * Log/display port multiplier information
+ * No Mutex should be hold.
  */
 static void
 sata_show_pmult_info(sata_hba_inst_t *sata_hba_inst,
@@ -11551,13 +11612,21 @@ sata_show_pmult_info(sata_hba_inst_t *sata_hba_inst,
 {
 	_NOTE(ARGUNUSED(sata_hba_inst))
 
+	int cport = sata_device->satadev_addr.cport;
+	sata_pmult_info_t *pmultinfo;
 	char msg_buf[MAXPATHLEN];
 	uint32_t gscr0, gscr1, gscr2, gscr64;
 
-	gscr0 = sata_device->satadev_gscr.gscr0;
-	gscr1 = sata_device->satadev_gscr.gscr1;
-	gscr2 = sata_device->satadev_gscr.gscr2;
-	gscr64 = sata_device->satadev_gscr.gscr64;
+	mutex_enter(&SATA_CPORT_MUTEX(sata_hba_inst, cport));
+	pmultinfo = SATA_PMULT_INFO(sata_hba_inst, cport);
+	if (pmultinfo == NULL)
+		return;
+
+	gscr0 = pmultinfo->pmult_gscr.gscr0;
+	gscr1 = pmultinfo->pmult_gscr.gscr1;
+	gscr2 = pmultinfo->pmult_gscr.gscr2;
+	gscr64 = pmultinfo->pmult_gscr.gscr64;
+	mutex_exit(&SATA_CPORT_MUTEX(sata_hba_inst, cport));
 
 	cmn_err(CE_CONT, "?Port Multiplier %d device-ports found at port %d",
 	    sata_device->satadev_add_info, sata_device->satadev_addr.cport);
@@ -18522,8 +18591,12 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 
 			if (SATA_CPORTINFO_PMULT_INFO(cportinfo) != NULL) {
 				/* Log the info of new port multiplier */
+				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+				    saddr->cport)->cport_mutex);
 				sata_show_pmult_info(sata_hba_inst,
 				    &sata_device);
+				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+				    saddr->cport)->cport_mutex);
 			}
 
 			ASSERT(SATA_CPORTINFO_PMULT_INFO(cportinfo) != NULL);
