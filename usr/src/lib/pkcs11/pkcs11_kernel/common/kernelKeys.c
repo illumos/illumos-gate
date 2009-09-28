@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <errno.h>
@@ -1983,18 +1981,19 @@ static int
 get_base_key_attributes(kernel_object_t *base_key, crypto_key_t *key_by_value)
 {
 	CK_ATTRIBUTE tmp;
-	crypto_object_attribute_t *attrs;
+	crypto_object_attribute_t *attrs = NULL;
 	biginteger_t *big;
-	int rv;
+	int i, count = 0, rv;
 
 	switch (base_key->key_type) {
 	case CKK_EC:
-		attrs = malloc(2 * sizeof (crypto_object_attribute_t));
+		count = 2;
+		attrs = malloc(count * sizeof (crypto_object_attribute_t));
 		if (attrs == NULL) {
 			rv = CKR_HOST_MEMORY;
 			goto out;
 		}
-		bzero(attrs, 2 * sizeof (crypto_object_attribute_t));
+		bzero(attrs, count * sizeof (crypto_object_attribute_t));
 
 		(void) pthread_mutex_lock(&base_key->object_mutex);
 
@@ -2029,6 +2028,7 @@ get_base_key_attributes(kernel_object_t *base_key, crypto_key_t *key_by_value)
 		}
 		rv = kernel_get_attribute(base_key, &tmp);
 		if (rv != CKR_OK) {
+			free(tmp.pValue);
 			goto out;
 		}
 		attrs[0].oa_type = tmp.type;
@@ -2058,6 +2058,7 @@ get_base_key_attributes(kernel_object_t *base_key, crypto_key_t *key_by_value)
 		}
 		rv = kernel_get_attribute(base_key, &tmp);
 		if (rv != CKR_OK) {
+			free(tmp.pValue);
 			goto out;
 		}
 		attrs[1].oa_type = tmp.type;
@@ -2068,12 +2069,13 @@ get_base_key_attributes(kernel_object_t *base_key, crypto_key_t *key_by_value)
 		break;
 
 	case CKK_DH:
-		attrs = malloc(3 * sizeof (crypto_object_attribute_t));
+		count = 3;
+		attrs = malloc(count * sizeof (crypto_object_attribute_t));
 		if (attrs == NULL) {
 			rv = CKR_HOST_MEMORY;
 			goto out;
 		}
-		bzero(attrs, 3 * sizeof (crypto_object_attribute_t));
+		bzero(attrs, count * sizeof (crypto_object_attribute_t));
 
 		(void) pthread_mutex_lock(&base_key->object_mutex);
 
@@ -2102,6 +2104,7 @@ get_base_key_attributes(kernel_object_t *base_key, crypto_key_t *key_by_value)
 		}
 		rv = kernel_get_attribute(base_key, &tmp);
 		if (rv != CKR_OK) {
+			free(tmp.pValue);
 			goto out;
 		}
 		attrs[0].oa_type = tmp.type;
@@ -2124,13 +2127,14 @@ get_base_key_attributes(kernel_object_t *base_key, crypto_key_t *key_by_value)
 		}
 		rv = kernel_get_attribute(base_key, &tmp);
 		if (rv != CKR_OK) {
+			free(tmp.pValue);
 			goto out;
 		}
 		attrs[1].oa_type = tmp.type;
 		attrs[1].oa_value = tmp.pValue;
 		attrs[1].oa_value_len = tmp.ulValueLen;
 
-		big = OBJ_PRI_EC_VALUE(base_key);
+		big = OBJ_PRI_DH_VALUE(base_key);
 		tmp.type = CKA_VALUE;
 
 		tmp.ulValueLen = big->big_value_len;
@@ -2141,6 +2145,7 @@ get_base_key_attributes(kernel_object_t *base_key, crypto_key_t *key_by_value)
 		}
 		rv = kernel_get_attribute(base_key, &tmp);
 		if (rv != CKR_OK) {
+			free(tmp.pValue);
 			goto out;
 		}
 		attrs[2].oa_type = tmp.type;
@@ -2159,6 +2164,13 @@ get_base_key_attributes(kernel_object_t *base_key, crypto_key_t *key_by_value)
 
 out:
 	(void) pthread_mutex_unlock(&base_key->object_mutex);
+	if (attrs != NULL) {
+		for (i = 0; i < count; i++) {
+			if (attrs[i].oa_value != NULL)
+				free(attrs[i].oa_value);
+		}
+		free(attrs);
+	}
 	return (rv);
 }
 
@@ -2226,12 +2238,14 @@ derive_key_by_value(CK_MECHANISM_PTR pMechanism, CK_ATTRIBUTE_PTR pTemplate,
 	if (rv != CKR_OK) {
 		goto failed_exit;
 	}
+	obj_ndk.ndk_in_count = attr_count - 1;
 
 	rv = process_object_attributes(&newTemplate[attr_count - 1],
 	    1, &obj_ndk.ndk_out_attributes, &is_token_obj);
 	if (rv != CKR_OK) {
 		goto failed_exit;
 	}
+	obj_ndk.ndk_out_count = 1;
 
 	/* Cannot create a token object with a READ-ONLY session. */
 	if (is_token_obj && session_p->ses_RO) {
@@ -2253,8 +2267,6 @@ derive_key_by_value(CK_MECHANISM_PTR pMechanism, CK_ATTRIBUTE_PTR pTemplate,
 	}
 
 	obj_ndk.ndk_base_key.ck_format = CRYPTO_KEY_ATTR_LIST;
-	obj_ndk.ndk_in_count = attr_count - 1;
-	obj_ndk.ndk_out_count = 1;
 
 	while ((r = ioctl(kernel_fd, CRYPTO_NOSTORE_DERIVE_KEY,
 	    &obj_ndk)) < 0) {
