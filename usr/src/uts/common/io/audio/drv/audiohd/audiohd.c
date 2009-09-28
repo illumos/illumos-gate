@@ -255,8 +255,7 @@ audiohd_add_intrs(audiohd_state_t *statep, int intr_type)
 	ret = ddi_intr_alloc(dip, statep->htable, intr_type, 0,
 	    count, &actual, DDI_INTR_ALLOC_NORMAL);
 	if (ret != DDI_SUCCESS || actual == 0) {
-		audio_dev_warn(statep->adev, "ddi_intr_alloc() failed %d",
-		    ret);
+		/* ddi_intr_alloc() failed  */
 		kmem_free(statep->htable, intr_size);
 		return (DDI_FAILURE);
 	}
@@ -451,24 +450,22 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 
 	if ((intr_types & DDI_INTR_TYPE_MSI) && statep->msi_enable) {
-		if (audiohd_add_intrs(statep, DDI_INTR_TYPE_MSI) !=
+		if (audiohd_add_intrs(statep, DDI_INTR_TYPE_MSI) ==
 		    DDI_SUCCESS) {
-			audio_dev_warn(statep->adev, "MSI registration failed, "
-			    "trying FIXED interrupt type");
-		} else {
 			statep->intr_type = DDI_INTR_TYPE_MSI;
 			statep->intr_added = B_TRUE;
 		}
 	}
 	if (!(statep->intr_added) &&
 	    (intr_types & DDI_INTR_TYPE_FIXED)) {
+		/* MSI registration failed, trying FIXED interrupt type */
 		if (audiohd_add_intrs(statep, DDI_INTR_TYPE_FIXED) !=
 		    DDI_SUCCESS) {
 			audio_dev_warn(statep->adev, "FIXED interrupt "
 			    "registration failed");
 			goto error;
 		}
-		audio_dev_warn(statep->adev, "Using FIXED interrupt type");
+		/* FIXED interrupt type is supported */
 		statep->intr_type = DDI_INTR_TYPE_FIXED;
 		statep->intr_added = B_TRUE;
 	}
@@ -6243,7 +6240,7 @@ audioha_codec_verb_get(void *arg, uint8_t caddr, uint8_t wid,
 	}
 
 	audio_dev_warn(statep->adev, "timeout when get "
-	    " response from codec: wid=%d, verb=0x%04x, param=0x%04x",
+	    "response from codec: wid=%d, verb=0x%04x, param=0x%04x",
 	    wid, verb, param);
 
 	return ((uint32_t)(-1));
