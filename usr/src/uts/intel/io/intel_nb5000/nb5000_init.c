@@ -120,6 +120,8 @@ uint_t nb5000_mask_poll_fbd = EMASK_FBD_NF;
 uint_t nb5000_mask_bios_fbd = EMASK_FBD_FATAL;
 uint_t nb5400_mask_poll_fbd = EMASK_5400_FBD_NF;
 uint_t nb5400_mask_bios_fbd = EMASK_5400_FBD_FATAL;
+uint_t nb7300_mask_poll_fbd = EMASK_7300_FBD_NF;
+uint_t nb7300_mask_bios_fbd = EMASK_7300_FBD_FATAL;
 
 int nb5100_reset_emask_mem = 1;
 uint_t nb5100_mask_poll_mem = EMASK_MEM_NF;
@@ -129,6 +131,7 @@ int nb5000_reset_emask_fsb = 1;
 uint_t nb5000_mask_poll_fsb = EMASK_FSB_NF;
 uint_t nb5000_mask_bios_fsb = EMASK_FSB_FATAL;
 
+uint_t nb5100_emask_int = EMASK_INT_5100;
 uint_t nb5400_emask_int = EMASK_INT_5400;
 
 uint_t nb7300_emask_int = EMASK_INT_7300;
@@ -137,6 +140,8 @@ uint_t nb5000_emask_int = EMASK_INT_5000;
 int nb5000_reset_emask_int = 1;
 uint_t nb5000_mask_poll_int = EMASK_INT_NF;
 uint_t nb5000_mask_bios_int = EMASK_INT_FATAL;
+uint_t nb5100_mask_poll_int = EMASK_INT_5100_NF;
+uint_t nb5100_mask_bios_int = EMASK_INT_5100_FATAL;
 
 uint_t nb_mask_poll_thr = EMASK_THR_NF;
 uint_t nb_mask_bios_thr = EMASK_THR_FATAL;
@@ -970,8 +975,17 @@ nb_int_init()
 	uint32_t err2_int;
 	uint32_t mcerr_int;
 	uint32_t emask_int;
+	uint32_t nb_mask_bios_int;
+	uint32_t nb_mask_poll_int;
 	uint16_t stepping;
 
+	if (nb_chipset == INTEL_NB_5100) {
+		nb_mask_bios_int = nb5100_mask_bios_int;
+		nb_mask_poll_int = nb5100_mask_poll_int;
+	} else {
+		nb_mask_bios_int = nb5000_mask_bios_int;
+		nb_mask_poll_int = nb5000_mask_poll_int;
+	}
 	err0_int = ERR0_INT_RD();
 	err1_int = ERR1_INT_RD();
 	err2_int = ERR2_INT_RD();
@@ -990,12 +1004,12 @@ nb_int_init()
 	MCERR_INT_WR(ERR_INT_ALL);
 	EMASK_INT_WR(ERR_INT_ALL);
 
-	mcerr_int &= ~nb5000_mask_bios_int;
-	mcerr_int |= nb5000_mask_bios_int & (~err0_int | ~err1_int | ~err2_int);
-	mcerr_int |= nb5000_mask_poll_int;
-	err0_int |= nb5000_mask_poll_int;
-	err1_int |= nb5000_mask_poll_int;
-	err2_int |= nb5000_mask_poll_int;
+	mcerr_int &= ~nb_mask_bios_int;
+	mcerr_int |= nb_mask_bios_int & (~err0_int | ~err1_int | ~err2_int);
+	mcerr_int |= nb_mask_poll_int;
+	err0_int |= nb_mask_poll_int;
+	err1_int |= nb_mask_poll_int;
+	err2_int |= nb_mask_poll_int;
 
 	l_mcerr_int = mcerr_int;
 	ERR0_INT_WR(err0_int);
@@ -1012,6 +1026,8 @@ nb_int_init()
 		} else if (nb_chipset == INTEL_NB_5400) {
 			EMASK_5400_INT_WR(nb5400_emask_int |
 			    (emask_int & EMASK_INT_RES));
+		} else if (nb_chipset == INTEL_NB_5100) {
+			EMASK_5000_INT_WR(nb5100_emask_int);
 		} else {
 			EMASK_5000_INT_WR(nb5000_emask_int);
 		}
@@ -1077,11 +1093,16 @@ nb_fbd_init()
 	MCERR_FBD_WR(0xffffffff);
 	EMASK_FBD_WR(0xffffffff);
 
-	if (nb_chipset == INTEL_NB_7300 && nb_mode == NB_MEMORY_MIRROR) {
-		/* MCH 7300 errata 34 */
-		emask_bios_fbd = nb5000_mask_bios_fbd & ~EMASK_FBD_M23;
-		emask_poll_fbd = nb5000_mask_poll_fbd;
-		mcerr_fbd |= EMASK_FBD_M23;
+	if (nb_chipset == INTEL_NB_7300) {
+		if (nb_mode == NB_MEMORY_MIRROR) {
+			/* MCH 7300 errata 34 */
+			emask_bios_fbd = nb7300_mask_bios_fbd & ~EMASK_FBD_M23;
+			emask_poll_fbd = nb7300_mask_poll_fbd;
+			mcerr_fbd |= EMASK_FBD_M23;
+		} else {
+			emask_bios_fbd = nb7300_mask_bios_fbd;
+			emask_poll_fbd = nb7300_mask_poll_fbd;
+		}
 	} else if (nb_chipset == INTEL_NB_5400) {
 		emask_bios_fbd = nb5400_mask_bios_fbd;
 		emask_poll_fbd = nb5400_mask_poll_fbd;
