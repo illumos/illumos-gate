@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -57,6 +57,8 @@ readonly LN=/usr/bin/ln
 readonly SED=/usr/bin/sed
 readonly CAT=/usr/bin/cat
 readonly FIND=/usr/bin/find
+readonly UNAME=/usr/bin/uname
+readonly MACH=`$UNAME -p`
 
 # for gettext
 TEXTDOMAIN=SUNW_OST_OSCMD
@@ -144,8 +146,19 @@ function mkdu
 	trap '/bin/rm -rf $statusfile $tmpdudir' EXIT
 
 	# Create DU directory first.
-	distdir=$ROOTDIR/DU/sol_$VERSION/i86pc
+	distdir=$ROOTDIR/DU/sol_$VERSION/$MACH
 	$MKDIR -p "$distdir/Tools" "$distdir/Product"
+
+	# to the other UltraSPARC architecture
+	if [[ "$MACH" != "i386" ]]
+	then
+		cd $ROOTDIR/DU/sol_$VERSION
+		$LN -s sparc sun4v
+		$LN -s sparc sun4u
+	else
+		cd $ROOTDIR/DU/sol_$VERSION
+		$LN -s i386 i86pc
+	fi	
 
 	# Unfortunately pkgtrans insists that all packages must be in
 	# <device1> (see pkgtrans(1)).  The packages can't have any path
@@ -244,14 +257,26 @@ function mkiso
 	# Note: the "-log-file >(cat -u >&2)" and "2>/dev/null" below is a
 	#	trick to filter out mkisofs's warning message about being
 	#	non-conforming to ISO-9660.
+	# We do some funky architecture-specific stuff here so that we can
+	# actually create a bootable media image for UltraSPARC systems
+	
+	ISOARGS_sparc="-B ... -joliet-long -R -U"
+	ISOARGS_i386="-d -N -r -relaxed-filenames"	
+	if [[ "$MACH" = "i386" ]]
+	then
+		ISOARGS=$ISOARGS_i386
+	else
+		ISOARGS=$ISOARGS_sparc
+	fi
+
 	$MKISOFS -o "$ISO" \
-		-relaxed-filenames \
 		-allow-leading-dots \
-		-N -l -d -D -r \
+		$ISOARGS \
+		-ldots -full-iso9660-filenames \
 		-R -J \
-		-V "$LABEL" \
+		-V "$ISOLABEL" \
 		$vflag \
-		-log-file >(/bin/cat -u >&2) \
+		-log-file >($CAT -u >&2) \
 		"$ROOTDIR" 2>/dev/null
 }
 

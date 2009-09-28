@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -39,7 +39,6 @@ readonly MKISOFS=/usr/bin/mkisofs
 readonly PATCHADD=/usr/sbin/patchadd
 readonly PKGTRANS=/usr/bin/pkgtrans
 readonly PKGADD=/usr/sbin/pkgadd
-readonly ROOT_ARCHIVE=/usr/sbin/root_archive
 readonly LOFIADM=/usr/sbin/lofiadm
 readonly MKDIR=/usr/bin/mkdir
 readonly RM=/usr/bin/rm
@@ -57,9 +56,21 @@ readonly LN=/usr/bin/ln
 readonly SED=/usr/bin/sed
 readonly CAT=/usr/bin/cat
 readonly FIND=/usr/bin/find
+readonly UNAME=/usr/bin/uname
+readonly MACH=`$UNAME -p`
 
+ROOT_ARCHIVE=/usr/sbin/root_archive
+BOOTBLOCK=
+MINIROOT=
 # Relative to a Solaris media root.
-readonly ELTORITO=boot/grub/stage2_eltorito
+if [ "$MACH" = "sparc" ]; then
+	BOOTBLOCK=boot/hsfs.bootblock
+	MINIROOT=$MEDIA_ROOT/boot/sparc.miniroot
+else
+	# x86/x64
+	BOOTBLOCK=boot/grub/stage2_eltorito
+	MINIROOT=$MEDIA_ROOT/boot/x86.miniroot
+fi
 
 readonly TMP_DIR=${TMPDIR:-/tmp}/${PROG##*/}.$$
 readonly LOGFILE=${TMPDIR:-/tmp}/${PROG##*/}-log.$$
@@ -408,10 +419,15 @@ function check_miniroot
 	MINIROOT=$MEDIA_ROOT/boot/x86.miniroot
 	if [[ ! -f "$MINIROOT" ]]
 	then
-		gettext "Can't find $MINIROOT.\n"
-		return 1
+		return 0 
 	fi
-	return 0
+	MINIROOT=$MEDIA_ROOT/boot/sparc.miniroot
+	if [[ ! -f "$MINIROOT" ]]
+	then
+		return 0 
+	fi
+	gettext "Can't find $MEDIA_ROOT/boot/x86.miniroot or $MEDIA_ROOT/boot/sparc.miniroot.\n"
+	return 1 
 }
 
 
@@ -453,10 +469,22 @@ function create_nonboot_iso # <dir>
 	# Note: the "-log-file >(cat -u >&2)" and "2>/dev/null" below is a
 	#	trick to filter out mkisofs's warning message about being
 	#	non-conforming to ISO-9660.
+	# We do some funky architecture-specific stuff here so that we can
+	# actually create a bootable media image for UltraSPARC systems
+
+	sparc_ISOARGS="-B ... -joliet-long -U"
+	i386_ISOARGS="-d -N -r -relaxed-filenames"
+	if [[ "$MACH" = "i386" ]]
+	then
+		ISOARGS=$i386_ISOARGS
+	else
+		ISOARGS=$sparc_ISOARGS
+	fi
+	
 	$MKISOFS -o "$ISO" \
-		-relaxed-filenames \
 		-allow-leading-dots \
-		-N -l -d -D -r \
+		$ISOARGS \
+		-l -ldots \
 		-R -J \
 		-V "$ISOLABEL" \
 		$vflag \
@@ -498,38 +526,47 @@ function create_bootable_iso # <dir>
 		;;
 	esac
 
-	# Verify the El Torito file exists under media root.  And if so,
+	# Verify the boot block exists under media root. If it does,	
 	# verify it's writable since it will be modified with some boot
 	# information by mkisofs' -boot-info-table option.
-	if [[ ! -f "$dir/$ELTORITO" ]]
+	if [[ ! -f "$dir/$BOOTBLOCK" ]]
 	then
-		gettext "Can't find $dir/$ELTORITO.\n"
+		gettext "Can't find $dir/$BOOTBLOCK.\n"
 		return 1
-	elif [[ ! -w "$dir/$ELTORITO" ]]
+	elif [[ ! -w "$dir/$BOOTBLOCK" ]]	
 	then
-		gettext "$dir/$ELTORITO is not writable.\n"
+		gettext "$dir/$BOOTBLOCK is not writable.\n"	
 		return 1
 	fi
 
 	gettext "Creating bootable ISO image ..."
 
-	# Since mkisofs below will modify the file $ELTORITO in-place, save
+	# Since mkisofs below will modify the file $BOOTBLOCK in-place, save
 	# a copy of it first.
-	saved=$TMP_DIR/${ELTORITO##*/}
-	$CP -f "$dir/$ELTORITO" "$saved" || return
+	saved=$TMP_DIR/${BOOTBLOCK##*/}
+	$CP -f "$dir/$BOOTBLOCK" "$saved" || return
 
 	# Note: the "-log-file >(cat -u >&2)" and "2>/dev/null" below is a
 	#	trick to filter out mkisofs's warning message about being
 	#	non-conforming to ISO-9660.
+	# We do some funky architecture-specific stuff here so that we can
+	# actually create a bootable media image for UltraSPARC systems
+	sparc_ISOARGS="-G $BOOTBLOCK -B ... -joliet-long -U"
+	i386_ISOARGS="-b boot/grub/stage2_eltorito -boot-info-table "
+	i386_ISOARGS="$i386_ISOARGS -boot-load-size 4 -c .catalog -d -N "
+	i386_ISOARGS="$i386_ISOARGS -no-emul-boot -r -relaxed-filenames"
+	if [[ "$MACH" = "i386" ]]
+	then
+		ISOARGS=$i386_ISOARGS
+	else
+		ISOARGS=$sparc_ISOARGS
+	fi
+
+	cd $dir
 	$MKISOFS -o "$ISO" \
-		-b "$ELTORITO" \
-		-c .catalog \
-		-no-emul-boot \
-		-boot-load-size 4 \
-		-boot-info-table \
-		-relaxed-filenames \
 		-allow-leading-dots \
-		-N -l -d -D -r \
+		$ISOARGS \
+		-l -ldots \
 		-R -J \
 		-V "$ISOLABEL" \
 		$vflag \
@@ -552,8 +589,22 @@ function create_du
 	typeset distdir tmpdudir pkgs obj statusfile
 
 	# Create DU directory first.
-	distdir=$DU_OUTDIR/DU/sol_$VERSION/i86pc
+	distdir=$DU_OUTDIR/DU/sol_$VERSION/$MACH
 	$MKDIR -p "$distdir/Tools" "$distdir/Product"
+
+	echo "start create DU with MACH $MACH"
+
+	# If we're running this script on sun4[vu], then create a symlink
+	# to the other UltraSPARC architecture
+	if [[ "$MACH" != "i386" ]]
+	then
+		cd $DU_OUTDIR/DU/sol_$VERSION
+		$LN -s sparc sun4v
+		$LN -s sparc sun4u
+	else
+		cd $DU_OUTDIR/DU/sol_$VERSION
+		$LN -s i386 i86pc
+	fi		
 
 	# Unfortunately pkgtrans insists that all packages must be in
 	# <device1> (see pkgtrans(1)).  The packages can't have any path
@@ -615,19 +666,61 @@ EOF
 basedir=/
 toolsdir=`dirname $0`
 tmpfile=/tmp/`basename $0`.$$
+gzip=/usr/bin/gzip
 while getopts "R:" arg
 do
         case "$arg" in
                 R) basedir=$OPTARG;;
         esac
 done
-/usr/bin/gzip -c -d "$toolsdir/../Product/pkgs.gz" > $tmpfile &&
+
+# /etc/driver_aliases ,/etc/driver_classes
+# /etc/name_to_major /etc/minor_perm
+# The four file can't append due to ACL defect.
+# workaround this by mv and cp
+
+/usr/bin/touch /etc/driver_aliases
+if [ $? -ne 0 ] ; then
+        /bin/cp /etc/driver_aliases /tmp/driver_aliases
+        /bin/mv /etc/driver_aliases /tmp/driver_aliases.bak
+        /bin/mv /tmp/driver_aliases /etc
+fi
+/usr/bin/touch /etc/driver_classes
+if [ $? -ne 0 ] ; then
+        /bin/cp /etc/driver_classes /tmp/driver_classes
+        /bin/mv /etc/driver_classes /tmp/driver_classes.bak
+        /bin/mv /tmp/driver_classes /etc
+fi
+/usr/bin/touch /etc/name_to_major
+if [ $? -ne 0 ] ; then
+        /bin/cp /etc/name_to_major /tmp/name_to_major
+        /bin/mv /etc/name_to_major /tmp/name_to_major.bak
+        /bin/mv /tmp/name_to_major /etc
+fi
+/usr/bin/touch /etc/minor_perm
+if [ $? -ne 0 ] ; then
+        /bin/cp /etc/minor_perm /tmp/minor_perm
+        /bin/mv /etc/minor_perm /tmp/minor_perm.bak
+        /bin/mv /tmp/minor_perm /etc
+fi     
+
+# Make sure that we've got our own copy of /usr/bin/gzip
+# in the tools directory 
+
+if [ ! -f $gzip ] ; then
+        gzip=$toolsdir/gzip
+        /usr/bin/chmod a+x "$toolsdir/gzip" 2>/dev/null
+fi
+
+$gzip -c -d "$toolsdir/../Product/pkgs.gz" > $tmpfile &&
 	/usr/sbin/pkgadd -R "$basedir" -d "$tmpfile" -a "$toolsdir/admin" all
 status=$?
 rm -f "$tmpfile"
 exit $status
 EOF
 	$CHMOD a+rx "$distdir/Tools/install.sh"
+
+	$CP -f /usr/bin/gzip "$distdir/Tools" 2>/dev/null
 }
 
 
@@ -642,11 +735,13 @@ function unpack_media
 	# We need to use the unpackmedia option to correctly apply patches
 	gettext "Unpacking media ... "
 	$ROOT_ARCHIVE unpackmedia "$MEDIA_ROOT" "$UNPACKED_ROOT" > /dev/null 2>&1 
-	if [ $? != 0 -a ! -d $MEDIA_ROOT/Solaris_10 ]; then
-		# we _do_ care, because we're not patching a Solaris 10
-		# update media instance
-		gettext "There was an error unpacking the media from $MEDIA_ROOT\n"
-		exit 1
+	if [ $? != 0 ]; then
+		if [ -d $MEDIA_ROOT/Solaris_10 -a -d $MEDIA_ROOT/Solaris_11 ]; then
+			# we _do_ care, because we're not patching a Solaris
+			# update media instance
+			gettext "There was an error unpacking the media from $MEDIA_ROOT\n"
+			exit 1
+		fi
 	fi
 }
 
@@ -664,16 +759,19 @@ function repack_media
 	# and this will cause problems on re-packing. So we sneakily
 	# use the version that we've just unpacked
 	if [ -d $MEDIA_ROOT/Solaris_10 ]; then
-		ROOT_ARCHIVE=$MEDIA_ROOT/boot/solaris/bin/root_archive
+		ROOT_ARCHIVE=$UNPACKED_ROOT/boot/solaris/bin/root_archive
 	fi
 
 	$ROOT_ARCHIVE packmedia "$MEDIA_ROOT" "$UNPACKED_ROOT" > /dev/null 2>&1
-	if [ $? != 0 -a ! -d $MEDIA_ROOT/Solaris_10 ]; then
-		# we _do_ care, because we're not patching a Solaris 10
-		# update media instance
-		gettext "There was an error unpacking the media from $MEDIA_ROOT\n"
-		exit 1
+	if [ $? != 0 ]; then
+		if [ -d $MEDIA_ROOT/Solaris_10 -a -d $MEDIA_ROOT/Solaris_11 ]; then
+			# we _do_ care, because we're not patching a Solaris 
+			# update media instance
+			gettext "There was an error packing the media from $MEDIA_ROOT\n"
+			exit 1
+		fi
 	fi
+	gettext "Done.\n"
 }
 
 
@@ -705,7 +803,7 @@ function add_pkgs
 	#
 	echo;
 	gettext "Installing package(s) onto miniroot.\n"
-	icmd=$DU_OUTDIR/DU/sol_$VERSION/i86pc/Tools/install.sh
+	icmd=$DU_OUTDIR/DU/sol_$VERSION/$MACH/Tools/install.sh
 	if [[ ! -f "$icmd" ]]
 	then
 		# This shouldn't happen, but just in case.
@@ -753,10 +851,22 @@ function add_patches
 
 	$RM -rf "$tmpdir"
 
-	distdir=$ITUDIR/$ITU_COUNTDIR/DU/sol_$VERSION/i86pc
+	distdir=$ITUDIR/$ITU_COUNTDIR/DU/sol_$VERSION/$MACH
 	(( ITU_COUNTDIR += 1 ))
 
 	$MKDIR -p "$distdir/Tools" "$distdir/Product" "$tmpdir" || return
+
+	# If we're running this script on sun4[vu], then create a symlink
+	# to the other UltraSPARC architecture
+	if [[ "$MACH" != "i386" ]]
+	then
+		cd $ITUDIR/$ITU_COUNTDIR/DU/sol_$VERSION
+		$LN -s sparc sun4v
+		$LN -s sparc sun4u
+	else
+		cd $ITUDIR/$ITU_COUNTDIR/DU/sol_$VERSION
+		$LN -s i386 i86pc
+	fi	
 
 	#
 	# Add packages onto media root
@@ -817,6 +927,7 @@ function add_patches
 basedir=/
 toolsdir=`dirname $0`
 tmpdir=/tmp/`basename $0`.$$
+gzip=/usr/bin/gzip
 trap "/bin/rm -rf $tmpdir" 0
 while getopts "R:" arg
 do
@@ -828,12 +939,23 @@ done
 tmpfile=$tmpdir/patches
 patchdir=$tmpdir/patchdir
 /bin/mkdir "$patchdir" || exit
-/usr/bin/gzip -c -d "$toolsdir/../Product/patches.gz" > $tmpfile || exit
+
+# Make sure that we've got our own copy of /usr/bin/gzip
+# in the tools directory 
+
+if [ ! -f $gzip ] ; then
+        gzip=$toolsdir/gzip
+        /usr/bin/chmod a+x "$toolsdir/gzip" 2>/dev/null
+fi
+
+$gzip -c -d "$toolsdir/../Product/patches.gz" > $tmpfile || exit
 cd "$patchdir"
 /bin/cpio -idum < "$tmpfile" || exit
 patchadd -R "$basedir" -nu *
 EOF
 	$CHMOD a+rx "$distdir/Tools/install.sh"
+
+	$CP -f /usr/bin/gzip "$distdir/Tools" 2>/dev/null
 
 	#
 	# Patch the miniroot
@@ -905,7 +1027,7 @@ function makedu # <arg> ...
 	if [[ -n "$ISO" ]]
 	then
 		check_iso || return
-		${ISOLABEL:=DU sol_$VERSION}		# default ISO label
+		${ISOLABEL:=DU sol_$VERSION} 2>/dev/null 		# default ISO label
 	fi
 	check_dudir || return		# should be called after check_iso
 
@@ -920,6 +1042,12 @@ function makedu # <arg> ...
 	then
 		$RM -rf "$DU_OUTDIR/DU"
 		[[ -n "$ISO" ]] && rm -f "$ISO"
+	else
+		if [[ "$MACH" != "i386" ]]
+		then
+			echo "This DU must be written as either an ISO (hsfs)"
+			echo "or a *ufs* filesystem. DO NOT USE pcfs!"
+		fi
 	fi
 	return $i
 }
@@ -1012,6 +1140,7 @@ function patchmedia # <arg> ...
 	print
 	repack_media || return
 	create_bootable_iso "$MEDIA_ROOT"
+	gettext "$MEDIA_ROOT has been successfully patched\n"
 }
 
 

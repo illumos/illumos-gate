@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -31,9 +31,14 @@
 readonly PROG=$0
 MKISOFS=/usr/bin/mkisofs
 ELTORITO=boot/grub/stage2_eltorito	# relative to $MEDIA_ROOT
+SPARCBOOT=boot/hsfs.bootblock
+CAT=/usr/bin/cat
 CP=/usr/bin/cp
 RM=/usr/bin/rm
-
+UNAME=/usr/bin/uname
+MACH=`$UNAME -p`
+BOOTBLOCK=
+GREP=/usr/bin/grep
 
 # for gettext
 TEXTDOMAIN=SUNW_OST_OSCMD
@@ -106,10 +111,11 @@ if [[ -e "$ISOIMAGE" && ! -w "$ISOIMAGE" ]]; then
 	exit 1
 fi
 
-# We will have the El Torito file modified with some boot information
-# (-boot-info-table option) so it needs to be writable.
-if [[ ! -w "$MEDIA_ROOT/$ELTORITO" ]]
-then
+# If we're on an x86/x64 system, we need to have the El Torito file
+# modified with some boot information (-boot-info-table option).
+# If the image isn't writable, we can't continue
+# UltraSPARC systems (sun4u, sun4v etc) don't use El Torito
+if [[ "$MACH" = "i386" && ! -w "$MEDIA_ROOT/$ELTORITO" ]]; then
 	gettext "$MEDIA_ROOT/$ELTORITO is not writable.\n"
 	exit 1
 fi
@@ -140,26 +146,47 @@ esac
 # Since mkisofs below will modify the file $ELTORITO in-place, save a copy
 # of it first.  Use trap to restore it when this script exits (including
 # when user hits control-C).
-ELTORITO_SAVE=/tmp/${ELTORITO##*/}.$$
-$CP "$MEDIA_ROOT/$ELTORITO" "$ELTORITO_SAVE" || exit 1
-trap '"$CP" "$ELTORITO_SAVE" "$MEDIA_ROOT/$ELTORITO" 2>/dev/null;
-	"$RM" -f "$ELTORITO_SAVE"' EXIT
+
+if [[ "$MACH" = "i386" ]]
+then
+	BOOTBLOCK=$MEDIA_ROOT/$ELTORITO
+	ELTORITO_SAVE=/tmp/${ELTORITO##*/}.$$
+	$CP "$MEDIA_ROOT/$ELTORITO" "$ELTORITO_SAVE" || exit 1
+	trap '"$CP" "$ELTORITO_SAVE" "$MEDIA_ROOT/$ELTORITO" 2>/dev/null;
+		"$RM" -f "$ELTORITO_SAVE"' EXIT
+else
+	# sun4u/sun4u1/sun4v et al
+	BOOTBLOCK=$MEDIA_ROOT/$SPARCBOOT
+	SPARCBOOT_SAVE=/tmp/hsfs.bootblock.$$
+	$CP "$MEDIA_ROOT/$SPARCBOOT" "$SPARCBOOT_SAVE" || exit 1
+	trap '"$CP" "$MEDIA_ROOT/$SPARCBOOT" "$SPARCBOOT_SAVE" 2>/dev/null;
+		"$RM" -f $SPARCBOOT_SAVE"' EXIT
+fi
 
 # Call mkisofs to do the actual work.
 # Note: the "-log-file >(cat -u >&2)" and "2>/dev/null" below is a trick
 #	to filter out mkisofs's warning message about being non-conforming
 #	to ISO-9660.
+# We do some funky architecture-specific stuff here so that we can
+# actually create a bootable media image for UltraSPARC systems
+
+sparc_ISOARGS="-G $BOOTBLOCK -B ... -joliet-long -R -U"
+i386_ISOARGS="-b boot/grub/stage2_eltorito -boot-info-table "
+i386_ISOARGS="$i386_ISOARGS -boot-load-size 4 -c .catalog -d -N "
+i386_ISOARGS="$i386_ISOARGS -no-emul-boot -r -relaxed-filenames"
+if [[ "$MACH" = "i386" ]]
+then
+	ISOARGS=$i386_ISOARGS
+else
+	ISOARGS=$sparc_ISOARGS
+fi
+
 $MKISOFS -o "$ISOIMAGE" \
-	-b "$ELTORITO" \
-	-c .catalog \
-	-no-emul-boot \
-	-boot-load-size 4 \
-	-boot-info-table \
-	-relaxed-filenames \
 	-allow-leading-dots \
-	-N -l -d -D -r \
+	$ISOARGS \
+	-l -ldots \
 	-R -J \
-	-V "$LABEL" \
+	-V "$ISOLABEL" \
 	$VERBOSE_FLAG \
-	-log-file >(/bin/cat -u >&2) \
+	-log-file >($CAT -u >&2) \
 	"$MEDIA_ROOT" 2>/dev/null

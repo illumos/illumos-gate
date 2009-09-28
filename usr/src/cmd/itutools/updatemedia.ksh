@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -54,9 +54,10 @@ readonly CAT=/usr/bin/cat
 readonly FIND=/usr/bin/find
 readonly HEAD=/usr/bin/head
 readonly SORT=/usr/bin/sort
-readonly ROOT_ARCHIVE=/usr/sbin/root_archive
+readonly UNAME=/usr/bin/uname
+readonly MACH=`$UNAME -p`
 
-
+ROOT_ARCHIVE=/usr/sbin/root_archive
 # for gettext
 TEXTDOMAIN=SUNW_OST_OSCMD
 export TEXTDOMAIN
@@ -130,7 +131,7 @@ function repack_media
 	# and this will cause problems on re-packing. So we sneakily
 	# use the version that we've just unpacked
 	if [ -d $MEDIA_ROOT/Solaris_10 ]; then
-		ROOT_ARCHIVE=$MEDIA_ROOT/boot/solaris/bin/root_archive
+		ROOT_ARCHIVE=$UNPACKED_ROOT/boot/solaris/bin/root_archive
 	fi
 
 	$ROOT_ARCHIVE packmedia "$MEDIA_ROOT" "$UNPACKED_ROOT" > /dev/null 2>&1
@@ -202,7 +203,7 @@ function add_pkgs
 	# Using the Driver Update above install the packages onto the miniroot.
 	echo;
 	gettext "Installing package(s) onto miniroot."
-	icmd=$dudir/DU/sol_$VERSION/i86pc/Tools/install.sh
+	icmd=$dudir/DU/sol_$VERSION/$MACH/Tools/install.sh
 	if [[ ! -f "$icmd" ]]
 	then
 		# This shouldn't happen, but just in case.
@@ -241,10 +242,22 @@ function add_patches
 
 	trap '$RM -rf $tmpdir $statusfile' EXIT
 
-	distdir=$ITUDIR/$COUNTDIR/DU/sol_$VERSION/i86pc
+	distdir=$ITUDIR/$COUNTDIR/DU/sol_$VERSION/$MACH
 	(( COUNTDIR += 1 ))
 
 	$MKDIR -p "$distdir/Tools" "$distdir/Product" "$tmpdir" || return
+
+	# If we're running this script on sun4[vu], then create a symlink
+	# to the other UltraSPARC architecture
+	if [[ "$MACH" != "i386" ]]
+	then
+		cd $ITUDIR/$COUNTDIR/DU/sol_$VERSION/
+		$LN -s sparc sun4v
+		$LN -s sparc sun4u
+	else
+		cd $ITUDIR/$COUNTDIR/DU/sol_$VERSION/
+		$LN -s i386 i86pc
+	fi	
 
 	# Patch the miniroot
 	echo;
@@ -413,12 +426,19 @@ RELEASE=5.${SOLARIS_DIR##*Solaris_}
 VERSION=$(echo $RELEASE | $SED 's/5\./2/')
 
 # If user didn't specify ISO label, use the Solaris_* dir as label.
-${ISOLABEL:=${SOLARIS_DIR##*/}}
+${ISOLABEL:=${SOLARIS_DIR##*/}} 2>/dev/null
 
 # Verify miniroot
-MINIROOT=$MEDIA_ROOT/boot/x86.miniroot
-if [[ ! -f "$MINIROOT" ]]
-then
+
+MINIROOT=
+# Relative to a Solaris media root.
+if [ "$MACH" = "sparc" ]; then
+	MINIROOT=$MEDIA_ROOT/boot/sparc.miniroot
+else
+	# x86/x64
+	MINIROOT=$MEDIA_ROOT/boot/x86.miniroot
+fi
+if [ ! -f $MINIROOT ]; then
 	gettext "No boot/x86.miniroot under media root.\n"
 	exit 1
 fi

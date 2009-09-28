@@ -735,7 +735,9 @@ compress()
 			find kernel/misc/sparcv9/ctf kernel/fs/sparcv9/dcfs \
 			    kernel/misc/ctf kernel/fs/dcfs \
 			    etc/system etc/name_to_major etc/path_to_inst \
-			    etc/name_to_sysnum | cpio -pdum $DST 2> /dev/null
+			    etc/name_to_sysnum  etc/driver_aliases \
+			    etc/driver_classes etc/minor_perm | \
+			    cpio -pdum $DST 2> /dev/null
 		fi
 	)
 }
