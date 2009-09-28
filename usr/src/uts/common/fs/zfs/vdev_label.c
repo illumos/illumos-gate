@@ -366,8 +366,11 @@ vdev_top_config_generate(spa_t *spa, nvlist_t *config)
 			array[idx++] = c;
 	}
 
-	VERIFY(nvlist_add_uint64_array(config, ZPOOL_CONFIG_HOLE_ARRAY,
-	    array, idx++) == 0);
+	if (idx) {
+		VERIFY(nvlist_add_uint64_array(config, ZPOOL_CONFIG_HOLE_ARRAY,
+		    array, idx) == 0);
+	}
+
 	VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_VDEV_CHILDREN,
 	    rvd->vdev_children) == 0);
 
