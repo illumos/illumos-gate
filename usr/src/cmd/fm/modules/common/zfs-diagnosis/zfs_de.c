@@ -404,18 +404,12 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	}
 
 	/*
-	 * Determine if this ereport corresponds to an open case.  Cases are
-	 * indexed by ENA, since ZFS does all the work of chaining together
-	 * related ereports.
-	 *
-	 * We also detect if an ereport corresponds to an open case by context,
-	 * such as:
-	 *
-	 * 	- An error occurred during an open of a pool with an existing
-	 *	  case.
-	 *
-	 * 	- An error occurred for a device which already has an open
-	 *	  case.
+	 * Determine if this ereport corresponds to an open case.  Previous
+	 * incarnations of this DE used the ENA to chain events together as
+	 * part of the same case.  The problem with this is that we rely on
+	 * global uniqueness of cases based on (pool_guid, vdev_guid) pair when
+	 * generating SERD engines.  Instead, we have a case for each vdev or
+	 * pool, regardless of the ENA.
 	 */
 	(void) nvlist_lookup_uint64(nvl,
 	    FM_EREPORT_PAYLOAD_ZFS_POOL_GUID, &pool_guid);
@@ -427,24 +421,8 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 
 	for (zcp = uu_list_first(zfs_cases); zcp != NULL;
 	    zcp = uu_list_next(zfs_cases, zcp)) {
-		/*
-		 * Matches a known ENA.
-		 */
-		if (zcp->zc_data.zc_ena == ena)
-			break;
-
-		/*
-		 * Matches a case involving load errors for this same pool.
-		 */
 		if (zcp->zc_data.zc_pool_guid == pool_guid &&
-		    zcp->zc_data.zc_pool_state == SPA_LOAD_OPEN &&
-		    pool_state == SPA_LOAD_OPEN)
-			break;
-
-		/*
-		 * Device errors for the same device.
-		 */
-		if (vdev_guid != 0 && zcp->zc_data.zc_vdev_guid == vdev_guid)
+		    zcp->zc_data.zc_vdev_guid == vdev_guid)
 			break;
 	}
 
@@ -569,11 +547,7 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		zfs_case_solve(hdl, zcp, "fault.fs.zfs.log_replay", B_TRUE);
 	} else if (fmd_nvl_class_match(hdl, nvl, "ereport.fs.zfs.vdev.*")) {
 		/*
-		 * Device fault.  If this occurred during pool open, then defer
-		 * reporting the fault.  If the pool itself could not be opeend,
-		 * we only report the pool fault, not every device fault that
-		 * may have caused the problem.  If we do not see a pool fault
-		 * within the timeout period, then we'll solve the device case.
+		 * Device fault.
 		 */
 		zfs_case_solve(hdl, zcp, "fault.fs.zfs.device",  B_TRUE);
 	} else if (fmd_nvl_class_match(hdl, nvl,

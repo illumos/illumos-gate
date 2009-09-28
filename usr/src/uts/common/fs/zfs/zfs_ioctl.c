@@ -1952,8 +1952,10 @@ zfs_ioc_pool_set_props(zfs_cmd_t *zc)
 			spa_config_sync(spa, B_FALSE, B_TRUE);
 		}
 		mutex_exit(&spa_namespace_lock);
-		if (spa != NULL)
+		if (spa != NULL) {
+			nvlist_free(props);
 			return (0);
+		}
 	}
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0) {

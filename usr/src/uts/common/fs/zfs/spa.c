@@ -1141,6 +1141,15 @@ spa_check_logs(spa_t *spa)
 	return (0);
 }
 
+static void
+spa_aux_check_removed(spa_aux_vdev_t *sav)
+{
+	int i;
+
+	for (i = 0; i < sav->sav_count; i++)
+		spa_check_removed(sav->sav_vdevs[i]);
+}
+
 /*
  * Load an existing storage pool, using the pool's builtin spa_config as a
  * source of configuration information.
@@ -1503,6 +1512,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		    spa->spa_pool_props_object,
 		    zpool_prop_to_name(ZPOOL_PROP_AUTOREPLACE),
 		    sizeof (uint64_t), 1, &autoreplace);
+		spa->spa_autoreplace = (autoreplace != 0);
 		(void) zap_lookup(spa->spa_meta_objset,
 		    spa->spa_pool_props_object,
 		    zpool_prop_to_name(ZPOOL_PROP_DELEGATION),
@@ -1524,8 +1534,18 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	 * unopenable vdevs so that the normal autoreplace handler can take
 	 * over.
 	 */
-	if (autoreplace && state != SPA_LOAD_TRYIMPORT)
+	if (spa->spa_autoreplace && state != SPA_LOAD_TRYIMPORT) {
 		spa_check_removed(spa->spa_root_vdev);
+		/*
+		 * For the import case, this is done in spa_import(), because
+		 * at this point we're using the spare definitions from
+		 * the MOS config, not necessarily from the userland config.
+		 */
+		if (state != SPA_LOAD_IMPORT) {
+			spa_aux_check_removed(&spa->spa_spares);
+			spa_aux_check_removed(&spa->spa_l2cache);
+		}
+	}
 
 	/*
 	 * Load the vdev state for all toplevel vdevs.
@@ -2640,6 +2660,14 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props)
 		spa_load_l2cache(spa);
 		spa_config_exit(spa, SCL_ALL, FTAG);
 		spa->spa_l2cache.sav_sync = B_TRUE;
+	}
+
+	/*
+	 * Check for any removed devices.
+	 */
+	if (spa->spa_autoreplace) {
+		spa_aux_check_removed(&spa->spa_spares);
+		spa_aux_check_removed(&spa->spa_l2cache);
 	}
 
 	if (spa_writeable(spa)) {
