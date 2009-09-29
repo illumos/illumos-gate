@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.67 sol_anvik_patch
+ * IntelVersion: 1.68 v3-1-3_2009-8-20
  */
 
 /*
@@ -212,6 +212,8 @@ e1000_init_mac_params_82543(struct e1000_hw *hw)
 
 	/* bus type/speed/width */
 	mac->ops.get_bus_info = e1000_get_bus_info_pci_generic;
+	/* function id */
+	mac->ops.set_lan_id = e1000_set_lan_id_multi_port_pci;
 	/* reset */
 	mac->ops.reset_hw = e1000_reset_hw_82543;
 	/* hw initialization */

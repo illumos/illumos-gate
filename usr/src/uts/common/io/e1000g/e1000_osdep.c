@@ -58,7 +58,7 @@ e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 /*
  * phy_spd_state - set smart-power-down (SPD) state
  *
- * This only acts on the 82541/47 family and the 82571/72 family.
+ * This only acts on the silicon families that have the SPD feature.
  * For any others, return without doing anything.
  */
 void
@@ -78,6 +78,9 @@ phy_spd_state(struct e1000_hw *hw, boolean_t enable)
 		break;
 	case e1000_82571:
 	case e1000_82572:
+	case e1000_82573:
+	case e1000_82574:
+	case e1000_82583:
 		offset = IGP02E1000_PHY_POWER_MGMT;
 		spd_bit = IGP02E1000_PM_SPD;
 		break;
@@ -112,21 +115,27 @@ e1000_read_pcie_cap_reg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 }
 
 /*
- * Enables PCI-Express master access.
- *
- * hw: Struct containing variables accessed by shared code
- *
- * returns: - none.
+ * For some hardware types, access to NVM & PHY need to be serialized by mutex.
+ * The necessary mutexes will have been created by shared code.  Here we destroy
+ * that mutexes for just the hardware types that need it.
  */
 void
-e1000_enable_pciex_master(struct e1000_hw *hw)
+e1000_destroy_hw_mutex(struct e1000_hw *hw)
 {
-	uint32_t ctrl;
+	struct e1000_dev_spec_ich8lan *dev_spec;
 
-	if (hw->bus.type != e1000_bus_type_pci_express)
-		return;
+	switch (hw->mac.type) {
+	case e1000_ich8lan:
+	case e1000_ich9lan:
+	case e1000_ich10lan:
+	case e1000_pchlan:
+		cmn_err(CE_WARN, "destroy mutexes in e1000_destroy_hw_mutex\n");
+		dev_spec = &hw->dev_spec.ich8lan;
+		E1000_MUTEX_DESTROY(&dev_spec->nvm_mutex);
+		E1000_MUTEX_DESTROY(&dev_spec->swflag_mutex);
+		break;
 
-	ctrl = E1000_READ_REG(hw, E1000_CTRL);
-	ctrl &= ~E1000_CTRL_GIO_MASTER_DISABLE;
-	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
+	default:
+		break;	/* no action */
+	}
 }

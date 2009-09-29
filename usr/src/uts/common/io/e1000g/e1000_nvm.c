@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.46 sol_anvik_patch
+ * IntelVersion: 1.49 v3-1-3_2009-8-20
  */
 #include "e1000_api.h"
 
@@ -831,31 +831,23 @@ out:
 s32
 e1000_read_mac_addr_generic(struct e1000_hw *hw)
 {
-	s32 ret_val = E1000_SUCCESS;
-	u16 offset, nvm_data, i;
+	u32 rar_high;
+	u32 rar_low;
+	u16 i;
 
-	DEBUGFUNC("e1000_read_mac_addr");
+	rar_high = E1000_READ_REG(hw, E1000_RAH(0));
+	rar_low = E1000_READ_REG(hw, E1000_RAL(0));
 
-	for (i = 0; i < ETH_ADDR_LEN; i += 2) {
-		offset = i >> 1;
-		ret_val = hw->nvm.ops.read(hw, offset, 1, &nvm_data);
-		if (ret_val) {
-			DEBUGOUT("NVM Read Error\n");
-			goto out;
-		}
-		hw->mac.perm_addr[i] = (u8)(nvm_data & 0xFF);
-		hw->mac.perm_addr[i + 1] = (u8)(nvm_data >> 8);
-	}
+	for (i = 0; i < E1000_RAL_MAC_ADDR_LEN; i++)
+		hw->mac.perm_addr[i] = (u8)(rar_low >> (i*8));
 
-	/* Flip last bit of mac address if we're on second port */
-	if (hw->bus.func == E1000_FUNC_1)
-		hw->mac.perm_addr[5] ^= 1;
+	for (i = 0; i < E1000_RAH_MAC_ADDR_LEN; i++)
+		hw->mac.perm_addr[i+4] = (u8)(rar_high >> (i*8));
 
 	for (i = 0; i < ETH_ADDR_LEN; i++)
 		hw->mac.addr[i] = hw->mac.perm_addr[i];
 
-out:
-	return (ret_val);
+	return (E1000_SUCCESS);
 }
 
 /*

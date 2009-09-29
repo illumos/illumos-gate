@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
@@ -56,8 +56,9 @@ typedef struct {
 	char		name[10];
 	uint32_t	offset;
 } Regi_t;
+
 int e1000g_debug = E1000G_WARN_LEVEL;
-#endif
+#endif	/* E1000G_DEBUG */
 int e1000g_log_mode = E1000G_LOG_PRINT;
 
 void
@@ -595,4 +596,4 @@ pciconfig_bar(void *instance, uint32_t offset, char *name)
 		    name, base, tag_type, size, tag_mem);
 	}
 }
-#endif
+#endif	/* E1000G_DEBUG */

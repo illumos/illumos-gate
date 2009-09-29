@@ -149,6 +149,7 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	uint32_t rctl;
 	uint32_t rxdctl;
 	uint32_t ert;
+	uint16_t phy_data;
 	int i;
 	int size;
 	e1000g_rx_data_t *rx_data;
@@ -318,6 +319,25 @@ e1000g_rx_setup(struct e1000g *Adapter)
 		}
 
 		E1000_WRITE_REG(hw, E1000_ERT, ert);
+	}
+
+	/* Workaround errata on 82577/8 adapters with large frames */
+	if ((hw->mac.type == e1000_pchlan) &&
+	    (Adapter->default_mtu > ETHERMTU)) {
+
+		e1000_read_phy_reg(hw, PHY_REG(770, 26), &phy_data);
+		phy_data &= 0xfff8;
+		phy_data |= (1 << 2);
+		e1000_write_phy_reg(hw, PHY_REG(770, 26), phy_data);
+
+		if (hw->phy.type == e1000_phy_82577) {
+			e1000_read_phy_reg(hw, 22, &phy_data);
+			phy_data &= 0x0fff;
+			phy_data |= (1 << 14);
+			e1000_write_phy_reg(hw, 0x10, 0x2823);
+			e1000_write_phy_reg(hw, 0x11, 0x0003);
+			e1000_write_phy_reg(hw, 22, phy_data);
+		}
 	}
 
 	reg_val =

@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.64 sol_anvik_patch
+ * IntelVersion: 1.68 v3-1-3_2009-8-20
  */
 
 /*
@@ -112,6 +112,7 @@ e1000_init_phy_params_82541(struct e1000_hw *hw)
 		ret_val = -E1000_ERR_PHY;
 		goto out;
 	}
+
 out:
 	return (ret_val);
 }
@@ -237,6 +238,8 @@ e1000_init_mac_params_82541(struct e1000_hw *hw)
 
 	/* bus type/speed/width */
 	mac->ops.get_bus_info = e1000_get_bus_info_pci_generic;
+	/* function id */
+	mac->ops.set_lan_id = e1000_set_lan_id_single_port;
 	/* reset */
 	mac->ops.reset_hw = e1000_reset_hw_82541;
 	/* hw initialization */
@@ -257,6 +260,8 @@ e1000_init_mac_params_82541(struct e1000_hw *hw)
 	mac->ops.clear_vfta = e1000_clear_vfta_generic;
 	/* setting MTA */
 	mac->ops.mta_set = e1000_mta_set_generic;
+	/* ID LED init */
+	mac->ops.id_led_init = e1000_id_led_init_generic;
 	/* setup LED */
 	mac->ops.setup_led = e1000_setup_led_82541;
 	/* cleanup LED */
@@ -385,16 +390,13 @@ e1000_init_hw_82541(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_init_hw_82541");
 
 	/* Initialize identification LED */
-	ret_val = e1000_id_led_init_generic(hw);
+	ret_val = mac->ops.id_led_init(hw);
 	if (ret_val) {
 		DEBUGOUT("Error initializing identification LED\n");
 		/* This is not fatal and we should not stop init due to this */
 	}
 
-	/*
-	 * workaround - Store Default value in dev_spec->spd_default for
-	 * later use
-	 */
+	/* Storing the Speed Power Down  value for later use */
 	ret_val = hw->phy.ops.read_reg(hw,
 	    IGP01E1000_GMII_FIFO,
 	    &dev_spec->spd_default);

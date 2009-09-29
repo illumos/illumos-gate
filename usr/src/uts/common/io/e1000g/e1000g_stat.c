@@ -36,6 +36,7 @@
 #include "e1000g_debug.h"
 
 static int e1000g_update_stats(kstat_t *ksp, int rw);
+static uint32_t e1000g_read_phy_stat(struct e1000_hw *hw, int reg);
 
 /*
  * e1000_tbi_adjust_stats
@@ -217,7 +218,8 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 
 	if ((hw->mac.type != e1000_ich8lan) &&
 	    (hw->mac.type != e1000_ich9lan) &&
-	    (hw->mac.type != e1000_ich10lan)) {
+	    (hw->mac.type != e1000_ich10lan) &&
+	    (hw->mac.type != e1000_pchlan)) {
 		e1000g_ksp->Symerrs.value.ul +=
 		    E1000_READ_REG(hw, E1000_SYMERRS);
 #ifdef E1000G_DEBUG
@@ -256,7 +258,7 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 	e1000g_ksp->Roc.value.ul += E1000_READ_REG(hw, E1000_ROC);
 	e1000g_ksp->Rjc.value.ul += E1000_READ_REG(hw, E1000_RJC);
 	e1000g_ksp->Tpr.value.ul += E1000_READ_REG(hw, E1000_TPR);
-	e1000g_ksp->Tncrs.value.ul += E1000_READ_REG(hw, E1000_TNCRS);
+	e1000g_ksp->Tncrs.value.ul += e1000g_read_phy_stat(hw, E1000_TNCRS);
 	e1000g_ksp->Tsctc.value.ul += E1000_READ_REG(hw, E1000_TSCTC);
 	e1000g_ksp->Tsctfc.value.ul += E1000_READ_REG(hw, E1000_TSCTFC);
 
@@ -387,13 +389,13 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	case MAC_STAT_OERRORS:
 		e1000g_ksp->Ecol.value.ul +=
-		    E1000_READ_REG(hw, E1000_ECOL);
+		    e1000g_read_phy_stat(hw, E1000_ECOL);
 		*val = e1000g_ksp->Ecol.value.ul;
 		break;
 
 	case MAC_STAT_COLLISIONS:
 		e1000g_ksp->Colc.value.ul +=
-		    E1000_READ_REG(hw, E1000_COLC);
+		    e1000g_read_phy_stat(hw, E1000_COLC);
 		*val = e1000g_ksp->Colc.value.ul;
 		break;
 
@@ -467,31 +469,31 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	case ETHER_STAT_EX_COLLISIONS:
 		e1000g_ksp->Ecol.value.ul +=
-		    E1000_READ_REG(hw, E1000_ECOL);
+		    e1000g_read_phy_stat(hw, E1000_ECOL);
 		*val = e1000g_ksp->Ecol.value.ul;
 		break;
 
 	case ETHER_STAT_TX_LATE_COLLISIONS:
 		e1000g_ksp->Latecol.value.ul +=
-		    E1000_READ_REG(hw, E1000_LATECOL);
+		    e1000g_read_phy_stat(hw, E1000_LATECOL);
 		*val = e1000g_ksp->Latecol.value.ul;
 		break;
 
 	case ETHER_STAT_DEFER_XMTS:
 		e1000g_ksp->Dc.value.ul +=
-		    E1000_READ_REG(hw, E1000_DC);
+		    e1000g_read_phy_stat(hw, E1000_DC);
 		*val = e1000g_ksp->Dc.value.ul;
 		break;
 
 	case ETHER_STAT_FIRST_COLLISIONS:
 		e1000g_ksp->Scc.value.ul +=
-		    E1000_READ_REG(hw, E1000_SCC);
+		    e1000g_read_phy_stat(hw, E1000_SCC);
 		*val = e1000g_ksp->Scc.value.ul;
 		break;
 
 	case ETHER_STAT_MULTI_COLLISIONS:
 		e1000g_ksp->Mcc.value.ul +=
-		    E1000_READ_REG(hw, E1000_MCC);
+		    e1000g_read_phy_stat(hw, E1000_MCC);
 		*val = e1000g_ksp->Mcc.value.ul;
 		break;
 
@@ -503,7 +505,7 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	case ETHER_STAT_MACXMT_ERRORS:
 		e1000g_ksp->Ecol.value.ul +=
-		    E1000_READ_REG(hw, E1000_ECOL);
+		    e1000g_read_phy_stat(hw, E1000_ECOL);
 		*val = e1000g_ksp->Ecol.value.ul;
 		break;
 
@@ -884,4 +886,80 @@ e1000g_init_stats(struct e1000g *Adapter)
 	kstat_install(ksp);
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * e1000g_read_phy_stat - read certain PHY statistics
+ *
+ * Certain statistics are read from MAC registers on some silicon types
+ * but are read from the PHY on other silicon types.  This routine
+ * handles that difference as needed.
+ */
+static uint32_t
+e1000g_read_phy_stat(struct e1000_hw *hw, int reg)
+{
+	uint16_t phy_low, phy_high;
+	uint32_t val;
+
+	/* get statistic from PHY in these cases */
+	if ((hw->phy.type == e1000_phy_82578) ||
+	    (hw->phy.type == e1000_phy_82577)) {
+
+		switch (reg) {
+		case E1000_SCC:
+			(void) e1000_read_phy_reg(hw, HV_SCC_UPPER, &phy_high);
+			(void) e1000_read_phy_reg(hw, HV_SCC_LOWER, &phy_low);
+			val = ((uint32_t)phy_high << 16) | (uint32_t)phy_low;
+			break;
+
+		case E1000_MCC:
+			(void) e1000_read_phy_reg(hw, HV_MCC_UPPER, &phy_high);
+			(void) e1000_read_phy_reg(hw, HV_MCC_LOWER, &phy_low);
+			val = ((uint32_t)phy_high << 16) | (uint32_t)phy_low;
+			break;
+
+		case E1000_ECOL:
+			(void) e1000_read_phy_reg(hw, HV_ECOL_UPPER, &phy_high);
+			(void) e1000_read_phy_reg(hw, HV_ECOL_LOWER, &phy_low);
+			val = ((uint32_t)phy_high << 16) | (uint32_t)phy_low;
+			break;
+
+		case E1000_COLC:
+			(void) e1000_read_phy_reg(hw, HV_COLC_UPPER, &phy_high);
+			(void) e1000_read_phy_reg(hw, HV_COLC_LOWER, &phy_low);
+			val = ((uint32_t)phy_high << 16) | (uint32_t)phy_low;
+			break;
+
+		case E1000_LATECOL:
+			(void) e1000_read_phy_reg(hw, HV_LATECOL_UPPER,
+			    &phy_high);
+			(void) e1000_read_phy_reg(hw, HV_LATECOL_LOWER,
+			    &phy_low);
+			val = ((uint32_t)phy_high << 16) | (uint32_t)phy_low;
+			break;
+
+		case E1000_DC:
+			(void) e1000_read_phy_reg(hw, HV_DC_UPPER, &phy_high);
+			(void) e1000_read_phy_reg(hw, HV_DC_LOWER, &phy_low);
+			val = ((uint32_t)phy_high << 16) | (uint32_t)phy_low;
+			break;
+
+		case E1000_TNCRS:
+			(void) e1000_read_phy_reg(hw, HV_TNCRS_UPPER,
+			    &phy_high);
+			(void) e1000_read_phy_reg(hw, HV_TNCRS_LOWER,
+			    &phy_low);
+			val = ((uint32_t)phy_high << 16) | (uint32_t)phy_low;
+			break;
+
+		default:
+			break;
+		}
+
+	/* get statistic from MAC otherwise */
+	} else {
+		val = E1000_READ_REG(hw, reg);
+	}
+
+	return (val);
 }

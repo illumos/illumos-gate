@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.398 sol_anvik_patch
+ * IntelVersion: 1.432 v3-1-3_2009-8-20
  */
 #ifndef _E1000_HW_H_
 #define	_E1000_HW_H_
@@ -92,6 +92,8 @@ struct e1000_hw;
 #define	E1000_DEV_ID_82573E_IAMT		0x108C
 #define	E1000_DEV_ID_82573L			0x109A
 #define	E1000_DEV_ID_82574L			0x10D3
+#define	E1000_DEV_ID_82574LA			0x10F6
+#define	E1000_DEV_ID_82583V			0x150C
 #define	E1000_DEV_ID_80003ES2LAN_COPPER_DPT	0x1096
 #define	E1000_DEV_ID_80003ES2LAN_SERDES_DPT	0x1098
 #define	E1000_DEV_ID_80003ES2LAN_COPPER_SPT	0x10BA
@@ -115,8 +117,13 @@ struct e1000_hw;
 #define	E1000_DEV_ID_ICH10_R_BM_LM		0x10CC
 #define	E1000_DEV_ID_ICH10_R_BM_LF		0x10CD
 #define	E1000_DEV_ID_ICH10_R_BM_V		0x10CE
+#define	E1000_DEV_ID_ICH10_HANKSVILLE		0xF0FE
 #define	E1000_DEV_ID_ICH10_D_BM_LM		0x10DE
 #define	E1000_DEV_ID_ICH10_D_BM_LF		0x10DF
+#define	E1000_DEV_ID_PCH_M_HV_LM		0x10EA
+#define	E1000_DEV_ID_PCH_M_HV_LC		0x10EB
+#define	E1000_DEV_ID_PCH_D_HV_DM		0x10EF
+#define	E1000_DEV_ID_PCH_D_HV_DC		0x10F0
 
 #define	E1000_REVISION_0	0
 #define	E1000_REVISION_1	1
@@ -126,6 +133,12 @@ struct e1000_hw;
 
 #define	E1000_FUNC_0	0
 #define	E1000_FUNC_1	1
+
+#define	E1000_ALT_MAC_ADDRESS_OFFSET_LAN0	0
+#define	E1000_ALT_MAC_ADDRESS_OFFSET_LAN1	3
+
+/* Maximum size of the MTA register table in all supported adapters */
+#define	MAX_MTA_REG 128
 
 enum e1000_mac_type {
 	e1000_undefined = 0,
@@ -145,10 +158,12 @@ enum e1000_mac_type {
 	e1000_82572,
 	e1000_82573,
 	e1000_82574,
+	e1000_82583,
 	e1000_80003es2lan,
 	e1000_ich8lan,
 	e1000_ich9lan,
 	e1000_ich10lan,
+	e1000_pchlan,
 	e1000_num_macs	/* List is 1-based, so subtract 1 for true count. */
 };
 
@@ -187,7 +202,8 @@ enum e1000_phy_type {
 	e1000_phy_igp_3,
 	e1000_phy_ife,
 	e1000_phy_bm,
-	e1000_phy_vf
+	e1000_phy_82578,
+	e1000_phy_82577,
 };
 
 enum e1000_bus_type {
@@ -265,6 +281,13 @@ enum e1000_smart_speed {
 	e1000_smart_speed_default = 0,
 	e1000_smart_speed_on,
 	e1000_smart_speed_off
+};
+
+enum e1000_serdes_link_state {
+	e1000_serdes_link_down = 0,
+	e1000_serdes_link_autoneg_progress,
+	e1000_serdes_link_autoneg_complete,
+	e1000_serdes_link_forced_up
 };
 
 /* Receive Descriptor */
@@ -537,6 +560,7 @@ struct e1000_host_mng_command_info {
 struct e1000_mac_operations {
 	/* Function pointers for the MAC. */
 	s32 (*init_params)(struct e1000_hw *);
+	s32 (*id_led_init)(struct e1000_hw *);
 	s32 (*blink_led)(struct e1000_hw *);
 	s32 (*check_for_link)(struct e1000_hw *);
 	bool (*check_mng_mode)(struct e1000_hw *hw);
@@ -544,10 +568,11 @@ struct e1000_mac_operations {
 	void (*clear_hw_cntrs)(struct e1000_hw *);
 	void (*clear_vfta)(struct e1000_hw *);
 	s32 (*get_bus_info)(struct e1000_hw *);
+	void (*set_lan_id)(struct e1000_hw *);
 	s32 (*get_link_up_info)(struct e1000_hw *, u16 *, u16 *);
 	s32 (*led_on)(struct e1000_hw *);
 	s32 (*led_off)(struct e1000_hw *);
-	void (*update_mc_addr_list)(struct e1000_hw *, u8 *, u32, u32, u32);
+	void (*update_mc_addr_list)(struct e1000_hw *, u8 *, u32);
 	s32 (*reset_hw)(struct e1000_hw *);
 	s32 (*init_hw)(struct e1000_hw *);
 	s32 (*setup_link)(struct e1000_hw *);
@@ -620,6 +645,7 @@ struct e1000_mac_info {
 	u16 ifs_ratio;
 	u16 ifs_step_size;
 	u16 mta_reg_count;
+	u32 mta_shadow[MAX_MTA_REG];
 	u16 rar_entry_count;
 
 	u8 forced_speed_duplex;
@@ -632,6 +658,7 @@ struct e1000_mac_info {
 	bool get_link_status;
 	bool in_ifs_mode;
 	bool report_tx_early;
+	enum e1000_serdes_link_state serdes_link_state;
 	bool serdes_has_link;
 	bool tx_pkt_filtering;
 };
@@ -728,6 +755,11 @@ struct e1000_dev_spec_82543 {
 
 struct e1000_dev_spec_82571 {
 	bool laa_is_present;
+	u32 smb_counter;
+};
+
+struct e1000_dev_spec_80003es2lan {
+	bool  mdic_wa_enable;
 };
 
 struct e1000_shadow_ram {
@@ -740,6 +772,8 @@ struct e1000_shadow_ram {
 struct e1000_dev_spec_ich8lan {
 	bool kmrn_lock_loss_workaround_enabled;
 	struct e1000_shadow_ram shadow_ram[E1000_SHADOW_RAM_WORDS];
+	E1000_MUTEX nvm_mutex;
+	E1000_MUTEX swflag_mutex;
 };
 
 struct e1000_hw {
@@ -761,6 +795,7 @@ struct e1000_hw {
 		struct e1000_dev_spec_82542	_82542;
 		struct e1000_dev_spec_82543	_82543;
 		struct e1000_dev_spec_82571	_82571;
+		struct e1000_dev_spec_80003es2lan _80003es2lan;
 		struct e1000_dev_spec_ich8lan	ich8lan;
 	} dev_spec;
 
@@ -782,6 +817,7 @@ struct e1000_hw {
 void e1000_pci_clear_mwi(struct e1000_hw *hw);
 void e1000_pci_set_mwi(struct e1000_hw *hw);
 s32 e1000_read_pcie_cap_reg(struct e1000_hw *hw, u32 reg, u16 *value);
+s32 e1000_write_pcie_cap_reg(struct e1000_hw *hw, u32 reg, u16 *value);
 void e1000_read_pci_cfg(struct e1000_hw *hw, u32 reg, u16 *value);
 void e1000_write_pci_cfg(struct e1000_hw *hw, u32 reg, u16 *value);
 

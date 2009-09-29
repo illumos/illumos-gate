@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.9 sol_anvik_patch
+ * IntelVersion: 1.9 v3-1-3_2009-8-20
  */
 #ifndef _E1000_82541_H_
 #define	_E1000_82541_H_

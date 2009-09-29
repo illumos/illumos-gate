@@ -46,6 +46,7 @@ extern "C" {
 #include <sys/pci.h>
 #include <sys/atomic.h>
 #include <sys/note.h>
+#include <sys/mutex.h>
 #include "e1000g_debug.h"
 
 #define	usec_delay(x)		drv_usecwait(x)
@@ -75,6 +76,7 @@ extern "C" {
 
 #define	false		0
 #define	true		1
+
 #define	CMD_MEM_WRT_INVALIDATE	0x0010	/* BIT_4 */
 #define	PCI_COMMAND_REGISTER	0x04
 #define	PCI_EX_CONF_CAP		0xE0
@@ -192,6 +194,16 @@ struct e1000g_osdep {
 	ddi_acc_handle_t ich_flash_handle;
 	struct e1000g *adapter;
 };
+
+/* Shared Code Mutex Defines */
+#define	E1000_MUTEX			kmutex_t
+#define	E1000_MUTEX_INIT(mutex)		mutex_init(mutex, NULL, \
+	MUTEX_DRIVER, NULL)
+#define	E1000_MUTEX_DESTROY(mutex)	mutex_destroy(mutex)
+
+#define	E1000_MUTEX_LOCK(mutex)		mutex_enter(mutex)
+#define	E1000_MUTEX_TRYLOCK(mutex)	mutex_tryenter(mutex)
+#define	E1000_MUTEX_UNLOCK(mutex)	mutex_exit(mutex)
 
 #ifdef __sparc	/* on SPARC, use only memory-mapped routines */
 #define	E1000_WRITE_REG_IO	E1000_WRITE_REG

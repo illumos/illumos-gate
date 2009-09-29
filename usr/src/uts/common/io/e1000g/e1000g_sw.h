@@ -102,7 +102,6 @@ extern "C" {
 /*
  * constants used in setting flow control thresholds
  */
-#define	E1000_PBA_10K		0x000A
 #define	E1000_PBA_MASK		0xffff
 #define	E1000_PBA_SHIFT		10
 #define	E1000_FC_HIGH_DIFF	0x1638 /* High: 5688 bytes below Rx FIFO size */
@@ -266,8 +265,9 @@ extern "C" {
 #define	FRAME_SIZE_UPTO_16K	16384
 #define	FRAME_SIZE_UPTO_9K	9234
 
-#define	MAXIMUM_MTU		9216
 #define	DEFAULT_MTU		ETHERMTU
+#define	MAXIMUM_MTU_4K		4096
+#define	MAXIMUM_MTU_9K		9216
 
 #define	DEFAULT_FRAME_SIZE	\
 	(DEFAULT_MTU + sizeof (struct ether_vlan_header) + ETHERFCSL)
@@ -878,6 +878,7 @@ typedef struct e1000g {
 	uint32_t intr_throttling_rate;
 
 	uint32_t default_mtu;
+	uint32_t max_mtu;
 	uint32_t max_frame_size;
 	uint32_t min_frame_size;
 
@@ -1018,7 +1019,6 @@ void e1000g_release_dma_resources(struct e1000g *Adapter);
 void e1000g_free_rx_sw_packet(p_rx_sw_packet_t packet, boolean_t full_release);
 void e1000g_tx_setup(struct e1000g *Adapter);
 void e1000g_rx_setup(struct e1000g *Adapter);
-void e1000g_setup_multicast(struct e1000g *Adapter);
 
 int e1000g_recycle(e1000g_tx_ring_t *tx_ring);
 void e1000g_free_tx_swpkt(p_tx_sw_packet_t packet);
@@ -1039,6 +1039,7 @@ void e1000g_clear_all_interrupts(struct e1000g *Adapter);
 void e1000g_clear_tx_interrupt(struct e1000g *Adapter);
 void e1000g_mask_tx_interrupt(struct e1000g *Adapter);
 void phy_spd_state(struct e1000_hw *hw, boolean_t enable);
+void e1000_destroy_hw_mutex(struct e1000_hw *hw);
 void e1000_enable_pciex_master(struct e1000_hw *hw);
 int e1000g_check_acc_handle(ddi_acc_handle_t handle);
 int e1000g_check_dma_handle(ddi_dma_handle_t handle);

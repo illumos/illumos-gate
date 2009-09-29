@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.18 sol_anvik_patch
+ * IntelVersion: 1.18 v3-1-3_2009-8-20
  */
 #ifndef _E1000_NVM_H_
 #define	_E1000_NVM_H_

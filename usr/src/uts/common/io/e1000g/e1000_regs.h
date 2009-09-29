@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.61 sol_anvik_patch
+ * IntelVersion: 1.76 v3-1-3_2009-8-20
  */
 #ifndef _E1000_REGS_H_
 #define	_E1000_REGS_H_
@@ -56,10 +56,13 @@ extern "C" {
 #define	E1000_IMC	0x000D8  /* Interrupt Mask Clear - WO */
 #define	E1000_IAM	0x000E0  /* Interrupt Acknowledge Auto Mask */
 #define	E1000_IVAR	0x000E4  /* Interrupt Vector Allocation Register - RW */
+#define	E1000_SVCR	0x000F0
+#define	E1000_SVT	0x000F4
 #define	E1000_RCTL	0x00100  /* Rx Control - RW */
 #define	E1000_FCTTV	0x00170  /* Flow Control Transmit Timer Value - RW */
 #define	E1000_TXCW	0x00178  /* Tx Configuration Word - RW */
 #define	E1000_RXCW	0x00180  /* Rx Configuration Word - RO */
+#define	E1000_PBA_ECC	0x01100  /* PBA ECC Register */
 #define	E1000_TCTL	0x00400  /* Tx Control - RW */
 #define	E1000_TCTL_EXT	0x00404  /* Extended Tx Control - RW */
 #define	E1000_TIPG	0x00410  /* Tx Inter-packet gap -RW */
@@ -247,6 +250,8 @@ extern "C" {
 /* Interrupt Cause Receiver Overrun Count */
 #define	E1000_ICRXOC	0x04124
 
+#define	E1000_CRC_OFFSET	0x05F50	/* CRC Offset register */
+
 #define	E1000_PCS_CFG0	0x04200  /* PCS Configuration 0 - RW */
 #define	E1000_PCS_LCTL	0x04208  /* PCS Link Control - RW */
 #define	E1000_PCS_LSTAT	0x0420C  /* PCS Link Status - RO */
@@ -301,6 +306,7 @@ extern "C" {
 #define	E1000_GIOCTL	0x05B44 /* GIO Analog Control Register */
 #define	E1000_SCCTL	0x05B4C /* PCIc PLL Configuration Register */
 #define	E1000_GCR	0x05B00 /* PCI-Ex Control */
+#define	E1000_GCR2	0x05B64 /* PCI-Ex Control #2 */
 #define	E1000_GSCL_1	0x05B10 /* PCI-Ex Statistic Control #1 */
 #define	E1000_GSCL_2	0x05B14 /* PCI-Ex Statistic Control #2 */
 #define	E1000_GSCL_3	0x05B18 /* PCI-Ex Statistic Control #3 */
@@ -308,6 +314,8 @@ extern "C" {
 #define	E1000_FACTPS	0x05B30 /* Function Active and Power State to MNG */
 #define	E1000_SWSM	0x05B50 /* SW Semaphore */
 #define	E1000_FWSM	0x05B54 /* FW Semaphore */
+/* Driver-only SW semaphore (not used by BOOT agents) */
+#define	E1000_SWSM2	0x05B58
 #define	E1000_DCA_ID	0x05B70 /* DCA Requester ID Information - RO */
 #define	E1000_DCA_CTRL	0x05B74 /* DCA Control - RW */
 #define	E1000_FFLT_DBG	0x05F04 /* Debug Register */
