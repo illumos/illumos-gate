@@ -232,6 +232,7 @@ acpidev_walk_apic(ACPI_BUFFER *bufp, ACPI_HANDLE hdl, char *method,
 	ACPI_STATUS rc;
 	ssize_t len;
 	ACPI_BUFFER buf;
+	ACPI_OBJECT *obj;
 	ACPI_SUBTABLE_HEADER *ap;
 	ACPI_TABLE_MADT *mp = NULL;
 
@@ -252,17 +253,23 @@ acpidev_walk_apic(ACPI_BUFFER *bufp, ACPI_HANDLE hdl, char *method,
 	} else if (method != NULL) {
 		/*
 		 * Otherwise, if we have an evaluate method, we get the walk
-		 * buffer from a successful invocation of AcpiEvaluateObject.
+		 * buffer from a successful invocation of
+		 * AcpiEvaluateObjectTyped().
 		 */
 		ASSERT(hdl != NULL);
-		rc = AcpiEvaluateObject(hdl, method, NULL, &buf);
-		if (ACPI_FAILURE(rc) && rc != AE_NOT_FOUND) {
-			cmn_err(CE_WARN, "!acpidev: failed to evaluate %s "
-			    "in acpidev_walk_apic().", method);
+		rc = AcpiEvaluateObjectTyped(hdl, method, NULL, &buf,
+		    ACPI_TYPE_BUFFER);
+		if (ACPI_SUCCESS(rc)) {
+			ASSERT(buf.Length >= sizeof (*obj));
+			obj = buf.Pointer;
+			ap = (ACPI_SUBTABLE_HEADER *)obj->Buffer.Pointer;
+			len = obj->Buffer.Length;
+		} else {
+			if (rc != AE_NOT_FOUND)
+				cmn_err(CE_WARN, "!acpidev: failed to evaluate "
+				    "%s in acpidev_walk_apic().", method);
 			return (rc);
 		}
-		ap = (ACPI_SUBTABLE_HEADER *)buf.Pointer;
-		len = buf.Length;
 	} else {
 		/* As a last resort, walk the MADT table. */
 		rc = AcpiGetTable(ACPI_SIG_MADT, 1, (ACPI_TABLE_HEADER **)&mp);

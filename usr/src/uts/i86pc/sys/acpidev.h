@@ -79,7 +79,7 @@ extern "C" {
 #define	ACPIDEV_TYPE_SCOPE		"acpiscope"
 #define	ACPIDEV_TYPE_DEVICE		"acpidevice"
 #define	ACPIDEV_TYPE_CONTAINER		"acpicontainer"
-#define	ACPIDEV_TYPE_CPU		"cpu"
+#define	ACPIDEV_TYPE_CPU		"acpicpu"
 #define	ACPIDEV_TYPE_MEMORY		"acpimemory"
 
 /* Device property names for ACPI objects. */
