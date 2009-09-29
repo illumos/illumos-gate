@@ -117,6 +117,9 @@ extern "C" {
 #define	MS_PNY_VID	0x154b	/* Vendor ID of PNY Corp */
 #define	MS_PNY_PID0	0x16	/* PNY floppy drive */
 
+#define	MS_WD_VID	0x1058	/* Vendor ID of Western Digital */
+#define	MS_WD_PID   0x1001  /* PID for Western Digital USB External HDD */
+
 /*
  * The AMI virtual floppy device is not a real USB storage device, but
  * emulated by the SP firmware shipped together with important Sun x86
@@ -198,6 +201,7 @@ extern "C" {
 #define	SCSA2USB_ATTRS_USE_CSW_RESIDUE	0x800	/* for residue checking */
 #define	SCSA2USB_ATTRS_NO_MEDIA_CHECK	0x1000	/* for media checking */
 #define	SCSA2USB_ATTRS_NO_CAP_ADJUST	0x2000	/* for CAPACITY adjusting */
+#define	SCSA2USB_ATTRS_INQUIRY_EVPD	0x4000	/* SCMD_INQUIRY with evpd */
 #define	SCSA2USB_ATTRS_REDUCED_CMD	\
 	(SCSA2USB_ATTRS_DOORLOCK|SCSA2USB_ATTRS_MODE_SENSE| \
 	SCSA2USB_ATTRS_START_STOP|SCSA2USB_ATTRS_INQUIRY| \

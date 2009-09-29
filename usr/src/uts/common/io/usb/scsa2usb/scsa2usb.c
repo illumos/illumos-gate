@@ -370,8 +370,11 @@ static struct blacklist {
 
 	/* Alcor Micro Corp 6387 flash disk */
 	{MS_ALCOR_VID, MS_ALCOR_PID0, 0,
-	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_USE_CSW_RESIDUE}
+	    SCSA2USB_ATTRS_GET_LUN | SCSA2USB_ATTRS_USE_CSW_RESIDUE},
 
+	/* Western Digital External HDD */
+	{MS_WD_VID, MS_WD_PID, 0,
+	    SCSA2USB_ATTRS_INQUIRY_EVPD}
 };
 
 
@@ -3123,9 +3126,29 @@ scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
 			cmd->cmd_pkt->pkt_state |= STATE_XFERRED_DATA;
 
 			return (SCSA2USB_JUST_ACCEPT);
+		} else if (!(scsa2usbp->scsa2usb_attrs &
+		    SCSA2USB_ATTRS_INQUIRY_EVPD)) {
+			/*
+			 * Some devices do not handle the inquiry cmd with
+			 * evpd bit set well, e.g. some devices return the
+			 * same page 0x83 data which will cause the generated
+			 * devid by sd is not unique, thus return CHECK
+			 * CONDITION directly to sd.
+			 */
+			uchar_t evpd = 0x01;
+
+			if (!(cmd->cmd_pkt->pkt_cdbp[1] & evpd))
+				break;
+
+			if (cmd->cmd_bp) {
+				cmd->cmd_pkt->pkt_resid = cmd->cmd_bp->
+				    b_bcount;
+			}
+			scsa2usb_force_invalid_request(scsa2usbp, cmd);
+
+			return (SCSA2USB_JUST_ACCEPT);
 		}
 		break;
-
 	/*
 	 * Fake accepting the following  Opcodes
 	 * (as most drives don't support these)
@@ -3171,6 +3194,7 @@ int
 scsa2usb_handle_scsi_cmd_sub_class(scsa2usb_state_t *scsa2usbp,
     scsa2usb_cmd_t *cmd, struct scsi_pkt *pkt)
 {
+	uchar_t evpd = 0x01;
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_handle_scsi_cmd_sub_class: cmd = 0x%p pkt = 0x%p",
 	    (void *)cmd, (void *)pkt);
@@ -3208,9 +3232,26 @@ scsa2usb_handle_scsi_cmd_sub_class(scsa2usb_state_t *scsa2usbp,
 		cmd->cmd_dir = CBW_DIR_IN;
 		cmd->cmd_actual_len = CDB_GROUP0;
 		cmd->cmd_cdb[SCSA2USB_LBA_0] = pkt->pkt_cdbp[2];
-		cmd->cmd_cdb[SCSA2USB_LBA_2] = cmd->cmd_xfercount =
-		    min(SCSA2USB_MAX_INQ_LEN,
-		    cmd->cmd_bp ? cmd->cmd_bp->b_bcount : 0);
+
+		/*
+		 * If vpd pages data is limited to maximum SCSA2USB_MAX_INQ_LEN,
+		 * the page data may be truncated, which may cause some issues
+		 * such as making the unique page 0x83 or 0x80 data from
+		 * different devices become the same. So don't limit return
+		 * length for vpd page inquiry cmd.
+		 * Another, in order to maintain compatibility, the original
+		 * length limitation for standard inquiry retains here. It
+		 * can be removed in future if it is verified that enough
+		 * devices can work well.
+		 */
+		if (pkt->pkt_cdbp[1] & evpd) {
+			cmd->cmd_cdb[SCSA2USB_LBA_2] = cmd->cmd_xfercount =
+			    (cmd->cmd_bp ? cmd->cmd_bp->b_bcount : 0);
+		} else {
+			cmd->cmd_cdb[SCSA2USB_LBA_2] = cmd->cmd_xfercount =
+			    min(SCSA2USB_MAX_INQ_LEN,
+			    cmd->cmd_bp ? cmd->cmd_bp->b_bcount : 0);
+		}
 		break;
 
 	case SCMD_READ_CAPACITY:
