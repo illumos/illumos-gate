@@ -11619,8 +11619,10 @@ sata_show_pmult_info(sata_hba_inst_t *sata_hba_inst,
 
 	mutex_enter(&SATA_CPORT_MUTEX(sata_hba_inst, cport));
 	pmultinfo = SATA_PMULT_INFO(sata_hba_inst, cport);
-	if (pmultinfo == NULL)
+	if (pmultinfo == NULL) {
+		mutex_exit(&SATA_CPORT_MUTEX(sata_hba_inst, cport));
 		return;
+	}
 
 	gscr0 = pmultinfo->pmult_gscr.gscr0;
 	gscr1 = pmultinfo->pmult_gscr.gscr1;
