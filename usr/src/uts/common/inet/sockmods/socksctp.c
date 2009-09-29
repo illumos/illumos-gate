@@ -2091,15 +2091,10 @@ sctp_assoc_recv(sock_upper_handle_t handle, mblk_t *mp, size_t len, int flags,
 	mutex_enter(&so->so_lock);
 
 	/*
-	 * Override b_flag for SCTP sockfs internal use
-	 */
-	mp->b_flag = (short)flags;
-
-	/*
 	 * For notify messages, need to fill in association id.
 	 * For data messages, sndrcvinfo could be in ancillary data.
 	 */
-	if (flags & SCTP_NOTIFICATION) {
+	if (mp->b_flag & SCTP_NOTIFICATION) {
 		mp2 = mp->b_cont;
 		sn = (union sctp_notification *)mp2->b_rptr;
 		switch (sn->sn_header.sn_type) {

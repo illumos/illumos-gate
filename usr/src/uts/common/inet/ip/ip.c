@@ -4363,7 +4363,6 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 	sin_t		*sin;
 	ipa_conn_t	*ac;
 	uchar_t		*ucp;
-	mblk_t		*mp1;
 	int		error = 0;
 	int		protocol;
 	ipa_conn_x_t	*acx;
@@ -4451,10 +4450,6 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		ip1dbg(("ip_bind: unaligned address\n"));
 		goto bad_addr;
 	}
-	/*
-	 * Check for trailing mps.
-	 */
-	mp1 = mp->b_cont;
 
 	switch (tbr->ADDR_length) {
 	default:
@@ -4464,13 +4459,13 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 
 	case IP_ADDR_LEN:
 		/* Verification of local address only */
-		error = ip_bind_laddr_v4(connp, &mp1, protocol,
+		error = ip_bind_laddr_v4(connp, &mp->b_cont, protocol,
 		    *(ipaddr_t *)ucp, 0, B_FALSE);
 		break;
 
 	case sizeof (sin_t):
 		sin = (sin_t *)ucp;
-		error = ip_bind_laddr_v4(connp, &mp1, protocol,
+		error = ip_bind_laddr_v4(connp, &mp->b_cont, protocol,
 		    sin->sin_addr.s_addr, sin->sin_port, B_TRUE);
 		break;
 
@@ -4480,7 +4475,7 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		if (ac->ac_lport == 0)
 			ac->ac_lport = connp->conn_lport;
 		/* Always verify destination reachability. */
-		error = ip_bind_connected_v4(connp, &mp1, protocol,
+		error = ip_bind_connected_v4(connp, &mp->b_cont, protocol,
 		    &ac->ac_laddr, ac->ac_lport, ac->ac_faddr, ac->ac_fport,
 		    B_TRUE, B_TRUE, cr);
 		break;
@@ -4491,7 +4486,7 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		 * Whether or not to verify destination reachability depends
 		 * on the setting of the ACX_VERIFY_DST flag in acx->acx_flags.
 		 */
-		error = ip_bind_connected_v4(connp, &mp1, protocol,
+		error = ip_bind_connected_v4(connp, &mp->b_cont, protocol,
 		    &acx->acx_conn.ac_laddr, acx->acx_conn.ac_lport,
 		    acx->acx_conn.ac_faddr, acx->acx_conn.ac_fport,
 		    B_TRUE, (acx->acx_flags & ACX_VERIFY_DST) != 0, cr);
