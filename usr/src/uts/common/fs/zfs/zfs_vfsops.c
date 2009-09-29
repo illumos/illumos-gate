@@ -951,7 +951,7 @@ zfsvfs_setup(zfsvfs_t *zfsvfs, boolean_t mounting)
 
 	zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);
 	if (zil_disable) {
-		zil_destroy(zfsvfs->z_log, 0);
+		zil_destroy(zfsvfs->z_log, B_FALSE);
 		zfsvfs->z_log = NULL;
 	}
 

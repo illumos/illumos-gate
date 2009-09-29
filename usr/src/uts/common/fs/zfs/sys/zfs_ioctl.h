@@ -118,6 +118,8 @@ typedef struct zinject_record {
 	uint32_t	zi_freq;
 	uint32_t	zi_failfast;
 	char		zi_func[MAXNAMELEN];
+	uint32_t	zi_iotype;
+	uint32_t	zi_pad;		/* 64-bit alignment */
 } zinject_record_t;
 
 #define	ZINJECT_NULL		0x1

@@ -411,6 +411,7 @@ extern void spa_open_ref(spa_t *spa, void *tag);
 extern void spa_close(spa_t *spa, void *tag);
 extern boolean_t spa_refcount_zero(spa_t *spa);
 
+#define	SCL_NONE	0x00
 #define	SCL_CONFIG	0x01
 #define	SCL_STATE	0x02
 #define	SCL_L2ARC	0x04		/* hack until L2ARC 2.0 */
@@ -436,7 +437,7 @@ extern void spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg,
 extern int spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error);
 
 /* Pool vdev state change lock */
-extern void spa_vdev_state_enter(spa_t *spa);
+extern void spa_vdev_state_enter(spa_t *spa, int oplock);
 extern int spa_vdev_state_exit(spa_t *spa, vdev_t *vd, int error);
 
 /* Accessor functions */

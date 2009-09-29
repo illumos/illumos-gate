@@ -2196,8 +2196,9 @@ zio_done(zio_t *zio)
 		if (zio->io_error != ECKSUM && vd != NULL && !vdev_is_dead(vd))
 			zfs_ereport_post(FM_EREPORT_ZFS_IO, spa, vd, zio, 0, 0);
 
-		if ((zio->io_error == EIO ||
-		    !(zio->io_flags & ZIO_FLAG_SPECULATIVE)) && zio == lio) {
+		if ((zio->io_error == EIO || !(zio->io_flags &
+		    (ZIO_FLAG_SPECULATIVE | ZIO_FLAG_DONT_PROPAGATE))) &&
+		    zio == lio) {
 			/*
 			 * For logical I/O requests, tell the SPA to log the
 			 * error and generate a logical data ereport.

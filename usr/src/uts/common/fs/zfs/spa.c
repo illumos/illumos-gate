@@ -3958,7 +3958,7 @@ spa_async_thread(spa_t *spa)
 	 * See if any devices need to be marked REMOVED.
 	 */
 	if (tasks & SPA_ASYNC_REMOVE) {
-		spa_vdev_state_enter(spa);
+		spa_vdev_state_enter(spa, SCL_NONE);
 		spa_async_remove(spa, spa->spa_root_vdev);
 		for (int i = 0; i < spa->spa_l2cache.sav_count; i++)
 			spa_async_remove(spa, spa->spa_l2cache.sav_vdevs[i]);
@@ -3977,7 +3977,7 @@ spa_async_thread(spa_t *spa)
 	 * See if any devices need to be probed.
 	 */
 	if (tasks & SPA_ASYNC_PROBE) {
-		spa_vdev_state_enter(spa);
+		spa_vdev_state_enter(spa, SCL_NONE);
 		spa_async_probe(spa, spa->spa_root_vdev);
 		(void) spa_vdev_state_exit(spa, NULL, 0);
 	}

@@ -880,6 +880,7 @@ spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error, char *tag)
 	if (error == 0 && !list_is_empty(&spa->spa_config_dirty_list)) {
 		dsl_pool_scrub_restart(spa->spa_dsl_pool);
 		config_changed = B_TRUE;
+		spa->spa_config_generation++;
 	}
 
 	/*
@@ -939,18 +940,24 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
  * Lock the given spa_t for the purpose of changing vdev state.
  */
 void
-spa_vdev_state_enter(spa_t *spa)
+spa_vdev_state_enter(spa_t *spa, int oplocks)
 {
-	spa_config_enter(spa, SCL_STATE_ALL, spa, RW_WRITER);
+	int locks = SCL_STATE_ALL | oplocks;
+
+	spa_config_enter(spa, locks, spa, RW_WRITER);
+	spa->spa_vdev_locks = locks;
 }
 
 int
 spa_vdev_state_exit(spa_t *spa, vdev_t *vd, int error)
 {
-	if (vd != NULL)
+	if (vd != NULL) {
 		vdev_state_dirty(vd->vdev_top);
+		spa->spa_config_generation++;
+	}
 
-	spa_config_exit(spa, SCL_STATE_ALL, spa);
+	ASSERT3U(spa->spa_vdev_locks, >=, SCL_STATE_ALL);
+	spa_config_exit(spa, spa->spa_vdev_locks, spa);
 
 	/*
 	 * If anything changed, wait for it to sync.  This ensures that,

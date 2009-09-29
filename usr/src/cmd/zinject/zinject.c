@@ -227,10 +227,14 @@ usage(void)
 	    "\t\tfunctions which call spa_vdev_config_exit(), or \n"
 	    "\t\tspa_vdev_exit() will trigger a panic.\n"
 	    "\n"
-	    "\tzinject -d device [-e errno] [-L <nvlist|uber>] [-F] pool\n"
+	    "\tzinject -d device [-e errno] [-L <nvlist|uber>] [-F]\n"
+	    "\t    [-T <read|write|free|claim|all> pool\n"
 	    "\t\tInject a fault into a particular device or the device's\n"
 	    "\t\tlabel.  Label injection can either be 'nvlist' or 'uber'.\n"
 	    "\t\t'errno' can either be 'nxio' (the default) or 'io'.\n"
+	    "\n"
+	    "\tzinject -d device -A <degrade|fault> pool\n"
+	    "\t\tPerform a specific action on a particular device\n"
 	    "\n"
 	    "\tzinject -b objset:object:level:blkid pool\n"
 	    "\n"
@@ -497,6 +501,22 @@ register_handler(const char *pool, int flags, zinject_record_t *record,
 }
 
 int
+perform_action(const char *pool, zinject_record_t *record, int cmd)
+{
+	zfs_cmd_t zc;
+
+	ASSERT(cmd == VDEV_STATE_DEGRADED || cmd == VDEV_STATE_FAULTED);
+	(void) strlcpy(zc.zc_name, pool, sizeof (zc.zc_name));
+	zc.zc_guid = record->zi_guid;
+	zc.zc_cookie = cmd;
+
+	if (ioctl(zfs_fd, ZFS_IOC_VDEV_SET_STATE, &zc) == 0)
+		return (0);
+
+	return (1);
+}
+
+int
 main(int argc, char **argv)
 {
 	int c;
@@ -509,6 +529,8 @@ main(int argc, char **argv)
 	int quiet = 0;
 	int error = 0;
 	int domount = 0;
+	int io_type = ZIO_TYPES;
+	int action = VDEV_STATE_UNKNOWN;
 	err_type_t type = TYPE_INVAL;
 	err_type_t label = TYPE_INVAL;
 	zinject_record_t record = { 0 };
@@ -546,10 +568,23 @@ main(int argc, char **argv)
 		return (0);
 	}
 
-	while ((c = getopt(argc, argv, ":ab:d:f:Fqhc:t:l:mr:e:uL:p:")) != -1) {
+	while ((c = getopt(argc, argv,
+	    ":aA:b:d:f:Fqhc:t:T:l:mr:e:uL:p:")) != -1) {
 		switch (c) {
 		case 'a':
 			flags |= ZINJECT_FLUSH_ARC;
+			break;
+		case 'A':
+			if (strcasecmp(optarg, "degrade") == 0) {
+				action = VDEV_STATE_DEGRADED;
+			} else if (strcasecmp(optarg, "fault") == 0) {
+				action = VDEV_STATE_FAULTED;
+			} else {
+				(void) fprintf(stderr, "invalid action '%s': "
+				    "must be 'degrade' or 'fault'\n", optarg);
+				usage();
+				return (1);
+			}
 			break;
 		case 'b':
 			raw = optarg;
@@ -610,6 +645,25 @@ main(int argc, char **argv)
 			break;
 		case 'r':
 			range = optarg;
+			break;
+		case 'T':
+			if (strcasecmp(optarg, "read") == 0) {
+				io_type = ZIO_TYPE_READ;
+			} else if (strcasecmp(optarg, "write") == 0) {
+				io_type = ZIO_TYPE_WRITE;
+			} else if (strcasecmp(optarg, "free") == 0) {
+				io_type = ZIO_TYPE_FREE;
+			} else if (strcasecmp(optarg, "claim") == 0) {
+				io_type = ZIO_TYPE_CLAIM;
+			} else if (strcasecmp(optarg, "all") == 0) {
+				io_type = ZIO_TYPES;
+			} else {
+				(void) fprintf(stderr, "invalid I/O type "
+				    "'%s': must be 'read', 'write', 'free', "
+				    "'claim' or 'all'\n", optarg);
+				usage();
+				return (1);
+			}
 			break;
 		case 't':
 			if ((type = name_to_type(optarg)) == TYPE_INVAL &&
@@ -708,10 +762,15 @@ main(int argc, char **argv)
 			return (1);
 		}
 
+		record.zi_iotype = io_type;
 		if (translate_device(pool, device, label, &record) != 0)
 			return (1);
 		if (!error)
 			error = ENXIO;
+
+		if (action != VDEV_STATE_UNKNOWN)
+			return (perform_action(pool, &record, action));
+
 	} else if (raw != NULL) {
 		if (range != NULL || type != TYPE_INVAL || level != 0 ||
 		    record.zi_func[0] != '\0') {

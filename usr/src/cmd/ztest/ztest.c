@@ -203,13 +203,13 @@ uint64_t zopt_rarely = 60;		/* every 60 seconds */
 
 ztest_info_t ztest_info[] = {
 	{ ztest_dmu_read_write,			1,	&zopt_always	},
-	{ ztest_dmu_read_write_zcopy,		1,	&zopt_always	},
 	{ ztest_dmu_write_parallel,		30,	&zopt_always	},
 	{ ztest_dmu_object_alloc_free,		1,	&zopt_always	},
 	{ ztest_dmu_commit_callbacks,		10,	&zopt_always	},
 	{ ztest_zap,				30,	&zopt_always	},
 	{ ztest_fzap,				30,	&zopt_always	},
 	{ ztest_zap_parallel,			100,	&zopt_always	},
+	{ ztest_dmu_read_write_zcopy,		1,	&zopt_sometimes	},
 	{ ztest_dsl_prop_get_set,		1,	&zopt_sometimes	},
 	{ ztest_dmu_objset_create_destroy,	1,	&zopt_sometimes },
 	{ ztest_dmu_snapshot_create_destroy,	1,	&zopt_sometimes },
@@ -1245,8 +1245,8 @@ online_vdev(vdev_t *vd, void *arg)
 {
 	spa_t *spa = vd->vdev_spa;
 	vdev_t *tvd = vd->vdev_top;
-	vdev_t *pvd = vd->vdev_parent;
 	uint64_t guid = vd->vdev_guid;
+	uint64_t generation = spa->spa_config_generation + 1;
 
 	ASSERT(spa_config_held(spa, SCL_STATE, RW_READER) == SCL_STATE);
 	ASSERT(vd->vdev_ops->vdev_op_leaf);
@@ -1262,10 +1262,14 @@ online_vdev(vdev_t *vd, void *arg)
 	 * vdev may have been detached/replaced while we were
 	 * trying to online it.
 	 */
-	if (vd != vdev_lookup_by_guid(tvd, guid) || vd->vdev_parent != pvd) {
-		if (zopt_verbose >= 6) {
-			(void) printf("vdev %p has disappeared, was "
-			    "guid %llu\n", (void *)vd, (u_longlong_t)guid);
+	if (generation != spa->spa_config_generation) {
+		if (zopt_verbose >= 5) {
+			(void) printf("vdev configuration has changed, "
+			    "guid %llu, state %llu, expected gen %llu, "
+			    "got gen %llu\n", (u_longlong_t)guid,
+			    (u_longlong_t)tvd->vdev_state,
+			    (u_longlong_t)generation,
+			    (u_longlong_t)spa->spa_config_generation);
 		}
 		return (vd);
 	}
@@ -1309,7 +1313,6 @@ ztest_vdev_LUN_growth(ztest_args_t *za)
 	uint64_t spa_newsize, spa_cursize, ms_count;
 
 	(void) mutex_lock(&ztest_shared->zs_vdev_lock);
-	mutex_enter(&spa_namespace_lock);
 	spa_config_enter(spa, SCL_STATE, spa, RW_READER);
 
 	while (tvd == NULL || tvd->vdev_islog) {
@@ -1330,12 +1333,12 @@ ztest_vdev_LUN_growth(ztest_args_t *za)
 	psize = vd->vdev_psize;
 
 	/*
-	 * We only try to expand the vdev if it's less than 4x its
-	 * original size and it has a valid psize.
+	 * We only try to expand the vdev if it's healthy, less than 4x its
+	 * original size, and it has a valid psize.
 	 */
-	if (psize == 0 || psize >= 4 * zopt_vdev_size) {
+	if (tvd->vdev_state != VDEV_STATE_HEALTHY ||
+	    psize == 0 || psize >= 4 * zopt_vdev_size) {
 		spa_config_exit(spa, SCL_STATE, spa);
-		mutex_exit(&spa_namespace_lock);
 		(void) mutex_unlock(&ztest_shared->zs_vdev_lock);
 		return;
 	}
@@ -1361,16 +1364,14 @@ ztest_vdev_LUN_growth(ztest_args_t *za)
 	    tvd->vdev_state != VDEV_STATE_HEALTHY) {
 		if (zopt_verbose >= 5) {
 			(void) printf("Could not expand LUN because "
-			    "some vdevs were not healthy\n");
+			    "the vdev configuration changed.\n");
 		}
 		(void) spa_config_exit(spa, SCL_STATE, spa);
-		mutex_exit(&spa_namespace_lock);
 		(void) mutex_unlock(&ztest_shared->zs_vdev_lock);
 		return;
 	}
 
 	(void) spa_config_exit(spa, SCL_STATE, spa);
-	mutex_exit(&spa_namespace_lock);
 
 	/*
 	 * Expanding the LUN will update the config asynchronously,
@@ -3486,6 +3487,7 @@ ztest_fault_inject(ztest_args_t *za)
 	int maxfaults = zopt_maxfaults;
 	vdev_t *vd0 = NULL;
 	uint64_t guid0 = 0;
+	boolean_t islog = B_FALSE;
 
 	ASSERT(leaves >= 1);
 
@@ -3513,6 +3515,9 @@ ztest_fault_inject(ztest_args_t *za)
 		    zopt_dir, zopt_pool, top * leaves + leaf);
 
 		vd0 = vdev_lookup_by_path(spa->spa_root_vdev, path0);
+		if (vd0 != NULL && vd0->vdev_top->vdev_islog)
+			islog = B_TRUE;
+
 		if (vd0 != NULL && maxfaults != 1) {
 			/*
 			 * Make vd0 explicitly claim to be unreadable,
@@ -3558,21 +3563,37 @@ ztest_fault_inject(ztest_args_t *za)
 
 	spa_config_exit(spa, SCL_STATE, FTAG);
 
-	if (maxfaults == 0)
-		return;
-
 	/*
-	 * If we can tolerate two or more faults, randomly online/offline vd0.
+	 * If we can tolerate two or more faults, or we're dealing
+	 * with a slog, randomly online/offline vd0.
 	 */
-	if (maxfaults >= 2 && guid0 != 0) {
+	if ((maxfaults >= 2 || islog) && guid0 != 0) {
 		if (ztest_random(10) < 6) {
 			int flags = (ztest_random(2) == 0 ?
 			    ZFS_OFFLINE_TEMPORARY : 0);
+
+			/*
+			 * We have to grab the zs_name_lock as writer to
+			 * prevent a race between offlining a slog and
+			 * destroying a dataset. Offlining the slog will
+			 * grab a reference on the dataset which may cause
+			 * dmu_objset_destroy() to fail with EBUSY thus
+			 * leaving the dataset in an inconsistent state.
+			 */
+			if (islog)
+				(void) rw_wrlock(&ztest_shared->zs_name_lock);
+
 			VERIFY(vdev_offline(spa, guid0, flags) != EBUSY);
+
+			if (islog)
+				(void) rw_unlock(&ztest_shared->zs_name_lock);
 		} else {
 			(void) vdev_online(spa, guid0, 0, NULL);
 		}
 	}
+
+	if (maxfaults == 0)
+		return;
 
 	/*
 	 * We have at least single-fault tolerance, so inject data corruption.
@@ -3921,7 +3942,7 @@ static void
 ztest_resume(spa_t *spa)
 {
 	if (spa_suspended(spa)) {
-		spa_vdev_state_enter(spa);
+		spa_vdev_state_enter(spa, SCL_NONE);
 		vdev_clear(spa, NULL);
 		(void) spa_vdev_state_exit(spa, NULL, 0);
 		(void) zio_resume(spa);

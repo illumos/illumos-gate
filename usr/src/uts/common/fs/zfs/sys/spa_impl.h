@@ -122,6 +122,7 @@ struct spa {
 	spa_aux_vdev_t	spa_spares;		/* hot spares */
 	spa_aux_vdev_t	spa_l2cache;		/* L2ARC cache devices */
 	uint64_t	spa_config_object;	/* MOS object for pool config */
+	uint64_t	spa_config_generation;	/* config generation number */
 	uint64_t	spa_syncing_txg;	/* txg currently syncing */
 	uint64_t	spa_sync_bplist_obj;	/* object for deferred frees */
 	bplist_t	spa_sync_bplist;	/* deferred-free bplist */
@@ -172,6 +173,7 @@ struct spa {
 	spa_log_state_t spa_log_state;		/* log state */
 	uint64_t	spa_autoexpand;		/* lun expansion on/off */
 	boolean_t	spa_autoreplace;	/* autoreplace set in open */
+	int		spa_vdev_locks;		/* locks grabbed */
 	/*
 	 * spa_refcnt & spa_config_lock must be the last elements
 	 * because refcount_t changes size based on compilation options.

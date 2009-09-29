@@ -45,6 +45,7 @@ SUNWprivate_1.1 {
 	fletcher_4_byteswap;
 	fletcher_4_incremental_native;
 	fletcher_4_incremental_byteswap;
+	hist_event_table;
 	libzfs_errno;
 	libzfs_error_action;
 	libzfs_error_description;
@@ -170,6 +171,7 @@ SUNWprivate_1.1 {
 	zpool_get_prop_int;
 	zpool_get_state;
 	zpool_get_status;
+	zpool_history_unpack;
 	zpool_import;
 	zpool_import_props;
 	zpool_import_status;

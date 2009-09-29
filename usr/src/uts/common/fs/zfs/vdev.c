@@ -1935,7 +1935,7 @@ vdev_fault(spa_t *spa, uint64_t guid)
 {
 	vdev_t *vd;
 
-	spa_vdev_state_enter(spa);
+	spa_vdev_state_enter(spa, SCL_NONE);
 
 	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
 		return (spa_vdev_state_exit(spa, NULL, ENODEV));
@@ -1955,7 +1955,8 @@ vdev_fault(spa_t *spa, uint64_t guid)
 	 * unavailable, then back off and simply mark the vdev as degraded
 	 * instead.
 	 */
-	if (vdev_is_dead(vd->vdev_top) && vd->vdev_aux == NULL) {
+	if (vdev_is_dead(vd->vdev_top) && !vd->vdev_islog &&
+	    vd->vdev_aux == NULL) {
 		vd->vdev_degraded = 1ULL;
 		vd->vdev_faulted = 0ULL;
 
@@ -1984,7 +1985,7 @@ vdev_degrade(spa_t *spa, uint64_t guid)
 {
 	vdev_t *vd;
 
-	spa_vdev_state_enter(spa);
+	spa_vdev_state_enter(spa, SCL_NONE);
 
 	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
 		return (spa_vdev_state_exit(spa, NULL, ENODEV));
@@ -2017,7 +2018,7 @@ vdev_online(spa_t *spa, uint64_t guid, uint64_t flags, vdev_state_t *newstate)
 {
 	vdev_t *vd, *tvd, *pvd, *rvd = spa->spa_root_vdev;
 
-	spa_vdev_state_enter(spa);
+	spa_vdev_state_enter(spa, SCL_NONE);
 
 	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
 		return (spa_vdev_state_exit(spa, NULL, ENODEV));
@@ -2064,12 +2065,33 @@ vdev_online(spa_t *spa, uint64_t guid, uint64_t flags, vdev_state_t *newstate)
 }
 
 int
+vdev_offline_log(spa_t *spa)
+{
+	int error = 0;
+
+	if ((error = dmu_objset_find(spa_name(spa), zil_vdev_offline,
+	    NULL, DS_FIND_CHILDREN)) == 0) {
+
+		/*
+		 * We successfully offlined the log device, sync out the
+		 * current txg so that the "stubby" block can be removed
+		 * by zil_sync().
+		 */
+		txg_wait_synced(spa->spa_dsl_pool, 0);
+	}
+	return (error);
+}
+
+int
 vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 {
 	vdev_t *vd, *tvd;
-	int error;
+	int error = 0;
+	uint64_t generation;
+	metaslab_group_t *mg;
 
-	spa_vdev_state_enter(spa);
+top:
+	spa_vdev_state_enter(spa, SCL_ALLOC);
 
 	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
 		return (spa_vdev_state_exit(spa, NULL, ENODEV));
@@ -2078,6 +2100,8 @@ vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
 
 	tvd = vd->vdev_top;
+	mg = tvd->vdev_mg;
+	generation = spa->spa_config_generation + 1;
 
 	/*
 	 * If the device isn't already offline, try to offline it.
@@ -2091,6 +2115,38 @@ vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 		if (!tvd->vdev_islog && vd->vdev_aux == NULL &&
 		    vdev_dtl_required(vd))
 			return (spa_vdev_state_exit(spa, NULL, EBUSY));
+
+		/*
+		 * If the top-level is a slog and it's had allocations
+		 * then proceed. We check that the vdev's metaslab
+		 * grop is not NULL since it's possible that we may
+		 * have just added this vdev and have not yet initialized
+		 * it's metaslabs.
+		 */
+		if (tvd->vdev_islog && mg != NULL) {
+			/*
+			 * Prevent any future allocations.
+			 */
+			metaslab_class_remove(spa->spa_log_class, mg);
+			(void) spa_vdev_state_exit(spa, vd, 0);
+
+			error = vdev_offline_log(spa);
+
+			spa_vdev_state_enter(spa, SCL_ALLOC);
+
+			/*
+			 * Check to see if the config has changed.
+			 */
+			if (error || generation != spa->spa_config_generation) {
+				metaslab_class_add(spa->spa_log_class, mg);
+				if (error)
+					return (spa_vdev_state_exit(spa,
+					    vd, error));
+				(void) spa_vdev_state_exit(spa, vd, 0);
+				goto top;
+			}
+			ASSERT3U(tvd->vdev_stat.vs_alloc, ==, 0);
+		}
 
 		/*
 		 * Offline this device and reopen its top-level vdev.
@@ -2107,28 +2163,18 @@ vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
 			vdev_reopen(tvd);
 			return (spa_vdev_state_exit(spa, NULL, EBUSY));
 		}
+
+		/*
+		 * Add the device back into the metaslab rotor so that
+		 * once we online the device it's open for business.
+		 */
+		if (tvd->vdev_islog && mg != NULL)
+			metaslab_class_add(spa->spa_log_class, mg);
 	}
 
 	vd->vdev_tmpoffline = !!(flags & ZFS_OFFLINE_TEMPORARY);
 
-	if (!tvd->vdev_islog || !vdev_is_dead(tvd))
-		return (spa_vdev_state_exit(spa, vd, 0));
-
-	(void) spa_vdev_state_exit(spa, vd, 0);
-
-	error = dmu_objset_find(spa_name(spa), zil_vdev_offline,
-	    NULL, DS_FIND_CHILDREN);
-	if (error) {
-		(void) vdev_online(spa, guid, 0, NULL);
-		return (error);
-	}
-	/*
-	 * If we successfully offlined the log device then we need to
-	 * sync out the current txg so that the "stubby" block can be
-	 * removed by zil_sync().
-	 */
-	txg_wait_synced(spa->spa_dsl_pool, 0);
-	return (0);
+	return (spa_vdev_state_exit(spa, vd, 0));
 }
 
 /*
@@ -2354,6 +2400,14 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 	 */
 	if (zio->io_error == EIO &&
 	    !(zio->io_flags & ZIO_FLAG_IO_RETRY))
+		return;
+
+	/*
+	 * Intent logs writes won't propagate their error to the root
+	 * I/O so don't mark these types of failures as pool-level
+	 * errors.
+	 */
+	if (zio->io_vd == NULL && (zio->io_flags & ZIO_FLAG_DONT_PROPAGATE))
 		return;
 
 	mutex_enter(&vd->vdev_stat_lock);

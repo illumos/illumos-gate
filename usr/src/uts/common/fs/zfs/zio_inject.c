@@ -184,7 +184,7 @@ zio_handle_label_injection(zio_t *zio, int error)
 	int label;
 	int ret = 0;
 
-	if (offset + zio->io_size > VDEV_LABEL_START_SIZE &&
+	if (offset >= VDEV_LABEL_START_SIZE &&
 	    offset < vd->vdev_psize - VDEV_LABEL_END_SIZE)
 		return (0);
 
@@ -226,6 +226,18 @@ zio_handle_device_injection(vdev_t *vd, zio_t *zio, int error)
 	inject_handler_t *handler;
 	int ret = 0;
 
+	/*
+	 * We skip over faults in the labels unless it's during
+	 * device open (i.e. zio == NULL).
+	 */
+	if (zio != NULL) {
+		uint64_t offset = zio->io_offset;
+
+		if (offset < VDEV_LABEL_START_SIZE ||
+		    offset >= vd->vdev_psize - VDEV_LABEL_END_SIZE)
+		return (0);
+	}
+
 	rw_enter(&inject_lock, RW_READER);
 
 	for (handler = list_head(&inject_handlers); handler != NULL;
@@ -242,6 +254,12 @@ zio_handle_device_injection(vdev_t *vd, zio_t *zio, int error)
 			    (ZIO_FLAG_IO_RETRY | ZIO_FLAG_TRYHARD)))) {
 				continue;
 			}
+
+			/* Handle type specific I/O failures */
+			if (zio != NULL &&
+			    handler->zi_record.zi_iotype != ZIO_TYPES &&
+			    handler->zi_record.zi_iotype != zio->io_type)
+				continue;
 
 			if (handler->zi_record.zi_error == error) {
 				/*

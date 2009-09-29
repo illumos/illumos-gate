@@ -332,10 +332,14 @@ extern nvlist_t *zpool_find_import_activeok(libzfs_handle_t *, int, char **);
  */
 struct zfs_cmd;
 
+extern const char *hist_event_table[LOG_END];
+
 extern char *zpool_vdev_name(libzfs_handle_t *, zpool_handle_t *, nvlist_t *,
     boolean_t verbose);
 extern int zpool_upgrade(zpool_handle_t *, uint64_t);
 extern int zpool_get_history(zpool_handle_t *, nvlist_t **);
+extern int zpool_history_unpack(char *, uint64_t, uint64_t *,
+    nvlist_t ***, uint_t *);
 extern void zpool_set_history_str(const char *subcommand, int argc,
     char **argv, char *history_str);
 extern int zpool_stage_history(libzfs_handle_t *, const char *);

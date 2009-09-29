@@ -77,6 +77,8 @@ boolean_t zfs_nocacheflush = B_FALSE;
 
 static kmem_cache_t *zil_lwb_cache;
 
+static boolean_t zil_empty(zilog_t *zilog);
+
 static int
 zil_dva_compare(const void *x1, const void *x2)
 {
@@ -436,23 +438,12 @@ zil_destroy(zilog_t *zilog, boolean_t keep_first)
 
 	mutex_enter(&zilog->zl_lock);
 
-	/*
-	 * It is possible for the ZIL to get the previously mounted zilog
-	 * structure of the same dataset if quickly remounted and the dbuf
-	 * eviction has not completed. In this case we can see a non
-	 * empty lwb list and keep_first will be set. We fix this by
-	 * clearing the keep_first. This will be slower but it's very rare.
-	 */
-	if (!list_is_empty(&zilog->zl_lwb_list) && keep_first)
-		keep_first = B_FALSE;
-
 	ASSERT3U(zilog->zl_destroy_txg, <, txg);
 	zilog->zl_destroy_txg = txg;
-	zilog->zl_keep_first = keep_first;
 
 	if (!list_is_empty(&zilog->zl_lwb_list)) {
 		ASSERT(zh->zh_claim_txg == 0);
-		ASSERT(!keep_first);
+		zilog->zl_keep_first = B_FALSE;
 		while ((lwb = list_head(&zilog->zl_lwb_list)) != NULL) {
 			list_remove(&zilog->zl_lwb_list, lwb);
 			if (lwb->lwb_buf != NULL)
@@ -461,9 +452,23 @@ zil_destroy(zilog_t *zilog, boolean_t keep_first)
 			kmem_cache_free(zil_lwb_cache, lwb);
 		}
 	} else {
-		if (!keep_first) {
+		zilog->zl_keep_first = keep_first;
+		if (zh->zh_flags & ZIL_REPLAY_NEEDED) {
+			ASSERT(!keep_first);
 			(void) zil_parse(zilog, zil_free_log_block,
 			    zil_free_log_record, tx, zh->zh_claim_txg);
+		} else {
+			/*
+			 * Would like to assert zil_empty() but that
+			 * would force us to read the log chain which
+			 * requires us to do I/O to the log. This is
+			 * overkill since we really just want to destroy
+			 * the chain anyway.
+			 */
+			if (!keep_first) {
+				blkptr_t bp = zh->zh_log;
+				zio_free_blk(zilog->zl_spa, &bp, txg);
+			}
 		}
 	}
 	mutex_exit(&zilog->zl_lock);
@@ -746,7 +751,7 @@ zil_lwb_write_init(zilog_t *zilog, lwb_t *lwb)
 		lwb->lwb_zio = zio_rewrite(zilog->zl_root_zio, zilog->zl_spa,
 		    0, &lwb->lwb_blk, lwb->lwb_buf, lwb->lwb_sz,
 		    zil_lwb_write_done, lwb, ZIO_PRIORITY_LOG_WRITE,
-		    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE, &zb);
+		    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_PROPAGATE, &zb);
 	}
 }
 

@@ -3624,49 +3624,6 @@ typedef struct hist_cbdata {
 	int internal;
 } hist_cbdata_t;
 
-char *hist_event_table[LOG_END] = {
-	"invalid event",
-	"pool create",
-	"vdev add",
-	"pool remove",
-	"pool destroy",
-	"pool export",
-	"pool import",
-	"vdev attach",
-	"vdev replace",
-	"vdev detach",
-	"vdev online",
-	"vdev offline",
-	"vdev upgrade",
-	"pool clear",
-	"pool scrub",
-	"pool property set",
-	"create",
-	"clone",
-	"destroy",
-	"destroy_begin_sync",
-	"inherit",
-	"property set",
-	"quota set",
-	"permission update",
-	"permission remove",
-	"permission who remove",
-	"promote",
-	"receive",
-	"rename",
-	"reservation set",
-	"replay_inc_sync",
-	"replay_full_sync",
-	"rollback",
-	"snapshot",
-	"filesystem version upgrade",
-	"refquota set",
-	"refreservation set",
-	"pool scrub done",
-	"user hold",
-	"user release",
-};
-
 /*
  * Print out the command history for a specific pool.
  */

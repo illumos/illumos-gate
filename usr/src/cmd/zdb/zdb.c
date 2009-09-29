@@ -100,6 +100,7 @@ usage(void)
 	(void) fprintf(stderr, "	-u uberblock\n");
 	(void) fprintf(stderr, "	-d datasets\n");
 	(void) fprintf(stderr, "        -C cached pool configuration\n");
+	(void) fprintf(stderr, "        -h pool history\n");
 	(void) fprintf(stderr, "	-i intent logs\n");
 	(void) fprintf(stderr, "	-b block statistics\n");
 	(void) fprintf(stderr, "	-m metaslabs\n");
@@ -504,7 +505,7 @@ dump_dtl(vdev_t *vd, int indent)
 	char *name[DTL_TYPES] = { "missing", "partial", "scrub", "outage" };
 	char prefix[256];
 
-	spa_vdev_state_enter(spa);
+	spa_vdev_state_enter(spa, SCL_NONE);
 	required = vdev_dtl_required(vd);
 	(void) spa_vdev_state_exit(spa, NULL, 0);
 
@@ -532,6 +533,67 @@ dump_dtl(vdev_t *vd, int indent)
 
 	for (int c = 0; c < vd->vdev_children; c++)
 		dump_dtl(vd->vdev_child[c], indent + 4);
+}
+
+static void
+dump_history(spa_t *spa)
+{
+	nvlist_t **events = NULL;
+	char buf[SPA_MAXBLOCKSIZE];
+	uint64_t resid, off = 0;
+	uint64_t len = sizeof (buf);
+	uint_t num = 0;
+	int error;
+	time_t tsec;
+	struct tm t;
+	char tbuf[30];
+	char internalstr[MAXPATHLEN];
+
+	do {
+		if ((error = spa_history_get(spa, &off, &len, buf)) != 0) {
+			(void) fprintf(stderr, "Unable to read history: "
+			    "error %d\n", error);
+			return;
+		}
+
+		if (zpool_history_unpack(buf, len, &resid, &events, &num) != 0)
+			break;
+
+		off -= resid;
+	} while (len != 0);
+
+	(void) printf("\nHistory:\n");
+	for (int i = 0; i < num; i++) {
+		uint64_t time, txg, ievent;
+		char *cmd, *intstr;
+
+		if (nvlist_lookup_uint64(events[i], ZPOOL_HIST_TIME,
+		    &time) != 0)
+			continue;
+		if (nvlist_lookup_string(events[i], ZPOOL_HIST_CMD,
+		    &cmd) != 0) {
+			if (nvlist_lookup_uint64(events[i],
+			    ZPOOL_HIST_INT_EVENT, &ievent) != 0)
+				continue;
+			verify(nvlist_lookup_uint64(events[i],
+			    ZPOOL_HIST_TXG, &txg) == 0);
+			verify(nvlist_lookup_string(events[i],
+			    ZPOOL_HIST_INT_STR, &intstr) == 0);
+			if (ievent >= LOG_END)
+				continue;
+
+			(void) snprintf(internalstr,
+			    sizeof (internalstr),
+			    "[internal %s txg:%lld] %s",
+			    hist_event_table[ievent], txg,
+			    intstr);
+			cmd = internalstr;
+		}
+		tsec = time;
+		(void) localtime_r(&tsec, &t);
+		(void) strftime(tbuf, sizeof (tbuf), "%F.%T", &t);
+		(void) printf("%s %s\n", tbuf, cmd);
+	}
 }
 
 /*ARGSUSED*/
@@ -1791,6 +1853,9 @@ dump_zpool(spa_t *spa)
 	if (dump_opt['s'])
 		show_pool_stats(spa);
 
+	if (dump_opt['h'])
+		dump_history(spa);
+
 	if (rc != 0)
 		exit(rc);
 }
@@ -2256,11 +2321,12 @@ main(int argc, char **argv)
 
 	dprintf_setup(&argc, argv);
 
-	while ((c = getopt(argc, argv, "udibcmsvCLS:U:lRep:t:")) != -1) {
+	while ((c = getopt(argc, argv, "udhibcmsvCLS:U:lRep:t:")) != -1) {
 		switch (c) {
 		case 'u':
 		case 'd':
 		case 'i':
+		case 'h':
 		case 'b':
 		case 'c':
 		case 'm':
@@ -2415,6 +2481,23 @@ main(int argc, char **argv)
 			    B_TRUE, FTAG, &os);
 		} else {
 			error = spa_open(argv[0], &spa, FTAG);
+			if (error) {
+				/*
+				 * If we're missing the log device then
+				 * try opening the pool after clearing the
+				 * log state.
+				 */
+				mutex_enter(&spa_namespace_lock);
+				if ((spa = spa_lookup(argv[0])) != NULL &&
+				    spa->spa_log_state == SPA_LOG_MISSING) {
+					spa->spa_log_state = SPA_LOG_CLEAR;
+					error = 0;
+				}
+				mutex_exit(&spa_namespace_lock);
+
+				if (!error)
+					error = spa_open(argv[0], &spa, FTAG);
+			}
 		}
 	}
 

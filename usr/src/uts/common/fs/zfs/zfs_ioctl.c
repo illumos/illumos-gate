@@ -2983,7 +2983,7 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	spa_vdev_state_enter(spa);
+	spa_vdev_state_enter(spa, SCL_NONE);
 
 	if (zc->zc_guid == 0) {
 		vd = NULL;

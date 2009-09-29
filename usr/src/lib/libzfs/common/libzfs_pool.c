@@ -42,6 +42,49 @@
 #include "zfs_prop.h"
 #include "libzfs_impl.h"
 
+const char *hist_event_table[LOG_END] = {
+	"invalid event",
+	"pool create",
+	"vdev add",
+	"pool remove",
+	"pool destroy",
+	"pool export",
+	"pool import",
+	"vdev attach",
+	"vdev replace",
+	"vdev detach",
+	"vdev online",
+	"vdev offline",
+	"vdev upgrade",
+	"pool clear",
+	"pool scrub",
+	"pool property set",
+	"create",
+	"clone",
+	"destroy",
+	"destroy_begin_sync",
+	"inherit",
+	"property set",
+	"quota set",
+	"permission update",
+	"permission remove",
+	"permission who remove",
+	"promote",
+	"receive",
+	"rename",
+	"reservation set",
+	"replay_inc_sync",
+	"replay_full_sync",
+	"rollback",
+	"snapshot",
+	"filesystem version upgrade",
+	"refquota set",
+	"refreservation set",
+	"pool scrub done",
+	"user hold",
+	"user release",
+};
+
 static int read_efi_label(nvlist_t *config, diskaddr_t *sb);
 
 #if defined(__i386) || defined(__amd64)
@@ -2804,7 +2847,7 @@ get_history(zpool_handle_t *zhp, char *buf, uint64_t *off, uint64_t *len)
  * into 'records'.  'leftover' is set to the number of bytes that weren't
  * processed as there wasn't a complete record.
  */
-static int
+int
 zpool_history_unpack(char *buf, uint64_t bytes_read, uint64_t *leftover,
     nvlist_t ***records, uint_t *numrecords)
 {

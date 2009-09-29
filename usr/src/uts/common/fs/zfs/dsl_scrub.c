@@ -1033,7 +1033,7 @@ dsl_pool_scrub_clean(dsl_pool_t *dp)
 	 * spa_scrub_reopen flag indicates that vdev_open() should not
 	 * attempt to start another scrub.
 	 */
-	spa_vdev_state_enter(spa);
+	spa_vdev_state_enter(spa, SCL_NONE);
 	spa->spa_scrub_reopen = B_TRUE;
 	vdev_reopen(spa->spa_root_vdev);
 	spa->spa_scrub_reopen = B_FALSE;

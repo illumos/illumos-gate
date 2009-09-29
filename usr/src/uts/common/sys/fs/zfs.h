@@ -692,7 +692,7 @@ typedef enum {
 /*
  * Note: This is encoded on-disk, so new events must be added to the
  * end, and unused events can not be removed.  Be sure to edit
- * zpool_main.c: hist_event_table[].
+ * libzfs_pool.c: hist_event_table[].
  */
 typedef enum history_internal_events {
 	LOG_NO_EVENT = 0,
