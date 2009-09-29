@@ -32,6 +32,7 @@ SRCS = \
 	routing_include.sh \
 	sendmail_include.sh \
 	smf_include.sh \
+	mfsthistory \
 	manifest_cleanup.ksh
 
 SCRIPTS = $(SRCS:%=$(ROOT)/lib/svc/share/%)

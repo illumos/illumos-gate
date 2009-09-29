@@ -36,6 +36,7 @@ MFSTPG=manifestfiles
 MFSTSCAN=/lib/svc/bin/mfstscan
 MCLEANUPFILE=/etc/svc/volatile/mcleanup.$$
 IGNORELIST="system/install-discovery smf/manifest"
+MFSTHISTORY=/lib/svc/share/mfsthistory
 UPLIST=0
 
 #
@@ -58,9 +59,6 @@ function create_list {
 
 
 			eval $cl_invent=\"\$$cl_invent $cl_mfile\"
-			# XXX - remove this line at some point "
-			# I clears up the above escaped quote throwing
-			# off my color scheme in vim.
 		done
 	done
 	UPLIST=1
@@ -152,12 +150,16 @@ function process_service {
 	#
 	for mf in ${ps_mfiles[@]}
 	do
+		#
+		# This is an unsupported service just return
+		# skipping the service.
+		#
+		[ ${mf%/var/svc/manifest*} ] && return
+
 		if [ ! -f $mf ]; then
 			ps_mfiles_tmp="$ps_mfiles_tmp $mf"
 			continue
 		fi
-
-		[ ${mf%/var/svc/manifest*} ] && continue
 
 		inst=`get_instances $mf`
 
@@ -328,6 +330,12 @@ function add_manifest {
 	if [ "$1" == "FALSE" ]; then
 		am_lisnap=1
 		am_inst=`svcs -H -oFMRI $am_service 2>/dev/null`
+
+		#
+		# Check for a last-import snapshot, if there is not
+		# one then the service was hand crafted and the support
+		# should be set to false.
+		#
 		if [ $? -eq 0 ]; then
 			for i in $am_inst
 			do
@@ -336,16 +344,33 @@ function add_manifest {
 			done
 		fi
 
-		if [ $am_lisnap -eq 0 ]; then
+		if [ $am_lisnap -ne 0 ]; then
+			$SVCCFG -s $am_service setprop $MFSTPG/support = boolean: 0
+
+			return
+		fi
+
+		#
+		# If the service was not hand crafted then check to see if
+		# the service has ever been installed in the /var/svc/manifest
+		# directory and therefore a known removed service.
+		#
+		grep "$am_service " $MFSTHISTORY | grep -v "^#" > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo "$SVCCFG delete $am_service"
 			$SVCCFG delete -f $am_service
 		else
+			#
+			# Do not know where the service came from so set
+			# it to false.
+			#
 			$SVCCFG -s $am_service setprop $MFSTPG/support = boolean: 0
 		fi
 	else
 		for am_mfile in $@
 		do
 			CF=${am_mfile#/*}
-			CF=`echo $CF | sed -e 's/[-\/\,\.]/_/g'`
+			CF=`echo $CF | sed -e 's/[\/\,\.]/_/g'`
 			$SVCCFG -s $am_service setprop $MFSTPG/$CF = astring: $am_mfile
 		done
 	fi
@@ -434,9 +459,11 @@ function manifest_cleanup {
 	do
 		svcprop -q -p $MFSTPG $service
 		if [ $? -ne 0 ]; then
-			if [[ $IGNORELIST == $ps_service ]]; then
+			mc_igchk=`eval expr \"$IGNORELIST \" : "'.*\($service \)'"`
+			if [[ -n $mc_igchk ]]; then
 				echo "add_manifest $service FALSE"
 				add_manifest $service FALSE
+				continue
 			fi
 			
 			[ $UPLIST -eq 0 ] && create_list
