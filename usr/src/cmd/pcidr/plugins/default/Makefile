@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 .PARALLEL:
@@ -41,7 +40,8 @@ include $(SRC)/lib/Makefile.lib
 include $(SRC)/cmd/pcidr/Makefile.com
 #############################################################################
 
-THISDIR = $(TOP)/plugins/default
+THISDIR = ../../plugins/default
+USR_SRC_BASE = ../../../..
 
 # SRCS is used by the lintcheck rule and is defined as
 # $(OBJECTS:%.o=$(SRCDIR)/%.c) where SRCDIR is this directory; set SRCS to a
@@ -49,7 +49,7 @@ THISDIR = $(TOP)/plugins/default
 #
 
 SRCDIR = .
-SRCS = $(TOPOBJECTS:%.o=$(TOP)/%.c) $(LOCOBJECTS:%.o=$(SRCDIR)/%.c)
+SRCS = $(TOPOBJECTS:%.o=$(USR_SRC_BASE)/cmd/pcidr/%.c) $(LOCOBJECTS:%.o=$(SRCDIR)/%.c) 
 
 LIBS = $(DYNLIB)
 
@@ -75,16 +75,7 @@ lint: lintcheck
 
 $(ROOTLIBS): all
 
-# Note that we can't do:
-#	$(TOPOBJECTS:%=objs/%) := SRCDIR = $(TOP)
-# and let the make do the rest because the man page states:
-# "Notice that if a conditional macro is referred to in a  dependency list,
-#  the $ must be delayed (use $$ instead)."
-#
-# So we must add new targets for our TOPOBJECTS items but follow
-# the existing pic/*.o and objs/*.o rules in lib/Makefile.targ
-#
-objs/%.o pics/%.o: $(TOP)/%.c
+objs/%.o pics/%.o: $(USR_SRC_BASE)/cmd/pcidr/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
