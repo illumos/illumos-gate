@@ -114,7 +114,7 @@ kcf_check_prov_mech_keylen(kcf_provider_desc_t *provider,
 	crypto_key_t *key)
 {
 	crypto_mech_info_t *mech_info = NULL;
-	uint_t keylen = 0;
+	size_t keylen = 0;
 	ssize_t attr_len;
 	uchar_t *attr;
 
@@ -169,7 +169,7 @@ kcf_check_prov_mech_keylen(kcf_provider_desc_t *provider,
 
 	DTRACE_PROBE4(keylen__check,
 	    crypto_mech_type_t, mech_type,
-	    uint_t, keylen,
+	    size_t, keylen,
 	    ssize_t, mech_info->cm_min_key_length,
 	    ssize_t, mech_info->cm_max_key_length);
 	/* Do the actual check. */
