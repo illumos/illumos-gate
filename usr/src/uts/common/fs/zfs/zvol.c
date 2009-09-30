@@ -1771,7 +1771,7 @@ zvol_dump_fini(zvol_state_t *zv)
 		dmu_tx_abort(tx);
 		return (error);
 	}
-	dmu_object_set_blocksize(os, ZVOL_OBJ, vbs, 0, tx);
+	(void) dmu_object_set_blocksize(os, ZVOL_OBJ, vbs, 0, tx);
 	dmu_tx_commit(tx);
 
 	return (0);

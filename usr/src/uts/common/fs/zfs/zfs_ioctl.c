@@ -2567,7 +2567,7 @@ zfs_ioc_destroy(zfs_cmd_t *zc)
 
 	err = dmu_objset_destroy(zc->zc_name, zc->zc_defer_destroy);
 	if (zc->zc_objset_type == DMU_OST_ZVOL && err == 0)
-		zvol_remove_minor(zc->zc_name);
+		(void) zvol_remove_minor(zc->zc_name);
 	return (err);
 }
 

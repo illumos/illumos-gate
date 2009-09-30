@@ -185,6 +185,7 @@ ztest_func_t ztest_vdev_LUN_growth;
 ztest_func_t ztest_vdev_add_remove;
 ztest_func_t ztest_vdev_aux_add_remove;
 ztest_func_t ztest_scrub;
+ztest_func_t ztest_dmu_snapshot_hold;
 
 typedef struct ztest_info {
 	ztest_func_t	*zi_func;	/* test function */
@@ -215,6 +216,7 @@ ztest_info_t ztest_info[] = {
 	{ ztest_dmu_snapshot_create_destroy,	1,	&zopt_sometimes },
 	{ ztest_spa_create_destroy,		1,	&zopt_sometimes },
 	{ ztest_fault_inject,			1,	&zopt_sometimes	},
+	{ ztest_dmu_snapshot_hold,		1,	&zopt_sometimes	},
 	{ ztest_spa_rename,			1,	&zopt_rarely	},
 	{ ztest_vdev_attach_detach,		1,	&zopt_rarely	},
 	{ ztest_vdev_LUN_growth,		1,	&zopt_rarely	},
@@ -3464,6 +3466,119 @@ ztest_dsl_prop_get_set(ztest_args_t *za)
 		}
 	}
 
+	(void) rw_unlock(&ztest_shared->zs_name_lock);
+}
+
+/*
+ * Test snapshot hold/release and deferred destroy.
+ */
+void
+ztest_dmu_snapshot_hold(ztest_args_t *za)
+{
+	int error;
+	objset_t *os = za->za_os;
+	objset_t *origin;
+	uint64_t curval = za->za_instance;
+	char snapname[100];
+	char fullname[100];
+	char clonename[100];
+	char tag[100];
+	char osname[MAXNAMELEN];
+
+	(void) rw_rdlock(&ztest_shared->zs_name_lock);
+
+	dmu_objset_name(os, osname);
+
+	(void) snprintf(snapname, 100, "sh1_%llu", curval);
+	(void) snprintf(fullname, 100, "%s@%s", osname, snapname);
+	(void) snprintf(clonename, 100, "%s/ch1_%llu", osname, curval);
+	(void) snprintf(tag, 100, "%tag_%llu", curval);
+
+	/*
+	 * Clean up from any previous run.
+	 */
+	(void) dmu_objset_destroy(clonename, B_FALSE);
+	(void) dsl_dataset_user_release(osname, snapname, tag, B_FALSE);
+	(void) dmu_objset_destroy(fullname, B_FALSE);
+
+	/*
+	 * Create snapshot, clone it, mark snap for deferred destroy,
+	 * destroy clone, verify snap was also destroyed.
+	 */
+	error = dmu_objset_snapshot(osname, snapname, NULL, FALSE);
+	if (error) {
+		if (error == ENOSPC) {
+			ztest_record_enospc("dmu_objset_snapshot");
+			goto out;
+		}
+		fatal(0, "dmu_objset_snapshot(%s) = %d", fullname, error);
+	}
+
+	error = dmu_objset_hold(fullname, FTAG, &origin);
+	if (error)
+		fatal(0, "dmu_objset_hold(%s) = %d", fullname, error);
+
+	error = dmu_objset_clone(clonename, dmu_objset_ds(origin), 0);
+	dmu_objset_rele(origin, FTAG);
+	if (error) {
+		if (error == ENOSPC) {
+			ztest_record_enospc("dmu_objset_clone");
+			goto out;
+		}
+		fatal(0, "dmu_objset_clone(%s) = %d", clonename, error);
+	}
+
+	error = dmu_objset_destroy(fullname, B_TRUE);
+	if (error) {
+		fatal(0, "dmu_objset_destroy(%s, B_TRUE) = %d",
+		    fullname, error);
+	}
+
+	error = dmu_objset_destroy(clonename, B_FALSE);
+	if (error)
+		fatal(0, "dmu_objset_destroy(%s) = %d", clonename, error);
+
+	error = dmu_objset_hold(fullname, FTAG, &origin);
+	if (error != ENOENT)
+		fatal(0, "dmu_objset_hold(%s) = %d", fullname, error);
+
+	/*
+	 * Create snapshot, add temporary hold, verify that we can't
+	 * destroy a held snapshot, mark for deferred destroy,
+	 * release hold, verify snapshot was destroyed.
+	 */
+	error = dmu_objset_snapshot(osname, snapname, NULL, FALSE);
+	if (error) {
+		if (error == ENOSPC) {
+			ztest_record_enospc("dmu_objset_snapshot");
+			goto out;
+		}
+		fatal(0, "dmu_objset_snapshot(%s) = %d", fullname, error);
+	}
+
+	error = dsl_dataset_user_hold(osname, snapname, tag, B_FALSE, B_TRUE);
+	if (error)
+		fatal(0, "dsl_dataset_user_hold(%s)", fullname, tag);
+
+	error = dmu_objset_destroy(fullname, B_FALSE);
+	if (error != EBUSY) {
+		fatal(0, "dmu_objset_destroy(%s, B_FALSE) = %d",
+		    fullname, error);
+	}
+
+	error = dmu_objset_destroy(fullname, B_TRUE);
+	if (error) {
+		fatal(0, "dmu_objset_destroy(%s, B_TRUE) = %d",
+		    fullname, error);
+	}
+
+	error = dsl_dataset_user_release(osname, snapname, tag, B_FALSE);
+	if (error)
+		fatal(0, "dsl_dataset_user_release(%s)", fullname, tag);
+
+	VERIFY(dmu_objset_hold(fullname, FTAG, &origin) == ENOENT);
+
+out:
 	(void) rw_unlock(&ztest_shared->zs_name_lock);
 }
 
