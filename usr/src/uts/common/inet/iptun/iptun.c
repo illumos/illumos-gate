@@ -2647,8 +2647,9 @@ iptun_input(void *arg, mblk_t *mp, void *arg2)
 			goto drop;
 	}
 
-	if (!ipsec_tun_inbound(mp, &data_mp, iptun->iptun_itp, inner4,
-	    inner6, outer4, outer6, outer_hlen, iptun->iptun_ns)) {
+	if (!ipsec_tun_inbound((mp == data_mp ? NULL : mp), &data_mp,
+	    iptun->iptun_itp, inner4, inner6, outer4, outer6, outer_hlen,
+	    iptun->iptun_ns)) {
 		/* Callee did all of the freeing. */
 		return;
 	}
