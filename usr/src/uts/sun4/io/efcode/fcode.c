@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -838,6 +838,15 @@ fc_get_fcode(dev_t dev, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	st = fc_states + m;
 	ASSERT(m < fc_max_opens && FC_STATE_ACTIVE(st->state));
 
+	/*
+	 * It's an error if we're not in state FC_STATE_IN_PROGRESS
+	 */
+	if (st->state != FC_STATE_IN_PROGRESS) {
+		cmn_err(CE_CONT, "fc_ioctl: fc_get_fcode: wrong state (%d)\n",
+		    st->state);
+		return (EINVAL);
+	}
+
 	ASSERT(st->req != NULL);
 	rp = st->req->handle;
 
@@ -891,6 +900,16 @@ fc_set_fcode_error(dev_t dev, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 
 	st = fc_states + m;
 	ASSERT(m < fc_max_opens && FC_STATE_ACTIVE(st->state));
+
+	/*
+	 * It's an error if we're not in state FC_STATE_IN_PROGRESS.
+	 */
+	if (st->state != FC_STATE_IN_PROGRESS) {
+		cmn_err(CE_CONT,
+		    "fc_ioctl:fc_set_fcode_error: wrong state (%d)\n",
+		    st->state);
+		return (EINVAL);
+	}
 
 	ASSERT(st->req != NULL);
 	fp = st->req;
