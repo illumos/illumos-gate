@@ -65,8 +65,6 @@ extern "C" {
 
 #define	MAXLINE		(1088)		/* max len of detail line */
 
-#define	MAX_HDRTRAILER	(64)		/* max hdr/trailer packet slack */
-
 /*
  * The RPC XID cache structure.
  * When analyzing RPC protocols we
