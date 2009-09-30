@@ -5822,3 +5822,190 @@ stmfGetPersistMethod(uint8_t *persistType, boolean_t serviceState)
 
 	return (ret);
 }
+
+/*
+ * validateLunNumIoctl
+ *
+ * Purpose: Issues ioctl to check and get available lun# in view entry
+ *
+ * viewEntry - view entry to use
+ */
+static int
+validateLunNumIoctl(int fd, stmfViewEntry *viewEntry)
+{
+	int ret = STMF_STATUS_SUCCESS;
+	int ioctlRet;
+	stmf_iocdata_t stmfIoctl;
+	stmf_view_op_entry_t ioctlViewEntry;
+
+	bzero(&ioctlViewEntry, sizeof (ioctlViewEntry));
+	/*
+	 * don't set ve_ndx or ve_ndx_valid as ve_ndx_valid should be
+	 * false on input
+	 */
+	ioctlViewEntry.ve_lu_number_valid = viewEntry->luNbrValid;
+	ioctlViewEntry.ve_all_hosts = viewEntry->allHosts;
+	ioctlViewEntry.ve_all_targets = viewEntry->allTargets;
+
+	if (viewEntry->allHosts == B_FALSE) {
+		bcopy(viewEntry->hostGroup, &ioctlViewEntry.ve_host_group.name,
+		    sizeof (stmfGroupName));
+		ioctlViewEntry.ve_host_group.name_size =
+		    strlen((char *)viewEntry->hostGroup);
+	}
+	if (viewEntry->allTargets == B_FALSE) {
+		bcopy(viewEntry->targetGroup,
+		    &ioctlViewEntry.ve_target_group.name,
+		    sizeof (stmfGroupName));
+		ioctlViewEntry.ve_target_group.name_size =
+		    strlen((char *)viewEntry->targetGroup);
+	}
+	/* Validating the lun number */
+	if (viewEntry->luNbrValid) {
+		bcopy(viewEntry->luNbr, &ioctlViewEntry.ve_lu_nbr,
+		    sizeof (ioctlViewEntry.ve_lu_nbr));
+	}
+
+	bzero(&stmfIoctl, sizeof (stmfIoctl));
+	/*
+	 * Issue ioctl to validate lun# in the view entry
+	 */
+	stmfIoctl.stmf_version = STMF_VERSION_1;
+	stmfIoctl.stmf_ibuf_size = sizeof (ioctlViewEntry);
+	stmfIoctl.stmf_ibuf = (uint64_t)(unsigned long)&ioctlViewEntry;
+	stmfIoctl.stmf_obuf_size = sizeof (ioctlViewEntry);
+	stmfIoctl.stmf_obuf = (uint64_t)(unsigned long)&ioctlViewEntry;
+	ioctlRet = ioctl(fd, STMF_IOCTL_VALIDATE_VIEW, &stmfIoctl);
+
+	/* save available lun number */
+	if (!viewEntry->luNbrValid) {
+		bcopy(ioctlViewEntry.ve_lu_nbr, viewEntry->luNbr,
+		    sizeof (ioctlViewEntry.ve_lu_nbr));
+	}
+	if (ioctlRet != 0) {
+		switch (errno) {
+			case EBUSY:
+				ret = STMF_ERROR_BUSY;
+				break;
+			case EPERM:
+				ret = STMF_ERROR_PERM;
+				break;
+			case EACCES:
+				switch (stmfIoctl.stmf_error) {
+					case STMF_IOCERR_UPDATE_NEED_CFG_INIT:
+						ret = STMF_ERROR_CONFIG_NONE;
+						break;
+					default:
+						ret = STMF_ERROR_PERM;
+						break;
+				}
+				break;
+			default:
+				switch (stmfIoctl.stmf_error) {
+					case STMF_IOCERR_LU_NUMBER_IN_USE:
+						ret = STMF_ERROR_LUN_IN_USE;
+						break;
+					case STMF_IOCERR_VIEW_ENTRY_CONFLICT:
+						ret = STMF_ERROR_VE_CONFLICT;
+						break;
+					case STMF_IOCERR_UPDATE_NEED_CFG_INIT:
+						ret = STMF_ERROR_CONFIG_NONE;
+						break;
+					case STMF_IOCERR_INVALID_HG:
+						ret = STMF_ERROR_INVALID_HG;
+						break;
+					case STMF_IOCERR_INVALID_TG:
+						ret = STMF_ERROR_INVALID_TG;
+						break;
+					default:
+						syslog(LOG_DEBUG,
+						    "addViewEntryIoctl"
+						    ":error(%d)",
+						    stmfIoctl.stmf_error);
+						ret = STMF_STATUS_ERROR;
+						break;
+				}
+				break;
+		}
+	}
+	return (ret);
+}
+
+/*
+ * stmfValidateView
+ *
+ * Purpose: Validate or get lun # base on TG, HG of view entry
+ *
+ * viewEntry - view entry structure to use
+ */
+int
+stmfValidateView(stmfViewEntry *viewEntry)
+{
+	int ret;
+	int fd;
+	stmfViewEntry iViewEntry;
+
+	if (viewEntry == NULL) {
+		return (STMF_ERROR_INVALID_ARG);
+	}
+
+	/* initialize and set internal view entry */
+	bzero(&iViewEntry, sizeof (iViewEntry));
+
+	if (!viewEntry->allHosts) {
+		bcopy(viewEntry->hostGroup, iViewEntry.hostGroup,
+		    sizeof (iViewEntry.hostGroup));
+	} else {
+		iViewEntry.allHosts = B_TRUE;
+	}
+
+	if (!viewEntry->allTargets) {
+		bcopy(viewEntry->targetGroup, iViewEntry.targetGroup,
+		    sizeof (iViewEntry.targetGroup));
+	} else {
+		iViewEntry.allTargets = B_TRUE;
+	}
+
+	if (viewEntry->luNbrValid) {
+		iViewEntry.luNbrValid = B_TRUE;
+		bcopy(viewEntry->luNbr, iViewEntry.luNbr,
+		    sizeof (iViewEntry.luNbr));
+	}
+
+	/*
+	 * set users return view entry index valid flag to false
+	 * in case of failure
+	 */
+	viewEntry->veIndexValid = B_FALSE;
+
+	/* Check to ensure service exists */
+	if (psCheckService() != STMF_STATUS_SUCCESS) {
+		return (STMF_ERROR_SERVICE_NOT_FOUND);
+	}
+
+	/* call init */
+	ret = initializeConfig();
+	if (ret != STMF_STATUS_SUCCESS) {
+		return (ret);
+	}
+
+	/*
+	 * Open control node for stmf
+	 */
+	if ((ret = openStmf(OPEN_STMF, &fd)) != STMF_STATUS_SUCCESS)
+		return (ret);
+
+	/*
+	 * Validate lun# in the view entry from the driver
+	 */
+	ret = validateLunNumIoctl(fd, &iViewEntry);
+	(void) close(fd);
+
+	/* save available lun number */
+	if (!viewEntry->luNbrValid) {
+		bcopy(iViewEntry.luNbr, viewEntry->luNbr,
+		    sizeof (iViewEntry.luNbr));
+	}
+
+	return (ret);
+}

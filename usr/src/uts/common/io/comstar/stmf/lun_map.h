@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_LUN_MAP_H
@@ -153,6 +153,8 @@ int stmf_add_group(uint8_t *grpname, uint16_t grpname_size,
 int stmf_add_ve(uint8_t *hgname, uint16_t hgname_size, uint8_t *tgname,
 		uint16_t tgname_size, uint8_t *lu_guid, uint32_t *ve_id,
 		uint8_t *luNbr, uint32_t *err_detail);
+int stmf_validate_lun_ve(uint8_t *hgname, uint16_t hgname_size, uint8_t *tgname,
+		uint16_t tgname_size, uint8_t *luNbr, uint32_t *err_detail);
 int stmf_remove_ve_by_id(uint8_t *guid, uint32_t veid, uint32_t *err_detail);
 stmf_id_data_t *stmf_lookup_id(stmf_id_list_t *idlist, uint16_t id_size,
 		uint8_t *data);

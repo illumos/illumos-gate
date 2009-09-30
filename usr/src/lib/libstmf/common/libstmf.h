@@ -355,6 +355,7 @@ int stmfSetPersistMethod(uint8_t persistType, boolean_t serviceSet);
 int stmfSetProviderData(char *providerName, nvlist_t *nvl, int providerType);
 int stmfSetProviderDataProt(char *providerName, nvlist_t *nvl,
     int providerType, uint64_t *setToken);
+int stmfValidateView(stmfViewEntry *viewEntry);
 
 #ifdef	__cplusplus
 }

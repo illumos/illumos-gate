@@ -83,6 +83,7 @@ SUNW_1.1 {
 	    stmfSetProviderData;
 	    stmfSetProviderDataProt;
 	    stmfSetLuProp;
+	    stmfValidateView;
 	local:
 		*;
 };

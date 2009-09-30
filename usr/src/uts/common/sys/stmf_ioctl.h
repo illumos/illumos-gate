@@ -66,6 +66,7 @@ extern "C" {
 #define	STMF_IOCTL_REG_LU_LIST			(STMF_IOCTL | 32)
 #define	STMF_IOCTL_VE_LU_LIST			(STMF_IOCTL | 33)
 #define	STMF_IOCTL_LU_VE_LIST			(STMF_IOCTL | 34)
+#define	STMF_IOCTL_VALIDATE_VIEW		(STMF_IOCTL | 35)
 
 typedef	struct stmf_iocdata {
 	uint32_t	stmf_version;

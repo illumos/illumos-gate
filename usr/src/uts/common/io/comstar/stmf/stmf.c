@@ -887,6 +887,7 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		    grpname->name_size, idtype, &iocd->stmf_error);
 		mutex_exit(&stmf_state.stmf_lock);
 		break;
+	case STMF_IOCTL_VALIDATE_VIEW:
 	case STMF_IOCTL_ADD_VIEW_ENTRY:
 		if (stmf_state.stmf_config_state == STMF_CONFIG_NONE) {
 			ret = EACCES;
@@ -914,14 +915,23 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		else
 			veid = 0xffffffff;
 		mutex_enter(&stmf_state.stmf_lock);
-		ret = stmf_add_ve(ve->ve_host_group.name,
-		    ve->ve_host_group.name_size,
-		    ve->ve_target_group.name,
-		    ve->ve_target_group.name_size,
-		    ve->ve_guid,
-		    &veid,
-		    ve->ve_lu_nbr,
-		    &iocd->stmf_error);
+		if (cmd == STMF_IOCTL_ADD_VIEW_ENTRY) {
+			ret = stmf_add_ve(ve->ve_host_group.name,
+			    ve->ve_host_group.name_size,
+			    ve->ve_target_group.name,
+			    ve->ve_target_group.name_size,
+			    ve->ve_guid,
+			    &veid,
+			    ve->ve_lu_nbr,
+			    &iocd->stmf_error);
+		} else {  /* STMF_IOCTL_VALIDATE_VIEW */
+			ret = stmf_validate_lun_ve(ve->ve_host_group.name,
+			    ve->ve_host_group.name_size,
+			    ve->ve_target_group.name,
+			    ve->ve_target_group.name_size,
+			    ve->ve_lu_nbr,
+			    &iocd->stmf_error);
+		}
 		mutex_exit(&stmf_state.stmf_lock);
 		if (ret == 0 &&
 		    (!ve->ve_ndx_valid || !ve->ve_lu_number_valid) &&

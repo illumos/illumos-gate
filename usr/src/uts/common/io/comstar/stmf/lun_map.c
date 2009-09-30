@@ -1668,3 +1668,90 @@ stmf_get_ve_map_per_ids(stmf_id_data_t *tgid, stmf_id_data_t *hgid)
 	}
 	return (NULL);
 }
+
+stmf_status_t
+stmf_validate_lun_view_entry(stmf_id_data_t *hg, stmf_id_data_t *tg,
+    uint8_t *lun, uint32_t *err_detail)
+{
+	char			*phg, *ptg;
+	stmf_lun_map_t		*ve_map = NULL;
+	stmf_ver_hg_t		*verhg = NULL;
+	stmf_ver_tg_t		*vertg = NULL;
+	uint16_t		lun_num;
+	stmf_status_t		ret = STMF_SUCCESS;
+
+	ASSERT(mutex_owned(&stmf_state.stmf_lock));
+
+	ve_map = stmf_duplicate_ve_map(0);
+	for (vertg = stmf_state.stmf_ver_tg_head; vertg != NULL;
+	    vertg = vertg->vert_next) {
+		ptg = (char *)vertg->vert_tg_ref->id_data;
+		if ((ptg[0] != '*') && (tg->id_data[0] != '*') &&
+		    (vertg->vert_tg_ref != tg)) {
+			continue;
+		}
+		for (verhg = vertg->vert_verh_list; verhg != NULL;
+		    verhg = verhg->verh_next) {
+			phg = (char *)verhg->verh_hg_ref->id_data;
+			if ((phg[0] != '*') && (hg->id_data[0] != '*') &&
+			    (verhg->verh_hg_ref != hg)) {
+				continue;
+			}
+			(void) stmf_merge_ve_map(&verhg->verh_ve_map, ve_map,
+			    &ve_map, 0);
+		}
+	}
+
+	ret = STMF_SUCCESS;
+	/* Return an available lun number */
+	if (lun[2] == 0xFF) {
+		/* Pick a LUN number */
+		lun_num = stmf_get_next_free_lun(ve_map, lun);
+		if (lun_num > 0x3FFF)
+			ret = STMF_NOT_SUPPORTED;
+	} else {
+		lun_num = (uint16_t)lun[1] | (((uint16_t)(lun[0] & 0x3F)) << 8);
+		if (stmf_get_ent_from_map(ve_map, lun_num) != NULL) {
+			*err_detail = STMF_IOCERR_LU_NUMBER_IN_USE;
+			ret = STMF_LUN_TAKEN;
+		}
+	}
+	stmf_destroy_ve_map(ve_map);
+
+	return (ret);
+}
+
+int
+stmf_validate_lun_ve(uint8_t *hgname, uint16_t hgname_size,
+		uint8_t *tgname, uint16_t tgname_size,
+		uint8_t *luNbr, uint32_t *err_detail)
+{
+	stmf_id_data_t		*hg;
+	stmf_id_data_t		*tg;
+	stmf_status_t		ret;
+
+	ASSERT(mutex_owned(&stmf_state.stmf_lock));
+
+	hg = stmf_lookup_id(&stmf_state.stmf_hg_list, hgname_size,
+	    (uint8_t *)hgname);
+	if (!hg) {
+		*err_detail = STMF_IOCERR_INVALID_HG;
+		return (ENOENT); /* could not find group */
+	}
+	tg = stmf_lookup_id(&stmf_state.stmf_tg_list, tgname_size,
+	    (uint8_t *)tgname);
+	if (!tg) {
+		*err_detail = STMF_IOCERR_INVALID_TG;
+		return (ENOENT); /* could not find group */
+	}
+	ret = stmf_validate_lun_view_entry(hg, tg, luNbr, err_detail);
+
+	if (ret == STMF_LUN_TAKEN) {
+		return (EEXIST);
+	} else if (ret == STMF_NOT_SUPPORTED) {
+		return (E2BIG);
+	} else if (ret != STMF_SUCCESS) {
+		return (EINVAL);
+	}
+	return (0);
+}
