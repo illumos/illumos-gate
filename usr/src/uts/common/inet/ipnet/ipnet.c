@@ -1428,6 +1428,14 @@ ipnet_add_ifaddr(uint64_t lif, ipnetif_t *ipnetif, net_handle_t nd)
 		break;
 	}
 
+	/*
+	 * The zoneid stored in ipnetif_t needs to correspond to the actual
+	 * zone the address is being used in. This facilitates finding the
+	 * correct netstack_t pointer, amongst other things, later.
+	 */
+	if (zoneid == ALL_ZONES)
+		zoneid = GLOBAL_ZONEID;
+
 	mutex_enter(&ipnetif->if_addr_lock);
 	if (zoneid != ipnetif->if_zoneid) {
 		ipnetif_t *ifp2;
