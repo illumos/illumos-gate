@@ -13,6 +13,7 @@ dladm
 smmsp
 listen
 gdm
+xvm
 mysql
 openldap
 webservd
