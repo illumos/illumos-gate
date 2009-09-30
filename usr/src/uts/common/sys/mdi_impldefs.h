@@ -342,7 +342,7 @@ typedef struct mdi_phci {
 	struct mdi_phci		*ph_next;	/* next pHCI link	*/
 	struct mdi_phci		*ph_prev;	/* prev pHCI link	*/
 	dev_info_t		*ph_dip;	/* pHCI devi handle	*/
-	struct mdi_vhci 	*ph_vhci;	/* pHCI back ref. to vHCI */
+	struct mdi_vhci		*ph_vhci;	/* pHCI back ref. to vHCI */
 
 	/* protected by MDI_PHCI_LOCK ph_mutex... */
 	kmutex_t		ph_mutex;	/* per-pHCI mutex	*/
@@ -398,7 +398,7 @@ typedef struct mdi_phci {
 #define	MDI_PHCI_IS_READY(ph)						\
 	    (((ph)->ph_flags & MDI_PHCI_DISABLE_MASK) == 0)
 
-#define	MDI_PHCI_SET_OFFLINE(ph) 					{\
+#define	MDI_PHCI_SET_OFFLINE(ph)					{\
 	    ASSERT(MDI_PHCI_LOCKED(ph));				\
 	    (ph)->ph_flags |= MDI_PHCI_FLAGS_OFFLINE;			}
 #define	MDI_PHCI_SET_ONLINE(ph)						{\
@@ -407,7 +407,7 @@ typedef struct mdi_phci {
 #define	MDI_PHCI_IS_OFFLINE(ph)						\
 	    ((ph)->ph_flags & MDI_PHCI_FLAGS_OFFLINE)
 
-#define	MDI_PHCI_SET_SUSPEND(ph) 					{\
+#define	MDI_PHCI_SET_SUSPEND(ph)					{\
 	    ASSERT(MDI_PHCI_LOCKED(ph));				\
 	    (ph)->ph_flags |= MDI_PHCI_FLAGS_SUSPEND;			}
 #define	MDI_PHCI_SET_RESUME(ph)						{\
@@ -501,7 +501,7 @@ typedef struct mdi_phci {
  * OPTIMAL	- Client device has at least one redundant path.
  * DEGRADED	- No redundant paths (critical).  Failure in the current active
  *		  path would result in data access failures.
- * FAILED 	- No paths are available to access this device.
+ * FAILED	- No paths are available to access this device.
  *
  * Locking order:
  *
@@ -517,7 +517,7 @@ typedef struct mdi_client {
 	char			*ct_drvname;	/* client driver name	*/
 	char			*ct_guid;	/* client guid		*/
 	client_lb_t		ct_lb;		/* load balancing scheme */
-	client_lb_args_t	*ct_lb_args; 	/* load balancing args */
+	client_lb_args_t	*ct_lb_args;	/* load balancing args */
 
 
 	/* protected by MDI_CLIENT_LOCK ct_mutex... */
@@ -726,8 +726,9 @@ struct mdi_pathinfo {
 	kcondvar_t		pi_ref_cv;	/* condition variable	*/
 	struct mdi_pi_kstats	*pi_kstats;	/* aggregate kstats */
 	int			pi_pm_held;	/* phci's kidsup incremented */
-	int			pi_preferred;	/* Preferred path 	*/
+	int			pi_preferred;	/* Preferred path	*/
 	void			*pi_vprivate;	/* vhci private info	*/
+	uint_t			pi_flags;	/* path flags */
 };
 
 /*
@@ -958,6 +959,26 @@ struct pi_errs {
 
 #define	MDI_PI_IS_SUSPENDED(pip)					\
 	((MDI_PI(pip))->pi_phci->ph_flags & MDI_PHCI_FLAGS_SUSPEND)
+
+#define	MDI_PI_FLAGS_SET_HIDDEN(pip)					{\
+	ASSERT(MDI_PI_LOCKED(pip));					\
+	MDI_PI(pip)->pi_flags |= MDI_PATHINFO_FLAGS_HIDDEN;		}
+#define	MDI_PI_FLAGS_CLR_HIDDEN(pip)					{\
+	ASSERT(MDI_PI_LOCKED(pip));					\
+	MDI_PI(pip)->pi_flags &= ~MDI_PATHINFO_FLAGS_HIDDEN;		}
+#define	MDI_PI_FLAGS_IS_HIDDEN(pip)					\
+	((MDI_PI(pip)->pi_flags & MDI_PATHINFO_FLAGS_HIDDEN) ==		\
+	MDI_PATHINFO_FLAGS_HIDDEN)
+
+#define	MDI_PI_FLAGS_SET_DEVICE_REMOVED(pip)				{\
+	ASSERT(MDI_PI_LOCKED(pip));					\
+	MDI_PI(pip)->pi_flags |= MDI_PATHINFO_FLAGS_DEVICE_REMOVED;	}
+#define	MDI_PI_FLAGS_CLR_DEVICE_REMOVED(pip)				{\
+	ASSERT(MDI_PI_LOCKED(pip));					\
+	MDI_PI(pip)->pi_flags &= ~MDI_PATHINFO_FLAGS_DEVICE_REMOVED;	}
+#define	MDI_PI_FLAGS_IS_DEVICE_REMOVED(pip)				\
+	((MDI_PI(pip)->pi_flags & MDI_PATHINFO_FLAGS_DEVICE_REMOVED) ==	\
+	MDI_PATHINFO_FLAGS_DEVICE_REMOVED)
 
 /*
  * mdi_vhcache_client, mdi_vhcache_pathinfo, and mdi_vhcache_phci structures

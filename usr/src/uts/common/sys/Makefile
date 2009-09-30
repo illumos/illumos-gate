@@ -142,6 +142,8 @@ CHKHDRS=			\
 	cyclic_impl.h		\
 	dacf.h			\
 	dacf_impl.h		\
+	damap.h		\
+	damap_impl.h		\
 	dc_ki.h			\
 	ddi.h			\
 	ddifm.h			\

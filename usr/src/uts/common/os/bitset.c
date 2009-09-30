@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -259,4 +259,81 @@ bitset_find(bitset_t *b)
 	} while (i != start);
 
 	return (elt);
+}
+
+/*
+ * AND, OR, and XOR bitset computations
+ * Returns 1 if resulting bitset has any set bits
+ */
+int
+bitset_and(bitset_t *bs1, bitset_t *bs2, bitset_t *res)
+{
+	int i, anyset;
+
+	for (anyset = 0, i = 0; i < bs1->bs_words; i++) {
+		if ((res->bs_set[i] = (bs1->bs_set[i] & bs2->bs_set[i])) != 0)
+			anyset = 1;
+	}
+	return (anyset);
+}
+
+int
+bitset_or(bitset_t *bs1, bitset_t *bs2, bitset_t *res)
+{
+	int i, anyset;
+
+	for (anyset = 0, i = 0; i < bs1->bs_words; i++) {
+		if ((res->bs_set[i] = (bs1->bs_set[i] | bs2->bs_set[i])) != 0)
+			anyset = 1;
+	}
+	return (anyset);
+}
+
+int
+bitset_xor(bitset_t *bs1, bitset_t *bs2, bitset_t *res)
+{
+	int i;
+	int anyset = 0;
+
+	for (i = 0; i < bs1->bs_words; i++) {
+		if ((res->bs_set[i] = (bs1->bs_set[i] ^ bs2->bs_set[i])) != 0)
+			anyset = 1;
+	}
+	return (anyset);
+}
+
+/*
+ * return 1 if bitmaps are identical
+ */
+int
+bitset_match(bitset_t *bs1, bitset_t *bs2)
+{
+	int i;
+
+	if (bs1->bs_words != bs2->bs_words)
+		return (0);
+
+	for (i = 0; i < bs1->bs_words; i++)
+		if (bs1->bs_set[i] != bs2->bs_set[i])
+			return (0);
+	return (1);
+}
+
+/*
+ * Zero a bitset_t
+ */
+void
+bitset_zero(bitset_t *b)
+{
+	bzero(b->bs_set, sizeof (ulong_t) * b->bs_words);
+}
+
+
+/*
+ * Copy a bitset_t
+ */
+void
+bitset_copy(bitset_t *src, bitset_t *dest)
+{
+	bcopy(src->bs_set, dest->bs_set, sizeof (ulong_t) * src->bs_words);
 }

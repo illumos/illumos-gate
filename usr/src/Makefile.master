@@ -132,6 +132,7 @@ NM=		/usr/ccs/bin/nm
 DIFF=		/usr/bin/diff
 GREP=		/usr/bin/grep
 EGREP=		/usr/bin/egrep
+ELFWRAP=	/usr/bin/elfwrap
 KSH93=		/usr/bin/ksh93
 SED=		/usr/bin/sed
 NAWK=		/usr/bin/nawk
@@ -536,6 +537,12 @@ CCFLAGS=	$(CCOPTFLAG) $($(MACH)_CCFLAGS)
 CCFLAGS64=	$(CCOPTFLAG64) $($(MACH64)_CCFLAGS)
 
 #
+#
+#
+ELFWRAP_FLAGS	=	
+ELFWRAP_FLAGS64	=	-64
+
+#
 # Various mapfiles that are used throughout the build, and delivered to
 # /usr/lib/ld.
 #
@@ -593,6 +600,8 @@ COMPILE.s=	$(AS) $(ASFLAGS) $(AS_CPPFLAGS)
 COMPILE64.s=	$(AS) $(ASFLAGS) $($(MACH64)_AS_XARCH) $(AS_CPPFLAGS)
 COMPILE.d=	$(DTRACE) -G -32
 COMPILE64.d=	$(DTRACE) -G -64
+COMPILE.b=	$(ELFWRAP) $(ELFWRAP_FLAGS$(CLASS))
+COMPILE64.b=	$(ELFWRAP) $(ELFWRAP_FLAGS$(CLASS))
 
 CLASSPATH=	.
 COMPILE.java=	$(JAVAC) $(JAVAFLAGS) -classpath $(CLASSPATH)
@@ -971,6 +980,10 @@ PKGARCHIVE=$(SRC)/../../packages/$(MACH)/nightly$(PKGARCHIVESUFFIX)
 	$(COMPILE.c) -o $@ $*.c $(CTFCONVERT_HOOK)
 	$(POST_PROCESS_O)
 	$(RM) $*.c
+
+.bin.o:
+	$(COMPILE.b) -o $@ $<
+	$(POST_PROCESS_O)
 
 .java.class:
 	$(COMPILE.java) $<

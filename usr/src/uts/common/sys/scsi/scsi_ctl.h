@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_SCSI_CTL_H
 #define	_SYS_SCSI_SCSI_CTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/scsi/scsi_types.h>
 
@@ -54,12 +51,6 @@ extern "C" {
  */
 #define	SCSI_RESET_NOTIFY	0x01	/* register the reset notification */
 #define	SCSI_RESET_CANCEL	0x02	/* cancel the reset notification */
-
-/*
- * Define for scsi_get_bus_addr/scsi_get_name first argument.
- */
-#define	SCSI_GET_INITIATOR_ID	((struct scsi_device *)NULL)
-					/* return initiator-id */
 
 /*
  * Define for scsi_get_name string length.
@@ -98,9 +89,8 @@ int	scsi_terminate_task(struct scsi_address *ap, struct scsi_pkt *pkt);
  * Other functions
  */
 int	scsi_clear_aca(struct scsi_address *ap);
-int	scsi_get_bus_addr(struct scsi_device *devp, char *name, int len);
-int	scsi_get_name(struct scsi_device *devp, char *name, int len);
-
+int	scsi_ua_get_reportdev(struct scsi_device *sd, char *ba, int len);
+int	scsi_ua_get(struct scsi_device *sd, char *ua, int len);
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

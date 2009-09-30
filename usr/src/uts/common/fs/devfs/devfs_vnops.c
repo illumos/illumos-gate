@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * vnode ops for the devfs
@@ -59,7 +57,7 @@
 #include <sys/debug.h>
 #include <sys/policy.h>
 #include <sys/modctl.h>
-
+#include <sys/sunndi.h>
 #include <fs/fs_subr.h>
 #include <sys/fs/dv_node.h>
 
@@ -960,13 +958,23 @@ devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp,
 	diroff++;
 	for (dv = DV_FIRST_ENTRY(ddv); dv;
 	    dv = DV_NEXT_ENTRY(ddv, dv), diroff++) {
+		/* skip entries until at correct directory offset */
+		if (diroff < soff)
+			continue;
+
 		/*
-		 * although DDM_INTERNAL_PATH minor nodes are skipped for
-		 * readdirs outside the kernel, they still occupy directory
-		 * offsets
+		 * hidden nodes are skipped (but they still occupy a
+		 * directory offset).
 		 */
-		if (diroff < soff ||
-		    ((dv->dv_flags & DV_INTERNAL) && (cred != kcred)))
+		if (dv->dv_devi && ndi_dev_is_hidden_node(dv->dv_devi))
+			continue;
+
+		/*
+		 * DDM_INTERNAL_PATH minor nodes are skipped for readdirs
+		 * outside the kernel (but they still occupy a directory
+		 * offset).
+		 */
+		if ((dv->dv_flags & DV_INTERNAL) && (cred != kcred))
 			continue;
 
 		reclen = DIRENT64_RECLEN(strlen(dv->dv_name));

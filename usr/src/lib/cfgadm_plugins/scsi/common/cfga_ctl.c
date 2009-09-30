@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "cfga_scsi.h"
 
@@ -299,44 +297,54 @@ dev_change_state(
 			break;
 		}
 
-		/* When unconfiguring a device, first offline it through RCM. */
-		if ((apidp->flags & FLAG_DISABLE_RCM) == 0) {
-			if (cmd == SCFGA_DEV_UNCONFIGURE) {
-				dev_list[0] = get_node_path(apidp->path);
-				if (dev_list[0] == NULL) {
-					ret = SCFGA_ERR;
-					break;
-				}
-				if ((ret = scsi_rcm_offline(dev_list,
-				    errstring, flags)) != SCFGA_OK) {
-					break;
+		if (apidp->dyntype == PATH_APID) {
+			/* call a scsi_vhci ioctl to do online/offline path. */
+			ret = path_apid_state_change(apidp, cmd,
+			    flags, errstring, &l_errno, errid);
+		} else {
+			/*
+			 * When unconfiguring a device, first offline it
+			 * through RCM.
+			 */
+			if ((apidp->flags & FLAG_DISABLE_RCM) == 0) {
+				if (cmd == SCFGA_DEV_UNCONFIGURE) {
+					dev_list[0] =
+					    get_node_path(apidp->path);
+					if (dev_list[0] == NULL) {
+						ret = SCFGA_ERR;
+						break;
+					}
+					if ((ret = scsi_rcm_offline(dev_list,
+					    errstring, flags)) != SCFGA_OK) {
+						break;
+					}
 				}
 			}
-		}
 
-		ret = devctl_cmd(apidp->path, cmd, NULL, &l_errno);
-		if (ret != SCFGA_OK) {
-			cfga_err(errstring, l_errno, errid, 0);
+			ret = devctl_cmd(apidp->path, cmd, NULL, &l_errno);
+			if (ret != SCFGA_OK) {
+				cfga_err(errstring, l_errno, errid, 0);
 
 			/*
 			 * If an unconfigure fails, cancel the RCM offline.
 			 * Discard any RCM failures so that the devctl
 			 * failure will still be reported.
 			 */
-			if ((apidp->flags & FLAG_DISABLE_RCM) == 0) {
-				if (cmd == SCFGA_DEV_UNCONFIGURE)
-					(void) scsi_rcm_online(dev_list,
-					    errstring, flags);
+				if ((apidp->flags & FLAG_DISABLE_RCM) == 0) {
+					if (cmd == SCFGA_DEV_UNCONFIGURE)
+						(void) scsi_rcm_online(dev_list,
+						    errstring, flags);
+				}
+				break;
 			}
-			break;
-		}
-		if ((apidp->flags & FLAG_DISABLE_RCM) == 0) {
+			if ((apidp->flags & FLAG_DISABLE_RCM) == 0) {
 			/*
 			 * Unconfigure succeeded, call the RCM notify_remove.
 			 */
-			if (cmd == SCFGA_DEV_UNCONFIGURE)
-				(void) scsi_rcm_remove(dev_list,
+				if (cmd == SCFGA_DEV_UNCONFIGURE)
+					(void) scsi_rcm_remove(dev_list,
 					    errstring, flags);
+			}
 		}
 		break;
 

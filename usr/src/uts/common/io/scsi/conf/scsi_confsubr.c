@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,11 +39,11 @@
  * macro for filling in lun value for scsi-1 support
  */
 
-#define	FILL_SCSI1_LUN(devp, pkt) \
-	if ((devp->sd_address.a_lun > 0) && \
-	    (devp->sd_inq->inq_ansi == 0x1)) { \
+#define	FILL_SCSI1_LUN(sd, pkt) \
+	if ((sd->sd_address.a_lun > 0) && \
+	    (sd->sd_inq->inq_ansi == 0x1)) { \
 		((union scsi_cdb *)(pkt)->pkt_cdbp)->scc_lun = \
-		    devp->sd_address.a_lun; \
+		    sd->sd_address.a_lun; \
 	}
 
 extern struct mod_ops mod_miscops;
@@ -63,6 +63,12 @@ static int get_inquiry_prop_len(char *, size_t);
 static int scsi_check_ss2_LUN_limit(struct scsi_device *);
 static void scsi_establish_LUN_limit(struct scsi_device *);
 static void scsi_update_parent_ss2_prop(dev_info_t *, int, int);
+
+static int check_vpd_page_support8083(struct scsi_device *sd,
+		int (*callback)(), int *, int *);
+static int send_scsi_INQUIRY(struct scsi_device *sd,
+		int (*callback)(), uchar_t *bufaddr, size_t buflen,
+		uchar_t evpd, uchar_t page_code, size_t *lenp);
 
 /*
  * this int-array HBA-node property keeps track of strictly SCSI-2
@@ -209,10 +215,10 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-#define	ROUTE	(&devp->sd_address)
+#define	ROUTE	(&sd->sd_address)
 
 static int
-scsi_slave_do_rqsense(struct scsi_device *devp, int (*callback)())
+scsi_slave_do_rqsense(struct scsi_device *sd, int (*callback)())
 {
 	struct scsi_pkt *rq_pkt = NULL;
 	struct buf *rq_bp = NULL;
@@ -243,7 +249,7 @@ scsi_slave_do_rqsense(struct scsi_device *devp, int (*callback)())
 
 	(void) scsi_setup_cdb((union scsi_cdb *)rq_pkt->
 	    pkt_cdbp, SCMD_REQUEST_SENSE, 0, SENSE_LENGTH, 0);
-	FILL_SCSI1_LUN(devp, rq_pkt);
+	FILL_SCSI1_LUN(sd, rq_pkt);
 	rq_pkt->pkt_flags = FLAG_NOINTR|FLAG_NOPARITY|FLAG_SENSING;
 
 	/*
@@ -275,11 +281,11 @@ out:
  *
  * SCSI slave probe routine - provided as a service to target drivers
  *
- * Mostly attempts to allocate and fill devp inquiry data..
+ * Mostly attempts to allocate and fill sd inquiry data..
  */
 
 int
-scsi_slave(struct scsi_device *devp, int (*callback)())
+scsi_slave(struct scsi_device *sd, int (*callback)())
 {
 	struct scsi_pkt	*pkt;
 	int		rval = SCSIPROBE_EXISTS;
@@ -298,7 +304,7 @@ scsi_slave(struct scsi_device *devp, int (*callback)())
 
 	(void) scsi_setup_cdb((union scsi_cdb *)pkt->pkt_cdbp,
 	    SCMD_TEST_UNIT_READY, 0, 0, 0);
-	FILL_SCSI1_LUN(devp, pkt);
+	FILL_SCSI1_LUN(sd, pkt);
 	pkt->pkt_flags = FLAG_NOINTR|FLAG_NOPARITY;
 
 	if (scsi_poll(pkt) < 0) {
@@ -313,7 +319,7 @@ scsi_slave(struct scsi_device *devp, int (*callback)())
 				 * scanner and processor devices can return a
 				 * check condition here
 				 */
-				rval = scsi_slave_do_rqsense(devp, callback);
+				rval = scsi_slave_do_rqsense(sd, callback);
 		}
 
 		if (rval != SCSIPROBE_EXISTS) {
@@ -338,18 +344,19 @@ scsi_slave(struct scsi_device *devp, int (*callback)())
 	 */
 	if ((pkt->pkt_state & STATE_ARQ_DONE) == 0) {
 		if (((struct scsi_status *)pkt->pkt_scbp)->sts_chk) {
-			rval = scsi_slave_do_rqsense(devp, callback);
+			rval = scsi_slave_do_rqsense(sd, callback);
 		}
 	}
 
 	/*
 	 * call scsi_probe to do the inquiry
-	 * XXX there is minor difference with the old scsi_slave implementation:
-	 * busy conditions are not handled in scsi_probe.
+	 *
+	 * NOTE: there is minor difference with the old scsi_slave
+	 * implementation: busy conditions are not handled in scsi_probe.
 	 */
 	scsi_destroy_pkt(pkt);
 	if (rval == SCSIPROBE_EXISTS) {
-		return (scsi_probe(devp, callback));
+		return (scsi_probe(sd, callback));
 	} else {
 		return (rval);
 	}
@@ -363,7 +370,7 @@ scsi_slave(struct scsi_device *devp, int (*callback)())
  */
 /*ARGSUSED*/
 void
-scsi_unslave(struct scsi_device *devp)
+scsi_unslave(struct scsi_device *sd)
 {
 }
 
@@ -375,7 +382,7 @@ scsi_unslave(struct scsi_device *devp)
  */
 /*ARGSUSED*/
 void
-scsi_unprobe(struct scsi_device *devp)
+scsi_unprobe(struct scsi_device *sd)
 {
 }
 
@@ -445,12 +452,12 @@ exit:
  * intact.
  */
 int
-scsi_probe(struct scsi_device *devp, int (*callback)())
+scsi_probe(struct scsi_device *sd, int (*callback)())
 {
-	int ret;
-	scsi_hba_tran_t		*tran = devp->sd_address.a_hba_tran;
+	int			ret;
+	scsi_hba_tran_t		*tran = sd->sd_address.a_hba_tran;
 
-	if (scsi_check_ss2_LUN_limit(devp) != 0) {
+	if (scsi_check_ss2_LUN_limit(sd) != 0) {
 		/*
 		 * caller is trying to probe a strictly-SCSI-2 device
 		 * with a LUN that is too large, so do not allow it
@@ -459,32 +466,43 @@ scsi_probe(struct scsi_device *devp, int (*callback)())
 	}
 
 	if (tran->tran_tgt_probe != NULL) {
-		ret = (*tran->tran_tgt_probe)(devp, callback);
+		ret = (*tran->tran_tgt_probe)(sd, callback);
 	} else {
-		ret = scsi_hba_probe(devp, callback);
+		ret = scsi_hba_probe(sd, callback);
 	}
 
 	if (ret == SCSIPROBE_EXISTS) {
-		create_inquiry_props(devp);
+		create_inquiry_props(sd);
 		/* is this a strictly-SCSI-2 node ?? */
-		scsi_establish_LUN_limit(devp);
+		scsi_establish_LUN_limit(sd);
 	}
 
 	return (ret);
 }
+/*
+ * probe scsi device using any available path
+ *
+ */
+int
+scsi_hba_probe(struct scsi_device *sd, int (*callback)())
+{
+	return (scsi_hba_probe_pi(sd, callback, 0));
+}
 
 /*
- * scsi_hba_probe does not do any test unit ready's which access the medium
+ * probe scsi device using specific path
+ *
+ * scsi_hba_probe_pi does not do any test unit ready's which access the medium
  * and could cause busy or not ready conditions.
- * scsi_hba_probe does 2 inquiries and a rqsense to clear unit attention
+ * scsi_hba_probe_pi does 2 inquiries and a rqsense to clear unit attention
  * and to allow sync negotiation to take place
- * finally, scsi_hba_probe does one more inquiry which should
+ * finally, scsi_hba_probe_pi does one more inquiry which should
  * reliably tell us what kind of target we have.
  * A scsi-2 compliant target should be able to	return inquiry with 250ms
  * and we actually wait more than a second after reset.
  */
 int
-scsi_hba_probe(struct scsi_device *devp, int (*callback)())
+scsi_hba_probe_pi(struct scsi_device *sd, int (*callback)(), int pi)
 {
 	struct scsi_pkt		*inq_pkt = NULL;
 	struct scsi_pkt		*rq_pkt = NULL;
@@ -494,11 +512,11 @@ scsi_hba_probe(struct scsi_device *devp, int (*callback)())
 	int			(*cb_flag)();
 	int			pass = 1;
 
-	if (devp->sd_inq == NULL) {
-		devp->sd_inq = (struct scsi_inquiry *)
+	if (sd->sd_inq == NULL) {
+		sd->sd_inq = (struct scsi_inquiry *)
 		    kmem_alloc(SUN_INQSIZE, ((callback == SLEEP_FUNC) ?
 		    KM_SLEEP : KM_NOSLEEP));
-		if (devp->sd_inq == NULL) {
+		if (sd->sd_inq == NULL) {
 			goto out;
 		}
 	}
@@ -529,6 +547,14 @@ scsi_hba_probe(struct scsi_device *devp, int (*callback)())
 	inq_pkt->pkt_flags = FLAG_NOINTR|FLAG_NOPARITY;
 
 	/*
+	 * set transport path
+	 */
+	if (pi && scsi_pkt_allocated_correctly(inq_pkt)) {
+		inq_pkt->pkt_path_instance = pi;
+		inq_pkt->pkt_flags |= FLAG_PKT_PATH_INSTANCE;
+	}
+
+	/*
 	 * the first inquiry will tell us whether a target
 	 * responded
 	 *
@@ -537,8 +563,8 @@ scsi_hba_probe(struct scsi_device *devp, int (*callback)())
 	 * incorrect after we have real sd_inq data (for lun0) we will do a
 	 * second pass during which FILL_SCSI1_LUN will place lun in CDB.
 	 */
-	bzero((caddr_t)devp->sd_inq, SUN_INQSIZE);
-again:	FILL_SCSI1_LUN(devp, inq_pkt);
+	bzero((caddr_t)sd->sd_inq, SUN_INQSIZE);
+again:	FILL_SCSI1_LUN(sd, inq_pkt);
 
 	if (scsi_test(inq_pkt) < 0) {
 		if (inq_pkt->pkt_reason == CMD_INCOMPLETE) {
@@ -614,8 +640,16 @@ again:	FILL_SCSI1_LUN(devp, inq_pkt);
 
 			(void) scsi_setup_cdb((union scsi_cdb *)rq_pkt->
 			    pkt_cdbp, SCMD_REQUEST_SENSE, 0, SENSE_LENGTH, 0);
-			FILL_SCSI1_LUN(devp, rq_pkt);
+			FILL_SCSI1_LUN(sd, rq_pkt);
 			rq_pkt->pkt_flags = FLAG_NOINTR|FLAG_NOPARITY;
+
+			/*
+			 * set transport path
+			 */
+			if (pi && scsi_pkt_allocated_correctly(rq_pkt)) {
+				rq_pkt->pkt_path_instance = pi;
+				rq_pkt->pkt_flags |= FLAG_PKT_PATH_INSTANCE;
+			}
 
 			/*
 			 * The FILL_SCSI1_LUN above will find "inq_ansi != 1"
@@ -698,7 +732,7 @@ done:
 	} else {
 		ASSERT(inq_pkt->pkt_resid >= 0);
 		bcopy((caddr_t)inq_bp->b_un.b_addr,
-		    (caddr_t)devp->sd_inq, (SUN_INQSIZE - inq_pkt->pkt_resid));
+		    (caddr_t)sd->sd_inq, (SUN_INQSIZE - inq_pkt->pkt_resid));
 		rval = SCSIPROBE_EXISTS;
 	}
 
@@ -708,9 +742,9 @@ out:
 	 * the "real" lun needs to be embedded into the cdb.
 	 */
 	if ((rval == SCSIPROBE_EXISTS) && (pass == 1) &&
-	    (devp->sd_address.a_lun > 0) && (devp->sd_inq->inq_ansi == 0x1)) {
+	    (sd->sd_address.a_lun > 0) && (sd->sd_inq->inq_ansi == 0x1)) {
 		pass++;
-		if (devp->sd_address.a_lun <= 7)
+		if (sd->sd_address.a_lun <= 7)
 			goto again;
 
 		/*
@@ -739,70 +773,171 @@ out:
  * Convert from a scsi_device structure pointer to a scsi_hba_tran structure
  * pointer. The correct way to do this is
  *
- *	#define	DEVP_TO_TRAN(devp)	((devp)->sd_address.a_hba_tran)
+ *	#define	DEVP_TO_TRAN(sd)	((sd)->sd_address.a_hba_tran)
  *
  * however we have some consumers that place their own vector in a_hba_tran. To
  * avoid problems, we implement this using the sd_tran_safe. See
  * scsi_hba_initchild for more details.
  */
-#define	DEVP_TO_TRAN(devp)	((devp)->sd_tran_safe)
+#define	DEVP_TO_TRAN(sd)	((sd)->sd_tran_safe)
 
 /*
- * Function to get human readable REPORTDEV addressing information from
- * scsi address structure for SPI when tran_get_bus_addr is not implemented.
+ * Function, callable from SCSA framework, to get 'human' readable REPORTDEV
+ * addressing information from scsi_device properties.
  */
 int
-scsi_get_bus_addr(struct scsi_device *devp, char *ba, int len)
+scsi_ua_get_reportdev(struct scsi_device *sd, char *ra, int len)
 {
-	struct scsi_address	*ap;
+	/* use deprecated tran_get_bus_addr interface if it is defined */
+	/* NOTE: tran_get_bus_addr is a poor name choice for interface */
+	if (DEVP_TO_TRAN(sd)->tran_get_bus_addr)
+		return ((*DEVP_TO_TRAN(sd)->tran_get_bus_addr)(sd, ra, len));
+	return (scsi_hba_ua_get_reportdev(sd, ra, len));
+}
 
-	/* use tran_get_bus_addr interface if it is defined */
-	if (DEVP_TO_TRAN(devp)->tran_get_bus_addr)
-		return ((*DEVP_TO_TRAN(devp)->tran_get_bus_addr)
-		    (devp, ba, len));
+/*
+ * Function, callable from HBA driver's tran_get_bus_addr(9E) implementation,
+ * to get standard form of human readable REPORTDEV addressing information
+ * from scsi_device properties.
+ */
+int
+scsi_hba_ua_get_reportdev(struct scsi_device *sd, char *ra, int len)
+{
+	int		tgt, lun, sfunc;
+	char		*tgt_port;
+	scsi_lun64_t	lun64;
 
-	ap = &devp->sd_address;
-	(void) snprintf(ba, len, "target %x lun %x", ap->a_target, ap->a_lun);
+	/* get device unit-address properties */
+	tgt = scsi_device_prop_get_int(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_TARGET, -1);
+	if (scsi_device_prop_lookup_string(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_TARGET_PORT, &tgt_port) != DDI_PROP_SUCCESS)
+		tgt_port = NULL;
+	if ((tgt == -1) && (tgt_port == NULL))
+		return (0);		/* no target */
+
+	lun = scsi_device_prop_get_int(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_LUN, 0);
+	lun64 = scsi_device_prop_get_int64(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_LUN64, lun);
+	sfunc = scsi_device_prop_get_int(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_SFUNC, -1);
+
+	/*
+	 * XXX should the default be to print this in decimal for
+	 * "human readable" form, so it matches conf files?
+	 */
+	if (tgt_port) {
+		if (sfunc == -1)
+			(void) snprintf(ra, len,
+			    "%s %s lun %" PRIx64,
+			    SCSI_ADDR_PROP_TARGET_PORT, tgt_port, lun64);
+		else
+			(void) snprintf(ra, len,
+			    "%s %s lun %" PRIx64 " sfunc %x",
+			    SCSI_ADDR_PROP_TARGET_PORT, tgt_port, lun64, sfunc);
+		scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, tgt_port);
+	} else {
+		if (sfunc == -1)
+			(void) snprintf(ra, len,
+			    "%s %x lun %" PRIx64,
+			    SCSI_ADDR_PROP_TARGET, tgt, lun64);
+		else
+			(void) snprintf(ra, len,
+			    "%s %x lun %" PRIx64 " sfunc %x",
+			    SCSI_ADDR_PROP_TARGET, tgt, lun64, sfunc);
+	}
+
 	return (1);
 }
 
 /*
- * scsi_set_name: using properties, return "unit-address" string.
- *
- * Function to get "unit-address" in "name@unit-address" /devices path
- * 'name' form from the unit-address properties on a node.
- *
- * NOTE: a better name for this function would be scsi_get_unit_address.
+ * scsi_ua_get: using properties, return "unit-address" string.
+ * Called by SCSA framework, may call HBAs tran function.
  */
 int
-scsi_get_name(struct scsi_device *devp, char *ua, int len)
+scsi_ua_get(struct scsi_device *sd, char *ua, int len)
 {
-	struct scsi_address	*ap;
+	char		*eua;
 
-	/* use tran_get_name interface if it is defined */
-	if (DEVP_TO_TRAN(devp)->tran_get_name)
-		return ((*DEVP_TO_TRAN(devp)->tran_get_name)
-		    (devp, ua, len));
+	/* See if we already have established the unit-address. */
+	if ((eua = scsi_device_unit_address(sd)) != NULL) {
+		(void) strlcpy(ua, eua, len);
+		return (1);
+	}
 
-	ap = &devp->sd_address;
-	(void) snprintf(ua, len, "%x,%x", ap->a_target, ap->a_lun);
+	/* Use deprecated tran_get_name interface if it is defined. */
+	/* NOTE: tran_get_name is a poor name choice for interface */
+	if (DEVP_TO_TRAN(sd)->tran_get_name)
+		return ((*DEVP_TO_TRAN(sd)->tran_get_name)(sd, ua, len));
+
+	/* Use generic property implementation */
+	return (scsi_hba_ua_get(sd, ua, len));
+}
+
+/*
+ * scsi_hba_ua_get: using properties, return "unit-address" string.
+ * This function may be called from an HBAs tran function.
+ *
+ * Function to get "unit-address" in "name@unit-address" /devices path
+ * component form from the scsi_device unit-address properties on a node.
+ *
+ * NOTE: This function works in conjunction with scsi_hba_ua_set().
+ */
+int
+scsi_hba_ua_get(struct scsi_device *sd, char *ua, int len)
+{
+	int		tgt, lun, sfunc;
+	char		*tgt_port;
+	scsi_lun64_t	lun64;
+
+	/* get device unit-address properties */
+	tgt = scsi_device_prop_get_int(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_TARGET, -1);
+	if (scsi_device_prop_lookup_string(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_TARGET_PORT, &tgt_port) != DDI_PROP_SUCCESS)
+		tgt_port = NULL;
+	if ((tgt == -1) && (tgt_port == NULL))
+		return (0);		/* no target */
+
+	lun = scsi_device_prop_get_int(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_LUN, 0);
+	lun64 = scsi_device_prop_get_int64(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_LUN64, lun);
+	sfunc = scsi_device_prop_get_int(sd, SCSI_DEVICE_PROP_PATH,
+	    SCSI_ADDR_PROP_SFUNC, -1);
+	if (tgt_port) {
+		if (sfunc == -1)
+			(void) snprintf(ua, len, "%s,%" PRIx64,
+			    tgt_port, lun64);
+		else
+			(void) snprintf(ua, len, "%s,%" PRIx64 ",%x",
+			    tgt_port, lun64, sfunc);
+		scsi_device_prop_free(sd, SCSI_DEVICE_PROP_PATH, tgt_port);
+	} else {
+		if (sfunc == -1)
+			(void) snprintf(ua, len, "%x,%" PRIx64, tgt, lun64);
+		else
+			(void) snprintf(ua, len, "%x,%" PRIx64 ",%x",
+			    tgt, lun64, sfunc);
+	}
 	return (1);
 }
 
 void
-create_inquiry_props(struct scsi_device *devp)
+create_inquiry_props(struct scsi_device *sd)
 {
-	struct scsi_inquiry *inq = devp->sd_inq;
+	struct scsi_inquiry *inq = sd->sd_inq;
 
-	(void) ndi_prop_update_int(DDI_DEV_T_NONE, devp->sd_dev,
+	(void) ndi_prop_update_int(DDI_DEV_T_NONE, sd->sd_dev,
 	    INQUIRY_DEVICE_TYPE, (int)inq->inq_dtype);
 
 	/*
 	 * Create the following properties:
 	 *
-	 * inquiry-vendor-id 	Vendor id (INQUIRY data bytes 8-15)
-	 * inquiry-product-id 	Product id (INQUIRY data bytes 16-31)
-	 * inquiry-revision-id 	Product Rev level (INQUIRY data bytes 32-35)
+	 * inquiry-vendor-id	Vendor id (INQUIRY data bytes 8-15)
+	 * inquiry-product-id	Product id (INQUIRY data bytes 16-31)
+	 * inquiry-revision-id	Product Rev level (INQUIRY data bytes 32-35)
 	 *
 	 * Note we don't support creation of these properties for scsi-1
 	 * devices (as the vid, pid and revision were not defined) and we
@@ -810,21 +945,21 @@ create_inquiry_props(struct scsi_device *devp)
 	 * stripped of Nulls and spaces.
 	 */
 	if (inq->inq_ansi != 1) {
-		if (ddi_prop_exists(DDI_DEV_T_NONE, devp->sd_dev,
+		if (ddi_prop_exists(DDI_DEV_T_NONE, sd->sd_dev,
 		    DDI_PROP_TYPE_STRING, INQUIRY_VENDOR_ID) == 0)
-			(void) scsi_hba_prop_update_inqstring(devp,
+			(void) scsi_device_prop_update_inqstring(sd,
 			    INQUIRY_VENDOR_ID,
 			    inq->inq_vid, sizeof (inq->inq_vid));
 
-		if (ddi_prop_exists(DDI_DEV_T_NONE, devp->sd_dev,
+		if (ddi_prop_exists(DDI_DEV_T_NONE, sd->sd_dev,
 		    DDI_PROP_TYPE_STRING, INQUIRY_PRODUCT_ID) == 0)
-			(void) scsi_hba_prop_update_inqstring(devp,
+			(void) scsi_device_prop_update_inqstring(sd,
 			    INQUIRY_PRODUCT_ID,
 			    inq->inq_pid, sizeof (inq->inq_pid));
 
-		if (ddi_prop_exists(DDI_DEV_T_NONE, devp->sd_dev,
+		if (ddi_prop_exists(DDI_DEV_T_NONE, sd->sd_dev,
 		    DDI_PROP_TYPE_STRING, INQUIRY_REVISION_ID) == 0)
-			(void) scsi_hba_prop_update_inqstring(devp,
+			(void) scsi_device_prop_update_inqstring(sd,
 			    INQUIRY_REVISION_ID,
 			    inq->inq_revision, sizeof (inq->inq_revision));
 	}
@@ -835,7 +970,7 @@ create_inquiry_props(struct scsi_device *devp)
  * treatment to trim trailing blanks (etc) and ensure null termination.
  */
 int
-scsi_hba_prop_update_inqstring(struct scsi_device *devp,
+scsi_device_prop_update_inqstring(struct scsi_device *sd,
     char *name, char *data, size_t len)
 {
 	int	ilen;
@@ -851,7 +986,7 @@ scsi_hba_prop_update_inqstring(struct scsi_device *devp,
 	data_string = kmem_zalloc(ilen + 1, KM_SLEEP);
 	bcopy(data, data_string, ilen);
 	rv = ndi_prop_update_string(DDI_DEV_T_NONE,
-	    devp->sd_dev, name, data_string);
+	    sd->sd_dev, name, data_string);
 	kmem_free(data_string, ilen + 1);
 	return (rv);
 }
@@ -944,11 +1079,11 @@ scsi_device_hba_private_get(struct scsi_device *sd)
  * else return 1, meaning do *NOT* probe this target/LUN
  */
 static int
-scsi_check_ss2_LUN_limit(struct scsi_device *devp)
+scsi_check_ss2_LUN_limit(struct scsi_device *sd)
 {
-	struct scsi_address	*ap = &(devp->sd_address);
+	struct scsi_address	*ap = &(sd->sd_address);
 	dev_info_t		*pdevi =
-	    (dev_info_t *)DEVI(devp->sd_dev)->devi_parent;
+	    (dev_info_t *)DEVI(sd->sd_dev)->devi_parent;
 	int			ret_val = 0;	/* default return value */
 	uchar_t			*tgt_list;
 	uint_t			tgt_nelements;
@@ -1023,11 +1158,11 @@ scsi_check_ss2_LUN_limit(struct scsi_device *devp)
  * and if it is we mark our parent node with this information
  */
 static void
-scsi_establish_LUN_limit(struct scsi_device *devp)
+scsi_establish_LUN_limit(struct scsi_device *sd)
 {
-	struct scsi_address	*ap = &(devp->sd_address);
-	struct scsi_inquiry	*inq = devp->sd_inq;
-	dev_info_t		*devi = devp->sd_dev;
+	struct scsi_address	*ap = &(sd->sd_address);
+	struct scsi_inquiry	*inq = sd->sd_inq;
+	dev_info_t		*devi = sd->sd_dev;
 	char			*vid = NULL;
 	char			*pid = NULL;
 	char			*rev = NULL;
@@ -1285,4 +1420,247 @@ scsi_update_parent_ss2_prop(dev_info_t *devi, int tgt, int add_tgt)
 		}
 	}
 #endif
+}
+
+
+/* XXX BEGIN: find a better place for this: inquiry.h? */
+/*
+ * Definitions used by device id registration routines
+ */
+#define	VPD_HEAD_OFFSET		3	/* size of head for vpd page */
+#define	VPD_PAGE_LENGTH		3	/* offset for pge length data */
+#define	VPD_MODE_PAGE		1	/* offset into vpd pg for "page code" */
+
+/* size for devid inquiries */
+#define	MAX_INQUIRY_SIZE	0xF0
+#define	MAX_INQUIRY_SIZE_EVPD	0xFF	/* XXX why is this longer */
+/* XXX END: find a better place for these */
+
+
+/*
+ * Decorate devinfo node with identity properties using information obtained
+ * from device. These properties are used by device enumeration code to derive
+ * the devid, and guid for the device. These properties are also used to
+ * determine if a device should be enumerated under the physical HBA (PHCI) or
+ * the virtual HBA (VHCI, for mpxio support).
+ *
+ * Return zero on success. If commands that should succeed fail or allocations
+ * fail then return failure (non-zero). It is possible for this function to
+ * return success and not have decorated the node with any additional identity
+ * information if the device correctly responds indicating that they are not
+ * supported.  When failure occurs the caller should consider not making the
+ * device accessible.
+ */
+int
+scsi_device_identity(struct scsi_device *sd, int (*callback)())
+{
+	dev_info_t	*devi		= sd->sd_dev;
+	uchar_t		*inq80		= NULL;
+	uchar_t		*inq83		= NULL;
+	int		rval;
+	size_t		len;
+	int		pg80, pg83;
+
+	/* find out what pages are supported by device */
+	if (check_vpd_page_support8083(sd, callback, &pg80, &pg83) == -1)
+		return (-1);
+
+	/* if available, collect page 80 data and add as property */
+	if (pg80) {
+		inq80 = kmem_zalloc(MAX_INQUIRY_SIZE,
+		    ((callback == SLEEP_FUNC) ? KM_SLEEP : KM_NOSLEEP));
+		if (inq80 == NULL) {
+			rval = -1;
+			goto out;
+		}
+
+		rval = send_scsi_INQUIRY(sd, callback, inq80,
+		    MAX_INQUIRY_SIZE, 0x01, 0x80, &len);
+		if (rval)
+			goto out;		/* should have worked */
+
+		if (len && (ndi_prop_update_byte_array(DDI_DEV_T_NONE, devi,
+		    "inquiry-page-80", inq80, len) != DDI_PROP_SUCCESS)) {
+			cmn_err(CE_WARN, "scsi_device_identity: "
+			    "failed to add page80 prop");
+			rval = -1;
+			goto out;
+		}
+	}
+
+	/* if available, collect page 83 data and add as property */
+	if (pg83) {
+		inq83 = kmem_zalloc(MAX_INQUIRY_SIZE,
+		    ((callback == SLEEP_FUNC) ? KM_SLEEP : KM_NOSLEEP));
+		if (inq83 == NULL) {
+			rval = -1;
+			goto out;
+		}
+
+		rval = send_scsi_INQUIRY(sd, callback, inq83,
+		    MAX_INQUIRY_SIZE, 0x01, 0x83, &len);
+		if (rval)
+			goto out;		/* should have worked */
+
+		if (len && (ndi_prop_update_byte_array(DDI_DEV_T_NONE, devi,
+		    "inquiry-page-83", inq83, len) != DDI_PROP_SUCCESS)) {
+			cmn_err(CE_WARN, "scsi_device_identity: "
+			    "failed to add page83 prop");
+			rval = -1;
+			goto out;
+		}
+	}
+
+	/* Commands worked, identity information that exists has been added. */
+	rval = 0;
+
+	/* clean up resources */
+out:	if (inq80 != NULL)
+		kmem_free(inq80, MAX_INQUIRY_SIZE);
+	if (inq83 != NULL)
+		kmem_free(inq83, MAX_INQUIRY_SIZE);
+
+	return (rval);
+}
+
+/*
+ * Send an INQUIRY command with the EVPD bit set and a page code of 0x00 to
+ * the device, returning zero on success. Returned INQUIRY data is used to
+ * determine which vital product pages are supported. The device idenity
+ * information we are looking for is in pages 0x83 and/or 0x80. If the device
+ * fails the EVPD inquiry then no pages are supported but the call succeeds.
+ * Return -1 (failure) if there were memory allocation failures or if a
+ * command faild that should have worked.
+ */
+static int
+check_vpd_page_support8083(struct scsi_device *sd, int (*callback)(),
+	int *ppg80, int *ppg83)
+{
+	uchar_t *page_list;
+	int	counter;
+	int	rval;
+
+	/* pages are not supported */
+	*ppg80 = 0;
+	*ppg83 = 0;
+
+	/*
+	 * We'll set the page length to the maximum to save figuring it out
+	 * with an additional call.
+	 */
+	page_list =  kmem_zalloc(MAX_INQUIRY_SIZE_EVPD,
+	    ((callback == SLEEP_FUNC) ? KM_SLEEP : KM_NOSLEEP));
+	if (page_list == NULL)
+		return (-1);		/* memory allocation problem */
+
+	/* issue page 0 (Supported VPD Pages) INQUIRY with evpd set */
+	rval = send_scsi_INQUIRY(sd, callback,
+	    page_list, MAX_INQUIRY_SIZE_EVPD, 1, 0, NULL);
+
+	/*
+	 * Now we must validate that the device accepted the command (some
+	 * devices do not support it) and if the idenity pages we are
+	 * interested in are supported.
+	 */
+	if ((rval == 0) &&
+	    (page_list[VPD_MODE_PAGE] == 0x00)) {
+		/* Loop to find one of the 2 pages we need */
+		counter = 4;  /* Supported pages start at byte 4, with 0x00 */
+
+		/*
+		 * Pages are returned in ascending order, and 0x83 is the
+		 * last page we are hoping to find.
+		 */
+		while ((page_list[counter] <= 0x83) &&
+		    (counter <= (page_list[VPD_PAGE_LENGTH] +
+		    VPD_HEAD_OFFSET))) {
+			/*
+			 * Add 3 because page_list[3] is the number of
+			 * pages minus 3
+			 */
+
+			switch (page_list[counter]) {
+			case 0x80:
+				*ppg80 = 1;
+				break;
+			case 0x83:
+				*ppg83 = 1;
+				break;
+			}
+			counter++;
+		}
+	}
+
+	kmem_free(page_list, MAX_INQUIRY_SIZE_EVPD);
+	return (0);
+}
+
+/*
+ * Send INQUIRY command with specified EVPD and page code.  Return
+ * zero on success.  On success, the amount of data transferred
+ * is returned in *lenp.
+ */
+static int
+send_scsi_INQUIRY(struct scsi_device *sd, int (*callback)(),
+    uchar_t *bufaddr, size_t buflen,
+    uchar_t evpd, uchar_t page_code, size_t *lenp)
+{
+	int		(*cb_flag)();
+	struct buf	*inq_bp;
+	struct scsi_pkt *inq_pkt = NULL;
+	int		rval = -1;
+
+	if (lenp)
+		*lenp = 0;
+	if (callback != SLEEP_FUNC && callback != NULL_FUNC)
+		cb_flag = NULL_FUNC;
+	else
+		cb_flag = callback;
+	inq_bp = scsi_alloc_consistent_buf(ROUTE,
+	    (struct buf *)NULL, buflen, B_READ, cb_flag, NULL);
+	if (inq_bp == NULL)
+		goto out;		/* memory allocation problem */
+
+	inq_pkt = scsi_init_pkt(ROUTE, (struct scsi_pkt *)NULL,
+	    inq_bp, CDB_GROUP0, sizeof (struct scsi_arq_status),
+	    0, PKT_CONSISTENT, callback, NULL);
+	if (inq_pkt == NULL)
+		goto out;		/* memory allocation problem */
+
+	ASSERT(inq_bp->b_error == 0);
+
+	/* form INQUIRY cdb with specified EVPD and page code */
+	(void) scsi_setup_cdb((union scsi_cdb *)inq_pkt->pkt_cdbp,
+	    SCMD_INQUIRY, 0, buflen, 0);
+	inq_pkt->pkt_cdbp[1] = evpd;
+	inq_pkt->pkt_cdbp[2] = page_code;
+
+	inq_pkt->pkt_time = SCSI_POLL_TIMEOUT;	/* in seconds */
+	inq_pkt->pkt_flags = FLAG_NOINTR|FLAG_NOPARITY;
+
+	/*
+	 * Issue inquiry command thru scsi_test
+	 *
+	 * NOTE: This is important data about device identity, not sure why
+	 * NOPARITY is used. Also seems like we should check pkt_stat for
+	 * STATE_XFERRED_DATA.
+	 */
+	if ((scsi_test(inq_pkt) == 0) &&
+	    (inq_pkt->pkt_reason == CMD_CMPLT) &&
+	    (((*inq_pkt->pkt_scbp) & STATUS_MASK) == 0)) {
+		ASSERT(inq_pkt->pkt_resid >= 0);
+		ASSERT(inq_pkt->pkt_resid <= buflen);
+
+		bcopy(inq_bp->b_un.b_addr,
+		    bufaddr, buflen - inq_pkt->pkt_resid);
+		if (lenp)
+			*lenp = (buflen - inq_pkt->pkt_resid);
+		rval = 0;
+	}
+
+out:	if (inq_pkt)
+		scsi_destroy_pkt(inq_pkt);
+	if (inq_bp)
+		scsi_free_consistent_buf(inq_bp);
+	return (rval);
 }

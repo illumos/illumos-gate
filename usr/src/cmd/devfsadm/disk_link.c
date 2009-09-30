@@ -29,8 +29,11 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <ctype.h>
+#include <sys/int_fmtio.h>
 #include <sys/stat.h>
 #include <bsm/devalloc.h>
+#include <sys/scsi/scsi_address.h>
+#include <sys/libdevid.h>
 
 #define	DISK_SUBPATH_MAX 100
 #define	RM_STALE 0x01
@@ -68,31 +71,31 @@ static int reserved_links_exist(di_node_t node, di_minor_t minor, int nflags);
 
 
 static devfsadm_create_t disk_cbt[] = {
-	{ "disk", "ddi_block", NULL,
+	{ "disk", DDI_NT_BLOCK, NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_nchan
 	},
-	{ "disk", "ddi_block:channel", NULL,
+	{ "disk", DDI_NT_BLOCK_CHAN, NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_chan
 	},
-	{ "disk", "ddi_block:fabric", NULL,
+	{ "disk", DDI_NT_BLOCK_FABRIC, NULL,
 		TYPE_EXACT, ILEVEL_0, disk_callback_fabric
 	},
-	{ "disk", "ddi_block:wwn", NULL,
+	{ "disk", DDI_NT_BLOCK_WWN, NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_wwn
 	},
-	{ "disk", "ddi_block:sas", NULL,
+	{ "disk", DDI_NT_BLOCK_SAS, NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_sas
 	},
-	{ "disk", "ddi_block:cdrom", NULL,
+	{ "disk", DDI_NT_CD, NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_nchan
 	},
-	{ "disk", "ddi_block:cdrom:channel", NULL,
+	{ "disk", DDI_NT_CD_CHAN, NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_chan
 	},
-	{ "disk", "ddi_block:xvmd", NULL,
+	{ "disk", DDI_NT_BLOCK_XVMD, NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_xvmd
 	},
-	{ "disk", "ddi_block:cdrom:xvmd", NULL,
+	{ "disk", DDI_NT_CD_XVMD, NULL,
 	    TYPE_EXACT, ILEVEL_0, disk_callback_xvmd
 	},
 };
@@ -168,11 +171,13 @@ disk_callback_wwn(di_minor_t minor, di_node_t node)
 	int targ;
 	int *intp;
 
-	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "target", &intp) <= 0) {
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, SCSI_ADDR_PROP_TARGET,
+	    &intp) <= 0) {
 		return (DEVFSADM_CONTINUE);
 	}
 	targ = *intp;
-	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "lun", &intp) <= 0) {
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, SCSI_ADDR_PROP_LUN,
+	    &intp) <= 0) {
 		lun = 0;
 	} else {
 		lun = *intp;
@@ -207,7 +212,7 @@ disk_callback_fabric(di_minor_t minor, di_node_t node)
 	} else if (di_prop_lookup_bytes(DDI_DEV_T_ANY, node,
 	    "port-wwn", &wwn) > 0) {
 		if (di_prop_lookup_ints(DDI_DEV_T_ANY, node,
-		    "lun", &intp) > 0) {
+		    SCSI_ADDR_PROP_LUN, &intp) > 0) {
 			lun = *intp;
 		} else {
 			lun = 0;
@@ -236,38 +241,72 @@ static int
 disk_callback_sas(di_minor_t minor, di_node_t node)
 {
 	char disk[DISK_SUBPATH_MAX];
-	int lun;
+	int lun64_found = 0;
+	scsi_lun64_t lun64, sl;
+	scsi_lun_t lun;
+	int64_t *lun64p;
+	uint64_t wwn;
 	int *intp;
-	char *str;
-	char *wwn;
+	char *tgt_port;
+	uchar_t addr_method;
 
-	/*
-	 * get LUN property
-	 */
-	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node,
-	    "lun", &intp) > 0) {
-		lun = *intp;
-	} else {
-		lun = 0;
-	}
-	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
-	    "target-port", &wwn) > 0) {
-		/*
-		 * If the target-port property exist
-		 * we use wwn format naming
-		 */
-		for (str = wwn; *str != '\0'; str++) {
-			*str = DISK_LINK_TO_UPPER(*str);
+	/* Get lun property */
+	if (di_prop_lookup_int64(DDI_DEV_T_ANY, node,
+	    SCSI_ADDR_PROP_LUN64, &lun64p) > 0) {
+		if (*lun64p != SCSI_LUN64_ILLEGAL) {
+			lun64_found = 1;
+			lun64 = (uint64_t)*lun64p;
 		}
-		(void) snprintf(disk, DISK_SUBPATH_MAX, "t%sd%d", wwn, lun);
+	}
+	if ((!lun64_found) && (di_prop_lookup_ints(DDI_DEV_T_ANY, node,
+	    SCSI_ADDR_PROP_LUN, &intp) > 0)) {
+		lun64 = (uint64_t)*intp;
+	}
 
+	lun = scsi_lun64_to_lun(lun64);
+
+	addr_method = (lun.sl_lun1_msb & SCSI_LUN_AM_MASK);
+
+	if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+	    SCSI_ADDR_PROP_TARGET_PORT, &tgt_port) > 0) {
+		(void) scsi_wwnstr_to_wwn(tgt_port, &wwn);
+		if ((addr_method == SCSI_LUN_AM_PDEV) &&
+		    (lun.sl_lun2_msb == 0) && (lun.sl_lun2_lsb == 0) &&
+		    (lun.sl_lun3_msb == 0) && (lun.sl_lun3_lsb == 0) &&
+		    (lun.sl_lun4_msb == 0) && (lun.sl_lun4_lsb == 0)) {
+			(void) snprintf(disk, DISK_SUBPATH_MAX,
+			    "t%"PRIX64"d%"PRId64, wwn, lun64);
+		} else if ((addr_method == SCSI_LUN_AM_FLAT) &&
+		    (lun.sl_lun2_msb == 0) && (lun.sl_lun2_lsb == 0) &&
+		    (lun.sl_lun3_msb == 0) && (lun.sl_lun3_lsb == 0) &&
+		    (lun.sl_lun4_msb == 0) && (lun.sl_lun4_lsb == 0)) {
+			sl = (lun.sl_lun1_msb << 8) | lun.sl_lun1_lsb;
+			(void) snprintf(disk, DISK_SUBPATH_MAX,
+			    "t%"PRIX64"d%"PRIX16, wwn, sl);
+		} else {
+			(void) snprintf(disk, DISK_SUBPATH_MAX,
+			    "t%"PRIX64"d%"PRIX64, wwn, lun64);
+		}
 	} else if (di_prop_lookup_ints(DDI_DEV_T_ANY, node,
-	    "sata-phy", &intp) > 0) {
-		/*
-		 * For direct attached SATA device without Device Name,
-		 * no wwn exist, we use phy format naming
-		 */
-		(void) snprintf(disk, DISK_SUBPATH_MAX, "t%dd%d", *intp, lun);
+	    SCSI_ADDR_PROP_SATA_PHY, &intp) > 0) {
+		/* Use phy format naming, for SATA devices without wwn */
+		if ((addr_method == SCSI_LUN_AM_PDEV) &&
+		    (lun.sl_lun2_msb == 0) && (lun.sl_lun2_lsb == 0) &&
+		    (lun.sl_lun3_msb == 0) && (lun.sl_lun3_lsb == 0) &&
+		    (lun.sl_lun4_msb == 0) && (lun.sl_lun4_lsb == 0)) {
+			(void) snprintf(disk, DISK_SUBPATH_MAX,
+			    "t%sd%"PRId64, *intp, lun64);
+		} else if ((addr_method == SCSI_LUN_AM_FLAT) &&
+		    (lun.sl_lun2_msb == 0) && (lun.sl_lun2_lsb == 0) &&
+		    (lun.sl_lun3_msb == 0) && (lun.sl_lun3_lsb == 0) &&
+		    (lun.sl_lun4_msb == 0) && (lun.sl_lun4_lsb == 0)) {
+			sl = (lun.sl_lun1_msb << 8) | lun.sl_lun1_lsb;
+			(void) snprintf(disk, DISK_SUBPATH_MAX,
+			    "t%sd%"PRIX16, *intp, sl);
+		} else {
+			(void) snprintf(disk, DISK_SUBPATH_MAX,
+			    "t%sd%"PRIX64, *intp, lun64);
+		}
 	} else {
 		return (DEVFSADM_CONTINUE);
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "cfga_scsi.h"
 
@@ -59,7 +56,11 @@ scsi_rcm_offline(char **rsrclist, char **errstring, cfga_flags_t flags)
 
 	if ((rret = rcm_request_offline_list(rcm_handle, rsrclist, rflags,
 	    &rinfo)) != RCM_SUCCESS) {
-		cfga_err(errstring, 0, ERRARG_RCM_OFFLINE, 0);
+		if ((flags & FLAG_CLIENT_DEV) == FLAG_CLIENT_DEV) {
+			cfga_err(errstring, 0, ERRARG_RCM_CLIENT_OFFLINE, 0);
+		} else {
+			cfga_err(errstring, 0, ERRARG_RCM_OFFLINE, 0);
+		}
 		if (rinfo) {
 			(void) scsi_rcm_info_table(rinfo, errstring);
 			rcm_free_info(rinfo);
@@ -69,7 +70,7 @@ scsi_rcm_offline(char **rsrclist, char **errstring, cfga_flags_t flags)
 			    rflags & ~RCM_FORCE, NULL);
 		ret = SCFGA_BUSY;
 	}
-	rcm_free_handle(rcm_handle);
+	(void) rcm_free_handle(rcm_handle);
 	return (ret);
 }
 
@@ -102,7 +103,7 @@ scsi_rcm_online(char **rsrclist, char **errstring, cfga_flags_t flags)
 		}
 		ret = SCFGA_BUSY;
 	}
-	rcm_free_handle(rcm_handle);
+	(void) rcm_free_handle(rcm_handle);
 	return (ret);
 }
 
@@ -136,7 +137,7 @@ scsi_rcm_remove(char **rsrclist, char **errstring, cfga_flags_t flags)
 		ret = SCFGA_BUSY;
 	}
 
-	rcm_free_handle(rcm_handle);
+	(void) rcm_free_handle(rcm_handle);
 	return (ret);
 }
 
@@ -182,7 +183,7 @@ scsi_rcm_suspend(char **rsrclist, char **errstring, cfga_flags_t flags,
 			    (rflags & (~RCM_FORCE)), NULL);
 		ret = SCFGA_BUSY;
 	}
-	rcm_free_handle(rcm_handle);
+	(void) rcm_free_handle(rcm_handle);
 	return (ret);
 }
 
@@ -220,7 +221,7 @@ scsi_rcm_resume(char **rsrclist, char **errstring, cfga_flags_t flags,
 		}
 		ret = SCFGA_BUSY;
 	}
-	rcm_free_handle(rcm_handle);
+	(void) rcm_free_handle(rcm_handle);
 	return (ret);
 }
 

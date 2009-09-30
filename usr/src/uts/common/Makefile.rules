@@ -332,6 +332,14 @@ $(OBJS_DIR)/%.o:		$(COMMONBASE)/zfs/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:	$(UTSBASE)/common/io/scsi/adapters/pmcs/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:	$(UTSBASE)/common/io/scsi/adapters/pmcs/%.bin
+	$(COMPILE.b) -o $@ $<
+	$(CTFCONVERT_O)
+
 KMECHKRB5_BASE=$(UTSBASE)/common/gssapi/mechs/krb5
 
 KGSSDFLAGS=-I $(UTSBASE)/common/gssapi/include 
@@ -2151,6 +2159,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/blk2scsa/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/pmcs/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/scsi_vhci/%.c

@@ -2035,12 +2035,12 @@ sata_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	}
 
 	if (vid)
-		(void) scsi_hba_prop_update_inqstring(sd, INQUIRY_VENDOR_ID,
+		(void) scsi_device_prop_update_inqstring(sd, INQUIRY_VENDOR_ID,
 		    vid, strlen(vid));
 	if (pid)
-		(void) scsi_hba_prop_update_inqstring(sd, INQUIRY_PRODUCT_ID,
+		(void) scsi_device_prop_update_inqstring(sd, INQUIRY_PRODUCT_ID,
 		    pid, strlen(pid));
-	(void) scsi_hba_prop_update_inqstring(sd, INQUIRY_REVISION_ID,
+	(void) scsi_device_prop_update_inqstring(sd, INQUIRY_REVISION_ID,
 	    fw, strlen(fw));
 
 	return (DDI_SUCCESS);

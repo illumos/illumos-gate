@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SCSI_ADAPTERS_MPAPI_SCSI_VHCI_H
 #define	_SYS_SCSI_ADAPTERS_MPAPI_SCSI_VHCI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -110,11 +108,18 @@ typedef struct mpapi_lu_data {
 
 /*
  * Structure to maintain mpapi path data.
+ *
+ * The hide flag is set when pip was detroyed or should
+ * have been destroyed(MDI_PATHINFO_FLAGS_DEVICE_REMOVED).
+ * The valid flag is set to 0 when the path is neither online
+ * nor standby state. When hide flag is set the valid flag set
+ * to 0 also.
  */
 typedef struct mpapi_path_data {
 	void			*resp; /* pip */
 	char			*path_name;
 	int			valid;
+	int			hide;
 	char			pclass[MPAPI_SCSI_MAXPCLASSLEN];
 	mp_path_prop_t		prop;
 } mpapi_path_data_t;

@@ -31,11 +31,13 @@
 GENUNIX_SRCS =		\
 	avl.c		\
 	bio.c		\
+	bitset.c	\
 	combined.c	\
 	contract.c	\
 	cpupart.c	\
 	ctxop.c		\
 	cyclic.c	\
+	damap.c		\
 	devinfo.c	\
 	dist.c		\
 	findstack.c	\

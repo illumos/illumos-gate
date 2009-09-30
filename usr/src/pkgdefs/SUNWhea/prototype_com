@@ -744,6 +744,8 @@ f none usr/include/sys/cyclic.h 644 root bin
 f none usr/include/sys/cyclic_impl.h 644 root bin
 f none usr/include/sys/dacf.h 644 root bin
 f none usr/include/sys/dacf_impl.h 644 root bin
+f none usr/include/sys/damap.h 644 root bin
+f none usr/include/sys/damap_impl.h 644 root bin
 f none usr/include/sys/dc_ki.h 644 root bin
 f none usr/include/sys/ddi.h 644 root bin
 f none usr/include/sys/ddifm.h 644 root bin

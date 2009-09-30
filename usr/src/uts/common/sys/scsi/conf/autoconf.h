@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SCSI_CONF_AUTOCONF_H
 #define	_SYS_SCSI_CONF_AUTOCONF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -75,6 +73,9 @@ extern "C" {
 #define	SCSI_OPTIONS_NLUNS_8		0x20000
 #define	SCSI_OPTIONS_NLUNS_16		0x30000
 #define	SCSI_OPTIONS_NLUNS_32		0x40000
+#define	SCSI_OPTIONS_NLUNS_64		0x50000
+#define	SCSI_OPTIONS_NLUNS_128		0x60000
+#define	SCSI_OPTIONS_NLUNS_256		0x70000
 
 #define	SCSI_OPTIONS_NLUNS(n)		((n) & SCSI_OPTIONS_NLUNS_MASK)
 
@@ -153,14 +154,41 @@ extern "C" {
 #define	SCSI_DEFAULT_SELECTION_TIMEOUT	250
 
 /*
- * Kernel references
+ * SCSI subsystem scsi_enumeration options.
+ *
+ * Knob for SPI (SCSI Parallel Intrconnect) enumeration. Unless an HBA defines
+ * it's own tran_bus_config, SPI enumeration is used. The "scsi_enumeration"
+ * knob determines how SPI enumeration is performed.
+ *
+ * The global variable "scsi_enumeration" is used as the default value of the
+ * "scsi-enumeration" property. In addition to enabling/disabling enumeration
+ * (bit 0), target and lun threading can be specified.  Having things
+ * multi-threaded does not guarantee reduce configuration time, however when
+ * the bus is marginal multi-threading can substaintaly reduce configuration
+ * time because targets negotiate to stable transfer speeds in parallel - so
+ * all targets have stabalized by the time the sequential attach(9E) operations
+ * begin.  Running multi-threaded also helps verification of framework and HBA
+ * locking: a BUS_CONFIG_ALL is equivalent to every target and lun combination
+ * getting a BUS_CONFIG_ONE from a separate thread at the same time.  A disable
+ * mechanism is provided to accomidate buggy HBAs (set scsi-enumeration=7
+ * driver.conf). Values are:
+ *
+ *	0	driver.conf enumeration
+ *	1	dynamic enumeration with target and lun multi-threading.
+ *	3	dynamic enumeration with lun multi-threading disabled.
+ *	5	dynamic enumeration with target multi-threading disabled;
+ *	7	dynamic enumeration with target/lun multi-threading disabled.
  */
+#define	SCSI_ENUMERATION_ENABLE			0x1
+#define	SCSI_ENUMERATION_MT_LUN_DISABLE		0x2
+#define	SCSI_ENUMERATION_MT_TARGET_DISABLE	0x4
 
 #ifdef	_KERNEL
 /*
  * Global SCSI config variables / options
  */
 extern int		scsi_options;
+extern int		scsi_enumeration;
 extern unsigned int	scsi_reset_delay;	/* specified in milli seconds */
 extern int		scsi_tag_age_limit;
 extern int		scsi_watchdog_tick;

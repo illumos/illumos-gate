@@ -434,6 +434,7 @@ DRV_KMODS	+= emul64
 #
 DRV_KMODS	+= options
 DRV_KMODS	+= scsi_vhci
+DRV_KMODS	+= pmcs
 DRV_KMODS	+= arcmsr
 DRV_KMODS	+= fcp
 DRV_KMODS	+= fcip

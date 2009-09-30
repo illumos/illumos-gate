@@ -647,7 +647,7 @@ di_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		rv = i_ddi_devs_attached(i);
 		modunload_enable();
 
-		i_ddi_di_cache_invalidate(KM_SLEEP);
+		i_ddi_di_cache_invalidate();
 
 		return ((rv == DDI_SUCCESS)? 0 : ENXIO);
 
@@ -2638,6 +2638,19 @@ path_state_convert(mdi_pathinfo_state_t st)
 	}
 }
 
+static uint_t
+path_flags_convert(uint_t pi_path_flags)
+{
+	uint_t	di_path_flags = 0;
+
+	/* MDI_PATHINFO_FLAGS_HIDDEN nodes not in snapshot */
+
+	if (pi_path_flags & MDI_PATHINFO_FLAGS_DEVICE_REMOVED)
+		di_path_flags |= DI_PATH_FLAGS_DEVICE_REMOVED;
+
+	return (di_path_flags);
+}
+
 
 static di_off_t
 di_path_getprop(mdi_pathinfo_t *pip, di_off_t *off_p,
@@ -2793,12 +2806,18 @@ di_getpath_data(dev_info_t *dip, di_off_t *off_p, di_off_t noff,
 
 	pip = NULL;
 	while (pip = (*next_pip)(dip, pip)) {
-		mdi_pathinfo_state_t state;
 		di_off_t stored_offset;
 
 		dcmn_err((CE_WARN, "marshalling pip = %p", (void *)pip));
 
 		mdi_pi_lock(pip);
+
+		/* We don't represent hidden paths in the snapshot */
+		if (mdi_pi_ishidden(pip)) {
+			dcmn_err((CE_WARN, "hidden, skip"));
+			mdi_pi_unlock(pip);
+			continue;
+		}
 
 		if (di_pip_find(st, pip, &stored_offset) != -1) {
 			/*
@@ -2856,8 +2875,8 @@ di_getpath_data(dev_info_t *dip, di_off_t *off_p, di_off_t noff,
 		 */
 		di_register_pip(st, pip, me->self);
 
-		state = mdi_pi_get_state(pip);
-		me->path_state = path_state_convert(state);
+		me->path_state = path_state_convert(mdi_pi_get_state(pip));
+		me->path_flags = path_flags_convert(mdi_pi_get_flags(pip));
 
 		me->path_instance = mdi_pi_get_path_instance(pip);
 

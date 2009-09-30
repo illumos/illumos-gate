@@ -114,6 +114,10 @@ struct scsi_address {
 #define	SCSI_ADDR_PROP_LUN64		"lun64"		/* int64 */
 #define	SCSI_ADDR_PROP_SFUNC		"sfunc"		/* int */
 
+#define	SCSI_ADDR_PROP_IPORTUA		"scsi-iport"	/* string */
+
+#define	SCSI_ADDR_PROP_SATA_PHY		"sata-phy"	/* int */
+
 /*
  * Addressing property names, values are in string form compatible
  * with the SCSI_ADDR_PROP_TARGET_PORT part of the related
@@ -165,6 +169,7 @@ int		scsi_wwnstr_to_wwn(const char *wwnstr, uint64_t *wwnp);
 char		*scsi_wwn_to_wwnstr(uint64_t wwn,
 		    int unit_address_form, char *wwnstr);
 void		scsi_wwnstr_hexcase(char *wwnstr, int lower_case);
+const char	*scsi_wwnstr_skip_ua_prefix(const char *wwnstr);
 void		scsi_free_wwnstr(char *wwnstr);
 #endif	/* _KERNEL */
 

@@ -2174,6 +2174,12 @@ ndi_dev_is_hidden_node(dev_info_t *dip)
 	return ((DEVI(dip)->devi_node_attributes & DDI_HIDDEN_NODE) != 0);
 }
 
+int
+ndi_dev_is_hotplug_node(dev_info_t *dip)
+{
+	return ((DEVI(dip)->devi_node_attributes & DDI_HOTPLUG_NODE) != 0);
+}
+
 void
 ndi_devi_set_hidden(dev_info_t *dip)
 {
@@ -2556,15 +2562,15 @@ ndi_flavorv_alloc(dev_info_t *self, int nflavors)
 void
 ndi_flavorv_set(dev_info_t *self, ndi_flavor_t child_flavor, void *v)
 {
-	ASSERT(child_flavor < DEVI(self)->devi_flavorv_n &&
-	    DEVI(self)->devi_flavorv != NULL);
-	if (child_flavor > DEVI(self)->devi_flavorv_n ||
-	    DEVI(self)->devi_flavorv == NULL) {
-		return;
-	}
 	if (child_flavor == NDI_FLAVOR_VANILLA) {
 		ddi_set_driver_private(self, v);
 	} else {
+		ASSERT(child_flavor < DEVI(self)->devi_flavorv_n &&
+		    DEVI(self)->devi_flavorv != NULL);
+		if (child_flavor > DEVI(self)->devi_flavorv_n ||
+		    DEVI(self)->devi_flavorv == NULL) {
+			return;
+		}
 		DEVI(self)->devi_flavorv[child_flavor - 1] = v;
 	}
 }
@@ -2572,15 +2578,15 @@ ndi_flavorv_set(dev_info_t *self, ndi_flavor_t child_flavor, void *v)
 void	*
 ndi_flavorv_get(dev_info_t *self, ndi_flavor_t child_flavor)
 {
-	ASSERT(child_flavor < DEVI(self)->devi_flavorv_n &&
-	    DEVI(self)->devi_flavorv != NULL);
-	if (child_flavor > DEVI(self)->devi_flavorv_n ||
-	    DEVI(self)->devi_flavorv == NULL) {
-		return (NULL);
-	}
 	if (child_flavor == NDI_FLAVOR_VANILLA) {
 		return (ddi_get_driver_private(self));
 	} else {
+		ASSERT(child_flavor < DEVI(self)->devi_flavorv_n &&
+		    DEVI(self)->devi_flavorv != NULL);
+		if (child_flavor > DEVI(self)->devi_flavorv_n ||
+		    DEVI(self)->devi_flavorv == NULL) {
+			return (NULL);
+		}
 		return (DEVI(self)->devi_flavorv[child_flavor - 1]);
 	}
 }

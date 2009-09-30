@@ -67,6 +67,7 @@ SUNWprivate_1.1 {
 	scsi_lun_to_lun64;
 	scsi_wwn_to_wwnstr;
 	scsi_wwnstr_hexcase;
+	scsi_wwnstr_skip_ua_prefix;
 	scsi_wwnstr_to_wwn;
     local:
 	*;

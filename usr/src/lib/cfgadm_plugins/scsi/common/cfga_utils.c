@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "cfga_scsi.h"
 #include <libgen.h>
@@ -125,6 +123,7 @@ msgcvt_t str_tbl[] = {
 {ERRARG_RCM_SUSPEND,	0, 1,	"failed to suspend: "},
 {ERRARG_RCM_RESUME,	0, 1,	"failed to resume: "},
 {ERRARG_RCM_OFFLINE,	0, 1,	"failed to offline: "},
+{ERRARG_RCM_CLIENT_OFFLINE,	0, 1,	"failed to offline a client device: "},
 {ERRARG_RCM_ONLINE,	0, 1,	"failed to online: "},
 {ERRARG_RCM_REMOVE,	0, 1,	"failed to remove: "},
 
@@ -327,6 +326,7 @@ pathdup(const char *path, int *l_errnop)
 	return (dup);
 }
 
+
 scfga_ret_t
 apidt_create(const char *ap_id, apid_t *apidp, char **errstring)
 {
@@ -355,11 +355,22 @@ apidt_create(const char *ap_id, apid_t *apidp, char **errstring)
 
 		/* Remove the dynamic component from the base */
 		*dyn = '\0';
+	} else {
+		apidp->dyntype = NODYNCOMP;
+	}
+
+	/* get dyn comp type */
+	if (dyncomp != NULL) {
+		if (strstr(dyncomp, PATH_APID_DYN_SEP) != NULL) {
+			apidp->dyntype = PATH_APID;
+		} else {
+			apidp->dyntype = DEV_APID;
+		}
 	}
 
 	/* Create the path */
-	if ((ret = apid_to_path(hba_phys, dyncomp, &path, &l_errno))
-	    != SCFGA_OK) {
+	if ((ret = apid_to_path(hba_phys, dyncomp, &path,
+	    &l_errno)) != SCFGA_OK) {
 		cfga_err(errstring, l_errno, ERR_OP_FAILED, 0);
 		goto err;
 	}
@@ -471,6 +482,8 @@ walk_tree(
 	if (cmd == SCFGA_WALK_NODE) {
 		rv = di_walk_node(walk_root, up->node_args.flags, arg,
 		    up->node_args.fcn);
+	} else if (cmd == SCFGA_WALK_PATH) {
+		rv = stat_path_info(walk_root, arg, l_errnop);
 	} else {
 		assert(cmd == SCFGA_WALK_MINOR);
 		rv = di_walk_minor(walk_root, up->minor_args.nodetype, 0, arg,
@@ -509,7 +522,8 @@ invoke_cmd(
 	 * Determine if the func has an equal sign; only compare up to
 	 * the equals
 	 */
-	for (len = 0; func[len] != 0 && func[len] != '='; len++);
+	for (len = 0; func[len] != 0 && func[len] != '='; len++) {
+	};
 
 	for (i = 0; i < N_HW_CMDS; i++) {
 		const char *s = GET_MSG_STR(hw_cmds[i].str_id);
@@ -617,10 +631,10 @@ cfga_led_msg(struct cfga_msg *msgp, apid_t *apidp, led_strid_t led,
 	if ((apidp == NULL) || (apidp->dyncomp == NULL)) {
 		return;
 	}
-	snprintf(led_msg, sizeof (led_msg), "%-23s\t%s=%s\n",
-			basename(apidp->dyncomp),
-			dgettext(TEXT_DOMAIN, led_strs[led]),
-			dgettext(TEXT_DOMAIN, led_mode_strs[mode]));
+	(void) snprintf(led_msg, sizeof (led_msg), "%-23s\t%s=%s\n",
+	    basename(apidp->dyncomp),
+	    dgettext(TEXT_DOMAIN, led_strs[led]),
+	    dgettext(TEXT_DOMAIN, led_mode_strs[mode]));
 	(void) (*msgp->message_routine)(msgp->appdata_ptr, led_msg);
 }
 
@@ -721,6 +735,211 @@ out:
 		sp = savep;
 	}
 }
+
+/*
+ * Check to see if the given pi_node is the last path to the client device.
+ *
+ * Return:
+ *	0: if there is another path avialable.
+ *	-1: if no other paths available.
+ */
+static int
+check_available_path(
+	di_node_t client_node,
+	di_path_t pi_node)
+{
+	di_path_state_t pi_state;
+	di_path_t   next_pi = DI_PATH_NIL;
+
+	if (((pi_state = di_path_state(pi_node)) != DI_PATH_STATE_ONLINE) &&
+	    (pi_state != DI_PATH_STATE_STANDBY)) {
+		/* it is not last available path */
+		return (0);
+	}
+
+	while (next_pi = di_path_client_next_path(client_node, next_pi)) {
+		/* if anohter pi node is avaialble, return 0 */
+		if ((next_pi != pi_node) &&
+		    (((pi_state = di_path_state(next_pi)) ==
+		    DI_PATH_STATE_ONLINE) ||
+		    pi_state == DI_PATH_STATE_STANDBY)) {
+			return (0);
+		}
+	}
+	return (-1);
+}
+
+scfga_ret_t
+path_apid_state_change(
+	apid_t		*apidp,
+	scfga_cmd_t	cmd,
+	cfga_flags_t	flags,
+	char		**errstring,
+	int		*l_errnop,
+	msgid_t		errid)
+{
+	di_node_t   root, walk_root, client_node;
+	di_path_t   pi_node = DI_PATH_NIL;
+	char	    *root_path, *cp, *client_path, devpath[MAXPATHLEN];
+	int	    len, found = 0;
+	scfga_ret_t ret;
+	char *dev_list[2] = {NULL};
+
+	*l_errnop = 0;
+
+	/* Make sure apid is pathinfo associated apid. */
+	if ((apidp->dyntype != PATH_APID) || (apidp->dyncomp == NULL)) {
+		return (SCFGA_LIB_ERR);
+	}
+
+	if ((cmd != SCFGA_DEV_CONFIGURE) && (cmd != SCFGA_DEV_UNCONFIGURE)) {
+		return (SCFGA_LIB_ERR);
+	}
+
+	if ((root_path = strdup(apidp->hba_phys)) == NULL) {
+		*l_errnop = errno;
+		return (SCFGA_LIB_ERR);
+	}
+
+	/* Fix up path for di_init() */
+	len = strlen(DEVICES_DIR);
+	if (strncmp(root_path, DEVICES_DIR SLASH,
+	    len + strlen(SLASH)) == 0) {
+		cp = root_path + len;
+		(void) memmove(root_path, cp, strlen(cp) + 1);
+	} else if (*root_path != '/') {
+		*l_errnop = 0;
+		S_FREE(root_path);
+		return (SCFGA_ERR);
+	}
+
+	/* Remove dynamic component if any */
+	if ((cp = GET_DYN(root_path)) != NULL) {
+		*cp = '\0';
+	}
+
+	/* Remove minor name if any */
+	if ((cp = strrchr(root_path, ':')) != NULL) {
+		*cp = '\0';
+	}
+
+	/*
+	 * Cached snapshots are always rooted at "/"
+	 */
+
+	/* Get a snapshot */
+	if ((root = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
+		*l_errnop = errno;
+		S_FREE(root_path);
+		return (SCFGA_ERR);
+	}
+
+	/*
+	 * Lookup the subtree of interest
+	 */
+	walk_root = di_lookup_node(root, root_path);
+
+	if (walk_root == DI_NODE_NIL) {
+		*l_errnop = errno;
+		di_fini(root);
+		S_FREE(root_path);
+		return (SCFGA_LIB_ERR);
+	}
+
+
+	if ((pi_node = di_path_next_client(walk_root, pi_node)) ==
+	    DI_PATH_NIL) {
+		/* the path apid not found */
+		di_fini(root);
+		S_FREE(root_path);
+		return (SCFGA_APID_NOEXIST);
+	}
+
+	do {
+		/* check the length first. */
+		if (strlen(di_path_bus_addr(pi_node)) !=
+		    strlen(apidp->dyncomp)) {
+			continue;
+		}
+
+		/* compare bus addr. */
+		if (strcmp(di_path_bus_addr(pi_node), apidp->dyncomp) == 0) {
+			found = 1;
+			break;
+		}
+		pi_node = di_path_next_client(root, pi_node);
+	} while (pi_node != DI_PATH_NIL);
+
+	if (!found) {
+		di_fini(root);
+		S_FREE(root_path);
+		return (SCFGA_APID_NOEXIST);
+	}
+
+	/* Get client node path. */
+	client_node = di_path_client_node(pi_node);
+	if (client_node == DI_NODE_NIL) {
+		di_fini(root);
+		S_FREE(root_path);
+		return (SCFGA_ERR);
+	} else {
+		client_path = di_devfs_path(client_node);
+		if (client_path == NULL) {
+			di_fini(root);
+			S_FREE(root_path);
+			return (SCFGA_ERR);
+		}
+
+		if ((apidp->flags & FLAG_DISABLE_RCM) == 0) {
+			if (cmd == SCFGA_DEV_UNCONFIGURE) {
+				if (check_available_path(client_node,
+				    pi_node) != 0) {
+					/*
+					 * last path. check if unconfiguring
+					 * is okay.
+					 */
+					(void) snprintf(devpath,
+					    strlen(DEVICES_DIR) +
+					    strlen(client_path) + 1, "%s%s",
+					    DEVICES_DIR, client_path);
+					dev_list[0] = devpath;
+					flags |= FLAG_CLIENT_DEV;
+					ret = scsi_rcm_offline(dev_list,
+					    errstring, flags);
+					if (ret != SCFGA_OK) {
+						di_fini(root);
+						di_devfs_path_free(client_path);
+						S_FREE(root_path);
+						return (ret);
+					}
+				}
+			}
+		}
+	}
+
+	ret = devctl_cmd(apidp->path, cmd, NULL, l_errnop);
+	if (ret != SCFGA_OK) {
+		cfga_err(errstring, *l_errnop, errid, 0);
+
+		/*
+		 * If an unconfigure fails, cancel the RCM offline.
+		 * Discard any RCM failures so that the devctl
+		 * failure will still be reported.
+		 */
+		if ((apidp->flags & FLAG_DISABLE_RCM) == 0) {
+			if (cmd == SCFGA_DEV_UNCONFIGURE)
+				(void) scsi_rcm_online(dev_list,
+				    errstring, flags);
+		}
+	}
+
+	di_devfs_path_free(client_path);
+	di_fini(root);
+	S_FREE(root_path);
+
+	return (ret);
+}
+
 
 scfga_ret_t
 devctl_cmd(
@@ -840,7 +1059,7 @@ known_state(di_node_t node)
 	 * offline.
 	 */
 	if ((state & DI_DEVICE_OFFLINE) == DI_DEVICE_OFFLINE ||
-		(state & DI_DRIVER_DETACHED) != DI_DRIVER_DETACHED) {
+	    (state & DI_DRIVER_DETACHED) != DI_DRIVER_DETACHED) {
 		return (1);
 	}
 

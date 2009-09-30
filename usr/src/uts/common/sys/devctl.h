@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@ extern "C" {
  * and nexus driver devctl IOCTL interface.
  *
  * Applications and nexus drivers may not access the contents of this
- * structure directly.  Instead, drivers must use the ndi_dc_XXX(9n)
+ * structure directly.  Instead, drivers must use the ndi_dc_*(9n)
  * interfaces, while applications must use the interfaces provided by
  * libdevice.so.1.
  */
@@ -229,6 +229,9 @@ typedef struct devctl_ap_state32 {
 #define	BUS_ACTIVE	0x10
 #define	BUS_QUIESCED	0x20
 #define	BUS_SHUTDOWN	0x40
+
+#define	DEVICE_STATES_ASCII	"Dev_Online", "Dev_Busy", "Dev_Offline", \
+	"Dev_Down", "Bus_Active", "Bus_Quiesced", "Bus_Shutdown"
 
 #define	DC_DEVI_NODENAME	"ndi_dc.devi_nodename"
 

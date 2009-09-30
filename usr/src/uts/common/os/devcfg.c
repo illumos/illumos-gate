@@ -179,8 +179,6 @@ static void link_to_driver_list(dev_info_t *);
 static void unlink_from_driver_list(dev_info_t *);
 static void add_to_dn_list(struct devnames *, dev_info_t *);
 static void remove_from_dn_list(struct devnames *, dev_info_t *);
-static dev_info_t *find_child_by_callback(dev_info_t *, char *, char *,
-    int (*)(dev_info_t *, char *, int));
 static dev_info_t *find_duplicate_child();
 static void add_global_props(dev_info_t *);
 static void remove_global_props(dev_info_t *);
@@ -277,11 +275,14 @@ i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
 	 * DEVI_PSEUDO_NODEID		DDI_NC_PSEUDO		A
 	 * DEVI_SID_NODEID		DDI_NC_PSEUDO		A,P
 	 * DEVI_SID_HIDDEN_NODEID	DDI_NC_PSEUDO		A,P,H
+	 * DEVI_SID_HP_NODEID		DDI_NC_PSEUDO		A,P,h
+	 * DEVI_SID_HP_HIDDEN_NODEID	DDI_NC_PSEUDO		A,P,H,h
 	 * other			DDI_NC_PROM		P
 	 *
 	 * Where A = DDI_AUTO_ASSIGNED_NODEID (auto-assign a nodeid)
 	 * and	 P = DDI_PERSISTENT
 	 * and	 H = DDI_HIDDEN_NODE
+	 * and	 h = DDI_HOTPLUG_NODE
 	 *
 	 * auto-assigned nodeids are also auto-freed.
 	 */
@@ -289,12 +290,23 @@ i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
 	switch (nodeid) {
 	case DEVI_SID_HIDDEN_NODEID:
 		devi->devi_node_attributes |= DDI_HIDDEN_NODE;
-		/*FALLTHROUGH*/
+		goto sid;
+
+	case DEVI_SID_HP_NODEID:
+		devi->devi_node_attributes |= DDI_HOTPLUG_NODE;
+		goto sid;
+
+	case DEVI_SID_HP_HIDDEN_NODEID:
+		devi->devi_node_attributes |= DDI_HIDDEN_NODE;
+		devi->devi_node_attributes |= DDI_HOTPLUG_NODE;
+		goto sid;
+
 	case DEVI_SID_NODEID:
-		devi->devi_node_attributes |= DDI_PERSISTENT;
+sid:		devi->devi_node_attributes |= DDI_PERSISTENT;
 		if ((elem = kmem_zalloc(sizeof (*elem), flag)) == NULL)
 			goto fail;
 		/*FALLTHROUGH*/
+
 	case DEVI_PSEUDO_NODEID:
 		devi->devi_node_attributes |= DDI_AUTO_ASSIGNED_NODEID;
 		devi->devi_node_class = DDI_NC_PSEUDO;
@@ -303,9 +315,11 @@ i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
 			/*NOTREACHED*/
 		}
 		break;
+
 	default:
 		if ((elem = kmem_zalloc(sizeof (*elem), flag)) == NULL)
 			goto fail;
+
 		/*
 		 * the nodetype is 'prom', try to 'take' the nodeid now.
 		 * This requires memory allocation, so check for failure.
@@ -318,7 +332,7 @@ i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
 		devi->devi_nodeid = nodeid;
 		devi->devi_node_class = DDI_NC_PROM;
 		devi->devi_node_attributes = DDI_PERSISTENT;
-
+		break;
 	}
 
 	if (ndi_dev_is_persistent_node((dev_info_t *)devi)) {
@@ -2142,7 +2156,9 @@ find_sibling(dev_info_t *head, char *cname, char *caddr, uint_t flag,
 	/*
 	 * Walk the child list to find a match
 	 */
-
+	if (head == NULL)
+		return (NULL);
+	ASSERT(DEVI_BUSY_OWNED(ddi_get_parent(head)));
 	for (dip = head; dip; dip = ddi_get_next_sibling(dip)) {
 		if (by == FIND_NODE_BY_NODENAME) {
 			/* match node name */
@@ -2210,12 +2226,15 @@ find_duplicate_child(dev_info_t *pdip, dev_info_t *dip)
  * Find a child of a given name and address, using a callback to name
  * unnamed children. cname is the binding name.
  */
-static dev_info_t *
-find_child_by_callback(dev_info_t *pdip, char *cname, char *caddr,
-    int (*name_node)(dev_info_t *, char *, int))
+dev_info_t *
+ndi_devi_findchild_by_callback(dev_info_t *pdip, char *dname, char *ua,
+    int (*make_ua)(dev_info_t *, char *, int))
 {
-	return (find_sibling(ddi_get_child(pdip), cname, caddr,
-	    FIND_NODE_BY_DRIVER|FIND_ADDR_BY_CALLBACK, name_node));
+	int	by = FIND_ADDR_BY_CALLBACK;
+
+	ASSERT(DEVI_BUSY_OWNED(pdip));
+	by |= dname ? FIND_NODE_BY_DRIVER : FIND_NODE_BY_ADDR;
+	return (find_sibling(ddi_get_child(pdip), dname, ua, by, make_ua));
 }
 
 /*
@@ -2531,15 +2550,15 @@ i_ddi_unload_drvconf(major_t major)
  * It returns DDI_SUCCESS if the node is merged and DDI_FAILURE otherwise.
  */
 int
-ndi_merge_node(dev_info_t *dip, int (*name_node)(dev_info_t *, char *, int))
+ndi_merge_node(dev_info_t *dip, int (*make_ua)(dev_info_t *, char *, int))
 {
 	dev_info_t *hwdip;
 
 	ASSERT(ndi_dev_is_persistent_node(dip) == 0);
 	ASSERT(ddi_get_name_addr(dip) != NULL);
 
-	hwdip = find_child_by_callback(ddi_get_parent(dip),
-	    ddi_binding_name(dip), ddi_get_name_addr(dip), name_node);
+	hwdip = ndi_devi_findchild_by_callback(ddi_get_parent(dip),
+	    ddi_binding_name(dip), ddi_get_name_addr(dip), make_ua);
 
 	/*
 	 * Look for the hardware node that is the target of the merge;
@@ -4506,11 +4525,17 @@ i_ndi_devi_report_status_change(dev_info_t *dip, char *path)
 	char *status;
 
 	if (!DEVI_NEED_REPORT(dip) ||
-	    (i_ddi_node_state(dip) < DS_INITIALIZED)) {
+	    (i_ddi_node_state(dip) < DS_INITIALIZED) ||
+	    ndi_dev_is_hidden_node(dip)) {
 		return;
 	}
 
-	if (DEVI_IS_DEVICE_OFFLINE(dip)) {
+	/* Invalidate the devinfo snapshot cache */
+	i_ddi_di_cache_invalidate();
+
+	if (DEVI_IS_DEVICE_REMOVED(dip)) {
+		status = "removed";
+	} else if (DEVI_IS_DEVICE_OFFLINE(dip)) {
 		status = "offline";
 	} else if (DEVI_IS_DEVICE_DOWN(dip)) {
 		status = "down";
@@ -4547,25 +4572,24 @@ i_ndi_devi_report_status_change(dev_info_t *dip, char *path)
 static int
 i_log_devfs_add_devinfo(dev_info_t *dip, uint_t flags)
 {
-	int se_err;
-	char *pathname;
-	sysevent_t *ev;
-	sysevent_id_t eid;
-	sysevent_value_t se_val;
-	sysevent_attr_list_t *ev_attr_list = NULL;
-	char *class_name;
-	int no_transport = 0;
+	int			se_err;
+	char			*pathname;
+	sysevent_t		*ev;
+	sysevent_id_t		eid;
+	sysevent_value_t	se_val;
+	sysevent_attr_list_t	*ev_attr_list = NULL;
+	char			*class_name;
+	int			no_transport = 0;
 
-	ASSERT(dip);
-
-	/*
-	 * Invalidate the devinfo snapshot cache
-	 */
-	i_ddi_di_cache_invalidate(KM_SLEEP);
+	ASSERT(dip && ddi_get_parent(dip) &&
+	    DEVI_BUSY_OWNED(ddi_get_parent(dip)));
 
 	/* do not generate ESC_DEVFS_DEVI_ADD event during boot */
 	if (!i_ddi_io_initialized())
 		return (DDI_SUCCESS);
+
+	/* Invalidate the devinfo snapshot cache */
+	i_ddi_di_cache_invalidate();
 
 	ev = sysevent_alloc(EC_DEVFS, ESC_DEVFS_DEVI_ADD, EP_DDI, SE_SLEEP);
 
@@ -4649,17 +4673,18 @@ static int
 i_log_devfs_remove_devinfo(char *pathname, char *class_name, char *driver_name,
     int instance, uint_t flags)
 {
-	sysevent_t *ev;
-	sysevent_id_t eid;
-	sysevent_value_t se_val;
-	sysevent_attr_list_t *ev_attr_list = NULL;
-	int se_err;
-	int no_transport = 0;
-
-	i_ddi_di_cache_invalidate(KM_SLEEP);
+	sysevent_t		*ev;
+	sysevent_id_t		eid;
+	sysevent_value_t	se_val;
+	sysevent_attr_list_t	*ev_attr_list = NULL;
+	int			se_err;
+	int			no_transport = 0;
 
 	if (!i_ddi_io_initialized())
 		return (DDI_SUCCESS);
+
+	/* Invalidate the devinfo snapshot cache */
+	i_ddi_di_cache_invalidate();
 
 	ev = sysevent_alloc(EC_DEVFS, ESC_DEVFS_DEVI_REMOVE, EP_DDI, SE_SLEEP);
 
@@ -4739,6 +4764,37 @@ fail:
 	return (DDI_SUCCESS);
 }
 
+static void
+i_ddi_log_devfs_device_remove(dev_info_t *dip)
+{
+	char	*path;
+
+	ASSERT(dip && ddi_get_parent(dip) &&
+	    DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+	ASSERT(DEVI_IS_DEVICE_REMOVED(dip));
+
+	ASSERT(i_ddi_node_state(dip) >= DS_INITIALIZED);
+	if (i_ddi_node_state(dip) < DS_INITIALIZED)
+		return;
+
+	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) i_log_devfs_remove_devinfo(ddi_pathname(dip, path),
+	    i_ddi_devi_class(dip), (char *)ddi_driver_name(dip),
+	    ddi_get_instance(dip), 0);
+	kmem_free(path, MAXPATHLEN);
+}
+
+static void
+i_ddi_log_devfs_device_insert(dev_info_t *dip)
+{
+	ASSERT(dip && ddi_get_parent(dip) &&
+	    DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+	ASSERT(!DEVI_IS_DEVICE_REMOVED(dip));
+
+	(void) i_log_devfs_add_devinfo(dip, 0);
+}
+
+
 /*
  * log an event that a dev_info branch has been configured or unconfigured.
  */
@@ -4755,6 +4811,9 @@ i_log_devfs_branch(char *node_path, char *subclass)
 	/* do not generate the event during boot */
 	if (!i_ddi_io_initialized())
 		return (DDI_SUCCESS);
+
+	/* Invalidate the devinfo snapshot cache */
+	i_ddi_di_cache_invalidate();
 
 	ev = sysevent_alloc(EC_DEVFS, subclass, EP_DDI, SE_SLEEP);
 
@@ -5461,7 +5520,6 @@ ndi_devi_config_one(dev_info_t *dip, char *devnm, dev_info_t **dipp, int flags)
 	 * by the BUS_CONFIG_ONE.
 	 */
 	ASSERT(*dipp);
-
 	error = devi_config_common(*dipp, flags, DDI_MAJOR_T_NONE);
 
 	pm_post_config(dip, devnm);
@@ -6365,7 +6423,7 @@ ndi_devi_offline(dev_info_t *dip, uint_t flags)
 	}
 	ndi_devi_enter(pdip, &circ);
 
-	if (i_ddi_node_state(dip) == DS_READY) {
+	if (i_ddi_devi_attached(dip)) {
 		/*
 		 * If dip is in DS_READY state, there may be cached dv_nodes
 		 * referencing this dip, so we invoke devfs code path.
@@ -6380,11 +6438,21 @@ ndi_devi_offline(dev_info_t *dip, uint_t flags)
 			ndi_devi_exit(vdip, v_circ);
 
 		/*
-		 * If we own parent lock, this is part of a branch
-		 * operation. We skip the devfs_clean() step.
+		 * If we are explictly told to clean, then clean. If we own the
+		 * parent lock then this is part of a branch operation, and we
+		 * skip the devfs_clean() step.
+		 *
+		 * NOTE: A thread performing a devfs file system lookup/
+		 * bus_config can't call devfs_clean to unconfig without
+		 * causing rwlock problems in devfs. For ndi_devi_offline, this
+		 * means that the NDI_DEVFS_CLEAN flag is safe from ioctl code
+		 * or from an async hotplug thread, but is not safe from a
+		 * nexus driver's bus_config implementation.
 		 */
-		if (!DEVI_BUSY_OWNED(pdip))
+		if ((flags & NDI_DEVFS_CLEAN) ||
+		    (!DEVI_BUSY_OWNED(pdip)))
 			(void) devfs_clean(pdip, devname + 1, DV_CLEAN_FORCE);
+
 		kmem_free(devname, MAXNAMELEN + 1);
 
 		rval = devi_unconfig_branch(dip, NULL, flags|NDI_UNCONFIG,
@@ -6416,7 +6484,7 @@ ndi_devi_offline(dev_info_t *dip, uint_t flags)
 }
 
 /*
- * Find the child dev_info node of parent nexus 'p' whose name
+ * Find the child dev_info node of parent nexus 'p' whose unit address
  * matches "cname@caddr".  Recommend use of ndi_devi_findchild() instead.
  */
 dev_info_t *
@@ -6436,7 +6504,7 @@ ndi_devi_find(dev_info_t *pdip, char *cname, char *caddr)
 }
 
 /*
- * Find the child dev_info node of parent nexus 'p' whose name
+ * Find the child dev_info node of parent nexus 'p' whose unit address
  * matches devname "name@addr".  Permits caller to hold the parent.
  */
 dev_info_t *
@@ -6573,7 +6641,7 @@ path_to_major(char *path)
  * Some callers expect to be able to perform a hold_devi() while in a context
  * where using ndi_devi_enter() to ensure the hold might cause deadlock (see
  * open-from-attach code in consconfig_dacf.c). Such special-case callers
- * must ensure that an ndi_devi_enter(parent)/ndi_devi_hold() from a safe
+ * must ensure that an ndi_devi_enter(parent)/ndi_hold_devi() from a safe
  * context is already active. The hold_devi() implementation must accommodate
  * these callers.
  */
@@ -6601,7 +6669,7 @@ hold_devi(major_t major, int instance, int flags)
 		if (DEVI(dip)->devi_instance == instance) {
 			/*
 			 * To accommodate callers that can't block in
-			 * ndi_devi_enter() we do an ndi_devi_hold(), and
+			 * ndi_devi_enter() we do an ndi_hold_devi(), and
 			 * afterwards check that the node is in a state where
 			 * the hold prevents detach(). If we did not manage to
 			 * prevent detach then we ndi_rele_devi() and perform
@@ -7713,7 +7781,7 @@ i_ddi_di_cache_free(struct di_cache *cache)
 }
 
 void
-i_ddi_di_cache_invalidate(int kmflag)
+i_ddi_di_cache_invalidate()
 {
 	int	cache_valid;
 
@@ -7729,13 +7797,18 @@ i_ddi_di_cache_invalidate(int kmflag)
 	/* Invalidate the in-core cache and dispatch free on valid->invalid */
 	cache_valid = atomic_swap_uint(&di_cache.cache_valid, 0);
 	if (cache_valid) {
+		/*
+		 * This is an optimization to start cleaning up a cached
+		 * snapshot early.  For this reason, it is OK for
+		 * taskq_dispatach to fail (and it is OK to not track calling
+		 * context relative to sleep, and assume NOSLEEP).
+		 */
 		(void) taskq_dispatch(system_taskq, free_cache_task, NULL,
-		    (kmflag == KM_SLEEP) ? TQ_SLEEP : TQ_NOSLEEP);
+		    TQ_NOSLEEP);
 	}
 
 	if (di_cache_debug) {
-		cmn_err(CE_NOTE, "invalidation with km_flag: %s",
-		    kmflag == KM_SLEEP ? "KM_SLEEP" : "KM_NOSLEEP");
+		cmn_err(CE_NOTE, "invalidation");
 	}
 }
 
@@ -7862,6 +7935,100 @@ ndi_devi_config_vhci(char *drvname, int flags)
 	i_ndi_devi_report_status_change(dip, NULL);
 
 	return (dip);
+}
+
+/*
+ * Maintain DEVI_DEVICE_REMOVED hotplug devi_state for remove/reinsert hotplug
+ * of open devices. Currently, because of tight coupling between the devfs file
+ * system and the Solaris device tree, a driver can't always make the device
+ * tree state (esp devi_node_state) match device hardware hotplug state. Until
+ * resolved, to overcome this deficiency we use the following interfaces that
+ * maintain the DEVI_DEVICE_REMOVED devi_state status bit.  These interface
+ * report current state, and drive operation (like events and cache
+ * invalidation) when a driver changes remove/insert state of an open device.
+ *
+ * The ndi_devi_device_isremoved() returns 1 if the device is currently removed.
+ *
+ * The ndi_devi_device_remove() interface declares the device as removed, and
+ * returns 1 if there was a state change associated with this declaration.
+ *
+ * The ndi_devi_device_insert() declares the device as inserted, and returns 1
+ * if there was a state change associated with this declaration.
+ */
+int
+ndi_devi_device_isremoved(dev_info_t *dip)
+{
+	return (DEVI_IS_DEVICE_REMOVED(dip));
+}
+
+int
+ndi_devi_device_remove(dev_info_t *dip)
+{
+	ASSERT(dip && ddi_get_parent(dip) &&
+	    DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+
+	/* Return if already marked removed. */
+	if (ndi_devi_device_isremoved(dip))
+		return (0);
+
+	/* Mark the device as having been physically removed. */
+	mutex_enter(&(DEVI(dip)->devi_lock));
+	ndi_devi_set_hidden(dip);	/* invisible: lookup/snapshot */
+	DEVI_SET_DEVICE_REMOVED(dip);
+	DEVI_SET_EVREMOVE(dip);		/* this clears EVADD too */
+	mutex_exit(&(DEVI(dip)->devi_lock));
+
+	/* report remove (as 'removed') */
+	i_ndi_devi_report_status_change(dip, NULL);
+
+	/*
+	 * Invalidate the cache to ensure accurate
+	 * (di_state() & DI_DEVICE_REMOVED).
+	 */
+	i_ddi_di_cache_invalidate();
+
+	/*
+	 * Generate sysevent for those interested in removal (either directly
+	 * via EC_DEVFS or indirectly via devfsadmd generated EC_DEV).
+	 */
+	i_ddi_log_devfs_device_remove(dip);
+
+	return (1);		/* DEVICE_REMOVED state changed */
+}
+
+int
+ndi_devi_device_insert(dev_info_t *dip)
+{
+	ASSERT(dip && ddi_get_parent(dip) &&
+	    DEVI_BUSY_OWNED(ddi_get_parent(dip)));
+
+	/* Return if not marked removed. */
+	if (!ndi_devi_device_isremoved(dip))
+		return (0);
+
+	/* Mark the device as having been physically reinserted. */
+	mutex_enter(&(DEVI(dip)->devi_lock));
+	ndi_devi_clr_hidden(dip);	/* visible: lookup/snapshot */
+	DEVI_SET_DEVICE_REINSERTED(dip);
+	DEVI_SET_EVADD(dip);		/* this clears EVREMOVE too */
+	mutex_exit(&(DEVI(dip)->devi_lock));
+
+	/* report insert (as 'online') */
+	i_ndi_devi_report_status_change(dip, NULL);
+
+	/*
+	 * Invalidate the cache to ensure accurate
+	 * (di_state() & DI_DEVICE_REMOVED).
+	 */
+	i_ddi_di_cache_invalidate();
+
+	/*
+	 * Generate sysevent for those interested in removal (either directly
+	 * via EC_DEVFS or indirectly via devfsadmd generated EC_DEV).
+	 */
+	i_ddi_log_devfs_device_insert(dip);
+
+	return (1);		/* DEVICE_REMOVED state changed */
 }
 
 /*

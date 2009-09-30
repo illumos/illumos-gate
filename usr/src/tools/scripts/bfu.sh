@@ -222,6 +222,7 @@ global_zone_only_files="
 	kernel/drv/mpt.conf
 	kernel/drv/mpt_sas.conf
 	kernel/drv/options.conf
+	kernel/drv/pmcs.conf
 	kernel/drv/qlc.conf
 	kernel/drv/ra.conf
 	kernel/drv/scsa2usb.conf

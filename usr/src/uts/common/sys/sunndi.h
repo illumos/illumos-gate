@@ -318,6 +318,7 @@ ndi_irm_destroy(ddi_irm_pool_t *poolp);
 #define	NDI_DRV_CONF_REPROBE	0x04000000 /* reprobe conf-enum'd nodes only */
 #define	NDI_DETACH_DRIVER	0x08000000 /* performing driver_detach */
 #define	NDI_MTC_OFF		0x10000000 /* disable multi-threading */
+#define	NDI_USER_REQ		0x20000000 /* user requested operation */
 
 /* ndi interface flag values */
 #define	NDI_SLEEP		0x000000
@@ -340,6 +341,26 @@ ndi_devi_find(dev_info_t *p, char *cname, char *caddr);
  */
 dev_info_t *
 ndi_devi_findchild(dev_info_t *p, char *devname);
+
+/*
+ * Find the child dev_info node of parent nexus 'p' whose name
+ * matches "dname"@"ua". If a child doesn't have a "ua"
+ * value, it calls the function "make_ua" to create it.
+ */
+dev_info_t *
+ndi_devi_findchild_by_callback(dev_info_t *p, char *dname, char *ua,
+    int (*make_ua)(dev_info_t *, char *, int));
+
+/*
+ * Maintain DEVI_DEVICE_REMOVED hotplug devi_state for remove/reinsert hotplug
+ * of open devices.
+ */
+int
+ndi_devi_device_isremoved(dev_info_t *dip);
+int
+ndi_devi_device_remove(dev_info_t *dip);
+int
+ndi_devi_device_insert(dev_info_t *dip);
 
 /*
  * generate debug msg via NDI_DEVI_DEBUG flag
@@ -462,10 +483,10 @@ typedef struct ndi_event_definition {
 } ndi_event_definition_t;
 
 typedef struct ndi_event_cookie {
-	ndi_event_definition_t 	*definition;	/* Event Description */
+	ndi_event_definition_t	*definition;	/* Event Description */
 	dev_info_t		*ddip;		/* Devi defining this event */
 	ndi_event_callbacks_t	*callback_list; /* Cb's reg'd to w/ this evt */
-	struct ndi_event_cookie *next_cookie; 	/* Next cookie def'd in hdl */
+	struct ndi_event_cookie *next_cookie;	/* Next cookie def'd in hdl */
 } ndi_event_cookie_t;
 
 
@@ -522,7 +543,7 @@ ndi_event_unbind_set(ndi_event_hdl_t	handle,
  * get an event cookie
  */
 int
-ndi_event_retrieve_cookie(ndi_event_hdl_t 	handle,
+ndi_event_retrieve_cookie(ndi_event_hdl_t	handle,
 	dev_info_t		*child_dip,
 	char			*eventname,
 	ddi_eventcookie_t	*cookiep,
@@ -532,7 +553,7 @@ ndi_event_retrieve_cookie(ndi_event_hdl_t 	handle,
  * add an event callback info to the ndi event handle
  */
 int
-ndi_event_add_callback(ndi_event_hdl_t 	handle,
+ndi_event_add_callback(ndi_event_hdl_t	handle,
 	dev_info_t		*child_dip,
 	ddi_eventcookie_t	cookie,
 	void			(*event_callback)
@@ -591,7 +612,7 @@ ndi_event_cookie_to_name(ndi_event_hdl_t handle,
  * name given an event_tag
  */
 char *
-ndi_event_tag_to_name(ndi_event_hdl_t 	handle, int event_tag);
+ndi_event_tag_to_name(ndi_event_hdl_t	handle, int event_tag);
 
 dev_info_t *
 ndi_devi_config_vhci(char *, int);
@@ -635,9 +656,9 @@ typedef struct ndi_ra_request {
 					/* restricted to		*/
 
 	uint64_t	ra_boundlen;	/* Length of the area, starting	*/
-					/* from ra_boundbase, for the 	*/
+					/* from ra_boundbase, for the	*/
 					/* allocated resource to be	*/
-					/* restricted to.    		*/
+					/* restricted to.   		*/
 
 	uint64_t	ra_align_mask;	/* Alignment mask used for	*/
 					/* allocated base address	*/
@@ -728,6 +749,11 @@ int ndi_dev_is_pseudo_node(dev_info_t *);
 int ndi_dev_is_persistent_node(dev_info_t *);
 
 /*
+ * ndi_dev_is_hotplug_node: Return non-zero if the node was created by hotplug.
+ */
+int ndi_dev_is_hotplug_node(dev_info_t *);
+
+/*
  * ndi_dev_is_hidden_node: Return non-zero if the node is hidden.
  */
 int ndi_dev_is_hidden_node(dev_info_t *);
@@ -761,8 +787,8 @@ void ndi_set_dma_fault(ddi_dma_handle_t dh);
 void ndi_clr_dma_fault(ddi_dma_handle_t dh);
 
 /* Driver.conf property merging */
-int ndi_merge_node(dev_info_t *, int (*)(dev_info_t *, char *, int));
-void ndi_merge_wildcard_node(dev_info_t *);
+int	ndi_merge_node(dev_info_t *, int (*)(dev_info_t *, char *, int));
+void	ndi_merge_wildcard_node(dev_info_t *);
 
 /*
  * Ndi 'flavor' support: These interfaces are to support a nexus driver

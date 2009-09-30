@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SCSI_TARGETS_SMP_H
 #define	_SYS_SCSI_TARGETS_SMP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/scsi/scsi.h>
@@ -47,17 +45,19 @@ extern "C" {
 #define	SMP_EXOPENED	2
 
 typedef struct smp_state {
-	struct smp_device *smp_dev;		/* pointer to smp_device */
-	kmutex_t smp_mutex;			/* mutex */
-	uint32_t smp_open_flag;		/* open flag */
+	struct smp_device	*smp_dev;	/* pointer to smp_device */
+	kmutex_t		smp_mutex;	/* mutex */
+	uint32_t		smp_open_flag;	/* open flag */
+	kcondvar_t		smp_cv;		/* condition variable */
+	uint32_t		smp_busy;	/* busy */
 } smp_state_t;
 
 #define	SMP_ESTIMATED_NUM_DEVS	4		/* for soft-state allocation */
-#define	SMP_DEFAULT_RETRY_TIMES	3
+#define	SMP_DEFAULT_RETRY_TIMES	5
 
 #define	SMP_FLAG_REQBUF		0x1
 #define	SMP_FLAG_RSPBUF		0x2
-#define	SMP_FLAG_XFER			0x4
+#define	SMP_FLAG_XFER		0x4
 
 #endif /* defined(_KERNEL) */
 

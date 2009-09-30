@@ -68,43 +68,45 @@
 #include <sys/port_impl.h>
 
 #include "avl.h"
+#include "bio.h"
+#include "bitset.h"
 #include "combined.h"
 #include "contract.h"
 #include "cpupart_mdb.h"
+#include "ctxop.h"
+#include "cyclic.h"
+#include "damap.h"
 #include "devinfo.h"
-#include "irm.h"
-#include "leaky.h"
-#include "lgrp.h"
-#include "pg.h"
+#include "findstack.h"
+#include "fm.h"
 #include "group.h"
-#include "list.h"
-#include "log.h"
+#include "irm.h"
 #include "kgrep.h"
 #include "kmem.h"
-#include "bio.h"
-#include "streams.h"
-#include "cyclic.h"
-#include "findstack.h"
-#include "ndievents.h"
+#include "ldi.h"
+#include "leaky.h"
+#include "lgrp.h"
+#include "list.h"
+#include "log.h"
+#include "mdi.h"
+#include "memory.h"
 #include "mmd.h"
+#include "modhash.h"
+#include "ndievents.h"
 #include "net.h"
 #include "netstack.h"
 #include "nvpair.h"
-#include "ctxop.h"
-#include "tsd.h"
-#include "thread.h"
-#include "memory.h"
-#include "sobj.h"
-#include "sysevent.h"
+#include "pg.h"
 #include "rctl.h"
+#include "sobj.h"
+#include "streams.h"
+#include "sysevent.h"
+#include "thread.h"
+#include "tsd.h"
 #include "tsol.h"
 #include "typegraph.h"
-#include "ldi.h"
 #include "vfs.h"
 #include "zone.h"
-#include "modhash.h"
-#include "mdi.h"
-#include "fm.h"
 
 /*
  * Surely this is defined somewhere...
@@ -4329,13 +4331,11 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "whereopen", ":", "given a vnode, dumps procs which have it open",
 	    whereopen },
 
-	/* from zone.c */
-	{ "zone", "?", "display kernel zone(s)", zoneprt },
-	{ "zsd", ":[-v] [zsd_key]", "display zone-specific-data entries for "
-	    "selected zones", zsd },
-
 	/* from bio.c */
 	{ "bufpagefind", ":addr", "find page_t on buf_t list", bufpagefind },
+
+	/* from bitset.c */
+	{ "bitset", ":", "display a bitset", bitset, bitset_help },
 
 	/* from contract.c */
 	{ "contract", "?", "display a contract", cmd_contract },
@@ -4351,6 +4351,9 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "cycinfo", "?", "dump cyc_cpu info", cycinfo },
 	{ "cyclic", ":", "developer information", cyclic },
 	{ "cyctrace", "?", "dump cyclic trace buffer", cyctrace },
+
+	/* from damap.c */
+	{ "damap", ":", "display a damap_t", damap, damap_help },
 
 	/* from devinfo.c */
 	{ "devbindings", "?[-qs] [device-name | major-num]",
@@ -4401,6 +4404,9 @@ static const mdb_dcmd_t dcmds[] = {
 		"[-s sobj | -S sobj] [-t tstate | -T tstate]",
 		"print unique kernel thread stacks",
 		stacks, stacks_help },
+
+	/* from group.c */
+	{ "group", "?[-q]", "display a group", group},
 
 	/* from irm.c */
 	{ "irmpools", NULL, "display interrupt pools", irmpools_dcmd },
@@ -4458,6 +4464,22 @@ static const mdb_dcmd_t dcmds[] = {
 	/* from log.c */
 	{ "msgbuf", "?[-v]", "print most recent console messages", msgbuf },
 
+	/* from mdi.c */
+	{ "mdipi", NULL, "given a path, dump mdi_pathinfo "
+		"and detailed pi_prop list", mdipi },
+	{ "mdiprops", NULL, "given a pi_prop, dump the pi_prop list",
+		mdiprops },
+	{ "mdiphci", NULL, "given a phci, dump mdi_phci and "
+		"list all paths", mdiphci },
+	{ "mdivhci", NULL, "given a vhci, dump mdi_vhci and list "
+		"all phcis", mdivhci },
+	{ "mdiclient_paths", NULL, "given a path, walk mdi_pathinfo "
+		"client links", mdiclient_paths },
+	{ "mdiphci_paths", NULL, "given a path, walk through mdi_pathinfo "
+		"phci links", mdiphci_paths },
+	{ "mdiphcis", NULL, "given a phci, walk through mdi_phci ph_next links",
+		mdiphcis },
+
 	/* from memory.c */
 	{ "page", "?", "display a summarized page_t", page },
 	{ "memstat", NULL, "display memory usage summary", memstat },
@@ -4507,10 +4529,7 @@ static const mdb_dcmd_t dcmds[] = {
 
 	/* from pg.c */
 	{ "pg", "?[-q]", "display a pg", pg},
-	/* from group.c */
-	{ "group", "?[-q]", "display a group", group},
 
-	/* from log.c */
 	/* from rctl.c */
 	{ "rctl_dict", "?", "print systemwide default rctl definitions",
 		rctl_dict },
@@ -4585,21 +4604,10 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "pfiles", ":[-fp]", "print process file information", pfiles,
 		pfiles_help },
 
-	/* from mdi.c */
-	{ "mdipi", NULL, "given a path, dump mdi_pathinfo "
-		"and detailed pi_prop list", mdipi },
-	{ "mdiprops", NULL, "given a pi_prop, dump the pi_prop list",
-		mdiprops },
-	{ "mdiphci", NULL, "given a phci, dump mdi_phci and "
-		"list all paths", mdiphci },
-	{ "mdivhci", NULL, "given a vhci, dump mdi_vhci and list "
-		"all phcis", mdivhci },
-	{ "mdiclient_paths", NULL, "given a path, walk mdi_pathinfo "
-		"client links", mdiclient_paths },
-	{ "mdiphci_paths", NULL, "given a path, walk through mdi_pathinfo "
-		"phci links", mdiphci_paths },
-	{ "mdiphcis", NULL, "given a phci, walk through mdi_phci ph_next links",
-		mdiphcis },
+	/* from zone.c */
+	{ "zone", "?", "display kernel zone(s)", zoneprt },
+	{ "zsd", ":[-v] [zsd_key]", "display zone-specific-data entries for "
+	    "selected zones", zsd },
 
 	{ NULL }
 };
@@ -4671,12 +4679,6 @@ static const mdb_walker_t walkers[] = {
 	{ AVL_WALK_NAME, AVL_WALK_DESC,
 		avl_walk_init, avl_walk_step, avl_walk_fini },
 
-	/* from zone.c */
-	{ "zone", "walk a list of kernel zones",
-		zone_walk_init, zone_walk_step, NULL },
-	{ "zsd", "walk list of zsd entries for a zone",
-		zsd_walk_init, zsd_walk_step, NULL },
-
 	/* from bio.c */
 	{ "buf", "walk the bio buf hash",
 		buf_walk_init, buf_walk_step, buf_walk_fini },
@@ -4744,6 +4746,10 @@ static const mdb_walker_t walkers[] = {
 	{ "devinfo_fmc",
 		"walk a fault management handle cache active list",
 		devinfo_fmc_walk_init, devinfo_fmc_walk_step, NULL },
+
+	/* from group.c */
+	{ "group", "walk all elements of a group",
+		group_walk_init, group_walk_step, NULL },
 
 	/* from irm.c */
 	{ "irmpools", "walk global list of interrupt pools",
@@ -4822,13 +4828,23 @@ static const mdb_walker_t walkers[] = {
 	{ "lgrp_rsrc_cpu", "walk lgroup CPU resources of given lgroup",
 		lgrp_rsrc_cpu_walk_init, lgrp_set_walk_step, NULL },
 
-	/* from group.c */
-	{ "group", "walk all elements of a group",
-		group_walk_init, group_walk_step, NULL },
-
 	/* from list.c */
 	{ LIST_WALK_NAME, LIST_WALK_DESC,
 		list_walk_init, list_walk_step, list_walk_fini },
+
+	/* from mdi.c */
+	{ "mdipi_client_list", "Walker for mdi_pathinfo pi_client_link",
+		mdi_pi_client_link_walk_init,
+		mdi_pi_client_link_walk_step,
+		mdi_pi_client_link_walk_fini },
+	{ "mdipi_phci_list", "Walker for mdi_pathinfo pi_phci_link",
+		mdi_pi_phci_link_walk_init,
+		mdi_pi_phci_link_walk_step,
+		mdi_pi_phci_link_walk_fini },
+	{ "mdiphci_list", "Walker for mdi_phci ph_next link",
+		mdi_phci_ph_next_walk_init,
+		mdi_phci_ph_next_walk_step,
+		mdi_phci_ph_next_walk_fini },
 
 	/* from memory.c */
 	{ "page", "walk all pages, or those from the specified vnode",
@@ -4874,6 +4890,10 @@ static const mdb_walker_t walkers[] = {
 		tcp_stacks_walk_init, tcp_stacks_walk_step, NULL },
 	{ "udp_stacks", "walk all the udp_stack_t",
 		udp_stacks_walk_init, udp_stacks_walk_step, NULL },
+
+	/* from netstack.c */
+	{ "netstack", "walk a list of kernel netstacks",
+		netstack_walk_init, netstack_walk_step, NULL },
 
 	/* from nvpair.c */
 	{ NVPAIR_WALKER_NAME, NVPAIR_WALKER_DESCR,
@@ -4950,25 +4970,11 @@ static const mdb_walker_t walkers[] = {
 	{ "vfs", "walk file system list",
 		vfs_walk_init, vfs_walk_step },
 
-	/* from mdi.c */
-	{ "mdipi_client_list", "Walker for mdi_pathinfo pi_client_link",
-		mdi_pi_client_link_walk_init,
-		mdi_pi_client_link_walk_step,
-		mdi_pi_client_link_walk_fini },
-
-	{ "mdipi_phci_list", "Walker for mdi_pathinfo pi_phci_link",
-		mdi_pi_phci_link_walk_init,
-		mdi_pi_phci_link_walk_step,
-		mdi_pi_phci_link_walk_fini },
-
-	{ "mdiphci_list", "Walker for mdi_phci ph_next link",
-		mdi_phci_ph_next_walk_init,
-		mdi_phci_ph_next_walk_step,
-		mdi_phci_ph_next_walk_fini },
-
-	/* from netstack.c */
-	{ "netstack", "walk a list of kernel netstacks",
-		netstack_walk_init, netstack_walk_step, NULL },
+	/* from zone.c */
+	{ "zone", "walk a list of kernel zones",
+		zone_walk_init, zone_walk_step, NULL },
+	{ "zsd", "walk list of zsd entries for a zone",
+		zsd_walk_init, zsd_walk_step, NULL },
 
 	{ NULL }
 };

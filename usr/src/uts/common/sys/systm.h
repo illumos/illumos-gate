@@ -175,6 +175,7 @@ hrtime_t untimeout_generic(callout_id_t, int);
 clock_t untimeout_default(callout_id_t, int);
 void delay(clock_t);
 int delay_sig(clock_t);
+void delay_random(clock_t);
 int nodev();
 int nulldev();
 major_t getudev(void);

@@ -16751,8 +16751,12 @@ sdintr(struct scsi_pkt *pktp)
 	 * state if needed.
 	 */
 	if (pktp->pkt_reason == CMD_DEV_GONE) {
-		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-		    "Command failed to complete...Device is gone\n");
+		/* Prevent multiple console messages for the same failure. */
+		if (un->un_last_pkt_reason != CMD_DEV_GONE) {
+			un->un_last_pkt_reason = CMD_DEV_GONE;
+			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+			    "Command failed to complete...Device is gone\n");
+		}
 		if (un->un_mediastate != DKIO_DEV_GONE) {
 			un->un_mediastate = DKIO_DEV_GONE;
 			cv_broadcast(&un->un_state_cv);

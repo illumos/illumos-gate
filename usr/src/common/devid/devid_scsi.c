@@ -41,6 +41,9 @@
 #include <sys/dditypes.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/scsi/scsi.h>
+#ifndef _KERNEL
+#include <sys/libdevid.h>
+#endif /* !_KERNEL */
 #include "devid_impl.h"
 
 #define	SCSI_INQUIRY_VID_POS			9
@@ -1244,8 +1247,7 @@ scsi_wwnstr_to_wwn(const char *wwnstr, uint64_t *wwnp)
 		return (DDI_FAILURE);
 
 	/* Skip leading 'w' if wwnstr is in unit-address form */
-	if (*wwnstr == 'w')
-		wwnstr++;
+	wwnstr = scsi_wwnstr_skip_ua_prefix(wwnstr);
 
 	if (strlen(wwnstr) != 16)
 		return (DDI_FAILURE);
@@ -1325,6 +1327,23 @@ scsi_wwnstr_hexcase(char *wwnstr, int upper_case_hex)
 			c += ('a' - 'A');	/* upper to lower */
 		*s = c;
 	}
+}
+
+/*
+ * Function: scsi_wwnstr_skip_ua_prefix
+ *
+ * Description: This routine removes the leading 'w' in wwnstr,
+ * 		if its in unit-address form.
+ *
+ * Arguments: wwnstr - the string wwn to be transformed
+ *
+ */
+const char *
+scsi_wwnstr_skip_ua_prefix(const char *wwnstr)
+{
+	if (*wwnstr == 'w')
+		wwnstr++;
+	return (wwnstr);
 }
 
 /*

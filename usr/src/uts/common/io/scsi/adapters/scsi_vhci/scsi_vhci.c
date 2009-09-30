@@ -221,6 +221,7 @@ static void vhci_clean_print(dev_info_t *dev, uint_t level,
 #endif
 static void vhci_print_prout_keys(scsi_vhci_lun_t *, char *);
 static void vhci_uscsi_iodone(struct scsi_pkt *pkt);
+static void vhci_invalidate_mpapi_lu(struct scsi_vhci *, scsi_vhci_lun_t *);
 
 /*
  * MP-API related functions
@@ -1514,7 +1515,7 @@ vhci_recovery_reset(scsi_vhci_lun_t *vlun, struct scsi_address *ap,
 static int
 vhci_scsi_reset_target(struct scsi_address *ap, int level, uint8_t select_path)
 {
-	dev_info_t		*vdip, *pdip, *cdip;
+	dev_info_t		*vdip, *cdip;
 	mdi_pathinfo_t		*pip = NULL;
 	mdi_pathinfo_t		*npip = NULL;
 	int			rval = -1;
@@ -1572,12 +1573,10 @@ again:
 
 	if (hba->tran_reset != NULL) {
 		if (hba->tran_reset(pap, level) == 0) {
-			pdip = mdi_pi_get_phci(pip);
-			vhci_log(CE_WARN, vdip, "!(%s%d):"
-			    " path (%s%d), reset %d failed",
+			vhci_log(CE_WARN, vdip, "!%s%d: "
+			    "path %s, reset %d failed",
 			    ddi_driver_name(cdip), ddi_get_instance(cdip),
-			    ddi_driver_name(pdip), ddi_get_instance(pdip),
-			    level);
+			    mdi_pi_spathname(pip), level);
 
 			/*
 			 * Select next path and issue the reset, repeat
@@ -2052,28 +2051,32 @@ vhci_scsi_get_name_bus_addr(struct scsi_device *sd,
 	ASSERT(sd != NULL);
 	ASSERT(name != NULL);
 
+	*name = 0;
 	cdip = sd->sd_dev;
 
 	ASSERT(cdip != NULL);
 
-	if (mdi_component_is_client(cdip, NULL) != MDI_SUCCESS) {
-		name[0] = '\0';
+	if (mdi_component_is_client(cdip, NULL) != MDI_SUCCESS)
 		return (1);
-	}
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, cdip, PROPFLAGS,
-	    MDI_CLIENT_GUID_PROP, &guid) != DDI_SUCCESS) {
-		name[0] = '\0';
+	    MDI_CLIENT_GUID_PROP, &guid) != DDI_SUCCESS)
 		return (1);
-	}
 
+	/*
+	 * Message is "sd# at scsi_vhci0: unit-address <guid>: <bus_addr>".
+	 *	<guid>		bus_addr argument == 0
+	 *	<bus_addr>	bus_addr argument != 0
+	 * Since the <guid> is already provided with unit-address, we just
+	 * provide failover module in <bus_addr> to keep output shorter.
+	 */
 	vlun = ADDR2VLUN(&sd->sd_address);
-	if (bus_addr && vlun && vlun->svl_fops_name) {
-		/* report the guid and the name of the failover module */
-		(void) snprintf(name, len, "g%s %s", guid, vlun->svl_fops_name);
-	} else {
-		/* report the guid */
+	if (bus_addr == 0) {
+		/* report the guid:  */
 		(void) snprintf(name, len, "g%s", guid);
+	} else if (vlun && vlun->svl_fops_name) {
+		/* report the name of the failover module */
+		(void) snprintf(name, len, "%s", vlun->svl_fops_name);
 	}
 
 	ddi_prop_free(guid);
@@ -2431,12 +2434,15 @@ bind_path:
 				sema_v(&vlun->svl_pgr_sema);
 			}
 			/*
-			 * Looks like a fatal error.
-			 * May be device disappeared underneath.
-			 * Give another chance to target driver for a retry to
-			 * get another path.
+			 * Consider it a fatal error if b_error is
+			 * set as a result of DMA binding failure
+			 * vs. a condition of being temporarily out of
+			 * some resource
 			 */
-			return (TRAN_BUSY);
+			if (geterror(vpkt->vpkt_tgt_init_bp))
+				return (TRAN_FATAL_ERROR);
+			else
+				return (TRAN_BUSY);
 		}
 	}
 
@@ -3054,8 +3060,8 @@ vhci_intr(struct scsi_pkt *pkt)
 	static char		*timeout_err = "Command Timeout";
 	static char		*parity_err = "Parity Error";
 	char			*err_str = NULL;
-	dev_info_t		*vdip, *cdip, *pdip;
-	char			*cpath, *dpath;
+	dev_info_t		*vdip, *cdip;
+	char			*cpath;
 
 	ASSERT(vpkt != NULL);
 	tpkt = vpkt->vpkt_tgt_pkt;
@@ -3359,6 +3365,21 @@ vhci_intr(struct scsi_pkt *pkt)
 		break;
 
 	case CMD_DEV_GONE:
+		/*
+		 * If this is the last path then report CMD_DEV_GONE to the
+		 * target driver, otherwise report BUSY to triggger retry.
+		 */
+		if (vlun->svl_dip &&
+		    (mdi_client_get_path_count(vlun->svl_dip) <= 1)) {
+			struct scsi_vhci	*vhci;
+			vhci = ADDR2VHCI(&tpkt->pkt_address);
+			VHCI_DEBUG(1, (CE_NOTE, NULL, "vhci_intr received "
+			    "cmd_dev_gone on last path\n"));
+			(void) vhci_invalidate_mpapi_lu(vhci, vlun);
+			break;
+		}
+
+		/* Report CMD_CMPLT-with-BUSY to cause retry. */
 		VHCI_DEBUG(1, (CE_NOTE, NULL, "vhci_intr received "
 		    "cmd_dev_gone\n"));
 		tpkt->pkt_reason = CMD_CMPLT;
@@ -3414,17 +3435,13 @@ vhci_intr(struct scsi_pkt *pkt)
 	if ((err_str != NULL) && (pkt->pkt_reason !=
 	    svp->svp_last_pkt_reason)) {
 		cdip = vlun->svl_dip;
-		pdip = mdi_pi_get_phci(vpkt->vpkt_path);
 		vdip = ddi_get_parent(cdip);
 		cpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-		dpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-		vhci_log(CE_WARN, vdip, "!%s (%s%d): %s on path %s (%s%d)",
+		vhci_log(CE_WARN, vdip, "!%s (%s%d): %s on path %s",
 		    ddi_pathname(cdip, cpath), ddi_driver_name(cdip),
 		    ddi_get_instance(cdip), err_str,
-		    ddi_pathname(pdip, dpath), ddi_driver_name(pdip),
-		    ddi_get_instance(pdip));
+		    mdi_pi_spathname(vpkt->vpkt_path));
 		kmem_free(cpath, MAXPATHLEN);
-		kmem_free(dpath, MAXPATHLEN);
 	}
 	svp->svp_last_pkt_reason = pkt->pkt_reason;
 	VHCI_DECR_PATH_CMDCOUNT(svp);
@@ -3672,7 +3689,7 @@ void
 vhci_update_pathstates(void *arg)
 {
 	mdi_pathinfo_t			*pip, *npip;
-	dev_info_t			*dip, *pdip;
+	dev_info_t			*dip;
 	struct scsi_failover_ops	*fo;
 	struct scsi_vhci_priv		*svp;
 	struct scsi_device		*psd;
@@ -3680,7 +3697,7 @@ vhci_update_pathstates(void *arg)
 	char				*pclass, *tptr;
 	struct scsi_vhci_lun		*vlun = (struct scsi_vhci_lun *)arg;
 	int				sps; /* mdi_select_path() status */
-	char				*cpath, *dpath;
+	char				*cpath;
 	struct scsi_vhci		*vhci;
 	struct scsi_pkt			*pkt;
 	struct buf			*bp;
@@ -3747,22 +3764,16 @@ vhci_update_pathstates(void *arg)
 				VHCI_DEBUG(1, (CE_NOTE, NULL,
 				    "!vhci_update_pathstates: marking path"
 				    " 0x%p as ONLINE\n", (void *)pip));
-				pdip = mdi_pi_get_phci(pip);
 				cpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-				dpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-				vhci_log(CE_NOTE, ddi_get_parent(dip), "!%s"
-				    " (%s%d): path %s (%s%d) target address %s"
-				    " is now ONLINE because of"
-				    " an externally initiated failover",
+				vhci_log(CE_NOTE, ddi_get_parent(dip), "!%s "
+				    "(%s%d): path %s "
+				    "is now ONLINE because of "
+				    "an externally initiated failover",
 				    ddi_pathname(dip, cpath),
 				    ddi_driver_name(dip),
 				    ddi_get_instance(dip),
-				    ddi_pathname(pdip, dpath),
-				    ddi_driver_name(pdip),
-				    ddi_get_instance(pdip),
-				    mdi_pi_get_addr(pip));
+				    mdi_pi_spathname(pip));
 				kmem_free(cpath, MAXPATHLEN);
-				kmem_free(dpath, MAXPATHLEN);
 				mdi_pi_set_state(pip,
 				    MDI_PATHINFO_STATE_ONLINE);
 				mdi_pi_set_preferred(pip,
@@ -3861,22 +3872,16 @@ vhci_update_pathstates(void *arg)
 			VHCI_DEBUG(1, (CE_NOTE, NULL,
 			    "!vhci_update_pathstates: marking path"
 			    " 0x%p as STANDBY\n", (void *)pip));
-			pdip = mdi_pi_get_phci(pip);
 			cpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-			dpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-			vhci_log(CE_NOTE, ddi_get_parent(dip), "!%s"
-			    " (%s%d): path %s (%s%d) target address %s"
-			    " is now STANDBY because of"
-			    " an externally initiated failover",
+			vhci_log(CE_NOTE, ddi_get_parent(dip), "!%s "
+			    "(%s%d): path %s "
+			    "is now STANDBY because of "
+			    "an externally initiated failover",
 			    ddi_pathname(dip, cpath),
 			    ddi_driver_name(dip),
 			    ddi_get_instance(dip),
-			    ddi_pathname(pdip, dpath),
-			    ddi_driver_name(pdip),
-			    ddi_get_instance(pdip),
-			    mdi_pi_get_addr(pip));
+			    mdi_pi_spathname(pip));
 			kmem_free(cpath, MAXPATHLEN);
-			kmem_free(dpath, MAXPATHLEN);
 			mdi_pi_set_state(pip,
 			    MDI_PATHINFO_STATE_STANDBY);
 			mdi_pi_set_preferred(pip,
@@ -4103,7 +4108,7 @@ vhci_pathinfo_uninit(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	hba = ddi_get_driver_private(pdip);
 	ASSERT(hba != NULL);
 
-	vhci_mpapi_set_path_state(vdip, pip, MP_DRVR_PATH_STATE_REMOVED);
+	vhci_mpapi_set_path_state(vdip, pip, MP_DRVR_PATH_STATE_UNINIT);
 	svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(pip);
 	if (svp == NULL) {
 		/* path already freed. Nothing to do. */
@@ -8647,3 +8652,33 @@ vhci_clean_print(dev_info_t *dev, uint_t level, char *title, uchar_t *data,
 	}
 }
 #endif
+static void
+vhci_invalidate_mpapi_lu(struct scsi_vhci *vhci, scsi_vhci_lun_t *vlun)
+{
+	char			*svl_wwn;
+	mpapi_item_list_t	*ilist;
+	mpapi_lu_data_t		*ld;
+
+	if (vlun == NULL) {
+		return;
+	} else {
+		svl_wwn = vlun->svl_lun_wwn;
+	}
+
+	ilist = vhci->mp_priv->obj_hdr_list[MP_OBJECT_TYPE_MULTIPATH_LU]->head;
+
+	while (ilist != NULL) {
+		ld = (mpapi_lu_data_t *)(ilist->item->idata);
+		if ((ld != NULL) && (strncmp(ld->prop.name, svl_wwn,
+		    strlen(svl_wwn)) == 0)) {
+			ld->valid = 0;
+			VHCI_DEBUG(6, (CE_WARN, NULL,
+			    "vhci_invalidate_mpapi_lu: "
+			    "Invalidated LU(%s)", svl_wwn));
+			return;
+		}
+		ilist = ilist->next;
+	}
+	VHCI_DEBUG(6, (CE_WARN, NULL, "vhci_invalidate_mpapi_lu: "
+	    "Could not find LU(%s) to invalidate.", svl_wwn));
+}

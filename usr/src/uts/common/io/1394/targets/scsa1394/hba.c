@@ -813,13 +813,15 @@ scsa1394_create_children(scsa1394_state_t *sp)
 		ndi_devi_alloc_sleep(sp->s_dip, node_name,
 		    (pnode_t)DEVI_SID_NODEID, &cdip);
 
-		ret = ndi_prop_update_int(DDI_DEV_T_NONE, cdip, "target", 0);
+		ret = ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+		    SCSI_ADDR_PROP_TARGET, 0);
 		if (ret != DDI_PROP_SUCCESS) {
 			(void) ndi_devi_free(cdip);
 			continue;
 		}
 
-		ret = ndi_prop_update_int(DDI_DEV_T_NONE, cdip, "lun", i);
+		ret = ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+		    SCSI_ADDR_PROP_LUN, i);
 		if (ret != DDI_PROP_SUCCESS) {
 			ddi_prop_remove_all(cdip);
 			(void) ndi_devi_free(cdip);
@@ -973,8 +975,8 @@ scsa1394_scsi_tgt_init(dev_info_t *dip, dev_info_t *cdip, scsi_hba_tran_t *tran,
 	int		ret = DDI_FAILURE;
 
 	if (ddi_prop_op(DDI_DEV_T_ANY, cdip, PROP_LEN_AND_VAL_BUF,
-	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "lun", (caddr_t)&lun,
-	    &plen) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, SCSI_ADDR_PROP_LUN,
+	    (caddr_t)&lun, &plen) != DDI_PROP_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 
@@ -1019,8 +1021,8 @@ scsa1394_scsi_tgt_free(dev_info_t *dip, dev_info_t *cdip, scsi_hba_tran_t *tran,
 	}
 
 	if (ddi_prop_op(DDI_DEV_T_ANY, cdip, PROP_LEN_AND_VAL_BUF,
-	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, "lun", (caddr_t)&lun,
-	    &plen) != DDI_PROP_SUCCESS) {
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, SCSI_ADDR_PROP_LUN,
+	    (caddr_t)&lun, &plen) != DDI_PROP_SUCCESS) {
 		return;
 	}
 

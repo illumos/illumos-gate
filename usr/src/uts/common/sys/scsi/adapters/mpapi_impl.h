@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SCSI_ADAPTERS_MPAPI_IMPL_H
 #define	_SYS_SCSI_ADAPTERS_MPAPI_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sunmdi.h>
 #include <sys/sunddi.h>
@@ -253,6 +251,7 @@ typedef struct mp_path_prop {
 #define	MP_DRVR_PATH_STATE_REMOVED		5
 #define	MP_DRVR_PATH_STATE_TRANSITIONING	6
 #define	MP_DRVR_PATH_STATE_UNKNOWN		7
+#define	MP_DRVR_PATH_STATE_UNINIT		8
 
 
 /* Structure for MP_PROPRIETARY_LOAD_BALANCE_PROPERTIES */

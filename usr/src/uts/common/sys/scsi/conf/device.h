@@ -141,6 +141,13 @@ struct scsi_device {
 	void			*sd_pathinfo;
 
 	/*
+	 * Counter that prevents demotion of DS_INITIALIZED node (esp loss of
+	 * devi_addr) by causing DDI_CTLOPS_UNINITCHILD failure - devi_ref
+	 * will not protect demotion of DS_INITIALIZED node.
+	 */
+	int			sd_uninit_prevent;
+
+	/*
 	 * The 'sd_tran_safe' field is a grotty hack that allows direct-access
 	 * (non-scsa) drivers (like chs, ata, and mlx - which all make cmdk
 	 * children) to *illegally* put their own vector in the scsi_address(9S)

@@ -55,23 +55,24 @@ int
 sas_hba_probe_smp(struct smp_device *smp_devp)
 {
 	smp_pkt_t smp_pkt_data, *smp_pkt = &smp_pkt_data;
-	struct smp_report_general_req smp_req;
-	struct smp_report_general_rsp smp_rsp;
+	uint8_t reqbuf[SMP_REQ_MINLEN];
+	uint8_t respbuf[SMP_RESP_MINLEN + sizeof (smp_report_general_resp_t)];
+	smp_request_frame_t *qfp = (smp_request_frame_t *)reqbuf;
+	smp_report_general_resp_t *sfp = (smp_report_general_resp_t *)respbuf;
 	int rval = DDI_PROBE_SUCCESS;
 
-	bzero(&smp_req, sizeof (struct smp_report_general_req));
-	bzero(&smp_rsp, sizeof (struct smp_report_general_rsp));
-	smp_req.frametype = (uint8_t)SMP_FRAME_TYPE_REQUEST;
-	smp_req.function = (uint8_t)SMP_REPORT_GENERAL;
-	smp_req.reqsize = 0x00;
+	bzero(reqbuf, sizeof (reqbuf));
+	bzero(respbuf, sizeof (respbuf));
+	qfp->srf_frame_type = SMP_FRAME_TYPE_REQUEST;
+	qfp->srf_function = SMP_FUNC_REPORT_GENERAL;
 
 	bzero(smp_pkt, sizeof (struct smp_pkt));
 	smp_pkt->pkt_address = &smp_devp->smp_addr;
 	smp_pkt->pkt_reason = 0;
-	smp_pkt->pkt_req = (caddr_t)&smp_req;
-	smp_pkt->pkt_reqsize = sizeof (struct smp_report_general_req);
-	smp_pkt->pkt_rsp = (caddr_t)&smp_rsp;
-	smp_pkt->pkt_rspsize = sizeof (struct smp_report_general_rsp);
+	smp_pkt->pkt_req = (caddr_t)qfp;
+	smp_pkt->pkt_reqsize = sizeof (reqbuf);
+	smp_pkt->pkt_rsp = (caddr_t)sfp;
+	smp_pkt->pkt_rspsize = sizeof (respbuf);
 	smp_pkt->pkt_timeout = SMP_DEFAULT_TIMEOUT;
 
 	if (sas_smp_transport(smp_pkt) != DDI_SUCCESS) {

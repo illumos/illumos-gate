@@ -67,6 +67,8 @@
 #include <sys/task.h>
 #include <sys/sdt.h>
 #include <sys/ddi_timer.h>
+#include <sys/random.h>
+#include <sys/modctl.h>
 
 /*
  * for NTP support
@@ -87,6 +89,7 @@ extern kcondvar_t	fsflush_cv;
 extern sysinfo_t	sysinfo;
 extern vminfo_t	vminfo;
 extern int	idleswtch;	/* flag set while idle in pswtch() */
+extern hrtime_t volatile devinfo_freeze;
 
 /*
  * high-precision avenrun values.  These are needed to make the
@@ -268,6 +271,10 @@ static int tod_fault_reset_flag = 0;
 
 /* patchable via /etc/system */
 int tod_validate_enable = 1;
+
+/* Diagnose/Limit messages about delay(9F) called from interrupt context */
+int			delay_from_interrupt_diagnose = 0;
+volatile uint32_t	delay_from_interrupt_msg = 20;
 
 /*
  * On non-SPARC systems, TOD validation must be deferred until gethrtime
@@ -1575,37 +1582,91 @@ profil_tick(uintptr_t upc)
 static void
 delay_wakeup(void *arg)
 {
-	kthread_t *t = arg;
+	kthread_t	*t = arg;
 
 	mutex_enter(&t->t_delay_lock);
 	cv_signal(&t->t_delay_cv);
 	mutex_exit(&t->t_delay_lock);
 }
 
-void
-delay(clock_t ticks)
-{
-	kthread_t *t = curthread;
-	clock_t deadline = lbolt + ticks;
-	clock_t timeleft;
-	timeout_id_t id;
-	extern hrtime_t volatile devinfo_freeze;
+/*
+ * The delay(9F) man page indicates that it can only be called from user or
+ * kernel context - detect and diagnose bad calls. The following macro will
+ * produce a limited number of messages identifying bad callers.  This is done
+ * in a macro so that caller() is meaningful. When a bad caller is identified,
+ * switching to 'drv_usecwait(TICK_TO_USEC(ticks));' may be appropriate.
+ */
+#define	DELAY_CONTEXT_CHECK()	{					\
+	uint32_t	m;						\
+	char		*f;						\
+	ulong_t		off;						\
+									\
+	m = delay_from_interrupt_msg;					\
+	if (delay_from_interrupt_diagnose && servicing_interrupt() &&	\
+	    !panicstr && !devinfo_freeze &&				\
+	    atomic_cas_32(&delay_from_interrupt_msg, m ? m : 1, m-1)) {	\
+		f = modgetsymname((uintptr_t)caller(), &off);		\
+		cmn_err(CE_WARN, "delay(9F) called from "		\
+		    "interrupt context: %s`%s",				\
+		    mod_containing_pc(caller()), f ? f : "...");	\
+	}								\
+}
 
-	if ((panicstr || devinfo_freeze) && ticks > 0) {
-		/*
-		 * Timeouts aren't running, so all we can do is spin.
-		 */
-		drv_usecwait(TICK_TO_USEC(ticks));
+/*
+ * delay_common: common delay code.
+ */
+static void
+delay_common(clock_t ticks)
+{
+	kthread_t	*t = curthread;
+	clock_t		deadline;
+	clock_t		timeleft;
+	callout_id_t	id;
+
+	/* If timeouts aren't running all we can do is spin. */
+	if (panicstr || devinfo_freeze) {
+		/* Convert delay(9F) call into drv_usecwait(9F) call. */
+		if (ticks > 0)
+			drv_usecwait(TICK_TO_USEC(ticks));
 		return;
 	}
 
+	deadline = lbolt + ticks;
 	while ((timeleft = deadline - lbolt) > 0) {
 		mutex_enter(&t->t_delay_lock);
-		id = timeout(delay_wakeup, t, timeleft);
+		id = timeout_default(delay_wakeup, t, timeleft);
 		cv_wait(&t->t_delay_cv, &t->t_delay_lock);
 		mutex_exit(&t->t_delay_lock);
-		(void) untimeout(id);
+		(void) untimeout_default(id, 0);
 	}
+}
+
+/*
+ * Delay specified number of clock ticks.
+ */
+void
+delay(clock_t ticks)
+{
+	DELAY_CONTEXT_CHECK();
+
+	delay_common(ticks);
+}
+
+/*
+ * Delay a random number of clock ticks between 1 and ticks.
+ */
+void
+delay_random(clock_t ticks)
+{
+	int	r;
+
+	DELAY_CONTEXT_CHECK();
+
+	(void) random_get_pseudo_bytes((void *)&r, sizeof (r));
+	if (ticks == 0)
+		ticks = 1;
+	ticks = (r % ticks) + 1;
+	delay_common(ticks);
 }
 
 /*
@@ -1614,19 +1675,30 @@ delay(clock_t ticks)
 int
 delay_sig(clock_t ticks)
 {
-	clock_t deadline = lbolt + ticks;
-	clock_t rc;
+	kthread_t	*t = curthread;
+	clock_t		deadline;
+	clock_t		rc;
 
-	mutex_enter(&curthread->t_delay_lock);
+	/* If timeouts aren't running all we can do is spin. */
+	if (panicstr || devinfo_freeze) {
+		if (ticks > 0)
+			drv_usecwait(TICK_TO_USEC(ticks));
+		return (0);
+	}
+
+	deadline = lbolt + ticks;
+	mutex_enter(&t->t_delay_lock);
 	do {
-		rc = cv_timedwait_sig(&curthread->t_delay_cv,
-		    &curthread->t_delay_lock, deadline);
+		rc = cv_timedwait_sig(&t->t_delay_cv,
+		    &t->t_delay_lock, deadline);
+		/* loop until past deadline or signaled */
 	} while (rc > 0);
-	mutex_exit(&curthread->t_delay_lock);
+	mutex_exit(&t->t_delay_lock);
 	if (rc == 0)
 		return (EINTR);
 	return (0);
 }
+
 
 #define	SECONDS_PER_DAY 86400
 

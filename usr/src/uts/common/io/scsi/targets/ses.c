@@ -21,7 +21,7 @@
 /*
  * Enclosure Services Device target driver
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -245,21 +245,27 @@ ses_probe(dev_info_t *dip)
 	 * been able to get one to attach.
 	 *
 	 */
-
-
 	if (dip == NULL)
 		return (DDI_PROBE_FAILURE);
+	/* SES_LOG(NULL, SES_CE_DEBUG1, "ses_probe: OK"); */
+	if (ddi_dev_is_sid(dip) == DDI_SUCCESS) {
+		return (DDI_PROBE_DONTCARE);
+	}
+
+	devp = ddi_get_driver_private(dip);
+
+	/* Legacy: prevent driver.conf specified ses nodes on atapi. */
+	if (scsi_ifgetcap(&devp->sd_address, "interconnect-type", -1) ==
+	    INTERCONNECT_ATAPI)
+		return (DDI_PROBE_FAILURE);
+
 	/*
 	 * XXX: Breakage from the x86 folks.
 	 */
 	if (strcmp(ddi_get_name(ddi_get_parent(dip)), "ata") == 0) {
 		return (DDI_PROBE_FAILURE);
 	}
-	/* SES_LOG(NULL, SES_CE_DEBUG1, "ses_probe: OK"); */
-	if (ddi_dev_is_sid(dip) == DDI_SUCCESS) {
-		return (DDI_PROBE_DONTCARE);
-	}
-	devp = ddi_get_driver_private(dip);
+
 	switch (err = scsi_probe(devp, SLEEP_FUNC)) {
 	case SCSIPROBE_EXISTS:
 		if (is_enc_dev(NULL, devp->sd_inq, SUN_INQSIZE, &ep)) {

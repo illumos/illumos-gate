@@ -99,6 +99,8 @@ LINTFLAGS += -erroff=E_NAME_MULTIPLY_DEF2
 LDLIBS +=		-ldevinfo
 devfsadm :=		LDLIBS += -lgen -lsysevent -lnvpair -lzonecfg -lbsm
 SUNW_md_link.so :=	LDLIBS += -lmeta
+SUNW_disk_link.so :=	LDLIBS += -ldevid
+SUNW_sgen_link.so :=	LDLIBS += -ldevid
 
 # All libraries are built from the same SUNW_%.so rule (see below), and define
 # their own SONAME using -h explicitly.  Null the generic -h macro that gets

@@ -53,6 +53,7 @@ extern int	scsi_wwnstr_to_wwn(const char *wwnstr, uint64_t *wwnp);
 extern char	*scsi_wwn_to_wwnstr(uint64_t wwn,
 		    int unit_address_form, char *wwnstr);
 extern void	scsi_wwnstr_hexcase(char *wwnstr, int lower_case);
+extern const char	*scsi_wwnstr_skip_ua_prefix(const char *wwnstr);
 extern void	scsi_free_wwnstr(char *wwnstr);
 
 #ifdef	SCSI_ADDR_PROP_LUN64

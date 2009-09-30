@@ -73,12 +73,15 @@
 #include <sys/debug.h>
 int	mdi_debug = 1;
 int	mdi_debug_logonly = 0;
-#define	MDI_DEBUG(level, stmnt) \
-	    if (mdi_debug >= (level)) i_mdi_log stmnt
-static void i_mdi_log(int, dev_info_t *, const char *fmt, ...);
+#define	MDI_DEBUG(dbglevel, pargs) if (mdi_debug >= (dbglevel))	i_mdi_log pargs
+#define	MDI_WARN	CE_WARN, __func__
+#define	MDI_NOTE	CE_NOTE, __func__
+#define	MDI_CONT	CE_CONT, __func__
+static void i_mdi_log(int, const char *, dev_info_t *, const char *, ...);
 #else	/* !DEBUG */
-#define	MDI_DEBUG(level, stmnt)
+#define	MDI_DEBUG(dbglevel, pargs)
 #endif	/* DEBUG */
+int	mdi_debug_consoleonly = 0;
 
 extern pri_t	minclsyspri;
 extern int	modrootloaded;
@@ -167,6 +170,7 @@ static int		mdi_pathmap_hash_size = 256;
 static kmutex_t		mdi_pathmap_mutex;
 static mod_hash_t	*mdi_pathmap_bypath;		/* "path"->instance */
 static mod_hash_t	*mdi_pathmap_byinstance;	/* instance->"path" */
+static mod_hash_t	*mdi_pathmap_sbyinstance;	/* inst->shortpath */
 
 /*
  * MDI component property name/value string definitions
@@ -332,6 +336,9 @@ i_mdi_init()
 	    mod_hash_null_valdtor);
 	mdi_pathmap_byinstance = mod_hash_create_idhash(
 	    "mdi_pathmap_byinstance", mdi_pathmap_hash_size,
+	    mod_hash_null_valdtor);
+	mdi_pathmap_sbyinstance = mod_hash_create_idhash(
+	    "mdi_pathmap_sbyinstance", mdi_pathmap_hash_size,
 	    mod_hash_null_valdtor);
 }
 
@@ -618,7 +625,6 @@ mdi_phci_register(char *class, dev_info_t *pdip, int flags)
 	mdi_phci_t		*ph;
 	mdi_vhci_t		*vh;
 	char			*data;
-	char			*pathname;
 
 	/*
 	 * Some subsystems, like fcp, perform pHCI registration from a
@@ -630,9 +636,6 @@ mdi_phci_register(char *class, dev_info_t *pdip, int flags)
 	 */
 	ASSERT(DEVI_BUSY_CHANGING(ddi_get_parent(pdip)));
 
-	pathname = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
-	(void) ddi_pathname(pdip, pathname);
-
 	/*
 	 * Check for mpxio-disable property. Enable mpxio if the property is
 	 * missing or not set to "yes".
@@ -641,19 +644,14 @@ mdi_phci_register(char *class, dev_info_t *pdip, int flags)
 	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip, 0, "mpxio-disable",
 	    &data) == DDI_SUCCESS)) {
 		if (strcmp(data, "yes") == 0) {
-			MDI_DEBUG(1, (CE_CONT, pdip,
-			    "?%s (%s%d) multipath capabilities "
-			    "disabled via %s.conf.\n", pathname,
-			    ddi_driver_name(pdip), ddi_get_instance(pdip),
+			MDI_DEBUG(1, (MDI_CONT, pdip,
+			    "?multipath capabilities disabled via %s.conf.",
 			    ddi_driver_name(pdip)));
 			ddi_prop_free(data);
-			kmem_free(pathname, MAXPATHLEN);
 			return (MDI_FAILURE);
 		}
 		ddi_prop_free(data);
 	}
-
-	kmem_free(pathname, MAXPATHLEN);
 
 	/*
 	 * Search for a matching vHCI
@@ -713,21 +711,20 @@ mdi_phci_unregister(dev_info_t *pdip, int flags)
 	mdi_phci_t		*ph;
 	mdi_phci_t		*tmp;
 	mdi_phci_t		*prev = NULL;
+	mdi_pathinfo_t		*pip;
 
 	ASSERT(DEVI_BUSY_CHANGING(ddi_get_parent(pdip)));
 
 	ph = i_devi_get_phci(pdip);
 	if (ph == NULL) {
-		MDI_DEBUG(1, (CE_WARN, pdip,
-		    "!pHCI unregister: Not a valid pHCI"));
+		MDI_DEBUG(1, (MDI_WARN, pdip, "!not a valid pHCI"));
 		return (MDI_FAILURE);
 	}
 
 	vh = ph->ph_vhci;
 	ASSERT(vh != NULL);
 	if (vh == NULL) {
-		MDI_DEBUG(1, (CE_WARN, pdip,
-		    "!pHCI unregister: Not a valid vHCI"));
+		MDI_DEBUG(1, (MDI_WARN, pdip, "!not a valid vHCI"));
 		return (MDI_FAILURE);
 	}
 
@@ -753,6 +750,13 @@ mdi_phci_unregister(dev_info_t *pdip, int flags)
 
 	vh->vh_phci_count--;
 	MDI_VHCI_PHCI_UNLOCK(vh);
+
+	/* Walk remaining pathinfo nodes and disassociate them from pHCI */
+	MDI_PHCI_LOCK(ph);
+	for (pip = (mdi_pathinfo_t *)ph->ph_path_head; pip;
+	    pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link)
+		MDI_PI(pip)->pi_phci = NULL;
+	MDI_PHCI_UNLOCK(ph);
 
 	i_mdi_log_sysevent(pdip, ph->ph_vhci->vh_class,
 	    ESC_DDI_INITIATOR_UNREGISTER);
@@ -823,8 +827,15 @@ mdi_devi_enter(dev_info_t *phci_dip, int *circular)
 		} else if (DEVI_IS_DETACHING(phci_dip)) {
 			vcircular = -1;
 			break;
+		} else if (servicing_interrupt()) {
+			/*
+			 * Don't delay an interrupt (and ensure adaptive
+			 * mutex inversion support).
+			 */
+			ndi_devi_enter(vdip, &vcircular);
+			break;
 		} else {
-			delay(1);
+			delay_random(2);
 		}
 	}
 
@@ -896,6 +907,9 @@ mdi_devi_exit_phci(dev_info_t *phci_dip, int circular)
 	/* Verify calling context */
 	ASSERT(MDI_PHCI(phci_dip));
 
+	/* Keep hold on pHCI until we reenter in mdi_devi_enter_phci */
+	ndi_hold_devi(phci_dip);
+
 	pcircular = (short)(circular & 0xFFFF);
 	ndi_devi_exit(phci_dip, pcircular);
 }
@@ -909,6 +923,9 @@ mdi_devi_enter_phci(dev_info_t *phci_dip, int *circular)
 	ASSERT(MDI_PHCI(phci_dip));
 
 	ndi_devi_enter(phci_dip, &pcircular);
+
+	/* Drop hold from mdi_devi_exit_phci. */
+	ndi_rele_devi(phci_dip);
 
 	/* verify matching mdi_devi_exit_phci/mdi_devi_enter_phci use */
 	ASSERT(pcircular == ((short)(*circular & 0xFFFF)));
@@ -1037,15 +1054,24 @@ i_mdi_phci_lock(mdi_phci_t *ph, mdi_pathinfo_t *pip)
 	if (pip) {
 		/* Reverse locking is requested. */
 		while (MDI_PHCI_TRYLOCK(ph) == 0) {
-			/*
-			 * tryenter failed. Try to grab again
-			 * after a small delay
-			 */
-			MDI_PI_HOLD(pip);
-			MDI_PI_UNLOCK(pip);
-			delay(1);
-			MDI_PI_LOCK(pip);
-			MDI_PI_RELE(pip);
+			if (servicing_interrupt()) {
+				MDI_PI_HOLD(pip);
+				MDI_PI_UNLOCK(pip);
+				MDI_PHCI_LOCK(ph);
+				MDI_PI_LOCK(pip);
+				MDI_PI_RELE(pip);
+				break;
+			} else {
+				/*
+				 * tryenter failed. Try to grab again
+				 * after a small delay
+				 */
+				MDI_PI_HOLD(pip);
+				MDI_PI_UNLOCK(pip);
+				delay_random(2);
+				MDI_PI_LOCK(pip);
+				MDI_PI_RELE(pip);
+			}
 		}
 	} else {
 		MDI_PHCI_LOCK(ph);
@@ -1083,8 +1109,8 @@ i_mdi_devinfo_create(mdi_vhci_t *vh, char *name, char *guid,
 	ASSERT(cdip == NULL);
 	if (cdip) {
 		cmn_err(CE_WARN,
-		    "i_mdi_devinfo_create: client dip %p already exists",
-			(void *)cdip);
+		    "i_mdi_devinfo_create: client %s@%s already exists",
+			name ? name : "", guid ? guid : "");
 	}
 
 	ndi_devi_alloc_sleep(vh->vh_dip, name, DEVI_SID_NODEID, &cdip);
@@ -1169,10 +1195,10 @@ i_mdi_devinfo_remove(dev_info_t *vdip, dev_info_t *cdip, int flags)
 
 	if (i_mdi_is_child_present(vdip, cdip) == MDI_SUCCESS ||
 	    (flags & MDI_CLIENT_FLAGS_DEV_NOT_SUPPORTED)) {
-		rv = ndi_devi_offline(cdip, NDI_DEVI_REMOVE);
+		rv = ndi_devi_offline(cdip, NDI_DEVFS_CLEAN | NDI_DEVI_REMOVE);
 		if (rv != NDI_SUCCESS) {
-			MDI_DEBUG(1, (CE_NOTE, NULL, "!i_mdi_devinfo_remove:"
-			    " failed. cdip = %p\n", (void *)cdip));
+			MDI_DEBUG(1, (MDI_NOTE, cdip,
+			    "!failed: cdip %p", (void *)cdip));
 		}
 		/*
 		 * Convert to MDI error code
@@ -1252,15 +1278,24 @@ i_mdi_client_lock(mdi_client_t *ct, mdi_pathinfo_t *pip)
 		 * Reverse locking is requested.
 		 */
 		while (MDI_CLIENT_TRYLOCK(ct) == 0) {
-			/*
-			 * tryenter failed. Try to grab again
-			 * after a small delay
-			 */
-			MDI_PI_HOLD(pip);
-			MDI_PI_UNLOCK(pip);
-			delay(1);
-			MDI_PI_LOCK(pip);
-			MDI_PI_RELE(pip);
+			if (servicing_interrupt()) {
+				MDI_PI_HOLD(pip);
+				MDI_PI_UNLOCK(pip);
+				MDI_CLIENT_LOCK(ct);
+				MDI_PI_LOCK(pip);
+				MDI_PI_RELE(pip);
+				break;
+			} else {
+				/*
+				 * tryenter failed. Try to grab again
+				 * after a small delay
+				 */
+				MDI_PI_HOLD(pip);
+				MDI_PI_UNLOCK(pip);
+				delay_random(2);
+				MDI_PI_LOCK(pip);
+				MDI_PI_RELE(pip);
+			}
 		}
 	} else {
 		MDI_CLIENT_LOCK(ct);
@@ -1543,8 +1578,8 @@ i_mdi_client_compute_state(mdi_client_t *ct, mdi_phci_t *ph)
 	if (online_count == 0) {
 		if (standby_count == 0) {
 			state = MDI_CLIENT_STATE_FAILED;
-			MDI_DEBUG(2, (CE_NOTE, NULL, "!client state: failed"
-			    " ct = %p\n", (void *)ct));
+			MDI_DEBUG(2, (MDI_NOTE, ct->ct_dip,
+			    "client state failed: ct = %p", (void *)ct));
 		} else if (standby_count == 1) {
 			state = MDI_CLIENT_STATE_DEGRADED;
 		} else {
@@ -1937,15 +1972,9 @@ i_mdi_lba_lb(mdi_client_t *ct, mdi_pathinfo_t **ret_pip, struct buf *bp)
 			MDI_PI_UNLOCK(pip);
 			pip = next;
 		}
-		if (pip == NULL) {
-			MDI_DEBUG(4, (CE_NOTE, NULL,
-			    "!lba %llx, no pip !!\n",
-				bp->b_lblkno));
-		} else {
-			MDI_DEBUG(4, (CE_NOTE, NULL,
-			    "!lba %llx, no pip for path_index, "
-			    "pip %p\n", bp->b_lblkno, (void *)pip));
-		}
+		MDI_DEBUG(4, (MDI_NOTE, ct->ct_dip,
+		    "lba %llx: path %s %p",
+		    bp->b_lblkno, mdi_pi_spathname(pip), (void *)pip));
 	}
 	return (MDI_FAILURE);
 }
@@ -2026,7 +2055,6 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 
 	/* determine type of arg based on flags */
 	if (flags & MDI_SELECT_PATH_INSTANCE) {
-		flags &= ~MDI_SELECT_PATH_INSTANCE;
 		path_instance = (int)(intptr_t)arg;
 		start_pip = NULL;
 	} else {
@@ -2056,8 +2084,8 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 			 * Client is not ready to accept any I/O requests.
 			 * Fail this request.
 			 */
-			MDI_DEBUG(2, (CE_NOTE, cdip, "!mdi_select_path: "
-			    "client state offline ct = %p\n", (void *)ct));
+			MDI_DEBUG(2, (MDI_NOTE, cdip,
+			    "client state offline ct = %p", (void *)ct));
 			MDI_CLIENT_UNLOCK(ct);
 			return (MDI_FAILURE);
 		}
@@ -2067,8 +2095,8 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 			 * Check for Failover is in progress. If so tell the
 			 * caller that this device is busy.
 			 */
-			MDI_DEBUG(2, (CE_NOTE, cdip, "!mdi_select_path: "
-			    "client failover in progress ct = %p\n",
+			MDI_DEBUG(2, (MDI_NOTE, cdip,
+			    "client failover in progress ct = %p",
 			    (void *)ct));
 			MDI_CLIENT_UNLOCK(ct);
 			return (MDI_BUSY);
@@ -2080,8 +2108,8 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 		 * (standby) and let the probe/attach process to continue.
 		 */
 		if (MDI_CLIENT_IS_DETACHED(ct) || !i_ddi_devi_attached(cdip)) {
-			MDI_DEBUG(4, (CE_NOTE, cdip, "!Devi is onlining "
-			    "ct = %p\n", (void *)ct));
+			MDI_DEBUG(4, (MDI_NOTE, cdip,
+			    "devi is onlining ct = %p", (void *)ct));
 			MDI_CLIENT_UNLOCK(ct);
 			return (MDI_DEVI_ONLINING);
 		}
@@ -2111,9 +2139,19 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 			return (MDI_FAILURE);
 		}
 
-		/* verify state of path */
+		/*
+		 * Verify state of path. When asked to select a specific
+		 * path_instance, we select the requested path in any
+		 * state (ONLINE, OFFLINE, STANDBY, FAULT) other than INIT.
+		 * We don't however select paths where the pHCI has detached.
+		 * NOTE: last pathinfo node of an opened client device may
+		 * exist in an OFFLINE state after the pHCI associated with
+		 * that path has detached (but pi_phci will be NULL if that
+		 * has occurred).
+		 */
 		MDI_PI_LOCK(pip);
-		if (MDI_PI(pip)->pi_state != MDI_PATHINFO_STATE_ONLINE) {
+		if ((MDI_PI(pip)->pi_state == MDI_PATHINFO_STATE_INIT) ||
+		    (MDI_PI(pip)->pi_phci == NULL)) {
 			MDI_PI_UNLOCK(pip);
 			MDI_CLIENT_UNLOCK(ct);
 			return (MDI_FAILURE);
@@ -2125,7 +2163,6 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 		 */
 		MDI_PI_HOLD(pip);
 		MDI_PI_UNLOCK(pip);
-		ct->ct_path_last = pip;
 		*ret_pip = pip;
 		MDI_CLIENT_UNLOCK(ct);
 		return (MDI_SUCCESS);
@@ -2213,7 +2250,7 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 				return (MDI_SUCCESS);
 			}
 		}
-		/*  FALLTHROUGH */
+		/* FALLTHROUGH */
 	case LOAD_BALANCE_RR:
 		/*
 		 * Load balancing is Round Robin. Start looking for a online
@@ -2598,8 +2635,8 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 	mdi_client_t		*ct;
 	mdi_pathinfo_t		*pip = NULL;
 
-	MDI_DEBUG(2, (CE_NOTE, pdip, "!mdi_pi_find: %s %s",
-	    caddr ? caddr : "NULL", paddr ? paddr : "NULL"));
+	MDI_DEBUG(2, (MDI_NOTE, pdip,
+	    "caddr@%s paddr@%s", caddr ? caddr : "", paddr ? paddr : ""));
 	if ((pdip == NULL) || (paddr == NULL)) {
 		return (NULL);
 	}
@@ -2608,8 +2645,7 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 		/*
 		 * Invalid pHCI device, Nothing more to do.
 		 */
-		MDI_DEBUG(2, (CE_WARN, pdip,
-		    "!mdi_pi_find: invalid phci"));
+		MDI_DEBUG(2, (MDI_WARN, pdip, "invalid phci"));
 		return (NULL);
 	}
 
@@ -2618,8 +2654,7 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 		/*
 		 * Invalid vHCI device, Nothing more to do.
 		 */
-		MDI_DEBUG(2, (CE_WARN, pdip,
-		    "!mdi_pi_find: invalid vhci"));
+		MDI_DEBUG(2, (MDI_WARN, pdip, "invalid vhci"));
 		return (NULL);
 	}
 
@@ -2633,8 +2668,8 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 		 */
 		MDI_PHCI_LOCK(ph);
 		if (MDI_PHCI_IS_OFFLINE(ph)) {
-			MDI_DEBUG(2, (CE_WARN, pdip,
-			    "!mdi_pi_find: offline phci %p", (void *)ph));
+			MDI_DEBUG(2, (MDI_WARN, pdip,
+			    "offline phci %p", (void *)ph));
 			MDI_PHCI_UNLOCK(ph);
 			return (NULL);
 		}
@@ -2647,8 +2682,8 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 			pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_phci_link;
 		}
 		MDI_PHCI_UNLOCK(ph);
-		MDI_DEBUG(2, (CE_NOTE, pdip, "!mdi_pi_find: found %p",
-		    (void *)pip));
+		MDI_DEBUG(2, (MDI_NOTE, pdip,
+		    "found %s %p", mdi_pi_spathname(pip), (void *)pip));
 		return (pip);
 	}
 
@@ -2676,8 +2711,8 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 		 * created yet.
 		 */
 		MDI_VHCI_CLIENT_UNLOCK(vh);
-		MDI_DEBUG(2, (CE_NOTE, pdip, "!mdi_pi_find: client not "
-		    "found for caddr %s", caddr ? caddr : "NULL"));
+		MDI_DEBUG(2, (MDI_NOTE, pdip,
+		    "client not found for caddr @%s", caddr ? caddr : ""));
 		return (NULL);
 	}
 
@@ -2705,7 +2740,8 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 		pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link;
 	}
 	MDI_CLIENT_UNLOCK(ct);
-	MDI_DEBUG(2, (CE_NOTE, pdip, "!mdi_pi_find: found:: %p", (void *)pip));
+	MDI_DEBUG(2, (MDI_NOTE, pdip,
+	    "found: %s %p", mdi_pi_spathname(pip), (void *)pip));
 	return (pip);
 }
 
@@ -2742,9 +2778,9 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	int		rv = MDI_NOMEM;
 	int		path_allocated = 0;
 
-	MDI_DEBUG(2, (CE_NOTE, pdip, "!mdi_pi_alloc_compatible: %s %s %s",
-	    cname ? cname : "NULL", caddr ? caddr : "NULL",
-	    paddr ? paddr : "NULL"));
+	MDI_DEBUG(2, (MDI_NOTE, pdip,
+	    "cname %s: caddr@%s paddr@%s",
+	    cname ? cname : "", caddr ? caddr : "", paddr ? paddr : ""));
 
 	if (pdip == NULL || cname == NULL || caddr == NULL || paddr == NULL ||
 	    ret_pip == NULL) {
@@ -2757,8 +2793,8 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	/* No allocations on detaching pHCI */
 	if (DEVI_IS_DETACHING(pdip)) {
 		/* Invalid pHCI device, return failure */
-		MDI_DEBUG(1, (CE_WARN, pdip,
-		    "!mdi_pi_alloc: detaching pHCI=%p", (void *)pdip));
+		MDI_DEBUG(1, (MDI_WARN, pdip,
+		    "!detaching pHCI=%p", (void *)pdip));
 		return (MDI_FAILURE);
 	}
 
@@ -2766,8 +2802,8 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	ASSERT(ph != NULL);
 	if (ph == NULL) {
 		/* Invalid pHCI device, return failure */
-		MDI_DEBUG(1, (CE_WARN, pdip,
-		    "!mdi_pi_alloc: invalid pHCI=%p", (void *)pdip));
+		MDI_DEBUG(1, (MDI_WARN, pdip,
+		    "!invalid pHCI=%p", (void *)pdip));
 		return (MDI_FAILURE);
 	}
 
@@ -2775,8 +2811,8 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	vh = ph->ph_vhci;
 	if (vh == NULL) {
 		/* Invalid vHCI device, return failure */
-		MDI_DEBUG(1, (CE_WARN, pdip,
-		    "!mdi_pi_alloc: invalid vHCI=%p", (void *)pdip));
+		MDI_DEBUG(1, (MDI_WARN, pdip,
+		    "!invalid vHCI=%p", (void *)pdip));
 		MDI_PHCI_UNLOCK(ph);
 		return (MDI_FAILURE);
 	}
@@ -2786,8 +2822,8 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 		 * Do not allow new node creation when pHCI is in
 		 * offline/suspended states
 		 */
-		MDI_DEBUG(1, (CE_WARN, pdip,
-		    "mdi_pi_alloc: pHCI=%p is not ready", (void *)ph));
+		MDI_DEBUG(1, (MDI_WARN, pdip,
+		    "pHCI=%p is not ready", (void *)ph));
 		MDI_PHCI_UNLOCK(ph);
 		return (MDI_BUSY);
 	}
@@ -2857,8 +2893,8 @@ fail:
 	MDI_PHCI_UNLOCK(ph);
 	*ret_pip = pip;
 
-	MDI_DEBUG(2, (CE_NOTE, pdip,
-	    "!mdi_pi_alloc_compatible: alloc %p", (void *)pip));
+	MDI_DEBUG(2, (MDI_NOTE, pdip,
+	    "alloc %s %p", mdi_pi_spathname(pip), (void *)pip));
 
 	if (path_allocated)
 		vhcache_pi_add(vh->vh_config, MDI_PI(pip));
@@ -2888,7 +2924,7 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 	mdi_pathinfo_t	*pip;
 	int		ct_circular;
 	int		ph_circular;
-	static char	path[MAXPATHLEN];
+	static char	path[MAXPATHLEN];	/* mdi_pathmap_mutex protects */
 	char		*path_persistent;
 	int		path_instance;
 	mod_hash_val_t	hv;
@@ -2927,7 +2963,7 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 	 */
         mutex_enter(&mdi_pathmap_mutex);
 	(void) ddi_pathname(ph->ph_dip, path);
-	(void) sprintf(path + strlen(path), "/%s@%s", 
+	(void) sprintf(path + strlen(path), "/%s@%s",
 	    mdi_pi_get_node_name(pip), mdi_pi_get_addr(pip));
         if (mod_hash_find(mdi_pathmap_bypath, (mod_hash_key_t)path, &hv) == 0) {
                 path_instance = (uint_t)(intptr_t)hv;
@@ -2939,6 +2975,15 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
                     (mod_hash_key_t)path_persistent,
                     (mod_hash_val_t)(intptr_t)path_instance);
 		(void) mod_hash_insert(mdi_pathmap_byinstance,
+		    (mod_hash_key_t)(intptr_t)path_instance,
+		    (mod_hash_val_t)path_persistent);
+
+		/* create shortpath name */
+		(void) snprintf(path, sizeof(path), "%s%d/%s@%s",
+		    ddi_driver_name(ph->ph_dip), ddi_get_instance(ph->ph_dip),
+		    mdi_pi_get_node_name(pip), mdi_pi_get_addr(pip));
+		path_persistent = i_ddi_strdup(path, KM_SLEEP);
+		(void) mod_hash_insert(mdi_pathmap_sbyinstance,
 		    (mod_hash_key_t)(intptr_t)path_instance,
 		    (mod_hash_val_t)path_persistent);
         }
@@ -2998,6 +3043,29 @@ mdi_pi_pathname_by_instance(int path_instance)
 	mutex_exit(&mdi_pathmap_mutex);
 	return (path);
 }
+
+/*
+ * mdi_pi_spathname_by_instance():
+ *	Lookup of "shortpath" by 'path_instance'. Return "shortpath".
+ *	NOTE: returned "shortpath" remains valid forever (until reboot).
+ */
+char *
+mdi_pi_spathname_by_instance(int path_instance)
+{
+	char		*path;
+	mod_hash_val_t	hv;
+
+	/* mdi_pathmap lookup of "path" by 'path_instance' */
+	mutex_enter(&mdi_pathmap_mutex);
+	if (mod_hash_find(mdi_pathmap_sbyinstance,
+	    (mod_hash_key_t)(intptr_t)path_instance, &hv) == 0)
+		path = (char *)hv;
+	else
+		path = NULL;
+	mutex_exit(&mdi_pathmap_mutex);
+	return (path);
+}
+
 
 /*
  * i_mdi_phci_add_path():
@@ -3068,8 +3136,9 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		/*
 		 * Invalid pHCI device, return failure
 		 */
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_free: invalid pHCI pip=%p", (void *)pip));
+		MDI_DEBUG(1, (MDI_WARN, NULL,
+		    "!invalid pHCI: pip %s %p",
+		    mdi_pi_spathname(pip), (void *)pip));
 		MDI_PI_UNLOCK(pip);
 		return (MDI_FAILURE);
 	}
@@ -3078,8 +3147,9 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 	ASSERT(vh != NULL);
 	if (vh == NULL) {
 		/* Invalid pHCI device, return failure */
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_free: invalid vHCI pip=%p", (void *)pip));
+		MDI_DEBUG(1, (MDI_WARN, ph->ph_dip,
+		    "!invalid vHCI: pip %s %p",
+		    mdi_pi_spathname(pip), (void *)pip));
 		MDI_PI_UNLOCK(pip);
 		return (MDI_FAILURE);
 	}
@@ -3090,8 +3160,9 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		/*
 		 * Invalid Client device, return failure
 		 */
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_free: invalid client pip=%p", (void *)pip));
+		MDI_DEBUG(1, (MDI_WARN, ph->ph_dip,
+		    "!invalid client: pip %s %p",
+		    mdi_pi_spathname(pip), (void *)pip));
 		MDI_PI_UNLOCK(pip);
 		return (MDI_FAILURE);
 	}
@@ -3106,8 +3177,8 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		/*
 		 * Node is busy
 		 */
-		MDI_DEBUG(1, (CE_WARN, ct->ct_dip,
-		    "!mdi_pi_free: pathinfo node is busy pip=%p", (void *)pip));
+		MDI_DEBUG(1, (MDI_WARN, ct->ct_dip,
+		    "!busy: pip %s %p", mdi_pi_spathname(pip), (void *)pip));
 		MDI_PI_UNLOCK(pip);
 		return (MDI_BUSY);
 	}
@@ -3116,9 +3187,10 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		/*
 		 * Give a chance for pending I/Os to complete.
 		 */
-		MDI_DEBUG(1, (CE_NOTE, ct->ct_dip, "!mdi_pi_free: "
-		    "%d cmds still pending on path: %p\n",
-		    MDI_PI(pip)->pi_ref_cnt, (void *)pip));
+		MDI_DEBUG(1, (MDI_NOTE, ct->ct_dip,
+		    "!%d cmds still pending on path: %s %p",
+		    MDI_PI(pip)->pi_ref_cnt,
+		    mdi_pi_spathname(pip), (void *)pip));
 		if (cv_timedwait(&MDI_PI(pip)->pi_ref_cv,
 		    &MDI_PI(pip)->pi_mutex,
 		    ddi_get_lbolt() + drv_usectohz(60 * 1000000)) == -1) {
@@ -3126,14 +3198,13 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 			 * The timeout time reached without ref_cnt being zero
 			 * being signaled.
 			 */
-			MDI_DEBUG(1, (CE_NOTE, ct->ct_dip,
-			    "!mdi_pi_free: "
-			    "Timeout reached on path %p without the cond\n",
-			    (void *)pip));
-			MDI_DEBUG(1, (CE_NOTE, ct->ct_dip,
-			    "!mdi_pi_free: "
-			    "%d cmds still pending on path: %p\n",
-			    MDI_PI(pip)->pi_ref_cnt, (void *)pip));
+			MDI_DEBUG(1, (MDI_NOTE, ct->ct_dip,
+			    "!Timeout reached on path %s %p without the cond",
+			    mdi_pi_spathname(pip), (void *)pip));
+			MDI_DEBUG(1, (MDI_NOTE, ct->ct_dip,
+			    "!%d cmds still pending on path %s %p",
+			    MDI_PI(pip)->pi_ref_cnt,
+			    mdi_pi_spathname(pip), (void *)pip));
 			MDI_PI_UNLOCK(pip);
 			return (MDI_BUSY);
 		}
@@ -3172,7 +3243,7 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 	 */
 	if (rv == MDI_SUCCESS) {
 		if (client_held) {
-			MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "mdi_pi_free "
+			MDI_DEBUG(4, (MDI_NOTE, ct->ct_dip,
 			    "i_mdi_pm_rele_client\n"));
 			i_mdi_pm_rele_client(ct, 1);
 		}
@@ -3356,8 +3427,9 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		 * Invalid pHCI device, fail the request
 		 */
 		MDI_PI_UNLOCK(pip);
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_state_change: invalid phci pip=%p", (void *)pip));
+		MDI_DEBUG(1, (MDI_WARN, NULL,
+		    "!invalid phci: pip %s %p",
+		    mdi_pi_spathname(pip), (void *)pip));
 		return (MDI_FAILURE);
 	}
 
@@ -3368,8 +3440,9 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		 * Invalid vHCI device, fail the request
 		 */
 		MDI_PI_UNLOCK(pip);
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_state_change: invalid vhci pip=%p", (void *)pip));
+		MDI_DEBUG(1, (MDI_WARN, ph->ph_dip,
+		    "!invalid vhci: pip %s %p",
+		    mdi_pi_spathname(pip), (void *)pip));
 		return (MDI_FAILURE);
 	}
 
@@ -3380,9 +3453,9 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		 * Invalid client device, fail the request
 		 */
 		MDI_PI_UNLOCK(pip);
-		MDI_DEBUG(1, (CE_WARN, NULL,
-		    "!mdi_pi_state_change: invalid client pip=%p",
-		    (void *)pip));
+		MDI_DEBUG(1, (MDI_WARN, ph->ph_dip,
+		    "!invalid client: pip %s %p",
+		    mdi_pi_spathname(pip), (void *)pip));
 		return (MDI_FAILURE);
 	}
 
@@ -3397,9 +3470,10 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		if (f != NULL) {
 			rv = (*f)(vh->vh_dip, pip, 0);
 			if (rv != MDI_SUCCESS) {
-				MDI_DEBUG(1, (CE_WARN, ct->ct_dip,
-				    "!vo_pi_init: failed vHCI=0x%p, pip=0x%p",
-				    (void *)vh, (void *)pip));
+				MDI_DEBUG(1, (MDI_WARN, ct->ct_dip,
+				    "!vo_pi_init failed: vHCI %p, pip %s %p",
+				    (void *)vh, mdi_pi_spathname(pip),
+				    (void *)pip));
 				return (MDI_FAILURE);
 			}
 		}
@@ -3413,9 +3487,8 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 	 */
 	i_mdi_phci_lock(ph, pip);
 	if (MDI_PHCI_IS_READY(ph) == 0) {
-		MDI_DEBUG(1, (CE_WARN, ct->ct_dip,
-		    "!mdi_pi_state_change: pHCI not ready, pHCI=%p",
-		    (void *)ph));
+		MDI_DEBUG(1, (MDI_WARN, ct->ct_dip,
+		    "!pHCI not ready, pHCI=%p", (void *)ph));
 		MDI_PI_UNLOCK(pip);
 		i_mdi_phci_unlock(ph);
 		return (MDI_BUSY);
@@ -3474,15 +3547,18 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		 * ndi_devi_offline() cannot hold pip or ct locks.
 		 */
 		MDI_PI_UNLOCK(pip);
+
 		/*
-		 * Don't offline the client dev_info node unless we have
-		 * no available paths left at all.
+		 * If this is a user initiated path online->offline operation
+		 * who's success would transition a client from DEGRADED to
+		 * FAILED then only proceed if we can offline the client first.
 		 */
 		cdip = ct->ct_dip;
-		if ((flag & NDI_DEVI_REMOVE) &&
-		    (ct->ct_path_count == 1)) {
+		if ((flag & NDI_USER_REQ) &&
+		    MDI_PI_IS_ONLINE(pip) &&
+		    (MDI_CLIENT_STATE(ct) == MDI_CLIENT_STATE_DEGRADED)) {
 			i_mdi_client_unlock(ct);
-			rv = ndi_devi_offline(cdip, 0);
+			rv = ndi_devi_offline(cdip, NDI_DEVFS_CLEAN);
 			if (rv != NDI_SUCCESS) {
 				/*
 				 * Convert to MDI error code
@@ -3521,8 +3597,8 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		MDI_CLIENT_SET_DEV_NOT_SUPPORTED(ct);
 	}
 	if (rv != MDI_SUCCESS) {
-		MDI_DEBUG(2, (CE_WARN, ct->ct_dip,
-		    "!vo_pi_state_change: failed rv = %x", rv));
+		MDI_DEBUG(2, (MDI_WARN, ct->ct_dip,
+		    "vo_pi_state_change failed: rv %x", rv));
 	}
 	if (MDI_PI_IS_TRANSIENT(pip)) {
 		if (rv == MDI_SUCCESS) {
@@ -3576,9 +3652,9 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 						 * Reset client flags to
 						 * offline.
 						 */
-						MDI_DEBUG(1, (CE_WARN, cdip,
-						    "!ndi_devi_online: failed "
-						    " Error: %x", rv));
+						MDI_DEBUG(1, (MDI_WARN, cdip,
+						    "!ndi_devi_online failed "
+						    "error %x", rv));
 						MDI_CLIENT_SET_OFFLINE(ct);
 					}
 					if (rv != NDI_SUCCESS) {
@@ -3596,11 +3672,12 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 				 * This is the last path case for
 				 * non-user initiated events.
 				 */
-				if (((flag & NDI_DEVI_REMOVE) == 0) &&
+				if (((flag & NDI_USER_REQ) == 0) &&
 				    cdip && (i_ddi_node_state(cdip) >=
 				    DS_INITIALIZED)) {
 					MDI_CLIENT_UNLOCK(ct);
-					rv = ndi_devi_offline(cdip, 0);
+					rv = ndi_devi_offline(cdip,
+					    NDI_DEVFS_CLEAN);
 					MDI_CLIENT_LOCK(ct);
 
 					if (rv != NDI_SUCCESS) {
@@ -3610,9 +3687,9 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 						 * online as the path could not
 						 * be offlined.
 						 */
-						MDI_DEBUG(1, (CE_WARN, cdip,
-						    "!ndi_devi_offline: failed "
-						    " Error: %x", rv));
+						MDI_DEBUG(1, (MDI_WARN, cdip,
+						    "!ndi_devi_offline failed: "
+						    "error %x", rv));
 						MDI_CLIENT_SET_ONLINE(ct);
 					}
 				}
@@ -3663,8 +3740,6 @@ mdi_pi_online(mdi_pathinfo_t *pip, int flags)
 	mdi_client_t	*ct = MDI_PI(pip)->pi_client;
 	int		client_held = 0;
 	int		rv;
-	int		se_flag;
-	int		kmem_flag;
 
 	ASSERT(ct != NULL);
 	rv = i_mdi_pi_state_change(pip, MDI_PATHINFO_STATE_ONLINE, flags);
@@ -3673,8 +3748,8 @@ mdi_pi_online(mdi_pathinfo_t *pip, int flags)
 
 	MDI_PI_LOCK(pip);
 	if (MDI_PI(pip)->pi_pm_held == 0) {
-		MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "mdi_pi_online "
-		    "i_mdi_pm_hold_pip %p\n", (void *)pip));
+		MDI_DEBUG(4, (MDI_NOTE, ct->ct_dip,
+		    "i_mdi_pm_hold_pip %p", (void *)pip));
 		i_mdi_pm_hold_pip(pip);
 		client_held = 1;
 	}
@@ -3686,18 +3761,11 @@ mdi_pi_online(mdi_pathinfo_t *pip, int flags)
 			rv = i_mdi_power_all_phci(ct);
 		}
 
-		MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "mdi_pi_online "
-		    "i_mdi_pm_hold_client %p\n", (void *)ct));
+		MDI_DEBUG(4, (MDI_NOTE, ct->ct_dip,
+		    "i_mdi_pm_hold_client %p", (void *)ct));
 		i_mdi_pm_hold_client(ct, 1);
 		MDI_CLIENT_UNLOCK(ct);
 	}
-
-	/* determine interrupt context */
-	se_flag = (servicing_interrupt()) ? SE_NOSLEEP : SE_SLEEP;
-	kmem_flag = (se_flag == SE_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
-
-	/* A new path is online.  Invalidate DINFOCACHE snap shot. */
-	i_ddi_di_cache_invalidate(kmem_flag);
 
 	return (rv);
 }
@@ -3741,8 +3809,16 @@ mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 {
 	int	ret, client_held = 0;
 	mdi_client_t	*ct;
-	int		se_flag;
-	int		kmem_flag;
+
+	/*
+	 * Original code overloaded NDI_DEVI_REMOVE to this interface, and
+	 * used it to mean "user initiated operation" (i.e. devctl). Callers
+	 * should now just use NDI_USER_REQ.
+	 */
+	if (flags & NDI_DEVI_REMOVE) {
+		flags &= ~NDI_DEVI_REMOVE;
+		flags |= NDI_USER_REQ;
+	}
 
 	ret = i_mdi_pi_state_change(pip, MDI_PATHINFO_STATE_OFFLINE, flags);
 
@@ -3756,18 +3832,11 @@ mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 		if (client_held) {
 			ct = MDI_PI(pip)->pi_client;
 			MDI_CLIENT_LOCK(ct);
-			MDI_DEBUG(4, (CE_NOTE, ct->ct_dip,
-			    "mdi_pi_offline i_mdi_pm_rele_client\n"));
+			MDI_DEBUG(4, (MDI_NOTE, ct->ct_dip,
+			    "i_mdi_pm_rele_client\n"));
 			i_mdi_pm_rele_client(ct, 1);
 			MDI_CLIENT_UNLOCK(ct);
 		}
-
-		/* determine interrupt context */
-		se_flag = (servicing_interrupt()) ? SE_NOSLEEP : SE_SLEEP;
-		kmem_flag = (se_flag == SE_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
-
-		/* pathinfo is offlined. update DINFOCACHE. */
-		i_ddi_di_cache_invalidate(kmem_flag);
 	}
 
 	return (ret);
@@ -3794,9 +3863,10 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 		/*
 		 * Give a chance for pending I/Os to complete.
 		 */
-		MDI_DEBUG(1, (CE_NOTE, ct->ct_dip, "!i_mdi_pi_offline: "
-		    "%d cmds still pending on path: %p\n",
-		    MDI_PI(pip)->pi_ref_cnt, (void *)pip));
+		MDI_DEBUG(1, (MDI_NOTE, ct->ct_dip,
+		    "!%d cmds still pending on path %s %p",
+		    MDI_PI(pip)->pi_ref_cnt, mdi_pi_spathname(pip),
+		    (void *)pip));
 		if (cv_timedwait(&MDI_PI(pip)->pi_ref_cv,
 		    &MDI_PI(pip)->pi_mutex,
 		    ddi_get_lbolt() + drv_usectohz(60 * 1000000)) == -1) {
@@ -3804,12 +3874,13 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 			 * The timeout time reached without ref_cnt being zero
 			 * being signaled.
 			 */
-			MDI_DEBUG(1, (CE_NOTE, ct->ct_dip, "!i_mdi_pi_offline: "
-			    "Timeout reached on path %p without the cond\n",
-			    (void *)pip));
-			MDI_DEBUG(1, (CE_NOTE, ct->ct_dip, "!i_mdi_pi_offline: "
-			    "%d cmds still pending on path: %p\n",
-			    MDI_PI(pip)->pi_ref_cnt, (void *)pip));
+			MDI_DEBUG(1, (MDI_NOTE, ct->ct_dip,
+			    "!Timeout reached on path %s %p without the cond",
+			    mdi_pi_spathname(pip), (void *)pip));
+			MDI_DEBUG(1, (MDI_NOTE, ct->ct_dip,
+			    "!%d cmds still pending on path %s %p",
+			    MDI_PI(pip)->pi_ref_cnt,
+			    mdi_pi_spathname(pip), (void *)pip));
 		}
 	}
 	vh = ct->ct_vhci;
@@ -3825,9 +3896,10 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 		MDI_PI_UNLOCK(pip);
 		if ((rv = (*f)(vdip, pip, MDI_PATHINFO_STATE_OFFLINE, 0,
 		    flags)) != MDI_SUCCESS) {
-			MDI_DEBUG(1, (CE_WARN, ct->ct_dip,
-			    "!vo_path_offline failed "
-			    "vdip %p, pip %p", (void *)vdip, (void *)pip));
+			MDI_DEBUG(1, (MDI_WARN, ct->ct_dip,
+			    "!vo_path_offline failed: vdip %s%d %p: path %s %p",
+			    ddi_driver_name(vdip), ddi_get_instance(vdip),
+			    (void *)vdip, mdi_pi_spathname(pip), (void *)pip));
 		}
 		MDI_PI_LOCK(pip);
 	}
@@ -3856,7 +3928,8 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 				    (i_ddi_node_state(cdip) >=
 				    DS_INITIALIZED)) {
 					MDI_CLIENT_UNLOCK(ct);
-					rv = ndi_devi_offline(cdip, 0);
+					rv = ndi_devi_offline(cdip,
+					    NDI_DEVFS_CLEAN);
 					MDI_CLIENT_LOCK(ct);
 					if (rv != NDI_SUCCESS) {
 						/*
@@ -3864,9 +3937,9 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 						 * Reset client flags to
 						 * online.
 						 */
-						MDI_DEBUG(4, (CE_WARN, cdip,
-						    "!ndi_devi_offline: failed "
-						    " Error: %x", rv));
+						MDI_DEBUG(4, (MDI_WARN, cdip,
+						    "ndi_devi_offline failed: "
+						    "error %x", rv));
 						MDI_CLIENT_SET_ONLINE(ct);
 					}
 				}
@@ -3895,8 +3968,8 @@ i_mdi_pi_offline(mdi_pathinfo_t *pip, int flags)
 	/*
 	 * Change in the mdi_pathinfo node state will impact the client state
 	 */
-	MDI_DEBUG(2, (CE_NOTE, NULL, "!i_mdi_pi_offline ct = %p pip = %p",
-	    (void *)ct, (void *)pip));
+	MDI_DEBUG(2, (MDI_NOTE, ct->ct_dip,
+	    "ct = %p pip = %p", (void *)ct, (void *)pip));
 	return (rv);
 }
 
@@ -3966,6 +4039,25 @@ mdi_pi_pathname(mdi_pathinfo_t *pip)
 	return (mdi_pi_pathname_by_instance(mdi_pi_get_path_instance(pip)));
 }
 
+/*
+ * mdi_pi_spathname():
+ *		Return pointer to shortpath to pathinfo node. Used for debug
+ *		messages, so return "" instead of NULL when unknown.
+ */
+char *
+mdi_pi_spathname(mdi_pathinfo_t *pip)
+{
+	char	*spath = "";
+
+	if (pip) {
+		spath = mdi_pi_spathname_by_instance(
+		    mdi_pi_get_path_instance(pip));
+		if (spath == NULL)
+			spath = "";
+	}
+	return (spath);
+}
+
 char *
 mdi_pi_pathname_obp(mdi_pathinfo_t *pip, char *path)
 {
@@ -4007,7 +4099,7 @@ mdi_pi_pathname_obp_set(mdi_pathinfo_t *pip, char *component)
 		(void) strncat(obp_path, component, MAXPATHLEN);
 	}
 	rc = mdi_prop_update_string(pip, "obp-path", obp_path);
-	
+
 	if (obp_path)
 		kmem_free(obp_path, MAXPATHLEN);
 	return (rc);
@@ -4040,8 +4132,12 @@ dev_info_t *
 mdi_pi_get_phci(mdi_pathinfo_t *pip)
 {
 	dev_info_t	*dip = NULL;
+	mdi_phci_t	*ph;
+
 	if (pip) {
-		dip = MDI_PI(pip)->pi_phci->ph_dip;
+		ph = MDI_PI(pip)->pi_phci;
+		if (ph)
+			dip = ph->ph_dip;
 	}
 	return (dip);
 }
@@ -4082,6 +4178,7 @@ caddr_t
 mdi_pi_get_phci_private(mdi_pathinfo_t *pip)
 {
 	caddr_t	pprivate = NULL;
+
 	if (pip) {
 		pprivate = MDI_PI(pip)->pi_pprivate;
 	}
@@ -4122,6 +4219,16 @@ mdi_pi_get_state(mdi_pathinfo_t *pip)
 		}
 	}
 	return (state);
+}
+
+/*
+ * mdi_pi_get_flags():
+ *		Get the mdi_pathinfo node flags.
+ */
+uint_t
+mdi_pi_get_flags(mdi_pathinfo_t *pip)
+{
+	return (pip ? MDI_PI(pip)->pi_flags : 0);
 }
 
 /*
@@ -4188,6 +4295,9 @@ mdi_pi_set_state(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state)
 		ext_state = MDI_PI(pip)->pi_state & MDI_PATHINFO_EXT_STATE_MASK;
 		MDI_PI(pip)->pi_state = state;
 		MDI_PI(pip)->pi_state |= ext_state;
+
+		/* Path has changed state, invalidate DINFOCACHE snap shot. */
+		i_ddi_di_cache_invalidate();
 	}
 }
 
@@ -4258,7 +4368,7 @@ mdi_prop_remove(mdi_pathinfo_t *pip, char *name)
 		while (nvp) {
 			nvpair_t	*next;
 			next = nvlist_next_nvpair(MDI_PI(pip)->pi_prop, nvp);
-			(void) snprintf(nvp_name, MAXNAMELEN, "%s",
+			(void) snprintf(nvp_name, sizeof(nvp_name), "%s",
 			    nvpair_name(nvp));
 			(void) nvlist_remove_all(MDI_PI(pip)->pi_prop,
 			    nvp_name);
@@ -4632,19 +4742,21 @@ mdi_prop_free(void *data)
 static void
 i_mdi_report_path_state(mdi_client_t *ct, mdi_pathinfo_t *pip)
 {
-	char		*phci_path, *ct_path;
+	char		*ct_path;
 	char		*ct_status;
 	char		*status;
-	dev_info_t	*dip = ct->ct_dip;
+	dev_info_t	*cdip = ct->ct_dip;
 	char		lb_buf[64];
+	int		report_lb_c = 0, report_lb_p = 0;
 
 	ASSERT(MDI_CLIENT_LOCKED(ct));
-	if ((dip == NULL) || (ddi_get_instance(dip) == -1) ||
+	if ((cdip == NULL) || (ddi_get_instance(cdip) == -1) ||
 	    (MDI_CLIENT_IS_REPORT_DEV_NEEDED(ct) == 0)) {
 		return;
 	}
 	if (MDI_CLIENT_STATE(ct) == MDI_CLIENT_STATE_OPTIMAL) {
 		ct_status = "optimal";
+		report_lb_c = 1;
 	} else if (MDI_CLIENT_STATE(ct) == MDI_CLIENT_STATE_DEGRADED) {
 		ct_status = "degraded";
 	} else if (MDI_CLIENT_STATE(ct) == MDI_CLIENT_STATE_FAILED) {
@@ -4653,10 +4765,15 @@ i_mdi_report_path_state(mdi_client_t *ct, mdi_pathinfo_t *pip)
 		ct_status = "unknown";
 	}
 
-	if (MDI_PI_IS_OFFLINE(pip)) {
+	lb_buf[0] = 0;		/* not interested in load balancing config */
+
+	if (MDI_PI_FLAGS_IS_DEVICE_REMOVED(pip)) {
+		status = "removed";
+	} else if (MDI_PI_IS_OFFLINE(pip)) {
 		status = "offline";
 	} else if (MDI_PI_IS_ONLINE(pip)) {
 		status = "online";
+		report_lb_p = 1;
 	} else if (MDI_PI_IS_STANDBY(pip)) {
 		status = "standby";
 	} else if (MDI_PI_IS_FAULT(pip)) {
@@ -4665,31 +4782,44 @@ i_mdi_report_path_state(mdi_client_t *ct, mdi_pathinfo_t *pip)
 		status = "unknown";
 	}
 
-	if (ct->ct_lb == LOAD_BALANCE_LBA) {
-		(void) snprintf(lb_buf, sizeof (lb_buf),
-		    "%s, region-size: %d", mdi_load_balance_lba,
-			ct->ct_lb_args->region_size);
-	} else if (ct->ct_lb == LOAD_BALANCE_NONE) {
-		(void) snprintf(lb_buf, sizeof (lb_buf),
-		    "%s", mdi_load_balance_none);
-	} else {
-		(void) snprintf(lb_buf, sizeof (lb_buf), "%s",
-		    mdi_load_balance_rr);
-	}
-
-	if (dip) {
+	if (cdip) {
 		ct_path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-		phci_path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-		cmn_err(CE_CONT, "?%s (%s%d) multipath status: %s, "
-		    "path %s (%s%d) to target address: %s is %s"
-		    " Load balancing: %s\n",
-		    ddi_pathname(dip, ct_path), ddi_driver_name(dip),
-		    ddi_get_instance(dip), ct_status,
-		    ddi_pathname(MDI_PI(pip)->pi_phci->ph_dip, phci_path),
-		    ddi_driver_name(MDI_PI(pip)->pi_phci->ph_dip),
-		    ddi_get_instance(MDI_PI(pip)->pi_phci->ph_dip),
-		    MDI_PI(pip)->pi_addr, status, lb_buf);
-		kmem_free(phci_path, MAXPATHLEN);
+
+		/*
+		 * NOTE: Keeping "multipath status: %s" and
+		 * "Load balancing: %s" format unchanged in case someone
+		 * scrubs /var/adm/messages looking for these messages.
+		 */
+		if (report_lb_c && report_lb_p) {
+			if (ct->ct_lb == LOAD_BALANCE_LBA) {
+				(void) snprintf(lb_buf, sizeof (lb_buf),
+				    "%s, region-size: %d", mdi_load_balance_lba,
+				    ct->ct_lb_args->region_size);
+			} else if (ct->ct_lb == LOAD_BALANCE_NONE) {
+				(void) snprintf(lb_buf, sizeof (lb_buf),
+				    "%s", mdi_load_balance_none);
+			} else {
+				(void) snprintf(lb_buf, sizeof (lb_buf), "%s",
+				    mdi_load_balance_rr);
+			}
+
+			cmn_err(mdi_debug_consoleonly ? CE_NOTE : CE_CONT,
+			    "?%s (%s%d) multipath status: %s: "
+			    "path %d %s is %s: Load balancing: %s\n",
+			    ddi_pathname(cdip, ct_path), ddi_driver_name(cdip),
+			    ddi_get_instance(cdip), ct_status,
+			    mdi_pi_get_path_instance(pip),
+			    mdi_pi_spathname(pip), status, lb_buf);
+		} else {
+			cmn_err(mdi_debug_consoleonly ? CE_NOTE : CE_CONT,
+			    "?%s (%s%d) multipath status: %s: "
+			    "path %d %s is %s\n",
+			    ddi_pathname(cdip, ct_path), ddi_driver_name(cdip),
+			    ddi_get_instance(cdip), ct_status,
+			    mdi_pi_get_path_instance(pip),
+			    mdi_pi_spathname(pip), status);
+		}
+
 		kmem_free(ct_path, MAXPATHLEN);
 		MDI_CLIENT_CLEAR_REPORT_DEV_NEEDED(ct);
 	}
@@ -4700,13 +4830,20 @@ i_mdi_report_path_state(mdi_client_t *ct, mdi_pathinfo_t *pip)
  * i_mdi_log():
  *		Utility function for error message management
  *
+ *		NOTE: Implementation takes care of trailing \n for cmn_err,
+ *		MDI_DEBUG should not terminate fmt strings with \n.
+ *
+ *		NOTE: If the level is >= 2, and there is no leading !?^
+ *		then a leading ! is implied (but can be overriden via
+ *		mdi_debug_consoleonly). If you are using kmdb on the console,
+ *		consider setting mdi_debug_consoleonly to 1 as an aid.
  */
-/*PRINTFLIKE3*/
+/*PRINTFLIKE4*/
 static void
-i_mdi_log(int level, dev_info_t *dip, const char *fmt, ...)
+i_mdi_log(int level, const char *func, dev_info_t *dip, const char *fmt, ...)
 {
 	char		name[MAXNAMELEN];
-	char		buf[MAXNAMELEN];
+	char		buf[512];
 	char		*bp;
 	va_list		ap;
 	int		log_only = 0;
@@ -4714,14 +4851,14 @@ i_mdi_log(int level, dev_info_t *dip, const char *fmt, ...)
 	int		console_only = 0;
 
 	if (dip) {
-		(void) snprintf(name, MAXNAMELEN, "%s%d: ",
+		(void) snprintf(name, sizeof(name), "%s%d: ",
 		    ddi_driver_name(dip), ddi_get_instance(dip));
 	} else {
 		name[0] = 0;
 	}
 
 	va_start(ap, fmt);
-	(void) vsnprintf(buf, MAXNAMELEN, fmt, ap);
+	(void) vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 
 	switch (buf[0]) {
@@ -4738,6 +4875,8 @@ i_mdi_log(int level, dev_info_t *dip, const char *fmt, ...)
 		console_only = 1;
 		break;
 	default:
+		if (level >= 2)
+			log_only = 1;		/* ! implied */
 		bp = buf;
 		break;
 	}
@@ -4746,22 +4885,41 @@ i_mdi_log(int level, dev_info_t *dip, const char *fmt, ...)
 		boot_only = 0;
 		console_only = 0;
 	}
+	if (mdi_debug_consoleonly) {
+		log_only = 0;
+		boot_only = 0;
+		console_only = 1;
+		level = CE_NOTE;
+		goto console;
+	}
 
 	switch (level) {
 	case CE_NOTE:
 		level = CE_CONT;
 		/* FALLTHROUGH */
 	case CE_CONT:
+		if (boot_only) {
+			cmn_err(level, "?mdi: %s%s: %s\n", name, func, bp);
+		} else if (console_only) {
+			cmn_err(level, "^mdi: %s%s: %s\n", name, func, bp);
+		} else if (log_only) {
+			cmn_err(level, "!mdi: %s%s: %s\n", name, func, bp);
+		} else {
+			cmn_err(level, "mdi: %s%s: %s\n", name, func, bp);
+		}
+		break;
+
 	case CE_WARN:
 	case CE_PANIC:
+	console:
 		if (boot_only) {
-			cmn_err(level, "?mdi: %s%s", name, bp);
+			cmn_err(level, "?mdi: %s%s: %s", name, func, bp);
 		} else if (console_only) {
-			cmn_err(level, "^mdi: %s%s", name, bp);
+			cmn_err(level, "^mdi: %s%s: %s", name, func, bp);
 		} else if (log_only) {
-			cmn_err(level, "!mdi: %s%s", name, bp);
+			cmn_err(level, "!mdi: %s%s: %s", name, func, bp);
 		} else {
-			cmn_err(level, "mdi: %s%s", name, bp);
+			cmn_err(level, "mdi: %s%s: %s", name, func, bp);
 		}
 		break;
 	default:
@@ -4791,8 +4949,8 @@ i_mdi_client_online(dev_info_t *ct_dip)
 	if (ct->ct_power_cnt == 0)
 		(void) i_mdi_power_all_phci(ct);
 
-	MDI_DEBUG(4, (CE_NOTE, ct_dip, "i_mdi_client_online "
-	    "i_mdi_pm_hold_client %p\n", (void *)ct));
+	MDI_DEBUG(4, (MDI_NOTE, ct_dip,
+	    "i_mdi_pm_hold_client %p", (void *)ct));
 	i_mdi_pm_hold_client(ct, 1);
 
 	MDI_CLIENT_UNLOCK(ct);
@@ -4887,8 +5045,8 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 	 * critical services.
 	 */
 	ph = i_devi_get_phci(dip);
-	MDI_DEBUG(2, (CE_NOTE, dip, "!mdi_phci_offline called %p %p\n",
-	    (void *)dip, (void *)ph));
+	MDI_DEBUG(2, (MDI_NOTE, dip,
+	    "called %p %p", (void *)dip, (void *)ph));
 	if (ph == NULL) {
 		return (rv);
 	}
@@ -4896,8 +5054,8 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 	MDI_PHCI_LOCK(ph);
 
 	if (MDI_PHCI_IS_OFFLINE(ph)) {
-		MDI_DEBUG(1, (CE_WARN, dip, "!pHCI %p already offlined",
-		    (void *)ph));
+		MDI_DEBUG(1, (MDI_WARN, dip,
+		    "!pHCI already offlined: %p", (void *)dip));
 		MDI_PHCI_UNLOCK(ph);
 		return (NDI_SUCCESS);
 	}
@@ -4906,10 +5064,10 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 	 * Check to see if the pHCI can be offlined
 	 */
 	if (ph->ph_unstable) {
-		MDI_DEBUG(1, (CE_WARN, dip,
-		    "!One or more target devices are in transient "
-		    "state. This device can not be removed at "
-		    "this moment. Please try again later."));
+		MDI_DEBUG(1, (MDI_WARN, dip,
+		    "!One or more target devices are in transient state. "
+		    "This device can not be removed at this moment. "
+		    "Please try again later."));
 		MDI_PHCI_UNLOCK(ph);
 		return (NDI_BUSY);
 	}
@@ -4930,11 +5088,10 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 			/*
 			 * Failover is in progress, Fail the DR
 			 */
-			MDI_DEBUG(1, (CE_WARN, dip,
-			    "!pHCI device (%s%d) is Busy. %s",
-			    ddi_driver_name(dip), ddi_get_instance(dip),
-			    "This device can not be removed at "
-			    "this moment. Please try again later."));
+			MDI_DEBUG(1, (MDI_WARN, dip,
+			    "!pHCI device is busy. "
+			    "This device can not be removed at this moment. "
+			    "Please try again later."));
 			MDI_PI_UNLOCK(pip);
 			i_mdi_client_unlock(ct);
 			MDI_PHCI_UNLOCK(ph);
@@ -4952,7 +5109,8 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 		    MDI_CLIENT_STATE_FAILED)) {
 			i_mdi_client_unlock(ct);
 			MDI_PHCI_UNLOCK(ph);
-			if (ndi_devi_offline(cdip, 0) != NDI_SUCCESS) {
+			if (ndi_devi_offline(cdip,
+			    NDI_DEVFS_CLEAN) != NDI_SUCCESS) {
 				/*
 				 * ndi_devi_offline() failed.
 				 * This pHCI provides the critical path
@@ -4960,11 +5118,10 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 				 * Return busy.
 				 */
 				MDI_PHCI_LOCK(ph);
-				MDI_DEBUG(1, (CE_WARN, dip,
-				    "!pHCI device (%s%d) is Busy. %s",
-				    ddi_driver_name(dip), ddi_get_instance(dip),
-				    "This device can not be removed at "
-				    "this moment. Please try again later."));
+				MDI_DEBUG(1, (MDI_WARN, dip,
+				    "!pHCI device is busy. "
+				    "This device can not be removed at this "
+				    "moment. Please try again later."));
 				failed_pip = pip;
 				break;
 			} else {
@@ -5004,7 +5161,8 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 					MDI_PI_UNLOCK(pip);
 					i_mdi_client_unlock(ct);
 					MDI_PHCI_UNLOCK(ph);
-					(void) ndi_devi_offline(cdip, 0);
+					(void) ndi_devi_offline(cdip,
+						NDI_DEVFS_CLEAN);
 					MDI_PHCI_LOCK(ph);
 					pip = next;
 					continue;
@@ -5039,7 +5197,7 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 	/*
 	 * Give a chance for any pending commands to execute
 	 */
-	delay(1);
+	delay_random(5);
 	MDI_PHCI_LOCK(ph);
 	pip = ph->ph_path_head;
 	while (pip != NULL) {
@@ -5048,11 +5206,10 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 		MDI_PI_LOCK(pip);
 		ct = MDI_PI(pip)->pi_client;
 		if (!MDI_PI_IS_OFFLINE(pip)) {
-			MDI_DEBUG(1, (CE_WARN, dip,
-			    "!pHCI device (%s%d) is Busy. %s",
-			    ddi_driver_name(dip), ddi_get_instance(dip),
-			    "This device can not be removed at "
-			    "this moment. Please try again later."));
+			MDI_DEBUG(1, (MDI_WARN, dip,
+			    "!pHCI device is busy. "
+			    "This device can not be removed at this moment. "
+			    "Please try again later."));
 			MDI_PI_UNLOCK(pip);
 			MDI_PHCI_SET_ONLINE(ph);
 			MDI_PHCI_UNLOCK(ph);
@@ -5166,7 +5323,7 @@ mdi_phci_retire_notify(dev_info_t *dip, int *constraint)
 		if ((MDI_CLIENT_IS_FAILOVER_IN_PROGRESS(ct)) ||
 		    (ct->ct_unstable)) {
 			/*
-			 * Failover is in progress, can't check for constraints 
+			 * Failover is in progress, can't check for constraints
 			 */
 			MDI_PI_UNLOCK(pip);
 			i_mdi_client_unlock(ct);
@@ -5201,7 +5358,7 @@ mdi_phci_retire_notify(dev_info_t *dip, int *constraint)
 }
 
 /*
- * offline the path(s) hanging off the PHCI. If the
+ * offline the path(s) hanging off the pHCI. If the
  * last path to any client, check that constraints
  * have been applied.
  */
@@ -5291,8 +5448,9 @@ mdi_phci_retire_finalize(dev_info_t *dip, int phci_only)
 	 * Cannot offline pip(s)
 	 */
 	if (unstable) {
-		cmn_err(CE_WARN, "PHCI in transient state, cannot "
-		    "retire, dip = %p", (void *)dip);
+		cmn_err(CE_WARN, "%s%d: mdi_phci_retire_finalize: "
+		    "pHCI in transient state, cannot retire",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		MDI_PHCI_UNLOCK(ph);
 		return;
 	}
@@ -5317,7 +5475,7 @@ mdi_phci_retire_finalize(dev_info_t *dip, int phci_only)
 	/*
 	 * Give a chance for any pending commands to execute
 	 */
-	delay(1);
+	delay_random(5);
 	MDI_PHCI_LOCK(ph);
 	pip = ph->ph_path_head;
 	while (pip != NULL) {
@@ -5326,8 +5484,10 @@ mdi_phci_retire_finalize(dev_info_t *dip, int phci_only)
 		MDI_PI_LOCK(pip);
 		ct = MDI_PI(pip)->pi_client;
 		if (!MDI_PI_IS_OFFLINE(pip)) {
-			cmn_err(CE_WARN, "PHCI busy, cannot offline path: "
-			    "PHCI dip = %p", (void *)dip);
+			cmn_err(CE_WARN, "mdi_phci_retire_finalize: "
+			    "path %d %s busy, cannot offline",
+			    mdi_pi_get_path_instance(pip),
+			    mdi_pi_spathname(pip));
 			MDI_PI_UNLOCK(pip);
 			MDI_PHCI_SET_ONLINE(ph);
 			MDI_PHCI_UNLOCK(ph);
@@ -5365,8 +5525,8 @@ i_mdi_client_offline(dev_info_t *dip, uint_t flags)
 	 * accordingly
 	 */
 	ct = i_devi_get_client(dip);
-	MDI_DEBUG(2, (CE_NOTE, dip, "!i_mdi_client_offline called %p %p\n",
-	    (void *)dip, (void *)ct));
+	MDI_DEBUG(2, (MDI_NOTE, dip,
+	    "called %p %p", (void *)dip, (void *)ct));
 	if (ct != NULL) {
 		MDI_CLIENT_LOCK(ct);
 		if (ct->ct_unstable) {
@@ -5374,10 +5534,10 @@ i_mdi_client_offline(dev_info_t *dip, uint_t flags)
 			 * One or more paths are in transient state,
 			 * Dont allow offline of a client device
 			 */
-			MDI_DEBUG(1, (CE_WARN, dip,
-			    "!One or more paths to this device is "
-			    "in transient state. This device can not "
-			    "be removed at this moment. "
+			MDI_DEBUG(1, (MDI_WARN, dip,
+			    "!One or more paths to "
+			    "this device are in transient state. "
+			    "This device can not be removed at this moment. "
 			    "Please try again later."));
 			MDI_CLIENT_UNLOCK(ct);
 			return (NDI_BUSY);
@@ -5387,11 +5547,10 @@ i_mdi_client_offline(dev_info_t *dip, uint_t flags)
 			 * Failover is in progress, Dont allow DR of
 			 * a client device
 			 */
-			MDI_DEBUG(1, (CE_WARN, dip,
-			    "!Client device (%s%d) is Busy. %s",
-			    ddi_driver_name(dip), ddi_get_instance(dip),
-			    "This device can not be removed at "
-			    "this moment. Please try again later."));
+			MDI_DEBUG(1, (MDI_WARN, dip,
+			    "!Client device is Busy. "
+			    "This device can not be removed at this moment. "
+			    "Please try again later."));
 			MDI_CLIENT_UNLOCK(ct);
 			return (NDI_BUSY);
 		}
@@ -5443,26 +5602,26 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 		MDI_PHCI_LOCK(ph);
 		switch (cmd) {
 		case DDI_ATTACH:
-			MDI_DEBUG(2, (CE_NOTE, dip,
-			    "!pHCI post_attach: called %p\n", (void *)ph));
+			MDI_DEBUG(2, (MDI_NOTE, dip,
+			    "phci post_attach called %p", (void *)ph));
 			if (error == DDI_SUCCESS) {
 				MDI_PHCI_SET_ATTACH(ph);
 			} else {
-				MDI_DEBUG(1, (CE_NOTE, dip,
-				    "!pHCI post_attach: failed error=%d\n",
+				MDI_DEBUG(1, (MDI_NOTE, dip,
+				    "!pHCI post_attach failed: error %d",
 				    error));
 				MDI_PHCI_SET_DETACH(ph);
 			}
 			break;
 
 		case DDI_RESUME:
-			MDI_DEBUG(2, (CE_NOTE, dip,
-			    "!pHCI post_resume: called %p\n", (void *)ph));
+			MDI_DEBUG(2, (MDI_NOTE, dip,
+			    "pHCI post_resume: called %p", (void *)ph));
 			if (error == DDI_SUCCESS) {
 				MDI_PHCI_SET_RESUME(ph);
 			} else {
-				MDI_DEBUG(1, (CE_NOTE, dip,
-				    "!pHCI post_resume: failed error=%d\n",
+				MDI_DEBUG(1, (MDI_NOTE, dip,
+				    "!pHCI post_resume failed: error %d",
 				    error));
 				MDI_PHCI_SET_SUSPEND(ph);
 			}
@@ -5478,15 +5637,15 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 		MDI_CLIENT_LOCK(ct);
 		switch (cmd) {
 		case DDI_ATTACH:
-			MDI_DEBUG(2, (CE_NOTE, dip,
-			    "!Client post_attach: called %p\n", (void *)ct));
+			MDI_DEBUG(2, (MDI_NOTE, dip,
+			    "client post_attach called %p", (void *)ct));
 			if (error != DDI_SUCCESS) {
-				MDI_DEBUG(1, (CE_NOTE, dip,
-				    "!Client post_attach: failed error=%d\n",
+				MDI_DEBUG(1, (MDI_NOTE, dip,
+				    "!client post_attach failed: error %d",
 				    error));
 				MDI_CLIENT_SET_DETACH(ct);
-				MDI_DEBUG(4, (CE_WARN, dip,
-				    "mdi_post_attach i_mdi_pm_reset_client\n"));
+				MDI_DEBUG(4, (MDI_WARN, dip,
+				    "i_mdi_pm_reset_client"));
 				i_mdi_pm_reset_client(ct);
 				break;
 			}
@@ -5503,13 +5662,13 @@ mdi_post_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, int error)
 			break;
 
 		case DDI_RESUME:
-			MDI_DEBUG(2, (CE_NOTE, dip,
-			    "!Client post_attach: called %p\n", (void *)ct));
+			MDI_DEBUG(2, (MDI_NOTE, dip,
+			    "client post_attach: called %p", (void *)ct));
 			if (error == DDI_SUCCESS) {
 				MDI_CLIENT_SET_RESUME(ct);
 			} else {
-				MDI_DEBUG(1, (CE_NOTE, dip,
-				    "!Client post_resume: failed error=%d\n",
+				MDI_DEBUG(1, (MDI_NOTE, dip,
+				    "!client post_resume failed: error %d",
 				    error));
 				MDI_CLIENT_SET_SUSPEND(ct);
 			}
@@ -5559,17 +5718,16 @@ i_mdi_phci_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	MDI_PHCI_LOCK(ph);
 	switch (cmd) {
 	case DDI_DETACH:
-		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!pHCI pre_detach: called %p\n", (void *)ph));
+		MDI_DEBUG(2, (MDI_NOTE, dip,
+		    "pHCI pre_detach: called %p", (void *)ph));
 		if (!MDI_PHCI_IS_OFFLINE(ph)) {
 			/*
 			 * mdi_pathinfo nodes are still attached to
 			 * this pHCI. Fail the detach for this pHCI.
 			 */
-			MDI_DEBUG(2, (CE_WARN, dip,
-			    "!pHCI pre_detach: "
-			    "mdi_pathinfo nodes are still attached "
-			    "%p\n", (void *)ph));
+			MDI_DEBUG(2, (MDI_WARN, dip,
+			    "pHCI pre_detach: paths are still attached %p",
+			    (void *)ph));
 			rv = DDI_FAILURE;
 			break;
 		}
@@ -5584,8 +5742,8 @@ i_mdi_phci_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 * client devices before pHCI can be suspended.
 		 */
 
-		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!pHCI pre_suspend: called %p\n", (void *)ph));
+		MDI_DEBUG(2, (MDI_NOTE, dip,
+		    "pHCI pre_suspend: called %p", (void *)ph));
 		/*
 		 * Suspend all the client devices accessible through this pHCI
 		 */
@@ -5608,8 +5766,8 @@ i_mdi_phci_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 					 * Suspend of one of the client
 					 * device has failed.
 					 */
-					MDI_DEBUG(1, (CE_WARN, dip,
-					    "!Suspend of device (%s%d) failed.",
+					MDI_DEBUG(1, (MDI_WARN, dip,
+					    "!suspend of device (%s%d) failed.",
 					    ddi_driver_name(cdip),
 					    ddi_get_instance(cdip)));
 					failed_pip = pip;
@@ -5676,14 +5834,16 @@ i_mdi_client_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	MDI_CLIENT_LOCK(ct);
 	switch (cmd) {
 	case DDI_DETACH:
-		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!Client pre_detach: called %p\n", (void *)ct));
+		MDI_DEBUG(2, (MDI_NOTE, dip,
+		    "client pre_detach: called %p",
+		     (void *)ct));
 		MDI_CLIENT_SET_DETACH(ct);
 		break;
 
 	case DDI_SUSPEND:
-		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!Client pre_suspend: called %p\n", (void *)ct));
+		MDI_DEBUG(2, (MDI_NOTE, dip,
+		    "client pre_suspend: called %p",
+		    (void *)ct));
 		MDI_CLIENT_SET_SUSPEND(ct);
 		break;
 
@@ -5736,15 +5896,17 @@ i_mdi_phci_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
 	 */
 	switch (cmd) {
 	case DDI_DETACH:
-		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!pHCI post_detach: called %p\n", (void *)ph));
+		MDI_DEBUG(2, (MDI_NOTE, dip,
+		    "pHCI post_detach: called %p",
+		    (void *)ph));
 		if (error != DDI_SUCCESS)
 			MDI_PHCI_SET_ATTACH(ph);
 		break;
 
 	case DDI_SUSPEND:
-		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!pHCI post_suspend: called %p\n", (void *)ph));
+		MDI_DEBUG(2, (MDI_NOTE, dip,
+		    "pHCI post_suspend: called %p",
+		    (void *)ph));
 		if (error != DDI_SUCCESS)
 			MDI_PHCI_SET_RESUME(ph);
 		break;
@@ -5769,14 +5931,14 @@ i_mdi_client_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
 	 */
 	switch (cmd) {
 	case DDI_DETACH:
-		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!Client post_detach: called %p\n", (void *)ct));
+		MDI_DEBUG(2, (MDI_NOTE, dip,
+		    "client post_detach: called %p", (void *)ct));
 		if (DEVI_IS_ATTACHING(ct->ct_dip)) {
-			MDI_DEBUG(4, (CE_NOTE, dip, "i_mdi_client_post_detach "
+			MDI_DEBUG(4, (MDI_NOTE, dip,
 			    "i_mdi_pm_rele_client\n"));
 			i_mdi_pm_rele_client(ct, ct->ct_path_count);
 		} else {
-			MDI_DEBUG(4, (CE_NOTE, dip, "i_mdi_client_post_detach "
+			MDI_DEBUG(4, (MDI_NOTE, dip,
 			    "i_mdi_pm_reset_client\n"));
 			i_mdi_pm_reset_client(ct);
 		}
@@ -5785,8 +5947,8 @@ i_mdi_client_post_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, int error)
 		break;
 
 	case DDI_SUSPEND:
-		MDI_DEBUG(2, (CE_NOTE, dip,
-		    "!Client post_suspend: called %p\n", (void *)ct));
+		MDI_DEBUG(2, (MDI_NOTE, dip,
+		    "called %p", (void *)ct));
 		if (error != DDI_SUCCESS)
 			MDI_CLIENT_SET_RESUME(ct);
 		break;
@@ -5926,18 +6088,19 @@ mdi_pi_enable_path(mdi_pathinfo_t *pip, int flags)
 {
 	mdi_phci_t	*ph;
 
-	ph = i_devi_get_phci(mdi_pi_get_phci(pip));
+	ph = MDI_PI(pip)->pi_phci;
 	if (ph == NULL) {
-		MDI_DEBUG(1, (CE_NOTE, NULL, "!mdi_pi_enable_path:"
-			" failed. pip: %p ph = NULL\n", (void *)pip));
+		MDI_DEBUG(1, (MDI_NOTE, mdi_pi_get_phci(pip),
+		    "!failed: path %s %p: NULL ph",
+		    mdi_pi_spathname(pip), (void *)pip));
 		return (MDI_FAILURE);
 	}
 
 	(void) i_mdi_enable_disable_path(pip, ph->ph_vhci, flags,
 		MDI_ENABLE_OP);
-	MDI_DEBUG(5, (CE_NOTE, NULL, "!mdi_pi_enable_path:"
-		" Returning success pip = %p. ph = %p\n",
-		(void *)pip, (void *)ph));
+	MDI_DEBUG(5, (MDI_NOTE, ph->ph_dip,
+	    "!returning success pip = %p. ph = %p",
+	    (void *)pip, (void *)ph));
 	return (MDI_SUCCESS);
 
 }
@@ -5952,18 +6115,19 @@ mdi_pi_disable_path(mdi_pathinfo_t *pip, int flags)
 {
 	mdi_phci_t	*ph;
 
-	ph = i_devi_get_phci(mdi_pi_get_phci(pip));
+	ph = MDI_PI(pip)->pi_phci;
 	if (ph == NULL) {
-		MDI_DEBUG(1, (CE_NOTE, NULL, "!mdi_pi_disable_path:"
-			" failed. pip: %p ph = NULL\n", (void *)pip));
+		MDI_DEBUG(1, (MDI_NOTE, mdi_pi_get_phci(pip),
+		    "!failed: path %s %p: NULL ph",
+		    mdi_pi_spathname(pip), (void *)pip));
 		return (MDI_FAILURE);
 	}
 
 	(void) i_mdi_enable_disable_path(pip,
-			ph->ph_vhci, flags, MDI_DISABLE_OP);
-	MDI_DEBUG(5, (CE_NOTE, NULL, "!mdi_pi_disable_path:"
-		"Returning success pip = %p. ph = %p",
-		(void *)pip, (void *)ph));
+	    ph->ph_vhci, flags, MDI_DISABLE_OP);
+	MDI_DEBUG(5, (MDI_NOTE, ph->ph_dip,
+	    "!returning success pip = %p. ph = %p",
+	    (void *)pip, (void *)ph));
 	return (MDI_SUCCESS);
 }
 
@@ -6035,8 +6199,8 @@ i_mdi_enable_disable_path(mdi_pathinfo_t *pip, mdi_vhci_t *vh, int flags,
 			MDI_EXT_STATE_CHANGE | sync_flag |
 			op | MDI_BEFORE_STATE_CHANGE);
 		if (rv != MDI_SUCCESS) {
-			MDI_DEBUG(2, (CE_WARN, vh->vh_dip,
-			"!vo_pi_state_change: failed rv = %x", rv));
+			MDI_DEBUG(2, (MDI_WARN, vh->vh_dip,
+			    "vo_pi_state_change: failed rv = %x", rv));
 		}
 	}
 	MDI_PI_LOCK(pip);
@@ -6076,8 +6240,8 @@ i_mdi_enable_disable_path(mdi_pathinfo_t *pip, mdi_vhci_t *vh, int flags,
 			MDI_EXT_STATE_CHANGE | sync_flag |
 			op | MDI_AFTER_STATE_CHANGE);
 		if (rv != MDI_SUCCESS) {
-			MDI_DEBUG(2, (CE_WARN, vh->vh_dip,
-			"!vo_pi_state_change: failed rv = %x", rv));
+			MDI_DEBUG(2, (MDI_WARN, vh->vh_dip,
+			    "vo_pi_state_change failed: rv = %x", rv));
 		}
 	}
 	return (next);
@@ -6099,18 +6263,18 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 	int		found_it;
 
 	ph = i_devi_get_phci(pdip);
-	MDI_DEBUG(5, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable: "
-		"Op = %d pdip = %p cdip = %p\n", op, (void *)pdip,
-		(void *)cdip));
+	MDI_DEBUG(5, (MDI_NOTE, cdip ? cdip : pdip,
+	    "!op = %d pdip = %p cdip = %p", op, (void *)pdip,
+	    (void *)cdip));
 	if (ph == NULL) {
-		MDI_DEBUG(1, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable:"
-			"Op %d failed. ph = NULL\n", op));
+		MDI_DEBUG(1, (MDI_NOTE, cdip ? cdip : pdip,
+		    "!failed: operation %d: NULL ph", op));
 		return (MDI_FAILURE);
 	}
 
 	if ((op != MDI_ENABLE_OP) && (op != MDI_DISABLE_OP)) {
-		MDI_DEBUG(1, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable: "
-			"Op Invalid operation = %d\n", op));
+		MDI_DEBUG(1, (MDI_NOTE, cdip ? cdip : pdip,
+		    "!failed: invalid operation %d", op));
 		return (MDI_FAILURE);
 	}
 
@@ -6120,8 +6284,8 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 		/*
 		 * Need to mark the Phci as enabled/disabled.
 		 */
-		MDI_DEBUG(3, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable: "
-		"Op %d for the phci\n", op));
+		MDI_DEBUG(4, (MDI_NOTE, cdip ? cdip : pdip,
+		    "op %d for the phci", op));
 		MDI_PHCI_LOCK(ph);
 		switch (flags) {
 			case USER_DISABLE:
@@ -6147,9 +6311,8 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 				break;
 			default:
 				MDI_PHCI_UNLOCK(ph);
-				MDI_DEBUG(1, (CE_NOTE, NULL,
-				"!i_mdi_pi_enable_disable:"
-				" Invalid flag argument= %d\n", flags));
+				MDI_DEBUG(1, (MDI_NOTE, cdip ? cdip : pdip,
+				    "!invalid flag argument= %d", flags));
 		}
 
 		/*
@@ -6168,9 +6331,8 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 		 */
 		ct = i_devi_get_client(cdip);
 		if (ct == NULL) {
-			MDI_DEBUG(1, (CE_NOTE, NULL,
-			"!i_mdi_pi_enable_disable:"
-			" failed. ct = NULL operation = %d\n", op));
+			MDI_DEBUG(1, (MDI_NOTE, cdip ? cdip : pdip,
+			    "!failed: operation = %d: NULL ct", op));
 			return (MDI_FAILURE);
 		}
 
@@ -6192,18 +6354,17 @@ i_mdi_pi_enable_disable(dev_info_t *cdip, dev_info_t *pdip, int flags, int op)
 
 		MDI_CLIENT_UNLOCK(ct);
 		if (found_it == 0) {
-			MDI_DEBUG(1, (CE_NOTE, NULL,
-			"!i_mdi_pi_enable_disable:"
-			" failed. Could not find corresponding pip\n"));
+			MDI_DEBUG(1, (MDI_NOTE, cdip ? cdip : pdip,
+			    "!failed. Could not find corresponding pip\n"));
 			return (MDI_FAILURE);
 		}
 
 		(void) i_mdi_enable_disable_path(pip, vh, flags, op);
 	}
 
-	MDI_DEBUG(5, (CE_NOTE, NULL, "!i_mdi_pi_enable_disable: "
-		"Op %d Returning success pdip = %p cdip = %p\n",
-		op, (void *)pdip, (void *)cdip));
+	MDI_DEBUG(5, (MDI_NOTE, cdip ? cdip : pdip,
+	    "!op %d returning success pdip = %p cdip = %p",
+	    op, (void *)pdip, (void *)cdip));
 	return (MDI_SUCCESS);
 }
 
@@ -6223,19 +6384,17 @@ i_mdi_pm_hold_pip(mdi_pathinfo_t *pip)
 	}
 
 	ph_dip = mdi_pi_get_phci(pip);
-	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_pm_hold_pip for %s%d %p\n",
-	    ddi_driver_name(ph_dip), ddi_get_instance(ph_dip), (void *)pip));
+	MDI_DEBUG(4, (MDI_NOTE, ph_dip,
+	    "%s %p", mdi_pi_spathname(pip), (void *)pip));
 	if (ph_dip == NULL) {
 		return;
 	}
 
 	MDI_PI_UNLOCK(pip);
-	MDI_DEBUG(4, (CE_NOTE, ph_dip, "kidsupcnt was %d\n",
+	MDI_DEBUG(4, (MDI_NOTE, ph_dip, "kidsupcnt was %d",
 	    DEVI(ph_dip)->devi_pm_kidsupcnt));
-
 	pm_hold_power(ph_dip);
-
-	MDI_DEBUG(4, (CE_NOTE, ph_dip, "kidsupcnt is %d\n",
+	MDI_DEBUG(4, (MDI_NOTE, ph_dip, "kidsupcnt is %d",
 	    DEVI(ph_dip)->devi_pm_kidsupcnt));
 	MDI_PI_LOCK(pip);
 
@@ -6262,17 +6421,17 @@ i_mdi_pm_rele_pip(mdi_pathinfo_t *pip)
 	ph_dip = mdi_pi_get_phci(pip);
 	ASSERT(ph_dip != NULL);
 
+	MDI_DEBUG(4, (MDI_NOTE, ph_dip,
+	    "%s %p", mdi_pi_spathname(pip), (void *)pip));
+
 	MDI_PI_UNLOCK(pip);
-	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_pm_rele_pip for %s%d %p\n",
-	    ddi_driver_name(ph_dip), ddi_get_instance(ph_dip), (void *)pip));
-
-	MDI_DEBUG(4, (CE_NOTE, ph_dip, "kidsupcnt was %d\n",
-	    DEVI(ph_dip)->devi_pm_kidsupcnt));
+	MDI_DEBUG(4, (MDI_NOTE, ph_dip,
+	    "kidsupcnt was %d", DEVI(ph_dip)->devi_pm_kidsupcnt));
 	pm_rele_power(ph_dip);
-	MDI_DEBUG(4, (CE_NOTE, ph_dip, "kidsupcnt is %d\n",
-	    DEVI(ph_dip)->devi_pm_kidsupcnt));
-
+	MDI_DEBUG(4, (MDI_NOTE, ph_dip,
+	    "kidsupcnt is %d", DEVI(ph_dip)->devi_pm_kidsupcnt));
 	MDI_PI_LOCK(pip);
+
 	MDI_PI(pip)->pi_pm_held = 0;
 }
 
@@ -6282,9 +6441,9 @@ i_mdi_pm_hold_client(mdi_client_t *ct, int incr)
 	ASSERT(MDI_CLIENT_LOCKED(ct));
 
 	ct->ct_power_cnt += incr;
-	MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "i_mdi_pm_hold_client %p "
-	    "ct_power_cnt = %d incr = %d\n", (void *)ct,
-	    ct->ct_power_cnt, incr));
+	MDI_DEBUG(4, (MDI_NOTE, ct->ct_dip,
+	    "%p ct_power_cnt = %d incr = %d",
+	    (void *)ct, ct->ct_power_cnt, incr));
 	ASSERT(ct->ct_power_cnt >= 0);
 }
 
@@ -6312,8 +6471,8 @@ i_mdi_pm_rele_client(mdi_client_t *ct, int decr)
 
 	if (i_ddi_devi_attached(ct->ct_dip)) {
 		ct->ct_power_cnt -= decr;
-		MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "i_mdi_pm_rele_client %p "
-		    "ct_power_cnt = %d decr = %d\n",
+		MDI_DEBUG(4, (MDI_NOTE, ct->ct_dip,
+		    "%p ct_power_cnt = %d decr = %d",
 		    (void *)ct, ct->ct_power_cnt, decr));
 	}
 
@@ -6327,8 +6486,8 @@ i_mdi_pm_rele_client(mdi_client_t *ct, int decr)
 static void
 i_mdi_pm_reset_client(mdi_client_t *ct)
 {
-	MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "i_mdi_pm_reset_client %p "
-	    "ct_power_cnt = %d\n", (void *)ct, ct->ct_power_cnt));
+	MDI_DEBUG(4, (MDI_NOTE, ct->ct_dip,
+	    "%p ct_power_cnt = %d", (void *)ct, ct->ct_power_cnt));
 	ASSERT(MDI_CLIENT_LOCKED(ct));
 	ct->ct_power_cnt = 0;
 	i_mdi_rele_all_phci(ct);
@@ -6350,15 +6509,15 @@ i_mdi_power_one_phci(mdi_pathinfo_t *pip)
 	MDI_PI_UNLOCK(pip);
 
 	/* bring all components of phci to full power */
-	MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_power_one_phci "
-	    "pm_powerup for %s%d %p\n", ddi_driver_name(ph_dip),
+	MDI_DEBUG(4, (MDI_NOTE, ph_dip,
+	    "pm_powerup for %s%d %p", ddi_driver_name(ph_dip),
 	    ddi_get_instance(ph_dip), (void *)pip));
 
 	ret = pm_powerup(ph_dip);
 
 	if (ret == DDI_FAILURE) {
-		MDI_DEBUG(4, (CE_NOTE, ph_dip, "i_mdi_power_one_phci "
-		    "pm_powerup FAILED for %s%d %p\n",
+		MDI_DEBUG(4, (MDI_NOTE, ph_dip,
+		    "pm_powerup FAILED for %s%d %p",
 		    ddi_driver_name(ph_dip), ddi_get_instance(ph_dip),
 		    (void *)pip));
 
@@ -6456,10 +6615,10 @@ mdi_bus_power(dev_info_t *parent, void *impl_arg, pm_bus_power_op_t op,
 	MDI_CLIENT_LOCK(ct);
 	switch (op) {
 	case BUS_POWER_PRE_NOTIFICATION:
-		MDI_DEBUG(4, (CE_NOTE, bpc->bpc_dip, "mdi_bus_power "
+		MDI_DEBUG(4, (MDI_NOTE, bpc->bpc_dip,
 		    "BUS_POWER_PRE_NOTIFICATION:"
-		    "%s@%s, olevel=%d, nlevel=%d, comp=%d\n",
-		    PM_NAME(bpc->bpc_dip), PM_ADDR(bpc->bpc_dip),
+		    "%s@%s, olevel=%d, nlevel=%d, comp=%d",
+		    ddi_node_name(bpc->bpc_dip), PM_ADDR(bpc->bpc_dip),
 		    bpc->bpc_olevel, bpc->bpc_nlevel, bpc->bpc_comp));
 
 		/* serialize power level change per client */
@@ -6480,17 +6639,17 @@ mdi_bus_power(dev_info_t *parent, void *impl_arg, pm_bus_power_op_t op,
 		 */
 		if (bpc->bpc_nlevel > 0) {
 			if (!DEVI_IS_ATTACHING(ct->ct_dip)) {
-				MDI_DEBUG(4, (CE_NOTE, bpc->bpc_dip,
-				    "mdi_bus_power i_mdi_pm_hold_client\n"));
+				MDI_DEBUG(4, (MDI_NOTE, bpc->bpc_dip,
+				    "i_mdi_pm_hold_client\n"));
 				i_mdi_pm_hold_client(ct, ct->ct_path_count);
 			}
 		}
 		break;
 	case BUS_POWER_POST_NOTIFICATION:
-		MDI_DEBUG(4, (CE_NOTE, bpc->bpc_dip, "mdi_bus_power "
+		MDI_DEBUG(4, (MDI_NOTE, bpc->bpc_dip,
 		    "BUS_POWER_POST_NOTIFICATION:"
-		    "%s@%s, olevel=%d, nlevel=%d, comp=%d result=%d\n",
-		    PM_NAME(bpc->bpc_dip), PM_ADDR(bpc->bpc_dip),
+		    "%s@%s, olevel=%d, nlevel=%d, comp=%d result=%d",
+		    ddi_node_name(bpc->bpc_dip), PM_ADDR(bpc->bpc_dip),
 		    bpc->bpc_olevel, bpc->bpc_nlevel, bpc->bpc_comp,
 		    *(int *)result));
 
@@ -6505,21 +6664,21 @@ mdi_bus_power(dev_info_t *parent, void *impl_arg, pm_bus_power_op_t op,
 		/* release the hold we did in pre-notification */
 		if (bpc->bpc_nlevel > 0 && (*(int *)result != DDI_SUCCESS) &&
 		    !DEVI_IS_ATTACHING(ct->ct_dip)) {
-			MDI_DEBUG(4, (CE_NOTE, bpc->bpc_dip,
-			    "mdi_bus_power i_mdi_pm_rele_client\n"));
+			MDI_DEBUG(4, (MDI_NOTE, bpc->bpc_dip,
+			    "i_mdi_pm_rele_client\n"));
 			i_mdi_pm_rele_client(ct, ct->ct_path_count);
 		}
 
 		if (bpc->bpc_nlevel == 0 && (*(int *)result == DDI_SUCCESS)) {
 			/* another thread might started attaching */
 			if (DEVI_IS_ATTACHING(ct->ct_dip)) {
-				MDI_DEBUG(4, (CE_NOTE, bpc->bpc_dip,
-				    "mdi_bus_power i_mdi_pm_rele_client\n"));
+				MDI_DEBUG(4, (MDI_NOTE, bpc->bpc_dip,
+				    "i_mdi_pm_rele_client\n"));
 				i_mdi_pm_rele_client(ct, ct->ct_path_count);
 			/* detaching has been taken care in pm_post_unconfig */
 			} else if (!DEVI_IS_DETACHING(ct->ct_dip)) {
-				MDI_DEBUG(4, (CE_NOTE, bpc->bpc_dip,
-				    "mdi_bus_power i_mdi_pm_reset_client\n"));
+				MDI_DEBUG(4, (MDI_NOTE, bpc->bpc_dip,
+				    "i_mdi_pm_reset_client\n"));
 				i_mdi_pm_reset_client(ct);
 			}
 		}
@@ -6531,10 +6690,10 @@ mdi_bus_power(dev_info_t *parent, void *impl_arg, pm_bus_power_op_t op,
 
 	/* need to do more */
 	case BUS_POWER_HAS_CHANGED:
-		MDI_DEBUG(4, (CE_NOTE, bphc->bphc_dip, "mdi_bus_power "
+		MDI_DEBUG(4, (MDI_NOTE, bphc->bphc_dip,
 		    "BUS_POWER_HAS_CHANGED:"
-		    "%s@%s, olevel=%d, nlevel=%d, comp=%d\n",
-		    PM_NAME(bphc->bphc_dip), PM_ADDR(bphc->bphc_dip),
+		    "%s@%s, olevel=%d, nlevel=%d, comp=%d",
+		    ddi_node_name(bphc->bphc_dip), PM_ADDR(bphc->bphc_dip),
 		    bphc->bphc_olevel, bphc->bphc_nlevel, bphc->bphc_comp));
 
 		if (bphc->bphc_nlevel > 0 &&
@@ -6542,14 +6701,14 @@ mdi_bus_power(dev_info_t *parent, void *impl_arg, pm_bus_power_op_t op,
 			if (ct->ct_power_cnt == 0) {
 				ret = i_mdi_power_all_phci(ct);
 			}
-			MDI_DEBUG(4, (CE_NOTE, bphc->bphc_dip,
-			    "mdi_bus_power i_mdi_pm_hold_client\n"));
+			MDI_DEBUG(4, (MDI_NOTE, bphc->bphc_dip,
+			    "i_mdi_pm_hold_client\n"));
 			i_mdi_pm_hold_client(ct, ct->ct_path_count);
 		}
 
 		if (bphc->bphc_nlevel == 0 && bphc->bphc_olevel != -1) {
-			MDI_DEBUG(4, (CE_NOTE, bphc->bphc_dip,
-			    "mdi_bus_power i_mdi_pm_rele_client\n"));
+			MDI_DEBUG(4, (MDI_NOTE, bphc->bphc_dip,
+			    "i_mdi_pm_rele_client\n"));
 			i_mdi_pm_rele_client(ct, ct->ct_path_count);
 		}
 		break;
@@ -6575,23 +6734,20 @@ i_mdi_pm_pre_config_one(dev_info_t *child)
 
 	if (!MDI_CLIENT_IS_FAILED(ct)) {
 		MDI_CLIENT_UNLOCK(ct);
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_pre_config_one already configured\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "already configured\n"));
 		return (MDI_SUCCESS);
 	}
 
 	if (ct->ct_powercnt_config) {
 		MDI_CLIENT_UNLOCK(ct);
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_pre_config_one ALREADY held\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "already held\n"));
 		return (MDI_SUCCESS);
 	}
 
 	if (ct->ct_power_cnt == 0) {
 		ret = i_mdi_power_all_phci(ct);
 	}
-	MDI_DEBUG(4, (CE_NOTE, child,
-	    "i_mdi_pm_pre_config_one i_mdi_pm_hold_client\n"));
+	MDI_DEBUG(4, (MDI_NOTE, child, "i_mdi_pm_hold_client\n"));
 	i_mdi_pm_hold_client(ct, ct->ct_path_count);
 	ct->ct_powercnt_config = 1;
 	ct->ct_powercnt_reset = 0;
@@ -6644,23 +6800,20 @@ i_mdi_pm_pre_unconfig_one(dev_info_t *child, int *held, int flags)
 		cv_wait(&ct->ct_powerchange_cv, &ct->ct_mutex);
 
 	if (!i_ddi_devi_attached(ct->ct_dip)) {
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_pre_unconfig node detached already\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "node detached already\n"));
 		MDI_CLIENT_UNLOCK(ct);
 		return (MDI_SUCCESS);
 	}
 
 	if (MDI_CLIENT_IS_POWERED_DOWN(ct) &&
 	    (flags & NDI_AUTODETACH)) {
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_pre_unconfig auto-modunload\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "auto-modunload\n"));
 		MDI_CLIENT_UNLOCK(ct);
 		return (MDI_FAILURE);
 	}
 
 	if (ct->ct_powercnt_unconfig) {
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_pre_unconfig ct_powercnt_held\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "ct_powercnt_held\n"));
 		MDI_CLIENT_UNLOCK(ct);
 		*held = 1;
 		return (MDI_SUCCESS);
@@ -6669,8 +6822,7 @@ i_mdi_pm_pre_unconfig_one(dev_info_t *child, int *held, int flags)
 	if (ct->ct_power_cnt == 0) {
 		ret = i_mdi_power_all_phci(ct);
 	}
-	MDI_DEBUG(4, (CE_NOTE, child,
-	    "i_mdi_pm_pre_unconfig i_mdi_pm_hold_client\n"));
+	MDI_DEBUG(4, (MDI_NOTE, child, "i_mdi_pm_hold_client\n"));
 	i_mdi_pm_hold_client(ct, ct->ct_path_count);
 	ct->ct_powercnt_unconfig = 1;
 	ct->ct_powercnt_reset = 0;
@@ -6728,16 +6880,14 @@ i_mdi_pm_post_config_one(dev_info_t *child)
 		cv_wait(&ct->ct_powerchange_cv, &ct->ct_mutex);
 
 	if (ct->ct_powercnt_reset || !ct->ct_powercnt_config) {
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_post_config_one NOT configured\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "not configured\n"));
 		MDI_CLIENT_UNLOCK(ct);
 		return;
 	}
 
 	/* client has not been updated */
 	if (MDI_CLIENT_IS_FAILED(ct)) {
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_post_config_one NOT configured\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "client failed\n"));
 		MDI_CLIENT_UNLOCK(ct);
 		return;
 	}
@@ -6747,15 +6897,13 @@ i_mdi_pm_post_config_one(dev_info_t *child)
 	    !DEVI_IS_ATTACHING(ct->ct_dip)) ||
 	    (!i_ddi_devi_attached(ct->ct_dip) &&
 	    !DEVI_IS_ATTACHING(ct->ct_dip))) {
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_post_config i_mdi_pm_reset_client\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "i_mdi_pm_reset_client\n"));
 		i_mdi_pm_reset_client(ct);
 	} else {
 		mdi_pathinfo_t  *pip, *next;
 		int	valid_path_count = 0;
 
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_post_config i_mdi_pm_rele_client\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "i_mdi_pm_rele_client\n"));
 		pip = ct->ct_path_head;
 		while (pip != NULL) {
 			MDI_PI_LOCK(pip);
@@ -6812,8 +6960,7 @@ i_mdi_pm_post_unconfig_one(dev_info_t *child)
 		cv_wait(&ct->ct_powerchange_cv, &ct->ct_mutex);
 
 	if (!ct->ct_powercnt_unconfig || ct->ct_powercnt_reset) {
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_post_unconfig NOT held\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "not held\n"));
 		MDI_CLIENT_UNLOCK(ct);
 		return;
 	}
@@ -6823,15 +6970,13 @@ i_mdi_pm_post_unconfig_one(dev_info_t *child)
 	    i_ddi_devi_attached(ct->ct_dip)) ||
 	    (!i_ddi_devi_attached(ct->ct_dip) &&
 	    !DEVI_IS_ATTACHING(ct->ct_dip))) {
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_post_unconfig i_mdi_pm_reset_client\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "i_mdi_pm_reset_client\n"));
 		i_mdi_pm_reset_client(ct);
 	} else {
 		mdi_pathinfo_t  *pip, *next;
 		int	valid_path_count = 0;
 
-		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_post_unconfig i_mdi_pm_rele_client\n"));
+		MDI_DEBUG(4, (MDI_NOTE, child, "i_mdi_pm_rele_client\n"));
 		pip = ct->ct_path_head;
 		while (pip != NULL) {
 			MDI_PI_LOCK(pip);
@@ -6857,8 +7002,7 @@ i_mdi_pm_post_unconfig(dev_info_t *vdip, dev_info_t *child, int held)
 	ASSERT(MDI_VHCI(vdip));
 
 	if (!held) {
-		MDI_DEBUG(4, (CE_NOTE, vdip,
-		    "i_mdi_pm_post_unconfig held = %d\n", held));
+		MDI_DEBUG(4, (MDI_NOTE, vdip, "held = %d", held));
 		return;
 	}
 
@@ -6898,8 +7042,8 @@ mdi_power(dev_info_t *vdip, mdi_pm_op_t op, void *args, char *devnm, int flags)
 		client_dip = ndi_devi_findchild(vdip, devnm);
 	}
 
-	MDI_DEBUG(4, (CE_NOTE, vdip, "mdi_power op = %d %s %p\n",
-	    op, devnm ? devnm : "NULL", (void *)client_dip));
+	MDI_DEBUG(4, (MDI_NOTE, vdip,
+	    "op = %d %s %p", op, devnm ? devnm : "", (void *)client_dip));
 
 	switch (op) {
 	case MDI_PM_PRE_CONFIG:
@@ -6932,18 +7076,18 @@ mdi_power(dev_info_t *vdip, mdi_pm_op_t op, void *args, char *devnm, int flags)
 		if (op == MDI_PM_HOLD_POWER) {
 			if (ct->ct_power_cnt == 0) {
 				(void) i_mdi_power_all_phci(ct);
-				MDI_DEBUG(4, (CE_NOTE, client_dip,
-				    "mdi_power i_mdi_pm_hold_client\n"));
+				MDI_DEBUG(4, (MDI_NOTE, client_dip,
+				    "i_mdi_pm_hold_client\n"));
 				i_mdi_pm_hold_client(ct, ct->ct_path_count);
 			}
 		} else {
 			if (DEVI_IS_ATTACHING(ct->ct_dip)) {
-				MDI_DEBUG(4, (CE_NOTE, client_dip,
-				    "mdi_power i_mdi_pm_rele_client\n"));
+				MDI_DEBUG(4, (MDI_NOTE, client_dip,
+				    "i_mdi_pm_rele_client\n"));
 				i_mdi_pm_rele_client(ct, ct->ct_path_count);
 			} else {
-				MDI_DEBUG(4, (CE_NOTE, client_dip,
-				    "mdi_power i_mdi_pm_reset_client\n"));
+				MDI_DEBUG(4, (MDI_NOTE, client_dip,
+				    "i_mdi_pm_reset_client\n"));
 				i_mdi_pm_reset_client(ct);
 			}
 		}
@@ -7093,6 +7237,60 @@ mdi_phci_set_vhci_private(dev_info_t *dip, void *priv)
 	}
 }
 
+int
+mdi_pi_ishidden(mdi_pathinfo_t *pip)
+{
+	return (MDI_PI_FLAGS_IS_HIDDEN(pip));
+}
+
+int
+mdi_pi_device_isremoved(mdi_pathinfo_t *pip)
+{
+	return (MDI_PI_FLAGS_IS_DEVICE_REMOVED(pip));
+}
+
+/*
+ * When processing hotplug, if mdi_pi_offline-mdi_pi_free fails then this
+ * interface is used to represent device removal.
+ */
+int
+mdi_pi_device_remove(mdi_pathinfo_t *pip)
+{
+	MDI_PI_LOCK(pip);
+	if (mdi_pi_device_isremoved(pip)) {
+		MDI_PI_UNLOCK(pip);
+		return (0);
+	}
+	MDI_PI_FLAGS_SET_DEVICE_REMOVED(pip);
+	MDI_PI_FLAGS_SET_HIDDEN(pip);
+	MDI_PI_UNLOCK(pip);
+
+	i_ddi_di_cache_invalidate();
+
+	return (1);
+}
+
+/*
+ * When processing hotplug, if a path marked mdi_pi_device_isremoved()
+ * is now accessible then this interfaces is used to represent device insertion.
+ */
+int
+mdi_pi_device_insert(mdi_pathinfo_t *pip)
+{
+	MDI_PI_LOCK(pip);
+	if (!mdi_pi_device_isremoved(pip)) {
+		MDI_PI_UNLOCK(pip);
+		return (0);
+	}
+	MDI_PI_FLAGS_CLR_DEVICE_REMOVED(pip);
+	MDI_PI_FLAGS_CLR_HIDDEN(pip);
+	MDI_PI_UNLOCK(pip);
+
+	i_ddi_di_cache_invalidate();
+
+	return (1);
+}
+
 /*
  * List of vhci class names:
  * A vhci class name must be in this list only if the corresponding vhci
@@ -7196,7 +7394,7 @@ setup_vhci_cache(mdi_vhci_t *vh)
 			vhcache->vhcache_flags |= MDI_VHCI_CACHE_SETUP_DONE;
 		else  {
 			cmn_err(CE_WARN,
-			    "%s: data file corrupted, will recreate\n",
+			    "%s: data file corrupted, will recreate",
 			    vhc->vhc_vhcache_filename);
 		}
 		rw_exit(&vhcache->vhcache_lock);
@@ -7269,7 +7467,7 @@ stop_vhcache_async_threads(mdi_vhci_config_t *vhc)
 	while ((vhc->vhc_flags & MDI_VHC_VHCACHE_FLUSH_THREAD) ||
 	    vhc->vhc_acc_thrcount != 0) {
 		mutex_exit(&vhc->vhc_lock);
-		delay(1);
+		delay_random(5);
 		mutex_enter(&vhc->vhc_lock);
 	}
 
@@ -7314,7 +7512,7 @@ stop_vhcache_flush_thread(void *arg, int code)
 
 	while (vhc->vhc_flags & MDI_VHC_VHCACHE_FLUSH_THREAD) {
 		mutex_exit(&vhc->vhc_lock);
-		delay(1);
+		delay_random(5);
 		mutex_enter(&vhc->vhc_lock);
 	}
 
@@ -7542,9 +7740,9 @@ caddrmapnvl_to_vhcache(mdi_vhci_cache_t *vhcache, nvlist_t *nvl,
  *	...
  * where pi_addr1, pi_addr2, ... are bus specific addresses of pathinfo nodes
  * (so called pi_addrs, for example: "w2100002037cd9f72,0");
- * phci-ids are integers that identify PHCIs to which the
+ * phci-ids are integers that identify pHCIs to which the
  * the bus specific address belongs to. These integers are used as an index
- * into to the phcis string array in the main nvlist to get the PHCI path.
+ * into to the phcis string array in the main nvlist to get the pHCI path.
  */
 static int
 mainnvl_to_vhcache(mdi_vhci_cache_t *vhcache, nvlist_t *nvl)
@@ -8977,8 +9175,8 @@ mdi_vhci_bus_config(dev_info_t *vdip, uint_t flags, ddi_bus_config_op_t op,
 	 * the vhci node.
 	 */
 	if (DEVI_BUSY_OWNED(vdip)) {
-		MDI_DEBUG(2, (CE_NOTE, vdip, "!MDI: vhci bus config: "
-		    "vhci dip is busy owned %p\n", (void *)vdip));
+		MDI_DEBUG(2, (MDI_NOTE, vdip,
+		    "vhci dip is busy owned %p", (void *)vdip));
 		goto default_bus_config;
 	}
 
@@ -9063,10 +9261,10 @@ read_on_disk_vhci_cache(char *vhci_class)
 		kmem_free(filename, strlen(filename) + 1);
 		return (nvl);
 	} else if (err == EIO)
-		cmn_err(CE_WARN, "%s: I/O error, will recreate\n", filename);
+		cmn_err(CE_WARN, "%s: I/O error, will recreate", filename);
 	else if (err == EINVAL)
 		cmn_err(CE_WARN,
-		    "%s: data file corrupted, will recreate\n", filename);
+		    "%s: data file corrupted, will recreate", filename);
 
 	kmem_free(filename, strlen(filename) + 1);
 	return (NULL);
@@ -9298,8 +9496,7 @@ error:
 	return;
 
 alloc_failed:
-	MDI_DEBUG(1, (CE_WARN, dip,
-	    "!i_mdi_log_sysevent: Unable to send sysevent"));
+	MDI_DEBUG(1, (MDI_WARN, dip, "!unable to send sysevent"));
 }
 
 char **

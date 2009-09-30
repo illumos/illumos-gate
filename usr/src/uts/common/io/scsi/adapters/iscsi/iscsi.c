@@ -586,10 +586,11 @@ iscsi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			    ihp->hba_isid[5]);
 
 			if (ddi_prop_update_string(DDI_DEV_T_NONE, dip,
-			    "initiator-port", init_port_name) !=
+			    SCSI_ADDR_PROP_INITIATOR_PORT, init_port_name) !=
 			    DDI_PROP_SUCCESS) {
 				cmn_err(CE_WARN, "iscsi_attach: Creating "
-				    "initiator-port property on iSCSI "
+				    SCSI_ADDR_PROP_INITIATOR_PORT
+				    " property on iSCSI "
 				    "HBA(%s) with dip(%d) Failed",
 				    (char *)ihp->hba_name,
 				    ddi_get_instance(dip));
@@ -1758,10 +1759,10 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		    ihp->hba_isid[5]);
 
 		if (ddi_prop_update_string(DDI_DEV_T_NONE,
-		    ihp->hba_dip, "initiator-port",
+		    ihp->hba_dip, SCSI_ADDR_PROP_INITIATOR_PORT,
 		    init_port_name) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_WARN, "iscsi_ioctl: Updating "
-			    "initiator-port property on iSCSI "
+			    SCSI_ADDR_PROP_INITIATOR_PORT " property on iSCSI "
 			    "HBA(%s) with dip(%d) Failed",
 			    (char *)ihp->hba_name,
 			    ddi_get_instance(ihp->hba_dip));
@@ -4709,10 +4710,11 @@ iscsi_virt_lun_init(dev_info_t *hba_dip, dev_info_t *lun_dip,
 		    ilp->lun_sess->sess_name, ilp->lun_sess->sess_tpgt_conf);
 	}
 
-	if (mdi_prop_update_string(pip, "target-port",
-	    target_port_name) != DDI_PROP_SUCCESS) {
-		cmn_err(CE_WARN, "iscsi_virt_lun_init: Creating 'target-port' "
-		"property on Path(%p) for Target(%s), Lun(%d) Failed",
+	if (mdi_prop_update_string(pip,
+	    SCSI_ADDR_PROP_TARGET_PORT, target_port_name) != DDI_PROP_SUCCESS) {
+		cmn_err(CE_WARN, "iscsi_virt_lun_init: Creating '"
+		    SCSI_ADDR_PROP_TARGET_PORT "' property on Path(%p) "
+		    "for Target(%s), Lun(%d) Failed",
 		    (void *)pip, ilp->lun_sess->sess_name, ilp->lun_num);
 	}
 
@@ -4825,10 +4827,10 @@ iscsi_phys_lun_init(dev_info_t *hba_dip, dev_info_t *lun_dip,
 	}
 
 	if (ddi_prop_update_string(DDI_DEV_T_NONE, lun_dip,
-	    "target-port", target_port_name) != DDI_PROP_SUCCESS) {
-		cmn_err(CE_WARN, "iscsi_phys_lun_init: Creating 'target-port' "
-		    "property on Target(%s), Lun(%d) Failed",
-		    ilp->lun_sess->sess_name, ilp->lun_num);
+	    SCSI_ADDR_PROP_TARGET_PORT, target_port_name) != DDI_PROP_SUCCESS) {
+		cmn_err(CE_WARN, "iscsi_phys_lun_init: Creating '"
+		    SCSI_ADDR_PROP_TARGET_PORT "' property on Target(%s), "
+		    "Lun(%d) Failed", ilp->lun_sess->sess_name, ilp->lun_num);
 	}
 
 	return (rtn);

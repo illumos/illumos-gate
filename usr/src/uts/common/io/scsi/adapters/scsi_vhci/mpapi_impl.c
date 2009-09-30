@@ -908,6 +908,8 @@ vhci_get_path_list_for_mp_lu(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	uint64_t		*oid = (uint64_t *)(input_data);
 	mpapi_item_list_t	*ilist, *mplu_path_list = NULL;
 	mpapi_lu_data_t		*mplup;
+	mpapi_path_data_t	*mppathp;
+	mdi_pathinfo_t		*pip;
 
 	ilist = vhci->mp_priv->obj_hdr_list[MP_OBJECT_TYPE_MULTIPATH_LU]->head;
 
@@ -934,14 +936,33 @@ vhci_get_path_list_for_mp_lu(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	}
 
 	while (mplu_path_list != NULL) {
-		if (count < list_len) {
-			oid_list[count] = (uint64_t)mplu_path_list->
-			    item->oid.raw_oid;
-		} else {
-			rval = MP_MORE_DATA;
+		mppathp  = (mpapi_path_data_t *)(mplu_path_list->item->idata);
+		/* skip a path that should be hidden. */
+		if (!(mppathp->hide)) {
+			pip = (mdi_pathinfo_t *)mppathp->resp;
+			mdi_hold_path(pip);
+			/*
+			 * check if the pip is marked as device removed.
+			 * When pi_flag MDI_PATHINFO_FLAGS_DEVICE_REMOVED is set
+			 * the node should have been destroyed but did not
+			 * due to open on the client node.
+			 * The driver tracks such a node through the hide flag
+			 * and doesn't report it throuth ioctl response.
+			 * The devinfo driver doesn't report such a path.
+			 */
+			if (!(MDI_PI_FLAGS_IS_DEVICE_REMOVED(pip))) {
+				if (count < list_len) {
+					oid_list[count] =
+					    (uint64_t)mplu_path_list->
+					    item->oid.raw_oid;
+				} else {
+					rval = MP_MORE_DATA;
+				}
+				count++;
+			}
+			mdi_rele_path(pip);
 		}
 		mplu_path_list = mplu_path_list->next;
-		count++;
 	}
 
 	mpioc->mp_alen = (uint32_t)(count * sizeof (uint64_t));
@@ -972,6 +993,8 @@ vhci_get_path_list_for_init_port(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	uint64_t		*oid = (uint64_t *)(input_data);
 	mpapi_item_list_t	*ilist, *mpinit_path_list = NULL;
 	mpapi_initiator_data_t	*mpinitp;
+	mpapi_path_data_t	*mppathp;
+	mdi_pathinfo_t		*pip;
 
 	ilist = vhci->mp_priv->
 	    obj_hdr_list[MP_OBJECT_TYPE_INITIATOR_PORT]->head;
@@ -1016,14 +1039,33 @@ vhci_get_path_list_for_init_port(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	}
 
 	while (mpinit_path_list != NULL) {
-		if (count < list_len) {
-			oid_list[count] = (uint64_t)mpinit_path_list->
-			    item->oid.raw_oid;
-		} else {
-			rval = MP_MORE_DATA;
+		mppathp  = (mpapi_path_data_t *)(mpinit_path_list->item->idata);
+		/* skip a path that should be hidden. */
+		if (!(mppathp->hide)) {
+			pip = (mdi_pathinfo_t *)mppathp->resp;
+			mdi_hold_path(pip);
+			/*
+			 * check if the pip is marked as device removed.
+			 * When pi_flag MDI_PATHINFO_FLAGS_DEVICE_REMOVED is set
+			 * the node should have been destroyed but did not
+			 * due to open on the client node.
+			 * The driver tracks such a node through the hide flag
+			 * and doesn't report it throuth ioctl response.
+			 * The devinfo driver doesn't report such a path.
+			 */
+			if (!(MDI_PI_FLAGS_IS_DEVICE_REMOVED(pip))) {
+				if (count < list_len) {
+					oid_list[count] =
+					    (uint64_t)mpinit_path_list->
+					    item->oid.raw_oid;
+				} else {
+					rval = MP_MORE_DATA;
+				}
+				count++;
+			}
+			mdi_rele_path(pip);
 		}
 		mpinit_path_list = mpinit_path_list->next;
-		count++;
 	}
 
 	mpioc->mp_alen = (uint32_t)(count * sizeof (uint64_t));
@@ -1054,6 +1096,8 @@ vhci_get_path_list_for_target_port(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	uint64_t		*oid = (uint64_t *)(input_data);
 	mpapi_item_list_t	*ilist, *mptp_path_list = NULL;
 	mpapi_tport_data_t	*mptpp;
+	mpapi_path_data_t	*mppathp;
+	mdi_pathinfo_t		*pip;
 
 	ilist = vhci->mp_priv->obj_hdr_list[MP_OBJECT_TYPE_TARGET_PORT]->head;
 
@@ -1080,14 +1124,33 @@ vhci_get_path_list_for_target_port(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 	}
 
 	while (mptp_path_list != NULL) {
-		if (count < list_len) {
-			oid_list[count] =
-			    (uint64_t)mptp_path_list->item->oid.raw_oid;
-		} else {
-			rval = MP_MORE_DATA;
+		mppathp  = (mpapi_path_data_t *)(mptp_path_list->item->idata);
+		/* skip a path that should be hidden. */
+		if (!(mppathp->hide)) {
+			pip = (mdi_pathinfo_t *)mppathp->resp;
+			mdi_hold_path(pip);
+			/*
+			 * check if the pip is marked as device removed.
+			 * When pi_flag MDI_PATHINFO_FLAGS_DEVICE_REMOVED is set
+			 * the node should have been destroyed but did not
+			 * due to open on the client node.
+			 * The driver tracks such a node through the hide flag
+			 * and doesn't report it throuth ioctl response.
+			 * The devinfo driver doesn't report such a path.
+			 */
+			if (!(MDI_PI_FLAGS_IS_DEVICE_REMOVED(pip))) {
+				if (count < list_len) {
+					oid_list[count] =
+					    (uint64_t)mptp_path_list->
+					    item->oid.raw_oid;
+				} else {
+					rval = MP_MORE_DATA;
+				}
+				count++;
+			}
+			mdi_rele_path(pip);
 		}
 		mptp_path_list = mptp_path_list->next;
-		count++;
 	}
 
 	mpioc->mp_alen = (uint32_t)(count * sizeof (uint64_t));
@@ -2559,21 +2622,26 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 			if (strncmp(interconnect,
 			    INTERCONNECT_FABRIC_STR,
 			    strlen(interconnect)) == 0) {
-				mp_interconnect_type = 2;
+				mp_interconnect_type =
+				    MP_DRVR_TRANSPORT_TYPE_FC;
 			} else if (strncmp(interconnect,
 			    INTERCONNECT_PARALLEL_STR,
 			    strlen(interconnect)) == 0) {
-				mp_interconnect_type = 3;
+				mp_interconnect_type =
+				    MP_DRVR_TRANSPORT_TYPE_SPI;
 			} else if (strncmp(interconnect,
 			    INTERCONNECT_ISCSI_STR,
 			    strlen(interconnect)) == 0) {
-				mp_interconnect_type = 4;
+				mp_interconnect_type =
+				    MP_DRVR_TRANSPORT_TYPE_ISCSI;
 			} else if (strncmp(interconnect,
 			    INTERCONNECT_IBSRP_STR,
 			    strlen(interconnect)) == 0) {
-				mp_interconnect_type = 5;
+				mp_interconnect_type =
+				    MP_DRVR_TRANSPORT_TYPE_IFB;
 			} else {
-				mp_interconnect_type = 0;
+				mp_interconnect_type =
+				    MP_DRVR_TRANSPORT_TYPE_UNKNOWN;
 			}
 
 			init = kmem_zalloc(
@@ -2762,6 +2830,7 @@ vhci_mpapi_create_item(struct scsi_vhci *vhci, uint8_t obj_type, void* res)
 			path->resp = res;
 			path->path_name = pname;
 			path->valid = 1;
+			path->hide = 0;
 			path->prop.id = item->oid.raw_oid;
 			item->idata = (void *)path;
 			vhci_mpapi_log_sysevent(vhci->vhci_dip,
@@ -2886,6 +2955,7 @@ vhci_update_mpapi_data(struct scsi_vhci *vhci, scsi_vhci_lun_t *vlun,
 		 */
 		pd = path_list->item->idata;
 		pd->valid = 1;
+		pd->hide = 0;
 		pd->resp = pip;
 	}
 
@@ -3907,14 +3977,27 @@ vhci_mpapi_set_path_state(dev_info_t *vdip, mdi_pathinfo_t *pip, int state)
 	}
 
 	/*
+	 * Check if the pathinfo is uninitialized(destroyed).
+	 */
+	if (state == MP_DRVR_PATH_STATE_UNINIT) {
+		pp->hide = 1;
+		VHCI_DEBUG(6, (CE_NOTE, NULL, "vhci_mpapi_set_path_state: "
+		    "path(pip: %p) is uninited(destroyed).",
+		    (void *)pip));
+	} else {
+		pp->hide = 0;
+	}
+	/*
 	 * Find if there are any paths at all to the lun
 	 */
 	if ((state == MP_DRVR_PATH_STATE_REMOVED) || (state ==
 	    MP_DRVR_PATH_STATE_PATH_ERR) || (state ==
 	    MP_DRVR_PATH_STATE_LU_ERR) || (state ==
-	    MP_DRVR_PATH_STATE_UNKNOWN)) {
+	    MP_DRVR_PATH_STATE_UNKNOWN) || pp->hide) {
 		pp->valid = 0;
-
+		VHCI_DEBUG(6, (CE_NOTE, NULL, "vhci_mpapi_set_path_state: "
+		    "path(pip: %p) is not okay state.  Set to invalid.",
+		    (void *)pip));
 		svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(pip);
 		svl = svp->svp_svl;
 		/*
@@ -3937,6 +4020,9 @@ vhci_mpapi_set_path_state(dev_info_t *vdip, mdi_pathinfo_t *pip, int state)
 			if (lu_list != NULL) {
 				ld = lu_list->item->idata;
 				ld->valid = 0;
+				VHCI_DEBUG(6, (CE_NOTE, NULL,
+				    "vhci_mpapi_set_path_state: "
+				    " Invalidated LU(%s)", svl->svl_lun_wwn));
 			}
 		}
 	}
@@ -4198,7 +4284,8 @@ vhci_mpapi_chk_last_path(mdi_pathinfo_t *pip)
 		    MDI_PI_IS_STANDBY(ret_pip) ||
 		    MDI_PI_IS_INIT(ret_pip)) &&
 		    !(MDI_PI_IS_DISABLE(ret_pip) ||
-		    MDI_PI_IS_TRANSIENT(ret_pip))) {
+		    MDI_PI_IS_TRANSIENT(ret_pip) ||
+		    MDI_PI_FLAGS_IS_DEVICE_REMOVED(ret_pip))) {
 			count++;
 		}
 		mdi_pi_unlock(ret_pip);

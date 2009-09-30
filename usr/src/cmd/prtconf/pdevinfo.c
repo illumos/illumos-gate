@@ -770,7 +770,6 @@ dump_devs(di_node_t node, void *arg)
 		(void) printf(" (retired)");
 	} else if (di_state(node) & DI_DRIVER_DETACHED)
 		(void) printf(" (driver not attached)");
-
 	(void) printf("\n");
 
 	if (opts.o_verbose)  {
@@ -1030,6 +1029,13 @@ dump_pathing_data(int ilev, di_node_t node)
 		return;
 
 	while ((pi = di_path_client_next_path(node, pi)) != DI_PATH_NIL) {
+
+		/* It is not really a path if we failed to capture the pHCI */
+		phci_node = di_path_phci_node(pi);
+		if (phci_node == DI_NODE_NIL)
+			continue;
+
+		/* Print header for the first path */
 		if (firsttime) {
 			indent_to_level(ilev);
 			firsttime = 0;
@@ -1042,10 +1048,9 @@ dump_pathing_data(int ilev, di_node_t node)
 		 * the same as the /devices devifo path had the device been
 		 * enumerated under pHCI.
 		 */
-		phci_node = di_path_phci_node(pi);
 		phci_path = di_devfs_path(phci_node);
-		path_instance = di_path_instance(pi);
 		if (phci_path) {
+			path_instance = di_path_instance(pi);
 			if (path_instance > 0) {
 				indent_to_level(ilev);
 				(void) printf("Path %d: %s/%s@%s\n",
@@ -1060,6 +1065,7 @@ dump_pathing_data(int ilev, di_node_t node)
 		indent_to_level(ilev);
 		(void) printf("%s#%d (%s)\n", di_driver_name(phci_node),
 		    di_instance(phci_node), path_state_name(di_path_state(pi)));
+
 		(void) dump_prop_list(&pathprop_dumpops, NULL, ilev + 1,
 		    pi, DDI_DEV_T_ANY, NULL);
 	}

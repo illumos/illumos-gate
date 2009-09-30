@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _CFGA_SCSI_H
 #define	_CFGA_SCSI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -118,6 +116,7 @@ typedef enum {
 	SCFGA_REPLACE_DEV,
 	SCFGA_WALK_NODE,
 	SCFGA_WALK_MINOR,
+	SCFGA_WALK_PATH,
 	SCFGA_BUS_QUIESCE,
 	SCFGA_BUS_UNQUIESCE,
 	SCFGA_BUS_GETSTATE,
@@ -140,6 +139,12 @@ typedef enum {
 	SCFGA_TERMINATE = 0,
 	SCFGA_CONTINUE
 } scfga_recur_t;
+
+typedef enum {
+	NODYNCOMP = 1,
+	DEV_APID,
+	PATH_APID
+} dyncomp_t;
 
 
 /* Structures for tree walking code */
@@ -180,7 +185,8 @@ typedef struct {
 typedef struct {
 	char		*hba_phys;
 	char		*dyncomp;
-	char		*path;
+	dyncomp_t	dyntype;    /* is pathinfo or dev apid? */
+	char		*path;	    /* for apid with device dyn comp. */
 	uint_t		flags;
 } apid_t;
 
@@ -191,6 +197,9 @@ typedef struct {
 /* apid_t flags */
 #define	FLAG_DISABLE_RCM	0x01
 #define	FLAG_USE_DIFORCE	0x02
+
+/* internal use for handling pathinfo */
+#define	FLAG_CLIENT_DEV		0x04
 
 /* Message ids */
 typedef enum {
@@ -239,6 +248,7 @@ ERR_RCM_HANDLE,
 ERRARG_RCM_SUSPEND,
 ERRARG_RCM_RESUME,
 ERRARG_RCM_OFFLINE,
+ERRARG_RCM_CLIENT_OFFLINE,
 ERRARG_RCM_ONLINE,
 ERRARG_RCM_REMOVE,
 
@@ -323,6 +333,7 @@ typedef struct {
 
 #define	DYN_SEP			"::"
 #define	MINOR_SEP		":"
+#define	PATH_APID_DYN_SEP	","
 
 #define	S_FREE(x)	(((x) != NULL) ? (free(x), (x) = NULL) : (void *)0)
 #define	S_STR(x)	(((x) == NULL) ? "" : (x))
@@ -376,6 +387,7 @@ scfga_ret_t do_list(apid_t *apidp, scfga_cmd_t cmd,
     ldata_list_t **llpp, int *nelem, char **errstring);
 scfga_ret_t list_ext_postprocess(ldata_list_t **llpp, int nelem,
     cfga_list_data_t **ap_id_list, int *nlistp, char **errstring);
+int stat_path_info(di_node_t root, void *arg, int *l_errnop);
 
 
 /* Conversion routines */
@@ -385,6 +397,7 @@ scfga_ret_t apid_to_path(const char *hba_phys, const char *dyncomp,
     char **pathpp, int *l_errnop);
 scfga_ret_t make_dyncomp(di_node_t node, const char *physpath,
     char **dyncompp, int *l_errnop);
+scfga_ret_t make_path_dyncomp(di_path_t path, char **dyncomp, int *l_errnop);
 
 
 /* RCM routines */
@@ -411,6 +424,8 @@ void list_free(ldata_list_t **llpp);
 int known_state(di_node_t node);
 scfga_ret_t devctl_cmd(const char *ap_id, scfga_cmd_t cmd,
     uint_t *statep, int *l_errnop);
+scfga_ret_t path_apid_state_change(apid_t *apidp, scfga_cmd_t cmd,
+    cfga_flags_t flags, char **errstring, int *l_errnop, msgid_t errid);
 scfga_ret_t invoke_cmd(const char *func, apid_t *apidt, prompt_t *prp,
     cfga_flags_t flags, char **errstring);
 

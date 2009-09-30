@@ -143,6 +143,8 @@ main(int argc, char **argv)
 			    devinfo_root));
 			print_mpx_capable(di_drv_first_node("mpt_sas",
 			    devinfo_root));
+			print_mpx_capable(di_drv_first_node("pmcs",
+			    devinfo_root));
 		}
 		di_fini(devinfo_root);
 		return (0);
@@ -401,7 +403,8 @@ parse_args(int argc, char *argv[])
 			/* update this if adding support for a new driver */
 			if ((strncmp(drvlimit, "fp", 2) == NULL) &&
 			    (strncmp(drvlimit, "mpt", 3) == NULL) &&
-			    (strncmp(drvlimit, "mpt_sas", 7) == NULL)) {
+			    (strncmp(drvlimit, "mpt_sas", 7) == NULL) &&
+			    (strncmp(drvlimit, "pmcs", 4) == NULL)) {
 				logmsg(MSG_ERROR,
 				    gettext("invalid parent driver (%s) "
 				    "specified"), drvlimit);

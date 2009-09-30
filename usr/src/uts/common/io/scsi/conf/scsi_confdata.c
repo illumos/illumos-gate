@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,5 +97,23 @@ int	scsi_watchdog_tick = 10;
  * default scsi target driver "fm-capable" property value
  */
 int	scsi_fm_capable = DDI_FM_EREPORT_CAPABLE;
+
+/*
+ * SCSI enumeration options defines are kept in <scsi/conf/autoconf.h>.
+ * When scsi_enumeration is enabled, driver.conf enumeration is unnecessary.
+ *
+ * The global variable "scsi_enumeration" is used as the default value of the
+ * "scsi-enumeration" property. In addition to enabline/disabling enumeration
+ * (bit 0), target and lun threading can be specified.
+ *
+ *	0	driver.conf enumeration
+ *	1	dynamic enumeration with target/lun multi-threading.
+ *	3	dynamic enumeration with lun multi-threading disabled.
+ *	5	dynamic enumeration with target multi-threading disabled;
+ *	7	dynamic enumeration with target/lun multi-threading disabled.
+ *
+ * Default is currently driver.conf enumeration (0).
+ */
+int	scsi_enumeration = 0;
 
 #endif	/* _KERNEL */

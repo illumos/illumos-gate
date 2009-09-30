@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,8 +228,7 @@ listMpathSupport(int operandLen, char *operand[])
 	MP_OID_LIST				*pPluginOidList;
 	boolean_t				shown = B_FALSE;
 	/* number of plugins listed */
-	int					i,
-						op;
+	int					i, op;
 
 	if ((mpstatus = MP_GetPluginOidList(&pPluginOidList))
 	    != MP_STATUS_SUCCESS) {
@@ -276,11 +275,12 @@ listMpathSupport(int operandLen, char *operand[])
 						    TEXT_LB_MPATH_SUPPORT),
 						    pluginProps.fileName);
 					} else {
-					/* LINTED E_SEC_PRINTF_VAR_FMT */
-						(void) fprintf(stderr,
-						    getTextString(
+				/* begin back-up indentation */
+				/* LINTED E_SEC_PRINTF_VAR_FMT */
+				(void) fprintf(stderr, getTextString(
 				    ERR_CANT_FIND_MPATH_SUPPORT_WITH_NAME),
-						    operand[op]);
+				    operand[op]);
+				/* end back-up indentation */
 						(void) printf("\n");
 					}
 				}
@@ -311,9 +311,7 @@ showMpathSupport(int operandLen, char *operand[])
 	MP_OID_LIST				*deviceOidListArray;
 	MP_DEVICE_PRODUCT_PROPERTIES		devProps;
 	boolean_t				bListIt = B_FALSE;
-	int					op,
-						i,
-						j;
+	int					op, i, j;
 	MP_LOAD_BALANCE_TYPE 			lb;
 
 
@@ -330,7 +328,7 @@ showMpathSupport(int operandLen, char *operand[])
 	}
 
 	for (op = 0; op < operandLen; op++) {
-	    bListIt = B_FALSE;
+		bListIt = B_FALSE;
 
 		for (i = 0; i < pPluginOidList->oidCount; i++) {
 
@@ -377,11 +375,11 @@ showMpathSupport(int operandLen, char *operand[])
 			    getTextString(TEXT_LB_DEFAULT_LB));
 			/* don't ignore load balance type none. */
 			if (pluginProps.defaultloadBalanceType == 0) {
-			    (void) printf("%s",
-			    getTextString(TEXT_LBTYPE_NONE));
+				(void) printf("%s",
+				    getTextString(TEXT_LBTYPE_NONE));
 			} else {
-			    displayLoadBalanceString(
-			    pluginProps.defaultloadBalanceType);
+				displayLoadBalanceString(
+				    pluginProps.defaultloadBalanceType);
 			}
 			(void) printf("\n");
 
@@ -391,19 +389,20 @@ showMpathSupport(int operandLen, char *operand[])
 			/* check each bit, display string if found set */
 			if (pluginProps.supportedLoadBalanceTypes == 0) {
 				(void) printf("\t\t%s\n",
-					getTextString(TEXT_LBTYPE_NONE));
+				    getTextString(TEXT_LBTYPE_NONE));
 			} else {
-			    lb = 1;
-			    do {
-				if (0 != (lb &
-				    pluginProps.supportedLoadBalanceTypes)) {
-					(void) printf("\t\t");
-					displayLoadBalanceString(lb &
-					pluginProps.supportedLoadBalanceTypes);
-					(void) printf("\n");
-				}
-				lb = lb<<1;
-			    } while (lb < 0x80000000);
+				lb = 1;
+				do {
+					if (0 != (lb & pluginProps.
+					    supportedLoadBalanceTypes)) {
+						(void) printf("\t\t");
+						displayLoadBalanceString(lb &
+						    pluginProps.
+						    supportedLoadBalanceTypes);
+						(void) printf("\n");
+					}
+					lb = lb<<1;
+				} while (lb < 0x80000000);
 			}
 
 			(void) printf("\t%s  %s\n",
@@ -493,9 +492,10 @@ showMpathSupport(int operandLen, char *operand[])
 
 				for (j = 0; j < deviceOidListArray->oidCount;
 				    j++) {
-					(void) memset(&devProps, 0,
-					sizeof (MP_DEVICE_PRODUCT_PROPERTIES));
-
+				/* begin backup indentation */
+				(void) memset(&devProps, 0,
+				    sizeof (MP_DEVICE_PRODUCT_PROPERTIES));
+				/* end backup indentation */
 					if ((mpstatus =
 					    MP_GetDeviceProductProperties(\
 					    deviceOidListArray->oids[j],
@@ -520,24 +520,24 @@ showMpathSupport(int operandLen, char *operand[])
 						(void) printf("\n\t\t%s\n",
 						    getTextString(
 						    TEXT_LB_SUPPORTED_LB));
-			if (devProps.supportedLoadBalanceTypes == 0) {
-				(void) printf("\t\t\t%s\n",
-					getTextString(TEXT_LBTYPE_NONE));
-			} else {
-			    lb = 1;
-			    do {
+		/* begin back-up indentation */
+		if (devProps.supportedLoadBalanceTypes == 0) {
+			(void) printf("\t\t\t%s\n",
+			    getTextString(TEXT_LBTYPE_NONE));
+		} else {
+			lb = 1;
+			do {
 				if (0 != (lb &
 				    devProps.supportedLoadBalanceTypes)) {
 					(void) printf("\t\t\t");
 					displayLoadBalanceString(lb &
-					devProps.supportedLoadBalanceTypes);
+					    devProps.supportedLoadBalanceTypes);
 					(void) printf("\n");
 				}
 				lb = lb<<1;
-			    } while (lb < 0x80000000);
-			}
-
-
+			} while (lb < 0x80000000);
+		}
+		/* end back-up indentation */
 						(void) printf("\n");
 
 					} else {
@@ -582,18 +582,14 @@ showMpathSupport(int operandLen, char *operand[])
 int
 modifyMpathSupport(int operandLen, char *operand[], cmdOptions_t *options)
 {
-	MP_STATUS				mpstatus = MP_STATUS_SUCCESS;
-	MP_PLUGIN_PROPERTIES			pluginProps;
-	MP_OID_LIST				*pPluginOidList;
-	boolean_t				bFoundIt = B_FALSE;
-	MP_OID					pluginOid;
-	cmdOptions_t 				*optionList = options;
-	char					*cmdStr =
-						    getTextString(
-						    TEXT_UNKNOWN);
-	int					op,
-						i,
-						lbValue;
+	MP_STATUS		mpstatus = MP_STATUS_SUCCESS;
+	MP_PLUGIN_PROPERTIES	pluginProps;
+	MP_OID_LIST		*pPluginOidList;
+	boolean_t		bFoundIt = B_FALSE;
+	MP_OID			pluginOid;
+	cmdOptions_t 		*optionList = options;
+	char			*cmdStr = getTextString(TEXT_UNKNOWN);
+	int			op, i, lbValue;
 
 	if ((mpstatus = MP_GetPluginOidList(&pPluginOidList))
 	    != MP_STATUS_SUCCESS) {
@@ -645,8 +641,8 @@ modifyMpathSupport(int operandLen, char *operand[], cmdOptions_t *options)
 				mpstatus =
 				    MP_EnableAutoFailback(pluginOid);
 			} else if (0 ==
-				strcasecmp(optionList->optarg,
-				    getTextString(TEXT_OFF))) {
+			    strcasecmp(optionList->optarg,
+			    getTextString(TEXT_OFF))) {
 				mpstatus =
 				    MP_DisableAutoFailback(pluginOid);
 			} else {
@@ -667,8 +663,8 @@ modifyMpathSupport(int operandLen, char *operand[], cmdOptions_t *options)
 				mpstatus =
 				    MP_EnableAutoProbing(pluginOid);
 			} else if (0 ==
-				strcasecmp(optionList->optarg,
-				    getTextString(TEXT_OFF))) {
+			    strcasecmp(optionList->optarg,
+			    getTextString(TEXT_OFF))) {
 				mpstatus =
 				    MP_DisableAutoProbing(pluginOid);
 			} else {
@@ -738,29 +734,18 @@ modifyMpathSupport(int operandLen, char *operand[], cmdOptions_t *options)
 int
 listLogicalUnit(int operandLen, char *operand[], cmdOptions_t *options)
 {
-	MP_STATUS				mpstatus = MP_STATUS_SUCCESS;
-	MP_MULTIPATH_LOGICAL_UNIT_PROPERTIES	luProps;
-	MP_PLUGIN_PROPERTIES			pluginProps;
-	MP_TARGET_PORT_PROPERTIES		tportProps;
-	MP_OID_LIST				*pPluginOidList,
-						*pLogicalUnitOidList,
-						*pTpgOidListArray,
-						*pTportOidListArray;
-	boolean_t				bListIt = B_FALSE,
-						bFoundOperand = B_FALSE,
-						*bFoundOption,
-						bContinue = B_FALSE;
-	MP_OID					luOid;
-	cmdOptions_t 				*optionList = options;
-	int					opListCount = 0,
-						i = 0,
-						lu = 0,
-						tpg = 0,
-						opoffset = 0,
-						j = 0,
-						opStart = 0,
-						opEnd = 0,
-						opIndex;
+	MP_STATUS mpstatus = MP_STATUS_SUCCESS;
+	MP_MULTIPATH_LOGICAL_UNIT_PROPERTIES luProps;
+	MP_PLUGIN_PROPERTIES pluginProps;
+	MP_TARGET_PORT_PROPERTIES tportProps;
+	MP_OID_LIST *pPluginOidList, *pLogicalUnitOidList,
+	    *pTpgOidListArray, *pTportOidListArray;
+	boolean_t bListIt = B_FALSE, bFoundOperand = B_FALSE,
+	    *bFoundOption, bContinue = B_FALSE;
+	MP_OID luOid;
+	cmdOptions_t *optionList = options;
+	int opListCount = 0, i = 0, lu = 0, tpg = 0, opoffset = 0, j = 0,
+	    opStart = 0, opEnd = 0, opIndex;
 
 	/* count number of options */
 	for (; optionList->optval; optionList++) {
@@ -819,9 +804,11 @@ listLogicalUnit(int operandLen, char *operand[], cmdOptions_t *options)
 			}
 
 			for (lu = 0; lu < pLogicalUnitOidList->oidCount; lu++) {
-				/* get lu properties so we can check the name */
-				(void) memset(&luProps, 0,
-				sizeof (MP_MULTIPATH_LOGICAL_UNIT_PROPERTIES));
+			/* begin backup indentation */
+			/* get lu properties so we can check the name */
+			(void) memset(&luProps, 0,
+			    sizeof (MP_MULTIPATH_LOGICAL_UNIT_PROPERTIES));
+			/* end backup indentation */
 				mpstatus =
 				    MP_GetMPLogicalUnitProperties(
 				    pLogicalUnitOidList->oids[lu],
@@ -903,9 +890,11 @@ listLogicalUnit(int operandLen, char *operand[], cmdOptions_t *options)
 				    (lu < pLogicalUnitOidList->oidCount);
 				    lu++) {
 					bListIt = B_FALSE;
-					/* get lu props & check the name */
-					(void) memset(&luProps, 0,
-				sizeof (MP_MULTIPATH_LOGICAL_UNIT_PROPERTIES));
+			/* begin backup indentation */
+			/* get lu props & check the name */
+			(void) memset(&luProps, 0,
+			    sizeof (MP_MULTIPATH_LOGICAL_UNIT_PROPERTIES));
+			/* end backup indentation */
 					mpstatus =
 					    MP_GetMPLogicalUnitProperties(
 					    pLogicalUnitOidList->oids[lu],
@@ -968,7 +957,7 @@ switch (optionList->optval) {
 		    (B_FALSE == bListIt); tpg++) {
 			mpstatus =
 			    MP_GetTargetPortOidList(pTpgOidListArray->oids[tpg],
-				&pTportOidListArray);
+			    &pTportOidListArray);
 			if (mpstatus != MP_STATUS_SUCCESS) {
 				(void) fprintf(stderr, "%s:  %s\n",
 				    cmdName,
@@ -1148,8 +1137,7 @@ listIndividualLogicalUnit(MP_OID luOid,
 	MP_PATH_LOGICAL_UNIT_PROPERTIES		pathProps;
 	MP_OID_LIST				*pPathOidListArray;
 	MP_STATUS				mpstatus = MP_STATUS_SUCCESS;
-	int					numOperationalPaths,
-						pa;
+	int					numOperationalPaths, pa;
 
 	(void) printf("\t");
 	displayArray(luProps.deviceFileName, sizeof (luProps.deviceFileName));
@@ -1161,7 +1149,7 @@ listIndividualLogicalUnit(MP_OID luOid,
 		/* LINTED E_SEC_PRINTF_VAR_FMT */
 		(void) fprintf(stderr,
 		    getTextString(ERR_NO_LU_PATH_INFO_WITH_MISSING_LU_STR),
-		getStringArray(luProps.deviceFileName,
+		    getStringArray(luProps.deviceFileName,
 		    sizeof (luProps.deviceFileName)));
 		(void) fprintf(stderr, "\n");
 		return (mpstatus);
@@ -1213,8 +1201,7 @@ showLogicalUnit(int operandLen, char *operand[])
 	MP_STATUS				mpstatus = MP_STATUS_SUCCESS;
 	MP_MULTIPATH_LOGICAL_UNIT_PROPERTIES	luProps;
 	MP_PLUGIN_PROPERTIES			pluginProps;
-	MP_OID					luOid,
-						pluginOid;
+	MP_OID					luOid, pluginOid;
 
 	int					op;
 
@@ -1292,21 +1279,18 @@ showIndividualLogicalUnit(MP_OID luOid,
 	MP_TARGET_PORT_GROUP_PROPERTIES		tpgProps;
 	MP_TARGET_PORT_PROPERTIES 		tportProps;
 	MP_INITIATOR_PORT_PROPERTIES 		initProps;
-	MP_OID_LIST				*pPathOidListArray,
-						*pTPGOidListArray,
-						*pTportOidListArray;
+	MP_OID_LIST	*pPathOidListArray, *pTPGOidListArray,
+	    *pTportOidListArray;
 	MP_STATUS				mpstatus = MP_STATUS_SUCCESS;
 	boolean_t				showTportLabel = B_TRUE;
 
-	int					pa,
-						tpg,
-						tport;
+	int					pa, tpg, tport;
 
 	(void) printf("%s  ", getTextString(TEXT_LB_LOGICAL_UNIT));
 	displayArray(luProps.deviceFileName, sizeof (luProps.deviceFileName));
 	(void) printf("\n");
 	(void) printf("\t%s  %s\n", getTextString(TEXT_LB_MPATH_SUPPORT),
-		pluginProps.fileName);
+	    pluginProps.fileName);
 
 	(void) printf("\t%s  ", getTextString(TEXT_LB_VENDOR));
 	displayArray(luProps.vendor,
@@ -1467,14 +1451,16 @@ showIndividualLogicalUnit(MP_OID luOid,
 					    getAccessStateStr(
 					    tpgProps.accessState));
 					    /* display label for each tpg. */
-					    (void) printf("\t\t%s\n",
-						getTextString(TEXT_TPORT_LIST));
+					(void) printf("\t\t%s\n",
+					    getTextString(TEXT_TPORT_LIST));
 				} else {
 					/* display label once for symmetric. */
 					if (B_TRUE == showTportLabel) {
-						(void) printf("\t%s\n",
-						getTextString(TEXT_TPORT_LIST));
-						showTportLabel = B_FALSE;
+					/* begin back-up indentation */
+					(void) printf("\t%s\n",
+					    getTextString(TEXT_TPORT_LIST));
+					showTportLabel = B_FALSE;
+					/* end back-up indentation */
 					}
 				}
 
@@ -1496,28 +1482,28 @@ showIndividualLogicalUnit(MP_OID luOid,
 		    MP_GetTargetPortProperties(pTportOidListArray->oids[tport],
 		    &tportProps)) != MP_STATUS_SUCCESS) {
 			(void) fprintf(stderr, "%s:  %s",
-			cmdName, getTextString(ERR_NO_PROPERTIES));
+			    cmdName, getTextString(ERR_NO_PROPERTIES));
 		} else {
 			if (MP_TRUE == luProps.asymmetric) {
 				(void) printf("\t\t\t%s  ",
-				getTextString(TEXT_LB_NAME));
+				    getTextString(TEXT_LB_NAME));
 				displayArray(tportProps.portID,
-					sizeof (tportProps.portID));
+				    sizeof (tportProps.portID));
 				(void) printf("\n\t\t\t%s  %d\n",
-				getTextString(TEXT_LB_RELATIVE_ID),
-				tportProps.relativePortID);
+				    getTextString(TEXT_LB_RELATIVE_ID),
+				    tportProps.relativePortID);
 			} else {
 				(void) printf("\t\t%s  ",
-				getTextString(TEXT_LB_NAME));
+				    getTextString(TEXT_LB_NAME));
 				displayArray(tportProps.portID,
-					sizeof (tportProps.portID));
+				    sizeof (tportProps.portID));
 				(void) printf("\n\t\t%s  %d\n",
-				getTextString(TEXT_LB_RELATIVE_ID),
-				tportProps.relativePortID);
+				    getTextString(TEXT_LB_RELATIVE_ID),
+				    tportProps.relativePortID);
 			}
 			/* insert blank line if not the last target port. */
 			if (!(tport == (pTportOidListArray->oidCount - 1))) {
-			    (void) printf("\n");
+				(void) printf("\n");
 			}
 		}
 	} /* for each target port */
@@ -1551,9 +1537,7 @@ modifyLogicalUnit(int operandLen, char *operand[], cmdOptions_t *options)
 	MP_STATUS				mpstatus = MP_STATUS_SUCCESS;
 	MP_OID					luOid;
 	cmdOptions_t 				*optionList = options;
-	char					*cmdStr =
-						    getTextString(
-						    TEXT_UNKNOWN);
+	char	*cmdStr = getTextString(TEXT_UNKNOWN);
 	int					op;
 
 	for (op = 0; op < operandLen; op++) {
@@ -1580,14 +1564,15 @@ modifyLogicalUnit(int operandLen, char *operand[], cmdOptions_t *options)
 					mpstatus =
 					    MP_DisableAutoFailback(luOid);
 				} else {
-					/* LINTED E_SEC_PRINTF_VAR_FMT */
-					(void) fprintf(stderr, getTextString(
+				/* begin back-up indentation */
+				/* LINTED E_SEC_PRINTF_VAR_FMT */
+				(void) fprintf(stderr, getTextString(
 				    ERR_FAILED_TO_CHANGE_OPTION_WITH_REASON),
-					    cmdStr,
-					    getTextString(
-					    TEXT_ILLEGAL_ARGUMENT));
-					(void) printf("\n");
-					return (ERROR_CLI_FAILED);
+				    cmdStr, getTextString(
+				    TEXT_ILLEGAL_ARGUMENT));
+				(void) printf("\n");
+				return (ERROR_CLI_FAILED);
+				/* start back-up indentation */
 				}
 				break;
 			case 'p':
@@ -1598,18 +1583,19 @@ modifyLogicalUnit(int operandLen, char *operand[], cmdOptions_t *options)
 					mpstatus =
 					    MP_EnableAutoProbing(luOid);
 				} else if (0 == strcasecmp(optionList->optarg,
-					getTextString(TEXT_OFF))) {
+				    getTextString(TEXT_OFF))) {
 					mpstatus =
 					    MP_DisableAutoProbing(luOid);
 				} else {
-					/* LINTED E_SEC_PRINTF_VAR_FMT */
-					(void) fprintf(stderr, getTextString(
+				/* begin back-up indentation */
+				/* LINTED E_SEC_PRINTF_VAR_FMT */
+				(void) fprintf(stderr, getTextString(
 				    ERR_FAILED_TO_CHANGE_OPTION_WITH_REASON),
-					    cmdStr,
-					    getTextString(
-					    TEXT_ILLEGAL_ARGUMENT));
-					(void) printf("\n");
-					return (ERROR_CLI_FAILED);
+				    cmdStr, getTextString(
+				    TEXT_ILLEGAL_ARGUMENT));
+				(void) printf("\n");
+				return (ERROR_CLI_FAILED);
+				/* end back-up indentation */
 				}
 				break;
 			case 'b':
@@ -1689,7 +1675,7 @@ failoverLogicalUnit(char *operand[])
 	    MP_GetAssociatedTPGOidList(luOid, &pTpgOidListArray);
 	if (mpstatus != MP_STATUS_SUCCESS) {
 		(void) fprintf(stderr, "%s:  %s\n",
-		cmdName, getTextString(ERR_NO_ASSOC_TPGS));
+		    cmdName, getTextString(ERR_NO_ASSOC_TPGS));
 		return (mpstatus);
 	}
 
@@ -1709,7 +1695,7 @@ failoverLogicalUnit(char *operand[])
 		}
 		if (MP_FALSE == tpgProps.explicitFailover) {
 			(void) fprintf(stderr, "%s:  %s\n",
-			cmdName, getTextString(ERR_NO_FAILOVER_ALLOWED));
+			    cmdName, getTextString(ERR_NO_FAILOVER_ALLOWED));
 			return (ERROR_CLI_FAILED);
 		}
 
@@ -1726,12 +1712,14 @@ failoverLogicalUnit(char *operand[])
 			mpstatus =
 			    MP_SetTPGAccess(luOid, 1, &tpgStatePair);
 			if (MP_STATUS_SUCCESS != mpstatus) {
-				/* LINTED E_SEC_PRINTF_VAR_FMT */
-				(void) fprintf(stderr, getTextString(
+			/* begin back-up indentation */
+			/* LINTED E_SEC_PRINTF_VAR_FMT */
+			(void) fprintf(stderr, getTextString(
 			    ERR_FAILED_TO_FAILOVER_WITH_REASON),
 			    getMpStatusStr(mpstatus));
-				(void) printf("\n");
-				return (mpstatus);
+			(void) printf("\n");
+			return (mpstatus);
+			/* end back-up indentation */
 			}
 		}
 
@@ -1765,15 +1753,13 @@ getLogicalUnitOid(MP_CHAR *luFileName, MP_OID *pluOid)
 	MP_STATUS				mpstatus = MP_STATUS_SUCCESS;
 	MP_MULTIPATH_LOGICAL_UNIT_PROPERTIES	luProps;
 	MP_PLUGIN_PROPERTIES			pluginProps;
-	MP_OID_LIST				*pPluginOidList,
-						*pLogicalUnitOidList;
+	MP_OID_LIST	*pPluginOidList, *pLogicalUnitOidList;
 	boolean_t				foundIt = B_FALSE;
 
-	int					i,
-						lu;
+	int					i, lu;
 
 	int 					fd1, fd2;
-	ddi_devid_t				devid1 = NULL, devid2 = NULL;
+	ddi_devid_t				devid1, devid2;
 
 	if (NULL == pluOid) {
 		/* print some kind of error msg here - should never happen */
@@ -1788,14 +1774,14 @@ getLogicalUnitOid(MP_CHAR *luFileName, MP_OID *pluOid)
 	pluOid->ownerId = 0;
 
 	if ((mpstatus = MP_GetPluginOidList(&pPluginOidList))
-		!= MP_STATUS_SUCCESS) {
+	    != MP_STATUS_SUCCESS) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
 		    getTextString(ERR_NO_MPATH_SUPPORT_LIST));
 		return (B_FALSE);
 	}
 	if ((NULL == pPluginOidList) || (pPluginOidList->oidCount < 1)) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
-		getTextString(ERR_NO_MPATH_SUPPORT_LIST));
+		    getTextString(ERR_NO_MPATH_SUPPORT_LIST));
 		return (ERROR_CLI_FAILED);
 	}
 	for (i = 0; i < pPluginOidList->oidCount; i++) {
@@ -1805,9 +1791,9 @@ getLogicalUnitOid(MP_CHAR *luFileName, MP_OID *pluOid)
 		if ((mpstatus =
 		    MP_GetPluginProperties(pPluginOidList->oids[i],
 		    &pluginProps)) != MP_STATUS_SUCCESS) {
-				(void) fprintf(stderr, "%s:  %s\n",
-				    cmdName, getTextString(ERR_NO_PROPERTIES));
-				return (B_FALSE);
+			(void) fprintf(stderr, "%s:  %s\n",
+			    cmdName, getTextString(ERR_NO_PROPERTIES));
+			return (B_FALSE);
 		}
 
 		/* attempt to find this logical unit */
@@ -1834,7 +1820,8 @@ getLogicalUnitOid(MP_CHAR *luFileName, MP_OID *pluOid)
 				return (B_FALSE);
 			}
 
-			if (0 == strcmp(luFileName, luProps.deviceFileName)) {
+			if (compareLUName(luFileName, luProps.deviceFileName)
+			    == B_TRUE) {
 				foundIt = B_TRUE;
 			} else {
 				/* user input didn't match, try via devid */
@@ -1845,10 +1832,11 @@ getLogicalUnitOid(MP_CHAR *luFileName, MP_OID *pluOid)
 				 */
 
 				fd1 = fd2 = -1;
+				devid1 = devid2 = NULL;
 				if (((fd1 = open(luFileName,
-					O_RDONLY|O_NDELAY)) >= 0) &&
+				    O_RDONLY|O_NDELAY)) >= 0) &&
 				    ((fd2 = open(luProps.deviceFileName,
-					O_RDONLY|O_NDELAY)) >= 0) &&
+				    O_RDONLY|O_NDELAY)) >= 0) &&
 				    (devid_get(fd1, &devid1) == 0) &&
 				    (devid_get(fd2, &devid2) == 0) &&
 				    ((NULL != devid1) && (NULL != devid2))) {
@@ -1905,14 +1893,11 @@ listInitiatorPort(int operandLen, char *operand[])
 {
 	MP_STATUS				mpstatus = MP_STATUS_SUCCESS;
 	MP_INITIATOR_PORT_PROPERTIES 		initProps;
-	MP_OID_LIST				*pPluginOidList,
-						*pInitOidList;
+	MP_OID_LIST	*pPluginOidList, *pInitOidList;
 	boolean_t				bListIt = B_FALSE;
 	boolean_t				*foundOp;
 
-	int					ol,
-						i,
-						iport;
+	int		ol, i, iport;
 
 	foundOp = malloc((sizeof (boolean_t)) * operandLen);
 	if (NULL == foundOp) {
@@ -1926,7 +1911,7 @@ listInitiatorPort(int operandLen, char *operand[])
 	}
 
 	if ((mpstatus = MP_GetPluginOidList(&pPluginOidList))
-		!= MP_STATUS_SUCCESS) {
+	    != MP_STATUS_SUCCESS) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
 		    getTextString(ERR_NO_MPATH_SUPPORT_LIST));
 		return (mpstatus);
@@ -1948,7 +1933,7 @@ listInitiatorPort(int operandLen, char *operand[])
 			    getMpStatusStr(mpstatus));
 			(void) printf("\n");
 		} else if ((NULL == pInitOidList) ||
-			(pInitOidList->oidCount < 1)) {
+		    (pInitOidList->oidCount < 1)) {
 			(void) fprintf(stderr, "%s: %s\n", cmdName,
 			    getTextString(ERR_NO_INIT_PORTS));
 		} else {
@@ -2032,7 +2017,7 @@ listIndividualInitiatorPort(MP_INITIATOR_PORT_PROPERTIES initProps)
 
 	(void) printf("%s  ", getTextString(TEXT_LB_INITATOR_PORT));
 	displayArray(initProps.portID,
-		sizeof (initProps.portID));
+	    sizeof (initProps.portID));
 	(void) printf("\n");
 
 	return (mpstatus);
@@ -2056,16 +2041,12 @@ showInitiatorPort(int operandLen, char *operand[])
 {
 	MP_STATUS				mpstatus = MP_STATUS_SUCCESS;
 	MP_INITIATOR_PORT_PROPERTIES 		initProps;
-	MP_OID_LIST				*pPluginOidList,
-						*pInitOidList;
-	boolean_t				bListIt = B_FALSE,
-						bFoundIt = B_FALSE;
-	int					op,
-						i,
-						iport;
+	MP_OID_LIST	*pPluginOidList, *pInitOidList;
+	boolean_t	bListIt = B_FALSE, bFoundIt = B_FALSE;
+	int		op, i, iport;
 
 	if ((mpstatus = MP_GetPluginOidList(&pPluginOidList))
-		!= MP_STATUS_SUCCESS) {
+	    != MP_STATUS_SUCCESS) {
 		(void) fprintf(stderr, "%s: %s\n", cmdName,
 		    getTextString(ERR_NO_MPATH_SUPPORT_LIST));
 		return (mpstatus);
@@ -2107,9 +2088,11 @@ showInitiatorPort(int operandLen, char *operand[])
 					    pInitOidList->oids[iport],
 					    &initProps))
 					    != MP_STATUS_SUCCESS) {
-						(void) fprintf(stderr,
-						    "%s: %s\n", cmdName,
+					/* begin back-up indentation */
+					(void) fprintf(stderr,
+					    "%s: %s\n", cmdName,
 					    getTextString(ERR_NO_PROPERTIES));
+					/* end back-up indentation */
 					} else {
 						if (0 == strcmp(operand[op],
 						    initProps.portID)) {
@@ -2120,8 +2103,8 @@ showInitiatorPort(int operandLen, char *operand[])
 
 					if (B_TRUE == bListIt) {
 						mpstatus =
-						showIndividualInitiatorPort(
-						initProps);
+						    showIndividualInitiatorPort(
+						    initProps);
 						if (0 != mpstatus) {
 							return (mpstatus);
 						}
@@ -2199,9 +2182,7 @@ enablePath(cmdOptions_t *options)
 	MP_OID					pathOid;
 
 	cmdOptions_t 				*optionList = options;
-	boolean_t				bHaveInit = B_FALSE,
-						bHaveTarg = B_FALSE,
-						bHaveLu = B_FALSE;
+	boolean_t   bHaveInit = B_FALSE, bHaveTarg = B_FALSE, bHaveLu = B_FALSE;
 
 	for (; optionList->optval; optionList++) {
 		switch (optionList->optval) {
@@ -2284,9 +2265,8 @@ disablePath(cmdOptions_t *options)
 	MP_OID					pathOid;
 
 	cmdOptions_t 				*optionList = options;
-	boolean_t				bHaveInit = B_FALSE,
-						bHaveTarg = B_FALSE,
-						bHaveLu = B_FALSE;
+	boolean_t	bHaveInit = B_FALSE, bHaveTarg = B_FALSE,
+	    bHaveLu = B_FALSE;
 
 	for (; optionList->optval; optionList++) {
 		switch (optionList->optval) {
@@ -2471,24 +2451,18 @@ getPathOid(cmdOptions_t *options, MP_OID *pPathOid)
 	MP_INITIATOR_PORT_PROPERTIES		initProps;
 	MP_TARGET_PORT_PROPERTIES		targProps;
 
-	MP_OID_LIST				*pPluginOidList,
-						*pLogicalUnitOidList,
-						*pathOidListArray;
+	MP_OID_LIST	*pPluginOidList, *pLogicalUnitOidList,
+	    *pathOidListArray;
 
 	boolean_t				bFoundIt = B_FALSE;
 	MP_CHAR					initPortID[256];
 	MP_CHAR					targetPortID[256];
 	MP_CHAR					luDeviceFileName[256];
-	boolean_t				bHaveTarg = B_FALSE,
-						bHaveLu = B_FALSE,
-						bHaveInit = B_FALSE;
-
-
+	boolean_t	bHaveTarg = B_FALSE, bHaveLu = B_FALSE,
+	    bHaveInit = B_FALSE;
 	cmdOptions_t 				*optionList = options;
 
-	int					i,
-						lu,
-						pa;
+	int					i, lu, pa;
 	if (NULL == pPathOid) {
 		return (B_FALSE);
 	}
@@ -2550,7 +2524,7 @@ getPathOid(cmdOptions_t *options, MP_OID *pPathOid)
 		}
 
 		for (lu = 0; (lu < pLogicalUnitOidList->oidCount) &&
-			(B_FALSE == bFoundIt); lu++) {
+		    (B_FALSE == bFoundIt); lu++) {
 
 			/* get lu properties so we can check the name */
 			(void) memset(&luProps, 0,
@@ -2563,8 +2537,8 @@ getPathOid(cmdOptions_t *options, MP_OID *pPathOid)
 				    cmdName, getTextString(ERR_NO_PROPERTIES));
 				return (B_FALSE);
 			}
-			if (0 == strcmp(luDeviceFileName,
-			    luProps.deviceFileName)) {
+			if (compareLUName(luDeviceFileName,
+			    luProps.deviceFileName) == B_TRUE) {
 				/* get paths for this LU and search from here */
 				mpstatus =
 				    MP_GetAssociatedPathOidList(
@@ -2580,8 +2554,8 @@ getPathOid(cmdOptions_t *options, MP_OID *pPathOid)
 				}
 
 				for (pa = 0;
-					(pa < pathOidListArray->oidCount) &&
-					(B_FALSE == bFoundIt); pa++) {
+				    (pa < pathOidListArray->oidCount) &&
+				    (B_FALSE == bFoundIt); pa++) {
 					mpstatus =
 					    MP_GetPathLogicalUnitProperties
 					    (pathOidListArray->oids[pa],
@@ -2767,7 +2741,7 @@ displayLogicalUnitNameTypeString(MP_LOGICAL_UNIT_NAME_TYPE typeVal)
 			break;
 		case MP_LU_NAME_TYPE_DEVICE_SPECIFIC:
 			typeString =
-			getTextString(TEXT_NAME_TYPE_DEVICE_SPECIFIC);
+			    getTextString(TEXT_NAME_TYPE_DEVICE_SPECIFIC);
 			break;
 		default:
 			typeString = getTextString(TEXT_UNKNOWN);
@@ -3203,7 +3177,7 @@ listFunc(int operandLen, char *operand[], int object, cmdOptions_t *options,
 			break;
 		default:
 			(void) fprintf(stderr, "%s: %s\n",
-		    cmdName, getTextString(TEXT_UNKNOWN_OBJECT));
+			    cmdName, getTextString(TEXT_UNKNOWN_OBJECT));
 			ret = 1;
 			break;
 	}

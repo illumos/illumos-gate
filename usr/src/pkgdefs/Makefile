@@ -84,6 +84,8 @@ sparc_SUBDIRS= \
 	SUNWiopc.u \
 	SUNWiopc.v \
 	SUNWpdu	  \
+	SUNWpmcsr  \
+	SUNWpmcsu  \
 	SUNWpstl.u \
 	SUNWqfed \
 	SUNWqus \
@@ -149,6 +151,8 @@ i386_SUBDIRS= \
 	SUNWonmtst.i \
 	SUNWos86r  \
 	SUNWparted  \
+	SUNWpmcsr \
+	SUNWpmcsu \
 	SUNWpsdcr  \
 	SUNWpsdir  \
 	SUNWpsh \

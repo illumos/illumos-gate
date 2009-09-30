@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,20 @@ int		bitset_atomic_test_and_del(bitset_t *, uint_t);
 int		bitset_in_set(bitset_t *, uint_t);
 int		bitset_is_null(bitset_t *);
 uint_t		bitset_find(bitset_t *);
+
+/*
+ * Bitset computations
+ */
+int		bitset_and(bitset_t *, bitset_t *, bitset_t *);
+int		bitset_or(bitset_t *, bitset_t *, bitset_t *);
+int		bitset_xor(bitset_t *, bitset_t *, bitset_t *);
+
+/*
+ * Miscellaneous bitset operations
+ */
+void		bitset_zero(bitset_t *);
+void		bitset_copy(bitset_t *, bitset_t *);
+int		bitset_match(bitset_t *, bitset_t *);
 
 #endif	/* !_KERNEL && !_KMEMUSER */
 

@@ -1184,6 +1184,17 @@ founddv:
 
 found:
 	/*
+	 * Fail lookup of device that has now become hidden (typically via
+	 * hot removal of open device).
+	 */
+	if (dv->dv_devi && ndi_dev_is_hidden_node(dv->dv_devi)) {
+		dcmn_err2(("dv_find: nm %s failed: hidden/removed\n", nm));
+		VN_RELE(vp);
+		rv = ENOENT;
+		goto notfound;
+	}
+
+	/*
 	 * Skip non-kernel lookups of internal nodes.
 	 * This use of kcred to distinguish between user and
 	 * internal kernel lookups is unfortunate.  The information
@@ -1192,6 +1203,7 @@ found:
 	 * this distinction.
 	 */
 	if ((dv->dv_flags & DV_INTERNAL) && (cred != kcred)) {
+		dcmn_err2(("dv_find: nm %s failed: internal\n", nm));
 		VN_RELE(vp);
 		rv = ENOENT;
 		goto notfound;
@@ -1251,7 +1263,7 @@ dv_filldir(struct dv_node *ddv)
 	ndi_devi_enter(pdevi, &circ);
 	for (devi = ddi_get_child(pdevi); devi;
 	    devi = ddi_get_next_sibling(devi)) {
-		if (i_ddi_node_state(devi) < DS_PROBED)
+		if (i_ddi_node_state(devi) < DS_INITIALIZED)
 			continue;
 
 		/* skip hidden nodes */

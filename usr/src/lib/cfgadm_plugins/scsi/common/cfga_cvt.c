@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999, 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "cfga_scsi.h"
 
@@ -78,6 +75,8 @@ static scfga_ret_t drv_to_dyncomp(di_node_t node, const char *phys,
     char **dyncompp, int *l_errnop);
 static scfga_ret_t get_hba_devlink(const char *hba_phys,
     char **hba_logpp, int *l_errnop);
+static scfga_ret_t path_apid_dyn_to_path(const char *hba_phys, const char *dyn,
+    char **pathpp, int *l_errnop);
 
 
 /* Globals */
@@ -263,17 +262,150 @@ apid_to_path(
 	/*
 	 * If the dynamic component has a '/', it was derived from a devlink
 	 * Else it was derived from driver name and instance number.
+	 * If it is pathinfo instance number based ap id, it will have a format
+	 * path#.???.
 	 */
 	if (strchr(dyncomp, '/') != NULL) {
 		ret = devlink_dyn_to_devpath(hba_phys, dyncomp, pathpp,
 		    l_errnop);
+	} else if (strstr(dyncomp, PATH_APID_DYN_SEP) != NULL) {
+		ret = path_apid_dyn_to_path(hba_phys, dyncomp, pathpp,
+		    l_errnop);
 	} else {
 		ret = drv_dyn_to_devpath(hba_phys, dyncomp, pathpp, l_errnop);
 	}
-
 	assert(ret != SCFGA_OK || *pathpp != NULL);
 
+
 	return (ret);
+}
+
+/*
+ * Get the devfs path of pathinfo node that is associated with
+ * the given dynamic component.
+ *
+ * input
+ *   hba_phys: physical path of HBA
+ *   dyn : bus address of pathinfo node
+ * output:
+ *   pathpp: devfs path of the pathinfo node.
+ */
+static scfga_ret_t
+path_apid_dyn_to_path(
+	const char *hba_phys,
+	const char *dyn,
+	char **pathpp,
+	int *l_errnop)
+{
+
+	di_node_t   root, walk_root;
+	di_path_t   pi_node = DI_PATH_NIL;
+	char	    *root_path, *devpath, *cp;
+	int	    len;
+
+	*l_errnop = 0;
+
+	/* *pathpp should be NULL if pathpp is not NULL. */
+	if ((hba_phys == NULL) || (pathpp != NULL) && (*pathpp != NULL)) {
+		return (SCFGA_LIB_ERR);
+	}
+
+	if ((root_path = strdup(hba_phys)) == NULL) {
+		*l_errnop = errno;
+		return (SCFGA_LIB_ERR);
+	}
+
+	/* Fix up path for di_init() */
+	len = strlen(DEVICES_DIR);
+	if (strncmp(root_path, DEVICES_DIR SLASH,
+	    len + strlen(SLASH)) == 0) {
+		cp = root_path + len;
+		(void) memmove(root_path, cp, strlen(cp) + 1);
+	} else if (*root_path != '/') {
+		*l_errnop = 0;
+		S_FREE(root_path);
+		return (SCFGA_ERR);
+	}
+
+	/* Remove dynamic component if any */
+	if ((cp = GET_DYN(root_path)) != NULL) {
+		*cp = '\0';
+	}
+
+	/* Remove minor name if any */
+	if ((cp = strrchr(root_path, ':')) != NULL) {
+		*cp = '\0';
+	}
+
+	/*
+	 * Cached snapshots are always rooted at "/"
+	 */
+
+	/* Get a snapshot */
+	if ((root = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
+		*l_errnop = errno;
+		S_FREE(root_path);
+		return (SCFGA_ERR);
+	}
+
+	/*
+	 * Lookup the subtree of interest
+	 */
+	walk_root = di_lookup_node(root, root_path);
+
+	if (walk_root == DI_NODE_NIL) {
+		*l_errnop = errno;
+		di_fini(root);
+		S_FREE(root_path);
+		return (SCFGA_LIB_ERR);
+	}
+
+	S_FREE(root_path);
+
+	if ((pi_node = di_path_next_client(walk_root, pi_node)) ==
+	    DI_PATH_NIL) {
+		di_fini(root);
+		return (SCFGA_APID_NOEXIST);
+	}
+
+	/*
+	 * now parse the path info node.
+	 */
+	do {
+		/* check the length first. */
+		if (strlen(di_path_bus_addr(pi_node)) != strlen(dyn)) {
+			continue;
+		}
+
+		if (strcmp(di_path_bus_addr(pi_node), dyn) == 0) {
+			/* get the devfspath of pathinfo node. */
+			devpath = di_path_devfs_path(pi_node);
+			if (devpath == NULL) {
+				*l_errnop = errno;
+				di_fini(root);
+				return (SCFGA_ERR);
+			}
+
+			len = strlen(DEVICES_DIR) + strlen(devpath) + 1;
+			*pathpp = calloc(1, len);
+			if (*pathpp == NULL) {
+				*l_errnop = errno;
+				di_devfs_path_free(devpath);
+				di_fini(root);
+				return (SCFGA_ERR);
+			} else {
+				(void) snprintf(*pathpp, len, "%s%s",
+				    DEVICES_DIR, devpath);
+				di_devfs_path_free(devpath);
+				di_fini(root);
+				return (SCFGA_OK);
+			}
+		}
+		pi_node = di_path_next_client(walk_root, pi_node);
+	} while (pi_node != DI_PATH_NIL);
+
+	di_fini(root);
+	return (SCFGA_APID_NOEXIST);
 }
 
 static scfga_ret_t
@@ -497,7 +629,7 @@ make_dyncomp(
 		path = (char *)physpath;
 	} else {
 		match_minor = 1;
-		snprintf(pathbuf, MAXPATHLEN, "%s:%s", physpath,
+		(void) snprintf(pathbuf, MAXPATHLEN, "%s:%s", physpath,
 		    di_minor_name(minor));
 		path = pathbuf;
 	}
@@ -525,6 +657,36 @@ make_dyncomp(
 	assert(ret != SCFGA_OK || *dyncompp != NULL);
 
 	return (ret);
+}
+
+/*
+ * Create a dynamic component of path ap_id for the given path info node.
+ * The caller should free the buffer for the dynamic component.
+ */
+scfga_ret_t
+make_path_dyncomp(
+	di_path_t path,
+	char **dyncompp,
+	int *l_errnop)
+{
+	char *pi_addr;
+
+	if ((path == DI_PATH_NIL) || (*dyncompp != NULL)) {
+		return (SCFGA_LIB_ERR);
+	}
+
+	if ((pi_addr = di_path_bus_addr(path)) != NULL) {
+		*dyncompp = calloc(1, strlen(pi_addr) + 1);
+		if (*dyncompp == NULL) {
+			*l_errnop = errno;
+			return (SCFGA_LIB_ERR);
+		}
+		(void) strncpy(*dyncompp, pi_addr, strlen(pi_addr));
+	} else {
+		return (SCFGA_LIB_ERR);
+	}
+
+	return (SCFGA_OK);
 }
 
 /*ARGSUSED*/
@@ -723,7 +885,8 @@ tape_devlink_to_dyncomp(dyn_t *dyntp)
 	cp = strrchr(dyntp->dyncomp, '/');
 
 	/* Remove the mode part */
-	while (isdigit(*(++cp)));
+	while (isdigit(*(++cp))) {
+	};
 	*cp = '\0';
 
 

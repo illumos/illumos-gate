@@ -81,6 +81,7 @@ extern "C" {
 #define	DI_DEVICE_OFFLINE	0x1
 #define	DI_DEVICE_DOWN		0x2
 #define	DI_DEVICE_DEGRADED	0x4
+#define	DI_DEVICE_REMOVED	0x8
 #define	DI_BUS_QUIESCED		0x100
 #define	DI_BUS_DOWN		0x200
 
@@ -192,6 +193,7 @@ extern char		*di_path_node_name(di_path_t path);
 extern char		*di_path_bus_addr(di_path_t path);
 extern int		di_path_instance(di_path_t path);
 extern di_path_state_t	di_path_state(di_path_t path);
+extern uint_t		di_path_flags(di_path_t path);
 
 extern char		*di_path_devfs_path(di_path_t path);
 extern char		*di_path_client_devfs_path(di_path_t path);

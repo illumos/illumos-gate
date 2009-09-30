@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Interfaces for getting device configuration data from kernel
@@ -977,9 +975,11 @@ di_state(di_node_t node)
 	if (DI_NODE(node)->state & DEVI_DEVICE_OFFLINE)
 		result |= DI_DEVICE_OFFLINE;
 	if (DI_NODE(node)->state & DEVI_DEVICE_DOWN)
-		result |= DI_DEVICE_OFFLINE;
+		result |= DI_DEVICE_DOWN;
 	if (DI_NODE(node)->state & DEVI_DEVICE_DEGRADED)
 		result |= DI_DEVICE_DEGRADED;
+	if (DI_NODE(node)->state & DEVI_DEVICE_REMOVED)
+		result |= DI_DEVICE_REMOVED;
 	if (DI_NODE(node)->state & DEVI_BUS_QUIESCED)
 		result |= DI_BUS_QUIESCED;
 	if (DI_NODE(node)->state & DEVI_BUS_DOWN)
@@ -2026,6 +2026,12 @@ di_path_state_t
 di_path_state(di_path_t path)
 {
 	return ((di_path_state_t)DI_PATH(path)->path_state);
+}
+
+uint_t
+di_path_flags(di_path_t path)
+{
+	return (DI_PATH(path)->path_flags);
 }
 
 char *

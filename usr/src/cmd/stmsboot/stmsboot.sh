@@ -39,7 +39,7 @@ SAVEDIR=/etc/mpxio
 BOOTDEVICES=$SAVEDIR/boot-devices
 RECOVERFILE=$SAVEDIR/recover_instructions
 SVCCFG_RECOVERY=$SAVEDIR/svccfg_recover
-SUPPORTED_DRIVERS="fp|mpt|mpt_sas"
+SUPPORTED_DRIVERS="fp|mpt|mpt_sas|pmcs"
 USAGE=`gettext "Usage: stmsboot [-D $SUPPORTED_DRIVERS] -e | -d | -u | -L | -l controller_number"`
 TEXTDOMAIN=SUNW_OST_OSCMD
 export TEXTDOMAIN
@@ -290,7 +290,7 @@ update_sysfiles()
 # Returns 0 on success, 1 on failure.
 #
 # Args: $cmd = {enable | disable}
-#	$d = {fp | mpt | mpt_sas}
+#	$d = {fp | mpt | mpt_sas | pmcs}
 #
 # the global variable $DRVLIST is used
 #
@@ -417,7 +417,7 @@ get_newbootpath_for_stmsdev() {
 # Emit a warning message to the user that by default we
 # operate on all multipath-capable controllers that are
 # attached to the system, and that if they want to operate
-# on only a specific controller type (fp|mpt|mpt_sas|....) then 
+# on only a specific controller type (fp|mpt|mpt_sas|pmcs|....) then 
 # they need to re-invoke stmsboot with "-D $driver" in
 # their argument list
 #
@@ -437,7 +437,7 @@ emit_driver_warning_msg() {
 	
 	echo ""
 	gettext "If you do NOT wish to operate on these controllers, please quit stmsboot\n"
-	gettext "and re-invoke with -D { fp | mpt | mpt_sas} to specify which controllers you wish\n"
+	gettext "and re-invoke with -D { fp | mpt | mpt_sas | pmcs} to specify which controllers you wish\n"
 	gettext "to modify your multipathing configuration for.\n"
 
 	echo ""
@@ -480,7 +480,7 @@ if [ "x$cmd" = xnone ]; then
 fi
 
 if [ "x$DRV" = "x" ]; then
-	DRVLIST="fp mpt mpt_sas"
+	DRVLIST="fp mpt mpt_sas pmcs"
 else
 	DRVLIST=$DRV
 fi

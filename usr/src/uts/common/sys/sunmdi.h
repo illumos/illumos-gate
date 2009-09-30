@@ -87,7 +87,11 @@ typedef enum {
 #define	MDI_COMPONENT_CLIENT	0x4
 
 /*
- * mdi_pathinfo node state utility definitions
+ * mdi_pathinfo node state utility definitions (bits in mdi_pathinfo_state_t)
+ *
+ * NOTE: having mdi_pathinfo_state_t contain both state and flags is error
+ * prone.  For new flags, please consider using MDI_PATHINFO_FLAG_ (and
+ * moving existing EXT_STATE_MASK flags over would be good too).
  */
 #define	MDI_PATHINFO_STATE_TRANSIENT			0x00010000
 #define	MDI_PATHINFO_STATE_USER_DISABLE			0x00100000
@@ -95,6 +99,12 @@ typedef enum {
 #define	MDI_PATHINFO_STATE_DRV_DISABLE_TRANSIENT	0x00400000
 #define	MDI_PATHINFO_STATE_MASK				0x0000FFFF
 #define	MDI_PATHINFO_EXT_STATE_MASK			0xFFF00000
+
+/*
+ * mdi_pathinfo flags definitions
+ */
+#define	MDI_PATHINFO_FLAGS_HIDDEN			0x00000001
+#define	MDI_PATHINFO_FLAGS_DEVICE_REMOVED		0x00000002
 
 #define	USER_DISABLE			1
 #define	DRIVER_DISABLE			2
@@ -191,6 +201,12 @@ int mdi_pi_enable(dev_info_t *, dev_info_t *, int);
 int mdi_pi_disable_path(mdi_pathinfo_t *, int);
 int mdi_pi_enable_path(mdi_pathinfo_t *, int);
 
+int mdi_pi_ishidden(mdi_pathinfo_t *);
+
+int mdi_pi_device_isremoved(mdi_pathinfo_t *);
+int mdi_pi_device_remove(mdi_pathinfo_t *);
+int mdi_pi_device_insert(mdi_pathinfo_t *);
+
 /*
  * MPxIO-PM stuff
  */
@@ -228,11 +244,14 @@ dev_info_t *mdi_pi_get_phci(mdi_pathinfo_t *);
 char *mdi_pi_get_node_name(mdi_pathinfo_t *);
 char *mdi_pi_get_addr(mdi_pathinfo_t *);
 mdi_pathinfo_state_t mdi_pi_get_state(mdi_pathinfo_t *);
+uint_t mdi_pi_get_flags(mdi_pathinfo_t *);
 int mdi_pi_get_path_instance(mdi_pathinfo_t *);
-char *mdi_pi_pathname_by_instance(int path_instance);
+char *mdi_pi_pathname_by_instance(int);
 char *mdi_pi_pathname(mdi_pathinfo_t *);
 char *mdi_pi_pathname_obp(mdi_pathinfo_t *, char *);
 int mdi_pi_pathname_obp_set(mdi_pathinfo_t *, char *);
+char *mdi_pi_spathname_by_instance(int);
+char *mdi_pi_spathname(mdi_pathinfo_t *);
 
 /*
  * mdi_pathinfo Property handling functions

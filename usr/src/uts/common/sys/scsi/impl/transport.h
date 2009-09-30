@@ -39,6 +39,12 @@ extern "C" {
 #ifdef	_KERNEL
 
 /*
+ * Opaque  handles to address maps
+ */
+typedef struct __scsi_iportmap	scsi_hba_iportmap_t;
+typedef struct __scsi_tgtmap	scsi_hba_tgtmap_t;
+
+/*
  * SCSI transport structures
  *
  *	As each Host Adapter makes itself known to the system,
@@ -54,7 +60,9 @@ typedef struct scsi_hba_tran	scsi_hba_tran_t;
 
 struct scsi_hba_tran {
 	/*
-	 * Ptr to the device info structure for this particular HBA.
+	 * Ptr to the device info structure for this particular HBA. If a SCSA
+	 * HBA driver separates initiator port function from HBA function,
+	 * this field still refers to the HBA and is used to manage DMA.
 	 */
 	dev_info_t	*tran_hba_dip;
 
@@ -64,8 +72,8 @@ struct scsi_hba_tran {
 	void		*tran_hba_private;	/* HBA softstate */
 
 	/*
-	 * The following two fields are only used in the SCSI_HBA_TRAN_CLONE
-	 * case. Consider using SCSI_HBA_ADDR_COMPLEX instead.
+	 * The following two fields are only used in the deprecated
+	 * SCSI_HBA_TRAN_CLONE case. Use SCSI_HBA_ADDR_COMPLEX instead.
 	 */
 	void			*tran_tgt_private;
 	struct scsi_device	*tran_sd;
@@ -215,8 +223,7 @@ struct scsi_hba_tran {
 	 * open_flag: bit field indicating which minor nodes are open.
 	 *	0 = closed, 1 = shared open, all bits 1 = excl open.
 	 *
-	 * XXX Unused if hba driver chooses to implement own
-	 *	xxopen(9e) entry point
+	 * NOTE: Unused if HBA driver implements its own open(9e) entry point.
 	 */
 	kmutex_t		tran_open_lock;
 	uint64_t		tran_open_flag;
@@ -246,7 +253,7 @@ struct scsi_hba_tran {
 				void			*result);
 
 	/*
-	 * Inter-Connect type of trasnport as defined in
+	 * Inter-Connect type of transport as defined in
 	 * usr/src/uts/common/sys/scsi/impl/services.h
 	 */
 	int		tran_interconnect_type;
@@ -286,6 +293,16 @@ struct scsi_hba_tran {
 	 */
 	dev_info_t	*tran_iport_dip;
 
+	/*
+	 * map of initiator ports below HBA
+	 */
+	scsi_hba_iportmap_t	*tran_iportmap;
+
+	/*
+	 * map of targets below initiator
+	 */
+	scsi_hba_tgtmap_t	*tran_tgtmap;
+
 #ifdef	SCSI_SIZE_CLEAN_VERIFY
 	/*
 	 * Must be last: Building a driver with-and-without
@@ -306,7 +323,7 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data",
 	scsi_hba_tran::tran_open_flag
 	scsi_hba_tran::tran_pkt_cache_ptr))
 /*
- * we only modify the dma atributes (like dma_attr_granular) upon
+ * we only modify the dma attributes (like dma_attr_granular) upon
  * attach and in response to a setcap. It is also up to the target
  * driver to not have any outstanding I/Os when it is changing the
  * capabilities of the transport.
@@ -373,7 +390,22 @@ int		scsi_hba_probe(
 				struct scsi_device	*sd,
 				int			(*callback)(void));
 
-char			*scsi_get_device_type_string(
+int		scsi_hba_probe_pi(
+				struct scsi_device	*sd,
+				int			(*callback)(void),
+				int			pi);
+
+int		scsi_hba_ua_get_reportdev(
+				struct scsi_device	*sd,
+				char			*ba,
+				int			len);
+
+int		scsi_hba_ua_get(
+				struct scsi_device	*sd,
+				char			*ua,
+				int			len);
+
+char		*scsi_get_device_type_string(
 				char			*prop_name,
 				dev_info_t		*hba_dip,
 				struct scsi_device	*sd);
@@ -443,8 +475,7 @@ void		scsi_hba_nodename_compatible_free(
 				char			*nodename,
 				char			**compatible);
 
-
-int		scsi_hba_prop_update_inqstring(
+int		scsi_device_prop_update_inqstring(
 				struct scsi_device	*sd,
 				char			*name,
 				char			*data,
@@ -453,8 +484,12 @@ int		scsi_hba_prop_update_inqstring(
 void		scsi_hba_pkt_comp(
 				struct scsi_pkt		*pkt);
 
+int		scsi_device_identity(
+				struct scsi_device	*sd,
+				int			(*callback)(void));
+
 char		*scsi_hba_iport_unit_address(
-				dev_info_t		*self);
+				dev_info_t		*dip);
 
 int		scsi_hba_iport_register(
 				dev_info_t		*dip,
@@ -466,6 +501,8 @@ int		scsi_hba_iport_exist(
 dev_info_t	*scsi_hba_iport_find(
 				dev_info_t		*pdip,
 				char			*portnm);
+
+
 /*
  * Flags for scsi_hba_attach
  *
@@ -496,8 +533,8 @@ dev_info_t	*scsi_hba_iport_find(
  *				same driver. The driver can distinguish context
  *				by calling scsi_hba_iport_unit_address().
  *
- * SCSI_HBA_TRAN_CLONE		Consider using SCSI_HBA_ADDR_COMPLEX instead.
- *				SCSI_HBA_TRAN_CLONE is a KLUDGE to address
+ * ::SCSI_HBA_TRAN_CLONE	Deprecated: use SCSI_HBA_ADDR_COMPLEX instead.
+ *				SCSI_HBA_TRAN_CLONE was a KLUDGE to address
  *				limitations of the scsi_address(9S) structure
  *				via duplication of scsi_hba_tran(9S) and
  *				use of tran_tgt_private.
@@ -507,10 +544,10 @@ dev_info_t	*scsi_hba_iport_find(
 #define	SCSI_HBA_TRAN_PHCI	0x02	/* treat HBA as mpxio 'pHCI' */
 #define	SCSI_HBA_TRAN_CDB	0x04	/* allocate cdb */
 #define	SCSI_HBA_TRAN_SCB	0x08	/* allocate sense */
+#define	SCSI_HBA_HBA		0x10	/* all HBA children are iports */
 
 #define	SCSI_HBA_ADDR_SPI	0x20	/* scsi_address in SPI form */
 #define	SCSI_HBA_ADDR_COMPLEX	0x40	/* scsi_address is COMPLEX */
-#define	SCSI_HBA_HBA		0x80	/* all HBA children are iport */
 
 /* upper bits used to record SCSA configuration state */
 #define	SCSI_HBA_SCSA_PHCI	0x10000	/* need mdi_phci_unregister */
@@ -526,14 +563,88 @@ dev_info_t	*scsi_hba_iport_find(
  * Support extra flavors for SCSA children
  */
 #define	SCSA_FLAVOR_SCSI_DEVICE	NDI_FLAVOR_VANILLA
-#define	SCSA_FLAVOR_IPORT	1
-#define	SCSA_FLAVOR_SMP		2
+#define	SCSA_FLAVOR_SMP		1
+#define	SCSA_FLAVOR_IPORT	2
 #define	SCSA_NFLAVORS		3
 
 /*
  * Maximum number of iport nodes under PCI function
  */
 #define	SCSI_HBA_MAX_IPORTS	32
+
+/*
+ * SCSI iport map interfaces
+ */
+int	scsi_hba_iportmap_create(
+				dev_info_t		*hba_dip,
+				clock_t			stable_ms,
+				int			n_entries,
+				scsi_hba_iportmap_t	**iportmapp);
+
+int	scsi_hba_iportmap_iport_add(
+				scsi_hba_iportmap_t	*iportmap,
+				char			*iport_addr,
+				void			*iport_priv);
+
+int	scsi_hba_iportmap_iport_remove(
+				scsi_hba_iportmap_t	*iportmap,
+				char			*iport_addr);
+
+void	scsi_hba_iportmap_destroy(scsi_hba_iportmap_t	*iportmap);
+
+/*
+ * SCSI target map interfaces
+ */
+typedef enum { SCSI_TM_FULLSET = 0, SCSI_TM_PERADDR }	scsi_tgtmap_mode_t;
+typedef enum {
+    SCSI_TGT_SCSI_DEVICE = 0, SCSI_TGT_SMP_DEVICE, SCSI_TGT_NTYPES
+}	scsi_tgtmap_tgt_type_t;
+
+typedef void	(*scsi_tgt_activate_cb_t)(
+				void			*tgtmap_priv,
+				char			*tgt_addr,
+				scsi_tgtmap_tgt_type_t	tgt_type,
+				void			**tgt_privp);
+typedef void	(*scsi_tgt_deactivate_cb_t)(
+				void			*tgtmap_priv,
+				char			*tgt_addr,
+				scsi_tgtmap_tgt_type_t	tgt_type,
+				void			*tgt_priv);
+int	scsi_hba_tgtmap_create(
+				dev_info_t		*iport_dip,
+				scsi_tgtmap_mode_t	rpt_mode,
+				clock_t			stable_ms,
+				int			n_entries,
+				void			*tgtmap_priv,
+				scsi_tgt_activate_cb_t	activate_cb,
+				scsi_tgt_deactivate_cb_t deactivate_cb,
+				scsi_hba_tgtmap_t	**tgtmapp);
+
+int	scsi_hba_tgtmap_set_begin(scsi_hba_tgtmap_t	*tgtmap);
+
+int	scsi_hba_tgtmap_set_add(
+				scsi_hba_tgtmap_t	*tgtmap,
+				scsi_tgtmap_tgt_type_t	tgt_type,
+				char			*tgt_addr,
+				void			*tgt_priv);
+
+int	scsi_hba_tgtmap_set_end(
+				scsi_hba_tgtmap_t	*tgtmap,
+				uint_t			flags);
+
+int	scsi_hba_tgtmap_tgt_add(
+				scsi_hba_tgtmap_t	*tgtmap,
+				scsi_tgtmap_tgt_type_t	tgt_type,
+				char			*tgt_addr,
+				void			*tgt_priv);
+
+int	scsi_hba_tgtmap_tgt_remove(
+				scsi_hba_tgtmap_t	*tgtmap,
+				scsi_tgtmap_tgt_type_t	tgt_type,
+				char			*tgt_addr);
+
+void	scsi_hba_tgtmap_destroy(scsi_hba_tgtmap_t	*tgt_map);
+
 
 /*
  * For minor nodes created by the SCSA framework, minor numbers are

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_SCSI_PKT_H
 #define	_SYS_SCSI_SCSI_PKT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/scsi/scsi_types.h>
 
@@ -105,6 +103,9 @@ struct scsi_pkt {
 
 	/* private: iff scsi_pkt_allocated_correctly() */
 	int	pkt_path_instance;	/* pHCI transport path */
+
+	/* stage-temporary: iff scsi_pkt_allocated_correctly() */
+	void	*pkt_stmp;		/* temporary for current pkt stage */
 
 #ifdef	SCSI_SIZE_CLEAN_VERIFY
 	/*

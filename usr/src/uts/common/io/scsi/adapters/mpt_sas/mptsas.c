@@ -1242,7 +1242,7 @@ intr_done:
 	}
 	hba_attach_setup++;
 
-	mpt->m_smptran = sas_hba_tran_alloc(dip, SCSI_HBA_CANSLEEP);
+	mpt->m_smptran = sas_hba_tran_alloc(dip);
 	ASSERT(mpt->m_smptran != NULL);
 	mpt->m_smptran->tran_hba_private = mpt;
 	mpt->m_smptran->tran_smp_start = mptsas_smp_start;
@@ -2664,7 +2664,7 @@ mptsas_name_child(dev_info_t *lun_dip, char *name, int len)
 	    LUN_PROP, 0);
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, lun_dip, DDI_PROP_DONTPASS,
-	    "target-port", &sas_wwn) == DDI_PROP_SUCCESS) {
+	    SCSI_ADDR_PROP_TARGET_PORT, &sas_wwn) == DDI_PROP_SUCCESS) {
 		/*
 		 * Stick in the address of the form "wWWN,LUN"
 		 */
@@ -2748,8 +2748,8 @@ mptsas_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 			return (DDI_FAILURE);
 		}
 
-		if (mdi_prop_lookup_string(pip, "target-port", &psas_wwn) ==
-		    MDI_SUCCESS) {
+		if (mdi_prop_lookup_string(pip, SCSI_ADDR_PROP_TARGET_PORT,
+		    &psas_wwn) == MDI_SUCCESS) {
 			if (scsi_wwnstr_to_wwn(psas_wwn, &sas_wwn)) {
 				sas_wwn = 0;
 			}
@@ -2759,7 +2759,7 @@ mptsas_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		lun = ddi_prop_get_int(DDI_DEV_T_ANY, tgt_dip,
 		    DDI_PROP_DONTPASS, LUN_PROP, 0);
 		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, tgt_dip,
-		    DDI_PROP_DONTPASS, "target-port", &psas_wwn) ==
+		    DDI_PROP_DONTPASS, SCSI_ADDR_PROP_TARGET_PORT, &psas_wwn) ==
 		    DDI_PROP_SUCCESS) {
 			if (scsi_wwnstr_to_wwn(psas_wwn, &sas_wwn)) {
 				sas_wwn = 0;
@@ -2860,12 +2860,12 @@ mptsas_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		 * override SCSA "inquiry-*" properties
 		 */
 		if (vid)
-			(void) scsi_hba_prop_update_inqstring(sd,
+			(void) scsi_device_prop_update_inqstring(sd,
 			    INQUIRY_VENDOR_ID, vid, strlen(vid));
 		if (pid)
-			(void) scsi_hba_prop_update_inqstring(sd,
+			(void) scsi_device_prop_update_inqstring(sd,
 			    INQUIRY_PRODUCT_ID, pid, strlen(pid));
-		(void) scsi_hba_prop_update_inqstring(sd,
+		(void) scsi_device_prop_update_inqstring(sd,
 		    INQUIRY_REVISION_ID, fw, strlen(fw));
 
 		if (inq89 != NULL) {
@@ -12295,8 +12295,8 @@ mptsas_create_virt_lun(dev_info_t *pdip, struct scsi_inquiry *inq, char *guid,
 			mdi_rtn = MDI_FAILURE;
 			goto virt_create_done;
 		}
-		if (sas_wwn && (mdi_prop_update_string(*pip, "target-port",
-		    wwn_str) != DDI_PROP_SUCCESS)) {
+		if (sas_wwn && (mdi_prop_update_string(*pip,
+		    SCSI_ADDR_PROP_TARGET_PORT, wwn_str) != DDI_PROP_SUCCESS)) {
 			mptsas_log(mpt, CE_WARN, "mptsas driver unable to "
 			    "create property for target %d lun %d "
 			    "(target-port)", target, lun);
@@ -12449,7 +12449,7 @@ mptsas_create_phys_lun(dev_info_t *pdip, struct scsi_inquiry *inq,
 		wwn_str = kmem_zalloc(MPTSAS_WWN_STRLEN, KM_SLEEP);
 		(void) sprintf(wwn_str, "%016"PRIx64, sas_wwn);
 		if (sas_wwn && ndi_prop_update_string(DDI_DEV_T_NONE,
-		    *lun_dip, "target-port", wwn_str)
+		    *lun_dip, SCSI_ADDR_PROP_TARGET_PORT, wwn_str)
 		    != DDI_PROP_SUCCESS) {
 			mptsas_log(mpt, CE_WARN, "mptsas unable to "
 			    "create property for SAS target %d lun %d "

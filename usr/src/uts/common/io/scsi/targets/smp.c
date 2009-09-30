@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,14 @@ static int smp_handle_func(dev_t, intptr_t, int, cred_t *, int *);
  */
 static void smp_log(smp_state_t  *, int,  const char *, ...);
 
-int smp_retry_times = SMP_DEFAULT_RETRY_TIMES;
+int smp_retry_times	= SMP_DEFAULT_RETRY_TIMES;
+int smp_retry_delay	= 10000;	/* 10msec */
+int smp_delay_cmd	= 1;		/* 1usec */
+int smp_single_command	= 1;		/* one command at a time */
+
+static int smp_retry_recovered	= 0;	/* retry recovery counter */
+static int smp_retry_failed	= 0;	/* retry failed counter */
+static int smp_failed		= 0;
 
 static struct cb_ops smp_cb_ops = {
 	smp_open,			/* open */
@@ -147,7 +154,7 @@ _info(struct modinfo *modinfop)
 
 /*
  * smp_attach()
- * 	attach(9e) entrypoint.
+ *	attach(9e) entrypoint.
  */
 static int
 smp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
@@ -224,7 +231,7 @@ smp_do_attach(dev_info_t *dip)
 
 /*
  * smp_detach()
- * 	detach(9E) entrypoint
+ *	detach(9E) entrypoint
  */
 static int
 smp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
@@ -255,7 +262,7 @@ smp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 /*
  * smp_do_detach()
- * 	detach the driver, tearing down resources.
+ *	detach the driver, tearing down resources.
  */
 static int
 smp_do_detach(dev_info_t *dip)
@@ -459,7 +466,6 @@ smp_handle_func(dev_t dev,
 	DTRACE_PROBE1(smp__transport__start, caddr_t, smp_pkt->pkt_req);
 
 	smp_pkt->pkt_address = &smp_state->smp_dev->smp_addr;
-	smp_pkt->pkt_reason = 0;
 	if (usmp_cmd->usmp_timeout <= 0) {
 		smp_pkt->pkt_timeout = SMP_DEFAULT_TIMEOUT;
 	} else {
@@ -469,20 +475,56 @@ smp_handle_func(dev_t dev,
 	/* call sas_smp_transport entry and send smp_pkt to HBA driver */
 	cmd_flags |= SMP_FLAG_XFER;
 	for (retrycount = 0; retrycount <= smp_retry_times; retrycount++) {
-		if (sas_smp_transport(smp_pkt) == DDI_SUCCESS) {
-			rval = DDI_SUCCESS;
+
+		/*
+		 * To improve transport reliability, only allow one command
+		 * outstanding at a time in sas_smp_transport().
+		 *
+		 * NOTE: Some expanders have issues with heavy smp load.
+		 */
+		if (smp_single_command) {
+			mutex_enter(&smp_state->smp_mutex);
+			while (smp_state->smp_busy)
+				cv_wait(&smp_state->smp_cv,
+				    &smp_state->smp_mutex);
+			smp_state->smp_busy = 1;
+			mutex_exit(&smp_state->smp_mutex);
+		}
+
+		/* Let the transport know if more retries are possible. */
+		smp_pkt->pkt_will_retry =
+		    (retrycount < smp_retry_times) ? 1 : 0;
+
+		smp_pkt->pkt_reason = 0;
+		rval = sas_smp_transport(smp_pkt);	/* put on the wire */
+
+		if (smp_delay_cmd)
+			delay(drv_usectohz(smp_delay_cmd));
+
+		if (smp_single_command) {
+			mutex_enter(&smp_state->smp_mutex);
+			smp_state->smp_busy = 0;
+			cv_signal(&smp_state->smp_cv);
+			mutex_exit(&smp_state->smp_mutex);
+		}
+
+		if (rval == DDI_SUCCESS) {
+			if (retrycount)
+				smp_retry_recovered++;
+			rval = 0;
 			break;
 		}
 
 		switch (smp_pkt->pkt_reason) {
 		case EAGAIN:
 			if (retrycount < smp_retry_times) {
-				smp_pkt->pkt_reason = 0;
 				bzero(smp_pkt->pkt_rsp,
 				    (size_t)usmp_cmd->usmp_rspsize);
-				delay(drv_usectohz(10000)); /* 10 ms */
+				if (smp_retry_delay)
+					delay(drv_usectohz(smp_retry_delay));
 				continue;
 			} else {
+				smp_retry_failed++;
 				smp_log(smp_state, CE_NOTE,
 				    "!sas_smp_transport failed, pkt_reason %d",
 				    smp_pkt->pkt_reason);
@@ -516,6 +558,9 @@ done:
 	if ((cmd_flags & SMP_FLAG_RSPBUF) != 0) {
 		kmem_free(smp_pkt->pkt_rsp, smp_pkt->pkt_rspsize);
 	}
+
+	if (rval)
+		smp_failed++;
 	return (rval);
 }
 

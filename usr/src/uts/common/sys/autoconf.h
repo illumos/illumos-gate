@@ -265,7 +265,7 @@ extern void i_ddi_forceattach_drivers(void);
 extern int i_ddi_io_initialized(void);
 extern dev_info_t *i_ddi_create_branch(dev_info_t *, int);
 extern void i_ddi_add_devimap(dev_info_t *dip);
-extern void i_ddi_di_cache_invalidate(int kmflag);
+extern void i_ddi_di_cache_invalidate(void);
 extern void i_ddi_di_cache_free(struct di_cache *cache);
 
 /* devname_state - for /dev to denote reconfig and system available */

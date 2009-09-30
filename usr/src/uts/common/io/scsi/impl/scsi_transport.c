@@ -188,7 +188,6 @@ scsi_transport(struct scsi_pkt *pkt)
 	} else {
 		uint_t	savef;
 		void	(*savec)();
-		int	status;
 
 #ifdef SCSI_POLL_STAT
 		mutex_enter(&scsi_flag_nointr_mutex);
@@ -202,7 +201,7 @@ scsi_transport(struct scsi_pkt *pkt)
 		pkt->pkt_flags &= ~FLAG_NOINTR;
 		pkt->pkt_flags |= FLAG_IMMEDIATE_CB;
 
-		if ((status = (*A_TO_TRAN(ap)->tran_start)(ap, pkt)) ==
+		if ((rval = (*A_TO_TRAN(ap)->tran_start)(ap, pkt)) ==
 		    TRAN_ACCEPT) {
 			mutex_enter(&scsi_flag_nointr_mutex);
 			while (pkt->pkt_comp != CALLBACK_DONE) {
@@ -214,6 +213,6 @@ scsi_transport(struct scsi_pkt *pkt)
 
 		pkt->pkt_flags = savef;
 		pkt->pkt_comp = savec;
-		return (status);
+		return (rval);
 	}
 }

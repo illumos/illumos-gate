@@ -116,6 +116,8 @@ extern "C" {
 #define	DEVI_PSEUDO_NODEID	((int)-1)
 #define	DEVI_SID_NODEID		((int)-2)
 #define	DEVI_SID_HIDDEN_NODEID	((int)-3)
+#define	DEVI_SID_HP_NODEID	((int)-4)
+#define	DEVI_SID_HP_HIDDEN_NODEID ((int)-5)
 
 #define	DEVI_PSEUDO_NEXNAME	"pseudo"
 #define	DEVI_ISA_NEXNAME	"isa"
@@ -1556,43 +1558,84 @@ int
 ddi_fls(long mask);
 
 /*
- * The next five routines comprise generic storage management utilities
- * for driver soft state structures.
+ * The ddi_soft_state* routines comprise generic storage management utilities
+ * for driver soft state structures.  Two types of soft_state indexes are
+ * supported: 'integer index', and 'string index'.
  */
+typedef	struct __ddi_soft_state_bystr	ddi_soft_state_bystr;
 
 /*
- * Allocate a set of pointers to 'n_items' objects of size 'size'
- * bytes.  Each pointer is initialized to nil. 'n_items' is a hint i.e.
- * zero is allowed.
+ * Initialize a soft_state set, establishing the 'size' of soft state objects
+ * in the set.
+ *
+ * For an 'integer indexed' soft_state set, the initial set will accommodate
+ * 'n_items' objects - 'n_items' is a hint (i.e. zero is allowed), allocations
+ * that exceed 'n_items' have additional overhead.
+ *
+ * For a 'string indexed' soft_state set, 'n_items' should be the typical
+ * number of soft state objects in the set - 'n_items' is a hint, there may
+ * be additional overhead if the hint is too small (and wasted memory if the
+ * hint is too big).
  */
 int
 ddi_soft_state_init(void **state_p, size_t size, size_t n_items);
+int
+ddi_soft_state_bystr_init(ddi_soft_state_bystr **state_p,
+    size_t size, int n_items);
 
 /*
- * Allocate a state structure of size 'size' to be associated
- * with item 'item'.
+ * Allocate a soft state object associated with either 'integer index' or
+ * 'string index' from a soft_state set.
  */
 int
 ddi_soft_state_zalloc(void *state, int item);
+int
+ddi_soft_state_bystr_zalloc(ddi_soft_state_bystr *state, const char *str);
 
 /*
- * Fetch a pointer to the allocated soft state structure
- * corresponding to 'item.'
+ * Get the pointer to the allocated soft state object associated with
+ * either 'integer index' or 'string index'.
  */
 void *
 ddi_get_soft_state(void *state, int item);
+void *
+ddi_soft_state_bystr_get(ddi_soft_state_bystr *state, const char *str);
 
 /*
- * Free the state structure corresponding to 'item.'
+ * Free the soft state object associated with either 'integer index'
+ * or 'string index'.
  */
 void
 ddi_soft_state_free(void *state, int item);
+void
+ddi_soft_state_bystr_free(ddi_soft_state_bystr *state, const char *str);
 
 /*
- * Free the handle, and any associated soft state structures.
+ * Free the soft state set and any associated soft state objects.
  */
 void
 ddi_soft_state_fini(void **state_p);
+void
+ddi_soft_state_bystr_fini(ddi_soft_state_bystr **state_p);
+
+/*
+ * The ddi_strid_* routines provide string-to-index management utilities.
+ */
+typedef	struct __ddi_strid	ddi_strid;
+int
+ddi_strid_init(ddi_strid **strid_p, int n_items);
+id_t
+ddi_strid_alloc(ddi_strid *strid, char *str);
+id_t
+ddi_strid_fixed_alloc(ddi_strid *strid, char *str);
+id_t
+ddi_strid_str2id(ddi_strid *strid, char *str);
+char *
+ddi_strid_id2str(ddi_strid *strid, id_t id);
+void
+ddi_strid_free(ddi_strid *strid, id_t id);
+void
+ddi_strid_fini(ddi_strid **strid_p);
 
 /*
  * Set the addr field of the name in dip to name

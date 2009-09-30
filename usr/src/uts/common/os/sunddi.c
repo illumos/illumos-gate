@@ -83,6 +83,7 @@
 #include <net/if.h>
 #include <sys/rctl.h>
 #include <sys/zone.h>
+#include <sys/ddi.h>
 
 extern	pri_t	minclsyspri;
 
@@ -105,7 +106,6 @@ static	kthread_t	*ddi_umem_unlock_thread;
  */
 static	struct	ddi_umem_cookie *ddi_umem_unlock_head = NULL;
 static	struct	ddi_umem_cookie *ddi_umem_unlock_tail = NULL;
-
 
 /*
  * DDI(Sun) Function and flag definitions:
@@ -4597,7 +4597,7 @@ i_ddi_prop_dyn_cache_invalidate(dev_info_t *dip, i_ddi_prop_dyn_t *dp)
 {
 	/* for now we invalidate the entire cached snapshot */
 	if (dip && dp)
-		i_ddi_di_cache_invalidate(KM_SLEEP);
+		i_ddi_di_cache_invalidate();
 }
 
 /* ARGSUSED */
@@ -4605,7 +4605,7 @@ void
 ddi_prop_cache_invalidate(dev_t dev, dev_info_t *dip, char *name, int flags)
 {
 	/* for now we invalidate the entire cached snapshot */
-	i_ddi_di_cache_invalidate(KM_SLEEP);
+	i_ddi_di_cache_invalidate();
 }
 
 
@@ -5750,7 +5750,7 @@ i_log_devfs_minor_create(dev_info_t *dip, char *minor_name)
 	se_flag = (servicing_interrupt()) ? SE_NOSLEEP : SE_SLEEP;
 	kmem_flag = (se_flag == SE_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
 
-	i_ddi_di_cache_invalidate(kmem_flag);
+	i_ddi_di_cache_invalidate();
 
 #ifdef DEBUG
 	if ((se_flag == SE_NOSLEEP) && sunddi_debug) {
@@ -5857,7 +5857,7 @@ i_log_devfs_minor_remove(dev_info_t *dip, char *minor_name)
 		return (DDI_SUCCESS);
 	}
 
-	i_ddi_di_cache_invalidate(KM_SLEEP);
+	i_ddi_di_cache_invalidate();
 
 	ev = sysevent_alloc(EC_DEVFS, ESC_DEVFS_MINOR_REMOVE, EP_DDI, SE_SLEEP);
 	if (ev == NULL) {
@@ -6244,10 +6244,10 @@ ddi_fls(long mask)
 }
 
 /*
- * The next five routines comprise generic storage management utilities
- * for driver soft state structures (in "the old days," this was done
- * with a statically sized array - big systems and dynamic loading
- * and unloading make heap allocation more attractive)
+ * The ddi_soft_state_* routines comprise generic storage management utilities
+ * for driver soft state structures (in "the old days," this was done with
+ * statically sized array - big systems and dynamic loading and unloading
+ * make heap allocation more attractive).
  */
 
 /*
@@ -6276,9 +6276,9 @@ ddi_fls(long mask)
 int
 ddi_soft_state_init(void **state_p, size_t size, size_t n_items)
 {
-	struct i_ddi_soft_state *ss;
+	i_ddi_soft_state	*ss;
 
-	if (state_p == NULL || *state_p != NULL || size == 0)
+	if (state_p == NULL || size == 0)
 		return (EINVAL);
 
 	ss = kmem_zalloc(sizeof (*ss), KM_SLEEP);
@@ -6300,10 +6300,8 @@ ddi_soft_state_init(void **state_p, size_t size, size_t n_items)
 	ss->array = kmem_zalloc(ss->n_items * sizeof (void *), KM_SLEEP);
 
 	*state_p = ss;
-
 	return (0);
 }
-
 
 /*
  * Allocate a state structure of size 'size' to be associated
@@ -6315,11 +6313,11 @@ ddi_soft_state_init(void **state_p, size_t size, size_t n_items)
 int
 ddi_soft_state_zalloc(void *state, int item)
 {
-	struct i_ddi_soft_state *ss;
-	void **array;
-	void *new_element;
+	i_ddi_soft_state	*ss = (i_ddi_soft_state *)state;
+	void			**array;
+	void			*new_element;
 
-	if ((ss = state) == NULL || item < 0)
+	if ((state == NULL) || (item < 0))
 		return (DDI_FAILURE);
 
 	mutex_enter(&ss->lock);
@@ -6350,9 +6348,9 @@ ddi_soft_state_zalloc(void *state, int item)
 	 * Check if the array is big enough, if not, grow it.
 	 */
 	if (item >= ss->n_items) {
-		void	**new_array;
-		size_t	new_n_items;
-		struct i_ddi_soft_state *dirty;
+		void			**new_array;
+		size_t			new_n_items;
+		struct i_ddi_soft_state	*dirty;
 
 		/*
 		 * Allocate a new array of the right length, copy
@@ -6405,7 +6403,6 @@ ddi_soft_state_zalloc(void *state, int item)
 	return (DDI_SUCCESS);
 }
 
-
 /*
  * Fetch a pointer to the allocated soft state structure.
  *
@@ -6428,9 +6425,9 @@ ddi_soft_state_zalloc(void *state, int item)
 void *
 ddi_get_soft_state(void *state, int item)
 {
-	struct i_ddi_soft_state *ss = state;
+	i_ddi_soft_state	*ss = (i_ddi_soft_state *)state;
 
-	ASSERT(ss != NULL && item >= 0);
+	ASSERT((ss != NULL) && (item >= 0));
 
 	if (item < ss->n_items && ss->array != NULL)
 		return (ss->array[item]);
@@ -6450,12 +6447,12 @@ ddi_get_soft_state(void *state, int item)
 void
 ddi_soft_state_free(void *state, int item)
 {
-	struct i_ddi_soft_state *ss;
-	void **array;
-	void *element;
-	static char msg[] = "ddi_soft_state_free:";
+	i_ddi_soft_state	*ss = (i_ddi_soft_state *)state;
+	void			**array;
+	void			*element;
+	static char		msg[] = "ddi_soft_state_free:";
 
-	if ((ss = state) == NULL) {
+	if (ss == NULL) {
 		cmn_err(CE_WARN, "%s null handle: %s",
 		    msg, mod_containing_pc(caller()));
 		return;
@@ -6482,7 +6479,6 @@ ddi_soft_state_free(void *state, int item)
 		kmem_free(element, ss->size);
 }
 
-
 /*
  * Free the entire set of pointers, and any
  * soft state structures contained therein.
@@ -6499,11 +6495,12 @@ ddi_soft_state_free(void *state, int item)
 void
 ddi_soft_state_fini(void **state_p)
 {
-	struct i_ddi_soft_state *ss, *dirty;
-	int item;
-	static char msg[] = "ddi_soft_state_fini:";
+	i_ddi_soft_state	*ss, *dirty;
+	int			item;
+	static char		msg[] = "ddi_soft_state_fini:";
 
-	if (state_p == NULL || (ss = *state_p) == NULL) {
+	if (state_p == NULL ||
+	    (ss = (i_ddi_soft_state *)(*state_p)) == NULL) {
 		cmn_err(CE_WARN, "%s null handle: %s",
 		    msg, mod_containing_pc(caller()));
 		return;
@@ -6534,6 +6531,287 @@ ddi_soft_state_fini(void **state_p)
 	kmem_free(ss, sizeof (*ss));
 
 	*state_p = NULL;
+}
+
+#define	SS_N_ITEMS_PER_HASH	16
+#define	SS_MIN_HASH_SZ		16
+#define	SS_MAX_HASH_SZ		4096
+
+int
+ddi_soft_state_bystr_init(ddi_soft_state_bystr **state_p, size_t size,
+    int n_items)
+{
+	i_ddi_soft_state_bystr	*sss;
+	int			hash_sz;
+
+	ASSERT(state_p && size && n_items);
+	if ((state_p == NULL) || (size == 0) || (n_items == 0))
+		return (EINVAL);
+
+	/* current implementation is based on hash, convert n_items to hash */
+	hash_sz = n_items / SS_N_ITEMS_PER_HASH;
+	if (hash_sz < SS_MIN_HASH_SZ)
+		hash_sz = SS_MIN_HASH_SZ;
+	else if (hash_sz > SS_MAX_HASH_SZ)
+		hash_sz = SS_MAX_HASH_SZ;
+
+	/* allocate soft_state pool */
+	sss = kmem_zalloc(sizeof (*sss), KM_SLEEP);
+	sss->ss_size = size;
+	sss->ss_mod_hash = mod_hash_create_strhash("soft_state_bystr",
+	    hash_sz, mod_hash_null_valdtor);
+	*state_p = (ddi_soft_state_bystr *)sss;
+	return (0);
+}
+
+int
+ddi_soft_state_bystr_zalloc(ddi_soft_state_bystr *state, const char *str)
+{
+	i_ddi_soft_state_bystr	*sss = (i_ddi_soft_state_bystr *)state;
+	void			*sso;
+	char			*dup_str;
+
+	ASSERT(sss && str && sss->ss_mod_hash);
+	if ((sss == NULL) || (str == NULL) || (sss->ss_mod_hash == NULL))
+		return (DDI_FAILURE);
+	sso = kmem_zalloc(sss->ss_size, KM_SLEEP);
+	dup_str = i_ddi_strdup((char *)str, KM_SLEEP);
+	if (mod_hash_insert(sss->ss_mod_hash,
+	    (mod_hash_key_t)dup_str, (mod_hash_val_t)sso) == 0)
+		return (DDI_SUCCESS);
+
+	/*
+	 * The only error from an strhash insert is caused by a duplicate key.
+	 * We refuse to tread on an existing elements, so free and fail.
+	 */
+	kmem_free(dup_str, strlen(dup_str) + 1);
+	kmem_free(sso, sss->ss_size);
+	return (DDI_FAILURE);
+}
+
+void *
+ddi_soft_state_bystr_get(ddi_soft_state_bystr *state, const char *str)
+{
+	i_ddi_soft_state_bystr	*sss = (i_ddi_soft_state_bystr *)state;
+	void			*sso;
+
+	ASSERT(sss && str && sss->ss_mod_hash);
+	if ((sss == NULL) || (str == NULL) || (sss->ss_mod_hash == NULL))
+		return (NULL);
+
+	if (mod_hash_find(sss->ss_mod_hash,
+	    (mod_hash_key_t)str, (mod_hash_val_t *)&sso) == 0)
+		return (sso);
+	return (NULL);
+}
+
+void
+ddi_soft_state_bystr_free(ddi_soft_state_bystr *state, const char *str)
+{
+	i_ddi_soft_state_bystr	*sss = (i_ddi_soft_state_bystr *)state;
+	void			*sso;
+
+	ASSERT(sss && str && sss->ss_mod_hash);
+	if ((sss == NULL) || (str == NULL) || (sss->ss_mod_hash == NULL))
+		return;
+
+	(void) mod_hash_remove(sss->ss_mod_hash,
+	    (mod_hash_key_t)str, (mod_hash_val_t *)&sso);
+	kmem_free(sso, sss->ss_size);
+}
+
+void
+ddi_soft_state_bystr_fini(ddi_soft_state_bystr **state_p)
+{
+	i_ddi_soft_state_bystr	*sss;
+
+	ASSERT(state_p);
+	if (state_p == NULL)
+		return;
+
+	sss = (i_ddi_soft_state_bystr *)(*state_p);
+	if (sss == NULL)
+		return;
+
+	ASSERT(sss->ss_mod_hash);
+	if (sss->ss_mod_hash) {
+		mod_hash_destroy_strhash(sss->ss_mod_hash);
+		sss->ss_mod_hash = NULL;
+	}
+
+	kmem_free(sss, sizeof (*sss));
+	*state_p = NULL;
+}
+
+/*
+ * The ddi_strid_* routines provide string-to-index management utilities.
+ */
+/* allocate and initialize an strid set */
+int
+ddi_strid_init(ddi_strid **strid_p, int n_items)
+{
+	i_ddi_strid	*ss;
+	int		hash_sz;
+
+	if (strid_p == NULL)
+		return (DDI_FAILURE);
+
+	/* current implementation is based on hash, convert n_items to hash */
+	hash_sz = n_items / SS_N_ITEMS_PER_HASH;
+	if (hash_sz < SS_MIN_HASH_SZ)
+		hash_sz = SS_MIN_HASH_SZ;
+	else if (hash_sz > SS_MAX_HASH_SZ)
+		hash_sz = SS_MAX_HASH_SZ;
+
+	ss = kmem_alloc(sizeof (*ss), KM_SLEEP);
+	ss->strid_space = id_space_create("strid", 1, n_items);
+	ss->strid_bystr = mod_hash_create_strhash("strid_bystr", hash_sz,
+	    mod_hash_null_valdtor);
+	ss->strid_byid = mod_hash_create_idhash("strid_byid", hash_sz,
+	    mod_hash_null_valdtor);
+	*strid_p = (ddi_strid *)ss;
+	return (DDI_SUCCESS);
+}
+
+#define	ID_FIXED_SIZE	0x1
+
+/* allocate an id mapping within the specified set for str, return id */
+static id_t
+i_ddi_strid_alloc(ddi_strid *strid, char *str, int flags)
+{
+	i_ddi_strid	*ss = (i_ddi_strid *)strid;
+	id_t		id;
+	char		*s;
+
+	ASSERT(ss && str);
+	if ((ss == NULL) || (str == NULL))
+		return (0);
+
+	/*
+	 * Allocate an id using VM_FIRSTFIT in order to keep allocated id
+	 * range as compressed as possible.  This is important to minimize
+	 * the amount of space used when the id is used as a ddi_soft_state
+	 * index by the caller.
+	 *
+	 * If ID_FIXED_SIZE, use the _nosleep variant to fail rather
+	 * than sleep in id_allocff()
+	 */
+	if (flags & ID_FIXED_SIZE) {
+		id = id_allocff_nosleep(ss->strid_space);
+		if (id == (id_t)-1)
+			return (0);
+	} else {
+		id = id_allocff(ss->strid_space);
+	}
+
+	/*
+	 * NOTE: since we create and destroy in unison we can save space by
+	 * using bystr key as the byid value.  This means destroy must occur
+	 * in (byid, bystr) order.
+	 */
+	s = i_ddi_strdup(str, KM_SLEEP);
+	if (mod_hash_insert(ss->strid_bystr, (mod_hash_key_t)s,
+	    (mod_hash_val_t)(intptr_t)id) != 0) {
+		ddi_strid_free(strid, id);
+		return (0);
+	}
+	if (mod_hash_insert(ss->strid_byid, (mod_hash_key_t)(intptr_t)id,
+	    (mod_hash_val_t)s) != 0) {
+		ddi_strid_free(strid, id);
+		return (0);
+	}
+
+	/* NOTE: s if freed on mod_hash_destroy by mod_hash_strval_dtor */
+	return (id);
+}
+
+/* allocate an id mapping within the specified set for str, return id */
+id_t
+ddi_strid_alloc(ddi_strid *strid, char *str)
+{
+	return (i_ddi_strid_alloc(strid, str, 0));
+}
+
+/* allocate an id mapping within the specified set for str, return id */
+id_t
+ddi_strid_fixed_alloc(ddi_strid *strid, char *str)
+{
+	return (i_ddi_strid_alloc(strid, str, ID_FIXED_SIZE));
+}
+
+/* return the id within the specified strid given the str */
+id_t
+ddi_strid_str2id(ddi_strid *strid, char *str)
+{
+	i_ddi_strid	*ss = (i_ddi_strid *)strid;
+	id_t		id = 0;
+	mod_hash_val_t	hv;
+
+	ASSERT(ss && str);
+	if (ss && str && (mod_hash_find(ss->strid_bystr,
+	    (mod_hash_key_t)str, &hv) == 0))
+		id = (int)(intptr_t)hv;
+	return (id);
+}
+
+/* return str within the specified strid given the id */
+char *
+ddi_strid_id2str(ddi_strid *strid, id_t id)
+{
+	i_ddi_strid	*ss = (i_ddi_strid *)strid;
+	char		*str = NULL;
+	mod_hash_val_t	hv;
+
+	ASSERT(ss && id > 0);
+	if (ss && (id > 0) && (mod_hash_find(ss->strid_byid,
+	    (mod_hash_key_t)(uintptr_t)id, &hv) == 0))
+		str = (char *)hv;
+	return (str);
+}
+
+/* free the id mapping within the specified strid */
+void
+ddi_strid_free(ddi_strid *strid, id_t id)
+{
+	i_ddi_strid	*ss = (i_ddi_strid *)strid;
+	char		*str;
+
+	ASSERT(ss && id > 0);
+	if ((ss == NULL) || (id <= 0))
+		return;
+
+	/* bystr key is byid value: destroy order must be (byid, bystr) */
+	str = ddi_strid_id2str(strid, id);
+	(void) mod_hash_destroy(ss->strid_byid, (mod_hash_key_t)(uintptr_t)id);
+	id_free(ss->strid_space, id);
+
+	if (str)
+		(void) mod_hash_destroy(ss->strid_bystr, (mod_hash_key_t)str);
+}
+
+/* destroy the strid set */
+void
+ddi_strid_fini(ddi_strid **strid_p)
+{
+	i_ddi_strid	*ss;
+
+	ASSERT(strid_p);
+	if (strid_p == NULL)
+		return;
+
+	ss = (i_ddi_strid *)(*strid_p);
+	if (ss == NULL)
+		return;
+
+	/* bystr key is byid value: destroy order must be (byid, bystr) */
+	if (ss->strid_byid)
+		mod_hash_destroy_hash(ss->strid_byid);
+	if (ss->strid_byid)
+		mod_hash_destroy_hash(ss->strid_bystr);
+	if (ss->strid_space)
+		id_space_destroy(ss->strid_space);
+	kmem_free(ss, sizeof (*ss));
+	*strid_p = NULL;
 }
 
 /*

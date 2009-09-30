@@ -317,6 +317,7 @@ struct di_path {
 	uint_t		path_snap_state; /* describes valid fields */
 	int		path_instance;	/* path instance */
 	uint64_t 	user_private_data;
+	uint_t		path_flags;	/* path flags */
 };
 
 /*
@@ -329,6 +330,11 @@ struct di_path {
 #define	DI_PATH_SNAP_NOCLINK	0x10	/* client linkage not in snapshot */
 #define	DI_PATH_SNAP_NOPLINK	0x20	/* phci linkage not in snapshot */
 #define	DI_PATH_SNAP_LINKS	0x40	/* linkages have been postprocessed */
+
+/*
+ * Flags for path_flags
+ */
+#define	DI_PATH_FLAGS_DEVICE_REMOVED	0x01	/* peer of DI_DEVICE_REMOVED */
 
 /*
  * path properties

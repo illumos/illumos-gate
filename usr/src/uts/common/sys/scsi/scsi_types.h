@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,11 @@ typedef	void *opaque_t;
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/devops.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/stat.h>
+#include <sys/sunndi.h>
+#include <sys/devctl.h>
 #endif	/* _KERNEL */
 
 /*
@@ -87,22 +92,9 @@ typedef	void *opaque_t;
 #include <sys/scsi/generic/message.h>
 #include <sys/scsi/generic/mode.h>
 
-
 /*
  * Sun SCSI type definitions
  */
 #include <sys/scsi/impl/types.h>
-
-/*
- * For drivers which do not include these - must be last
- */
-#ifdef	_KERNEL
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-#include <sys/stat.h>
-#include <sys/sunndi.h>
-#include <sys/devctl.h>
-#include <sys/ddifm.h>
-#endif	/* _KERNEL */
 
 #endif	/* _SYS_SCSI_SCSI_TYPES_H */

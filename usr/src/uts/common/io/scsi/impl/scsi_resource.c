@@ -324,12 +324,12 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		pktw->pcw_flags = 0;
 		in_pktp = &(pktw->pcw_pkt);
 		in_pktp->pkt_address = *ap;
+
 		/*
 		 * target drivers should initialize pkt_comp and
 		 * pkt_time, but sometimes they don't so initialize
 		 * them here to be safe.
 		 */
-		in_pktp->pkt_address = *ap;
 		in_pktp->pkt_flags = 0;
 		in_pktp->pkt_time = 0;
 		in_pktp->pkt_resid = 0;

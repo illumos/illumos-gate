@@ -55,10 +55,10 @@ static callout_cache_t *callout_caches;		/* linked list of caches */
 static callout_table_t *callout_table;		/* global callout table array */
 
 /*
- * We run normal callouts from PIL 10. This means that no other handler that
- * runs at PIL 10 is allowed to wait for normal callouts directly or indirectly
- * as it will cause a deadlock. This has always been an unwritten rule.
- * We are making it explicit here.
+ * We run 'realtime' callouts at PIL 1 (CY_LOW_LEVEL). For 'normal'
+ * callouts, from PIL 10 (CY_LOCK_LEVEL) we dispatch the callout,
+ * via taskq, to a thread that executes at PIL 0 - so we end up running
+ * 'normal' callouts at PIL 0.
  */
 static volatile int callout_realtime_level = CY_LOW_LEVEL;
 static volatile int callout_normal_level = CY_LOCK_LEVEL;

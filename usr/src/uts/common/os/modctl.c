@@ -661,7 +661,7 @@ modctl_update_driver_aliases(int add, int *data)
 	 * driver now exists.
 	 */
 	i_ddi_bind_devs();
-	i_ddi_di_cache_invalidate(KM_SLEEP);
+	i_ddi_di_cache_invalidate();
 
 error:
 	if (mc.num_aliases > 0) {
@@ -711,7 +711,7 @@ modctl_rem_major(major_t major)
 	(void) i_ddi_unload_drvconf(major);
 	i_ddi_unbind_devs(major);
 	i_ddi_bind_devs();
-	i_ddi_di_cache_invalidate(KM_SLEEP);
+	i_ddi_di_cache_invalidate();
 
 	/* purge all the bindings to this driver */
 	purge_mbind(major, mb_hashtab);

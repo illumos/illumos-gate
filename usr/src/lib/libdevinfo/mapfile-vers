@@ -206,6 +206,7 @@ SUNWprivate_1.1 {
 	di_minor_devinfo;
 	di_node_state;
 	di_parent_private_data;
+	di_path_flags;
 # XXX remove: di_path_(addr,next,next_client,next_phci)
 	di_path_addr;
 	di_path_next;

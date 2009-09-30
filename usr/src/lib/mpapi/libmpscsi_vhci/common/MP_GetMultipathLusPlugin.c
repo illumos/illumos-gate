@@ -32,9 +32,40 @@
 
 #include <libdevinfo.h>
 
+/*
+ * Checks whether there is online path or not.
+ *  - no path found returns -1.
+ *  - online/standby path found returns 1.
+ *  - path exists but no online/standby path found returns 0.
+ */
+static int checkAvailablePath(di_node_t node)
+{
+	di_path_t path;
+	di_path_state_t state;
+
+	if ((path = di_path_client_next_path(node, DI_PATH_NIL))
+	    == DI_PATH_NIL) {
+		log(LOG_INFO, "checkAvailalblePath()",
+		    " - No path found");
+		return (-1);
+	}
+
+	do {
+		/* ignore the path that is neither online nor standby. */
+		if (((state = di_path_state(path)) == DI_PATH_STATE_ONLINE) ||
+		    (state == DI_PATH_STATE_STANDBY)) {
+			return (1);
+		}
+	} while ((path = di_path_client_next_path(node, path)) != DI_PATH_NIL);
+
+	/* return 0 for the case that there is no online path to the node. */
+	log(LOG_INFO, "checkAvailalblePath()", " - No online path found");
+	return (0);
+}
+
 static int getOidList(di_node_t root_node, MP_OID_LIST *pOidList)
 {
-	int numNodes = 0;
+	int numNodes = 0, state;
 
 	MP_UINT64 instNum = 0;
 
@@ -59,8 +90,21 @@ static int getOidList(di_node_t root_node, MP_OID_LIST *pOidList)
 
 	while (DI_NODE_NIL != sv_child_node) {
 
-		/* Skip the node which is not online. */
-		if (di_state(sv_child_node) != 0) {
+		/* skip the node which is offline, down or detached. */
+		state = di_state(sv_child_node);
+		if ((state & DI_DEVICE_DOWN) ||
+		    (state & DI_DEVICE_OFFLINE)) {
+			sv_child_node = di_sibling_node(sv_child_node);
+			continue;
+		}
+
+		/*
+		 * skip if the node doesn't have any path avaialble.
+		 * If any path is found from the DINFOCACHE snaphost
+		 * that means the driver keeps track of the path regadless
+		 * of state.
+		 */
+		if (checkAvailablePath(sv_child_node) == -1) {
 			sv_child_node = di_sibling_node(sv_child_node);
 			continue;
 		}
