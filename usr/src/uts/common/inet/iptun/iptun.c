@@ -2599,7 +2599,6 @@ iptun_input(void *arg, mblk_t *mp, void *arg2)
 	ipha_t	*outer4, *inner4;
 	ip6_t	*outer6, *inner6;
 	mblk_t	*data_mp = mp;
-	boolean_t ipsec = B_FALSE;
 
 	ASSERT(IPCL_IS_IPTUN(connp));
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_CTL);
@@ -2616,7 +2615,6 @@ iptun_input(void *arg, mblk_t *mp, void *arg2)
 			iptun_input_icmp(iptun, mp, data_mp);
 			return;
 		}
-		ipsec = B_TRUE;
 	}
 
 	/*
@@ -2649,14 +2647,12 @@ iptun_input(void *arg, mblk_t *mp, void *arg2)
 			goto drop;
 	}
 
-	if (ipsec) {
-		if (!ipsec_tun_inbound(mp, &data_mp, iptun->iptun_itp, inner4,
-		    inner6, outer4, outer6, outer_hlen, iptun->iptun_ns)) {
-			/* Callee did all of the freeing. */
-			return;
-		}
-		mp = data_mp;
+	if (!ipsec_tun_inbound(mp, &data_mp, iptun->iptun_itp, inner4,
+	    inner6, outer4, outer6, outer_hlen, iptun->iptun_ns)) {
+		/* Callee did all of the freeing. */
+		return;
 	}
+	mp = data_mp;
 
 	if (iptun->iptun_typeinfo->iti_type == IPTUN_TYPE_6TO4 &&
 	    !iptun_in_6to4_ok(iptun, outer4, inner6))
