@@ -17637,7 +17637,14 @@ ip_sioctl_slifindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		return (EEXIST);
 	}
 
-	/* The new index is unused. Set it in the phyint. */
+	/*
+	 * The new index is unused. Set it in the phyint. However we must not
+	 * forget to trigger NE_IFINDEX_CHANGE event before the ifindex
+	 * changes. The event must be bound to old ifindex value.
+	 */
+	ill_nic_event_dispatch(ill, 0, NE_IFINDEX_CHANGE,
+	    &index, sizeof (index));
+
 	old_index = phyi->phyint_ifindex;
 	phyi->phyint_ifindex = index;
 
@@ -20265,6 +20272,8 @@ ill_hook_event2str(nic_event_t event)
 		return ("LIF_UP");
 	case NE_LIF_DOWN:
 		return ("LIF_DOWN");
+	case NE_IFINDEX_CHANGE:
+		return ("IFINDEX_CHANGE");
 	default:
 		return ("UNKNOWN");
 	}
