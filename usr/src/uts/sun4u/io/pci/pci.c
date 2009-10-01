@@ -340,14 +340,6 @@ pci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (pcitool_init(dip) != DDI_SUCCESS) {
 			goto err_bad_pcitool_nodes;
 		}
-
-		/*
-		 * Due to unresolved hardware issues, disable PCIPM until
-		 * the problem is fully understood.
-		 *
-		 * pci_pwr_setup(pci_p, dip);
-		 */
-
 		ddi_report_dev(dip);
 
 		pci_p->pci_state = PCI_ATTACHED;
