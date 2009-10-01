@@ -8505,6 +8505,7 @@ iment_sub(struct ism_ment *iment, struct hat *ism_hat)
 	iment->iment_next = NULL;
 	iment->iment_prev = NULL;
 	iment->iment_hat =  NULL;
+	iment->iment_base_va = 0;
 }
 
 /*
@@ -14959,8 +14960,6 @@ sfmmu_unlink_scd_from_regions(sf_srd_t *srdp, sf_scd_t *scdp)
 				ASSERT(ism_ment->iment_hat == scdp->scd_sfmmup);
 				ASSERT(ism_ment->iment_base_va ==
 				    rgnp->rgn_saddr);
-				ism_ment->iment_hat = NULL;
-				ism_ment->iment_base_va = 0;
 				mutex_enter(&ism_mlist_lock);
 				iment_sub(ism_ment, ism_hatid);
 				mutex_exit(&ism_mlist_lock);
