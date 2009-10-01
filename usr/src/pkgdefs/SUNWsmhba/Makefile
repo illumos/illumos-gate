@@ -26,9 +26,12 @@ include ../Makefile.com
 
 DATAFILES += depend
 
+LICENSEFILES += ../../lib/smhba/THIRDPARTYLICENSE
+
 .KEEP_STATE:
 
 all: $(FILES) 
+
 install: all pkg
 
 include ../Makefile.targ
