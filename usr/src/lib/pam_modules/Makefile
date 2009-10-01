@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/pam_modules/Makefile
 #
@@ -52,9 +50,6 @@ SUBDIRS = \
 	unix_account	\
 	unix_cred	\
 	unix_session
-
-$(CLOSED_BUILD)SUBDIRS += \
-	$(CLOSED)/lib/pam_modules/smartcard
 
 all :=		TARGET= all
 catalog :=	TARGET= _msg

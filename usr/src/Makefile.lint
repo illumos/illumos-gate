@@ -467,11 +467,9 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked \
 	$(CLOSED)/cmd/pax \
 	$(CLOSED)/cmd/sed_xpg4 \
-	$(CLOSED)/cmd/smartcard \
 	$(CLOSED)/cmd/tail \
 	$(CLOSED)/cmd/tr_xpg4 \
-	$(CLOSED)/lib/libc_i18n \
-	$(CLOSED)/lib/smartcard
+	$(CLOSED)/lib/libc_i18n
 
 i386_SUBDIRS= \
 	cmd/biosdev \

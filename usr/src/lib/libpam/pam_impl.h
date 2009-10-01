@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_PAM_IMPL_H
 #define	_PAM_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -230,13 +228,6 @@ struct pam_handle {
 	struct	pam_module_data *ssd;		/* module specific data */
 	fd_list *fd;				/* module fd's */
 	env_list *pam_env;			/* environment variables */
-
-	/*
-	 * XXX -- Contracted Consolidation Private
-	 *	  to be eliminated when dtlogin contract is terminated
-	 * Version number requested by PAM's client
-	 */
-	char	*pam_client_message_version_number;
 };
 
 /*

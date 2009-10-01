@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile contains the common definitions for the sun4u unix
@@ -401,7 +401,6 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ctsmc
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= m1535ppm
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= memtest
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= mi2cv
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= scmi2c
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= smbus_ara
 
 #

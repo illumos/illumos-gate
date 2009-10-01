@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <regex.h>
 #include <devfsadm.h>
@@ -41,7 +39,6 @@ static int ddi_other(di_minor_t minor, di_node_t node);
 static int diskette(di_minor_t minor, di_node_t node);
 static int ecpp_create(di_minor_t minor, di_node_t node);
 static int mc_node(di_minor_t minor, di_node_t node);
-static int ddi_cardreader(di_minor_t minor, di_node_t node);
 static int starcat_sbbc_node(di_minor_t minor, di_node_t node);
 static int lom(di_minor_t minor, di_node_t node);
 static int ntwdt_create(di_minor_t minor, di_node_t node);
@@ -63,9 +60,6 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "printer",  "ddi_printer", NULL,
 	    TYPE_EXACT, ILEVEL_1, ecpp_create
 	},
-	{ "card-reader", "ddi_smartcard_reader", NULL,
-		TYPE_EXACT, ILEVEL_0, ddi_cardreader
-	},
 	{ "pseudo", "ddi_pseudo", "lw8",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, lom
 	},
@@ -78,17 +72,6 @@ static devfsadm_create_t misc_cbt[] = {
 };
 
 DEVFSADM_CREATE_INIT_V0(misc_cbt);
-
-/* Smart Card Reader device link */
-#define	CARDREADER_LINK		"^scmi2c[0-9]+$"
-
-/* Rules for removing links */
-static devfsadm_remove_t sparc_remove_cbt[] = {
-	{ "card-reader", CARDREADER_LINK, RM_PRE | RM_ALWAYS,
-		ILEVEL_0, devfsadm_rm_all }
-};
-
-DEVFSADM_REMOVE_INIT_V0(sparc_remove_cbt);
 
 
 /*
@@ -210,57 +193,6 @@ mc_node(di_minor_t minor, di_node_t node)
 	(void) devfsadm_mklink(l_path, node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }
-
-
-/*
- * This function is called for Smartcard card reader nodes
- * Handles minor node type "ddi_smartcard_reader"
- * type=ddi_smartcard_reader;name=card-reader   scmi2c\N0
- * Calls enumerate to assign logical card-reader id and then
- * devfsadm_mklink to make the link.
- */
-static int
-ddi_cardreader(di_minor_t minor, di_node_t node)
-{
-	char p_path[PATH_MAX +1], l_path[PATH_MAX +1];
-	char *buf;
-	char *ptr;
-	char *nn, *mn;
-
-	devfsadm_enumerate_t rules[1] = {"^scmi2c([0-9]+)$", 1, MATCH_ALL};
-
-	nn = di_node_name(node);
-	if (strcmp(nn, "card-reader")) {
-		return (DEVFSADM_CONTINUE);
-	}
-
-	if (NULL == (ptr = di_devfs_path(node))) {
-		return (DEVFSADM_CONTINUE);
-	}
-
-	(void) strcpy(p_path, ptr);
-	(void) strcat(p_path, ":");
-
-	mn = di_minor_name(minor);
-
-	(void) strcat(p_path, mn);
-	di_devfs_path_free(ptr);
-
-	if (devfsadm_enumerate_int(p_path, 0, &buf, rules, 1)) {
-		return (DEVFSADM_CONTINUE);
-	}
-	(void) snprintf(l_path, sizeof (l_path), "scmi2c%s", buf);
-	free(buf);
-	(void) devfsadm_mklink(l_path, node, minor, 0);
-
-	return (DEVFSADM_CONTINUE);
-}
-
-
-
-
-
-
 
 
 /*

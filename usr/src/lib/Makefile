@@ -163,8 +163,6 @@ SUBDIRS += \
 	libinstzones	\
 	libpkg
 
-$(CLOSED_BUILD)SUBDIRS += \
-	$(CLOSED)/lib/smartcard
 SUBDIRS += \
 	passwdutil	\
 	pam_modules	\
@@ -361,8 +359,6 @@ MSGSUBDIRS=		\
 	pam_modules	\
 	pyzfs		\
 	rpcsec_gss
-$(CLOSED_BUILD)MSGSUBDIRS += \
-	$(CLOSED)/lib/smartcard
 MSGSUBDIRS += \
 	$($(MACH)_MSGSUBDIRS)
 
@@ -497,8 +493,7 @@ HDRSUBDIRS=		\
 
 $(CLOSED_BUILD)HDRSUBDIRS += \
 	$(CLOSED)/lib/libc_i18n	\
-	$(CLOSED)/lib/libike	\
-	$(CLOSED)/lib/smartcard
+	$(CLOSED)/lib/libike
 
 i386_HDRSUBDIRS=	\
 	libparted	\
@@ -550,9 +545,6 @@ install_h check:	$(HDRSUBDIRS:%=%-nodepend)
 _msg:			$(MSGSUBDIRS:%=%-nodepend) .WAIT _dc
 
 _dc:			$(DCSUBDIRS:%=%-nodepend)
-
-# dependencies for pam_modules (see below)
-$(CLOSED_BUILD)SMARTCARD=	$(CLOSED)/lib/smartcard
 
 #
 # Library interdependencies are called out explicitly here
@@ -617,7 +609,7 @@ libwrap:	libnsl libsocket
 libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil
 libwanbootutil:	libnsl
-pam_modules:	libproject passwdutil $(SMARTCARD) smbsrv
+pam_modules:	libproject passwdutil smbsrv
 libscf:		libuutil libmd libgen libsmbios
 libinetsvc:	libscf
 librestart:	libuutil libscf

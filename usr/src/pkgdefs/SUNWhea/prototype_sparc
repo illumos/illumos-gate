@@ -182,7 +182,6 @@ d none usr/platform/sun4u/include/sys/i2c/clients 755 root bin
 f none usr/platform/sun4u/include/sys/i2c/misc/i2c_svc.h 644 root bin
 f none usr/platform/sun4u/include/sys/i2c/clients/max1617.h 644 root bin
 f none usr/platform/sun4u/include/sys/i2c/clients/i2c_client.h 644 root bin
-f none usr/platform/sun4u/include/sys/i2c/clients/scmi2c.h 644 root bin
 f none usr/platform/sun4u/include/sys/i2c/clients/hpc3130.h 644 root bin
 f none usr/platform/sun4u/include/sys/i2c/clients/lm75.h 644 root bin
 f none usr/platform/sun4u/include/sys/i2c/clients/pcf8591.h 644 root bin

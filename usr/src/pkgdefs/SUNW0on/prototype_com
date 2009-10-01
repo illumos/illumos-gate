@@ -410,11 +410,3 @@ f none usr/lib/help/profiles/locale/RtCPUPowerManagement.html 444 root bin
 f none usr/lib/help/profiles/locale/RtMMSAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/RtMMSOper.html 444 root bin
 f none usr/lib/help/profiles/locale/RtMMSUser.html 444 root bin
-#
-#
-# OCF Messages
-#
-f none usr/lib/locale/C/LC_MESSAGES/libsmartcard.msg 644 root sys
-d none usr/share/lib/locale/com/sun/opencard 755 root bin
-d none usr/share/lib/locale/com/sun/opencard/cmd 755 root bin
-f none usr/share/lib/locale/com/sun/opencard/cmd/OCFMessages.properties 644 root sys

@@ -20,10 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
@@ -91,11 +89,14 @@ do
 			rm -f /tmp/etcrpc.$$
 		fi	
 
-		# Add ocfserv entry
-		grep 'ocfserv' $dest > /dev/null 2>&1
-		if [ $? -ne 0 ] ; then
-			echo 'ocfserv		100150' >> $dest
-		fi
+		# Delete ocfserv entry
+		grep 'ocfserv[	]*100150' $dest >/dev/null 2>&1
+		if [ $? -eq 0 ] ; then
+			grep -v 'ocfserv[	]*100150' $dest \
+					>/tmp/etcrpc.$$ 2>/dev/null
+			cp /tmp/etcrpc.$$ $dest
+			rm -f /tmp/etcrpc.$$
+		fi	
 
 		# Add metad entry
 		grep 'metad' $dest > /dev/null 2>&1

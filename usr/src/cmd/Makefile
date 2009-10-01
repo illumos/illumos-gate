@@ -479,8 +479,7 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/printf	\
 	$(CLOSED)/cmd/sed	\
 	$(CLOSED)/cmd/sed_xpg4	\
-	$(CLOSED)/cmd/smartcard	\
-	$(CLOSED)/cmd/tail	\
+ODE	$(CLOSED)/cmd/tail	\
 	$(CLOSED)/cmd/tr_xpg4
 
 i386_SUBDIRS=		\

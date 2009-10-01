@@ -62,8 +62,6 @@ sparc_SUBDIRS= \
 	SUNWidn.u \
 	SUNWifp  \
 	SUNWifph \
-	SUNWjcom \
-	SUNWjib \
 	SUNWkvm.c  \
 	SUNWkvm.d  \
 	SUNWkvm.m  \
@@ -92,11 +90,9 @@ sparc_SUBDIRS= \
 	SUNWsckmr \
 	SUNWsckmu.u \
 	SUNWsckm.u \
-	SUNWscmhdlr \
 	SUNWsfdr.u \
 	SUNWsfdrr.u \
 	SUNWssad  \
-	SUNWstc.u \
 	SUNWus.u \
 	SUNWust1.v \
 	SUNWust2.v \
@@ -372,10 +368,6 @@ COMMON_SUBDIRS= \
 	SUNWnisu  \
 	SUNWnwamintr \
 	SUNWnwamintu \
-	SUNWocf \
-	SUNWocfd \
-	SUNWocfh \
-	SUNWocfr \
 	SUNWonfmes \
 	SUNWonzfsr \
 	SUNWonzfs \
@@ -384,7 +376,6 @@ COMMON_SUBDIRS= \
 	SUNWypu \
 	SUNWpacketh \
 	SUNWpacketu \
-	SUNWpamsc \
 	SUNWpapi \
 	SUNWpcan \
 	SUNWpcelx \

@@ -805,12 +805,6 @@ usr/lib/sparcv9/libcmdutils.so		sparc
 #
 usr/include/aclutils.h			sparc
 #
-# Entries for the SCM IFD Handler which are used only to build
-# the SCM IFD Handler and are not delivered to customers.
-#
-usr/include/scm_ifdh.h			sparc
-usr/include/scm_protocol.h		sparc
-#
 # USB skeleton driver stays in sync with the rest of USB but doesn't ship.
 #
 kernel/drv/sparcv9/usbskel		sparc

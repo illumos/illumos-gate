@@ -110,8 +110,6 @@ $(CLOSED_BUILD)CLOSED_HDRS=	\
 	memtestio_sr.h		\
 	memtestio_u.h
 
-$(CLOSED_BUILD)CLOSED_I2CHDRS =	clients/scmi2c.h
-
 I2CHDRS =	clients/max1617.h misc/i2c_svc.h clients/i2c_client.h	\
 		clients/hpc3130.h clients/lm75.h	\
 		clients/pcf8591.h clients/ssc050.h $(CLOSED_I2CHDRS)

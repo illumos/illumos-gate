@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -20,8 +20,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	rpc
 #
@@ -86,7 +84,6 @@ nisd		100300	rpc.nisd
 nispasswd	100303	rpc.nispasswdd
 ufsd		100233	ufsd
 pcnfsd		150001
-ocfserv		100150
 metad		100229	metad
 metamhd		100230	metamhd
 metamedd	100242	metamedd

@@ -148,10 +148,6 @@ all_zones_files="
 	etc/shadow
 	etc/skel/.profile
 	etc/skel/local.*
-	etc/smartcard/.keys
-	etc/smartcard/desktop.properties
-	etc/smartcard/ocf.classpath
-	etc/smartcard/opencard.properties
 	etc/ssh/ssh_config
 	etc/ssh/sshd_config
 	etc/syslog.conf
@@ -499,7 +495,6 @@ smf_inetd_conversions="
 	metamedd
 	metamhd
 	name
-	ocfserv
 	printer
 	rexd
 	rquotad
@@ -1538,6 +1533,7 @@ smf_obsolete_manifests="
 	var/svc/manifest/network/datalink-init.xml
 	var/svc/manifest/network/iscsi_initiator.xml
 	var/svc/manifest/network/fcoe_config.xml
+	var/svc/manifest/network/rpc/ocfserv.xml
 "
 
 # smf services whose manifests have been renamed
@@ -3932,6 +3928,44 @@ remove_eof_mobileip() {
 		rm -f "$rootprefix/usr/sbin/mipagentstat"
 	fi
 	printf '\n'
+}
+
+#
+# Remove EOF Smartcard framework
+#
+remove_eof_smartcard()
+{
+	# Packages to remove
+	typeset -r smartcard_pkg='SUNWjcom SUNWkib SUNWocf SUNWocfd SUNWocfh
+SUNWocfr SUNWpamsc SUNWscmhdlr'
+	typeset pkg
+
+	printf 'Removing EOF Smartcard... '
+
+	for pkg in $smartcard_pkgs
+	do
+		if [ -d $rootprefix/var/sadm/pkg/$pkg ]; then
+			rm -rf $rootprefix/var/sadm/pkg/$pkg
+			grep -vw $pkg $rootprefix/var/sadm/install/contents > \
+			    /tmp/contents.$$
+			cp /tmp/contents.$$ /var/sadm/install/contents.$$
+			rm /tmp/contents.$$
+		fi
+	done
+
+	#
+	# Remove smartcard headers, libraries,  Old readers and the 
+	# parts delivered from other consolidations
+	# that no longer work with the ON parts removed.
+	#
+	rm -rf  $usr/lib/smartcard \
+		$usr/share/lib/smartcard \
+		$usr/include/smartcard.h \
+		$usr/include/smartcard \
+		$root/etc/smartcard \
+		$root/platform/sun4u/kernel/drv/sparcv9/scmi2c
+
+	printf 'done.\n'
 }
 
 remove_properties() {
@@ -6534,6 +6568,13 @@ mondo_loop() {
 	fi
 
 	#
+	# Remove EOF Smartcard support
+	#
+	if [ -d $usr/lib/smartcard ]; then
+		remove_eof_smartcard
+	fi
+
+	#
 	# Remove DMI
 	#
 	if [ -d $usr/lib/dmi -o \
@@ -7299,39 +7340,6 @@ mondo_loop() {
 	#
 	rm -f $root/kernel/misc/sparcv9/rpcib
 	rm -f $root/kernel/drv/sparcv9/rpcib
-
-	#
-	# Remove old smartcard header files
-	#
-
-	rm -f \
-		$usr/include/smartcard.h \
-		$usr/include/smartcard/ocf_authenticate.h \
-		$usr/include/smartcard/ocf_core.h \
-		$usr/include/smartcard/ocf_core_cardservices.h
-
-	#
-	# Remove smartcard libraries that should not have been shipped.
-	#
-	rm -rf  $usr/lib/smartcard/sparcv9/ \
-		$usr/share/lib/smartcard/scmtester.jar
-
-	#
-	# Remove external smartcard reader driver
-	#
-	rm -f $usr/share/lib/smartcard/scmrsr3.jar
-
-	#
-	# Remove old internal smartcard reader driver
-	#
-	rm -f $usr/share/lib/smartcard/scmiscr.jar
-	rm -f $usr/lib/smartcard/libSCMI2CNative.so
-	rm -f $usr/lib/smartcard/libSCMI2CNative.so.1
-
-	#
-	# Remove Smart OS
-	#
-	rm -f $usr/share/lib/smartcard/smartos.jar
 
 	#
 	# Remove drivers & header files for EOL of soc & pln drivers

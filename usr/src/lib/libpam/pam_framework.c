@@ -110,14 +110,6 @@ pam_trace_iname(int item_type, char *iname_buf)
 {
 	char *name;
 
-	/*
-	 * XXX -- Contracted Consolidation Private
-	 *	  to be eliminated when dtlogin contract is terminated
-	 * Version number requested by PAM's client
-	 */
-	if (item_type == PAM_MSG_VERSION)
-		return ("msg_version");
-
 	if (item_type <= 0 ||
 	    item_type >= PAM_MAX_ITEMS ||
 	    (name = pam_inames[item_type]) == NULL) {
@@ -415,29 +407,6 @@ pam_set_item(pam_handle_t *pamh, int item_type, const void *item)
 		return (PAM_PERM_DENIED);
 
 	/*
-	 * XXX -- Contracted Consolidation Private
-	 *	  to be eliminated when dtlogin contract is terminated
-	 * Check if tag is Sun proprietary
-	 */
-	if (item_type == PAM_MSG_VERSION) {
-		if (pamh->pam_client_message_version_number)
-			free(pamh->pam_client_message_version_number);
-
-		if (item == NULL)
-			pamh->pam_client_message_version_number = NULL;
-		else
-			if ((pamh->pam_client_message_version_number =
-			    strdup((char *)item)) == NULL)
-				return (PAM_BUF_ERR);
-
-		pam_trace(PAM_DEBUG_ITEM,
-		    "pam_set_item(%p:%s)=%s", (void *)pamh,
-		    pam_trace_iname(item_type, iname_buf),
-		    item ? (char *)item : "NULL");
-		return (PAM_SUCCESS);
-	}
-
-	/*
 	 * Check that item_type is within valid range
 	 */
 
@@ -583,19 +552,6 @@ pam_get_item(const pam_handle_t *pamh, int item_type, void **item)
 
 	if (pamh == NULL)
 		return (PAM_SYSTEM_ERR);
-
-	/*
-	 * XXX -- Contracted Consolidation Private
-	 *	  to be eliminated when dtlogin contract is terminated
-	 * Check if tag is Sun proprietary
-	 */
-	if (item_type == PAM_MSG_VERSION) {
-		*item = pamh->pam_client_message_version_number;
-		pam_trace(PAM_DEBUG_ITEM, "pam_get_item(%p:%s)=%s",
-		    (void *)pamh, pam_trace_iname(item_type, iname_buf),
-		    *item ? (char *)*item : "NULL");
-		return (PAM_SUCCESS);
-	}
 
 	if (item_type <= 0 || item_type >= PAM_MAX_ITEMS)
 		return (PAM_SYMBOL_ERR);
@@ -2546,10 +2502,6 @@ clean_up(pam_handle_t *pamh)
 	pam_repository_t *auth_rep;
 
 	if (pamh) {
-		/* Cleanup Sun proprietary tag information */
-		if (pamh->pam_client_message_version_number)
-			free(pamh->pam_client_message_version_number);
-
 		while (pamh->include_depth >= 0) {
 			free_pam_conf_info(pamh);
 			pamh->include_depth--;

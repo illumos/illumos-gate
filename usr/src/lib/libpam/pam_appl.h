@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _PAM_APPL_H
 #define	_PAM_APPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -106,15 +104,6 @@ struct pam_message {
 #define	PAM_PROMPT_ECHO_ON	2 	/* Echo on when getting response */
 #define	PAM_ERROR_MSG		3	/* Error message */
 #define	PAM_TEXT_INFO		4	/* Textual information */
-
-/*
- * Sun's proprietary message types
- * Can these new new message types supported in version 2
- * have the numbers like -XXX (ie., negative numbers).
- * Hence will not clash with new proposals from X/OPEN
- */
-#define	PAM_MSG_NOCONF		2001	/* No confirmation from user */
-#define	PAM_CONV_INTERRUPT	2002	/* Return from conv() */
 
 /*
  * max # of messages passed to the application through the
@@ -224,13 +213,6 @@ struct pam_repository {
 };
 
 typedef struct pam_repository pam_repository_t;
-
-/*
- * PAM message version.
- * Sun proprietary pam_[sg]et_item() extension
- */
-#define	PAM_MSG_VERSION	3001		/* PAM message version supported */
-#define	PAM_MSG_VERSION_V2 "2.0"	/* PAM 2.0 message version */
 
 /*
  * pam_get_user is called to retrieve the user name (PAM_USER). If PAM_USER

@@ -147,7 +147,6 @@ MANIFEST_SUBDIRS=			\
 	ypcmd/ypupdated
 
 $(CLOSED_BUILD)MANIFEST_SUBDIRS +=		\
-	$(CLOSED)/cmd/smartcard/daemon		\
 	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked
 
 DTEST_SUBDIRS= \

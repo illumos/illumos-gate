@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Create an encumbered binaries tarball from a full build proto area,
 # less the contents of an OpenSolaris proto area.  Special handling
@@ -184,7 +182,6 @@ delete="$delete
 "
 # encumbered binaries and associated files
 delete="$delete
-	etc/smartcard/
 	kernel/drv/amd64/audioens
 	kernel/drv/amd64/bmc
 	kernel/drv/amd64/pcn
@@ -211,9 +208,7 @@ delete="$delete
 	usr/bin/ksh
 	usr/bin/pfksh
 	usr/bin/rksh
-	usr/bin/smartcard
 	usr/ccs/bin/dis
-	usr/include/smartcard/
 	usr/include/sys/audio/audioens.h
 	usr/include/sys/phx.h
 	usr/include/sys/scsi/adapters/ifpcmd.h
@@ -225,27 +220,9 @@ delete="$delete
 	usr/include/sys/scsi/adapters/ispmail.h
 	usr/include/sys/scsi/adapters/ispreg.h
 	usr/include/sys/scsi/adapters/ispvar.h
-	usr/lib/amd64/libsmartcard.so.1
-	usr/lib/amd64/libsmartcard.so
-	usr/lib/amd64/llib-lsmartcard.ln
-	usr/lib/libsmartcard.so.1
-	usr/lib/libsmartcard.so
-	usr/lib/llib-lsmartcard.ln
-	usr/lib/llib-lsmartcard
-	usr/lib/locale/C/LC_MESSAGES/libsmartcard.msg
 	usr/lib/mdb/disasm/sparc.so
 	usr/lib/mdb/disasm/sparcv9/sparc.so
 	usr/lib/mdb/kvm/sparcv9/isp.so
-	usr/lib/security/amd64/pam_smartcard.so.1
-	usr/lib/security/amd64/pam_smartcard.so
-	usr/lib/security/pam_smartcard.so.1
-	usr/lib/security/pam_smartcard.so
-	usr/lib/security/sparcv9/pam_smartcard.so.1
-	usr/lib/security/sparcv9/pam_smartcard.so
-	usr/lib/smartcard/
-	usr/lib/sparcv9/libsmartcard.so.1
-	usr/lib/sparcv9/libsmartcard.so
-	usr/lib/sparcv9/llib-lsmartcard.ln
 	usr/platform/SUNW,Netra-T12/
 	usr/platform/sun4u/include/sys/i2c/misc/i2c_svc.h
 	usr/platform/sun4u/include/sys/memtestio.h
@@ -260,14 +237,10 @@ delete="$delete
 	usr/platform/sun4v/include/sys/memtestio.h
 	usr/platform/sun4v/include/sys/memtestio_ni.h
 	usr/platform/sun4v/include/sys/memtestio_v.h
-	usr/sbin/ocfserv
-	usr/share/javadoc/smartcard/
-	usr/share/lib/smartcard/
 	usr/share/lib/sgml/locale/C/dtds/docbook/docbook.dtd
 	usr/share/lib/sgml/locale/C/dtds/docbook/
 	usr/share/lib/sgml/locale/C/dtds/solbookv1/solbook.dtd
 	usr/share/lib/sgml/locale/C/dtds/solbookv1/
-	var/svc/manifest/network/rpc/ocfserv.xml
 "
 # memory fault injector test framework
 delete="$delete

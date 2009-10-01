@@ -299,9 +299,6 @@
   <!--
 	non-default inetd(1M) RPC services disabled
   -->
-  <service name='network/rpc/ocfserv' version='1' type='service'>
-    <instance name='default' enabled='false'/>
-  </service>
   <service name='network/rpc/rex' version='1' type='service'>
     <instance name='default' enabled='false'/>
   </service>
