@@ -155,6 +155,22 @@ mlsetup(struct regs *rp)
 		cpuid_feature_edx_exclude = (uint32_t)prop_value;
 
 	/*
+	 * Initialize idt0, gdt0, ldt0_default, ktss0 and dftss.
+	 */
+	init_desctbls();
+
+	/*
+	 * lgrp_init() and possibly cpuid_pass1() need PCI config
+	 * space access
+	 */
+#if defined(__xpv)
+	if (DOMAIN_IS_INITDOMAIN(xen_info))
+		pci_cfgspace_init();
+#else
+	pci_cfgspace_init();
+#endif
+
+	/*
 	 * The first lightweight pass (pass0) through the cpuid data
 	 * was done in locore before mlsetup was called.  Do the next
 	 * pass in C code.
@@ -166,11 +182,6 @@ mlsetup(struct regs *rp)
 	 * minimum) this value may be altered.
 	 */
 	x86_feature = cpuid_pass1(cpu[0]);
-
-	/*
-	 * Initialize idt0, gdt0, ldt0_default, ktss0 and dftss.
-	 */
-	init_desctbls();
 
 #if !defined(__xpv)
 
@@ -338,14 +349,6 @@ mlsetup(struct regs *rp)
 		kmdb_enter();
 
 	cpu_vm_data_init(CPU);
-
-	/* lgrp_init() needs PCI config space access */
-#if defined(__xpv)
-	if (DOMAIN_IS_INITDOMAIN(xen_info))
-		pci_cfgspace_init();
-#else
-	pci_cfgspace_init();
-#endif
 
 	rp->r_fp = 0;	/* terminate kernel stack traces! */
 
