@@ -167,10 +167,11 @@ i_dls_link_subchain(dls_link_t *dlp, mblk_t *mp, const mac_header_info_t *mhip,
 		prevp->b_next = mp;
 
 		/*
-		 * The source, destination, sap, vlan id and the MSGNOLOOP
-		 * flag must all match in a given subchain.
+		 * The source, destination, sap, vlan tag must all match in
+		 * a given subchain.
 		 */
-		if (memcmp(mhip->mhi_daddr, cmhi.mhi_daddr, addr_size) != 0 ||
+		if (mhip->mhi_saddr == NULL || cmhi.mhi_saddr == NULL ||
+		    memcmp(mhip->mhi_daddr, cmhi.mhi_daddr, addr_size) != 0 ||
 		    memcmp(mhip->mhi_saddr, cmhi.mhi_saddr, addr_size) != 0 ||
 		    mhip->mhi_bindsap != cmhi.mhi_bindsap) {
 			/*
