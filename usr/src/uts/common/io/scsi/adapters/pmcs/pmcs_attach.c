@@ -23,10 +23,8 @@
  * Use is subject to license terms.
  */
 #include <sys/scsi/adapters/pmcs/pmcs.h>
-#include <sys/scsi/adapters/pmcs/pmcs_bldrev.h>
 
-#define	PMCS_DRIVER_VERSION	"PMC-Sierra HBA Driver "\
-	PMCS_BUILD_VERSION
+#define	PMCS_DRIVER_VERSION	"pmcs HBA device driver"
 
 static	char	*pmcs_driver_rev = PMCS_DRIVER_VERSION;
 

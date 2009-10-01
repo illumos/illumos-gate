@@ -42,8 +42,6 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/scsi/adapters/pmcs
 WARLOCK_OUT     = $(PMCS_OBJS:%.o=%.ll)
 WARLOCK_OK      = $(MODULE).ok
 WLCMD_DIR       = $(UTSBASE)/common/io/warlock
-BLDREVHDR	= ../../common/sys/scsi/adapters/pmcs/pmcs_bldrev.h
-BLDREVHDR_T	= ../../common/sys/scsi/adapters/pmcs/pmcs_bldrev.h.tmp
 
 #
 #	Kernel Module Dependencies
@@ -77,25 +75,11 @@ CPPFLAGS	+= $(PMCS_DRV_FLGS) \
 #
 .KEEP_STATE:
 
-all:		ADDBUILDREV $(ALL_DEPS)
-
-ADDBUILDREV:
-		@$(ECHO) '#define PMCS_BUILD_VERSION "'`date '+v20%y%m%d'`\"> \
-		    $(BLDREVHDR_T);					\
-		if [ -f $(BLDREVHDR) ]; then 				\
-			RD=`$(DIFF) $(BLDREVHDR) $(BLDREVHDR_T) || $(TRUE)`; \
-			if [ ! -z "$$RD" ]; then			\
-				$(MV) $(BLDREVHDR_T) $(BLDREVHDR);	\
-			fi;						\
-		else							\
-			$(MV) $(BLDREVHDR_T) $(BLDREVHDR);		\
-		fi;							\
-		$(RM) $(BLDREVHDR_T)
+all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
-		-$(RM) $(BLDREVHDR)
 
 clobber:	$(CLOBBER_DEPS)
 
@@ -105,7 +89,7 @@ modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
-install:	ADDBUILDREV $(INSTALL_DEPS)
+install:	$(INSTALL_DEPS)
 
 #
 #	Include common targets.
