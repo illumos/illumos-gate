@@ -395,7 +395,7 @@ buf_fill (int abort)
 	/* Neither TFTP_OACK nor TFTP_DATA.  */
 	break;
 
-      if ((block || bcounter) && (block != prevblock + (unsigned short) 1))
+      if ((block || bcounter) && (block != (unsigned short) (prevblock + 1)))
 	/* Block order should be continuous */
 	tp.u.ack.block = htons (block = prevblock);
       
