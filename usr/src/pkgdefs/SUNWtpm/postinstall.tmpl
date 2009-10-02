@@ -80,7 +80,12 @@ add_acpi()
 # Add entry to /etc/devlink.tab if not there already
 # Note: the tab after ${DRV} here is important.
 if [ "${ISA_TYPE}" = "${ISA_TYPE_I386}" ]; then
-	add_acpi
+	/usr/bin/pkginfo SUNWrmodr > /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "The SUNWrmodr package must be installed in order for TPM device to be recognized"
+	else
+		add_acpi
+	fi
 	add_driver
 else 
 	if [ "${ISA_TYPE}" = "${ISA_TYPE_SPARC}" -a "${MACH}" = "sun4v" ]; then

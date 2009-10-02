@@ -27,9 +27,21 @@ include ../Makefile.com
 TMPLFILES += postinstall preremove
 DATAFILES += depend
 
+ACTION=grep SUNWrmodr depend > /dev/null || \
+	(chmod 666 depend; \
+	echo "P SUNWrmodr	Realmode Modules, (Root)" >> depend; \
+	chmod 444 depend;)
+
 .KEEP_STATE:
 
-all: $(FILES)
+all: $(FILES) action_$(MACH)
+
+action_i386: depend
+	$(ACTION)
+	touch $@
+
+action_sparc:
+
 install: all pkg
 
 include ../Makefile.targ
