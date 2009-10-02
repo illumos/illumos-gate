@@ -615,6 +615,15 @@ open_conn(adutils_host_t *adh, int timeoutsecs)
 	(void) ldap_set_option(adh->ld, LDAP_OPT_SIZELIMIT, &zero);
 	(void) ldap_set_option(adh->ld, LDAP_X_OPT_CONNECT_TIMEOUT, &timeoutms);
 	(void) ldap_set_option(adh->ld, LDAP_OPT_RESTART, LDAP_OPT_ON);
+
+	rc = adutils_set_thread_functions(adh->ld);
+	if (rc != LDAP_SUCCESS) {
+		/* Error has already been logged */
+		(void) ldap_unbind(adh->ld);
+		adh->ld = NULL;
+		goto out;
+	}
+
 	rc = ldap_sasl_interactive_bind_s(adh->ld, "" /* binddn */,
 	    adh->saslmech, NULL, NULL, adh->saslflags, &saslcallback,
 	    NULL);

@@ -25,10 +25,13 @@
 
 LIBRARY =	libadutils.a
 VERS =		.1
-OBJECTS =	adutils.o addisc.o
-LINT_OBJECTS =	adutils.o addisc.o
+OBJECTS =	adutils.o addisc.o adutils_threadfuncs.o
+LINT_OBJECTS =	adutils.o addisc.o adutils_threadfuncs.o
 
 include ../../Makefile.lib
+
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc -lldap -lresolv -lsocket -lnsl
@@ -36,7 +39,7 @@ SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR)
+CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(SRC)/lib/libldap5/include/ldap
 
 lint := OBJECTS = $(LINT_OBJECTS)
 

@@ -834,7 +834,6 @@ ldap_lookup_init(idmap_ad_disc_ds_t *ds)
 		ldversion = LDAP_VERSION3;
 		(void) ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION,
 		    &ldversion);
-
 		(void) ldap_set_option(ld, LDAP_OPT_REFERRALS,
 		    LDAP_OPT_OFF);
 		(void) ldap_set_option(ld, LDAP_OPT_TIMELIMIT, &zero);
@@ -844,6 +843,14 @@ ldap_lookup_init(idmap_ad_disc_ds_t *ds)
 		    &timeoutms);
 		(void) ldap_set_option(ld, LDAP_OPT_RESTART,
 		    LDAP_OPT_ON);
+
+		rc = adutils_set_thread_functions(ld);
+		if (rc != LDAP_SUCCESS) {
+			/* Error has already been logged */
+			(void) ldap_unbind(ld);
+			ld = NULL;
+			continue;
+		}
 
 		rc = ldap_sasl_interactive_bind_s(ld, "" /* binddn */,
 		    saslmech, NULL, NULL, saslflags, &saslcallback,

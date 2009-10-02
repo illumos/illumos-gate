@@ -155,6 +155,8 @@ char *adutils_sid2txt(adutils_sid_t *sidp);
 
 int saslcallback(LDAP *ld, unsigned flags, void *defaults, void *prompts);
 
+int adutils_set_thread_functions(LDAP *ld);
+
 /* Global logger function */
 
 extern adutils_logger logger;
