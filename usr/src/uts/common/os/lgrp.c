@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,7 +225,13 @@ static void	lgrp_mem_rename(int, lgrp_handle_t, lgrp_handle_t);
 static void	lgrp_part_add_cpu(struct cpu *, lgrp_id_t);
 static void	lgrp_part_del_cpu(struct cpu *);
 
+/*
+ * lgroup framework initialization
+ */
+static void	lgrp_main_init(void);
+static void	lgrp_main_mp_init(void);
 static void	lgrp_root_init(void);
+static void	lgrp_setup(void);
 
 /*
  * lpl topology
@@ -284,7 +290,7 @@ lgrp_optimizations(void)
 }
 
 /*
- * Build full lgroup topology
+ * Setup root lgroup
  */
 static void
 lgrp_root_init(void)
@@ -352,28 +358,52 @@ lgrp_root_init(void)
 
 /*
  * Initialize the lgroup framework and allow the platform to do the same
+ *
+ * This happens in stages during boot and is all funnelled through this routine
+ * (see definition of lgrp_init_stages_t to see what happens at each stage and
+ * when)
  */
 void
-lgrp_init(void)
+lgrp_init(lgrp_init_stages_t stage)
 {
 	/*
 	 * Initialize the platform
 	 */
-	lgrp_plat_init();
+	lgrp_plat_init(stage);
 
-	/*
-	 * Set max number of lgroups supported on this platform which must be
-	 * less than the max number of lgroups supported by the common lgroup
-	 * framework (eg. NLGRPS_MAX is max elements in lgrp_table[], etc.)
-	 */
-	nlgrpsmax = lgrp_plat_max_lgrps();
-	ASSERT(nlgrpsmax <= NLGRPS_MAX);
+	switch (stage) {
+	case LGRP_INIT_STAGE1:
+		/*
+		 * Set max number of lgroups supported on this platform which
+		 * must be less than the max number of lgroups supported by the
+		 * common lgroup framework (eg. NLGRPS_MAX is max elements in
+		 * lgrp_table[], etc.)
+		 */
+		nlgrpsmax = lgrp_plat_max_lgrps();
+		ASSERT(nlgrpsmax <= NLGRPS_MAX);
+		break;
+
+	case LGRP_INIT_STAGE2:
+		lgrp_setup();
+		break;
+
+	case LGRP_INIT_STAGE4:
+		lgrp_main_init();
+		break;
+
+	case LGRP_INIT_STAGE5:
+		lgrp_main_mp_init();
+		break;
+
+	default:
+		break;
+	}
 }
 
 /*
  * Create the root and cpu0's lgroup, and set t0's home.
  */
-void
+static void
 lgrp_setup(void)
 {
 	/*
@@ -389,16 +419,6 @@ lgrp_setup(void)
 }
 
 /*
- * Lgroup initialization is split in two parts. The first part
- * (lgrp_main_init()) is called right before start_other_cpus() in main. The
- * second part (lgrp_main_mp_init()) is called right after start_other_cpus()
- * when all CPUs are brought online and all distance information is available.
- *
- * When lgrp_main_init() is complete it sets lgrp_initialized. The
- * lgrp_main_mp_init() sets lgrp_topo_initialized.
- */
-
-/*
  * true when lgrp initialization has been completed.
  */
 int	lgrp_initialized = 0;
@@ -412,7 +432,7 @@ int	lgrp_topo_initialized = 0;
  * Init routine called after startup(), /etc/system has been processed,
  * and cpu0 has been added to an lgroup.
  */
-void
+static void
 lgrp_main_init(void)
 {
 	cpu_t		*cp = CPU;
@@ -488,7 +508,6 @@ lgrp_main_init(void)
 	lgrp_kstat_create(cp);
 	mutex_exit(&cpu_lock);
 
-	lgrp_plat_main_init();
 	lgrp_initialized = 1;
 }
 
@@ -496,7 +515,7 @@ lgrp_main_init(void)
  * Finish lgrp initialization after all CPUS are brought on-line.
  * This routine is called after start_other_cpus().
  */
-void
+static void
 lgrp_main_mp_init(void)
 {
 	klgrpset_t changed;

@@ -254,9 +254,11 @@ typedef	struct node_phys_addr_map {
 static int				lgrp_plat_apic_ncpus = 0;
 
 /*
- * CPU to node ID mapping table (only used for SRAT)
+ * CPU to node ID mapping table (only used for SRAT) and its max number of
+ * entries
  */
-static cpu_node_map_t			lgrp_plat_cpu_node[NCPU];
+static cpu_node_map_t			*lgrp_plat_cpu_node = NULL;
+static uint_t				lgrp_plat_cpu_node_nentries = 0;
 
 /*
  * Latency statistics
@@ -385,11 +387,9 @@ void		lgrp_plat_config(lgrp_config_flag_t flag, uintptr_t arg);
 
 lgrp_handle_t	lgrp_plat_cpu_to_hand(processorid_t id);
 
-void		lgrp_plat_init(void);
+void		lgrp_plat_init(lgrp_init_stages_t stage);
 
 int		lgrp_plat_latency(lgrp_handle_t from, lgrp_handle_t to);
-
-void		lgrp_plat_main_init(void);
 
 int		lgrp_plat_max_lgrps(void);
 
@@ -412,10 +412,13 @@ static int	lgrp_plat_cpu_node_update(node_domain_map_t *node_domain,
     int node_cnt, cpu_node_map_t *cpu_node, int nentries, uint32_t apicid,
     uint32_t domain);
 
-static int	lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node);
+static int	lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node,
+    int cpu_node_nentries);
 
 static int	lgrp_plat_domain_to_node(node_domain_map_t *node_domain,
     int node_cnt, uint32_t domain);
+
+static void	lgrp_plat_get_numa_config(void);
 
 static void	lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
     lgrp_plat_latency_stats_t *lat_stats,
@@ -423,6 +426,8 @@ static void	lgrp_plat_latency_adjust(node_phys_addr_map_t *node_memory,
 
 static int	lgrp_plat_latency_verify(node_phys_addr_map_t *node_memory,
     lgrp_plat_latency_stats_t *lat_stats);
+
+static void	lgrp_plat_main_init(void);
 
 static pgcnt_t	lgrp_plat_mem_size_default(lgrp_handle_t, lgrp_mem_query_t);
 
@@ -438,9 +443,8 @@ static void	lgrp_plat_node_sort(node_domain_map_t *node_domain,
     node_phys_addr_map_t *node_memory);
 
 static hrtime_t	lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
-    lgrp_plat_probe_mem_config_t *probe_mem_config,
-    lgrp_plat_latency_stats_t *lat_stats,
-    lgrp_plat_probe_stats_t *probe_stats);
+    int cpu_node_nentries, lgrp_plat_probe_mem_config_t *probe_mem_config,
+    lgrp_plat_latency_stats_t *lat_stats, lgrp_plat_probe_stats_t *probe_stats);
 
 static int	lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node);
 
@@ -451,6 +455,8 @@ static int	lgrp_plat_process_srat(struct srat *tp,
     uint32_t *prox_domain_min, node_domain_map_t *node_domain,
     cpu_node_map_t *cpu_node, int cpu_count,
     node_phys_addr_map_t *node_memory);
+
+static void	lgrp_plat_release_bootstrap(void);
 
 static int	lgrp_plat_srat_domains(struct srat *tp,
     uint32_t *prox_domain_min);
@@ -728,7 +734,7 @@ lgrp_plat_cpu_to_hand(processorid_t id)
 		return (LGRP_DEFAULT_HANDLE);
 
 	hand = (lgrp_handle_t)lgrp_plat_cpu_to_node(cpu[id],
-	    lgrp_plat_cpu_node);
+	    lgrp_plat_cpu_node, lgrp_plat_cpu_node_nentries);
 
 	ASSERT(hand != (lgrp_handle_t)-1);
 	if (hand == (lgrp_handle_t)-1)
@@ -742,166 +748,63 @@ lgrp_plat_cpu_to_hand(processorid_t id)
  * Platform-specific initialization of lgroups
  */
 void
-lgrp_plat_init(void)
+lgrp_plat_init(lgrp_init_stages_t stage)
 {
 #if defined(__xpv)
-	/*
-	 * XXPV	For now, the hypervisor treats all memory equally.
-	 */
-	lgrp_plat_node_cnt = max_mem_nodes = 1;
 #else	/* __xpv */
-	uint_t		probe_op;
 	u_longlong_t	value;
-
-	/*
-	 * Get boot property for lgroup topology height limit
-	 */
-	if (bootprop_getval(BP_LGRP_TOPO_LEVELS, &value) == 0)
-		(void) lgrp_topo_ht_limit_set((int)value);
-
-	/*
-	 * Get boot property for enabling/disabling SRAT
-	 */
-	if (bootprop_getval(BP_LGRP_SRAT_ENABLE, &value) == 0)
-		lgrp_plat_srat_enable = (int)value;
-
-	/*
-	 * Get boot property for enabling/disabling SLIT
-	 */
-	if (bootprop_getval(BP_LGRP_SLIT_ENABLE, &value) == 0)
-		lgrp_plat_slit_enable = (int)value;
-
-	/*
-	 * Initialize as a UMA machine
-	 */
-	if (lgrp_topo_ht_limit() == 1) {
-		lgrp_plat_node_cnt = max_mem_nodes = 1;
-		return;
-	}
-
-	/*
-	 * Read boot property with CPU to APIC ID mapping table/array and fill
-	 * in CPU to node ID mapping table with APIC ID for each CPU
-	 */
-	lgrp_plat_apic_ncpus =
-	    lgrp_plat_process_cpu_apicids(lgrp_plat_cpu_node);
-
-	/*
-	 * Determine which CPUs and memory are local to each other and number
-	 * of NUMA nodes by reading ACPI System Resource Affinity Table (SRAT)
-	 */
-	if (lgrp_plat_apic_ncpus > 0) {
-		int	retval;
-
-		retval = lgrp_plat_process_srat(srat_ptr,
-		    &lgrp_plat_prox_domain_min,
-		    lgrp_plat_node_domain, lgrp_plat_cpu_node,
-		    lgrp_plat_apic_ncpus, lgrp_plat_node_memory);
-		if (retval <= 0) {
-			lgrp_plat_srat_error = retval;
-			lgrp_plat_node_cnt = 1;
-		} else {
-			lgrp_plat_srat_error = 0;
-			lgrp_plat_node_cnt = retval;
-		}
-	}
-
-	/*
-	 * Try to use PCI config space registers on Opteron if there's an error
-	 * processing CPU to APIC ID mapping or SRAT
-	 */
-	if ((lgrp_plat_apic_ncpus <= 0 || lgrp_plat_srat_error != 0) &&
-	    is_opteron())
-		opt_get_numa_config(&lgrp_plat_node_cnt, &lgrp_plat_mem_intrlv,
-		    lgrp_plat_node_memory);
-
-	/*
-	 * Don't bother to setup system for multiple lgroups and only use one
-	 * memory node when memory is interleaved between any nodes or there is
-	 * only one NUMA node
-	 *
-	 * NOTE: May need to change this for Dynamic Reconfiguration (DR)
-	 *	 when and if it happens for x86/x64
-	 */
-	if (lgrp_plat_mem_intrlv || lgrp_plat_node_cnt == 1) {
-		lgrp_plat_node_cnt = max_mem_nodes = 1;
-		(void) lgrp_topo_ht_limit_set(1);
-		return;
-	}
-
-	/*
-	 * Leaf lgroups on x86/x64 architectures contain one physical
-	 * processor chip. Tune lgrp_expand_proc_thresh and
-	 * lgrp_expand_proc_diff so that lgrp_choose() will spread
-	 * things out aggressively.
-	 */
-	lgrp_expand_proc_thresh = LGRP_LOADAVG_THREAD_MAX / 2;
-	lgrp_expand_proc_diff = 0;
-
-	/*
-	 * There should be one memnode (physical page free list(s)) for
-	 * each node
-	 */
-	max_mem_nodes = lgrp_plat_node_cnt;
-
-	/*
-	 * Initialize min and max latency before reading SLIT or probing
-	 */
-	lgrp_plat_lat_stats.latency_min = -1;
-	lgrp_plat_lat_stats.latency_max = 0;
-
-	/*
-	 * Determine how far each NUMA node is from each other by
-	 * reading ACPI System Locality Information Table (SLIT) if it
-	 * exists
-	 */
-	lgrp_plat_slit_error = lgrp_plat_process_slit(slit_ptr,
-	    lgrp_plat_node_cnt, lgrp_plat_node_memory,
-	    &lgrp_plat_lat_stats);
-	if (lgrp_plat_slit_error == 0)
-		return;
-
-	/*
-	 * Probe to determine latency between NUMA nodes when SLIT
-	 * doesn't exist or make sense
-	 */
-	lgrp_plat_probe_flags |= LGRP_PLAT_PROBE_ENABLE;
-
-	/*
-	 * Specify whether to probe using vendor ID register or page copy
-	 * if hasn't been specified already or is overspecified
-	 */
-	probe_op = lgrp_plat_probe_flags &
-	    (LGRP_PLAT_PROBE_PGCPY|LGRP_PLAT_PROBE_VENDOR);
-
-	if (probe_op == 0 ||
-	    probe_op == (LGRP_PLAT_PROBE_PGCPY|LGRP_PLAT_PROBE_VENDOR)) {
-		lgrp_plat_probe_flags &=
-		    ~(LGRP_PLAT_PROBE_PGCPY|LGRP_PLAT_PROBE_VENDOR);
-		if (is_opteron())
-			lgrp_plat_probe_flags |=
-			    LGRP_PLAT_PROBE_VENDOR;
-		else
-			lgrp_plat_probe_flags |= LGRP_PLAT_PROBE_PGCPY;
-	}
-
-	/*
-	 * Probing errors can mess up the lgroup topology and
-	 * force us fall back to a 2 level lgroup topology.
-	 * Here we bound how tall the lgroup topology can grow
-	 * in hopes of avoiding any anamolies in probing from
-	 * messing up the lgroup topology by limiting the
-	 * accuracy of the latency topology.
-	 *
-	 * Assume that nodes will at least be configured in a
-	 * ring, so limit height of lgroup topology to be less
-	 * than number of nodes on a system with 4 or more
-	 * nodes
-	 */
-	if (lgrp_plat_node_cnt >= 4 && lgrp_topo_ht_limit() ==
-	    lgrp_topo_ht_limit_default())
-		(void) lgrp_topo_ht_limit_set(lgrp_plat_node_cnt - 1);
 #endif	/* __xpv */
+
+	switch (stage) {
+	case LGRP_INIT_STAGE1:
+#if defined(__xpv)
+		/*
+		 * XXPV	For now, the hypervisor treats all memory equally.
+		 */
+		lgrp_plat_node_cnt = max_mem_nodes = 1;
+#else	/* __xpv */
+		/*
+		 * Get boot property for lgroup topology height limit
+		 */
+		if (bootprop_getval(BP_LGRP_TOPO_LEVELS, &value) == 0)
+			(void) lgrp_topo_ht_limit_set((int)value);
+
+		/*
+		 * Get boot property for enabling/disabling SRAT
+		 */
+		if (bootprop_getval(BP_LGRP_SRAT_ENABLE, &value) == 0)
+			lgrp_plat_srat_enable = (int)value;
+
+		/*
+		 * Get boot property for enabling/disabling SLIT
+		 */
+		if (bootprop_getval(BP_LGRP_SLIT_ENABLE, &value) == 0)
+			lgrp_plat_slit_enable = (int)value;
+
+		/*
+		 * Initialize as a UMA machine
+		 */
+		if (lgrp_topo_ht_limit() == 1) {
+			lgrp_plat_node_cnt = max_mem_nodes = 1;
+			return;
+		}
+
+		lgrp_plat_get_numa_config();
+#endif	/* __xpv */
+		break;
+
+	case LGRP_INIT_STAGE3:
+		lgrp_plat_probe();
+		lgrp_plat_release_bootstrap();
+		break;
+
+	case LGRP_INIT_STAGE4:
+		lgrp_plat_main_init();
+		break;
+
+	default:
+		break;
+	}
 }
 
 
@@ -943,123 +846,13 @@ lgrp_plat_latency(lgrp_handle_t from, lgrp_handle_t to)
 	 * Probe from current CPU if its lgroup latencies haven't been set yet
 	 * and we are trying to get latency from current CPU to some node
 	 */
-	node = lgrp_plat_cpu_to_node(CPU, lgrp_plat_cpu_node);
+	node = lgrp_plat_cpu_to_node(CPU, lgrp_plat_cpu_node,
+	    lgrp_plat_cpu_node_nentries);
 	ASSERT(node >= 0 && node < lgrp_plat_node_cnt);
 	if (lgrp_plat_lat_stats.latencies[src][src] == 0 && node == src)
 		lgrp_plat_probe();
 
 	return (lgrp_plat_lat_stats.latencies[src][dest]);
-}
-
-
-/*
- * Platform-specific initialization
- */
-void
-lgrp_plat_main_init(void)
-{
-	int	curnode;
-	int	ht_limit;
-	int	i;
-
-	/*
-	 * Print a notice that MPO is disabled when memory is interleaved
-	 * across nodes....Would do this when it is discovered, but can't
-	 * because it happens way too early during boot....
-	 */
-	if (lgrp_plat_mem_intrlv)
-		cmn_err(CE_NOTE,
-		    "MPO disabled because memory is interleaved\n");
-
-	/*
-	 * Don't bother to do any probing if it is disabled, there is only one
-	 * node, or the height of the lgroup topology less than or equal to 2
-	 */
-	ht_limit = lgrp_topo_ht_limit();
-	if (!(lgrp_plat_probe_flags & LGRP_PLAT_PROBE_ENABLE) ||
-	    max_mem_nodes == 1 || ht_limit <= 2) {
-		/*
-		 * Setup lgroup latencies for 2 level lgroup topology
-		 * (ie. local and remote only) if they haven't been set yet
-		 */
-		if (ht_limit == 2 && lgrp_plat_lat_stats.latency_min == -1 &&
-		    lgrp_plat_lat_stats.latency_max == 0)
-			lgrp_plat_2level_setup(lgrp_plat_node_memory,
-			    &lgrp_plat_lat_stats);
-		return;
-	}
-
-	if (lgrp_plat_probe_flags & LGRP_PLAT_PROBE_VENDOR) {
-		/*
-		 * Should have been able to probe from CPU 0 when it was added
-		 * to lgroup hierarchy, but may not have been able to then
-		 * because it happens so early in boot that gethrtime() hasn't
-		 * been initialized.  (:-(
-		 */
-		curnode = lgrp_plat_cpu_to_node(CPU, lgrp_plat_cpu_node);
-		ASSERT(curnode >= 0 && curnode < lgrp_plat_node_cnt);
-		if (lgrp_plat_lat_stats.latencies[curnode][curnode] == 0)
-			lgrp_plat_probe();
-
-		return;
-	}
-
-	/*
-	 * When probing memory, use one page for every sample to determine
-	 * lgroup topology and taking multiple samples
-	 */
-	if (lgrp_plat_probe_mem_config.probe_memsize == 0)
-		lgrp_plat_probe_mem_config.probe_memsize = PAGESIZE *
-		    lgrp_plat_probe_nsamples;
-
-	/*
-	 * Map memory in each node needed for probing to determine latency
-	 * topology
-	 */
-	for (i = 0; i < lgrp_plat_node_cnt; i++) {
-		int	mnode;
-
-		/*
-		 * Skip this node and leave its probe page NULL
-		 * if it doesn't have any memory
-		 */
-		mnode = plat_lgrphand_to_mem_node((lgrp_handle_t)i);
-		if (!mem_node_config[mnode].exists) {
-			lgrp_plat_probe_mem_config.probe_va[i] = NULL;
-			continue;
-		}
-
-		/*
-		 * Allocate one kernel virtual page
-		 */
-		lgrp_plat_probe_mem_config.probe_va[i] = vmem_alloc(heap_arena,
-		    lgrp_plat_probe_mem_config.probe_memsize, VM_NOSLEEP);
-		if (lgrp_plat_probe_mem_config.probe_va[i] == NULL) {
-			cmn_err(CE_WARN,
-			    "lgrp_plat_main_init: couldn't allocate memory");
-			return;
-		}
-
-		/*
-		 * Get PFN for first page in each node
-		 */
-		lgrp_plat_probe_mem_config.probe_pfn[i] =
-		    mem_node_config[mnode].physbase;
-
-		/*
-		 * Map virtual page to first page in node
-		 */
-		hat_devload(kas.a_hat, lgrp_plat_probe_mem_config.probe_va[i],
-		    lgrp_plat_probe_mem_config.probe_memsize,
-		    lgrp_plat_probe_mem_config.probe_pfn[i],
-		    PROT_READ | PROT_WRITE | HAT_PLAT_NOCACHE,
-		    HAT_LOAD_NOCONSIST);
-	}
-
-	/*
-	 * Probe from current CPU
-	 */
-	lgrp_plat_probe();
 }
 
 
@@ -1189,7 +982,8 @@ lgrp_plat_probe(void)
 	/*
 	 * Determine ID of node containing current CPU
 	 */
-	from = lgrp_plat_cpu_to_node(CPU, lgrp_plat_cpu_node);
+	from = lgrp_plat_cpu_to_node(CPU, lgrp_plat_cpu_node,
+	    lgrp_plat_cpu_node_nentries);
 	ASSERT(from >= 0 && from < lgrp_plat_node_cnt);
 	if (srat_ptr && lgrp_plat_srat_enable && !lgrp_plat_srat_error)
 		ASSERT(lgrp_plat_node_domain[from].exists);
@@ -1215,8 +1009,9 @@ lgrp_plat_probe(void)
 			 * probed yet or don't have memory
 			 */
 			probe_time = lgrp_plat_probe_time(to,
-			    lgrp_plat_cpu_node, &lgrp_plat_probe_mem_config,
-			    &lgrp_plat_lat_stats, &lgrp_plat_probe_stats);
+			    lgrp_plat_cpu_node, lgrp_plat_cpu_node_nentries,
+			    &lgrp_plat_probe_mem_config, &lgrp_plat_lat_stats,
+			    &lgrp_plat_probe_stats);
 			if (probe_time == 0)
 				continue;
 
@@ -1343,7 +1138,8 @@ lgrp_plat_cpu_node_update(node_domain_map_t *node_domain, int node_cnt,
  * Get node ID for given CPU
  */
 static int
-lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node)
+lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node,
+    int cpu_node_nentries)
 {
 	processorid_t	cpuid;
 
@@ -1369,7 +1165,7 @@ lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node)
 	 * Return -1 when CPU to node ID mapping entry doesn't exist for given
 	 * CPU
 	 */
-	if (!cpu_node[cpuid].exists)
+	if (cpuid >= cpu_node_nentries || !cpu_node[cpuid].exists)
 		return (-1);
 
 	return (cpu_node[cpuid].node);
@@ -1399,6 +1195,159 @@ lgrp_plat_domain_to_node(node_domain_map_t *node_domain, int node_cnt,
 		node = (node + 1) % node_cnt;
 	} while (node != start);
 	return (-1);
+}
+
+
+/*
+ * Get NUMA configuration of machine
+ */
+static void
+lgrp_plat_get_numa_config(void)
+{
+	uint_t		probe_op;
+
+	/*
+	 * Read boot property with CPU to APIC ID mapping table/array to
+	 * determine number of CPUs
+	 */
+	lgrp_plat_apic_ncpus = lgrp_plat_process_cpu_apicids(NULL);
+
+	/*
+	 * Determine which CPUs and memory are local to each other and number
+	 * of NUMA nodes by reading ACPI System Resource Affinity Table (SRAT)
+	 */
+	if (lgrp_plat_apic_ncpus > 0) {
+		int	retval;
+
+		/*
+		 * Temporarily allocate boot memory to use for CPU to node
+		 * mapping since kernel memory allocator isn't alive yet
+		 */
+		lgrp_plat_cpu_node = (cpu_node_map_t *)BOP_ALLOC(bootops,
+		    NULL, lgrp_plat_apic_ncpus * sizeof (cpu_node_map_t),
+		    sizeof (int));
+
+		ASSERT(lgrp_plat_cpu_node != NULL);
+		if (lgrp_plat_cpu_node) {
+			lgrp_plat_cpu_node_nentries = lgrp_plat_apic_ncpus;
+			bzero(lgrp_plat_cpu_node, lgrp_plat_cpu_node_nentries *
+			    sizeof (cpu_node_map_t));
+		}
+
+		/*
+		 * Fill in CPU to node ID mapping table with APIC ID for each
+		 * CPU
+		 */
+		(void) lgrp_plat_process_cpu_apicids(lgrp_plat_cpu_node);
+
+		retval = lgrp_plat_process_srat(srat_ptr,
+		    &lgrp_plat_prox_domain_min,
+		    lgrp_plat_node_domain, lgrp_plat_cpu_node,
+		    lgrp_plat_apic_ncpus, lgrp_plat_node_memory);
+		if (retval <= 0) {
+			lgrp_plat_srat_error = retval;
+			lgrp_plat_node_cnt = 1;
+		} else {
+			lgrp_plat_srat_error = 0;
+			lgrp_plat_node_cnt = retval;
+		}
+	}
+
+	/*
+	 * Try to use PCI config space registers on Opteron if there's an error
+	 * processing CPU to APIC ID mapping or SRAT
+	 */
+	if ((lgrp_plat_apic_ncpus <= 0 || lgrp_plat_srat_error != 0) &&
+	    is_opteron())
+		opt_get_numa_config(&lgrp_plat_node_cnt, &lgrp_plat_mem_intrlv,
+		    lgrp_plat_node_memory);
+
+	/*
+	 * Don't bother to setup system for multiple lgroups and only use one
+	 * memory node when memory is interleaved between any nodes or there is
+	 * only one NUMA node
+	 *
+	 * NOTE: May need to change this for Dynamic Reconfiguration (DR)
+	 *	 when and if it happens for x86/x64
+	 */
+	if (lgrp_plat_mem_intrlv || lgrp_plat_node_cnt == 1) {
+		lgrp_plat_node_cnt = max_mem_nodes = 1;
+		(void) lgrp_topo_ht_limit_set(1);
+		return;
+	}
+
+	/*
+	 * Leaf lgroups on x86/x64 architectures contain one physical
+	 * processor chip. Tune lgrp_expand_proc_thresh and
+	 * lgrp_expand_proc_diff so that lgrp_choose() will spread
+	 * things out aggressively.
+	 */
+	lgrp_expand_proc_thresh = LGRP_LOADAVG_THREAD_MAX / 2;
+	lgrp_expand_proc_diff = 0;
+
+	/*
+	 * There should be one memnode (physical page free list(s)) for
+	 * each node
+	 */
+	max_mem_nodes = lgrp_plat_node_cnt;
+
+	/*
+	 * Initialize min and max latency before reading SLIT or probing
+	 */
+	lgrp_plat_lat_stats.latency_min = -1;
+	lgrp_plat_lat_stats.latency_max = 0;
+
+	/*
+	 * Determine how far each NUMA node is from each other by
+	 * reading ACPI System Locality Information Table (SLIT) if it
+	 * exists
+	 */
+	lgrp_plat_slit_error = lgrp_plat_process_slit(slit_ptr,
+	    lgrp_plat_node_cnt, lgrp_plat_node_memory,
+	    &lgrp_plat_lat_stats);
+	if (lgrp_plat_slit_error == 0)
+		return;
+
+	/*
+	 * Probe to determine latency between NUMA nodes when SLIT
+	 * doesn't exist or make sense
+	 */
+	lgrp_plat_probe_flags |= LGRP_PLAT_PROBE_ENABLE;
+
+	/*
+	 * Specify whether to probe using vendor ID register or page copy
+	 * if hasn't been specified already or is overspecified
+	 */
+	probe_op = lgrp_plat_probe_flags &
+	    (LGRP_PLAT_PROBE_PGCPY|LGRP_PLAT_PROBE_VENDOR);
+
+	if (probe_op == 0 ||
+	    probe_op == (LGRP_PLAT_PROBE_PGCPY|LGRP_PLAT_PROBE_VENDOR)) {
+		lgrp_plat_probe_flags &=
+		    ~(LGRP_PLAT_PROBE_PGCPY|LGRP_PLAT_PROBE_VENDOR);
+		if (is_opteron())
+			lgrp_plat_probe_flags |=
+			    LGRP_PLAT_PROBE_VENDOR;
+		else
+			lgrp_plat_probe_flags |= LGRP_PLAT_PROBE_PGCPY;
+	}
+
+	/*
+	 * Probing errors can mess up the lgroup topology and
+	 * force us fall back to a 2 level lgroup topology.
+	 * Here we bound how tall the lgroup topology can grow
+	 * in hopes of avoiding any anamolies in probing from
+	 * messing up the lgroup topology by limiting the
+	 * accuracy of the latency topology.
+	 *
+	 * Assume that nodes will at least be configured in a
+	 * ring, so limit height of lgroup topology to be less
+	 * than number of nodes on a system with 4 or more
+	 * nodes
+	 */
+	if (lgrp_plat_node_cnt >= 4 && lgrp_topo_ht_limit() ==
+	    lgrp_topo_ht_limit_default())
+		(void) lgrp_topo_ht_limit_set(lgrp_plat_node_cnt - 1);
 }
 
 
@@ -1749,6 +1698,118 @@ lgrp_plat_latency_verify(node_phys_addr_map_t *node_memory,
 
 
 /*
+ * Platform-specific initialization
+ */
+static void
+lgrp_plat_main_init(void)
+{
+	int	curnode;
+	int	ht_limit;
+	int	i;
+
+	/*
+	 * Print a notice that MPO is disabled when memory is interleaved
+	 * across nodes....Would do this when it is discovered, but can't
+	 * because it happens way too early during boot....
+	 */
+	if (lgrp_plat_mem_intrlv)
+		cmn_err(CE_NOTE,
+		    "MPO disabled because memory is interleaved\n");
+
+	/*
+	 * Don't bother to do any probing if it is disabled, there is only one
+	 * node, or the height of the lgroup topology less than or equal to 2
+	 */
+	ht_limit = lgrp_topo_ht_limit();
+	if (!(lgrp_plat_probe_flags & LGRP_PLAT_PROBE_ENABLE) ||
+	    max_mem_nodes == 1 || ht_limit <= 2) {
+		/*
+		 * Setup lgroup latencies for 2 level lgroup topology
+		 * (ie. local and remote only) if they haven't been set yet
+		 */
+		if (ht_limit == 2 && lgrp_plat_lat_stats.latency_min == -1 &&
+		    lgrp_plat_lat_stats.latency_max == 0)
+			lgrp_plat_2level_setup(lgrp_plat_node_memory,
+			    &lgrp_plat_lat_stats);
+		return;
+	}
+
+	if (lgrp_plat_probe_flags & LGRP_PLAT_PROBE_VENDOR) {
+		/*
+		 * Should have been able to probe from CPU 0 when it was added
+		 * to lgroup hierarchy, but may not have been able to then
+		 * because it happens so early in boot that gethrtime() hasn't
+		 * been initialized.  (:-(
+		 */
+		curnode = lgrp_plat_cpu_to_node(CPU, lgrp_plat_cpu_node,
+		    lgrp_plat_cpu_node_nentries);
+		ASSERT(curnode >= 0 && curnode < lgrp_plat_node_cnt);
+		if (lgrp_plat_lat_stats.latencies[curnode][curnode] == 0)
+			lgrp_plat_probe();
+
+		return;
+	}
+
+	/*
+	 * When probing memory, use one page for every sample to determine
+	 * lgroup topology and taking multiple samples
+	 */
+	if (lgrp_plat_probe_mem_config.probe_memsize == 0)
+		lgrp_plat_probe_mem_config.probe_memsize = PAGESIZE *
+		    lgrp_plat_probe_nsamples;
+
+	/*
+	 * Map memory in each node needed for probing to determine latency
+	 * topology
+	 */
+	for (i = 0; i < lgrp_plat_node_cnt; i++) {
+		int	mnode;
+
+		/*
+		 * Skip this node and leave its probe page NULL
+		 * if it doesn't have any memory
+		 */
+		mnode = plat_lgrphand_to_mem_node((lgrp_handle_t)i);
+		if (!mem_node_config[mnode].exists) {
+			lgrp_plat_probe_mem_config.probe_va[i] = NULL;
+			continue;
+		}
+
+		/*
+		 * Allocate one kernel virtual page
+		 */
+		lgrp_plat_probe_mem_config.probe_va[i] = vmem_alloc(heap_arena,
+		    lgrp_plat_probe_mem_config.probe_memsize, VM_NOSLEEP);
+		if (lgrp_plat_probe_mem_config.probe_va[i] == NULL) {
+			cmn_err(CE_WARN,
+			    "lgrp_plat_main_init: couldn't allocate memory");
+			return;
+		}
+
+		/*
+		 * Get PFN for first page in each node
+		 */
+		lgrp_plat_probe_mem_config.probe_pfn[i] =
+		    mem_node_config[mnode].physbase;
+
+		/*
+		 * Map virtual page to first page in node
+		 */
+		hat_devload(kas.a_hat, lgrp_plat_probe_mem_config.probe_va[i],
+		    lgrp_plat_probe_mem_config.probe_memsize,
+		    lgrp_plat_probe_mem_config.probe_pfn[i],
+		    PROT_READ | PROT_WRITE | HAT_PLAT_NOCACHE,
+		    HAT_LOAD_NOCONSIST);
+	}
+
+	/*
+	 * Probe from current CPU
+	 */
+	lgrp_plat_probe();
+}
+
+
+/*
  * Return the number of free, allocatable, or installed
  * pages in an lgroup
  * This is a copy of the MAX_MEM_NODES == 1 version of the routine
@@ -2026,7 +2087,7 @@ lgrp_plat_node_sort(node_domain_map_t *node_domain, int node_cnt,
  * Return time needed to probe from current CPU to memory in given node
  */
 static hrtime_t
-lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
+lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node, int cpu_node_nentries,
     lgrp_plat_probe_mem_config_t *probe_mem_config,
     lgrp_plat_latency_stats_t *lat_stats, lgrp_plat_probe_stats_t *probe_stats)
 {
@@ -2044,7 +2105,7 @@ lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
 	/*
 	 * Determine ID of node containing current CPU
 	 */
-	from = lgrp_plat_cpu_to_node(CPU, cpu_node);
+	from = lgrp_plat_cpu_to_node(CPU, cpu_node, cpu_node_nentries);
 	ASSERT(from >= 0 && from < lgrp_plat_node_cnt);
 
 	/*
@@ -2139,7 +2200,8 @@ lgrp_plat_probe_time(int to, cpu_node_map_t *cpu_node,
 
 /*
  * Read boot property with CPU to APIC ID array, fill in CPU to node ID
- * mapping table with APIC ID for each CPU, and return number of CPU APIC IDs.
+ * mapping table with APIC ID for each CPU (if pointer to table isn't NULL),
+ * and return number of CPU APIC IDs.
  *
  * NOTE: This code assumes that CPU IDs are assigned in order that they appear
  *       in in cpu_apicid_array boot property which is based on and follows
@@ -2157,17 +2219,11 @@ lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node)
 	int	n;
 
 	/*
-	 * Nothing to do when no array to fill in or not enough CPUs
-	 */
-	if (cpu_node == NULL)
-		return (-1);
-
-	/*
 	 * Check length of property value
 	 */
 	boot_prop_len = BOP_GETPROPLEN(bootops, boot_prop_name);
 	if (boot_prop_len <= 0 || boot_prop_len > sizeof (cpu_apicid_array))
-		return (-2);
+		return (-1);
 
 	/*
 	 * Calculate number of entries in array and return when there's just
@@ -2175,13 +2231,20 @@ lgrp_plat_process_cpu_apicids(cpu_node_map_t *cpu_node)
 	 */
 	n = boot_prop_len / sizeof (uint8_t);
 	if (n == 1)
-		return (-3);
+		return (-2);
 
 	/*
 	 * Get CPU to APIC ID property value
 	 */
 	if (BOP_GETPROP(bootops, boot_prop_name, cpu_apicid_array) < 0)
-		return (-4);
+		return (-3);
+
+	/*
+	 * Just return number of CPU APIC IDs if CPU to node mapping table is
+	 * NULL
+	 */
+	if (cpu_node == NULL)
+		return (n);
 
 	/*
 	 * Fill in CPU to node ID mapping table with APIC ID for each CPU
@@ -2400,6 +2463,27 @@ lgrp_plat_process_srat(struct srat *tp, uint32_t *prox_domain_min,
 	    node_memory);
 
 	return (node_cnt);
+}
+
+
+/*
+ * Allocate permanent memory for any temporary memory that we needed to
+ * allocate using BOP_ALLOC() before kmem_alloc() and VM system were
+ * initialized and copy everything from temporary to permanent memory since
+ * temporary boot memory will eventually be released during boot
+ */
+static void
+lgrp_plat_release_bootstrap(void)
+{
+	void	*buf;
+	size_t	size;
+
+	if (lgrp_plat_cpu_node_nentries > 0) {
+		size = lgrp_plat_cpu_node_nentries * sizeof (cpu_node_map_t);
+		buf = kmem_alloc(size, KM_SLEEP);
+		bcopy(lgrp_plat_cpu_node, buf, size);
+		lgrp_plat_cpu_node = buf;
+	}
 }
 
 

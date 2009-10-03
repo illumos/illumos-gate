@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -295,6 +295,32 @@ typedef enum lgrp_config_flag {
 } lgrp_config_flag_t;
 
 /*
+ * Stages of lgroup framework initialization (done through lgrp_init()):
+ *
+ * 1) Initialize common and platform specific code (called in mlsetup())
+ *
+ * 2) Setup root lgroup and add CPU 0 to lgroup(s) (called near beginning of
+ *    main() before startup())
+ *
+ * 3) Probe from CPU 0 and copy and release any BOP_ALLOC-ed memory temporarily
+ *    allocated before kernel memory allocator is setup (called in main()
+ *    after startup(), gethrtime() is setup, and before interrupts enabled)
+ *
+ * 4) Check for null proc LPA on Starcat, collapse lgroup topology (if
+ *    necessary), setup lgroup kstats, etc. (called before start_other_cpus())
+ *
+ * 5) Finish any lgroup initialization needed including updating lgroup
+ *    topology after all CPUs started (called after start_other_cpus())
+ */
+typedef enum lgrp_init_stages {
+	LGRP_INIT_STAGE1,
+	LGRP_INIT_STAGE2,
+	LGRP_INIT_STAGE3,
+	LGRP_INIT_STAGE4,
+	LGRP_INIT_STAGE5
+} lgrp_init_stages_t;
+
+/*
  * Memory allocation policies
  */
 typedef enum lgrp_mem_policy {
@@ -510,8 +536,7 @@ extern lpl_t		*lpl_bootstrap;	/* bootstrap lpl for non-active CPUs */
  * lgroup management
  */
 int	lgrp_optimizations(void);
-void	lgrp_init(void);
-void	lgrp_setup(void);
+void	lgrp_init(lgrp_init_stages_t);
 lgrp_t	*lgrp_create(void);
 void	lgrp_destroy(lgrp_t *);
 void	lgrp_config(lgrp_config_flag_t, uintptr_t, uintptr_t);
@@ -588,8 +613,7 @@ int	lpl_topo_verify(struct cpupart *);
 
 
 /* platform interfaces */
-void	lgrp_plat_init(void);
-void	lgrp_plat_main_init(void);
+void	lgrp_plat_init(lgrp_init_stages_t);
 lgrp_t	*lgrp_plat_alloc(lgrp_id_t lgrpid);
 void	lgrp_plat_config(lgrp_config_flag_t, uintptr_t);
 lgrp_handle_t	lgrp_plat_cpu_to_hand(processorid_t);
@@ -598,7 +622,6 @@ int	lgrp_plat_max_lgrps(void);
 pgcnt_t	lgrp_plat_mem_size(lgrp_handle_t, lgrp_mem_query_t);
 int	lgrp_plat_latency(lgrp_handle_t, lgrp_handle_t);
 lgrp_handle_t	lgrp_plat_root_hand(void);
-void	lgrp_plat_probe(void);
 
 extern uint32_t		lgrp_expand_proc_thresh;
 extern uint32_t		lgrp_expand_proc_diff;

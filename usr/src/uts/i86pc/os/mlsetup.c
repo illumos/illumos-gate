@@ -367,7 +367,7 @@ mlsetup(struct regs *rp)
 	/*
 	 * Initialize the lgrp framework
 	 */
-	lgrp_init();
+	lgrp_init(LGRP_INIT_STAGE1);
 
 	if (boothowto & RB_HALT) {
 		prom_printf("unix: kernel halted by -h flag\n");

@@ -370,8 +370,6 @@ main(void)
 	extern int	pm_adjust_timestamps(dev_info_t *, void *);
 	extern void	start_other_cpus(int);
 	extern void	sysevent_evc_thrinit();
-	extern void	lgrp_main_init(void);
-	extern void	lgrp_main_mp_init(void);
 #if defined(__x86)
 	extern void	fastboot_post_startup(void);
 #endif
@@ -388,9 +386,9 @@ main(void)
 	ASSERT_STACK_ALIGNED();
 
 	/*
-	 * Setup the first lgroup, and home t0
+	 * Setup root lgroup and leaf lgroup for CPU 0
 	 */
-	lgrp_setup();
+	lgrp_init(LGRP_INIT_STAGE2);
 
 	/*
 	 * Once 'startup()' completes, the thread_reaper() daemon would be
@@ -419,8 +417,10 @@ main(void)
 	/*
 	 * May need to probe to determine latencies from CPU 0 after
 	 * gethrtime() comes alive in cbe_init() and before enabling interrupts
+	 * and copy and release any temporary memory allocated with BOP_ALLOC()
+	 * before release_bootstrap() frees boot memory
 	 */
-	lgrp_plat_probe();
+	lgrp_init(LGRP_INIT_STAGE3);
 
 	/*
 	 * Call all system initialization functions.
@@ -529,11 +529,10 @@ main(void)
 	sysevent_evc_thrinit();
 
 	/*
-	 * main lgroup initialization
-	 * This must be done after post_startup(), but before
+	 * This must be done after post_startup() but before
 	 * start_other_cpus()
 	 */
-	lgrp_main_init();
+	lgrp_init(LGRP_INIT_STAGE4);
 
 	/*
 	 * Perform MP initialization, if any.
@@ -551,7 +550,7 @@ main(void)
 	/*
 	 * Finish lgrp initialization after all CPUS are brought online.
 	 */
-	lgrp_main_mp_init();
+	lgrp_init(LGRP_INIT_STAGE5);
 
 	/*
 	 * After mp_init(), number of cpus are known (this is

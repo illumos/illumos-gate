@@ -273,7 +273,7 @@ mlsetup(struct regs *rp, kfpu_t *fp)
 	 * lgroup framework initialization. This must be done prior
 	 * to devices being mapped.
 	 */
-	lgrp_init();
+	lgrp_init(LGRP_INIT_STAGE1);
 
 	cpu_setup();
 

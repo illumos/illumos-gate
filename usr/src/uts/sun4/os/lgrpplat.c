@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <sys/cpuvar.h>
 #include <sys/lgrp.h>
@@ -100,34 +97,35 @@ int mpo_disabled = 0;
 lgrp_handle_t lgrp_default_handle = LGRP_DEFAULT_HANDLE;
 
 void
-lgrp_plat_init(void)
+lgrp_plat_init(lgrp_init_stages_t stage)
 {
 	int i;
 
-	/*
-	 * Initialize lookup tables to invalid values so we catch
-	 * any illegal use of them.
-	 */
-	for (i = 0; i < MAX_MEM_NODES; i++) {
-		memnode_to_lgrphand[i] = -1;
-		lgrphand_to_memnode[i] = -1;
+	switch (stage) {
+	case LGRP_INIT_STAGE1:
+		/*
+		 * Initialize lookup tables to invalid values so we catch
+		 * any illegal use of them.
+		 */
+		for (i = 0; i < MAX_MEM_NODES; i++) {
+			memnode_to_lgrphand[i] = -1;
+			lgrphand_to_memnode[i] = -1;
+		}
+
+		if (lgrp_topo_ht_limit() == 1) {
+			max_mem_nodes = 1;
+			return;
+		}
+
+		if (&plat_lgrp_cpu_to_hand)
+			max_mem_nodes = MAX_MEM_NODES;
+
+		if (&plat_lgrp_init)
+			plat_lgrp_init();
+		break;
+	default:
+		break;
 	}
-
-	if (lgrp_topo_ht_limit() == 1) {
-		max_mem_nodes = 1;
-		return;
-	}
-
-	if (&plat_lgrp_cpu_to_hand)
-		max_mem_nodes = MAX_MEM_NODES;
-
-	if (&plat_lgrp_init)
-		plat_lgrp_init();
-}
-
-void
-lgrp_plat_main_init(void)
-{
 }
 
 /* ARGSUSED */
@@ -351,12 +349,4 @@ lgrp_plat_alloc(lgrp_id_t lgrpid)
 	if (lgrpid >= NLGRP || nlgrps_alloc > NLGRP)
 		return (NULL);
 	return (lgrp);
-}
-
-/*
- * Probe memory in each node from current CPU to determine latency topology
- */
-void
-lgrp_plat_probe(void)
-{
 }
