@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -97,7 +98,6 @@ static void		Perror2(char *, char *);
 static int		use_stdin(void);
 static int		copyattributes(char *, char *);
 static int		copy_sysattr(char *, char *);
-static void		timestruc_to_timeval(timestruc_t *, struct timeval *);
 static tree_node_t	*create_tnode(dev_t, ino_t);
 
 static struct stat 	s1, s2, s3, s4;
@@ -1341,23 +1341,23 @@ usage(void)
  *
  * Try to preserve modification and access time.
  * If 1) pflg is not set, or 2) pflg is set and this is the Solaris version,
- * don't report a utime() failure.
- * If this is the XPG4 version and utime fails, if 1) pflg is set (cp -p)
+ * don't report a utimensat() failure.
+ * If this is the XPG4 version and utimensat fails, if 1) pflg is set (cp -p)
  * or 2) we are doing a mv, print a diagnostic message; arrange for a non-zero
  * exit status only if pflg is set.
- * utimes(2) is being used to achieve granularity in
- * microseconds while setting file times.
+ * utimensat(2) is being used to achieve granularity in nanoseconds
+ * (if supported by the underlying file system) while setting file times.
  */
 static int
 chg_time(char *to, struct stat ss)
 {
-	struct timeval times[2];
+	struct timespec times[2];
 	int rc;
 
-	timestruc_to_timeval(&ss.st_atim, times);
-	timestruc_to_timeval(&ss.st_mtim, times + 1);
+	times[0] = ss.st_atim;
+	times[1] = ss.st_mtim;
 
-	rc = utimes(to, times);
+	rc = utimensat(AT_FDCWD, to, times, 0);
 #ifdef XPG4
 	if ((pflg || mve) && rc != 0) {
 		(void) fprintf(stderr,
@@ -1630,7 +1630,7 @@ copyattributes(char *source, char *target)
 	int clearflg = 0;
 	acl_t *xacl = NULL;
 	acl_t *attrdiracl = NULL;
-	struct timeval times[2];
+	struct timespec times[2];
 
 
 	if (pathconf(source,  _PC_XATTR_EXISTS) != 1)
@@ -1677,13 +1677,11 @@ copyattributes(char *source, char *target)
 		}
 		/*
 		 * Now that we are the owner we can update st_ctime by calling
-		 * futimesat.
+		 * utimensat.
 		 */
-		times[0].tv_sec = attrdir.st_atime;
-		times[0].tv_usec = 0;
-		times[1].tv_sec = attrdir.st_mtime;
-		times[1].tv_usec = 0;
-		if (futimesat(targetdirfd, ".", times) < 0) {
+		times[0] = attrdir.st_atim;
+		times[1] = attrdir.st_mtim;
+		if (utimensat(targetdirfd, ".", times, 0) < 0) {
 			if (!attrsilent) {
 				(void) fprintf(stderr,
 				    gettext("%s: cannot set attribute times"
@@ -1792,10 +1790,9 @@ copyattributes(char *source, char *target)
 					++clearflg;
 				}
 			}
-			/* tv_usec were cleared above */
-			times[0].tv_sec = s3.st_atime;
-			times[1].tv_sec = s3.st_mtime;
-			if (futimesat(targetdirfd, dp->d_name, times) < 0) {
+			times[0] = s3.st_atim;
+			times[1] = s3.st_mtim;
+			if (utimensat(targetdirfd, dp->d_name, times, 0) < 0) {
 				if (!attrsilent) {
 					(void) fprintf(stderr,
 					    gettext("%s: cannot set attribute"
@@ -1971,16 +1968,6 @@ out:
 		nvlist_free(response);
 	close_all();
 	return (error == 0 ? 0 : 1);
-}
-
-/*
- * nanoseconds are rounded off to microseconds by flooring.
- */
-static void
-timestruc_to_timeval(timestruc_t *ts, struct timeval *tv)
-{
-	tv->tv_sec = ts->tv_sec;
-	tv->tv_usec = ts->tv_nsec / 1000;
 }
 
 /* Open the source file */
