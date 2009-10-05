@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 . /lib/svc/share/smf_include.sh
@@ -54,6 +54,11 @@ PATH=/usr/sbin:/usr/bin; export PATH
 case "$1" in
 'start')
 	egrep -vs '^#|^global:' /etc/zones/index || exit 0  # no local zones
+
+	#
+	# Boot the installed zones for which the "autoboot" zone property is
+	# set and invoke the sysboot hook for all other installed zones.
+	#
 	ZONES=""
 	for zone in `zoneadm list -pi | nawk -F: '{
 			if ($3 == "installed") {
@@ -72,8 +77,11 @@ case "$1" in
 			# to be in an orphaned contract.
 			#
 			zoneadm -z $zone boot &
+		else
+			zoneadm -z $zone sysboot &
 		fi
 	done
+
 	#
 	# Wait for all zoneadm processes to finish before allowing the
 	# start method to exit.

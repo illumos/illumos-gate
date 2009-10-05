@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +72,7 @@
 #define	DTD_ELEM_PRIVILEGE	((const xmlChar *) "privilege")
 #define	DTD_ELEM_QUERY		((const xmlChar *) "query")
 #define	DTD_ELEM_SYMLINK	((const xmlChar *) "symlink")
+#define	DTD_ELEM_SYSBOOT	((const xmlChar *) "sysboot")
 #define	DTD_ELEM_UNINSTALL	((const xmlChar *) "uninstall")
 #define	DTD_ELEM_USER_CMD	((const xmlChar *) "user_cmd")
 #define	DTD_ELEM_VALIDSNAP	((const xmlChar *) "validatesnap")
@@ -676,6 +677,15 @@ brand_get_verify_adm(brand_handle_t bh, const char *zonename,
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
 	    buf, len, DTD_ELEM_VERIFY_ADM, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_sysboot(brand_handle_t bh, const char *zonename,
+    const char *zonepath, char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zonepath, NULL, NULL,
+	    buf, len, DTD_ELEM_SYSBOOT, B_TRUE, B_TRUE));
 }
 
 int

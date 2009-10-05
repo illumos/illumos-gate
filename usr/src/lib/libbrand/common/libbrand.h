@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,6 +93,8 @@ extern int brand_get_user_cmd(brand_handle_t, const char *, char *, size_t);
 extern int brand_get_verify_cfg(brand_handle_t, char *, size_t);
 extern int brand_get_verify_adm(brand_handle_t, const char *, const char *,
     char *, size_t);
+extern int brand_get_sysboot(brand_handle_t, const char *, const char *, char *,
+    size_t);
 
 extern int brand_config_iter_privilege(brand_handle_t,
     int (*func)(void *, priv_iter_t *), void *);

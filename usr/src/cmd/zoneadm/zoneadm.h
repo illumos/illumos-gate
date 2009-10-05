@@ -44,9 +44,10 @@
 #define	CMD_ATTACH	14
 #define	CMD_MARK	15
 #define	CMD_APPLY	16
+#define	CMD_SYSBOOT	17
 
 #define	CMD_MIN		CMD_HELP
-#define	CMD_MAX		CMD_APPLY
+#define	CMD_MAX		CMD_SYSBOOT
 
 #if !defined(TEXT_DOMAIN)		/* should be defined by cc -D */
 #define	TEXT_DOMAIN	"SYS_TEST"	/* Use this only if it wasn't */

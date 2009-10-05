@@ -162,6 +162,7 @@ static int detach_func(int argc, char *argv[]);
 static int attach_func(int argc, char *argv[]);
 static int mark_func(int argc, char *argv[]);
 static int apply_func(int argc, char *argv[]);
+static int sysboot_func(int argc, char *argv[]);
 static int sanity_check(char *zone, int cmd_num, boolean_t running,
     boolean_t unsafe_when_running, boolean_t force);
 static int cmd_match(char *cmd);
@@ -188,7 +189,8 @@ static struct cmd cmdtab[] = {
 	{ CMD_DETACH,		"detach",	SHELP_DETACH,	detach_func },
 	{ CMD_ATTACH,		"attach",	SHELP_ATTACH,	attach_func },
 	{ CMD_MARK,		"mark",		SHELP_MARK,	mark_func },
-	{ CMD_APPLY,		"apply",	NULL,		apply_func }
+	{ CMD_APPLY,		"apply",	NULL,		apply_func },
+	{ CMD_SYSBOOT,		"sysboot",	NULL,		sysboot_func }
 };
 
 /* global variables */
@@ -1694,6 +1696,14 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 				zerror(gettext("must be %s before %s."),
 				    zone_state_str(ZONE_STATE_MOUNTED),
 				    cmd_to_str(cmd_num));
+				return (Z_ERR);
+			}
+			break;
+		case CMD_SYSBOOT:
+			if (state != ZONE_STATE_INSTALLED) {
+				zerror(gettext("%s operation is invalid for %s "
+				    "zones."), cmd_to_str(cmd_num),
+				    zone_state_str(state));
 				return (Z_ERR);
 			}
 			break;
@@ -5400,6 +5410,77 @@ apply_func(int argc, char *argv[])
 	zonecfg_fini_handle(handle);
 
 	return (res);
+}
+
+/*
+ * This is an undocumented interface that is invoked by the zones SMF service
+ * for installed zones that won't automatically boot.
+ */
+/* ARGSUSED */
+static int
+sysboot_func(int argc, char *argv[])
+{
+	int err;
+	zone_dochandle_t zone_handle;
+	brand_handle_t brand_handle;
+	char cmdbuf[MAXPATHLEN];
+	char zonepath[MAXPATHLEN];
+
+	/*
+	 * This subcommand can only be executed in the global zone on non-global
+	 * zones.
+	 */
+	if (zonecfg_in_alt_root())
+		return (usage(B_FALSE));
+	if (sanity_check(target_zone, CMD_SYSBOOT, B_FALSE, B_TRUE, B_FALSE) !=
+	    Z_OK)
+		return (Z_ERR);
+
+	/*
+	 * Fetch the sysboot hook from the target zone's brand.
+	 */
+	if ((zone_handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_SYSBOOT), B_TRUE);
+		return (Z_ERR);
+	}
+	if ((err = zonecfg_get_handle(target_zone, zone_handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_SYSBOOT), B_TRUE);
+		zonecfg_fini_handle(zone_handle);
+		return (Z_ERR);
+	}
+	if ((err = zonecfg_get_zonepath(zone_handle, zonepath,
+	    sizeof (zonepath))) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_SYSBOOT), B_TRUE);
+		zonecfg_fini_handle(zone_handle);
+		return (Z_ERR);
+	}
+	if ((brand_handle = brand_open(target_brand)) == NULL) {
+		zerror(gettext("missing or invalid brand during %s operation: "
+		    "%s"), cmd_to_str(CMD_SYSBOOT), target_brand);
+		zonecfg_fini_handle(zone_handle);
+		return (Z_ERR);
+	}
+	err = get_hook(brand_handle, cmdbuf, sizeof (cmdbuf), brand_get_sysboot,
+	    target_zone, zonepath);
+	brand_close(brand_handle);
+	zonecfg_fini_handle(zone_handle);
+	if (err != Z_OK) {
+		zerror(gettext("unable to get brand hook from brand %s for %s "
+		    "operation"), target_brand, cmd_to_str(CMD_SYSBOOT));
+		return (Z_ERR);
+	}
+
+	/*
+	 * If the hook wasn't defined (which is OK), then indicate success and
+	 * return.  Otherwise, execute the hook.
+	 */
+	if (cmdbuf[0] != '\0')
+		return ((subproc_status(gettext("brand sysboot operation"),
+		    do_subproc(cmdbuf), B_FALSE) == ZONE_SUBPROC_OK) ? Z_OK :
+		    Z_BRAND_ERROR);
+	return (Z_OK);
 }
 
 static int
