@@ -135,34 +135,36 @@ typedef struct aio {
 /*
  * aio_flags for an aio_t.
  */
-#define	AIO_CLEANUP		0x1		/* do aio cleanup processing */
-#define	AIO_WAITN		0x2		/* aiowaitn in progress */
-#define	AIO_WAITN_PENDING	0x4		/* aiowaitn requests pending */
-#define	AIO_REQ_BLOCK		0x8		/* block new requests */
-#define	AIO_CLEANUP_PORT	0x10
-#define	AIO_DONE_ACTIVE		0x20		/* aio_done call in progress */
+#define	AIO_CLEANUP		0x0001	/* do aio cleanup processing */
+#define	AIO_WAITN		0x0002	/* aiowaitn in progress */
+#define	AIO_WAITN_PENDING	0x0004	/* aiowaitn requests pending */
+#define	AIO_REQ_BLOCK		0x0008	/* block new requests */
+#define	AIO_CLEANUP_PORT	0x0010
+#define	AIO_DONE_ACTIVE		0x0020	/* aio_done call in progress */
+#define	AIO_SOLARIS_REQ		0x0040	/* an old solaris aio req was issued */
 
 /*
  * aio_req_flags for an aio_req_t
  */
-#define	AIO_POLL	0x1			/* AIO_INPROGRESS is set */
-#define	AIO_PENDING	0x2			/* aio is in progress */
-#define	AIO_PHYSIODONE	0x4			/* unlocked phys pages */
-#define	AIO_COPYOUTDONE	0x8			/* result copied to userland */
-#define	AIO_NOTIFYQ	0x10			/* aio req is on the notifyq */
-#define	AIO_CLEANUPQ	0x20			/* aio req is on the cleanupq */
-#define	AIO_POLLQ	0x40			/* aio req is on the pollq */
-#define	AIO_DONEQ	0x80			/* aio req is on the doneq */
-#define	AIO_ZEROLEN	0x100			/* aio req is zero length */
-#define	AIO_PAGELOCKDONE	0x200		/* aio called as_pagelock() */
-#define	AIO_CLOSE_PORT	0x400		/* port is being closed */
-#define	AIO_SIGNALLED	0x800		/* process signalled by this req */
+#define	AIO_POLL	0x0001		/* AIO_INPROGRESS is set */
+#define	AIO_PENDING	0x0002		/* aio is in progress */
+#define	AIO_PHYSIODONE	0x0004		/* unlocked phys pages */
+#define	AIO_COPYOUTDONE	0x0008		/* result copied to userland */
+#define	AIO_NOTIFYQ	0x0010		/* aio req is on the notifyq */
+#define	AIO_CLEANUPQ	0x0020		/* aio req is on the cleanupq */
+#define	AIO_POLLQ	0x0040		/* aio req is on the pollq */
+#define	AIO_DONEQ	0x0080		/* aio req is on the doneq */
+#define	AIO_ZEROLEN	0x0100		/* aio req is zero length */
+#define	AIO_PAGELOCKDONE 0x0200		/* aio called as_pagelock() */
+#define	AIO_CLOSE_PORT	0x0400		/* port is being closed */
+#define	AIO_SIGNALLED	0x0800		/* process signalled by this req */
+#define	AIO_SOLARIS	0x1000		/* this is an old solaris aio req */
 
 /* flag argument of aio_cleanup() */
 
-#define	AIO_CLEANUP_POLL	0		/* check kaio poll queue */
-#define	AIO_CLEANUP_EXIT	1		/* aio_cleanup_exit() */
-#define	AIO_CLEANUP_THREAD	2		/* aio_cleanup_thread() */
+#define	AIO_CLEANUP_POLL	0	/* check kaio poll queue */
+#define	AIO_CLEANUP_EXIT	1	/* aio_cleanup_exit() */
+#define	AIO_CLEANUP_THREAD	2	/* aio_cleanup_thread() */
 
 /* functions exported by common/os/aio_subr.c */
 

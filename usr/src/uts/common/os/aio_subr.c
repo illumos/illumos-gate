@@ -388,9 +388,11 @@ aio_done(struct buf *bp)
 
 	/*
 	 * No need to set this flag for pollq, portq, lio requests.
-	 * Send a SIGIO signal when the process has a handler enabled.
+	 * If this is an old Solaris aio request, and the process has
+	 * a SIGIO signal handler enabled, then send a SIGIO signal.
 	 */
 	if (!sigev && !use_port && head == NULL &&
+	    (reqp->aio_req_flags & AIO_SOLARIS) &&
 	    (func = PTOU(p)->u_signal[SIGIO - 1]) != SIG_DFL &&
 	    (func != SIG_IGN)) {
 		send_signal = 1;
@@ -774,6 +776,12 @@ aio_cleanup(int flag)
 	 */
 
 	mutex_enter(&aiop->aio_mutex);
+	/*
+	 * If there has never been an old solaris aio request
+	 * issued by this process, then do not send a SIGIO signal.
+	 */
+	if (!(aiop->aio_flags & AIO_SOLARIS_REQ))
+		signalled = 1;
 	cv_broadcast(&aiop->aio_waitcv);
 	mutex_exit(&aiop->aio_mutex);
 

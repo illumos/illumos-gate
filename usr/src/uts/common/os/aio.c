@@ -86,7 +86,7 @@ static aio_req_t *aio_req_remove(aio_req_t *);
 static int aio_req_find(aio_result_t *, aio_req_t **);
 static int aio_hash_insert(struct aio_req_t *, aio_t *);
 static int aio_req_setup(aio_req_t **, aio_t *, aiocb_t *,
-    aio_result_t *, vnode_t *);
+    aio_result_t *, vnode_t *, int);
 static int aio_cleanup_thread(aio_t *);
 static aio_lio_t *aio_list_get(aio_result_t *);
 static void lio_set_uerror(void *, int);
@@ -106,7 +106,7 @@ static int aiorw(int, void *, int, int);
 
 static int alioLF(int, void *, int, void *);
 static int aio_req_setupLF(aio_req_t **, aio_t *, aiocb64_32_t *,
-    aio_result_t *, vnode_t *);
+    aio_result_t *, vnode_t *, int);
 static int alio32(int, void *, int, void *);
 static int driver_aio_write(vnode_t *vp, struct aio_req *aio, cred_t *cred_p);
 static int driver_aio_read(vnode_t *vp, struct aio_req *aio, cred_t *cred_p);
@@ -1401,7 +1401,7 @@ alio(
 		}
 
 		error = aio_req_setup(&reqp, aiop, aiocb,
-		    &cbp->aio_resultp, vp);
+		    &cbp->aio_resultp, vp, 0);
 		if (error) {
 			releasef(aiocb->aio_fildes);
 			lio_set_uerror(&cbp->aio_resultp, error);
@@ -1982,14 +1982,14 @@ arw(
 	aiocb.aio_nbytes = bufsize;
 	aiocb.aio_offset = offset;
 	aiocb.aio_sigevent.sigev_notify = 0;
-	error = aio_req_setup(&reqp, aiop, &aiocb, resultp, vp);
+	error = aio_req_setup(&reqp, aiop, &aiocb, resultp, vp, 1);
 #else
 	aiocb64.aio_fildes = fdes;
 	aiocb64.aio_buf = (caddr32_t)bufp;
 	aiocb64.aio_nbytes = bufsize;
 	aiocb64.aio_offset = offset;
 	aiocb64.aio_sigevent.sigev_notify = 0;
-	error = aio_req_setupLF(&reqp, aiop, &aiocb64, resultp, vp);
+	error = aio_req_setupLF(&reqp, aiop, &aiocb64, resultp, vp, 1);
 #endif
 	if (error) {
 		releasef(fdes);
@@ -2172,9 +2172,9 @@ aiorw(
 		return (EBADFD);
 	}
 	if (run_mode == AIO_LARGEFILE)
-		error = aio_req_setupLF(&reqp, aiop, &aiocb64, resultp, vp);
+		error = aio_req_setupLF(&reqp, aiop, &aiocb64, resultp, vp, 0);
 	else
-		error = aio_req_setup(&reqp, aiop, &aiocb, resultp, vp);
+		error = aio_req_setup(&reqp, aiop, &aiocb, resultp, vp, 0);
 
 	if (error) {
 		releasef(fd);
@@ -2393,7 +2393,8 @@ aio_req_setup(
 	aio_t 		*aiop,
 	aiocb_t 	*arg,
 	aio_result_t 	*resultp,
-	vnode_t		*vp)
+	vnode_t		*vp,
+	int		old_solaris_req)
 {
 	sigqueue_t	*sqp = NULL;
 	aio_req_t 	*reqp;
@@ -2439,6 +2440,11 @@ aio_req_setup(
 	aiop->aio_pending++;
 	aiop->aio_outstanding++;
 	reqp->aio_req_flags = AIO_PENDING;
+	if (old_solaris_req) {
+		/* this is an old solaris aio request */
+		reqp->aio_req_flags |= AIO_SOLARIS;
+		aiop->aio_flags |= AIO_SOLARIS_REQ;
+	}
 	if (sigev->sigev_notify == SIGEV_THREAD ||
 	    sigev->sigev_notify == SIGEV_PORT)
 		aio_enq(&aiop->aio_portpending, reqp, 0);
@@ -3106,10 +3112,10 @@ alioLF(
 #ifdef	_LP64
 		aiocb_LFton(aiocb, &aiocb_n);
 		error = aio_req_setup(&reqp, aiop, &aiocb_n,
-		    (aio_result_t *)&cbp->aio_resultp, vp);
+		    (aio_result_t *)&cbp->aio_resultp, vp, 0);
 #else
 		error = aio_req_setupLF(&reqp, aiop, aiocb,
-		    (aio_result_t *)&cbp->aio_resultp, vp);
+		    (aio_result_t *)&cbp->aio_resultp, vp, 0);
 #endif  /* _LP64 */
 		if (error) {
 			releasef(aiocb->aio_fildes);
@@ -3284,7 +3290,8 @@ aio_req_setupLF(
 	aio_t		*aiop,
 	aiocb64_32_t	*arg,
 	aio_result_t	*resultp,
-	vnode_t		*vp)
+	vnode_t		*vp,
+	int		old_solaris_req)
 {
 	sigqueue_t	*sqp = NULL;
 	aio_req_t	*reqp;
@@ -3330,6 +3337,11 @@ aio_req_setupLF(
 	aiop->aio_pending++;
 	aiop->aio_outstanding++;
 	reqp->aio_req_flags = AIO_PENDING;
+	if (old_solaris_req) {
+		/* this is an old solaris aio request */
+		reqp->aio_req_flags |= AIO_SOLARIS;
+		aiop->aio_flags |= AIO_SOLARIS_REQ;
+	}
 	if (sigev->sigev_notify == SIGEV_THREAD ||
 	    sigev->sigev_notify == SIGEV_PORT)
 		aio_enq(&aiop->aio_portpending, reqp, 0);
@@ -3595,7 +3607,7 @@ alio32(
 		}
 
 		error = aio_req_setup(&reqp, aiop, aiocb,
-		    (aio_result_t *)&cbp->aio_resultp, vp);
+		    (aio_result_t *)&cbp->aio_resultp, vp, 0);
 		if (error) {
 			releasef(aiocb->aio_fildes);
 			lio_set_uerror(&cbp->aio_resultp, error);
