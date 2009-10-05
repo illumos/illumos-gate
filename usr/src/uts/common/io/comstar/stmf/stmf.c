@@ -1349,7 +1349,8 @@ stmf_set_stmf_state(stmf_state_desc_t *std)
 			mutex_exit(&stmf_state.stmf_lock);
 			return (0);
 		}
-		if (stmf_state.stmf_config_state == STMF_CONFIG_INIT) {
+		if ((stmf_state.stmf_config_state == STMF_CONFIG_INIT) ||
+		    (stmf_state.stmf_config_state == STMF_CONFIG_NONE)) {
 			if (std->config_state != STMF_CONFIG_INIT_DONE) {
 				mutex_exit(&stmf_state.stmf_lock);
 				return (EINVAL);
