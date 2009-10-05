@@ -2180,6 +2180,7 @@ _rdc_remote_flush(rdc_aio_t *aio)
 		 * another set that has not resumed
 		 */
 		krdc->remote_index = rdc_net_state(krdc->index, CCIO_SLAVE);
+		DTRACE_PROBE1(remote_index_negative, int, krdc->remote_index);
 
 	}
 
@@ -2356,6 +2357,7 @@ _rdc_remote_flush(rdc_aio_t *aio)
 				rdc_ooreply++;
 			}
 #endif
+			DTRACE_PROBE1(pendvec_return, int, vecp->seq);
 
 			if (group->asyncstall) {
 				cv_broadcast(&group->asyncqcv);

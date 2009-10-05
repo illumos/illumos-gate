@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -643,10 +643,19 @@ typedef struct rdc_host_u {
 /*
  * macro used to determine if the incomming sq, with sequence
  * value x, should be placed before the sq with sequence value y.
- * This has to account for integer wrap.
+ * This has to account for integer wrap. We account for integer
+ * wrap by checking if the difference between x and y is within
+ * half of the maximum integer value (RDC_MAXINT) or not.
  */
-#define	RDC_INFRONT(x, y) (((x < y) && ((y - x) < 1000)) ? 1 : \
-	((x > y) && ((x - y) > 1000)) ? 1 : 0)
+
+#define	RDC_BITSPERBYTE 8
+#define	RDC_BITS(type)	(RDC_BITSPERBYTE * (long)sizeof (type))
+#define	RDC_HIBITI	((unsigned)1 << (RDC_BITS(int) - 1))
+#define	RDC_MAXINT	((int)(~RDC_HIBITI))
+#define	RDC_RANGE	((RDC_MAXINT / 2) -1)
+
+#define	RDC_INFRONT(x, y) (((x < y) && ((y - x) < RDC_RANGE)) ? 1 : \
+	((x > y) && ((x - y) > RDC_RANGE)) ? 1 : 0)
 
 
 

@@ -1040,6 +1040,8 @@ r_net_write6(SVCXPRT *xprt)
 					    RDC_MAXPENDQ, group->seqack,
 					    diskio.seq, maxseq, group->seq);
 #endif
+				DTRACE_PROBE2(qsize_exceeded, int, diskio.seq,
+				    int, maxseq);
 					if (!(rdc_get_vflags(urdc) &
 					    RDC_VOL_FAILED)) {
 						rdc_many_enter(krdc);
@@ -2564,6 +2566,7 @@ rdc_setbitind(int *pendcnt, net_pendvec_t *pvec, rdc_net_dataset_t *dset,
 	pvec[pc].alen = dset->fbalen;
 	pvec[pc].pindex = pindex;
 	*pendcnt = pc + 1;
+	DTRACE_PROBE1(pvec_reply, int, seq);
 }
 
 /*
