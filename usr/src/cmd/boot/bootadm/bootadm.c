@@ -8967,9 +8967,23 @@ get_set_kernel(
 		    strchr(signbuf, ')') == NULL);
 
 		if (optnum == KERNEL_CMD) {
-			BAM_DPRINTF((D_GET_SET_KERNEL_NEW_KERN, fcn, new_path));
-			entryNum = add_boot_entry(mp, BOOTENV_RC_TITLE,
-			    signbuf, new_path, NULL, NULL, NULL);
+			if (strcmp(fstype, "zfs") == 0) {
+				new_str_len = strlen(new_path) +
+				    strlen(ZFS_BOOT) + 8;
+				new_arg = s_calloc(1, new_str_len);
+				(void) snprintf(new_arg, new_str_len, "%s %s",
+				    new_path, ZFS_BOOT);
+				BAM_DPRINTF((D_GET_SET_KERNEL_NEW_KERN, fcn,
+				    new_arg));
+				entryNum = add_boot_entry(mp, BOOTENV_RC_TITLE,
+				    signbuf, new_arg, NULL, NULL, NULL);
+				free(new_arg);
+			} else {
+				BAM_DPRINTF((D_GET_SET_KERNEL_NEW_KERN, fcn,
+				    new_path));
+				entryNum = add_boot_entry(mp, BOOTENV_RC_TITLE,
+				    signbuf, new_path, NULL, NULL, NULL);
+			}
 		} else {
 			new_str_len = strlen(path) + 8;
 			if (strcmp(fstype, "zfs") == 0) {
