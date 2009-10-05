@@ -641,31 +641,31 @@ smb_node_root_init(vnode_t *vp, smb_server_t *sv, smb_node_t **root)
 int
 smb_node_set_delete_on_close(smb_node_t *node, cred_t *cr, uint32_t flags)
 {
-	int rc;
+	int rc = 0;
 	smb_attr_t attr;
 
-	mutex_enter(&node->n_mutex);
-
-	if ((node->flags & NODE_FLAGS_DELETE_ON_CLOSE) ||
-	    (node->readonly_creator)) {
-		mutex_exit(&node->n_mutex);
+	if (node->readonly_creator)
 		return (-1);
-	}
 
 	bzero(&attr, sizeof (smb_attr_t));
 	attr.sa_mask = SMB_AT_DOSATTR;
 	rc = smb_fsop_getattr(NULL, kcred, node, &attr);
 	if ((rc != 0) || (attr.sa_dosattr & FILE_ATTRIBUTE_READONLY)) {
-		mutex_exit(&node->n_mutex);
 		return (-1);
 	}
 
-	crhold(cr);
-	node->delete_on_close_cred = cr;
-	node->n_delete_on_close_flags = flags;
-	node->flags |= NODE_FLAGS_DELETE_ON_CLOSE;
+	mutex_enter(&node->n_mutex);
+	if (node->flags & NODE_FLAGS_DELETE_ON_CLOSE) {
+		rc = -1;
+	} else {
+		crhold(cr);
+		node->delete_on_close_cred = cr;
+		node->n_delete_on_close_flags = flags;
+		node->flags |= NODE_FLAGS_DELETE_ON_CLOSE;
+		rc = 0;
+	}
 	mutex_exit(&node->n_mutex);
-	return (0);
+	return (rc);
 }
 
 void

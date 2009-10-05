@@ -38,7 +38,6 @@
 #include <assert.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
 
@@ -49,7 +48,7 @@
 /*
  * DC Locator
  */
-#define	SMB_DCLOCATOR_TIMEOUT	45
+#define	SMB_DCLOCATOR_TIMEOUT	45	/* seconds */
 #define	SMB_IS_FQDN(domain)	(strchr(domain, '.') != NULL)
 
 typedef struct smb_dclocator {
@@ -64,15 +63,15 @@ typedef struct smb_dclocator {
 static smb_dclocator_t smb_dclocator;
 static pthread_t smb_dclocator_thr;
 
-static void *smb_dclocator_main(void *);
-static void smb_domain_update(char *, char *);
-static boolean_t smb_domain_query_dns(char *, char *, smb_domain_t *);
-static boolean_t smb_domain_query_nbt(char *, char *, smb_domain_t *);
-static boolean_t smb_domain_match(char *, char *, uint32_t);
-static uint32_t smb_domain_query(char *, char *, smb_domain_t *);
-static void smb_domain_enum_trusted(char *, char *, smb_trusted_domains_t *);
-static uint32_t smb_domain_use_config(char *, nt_domain_t *);
-static void smb_domain_free(smb_domain_t *di);
+static void *smb_ddiscover_service(void *);
+static void smb_ddiscover_main(char *, char *);
+static boolean_t smb_ddiscover_dns(char *, char *, smb_domainex_t *);
+static boolean_t smb_ddiscover_nbt(char *, char *, smb_domainex_t *);
+static boolean_t smb_ddiscover_domain_match(char *, char *, uint32_t);
+static uint32_t smb_ddiscover_qinfo(char *, char *, smb_domainex_t *);
+static void smb_ddiscover_enum_trusted(char *, char *, smb_domainex_t *);
+static uint32_t smb_ddiscover_use_config(char *, smb_domainex_t *);
+static void smb_domainex_free(smb_domainex_t *);
 
 /*
  * ===================================================================
@@ -82,8 +81,6 @@ static void smb_domain_free(smb_domain_t *di);
  */
 
 /*
- * smb_dclocator_init
- *
  * Initialization of the DC locator thread.
  * Returns 0 on success, an error number if thread creation fails.
  */
@@ -96,14 +93,12 @@ smb_dclocator_init(void)
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
 	rc = pthread_create(&smb_dclocator_thr, &tattr,
-	    smb_dclocator_main, 0);
+	    smb_ddiscover_service, 0);
 	(void) pthread_attr_destroy(&tattr);
 	return (rc);
 }
 
 /*
- * smb_locate_dc
- *
  * This is the entry point for discovering a domain controller for the
  * specified domain.
  *
@@ -121,11 +116,11 @@ smb_dclocator_init(void)
  * Returns B_TRUE if the DC/domain info is available.
  */
 boolean_t
-smb_locate_dc(char *domain, char *dc, smb_domain_t *dp)
+smb_locate_dc(char *domain, char *dc, smb_domainex_t *dp)
 {
 	int rc;
 	timestruc_t to;
-	smb_domain_t domain_info;
+	smb_domainex_t domain_info;
 
 	if (domain == NULL || *domain == '\0')
 		return (B_FALSE);
@@ -160,31 +155,21 @@ smb_locate_dc(char *domain, char *dc, smb_domain_t *dp)
 }
 
 /*
- * Returns a copy of primary domain information plus
- * the selected domain controller
- */
-boolean_t
-smb_domain_getinfo(smb_domain_t *dp)
-{
-	return (nt_domain_get_primary(dp));
-}
-
-/*
  * ==========================================================
  * DC discovery functions
  * ==========================================================
  */
 
 /*
- * This is the DC discovery thread: it gets woken up whenever someone
- * wants to locate a domain controller.
+ * This is the domain and DC discovery service: it gets woken up whenever
+ * there is need to locate a domain controller.
  *
  * Upon success, the SMB domain cache will be populated with the discovered
  * DC and domain info.
  */
 /*ARGSUSED*/
 static void *
-smb_dclocator_main(void *arg)
+smb_ddiscover_service(void *arg)
 {
 	char domain[SMB_PI_MAX_DOMAIN];
 	char sought_dc[MAXHOSTNAMELEN];
@@ -201,7 +186,7 @@ smb_dclocator_main(void *arg)
 		(void) strlcpy(sought_dc, smb_dclocator.sdl_dc, MAXHOSTNAMELEN);
 		(void) mutex_unlock(&smb_dclocator.sdl_mtx);
 
-		smb_domain_update(domain, sought_dc);
+		smb_ddiscover_main(domain, sought_dc);
 
 		(void) mutex_lock(&smb_dclocator.sdl_mtx);
 		smb_dclocator.sdl_locate = B_FALSE;
@@ -223,29 +208,30 @@ smb_dclocator_main(void *arg)
  * obtained information.
  */
 static void
-smb_domain_update(char *domain, char *server)
+smb_ddiscover_main(char *domain, char *server)
 {
-	smb_domain_t di;
-	boolean_t query_ok;
+	smb_domainex_t dxi;
+	boolean_t discovered;
 
-	bzero(&di, sizeof (smb_domain_t));
+	bzero(&dxi, sizeof (smb_domainex_t));
 
-	nt_domain_start_update();
+	if (smb_domain_start_update() != SMB_DOMAIN_SUCCESS)
+		return;
 
 	if (SMB_IS_FQDN(domain))
-		query_ok = smb_domain_query_dns(domain, server, &di);
+		discovered = smb_ddiscover_dns(domain, server, &dxi);
 	else
-		query_ok = smb_domain_query_nbt(domain, server, &di);
+		discovered = smb_ddiscover_nbt(domain, server, &dxi);
 
-	if (query_ok)
-		nt_domain_update(&di);
+	if (discovered)
+		smb_domain_update(&dxi);
 
-	nt_domain_end_update();
+	smb_domain_end_update();
 
-	smb_domain_free(&di);
+	smb_domainex_free(&dxi);
 
-	if (query_ok)
-		nt_domain_save();
+	if (discovered)
+		smb_domain_save();
 }
 
 /*
@@ -253,13 +239,14 @@ smb_domain_update(char *domain, char *server)
  * primary and trusted domains information will be queried.
  */
 static boolean_t
-smb_domain_query_dns(char *domain, char *server, smb_domain_t *di)
+smb_ddiscover_dns(char *domain, char *server, smb_domainex_t *dxi)
 {
 	uint32_t status;
-	if (!smb_ads_lookup_msdcs(domain, server, di->d_dc, MAXHOSTNAMELEN))
+
+	if (!smb_ads_lookup_msdcs(domain, server, dxi->d_dc, MAXHOSTNAMELEN))
 		return (B_FALSE);
 
-	status = smb_domain_query(domain, di->d_dc, di);
+	status = smb_ddiscover_qinfo(domain, dxi->d_dc, dxi);
 	return (status == NT_STATUS_SUCCESS);
 }
 
@@ -277,30 +264,30 @@ smb_domain_query_dns(char *domain, char *server, smb_domain_t *di)
  * actually for another domain, whose first label of its FQDN somehow
  * matches with the NetBIOS name of the domain we're interested in.
  */
-
 static boolean_t
-smb_domain_query_nbt(char *domain, char *server, smb_domain_t *di)
+smb_ddiscover_nbt(char *domain, char *server, smb_domainex_t *dxi)
 {
 	char dnsdomain[MAXHOSTNAMELEN];
 	uint32_t status;
 
 	*dnsdomain = '\0';
 
-	if (!smb_browser_netlogon(domain, di->d_dc, MAXHOSTNAMELEN)) {
-		if (!smb_domain_match(domain, dnsdomain, MAXHOSTNAMELEN))
+	if (!smb_browser_netlogon(domain, dxi->d_dc, MAXHOSTNAMELEN)) {
+		if (!smb_ddiscover_domain_match(domain, dnsdomain,
+		    MAXHOSTNAMELEN))
 			return (B_FALSE);
 
-		if (!smb_ads_lookup_msdcs(dnsdomain, server, di->d_dc,
+		if (!smb_ads_lookup_msdcs(dnsdomain, server, dxi->d_dc,
 		    MAXHOSTNAMELEN))
 			return (B_FALSE);
 	}
 
-	status = smb_domain_query(domain, di->d_dc, di);
+	status = smb_ddiscover_qinfo(domain, dxi->d_dc, dxi);
 	if (status != NT_STATUS_SUCCESS)
 		return (B_FALSE);
 
 	if ((*dnsdomain != '\0') &&
-	    utf8_strcasecmp(domain, di->d_info.di_nbname))
+	    utf8_strcasecmp(domain, dxi->d_primary.di_nbname))
 		return (B_FALSE);
 
 	/*
@@ -309,8 +296,8 @@ smb_domain_query_nbt(char *domain, char *server, smb_domain_t *di)
 	 * if we previously locate a DC via NetBIOS. On success,
 	 * ADS cache will be populated.
 	 */
-	if (smb_ads_lookup_msdcs(di->d_info.di_fqname, server,
-	    di->d_dc, MAXHOSTNAMELEN) == 0)
+	if (smb_ads_lookup_msdcs(dxi->d_primary.di_fqname, server,
+	    dxi->d_dc, MAXHOSTNAMELEN) == 0)
 		return (B_FALSE);
 
 	return (B_TRUE);
@@ -322,7 +309,7 @@ smb_domain_query_nbt(char *domain, char *server, smb_domain_t *di)
  * If a match is found, it'll be returned in the passed buffer.
  */
 static boolean_t
-smb_domain_match(char *nb_domain, char *buf, uint32_t len)
+smb_ddiscover_domain_match(char *nb_domain, char *buf, uint32_t len)
 {
 	struct __res_state res_state;
 	int i;
@@ -373,22 +360,22 @@ smb_domain_match(char *nb_domain, char *buf, uint32_t len)
  * domain - either NetBIOS or fully-qualified domain name
  */
 static uint32_t
-smb_domain_query(char *domain, char *server, smb_domain_t *di)
+smb_ddiscover_qinfo(char *domain, char *server, smb_domainex_t *dxi)
 {
 	uint32_t status;
 
 	mlsvc_disconnect(server);
 
-	status = lsa_query_dns_domain_info(server, domain, &di->d_info);
+	status = lsa_query_dns_domain_info(server, domain, &dxi->d_primary);
 	if (status != NT_STATUS_SUCCESS) {
-		status = smb_domain_use_config(domain, &di->d_info);
+		status = smb_ddiscover_use_config(domain, dxi);
 		if (status != NT_STATUS_SUCCESS)
 			status = lsa_query_primary_domain_info(server, domain,
-			    &di->d_info);
+			    &dxi->d_primary);
 	}
 
 	if (status == NT_STATUS_SUCCESS)
-		smb_domain_enum_trusted(domain, server, &di->d_trusted);
+		smb_ddiscover_enum_trusted(domain, server, dxi);
 
 	return (status);
 }
@@ -399,10 +386,12 @@ smb_domain_query(char *domain, char *server, smb_domain_t *di)
  * domain - either NetBIOS or fully-qualified domain name.
  */
 static void
-smb_domain_enum_trusted(char *domain, char *server, smb_trusted_domains_t *list)
+smb_ddiscover_enum_trusted(char *domain, char *server, smb_domainex_t *dxi)
 {
+	smb_trusted_domains_t *list;
 	uint32_t status;
 
+	list = &dxi->d_trusted;
 	status = lsa_enum_trusted_domains_ex(server, domain, list);
 	if (status != NT_STATUS_SUCCESS)
 		(void) lsa_enum_trusted_domains(server, domain, list);
@@ -410,15 +399,17 @@ smb_domain_enum_trusted(char *domain, char *server, smb_trusted_domains_t *list)
 
 /*
  * If the domain to be discovered matches the current domain (i.e the
- * value of either domain or fqdn configuration), the output parameter
- * 'dinfo' will be set to the information stored in SMF.
+ * value of either domain or fqdn configuration), then get the primary
+ * domain information from SMF.
  */
 static uint32_t
-smb_domain_use_config(char *domain, nt_domain_t *dinfo)
+smb_ddiscover_use_config(char *domain, smb_domainex_t *dxi)
 {
 	boolean_t use;
+	smb_domain_t *dinfo;
 
-	bzero(dinfo, sizeof (nt_domain_t));
+	dinfo = &dxi->d_primary;
+	bzero(dinfo, sizeof (smb_domain_t));
 
 	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
 		return (NT_STATUS_UNSUCCESSFUL);
@@ -440,7 +431,7 @@ smb_domain_use_config(char *domain, nt_domain_t *dinfo)
 }
 
 static void
-smb_domain_free(smb_domain_t *di)
+smb_domainex_free(smb_domainex_t *dxi)
 {
-	free(di->d_trusted.td_domains);
+	free(dxi->d_trusted.td_domains);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,6 @@
 #include <strings.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/ntaccess.h>
@@ -104,7 +103,7 @@ lsar_open_policy2(char *server, char *domain, char *username,
 	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 	arg.attributes.length = sizeof (struct mslsa_object_attributes);
 
-	if (ndr_rpc_server_os(lsa_handle) == NATIVE_OS_NT5_0) {
+	if (ndr_rpc_server_os(lsa_handle) == NATIVE_OS_WIN2000) {
 		arg.desiredAccess = MAXIMUM_ALLOWED;
 	} else {
 		arg.desiredAccess = GENERIC_EXECUTE

@@ -40,7 +40,6 @@
 #include <security/pkcs11.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/netlogon.ndl>
@@ -127,18 +126,13 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 int
 netr_open(char *server, char *domain, mlsvc_handle_t *netr_handle)
 {
-	srvsvc_server_info_t svinfo;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
 
-	if (srvsvc_net_server_getinfo(server, domain, &svinfo) < 0)
-		return (-1);
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if (ndr_rpc_bind(netr_handle, server, domain, user, "NETR") < 0)
 		return (-1);
 
-	ndr_rpc_server_setinfo(netr_handle, &svinfo);
-	free(svinfo.sv_name);
-	free(svinfo.sv_comment);
 	return (0);
 }
 
@@ -214,7 +208,7 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	arg.hostname = (unsigned char *)netr_info->hostname;
 	arg.negotiate_flags = NETR_NEGOTIATE_BASE_FLAGS;
 
-	if (ndr_rpc_server_os(netr_handle) != NATIVE_OS_WINNT) {
+	if (ndr_rpc_server_os(netr_handle) == NATIVE_OS_WIN2000) {
 		arg.negotiate_flags |= NETR_NEGOTIATE_STRONGKEY_FLAG;
 		if (netr_gen_skey128(netr_info) != SMBAUTH_SUCCESS)
 			return (-1);

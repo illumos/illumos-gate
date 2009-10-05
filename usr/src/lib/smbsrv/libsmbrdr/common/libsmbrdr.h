@@ -32,28 +32,8 @@
 extern "C" {
 #endif
 
-typedef struct smbrdr_session_info {
-	int si_server_os;
-	int si_server_lm;
-	int si_dc_type;
-} smbrdr_session_info_t;
-
-/*
- * Redirector IPC functions
- *
- * The following functions are required by the mlsvc_join to
- * apply new authentication information for the authenticated IPC, rollback
- * or commit the changes to the original authentication information.
- */
-extern void smbrdr_ipc_set(char *, unsigned char *);
-extern void smbrdr_ipc_commit(void);
-extern void smbrdr_ipc_rollback(void);
-extern char *smbrdr_ipc_get_user(void);
-extern unsigned char *smbrdr_ipc_get_passwd(void);
-
-
 /* Redirector LOGON function */
-extern int mlsvc_logon(char *, char *, char *);
+extern int smbrdr_logon(char *, char *, char *);
 extern int smbrdr_get_ssnkey(int, unsigned char *, size_t);
 
 /* Redirector named pipe functions */
@@ -63,10 +43,8 @@ extern int smbrdr_readx(int, char *, int);
 extern int smbrdr_transact(int, char *, int, char *, int);
 
 /* Redirector session functions */
-extern void smbrdr_init(void);
-extern int smbrdr_session_info(int, smbrdr_session_info_t *);
-extern int mlsvc_echo(char *);
-extern void mlsvc_disconnect(char *);
+extern int smbrdr_echo(const char *);
+extern void smbrdr_disconnect(const char *);
 
 /* DEBUG functions */
 extern void smbrdr_dump_ofiles(void);

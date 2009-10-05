@@ -79,8 +79,6 @@ smbnative_os_value(const char *native_os)
 		{ NATIVE_OS_WIN95,	"Windows 4.0"		},
 		{ NATIVE_OS_WIN2000,	"Windows 5.0"		},
 		{ NATIVE_OS_WIN2000,	"Windows 5.1"		},
-		{ NATIVE_OS_WIN2000,	"Windows 2000 5.0"	},
-		{ NATIVE_OS_NT5_1,	"Windows 2000 5.1"	},
 		{ NATIVE_OS_WIN2000,	"Windows 2000"		},
 		{ NATIVE_OS_WIN2000,	"Windows 2002"		},
 		{ NATIVE_OS_WIN2000,	"Windows .NET"		},

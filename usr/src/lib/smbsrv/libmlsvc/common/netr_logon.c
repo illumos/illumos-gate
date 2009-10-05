@@ -37,7 +37,6 @@
 #include <thread.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/netlogon.ndl>
@@ -104,7 +103,7 @@ netlogon_logon_private(netr_client_t *clnt, smb_token_t *token)
 	char resource_domain[SMB_PI_MAX_DOMAIN];
 	char server[NETBIOS_NAME_SZ * 2];
 	mlsvc_handle_t netr_handle;
-	smb_domain_t di;
+	smb_domainex_t di;
 	uint32_t status;
 	int retries = 0, server_changed = 0;
 
@@ -113,7 +112,7 @@ netlogon_logon_private(netr_client_t *clnt, smb_token_t *token)
 	if (!smb_domain_getinfo(&di))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if ((mlsvc_echo(di.d_dc)) < 0) {
+	if (mlsvc_ping(di.d_dc) < 0) {
 		/*
 		 * We had a session to the DC but it's not responding.
 		 * So drop the credential chain.
@@ -123,7 +122,8 @@ netlogon_logon_private(netr_client_t *clnt, smb_token_t *token)
 	}
 
 	do {
-		if (netr_open(di.d_dc, di.d_info.di_nbname, &netr_handle) != 0)
+		if (netr_open(di.d_dc, di.d_primary.di_nbname, &netr_handle)
+		    != 0)
 			return (NT_STATUS_OPEN_FAILED);
 
 		if (di.d_dc && (*netr_global_info.server != '\0')) {
@@ -677,13 +677,13 @@ netr_setup_domain_groups(struct netr_validation_info3 *info3, smb_ids_t *gids)
 static boolean_t
 netr_isadmin(struct netr_validation_info3 *info3)
 {
-	nt_domain_t di;
+	smb_domain_t di;
 	int i;
 
-	if (!nt_domain_lookup_sid((smb_sid_t *)info3->LogonDomainId, &di))
+	if (!smb_domain_lookup_sid((smb_sid_t *)info3->LogonDomainId, &di))
 		return (B_FALSE);
 
-	if (di.di_type != NT_DOMAIN_PRIMARY)
+	if (di.di_type != SMB_DOMAIN_PRIMARY)
 		return (B_FALSE);
 
 	if ((info3->UserId == DOMAIN_USER_RID_ADMIN) ||

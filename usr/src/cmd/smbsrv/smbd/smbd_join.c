@@ -32,7 +32,6 @@
 #include <sys/errno.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
@@ -81,7 +80,7 @@ smbd_join(smb_joininfo_t *info)
  *
  * Since the kclient has updated the machine password stored in SMF
  * repository, the cached ipc_info must be updated accordingly by calling
- * smbrdr_ipc_commit.
+ * smb_ipc_commit.
  *
  * Due to potential replication delays in a multiple DC environment, the
  * NETLOGON rpc request must be sent to the DC, to which the KPASSWD request
@@ -99,10 +98,11 @@ smbd_set_netlogon_cred(void)
 	char kpasswd_srv[MAXHOSTNAMELEN];
 	char kpasswd_domain[MAXHOSTNAMELEN];
 	char sam_acct[SMB_SAMACCT_MAXLEN];
-	char *ipc_usr, *dom;
+	char ipc_usr[SMB_USERNAME_MAXLEN];
+	char *dom;
 	boolean_t new_domain = B_FALSE;
-	smb_domain_t domain;
-	nt_domain_t *di;
+	smb_domainex_t dxi;
+	smb_domain_t *di;
 
 	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
 		return (B_FALSE);
@@ -121,12 +121,12 @@ smbd_set_netlogon_cred(void)
 	 * progress, don't do anything.
 	 */
 	(void) smb_getsamaccount(sam_acct, sizeof (sam_acct));
-	ipc_usr = smbrdr_ipc_get_user();
+	smb_ipc_get_user(ipc_usr, SMB_USERNAME_MAXLEN);
 	if (utf8_strcasecmp(ipc_usr, sam_acct))
 		return (B_FALSE);
 
-	di = &domain.d_info;
-	if (!smb_domain_getinfo(&domain))
+	di = &dxi.d_primary;
+	if (!smb_domain_getinfo(&dxi))
 		(void) smb_getfqdomainname(di->di_fqname, MAXHOSTNAMELEN);
 
 	(void) smb_config_getstr(SMB_CI_KPASSWD_DOMAIN, kpasswd_domain,
@@ -145,20 +145,20 @@ smbd_set_netlogon_cred(void)
 	 * currently cached or the SMB daemon has previously discovered a DC
 	 * that is different than the kpasswd server.
 	 */
-	if (new_domain || utf8_strcasecmp(domain.d_dc, kpasswd_srv) != 0) {
-		if (*domain.d_dc != '\0')
-			mlsvc_disconnect(domain.d_dc);
+	if (new_domain || utf8_strcasecmp(dxi.d_dc, kpasswd_srv) != 0) {
+		if (*dxi.d_dc != '\0')
+			mlsvc_disconnect(dxi.d_dc);
 
-		if (!smb_locate_dc(dom, kpasswd_srv, &domain)) {
-			if (!smb_locate_dc(di->di_fqname, "", &domain)) {
-				smbrdr_ipc_commit();
+		if (!smb_locate_dc(dom, kpasswd_srv, &dxi)) {
+			if (!smb_locate_dc(di->di_fqname, "", &dxi)) {
+				smb_ipc_commit();
 				return (B_FALSE);
 			}
 		}
 	}
 
-	smbrdr_ipc_commit();
-	if (mlsvc_netlogon(domain.d_dc, di->di_nbname)) {
+	smb_ipc_commit();
+	if (mlsvc_netlogon(dxi.d_dc, di->di_nbname)) {
 		syslog(LOG_ERR,
 		    "failed to establish NETLOGON credential chain");
 		return (B_TRUE);
@@ -209,8 +209,8 @@ static void *
 smbd_locate_dc_thread(void *arg)
 {
 	char domain[MAXHOSTNAMELEN];
-	smb_domain_t new_domain;
-	nt_domain_t *di;
+	smb_domainex_t new_domain;
+	smb_domain_t *di;
 
 	if (!smb_match_netlogon_seqnum()) {
 		(void) smbd_set_netlogon_cred();
@@ -221,7 +221,7 @@ smbd_locate_dc_thread(void *arg)
 		}
 
 		if (smb_locate_dc(domain, "", &new_domain)) {
-			di = &new_domain.d_info;
+			di = &new_domain.d_primary;
 			smb_config_setdomaininfo(di->di_nbname, di->di_fqname,
 			    di->di_sid,
 			    di->di_u.di_dns.ddi_forest,
@@ -298,8 +298,8 @@ smbd_join_domain(smb_joininfo_t *info)
 	uint32_t status;
 	unsigned char passwd_hash[SMBAUTH_HASH_SZ];
 	char dc[MAXHOSTNAMELEN];
-	smb_domain_t domain_info;
-	nt_domain_t *di;
+	smb_domainex_t dxi;
+	smb_domain_t *di;
 
 	/*
 	 * Ensure that any previous membership of this domain has
@@ -317,32 +317,32 @@ smbd_join_domain(smb_joininfo_t *info)
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
-	smbrdr_ipc_set(info->domain_username, passwd_hash);
+	smb_ipc_set(info->domain_username, passwd_hash);
 
 	(void) smbd_get_kpasswd_srv(dc, sizeof (dc));
 	/* info->domain_name could either be NetBIOS domain name or FQDN */
-	if (smb_locate_dc(info->domain_name, dc, &domain_info)) {
-		status = mlsvc_join(&domain_info, info->domain_username,
+	if (smb_locate_dc(info->domain_name, dc, &dxi)) {
+		status = mlsvc_join(&dxi, info->domain_username,
 		    info->domain_passwd);
 
 		if (status == NT_STATUS_SUCCESS) {
-			di = &domain_info.d_info;
+			di = &dxi.d_primary;
 			smbd_set_secmode(SMB_SECMODE_DOMAIN);
 			smb_config_setdomaininfo(di->di_nbname, di->di_fqname,
 			    di->di_sid,
 			    di->di_u.di_dns.ddi_forest,
 			    di->di_u.di_dns.ddi_guid);
-			smbrdr_ipc_commit();
+			smb_ipc_commit();
 			return (status);
 		}
 
-		smbrdr_ipc_rollback();
+		smb_ipc_rollback();
 		syslog(LOG_ERR, "smbd: failed joining %s (%s)",
 		    info->domain_name, xlate_nt_status(status));
 		return (status);
 	}
 
-	smbrdr_ipc_rollback();
+	smb_ipc_rollback();
 	syslog(LOG_ERR, "smbd: failed locating domain controller for %s",
 	    info->domain_name);
 	return (NT_STATUS_DOMAIN_CONTROLLER_NOT_FOUND);

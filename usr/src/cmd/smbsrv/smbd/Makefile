@@ -47,7 +47,7 @@ $(ROOTSVCMETHOD):= FILEMODE = 0555
 
 include ../Makefile.smbsrv.defs
 
-LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lmlsvc -lmlrpc -lsmbrdr -lsmbns -lsmb \
+LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lmlsvc -lmlrpc -lsmbns -lsmb \
 	-lzfs -lbsm -lnsl -lumem
 LDFLAGS += -R/usr/lib/smbsrv
 

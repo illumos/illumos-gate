@@ -39,7 +39,6 @@
 #include <time.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/ntstatus.h>
@@ -61,14 +60,14 @@ static int srvsvc_net_remote_tod(char *, char *, struct timeval *, struct tm *);
 static int
 srvsvc_open(char *server, char *domain, char *username, mlsvc_handle_t *handle)
 {
-	smb_domain_t di;
+	smb_domainex_t di;
 
 	if (server == NULL || domain == NULL) {
 		if (!smb_domain_getinfo(&di))
 			return (-1);
 
 		server = di.d_dc;
-		domain = di.d_info.di_nbname;
+		domain = di.d_primary.di_nbname;
 	}
 
 	if (username == NULL)
@@ -105,13 +104,13 @@ srvsvc_net_share_get_info(char *server, char *domain, char *netname)
 	struct mslm_NetShareInfo_1 *info1;
 	struct mslm_NetShareInfo_2 *info2;
 	int len;
-	char *user = NULL;
+	char user[SMB_USERNAME_MAXLEN];
 
 	if (netname == NULL)
 		return (-1);
 
 	if (srvsvc_info_level == 2)
-		user = smbrdr_ipc_get_user();
+		smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if (srvsvc_open(server, domain, user, &handle) != 0)
 		return (-1);
@@ -195,10 +194,12 @@ srvsvc_net_session_enum(char *server, char *domain, char *netname)
 	struct mslm_infonres infonres;
 	struct mslm_SESSION_INFO_1 *nsi1;
 	int len;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
 
 	if (netname == NULL)
 		return (-1);
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	rc = srvsvc_open(server, domain, user, &handle);
 	if (rc != 0)
@@ -260,10 +261,12 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 	struct mslm_NetConnectInfo0 info0;
 	struct mslm_NetConnectInfoBuf1 *cib1;
 	int len;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
 
 	if (netname == NULL)
 		return (-1);
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	rc = srvsvc_open(server, domain, user, &handle);
 	if (rc != 0)
@@ -347,6 +350,10 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 	return (0);
 }
 
+/*
+ * Windows 95+ and Windows NT4.0 both report the version as 4.0.
+ * Windows 2000+ reports the version as 5.x.
+ */
 int
 srvsvc_net_server_getinfo(char *server, char *domain,
     srvsvc_server_info_t *svinfo)
@@ -355,7 +362,9 @@ srvsvc_net_server_getinfo(char *server, char *domain,
 	struct mslm_NetServerGetInfo arg;
 	struct mslm_SERVER_INFO_101 *sv101;
 	int len, opnum, rc;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if (srvsvc_open(server, domain, user, &handle) != 0)
 		return (-1);
@@ -389,6 +398,16 @@ srvsvc_net_server_getinfo(char *server, char *domain,
 	if (sv101->sv101_comment)
 		svinfo->sv_comment = strdup((char *)sv101->sv101_comment);
 
+	if (svinfo->sv_type & SV_TYPE_WFW)
+		svinfo->sv_os = NATIVE_OS_WIN95;
+	if (svinfo->sv_type & SV_TYPE_WINDOWS)
+		svinfo->sv_os = NATIVE_OS_WIN95;
+	if ((svinfo->sv_type & SV_TYPE_NT) ||
+	    (svinfo->sv_type & SV_TYPE_SERVER_NT))
+		svinfo->sv_os = NATIVE_OS_WINNT;
+	if (svinfo->sv_version_major > 4)
+		svinfo->sv_os = NATIVE_OS_WIN2000;
+
 	srvsvc_close(&handle);
 	return (0);
 }
@@ -399,7 +418,7 @@ srvsvc_net_server_getinfo(char *server, char *domain,
 void
 srvsvc_timesync(void)
 {
-	smb_domain_t di;
+	smb_domainex_t di;
 	struct timeval tv;
 	struct tm tm;
 	time_t tsecs;
@@ -407,7 +426,8 @@ srvsvc_timesync(void)
 	if (!smb_domain_getinfo(&di))
 		return;
 
-	if (srvsvc_net_remote_tod(di.d_dc, di.d_info.di_nbname, &tv, &tm) != 0)
+	if (srvsvc_net_remote_tod(di.d_dc, di.d_primary.di_nbname, &tv, &tm)
+	    != 0)
 		return;
 
 	if (settimeofday(&tv, 0))
@@ -424,14 +444,15 @@ srvsvc_timesync(void)
 int
 srvsvc_gettime(unsigned long *t)
 {
-	smb_domain_t di;
+	smb_domainex_t di;
 	struct timeval tv;
 	struct tm tm;
 
 	if (!smb_domain_getinfo(&di))
 		return (-1);
 
-	if (srvsvc_net_remote_tod(di.d_dc, di.d_info.di_nbname, &tv, &tm) != 0)
+	if (srvsvc_net_remote_tod(di.d_dc, di.d_primary.di_nbname, &tv, &tm)
+	    != 0)
 		return (-1);
 
 	*t = tv.tv_sec;
@@ -477,7 +498,9 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 	int rc;
 	int opnum;
 	int len;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	rc = srvsvc_open(server, domain, user, &handle);
 	if (rc != 0)
@@ -535,14 +558,14 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 void
 srvsvc_net_test(char *server, char *domain, char *netname)
 {
-	smb_domain_t di;
+	smb_domainex_t di;
 	srvsvc_server_info_t svinfo;
 
 	(void) smb_tracef("%s %s %s", server, domain, netname);
 
 	if (smb_domain_getinfo(&di)) {
 		server = di.d_dc;
-		domain = di.d_info.di_nbname;
+		domain = di.d_primary.di_nbname;
 	}
 
 	if (srvsvc_net_server_getinfo(server, domain, &svinfo) == 0) {

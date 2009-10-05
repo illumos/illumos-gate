@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,20 +32,24 @@
 
 #include "ndrtypes.ndl"
 
-
-#define SAMR_OPNUM_ConnectAnon			0x00
+/* Windows NT */
+#define SAMR_OPNUM_ConnectAnon			0x00	/* SamrConnect */
 #define SAMR_OPNUM_CloseHandle			0x01
+#define SAMR_OPNUM_SetSecObject			0x02
 #define SAMR_OPNUM_QuerySecObject		0x03
+#define SAMR_OPNUM_ShutdownSamServer		0x04	/* NotUsedOnWire */
 #define SAMR_OPNUM_LookupDomain			0x05
 #define SAMR_OPNUM_EnumLocalDomains		0x06
 #define SAMR_OPNUM_OpenDomain			0x07
 #define SAMR_OPNUM_QueryDomainInfo		0x08
+#define SAMR_OPNUM_SetDomainInfo		0x09
 #define SAMR_OPNUM_CreateDomainGroup		0x0a
 #define SAMR_OPNUM_QueryDomainGroups		0x0b
+#define SAMR_OPNUM_CreateDomainUser		0x0c
 #define SAMR_OPNUM_EnumDomainUsers		0x0d
 #define SAMR_OPNUM_CreateDomainAlias		0x0e
 #define SAMR_OPNUM_EnumDomainAliases		0x0f
-#define SAMR_OPNUM_LookupIds			0x10
+#define SAMR_OPNUM_LookupIds			0x10	/* GetAliasMembership */
 #define SAMR_OPNUM_LookupNames			0x11
 #define SAMR_OPNUM_LookupDomainIds		0x12
 #define SAMR_OPNUM_OpenGroup			0x13
@@ -55,6 +59,7 @@
 #define SAMR_OPNUM_DeleteDomainGroup		0x17
 #define SAMR_OPNUM_DeleteGroupMember		0x18
 #define SAMR_OPNUM_ListGroupMembers		0x19
+#define SAMR_OPNUM_SetGroupMemberAttributes	0x1a
 #define SAMR_OPNUM_OpenAlias			0x1b
 #define SAMR_OPNUM_QueryAliasInfo		0x1c
 #define SAMR_OPNUM_SetAliasInfo			0x1d
@@ -65,19 +70,45 @@
 #define SAMR_OPNUM_OpenUser			0x22
 #define SAMR_OPNUM_DeleteUser			0x23
 #define SAMR_OPNUM_QueryUserInfo		0x24
+#define SAMR_OPNUM_SetUserInfo0			0x25	/* SetUserInfo */
+#define SAMR_OPNUM_ChangeUserPassword0		0x26	/* ChangeUserPassword */
 #define SAMR_OPNUM_QueryUserGroups		0x27
 #define SAMR_OPNUM_QueryDispInfo		0x28	/* QueryDispInfo1 */
+#define	SAMR_OPNUM_GetDisplayEnumIndex		0x29
+#define	SAMR_OPNUM_TestPrivateDomainFunctions	0x2a	/* NotUsedOnWire */
+#define	SAMR_OPNUM_TestPrivateUserFunctions	0x2b	/* NotUsedOnWire */
 #define SAMR_OPNUM_GetUserPwInfo		0x2c
-#define SAMR_OPNUM_EnumDomainGroups		0x30	/* QueryDispInfo3 */
-#define SAMR_OPNUM_CreateUser			0x32
-#define SAMR_OPNUM_QueryDispInfo4		0x33
-#define SAMR_OPNUM_AddMultiAliasMember		0x34
-#define SAMR_OPNUM_ChangeUserPasswd		0x37
+
+/* Windows 2000 */
+#define	SAMR_OPNUM_RemoveMemberFromForeignDomain        0x2d
+#define	SAMR_OPNUM_QueryInfoDomain2		0x2e
+#define	SAMR_OPNUM_QueryInfoUser2		0x2f
+#define	SAMR_OPNUM_EnumDomainGroups		0x30    /* QueryDispInfo2 */
+#define	SAMR_OPNUM_GetDisplayEnumIndex2		0x31
+#define	SAMR_OPNUM_CreateUser			0x32
+#define	SAMR_OPNUM_QueryDispInfo4		0x33
+#define	SAMR_OPNUM_AddMultipleAliasMembers	0x34
+#define	SAMR_OPNUM_RemoveMultipleAliasMembers	0x35
+#define	SAMR_OPNUM_ChangeUserOemPassword	0x36
+#define SAMR_OPNUM_ChangeUserPasswd		0x37	/* UnicodePasswd */
 #define SAMR_OPNUM_GetDomainPwInfo		0x38
-#define SAMR_OPNUM_Connect			0x39
+#define SAMR_OPNUM_Connect			0x39	/* SamrConnect2 */
 #define SAMR_OPNUM_SetUserInfo			0x3a
-#define SAMR_OPNUM_Connect3			0x3e
-#define SAMR_OPNUM_Connect4			0x40
+#define	SAMR_OPNUM_SetBootKeyInformation	0x3b
+#define	SAMR_OPNUM_GetBootKeyInformation	0x3c
+#define	SAMR_OPNUM_Connect2			0x3d	/* SamrConnect3 */
+#define	SAMR_OPNUM_Connect3			0x3e	/* SamrConnect4 */
+#define	SAMR_OPNUM_ChangeUserUnicodePassword3	0x3f
+
+/* Windows XP and Windows Server 2003 */
+#define	SAMR_OPNUM_Connect4			0x40	/* SamrConnect5 */
+#define	SAMR_OPNUM_RidToSid                     0x41
+#define	SAMR_OPNUM_SetDSRMPassword              0x42
+#define	SAMR_OPNUM_ValidatePassword             0x43
+
+/* Windows Vista */
+#define SAMR_OPNUM_QueryLocalizableAccountsInDomain     0x44
+#define SAMR_OPNUM_PerformGenericOperation              0x45
 
 
 /*
@@ -129,6 +160,10 @@
 #define SAMR_ALIAS_ACCESS_GET_MEMBERS		0x00000004
 #define SAMR_ALIAS_ACCESS_DEL_MEMBER		0x00000002
 #define SAMR_ALIAS_ACCESS_ADD_MEMBER		0x00000001
+
+#define	SAMR_REVISION_1			1	/* Pre Windows 2000 */
+#define	SAMR_REVISION_2			2	/* Windows 2000 */
+#define	SAMR_REVISION_3			3	/* Post Windows 2000 */
 
 /*
  * Definition for a SID. The ndl compiler does not allow a typedef of
@@ -247,7 +282,7 @@ struct samr_Connect {
 OPERATION(SAMR_OPNUM_Connect3)
 struct samr_Connect3 {
 	IN	LPTSTR servername;
-	IN	DWORD unknown_02;
+	IN	DWORD revision;
 	IN	DWORD access_mask;
 	OUT	samr_handle_t handle;
 	OUT	DWORD status;
@@ -258,9 +293,31 @@ struct samr_Connect3 {
  ***********************************************************************
  * SamrConnect4. A new form of connect first seen with Windows XP.
  * The server name is the fully qualified domain name, i.e.
- *	\\server.procom.com.
+ *	\\server.sun.com.
+ *
+ * [in]  DWORD	 InVersion,
+ * [in]  [switch_is(InVersion)]    samr_revision_info *InRevisionInfo
+ * [out] DWORD	 *OutVersion
+ * [out] [switch_is(*OutVersion)] *samr_revision_info *OutRevisionInfo
+ *
+ * SupportedFeatures (see notes in [MS-SAMR]
+ *	0x00000001	RID values returned from the server must not be
+ *			concatenated with the domain SID.
+ *	0x00000002	Reserved
+ *	0x00000004	Reserved
  ***********************************************************************
  */
+struct samr_revision_info1 {
+	DWORD revision;
+	DWORD supported_features;
+};
+typedef struct samr_revision_info1 samr_revision_info1_t;
+
+union samr_revision_info {
+	UNION_INFO_ENT(1,samr_revision_info);
+	DEFAULT	char *nullptr;
+};
+
 OPERATION(SAMR_OPNUM_Connect4)
 struct samr_Connect4 {
 	IN		LPTSTR servername;
@@ -911,12 +968,10 @@ struct samr_GetUserPwInfo {
  * CreateUser
  *
  * Create a user in the domain specified by the domain handle. The
- * domain handle is obtained obtained via SAMR_OPNUM_OpenDomain. There
- * is an unknown value at the end of the request: 0xe00500b0.
+ * domain handle is obtained obtained via SAMR_OPNUM_OpenDomain.
+ * DesiredAccess: 0xe00500b0.
  * The output will be a handle for use with the specified user and the
- * user's RID. I think the RID may be a pointer but the value came back
- * as zero once so I've padded it out so that the marshalling doesn't
- * get confused.
+ * user's RID. I think the RID may be a unique pointer (it can be null).
  ***********************************************************************
  */
 OPERATION(SAMR_OPNUM_CreateUser)
@@ -924,7 +979,7 @@ struct samr_CreateUser {
 	IN	samr_handle_t handle;
 	IN	samr_vcbuf_t username;
 	IN	DWORD account_flags;
-	IN	DWORD unknown_e00500b0;
+	IN	DWORD desired_access;
 	OUT	samr_handle_t user_handle;
 	OUT	DWORD maybe_ptr;
 	OUT	DWORD rid;

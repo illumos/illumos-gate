@@ -55,7 +55,7 @@
  *   The following are Defined Constants for the NetBIOS Datagram
  *   Service:
  *
- *   - DGM_SRVC_UDP_PORT: the globally well-known UDP port allocated
+ *   - IPPORT_NETBIOS_DGM: the globally well-known UDP port allocated
  *     where the NetBIOS Datagram Service receives UDP packets.  See
  *     section 6, "Defined Constants", for its value.
  */
@@ -103,11 +103,12 @@
  *
  *   DATAGRAM SERVICE:
  *
- *      DGM_SRVC_UDP_PORT          138 (decimal)
+ *      IPPORT_NETBIOS_DGM          138 (decimal)
  *
  *      FRAGMENT_TO                2 seconds (default)
  */
 
+#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -210,7 +211,7 @@ smb_netbios_datagram_fini()
  *             half-ASCII, biased encoded name;
  *        SOURCE_NAME = cat(source, SCOPE_ID);
  *        SOURCE_IP = this nodes IP address;
- *        SOURCE_PORT =  DGM_SRVC_UDP_PORT;
+ *        SOURCE_PORT =  IPPORT_NETBIOS_DGM;
  *
  *        IF NetBIOS broadcast THEN
  *        BEGIN
@@ -318,7 +319,7 @@ smb_netbios_datagram_send(struct name_entry *src, struct name_entry *dest,
 {
 	smb_inaddr_t ipaddr;
 	size_t count, srclen, destlen, sinlen;
-	struct addr_entry *addr;
+	addr_entry_t *addr;
 	struct sockaddr_in sin;
 	char *buffer;
 	char ha_source[NETBIOS_DOMAIN_NAME_MAX];
@@ -333,9 +334,8 @@ smb_netbios_datagram_send(struct name_entry *src, struct name_entry *dest,
 	destlen = strlen(ha_dest) + 1;
 
 	/* give some extra room */
-	buffer = (char *)malloc(MAX_DATAGRAM_LENGTH * 4);
-	if (buffer == 0) {
-		syslog(LOG_ERR, "netbios: datagram send (resource shortage)");
+	if ((buffer = malloc(MAX_DATAGRAM_LENGTH * 4)) == NULL) {
+		syslog(LOG_ERR, "nbt datagram: send: %m");
 		return (-1);
 	}
 
@@ -399,7 +399,7 @@ smb_netbios_datagram_send_to_net(struct name_entry *src,
 {
 	smb_inaddr_t ipaddr;
 	size_t count, srclen, destlen, sinlen;
-	struct addr_entry *addr;
+	addr_entry_t *addr;
 	struct sockaddr_in sin;
 	char *buffer;
 	char ha_source[NETBIOS_DOMAIN_NAME_MAX];
@@ -414,9 +414,8 @@ smb_netbios_datagram_send_to_net(struct name_entry *src,
 	destlen = strlen(ha_dest) + 1;
 
 	/* give some extra room */
-	buffer = (char *)malloc(MAX_DATAGRAM_LENGTH * 4);
-	if (buffer == 0) {
-		syslog(LOG_ERR, "netbios: datagram send (resource shortage)");
+	if ((buffer = malloc(MAX_DATAGRAM_LENGTH * 4)) == NULL) {
+		syslog(LOG_ERR, "nbt datagram: send_to_net: %m");
 		return (-1);
 	}
 
@@ -570,7 +569,7 @@ smb_netbios_datagram_error(unsigned char *buf)
 
 /*
  * Function: int smb_netbios_process_BPM_datagram(unsigned char *packet,
- *		struct addr_entry *addr)
+ *		addr_entry_t *addr)
  *
  * Description from rfc1002:
  *
@@ -797,7 +796,7 @@ process_datagram:
 			(void) memcpy(&datagram->rawbuf[4],
 			    &datagram->src.addr_list.sin.sin_addr.s_addr,
 			    sizeof (uint32_t));
-			BE_OUT16(&datagram->rawbuf[8], DGM_SRVC_UDP_PORT);
+			BE_OUT16(&datagram->rawbuf[8], IPPORT_NETBIOS_DGM);
 
 			(void) sendto(datagram_sock, datagram->rawbuf,
 			    datagram->rawbytes, 0,
@@ -812,180 +811,12 @@ process_datagram:
 	free(datagram);
 }
 
-
 /*
- * smb_netbios_process_NBDD_datagram
- *
- * Description from rfc1002:
- *
- *
- *  5.3.4.  PROTOCOLS FOR THE NBDD
- *
- *   The key to NetBIOS Datagram forwarding service is the packet
- *   delivered to the destination end node must have the same NetBIOS
- *   header as if the source end node sent the packet directly to the
- *   destination end node.  Consequently, the NBDD does not reassemble
- *   NetBIOS Datagrams.  It forwards the UDP packet as is.
- *
- *   PROCEDURE  datagram_packet(packet)
- *
- *   (*
- *    * processing initiated by a incoming datagram service
- *    * packet on a NBDD node.
- *    *)
- *
- *   BEGIN
- *        CASE packet type OF
- *
- *           DATAGRAM SERVICE:
- *           BEGIN
- *                IF packet was sent as a directed
- *                   NetBIOS datagram THEN
- *                BEGIN
- *                  (*
- *                   * provide group forwarding service
- *                   *
- *                   * Forward datagram to each member of the
- *                   * group.  Can forward via:
- *                   *   1) get list of group members and send
- *                   *   the DATAGRAM SERVICE packet unicast
- *                   *   to each
- *                   *   2) use Group Multicast, if available
- *                   *   3) combination of 1) and 2)
- *                   *)
- *
- *                  ...
- *
- *                END
- *
- *                ELSE
- *                BEGIN
- *                  (*
- *                   * provide broadcast forwarding service
- *                   *
- *                   * Forward datagram to every node in the
- *                   * NetBIOS scope.  Can forward via:
- *                   *   1) get list of group members and send
- *                   *   the DATAGRAM SERVICE packet unicast
- *                   *   to each
- *                   *   2) use Group Multicast, if available
- *                   *   3) combination of 1) and 2)
- *                   *)
- *
- *                  ...
- *
- *                END
- *           END (* datagram service *)
- *
- *           DATAGRAM ERROR:
- *           BEGIN
- *             (*
- *              * Should never receive these because Datagrams
- *              * forwarded have source end node IP address and
- *              * port in NetBIOS header.
- *              *)
- *
- *             send DELETE NAME REQUEST with incorrect name and
- *                  IP address to NetBIOS Name Server;
- *
- *           END (* datagram error *)
- *
- *           DATAGRAM QUERY REQUEST:
- *           BEGIN
- *             IF can send packet to DESTINATION_NAME THEN
- *             BEGIN
- *                  (*
- *                   * NBDD is able to relay Datagrams for
- *                   * this name
- *                   *)
- *
- *                  send POSITIVE DATAGRAM QUERY RESPONSE to
- *                    REQUEST source IP address and UDP port
- *                    with requests DGM_ID;
- *             END
- *             ELSE
- *             BEGIN
- *                  (*
- *                   * NBDD is NOT able to relay Datagrams for
- *                   * this name
- *                   *)
- *
- *                  send NEGATIVE DATAGRAM QUERY RESPONSE to
- *                    REQUEST source IP address and UDP port
- *
- *                    with requests DGM_ID;
- *             END
- *           END (* datagram query request *)
- *
- *        END (* case *)
- *   END (* procedure *)
+ * NetBIOS Datagram Service (port 138)
  */
-
-
-/*
- * Function: int smb_netbios_datagram_service_daemon(void)
- *
- * Description:
- *
- * 4.4.  DATAGRAM SERVICE PACKETS
- *
- * 4.4.1.  NetBIOS DATAGRAM HEADER
- *
- *                        1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
- *    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |   MSG_TYPE    |     FLAGS     |           DGM_ID              |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |                           SOURCE_IP                           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |          SOURCE_PORT          |          DGM_LENGTH           |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *   |         PACKET_OFFSET         |
- *   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
- *
- *   MSG_TYPE values (in hexidecimal):
- *
- *           10 -  DIRECT_UNIQUE DATAGRAM
- *           11 -  DIRECT_GROUP DATAGRAM
- *           12 -  BROADCAST DATAGRAM
- *           13 -  DATAGRAM ERROR
- *           14 -  DATAGRAM QUERY REQUEST
- *           15 -  DATAGRAM POSITIVE QUERY RESPONSE
- *           16 -  DATAGRAM NEGATIVE QUERY RESPONSE
- *
- *   Bit definitions of the FLAGS field:
- *
- *     0   1   2   3   4   5   6   7
- *   +---+---+---+---+---+---+---+---+
- *   | 0 | 0 | 0 | 0 |  SNT  | F | M |
- *   +---+---+---+---+---+---+---+---+
- *
- *   Symbol     Bit(s)   Description
- *
- *   M               7   MORE flag, If set then more NetBIOS datagram
- *                       fragments follow.
- *
- *   F               6   FIRST packet flag,  If set then this is first
- *                       (and possibly only) fragment of NetBIOS
- *                       datagram
- *
- *   SNT           4,5   Source End-Node type:
- *                          00 = B node
- *                          01 = P node
- *                          10 = M node
- *                          11 = NBDD
- *   RESERVED      0-3   Reserved, must be zero (0)
- *
- * Inputs:
- *	Nothing
- *
- * Returns:
- *	int	-> Description
- */
-
 /*ARGSUSED*/
 void *
-smb_netbios_datagram_service_daemon(void *arg)
+smb_netbios_datagram_service(void *arg)
 {
 	struct sockaddr_in 	sin;
 	struct datagram 	*datagram;
@@ -999,37 +830,40 @@ smb_netbios_datagram_service_daemon(void *arg)
 	(void) mutex_unlock(&smb_dgq_mtx);
 
 	if ((datagram_sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		syslog(LOG_ERR,
-		    "smbd: Could not create AF_INET, SOCK_DGRAM, socket");
-		smb_netbios_chg_status(NETBIOS_DATAGRAM_SVC_FAILED, 1);
-		return (0);
+		syslog(LOG_ERR, "nbt datagram: socket failed: %m");
+		smb_netbios_event(NETBIOS_EVENT_ERROR);
+		return (NULL);
 	}
+
+	flag = 1;
+	(void) setsockopt(datagram_sock, SOL_SOCKET, SO_REUSEADDR, &flag,
+	    sizeof (flag));
 
 	bzero(&sin, sizeof (sin));
 	sin.sin_family = AF_INET;
-	sin.sin_port = htons(DGM_SRVC_UDP_PORT);
+	sin.sin_port = htons(IPPORT_NETBIOS_DGM);
 	if (bind(datagram_sock, (struct sockaddr *)&sin, sizeof (sin)) != 0) {
-		syslog(LOG_ERR, "smbd: Bind to name service port %d failed",
-		    DGM_SRVC_UDP_PORT);
+		syslog(LOG_ERR, "nbt datagram: bind(%d) failed: %m",
+		    IPPORT_NETBIOS_DGM);
 		(void) close(datagram_sock);
-		smb_netbios_chg_status(NETBIOS_DATAGRAM_SVC_FAILED, 1);
-		return (0);
+		smb_netbios_event(NETBIOS_EVENT_ERROR);
+		return (NULL);
 	}
+
+	flag = 1;
 	(void) setsockopt(datagram_sock, SOL_SOCKET, SO_BROADCAST, &flag,
 	    sizeof (flag));
 
-	smb_netbios_chg_status(NETBIOS_DATAGRAM_SVC_RUNNING, 1);
+	smb_netbios_event(NETBIOS_EVENT_DGM_START);
 
-	while (((nb_status.state & NETBIOS_SHUTTING_DOWN) == 0) ||
-	    (nb_status.state & NETBIOS_BROWSER_RUNNING)) {
-		if ((datagram = (struct datagram *)
-		    malloc(sizeof (struct datagram))) == 0) {
-			/* Sleep for 10 sec and try again */
-			(void) sleep(10);
+	while (smb_netbios_running()) {
+		if ((datagram = malloc(sizeof (struct datagram))) == NULL) {
+			/* Sleep for 10 seconds and try again */
+			smb_netbios_sleep(10);
 			continue;
 		}
 
-ignore:		bzero(&datagram->inaddr, sizeof (struct addr_entry));
+ignore:		bzero(&datagram->inaddr, sizeof (addr_entry_t));
 		datagram->inaddr.sinlen = sizeof (datagram->inaddr.sin);
 		datagram->inaddr.forw = datagram->inaddr.back =
 		    &datagram->inaddr;
@@ -1038,9 +872,8 @@ ignore:		bzero(&datagram->inaddr, sizeof (struct addr_entry));
 		    MAX_DATAGRAM_LENGTH, 0,
 		    (struct sockaddr *)&datagram->inaddr.sin,
 		    &datagram->inaddr.sinlen)) < 0) {
-			syslog(LOG_ERR,
-			    "smbd: NETBIOS datagram - recvfrom failed");
-			smb_netbios_chg_status(NETBIOS_DATAGRAM_SVC_FAILED, 1);
+			syslog(LOG_ERR, "nbt datagram: recvfrom failed: %m");
+			smb_netbios_event(NETBIOS_EVENT_ERROR);
 			break;
 		}
 
@@ -1071,17 +904,12 @@ ignore:		bzero(&datagram->inaddr, sizeof (struct addr_entry));
 		smb_netbios_BPM_datagram(datagram);
 	}
 
-	smb_netbios_chg_status(NETBIOS_DATAGRAM_SVC_RUNNING, 0);
-
-	(void) mutex_lock(&nb_status.mtx);
-	while (nb_status.state & NETBIOS_BROWSER_RUNNING)
-		(void) cond_wait(&nb_status.cv, &nb_status.mtx);
-	(void) mutex_unlock(&nb_status.mtx);
+	smb_netbios_event(NETBIOS_EVENT_DGM_STOP);
+	(void) smb_netbios_wait(NETBIOS_EVENT_BROWSER_STOP);
 
 	(void) close(datagram_sock);
 	smb_netbios_datagram_fini();
-	smb_tracef("smbd: Netbios Datagram Service is down\n");
-	return (0);
+	return (NULL);
 }
 
 static char

@@ -47,13 +47,12 @@
 #include <smbsrv/cifs.h>
 #include <smbsrv/ntstatus.h>
 #include <smbrdr.h>
-#include <smbrdr_ipc_util.h>
 
 #define	SMBRDR_DOMAIN_MAX		32
 
 static uint16_t smbrdr_ports[] = {
-	SMB_SRVC_TCP_PORT,
-	SSN_SRVC_TCP_PORT
+	IPPORT_SMB,
+	IPPORT_NETBIOS_SSN
 };
 
 static int smbrdr_nports = sizeof (smbrdr_ports) / sizeof (smbrdr_ports[0]);
@@ -66,7 +65,7 @@ static struct sdb_session *smbrdr_session_init(char *, char *);
 static int smbrdr_trnsprt_connect(struct sdb_session *, uint16_t);
 static int smbrdr_session_connect(char *, char *);
 static int smbrdr_smb_negotiate(struct sdb_session *);
-static int smbrdr_echo(struct sdb_session *);
+static int smbrdr_smb_echo(struct sdb_session *);
 static void smbrdr_session_disconnect(struct sdb_session *, int);
 
 
@@ -77,21 +76,10 @@ smbrdr_session_clear(struct sdb_session *session)
 }
 
 /*
- * Entry pointy for smbrdr initialization.
- */
-void
-smbrdr_init(void)
-{
-	smbrdr_ipc_init();
-}
-
-/*
- * mlsvc_disconnect
- *
  * Disconnects the session with given server.
  */
 void
-mlsvc_disconnect(char *server)
+smbrdr_disconnect(const char *server)
 {
 	struct sdb_session *session;
 
@@ -282,7 +270,7 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	 * Otherwise, we're doing NetBIOS-less SMB, i.e. SMB over TCP,
 	 * which is typically on port 445.
 	 */
-	if (port == SSN_SRVC_TCP_PORT) {
+	if (port == IPPORT_NETBIOS_SSN) {
 		if (smb_getnetbiosname(hostname, MAXHOSTNAMELEN) != 0) {
 			syslog(LOG_DEBUG, "smbrdr: no hostname");
 			if (sock != 0)
@@ -532,7 +520,7 @@ smbrdr_session_unlock(struct sdb_session *session)
  *            the pointer.
  */
 struct sdb_session *
-smbrdr_session_lock(char *server, char *username, int lmode)
+smbrdr_session_lock(const char *server, const char *username, int lmode)
 {
 	struct sdb_session *session;
 	int i;
@@ -563,39 +551,6 @@ smbrdr_session_lock(char *server, char *username, int lmode)
 	}
 
 	return (NULL);
-}
-
-/*
- * smbrdr_session_info
- *
- * Return session information related to the specified
- * named pipe (fid).
- */
-int
-smbrdr_session_info(int fid, smbrdr_session_info_t *si)
-{
-	struct sdb_session *session;
-	struct sdb_netuse *netuse;
-	struct sdb_ofile *ofile;
-
-	if (si == NULL)
-		return (-1);
-
-	if ((ofile = smbrdr_ofile_get(fid)) == NULL) {
-		syslog(LOG_DEBUG,
-		    "smbrdr_session_info: unknown file (%d)", fid);
-		return (-1);
-	}
-
-	netuse = ofile->netuse;
-	session = netuse->session;
-
-	si->si_server_os = session->remote_os;
-	si->si_server_lm = session->remote_lm;
-	si->si_dc_type = session->pdc_type;
-
-	smbrdr_ofile_put(ofile);
-	return (0);
 }
 
 /*
@@ -635,11 +590,8 @@ smbrdr_dump_sessions(void)
 	}
 }
 
-/*
- * mlsvc_echo
- */
 int
-mlsvc_echo(char *server)
+smbrdr_echo(const char *server)
 {
 	struct sdb_session *session;
 	int res = 0;
@@ -647,7 +599,7 @@ mlsvc_echo(char *server)
 	if ((session = smbrdr_session_lock(server, 0, SDB_SLCK_WRITE)) == 0)
 		return (1);
 
-	if (smbrdr_echo(session) != 0) {
+	if (smbrdr_smb_echo(session) != 0) {
 		session->state = SDB_SSTATE_STALE;
 		res = -1;
 	}
@@ -657,8 +609,6 @@ mlsvc_echo(char *server)
 }
 
 /*
- * smbrdr_echo
- *
  * This request can be used to test the connection to the server. The
  * server should echo the data sent. The server should ignore the tid
  * in the header, so this request when there are no tree connections.
@@ -667,7 +617,7 @@ mlsvc_echo(char *server)
  * Return 0 on success. Otherwise return a -ve error code.
  */
 static int
-smbrdr_echo(struct sdb_session *session)
+smbrdr_smb_echo(struct sdb_session *session)
 {
 	static char *echo_str = "smbrdr";
 	smbrdr_handle_t srh;

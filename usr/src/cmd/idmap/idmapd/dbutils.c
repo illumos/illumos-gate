@@ -2572,9 +2572,9 @@ generate_localsid(idmap_mapping *req, idmap_id_res *res, int is_user,
 	 * way we generate localSIDs.
 	 */
 	if (is_user && res->id.idtype == IDMAP_GSID)
-		return (IDMAP_ERR_NOMAPPING);
+		return (IDMAP_ERR_NOTGROUP);
 	if (!is_user && res->id.idtype == IDMAP_USID)
-		return (IDMAP_ERR_NOMAPPING);
+		return (IDMAP_ERR_NOTUSER);
 
 	/* Skip 1000 UIDs */
 	if (is_user &&

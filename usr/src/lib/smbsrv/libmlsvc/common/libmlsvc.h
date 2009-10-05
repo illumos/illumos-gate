@@ -42,7 +42,6 @@
 #include <smbsrv/smb_share.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/ndl/lsarpc.ndl>
 
@@ -58,15 +57,15 @@ extern uint32_t mlsvc_lookup_sid(smb_sid_t *, char **);
  * information.
  */
 
-extern boolean_t smb_locate_dc(char *, char *, smb_domain_t *);
-extern boolean_t smb_domain_getinfo(smb_domain_t *);
-
+extern boolean_t smb_locate_dc(char *, char *, smb_domainex_t *);
 
 extern void dssetup_clear_domain_info(void);
+extern void mlsvc_disconnect(const char *);
 extern int mlsvc_init(void);
 extern void mlsvc_fini(void);
+extern int mlsvc_ping(const char *);
 extern DWORD mlsvc_netlogon(char *, char *);
-extern DWORD mlsvc_join(smb_domain_t *, char *, char *);
+extern DWORD mlsvc_join(smb_domainex_t *, char *, char *);
 
 
 /*
@@ -136,6 +135,7 @@ typedef struct srvsvc_server_info {
 	uint32_t	sv_version_minor;
 	uint32_t	sv_type;
 	char		*sv_comment;
+	uint32_t	sv_os;
 } srvsvc_server_info_t;
 
 int srvsvc_net_server_getinfo(char *, char *, srvsvc_server_info_t *);
@@ -151,16 +151,16 @@ int srvsvc_net_server_getinfo(char *, char *, srvsvc_server_info_t *);
 typedef struct mlsvc_handle {
 	ndr_hdid_t			handle;
 	ndr_client_t			*clnt;
-	int				remote_os;
+	uint32_t			remote_os;
 	srvsvc_server_info_t		svinfo;
 } mlsvc_handle_t;
 
+void ndr_rpc_init(void);
+void ndr_rpc_fini(void);
 int ndr_rpc_bind(mlsvc_handle_t *, char *, char *, char *, const char *);
 void ndr_rpc_unbind(mlsvc_handle_t *);
 int ndr_rpc_call(mlsvc_handle_t *, int, void *);
-void ndr_rpc_server_setinfo(mlsvc_handle_t *, const srvsvc_server_info_t *);
-void ndr_rpc_server_getinfo(mlsvc_handle_t *, srvsvc_server_info_t *);
-int ndr_rpc_server_os(mlsvc_handle_t *);
+uint32_t ndr_rpc_server_os(mlsvc_handle_t *);
 int ndr_rpc_get_ssnkey(mlsvc_handle_t *, unsigned char *, size_t);
 void *ndr_rpc_malloc(mlsvc_handle_t *, size_t);
 ndr_heap_t *ndr_rpc_get_heap(mlsvc_handle_t *);

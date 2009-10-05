@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+#include <sys/tzfile.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -38,10 +39,8 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
-
 #include <smbsrv/cifs.h>
 #include <smbsrv/mailslot.h>
-
 #include <smbns_browser.h>
 #include <smbns_netbios.h>
 
@@ -81,8 +80,6 @@ static int smb_browser_init(void);
 static void smb_browser_infoinit(void);
 static void smb_browser_infoterm(void);
 static void smb_browser_infofree(void);
-
-
 
 
 void
@@ -653,7 +650,7 @@ smb_browser_addr_of_subnet(struct name_entry *name, smb_hostinfo_t *hinfo,
     struct name_entry *result)
 {
 	uint32_t ipaddr, mask, saddr;
-	struct addr_entry *addr;
+	addr_entry_t *addr;
 
 	if (name == NULL)
 		return (-1);
@@ -692,7 +689,7 @@ smb_browser_bcast_addr_of_subnet(struct name_entry *name, uint32_t bcast,
 	result->addr_list.sin.sin_family = AF_INET;
 	result->addr_list.sinlen = sizeof (result->addr_list.sin);
 	result->addr_list.sin.sin_addr.s_addr = bcast;
-	result->addr_list.sin.sin_port = htons(DGM_SRVC_UDP_PORT);
+	result->addr_list.sin.sin_port = htons(IPPORT_NETBIOS_DGM);
 	result->addr_list.forw = result->addr_list.back = &result->addr_list;
 	return (0);
 }
@@ -772,7 +769,7 @@ smb_browser_bcast_addr_of_subnet(struct name_entry *name, uint32_t bcast,
 static void
 smb_browser_send_HostAnnouncement(smb_hostinfo_t *hinfo,
     uint32_t next_announcement, boolean_t remove,
-    struct addr_entry *addr, char suffix)
+    addr_entry_t *addr, char suffix)
 {
 	smb_msgbuf_t mb;
 	int offset, announce_len, data_length;
@@ -801,9 +798,9 @@ smb_browser_send_HostAnnouncement(smb_hostinfo_t *hinfo,
 	}
 
 	/* give some extra room */
-	buffer = (unsigned char *)malloc(MAX_DATAGRAM_LENGTH * 2);
-	if (buffer == 0) {
-		syslog(LOG_ERR, "HostAnnouncement: resource shortage");
+	buffer = malloc(MAX_DATAGRAM_LENGTH * 2);
+	if (buffer == NULL) {
+		syslog(LOG_DEBUG, "smb browser: HostAnnouncement: %m");
 		return;
 	}
 
@@ -824,7 +821,7 @@ smb_browser_send_HostAnnouncement(smb_hostinfo_t *hinfo,
 	 * specifying a type of 0 just prior to shutting down, to allow it to
 	 * quickly be removed from the list of available servers.
 	 */
-	if (remove || (nb_status.state & NETBIOS_SHUTTING_DOWN))
+	if (remove || (!smb_netbios_running()))
 		type = 0;
 	else
 		type = hinfo->hi_type;
@@ -860,11 +857,11 @@ smb_browser_process_AnnouncementRequest(struct datagram *datagram,
 	boolean_t h_found = B_FALSE;
 
 	if (strcmp(mailbox, MAILSLOT_LANMAN) != 0) {
-		syslog(LOG_DEBUG, "smb_browse: Wrong Mailbox (%s)", mailbox);
+		syslog(LOG_DEBUG, "smb browser: wrong mailbox (%s)", mailbox);
 		return;
 	}
 
-	(void) sleep(delay);
+	smb_netbios_sleep(delay);
 
 	(void) rw_rdlock(&smb_binfo.bi_hlist_rwl);
 	hinfo = list_head(&smb_binfo.bi_hlist);
@@ -882,7 +879,7 @@ smb_browser_process_AnnouncementRequest(struct datagram *datagram,
 	if (h_found) {
 		next_announcement = hinfo->hi_nextannouce * 60 * 1000;
 		smb_browser_send_HostAnnouncement(hinfo, next_announcement,
-		    B_FALSE, &datagram->src.addr_list, 0x1D);
+		    B_FALSE, &datagram->src.addr_list, NBT_MB);
 	}
 	(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
 }
@@ -915,7 +912,7 @@ smb_browser_dispatch(void *arg)
 	unsigned char 	*data;
 	int		datalen;
 
-	syslog(LOG_DEBUG, "smb_browse: packet_received");
+	syslog(LOG_DEBUG, "smb browser: packet received");
 
 	smb_msgbuf_init(&mb, datagram->data, datagram->data_length, 0);
 	rc = smb_msgbuf_decode(&mb, "Mb27.bwwwwb.w6.wwwwb.wwwws",
@@ -939,7 +936,7 @@ smb_browser_dispatch(void *arg)
 	    &mailbox);			/* Mailbox address */
 
 	if (rc < 0) {
-		syslog(LOG_ERR, "smb_browser_dispatch: decode error");
+		syslog(LOG_ERR, "smb browser: decode error");
 		smb_msgbuf_term(&mb);
 		free(datagram);
 		return (0);
@@ -972,7 +969,7 @@ smb_browser_dispatch(void *arg)
 		break;
 
 	default:
-		syslog(LOG_DEBUG, "smb_browse: invalid message_type(%d, %x)",
+		syslog(LOG_DEBUG, "smb browser: invalid message type(%d, %x)",
 		    message_type, message_type);
 		break;
 	}
@@ -1064,7 +1061,7 @@ smb_browser_config(void)
 	(void) utf8_strupr(resource_domain);
 
 	/* domain<00> */
-	smb_init_name_struct((unsigned char *)resource_domain, 0x00,
+	smb_init_name_struct((unsigned char *)resource_domain, NBT_WKSTA,
 	    0, 0, 0, 0, 0, &name);
 	entry = smb_name_find_name(&name);
 	smb_name_unlock_name(entry);
@@ -1072,9 +1069,9 @@ smb_browser_config(void)
 	(void) rw_rdlock(&smb_binfo.bi_hlist_rwl);
 	hinfo = list_head(&smb_binfo.bi_hlist);
 	while (hinfo) {
-		smb_init_name_struct((unsigned char *)resource_domain, 0x00, 0,
-		    hinfo->hi_nic.nic_ip.a_ipv4,
-		    htons(DGM_SRVC_UDP_PORT), NAME_ATTR_GROUP,
+		smb_init_name_struct((unsigned char *)resource_domain,
+		    NBT_WKSTA, 0, hinfo->hi_nic.nic_ip.a_ipv4,
+		    htons(IPPORT_NETBIOS_DGM), NAME_ATTR_GROUP,
 		    NAME_ATTR_LOCAL, &name);
 		(void) smb_name_add_name(&name);
 
@@ -1083,7 +1080,7 @@ smb_browser_config(void)
 	(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
 
 	/* All our local master browsers */
-	smb_init_name_struct((unsigned char *)resource_domain, 0x1D,
+	smb_init_name_struct((unsigned char *)resource_domain, NBT_MB,
 	    0, 0, 0, 0, 0, &dest);
 	entry = smb_name_find_name(&dest);
 
@@ -1094,7 +1091,7 @@ smb_browser_config(void)
 			rc = smb_browser_addr_of_subnet(entry, hinfo, &master);
 			if (rc == 0) {
 				syslog(LOG_DEBUG,
-				    "smbd: Master browser found at %s",
+				    "smb browser: master browser found at %s",
 				    inet_ntoa(master.addr_list.sin.sin_addr));
 			}
 			hinfo = list_next(&smb_binfo.bi_hlist, hinfo);
@@ -1106,10 +1103,11 @@ smb_browser_config(void)
 
 	/* Domain master browser */
 	smb_init_name_struct((unsigned char *)resource_domain,
-	    0x1B, 0, 0, 0, 0, 0, &dest);
+	    NBT_DMB, 0, 0, 0, 0, 0, &dest);
 
 	if ((entry = smb_name_find_name(&dest)) != 0) {
-		syslog(LOG_DEBUG, "smbd: Domain Master browser for %s is %s",
+		syslog(LOG_DEBUG,
+		    "smb browser: domain master browser for %s is %s",
 		    resource_domain,
 		    inet_ntoa(entry->addr_list.sin.sin_addr));
 		smb_name_unlock_name(entry);
@@ -1161,8 +1159,9 @@ smb_browser_init(void)
 		(void) utf8_strupr(hinfo->hi_nbname);
 		/* 0x20: file server service  */
 		smb_init_name_struct((unsigned char *)hinfo->hi_nbname,
-		    0x20, 0, hinfo->hi_nic.nic_ip.a_ipv4,
-		    htons(DGM_SRVC_UDP_PORT), NAME_ATTR_UNIQUE, NAME_ATTR_LOCAL,
+		    NBT_SERVER, 0, hinfo->hi_nic.nic_ip.a_ipv4,
+		    htons(IPPORT_NETBIOS_DGM),
+		    NAME_ATTR_UNIQUE, NAME_ATTR_LOCAL,
 		    &hinfo->hi_netname);
 
 		list_insert_tail(&smb_binfo.bi_hlist, hinfo);
@@ -1186,17 +1185,17 @@ smb_browser_non_master_duties(smb_hostinfo_t *hinfo, boolean_t remove)
 {
 	struct name_entry name;
 	struct name_entry *dest;
-	struct addr_entry addr;
+	addr_entry_t addr;
 	char resource_domain[SMB_PI_MAX_DOMAIN];
 
 	smb_browser_send_HostAnnouncement(hinfo, hinfo->hi_interval,
-	    remove, 0, 0x1D);
+	    remove, 0, NBT_MB);
 	if (smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN) != 0)
 		return;
 
 	(void) utf8_strupr(resource_domain);
 
-	smb_init_name_struct((unsigned char *)resource_domain, 0x1D,
+	smb_init_name_struct((unsigned char *)resource_domain, NBT_MB,
 	    0, 0, 0, 0, 0, &name);
 
 	if ((dest = smb_name_find_name(&name))) {
@@ -1204,16 +1203,16 @@ smb_browser_non_master_duties(smb_hostinfo_t *hinfo, boolean_t remove)
 		addr.forw = addr.back = &addr;
 		smb_name_unlock_name(dest);
 		smb_browser_send_HostAnnouncement(hinfo, hinfo->hi_interval,
-		    remove, &addr, 0x1D);
+		    remove, &addr, NBT_MB);
 	} else {
-		smb_init_name_struct((unsigned char *)resource_domain, 0x1B,
-		    0, 0, 0, 0, 0, &name);
+		smb_init_name_struct((unsigned char *)resource_domain,
+		    NBT_DMB, 0, 0, 0, 0, 0, &name);
 		if ((dest = smb_name_find_name(&name))) {
 			addr = dest->addr_list;
 			addr.forw = addr.back = &addr;
 			smb_name_unlock_name(dest);
 			smb_browser_send_HostAnnouncement(hinfo,
-			    remove, hinfo->hi_interval, &addr, 0x1B);
+			    remove, hinfo->hi_interval, &addr, NBT_DMB);
 		}
 	}
 
@@ -1235,61 +1234,24 @@ smb_browser_non_master_duties(smb_hostinfo_t *hinfo, boolean_t remove)
 
 
 /*
- * smb_browser_sleep
- *
- * Put browser in 1 minute sleep if netbios services are not
- * shutting down and both name and datagram services are still
- * running. It'll wake up after 1 minute or if one of the above
- * conditions go false. It checks the conditions again and return
- * 1 if everything is ok or 0 if browser shouldn't continue
- * running.
- */
-static boolean_t
-smb_browser_sleep(void)
-{
-	boolean_t slept = B_FALSE;
-	timestruc_t to;
-
-	(void) mutex_lock(&nb_status.mtx);
-	while (((nb_status.state & NETBIOS_SHUTTING_DOWN) == 0) &&
-	    (nb_status.state & NETBIOS_NAME_SVC_RUNNING) &&
-	    (nb_status.state & NETBIOS_DATAGRAM_SVC_RUNNING)) {
-
-		if (slept) {
-			(void) mutex_unlock(&nb_status.mtx);
-			return (B_TRUE);
-		}
-
-		to.tv_sec = 60;  /* 1 minute */
-		to.tv_nsec = 0;
-		(void) cond_reltimedwait(&nb_status.cv, &nb_status.mtx, &to);
-		slept = B_TRUE;
-	}
-	(void) mutex_unlock(&nb_status.mtx);
-
-	return (B_FALSE);
-}
-
-/*
- * smb_browser_daemon
- *
- * Smb Netbios browser daemon.
+ * SMB NetBIOS Browser Service
  */
 /*ARGSUSED*/
 void *
-smb_browser_daemon(void *arg)
+smb_browser_service(void *arg)
 {
 	smb_hostinfo_t *hinfo;
 
 	smb_browser_infoinit();
 	smb_browser_config();
 
-	smb_netbios_chg_status(NETBIOS_BROWSER_RUNNING, 1);
+	smb_netbios_event(NETBIOS_EVENT_BROWSER_START);
 
 restart:
 	do {
 		(void) rw_rdlock(&smb_binfo.bi_hlist_rwl);
 		hinfo = list_head(&smb_binfo.bi_hlist);
+
 		while (hinfo) {
 			if (--hinfo->hi_nextannouce > 0 ||
 			    hinfo->hi_nic.nic_bcast == 0) {
@@ -1312,11 +1274,13 @@ restart:
 
 			hinfo = list_next(&smb_binfo.bi_hlist, hinfo);
 		}
+
 		(void) rw_unlock(&smb_binfo.bi_hlist_rwl);
-	} while (smb_browser_sleep());
+		smb_netbios_sleep(SECSPERMIN);	/* 1 minute */
+	} while (smb_netbios_running());
 
 	smb_browser_infoterm();
-	smb_netbios_chg_status(NETBIOS_BROWSER_RUNNING, 0);
+	smb_netbios_event(NETBIOS_EVENT_BROWSER_STOP);
 	return (0);
 }
 
@@ -1367,8 +1331,8 @@ smb_browser_netlogon(char *domain, char *dc, uint32_t dc_len)
 /*
  * smb_browser_infoinit
  *
- * This function is called only once when browser daemon starts
- * to initialize global smb_binfo structure
+ * This function is called only once when the browser starts
+ * to initialize the global smb_binfo structure.
  */
 static void
 smb_browser_infoinit(void)
@@ -1391,8 +1355,8 @@ smb_browser_infoinit(void)
 /*
  * smb_browser_infoterm
  *
- * This function is called only once when browser daemon stops
- * to destruct smb_binfo structure
+ * This function is called only once when the browser stops
+ * to destroy the smb_binfo structure.
  */
 static void
 smb_browser_infoterm(void)

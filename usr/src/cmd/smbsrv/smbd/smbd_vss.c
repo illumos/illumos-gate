@@ -32,7 +32,6 @@
 #include <libzfs.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>

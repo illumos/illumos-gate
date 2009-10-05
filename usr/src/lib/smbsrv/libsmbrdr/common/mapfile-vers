@@ -39,23 +39,16 @@
 
 SUNWprivate {
     global:
-	mlsvc_disconnect;
-	mlsvc_echo;
-	mlsvc_logon;
 	smbrdr_close_pipe;
+	smbrdr_disconnect;
 	smbrdr_dump_netuse;
 	smbrdr_dump_ofiles;
 	smbrdr_dump_sessions;
+	smbrdr_echo;
 	smbrdr_get_ssnkey;
-	smbrdr_init;
-	smbrdr_ipc_commit;
-	smbrdr_ipc_get_user;
-	smbrdr_ipc_rollback;
-	smbrdr_ipc_set;
-	smbrdr_ipc_get_passwd;
+	smbrdr_logon;
 	smbrdr_open_pipe;
 	smbrdr_readx;
-	smbrdr_session_info;
 	smbrdr_transact;
     local:
 	*;

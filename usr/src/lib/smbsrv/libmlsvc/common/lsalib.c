@@ -32,7 +32,6 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_token.h>
@@ -139,11 +138,13 @@ lsa_lookup_sid(smb_sid_t *sid, smb_account_t *info)
  */
 DWORD
 lsa_query_primary_domain_info(char *server, char *domain,
-    nt_domain_t *info)
+    smb_domain_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD status;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
@@ -165,11 +166,13 @@ lsa_query_primary_domain_info(char *server, char *domain,
  */
 DWORD
 lsa_query_account_domain_info(char *server, char *domain,
-    nt_domain_t *info)
+    smb_domain_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD status;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
@@ -192,11 +195,13 @@ lsa_query_account_domain_info(char *server, char *domain,
  * Returns NT status codes.
  */
 DWORD
-lsa_query_dns_domain_info(char *server, char *domain, nt_domain_t *info)
+lsa_query_dns_domain_info(char *server, char *domain, smb_domain_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD status;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
@@ -224,7 +229,9 @@ lsa_enum_trusted_domains(char *server, char *domain,
 	mlsvc_handle_t domain_handle;
 	DWORD enum_context;
 	DWORD status;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
@@ -261,7 +268,9 @@ lsa_enum_trusted_domains_ex(char *server, char *domain,
 	mlsvc_handle_t domain_handle;
 	DWORD enum_context;
 	DWORD status;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
@@ -335,14 +344,16 @@ static uint32_t
 lsa_lookup_name_domain(char *account_name, smb_account_t *info)
 {
 	mlsvc_handle_t domain_handle;
-	smb_domain_t dinfo;
-	char *user = smbrdr_ipc_get_user();
+	smb_domainex_t dinfo;
 	uint32_t status;
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if (!smb_domain_getinfo(&dinfo))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if (lsar_open(dinfo.d_dc, dinfo.d_info.di_nbname, user,
+	if (lsar_open(dinfo.d_dc, dinfo.d_primary.di_nbname, user,
 	    &domain_handle) != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
@@ -378,13 +389,15 @@ lsa_lookup_privs(char *account_name, char *target_name, smb_account_t *ainfo)
 {
 	mlsvc_handle_t domain_handle;
 	int rc;
-	char *user = smbrdr_ipc_get_user();
-	smb_domain_t dinfo;
+	smb_domainex_t dinfo;
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if (!smb_domain_getinfo(&dinfo))
 		return (-1);
 
-	if ((lsar_open(dinfo.d_dc, dinfo.d_info.di_nbname, user,
+	if ((lsar_open(dinfo.d_dc, dinfo.d_primary.di_nbname, user,
 	    &domain_handle)) != 0)
 		return (-1);
 
@@ -409,7 +422,9 @@ lsa_list_privs(char *server, char *domain)
 	mlsvc_handle_t domain_handle;
 	int rc;
 	int i;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	rc = lsar_open(server, domain, user, &domain_handle);
 	if (rc != 0)
@@ -519,14 +534,16 @@ static uint32_t
 lsa_lookup_sid_domain(smb_sid_t *sid, smb_account_t *ainfo)
 {
 	mlsvc_handle_t domain_handle;
-	char *user = smbrdr_ipc_get_user();
 	uint32_t status;
-	smb_domain_t dinfo;
+	smb_domainex_t dinfo;
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	if (!smb_domain_getinfo(&dinfo))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if (lsar_open(dinfo.d_dc, dinfo.d_info.di_nbname, user,
+	if (lsar_open(dinfo.d_dc, dinfo.d_primary.di_nbname, user,
 	    &domain_handle) != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 

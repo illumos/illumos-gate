@@ -31,7 +31,6 @@
 #include <alloca.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlsvc.h>
 
 #include <smbsrv/ntstatus.h>
@@ -114,7 +113,9 @@ sam_create_account(char *server, char *domain_name, char *account_name,
 	DWORD rid;
 	DWORD status;
 	int rc;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	rc = samr_open(server, domain_name, user, SAM_CONNECT_CREATE_ACCOUNT,
 	    &samr_handle);
@@ -199,7 +200,9 @@ sam_delete_account(char *server, char *domain_name, char *account_name)
 	DWORD access_mask;
 	DWORD status;
 	int rc;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	rc = samr_open(server, domain_name, user, SAM_LOOKUP_INFORMATION,
 	    &samr_handle);
@@ -250,7 +253,9 @@ sam_check_user(char *server, char *domain_name, char *account_name)
 	DWORD access_mask;
 	DWORD status;
 	int rc;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	rc = samr_open(server, domain_name, user, SAM_LOOKUP_INFORMATION,
 	    &samr_handle);
@@ -306,7 +311,9 @@ sam_lookup_name(char *server, char *domain_name, char *account_name,
 	struct samr_sid *domain_sid;
 	int rc;
 	DWORD status;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	*rid_ret = 0;
 
@@ -352,7 +359,9 @@ sam_get_local_domains(char *server, char *domain_name)
 	mlsvc_handle_t samr_handle;
 	DWORD status;
 	int rc;
-	char *user = smbrdr_ipc_get_user();
+	char user[SMB_USERNAME_MAXLEN];
+
+	smb_ipc_get_user(user, SMB_USERNAME_MAXLEN);
 
 	rc = samr_open(server, domain_name, user, SAM_ENUM_LOCAL_DOMAIN,
 	    &samr_handle);
@@ -399,21 +408,20 @@ sam_oem_password(oem_password_t *oem_password, unsigned char *new_password,
 static struct samr_sid *
 sam_get_domain_sid(mlsvc_handle_t *samr_handle, char *server, char *domain_name)
 {
-	struct samr_sid *sid = NULL;
-	smb_domain_t domain;
+	smb_sid_t *sid = NULL;
+	smb_domainex_t domain;
 
 	if (ndr_rpc_server_os(samr_handle) == NATIVE_OS_WIN2000) {
 		if (!smb_domain_getinfo(&domain)) {
 			if (lsa_query_account_domain_info(server, domain_name,
-			    &domain.d_info) != NT_STATUS_SUCCESS)
+			    &domain.d_primary) != NT_STATUS_SUCCESS)
 				return (NULL);
 		}
 
-		sid = (struct samr_sid *)smb_sid_fromstr(domain.d_info.di_sid);
+		sid = smb_sid_fromstr(domain.d_primary.di_sid);
 	} else {
-		sid = (struct samr_sid *)samr_lookup_domain(samr_handle,
-		    domain_name);
+		sid = samr_lookup_domain(samr_handle, domain_name);
 	}
 
-	return (sid);
+	return ((struct samr_sid *)sid);
 }

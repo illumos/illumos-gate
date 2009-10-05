@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,10 @@
 #define ARG_IS(X)	[arg_is(X)]
 
 #define REFERENCE	[reference]
+#define REF		[reference]
+#define UNIQUE		[unique]
+#define PTR		[ptr]
+#define POINTER_DEFAULT(X)	[pointer_default(X)]
 
 #define ANY_SIZE_ARRAY	*
 
@@ -57,6 +61,7 @@
 #define BYTE	uchar
 #define WORD	ushort
 #define DWORD	ulong
+#define ntstatus_t	ulong
 
 #define LPTSTR	STRING wchar *
 
@@ -101,6 +106,10 @@
 #define ARG_IS(X)
 
 #define REFERENCE
+#define REF
+#define UNIQUE
+#define PTR
+#define POINTER_DEFAULT(X)
 
 #define IMPORT_EXTERN
 

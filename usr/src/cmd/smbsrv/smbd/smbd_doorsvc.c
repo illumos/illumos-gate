@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SMBd door server
@@ -178,8 +176,6 @@ smb_door_srv_func(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 		goto door_return;
 	}
 
-	syslog(LOG_DEBUG, "smb_door_srv_func: execute server routine"
-	    "(opcode=%d)", opcode);
 	if (smb_dr_is_valid_opcode(opcode) != 0) {
 		tmpbuf = smb_door_srv_err_hdlr(SMB_DR_OP_ERR_INVALID_OPCODE,
 		    &rbufsize);

@@ -520,7 +520,7 @@ lsarpc_s_GetConnectedUser(void *arg, ndr_xa_t *mxa)
 	struct mslsa_GetConnectedUser *param = arg;
 	smb_netuserinfo_t *user = &mxa->pipe->np_user;
 	DWORD status = NT_STATUS_SUCCESS;
-	smb_domain_t di;
+	smb_domainex_t di;
 	int rc1;
 	int rc2;
 
@@ -638,16 +638,16 @@ static DWORD
 lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *info,
     ndr_xa_t *mxa)
 {
-	nt_domain_t di;
+	smb_domain_t di;
 	boolean_t found;
 	int rc;
 
 	bzero(info, sizeof (struct mslsa_PrimaryDomainInfo));
 
 	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
-		found = nt_domain_lookup_type(NT_DOMAIN_LOCAL, &di);
+		found = smb_domain_lookup_type(SMB_DOMAIN_LOCAL, &di);
 	else
-		found = nt_domain_lookup_type(NT_DOMAIN_PRIMARY, &di);
+		found = smb_domain_lookup_type(SMB_DOMAIN_PRIMARY, &di);
 
 	if (!found)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
@@ -676,12 +676,12 @@ static DWORD
 lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *info,
     ndr_xa_t *mxa)
 {
-	nt_domain_t di;
+	smb_domain_t di;
 	int rc;
 
 	bzero(info, sizeof (struct mslsa_AccountDomainInfo));
 
-	if (!nt_domain_lookup_type(NT_DOMAIN_LOCAL, &di))
+	if (!smb_domain_lookup_type(SMB_DOMAIN_LOCAL, &di))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
 	rc = NDR_MSTRING(mxa, di.di_nbname, (ndr_mstring_t *)&info->name);

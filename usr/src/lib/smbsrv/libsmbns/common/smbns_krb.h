@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SMBSRV_SMB_KRB5_H
-#define	_SMBSRV_SMB_KRB5_H
+#ifndef _SMBSRV_SMB_KRB_H
+#define	_SMBSRV_SMB_KRB_H
 
-#include <gssapi/gssapi.h>
 #include <kerberosv5/krb5.h>
 
 #ifdef __cplusplus
@@ -45,19 +44,7 @@ typedef enum smb_krb5_spn_idx {
 	SMBKRB5_SPN_IDX_MAX
 } smb_krb5_spn_idx_t;
 
-extern gss_OID gss_nt_user_name;
-extern gss_OID gss_nt_machine_uid_name;
-extern gss_OID gss_nt_string_uid_name;
-extern gss_OID gss_nt_service_name;
-extern gss_OID gss_nt_exported_name;
-extern gss_OID gss_nt_service_name_v2;
-
-int krb5_acquire_cred_kinit(char *, char *, gss_cred_id_t *,
-    gss_OID *, int *, char *);
-int krb5_establish_sec_ctx_kinit(char *, char *, gss_cred_id_t,
-    gss_ctx_id_t *, gss_name_t, gss_OID, int, gss_buffer_desc *,
-    gss_buffer_desc *, OM_uint32 *, OM_uint32 *, int *,
-    int *, OM_uint32 *, char *);
+int smb_kinit(char *, char *);
 char *smb_krb5_get_spn(smb_krb5_spn_idx_t idx, char *fqhost);
 char *smb_krb5_get_upn(char *spn, char *domain);
 int smb_krb5_ctx_init(krb5_context *ctx);
@@ -76,4 +63,4 @@ boolean_t smb_krb5_find_keytab_entries(const char *fqhn, char *fname);
 }
 #endif
 
-#endif /* _SMBSRV_SMB_KRB5_H */
+#endif /* _SMBSRV_SMB_KRB_H */

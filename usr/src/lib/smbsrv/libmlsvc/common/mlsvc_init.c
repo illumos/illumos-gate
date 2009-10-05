@@ -60,6 +60,7 @@ mlsvc_init(void)
 	if ((rc = smb_dclocator_init()) != 0)
 		return (rc);
 
+	ndr_rpc_init();
 	srvsvc_initialize();
 	wkssvc_initialize();
 	lsarpc_initialize();
@@ -86,6 +87,7 @@ mlsvc_fini(void)
 	smb_logon_fini();
 	svcctl_finalize();
 	logr_finalize();
+	ndr_rpc_fini();
 }
 
 /*ARGSUSED*/

@@ -59,7 +59,7 @@ typedef enum {
 
 typedef struct samr_keydata {
 	samr_key_t kd_key;
-	nt_domain_type_t kd_type;
+	smb_domain_type_t kd_type;
 	DWORD kd_rid;
 } samr_keydata_t;
 
@@ -93,7 +93,7 @@ typedef enum {
 
 #define	SAMR_SUPPORTED_DISPLEVEL(lvl) (lvl == DomainDisplayUser)
 
-static ndr_hdid_t *samr_hdalloc(ndr_xa_t *, samr_key_t, nt_domain_type_t,
+static ndr_hdid_t *samr_hdalloc(ndr_xa_t *, samr_key_t, smb_domain_type_t,
     DWORD);
 static void samr_hdfree(ndr_xa_t *, ndr_hdid_t *);
 static ndr_handle_t *samr_hdlookup(ndr_xa_t *, ndr_hdid_t *, samr_key_t);
@@ -147,7 +147,7 @@ samr_call_stub(ndr_xa_t *mxa)
  * Handle allocation wrapper to setup the local context.
  */
 static ndr_hdid_t *
-samr_hdalloc(ndr_xa_t *mxa, samr_key_t key, nt_domain_type_t domain_type,
+samr_hdalloc(ndr_xa_t *mxa, samr_key_t key, smb_domain_type_t domain_type,
     DWORD rid)
 {
 	samr_keydata_t *data;
@@ -213,7 +213,7 @@ samr_s_ConnectAnon(void *arg, ndr_xa_t *mxa)
 	struct samr_ConnectAnon *param = arg;
 	ndr_hdid_t *id;
 
-	id = samr_hdalloc(mxa, SAMR_KEY_CONNECT, NT_DOMAIN_NULL, 0);
+	id = samr_hdalloc(mxa, SAMR_KEY_CONNECT, SMB_DOMAIN_NULL, 0);
 	if (id) {
 		bcopy(id, &param->handle, sizeof (samr_handle_t));
 		param->status = 0;
@@ -257,7 +257,7 @@ samr_s_LookupDomain(void *arg, ndr_xa_t *mxa)
 {
 	struct samr_LookupDomain *param = arg;
 	char *domain_name;
-	nt_domain_t di;
+	smb_domain_t di;
 
 	if ((domain_name = (char *)param->domain_name.str) == NULL) {
 		bzero(param, sizeof (struct samr_LookupDomain));
@@ -265,7 +265,7 @@ samr_s_LookupDomain(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
-	if (!nt_domain_lookup_name(domain_name, &di)) {
+	if (!smb_domain_lookup_name(domain_name, &di)) {
 		bzero(param, sizeof (struct samr_LookupDomain));
 		param->status = NT_SC_ERROR(NT_STATUS_NO_SUCH_DOMAIN);
 		return (NDR_DRC_OK);
@@ -370,7 +370,7 @@ samr_s_OpenDomain(void *arg, ndr_xa_t *mxa)
 {
 	struct samr_OpenDomain *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
-	nt_domain_t domain;
+	smb_domain_t domain;
 
 	if (samr_hdlookup(mxa, id, SAMR_KEY_CONNECT) == NULL) {
 		bzero(&param->domain_handle, sizeof (samr_handle_t));
@@ -378,14 +378,14 @@ samr_s_OpenDomain(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
-	if (!nt_domain_lookup_sid((smb_sid_t *)param->sid, &domain)) {
+	if (!smb_domain_lookup_sid((smb_sid_t *)param->sid, &domain)) {
 		bzero(&param->domain_handle, sizeof (samr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 		return (NDR_DRC_OK);
 	}
 
-	if ((domain.di_type != NT_DOMAIN_BUILTIN) &&
-	    (domain.di_type != NT_DOMAIN_LOCAL)) {
+	if ((domain.di_type != SMB_DOMAIN_BUILTIN) &&
+	    (domain.di_type != SMB_DOMAIN_LOCAL)) {
 		bzero(&param->domain_handle, sizeof (samr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 		return (NDR_DRC_OK);
@@ -444,13 +444,13 @@ samr_s_QueryDomainInfo(void *arg, ndr_xa_t *mxa)
 	data = (samr_keydata_t *)hd->nh_data;
 
 	switch (data->kd_type) {
-	case NT_DOMAIN_BUILTIN:
+	case SMB_DOMAIN_BUILTIN:
 		domain = "BUILTIN";
 		user_cnt = 0;
 		alias_cnt = smb_sam_grp_cnt(data->kd_type);
 		break;
 
-	case NT_DOMAIN_LOCAL:
+	case SMB_DOMAIN_LOCAL:
 		rc = smb_getnetbiosname(hostname, sizeof (hostname));
 		if (rc == 0) {
 			domain = hostname;
@@ -560,7 +560,7 @@ samr_s_LookupNames(void *arg, ndr_xa_t *mxa)
 	data = (samr_keydata_t *)hd->nh_data;
 
 	switch (data->kd_type) {
-	case NT_DOMAIN_BUILTIN:
+	case SMB_DOMAIN_BUILTIN:
 		wka = smb_wka_lookup_name((char *)param->name.str);
 		if (wka != NULL) {
 			param->rids.n_entry = 1;
@@ -573,7 +573,7 @@ samr_s_LookupNames(void *arg, ndr_xa_t *mxa)
 		}
 		break;
 
-	case NT_DOMAIN_LOCAL:
+	case SMB_DOMAIN_LOCAL:
 		status = smb_sam_lookup_name(NULL, (char *)param->name.str,
 		    SidTypeUnknown, &account);
 		if (status == NT_STATUS_SUCCESS) {
@@ -697,7 +697,7 @@ samr_s_QueryUserGroups(void *arg, ndr_xa_t *mxa)
 	smb_sid_t *user_sid = NULL;
 	smb_group_t grp;
 	smb_giter_t gi;
-	nt_domain_t di;
+	smb_domain_t di;
 	uint32_t status;
 	int size;
 	int ngrp_max;
@@ -709,9 +709,9 @@ samr_s_QueryUserGroups(void *arg, ndr_xa_t *mxa)
 
 	data = (samr_keydata_t *)hd->nh_data;
 	switch (data->kd_type) {
-	case NT_DOMAIN_BUILTIN:
-	case NT_DOMAIN_LOCAL:
-		if (!nt_domain_lookup_type(data->kd_type, &di)) {
+	case SMB_DOMAIN_BUILTIN:
+	case SMB_DOMAIN_LOCAL:
+		if (!smb_domain_lookup_type(data->kd_type, &di)) {
 			status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
 			goto query_error;
 		}
@@ -828,7 +828,7 @@ samr_s_Connect(void *arg, ndr_xa_t *mxa)
 	struct samr_Connect *param = arg;
 	ndr_hdid_t *id;
 
-	id = samr_hdalloc(mxa, SAMR_KEY_CONNECT, NT_DOMAIN_NULL, 0);
+	id = samr_hdalloc(mxa, SAMR_KEY_CONNECT, SMB_DOMAIN_NULL, 0);
 	if (id) {
 		bcopy(id, &param->handle, sizeof (samr_handle_t));
 		param->status = 0;
@@ -956,10 +956,10 @@ samr_s_QueryDispInfo(void *arg, ndr_xa_t *mxa)
 	data = (samr_keydata_t *)hd->nh_data;
 
 	switch (data->kd_type) {
-	case NT_DOMAIN_BUILTIN:
+	case SMB_DOMAIN_BUILTIN:
 		goto no_info;
 
-	case NT_DOMAIN_LOCAL:
+	case SMB_DOMAIN_LOCAL:
 		num_users = smb_sam_usr_cnt();
 		start_idx = param->start_idx;
 		if ((num_users == 0) || (start_idx >= num_users))

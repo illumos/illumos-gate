@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1186,10 +1186,8 @@ ndr_outer_string(ndr_ref_t *outer_ref)
 
 		if (ti == &ndt_s_wchar) {
 			/*
-			 * size_is is the number of characters in the string,
-			 * including the null. We assume valp is UTF-8 encoded.
-			 * We can use mts_wcequiv_strlen for ASCII, extended
-			 * ASCII or Unicode (UCS-2).
+			 * size_is is the number of characters in the
+			 * (multibyte) string, including the null.
 			 */
 			size_is = (mts_wcequiv_strlen(valp) /
 			    sizeof (mts_wchar_t)) + 1;

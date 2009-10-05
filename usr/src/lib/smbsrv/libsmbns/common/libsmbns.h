@@ -37,8 +37,6 @@ extern "C" {
 
 
 typedef struct smb_ads_handle {
-	char *user;		/* admin user to create share in ADS */
-	char *pwd;		/* user password */
 	char *domain;		/* ADS domain */
 	char *domain_dn;	/* domain in Distinquish Name format */
 	char *ip_addr;		/* ip addr in string format */
@@ -103,14 +101,13 @@ extern int dyndns_update(char *);
 extern void dyndns_update_zones(void);
 extern void dyndns_clear_zones(void);
 
-/* Kerberos initialization function */
-extern int smb_kinit(char *, char *);
+/* Kerberos cache management function */
 extern int smb_ccache_init(char *, char *);
 extern void smb_ccache_remove(char *);
 
 /* NETBIOS Functions */
 extern int smb_netbios_start(void);
-extern void smb_netbios_shutdown(void);
+extern void smb_netbios_stop(void);
 extern void smb_netbios_name_reconfig(void);
 
 /* Browser Functions */

@@ -19,175 +19,162 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Main startup code for SMB/NETBIOS and some utility routines
  * for the NETBIOS layer.
  */
 
+#include <sys/tzfile.h>
+#include <assert.h>
 #include <synch.h>
 #include <unistd.h>
 #include <syslog.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/socket.h>
-
+#include <stdio.h>
+#include <pwd.h>
+#include <grp.h>
 #include <smbns_netbios.h>
 
-netbios_status_t nb_status;
+#define	SMB_NETBIOS_DUMP_FILE		"netbios"
 
-static pthread_t smb_nbns_thr; /* name service */
-static pthread_t smb_nbds_thr; /* dgram service */
-static pthread_t smb_nbts_thr; /* timer */
-static pthread_t smb_nbbs_thr; /* browser */
+static netbios_service_t nbtd;
 
-static void *smb_netbios_timer(void *);
+static void smb_netbios_shutdown(void);
+static void *smb_netbios_service(void *);
+static void smb_netbios_dump(void);
 
-void
-smb_netbios_chg_status(uint32_t status, int set)
-{
-	(void) mutex_lock(&nb_status.mtx);
-	if (set)
-		nb_status.state |= status;
-	else
-		nb_status.state &= ~status;
-	(void) cond_broadcast(&nb_status.cv);
-	(void) mutex_unlock(&nb_status.mtx);
-}
-
-void
-smb_netbios_shutdown(void)
-{
-	smb_netbios_chg_status(NETBIOS_SHUTTING_DOWN, 1);
-
-	(void) pthread_join(smb_nbts_thr, 0);
-	(void) pthread_join(smb_nbbs_thr, 0);
-	(void) pthread_join(smb_nbns_thr, 0);
-	(void) pthread_join(smb_nbds_thr, 0);
-
-	nb_status.state = NETBIOS_SHUT_DOWN;
-}
-
+/*
+ * Start the NetBIOS services
+ */
 int
 smb_netbios_start(void)
 {
-	int rc;
-	mutex_t *mp;
-	cond_t *cvp;
+	pthread_t	tid;
+	pthread_attr_t	attr;
+	int		rc;
 
-	/* Startup Netbios named; port 137 */
-	rc = pthread_create(&smb_nbns_thr, 0,
-	    smb_netbios_name_service_daemon, 0);
-	if (rc)
+	if (smb_netbios_cache_init() < 0)
 		return (-1);
 
-	mp = &nb_status.mtx;
-	cvp = &nb_status.cv;
+	(void) pthread_attr_init(&attr);
+	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	rc = pthread_create(&tid, &attr, smb_netbios_service, NULL);
+	(void) pthread_attr_destroy(&attr);
+	return (rc);
+}
 
-	(void) mutex_lock(mp);
-	while (!(nb_status.state & (NETBIOS_NAME_SVC_RUNNING |
-	    NETBIOS_NAME_SVC_FAILED))) {
-		(void) cond_wait(cvp, mp);
-	}
+/*
+ * Stop the NetBIOS services
+ */
+void
+smb_netbios_stop(void)
+{
+	char	fname[MAXPATHLEN];
 
-	if (nb_status.state & NETBIOS_NAME_SVC_FAILED) {
-		(void) mutex_unlock(mp);
+	smb_netbios_event(NETBIOS_EVENT_STOP);
+
+	(void) snprintf(fname, MAXPATHLEN, "%s/%s",
+	    SMB_VARRUN_DIR, SMB_NETBIOS_DUMP_FILE);
+	(void) unlink(fname);
+
+}
+
+/*
+ * Launch the NetBIOS Name Service, Datagram and Browser services
+ * and then sit in a loop providing a 1 second resolution timer.
+ * The timer will:
+ *	- update the netbios stats file every 10 minutes
+ *	- clean the cache every 10 minutes
+ */
+/*ARGSUSED*/
+static void *
+smb_netbios_service(void *arg)
+{
+	static uint32_t	ticks = 0;
+	pthread_t	tid;
+	int		rc;
+
+	smb_netbios_event(NETBIOS_EVENT_START);
+
+	rc = pthread_create(&tid, NULL, smb_netbios_name_service, NULL);
+	if (rc != 0) {
 		smb_netbios_shutdown();
-		return (-1);
+		return (NULL);
 	}
-	(void) mutex_unlock(mp);
+
+	smb_netbios_wait(NETBIOS_EVENT_NS_START);
+	if (smb_netbios_error()) {
+		smb_netbios_shutdown();
+		return (NULL);
+	}
 
 	smb_netbios_name_config();
 
-	/* Startup Netbios datagram service; port 138 */
-	rc = pthread_create(&smb_nbds_thr, 0,
-	    smb_netbios_datagram_service_daemon, 0);
+	rc = pthread_create(&tid, NULL, smb_netbios_datagram_service, NULL);
 	if (rc != 0) {
 		smb_netbios_shutdown();
-		return (-1);
+		return (NULL);
 	}
 
-	(void) mutex_lock(mp);
-	while (!(nb_status.state & (NETBIOS_DATAGRAM_SVC_RUNNING |
-	    NETBIOS_DATAGRAM_SVC_FAILED))) {
-		(void) cond_wait(cvp, mp);
-	}
-
-	if (nb_status.state & NETBIOS_DATAGRAM_SVC_FAILED) {
-		(void) mutex_unlock(mp);
+	smb_netbios_wait(NETBIOS_EVENT_DGM_START);
+	if (smb_netbios_error()) {
 		smb_netbios_shutdown();
-		return (-1);
-	}
-	(void) mutex_unlock(mp);
-
-	/* Startup Netbios browser service */
-	rc = pthread_create(&smb_nbbs_thr, 0, smb_browser_daemon, 0);
-	if (rc) {
-		smb_netbios_shutdown();
-		return (-1);
+		return (NULL);
 	}
 
-	/* Startup Our internal, 1 second resolution, timer */
-	rc = pthread_create(&smb_nbts_thr, 0, smb_netbios_timer, 0);
+	rc = pthread_create(&tid, NULL, smb_browser_service, NULL);
 	if (rc != 0) {
 		smb_netbios_shutdown();
-		return (-1);
+		return (NULL);
 	}
 
-	(void) mutex_lock(mp);
-	while (!(nb_status.state & (NETBIOS_TIMER_RUNNING |
-	    NETBIOS_TIMER_FAILED))) {
-		(void) cond_wait(cvp, mp);
-	}
+	smb_netbios_event(NETBIOS_EVENT_TIMER_START);
 
-	if (nb_status.state & NETBIOS_TIMER_FAILED) {
-		(void) mutex_unlock(mp);
-		smb_netbios_shutdown();
-		return (-1);
-	}
-	(void) mutex_unlock(mp);
-
-	return (0);
-}
-
-/*ARGSUSED*/
-static void *
-smb_netbios_timer(void *arg)
-{
-	static unsigned int ticks = 0;
-
-	smb_netbios_chg_status(NETBIOS_TIMER_RUNNING, 1);
-
-	while ((nb_status.state & NETBIOS_SHUTTING_DOWN) == 0) {
+	for (;;) {
 		(void) sleep(1);
 		ticks++;
 
-		if ((nb_status.state & NETBIOS_DATAGRAM_SVC_RUNNING) == 0)
-			break;
-
-		if ((nb_status.state & NETBIOS_NAME_SVC_RUNNING) == 0)
+		if (!smb_netbios_running())
 			break;
 
 		smb_netbios_datagram_tick();
 		smb_netbios_name_tick();
 
-		/* every 10 minutes */
-		if ((ticks % 600) == 0)
+		if ((ticks % 600) == 0) {
+			smb_netbios_event(NETBIOS_EVENT_DUMP);
 			smb_netbios_cache_clean();
+		}
 	}
 
-	nb_status.state &= ~NETBIOS_TIMER_RUNNING;
-	if ((nb_status.state & NETBIOS_SHUTTING_DOWN) == 0) {
-		/* either name or datagram service has failed */
-		smb_netbios_shutdown();
-	}
+	smb_netbios_event(NETBIOS_EVENT_TIMER_STOP);
+	smb_netbios_shutdown();
+	return (NULL);
+}
 
-	return (0);
+static void
+smb_netbios_shutdown(void)
+{
+	(void) pthread_join(nbtd.nbs_browser.s_tid, 0);
+	(void) pthread_join(nbtd.nbs_dgm.s_tid, 0);
+	(void) pthread_join(nbtd.nbs_ns.s_tid, 0);
+
+	nbtd.nbs_browser.s_tid = 0;
+	nbtd.nbs_dgm.s_tid = 0;
+	nbtd.nbs_ns.s_tid = 0;
+
+	smb_netbios_cache_fini();
+
+	if (smb_netbios_error()) {
+		smb_netbios_event(NETBIOS_EVENT_RESET);
+		if (smb_netbios_start() != 0)
+			syslog(LOG_ERR, "netbios: restart failed");
+	}
 }
 
 int
@@ -263,4 +250,284 @@ smb_init_name_struct(unsigned char *name, char suffix, unsigned char *scope,
 	dest->addr_list.sin.sin_port = port;
 	dest->addr_list.attributes = addr_attr;
 	dest->addr_list.forw = dest->addr_list.back = &dest->addr_list;
+}
+
+void
+smb_netbios_event(netbios_event_t event)
+{
+	static char *event_msg[] = {
+		"startup",
+		"shutdown",
+		"restart",
+		"name service started",
+		"name service stopped",
+		"datagram service started",
+		"datagram service stopped",
+		"browser service started",
+		"browser service stopped",
+		"timer service started",
+		"timer service stopped",
+		"error",
+		"dump"
+	};
+
+	(void) mutex_lock(&nbtd.nbs_mtx);
+
+	if (event == NETBIOS_EVENT_DUMP) {
+		if (nbtd.nbs_last_event == NULL)
+			nbtd.nbs_last_event = event_msg[event];
+		smb_netbios_dump();
+		(void) mutex_unlock(&nbtd.nbs_mtx);
+		return;
+	}
+
+	nbtd.nbs_last_event = event_msg[event];
+	syslog(LOG_DEBUG, "netbios: %s", nbtd.nbs_last_event);
+
+	switch (nbtd.nbs_state) {
+	case NETBIOS_STATE_INIT:
+		if (event == NETBIOS_EVENT_START)
+			nbtd.nbs_state = NETBIOS_STATE_RUNNING;
+		break;
+
+	case NETBIOS_STATE_RUNNING:
+		switch (event) {
+		case NETBIOS_EVENT_NS_START:
+			nbtd.nbs_ns.s_tid = pthread_self();
+			nbtd.nbs_ns.s_up = B_TRUE;
+			break;
+		case NETBIOS_EVENT_NS_STOP:
+			nbtd.nbs_ns.s_up = B_FALSE;
+			break;
+		case NETBIOS_EVENT_DGM_START:
+			nbtd.nbs_dgm.s_tid = pthread_self();
+			nbtd.nbs_dgm.s_up = B_TRUE;
+			break;
+		case NETBIOS_EVENT_DGM_STOP:
+			nbtd.nbs_dgm.s_up = B_FALSE;
+			break;
+		case NETBIOS_EVENT_BROWSER_START:
+			nbtd.nbs_browser.s_tid = pthread_self();
+			nbtd.nbs_browser.s_up = B_TRUE;
+			break;
+		case NETBIOS_EVENT_BROWSER_STOP:
+			nbtd.nbs_browser.s_up = B_FALSE;
+			break;
+		case NETBIOS_EVENT_TIMER_START:
+			nbtd.nbs_timer.s_tid = pthread_self();
+			nbtd.nbs_timer.s_up = B_TRUE;
+			break;
+		case NETBIOS_EVENT_TIMER_STOP:
+			nbtd.nbs_timer.s_up = B_FALSE;
+			break;
+		case NETBIOS_EVENT_STOP:
+			nbtd.nbs_state = NETBIOS_STATE_CLOSING;
+			break;
+		case NETBIOS_EVENT_ERROR:
+			nbtd.nbs_state = NETBIOS_STATE_ERROR;
+			++nbtd.nbs_errors;
+			break;
+		default:
+			break;
+		}
+		break;
+
+	case NETBIOS_STATE_CLOSING:
+	case NETBIOS_STATE_ERROR:
+	default:
+		switch (event) {
+		case NETBIOS_EVENT_NS_STOP:
+			nbtd.nbs_ns.s_up = B_FALSE;
+			break;
+		case NETBIOS_EVENT_DGM_STOP:
+			nbtd.nbs_dgm.s_up = B_FALSE;
+			break;
+		case NETBIOS_EVENT_BROWSER_STOP:
+			nbtd.nbs_browser.s_up = B_FALSE;
+			break;
+		case NETBIOS_EVENT_TIMER_STOP:
+			nbtd.nbs_timer.s_up = B_FALSE;
+			break;
+		case NETBIOS_EVENT_STOP:
+			nbtd.nbs_state = NETBIOS_STATE_CLOSING;
+			break;
+		case NETBIOS_EVENT_RESET:
+			nbtd.nbs_state = NETBIOS_STATE_INIT;
+			break;
+		case NETBIOS_EVENT_ERROR:
+			++nbtd.nbs_errors;
+			break;
+		default:
+			break;
+		}
+		break;
+	}
+
+	smb_netbios_dump();
+	(void) cond_broadcast(&nbtd.nbs_cv);
+	(void) mutex_unlock(&nbtd.nbs_mtx);
+}
+
+void
+smb_netbios_wait(netbios_event_t event)
+{
+	boolean_t *svc = NULL;
+	boolean_t desired_state;
+
+	(void) mutex_lock(&nbtd.nbs_mtx);
+
+	switch (event) {
+	case NETBIOS_EVENT_NS_START:
+	case NETBIOS_EVENT_NS_STOP:
+		svc = &nbtd.nbs_ns.s_up;
+		desired_state =
+		    (event == NETBIOS_EVENT_NS_START) ? B_TRUE : B_FALSE;
+		break;
+	case NETBIOS_EVENT_DGM_START:
+	case NETBIOS_EVENT_DGM_STOP:
+		svc = &nbtd.nbs_dgm.s_up;
+		desired_state =
+		    (event == NETBIOS_EVENT_DGM_START) ? B_TRUE : B_FALSE;
+		break;
+	case NETBIOS_EVENT_BROWSER_START:
+	case NETBIOS_EVENT_BROWSER_STOP:
+		svc = &nbtd.nbs_browser.s_up;
+		desired_state =
+		    (event == NETBIOS_EVENT_BROWSER_START) ? B_TRUE : B_FALSE;
+		break;
+	default:
+		(void) mutex_unlock(&nbtd.nbs_mtx);
+		return;
+	}
+
+	while (*svc != desired_state) {
+		if (nbtd.nbs_state != NETBIOS_STATE_RUNNING)
+			break;
+
+		(void) cond_wait(&nbtd.nbs_cv, &nbtd.nbs_mtx);
+	}
+
+	(void) mutex_unlock(&nbtd.nbs_mtx);
+}
+
+void
+smb_netbios_sleep(time_t seconds)
+{
+	timestruc_t reltimeout;
+
+	(void) mutex_lock(&nbtd.nbs_mtx);
+
+	if (nbtd.nbs_state == NETBIOS_STATE_RUNNING) {
+		if (seconds == 0)
+			seconds  = 1;
+		reltimeout.tv_sec = seconds;
+		reltimeout.tv_nsec = 0;
+
+		(void) cond_reltimedwait(&nbtd.nbs_cv,
+		    &nbtd.nbs_mtx, &reltimeout);
+	}
+
+	(void) mutex_unlock(&nbtd.nbs_mtx);
+}
+
+boolean_t
+smb_netbios_running(void)
+{
+	boolean_t is_running;
+
+	(void) mutex_lock(&nbtd.nbs_mtx);
+
+	if (nbtd.nbs_state == NETBIOS_STATE_RUNNING)
+		is_running = B_TRUE;
+	else
+		is_running = B_FALSE;
+
+	(void) mutex_unlock(&nbtd.nbs_mtx);
+	return (is_running);
+}
+
+boolean_t
+smb_netbios_error(void)
+{
+	boolean_t error;
+
+	(void) mutex_lock(&nbtd.nbs_mtx);
+
+	if (nbtd.nbs_state == NETBIOS_STATE_ERROR)
+		error = B_TRUE;
+	else
+		error = B_FALSE;
+
+	(void) mutex_unlock(&nbtd.nbs_mtx);
+	return (error);
+}
+
+/*
+ * Write the service state to /var/run/smb/netbios.
+ *
+ * This is a private interface.  To update the file use:
+ *	smb_netbios_event(NETBIOS_EVENT_DUMP);
+ */
+static void
+smb_netbios_dump(void)
+{
+	static struct {
+		netbios_state_t state;
+		char		*text;
+	} sm[] = {
+		{ NETBIOS_STATE_INIT,		"init" },
+		{ NETBIOS_STATE_RUNNING,	"running" },
+		{ NETBIOS_STATE_CLOSING,	"closing" },
+		{ NETBIOS_STATE_ERROR,		"error" }
+	};
+
+	char		fname[MAXPATHLEN];
+	FILE		*fp;
+	struct passwd	*pwd;
+	struct group	*grp;
+	uid_t		uid;
+	gid_t		gid;
+	char		*last_event = "none";
+	int		i;
+
+	(void) snprintf(fname, MAXPATHLEN, "%s/%s",
+	    SMB_VARRUN_DIR, SMB_NETBIOS_DUMP_FILE);
+
+	if ((fp = fopen(fname, "w")) == NULL)
+		return;
+
+	pwd = getpwnam("root");
+	grp = getgrnam("sys");
+	uid = (pwd == NULL) ? 0 : pwd->pw_uid;
+	gid = (grp == NULL) ? 3 : grp->gr_gid;
+
+	(void) lockf(fileno(fp), F_LOCK, 0);
+	(void) fchmod(fileno(fp), 0600);
+	(void) fchown(fileno(fp), uid, gid);
+
+	if (nbtd.nbs_last_event)
+		last_event = nbtd.nbs_last_event;
+
+	for (i = 0; i < sizeof (sm) / sizeof (sm[0]); ++i) {
+		if (nbtd.nbs_state == sm[i].state) {
+			(void) fprintf(fp,
+			    "State             %s  (event: %s, errors: %u)\n",
+			    sm[i].text, last_event, nbtd.nbs_errors);
+			break;
+		}
+	}
+
+	(void) fprintf(fp, "Name Service      %-7s  (%u)\n",
+	    nbtd.nbs_ns.s_up ? "up" : "down", nbtd.nbs_ns.s_tid);
+	(void) fprintf(fp, "Datagram Service  %-7s  (%u)\n",
+	    nbtd.nbs_dgm.s_up ? "up" : "down", nbtd.nbs_dgm.s_tid);
+	(void) fprintf(fp, "Browser Service   %-7s  (%u)\n",
+	    nbtd.nbs_browser.s_up ? "up" : "down", nbtd.nbs_browser.s_tid);
+	(void) fprintf(fp, "Timer Service     %-7s  (%u)\n",
+	    nbtd.nbs_timer.s_up ? "up" : "down", nbtd.nbs_timer.s_tid);
+
+	smb_netbios_cache_dump(fp);
+
+	(void) lockf(fileno(fp), F_ULOCK, 0);
+	(void) fclose(fp);
 }

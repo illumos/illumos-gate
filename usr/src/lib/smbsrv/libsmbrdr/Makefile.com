@@ -19,17 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libsmbrdr.a
 VERS =		.1
 
 OBJS_COMMON =			\
-	smbrdr_ipc_util.o	\
 	smbrdr_lib.o		\
 	smbrdr_logon.o		\
 	smbrdr_netbios.o	\

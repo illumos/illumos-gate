@@ -490,13 +490,13 @@ smb_logon_local(netr_client_t *clnt, smb_token_t *token)
 	char guest[SMB_USERNAME_MAXLEN];
 	smb_passwd_t smbpw;
 	uint32_t status;
-	nt_domain_t domain;
+	smb_domain_t domain;
 	boolean_t isguest;
 
 	/* Make sure this is not a domain user */
 	if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
-		if (nt_domain_lookup_name(clnt->e_domain, &domain)) {
-			if (domain.di_type != NT_DOMAIN_LOCAL)
+		if (smb_domain_lookup_name(clnt->e_domain, &domain)) {
+			if (domain.di_type != SMB_DOMAIN_LOCAL)
 				return (NT_STATUS_INVALID_LOGON_TYPE);
 		}
 	}

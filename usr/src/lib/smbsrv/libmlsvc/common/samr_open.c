@@ -41,7 +41,6 @@
 #include <sys/param.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
@@ -54,6 +53,9 @@ static DWORD samr_connect1(char *, char *, char *, DWORD, mlsvc_handle_t *);
 static DWORD samr_connect2(char *, char *, char *, DWORD, mlsvc_handle_t *);
 static DWORD samr_connect3(char *, char *, char *, DWORD, mlsvc_handle_t *);
 static DWORD samr_connect4(char *, char *, char *, DWORD, mlsvc_handle_t *);
+
+typedef DWORD (*samr_connop_t)(char *, char *, char *, DWORD,
+    mlsvc_handle_t *);
 
 /*
  * samr_open
@@ -71,7 +73,7 @@ int
 samr_open(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
-	smb_domain_t di;
+	smb_domainex_t di;
 	int rc;
 
 	if (server == NULL || domain == NULL) {
@@ -79,7 +81,7 @@ samr_open(char *server, char *domain, char *username, DWORD access_mask,
 			return (-1);
 
 		server = di.d_dc;
-		domain = di.d_info.di_nbname;
+		domain = di.d_primary.di_nbname;
 	}
 
 	if (username == NULL)
@@ -93,38 +95,41 @@ samr_open(char *server, char *domain, char *username, DWORD access_mask,
 /*
  * samr_connect
  *
- * Connect to the SAM on the specified server (domain controller).
- * This is the entry point for the various SAM connect calls.  We do
- * parameter validation and open the samr named pipe here.  The actual
- * RPC is based on the native OS of the server.
+ * Connect to the SAMR service on the specified server (domain controller).
+ * New SAM connect calls have been added to Windows over time:
  *
- * Returns 0 on success. Otherwise returns a -ve error code.
+ *	Windows NT3.x:	SamrConnect
+ *	Windows NT4.0:	SamrConnect2
+ *	Windows 2000:	SamrConnect3
+ *	Windows XP:	SamrConnect4
+ *
+ * Try the calls from most recent to oldest until the server responds with
+ * something other than an RPC protocol error.  We don't use the original
+ * connect call because all supported servers should support SamrConnect2.
  */
 int
 samr_connect(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
-	DWORD status;
+	static samr_connop_t samr_connop[] = {
+		samr_connect4,
+		samr_connect3,
+		samr_connect2
+	};
+
+	int	n_op = (sizeof (samr_connop) / sizeof (samr_connop[0]));
+	DWORD	status;
+	int	i;
 
 	if (ndr_rpc_bind(samr_handle, server, domain, username, "SAMR") < 0)
 		return (-1);
 
-	switch (ndr_rpc_server_os(samr_handle)) {
-	case NATIVE_OS_NT5_1:
-		status = samr_connect4(server, domain, username, access_mask,
-		    samr_handle);
-		break;
+	for (i = 0; i < n_op; ++i) {
+		status = (*samr_connop[i])(server, domain, username,
+		    access_mask, samr_handle);
 
-	case NATIVE_OS_NT5_0:
-		status = samr_connect3(server, domain, username, access_mask,
-		    samr_handle);
-		break;
-
-	case NATIVE_OS_NT4_0:
-	default:
-		status = samr_connect2(server, domain, username, access_mask,
-		    samr_handle);
-		break;
+		if (status != NT_STATUS_UNSUCCESSFUL)
+			break;
 	}
 
 	if (status != NT_STATUS_SUCCESS) {
@@ -244,7 +249,7 @@ samr_connect3(char *server, char *domain, char *username, DWORD access_mask,
 	len = strlen(server) + 4;
 	arg.servername = ndr_rpc_malloc(samr_handle, len);
 	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
-	arg.unknown_02 = 0x00000002;
+	arg.revision = SAMR_REVISION_2;
 	arg.access_mask = access_mask;
 
 	if (ndr_rpc_call(samr_handle, opnum, &arg) != 0) {
@@ -283,7 +288,7 @@ samr_connect4(char *server, char *domain, char *username, DWORD access_mask,
 	int len;
 	int opnum;
 	DWORD status;
-	smb_domain_t dinfo;
+	smb_domainex_t dinfo;
 
 	bzero(&arg, sizeof (struct samr_Connect4));
 	opnum = SAMR_OPNUM_Connect;
@@ -292,12 +297,12 @@ samr_connect4(char *server, char *domain, char *username, DWORD access_mask,
 	if (!smb_domain_getinfo(&dinfo))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	len = strlen(server) + strlen(dinfo.d_info.di_fqname) + 4;
+	len = strlen(server) + strlen(dinfo.d_primary.di_fqname) + 4;
 	arg.servername = ndr_rpc_malloc(samr_handle, len);
 
-	if (*dinfo.d_info.di_fqname != '\0')
+	if (*dinfo.d_primary.di_fqname != '\0')
 		(void) snprintf((char *)arg.servername, len, "\\\\%s.%s",
-		    server, dinfo.d_info.di_fqname);
+		    server, dinfo.d_primary.di_fqname);
 	else
 		(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 
@@ -572,7 +577,7 @@ samr_create_user(mlsvc_handle_t *domain_handle, char *username,
 	ndr_heap_mkvcs(heap, username, (ndr_vcstr_t *)&arg.username);
 
 	arg.account_flags = account_flags;
-	arg.unknown_e00500b0 = 0xE00500B0;
+	arg.desired_access = 0xE00500B0;
 
 	rc = ndr_rpc_call(domain_handle, opnum, &arg);
 	if (rc != 0) {

@@ -49,24 +49,45 @@
 	(e)->forw = 0;			\
 	(e)->back = 0;
 
-#define	NETBIOS_NAME_SVC_LAUNCHED	0x00001
-#define	NETBIOS_NAME_SVC_RUNNING	0x00002
-#define	NETBIOS_NAME_SVC_FAILED		0x00004
+typedef enum {
+	NETBIOS_EVENT_START = 0,
+	NETBIOS_EVENT_STOP,
+	NETBIOS_EVENT_RESET,
+	NETBIOS_EVENT_NS_START,
+	NETBIOS_EVENT_NS_STOP,
+	NETBIOS_EVENT_DGM_START,
+	NETBIOS_EVENT_DGM_STOP,
+	NETBIOS_EVENT_BROWSER_START,
+	NETBIOS_EVENT_BROWSER_STOP,
+	NETBIOS_EVENT_TIMER_START,
+	NETBIOS_EVENT_TIMER_STOP,
+	NETBIOS_EVENT_ERROR,
+	NETBIOS_EVENT_DUMP
+} netbios_event_t;
 
-#define	NETBIOS_DATAGRAM_SVC_LAUNCHED	0x00010
-#define	NETBIOS_DATAGRAM_SVC_RUNNING	0x00020
-#define	NETBIOS_DATAGRAM_SVC_FAILED	0x00040
+typedef enum {
+	NETBIOS_STATE_INIT = 0,
+	NETBIOS_STATE_RUNNING,
+	NETBIOS_STATE_CLOSING,
+	NETBIOS_STATE_ERROR
+} netbios_state_t;
 
-#define	NETBIOS_TIMER_LAUNCHED		0x00100
-#define	NETBIOS_TIMER_RUNNING		0x00200
-#define	NETBIOS_TIMER_FAILED		0x00400
+typedef struct {
+	pthread_t	s_tid;
+	boolean_t	s_up;
+} netbios_svc_t;
 
-#define	NETBIOS_BROWSER_LAUNCHED	0x01000
-#define	NETBIOS_BROWSER_RUNNING		0x02000
-#define	NETBIOS_BROWSER_FAILED		0x04000
-
-#define	NETBIOS_SHUTTING_DOWN		0x10000
-#define	NETBIOS_SHUT_DOWN		0x20000
+typedef struct {
+	mutex_t		nbs_mtx;
+	cond_t		nbs_cv;
+	netbios_svc_t	nbs_ns;
+	netbios_svc_t	nbs_dgm;
+	netbios_svc_t	nbs_browser;
+	netbios_svc_t	nbs_timer;
+	netbios_state_t	nbs_state;
+	uint32_t	nbs_errors;
+	char		*nbs_last_event;
+} netbios_service_t;
 
 char smb_node_type;
 
@@ -74,13 +95,6 @@ char smb_node_type;
 #define	SMB_NODETYPE_P	'P'
 #define	SMB_NODETYPE_M	'M'
 #define	SMB_NODETYPE_H	'H'
-
-typedef struct {
-	mutex_t mtx;
-	cond_t cv;
-	uint32_t state;
-} netbios_status_t;
-extern netbios_status_t nb_status;
 
 /*
  * NAME service definitions
@@ -614,14 +628,22 @@ typedef struct nbcache_iter {
 #define	NETBIOS_NAME_IS_STAR(name) \
 	(bcmp(name, "*\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", NETBIOS_NAME_SZ) == 0)
 
-void smb_netbios_chg_status(uint32_t status, int set);
+
+/*
+ * NetBIOS service state machine interface
+ */
+void smb_netbios_event(netbios_event_t);
+void smb_netbios_wait(netbios_event_t);
+void smb_netbios_sleep(time_t);
+boolean_t smb_netbios_running(void);
+boolean_t smb_netbios_error(void);
 
 /*
  * Name Cache Functions
  */
 int  smb_netbios_cache_init(void);
 void smb_netbios_cache_fini(void);
-void smb_netbios_cache_dump(void);
+void smb_netbios_cache_dump(FILE *fp);
 int smb_netbios_cache_count(void);
 void smb_netbios_cache_clean(void);
 void smb_netbios_cache_reset_ttl(void);
@@ -640,13 +662,13 @@ unsigned char *smb_netbios_cache_status(unsigned char *, int, unsigned char *);
 int smb_netbios_cache_getfirst(nbcache_iter_t *);
 int smb_netbios_cache_getnext(nbcache_iter_t *);
 
-void smb_netbios_name_dump(struct name_entry *entry);
+void smb_netbios_name_dump(FILE *fp, struct name_entry *entry);
 void smb_netbios_name_logf(struct name_entry *entry);
 void smb_netbios_name_freeaddrs(struct name_entry *entry);
 struct name_entry *smb_netbios_name_dup(struct name_entry *, int);
 
 /* Name service functions */
-void *smb_netbios_name_service_daemon(void *);
+void *smb_netbios_name_service(void *);
 void smb_init_name_struct(unsigned char *, char, unsigned char *, uint32_t,
     unsigned short, uint32_t, uint32_t, struct name_entry *);
 
@@ -665,14 +687,14 @@ void smb_encode_netbios_name(unsigned char *, char, unsigned char *,
     struct name_entry *);
 
 /* Datagram service functions */
-void *smb_netbios_datagram_service_daemon(void *);
+void *smb_netbios_datagram_service(void *);
 int smb_netbios_datagram_send(struct name_entry *,
     struct name_entry *, unsigned char *, int);
 void smb_netbios_datagram_tick(void);
 
 /* browser functions */
 void *smb_browser_dispatch(void *arg);
-void *smb_browser_daemon(void *);
+void *smb_browser_service(void *);
 int smb_browser_load_transact_header(unsigned char *, int, int, int, char *);
 
 /* Netlogon function */

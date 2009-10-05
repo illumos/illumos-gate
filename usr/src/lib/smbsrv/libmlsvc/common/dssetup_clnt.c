@@ -31,7 +31,6 @@
 #include <strings.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/ndl/dssetup.ndl>
 #include <smbsrv/libmlsvc.h>
 
@@ -40,7 +39,7 @@ dssetup_get_domain_info(ds_primary_domain_info_t *ds_info)
 {
 	dssetup_DsRoleGetPrimaryDomainInfo_t arg;
 	struct dssetup_DsRolePrimaryDomInfo1 *info;
-	smb_domain_t di;
+	smb_domainex_t di;
 	mlsvc_handle_t handle;
 	int opnum;
 	int rc;
@@ -48,7 +47,7 @@ dssetup_get_domain_info(ds_primary_domain_info_t *ds_info)
 	if (!smb_domain_getinfo(&di))
 		return (-1);
 
-	if (ndr_rpc_bind(&handle, di.d_dc, di.d_info.di_nbname,
+	if (ndr_rpc_bind(&handle, di.d_dc, di.d_primary.di_nbname,
 	    MLSVC_ANON_USER, "DSSETUP") != 0)
 		return (-1);
 

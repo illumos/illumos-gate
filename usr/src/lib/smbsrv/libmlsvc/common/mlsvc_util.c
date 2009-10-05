@@ -38,9 +38,9 @@
 #include <syslog.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
+#include <smbsrv/libsmbrdr.h>
 #include <smbsrv/smbinfo.h>
 #include <lsalib.h>
 #include <samlib.h>
@@ -138,21 +138,21 @@ mlsvc_netlogon(char *server, char *domain)
  * Returns NT status codes.
  */
 DWORD
-mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
+mlsvc_join(smb_domainex_t *dxi, char *user, char *plain_text)
 {
 	int erc;
 	DWORD status;
 	char machine_passwd[NETR_MACHINE_ACCT_PASSWD_MAX];
 	smb_adjoin_status_t err;
-	nt_domain_t *domain;
+	smb_domain_t *domain;
 
 	machine_passwd[0] = '\0';
 
-	domain = &dinfo->d_info;
+	domain = &dxi->d_primary;
 
-	mlsvc_disconnect(dinfo->d_dc);
+	mlsvc_disconnect(dxi->d_dc);
 
-	erc = mlsvc_logon(dinfo->d_dc, domain->di_nbname, user);
+	erc = smbrdr_logon(dxi->d_dc, domain->di_nbname, user);
 
 	if (erc == AUTH_USER_GRANT) {
 		if (mlsvc_ntjoin_support == B_FALSE) {
@@ -167,7 +167,7 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 			}
 		} else {
 
-			status = sam_create_trust_account(dinfo->d_dc,
+			status = sam_create_trust_account(dxi->d_dc,
 			    domain->di_nbname);
 			if (status == NT_STATUS_SUCCESS) {
 				(void) smb_getnetbiosname(machine_passwd,
@@ -177,7 +177,7 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 		}
 
 		if (status == NT_STATUS_SUCCESS) {
-			erc = smb_setdomainprops(NULL, dinfo->d_dc,
+			erc = smb_setdomainprops(NULL, dxi->d_dc,
 			    machine_passwd);
 			if (erc != 0) {
 				syslog(LOG_NOTICE, "Failed to update CIFS "
@@ -185,11 +185,23 @@ mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 				return (NT_STATUS_UNSUCCESSFUL);
 			}
 
-			status = mlsvc_netlogon(dinfo->d_dc, domain->di_nbname);
+			status = mlsvc_netlogon(dxi->d_dc, domain->di_nbname);
 		}
 	} else {
 		status = NT_STATUS_LOGON_FAILURE;
 	}
 
 	return (status);
+}
+
+int
+mlsvc_ping(const char *server)
+{
+	return (smbrdr_echo(server));
+}
+
+void
+mlsvc_disconnect(const char *server)
+{
+	smbrdr_disconnect(server);
 }

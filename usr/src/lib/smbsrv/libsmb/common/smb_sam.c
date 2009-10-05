@@ -96,7 +96,7 @@ uint32_t
 smb_sam_lookup_name(char *domain, char *name, uint16_t type,
     smb_account_t *account)
 {
-	nt_domain_t di;
+	smb_domain_t di;
 	smb_sid_t *sid;
 	uint32_t status;
 	smb_lwka_t *lwka;
@@ -104,15 +104,15 @@ smb_sam_lookup_name(char *domain, char *name, uint16_t type,
 	bzero(account, sizeof (smb_account_t));
 
 	if (domain != NULL) {
-		if (!nt_domain_lookup_name(domain, &di) ||
-		    (di.di_type != NT_DOMAIN_LOCAL))
+		if (!smb_domain_lookup_name(domain, &di) ||
+		    (di.di_type != SMB_DOMAIN_LOCAL))
 			return (NT_STATUS_NOT_FOUND);
 
 		/* Only Netbios hostname is accepted */
 		if (utf8_strcasecmp(domain, di.di_nbname) != 0)
 			return (NT_STATUS_NONE_MAPPED);
 	} else {
-		if (!nt_domain_lookup_type(NT_DOMAIN_LOCAL, &di))
+		if (!smb_domain_lookup_type(SMB_DOMAIN_LOCAL, &di))
 			return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 	}
 
@@ -209,7 +209,7 @@ smb_sam_lookup_sid(smb_sid_t *sid, smb_account_t *account)
 	smb_passwd_t smbpw;
 	smb_group_t grp;
 	smb_lwka_t *lwka;
-	nt_domain_t di;
+	smb_domain_t di;
 	uint32_t rid;
 	uid_t id;
 	int id_type;
@@ -217,7 +217,7 @@ smb_sam_lookup_sid(smb_sid_t *sid, smb_account_t *account)
 
 	bzero(account, sizeof (smb_account_t));
 
-	if (!nt_domain_lookup_type(NT_DOMAIN_LOCAL, &di))
+	if (!smb_domain_lookup_type(SMB_DOMAIN_LOCAL, &di))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
 	if (smb_sid_cmp(sid, di.di_binsid)) {
@@ -362,17 +362,17 @@ smb_sam_usr_groups(smb_sid_t *user_sid, smb_ids_t *gids)
  * in /var/smb/smbgroup.db
  */
 int
-smb_sam_grp_cnt(nt_domain_type_t dtype)
+smb_sam_grp_cnt(smb_domain_type_t dtype)
 {
 	int grpcnt;
 	int rc;
 
 	switch (dtype) {
-	case NT_DOMAIN_BUILTIN:
+	case SMB_DOMAIN_BUILTIN:
 		rc = smb_lgrp_numbydomain(SMB_LGRP_BUILTIN, &grpcnt);
 		break;
 
-	case NT_DOMAIN_LOCAL:
+	case SMB_DOMAIN_LOCAL:
 		rc = smb_lgrp_numbydomain(SMB_LGRP_LOCAL, &grpcnt);
 		break;
 

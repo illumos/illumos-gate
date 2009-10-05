@@ -41,6 +41,7 @@
 SUNWprivate {
     global:
 	dssetup_clear_domain_info;
+	mlsvc_disconnect;
 	mlsvc_fini;
 	mlsvc_init;
 	mlsvc_join;
@@ -49,7 +50,6 @@ SUNWprivate {
 	mlsvc_netlogon;
 	smb_autohome_add;
 	smb_autohome_remove;
-	smb_domain_getinfo;
 	smb_locate_dc;
 	smb_logon;
 	smb_shr_add;

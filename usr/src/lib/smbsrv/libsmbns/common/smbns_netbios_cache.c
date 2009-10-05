@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <synch.h>
 #include <stdio.h>
@@ -38,42 +36,37 @@
 #define	NETBIOS_HTAB_SZ	128
 #define	NETBIOS_HKEY_SZ	(NETBIOS_NAME_SZ + NETBIOS_DOMAIN_NAME_MAX)
 
-#define	NETBIOS_NAMEBUF  char namebuf[20]
-
 #define	NETBIOS_SAME_IP(addr1, addr2) \
 	((addr1)->sin.sin_addr.s_addr == (addr2)->sin.sin_addr.s_addr)
-
-int smb_netbios_name_debug = 0;
 
 typedef char nb_key_t[NETBIOS_HKEY_SZ];
 static HT_HANDLE *smb_netbios_cache = 0;
 static rwlock_t nb_cache_lock;
 
-static char *smb_strname(struct name_entry *name, char *buf, int bufsize);
+static void smb_strname(struct name_entry *name, char *buf, int bufsize);
 static void hash_callback(HT_ITEM *item);
 static int smb_netbios_match(const char *key1, const char *key2, size_t n);
 static void smb_netbios_cache_key(char *key, unsigned char *name,
 					unsigned char *scope);
 
 int
-smb_netbios_cache_init()
+smb_netbios_cache_init(void)
 {
 	(void) rw_wrlock(&nb_cache_lock);
-	if (smb_netbios_cache == 0) {
+	if (smb_netbios_cache == NULL) {
 		smb_netbios_cache = ht_create_table(NETBIOS_HTAB_SZ,
 		    NETBIOS_HKEY_SZ, HTHF_FIXED_KEY);
-		if (smb_netbios_cache == 0) {
-			syslog(LOG_ERR,
-			    "smbd: cannot create NetBIOS name cache");
+		if (smb_netbios_cache == NULL) {
+			syslog(LOG_ERR, "nbns: cannot create name cache");
 			(void) rw_unlock(&nb_cache_lock);
-			return (0);
+			return (-1);
 		}
 		(void) ht_register_callback(smb_netbios_cache, hash_callback);
 		ht_set_cmpfn(smb_netbios_cache, smb_netbios_match);
 	}
 	(void) rw_unlock(&nb_cache_lock);
 
-	return (1);
+	return (0);
 }
 
 void
@@ -81,7 +74,7 @@ smb_netbios_cache_fini(void)
 {
 	(void) rw_wrlock(&nb_cache_lock);
 	ht_destroy_table(smb_netbios_cache);
-	smb_netbios_cache = 0;
+	smb_netbios_cache = NULL;
 	(void) rw_unlock(&nb_cache_lock);
 }
 
@@ -201,8 +194,8 @@ struct name_entry *
 smb_netbios_cache_lookup_addr(struct name_entry *name)
 {
 	struct name_entry *entry = 0;
-	struct addr_entry *addr;
-	struct addr_entry *name_addr;
+	addr_entry_t *addr;
+	addr_entry_t *name_addr;
 	HT_ITEM *item;
 	nb_key_t key;
 
@@ -234,8 +227,8 @@ int
 smb_netbios_cache_insert(struct name_entry *name)
 {
 	struct name_entry *entry;
-	struct addr_entry *addr;
-	struct addr_entry *name_addr;
+	addr_entry_t *addr;
+	addr_entry_t *name_addr;
 	HT_ITEM *item;
 	nb_key_t key;
 	int rc;
@@ -275,7 +268,7 @@ smb_netbios_cache_insert(struct name_entry *name)
 			}
 		}
 
-		if ((addr = malloc(sizeof (struct addr_entry))) != NULL) {
+		if ((addr = malloc(sizeof (addr_entry_t))) != NULL) {
 			*addr = name->addr_list;
 			entry->attributes |= addr->attributes;
 			QUEUE_INSERT_TAIL(&entry->addr_list, addr);
@@ -337,7 +330,7 @@ int
 smb_netbios_cache_insert_list(struct name_entry *name)
 {
 	struct name_entry entry;
-	struct addr_entry *addr;
+	addr_entry_t *addr;
 
 	addr = &name->addr_list;
 	do {
@@ -361,8 +354,8 @@ void
 smb_netbios_cache_update_entry(struct name_entry *entry,
     struct name_entry *name)
 {
-	struct addr_entry *addr;
-	struct addr_entry *name_addr;
+	addr_entry_t *addr;
+	addr_entry_t *name_addr;
 
 	addr = &entry->addr_list;
 	name_addr = &name->addr_list;
@@ -442,7 +435,7 @@ smb_netbios_cache_status(unsigned char *buf, int bufsize, unsigned char *scope)
 void
 smb_netbios_cache_reset_ttl()
 {
-	struct addr_entry *addr;
+	addr_entry_t *addr;
 	struct name_entry *name;
 	HT_ITERATOR hti;
 	HT_ITEM *item;
@@ -524,7 +517,7 @@ void
 smb_netbios_cache_refresh(name_queue_t *refq)
 {
 	struct name_entry *name;
-	struct addr_entry *addr;
+	addr_entry_t *addr;
 	HT_ITERATOR hti;
 	HT_ITEM *item;
 
@@ -608,7 +601,7 @@ smb_netbios_cache_delete_locals(name_queue_t *delq)
 void
 smb_netbios_name_freeaddrs(struct name_entry *entry)
 {
-	struct addr_entry *addr;
+	addr_entry_t *addr;
 
 	if (entry == 0)
 		return;
@@ -637,19 +630,28 @@ smb_netbios_cache_count()
 }
 
 void
-smb_netbios_cache_dump(void)
+smb_netbios_cache_dump(FILE *fp)
 {
 	struct name_entry *name;
 	HT_ITERATOR hti;
 	HT_ITEM *item;
 
 	(void) rw_rdlock(&nb_cache_lock);
+
+	if (ht_get_total_items(smb_netbios_cache) != 0) {
+		(void) fprintf(fp, "\n%-22s %-16s %-16s  %s\n",
+		    "Name", "Type", "Address", "TTL");
+		(void) fprintf(fp, "%s%s\n",
+		    "-------------------------------",
+		    "------------------------------");
+	}
+
 	item = ht_findfirst(smb_netbios_cache, &hti);
 	while (item) {
 		if (item->hi_data) {
 			name = (struct name_entry *)item->hi_data;
 			(void) mutex_lock(&name->mtx);
-			smb_netbios_name_dump(name);
+			smb_netbios_name_dump(fp, name);
 			(void) mutex_unlock(&name->mtx);
 		}
 		item = ht_findnext(&hti);
@@ -658,29 +660,28 @@ smb_netbios_cache_dump(void)
 }
 
 void
-smb_netbios_name_dump(struct name_entry *entry)
+smb_netbios_name_dump(FILE *fp, struct name_entry *entry)
 {
-	struct addr_entry *addr;
-	int count = 0;
+	char		buf[MAXHOSTNAMELEN];
+	addr_entry_t	*addr;
+	char		*type;
+	int		count = 0;
 
-	if (smb_netbios_name_debug == 0)
-		return;
+	smb_strname(entry, buf, sizeof (buf));
+	type = (IS_UNIQUE(entry->attributes)) ? "UNIQUE" : "GROUP";
 
-	syslog(LOG_DEBUG, "name='%15.15s<%02X>' scope='%s' attr=0x%x",
-	    entry->name, entry->name[15],
-	    entry->scope, entry->attributes);
+	(void) fprintf(fp, "%s %-6s (0x%04x)  ", buf, type, entry->attributes);
+
 	addr = &entry->addr_list;
 	do {
-		syslog(LOG_DEBUG, "addr_list[%d]:", count++);
-		syslog(LOG_DEBUG, "  attributes     = 0x%x", addr->attributes);
-		syslog(LOG_DEBUG, "  conflict_timer = %d",
-		    addr->conflict_timer);
-		syslog(LOG_DEBUG, "  refresh_ttl    = %d", addr->refresh_ttl);
-		syslog(LOG_DEBUG, "  ttl            = %d", addr->ttl);
-		syslog(LOG_DEBUG, "  sin.sin_addr   = %s",
-		    inet_ntoa(addr->sin.sin_addr));
-		syslog(LOG_DEBUG, "  sin.sin_port   = %d", addr->sin.sin_port);
-		syslog(LOG_DEBUG, "  sin.sinlen     = %d", addr->sinlen);
+		if (count == 0)
+			(void) fprintf(fp, "%-16s  %d\n",
+			    inet_ntoa(addr->sin.sin_addr), addr->ttl);
+		else
+			(void) fprintf(fp, "%-28s  (0x%04x)  %-16s  %d\n",
+			    " ", addr->attributes,
+			    inet_ntoa(addr->sin.sin_addr), addr->ttl);
+		++count;
 		addr = addr->forw;
 	} while (addr != &entry->addr_list);
 }
@@ -688,16 +689,17 @@ smb_netbios_name_dump(struct name_entry *entry)
 void
 smb_netbios_name_logf(struct name_entry *entry)
 {
-	struct addr_entry *addr;
-	NETBIOS_NAMEBUF;
+	char		namebuf[MAXHOSTNAMELEN];
+	addr_entry_t	*addr;
 
-	(void) smb_strname(entry, namebuf, sizeof (namebuf));
+	smb_strname(entry, namebuf, sizeof (namebuf));
 	syslog(LOG_DEBUG, "%s flags=0x%x\n", namebuf, entry->attributes);
 	addr = &entry->addr_list;
 	do {
-		syslog(LOG_DEBUG, "  %s ttl=%d flags=0x%x",
+		syslog(LOG_DEBUG, "  %s ttl=%d flags=0x%x port=%d",
 		    inet_ntoa(addr->sin.sin_addr),
-		    addr->ttl, addr->attributes);
+		    addr->ttl, addr->attributes,
+		    addr->sin.sin_port);
 		addr = addr->forw;
 	} while (addr && (addr != &entry->addr_list));
 }
@@ -716,8 +718,8 @@ smb_netbios_name_logf(struct name_entry *entry)
 struct name_entry *
 smb_netbios_name_dup(struct name_entry *entry, int alladdr)
 {
-	struct addr_entry *addr;
-	struct addr_entry *dup_addr;
+	addr_entry_t *addr;
+	addr_entry_t *dup_addr;
 	struct name_entry *dup;
 	int addr_cnt = 0;
 	int size = 0;
@@ -731,7 +733,7 @@ smb_netbios_name_dup(struct name_entry *entry, int alladdr)
 	}
 
 	size = sizeof (struct name_entry) +
-	    (addr_cnt * sizeof (struct addr_entry));
+	    (addr_cnt * sizeof (addr_entry_t));
 	dup = (struct name_entry *)malloc(size);
 	if (dup == 0)
 		return (0);
@@ -750,7 +752,7 @@ smb_netbios_name_dup(struct name_entry *entry, int alladdr)
 		return (dup);
 
 	/* LINTED - E_BAD_PTR_CAST_ALIGN */
-	dup_addr = (struct addr_entry *)((unsigned char *)dup +
+	dup_addr = (addr_entry_t *)((unsigned char *)dup +
 	    sizeof (struct name_entry));
 
 	addr = entry->addr_list.forw;
@@ -764,17 +766,22 @@ smb_netbios_name_dup(struct name_entry *entry, int alladdr)
 	return (dup);
 }
 
-static char *
-smb_strname(struct name_entry *name, char *buf, int bufsize)
+static void
+smb_strname(struct name_entry *entry, char *buf, int bufsize)
 {
-	char *p;
+	char	tmp[MAXHOSTNAMELEN];
+	char	*p;
 
-	(void) snprintf(buf, bufsize, "%15.15s", name->name);
-	p = strchr(buf, ' ');
-	if (p)
-		(void) snprintf(p, 5, "<%02X>", name->name[15]);
+	(void) snprintf(tmp, MAXHOSTNAMELEN, "%15.15s", entry->name);
+	if ((p = strchr(tmp, ' ')) != NULL)
+		*p = '\0';
 
-	return (buf);
+	if (entry->scope[0] != '\0') {
+		(void) strlcat(tmp, ".", MAXHOSTNAMELEN);
+		(void) strlcat(tmp, (char *)entry->scope, MAXHOSTNAMELEN);
+	}
+
+	(void) snprintf(buf, bufsize, "%-16s  <%02X>", tmp, entry->name[15]);
 }
 
 static void

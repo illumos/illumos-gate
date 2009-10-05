@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smbns_netlogon.c	1.7	08/07/16 SMI"
-
 /*
  * This module handles the primary domain controller location protocol.
  * The document claims to be version 1.15 of the browsing protocol. It also
@@ -81,7 +79,7 @@ extern cond_t ntdomain_cv;
 void
 smb_netlogon_request(struct name_entry *server, char *domain)
 {
-	nt_domain_t di;
+	smb_domain_t di;
 	smb_sid_t *sid = NULL;
 	int protocol = NETLOGON_PROTO_NETLOGON;
 
@@ -216,13 +214,13 @@ smb_netlogon_receive(struct datagram *datagram,
 		return;
 	}
 
-	if (domain == 0 || primary == 0) {
+	if (domain == NULL || primary == NULL) {
 		syslog(LOG_ERR, "NetLogonResponse: malformed packet");
 		smb_msgbuf_term(&mb);
 		return;
 	}
 
-	syslog(LOG_DEBUG, "DC Offer Dom=%s PDC=%s From=%s",
+	syslog(LOG_DEBUG, "DC Offer Domain=%s PDC=%s From=%s",
 	    domain, primary, src_name);
 
 	(void) mutex_lock(&ntdomain_mtx);
@@ -449,8 +447,8 @@ smb_netlogon_send(struct name_entry *name,
 		smb_init_name_struct((unsigned char *)domain, suffix[i],
 		    0, 0, 0, 0, 0, &dname);
 
-		syslog(LOG_DEBUG, "smb_netlogon_send");
-		smb_netbios_name_dump(&dname);
+		syslog(LOG_DEBUG, "SmbNetlogonSend");
+		smb_netbios_name_logf(&dname);
 		if ((dest = smb_name_find_name(&dname)) != 0) {
 			dest_dup = smb_netbios_name_dup(dest, 1);
 			smb_name_unlock_name(dest);
@@ -460,7 +458,8 @@ smb_netlogon_send(struct name_entry *name,
 				free(dest_dup);
 			}
 		} else {
-			syslog(LOG_DEBUG, "smbd: NBNS couldn't find %s<0x%X>",
+			syslog(LOG_DEBUG,
+			    "SmbNetlogonSend: could not find %s<0x%X>",
 			    domain, suffix[i]);
 		}
 	}

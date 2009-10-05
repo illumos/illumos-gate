@@ -150,6 +150,8 @@ struct ndr_heap;
 struct ndr_stream;
 struct ndr_reference;
 
+typedef uint16_t ndr_wchar_t;
+
 typedef struct ndr_typeinfo {
 	unsigned char		version;	/* sanity check */
 	unsigned char		alignment;	/* mask */

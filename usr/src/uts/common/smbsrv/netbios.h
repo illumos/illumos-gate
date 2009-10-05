@@ -58,9 +58,9 @@ extern "C" {
  * This is then encoded as a 32 byte string.
  *
  * NetBIOS Name:  NetBIOS
- * NetBIOS Scope: PROCOM.COM
- * First Level:   EOGFHEECEJEPFDCACACACACACACACACA.PROCOM.COM
- * Second Level:  <32>EOGFHEECEJEPFDCACACACACACACACACA<6>PROCOM<3>COM<0>
+ * NetBIOS Scope: DOMAIN.COM
+ * First Level:   EOGFHEECEJEPFDCACACACACACACACACA.DOMAIN.COM
+ * Second Level:  <32>EOGFHEECEJEPFDCACACACACACACACACA<6>DOMAIN<3>COM<0>
  */
 #define	NETBIOS_NAME_SZ			16
 #define	NETBIOS_ENCODED_NAME_SZ		32
@@ -71,6 +71,22 @@ extern "C" {
 	((NETBIOS_ENCODED_NAME_SZ + 2) * 2)
 
 #define	NETBIOS_HDR_SZ			4	/* bytes */
+
+/*
+ * NetBIOS name type/suffix: 16th byte of the NetBIOS name.
+ * The NetBIOS suffix is used by to identify computer services.
+ */
+#define	NBT_WKSTA			0x00	/* Workstation Service */
+#define	NBT_CLIENT			0x03	/* Messenger Service */
+#define	NBT_RASSRVR			0x06	/* RAS Server Service */
+#define	NBT_DMB				0x1B	/* Domain Master Browser */
+#define	NBT_IP				0x1C	/* Domain Controller */
+#define	NBT_MB				0x1D	/* Master Browser */
+#define	NBT_BS				0x1E	/* Browser Elections */
+#define	NBT_NETDDE			0x1F	/* NetDDE Service */
+#define	NBT_SERVER			0x20	/* Server Service */
+#define	NBT_RASCLNT			0x21	/* RAS Client Service */
+
 /*
  * Session Packet Types (RFC 1002 4.3.1).
  */
@@ -107,10 +123,6 @@ extern "C" {
 #define	DATAGRAM_INVALID_SOURCE_NAME_FORMAT		0x83
 #define	DATAGRAM_INVALID_DESTINATION_NAME_FORMAT	0x84
 
-#define	NAME_SERVICE_TCP_PORT		137
-#define	NAME_SERVICE_UDP_PORT		137
-#define	DGM_SRVC_UDP_PORT		138
-#define	SSN_SRVC_TCP_PORT		139
 #define	MAX_DATAGRAM_LENGTH		576
 #define	DATAGRAM_HEADER_LENGTH		14
 #define	DATAGRAM_ERR_HEADER_LENGTH	11

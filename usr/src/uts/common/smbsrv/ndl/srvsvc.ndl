@@ -1056,11 +1056,11 @@ struct mslm_NetSessionDel {
 #define SV_TYPE_DIALIN_SERVER       0x00000400
 #define SV_TYPE_XENIX_SERVER        0x00000800
 #define SV_TYPE_SERVER_UNIX         SV_TYPE_XENIX_SERVER
-#define SV_TYPE_NT                  0x00001000
-#define SV_TYPE_WFW                 0x00002000
+#define SV_TYPE_NT                  0x00001000	/* NT Workstation */
+#define SV_TYPE_WFW                 0x00002000	/* Windows for Workgroups */
 
 #define SV_TYPE_SERVER_MFPN         0x00004000
-#define SV_TYPE_SERVER_NT           0x00008000
+#define SV_TYPE_SERVER_NT           0x00008000	/* NT Server */
 #define SV_TYPE_POTENTIAL_BROWSER   0x00010000
 #define SV_TYPE_BACKUP_BROWSER      0x00020000
 #define SV_TYPE_MASTER_BROWSER      0x00040000
@@ -1068,8 +1068,7 @@ struct mslm_NetSessionDel {
 #define SV_TYPE_SERVER_OSF          0x00100000
 #define SV_TYPE_SERVER_VMS          0x00200000
 #define SV_TYPE_WINDOWS             0x00400000  /* Windows95 and above */
-#define SV_TYPE_ALTERNATE_XPORT     0x20000000  /* return list for
-						 * alternate transport */
+#define SV_TYPE_ALTERNATE_XPORT     0x20000000  /* Return alt transport list */
 #define SV_TYPE_LOCAL_LIST_ONLY     0x40000000  /* Return local list only */
 #define SV_TYPE_DOMAIN_ENUM         0x80000000
 #define SV_TYPE_ALL                 0xFFFFFFFF  /* handy for NetServerEnum2 */

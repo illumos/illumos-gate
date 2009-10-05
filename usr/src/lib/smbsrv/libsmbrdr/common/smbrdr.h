@@ -204,7 +204,7 @@ int nb_session_request(int, char *, char *, char *, char *);
  * smbrdr_session.c
  */
 int smbrdr_negotiate(char *, char *);
-struct sdb_session *smbrdr_session_lock(char *, char *, int);
+struct sdb_session *smbrdr_session_lock(const char *, const char *, int);
 void smbrdr_session_unlock(struct sdb_session *);
 
 /*

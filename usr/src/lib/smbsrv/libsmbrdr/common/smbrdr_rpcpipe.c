@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,8 +62,8 @@ smbrdr_ofile_free(struct sdb_ofile *ofile)
  */
 static struct sdb_ofile ofile_table[N_OFILE_TABLE];
 
-static int mlsvc_pipe_recon_wait = 50;
-static int mlsvc_pipe_recon_tries = 3;
+static int smbrdr_pipe_recon_wait = 50;
+static int smbrdr_pipe_recon_tries = 3;
 
 
 /*
@@ -83,7 +83,7 @@ smbrdr_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 	struct timespec st;
 	int i;
 
-	if (mlsvc_logon(hostname, domain, username) != 0)
+	if (smbrdr_logon(hostname, domain, username) != 0)
 		return (-1);
 
 	/*
@@ -93,7 +93,7 @@ smbrdr_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 	for (i = 0; i < 2; i++) {
 		status = smbrdr_tree_connect(hostname, username, "IPC$", &tid);
 		if (i == 0 && status == NT_STATUS_UNEXPECTED_NETWORK_ERROR) {
-			if (mlsvc_logon(hostname, domain, username) != 0)
+			if (smbrdr_logon(hostname, domain, username) != 0)
 				return (-1);
 			continue;
 		}
@@ -128,7 +128,7 @@ smbrdr_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 
 	status = NT_STATUS_OPEN_FAILED;
 
-	for (retry = 0; retry < mlsvc_pipe_recon_tries; retry++) {
+	for (retry = 0; retry < smbrdr_pipe_recon_tries; retry++) {
 		status = smbrdr_ntcreatex(ofile);
 
 		switch (status) {
@@ -146,7 +146,7 @@ smbrdr_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 			 * the pipe becomes available.
 			 */
 			st.tv_sec = 0;
-			st.tv_nsec = mlsvc_pipe_recon_wait * 1000000;
+			st.tv_nsec = smbrdr_pipe_recon_wait * 1000000;
 			(void) nanosleep(&st, 0);
 			break;
 
@@ -154,7 +154,7 @@ smbrdr_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 			/*
 			 * Something else went wrong: no more retries.
 			 */
-			retry = mlsvc_pipe_recon_tries;
+			retry = smbrdr_pipe_recon_tries;
 			break;
 		}
 	}
@@ -259,7 +259,7 @@ smbrdr_ofile_get(int fid)
  *
  * This function can be used when closing a share to ensure that all
  * ofiles resources are released. Don't call smbrdr_close_pipe because
- * that will call mlsvc_smb_tdcon and we don't know what state
+ * that will disconnect the tree and we don't know what state
  * the share is in. The server will probably close all files anyway.
  * We are more interested in releasing the ofile resources.
  */

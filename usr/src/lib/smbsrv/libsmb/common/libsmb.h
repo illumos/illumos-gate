@@ -484,6 +484,16 @@ boolean_t smb_auth_validate_nt(unsigned char *, uint32_t, smb_passwd_t *,
     unsigned char *, int, char *, char *, uchar_t *);
 
 /*
+ * SMB authenticated IPC
+ */
+extern void smb_ipc_commit(void);
+extern void smb_ipc_get_user(char *, size_t);
+extern void smb_ipc_get_passwd(uint8_t *, size_t);
+extern void smb_ipc_init(void);
+extern void smb_ipc_rollback(void);
+extern void smb_ipc_set(char *, uint8_t *);
+
+/*
  * SMB MAC Signing
  */
 
@@ -553,16 +563,16 @@ extern void smb_mac_dec_seqnum(smb_sign_ctx_t *sign_ctx);
  * that the system joined. All other domains are either
  * trusted or untrusted, as defined by the primary domain PDC.
  */
-typedef enum nt_domain_type {
-	NT_DOMAIN_NULL,
-	NT_DOMAIN_BUILTIN,
-	NT_DOMAIN_LOCAL,
-	NT_DOMAIN_PRIMARY,
-	NT_DOMAIN_ACCOUNT,
-	NT_DOMAIN_TRUSTED,
-	NT_DOMAIN_UNTRUSTED,
-	NT_DOMAIN_NUM_TYPES
-} nt_domain_type_t;
+typedef enum smb_domain_type {
+	SMB_DOMAIN_NULL,
+	SMB_DOMAIN_BUILTIN,
+	SMB_DOMAIN_LOCAL,
+	SMB_DOMAIN_PRIMARY,
+	SMB_DOMAIN_ACCOUNT,
+	SMB_DOMAIN_TRUSTED,
+	SMB_DOMAIN_UNTRUSTED,
+	SMB_DOMAIN_NUM_TYPES
+} smb_domain_type_t;
 
 /*
  * Information specific to trusted domains
@@ -586,9 +596,9 @@ typedef struct smb_domain_dns {
 /*
  * This is the information that is held about each domain.
  */
-typedef struct nt_domain {
+typedef struct smb_domain {
 	list_node_t		di_lnd;
-	nt_domain_type_t	di_type;
+	smb_domain_type_t	di_type;
 	char			di_sid[SMB_SID_STRSZ];
 	char			di_nbname[NETBIOS_NAME_SZ];
 	char			di_fqname[MAXHOSTNAMELEN];
@@ -597,11 +607,11 @@ typedef struct nt_domain {
 		smb_domain_dns_t	di_dns;
 		smb_domain_trust_t	di_trust;
 	} di_u;
-} nt_domain_t;
+} smb_domain_t;
 
 typedef struct smb_trusted_domains {
 	uint32_t	td_num;
-	nt_domain_t	*td_domains;
+	smb_domain_t	*td_domains;
 } smb_trusted_domains_t;
 
 #define	SMB_DOMAIN_SUCCESS		0
@@ -611,29 +621,38 @@ typedef struct smb_trusted_domains {
 #define	SMB_DOMAIN_INTERNAL_ERR		4
 #define	SMB_DOMAIN_INVALID_ARG		5
 #define	SMB_DOMAIN_NO_MEMORY		6
+#define	SMB_DOMAIN_NO_CACHE		7
 
-typedef struct smb_domain {
+/*
+ * This structure could contain information about
+ * the primary domain the name of selected domain controller
+ * for the primary domain and a list of trusted domains if
+ * any. The "ex" in the structure name stands for extended.
+ * This is to differentiate this structure from smb_domain_t
+ * which only contains information about a single domain.
+ */
+typedef struct smb_domainex {
 	char			d_dc[MAXHOSTNAMELEN];
-	nt_domain_t		d_info;
+	smb_domain_t		d_primary;
 	smb_trusted_domains_t	d_trusted;
-} smb_domain_t;
+} smb_domainex_t;
 
-int nt_domain_init(uint32_t);
-void nt_domain_fini(void);
-void nt_domain_show(void);
-void nt_domain_save(void);
-boolean_t nt_domain_lookup_name(char *, nt_domain_t *);
-boolean_t nt_domain_lookup_sid(smb_sid_t *, nt_domain_t *);
-boolean_t nt_domain_lookup_type(nt_domain_type_t, nt_domain_t *);
-boolean_t nt_domain_get_primary(smb_domain_t *);
-void nt_domain_update(smb_domain_t *);
-void nt_domain_start_update(void);
-void nt_domain_end_update(void);
-void nt_domain_set_basic_info(char *, char *, char *, nt_domain_t *);
-void nt_domain_set_dns_info(char *, char *, char *, char *, char *,
-    nt_domain_t *);
-void nt_domain_set_trust_info(char *, char *, char *,
-    uint32_t, uint32_t, uint32_t, nt_domain_t *);
+int smb_domain_init(uint32_t);
+void smb_domain_fini(void);
+void smb_domain_show(void);
+void smb_domain_save(void);
+boolean_t smb_domain_lookup_name(char *, smb_domain_t *);
+boolean_t smb_domain_lookup_sid(smb_sid_t *, smb_domain_t *);
+boolean_t smb_domain_lookup_type(smb_domain_type_t, smb_domain_t *);
+boolean_t smb_domain_getinfo(smb_domainex_t *);
+void smb_domain_update(smb_domainex_t *);
+uint32_t smb_domain_start_update(void);
+void smb_domain_end_update(void);
+void smb_domain_set_basic_info(char *, char *, char *, smb_domain_t *);
+void smb_domain_set_dns_info(char *, char *, char *, char *, char *,
+    smb_domain_t *);
+void smb_domain_set_trust_info(char *, char *, char *,
+    uint32_t, uint32_t, uint32_t, smb_domain_t *);
 
 typedef enum {
 	SMB_LGRP_BUILTIN = 1,
@@ -823,7 +842,7 @@ uint32_t smb_sam_lookup_name(char *, char *, uint16_t, smb_account_t *);
 uint32_t smb_sam_lookup_sid(smb_sid_t *, smb_account_t *);
 int smb_sam_usr_cnt(void);
 uint32_t smb_sam_usr_groups(smb_sid_t *, smb_ids_t *);
-int smb_sam_grp_cnt(nt_domain_type_t);
+int smb_sam_grp_cnt(smb_domain_type_t);
 void smb_account_free(smb_account_t *);
 boolean_t smb_account_validate(smb_account_t *);
 

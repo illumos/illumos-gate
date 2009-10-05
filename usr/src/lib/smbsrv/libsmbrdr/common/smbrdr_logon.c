@@ -37,7 +37,6 @@
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smb.h>
-#include <smbrdr_ipc_util.h>
 #include <smbrdr.h>
 
 #define	SMBRDR_ANON_USER	"IPC$"
@@ -53,14 +52,12 @@ static int smbrdr_logon_user(char *server, char *username, unsigned char *pwd);
 static int smbrdr_authenticate(char *, char *, char *, unsigned char *);
 
 /*
- * mlsvc_logon
- *
  * If the username is SMBRDR_ANON_USER, an anonymous session will be
  * established. Otherwise, an authenticated session will be established
  * based on the specified credentials.
  */
 int
-mlsvc_logon(char *domain_controller, char *domain, char *username)
+smbrdr_logon(char *domain_controller, char *domain, char *username)
 {
 	int rc;
 
@@ -145,15 +142,15 @@ static int
 smbrdr_auth_logon(char *domain_controller, char *domain_name, char *username)
 {
 	int erc;
-	unsigned char *pwd_hash = NULL;
+	uint8_t pwd_hash[SMBAUTH_HASH_SZ];
 
 	if (username == NULL || *username == 0) {
 		syslog(LOG_DEBUG, "smbrdr_auth_logon: no username");
 		return (-1);
 	}
 
-	pwd_hash = smbrdr_ipc_get_passwd();
-	if (!pwd_hash || *pwd_hash == 0) {
+	smb_ipc_get_passwd(pwd_hash, SMBAUTH_HASH_SZ);
+	if (*pwd_hash == 0) {
 		syslog(LOG_DEBUG, "smbrdr_auth_logon: no password");
 		return (-1);
 	}

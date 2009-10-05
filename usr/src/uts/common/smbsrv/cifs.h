@@ -46,13 +46,6 @@
 extern "C" {
 #endif
 
-
-/*
- * SMB-over-TCP (NETBIOS-less SMB) TCP port
- */
-#define	SMB_SRVC_TCP_PORT		445
-
-
 /* Share types */
 #ifndef _SHARE_TYPES_DEFINED_
 #define	_SHARE_TYPES_DEFINED_

@@ -314,14 +314,14 @@ smb_session_xprt_gethdr(smb_session_t *session, smb_xprt_t *ret_hdr)
 		return (rc);
 
 	switch (session->s_local_port) {
-	case SSN_SRVC_TCP_PORT:
+	case IPPORT_NETBIOS_SSN:
 		ret_hdr->xh_type = buf[0];
 		ret_hdr->xh_length = (((uint32_t)buf[1] & 1) << 16) |
 		    ((uint32_t)buf[2] << 8) |
 		    ((uint32_t)buf[3]);
 		break;
 
-	case SMB_SRVC_TCP_PORT:
+	case IPPORT_SMB:
 		ret_hdr->xh_type = buf[0];
 
 		if (ret_hdr->xh_type != 0) {
@@ -358,14 +358,14 @@ smb_session_xprt_puthdr(smb_session_t *session, smb_xprt_t *hdr,
 	}
 
 	switch (session->s_local_port) {
-	case SSN_SRVC_TCP_PORT:
+	case IPPORT_NETBIOS_SSN:
 		buf[0] = hdr->xh_type;
 		buf[1] = ((hdr->xh_length >> 16) & 1);
 		buf[2] = (hdr->xh_length >> 8) & 0xff;
 		buf[3] = hdr->xh_length & 0xff;
 		break;
 
-	case SMB_SRVC_TCP_PORT:
+	case IPPORT_SMB:
 		buf[0] = hdr->xh_type;
 		buf[1] = (hdr->xh_length >> 16) & 0xff;
 		buf[2] = (hdr->xh_length >> 8) & 0xff;
@@ -486,7 +486,7 @@ smb_session_daemon(smb_session_list_t *se)
 	if (session == NULL)
 		return (EINVAL);
 
-	if (session->s_local_port == SSN_SRVC_TCP_PORT) {
+	if (session->s_local_port == IPPORT_NETBIOS_SSN) {
 		rc = smb_session_request(session);
 		if (rc) {
 			smb_rwx_rwenter(&session->s_lock, RW_WRITER);
@@ -631,7 +631,7 @@ smb_session_message(smb_session_t *session)
 }
 
 /*
- * Port will be SSN_SRVC_TCP_PORT or SMB_SRVC_TCP_PORT.
+ * Port will be IPPORT_NETBIOS_SSN or IPPORT_SMB.
  */
 smb_session_t *
 smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,

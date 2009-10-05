@@ -77,21 +77,21 @@ typedef struct smb_domain_cache {
 
 static smb_domain_cache_t smb_dcache;
 
-static uint32_t nt_domain_add(nt_domain_type_t, nt_domain_t *);
-static uint32_t nt_domain_add_local(void);
-static uint32_t nt_domain_add_primary(uint32_t);
-static void nt_domain_unlink(void);
+static uint32_t smb_domain_add(smb_domain_type_t, smb_domain_t *);
+static uint32_t smb_domain_add_local(void);
+static uint32_t smb_domain_add_primary(uint32_t);
+static void smb_domain_unlink(void);
 
 static void smb_dcache_create(void);
 static void smb_dcache_destroy(void);
 static uint32_t smb_dcache_lock(int);
 static void smb_dcache_unlock(void);
-static void smb_dcache_remove(nt_domain_t *);
-static uint32_t smb_dcache_add(nt_domain_t *);
+static void smb_dcache_remove(smb_domain_t *);
+static uint32_t smb_dcache_add(smb_domain_t *);
 static void smb_dcache_getdc(char *, size_t);
 static void smb_dcache_setdc(char *);
 static boolean_t smb_dcache_wait(void);
-static void smb_dcache_updating(void);
+static uint32_t smb_dcache_updating(void);
 static void smb_dcache_ready(void);
 
 /*
@@ -101,30 +101,30 @@ static void smb_dcache_ready(void);
  * Returns 0 on success and an error code on failure.
  */
 int
-nt_domain_init(uint32_t secmode)
+smb_domain_init(uint32_t secmode)
 {
-	nt_domain_t di;
+	smb_domain_t di;
 	int rc;
 
 	smb_dcache_create();
 
-	if ((rc = nt_domain_add_local()) != 0)
+	if ((rc = smb_domain_add_local()) != 0)
 		return (rc);
 
-	nt_domain_set_basic_info(NT_BUILTIN_DOMAIN_SIDSTR, "BUILTIN", "", &di);
-	(void) nt_domain_add(NT_DOMAIN_BUILTIN, &di);
+	smb_domain_set_basic_info(NT_BUILTIN_DOMAIN_SIDSTR, "BUILTIN", "", &di);
+	(void) smb_domain_add(SMB_DOMAIN_BUILTIN, &di);
 
-	return (nt_domain_add_primary(secmode));
+	return (smb_domain_add_primary(secmode));
 }
 
 /*
  * Destroys the cache upon service termination
  */
 void
-nt_domain_fini(void)
+smb_domain_fini(void)
 {
 	smb_dcache_destroy();
-	nt_domain_unlink();
+	smb_domain_unlink();
 }
 
 /*
@@ -132,7 +132,7 @@ nt_domain_fini(void)
  * for duplicates.
  */
 static uint32_t
-nt_domain_add(nt_domain_type_t type, nt_domain_t *di)
+smb_domain_add(smb_domain_type_t type, smb_domain_t *di)
 {
 	uint32_t res;
 
@@ -160,13 +160,13 @@ nt_domain_add(nt_domain_type_t type, nt_domain_t *di)
  * If the domain is not in the cache B_FALSE is returned.
  */
 boolean_t
-nt_domain_lookup_name(char *name, nt_domain_t *di)
+smb_domain_lookup_name(char *name, smb_domain_t *di)
 {
 	boolean_t found = B_FALSE;
-	nt_domain_t *dcnode;
+	smb_domain_t *dcnode;
 	char *p;
 
-	bzero(di, sizeof (nt_domain_t));
+	bzero(di, sizeof (smb_domain_t));
 
 	if (name == NULL || *name == '\0')
 		return (B_FALSE);
@@ -214,13 +214,13 @@ nt_domain_lookup_name(char *name, nt_domain_t *di)
  * If the domain is not in the cache B_FALSE is returned.
  */
 boolean_t
-nt_domain_lookup_sid(smb_sid_t *sid, nt_domain_t *di)
+smb_domain_lookup_sid(smb_sid_t *sid, smb_domain_t *di)
 {
 	boolean_t found = B_FALSE;
-	nt_domain_t *dcnode;
+	smb_domain_t *dcnode;
 	char sidstr[SMB_SID_STRSZ];
 
-	bzero(di, sizeof (nt_domain_t));
+	bzero(di, sizeof (smb_domain_t));
 
 	if (sid == NULL)
 		return (B_FALSE);
@@ -257,12 +257,12 @@ nt_domain_lookup_sid(smb_sid_t *sid, nt_domain_t *di)
  * If the domain is not in the cache B_FALSE is returned.
  */
 boolean_t
-nt_domain_lookup_type(nt_domain_type_t type, nt_domain_t *di)
+smb_domain_lookup_type(smb_domain_type_t type, smb_domain_t *di)
 {
 	boolean_t found = B_FALSE;
-	nt_domain_t *dcnode;
+	smb_domain_t *dcnode;
 
-	bzero(di, sizeof (nt_domain_t));
+	bzero(di, sizeof (smb_domain_t));
 
 	if (smb_dcache_lock(SMB_DCACHE_RDLOCK) != SMB_DOMAIN_SUCCESS)
 		return (B_FALSE);
@@ -288,13 +288,13 @@ nt_domain_lookup_type(nt_domain_type_t type, nt_domain_t *di)
  * the selected domain controller.
  */
 boolean_t
-nt_domain_get_primary(smb_domain_t *domain)
+smb_domain_getinfo(smb_domainex_t *dxi)
 {
 	boolean_t success;
 
-	success = nt_domain_lookup_type(NT_DOMAIN_PRIMARY, &domain->d_info);
+	success = smb_domain_lookup_type(SMB_DOMAIN_PRIMARY, &dxi->d_primary);
 	if (success)
-		smb_dcache_getdc(domain->d_dc, sizeof (domain->d_dc));
+		smb_dcache_getdc(dxi->d_dc, sizeof (dxi->d_dc));
 
 	return (success);
 }
@@ -304,17 +304,17 @@ nt_domain_get_primary(smb_domain_t *domain)
  * In this state any request for reading the cache would
  * be blocked until the update is finished.
  */
-void
-nt_domain_start_update(void)
+uint32_t
+smb_domain_start_update(void)
 {
-	smb_dcache_updating();
+	return (smb_dcache_updating());
 }
 
 /*
  * Transfer the cache from updating to ready state.
  */
 void
-nt_domain_end_update(void)
+smb_domain_end_update(void)
 {
 	smb_dcache_ready();
 }
@@ -328,9 +328,9 @@ nt_domain_end_update(void)
  * primary and trusted will be removed from cache.
  */
 void
-nt_domain_update(smb_domain_t *domain)
+smb_domain_update(smb_domainex_t *dxi)
 {
-	nt_domain_t *dcnode;
+	smb_domain_t *dcnode;
 	int i;
 
 	if (smb_dcache_lock(SMB_DCACHE_WRLOCK) != SMB_DOMAIN_SUCCESS)
@@ -338,8 +338,8 @@ nt_domain_update(smb_domain_t *domain)
 
 	dcnode = list_head(&smb_dcache.dc_cache);
 	while (dcnode) {
-		if ((dcnode->di_type == NT_DOMAIN_PRIMARY) ||
-		    (dcnode->di_type == NT_DOMAIN_TRUSTED)) {
+		if ((dcnode->di_type == SMB_DOMAIN_PRIMARY) ||
+		    (dcnode->di_type == SMB_DOMAIN_TRUSTED)) {
 			smb_dcache_remove(dcnode);
 			dcnode = list_head(&smb_dcache.dc_cache);
 		} else {
@@ -347,11 +347,11 @@ nt_domain_update(smb_domain_t *domain)
 		}
 	}
 
-	if (smb_dcache_add(&domain->d_info) == SMB_DOMAIN_SUCCESS) {
-		for (i = 0; i < domain->d_trusted.td_num; i++)
-			(void) smb_dcache_add(&domain->d_trusted.td_domains[i]);
+	if (smb_dcache_add(&dxi->d_primary) == SMB_DOMAIN_SUCCESS) {
+		for (i = 0; i < dxi->d_trusted.td_num; i++)
+			(void) smb_dcache_add(&dxi->d_trusted.td_domains[i]);
 
-		smb_dcache_setdc(domain->d_dc);
+		smb_dcache_setdc(dxi->d_dc);
 	}
 
 	smb_dcache_unlock();
@@ -361,11 +361,11 @@ nt_domain_update(smb_domain_t *domain)
  * Write the list of domains to /var/run/smb/domains.
  */
 void
-nt_domain_save(void)
+smb_domain_save(void)
 {
 	char		fname[MAXPATHLEN];
 	char		tag;
-	nt_domain_t	*domain;
+	smb_domain_t	*domain;
 	FILE		*fp;
 	struct passwd	*pwd;
 	struct group	*grp;
@@ -393,16 +393,16 @@ nt_domain_save(void)
 	domain = list_head(&smb_dcache.dc_cache);
 	while (domain) {
 		switch (domain->di_type) {
-		case NT_DOMAIN_PRIMARY:
+		case SMB_DOMAIN_PRIMARY:
 			tag = '*';
 			break;
 
-		case NT_DOMAIN_TRUSTED:
-		case NT_DOMAIN_UNTRUSTED:
+		case SMB_DOMAIN_TRUSTED:
+		case SMB_DOMAIN_UNTRUSTED:
 			tag = '-';
 			break;
 
-		case NT_DOMAIN_LOCAL:
+		case SMB_DOMAIN_LOCAL:
 			tag = '.';
 			break;
 		default:
@@ -425,7 +425,7 @@ nt_domain_save(void)
  * List the domains in /var/run/smb/domains.
  */
 void
-nt_domain_show(void)
+smb_domain_show(void)
 {
 	char buf[MAXPATHLEN];
 	char *p;
@@ -449,8 +449,8 @@ nt_domain_show(void)
 }
 
 void
-nt_domain_set_basic_info(char *sid, char *nb_domain, char *fq_domain,
-    nt_domain_t *di)
+smb_domain_set_basic_info(char *sid, char *nb_domain, char *fq_domain,
+    smb_domain_t *di)
 {
 	if (sid == NULL || nb_domain == NULL || fq_domain == NULL ||
 	    di == NULL)
@@ -464,31 +464,31 @@ nt_domain_set_basic_info(char *sid, char *nb_domain, char *fq_domain,
 }
 
 void
-nt_domain_set_dns_info(char *sid, char *nb_domain, char *fq_domain,
-    char *forest, char *guid, nt_domain_t *di)
+smb_domain_set_dns_info(char *sid, char *nb_domain, char *fq_domain,
+    char *forest, char *guid, smb_domain_t *di)
 {
 	if (di == NULL || forest == NULL || guid == NULL)
 		return;
 
-	nt_domain_set_basic_info(sid, nb_domain, fq_domain, di);
+	smb_domain_set_basic_info(sid, nb_domain, fq_domain, di);
 	(void) strlcpy(di->di_u.di_dns.ddi_forest, forest, MAXHOSTNAMELEN);
 	(void) strlcpy(di->di_u.di_dns.ddi_guid, guid,
 	    UUID_PRINTABLE_STRING_LENGTH);
 }
 
 void
-nt_domain_set_trust_info(char *sid, char *nb_domain, char *fq_domain,
+smb_domain_set_trust_info(char *sid, char *nb_domain, char *fq_domain,
     uint32_t trust_dir, uint32_t trust_type, uint32_t trust_attrs,
-    nt_domain_t *di)
+    smb_domain_t *di)
 {
 	smb_domain_trust_t *ti;
 
 	if (di == NULL)
 		return;
 
-	di->di_type = NT_DOMAIN_TRUSTED;
+	di->di_type = SMB_DOMAIN_TRUSTED;
 	ti = &di->di_u.di_trust;
-	nt_domain_set_basic_info(sid, nb_domain, fq_domain, di);
+	smb_domain_set_basic_info(sid, nb_domain, fq_domain, di);
 	ti->dti_trust_direction = trust_dir;
 	ti->dti_trust_type = trust_type;
 	ti->dti_trust_attrs = trust_attrs;
@@ -498,7 +498,7 @@ nt_domain_set_trust_info(char *sid, char *nb_domain, char *fq_domain,
  * Remove the /var/run/smb/domains file.
  */
 static void
-nt_domain_unlink(void)
+smb_domain_unlink(void)
 {
 	char fname[MAXPATHLEN];
 
@@ -511,12 +511,12 @@ nt_domain_unlink(void)
  * Add an entry for the local domain to the domain cache
  */
 static uint32_t
-nt_domain_add_local(void)
+smb_domain_add_local(void)
 {
 	char *lsidstr;
 	char hostname[NETBIOS_NAME_SZ];
 	char fq_name[MAXHOSTNAMELEN];
-	nt_domain_t di;
+	smb_domain_t di;
 
 	if ((lsidstr = smb_config_get_localsid()) == NULL)
 		return (SMB_DOMAIN_NOMACHINE_SID);
@@ -528,8 +528,8 @@ nt_domain_add_local(void)
 
 	*fq_name = '\0';
 	(void) smb_getfqhostname(fq_name, MAXHOSTNAMELEN);
-	nt_domain_set_basic_info(lsidstr, hostname, fq_name, &di);
-	(void) nt_domain_add(NT_DOMAIN_LOCAL, &di);
+	smb_domain_set_basic_info(lsidstr, hostname, fq_name, &di);
+	(void) smb_domain_add(SMB_DOMAIN_LOCAL, &di);
 
 	free(lsidstr);
 	return (SMB_DOMAIN_SUCCESS);
@@ -539,12 +539,12 @@ nt_domain_add_local(void)
  * Add an entry for the primary domain to the domain cache
  */
 static uint32_t
-nt_domain_add_primary(uint32_t secmode)
+smb_domain_add_primary(uint32_t secmode)
 {
 	char sidstr[SMB_SID_STRSZ];
 	char fq_name[MAXHOSTNAMELEN];
 	char nb_name[NETBIOS_NAME_SZ];
-	nt_domain_t di;
+	smb_domain_t di;
 	int rc;
 
 	if (secmode != SMB_SECMODE_DOMAIN)
@@ -559,8 +559,8 @@ nt_domain_add_primary(uint32_t secmode)
 		return (SMB_DOMAIN_NODOMAIN_NAME);
 
 	(void) smb_getfqdomainname(fq_name, MAXHOSTNAMELEN);
-	nt_domain_set_basic_info(sidstr, nb_name, fq_name, &di);
-	(void) nt_domain_add(NT_DOMAIN_PRIMARY, &di);
+	smb_domain_set_basic_info(sidstr, nb_name, fq_name, &di);
+	(void) smb_domain_add(SMB_DOMAIN_PRIMARY, &di);
 	return (SMB_DOMAIN_SUCCESS);
 }
 
@@ -577,8 +577,8 @@ smb_dcache_create(void)
 		return;
 	}
 
-	list_create(&smb_dcache.dc_cache, sizeof (nt_domain_t),
-	    offsetof(nt_domain_t, di_lnd));
+	list_create(&smb_dcache.dc_cache, sizeof (smb_domain_t),
+	    offsetof(smb_domain_t, di_lnd));
 
 	smb_dcache.dc_nops = 0;
 	*smb_dcache.dc_server = '\0';
@@ -592,7 +592,7 @@ smb_dcache_create(void)
 static void
 smb_dcache_flush(void)
 {
-	nt_domain_t *di;
+	smb_domain_t *di;
 
 	(void) rw_wrlock(&smb_dcache.dc_cache_lck);
 	while ((di = list_head(&smb_dcache.dc_cache)) != NULL)
@@ -687,11 +687,11 @@ smb_dcache_unlock(void)
 }
 
 static uint32_t
-smb_dcache_add(nt_domain_t *di)
+smb_dcache_add(smb_domain_t *di)
 {
-	nt_domain_t *dcnode;
+	smb_domain_t *dcnode;
 
-	if ((dcnode = malloc(sizeof (nt_domain_t))) == NULL)
+	if ((dcnode = malloc(sizeof (smb_domain_t))) == NULL)
 		return (SMB_DOMAIN_NO_MEMORY);
 
 	*dcnode = *di;
@@ -706,7 +706,7 @@ smb_dcache_add(nt_domain_t *di)
 }
 
 static void
-smb_dcache_remove(nt_domain_t *di)
+smb_dcache_remove(smb_domain_t *di)
 {
 	list_remove(&smb_dcache.dc_cache, di);
 	smb_sid_free(di->di_binsid);
@@ -729,6 +729,11 @@ smb_dcache_getdc(char *buf, size_t buflen)
 	(void) mutex_unlock(&smb_dcache.dc_mtx);
 }
 
+/*
+ * Waits for SMB_DCACHE_UPDATE_WAIT seconds if cache is in
+ * UPDATING state. Upon wake up returns true if cache is
+ * ready to be used, otherwise it returns false.
+ */
 static boolean_t
 smb_dcache_wait(void)
 {
@@ -747,24 +752,77 @@ smb_dcache_wait(void)
 	return (smb_dcache.dc_state == SMB_DCACHE_STATE_READY);
 }
 
-static void
+/*
+ * Transfers the cache into UPDATING state, this will ensure
+ * any read access to the cache will be stalled until the
+ * update is finished. This is to avoid providing incomplete,
+ * inconsistent or stale information.
+ *
+ * If another thread is already updating the cache, other
+ * callers will wait until cache is no longer in UPDATING
+ * state. The return code is decided based on the new
+ * state of the cache.
+ */
+static uint32_t
 smb_dcache_updating(void)
 {
+	uint32_t rc;
+
 	(void) mutex_lock(&smb_dcache.dc_mtx);
-	if (smb_dcache.dc_state == SMB_DCACHE_STATE_READY)
+	switch (smb_dcache.dc_state) {
+	case SMB_DCACHE_STATE_READY:
 		smb_dcache.dc_state = SMB_DCACHE_STATE_UPDATING;
-	else
-		assert(0);
+		rc = SMB_DOMAIN_SUCCESS;
+		break;
+
+	case SMB_DCACHE_STATE_UPDATING:
+		while (smb_dcache.dc_state == SMB_DCACHE_STATE_UPDATING)
+			(void) cond_wait(&smb_dcache.dc_cv,
+			    &smb_dcache.dc_mtx);
+
+		if (smb_dcache.dc_state == SMB_DCACHE_STATE_READY) {
+			smb_dcache.dc_state = SMB_DCACHE_STATE_UPDATING;
+			rc = SMB_DOMAIN_SUCCESS;
+		} else {
+			rc = SMB_DOMAIN_NO_CACHE;
+		}
+		break;
+
+	case SMB_DCACHE_STATE_NONE:
+	case SMB_DCACHE_STATE_DESTROYING:
+		rc = SMB_DOMAIN_NO_CACHE;
+		break;
+
+	default:
+		break;
+	}
+
 	(void) mutex_unlock(&smb_dcache.dc_mtx);
+	return (rc);
 }
 
+/*
+ * Transfers the cache from UPDATING to READY state.
+ *
+ * Nothing will happen if the cache is no longer available
+ * or it is being destroyed.
+ */
 static void
 smb_dcache_ready(void)
 {
 	(void) mutex_lock(&smb_dcache.dc_mtx);
-	if (smb_dcache.dc_state == SMB_DCACHE_STATE_UPDATING)
+	switch (smb_dcache.dc_state) {
+	case SMB_DCACHE_STATE_UPDATING:
 		smb_dcache.dc_state = SMB_DCACHE_STATE_READY;
-	else
+		(void) cond_broadcast(&smb_dcache.dc_cv);
+		break;
+
+	case SMB_DCACHE_STATE_NONE:
+	case SMB_DCACHE_STATE_DESTROYING:
+		break;
+
+	default:
 		assert(0);
+	}
 	(void) mutex_unlock(&smb_dcache.dc_mtx);
 }

@@ -299,17 +299,17 @@ smb_dop_get_dcinfo(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
 {
 	char *rbuf = NULL;
-	smb_domain_t dinfo;
+	smb_domainex_t dxi;
 
 	*err = SMB_DR_OP_SUCCESS;
 	*rbufsize = 0;
 
-	if (!smb_domain_getinfo(&dinfo)) {
+	if (!smb_domain_getinfo(&dxi)) {
 		*err = SMB_DR_OP_ERR_EMPTYBUF;
 		return (NULL);
 	}
 
-	if ((rbuf = smb_dr_encode_string(SMB_DR_OP_SUCCESS, dinfo.d_dc,
+	if ((rbuf = smb_dr_encode_string(SMB_DR_OP_SUCCESS, dxi.d_dc,
 	    rbufsize)) == NULL) {
 		*err = SMB_DR_OP_ERR_ENCODE;
 		*rbufsize = 0;

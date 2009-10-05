@@ -652,7 +652,7 @@ smb_server_nbt_listen(smb_ioc_listen_t *ioc)
 	/*
 	 * netbios must be ipv4
 	 */
-	rc = smb_server_listen(sv, &sv->sv_nbt_daemon, SSN_SRVC_TCP_PORT,
+	rc = smb_server_listen(sv, &sv->sv_nbt_daemon, IPPORT_NETBIOS_SSN,
 	    AF_INET, ioc->error);
 
 	if (rc) {
@@ -700,10 +700,10 @@ smb_server_tcp_listen(smb_ioc_listen_t *ioc)
 
 	if (sv->sv_cfg.skc_ipv6_enable)
 		rc = smb_server_listen(sv, &sv->sv_tcp_daemon,
-		    SMB_SRVC_TCP_PORT, AF_INET6, ioc->error);
+		    IPPORT_SMB, AF_INET6, ioc->error);
 	else
 		rc = smb_server_listen(sv, &sv->sv_tcp_daemon,
-		    SMB_SRVC_TCP_PORT, AF_INET, ioc->error);
+		    IPPORT_SMB, AF_INET, ioc->error);
 	if (rc) {
 		mutex_enter(&sv->sv_mutex);
 		sv->sv_tcp_daemon.ld_kth = NULL;

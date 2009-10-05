@@ -26,7 +26,6 @@
 #include <sys/param.h>
 #include <ldap.h>
 #include <stdlib.h>
-#include <gssapi/gssapi.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -44,6 +43,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <sasl/sasl.h>
+#include <note.h>
 
 #include <smbsrv/libsmbns.h>
 #include <smbns_dyndns.h>
@@ -176,7 +177,6 @@ typedef struct smb_ads_host_list {
 } smb_ads_host_list_t;
 
 static smb_ads_handle_t *smb_ads_open_main(char *, char *, char *);
-static int smb_ads_bind(smb_ads_handle_t *);
 static int smb_ads_add_computer(smb_ads_handle_t *, int, char *);
 static int smb_ads_modify_computer(smb_ads_handle_t *, int, char *);
 static int smb_ads_computer_op(smb_ads_handle_t *, int, int, char *);
@@ -595,7 +595,7 @@ smb_ads_dup_host_info(smb_ads_host_info_t *ads_host)
 /*
  * smb_ads_hlist_alloc
  */
-smb_ads_host_list_t *
+static smb_ads_host_list_t *
 smb_ads_hlist_alloc(int count)
 {
 	int size;
@@ -1034,6 +1034,24 @@ smb_ads_open(void)
 	return (smb_ads_open_main(domain, NULL, NULL));
 }
 
+static int
+smb_ads_saslcallback(LDAP *ld, unsigned flags, void *defaults, void *prompts)
+{
+	NOTE(ARGUNUSED(ld, defaults));
+	sasl_interact_t *interact;
+
+	if (prompts == NULL || flags != LDAP_SASL_INTERACTIVE)
+		return (LDAP_PARAM_ERROR);
+
+	/* There should be no extra arguemnts for SASL/GSSAPI authentication */
+	for (interact = prompts; interact->id != SASL_CB_LIST_END;
+	    interact++) {
+		interact->result = NULL;
+		interact->len = 0;
+	}
+	return (LDAP_SUCCESS);
+}
+
 /*
  * smb_ads_open_main
  * Open a LDAP connection to an ADS server.
@@ -1048,7 +1066,7 @@ smb_ads_open(void)
  * After the LDAP connection, the LDAP version will be set to 3 using
  * ldap_set_option().
  *
- * The smb_ads_bind() routine is also called before the ADS handle is returned.
+ * The LDAP connection is bound before the ADS handle is returned.
  * Parameters:
  *   domain - fully-qualified domain name
  *   user   - the user account for whom the Kerberos TGT ticket and ADS
@@ -1066,6 +1084,14 @@ smb_ads_open_main(char *domain, char *user, char *password)
 	LDAP *ld;
 	int version = 3;
 	smb_ads_host_info_t *ads_host = NULL;
+	int rc;
+
+	if (user != NULL) {
+		if (smb_kinit(user, password) == 0)
+			return (NULL);
+		user = NULL;
+		password = NULL;
+	}
 
 	ads_host = smb_ads_find_host(domain, NULL);
 	if (ads_host == NULL)
@@ -1097,8 +1123,6 @@ smb_ads_open_main(char *domain, char *user, char *password)
 
 	(void) ldap_set_option(ld, LDAP_OPT_REFERRALS, LDAP_OPT_OFF);
 	ah->ld = ld;
-	ah->user = (user) ? strdup(user) : NULL;
-	ah->pwd = (password) ? strdup(password) : NULL;
 	ah->domain = strdup(domain);
 
 	if (ah->domain == NULL) {
@@ -1133,7 +1157,11 @@ smb_ads_open_main(char *domain, char *user, char *password)
 	}
 	(void) mutex_unlock(&smb_ads_cfg.c_mtx);
 
-	if (smb_ads_bind(ah) == -1) {
+	rc = ldap_sasl_interactive_bind_s(ah->ld, "", "GSSAPI", NULL, NULL,
+	    LDAP_SASL_INTERACTIVE, &smb_ads_saslcallback, NULL);
+	if (rc != LDAP_SUCCESS) {
+		syslog(LOG_ERR, "ldal_sasl_interactive_bind_s failed (%s)",
+		    ldap_err2string(rc));
 		smb_ads_close(ah);
 		free(ads_host);
 		return (NULL);
@@ -1155,52 +1183,17 @@ smb_ads_open_main(char *domain, char *user, char *password)
 void
 smb_ads_close(smb_ads_handle_t *ah)
 {
-	int len;
-
 	if (ah == NULL)
 		return;
 	/* close and free connection resources */
 	if (ah->ld)
 		(void) ldap_unbind(ah->ld);
 
-	free(ah->user);
-	if (ah->pwd) {
-		len = strlen(ah->pwd);
-		/* zero out the memory that contains user's password */
-		if (len > 0)
-			bzero(ah->pwd, len);
-		free(ah->pwd);
-	}
 	free(ah->domain);
 	free(ah->domain_dn);
 	free(ah->hostname);
 	free(ah->site);
 	free(ah);
-}
-
-/*
- * smb_ads_display_stat
- * Display error message for GSS-API routines.
- * Parameters:
- *   maj:  GSS major status
- *   min:  GSS minor status
- * Returns:
- *   None
- */
-static void
-smb_ads_display_stat(OM_uint32 maj, OM_uint32 min)
-{
-	gss_buffer_desc msg;
-	OM_uint32 msg_ctx = 0;
-	OM_uint32 min2;
-	(void) gss_display_status(&min2, maj, GSS_C_GSS_CODE, GSS_C_NULL_OID,
-	    &msg_ctx, &msg);
-	smb_tracef("major status: %s", (char *)msg.value);
-	(void) gss_release_buffer(&min2, &msg);
-	(void) gss_display_status(&min2, min, GSS_C_MECH_CODE, GSS_C_NULL_OID,
-	    &msg_ctx, &msg);
-	smb_tracef("minor status: %s", (char *)msg.value);
-	(void) gss_release_buffer(&min2, &msg);
 }
 
 /*
@@ -1279,290 +1272,6 @@ smb_ads_free_spnset(char **spn_set)
 	int i;
 	for (i = 0; spn_set[i]; i++)
 		free(spn_set[i]);
-}
-
-/*
- * smb_ads_acquire_cred
- * Called by smb_ads_bind() to get a handle to administrative user's credential
- * stored locally on the system.  The credential is the TGT.  If the attempt at
- * getting handle fails then a second attempt will be made after getting a
- * new TGT.
- * Please look at smb_ads_bind() for more information.
- *
- * Paramters:
- *   ah         : handle to ADS server
- *   kinit_retry: if 0 then a second attempt will be made to get handle to the
- *                credential if the first attempt fails
- * Returns:
- *   cred_handle: handle to the administrative user's credential (TGT)
- *   oid        : contains Kerberos 5 object identifier
- *   kinit_retry: A 1 indicates that a second attempt has been made to get
- *                handle to the credential and no further attempts can be made
- *   -1         : error
- *    0         : success
- */
-static int
-smb_ads_acquire_cred(smb_ads_handle_t *ah, gss_cred_id_t *cred_handle,
-    gss_OID *oid, int *kinit_retry)
-{
-	return (krb5_acquire_cred_kinit(ah->user, ah->pwd, cred_handle, oid,
-	    kinit_retry, "ads"));
-}
-
-/*
- * smb_ads_establish_sec_context
- * Called by smb_ads_bind() to establish a security context to an LDAP service
- * on an ADS server. If the attempt at establishing the security context fails
- * then a second attempt will be made by smb_ads_bind() if a new TGT has not
- * been already obtained in ads_acquire_cred.  The second attempt, if allowed,
- * will obtained a new TGT here and a new handle to the credential will also be
- * obtained in ads_acquire_cred.  LDAP SASL bind is used to send and receive
- * the GSS tokens to and from the ADS server.
- * Please look at ads_bind for more information.
- * Paramters:
- *   ah             : handle to ADS server
- *   cred_handle    : handle to administrative user's credential (TGT)
- *   oid            : Kerberos 5 object identifier
- *   kinit_retry    : if 0 then a second attempt can be made to establish a
- *                    security context with ADS server if first attempt fails
- * Returns:
- *   gss_context    : security context to ADS server
- *   sercred        : encrypted ADS server's supported security layers
- *   do_acquire_cred: if 1 then a second attempt will be made to establish a
- *                    security context with ADS server after getting a new
- *                    handle to the user's credential
- *   kinit_retry    : if 1 then a second attempt will be made to establish a
- *                    a security context and no further attempts can be made
- *   -1             : error
- *    0             : success
- */
-static int
-smb_ads_establish_sec_context(smb_ads_handle_t *ah, gss_ctx_id_t *gss_context,
-    gss_cred_id_t cred_handle, gss_OID oid, struct berval **sercred,
-    int *kinit_retry, int *do_acquire_cred)
-{
-	OM_uint32 maj, min, time_rec;
-	char service_name[SMB_ADS_MAXBUFLEN];
-	gss_buffer_desc send_tok, service_buf;
-	gss_name_t target_name;
-	gss_buffer_desc input;
-	gss_buffer_desc *inputptr;
-	struct berval cred;
-	OM_uint32 ret_flags;
-	int stat;
-	int gss_flags;
-
-	(void) snprintf(service_name, SMB_ADS_MAXBUFLEN, "ldap@%s",
-	    ah->hostname);
-	service_buf.value = service_name;
-	service_buf.length = strlen(service_name)+1;
-	if ((maj = gss_import_name(&min, &service_buf,
-	    (gss_OID) gss_nt_service_name,
-	    &target_name)) != GSS_S_COMPLETE) {
-		smb_ads_display_stat(maj, min);
-		if (oid != GSS_C_NO_OID)
-			(void) gss_release_oid(&min, &oid);
-		return (-1);
-	}
-
-	*gss_context = GSS_C_NO_CONTEXT;
-	*sercred = NULL;
-	inputptr = GSS_C_NO_BUFFER;
-	gss_flags = GSS_C_MUTUAL_FLAG;
-	do {
-		if (krb5_establish_sec_ctx_kinit(ah->user, ah->pwd,
-		    cred_handle, gss_context, target_name, oid,
-		    gss_flags, inputptr, &send_tok,
-		    &ret_flags, &time_rec, kinit_retry,
-		    do_acquire_cred, &maj, "ads") == -1) {
-			if (oid != GSS_C_NO_OID)
-				(void) gss_release_oid(&min, &oid);
-			(void) gss_release_name(&min, &target_name);
-			return (-1);
-		}
-
-		cred.bv_val = send_tok.value;
-		cred.bv_len = send_tok.length;
-		if (*sercred) {
-			ber_bvfree(*sercred);
-			*sercred = NULL;
-		}
-		stat = ldap_sasl_bind_s(ah->ld, NULL, "GSSAPI",
-		    &cred, NULL, NULL, sercred);
-		if (stat != LDAP_SUCCESS &&
-		    stat != LDAP_SASL_BIND_IN_PROGRESS) {
-			syslog(LOG_NOTICE, "ldap_sasl_bind: %s",
-			    ldap_err2string(stat));
-			if (oid != GSS_C_NO_OID)
-				(void) gss_release_oid(&min, &oid);
-			(void) gss_release_name(&min, &target_name);
-			(void) gss_release_buffer(&min, &send_tok);
-			return (-1);
-		}
-		input.value = (*sercred)->bv_val;
-		input.length = (*sercred)->bv_len;
-		inputptr = &input;
-		if (send_tok.length > 0)
-			(void) gss_release_buffer(&min, &send_tok);
-	} while (maj != GSS_S_COMPLETE);
-
-	if (oid != GSS_C_NO_OID)
-		(void) gss_release_oid(&min, &oid);
-	(void) gss_release_name(&min, &target_name);
-
-	return (0);
-}
-
-/*
- * smb_ads_negotiate_sec_layer
- * Call by smb_ads_bind() to negotiate additional security layer for further
- * communication after security context establishment.  No additional security
- * is needed so a "no security layer" is negotiated.  The security layer is
- * described in the SASL RFC 2478 and this step is needed for secure LDAP
- * binding.  LDAP SASL bind is used to send and receive the GSS tokens to and
- * from the ADS server.
- * Please look at smb_ads_bind for more information.
- *
- * Paramters:
- *   ah         : handle to ADS server
- *   gss_context: security context to ADS server
- *   sercred    : encrypted ADS server's supported security layers
- * Returns:
- *   -1         : error
- *    0         : success
- */
-static int
-smb_ads_negotiate_sec_layer(smb_ads_handle_t *ah, gss_ctx_id_t gss_context,
-    struct berval *sercred)
-{
-	OM_uint32 maj, min;
-	gss_buffer_desc unwrap_inbuf, unwrap_outbuf;
-	gss_buffer_desc wrap_inbuf, wrap_outbuf;
-	int conf_state, sec_layer;
-	char auth_id[5];
-	struct berval cred;
-	int stat;
-	gss_qop_t qt;
-
-	/* check for server supported security layer */
-	unwrap_inbuf.value = sercred->bv_val;
-	unwrap_inbuf.length = sercred->bv_len;
-	if ((maj = gss_unwrap(&min, gss_context,
-	    &unwrap_inbuf, &unwrap_outbuf,
-	    &conf_state, &qt)) != GSS_S_COMPLETE) {
-		smb_ads_display_stat(maj, min);
-		if (sercred)
-			ber_bvfree(sercred);
-		return (-1);
-	}
-	sec_layer = *((char *)unwrap_outbuf.value);
-	(void) gss_release_buffer(&min, &unwrap_outbuf);
-	if (!(sec_layer & 1)) {
-		if (sercred)
-			ber_bvfree(sercred);
-		return (-1);
-	}
-	if (sercred) ber_bvfree(sercred);
-
-	/* no security layer needed after successful binding */
-	auth_id[0] = 0x01;
-
-	/* byte 2-4: max client recv size in network byte order */
-	auth_id[1] = 0x00;
-	auth_id[2] = 0x40;
-	auth_id[3] = 0x00;
-	wrap_inbuf.value = auth_id;
-	wrap_inbuf.length = 4;
-	conf_state = 0;
-	if ((maj = gss_wrap(&min, gss_context, conf_state, 0, &wrap_inbuf,
-	    &conf_state, &wrap_outbuf)) != GSS_S_COMPLETE) {
-		smb_ads_display_stat(maj, min);
-		return (-1);
-	}
-
-	cred.bv_val = wrap_outbuf.value;
-	cred.bv_len = wrap_outbuf.length;
-	sercred = NULL;
-	stat = ldap_sasl_bind_s(ah->ld, NULL, "GSSAPI", &cred, NULL, NULL,
-	    &sercred);
-	if (stat != LDAP_SUCCESS && stat != LDAP_SASL_BIND_IN_PROGRESS) {
-		syslog(LOG_NOTICE, "ldap_sasl_bind: %s",
-		    ldap_err2string(stat));
-		(void) gss_release_buffer(&min, &wrap_outbuf);
-		return (-1);
-	}
-
-	(void) gss_release_buffer(&min, &wrap_outbuf);
-	if (sercred)
-		ber_bvfree(sercred);
-
-	return (0);
-}
-
-/*
- * smb_ads_bind
- * Use secure binding to bind to ADS server.
- * Use GSS-API with Kerberos 5 as the security mechanism and LDAP SASL with
- * Kerberos 5 as the security mechanisn to authenticate, obtain a security
- * context, and securely bind an administrative user so that other LDAP
- * commands can be used, i.e. add and delete.
- *
- * To obtain the security context, a Kerberos ticket-granting ticket (TGT)
- * for the user is needed to obtain a ticket for the LDAP service.  To get
- * a TGT for the user, the username and password is needed.  Once a TGT is
- * obtained then it will be stored locally and used until it is expired.
- * This routine will automatically obtained a TGT for the first time or when
- * it expired.  LDAP SASL bind is then finally used to send GSS tokens to
- * obtain a security context for the LDAP service on the ADS server.  If
- * there is any problem getting the security context then a new TGT will be
- * obtain to try getting the security context once more.
- *
- * After the security context is obtain and established, the LDAP SASL bind
- * is used to negotiate an additional security layer.  No further security is
- * needed so a "no security layer" is negotiated.  After this the security
- * context can be deleted and further LDAP commands can be sent to the ADS
- * server until a LDAP unbind command is issued to the ADS server.
- * Paramaters:
- *   ah: handle to ADS server
- * Returns:
- *  -1: error
- *   0: success
- */
-static int
-smb_ads_bind(smb_ads_handle_t *ah)
-{
-	OM_uint32 min;
-	gss_cred_id_t cred_handle;
-	gss_ctx_id_t gss_context;
-	gss_OID oid;
-	struct berval *sercred;
-	int kinit_retry, do_acquire_cred;
-	int rc = 0;
-
-	kinit_retry = 0;
-	do_acquire_cred = 0;
-
-acquire_cred:
-
-	if (smb_ads_acquire_cred(ah, &cred_handle, &oid, &kinit_retry))
-		return (-1);
-
-	if (smb_ads_establish_sec_context(ah, &gss_context, cred_handle,
-	    oid, &sercred, &kinit_retry, &do_acquire_cred)) {
-		(void) gss_release_cred(&min, &cred_handle);
-		if (do_acquire_cred) {
-			do_acquire_cred = 0;
-			goto acquire_cred;
-		}
-		return (-1);
-	}
-	rc = smb_ads_negotiate_sec_layer(ah, gss_context, sercred);
-
-	if (cred_handle != GSS_C_NO_CREDENTIAL)
-		(void) gss_release_cred(&min, &cred_handle);
-	(void) gss_delete_sec_context(&min, &gss_context, NULL);
-
-	return ((rc) ? -1 : 0);
 }
 
 /*

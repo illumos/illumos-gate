@@ -27,13 +27,38 @@
  * Client NDR RPC interface.
  */
 
+#include <sys/types.h>
 #include <sys/errno.h>
+#include <time.h>
 #include <strings.h>
 #include <assert.h>
+#include <thread.h>
+#include <synch.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
+
+/*
+ * Server info cache entry expiration in seconds.
+ */
+#define	NDR_SVINFO_TIMEOUT	1800
+
+typedef struct ndr_svinfo {
+	list_node_t		svi_lnd;
+	time_t			svi_tcached;
+	char			svi_server[MAXNAMELEN];
+	char			svi_domain[MAXNAMELEN];
+	srvsvc_server_info_t	svi_svinfo;
+} ndr_svinfo_t;
+
+typedef struct ndr_svlist {
+	list_t		svl_list;
+	mutex_t		svl_mtx;
+	boolean_t	svl_init;
+} ndr_svlist_t;
+
+static ndr_svlist_t ndr_svlist;
 
 static int ndr_xa_init(ndr_client_t *, ndr_xa_t *);
 static int ndr_xa_exchange(ndr_client_t *, ndr_xa_t *);
@@ -41,6 +66,54 @@ static int ndr_xa_read(ndr_client_t *, ndr_xa_t *);
 static void ndr_xa_preserve(ndr_client_t *, ndr_xa_t *);
 static void ndr_xa_destruct(ndr_client_t *, ndr_xa_t *);
 static void ndr_xa_release(ndr_client_t *);
+
+static int ndr_svinfo_lookup(char *, char *, srvsvc_server_info_t *);
+static boolean_t ndr_svinfo_match(const char *, const char *, const
+    ndr_svinfo_t *);
+static boolean_t ndr_svinfo_expired(ndr_svinfo_t *);
+
+/*
+ * Initialize the RPC client interface: create the server info cache.
+ */
+void
+ndr_rpc_init(void)
+{
+	(void) mutex_lock(&ndr_svlist.svl_mtx);
+
+	if (!ndr_svlist.svl_init) {
+		list_create(&ndr_svlist.svl_list, sizeof (ndr_svinfo_t),
+		    offsetof(ndr_svinfo_t, svi_lnd));
+		ndr_svlist.svl_init = B_TRUE;
+	}
+
+	(void) mutex_unlock(&ndr_svlist.svl_mtx);
+}
+
+/*
+ * Terminate the RPC client interface: flush and destroy the server info
+ * cache.
+ */
+void
+ndr_rpc_fini(void)
+{
+	ndr_svinfo_t *svi;
+
+	(void) mutex_lock(&ndr_svlist.svl_mtx);
+
+	if (ndr_svlist.svl_init) {
+		while ((svi = list_head(&ndr_svlist.svl_list)) != NULL) {
+			list_remove(&ndr_svlist.svl_list, svi);
+			free(svi->svi_svinfo.sv_name);
+			free(svi->svi_svinfo.sv_comment);
+			free(svi);
+		}
+
+		list_destroy(&ndr_svlist.svl_list);
+		ndr_svlist.svl_init = B_FALSE;
+	}
+
+	(void) mutex_unlock(&ndr_svlist.svl_mtx);
+}
 
 /*
  * This call must be made to initialize an RPC client structure and bind
@@ -61,7 +134,8 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 {
 	ndr_client_t		*clnt;
 	ndr_service_t		*svc;
-	smbrdr_session_info_t	si;
+	srvsvc_server_info_t	svinfo;
+	int			remote_os;
 	int			fid;
 	int			rc;
 
@@ -71,6 +145,20 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 
 	if ((svc = ndr_svc_lookup_name(service)) == NULL)
 		return (-1);
+
+	/*
+	 * Set the default based on the assumption that most
+	 * servers will be Windows 2000 or later.
+	 * Don't lookup the svinfo if this is a SRVSVC request
+	 * because the SRVSVC is used to get the server info.
+	 * None of the SRVSVC calls depend on the remote OS.
+	 */
+	remote_os = NATIVE_OS_WIN2000;
+
+	if (strcasecmp(service, "SRVSVC") != 0) {
+		if (ndr_svinfo_lookup(server, domain, &svinfo) == 0)
+			remote_os = svinfo.sv_os;
+	}
 
 	if ((clnt = malloc(sizeof (ndr_client_t))) == NULL)
 		return (-1);
@@ -95,10 +183,9 @@ ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
 	clnt->xa_destruct = ndr_xa_destruct;
 	clnt->xa_release = ndr_xa_release;
 
-	(void) smbrdr_session_info(fid, &si);
 	bzero(&handle->handle, sizeof (ndr_hdid_t));
 	handle->clnt = clnt;
-	handle->remote_os = si.si_server_os;
+	handle->remote_os = remote_os;
 
 	if (ndr_rpc_get_heap(handle) == NULL) {
 		free(clnt);
@@ -170,39 +257,9 @@ ndr_rpc_call(mlsvc_handle_t *handle, int opnum, void *params)
 }
 
 /*
- * Set information about the remote RPC server in the handle.
- */
-void
-ndr_rpc_server_setinfo(mlsvc_handle_t *handle,
-    const srvsvc_server_info_t *svinfo)
-{
-	bcopy(svinfo, &handle->svinfo, sizeof (srvsvc_server_info_t));
-	handle->svinfo.sv_name = NULL;
-	handle->svinfo.sv_comment = NULL;
-
-	if (svinfo->sv_version_major > 4)
-		handle->remote_os = NATIVE_OS_WIN2000;
-	else
-		handle->remote_os = NATIVE_OS_WINNT;
-
-	smb_tracef("NdrRpcServerSetInfo: %s (version %d.%d)",
-	    svinfo->sv_name ? svinfo->sv_name : "<unknown>",
-	    svinfo->sv_version_major, svinfo->sv_version_minor);
-}
-
-/*
- * Get information about the remote RPC server from the handle.
- */
-void
-ndr_rpc_server_getinfo(mlsvc_handle_t *handle, srvsvc_server_info_t *svinfo)
-{
-	bcopy(&handle->svinfo, svinfo, sizeof (srvsvc_server_info_t));
-}
-
-/*
  * Returns the Native-OS of the RPC server.
  */
-int
+uint32_t
 ndr_rpc_server_os(mlsvc_handle_t *handle)
 {
 	return (handle->remote_os);
@@ -467,4 +524,91 @@ ndr_xa_release(ndr_client_t *clnt)
 		clnt->heap = NULL;
 		clnt->heap_preserved = B_FALSE;
 	}
+}
+
+/*
+ * Lookup platform, type and version information about a server.
+ * If the cache doesn't already contain the data, contact the server and
+ * cache the response before returning the server info to the caller.
+ */
+static int
+ndr_svinfo_lookup(char *server, char *domain, srvsvc_server_info_t *svinfo)
+{
+	ndr_svinfo_t *svi;
+
+	(void) mutex_lock(&ndr_svlist.svl_mtx);
+	assert(ndr_svlist.svl_init == B_TRUE);
+
+	svi = list_head(&ndr_svlist.svl_list);
+	while (svi != NULL) {
+		if (ndr_svinfo_expired(svi)) {
+			svi = list_head(&ndr_svlist.svl_list);
+			continue;
+		}
+
+		if (ndr_svinfo_match(server, domain, svi)) {
+			bcopy(&svi->svi_svinfo, svinfo,
+			    sizeof (srvsvc_server_info_t));
+			(void) mutex_unlock(&ndr_svlist.svl_mtx);
+			return (0);
+		}
+
+		svi = list_next(&ndr_svlist.svl_list, svi);
+	}
+
+	if ((svi = malloc(sizeof (ndr_svinfo_t))) == NULL) {
+		(void) mutex_unlock(&ndr_svlist.svl_mtx);
+		return (-1);
+	}
+
+	if (srvsvc_net_server_getinfo(server, domain, &svi->svi_svinfo) < 0) {
+		(void) mutex_unlock(&ndr_svlist.svl_mtx);
+		free(svi);
+		return (-1);
+	}
+
+	(void) time(&svi->svi_tcached);
+	(void) strlcpy(svi->svi_server, server, MAXNAMELEN);
+	(void) strlcpy(svi->svi_domain, domain, MAXNAMELEN);
+	list_insert_tail(&ndr_svlist.svl_list, svi);
+	bcopy(&svi->svi_svinfo, svinfo, sizeof (srvsvc_server_info_t));
+	(void) mutex_unlock(&ndr_svlist.svl_mtx);
+	return (0);
+}
+
+static boolean_t
+ndr_svinfo_match(const char *server, const char *domain,
+    const ndr_svinfo_t *svi)
+{
+	if ((utf8_strcasecmp(server, svi->svi_server) == 0) &&
+	    (utf8_strcasecmp(domain, svi->svi_domain) == 0)) {
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+/*
+ * If the server info in the cache has expired, discard it and return true.
+ * Otherwise return false.
+ *
+ * This is a private function to support ndr_svinfo_lookup() that assumes
+ * the list mutex is held.
+ */
+static boolean_t
+ndr_svinfo_expired(ndr_svinfo_t *svi)
+{
+	time_t	tnow;
+
+	(void) time(&tnow);
+
+	if (difftime(tnow, svi->svi_tcached) > NDR_SVINFO_TIMEOUT) {
+		list_remove(&ndr_svlist.svl_list, svi);
+		free(svi->svi_svinfo.sv_name);
+		free(svi->svi_svinfo.sv_comment);
+		free(svi);
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
 }

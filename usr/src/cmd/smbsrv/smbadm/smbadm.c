@@ -817,7 +817,7 @@ smbadm_list(int argc, char **argv)
 		    srvname, fqdn, ipstr);
 	}
 
-	nt_domain_show();
+	smb_domain_show();
 	return (0);
 }
 

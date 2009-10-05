@@ -48,6 +48,18 @@
 static mutex_t seqnum_mtx;
 
 /*
+ * IPC connection information that may be passed to the SMB Redirector.
+ */
+typedef struct {
+	char	user[SMB_USERNAME_MAXLEN];
+	uint8_t	passwd[SMBAUTH_HASH_SZ];
+} smb_ipc_t;
+
+static smb_ipc_t	ipc_info;
+static smb_ipc_t	ipc_orig_info;
+static rwlock_t		smb_ipc_lock;
+
+/*
  * Some older clients (Windows 98) only handle the low byte
  * of the max workers value. If the low byte is less than
  * SMB_PI_MAX_WORKERS_MIN set it to SMB_PI_MAX_WORKERS_MIN.
@@ -280,6 +292,108 @@ smb_set_machine_passwd(char *passwd)
 		rc = 0;
 	(void) mutex_unlock(&seqnum_mtx);
 	return (rc);
+}
+
+static int
+smb_get_machine_passwd(uint8_t *buf, size_t buflen)
+{
+	char pwd[SMB_PASSWD_MAXLEN + 1];
+	int rc;
+
+	if (buflen < SMBAUTH_HASH_SZ)
+		return (-1);
+
+	rc = smb_config_getstr(SMB_CI_MACHINE_PASSWD, pwd, sizeof (pwd));
+	if ((rc != SMBD_SMF_OK) || *pwd == '\0')
+		return (-1);
+
+	if (smb_auth_ntlm_hash(pwd, buf) != 0)
+		return (-1);
+
+	return (rc);
+}
+
+/*
+ * Set up IPC connection credentials.
+ */
+void
+smb_ipc_init(void)
+{
+	int rc;
+
+	(void) rw_wrlock(&smb_ipc_lock);
+	bzero(&ipc_info, sizeof (smb_ipc_t));
+	bzero(&ipc_orig_info, sizeof (smb_ipc_t));
+
+	(void) smb_getsamaccount(ipc_info.user, SMB_USERNAME_MAXLEN);
+	rc = smb_get_machine_passwd(ipc_info.passwd, SMBAUTH_HASH_SZ);
+	if (rc != 0)
+		*ipc_info.passwd = 0;
+	(void) rw_unlock(&smb_ipc_lock);
+
+}
+
+/*
+ * Set the IPC username and password hash in memory.  If the domain
+ * join succeeds, the credentials will be committed for use with
+ * authenticated IPC.  Otherwise, they should be rolled back.
+ */
+void
+smb_ipc_set(char *plain_user, uint8_t *passwd_hash)
+{
+	(void) rw_wrlock(&smb_ipc_lock);
+	(void) strlcpy(ipc_info.user, plain_user, sizeof (ipc_info.user));
+	(void) memcpy(ipc_info.passwd, passwd_hash, SMBAUTH_HASH_SZ);
+	(void) rw_unlock(&smb_ipc_lock);
+
+}
+
+/*
+ * Save the host credentials to be used for authenticated IPC.
+ * The credentials are also saved to the original IPC info as
+ * rollback data in case the join domain process fails later.
+ */
+void
+smb_ipc_commit(void)
+{
+	(void) rw_wrlock(&smb_ipc_lock);
+	(void) smb_getsamaccount(ipc_info.user, SMB_USERNAME_MAXLEN);
+	(void) smb_get_machine_passwd(ipc_info.passwd, SMBAUTH_HASH_SZ);
+	(void) memcpy(&ipc_orig_info, &ipc_info, sizeof (smb_ipc_t));
+	(void) rw_unlock(&smb_ipc_lock);
+}
+
+/*
+ * Restore the original credentials
+ */
+void
+smb_ipc_rollback(void)
+{
+	(void) rw_wrlock(&smb_ipc_lock);
+	(void) strlcpy(ipc_info.user, ipc_orig_info.user,
+	    sizeof (ipc_info.user));
+	(void) memcpy(ipc_info.passwd, ipc_orig_info.passwd,
+	    sizeof (ipc_info.passwd));
+	(void) rw_unlock(&smb_ipc_lock);
+}
+
+void
+smb_ipc_get_user(char *buf, size_t buflen)
+{
+	(void) rw_rdlock(&smb_ipc_lock);
+	(void) strlcpy(buf, ipc_info.user, buflen);
+	(void) rw_unlock(&smb_ipc_lock);
+}
+
+void
+smb_ipc_get_passwd(uint8_t *buf, size_t buflen)
+{
+	if (buflen < SMBAUTH_HASH_SZ)
+		return;
+
+	(void) rw_rdlock(&smb_ipc_lock);
+	(void) memcpy(buf, ipc_info.passwd, SMBAUTH_HASH_SZ);
+	(void) rw_unlock(&smb_ipc_lock);
 }
 
 /*
