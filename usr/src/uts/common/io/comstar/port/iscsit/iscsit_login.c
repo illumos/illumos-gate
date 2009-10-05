@@ -2630,11 +2630,6 @@ iscsit_add_declarative_keys(iscsit_conn_t *ict)
 		kvrc = idm_nvstat_to_kvstat(nvrc);
 		goto done;
 	}
-	if ((nvrc = nvlist_add_uint64(cfg_nv, "MaxOutstandingUnexpectedPDUs",
-	    ISCSIT_MAX_OUTSTANDING_UNEXPECTED_PDUS)) != 0) {
-		kvrc = idm_nvstat_to_kvstat(nvrc);
-		goto done;
-	}
 
 	kvrc = idm_declare_key_values(ict->ict_ic, cfg_nv,
 	    lsm->icl_response_nvlist);

@@ -853,12 +853,13 @@ iser_declare_key_values(idm_conn_t *ic, nvlist_t *config_nvl,
     nvlist_t *outgoing_nvl)
 {
 	kv_status_t		kvrc;
-	int			nvrc;
+	int			nvrc = 0;
+	int			rc;
 	uint64_t		uint64_val;
 
-	if ((nvrc = nvlist_lookup_uint64(config_nvl,
+	if ((rc = nvlist_lookup_uint64(config_nvl,
 	    ISER_KV_KEY_NAME_MAX_OUTSTANDING_PDU, &uint64_val)) != ENOENT) {
-		ASSERT(nvrc == 0);
+		ASSERT(rc == 0);
 		if (outgoing_nvl) {
 			nvrc = nvlist_add_uint64(outgoing_nvl,
 			    ISER_KV_KEY_NAME_MAX_OUTSTANDING_PDU, uint64_val);
