@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -454,7 +454,7 @@ sndr_report()
 			if (dflags & ASYNC_QUEUE)
 				printQueueStats(first, cur->cur_set);
 
-			io_report(cur->cur_sec->ks_data, cur->pre_sec->ks_data,
+			io_report(cur->cur_sec, cur->pre_sec,
 			    sdbc_getstat(vn));
 			printf("\n");
 
@@ -486,7 +486,7 @@ sndr_report()
 			if (dflags & ASYNC_QUEUE)
 				printQueueStats(first, cur->cur_set);
 
-			io_report(cur->cur_bmp->ks_data, cur->pre_bmp->ks_data,
+			io_report(cur->cur_bmp, cur->pre_bmp,
 			    sdbc_getstat(vn));
 			printf("\n");
 

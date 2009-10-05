@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,7 +141,7 @@ u64_delta(uint64_t old, uint64_t new)
  * 	at the beginning of an interval.
  */
 void
-io_report(kstat_io_t *cur, kstat_io_t *pre, sdbcstat_t *sdbcstat)
+io_report(kstat_t *cur_kstat, kstat_t *pre_kstat, sdbcstat_t *sdbcstat)
 {
 	sdbcvals_t vals;
 
@@ -150,12 +150,15 @@ io_report(kstat_io_t *cur, kstat_io_t *pre, sdbcstat_t *sdbcstat)
 
 	double rtm, tps, avs, etime;
 
+	kstat_io_t *cur = cur_kstat->ks_data;
+	kstat_io_t *pre = pre_kstat->ks_data;
+
 	if (sdbcstat &&
 	    sdbc_getvalues(sdbcstat, &vals, (SDBC_KBYTES | SDBC_INTAVG)))
 		return;
 
 	/* Time */
-	hr_etime = hrtime_delta(pre->wlastupdate, cur->wlastupdate);
+	hr_etime = hrtime_delta(pre_kstat->ks_snaptime, cur_kstat->ks_snaptime);
 	etime = hr_etime / (double)NANOSEC;
 
 	/* Read count */

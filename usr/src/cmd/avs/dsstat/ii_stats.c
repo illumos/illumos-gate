@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -494,8 +494,7 @@ ii_report()
 				printf(" <<offline>>");
 				linesout++;
 			} else {
-				io_report(cur->cur_mst->ks_data,
-				    cur->pre_mst->ks_data,
+				io_report(cur->cur_mst, cur->pre_mst,
 				    sdbc_getstat(vol + offset));
 			}
 
@@ -536,8 +535,7 @@ ii_report()
 				printf(" <<offline>>");
 				linesout++;
 			} else {
-				io_report(cur->cur_shd->ks_data,
-				    cur->pre_shd->ks_data,
+				io_report(cur->cur_shd, cur->pre_shd,
 				    sdbc_getstat(vol + offset));
 			}
 
@@ -578,8 +576,7 @@ ii_report()
 				printf(" <<offline>>");
 				linesout++;
 			} else {
-				io_report(cur->cur_bmp->ks_data,
-				    cur->pre_bmp->ks_data,
+				io_report(cur->cur_bmp, cur->pre_bmp,
 				    sdbc_getstat(vol + offset));
 			}
 			printf("\n");
@@ -632,8 +629,7 @@ ii_report()
 				printf(" <<offline>>");
 				linesout++;
 			} else {
-				io_report(cur->cur_ovr->ks_data,
-				    cur->pre_ovr->ks_data,
+				io_report(cur->cur_ovr, cur->pre_ovr,
 				    sdbc_getstat(vol + offset));
 			}
 

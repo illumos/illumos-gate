@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,7 @@ extern "C" {
 uint64_t hrtime_delta(hrtime_t, hrtime_t);
 uint32_t u32_delta(uint32_t, uint32_t);
 uint64_t u64_delta(uint64_t, uint64_t);
-void io_report(kstat_io_t *, kstat_io_t *, sdbcstat_t *);
+void io_report(kstat_t *, kstat_t *, sdbcstat_t *);
 int io_value_check(kstat_io_t *, kstat_io_t *);
 void cd_report(sdbcstat_t *);
 void header();
