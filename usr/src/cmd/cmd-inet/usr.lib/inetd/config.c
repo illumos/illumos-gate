@@ -545,8 +545,10 @@ valid_inst_props(const char *fmri, inetd_prop_t *bprops, inetd_prop_t **mprops,
 		}
 	}
 
-	if (!valid)
+	if (!valid) {
 		destroy_basic_cfg(*cfg);
+		*cfg = NULL;
+	}
 
 	return (valid);
 }
