@@ -307,10 +307,6 @@ cfork(int isvfork, int isfork1, int flags)
 			goto forkerr;
 		}
 
-		/* Duplicate parent's shared memory */
-		if (p->p_segacct)
-			shmfork(p, cp);
-
 		/*
 		 * Remove all DTrace tracepoints from the child process. We
 		 * need to do this _before_ duplicating USDT providers since
@@ -319,26 +315,26 @@ cfork(int isvfork, int isfork1, int flags)
 		if (p->p_dtrace_count > 0)
 			dtrace_fasttrap_fork(p, cp);
 
+		mutex_enter(&p->p_lock);
+		sprunlock(p);
+
+		/* Duplicate parent's shared memory */
+		if (p->p_segacct)
+			shmfork(p, cp);
+
 		/*
 		 * Duplicate any helper actions and providers. The SFORKING
 		 * we set above informs the code to enable USDT probes that
 		 * sprlock() may fail because the child is being forked.
 		 */
 		if (p->p_dtrace_helpers != NULL) {
-			mutex_enter(&p->p_lock);
-			sprunlock(p);
-
 			ASSERT(dtrace_helpers_fork != NULL);
 			(*dtrace_helpers_fork)(p, cp);
-
-			mutex_enter(&p->p_lock);
-			p->p_flag &= ~SFORKING;
-			mutex_exit(&p->p_lock);
-		} else {
-			mutex_enter(&p->p_lock);
-			p->p_flag &= ~SFORKING;
-			sprunlock(p);
 		}
+
+		mutex_enter(&p->p_lock);
+		p->p_flag &= ~SFORKING;
+		mutex_exit(&p->p_lock);
 	}
 
 	/*
