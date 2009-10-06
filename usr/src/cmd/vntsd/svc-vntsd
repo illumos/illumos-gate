@@ -131,6 +131,23 @@ if [ "$auth" = "true" ]; then
 	args="$args -A"
 fi
 
+#
+# If we don't have a vcc device we don't want to try to start vntsd. By default
+# newer versions of the factory settings will try to start vntsd by default.
+# Since we may be installed on a machine with an older firmware we need to make
+# sure that we don't try to start if the virtual console concentrator is not
+# present.
+#
+VNTSD_DEV='/devices/virtual-devices@100/channel-devices@200/virtual-console-concentrator@0:ctl'
+if [ ! -c "$VNTSD_DEV" ]; then
+	echo "The Virtual Network Terminal Server service has been disabled" \
+	    "because the system has no virtual console concentrator (vcc)" \
+	    "device."
+	/usr/sbin/svcadm disable -t "$SMF_FMRI"
+	sleep 5 &
+	exit $SMF_EXIT_OK
+fi
+
 if [ -x /usr/lib/ldoms/vntsd ]; then
     /usr/lib/ldoms/vntsd $args
     rc=$?
