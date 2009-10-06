@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Assembly code support for Cheetah/Cheetah+ modules
@@ -133,29 +133,38 @@
 /*
  * macro that flushes the entire dcache color
  * dcache size = 64K, one way 16K
+ *
+ * In:
+ *    arg = virtual color register (not clobbered)
+ *    way = way#, can either be a constant or a register (not clobbered)
+ *    tmp1, tmp2, tmp3 = scratch registers
+ *
  */
 #define DCACHE_FLUSHCOLOR(arg, way, tmp1, tmp2, tmp3)			\
 	ldxa	[%g0]ASI_DCU, tmp1;					\
 	btst	DCU_DC, tmp1;		/* is dcache enabled? */	\
 	bz,pn	%icc, 1f;						\
 	ASM_LD(tmp1, dcache_linesize)					\
-	set	MMU_PAGESIZE, tmp2;					\
 	/*								\
 	 * arg = virtual color						\
-	 * tmp2 = page size						\
 	 * tmp1 = cache line size					\
 	 */								\
-	sllx	arg, MMU_PAGESHIFT, arg; /* color to dcache page */	\
+	sllx	arg, MMU_PAGESHIFT, tmp2; /* color to dcache page */	\
 	mov	way, tmp3;						\
-	sllx	tmp3, 14, tmp3;		 /* One way 16K */		\
-	or	arg, tmp3, arg;						\
+	sllx	tmp3, 14, tmp3;		  /* One way 16K */		\
+	or	tmp2, tmp3, tmp3;					\
+	set	MMU_PAGESIZE, tmp2;					\
+	/*								\
+	 * tmp2 = page size						\
+	 * tmp3 =  cached page in dcache				\
+	 */								\
 	sub	tmp2, tmp1, tmp2;					\
 2:									\
-	stxa	%g0, [arg + tmp2]ASI_DC_TAG;				\
+	stxa	%g0, [tmp3 + tmp2]ASI_DC_TAG;				\
 	membar	#Sync;							\
 	cmp	%g0, tmp2;						\
 	bne,pt	%icc, 2b;						\
-	  sub	tmp2, tmp1, tmp2;					\
+	sub	tmp2, tmp1, tmp2;					\
 1:
 
 /* END CSTYLED */
