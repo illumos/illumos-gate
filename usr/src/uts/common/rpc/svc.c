@@ -1440,7 +1440,7 @@ svc_getreq(
 /*
  * Allocate new clone transport handle.
  */
-static SVCXPRT *
+SVCXPRT *
 svc_clone_init(void)
 {
 	SVCXPRT *clone_xprt;
@@ -1453,7 +1453,7 @@ svc_clone_init(void)
 /*
  * Free memory allocated by svc_clone_init.
  */
-static void
+void
 svc_clone_free(SVCXPRT *clone_xprt)
 {
 	/* Fre credentials from crget() */
@@ -1468,7 +1468,7 @@ svc_clone_free(SVCXPRT *clone_xprt)
  * - copy some of the master's fields to the clone
  * - call a transport specific clone routine.
  */
-static void
+void
 svc_clone_link(SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 {
 	cred_t *cred = clone_xprt->xp_cred;
@@ -1515,7 +1515,7 @@ svc_clone_link(SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
  * - call transport specific function to destroy the clone handle
  * - clear xp_master to avoid recursion.
  */
-static void
+void
 svc_clone_unlink(SVCXPRT *clone_xprt)
 {
 	SVCMASTERXPRT *xprt = clone_xprt->xp_master;
@@ -2638,4 +2638,84 @@ rdma_stop(rdma_xprt_group_t *rdma_xprts)
 		if (!rdma_xprts->rtg_listhead)
 			break;
 	}
+}
+
+
+/*
+ * rpc_msg_dup/rpc_msg_free
+ * Currently only used by svc_rpcsec_gss.c but put in this file as it
+ * may be useful to others in the future.
+ * But future consumers should be careful cuz so far
+ *   - only tested/used for call msgs (not reply)
+ *   - only tested/used with call verf oa_length==0
+ */
+struct rpc_msg *
+rpc_msg_dup(struct rpc_msg *src)
+{
+	struct rpc_msg *dst;
+	struct opaque_auth oa_src, oa_dst;
+
+	dst = kmem_alloc(sizeof (*dst), KM_SLEEP);
+
+	dst->rm_xid = src->rm_xid;
+	dst->rm_direction = src->rm_direction;
+
+	dst->rm_call.cb_rpcvers = src->rm_call.cb_rpcvers;
+	dst->rm_call.cb_prog = src->rm_call.cb_prog;
+	dst->rm_call.cb_vers = src->rm_call.cb_vers;
+	dst->rm_call.cb_proc = src->rm_call.cb_proc;
+
+	/* dup opaque auth call body cred */
+	oa_src = src->rm_call.cb_cred;
+
+	oa_dst.oa_flavor = oa_src.oa_flavor;
+	oa_dst.oa_base = kmem_alloc(oa_src.oa_length, KM_SLEEP);
+
+	bcopy(oa_src.oa_base, oa_dst.oa_base, oa_src.oa_length);
+	oa_dst.oa_length = oa_src.oa_length;
+
+	dst->rm_call.cb_cred = oa_dst;
+
+	/* dup or just alloc opaque auth call body verifier */
+	if (src->rm_call.cb_verf.oa_length > 0) {
+		oa_src = src->rm_call.cb_verf;
+
+		oa_dst.oa_flavor = oa_src.oa_flavor;
+		oa_dst.oa_base = kmem_alloc(oa_src.oa_length, KM_SLEEP);
+
+		bcopy(oa_src.oa_base, oa_dst.oa_base, oa_src.oa_length);
+		oa_dst.oa_length = oa_src.oa_length;
+
+		dst->rm_call.cb_verf = oa_dst;
+	} else {
+		oa_dst.oa_flavor = -1;  /* will be set later */
+		oa_dst.oa_base = kmem_alloc(MAX_AUTH_BYTES, KM_SLEEP);
+
+		oa_dst.oa_length = 0;   /* will be set later */
+
+		dst->rm_call.cb_verf = oa_dst;
+	}
+	return (dst);
+
+error:
+	kmem_free(dst->rm_call.cb_cred.oa_base,	dst->rm_call.cb_cred.oa_length);
+	kmem_free(dst, sizeof (*dst));
+	return (NULL);
+}
+
+void
+rpc_msg_free(struct rpc_msg **msg, int cb_verf_oa_length)
+{
+	struct rpc_msg *m = *msg;
+
+	kmem_free(m->rm_call.cb_cred.oa_base, m->rm_call.cb_cred.oa_length);
+	m->rm_call.cb_cred.oa_base = NULL;
+	m->rm_call.cb_cred.oa_length = 0;
+
+	kmem_free(m->rm_call.cb_verf.oa_base, cb_verf_oa_length);
+	m->rm_call.cb_verf.oa_base = NULL;
+	m->rm_call.cb_verf.oa_length = 0;
+
+	kmem_free(m, sizeof (*m));
+	m = NULL;
 }

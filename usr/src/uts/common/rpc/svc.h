@@ -1095,6 +1095,18 @@ extern int	__svc_vc_dupdone();
 #endif	/* __STDC__ */
 #endif	/* _KERNEL */
 
+#ifdef	_KERNEL
+/*
+ * Private interfaces and structures for SVCXPRT cloning.
+ * The interfaces and data structures are not committed and subject to
+ * change in future releases.
+ */
+extern SVCXPRT *svc_clone_init(void);
+extern void svc_clone_free(SVCXPRT *);
+extern void svc_clone_link(SVCMASTERXPRT *, SVCXPRT *);
+extern void svc_clone_unlink(SVCXPRT *);
+#endif	/* _KERNEL */
+
 #ifdef	__cplusplus
 }
 #endif

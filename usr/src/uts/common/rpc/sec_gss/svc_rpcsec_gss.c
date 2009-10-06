@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright 1993 OpenVision Technologies, Inc., All Rights Reserved.
@@ -45,6 +43,8 @@
 #include <gssapi/gssapi_ext.h>
 #include <rpc/rpc.h>
 #include <rpc/rpcsec_defs.h>
+#include <sys/sunddi.h>
+#include <sys/atomic.h>
 
 extern bool_t __rpc_gss_make_principal(rpc_gss_principal_t *, gss_buffer_t);
 
@@ -222,6 +222,32 @@ struct svc_auth_ops svc_rpc_gss_ops = {
 	svc_rpc_gss_unwrap,
 };
 
+/* taskq(9F) */
+typedef struct svcrpcsec_gss_taskq_arg {
+	SVCXPRT			*rq_xprt;
+	rpc_gss_init_arg	*rpc_call_arg;
+	struct rpc_msg		*msg;
+	svc_rpc_gss_data	*client_data;
+	uint_t			cr_version;
+	rpc_gss_service_t	cr_service;
+} svcrpcsec_gss_taskq_arg_t;
+
+/* gssd is single threaded, so 1 thread for the taskq is probably good/ok */
+int rpcsec_gss_init_taskq_nthreads = 1;
+static ddi_taskq_t *svcrpcsec_gss_init_taskq = NULL;
+
+extern struct rpc_msg *rpc_msg_dup(struct rpc_msg *);
+extern void rpc_msg_free(struct rpc_msg **, int);
+
+/*
+ * from svc_clts.c:
+ * Transport private data.
+ * Kept in xprt->xp_p2buf.
+ */
+struct udp_data {
+	mblk_t	*ud_resp;			/* buffer for response */
+	mblk_t	*ud_inmp;			/* mblk chain of request */
+};
 
 /*ARGSUSED*/
 static int
@@ -266,15 +292,23 @@ svc_gss_init()
 	mutex_init(&ctx_mutex, NULL, MUTEX_DEFAULT, NULL);
 	rw_init(&cred_lock, NULL, RW_DEFAULT, NULL);
 	clients = (svc_rpc_gss_data **)
-		kmem_zalloc(svc_rpc_gss_hashmod * sizeof (svc_rpc_gss_data *),
-			KM_SLEEP);
+	    kmem_zalloc(svc_rpc_gss_hashmod * sizeof (svc_rpc_gss_data *),
+	    KM_SLEEP);
 	svc_data_handle = kmem_cache_create("rpc_gss_data_cache",
-					    sizeof (svc_rpc_gss_data), 0,
-					    svc_gss_data_create,
-					    svc_gss_data_destroy,
-					    svc_gss_data_reclaim,
-					    NULL, NULL, 0);
+	    sizeof (svc_rpc_gss_data), 0,
+	    svc_gss_data_create,
+	    svc_gss_data_destroy,
+	    svc_gss_data_reclaim,
+	    NULL, NULL, 0);
 
+	if (svcrpcsec_gss_init_taskq == NULL) {
+		svcrpcsec_gss_init_taskq = ddi_taskq_create(NULL,
+		    "rpcsec_gss_init_taskq", rpcsec_gss_init_taskq_nthreads,
+		    TASKQ_DEFAULTPRI, 0);
+		if (svcrpcsec_gss_init_taskq == NULL)
+			cmn_err(CE_NOTE,
+			    "svc_gss_init: ddi_taskq_create failed");
+	}
 }
 
 /*
@@ -641,48 +675,29 @@ bool_t transfer_sec_context(svc_rpc_gss_data *client_data) {
 	return (TRUE);
 }
 
-
 /*
- * Server side authentication for RPCSEC_GSS.
+ * do_gss_accept is called from a taskq and does all the work for a
+ * RPCSEC_GSS_INIT call (mostly calling kgss_accept_sec_context()).
  */
-enum auth_stat
-__svcrpcsec_gss(rqst, msg, no_dispatch)
-	struct svc_req		*rqst;
-	struct rpc_msg		*msg;
-	bool_t			*no_dispatch;
+static enum auth_stat
+do_gss_accept(
+	SVCXPRT *xprt,
+	rpc_gss_init_arg *call_arg,
+	struct rpc_msg *msg,
+	svc_rpc_gss_data *client_data,
+	uint_t cr_version,
+	rpc_gss_service_t cr_service)
 {
-	XDR			xdrs;
-	rpc_gss_creds		creds;
-	rpc_gss_init_arg	call_arg;
-	rpc_gss_init_res	call_res, *retrans_result;
+	rpc_gss_init_res	call_res;
 	gss_buffer_desc		output_token;
 	OM_uint32		gssstat, minor, minor_stat, time_rec;
-	struct opaque_auth	*cred;
-	svc_rpc_gss_data	*client_data;
 	int			ret_flags, ret;
-	svc_rpc_gss_parms_t	*gss_parms;
 	gss_OID 		mech_type = GSS_C_NULL_OID;
 	int			free_mech_type = 1;
+	struct svc_req		r, *rqst;
 
-	*no_dispatch = FALSE;
-
-	/*
-	 * Initialize response verifier to NULL verifier.  If
-	 * necessary, this will be changed later.
-	 */
-	rqst->rq_xprt->xp_verf.oa_flavor = AUTH_NONE;
-	rqst->rq_xprt->xp_verf.oa_base = NULL;
-	rqst->rq_xprt->xp_verf.oa_length = 0;
-
-	/*
-	 * Need to null out results to start with.
-	 */
-	bzero((char *)&call_res, sizeof (call_res));
-
-	/*
-	 * Pull out and check credential and verifier.
-	 */
-	cred = &msg->rm_call.cb_cred;
+	rqst = &r;
+	rqst->rq_xprt = xprt;
 
 	/*
 	 * Initialize output_token.
@@ -690,77 +705,8 @@ __svcrpcsec_gss(rqst, msg, no_dispatch)
 	output_token.length = 0;
 	output_token.value = NULL;
 
-	if (cred->oa_length == 0) {
-		RPCGSS_LOG0(1, "_svcrpcsec_gss: zero length cred\n");
-		return (AUTH_BADCRED);
-	}
+	bzero((char *)&call_res, sizeof (call_res));
 
-	xdrmem_create(&xdrs, cred->oa_base, cred->oa_length, XDR_DECODE);
-	bzero((char *)&creds, sizeof (creds));
-	if (!__xdr_rpc_gss_creds(&xdrs, &creds)) {
-		XDR_DESTROY(&xdrs);
-		RPCGSS_LOG0(1, "_svcrpcsec_gss: can't decode creds\n");
-		ret = AUTH_BADCRED;
-		goto error;
-	}
-	XDR_DESTROY(&xdrs);
-
-	/*
-	 * If this is a control message and proc is GSSAPI_INIT, then
-	 * create a client handle for this client.  Otherwise, look up
-	 * the existing handle.
-	 */
-	if (creds.gss_proc == RPCSEC_GSS_INIT) {
-		if (creds.ctx_handle.length != 0) {
-			RPCGSS_LOG0(1, "_svcrpcsec_gss: ctx_handle not null\n");
-			ret = AUTH_BADCRED;
-			goto error;
-		}
-		if ((client_data = create_client()) == NULL) {
-			RPCGSS_LOG0(1,
-			"_svcrpcsec_gss: can't create a new cache entry\n");
-			ret = AUTH_FAILED;
-			goto error;
-		}
-	} else {
-		/*
-		 * Only verify values for service parameter when proc
-		 * not RPCSEC_GSS_INIT or RPCSEC_GSS_CONTINUE_INIT.
-		 * RFC2203 says contents for sequence and service args
-		 * are undefined for creation procs.
-		 *
-		 * Note: only need to check for *CONTINUE_INIT here because
-		 *	 if() clause already checked for RPCSEC_GSS_INIT
-		 */
-		if (creds.gss_proc != RPCSEC_GSS_CONTINUE_INIT) {
-			switch (creds.service) {
-			case rpc_gss_svc_none:
-			case rpc_gss_svc_integrity:
-			case rpc_gss_svc_privacy:
-				break;
-			default:
-				RPCGSS_LOG(1, "_svcrpcsec_gss: unknown service "
-					"type: 0x%x\n", creds.service);
-				ret = AUTH_BADCRED;
-				goto error;
-			}
-		}
-		if (creds.ctx_handle.length == 0) {
-			RPCGSS_LOG0(1, "_svcrpcsec_gss: no ctx_handle\n");
-			ret = AUTH_BADCRED;
-			goto error;
-		}
-		if ((client_data = get_client(&creds.ctx_handle)) == NULL) {
-			ret = RPCSEC_GSS_NOCRED;
-			RPCGSS_LOG0(1, "_svcrpcsec_gss: no security context\n");
-			goto error;
-		}
-	}
-
-	/*
-	 * lock the client data until it's safe; if it's already stale,
-	 * no more processing is possible
-	 */
 	mutex_enter(&client_data->clm);
 	if (client_data->stale) {
 		ret = RPCSEC_GSS_NOCRED;
@@ -775,6 +721,345 @@ __svcrpcsec_gss(rqst, msg, no_dispatch)
 	call_res.ctx_handle.length = sizeof (client_data->key);
 	call_res.ctx_handle.value = (char *)&client_data->key;
 	call_res.seq_window = SEQ_WIN;
+
+	gssstat = GSS_S_FAILURE;
+	minor = 0;
+	minor_stat = 0;
+	rw_enter(&cred_lock, RW_READER);
+
+	if (client_data->client_name.length) {
+		(void) gss_release_buffer(&minor,
+		    &client_data->client_name);
+	}
+	gssstat = kgss_accept_sec_context(&minor_stat,
+	    &client_data->context,
+	    GSS_C_NO_CREDENTIAL,
+	    call_arg,
+	    GSS_C_NO_CHANNEL_BINDINGS,
+	    &client_data->client_name,
+	    &mech_type,
+	    &output_token,
+	    &ret_flags,
+	    &time_rec,
+	    NULL,		/* don't need a delegated cred back */
+	    crgetuid(CRED()));
+
+	RPCGSS_LOG(4, "gssstat 0x%x \n", gssstat);
+
+	if (gssstat == GSS_S_COMPLETE) {
+		/*
+		 * Set the raw and unix credentials at this
+		 * point.  This saves a lot of computation
+		 * later when credentials are retrieved.
+		 */
+		client_data->raw_cred.version = cr_version;
+		client_data->raw_cred.service = cr_service;
+
+		if (client_data->raw_cred.mechanism) {
+			kgss_free_oid(client_data->raw_cred.mechanism);
+			client_data->raw_cred.mechanism = NULL;
+		}
+		client_data->raw_cred.mechanism = (rpc_gss_OID) mech_type;
+		/*
+		 * client_data is now responsible for freeing
+		 * the data of 'mech_type'.
+		 */
+		free_mech_type = 0;
+
+		if (client_data->raw_cred.client_principal) {
+			kmem_free((caddr_t)client_data->\
+			    raw_cred.client_principal,
+			    client_data->raw_cred.\
+			    client_principal->len + sizeof (int));
+			client_data->raw_cred.client_principal = NULL;
+		}
+
+		/*
+		 *  The client_name returned from
+		 *  kgss_accept_sec_context() is in an
+		 *  exported flat format.
+		 */
+		if (! __rpc_gss_make_principal(
+		    &client_data->raw_cred.client_principal,
+		    &client_data->client_name)) {
+			RPCGSS_LOG0(1, "_svcrpcsec_gss: "
+			    "make principal failed\n");
+			gssstat = GSS_S_FAILURE;
+			(void) gss_release_buffer(&minor_stat, &output_token);
+		}
+	}
+
+	rw_exit(&cred_lock);
+
+	call_res.gss_major = gssstat;
+	call_res.gss_minor = minor_stat;
+
+	if (gssstat != GSS_S_COMPLETE &&
+	    gssstat != GSS_S_CONTINUE_NEEDED) {
+		call_res.ctx_handle.length = 0;
+		call_res.ctx_handle.value = NULL;
+		call_res.seq_window = 0;
+		rpc_gss_display_status(gssstat, minor_stat, mech_type,
+		    crgetuid(CRED()),
+		    "_svc_rpcsec_gss gss_accept_sec_context");
+		(void) svc_sendreply(rqst->rq_xprt,
+		    __xdr_rpc_gss_init_res, (caddr_t)&call_res);
+		client_data->stale = TRUE;
+		ret = AUTH_OK;
+		goto error2;
+	}
+
+	/*
+	 * If appropriate, set established to TRUE *after* sending
+	 * response (otherwise, the client will receive the final
+	 * token encrypted)
+	 */
+	if (gssstat == GSS_S_COMPLETE) {
+		/*
+		 * Context is established.  Set expiration time
+		 * for the context.
+		 */
+		client_data->seq_num = 1;
+		if ((time_rec == GSS_C_INDEFINITE) || (time_rec == 0)) {
+			client_data->expiration = GSS_C_INDEFINITE;
+		} else {
+			client_data->expiration =
+			    time_rec + gethrestime_sec();
+		}
+
+		if (!transfer_sec_context(client_data)) {
+			ret = RPCSEC_GSS_FAILED;
+			client_data->stale = TRUE;
+			RPCGSS_LOG0(1,
+			    "_svc_rpcsec_gss: transfer sec context failed\n");
+			goto error2;
+		}
+
+		client_data->established = TRUE;
+	}
+
+	/*
+	 * This step succeeded.  Send a response, along with
+	 * a token if there's one.  Don't dispatch.
+	 */
+
+	if (output_token.length != 0)
+		GSS_COPY_BUFFER(call_res.token, output_token);
+
+	/*
+	 * If GSS_S_COMPLETE: set response verifier to
+	 * checksum of SEQ_WIN
+	 */
+	if (gssstat == GSS_S_COMPLETE) {
+		if (!set_response_verf(rqst, msg, client_data,
+		    (uint_t)SEQ_WIN)) {
+			ret = RPCSEC_GSS_FAILED;
+			client_data->stale = TRUE;
+			RPCGSS_LOG0(1,
+			    "_svc_rpcsec_gss:set response verifier failed\n");
+			goto error2;
+		}
+	}
+
+	if (!svc_sendreply(rqst->rq_xprt, __xdr_rpc_gss_init_res,
+	    (caddr_t)&call_res)) {
+		ret = RPCSEC_GSS_FAILED;
+		client_data->stale = TRUE;
+		RPCGSS_LOG0(1, "_svc_rpcsec_gss:send reply failed\n");
+		goto error2;
+	}
+
+	/*
+	 * Cache last response in case it is lost and the client
+	 * retries on an established context.
+	 */
+	(void) retrans_add(client_data, msg->rm_xid, &call_res);
+	ASSERT(client_data->ref_cnt > 0);
+	client_data->ref_cnt--;
+	mutex_exit(&client_data->clm);
+
+	(void) gss_release_buffer(&minor_stat, &output_token);
+
+	return (AUTH_OK);
+
+error2:
+	ASSERT(client_data->ref_cnt > 0);
+	client_data->ref_cnt--;
+	mutex_exit(&client_data->clm);
+	(void) gss_release_buffer(&minor_stat, &output_token);
+	if (free_mech_type && mech_type)
+		kgss_free_oid(mech_type);
+
+	return (ret);
+}
+
+static void
+svcrpcsec_gss_taskq_func(void *svcrpcsecgss_taskq_arg)
+{
+	enum auth_stat retval;
+	svcrpcsec_gss_taskq_arg_t *arg = svcrpcsecgss_taskq_arg;
+
+	retval = do_gss_accept(arg->rq_xprt, arg->rpc_call_arg, arg->msg,
+	    arg->client_data, arg->cr_version, arg->cr_service);
+	if (retval != AUTH_OK) {
+		cmn_err(CE_NOTE,
+		    "svcrpcsec_gss_taskq_func:  do_gss_accept fail 0x%x",
+		    retval);
+	}
+	rpc_msg_free(&arg->msg, MAX_AUTH_BYTES);
+	svc_clone_unlink(arg->rq_xprt);
+	svc_clone_free(arg->rq_xprt);
+	xdr_free(__xdr_rpc_gss_init_arg, (caddr_t)arg->rpc_call_arg);
+	kmem_free(arg->rpc_call_arg, sizeof (*arg->rpc_call_arg));
+
+	kmem_free(arg, sizeof (*arg));
+}
+
+static enum auth_stat
+rpcsec_gss_init(
+	struct svc_req		*rqst,
+	struct rpc_msg		*msg,
+	rpc_gss_creds		creds,
+	bool_t			*no_dispatch,
+	svc_rpc_gss_data	*c_d) /* client data, can be NULL */
+{
+	svc_rpc_gss_data	*client_data;
+	int ret;
+	svcrpcsec_gss_taskq_arg_t *arg;
+
+	if (creds.ctx_handle.length != 0) {
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: ctx_handle not null\n");
+		ret = AUTH_BADCRED;
+		return (ret);
+	}
+
+	client_data = c_d ? c_d : create_client();
+	if (client_data == NULL) {
+		RPCGSS_LOG0(1,
+		    "_svcrpcsec_gss: can't create a new cache entry\n");
+		ret = AUTH_FAILED;
+		return (ret);
+	}
+
+	mutex_enter(&client_data->clm);
+	if (client_data->stale) {
+		ret = RPCSEC_GSS_NOCRED;
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: client data stale\n");
+		goto error2;
+	}
+
+	/*
+	 * kgss_accept_sec_context()/gssd(1M) can be overly time
+	 * consuming so let's queue it and return asap.
+	 *
+	 * taskq func must free arg.
+	 */
+	arg = kmem_alloc(sizeof (*arg), KM_SLEEP);
+
+	/* taskq func must free rpc_call_arg & deserialized arguments */
+	arg->rpc_call_arg = kmem_alloc(sizeof (*arg->rpc_call_arg), KM_SLEEP);
+
+	/* deserialize arguments */
+	bzero(arg->rpc_call_arg, sizeof (*arg->rpc_call_arg));
+	if (!SVC_GETARGS(rqst->rq_xprt, __xdr_rpc_gss_init_arg,
+	    (caddr_t)arg->rpc_call_arg)) {
+		ret = RPCSEC_GSS_FAILED;
+		client_data->stale = TRUE;
+		goto error2;
+	}
+
+	/* get a xprt clone for taskq thread, taskq func must free it */
+	arg->rq_xprt = svc_clone_init();
+	svc_clone_link(rqst->rq_xprt->xp_master, arg->rq_xprt);
+	arg->rq_xprt->xp_xid = rqst->rq_xprt->xp_xid;
+
+	/* UDP uses the incoming mblk for the response, so dup it. */
+	/* Note this probably should be done by svc_clone_link().  */
+	if (rqst->rq_xprt->xp_type == T_CLTS) {
+		struct udp_data *ud_src =
+		    (struct udp_data *)rqst->rq_xprt->xp_p2buf;
+		struct udp_data *ud_dst =
+		    (struct udp_data *)arg->rq_xprt->xp_p2buf;
+		if (ud_src->ud_resp) {
+			ud_dst->ud_resp = dupb(ud_src->ud_resp);
+		}
+	}
+
+	/* set the appropriate wrap/unwrap routine for RPCSEC_GSS */
+	arg->rq_xprt->xp_auth.svc_ah_ops = svc_rpc_gss_ops;
+	arg->rq_xprt->xp_auth.svc_ah_private = (caddr_t)client_data;
+
+	/* get a dup of rpc msg for taskq thread */
+	arg->msg = rpc_msg_dup(msg);  /* taskq func must free msg dup */
+
+	arg->client_data = client_data;
+	arg->cr_version = creds.version;
+	arg->cr_service = creds.service;
+
+	/* should be ok to hold clm lock as taskq will have new thread(s) */
+	ret = ddi_taskq_dispatch(svcrpcsec_gss_init_taskq,
+	    svcrpcsec_gss_taskq_func, arg, DDI_SLEEP);
+	if (ret == DDI_FAILURE) {
+		cmn_err(CE_NOTE, "rpcsec_gss_init: taskq dispatch fail");
+		ret = RPCSEC_GSS_FAILED;
+		rpc_msg_free(&arg->msg, MAX_AUTH_BYTES);
+		svc_clone_unlink(arg->rq_xprt);
+		svc_clone_free(arg->rq_xprt);
+		kmem_free(arg, sizeof (*arg));
+		goto error2;
+	}
+
+	mutex_exit(&client_data->clm);
+	*no_dispatch = TRUE;
+	return (AUTH_OK);
+
+error2:
+	ASSERT(client_data->ref_cnt > 0);
+	client_data->ref_cnt--;
+	mutex_exit(&client_data->clm);
+	cmn_err(CE_NOTE, "rpcsec_gss_init: error 0x%x", ret);
+	return (ret);
+}
+
+static enum auth_stat
+rpcsec_gss_continue_init(
+	struct svc_req		*rqst,
+	struct rpc_msg		*msg,
+	rpc_gss_creds		creds,
+	bool_t			*no_dispatch)
+{
+	int ret;
+	svc_rpc_gss_data	*client_data;
+	svc_rpc_gss_parms_t	*gss_parms;
+	rpc_gss_init_res	*retrans_result;
+
+	if (creds.ctx_handle.length == 0) {
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: no ctx_handle\n");
+		ret = AUTH_BADCRED;
+		return (ret);
+	}
+	if ((client_data = get_client(&creds.ctx_handle)) == NULL) {
+		ret = RPCSEC_GSS_NOCRED;
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: no security context\n");
+		return (ret);
+	}
+
+	mutex_enter(&client_data->clm);
+	if (client_data->stale) {
+		ret = RPCSEC_GSS_NOCRED;
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: client data stale\n");
+		goto error2;
+	}
+
+	/*
+	 * If context not established, go thru INIT code but with
+	 * this client handle.
+	 */
+	if (!client_data->established) {
+		mutex_exit(&client_data->clm);
+		return (rpcsec_gss_init(rqst, msg, creds, no_dispatch,
+		    client_data));
+	}
 
 	/*
 	 * Set the appropriate wrap/unwrap routine for RPCSEC_GSS.
@@ -795,405 +1080,329 @@ __svcrpcsec_gss(rqst, msg, no_dispatch)
 	gss_parms->context = (void *)client_data->context;
 	gss_parms->seq_num = creds.seq_num;
 
-	if (!client_data->established) {
-		if (creds.gss_proc == RPCSEC_GSS_DATA) {
-			RPCGSS_LOG0(1, "_svcrpcsec_gss: data exchange "
-				"message but context not established\n");
-
-			ret = RPCSEC_GSS_FAILED;
-			client_data->stale = TRUE;
-			goto error2;
-		}
-
-		/*
-		 * If the context is not established, then only
-		 * RPCSEC_GSS_INIT and RPCSEC_GSS_CONTINUE_INIT
-		 * requests are valid.
-		 */
-		if (creds.gss_proc != RPCSEC_GSS_INIT && creds.gss_proc !=
-						RPCSEC_GSS_CONTINUE_INIT) {
-			RPCGSS_LOG(1, "_svcrpcsec_gss: not an INIT or "
-				"CONTINUE_INIT message (0x%x) and context not "
-				"established\n", creds.gss_proc);
-
-			ret = RPCSEC_GSS_FAILED;
-			client_data->stale = TRUE;
-			goto error2;
-		}
-
-		/*
-		 * call is for us, deserialize arguments
-		 */
-		bzero(&call_arg, sizeof (call_arg));
-		if (!SVC_GETARGS(rqst->rq_xprt, __xdr_rpc_gss_init_arg,
-							(caddr_t)&call_arg)) {
-			RPCGSS_LOG0(1, "_svcrpcsec_gss: SVC_GETARGS failed\n");
-			ret = RPCSEC_GSS_FAILED;
-			client_data->stale = TRUE;
-			goto error2;
-		}
-
-		gssstat = GSS_S_FAILURE;
-		minor = 0;
-		minor_stat = 0;
-		rw_enter(&cred_lock, RW_READER);
-
-		if (client_data->client_name.length) {
-			(void) gss_release_buffer(&minor,
-				&client_data->client_name);
-		}
-		gssstat = kgss_accept_sec_context(&minor_stat,
-				&client_data->context,
-				GSS_C_NO_CREDENTIAL,
-				&call_arg,
-				GSS_C_NO_CHANNEL_BINDINGS,
-				&client_data->client_name,
-				&mech_type,
-				&output_token,
-				&ret_flags,
-				&time_rec,
-				/*
-				 * Don't need a delegated cred back.
-				 * No memory will be allocated if
-				 * passing NULL.
-				 */
-				NULL,
-				crgetuid(CRED()));
-
-		RPCGSS_LOG(4, "gssstat 0x%x \n", gssstat);
-
-		if (gssstat == GSS_S_COMPLETE) {
-			/*
-			 * Server_creds was right - set it.  Also
-			 * set the raw and unix credentials at this
-			 * point.  This saves a lot of computation
-			 * later when credentials are retrieved.
-			 */
-			client_data->raw_cred.version = creds.version;
-			client_data->raw_cred.service = creds.service;
-
-			if (client_data->raw_cred.mechanism) {
-			    kgss_free_oid(client_data->\
-				raw_cred.mechanism);
-			    client_data->raw_cred.mechanism = NULL;
-			}
-			client_data->raw_cred.mechanism =
-				(rpc_gss_OID) mech_type;
-			/*
-			 * client_data is now responsible for freeing
-			 * the data of 'mech_type'.
-			 */
-			free_mech_type = 0;
-
-			if (client_data->raw_cred.client_principal) {
-			    kmem_free((caddr_t)client_data->\
-				raw_cred.client_principal,
-				client_data->raw_cred.\
-				client_principal->len + sizeof (int));
-			    client_data->raw_cred.client_principal =
-				NULL;
-			}
-			/*
-			 *  The client_name returned from
-			 *  kgss_accept_sec_context() is in an
-			 *  exported flat format.
-			 */
-			if (! __rpc_gss_make_principal(
-			    &client_data->raw_cred.client_principal,
-			    &client_data->client_name)) {
-				RPCGSS_LOG0(1, "_svcrpcsec_gss: "
-				    "make principal failed\n");
-				gssstat = GSS_S_FAILURE;
-				(void) gss_release_buffer(&minor_stat,
-							&output_token);
-			}
-		}
-
-		rw_exit(&cred_lock);
-
-		call_res.gss_major = gssstat;
-		call_res.gss_minor = minor_stat;
-
-		xdr_free(__xdr_rpc_gss_init_arg, (caddr_t)&call_arg);
-
-		if (gssstat != GSS_S_COMPLETE &&
-		    gssstat != GSS_S_CONTINUE_NEEDED) {
-			/*
-			 * We have a failure - send response and delete
-			 * the context.  Don't dispatch.  Set ctx_handle
-			 * to NULL and seq_window to 0.
-			 */
-			call_res.ctx_handle.length = 0;
-			call_res.ctx_handle.value = NULL;
-			call_res.seq_window = 0;
-			rpc_gss_display_status(gssstat,
-				minor_stat,
-				mech_type,
-				crgetuid(CRED()),
-				"_svc_rpcsec_gss gss_accept_sec_context");
+	/*
+	 * This is an established context. Continue to
+	 * satisfy retried continue init requests out of
+	 * the retransmit cache.  Throw away any that don't
+	 * have a matching xid or the cach is empty.
+	 * Delete the retransmit cache once the client sends
+	 * a data request.
+	 */
+	if (client_data->retrans_data &&
+	    (client_data->retrans_data->xid == msg->rm_xid)) {
+		retrans_result = &client_data->retrans_data->result;
+		if (set_response_verf(rqst, msg, client_data,
+		    (uint_t)retrans_result->seq_window)) {
+			gss_parms->established = FALSE;
 			(void) svc_sendreply(rqst->rq_xprt,
-				__xdr_rpc_gss_init_res, (caddr_t)&call_res);
-			*no_dispatch = TRUE;
-			client_data->stale = TRUE;
-			ret = AUTH_OK;
-			goto error2;
-		}
-
-		/*
-		 * If appropriate, set established to TRUE *after* sending
-		 * response (otherwise, the client will receive the final
-		 * token encrypted)
-		 */
-
-		if (gssstat == GSS_S_COMPLETE) {
-			/*
-			 * Context is established.  Set expiration time
-			 * for the context.
-			 */
-			client_data->seq_num = 1;
-			if ((time_rec == GSS_C_INDEFINITE) || (time_rec == 0)) {
-				client_data->expiration = GSS_C_INDEFINITE;
-			} else {
-				client_data->expiration =
-				    time_rec + gethrestime_sec();
-			}
-
-			if (!transfer_sec_context(client_data)) {
-				ret = RPCSEC_GSS_FAILED;
-				client_data->stale = TRUE;
-				RPCGSS_LOG0(1,
-			    "_svc_rpcsec_gss: transfer sec context failed\n");
-				goto error2;
-			}
-
-			client_data->established = TRUE;
-		}
-
-		/*
-		 * This step succeeded.  Send a response, along with
-		 * a token if there's one.  Don't dispatch.
-		 */
-
-		if (output_token.length != 0) {
-			GSS_COPY_BUFFER(call_res.token, output_token);
-		}
-		/*
-		 * If GSS_S_COMPLETE: set response verifier to
-		 * checksum of SEQ_WIN
-		 */
-
-		if (gssstat == GSS_S_COMPLETE) {
-		    if (!set_response_verf(rqst, msg, client_data,
-				(uint_t)SEQ_WIN)) {
-			ret = RPCSEC_GSS_FAILED;
-			client_data->stale = TRUE;
-			RPCGSS_LOG0(1,
-			"_svc_rpcsec_gss:set response verifier failed\n");
-			goto error2;
-		    }
-		}
-
-		(void) svc_sendreply(rqst->rq_xprt, __xdr_rpc_gss_init_res,
-							(caddr_t)&call_res);
-		/*
-		 * Cache last response in case it is lost and the client
-		 * retries on an established context.
-		 */
-		(void) retrans_add(client_data, msg->rm_xid, &call_res);
-		*no_dispatch = TRUE;
-		ASSERT(client_data->ref_cnt > 0);
-		client_data->ref_cnt--;
-		(void) gss_release_buffer(&minor_stat, &output_token);
-
-	} else {
-		if ((creds.gss_proc != RPCSEC_GSS_DATA) &&
-		    (creds.gss_proc != RPCSEC_GSS_DESTROY)) {
-
-		    switch (creds.gss_proc) {
-
-		    case RPCSEC_GSS_CONTINUE_INIT:
-			/*
-			 * This is an established context. Continue to
-			 * satisfy retried continue init requests out of
-			 * the retransmit cache.  Throw away any that don't
-			 * have a matching xid or the cach is empty.
-			 * Delete the retransmit cache once the client sends
-			 * a data request.
-			 */
-			if (client_data->retrans_data &&
-			    (client_data->retrans_data->xid == msg->rm_xid)) {
-
-			    retrans_result = &client_data->retrans_data->result;
-			    if (set_response_verf(rqst, msg, client_data,
-				(uint_t)retrans_result->seq_window)) {
-
-				gss_parms->established = FALSE;
-				(void) svc_sendreply(rqst->rq_xprt,
-					__xdr_rpc_gss_init_res,
-					(caddr_t)retrans_result);
-				*no_dispatch = TRUE;
-				ASSERT(client_data->ref_cnt > 0);
-				client_data->ref_cnt--;
-				goto success;
-			    }
-			}
-			/* fall thru to default */
-
-		    default:
-			RPCGSS_LOG0(1, "_svcrpcsec_gss: non-data request "
-				"on an established context\n");
-			ret = AUTH_FAILED;
-			goto error2;
-		    }
-		}
-
-		/*
-		 * Once the context is established and there is no more
-		 * retransmission of last continue init request, it is safe
-		 * to delete the retransmit cache entry.
-		 */
-		if (client_data->retrans_data)
-			retrans_del(client_data);
-
-		/*
-		 * Context is already established.  Check verifier, and
-		 * note parameters we will need for response in gss_parms.
-		 */
-		if (!check_verf(msg, client_data->context,
-			(int *)&gss_parms->qop_rcvd, client_data->u_cred.uid)) {
-			ret = RPCSEC_GSS_NOCRED;
-			RPCGSS_LOG0(1, "_svcrpcsec_gss: check verf failed\n");
-			goto error2;
-		}
-
-		/*
-		 *  Check and invoke callback if necessary.
-		 */
-		if (!client_data->done_docallback) {
-			client_data->done_docallback = TRUE;
-			client_data->qop = gss_parms->qop_rcvd;
-			client_data->raw_cred.qop = gss_parms->qop_rcvd;
-			client_data->raw_cred.service = creds.service;
-			if (!do_callback(rqst, client_data)) {
-				ret = AUTH_FAILED;
-				RPCGSS_LOG0(1,
-					"_svc_rpcsec_gss:callback failed\n");
-				goto error2;
-			}
-		}
-
-		/*
-		 * If the context was locked, make sure that the client
-		 * has not changed QOP.
-		 */
-		if (client_data->locked &&
-				gss_parms->qop_rcvd != client_data->qop) {
-			ret = AUTH_BADVERF;
-			RPCGSS_LOG0(1, "_svcrpcsec_gss: can not change qop\n");
-			goto error2;
-		}
-
-		/*
-		 * Validate sequence number.
-		 */
-		if (!check_seq(client_data, creds.seq_num,
-						&client_data->stale)) {
-			if (client_data->stale) {
-				ret = RPCSEC_GSS_FAILED;
-				RPCGSS_LOG0(1,
-					"_svc_rpcsec_gss:check seq failed\n");
-			} else {
-				RPCGSS_LOG0(4, "_svc_rpcsec_gss:check seq "
-					"failed on good context. Ignoring "
-					"request\n");
-				/*
-				 * Operational error, drop packet silently.
-				 * The client will recover after timing out,
-				 * assuming this is a client error and not
-				 * a relpay attack.  Don't dispatch.
-				 */
-				ret = AUTH_OK;
-				*no_dispatch = TRUE;
-			}
-			goto error2;
-		}
-
-		/*
-		 * set response verifier
-		 */
-		if (!set_response_verf(rqst, msg, client_data,
-				creds.seq_num)) {
-			ret = RPCSEC_GSS_FAILED;
-			client_data->stale = TRUE;
-			RPCGSS_LOG0(1,
-			"_svc_rpcsec_gss:set response verifier failed\n");
-			goto error2;
-		}
-
-		/*
-		 * If this is a control message RPCSEC_GSS_DESTROY, process
-		 * the call; otherwise, return AUTH_OK so it will be
-		 * dispatched to the application server.
-		 */
-		if (creds.gss_proc == RPCSEC_GSS_DESTROY) {
-			/*
-			 * XXX Kernel client is not issuing this procudure
-			 * right now. Need to revisit.
-			 */
-			(void) svc_sendreply(rqst->rq_xprt, xdr_void, NULL);
+			    __xdr_rpc_gss_init_res, (caddr_t)retrans_result);
 			*no_dispatch = TRUE;
 			ASSERT(client_data->ref_cnt > 0);
 			client_data->ref_cnt--;
-			client_data->stale = TRUE;
-		} else {
-			/* This should be an RPCSEC_GSS_DATA request. */
-			ASSERT(creds.gss_proc == RPCSEC_GSS_DATA);
-
-			/*
-			 * If context is locked, make sure that the client
-			 * has not changed the security service.
-			 */
-			if (client_data->locked &&
-			    client_data->raw_cred.service != creds.service) {
-				RPCGSS_LOG0(1, "_svc_rpcsec_gss: "
-					"security service changed.\n");
-				ret = AUTH_FAILED;
-				goto error2;
-			}
-
-			/*
-			 * Set client credentials to raw credential
-			 * structure in context.  This is okay, since
-			 * this will not change during the lifetime of
-			 * the context (so it's MT safe).
-			 */
-			rqst->rq_clntcred = (char *)&client_data->raw_cred;
 		}
 	}
-
-success:
-	/*
-	 * Success.
-	 */
-	if (creds.ctx_handle.length != 0)
-		xdr_free(__xdr_rpc_gss_creds, (caddr_t)&creds);
 	mutex_exit(&client_data->clm);
 
 	return (AUTH_OK);
+
 error2:
 	ASSERT(client_data->ref_cnt > 0);
 	client_data->ref_cnt--;
-	(void) gss_release_buffer(&minor_stat, &output_token);
-	if (free_mech_type && mech_type)
-		kgss_free_oid(mech_type);
 	mutex_exit(&client_data->clm);
-error:
+	return (ret);
+}
+
+static enum auth_stat
+rpcsec_gss_data(
+	struct svc_req		*rqst,
+	struct rpc_msg		*msg,
+	rpc_gss_creds		creds,
+	bool_t			*no_dispatch)
+{
+	int ret;
+	svc_rpc_gss_parms_t	*gss_parms;
+	svc_rpc_gss_data	*client_data;
+
+	switch (creds.service) {
+	case rpc_gss_svc_none:
+	case rpc_gss_svc_integrity:
+	case rpc_gss_svc_privacy:
+		break;
+	default:
+		cmn_err(CE_NOTE, "__svcrpcsec_gss: unknown service type=0x%x",
+		    creds.service);
+		RPCGSS_LOG(1, "_svcrpcsec_gss: unknown service type: 0x%x\n",
+		    creds.service);
+		ret = AUTH_BADCRED;
+		return (ret);
+	}
+
+	if (creds.ctx_handle.length == 0) {
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: no ctx_handle\n");
+		ret = AUTH_BADCRED;
+		return (ret);
+	}
+	if ((client_data = get_client(&creds.ctx_handle)) == NULL) {
+		ret = RPCSEC_GSS_NOCRED;
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: no security context\n");
+		return (ret);
+	}
+
+
+	mutex_enter(&client_data->clm);
+	if (!client_data->established) {
+		ret = AUTH_FAILED;
+		goto error2;
+	}
+	if (client_data->stale) {
+		ret = RPCSEC_GSS_NOCRED;
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: client data stale\n");
+		goto error2;
+	}
+
 	/*
-	 * Failure.
+	 * Once the context is established and there is no more
+	 * retransmission of last continue init request, it is safe
+	 * to delete the retransmit cache entry.
 	 */
+	if (client_data->retrans_data)
+		retrans_del(client_data);
+
+	/*
+	 * Set the appropriate wrap/unwrap routine for RPCSEC_GSS.
+	 */
+	rqst->rq_xprt->xp_auth.svc_ah_ops = svc_rpc_gss_ops;
+	rqst->rq_xprt->xp_auth.svc_ah_private = (caddr_t)client_data;
+
+	/*
+	 * Keep copy of parameters we'll need for response, for the
+	 * sake of reentrancy (we don't want to look in the context
+	 * data because when we are sending a response, another
+	 * request may have come in).
+	 */
+	gss_parms = &rqst->rq_xprt->xp_auth.svc_gss_parms;
+	gss_parms->established = client_data->established;
+	gss_parms->service = creds.service;
+	gss_parms->qop_rcvd = (uint_t)client_data->qop;
+	gss_parms->context = (void *)client_data->context;
+	gss_parms->seq_num = creds.seq_num;
+
+	/*
+	 * Context is already established.  Check verifier, and
+	 * note parameters we will need for response in gss_parms.
+	 */
+	if (!check_verf(msg, client_data->context,
+	    (int *)&gss_parms->qop_rcvd, client_data->u_cred.uid)) {
+		ret = RPCSEC_GSS_NOCRED;
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: check verf failed\n");
+		goto error2;
+	}
+
+	/*
+	 *  Check and invoke callback if necessary.
+	 */
+	if (!client_data->done_docallback) {
+		client_data->done_docallback = TRUE;
+		client_data->qop = gss_parms->qop_rcvd;
+		client_data->raw_cred.qop = gss_parms->qop_rcvd;
+		client_data->raw_cred.service = creds.service;
+		if (!do_callback(rqst, client_data)) {
+			ret = AUTH_FAILED;
+			RPCGSS_LOG0(1, "_svc_rpcsec_gss:callback failed\n");
+			goto error2;
+		}
+	}
+
+	/*
+	 * If the context was locked, make sure that the client
+	 * has not changed QOP.
+	 */
+	if (client_data->locked && gss_parms->qop_rcvd != client_data->qop) {
+		ret = AUTH_BADVERF;
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: can not change qop\n");
+		goto error2;
+	}
+
+	/*
+	 * Validate sequence number.
+	 */
+	if (!check_seq(client_data, creds.seq_num, &client_data->stale)) {
+		if (client_data->stale) {
+			ret = RPCSEC_GSS_FAILED;
+			RPCGSS_LOG0(1,
+			    "_svc_rpcsec_gss:check seq failed\n");
+		} else {
+			RPCGSS_LOG0(4, "_svc_rpcsec_gss:check seq "
+			    "failed on good context. Ignoring "
+			    "request\n");
+			/*
+			 * Operational error, drop packet silently.
+			 * The client will recover after timing out,
+			 * assuming this is a client error and not
+			 * a relpay attack.  Don't dispatch.
+			 */
+			ret = AUTH_OK;
+			*no_dispatch = TRUE;
+		}
+		goto error2;
+	}
+
+	/*
+	 * set response verifier
+	 */
+	if (!set_response_verf(rqst, msg, client_data, creds.seq_num)) {
+		ret = RPCSEC_GSS_FAILED;
+		client_data->stale = TRUE;
+		RPCGSS_LOG0(1,
+		    "_svc_rpcsec_gss:set response verifier failed\n");
+		goto error2;
+	}
+
+	/*
+	 * If context is locked, make sure that the client
+	 * has not changed the security service.
+	 */
+	if (client_data->locked &&
+	    client_data->raw_cred.service != creds.service) {
+		RPCGSS_LOG0(1, "_svc_rpcsec_gss: "
+		    "security service changed.\n");
+		ret = AUTH_FAILED;
+		goto error2;
+	}
+
+	/*
+	 * Set client credentials to raw credential
+	 * structure in context.  This is okay, since
+	 * this will not change during the lifetime of
+	 * the context (so it's MT safe).
+	 */
+	rqst->rq_clntcred = (char *)&client_data->raw_cred;
+
+	mutex_exit(&client_data->clm);
+	return (AUTH_OK);
+
+error2:
+	ASSERT(client_data->ref_cnt > 0);
+	client_data->ref_cnt--;
+	mutex_exit(&client_data->clm);
+	return (ret);
+}
+
+/*
+ * Note we don't have a client yet to use this routine and test it.
+ */
+static enum auth_stat
+rpcsec_gss_destroy(
+	struct svc_req		*rqst,
+	rpc_gss_creds		creds,
+	bool_t			*no_dispatch)
+{
+	svc_rpc_gss_data	*client_data;
+	int ret;
+
+	if (creds.ctx_handle.length == 0) {
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: no ctx_handle\n");
+		ret = AUTH_BADCRED;
+		return (ret);
+	}
+	if ((client_data = get_client(&creds.ctx_handle)) == NULL) {
+		ret = RPCSEC_GSS_NOCRED;
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: no security context\n");
+		return (ret);
+	}
+
+	mutex_enter(&client_data->clm);
+	if (!client_data->established) {
+		ret = AUTH_FAILED;
+		goto error2;
+	}
+	if (client_data->stale) {
+		ret = RPCSEC_GSS_NOCRED;
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: client data stale\n");
+		goto error2;
+	}
+
+	(void) svc_sendreply(rqst->rq_xprt, xdr_void, NULL);
+	*no_dispatch = TRUE;
+	ASSERT(client_data->ref_cnt > 0);
+	client_data->ref_cnt--;
+	client_data->stale = TRUE;
+	mutex_exit(&client_data->clm);
+	return (AUTH_OK);
+
+error2:
+	ASSERT(client_data->ref_cnt > 0);
+	client_data->ref_cnt--;
+	client_data->stale = TRUE;
+	mutex_exit(&client_data->clm);
+	return (ret);
+}
+
+/*
+ * Server side authentication for RPCSEC_GSS.
+ */
+enum auth_stat
+__svcrpcsec_gss(
+	struct svc_req		*rqst,
+	struct rpc_msg		*msg,
+	bool_t			*no_dispatch)
+{
+	XDR			xdrs;
+	rpc_gss_creds		creds;
+	struct opaque_auth	*cred;
+	int			ret;
+
+	*no_dispatch = FALSE;
+
+	/*
+	 * Initialize response verifier to NULL verifier.  If
+	 * necessary, this will be changed later.
+	 */
+	rqst->rq_xprt->xp_verf.oa_flavor = AUTH_NONE;
+	rqst->rq_xprt->xp_verf.oa_base = NULL;
+	rqst->rq_xprt->xp_verf.oa_length = 0;
+
+	/*
+	 * Pull out and check credential and verifier.
+	 */
+	cred = &msg->rm_call.cb_cred;
+
+	if (cred->oa_length == 0) {
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: zero length cred\n");
+		return (AUTH_BADCRED);
+	}
+
+	xdrmem_create(&xdrs, cred->oa_base, cred->oa_length, XDR_DECODE);
+	bzero((char *)&creds, sizeof (creds));
+	if (!__xdr_rpc_gss_creds(&xdrs, &creds)) {
+		XDR_DESTROY(&xdrs);
+		RPCGSS_LOG0(1, "_svcrpcsec_gss: can't decode creds\n");
+		ret = AUTH_BADCRED;
+		return (AUTH_BADCRED);
+	}
+	XDR_DESTROY(&xdrs);
+
+	switch (creds.gss_proc) {
+	case RPCSEC_GSS_INIT:
+		ret = rpcsec_gss_init(rqst, msg, creds, no_dispatch, NULL);
+		break;
+	case RPCSEC_GSS_CONTINUE_INIT:
+		ret = rpcsec_gss_continue_init(rqst, msg, creds, no_dispatch);
+		break;
+	case RPCSEC_GSS_DATA:
+		ret = rpcsec_gss_data(rqst, msg, creds, no_dispatch);
+		break;
+	case RPCSEC_GSS_DESTROY:
+		ret = rpcsec_gss_destroy(rqst, creds, no_dispatch);
+		break;
+	default:
+		cmn_err(CE_NOTE, "__svcrpcsec_gss: bad proc=%d",
+		    creds.gss_proc);
+		ret = AUTH_BADCRED;
+	}
+
 	if (creds.ctx_handle.length != 0)
 		xdr_free(__xdr_rpc_gss_creds, (caddr_t)&creds);
-
 	return (ret);
 }
 
@@ -1251,22 +1460,23 @@ check_verf(struct rpc_msg *msg, gss_ctx_id_t context, int *qop_state, uid_t uid)
 	tok_buf.value = oa->oa_base;
 
 	gssstat = kgss_verify(&minor_stat, context, &msg_buf, &tok_buf,
-				qop_state);
+	    qop_state);
 	if (gssstat != GSS_S_COMPLETE) {
 		RPCGSS_LOG(1, "check_verf: kgss_verify status 0x%x\n", gssstat);
 
 		RPCGSS_LOG(4, "check_verf: msg_buf length %d\n", len);
 		RPCGSS_LOG(4, "check_verf: msg_buf value 0x%x\n", *(int *)hdr);
 		RPCGSS_LOG(4, "check_verf: tok_buf length %ld\n",
-				tok_buf.length);
+		    tok_buf.length);
 		RPCGSS_LOG(4, "check_verf: tok_buf value 0x%p\n",
-			(void *)oa->oa_base);
+		    (void *)oa->oa_base);
 		RPCGSS_LOG(4, "check_verf: context 0x%p\n", (void *)context);
 
 		return (FALSE);
 	}
 	return (TRUE);
 }
+
 
 /*
  * Set response verifier.  This is the checksum of the given number.
@@ -1287,6 +1497,7 @@ set_response_verf(rqst, msg, cl, num)
 	in_buf.length = sizeof (num);
 	in_buf.value = (char *)&num_net;
 /* XXX uid ? */
+
 	if ((kgss_sign(&minor, cl->context, cl->qop, &in_buf,
 				&out_buf)) != GSS_S_COMPLETE)
 		return (FALSE);
@@ -1309,7 +1520,7 @@ create_client()
 	static uint_t		key = 1;
 
 	client_data = (svc_rpc_gss_data *) kmem_cache_alloc(svc_data_handle,
-							    KM_SLEEP);
+	    KM_SLEEP);
 	if (client_data == NULL)
 		return (NULL);
 
@@ -1524,8 +1735,7 @@ sweep_clients(bool_t from_reclaim)
 	ASSERT(mutex_owned(&ctx_mutex));
 
 	last_reference_needed = now - (from_reclaim ?
-				    svc_rpc_gss_active_delta :
-				    svc_rpc_gss_inactive_delta);
+	    svc_rpc_gss_active_delta : svc_rpc_gss_inactive_delta);
 
 	cl = lru_last;
 	while (cl) {
@@ -1580,6 +1790,7 @@ svc_rpc_gss_wrap(auth, out_xdrs, xdr_func, xdr_ptr)
 	caddr_t			xdr_ptr;
 {
 	svc_rpc_gss_parms_t	*gss_parms = SVCAUTH_GSSPARMS(auth);
+	bool_t ret;
 
 	/*
 	 * If context is not established, or if neither integrity nor
@@ -1590,11 +1801,12 @@ svc_rpc_gss_wrap(auth, out_xdrs, xdr_func, xdr_ptr)
 				gss_parms->service == rpc_gss_svc_none)
 		return ((*xdr_func)(out_xdrs, xdr_ptr));
 
-	return (__rpc_gss_wrap_data(gss_parms->service,
+	ret = __rpc_gss_wrap_data(gss_parms->service,
 				(OM_uint32)gss_parms->qop_rcvd,
 				(gss_ctx_id_t)gss_parms->context,
 				gss_parms->seq_num,
-				out_xdrs, xdr_func, xdr_ptr));
+				out_xdrs, xdr_func, xdr_ptr);
+	return (ret);
 }
 
 /*
@@ -1699,8 +1911,8 @@ common_client_data_free(svc_rpc_gss_data *client_data)
 
 	if (client_data->raw_cred.client_principal) {
 		kmem_free((caddr_t)client_data->raw_cred.client_principal,
-			client_data->raw_cred.client_principal->len +
-			sizeof (int));
+		    client_data->raw_cred.client_principal->len +
+		    sizeof (int));
 		client_data->raw_cred.client_principal = NULL;
 	}
 
