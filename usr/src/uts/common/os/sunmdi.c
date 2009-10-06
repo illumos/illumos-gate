@@ -2133,10 +2133,10 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 		    pip = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link)
 			;
 
-		/* If path can't be selected then MDI_FAILURE is returned. */
+		/* If path can't be selected then MDI_NOPATH is returned. */
 		if (pip == NULL) {
 			MDI_CLIENT_UNLOCK(ct);
-			return (MDI_FAILURE);
+			return (MDI_NOPATH);
 		}
 
 		/*
@@ -2155,6 +2155,13 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 			MDI_PI_UNLOCK(pip);
 			MDI_CLIENT_UNLOCK(ct);
 			return (MDI_FAILURE);
+		}
+
+		/* Return MDI_BUSY if we have a transient condition */
+		if (MDI_PI_IS_TRANSIENT(pip)) {
+			MDI_PI_UNLOCK(pip);
+			MDI_CLIENT_UNLOCK(ct);
+			return (MDI_BUSY);
 		}
 
 		/*
