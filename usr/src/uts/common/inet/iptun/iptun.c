@@ -2534,6 +2534,13 @@ iptun_in_6to4_ok(iptun_t *iptun, ipha_t *outer4, ip6_t *inner6)
 	ipaddr_t v4addr;
 
 	/*
+	 * It's possible that someone sent us an IPv4-in-IPv4 packet with the
+	 * IPv4 address of a 6to4 tunnel as the destination.
+	 */
+	if (inner6 == NULL)
+		return (B_FALSE);
+
+	/*
 	 * Make sure that the IPv6 destination is within the site that this
 	 * 6to4 tunnel is routing for.  We don't want people bouncing random
 	 * tunneled IPv6 packets through this 6to4 router.

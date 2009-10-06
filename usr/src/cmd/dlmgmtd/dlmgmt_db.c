@@ -1227,7 +1227,7 @@ dlmgmt_write_db_entry(const char *entryname, dlmgmt_link_t *linkp,
 /*
  * Upgrade properties that have link IDs as values to link names.  Because '.'
  * is a valid linkname character, the port separater for link aggregations
- * must be changed to ':'.4
+ * must be changed to ':'.
  */
 static void
 linkattr_upgrade(dlmgmt_linkattr_t *attrp)
@@ -1243,7 +1243,7 @@ linkattr_upgrade(dlmgmt_linkattr_t *attrp)
 	if (strcmp(attrp->lp_name, "linkover") == 0 ||
 	    strcmp(attrp->lp_name, "simnetpeer") == 0) {
 		if (attrp->lp_type == DLADM_TYPE_UINT64) {
-			linkid = *(datalink_id_t *)attrp->lp_val;
+			linkid = (datalink_id_t)*(uint64_t *)attrp->lp_val;
 			if ((linkp = link_by_id(linkid, GLOBAL_ZONEID)) == NULL)
 				return;
 			new_attr_sz = strlen(linkp->ll_link) + 1;

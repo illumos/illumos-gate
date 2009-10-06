@@ -66,23 +66,15 @@ boolean_t		devnet_need_rebuild;
 
 #define	VLAN_HASHSZ	67	/* prime */
 
-
 /*
- * The following names are default tunnel interface names for backward
- * compatibility with Solaris 10 and prior.  Opening a /dev/net node with one
- * of these names causes a tunnel link to be implicitly created in
- * dls_devnet_hold_by_name().
+ * The following macros take a link name without the trailing PPA as input.
+ * Opening a /dev/net node with one of these names causes a tunnel link to be
+ * implicitly created in dls_devnet_hold_by_name() for backward compatibility
+ * with Solaris 10 and prior.
  */
-#define	IPTUN_IPV4_NAME	"ip.tun"
-#define	IPTUN_IPV6_NAME	"ip6.tun"
-#define	IPTUN_6TO4_NAME	"ip.6to4tun"
-
-#define	IS_IPV4_TUN(name)	(					\
-    strncmp((name), IPTUN_IPV4_NAME, strlen(IPTUN_IPV4_NAME)) == 0)
-#define	IS_IPV6_TUN(name)	(					\
-    strncmp((name), IPTUN_IPV6_NAME, strlen(IPTUN_IPV6_NAME)) == 0)
-#define	IS_6TO4_TUN(name)	(					\
-    strncmp((name), IPTUN_6TO4_NAME, strlen(IPTUN_6TO4_NAME)) == 0)
+#define	IS_IPV4_TUN(name)	(strcmp((name), "ip.tun") == 0)
+#define	IS_IPV6_TUN(name)	(strcmp((name), "ip6.tun") == 0)
+#define	IS_6TO4_TUN(name)	(strcmp((name), "ip.6to4tun") == 0)
 #define	IS_IPTUN_LINK(name)	(					\
     IS_IPV4_TUN(name) || IS_IPV6_TUN(name) || IS_6TO4_TUN(name))
 
@@ -117,7 +109,8 @@ typedef struct dls_devnet_s {
 	taskqid_t	dd_prop_taskid;
 } dls_devnet_t;
 
-static int i_dls_devnet_create_iptun(const char *, datalink_id_t *);
+static int i_dls_devnet_create_iptun(const char *, const char *,
+    datalink_id_t *);
 static int i_dls_devnet_destroy_iptun(datalink_id_t);
 static int i_dls_devnet_setzid(dls_devnet_t *, zoneid_t, boolean_t);
 static int dls_devnet_unset(const char *, datalink_id_t *, boolean_t);
@@ -1144,8 +1137,11 @@ dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp)
 	if (err != ENOENT)
 		return (err);
 
-	if (IS_IPTUN_LINK(link)) {
-		if ((err = i_dls_devnet_create_iptun(link, &linkid)) != 0)
+	if (ddi_parse(link, drv, &ppa) != DDI_SUCCESS)
+		return (ENOENT);
+
+	if (IS_IPTUN_LINK(drv)) {
+		if ((err = i_dls_devnet_create_iptun(link, drv, &linkid)) != 0)
 			return (err);
 		/*
 		 * At this point, an IP tunnel MAC has registered, which
@@ -1165,9 +1161,6 @@ dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp)
 		(*ddpp)->dd_flags |= DD_IMPLICIT_IPTUN;
 		return (0);
 	}
-
-	if (ddi_parse(link, drv, &ppa) != DDI_SUCCESS)
-		return (ENOENT);
 
 	/*
 	 * If this link:
@@ -1727,7 +1720,8 @@ dls_devnet_destroy(mac_handle_t mh, datalink_id_t *idp, boolean_t wait)
  * Implicitly create an IP tunnel link.
  */
 static int
-i_dls_devnet_create_iptun(const char *name, datalink_id_t *linkid)
+i_dls_devnet_create_iptun(const char *linkname, const char *drvname,
+    datalink_id_t *linkid)
 {
 	int		err;
 	iptun_kparams_t	ik;
@@ -1742,20 +1736,20 @@ i_dls_devnet_create_iptun(const char *name, datalink_id_t *linkid)
 	if ((iptun_dip = ddi_hold_devi_by_instance(iptun_major, 0, 0)) == NULL)
 		return (EINVAL);
 
-	if (IS_IPV4_TUN(name)) {
+	if (IS_IPV4_TUN(drvname)) {
 		ik.iptun_kparam_type = IPTUN_TYPE_IPV4;
 		media = DL_IPV4;
-	} else if (IS_6TO4_TUN(name)) {
+	} else if (IS_6TO4_TUN(drvname)) {
 		ik.iptun_kparam_type = IPTUN_TYPE_6TO4;
 		media = DL_6TO4;
-	} else if (IS_IPV6_TUN(name)) {
+	} else if (IS_IPV6_TUN(drvname)) {
 		ik.iptun_kparam_type = IPTUN_TYPE_IPV6;
 		media = DL_IPV6;
 	}
 	ik.iptun_kparam_flags = (IPTUN_KPARAM_TYPE | IPTUN_KPARAM_IMPLICIT);
 
 	/* Obtain a datalink id for this tunnel. */
-	err = dls_mgmt_create((char *)name, 0, DATALINK_CLASS_IPTUN, media,
+	err = dls_mgmt_create((char *)linkname, 0, DATALINK_CLASS_IPTUN, media,
 	    B_FALSE, &ik.iptun_kparam_linkid);
 	if (err != 0) {
 		ddi_release_devi(iptun_dip);

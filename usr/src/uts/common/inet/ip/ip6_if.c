@@ -1150,7 +1150,7 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 void
 ill_setdefaulttoken(ill_t *ill)
 {
-	if (!ill->ill_manual_token) {
+	if (!ill->ill_manual_token && ill->ill_phys_addr_length != 0) {
 		bzero(&ill->ill_token, sizeof (ill->ill_token));
 		MEDIA_V6INTFID(ill->ill_media, ill, &ill->ill_token);
 		ill->ill_token_length = IPV6_TOKEN_LEN;
