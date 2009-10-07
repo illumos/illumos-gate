@@ -1052,6 +1052,17 @@ ql_async_event(ql_adapter_state_t *ha, uint32_t mbx, ql_head_t *done_q,
 			EL(ha, "%xh Port Database Update, Login/Logout "
 			    "received, mbx1=%xh, mbx2=%xh, mbx3=%xh\n",
 			    mb[0], mb[1], mb[2], mb[3]);
+		} else if (CFG_IST(ha, CFG_CTRL_81XX) && mb[1] == 0xffff &&
+		    mb[2] == 0x7 && MSB(mb[3]) == 0xe) {
+			if (!(ha->task_daemon_flags & LOOP_DOWN)) {
+				*set_flags |= LOOP_DOWN;
+			}
+			ql_port_state(ha, FC_STATE_OFFLINE,
+			    FC_STATE_CHANGE | COMMAND_WAIT_NEEDED | LOOP_DOWN);
+
+			if (ha->loop_down_timer == LOOP_DOWN_TIMER_OFF) {
+				ha->loop_down_timer = LOOP_DOWN_TIMER_START;
+			}
 		} else {
 			EL(ha, "%xh Port Database Update received, mbx1=%xh,"
 			    " mbx2=%xh, mbx3=%xh\n", mb[0], mb[1], mb[2],
@@ -1657,10 +1668,6 @@ ql_error_entry(ql_adapter_state_t *ha, response_t *pkt, ql_head_t *done_q,
 	}
 
 	if (sp != NULL) {
-		ha->outstanding_cmds[index] = NULL;
-		sp->handle = 0;
-		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
-
 		/* Bad payload or header */
 		if (pkt->entry_status & (BIT_5 + BIT_4 + BIT_3 + BIT_2)) {
 			/* Bad payload or header, set error status. */
@@ -1792,10 +1799,6 @@ ql_status_entry(ql_adapter_state_t *ha, sts_entry_t *pkt,
 			    ha->instance);
 			return (0);
 		}
-
-		ha->outstanding_cmds[index] = NULL;
-		sp->handle = 0;
-		sp->flags &= ~SRB_IN_TOKEN_ARRAY;
 
 		/*
 		 * Fast path to good SCSI I/O completion
@@ -1968,8 +1971,8 @@ ql_verify_preprocessed_cmd(ql_adapter_state_t *ha, uint32_t *pkt_handle,
 		}
 
 		if (sp != NULL) {
-			EL(ha, "sp=%x, resp_id=%x, get=%d\n", sp,
-			    resp_identifier, get_handle);
+			EL(ha, "sp=%xh, resp_id=%xh, get=%d, index=%xh\n", sp,
+			    resp_identifier, get_handle, index);
 			break;
 		} else {
 			get_handle -= 1;
@@ -1980,7 +1983,8 @@ ql_verify_preprocessed_cmd(ql_adapter_state_t *ha, uint32_t *pkt_handle,
 				    RESPONSE_Q_BUFFER_OFFSET,
 				    RESPONSE_QUEUE_SIZE,
 				    DDI_DMA_SYNC_FORKERNEL);
-				EL(ha, "last chance DMA sync\n");
+				EL(ha, "last chance DMA sync, index=%xh\n",
+				    index);
 			}
 		}
 	}

@@ -827,6 +827,49 @@ typedef struct ql_25xx_fw_dump {
 	uint32_t ext_mem[1];
 } ql_25xx_fw_dump_t;
 
+typedef struct ql_81xx_fw_dump {
+	uint32_t r2h_status;
+	uint32_t hostrisc_reg[32];
+	uint32_t pcie_reg[4];
+	uint32_t host_reg[32];
+	uint16_t mailbox_reg[32];
+	uint32_t xseq_gp_reg[128];
+	uint32_t xseq_0_reg[48];
+	uint32_t xseq_1_reg[16];
+	uint32_t rseq_gp_reg[128];
+	uint32_t rseq_0_reg[32];
+	uint32_t rseq_1_reg[16];
+	uint32_t rseq_2_reg[16];
+	uint32_t aseq_gp_reg[128];
+	uint32_t aseq_0_reg[32];
+	uint32_t aseq_1_reg[16];
+	uint32_t aseq_2_reg[16];
+	uint32_t cmd_dma_reg[16];
+	uint32_t req0_dma_reg[15];
+	uint32_t resp0_dma_reg[15];
+	uint32_t req1_dma_reg[15];
+	uint32_t xmt0_dma_reg[32];
+	uint32_t xmt1_dma_reg[32];
+	uint32_t xmt2_dma_reg[32];
+	uint32_t xmt3_dma_reg[32];
+	uint32_t xmt4_dma_reg[32];
+	uint32_t xmt_data_dma_reg[16];
+	uint32_t rcvt0_data_dma_reg[32];
+	uint32_t rcvt1_data_dma_reg[32];
+	uint32_t risc_gp_reg[128];
+	uint32_t shadow_reg[11];
+	uint32_t risc_io;
+	uint32_t lmc_reg[128];
+	uint32_t fpm_hdw_reg[224];
+	uint32_t fb_hdw_reg[208];
+	uint32_t code_ram[0x2000];
+	uint32_t req_q[REQUEST_QUEUE_SIZE / 4];
+	uint32_t rsp_q[RESPONSE_QUEUE_SIZE / 4];
+	uint32_t ext_trace_buf[FWEXTSIZE / 4];
+	uint32_t fce_trace_buf[FWFCESIZE / 4];
+	uint32_t ext_mem[1];
+} ql_81xx_fw_dump_t;
+
 #ifdef _KERNEL
 
 /*

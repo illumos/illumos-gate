@@ -3384,7 +3384,8 @@ ql_diagnostic_loopback(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 		return;
 	}
 
-	if (DRIVER_SUSPENDED(ha) || ql_stall_driver(ha, 0) != QL_SUCCESS) {
+	if ((ha->task_daemon_flags & (QL_LOOP_TRANSITION | DRIVER_STALL)) ||
+	    ql_stall_driver(ha, 0) != QL_SUCCESS) {
 		EL(ha, "failed, LOOP_NOT_READY\n");
 		kmem_free(bp, plbreq.TransferCount);
 		cmd->Status = EXT_STATUS_BUSY;
@@ -3400,11 +3401,15 @@ ql_diagnostic_loopback(ql_adapter_state_t *ha, EXT_IOCTL *cmd, int mode)
 	/* determine topology so we can send the loopback or the echo */
 	/* Echo is supported on 2300's only and above */
 
-	if ((ha->topology & QL_F_PORT) && ha->device_id >= 0x2300) {
+	if (!(ha->task_daemon_flags & LOOP_DOWN) &&
+	    (ha->topology & QL_F_PORT) &&
+	    ha->device_id >= 0x2300) {
 		QL_PRINT_9(CE_CONT, "(%d): F_PORT topology -- using echo\n",
 		    ha->instance);
 		plbrsp.CommandSent = INT_DEF_LB_ECHO_CMD;
-		rval = ql_diag_echo(ha, 0, bp, plbreq.TransferCount, 0, &mr);
+		rval = ql_diag_echo(ha, 0, bp, plbreq.TransferCount,
+		    (uint16_t)(CFG_IST(ha, CFG_CTRL_81XX) ? BIT_15 : BIT_6),
+		    &mr);
 	} else {
 		plbrsp.CommandSent = INT_DEF_LB_LOOPBACK_CMD;
 		rval = ql_diag_loopback(ha, 0, bp, plbreq.TransferCount,
@@ -6778,7 +6783,7 @@ ql_check_pci(ql_adapter_state_t *ha, ql_fcache_t *fcache, uint32_t *nextpos)
 	}
 
 	(void) snprintf(fcache->verstr, FCHBA_OPTION_ROM_VERSION_LEN,
-	    "%d.%d", pcid->revisionlevel[1], pcid->revisionlevel[0]);
+	    "%d.%02d", pcid->revisionlevel[1], pcid->revisionlevel[0]);
 
 	QL_PRINT_9(CE_CONT, "(%d): done\n", ha->instance);
 
@@ -6802,7 +6807,7 @@ ql_flash_layout_table(ql_adapter_state_t *ha, uint32_t flt_paddr)
 	ql_flt_ptr_t	*fptr;
 	ql_flt_hdr_t	*fhdr;
 	ql_flt_region_t	*frgn;
-	uint8_t		*bp;
+	uint8_t		*bp, *eaddr;
 	int		rval;
 	uint32_t	len, faddr, cnt;
 	uint16_t	chksum, w16;
@@ -6868,8 +6873,9 @@ ql_flash_layout_table(ql_adapter_state_t *ha, uint32_t flt_paddr)
 	}
 
 	/* Process flash layout table regions */
+	eaddr = bp + sizeof (ql_flt_hdr_t) + len;
 	for (frgn = (ql_flt_region_t *)(bp + sizeof (ql_flt_hdr_t));
-	    (caddr_t)frgn < (caddr_t)(bp + FLASH_LAYOUT_TABLE_SIZE); frgn++) {
+	    (uint8_t *)frgn < eaddr; frgn++) {
 		faddr = CHAR_TO_LONG(frgn->beg_addr[0], frgn->beg_addr[1],
 		    frgn->beg_addr[2], frgn->beg_addr[3]);
 		faddr >>= 2;

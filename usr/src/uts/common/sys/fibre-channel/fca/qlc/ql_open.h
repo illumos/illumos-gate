@@ -42,7 +42,7 @@ extern "C" {
 #endif
 
 #ifndef QL_VERSION
-#define	QL_VERSION	"20090707-2.37"
+#define	QL_VERSION	"20090924-2.38"
 #endif
 
 #ifndef	QL_NAME

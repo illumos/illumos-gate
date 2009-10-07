@@ -1016,11 +1016,12 @@ typedef struct _EXT_MENLO_ACCESS_PARAMETERS {
 					/* Statistics, Configuration) */
 
 typedef struct _EXT_MENLO_MANAGE_INFO {
-	UINT64				pDataBytes;	/* 4 */
+	UINT64				pDataBytes;	/* 8 */
 	EXT_MENLO_ACCESS_PARAMETERS	Parameters;	/* 12 */
-	UINT32				TotalByteCount;
-	UINT16				Operation;
-	UINT16				Reserved;
+	UINT32				TotalByteCount;	/* 4 */
+	UINT16				Operation;	/* 2 */
+	UINT16				Reserved;	/* 2 */
+	UINT16				Reserved1[2];	/* 4 */
 } EXT_MENLO_MANAGE_INFO, *PEXT_MENLO_MANAGE_INFO;
 
 #define	MENLO_FC_CHECKSUM_FAILURE	0x01

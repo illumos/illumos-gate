@@ -72,6 +72,8 @@ static int ql_23xx_dump_dcmd(ql_adapter_state_t *, uint_t, int,
     const mdb_arg_t *);
 static int ql_25xx_dump_dcmd(ql_adapter_state_t *, uint_t, int,
     const mdb_arg_t *);
+static int ql_81xx_dump_dcmd(ql_adapter_state_t *, uint_t, int,
+    const mdb_arg_t *);
 static void ql_elog_common(ql_adapter_state_t *, boolean_t);
 
 /*
@@ -1814,8 +1816,10 @@ qlc_getdump_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (CFG_IST(ha, CFG_CTRL_2422)) {
 		(void) ql_24xx_dump_dcmd(ha, flags, argc, argv);
-	} else if (CFG_IST(ha, CFG_CTRL_2581))  {
+	} else if (CFG_IST(ha, CFG_CTRL_25XX))  {
 		(void) ql_25xx_dump_dcmd(ha, flags, argc, argv);
+	} else if (CFG_IST(ha, CFG_CTRL_81XX))  {
+		(void) ql_81xx_dump_dcmd(ha, flags, argc, argv);
 	} else {
 		(void) ql_23xx_dump_dcmd(ha, flags, argc, argv);
 	}
@@ -2425,6 +2429,382 @@ ql_25xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
 	uint32_t		cnt = 0;
 
 	fw = (ql_25xx_fw_dump_t *)mdb_alloc(ha->ql_dump_size, UM_SLEEP);
+
+	if (mdb_vread(fw, ha->ql_dump_size,
+	    (uintptr_t)ha->ql_dump_ptr) == -1) {
+		mdb_warn("failed to read ql_dump_ptr (no f/w dump active?)");
+		mdb_free(fw, ha->ql_dump_size);
+		return (DCMD_OK);
+	}
+
+	mdb_printf("\nISP FW Version %d.%02d.%02d Attributes %X\n",
+	    ha->fw_major_version, ha->fw_minor_version,
+	    ha->fw_subminor_version, ha->fw_attributes);
+
+	mdb_printf("\nR2H Register\n%08x\n", fw->r2h_status);
+
+	mdb_printf("\n\nHostRisc Registers");
+	for (cnt = 0; cnt < sizeof (fw->hostrisc_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->hostrisc_reg[cnt]);
+	}
+
+	mdb_printf("\n\nPCIe Registers");
+	for (cnt = 0; cnt < sizeof (fw->pcie_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->pcie_reg[cnt]);
+	}
+
+	mdb_printf("\n\nHost Interface Registers");
+	for (cnt = 0; cnt < sizeof (fw->host_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->host_reg[cnt]);
+	}
+
+	mdb_printf("\n\nShadow Registers");
+	for (cnt = 0; cnt < sizeof (fw->shadow_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+
+		mdb_printf("%08x ", fw->shadow_reg[cnt]);
+	}
+
+	mdb_printf("\n\nMailbox Registers");
+	for (cnt = 0; cnt < sizeof (fw->mailbox_reg) / 2; cnt++) {
+		if (cnt % 16 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%04x ", fw->mailbox_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXSEQ GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->xseq_gp_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xseq_gp_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXSEQ-0 Registers");
+	for (cnt = 0; cnt < sizeof (fw->xseq_0_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xseq_0_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXSEQ-1 Registers");
+	for (cnt = 0; cnt < sizeof (fw->xseq_1_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xseq_1_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRSEQ GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->rseq_gp_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rseq_gp_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRSEQ-0 Registers");
+	for (cnt = 0; cnt < sizeof (fw->rseq_0_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rseq_0_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRSEQ-1 Registers");
+	for (cnt = 0; cnt < sizeof (fw->rseq_1_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rseq_1_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRSEQ-2 Registers");
+	for (cnt = 0; cnt < sizeof (fw->rseq_2_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rseq_2_reg[cnt]);
+	}
+
+	mdb_printf("\n\nASEQ GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->aseq_gp_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->aseq_gp_reg[cnt]);
+	}
+
+	mdb_printf("\n\nASEQ-0 GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->aseq_0_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+
+		mdb_printf("%08x ", fw->aseq_0_reg[cnt]);
+	}
+
+	mdb_printf("\n\nASEQ-1 GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->aseq_1_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+
+		mdb_printf("%08x ", fw->aseq_1_reg[cnt]);
+	}
+
+	mdb_printf("\n\nASEQ-2 GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->aseq_2_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->aseq_2_reg[cnt]);
+	}
+
+	mdb_printf("\n\nCommand DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->cmd_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->cmd_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRequest0 Queue DMA Channel Registers");
+	for (cnt = 0; cnt < sizeof (fw->req0_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->req0_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nResponse0 Queue DMA Channel Registers");
+	for (cnt = 0; cnt < sizeof (fw->resp0_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->resp0_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRequest1 Queue DMA Channel Registers");
+	for (cnt = 0; cnt < sizeof (fw->req1_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->req1_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT0 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt0_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt0_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT1 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt1_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt1_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT2 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt2_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt2_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT3 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt3_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt3_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT4 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt4_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt4_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nXMT Data DMA Common Registers");
+	for (cnt = 0; cnt < sizeof (fw->xmt_data_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->xmt_data_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRCV Thread 0 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->rcvt0_data_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rcvt0_data_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRCV Thread 1 Data DMA Registers");
+	for (cnt = 0; cnt < sizeof (fw->rcvt1_data_dma_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->rcvt1_data_dma_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRISC GP Registers");
+	for (cnt = 0; cnt < sizeof (fw->risc_gp_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->risc_gp_reg[cnt]);
+	}
+
+	mdb_printf("\n\nRISC IO Register\n%08x", fw->risc_io);
+
+	mdb_printf("\n\nLMC Registers");
+	for (cnt = 0; cnt < sizeof (fw->lmc_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->lmc_reg[cnt]);
+	}
+
+	mdb_printf("\n\nFPM Hardware Registers");
+	for (cnt = 0; cnt < sizeof (fw->fpm_hdw_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->fpm_hdw_reg[cnt]);
+	}
+
+	mdb_printf("\n\nFB Hardware Registers");
+	for (cnt = 0; cnt < sizeof (fw->fb_hdw_reg) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n");
+		}
+		mdb_printf("%08x ", fw->fb_hdw_reg[cnt]);
+	}
+
+	mdb_printf("\n\nCode RAM");
+	for (cnt = 0; cnt < sizeof (fw->code_ram) / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n%08x: ", cnt + 0x20000);
+		}
+		mdb_printf("%08x ", fw->code_ram[cnt]);
+	}
+
+	mdb_printf("\n\nExternal Memory");
+	for (cnt = 0; cnt < ha->fw_ext_memory_size / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n%08x: ", cnt + 0x100000);
+		}
+		mdb_printf("%08x ", fw->ext_mem[cnt]);
+	}
+
+	mdb_printf("\n[<==END] ISP Debug Dump");
+
+	mdb_printf("\n\nRequest Queue");
+
+	for (cnt = 0; cnt < REQUEST_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n%08x: ", cnt);
+		}
+		mdb_printf("%08x ", fw->req_q[cnt]);
+	}
+
+	mdb_printf("\n\nResponse Queue");
+
+	for (cnt = 0; cnt < RESPONSE_QUEUE_SIZE / 4; cnt++) {
+		if (cnt % 8 == 0) {
+			mdb_printf("\n%08x: ", cnt);
+		}
+		mdb_printf("%08x ", fw->rsp_q[cnt]);
+	}
+
+	if ((ha->cfg_flags & CFG_ENABLE_FWEXTTRACE) &&
+	    (ha->fwexttracebuf.bp != NULL)) {
+		uint32_t cnt_b = 0;
+		uint32_t *w32 = ha->fwexttracebuf.bp;
+
+		mdb_printf("\n\nExtended Trace Buffer Memory");
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWEXTSIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				mdb_printf("\n%08x: ", w32 + cnt_b);
+			}
+			mdb_printf("%08x ", fw->ext_trace_buf[cnt]);
+		}
+	}
+
+	if ((ha->cfg_flags & CFG_ENABLE_FWFCETRACE) &&
+	    (ha->fwfcetracebuf.bp != NULL)) {
+		uint32_t cnt_b = 0;
+		uint32_t *w32 = ha->fwfcetracebuf.bp;
+
+		mdb_printf("\n\nFC Event Trace Buffer Memory");
+		/* show data address as a byte address, data as long words */
+		for (cnt = 0; cnt < FWFCESIZE / 4; cnt++) {
+			cnt_b = cnt * 4;
+			if (cnt_b % 32 == 0) {
+				mdb_printf("\n%08x: ", w32 + cnt_b);
+			}
+			mdb_printf("%08x ", fw->fce_trace_buf[cnt]);
+		}
+	}
+
+	mdb_free(fw, ha->ql_dump_size);
+
+	mdb_printf("\n\nreturn exit\n");
+
+	return (DCMD_OK);
+}
+
+/*
+ * ql_81xx_dump_dcmd
+ *	prints out a firmware dump buffer
+ *
+ * Input:
+ *	addr  = User supplied address. (NB: nust be an ha)
+ *	flags = mdb flags.
+ *	argc  = Number of user supplied args.
+ *	argv  = Arg array.
+ *
+ * Returns:
+ *	DCMD_OK or DCMD_ERR
+ *
+ * Context:
+ *	User context.
+ *
+ */
+/*ARGSUSED*/
+static int
+ql_81xx_dump_dcmd(ql_adapter_state_t *ha, uint_t flags, int argc,
+    const mdb_arg_t *argv)
+{
+	ql_81xx_fw_dump_t	*fw;
+	uint32_t		cnt = 0;
+
+	fw = (ql_81xx_fw_dump_t *)mdb_alloc(ha->ql_dump_size, UM_SLEEP);
 
 	if (mdb_vread(fw, ha->ql_dump_size,
 	    (uintptr_t)ha->ql_dump_ptr) == -1) {

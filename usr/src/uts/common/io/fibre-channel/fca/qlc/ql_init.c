@@ -71,6 +71,7 @@ static int ql_configure_device_d_id(ql_adapter_state_t *);
 static void ql_set_max_read_req(ql_adapter_state_t *);
 static void ql_configure_n_port_info(ql_adapter_state_t *);
 static void ql_clear_mcp(ql_adapter_state_t *);
+static void ql_mps_reset(ql_adapter_state_t *);
 
 /*
  * ql_initialize_adapter
@@ -2274,6 +2275,10 @@ ql_load_isp_firmware(ql_adapter_state_t *vha)
 	size_t			byte_count;
 	ql_adapter_state_t	*ha = vha->pha;
 
+	if (CFG_IST(ha, CFG_CTRL_81XX)) {
+		ql_mps_reset(ha);
+	}
+
 	if (CFG_IST(ha, CFG_LOAD_FLASH_FW)) {
 		return (ql_load_flash_fw(ha));
 	}
@@ -4224,4 +4229,41 @@ ql_vport_destroy(ql_adapter_state_t *ha)
 	kmem_free(ha, sizeof (ql_adapter_state_t));
 
 	QL_PRINT_10(CE_CONT, "(%d,%d): done\n", ha->instance, ha->vp_index);
+}
+
+/*
+ * ql_mps_reset
+ *	Reset MPS for FCoE functions.
+ *
+ * Input:
+ *	ha = virtual adapter state pointer.
+ *
+ * Context:
+ *	Kernel context.
+ */
+static void
+ql_mps_reset(ql_adapter_state_t *ha)
+{
+	uint32_t	data, dctl = 1000;
+
+	do {
+		if (dctl-- == 0 || ql_wrt_risc_ram_word(ha, 0x7c00, 1) !=
+		    QL_SUCCESS) {
+			return;
+		}
+		if (ql_rd_risc_ram_word(ha, 0x7c00, &data) != QL_SUCCESS) {
+			ql_wrt_risc_ram_word(ha, 0x7c00, 0);
+			return;
+		}
+	} while (!(data & BIT_0));
+
+	if (ql_rd_risc_ram_word(ha, 0x7A15, &data) == QL_SUCCESS) {
+		dctl = (uint16_t)ql_pci_config_get16(ha, 0x54);
+		if ((data & 0xe0) != (dctl & 0xe0)) {
+			data &= 0xff1f;
+			data |= dctl & 0xe0;
+			ql_wrt_risc_ram_word(ha, 0x7A15, data);
+		}
+	}
+	ql_wrt_risc_ram_word(ha, 0x7c00, 0);
 }

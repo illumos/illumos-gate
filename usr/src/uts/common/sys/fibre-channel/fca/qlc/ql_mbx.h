@@ -190,6 +190,7 @@ extern "C" {
 #define	MBC_DUMP_RISC_RAM		0xa	/* Dump RISC RAM command. */
 #define	MBC_LOAD_RAM_EXTENDED		0xb	/* Load RAM extended. */
 #define	MBC_DUMP_RAM_EXTENDED		0xc	/* Dump RAM extended. */
+#define	MBC_WRITE_RAM_EXTENDED		0xd	/* Write RAM word. */
 #define	MBC_READ_RAM_EXTENDED		0xf	/* Read RAM extended. */
 #define	MBC_SERDES_TRANSMIT_PARAMETERS	0x10	/* Serdes Xmit Parameters */
 #define	MBC_2300_EXECUTE_IOCB		0x12	/* ISP2300 Execute IOCB cmd */
@@ -700,6 +701,8 @@ int ql_verify_checksum(ql_adapter_state_t *);
 int ql_get_id_list(ql_adapter_state_t *, caddr_t, uint32_t, ql_mbx_data_t *);
 int ql_wrt_risc_ram(ql_adapter_state_t *, uint32_t, uint64_t, uint32_t);
 int ql_rd_risc_ram(ql_adapter_state_t *, uint32_t, uint64_t, uint32_t);
+int ql_wrt_risc_ram_word(ql_adapter_state_t *, uint32_t, uint32_t);
+int ql_rd_risc_ram_word(ql_adapter_state_t *, uint32_t, uint32_t *);
 int ql_issue_mbx_iocb(ql_adapter_state_t *, caddr_t, uint32_t);
 int ql_mbx_wrap_test(ql_adapter_state_t *, ql_mbx_data_t *);
 int ql_execute_fw(ql_adapter_state_t *);
@@ -748,6 +751,7 @@ int ql_get_dcbx_params(ql_adapter_state_t *, uint32_t, caddr_t);
 	{MBC_DUMP_RISC_RAM, "MBC_DUMP_RISC_RAM"},			\
 	{MBC_LOAD_RAM_EXTENDED, "MBC_LOAD_RAM_EXTENDED"},		\
 	{MBC_DUMP_RAM_EXTENDED, "MBC_DUMP_RAM_EXTENDED"},		\
+	{MBC_WRITE_RAM_EXTENDED, "MBC_WRITE_RAM_EXTENDED"},		\
 	{MBC_READ_RAM_EXTENDED, "MBC_READ_RAM_EXTENDED"},		\
 	{MBC_SERDES_TRANSMIT_PARAMETERS, "MBC_SERDES_TRANSMIT_PARAMETERS"},\
 	{MBC_2300_EXECUTE_IOCB, "MBC_2300_EXECUTE_IOCB"},		\
