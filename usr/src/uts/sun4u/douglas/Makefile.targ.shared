@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	Common targets for sun4u Douglas implementation specific modules.
 #
@@ -35,25 +35,25 @@ IMPLEMENTED_PLATFORM	= TAD,SPARCLE
 # Rules for implementation subdirectories.
 #
 $(ROOT_DOUGLAS_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_DOUGLAS_MOD_DIR): $(ROOT_DOUGLAS_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_DOUGLAS_MISC_DIR_32): $(ROOT_DOUGLAS_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_DOUGLAS_MISC_DIR_64): $(ROOT_DOUGLAS_MISC_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_DOUGLAS_DRV_DIR_32): $(ROOT_DOUGLAS_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_DOUGLAS_DRV_DIR_64): $(ROOT_DOUGLAS_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_DOUGLAS_DIR): $(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_DOUGLAS_INC_DIR): $(USR_DOUGLAS_DIR)
 	-$(INS.slink4)
@@ -62,11 +62,7 @@ $(USR_DOUGLAS_SBIN_DIR): $(USR_DOUGLAS_DIR)
 	-$(INS.slink5)
 
 $(USR_DOUGLAS_LIB_DIR): $(USR_DOUGLAS_DIR)
-	-$(INS.dir.root.bin)
-
-$(USR_DOUGLAS_ISYS_DIR): $(USR_DOUGLAS_INC_DIR)
-	-$(INS.dir.bin.bin)
-
+	-$(INS.dir)
 
 $(ROOT_DOUGLAS_MOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_DOUGLAS_MOD_DIR) FRC
 	$(INS.file)

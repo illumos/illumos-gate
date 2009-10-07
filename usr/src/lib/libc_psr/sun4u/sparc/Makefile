@@ -49,7 +49,7 @@ LIBC_PSR_LINKS	= $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MODULE))
 INS.slink6	= $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@
 
 $(LIBC_PSR_DIRS):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(LIBC_PSR_LINKS): $(LIBC_PSR_DIRS)
 	-$(INS.slink6)

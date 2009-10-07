@@ -67,16 +67,16 @@ clean:
 lint:	lint_SRCS
 
 $(USR_PLAT_DIR):
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_DIR):	$(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_DIR):	$(USR_PSM_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_LIB64_DIR):	$(USR_PSM_LIB_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_LIB64_DIR)/%: % $(USR_PSM_LIB64_DIR)
 	$(INS.file)

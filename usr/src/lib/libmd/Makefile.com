@@ -105,13 +105,13 @@ INS.slink6 = $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@
 INS.slink64 = $(RM) -r $@; $(SYMLINK) ../../../$(PLATFORM)/lib/$(MACH64)/$(MODULE) $@
 
 $(LIBMD_PSR_DIRS):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(LIBMD_PSR_LINKS): $(LIBMD_PSR_DIRS)
 	-$(INS.slink6)
 
 $(LIBMD_PSR64_DIRS):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(LIBMD_PSR64_LINKS): $(LIBMD_PSR64_DIRS)
 	-$(INS.slink64)

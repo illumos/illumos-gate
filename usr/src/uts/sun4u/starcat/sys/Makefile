@@ -69,9 +69,6 @@ check:	$(CHECKHDRS)
 $(USR_STARCAT_ISYS_DIR)/%:	% $(USR_STARCAT_ISYS_DIR)
 	$(INS.file)
 
-$(ROOTDIRS):
-	$(INS.dir.bin.bin)
-
 FRC:
 
 include ../Makefile.targ

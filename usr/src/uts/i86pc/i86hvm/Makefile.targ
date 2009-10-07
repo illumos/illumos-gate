@@ -18,10 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Common targets for i86hvm platform-implementation specific modules.
@@ -33,22 +32,22 @@
 # Rules for implementation subdirectories.
 #
 $(ROOT_HVM_DIR):
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 $(ROOT_HVM_MOD_DIR):		$(ROOT_HVM_DIR)
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 $(ROOT_HVM_DRV_DIR_32):		$(ROOT_HVM_MOD_DIR)
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 $(ROOT_HVM_DRV_DIR_64):		$(ROOT_HVM_DRV_DIR_32)
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 $(ROOT_HVM_MISC_DIR_32):	$(ROOT_HVM_MOD_DIR)
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 $(ROOT_HVM_MISC_DIR_64):	$(ROOT_HVM_MISC_DIR_32)
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 $(ROOT_HVM_MOD_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_MOD_DIR) FRC
 	$(INS.file)
@@ -60,7 +59,7 @@ $(ROOT_HVM_MISC_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_MISC_DIR) FRC
 	$(INS.file)
 
 $(USR_HVM_DIR):
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 #
 #	Include common targets.

@@ -35,9 +35,6 @@ OBJECTS= mema.o mema_prom.o mema_test.o mema_test_config.o mema_test_subr.o \
 # include library definitions
 include $(SRC)/lib/Makefile.lib
 
-INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) $@
-INS.dir.root.bin=	$(INS) -s -d -m $(DIRMODE) $@
-
 USR_PLAT_DIR		= $(ROOT)/usr/platform
 USR_PSM_DIR		= $(USR_PLAT_DIR)/sun4u
 USR_PSM_LIB_DIR		= $(USR_PSM_DIR)/lib
@@ -64,16 +61,16 @@ lint:   lintcheck
 
 # Create target directories
 $(USR_PSM_DIR):		$(LINKED_DIRS)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_DIR):	$(USR_PSM_DIR) $(LINKED_LIB_DIRS)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_CFG_DIR):	$(USR_PSM_LIB_DIR) $(LINKED_CFG_DIRS)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_CFG_DIR_64):	$(USR_PSM_LIB_CFG_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_CFG_DIR)/%: % $(USR_PSM_LIB_CFG_DIR)
 	-$(INS.file)

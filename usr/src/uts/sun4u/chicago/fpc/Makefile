@@ -20,10 +20,10 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	uts/sun4u/chicago/fpc/Makefile
 #
@@ -125,28 +125,28 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 install:	$(INSTALL_DEPS)
 
 $(ROOT_BOSTON_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_BOSTON_MOD_DIR): $(ROOT_BOSTON_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_BOSTON_DRV_DIR_32): $(ROOT_BOSTON_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_BOSTON_DRV_DIR_64): $(ROOT_BOSTON_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_MOD_DIR): $(ROOT_SEATTLE_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_DRV_DIR_32): $(ROOT_SEATTLE_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_DRV_DIR_64): $(ROOT_SEATTLE_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(BOSTON_ROOTMODULE): $(ROOTMODULE) $(ROOT_BOSTON_DRV_DIR_64)
 	$(RM) $@; $(SYMLINK) $(ROOTMODULE_SOFTLINK) $@

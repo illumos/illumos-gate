@@ -85,7 +85,7 @@ LINKED_SBIN_DIRS = $(PLATLINKS:%=$(USR_PLAT_DIR)/%/sbin)
 .PARALLEL: $(OBJS)
 
 $(LINKED_SBIN_DIRS): $(LINKED_DIRS)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 %.o:	common/%.c
 	$(COMPILE.c) -o $@ $<

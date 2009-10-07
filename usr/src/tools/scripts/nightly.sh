@@ -1536,10 +1536,17 @@ else
 	PROTOCMPTERSE="protocmp.terse -gu"
 fi
 POUND_SIGN="#"
+# have we set RELEASE_DATE in our env file?
+if [ -z "$RELEASE_DATE" ]; then
+	RELEASE_DATE=$(LC_ALL=C date +"%B %Y")
+fi
+BUILD_DATE=$(LC_ALL=C date +%Y-%b-%d)
+BASEWSDIR=$(basename $CODEMGR_WS)
+DEV_CM="\"@(#)SunOS Internal Development: $LOGNAME $BUILD_DATE [$BASEWSDIR]\""
 
-# we export POUND_SIGN to speed up the build process -- prevents evaluation of
-# the Makefile.master definitions.
-export o_FLAG X_FLAG POUND_SIGN
+# we export POUND_SIGN, RELEASE_DATE and DEV_CM to speed up the build process
+# by avoiding repeated shell invocations to evaluate Makefile.master definitions.
+export o_FLAG X_FLAG POUND_SIGN RELEASE_DATE DEV_CM
 
 maketype="distributed"
 MAKE=dmake

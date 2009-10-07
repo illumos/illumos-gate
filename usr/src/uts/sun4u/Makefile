@@ -225,7 +225,7 @@ install_h check: install_platforms $(IMPLEMENTATIONS) \
 # here in kernel land.
 #
 $(ROOT_PLAT_DIRS): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 #
 # create directories in /usr/platform/ for the implementations that are
@@ -236,7 +236,7 @@ $(ROOT_PLAT_DIRS): $(ROOT_PLAT_DIR)
 # that are linked to it.
 #
 $(USR_PLAT_DIR)/$(IMPLEMENTED_PLATFORM):	$(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 #
 # create the links in /usr/platform/ foreach $(LINKED_PLATFORMS)
@@ -271,7 +271,7 @@ $(USR_DESKTOP_SBIN_DIR):	$(USR_DESKTOP_DIR)
 	$(INS.slink5)
 
 $(USR_DESKTOP_LIB_DIR):		$(USR_DESKTOP_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 #
 #	Full kernel lint target.

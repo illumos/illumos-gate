@@ -32,9 +32,6 @@ OBJECTS= ap.o ap_msg.o ap_rcm.o ap_sbd.o ap_seq.o cfga.o ap_err.o
 # include library definitions
 include ../../../Makefile.lib
 
-INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) $@
-INS.dir.root.bin=	$(INS) -s -d -m $(DIRMODE) $@
-
 USR_PLAT_DIR		= $(ROOT)/usr/platform
 USR_PSM_DIR		= $(USR_PLAT_DIR)/sun4u
 USR_PSM_LIB_DIR		= $(USR_PSM_DIR)/lib
@@ -67,16 +64,16 @@ lint:   lintcheck
 
 # Create target directories
 $(USR_PSM_DIR):
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_DIR):	$(USR_PSM_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_CFG_DIR):	$(USR_PSM_LIB_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_CFG_DIR_64):	$(USR_PSM_LIB_CFG_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_CFG_DIR)/%: % $(USR_PSM_LIB_CFG_DIR)
 	-$(INS.file)

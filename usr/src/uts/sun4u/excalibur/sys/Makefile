@@ -56,9 +56,6 @@ check:	$(CHECKHDRS)
 $(USR_EXCALIBUR_ISYS_DIR)/%:	% $(USR_EXCALIBUR_ISYS_DIR)
 	$(INS.file)
 
-$(ROOTDIRS):
-	$(INS.dir.bin.bin)
-
 FRC:
 
 include ../Makefile.targ

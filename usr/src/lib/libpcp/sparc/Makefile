@@ -58,13 +58,13 @@ $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 	$(INS.file)
 
 $(USR_PSM_LIB_DIR):
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 $(LINKED_DIRS):   $(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(LINKED_LIB_DIRS):  $(LINKED_DIRS)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(LINKED_LIBPCP_DIR): $(USR_PLAT_DIR)
 	-$(INS.slink7)

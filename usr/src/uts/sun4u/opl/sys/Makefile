@@ -93,9 +93,6 @@ check:	$(CHECKHDRS)
 $(USR_OPL_ISYS_DIR)/%:	% $(USR_OPL_ISYS_DIR)
 	$(INS.file)
 
-$(ROOTDIRS):
-	$(INS.dir.bin.bin)
-
 FRC:
 
 include ../Makefile.targ

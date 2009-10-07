@@ -51,7 +51,7 @@ LIBC_PSR64_LINKS = $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MACH64)/$(MODUL
 INS.slink6	= $(RM) -r $@; $(SYMLINK) ../../../$(PLATFORM)/lib/$(MACH64)/$(MODULE) $@
 
 $(LIBC_PSR64_DIRS):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(LIBC_PSR64_LINKS): $(LIBC_PSR64_DIRS)
 	-$(INS.slink6)

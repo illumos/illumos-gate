@@ -30,25 +30,25 @@
 # Rules for implementation subdirectories.
 #
 $(ROOT_MONTOYA_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MONTOYA_MOD_DIR): $(ROOT_MONTOYA_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MONTOYA_DRV_DIR_32): $(ROOT_MONTOYA_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MONTOYA_DRV_DIR_64): $(ROOT_MONTOYA_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MONTOYA_LIB_DIR): $(ROOT_MONTOYA_DIR)
 	-$(INS.slink2)
 
 $(ROOT_MONTOYA_MISC_DIR_32): $(ROOT_MONTOYA_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MONTOYA_MISC_DIR_64): $(ROOT_MONTOYA_MISC_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MONTOYA_MOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_MONTOYA_MOD_DIR) FRC
 	$(INS.file)
@@ -60,19 +60,19 @@ $(ROOT_MONTOYA_DRV_DIR)/%: $(OBJS_DIR)/% $(ROOT_MONTOYA_DRV_DIR) FRC
 	$(INS.file)
 
 $(USR_MONTOYA_DIR):	$(USR_SUN4V_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_MONTOYA_INC_DIR):	$(USR_MONTOYA_DIR)
 	-$(INS.slink4)
 
 $(USR_MONTOYA_ISYS_DIR):	$(USR_MONTOYA_INC_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_MONTOYA_SBIN_DIR):	$(USR_MONTOYA_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_MONTOYA_LIB_DIR):	$(USR_MONTOYA_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%): $(USR_PLAT_DIR)
 	$(INS.slink3)

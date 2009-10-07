@@ -26,16 +26,7 @@
 #
 # Makefile.psm, global definitions for platform specific modules
 
-#
-# The distinction between root.sys and root.bin is largely historical;
-# the files in group bin used to be owned by user bin.
-#
-INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) $@
-INS.dir.root.bin=	$(INS) -s -d -m $(DIRMODE) $@
 
-#
-#
-#
 ROOT_PLAT_DIR		 = $(ROOT)/platform
 
 ROOT_PSM_DIR		 = $(ROOT_PLAT_DIR)/$(PLATFORM)

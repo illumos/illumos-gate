@@ -54,12 +54,18 @@ ROOT=		/proto
 #
 # The declaration POUND_SIGN is always '#'. This is needed to get around the
 # make feature that '#' is always a comment delimiter, even when escaped or
-# quoted.  The only way of generating this is the :sh macro mechanism.  Note
-# however that in general :sh macros should be avoided in makefiles that are
-# widely included into other makefiles, as the resulting shell executions can
-# cause a noticable slowdown in build times.
+# quoted. We use this macro expansion method to get POUND_SIGN rather than
+# always breaking out a shell because the general case can cause a noticable
+# slowdown in build times when so many Makefiles include Makefile.master.
 #
-POUND_SIGN:sh=				echo \\043
+# While the majority of users are expected to override the setting below
+# with an env file (via nightly or bldenv), if you aren't building that way
+# (ie, you're using "ws" or some other bootstrapping method) then you need
+# this definition in order to avoid the subshell invocation mentioned above.
+#
+
+PRE_POUND=				pre\#
+POUND_SIGN=				$(PRE_POUND:pre\%=%)
 
 NOT_RELEASE_BUILD=
 INTERNAL_RELEASE_BUILD=			$(POUND_SIGN)
@@ -885,11 +891,10 @@ RELEASE_MINOR=	11
 RELEASE=	$(RELEASE_MAJOR).$(RELEASE_MINOR)
 VERSION=	SunOS Development
 PATCHID=	$(VERSION)
-RELEASE_DATE=	October 2007
+RELEASE_DATE=	release date not set
 PATCH_DATE=	$(RELEASE_DATE)
 RELEASE_CM=	"@($(POUND_SIGN))SunOS $(RELEASE) $(PATCHID) $(PATCH_DATE)"
-DEV_CM=		"@($(POUND_SIGN))SunOS Internal Development: \
-`$(ECHO) $$LOGNAME` `date +%Y-%m-%d` `$(ECHO) [\`basename $$CODEMGR_WS\`]`"
+DEV_CM=		"@($(POUND_SIGN))SunOS Internal Development: non-nightly build"
 
 PROCESS_COMMENT=		   @?${MCS} -c -a $(RELEASE_CM) -a $(DEV_CM)
 $(STRIP_COMMENTS)PROCESS_COMMENT=  @?${MCS} -d -a $(RELEASE_CM) -a $(DEV_CM)

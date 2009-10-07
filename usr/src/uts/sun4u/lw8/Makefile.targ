@@ -20,10 +20,10 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	Common targets for sun4u LW8 implementation specific modules.
 #
@@ -34,43 +34,43 @@
 # Rules for implementation subdirectories.
 #
 $(ROOT_LW8_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW8_MOD_DIR): $(ROOT_LW8_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW8_DRV_DIR_32): $(ROOT_LW8_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW8_DRV_DIR_64): $(ROOT_LW8_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW8_MISC_DIR_32): $(ROOT_LW8_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW8_MISC_DIR_64): $(ROOT_LW8_MISC_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW8_CRYPTO_DIR_32): $(ROOT_LW8_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW8_CRYPTO_DIR_64): $(ROOT_LW8_CRYPTO_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_LW8_DIR): $(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_LW8_INC_DIR): $(USR_LW8_DIR)
 	$(INS.slink4)
 
 $(USR_LW8_ISYS_DIR): $(USR_LW8_INC_DIR)
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 $(USR_LW8_SBIN_DIR): $(USR_LW8_DIR)
 	$(INS.slink5)
 
 $(USR_LW8_LIB_DIR): $(USR_LW8_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(ROOT_LW8_DRV_DIR)/%: $(OBJS_DIR)/% $(ROOT_LW8_DRV_DIR) FRC
 	$(INS.file)

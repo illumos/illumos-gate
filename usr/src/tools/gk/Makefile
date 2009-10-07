@@ -27,16 +27,22 @@ GKFILES= \
 	cshrc \
 	login
 
+SHFILES = gen_make.machines
+ROOTONBLDGKSHFILES = $(SHFILES)
+
+CLEANFILES += $(GKFILES) $(SHFILES)
 
 include ../Makefile.tools
 
-FILEMODE=	644
-
 .KEEP_STATE:
 
-all:	$(GKFILES)
+FILEMODE = 0644
+$(ROOTONBLDGKSHFILES):= FILEMODE= 755
 
-install: all .WAIT $(ROOTONBLDGKFILES)
+all:	$(GKFILES) $(SHFILES)
+
+install: all .WAIT $(ROOTONBLDGKFILES) \
+	$(ROOTONBLDGKSHFILES)
 
 clean:
 	$(RM) $(CLEANFILES)

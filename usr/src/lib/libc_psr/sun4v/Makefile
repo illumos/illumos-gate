@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/lib/Makefile.lib
@@ -40,13 +38,13 @@ TOUCH		= /usr/bin/touch
 MODULE		= libc_psr.so.1
 
 $(ROOT_PSM_LIB_DIR):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(ROOT_PSM_LIB_DIR)/$(MODULE):	$(ROOT_PSM_LIB_DIR) $(MODULE)
 	$(RM) -r $@; $(INS) -s -m $(FILEMODE) -f $(@D) $(MODULE)
 
 $(ROOT_PSM_LIB64_DIR):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(ROOT_PSM_LIB64_DIR)/$(MODULE):	$(ROOT_PSM_LIB64_DIR) $(MODULE)
 	$(RM) -r $@; $(INS) -s -m $(FILEMODE) -f $(@D) $(MODULE)

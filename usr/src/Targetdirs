@@ -24,43 +24,52 @@
 #
 
 #
-# The list is built of owner-group combinations.  ROOT.SYS occurs twice
-# because some directories owned by root and in group sys are subdirectories
-# of directories having other owner-group attributes.
-#
 # It is easier to think in terms of directory names without the ROOT macro
 # prefix.  ROOTDIRS is TARGETDIRS with ROOT prefixes.  It is necessary
 # to work with ROOT prefixes when controlling conditional assignments.
 #
-# The macro SYM.ROOT.SYS means symlinks with owner root and group sys.
 
-SYMLINKS=	$(SYM.ROOT.SYS) $(SYM.ROOT.BIN) $(SYM.OTHERS)
+DIRLINKS=	$(SYM.DIRS)
+$(BUILD64)	DIRLINKS += $(SYM.DIRS64)
 
-TARGETDIRS=	$(ROOT.SYS) $(ROOT.BIN) $(ROOT.SYS2) \
-		$(UUCP.UUCP) $(OTHERS) $(ROOT.OTHER) \
-		$(SYM.USRCCSLIB) $(SYM.USRLIB)
+FILELINKS= $(SYM.USRCCSLIB) $(SYM.USRLIB)
+$(BUILD64)	FILELINKS += $(SYM.USRCCSLIB64) $(SYM.USRLIB64)
 
-$(BUILD64)	TARGETDIRS += $(ROOT.SYS64.2) $(ROOT.BIN64) \
-		$(SYM.USRCCSLIB64) $(SYM.USRLIB64)
+TARGETDIRS=	$(DIRS)
+$(BUILD64)	TARGETDIRS += $(DIRS64)
 
-$(BUILD64)	SYMLINKS += $(SYM.ROOT.BIN64)
+TARGETDIRS	+= $(FILELINKS) $(DIRLINKS)
 
-TARGETDIRS	+= $(SYMLINKS)
-
-i386_ROOT.SYS= \
+i386_DIRS= \
 	/boot/acpi \
 	/boot/acpi/tables \
 	/boot/grub \
 	/boot/grub/bin \
-	/platform/i86pc
+	/platform/i86pc \
+	/usr/lib/brand/lx \
+	/usr/lib/brand/lx/amd64 \
+	/usr/lib/brand/lx/distros \
+	/usr/lib/xen \
+	/usr/lib/xen/bin
 
-sparc_ROOT.SYS=
+sparc_DIRS= \
+	/usr/lib/ldoms
 
-ROOT.SYS= \
+# EXPORT DELETE START
+XDIRS= \
+	/usr/lib/inet/wanboot
+# EXPORT DELETE END
+
+sparc_64ONLY= $(POUND_SIGN)
+64ONLY=  $($(MACH)_64ONLY)
+
+$(64ONLY) MACH32_DIRS=/usr/ucb/$(MACH32)
+
+DIRS= \
 	/boot \
 	/boot/solaris \
 	/boot/solaris/bin \
-	$($(MACH)_ROOT.SYS) \
+	$($(MACH)_DIRS) \
 	/dev \
 	/dev/dsk \
 	/dev/fd \
@@ -71,6 +80,7 @@ ROOT.SYS= \
 	/dev/pts \
 	/dev/sad \
 	/dev/swap \
+	/dev/term \
 	/dev/vt \
 	/dev/zcons \
 	/devices \
@@ -83,10 +93,13 @@ ROOT.SYS= \
 	/etc/crypto \
 	/etc/crypto/certs \
 	/etc/crypto/crls \
+	/etc/dbus-1 \
+	/etc/dbus-1/system.d \
 	/etc/default \
 	/etc/devices  \
 	/etc/dev  \
 	/etc/dfs  \
+	/etc/dladm \
 	/etc/fs  \
 	/etc/fs/nfs  \
 	/etc/fs/zfs \
@@ -113,12 +126,24 @@ ROOT.SYS= \
 	/etc/init.d  \
 	/etc/dhcp	\
 	/etc/lib  \
+	/etc/mail  \
+	/etc/mail/cf  \
+	/etc/mail/cf/cf  \
+	/etc/mail/cf/domain  \
+	/etc/mail/cf/feature  \
+	/etc/mail/cf/m4  \
+	/etc/mail/cf/mailer  \
+	/etc/mail/cf/ostype  \
+	/etc/mail/cf/sh  \
+	/etc/net-snmp \
+	/etc/net-snmp/snmp \
 	/etc/opt  \
 	/etc/rc0.d  \
 	/etc/rc1.d  \
 	/etc/rc2.d  \
 	/etc/rc3.d  \
 	/etc/rcS.d  \
+	/etc/saf \
 	/etc/sasl	\
 	/etc/sfw \
 	/etc/svc \
@@ -129,98 +154,6 @@ ROOT.SYS= \
 	/etc/zones  \
 	/export  \
 	/home  \
-	/kernel  \
-	/mnt  \
-	/opt  \
-	/platform  \
-	/proc  \
-	/root  \
-	/sbin  \
-	/system \
-	/system/contract \
-	/system/object \
-	/usr  \
-	/usr/kernel  \
-	/usr/platform  \
-	/usr/share  \
-	/var  \
-	/var/adm  \
-	/var/adm/pool \
-	/var/adm/sm.bin \
-	/var/adm/streams \
-	/var/cores \
-	/var/cron \
-	/var/db \
-	/var/db/ipf \
-	/var/krb5 \
-	/var/krb5/rcache  \
-	/var/krb5/rcache/root  \
-	/var/log \
-	/var/log/pool \
-	/var/sadm \
-	/var/sadm/pkg \
-	/var/sadm/security \
-	/var/opt \
-	/var/run \
-	/var/smb \
-	/var/svc \
-	/var/svc/log \
-	/var/svc/manifest \
-	/var/svc/manifest/milestone \
-	/var/svc/manifest/device \
-	/var/svc/manifest/system \
-	/var/svc/manifest/system/device \
-	/var/svc/manifest/system/filesystem \
-	/var/svc/manifest/system/security \
-	/var/svc/manifest/system/svc \
-	/var/svc/manifest/network \
-	/var/svc/manifest/network/dns \
-  	/var/svc/manifest/network/ipsec \
-	/var/svc/manifest/network/ldap \
-	/var/svc/manifest/network/nfs \
-	/var/svc/manifest/network/nis \
-	/var/svc/manifest/network/rpc \
-	/var/svc/manifest/network/security \
-	/var/svc/manifest/network/shares \
-	/var/svc/manifest/network/ssl \
-	/var/svc/manifest/application \
-	/var/svc/manifest/application/management \
-	/var/svc/manifest/application/security \
-	/var/svc/manifest/application/print \
-	/var/svc/manifest/platform \
-	/var/svc/manifest/platform/sun4u \
-	/var/svc/manifest/platform/sun4v \
-	/var/svc/manifest/site \
-	/var/svc/profile \
-	/var/tsol \
-	/var/tsol/doors
-
-# EXPORT DELETE START
-XROOT.BIN= \
-	/usr/lib/inet/wanboot
-# EXPORT DELETE END
-
-i386_ROOT.BIN= \
-	/usr/lib/brand/lx \
-	/usr/lib/brand/lx/amd64 \
-	/usr/lib/brand/lx/distros \
-	/usr/lib/xen \
-	/usr/lib/xen/bin
-
-sparc_ROOT.BIN= \
-	/usr/lib/ldoms
-
-sparc_64ONLY= $(POUND_SIGN)
-64ONLY=  $($(MACH)_64ONLY)
-
-$(64ONLY) MACH32_ROOT.UCB=/usr/ucb/$(MACH32)
-ROOT.BIN= \
-	$($(MACH)_ROOT.BIN) \
-	/etc/dbus-1 \
-	/etc/dbus-1/system.d \
-	/etc/saf \
-	/etc/net-snmp \
-	/etc/net-snmp/snmp \
 	/lib \
 	/lib/crypto \
 	/lib/inet \
@@ -232,6 +165,18 @@ ROOT.BIN= \
 	/lib/svc/monitor \
 	/lib/svc/seed \
 	/lib/svc/share \
+	/kernel  \
+	/mnt  \
+	/opt  \
+	/platform  \
+	/proc  \
+	/root  \
+	/sbin  \
+	/system \
+	/system/contract \
+	/system/object \
+	/tmp \
+	/usr  \
 	/usr/4lib \
 	/usr/ast \
 	/usr/ast/bin \
@@ -245,7 +190,6 @@ ROOT.BIN= \
 	/usr/games \
 	/usr/include \
 	/usr/include/ast \
-	/usr/include/sys/crypto \
 	/usr/include/fm \
 	/usr/include/gssapi \
 	/usr/include/hal \
@@ -255,7 +199,9 @@ ROOT.BIN= \
 	/usr/include/sasl \
 	/usr/include/scsi \
 	/usr/include/security \
+	/usr/include/sys/crypto \
 	/usr/include/tsol \
+	/usr/kernel  \
 	/usr/kvm \
 	/usr/lib \
 	/usr/lib/abi \
@@ -272,17 +218,22 @@ ROOT.BIN= \
 	/usr/lib/crypto \
 	/usr/lib/drv \
 	/usr/lib/elfedit \
+	/usr/lib/fm \
 	/usr/lib/font \
+	/usr/lib/fs \
+	/usr/lib/fs/nfs \
+	/usr/lib/fs/proc \
+	/usr/lib/fs/smb \
+	/usr/lib/fs/zfs \
+	/usr/lib/gss \
+	/usr/lib/hal \
 	/usr/lib/inet \
 	/usr/lib/inet/dhcp \
 	/usr/lib/inet/dhcp/nsu \
 	/usr/lib/inet/dhcp/svc \
 	/usr/lib/inet/dhcp/svcadm \
 	/usr/lib/inet/$(MACH32) \
-	$(XROOT.BIN) \
-	/usr/lib/fm    \
-	/usr/lib/gss    \
-	/usr/lib/hal \
+	$(XDIRS) \
 	/usr/lib/krb5 \
 	/usr/lib/link_audit \
 	/usr/lib/libp \
@@ -290,12 +241,20 @@ ROOT.BIN= \
 	/usr/lib/localedef/extensions \
 	/usr/lib/localedef/src \
 	/usr/lib/lwp \
+	/usr/lib/mdb \
+	/usr/lib/mdb/kvm \
+	/usr/lib/mdb/proc \
+	/usr/lib/mdb/disasm \
+	/usr/lib/nfs \
+	/usr/net \
+	/usr/net/servers \
 	/usr/lib/pool \
 	/usr/lib/python2.4 \
 	/usr/lib/python2.4/vendor-packages \
 	/usr/lib/python2.4/vendor-packages/zfs \
 	/usr/lib/rcap \
 	/usr/lib/rcap/$(MACH32) \
+	/usr/lib/sa  \
 	/usr/lib/saf \
 	/usr/lib/sasl \
 	/usr/lib/scsi \
@@ -307,6 +266,7 @@ ROOT.BIN= \
 	/usr/lib/zones \
 	/usr/old \
 	/usr/openwin \
+	/usr/platform  \
 	/usr/proc \
 	/usr/proc/bin \
 	/usr/sadm \
@@ -315,18 +275,29 @@ ROOT.BIN= \
 	/usr/sadm/install/scripts \
 	/usr/sadm/sysadm \
 	/usr/sadm/sysadm/add-ons \
-	/usr/snadm \
-	/usr/snadm/lib \
 	/usr/sbin \
 	/usr/sbin/$(MACH32) \
+	/usr/share  \
+	/usr/share/applications \
 	/usr/share/audio \
 	/usr/share/audio/samples \
 	/usr/share/audio/samples/au \
+	/usr/share/gnome \
 	/usr/share/gnome/autostart \
+	/usr/share/hwdata \
+	/usr/share/lib \
+	/usr/share/lib/ccs \
+	/usr/share/lib/tmac  \
+	/usr/share/lib/ldif  \
+	/usr/share/lib/xml \
+	/usr/share/lib/xml/dtd \
 	/usr/share/man \
 	/usr/share/man/man1m \
+	/usr/share/src \
+	/usr/snadm \
+	/usr/snadm/lib \
 	/usr/ucb \
-	$(MACH32_ROOT.UCB) \
+	$(MACH32_DIRS) \
 	/usr/ucblib \
 	/usr/xpg4 \
 	/usr/xpg4/bin \
@@ -334,20 +305,86 @@ ROOT.BIN= \
 	/usr/xpg4/lib \
 	/usr/xpg6 \
 	/usr/xpg6/bin \
+	/var  \
+	/var/adm  \
+	/var/adm/exacct \
+	/var/adm/log \
+	/var/adm/pool \
+	/var/adm/sa \
+	/var/adm/sm.bin \
+	/var/adm/streams \
+	/var/cores \
+	/var/cron \
+	/var/db \
+	/var/db/ipf \
 	/var/games \
+	/var/idmap \
+	/var/krb5 \
+	/var/krb5/rcache  \
+	/var/krb5/rcache/root  \
 	/var/ld \
+	/var/log \
+	/var/log/pool \
+	/var/mail \
 	/var/news \
+	/var/opt \
 	/var/preserve \
+	/var/run \
 	/var/saf \
+	/var/sadm \
 	/var/sadm/install \
 	/var/sadm/install/admin \
 	/var/sadm/install/logs \
+	/var/sadm/pkg \
+	/var/sadm/security \
+	/var/smb \
 	/var/spool \
-	/var/spool/pkg
+	/var/spool/cron \
+	/var/spool/cron/atjobs \
+	/var/spool/cron/crontabs \
+	/var/spool/lp \
+	/var/spool/pkg \
+	/var/spool/uucp \
+	/var/spool/uucppublic \
+	/var/svc \
+	/var/svc/log \
+	/var/svc/manifest \
+	/var/svc/manifest/milestone \
+	/var/svc/manifest/device \
+	/var/svc/manifest/system \
+	/var/svc/manifest/system/device \
+	/var/svc/manifest/system/filesystem \
+	/var/svc/manifest/system/security \
+	/var/svc/manifest/system/svc \
+	/var/svc/manifest/network \
+	/var/svc/manifest/network/dns \
+	/var/svc/manifest/network/ipsec \
+	/var/svc/manifest/network/ldap \
+	/var/svc/manifest/network/nfs \
+	/var/svc/manifest/network/nis \
+	/var/svc/manifest/network/rpc \
+	/var/svc/manifest/network/security \
+	/var/svc/manifest/network/shares \
+	/var/svc/manifest/network/ssl \
+	/var/svc/manifest/application \
+	/var/svc/manifest/application/management \
+	/var/svc/manifest/application/security \
+	/var/svc/manifest/application/print \
+	/var/svc/manifest/platform \
+	/var/svc/manifest/platform/sun4u \
+	/var/svc/manifest/platform/sun4v \
+	/var/svc/manifest/site \
+	/var/svc/profile \
+	/var/uucp \
+	/var/tmp \
+	/var/tsol \
+	/var/tsol/doors
 
-sparcv9_ROOT.BIN64= \
+sparcv9_DIRS64= \
+	/platform/sun4u \
 	/platform/sun4u/lib \
 	/platform/sun4u/lib/$(MACH64) \
+	/usr/platform/sun4u \
 	/usr/platform/sun4u/sbin \
 	/usr/platform/sun4u/lib \
 	/platform/sun4v/lib \
@@ -357,11 +394,11 @@ sparcv9_ROOT.BIN64= \
 	/usr/platform/sun4u-us3/lib \
 	/usr/platform/sun4u-opl/lib
 
-amd64_ROOT.BIN64= \
+amd64_DIRS64= \
 	/platform/i86pc/amd64
 
-ROOT.BIN64= \
-	$($(MACH64)_ROOT.BIN64) \
+DIRS64= \
+	$($(MACH64)_DIRS64) \
 	/lib/$(MACH64) \
 	/lib/crypto/$(MACH64) \
 	/lib/secure/$(MACH64) \
@@ -373,11 +410,15 @@ ROOT.BIN64= \
 	/usr/lib/brand/sn1/$(MACH64) \
 	/usr/lib/elfedit/$(MACH64) \
 	/usr/lib/fm/$(MACH64) \
+	/usr/lib/fs/nfs/$(MACH64) \
+	/usr/lib/fs/smb/$(MACH64) \
 	/usr/lib/inet/$(MACH64) \
 	/usr/lib/krb5/$(MACH64) \
 	/usr/lib/libp/$(MACH64) \
 	/usr/lib/link_audit/$(MACH64) \
 	/usr/lib/lwp/$(MACH64) \
+	/usr/lib/mdb/kvm/$(MACH64) \
+	/usr/lib/mdb/proc/$(MACH64) \
 	/usr/lib/rcap/$(MACH64) \
 	/usr/lib/sasl/$(MACH64) \
 	/usr/lib/scsi/$(MACH64) \
@@ -391,120 +432,50 @@ ROOT.BIN64= \
 	/usr/xpg4/lib/$(MACH64) \
 	/var/ld/$(MACH64)
 
-ROOT.OTHER= \
-	/usr/share/applications \
-	/usr/share/gnome
-
-ROOT.SYS2= \
-	/usr/lib/fs \
-	/usr/lib/fs/nfs \
-	/usr/lib/fs/proc \
-	/usr/lib/fs/smb \
-	/usr/lib/fs/zfs \
-	/usr/lib/mdb \
-	/usr/lib/mdb/kvm \
-	/usr/lib/mdb/proc \
-	/usr/lib/mdb/disasm \
-	/usr/lib/nfs \
-	/usr/net \
-	/usr/net/servers \
-	/usr/share/hwdata \
-	/usr/share/lib \
-	/usr/share/lib/xml \
-	/usr/share/lib/xml/dtd \
-	/usr/share/src \
-	/var/spool/cron \
-	/var/spool/cron/atjobs \
-	/var/spool/cron/crontabs
-
-sparcv9_ROOT.SYS64.2 = \
-	/platform/sun4u \
-	/usr/platform/sun4u
-
-amd64_ROOT.SYS64.2 =
-
-ROOT.SYS64.2 = \
-	$($(MACH64)_ROOT.SYS64.2) \
-	/usr/lib/mdb/kvm/$(MACH64) \
-	/usr/lib/mdb/proc/$(MACH64) \
-	/usr/lib/fs/nfs/$(MACH64) \
-	/usr/lib/fs/smb/$(MACH64)
-
-UUCP.UUCP= \
-	/var/spool/uucp \
-	/var/spool/uucppublic \
-	/var/uucp
-
-OTHERS=  \
-	/dev/term  \
-	/tmp  \
-	/etc/dladm \
-	/etc/mail  \
-	/etc/mail/cf  \
-	/etc/mail/cf/cf  \
-	/etc/mail/cf/domain  \
-	/etc/mail/cf/feature  \
-	/etc/mail/cf/m4  \
-	/etc/mail/cf/mailer  \
-	/etc/mail/cf/ostype  \
-	/etc/mail/cf/sh  \
-	/usr/lib/sa  \
-	/usr/share/lib/ccs \
-	/usr/share/lib/tmac  \
-	/usr/share/lib/ldif  \
-	/var/adm/exacct \
-	/var/adm/log \
-	/var/adm/sa \
-	/var/idmap \
-	/var/mail \
-	/var/spool/lp \
-	/var/tmp
-
 # /var/mail/:saved is built directly by the rootdirs target in
 # /usr/src/Makefile because of the colon in its name.
 
 # macros for symbolic links
-
-SYM.ROOT.SYS= \
+SYM.DIRS= \
+	/bin \
 	/dev/stdin \
 	/dev/stdout \
 	/dev/stderr \
-	/usr/adm \
-	/usr/lib/cron \
-	/usr/man \
-	/usr/pub
-
-SYM.ROOT.BIN= \
-	/bin \
-	/lib/32 \
-	/lib/crypto/32 \
-	/lib/secure/32 \
 	/etc/lib/ld.so.1 \
 	/etc/lib/libdl.so.1 \
 	/etc/lib/nss_files.so.1 \
+	/etc/log \
+	/lib/32 \
+	/lib/crypto/32 \
+	/lib/secure/32 \
+	/usr/adm \
 	/usr/spool \
 	/usr/lib/tmac \
 	/usr/ccs/lib/link_audit \
 	/usr/news \
 	/usr/preserve \
-	/usr/src \
 	/usr/lib/32 \
+	/usr/lib/cron \
 	/usr/lib/elfedit/32 \
 	/usr/lib/libp/32 \
 	/usr/lib/lwp/32 \
 	/usr/lib/link_audit/32 \
 	/usr/lib/secure/32 \
-	/var/ld/32 \
-	/usr/ucblib/32
+	/usr/mail \
+	/usr/man \
+	/usr/pub \
+	/usr/src \
+	/usr/tmp \
+	/usr/ucblib/32 \
+	/var/ld/32
 
-
-i386_SYM.ROOT.BIN64= \
+i386_SYM.DIRS64= \
 	/usr/lib/brand/lx/64
 
-sparc_SYM.ROOT.BIN64=
+sparc_SYM.DIRS64=
 
-SYM.ROOT.BIN64= \
-	$($(MACH)_SYM.ROOT.BIN64) \
+SYM.DIRS64= \
+	$($(MACH)_SYM.DIRS64) \
 	/lib/64 \
 	/lib/crypto/64 \
 	/lib/secure/64 \
@@ -520,11 +491,6 @@ SYM.ROOT.BIN64= \
 	/var/ld/64 \
 	/usr/ucblib/64
 
-SYM.OTHERS=  \
-	/etc/log  \
-	/usr/mail  \
-	/usr/tmp
-
 # prepend the ROOT prefix
 
 ROOTDIRS=	$(TARGETDIRS:%=$(ROOT)%)
@@ -536,62 +502,12 @@ ROOTDIRS=	$(TARGETDIRS:%=$(ROOT)%)
 # default values assigned.  If a directory is mentioned above and not
 # mentioned below, it has default values for attributes.
 #
-# The default values for OWNER, GROUP, and DIRMODE are specified in
-# /usr/src/Makefile.master.
+# The default value for DIRMODE is specified in usr/src/Makefile.master.
 #
-
-$(ROOT)/tmp \
-$(ROOT)/usr/tmp \
-$(ROOT)/var/tmp \
-$(ROOT)/var/adm/sa \
-$(ROOT.SYS:%=$(ROOT)%) \
-$(ROOT.SYS2:%=$(ROOT)%) \
-$(ROOT.SYS64.2:%=$(ROOT)%) \
-$(SYM.ROOT.SYS:%=$(ROOT)%):=	GROUP= sys
-
-$(ROOT.OTHER:%=$(ROOT)%):=	GROUP= other
 
 $(ROOT)/var/adm \
 $(ROOT)/var/adm/sa :=		DIRMODE= 775
 
-$(ROOT)/var/idmap :=		OWNER= daemon
-$(ROOT)/var/idmap :=		GROUP= daemon
-
-$(ROOT)/root:=			GROUP= root
-
-$(ROOT)/dev/term:=		GROUP= root
-
-$(UUCP.UUCP:%=$(ROOT)%):=	OWNER= uucp
-$(UUCP.UUCP:%=$(ROOT)%):=	GROUP= uucp
-
-$(ROOT)/etc/log \
-$(ROOT)/usr/lib/sa \
-$(ROOT)/var/adm/exacct \
-$(ROOT)/var/adm/log \
-$(ROOT)/var/adm/sa:=		OWNER= adm
-
-$(ROOT)/etc/log \
-$(ROOT)/var/adm/exacct \
-$(ROOT)/var/adm/log:=	GROUP= adm
-
-$(ROOT)/etc/mail \
-$(ROOT)/etc/mail/cf \
-$(ROOT)/etc/mail/cf/cf \
-$(ROOT)/etc/mail/cf/domain \
-$(ROOT)/etc/mail/cf/feature \
-$(ROOT)/etc/mail/cf/m4 \
-$(ROOT)/etc/mail/cf/mailer \
-$(ROOT)/etc/mail/cf/ostype \
-$(ROOT)/etc/mail/cf/sh \
-$(ROOT)/usr/mail \
-$(ROOT)/var/mail  :=	GROUP= mail
-
-
-$(ROOT)/etc/dladm :=		OWNER= dladm
-$(ROOT)/etc/dladm :=		GROUP= sys
-
-$(ROOT)/var/spool/lp:=		OWNER= lp
-$(ROOT)/var/spool/lp:=		GROUP= lp
 $(ROOT)/var/spool/lp:=		DIRMODE= 775
 
 # file mode
@@ -624,12 +540,8 @@ $(ROOT)/var/sadm/install/logs :=	DIRMODE= 555
 $(ROOT)/dev/fd \
 $(ROOT)/home:=		DIRMODE= 555
 
-$(ROOT)/dev/fd \
-$(ROOT)/home:=		GROUP= root
-
 $(ROOT)/var/mail:=	DIRMODE=1777
 
-$(ROOT)/proc:=		GROUP= root
 $(ROOT)/proc:=		DIRMODE= 555
 
 $(ROOT)/system/contract:=	DIRMODE= 555
@@ -686,10 +598,11 @@ $(BUILD64) $(ROOT)/usr/xpg4/lib/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/var/ld/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/ucblib/64:=	LINKDEST=$(MACH64)
 
+#
 # Installing a directory symlink calls for overriding INS.dir to install
 # a symlink.
 #
-$(SYMLINKS:%=$(ROOT)%):= \
+$(DIRLINKS:%=$(ROOT)%):= \
    INS.dir= -$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@
 
 # Special symlinks to populate usr/ccs/lib, whose objects
@@ -855,13 +768,6 @@ SYM.USRCCSLIB64= \
 	/usr/lib/libp/$(MACH64)/libc.so.1 \
 	/usr/lib/lwp/$(MACH64)/libthread.so.1 \
 	/usr/lib/lwp/$(MACH64)/libthread_db.so.1
-
-
-$(SYM.USRCCSLIB:%=$(ROOT)%):= \
-    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@
-
-$(SYM.USRCCSLIB64:%=$(ROOT)%):= \
-    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@
 
 # Special symlinks to direct libraries that have been moved
 # from /usr/lib to /lib in order to live in the root filesystem.
@@ -1892,9 +1798,9 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/nss_nisplus.so.1 \
 	/usr/lib/$(MACH64)/nss_user.so.1
 
-$(SYM.USRLIB:%=$(ROOT)%):= \
+#
+# usr/src/Makefile uses INS.dir for any member of ROOTDIRS, the fact
+# these are symlinks to files has no bearing on this.
+#
+$(FILELINKS:%=$(ROOT)%):= \
     INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@
-
-$(SYM.USRLIB64:%=$(ROOT)%):= \
-    INS.dir= -$(RM) $@; $(SYMLINK) $(REALPATH) $@
-

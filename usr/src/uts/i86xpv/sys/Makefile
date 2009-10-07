@@ -60,7 +60,7 @@ install_h:	$(ROOTDIRS) .WAIT $(ROOTHDRS) $(ROOTLINK)
 check:		$(CHECKHDRS)
 
 $(ROOTDIRS):
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 $(ROOTLINK):	$(ROOTDIRS)
 	-$(RM) -r $@; $(SYMLINK) $(LINKDEST) $@

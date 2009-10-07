@@ -54,13 +54,13 @@ all install: lib32 $(BUILD64) lib64 $(LIBC_PSR_LINKS) $(LIBC_PSR64_LINKS)
 clean clobber: lib32 $(BUILD64) lib64
 
 $(LIBC_PSR_DIRS):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(LIBC_PSR_LINKS): $(LIBC_PSR_DIRS)
 	-$(INS.slink6)
 
 $(LIBC_PSR64_DIRS):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(LIBC_PSR64_LINKS): $(LIBC_PSR64_DIRS)
 	-$(INS.slink7)

@@ -21,10 +21,10 @@
 #
 # uts/sun4u/aes/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #	This makefile drives the production of the aes kernel module.
 #
@@ -114,13 +114,13 @@ install:	$(INSTALL_DEPS)
 include $(UTSBASE)/sun4u/Makefile.targ
 
 $(ROOT_US3_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_US3_MOD_DIR): $(ROOT_US3_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_US3_CRYPTO_DIR): $(ROOT_US3_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_US3_CRYPTO_DIR)/%: $(OBJS_DIR)/% $(ROOT_US3_CRYPTO_DIR)
 	-$(INS.file)

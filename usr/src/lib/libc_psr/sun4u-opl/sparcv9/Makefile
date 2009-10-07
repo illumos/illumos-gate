@@ -19,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 
 #
 # Platform specific Makefile for libc_psr.
@@ -56,7 +55,7 @@ LIBC_PSR64_DIR = $(ROOT_PSM_LIB_DIR)/$(MACH64)
 LIBC_PSR64_LIB  = $(LIBC_PSR64_DIR)/$(MODULE)
 
 $(LIBC_PSR64_DIRS):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 all:		$(LIBS)
 

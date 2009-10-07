@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -35,43 +33,43 @@
 # Rules for implementation subdirectories.
 #
 $(ROOT_LW2PLUS_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW2PLUS_MOD_DIR): $(ROOT_LW2PLUS_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW2PLUS_DRV_DIR_32): $(ROOT_LW2PLUS_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW2PLUS_DRV_DIR_64): $(ROOT_LW2PLUS_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW2PLUS_MISC_DIR_32): $(ROOT_LW2PLUS_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW2PLUS_MISC_DIR_64): $(ROOT_LW2PLUS_MISC_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW2PLUS_CRYPTO_DIR_32): $(ROOT_LW2PLUS_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_LW2PLUS_CRYPTO_DIR_64): $(ROOT_LW2PLUS_CRYPTO_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_LW2PLUS_DIR): $(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_LW2PLUS_INC_DIR): $(USR_LW2PLUS_DIR)
 	$(INS.slink4)
 
 $(USR_LW2PLUS_ISYS_DIR): $(USR_LW2PLUS_INC_DIR)
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 $(USR_LW2PLUS_SBIN_DIR): $(USR_LW2PLUS_DIR)
 	$(INS.slink5)
 
 $(USR_LW2PLUS_LIB_DIR): $(USR_LW2PLUS_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(ROOT_LW2PLUS_DRV_DIR)/%: $(OBJS_DIR)/% $(ROOT_LW2PLUS_DRV_DIR) FRC
 	$(INS.file)

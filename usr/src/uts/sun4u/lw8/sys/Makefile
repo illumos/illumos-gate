@@ -61,7 +61,7 @@ $(USR_LW8_ISYS_DIR)/%:	% $(USR_LW8_ISYS_DIR)
 	$(INS.file)
 
 $(ROOTDIRS):
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 FRC:
 

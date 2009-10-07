@@ -436,7 +436,9 @@ The version text string to be used; e.g., "onnv:`date '+%Y-%m-%d'`".
 .LP
 .B RELEASE_DATE
 .RS 5
-The release date text to be used; e.g., October 2007.
+The release date text to be used; e.g., October 2009. If not set in
+your environment file, then this text defaults to the output from
+$(LC_ALL=C date +"%B %Y"); e.g., "October 2009".
 .RE
 .LP
 .B INTERNAL_RELEASE_BUILD

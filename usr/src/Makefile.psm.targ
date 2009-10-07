@@ -28,26 +28,26 @@
 #	Installation targets and rules:
 #
 $(ROOT_PLAT_DIR) $(USR_PLAT_DIR):
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_PSM_DIR):		$(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_BOOT_PSM_KERN_DIR):
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_PSM_LIB_DIR) \
 $(ROOT_PSM_SBIN_DIR):		$(ROOT_PSM_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_PSM_LIB64_DIR):		$(ROOT_PSM_LIB_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(ROOT_PSM_MOD_DIR):		$(ROOT_PSM_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_PSM_MOD_DIRS_32):	$(ROOT_PSM_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_PSM_DIR)/%:		% $(ROOT_PSM_DIR)
 	$(INS.file)
@@ -113,13 +113,13 @@ $(ROOT_PSM_BRAND_DIR)/%:	$(OBJS_DIR)/% $(ROOT_PSM_BRAND_DIR) FRC
 	$(INS.file)
 
 $(ROOT_PSM_LIB_FS_DIR):	$(ROOT_PSM_LIB_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(ROOT_PSM_LIB_UFS_DIR) \
 $(ROOT_PSM_LIB_NFS_DIR) \
 $(ROOT_PSM_LIB_HSFS_DIR) \
 $(ROOT_PSM_LIB_ZFS_DIR):	$(ROOT_PSM_LIB_FS_DIR)
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 $(ROOT_PSM_LIB_UFS_DIR)/%:	% $(ROOT_PSM_LIB_UFS_DIR)
 	$(INS.file)
@@ -137,34 +137,34 @@ $(ROOT_PSM_LIB_ZFS_DIR)/%:	% $(ROOT_PSM_LIB_ZFS_DIR)
 #
 #
 $(USR_PSM_DIR):			$(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_INCL_DIR) \
 $(USR_PSM_LIB_DIR) \
 $(USR_PSM_SBIN_DIR):		$(USR_PSM_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_LIB64_DIR):	$(USR_PSM_LIB_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_FS_DIR):	$(USR_PSM_LIB_DIR) $(LINKED_LIB_FS_DIRS)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_UFS_DIR) \
 $(USR_PSM_LIB_NFS_DIR) \
 $(USR_PSM_LIB_HSFS_DIR) \
 $(USR_PSM_LIB_ZFS_DIR):	$(USR_PSM_LIB_FS_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_MOD_DIR):		$(USR_PSM_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_MOD_DIRS_32):		$(USR_PSM_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_ISYS_DIR) \
 $(USR_PSM_IVM_DIR):		$(USR_PSM_INCL_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_PSM_INCL_DIR)/%:		% $(USR_PSM_INCL_DIR)
 	$(INS.file)
@@ -227,10 +227,10 @@ $(USR_PSM_DACF_DIR)/%:		% $(USR_PSM_DACF_DIR) FRC
 # links in /usr/platform
 #
 $(LINKED_DIRS):		$(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(LINKED_LIB_DIRS):	$(LINKED_DIRS)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(LINKED_ADB_DIRS):	$(LINKED_LIB_DIRS)
 	-$(INS.slink6)

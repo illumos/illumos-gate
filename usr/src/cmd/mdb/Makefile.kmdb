@@ -130,8 +130,6 @@ $(KCTLTGTS) := ASFLAGS += -D_KERNEL
 
 ffs.o ffs.ln := CPPFLAGS += -Dffs=mdb_ffs
 
-INS.dir.root.sys=	$(INS) -s -d -m $(DIRMODE) $@
-
 $(ROOTMISC) $(ROOTMISC64) := FILEMODE = 0755
 
 include ../../../Makefile.kmdb.targ

@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Build and link kmdb
@@ -96,7 +95,7 @@ kmdb_context_off.h: ../../kmdb/kmdb_context_off.in
 #
 
 $(ROOT_MISC_DIR) $(ROOT_MISC_DIR_64):
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MISC_DIR)/%: 	% $(ROOT_MISC_DIR)
 	$(INS.file)

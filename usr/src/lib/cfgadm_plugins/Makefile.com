@@ -72,10 +72,10 @@ LINKED_CFG_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib/cfgadm)
 INS.slink6=	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@
 
 $(LINKED_DIRS):		$(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(LINKED_LIB_DIRS):	$(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(LINKED_CFG_DIRS):	$(USR_PLAT_DIR)
 	-$(INS.slink6)

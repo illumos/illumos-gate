@@ -39,8 +39,6 @@
 i depend
 i pkginfo
 i copyright
-i postinstall
-i preremove
 #
 # source locations relative to the prototype file
 #
@@ -174,6 +172,7 @@ f none opt/onbld/etc/exception_lists/interface_cmp 644 root bin
 d none opt/onbld/gk 755 root bin
 f none opt/onbld/gk/.cshrc 644 root bin
 f none opt/onbld/gk/.login 644 root bin
+f none opt/onbld/gk/gen_make.machines 755 root bin
 d none opt/onbld/man 755 root bin
 d none opt/onbld/man/man1 755 root bin
 f none opt/onbld/man/man1/Install.1 644 root bin

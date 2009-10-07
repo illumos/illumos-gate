@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -56,7 +54,7 @@ LIBC_PSR64_LIB	= $(LIBC_PSR64_DIR)/$(MODULE)
 INS.libc.64	= $(RM) -r $@; $(INS) -f $(@D) $(MODULE)
 
 $(LIBC_PSR64_DIR):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(LIBC_PSR64_LIB): $(LIBC_PSR64_DIR) $(MODULE)
 	-$(INS.libc.64)

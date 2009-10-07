@@ -135,13 +135,13 @@ $(LINTS_DIR)/vers.ln: $(SRC)/uts/common/os/vers.c
 #	Installation targets and rules:
 #
 $(ROOT_MOD_DIR) $(USR_MOD_DIR):
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MOD_DIRS_32):	$(ROOT_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_MOD_DIRS_32):	$(USR_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MOD_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MOD_DIR) FRC
 	$(INS.file)
@@ -257,13 +257,13 @@ include $(SRC)/Makefile.psm.targ
 #	Target for 64b modules
 #
 $(ROOT_KERN_DIR_64):
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_KERN_DIR_64)/%:	$(OBJS_DIR)/% $(ROOT_KERN_DIR_64) FRC
 	$(INS.file)
 
 %/$(SUBDIR64):		%
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 #
 #	Targets for '.conf' file installation.

@@ -77,10 +77,10 @@ $(USR_PSM_LIB_DIR):
 	cd $(UTSBASE)/sun4u/cherrystone; pwd ; $(MAKE) $(USR_PSM_LIB_DIR)
 
 $(LINKED_DIRS):	$(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(LINKED_LIB_DIRS):	$(LINKED_DIRS)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(LINKED_PRTDIAG_DIRS):	$(USR_PLAT_DIR)
 	-$(INS.slink6)

@@ -56,13 +56,13 @@ clean:
 lint:	lint_PROG
 
 $(USR_PLAT_DIR):
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_DIR):		$(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_DIR):	$(USR_PSM_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_PSM_LIB_DIR)/%:		% $(USR_PSM_LIB_DIR)
 	$(INS.file)

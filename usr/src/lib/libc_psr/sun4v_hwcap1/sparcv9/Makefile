@@ -56,7 +56,7 @@ INS.libc.64	= $(RM) -r $@; $(INS) -m $(FILEMODE) -f $(@D) $(MODULE)
 $(LIBC_PSR64_LIB) := FILEMODE= 0755
 
 $(LIBC_PSR64_DIR):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(LIBC_PSR64_LIB): $(LIBC_PSR64_DIR) $(MODULE)
 	-$(INS.libc.64)

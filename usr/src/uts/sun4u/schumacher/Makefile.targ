@@ -32,37 +32,37 @@ IMPLEMENTED_PLATFORM	= SUNW,Netra-CP3010
 # Rules for implementation subdirectories.
 #
 $(ROOT_SCHUMACHER_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SCHUMACHER_MOD_DIR): $(ROOT_SCHUMACHER_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SCHUMACHER_MISC_DIR_32): $(ROOT_SCHUMACHER_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SCHUMACHER_MISC_DIR): $(ROOT_SCHUMACHER_MISC_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SCHUMACHER_DRV_DIR_32): $(ROOT_SCHUMACHER_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SCHUMACHER_DRV_DIR): $(ROOT_SCHUMACHER_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SCHUMACHER_CRYPTO_DIR_32): $(ROOT_SCHUMACHER_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SCHUMACHER_CRYPTO_DIR_64): $(ROOT_SCHUMACHER_CRYPTO_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_SCHUMACHER_DIR): $(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_SCHUMACHER_INC_DIR): $(USR_SCHUMACHER_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_SCHUMACHER_SBIN_DIR): $(USR_SCHUMACHER_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_SCHUMACHER_SBIN_PRTDIAG): $(USR_SCHUMACHER_SBIN_DIR)
 	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/prtdiag $@
@@ -74,10 +74,7 @@ $(USR_SCHUMACHER_SBIN_FRUADM): $(USR_SCHUMACHER_SBIN_DIR)
 	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/fruadm $@
 
 $(USR_SCHUMACHER_LIB_DIR): $(USR_SCHUMACHER_DIR)
-	-$(INS.dir.root.bin)
-
-$(USR_SCHUMACHER_ISYS_DIR): $(USR_SCHUMACHER_INC_DIR)
-	-$(INS.dir.bin.bin)
+	-$(INS.dir)
 
 $(ROOT_SCHUMACHER_MOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_SCHUMACHER_MOD_DIR)
 	$(INS.file)

@@ -58,7 +58,7 @@ $(ROOTDIR)/%: %	$(ROOTDIR)
 	$(INS.file)
 
 $(ROOTDIR):
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 FRC:
 

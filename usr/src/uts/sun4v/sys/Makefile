@@ -143,7 +143,7 @@ $(USR_PSM_ISYS_DIR)/%:	$(CLOSED)/uts/sun4v/sys/% $(USR_PSM_ISYS_DIR)
 	$(INS.file)
 
 $(ROOTDIRS):
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 # -r because this used to be a directory and is now a link.
 $(ROOTLINK):	$(ROOTDIRS)

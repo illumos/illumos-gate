@@ -33,7 +33,6 @@ ROOTETC=	$(ROOT)/etc
 include ../../Makefile.lib
 
 HETCFILES=	$(CONFIGFILE:%=$(ROOTETC)/%)
-HETCFILES:=	FILEMODE= 644
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 SRCDIR=		../common

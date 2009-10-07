@@ -31,8 +31,6 @@ OBJECTS= cfga.o pci_strings.o
 include ../../../Makefile.lib
 
 SRCDIR =	../common
-INS.dir.root.sys=       $(INS) -s -d -m $(DIRMODE) $@
-INS.dir.bin.bin=        $(INS) -s -d -m $(DIRMODE) $@
 
 USR_LIB_DIR		= $(ROOT)/usr/lib
 USR_LIB_DIR_CFGADM	= $(USR_LIB_DIR)/cfgadm
@@ -57,13 +55,13 @@ lint:   lintcheck
 
 # Create target directories
 $(USR_LIB_DIR):
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_LIB_DIR_CFGADM): $(USR_LIB_DIR)
-	-$(INS.dir.bin.bin)
+	-$(INS.dir)
 
 $(USR_LIB_DIR_CFGADM_64): $(USR_LIB_DIR_CFGADM)
-	-$(INS.dir.bin.bin)
+	-$(INS.dir)
 
 $(USR_LIB_DIR_CFGADM)/%: % $(USR_LIB_DIR_CFGADM)
 	-$(INS.file)

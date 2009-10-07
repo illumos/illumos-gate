@@ -18,10 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/libmd/Makefile.sun4u.links
@@ -57,8 +54,6 @@ LINKED_PLATFORMS	+= SUNW,Sun-Fire-280R
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-15000
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-880
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-480R
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V890
-LINKED_PLATFORMS	+= SUNW,Sun-Fire-V490
 LINKED_PLATFORMS	+= SUNW,Serverblade1
 LINKED_PLATFORMS	+= SUNW,Netra-T12
 LINKED_PLATFORMS	+= SUNW,Netra-T4

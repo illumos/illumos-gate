@@ -33,37 +33,37 @@ IMPLEMENTED_PLATFORM   = SUNW,Sun-Fire-V215
 # Rules for implementation subdirectories.
 #
 $(ROOT_SEATTLE_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_MOD_DIR): $(ROOT_SEATTLE_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_MISC_DIR_32): $(ROOT_SEATTLE_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_MISC_DIR_64): $(ROOT_SEATTLE_MISC_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_DRV_DIR_32): $(ROOT_SEATTLE_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_DRV_DIR_64): $(ROOT_SEATTLE_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_CRYPTO_DIR_32): $(ROOT_SEATTLE_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SEATTLE_CRYPTO_DIR_64): $(ROOT_SEATTLE_CRYPTO_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_SEATTLE_DIR): $(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_SEATTLE_INC_DIR): $(USR_SEATTLE_DIR)
 	-$(INS.slink4)
 
 $(USR_SEATTLE_SBIN_DIR): $(USR_SEATTLE_DIR)
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 $(USR_SEATTLE_SBIN_PRTDIAG): $(USR_SEATTLE_SBIN_DIR)
 	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/prtdiag $@
@@ -81,10 +81,10 @@ $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%): $(USR_PLAT_DIR)
 	$(INS.slink3)
 
 $(USR_SEATTLE_LIB_DIR): $(USR_SEATTLE_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_SEATTLE_ISYS_DIR): $(USR_SEATTLE_INC_DIR)
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 $(ROOT_SEATTLE_MOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_SEATTLE_MOD_DIR)
 	$(INS.file)

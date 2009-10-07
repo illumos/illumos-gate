@@ -3250,7 +3250,8 @@ if [[ -z "$preparer" ]]; then
 	')
 fi
 
-print "<tr><th>Prepared by:</th><td>$preparer on `date`</td></tr>"
+PREPDATE=$(LC_ALL=C /usr/bin/date +%Y-%b-%d\ %R\ %z\ %Z)
+print "<tr><th>Prepared by:</th><td>$preparer on $PREPDATE</td></tr>"
 print "<tr><th>Workspace:</th><td>$CWS"
 if [[ -n $CWS_REV ]]; then
 	print "(at $CWS_REV)"

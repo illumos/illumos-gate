@@ -52,19 +52,19 @@ $(USR_PSM_LIB_DIR)/%: % $(USR_PSM_LIB_DIR)
 	$(INS.file)
 
 $(USR_PSM_LIB_DIR):
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 $(USR_PSM_INCL_DIR)/%:	../common/% $(USR_PSM_INCL_DIR)
 	$(INS.file)
 
 $(USR_PSM_INCL_DIR):
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 $(LINKED_DIRS):	$(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(LINKED_LIB_DIRS):	$(LINKED_DIRS)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(LINKED_LIBTSALARM_DIR):	$(USR_PLAT_DIR)
 	-$(INS.slink7)

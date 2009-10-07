@@ -60,7 +60,7 @@ $(USR_CHERRYSTONE_ISYS_DIR)/%:	% $(USR_CHERRYSTONE_ISYS_DIR)
 	$(INS.file)
 
 $(ROOTDIRS):
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 FRC:
 

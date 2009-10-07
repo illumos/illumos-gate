@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 CLASS		= 32
@@ -50,6 +48,6 @@ all:		$(LIBS)
 
 $(ROOT_PSM_LIB_DIR)/% := FILEMODE = 755
 
-install:	all $(LIBMD_PSR_LINKS) $(ROOT_PSM_LIBS)
+install:	all $(ROOT_PSM_LIB_DIR)/$(LIBS)
 
 include $(SRC)/Makefile.psm.targ

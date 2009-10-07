@@ -1,3 +1,4 @@
+#!/usr/bin/ksh93
 #
 # CDDL HEADER START
 #
@@ -18,51 +19,30 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+# 
+# script to generate example .make.machines for build users
 #
-UTSBASE	= ../../..
 
-#
-# include global definitions
-#
-include ../Makefile.starfire
 
-#
-# Override defaults.
-#
-FILEMODE	 = 644
+PATH=/usr/bin:/usr/sbin
 
-HDRS=	cvc.h
+THISHOST=$(uname -n)
 
-STARHDRS=	$(UTSBASE)/sun4u/ngdr/sys/dr.h \
-		$(UTSBASE)/sun4u/ngdr/sys/dr_util.h
+cpus=$(psrinfo | grep on-line | wc -l)
+max=$(((cpus + 1) * 2))
 
-ROOTHDRS=	$(HDRS:%=$(USR_STARFIRE_ISYS_DIR)/%)
+EXISTING=$(grep "^$THISHOST" $HOME/.make.machines |awk -F"=" '{print $2}')
 
-ROOTDIR=	$(ROOT)/usr/share/src
-ROOTDIRS=	$(ROOTDIR)/uts $(ROOTDIR)/uts/$(PLATFORM)
-
-CHECKHDRS=	$(HDRS:%.h=%.check) \
-		$(STARHDRS:%.h=%.check)
-
-.KEEP_STATE:
-
-.PARALLEL: $(CHECKHDRS) $(ROOTHDRS)
-
-install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS) $(ROOTLINK)
-
-check:	$(CHECKHDRS)
-
-#
-# install rules
-#
-$(USR_STARFIRE_ISYS_DIR)/%:	% $(USR_STARFIRE_ISYS_DIR)
-	$(INS.file)
-
-$(ROOTDIRS):
-	$(INS.dir)
-
-FRC:
-
-include ../Makefile.targ
+if [[ -n "$EXISTING" ]] then
+	printf "Your existing \$HOME/.make.machines has a concurrency "
+	printf "setting of $EXISTING for host\n"
+	printf "$THISHOST. If you wish to change the setting then this "
+	printf "script suggests\nsetting concurrency to $max for a single-user "
+	printf "machine. Multi-user machines might\nrequire different values.\n"
+else
+	printf "$THISHOST max=$max\n" >> $HOME/.make.machines
+	printf "dmake concurrency for host $THISHOST set to $max.\n"
+fi

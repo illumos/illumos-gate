@@ -19,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 #
 #	Common targets for sun4u MAKAHA implementation specific modules.
@@ -31,7 +31,7 @@
 # Platform targets
 #
 $(ROOT_MAKAHA_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 .KEEP_STATE:
 
@@ -39,22 +39,22 @@ $(ROOT_MAKAHA_DIR): $(ROOT_PLAT_DIR)
 # Rules for implementation subdirectories.
 #
 $(ROOT_MAKAHA_MOD_DIR): $(ROOT_MAKAHA_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MAKAHA_DRV_DIR_32): $(ROOT_MAKAHA_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MAKAHA_DRV_DIR_64): $(ROOT_MAKAHA_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MAKAHA_MISC_DIR_32): $(ROOT_MAKAHA_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MAKAHA_MISC_DIR_64): $(ROOT_MAKAHA_MISC_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_MAKAHA_DIR): $(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_MAKAHA_INC_DIR): $(USR_MAKAHA_DIR)
 	-$(INS.slink4)
@@ -63,10 +63,10 @@ $(USR_MAKAHA_SBIN_DIR): $(USR_MAKAHA_DIR)
 	-$(INS.slink5)
 
 $(USR_MAKAHA_LIB_DIR): $(USR_MAKAHA_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_MAKAHA_ISYS_DIR): $(USR_MAKAHA_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(ROOT_MAKAHA_MOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_MAKAHA_MOD_DIR)
 	$(INS.file)
@@ -75,10 +75,10 @@ $(ROOT_MAKAHA_MISC_DIR)/%: $(OBJS_DIR)/% $(ROOT_MAKAHA_MISC_DIR)
 	$(INS.file)
 
 $(ROOT_MAKAHA_DACF_DIR_32): $(ROOT_MAKAHA_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MAKAHA_DACF_DIR_64): $(ROOT_MAKAHA_DACF_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_MAKAHA_DACF_DIR)/%: $(OBJS_DIR)/% $(ROOT_MAKAHA_DACF_DIR)
 	$(INS.file)
@@ -90,25 +90,25 @@ $(ROOT_MAKAHA_DRV_DIR)/%: $(OBJS_DIR)/% $(ROOT_MAKAHA_DRV_DIR) FRC
 # Create Sputnik platform directories
 #
 $(ROOT_SPUTNIK_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SPUTNIK_MOD_DIR): $(ROOT_SPUTNIK_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SPUTNIK_DRV_DIR_32): $(ROOT_SPUTNIK_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SPUTNIK_DRV_DIR_64): $(ROOT_SPUTNIK_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SPUTNIK_MISC_DIR_32): $(ROOT_SPUTNIK_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SPUTNIK_MISC_DIR_64): $(ROOT_SPUTNIK_MISC_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_SPUTNIK_DIR): $(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(USR_SPUTNIK_INC_DIR): $(USR_SPUTNIK_DIR)
 	-$(INS.slink4)
@@ -117,10 +117,10 @@ $(USR_SPUTNIK_SBIN_DIR): $(USR_SPUTNIK_DIR)
 	-$(INS.slink5)
 
 $(USR_SPUTNIK_LIB_DIR): $(USR_SPUTNIK_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_SPUTNIK_ISYS_DIR): $(USR_SPUTNIK_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(ROOT_SPUTNIK_MOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_SPUTNIK_MOD_DIR)
 	$(INS.file)
@@ -132,10 +132,10 @@ $(ROOT_SPUTNIK_DRV_DIR)/%: $(OBJS_DIR)/% $(ROOT_SPUTNIK_DRV_DIR)
 	$(INS.file)
 
 $(ROOT_SPUTNIK_DACF_DIR_32): $(ROOT_SPUTNIK_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SPUTNIK_DACF_DIR_64): $(ROOT_SPUTNIK_DACF_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SPUTNIK_DACF_DIR)/%: $(OBJS_DIR)/% $(ROOT_SPUTNIK_DACF_DIR)
 	$(INS.file)

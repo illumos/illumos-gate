@@ -60,7 +60,7 @@ $(USR_SUNFIRE_ISYS_DIR)/%:	% $(USR_SUNFIRE_ISYS_DIR)
 	$(INS.file)
 
 $(ROOTDIRS):
-	$(INS.dir.root.bin)
+	$(INS.dir)
 
 FRC:
 

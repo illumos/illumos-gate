@@ -152,7 +152,7 @@ INS.slink64 = $(RM) -r $@; \
 
 $(SOFT_PSR_DIRS) \
 $(SOFT_PSR64_DIRS):
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(SOFT_PSR_LINKS): $(SOFT_PSR_DIRS)
 	-$(INS.slink6)

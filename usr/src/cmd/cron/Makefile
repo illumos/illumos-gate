@@ -141,12 +141,7 @@ $(XPG6) := CFLAGS += -DXPG6
 
 LINTFLAGS += -u
 
-$(ROOTSVCSYSTEM)/cron.xml := OWNER = root
-$(ROOTSVCSYSTEM)/cron.xml := GROUP = sys
 $(ROOTSVCSYSTEM)/cron.xml := FILEMODE = 0444
-
-$(ROOTLIBSVCMETHOD)/svc-cron := OWNER = root
-$(ROOTLIBSVCMETHOD)/svc-cron := GROUP = bin
 $(ROOTLIBSVCMETHOD)/svc-cron := FILEMODE = 0555
 
 

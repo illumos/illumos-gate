@@ -33,34 +33,34 @@
 # Rules for implementation subdirectories.
 #
 $(ROOT_SNOWBIRD_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SNOWBIRD_MOD_DIR): $(ROOT_SNOWBIRD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SNOWBIRD_DRV_DIR_32): $(ROOT_SNOWBIRD_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SNOWBIRD_DRV_DIR_64): $(ROOT_SNOWBIRD_DRV_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SNOWBIRD_TOD_DIR_32): $(ROOT_SNOWBIRD_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SNOWBIRD_TOD_DIR_64): $(ROOT_SNOWBIRD_TOD_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SNOWBIRD_MISC_DIR_32): $(ROOT_SNOWBIRD_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SNOWBIRD_MISC_DIR_64): $(ROOT_SNOWBIRD_MISC_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SNOWBIRD_DACF_DIR_32): $(ROOT_SNOWBIRD_MOD_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SNOWBIRD_DACF_DIR_64): $(ROOT_SNOWBIRD_DACF_DIR_32)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 $(ROOT_SNOWBIRD_MOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_SNOWBIRD_MOD_DIR) FRC
 	$(INS.file)
@@ -78,13 +78,13 @@ $(ROOT_SNOWBIRD_TOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_SNOWBIRD_TOD_DIR) FRC
 	$(INS.file)
 
 $(USR_SNOWBIRD_DIR):	$(USR_PLAT_DIR)
-	$(INS.dir.root.sys)
+	$(INS.dir)
 
 $(USR_SNOWBIRD_INC_DIR):	$(USR_SNOWBIRD_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_SNOWBIRD_SBIN_DIR): $(USR_SNOWBIRD_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_SNOWBIRD_SBIN_PRTDIAG): $(USR_SNOWBIRD_SBIN_DIR)
 	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/prtdiag $@
@@ -96,10 +96,10 @@ $(USR_SNOWBIRD_SBIN_FRUADM): $(USR_SNOWBIRD_SBIN_DIR)
 	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/fruadm $@
 
 $(USR_SNOWBIRD_LIB_DIR): $(USR_SNOWBIRD_DIR)
-	-$(INS.dir.root.bin)
+	-$(INS.dir)
 
 $(USR_SNOWBIRD_ISYS_DIR):	$(USR_SNOWBIRD_INC_DIR)
-	-$(INS.dir.root.sys)
+	-$(INS.dir)
 
 #
 #	Include common targets.
