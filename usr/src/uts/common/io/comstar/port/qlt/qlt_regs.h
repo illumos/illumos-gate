@@ -93,6 +93,14 @@ extern "C" {
 #define	RISC_INTR_REQUEST	BIT_3
 
 /*
+ * RISC_STATUS register
+ */
+#define	RISC_HOST_INTR_REQUEST	BIT_15
+#define	RISC_PAUSED		BIT_08
+#define	FW_INTR_STATUS_MASK	(BIT_7 | BIT_6 | BIT_5 | BIT_4 | \
+    BIT_3 | BIT_2 | BIT_1 | BIT_0)
+
+/*
  * HCCR commands
  */
 #define	HCCR_CMD_NOP				0
@@ -103,6 +111,8 @@ extern "C" {
 #define	HCCR_CMD_SET_HOST_TO_RISC_INTR		0x50000000
 #define	HCCR_CMD_CLEAR_HOST_TO_RISC_INTR	0x60000000
 #define	HCCR_CMD_CLEAR_RISC_TO_PCI_INTR		0xA0000000
+
+#define	MBC_STOP_FIRMWARE	0x14
 
 /*
  * Flash/NVRAM definitions

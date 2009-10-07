@@ -351,6 +351,71 @@ typedef struct {
 	DMEM_WR32(qlt, addr, (data & 0xffffffff)), \
 	DMEM_WR32(qlt, (addr)+4, ((uint64_t)data) >> 32)
 
+/*
+ * Structure used to associate values with strings which describe them.
+ */
+typedef struct string_table_entry {
+	uint32_t value;
+	char    *string;
+} string_table_t;
+
+char *prop_text(int prop_status);
+char *value2string(string_table_t *entry, int value, int delimiter);
+
+#define	PROP_STATUS_DELIMITER	((uint32_t)0xFFFF)
+
+#define	DDI_PROP_STATUS()					\
+{								\
+	{DDI_PROP_SUCCESS, "DDI_PROP_SUCCESS"},			\
+	{DDI_PROP_NOT_FOUND, "DDI_PROP_NOT_FOUND"},		\
+	{DDI_PROP_UNDEFINED, "DDI_PROP_UNDEFINED"},		\
+	{DDI_PROP_NO_MEMORY, "DDI_PROP_NO_MEMORY"},		\
+	{DDI_PROP_INVAL_ARG, "DDI_PROP_INVAL_ARG"},		\
+	{DDI_PROP_BUF_TOO_SMALL, "DDI_PROP_BUF_TOO_SMALL"},	\
+	{DDI_PROP_CANNOT_DECODE, "DDI_PROP_CANNOT_DECODE"},	\
+	{DDI_PROP_CANNOT_ENCODE, "DDI_PROP_CANNOT_ENCODE"},	\
+	{DDI_PROP_END_OF_DATA, "DDI_PROP_END_OF_DATA"},		\
+	{PROP_STATUS_DELIMITER, "DDI_PROP_UNKNOWN"}		\
+}
+
+#ifndef TRUE
+#define	TRUE	B_TRUE
+#endif
+
+#ifndef FALSE
+#define	FALSE	B_FALSE
+#endif
+
+/* Little endian machine correction defines. */
+#ifdef _LITTLE_ENDIAN
+#define	LITTLE_ENDIAN_16(x)
+#define	LITTLE_ENDIAN_24(x)
+#define	LITTLE_ENDIAN_32(x)
+#define	LITTLE_ENDIAN_64(x)
+#define	LITTLE_ENDIAN(bp, bytes)
+#define	BIG_ENDIAN_16(x)	qlt_chg_endian((uint8_t *)x, 2)
+#define	BIG_ENDIAN_24(x)	qlt_chg_endian((uint8_t *)x, 3)
+#define	BIG_ENDIAN_32(x)	qlt_chg_endian((uint8_t *)x, 4)
+#define	BIG_ENDIAN_64(x)	qlt_chg_endian((uint8_t *)x, 8)
+#define	BIG_ENDIAN(bp, bytes)	qlt_chg_endian((uint8_t *)bp, bytes)
+#endif /* _LITTLE_ENDIAN */
+
+/* Big endian machine correction defines. */
+#ifdef _BIG_ENDIAN
+#define	LITTLE_ENDIAN_16(x)		qlt_chg_endian((uint8_t *)x, 2)
+#define	LITTLE_ENDIAN_24(x)		qlt_chg_endian((uint8_t *)x, 3)
+#define	LITTLE_ENDIAN_32(x)		qlt_chg_endian((uint8_t *)x, 4)
+#define	LITTLE_ENDIAN_64(x)		qlt_chg_endian((uint8_t *)x, 8)
+#define	LITTLE_ENDIAN(bp, bytes)	qlt_chg_endian((uint8_t *)bp, bytes)
+#define	BIG_ENDIAN_16(x)
+#define	BIG_ENDIAN_24(x)
+#define	BIG_ENDIAN_32(x)
+#define	BIG_ENDIAN_64(x)
+#define	BIG_ENDIAN(bp, bytes)
+#endif /* _BIG_ENDIAN */
+
+void	qlt_chg_endian(uint8_t *, size_t);
+
 void qlt_el_msg(qlt_state_t *qlt, const char *fn, int ce, ...);
 void qlt_dump_el_trace_buffer(qlt_state_t *qlt);
 #define	EL(qlt, ...) 	qlt_el_msg(qlt, __func__, CE_CONT, __VA_ARGS__);

@@ -78,10 +78,6 @@ static void qlt_handle_unsol_els_abort_completion(qlt_state_t *qlt,
 static void qlt_handle_sol_els_completion(qlt_state_t *qlt, uint8_t *rsp);
 static void qlt_handle_rcvd_abts(qlt_state_t *qlt, uint8_t *resp);
 static void qlt_handle_abts_completion(qlt_state_t *qlt, uint8_t *resp);
-static fct_status_t qlt_reset_chip_and_download_fw(qlt_state_t *qlt,
-    int reset_only);
-static fct_status_t qlt_load_risc_ram(qlt_state_t *qlt, uint32_t *host_addr,
-    uint32_t word_count, uint32_t risc_addr);
 static fct_status_t qlt_read_nvram(qlt_state_t *qlt);
 static void qlt_verify_fw(qlt_state_t *qlt);
 static void qlt_handle_verify_fw_completion(qlt_state_t *qlt, uint8_t *rsp);
@@ -145,10 +141,21 @@ static int qlt_el_trace_desc_dtor(qlt_state_t *qlt);
 static int qlt_validate_trace_desc(qlt_state_t *qlt);
 static char *qlt_find_trace_start(qlt_state_t *qlt);
 
+static int qlt_read_int_prop(qlt_state_t *qlt, char *prop, int defval);
+static int qlt_read_string_prop(qlt_state_t *qlt, char *prop, char **prop_val);
+static int qlt_read_string_instance_prop(qlt_state_t *qlt, char *prop,
+    char **prop_val);
+static int qlt_convert_string_to_ull(char *prop, int radix,
+    u_longlong_t *result);
+static boolean_t qlt_wwn_overload_prop(qlt_state_t *qlt);
+static int qlt_quiesce(dev_info_t *dip);
+
 #define	SETELSBIT(bmp, els)	(bmp)[((els) >> 3) & 0x1F] = \
 	(uint8_t)((bmp)[((els) >> 3) & 0x1F] | ((uint8_t)1) << ((els) & 7))
 
 int qlt_enable_msix = 0;
+
+string_table_t prop_status_tbl[] = DDI_PROP_STATUS();
 
 /* Array to quickly calculate next free buf index to use */
 #if 0
@@ -184,7 +191,8 @@ static struct dev_ops qlt_ops = {
 	nodev,
 	&qlt_cb_ops,
 	NULL,
-	ddi_power
+	ddi_power,
+	qlt_quiesce
 };
 
 #ifndef	PORT_SPEED_10G
@@ -284,12 +292,6 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-int
-qlt_read_int_prop(qlt_state_t *qlt, char *prop, int defval)
-{
-	return (ddi_getprop(DDI_DEV_T_ANY, qlt->dip,
-	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, prop, defval));
-}
 
 static int
 qlt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
@@ -377,7 +379,9 @@ qlt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    (unsigned long long)ret);
 		goto attach_fail_5;
 	}
-
+	if (qlt_wwn_overload_prop(qlt) == TRUE) {
+		EL(qlt, "wwnn overloaded.\n", instance);
+	}
 	if (ddi_dma_alloc_handle(dip, &qlt_queue_dma_attr, DDI_DMA_SLEEP,
 	    0, &qlt->queue_mem_dma_handle) != DDI_SUCCESS) {
 		goto attach_fail_5;
@@ -577,6 +581,46 @@ qlt_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	cv_destroy(&qlt->rp_dereg_cv);
 	(void) qlt_el_trace_desc_dtor(qlt);
 	ddi_soft_state_free(qlt_state, instance);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * qlt_quiesce	quiesce a device attached to the system.
+ */
+static int
+qlt_quiesce(dev_info_t *dip)
+{
+	qlt_state_t	*qlt;
+	uint32_t	timer;
+	uint32_t	stat;
+
+	qlt = ddi_get_soft_state(qlt_state, ddi_get_instance(dip));
+	if (qlt == NULL) {
+		/* Oh well.... */
+		return (DDI_SUCCESS);
+	}
+
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_HOST_TO_RISC_INTR);
+	REG_WR16(qlt, REG_MBOX0, MBC_STOP_FIRMWARE);
+	REG_WR32(qlt, REG_HCCR, HCCR_CMD_SET_HOST_TO_RISC_INTR);
+	for (timer = 0; timer < 30000; timer++) {
+		stat = REG_RD32(qlt, REG_RISC_STATUS);
+		if (stat & RISC_HOST_INTR_REQUEST) {
+			if ((stat & FW_INTR_STATUS_MASK) < 0x12) {
+				REG_WR32(qlt, REG_HCCR,
+				    HCCR_CMD_CLEAR_RISC_PAUSE);
+				break;
+			}
+			REG_WR32(qlt, REG_HCCR,
+			    HCCR_CMD_CLEAR_HOST_TO_RISC_INTR);
+		}
+		drv_usecwait(100);
+	}
+	/* Reset the chip. */
+	REG_WR32(qlt, REG_CTRL_STATUS, CHIP_SOFT_RESET | DMA_SHUTDOWN_CTRL |
+	    PCI_X_XFER_CTRL);
+	drv_usecwait(100);
 
 	return (DDI_SUCCESS);
 }
@@ -2447,7 +2491,6 @@ static uint_t
 qlt_isr(caddr_t arg, caddr_t arg2)
 {
 	qlt_state_t	*qlt = (qlt_state_t *)arg;
-	int		instance;
 	uint32_t	risc_status, intr_type;
 	int		i;
 	int		intr_loop_count;
@@ -2495,7 +2538,6 @@ qlt_isr(caddr_t arg, caddr_t arg2)
 	 * but we did not service it either because of max iterations.
 	 * Maybe offload the intr on a different thread.
 	 */
-	instance = ddi_get_instance(qlt->dip);
 	intr_loop_count = 0;
 
 	REG_WR32(qlt, REG_INTR_CTRL, 0);
@@ -2506,7 +2548,7 @@ intr_again:;
 	if (risc_status & BIT_8) {
 		EL(qlt, "Risc Pause status=%xh\n", risc_status);
 		cmn_err(CE_WARN, "qlt(%d): Risc Pause %08x",
-		    instance, risc_status);
+		    qlt->instance, risc_status);
 		(void) snprintf(info, 80, "Risc Pause %08x", risc_status);
 		info[79] = 0;
 		(void) fct_port_shutdown(qlt->qlt_port,
@@ -2516,21 +2558,20 @@ intr_again:;
 
 	/* First check for high performance path */
 	intr_type = risc_status & 0xff;
-	if (intr_type == 0x1C) {
+	if (intr_type == 0x1D) {
+		qlt->atio_ndx_from_fw = (uint16_t)
+		    REG_RD32(qlt, REG_ATIO_IN_PTR);
+		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
+		qlt->resp_ndx_from_fw = risc_status >> 16;
+		qlt_handle_atio_queue_update(qlt);
+		qlt_handle_resp_queue_update(qlt);
+	} else if (intr_type == 0x1C) {
 		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
 		qlt->atio_ndx_from_fw = (uint16_t)(risc_status >> 16);
 		qlt_handle_atio_queue_update(qlt);
 	} else if (intr_type == 0x13) {
 		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
 		qlt->resp_ndx_from_fw = risc_status >> 16;
-		qlt_handle_resp_queue_update(qlt);
-		/* XXX what about priority queue */
-	} else if (intr_type == 0x1D) {
-		qlt->atio_ndx_from_fw = (uint16_t)
-		    REG_RD32(qlt, REG_ATIO_IN_PTR);
-		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
-		qlt->resp_ndx_from_fw = risc_status >> 16;
-		qlt_handle_atio_queue_update(qlt);
 		qlt_handle_resp_queue_update(qlt);
 	} else if (intr_type == 0x12) {
 		uint16_t code = (uint16_t)(risc_status >> 16);
@@ -2546,8 +2587,8 @@ intr_again:;
 		    " mb3=%x, mb5=%x, mb6=%x", code, mbox1, mbox2, mbox3,
 		    mbox5, mbox6);
 		cmn_err(CE_NOTE, "!qlt(%d): Async event %x mb1=%x mb2=%x,"
-		    " mb3=%x, mb5=%x, mb6=%x", instance, code, mbox1, mbox2,
-		    mbox3, mbox5, mbox6);
+		    " mb3=%x, mb5=%x, mb6=%x", qlt->instance, code, mbox1,
+		    mbox2, mbox3, mbox5, mbox6);
 
 		if ((code == 0x8030) || (code == 0x8010) || (code == 0x8013)) {
 			if (qlt->qlt_link_up) {
@@ -2635,7 +2676,7 @@ intr_again:;
 		if (qlt->mbox_io_state != MBOX_STATE_CMD_RUNNING) {
 			cmn_err(CE_WARN, "qlt(%d): mailbox completion received"
 			    " when driver wasn't waiting for it %d",
-			    instance, qlt->mbox_io_state);
+			    qlt->instance, qlt->mbox_io_state);
 		} else {
 			for (i = 0; i < MAX_MBOXES; i++) {
 				if (qlt->mcp->from_fw_mask &
@@ -2651,7 +2692,7 @@ intr_again:;
 		mutex_exit(&qlt->mbox_lock);
 	} else {
 		cmn_err(CE_WARN, "qlt(%d): Unknown intr type 0x%x",
-		    instance, intr_type);
+		    qlt->instance, intr_type);
 		REG_WR32(qlt, REG_HCCR, HCCR_CMD_CLEAR_RISC_TO_PCI_INTR);
 	}
 
@@ -5925,8 +5966,8 @@ qlt_find_trace_start(qlt_state_t *qlt)
 	    qlt->el_trace_desc->next;
 
 	/*
-	 * if the buffer has not wrapped next will point at a null so
-	 * start is the beginning of the buffer.  if next points at a char
+	 * If the buffer has not wrapped next will point at a null so
+	 * start is the beginning of the buffer.  If next points at a char
 	 * then we must traverse the buffer until a null is detected and
 	 * that will be the beginning of the oldest whole object in the buffer
 	 * which is the start.
@@ -5942,4 +5983,128 @@ qlt_find_trace_start(qlt_state_t *qlt)
 		trace_start = qlt->el_trace_desc->trace_buffer;
 	}
 	return (trace_start);
+}
+
+
+static int
+qlt_read_int_prop(qlt_state_t *qlt, char *prop, int defval)
+{
+	return (ddi_getprop(DDI_DEV_T_ANY, qlt->dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, prop, defval));
+}
+
+static int
+qlt_read_string_prop(qlt_state_t *qlt, char *prop, char **prop_val)
+{
+	return (ddi_prop_lookup_string(DDI_DEV_T_ANY, qlt->dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_CANSLEEP, prop, prop_val));
+}
+
+static int
+qlt_read_string_instance_prop(qlt_state_t *qlt, char *prop, char **prop_val)
+{
+	char		instance_prop[256];
+
+	/* Get adapter instance specific parameter. */
+	(void) sprintf(instance_prop, "hba%d-%s", qlt->instance, prop);
+	return (qlt_read_string_prop(qlt, instance_prop, prop_val));
+}
+
+static int
+qlt_convert_string_to_ull(char *prop, int radix,
+    u_longlong_t *result)
+{
+	return (ddi_strtoull((const char *)prop, 0, radix, result));
+}
+
+static boolean_t
+qlt_wwn_overload_prop(qlt_state_t *qlt)
+{
+	char		*prop_val = 0;
+	int		rval;
+	int		radix;
+	u_longlong_t	wwnn = 0, wwpn = 0;
+	boolean_t	overloaded = FALSE;
+
+	radix = 16;
+
+	rval = qlt_read_string_instance_prop(qlt, "adapter-wwnn", &prop_val);
+	if (rval == DDI_PROP_SUCCESS) {
+		rval = qlt_convert_string_to_ull(prop_val, radix, &wwnn);
+	}
+	if (rval == DDI_PROP_SUCCESS) {
+		rval = qlt_read_string_instance_prop(qlt, "adapter-wwpn",
+		    &prop_val);
+		if (rval == DDI_PROP_SUCCESS) {
+			rval = qlt_convert_string_to_ull(prop_val, radix,
+			    &wwpn);
+		}
+	}
+	if (rval == DDI_PROP_SUCCESS) {
+		overloaded = TRUE;
+		/* Overload the current node/port name nvram copy */
+		bcopy((char *)&wwnn, qlt->nvram->node_name, 8);
+		BIG_ENDIAN_64(qlt->nvram->node_name);
+		bcopy((char *)&wwpn, qlt->nvram->port_name, 8);
+		BIG_ENDIAN_64(qlt->nvram->port_name);
+	}
+	return (overloaded);
+}
+
+/*
+ * prop_text - Return a pointer to a string describing the status
+ *
+ * Input:	prop_status = the return status from a property function.
+ * Returns:	pointer to a string.
+ * Context:	Kernel context.
+ */
+char *
+prop_text(int prop_status)
+{
+	string_table_t *entry = &prop_status_tbl[0];
+
+	return (value2string(entry, prop_status, 0xFFFF));
+}
+
+/*
+ * value2string	Return a pointer to a string associated with the value
+ *
+ * Input:	entry = the value to string table
+ *		value = the value
+ * Returns:	pointer to a string.
+ * Context:	Kernel context.
+ */
+char *
+value2string(string_table_t *entry, int value, int delimiter)
+{
+	for (; entry->value != delimiter; entry++) {
+		if (entry->value == value) {
+			break;
+		}
+	}
+	return (entry->string);
+}
+
+/*
+ * qlt_chg_endian Change endianess of byte array.
+ *
+ * Input:	buf = array pointer.
+ *		size = size of array in bytes.
+ *
+ * Context:	Interrupt or Kernel context.
+ */
+void
+qlt_chg_endian(uint8_t buf[], size_t size)
+{
+	uint8_t byte;
+	size_t  cnt1;
+	size_t  cnt;
+
+	cnt1 = size - 1;
+	for (cnt = 0; cnt < size / 2; cnt++) {
+		byte = buf[cnt1];
+		buf[cnt1] = buf[cnt];
+		buf[cnt] = byte;
+		cnt1--;
+	}
 }

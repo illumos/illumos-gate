@@ -45,7 +45,7 @@ extern "C" {
 #endif
 
 #ifndef QLT_VERSION
-#define	QLT_VERSION	"20090814-1.01"
+#define	QLT_VERSION	"20090922-1.02"
 #endif
 
 #ifndef	QLT_NAME
