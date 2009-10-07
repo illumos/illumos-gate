@@ -891,7 +891,7 @@ static const ofmt_field_t linkprop_fields[] = {
 { "PERM",	5,	LINKPROP_PERM,		print_linkprop_cb},
 { "VALUE",	15,	LINKPROP_VALUE,		print_linkprop_cb},
 { "DEFAULT",	15,	LINKPROP_DEFAULT,	print_linkprop_cb},
-{ "POSSIBLE",	21,	LINKPROP_POSSIBLE,	print_linkprop_cb},
+{ "POSSIBLE",	20,	LINKPROP_POSSIBLE,	print_linkprop_cb},
 { NULL,		0,	0,			NULL}}
 ;
 
@@ -6286,6 +6286,7 @@ print_linkprop(datalink_id_t linkid, show_linkprop_state_t *statep,
 
 	statep->ls_status = DLADM_STATUS_OK;
 
+	buf[0] = '\0';
 	ptr = buf;
 	lim = buf + DLADM_STRSIZE;
 	for (i = 0; i < valcnt; i++) {
@@ -6493,6 +6494,9 @@ do_show_linkprop(int argc, char **argv, const char *use)
 
 	if (state.ls_parsable)
 		ofmtflags |= OFMT_PARSABLE;
+	else
+		ofmtflags |= OFMT_WRAP;
+
 	oferr = ofmt_open(fields_str, linkprop_fields, ofmtflags, 0, &ofmt);
 	dladm_ofmt_check(oferr, state.ls_parsable, ofmt);
 	state.ls_ofmt = ofmt;

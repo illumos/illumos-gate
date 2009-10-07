@@ -913,6 +913,17 @@ proto_setphysaddr_req(dld_str_t *dsp, mblk_t *mp)
 		goto failed2;
 	}
 
+	/*
+	 * If mac-nospoof is enabled and the link is owned by a
+	 * non-global zone, changing the mac address is not allowed.
+	 */
+	if (dsp->ds_dlp->dl_zid != GLOBAL_ZONEID &&
+	    mac_protect_enabled(dsp->ds_mch, MPT_MACNOSPOOF)) {
+		dls_active_clear(dsp, B_FALSE);
+		err = EACCES;
+		goto failed2;
+	}
+
 	err = mac_unicast_primary_set(dsp->ds_mh,
 	    mp->b_rptr + dlp->dl_addr_offset);
 	if (err != 0) {

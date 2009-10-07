@@ -100,17 +100,17 @@ i_dls_link_destructor(void *buf, void *arg)
  * - Strip the padding and skip over the header. Note that because some
  *   DLS consumers only check the db_ref count of the first mblk, we
  *   pullup the message into a single mblk. Because the original message
- *   is freed as the result of message pulling up, dls_link_header_info()
+ *   is freed as the result of message pulling up, mac_vlan_header_info()
  *   is called again to update the mhi_saddr and mhi_daddr pointers in the
- *   mhip. Further, the dls_link_header_info() function ensures that the
+ *   mhip. Further, the mac_vlan_header_info() function ensures that the
  *   size of the pulled message is greater than the MAC header size,
  *   therefore we can directly advance b_rptr to point at the payload.
  *
  * We choose to use a macro for performance reasons.
  */
-#define	DLS_PREPARE_PKT(dlp, mp, mhip, err) {				\
+#define	DLS_PREPARE_PKT(mh, mp, mhip, err) {				\
 	mblk_t *nextp = (mp)->b_next;					\
-	if (((err) = dls_link_header_info((dlp), (mp), (mhip))) == 0) {	\
+	if (((err) = mac_vlan_header_info((mh), (mp), (mhip))) == 0) {	\
 		DLS_STRIP_PADDING((mhip)->mhi_pktsize, (mp));		\
 		if (MBLKL((mp)) < (mhip)->mhi_hdrsize) {		\
 			mblk_t *newmp;					\
@@ -120,7 +120,7 @@ i_dls_link_destructor(void *buf, void *arg)
 				(mp)->b_next = NULL;			\
 				freemsg((mp));				\
 				(mp) = newmp;				\
-				VERIFY(dls_link_header_info((dlp),	\
+				VERIFY(mac_vlan_header_info((mh),	\
 				    (mp), (mhip)) == 0);		\
 				(mp)->b_next = nextp;			\
 				(mp)->b_rptr += (mhip)->mhi_hdrsize;	\
@@ -160,7 +160,7 @@ i_dls_link_subchain(dls_link_t *dlp, mblk_t *mp, const mac_header_info_t *mhip,
 		uint16_t cvid, cpri;
 		int err;
 
-		DLS_PREPARE_PKT(dlp, mp, &cmhi, err);
+		DLS_PREPARE_PKT(dlp->dl_mh, mp, &cmhi, err);
 		if (err != 0)
 			break;
 
@@ -361,7 +361,7 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 		 */
 		accepted = B_FALSE;
 
-		DLS_PREPARE_PKT(dlp, mp, &mhi, err);
+		DLS_PREPARE_PKT(dlp->dl_mh, mp, &mhi, err);
 		if (err != 0) {
 			atomic_add_32(&(dlp->dl_unknowns), 1);
 			nextp = mp->b_next;
@@ -510,7 +510,7 @@ dls_rx_vlan_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 	void				*ds_rx_arg;
 	int				err;
 
-	DLS_PREPARE_PKT(dlp, mp, &mhi, err);
+	DLS_PREPARE_PKT(dlp->dl_mh, mp, &mhi, err);
 	if (err != 0)
 		goto drop;
 
@@ -555,7 +555,7 @@ dls_rx_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 	dls_head_t			*dhp;
 	mod_hash_key_t			key;
 
-	DLS_PREPARE_PKT(dlp, mp, &mhi, err);
+	DLS_PREPARE_PKT(dlp->dl_mh, mp, &mhi, err);
 	if (err != 0)
 		goto drop;
 
@@ -1034,71 +1034,4 @@ dls_link_remove(dls_link_t *dlp, dld_str_t *dsp)
 		dhp->dh_removing = B_FALSE;
 		mutex_exit(&dhp->dh_lock);
 	}
-}
-
-int
-dls_link_header_info(dls_link_t *dlp, mblk_t *mp, mac_header_info_t *mhip)
-{
-	boolean_t	is_ethernet = (dlp->dl_mip->mi_media == DL_ETHER);
-	uint16_t	pvid = mac_get_pvid(dlp->dl_mh);
-	int		err = 0;
-
-	/*
-	 * Packets should always be at least 16 bit aligned.
-	 */
-	ASSERT(IS_P2ALIGNED(mp->b_rptr, sizeof (uint16_t)));
-
-	if ((err = mac_header_info(dlp->dl_mh, mp, mhip)) != 0)
-		return (err);
-
-	/*
-	 * If this is a VLAN-tagged Ethernet packet, then the SAP in the
-	 * mac_header_info_t as returned by mac_header_info() is
-	 * ETHERTYPE_VLAN. We need to grab the ethertype from the VLAN header.
-	 */
-	mhip->mhi_ispvid = B_FALSE;
-	if (is_ethernet && (mhip->mhi_bindsap == ETHERTYPE_VLAN)) {
-		struct ether_vlan_header *evhp;
-		uint16_t sap;
-		mblk_t *tmp = NULL;
-		size_t size;
-
-		size = sizeof (struct ether_vlan_header);
-		if (MBLKL(mp) < size) {
-			/*
-			 * Pullup the message in order to get the MAC header
-			 * infomation. Note that this is a read-only function,
-			 * we keep the input packet intact.
-			 */
-			if ((tmp = msgpullup(mp, size)) == NULL)
-				return (EINVAL);
-
-			mp = tmp;
-		}
-		evhp = (struct ether_vlan_header *)mp->b_rptr;
-		sap = ntohs(evhp->ether_type);
-		(void) mac_sap_verify(dlp->dl_mh, sap, &mhip->mhi_bindsap);
-		mhip->mhi_hdrsize = sizeof (struct ether_vlan_header);
-		mhip->mhi_tci = ntohs(evhp->ether_tci);
-		mhip->mhi_istagged = B_TRUE;
-		freemsg(tmp);
-
-		/*
-		 * If this port has a non-zero PVID, then we have to lie to the
-		 * caller about the VLAN ID.  It's always zero on receive for
-		 * that VLAN.
-		 */
-		if (pvid != VLAN_ID_NONE && VLAN_ID(mhip->mhi_tci) == pvid) {
-			mhip->mhi_tci &= ~(VLAN_ID_MASK << VLAN_ID_SHIFT);
-			mhip->mhi_ispvid = B_TRUE;
-		}
-
-		if (VLAN_CFI(mhip->mhi_tci) != ETHER_CFI)
-			return (EINVAL);
-	} else {
-		mhip->mhi_istagged = B_FALSE;
-		mhip->mhi_tci = 0;
-	}
-
-	return (0);
 }

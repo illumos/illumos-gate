@@ -50,15 +50,17 @@ static fad_checkf_t do_check_local_ip;
 static fad_checkf_t do_check_remote_ip;
 static fad_checkf_t do_check_protocol;
 static fad_checkf_t do_check_local_port;
+static fad_checkf_t do_check_remote_port;
 
 static dladm_status_t do_check_port(char *, boolean_t, flow_desc_t *);
 
 static fattr_desc_t	attr_table[] = {
-	{ "local_ip",	do_check_local_ip },
-	{ "remote_ip",	do_check_remote_ip },
-	{ "transport",	do_check_protocol },
-	{ "local_port",	do_check_local_port },
-	{ "dsfield",	do_check_dsfield },
+	{ "local_ip",		do_check_local_ip },
+	{ "remote_ip",		do_check_remote_ip },
+	{ "transport",		do_check_protocol },
+	{ "local_port",		do_check_local_port },
+	{ "remote_port",	do_check_remote_port },
+	{ "dsfield",		do_check_dsfield },
 };
 
 #define	DLADM_MAX_FLOWATTRS	(sizeof (attr_table) / sizeof (fattr_desc_t))
@@ -162,19 +164,26 @@ do_check_local_port(char *attr_val, flow_desc_t *fdesc)
 }
 
 dladm_status_t
+do_check_remote_port(char *attr_val, flow_desc_t *fdesc)
+{
+	return (do_check_port(attr_val, B_FALSE, fdesc));
+}
+
+dladm_status_t
 do_check_port(char *attr_val, boolean_t local, flow_desc_t *fdesc)
 {
 	char	*endp = NULL;
 	long	val;
 
+	val = strtol(attr_val, &endp, 10);
+	if (val < 1 || val > MAX_PORT || *endp != '\0')
+		return (DLADM_STATUS_INVALID_PORT);
 	if (local) {
 		fdesc->fd_mask |= FLOW_ULP_PORT_LOCAL;
-		val = strtol(attr_val, &endp, 10);
-		if (val < 1 || val > MAX_PORT)
-			return (DLADM_STATUS_INVALID_PORT);
 		fdesc->fd_local_port = htons((uint16_t)val);
 	} else {
-		return (DLADM_STATUS_BADVAL);
+		fdesc->fd_mask |= FLOW_ULP_PORT_REMOTE;
+		fdesc->fd_remote_port = htons((uint16_t)val);
 	}
 
 	return (DLADM_STATUS_OK);
@@ -391,6 +400,9 @@ dladm_flow_attr_port2str(dladm_flow_attr_t *attrp, char *buf, size_t buf_len)
 	if (fdesc.fd_mask & FLOW_ULP_PORT_LOCAL) {
 		(void) snprintf(buf, buf_len, "%d",
 		    ntohs(fdesc.fd_local_port));
+	} else if (fdesc.fd_mask & FLOW_ULP_PORT_REMOTE) {
+		(void) snprintf(buf, buf_len, "%d",
+		    ntohs(fdesc.fd_remote_port));
 	} else {
 		buf[0] = '\0';
 	}

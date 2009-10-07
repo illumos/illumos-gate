@@ -934,7 +934,7 @@ str_mdata_raw_put(dld_str_t *dsp, mblk_t *mp)
 		size += MBLKL(bp);
 	}
 
-	if (dls_link_header_info(dsp->ds_dlp, mp, &mhi) != 0)
+	if (mac_vlan_header_info(dsp->ds_mh, mp, &mhi) != 0)
 		goto discard;
 
 	mac_sdu_get(dsp->ds_mh, NULL, &max_sdu);
@@ -1450,7 +1450,7 @@ str_unitdata_ind(dld_str_t *dsp, mblk_t *mp, boolean_t strip_vlan)
 	/*
 	 * Get the packet header information.
 	 */
-	if (dls_link_header_info(dsp->ds_dlp, mp, &mhi) != 0)
+	if (mac_vlan_header_info(dsp->ds_mh, mp, &mhi) != 0)
 		return (NULL);
 
 	/*

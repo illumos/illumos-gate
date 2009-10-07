@@ -2354,7 +2354,10 @@ flow_transport_match_fe(flow_tab_t *ft, flow_entry_t *f1, flow_entry_t *f2)
 	if ((fd1->fd_mask & FLOW_ULP_PORT_LOCAL) != 0)
 		return (fd1->fd_local_port == fd2->fd_local_port);
 
-	return (fd1->fd_remote_port == fd2->fd_remote_port);
+	if ((fd1->fd_mask & FLOW_ULP_PORT_REMOTE) != 0)
+		return (fd1->fd_remote_port == fd2->fd_remote_port);
+
+	return (B_TRUE);
 }
 
 static flow_ops_t flow_l2_ops = {
@@ -2398,7 +2401,8 @@ static flow_tab_info_t flow_tab_info_list[] = {
 	{&flow_ip_ops, FLOW_IP_VERSION | FLOW_IP_REMOTE, 2},
 	{&flow_ip_ops, FLOW_IP_DSFIELD, 1},
 	{&flow_ip_proto_ops, FLOW_IP_PROTOCOL, 256},
-	{&flow_transport_ops, FLOW_IP_PROTOCOL | FLOW_ULP_PORT_LOCAL, 1024}
+	{&flow_transport_ops, FLOW_IP_PROTOCOL | FLOW_ULP_PORT_LOCAL, 1024},
+	{&flow_transport_ops, FLOW_IP_PROTOCOL | FLOW_ULP_PORT_REMOTE, 1024}
 };
 
 #define	FLOW_MAX_TAB_INFO \

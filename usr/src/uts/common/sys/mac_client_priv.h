@@ -68,6 +68,7 @@ extern boolean_t mac_sap_verify(mac_handle_t, uint32_t, uint32_t *);
 extern mblk_t *mac_header(mac_handle_t, const uint8_t *, uint32_t, mblk_t *,
     size_t);
 extern int mac_header_info(mac_handle_t, mblk_t *, mac_header_info_t *);
+extern int mac_vlan_header_info(mac_handle_t, mblk_t *, mac_header_info_t *);
 extern mblk_t *mac_header_cook(mac_handle_t, mblk_t *);
 extern mblk_t *mac_header_uncook(mac_handle_t, mblk_t *);
 

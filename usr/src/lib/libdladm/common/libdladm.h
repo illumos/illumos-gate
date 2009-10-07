@@ -27,6 +27,7 @@
 #define	_LIBDLADM_H
 
 #include <sys/dls_mgmt.h>
+#include <sys/dld.h>
 #include <sys/dlpi.h>
 
 /*
@@ -224,6 +225,12 @@ extern boolean_t	dladm_valid_linkname(const char *);
 extern boolean_t	dladm_str2interval(char *, uint32_t *);
 extern dladm_status_t	dladm_str2bw(char *, uint64_t *);
 extern const char	*dladm_bw2str(int64_t, char *);
+extern dladm_status_t	dladm_str2pri(char *, mac_priority_level_t *);
+extern const char	*dladm_pri2str(mac_priority_level_t, char *);
+extern dladm_status_t	dladm_str2protect(char *, uint32_t *);
+extern const char	*dladm_protect2str(uint32_t, char *);
+extern dladm_status_t	dladm_str2ipv4addr(char *, void *);
+extern const char	*dladm_ipv4addr2str(void *, char *);
 
 extern dladm_status_t	dladm_parse_flow_props(char *, dladm_arg_list_t **,
 			    boolean_t);

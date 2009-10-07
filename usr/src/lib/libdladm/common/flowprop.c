@@ -493,7 +493,7 @@ dladm_parse_flow_props(char *str, dladm_arg_list_t **listp, boolean_t novalues)
  */
 static dladm_status_t
 i_dladm_flow_proplist_extract_one(dladm_arg_list_t *proplist,
-    const char *name, void *val)
+    const char *name, void *arg)
 {
 	dladm_status_t		status;
 	dladm_arg_info_t	*aip = NULL;
@@ -543,8 +543,8 @@ i_dladm_flow_proplist_extract_one(dladm_arg_list_t *proplist,
 
 			/* Extract kernel structure */
 			if (rpp->rp_extract != NULL) {
-				status = rpp->rp_extract(vdp, val,
-				    aip->ai_count);
+				status = rpp->rp_extract(vdp,
+				    aip->ai_count, arg);
 			} else {
 				status = DLADM_STATUS_BADARG;
 			}

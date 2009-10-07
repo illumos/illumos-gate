@@ -134,6 +134,7 @@ typedef enum {
 	OFMT_ENOFIELDS,		/* no valid output fields */
 	OFMT_EPARSEALL,		/* 'all' invalid in parsable mode */
 	OFMT_EPARSENONE,	/* output fields missing in parsable mode */
+	OFMT_EPARSEWRAP,	/* parsable mode incompatible with wrap mode */
 	OFMT_ENOTEMPLATE	/* no template provided for fields */
 } ofmt_status_t;
 
@@ -169,6 +170,7 @@ extern ofmt_status_t ofmt_open(const char *, const ofmt_field_t *, uint_t,
     uint_t, ofmt_handle_t *);
 
 #define	OFMT_PARSABLE	0x00000001 /* machine parsable mode */
+#define	OFMT_WRAP	0x00000002 /* wrap output if field width is exceeded */
 
 /*
  * ofmt_close() must be called to free resources associated

@@ -157,6 +157,10 @@ SUNWprivate_1.1 {
 	dladm_walk_hwgrp;
 	dladm_pri2str;
 	dladm_str2pri;
+	dladm_protect2str;
+	dladm_str2protect;
+	dladm_ipv4addr2str;
+	dladm_str2ipv4addr;
 	dladm_start_usagelog;
 	dladm_stop_usagelog;
 	dladm_walk_usage_res;

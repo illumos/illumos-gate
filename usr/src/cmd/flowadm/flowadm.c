@@ -163,7 +163,8 @@ typedef struct flow_fields_buf_s
 	char flow_link[MAXLINKNAMELEN];
 	char flow_ipaddr[INET6_ADDRSTRLEN+4];
 	char flow_proto[PROTO_MAXSTR_LEN];
-	char flow_port[PORT_MAXSTR_LEN];
+	char flow_lport[PORT_MAXSTR_LEN];
+	char flow_rport[PORT_MAXSTR_LEN];
 	char flow_dsfield[DSFIELD_MAXSTR_LEN];
 } flow_fields_buf_t;
 
@@ -173,12 +174,14 @@ static ofmt_field_t flow_fields[] = {
 	offsetof(flow_fields_buf_t, flow_name), print_default_cb},
 {  "LINK",	12,
 	offsetof(flow_fields_buf_t, flow_link), print_default_cb},
-{  "IPADDR",	31,
+{  "IPADDR",	25,
 	offsetof(flow_fields_buf_t, flow_ipaddr), print_default_cb},
 {  "PROTO",	7,
 	offsetof(flow_fields_buf_t, flow_proto), print_default_cb},
-{  "PORT",	8,
-	offsetof(flow_fields_buf_t, flow_port), print_default_cb},
+{  "LPORT",	8,
+	offsetof(flow_fields_buf_t, flow_lport), print_default_cb},
+{  "RPORT",	8,
+	offsetof(flow_fields_buf_t, flow_rport), print_default_cb},
 {  "DSFLD",	10,
 	offsetof(flow_fields_buf_t, flow_dsfield), print_default_cb},
 NULL_OFMT}
@@ -344,7 +347,8 @@ char			*altroot = NULL;
 static dladm_handle_t handle = NULL;
 
 static const char *attr_table[] =
-	{"local_ip", "remote_ip", "transport", "local_port", "dsfield"};
+	{"local_ip", "remote_ip", "transport", "local_port", "remote_port",
+	    "dsfield"};
 
 #define	NATTR	(sizeof (attr_table)/sizeof (char *))
 
@@ -909,8 +913,14 @@ print_flow(show_flow_state_t *state, dladm_flow_attr_t *attr,
 	    sizeof (fbuf->flow_ipaddr));
 	(void) dladm_flow_attr_proto2str(attr, fbuf->flow_proto,
 	    sizeof (fbuf->flow_proto));
-	(void) dladm_flow_attr_port2str(attr, fbuf->flow_port,
-	    sizeof (fbuf->flow_port));
+	if ((attr->fa_flow_desc.fd_mask & FLOW_ULP_PORT_LOCAL) != 0) {
+		(void) dladm_flow_attr_port2str(attr, fbuf->flow_lport,
+		    sizeof (fbuf->flow_lport));
+	}
+	if ((attr->fa_flow_desc.fd_mask & FLOW_ULP_PORT_REMOTE) != 0) {
+		(void) dladm_flow_attr_port2str(attr, fbuf->flow_rport,
+		    sizeof (fbuf->flow_rport));
+	}
 	(void) dladm_flow_attr_dsfield2str(attr, fbuf->flow_dsfield,
 	    sizeof (fbuf->flow_dsfield));
 

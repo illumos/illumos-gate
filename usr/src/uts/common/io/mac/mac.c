@@ -2729,6 +2729,7 @@ mac_set_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 	switch (macprop->mp_id) {
 	case MAC_PROP_MAXBW:
 	case MAC_PROP_PRIO:
+	case MAC_PROP_PROTECT:
 	case MAC_PROP_BIND_CPU: {
 		mac_resource_props_t mrp;
 
@@ -2808,6 +2809,7 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize,
 	switch (macprop->mp_id) {
 	case MAC_PROP_MAXBW:
 	case MAC_PROP_PRIO:
+	case MAC_PROP_PROTECT:
 	case MAC_PROP_BIND_CPU: {
 		mac_resource_props_t mrp;
 

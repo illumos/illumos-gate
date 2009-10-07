@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -92,6 +92,7 @@ msgid  "prop"
 msgid  "property"
 msgid  "psSi:l:o:"
 msgid  "remote_ip"
+msgid  "remote_port"
 msgid  "remove-flow"
 msgid  "reset"
 msgid  "reset-flowprop"

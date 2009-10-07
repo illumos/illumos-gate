@@ -211,6 +211,7 @@ typedef enum {
 	MAC_PROP_PVID,
 	MAC_PROP_LLIMIT,
 	MAC_PROP_LDECAY,
+	MAC_PROP_PROTECT,
 	MAC_PROP_PRIVATE = -1
 } mac_prop_id_t;
 

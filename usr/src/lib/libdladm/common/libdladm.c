@@ -30,6 +30,8 @@
 #include <strings.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/dld.h>
@@ -79,6 +81,18 @@ static media_type_t media_type_table[] =  {
 	{ DL_OTHER, 	"Other" }
 };
 #define	MEDIATYPECOUNT	(sizeof (media_type_table) / sizeof (media_type_t))
+
+typedef struct {
+	uint32_t	lp_type;
+	char		*lp_name;
+} link_protect_t;
+
+static link_protect_t link_protect_types[] = {
+	{ MPT_MACNOSPOOF, "mac-nospoof" },
+	{ MPT_IPNOSPOOF, "ip-nospoof" },
+	{ MPT_RESTRICTED, "restricted" }
+};
+#define	LPTYPES	(sizeof (link_protect_types) / sizeof (link_protect_t))
 
 dladm_status_t
 dladm_open(dladm_handle_t *handle)
@@ -834,6 +848,82 @@ dladm_pri2str(mac_priority_level_t pri, char *buf)
 	}
 	(void) snprintf(buf, DLADM_STRSIZE, "%s", dgettext(TEXT_DOMAIN, s));
 	return (buf);
+}
+
+/*
+ * Convert protect string to a value.
+ */
+dladm_status_t
+dladm_str2protect(char *token, uint32_t *ptype)
+{
+	link_protect_t	*lp;
+	int		i;
+
+	for (i = 0; i < LPTYPES; i++) {
+		lp = &link_protect_types[i];
+		if (strcmp(token, lp->lp_name) == 0) {
+			*ptype = lp->lp_type;
+			return (DLADM_STATUS_OK);
+		}
+	}
+	return (DLADM_STATUS_BADVAL);
+}
+
+/*
+ * Convert protect value to a string.
+ */
+const char *
+dladm_protect2str(uint32_t ptype, char *buf)
+{
+	const char	*s = "--";
+	link_protect_t	*lp;
+	int		i;
+
+	for (i = 0; i < LPTYPES; i++) {
+		lp = &link_protect_types[i];
+		if (lp->lp_type == ptype) {
+			s = lp->lp_name;
+			break;
+		}
+	}
+	(void) snprintf(buf, DLADM_STRSIZE, "%s", dgettext(TEXT_DOMAIN, s));
+	return (buf);
+}
+
+/*
+ * Convert an IPv4 address to/from a string.
+ */
+const char *
+dladm_ipv4addr2str(void *addr, char *buf)
+{
+	if (inet_ntop(AF_INET, addr, buf, INET_ADDRSTRLEN) == NULL)
+		buf[0] = 0;
+
+	return (buf);
+}
+
+dladm_status_t
+dladm_str2ipv4addr(char *token, void *addr)
+{
+	return (inet_pton(AF_INET, token, addr) == 1 ?
+	    DLADM_STATUS_OK : DLADM_STATUS_INVALID_IP);
+}
+
+/*
+ * Find the set bits in a mask.
+ * This is used for expanding a bitmask into individual sub-masks
+ * which can be used for further processing.
+ */
+void
+dladm_find_setbits32(uint32_t mask, uint32_t *list, uint32_t *cnt)
+{
+	int	i, c = 0;
+
+	for (i = 0; i < 32; i++) {
+		if (((1 << i) & mask) != 0)
+			list[c++] = 1 << i;
+	}
+	*cnt = c;
 }
 
 void

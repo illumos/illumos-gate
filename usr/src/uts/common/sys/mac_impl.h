@@ -751,6 +751,12 @@ extern void i_mac_group_rem_ring(mac_group_t *, mac_ring_t *, boolean_t);
 
 extern void mac_poll_state_change(mac_handle_t, boolean_t);
 
+extern mblk_t *mac_protect_check(mac_client_handle_t, mblk_t *);
+extern int mac_protect_set(mac_client_handle_t, mac_resource_props_t *);
+extern boolean_t mac_protect_enabled(mac_client_handle_t, uint32_t);
+extern int mac_protect_validate(mac_resource_props_t *);
+extern void mac_protect_update(mac_resource_props_t *, mac_resource_props_t *);
+
 /* Global callbacks into the bridging module (when loaded) */
 extern mac_bridge_tx_t mac_bridge_tx_cb;
 extern mac_bridge_rx_t mac_bridge_rx_cb;

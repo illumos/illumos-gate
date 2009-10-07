@@ -2791,7 +2791,7 @@ mac_tx_cookie_t
 mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
     uint16_t flag, mblk_t **ret_mp)
 {
-	mac_tx_cookie_t		cookie;
+	mac_tx_cookie_t		cookie = NULL;
 	int			error;
 	mac_tx_percpu_t		*mytx;
 	mac_soft_ring_set_t	*srs;
@@ -2811,6 +2811,15 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 			return (NULL);
 		}
 	}
+
+	/*
+	 * If mac protection is enabled, only the permissible packets will be
+	 * returned by mac_protect_check().
+	 */
+	if ((mcip->mci_flent->
+	    fe_resource_props.mrp_mask & MRP_PROTECT) != 0 &&
+	    (mp_chain = mac_protect_check(mch, mp_chain)) == NULL)
+		goto done;
 
 	if (mcip->mci_subflow_tab != NULL &&
 	    mcip->mci_subflow_tab->ft_flow_count > 0 &&
@@ -2836,11 +2845,10 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 	 * of the mac datapath is required to remove this limitation.
 	 */
 	if (srs == NULL) {
-		if (!(flag & MAC_TX_NO_HOLD))
-			MAC_TX_RELE(mcip, mytx);
 		freemsgchain(mp_chain);
-		return (NULL);
+		goto done;
 	}
+
 	srs_tx = &srs->srs_tx;
 	if (srs_tx->st_mode == SRS_TX_DEFAULT &&
 	    (srs->srs_state & SRS_ENQUEUED) == 0 &&
@@ -3225,15 +3233,20 @@ mac_client_set_resources(mac_client_handle_t mch, mac_resource_props_t *mrp)
 
 	if ((mrp->mrp_mask & MRP_MAXBW) || (mrp->mrp_mask & MRP_PRIORITY)) {
 		err = mac_resource_ctl_set(mch, mrp);
-		if (err != 0) {
-			i_mac_perim_exit(mip);
-			return (err);
-		}
+		if (err != 0)
+			goto done;
 	}
 
-	if (mrp->mrp_mask & MRP_CPUS)
+	if (mrp->mrp_mask & MRP_CPUS) {
 		err = mac_cpu_set(mch, mrp);
+		if (err != 0)
+			goto done;
+	}
 
+	if (mrp->mrp_mask & MRP_PROTECT)
+		err = mac_protect_set(mch, mrp);
+
+done:
 	i_mac_perim_exit(mip);
 	return (err);
 }
@@ -3558,6 +3571,62 @@ mac_header_info(mac_handle_t mh, mblk_t *mp, mac_header_info_t *mhip)
 	    mhip));
 }
 
+int
+mac_vlan_header_info(mac_handle_t mh, mblk_t *mp, mac_header_info_t *mhip)
+{
+	mac_impl_t	*mip = (mac_impl_t *)mh;
+	boolean_t	is_ethernet = (mip->mi_info.mi_media == DL_ETHER);
+	int		err = 0;
+
+	/*
+	 * Packets should always be at least 16 bit aligned.
+	 */
+	ASSERT(IS_P2ALIGNED(mp->b_rptr, sizeof (uint16_t)));
+
+	if ((err = mac_header_info(mh, mp, mhip)) != 0)
+		return (err);
+
+	/*
+	 * If this is a VLAN-tagged Ethernet packet, then the SAP in the
+	 * mac_header_info_t as returned by mac_header_info() is
+	 * ETHERTYPE_VLAN. We need to grab the ethertype from the VLAN header.
+	 */
+	if (is_ethernet && (mhip->mhi_bindsap == ETHERTYPE_VLAN)) {
+		struct ether_vlan_header *evhp;
+		uint16_t sap;
+		mblk_t *tmp = NULL;
+		size_t size;
+
+		size = sizeof (struct ether_vlan_header);
+		if (MBLKL(mp) < size) {
+			/*
+			 * Pullup the message in order to get the MAC header
+			 * infomation. Note that this is a read-only function,
+			 * we keep the input packet intact.
+			 */
+			if ((tmp = msgpullup(mp, size)) == NULL)
+				return (EINVAL);
+
+			mp = tmp;
+		}
+		evhp = (struct ether_vlan_header *)mp->b_rptr;
+		sap = ntohs(evhp->ether_type);
+		(void) mac_sap_verify(mh, sap, &mhip->mhi_bindsap);
+		mhip->mhi_hdrsize = sizeof (struct ether_vlan_header);
+		mhip->mhi_tci = ntohs(evhp->ether_tci);
+		mhip->mhi_istagged = B_TRUE;
+		freemsg(tmp);
+
+		if (VLAN_CFI(mhip->mhi_tci) != ETHER_CFI)
+			return (EINVAL);
+	} else {
+		mhip->mhi_istagged = B_FALSE;
+		mhip->mhi_tci = 0;
+	}
+
+	return (0);
+}
+
 mblk_t *
 mac_header_cook(mac_handle_t mh, mblk_t *mp)
 {
@@ -3648,6 +3717,9 @@ mac_update_resources(mac_resource_props_t *nmrp, mac_resource_props_t *cmrp,
 		}
 		if (nmrp->mrp_mask & MRP_CPUS)
 			MAC_COPY_CPUS(nmrp, cmrp);
+
+		if (nmrp->mrp_mask & MRP_PROTECT)
+			mac_protect_update(nmrp, cmrp);
 	}
 }
 
@@ -4148,6 +4220,12 @@ mac_validate_props(mac_resource_props_t *mrp)
 		fanout = mrp->mrp_fanout_mode;
 		if (fanout < 0 || fanout > MCM_CPUS)
 			return (EINVAL);
+	}
+
+	if (mrp->mrp_mask & MRP_PROTECT) {
+		int err = mac_protect_validate(mrp);
+		if (err != 0)
+			return (err);
 	}
 	return (0);
 }

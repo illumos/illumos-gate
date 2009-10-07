@@ -113,7 +113,7 @@ typedef struct mac_cpus_props_s {
 	 * in retargetting the interrupt assignment.
 	 */
 	int32_t			mc_intr_cpu;
-	mac_cpu_mode_t		mc_fanout_mode;		/*  fanout mode */
+	mac_cpu_mode_t		mc_fanout_mode;		/* fanout mode */
 } mac_cpus_t;
 
 /* Priority values */
@@ -123,6 +123,21 @@ typedef enum {
 	MPL_HIGH,
 	MPL_RESET
 } mac_priority_level_t;
+
+/* Protection types */
+#define	MPT_MACNOSPOOF		0x00000001
+#define	MPT_IPNOSPOOF		0x00000002
+#define	MPT_RESTRICTED		0x00000004
+#define	MPT_ALL			(MPT_MACNOSPOOF|MPT_IPNOSPOOF|MPT_RESTRICTED)
+#define	MPT_RESET		0xffffffff
+#define	MPT_MAXIPADDR		32
+
+typedef struct mac_protect_s {
+	uint32_t	mp_types;
+	uint32_t	mp_ipaddrcnt;
+	ipaddr_t	mp_ipaddrs[MPT_MAXIPADDR];
+} mac_protect_t;
+
 
 /* The default priority for links */
 #define	MPL_LINK_DEFAULT		MPL_HIGH
@@ -134,6 +149,7 @@ typedef enum {
 #define	MRP_CPUS		0x00000002 	/* CPU/fanout set */
 #define	MRP_CPUS_USERSPEC	0x00000004 	/* CPU/fanout from user */
 #define	MRP_PRIORITY		0x00000008 	/* Priority set */
+#define	MRP_PROTECT		0x00000010	/* Protection set */
 
 #define	MRP_THROTTLE		MRP_MAXBW
 
@@ -157,6 +173,7 @@ typedef	struct mac_resource_props_s {
 	uint64_t		mrp_maxbw;	/* bandwidth limit in bps */
 	mac_priority_level_t	mrp_priority;	/* relative flow priority */
 	mac_cpus_t		mrp_cpus;
+	mac_protect_t		mrp_protect;
 } mac_resource_props_t;
 
 #define	mrp_ncpus	mrp_cpus.mc_ncpus

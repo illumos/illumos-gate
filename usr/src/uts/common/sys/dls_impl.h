@@ -84,8 +84,6 @@ extern void		dls_link_rele(dls_link_t *);
 extern int		dls_link_rele_by_name(const char *);
 extern void		dls_link_add(dls_link_t *, uint32_t, dld_str_t *);
 extern void		dls_link_remove(dls_link_t *, dld_str_t *);
-extern int		dls_link_header_info(dls_link_t *, mblk_t *,
-			    mac_header_info_t *);
 extern int		dls_link_getzid(const char *, zoneid_t *);
 extern int		dls_link_setzid(const char *, zoneid_t);
 extern dev_info_t	*dls_link_devinfo(dev_t);

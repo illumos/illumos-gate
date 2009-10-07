@@ -613,7 +613,7 @@ GLD_OBJS +=     gld.o gldutil.o
 
 MAC_OBJS +=     mac.o  mac_bcast.o mac_client.o mac_datapath_setup.o mac_flow.o \
 		mac_hio.o mac_mod.o mac_ndd.o mac_provider.o mac_sched.o \
-		mac_soft_ring.o mac_stat.o mac_util.o
+		mac_protect.o mac_soft_ring.o mac_stat.o mac_util.o
 
 MAC_6TO4_OBJS +=	mac_6to4.o
 

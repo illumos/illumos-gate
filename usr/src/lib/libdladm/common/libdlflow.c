@@ -72,6 +72,7 @@ static const char *LOCAL_IP_ADDR = "local_ip";
 static const char *REMOTE_IP_ADDR = "remote_ip";
 static const char *TRANSPORT = "transport";
 static const char *LOCAL_PORT = "local_port";
+static const char *REMOTE_PORT = "remote_port";
 static const char *DSFIELD = "dsfield";
 
 /*
@@ -131,7 +132,6 @@ dladm_flow_parse_db(char *line, dld_flowinfo_t *attr)
 {
 	char		*token;
 	char		*value, *name = NULL;
-	char		*endp = NULL;
 	char		*lasts = NULL;
 	dladm_status_t	status = DLADM_STATUS_FLOW_DB_PARSE_ERR;
 
@@ -156,7 +156,7 @@ dladm_flow_parse_db(char *line, dld_flowinfo_t *attr)
 
 		if (strcmp(name, "linkid") == 0) {
 			if ((attr->fi_linkid =
-			    (uint32_t)strtol(value, &endp, 10)) ==
+			    (uint32_t)strtol(value, NULL, 10)) ==
 			    DATALINK_INVALID_LINKID)
 				goto done;
 
@@ -164,7 +164,7 @@ dladm_flow_parse_db(char *line, dld_flowinfo_t *attr)
 			attr->fi_resource_props.mrp_mask |=
 			    MRP_MAXBW;
 			attr->fi_resource_props.mrp_maxbw =
-			    (uint64_t)strtol(value, &endp, 0);
+			    (uint64_t)strtol(value, NULL, 0);
 
 		} else if (strcmp(name, PRIORITY) == 0) {
 			attr->fi_resource_props.mrp_mask |= MRP_PRIORITY;
@@ -194,14 +194,20 @@ dladm_flow_parse_db(char *line, dld_flowinfo_t *attr)
 		} else if (strcmp(name, TRANSPORT) == 0) {
 			attr->fi_flow_desc.fd_mask |= FLOW_IP_PROTOCOL;
 			attr->fi_flow_desc.fd_protocol =
-			    (uint8_t)strtol(value, &endp, 0);
+			    (uint8_t)strtol(value, NULL, 0);
 
 		} else if (strcmp(name, LOCAL_PORT) == 0) {
 			attr->fi_flow_desc.fd_mask |= FLOW_ULP_PORT_LOCAL;
 			attr->fi_flow_desc.fd_local_port =
-			    (uint16_t)strtol(value, &endp, 10);
+			    (uint16_t)strtol(value, NULL, 10);
 			attr->fi_flow_desc.fd_local_port =
 			    htons(attr->fi_flow_desc.fd_local_port);
+		} else if (strcmp(name, REMOTE_PORT) == 0) {
+			attr->fi_flow_desc.fd_mask |= FLOW_ULP_PORT_REMOTE;
+			attr->fi_flow_desc.fd_remote_port =
+			    (uint16_t)strtol(value, NULL, 10);
+			attr->fi_flow_desc.fd_remote_port =
+			    htons(attr->fi_flow_desc.fd_remote_port);
 		}
 		free(name);
 		name = NULL;
@@ -302,6 +308,10 @@ i_dladm_flow_fput_grp(FILE *fp, dld_flowinfo_t *attr)
 	if (attr->fi_flow_desc.fd_mask & FLOW_ULP_PORT_LOCAL)
 		FPRINTF_ERR(fprintf(fp, "%s=%d\t", LOCAL_PORT,
 		    ntohs(attr->fi_flow_desc.fd_local_port)));
+
+	if (attr->fi_flow_desc.fd_mask & FLOW_ULP_PORT_REMOTE)
+		FPRINTF_ERR(fprintf(fp, "%s=%d\t", REMOTE_PORT,
+		    ntohs(attr->fi_flow_desc.fd_remote_port)));
 
 	FPRINTF_ERR(fprintf(fp, "\n"));
 
