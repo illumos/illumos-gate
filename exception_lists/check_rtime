@@ -127,6 +127,8 @@ UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\.15
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1
 UNUSED_RPATH	/usr/postgres/8.3/lib.*\ from\ .*libpq\.so\.5
 UNUSED_RPATH	/usr/sfw/lib.*\ from\ .*libpq\.so\.5
+UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libsmime3\.so
+UNUSED_RPATH	/usr/lib/mps.*\ from\ .*libssl3\.so
 
 # Unused runpaths for reasons not captured above
 UNUSED_RPATH	/usr/lib/smbsrv.*\ from\ .*libsmb\.so\.1 	# future needs
