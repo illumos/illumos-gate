@@ -38,7 +38,9 @@ LDLIBS += -lcurses -ldtrace
 all install	:= LDLIBS += -lglib-2.0
 
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
+LINTFLAGS += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 LINTFLAGS64 += -erroff=E_NAME_USED_NOT_DEF2
+LINTFLAGS64 += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 
 FILEMODE = 0555
 
