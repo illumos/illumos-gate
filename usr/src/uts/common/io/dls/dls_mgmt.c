@@ -1068,7 +1068,7 @@ dls_devnet_hold_by_dev(dev_t dev, dls_dl_handle_t *ddhp)
 	 * Hold this link to prevent it being detached in case of a
 	 * GLDv3 physical link.
 	 */
-	if (DLS_MINOR2INST(getminor(dev)) < DLS_MAX_MINOR)
+	if (DLS_MINOR2INST(getminor(dev)) <= DLS_MAX_PPA)
 		(void) softmac_hold_device(dev, &ddh);
 
 	rw_enter(&i_dls_devnet_lock, RW_WRITER);

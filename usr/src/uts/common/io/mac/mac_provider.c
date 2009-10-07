@@ -403,7 +403,7 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	dnp->dn_flags |= (DN_GLDV3_DRIVER | DN_NETWORK_DRIVER);
 	UNLOCK_DEV_OPS(&dnp->dn_lock);
 
-	if (mip->mi_minor < MAC_MAX_MINOR + 1) {
+	if (mip->mi_minor <= MAC_MAX_MINOR) {
 		/* Create a style-2 DLPI device */
 		if (ddi_create_minor_node(mip->mi_dip, driver, S_IFCHR, 0,
 		    DDI_NT_NET, CLONE_DEV) != DDI_SUCCESS)

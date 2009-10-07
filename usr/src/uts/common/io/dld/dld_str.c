@@ -155,7 +155,7 @@ i_dld_str_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 		 */
 		if (mh != NULL) {
 			statep->ds_dip = mac_devinfo_get(mh);
-			statep->ds_instance = mac_minor(mh) - 1;
+			statep->ds_instance = DLS_MINOR2INST(mac_minor(mh));
 		}
 		return (MH_WALK_TERMINATE);
 	}
@@ -202,8 +202,8 @@ dld_devt_to_instance(dev_t dev)
 		return (-1);
 
 	/*
-	 * Check for style 2 unassociated node, this is quick and
-	 * easy.  Note that this doesn't *necessarily* work for legacy
+	 * Check for unopened style 1 node.
+	 * Note that this doesn't *necessarily* work for legacy
 	 * devices, but this code is only called within the
 	 * getinfo(9e) implementation for true GLDv3 devices, so it
 	 * doesn't matter.
@@ -228,7 +228,7 @@ dld_devt_to_instance(dev_t dev)
  * instances are attached.  Hence, if a particular provider needs a
  * special mapping (the mac instance != ddi_get_instance()), then it
  * may need to provide its own implmentation using the
- * MAC_MINOR_TO_INSTANCE() function, and translating the returned mac
+ * mac_devt_to_instance() function, and translating the returned mac
  * instance to a devinfo instance.  For dev_t's where the minor number
  * is too large (i.e. > MAC_MAX_MINOR), the provider can call this
  * function indirectly via the mac_getinfo() function.

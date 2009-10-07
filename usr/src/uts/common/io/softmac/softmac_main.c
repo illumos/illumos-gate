@@ -1509,21 +1509,13 @@ softmac_hold_device(dev_t dev, dls_dev_handle_t *ddhp)
 	drvname = ddi_major_to_name(getmajor(dev));
 
 	/*
-	 * Exclude non-physical network device instances, for example, aggr0.
-	 */
-	if (!NETWORK_DRV(getmajor(dev)) || (strcmp(drvname, "aggr") == 0) ||
-	    (strcmp(drvname, "vnic") == 0)) {
-		return (ENOENT);
-	}
-
-	/*
 	 * We have to lookup the device instance using getinfo(9e).
 	 */
 	inst = dev_to_instance(dev);
 	if (inst < 0)
 		return (ENOENT);
 
-	if ((ppa = getminor(dev) - 1) > 1000)
+	if ((ppa = getminor(dev) - 1) > DLS_MAX_PPA)
 		return (ENOENT);
 
 	/*
@@ -1532,6 +1524,19 @@ softmac_hold_device(dev_t dev, dls_dev_handle_t *ddhp)
 	 */
 	if ((dip = ddi_hold_devi_by_instance(getmajor(dev), inst, 0)) == NULL)
 		return (ENOENT);
+
+	/*
+	 * Exclude non-physical network device instances, for example, aggr0.
+	 * Note: this check *must* occur after the dip is held, or else
+	 * NETWORK_DRV might return false incorrectly.  (Essentially, the
+	 * driver needs to be loaded to populate the dev_ops structure
+	 * that NETWORK_DRV checks.)
+	 */
+	if (!NETWORK_DRV(getmajor(dev)) || (strcmp(drvname, "aggr") == 0) ||
+	    (strcmp(drvname, "vnic") == 0)) {
+		ddi_release_devi(dip);
+		return (ENOENT);
+	}
 
 	/*
 	 * This is a network device; wait for its softmac to be registered.
