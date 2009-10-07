@@ -18,13 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-
-/*
- * Block comment which describes the contents of this file.
  */
 
 #include <dlfcn.h>
@@ -178,17 +175,17 @@ sdssc_bind_library(void)
 
 				/*
 				 * If old libsdssc library is there, then
-				 * sdssc_mo_create_begin is not yet supported.
+				 * _sdssc_mo_create_begin is not yet supported.
 				 */
 				if (strcmp(ftp->fname,
-				    "sdssc_mo_create_begin")) {
+				    "_sdssc_mo_create_begin") == 0) {
 					*ftp->fptr = (void *)&not_bound_error;
 					continue;
 				}
 				/*
 				 * If this routine fails to find a single
 				 * entry point that it's expecting
-				 * (except sdssc_mo_create_begin) then
+				 * (except _sdssc_mo_create_begin) then
 				 * setup non-sdssc stubs routines
 				 * as function pointers.
 				 */
