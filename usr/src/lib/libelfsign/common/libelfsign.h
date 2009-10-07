@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LIBELFSIGN_H
 #define	_LIBELFSIGN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,6 +76,7 @@ typedef struct ELFCert_s {
 enum ES_ACTION {
 	ES_GET,
 	ES_GET_CRYPTO,
+	ES_GET_FIPS140,
 	ES_UPDATE,
 	ES_UPDATE_RSA_MD5_SHA1,
 	ES_UPDATE_RSA_SHA1

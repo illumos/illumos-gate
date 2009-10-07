@@ -221,6 +221,12 @@ static crypto_key_ops_t des_key_ops = {
 	des_key_check
 };
 
+static void des_POST(int *);
+
+static crypto_fips140_ops_t des_fips140_ops = {
+	des_POST
+};
+
 static crypto_ops_t des_crypto_ops = {
 	&des_control_ops,
 	NULL,
@@ -235,11 +241,14 @@ static crypto_ops_t des_crypto_ops = {
 	NULL,
 	&des_key_ops,
 	NULL,
-	&des_ctx_ops
+	&des_ctx_ops,
+	NULL,
+	NULL,
+	&des_fips140_ops
 };
 
 static crypto_provider_info_t des_prov_info = {
-	CRYPTO_SPI_VERSION_1,
+	CRYPTO_SPI_VERSION_4,
 	"DES Software Provider",
 	CRYPTO_SW_PROVIDER,
 	{&modlinkage},

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,14 @@ typedef struct swrand_stats {
 extern int random_add_entropy(uint8_t *, size_t, uint_t);
 extern int random_get_bytes(uint8_t *, size_t);
 extern int random_get_pseudo_bytes(uint8_t *, size_t);
+
+/*
+ * Functions for FIPS 140 validated random. Thesse functions should not be used
+ * for early booting kernel modules as modules in a FIPS 140 boundary must wait
+ * until the SMF service "cryptosvc" to run.
+ */
+extern int random_get_bytes_fips140(uint8_t *, size_t);
+extern int random_get_pseudo_bytes_fips140(uint8_t *, size_t);
 
 #endif /* _KERNEL */
 

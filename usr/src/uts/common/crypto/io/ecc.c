@@ -188,6 +188,13 @@ static crypto_nostore_key_ops_t ecc_nostore_key_ops = {
 	ecc_nostore_key_derive
 };
 
+static void ecc_POST(int *);
+
+static crypto_fips140_ops_t ecc_fips140_ops = {
+	ecc_POST
+};
+
+
 static crypto_ops_t ecc_crypto_ops = {
 	&ecc_control_ops,
 	NULL,
@@ -204,11 +211,12 @@ static crypto_ops_t ecc_crypto_ops = {
 	NULL,
 	NULL,
 	NULL,
-	&ecc_nostore_key_ops
+	&ecc_nostore_key_ops,
+	&ecc_fips140_ops
 };
 
 static crypto_provider_info_t ecc_prov_info = {
-	CRYPTO_SPI_VERSION_3,
+	CRYPTO_SPI_VERSION_4,
 	"EC Software Provider",
 	CRYPTO_SW_PROVIDER,
 	{&modlinkage},
@@ -422,7 +430,7 @@ ecc_knzero_random_generator(uint8_t *ran_out, size_t ran_len)
 	uint8_t extrarand[32];
 	size_t extrarand_len;
 
-	if ((rv = random_get_pseudo_bytes(ran_out, ran_len)) != 0)
+	if ((rv = random_get_pseudo_bytes_fips140(ran_out, ran_len)) != 0)
 		return (rv);
 
 	/*
@@ -445,7 +453,7 @@ ecc_knzero_random_generator(uint8_t *ran_out, size_t ran_len)
 		if (ebc == 0) {
 			/* refresh extrarand */
 			extrarand_len = sizeof (extrarand);
-			if ((rv = random_get_pseudo_bytes(extrarand,
+			if ((rv = random_get_pseudo_bytes_fips140(extrarand,
 			    extrarand_len)) != 0) {
 				return (rv);
 			}
@@ -1183,7 +1191,7 @@ ecc_nostore_key_generate_pair(crypto_provider_handle_t provider,
 	bcopy(privKey->publicValue.data, point, xylen);
 	pub_out_template[point_idx].oa_value_len = xylen;
 
-	if ((rv = kcf_get_fips140_mode()) == FIPS140_MODE_ENABLED) {
+	if (kcf_get_fips140_mode() == FIPS140_MODE_ENABLED) {
 		/* Pair-wise consistency test */
 		if ((rv = fips_pairwise_check(privKey)) != CRYPTO_SUCCESS)
 			cmn_err(CE_WARN, "ecc: fips_pairwise_check() "

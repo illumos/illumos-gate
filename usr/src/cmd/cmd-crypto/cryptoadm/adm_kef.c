@@ -1210,12 +1210,10 @@ refresh(void)
 	 * handle fips_status=enabled|disabled
 	 */
 	ptr = pfipslist;
-	if (ptr != NULL) {
-		if (ptr->pent->flag_fips_enabled) {
-			rc = do_fips_actions(FIPS140_ENABLE, REFRESH);
-		} else {
-			rc = do_fips_actions(FIPS140_DISABLE, REFRESH);
-		}
+	if (ptr != NULL && ptr->pent->flag_fips_enabled) {
+		rc = do_fips_actions(FIPS140_ENABLE, REFRESH);
+	} else {
+		rc = do_fips_actions(FIPS140_DISABLE, REFRESH);
 	}
 
 	(void) close(fd);

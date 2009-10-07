@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@ extern "C" {
 #define	CRYPTO_SPI_VERSION_1	1
 #define	CRYPTO_SPI_VERSION_2	2
 #define	CRYPTO_SPI_VERSION_3	3
+#define	CRYPTO_SPI_VERSION_4	4
 
 /*
  * Provider-private handle. This handle is specified by a provider
@@ -490,6 +491,15 @@ typedef struct crypto_nostore_key_ops {
 } crypto_nostore_key_ops_t;
 
 /*
+ * crypto_fips140_ops provides a function for FIPS 140 Power-On Self Test for
+ * those providers that are part of the Cryptographic Framework bounday.  See
+ * crypto_fips140_ops(9s) for details.
+ */
+typedef struct crypto_fips140_ops {
+	void (*fips140_post)(int *);
+} crypto_fips140_ops_t;
+
+/*
  * The crypto_ops(9S) structure contains the structures containing
  * the pointers to functions implemented by cryptographic providers.
  * It is specified as part of the crypto_provider_info(9S)
@@ -523,8 +533,14 @@ typedef struct crypto_ops_v3 {
 	crypto_nostore_key_ops_t		*co_nostore_key_ops;
 } crypto_ops_v3_t;
 
+typedef struct crypto_ops_v4 {
+	crypto_ops_v3_t				v3_ops;
+	crypto_fips140_ops_t			*co_fips140_ops;
+} crypto_ops_v4_t;
+
 typedef struct crypto_ops {
 	union {
+		crypto_ops_v4_t	cou_v4;
 		crypto_ops_v3_t	cou_v3;
 		crypto_ops_v2_t	cou_v2;
 		crypto_ops_v1_t	cou_v1;
@@ -547,6 +563,7 @@ typedef struct crypto_ops {
 #define	co_ctx_ops			cou.cou_v1.co_ctx_ops
 #define	co_mech_ops			cou.cou_v2.co_mech_ops
 #define	co_nostore_key_ops		cou.cou_v3.co_nostore_key_ops
+#define	co_fips140_ops			cou.cou_v4.co_fips140_ops
 
 /*
  * Provider device specification passed during registration.

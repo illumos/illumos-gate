@@ -271,6 +271,150 @@ cryptosvc_is_down(void)
 	return (ret);
 }
 
+
+/* Generic function for all door calls to kcfd. */
+ELFsign_status_t
+kcfd_door_call(char *fullpath, boolean_t fips140, CK_RV *rv)
+{
+	boolean_t	try_door_open_again = B_FALSE;
+	int		 kcfdfd = -1;
+	door_arg_t	darg;
+	kcf_door_arg_t *kda = NULL;
+	kcf_door_arg_t *rkda = NULL;
+	int		r;
+	int		is_cryptosvc_up_count = 0;
+	int		door_errno = 0;
+	ELFsign_status_t estatus = ELFSIGN_UNKNOWN;
+
+open_door_file:
+	while ((kcfdfd = open(_PATH_KCFD_DOOR, O_RDONLY)) == -1) {
+		/* save errno and test for EINTR or EAGAIN */
+		door_errno = errno;
+		if (door_errno == EINTR ||
+		    door_errno == EAGAIN)
+			continue;
+		/* if disabled or maintenance mode - bail */
+		if (cryptosvc_is_down())
+			break;
+		/* exceeded our number of tries? */
+		if (is_cryptosvc_up_count > MAX_CRYPTOSVC_ONLINE_TRIES)
+			break;
+		/* any other state, try again up to 1/2 minute */
+		(void) sleep(5);
+		is_cryptosvc_up_count++;
+	}
+	if (kcfdfd == -1) {
+		if (!cryptosvc_is_online()) {
+			cryptoerror(LOG_ERR, "libpkcs11: unable to open"
+			    " kcfd door_file %s: %s.  %s is not online."
+			    " (see svcs -xv for details).",
+			    _PATH_KCFD_DOOR, strerror(door_errno),
+			    CRYPTOSVC_DEFAULT_INSTANCE_FMRI);
+		} else {
+			cryptoerror(LOG_ERR, "libpkcs11: unable to open"
+			    " kcfd door_file %s: %s.", _PATH_KCFD_DOOR,
+			    strerror(door_errno));
+		}
+		*rv = CKR_CRYPTOKI_NOT_INITIALIZED;
+		estatus = ELFSIGN_UNKNOWN;
+		goto verifycleanup;
+	}
+
+	/* Mark the door "close on exec" */
+	(void) fcntl(kcfdfd, F_SETFD, FD_CLOEXEC);
+
+	if ((kda = malloc(sizeof (kcf_door_arg_t))) == NULL) {
+		cryptoerror(LOG_ERR, "libpkcs11: malloc of kda "
+		    "failed: %s", strerror(errno));
+		goto verifycleanup;
+	}
+
+	if (fips140 == B_TRUE)
+		kda->da_version = KCFD_FIPS140_INTCHECK;
+	else {
+		kda->da_version = KCF_KCFD_VERSION1;
+		(void) strlcpy(kda->da_u.filename, fullpath,
+		    strlen(fullpath) + 1);
+	}
+
+	kda->da_iskernel = B_FALSE;
+
+	darg.data_ptr = (char *)kda;
+	darg.data_size = sizeof (kcf_door_arg_t);
+	darg.desc_ptr = NULL;
+	darg.desc_num = 0;
+	darg.rbuf = (char *)kda;
+	darg.rsize = sizeof (kcf_door_arg_t);
+
+	while ((r = door_call(kcfdfd, &darg)) != 0) {
+		/* save errno and test for certain errors */
+		door_errno = errno;
+		if (door_errno == EINTR || door_errno == EAGAIN)
+			continue;
+		/* if disabled or maintenance mode - bail */
+		if (cryptosvc_is_down())
+			break;
+		/* exceeded our number of tries? */
+		if (is_cryptosvc_up_count > MAX_CRYPTOSVC_ONLINE_TRIES)
+			break;
+			/* if stale door_handle, retry the open */
+		if (door_errno == EBADF) {
+			try_door_open_again = B_TRUE;
+			is_cryptosvc_up_count++;
+			(void) sleep(5);
+			goto verifycleanup;
+		} else
+			break;
+		}
+
+	if (r != 0) {
+		if (!cryptosvc_is_online()) {
+			cryptoerror(LOG_ERR, "%s is not online "
+			    " - unable to utilize cryptographic "
+			    "services.  (see svcs -xv for details).",
+			    CRYPTOSVC_DEFAULT_INSTANCE_FMRI);
+		} else {
+			cryptoerror(LOG_ERR, "libpkcs11: door_call "
+			    "of door_file %s failed with error %s.",
+			    _PATH_KCFD_DOOR, strerror(door_errno));
+		}
+		*rv = CKR_CRYPTOKI_NOT_INITIALIZED;
+		estatus = ELFSIGN_UNKNOWN;
+		goto verifycleanup;
+	}
+
+	/*LINTED*/
+	rkda = (kcf_door_arg_t *)darg.rbuf;
+	if ((fips140 == B_FALSE && rkda->da_version != KCF_KCFD_VERSION1) ||
+	    (fips140 == B_TRUE && rkda->da_version != KCFD_FIPS140_INTCHECK)) {
+		cryptoerror(LOG_ERR,
+		    "libpkcs11: kcfd and libelfsign versions "
+		    "don't match: got %d expected %d", rkda->da_version,
+		    (fips140) ? KCFD_FIPS140_INTCHECK : KCF_KCFD_VERSION1);
+		goto verifycleanup;
+	}
+	estatus = rkda->da_u.result.status;
+verifycleanup:
+	if (kcfdfd != -1) {
+		(void) close(kcfdfd);
+	}
+	if (rkda != NULL && rkda != kda)
+		(void) munmap((char *)rkda, darg.rsize);
+	if (kda != NULL) {
+		bzero(kda, sizeof (kda));
+		free(kda);
+		kda = NULL;
+		rkda = NULL;	/* rkda is an alias of kda */
+	}
+	if (try_door_open_again) {
+		try_door_open_again = B_FALSE;
+		goto open_door_file;
+	}
+
+	return (estatus);
+}
+
+
 /*
  * For each provider found in pkcs11.conf: expand $ISA if necessary,
  * verify the module is signed, load the provider, find all of its
@@ -313,14 +457,18 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 
 	ELFsign_status_t estatus = ELFSIGN_UNKNOWN;
 	char *estatus_str = NULL;
-	int kcfdfd = -1;
-	door_arg_t	darg;
-	kcf_door_arg_t *kda = NULL;
-	kcf_door_arg_t *rkda = NULL;
-	int r;
-	int		is_cryptosvc_up_count = 0;
-	int		door_errno = 0;
-	boolean_t	try_door_open_again = B_FALSE;
+	int fips140_mode = CRYPTO_FIPS_MODE_DISABLED;
+
+	/* Check FIPS 140 configuration and execute check if enabled */
+	(void) get_fips_mode(&fips140_mode);
+	if (fips140_mode) {
+		estatus = kcfd_door_call(NULL, B_TRUE, &rv);
+		if (estatus != ELFSIGN_SUCCESS) {
+			cryptoerror(LOG_ERR, "libpkcs11: failed FIPS 140 "
+			    "integrity check.");
+			return (CKR_GENERAL_ERROR);
+		}
+	}
 
 	phead = pplist;
 
@@ -538,123 +686,7 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		 * kcfd libelfsign door protocol to use and fd instead
 		 * of a path - but that wouldn't work in the kernel case.
 		 */
-open_door_file:
-		while ((kcfdfd = open(_PATH_KCFD_DOOR, O_RDONLY)) == -1) {
-			/* save errno and test for EINTR or EAGAIN */
-			door_errno = errno;
-			if (door_errno == EINTR ||
-			    door_errno == EAGAIN)
-				continue;
-			/* if disabled or maintenance mode - bail */
-			if (cryptosvc_is_down())
-				break;
-			/* exceeded our number of tries? */
-			if (is_cryptosvc_up_count > MAX_CRYPTOSVC_ONLINE_TRIES)
-				break;
-			/* any other state, try again up to 1/2 minute */
-			(void) sleep(5);
-			is_cryptosvc_up_count++;
-		}
-		if (kcfdfd == -1) {
-			if (!cryptosvc_is_online()) {
-				cryptoerror(LOG_ERR, "libpkcs11: unable to open"
-				    " kcfd door_file %s: %s.  %s is not online."
-				    " (see svcs -xv for details).",
-				    _PATH_KCFD_DOOR, strerror(door_errno),
-				    CRYPTOSVC_DEFAULT_INSTANCE_FMRI);
-			} else {
-				cryptoerror(LOG_ERR, "libpkcs11: unable to open"
-				    " kcfd door_file %s: %s.", _PATH_KCFD_DOOR,
-				    strerror(door_errno));
-			}
-			rv = CKR_CRYPTOKI_NOT_INITIALIZED;
-			estatus = ELFSIGN_UNKNOWN;
-			goto verifycleanup;
-		}
-
-		/* Mark the door "close on exec" */
-		(void) fcntl(kcfdfd, F_SETFD, FD_CLOEXEC);
-
-		if ((kda = malloc(sizeof (kcf_door_arg_t))) == NULL) {
-			cryptoerror(LOG_ERR, "libpkcs11: malloc of kda "
-			    "failed: %s", strerror(errno));
-			goto verifycleanup;
-		}
-		kda->da_version = KCF_KCFD_VERSION1;
-		kda->da_iskernel = B_FALSE;
-		(void) strlcpy(kda->da_u.filename, fullpath,
-		    strlen(fullpath) + 1);
-
-		darg.data_ptr = (char *)kda;
-		darg.data_size = sizeof (kcf_door_arg_t);
-		darg.desc_ptr = NULL;
-		darg.desc_num = 0;
-		darg.rbuf = (char *)kda;
-		darg.rsize = sizeof (kcf_door_arg_t);
-
-		while ((r = door_call(kcfdfd, &darg)) != 0) {
-			/* save errno and test for certain errors */
-			door_errno = errno;
-			if (door_errno == EINTR || door_errno == EAGAIN)
-				continue;
-			/* if disabled or maintenance mode - bail */
-			if (cryptosvc_is_down())
-				break;
-			/* exceeded our number of tries? */
-			if (is_cryptosvc_up_count > MAX_CRYPTOSVC_ONLINE_TRIES)
-				break;
-			/* if stale door_handle, retry the open */
-			if (door_errno == EBADF) {
-				try_door_open_again = B_TRUE;
-				is_cryptosvc_up_count++;
-				(void) sleep(5);
-				goto verifycleanup;
-			} else
-				break;
-		}
-
-		if (r != 0) {
-			if (!cryptosvc_is_online()) {
-				cryptoerror(LOG_ERR, "%s is not online "
-				    " - unable to utilize cryptographic "
-				    "services.  (see svcs -xv for details).",
-				    CRYPTOSVC_DEFAULT_INSTANCE_FMRI);
-			} else {
-				cryptoerror(LOG_ERR, "libpkcs11: door_call "
-				    "of door_file %s failed with error %s.",
-				    _PATH_KCFD_DOOR, strerror(door_errno));
-			}
-			rv = CKR_CRYPTOKI_NOT_INITIALIZED;
-			estatus = ELFSIGN_UNKNOWN;
-			goto verifycleanup;
-		}
-
-		/*LINTED*/
-		rkda = (kcf_door_arg_t *)darg.rbuf;
-		if (rkda->da_version != KCF_KCFD_VERSION1) {
-			cryptoerror(LOG_ERR,
-			    "libpkcs11: kcfd and libelfsign versions "
-			    "don't match: got %d expected %d",
-			    rkda->da_version, KCF_KCFD_VERSION1);
-			goto verifycleanup;
-		}
-		estatus = rkda->da_u.result.status;
-verifycleanup:
-		if (kcfdfd != -1) {
-			(void) close(kcfdfd);
-		}
-		if (rkda != NULL && rkda != kda)
-			(void) munmap((char *)rkda, darg.rsize);
-		if (kda != NULL) {
-			bzero(kda, sizeof (kda));
-			free(kda);
-			kda = NULL;
-			rkda = NULL;	/* rkda is an alias of kda */
-		}
-		if (try_door_open_again) {
-			try_door_open_again = B_FALSE;
-			goto open_door_file;
-		}
+		estatus = kcfd_door_call(fullpath, B_FALSE, &rv);
 
 		switch (estatus) {
 		case ELFSIGN_UNKNOWN:

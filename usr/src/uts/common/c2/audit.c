@@ -2180,6 +2180,11 @@ audit_cryptoadm(int cmd, char *module_name, crypto_mech_name_t *mech_names,
 			    "op=CRYPTO_LOAD_DOOR, return_val=%d", rv);
 		break;
 
+	case CRYPTO_FIPS140_SET:
+		(void) snprintf(buffer, sizeof (buffer),
+		    "op=CRYPTO_FIPS140_SET, fips_state=%d", rv);
+		break;
+
 	default:
 		return;
 	}

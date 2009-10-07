@@ -48,6 +48,7 @@
 #include <sys/crypto/sched_impl.h>
 #include <sys/crypto/ioctladmin.h>
 #include <c2/audit.h>
+#include <sys/disp.h>
 
 /*
  * DDI entry points.
@@ -61,9 +62,6 @@ static int cryptoadm_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
 extern void audit_cryptoadm(int, char *, crypto_mech_name_t *, uint_t,
     uint_t, uint32_t, int);
-
-kmutex_t fips140_mode_lock;
-extern uint32_t global_fips140_mode;
 
 /*
  * Module linkage.
@@ -808,14 +806,15 @@ out2:
 }
 
 /*
- * This function enables/disables FIPS140 mode or gets the  current
- * FIPS140 mode status.
+ * This function enables/disables FIPS140 mode or gets the current
+ * FIPS 140 mode status.
  *
- * Enable or disable FIPS140 ioctl operation name:
- *	FIPS140_ENABLE or FIPS140_DISABLE
- *
- * Global fips140 mode status in kernel:
- *	FIPS140_MODE_ENABLED or FIPS140_MODE_DISABLED
+ * CRYPTO_FIPS140_STATUS: Returns back the value of global_fips140_mode.
+ * CRYPTO_FIPS140_SET: Recognizes 2 operations from userland:
+ *                     FIPS140_ENABLE or FIPS140_DISABLE. These can only be
+ *                     called when global_fips140_mode is FIPS140_MODE_UNSET
+ *                     as they are only operations that can be performed at
+ *                     bootup.
  */
 /* ARGSUSED */
 static int
@@ -833,17 +832,42 @@ fips140_actions(dev_t dev, caddr_t arg, int mode, int *rval, int cmd)
 		fips140_info.fips140_status = global_fips140_mode;
 		break;
 	case CRYPTO_FIPS140_SET:
+		/* If the mode has been determined, there is nothing to set */
 		mutex_enter(&fips140_mode_lock);
-		if (fips140_info.fips140_op == FIPS140_ENABLE)
-			global_fips140_mode = FIPS140_MODE_ENABLED;
-		else if (fips140_info.fips140_op == FIPS140_DISABLE)
+
+		if (fips140_info.fips140_op == FIPS140_ENABLE &&
+		    global_fips140_mode == FIPS140_MODE_UNSET) {
+			/*
+			 * If FIPS 140 is enabled, all approriate modules
+			 * must be loaded and validated.  This can be done in
+			 * the background as the rest of the OS comes up.
+			 */
+			global_fips140_mode = FIPS140_MODE_VALIDATING;
+			(void) thread_create(NULL, 0, kcf_fips140_validate,
+			    NULL, 0, &p0, TS_RUN, MAXCLSYSPRI);
+			cv_signal(&cv_fips140);
+
+		} else if (fips140_info.fips140_op == FIPS140_DISABLE &&
+		    global_fips140_mode == FIPS140_MODE_UNSET) {
+			/*
+			 * If FIPS 140 is not enabled, any modules that are
+			 * waiting for validation must be released so they
+			 * can be verified.
+			 */
 			global_fips140_mode = FIPS140_MODE_DISABLED;
-		else {
+			kcf_activate();
+			cv_signal(&cv_fips140);
+
+		} else if (fips140_info.fips140_op != FIPS140_DISABLE &&
+		    fips140_info.fips140_op != FIPS140_ENABLE) {
 			rv = CRYPTO_ARGUMENTS_BAD;
-			error = CRYPTO_FAILED;
 		}
+
 		mutex_exit(&fips140_mode_lock);
 		break;
+
+	default:
+		rv = CRYPTO_ARGUMENTS_BAD;
 	}
 
 	fips140_info.fips140_return_value = rv;

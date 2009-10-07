@@ -565,6 +565,7 @@ typedef enum cmd_type {
 #define	CRYPTO_MODVERIFICATION_FAILED		0x00000050
 #define	CRYPTO_OLD_CTX_TEMPLATE			0x00000051
 #define	CRYPTO_WEAK_KEY				0x00000052
+#define	CRYPTO_FIPS140_ERROR			0x00000053
 
 /*
  * Special values that can be used to indicate that information is unavailable

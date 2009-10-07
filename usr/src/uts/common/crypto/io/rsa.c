@@ -274,6 +274,12 @@ static crypto_ctx_ops_t rsa_ctx_ops = {
 	rsa_free_context
 };
 
+static void rsa_POST(int *);
+
+static crypto_fips140_ops_t rsa_fips140_ops = {
+	rsa_POST
+};
+
 static crypto_ops_t rsa_crypto_ops = {
 	&rsa_control_ops,
 	NULL,
@@ -288,11 +294,14 @@ static crypto_ops_t rsa_crypto_ops = {
 	NULL,
 	NULL,
 	NULL,
-	&rsa_ctx_ops
+	&rsa_ctx_ops,
+	NULL,
+	NULL,
+	&rsa_fips140_ops
 };
 
 static crypto_provider_info_t rsa_prov_info = {
-	CRYPTO_SPI_VERSION_1,
+	CRYPTO_SPI_VERSION_4,
 	"RSA Software Provider",
 	CRYPTO_SW_PROVIDER,
 	{&modlinkage},
@@ -448,7 +457,7 @@ knzero_random_generator(uint8_t *ran_out, size_t ran_len)
 	uint8_t extrarand[32];
 	size_t extrarand_len;
 
-	if ((rv = random_get_pseudo_bytes(ran_out, ran_len)) != 0)
+	if ((rv = random_get_pseudo_bytes_fips140(ran_out, ran_len)) != 0)
 		return (rv);
 
 	/*
@@ -471,7 +480,7 @@ knzero_random_generator(uint8_t *ran_out, size_t ran_len)
 		if (ebc == 0) {
 			/* refresh extrarand */
 			extrarand_len = sizeof (extrarand);
-			if ((rv = random_get_pseudo_bytes(extrarand,
+			if ((rv = random_get_pseudo_bytes_fips140(extrarand,
 			    extrarand_len)) != 0) {
 				return (rv);
 			}

@@ -306,6 +306,14 @@ allocate_ops_v3(crypto_ops_t *src, crypto_ops_t *dst)
 		    kmem_alloc(sizeof (crypto_nostore_key_ops_t), KM_SLEEP);
 }
 
+static void
+allocate_ops_v4(crypto_ops_t *src, crypto_ops_t *dst)
+{
+	if (src->co_fips140_ops != NULL)
+		dst->co_fips140_ops =
+		    kmem_alloc(sizeof (crypto_fips140_ops_t), KM_SLEEP);
+}
+
 /*
  * Allocate a provider descriptor. mech_list_count specifies the
  * number of mechanisms supported by the providers, and is used
@@ -353,8 +361,10 @@ kcf_alloc_provider_desc(crypto_provider_info_t *info)
 		allocate_ops_v1(src_ops, desc->pd_ops_vector, &mech_list_count);
 		if (info->pi_interface_version >= CRYPTO_SPI_VERSION_2)
 			allocate_ops_v2(src_ops, desc->pd_ops_vector);
-		if (info->pi_interface_version == CRYPTO_SPI_VERSION_3)
+		if (info->pi_interface_version >= CRYPTO_SPI_VERSION_3)
 			allocate_ops_v3(src_ops, desc->pd_ops_vector);
+		if (info->pi_interface_version == CRYPTO_SPI_VERSION_4)
+			allocate_ops_v4(src_ops, desc->pd_ops_vector);
 	}
 
 	desc->pd_mech_list_count = mech_list_count;
@@ -468,6 +478,10 @@ kcf_free_provider_desc(kcf_provider_desc_t *desc)
 		if (desc->pd_ops_vector->co_nostore_key_ops != NULL)
 			kmem_free(desc->pd_ops_vector->co_nostore_key_ops,
 			    sizeof (crypto_nostore_key_ops_t));
+
+		if (desc->pd_ops_vector->co_fips140_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_fips140_ops,
+			    sizeof (crypto_fips140_ops_t));
 
 		kmem_free(desc->pd_ops_vector, sizeof (crypto_ops_t));
 	}
@@ -857,9 +871,11 @@ kcf_prov_tab_dump(char *message)
 
 /*
  * This function goes through the provider table and verifies
- * any unverified providers.
+ * any KCF_PROV_UNVERIFIED providers.
  *
- * This is called when kcfd is up and the door handle is ready.
+ * This is called when kcfd is up and the door handle is ready.  It is
+ * again called when the status of FIPS 140 has been determined, so providers
+ * delayed by FIPS 140 can now be verified.
  */
 void
 verify_unverified_providers()

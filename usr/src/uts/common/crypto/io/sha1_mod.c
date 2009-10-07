@@ -163,6 +163,12 @@ static crypto_ctx_ops_t sha1_ctx_ops = {
 	sha1_free_context
 };
 
+static void sha1_POST(int *);
+
+static crypto_fips140_ops_t sha1_fips140_ops = {
+	sha1_POST
+};
+
 static crypto_ops_t sha1_crypto_ops = {
 	&sha1_control_ops,
 	&sha1_digest_ops,
@@ -177,11 +183,14 @@ static crypto_ops_t sha1_crypto_ops = {
 	NULL,
 	NULL,
 	NULL,
-	&sha1_ctx_ops
+	&sha1_ctx_ops,
+	NULL,
+	NULL,
+	&sha1_fips140_ops
 };
 
 static crypto_provider_info_t sha1_prov_info = {
-	CRYPTO_SPI_VERSION_1,
+	CRYPTO_SPI_VERSION_4,
 	"SHA1 Software Provider",
 	CRYPTO_SW_PROVIDER,
 	{&modlinkage},

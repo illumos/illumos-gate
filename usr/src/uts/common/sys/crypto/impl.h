@@ -139,6 +139,7 @@ typedef struct kcf_prov_cpu {
 typedef enum {
 	KCF_PROV_ALLOCATED = 1,
 	KCF_PROV_UNVERIFIED,
+	KCF_PROV_UNVERIFIED_FIPS140,
 	KCF_PROV_VERIFICATION_FAILED,
 	/*
 	 * state < KCF_PROV_READY means the provider can not
@@ -523,6 +524,13 @@ typedef struct crypto_session_data {
 
 #define	KCF_MAX_PIN_LEN			1024
 
+/* Global FIPS 140 mode variable */
+extern uint32_t global_fips140_mode;
+/* Global FIPS 140 mode lock */
+extern kmutex_t fips140_mode_lock;
+/* Conditional variable for kcf to wait until kcfd tells the FIPS mode status */
+extern kcondvar_t cv_fips140;
+
 /*
  * Per-minor info.
  *
@@ -581,6 +589,7 @@ extern rctl_hndl_t rc_project_crypto_mem;
 #define	KCF_PROV_MECH_OPS(pd)		((pd)->pd_ops_vector->co_mech_ops)
 #define	KCF_PROV_NOSTORE_KEY_OPS(pd)	\
 	((pd)->pd_ops_vector->co_nostore_key_ops)
+#define	KCF_PROV_FIPS140_OPS(pd)	((pd)->pd_ops_vector->co_fips140_ops)
 
 /*
  * Wrappers for crypto_control_ops(9S) entry points.
@@ -1313,6 +1322,7 @@ int crypto_load_soft_config(caddr_t name, uint_t count,
 int crypto_load_door(uint_t did);
 void crypto_free_mech_list(crypto_mech_name_t *list, uint_t count);
 void crypto_free_dev_list(crypto_dev_list_entry_t *list, uint_t count);
+extern void kcf_activate();
 
 /* Miscellaneous */
 int crypto_get_mechanism_number(caddr_t name, crypto_mech_type_t *number);
@@ -1395,8 +1405,12 @@ extern int kcf_policy_load_soft_disabled(char *, uint_t, crypto_mech_name_t *,
     uint_t *, crypto_mech_name_t **);
 extern int kcf_policy_load_dev_disabled(char *, uint_t, uint_t,
     crypto_mech_name_t *, uint_t *, crypto_mech_name_t **);
-extern boolean_t in_soft_config_list(char *);
+extern void remove_soft_config(char *);
+
+/* FIPS 140 functions */
 extern int kcf_get_fips140_mode(void);
+extern void kcf_fips140_validate();
+extern void kcf_activate();
 
 #endif	/* _KERNEL */
 

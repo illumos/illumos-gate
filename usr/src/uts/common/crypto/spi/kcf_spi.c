@@ -38,6 +38,7 @@
 #include <sys/crypto/impl.h>
 #include <sys/crypto/sched_impl.h>
 #include <sys/crypto/spi.h>
+#include <sys/crypto/ioctladmin.h>
 #include <sys/taskq.h>
 #include <sys/disp.h>
 #include <sys/kstat.h>
@@ -108,6 +109,12 @@ copy_ops_vector_v3(crypto_ops_t *src_ops, crypto_ops_t *dst_ops)
 	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_nostore_key_ops);
 }
 
+static void
+copy_ops_vector_v4(crypto_ops_t *src_ops, crypto_ops_t *dst_ops)
+{
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_fips140_ops);
+}
+
 /*
  * This routine is used to add cryptographic providers to the KEF framework.
  * Providers pass a crypto_provider_info structure to crypto_register_provider()
@@ -120,15 +127,14 @@ int
 crypto_register_provider(crypto_provider_info_t *info,
     crypto_kcf_provider_handle_t *handle)
 {
-	int need_verify;
+	int need_fips140_verify, need_verify = 1;
 	struct modctl *mcp;
 	char *name;
 	char ks_name[KSTAT_STRLEN];
-
 	kcf_provider_desc_t *prov_desc = NULL;
 	int ret = CRYPTO_ARGUMENTS_BAD;
 
-	if (info->pi_interface_version > CRYPTO_SPI_VERSION_3)
+	if (info->pi_interface_version > CRYPTO_SPI_VERSION_4)
 		return (CRYPTO_VERSION_MISMATCH);
 
 	/*
@@ -177,8 +183,12 @@ crypto_register_provider(crypto_provider_info_t *info,
 			    prov_desc->pd_ops_vector);
 			prov_desc->pd_flags = info->pi_flags;
 		}
-		if (info->pi_interface_version == CRYPTO_SPI_VERSION_3) {
+		if (info->pi_interface_version >= CRYPTO_SPI_VERSION_3) {
 			copy_ops_vector_v3(info->pi_ops_vector,
+			    prov_desc->pd_ops_vector);
+		}
+		if (info->pi_interface_version == CRYPTO_SPI_VERSION_4) {
+			copy_ops_vector_v4(info->pi_ops_vector,
 			    prov_desc->pd_ops_vector);
 		}
 	}
@@ -239,6 +249,15 @@ crypto_register_provider(crypto_provider_info_t *info,
 	if ((need_verify = kcf_need_signature_verification(prov_desc)) == -1) {
 		undo_register_provider(prov_desc, B_TRUE);
 		ret = CRYPTO_MODVERIFICATION_FAILED;
+		goto bail;
+	}
+
+	if ((need_fips140_verify =
+	    kcf_need_fips140_verification(prov_desc)) == -1) {
+		mutex_enter(&prov_desc->pd_lock);
+		prov_desc->pd_state = KCF_PROV_VERIFICATION_FAILED;
+		mutex_exit(&prov_desc->pd_lock);
+		ret = CRYPTO_FIPS140_ERROR;
 		goto bail;
 	}
 
@@ -317,7 +336,20 @@ crypto_register_provider(crypto_provider_info_t *info,
 	if (prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER)
 		process_logical_providers(info, prov_desc);
 
+	/* This provider needs to wait until we know the FIPS 140 status */
+	if (need_fips140_verify == 1) {
+		mutex_enter(&prov_desc->pd_lock);
+		prov_desc->pd_state = KCF_PROV_UNVERIFIED_FIPS140;
+		mutex_exit(&prov_desc->pd_lock);
+		goto exit;
+	}
+
+	/* This provider needs to have the signature verified */
 	if (need_verify == 1) {
+		mutex_enter(&prov_desc->pd_lock);
+		prov_desc->pd_state = KCF_PROV_UNVERIFIED;
+		mutex_exit(&prov_desc->pd_lock);
+
 		/* kcf_verify_signature routine will release this hold */
 		KCF_PROV_REFHOLD(prov_desc);
 
@@ -346,6 +378,7 @@ crypto_register_provider(crypto_provider_info_t *info,
 		kcf_do_notify(prov_desc, B_TRUE);
 	}
 
+exit:
 	*handle = prov_desc->pd_kcf_prov_handle;
 	ret = CRYPTO_SUCCESS;
 

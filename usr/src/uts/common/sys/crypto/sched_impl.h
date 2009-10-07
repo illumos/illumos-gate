@@ -524,6 +524,7 @@ extern void kcf_free_context(kcf_context_t *);
 
 extern int kcf_svc_wait(int *);
 extern int kcf_svc_do_run(void);
+extern int kcf_need_fips140_verification(kcf_provider_desc_t *);
 extern int kcf_need_signature_verification(kcf_provider_desc_t *);
 extern void kcf_verify_signature(void *);
 extern struct modctl *kcf_get_modctl(crypto_provider_info_t *);

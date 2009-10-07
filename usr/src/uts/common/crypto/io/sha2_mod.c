@@ -189,6 +189,12 @@ static crypto_ctx_ops_t sha2_ctx_ops = {
 	sha2_free_context
 };
 
+static void sha2_POST(int *);
+
+static crypto_fips140_ops_t sha2_fips140_ops = {
+	sha2_POST
+};
+
 static crypto_ops_t sha2_crypto_ops = {
 	&sha2_control_ops,
 	&sha2_digest_ops,
@@ -203,11 +209,14 @@ static crypto_ops_t sha2_crypto_ops = {
 	NULL,
 	NULL,
 	NULL,
-	&sha2_ctx_ops
+	&sha2_ctx_ops,
+	NULL,
+	NULL,
+	&sha2_fips140_ops
 };
 
 static crypto_provider_info_t sha2_prov_info = {
-	CRYPTO_SPI_VERSION_1,
+	CRYPTO_SPI_VERSION_4,
 	"SHA2 Software Provider",
 	CRYPTO_SW_PROVIDER,
 	{&modlinkage},

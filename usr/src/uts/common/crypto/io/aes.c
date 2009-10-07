@@ -187,6 +187,12 @@ static crypto_ctx_ops_t aes_ctx_ops = {
 	aes_free_context
 };
 
+static void aes_POST(int *);
+
+static crypto_fips140_ops_t aes_fips140_ops = {
+	aes_POST
+};
+
 static crypto_ops_t aes_crypto_ops = {
 	&aes_control_ops,
 	NULL,
@@ -201,11 +207,14 @@ static crypto_ops_t aes_crypto_ops = {
 	NULL,
 	NULL,
 	NULL,
-	&aes_ctx_ops
+	&aes_ctx_ops,
+	NULL,
+	NULL,
+	&aes_fips140_ops
 };
 
 static crypto_provider_info_t aes_prov_info = {
-	CRYPTO_SPI_VERSION_1,
+	CRYPTO_SPI_VERSION_4,
 	"AES Software Provider",
 	CRYPTO_SW_PROVIDER,
 	{&modlinkage},

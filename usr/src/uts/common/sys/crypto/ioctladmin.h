@@ -127,14 +127,19 @@ enum {
 	FIPS140_STATUS,		/* get current fips140 mode */
 	FIPS140_ENABLE,		/* enable fips140 mode */
 	FIPS140_DISABLE		/* disable fips140 mode */
+
+
 };
 
 /*
  * FIPS140 Mode Status
  */
 enum {
-	FIPS140_MODE_DISABLED,
-	FIPS140_MODE_ENABLED
+	FIPS140_MODE_UNSET,	 /* userland has not told us the mode */
+	FIPS140_MODE_VALIDATING, /* In the process of validation to enable */
+	FIPS140_MODE_SHUTDOWN,	 /* Failure has occurred, shutdown framework */
+	FIPS140_MODE_ENABLED,	 /* Validation is complete and we are running */
+	FIPS140_MODE_DISABLED	 /* Not running in FIPS 140 mode */
 };
 
 #define	CRYPTO_GET_VERSION		CRYPTOADMIN(1)

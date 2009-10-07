@@ -52,11 +52,17 @@ const char _PATH_ELFSIGN_ETC_CERTS[] = ETC_CERTS_DIR;
 /*
  * The CACERT and OBJCACERT are the Cryptographic Trust Anchors
  * for the Solaris Cryptographic Framework.
+ *
+ * The SECACERT is the Signed Execution Trust Anchor that the
+ * Cryptographic Framework uses for FIPS-140 validation of non-crypto
+ * binaries
  */
 static const char _PATH_CRYPTO_CACERT[] = CRYPTO_CERTS_DIR "/CA";
 static const char _PATH_CRYPTO_OBJCACERT[] = CRYPTO_CERTS_DIR "/SUNWObjectCA";
+static const char _PATH_CRYPTO_SECACERT[] = ETC_CERTS_DIR "/SUNWSolarisCA";
 static ELFCert_t CACERT = NULL;
 static ELFCert_t OBJCACERT = NULL;
+static ELFCert_t SECACERT = NULL;
 static pthread_mutex_t ca_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void elfcertlib_freecert(ELFsign_t, ELFCert_t);
@@ -95,10 +101,18 @@ elfcertlib_verifycert(ELFsign_t ess, ELFCert_t cert)
 		(void) elfcertlib_getcert(ess, (char *)_PATH_CRYPTO_CACERT,
 		    NULL, &CACERT, ES_GET);
 	}
+
 	if (OBJCACERT == NULL) {
 		(void) elfcertlib_getcert(ess, (char *)_PATH_CRYPTO_OBJCACERT,
 		    NULL, &OBJCACERT, ES_GET);
 	}
+
+	if (SECACERT == NULL) {
+		(void) elfcertlib_getcert(ess,
+		    (char *)_PATH_CRYPTO_SECACERT, NULL, &SECACERT,
+		    ES_GET_FIPS140);
+	}
+
 	(void) pthread_mutex_unlock(&ca_mutex);
 
 	if (CACERT != NULL) {
@@ -134,6 +148,19 @@ elfcertlib_verifycert(ELFsign_t ess, ELFCert_t cert)
 			if (ess->es_certCAcallback != NULL)
 				(ess->es_certvercallback)(ess->es_callbackctx,
 				    cert, OBJCACERT);
+			cert->c_verified = E_OK;
+			return (B_TRUE);
+		}
+	}
+
+	if (SECACERT != NULL) {
+		rv = KMF_VerifyCertWithCert(ess->es_kmfhandle,
+		    (const KMF_DATA *)&cert->c_cert,
+		    (const KMF_DATA *)&SECACERT->c_cert.certificate);
+		if (rv == KMF_OK) {
+			if (ess->es_certCAcallback != NULL)
+				(ess->es_certvercallback)(ess->es_callbackctx,
+				    cert, SECACERT);
 			cert->c_verified = E_OK;
 			return (B_TRUE);
 		}
@@ -266,7 +293,8 @@ elfcertlib_getcert(ELFsign_t ess, char *cert_pathname,
 	 */
 	if (cert_pathname != NULL && (
 	    strcmp(cert_pathname, _PATH_CRYPTO_CACERT) == 0 ||
-	    strcmp(cert_pathname, _PATH_CRYPTO_OBJCACERT) == 0)) {
+	    strcmp(cert_pathname, _PATH_CRYPTO_OBJCACERT) == 0 ||
+	    strcmp(cert_pathname, _PATH_CRYPTO_SECACERT) == 0)) {
 		if (ess->es_certCAcallback != NULL)
 			(ess->es_certCAcallback)(ess->es_callbackctx, cert,
 			    cert_pathname);

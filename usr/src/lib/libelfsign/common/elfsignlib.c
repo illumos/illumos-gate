@@ -256,6 +256,7 @@ elfsign_begin(const char *filename, enum ES_ACTION action, ELFsign_t *essp)
 	switch (action) {
 	case ES_GET:
 	case ES_GET_CRYPTO:
+	case ES_GET_FIPS140:
 		cryptodebug("elfsign_begin for get");
 		elfcmd = ELF_C_READ;
 		oflags = O_RDONLY | O_NOCTTY | O_NDELAY;
@@ -1155,6 +1156,7 @@ elfsign_verify_signature(ELFsign_t ess, struct ELFsign_sig_info **esipp)
 		 *	force verification of crypto certs
 		 */
 		if ((ess->es_action == ES_GET_CRYPTO ||
+		    ess->es_action == ES_GET_FIPS140 ||
 		    strstr(fsx.fsx_signer_DN, ELFSIGN_CRYPTO)) &&
 		    !elfcertlib_verifycert(ess, cert)) {
 			cryptodebug("elfsign_verify_signature: invalid cert");

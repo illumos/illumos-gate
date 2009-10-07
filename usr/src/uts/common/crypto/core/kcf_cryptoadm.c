@@ -1134,6 +1134,41 @@ add_soft_config(char *name, uint_t count, crypto_mech_name_t *array)
 }
 
 /*
+ * This function removes a module entry from the soft_config_list.
+ *
+ * This comes in handy if FIPS 140 is enabled, but fails to validate.  At
+ * which point when the kernel reports its' supported modules, it shows only
+ * those that are not within the boundary
+ */
+void
+remove_soft_config(char *name)
+{
+	kcf_soft_conf_entry_t *p, *entry = NULL, *prev = NULL;
+
+	mutex_enter(&soft_config_mutex);
+	/* Search for provider in soft_config_list */
+	for (p = soft_config_list; p != NULL; p = p->ce_next) {
+		if (strncmp(name, p->ce_name, MAXNAMELEN) == 0) {
+			entry = p;
+			break;
+		}
+		prev = p;
+	}
+
+	if (prev == NULL) {
+		/* entry to remove is at the head of the list */
+		soft_config_list = entry->ce_next;
+	} else {
+		prev->ce_next = entry->ce_next;
+	}
+
+	mutex_exit(&soft_config_mutex);
+
+	/* free entry */
+	free_soft_config_entry(entry);
+}
+
+/*
  * This routine searches the soft_config_list for the first entry that
  * has the specified mechanism in its mechanism list.  If found,
  * a buffer containing the name of the software module that implements

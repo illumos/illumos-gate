@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,10 @@ typedef enum ELFsign_status_e {
 	ELFSIGN_RESTRICTED
 } ELFsign_status_t;
 
+/* Version values for da_version in kcf_door_args_t */
 #define	KCF_KCFD_VERSION1	1
+#define	KCFD_FIPS140_INTCHECK	2
+
 #define	SIG_MAX_LENGTH		1024
 
 #define	ELF_SIGNATURE_SECTION	".SUNW_signature"

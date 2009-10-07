@@ -162,6 +162,12 @@ static crypto_random_number_ops_t swrand_random_number_ops = {
 	swrand_generate_random
 };
 
+static void swrand_POST(int *);
+
+static crypto_fips140_ops_t swrand_fips140_ops = {
+	swrand_POST
+};
+
 static crypto_ops_t swrand_crypto_ops = {
 	&swrand_control_ops,
 	NULL,
@@ -176,11 +182,14 @@ static crypto_ops_t swrand_crypto_ops = {
 	NULL,
 	NULL,
 	NULL,
-	NULL
+	NULL,
+	NULL,
+	NULL,
+	&swrand_fips140_ops
 };
 
 static crypto_provider_info_t swrand_prov_info = {
-	CRYPTO_SPI_VERSION_1,
+	CRYPTO_SPI_VERSION_4,
 	"Kernel Random Number Provider",
 	CRYPTO_SW_PROVIDER,
 	{&modlinkage},
