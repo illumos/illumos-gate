@@ -89,6 +89,10 @@ extern "C" {
 #define	STMF_ERROR_INVALID_PROP		(STMF_STATUS_ERROR | 0x20)
 #define	STMF_ERROR_PERSIST_TYPE		(STMF_STATUS_ERROR | 0x21)
 #define	STMF_ERROR_TG_ONLINE		(STMF_STATUS_ERROR | 0x22)
+#define	STMF_ERROR_ACCESS_STATE_SET	(STMF_STATUS_ERROR | 0x23)
+#define	STMF_ERROR_NO_PROP_STANDBY	(STMF_STATUS_ERROR | 0x24)
+#define	STMF_ERROR_POST_MSG_FAILED	(STMF_STATUS_ERROR | 0x25)
+#define	STMF_ERROR_DOOR_INSTALLED	(STMF_STATUS_ERROR | 0x26)
 
 /* Failures for stmfCreateLu */
 #define	STMF_ERROR_FILE_IN_USE		(STMF_STATUS_ERROR | 0x100)
@@ -118,6 +122,12 @@ extern "C" {
 #define	STMF_PERSIST_SMF	1
 #define	STMF_PERSIST_NONE	2
 
+/* Logical unit access states */
+#define	STMF_ACCESS_ACTIVE		"0"
+#define	STMF_ACCESS_ACTIVE_TO_STANDBY   "1"
+#define	STMF_ACCESS_STANDBY		"2"
+#define	STMF_ACCESS_STANDBY_TO_ACTIVE	"3"
+
 /*
  * LU Disk Properties
  */
@@ -136,7 +146,8 @@ enum {
 	STMF_LU_PROP_WRITE_CACHE_DISABLE,
 	STMF_LU_PROP_VID,
 	STMF_LU_PROP_PID,
-	STMF_LU_PROP_SERIAL_NUM
+	STMF_LU_PROP_SERIAL_NUM,
+	STMF_LU_PROP_ACCESS_STATE
 };
 
 
@@ -152,8 +163,12 @@ enum {
 typedef enum _stmfProtocol
 {
 	STMF_PROTOCOL_FIBRE_CHANNEL =	0,
-	STMF_PROTOCOL_ISCSI =		1,
-	STMF_PROTOCOL_SAS =		2
+	STMF_PROTOCOL_SCSI =		1,
+	STMF_PROTOCOL_SSA =		2,
+	STMF_PROTOCOL_IEEE_1394 =	3,
+	STMF_PROTOCOL_SRP =		4,
+	STMF_PROTOCOL_ISCSI =		5,
+	STMF_PROTOCOL_SAS =		6
 } stmfProtocol;
 
 
@@ -289,7 +304,6 @@ typedef struct _stmfLocalPortProviderProperties
 	uchar_t	    rsvd[64];
 } stmfLocalPortProviderProperties;
 
-
 /* API prototypes */
 int stmfAddToHostGroup(stmfGroupName *hostGroupName, stmfDevid *name);
 int stmfAddToTargetGroup(stmfGroupName *targetGroupName, stmfDevid *targetName);
@@ -302,10 +316,12 @@ int stmfCreateTargetGroup(stmfGroupName *targetGroupName);
 int stmfDeleteHostGroup(stmfGroupName *hostGroupName);
 int stmfDeleteLu(stmfGuid *luGuid);
 int stmfDeleteTargetGroup(stmfGroupName *targetGroupName);
+void stmfDestroyProxyDoor(int hdl);
 int stmfDevidFromIscsiName(char *iscsiName, stmfDevid *devid);
 int stmfDevidFromWwn(uchar_t wwn[8], stmfDevid *devid);
 int stmfFreeLuResource(luResource hdl);
 void stmfFreeMemory(void *);
+int stmfGetAluaState(boolean_t *enabled, uint32_t *node);
 int stmfGetHostGroupList(stmfGroupList **initiatorGroupList);
 int stmfGetHostGroupMembers(stmfGroupName *hostGroupName,
     stmfGroupProperties **groupProperties);
@@ -335,7 +351,9 @@ int stmfGetTargetProperties(stmfDevid *target,
     stmfTargetProperties *targetProps);
 int stmfGetViewEntryList(stmfGuid *lu, stmfViewEntryList **viewEntryList);
 int stmfImportLu(uint16_t dType, char *fname, stmfGuid *luGuid);
+int stmfInitProxyDoor(int *hdl, int fd);
 int stmfLoadConfig(void);
+int stmfLuStandby(stmfGuid *luGuid);
 int stmfModifyLu(stmfGuid *luGuid, uint32_t prop, const char *propVal);
 int stmfModifyLuByFname(uint16_t dType, const char *fname, uint32_t prop,
     const char *propVal);
@@ -345,11 +363,13 @@ int stmfOfflineLogicalUnit(stmfGuid *logicalUnit);
 int stmfOnline(void);
 int stmfOnlineTarget(stmfDevid *devid);
 int stmfOnlineLogicalUnit(stmfGuid *logicalUnit);
+int stmfPostProxyMsg(int hdl, void *buf, uint32_t buflen);
 int stmfRemoveFromHostGroup(stmfGroupName *hostGroupName,
     stmfDevid *initiatorName);
 int stmfRemoveFromTargetGroup(stmfGroupName *targetGroupName,
     stmfDevid *targetName);
 int stmfRemoveViewEntry(stmfGuid *lu, uint32_t viewEntryIndex);
+int stmfSetAluaState(boolean_t enabled, uint32_t node);
 int stmfSetLuProp(luResource hdl, uint32_t propType, const char *propVal);
 int stmfSetPersistMethod(uint8_t persistType, boolean_t serviceSet);
 int stmfSetProviderData(char *providerName, nvlist_t *nvl, int providerType);

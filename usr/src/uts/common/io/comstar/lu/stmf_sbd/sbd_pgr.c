@@ -40,6 +40,7 @@
 #define	MAX_PGR_PARAM_LIST_LENGTH	(256 * 1024)
 
 int  sbd_pgr_reservation_conflict(scsi_task_t *);
+void sbd_pgr_reset(sbd_lu_t *);
 void sbd_pgr_initialize_it(scsi_task_t *);
 void sbd_handle_pgr_in_cmd(scsi_task_t *, stmf_data_buf_t *);
 void sbd_handle_pgr_out_cmd(scsi_task_t *, stmf_data_buf_t *);
@@ -531,6 +532,25 @@ sbd_pgr_keylist_dealloc(sbd_lu_t *slu)
 		pgr->pgr_keylist = key->pgr_key_next;
 		sbd_pgr_key_free(key);
 	}
+}
+
+/*
+ * Reset and clear the keys, Can be used in the case of Lun Reset
+ */
+void
+sbd_pgr_reset(sbd_lu_t *slu)
+{
+	sbd_pgr_t	*pgr  = slu->sl_pgr;
+
+	rw_enter(&pgr->pgr_lock, RW_WRITER);
+	if (!(pgr->pgr_flags & SBD_PGR_APTPL)) {
+		sbd_pgr_keylist_dealloc(slu);
+		pgr->pgr_PRgeneration	= 0;
+		pgr->pgr_rsvholder	= NULL;
+		pgr->pgr_rsv_type	= 0;
+		pgr->pgr_flags		= 0;
+	}
+	rw_exit(&pgr->pgr_lock);
 }
 
 static void

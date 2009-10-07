@@ -67,6 +67,7 @@ MANIFEST_TOPDIRS=			\
 	sckmd				\
 	sf880drd			\
 	smserverd			\
+	stmfproxy			\
 	stmfsvc				\
 	stmsboot			\
 	syseventd			\

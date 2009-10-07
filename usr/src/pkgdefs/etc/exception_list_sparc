@@ -1336,6 +1336,17 @@ usr/include/sys/scsi/adapters/qusmail.h	sparc
 usr/include/sys/stmf_sbd_ioctl.h	sparc
 
 #
+# proxy port provider interface
+#
+usr/include/sys/pppt_ic_if.h		sparc
+usr/include/sys/pppt_ioctl.h		sparc
+
+# proxy daemon lint library
+usr/lib/llib-lstmfproxy			sparc
+usr/lib/llib-lstmfproxy.ln		sparc
+usr/lib/sparcv9/llib-lstmfproxy.ln	sparc
+
+#
 # portable object file and dictionary used by libfmd_msg test
 #
 usr/lib/fm/dict/TEST.dict		sparc

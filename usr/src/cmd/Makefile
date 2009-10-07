@@ -383,6 +383,7 @@ COMMON_SUBDIRS=		\
 	ssh		\
 	stat		\
 	stmfadm		\
+	stmfproxy	\
 	stmfsvc		\
 	stmsboot	\
 	streams		\

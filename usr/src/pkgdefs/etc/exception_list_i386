@@ -1242,6 +1242,17 @@ usr/include/sys/scsi/adapters/iscsi_if.h		i386
 usr/include/sys/stmf_sbd_ioctl.h	i386
 
 #
+# proxy port provider interface
+#
+usr/include/sys/pppt_ic_if.h		i386
+usr/include/sys/pppt_ioctl.h		i386
+
+# proxy daemon lint library
+usr/lib/llib-lstmfproxy			i386
+usr/lib/llib-lstmfproxy.ln		i386
+usr/lib/amd64/llib-lstmfproxy.ln	i386
+
+#
 # portable object file and dictionary used by libfmd_msg test
 #
 usr/lib/fm/dict/TEST.dict		i386

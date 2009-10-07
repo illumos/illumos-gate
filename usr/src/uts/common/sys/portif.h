@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_PORTIF_H
@@ -112,6 +112,7 @@ stmf_status_t stmf_register_scsi_session(stmf_local_port_t *lport,
 				stmf_scsi_session_t *ss);
 void stmf_deregister_scsi_session(stmf_local_port_t *lport,
 				stmf_scsi_session_t *ss);
+void stmf_set_port_standby(stmf_local_port_t *lport, uint16_t rtpid);
 
 #ifdef	__cplusplus
 }

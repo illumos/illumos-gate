@@ -101,6 +101,7 @@ void sbd_handle_mode_select(scsi_task_t *task, stmf_data_buf_t *dbuf);
 
 extern void sbd_pgr_initialize_it(scsi_task_t *);
 extern int sbd_pgr_reservation_conflict(scsi_task_t *);
+extern void sbd_pgr_reset(sbd_lu_t *);
 extern void sbd_pgr_remove_it_handle(sbd_lu_t *, sbd_it_data_t *);
 extern void sbd_handle_pgr_in_cmd(scsi_task_t *, stmf_data_buf_t *);
 extern void sbd_handle_pgr_out_cmd(scsi_task_t *, stmf_data_buf_t *);
@@ -696,6 +697,8 @@ sbd_handle_short_write_xfer_completion(scsi_task_t *task,
     stmf_data_buf_t *dbuf)
 {
 	sbd_cmd_t *scmd;
+	stmf_status_t st_ret;
+	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 
 	/*
 	 * For now lets assume we will get only one sglist element
@@ -717,11 +720,27 @@ sbd_handle_short_write_xfer_completion(scsi_task_t *task,
 	switch (task->task_cdb[0]) {
 	case SCMD_MODE_SELECT:
 	case SCMD_MODE_SELECT_G1:
-		sbd_handle_mode_select_xfer(task,
-		    dbuf->db_sglist[0].seg_addr, dbuf->db_data_size);
+		if (sl->sl_access_state == SBD_LU_STANDBY) {
+			st_ret = stmf_proxy_scsi_cmd(task, dbuf);
+			if (st_ret != STMF_SUCCESS) {
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_LU_NO_ACCESS_UNAVAIL);
+			}
+		} else {
+			sbd_handle_mode_select_xfer(task,
+			    dbuf->db_sglist[0].seg_addr, dbuf->db_data_size);
+		}
 		break;
 	case SCMD_PERSISTENT_RESERVE_OUT:
-		sbd_handle_pgr_out_data(task, dbuf);
+		if (sl->sl_access_state == SBD_LU_STANDBY) {
+			st_ret = stmf_proxy_scsi_cmd(task, dbuf);
+			if (st_ret != STMF_SUCCESS) {
+				stmf_scsilib_send_status(task, STATUS_CHECK,
+				    STMF_SAA_LU_NO_ACCESS_UNAVAIL);
+			}
+		} else {
+			sbd_handle_pgr_out_data(task, dbuf);
+		}
 		break;
 	default:
 		/* This should never happen */
@@ -1458,6 +1477,7 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	sbd_lu_t *sl = (sbd_lu_t *)task->task_lu->lu_provider_private;
 	sbd_it_data_t *it;
 	uint8_t cdb0, cdb1;
+	stmf_status_t st_ret;
 
 	if ((it = task->task_lu_itl_handle) == NULL) {
 		mutex_enter(&sl->sl_lock);
@@ -1492,7 +1512,9 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			return;
 		}
 		task->task_lu_itl_handle = it;
-		it->sbd_it_ua_conditions = SBD_UA_POR;
+		if (sl->sl_access_state != SBD_LU_STANDBY) {
+			it->sbd_it_ua_conditions = SBD_UA_POR;
+		}
 	} else if (it->sbd_it_flags & SBD_IT_PGR_CHECK_FLAG) {
 		sbd_pgr_initialize_it(task);
 		mutex_enter(&sl->sl_lock);
@@ -1502,6 +1524,17 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 
 	if (task->task_mgmt_function) {
 		stmf_scsilib_handle_task_mgmt(task);
+		return;
+	}
+
+	/*
+	 * if we're transitioning between access
+	 * states, return NOT READY
+	 */
+	if (sl->sl_access_state == SBD_LU_TRANSITION_TO_STANDBY ||
+	    sl->sl_access_state == SBD_LU_TRANSITION_TO_ACTIVE) {
+		stmf_scsilib_send_status(task, STATUS_CHECK,
+		    STMF_SAA_LU_NO_ACCESS_UNAVAIL);
 		return;
 	}
 
@@ -1522,18 +1555,20 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 	}
 
 	/* Reservation conflict checks */
-	if (SBD_PGR_RSVD(sl->sl_pgr)) {
-		if (sbd_pgr_reservation_conflict(task)) {
-			stmf_scsilib_send_status(task,
-			    STATUS_RESERVATION_CONFLICT, 0);
-			return;
-		}
-	} else if ((sl->sl_flags & SL_LU_HAS_SCSI2_RESERVATION) &&
-	    ((it->sbd_it_flags & SBD_IT_HAS_SCSI2_RESERVATION) == 0)) {
-		if (!(SCSI2_CONFLICT_FREE_CMDS(task->task_cdb))) {
-			stmf_scsilib_send_status(task,
-			    STATUS_RESERVATION_CONFLICT, 0);
-			return;
+	if (sl->sl_access_state != SBD_LU_STANDBY) {
+		if (SBD_PGR_RSVD(sl->sl_pgr)) {
+			if (sbd_pgr_reservation_conflict(task)) {
+				stmf_scsilib_send_status(task,
+				    STATUS_RESERVATION_CONFLICT, 0);
+				return;
+			}
+		} else if ((sl->sl_flags & SL_LU_HAS_SCSI2_RESERVATION) &&
+		    ((it->sbd_it_flags & SBD_IT_HAS_SCSI2_RESERVATION) == 0)) {
+			if (!(SCSI2_CONFLICT_FREE_CMDS(task->task_cdb))) {
+				stmf_scsilib_send_status(task,
+				    STATUS_RESERVATION_CONFLICT, 0);
+				return;
+			}
 		}
 	}
 
@@ -1557,6 +1592,16 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 			it->sbd_it_ua_conditions &=
 			    ~SBD_UA_MODE_PARAMETERS_CHANGED;
 			saa = STMF_SAA_MODE_PARAMETERS_CHANGED;
+		} else if (it->sbd_it_ua_conditions &
+		    SBD_UA_ASYMMETRIC_ACCESS_CHANGED) {
+			it->sbd_it_ua_conditions &=
+			    ~SBD_UA_ASYMMETRIC_ACCESS_CHANGED;
+			saa = STMF_SAA_ASYMMETRIC_ACCESS_CHANGED;
+		} else if (it->sbd_it_ua_conditions &
+		    SBD_UA_ACCESS_STATE_TRANSITION) {
+			it->sbd_it_ua_conditions &=
+			    ~SBD_UA_ACCESS_STATE_TRANSITION;
+			saa = STMF_SAA_LU_NO_ACCESS_TRANSITION;
 		} else {
 			it->sbd_it_ua_conditions = 0;
 			saa = 0;
@@ -1565,6 +1610,49 @@ sbd_new_task(struct scsi_task *task, struct stmf_data_buf *initial_dbuf)
 		if (saa) {
 			stmf_scsilib_send_status(task, STATUS_CHECK, saa);
 			return;
+		}
+	}
+
+	cdb0 = task->task_cdb[0];
+	cdb1 = task->task_cdb[1];
+
+	if (sl->sl_access_state == SBD_LU_STANDBY) {
+		if (cdb0 != SCMD_INQUIRY &&
+		    cdb0 != SCMD_MODE_SENSE &&
+		    cdb0 != SCMD_MODE_SENSE_G1 &&
+		    cdb0 != SCMD_MODE_SELECT &&
+		    cdb0 != SCMD_MODE_SELECT_G1 &&
+		    cdb0 != SCMD_RESERVE &&
+		    cdb0 != SCMD_RELEASE &&
+		    cdb0 != SCMD_PERSISTENT_RESERVE_OUT &&
+		    cdb0 != SCMD_PERSISTENT_RESERVE_IN &&
+		    cdb0 != SCMD_REQUEST_SENSE &&
+		    !(cdb0 == SCMD_MAINTENANCE_IN &&
+		    (cdb1 & 0x1F) == 0x0A)) {
+			stmf_scsilib_send_status(task, STATUS_CHECK,
+			    STMF_SAA_LU_NO_ACCESS_STANDBY);
+			return;
+		}
+
+		/*
+		 * is this a short write?
+		 * if so, we'll need to wait until we have the buffer
+		 * before proxying the command
+		 */
+		switch (cdb0) {
+			case SCMD_MODE_SELECT:
+			case SCMD_MODE_SELECT_G1:
+			case SCMD_PERSISTENT_RESERVE_OUT:
+				break;
+			default:
+				st_ret = stmf_proxy_scsi_cmd(task,
+				    initial_dbuf);
+				if (st_ret != STMF_SUCCESS) {
+					stmf_scsilib_send_status(task,
+					    STATUS_CHECK,
+					    STMF_SAA_LU_NO_ACCESS_UNAVAIL);
+				}
+				return;
 		}
 	}
 
@@ -1886,6 +1974,7 @@ sbd_ctl(struct stmf_lu *lu, int cmd, void *arg)
 			    SL_LU_HAS_SCSI2_RESERVATION);
 			sl->sl_state = STMF_STATE_OFFLINE;
 			sl->sl_state_not_acked = 1;
+			sbd_pgr_reset(sl);
 		}
 		(void) stmf_ctl(STMF_CMD_LU_OFFLINE_COMPLETE, lu, &st);
 		break;
@@ -1916,12 +2005,17 @@ sbd_lu_reset_state(stmf_lu_t *lu)
 	if (sl->sl_flags & SL_SAVED_WRITE_CACHE_DISABLE) {
 		sl->sl_flags |= SL_WRITEBACK_CACHE_DISABLE;
 		mutex_exit(&sl->sl_lock);
-		(void) sbd_wcd_set(1, sl);
+		if (sl->sl_access_state == SBD_LU_ACTIVE) {
+			(void) sbd_wcd_set(1, sl);
+		}
 	} else {
 		sl->sl_flags &= ~SL_WRITEBACK_CACHE_DISABLE;
 		mutex_exit(&sl->sl_lock);
-		(void) sbd_wcd_set(0, sl);
+		if (sl->sl_access_state == SBD_LU_ACTIVE) {
+			(void) sbd_wcd_set(0, sl);
+		}
 	}
+	sbd_pgr_reset(sl);
 	sbd_check_and_clear_scsi2_reservation(sl, NULL);
 	if (stmf_deregister_all_lu_itl_handles(lu) != STMF_SUCCESS) {
 		return (STMF_FAILURE);

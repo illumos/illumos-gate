@@ -156,6 +156,7 @@ SUBDIRS += \
 	libsmbfs	\
 	libfcoe		\
 	libstmf		\
+	libstmfproxy	\
 	libnsctl	\
 	libunistat	\
 	libdscfg	\
@@ -449,6 +450,7 @@ HDRSUBDIRS=		\
 	libsqlite	\
 	libfcoe		\
 	libstmf		\
+	libstmfproxy	\
 	libsum		\
 	libsysevent	\
 	libtecla	\
@@ -595,6 +597,7 @@ libshell:	libast libcmd libdll libsocket libsecdb
 libsip:		libmd5
 libsmbfs:	libsocket libnsl libkrb5
 libsocket:	libnsl
+libstmfproxy: 	libstmf libsocket libnsl libpthread
 libsum: 	libast
 libldap5:	libsasl libsocket libnsl libmd
 libsldap:	libldap5 libtsol libnsl libc libscf libresolv

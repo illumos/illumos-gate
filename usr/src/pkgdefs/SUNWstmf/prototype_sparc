@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -48,3 +48,4 @@ f none kernel/drv/sparcv9/stmf_sbd 0755 root sys
 f none kernel/drv/sparcv9/stmf 0755 root sys
 f none kernel/drv/sparcv9/fct 0755 root sys
 f none kernel/drv/sparcv9/qlt 0755 root sys
+f none kernel/drv/sparcv9/pppt 0755 root sys

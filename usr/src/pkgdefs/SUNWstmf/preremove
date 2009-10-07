@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -48,6 +48,7 @@ sleep 2
 
 remove_drv qlt
 remove_drv fct
+remove_drv pppt
 remove_drv stmf_sbd
 echo 'stmf_allow_modunload/W 1' | /bin/mdb -kw >/dev/null 2>&1
 remove_drv stmf

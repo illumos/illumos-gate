@@ -45,9 +45,12 @@
 #include <stmf_impl.h>
 #include <lun_map.h>
 #include <stmf_state.h>
+#include <pppt_ic_if.h>
 
 static uint64_t stmf_session_counter = 0;
 static uint16_t stmf_rtpid_counter = 0;
+/* start messages at 1 */
+static uint64_t stmf_proxy_msg_id = 1;
 
 static int stmf_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
 static int stmf_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
@@ -61,6 +64,9 @@ static int stmf_get_stmf_state(stmf_state_desc_t *std);
 static int stmf_set_stmf_state(stmf_state_desc_t *std);
 static void stmf_abort_task_offline(scsi_task_t *task, int offline_lu,
     char *info);
+static int stmf_set_alua_state(stmf_alua_state_desc_t *alua_state);
+static void stmf_get_alua_state(stmf_alua_state_desc_t *alua_state);
+stmf_xfer_data_t *stmf_prepare_tpgs_data(uint8_t ilu_alua);
 void stmf_svc_init();
 stmf_status_t stmf_svc_fini();
 void stmf_svc(void *arg);
@@ -85,6 +91,30 @@ void stmf_worker_init();
 stmf_status_t stmf_worker_fini();
 void stmf_worker_mgmt();
 void stmf_worker_task(void *arg);
+static void stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss);
+static stmf_status_t stmf_ic_lu_reg(stmf_ic_reg_dereg_lun_msg_t *msg,
+    uint32_t type);
+static stmf_status_t stmf_ic_lu_dereg(stmf_ic_reg_dereg_lun_msg_t *msg);
+static stmf_status_t stmf_ic_rx_scsi_status(stmf_ic_scsi_status_msg_t *msg);
+static stmf_status_t stmf_ic_rx_status(stmf_ic_status_msg_t *msg);
+static stmf_status_t stmf_ic_rx_scsi_data(stmf_ic_scsi_data_msg_t *msg);
+void stmf_task_lu_killall(stmf_lu_t *lu, scsi_task_t *tm_task, stmf_status_t s);
+
+/* pppt modhandle */
+ddi_modhandle_t pppt_mod;
+
+/* pppt modload imported functions */
+stmf_ic_reg_port_msg_alloc_func_t ic_reg_port_msg_alloc;
+stmf_ic_dereg_port_msg_alloc_func_t ic_dereg_port_msg_alloc;
+stmf_ic_reg_lun_msg_alloc_func_t ic_reg_lun_msg_alloc;
+stmf_ic_dereg_lun_msg_alloc_func_t ic_dereg_lun_msg_alloc;
+stmf_ic_lun_active_msg_alloc_func_t ic_lun_active_msg_alloc;
+stmf_ic_scsi_cmd_msg_alloc_func_t ic_scsi_cmd_msg_alloc;
+stmf_ic_scsi_data_xfer_done_msg_alloc_func_t ic_scsi_data_xfer_done_msg_alloc;
+stmf_ic_session_create_msg_alloc_func_t ic_session_reg_msg_alloc;
+stmf_ic_session_destroy_msg_alloc_func_t ic_session_dereg_msg_alloc;
+stmf_ic_tx_msg_func_t ic_tx_msg;
+stmf_ic_msg_free_func_t ic_msg_free;
 
 static void stmf_update_kstat_lu_q(scsi_task_t *, void());
 static void stmf_update_kstat_lport_q(scsi_task_t *, void());
@@ -687,6 +717,24 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 			break;
 		}
 		ret = stmf_get_stmf_state((stmf_state_desc_t *)obuf);
+		break;
+
+	case STMF_IOCTL_SET_ALUA_STATE:
+		if ((ibuf == NULL) ||
+		    (iocd->stmf_ibuf_size < sizeof (stmf_alua_state_desc_t))) {
+			ret = EINVAL;
+			break;
+		}
+		ret = stmf_set_alua_state((stmf_alua_state_desc_t *)ibuf);
+		break;
+
+	case STMF_IOCTL_GET_ALUA_STATE:
+		if ((obuf == NULL) ||
+		    (iocd->stmf_obuf_size < sizeof (stmf_alua_state_desc_t))) {
+			ret = EINVAL;
+			break;
+		}
+		stmf_get_alua_state((stmf_alua_state_desc_t *)obuf);
 		break;
 
 	case STMF_IOCTL_SET_LU_STATE:
@@ -1431,6 +1479,545 @@ stmf_get_stmf_state(stmf_state_desc_t *std)
 	return (0);
 }
 
+/*
+ * handles registration message from pppt for a logical unit
+ */
+stmf_status_t
+stmf_ic_lu_reg(stmf_ic_reg_dereg_lun_msg_t *msg, uint32_t type)
+{
+	stmf_i_lu_provider_t	*ilp;
+	stmf_lu_provider_t	*lp;
+	mutex_enter(&stmf_state.stmf_lock);
+	for (ilp = stmf_state.stmf_ilplist; ilp != NULL; ilp = ilp->ilp_next) {
+		if (strcmp(msg->icrl_lu_provider_name,
+		    ilp->ilp_lp->lp_name) == 0) {
+			lp = ilp->ilp_lp;
+			mutex_exit(&stmf_state.stmf_lock);
+			lp->lp_proxy_msg(msg->icrl_lun_id, msg->icrl_cb_arg,
+			    msg->icrl_cb_arg_len, type);
+			return (STMF_SUCCESS);
+		}
+	}
+	mutex_exit(&stmf_state.stmf_lock);
+	return (STMF_SUCCESS);
+}
+
+/*
+ * handles de-registration message from pppt for a logical unit
+ */
+stmf_status_t
+stmf_ic_lu_dereg(stmf_ic_reg_dereg_lun_msg_t *msg)
+{
+	stmf_i_lu_provider_t	*ilp;
+	stmf_lu_provider_t	*lp;
+	mutex_enter(&stmf_state.stmf_lock);
+	for (ilp = stmf_state.stmf_ilplist; ilp != NULL; ilp = ilp->ilp_next) {
+		if (strcmp(msg->icrl_lu_provider_name,
+		    ilp->ilp_lp->lp_name) == 0) {
+			lp = ilp->ilp_lp;
+			mutex_exit(&stmf_state.stmf_lock);
+			lp->lp_proxy_msg(msg->icrl_lun_id, NULL, 0,
+			    STMF_MSG_LU_DEREGISTER);
+			return (STMF_SUCCESS);
+		}
+	}
+	mutex_exit(&stmf_state.stmf_lock);
+	return (STMF_SUCCESS);
+}
+
+/*
+ * helper function to find a task that matches a task_msgid
+ */
+scsi_task_t *
+find_task_from_msgid(uint8_t *lu_id, stmf_ic_msgid_t task_msgid)
+{
+	stmf_i_lu_t *ilu;
+	stmf_i_scsi_task_t *itask;
+
+	mutex_enter(&stmf_state.stmf_lock);
+	for (ilu = stmf_state.stmf_ilulist; ilu != NULL; ilu = ilu->ilu_next) {
+		if (bcmp(lu_id, ilu->ilu_lu->lu_id->ident, 16) == 0) {
+			break;
+		}
+	}
+
+	if (ilu == NULL) {
+		mutex_exit(&stmf_state.stmf_lock);
+		return (NULL);
+	}
+
+	mutex_enter(&ilu->ilu_task_lock);
+	for (itask = ilu->ilu_tasks; itask != NULL;
+	    itask = itask->itask_lu_next) {
+		if (itask->itask_flags & (ITASK_IN_FREE_LIST |
+		    ITASK_BEING_ABORTED)) {
+			continue;
+		}
+		if (itask->itask_proxy_msg_id == task_msgid) {
+			break;
+		}
+	}
+	mutex_exit(&ilu->ilu_task_lock);
+	mutex_exit(&stmf_state.stmf_lock);
+
+	if (itask != NULL) {
+		return (itask->itask_task);
+	} else {
+		/* task not found. Likely already aborted. */
+		return (NULL);
+	}
+}
+
+/*
+ * message received from pppt/ic
+ */
+stmf_status_t
+stmf_msg_rx(stmf_ic_msg_t *msg)
+{
+	mutex_enter(&stmf_state.stmf_lock);
+	if (stmf_state.stmf_alua_state != 1) {
+		mutex_exit(&stmf_state.stmf_lock);
+		cmn_err(CE_WARN, "stmf alua state is disabled");
+		ic_msg_free(msg);
+		return (STMF_FAILURE);
+	}
+	mutex_exit(&stmf_state.stmf_lock);
+
+	switch (msg->icm_msg_type) {
+		case STMF_ICM_REGISTER_LUN:
+			(void) stmf_ic_lu_reg(
+			    (stmf_ic_reg_dereg_lun_msg_t *)msg->icm_msg,
+			    STMF_MSG_LU_REGISTER);
+			break;
+		case STMF_ICM_LUN_ACTIVE:
+			(void) stmf_ic_lu_reg(
+			    (stmf_ic_reg_dereg_lun_msg_t *)msg->icm_msg,
+			    STMF_MSG_LU_ACTIVE);
+			break;
+		case STMF_ICM_DEREGISTER_LUN:
+			(void) stmf_ic_lu_dereg(
+			    (stmf_ic_reg_dereg_lun_msg_t *)msg->icm_msg);
+			break;
+		case STMF_ICM_SCSI_DATA:
+			(void) stmf_ic_rx_scsi_data(
+			    (stmf_ic_scsi_data_msg_t *)msg->icm_msg);
+			break;
+		case STMF_ICM_SCSI_STATUS:
+			(void) stmf_ic_rx_scsi_status(
+			    (stmf_ic_scsi_status_msg_t *)msg->icm_msg);
+			break;
+		case STMF_ICM_STATUS:
+			(void) stmf_ic_rx_status(
+			    (stmf_ic_status_msg_t *)msg->icm_msg);
+			break;
+		default:
+			cmn_err(CE_WARN, "unknown message received %d",
+			    msg->icm_msg_type);
+			ic_msg_free(msg);
+			return (STMF_FAILURE);
+	}
+	ic_msg_free(msg);
+	return (STMF_SUCCESS);
+}
+
+stmf_status_t
+stmf_ic_rx_status(stmf_ic_status_msg_t *msg)
+{
+	stmf_i_local_port_t *ilport;
+
+	if (msg->ics_msg_type != STMF_ICM_REGISTER_PROXY_PORT) {
+		/* for now, ignore other message status */
+		return (STMF_SUCCESS);
+	}
+
+	if (msg->ics_status != STMF_SUCCESS) {
+		return (STMF_SUCCESS);
+	}
+
+	mutex_enter(&stmf_state.stmf_lock);
+	for (ilport = stmf_state.stmf_ilportlist; ilport != NULL;
+	    ilport = ilport->ilport_next) {
+		if (msg->ics_msgid == ilport->ilport_reg_msgid) {
+			ilport->ilport_proxy_registered = 1;
+			break;
+		}
+	}
+	mutex_exit(&stmf_state.stmf_lock);
+	return (STMF_SUCCESS);
+}
+
+/*
+ * handles scsi status message from pppt
+ */
+stmf_status_t
+stmf_ic_rx_scsi_status(stmf_ic_scsi_status_msg_t *msg)
+{
+	scsi_task_t *task;
+
+	task = find_task_from_msgid(msg->icss_lun_id, msg->icss_task_msgid);
+
+	if (task == NULL) {
+		return (STMF_SUCCESS);
+	}
+
+	task->task_scsi_status = msg->icss_status;
+	task->task_sense_data = msg->icss_sense;
+	task->task_sense_length = msg->icss_sense_len;
+	(void) stmf_send_scsi_status(task, STMF_IOF_LU_DONE);
+
+	return (STMF_SUCCESS);
+}
+
+/*
+ * handles scsi data message from pppt
+ */
+stmf_status_t
+stmf_ic_rx_scsi_data(stmf_ic_scsi_data_msg_t *msg)
+{
+	stmf_i_scsi_task_t *itask;
+	scsi_task_t *task;
+	stmf_xfer_data_t *xd = NULL;
+	stmf_data_buf_t *dbuf;
+	uint32_t sz, minsz, xd_sz, asz;
+
+	task = find_task_from_msgid(msg->icsd_lun_id, msg->icsd_task_msgid);
+	if (task == NULL) {
+		stmf_ic_msg_t *ic_xfer_done_msg = NULL;
+		static uint64_t data_msg_id;
+		stmf_status_t ic_ret = STMF_FAILURE;
+		mutex_enter(&stmf_state.stmf_lock);
+		data_msg_id = stmf_proxy_msg_id++;
+		mutex_exit(&stmf_state.stmf_lock);
+		/*
+		 * send xfer done status to pppt
+		 * for now, set the session id to 0 as we cannot
+		 * ascertain it since we cannot find the task
+		 */
+		ic_xfer_done_msg = ic_scsi_data_xfer_done_msg_alloc(
+		    msg->icsd_task_msgid, 0, STMF_FAILURE, data_msg_id);
+		if (ic_xfer_done_msg) {
+			ic_ret = ic_tx_msg(ic_xfer_done_msg);
+			if (ic_ret != STMF_IC_MSG_SUCCESS) {
+				cmn_err(CE_WARN, "unable to xmit proxy msg");
+			}
+		}
+		return (STMF_FAILURE);
+	}
+
+	itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
+	dbuf = itask->itask_proxy_dbuf;
+	/*
+	 * stmf will now take over the task handling for this task
+	 * but it still needs to be treated differently from other
+	 * default handled tasks, hence the ITASK_PROXY_TASK
+	 */
+	itask->itask_flags |= ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK;
+
+	task->task_cmd_xfer_length = msg->icsd_data_len;
+
+	if (task->task_additional_flags &
+	    TASK_AF_NO_EXPECTED_XFER_LENGTH) {
+		task->task_expected_xfer_length =
+		    task->task_cmd_xfer_length;
+	}
+
+	sz = min(task->task_expected_xfer_length,
+	    task->task_cmd_xfer_length);
+
+	xd_sz = msg->icsd_data_len;
+	asz = xd_sz + sizeof (*xd) - 4;
+	xd = (stmf_xfer_data_t *)kmem_zalloc(asz, KM_NOSLEEP);
+
+	if (xd == NULL) {
+		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+		    STMF_ALLOC_FAILURE, NULL);
+		return (STMF_FAILURE);
+	}
+
+	xd->alloc_size = asz;
+	xd->size_left = xd_sz;
+	bcopy(msg->icsd_data, xd->buf, xd_sz);
+
+	sz = min(sz, xd->size_left);
+	xd->size_left = sz;
+	minsz = min(512, sz);
+
+	if (dbuf == NULL)
+		dbuf = stmf_alloc_dbuf(task, sz, &minsz, 0);
+	if (dbuf == NULL) {
+		kmem_free(xd, xd->alloc_size);
+		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
+		    STMF_ALLOC_FAILURE, NULL);
+		return (STMF_FAILURE);
+	}
+	dbuf->db_lu_private = xd;
+	stmf_xd_to_dbuf(dbuf);
+
+	dbuf->db_flags = DB_DIRECTION_TO_RPORT;
+	(void) stmf_xfer_data(task, dbuf, 0);
+	return (STMF_SUCCESS);
+}
+
+stmf_status_t
+stmf_proxy_scsi_cmd(scsi_task_t *task, stmf_data_buf_t *dbuf)
+{
+	stmf_i_scsi_task_t *itask =
+	    (stmf_i_scsi_task_t *)task->task_stmf_private;
+	stmf_i_local_port_t *ilport =
+	    (stmf_i_local_port_t *)task->task_lport->lport_stmf_private;
+	stmf_ic_msg_t *ic_cmd_msg;
+	stmf_ic_msg_status_t ic_ret;
+	stmf_status_t ret = STMF_FAILURE;
+
+	if (ilport->ilport_proxy_registered == 0) {
+		cmn_err(CE_WARN, "proxy port not registered");
+		return (STMF_FAILURE);
+	}
+
+	if (stmf_state.stmf_alua_state != 1) {
+		cmn_err(CE_WARN, "stmf alua state is disabled");
+		return (STMF_FAILURE);
+	}
+
+	mutex_enter(&stmf_state.stmf_lock);
+	itask->itask_proxy_msg_id = stmf_proxy_msg_id++;
+	mutex_exit(&stmf_state.stmf_lock);
+	itask->itask_proxy_dbuf = dbuf;
+	if (dbuf) {
+		ic_cmd_msg = ic_scsi_cmd_msg_alloc(itask->itask_proxy_msg_id,
+		    task, dbuf->db_data_size, dbuf->db_sglist[0].seg_addr,
+		    itask->itask_proxy_msg_id);
+	} else {
+		ic_cmd_msg = ic_scsi_cmd_msg_alloc(itask->itask_proxy_msg_id,
+		    task, 0, NULL, itask->itask_proxy_msg_id);
+	}
+	if (ic_cmd_msg) {
+		ic_ret = ic_tx_msg(ic_cmd_msg);
+		if (ic_ret == STMF_IC_MSG_SUCCESS) {
+			ret = STMF_SUCCESS;
+		}
+	}
+	return (ret);
+}
+
+
+stmf_status_t
+pppt_modload()
+{
+	int error;
+
+	if (pppt_mod == NULL && ((pppt_mod =
+	    ddi_modopen("drv/pppt", KRTLD_MODE_FIRST, &error)) == NULL)) {
+		cmn_err(CE_WARN, "Unable to load pppt");
+		return (STMF_FAILURE);
+	}
+
+	if (ic_reg_port_msg_alloc == NULL && ((ic_reg_port_msg_alloc =
+	    (stmf_ic_reg_port_msg_alloc_func_t)
+	    ddi_modsym(pppt_mod, "stmf_ic_reg_port_msg_alloc",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN,
+		    "Unable to find symbol - stmf_ic_reg_port_msg_alloc");
+		return (STMF_FAILURE);
+	}
+
+
+	if (ic_dereg_port_msg_alloc == NULL && ((ic_dereg_port_msg_alloc =
+	    (stmf_ic_dereg_port_msg_alloc_func_t)
+	    ddi_modsym(pppt_mod, "stmf_ic_dereg_port_msg_alloc",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN,
+		    "Unable to find symbol - stmf_ic_dereg_port_msg_alloc");
+		return (STMF_FAILURE);
+	}
+
+	if (ic_reg_lun_msg_alloc == NULL && ((ic_reg_lun_msg_alloc =
+	    (stmf_ic_reg_lun_msg_alloc_func_t)
+	    ddi_modsym(pppt_mod, "stmf_ic_reg_lun_msg_alloc",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN,
+		    "Unable to find symbol - stmf_ic_reg_lun_msg_alloc");
+		return (STMF_FAILURE);
+	}
+
+	if (ic_lun_active_msg_alloc == NULL && ((ic_lun_active_msg_alloc =
+	    (stmf_ic_lun_active_msg_alloc_func_t)
+	    ddi_modsym(pppt_mod, "stmf_ic_lun_active_msg_alloc",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN,
+		    "Unable to find symbol - stmf_ic_lun_active_msg_alloc");
+		return (STMF_FAILURE);
+	}
+
+	if (ic_dereg_lun_msg_alloc == NULL && ((ic_dereg_lun_msg_alloc =
+	    (stmf_ic_dereg_lun_msg_alloc_func_t)
+	    ddi_modsym(pppt_mod, "stmf_ic_dereg_lun_msg_alloc",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN,
+		    "Unable to find symbol - stmf_ic_dereg_lun_msg_alloc");
+		return (STMF_FAILURE);
+	}
+
+	if (ic_scsi_cmd_msg_alloc == NULL && ((ic_scsi_cmd_msg_alloc =
+	    (stmf_ic_scsi_cmd_msg_alloc_func_t)
+	    ddi_modsym(pppt_mod, "stmf_ic_scsi_cmd_msg_alloc",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN,
+		    "Unable to find symbol - stmf_ic_scsi_cmd_msg_alloc");
+		return (STMF_FAILURE);
+	}
+
+	if (ic_scsi_data_xfer_done_msg_alloc == NULL &&
+	    ((ic_scsi_data_xfer_done_msg_alloc =
+	    (stmf_ic_scsi_data_xfer_done_msg_alloc_func_t)
+	    ddi_modsym(pppt_mod, "stmf_ic_scsi_data_xfer_done_msg_alloc",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN,
+		    "Unable to find symbol -"
+		    "stmf_ic_scsi_data_xfer_done_msg_alloc");
+		return (STMF_FAILURE);
+	}
+
+	if (ic_session_reg_msg_alloc == NULL &&
+	    ((ic_session_reg_msg_alloc =
+	    (stmf_ic_session_create_msg_alloc_func_t)
+	    ddi_modsym(pppt_mod, "stmf_ic_session_create_msg_alloc",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN,
+		    "Unable to find symbol -"
+		    "stmf_ic_session_create_msg_alloc");
+		return (STMF_FAILURE);
+	}
+
+	if (ic_session_dereg_msg_alloc == NULL &&
+	    ((ic_session_dereg_msg_alloc =
+	    (stmf_ic_session_destroy_msg_alloc_func_t)
+	    ddi_modsym(pppt_mod, "stmf_ic_session_destroy_msg_alloc",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN,
+		    "Unable to find symbol -"
+		    "stmf_ic_session_destroy_msg_alloc");
+		return (STMF_FAILURE);
+	}
+
+	if (ic_tx_msg == NULL && ((ic_tx_msg =
+	    (stmf_ic_tx_msg_func_t)ddi_modsym(pppt_mod, "stmf_ic_tx_msg",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN, "Unable to find symbol - stmf_ic_tx_msg");
+		return (STMF_FAILURE);
+	}
+
+	if (ic_msg_free == NULL && ((ic_msg_free =
+	    (stmf_ic_msg_free_func_t)ddi_modsym(pppt_mod, "stmf_ic_msg_free",
+	    &error)) == NULL)) {
+		cmn_err(CE_WARN, "Unable to find symbol - stmf_ic_msg_free");
+		return (STMF_FAILURE);
+	}
+	return (STMF_SUCCESS);
+}
+
+static void
+stmf_get_alua_state(stmf_alua_state_desc_t *alua_state)
+{
+	mutex_enter(&stmf_state.stmf_lock);
+	alua_state->alua_node = stmf_state.stmf_alua_node;
+	alua_state->alua_state = stmf_state.stmf_alua_state;
+	mutex_exit(&stmf_state.stmf_lock);
+}
+
+
+static int
+stmf_set_alua_state(stmf_alua_state_desc_t *alua_state)
+{
+	stmf_i_local_port_t *ilport;
+	stmf_i_lu_t *ilu;
+	stmf_lu_t *lu;
+	stmf_ic_msg_status_t ic_ret;
+	stmf_ic_msg_t *ic_reg_lun, *ic_reg_port;
+	stmf_local_port_t *lport;
+	int ret = 0;
+
+	if (alua_state->alua_state > 1 || alua_state->alua_node > 1) {
+		return (EINVAL);
+	}
+
+	mutex_enter(&stmf_state.stmf_lock);
+	if (alua_state->alua_state == 1) {
+		if (pppt_modload() == STMF_FAILURE) {
+			ret = EIO;
+			goto err;
+		}
+		if (alua_state->alua_node != 0) {
+			/* reset existing rtpids to new base */
+			cmn_err(CE_NOTE, "non-zero alua node set");
+			stmf_rtpid_counter = 255;
+		}
+		stmf_state.stmf_alua_node = alua_state->alua_node;
+		stmf_state.stmf_alua_state = 1;
+		/* register existing local ports with ppp */
+		for (ilport = stmf_state.stmf_ilportlist; ilport != NULL;
+		    ilport = ilport->ilport_next) {
+			/* skip standby ports */
+			if (ilport->ilport_standby == 1) {
+				continue;
+			}
+			if (alua_state->alua_node != 0) {
+				ilport->ilport_rtpid =
+				    atomic_add_16_nv(&stmf_rtpid_counter, 1);
+			}
+			lport = ilport->ilport_lport;
+			ic_reg_port = ic_reg_port_msg_alloc(
+			    lport->lport_id, ilport->ilport_rtpid,
+			    0, NULL, stmf_proxy_msg_id);
+			if (ic_reg_port) {
+				ic_ret = ic_tx_msg(ic_reg_port);
+				if (ic_ret == STMF_IC_MSG_SUCCESS) {
+					ilport->ilport_reg_msgid =
+					    stmf_proxy_msg_id++;
+				} else {
+					cmn_err(CE_WARN,
+					    "error on port registration "
+					    "port - %s",
+					    ilport->ilport_kstat_tgt_name);
+				}
+			}
+		}
+		/* register existing logical units */
+		for (ilu = stmf_state.stmf_ilulist; ilu != NULL;
+		    ilu = ilu->ilu_next) {
+			if (ilu->ilu_access != STMF_LU_ACTIVE) {
+				continue;
+			}
+			/* register with proxy module */
+			lu = ilu->ilu_lu;
+			if (lu->lu_lp && lu->lu_lp->lp_lpif_rev == LPIF_REV_2 &&
+			    lu->lu_lp->lp_alua_support) {
+				ilu->ilu_alua = 1;
+				/* allocate the register message */
+				ic_reg_lun = ic_reg_lun_msg_alloc(
+				    lu->lu_id->ident, lu->lu_lp->lp_name,
+				    lu->lu_proxy_reg_arg_len,
+				    (uint8_t *)lu->lu_proxy_reg_arg,
+				    stmf_proxy_msg_id);
+				/* send the message */
+				if (ic_reg_lun) {
+					ic_ret = ic_tx_msg(ic_reg_lun);
+					if (ic_ret == STMF_IC_MSG_SUCCESS) {
+						stmf_proxy_msg_id++;
+					}
+				}
+			}
+		}
+	} else {
+		stmf_state.stmf_alua_state = 0;
+	}
+
+err:
+	mutex_exit(&stmf_state.stmf_lock);
+	return (ret);
+}
+
+
 typedef struct {
 	void	*bp;	/* back pointer from internal struct to main struct */
 	int	alloc_size;
@@ -1571,7 +2158,7 @@ stmf_register_lu_provider(stmf_lu_provider_t *lp)
 	stmf_pp_data_t *ppd;
 	uint32_t cb_flags;
 
-	if (lp->lp_lpif_rev != LPIF_REV_1)
+	if (lp->lp_lpif_rev != LPIF_REV_1 && lp->lp_lpif_rev != LPIF_REV_2)
 		return (STMF_FAILURE);
 
 	mutex_enter(&stmf_state.stmf_lock);
@@ -2216,6 +2803,83 @@ stmf_create_kstat_lport(stmf_i_local_port_t *ilport)
 	kstat_install(ilport->ilport_kstat_io);
 }
 
+/*
+ * set the asymmetric access state for a logical unit
+ * caller is responsible for establishing SCSI unit attention on
+ * state change
+ */
+stmf_status_t
+stmf_set_lu_access(stmf_lu_t *lu, uint8_t access_state)
+{
+	stmf_i_lu_t *ilu;
+	uint8_t *p1, *p2;
+
+	if ((access_state != STMF_LU_STANDBY) &&
+	    (access_state != STMF_LU_ACTIVE)) {
+		return (STMF_INVALID_ARG);
+	}
+
+	p1 = &lu->lu_id->ident[0];
+	mutex_enter(&stmf_state.stmf_lock);
+	if (stmf_state.stmf_inventory_locked) {
+		mutex_exit(&stmf_state.stmf_lock);
+		return (STMF_BUSY);
+	}
+
+	for (ilu = stmf_state.stmf_ilulist; ilu != NULL; ilu = ilu->ilu_next) {
+		p2 = &ilu->ilu_lu->lu_id->ident[0];
+		if (bcmp(p1, p2, 16) == 0) {
+			break;
+		}
+	}
+
+	if (!ilu) {
+		ilu = (stmf_i_lu_t *)lu->lu_stmf_private;
+	} else {
+		/*
+		 * We're changing access state on an existing logical unit
+		 * Send the proxy registration message for this logical unit
+		 * if we're in alua mode.
+		 * If the requested state is STMF_LU_ACTIVE, we want to register
+		 * this logical unit.
+		 * If the requested state is STMF_LU_STANDBY, we're going to
+		 * abort all tasks for this logical unit.
+		 */
+		if (stmf_state.stmf_alua_state == 1 &&
+		    access_state == STMF_LU_ACTIVE) {
+			stmf_ic_msg_status_t ic_ret = STMF_IC_MSG_SUCCESS;
+			stmf_ic_msg_t *ic_reg_lun;
+			if (lu->lu_lp && lu->lu_lp->lp_lpif_rev == LPIF_REV_2 &&
+			    lu->lu_lp->lp_alua_support) {
+				ilu->ilu_alua = 1;
+				/* allocate the register message */
+				ic_reg_lun = ic_lun_active_msg_alloc(p1,
+				    lu->lu_lp->lp_name,
+				    lu->lu_proxy_reg_arg_len,
+				    (uint8_t *)lu->lu_proxy_reg_arg,
+				    stmf_proxy_msg_id);
+				/* send the message */
+				if (ic_reg_lun) {
+					ic_ret = ic_tx_msg(ic_reg_lun);
+					if (ic_ret == STMF_IC_MSG_SUCCESS) {
+						stmf_proxy_msg_id++;
+					}
+				}
+			}
+		} else if (stmf_state.stmf_alua_state == 1 &&
+		    access_state == STMF_LU_STANDBY) {
+			/* abort all tasks for this lu */
+			stmf_task_lu_killall(lu, NULL, STMF_ABORTED);
+		}
+	}
+
+	ilu->ilu_access = access_state;
+
+	mutex_exit(&stmf_state.stmf_lock);
+	return (STMF_SUCCESS);
+}
+
+
 stmf_status_t
 stmf_register_lu(stmf_lu_t *lu)
 {
@@ -2266,6 +2930,30 @@ stmf_register_lu(stmf_lu_t *lu)
 	ilu->ilu_cur_task_cntr = &ilu->ilu_task_cntr1;
 	STMF_EVENT_ALLOC_HANDLE(ilu->ilu_event_hdl);
 	stmf_create_kstat_lu(ilu);
+	/*
+	 * register with proxy module if available and logical unit
+	 * is in active state
+	 */
+	if (stmf_state.stmf_alua_state == 1 &&
+	    ilu->ilu_access == STMF_LU_ACTIVE) {
+		stmf_ic_msg_status_t ic_ret = STMF_IC_MSG_SUCCESS;
+		stmf_ic_msg_t *ic_reg_lun;
+		if (lu->lu_lp && lu->lu_lp->lp_lpif_rev == LPIF_REV_2 &&
+		    lu->lu_lp->lp_alua_support) {
+			ilu->ilu_alua = 1;
+			/* allocate the register message */
+			ic_reg_lun = ic_reg_lun_msg_alloc(p1,
+			    lu->lu_lp->lp_name, lu->lu_proxy_reg_arg_len,
+			    (uint8_t *)lu->lu_proxy_reg_arg, stmf_proxy_msg_id);
+			/* send the message */
+			if (ic_reg_lun) {
+				ic_ret = ic_tx_msg(ic_reg_lun);
+				if (ic_ret == STMF_IC_MSG_SUCCESS) {
+					stmf_proxy_msg_id++;
+				}
+			}
+		}
+	}
 	mutex_exit(&stmf_state.stmf_lock);
 
 	/* XXX we should probably check if this lu can be brought online */
@@ -2314,6 +3002,28 @@ stmf_deregister_lu(stmf_lu_t *lu)
 			ilu->ilu_tasks = ilu->ilu_free_tasks = NULL;
 			ilu->ilu_ntasks = ilu->ilu_ntasks_free = 0;
 		}
+		/* de-register with proxy if available */
+		if (ilu->ilu_access == STMF_LU_ACTIVE &&
+		    stmf_state.stmf_alua_state == 1) {
+			/* de-register with proxy module */
+			stmf_ic_msg_status_t ic_ret = STMF_IC_MSG_SUCCESS;
+			stmf_ic_msg_t *ic_dereg_lun;
+			if (lu->lu_lp && lu->lu_lp->lp_lpif_rev == LPIF_REV_2 &&
+			    lu->lu_lp->lp_alua_support) {
+				ilu->ilu_alua = 1;
+				/* allocate the de-register message */
+				ic_dereg_lun = ic_dereg_lun_msg_alloc(
+				    lu->lu_id->ident, lu->lu_lp->lp_name, 0,
+				    NULL, stmf_proxy_msg_id);
+				/* send the message */
+				if (ic_dereg_lun) {
+					ic_ret = ic_tx_msg(ic_dereg_lun);
+					if (ic_ret == STMF_IC_MSG_SUCCESS) {
+						stmf_proxy_msg_id++;
+					}
+				}
+			}
+		}
 
 		if (ilu->ilu_next)
 			ilu->ilu_next->ilu_prev = ilu->ilu_prev;
@@ -2356,6 +3066,15 @@ stmf_deregister_lu(stmf_lu_t *lu)
 	return (STMF_SUCCESS);
 }
 
+void
+stmf_set_port_standby(stmf_local_port_t *lport, uint16_t rtpid)
+{
+	stmf_i_local_port_t *ilport =
+	    (stmf_i_local_port_t *)lport->lport_stmf_private;
+	ilport->ilport_rtpid = rtpid;
+	ilport->ilport_standby = 1;
+}
+
 stmf_status_t
 stmf_register_local_port(stmf_local_port_t *lport)
 {
@@ -2384,7 +3103,34 @@ stmf_register_local_port(stmf_local_port_t *lport)
 	ilport->ilport_tg =
 	    stmf_lookup_group_for_target(lport->lport_id->ident,
 	    lport->lport_id->ident_length);
-	ilport->ilport_rtpid = atomic_add_16_nv(&stmf_rtpid_counter, 1);
+
+	/*
+	 * rtpid will/must be set if this is a standby port
+	 * only register ports that are not standby (proxy) ports
+	 */
+	if (ilport->ilport_standby == 0) {
+		ilport->ilport_rtpid = atomic_add_16_nv(&stmf_rtpid_counter, 1);
+	}
+
+	if (stmf_state.stmf_alua_state == 1 &&
+	    ilport->ilport_standby == 0) {
+		stmf_ic_msg_t *ic_reg_port;
+		stmf_ic_msg_status_t ic_ret;
+		stmf_local_port_t *lport;
+		lport = ilport->ilport_lport;
+		ic_reg_port = ic_reg_port_msg_alloc(
+		    lport->lport_id, ilport->ilport_rtpid,
+		    0, NULL, stmf_proxy_msg_id);
+		if (ic_reg_port) {
+			ic_ret = ic_tx_msg(ic_reg_port);
+			if (ic_ret == STMF_IC_MSG_SUCCESS) {
+				ilport->ilport_reg_msgid = stmf_proxy_msg_id++;
+			} else {
+				cmn_err(CE_WARN, "error on port registration "
+				"port - %s", ilport->ilport_kstat_tgt_name);
+			}
+		}
+	}
 	STMF_EVENT_ALLOC_HANDLE(ilport->ilport_event_hdl);
 	stmf_create_kstat_lport(ilport);
 	if (stmf_workers_state == STMF_WORKERS_DISABLED) {
@@ -2418,7 +3164,26 @@ stmf_deregister_local_port(stmf_local_port_t *lport)
 		mutex_exit(&stmf_state.stmf_lock);
 		return (STMF_BUSY);
 	}
+
 	ilport = (stmf_i_local_port_t *)lport->lport_stmf_private;
+
+	/*
+	 * deregister ports that are not standby (proxy)
+	 */
+	if (stmf_state.stmf_alua_state == 1 &&
+	    ilport->ilport_standby == 0) {
+		stmf_ic_msg_t *ic_dereg_port;
+		stmf_ic_msg_status_t ic_ret;
+		ic_dereg_port = ic_dereg_port_msg_alloc(
+		    lport->lport_id, 0, NULL, stmf_proxy_msg_id);
+		if (ic_dereg_port) {
+			ic_ret = ic_tx_msg(ic_dereg_port);
+			if (ic_ret == STMF_IC_MSG_SUCCESS) {
+				stmf_proxy_msg_id++;
+			}
+		}
+	}
+
 	if (ilport->ilport_nsessions == 0) {
 		if (ilport->ilport_next)
 			ilport->ilport_next->ilport_prev = ilport->ilport_prev;
@@ -2495,6 +3260,8 @@ stmf_register_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 	iss->iss_creation_time = ddi_get_time();
 	ss->ss_session_id = atomic_add_64_nv(&stmf_session_counter, 1);
 	iss->iss_flags &= ~ISS_BEING_CREATED;
+	/* XXX should we remove ISS_LUN_INVENTORY_CHANGED on new session? */
+	iss->iss_flags &= ~ISS_LUN_INVENTORY_CHANGED;
 	DTRACE_PROBE2(session__online, stmf_local_port_t *, lport,
 	    stmf_scsi_session_t *, ss);
 	return (STMF_SUCCESS);
@@ -2507,6 +3274,8 @@ stmf_deregister_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 	    lport->lport_stmf_private;
 	stmf_i_scsi_session_t *iss, **ppss;
 	int found = 0;
+	stmf_ic_msg_t *ic_session_dereg;
+	stmf_status_t ic_ret = STMF_FAILURE;
 
 	DTRACE_PROBE2(session__offline, stmf_local_port_t *, lport,
 	    stmf_scsi_session_t *, ss);
@@ -2525,7 +3294,21 @@ try_dereg_ss_again:
 		delay(1);
 		goto try_dereg_ss_again;
 	}
+
+	/* dereg proxy session if not standby port */
+	if (stmf_state.stmf_alua_state == 1 && ilport->ilport_standby == 0) {
+		ic_session_dereg = ic_session_dereg_msg_alloc(
+		    ss, stmf_proxy_msg_id);
+		if (ic_session_dereg) {
+			ic_ret = ic_tx_msg(ic_session_dereg);
+			if (ic_ret == STMF_IC_MSG_SUCCESS) {
+				stmf_proxy_msg_id++;
+			}
+		}
+	}
+
 	mutex_exit(&stmf_state.stmf_lock);
+
 	rw_enter(&ilport->ilport_lock, RW_WRITER);
 	for (ppss = &ilport->ilport_ss_list; *ppss != NULL;
 	    ppss = &((*ppss)->iss_next)) {
@@ -3032,16 +3815,14 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 	return (task);
 }
 
-void
-stmf_task_lu_free(scsi_task_t *task)
+static void
+stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss)
 {
 	stmf_i_scsi_task_t *itask =
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
-	stmf_i_scsi_session_t *iss = (stmf_i_scsi_session_t *)
-	    task->task_session->ss_stmf_private;
 	stmf_i_lu_t *ilu = (stmf_i_lu_t *)task->task_lu->lu_stmf_private;
 
-	rw_enter(iss->iss_lockp, RW_READER);
+	ASSERT(rw_lock_held(iss->iss_lockp));
 	itask->itask_flags = ITASK_IN_FREE_LIST;
 	mutex_enter(&ilu->ilu_task_lock);
 	itask->itask_lu_free_next = ilu->ilu_free_tasks;
@@ -3049,7 +3830,6 @@ stmf_task_lu_free(scsi_task_t *task)
 	ilu->ilu_ntasks_free++;
 	mutex_exit(&ilu->ilu_task_lock);
 	atomic_add_32(itask->itask_ilu_task_cntr, -1);
-	rw_exit(iss->iss_lockp);
 }
 
 void
@@ -3245,6 +4025,8 @@ stmf_task_free(scsi_task_t *task)
 	stmf_local_port_t *lport = task->task_lport;
 	stmf_i_scsi_task_t *itask = (stmf_i_scsi_task_t *)
 	    task->task_stmf_private;
+	stmf_i_scsi_session_t *iss = (stmf_i_scsi_session_t *)
+	    task->task_session->ss_stmf_private;
 
 	DTRACE_PROBE1(stmf__task__end, scsi_task_t *, task);
 	stmf_free_task_bufs(itask, lport);
@@ -3255,6 +4037,8 @@ stmf_task_free(scsi_task_t *task)
 			    itask->itask_itl_datap);
 		}
 	}
+
+	rw_enter(iss->iss_lockp, RW_READER);
 	lport->lport_task_free(task);
 	if (itask->itask_worker) {
 		atomic_add_32(&stmf_cur_ntasks, -1);
@@ -3264,7 +4048,8 @@ stmf_task_free(scsi_task_t *task)
 	 * After calling stmf_task_lu_free, the task pointer can no longer
 	 * be trusted.
 	 */
-	stmf_task_lu_free(task);
+	stmf_task_lu_free(task, iss);
+	rw_exit(iss->iss_lockp);
 }
 
 void
@@ -4305,17 +5090,31 @@ stmf_wwn_to_devid_desc(scsi_devid_desc_t *sdid, uint8_t *wwn,
 
 
 stmf_xfer_data_t *
-stmf_prepare_tpgs_data()
+stmf_prepare_tpgs_data(uint8_t ilu_alua)
 {
 	stmf_xfer_data_t *xd;
 	stmf_i_local_port_t *ilport;
 	uint8_t *p;
-	uint32_t sz, asz, nports;
+	uint32_t sz, asz, nports = 0, nports_standby = 0;
 
 	mutex_enter(&stmf_state.stmf_lock);
-	/* The spec only allows for 255 ports to be reported */
-	nports = min(stmf_state.stmf_nlports, 255);
+	/* check if any ports are standby and create second group */
+	for (ilport = stmf_state.stmf_ilportlist; ilport;
+	    ilport = ilport->ilport_next) {
+		if (ilport->ilport_standby == 1) {
+			nports_standby++;
+		} else {
+			nports++;
+		}
+	}
+
+	/* The spec only allows for 255 ports to be reported per group */
+	nports = min(nports, 255);
+	nports_standby = min(nports_standby, 255);
 	sz = (nports * 4) + 12;
+	if (nports_standby && ilu_alua) {
+		sz += (nports_standby * 4) + 8;
+	}
 	asz = sz + sizeof (*xd) - 4;
 	xd = (stmf_xfer_data_t *)kmem_zalloc(asz, KM_NOSLEEP);
 	if (xd == NULL) {
@@ -4330,13 +5129,42 @@ stmf_prepare_tpgs_data()
 	*((uint32_t *)p) = BE_32(sz - 4);
 	p += 4;
 	p[0] = 0x80;	/* PREF */
-	p[1] = 1;	/* AO_SUP */
+	p[1] = 5;	/* AO_SUP, S_SUP */
+	if (stmf_state.stmf_alua_node == 1) {
+		p[3] = 1;	/* Group 1 */
+	} else {
+		p[3] = 0;	/* Group 0 */
+	}
 	p[7] = nports & 0xff;
 	p += 8;
-	for (ilport = stmf_state.stmf_ilportlist; ilport && nports;
-	    nports++, ilport = ilport->ilport_next, p += 4) {
+	for (ilport = stmf_state.stmf_ilportlist; ilport;
+	    ilport = ilport->ilport_next) {
+		if (ilport->ilport_standby == 1) {
+			continue;
+		}
 		((uint16_t *)p)[1] = BE_16(ilport->ilport_rtpid);
+		p += 4;
 	}
+	if (nports_standby && ilu_alua) {
+		p[0] = 0x02;	/* Non PREF, Standby */
+		p[1] = 5;	/* AO_SUP, S_SUP */
+		if (stmf_state.stmf_alua_node == 1) {
+			p[3] = 0;	/* Group 0 */
+		} else {
+			p[3] = 1;	/* Group 1 */
+		}
+		p[7] = nports_standby & 0xff;
+		p += 8;
+		for (ilport = stmf_state.stmf_ilportlist; ilport;
+		    ilport = ilport->ilport_next) {
+			if (ilport->ilport_standby == 0) {
+				continue;
+			}
+			((uint16_t *)p)[1] = BE_16(ilport->ilport_rtpid);
+			p += 4;
+		}
+	}
+
 	mutex_exit(&stmf_state.stmf_lock);
 
 	return (xd);
@@ -4501,13 +5329,18 @@ stmf_scsilib_prepare_vpd_page83(scsi_task_t *task, uint8_t *page,
 			p = (uint8_t *)task->task_lport->lport_id;
 			continue;
 		} else if (vpd_mask & STMF_VPD_TP_GROUP) {
+			stmf_i_local_port_t *ilport;
 			last_bit = STMF_VPD_TP_GROUP;
 			p = small_buf;
 			bzero(p, 8);
 			p[0] = 1;
 			p[1] = 0x15;
 			p[3] = 4;
-			/* Group ID is always 0 */
+			ilport = (stmf_i_local_port_t *)
+			    task->task_lport->lport_stmf_private;
+			if (ilport->ilport_rtpid > 255) {
+				p[7] = 1;	/* Group 1 */
+			}
 			sz = 8;
 			continue;
 		} else if (vpd_mask & STMF_VPD_RELATIVE_TP_ID) {
@@ -4542,6 +5375,8 @@ stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf)
 {
 	stmf_i_scsi_task_t *itask =
 	    (stmf_i_scsi_task_t *)task->task_stmf_private;
+	stmf_i_lu_t *ilu =
+	    (stmf_i_lu_t *)task->task_lu->lu_stmf_private;
 	stmf_xfer_data_t *xd;
 	uint32_t sz, minsz;
 
@@ -4571,7 +5406,7 @@ stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	sz = min(task->task_expected_xfer_length,
 	    task->task_cmd_xfer_length);
 
-	xd = stmf_prepare_tpgs_data();
+	xd = stmf_prepare_tpgs_data(ilu->ilu_alua);
 
 	if (xd == NULL) {
 		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
@@ -4602,6 +5437,7 @@ stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf)
 void
 stmf_scsilib_handle_task_mgmt(scsi_task_t *task)
 {
+
 	switch (task->task_mgmt_function) {
 	/*
 	 * For now we will abort all I/Os on the LU in case of ABORT_TASK_SET
@@ -4614,6 +5450,8 @@ stmf_scsilib_handle_task_mgmt(scsi_task_t *task)
 	case TM_CLEAR_TASK_SET:
 	case TM_LUN_RESET:
 		stmf_handle_lun_reset(task);
+		/* issue the reset to the proxy node as well */
+		(void) stmf_proxy_scsi_cmd(task, NULL);
 		return;
 	case TM_TARGET_RESET:
 	case TM_TARGET_COLD_RESET:
@@ -5392,6 +6230,9 @@ stmf_dlun0_new_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 void
 stmf_dlun0_dbuf_done(scsi_task_t *task, stmf_data_buf_t *dbuf)
 {
+	stmf_i_scsi_task_t *itask =
+	    (stmf_i_scsi_task_t *)task->task_stmf_private;
+
 	if (dbuf->db_xfer_status != STMF_SUCCESS) {
 		stmf_abort(STMF_QUEUE_TASK_ABORT, task,
 		    dbuf->db_xfer_status, NULL);
@@ -5402,6 +6243,33 @@ stmf_dlun0_dbuf_done(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		/* There is more */
 		stmf_xd_to_dbuf(dbuf);
 		(void) stmf_xfer_data(task, dbuf, 0);
+		return;
+	}
+	/*
+	 * If this is a proxy task, it will need to be completed from the
+	 * proxy port provider. This message lets pppt know that the xfer
+	 * is complete. When we receive the status from pppt, we will
+	 * then relay that status back to the lport.
+	 */
+	if (itask->itask_flags & ITASK_PROXY_TASK) {
+		stmf_ic_msg_t *ic_xfer_done_msg = NULL;
+		stmf_status_t ic_ret = STMF_FAILURE;
+		uint64_t session_msg_id;
+		mutex_enter(&stmf_state.stmf_lock);
+		session_msg_id = stmf_proxy_msg_id++;
+		mutex_exit(&stmf_state.stmf_lock);
+		/* send xfer done status to pppt */
+		ic_xfer_done_msg = ic_scsi_data_xfer_done_msg_alloc(
+		    itask->itask_proxy_msg_id,
+		    task->task_session->ss_session_id,
+		    STMF_SUCCESS, session_msg_id);
+		if (ic_xfer_done_msg) {
+			ic_ret = ic_tx_msg(ic_xfer_done_msg);
+			if (ic_ret != STMF_IC_MSG_SUCCESS) {
+				cmn_err(CE_WARN, "unable to xmit session msg");
+			}
+		}
+		/* task will be completed from pppt */
 		return;
 	}
 	stmf_scsilib_send_status(task, STATUS_GOOD, 0);

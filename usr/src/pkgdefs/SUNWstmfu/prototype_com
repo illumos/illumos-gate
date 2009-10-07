@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -44,10 +44,13 @@ f none usr/lib/libstmf.so.1 755 root bin
 s none usr/lib/libstmf.so=libstmf.so.1
 f none usr/lib/llib-lstmf 644 root bin
 f none usr/lib/llib-lstmf.ln 644 root bin
+f none usr/lib/libstmfproxy.so.1 755 root bin
+s none usr/lib/libstmfproxy.so=libstmfproxy.so.1
 d none usr/lib/mdb 755 root sys
 d none usr/lib/mdb/kvm 755 root sys
 d none usr/include 755 root bin
 f none usr/include/libstmf.h 644 root bin
+f none usr/include/libstmfproxy.h 644 root bin
 d none usr/include/sys 755 root bin
 f none usr/include/sys/fct_defines.h 644 root bin
 f none usr/include/sys/fctio.h 644 root bin
@@ -57,3 +60,9 @@ f none usr/include/sys/lpif.h 644 root bin
 f none usr/include/sys/portif.h 644 root bin
 f none usr/include/sys/stmf_defines.h 644 root bin
 f none usr/include/sys/stmf_ioctl.h 644 root bin
+d none usr/demo 755 root bin
+d none usr/demo/comstar 755 root bin
+f none usr/demo/comstar/stmfproxy.xml 444 root bin
+d none usr/demo/comstar/bin 755 root bin
+f none usr/demo/comstar/bin/svc-stmfproxy 555 root bin
+f none usr/demo/comstar/bin/aluaadm 555 root bin

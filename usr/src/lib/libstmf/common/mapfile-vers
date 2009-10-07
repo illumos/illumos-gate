@@ -48,6 +48,7 @@ SUNW_1.1 {
 	    stmfDeleteHostGroup;
 	    stmfDeleteLu;
 	    stmfDeleteTargetGroup;
+	    stmfDestroyProxyDoor;
 	    stmfDevidFromIscsiName;
 	    stmfDevidFromWwn;
 	    stmfFreeLuResource;
@@ -70,20 +71,25 @@ SUNW_1.1 {
 	    stmfGetState;
 	    stmfGetViewEntryList;
 	    stmfImportLu;
+	    stmfInitProxyDoor;
+	    stmfLuStandby;
 	    stmfModifyLu;
 	    stmfModifyLuByFname;
 	    stmfOfflineTarget;
 	    stmfOfflineLogicalUnit;
 	    stmfOnlineTarget;
 	    stmfOnlineLogicalUnit;
+	    stmfPostProxyMsg;
 	    stmfRemoveFromHostGroup;
 	    stmfRemoveFromTargetGroup;
 	    stmfRemoveViewEntry;
+	    stmfSetAluaState;
+	    stmfGetAluaState;
 	    stmfSetPersistMethod;
 	    stmfSetProviderData;
 	    stmfSetProviderDataProt;
 	    stmfSetLuProp;
-	    stmfValidateView;
+            stmfValidateView;
 	local:
 		*;
 };

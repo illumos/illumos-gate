@@ -67,6 +67,7 @@ typedef struct _diskResource {
 	boolean_t   writeProtectEnable;
 	boolean_t   writebackCacheDisableValid;
 	boolean_t   writebackCacheDisable;
+	uint16_t    accessState;
 } diskResource;
 
 

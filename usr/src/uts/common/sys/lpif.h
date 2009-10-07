@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef	_LPIF_H
@@ -30,12 +30,14 @@
  */
 
 #include <sys/stmf_defines.h>
+#include <sys/stmf.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #define	LPIF_REV_1	0x00010000
+#define	LPIF_REV_2	0x00020000
 
 typedef struct stmf_lu {
 	void			*lu_stmf_private;
@@ -70,6 +72,8 @@ typedef struct stmf_lu {
 		void *arg, uint8_t *buf, uint32_t *bufsizep);
 	void			(*lu_event_handler)(struct stmf_lu *lu,
 		int eventid, void *arg, uint32_t flags);
+	void			*lu_proxy_reg_arg;
+	uint32_t		lu_proxy_reg_arg_len;
 } stmf_lu_t;
 
 /*
@@ -78,6 +82,23 @@ typedef struct stmf_lu {
 #define	STMF_LU_ABORT_TASK		1
 #define	STMF_LU_RESET_STATE		2
 #define	STMF_LU_ITL_HANDLE_REMOVED	3
+
+/*
+ * Asymmetric access state
+ */
+#define	STMF_LU_ACTIVE			0
+#define	STMF_LU_STANDBY			1
+
+/*
+ * proxy register msg types
+ */
+#define	STMF_MSG_LU_REGISTER		0
+#define	STMF_MSG_LU_ACTIVE		1
+#define	STMF_MSG_LU_DEREGISTER		2
+
+
+#define	STMF_PROXY_READ			1
+#define	STMF_PROXY_WRITE		2
 
 /*
  * Reasons for itl handle removal. Passed in flags.
@@ -92,17 +113,23 @@ typedef struct stmf_lu_provider {
 	void			*lp_stmf_private;
 	void			*lp_private;
 
-	uint32_t		lp_lpif_rev;	/* Currently LPIF_REV_1 */
+	uint32_t		lp_lpif_rev;	/* Currently LPIF_REV_2 */
 	int			lp_instance;
 	char			*lp_name;
 	void			(*lp_cb)(struct stmf_lu_provider *lp,
 	    int cmd, void *arg, uint32_t flags);
+	uint8_t			lp_alua_support;
+	stmf_status_t		(*lp_proxy_msg)(uint8_t *luid,
+	    void *proxy_reg_arg, uint32_t proxy_reg_arg_len, uint32_t type);
 } stmf_lu_provider_t;
 
 stmf_status_t stmf_deregister_lu_provider(stmf_lu_provider_t *lp);
 stmf_status_t stmf_register_lu_provider(stmf_lu_provider_t *lp);
 stmf_status_t stmf_register_lu(stmf_lu_t *lup);
 stmf_status_t stmf_deregister_lu(stmf_lu_t *lup);
+stmf_status_t stmf_set_lu_access(stmf_lu_t *lup, uint8_t access_state);
+stmf_status_t stmf_proxy_scsi_cmd(scsi_task_t *, stmf_data_buf_t *dbuf);
+int stmf_is_standby_port(scsi_task_t *);
 
 #ifdef	__cplusplus
 }

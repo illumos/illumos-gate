@@ -84,4 +84,6 @@ then
 	driver_add qlt
 fi
 
+add_drv -n -b "${BASEDIR}" -m '* 0666 root sys' pppt > /dev/null 2>&1
+
 exit 0

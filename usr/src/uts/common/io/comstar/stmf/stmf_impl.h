@@ -75,6 +75,8 @@ typedef struct stmf_i_lu {
 	uint32_t	ilu_ref_cnt;
 	uint8_t		ilu_state;
 	uint8_t		ilu_prev_state;
+	uint8_t		ilu_access;
+	uint8_t		ilu_alua;
 	stmf_event_handle_t ilu_event_hdl;
 	struct stmf_i_lu *ilu_next;
 	struct stmf_i_lu *ilu_prev;
@@ -87,6 +89,9 @@ typedef struct stmf_i_lu {
 	uint32_t	ilu_ntasks;	 /* # of tasks in the ilu_task list */
 	uint32_t	ilu_ntasks_free;	/* # of tasks that are free */
 	uint32_t	ilu_ntasks_min_free; /* # minimal free tasks */
+	uint32_t	rsvd1;
+	uint32_t	ilu_proxy_registered;
+	uint64_t	ilu_reg_msgid;
 	struct stmf_i_scsi_task	*ilu_tasks;
 	struct stmf_i_scsi_task *ilu_free_tasks;
 	struct stmf_itl_data	*ilu_itl_list;
@@ -124,7 +129,12 @@ typedef struct stmf_i_local_port {
 	struct stmf_i_local_port *ilport_prev;
 	uint8_t			ilport_state;
 	uint8_t			ilport_prev_state;
+	uint8_t			ilport_standby;
+	uint8_t			ilport_alua;
 	uint16_t		ilport_rtpid; /* relative tpid */
+	uint16_t		ilport_proxy_registered;
+	uint64_t		ilport_reg_msgid;
+	uint8_t			ilport_no_standby_lu;
 	stmf_event_handle_t	ilport_event_hdl;
 	clock_t			ilport_last_online_clock;
 	clock_t			ilport_avg_interval;
@@ -183,6 +193,8 @@ typedef struct stmf_i_scsi_task {
 	scsi_task_t		*itask_task;
 	uint32_t		itask_alloc_size;
 	uint32_t		itask_flags;
+	uint64_t		itask_proxy_msg_id;
+	stmf_data_buf_t		*itask_proxy_dbuf;
 	struct stmf_worker	*itask_worker;
 	uint32_t		*itask_ilu_task_cntr;
 	struct stmf_i_scsi_task	*itask_worker_next;
@@ -219,6 +231,7 @@ typedef struct stmf_i_scsi_task {
 #define	ITASK_CAUSING_LU_RESET		0x0400
 #define	ITASK_CAUSING_TARGET_RESET	0x0800
 #define	ITASK_KSTAT_IN_RUNQ		0x1000
+#define	ITASK_PROXY_TASK		0x2000
 
 /*
  * itask cmds.
@@ -310,7 +323,6 @@ stmf_status_t stmf_dlun_fini();
 void stmf_worker_init();
 stmf_status_t stmf_worker_fini();
 void stmf_task_free(scsi_task_t *task);
-void stmf_task_lu_free(scsi_task_t *task);
 void stmf_do_task_abort(scsi_task_t *task);
 void stmf_do_itl_dereg(stmf_lu_t *lu, stmf_itl_data_t *itl,
 		uint8_t hdlrm_reason);

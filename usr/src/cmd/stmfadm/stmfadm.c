@@ -1113,6 +1113,11 @@ callModify(char *fname, stmfGuid *luGuid, uint32_t prop, const char *propVal,
 			    gettext("could not set write cache"));
 			ret++;
 			break;
+		case STMF_ERROR_ACCESS_STATE_SET:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("cannot modify while in standby mode"));
+			ret++;
+			break;
 		default:
 			(void) fprintf(stderr, "%s: %s: %s: %d\n", cmdName,
 			    gettext("could not set property"), propString,
@@ -2063,6 +2068,8 @@ printExtLuProps(stmfGuid *guid)
 		(void) printf("%s\n", propVal);
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
+	} else if (stmfRet == STMF_ERROR_NO_PROP_STANDBY) {
+		(void) printf("prop unavailable in standby\n");
 	} else {
 		(void) printf("<error retrieving property>\n");
 		ret++;
@@ -2075,6 +2082,8 @@ printExtLuProps(stmfGuid *guid)
 		(void) printf("%s\n", propVal);
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
+	} else if (stmfRet == STMF_ERROR_NO_PROP_STANDBY) {
+		(void) printf("prop unavailable in standby\n");
 	} else {
 		(void) printf("<error retrieving property>\n");
 		ret++;
@@ -2087,6 +2096,8 @@ printExtLuProps(stmfGuid *guid)
 		(void) printf("%s\n", propVal);
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
+	} else if (stmfRet == STMF_ERROR_NO_PROP_STANDBY) {
+		(void) printf("prop unavailable in standby\n");
 	} else {
 		(void) printf("<error retrieving property>\n");
 		ret++;
@@ -2099,6 +2110,8 @@ printExtLuProps(stmfGuid *guid)
 		(void) printf("%s\n", propVal);
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
+	} else if (stmfRet == STMF_ERROR_NO_PROP_STANDBY) {
+		(void) printf("prop unavailable in standby\n");
 	} else {
 		(void) printf("<error retrieving property>\n");
 		ret++;
@@ -2111,6 +2124,8 @@ printExtLuProps(stmfGuid *guid)
 		(void) printf("%s\n", propVal);
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
+	} else if (stmfRet == STMF_ERROR_NO_PROP_STANDBY) {
+		(void) printf("prop unavailable in standby\n");
 	} else {
 		(void) printf("<error retrieving property>\n");
 		ret++;
@@ -2123,6 +2138,8 @@ printExtLuProps(stmfGuid *guid)
 		(void) printf("%s\n", propVal);
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
+	} else if (stmfRet == STMF_ERROR_NO_PROP_STANDBY) {
+		(void) printf("prop unavailable in standby\n");
 	} else {
 		(void) printf("<error retrieving property>\n");
 		ret++;
@@ -2135,6 +2152,8 @@ printExtLuProps(stmfGuid *guid)
 		(void) printf("%s\n", propVal);
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
+	} else if (stmfRet == STMF_ERROR_NO_PROP_STANDBY) {
+		(void) printf("prop unavailable in standby\n");
 	} else {
 		(void) printf("<error retrieving property>\n");
 		ret++;
@@ -2147,6 +2166,8 @@ printExtLuProps(stmfGuid *guid)
 		(void) printf("%s\n", propVal);
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
+	} else if (stmfRet == STMF_ERROR_NO_PROP_STANDBY) {
+		(void) printf("prop unavailable in standby\n");
 	} else {
 		(void) printf("<error retrieving property>\n");
 		ret++;
@@ -2160,6 +2181,8 @@ printExtLuProps(stmfGuid *guid)
 		    strcasecmp(propVal, "true") ? "Disabled" : "Enabled");
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
+	} else if (stmfRet == STMF_ERROR_NO_PROP_STANDBY) {
+		(void) printf("prop unavailable in standby\n");
 	} else {
 		(void) printf("<error retrieving property>\n");
 		ret++;
@@ -2173,12 +2196,38 @@ printExtLuProps(stmfGuid *guid)
 		    strcasecmp(propVal, "true") ? "Enabled" : "Disabled");
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
+	} else if (stmfRet == STMF_ERROR_NO_PROP_STANDBY) {
+		(void) printf("prop unavailable in standby\n");
 	} else {
 		(void) printf("<error retrieving property>\n");
 		ret++;
 	}
 
+	stmfRet = stmfGetLuProp(hdl, STMF_LU_PROP_ACCESS_STATE, propVal,
+	    &propValSize);
+	(void) printf(PROPS_FORMAT, "Access State");
+	if (stmfRet == STMF_STATUS_SUCCESS) {
+		if (strcmp(propVal, STMF_ACCESS_ACTIVE) == 0) {
+			(void) printf("%s\n", "Active");
+		} else if (strcmp(propVal,
+		    STMF_ACCESS_ACTIVE_TO_STANDBY) == 0) {
+			(void) printf("%s\n", "Active->Standby");
+		} else if (strcmp(propVal, STMF_ACCESS_STANDBY) == 0) {
+			(void) printf("%s\n", "Standby");
+		} else if (strcmp(propVal,
+		    STMF_ACCESS_STANDBY_TO_ACTIVE) == 0) {
+			(void) printf("%s\n", "Standby->Active");
+		} else {
+			(void) printf("%s\n", "Unknown");
+		}
+	} else if (stmfRet == STMF_ERROR_NO_PROP) {
+		(void) printf("not set\n");
+	} else {
+		(void) printf("<error retrieving property>\n");
+		ret++;
+	}
 
+done:
 	(void) stmfFreeLuResource(hdl);
 	return (ret);
 
@@ -2274,6 +2323,26 @@ printTargetProps(stmfTargetProperties *targetProps)
 		(void) printf("-");
 	}
 	(void) printf("\n");
+	(void) printf(PROPS_FORMAT, "Protocol");
+	switch (targetProps->protocol) {
+		case STMF_PROTOCOL_FIBRE_CHANNEL:
+			(void) printf("%s", "Fibre Channel");
+			break;
+		case STMF_PROTOCOL_ISCSI:
+			(void) printf("%s", "iSCSI");
+			break;
+		case STMF_PROTOCOL_SRP:
+			(void) printf("%s", "SRP");
+			break;
+		case STMF_PROTOCOL_SAS:
+			(void) printf("%s", "SAS");
+			break;
+		default:
+			(void) printf("%s", "unknown");
+			break;
+	}
+
+	(void) printf("\n");
 }
 
 /*
@@ -2361,6 +2430,8 @@ listStateFunc(int operandLen, char *operands[], cmdOptions_t *options,
 {
 	int ret;
 	stmfState state;
+	boolean_t aluaEnabled;
+	uint32_t node;
 
 	if ((ret = getStmfState(&state)) != STMF_STATUS_SUCCESS)
 		return (ret);
@@ -2400,7 +2471,43 @@ listStateFunc(int operandLen, char *operands[], cmdOptions_t *options,
 			break;
 	}
 	(void) printf("\n");
-	return (0);
+	ret = stmfGetAluaState(&aluaEnabled, &node);
+	switch (ret) {
+		case STMF_STATUS_SUCCESS:
+			break;
+		case STMF_ERROR_PERM:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("permission denied"));
+			break;
+		case STMF_ERROR_BUSY:
+			(void) fprintf(stderr, "%s: %s\n", cmdName,
+			    gettext("resource busy"));
+			break;
+		default:
+			(void) fprintf(stderr, "%s: %s: %d\n", cmdName,
+			    gettext("unknown error"), ret);
+			break;
+	}
+	(void) printf("%-18s: ", "ALUA Status");
+	if (ret == STMF_STATUS_SUCCESS) {
+		if (aluaEnabled == B_TRUE) {
+			(void) printf("enabled");
+		} else {
+			(void) printf("disabled");
+		}
+	} else {
+		(void) printf("unknown");
+	}
+
+	(void) printf("\n");
+	(void) printf("%-18s: ", "ALUA Node");
+	if (ret == STMF_STATUS_SUCCESS) {
+		(void) printf("%d", node);
+	} else {
+		(void) printf("unknown");
+	}
+	(void) printf("\n");
+	return (ret);
 }
 
 /*

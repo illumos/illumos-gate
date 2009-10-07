@@ -426,7 +426,13 @@ stmf_add_lu_to_session(stmf_i_local_port_t *ilport,
 	ret = stmf_add_ent_to_map(sm, (void *)lun_map_ent, lu_nbr);
 	ASSERT(ret == STMF_SUCCESS);
 	atomic_add_32(&ilu->ilu_ref_cnt, 1);
-	new_flags |= ISS_LUN_INVENTORY_CHANGED;
+	/*
+	 * do not set lun inventory flag for standby port
+	 * as this would be handled from peer
+	 */
+	if (ilport->ilport_standby == 0) {
+		new_flags |= ISS_LUN_INVENTORY_CHANGED;
+	}
 	atomic_or_32(&iss->iss_flags, new_flags);
 	return (STMF_SUCCESS);
 }

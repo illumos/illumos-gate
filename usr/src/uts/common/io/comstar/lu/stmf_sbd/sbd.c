@@ -51,6 +51,7 @@
 
 extern sbd_status_t sbd_pgr_meta_init(sbd_lu_t *sl);
 extern sbd_status_t sbd_pgr_meta_load(sbd_lu_t *sl);
+extern void sbd_pgr_reset(sbd_lu_t *sl);
 
 static int sbd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
     void **result);
@@ -61,10 +62,19 @@ static int sbd_close(dev_t dev, int flag, int otype, cred_t *credp);
 static int stmf_sbd_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
     cred_t *credp, int *rval);
 void sbd_lp_cb(stmf_lu_provider_t *lp, int cmd, void *arg, uint32_t flags);
+stmf_status_t sbd_proxy_reg_lu(uint8_t *luid, void *proxy_reg_arg,
+    uint32_t proxy_reg_arg_len);
+stmf_status_t sbd_proxy_dereg_lu(uint8_t *luid, void *proxy_reg_arg,
+    uint32_t proxy_reg_arg_len);
+stmf_status_t sbd_proxy_msg(uint8_t *luid, void *proxy_arg,
+    uint32_t proxy_arg_len, uint32_t type);
 int sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
     uint32_t *err_ret);
+int sbd_create_standby_lu(sbd_create_standby_lu_t *slu, uint32_t *err_ret);
+int sbd_set_lu_standby(sbd_set_lu_standby_t *stlu, uint32_t *err_ret);
 int sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
     int no_register, sbd_lu_t **slr);
+int sbd_import_active_lu(sbd_import_lu_t *ilu, sbd_lu_t *sl, uint32_t *err_ret);
 int sbd_delete_lu(sbd_delete_lu_t *dlu, int struct_sz, uint32_t *err_ret);
 int sbd_modify_lu(sbd_modify_lu_t *mlu, int struct_sz, uint32_t *err_ret);
 int sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
@@ -80,6 +90,7 @@ int sbd_is_zvol(char *path);
 int sbd_zvolget(char *zvol_name, char **comstarprop);
 int sbd_zvolset(char *zvol_name, char *comstarprop);
 char sbd_ctoi(char c);
+void sbd_close_lu(sbd_lu_t *sl);
 
 static ldi_ident_t	sbd_zfs_ident;
 static stmf_lu_provider_t *sbd_lp;
@@ -151,10 +162,12 @@ _init(void)
 		return (ret);
 	sbd_lp = (stmf_lu_provider_t *)stmf_alloc(STMF_STRUCT_LU_PROVIDER,
 	    0, 0);
-	sbd_lp->lp_lpif_rev = LPIF_REV_1;
+	sbd_lp->lp_lpif_rev = LPIF_REV_2;
 	sbd_lp->lp_instance = 0;
 	sbd_lp->lp_name = sbd_name;
 	sbd_lp->lp_cb = sbd_lp_cb;
+	sbd_lp->lp_alua_support = 1;
+	sbd_lp->lp_proxy_msg = sbd_proxy_msg;
 	sbd_zfs_ident = ldi_ident_from_anon();
 
 	if (stmf_register_lu_provider(sbd_lp) != STMF_SUCCESS) {
@@ -319,6 +332,18 @@ stmf_sbd_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		ret = sbd_create_register_lu((sbd_create_and_reg_lu_t *)
 		    ibuf, iocd->stmf_ibuf_size, &iocd->stmf_error);
 		bcopy(ibuf, obuf, iocd->stmf_obuf_size);
+		break;
+	case SBD_IOCTL_SET_LU_STANDBY:
+		if (iocd->stmf_ibuf_size < sizeof (sbd_set_lu_standby_t)) {
+			ret = EFAULT;
+			break;
+		}
+		if (iocd->stmf_obuf_size) {
+			ret = EINVAL;
+			break;
+		}
+		ret = sbd_set_lu_standby((sbd_set_lu_standby_t *)ibuf,
+		    &iocd->stmf_error);
 		break;
 	case SBD_IOCTL_IMPORT_LU:
 		if (iocd->stmf_ibuf_size <
@@ -592,9 +617,24 @@ sbd_read_meta(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
 	io_buf = (uint8_t *)kmem_zalloc(io_size, KM_SLEEP);
 	ASSERT((starting_off + io_size) <= sl->sl_total_meta_size);
 
+	/*
+	 * Don't proceed if the device has been closed
+	 * This can occur on an access state change to standby or
+	 * a delete. The writer lock is acquired before closing the
+	 * lu. If importing, reading the metadata is valid, hence
+	 * the check on SL_OP_IMPORT_LU.
+	 */
+	rw_enter(&sl->sl_access_state_lock, RW_READER);
+	if ((sl->sl_flags & SL_MEDIA_LOADED) == 0 &&
+	    sl->sl_trans_op != SL_OP_IMPORT_LU) {
+		rw_exit(&sl->sl_access_state_lock);
+		ret = SBD_FILEIO_FAILURE;
+		goto sbd_read_meta_failure;
+	}
 	if (sl->sl_flags & SL_ZFS_META) {
 		if ((ret = sbd_read_zfs_meta(sl, io_buf, io_size,
 		    starting_off)) != SBD_SUCCESS) {
+			rw_exit(&sl->sl_access_state_lock);
 			goto sbd_read_meta_failure;
 		}
 	} else {
@@ -604,9 +644,11 @@ sbd_read_meta(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
 
 		if (vret || resid) {
 			ret = SBD_FILEIO_FAILURE | vret;
+			rw_exit(&sl->sl_access_state_lock);
 			goto sbd_read_meta_failure;
 		}
 	}
+	rw_exit(&sl->sl_access_state_lock);
 
 	bcopy(io_buf + data_off, buf, size);
 	ret = SBD_SUCCESS;
@@ -652,9 +694,24 @@ sbd_write_meta(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
 		goto sbd_write_meta_failure;
 	}
 	bcopy(buf, io_buf + data_off, size);
+	/*
+	 * Don't proceed if the device has been closed
+	 * This can occur on an access state change to standby or
+	 * a delete. The writer lock is acquired before closing the
+	 * lu. If importing, reading the metadata is valid, hence
+	 * the check on SL_OP_IMPORT_LU.
+	 */
+	rw_enter(&sl->sl_access_state_lock, RW_READER);
+	if ((sl->sl_flags & SL_MEDIA_LOADED) == 0 &&
+	    sl->sl_trans_op != SL_OP_IMPORT_LU) {
+		rw_exit(&sl->sl_access_state_lock);
+		ret = SBD_FILEIO_FAILURE;
+		goto sbd_write_meta_failure;
+	}
 	if (sl->sl_flags & SL_ZFS_META) {
 		if ((ret = sbd_write_zfs_meta(sl, io_buf, io_size,
 		    starting_off)) != SBD_SUCCESS) {
+			rw_exit(&sl->sl_access_state_lock);
 			goto sbd_write_meta_failure;
 		}
 	} else {
@@ -664,9 +721,11 @@ sbd_write_meta(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
 
 		if (vret || resid) {
 			ret = SBD_FILEIO_FAILURE | vret;
+			rw_exit(&sl->sl_access_state_lock);
 			goto sbd_write_meta_failure;
 		}
 	}
+	rw_exit(&sl->sl_access_state_lock);
 
 	ret = SBD_SUCCESS;
 
@@ -1287,6 +1346,22 @@ sbd_populate_and_register_lu(sbd_lu_t *sl, uint32_t *err_ret)
 	} else {
 		lu->lu_alias = sl->sl_name;
 	}
+	if (sl->sl_access_state == SBD_LU_STANDBY) {
+		/* call set access state */
+		ret = stmf_set_lu_access(lu, STMF_LU_STANDBY);
+		if (ret != STMF_SUCCESS) {
+			*err_ret = SBD_RET_ACCESS_STATE_FAILED;
+			return (EIO);
+		}
+	}
+	/* set proxy_reg_cb_arg to meta filename */
+	if (sl->sl_meta_filename) {
+		lu->lu_proxy_reg_arg = sl->sl_meta_filename;
+		lu->lu_proxy_reg_arg_len = strlen(sl->sl_meta_filename) + 1;
+	} else {
+		lu->lu_proxy_reg_arg = sl->sl_data_filename;
+		lu->lu_proxy_reg_arg_len = strlen(sl->sl_data_filename) + 1;
+	}
 	lu->lu_lp = sbd_lp;
 	lu->lu_task_alloc = sbd_task_alloc;
 	lu->lu_new_task = sbd_new_task;
@@ -1434,8 +1509,8 @@ odf_close_data_and_exit:
 	return (ret);
 }
 
-int
-sbd_close_delete_lu(sbd_lu_t *sl, int ret)
+void
+sbd_close_lu(sbd_lu_t *sl)
 {
 	int flag;
 
@@ -1445,6 +1520,7 @@ sbd_close_delete_lu(sbd_lu_t *sl, int ret)
 			rw_destroy(&sl->sl_zfs_meta_lock);
 			if (sl->sl_zfs_meta) {
 				kmem_free(sl->sl_zfs_meta, ZAP_MAXVALUELEN / 2);
+				sl->sl_zfs_meta = NULL;
 			}
 		} else {
 			flag = FREAD | FWRITE | FOFFMAX | FEXCL;
@@ -1467,11 +1543,68 @@ sbd_close_delete_lu(sbd_lu_t *sl, int ret)
 			sl->sl_flags &= ~SL_META_OPENED;
 		}
 	}
+}
+
+int
+sbd_set_lu_standby(sbd_set_lu_standby_t *stlu, uint32_t *err_ret)
+{
+	sbd_lu_t *sl;
+	sbd_status_t sret;
+	stmf_status_t stret;
+
+	sret = sbd_find_and_lock_lu(stlu->stlu_guid, NULL,
+	    SL_OP_MODIFY_LU, &sl);
+	if (sret != SBD_SUCCESS) {
+		if (sret == SBD_BUSY) {
+			*err_ret = SBD_RET_LU_BUSY;
+			return (EBUSY);
+		} else if (sret == SBD_NOT_FOUND) {
+			*err_ret = SBD_RET_NOT_FOUND;
+			return (ENOENT);
+		}
+		*err_ret = SBD_RET_ACCESS_STATE_FAILED;
+		return (EIO);
+	}
+
+	sl->sl_access_state = SBD_LU_TRANSITION_TO_STANDBY;
+	stret = stmf_set_lu_access((stmf_lu_t *)sl->sl_lu, STMF_LU_STANDBY);
+	if (stret != STMF_SUCCESS) {
+		sl->sl_trans_op = SL_OP_NONE;
+		*err_ret = SBD_RET_ACCESS_STATE_FAILED;
+		sl->sl_access_state = SBD_LU_TRANSITION_TO_STANDBY;
+		return (EIO);
+	}
+
+	/*
+	 * acquire the writer lock here to ensure we're not pulling
+	 * the rug from the vn_rdwr to the backing store
+	 */
+	rw_enter(&sl->sl_access_state_lock, RW_WRITER);
+	sbd_close_lu(sl);
+	rw_exit(&sl->sl_access_state_lock);
+
+	sl->sl_trans_op = SL_OP_NONE;
+	return (0);
+}
+
+int
+sbd_close_delete_lu(sbd_lu_t *sl, int ret)
+{
+
+	/*
+	 * acquire the writer lock here to ensure we're not pulling
+	 * the rug from the vn_rdwr to the backing store
+	 */
+	rw_enter(&sl->sl_access_state_lock, RW_WRITER);
+	sbd_close_lu(sl);
+	rw_exit(&sl->sl_access_state_lock);
+
 	if (sl->sl_flags & SL_LINKED)
 		sbd_unlink_lu(sl);
 	mutex_destroy(&sl->sl_metadata_lock);
 	mutex_destroy(&sl->sl_lock);
 	rw_destroy(&sl->sl_pgr->pgr_lock);
+	rw_destroy(&sl->sl_access_state_lock);
 	if (sl->sl_serial_no_alloc_size) {
 		kmem_free(sl->sl_serial_no, sl->sl_serial_no_alloc_size);
 	}
@@ -1553,11 +1686,13 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 	rw_init(&sl->sl_pgr->pgr_lock, NULL, RW_DRIVER, NULL);
 	mutex_init(&sl->sl_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&sl->sl_metadata_lock, NULL, MUTEX_DRIVER, NULL);
+	rw_init(&sl->sl_access_state_lock, NULL, RW_DRIVER, NULL);
 	p = ((char *)sl) + sizeof (sbd_lu_t) + sizeof (sbd_pgr_t);
 	sl->sl_data_filename = p;
 	(void) strcpy(sl->sl_data_filename, namebuf + slu->slu_data_fname_off);
 	p += strlen(sl->sl_data_filename) + 1;
 	sl->sl_meta_offset = SBD_META_OFFSET;
+	sl->sl_access_state = SBD_LU_ACTIVE;
 	if (slu->slu_meta_fname_valid) {
 		sl->sl_alias = sl->sl_name = sl->sl_meta_filename = p;
 		(void) strcpy(sl->sl_meta_filename, namebuf +
@@ -1778,6 +1913,180 @@ scm_err_out:
 	return (sbd_close_delete_lu(sl, ret));
 }
 
+stmf_status_t
+sbd_proxy_msg(uint8_t *luid, void *proxy_arg, uint32_t proxy_arg_len,
+    uint32_t type)
+{
+	switch (type) {
+		case STMF_MSG_LU_ACTIVE:
+			return (sbd_proxy_reg_lu(luid, proxy_arg,
+			    proxy_arg_len));
+		case STMF_MSG_LU_REGISTER:
+			return (sbd_proxy_reg_lu(luid, proxy_arg,
+			    proxy_arg_len));
+		case STMF_MSG_LU_DEREGISTER:
+			return (sbd_proxy_dereg_lu(luid, proxy_arg,
+			    proxy_arg_len));
+		default:
+			return (STMF_INVALID_ARG);
+	}
+}
+
+
+/*
+ * register a standby logical unit
+ * proxy_reg_arg contains the meta filename
+ */
+stmf_status_t
+sbd_proxy_reg_lu(uint8_t *luid, void *proxy_reg_arg, uint32_t proxy_reg_arg_len)
+{
+	sbd_lu_t *sl;
+	sbd_status_t sret;
+	sbd_create_standby_lu_t *stlu;
+	int alloc_sz;
+	uint32_t err_ret = 0;
+	stmf_status_t stret = STMF_SUCCESS;
+
+	if (luid == NULL) {
+		return (STMF_INVALID_ARG);
+	}
+
+	do {
+		sret = sbd_find_and_lock_lu(luid, NULL, SL_OP_MODIFY_LU, &sl);
+	} while (sret == SBD_BUSY);
+
+	if (sret == SBD_NOT_FOUND) {
+		alloc_sz = sizeof (*stlu) + proxy_reg_arg_len - 8;
+		stlu = (sbd_create_standby_lu_t *)kmem_zalloc(alloc_sz,
+		    KM_SLEEP);
+		bcopy(luid, stlu->stlu_guid, 16);
+		if (proxy_reg_arg_len) {
+			bcopy(proxy_reg_arg, stlu->stlu_meta_fname,
+			    proxy_reg_arg_len);
+			stlu->stlu_meta_fname_size = proxy_reg_arg_len;
+		}
+		if (sbd_create_standby_lu(stlu, &err_ret) != 0) {
+			cmn_err(CE_WARN,
+			    "Unable to create standby logical unit for %s",
+			    stlu->stlu_meta_fname);
+			stret = STMF_FAILURE;
+		}
+		kmem_free(stlu, alloc_sz);
+		return (stret);
+	} else if (sret == SBD_SUCCESS) {
+		/*
+		 * if the lu is already registered, then the lu should now
+		 * be in standby mode
+		 */
+		sbd_it_data_t *it;
+		if (sl->sl_access_state != SBD_LU_STANDBY) {
+			mutex_enter(&sl->sl_lock);
+			sl->sl_access_state = SBD_LU_STANDBY;
+			for (it = sl->sl_it_list; it != NULL;
+			    it = it->sbd_it_next) {
+				it->sbd_it_ua_conditions |=
+				    SBD_UA_ASYMMETRIC_ACCESS_CHANGED;
+				it->sbd_it_flags &=
+				    ~SBD_IT_HAS_SCSI2_RESERVATION;
+				sl->sl_flags &= ~SL_LU_HAS_SCSI2_RESERVATION;
+			}
+			mutex_exit(&sl->sl_lock);
+			sbd_pgr_reset(sl);
+		}
+		sl->sl_trans_op = SL_OP_NONE;
+	} else {
+		cmn_err(CE_WARN, "could not find and lock logical unit");
+		stret = STMF_FAILURE;
+	}
+out:
+	return (stret);
+}
+
+/* ARGSUSED */
+stmf_status_t
+sbd_proxy_dereg_lu(uint8_t *luid, void *proxy_reg_arg,
+    uint32_t proxy_reg_arg_len)
+{
+	sbd_delete_lu_t dlu = {0};
+	uint32_t err_ret;
+
+	if (luid == NULL) {
+		cmn_err(CE_WARN, "de-register lu request had null luid");
+		return (STMF_INVALID_ARG);
+	}
+
+	bcopy(luid, &dlu.dlu_guid, 16);
+
+	if (sbd_delete_lu(&dlu, (int)sizeof (dlu), &err_ret) != 0) {
+		cmn_err(CE_WARN, "failed to delete de-register lu request");
+		return (STMF_FAILURE);
+	}
+
+	return (STMF_SUCCESS);
+}
+
+int
+sbd_create_standby_lu(sbd_create_standby_lu_t *slu, uint32_t *err_ret)
+{
+	sbd_lu_t *sl;
+	stmf_lu_t *lu;
+	int ret = EIO;
+	int alloc_sz;
+
+	alloc_sz = sizeof (sbd_lu_t) + sizeof (sbd_pgr_t) +
+	    slu->stlu_meta_fname_size;
+	lu = (stmf_lu_t *)stmf_alloc(STMF_STRUCT_STMF_LU, alloc_sz, 0);
+	if (lu == NULL) {
+		return (ENOMEM);
+	}
+	sl = (sbd_lu_t *)lu->lu_provider_private;
+	bzero(sl, alloc_sz);
+	sl->sl_lu = lu;
+	sl->sl_alloc_size = alloc_sz;
+
+	sl->sl_pgr = (sbd_pgr_t *)(sl + 1);
+	sl->sl_meta_filename = ((char *)sl) + sizeof (sbd_lu_t) +
+	    sizeof (sbd_pgr_t);
+
+	if (slu->stlu_meta_fname_size > 0) {
+		(void) strcpy(sl->sl_meta_filename, slu->stlu_meta_fname);
+	}
+	sl->sl_name = sl->sl_meta_filename;
+
+	sl->sl_device_id[3] = 16;
+	sl->sl_device_id[0] = 0xf1;
+	sl->sl_device_id[1] = 3;
+	sl->sl_device_id[2] = 0;
+	bcopy(slu->stlu_guid, sl->sl_device_id + 4, 16);
+	lu->lu_id = (scsi_devid_desc_t *)sl->sl_device_id;
+	sl->sl_access_state = SBD_LU_STANDBY;
+
+	rw_init(&sl->sl_pgr->pgr_lock, NULL, RW_DRIVER, NULL);
+	mutex_init(&sl->sl_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&sl->sl_metadata_lock, NULL, MUTEX_DRIVER, NULL);
+	rw_init(&sl->sl_access_state_lock, NULL, RW_DRIVER, NULL);
+
+	sl->sl_trans_op = SL_OP_CREATE_REGISTER_LU;
+
+	if (sbd_link_lu(sl) != SBD_SUCCESS) {
+		*err_ret = SBD_RET_FILE_ALREADY_REGISTERED;
+		ret = EALREADY;
+		goto scs_err_out;
+	}
+
+	ret = sbd_populate_and_register_lu(sl, err_ret);
+	if (ret) {
+		goto scs_err_out;
+	}
+
+	sl->sl_trans_op = SL_OP_NONE;
+	atomic_add_32(&sbd_lu_count, 1);
+	return (0);
+
+scs_err_out:
+	return (sbd_close_delete_lu(sl, ret));
+}
+
 int
 sbd_load_sli_1_0(sbd_lu_t *sl, uint32_t *err_ret)
 {
@@ -1820,36 +2129,88 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 	sbd_lu_info_1_1_t *sli = NULL;
 	int asz;
 	int ret = 0;
+	stmf_status_t stret;
 	int flag;
 	int wcd = 0;
 	int data_opened;
 	uint16_t sli_buf_sz;
 	uint8_t *sli_buf_copy = NULL;
 	enum vtype vt;
+	int standby = 0;
 	sbd_status_t sret;
 
 	if (no_register && slr == NULL) {
 		return (EINVAL);
 	}
 	ilu->ilu_meta_fname[struct_sz - sizeof (*ilu) + 8 - 1] = 0;
-	asz = strlen(ilu->ilu_meta_fname) + 1;
+	/*
+	 * check whether logical unit is already registered ALUA
+	 * For a standby logical unit, the meta filename is set. Use
+	 * that to search for an existing logical unit.
+	 */
+	sret = sbd_find_and_lock_lu(NULL, (uint8_t *)&(ilu->ilu_meta_fname),
+	    SL_OP_IMPORT_LU, &sl);
 
-	lu = (stmf_lu_t *)stmf_alloc(STMF_STRUCT_STMF_LU,
-	    sizeof (sbd_lu_t) + sizeof (sbd_pgr_t) + asz, 0);
-	if (lu == NULL) {
-		return (ENOMEM);
+	if (sret == SBD_SUCCESS) {
+		if (sl->sl_access_state != SBD_LU_ACTIVE) {
+			no_register = 1;
+			standby = 1;
+			lu = sl->sl_lu;
+			if (sl->sl_alias_alloc_size) {
+				kmem_free(sl->sl_alias,
+				    sl->sl_alias_alloc_size);
+				sl->sl_alias_alloc_size = 0;
+				sl->sl_alias = NULL;
+				lu->lu_alias = NULL;
+			}
+			if (sl->sl_meta_filename == NULL) {
+				sl->sl_meta_filename = sl->sl_data_filename;
+			} else if (sl->sl_data_fname_alloc_size) {
+				kmem_free(sl->sl_data_filename,
+				    sl->sl_data_fname_alloc_size);
+				sl->sl_data_fname_alloc_size = 0;
+			}
+			if (sl->sl_serial_no_alloc_size) {
+				kmem_free(sl->sl_serial_no,
+				    sl->sl_serial_no_alloc_size);
+				sl->sl_serial_no_alloc_size = 0;
+			}
+			if (sl->sl_mgmt_url_alloc_size) {
+				kmem_free(sl->sl_mgmt_url,
+				    sl->sl_mgmt_url_alloc_size);
+				sl->sl_mgmt_url_alloc_size = 0;
+			}
+		} else {
+			*err_ret = SBD_RET_FILE_ALREADY_REGISTERED;
+			sl->sl_trans_op = SL_OP_NONE;
+			return (EALREADY);
+		}
+	} else if (sret == SBD_NOT_FOUND) {
+		asz = strlen(ilu->ilu_meta_fname) + 1;
+
+		lu = (stmf_lu_t *)stmf_alloc(STMF_STRUCT_STMF_LU,
+		    sizeof (sbd_lu_t) + sizeof (sbd_pgr_t) + asz, 0);
+		if (lu == NULL) {
+			return (ENOMEM);
+		}
+		sl = (sbd_lu_t *)lu->lu_provider_private;
+		bzero(sl, sizeof (*sl));
+		sl->sl_lu = lu;
+		sl->sl_pgr = (sbd_pgr_t *)(sl + 1);
+		sl->sl_meta_filename = ((char *)sl) + sizeof (*sl) +
+		    sizeof (sbd_pgr_t);
+		(void) strcpy(sl->sl_meta_filename, ilu->ilu_meta_fname);
+		sl->sl_name = sl->sl_meta_filename;
+		rw_init(&sl->sl_pgr->pgr_lock, NULL, RW_DRIVER, NULL);
+		rw_init(&sl->sl_access_state_lock, NULL, RW_DRIVER, NULL);
+		mutex_init(&sl->sl_lock, NULL, MUTEX_DRIVER, NULL);
+		mutex_init(&sl->sl_metadata_lock, NULL, MUTEX_DRIVER, NULL);
+		sl->sl_trans_op = SL_OP_IMPORT_LU;
+	} else {
+		*err_ret = SBD_RET_META_FILE_LOOKUP_FAILED;
+		return (EIO);
 	}
-	sl = (sbd_lu_t *)lu->lu_provider_private;
-	bzero(sl, sizeof (*sl));
-	sl->sl_lu = lu;
-	sl->sl_pgr = (sbd_pgr_t *)(sl + 1);
-	sl->sl_meta_filename = ((char *)sl) + sizeof (*sl) + sizeof (sbd_pgr_t);
-	(void) strcpy(sl->sl_meta_filename, ilu->ilu_meta_fname);
-	sl->sl_name = sl->sl_meta_filename;
-	rw_init(&sl->sl_pgr->pgr_lock, NULL, RW_DRIVER, NULL);
-	mutex_init(&sl->sl_lock, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&sl->sl_metadata_lock, NULL, MUTEX_DRIVER, NULL);
-	sl->sl_trans_op = SL_OP_IMPORT_LU;
+
 	/* we're only loading the metadata */
 	if (!no_register) {
 		if (sbd_link_lu(sl) != SBD_SUCCESS) {
@@ -1917,8 +2278,9 @@ sbd_import_lu(sbd_import_lu_t *ilu, int struct_sz, uint32_t *err_ret,
 	    SMS_ID_LU_INFO_1_1);
 	if ((sret == SBD_NOT_FOUND) && ((sl->sl_flags & SL_ZFS_META) == 0)) {
 		ret = sbd_load_sli_1_0(sl, err_ret);
-		if (ret)
+		if (ret) {
 			goto sim_err_out;
+		}
 		goto sim_sli_loaded;
 	}
 	if (sret != SBD_SUCCESS) {
@@ -2040,8 +2402,9 @@ sim_sli_loaded:
 	}
 
 	ret = sbd_open_data_file(sl, err_ret, 1, data_opened, 0);
-	if (ret)
+	if (ret) {
 		goto sim_err_out;
+	}
 
 	/*
 	 * set write cache disable on the device
@@ -2071,13 +2434,15 @@ sim_sli_loaded:
 	/* we're only loading the metadata */
 	if (!no_register) {
 		ret = sbd_populate_and_register_lu(sl, err_ret);
-		if (ret)
+		if (ret) {
 			goto sim_err_out;
+		}
 		atomic_add_32(&sbd_lu_count, 1);
 	}
 
 	bcopy(sl->sl_device_id + 4, ilu->ilu_ret_guid, 16);
 	sl->sl_trans_op = SL_OP_NONE;
+
 	if (sli) {
 		kmem_free(sli, sli->sli_sms_header.sms_size);
 		sli = NULL;
@@ -2086,9 +2451,39 @@ sim_sli_loaded:
 		kmem_free(sli_buf_copy, sli_buf_sz + 1);
 		sli_buf_copy = NULL;
 	}
-	if (no_register) {
+	if (no_register && !standby) {
 		*slr = sl;
 	}
+
+	/*
+	 * if this was imported from standby, set the access state
+	 * to active.
+	 */
+	if (standby) {
+		sbd_it_data_t *it;
+		mutex_enter(&sl->sl_lock);
+		sl->sl_access_state = SBD_LU_ACTIVE;
+		for (it = sl->sl_it_list; it != NULL;
+		    it = it->sbd_it_next) {
+			it->sbd_it_ua_conditions |=
+			    SBD_UA_ASYMMETRIC_ACCESS_CHANGED;
+			it->sbd_it_ua_conditions |= SBD_UA_POR;
+		}
+		mutex_exit(&sl->sl_lock);
+		/* call set access state */
+		stret = stmf_set_lu_access(lu, STMF_LU_ACTIVE);
+		if (stret != STMF_SUCCESS) {
+			*err_ret = SBD_RET_ACCESS_STATE_FAILED;
+			sl->sl_access_state = SBD_LU_STANDBY;
+			goto sim_err_out;
+		}
+		if (sl->sl_alias) {
+			lu->lu_alias = sl->sl_alias;
+		} else {
+			lu->lu_alias = sl->sl_name;
+		}
+	}
+	sl->sl_access_state = SBD_LU_ACTIVE;
 	return (0);
 
 sim_err_out:
@@ -2100,7 +2495,14 @@ sim_err_out:
 		kmem_free(sli_buf_copy, sli_buf_sz + 1);
 		sli_buf_copy = NULL;
 	}
-	return (sbd_close_delete_lu(sl, ret));
+
+	if (standby) {
+		*err_ret = SBD_RET_ACCESS_STATE_FAILED;
+		sl->sl_trans_op = SL_OP_NONE;
+		return (EIO);
+	} else {
+		return (sbd_close_delete_lu(sl, ret));
+	}
 }
 
 int
@@ -2178,6 +2580,12 @@ sbd_modify_lu(sbd_modify_lu_t *mlu, int struct_sz, uint32_t *err_ret)
 			return (ENOENT);
 		}
 		modify_unregistered = 1;
+	}
+
+	if (sl->sl_access_state != SBD_LU_ACTIVE) {
+		*err_ret = SBD_RET_ACCESS_STATE_FAILED;
+		ret = EINVAL;
+		goto smm_err_out;
 	}
 
 	/* check for write cache change */
@@ -2435,9 +2843,21 @@ sbd_data_read(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
 	DTRACE_PROBE4(backing__store__read__start, sbd_lu_t *, sl,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset);
 
+	/*
+	 * Don't proceed if the device has been closed
+	 * This can occur on an access state change to standby or
+	 * a delete. The writer lock is acquired before closing the
+	 * lu.
+	 */
+	rw_enter(&sl->sl_access_state_lock, RW_READER);
+	if ((sl->sl_flags & SL_MEDIA_LOADED) == 0) {
+		rw_exit(&sl->sl_access_state_lock);
+		return (SBD_FAILURE);
+	}
 	ret = vn_rdwr(UIO_READ, sl->sl_data_vp, (caddr_t)buf, (ssize_t)size,
 	    (offset_t)offset, UIO_SYSSPACE, 0, RLIM64_INFINITY, CRED(),
 	    &resid);
+	rw_exit(&sl->sl_access_state_lock);
 
 	DTRACE_PROBE5(backing__store__read__end, sbd_lu_t *, sl,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
@@ -2477,9 +2897,21 @@ sbd_data_write(sbd_lu_t *sl, uint64_t offset, uint64_t size, uint8_t *buf)
 	DTRACE_PROBE4(backing__store__write__start, sbd_lu_t *, sl,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset);
 
+	/*
+	 * Don't proceed if the device has been closed
+	 * This can occur on an access state change to standby or
+	 * a delete. The writer lock is acquired before closing the
+	 * lu.
+	 */
+	rw_enter(&sl->sl_access_state_lock, RW_READER);
+	if ((sl->sl_flags & SL_MEDIA_LOADED) == 0) {
+		rw_exit(&sl->sl_access_state_lock);
+		return (SBD_FAILURE);
+	}
 	ret = vn_rdwr(UIO_WRITE, sl->sl_data_vp, (caddr_t)buf, (ssize_t)size,
 	    (offset_t)offset, UIO_SYSSPACE, ioflag, RLIM64_INFINITY, CRED(),
 	    &resid);
+	rw_exit(&sl->sl_access_state_lock);
 
 	DTRACE_PROBE5(backing__store__write__end, sbd_lu_t *, sl,
 	    uint8_t *, buf, uint64_t, size, uint64_t, offset,
@@ -2604,6 +3036,8 @@ sbd_get_lu_props(sbd_lu_props_t *islp, uint32_t islp_sz,
 
 	oslp->slp_lu_size = sl->sl_lu_size;
 	oslp->slp_blksize = ((uint16_t)1) << sl->sl_data_blocksize_shift;
+
+	oslp->slp_access_state = sl->sl_access_state;
 
 	if (sl->sl_flags & SL_VID_VALID) {
 		oslp->slp_lu_vid = 1;

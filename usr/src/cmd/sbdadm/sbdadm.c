@@ -665,7 +665,7 @@ print_lu_attr(stmfGuid *guid)
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
 	} else {
-		(void) printf("<error retrieving property>");
+		(void) printf("<error retrieving property>\n");
 		ret++;
 	}
 
@@ -676,7 +676,7 @@ print_lu_attr(stmfGuid *guid)
 	} else if (stmfRet == STMF_ERROR_NO_PROP) {
 		(void) printf("not set\n");
 	} else {
-		(void) printf("<error retrieving property>");
+		(void) printf("<error retrieving property>\n");
 		ret++;
 	}
 

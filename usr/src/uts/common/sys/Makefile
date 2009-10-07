@@ -438,6 +438,8 @@ CHKHDRS=			\
 	port_kernel.h		\
 	portif.h		\
 	ppmio.h                 \
+	pppt_ic_if.h		\
+	pppt_ioctl.h		\
 	priocntl.h		\
 	priv.h			\
 	priv_impl.h		\

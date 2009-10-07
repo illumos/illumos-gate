@@ -190,6 +190,7 @@ typedef struct sbd_lu {
 
 	/* Metadata */
 	kmutex_t	sl_metadata_lock;
+	krwlock_t	sl_access_state_lock;
 	char		*sl_alias;
 	char		*sl_meta_filename;	/* If applicable */
 	char		*sl_mgmt_url;
@@ -210,6 +211,7 @@ typedef struct sbd_lu {
 	uint16_t	sl_alias_alloc_size;
 	uint16_t	sl_mgmt_url_alloc_size;
 	uint8_t		sl_serial_no_alloc_size;
+	uint8_t		sl_access_state;
 	uint64_t	sl_meta_offset;
 
 	/* zfs metadata */

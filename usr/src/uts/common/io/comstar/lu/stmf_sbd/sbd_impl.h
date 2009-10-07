@@ -230,15 +230,24 @@ typedef struct sbd_it_data {
 	sbd_pgr_key_t		*pgr_key_ptr;
 } sbd_it_data_t;
 
+typedef struct sbd_create_standby_lu {
+	uint32_t	stlu_meta_fname_size;
+	uint32_t	stlu_rsvd;
+	uint8_t		stlu_guid[16];
+	char		stlu_meta_fname[8];
+} sbd_create_standby_lu_t;
+
 /*
  * Different UA conditions
  */
-#define	SBD_UA_POR			0x01
-#define	SBD_UA_CAPACITY_CHANGED		0x02
-#define	SBD_UA_MODE_PARAMETERS_CHANGED	0x04
-#define	SBD_UA_REGISTRATIONS_PREEMPTED	0x10
-#define	SBD_UA_RESERVATIONS_PREEMPTED	0x20
-#define	SBD_UA_RESERVATIONS_RELEASED	0x40
+#define	SBD_UA_POR			    0x01
+#define	SBD_UA_CAPACITY_CHANGED		    0x02
+#define	SBD_UA_MODE_PARAMETERS_CHANGED	    0x04
+#define	SBD_UA_ACCESS_STATE_TRANSITION	    0x08
+#define	SBD_UA_REGISTRATIONS_PREEMPTED	    0x10
+#define	SBD_UA_RESERVATIONS_PREEMPTED	    0x20
+#define	SBD_UA_RESERVATIONS_RELEASED	    0x40
+#define	SBD_UA_ASYMMETRIC_ACCESS_CHANGED    0x80
 
 /*
  * sbd_it_flags

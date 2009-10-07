@@ -67,6 +67,8 @@ extern "C" {
 #define	STMF_IOCTL_VE_LU_LIST			(STMF_IOCTL | 33)
 #define	STMF_IOCTL_LU_VE_LIST			(STMF_IOCTL | 34)
 #define	STMF_IOCTL_VALIDATE_VIEW		(STMF_IOCTL | 35)
+#define	STMF_IOCTL_SET_ALUA_STATE		(STMF_IOCTL | 36)
+#define	STMF_IOCTL_GET_ALUA_STATE		(STMF_IOCTL | 37)
 
 typedef	struct stmf_iocdata {
 	uint32_t	stmf_version;
@@ -135,6 +137,14 @@ typedef struct stmf_state_desc {
 	uint8_t		state;
 	uint8_t		config_state;	/* N/A for LU/LPORTs */
 } stmf_state_desc_t;
+
+/*
+ * This struct is used for setting the alua state
+ */
+typedef struct stmf_alua_state_desc {
+	uint8_t		alua_state;
+	uint16_t	alua_node;
+} stmf_alua_state_desc_t;
 
 /* Error definitions for group/view entry/provider dataioctls */
 #define	STMF_IOCERR_NONE			0

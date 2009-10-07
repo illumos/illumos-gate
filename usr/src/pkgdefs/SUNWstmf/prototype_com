@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -46,6 +46,7 @@ f none kernel/drv/fct.conf 0644 root sys
 f none kernel/drv/qlt.conf 0644 root sys
 f none kernel/drv/stmf_sbd.conf 0644 root sys
 f none kernel/drv/stmf.conf 0644 root sys
+f none kernel/drv/pppt.conf 0644 root sys
 d none kernel/kmdb 755 root sys
 d none lib 755 root bin
 d none lib/svc 755 root bin
