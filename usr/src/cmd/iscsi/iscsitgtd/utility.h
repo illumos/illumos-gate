@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _TARGET_UTILITY_H
 #define	_TARGET_UTILITY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Block comment which describes the contents of this file.
@@ -77,7 +75,7 @@ Boolean_t parse_text(iscsi_conn_t *c, int dlen, char **text,
     int *text_length, int *errcode);
 Boolean_t add_text(char **text, int *current_length, char *name, char *val);
 char *task_to_str(int func);
-void create_geom(diskaddr_t size, int *cylinder, int *heads, int *spt);
+void create_geom(diskaddr_t size, int *cylinders, int *heads, int *spt);
 void connection_parameters_default(iscsi_conn_t *c);
 int sna_lt(uint32_t n1, uint32_t n2);
 int sna_lte(uint32_t n1, uint32_t n2);

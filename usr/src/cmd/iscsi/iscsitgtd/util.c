@@ -34,6 +34,7 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <inttypes.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
@@ -1264,64 +1265,68 @@ util_create_guid_naa(char **guid)
 
 /*
  * []----
- * | create_geom -- based on size determine best fit for CHS
+ * | create_geom -- based on size, determine best fit for CHS
  * |
- * | Given size in bytes which will be adjusted to sectors, find
- * | the best fit for making C * H * S == sectors
+ * | Given size in bytes, which will be adjusted to blocks, find
+ * | the best fit for making (C * H * S == blocks)
+ * |
+ * | Note that the following algorithm was derived from the
+ * | common disk label implementation, cmlb_convert_geometry().
+ * |
  * []----
  */
 void
-create_geom(diskaddr_t size, int *cylinder, int *heads, int *spt)
+create_geom(diskaddr_t size, int *cylinders, int *heads, int *spt)
 {
-	diskaddr_t	sects	= size >> 9;
-	diskaddr_t	c, h, s, t;
-	int		pass;
+	diskaddr_t	blocks = size >> 9;  /* 512 bytes/block */
 
 	/*
-	 * For certain odd size LU we can't generate correct geometry.
-	 * If this occurs the values will be set to zero and the MODE
-	 * pages will return unsupported.
+	 * For all devices we calculate cylinders using the heads and sectors
+	 * we assign based on capacity of the device.  The algorithm is
+	 * designed to be compatible with the way other operating systems
+	 * lay out fdisk tables for X86 and to insure that the cylinders never
+	 * exceed 65535 to prevent problems with X86 ioctls that report
+	 * geometry.
+	 * For some smaller disk sizes we report geometry that matches those
+	 * used by X86 BIOS usage. For larger disks, we use SPT that are
+	 * multiples of 63, since other OSes that are not limited to 16-bits
+	 * for cylinders stop at 63 SPT we make do by using multiples of 63 SPT.
+	 *
+	 * The following table (in order) illustrates some end result
+	 * calculations:
+	 *
+	 * Maximum number of blocks	nhead	nsect
+	 *
+	 * 2097152 (1GB)		 64	 32
+	 * 16777216 (8GB)		128	 32
+	 * 1052819775 (502.02GB)	255	 63
+	 * 2105639550 (0.98TB)		255	126
+	 * 3158459325 (1.47TB)		255	189
+	 * 4211279100 (1.96TB)		255	252
+	 * 5264098875 (2.45TB)		255	315
+	 * ...
 	 */
-	*cylinder	= 0;
-	*heads		= 0;
-	*spt		= 0;
 
-	for (pass = 0; pass < 2; pass++)
-		for (c = 0x8000; c > 0; c >>= 1) {
-			t = sects / c;
-			if ((t == 0) || ((sects % c) != 0))
-				continue;
-			for (h = 1; h < 0xff; h++)
-				if ((t % h) == 0) {
-					s = t / h;
-					if (s > 0xffff)
-						continue;
-					if ((pass == 0) &&
-					    ((c < MIN_VAL) || (h < MIN_VAL) ||
-					    (s < MIN_VAL))) {
-						continue;
-					}
+	if (blocks <= 0x200000) {
+		*heads = 64;
+		*spt = 32;
+	} else if (blocks <= 0x01000000) {
+		*heads = 128;
+		*spt = 32;
+	} else {
+		*heads = 255;
 
-					*cylinder	= (int)c;
-					*heads		= (int)h;
-					*spt		= (int)s;
-					return;
-				}
-		}
+		/* make sectors-per-track be smallest multiple of 63 */
+		*spt = ((blocks +
+		    (UINT16_MAX * 255 * 63) - 1) /
+		    (UINT16_MAX * 255 * 63)) * 63;
 
-	/*
-	 * At this point we've got a size which will not fit into
-	 * any values where C * H * S = size. So, set the heads and
-	 * sectors per track values to their largest which will make
-	 * a single cylinder 8GB. Then divide that into the size to
-	 * get the number of cylinders.
-	 */
-	h		= 0xff;
-	s		= 0xffff;
-	c		= sects / (h * s);
-	*heads		= (int)h;
-	*spt		= (int)s;
-	*cylinder	= (int)c;
+		if (*spt == 0)
+			*spt = (UINT16_MAX / 63) * 63;
+	}
+
+	/* cyls/dsk = (sectors/dsk) / (sectors/trk * tracks/cyl) */
+	*cylinders = blocks / (*spt * *heads);
 }
 
 /*
