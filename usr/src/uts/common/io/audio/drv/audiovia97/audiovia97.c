@@ -576,7 +576,7 @@ via97_alloc_port(via97_devc_t *devc, int num)
 	}
 
 	OUTL(devc, portc->base + 4, portc->sgd_paddr);
-	ddi_dma_sync(portc->sgd_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
+	(void) ddi_dma_sync(portc->sgd_dmah, 0, 0, DDI_DMA_SYNC_FORDEV);
 
 	portc->engine = audio_engine_alloc(&via97_engine_ops, caps);
 	if (portc->engine == NULL) {
