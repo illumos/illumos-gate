@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -485,13 +485,20 @@ pfiles_dig_pathname(uintptr_t vp, char *path)
 		 */
 		if (v.v_type == VSOCK) {
 			struct sonode sonode;
+			struct sockparams sockparams;
 
 			if (pfiles_get_sonode(&v, &sonode) == -1) {
 				return (-1);
 			}
+			if (mdb_vread(&sockparams, sizeof (sockparams),
+			    (uintptr_t)sonode.so_sockparams) == -1) {
+				mdb_warn("failed to read sockparams");
+				return (-1);
+			}
+
 			if (!SOCK_IS_NONSTR(&sonode)) {
-				struct sockparams *sp = sonode.so_sockparams;
-				vp = (uintptr_t)sp->sp_sdev_info.sd_vnode;
+				vp = (uintptr_t)
+				    sockparams.sp_sdev_info.sd_vnode;
 			} else {
 				vp = NULL;
 			}
