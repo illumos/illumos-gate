@@ -4340,14 +4340,12 @@ pmcs_pwork(pmcs_hw_t *pwp, pmcwork_t *p)
 	ASSERT(p != NULL);
 	ASSERT(mutex_owned(&p->lock));
 
-#ifdef DEBUG
 	p->last_ptr = p->ptr;
 	p->last_arg = p->arg;
 	p->last_phy = p->phy;
 	p->last_xp = p->xp;
 	p->last_htag = p->htag;
 	p->last_state = p->state;
-#endif
 	p->finish = gethrtime();
 
 	if (p->phy) {

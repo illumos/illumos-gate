@@ -201,7 +201,6 @@ struct pmcwork {
 	uint32_t		ssp_event; /* ssp event */
 	pmcs_dtype_t		dtype;	/* stash, incase phy gets cleared */
 
-	/* DEBUG-only fields from here on */
 	void			*last_ptr;
 	void			*last_arg;
 	pmcs_phy_t		*last_phy;

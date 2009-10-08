@@ -39,6 +39,7 @@ static int target_idx;
 static uint32_t	sas_phys, sata_phys, exp_phys, num_expanders, empty_phys;
 
 static pmcs_phy_t *pmcs_next_sibling(pmcs_phy_t *phyp);
+static void display_one_work(pmcwork_t *wp, int verbose, int idx);
 
 static void
 print_sas_address(pmcs_phy_t *phy)
@@ -205,6 +206,46 @@ display_iport(struct pmcs_hw m, uintptr_t addr, int verbose)
 	}
 
 	mdb_printf("\n");
+}
+
+static void
+display_completion_queue(struct pmcs_hw ss)
+{
+	pmcs_iocomp_cb_t ccb, *ccbp;
+	pmcwork_t work;
+
+	if (ss.iocomp_cb_head == NULL) {
+		mdb_printf("Completion queue is empty.\n");
+		return;
+	}
+
+	ccbp = ss.iocomp_cb_head;
+	mdb_printf("%8s %10s %20s %8s %8s O D\n",
+	    "HTag", "State", "Phy Path", "Target", "Timer");
+
+	while (ccbp) {
+		if (mdb_vread(&ccb, sizeof (pmcs_iocomp_cb_t),
+		    (uintptr_t)ccbp) != sizeof (pmcs_iocomp_cb_t)) {
+			mdb_warn("Unable to read completion queue entry\n");
+			return;
+		}
+
+		if (mdb_vread(&work, sizeof (pmcwork_t), (uintptr_t)ccb.pwrk)
+		    != sizeof (pmcwork_t)) {
+			mdb_warn("Unable to read work structure\n");
+			return;
+		}
+
+		/*
+		 * Only print the work structure if it's still active.  If
+		 * it's not, it's been completed since we started looking at
+		 * it.
+		 */
+		if (work.state != PMCS_WORK_STATE_NIL) {
+			display_one_work(&work, 0, 0);
+		}
+		ccbp = ccb.next;
+	}
 }
 
 /*ARGSUSED*/
@@ -383,20 +424,101 @@ display_targets(struct pmcs_hw m, int verbose, int totals_only)
 	    sas_targets, sata_targets, smp_targets);
 }
 
-/*ARGSUSED1*/
+static char *
+work_state_to_string(uint32_t state)
+{
+	char *state_string;
+
+	switch (state) {
+	case PMCS_WORK_STATE_NIL:
+		state_string = "Free";
+		break;
+	case PMCS_WORK_STATE_READY:
+		state_string = "Ready";
+		break;
+	case PMCS_WORK_STATE_ONCHIP:
+		state_string = "On Chip";
+		break;
+	case PMCS_WORK_STATE_INTR:
+		state_string = "In Intr";
+		break;
+	case PMCS_WORK_STATE_IOCOMPQ:
+		state_string = "I/O Comp";
+		break;
+	case PMCS_WORK_STATE_ABORTED:
+		state_string = "I/O Aborted";
+		break;
+	case PMCS_WORK_STATE_TIMED_OUT:
+		state_string = "I/O Timed Out";
+		break;
+	default:
+		state_string = "INVALID";
+		break;
+	}
+
+	return (state_string);
+}
+
+static void
+display_one_work(pmcwork_t *wp, int verbose, int idx)
+{
+	char		*state, *last_state;
+	char		*path;
+	pmcs_xscsi_t	xs;
+	pmcs_phy_t	phy;
+	int		tgt;
+
+	state = work_state_to_string(wp->state);
+	last_state = work_state_to_string(wp->last_state);
+
+	if (wp->ssp_event && wp->ssp_event != 0xffffffff) {
+		mdb_printf("SSP event 0x%x", wp->ssp_event);
+	}
+
+	tgt = -1;
+	if (wp->xp) {
+		if (MDB_RD(&xs, sizeof (xs), wp->xp) == -1) {
+			NOREAD(pmcs_xscsi_t, wp->xp);
+		} else {
+			tgt = xs.target_num;
+		}
+	}
+	if (wp->phy) {
+		if (MDB_RD(&phy, sizeof (phy), wp->phy) == -1) {
+			NOREAD(pmcs_phy_t, wp->phy);
+		}
+		path = phy.path;
+	} else {
+		path = "N/A";
+	}
+
+	if (verbose) {
+		mdb_printf("%4d ", idx);
+	}
+	if (tgt == -1) {
+		mdb_printf("%08x %10s %20s      N/A %8u %1d %1d ",
+		    wp->htag, state, path, wp->timer,
+		    wp->onwire, wp->dead);
+	} else {
+		mdb_printf("%08x %10s %20s %8d %8u %1d %1d ",
+		    wp->htag, state, path, tgt, wp->timer,
+		    wp->onwire, wp->dead);
+	}
+	if (verbose) {
+		mdb_printf("%08x %10s 0x%016p 0x%016p\n",
+		    wp->last_htag, last_state, wp->last_phy, wp->last_xp);
+	} else {
+		mdb_printf("\n");
+	}
+}
+
 static void
 display_work(struct pmcs_hw m, int verbose)
 {
 	int		idx;
-	int		tgt;
-	int		hdrp =  0;
-	pmcs_xscsi_t	xs;
-	pmcs_phy_t	phy;
-	char		buf[16];
+	boolean_t	header_printed = B_FALSE;
 	pmcwork_t	work, *wp = &work;
 	uintptr_t	_wp;
-	char		*state;
-	char		*path;
 
 	mdb_printf("\nActive Work structure information:\n");
 	mdb_printf("----------------------------------\n");
@@ -408,79 +530,79 @@ display_work(struct pmcs_hw m, int verbose)
 			NOREAD(pmcwork_t, _wp);
 			continue;
 		}
-		if (wp->htag == PMCS_TAG_TYPE_FREE) {
+
+		if (!verbose && (wp->htag == PMCS_TAG_TYPE_FREE)) {
 			continue;
 		}
-		if (hdrp++ == 0) {
-			mdb_printf("%8s %10s %20s %8s %8s O D\n",
+
+		if (header_printed == B_FALSE) {
+			if (verbose) {
+				mdb_printf("%4s ", "Idx");
+			}
+			mdb_printf("%8s %10s %20s %8s %8s O D ",
 			    "HTag", "State", "Phy Path", "Target", "Timer");
-		}
-		switch (wp->state) {
-		case PMCS_WORK_STATE_NIL:
-			state = "N/A";
-			break;
-		case PMCS_WORK_STATE_READY:
-			state = "Ready";
-			break;
-		case PMCS_WORK_STATE_ONCHIP:
-			state = "On Chip";
-			break;
-		case PMCS_WORK_STATE_INTR:
-			state = "In Intr";
-			break;
-		case PMCS_WORK_STATE_IOCOMPQ:
-			state = "I/O Comp";
-			break;
-		case PMCS_WORK_STATE_ABORTED:
-			state = "I/O Aborted";
-			break;
-		case PMCS_WORK_STATE_TIMED_OUT:
-			state = "I/O Timed Out";
-			break;
-		default:
-			mdb_snprintf(buf, sizeof (buf), "STATE=%d", wp->state);
-			state = buf;
-			break;
-		}
-		if (wp->ssp_event && wp->ssp_event != 0xffffffff) {
-			mdb_printf("SSP event 0x%x", wp->ssp_event);
-		}
-		tgt = -1;
-		if (wp->xp) {
-			if (MDB_RD(&xs, sizeof (xs), wp->xp) == -1) {
-				NOREAD(pmcs_xscsi_t, wp->xp);
+			if (verbose) {
+				mdb_printf("%8s %10s %18s %18s\n", "LastHTAG",
+				    "LastState", "LastPHY", "LastTgt");
 			} else {
-				tgt = xs.target_num;
+				mdb_printf("\n");
 			}
+			header_printed = B_TRUE;
 		}
-		if (wp->phy) {
-			if (MDB_RD(&phy, sizeof (phy), wp->phy) == -1) {
-				NOREAD(pmcs_phy_t, wp->phy);
-				continue;
-			}
-			path = phy.path;
-		} else {
-			path = "????";
-		}
-		mdb_printf("%08x %10s %20s %8d %8u %1d %1d\n",
-		    wp->htag, state, path, tgt, wp->timer,
-		    wp->onwire, wp->dead);
+
+		display_one_work(wp, verbose, idx);
 	}
 }
 
 static void
-print_spcmd(pmcs_cmd_t *sp, void *kaddr, int printhdr, int indent)
+print_spcmd(pmcs_cmd_t *sp, void *kaddr, int printhdr, int verbose)
 {
-	if (indent)
-		mdb_inc_indent(4);
+	int cdb_size, idx;
+	struct scsi_pkt pkt;
+	uchar_t cdb[256];
+
 	if (printhdr) {
-		mdb_printf("%16s %16s %16s %8s %s\n",
-		    "Command", "SCSA pkt", "DMA Chunks", "HTAG", "SATL Tag");
+		if (verbose) {
+			mdb_printf("%16s %16s %16s %8s %s CDB\n", "Command",
+			    "SCSA pkt", "DMA Chunks", "HTAG", "SATL Tag");
+		} else {
+			mdb_printf("%16s %16s %16s %8s %s\n", "Command",
+			    "SCSA pkt", "DMA Chunks", "HTAG", "SATL Tag");
+		}
 	}
-	mdb_printf("%16p %16p %16p %08x %08x\n",
+
+	mdb_printf("%16p %16p %16p %08x %08x ",
 	    kaddr, sp->cmd_pkt, sp->cmd_clist, sp->cmd_tag, sp->cmd_satltag);
-	if (indent)
-		mdb_dec_indent(4);
+
+	/*
+	 * If we're printing verbose, dump the CDB as well.
+	 */
+	if (verbose) {
+		if (sp->cmd_pkt) {
+			if (mdb_vread(&pkt, sizeof (struct scsi_pkt),
+			    (uintptr_t)sp->cmd_pkt) !=
+			    sizeof (struct scsi_pkt)) {
+				mdb_warn("Unable to read SCSI pkt\n");
+				return;
+			}
+			cdb_size = pkt.pkt_cdblen;
+			if (mdb_vread(&cdb[0], cdb_size,
+			    (uintptr_t)pkt.pkt_cdbp) != cdb_size) {
+				mdb_warn("Unable to read CDB\n");
+				return;
+			}
+
+			for (idx = 0; idx < cdb_size; idx++) {
+				mdb_printf("%02x ", cdb[idx]);
+			}
+		} else {
+			mdb_printf("N/A");
+		}
+
+		mdb_printf("\n");
+	} else {
+		mdb_printf("\n");
+	}
 }
 
 /*ARGSUSED1*/
@@ -503,7 +625,7 @@ display_waitqs(struct pmcs_hw m, int verbose)
 			NOREAD(pmcs_cmd_t, sp);
 			break;
 		}
-		print_spcmd(&s, sp, first, 0);
+		print_spcmd(&s, sp, first, verbose);
 		sp = s.cmd_next.stqe_next;
 		first = 0;
 	}
@@ -519,7 +641,7 @@ display_waitqs(struct pmcs_hw m, int verbose)
 			NOREAD(pmcs_cmd_t, sp);
 			break;
 		}
-		print_spcmd(&s, sp, first, 0);
+		print_spcmd(&s, sp, first, verbose);
 		sp = s.cmd_next.stqe_next;
 		first = 0;
 	}
@@ -554,7 +676,7 @@ display_waitqs(struct pmcs_hw m, int verbose)
 				NOREAD(pmcs_cmd_t, sp);
 				break;
 			}
-			print_spcmd(&s, sp, first, 0);
+			print_spcmd(&s, sp, first, verbose);
 			sp = s.cmd_next.stqe_next;
 			first = 0;
 		}
@@ -570,7 +692,7 @@ display_waitqs(struct pmcs_hw m, int verbose)
 				NOREAD(pmcs_cmd_t, sp);
 				break;
 			}
-			print_spcmd(&s, sp, first, 0);
+			print_spcmd(&s, sp, first, verbose);
 			sp = s.cmd_next.stqe_next;
 			first = 0;
 		}
@@ -586,7 +708,7 @@ display_waitqs(struct pmcs_hw m, int verbose)
 				NOREAD(pmcs_cmd_t, sp);
 				break;
 			}
-			print_spcmd(&s, sp, first, 0);
+			print_spcmd(&s, sp, first, verbose);
 			sp = s.cmd_next.stqe_next;
 			first = 0;
 		}
@@ -1580,6 +1702,204 @@ phy_walk_f(mdb_walk_state_t *wsp)
 	mdb_free(wsp->walk_data, sizeof (pmcs_phy_t));
 }
 
+static void
+display_matching_work(struct pmcs_hw ss, uintmax_t index, uintmax_t snum,
+    uintmax_t tag_type)
+{
+	int		idx;
+	pmcwork_t	work, *wp = &work;
+	uintptr_t	_wp;
+	boolean_t	printed_header = B_FALSE;
+	uint32_t	mask, mask_val, match_val;
+	char		*match_type;
+
+	if (index != UINT_MAX) {
+		match_type = "index";
+		mask = PMCS_TAG_INDEX_MASK;
+		mask_val = index << PMCS_TAG_INDEX_SHIFT;
+		match_val = index;
+	} else if (snum != UINT_MAX) {
+		match_type = "serial number";
+		mask = PMCS_TAG_SERNO_MASK;
+		mask_val = snum << PMCS_TAG_SERNO_SHIFT;
+		match_val = snum;
+	} else {
+		switch (tag_type) {
+		case PMCS_TAG_TYPE_NONE:
+			match_type = "tag type NONE";
+			break;
+		case PMCS_TAG_TYPE_CBACK:
+			match_type = "tag type CBACK";
+			break;
+		case PMCS_TAG_TYPE_WAIT:
+			match_type = "tag type WAIT";
+			break;
+		}
+		mask = PMCS_TAG_TYPE_MASK;
+		mask_val = tag_type << PMCS_TAG_TYPE_SHIFT;
+		match_val = tag_type;
+	}
+
+	_wp = (uintptr_t)ss.work;
+
+	for (idx = 0; idx < ss.max_cmd; idx++, _wp += sizeof (pmcwork_t)) {
+		if (MDB_RD(&work, sizeof (pmcwork_t), _wp) == -1) {
+			NOREAD(pmcwork_t, _wp);
+			continue;
+		}
+
+		if ((work.htag & mask) != mask_val) {
+			continue;
+		}
+
+		if (printed_header == B_FALSE) {
+			if (tag_type) {
+				mdb_printf("\nWork structures matching %s\n\n",
+				    match_type, match_val);
+			} else {
+				mdb_printf("\nWork structures matching %s of "
+				    "0x%x\n\n", match_type, match_val);
+			}
+			mdb_printf("%8s %10s %20s %8s %8s O D\n",
+			    "HTag", "State", "Phy Path", "Target", "Timer");
+			printed_header = B_TRUE;
+		}
+
+		display_one_work(wp, 0, 0);
+	}
+
+	if (!printed_header) {
+		mdb_printf("No work structure matches found\n");
+	}
+}
+
+static int
+pmcs_tag(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	struct	pmcs_hw		ss;
+	uintmax_t		tag_type = UINT_MAX;
+	uintmax_t		snum = UINT_MAX;
+	uintmax_t		index = UINT_MAX;
+	int			args = 0;
+	void			*pmcs_state;
+	char			*state_str;
+	struct dev_info		dip;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		pmcs_state = NULL;
+		if (mdb_readvar(&pmcs_state, "pmcs_softc_state") == -1) {
+			mdb_warn("can't read pmcs_softc_state");
+			return (DCMD_ERR);
+		}
+		if (mdb_pwalk_dcmd("genunix`softstate", "pmcs`pmcs_tag", argc,
+		    argv, (uintptr_t)pmcs_state) == -1) {
+			mdb_warn("mdb_pwalk_dcmd failed");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (mdb_getopts(argc, argv,
+	    'i', MDB_OPT_UINT64, &index,
+	    's', MDB_OPT_UINT64, &snum,
+	    't', MDB_OPT_UINT64, &tag_type) != argc)
+		return (DCMD_USAGE);
+
+	/*
+	 * Count the number of supplied options and make sure they are
+	 * within appropriate ranges.  If they're set to UINT_MAX, that means
+	 * they were not supplied, in which case reset them to 0.
+	 */
+	if (index != UINT_MAX) {
+		args++;
+		if (index > PMCS_TAG_INDEX_MASK) {
+			mdb_warn("Index is out of range\n");
+			return (DCMD_USAGE);
+		}
+	}
+
+	if (tag_type != UINT_MAX) {
+		args++;
+		switch (tag_type) {
+		case PMCS_TAG_TYPE_NONE:
+		case PMCS_TAG_TYPE_CBACK:
+		case PMCS_TAG_TYPE_WAIT:
+			break;
+		default:
+			mdb_warn("Invalid tag type\n");
+			return (DCMD_USAGE);
+		}
+	}
+
+	if (snum != UINT_MAX) {
+		args++;
+		if (snum > (PMCS_TAG_SERNO_MASK >> PMCS_TAG_SERNO_SHIFT)) {
+			mdb_warn("Serial number is out of range\n");
+			return (DCMD_USAGE);
+		}
+	}
+
+	/*
+	 * Make sure 1 and only 1 option is specified
+	 */
+	if ((args == 0) || (args > 1)) {
+		mdb_warn("Exactly one of -i, -s and -t must be specified\n");
+		return (DCMD_USAGE);
+	}
+
+	if (MDB_RD(&ss, sizeof (ss), addr) == -1) {
+		NOREAD(pmcs_hw_t, addr);
+		return (DCMD_ERR);
+	}
+
+	if (MDB_RD(&dip, sizeof (struct dev_info), ss.dip) == -1) {
+		NOREAD(pmcs_hw_t, addr);
+		return (DCMD_ERR);
+	}
+
+	/* processing completed */
+
+	if (((flags & DCMD_ADDRSPEC) && !(flags & DCMD_LOOP)) ||
+	    (flags & DCMD_LOOPFIRST)) {
+		if ((flags & DCMD_LOOP) && !(flags & DCMD_LOOPFIRST))
+			mdb_printf("\n");
+		mdb_printf("%16s %9s %4s B C  WorkFlags wserno DbgMsk %16s\n",
+		    "Address", "State", "Inst", "DIP");
+		mdb_printf("================================="
+		    "============================================\n");
+	}
+
+	switch (ss.state) {
+	case STATE_NIL:
+		state_str = "Invalid";
+		break;
+	case STATE_PROBING:
+		state_str = "Probing";
+		break;
+	case STATE_RUNNING:
+		state_str = "Running";
+		break;
+	case STATE_UNPROBING:
+		state_str = "Unprobing";
+		break;
+	case STATE_DEAD:
+		state_str = "Dead";
+		break;
+	}
+
+	mdb_printf("%16p %9s %4d %1d %1d 0x%08x 0x%04x 0x%04x %16p\n", addr,
+	    state_str, dip.devi_instance, ss.blocked, ss.configuring,
+	    ss.work_flags, ss.wserno, ss.debug_mask, ss.dip);
+	mdb_printf("\n");
+
+	mdb_inc_indent(4);
+	display_matching_work(ss, index, snum, tag_type);
+	mdb_dec_indent(4);
+	mdb_printf("\n");
+
+	return (DCMD_OK);
+}
+
 static int
 pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
@@ -1596,6 +1916,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t			ibq = FALSE;
 	uint_t			obq = FALSE;
 	uint_t			tgt_phy_count = FALSE;
+	uint_t			compq = FALSE;
 	int			rv = DCMD_OK;
 	void			*pmcs_state;
 	char			*state_str;
@@ -1616,6 +1937,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_getopts(argc, argv,
+	    'c', MDB_OPT_SETBITS, TRUE, &compq,
 	    'h', MDB_OPT_SETBITS, TRUE, &hw_info,
 	    'i', MDB_OPT_SETBITS, TRUE, &ic_info,
 	    'I', MDB_OPT_SETBITS, TRUE, &iport_info,
@@ -1646,10 +1968,10 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 * Thus, a provided address is ignored.  In addition, other options
 	 * cannot be specified at the same time.
 	 */
-
 	if (tracelog) {
 		if (hw_info || ic_info || iport_info || phy_info || work_info ||
-		    target_info || waitqs_info || ibq || obq || tgt_phy_count) {
+		    target_info || waitqs_info || ibq || obq || tgt_phy_count ||
+		    compq) {
 			return (DCMD_USAGE);
 		}
 
@@ -1666,7 +1988,7 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (((flags & DCMD_ADDRSPEC) && !(flags & DCMD_LOOP)) ||
 	    (flags & DCMD_LOOPFIRST) || phy_info || target_info || hw_info ||
-	    work_info || waitqs_info || ibq || obq || tgt_phy_count) {
+	    work_info || waitqs_info || ibq || obq || tgt_phy_count || compq) {
 		if ((flags & DCMD_LOOP) && !(flags & DCMD_LOOPFIRST))
 			mdb_printf("\n");
 		mdb_printf("%16s %9s %4s B C  WorkFlags wserno DbgMsk %16s\n",
@@ -1727,6 +2049,9 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (iport_info)
 		display_iport(ss, addr, verbose);
 
+	if (compq)
+		display_completion_queue(ss);
+
 	mdb_dec_indent(4);
 
 	return (rv);
@@ -1736,6 +2061,7 @@ void
 pmcs_help()
 {
 	mdb_printf("Prints summary information about each pmcs instance.\n"
+	    "    -c: Dump the completion queue\n"
 	    "    -h: Print more detailed hardware information\n"
 	    "    -i: Print interrupt coalescing information\n"
 	    "    -I: Print information about each iport\n"
@@ -1750,9 +2076,23 @@ pmcs_help()
 	    "    -v: Add verbosity to the above options\n");
 }
 
+void
+pmcs_tag_help()
+{
+	mdb_printf("Print all work structures by matching the tag.\n"
+	    "    -i index:        Match tag index (0x000 - 0xfff)\n"
+	    "    -s serialnumber: Match serial number (0x0000 - 0xffff)\n"
+	    "    -t tagtype:      Match tag type [NONE(1), CBACK(2), "
+	    "WAIT(3)]\n");
+}
+
 static const mdb_dcmd_t dcmds[] = {
-	{ "pmcs", "?[-hiIpQqtTwWv] | -l", "print pmcs information",
+	{ "pmcs", "?[-chiIpQqtTwWv] | -l", "print pmcs information",
 	    pmcs_dcmd, pmcs_help
+	},
+	{ "pmcs_tag", "?[-t tagtype|-s serialnum|-i index]",
+	    "Find work structures by tag type, serial number or index",
+	    pmcs_tag, pmcs_tag_help
 	},
 	{ NULL }
 };
