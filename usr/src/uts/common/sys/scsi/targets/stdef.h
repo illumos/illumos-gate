@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -508,9 +508,23 @@ struct dev_mode_page {
 #endif
 };
 
+struct sas_lun_mode {
+#if defined(_BIT_FIELDS_HTOL)
+	uchar_t :		3,
+		tran_layer_ret:	1,
+		protocol_id:	4;
+	uchar_t reserved[5];
+#elif defined(_BIT_FIELDS_LTOH)
+	uchar_t protocol_id:	4,
+		tran_layer_ret:	1,
+		:		3;
+	uchar_t reserved[5];
+#endif
+};
 typedef union {
 	struct comp_mode_page	comp;
 	struct dev_mode_page	dev;
+	struct sas_lun_mode	saslun;
 }modepage;
 
 /*
@@ -926,6 +940,12 @@ typedef enum {
 }st_states;
 
 typedef enum { RDWR, RDONLY, WORM, RDWORM, FAILED } writablity;
+typedef enum {
+	TLR_NOT_KNOWN,
+	TLR_NOT_SUPPORTED,
+	TLR_SAS_ONE_DEVICE,
+	TLR_SAS_TWO_DEVICE
+}st_tlr_state;
 
 
 /*
@@ -1023,7 +1043,6 @@ struct scsi_tape {
 	read_pos_data_t *un_read_pos_data;
 	struct mterror_entry_stack *un_error_entry_stk;
 					/* latest sense cmd buffer */
-
 #ifdef	__x86
 	ddi_dma_handle_t un_contig_mem_hdl;
 	struct contig_mem *un_contig_mem;
@@ -1048,6 +1067,7 @@ struct scsi_tape {
 	uchar_t un_unit_attention_flags;
 	uchar_t un_multipath;
 	ulong_t un_last_path_instance;
+	st_tlr_state un_tlr_flag;		/* tape support TLR flag */
 };
 
 typedef int (*bufunc_t)(struct scsi_tape *, int, int64_t, int);

@@ -127,6 +127,7 @@ extern char *sense_keys[NUM_SENSE_KEYS + NUM_IMPL_SENSE_KEYS];
 #define	SCSI_CAP_LUN_RESET		19
 #define	SCSI_CAP_CDB_LEN		20
 #define	SCSI_CAP_DMA_MAX_ARCH		21
+#define	SCSI_CAP_TRAN_LAYER_RETRIES	22
 #define	SCSI_CAP_ASCII		{					\
 		"dma-max", "msg-out", "disconnect", "synchronous",	\
 		"wide-xfer", "parity", "initiator-id", "untagged-qing",	\
@@ -135,7 +136,8 @@ extern char *sense_keys[NUM_SENSE_KEYS + NUM_IMPL_SENSE_KEYS];
 		"reset-notification", "qfull-retries",			\
 		"qfull-retry-interval", "scsi-version",			\
 		"interconnect-type", "lun-reset",			\
-		"max-cdb-length", "dma-max-arch", NULL }
+		"max-cdb-length", "dma-max-arch",			\
+		"tran-layer-retries", NULL }
 
 /*
  * Definitions used by some capabilities

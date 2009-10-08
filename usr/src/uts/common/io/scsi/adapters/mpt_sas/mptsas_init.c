@@ -267,6 +267,8 @@ mptsas_ioc_do_get_facts_reply(mptsas_t *mpt, caddr_t memp, int var,
 	 */
 	mpt->m_max_chain_depth = ddi_get8(accessp,
 	    &factsreply->MaxChainDepth);
+	mpt->m_ioc_capabilities = ddi_get32(accessp,
+	    &factsreply->IOCCapabilities);
 
 	/*
 	 * Calculate max frames per request based on DMA S/G length.

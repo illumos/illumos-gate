@@ -725,6 +725,7 @@ typedef struct mptsas {
 	uint32_t	m_free_index;
 	uint32_t	m_post_index;
 	uint8_t		m_reply_frame_size;
+	uint32_t	m_ioc_capabilities;
 
 	/*
 	 * indicates if the firmware was upload by the driver
@@ -1133,6 +1134,11 @@ typedef struct mptsas_dma_alloc_state
 #define	MPTSAS_REQUEST_POOL_CMD		0x0004
 #define	MPTSAS_ADDRESS_REPLY		0x0008
 #define	MPTSAS_CMD_TIMEOUT		0x0010
+
+/*
+ * response code tlr flag
+ */
+#define	MPTSAS_SCSI_RESPONSE_CODE_TLR_OFF	0x02
 
 /*
  * System Events

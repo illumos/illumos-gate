@@ -163,6 +163,12 @@ struct scsi_pkt {
 #define	FLAG_ISOLATE		0x00040000
 
 /*
+ * pkg_flag for TLR
+ */
+#define	FLAG_TLR		0x00080000
+
+
+/*
  * Following define is for scsi_vhci.
  *   NOQUEUE            If pHCI cannot transport the command to the device,
  *                      do not queue the pkt in pHCI. Return immediately with
@@ -194,6 +200,7 @@ struct scsi_pkt {
 #define	CMD_CMD_OVR	8	/* Command Overrun */
 #define	CMD_STS_OVR	9	/* Status Overrun */
 #define	CMD_TERMINATED	22	/* Command transport terminated on request */
+#define	CMD_TLR_OFF	23	/* don't support TLR */
 
 /*
  * Following defines are appropriate for SCSI parallel bus.

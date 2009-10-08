@@ -4829,7 +4829,7 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 {
 	uint8_t			scsi_status, scsi_state;
 	uint16_t		ioc_status;
-	uint32_t		xferred, sensecount, loginfo = 0;
+	uint32_t		xferred, sensecount, responsedata, loginfo = 0;
 	struct scsi_pkt		*pkt;
 	struct scsi_arq_status	*arqstat;
 	struct buf		*bp;
@@ -4848,6 +4848,8 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 	scsi_state = ddi_get8(mpt->m_acc_reply_frame_hdl, &reply->SCSIState);
 	xferred = ddi_get32(mpt->m_acc_reply_frame_hdl, &reply->TransferCount);
 	sensecount = ddi_get32(mpt->m_acc_reply_frame_hdl, &reply->SenseCount);
+	responsedata = ddi_get32(mpt->m_acc_reply_frame_hdl,
+	    &reply->ResponseInfo);
 
 	if (ioc_status & MPI2_IOCSTATUS_FLAG_LOG_INFO_AVAILABLE) {
 		loginfo = ddi_get32(mpt->m_acc_reply_frame_hdl,
@@ -4886,6 +4888,16 @@ mptsas_check_scsi_io_error(mptsas_t *mpt, pMpi2SCSIIOReply_t reply,
 		}
 		return;
 	}
+
+	if (scsi_state & MPI2_SCSI_STATE_RESPONSE_INFO_VALID) {
+		responsedata &= 0x000000FF;
+		if (responsedata & MPTSAS_SCSI_RESPONSE_CODE_TLR_OFF) {
+			mptsas_log(mpt, CE_NOTE, "Do not support the TLR\n");
+			pkt->pkt_reason = CMD_TLR_OFF;
+			return;
+		}
+	}
+
 
 	switch (scsi_status) {
 	case MPI2_SCSI_STATUS_CHECK_CONDITION:
@@ -7520,6 +7532,10 @@ mptsas_start_cmd(mptsas_t *mpt, mptsas_cmd_t *cmd)
 		control |= MPI2_SCSIIO_CONTROL_SIMPLEQ;
 	}
 
+	if (cmd->cmd_pkt_flags & FLAG_TLR) {
+		control |= MPI2_SCSIIO_CONTROL_TLR_ON;
+	}
+
 	mem = mpt->m_req_frame + (mpt->m_req_frame_size * SMID);
 	io_request = (pMpi2SCSIIORequest_t)mem;
 
@@ -8617,6 +8633,13 @@ mptsas_scsi_getcap(struct scsi_address *ap, char *cap, int tgtonly)
 		break;
 	case SCSI_CAP_INTERCONNECT_TYPE:
 		rval = INTERCONNECT_SAS;
+		break;
+	case SCSI_CAP_TRAN_LAYER_RETRIES:
+		if (mpt->m_ioc_capabilities &
+		    MPI2_IOCFACTS_CAPABILITY_TLR)
+			rval = TRUE;
+		else
+			rval = FALSE;
 		break;
 	default:
 		rval = UNDEFINED;
