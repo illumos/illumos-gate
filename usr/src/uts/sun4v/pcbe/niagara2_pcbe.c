@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -210,6 +210,8 @@ static ni2_generic_event_t ni2_generic_events[] = {
 	{ "PAPI_br_ins",	"Br_completed" },
 	{ "PAPI_ld_ins",	"Instr_ld" },
 	{ "PAPI_sr_ins",	"Instr_st" },
+	{ "PAPI_fp_ops",	"Instr_FGU_arithmetic" },
+	{ "PAPI_fp_ins",	"Instr_FGU_arithmetic" },
 	GEN_EV_END
 };
 

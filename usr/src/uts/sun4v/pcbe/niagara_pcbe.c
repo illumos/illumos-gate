@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,6 +170,7 @@ static const ni_generic_event_t Niagara_generic_names0[] = {
 	{ "PAPI_l2_icm",	"L2_imiss" },
 	{ "PAPI_l2_ldm",	"L2_dmiss_ld" },
 	{ "PAPI_fp_ops",	"FP_instr_cnt" },
+	{ "PAPI_fp_ins",	"FP_instr_cnt" },
 	{ "PAPI_l1_icm",	"IC_miss" },
 	{ "PAPI_l1_dcm",	"DC_miss" },
 	{ "PAPI_tlb_im",	"ITLB_miss" },
