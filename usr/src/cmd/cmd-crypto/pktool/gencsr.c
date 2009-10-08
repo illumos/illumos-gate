@@ -71,7 +71,7 @@ gencsr_pkcs11(KMF_HANDLE_T kmfhandle,
 	if (keyAlg == KMF_DSA)
 		sigAlg = KMF_ALGID_SHA1WithDSA;
 	else
-		sigAlg = KMF_ALGID_MD5WithRSA;
+		sigAlg = KMF_ALGID_SHA1WithRSA;
 
 
 	/* If the subject name cannot be parsed, flag it now and exit */
@@ -263,7 +263,7 @@ gencsr_file(KMF_HANDLE_T kmfhandle,
 	if (keyAlg == KMF_DSA)
 		sigAlg = KMF_ALGID_SHA1WithDSA;
 	else
-		sigAlg = KMF_ALGID_MD5WithRSA;
+		sigAlg = KMF_ALGID_SHA1WithRSA;
 
 	/* If the subject name cannot be parsed, flag it now and exit */
 	if ((kmfrv = kmf_dn_parser(subject, &csrSubject)) != KMF_OK) {
@@ -381,7 +381,7 @@ gencsr_nss(KMF_HANDLE_T kmfhandle,
 	if (keyAlg == KMF_DSA)
 		sigAlg = KMF_ALGID_SHA1WithDSA;
 	else
-		sigAlg = KMF_ALGID_MD5WithRSA;
+		sigAlg = KMF_ALGID_SHA1WithRSA;
 
 	kmfrv = configure_nss(kmfhandle, dir, prefix);
 	if (kmfrv != KMF_OK)
@@ -529,7 +529,7 @@ pk_gencsr(int argc, char *argv[])
 	KMF_HANDLE_T kmfhandle = NULL;
 	KMF_ENCODE_FORMAT fmt = KMF_FORMAT_ASN1;
 	KMF_KEY_ALG keyAlg = KMF_RSA;
-	KMF_ALGORITHM_INDEX sigAlg = KMF_ALGID_MD5WithRSA;
+	KMF_ALGORITHM_INDEX sigAlg = KMF_ALGID_SHA1WithRSA;
 	boolean_t interactive = B_FALSE;
 	char *subname = NULL;
 	KMF_CREDENTIAL tokencred = {NULL, 0};

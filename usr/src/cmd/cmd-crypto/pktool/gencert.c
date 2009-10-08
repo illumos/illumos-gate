@@ -722,7 +722,7 @@ pk_gencert(int argc, char *argv[])
 	KMF_HANDLE_T kmfhandle = NULL;
 	KMF_ENCODE_FORMAT fmt = KMF_FORMAT_ASN1;
 	KMF_KEY_ALG keyAlg = KMF_RSA;
-	KMF_ALGORITHM_INDEX sigAlg = KMF_ALGID_MD5WithRSA;
+	KMF_ALGORITHM_INDEX sigAlg = KMF_ALGID_SHA1WithRSA;
 	boolean_t interactive = B_FALSE;
 	char *subname = NULL;
 	KMF_CREDENTIAL tokencred = {NULL, 0};

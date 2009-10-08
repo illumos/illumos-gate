@@ -462,13 +462,13 @@ int
 Str2KeyType(char *algm, KMF_KEY_ALG *ktype, KMF_ALGORITHM_INDEX *sigAlg)
 {
 	if (algm == NULL) {
-		*sigAlg = KMF_ALGID_MD5WithRSA;
+		*sigAlg = KMF_ALGID_SHA1WithRSA;
 		*ktype = KMF_RSA;
 	} else if (strcasecmp(algm, "DSA") == 0) {
 		*sigAlg = KMF_ALGID_SHA1WithDSA;
 		*ktype = KMF_DSA;
 	} else if (strcasecmp(algm, "RSA") == 0) {
-		*sigAlg = KMF_ALGID_MD5WithRSA;
+		*sigAlg = KMF_ALGID_SHA1WithRSA;
 		*ktype = KMF_RSA;
 	} else {
 		return (-1);

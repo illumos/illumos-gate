@@ -2965,12 +2965,9 @@ sign_cert(KMF_HANDLE_T handle,
 			goto cleanup;
 		ret = set_algoid(&subj_cert->certificate.signature,
 		    signature_oid);
-
+		if (ret)
+			goto cleanup;
 	}
-
-	if (ret)
-		goto cleanup;
-
 	kmf_set_attr_at_index(attrlist, i, KMF_KEYSTORE_TYPE_ATTR,
 	    &Signkey->kstype, sizeof (KMF_KEYSTORE_TYPE));
 	i++;
