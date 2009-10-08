@@ -117,6 +117,7 @@ clone:ipw               0600 root sys 0666 root sys     /dev/ipw
 clone:iwh		0600 root sys 0666 root sys	/dev/iwh
 clone:iwi               0600 root sys 0666 root sys     /dev/iwi
 clone:iwk               0600 root sys 0666 root sys     /dev/iwk
+clone:mwl               0600 root sys 0666 root sys     /dev/mwl
 clone:pcwl              0600 root sys 0666 root sys     /dev/pcwl
 clone:pcan              0600 root sys 0666 root sys     /dev/pcan
 clone:ral		0600 root sys 0666 root sys	/dev/ral
@@ -150,6 +151,7 @@ ipw:*                   0600 root sys 0666 root sys     /dev/ipw*
 iwh:*			0600 root sys 0666 root sys	/dev/iwh*
 iwi:*                   0600 root sys 0666 root sys     /dev/iwi*
 iwk:*                   0600 root sys 0666 root sys     /dev/iwk*
+mwl:*                   0600 root sys 0666 root sys     /dev/mwl*
 pcwl:*                  0600 root sys 0666 root sys     /dev/pcwl*
 pcan:*                  0600 root sys 0666 root sys     /dev/pcan*
 ral:*			0600 root sys 0666 root sys	/dev/ral*
@@ -310,6 +312,7 @@ clone:ipw
 clone:iwh
 clone:iwi
 clone:iwk
+clone:mwl
 clone:pcwl
 clone:pcan
 clone:ral
@@ -343,6 +346,7 @@ ipw:*
 iwh:*
 iwi:*
 iwk:*
+mwl:*
 pcwl:*
 pcan:*
 ral:*

@@ -160,6 +160,8 @@ usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE
 usr/src/uts/common/io/mxfe/THIRDPARTYLICENSE
 usr/src/uts/common/io/ntxn/THIRDPARTYLICENSE
 usr/src/uts/common/io/myri10ge/THIRDPARTYLICENSE
+usr/src/uts/common/io/mwl/THIRDPARTYLICENSE
+usr/src/uts/common/io/mwl/mwl_fw/LICENSE
 usr/src/uts/common/io/pcan/THIRDPARTYLICENSE
 usr/src/uts/common/io/pcwl/THIRDPARTYLICENSE
 usr/src/uts/common/io/ppp/THIRDPARTYLICENSE

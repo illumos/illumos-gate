@@ -139,6 +139,7 @@ i386_SUBDIRS= \
 	SUNWlxu \
 	SUNWmegasas \
 	SUNWmv88sx \
+	SUNWmwl	\
 	SUNWbcmsata \
 	SUNWnge \
 	SUNWntfsprogs \
