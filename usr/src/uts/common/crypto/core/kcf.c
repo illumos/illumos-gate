@@ -221,13 +221,15 @@ kcf_activate()
 		KCF_PROV_REFRELE(pd);
 	}
 
+	/* If we are not in FIPS 140 mode exit */
+	if (global_fips140_mode == FIPS140_MODE_DISABLED)
+		return;
+
 	/* If we in the process of validating FIPS 140, enable it */
-	if (global_fips140_mode != FIPS140_MODE_DISABLED) {
-		mutex_enter(&fips140_mode_lock);
-		global_fips140_mode = FIPS140_MODE_ENABLED;
-		cv_signal(&cv_fips140);
-		mutex_exit(&fips140_mode_lock);
-	}
+	mutex_enter(&fips140_mode_lock);
+	global_fips140_mode = FIPS140_MODE_ENABLED;
+	cv_signal(&cv_fips140);
+	mutex_exit(&fips140_mode_lock);
 
 	verify_unverified_providers();
 }
