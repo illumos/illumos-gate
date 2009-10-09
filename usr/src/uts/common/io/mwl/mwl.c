@@ -1285,7 +1285,7 @@ mwlGetCalTable(struct mwl_softc *sc, uint8_t annex, uint8_t index)
 	_CMD_SETUP(pCmd, HostCmd_FW_GET_CALTABLE, HostCmd_CMD_GET_CALTABLE);
 	pCmd->annex = annex;
 	pCmd->index = index;
-	memset(pCmd->calTbl, 0, sizeof (pCmd->calTbl));
+	(void) memset(pCmd->calTbl, 0, sizeof (pCmd->calTbl));
 
 	retval = mwlExecuteCmd(sc, HostCmd_CMD_GET_CALTABLE);
 	if (retval == 0 &&
@@ -1612,7 +1612,7 @@ mwl_getchannels(struct mwl_softc *sc)
 	 * channel list for net80211.  Note that we pass up
 	 * an unsorted list; net80211 will sort it for us.
 	 */
-	memset(sc->sc_channels, 0, sizeof (sc->sc_channels));
+	(void) memset(sc->sc_channels, 0, sizeof (sc->sc_channels));
 	sc->sc_nchans = 0;
 	getchannels(sc, IEEE80211_CHAN_MAX, &sc->sc_nchans, sc->sc_channels);
 
@@ -1642,7 +1642,7 @@ mwl_gethwspecs(struct mwl_softc *sc)
 
 	hw = &sc->sc_hwspecs;
 	_CMD_SETUP(pCmd, HostCmd_DS_GET_HW_SPEC, HostCmd_CMD_GET_HW_SPEC);
-	memset(&pCmd->PermanentAddr[0], 0xff, IEEE80211_ADDR_LEN);
+	(void) memset(&pCmd->PermanentAddr[0], 0xff, IEEE80211_ADDR_LEN);
 	pCmd->ulFwAwakeCookie = LE_32((unsigned int)sc->sc_cmd_dmaaddr + 2048);
 
 	retval = mwlExecuteCmd(sc, HostCmd_CMD_GET_HW_SPEC);
@@ -1900,7 +1900,7 @@ mwl_hal_settxrate(struct mwl_softc *sc, MWL_HAL_TXRATE_HANDLING handling,
 	pCmd->MultiRateTxType = RATETYPE(rate->McastRate);
 	/* NB: no rate type field */
 	pCmd->ManagementRate = RATEVAL(rate->MgtRate);
-	memset(pCmd->FixedRateTable, 0, sizeof (pCmd->FixedRateTable));
+	(void) memset(pCmd->FixedRateTable, 0, sizeof (pCmd->FixedRateTable));
 	if (handling == RATE_FIXED) {
 		pCmd->Action = LE_32(HostCmd_ACT_GEN_SET);
 		pCmd->AllowRateDrop = LE_32(FIXED_RATE_WITHOUT_AUTORATE_DROP);
@@ -1949,7 +1949,7 @@ mwl_hal_settxrate_auto(struct mwl_softc *sc, const MWL_HAL_TXRATE *rate)
 	pCmd->MultiRateTxType = RATETYPE(rate->McastRate);
 	/* NB: no rate type field */
 	pCmd->ManagementRate = RATEVAL(rate->MgtRate);
-	memset(pCmd->FixedRateTable, 0, sizeof (pCmd->FixedRateTable));
+	(void) memset(pCmd->FixedRateTable, 0, sizeof (pCmd->FixedRateTable));
 	pCmd->Action = LE_32(HostCmd_ACT_NOT_USE_FIXED_RATE);
 
 	retval = mwlExecuteCmd(sc, HostCmd_CMD_SET_FIXED_RATE);
@@ -2046,7 +2046,7 @@ mwl_setrates(struct ieee80211com *ic)
 	 * Update the h/w rate map.
 	 * NB: 0x80 for MCS is passed through unchanged
 	 */
-	memset(&rates, 0, sizeof (rates));
+	(void) memset(&rates, 0, sizeof (rates));
 	/* rate used to send management frames */
 	rates.MgtRate = rs->ir_rates[0] & IEEE80211_RATE_VAL;
 	/* rate used to send multicast frames */
@@ -2292,7 +2292,7 @@ mwl_key_delete(struct ieee80211com *ic, const struct ieee80211_key *k)
 	const uint8_t bcastaddr[IEEE80211_ADDR_LEN] =
 	    { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
-	memset(&hk, 0, sizeof (hk));
+	(void) memset(&hk, 0, sizeof (hk));
 	hk.keyIndex = k->wk_keyix;
 	switch (k->wk_cipher->ic_cipher) {
 	case IEEE80211_CIPHER_WEP:
@@ -2332,7 +2332,7 @@ mwl_key_set(struct ieee80211com *ic, const struct ieee80211_key *k,
 	const uint8_t *macaddr;
 	MWL_HAL_KEYVAL hk;
 
-	memset(&hk, 0, sizeof (hk));
+	(void) memset(&hk, 0, sizeof (hk));
 	hk.keyIndex = k->wk_keyix;
 	switch (cip->ic_cipher) {
 	case IEEE80211_CIPHER_WEP:
@@ -2559,7 +2559,7 @@ mwl_setcurchanrates(struct mwl_softc *sc)
 	const struct ieee80211_rateset *rs;
 	MWL_HAL_TXRATE rates;
 
-	memset(&rates, 0, sizeof (rates));
+	(void) memset(&rates, 0, sizeof (rates));
 	rs = mwl_get_suprates(ic, sc->sc_cur_chan);
 	/* rate used to send management frames */
 	rates.MgtRate = rs->ir_rates[0] & IEEE80211_RATE_VAL;
@@ -2949,7 +2949,7 @@ get_rate_bitmap(const struct ieee80211_rateset *rs)
 static MWL_HAL_PEERINFO *
 mkpeerinfo(MWL_HAL_PEERINFO *pi, const struct ieee80211_node *ni)
 {
-	memset(pi, 0, sizeof (*pi));
+	(void) memset(pi, 0, sizeof (*pi));
 	pi->LegacyRateBitMap = get_rate_bitmap(&ni->in_rates);
 	pi->CapInfo = ni->in_capinfo;
 	return (pi);

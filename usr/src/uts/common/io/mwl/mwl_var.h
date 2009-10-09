@@ -594,7 +594,7 @@ struct mwl_softc {
 
 #define	_CMD_SETUP(pCmd, type, cmd) do {				\
 	pCmd = (type *)&sc->sc_cmd_mem[0];				\
-	memset(pCmd, 0, sizeof (type));					\
+	(void) memset(pCmd, 0, sizeof (type));				\
 	pCmd->CmdHdr.Cmd = LE_16(cmd);					\
 	pCmd->CmdHdr.Length = LE_16(sizeof (type));			\
 	_NOTE(CONSTCOND)						\
