@@ -42,7 +42,7 @@ i pkginfo
 i depend
 i postinstall
 i postremove
-i i.renameold
+i i.renamenew
 
 #
 # source locations relative to the prototype file
@@ -51,4 +51,4 @@ i i.renameold
 #
 d none	kernel			0755	root	sys
 d none	kernel/drv		0755	root	sys
-e renameold kernel/drv/bnx.conf	0644	root	sys
+e renamenew kernel/drv/bnx.conf	0644	root	sys

@@ -187,7 +187,7 @@ e inittab etc/inittab 644 root sys
 s none etc/install=../usr/sbin/install
 e preserve etc/ioctl.syscon 644 root sys
 s none etc/killall=../usr/sbin/killall
-e renameold etc/ksh.kshrc 644 root sys
+e renamenew etc/ksh.kshrc 644 root sys
 s none etc/labelit=../usr/sbin/labelit
 d none etc/lib 755 root sys
 s none etc/lib/ld.so.1=../../lib/ld.so.1
@@ -274,7 +274,7 @@ e renamenew etc/security/audit_warn 740 root sys
 f none etc/security/bsmconv 740 root sys
 f none etc/security/bsmunconv 740 root sys
 e policyconf etc/security/policy.conf 644 root sys
-e renameold etc/security/crypt.conf 644 root sys
+e renamenew etc/security/crypt.conf 644 root sys
 d none etc/security/dev 755 root sys
 f none etc/security/dev/audio 400 root bin
 f none etc/security/dev/fd0 400 root bin

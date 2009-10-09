@@ -43,7 +43,7 @@ i preinstall
 i postinstall
 i i.manifest
 i i.preserve
-i i.renameold
+i i.renamenew
 i r.manifest
 i r.preserve
 #
@@ -61,9 +61,9 @@ f manifest var/svc/manifest/network/nis/server.xml 0444 root sys
 f manifest var/svc/manifest/network/nis/update.xml 0444 root sys
 f manifest var/svc/manifest/network/nis/xfr.xml 0444 root sys
 d none var/yp 0755 root bin
-e renameold var/yp/Makefile 0555 root bin
+e renamenew var/yp/Makefile 0555 root bin
 d none var/yp/binding 0755 root bin
 f none var/yp/updaters 0500 root bin
 d none etc 0755 root sys
 d none etc/default 0755 root sys
-e renameold etc/default/yppasswdd 0644 root sys
+e renamenew etc/default/yppasswdd 0644 root sys

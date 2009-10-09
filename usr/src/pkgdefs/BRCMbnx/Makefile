@@ -28,7 +28,7 @@
  
 include ../Makefile.com
 
-DATAFILES += depend  i.renameold
+DATAFILES += depend  i.renamenew
 LICENSEFILES += $(OSBL)
 CDDL=
 

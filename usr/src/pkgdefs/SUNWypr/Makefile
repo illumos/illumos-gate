@@ -28,7 +28,7 @@
 
 include ../Makefile.com
 
-DATAFILES += depend i.preserve i.renameold i.manifest r.manifest
+DATAFILES += depend i.preserve i.renamenew i.manifest r.manifest
 CLASS_ACTION_SCRIPTS = r.preserve
 CLOBBERFILES += action
 
