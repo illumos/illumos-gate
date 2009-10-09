@@ -787,6 +787,18 @@ sctp_free(conn_t *connp)
 	sctp->sctp_iudchunks = 0;
 	sctp->sctp_fragdmsgs = 0;
 	sctp->sctp_reassmsgs = 0;
+	sctp->sctp_outseqtsns = 0;
+	sctp->sctp_osacks = 0;
+	sctp->sctp_isacks = 0;
+	sctp->sctp_idupchunks = 0;
+	sctp->sctp_gapcnt = 0;
+	sctp->sctp_cum_obchunks = 0;
+	sctp->sctp_cum_odchunks = 0;
+	sctp->sctp_cum_oudchunks = 0;
+	sctp->sctp_cum_rxtchunks = 0;
+	sctp->sctp_cum_ibchunks = 0;
+	sctp->sctp_cum_idchunks = 0;
+	sctp->sctp_cum_iudchunks = 0;
 
 	sctp->sctp_autoclose = 0;
 	sctp->sctp_tx_adaptation_code = 0;

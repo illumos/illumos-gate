@@ -110,11 +110,15 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		if (sctp->sctp_obchunks) {
 			UPDATE_MIB(&sctps->sctps_mib, sctpOutCtrlChunks,
 			    sctp->sctp_obchunks);
+			UPDATE_LOCAL(sctp->sctp_cum_obchunks,
+			    sctp->sctp_obchunks);
 			sctp->sctp_obchunks = 0;
 		}
 
 		if (sctp->sctp_odchunks) {
 			UPDATE_MIB(&sctps->sctps_mib, sctpOutOrderChunks,
+			    sctp->sctp_odchunks);
+			UPDATE_LOCAL(sctp->sctp_cum_odchunks,
 			    sctp->sctp_odchunks);
 			sctp->sctp_odchunks = 0;
 		}
@@ -122,11 +126,15 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		if (sctp->sctp_oudchunks) {
 			UPDATE_MIB(&sctps->sctps_mib, sctpOutUnorderChunks,
 			    sctp->sctp_oudchunks);
+			UPDATE_LOCAL(sctp->sctp_cum_oudchunks,
+			    sctp->sctp_oudchunks);
 			sctp->sctp_oudchunks = 0;
 		}
 
 		if (sctp->sctp_rxtchunks) {
 			UPDATE_MIB(&sctps->sctps_mib, sctpRetransChunks,
+			    sctp->sctp_rxtchunks);
+			UPDATE_LOCAL(sctp->sctp_cum_rxtchunks,
 			    sctp->sctp_rxtchunks);
 			sctp->sctp_rxtchunks = 0;
 		}
@@ -140,17 +148,23 @@ sctp_kstat_update(kstat_t *kp, int rw)
 		if (sctp->sctp_ibchunks) {
 			UPDATE_MIB(&sctps->sctps_mib, sctpInCtrlChunks,
 			    sctp->sctp_ibchunks);
+			UPDATE_LOCAL(sctp->sctp_cum_ibchunks,
+			    sctp->sctp_ibchunks);
 			sctp->sctp_ibchunks = 0;
 		}
 
 		if (sctp->sctp_idchunks) {
 			UPDATE_MIB(&sctps->sctps_mib, sctpInOrderChunks,
 			    sctp->sctp_idchunks);
+			UPDATE_LOCAL(sctp->sctp_cum_idchunks,
+			    sctp->sctp_idchunks);
 			sctp->sctp_idchunks = 0;
 		}
 
 		if (sctp->sctp_iudchunks) {
 			UPDATE_MIB(&sctps->sctps_mib, sctpInUnorderChunks,
+			    sctp->sctp_iudchunks);
+			UPDATE_LOCAL(sctp->sctp_cum_iudchunks,
 			    sctp->sctp_iudchunks);
 			sctp->sctp_iudchunks = 0;
 		}
@@ -483,26 +497,40 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 		sctp->sctp_opkts = 0;
 		UPDATE_MIB(&sctps->sctps_mib,
 		    sctpOutCtrlChunks, sctp->sctp_obchunks);
+		UPDATE_LOCAL(sctp->sctp_cum_obchunks,
+		    sctp->sctp_obchunks);
 		sctp->sctp_obchunks = 0;
 		UPDATE_MIB(&sctps->sctps_mib,
 		    sctpOutOrderChunks, sctp->sctp_odchunks);
+		UPDATE_LOCAL(sctp->sctp_cum_odchunks,
+		    sctp->sctp_odchunks);
 		sctp->sctp_odchunks = 0;
 		UPDATE_MIB(&sctps->sctps_mib, sctpOutUnorderChunks,
+		    sctp->sctp_oudchunks);
+		UPDATE_LOCAL(sctp->sctp_cum_oudchunks,
 		    sctp->sctp_oudchunks);
 		sctp->sctp_oudchunks = 0;
 		UPDATE_MIB(&sctps->sctps_mib,
 		    sctpRetransChunks, sctp->sctp_rxtchunks);
+		UPDATE_LOCAL(sctp->sctp_cum_rxtchunks,
+		    sctp->sctp_rxtchunks);
 		sctp->sctp_rxtchunks = 0;
 		UPDATE_MIB(&sctps->sctps_mib,
 		    sctpInSCTPPkts, sctp->sctp_ipkts);
 		sctp->sctp_ipkts = 0;
 		UPDATE_MIB(&sctps->sctps_mib,
 		    sctpInCtrlChunks, sctp->sctp_ibchunks);
+		UPDATE_LOCAL(sctp->sctp_cum_ibchunks,
+		    sctp->sctp_ibchunks);
 		sctp->sctp_ibchunks = 0;
 		UPDATE_MIB(&sctps->sctps_mib,
 		    sctpInOrderChunks, sctp->sctp_idchunks);
+		UPDATE_LOCAL(sctp->sctp_cum_idchunks,
+		    sctp->sctp_idchunks);
 		sctp->sctp_idchunks = 0;
 		UPDATE_MIB(&sctps->sctps_mib, sctpInUnorderChunks,
+		    sctp->sctp_iudchunks);
+		UPDATE_LOCAL(sctp->sctp_cum_iudchunks,
 		    sctp->sctp_iudchunks);
 		sctp->sctp_iudchunks = 0;
 		UPDATE_MIB(&sctps->sctps_mib,

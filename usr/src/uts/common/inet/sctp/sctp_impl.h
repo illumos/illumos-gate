@@ -693,7 +693,7 @@ typedef struct sctp_s {
 	uint32_t	sctp_rtt_tsn;
 	int64_t		sctp_out_time;
 
-	/* Stats */
+	/* Stats can be reset by snmp users kstat, netstat and snmp agents */
 	uint64_t	sctp_opkts;		/* sent pkts */
 	uint64_t	sctp_obchunks;		/* sent control chunks */
 	uint64_t	sctp_odchunks;		/* sent ordered data chunks */
@@ -959,6 +959,17 @@ typedef struct sctp_s {
 	uint64_t	sctp_isacks;		/* total sacks received */
 	uint64_t	sctp_idupchunks;	/* rx dups, ord or unord */
 	uint64_t	sctp_gapcnt;		/* total gap acks rx */
+	/*
+	 * Add the current data from the counters which are reset by snmp
+	 * to these cumulative counters to use in per endpoint statistics.
+	 */
+	uint64_t	sctp_cum_obchunks;	/* sent control chunks */
+	uint64_t	sctp_cum_odchunks;	/* sent ordered data chunks */
+	uint64_t	sctp_cum_oudchunks;	/* sent unord data chunks */
+	uint64_t	sctp_cum_rxtchunks;	/* retransmitted chunks */
+	uint64_t	sctp_cum_ibchunks;	/* recv control chunks */
+	uint64_t	sctp_cum_idchunks;	/* recv ordered data chunks */
+	uint64_t	sctp_cum_iudchunks;	/* recv unord data chunks */
 
 	/*
 	 * When non-zero, this is the maximum observed RTO since assoc stats

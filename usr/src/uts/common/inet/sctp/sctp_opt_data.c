@@ -897,19 +897,29 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 
 			/*
 			 * Copy the current stats to the stats struct.
+			 * For stats which can be reset by snmp users
+			 * add the cumulative and current stats for
+			 * the raw totals to output to the user.
 			 */
-			sas->sas_rtxchunks =  sctp->sctp_rxtchunks;
 			sas->sas_gapcnt = sctp->sctp_gapcnt;
 			sas->sas_outseqtsns = sctp->sctp_outseqtsns;
 			sas->sas_osacks = sctp->sctp_osacks;
 			sas->sas_isacks = sctp->sctp_isacks;
-			sas->sas_octrlchunks = sctp->sctp_obchunks;
-			sas->sas_ictrlchunks = sctp->sctp_ibchunks;
-			sas->sas_oodchunks = sctp->sctp_odchunks;
-			sas->sas_iodchunks = sctp->sctp_idchunks;
-			sas->sas_ouodchunks = sctp->sctp_oudchunks;
-			sas->sas_iuodchunks = sctp->sctp_iudchunks;
 			sas->sas_idupchunks = sctp->sctp_idupchunks;
+			sas->sas_rtxchunks =  sctp->sctp_rxtchunks +
+			    sctp->sctp_cum_rxtchunks;
+			sas->sas_octrlchunks = sctp->sctp_obchunks +
+			    sctp->sctp_cum_obchunks;
+			sas->sas_ictrlchunks = sctp->sctp_ibchunks +
+			    sctp->sctp_cum_ibchunks;
+			sas->sas_oodchunks = sctp->sctp_odchunks +
+			    sctp->sctp_cum_odchunks;
+			sas->sas_iodchunks = sctp->sctp_idchunks +
+			    sctp->sctp_cum_idchunks;
+			sas->sas_ouodchunks = sctp->sctp_oudchunks +
+			    sctp->sctp_cum_oudchunks;
+			sas->sas_iuodchunks = sctp->sctp_iudchunks +
+			    sctp->sctp_cum_iudchunks;
 
 			/*
 			 * Copy out the maximum observed RTO since the
