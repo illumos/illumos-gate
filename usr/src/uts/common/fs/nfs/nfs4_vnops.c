@@ -2754,7 +2754,7 @@ nfs4_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 		if (nfs_rw_lock_held(&rp->r_rwlock, RW_READER)) {
 			nfs_rw_exit(&rp->r_rwlock);
 			if (nfs_rw_enter_sig(&rp->r_rwlock, RW_WRITER,
-			    INTR(vp)))
+			    INTR4(vp)))
 				return (EINTR);
 		}
 
@@ -10435,7 +10435,7 @@ nfs4_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 	 * r_inmap after we release r_lkserlock.
 	 */
 
-	if (nfs_rw_enter_sig(&rp->r_rwlock, RW_WRITER, INTR(vp)))
+	if (nfs_rw_enter_sig(&rp->r_rwlock, RW_WRITER, INTR4(vp)))
 		return (EINTR);
 	atomic_add_int(&rp->r_inmap, 1);
 	nfs_rw_exit(&rp->r_rwlock);
