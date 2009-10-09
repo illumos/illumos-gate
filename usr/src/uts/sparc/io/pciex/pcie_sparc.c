@@ -28,6 +28,7 @@
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/pcie_impl.h>
+#include <sys/pcie_pwr.h>
 
 /* ARGSUSED */
 void
@@ -39,4 +40,26 @@ pcie_init_plat(dev_info_t *dip)
 void
 pcie_fini_plat(dev_info_t *dip)
 {
+}
+
+int
+pcie_plat_pwr_setup(dev_info_t *dip)
+{
+	if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
+	    "pm-want-child-notification?", NULL, NULL) != DDI_PROP_SUCCESS) {
+		PCIE_DBG("%s(%d): can't create pm-want-child-notification \n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Undo whatever is done in pcie_plat_pwr_common_setup
+ */
+void
+pcie_plat_pwr_teardown(dev_info_t *dip)
+{
+	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
+	    "pm-want-child-notification?");
 }

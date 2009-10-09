@@ -64,7 +64,7 @@ FD_OBJS	+=	fd_asm.o
 
 CPR_SPARC_OBJS +=	cpr_sparc.o
 PCI_PCI_OBJS +=		pci_pci.o pci_debug.o pci_pwr.o pcix.o
-PCIE_MISC_OBJS += 	pcie_plat.o
+PCIE_MISC_OBJS +=	pcie_sparc.o
 PCIEB_OBJS +=		pcieb_sparc.o
 FCODE_OBJS +=		fcode.o
 NSKERN_OBJS +=		nsc_asm.o
@@ -73,7 +73,7 @@ NSKERN_OBJS +=		nsc_asm.o
 #			file system modules
 #
 # XXX -	currently a bug?...
-#PROC_OBJS += 
+#PROC_OBJS +=
 CORE_OBJS +=	prmachdep.o
 
 #			ZFS file system module

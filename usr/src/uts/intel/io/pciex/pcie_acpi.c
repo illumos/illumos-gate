@@ -49,22 +49,6 @@ static ACPI_STATUS pcie_print_acpi_name(ACPI_HANDLE hdl, uint32_t nl,
 	void *context, void **ret);
 #endif /* DEBUG */
 
-void
-pcie_init_plat(dev_info_t *dip)
-{
-	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
-	bus_p->bus_plat_private =
-	    (pcie_x86_priv_t *)kmem_zalloc(sizeof (pcie_x86_priv_t), KM_SLEEP);
-}
-
-void
-pcie_fini_plat(dev_info_t *dip)
-{
-	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
-
-	kmem_free(bus_p->bus_plat_private, sizeof (pcie_x86_priv_t));
-}
-
 int
 pcie_acpi_osc(dev_info_t *dip, uint32_t *osc_flags)
 {

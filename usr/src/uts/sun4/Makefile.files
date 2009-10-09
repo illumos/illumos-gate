@@ -73,8 +73,7 @@ CORE_OBJS +=	xc.o
 ROOTNEX_OBJS	+= rootnex.o
 PX_OBJS		+= px.o px_debug.o px_devctl.o px_dma.o \
 		   px_fdvma.o px_fm.o px_ib.o px_intr.o px_mmu.o px_msi.o \
-		   px_msiq.o px_pec.o px_space.o px_tools.o px_util.o \
-		   pcie_pwr.o
+		   px_msiq.o px_pec.o px_space.o px_tools.o px_util.o
 FPC_OBJS        += fpc.o fpc-impl.o fpc-kstats.o
 VIS_OBJS	+= visinstr.o
 TOD_OBJS	+= tod.o

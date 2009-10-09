@@ -181,6 +181,8 @@ typedef struct pcie_pm {
 #endif /* PX_PLX */
 #endif /* lint */
 
+extern int pcie_plat_pwr_setup(dev_info_t *dip);
+extern void pcie_plat_pwr_teardown(dev_info_t *dip);
 extern int pwr_common_setup(dev_info_t *dip);
 extern void pwr_common_teardown(dev_info_t *dip);
 extern int pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,

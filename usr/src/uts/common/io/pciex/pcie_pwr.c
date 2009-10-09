@@ -38,18 +38,6 @@
 #include <sys/promif.h>		/* prom_printf */
 #include <sys/pcie_pwr.h>
 
-#if defined(DEBUG)
-
-#define	DBG pcie_pwr_dbg
-static void pcie_pwr_dbg(dev_info_t *dip, char *fmt, ...);
-static uint_t pcie_pwr_print = 0;
-
-#else /* DEBUG */
-
-#define	DBG 0 &&
-
-#endif /* DEBUG */
-
 /*
  * This file implements the power management functionality for
  * pci express switch and pci express-to-pci/pci-x bridge. All the
@@ -135,10 +123,12 @@ pcie_power(dev_info_t *dip, int component, int level)
 	    (level == PM_LEVEL_D2 && (pmcaps & PCIE_SUPPORTS_D2)));
 
 	mutex_enter(&pwr_p->pwr_lock);
-	DBG(dip, "pcie_power: change from %d to %d\n",
-	    pwr_p->pwr_func_lvl, level);
+	PCIE_DBG("%s(%d): pcie_power: change from %d to %d\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), pwr_p->pwr_func_lvl,
+	    level);
 	if (pwr_p->pwr_func_lvl == level) {
-		DBG(dip, "pcie_power: already at %d\n", level);
+		PCIE_DBG("%s(%d): pcie_power: already at %d\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip), level);
 		ret = DDI_SUCCESS;
 		goto pcie_pwr_done;
 	}
@@ -149,8 +139,9 @@ pcie_power(dev_info_t *dip, int component, int level)
 		 * or there is a hold.
 		 */
 		if (pwr_p->pwr_flags & PCIE_PM_BUSY) {
-			DBG(dip, "pcie_power: rejecting change to %d "
-			    "as busy\n", level);
+			PCIE_DBG("%s(%d): pcie_power: rejecting change to %d "
+			    "as busy\n", ddi_driver_name(dip),
+			    ddi_get_instance(dip), level);
 			goto pcie_pwr_done;
 		}
 
@@ -163,20 +154,23 @@ pcie_power(dev_info_t *dip, int component, int level)
 		ASSERT(!counters[PCIE_D0_INDEX] &&
 		    !counters[PCIE_UNKNOWN_INDEX]);
 		if (level < pwr_level_allowed(pwr_p)) {
-			DBG(dip, "pcie_power: rejecting level %d as"
-			    " %d is the lowest possible\n", level,
+			PCIE_DBG("%s(%d): pcie_power: rejecting level %d as"
+			    " %d is the lowest possible\n",
+			    ddi_driver_name(dip), ddi_get_instance(dip), level,
 			    pwr_level_allowed(pwr_p));
 			goto pcie_pwr_done;
 		}
 	}
 
 	if (pcie_pwr_change(dip, pwr_p, level) != DDI_SUCCESS) {
-		DBG(dip, "pcie_power: attempt to change to %d "
-		    " failed \n", level);
+		PCIE_DBG("%s(%d): pcie_power: attempt to change to %d "
+		    " failed \n", ddi_driver_name(dip), ddi_get_instance(dip),
+		    level);
 		goto pcie_pwr_done;
 	}
 	pwr_p->pwr_func_lvl = level;
-	DBG(dip, "pcie_power: level changed to %d \n", level);
+	PCIE_DBG("%s(%d): pcie_power: level changed to %d \n",
+	    ddi_driver_name(dip), ddi_get_instance(dip), level);
 	ret = DDI_SUCCESS;
 
 pcie_pwr_done:
@@ -223,10 +217,12 @@ pcie_pwr_change(dev_info_t *dip, pcie_pwr_t *pwr_p, int new)
 	}
 	/* Save config space, if going to D3 */
 	if (new == PM_LEVEL_D3) {
-		DBG(dip, "pwr_change: saving config space regs\n");
+		PCIE_DBG("%s(%d): pwr_change: saving config space regs\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		if (pci_save_config_regs(dip) != DDI_SUCCESS) {
-			DBG(dip, "pcie_pwr_change: failed to save "
-			    "config space regs\n");
+			PCIE_DBG("%s(%d): pcie_pwr_change: failed to save "
+			    "config space regs\n", ddi_driver_name(dip),
+			    ddi_get_instance(dip));
 			return (DDI_FAILURE);
 		}
 	}
@@ -246,10 +242,12 @@ pcie_pwr_change(dev_info_t *dip, pcie_pwr_t *pwr_p, int new)
 	 * Restore config space if coming out of D3
 	 */
 	if (pwr_p->pwr_func_lvl == PM_LEVEL_D3) {
-		DBG(dip, "pcie_pwr_change: restoring config space\n");
+		PCIE_DBG("%s(%d): pcie_pwr_change: restoring config space\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		if (pci_restore_config_regs(dip) != DDI_SUCCESS) {
-			DBG(dip, "pcie_pwr_change: failed to restore "
-			    "config space regs\n");
+			PCIE_DBG("%s(%d): pcie_pwr_change: failed to restore "
+			    "config space regs\n", ddi_driver_name(dip),
+			    ddi_get_instance(dip));
 			return (DDI_FAILURE);
 		}
 	}
@@ -310,7 +308,8 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 	mutex_enter(&pwr_p->pwr_lock);
 	switch (op) {
 	case BUS_POWER_PRE_NOTIFICATION:
-		DBG(dip, "pcie_bus_power: %s@%d op %s %d->%d\n",
+		PCIE_DBG("%s(%d): pcie_bus_power: %s@%d op %s %d->%d\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip),
 		    ddi_driver_name(cdip), ddi_get_instance(cdip),
 		    pcie_decode_pwr_op(op), old_level, new_level);
 		/*
@@ -323,13 +322,17 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		 */
 		if (pwr_p->pwr_flags & PCIE_NO_CHILD_PM) {
 			if (!PCIE_IS_COMPS_COUNTED(cdip)) {
-				DBG(dip, "pcie_bus_power: marking child "
-				    "busy to disable pm \n");
+				PCIE_DBG("%s(%d): pcie_bus_power: marking "
+				    "child busy to disable pm \n",
+				    ddi_driver_name(dip),
+				    ddi_get_instance(dip));
 				(void) pm_busy_component(cdip, 0);
 			}
 			if (new_level < PM_LEVEL_D0 && !comp) {
-				DBG(dip, "pcie_bus_power: rejecting "
-				    "child's attempt to go to %d\n", new_level);
+				PCIE_DBG("%s(%d): pcie_bus_power: rejecting "
+				    "child's attempt to go to %d\n",
+				    ddi_driver_name(dip), ddi_get_instance(dip),
+				    new_level);
 				rv = DDI_FAILURE;
 			}
 		}
@@ -340,7 +343,8 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 
 	case BUS_POWER_HAS_CHANGED:
 	case BUS_POWER_POST_NOTIFICATION:
-		DBG(dip, "pcie_bus_power: %s@%d op %s %d->%d\n",
+		PCIE_DBG("%s(%d): pcie_bus_power: %s@%d op %s %d->%d\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip),
 		    ddi_driver_name(cdip), ddi_get_instance(cdip),
 		    pcie_decode_pwr_op(op), old_level, new_level);
 		/*
@@ -355,8 +359,10 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 			(void) pcie_pm_add_child(dip, cdip);
 			if ((pwr_p->pwr_flags & PCIE_NO_CHILD_PM) &&
 			    (op == BUS_POWER_HAS_CHANGED)) {
-				DBG(dip, "pcie_bus_power: marking child "
-				    "busy to disable pm \n");
+				PCIE_DBG("%s(%d): pcie_bus_power: marking "
+				    "child busy to disable pm \n",
+				    ddi_driver_name(dip),
+				    ddi_get_instance(dip));
 				(void) pm_busy_component(cdip, 0);
 				/*
 				 * If the driver has already changed to lower
@@ -384,8 +390,10 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		}
 
 		if (*((int *)result) == DDI_FAILURE) {
-			DBG(dip, "pcie_bus_power: change for %s%d failed\n",
-			    ddi_driver_name(cdip), ddi_get_instance(cdip));
+			PCIE_DBG("%s(%d): pcie_bus_power: change for %s%d "
+			    "failed\n", ddi_driver_name(dip),
+			    ddi_get_instance(dip), ddi_driver_name(cdip),
+			    ddi_get_instance(cdip));
 			break;
 		}
 		/* Modify counters appropriately */
@@ -407,7 +415,8 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		 */
 		if (level_allowed >= pwr_p->pwr_func_lvl &&
 		    !(pwr_p->pwr_flags & PCIE_PM_BUSY)) {
-			DBG(dip, "pcie_bus_power: marking busy\n");
+			PCIE_DBG("%s(%d): pcie_bus_power: marking busy\n",
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 			(void) pm_busy_component(dip, 0);
 			pwr_p->pwr_flags |= PCIE_PM_BUSY;
 			break;
@@ -424,7 +433,8 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 			 * For pci express, we should check here whether
 			 * the link is in L1 state or not.
 			 */
-			DBG(dip, "pcie_bus_power: marking idle\n");
+			PCIE_DBG("%s(%d): pcie_bus_power: marking idle\n",
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 			(void) pm_idle_component(dip, 0);
 			pwr_p->pwr_flags &= ~PCIE_PM_BUSY;
 			break;
@@ -518,8 +528,9 @@ pcie_add_comps(dev_info_t *dip, dev_info_t *cdip, pcie_pwr_t *pwr_p)
 	if (!comps)
 		return;
 
-	DBG(dip, "pcie_add_comps: unknown level counter incremented "
+	PCIE_DBG("%s(%d): pcie_add_comps: unknown level counter incremented "
 	    "from %d by %d because of %s@%d\n",
+	    ddi_driver_name(dip), ddi_get_instance(dip),
 	    (pwr_p->pwr_counters)[PCIE_UNKNOWN_INDEX], comps,
 	    ddi_driver_name(cdip), ddi_get_instance(cdip));
 	(pwr_p->pwr_counters)[PCIE_UNKNOWN_INDEX] += comps;
@@ -565,8 +576,9 @@ pcie_remove_comps(dev_info_t *dip, dev_info_t *cdip, pcie_pwr_t *pwr_p)
 		}
 		return;
 	}
-	DBG(dip, "pcie_remove_comps:counters decremented because of "
-	    "%s@%d\n", ddi_driver_name(cdip), ddi_get_instance(cdip));
+	PCIE_DBG("%s(%d): pcie_remove_comps:counters decremented because of "
+	    "%s@%d\n", ddi_driver_name(dip), ddi_get_instance(dip),
+	    ddi_driver_name(cdip), ddi_get_instance(cdip));
 	child_counters = PCIE_CHILD_COUNTERS(cdip);
 	/*
 	 * Adjust the nexus counters. No need to adjust per child dip
@@ -605,13 +617,10 @@ pwr_common_setup(dev_info_t *dip)
 	pwr_p->pwr_func_lvl = PM_LEVEL_UNKNOWN;
 	pwr_p->pwr_pmcaps = PCIE_DEFAULT_LEVEL_SUPPORTED;
 
-	if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
-	    "pm-want-child-notification?", NULL, NULL) != DDI_PROP_SUCCESS) {
-		DBG(dip, "can't create pm-want-child-notification \n");
+	if (pcie_plat_pwr_setup(dip) != DDI_SUCCESS)
 		goto pwr_common_err;
-	}
-	pcie_pm_p->pcie_pwr_p = pwr_p;
 
+	pcie_pm_p->pcie_pwr_p = pwr_p;
 	return (DDI_SUCCESS);
 
 pwr_common_err:
@@ -637,8 +646,7 @@ pwr_common_teardown(dev_info_t *dip)
 	if (!pcie_pm_p || !(pwr_p = PCIE_NEXUS_PMINFO(dip)))
 		return;
 
-	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
-	    "pm-want-child-notification?");
+	pcie_plat_pwr_teardown(dip);
 	mutex_destroy(&pwr_p->pwr_lock);
 	pcie_pm_p->pcie_pwr_p = NULL;
 	kmem_free(pwr_p, sizeof (pcie_pwr_t));
@@ -675,11 +683,13 @@ pcie_pm_hold(dev_info_t *dip)
 	 */
 	mutex_enter(&pwr_p->pwr_lock);
 	ASSERT(pwr_p->pwr_hold >= 0);
-	DBG(dip, "pm_hold: incrementing hold \n");
+	PCIE_DBG("%s(%d): pm_hold: incrementing hold \n",
+	    ddi_driver_name(dip), ddi_get_instance(dip));
 	pwr_p->pwr_hold++;
 	/* Mark itself busy, if it is not done already */
 	if (!(pwr_p->pwr_flags & PCIE_PM_BUSY)) {
-		DBG(dip, "pm_hold: marking busy\n");
+		PCIE_DBG("%s(%d): pm_hold: marking busy\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		pwr_p->pwr_flags |= PCIE_PM_BUSY;
 		(void) pm_busy_component(dip, 0);
 	}
@@ -689,8 +699,9 @@ pcie_pm_hold(dev_info_t *dip)
 	}
 	mutex_exit(&pwr_p->pwr_lock);
 	if (pm_raise_power(dip, 0, PM_LEVEL_D0) != DDI_SUCCESS) {
-		DBG(dip, "pm_hold: attempt to raise power "
-		    "from %d to %d failed\n", pwr_p->pwr_func_lvl,
+		PCIE_DBG("%s(%d): pm_hold: attempt to raise power "
+		    "from %d to %d failed\n", ddi_driver_name(dip),
+		    ddi_get_instance(dip), pwr_p->pwr_func_lvl,
 		    PM_LEVEL_D0);
 		pcie_pm_release(dip);
 		return (DDI_FAILURE);
@@ -723,13 +734,15 @@ pcie_pm_subrelease(dev_info_t *dip, pcie_pwr_t *pwr_p)
 
 	ASSERT(MUTEX_HELD(&pwr_p->pwr_lock));
 	ASSERT(pwr_p->pwr_hold > 0);
-	DBG(dip, "pm_subrelease: decrementing hold \n");
+	PCIE_DBG("%s(%d): pm_subrelease: decrementing hold \n",
+	    ddi_driver_name(dip), ddi_get_instance(dip));
 	pwr_p->pwr_hold--;
 	ASSERT(pwr_p->pwr_hold >= 0);
 	ASSERT(pwr_p->pwr_flags & PCIE_PM_BUSY);
 	level = pwr_level_allowed(pwr_p);
 	if (pwr_p->pwr_hold == 0 && level < pwr_p->pwr_func_lvl) {
-		DBG(dip, "pm_subrelease: marking idle \n");
+		PCIE_DBG("%s(%d): pm_subrelease: marking idle \n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		(void) pm_idle_component(dip, 0);
 		pwr_p->pwr_flags &= ~PCIE_PM_BUSY;
 	}
@@ -766,7 +779,8 @@ pcie_pm_add_child(dev_info_t *dip, dev_info_t *cdip)
 	 * and we stay at full power.
 	 */
 	ASSERT(pwr_p->pwr_hold > 0);
-	DBG(dip, "pm_add_child: decrementing hold \n");
+	PCIE_DBG("%s(%d): pm_add_child: decrementing hold \n",
+	    ddi_driver_name(dip), ddi_get_instance(dip));
 	pwr_p->pwr_hold--;
 	/*
 	 * We must have made sure that busy bit
@@ -811,7 +825,8 @@ pcie_pm_remove_child(dev_info_t *dip, dev_info_t *cdip)
 	if ((pwr_p->pwr_hold == 0) &&
 	    (!total || (pwr_level_allowed(pwr_p) < pwr_p->pwr_func_lvl))) {
 		if (pwr_p->pwr_flags & PCIE_PM_BUSY) {
-			DBG(dip, "pcie_bus_power: marking idle\n");
+			PCIE_DBG("%s(%d): pcie_bus_power: marking idle\n",
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 			(void) pm_idle_component(dip, 0);
 			pwr_p->pwr_flags &= ~PCIE_PM_BUSY;
 		}
@@ -870,8 +885,9 @@ pcie_pwr_resume(dev_info_t *dip)
 		 * init'ed.  They will be set up by init_child().
 		 */
 		if (i_ddi_node_state(cdip) < DS_INITIALIZED) {
-			DBG(dip,
+			PCIE_DBG("%s(%d): "
 			    "DDI_RESUME: skipping %s%d not in CF1\n",
+			    ddi_driver_name(dip), ddi_get_instance(dip),
 			    ddi_driver_name(cdip), ddi_get_instance(cdip));
 			continue;
 		}
@@ -883,8 +899,9 @@ pcie_pwr_resume(dev_info_t *dip)
 		    "nexus-saved-config-regs") != 1)
 			continue;
 
-		DBG(dip,
+		PCIE_DBG("%s(%d): "
 		    "DDI_RESUME: nexus restoring %s%d config regs\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip),
 		    ddi_driver_name(cdip), ddi_get_instance(cdip));
 
 		/* clear errors left by OBP scrubbing */
@@ -901,7 +918,8 @@ pcie_pwr_resume(dev_info_t *dip)
 
 		if (ndi_prop_remove(DDI_DEV_T_NONE, cdip,
 		    "nexus-saved-config-regs") != DDI_PROP_SUCCESS) {
-			DBG(dip, "%s%d can't remove prop %s",
+			PCIE_DBG("%s(%d): %s%d can't remove prop %s",
+			    ddi_driver_name(dip), ddi_get_instance(dip),
 			    ddi_driver_name(cdip), ddi_get_instance(cdip),
 			    "nexus-saved-config-regs");
 		}
@@ -940,9 +958,10 @@ pcie_pwr_suspend(dev_info_t *dip)
 			mutex_exit(&pwr_p->pwr_lock);
 			if (pm_raise_power(dip, 0, PM_LEVEL_D0) !=
 			    DDI_SUCCESS) {
-				DBG(dip, "pwr_suspend: attempt "
+				PCIE_DBG("%s(%d): pwr_suspend: attempt "
 				    "to raise power from %d to %d "
-				    "failed\n", pwr_p->pwr_func_lvl,
+				    "failed\n", ddi_driver_name(dip),
+				    ddi_get_instance(dip), pwr_p->pwr_func_lvl,
 				    PM_LEVEL_D0);
 				return (DDI_FAILURE);
 			}
@@ -975,8 +994,9 @@ pcie_pwr_suspend(dev_info_t *dip)
 		 * init'ed.  They will be set up in init_child().
 		 */
 		if (i_ddi_node_state(cdip) < DS_INITIALIZED) {
-			DBG(dip, "DDI_SUSPEND: skipping "
-			    "%s%d not in CF1\n", ddi_driver_name(cdip),
+			PCIE_DBG("%s(%d): DDI_SUSPEND: skipping "
+			    "%s%d not in CF1\n", ddi_driver_name(dip),
+			    ddi_get_instance(dip), ddi_driver_name(cdip),
 			    ddi_get_instance(cdip));
 			continue;
 		}
@@ -1011,12 +1031,14 @@ pcie_pwr_suspend(dev_info_t *dip)
 		 */
 		if (ndi_prop_create_boolean(DDI_DEV_T_NONE, cdip,
 		    "nexus-saved-config-regs") != DDI_PROP_SUCCESS) {
-			DBG(dip, "%s%d can't update prop %s",
+			PCIE_DBG("%s(%d): %s%d can't update prop %s",
+			    ddi_driver_name(dip), ddi_get_instance(dip),
 			    ddi_driver_name(cdip), ddi_get_instance(cdip),
 			    "nexus-saved-config-regs");
 		}
-		DBG(dip, "DDI_SUSPEND: saving config space for"
-		    " %s%d\n", ddi_driver_name(cdip), ddi_get_instance(cdip));
+		PCIE_DBG("%s(%d): DDI_SUSPEND: saving config space for"
+		    " %s%d\n", ddi_driver_name(dip), ddi_get_instance(dip),
+		    ddi_driver_name(cdip), ddi_get_instance(cdip));
 
 		/* PCIe workaround: disable errors during 4K config save */
 		if (is_pcie = pcie_is_pcie(cdip))
@@ -1063,25 +1085,4 @@ pcie_decode_pwr_op(pm_bus_power_op_t op)
 	}
 	return ("UNKNOWN OP");
 }
-
-static void
-pcie_pwr_dbg(dev_info_t *dip, char *fmt, ...)
-{
-	va_list ap;
-	if (!pcie_pwr_print)
-		return;
-
-	if (dip)
-		prom_printf("%s(%d): pcie pwr: ", ddi_driver_name(dip),
-		    ddi_get_instance(dip));
-body:
-	va_start(ap, fmt);
-	if (ap)
-		prom_vprintf(fmt, ap);
-	else
-		prom_printf(fmt);
-
-	va_end(ap);
-}
-
 #endif
