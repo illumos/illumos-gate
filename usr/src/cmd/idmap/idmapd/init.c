@@ -277,14 +277,21 @@ reload_dcs(void)
 			goto nomem;
 	}
 
-	/* NEEDSWORK:  isn't there an easier way to find the domain SID? */
-	for (i = 0; pgcfg->domains_in_forest[i].domain[0] != '\0'; i++) {
-		if (domain_eq(pgcfg->domain_name,
-		    pgcfg->domains_in_forest[i].domain)) {
-			if (adutils_add_domain(new_dcs[0], pgcfg->domain_name,
-			    pgcfg->domains_in_forest[i].sid) != 0)
-				goto nomem;
-			break;
+	/*
+	 * NEEDSWORK:  All we need here is to add the domain and SID for
+	 * this DC to the list of domains supported by this entry.  Isn't
+	 * there an easier way to find the SID than to walk through the list
+	 * of all of the domains in the forest?
+	 */
+	ad_disc_domainsinforest_t *dif = pgcfg->domains_in_forest;
+	if (dif != NULL) {
+		for (; dif->domain[0] != '\0'; dif++) {
+			if (domain_eq(pgcfg->domain_name, dif->domain)) {
+				if (adutils_add_domain(new_dcs[0],
+				    dif->domain, dif->sid) != 0)
+					goto nomem;
+				break;
+			}
 		}
 	}
 
