@@ -29826,8 +29826,8 @@ static void
 ipobs_fini(ip_stack_t *ipst)
 {
 
-	net_protocol_release(ipst->ips_ip4_observe_pr);
-	net_protocol_release(ipst->ips_ip6_observe_pr);
+	VERIFY(net_protocol_release(ipst->ips_ip4_observe_pr) == 0);
+	VERIFY(net_protocol_release(ipst->ips_ip6_observe_pr) == 0);
 }
 
 /*

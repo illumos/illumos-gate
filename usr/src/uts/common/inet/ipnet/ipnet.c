@@ -1985,7 +1985,7 @@ ipobs_register_hook(netstack_t *ns, pfv_t func)
 	 * To register multiple hooks with he same callback function,
 	 * a unique name is needed.
 	 */
-	(void) snprintf(name, sizeof (name), "ipobserve_%p", hook);
+	(void) snprintf(name, sizeof (name), "ipobserve_%p", (void *)hook);
 	hook->h_name = strdup(name);
 
 	(void) net_hook_register(ipst->ips_ip4_observe_pr, NH_OBSERVE, hook);
@@ -2295,7 +2295,7 @@ ipnet_promisc_add(void *handle, uint_t how, void *data, uintptr_t *mhandle,
 	 */
 	HOOK_INIT(ipnet->ipnet_hook, ipnet_bpf_bounce, "", ipnet);
 	(void) snprintf(name, sizeof (name), "ipnet_promisc_%p",
-	    ipnet->ipnet_hook);
+	    (void *)ipnet->ipnet_hook);
 	ipnet->ipnet_hook->h_name = strdup(name);
 	ipnet->ipnet_data = data;
 	ipnet->ipnet_zoneid = ifp->if_zoneid;
