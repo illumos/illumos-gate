@@ -1639,21 +1639,8 @@ pmcs_soft_reset(pmcs_hw_t *pwp, boolean_t no_restart)
 				continue;
 			}
 			mutex_enter(&xp->statlock);
-			if (xp->assigned == 0 && xp->dying == 0) {
-				if (xp->new) {
-					xp->new = 0;
-					xp->ca = 0;
-					xp->qdepth = 0;
-					xp->phy = NULL;
-				}
-				mutex_exit(&xp->statlock);
-				continue;
-			}
-			xp->tagmap = 0;
-			xp->dying = 1;
-			xp->assigned = 0;
+			pmcs_clear_xp(pwp, xp);
 			mutex_exit(&xp->statlock);
-			SCHEDULE_WORK(pwp, PMCS_WORK_REM_DEVICES);
 		}
 	}
 
@@ -2895,6 +2882,7 @@ pmcs_clear_phy(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	if (!IS_ROOT_PHY(pptr)) {
 		pptr->iport = NULL;
 	}
+	/* keep target */
 }
 
 /*
@@ -6390,29 +6378,22 @@ pmcs_clear_xp(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	_NOTE(ARGUNUSED(pwp));
 
 	ASSERT(mutex_owned(&xp->statlock));
-	ASSERT(xp->dying);
 
 	pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Device 0x%p is gone.", __func__,
 	    (void *)xp);
 
 	/*
-	 * Clear the dip now.  This keeps pmcs_rem_old_devices from attempting
+	 * Clear the dip now.  This keeps pmcs_remove_device from attempting
 	 * to call us on the same device while we're still flushing queues.
 	 * The only side effect is we can no longer update SM-HBA properties,
 	 * but this device is going away anyway, so no matter.
 	 */
 	xp->dip = NULL;
 
-	/*
-	 * Flush all target queues
-	 */
-	pmcs_flush_target_queues(pwp, xp, PMCS_TGT_ALL_QUEUES);
-
 	xp->special_running = 0;
 	xp->recovering = 0;
 	xp->recover_wait = 0;
 	xp->draining = 0;
-	xp->dying = 0;
 	xp->new = 0;
 	xp->assigned = 0;
 	xp->dev_state = 0;
@@ -6423,6 +6404,11 @@ pmcs_clear_xp(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	xp->wq_recovery_tail = NULL;
 	/* Don't clear xp->phy */
 	/* Don't clear xp->actv_cnt */
+
+	/*
+	 * Flush all target queues
+	 */
+	pmcs_flush_target_queues(pwp, xp, PMCS_TGT_ALL_QUEUES);
 }
 
 static int
@@ -6958,7 +6944,7 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		}
 
 		tgt = pptr->target;
-		if (tgt == NULL) {
+		if (tgt == NULL || tgt->dev_gone) {
 			if (pptr->dtype != NOTHING) {
 				pmcs_prt(pwp, PMCS_PRT_DEBUG2,
 				    "%s: no target for DS error recovery for "
@@ -6970,13 +6956,6 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 		mutex_enter(&tgt->statlock);
 
 		if (tgt->recover_wait == 0) {
-			goto next_phy;
-		}
-
-		if (tgt->dying) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE,
-			    "%s: Not doing DS recovery on dying target %p",
-			    __func__, (void *)tgt);
 			goto next_phy;
 		}
 
@@ -7455,7 +7434,7 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 
 	if (tgt != NULL) {
 		mutex_enter(&tgt->statlock);
-		if (tgt->dying || !tgt->assigned) {
+		if (!tgt->assigned) {
 			if (pptr) {
 				pmcs_dec_phy_ref_count(pptr);
 			}
@@ -7466,7 +7445,7 @@ pmcs_start_ssp_event_recovery(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *iomb,
 	}
 	if (pptr == NULL) {
 		/*
-		 * No target or dying target.Need to run RE-DISCOVERY here.
+		 * No target, need to run RE-DISCOVERY here.
 		 */
 		if (pwrk->state != PMCS_WORK_STATE_TIMED_OUT) {
 			pwrk->state = PMCS_WORK_STATE_INTR;
@@ -7638,7 +7617,7 @@ restart:
 		mutex_exit(&pwp->lock);
 		if (tgt != NULL) {
 			mutex_enter(&tgt->statlock);
-			if (tgt->dying || !tgt->assigned) {
+			if (!tgt->assigned) {
 				mutex_exit(&tgt->statlock);
 				continue;
 			}
@@ -8011,6 +7990,7 @@ pmcs_handle_dead_phys(pmcs_hw_t *pwp)
 				}
 				mutex_exit(&phyp->target->statlock);
 			}
+			pmcs_unlock_phy(phyp);
 			kmem_cache_free(pwp->phy_cache, phyp);
 		}
 

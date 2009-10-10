@@ -98,7 +98,6 @@ struct pmcs_xscsi {
 		recovering	:	1,		/* now recovering */
 		event_recovery	:	1,		/* event recovery */
 		draining	:	1,
-		dying		:	1,
 		new		:	1,
 		assigned	:	1,
 		dev_gone	:	1,

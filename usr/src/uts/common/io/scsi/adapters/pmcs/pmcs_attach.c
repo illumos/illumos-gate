@@ -1694,33 +1694,6 @@ pmcs_add_new_device(pmcs_hw_t *pwp, pmcs_xscsi_t *target)
 	return (B_TRUE);
 }
 
-
-static void
-pmcs_rem_old_devices(pmcs_hw_t *pwp)
-{
-	pmcs_xscsi_t *xp;
-	int i;
-
-	mutex_enter(&pwp->lock);
-	for (i = 0; i < pwp->max_dev; i++) {
-		xp = pwp->targets[i];
-		if (xp == NULL) {
-			continue;
-		}
-		mutex_exit(&pwp->lock);
-
-		mutex_enter(&xp->statlock);
-		if (xp->dying && (xp->dip != NULL)) {
-			pmcs_clear_xp(pwp, xp);
-			/* Target is now gone */
-		}
-		mutex_exit(&xp->statlock);
-		mutex_enter(&pwp->lock);
-	}
-	mutex_exit(&pwp->lock);
-}
-
-
 void
 pmcs_worker(void *arg)
 {
@@ -1752,10 +1725,6 @@ pmcs_worker(void *arg)
 
 	if (work_flags & PMCS_WORK_FLAG_DS_ERR_RECOVERY) {
 		pmcs_dev_state_recovery(pwp, NULL);
-	}
-
-	if (work_flags & PMCS_WORK_FLAG_REM_DEVICES) {
-		pmcs_rem_old_devices(pwp);
 	}
 
 	if (work_flags & PMCS_WORK_FLAG_DISCOVER) {
@@ -2567,7 +2536,6 @@ pmcs_assign_device(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt)
 
 	tgt->new = 1;
 	tgt->dev_gone = 0;
-	tgt->dying = 0;
 	tgt->recover_wait = 0;
 
 	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
@@ -2611,11 +2579,9 @@ pmcs_remove_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
 				    "cancel config of vtgt %u", vtgt);
 			} else {
-				xp->assigned = 0;
-				xp->dying = 1;
-				SCHEDULE_WORK(pwp, PMCS_WORK_REM_DEVICES);
+				pmcs_clear_xp(pwp, xp);
 				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
-				    "Scheduling removal of tgt 0x%p vtgt %u",
+				    "Removed tgt 0x%p vtgt %u",
 				    (void *)xp, vtgt);
 			}
 			mutex_exit(&xp->statlock);

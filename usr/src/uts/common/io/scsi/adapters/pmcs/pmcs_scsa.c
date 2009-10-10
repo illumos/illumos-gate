@@ -491,19 +491,19 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	if (xp == NULL) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG2,
 		    "%s: dropping due to null target", __func__);
-		goto dead_duck;
+		goto dead_target;
 	}
 	ASSERT(mutex_owned(&xp->statlock));
 
 	/*
-	 * First, check to see if we're dying or unassigned.
+	 * First, check to see if the device is gone.
 	 */
-	if (xp->dying || xp->dev_gone) {
+	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG3,
-		    "%s: dropping due to dying/dead target 0x%p",
+		    "%s: dropping due to dead target 0x%p",
 		    __func__, (void *)xp);
-		goto dead_duck;
+		goto dead_target;
 	}
 
 	/*
@@ -556,7 +556,7 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	return (TRAN_ACCEPT);
 
-dead_duck:
+dead_target:
 	pkt->pkt_state = STATE_GOT_BUS;
 	pkt->pkt_reason = CMD_DEV_GONE;
 	mutex_enter(&pwp->cq_lock);
@@ -698,7 +698,7 @@ pmcs_scsa_reset(struct scsi_address *ap, int level)
 			return (0);
 		}
 
-		if (xp->dying || xp->dev_gone) {
+		if (xp->dev_gone) {
 			mutex_exit(&xp->statlock);
 			pmcs_prt(pwp, PMCS_PRT_DEBUG,
 			    "%s: Target 0x%p has gone away", __func__,
@@ -858,7 +858,7 @@ pmcs_addr2xp(struct scsi_address *ap, uint64_t *lp, pmcs_cmd_t *sp)
 	xp = lun->target;
 	mutex_enter(&xp->statlock);
 
-	if (xp->dying || xp->dev_gone || (xp->phy == NULL)) {
+	if (xp->dev_gone || (xp->phy == NULL)) {
 		mutex_exit(&xp->statlock);
 		return (NULL);
 	}
@@ -1477,11 +1477,11 @@ pmcs_scsa_wq_run_one(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	}
 
 	/*
-	 * Next, check to see if the target is alive
+	 * Next, check to see if the target is gone.
 	 */
-	if (xp->dying || xp->dev_gone) {
+	if (xp->dev_gone) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG,
-		    "%s: Flushing wait queue for dying/dead tgt 0x%p", __func__,
+		    "%s: Flushing wait queue for dead tgt 0x%p", __func__,
 		    (void *)xp);
 		pmcs_flush_target_queues(pwp, xp, PMCS_TGT_WAIT_QUEUE);
 		mutex_exit(&xp->statlock);
@@ -1707,7 +1707,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	sas_ssp_cmd_iu_t sc;
 
 	mutex_enter(&xp->statlock);
-	if (xp->dying || !xp->assigned) {
+	if (!xp->assigned) {
 		mutex_exit(&xp->statlock);
 		return (PMCS_WQ_RUN_FAIL_OTHER);
 	}
@@ -2160,7 +2160,7 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	pmcs_prt(pwp, PMCS_PRT_DEBUG2, "%s: regular cmd", __func__);
 
 	mutex_enter(&xp->statlock);
-	if (xp->dying || !xp->assigned) {
+	if (!xp->assigned) {
 		mutex_exit(&xp->statlock);
 		return (PMCS_WQ_RUN_FAIL_OTHER);
 	}

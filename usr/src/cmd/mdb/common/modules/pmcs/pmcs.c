@@ -332,9 +332,9 @@ display_targets(struct pmcs_hw m, int verbose, int totals_only)
 		}
 
 		/*
-		 * It has to be one of new, assigned or dying to be of interest.
+		 * It has to be new or assigned to be of interest.
 		 */
-		if (xs.new == 0 && xs.assigned == 0 && xs.dying == 0) {
+		if (xs.new == 0 && xs.assigned == 0) {
 			continue;
 		}
 
@@ -378,9 +378,8 @@ display_targets(struct pmcs_hw m, int verbose, int totals_only)
 		if (verbose) {
 			if (xs.new) {
 				mdb_printf(" new");
-			} else if (xs.dying) {
-				mdb_printf(" dying");
-			} else if (xs.assigned) {
+			}
+			if (xs.assigned) {
 				mdb_printf(" assigned");
 			}
 			if (xs.draining) {

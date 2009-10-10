@@ -234,7 +234,6 @@ typedef struct {
  * Offlevel work as a bit pattern.
  */
 #define	PMCS_WORK_DISCOVER		0
-#define	PMCS_WORK_REM_DEVICES		2
 #define	PMCS_WORK_ABORT_HANDLE		3
 #define	PMCS_WORK_SPINUP_RELEASE	4
 #define	PMCS_WORK_SAS_HW_ACK		5
@@ -248,7 +247,6 @@ typedef struct {
  * The actual values as they appear in work_flags
  */
 #define	PMCS_WORK_FLAG_DISCOVER		(1 << 0)
-#define	PMCS_WORK_FLAG_REM_DEVICES	(1 << 2)
 #define	PMCS_WORK_FLAG_ABORT_HANDLE	(1 << 3)
 #define	PMCS_WORK_FLAG_SPINUP_RELEASE	(1 << 4)
 #define	PMCS_WORK_FLAG_SAS_HW_ACK	(1 << 5)
