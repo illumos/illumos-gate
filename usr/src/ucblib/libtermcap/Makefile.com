@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libtermcap.a
@@ -38,28 +36,14 @@ include $(SRC)/lib/Makefile.lib
 ROOTLIBDIR=	$(ROOT)/usr/ucblib
 ROOTLIBDIR64=	$(ROOT)/usr/ucblib/$(MACH64)
 
-LIBS = $(DYNLIB) $(LINTLIB)
-
-LINTSRC= $(LINTLIB:%.ln=%)
-ROOTLINTDIR= $(ROOTLIBDIR)
-ROOTLINTDIR64= $(ROOTLIBDIR)/$(MACH64)
-ROOTLINT= $(LINTSRC:%=$(ROOTLINTDIR)/%)
-ROOTLINT64= $(LINTSRC:%=$(ROOTLINTDIR64)/%)
-
-# install rule for lint source file target
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
-$(ROOTLINTDIR64)/%: ../%
-	$(INS.file)
-
-$(LINTLIB):= SRCS=../llib-ltermcap
+LIBS = $(DYNLIB)
 
 CFLAGS	+=	$(CCVERBOSE)
 CFLAGS64 +=	$(CCVERBOSE)
 LDLIBS +=	-lc
 
 DEFS= -DCM_N -DCM_GT -DCM_B -DCM_D
-CPPFLAGS = $(DEFS) -I$(ROOT)/usr/ucbinclude $(CPPFLAGS.master)
+CPPFLAGS = $(DEFS) -I$(SRC)/ucbhead $(CPPFLAGS.master)
 
 .KEEP_STATE:
 

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
@@ -30,10 +28,10 @@ include ../Makefile.com
 DYNFLAGS += $(DYNFLAGS32)
 BUILD.SO= $(CC) -o $@ $(GSHARED) $(DYNFLAGS) $(PICS) -L $(ROOT)/usr/ucblib $(LDLIBS)
 
-LIBS = $(DYNLIB) $(LINTLIB)
+LIBS = $(DYNLIB)
 
 .KEEP_STATE:
 
 all: $(LIBS)
 
-install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
+install: all $(ROOTLIBS) $(ROOTLINKS)

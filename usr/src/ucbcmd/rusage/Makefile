@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,7 +27,7 @@ PROG= rusage
 
 include ../Makefile.ucbcmd
 
-INC1 = $(ROOT)/usr/ucbinclude
+INC1 = $(SRC)/ucbhead
 
 FILEMODE=	755
 

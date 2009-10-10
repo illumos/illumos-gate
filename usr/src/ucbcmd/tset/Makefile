@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,7 +31,7 @@ FILEMODE=	755
 
 LDLIBS =  -L$(ROOT)/usr/ucblib -R /usr/ucblib $(LDLIBS.cmd) -lucb -ltermcap
 
-CPPFLAGS = -I$(ROOT)/usr/ucbinclude $(CPPFLAGS.master)
+CPPFLAGS = -I$(SRC)/ucbhead $(CPPFLAGS.master)
 
 ROOTSYMLINK= $(ROOTBIN)/reset
 

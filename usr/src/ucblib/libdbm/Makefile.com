@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libdbm.a
@@ -36,26 +34,12 @@ include $(SRC)/lib/Makefile.lib
 ROOTLIBDIR=	$(ROOT)/usr/ucblib
 ROOTLIBDIR64=	$(ROOT)/usr/ucblib/$(MACH64)
 
-LIBS = $(DYNLIB) $(LINTLIB)
-
-LINTSRC= $(LINTLIB:%.ln=%)
-ROOTLINTDIR= $(ROOTLIBDIR)
-ROOTLINTDIR64= $(ROOTLIBDIR)/$(MACH64)
-ROOTLINT= $(LINTSRC:%=$(ROOTLINTDIR)/%)
-ROOTLINT64= $(LINTSRC:%=$(ROOTLINTDIR64)/%)
-
-# install rule for lint source file target
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
-$(ROOTLINTDIR64)/%: ../%
-	$(INS.file)
-
-$(LINTLIB):= SRCS=../llib-ldbm
+LIBS = $(DYNLIB)
 
 CFLAGS	+=	$(CCVERBOSE)
 LDLIBS +=	-lc
 
-CPPFLAGS = -I$(ROOT)/usr/ucbinclude $(CPPFLAGS.master)
+CPPFLAGS = -I$(SRC)/ucbhead $(CPPFLAGS.master)
 
 .KEEP_STATE:
 

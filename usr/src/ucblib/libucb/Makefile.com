@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libucb.a
@@ -87,27 +85,13 @@ SRCS=		$(PORTGENOBJS:%.o=../port/gen/%.c) \
 		$(PORTSTDIOOBJS:%.o=../port/stdio/%.c) \
 		$(PORTSYSOBJS:%.o=../port/sys/%.c)
 
-LIBS = $(DYNLIB) $(LINTLIB)
-
-LINTSRC= $(LINTLIB:%.ln=%)
-ROOTLINTDIR= $(ROOTLIBDIR)
-ROOTLINTDIR64= $(ROOTLIBDIR)/$(MACH64)
-ROOTLINT= $(LINTSRC:%=$(ROOTLINTDIR)/%)
-ROOTLINT64= $(LINTSRC:%=$(ROOTLINTDIR64)/%)
-
-# install rule for lint source file target
-$(ROOTLINTDIR)/%: ../port/%
-	$(INS.file)
-$(ROOTLINTDIR64)/%: ../%
-	$(INS.file)
-
-$(LINTLIB):= SRCS=../port/llib-lucb
+LIBS = $(DYNLIB)
 
 CFLAGS	+=	$(CCVERBOSE)
 CFLAGS64 +=	$(CCVERBOSE)
 LDLIBS +=	-lelf -lc
 
-CPPFLAGS = -D$(MACH) -I$(ROOT)/usr/ucbinclude -I../inc \
+CPPFLAGS = -D$(MACH) -I$(SRC)/ucbhead -I../inc \
 		-I../../../lib/libc/inc $(CPPFLAGS.master)
 
 ASFLAGS= -P -D__STDC__ -DLOCORE -D_SYS_SYS_S -D_ASM $(CPPFLAGS)

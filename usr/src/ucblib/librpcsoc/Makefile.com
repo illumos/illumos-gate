@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY= librpcsoc.a
@@ -49,10 +47,7 @@ DYNFLAGS += $(ZINTERPOSE)
 ROOTLIBDIR=	$(ROOT)/usr/ucblib
 ROOTLIBDIR64=   $(ROOT)/usr/ucblib/$(MACH64)
 
-LINTSRC= $(LINTLIB:%.ln=%)
-$(LINTLIB):= SRCS=../$(LINTSRC)
-
-CPPFLAGS = -I$(ROOT)/usr/ucbinclude -I../../../lib/libc/inc $(CPPFLAGS.master)
+CPPFLAGS = -I$(SRC)/ucbhead -I../../../lib/libc/inc $(CPPFLAGS.master)
 
 .KEEP_STATE:
 
@@ -62,6 +57,3 @@ lint: lintcheck
 include $(SRC)/lib/Makefile.targ
 include ../../Makefile.ucbtarg
 
-# install rule for lint library target
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)

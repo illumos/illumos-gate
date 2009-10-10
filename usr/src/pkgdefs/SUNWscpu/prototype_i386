@@ -62,13 +62,3 @@ s none usr/ucblib/amd64/libtermcap.so=./libtermcap.so.1
 f none usr/ucblib/amd64/libtermcap.so.1 755 root bin
 s none usr/ucblib/amd64/libucb.so=./libucb.so.1
 f none usr/ucblib/amd64/libucb.so.1 755 root bin
-# XX64 - fix me
-f none usr/ucblib/amd64/llib-lcurses 644 root bin
-f none usr/ucblib/amd64/llib-lcurses.ln 644 root bin
-f none usr/ucblib/amd64/llib-ldbm 644 root bin
-f none usr/ucblib/amd64/llib-ldbm.ln 644 root bin
-f none usr/ucblib/amd64/llib-lrpcsoc.ln 644 root bin
-f none usr/ucblib/amd64/llib-ltermcap 644 root bin
-f none usr/ucblib/amd64/llib-ltermcap.ln 644 root bin
-f none usr/ucblib/amd64/llib-lucb 644 root bin
-f none usr/ucblib/amd64/llib-lucb.ln 644 root bin

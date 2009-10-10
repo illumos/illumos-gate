@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libcurses.a
@@ -76,21 +74,7 @@ include $(SRC)/lib/Makefile.lib
 ROOTLIBDIR=	$(ROOT)/usr/ucblib
 ROOTLIBDIR64=	$(ROOT)/usr/ucblib/$(MACH64)
 
-LIBS = $(DYNLIB) $(LINTLIB)
-
-LINTSRC= $(LINTLIB:%.ln=%)
-ROOTLINTDIR= $(ROOTLIBDIR)
-ROOTLINTDIR64= $(ROOTLIBDIR)/$(MACH64)
-ROOTLINT= $(LINTSRC:%=$(ROOTLINTDIR)/%)
-ROOTLINT64= $(LINTSRC:%=$(ROOTLINTDIR64)/%)
-
-# install rule for lint source file target
-$(ROOTLINTDIR)/%: ../%
-	$(INS.file)
-$(ROOTLINTDIR64)/%: ../%
-	$(INS.file)
-
-$(LINTLIB):= SRCS=../llib-lcurses
+LIBS = $(DYNLIB)
 
 CFLAGS	+=	$(CCVERBOSE)
 CFLAGS64 +=	$(CCVERBOSE)
@@ -99,7 +83,7 @@ DYNFLAGS32 =	-R/usr/ucblib
 DYNFLAGS64 =	-R/usr/ucblib/$(MACH64)
 LDLIBS +=	-ltermcap -lucb -lc
 
-CPPFLAGS = -I$(ROOT)/usr/ucbinclude -I../../../lib/libc/inc $(CPPFLAGS.master)
+CPPFLAGS = -I$(SRC)/ucbhead -I../../../lib/libc/inc $(CPPFLAGS.master)
 
 .KEEP_STATE:
 

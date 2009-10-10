@@ -474,8 +474,6 @@ COMMON_SUBDIRS= \
 	SUNWspnego \
 	SUNWspsvr \
 	SUNWspsvu \
-	SUNWsra  \
-	SUNWsrh  \
 	SUNWsrptr  \
 	SUNWsrptu  \
 	SUNWsshcu \

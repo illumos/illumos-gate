@@ -60,12 +60,3 @@ s none usr/ucblib/sparcv9/libtermcap.so=./libtermcap.so.1
 f none usr/ucblib/sparcv9/libtermcap.so.1 755 root bin
 s none usr/ucblib/sparcv9/libucb.so=./libucb.so.1
 f none usr/ucblib/sparcv9/libucb.so.1 755 root bin
-f none usr/ucblib/sparcv9/llib-lcurses 644 root bin
-f none usr/ucblib/sparcv9/llib-lcurses.ln 644 root bin
-f none usr/ucblib/sparcv9/llib-ldbm 644 root bin
-f none usr/ucblib/sparcv9/llib-ldbm.ln 644 root bin
-f none usr/ucblib/sparcv9/llib-lrpcsoc.ln 644 root bin
-f none usr/ucblib/sparcv9/llib-ltermcap 644 root bin
-f none usr/ucblib/sparcv9/llib-ltermcap.ln 644 root bin
-f none usr/ucblib/sparcv9/llib-lucb 644 root bin
-f none usr/ucblib/sparcv9/llib-lucb.ln 644 root bin

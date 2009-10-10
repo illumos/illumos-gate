@@ -42,7 +42,7 @@ i386_SUBDIRS= psm grub
 
 SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 
-HDRSUBDIRS=	uts head lib cmd ucbhead
+HDRSUBDIRS=	uts head lib cmd
 
 # UCB headers are bug-for-bug compatible and not checkable against the header
 # standards.
@@ -52,7 +52,7 @@ CHKHDRSUBDIRS=	head uts lib
 #
 # Headers that can be built in parallel
 #
-PARALLEL_HEADERS = sysheaders userheaders libheaders ucbheaders cmdheaders
+PARALLEL_HEADERS = sysheaders userheaders libheaders cmdheaders
 
 #
 # Directories that can be built in parallel
@@ -150,13 +150,13 @@ closedbins: FRC $(ROOTDIRS)
 .PARALLEL: $(PARALLEL_HEADERS) DUMMY
 .PARALLEL: $(PARALLEL_DIRS) DUMMY
 
-$(SUBDIRS) head ucbhead pkgdefs: FRC
+$(SUBDIRS) head pkgdefs: FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 # librpcsvc has a dependency on headers installed by
 # userheaders, hence the .WAIT before libheaders.
 sgs: rootdirs .WAIT sysheaders userheaders .WAIT \
-	libheaders ucbheaders cmdheaders
+	libheaders cmdheaders
 
 #
 # Top-level setup target to setup the development environment that includes
@@ -192,9 +192,6 @@ libheaders: FRC
 
 sysheaders: FRC
 	@cd uts; pwd; $(MAKE) install_h
-
-ucbheaders: FRC
-	@cd ucbhead; pwd; $(MAKE) install_h
 
 cmdheaders: FRC
 	@cd cmd/fm; pwd; $(MAKE) install_h

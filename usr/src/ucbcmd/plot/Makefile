@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=	tek t4013 t300 t300s t450 aedplot bgplot dumbplot gigiplot \
@@ -50,7 +48,7 @@ include ../Makefile.ucbcmd
 
 FILEMODE=	755
 
-INC1 = $(ROOT)/usr/ucbinclude
+INC1 = $(SRC)/ucbhead
 
 LDFLAGS +=  -L$(ROOT)/usr/ucblib -R /usr/ucblib
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,14 +37,12 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 
 #include <sys/types.h>
 #include "file64.h"
 #include <stdio.h>
-#include <fcntl.h>
+#include <sys/fcntl.h>
 #include <unistd.h>
 #include <sys/file.h>
 #include "stdiom.h"
