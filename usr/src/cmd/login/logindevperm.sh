@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -34,7 +34,7 @@
 
 cat <<EOM
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # /etc/logindevperm - login-based device permissions
@@ -60,6 +60,17 @@ cat <<EOM
 #
 # console	mode	devices
 #
+/dev/console	0600	/dev/mouse:/dev/kbd
+/dev/console	0600	/dev/sound/*		# audio devices
+/dev/console	0600	/dev/fbs/*		# frame buffers
+/dev/console	0600	/dev/dri/*		# dri devices
+/dev/console	0400	/dev/removable-media/dsk/*	# removable media
+/dev/console	0400	/dev/removable-media/rdsk/*	# removable media
+/dev/console	0400	/dev/hotpluggable/dsk/*		# hotpluggable storage
+/dev/console	0400	/dev/hotpluggable/rdsk/*	# hotpluggable storage
+/dev/console	0600	/dev/video[0-9]+	# video devices
+/dev/console	0600	/dev/usb/hid[0-9]+	# hid devices should have the same permission with conskbd and consms
+/dev/console	0600	/dev/usb/[0-9a-f]+[.][0-9a-f]+/[0-9]+/* driver=scsa2usb,usb_mid,usbprn,ugen	#libusb/ugen devices
 /dev/vt/active	0600	/dev/mouse:/dev/kbd
 /dev/vt/active	0600	/dev/sound/*		# audio devices
 /dev/vt/active	0600	/dev/fbs/*		# frame buffers
