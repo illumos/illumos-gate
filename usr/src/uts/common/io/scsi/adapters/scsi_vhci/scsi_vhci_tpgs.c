@@ -34,7 +34,7 @@
 /*
  * External function definitions
  */
-extern void vhci_mpapi_update_tpg_data(struct scsi_address *, char *);
+extern void vhci_mpapi_update_tpg_data(struct scsi_address *, char *, int);
 
 
 
@@ -556,7 +556,8 @@ try_again:
 					*pstate = STD_UNAVAILABLE;
 					*preferred = PCLASS_NONPREFERRED;
 				}
-				vhci_mpapi_update_tpg_data(ap, mpapi_ptr);
+				vhci_mpapi_update_tpg_data(ap, mpapi_ptr,
+				    rel_tgt_port);
 				kmem_free((void *)bufp, len);
 				scsi_destroy_pkt(pkt);
 				return (0);

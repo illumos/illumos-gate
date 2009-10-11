@@ -63,7 +63,7 @@ int vhci_mpapi_get_vhci(dev_info_t *, void *);
 void vhci_mpapi_set_path_state(dev_info_t *, mdi_pathinfo_t *, int);
 void vhci_mpapi_synthesize_tpg_data(struct scsi_vhci *, scsi_vhci_lun_t *,
     mdi_pathinfo_t *);
-void vhci_mpapi_update_tpg_data(struct scsi_address *, char *);
+void vhci_mpapi_update_tpg_data(struct scsi_address *, char *, int);
 int vhci_mpapi_update_tpg_acc_state_for_lu(struct scsi_vhci *,
     scsi_vhci_lun_t *);
 
@@ -3368,7 +3368,8 @@ vhci_mpapi_synthesize_tpg_data(struct scsi_vhci *vhci, scsi_vhci_lun_t *vlun,
  */
 /* ARGSUSED */
 void
-vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
+vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr,
+    int rel_tgt_port)
 {
 	struct scsi_vhci_lun	*vlun;
 	struct scsi_vhci	*vhci;
@@ -3639,6 +3640,11 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
 		rel_tid = 0;
 		rel_tid |= ((ptr[2] & 0Xff) << 8);
 		rel_tid |= (ptr[3] & 0xff);
+
+		if (rel_tid != rel_tgt_port) {
+			ptr += 4;
+			continue;
+		}
 
 		VHCI_DEBUG(4, (CE_NOTE, NULL, "vhci_mpapi_update_tpg_data: "
 		    "TgtPort=%s, RelTgtPort=%x\n", tgt_port, rel_tid));
