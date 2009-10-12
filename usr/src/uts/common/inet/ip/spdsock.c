@@ -2151,13 +2151,11 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 					active = (spmsg->spd_msg_spdid ==
 					    SPD_ACTIVE);
 					audit_pf_policy(SPD_CLONE, cr,
-					    ns, ITP_NAME(itp), active, ENOENT,
-					    cpid);
+					    ns, NULL, active, ENOENT, cpid);
 				}
 				return;
 			}
 			spdsock_clone_node(itp, &error, NULL);
-			ITP_REFRELE(itp, ns);
 			if (audit_active) {
 				boolean_t active;
 				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
@@ -2169,6 +2167,7 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 				audit_pf_policy(SPD_CLONE, cr, ns,
 				    ITP_NAME(itp), active, error, cpid);
 			}
+			ITP_REFRELE(itp, ns);
 		}
 	} else {
 		error = ipsec_clone_system_policy(ns);

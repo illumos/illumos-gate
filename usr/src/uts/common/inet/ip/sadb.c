@@ -6597,6 +6597,8 @@ ipsec_tun_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 	int err;
 	ipsec_policy_head_t *polhead;
 
+	*diagnostic = 0;
+
 	/* Check for inner selectors and act appropriately */
 
 	if (innsrcext != NULL) {
@@ -6734,7 +6736,7 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 	ipsec_tun_pol_t *itp = NULL;
 	ipsec_policy_t *pp = NULL;
 	ipsec_selector_t sel, isel;
-	mblk_t *retmp;
+	mblk_t *retmp = NULL;
 	ip_stack_t	*ipst = ns->netstack_ip;
 
 	/* Normalize addresses */
@@ -6884,19 +6886,16 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 	if (pp != NULL) {
 		IPPOL_REFRELE(pp, ns);
 	}
+	ASSERT(err == 0 && diagnostic == 0);
+	if (retmp == NULL)
+		err = ENOMEM;
+bail:
 	if (itp != NULL) {
 		ITP_REFRELE(itp, ns);
 	}
-	if (retmp != NULL) {
-		return (retmp);
-	} else {
-		err = ENOMEM;
-		diagnostic = 0;
-	}
-bail:
 	samsg->sadb_msg_errno = (uint8_t)err;
 	samsg->sadb_x_msg_diagnostic = (uint16_t)diagnostic;
-	return (NULL);
+	return (retmp);
 }
 
 /*
