@@ -7987,6 +7987,39 @@ mondo_loop() {
 	rm -f $root/platform/i86pc/kernel/drv/amd64/amd_iommu
 
 	#
+	# Remove the UCB headers and lint libraries
+	#
+	rm -rf $usr/ucbinclude
+	rm -f $usr/ucblib/llib-lcurses
+	rm -f $usr/ucblib/llib-lcurses.ln
+	rm -f $usr/ucblib/llib-ldbm
+	rm -f $usr/ucblib/llib-ldbm.ln
+	rm -f $usr/ucblib/llib-lrpcsoc
+	rm -f $usr/ucblib/llib-lrpcsoc.ln
+	rm -f $usr/ucblib/llib-ltermcap
+	rm -f $usr/ucblib/llib-ltermcap.ln
+	rm -f $usr/ucblib/llib-lucb
+	rm -f $usr/ucblib/llib-lucb.ln
+	rm -f $usr/ucblib/amd64/llib-lcurses
+	rm -f $usr/ucblib/amd64/llib-lcurses.ln
+	rm -f $usr/ucblib/amd64/llib-ldbm
+	rm -f $usr/ucblib/amd64/llib-ldbm.ln
+	rm -f $usr/ucblib/amd64/llib-lrpcsoc.ln
+	rm -f $usr/ucblib/amd64/llib-ltermcap
+	rm -f $usr/ucblib/amd64/llib-ltermcap.ln
+	rm -f $usr/ucblib/amd64/llib-lucb
+	rm -f $usr/ucblib/amd64/llib-lucb.ln
+	rm -f $usr/ucblib/sparcv9/llib-lcurses
+	rm -f $usr/ucblib/sparcv9/llib-lcurses.ln
+	rm -f $usr/ucblib/sparcv9/llib-ldbm
+	rm -f $usr/ucblib/sparcv9/llib-ldbm.ln
+	rm -f $usr/ucblib/sparcv9/llib-lrpcsoc.ln
+	rm -f $usr/ucblib/sparcv9/llib-ltermcap
+	rm -f $usr/ucblib/sparcv9/llib-ltermcap.ln
+	rm -f $usr/ucblib/sparcv9/llib-lucb
+	rm -f $usr/ucblib/sparcv9/llib-lucb.ln
+
+	#
 	# The pkg* commands should not be used after this point and before
 	# archive extraction as libcrypto/libssl may not be available.
 	#
