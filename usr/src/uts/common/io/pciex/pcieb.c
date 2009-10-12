@@ -539,8 +539,17 @@ pcieb_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 			return (DDI_SUCCESS);
 
 		case DDI_POST:
-			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
-				pcie_pm_release(dip);
+			if (as->cmd == DDI_ATTACH &&
+			    as->result != DDI_SUCCESS) {
+				/*
+				 * Attach failed for the child device. The child
+				 * driver may have made PM calls before the
+				 * attach failed. pcie_pm_remove_child() should
+				 * cleanup PM state and holds (if any)
+				 * associated with the child device.
+				 */
+				return (pcie_pm_remove_child(dip, rdip));
+			}
 
 			if (as->result == DDI_SUCCESS) {
 				pf_init(rdip, (void *)pcieb->pcieb_fm_ibc,

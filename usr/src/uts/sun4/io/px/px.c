@@ -1238,8 +1238,17 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		case DDI_POST:
 			DBG(DBG_PWR, dip, "POST_ATTACH for %s@%d\n",
 			    ddi_driver_name(rdip), ddi_get_instance(rdip));
-			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
-				pcie_pm_release(dip);
+			if (as->cmd == DDI_ATTACH &&
+			    as->result != DDI_SUCCESS) {
+				/*
+				 * Attach failed for the child device. The child
+				 * driver may have made PM calls before the
+				 * attach failed. pcie_pm_remove_child() should
+				 * cleanup PM state and holds (if any)
+				 * associated with the child device.
+				 */
+				return (pcie_pm_remove_child(dip, rdip));
+			}
 
 			if (as->result == DDI_SUCCESS)
 				pf_init(rdip, (void *)px_p->px_fm_ibc, as->cmd);
