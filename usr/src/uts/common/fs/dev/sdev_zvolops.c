@@ -46,7 +46,7 @@ static size_t devzvol_zclist_size;
 static ldi_ident_t devzvol_li;
 static ldi_handle_t devzvol_lh;
 static kmutex_t devzvol_mtx;
-static int devzvol_isopen;
+static boolean_t devzvol_isopen;
 
 /*
  * we need to use ddi_mod* since fs/dev gets loaded early on in
@@ -120,9 +120,9 @@ devzvol_handle_ioctl(int cmd, zfs_cmd_t *zc, size_t *alloc_size)
 
 	if (cmd != ZFS_IOC_POOL_CONFIGS)
 		mutex_enter(&devzvol_mtx);
-	if (devzvol_isopen == 0) {
+	if (!devzvol_isopen) {
 		if ((rc = devzvol_open_zfs()) == 0) {
-			devzvol_isopen++;
+			devzvol_isopen = B_TRUE;
 		} else {
 			if (cmd != ZFS_IOC_POOL_CONFIGS)
 				mutex_exit(&devzvol_mtx);
@@ -366,10 +366,10 @@ devzvol_create_pool_dirs(struct vnode *dvp)
 	}
 	nvlist_free(nv);
 	mutex_enter(&devzvol_mtx);
-	if (pools == 0) {
+	if (devzvol_isopen && pools == 0) {
 		/* clean up so zfs can be unloaded */
 		devzvol_close_zfs();
-		devzvol_isopen--;
+		devzvol_isopen = B_FALSE;
 	}
 out:
 	mutex_exit(&devzvol_mtx);
