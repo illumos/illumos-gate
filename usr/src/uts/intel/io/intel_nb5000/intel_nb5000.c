@@ -1256,11 +1256,12 @@ log_nf_fbd_err(nb_regs_t *rp, int willpanic, int *interpose)
 	}
 }
 
-static void
+static int
 log_nf_mem_err(nb_regs_t *rp, int willpanic, int *interpose)
 {
 	int channel, branch;
 	int t = 0;
+	int rt = 0;
 
 	rp->flag = NB_REG_LOG_NF_MEM;
 
@@ -1311,6 +1312,14 @@ log_nf_mem_err(nb_regs_t *rp, int willpanic, int *interpose)
 			SPCPS_WR(branch);
 		}
 	}
+	if (nb_mode == NB_MEMORY_SINGLE_CHANNEL && channel != 0) {
+		/*
+		 * In the single channel mode, all dimms are on the channel 0.
+		 * Invalidate this error if the channel number is invalid.
+		 */
+		rt = 1;
+	}
+	return (rt);
 }
 
 static void
@@ -1332,7 +1341,7 @@ log_ferr(uint64_t ferr, uint32_t *nerrp, nb_logout_t *log, int willpanic)
 		log_nf_fbd_err(rp, willpanic, &interpose);
 		*nerrp = nerr & ~GE_NERR_FBD_NF;
 	} else if ((ferr & GE_MEM_NF) != 0) {
-		log_nf_mem_err(rp, willpanic, &interpose);
+		spurious = log_nf_mem_err(rp, willpanic, &interpose);
 		*nerrp = nerr & ~GE_NERR_MEM_NF;
 	} else if ((ferr & (GE_FERR_FSB_FATAL | GE_FERR_FSB_NF)) != 0) {
 		log_fsb_err(ferr, rp, willpanic, &interpose);
@@ -1378,7 +1387,7 @@ log_nerr(uint32_t *errp, nb_logout_t *log, int willpanic)
 		log_nf_fbd_err(rp, willpanic, &interpose);
 		*errp = err & ~GE_NERR_FBD_NF;
 	} else if ((err & GE_NERR_MEM_NF) != 0) {
-		log_nf_mem_err(rp, willpanic, &interpose);
+		spurious = log_nf_mem_err(rp, willpanic, &interpose);
 		*errp = err & ~GE_NERR_MEM_NF;
 	} else if ((err & (GE_NERR_FSB_FATAL | GE_NERR_FSB_NF)) != 0) {
 		log_fsb_err(GE_NERR_TO_FERR_FSB(err), rp, willpanic,
