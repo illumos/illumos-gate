@@ -567,7 +567,7 @@ fcoei_attach_init(fcoei_soft_state_t *ss)
 
 fail_minor_node:
 	FCOEI_LOG(__FUNCTION__, "fail_minor_node");
-	fc_fca_detach(ss->ss_dip);
+	(void) fc_fca_detach(ss->ss_dip);
 
 fail_fca_attach:
 	eport->eport_deregister_client(eport);
@@ -793,7 +793,7 @@ fcoei_clear_watchdog_jobs(fcoei_soft_state_t *ss)
 	mod_hash_clear(ss->ss_sol_oxid_hash);
 
 	while (!list_is_empty(&ss->ss_comp_xch_list)) {
-		list_remove_head(&ss->ss_comp_xch_list);
+		(void) list_remove_head(&ss->ss_comp_xch_list);
 	}
 	mutex_exit(&ss->ss_watchdog_mutex);
 }
@@ -1106,12 +1106,12 @@ fcoei_complete_xch(fcoei_exchange_t *xch, fcoe_frame_t *frm,
 	 * If xch is in hash table, we need remove it
 	 */
 	if (xch->xch_flags & XCH_FLAG_IN_SOL_HASH) {
-		mod_hash_remove(xch->xch_ss->ss_sol_oxid_hash,
+		(void) mod_hash_remove(xch->xch_ss->ss_sol_oxid_hash,
 		    FMHK(xch->xch_oxid), &val);
 		ASSERT((fcoei_exchange_t *)val == xch);
 		xch->xch_flags &= ~XCH_FLAG_IN_SOL_HASH;
 	} else if (xch->xch_flags & XCH_FLAG_IN_UNSOL_HASH) {
-		mod_hash_remove(xch->xch_ss->ss_unsol_rxid_hash,
+		(void) mod_hash_remove(xch->xch_ss->ss_unsol_rxid_hash,
 		    FMHK(xch->xch_rxid), &val);
 		ASSERT((fcoei_exchange_t *)val == xch);
 		xch->xch_flags &= ~XCH_FLAG_IN_UNSOL_HASH;

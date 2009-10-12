@@ -199,7 +199,8 @@ fcoet_send_cmd_response(fct_cmd_t *cmd, uint32_t ioflags)
 
 send_cmd_rsp_error:
 	(void) snprintf(info, 160, "fcoet_send_cmd_response: can not handle "
-	    "FCT_IOF_FORCE_FCA_DONE for cmd %p, ioflags-%x", cmd, ioflags);
+	    "FCT_IOF_FORCE_FCA_DONE for cmd %p, ioflags-%x", (void *)cmd,
+	    ioflags);
 	info[159] = 0;
 	(void) fct_port_shutdown(CMD2SS(cmd)->ss_port,
 	    STMF_RFLAG_FATAL_ERROR | STMF_RFLAG_RESET, info);

@@ -199,7 +199,7 @@ _init(void)
 		mutex_init(&fcoet_mutex, 0, MUTEX_DRIVER, 0);
 		ret = mod_install(&modlinkage);
 		if (ret) {
-			stmf_deregister_port_provider(fcoet_pp);
+			(void) stmf_deregister_port_provider(fcoet_pp);
 			stmf_free(fcoet_pp);
 			mutex_destroy(&fcoet_mutex);
 			ddi_soft_state_fini(&fcoet_state);
@@ -217,7 +217,7 @@ _fini(void)
 
 	ret = mod_remove(&modlinkage);
 	if (ret == 0) {
-		stmf_deregister_port_provider(fcoet_pp);
+		(void) stmf_deregister_port_provider(fcoet_pp);
 		stmf_free(fcoet_pp);
 		mutex_destroy(&fcoet_mutex);
 		ddi_soft_state_fini(&fcoet_state);

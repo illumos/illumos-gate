@@ -596,7 +596,7 @@ fcoei_process_sol_fcp_resp(fcoe_frame_t *frm)
 	/*
 	 * Update the exchange and hash table
 	 */
-	mod_hash_remove(FRM2SS(frm)->ss_sol_oxid_hash,
+	(void) mod_hash_remove(FRM2SS(frm)->ss_sol_oxid_hash,
 	    FMHK(xch->xch_oxid), &val);
 	ASSERT((fcoei_exchange_t *)val == xch);
 	xch->xch_flags &= ~XCH_FLAG_IN_SOL_HASH;
