@@ -19,9 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * DoPrinterView class
@@ -223,7 +222,7 @@ public class DoPrinterView {
 	o = o.concat("\n");
 
 	comment = getToken(o, "\tDescription:");
-	if (comment.equals("")) {
+	if (comment == null || comment.equals("")) {
 		comment = null;
 	}
 
@@ -415,7 +414,7 @@ public class DoPrinterView {
 	// If the device is in URI form (scheme:// ...), set the protocol
 	// for the "network attached" modify screen.
 	//
-	if (device.indexOf("://") != -1) {
+	if (device != null && device.indexOf("://") != -1) {
 		protocol = "uri";
 		destination = device;
 		device = null;
