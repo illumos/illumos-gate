@@ -187,7 +187,7 @@ e inittab etc/inittab 644 root sys
 s none etc/install=../usr/sbin/install
 e preserve etc/ioctl.syscon 644 root sys
 s none etc/killall=../usr/sbin/killall
-e renamenew etc/ksh.kshrc 644 root sys
+e renameold etc/ksh.kshrc 644 root sys
 s none etc/labelit=../usr/sbin/labelit
 d none etc/lib 755 root sys
 s none etc/lib/ld.so.1=../../lib/ld.so.1
