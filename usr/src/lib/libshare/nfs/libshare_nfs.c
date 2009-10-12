@@ -1913,6 +1913,10 @@ nfs_enable_share(sa_share_t share)
 			sa_sharetab_fill_zfs(share, &sh, "nfs");
 			err = sa_share_zfs(share, NULL, path, &sh,
 			    &ea, ZFS_SHARE_NFS);
+			if (err != SA_OK) {
+				errno = err;
+				err = -1;
+			}
 			sa_emptyshare(&sh);
 		}
 	} else {
@@ -2028,6 +2032,10 @@ nfs_disable_share(sa_share_t share, char *path)
 
 		err = sa_share_zfs(share, NULL, path, &sh,
 		    &ea, ZFS_UNSHARE_NFS);
+		if (err != SA_OK) {
+			errno = err;
+			err = -1;
+		}
 	} else {
 		err = exportfs(path, NULL);
 	}
@@ -2048,8 +2056,8 @@ nfs_disable_share(sa_share_t share, char *path)
 		case ENOENT:
 			ret = SA_NO_SUCH_PATH;
 			break;
-			default:
-				ret = SA_SYSTEM_ERR;
+		default:
+			ret = SA_SYSTEM_ERR;
 			break;
 		}
 	}

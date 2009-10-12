@@ -479,6 +479,10 @@ smb_enable_share(sa_share_t share)
 			sa_sharetab_fill_zfs(share, &sh, "smb");
 			err = sa_share_zfs(share, resource, (char *)path, &sh,
 			    &si, ZFS_SHARE_SMB);
+			if (err != SA_OK) {
+				errno = err;
+				err = -1;
+			}
 			sa_emptyshare(&sh);
 		}
 	}
@@ -659,11 +663,12 @@ smb_disable_share(sa_share_t share, char *path)
 	sa_group_t parent;
 	boolean_t iszfs;
 	int err = SA_OK;
+	int ret = SA_OK;
 	sa_handle_t handle;
 	boolean_t first = B_TRUE; /* work around sharetab issue */
 
 	if (path == NULL)
-		return (err);
+		return (ret);
 
 	/*
 	 * If the share is in a ZFS group we need to handle it
@@ -677,7 +682,7 @@ smb_disable_share(sa_share_t share, char *path)
 		goto done;
 
 	for (resource = sa_get_share_resource(share, NULL);
-	    resource != NULL || err != SA_OK;
+	    resource != NULL;
 	    resource = sa_get_next_resource(resource)) {
 		rname = sa_get_resource_attr(resource, "name");
 		if (rname == NULL) {
@@ -700,19 +705,36 @@ smb_disable_share(sa_share_t share, char *path)
 			sa_sharetab_fill_zfs(share, &sh, "smb");
 			err = sa_share_zfs(share, resource, (char *)path, &sh,
 			    rname, ZFS_UNSHARE_SMB);
-			/*
-			 * If we are no longer the first case, we
-			 * don't care about the sa_share_zfs err if it
-			 * is -1. This works around a problem in
-			 * sharefs and should be removed when sharefs
-			 * supports multiple entries per path.
-			 */
-			if (!first && err == -1)
-				err = SA_OK;
+			if (err != SA_OK) {
+				switch (err) {
+				case EINVAL:
+				case ENOENT:
+					err = SA_OK;
+					break;
+				default:
+					/*
+					 * If we are no longer the first case,
+					 * we don't care about the sa_share_zfs
+					 * err if it is -1. This works around
+					 * a problem in sharefs and should be
+					 * removed when sharefs supports
+					 * multiple entries per path.
+					 */
+					if (!first)
+						err = SA_OK;
+					else
+						err = SA_SYSTEM_ERR;
+					break;
+				}
+			}
+
 			first = B_FALSE;
 
 			sa_emptyshare(&sh);
 		}
+
+		if (err != SA_OK)
+			ret = err;
 		sa_free_attr_string(rname);
 	}
 done:
@@ -721,9 +743,9 @@ done:
 		if (handle != NULL)
 			(void) sa_delete_sharetab(handle, path, "smb");
 		else
-			err = SA_SYSTEM_ERR;
+			ret = SA_SYSTEM_ERR;
 	}
-	return (err);
+	return (ret);
 }
 
 /*

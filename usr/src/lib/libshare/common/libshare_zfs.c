@@ -28,6 +28,7 @@
 #include <libzfs.h>
 #include <string.h>
 #include <strings.h>
+#include <errno.h>
 #include <libshare.h>
 #include "libshare_impl.h"
 #include <libintl.h>
@@ -1264,10 +1265,10 @@ sa_share_zfs(sa_share_t share, sa_resource_t resource, char *path, share_t *sh,
 	 * First find the dataset name
 	 */
 	if ((group = sa_get_parent_group(share)) == NULL)  {
-		return (SA_SYSTEM_ERR);
+		return (EINVAL);
 	}
 	if ((sahandle = sa_find_group_handle(group)) == NULL) {
-		return (SA_SYSTEM_ERR);
+		return (EINVAL);
 	}
 
 	/*
@@ -1305,7 +1306,7 @@ sa_share_zfs(sa_share_t share, sa_resource_t resource, char *path, share_t *sh,
 				*p = '\0';
 			}
 		} else {
-			return (SA_SYSTEM_ERR);
+			return (EINVAL);
 		}
 	}
 
@@ -1338,6 +1339,8 @@ sa_share_zfs(sa_share_t share, sa_resource_t resource, char *path, share_t *sh,
 		    resource_name, exportdata, sh, i, operation);
 		if (err == SA_OK)
 			sa_update_sharetab_ts(sahandle);
+		else
+			err = errno;
 		if (resource_name)
 			sa_free_attr_string(resource_name);
 
