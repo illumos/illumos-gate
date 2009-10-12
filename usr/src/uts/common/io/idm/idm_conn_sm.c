@@ -458,6 +458,7 @@ idm_state_s2_xpt_wait(idm_conn_t *ic, idm_conn_event_ctx_t *event_ctx)
 		/* T4 */
 		idm_update_state(ic, CS_S4_IN_LOGIN, event_ctx);
 		break;
+	case CE_TRANSPORT_FAIL:
 	case CE_CONNECT_FAIL:
 	case CE_LOGOUT_OTHER_CONN_RCV:
 	case CE_TX_PROTOCOL_ERROR:
@@ -1127,6 +1128,7 @@ idm_update_state(idm_conn_t *ic, idm_conn_state_t new_state,
 		break;
 	case CS_S4_IN_LOGIN:
 		if (ic->ic_conn_type == CONN_TYPE_INI) {
+			(void) idm_notify_client(ic, CN_READY_FOR_LOGIN, NULL);
 			mutex_enter(&ic->ic_state_mutex);
 			ic->ic_state_flags |= CF_LOGIN_READY;
 			cv_signal(&ic->ic_state_cv);
@@ -1503,6 +1505,7 @@ idm_notify_client(idm_conn_t *ic, idm_client_notify_t cn, uintptr_t data)
 	 * for now lets just call the client's notify function and return
 	 * the status.
 	 */
+	ASSERT(!mutex_owned(&ic->ic_state_mutex));
 	cn = (cn > CN_MAX) ? CN_MAX : cn;
 	IDM_SM_LOG(CE_NOTE, "idm_notify_client: ic=%p %s(%d)\n",
 	    (void *)ic, idm_cn_strings[cn], cn);

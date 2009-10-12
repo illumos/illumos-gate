@@ -47,6 +47,7 @@
 #define	ISCSI_CMD_SM_STRINGS
 #define	ISCSI_ICS_NAMES
 #define	ISCSI_LOGIN_STATE_NAMES
+#define	IDM_CN_NOTIFY_STRINGS
 #include <sys/idm/idm.h>
 #include <iscsi.h>
 #include <iscsit.h>
@@ -160,6 +161,7 @@ static const char *iscsi_iscsit_login_state(unsigned int state);
 static const char *iscsi_iscsi_cmd_state(unsigned int state);
 static const char *iscsi_iscsi_sess_state(unsigned int state);
 static const char *iscsi_iscsi_conn_state(unsigned int state);
+static const char *iscsi_iscsi_conn_event(unsigned int event);
 static const char *iscsi_iscsi_login_state(unsigned int state);
 
 static void iscsi_format_timestamp(char *ts_str, int strlen,
@@ -1809,6 +1811,12 @@ iscsi_sm_audit_impl(uintptr_t addr)
 				event_name=
 				    iscsi_iscsi_sess_event(sar->sar_event);
 				break;
+			case SAS_ISCSI_CONN:
+				state_name =
+				    iscsi_iscsi_conn_state(sar->sar_state);
+				event_name=
+				    iscsi_iscsi_conn_event(sar->sar_event);
+				break;
 			default:
 				state_name = event_name = "N/A";
 				break;
@@ -1938,6 +1946,13 @@ static const char *
 iscsi_idm_conn_state(unsigned int state)
 {
 	return ((state < CS_MAX_STATE) ? idm_cs_name[state] : "N/A");
+}
+
+static const char *
+iscsi_iscsi_conn_event(unsigned int event)
+{
+
+	return ((event < CN_MAX) ? idm_cn_strings[event] : "N/A");
 }
 
 /*ARGSUSED*/
