@@ -371,6 +371,8 @@ void stmf_wwn_to_devid_desc(struct scsi_devid_desc *sdid, uint8_t *wwn,
     uint8_t protocol_id);
 stmf_status_t stmf_scsilib_uniq_lu_id(uint32_t company_id,
     struct scsi_devid_desc *lu_id);
+stmf_status_t stmf_scsilib_uniq_lu_id2(uint32_t company_id, uint32_t host_id,
+    struct scsi_devid_desc *lu_id);
 void stmf_scsilib_send_status(scsi_task_t *task, uint8_t st, uint32_t saa);
 uint32_t stmf_scsilib_prepare_vpd_page83(scsi_task_t *task, uint8_t *page,
 		uint32_t page_len, uint8_t byte0, uint32_t vpd_mask);

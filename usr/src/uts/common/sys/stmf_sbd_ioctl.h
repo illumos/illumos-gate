@@ -88,6 +88,7 @@ typedef struct sbd_create_and_reg_lu {
 			slu_mgmt_url_valid:1,
 			slu_guid_valid:1,
 			slu_company_id_valid:1,
+			slu_host_id_valid:1,
 			slu_writeback_cache_disable_valid:1,
 			slu_writeback_cache_disable:1,
 			slu_write_protected:1;
@@ -101,7 +102,7 @@ typedef struct sbd_create_and_reg_lu {
 	uint32_t	slu_company_id;
 	uint16_t	slu_alias_off;
 	uint16_t	slu_mgmt_url_off;
-	uint32_t	slu_rsvd1;
+	uint32_t	slu_host_id;
 	char		slu_rev[4];
 	char		slu_vid[8];
 	char		slu_pid[16];

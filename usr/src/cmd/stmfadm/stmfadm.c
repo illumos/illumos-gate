@@ -127,6 +127,7 @@ static int convertCharToPropId(char *, uint32_t *);
 #define	BLOCK_SIZE		    "BLK"
 #define	SERIAL_NUMBER		    "SERIAL"
 #define	MGMT_URL		    "MGMT-URL"
+#define	HOST_ID			    "HOST-ID"
 
 #define	MODIFY_HELP "\n"\
 "Description: Modify properties of a logical unit. \n" \
@@ -145,6 +146,8 @@ static int convertCharToPropId(char *, uint32_t *);
 "     alias    - alias for logical unit (up to 255 chars)\n" \
 "     blk      - block size in bytes in 2^n\n" \
 "     guid     - 32 ascii hex characters in NAA format \n" \
+"     host-id  - host identifier to be used for GUID generation \n" \
+"                8 ascii hex characters\n" \
 "     meta     - separate meta data file name\n" \
 "     mgmt-url - Management URL address\n" \
 "     oui      - organizational unique identifier\n" \
@@ -1287,6 +1290,8 @@ convertCharToPropId(char *prop, uint32_t *propId)
 		*propId = STMF_LU_PROP_META_FILENAME;
 	} else if (strcasecmp(prop, MGMT_URL) == 0) {
 		*propId = STMF_LU_PROP_MGMT_URL;
+	} else if (strcasecmp(prop, HOST_ID) == 0) {
+		*propId = STMF_LU_PROP_HOST_ID;
 	} else {
 		return (1);
 	}

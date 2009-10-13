@@ -59,7 +59,9 @@
 #define	LU_ASCII_GUID_SIZE 32
 #define	LU_GUID_SIZE 16
 #define	OUI_ASCII_SIZE 6
+#define	HOST_ID_ASCII_SIZE 8
 #define	OUI_SIZE 3
+#define	HOST_ID_SIZE 4
 #define	IDENT_LENGTH_BYTE 3
 
 /* various initial allocation values */
@@ -1239,6 +1241,11 @@ createDiskLu(diskResource *disk, stmfGuid *createdGuid)
 	if (disk->companyIdValid) {
 		sbdLu->slu_company_id_valid = 1;
 		sbdLu->slu_company_id = disk->companyId;
+	}
+
+	if (disk->hostIdValid) {
+		sbdLu->slu_host_id_valid = 1;
+		sbdLu->slu_host_id = disk->hostId;
 	}
 
 	if (disk->blkSizeValid) {
@@ -2589,7 +2596,9 @@ setDiskProp(luResourceImpl *hdl, uint32_t resourceProp, const char *propVal)
 	unsigned long long numericProp = 0;
 	char guidProp[LU_ASCII_GUID_SIZE + 1];
 	char ouiProp[OUI_ASCII_SIZE + 1];
+	char hostIdProp[HOST_ID_ASCII_SIZE + 1];
 	unsigned int oui[OUI_SIZE];
+	unsigned int hostId[HOST_ID_SIZE];
 	unsigned int guid[LU_GUID_SIZE];
 	int propSize;
 
@@ -2630,7 +2639,31 @@ setDiskProp(luResourceImpl *hdl, uint32_t resourceProp, const char *propVal)
 			diskLu->companyId += oui[0] << 16;
 			diskLu->companyId += oui[1] << 8;
 			diskLu->companyId += oui[2];
+			if (diskLu->companyId == 0) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
 			diskLu->companyIdValid = B_TRUE;
+			break;
+		case STMF_LU_PROP_HOST_ID:
+			if ((strlcpy(hostIdProp, propVal,
+			    sizeof (hostIdProp))) >= sizeof (hostIdProp)) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			if (checkHexUpper(hostIdProp) != 0) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			(void) sscanf(hostIdProp, "%2X%2X%2X%2X",
+			    &hostId[0], &hostId[1], &hostId[2], &hostId[3]);
+
+			diskLu->hostId = 0;
+			diskLu->hostId += hostId[0] << 24;
+			diskLu->hostId += hostId[1] << 16;
+			diskLu->hostId += hostId[2] << 8;
+			diskLu->hostId += hostId[3];
+			if (diskLu->hostId == 0) {
+				return (STMF_ERROR_INVALID_ARG);
+			}
+			diskLu->hostIdValid = B_TRUE;
 			break;
 		case STMF_LU_PROP_GUID:
 			if (strlen(propVal) != LU_ASCII_GUID_SIZE) {

@@ -1635,6 +1635,7 @@ sbd_create_register_lu(sbd_create_and_reg_lu_t *slu, int struct_sz,
 	int ret = EIO;
 	int flag;
 	int wcd = 0;
+	uint32_t hid = 0;
 	enum vtype vt;
 
 	sz = struct_sz - sizeof (sbd_create_and_reg_lu_t) + 8 + 1;
@@ -1864,9 +1865,11 @@ over_meta_open:
 		sl->sl_device_id[2] = 0;
 		bcopy(slu->slu_guid, sl->sl_device_id + 4, 16);
 	} else {
+		if (slu->slu_host_id_valid)
+			hid = slu->slu_host_id;
 		if (!slu->slu_company_id_valid)
 			slu->slu_company_id = COMPANY_ID_SUN;
-		if (stmf_scsilib_uniq_lu_id(slu->slu_company_id,
+		if (stmf_scsilib_uniq_lu_id2(slu->slu_company_id, hid,
 		    (scsi_devid_desc_t *)&sl->sl_device_id[0]) !=
 		    STMF_SUCCESS) {
 			*err_ret = SBD_RET_META_CREATION_FAILED;

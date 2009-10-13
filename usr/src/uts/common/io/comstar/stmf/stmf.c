@@ -5223,11 +5223,19 @@ static uint16_t stmf_lu_id_gen_number = 0;
 stmf_status_t
 stmf_scsilib_uniq_lu_id(uint32_t company_id, scsi_devid_desc_t *lu_id)
 {
+	return (stmf_scsilib_uniq_lu_id2(company_id, 0, lu_id));
+}
+
+stmf_status_t
+stmf_scsilib_uniq_lu_id2(uint32_t company_id, uint32_t host_id,
+    scsi_devid_desc_t *lu_id)
+{
 	uint8_t *p;
 	struct timeval32 timestamp32;
 	uint32_t *t = (uint32_t *)&timestamp32;
 	struct ether_addr mac;
 	uint8_t *e = (uint8_t *)&mac;
+	int hid = (int)host_id;
 
 	if (company_id == COMPANY_ID_NONE)
 		company_id = COMPANY_ID_SUN;
@@ -5244,8 +5252,10 @@ stmf_scsilib_uniq_lu_id(uint32_t company_id, scsi_devid_desc_t *lu_id)
 	p[5] = (company_id >> 12) & 0xff;
 	p[6] = (company_id >> 4) & 0xff;
 	p[7] = (company_id << 4) & 0xf0;
-	if (!localetheraddr((struct ether_addr *)NULL, &mac)) {
-		int hid = BE_32((int)zone_get_hostid(NULL));
+	if (hid == 0 && !localetheraddr((struct ether_addr *)NULL, &mac)) {
+		hid = BE_32((int)zone_get_hostid(NULL));
+	}
+	if (hid != 0) {
 		e[0] = (hid >> 24) & 0xff;
 		e[1] = (hid >> 16) & 0xff;
 		e[2] = (hid >> 8) & 0xff;
