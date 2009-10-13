@@ -914,11 +914,11 @@ papiJobQuery(papi_service_t handle, char *printer, int32_t job_id,
 	if ((*job = j = calloc(1, sizeof (*j))) == NULL)
 		return (PAPI_TEMPORARY_ERROR);
 
-	job_status_to_attributes(j, request_id, user, slabel, size, date, state,
-	    dest, form, charset, rank, file);
-
 	snprintf(req_id, sizeof (req_id), "%d-0", job_id);
 	lpsched_read_job_configuration(svc, j, req_id);
+
+	job_status_to_attributes(j, request_id, user, slabel, size, date, state,
+	    dest, form, charset, rank, file);
 
 	return (PAPI_OK);
 }
