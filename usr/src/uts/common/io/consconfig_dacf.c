@@ -1512,9 +1512,9 @@ dynamic_console_config(void)
 		 */
 		rconsvp = i_consconfig_createvp(CVC_PATH);
 		if (rconsvp == NULL)
-			return;
+			goto done;
 		rconsdev = rconsvp->v_rdev;
-		return;
+		goto done;
 	}
 
 	rwsconsvp = consconfig_sp->cons_wc_vp;
@@ -1535,6 +1535,8 @@ dynamic_console_config(void)
 	    mousedev,  kbddev, fbdev, rconsdev);
 
 	flush_deferred_console_buf();
+done:
+	consconfig_sp->cons_initialized = B_TRUE;
 }
 
 
@@ -2172,4 +2174,15 @@ consconfig_console_is_tipline(void)
 		return (B_TRUE);
 
 	return (B_FALSE);
+}
+
+boolean_t
+consconfig_dacf_initialized(void)
+{
+	cons_state_t	*sp;
+
+	if ((sp = (cons_state_t *)space_fetch("consconfig")) == NULL)
+		return (B_FALSE);
+
+	return (sp->cons_initialized);
 }

@@ -103,6 +103,7 @@ _info(struct modinfo *modinfop)
 }
 
 extern void dynamic_console_config(void);
+extern boolean_t consconfig_dacf_initialized(void);
 
 /*
  * Configure keyboard and mouse. Main entry here.
@@ -130,4 +131,9 @@ consconfig_get_usb_ms_path(void) {
 extern char *
 consconfig_get_plat_fbpath(void) {
 	return (plat_fbpath());
+}
+
+extern boolean_t
+consconfig_console_is_ready(void) {
+	return (consconfig_dacf_initialized());
 }
