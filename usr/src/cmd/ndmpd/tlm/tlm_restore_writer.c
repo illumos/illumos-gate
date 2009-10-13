@@ -231,7 +231,7 @@ rs_darhl_new_name(struct rs_name_maker *rnp, char *name, char **sels, int *pos,
 
 
 /*
- * Main dir restore funciton for tar
+ * Main dir restore function for tar
  */
 int
 tar_getdir(tlm_commands_t *commands,
@@ -863,7 +863,8 @@ tar_getdir(tlm_commands_t *commands,
 			longlink[0] = 0;
 			break;
 		case LF_LONGLINK:
-			file_size = min(file_size, TLM_MAX_PATH_NAME - lnk_end);
+			file_size = min(file_size,
+			    TLM_MAX_PATH_NAME - lnk_end - 1);
 			file_size = max(0, file_size);
 			size_left = get_long_name(lib, drv, file_size, longlink,
 			    &lnk_end, local_commands);
@@ -874,7 +875,8 @@ tar_getdir(tlm_commands_t *commands,
 				    file_size, size_left, lnk_end);
 			break;
 		case LF_LONGNAME:
-			file_size = min(file_size, TLM_MAX_PATH_NAME - nm_end);
+			file_size = min(file_size,
+			    TLM_MAX_PATH_NAME - nm_end - 1);
 			file_size = max(0, file_size);
 			size_left = get_long_name(lib, drv, file_size, longname,
 			    &nm_end, local_commands);
@@ -1833,16 +1835,19 @@ create_sym_link(char *dst, char *target, tlm_acls_t *acls,
     tlm_job_stats_t *job_satats)
 {
 	int erc;
+	struct stat64 *st;
 
 	if (mkbasedir(dst) < 0)
 		return (-1);
 
+	st = &acls->acl_attr;
 	erc = symlink(target, dst);
 	if (erc) {
 		job_satats->js_errors++;
 		NDMP_LOG(LOG_DEBUG, "error %d (errno %d) softlink [%s] to [%s]",
 		    erc, errno, dst, target);
 	} else {
+		st->st_mode |= S_IFLNK;
 		set_acl(dst, acls);
 	}
 
@@ -2004,9 +2009,15 @@ set_attr(char *name, tlm_acls_t *acls)
 		}
 	}
 
-	if (chmod(name, st->st_mode))
-		NDMP_LOG(LOG_ERR,
-		    "Could not set correct file permission for file %s.", name);
+	if (!S_ISLNK(st->st_mode)) {
+		if (chmod(name, st->st_mode))
+			NDMP_LOG(LOG_ERR, "Could not set correct file"
+			    " permission for file %s.", name);
+
+		tbuf.modtime = st->st_mtime;
+		tbuf.actime = st->st_atime;
+		(void) utime(name, &tbuf);
+	}
 
 	if (priv_all == TRUE) {
 		/*
@@ -2018,10 +2029,6 @@ set_attr(char *name, tlm_acls_t *acls)
 			NDMP_LOG(LOG_ERR,
 			    "Could not set least required privileges.");
 	}
-
-	tbuf.modtime = st->st_mtime;
-	tbuf.actime = st->st_atime;
-	(void) utime(name, &tbuf);
 }
 
 /*
