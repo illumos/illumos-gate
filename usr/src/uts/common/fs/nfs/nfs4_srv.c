@@ -6339,6 +6339,12 @@ rfs4_createfile(OPEN4args *args, struct svc_req *req, struct compound_state *cs,
 		cva.va_mtime.tv_nsec = (mtime->tv_nsec / 1000) * 1000;
 		cva.va_mode = (mode_t)0;
 		vap = &cva;
+
+		/*
+		 * For EXCL create, attrset is set to the server attr
+		 * used to cache the client's verifier.
+		 */
+		*attrset = FATTR4_TIME_MODIFY_MASK;
 		break;
 	}
 
