@@ -39,8 +39,8 @@ UTSBASE	= ../..
 #	Define the module and object file sets.
 #
 MODULE		= pcie
-OBJECTS		= $(PCI_E_MISC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCI_E_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln)
+OBJECTS		= $(PCIE_MISC_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCIE_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
