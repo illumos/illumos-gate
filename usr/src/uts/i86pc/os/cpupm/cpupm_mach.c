@@ -83,6 +83,7 @@ int (*cpupm_get_topspeed_callb)(void *);
 
 static void cpupm_event_notify_handler(ACPI_HANDLE, UINT32, void *);
 static void cpupm_free_notify_handlers(cpu_t *);
+static void cpupm_power_manage_notifications(void *);
 
 /*
  * Until proven otherwise, all power states are manageable.
@@ -261,12 +262,15 @@ cpupm_init(cpu_t *cp)
 	if ((mach_state->ms_caps & CPUPM_T_STATES) ||
 	    (mach_state->ms_caps & CPUPM_P_STATES) ||
 	    (mach_state->ms_caps & CPUPM_C_STATES)) {
-		cpupm_add_notify_handler(cp, cpupm_event_notify_handler, cp);
 		if (first) {
 			acpica_write_cpupm_capabilities(
 			    mach_state->ms_caps & CPUPM_P_STATES,
 			    mach_state->ms_caps & CPUPM_C_STATES);
 		}
+		cpupm_throttle_manage_notification(cp);
+		cpuidle_manage_cstates(cp);
+		cpupm_power_manage_notifications(cp);
+		cpupm_add_notify_handler(cp, cpupm_event_notify_handler, cp);
 	}
 	first = B_FALSE;
 #endif
