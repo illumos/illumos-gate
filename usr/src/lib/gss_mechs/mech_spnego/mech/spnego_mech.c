@@ -69,19 +69,7 @@
 #include	<string.h>
 #include	<k5-int.h>
 #include	<krb5.h>
-
-/*
- * SUNW17PACresync
- * MIT Kerb has phased out the context arg (1st one) of the functions
- * of struct gss_config, Solaris is not there yet and all mechs
- * will need to be changed at same time to do this cleanly.
- * Till then, we set this def to effect mechglueP.h.
- * Revisit for full 1.7 resync.
- */
-#define	GSSCONFIG_NO_CTXARG
 #include	<mglueP.h>
-#undef GSSCONFIG_NO_CTXARG
-
 #include	"gssapiP_spnego.h"
 #include	<gssapi_err_generic.h>
 
@@ -246,10 +234,12 @@ static struct gss_config spnego_mechanism =
 #else
 	NULL,				
 #endif  /* LEAN_CLIENT */
+/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	NULL,  /* unseal */
+/* EXPORT DELETE END */ /* CRYPT DELETE END */
 	NULL,				/* gss_process_context_token */
 	glue_spnego_gss_delete_sec_context,	/* gss_delete_sec_context */
-	NULL,	/* gss_context_time - SUNW17PACresync make it NULL */
+	glue_spnego_gss_context_time,
 	glue_spnego_gss_display_status,
 	NULL,				/* gss_indicate_mechs */
 	glue_spnego_gss_compare_name,
@@ -258,7 +248,9 @@ static struct gss_config spnego_mechanism =
 	glue_spnego_gss_release_name,
 	NULL,				/* gss_inquire_cred */
 	NULL,				/* gss_add_cred */
+/* EXPORT DELETE START */ /* CRYPT DELETE START */
 	NULL, /* seal */
+/* EXPORT DELETE END */ /* CRYPT DELETE END */
 #ifndef LEAN_CLIENT
 	glue_spnego_gss_export_sec_context,	/* gss_export_sec_context */
 	glue_spnego_gss_import_sec_context,	/* gss_import_sec_context */
@@ -268,15 +260,25 @@ static struct gss_config spnego_mechanism =
 #endif /* LEAN_CLIENT */
 	NULL, 				/* gss_inquire_cred_by_mech */
 	glue_spnego_gss_inquire_names_for_mech,
-	NULL,	/* gss_inquire_context - SUNW17PACresync make it NULL */
+	glue_spnego_gss_inquire_context,
 	NULL,				/* gss_internal_release_oid */
-	NULL,	/* gss_wrap_size_limit - SUNW17PACresync make it NULL */
+	glue_spnego_gss_wrap_size_limit,
 	NULL, /* pname */
 	NULL, /* userok */
-	NULL,				/* gss_export_name */
+	NULL, /* gss_export_name */
+/* EXPORT DELETE START */
+/* CRYPT DELETE START */
+#if 0
+/* CRYPT DELETE END */
+	NULL, /* seal */
+	NULL, /* unseal */
+/* CRYPT DELETE START */
+#endif
+/* CRYPT DELETE END */
+/* EXPORT DELETE END */
 	NULL, /* sign */
 	NULL, /* verify */
-	NULL,				/* gss_store_cred */
+	NULL, /* gss_store_cred */
         spnego_gss_inquire_sec_context_by_oid, /* gss_inquire_sec_context_by_oid */
 };
 
@@ -1169,6 +1171,9 @@ make_NegHints(OM_uint32 *minor_status,
 			*minor_status = code;
 			return (GSS_S_FAILURE);
 		}
+
+		hintNameBuf.value = hostname;
+		hintNameBuf.length = strlen(hostname);
 
 		major_status = gss_import_name(minor_status,
 					       &hintNameBuf,
@@ -2171,7 +2176,6 @@ spnego_gss_delete_sec_context(
 	return (ret);
 }
 
-#if 0 /* SUNW17PACresync */
 OM_uint32
 glue_spnego_gss_context_time(
 	void *context,
@@ -2196,7 +2200,6 @@ spnego_gss_context_time(
 			    time_rec);
 	return (ret);
 }
-#endif
 
 #ifndef LEAN_CLIENT
 OM_uint32
@@ -2248,7 +2251,6 @@ spnego_gss_import_sec_context(
 }
 #endif /* LEAN_CLIENT */
 
-#if 0 /* SUNW17PACresync */
 OM_uint32
 glue_spnego_gss_inquire_context(
 	void *context,
@@ -2300,9 +2302,7 @@ spnego_gss_inquire_context(
 
 	return (ret);
 }
-#endif
 
-#if 0 /* SUNW17PACresync */
 OM_uint32
 glue_spnego_gss_wrap_size_limit(
 	void *context,
@@ -2320,6 +2320,7 @@ glue_spnego_gss_wrap_size_limit(
 				req_output_size,
 				max_input_size));
 }
+
 OM_uint32
 spnego_gss_wrap_size_limit(
 	OM_uint32	*minor_status,
@@ -2338,7 +2339,6 @@ spnego_gss_wrap_size_limit(
 				max_input_size);
 	return (ret);
 }
-#endif
 
 #if 0 /* SUNW17PACresync */
 OM_uint32
