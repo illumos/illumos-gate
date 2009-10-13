@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * Driver to retire/unretire L2/L3 cachelines on panther
  */
@@ -67,7 +66,7 @@ extern void	unretire_l3_end(uint64_t, uint64_t);
 extern void	get_ecache_dtags_tl1(uint64_t, ch_cpu_logout_t *);
 extern void	get_l2_tag_tl1(uint64_t, uint64_t);
 extern void	get_l3_tag_tl1(uint64_t, uint64_t);
-
+extern const int _ncpu;
 
 /* Macro for putting 64-bit onto stack as two 32-bit ints */
 #define	PRTF_64_TO_32(x)	(uint32_t)((x)>>32), (uint32_t)(x)
@@ -77,16 +76,15 @@ uint_t l2_flush_retries_done = 0;
 int mem_cache_debug = 0x0;
 uint64_t pattern = 0;
 uint32_t retire_failures = 0;
-uint32_t last_error_injected_way = 0;
+#ifdef DEBUG
+int	inject_anonymous_tag_error = 0;
+int32_t last_error_injected_way = 0;
 uint8_t last_error_injected_bit = 0;
-uint32_t last_l3tag_error_injected_way = 0;
-uint8_t last_l3tag_error_injected_bit = 0;
-uint32_t last_l2tag_error_injected_way = 0;
-uint8_t last_l2tag_error_injected_bit = 0;
-uint32_t last_l3data_error_injected_way = 0;
-uint8_t last_l3data_error_injected_bit = 0;
-uint32_t last_l2data_error_injected_way = 0;
-uint8_t last_l2data_error_injected_bit = 0;
+extern int32_t last_l3tag_error_injected_way;
+extern uint8_t last_l3tag_error_injected_bit;
+extern int32_t last_l2tag_error_injected_way;
+extern uint8_t last_l2tag_error_injected_bit;
+#endif
 
 /* dev_ops and cb_ops entry point function declarations */
 static int	mem_cache_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -127,7 +125,7 @@ static struct dev_ops mem_cache_dev_ops = {
 	nulldev,		/* reset */
 	&mem_cache_cb_ops,
 	(struct bus_ops *)NULL,
-	nulldev,		/* power */
+	nulldev,			/* power */
 	ddi_quiesce_not_needed,		/* quiesce */
 };
 
@@ -564,19 +562,17 @@ mem_cache_ioctl_ops(int cmd, int mode, cache_info_t *cache_info)
 	uint64_t tag_data;
 	uint8_t state;
 
+	if (cache_info->way >= PN_CACHE_NWAYS)
+		return (EINVAL);
 	switch (cache_info->cache) {
 		case L2_CACHE_TAG:
 		case L2_CACHE_DATA:
-			if (cache_info->way >= PN_CACHE_NWAYS)
-				return (EINVAL);
 			if (cache_info->index >=
 			    (PN_L2_SET_SIZE/PN_L2_LINESIZE))
 				return (EINVAL);
 			break;
 		case L3_CACHE_TAG:
 		case L3_CACHE_DATA:
-			if (cache_info->way >= PN_CACHE_NWAYS)
-				return (EINVAL);
 			if (cache_info->index >=
 			    (PN_L3_SET_SIZE/PN_L3_LINESIZE))
 				return (EINVAL);
@@ -595,15 +591,9 @@ mem_cache_ioctl_ops(int cmd, int mode, cache_info_t *cache_info)
 		return (EINVAL);
 	}
 	mutex_exit(&cpu_lock);
+	pattern = 0;	/* default value of TAG PA when cacheline is retired. */
 	switch (cmd) {
 		case MEM_CACHE_RETIRE:
-			if ((cache_info->bit & MSB_BIT_MASK) ==
-			    MSB_BIT_MASK) {
-				pattern = ((uint64_t)1 <<
-				    (cache_info->bit & TAG_BIT_MASK));
-			} else {
-				pattern = 0;
-			}
 			tag_addr = get_tag_addr(cache_info);
 			pattern |= PN_ECSTATE_NA;
 			retire_retry_count = 0;
@@ -611,6 +601,9 @@ mem_cache_ioctl_ops(int cmd, int mode, cache_info_t *cache_info)
 			switch (cache_info->cache) {
 				case L2_CACHE_DATA:
 				case L2_CACHE_TAG:
+					if ((cache_info->bit & MSB_BIT_MASK) ==
+					    MSB_BIT_MASK)
+						pattern |= PN_L2TAG_PA_MASK;
 retry_l2_retire:
 					if (tag_addr_collides(tag_addr,
 					    cache_info->cache,
@@ -674,6 +667,9 @@ retry_l2_retire:
 					break;
 				case L3_CACHE_TAG:
 				case L3_CACHE_DATA:
+					if ((cache_info->bit & MSB_BIT_MASK) ==
+					    MSB_BIT_MASK)
+						pattern |= PN_L3TAG_PA_MASK;
 					if (tag_addr_collides(tag_addr,
 					    cache_info->cache,
 					    retire_l3_start, retire_l3_end))
@@ -731,9 +727,6 @@ retry_l2_retire:
 			switch (cache_info->cache) {
 				case L2_CACHE_DATA:
 				case L2_CACHE_TAG:
-					/*
-					 * Check if the index/way is in NA state
-					 */
 			/*
 			 * We bind ourself to a CPU and send cross trap to
 			 * ourself. On return from xt_one we can rely on the
@@ -771,9 +764,6 @@ retry_l2_retire:
 					break;
 				case L3_CACHE_TAG:
 				case L3_CACHE_DATA:
-					/*
-					 * Check if the index/way is in NA state
-					 */
 			/*
 			 * We bind ourself to a CPU and send cross trap to
 			 * ourself. On return from xt_one we can rely on the
@@ -823,7 +813,10 @@ retry_l2_retire:
 			 */
 			afar = (uint64_t)(cache_info->index
 			    << PN_CACHE_LINE_SHIFT);
+			mutex_enter(&cpu_lock);
 			affinity_set(cache_info->cpu_id);
+			(void) pause_cpus(NULL);
+			mutex_exit(&cpu_lock);
 			/*
 			 * We bind ourself to a CPU and send cross trap to
 			 * ourself. On return from xt_one we can rely on the
@@ -834,6 +827,10 @@ retry_l2_retire:
 			xt_one(cache_info->cpu_id,
 			    (xcfunc_t *)(get_ecache_dtags_tl1),
 			    afar, (uint64_t)(&clop));
+			mutex_enter(&cpu_lock);
+			(void) start_cpus();
+			mutex_exit(&cpu_lock);
+			affinity_clear();
 			switch (cache_info->cache) {
 				case L2_CACHE_TAG:
 					for (i = 0; i < PN_CACHE_NWAYS; i++) {
@@ -841,10 +838,12 @@ retry_l2_retire:
 						    clop.clo_data.chd_l2_data
 						    [i].ec_tag;
 					}
+#ifdef DEBUG
 					last_error_injected_bit =
 					    last_l2tag_error_injected_bit;
 					last_error_injected_way =
 					    last_l2tag_error_injected_way;
+#endif
 					break;
 				case L3_CACHE_TAG:
 					for (i = 0; i < PN_CACHE_NWAYS; i++) {
@@ -852,17 +851,21 @@ retry_l2_retire:
 						    clop.clo_data.chd_ec_data
 						    [i].ec_tag;
 					}
+#ifdef DEBUG
 					last_error_injected_bit =
 					    last_l3tag_error_injected_bit;
 					last_error_injected_way =
 					    last_l3tag_error_injected_way;
+#endif
 					break;
 				default:
-					affinity_clear();
 					return (ENOTSUP);
 			}	/* end if switch(cache) */
 #ifdef DEBUG
-			if (cmd == MEM_CACHE_READ_ERROR_INJECTED_TAGS) {
+			if ((cmd == MEM_CACHE_READ_ERROR_INJECTED_TAGS) &&
+			    (inject_anonymous_tag_error == 0) &&
+			    (last_error_injected_way >= 0) &&
+			    (last_error_injected_way <= 3)) {
 				pattern = ((uint64_t)1 <<
 				    last_error_injected_bit);
 				/*
@@ -884,10 +887,8 @@ retry_l2_retire:
 			    (caddr_t)cache_info->datap,
 			    sizeof (Lxcache_tag_data), mode)
 			    != DDI_SUCCESS) {
-				affinity_clear();
 				return (EFAULT);
 			}
-			affinity_clear();
 			break;	/* end of READ_TAGS */
 		default:
 			return (ENOTSUP);
@@ -938,7 +939,6 @@ mem_cache_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		mutex_exit(&softc->mutex);
 		return (EINVAL);
 	}
-
 	is_panther = IS_PANTHER(cpunodes[cache_info.cpu_id].implementation);
 	if (!is_panther) {
 		mutex_exit(&softc->mutex);

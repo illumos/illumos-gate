@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _CMD_STATE_H
 #define	_CMD_STATE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Case management and saved state restoration
@@ -158,6 +156,7 @@ typedef enum cmd_BUG_ptrsubtype {
 #define	CMD_TIMERTYPE_CPU_XR_WAITER	2
 #define	CMD_TIMERTYPE_MEM		3
 #define	CMD_TIMERTYPE_DP		4
+#define	CMD_TIMERTYPE_ANONYMOUS_TAG_ERROR 	5
 
 #define	CMD_TIMERTYPE_ISCPU(timer)	((timer) != CMD_TIMERTYPE_MEM && \
 					(timer) != CMD_TIMERTYPE_DP)

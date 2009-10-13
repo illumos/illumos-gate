@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * CPU/Memory error diagnosis engine for the UltraSPARC III, IV, T1,
@@ -409,6 +407,10 @@ cmd_timeout(fmd_hdl_t *hdl, id_t id, void *arg)
 		case CMD_TIMERTYPE_DP:
 
 			cmd_dp_timeout(hdl, id);
+			break;
+		case CMD_TIMERTYPE_ANONYMOUS_TAG_ERROR:
+
+			cmd_Lxcache_anonymous_tag_error_timeout(hdl, id);
 			break;
 #endif
 

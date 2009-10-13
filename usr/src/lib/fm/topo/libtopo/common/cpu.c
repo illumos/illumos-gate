@@ -20,9 +20,10 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 
 #include <errno.h>
 #include <limits.h>
@@ -249,7 +250,9 @@ fmri_nvl2str(nvlist_t *nvl, uint8_t version, char *buf, size_t buflen)
 {
 	int rc;
 	uint8_t	type;
-	uint32_t cpuid, index, way;
+	uint32_t cpuid, way;
+	uint32_t	index;
+	uint16_t	bit;
 	uint64_t serint;
 	char *serstr = NULL;
 
@@ -283,6 +286,7 @@ fmri_nvl2str(nvlist_t *nvl, uint8_t version, char *buf, size_t buflen)
 		rc = nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_INDEX,
 		    &index);
 		rc |= nvlist_lookup_uint32(nvl, FM_FMRI_CPU_CACHE_WAY, &way);
+		rc |= nvlist_lookup_uint16(nvl, FM_FMRI_CPU_CACHE_BIT, &bit);
 		rc |= nvlist_lookup_uint8(nvl, FM_FMRI_CPU_CACHE_TYPE, &type);
 
 		/* Insure there were no errors accessing the nvl */
@@ -296,10 +300,11 @@ fmri_nvl2str(nvlist_t *nvl, uint8_t version, char *buf, size_t buflen)
 				    FM_FMRI_CPU_ID, cpuid));
 			else {
 				return (snprintf(buf, buflen,
-				    "cpu:///%s=%u/%s=%u/%s=%u/%s=%d",
+				    "cpu:///%s=%u/%s=%u/%s=%u/%s=%d/%s=%d",
 				    FM_FMRI_CPU_ID, cpuid,
 				    FM_FMRI_CPU_CACHE_INDEX, index,
 				    FM_FMRI_CPU_CACHE_WAY, way,
+				    FM_FMRI_CPU_CACHE_BIT, bit,
 				    FM_FMRI_CPU_CACHE_TYPE, type));
 			}
 		} else {
@@ -310,11 +315,12 @@ fmri_nvl2str(nvlist_t *nvl, uint8_t version, char *buf, size_t buflen)
 				    FM_FMRI_CPU_SERIAL_ID, serstr));
 			} else {
 				return (snprintf(buf, buflen,
-				    "cpu:///%s=%u/%s=%s/%s=%u/%s=%u/%s=%d",
+				"cpu:///%s=%u/%s=%s/%s=%u/%s=%u/%s=%d/%s=%d",
 				    FM_FMRI_CPU_ID, cpuid,
 				    FM_FMRI_CPU_SERIAL_ID, serstr,
 				    FM_FMRI_CPU_CACHE_INDEX, index,
 				    FM_FMRI_CPU_CACHE_WAY, way,
+				    FM_FMRI_CPU_CACHE_BIT, bit,
 				    FM_FMRI_CPU_CACHE_TYPE, type));
 			}
 		}
@@ -363,8 +369,11 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 {
 	int err;
 	ulong_t cpuid;
-	uint8_t	type;
-	uint32_t way, index = NULL;
+	uint8_t	type = 0;
+	uint32_t way = 0;
+	uint32_t index = 0;
+	int	index_present = 0;
+	uint16_t	bit = 0;
 	char *str, *s, *end, *serial_end;
 	char *serial = NULL;
 	nvlist_t *fmri;
@@ -396,7 +405,11 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		serial = s;
 		serial_end = strchr(s, '/');
 		/* If there is cache data, all must be present */
-		if (s != NULL) {
+		if (serial_end != NULL) {
+			/* Now terminate the serial string */
+			*serial_end = '\0';
+			index_present = 1;
+			s = serial_end + 1;
 			s = strchr(s, '=');
 			++s;
 			index = strtoul(s, &end, 0);
@@ -405,6 +418,10 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 				    EMOD_FMRI_MALFORM));
 			}
 			s = strchr(s, '=');
+			if (s == NULL) {
+				return (topo_mod_seterrno(mod,
+				    EMOD_FMRI_MALFORM));
+			}
 			++s;
 			way = strtoul(s, &end, 0);
 			if (*(s = end) != '/') {
@@ -412,19 +429,26 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 				    EMOD_FMRI_MALFORM));
 			}
 			s = strchr(s, '=');
+			if (s == NULL) {
+				return (topo_mod_seterrno(mod,
+				    EMOD_FMRI_MALFORM));
+			}
 			++s;
-			type = strtoul(s, &end, 0);
+			bit = strtoul(s, &end, 0);
 			if (*(s = end) != '/') {
 				return (topo_mod_seterrno(mod,
 				    EMOD_FMRI_MALFORM));
 			}
+			s = strchr(s, '=');
+			if (s == NULL) {
+				return (topo_mod_seterrno(mod,
+				    EMOD_FMRI_MALFORM));
+			}
+			++s;
+			type = strtoul(s, &end, 0);
 		}
-		/* Now terminate the serial string */
-		if (serial_end != NULL)
-			*serial_end = '\n';
 
 	}
-
 	if (topo_mod_nvalloc(mod, &fmri, NV_UNIQUE_NAME) != 0)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 
@@ -436,11 +460,13 @@ cpu_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		err |= nvlist_add_string(fmri, FM_FMRI_CPU_SERIAL_ID,
 		    serial);
 
-	if (index != NULL) {
+	if (index_present) {
 		err |= nvlist_add_uint32(fmri, FM_FMRI_CPU_CACHE_INDEX,
 		    index);
 		err |= nvlist_add_uint32(fmri, FM_FMRI_CPU_CACHE_WAY,
 		    way);
+		err |= nvlist_add_uint16(fmri, FM_FMRI_CPU_CACHE_BIT,
+		    bit);
 		err |= nvlist_add_uint8(fmri, FM_FMRI_CPU_CACHE_TYPE,
 		    type);
 	}

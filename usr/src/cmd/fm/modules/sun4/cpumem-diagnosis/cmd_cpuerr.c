@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Ereport-handling routines for CPU errors
@@ -117,8 +115,8 @@ cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
 									\
 	if ((strstr(class, "ultraSPARC-IVplus.l3-thce") != 0) ||	\
 		(strstr(class, "ultraSPARC-IVplus.thce") != 0)) {	\
-		return (cmd_us4plus_tag_err(hdl, ep, nvl, class, cpu,	\
-		    ptr, ntname, ntname "_n", ntname "_t", fltname));	\
+		return (cmd_us4plus_tag_err(hdl, ep, nvl, cpu,	\
+		    ptr, ntname "_n", ntname "_t", fltname, clcode));	\
 	}								\
 	return (cmd_cpuerr_common(hdl, ep, cpu, &cpu->cpu_##casenm,	\
 	    ptr, ntname, ntname "_n", ntname "_t", fltname, clcode));	\
@@ -519,6 +517,7 @@ cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	uint8_t level = clcode & CMD_ERRCL_LEVEL_EXTRACT;
 	uint8_t	afar_status;
 	const errdata_t *ed = NULL;
+	int ref_incremented = 0;
 
 	clcode &= CMD_ERRCL_LEVEL_MASK; /* keep level bits out of train masks */
 
@@ -563,12 +562,15 @@ cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	}
 
 	cmd_trw_ref(hdl, trw, clcode);
+	ref_incremented++;
 
 	fmd_hdl_debug(hdl, "trw rescheduled for train delivery\n");
 
 redeliver:
 	if ((xr = cmd_xr_create(hdl, ep, nvl, cpu, clcode)) == NULL) {
 		fmd_hdl_debug(hdl, "cmd_xr_create failed");
+		if (ref_incremented)
+			cmd_trw_deref(hdl, trw);
 		return (CMD_EVD_BAD);
 	}
 

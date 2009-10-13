@@ -95,6 +95,7 @@
 	fmd_prop_get_string = FUNCTION extern;
 
 	fmd_repair_fru = FUNCTION extern;
+	fmd_repair_asru = FUNCTION extern;
 
 	fmd_serd_create = FUNCTION extern;
 	fmd_serd_destroy = FUNCTION extern;

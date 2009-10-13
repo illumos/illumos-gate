@@ -2203,6 +2203,22 @@ fmd_repair_fru(fmd_hdl_t *hdl, const char *fmri)
 	    fmd_asru_repaired, &fara);
 }
 
+/*ARGSUSED*/
+int
+fmd_repair_asru(fmd_hdl_t *hdl, const char *fmri)
+{
+	int err = FARA_ERR_RSRCNOTF;
+	fmd_asru_rep_arg_t fara;
+
+	fara.fara_reason = FMD_ASRU_REPAIRED;
+	fara.fara_rval = &err;
+	fara.fara_uuid = NULL;
+	fara.fara_bywhat = FARA_BY_ASRU;
+	fmd_asru_hash_apply_by_asru(fmd.d_asrus, fmri,
+	    fmd_asru_repaired, &fara);
+	return (err);
+}
+
 int
 fmd_event_local(fmd_hdl_t *hdl, fmd_event_t *ep)
 {

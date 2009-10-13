@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/processor.h>
@@ -342,10 +340,9 @@ fmd_fmri_contains(nvlist_t *er, nvlist_t *ee)
 {
 	int ret1, ret2;
 	char *erserstr, *eeserstr;
-	uint8_t  ertype, eetype, erversion, eeversion;
+	uint8_t  erversion, eeversion;
 	uint64_t erserint, eeserint;
 	uint32_t erval, eeval;
-	size_t count;
 
 	if (nvlist_lookup_uint32(er, FM_FMRI_CPU_ID, &erval) != 0)
 		return (0);
@@ -374,43 +371,27 @@ fmd_fmri_contains(nvlist_t *er, nvlist_t *ee)
 			return (0);
 	} else if (erversion == CPU_SCHEME_VERSION1) {
 		/* Serial ID is an optional element */
-		if ((ret1 = nvlist_lookup_string(er, FM_FMRI_CPU_SERIAL_ID,
-		    &erserstr)) != 0)
-			if (ret1 != ENOENT)
-				return (0);
-		if ((ret2 = nvlist_lookup_string(ee, FM_FMRI_CPU_SERIAL_ID,
-		    &eeserstr)) != 0)
-			if (ret2 != ENOENT)
-				return (0);
-		if (ret1 == 0 && ret2 == 0) {
-			count = strlen(erserstr);
-			if (strncmp(erserstr, eeserstr, count) != 0)
-				return (0);
-		}
+		ret1 = nvlist_lookup_string(er, FM_FMRI_CPU_SERIAL_ID,
+		    &erserstr);
+		ret2 = nvlist_lookup_string(ee, FM_FMRI_CPU_SERIAL_ID,
+		    &eeserstr);
+		if (ret1 != ret2)
+			return (0);
+		if (ret1 == ENOENT)
+			/*
+			 * Serial IDs not found in both container, containee
+			 */
+			return (1);
+		if (ret1 != 0)
+			return (0);
+		/*
+		 * Found Serial Ids in both container and containee.
+		 * Check if they are same.
+		 */
+		if (strlen(erserstr) != strlen(eeserstr))
+			return (0);
+		if (strcmp(erserstr, eeserstr) != 0)
+			return (0);
 	}
-	if (nvlist_lookup_uint32(er, FM_FMRI_CPU_CACHE_INDEX, &erval) != 0)
-		return (0);
-	if (nvlist_lookup_uint32(ee, FM_FMRI_CPU_CACHE_INDEX, &eeval) != 0)
-		return (0);
-
-	if (erval != eeval)
-		return (0);
-
-	if (nvlist_lookup_uint32(er, FM_FMRI_CPU_CACHE_WAY, &erval) != 0)
-		return (0);
-	if (nvlist_lookup_uint32(ee, FM_FMRI_CPU_CACHE_WAY, &eeval) != 0)
-		return (0);
-
-	if (erval != eeval)
-		return (0);
-
-	if (nvlist_lookup_uint8(er, FM_FMRI_CPU_CACHE_TYPE, &ertype) != 0)
-		return (0);
-	if (nvlist_lookup_uint8(ee, FM_FMRI_CPU_CACHE_TYPE, &eetype) != 0)
-		return (0);
-
-	if (eetype != ertype)
-		return (0);
-
 	return (1);
 }

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -84,6 +82,10 @@
 ch_cpu_logout_t	clop_before_flush;
 ch_cpu_logout_t	clop_after_flush;
 uint_t	flush_retries_done = 0;
+int32_t last_l3tag_error_injected_way = 255;
+uint8_t last_l3tag_error_injected_bit;
+int32_t last_l2tag_error_injected_way = 255;
+uint8_t last_l2tag_error_injected_bit;
 /*
  * Note that 'Cheetah PRM' refers to:
  *   SPARC V9 JPS1 Implementation Supplement: Sun UltraSPARC-III

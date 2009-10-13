@@ -236,6 +236,7 @@ extern int fmd_nvl_fmri_has_fault(fmd_hdl_t *, nvlist_t *, int, char *);
 #define	FMD_HAS_FAULT_RESOURCE	2
 
 extern void fmd_repair_fru(fmd_hdl_t *, const char *);
+extern int fmd_repair_asru(fmd_hdl_t *, const char *);
 
 extern int fmd_nvl_fmri_contains(fmd_hdl_t *, nvlist_t *, nvlist_t *);
 extern nvlist_t *fmd_nvl_fmri_translate(fmd_hdl_t *, nvlist_t *, nvlist_t *);
