@@ -59,8 +59,7 @@ static unsigned zfs_boot = 0;
  * Append the string pointed to by "str" to the string pointed to by "orig"
  * adding the delimeter "delim" in between.
  *
- * Return a pointer to the new string or NULL, if we were passed a bad string
- * or we couldn't allocate memory for the new one.
+ * Return a pointer to the new string or NULL, if we were passed a bad string.
  */
 static char *
 append_str(char *orig, char *str, char *delim)
@@ -68,57 +67,63 @@ append_str(char *orig, char *str, char *delim)
 	char *newstr;
 	int len;
 
-	if ((orig == NULL) || (str == NULL) || (delim == NULL))
+	if ((str == NULL) || (delim == NULL))
 		return (NULL);
 
-	if (*orig == NULL)
+	if ((orig == NULL) || (*orig == NULL)) {
+		/*
+		 * Return a pointer to a copy of the path so a caller can
+		 * always rely upon being able to free() a returned pointer.
+		 */
 		return (s_strdup(str));
+	}
 
 	len = strlen(orig) + strlen(str) + strlen(delim) + 1;
-	newstr = s_realloc(orig, len);
+	if ((newstr = malloc(len)) == NULL) {
+		bam_error(NO_MEM, len);
+		bam_exit(1);
+	}
 
-	if (newstr != NULL)
-		(void) snprintf(newstr, len, "%s%s%s", orig, delim, str);
-
+	(void) snprintf(newstr, len, "%s%s%s", orig, delim, str);
 	return (newstr);
 }
 
 /*
  * Replace the substring "old_str" in a path with the substring "new_str"
  *
- * Return a pointer to the  modified string or NULL, if we couldn't allocate
- * memory for the new string.
+ * Return a pointer to the modified string.
  */
 static char *
 modify_path(char *path, char *old_str, char *new_str)
 {
 	char *newpath;
-	char *oldpath;
 	char *pc;
+	int len;
 
-	oldpath = s_strdup(path);
-
-	if ((pc = strstr(oldpath, old_str)) == NULL) {
-		free(oldpath);
-		return (path);
-	}
+	/*
+	 * Return a pointer to a copy of the path so a caller can always rely
+	 * upon being able to free() a returned pointer.
+	 */
+	if ((pc = strstr(path, old_str)) == NULL)
+		return (s_strdup(path));
 
 	/*
 	 * Allocate space for duplicate of path with name changes and
 	 * NULL terminating byte
 	 */
-	if ((newpath = s_realloc(path,
-	    strlen(oldpath) - strlen(old_str) + strlen(new_str) + 1)) == NULL) {
-		free(oldpath);
-		return (NULL);
+	len = strlen(path) - strlen(old_str) + strlen(new_str) + 1;
+
+	if ((newpath = malloc(len)) == NULL) {
+		bam_error(NO_MEM, len);
+		bam_exit(1);
 	}
 
-	(void) strlcpy(newpath, oldpath, (pc - oldpath) + 1);
-	free(oldpath);
+	(void) strlcpy(newpath, path, (pc - path) + 1);
+	pc += strlen(old_str);
 
 	(void) strcat(newpath, new_str);
-	pc += strlen(old_str);
-	return (strcat(newpath, pc));
+	(void) strcat(newpath, pc);
+	return (newpath);
 }
 
 /*
@@ -165,7 +170,7 @@ get_token(char **token, char *str, char *delim)
 			/* found a delimiter, so create a token string */
 			if ((*token = malloc(len)) == NULL) {
 				bam_error(NO_MEM, len);
-				return (NULL);
+				bam_exit(1);
 			}
 
 			(void) strlcpy(*token, start, len);
@@ -219,7 +224,7 @@ set_serial_rate(int com, char *rate)
 		return (0);
 	}
 
-	*rp = s_realloc(*rp, strlen(rate));
+	*rp = s_realloc(*rp, strlen(rate) + 1);
 	(void) strcpy(*rp, rate);
 	return (0);
 }
@@ -421,7 +426,7 @@ cvt_metal_option(char *optstr)
 	    (strncmp(optstr, "ttyb-mode", namlen) == 0)) {
 		char *port = alloca(namlen + 1);
 
-		(void) strlcpy(port, optstr, namlen);
+		(void) strlcpy(port, optstr, namlen + 1);
 		return (serial_metal_to_hyper(port, value));
 	}
 
@@ -577,15 +582,20 @@ cvt_hyper_option(char *optstr)
  * use to construct an appropriate "module$" line that can be used to specify
  * how to boot the hypervisor's dom0.
  *
- * Return 0 on success, non-zero on failure.
+ * Return values:
+ *
+ *	-1: error parsing kernel path
+ *	 0: success
+ *	 1: kernel already a hypervisor kernel
  */
 static int
 cvt_metal_kernel(char *kernstr, char **path)
 {
 	char *token, *parsestr;
 
-	if ((parsestr = get_token(path, kernstr, " \t,")) == NULL)
-		return (*path == NULL);
+	parsestr = get_token(path, kernstr, " \t,");
+	if (*path == NULL)
+		return (-1);
 
 	/*
 	 * If the metal kernel specified contains the name of the hypervisor,
@@ -594,7 +604,9 @@ cvt_metal_kernel(char *kernstr, char **path)
 	 */
 	if (strstr(*path, XEN_MENU) != NULL) {
 		bam_error(ALREADY_HYPER);
-		return (-1);
+		free(*path);
+		*path = NULL;
+		return (1);
 	}
 
 	/* if the path was the last item on the line, that's OK. */
@@ -609,6 +621,8 @@ cvt_metal_kernel(char *kernstr, char **path)
 		free(token);
 		return (0);
 	}
+
+	free(token);
 
 	while ((parsestr = get_token(&token, parsestr, ",")) != NULL) {
 		(void) cvt_metal_option(token);
@@ -634,9 +648,10 @@ cvt_hyper_kernel(char *kernel)
 {
 	char *token, *parsestr;
 
-	/* eat the kernel path, which should be the first token */
-	if ((parsestr = get_token(&token, kernel, " \t,")) == NULL)
-		return (0);
+	parsestr = get_token(&token, kernel, " \t,");
+
+	if (token == NULL)
+		return (-1);
 
 	/*
 	 * If the hypervisor kernel specified lives in the metal kernel
@@ -645,11 +660,10 @@ cvt_hyper_kernel(char *kernel)
 	 */
 	if (strncmp(token, METAL_KERNEL_DIR, strlen(METAL_KERNEL_DIR)) == 0) {
 		bam_error(ALREADY_METAL);
-		(void) free(token);
+		free(token);
 		return (-1);
 	}
 
-	/* if the path was the last item on the line, that's OK. */
 	free(token);
 
 	/* check for kernel options */
@@ -673,7 +687,7 @@ cvt_hyper_kernel(char *kernel)
 static void
 cvt_hyper_module(char *modstr, char **path)
 {
-	char *token;
+	char *token = NULL;
 	char *parsestr = modstr;
 
 	/*
@@ -683,8 +697,8 @@ cvt_hyper_module(char *modstr, char **path)
 	while ((parsestr = get_token(path, parsestr, " \t,")) != NULL) {
 		if (*parsestr != '/')
 			break;
-
-		free(*path);
+		else
+			free(*path);
 	}
 
 	/* if the path was the last item on the line, that's OK. */
@@ -695,11 +709,16 @@ cvt_hyper_module(char *modstr, char **path)
 		return;
 	}
 
+	if (token == NULL)
+		return;
+
 	/* check for "-B" option */
 	if (strncmp(token, BFLAG, strlen(BFLAG)) != 0) {
 		free(token);
 		return;
 	}
+
+	free(token);
 
 	/* check for kernel options */
 	while ((parsestr = get_token(&token, parsestr, ",")) != NULL) {
@@ -727,6 +746,7 @@ parse_bootenvrc(char *osroot)
 
 	len = strlen(osroot) + strlen(BOOTRC_FILE) + 1;
 	rcpath = alloca(len);
+
 	(void) snprintf(rcpath, len, "%s%s", osroot, BOOTRC_FILE);
 
 	/* if we couldn't open the bootenv.rc file, ignore the issue. */
@@ -755,6 +775,7 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	entry_t *ent;
 	size_t len, zfslen;
 
+	char *newstr;
 	char *osdev;
 
 	char *title = NULL;
@@ -768,7 +789,7 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	char *kern_bargs = NULL;
 
 	int curdef;
-	int kp_allocated = 1;
+	int kp_allocated = 0;
 	int ret = BAM_ERROR;
 
 	assert(osroot);
@@ -841,8 +862,13 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 			(void) strcpy(module, lp->arg);
 		} else if ((strcmp(lp->cmd,
 		    menu_cmds[KERNEL_DOLLAR_CMD]) == 0) &&
-		    (cvt_metal_kernel(lp->arg, &kern_path) < 0)) {
-			ret = BAM_NOCHANGE;
+		    (ret = cvt_metal_kernel(lp->arg, &kern_path)) != 0) {
+			if (ret < 0) {
+				ret = BAM_ERROR;
+				bam_error(KERNEL_NOT_PARSEABLE, curdef);
+			} else
+				ret = BAM_NOCHANGE;
+
 			goto abort;
 		}
 
@@ -872,26 +898,35 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	if (console_dev != NULL) {
 		kern_bargs = s_strdup(console_dev);
 
-		if (serial_config[0] != NULL)
-			kern_bargs = append_str(kern_bargs, serial_config[0],
-			    " ");
+		if (serial_config[0] != NULL) {
+			newstr = append_str(kern_bargs, serial_config[0], " ");
+			free(kern_bargs);
+			kern_bargs = newstr;
+		}
 
-		if (serial_config[1] != NULL)
-			kern_bargs = append_str(kern_bargs, serial_config[1],
-			    " ");
+		if (serial_config[1] != NULL) {
+			newstr = append_str(kern_bargs, serial_config[1], " ");
+			free(kern_bargs);
+			kern_bargs = newstr;
+		}
 	}
 
-	if ((extra_args != NULL) && (*extra_args != NULL))
-		kern_bargs = append_str(kern_bargs, extra_args, " ");
+	if ((extra_args != NULL) && (*extra_args != NULL)) {
+		newstr = append_str(kern_bargs, extra_args, " ");
+		free(kern_bargs);
+		kern_bargs = newstr;
+	}
 
 	len = strlen(osroot) + strlen(XEN_MENU) + strlen(kern_bargs) +
 	    WHITESPC(1) + 1;
 
 	kernel = alloca(len);
 
-	if ((kern_bargs != NULL) && (*kern_bargs != NULL)) {
-		(void) snprintf(kernel, len, "%s%s %s", osroot, XEN_MENU,
-		    kern_bargs);
+	if (kern_bargs != NULL) {
+		if (*kern_bargs != NULL)
+			(void) snprintf(kernel, len, "%s%s %s", osroot,
+			    XEN_MENU, kern_bargs);
+
 		free(kern_bargs);
 	} else {
 		(void) snprintf(kernel, len, "%s%s", osroot, XEN_MENU);
@@ -905,10 +940,12 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	if ((strcmp(kern_path, DIRECT_BOOT_32) == 0) ||
 	    (strcmp(kern_path, DIRECT_BOOT_64) == 0)) {
 		kern_path = HYPERVISOR_KERNEL;
-		kp_allocated = 0;
 	} else {
-		kern_path = modify_path(kern_path, METAL_KERNEL_DIR,
+		newstr = modify_path(kern_path, METAL_KERNEL_DIR,
 		    HYPER_KERNEL_DIR);
+		free(kern_path);
+		kern_path = newstr;
+		kp_allocated = 1;
 	}
 
 	/*
@@ -920,7 +957,6 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	zfslen = (zfs_boot ? (WHITESPC(1) + strlen(ZFS_BOOT)) : 0);
 
 	mod_kernel = alloca(len + zfslen);
-
 	(void) snprintf(mod_kernel, len, "%s %s", kern_path, kern_path);
 
 	if (kp_allocated)
@@ -961,9 +997,6 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	return (BAM_ERROR);
 
 abort:
-	if ((kp_allocated) && (kern_path != NULL))
-		free(kern_path);
-
 	if (ret != BAM_NOCHANGE)
 		bam_error(HYPER_ABORT, ((*osroot == NULL) ? "/" : osroot));
 
@@ -980,7 +1013,8 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 	entry_t *ent;
 	size_t len, zfslen;
 
-	char *delim = ", ";
+	char *delim = ",";
+	char *newstr;
 	char *osdev;
 
 	char *title = NULL;
@@ -1087,7 +1121,9 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 	 * First, change the kernel directory from the hypervisor version to
 	 * that needed for a metal kernel.
 	 */
-	kern_path = modify_path(kern_path, HYPER_KERNEL_DIR, METAL_KERNEL_DIR);
+	newstr = modify_path(kern_path, HYPER_KERNEL_DIR, METAL_KERNEL_DIR);
+	free(kern_path);
+	kern_path = newstr;
 
 	/* allocate initial space for the kernel path */
 	len = strlen(kern_path) + 1;
@@ -1095,8 +1131,8 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 
 	if ((kernel = malloc(len + zfslen)) == NULL) {
 		free(kern_path);
-		bam_error(NO_MEM, len);
-		goto abort;
+		bam_error(NO_MEM, len + zfslen);
+		bam_exit(1);
 	}
 
 	(void) snprintf(kernel, len, "%s", kern_path);
@@ -1112,11 +1148,15 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 
 	if (console_dev != NULL) {
 		if (emit_bflag) {
-			kernel = append_str(kernel, BFLAG, " ");
-			kernel = append_str(kernel, console_dev, " ");
+			newstr = append_str(kernel, BFLAG, " ");
+			free(kernel);
+			kernel = append_str(newstr, console_dev, " ");
+			free(newstr);
 			emit_bflag = 0;
 		} else {
-			kernel = append_str(kernel, console_dev, ", ");
+			newstr = append_str(kernel, console_dev, ",");
+			free(kernel);
+			kernel = newstr;
 		}
 	}
 
@@ -1133,20 +1173,26 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 	 */
 
 	if (emit_bflag) {
-		kernel = append_str(kernel, BFLAG, " ");
+		newstr = append_str(kernel, BFLAG, " ");
+		free(kernel);
+		kernel = newstr;
 		delim = " ";
 		emit_bflag = 0;
 	}
 
 	if (serial_config[0] != NULL)
-		kernel = append_str(kernel, serial_config[0], delim);
+		newstr = append_str(kernel, serial_config[0], delim);
 	else
-		kernel = append_str(kernel, "ttya-mode='9600,8,n,1,-'", delim);
+		newstr = append_str(kernel, "ttya-mode='9600,8,n,1,-'", delim);
+
+	free(kernel);
 
 	if (serial_config[1] != NULL)
-		kernel = append_str(kernel, serial_config[1], ", ");
+		kernel = append_str(newstr, serial_config[1], ",");
 	else
-		kernel = append_str(kernel, "ttyb-mode='9600,8,n,1,-'", ", ");
+		kernel = append_str(newstr, "ttyb-mode='9600,8,n,1,-'", ",");
+
+	free(newstr);
 
 	/* shut off warning messages from the entry line parser */
 	if (ent->flags & BAM_ENTRY_BOOTADM)

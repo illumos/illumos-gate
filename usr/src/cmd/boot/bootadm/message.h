@@ -304,6 +304,9 @@ gettext("findroot in default boot entry (%d) missing.\n")
 #define	KERNEL_NOT_FOUND	\
 gettext("kernel$ in default boot entry (%d) missing.\n")
 
+#define	KERNEL_NOT_PARSEABLE	\
+gettext("kernel$ in default boot entry (%d) missing or not parseable.\n")
+
 #define	MODULE_NOT_PARSEABLE	\
 gettext("module$ in default boot entry (%d) missing or not parseable.\n")
 

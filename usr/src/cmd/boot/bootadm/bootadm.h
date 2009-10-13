@@ -167,6 +167,7 @@ extern void *s_calloc(size_t, size_t);
 extern void *s_realloc(void *, size_t);
 extern char *s_fgets(char *buf, int n, FILE *fp);
 extern void bam_error(char *format, ...);
+extern void bam_exit(int);
 extern void bam_print(char *, ...);
 extern void bam_print_stderr(char *format, ...);
 extern void bam_derror(char *format, ...);

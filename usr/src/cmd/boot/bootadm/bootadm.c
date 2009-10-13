@@ -253,7 +253,6 @@ static void parse_args(int, char *argv[]);
 static error_t bam_menu(char *, char *, int, char *[]);
 static error_t bam_archive(char *, char *);
 
-static void bam_exit(int);
 static void bam_lock(void);
 static void bam_unlock(void);
 
@@ -1324,7 +1323,7 @@ bam_print_stderr(char *format, ...)
 	va_end(ap);
 }
 
-static void
+void
 bam_exit(int excode)
 {
 	restore_env();
