@@ -447,6 +447,7 @@ ipc_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 	int			error, is_priv = (int)arg;
 	const char		*ifname;
 	boolean_t		isv6;
+	boolean_t		dsm_created = B_FALSE;
 
 	ipc_action_init(&ia);
 	error = dhcp_ipc_recv_request(fd, &ia.ia_request,
@@ -541,17 +542,15 @@ ipc_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 			if (lif != NULL &&
 			    (dsmp = insert_smach(lif, &error)) != NULL) {
 				/*
-				 * Get client ID and set "DHCPRUNNING" flag on
-				 * logical interface.  (V4 only, because V6
-				 * plumbs its own interfaces.)
+				 * Get client ID for logical interface.  (V4
+				 * only, because V6 plumbs its own interfaces.)
 				 */
 				error = get_smach_cid(dsmp);
-				if (error == DHCP_IPC_SUCCESS)
-					error = set_lif_dhcp(lif, B_FALSE);
 				if (error != DHCP_IPC_SUCCESS) {
 					remove_smach(dsmp);
 					dsmp = NULL;
 				}
+				dsm_created = (dsmp != NULL);
 			}
 
 		/*
@@ -564,6 +563,19 @@ ipc_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 			send_error_reply(&ia, error);
 			return;
 		}
+	}
+
+	/*
+	 * If this is a request for DHCP to manage a lease on an address,
+	 * ensure that IFF_DHCPRUNNING is set (we don't set this when the lif
+	 * is created because the lif may have been created for INFORM).
+	 */
+	if (ia.ia_cmd == DHCP_START &&
+	    (error = set_lif_dhcp(dsmp->dsm_lif)) != DHCP_IPC_SUCCESS) {
+		if (dsm_created)
+			remove_smach(dsmp);
+		send_error_reply(&ia, error);
+		return;
 	}
 
 	if ((dsmp->dsm_dflags & DHCP_IF_BOOTP) &&

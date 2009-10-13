@@ -180,7 +180,7 @@ boolean_t	verify_lif(const dhcp_lif_t *);
 dhcp_lif_t	*plumb_lif(dhcp_pif_t *, const in6_addr_t *);
 void		unplumb_lif(dhcp_lif_t *);
 dhcp_lif_t	*attach_lif(const char *, boolean_t, int *);
-int		set_lif_dhcp(dhcp_lif_t *, boolean_t);
+int		set_lif_dhcp(dhcp_lif_t *);
 void		set_lif_deprecated(dhcp_lif_t *);
 boolean_t	clear_lif_deprecated(dhcp_lif_t *);
 boolean_t	open_ip_lif(dhcp_lif_t *, in_addr_t, boolean_t);

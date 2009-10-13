@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ADOPTING state of the client state machine.  This is used only during
  * diskless boot with IPv4.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <string.h>
@@ -167,7 +165,7 @@ dhcp_adopt(void)
 
 	dsmp->dsm_cidlen = client_id_len;
 
-	if (set_lif_dhcp(lif, B_TRUE) != DHCP_IPC_SUCCESS)
+	if (set_lif_dhcp(lif) != DHCP_IPC_SUCCESS)
 		goto failure;
 
 	if (!set_smach_state(dsmp, ADOPTING))

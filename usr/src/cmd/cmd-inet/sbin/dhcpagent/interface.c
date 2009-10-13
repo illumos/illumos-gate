@@ -1116,12 +1116,11 @@ attach_lif(const char *lname, boolean_t isv6, int *error)
  *		   by DHCP.
  *
  *   input: dhcp_lif_t *: the logical interface
- *	    boolean_t: B_TRUE if adopting
  *  output: int: set to DHCP_IPC_E_* if operation fails
  */
 
 int
-set_lif_dhcp(dhcp_lif_t *lif, boolean_t is_adopting)
+set_lif_dhcp(dhcp_lif_t *lif)
 {
 	int fd;
 	int err;
@@ -1152,18 +1151,14 @@ set_lif_dhcp(dhcp_lif_t *lif, boolean_t is_adopting)
 	}
 
 	/*
-	 * if DHCPRUNNING is already set on the interface and we're
-	 * not adopting it, the agent probably crashed and burned.
-	 * note it, but don't let it stop the proceedings.  we're
-	 * pretty sure we're not already running, since we wouldn't
-	 * have been able to bind to our IPC port.
+	 * If IFF_DHCPRUNNING is already set on the interface and we're not
+	 * adopting it, the agent probably crashed and burned.  Note it, but
+	 * don't let it stop the proceedings (we're pretty sure we're not
+	 * already running, since we were able to bind to our IPC port).
 	 */
-
 	if (lifr.lifr_flags & IFF_DHCPRUNNING) {
-		if (!is_adopting) {
-			dhcpmsg(MSG_WARNING, "set_lif_dhcp: DHCP flag already "
-			    "set on %s", lif->lif_name);
-		}
+		dhcpmsg(MSG_VERBOSE, "set_lif_dhcp: IFF_DHCPRUNNING already set"
+		    " on %s", lif->lif_name);
 	} else {
 		/*
 		 * If the lif is on an interface under IPMP, IFF_NOFAILOVER

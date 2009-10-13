@@ -3387,14 +3387,11 @@ dhcp_do_ipc(dhcp_ipc_type_t type, const char *ifname, boolean_t printed_one)
 }
 
 /*
- * dhcp_walk_interfaces: walk the list of interfaces that have a given set of
- * flags turned on (flags_on) and a given set turned off (flags_off) for a
- * given address family (af).  For each, print out the DHCP status using
- * dhcp_do_ipc.
+ * dhcp_walk_interfaces: walk the list of interfaces for a given address
+ * family (af).  For each, print out the DHCP status using dhcp_do_ipc.
  */
 static boolean_t
-dhcp_walk_interfaces(uint_t flags_on, uint_t flags_off, int af,
-    boolean_t printed_one)
+dhcp_walk_interfaces(int af, boolean_t printed_one)
 {
 	struct lifnum	lifn;
 	struct lifconf	lifc;
@@ -3433,10 +3430,6 @@ dhcp_walk_interfaces(uint_t flags_on, uint_t flags_off, int af,
 		n_ifs = lifc.lifc_len / sizeof (struct lifreq);
 
 		for (i = 0; i < n_ifs; i++) {
-			if (ioctl(sock_fd, SIOCGLIFFLAGS, &lifc.lifc_req[i]) ==
-			    0 && (lifc.lifc_req[i].lifr_flags & (flags_on |
-			    flags_off)) != flags_on)
-				continue;
 			printed_one = dhcp_do_ipc(DHCP_STATUS |
 			    (af == AF_INET6 ? DHCP_V6 : 0),
 			    lifc.lifc_req[i].lifr_name, printed_one);
@@ -3471,13 +3464,11 @@ dhcp_report(char *ifname)
 		}
 	} else {
 		if (family_selected(AF_INET)) {
-			printed_one = dhcp_walk_interfaces(IFF_DHCPRUNNING,
-			    0, AF_INET, printed_one);
+			printed_one = dhcp_walk_interfaces(AF_INET,
+			    printed_one);
 		}
-		if (family_selected(AF_INET6)) {
-			(void) dhcp_walk_interfaces(IFF_DHCPRUNNING,
-			    IFF_ADDRCONF, AF_INET6, printed_one);
-		}
+		if (family_selected(AF_INET6))
+			(void) dhcp_walk_interfaces(AF_INET6, printed_one);
 	}
 }
 
