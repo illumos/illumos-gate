@@ -199,6 +199,7 @@ create_one_dimm(topo_mod_t *mod, tnode_t *pnode, int inst, mem_dimm_map_t *dp)
 	tnode_t *cnode;
 	nvlist_t *rsrc, *fru;
 	int nerr = 0, err;
+	nvlist_t *auth = NULL;
 
 	/*
 	 * Because mem_tnode_create will fill in a "FRU" value by default,
@@ -208,9 +209,11 @@ create_one_dimm(topo_mod_t *mod, tnode_t *pnode, int inst, mem_dimm_map_t *dp)
 	 * created.
 	 */
 
+	auth = topo_mod_auth(mod, pnode);
 	if ((fru = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION, "dimm",
-	    inst, NULL, NULL, dp->dm_part, NULL, dp->dm_serid)) == NULL)
+	    inst, NULL, auth, dp->dm_part, NULL, dp->dm_serid)) == NULL)
 		nerr++;
+	nvlist_free(auth);
 
 	cnode = mem_tnode_create(mod, pnode, "dimm", inst,
 	    dp->dm_serid, fru, dp->dm_label, NULL);
