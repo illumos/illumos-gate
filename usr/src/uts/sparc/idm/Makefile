@@ -21,7 +21,7 @@
 #
 # uts/intel/io/idm/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -59,6 +59,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
 LDFLAGS		+= -dy -Nfs/sockfs -Nmisc/ksocket
+
+#	Include
+INC_PATH	+= -I$(SRC)/common/hdcrc
 
 #
 #	Default build targets.

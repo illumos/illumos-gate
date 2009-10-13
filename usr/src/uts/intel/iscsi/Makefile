@@ -57,6 +57,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 # includes
 INC_PATH	+= -I$(UTSBASE)/common/io/scsi/adapters/iscsi
+INC_PATH	+= -I$(SRC)/common/hdcrc
 
 #
 # Note dependancy on misc/scsi.

@@ -38,8 +38,15 @@
 
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_so.h>
+#include <hd_crc.h>
 
 extern idm_transport_t  idm_transport_list[];
+/*
+ * -1 - uninitialized
+ * 0  - applicable
+ * others - NA
+ */
+static int iscsi_crc32_hd = -1;
 
 void
 idm_pdu_rx(idm_conn_t *ic, idm_pdu_t *pdu)
@@ -894,6 +901,16 @@ idm_crc32c(void *address, unsigned long length)
 
 	ASSERT(address != NULL);
 
+	if (iscsi_crc32_hd == -1) {
+		if (hd_crc32_avail((uint32_t *)idm_crc32c_table) == B_TRUE) {
+			iscsi_crc32_hd = 0;
+		} else {
+			iscsi_crc32_hd = 1;
+		}
+	}
+	if (iscsi_crc32_hd == 0)
+		return (HW_CRC32(buffer, length, crc));
+
 	while (length--) {
 		crc = idm_crc32c_table[(crc ^ *buffer++) & 0xFFL] ^
 		    (crc >> 8);
@@ -926,6 +943,17 @@ idm_crc32c_continued(void *address, unsigned long length, uint32_t crc)
 #endif
 
 	ASSERT(address != NULL);
+
+	if (iscsi_crc32_hd == -1) {
+		if (hd_crc32_avail((uint32_t *)idm_crc32c_table) == B_TRUE) {
+			iscsi_crc32_hd = 0;
+		} else {
+			iscsi_crc32_hd = 1;
+		}
+	}
+	if (iscsi_crc32_hd == 0)
+		return (HW_CRC32_CONT(buffer, length, crc));
+
 
 #ifdef	_BIG_ENDIAN
 	byte0 = (uint8_t)((crc >> 24) & 0xFF);
