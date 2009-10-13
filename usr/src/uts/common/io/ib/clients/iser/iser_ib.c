@@ -954,7 +954,12 @@ iser_ib_handle_portup_event(ibt_hca_hdl_t hdl, ibt_async_event_t *event)
 
 		/* HCA is just made available, first port on that HCA */
 		hca = iser_ib_alloc_hca(event->ev_hca_guid);
-
+		if (hca == NULL) {
+			ISER_LOG(CE_NOTE, "iser_ib_handle_portup_event "
+			    "iser_ib_alloc_hca failed: HCA(0x%llx) port(%d)",
+			    (longlong_t)event->ev_hca_guid, event->ev_port);
+			return;
+		}
 		mutex_enter(&iser_state->is_hcalist_lock);
 		list_insert_tail(&iser_state->is_hcalist, hca);
 		iser_state->is_num_hcas++;
