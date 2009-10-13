@@ -167,6 +167,11 @@ static void persistent_init_static_addr_oids()
 			curr_count++;
 		}
 
+		/* Skip the target whose address size length is 0 */
+		if (e.e_insize == 0) {
+			continue;
+		}
+
 		mutex_enter(&iscsi_oid_mutex);
 		e.e_oid = iscsi_oid++;
 		mutex_exit(&iscsi_oid_mutex);
@@ -213,6 +218,10 @@ persistent_static_addr_upgrade_to_v2()
 				continue;
 			}
 			*c_end = '\0';
+			/* Skip the target whose address size length is 0 */
+			if (e.e_insize == 0) {
+				continue;
+			}
 			/* Add updated record */
 			(void) persistent_static_addr_set(target_name, &e);
 		}

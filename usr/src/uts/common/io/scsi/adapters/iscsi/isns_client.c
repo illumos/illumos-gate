@@ -2505,7 +2505,18 @@ isns_process_dev_attr_qry_target_nodes_pdu(
 			}
 		} else if (ntohl(attr_tlv_p->attr_id) ==
 		    ISNS_PG_TAG_ATTR_ID) {
-			num_of_pgs++;
+			if (ntohl(attr_tlv_p->attr_len) > 0) {
+				/*
+				 * Count only those iSCSI node that have a
+				 * non-NULL PGT value as valid Entity.
+				 * Per rfc4171 section 3.4 - If the PGT value
+				 * registered for a specified Portal and iSCSI
+				 * Node is NULL, or if no PGT value is
+				 * registered, then the Portal does not provide
+				 * access to that iSCSI Node in the Entity.
+				 */
+				num_of_pgs++;
+			}
 		}
 		len = ntohl(attr_tlv_p->attr_len);
 
@@ -2649,8 +2660,15 @@ isns_process_dev_attr_qry_target_nodes_pdu(
 					    (*attr_tlv_p).
 					    attr_value);
 				}
-				(*pg_list)->pg_out_cnt++;
 				target_node_type_b = B_FALSE;
+				if (ntohl(attr_tlv_p->attr_len) > 0) {
+					/*
+					 * Only the iSCSI node that has a
+					 * non-NULL PGT value is an valid
+					 * Entity.
+					 */
+					(*pg_list)->pg_out_cnt++;
+				}
 				break;
 
 			default:

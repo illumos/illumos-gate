@@ -2589,7 +2589,8 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			break;
 		}
 
-		if (target->te_entry.e_vers != ISCSI_INTERFACE_VERSION) {
+		if ((target->te_entry.e_vers != ISCSI_INTERFACE_VERSION) ||
+		    (target->te_entry.e_insize == 0)) {
 			kmem_free(target, sizeof (*target));
 			rtn = EINVAL;
 			break;
@@ -2675,7 +2676,8 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		if (ddi_copyin((caddr_t)arg, &e, sizeof (e), mode)) {
 			rtn = EFAULT;
 			break;
-		} else if (e.e_vers != ISCSI_INTERFACE_VERSION) {
+		} else if ((e.e_vers != ISCSI_INTERFACE_VERSION) ||
+		    (e.e_insize == 0)) {
 			rtn = EINVAL;
 			break;
 		}
