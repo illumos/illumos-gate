@@ -1035,6 +1035,10 @@ reencode_attrs:
 					(void) makefh4((nfs_fh4 *)&fh, vp,
 					    (newexi ? newexi : cs->exi));
 
+					if (dvp->v_flag & V_XATTRDIR)
+						set_fh4_flag((nfs_fh4 *)&fh,
+						    FH4_NAMEDATTR);
+
 					if (!xdr_inline_encode_nfs_fh4(
 					    &ptr, ptr_redzone,
 					    (nfs_fh4_fmt_t *)fh.val)) {
