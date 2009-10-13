@@ -19453,15 +19453,22 @@ ip_ether_v6intfid(ill_t *ill, in6_addr_t *v6addr)
 {
 	char		*addr;
 
-	ASSERT(ill->ill_phys_addr_length == ETHERADDRL);
-
-	/* Form EUI-64 like address */
-	addr = (char *)&v6addr->s6_addr32[2];
-	bcopy(ill->ill_phys_addr, addr, 3);
-	addr[0] ^= 0x2;		/* Toggle Universal/Local bit */
-	addr[3] = (char)0xff;
-	addr[4] = (char)0xfe;
-	bcopy(ill->ill_phys_addr + 3, addr + 5, 3);
+	/*
+	 * Note that some IPv6 interfaces get plumbed over links that claim to
+	 * be DL_ETHER, but don't actually have Ethernet MAC addresses (e.g.
+	 * PPP links).  The ETHERADDRL check here ensures that we only set the
+	 * interface ID on IPv6 interfaces above links that actually have real
+	 * Ethernet addresses.
+	 */
+	if (ill->ill_phys_addr_length == ETHERADDRL) {
+		/* Form EUI-64 like address */
+		addr = (char *)&v6addr->s6_addr32[2];
+		bcopy(ill->ill_phys_addr, addr, 3);
+		addr[0] ^= 0x2;		/* Toggle Universal/Local bit */
+		addr[3] = (char)0xff;
+		addr[4] = (char)0xfe;
+		bcopy(ill->ill_phys_addr + 3, addr + 5, 3);
+	}
 }
 
 /* ARGSUSED */
