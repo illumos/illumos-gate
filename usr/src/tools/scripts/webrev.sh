@@ -914,7 +914,7 @@ function framed_sdiff
 # fix_postscript
 #
 # Merge codereview output files to a single conforming postscript file, by:
-# 	- removing all extraneous headers/trailers
+#	- removing all extraneous headers/trailers
 #	- making the page numbers right
 #	- removing pages devoid of contents which confuse some
 #	  postscript readers.
@@ -1016,7 +1016,7 @@ function insert_anchors
 
 		printf "<b style=\"font-size: large; color: red\">";
 		printf "--- EOF ---</b>"
-        	for(i=0;i<8;i++) printf "\n\n\n\n\n\n\n\n\n\n";
+		for(i=0;i<8;i++) printf "\n\n\n\n\n\n\n\n\n\n";
 		printf "</pre>"
 		printf "<form name=\"eof\">";
 		printf "<input name=\"value\" value=\"%d\" " \
@@ -1060,7 +1060,7 @@ function relative_dir
 	#
 	# 1. Strip off a leading "." or "./": this is important to get
 	#    the correct arcnav links for files in $WDIR.
-	# 2. Strip off a trailing "/": this is not strictly necessary, 
+	# 2. Strip off a trailing "/": this is not strictly necessary,
 	#    but is kind of nice, since it doesn't end up in "//" at
 	#    the end of a relative path.
 	# 3. Replace all remaining sequences of non-"/" with "..": the
@@ -1760,7 +1760,7 @@ function hg_active_wxfile
 # Call hg-active to get a wx-style active list, and hand it off to
 # flist_from_wx
 #
-function flist_from_mercurial 
+function flist_from_mercurial
 {
 	typeset child=$1
 	typeset parent=$2
@@ -1773,7 +1773,7 @@ function flist_from_mercurial
 		exit 1
 	fi
 	hg_active_wxfile $child $parent
-	
+
 	# flist_from_wx prints the Done, so we don't have to.
 	flist_from_wx $TMPFLIST
 }
@@ -2031,7 +2031,7 @@ function build_old_new_unknown
 
 	#
 	# Snag the parent's version of the file.
-	# 
+	#
 	if [[ -f $PWS/$PDIR/$PF ]]; then
 		rm -f $olddir/$PDIR/$PF
 		cp $PWS/$PDIR/$PF $olddir/$PDIR/$PF
@@ -2136,6 +2136,7 @@ PATH=$(dirname $(whence $0)):$PATH
 [[ -z $SCP ]] && SCP=`look_for_prog scp`
 [[ -z $SED ]] && SED=`look_for_prog sed`
 [[ -z $SFTP ]] && SFTP=`look_for_prog sftp`
+[[ -z $SORT ]] && SORT=`look_for_prog sort`
 [[ -z $MKTEMP ]] && MKTEMP=`look_for_prog mktemp`
 [[ -z $GREP ]] && GREP=`look_for_prog grep`
 [[ -z $FIND ]] && FIND=`look_for_prog find`
@@ -2192,7 +2193,7 @@ remote_target=
 
 #
 # NOTE: when adding/removing options it is necessary to sync the list
-# 	with usr/src/tools/onbld/hgext/cdm.py
+#	with usr/src/tools/onbld/hgext/cdm.py
 #
 while getopts "C:Di:I:lnNo:Op:t:Uw" opt
 do
@@ -2306,7 +2307,7 @@ elif [[ $SCM_MODE == "subversion" ]]; then
 			fi
 		done
 
-		rel=${url#$repo} 
+		rel=${url#$repo}
 		CWS=${PWD%$rel}
 	fi
 fi
@@ -2539,7 +2540,7 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	CWS_REV=`hg parent -R $codemgr_ws --template '{node|short}' 2>/dev/null`
 	PWS=$codemgr_parent
 
-	# 
+	#
 	# If the parent is a webrev, we want to do some things against
 	# the natural workspace parent (file list, comments, etc)
 	#
@@ -2565,7 +2566,7 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 	# therein.  We do this now (rather than when we possibly use
 	# hg-active to find comments) to avoid stomping specifications
 	# in the user-specified flist.
-	# 
+	#
 	if [[ -n $flist_done ]]; then
 		env_from_flist
 	fi
@@ -2578,7 +2579,7 @@ elif [[ $SCM_MODE == "mercurial" ]]; then
 		hg_active_wxfile $CWS $real_parent
 		print " Done."
 	fi
-	
+
 	#
 	# At this point we must have a wx flist either from hg-active,
 	# or in general.  Use it to try and find our parent revision,
@@ -2682,7 +2683,7 @@ if [[ -z $nflag ]]; then
 	fi
 
 	$SED -e '/^#/d' -e '/^[ 	]*$/d' $REGFILE | while read LINE; do
-		
+
 		name=${LINE%%=*}
 		value="${LINE#*=}"
 
@@ -2932,13 +2933,16 @@ if [[ $SCM_MODE == "mercurial" ]]; then
 	#    that file in "hg manifest -v" output:  start of line, three
 	#    octal digits for file permissions, space, a file type flag
 	#    character, space, the filename, end of line.
+	# 4) Eliminate any duplicate entries.  (This can occur if a
+	#    file has been used as the source of an hg cp and it's
+	#    also been modified in the same changeset.)
 	#
 	SEDFILE=/tmp/$$.manifest.sed
 	$SED '
 		s#^[^ ]* ##
 		s#/#\\\/#g
 		s#^.*$#/^... . &$/p#
-	' < $FLIST > $SEDFILE
+	' < $FLIST | $SORT -u > $SEDFILE
 
 	#
 	# Apply the generated script to the output of "hg manifest -v"
@@ -2968,26 +2972,30 @@ do
 	rename=
 	if [[ $# -eq 2 ]]; then
 		PP=$2			# old filename
-		oldname=" (was $PP)"
+		if [[ -f $PP ]]; then
+			oldname=" (copied from $PP)"
+		else
+			oldname=" (renamed from $PP)"
+		fi
 		oldpath="$PP"
 		rename=1
-        	PDIR=${PP%/*}
-        	if [[ $PDIR == $PP ]]; then
+		PDIR=${PP%/*}
+		if [[ $PDIR == $PP ]]; then
 			PDIR="."   # File at root of workspace
 		fi
 
 		PF=${PP##*/}
 
-	        DIR=${P%/*}
-	        if [[ $DIR == $P ]]; then
+		DIR=${P%/*}
+		if [[ $DIR == $P ]]; then
 			DIR="."   # File at root of workspace
 		fi
 
 		F=${P##*/}
 
         else
-	        DIR=${P%/*}
-	        if [[ "$DIR" == "$P" ]]; then
+		DIR=${P%/*}
+		if [[ "$DIR" == "$P" ]]; then
 			DIR="."   # File at root of workspace
 		fi
 
@@ -3058,7 +3066,7 @@ do
 	#	  output of Solaris diff properly when it comes to
 	#	  adds and deletes.  We need to do some "cleansing"
 	#         transformations:
-	# 	    [to add a file] @@ -1,0 +X,Y @@  -->  @@ -0,0 +X,Y @@
+	#	    [to add a file] @@ -1,0 +X,Y @@  -->  @@ -0,0 +X,Y @@
 	#	    [to del a file] @@ -X,Y +1,0 @@  -->  @@ -X,Y +0,0 @@
 	#
 	cleanse_rmfile="$SED 's/^\(@@ [0-9+,-]*\) [0-9+,-]* @@$/\1 +0,0 @@/'"
@@ -3081,7 +3089,6 @@ do
 
 		diff -u /dev/null $nfile | sh -c "$cleanse_newfile" \
 		    >> $WDIR/$DIR/$F.patch
-
 	fi
 
 	#
@@ -3388,11 +3395,17 @@ do
 	print "<b>$P</b>"
 
 	# For renamed files, clearly state whether or not they are modified
-	if [[ -n "$oldname" ]]; then
+	if [[ -f "$oldname" ]]; then
 		if [[ -n "$mv_but_nodiff" ]]; then
-			print "<i>(renamed only, was $oldname)</i>"
+			print "<i>(copied from $oldname)</i>"
 		else
-			print "<i>(modified and renamed, was $oldname)</i>"
+			print "<i>(copied and modified from $oldname)</i>"
+		fi
+	elif [[ -n "$oldname" ]]; then
+		if [[ -n "$mv_but_nodiff" ]]; then
+			print "<i>(renamed from $oldname)</i>"
+		else
+			print "<i>(renamed and modified from $oldname)</i>"
 		fi
 	fi
 

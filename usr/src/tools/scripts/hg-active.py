@@ -101,7 +101,7 @@ def main(argv):
     entries.sort()
 
     for entry in entries:
-        if entry.is_renamed():
+        if entry.is_renamed() or entry.is_copied():
             fh.write("%s %s\n" % (entry.name, entry.parentname))
         else:
             fh.write("%s\n" % entry.name)
