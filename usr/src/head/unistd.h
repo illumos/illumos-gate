@@ -878,16 +878,9 @@ extern int lockf64();
 
 #endif /* __STDC__ */
 
-/*
- * This atrocity is necessary on sparc because registers modified
- * by the child get propagated back to the parent via the window
- * save/restore mechanism.
- */
-#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
-#if defined(__sparc)
+#if !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || defined(__EXTENSIONS__)
 #pragma unknown_control_flow(vfork)
-#endif
-#endif /* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
+#endif /* !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)... */
 
 /*
  * getlogin_r() & ttyname_r() prototypes are defined here.

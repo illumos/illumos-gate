@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_FORK_H
 #define	_SYS_FORK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -43,9 +41,7 @@ extern pid_t forkx(int);
 extern pid_t forkallx(int);
 extern pid_t vforkx(int);
 
-#if defined(__sparc)
 #pragma unknown_control_flow(vforkx)
-#endif
 
 #endif	/* !defined(_KERNEL) */
 
