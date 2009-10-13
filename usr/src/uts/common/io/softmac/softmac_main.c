@@ -1528,12 +1528,11 @@ softmac_hold_device(dev_t dev, dls_dev_handle_t *ddhp)
 	/*
 	 * Exclude non-physical network device instances, for example, aggr0.
 	 * Note: this check *must* occur after the dip is held, or else
-	 * NETWORK_DRV might return false incorrectly.  (Essentially, the
+	 * NETWORK_PHYSDRV might return false incorrectly.  (Essentially, the
 	 * driver needs to be loaded to populate the dev_ops structure
-	 * that NETWORK_DRV checks.)
+	 * that NETWORK_PHYSDRV checks.)
 	 */
-	if (!NETWORK_DRV(getmajor(dev)) || (strcmp(drvname, "aggr") == 0) ||
-	    (strcmp(drvname, "vnic") == 0)) {
+	if (!NETWORK_PHYSDRV(getmajor(dev))) {
 		ddi_release_devi(dip);
 		return (ENOENT);
 	}

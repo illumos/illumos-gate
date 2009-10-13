@@ -6063,6 +6063,14 @@ ddi_create_minor_common(dev_info_t *dip, char *name, int spec_type,
 			/* Mark driver as a network driver */
 			LOCK_DEV_OPS(&dnp->dn_lock);
 			dnp->dn_flags |= DN_NETWORK_DRIVER;
+
+			/*
+			 * If this minor node is created during the device
+			 * attachment, this is a physical network device.
+			 * Mark the driver as a physical network driver.
+			 */
+			if (DEVI_IS_ATTACHING(dip))
+				dnp->dn_flags |= DN_NETWORK_PHYSDRIVER;
 			UNLOCK_DEV_OPS(&dnp->dn_lock);
 		}
 	}

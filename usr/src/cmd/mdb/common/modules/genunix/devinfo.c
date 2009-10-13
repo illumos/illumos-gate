@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1290,6 +1290,8 @@ devnames(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		{ "DN_OPEN_RETURNS_EINTR", \
 				DN_OPEN_RETURNS_EINTR, DN_OPEN_RETURNS_EINTR},
 		{ "DN_SCSI_SIZE_CLEAN",	DN_SCSI_SIZE_CLEAN, DN_SCSI_SIZE_CLEAN},
+		{ "DN_NETWORK_PHYSDRIVER", \
+				DN_NETWORK_PHYSDRIVER, DN_NETWORK_PHYSDRIVER},
 		{ NULL, 0, 0 }
 	};
 

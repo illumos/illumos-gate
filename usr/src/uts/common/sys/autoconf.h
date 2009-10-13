@@ -87,6 +87,7 @@ struct devnames {
 #define	DN_PHCI_DRIVER		0x2000	/* pHCI driver */
 #define	DN_OPEN_RETURNS_EINTR	0x4000	/* DDI_OPEN_RETURNS_EINTR prop */
 #define	DN_SCSI_SIZE_CLEAN	0x8000	/* driver is scsi_size_clean() */
+#define	DN_NETWORK_PHYSDRIVER	0x10000	/* physical network driver */
 
 #ifdef _KERNEL
 
@@ -229,8 +230,10 @@ extern krwlock_t devinfo_tree_lock;		/* obsolete */
 #define	DRV_UNLOADABLE(opsp)	((opsp)->devo_refcnt == 0)
 #define	DEV_OPS_HELD(opsp)	((opsp)->devo_refcnt > 0)
 #define	NEXUS_DRV(opsp)		((opsp)->devo_bus_ops != NULL)
-#define	NETWORK_DRV(major)	(devnamesp[major].dn_flags & DN_NETWORK_DRIVER)
-#define	GLDV3_DRV(major)	(devnamesp[major].dn_flags & DN_GLDV3_DRIVER)
+#define	NETWORK_DRV(maj)	(devnamesp[(maj)].dn_flags & DN_NETWORK_DRIVER)
+#define	GLDV3_DRV(maj)		(devnamesp[(maj)].dn_flags & DN_GLDV3_DRIVER)
+#define	NETWORK_PHYSDRV(maj)	\
+			(devnamesp[(maj)].dn_flags & DN_NETWORK_PHYSDRIVER)
 
 extern void impl_rem_dev_props(dev_info_t *);
 extern void add_class(char *, char *);
