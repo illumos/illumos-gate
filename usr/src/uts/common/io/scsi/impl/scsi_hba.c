@@ -3560,6 +3560,9 @@ string_scsi_to_1275(char *s_1275, char *s_scsi, int len)
  *				scsiclass: (generic form-group):
  *				  R	Removable_Media: Used when
  *					inq_rmb is set.
+ *				  S	SAF-TE device: Used when
+ *					inquiry information indicates
+ *					SAF-TE devices.
  *
  *				scsa.f:	(failover form-group):
  *				  E	Explicit Target_Port_Group: Used
@@ -3614,6 +3617,7 @@ scsi_hba_ident_nodename_compatible_get(struct scsi_inquiry *inq,
 	major_t		major;
 	ddi_devid_t	devid;
 	char		*guid;
+	uchar_t		*iqd = (uchar_t *)inq;
 
 	/*
 	 * Nodename_aliases: This table was originally designed to be
@@ -3808,6 +3812,8 @@ scsi_hba_ident_nodename_compatible_get(struct scsi_inquiry *inq,
 	 *	Since OBP does not distinguish removable media in its generic
 	 *	name selection we avoid setting the 'R' flag if the root is not
 	 *	yet mounted.
+	 *   S	SAF-TE device
+	 *	Set when the device type is SAT-TE.
 	 */
 	i = 0;
 	dtype_device = inq->inq_dtype & DTYPE_MASK;
@@ -3816,6 +3822,12 @@ scsi_hba_ident_nodename_compatible_get(struct scsi_inquiry *inq,
 	    (dtype_device == DTYPE_RODIRECT) ||
 	    (dtype_device == DTYPE_OPTICAL)))
 		gf[i++] = 'R';			/* removable */
+	gf[i] = '\0';
+
+	if (modrootloaded &&
+	    (dtype_device == DTYPE_PROCESSOR) &&
+	    (strncmp((char *)&iqd[44], "SAF-TE", 4) == 0))
+		gf[i++] = 'S';
 	gf[i] = '\0';
 
 	/*

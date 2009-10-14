@@ -20,9 +20,8 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # SUNWses postinstall script
@@ -81,7 +80,7 @@ on_the_list()
 }
 
 merged_aliases=""
-dev_aliases='"scsiclass,0d"'
+dev_aliases='"scsiclass,0d" "scsiclass,03S"'
 obsolete_aliases='"scsiclass,00.vSUN.pUniversal_Xport" "scsiclass,00.vSTK.pUniversal_Xport"'
 
 current_aliases=`grep \^ses ${DRVALS} | sed -e 's/^ses //g'`
