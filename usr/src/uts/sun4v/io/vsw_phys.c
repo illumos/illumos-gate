@@ -63,6 +63,7 @@
 #include <sys/note.h>
 #include <sys/mach_descrip.h>
 #include <sys/mac.h>
+#include <sys/mac_flow.h>
 #include <sys/mdeg.h>
 #include <sys/vsw.h>
 #include <sys/vlan.h>
@@ -86,6 +87,8 @@ static void vsw_mac_add_vlans(vsw_t *vswp, mac_client_handle_t mch,
 static void vsw_mac_remove_vlans(mac_client_handle_t mch, vsw_vlanid_t *vids,
     int nvids);
 static	void vsw_mac_set_mtu(vsw_t *vswp, uint32_t mtu);
+static void vsw_maccl_set_bandwidth(vsw_t *vswp, vsw_port_t *port, int type,
+    uint64_t maxbw);
 static int vsw_notify_add(vsw_t *vswp);
 static int vsw_notify_rem(vsw_t *vswp);
 static void vsw_notify_cb(void *arg, mac_notify_type_t type);
@@ -114,6 +117,8 @@ void vsw_mac_port_reconfig_vlans(vsw_port_t *portp, uint16_t new_pvid,
     vsw_vlanid_t *new_vids, int new_nvids);
 void vsw_if_mac_reconfig(vsw_t *vswp, boolean_t update_vlans,
     uint16_t new_pvid, vsw_vlanid_t *new_vids, int new_nvids);
+void vsw_update_bandwidth(vsw_t *vswp, vsw_port_t *port, int type,
+    uint64_t maxbw);
 
 /*
  * Functions imported from other files.
@@ -451,6 +456,16 @@ vsw_mac_multicast_remove_all(vsw_t *vswp, vsw_port_t *portp, int type)
 	mutex_exit(mca_lockp);
 }
 
+void
+vsw_update_bandwidth(vsw_t *vswp, vsw_port_t *port, int type, uint64_t maxbw)
+{
+	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
+
+	WRITE_MACCL_ENTER(vswp, port, type);
+	vsw_maccl_set_bandwidth(vswp, port, type, maxbw);
+	RW_MACCL_EXIT(vswp, port, type);
+}
+
 /*
  * Open a mac client and program uncast and multicast addresses
  * for a port or the interface.
@@ -720,6 +735,9 @@ vsw_set_port_hw_addr(vsw_port_t *port)
 	vsw_mac_add_vlans(vswp, port->p_mch, macaddr,
 	    mac_flags, port->vids, port->nvids);
 
+	/* Configure bandwidth to the MAC layer */
+	vsw_maccl_set_bandwidth(NULL, port, VSW_VNETPORT, port->p_bandwidth);
+
 	mac_rx_set(port->p_mch, vsw_port_rx_cb, (void *)port);
 
 	D1(vswp, "%s: exit", __func__);
@@ -790,6 +808,8 @@ vsw_set_if_hw_addr(vsw_t *vswp)
 
 	vsw_mac_add_vlans(vswp, vswp->mch, macaddr, mac_flags,
 	    vswp->vids, vswp->nvids);
+
+	vsw_maccl_set_bandwidth(vswp, NULL, VSW_LOCALDEV, vswp->bandwidth);
 
 	mac_rx_set(vswp->mch, vsw_if_rx_cb, (void *)vswp);
 
@@ -1355,5 +1375,64 @@ vsw_notify_link(vsw_t *vswp)
 
 		vswp->phys_link_state = link_state;
 		vsw_physlink_state_update(vswp);
+	}
+}
+
+/*
+ * Configure the bandwidth limit on the vsw or vnet devices via the MAC layer.
+ * Note that bandwidth limit is not supported on a HybridIO enabled
+ * vnet, as the HybridIO assigns a specific unit of hardware resource
+ * that cannot be changed to limit bandwidth.
+ */
+static void
+vsw_maccl_set_bandwidth(vsw_t *vswp, vsw_port_t *port, int type, uint64_t maxbw)
+{
+	int			rv = 0;
+	uint64_t		*bw;
+	mac_resource_props_t	mrp;
+	mac_client_handle_t	mch;
+
+	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
+
+	if (type == VSW_VNETPORT) {
+		ASSERT(RW_WRITE_HELD(&port->maccl_rwlock));
+		mch = port->p_mch;
+		bw = &port->p_bandwidth;
+	} else {
+		ASSERT(RW_WRITE_HELD(&vswp->maccl_rwlock));
+		mch = vswp->mch;
+		bw = &vswp->bandwidth;
+	}
+
+	if (mch == NULL) {
+		return;
+	}
+
+	if (maxbw >= MRP_MAXBW_MINVAL || maxbw == 0) {
+		bzero(&mrp, sizeof (mac_resource_props_t));
+		if (maxbw == 0) {
+			mrp.mrp_maxbw = MRP_MAXBW_RESETVAL;
+		} else {
+			mrp.mrp_maxbw = maxbw;
+		}
+		mrp.mrp_mask |= MRP_MAXBW;
+
+		rv = mac_client_set_resources(mch, &mrp);
+		if (rv != 0) {
+			if (type == VSW_VNETPORT) {
+				cmn_err(CE_NOTE, "!port%d: cannot set "
+				    "bandwidth limit to (%ld), error(%d)\n",
+				    port->p_instance, maxbw, rv);
+			} else {
+				cmn_err(CE_NOTE, "!vsw%d: cannot set "
+				    "bandwidth limit to (%ld), error(%d)\n",
+				    vswp->instance, maxbw, rv);
+			}
+		} else {
+			/*
+			 * update with successfully configured bandwidth.
+			 */
+			*bw = maxbw;
+		}
 	}
 }

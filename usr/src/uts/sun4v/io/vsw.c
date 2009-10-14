@@ -92,6 +92,8 @@ static	int vsw_read_mdprops(vsw_t *vswp);
 static	void vsw_vlan_read_ids(void *arg, int type, md_t *mdp,
 	mde_cookie_t node, uint16_t *pvidp, vsw_vlanid_t **vidspp,
 	uint16_t *nvidsp, uint16_t *default_idp);
+static	void vsw_port_read_bandwidth(vsw_port_t *portp, md_t *mdp,
+	mde_cookie_t node, uint64_t *bw);
 static	int vsw_port_read_props(vsw_port_t *portp, vsw_t *vswp,
 	md_t *mdp, mde_cookie_t *node);
 static	void vsw_read_pri_eth_types(vsw_t *vswp, md_t *mdp,
@@ -101,6 +103,8 @@ static	void vsw_mtu_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 static	int vsw_mtu_update(vsw_t *vswp, uint32_t mtu);
 static	void vsw_linkprop_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 	boolean_t *pls);
+static	void vsw_bandwidth_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
+	uint64_t *bw);
 static	void vsw_update_md_prop(vsw_t *, md_t *, mde_cookie_t);
 static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
 static boolean_t vsw_cmp_vids(vsw_vlanid_t *vids1,
@@ -168,7 +172,8 @@ extern void vsw_if_mac_reconfig(vsw_t *vswp, boolean_t update_vlans,
 extern void vsw_reset_ports(vsw_t *vswp);
 extern void vsw_port_reset(vsw_port_t *portp);
 extern void vsw_physlink_update_ports(vsw_t *vswp);
-void vsw_hio_port_update(vsw_port_t *portp, boolean_t hio_enabled);
+extern void vsw_update_bandwidth(vsw_t *vswp, vsw_port_t *port, int type,
+    uint64_t maxbw);
 
 /*
  * Internal tunables.
@@ -378,6 +383,8 @@ static char port_vid_propname[] = "remote-vlan-id";
 static char hybrid_propname[] = "hybrid";
 static char vsw_mtu_propname[] = "mtu";
 static char vsw_linkprop_propname[] = "linkprop";
+static char vsw_maxbw_propname[] = "maxbw";
+static char port_maxbw_propname[] = "maxbw";
 
 /*
  * Matching criteria passed to the MDEG to register interest
@@ -1717,6 +1724,9 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	/* read priority-ether-types */
 	vsw_read_pri_eth_types(vswp, mdp, node);
 
+	/* read bandwidth property of this vsw instance */
+	vsw_bandwidth_read(vswp, mdp, node, &vswp->bandwidth);
+
 	D1(vswp, "%s: exit", __func__);
 	return (0);
 }
@@ -1820,6 +1830,28 @@ vsw_vlan_read_ids(void *arg, int type, md_t *mdp, mde_cookie_t node,
 	}
 
 	*nvidsp = nvids;
+}
+
+static void
+vsw_port_read_bandwidth(vsw_port_t *portp, md_t *mdp, mde_cookie_t node,
+    uint64_t *bw)
+{
+	int		rv;
+	uint64_t	val;
+	vsw_t		*vswp;
+
+	vswp = portp->p_vswp;
+
+	rv = md_get_prop_val(mdp, node, port_maxbw_propname, &val);
+
+	if (rv != 0) {
+		*bw = 0;
+		D3(vswp, "%s: prop(%s) not found\n", __func__,
+		    port_maxbw_propname);
+	} else {
+		*bw = val;
+		D3(vswp, "%s: %s nodes found", __func__, port_maxbw_propname);
+	}
 }
 
 /*
@@ -1997,6 +2029,25 @@ vsw_physlink_state_update(vsw_t *vswp)
 	vsw_physlink_update_ports(vswp);
 }
 
+static void
+vsw_bandwidth_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node, uint64_t *bw)
+{
+	/* read the vsw bandwidth from md */
+	int		rv;
+	uint64_t	val;
+
+	rv = md_get_prop_val(mdp, node, vsw_maxbw_propname, &val);
+	if (rv != 0) {
+		*bw = 0;
+		D3(vswp, "%s: prop(%s) not found", __func__,
+		    vsw_maxbw_propname);
+	} else {
+		*bw = val;
+		D3(vswp, "%s: %s(%d): (%ld)\n", __func__,
+		    vsw_maxbw_propname, vswp->instance, *bw);
+	}
+}
+
 /*
  * Check to see if the relevant properties in the specified node have
  * changed, and if so take the appropriate action.
@@ -2024,13 +2075,15 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 				MD_smode = 0x8,
 				MD_vlans = 0x10,
 				MD_mtu = 0x20,
-				MD_pls = 0x40} updated;
+				MD_pls = 0x40,
+				MD_bw = 0x80} updated;
 	int		rv;
 	uint16_t	pvid;
 	vsw_vlanid_t	*vids;
 	uint16_t	nvids;
 	uint32_t	mtu;
 	boolean_t	pls_update;
+	uint64_t	maxbw;
 
 	updated = MD_init;
 
@@ -2145,6 +2198,18 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	vsw_linkprop_read(vswp, mdp, node, &pls_update);
 	if (pls_update != vswp->pls_update) {
 		updated |= MD_pls;
+	}
+
+	/* Read bandwidth */
+	vsw_bandwidth_read(vswp, mdp, node, &maxbw);
+	if (maxbw != vswp->bandwidth) {
+		if (maxbw >= MRP_MAXBW_MINVAL || maxbw == 0) {
+			updated |= MD_bw;
+		} else {
+			cmn_err(CE_NOTE, "!vsw%d: Unable to process bandwidth"
+			    " update as the specified value:%ld is invalid\n",
+			    vswp->instance, maxbw);
+		}
 	}
 
 	/*
@@ -2298,6 +2363,10 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		}
 	}
 
+	if (updated & MD_bw) {
+		vsw_update_bandwidth(vswp, NULL, VSW_LOCALDEV, maxbw);
+	}
+
 	return;
 
 fail_reconf:
@@ -2425,6 +2494,10 @@ vsw_port_read_props(vsw_port_t *portp, vsw_t *vswp,
 	 * negotiation, i.e., when we know the peer is HybridIO capable.
 	 */
 	portp->p_hio_capable = B_FALSE;
+
+	/* Read bandwidth of this port */
+	vsw_port_read_bandwidth(portp, mdp, *node, &portp->p_bandwidth);
+
 	return (0);
 }
 
@@ -2464,12 +2537,18 @@ vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 	uint64_t	pport_num;
 	vsw_port_list_t	*plistp;
 	vsw_port_t	*portp;
-	boolean_t	updated_vlans = B_FALSE;
 	uint16_t	pvid;
 	vsw_vlanid_t	*vids;
 	uint16_t	nvids;
 	uint64_t	val;
 	boolean_t	hio_enabled = B_FALSE;
+	uint64_t	maxbw;
+	enum		{P_MD_init = 0x1,
+				P_MD_vlans = 0x2,
+				P_MD_hio = 0x4,
+				P_MD_maxbw = 0x8} updated;
+
+	updated = P_MD_init;
 
 	/*
 	 * For now, we get port updates only if vlan ids changed.
@@ -2504,11 +2583,33 @@ vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 	    (nvids != portp->nvids) ||		/* # of vids changed? */
 	    ((nvids != 0) && (portp->nvids != 0) &&	/* vids changed? */
 	    !vsw_cmp_vids(vids, portp->vids, nvids))) {
-		updated_vlans = B_TRUE;
+		updated |= P_MD_vlans;
 	}
 
-	if (updated_vlans == B_TRUE) {
+	/* Check if hybrid property is present */
+	if (md_get_prop_val(curr_mdp, curr_mdex, hybrid_propname, &val) == 0) {
+		D1(vswp, "%s: prop(%s) found\n", __func__, hybrid_propname);
+		hio_enabled = B_TRUE;
+	}
 
+	if (portp->p_hio_enabled != hio_enabled) {
+		updated |= P_MD_hio;
+	}
+
+	/* Check if maxbw property is present */
+	vsw_port_read_bandwidth(portp, curr_mdp, curr_mdex, &maxbw);
+	if (maxbw != portp->p_bandwidth) {
+		if (maxbw >= MRP_MAXBW_MINVAL || maxbw == 0) {
+			updated |= P_MD_maxbw;
+		} else {
+			cmn_err(CE_NOTE, "!vsw%d: Unable to process bandwidth"
+			    " update for port %d as the specified value:%ld"
+			    " is invalid\n",
+			    vswp->instance, portp->p_instance, maxbw);
+		}
+	}
+
+	if (updated & P_MD_vlans) {
 		/* Remove existing vlan ids from the hash table. */
 		vsw_vlan_remove_ids(portp, VSW_VNETPORT);
 
@@ -2522,14 +2623,12 @@ vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 		vsw_vlan_unaware_port_reset(portp);
 	}
 
-	/* Check if hybrid property is present */
-	if (md_get_prop_val(curr_mdp, curr_mdex, hybrid_propname, &val) == 0) {
-		D1(vswp, "%s: prop(%s) found\n", __func__, hybrid_propname);
-		hio_enabled = B_TRUE;
+	if (updated & P_MD_hio) {
+		vsw_hio_port_update(portp, hio_enabled);
 	}
 
-	if (portp->p_hio_enabled != hio_enabled) {
-		vsw_hio_port_update(portp, hio_enabled);
+	if (updated & P_MD_maxbw) {
+		vsw_update_bandwidth(NULL, portp, VSW_VNETPORT, maxbw);
 	}
 
 	RW_EXIT(&plistp->lockrw);

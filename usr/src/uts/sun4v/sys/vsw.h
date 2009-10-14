@@ -198,6 +198,9 @@ typedef struct	vsw {
 	boolean_t		phys_no_link_update; /* no link-update supp */
 	boolean_t		pls_update;	/* phys link state update ? */
 	link_state_t		phys_link_state;    /* physical link state */
+
+	/* bandwidth related fields */
+	uint64_t		bandwidth;	/* bandwidth limit */
 } vsw_t;
 
 /*

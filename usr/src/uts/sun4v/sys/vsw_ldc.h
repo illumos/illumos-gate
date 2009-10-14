@@ -401,6 +401,9 @@ typedef struct vsw_port {
 	/* HybridIO related info */
 	uint32_t		p_hio_enabled;	/* Hybrid mode enabled? */
 	uint32_t		p_hio_capable;	/* Port capable of HIO */
+
+	/* bandwidth limit */
+	uint64_t		p_bandwidth;	/* bandwidth limit */
 } vsw_port_t;
 
 /* list of ports per vsw */
