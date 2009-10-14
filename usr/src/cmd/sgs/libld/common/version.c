@@ -183,6 +183,7 @@ ld_vers_check_defs(Ofl_desc *ofl)
 	for (APLIST_TRAVERSE(ofl->ofl_verdesc, idx1, vdp))
 		if ((is_cyclic = vers_visit_children(ofl, vdp, 0)) == S_ERROR)
 			return (S_ERROR);
+
 	if (is_cyclic)
 		ofl->ofl_flags |= FLG_OF_FATAL;
 
@@ -191,7 +192,7 @@ ld_vers_check_defs(Ofl_desc *ofl)
 		Sym		*sym;
 		Sym_desc	*sdp;
 		const char	*name = vdp->vd_name;
-		unsigned char	bind;
+		uchar_t		bind;
 		Ver_desc	*_vdp;
 		avl_index_t	where;
 		Aliste		idx2;
@@ -260,9 +261,8 @@ ld_vers_check_defs(Ofl_desc *ofl)
 				sdp->sd_sym->st_info =
 				    ELF_ST_INFO(bind, STT_OBJECT);
 				sdp->sd_ref = REF_REL_NEED;
-				sdp->sd_flags |= FLG_SY_SPECSEC;
-				sdp->sd_flags1 |=
-				    (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF);
+				sdp->sd_flags |= (FLG_SY_SPECSEC |
+				    FLG_SY_DEFAULT | FLG_SY_EXPDEF);
 				sdp->sd_aux->sa_overndx = vdp->vd_ndx;
 
 				/*
@@ -291,8 +291,8 @@ ld_vers_check_defs(Ofl_desc *ofl)
 			DBG_CALL(Dbg_ver_symbol(ofl->ofl_lml, name));
 
 			if ((sdp = ld_sym_enter(name, sym, vdp->vd_hash,
-			    vdp->vd_file, ofl, 0, SHN_ABS, FLG_SY_SPECSEC,
-			    (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+			    vdp->vd_file, ofl, 0, SHN_ABS,
+			    (FLG_SY_SPECSEC | FLG_SY_DEFAULT | FLG_SY_EXPDEF),
 			    &where)) == (Sym_desc *)S_ERROR)
 				return (S_ERROR);
 
@@ -903,20 +903,18 @@ ld_vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
 	 */
 	vndx = ifl->ifl_versym[ndx];
 	if (vndx == 0) {
-		sdp->sd_flags |= FLG_SY_REDUCED;
-		sdp->sd_flags1 |= FLG_SY1_HIDDEN;
+		sdp->sd_flags |= (FLG_SY_REDUCED | FLG_SY_HIDDEN);
 		return;
 	}
 
 	if (vndx == VER_NDX_ELIMINATE) {
-		sdp->sd_flags |= FLG_SY_REDUCED;
-		sdp->sd_flags1 |= (FLG_SY1_HIDDEN | FLG_SY1_ELIM);
+		sdp->sd_flags |= (FLG_SY_REDUCED | FLG_SY_HIDDEN | FLG_SY_ELIM);
 		return;
 	}
 
 	if (vndx == VER_NDX_GLOBAL) {
-		if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0)
-			sdp->sd_flags1 |= (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF);
+		if ((sdp->sd_flags & FLG_SY_HIDDEN) == 0)
+			sdp->sd_flags |= (FLG_SY_DEFAULT | FLG_SY_EXPDEF);
 		if (sdp->sd_aux->sa_overndx <= VER_NDX_GLOBAL)
 			sdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
 		return;
@@ -933,8 +931,8 @@ ld_vers_promote(Sym_desc *sdp, Word ndx, Ifl_desc *ifl, Ofl_desc *ofl)
 		return;
 	}
 
-	if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0)
-		sdp->sd_flags1 |= (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF);
+	if ((sdp->sd_flags & FLG_SY_HIDDEN) == 0)
+		sdp->sd_flags |= (FLG_SY_DEFAULT | FLG_SY_EXPDEF);
 
 	/*
 	 * Promote the symbols version index to the appropriate output version

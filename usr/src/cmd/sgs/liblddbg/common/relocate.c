@@ -205,7 +205,7 @@ Dbg_reloc_doact_title(Lm_list *lml)
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_REL_ACTIVE));
-	Elf_reloc_title(lml, ELF_DBG_LD, 0);
+	Elf_reloc_title(lml, ELF_DBG_LD_ACT, 0);
 }
 
 void
@@ -530,13 +530,6 @@ Elf_reloc_title(Lm_list *lml, int caller, Word type)
 		return;
 	}
 	if (caller == ELF_DBG_LD) {
-		if (type == 0) {
-			if (DBG_NOTLONG())
-				dbg_print(lml, MSG_INTL(MSG_REL_LDSV_TITLE));
-			else
-				dbg_print(lml, MSG_INTL(MSG_REL_LDLV_TITLE));
-			return;
-		}
 		if (type == SHT_RELA) {
 			if (DBG_NOTLONG())
 				dbg_print(lml, MSG_INTL(MSG_REL_LDSA_TITLE));
@@ -548,6 +541,14 @@ Elf_reloc_title(Lm_list *lml, int caller, Word type)
 			else
 				dbg_print(lml, MSG_INTL(MSG_REL_LDLN_TITLE));
 		}
+		return;
+	}
+	if (caller == ELF_DBG_LD_ACT) {
+		if (DBG_NOTLONG())
+			dbg_print(lml, MSG_INTL(MSG_REL_LDSV_TITLE));
+		else
+			dbg_print(lml, MSG_INTL(MSG_REL_LDLV_TITLE));
+		return;
 	}
 }
 
@@ -611,6 +612,41 @@ Elf_reloc_entry_2(Lm_list *lml, int caller, const char *prestr, Word type,
 				    prestr, typestr, EC_OFF(off), secname,
 				    symname, poststr);
 		}
+		return;
+	}
+	if (caller == ELF_DBG_LD_ACT) {
+		longlong_t	value = EC_SXWORD(add);
+
+		/*
+		 * The following diagnostics are used to create active
+		 * relocation output.  A "value" field is specified in the
+		 * same column as a RELA addend.
+		 *
+		 * We have to work around an issue caused by the use of a
+		 * common format string to handle both the 32-bit and 64-bit
+		 * cases.  'add' is a signed value.  In the ELFCLASS32 case
+		 * where add is a 32-bit value, the EC_SXWORD() macro widens
+		 * it to a 64-bit signed value, which will cause sign extension
+		 * in the upper 32-bits.  As we are displaying the value in hex,
+		 * this causes our 32-bit value to be displayed with 16 hex
+		 * digits instead of 8, as would be appropriate for ELFCLASS32.
+		 *
+		 * The solution is to mask off the unwanted bits before
+		 * formatting the value.  The use of 'longlong_t' instead of
+		 * Elf64_Sxword (used by the EC_SXWORD macro) is for the
+		 * benefit of lint.
+		 */
+#if	!defined(_ELF64)
+		value &= 0xffffffff;
+#endif
+		if (DBG_NOTLONG())
+			dbg_print(lml, MSG_INTL(MSG_REL_LDSA_ENTRY),
+			    prestr, typestr, EC_OFF(off),
+			    value, secname, symname, poststr);
+		else
+			dbg_print(lml, MSG_INTL(MSG_REL_LDLA_ENTRY),
+			    prestr, typestr, EC_OFF(off),
+			    value, secname, symname, poststr);
 	}
 }
 

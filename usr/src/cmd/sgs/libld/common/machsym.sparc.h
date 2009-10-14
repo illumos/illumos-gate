@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
 
 #ifndef	_MACHSYM_DOT_SPARC_DOT_H
 #define	_MACHSYM_DOT_SPARC_DOT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -56,7 +54,7 @@ extern "C" {
 #endif
 
 extern const char	*ld_is_regsym_sparc(Ofl_desc *, Ifl_desc *, Sym *,
-			    const char *, int, Word, const char *, Word *);
+			    const char *, int, Word, const char *, sd_flag_t *);
 extern int		ld_mach_sym_typecheck_sparc(Sym_desc *, Sym *,
 			    Ifl_desc *, Ofl_desc *);
 extern int		ld_reg_check_sparc(Sym_desc *, Sym *, const char *,

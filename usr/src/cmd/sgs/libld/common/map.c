@@ -196,7 +196,7 @@ gettoken(Ofl_desc *ofl, const char *mapfile, int eof_ok)
  *	#define AV_386_TSC 0x0002	 "    "    "   " 	TSC
  *
  * Or, the above two capabilities could be represented as V0x3.  Note, the
- * OVERRIDE flag is used to insure that only those values provided via this
+ * OVERRIDE flag is used to ensure that only those values provided via this
  * mapfile entry are recorded in the final image, ie. this overrides any
  * hardware capabilities that may be defined in the objects read as part of this
  * link-edit.  Specifying:
@@ -968,7 +968,7 @@ map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
 
 /*
  * Obtain a pseudo input file descriptor to assign to a mapfile.  This is
- * required any time a symbol is generated.  First traverse the input file
+ * required any time a symbol is generated.  Traverse the input file
  * descriptors looking for a match.  As all mapfile processing occurs before
  * any real input file processing this list is going to be small and we don't
  * need to do any filename clash checking.
@@ -1054,7 +1054,7 @@ map_atsign(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 		/* LINTED */
 		hval = (Word)elf_hash(name);
 		if ((sdp = ld_sym_enter(name, sym, hval, ifl, ofl, 0, SHN_ABS,
-		    (FLG_SY_SPECSEC | FLG_SY_GLOBREF), 0, &where)) ==
+		    (FLG_SY_SPECSEC | FLG_SY_GLOBREF), &where)) ==
 		    (Sym_desc *)S_ERROR)
 			return (S_ERROR);
 		sdp->sd_flags &= ~FLG_SY_CLEAN;
@@ -1380,8 +1380,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 		uchar_t 	type = STT_NOTYPE;
 		Addr		value = 0, size = 0;
 		char		*_name, *filtee = NULL;
-		Word		sym_flags = 0;
-		Half		sym_flags1 = 0;
+		sd_flag_t	sdflags = 0;
 		uint_t		filter = 0, novalue = 1, dftflag;
 		const char	*conflict;
 
@@ -1491,8 +1490,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					    /* BEGIN CSTYLED */
 					    eprintf(ofl->ofl_lml, ERR_FATAL,
 						MSG_INTL(MSG_MAP_MULTFILTEE),
-						mapfile, EC_XWORD(Line_num),
-						_name);
+						mapfile, EC_XWORD(Line_num));
 					    errcnt++;
 					    continue;
 					    /* END CSTYLED */
@@ -1573,33 +1571,33 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_FUNCTION)) == 0) {
 					shndx = SHN_ABS;
-					sym_flags |= FLG_SY_SPECSEC;
+					sdflags |= FLG_SY_SPECSEC;
 					type = STT_FUNC;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_DATA)) == 0) {
 					shndx = SHN_ABS;
-					sym_flags |= FLG_SY_SPECSEC;
+					sdflags |= FLG_SY_SPECSEC;
 					type = STT_OBJECT;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_COMMON)) == 0) {
 					shndx = SHN_COMMON;
-					sym_flags |= FLG_SY_SPECSEC;
+					sdflags |= FLG_SY_SPECSEC;
 					type = STT_OBJECT;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_PARENT)) == 0) {
-					sym_flags |= FLG_SY_PARENT;
+					sdflags |= FLG_SY_PARENT;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_EXTERN)) == 0) {
-					sym_flags |= FLG_SY_EXTERN;
+					sdflags |= FLG_SY_EXTERN;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_DIRECT)) == 0) {
-					sym_flags1 |= FLG_SY1_DIR;
+					sdflags |= FLG_SY_DIR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_NODIRECT)) == 0) {
-					sym_flags1 |= FLG_SY1_NDIR;
+					sdflags |= FLG_SY_NDIR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					ofl->ofl_flags1 |=
 					    (FLG_OF1_NDIRECT | FLG_OF1_NGLBDIR);
@@ -1616,7 +1614,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					}
 					/* END CSTYLED */
 					dftflag = filter = FLG_SY_STDFLTR;
-					sym_flags |= FLG_SY_STDFLTR;
+					sdflags |= FLG_SY_STDFLTR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					continue;
 				} else if (strcmp(Start_tok,
@@ -1632,7 +1630,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					}
 					/* END CSTYLED */
 					dftflag = filter = FLG_SY_AUXFLTR;
-					sym_flags |= FLG_SY_AUXFLTR;
+					sdflags |= FLG_SY_AUXFLTR;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					continue;
 				} else if (strcmp(Start_tok,
@@ -1646,19 +1644,19 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					    break;
 					}
 					/* END CSTYLED */
-					sym_flags |= FLG_SY_INTPOSE;
+					sdflags |= FLG_SY_INTPOSE;
 					ofl->ofl_flags |= FLG_OF_SYMINFO;
 					ofl->ofl_dtflags_1 |= DF_1_SYMINTPOSE;
 					continue;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_DYNSORT)) == 0) {
-					sym_flags |= FLG_SY_DYNSORT;
-					sym_flags &= ~FLG_SY_NODYNSORT;
+					sdflags |= FLG_SY_DYNSORT;
+					sdflags &= ~FLG_SY_NODYNSORT;
 					continue;
 				} else if (strcmp(Start_tok,
 				    MSG_ORIG(MSG_MAP_NODYNSORT)) == 0) {
-					sym_flags &= ~FLG_SY_DYNSORT;
-					sym_flags |= FLG_SY_NODYNSORT;
+					sdflags &= ~FLG_SY_DYNSORT;
+					sdflags |= FLG_SY_NODYNSORT;
 					continue;
 				} else {
 					eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -1716,8 +1714,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 * Make sure any parent or external declarations
 				 * fall back to references.
 				 */
-				if (sym_flags &
-				    (FLG_SY_PARENT | FLG_SY_EXTERN)) {
+				if (sdflags & (FLG_SY_PARENT | FLG_SY_EXTERN)) {
 					/*
 					 * Turn it into a reference by setting
 					 * the section index to UNDEF.
@@ -1744,8 +1741,8 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				sym->st_size = size;
 				sym->st_info = ELF_ST_INFO(STB_GLOBAL, type);
 
-				if ((sdp = ld_sym_enter(_name, sym, hash, ifl,
-				    ofl, 0, shndx, sym_flags, sym_flags1,
+				if ((sdp = ld_sym_enter(_name, sym, hash,
+				    ifl, ofl, 0, shndx, sdflags,
 				    &where)) == (Sym_desc *)S_ERROR)
 					return (S_ERROR);
 
@@ -1802,11 +1799,11 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					    conflict =
 						MSG_INTL(MSG_MAP_DIFF_SYMNDX);
 				} else {
-					sdp->sd_shndx = sym->st_shndx = shndx;
+					sym->st_shndx = sdp->sd_shndx = shndx;
 				}
 				/* END CSTYLED */
 
-				if ((sdp->sd_flags1 & MSK_SY1_GLOBAL) &&
+				if ((sdp->sd_flags & MSK_SY_GLOBAL) &&
 				    (sdp->sd_aux->sa_overndx !=
 				    VER_NDX_GLOBAL) &&
 				    (vdp->vd_ndx != VER_NDX_GLOBAL) &&
@@ -1870,7 +1867,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 * of update symbol processing.
 				 */
 				sdp->sd_flags &= ~FLG_SY_SPECSEC;
-				sym_flags &= ~FLG_SY_SPECSEC;
+				sdflags &= ~FLG_SY_SPECSEC;
 			}
 
 			/*
@@ -1886,11 +1883,11 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 * This symbol needs to be reduced to local.
 				 */
 				if (ofl->ofl_flags & FLG_OF_REDLSYM) {
-					sdp->sd_flags1 |=
-					    (FLG_SY1_HIDDEN | FLG_SY1_ELIM);
+					sdp->sd_flags |=
+					    (FLG_SY_HIDDEN | FLG_SY_ELIM);
 					sdp->sd_sym->st_other = STV_ELIMINATE;
 				} else {
-					sdp->sd_flags1 |= FLG_SY1_HIDDEN;
+					sdp->sd_flags |= FLG_SY_HIDDEN;
 					sdp->sd_sym->st_other = STV_HIDDEN;
 				}
 			} else if (scope == FLG_SCOPE_ELIM) {
@@ -1900,8 +1897,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 * any necessary relocation processing prior
 				 * to the symbol being eliminated.
 				 */
-				sdp->sd_flags1 |=
-				    (FLG_SY1_HIDDEN | FLG_SY1_ELIM);
+				sdp->sd_flags |= (FLG_SY_HIDDEN | FLG_SY_ELIM);
 				sdp->sd_sym->st_other = STV_ELIMINATE;
 
 			} else {
@@ -1909,24 +1905,23 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 * This symbol is explicitly defined to remain
 				 * global.
 				 */
-				sdp->sd_flags |= sym_flags;
-				sdp->sd_flags1 |= sym_flags1;
+				sdp->sd_flags |= sdflags;
 
 				/*
 				 * Qualify any global scope.
 				 */
 				if (scope == FLG_SCOPE_SNGL) {
-					sdp->sd_flags1 |=
-					    (FLG_SY1_SINGLE | FLG_SY1_NDIR);
+					sdp->sd_flags |=
+					    (FLG_SY_SINGLE | FLG_SY_NDIR);
 					sdp->sd_sym->st_other = STV_SINGLETON;
 				} else if (scope == FLG_SCOPE_PROT) {
-					sdp->sd_flags1 |= FLG_SY1_PROTECT;
+					sdp->sd_flags |= FLG_SY_PROTECT;
 					sdp->sd_sym->st_other = STV_PROTECTED;
 				} else if (scope == FLG_SCOPE_EXPT) {
-					sdp->sd_flags1 |= FLG_SY1_EXPORT;
+					sdp->sd_flags |= FLG_SY_EXPORT;
 					sdp->sd_sym->st_other = STV_EXPORTED;
 				} else
-					sdp->sd_flags1 |= FLG_SY1_DEFAULT;
+					sdp->sd_flags |= FLG_SY_DEFAULT;
 
 				/*
 				 * Record the present version index for later
@@ -1947,29 +1942,28 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			 * or resolved, to catch single instance, and
 			 * multi-instance definition inconsistencies.
 			 */
-			if ((sdp->sd_flags1 &
-			    (FLG_SY1_HIDDEN | FLG_SY1_ELIM)) &&
+			if ((sdp->sd_flags & (FLG_SY_HIDDEN | FLG_SY_ELIM)) &&
 			    ((scope != FLG_SCOPE_HIDD) &&
 			    (scope != FLG_SCOPE_ELIM))) {
 				conflict = MSG_INTL(MSG_MAP_DIFF_SYMLCL);
 
-			} else if (((sdp->sd_flags1 & FLG_SY1_SINGLE) ||
-			    (sdp->sd_flags1 & FLG_SY1_EXPORT)) &&
+			} else if ((sdp->sd_flags &
+			    (FLG_SY_SINGLE | FLG_SY_EXPORT)) &&
 			    ((scope != FLG_SCOPE_DFLT) &&
 			    (scope != FLG_SCOPE_EXPT) &&
 			    (scope != FLG_SCOPE_SNGL))) {
 				conflict = MSG_INTL(MSG_MAP_DIFF_SYMGLOB);
 
-			} else if ((sdp->sd_flags1 & FLG_SY1_PROTECT) &&
+			} else if ((sdp->sd_flags & FLG_SY_PROTECT) &&
 			    ((scope != FLG_SCOPE_DFLT) &&
 			    (scope != FLG_SCOPE_PROT))) {
 				conflict = MSG_INTL(MSG_MAP_DIFF_SYMPROT);
 
-			} else if ((sdp->sd_flags1 & FLG_SY1_NDIR) &&
+			} else if ((sdp->sd_flags & FLG_SY_NDIR) &&
 			    (scope == FLG_SCOPE_PROT)) {
 				conflict = MSG_INTL(MSG_MAP_DIFF_PROTNDIR);
 
-			} else if ((sdp->sd_flags1 & FLG_SY1_DIR) &&
+			} else if ((sdp->sd_flags & FLG_SY_DIR) &&
 			    (scope == FLG_SCOPE_SNGL)) {
 				conflict = MSG_INTL(MSG_MAP_DIFF_SNGLDIR);
 			}
@@ -1998,7 +1992,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 			 * Indicate that this symbol has been explicitly
 			 * contributed from a mapfile.
 			 */
-			sdp->sd_flags1 |= (FLG_SY1_MAPFILE | FLG_SY1_EXPDEF);
+			sdp->sd_flags |= (FLG_SY_MAPFILE | FLG_SY_EXPDEF);
 
 			/*
 			 * If we've encountered a symbol definition simulate
@@ -2469,10 +2463,9 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 		}
 
 		/*
-		 * If the second token is a '|' then we had better
-		 * of found a segment.  It is illegal to perform
-		 * section within segment ordering before the segment
-		 * has been declared.
+		 * If the second token is a '|' then we had better have found a
+		 * segment.  It is illegal to perform section within segment
+		 * ordering before the segment has been declared.
 		 */
 		if (tok == TK_PIPE) {
 			if (sgp1 == NULL) {

@@ -217,7 +217,7 @@ typedef struct {
 	int		(* ms_mach_sym_typecheck)(Sym_desc *, Sym *,
 			    Ifl_desc *, Ofl_desc *);
 	const char	*(* ms_is_regsym)(Ofl_desc *, Ifl_desc *, Sym *,
-			    const char *, int, Word, const char *, Word *);
+			    const char *, int, Word, const char *, sd_flag_t *);
 	Sym_desc	*(* ms_reg_find)(Sym * sym, Ofl_desc * ofl);
 	int		(* ms_reg_enter)(Sym_desc *, Ofl_desc *);
 } Target_machsym;
@@ -805,13 +805,13 @@ extern void		ld_sym_adjust_vis(Sym_desc *, Ofl_desc *);
 extern int		ld_sym_avl_comp(const void *, const void *);
 extern uintptr_t	ld_sym_copy(Sym_desc *);
 extern Sym_desc		*ld_sym_enter(const char *, Sym *, Word, Ifl_desc *,
-			    Ofl_desc *, Word, Word, Word, Half, avl_index_t *);
+			    Ofl_desc *, Word, Word, sd_flag_t, avl_index_t *);
 extern Sym_desc		*ld_sym_find(const char *, Word, avl_index_t *,
 			    Ofl_desc *);
 extern uintptr_t	ld_sym_nodirect(Is_desc *, Ifl_desc *, Ofl_desc *);
 extern uintptr_t	ld_sym_process(Is_desc *, Ifl_desc *, Ofl_desc *);
 extern uintptr_t	ld_sym_resolve(Sym_desc *, Sym *, Ifl_desc *,
-			    Ofl_desc *, int, Word, Word);
+			    Ofl_desc *, int, Word, sd_flag_t);
 extern uintptr_t	ld_sym_spec(Ofl_desc *);
 
 extern Target		ld_targ;

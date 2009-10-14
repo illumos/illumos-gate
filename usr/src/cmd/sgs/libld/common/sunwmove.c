@@ -151,7 +151,7 @@ append_move_desc(Ofl_desc *ofl, Sym_desc *sdp, Move *mvp, Is_desc *isp)
 			 * processing can be terminated once all move errors
 			 * are flushed out.
 			 */
-			sdp->sd_flags1 |= FLG_SY1_OVERLAP;
+			sdp->sd_flags |= FLG_SY_OVERLAP;
 			return (1);
 		}
 
@@ -302,7 +302,7 @@ ld_process_move(Ofl_desc *ofl)
 			if (append_move_desc(ofl, sdp, mvp, isp) == S_ERROR)
 				return (S_ERROR);
 
-			if (sdp->sd_flags1 & FLG_SY1_OVERLAP)
+			if (sdp->sd_flags & FLG_SY_OVERLAP)
 				errcnt++;
 
 			/*
@@ -335,8 +335,7 @@ ld_process_move(Ofl_desc *ofl)
 			 * The following two if statements checks the
 			 * if the move entry can be expanded or not.
 			 */
-			if (((ofl->ofl_flags & FLG_OF_STATIC) != 0) &&
-			    ((ofl->ofl_flags & FLG_OF_EXEC) != 0)) {
+			if (OFL_IS_STATIC_EXEC(ofl)) {
 				if (ELF_ST_TYPE(sym->st_info) == STT_SECTION) {
 					errcnt++;
 					eprintf(ofl->ofl_lml, ERR_FATAL,

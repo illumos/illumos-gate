@@ -38,27 +38,27 @@ pics/%.o:	$(CRTSRCS)/%.s
 		$(POST_PROCESS_O)
 
 pics/%.o:	%.c
-		$(COMPILE.c) -o $@ $< $(WARNFLAGS)
+		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 pics/%.o:	../common/%.c
-		$(COMPILE.c) -o $@ $<  $(WARNFLAGS)
+		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 pics/%.o:	$(VAR_AVLDIR)/%.c
-		$(COMPILE.c) -o $@ $< $(WARNFLAGS)
+		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 pics/%.o:	$(VAR_DTRDIR)/%.c
-		$(COMPILE.c) -o $@ $< $(WARNFLAGS)
+		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 pics/%.o:	$(SGSTOOLS)/common/%.c
-		$(COMPILE.c) -o $@ $< $(WARNFLAGS)
+		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 pics/%.o:	$(SRCBASE)/uts/$(PLAT)/krtld/%.c
-		$(COMPILE.c) -o $@ $<  $(WARNFLAGS)
+		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 $(RTLD):	pics $(PICS) $(CRTS)

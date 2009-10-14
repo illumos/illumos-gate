@@ -168,16 +168,17 @@ ld_open_outfile(Ofl_desc * ofl)
 
 /*
  * If we are creating a memory model we need to update the present memory image.
- * First we need to call elf_update(ELF_C_NULL) which will calculate the offsets
- * of each section and its associated data buffers.  From this information we
- * can then determine what padding is required.
+ * Use elf_update(ELF_C_NULL) to calculate the offset of each section and their
+ * associated data buffers.  From this information determine what padding is
+ * required.
+ *
  * Two actions are necessary to convert the present disc image into a memory
  * image:
  *
- *  o	Loadable segments must be padded so that the next segments virtual
+ *  -	Loadable segments must be padded so that the next segment virtual
  *	address and file offset are the same.
  *
- *  o	NOBITS sections must be converted into allocated, null filled sections.
+ *  -	NOBITS sections must be converted into allocated, null filled sections.
  */
 static uintptr_t
 pad_outfile(Ofl_desc *ofl)
@@ -348,19 +349,19 @@ create_outsec(Ofl_desc *ofl, Sg_desc *sgp, Os_desc *osp, Word ptype, int shidx,
  * Create the elf structures that allow the input data to be associated with the
  * new image:
  *
- *	o	define the new elf image using elf_begin(),
+ *  -	define the new elf image using elf_begin(),
  *
- *	o	obtain an elf header for the image,
+ *  -	obtain an elf header for the image,
  *
- *	o	traverse the input segments and create a program header array
- *		to define the required segments,
+ *  -	traverse the input segments and create a program header array to define
+ *	the required segments,
  *
- *	o 	traverse the output sections for each segment assigning a new
- *		section descriptor and section header for each,
+ *  -	traverse the output sections for each segment assigning a new section
+ *	descriptor and section header for each,
  *
- *	o	traverse the input sections associated with each output section
- *		and assign a new data descriptor to each (each output section
- *		becomes a linked list of input data buffers).
+ *  -	traverse the input sections associated with each output section and
+ *	assign a new data descriptor to each (each output section becomes a
+ *	linked list of input data buffers).
  */
 uintptr_t
 ld_create_outfile(Ofl_desc *ofl)
@@ -712,12 +713,11 @@ ld_create_outfile(Ofl_desc *ofl)
 	 * After all the basic input file processing, all data pointers are
 	 * referencing two types of memory:
 	 *
-	 *	o	allocated memory, ie. elf structures, internal link
-	 *		editor structures, and any new sections that have been
-	 *		created.
+	 *  -	allocated memory, ie. elf structures, internal link editor
+	 *	structures, and any new sections that have been created.
 	 *
-	 *	o	original input file mmap'ed memory, ie. the actual data
-	 *		sections of the input file images.
+	 *  -	original input file mmap'ed memory, ie. the actual data
+	 *	sections of the input file images.
 	 *
 	 * Up until now, the only memory modifications have been carried out on
 	 * the allocated memory.  Before carrying out any relocations, write the

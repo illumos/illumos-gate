@@ -269,7 +269,7 @@ typedef struct {
 #define	DF_1_NOOPEN	0x00000040	/* set RTLD_NOOPEN for this object */
 #define	DF_1_ORIGIN	0x00000080	/* ORIGIN processing required */
 #define	DF_1_DIRECT	0x00000100	/* direct binding enabled */
-#define	DF_1_TRANS	0x00000200
+#define	DF_1_TRANS	0x00000200	/* unused historical name */
 #define	DF_1_INTERPOSE	0x00000400	/* object is an interposer */
 #define	DF_1_NODEFLIB	0x00000800	/* ignore default library search path */
 #define	DF_1_NODUMP	0x00001000	/* object can't be dldump(3x)'ed */

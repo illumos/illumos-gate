@@ -54,7 +54,7 @@ typedef	enum {
 /* ARGSUSED0 */
 static void
 sym_null(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-    int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, sd_flag_t nsdflags)
 {
 }
 
@@ -184,7 +184,7 @@ sym_visibility(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 	if ((wnvis == STV_EXPORTED) || (wnvis == STV_SINGLETON)) {
 		if ((wovis != STV_DEFAULT) && (wovis != STV_EXPORTED) &&
 		    (wovis != STV_SINGLETON)) {
-			if (sdp->sd_flags1 & FLG_SY1_MAPFILE) {
+			if (sdp->sd_flags & FLG_SY_MAPFILE) {
 				sym_visibility_diag(ERR_WARNING, sdp, osym,
 				    nsym, ifl, ofl);
 			} else {
@@ -197,7 +197,7 @@ sym_visibility(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 	if (wovis == STV_SINGLETON) {
 		if ((wnvis == STV_EXPORTED) || (wnvis == STV_DEFAULT))
 			return (STV_SINGLETON);
-		if (sdp->sd_flags1 & FLG_SY1_MAPFILE) {
+		if (sdp->sd_flags & FLG_SY_MAPFILE) {
 			sym_visibility_diag(ERR_WARNING, sdp, osym,
 			    nsym, ifl, ofl);
 		} else {
@@ -211,7 +211,7 @@ sym_visibility(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 			return (STV_SINGLETON);
 		if (wnvis == STV_DEFAULT)
 			return (STV_EXPORTED);
-		if (sdp->sd_flags1 & FLG_SY1_MAPFILE) {
+		if (sdp->sd_flags & FLG_SY_MAPFILE) {
 			sym_visibility_diag(ERR_WARNING, sdp, osym,
 			    nsym, ifl, ofl);
 		} else {
@@ -231,7 +231,7 @@ sym_visibility(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 	 */
 	if ((wnvis == STV_INTERNAL) || (wovis == STV_INTERNAL)) {
 		if ((wnvis == STV_INTERNAL) &&
-		    (sdp->sd_flags1 & FLG_SY1_MAPFILE)) {
+		    (sdp->sd_flags & FLG_SY_MAPFILE)) {
 			sym_visibility_diag(ERR_WARNING, sdp, osym, nsym,
 			    ifl, ofl);
 		}
@@ -239,7 +239,7 @@ sym_visibility(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 
 	} else if ((wnvis == STV_HIDDEN) || (wovis == STV_HIDDEN)) {
 		if ((wnvis == STV_HIDDEN) &&
-		    (sdp->sd_flags1 & FLG_SY1_MAPFILE)) {
+		    (sdp->sd_flags & FLG_SY_MAPFILE)) {
 			sym_visibility_diag(ERR_WARNING, sdp, osym, nsym,
 			    ifl, ofl);
 		}
@@ -266,7 +266,7 @@ sym_visibility(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl)
 /*ARGSUSED4*/
 static void
 sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-    int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, sd_flag_t nsdflags)
 {
 	uchar_t		otype = ELF_ST_TYPE(sdp->sd_sym->st_info);
 	uchar_t		ntype = ELF_ST_TYPE(nsym->st_info);
@@ -298,7 +298,7 @@ sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 /*ARGSUSED4*/
 static void
 sym_mach_check(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-    int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, sd_flag_t nsdflags)
 {
 	/*
 	 * Perform any machine specific type checking.
@@ -314,11 +314,11 @@ sym_mach_check(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 static void
 /* ARGSUSED4 */
 sym_promote(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-    int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, sd_flag_t nsdflags)
 {
 	Word	shndx = nsym->st_shndx;
 
-	sym_typecheck(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+	sym_typecheck(sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 
 	/*
 	 * If the old symbol is from a shared object and the new symbol is a
@@ -343,19 +343,11 @@ sym_promote(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		 * it is a global or weak reference (see build_osym(), where
 		 * REF_DYN_NEED definitions are returned back to undefines).
 		 */
-		if (((shndx == SHN_UNDEF) || ((nsymflags & FLG_SY_SPECSEC) &&
+		if (((shndx == SHN_UNDEF) || ((nsdflags & FLG_SY_SPECSEC) &&
 		    (shndx == SHN_COMMON))) &&
 		    (ELF_ST_BIND(nsym->st_info) == STB_GLOBAL))
 			sdp->sd_flags |= FLG_SY_GLOBREF;
 
-	} else if ((shndx != SHN_UNDEF) && (ofl->ofl_dtflags_1 & DF_1_TRANS) &&
-	    (sdp->sd_aux->sa_bindto == 0) && (sdp->sd_ref == REF_REL_NEED) &&
-	    (ifl->ifl_ehdr->e_type == ET_DYN)) {
-		/*
-		 * If building a translator then record the symbol
-		 * we would 'bindto' with direct bindings.
-		 */
-		sdp->sd_aux->sa_bindto = ifl;
 	}
 }
 
@@ -364,7 +356,7 @@ sym_promote(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  */
 static void
 sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-    int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, sd_flag_t nsdflags)
 {
 	Sym	*osym = sdp->sd_sym;
 	Word	link;
@@ -381,7 +373,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	    ((ifl->ifl_flags & FLG_IF_NEEDED) == 0))
 		return;
 
-	sym_typecheck(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+	sym_typecheck(sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 
 	/*
 	 * This symbol has already been compared to an SO definition,
@@ -398,7 +390,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	*osym = *nsym;
 	sdp->sd_shndx = nshndx;
 	sdp->sd_flags &= ~FLG_SY_SPECSEC;
-	sdp->sd_flags |= (nsymflags & (FLG_SY_SPECSEC | FLG_SY_TENTSYM));
+	sdp->sd_flags |= (nsdflags & (FLG_SY_SPECSEC | FLG_SY_TENTSYM));
 
 	/*
 	 * If the new symbol has PROTECTED visibility, mark it.  If a PROTECTED
@@ -436,9 +428,9 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 			 * bound to, are tagged to prevent direct binding.
 			 */
 			if ((ofl->ofl_flags1 & FLG_OF1_ALNODIR) &&
-			    ((sdp->sd_flags1 &
-			    (FLG_SY1_PROTECT | FLG_SY1_DIR)) == 0))
-				sdp->sd_flags1 |= FLG_SY1_NDIR;
+			    ((sdp->sd_flags &
+			    (FLG_SY_PROTECT | FLG_SY_DIR)) == 0))
+				sdp->sd_flags |= FLG_SY_NDIR;
 		}
 
 		/*
@@ -447,7 +439,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		 * REF_DYN_NEED definitions are returned back to undefines).
 		 */
 		if (((nsym->st_shndx == SHN_UNDEF) ||
-		    ((nsymflags & FLG_SY_SPECSEC) &&
+		    ((nsdflags & FLG_SY_SPECSEC) &&
 		    (nsym->st_shndx == SHN_COMMON))) &&
 		    (ELF_ST_BIND(nsym->st_info) == STB_GLOBAL))
 			sdp->sd_flags |= FLG_SY_GLOBREF;
@@ -501,7 +493,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	/*
 	 * Update the input section descriptor to that of the new input file
 	 */
-	if (((nsymflags & FLG_SY_SPECSEC) == 0) &&
+	if (((nsdflags & FLG_SY_SPECSEC) == 0) &&
 	    (nsym->st_shndx != SHN_UNDEF)) {
 		if ((sdp->sd_isc = ifl->ifl_isdesc[nshndx]) == 0) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -517,7 +509,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  */
 static void
 sym_twoundefs(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-    int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, sd_flag_t nsdflags)
 {
 	Sym	*osym = sdp->sd_sym;
 	uchar_t	obind = ELF_ST_BIND(osym->st_info);
@@ -534,10 +526,10 @@ sym_twoundefs(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 */
 	if (((obind == STB_WEAK) && (nbind != STB_WEAK)) ||
 	    (obind == STT_NOTYPE) && (nbind != STT_NOTYPE)) {
-		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 		return;
 	}
-	sym_typecheck(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+	sym_typecheck(sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 }
 
 /*
@@ -545,7 +537,7 @@ sym_twoundefs(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  */
 static void
 sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-    int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, sd_flag_t nsdflags)
 {
 	Conv_inv_buf_t inv_buf1, inv_buf2;
 	Sym	*osym = sdp->sd_sym;
@@ -632,13 +624,13 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		if (warn)
 			eprintf(ofl->ofl_lml, ERR_NONE,
 			    MSG_INTL(MSG_SYM_DEFTAKEN), ifl->ifl_name);
-		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 		return;
 	} else {
 		if (warn)
 			eprintf(ofl->ofl_lml, ERR_NONE,
 			    MSG_INTL(MSG_SYM_DEFTAKEN), sdp->sd_file->ifl_name);
-		sym_promote(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+		sym_promote(sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 		return;
 	}
 }
@@ -648,7 +640,7 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  */
 static void
 sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-    int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, sd_flag_t nsdflags)
 {
 	Conv_inv_buf_t inv_buf1, inv_buf2;
 	Sym	*osym = sdp->sd_sym;
@@ -682,7 +674,7 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_SYM_DIFFTYPE), demangle(sdp->sd_name));
 			sym_promote(sdp, nsym, ifl, ofl, ndx,
-			    nshndx, nsymflags);
+			    nshndx, nsdflags);
 		} else {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_SYM_MULDEF), demangle(sdp->sd_name));
@@ -703,14 +695,14 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 				return;
 			else {
 				sym_override(sdp, nsym, ifl, ofl, ndx,
-				    nshndx, nsymflags);
+				    nshndx, nsdflags);
 				return;
 			}
 		}
 		if ((nfile == ET_DYN) && (ntype == STT_FUNC)) {
 			if ((ntype != STB_WEAK) && (otype == STB_WEAK)) {
 				sym_override(sdp, nsym, ifl, ofl, ndx,
-				    nshndx, nsymflags);
+				    nshndx, nsdflags);
 				return;
 			} else
 				return;
@@ -719,7 +711,7 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 
 	if (sdp->sd_flags & FLG_SY_TENTSYM)
 		otent = TRUE;
-	if (nsymflags & FLG_SY_TENTSYM)
+	if (nsdflags & FLG_SY_TENTSYM)
 		ntent = TRUE;
 
 
@@ -798,7 +790,7 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 
 	if ((ofile == ET_DYN) && (nfile == ET_REL) && (ntent == TRUE) &&
 	    (nvis == STV_PROTECTED)) {
-		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 		return;
 	}
 
@@ -814,13 +806,13 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		if (warn)
 			eprintf(ofl->ofl_lml, ERR_NONE,
 			    MSG_INTL(MSG_SYM_DEFTAKEN), ifl->ifl_name);
-		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+		sym_override(sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 		return;
 	} else {
 		if (warn)
 			eprintf(ofl->ofl_lml, ERR_NONE,
 			    MSG_INTL(MSG_SYM_DEFTAKEN), sdp->sd_file->ifl_name);
-		sym_promote(sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+		sym_promote(sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 		return;
 	}
 }
@@ -830,7 +822,7 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  */
 static void
 sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
-    int ndx, Word nshndx, Word nsymflags)
+    int ndx, Word nshndx, sd_flag_t nsdflags)
 {
 	Sym	*osym = sdp->sd_sym;
 	uchar_t	obind = ELF_ST_BIND(osym->st_info);
@@ -859,7 +851,7 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 			 * Take the new symbol.
 			 */
 			sym_override(sdp, nsym, ifl, ofl, ndx, nshndx,
-			    nsymflags);
+			    nsdflags);
 			return;
 		}
 	}
@@ -876,13 +868,13 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	if ((osym->st_value != nsym->st_value) &&
 	    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
 	    (sdp->sd_sym->st_shndx == SHN_COMMON) &&
-	    (nsymflags & FLG_SY_SPECSEC) &&
+	    (nsdflags & FLG_SY_SPECSEC) &&
 #if	defined(_ELF64)
 	    (nsym->st_shndx == SHN_COMMON)) ||
 	    ((ld_targ.t_m.m_mach == EM_AMD64) &&
 	    (sdp->sd_flags & FLG_SY_SPECSEC) &&
 	    (sdp->sd_sym->st_shndx == SHN_X86_64_LCOMMON) &&
-	    (nsymflags & FLG_SY_SPECSEC) &&
+	    (nsdflags & FLG_SY_SPECSEC) &&
 	    (nsym->st_shndx == SHN_X86_64_LCOMMON))) {
 #else
 	    (nsym->st_shndx == SHN_COMMON))) {
@@ -986,7 +978,7 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 					emsg = MSG_INTL(MSG_SYM_DEFUPDATE);
 				}
 				sym_override(sdp, nsym, ifl, ofl, ndx,
-				    nshndx, nsymflags);
+				    nshndx, nsdflags);
 			} else {
 				file = sdp->sd_file->ifl_name;
 				if (osym->st_size < nsym->st_size) {
@@ -994,19 +986,19 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 					emsg = MSG_INTL(MSG_SYM_DEFUPDATE);
 				}
 				sym_promote(sdp, nsym, ifl, ofl, ndx,
-				    nshndx, nsymflags);
+				    nshndx, nsdflags);
 			}
 		} else if (obind != nbind) {
 			if ((obind == STB_WEAK) && (nbind != STB_WEAK)) {
 				sym_override(sdp, nsym, ifl, ofl, ndx,
-				    nshndx, nsymflags);
+				    nshndx, nsdflags);
 				file = ifl->ifl_name;
 			} else
 				file = sdp->sd_file->ifl_name;
 		} else {
 			if (osym->st_size < nsym->st_size) {
 				sym_override(sdp, nsym, ifl, ofl, ndx,
-				    nshndx, nsymflags);
+				    nshndx, nsdflags);
 				file = ifl->ifl_name;
 			} else
 				file = sdp->sd_file->ifl_name;
@@ -1033,10 +1025,10 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		    (((obind == STB_WEAK) && (nbind != STB_WEAK)) &&
 		    (!((ofile != nfile) && (ofile == ET_REL)))))
 			sym_override(sdp, nsym, ifl, ofl, ndx,
-			    nshndx, nsymflags);
+			    nshndx, nsdflags);
 		else
 			sym_promote(sdp, nsym, ifl, ofl, ndx,
-			    nshndx, nsymflags);
+			    nshndx, nsdflags);
 	}
 
 	/*
@@ -1051,7 +1043,7 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
  * procedure to be called (if any).
  */
 static void (*Action[REF_NUM * SYM_NUM * 2][SYM_NUM])(Sym_desc *,
-    Sym *, Ifl_desc *, Ofl_desc *, int, Word, Word) = {
+    Sym *, Ifl_desc *, Ofl_desc *, int, Word, sd_flag_t) = {
 
 /*				defined		undef		tent	*/
 /*				ET_REL		ET_REL		ET_REL	*/
@@ -1083,7 +1075,7 @@ static void (*Action[REF_NUM * SYM_NUM * 2][SYM_NUM])(Sym_desc *,
 
 uintptr_t
 ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
-    Word nshndx, Word nsymflags)
+    Word nshndx, sd_flag_t nsdflags)
 {
 	int		row, column;		/* State table coordinates */
 	Sym		*osym = sdp->sd_sym;
@@ -1131,16 +1123,16 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	/*
 	 * Determine the new symbols definition (defines column in Action[]).
 	 */
-	if ((nsymflags & FLG_SY_SPECSEC) &&
+	if ((nsdflags & FLG_SY_SPECSEC) &&
 	    (nsym->st_shndx == SHN_COMMON)) {
 		column = SYM_TENTATIVE;
-		nsymflags |= FLG_SY_TENTSYM;
+		nsdflags |= FLG_SY_TENTSYM;
 #if	defined(_ELF64)
 	} else if ((ld_targ.t_m.m_mach == EM_AMD64) &&
-	    (nsymflags & FLG_SY_SPECSEC) &&
+	    (nsdflags & FLG_SY_SPECSEC) &&
 	    (nsym->st_shndx == SHN_X86_64_LCOMMON)) {
 		column = SYM_TENTATIVE;
-		nsymflags |= FLG_SY_TENTSYM;
+		nsdflags |= FLG_SY_TENTSYM;
 #endif
 	} else if ((nsym->st_shndx == SHN_UNDEF) ||
 	    (nsym->st_shndx == SHN_SUNW_IGNORE)) {
@@ -1153,11 +1145,11 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 		 * associated with a SHT_NOBITS section then this symbol
 		 * originated from a tentative symbol.
 		 */
-		if (((nsymflags & FLG_SY_SPECSEC) == 0) && (nfile == ET_DYN)) {
+		if (((nsdflags & FLG_SY_SPECSEC) == 0) && (nfile == ET_DYN)) {
 			isp = ifl->ifl_isdesc[nshndx];
 			if (isp && (isp->is_shdr->sh_type == SHT_NOBITS)) {
 				column = SYM_TENTATIVE;
-				nsymflags |= FLG_SY_TENTSYM;
+				nsdflags |= FLG_SY_TENTSYM;
 			}
 		}
 	}
@@ -1173,7 +1165,7 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	 * multiple (interposed) definitions of a symbol (refer to ldmap_out()).
 	 */
 	if ((ofl->ofl_flags & FLG_OF_GENMAP) && (nsym->st_shndx != SHN_UNDEF) &&
-	    ((nsymflags & FLG_SY_SPECSEC) == 0))
+	    ((nsdflags & FLG_SY_SPECSEC) == 0))
 		if (aplist_append(&sdp->sd_aux->sa_dfiles, ifl->ifl_name,
 		    AL_CNT_SDP_DFILES) == NULL)
 			return (S_ERROR);
@@ -1181,7 +1173,7 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	/*
 	 * Perform the required resolution.
 	 */
-	Action[row][column](sdp, nsym, ifl, ofl, ndx, nshndx, nsymflags);
+	Action[row][column](sdp, nsym, ifl, ofl, ndx, nshndx, nsdflags);
 
 	/*
 	 * Apply any visibility requirements.  If a SINGLETON has been
@@ -1191,14 +1183,12 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	 */
 	if ((oref == REF_REL_NEED) || (nfile == ET_REL)) {
 		if ((vis == STV_EXPORTED) || (vis == STV_SINGLETON)) {
-			sdp->sd_flags1 &= ~(FLG_SY1_PROTECT | FLG_SY1_ELIM |
-			    FLG_SY1_HIDDEN);
+			sdp->sd_flags &= ~MSK_SY_LOCAL;
 
 			if (vis == STV_EXPORTED)
-				sdp->sd_flags1 |= FLG_SY1_EXPORT;
+				sdp->sd_flags |= FLG_SY_EXPORT;
 			else {
-				sdp->sd_flags1 |=
-				    (FLG_SY1_NDIR | FLG_SY1_SINGLE);
+				sdp->sd_flags |= (FLG_SY_NDIR | FLG_SY_SINGLE);
 
 				if (sdp->sd_ref == REF_REL_NEED) {
 					ofl->ofl_flags1 |=
@@ -1206,11 +1196,11 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 				}
 			}
 		} else if (vis == STV_PROTECTED) {
-			sdp->sd_flags1 |= FLG_SY1_PROTECT;
+			sdp->sd_flags |= FLG_SY_PROTECT;
 		} else if ((vis == STV_INTERNAL) || (vis == STV_HIDDEN)) {
-			sdp->sd_flags1 |= FLG_SY1_HIDDEN;
+			sdp->sd_flags |= FLG_SY_HIDDEN;
 		} else if (vis == STV_ELIMINATE) {
-			sdp->sd_flags1 |= (FLG_SY1_HIDDEN | FLG_SY1_ELIM);
+			sdp->sd_flags |= (FLG_SY_HIDDEN | FLG_SY_ELIM);
 		}
 
 		sdp->sd_sym->st_other =

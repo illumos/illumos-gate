@@ -151,8 +151,7 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *crp)
 				continue;
 
 			/*
-			 * First, check if this symbol is reference symbol
-			 * for this relocation entry.
+			 * Determine if symbol is referenced from a relocation.
 			 */
 			rstndx = (Word) ELF_R_SYM(reloc->r_info);
 			rsdp = ifl->ifl_oldndx[rstndx];
@@ -175,7 +174,7 @@ is_disp_copied(Ofl_desc *ofl, Copy_rel *crp)
 			}
 
 			/*
-			 * Then check if this relocation entry is relocating
+			 * Determine whether the relocation entry is relocating
 			 * this symbol.
 			 */
 			if ((sdp->sd_isc != trel) ||
@@ -283,11 +282,10 @@ disp_scansyms(Ifl_desc * ifl, Rel_desc *rld, Boolean rlocal, int inspect,
 		 * either symbol.  Note, this test is very similar to the test
 		 * used in ld_sym_adjust_vis().
 		 */
-		if ((rlocal == TRUE) &&
-		    ((tsdp->sd_flags1 & FLG_SY1_HIDDEN) ||
+		if ((rlocal == TRUE) && ((tsdp->sd_flags & FLG_SY_HIDDEN) ||
 		    (ELF_ST_BIND(tsdp->sd_sym->st_info) != STB_GLOBAL) ||
 		    ((ofl->ofl_flags & (FLG_OF_AUTOLCL | FLG_OF_AUTOELM)) &&
-		    ((tsdp->sd_flags1 & MSK_SY1_NOAUTO) == 0))))
+		    ((tsdp->sd_flags & MSK_SY_NOAUTO) == 0))))
 			return (tsdp);
 
 		/*
@@ -717,10 +715,8 @@ ld_reloc_plt(Rel_desc *rsp, Ofl_desc *ofl)
 		 * If this symbol is binding to a LAZYLOADED object then
 		 * set the LAZYLD symbol flag.
 		 */
-		if ((sdp->sd_aux->sa_bindto &&
-		    (sdp->sd_aux->sa_bindto->ifl_flags & FLG_IF_LAZYLD)) ||
-		    (sdp->sd_file &&
-		    (sdp->sd_file->ifl_flags & FLG_IF_LAZYLD)))
+		if (sdp->sd_file &&
+		    (sdp->sd_file->ifl_flags & FLG_IF_LAZYLD))
 			sdp->sd_flags |= FLG_SY_LAZYLD;
 
 		rsp->rel_rtype = ld_targ.t_m.m_r_jmp_slot;
@@ -887,14 +883,14 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 		 * to carry out a number of checks against the symbols binding
 		 * that are triggered by the REF_DYN_NEED state.
 		 */
-		sdp->sd_flags |= FLG_SY_MVTOCOMM;
-		sdp->sd_flags1 |= (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF);
-		sdp->sd_flags1 &= ~MSK_SY1_LOCAL;
+		sdp->sd_flags |=
+		    (FLG_SY_MVTOCOMM | FLG_SY_DEFAULT | FLG_SY_EXPDEF);
+		sdp->sd_flags &= ~MSK_SY_LOCAL;
 		sdp->sd_sym->st_other &= ~MSK_SYM_VISIBILITY;
 		if (_sdp) {
-			_sdp->sd_flags |= FLG_SY_MVTOCOMM;
-			_sdp->sd_flags1 |= (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF);
-			_sdp->sd_flags1 &= ~MSK_SY1_LOCAL;
+			_sdp->sd_flags |= (FLG_SY_MVTOCOMM |
+			    FLG_SY_DEFAULT | FLG_SY_EXPDEF);
+			_sdp->sd_flags &= ~MSK_SY_LOCAL;
 			_sdp->sd_sym->st_other &= ~MSK_SYM_VISIBILITY;
 
 			/*
@@ -972,7 +968,7 @@ reloc_exec(Rel_desc *rsp, Ofl_desc *ofl)
 /*
  * All relocations should have been handled by the other routines.  This
  * routine is here as a catch all, if we do enter it we've goofed - but
- * we'll try and to the best we can.
+ * we'll try and do the best we can.
  */
 static uintptr_t
 reloc_generic(Rel_desc *rsp, Ofl_desc *ofl)
@@ -1030,7 +1026,7 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	 */
 	if (local && (((ofl->ofl_flags & FLG_OF_REDLSYM) &&
 	    (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL)) ||
-	    ((sdp->sd_flags1 & FLG_SY1_ELIM) &&
+	    ((sdp->sd_flags & FLG_SY_ELIM) &&
 	    (ofl->ofl_flags & FLG_OF_PROCRED)))) {
 		/*
 		 * But if this is PIC code, don't allow it for now.
@@ -1095,8 +1091,7 @@ reloc_TLS(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 	/*
 	 * All TLS relocations are illegal in a static executable.
 	 */
-	if ((flags & (FLG_OF_STATIC | FLG_OF_EXEC)) ==
-	    (FLG_OF_STATIC | FLG_OF_EXEC)) {
+	if (OFL_IS_STATIC_EXEC(ofl)) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_TLSSTAT),
 		    conv_reloc_type(mach, rtype, 0, &inv_buf1), ifl->ifl_name,
 		    demangle(rsp->rel_sname));
@@ -1217,25 +1212,25 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	 * Determine whether this symbol should be bound locally or not.
 	 * Symbols are bound locally if one of the following is true:
 	 *
-	 *  o	the symbol is of type STB_LOCAL.
+	 *  -	the symbol is of type STB_LOCAL.
 	 *
-	 *  o	the output image is not a relocatable object and the relocation
+	 *  -	the output image is not a relocatable object and the relocation
 	 *	is relative to the .got.
 	 *
-	 *  o	the section being relocated is of type SHT_SUNW_dof.  These
+	 *  -	the section being relocated is of type SHT_SUNW_dof.  These
 	 *	sections must be bound to the functions in the containing
 	 *	object and can not be interposed upon.
 	 *
-	 *  o	the symbol has been reduced (scoped to a local or symbolic) and
+	 *  -	the symbol has been reduced (scoped to a local or symbolic) and
 	 *	reductions are being processed.
 	 *
-	 *  o	the -Bsymbolic flag is in use when building a shared object,
+	 *  -	the -Bsymbolic flag is in use when building a shared object,
 	 *	and the symbol hasn't explicitly been defined as nodirect.
 	 *
-	 *  o	an executable (fixed address) is being created, and the symbol
+	 *  -	an executable (fixed address) is being created, and the symbol
 	 *	is defined in the executable.
 	 *
-	 *  o	the relocation is against a segment which will not be loaded
+	 *  -	the relocation is against a segment which will not be loaded
 	 *	into memory.  In this case, the relocation must be resolved
 	 *	now, as ld.so.1 can not process relocations against unmapped
 	 *	segments.
@@ -1250,8 +1245,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 		    reld->rel_isdesc->is_shdr->sh_type == SHT_SUNW_dof) {
 			local = TRUE;
 		} else if (!(flags & FLG_OF_RELOBJ) &&
-		    (IS_LOCALBND(rtype) ||
-		    IS_SEG_RELATIVE(rtype))) {
+		    (IS_LOCALBND(rtype) || IS_SEG_RELATIVE(rtype))) {
 			local = TRUE;
 		} else if (sdp->sd_ref == REF_REL_NEED) {
 			/*
@@ -1263,13 +1257,14 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 			 * explicit no-direct symbols should not be bound to
 			 * locally.
 			 */
-			if ((sdp->sd_flags1 &
-			    (FLG_SY1_HIDDEN | FLG_SY1_PROTECT)))
+			if ((sdp->sd_flags &
+			    (FLG_SY_HIDDEN | FLG_SY_PROTECT)))
 				local = TRUE;
 			else if ((flags & FLG_OF_EXEC) ||
 			    ((flags & FLG_OF_SYMBOLIC) &&
-			    ((sdp->sd_flags1 & FLG_SY1_NDIR) == 0)))
+			    ((sdp->sd_flags & FLG_SY_NDIR) == 0))) {
 				local = TRUE;
+			}
 		}
 	}
 
@@ -1355,7 +1350,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
 	if (local)
 		return ((*ld_targ.t_mr.mr_reloc_local)(reld, ofl));
 
-	if ((IS_PLT(rtype)) && ((flags & FLG_OF_BFLAG) == 0))
+	if (IS_PLT(rtype) && ((flags & FLG_OF_BFLAG) == 0))
 		return (ld_reloc_plt(reld, ofl));
 
 	if ((sdp->sd_ref == REF_REL_NEED) ||
@@ -1674,7 +1669,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 		return (S_ERROR);
 	}
 
-	if (sdp->sd_flags1 & FLG_SY1_IGNORE)
+	if (sdp->sd_flags & FLG_SY_IGNORE)
 		return (1);
 
 	/*
@@ -1702,18 +1697,19 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 
 				/*
 				 * A matching symbol was not found. We will
-				 * ignore this relocation. First, we must
-				 * decide whether or not to issue a warning.
+				 * ignore this relocation.  Determine whether
+				 * or not to issue a warning.
 				 * Warnings are always issued under -z verbose,
 				 * but otherwise, we will follow the lead of
 				 * the GNU ld and suppress them for certain
 				 * cases:
-				 *	- It is a non-allocable debug section.
-				 *	  The GNU ld tests for these by name,
-				 *	  but we are willing to extend it to
-				 *	  any non-allocable section.
-				 *	- The target section is excluded from
-				 *	  sloppy relocations by policy.
+				 *
+				 *  -	It is a non-allocable debug section.
+				 *	The GNU ld tests for these by name,
+				 *	but we are willing to extend it to
+				 *	any non-allocable section.
+				 *  -	The target section is excluded from
+				 *	sloppy relocations by policy.
 				 */
 				if (((ofl->ofl_flags & FLG_OF_VERBOSE) != 0) ||
 				    ((is_shdr->sh_flags & SHF_ALLOC) &&
@@ -1732,7 +1728,7 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 				return (1);
 			}
 		} else if (reld->rel_sname == sdp->sd_name)
-			nsdp = ld_sym_find(sdp->sd_name, SYM_NOHASH, 0, ofl);
+			nsdp = ld_sym_find(sdp->sd_name, SYM_NOHASH, NULL, ofl);
 
 		if (nsdp == NULL) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
@@ -2103,8 +2099,8 @@ ld_reloc_init(Ofl_desc *ofl)
 	ofl->ofl_gotcnt = ld_targ.t_m.m_got_xnumber;
 
 	/*
-	 * First process all of the relocations against NON-writable
-	 * segments followed by relocations against the writeable segments.
+	 * Process all of the relocations against NON-writable segments
+	 * followed by relocations against the writable segments.
 	 *
 	 * This separation is so that when the writable segments are processed
 	 * we know whether or not a COPYRELOC will be produced for any symbols.
@@ -2160,9 +2156,10 @@ ld_reloc_init(Ofl_desc *ofl)
 	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
 	    ((ofl->ofl_flags & FLG_OF_BLDGOT) ||
 	    ((((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL),
-	    SYM_NOHASH, 0, ofl)) != 0) ||
+	    SYM_NOHASH, NULL, ofl)) != NULL) ||
 	    ((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U),
-	    SYM_NOHASH, 0, ofl)) != 0)) && (sdp->sd_ref != REF_DYN_SEEN)))) {
+	    SYM_NOHASH, NULL, ofl)) != NULL)) &&
+	    (sdp->sd_ref != REF_DYN_SEEN)))) {
 		if (ld_make_got(ofl) == S_ERROR)
 			return (S_ERROR);
 
@@ -2341,7 +2338,7 @@ ld_reloc_process(Ofl_desc *ofl)
 	 * Determine the index of the symbol table that will be referenced by
 	 * the relocation entries.
 	 */
-	if ((flags & (FLG_OF_DYNAMIC|FLG_OF_RELOBJ)) == FLG_OF_DYNAMIC)
+	if (OFL_ALLOW_DYNSYM(ofl))
 		/* LINTED */
 		ndx = (Word)elf_ndxscn(ofl->ofl_osdynsym->os_scn);
 	else if (!(flags & FLG_OF_STRIP) || (flags & FLG_OF_RELOBJ))
@@ -2370,12 +2367,11 @@ ld_reloc_process(Ofl_desc *ofl)
 		Aliste	idx1;
 
 		/*
-		 * Process the relocation sections:
-		 *
-		 *  o	for each relocation section generated for the output
-		 *	image update its shdr information to reflect the
-		 *	symbol table it needs (sh_link) and the section to
-		 *	which the relocation must be applied (sh_info).
+		 * Process the relocation sections.  For each relocation
+		 * section generated for the output image update its shdr
+		 * information to reflect the symbol table it needs (sh_link)
+		 * and the section to which the relocation must be applied
+		 * (sh_info).
 		 */
 		for (APLIST_TRAVERSE(ofl->ofl_segs, idx1, sgp)) {
 			Os_desc *osp;
@@ -2636,9 +2632,9 @@ ld_adj_movereloc(Ofl_desc *ofl, Rel_desc *arsp)
 
 /*
  * Partially Initialized Symbol Handling routines
- * For RELA architecture, the second argument is reld->rel_raddend.
- * For REL  architecure, the second argument is the value stored
- *	at the relocation target address.
+ * For RELA architecture, the second argument is reld->rel_raddend.  For REL
+ * architecure, the second argument is the value stored at the relocation
+ * target address.
  */
 Sym_desc *
 ld_am_I_partial(Rel_desc *reld, Xword val)

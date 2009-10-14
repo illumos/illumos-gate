@@ -514,6 +514,15 @@ prepend_ldoptions(int *argcp, char ***argvp)
 		return (0);
 
 	/*
+	 * Get rid of any leading white space, and make sure the environment
+	 * string has size.
+	 */
+	while (isspace(*ld_options))
+		ld_options++;
+	if (*ld_options == '\0')
+		return (0);
+
+	/*
 	 * Prevent modification of actual environment strings.
 	 */
 	if ((ld_options = strdup(ld_options)) == NULL) {
@@ -521,15 +530,6 @@ prepend_ldoptions(int *argcp, char ***argvp)
 		eprintf(0, ERR_FATAL, MSG_INTL(MSG_SYS_ALLOC), strerror(err));
 		return (1);
 	}
-
-	/*
-	 * Get rid of any leading white space, and make sure the environment
-	 * string has size.
-	 */
-	while (isspace(*ld_options))
-		ld_options++;
-	if (*ld_options == '\0')
-		return (1);
 
 	/*
 	 * Determine the number of options provided.

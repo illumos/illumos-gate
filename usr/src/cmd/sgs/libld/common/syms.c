@@ -77,7 +77,7 @@ ld_sym_avl_comp(const void *elem1, const void *elem2)
 inline static const char *
 string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
     int symndx, Word shndx, Word symsecndx, const char *symsecname,
-    const char *strsecname, Word *flags)
+    const char *strsecname, sd_flag_t *flags)
 {
 	Word	name = sym->st_name;
 
@@ -250,8 +250,8 @@ ld_sym_nodirect(Is_desc *isp, Ifl_desc *ifl, Ofl_desc *ofl)
 			if (ifl != sdp->sd_file)
 				continue;
 
-			sdp->sd_flags1 &= ~FLG_SY1_DIR;
-			sdp->sd_flags1 |= FLG_SY1_NDIR;
+			sdp->sd_flags &= ~FLG_SY_DIR;
+			sdp->sd_flags |= FLG_SY_NDIR;
 		}
 	}
 	return (0);
@@ -317,7 +317,7 @@ ld_sym_find(const char *name, Word hash, avl_index_t *where, Ofl_desc *ofl)
 	/*
 	 * Return symbol found.
 	 */
-	return (sav->sav_symdesc);
+	return (sav->sav_sdp);
 }
 
 /*
@@ -328,8 +328,7 @@ ld_sym_find(const char *name, Word hash, avl_index_t *where, Ofl_desc *ofl)
  */
 Sym_desc *
 ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
-    Ofl_desc *ofl, Word ndx, Word shndx, Word sdflags, Half sdflags1,
-    avl_index_t *where)
+    Ofl_desc *ofl, Word ndx, Word shndx, sd_flag_t sdflags, avl_index_t *where)
 {
 	Sym_desc	*sdp;
 	Sym_aux		*sap;
@@ -354,13 +353,16 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 * Allocate a Sym Descriptor, Auxiliary Descriptor, and a Sym AVLNode -
 	 * contiguously.
 	 */
-	if ((savl = libld_calloc(sizeof (Sym_avlnode) + sizeof (Sym_desc) +
-	    sizeof (Sym_aux), 1)) == NULL)
+	if ((savl = libld_calloc(S_DROUND(sizeof (Sym_avlnode)) +
+	    S_DROUND(sizeof (Sym_desc)) +
+	    S_DROUND(sizeof (Sym_aux)), 1)) == NULL)
 		return ((Sym_desc *)S_ERROR);
-	sdp = (Sym_desc *)((uintptr_t)savl + sizeof (Sym_avlnode));
-	sap = (Sym_aux *)((uintptr_t)sdp + sizeof (Sym_desc));
+	sdp = (Sym_desc *)((uintptr_t)savl +
+	    S_DROUND(sizeof (Sym_avlnode)));
+	sap = (Sym_aux *)((uintptr_t)sdp +
+	    S_DROUND(sizeof (Sym_desc)));
 
-	savl->sav_symdesc = sdp;
+	savl->sav_sdp = sdp;
 	sdp->sd_file = ifl;
 	sdp->sd_aux = sap;
 	savl->sav_hash = sap->sa_hash = hash;
@@ -373,7 +375,6 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	*nsym = *osym;
 	sdp->sd_shndx = shndx;
 	sdp->sd_flags |= sdflags;
-	sdp->sd_flags1 |= sdflags1;
 
 	if ((_name = libld_malloc(strlen(name) + 1)) == NULL)
 		return ((Sym_desc *)S_ERROR);
@@ -443,24 +444,24 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	if ((etype == ET_NONE) || (etype == ET_REL)) {
 		switch (vis) {
 		case STV_DEFAULT:
-			sdp->sd_flags1 |= FLG_SY1_DEFAULT;
+			sdp->sd_flags |= FLG_SY_DEFAULT;
 			break;
 		case STV_INTERNAL:
 		case STV_HIDDEN:
-			sdp->sd_flags1 |= FLG_SY1_HIDDEN;
+			sdp->sd_flags |= FLG_SY_HIDDEN;
 			break;
 		case STV_PROTECTED:
-			sdp->sd_flags1 |= FLG_SY1_PROTECT;
+			sdp->sd_flags |= FLG_SY_PROTECT;
 			break;
 		case STV_EXPORTED:
-			sdp->sd_flags1 |= FLG_SY1_EXPORT;
+			sdp->sd_flags |= FLG_SY_EXPORT;
 			break;
 		case STV_SINGLETON:
-			sdp->sd_flags1 |= (FLG_SY1_SINGLE | FLG_SY1_NDIR);
+			sdp->sd_flags |= (FLG_SY_SINGLE | FLG_SY_NDIR);
 			ofl->ofl_flags1 |= (FLG_OF1_NDIRECT | FLG_OF1_NGLBDIR);
 			break;
 		case STV_ELIMINATE:
-			sdp->sd_flags1 |= (FLG_SY1_HIDDEN | FLG_SY1_ELIM);
+			sdp->sd_flags |= (FLG_SY_HIDDEN | FLG_SY_ELIM);
 			break;
 		default:
 			assert(vis <= STV_ELIMINATE);
@@ -474,24 +475,16 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 		 * tagged to prevent direct binding.
 		 */
 		if ((ofl->ofl_flags1 & FLG_OF1_ALNODIR) &&
-		    ((sdp->sd_flags1 & (FLG_SY1_PROTECT | FLG_SY1_DIR)) == 0) &&
+		    ((sdp->sd_flags & (FLG_SY_PROTECT | FLG_SY_DIR)) == 0) &&
 		    (nsym->st_shndx != SHN_UNDEF)) {
-			sdp->sd_flags1 |= FLG_SY1_NDIR;
+			sdp->sd_flags |= FLG_SY_NDIR;
 		}
 	} else {
 		sdp->sd_ref = REF_DYN_SEEN;
 
 		/*
-		 * Record the binding file for this symbol in the sa_bindto
-		 * field.  If this symbol is ever overridden by a REF_REL_NEED
-		 * definition, sa_bindto is used when building a 'translator'.
-		 */
-		if (nsym->st_shndx != SHN_UNDEF)
-			sdp->sd_aux->sa_bindto = ifl;
-
-		/*
 		 * If this is a protected symbol, remember this.  Note, this
-		 * state is different from the FLG_SY1_PROTECT used to establish
+		 * state is different from the FLG_SY_PROTECT used to establish
 		 * a symbol definitions visibility.  This state is used to warn
 		 * against possible copy relocations against this referenced
 		 * symbol.
@@ -506,7 +499,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 		 * this symbol.
 		 */
 		if ((vis == STV_SINGLETON) && (nsym->st_shndx != SHN_UNDEF))
-			sdp->sd_flags1 |= (FLG_SY1_SINGLE | FLG_SY1_NDIR);
+			sdp->sd_flags |= (FLG_SY_SINGLE | FLG_SY_NDIR);
 
 		/*
 		 * If the new symbol is from a shared library and is associated
@@ -524,9 +517,8 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 */
 	if (nsym->st_shndx == SHN_SUNW_IGNORE) {
 		sdp->sd_shndx = shndx = SHN_UNDEF;
-		sdp->sd_flags |= FLG_SY_REDUCED;
-		sdp->sd_flags1 |=
-		    (FLG_SY1_HIDDEN | FLG_SY1_IGNORE | FLG_SY1_ELIM);
+		sdp->sd_flags |= (FLG_SY_REDUCED |
+		    FLG_SY_HIDDEN | FLG_SY_IGNORE | FLG_SY_ELIM);
 	}
 
 	/*
@@ -616,6 +608,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 */
 	if ((ifl == NULL) || ((ifl->ifl_flags & FLG_IF_MAPFILE) == 0))
 		DBG_CALL(Dbg_syms_entered(ofl, nsym, sdp));
+
 	return (sdp);
 }
 
@@ -628,8 +621,8 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
  * issue a warning and leave the symbol as is.  If the non-underscore symbol
  * is referenced then turn it into a weak alias of the underscored symbol.
  *
- * The bits in flags_u are OR'd into the flags field of the symbol
- * for the underscored symbol.
+ * The bits in sdflags_u are OR'd into the flags field of the symbol for the
+ * underscored symbol.
  *
  * If this is a global symbol, and it hasn't explicitly been defined as being
  * directly bound to, indicate that it can't be directly bound to.
@@ -645,7 +638,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
  */
 static uintptr_t
 sym_add_spec(const char *name, const char *uname, Word sdaux_id,
-    Word flags_u, Half flags1, Ofl_desc *ofl)
+    sd_flag_t sdflags_u, sd_flag_t sdflags, Ofl_desc *ofl)
 {
 	Sym_desc	*sdp;
 	Sym_desc 	*usdp;
@@ -665,7 +658,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		    (usdp->sd_ref != REF_REL_NEED)) {
 			usdp->sd_ref = REF_REL_NEED;
 			usdp->sd_shndx = usdp->sd_sym->st_shndx = SHN_ABS;
-			usdp->sd_flags |= FLG_SY_SPECSEC | flags_u;
+			usdp->sd_flags |= FLG_SY_SPECSEC | sdflags_u;
 			usdp->sd_sym->st_info =
 			    ELF_ST_INFO(STB_GLOBAL, STT_OBJECT);
 			usdp->sd_isc = NULL;
@@ -681,20 +674,20 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 			 * should be defined protected, whereas all other
 			 * special symbols are tagged as no-direct.
 			 */
-			if (((usdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) &&
-			    (flags1 & FLG_SY1_DEFAULT)) {
+			if (((usdp->sd_flags & FLG_SY_HIDDEN) == 0) &&
+			    (sdflags & FLG_SY_DEFAULT)) {
 				usdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
 				if (sdaux_id == SDAUX_ID_GOT) {
-					usdp->sd_flags1 &= ~FLG_SY1_NDIR;
-					usdp->sd_flags1 |= FLG_SY1_PROTECT;
+					usdp->sd_flags &= ~FLG_SY_NDIR;
+					usdp->sd_flags |= FLG_SY_PROTECT;
 					usdp->sd_sym->st_other = STV_PROTECTED;
 				} else if (
-				    ((usdp->sd_flags1 & FLG_SY1_DIR) == 0) &&
+				    ((usdp->sd_flags & FLG_SY_DIR) == 0) &&
 				    ((ofl->ofl_flags & FLG_OF_SYMBOLIC) == 0)) {
-					usdp->sd_flags1 |= FLG_SY1_NDIR;
+					usdp->sd_flags |= FLG_SY_NDIR;
 				}
 			}
-			usdp->sd_flags1 |= flags1;
+			usdp->sd_flags |= sdflags;
 
 			/*
 			 * If the reference originated from a mapfile ensure
@@ -720,7 +713,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		sym->st_value = 0;
 		DBG_CALL(Dbg_syms_created(ofl->ofl_lml, uname));
 		if ((usdp = ld_sym_enter(uname, sym, hash, (Ifl_desc *)NULL,
-		    ofl, 0, SHN_ABS, FLG_SY_SPECSEC | flags_u, 0, &where)) ==
+		    ofl, 0, SHN_ABS, (FLG_SY_SPECSEC | sdflags_u), &where)) ==
 		    (Sym_desc *)S_ERROR)
 			return (S_ERROR);
 		usdp->sd_ref = REF_REL_NEED;
@@ -730,13 +723,13 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		usdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
 
 		if (sdaux_id == SDAUX_ID_GOT) {
-			usdp->sd_flags1 |= FLG_SY1_PROTECT;
+			usdp->sd_flags |= FLG_SY_PROTECT;
 			usdp->sd_sym->st_other = STV_PROTECTED;
-		} else if ((flags1 & FLG_SY1_DEFAULT) &&
+		} else if ((sdflags & FLG_SY_DEFAULT) &&
 		    ((ofl->ofl_flags & FLG_OF_SYMBOLIC) == 0)) {
-			usdp->sd_flags1 |= FLG_SY1_NDIR;
+			usdp->sd_flags |= FLG_SY_NDIR;
 		}
-		usdp->sd_flags1 |= flags1;
+		usdp->sd_flags |= sdflags;
 	}
 
 	if (name && (sdp = ld_sym_find(name, SYM_NOHASH, NULL, ofl)) &&
@@ -771,19 +764,19 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		 * automatic scoping).  The GOT should be defined protected,
 		 * whereas all other special symbols are tagged as no-direct.
 		 */
-		if (((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) &&
-		    (flags1 & FLG_SY1_DEFAULT)) {
+		if (((sdp->sd_flags & FLG_SY_HIDDEN) == 0) &&
+		    (sdflags & FLG_SY_DEFAULT)) {
 			sdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
 			if (sdaux_id == SDAUX_ID_GOT) {
-				sdp->sd_flags1 &= ~FLG_SY1_NDIR;
-				sdp->sd_flags1 |= FLG_SY1_PROTECT;
+				sdp->sd_flags &= ~FLG_SY_NDIR;
+				sdp->sd_flags |= FLG_SY_PROTECT;
 				sdp->sd_sym->st_other = STV_PROTECTED;
-			} else if (((sdp->sd_flags1 & FLG_SY1_DIR) == 0) &&
+			} else if (((sdp->sd_flags & FLG_SY_DIR) == 0) &&
 			    ((ofl->ofl_flags & FLG_OF_SYMBOLIC) == 0)) {
-				sdp->sd_flags1 |= FLG_SY1_NDIR;
+				sdp->sd_flags |= FLG_SY_NDIR;
 			}
 		}
-		sdp->sd_flags1 |= flags1;
+		sdp->sd_flags |= sdflags;
 
 		/*
 		 * If the reference originated from a mapfile ensure
@@ -898,22 +891,22 @@ ld_sym_spec(Ofl_desc *ofl)
 	DBG_CALL(Dbg_syms_spec_title(ofl->ofl_lml));
 
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_ETEXT), MSG_ORIG(MSG_SYM_ETEXT_U),
-	    SDAUX_ID_ETEXT, 0, (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+	    SDAUX_ID_ETEXT, 0, (FLG_SY_DEFAULT | FLG_SY_EXPDEF),
 	    ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_EDATA), MSG_ORIG(MSG_SYM_EDATA_U),
-	    SDAUX_ID_EDATA, 0, (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+	    SDAUX_ID_EDATA, 0, (FLG_SY_DEFAULT | FLG_SY_EXPDEF),
 	    ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_END), MSG_ORIG(MSG_SYM_END_U),
-	    SDAUX_ID_END, FLG_SY_DYNSORT, (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+	    SDAUX_ID_END, FLG_SY_DYNSORT, (FLG_SY_DEFAULT | FLG_SY_EXPDEF),
 	    ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_L_END), MSG_ORIG(MSG_SYM_L_END_U),
-	    SDAUX_ID_END, 0, FLG_SY1_HIDDEN, ofl) == S_ERROR)
+	    SDAUX_ID_END, 0, FLG_SY_HIDDEN, ofl) == S_ERROR)
 		return (S_ERROR);
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_L_START), MSG_ORIG(MSG_SYM_L_START_U),
-	    SDAUX_ID_START, 0, FLG_SY1_HIDDEN, ofl) == S_ERROR)
+	    SDAUX_ID_START, 0, FLG_SY_HIDDEN, ofl) == S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -921,14 +914,14 @@ ld_sym_spec(Ofl_desc *ofl)
 	 * static executables (in which case its value will be 0).
 	 */
 	if (sym_add_spec(MSG_ORIG(MSG_SYM_DYNAMIC), MSG_ORIG(MSG_SYM_DYNAMIC_U),
-	    SDAUX_ID_DYN, FLG_SY_DYNSORT, (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+	    SDAUX_ID_DYN, FLG_SY_DYNSORT, (FLG_SY_DEFAULT | FLG_SY_EXPDEF),
 	    ofl) == S_ERROR)
 		return (S_ERROR);
 
 	if (OFL_ALLOW_DYNSYM(ofl))
 		if (sym_add_spec(MSG_ORIG(MSG_SYM_PLKTBL),
 		    MSG_ORIG(MSG_SYM_PLKTBL_U), SDAUX_ID_PLT,
-		    FLG_SY_DYNSORT, (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF),
+		    FLG_SY_DYNSORT, (FLG_SY_DEFAULT | FLG_SY_EXPDEF),
 		    ofl) == S_ERROR)
 			return (S_ERROR);
 
@@ -937,10 +930,10 @@ ld_sym_spec(Ofl_desc *ofl)
 	 * Make sure it gets assigned the appropriate special attributes.
 	 */
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U),
-	    SYM_NOHASH, NULL, ofl)) != 0) && (sdp->sd_ref != REF_DYN_SEEN)) {
+	    SYM_NOHASH, NULL, ofl)) != NULL) && (sdp->sd_ref != REF_DYN_SEEN)) {
 		if (sym_add_spec(MSG_ORIG(MSG_SYM_GOFTBL),
 		    MSG_ORIG(MSG_SYM_GOFTBL_U), SDAUX_ID_GOT, FLG_SY_DYNSORT,
-		    (FLG_SY1_DEFAULT | FLG_SY1_EXPDEF), ofl) == S_ERROR)
+		    (FLG_SY_DEFAULT | FLG_SY_EXPDEF), ofl) == S_ERROR)
 			return (S_ERROR);
 	}
 
@@ -966,6 +959,10 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 		 * from any initial relocation processing that references this
 		 * symbol, or from the symbol validation processing.
 		 *
+		 * This routine is called either from any initial relocation
+		 * processing that references this symbol, or from the symbol
+		 * validation processing.
+		 *
 		 * A symbol is a candidate for auto-reduction/elimination if:
 		 *
 		 *  -	the symbol wasn't explicitly defined within a mapfile
@@ -981,14 +978,14 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 		 * necessary to print these symbols later.
 		 */
 		if ((oflags & (FLG_OF_AUTOLCL | FLG_OF_AUTOELM)) &&
-		    ((sdp->sd_flags1 & MSK_SY1_NOAUTO) == 0)) {
-			if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) {
-				sdp->sd_flags |= FLG_SY_REDUCED;
-				sdp->sd_flags1 |= FLG_SY1_HIDDEN;
+		    ((sdp->sd_flags & MSK_SY_NOAUTO) == 0)) {
+			if ((sdp->sd_flags & FLG_SY_HIDDEN) == 0) {
+				sdp->sd_flags |=
+				    (FLG_SY_REDUCED | FLG_SY_HIDDEN);
 			}
 
 			if (oflags & (FLG_OF_REDLSYM | FLG_OF_AUTOELM)) {
-				sdp->sd_flags1 |= FLG_SY1_ELIM;
+				sdp->sd_flags |= FLG_SY_ELIM;
 				sym->st_other = STV_ELIMINATE |
 				    (sym->st_other & ~MSK_SYM_VISIBILITY);
 			} else if (ELF_ST_VISIBILITY(sym->st_other) !=
@@ -1004,8 +1001,8 @@ ld_sym_adjust_vis(Sym_desc *sdp, Ofl_desc *ofl)
 		 * attribute.
 		 */
 		if ((oflags & FLG_OF_SYMBOLIC) &&
-		    ((sdp->sd_flags1 & (FLG_SY1_HIDDEN | FLG_SY1_NDIR)) == 0)) {
-			sdp->sd_flags1 |= FLG_SY1_PROTECT;
+		    ((sdp->sd_flags & (FLG_SY_HIDDEN | FLG_SY_NDIR)) == 0)) {
+			sdp->sd_flags |= FLG_SY_PROTECT;
 			if (ELF_ST_VISIBILITY(sym->st_other) == STV_DEFAULT)
 				sym->st_other = STV_PROTECTED |
 				    (sym->st_other & ~MSK_SYM_VISIBILITY);
@@ -1176,7 +1173,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		int		undeferr = 0;
 		uchar_t		vis;
 
-		sdp = sav->sav_symdesc;
+		sdp = sav->sav_sdp;
 
 		/*
 		 * If undefined symbols are allowed ignore any symbols that are
@@ -1255,8 +1252,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 */
 		if (((isp = sdp->sd_isc) != 0) && isp->is_shdr &&
 		    ((isp->is_shdr->sh_flags & SHF_ALLOC) == 0)) {
-			sdp->sd_flags |= FLG_SY_REDUCED;
-			sdp->sd_flags1 |= FLG_SY1_HIDDEN;
+			sdp->sd_flags |= (FLG_SY_REDUCED | FLG_SY_HIDDEN);
 		}
 
 		/*
@@ -1265,7 +1261,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 * original index for validation, and propagation to the output
 		 * file.
 		 */
-		if (sdp->sd_flags1 & FLG_SY1_IGNORE)
+		if (sdp->sd_flags & FLG_SY_IGNORE)
 			sdp->sd_shndx = SHN_SUNW_IGNORE;
 
 		if (undef) {
@@ -1300,11 +1296,9 @@ ld_sym_validate(Ofl_desc *ofl)
 			    ((ELF_ST_BIND(sym->st_info) != STB_WEAK) &&
 			    ((sdp->sd_flags &
 			    (FLG_SY_PARENT | FLG_SY_EXTERN)) == 0)) ||
-			    (((sdp->sd_flags &
-			    (FLG_SY_MAPREF | FLG_SY_MAPUSED)) ==
-			    FLG_SY_MAPREF) &&
-			    ((sdp->sd_flags1 & (FLG_SY1_HIDDEN |
-			    FLG_SY1_PROTECT)) == 0)))) {
+			    ((sdp->sd_flags &
+			    (FLG_SY_MAPREF | FLG_SY_MAPUSED | FLG_SY_HIDDEN |
+			    FLG_SY_PROTECT)) == FLG_SY_MAPREF))) {
 				sym_undef_entry(ofl, sdp, UNDEF);
 				ofl->ofl_flags |= undef;
 				undeferr = 1;
@@ -1346,7 +1340,7 @@ ld_sym_validate(Ofl_desc *ofl)
 			 * Capture that we've bound to a symbol that doesn't
 			 * allow being directly bound to.
 			 */
-			if (sdp->sd_flags1 & FLG_SY1_NDIR)
+			if (sdp->sd_flags & FLG_SY_NDIR)
 				ofl->ofl_flags1 |= FLG_OF1_NGLBDIR;
 
 			if (sdp->sd_file->ifl_vercnt) {
@@ -1384,7 +1378,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 * a fatal error.
 		 */
 		if ((sdp->sd_ref == REF_DYN_NEED) &&
-		    (sdp->sd_flags1 & (FLG_SY1_HIDDEN | FLG_SY1_PROTECT))) {
+		    (sdp->sd_flags & (FLG_SY_HIDDEN | FLG_SY_PROTECT))) {
 			sym_undef_entry(ofl, sdp, BNDLOCAL);
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
@@ -1401,7 +1395,7 @@ ld_sym_validate(Ofl_desc *ofl)
 				if (sdp->sd_aux && sdp->sd_aux->sa_overndx)
 					sdp->sd_aux->sa_overndx = 0;
 			} else {
-				if ((!(sdp->sd_flags1 & FLG_SY1_HIDDEN)) &&
+				if ((!(sdp->sd_flags & FLG_SY_HIDDEN)) &&
 				    sdp->sd_aux &&
 				    (sdp->sd_aux->sa_overndx == 0)) {
 					sym_undef_entry(ofl, sdp, NOVERSION);
@@ -1433,7 +1427,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 */
 		if ((sym->st_shndx == SHN_COMMON) &&
 		    (((oflags & FLG_OF_RELOBJ) == 0) ||
-		    ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
+		    ((sdp->sd_flags & FLG_SY_HIDDEN) &&
 		    (oflags & FLG_OF_PROCRED)))) {
 			if ((sdp->sd_move == NULL) ||
 			    ((sdp->sd_flags & FLG_SY_PAREXPN) == 0)) {
@@ -1482,14 +1476,14 @@ ld_sym_validate(Ofl_desc *ofl)
 		/*
 		 * Update the symbol count and the associated name string size.
 		 */
-		if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
+		if ((sdp->sd_flags & FLG_SY_HIDDEN) &&
 		    (oflags & FLG_OF_PROCRED)) {
 			/*
 			 * If any reductions are being processed, keep a count
 			 * of eliminated symbols, and if the symbol is being
 			 * reduced to local, count it's size for the .symtab.
 			 */
-			if (sdp->sd_flags1 & FLG_SY1_ELIM) {
+			if (sdp->sd_flags & FLG_SY_ELIM) {
 				ofl->ofl_elimcnt++;
 			} else {
 				ofl->ofl_scopecnt++;
@@ -1511,14 +1505,13 @@ ld_sym_validate(Ofl_desc *ofl)
 			ofl->ofl_globcnt++;
 
 			/*
-			 * Check to see if this global variable should
-			 * go into a sort section. Sort sections require
-			 * a .SUNW_ldynsym section, so, don't check
-			 * unless a .SUNW_ldynsym is allowed.
+			 * Check to see if this global variable should go into
+			 * a sort section. Sort sections require a
+			 * .SUNW_ldynsym section, so, don't check unless a
+			 * .SUNW_ldynsym is allowed.
 			 */
-			if (allow_ldynsym) {
+			if (allow_ldynsym)
 				DYNSORT_COUNT(sdp, sym, type, ++);
-			}
 
 			/*
 			 * If global direct bindings are in effect, or this
@@ -1529,8 +1522,8 @@ ld_sym_validate(Ofl_desc *ofl)
 			 */
 			if (((ofl->ofl_dtflags_1 & DF_1_DIRECT) || (isp &&
 			    (isp->is_file->ifl_flags & FLG_IF_DIRECT))) &&
-			    ((sdp->sd_flags1 & FLG_SY1_NDIR) == 0))
-				sdp->sd_flags1 |= FLG_SY1_DIR;
+			    ((sdp->sd_flags & FLG_SY_NDIR) == 0))
+				sdp->sd_flags |= FLG_SY_DIR;
 
 			/*
 			 * Insert the symbol name.
@@ -1585,7 +1578,7 @@ ld_sym_validate(Ofl_desc *ofl)
 			if (sdp->sd_sym->st_name == 0)
 				sdp->sd_name = MSG_ORIG(MSG_STR_EMPTY);
 
-			if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) ||
+			if ((sdp->sd_flags & FLG_SY_HIDDEN) ||
 			    (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL))
 				ofl->ofl_lregsymcnt++;
 		}
@@ -1935,7 +1928,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		int		last_file_ndx = 0;
 
 		for (sym++, ndx = 1; ndx < local; sym++, ndx++) {
-			Word		shndx, sdflags = FLG_SY_CLEAN;
+			sd_flag_t	sdflags = FLG_SY_CLEAN;
+			Word		shndx;
 			const char	*name;
 			Sym_desc	*rsdp;
 			int		shndx_bad = 0;
@@ -2023,6 +2017,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			if (sdp == NULL) {
 				sdp = &(ifl->ifl_locs[ndx]);
 				sdp->sd_ref = REF_REL_NEED;
+				sdp->sd_symndx = ndx;
 			}
 			if (rsdp == NULL) {
 				sdp->sd_name = name;
@@ -2041,8 +2036,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 */
 			if (sym->st_shndx == SHN_SUNW_IGNORE) {
 				sdp->sd_shndx = shndx = SHN_UNDEF;
-				sdp->sd_flags1 |=
-				    (FLG_SY1_IGNORE | FLG_SY1_ELIM);
+				sdp->sd_flags |= (FLG_SY_IGNORE | FLG_SY_ELIM);
 			}
 
 			/*
@@ -2243,15 +2237,17 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	/* LINTED */
 	for (ndx = (int)local; ndx < total; sym++, ndx++) {
 		const char	*name;
-		Word		shndx, sdflags = 0;
+		sd_flag_t	sdflags = 0;
+		Word		shndx;
 		int		shndx_bad = 0;
+		Sym		*nsym = sym;
 
 		/*
 		 * Determine and validate the associated section index.
 		 */
-		if (symshndx && (sym->st_shndx == SHN_XINDEX)) {
+		if (symshndx && (nsym->st_shndx == SHN_XINDEX)) {
 			shndx = symshndx[ndx];
-		} else if ((shndx = sym->st_shndx) >= SHN_LORESERVE) {
+		} else if ((shndx = nsym->st_shndx) >= SHN_LORESERVE) {
 			sdflags |= FLG_SY_SPECSEC;
 		} else if (shndx > ifl->ifl_ehdr->e_shnum) {
 			/* We need the name before we can issue error */
@@ -2261,7 +2257,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		/*
 		 * Check if st_name has a valid value or not.
 		 */
-		if ((name = string(ofl, ifl, sym, strs, strsize, ndx, shndx,
+		if ((name = string(ofl, ifl, nsym, strs, strsize, ndx, shndx,
 		    symsecndx, symsecname, strsecname, &sdflags)) == NULL) {
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
@@ -2276,7 +2272,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    MSG_INTL(MSG_SYM_INVSHNDX),
 			    demangle_symname(name, symsecname, ndx),
 			    ifl->ifl_name,
-			    conv_sym_shndx(osabi, mach, sym->st_shndx,
+			    conv_sym_shndx(osabi, mach, nsym->st_shndx,
 			    CONV_FMT_DECIMAL, &inv_buf));
 			continue;
 		}
@@ -2298,8 +2294,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * to feel, but if nothing else, pollutes diagnostic relocation
 		 * output.
 		 */
-		if (name[0] && (etype == ET_DYN) && (sym->st_size == 0) &&
-		    (ELF_ST_TYPE(sym->st_info) == STT_OBJECT) &&
+		if (name[0] && (etype == ET_DYN) && (nsym->st_size == 0) &&
+		    (ELF_ST_TYPE(nsym->st_info) == STT_OBJECT) &&
 		    (name[0] == '_') && ((name[1] == 'e') ||
 		    (name[1] == 'D') || (name[1] == 'P')) &&
 		    ((strcmp(name, MSG_ORIG(MSG_SYM_ETEXT_U)) == 0) ||
@@ -2356,7 +2352,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		/*
 		 * Determine and validate the symbols binding.
 		 */
-		bind = ELF_ST_BIND(sym->st_info);
+		bind = ELF_ST_BIND(nsym->st_info);
 		if ((bind != STB_GLOBAL) && (bind != STB_WEAK)) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_SYM_NONGLOB),
@@ -2373,7 +2369,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * discarded, then discard the symbol itself.
 		 */
 		if (((sdflags & FLG_SY_SPECSEC) == 0) &&
-		    (sym->st_shndx != SHN_UNDEF)) {
+		    (nsym->st_shndx != SHN_UNDEF)) {
 			Is_desc	*isp;
 
 			if (shndx >= ifl->ifl_shnum) {
@@ -2387,7 +2383,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				    MSG_INTL(MSG_SYM_INVSHNDX),
 				    demangle_symname(name, symsecname, ndx),
 				    ifl->ifl_name,
-				    conv_sym_shndx(osabi, mach, sym->st_shndx,
+				    conv_sym_shndx(osabi, mach, nsym->st_shndx,
 				    CONV_FMT_DECIMAL, &inv_buf));
 				continue;
 			}
@@ -2404,7 +2400,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				 * we can compensate.
 				 */
 				sdp->sd_name = name;
-				sdp->sd_sym = sym;
+				sdp->sd_sym = nsym;
 				sdp->sd_file = ifl;
 				sdp->sd_isc = isp;
 				sdp->sd_flags = FLG_SY_ISDISC;
@@ -2425,11 +2421,11 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		hash = (Word)elf_hash((const char *)name);
 		if ((sdp = ld_sym_find(name, hash, &where, ofl)) == NULL) {
 			DBG_CALL(Dbg_syms_global(ofl->ofl_lml, ndx, name));
-			if ((sdp = ld_sym_enter(name, sym, hash, ifl, ofl, ndx,
-			    shndx, sdflags, 0, &where)) == (Sym_desc *)S_ERROR)
+			if ((sdp = ld_sym_enter(name, nsym, hash, ifl, ofl, ndx,
+			    shndx, sdflags, &where)) == (Sym_desc *)S_ERROR)
 				return (S_ERROR);
 
-		} else if (ld_sym_resolve(sdp, sym, ifl, ofl, ndx, shndx,
+		} else if (ld_sym_resolve(sdp, nsym, ifl, ofl, ndx, shndx,
 		    sdflags) == S_ERROR)
 			return (S_ERROR);
 
@@ -2437,7 +2433,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * After we've compared a defined symbol in one shared
 		 * object, flag the symbol so we don't compare it again.
 		 */
-		if ((etype == ET_DYN) && (sym->st_shndx != SHN_UNDEF) &&
+		if ((etype == ET_DYN) && (nsym->st_shndx != SHN_UNDEF) &&
 		    ((sdp->sd_flags & FLG_SY_SOFOUND) == 0))
 			sdp->sd_flags |= FLG_SY_SOFOUND;
 
@@ -2577,7 +2573,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			for (sndx = ndx + 1; sndx < (total - local); sndx++) {
 				Sym_desc	*ssdp = sort[sndx];
 				Sym		*ssym;
-				int		w_dynbits, s_dynbits;
+				sd_flag_t	w_dynbits, s_dynbits;
 
 				/*
 				 * Ignore any empty symbol descriptor, or the
@@ -2719,7 +2715,7 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	if (sdp == NULL) {
 		DBG_CALL(Dbg_syms_global(ofl->ofl_lml, 0, name));
 		if ((sdp = ld_sym_enter(name, sym, hash, ifl, ofl, 0, SHN_UNDEF,
-		    0, 0, &where)) == (Sym_desc *)S_ERROR)
+		    0, &where)) == (Sym_desc *)S_ERROR)
 			return ((Sym_desc *)S_ERROR);
 	} else if (ld_sym_resolve(sdp, sym, ifl, ofl, 0,
 	    SHN_UNDEF, 0) == S_ERROR)

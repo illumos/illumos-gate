@@ -944,6 +944,7 @@ extern	void	Dbg_ver_symbol(Lm_list *, const char *);
 #define	ELF_DBG_ELFDUMP		1
 #define	ELF_DBG_RTLD		2
 #define	ELF_DBG_LD		3
+#define	ELF_DBG_LD_ACT		4
 
 /*
  * Define generic Elf_*() interfaces.

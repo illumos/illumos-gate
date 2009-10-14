@@ -839,6 +839,7 @@
 @ MSG_ARG_NODEFLIB	"the default library search path has been suppressed, \
 			 but no runpaths have been specified via %s"
 @ MSG_ARG_NOENTRY	"entry point symbol `%s' is undefined"
+@ MSG_ARG_UNSUPPORTED	"option %s is no longer supported; ignored"
 
 @ MSG_ARG_FLAGS		"flags processing errors"
 @ MSG_ARG_FILES		"file processing errors. No output written to %s"
@@ -1007,7 +1008,7 @@
 			 after `-'"
 @ MSG_MAP_EXPVERS	"%s: %lld: expected a `;' or version reference \
 			 after `}'"
-@ MSG_MAP_MULTFILTEE	"%s: %lld: multiple filtee definitions unsupported"
+@ MSG_MAP_MULTFILTEE	"%s: %lld: multiple filtee definitions are unsupported"
 @ MSG_MAP_NOFILTER	"%s: %lld: filtee definition required"
 @ MSG_MAP_BADSF1	"%s: %lld: unknown software capabilities: 0x%llx; \
 			 ignored"
@@ -1133,7 +1134,7 @@
 @ MSG_ARG_BLOCAL	"-Blocal"
 @ MSG_ARG_BNODIRECT	"-Bnodirect"
 @ MSG_ARG_BSYMBOLIC	"-Bsymbolic"
-@ MSG_ARG_BTRANS	"-Btrans"
+@ MSG_ARG_BTRANSLATOR	"-Btranslator"
 @ MSG_ARG_C		"-c"
 @ MSG_ARG_D		"-d"
 @ MSG_ARG_DY		"-dy"

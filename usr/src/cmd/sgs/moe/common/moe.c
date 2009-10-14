@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <dlfcn.h>
 #include <link.h>
@@ -95,7 +94,6 @@ trim_msg(char *str)
 static int
 openlib(const char *prog, const char *name, int class, int silent, int verbose)
 {
-	Link_map	*lmp;
 	void		*handle;
 	const char	*modestr;
 
@@ -128,15 +126,18 @@ openlib(const char *prog, const char *name, int class, int silent, int verbose)
 			(void) fflush(stderr);
 		return (1);
 	}
-	if (dlinfo(handle, RTLD_DI_LINKMAP, &lmp) == -1) {
-		if (verbose)
-			(void) fprintf(stderr, MSG_ORIG(MSG_FMT_VERBOSE), prog,
-			    modestr, trim_msg(dlerror()));
-			(void) fflush(stderr);
-		return (1);
-	}
-
 	if (silent == 0) {
+		Link_map	*lmp;
+
+		if (dlinfo(handle, RTLD_DI_LINKMAP, &lmp) == -1) {
+			if (verbose)
+				(void) fprintf(stderr,
+				    MSG_ORIG(MSG_FMT_VERBOSE), prog, modestr,
+				    trim_msg(dlerror()));
+				(void) fflush(stderr);
+			return (1);
+		}
+
 		if (verbose)
 			(void) printf(MSG_ORIG(MSG_FMT_VERBOSE), prog, modestr,
 			    lmp->l_name);
@@ -215,14 +216,15 @@ main(int argc, char **argv, char **envp)
 #if	!defined(_LP64)
 	if (mode != ONLY64) {
 #endif
-		if (openlib(prog, argv[optind], class, silent, verbose) != 0)
+		if (openlib(prog, argv[optind], class, silent, verbose) != 0) {
 			if (mode)
 				error++;
+		}
 #if	!defined(_LP64)
 	}
 #endif
 	if (mode == ONLY32)
-		return (0);
+		return (error);
 
 	/*
 	 * Re-exec ourselves to process any 64-bit expansion.

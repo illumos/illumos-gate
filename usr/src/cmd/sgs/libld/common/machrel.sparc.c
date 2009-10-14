@@ -1269,7 +1269,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				    arsp->rel_osdesc->os_outdata->d_buf;
 
 				DBG_CALL(Dbg_reloc_doact(ofl->ofl_lml,
-				    ELF_DBG_LD, M_MACH, SHT_RELA,
+				    ELF_DBG_LD_ACT, M_MACH, SHT_RELA,
 				    arsp->rel_rtype, R1addr, value,
 				    arsp->rel_sname, arsp->rel_osdesc));
 
@@ -1368,8 +1368,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->
 			    is_indata));
 
-			/*LINTED*/
-			DBG_CALL(Dbg_reloc_doact(ofl->ofl_lml, ELF_DBG_LD,
+			DBG_CALL(Dbg_reloc_doact(ofl->ofl_lml, ELF_DBG_LD_ACT,
 			    M_MACH, SHT_RELA, arsp->rel_rtype, EC_NATPTR(addr),
 			    value, arsp->rel_sname, arsp->rel_osdesc));
 			addr += (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf;
@@ -1433,8 +1432,7 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 	 * symbol in a static executable, it's best to disable them here
 	 * instead of through out the relocation code.
 	 */
-	if ((ofl->ofl_flags & (FLG_OF_STATIC | FLG_OF_EXEC)) ==
-	    (FLG_OF_STATIC | FLG_OF_EXEC))
+	if (OFL_IS_STATIC_EXEC(ofl))
 		return (1);
 
 	/*
@@ -2098,9 +2096,11 @@ ld_allocate_got(Ofl_desc * ofl)
 	 * Assign bias to GOT symbols.
 	 */
 	addr = -neggotoffset * M_GOT_ENTSIZE;
-	if (sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL), SYM_NOHASH, 0, ofl))
+	if ((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL), SYM_NOHASH,
+	    NULL, ofl)) != NULL)
 		sdp->sd_sym->st_value = addr;
-	if (sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U), SYM_NOHASH, 0, ofl))
+	if ((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U), SYM_NOHASH,
+	    NULL, ofl)) != NULL)
 		sdp->sd_sym->st_value = addr;
 
 	if (ofl->ofl_tlsldgotndx) {
@@ -2120,7 +2120,7 @@ ld_fillin_gotplt(Ofl_desc *ofl)
 		Sym_desc	*sdp;
 
 		if ((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_DYNAMIC_U),
-		    SYM_NOHASH, 0, ofl)) != NULL) {
+		    SYM_NOHASH, NULL, ofl)) != NULL) {
 			uchar_t	*genptr;
 
 			genptr = ((uchar_t *)ofl->ofl_osgot->os_outdata->d_buf +

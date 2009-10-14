@@ -495,7 +495,7 @@ Dbg_syms_reduce(Ofl_desc *ofl, int which, Sym_desc *sdp, int idx,
 		dbg_print(lml, MSG_INTL(MSG_SYM_RETAINING));
 	}
 
-	if ((sdp->sd_flags1 & FLG_SY1_ELIM) && isfromglobal)
+	if ((sdp->sd_flags & FLG_SY_ELIM) && isfromglobal)
 		dbg_print(lml, MSG_INTL(MSG_SYM_ELIMINATING),
 		    Dbg_demangle_name(sdp->sd_name));
 	else if (isfromglobal)

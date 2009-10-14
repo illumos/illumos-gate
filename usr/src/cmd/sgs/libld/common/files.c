@@ -98,7 +98,7 @@ ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Word flags, Ofl_desc *ofl,
 		return (0);
 	}
 
-	if ((ifl = libld_calloc(1, sizeof (Ifl_desc))) == 0)
+	if ((ifl = libld_calloc(1, sizeof (Ifl_desc))) == NULL)
 		return ((Ifl_desc *)S_ERROR);
 	ifl->ifl_name = name;
 	ifl->ifl_ehdr = ehdr;
@@ -139,7 +139,7 @@ ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Word flags, Ofl_desc *ofl,
 	}
 
 	if ((ifl->ifl_isdesc = libld_calloc(ifl->ifl_shnum,
-	    sizeof (Is_desc *))) == 0)
+	    sizeof (Is_desc *))) == NULL)
 		return ((Ifl_desc *)S_ERROR);
 
 	/*
@@ -172,7 +172,7 @@ process_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	 * section elf_getdata() will still create a data buffer (the buffer
 	 * will be null and the size will reflect the actual memory size).
 	 */
-	if ((isp = libld_calloc(sizeof (Is_desc), 1)) == 0)
+	if ((isp = libld_calloc(sizeof (Is_desc), 1)) == NULL)
 		return (S_ERROR);
 	isp->is_shdr = shdr;
 	isp->is_file = ifl;
@@ -816,7 +816,7 @@ process_sym_shndx(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	if (shdr->sh_link < ndx) {
 		Is_desc	*isp = ifl->ifl_isdesc[shdr->sh_link];
 
-		if ((isp == 0) || ((isp->is_shdr->sh_type != SHT_SYMTAB) &&
+		if ((isp == NULL) || ((isp->is_shdr->sh_type != SHT_SYMTAB) &&
 		    (isp->is_shdr->sh_type != SHT_DYNSYM))) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_INVSHLINK), ifl->ifl_name,
@@ -838,7 +838,7 @@ sym_shndx_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	if (isc->is_shdr->sh_link > isc->is_scnndx) {
 		Is_desc	*isp = ifl->ifl_isdesc[isc->is_shdr->sh_link];
 
-		if ((isp == 0) || ((isp->is_shdr->sh_type != SHT_SYMTAB) &&
+		if ((isp == NULL) || ((isp->is_shdr->sh_type != SHT_SYMTAB) &&
 		    (isp->is_shdr->sh_type != SHT_DYNSYM))) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_INVSHLINK), isc->is_file->ifl_name,
@@ -941,10 +941,10 @@ process_rel_dynamic(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
  *
  * This code is remarkably similar to expand() in rtld/common/paths.c.
  */
-static char		*platform = 0;
+static char		*platform = NULL;
 static size_t		platform_sz = 0;
-static Isa_desc		*isa = 0;
-static Uts_desc		*uts = 0;
+static Isa_desc		*isa = NULL;
+static Uts_desc		*uts = NULL;
 
 static char *
 expand(const char *parent, const char *name, char **next)
@@ -979,7 +979,7 @@ expand(const char *parent, const char *name, char **next)
 			 * on $ORIGIN/lib2.so would be expanded to
 			 * foo/bar/lib2.so.
 			 */
-			if ((eptr = strrchr(parent, '/')) == 0) {
+			if ((eptr = strrchr(parent, '/')) == NULL) {
 				*nptr++ = '.';
 				nrem--;
 			} else {
@@ -1000,7 +1000,7 @@ expand(const char *parent, const char *name, char **next)
 			/*
 			 * Establish the platform from sysconf - like uname -i.
 			 */
-			if ((platform == 0) && (platform_sz == 0)) {
+			if ((platform == NULL) && (platform_sz == 0)) {
 				char	info[SYS_NMLN];
 				long	size;
 
@@ -1012,7 +1012,7 @@ expand(const char *parent, const char *name, char **next)
 				} else
 					platform_sz = 1;
 			}
-			if (platform != 0) {
+			if (platform) {
 				if (platform_sz >= nrem)
 					return ((char *)name);
 
@@ -1029,7 +1029,7 @@ expand(const char *parent, const char *name, char **next)
 			/*
 			 * Establish the os name - like uname -s.
 			 */
-			if (uts == 0)
+			if (uts == NULL)
 				uts = conv_uts();
 
 			if (uts && uts->uts_osnamesz) {
@@ -1050,7 +1050,7 @@ expand(const char *parent, const char *name, char **next)
 			/*
 			 * Establish the os release - like uname -r.
 			 */
-			if (uts == 0)
+			if (uts == NULL)
 				uts = conv_uts();
 
 			if (uts && uts->uts_osrelsz) {
@@ -1072,7 +1072,7 @@ expand(const char *parent, const char *name, char **next)
 			 * Establish instruction sets from sysconf.  Note that
 			 * this is only meaningful from runpaths.
 			 */
-			if (isa == 0)
+			if (isa == NULL)
 				isa = conv_isalist();
 
 			if (isa && isa->isa_listsz &&
@@ -1103,7 +1103,7 @@ expand(const char *parent, const char *name, char **next)
 				    isa->isa_listsz - opt->isa_namesz;
 				if (*next)
 					mlen += strlen(*next);
-				if ((_next = lptr = libld_malloc(mlen)) == 0)
+				if ((_next = lptr = libld_malloc(mlen)) == NULL)
 					return (0);
 
 				for (no = 1, opt++; no < isa->isa_optno;
@@ -1153,7 +1153,7 @@ expand(const char *parent, const char *name, char **next)
 	*nptr = '\0';
 
 	if (expanded) {
-		if ((nptr = libld_malloc(strlen(_name) + 1)) == 0)
+		if ((nptr = libld_malloc(strlen(_name) + 1)) == NULL)
 			return ((char *)name);
 		(void) strcpy(nptr, _name);
 		return (nptr);
@@ -1274,7 +1274,7 @@ process_dynamic(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * runpath which is exactly what ld.so.1 would do during
 			 * its dependency processing).
 			 */
-			if (rpath && (sdf->sdf_rpath == 0))
+			if (rpath && (sdf->sdf_rpath == NULL))
 				sdf->sdf_rpath = rpath;
 
 		} else if (dyn->d_tag == DT_FLAGS_1) {
@@ -1673,7 +1673,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 
 	DBG_CALL(Dbg_file_generic(ofl->ofl_lml, ifl));
 	ndx = 0;
-	vdfisp = vndisp = vsyisp = sifisp = capisp = 0;
+	vdfisp = vndisp = vsyisp = sifisp = capisp = NULL;
 	scn = NULL;
 	while (scn = elf_nextscn(elf, scn)) {
 		ndx++;
@@ -1943,7 +1943,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	 * from this object. It may also update the dependency to USED and
 	 * supply an alternative SONAME.
 	 */
-	sdf = 0;
+	sdf = NULL;
 	if (column && (ifl->ifl_flags & FLG_IF_NEEDED)) {
 		const char	*base;
 
@@ -1999,7 +1999,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	for (ndx = 0; ndx < ifl->ifl_shnum; ndx++) {
 		Is_desc	*isp;
 
-		if ((isp = ifl->ifl_isdesc[ndx]) == 0)
+		if ((isp = ifl->ifl_isdesc[ndx]) == NULL)
 			continue;
 		row = isp->is_shdr->sh_type;
 
@@ -2062,17 +2062,17 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
  * Process the current input file.  There are basically three types of files
  * that come through here:
  *
- *  o	files explicitly defined on the command line (ie. foo.o or bar.so),
+ *  -	files explicitly defined on the command line (ie. foo.o or bar.so),
  *	in this case only the `name' field is valid.
  *
- *  o	libraries determined from the -l command line option (ie. -lbar),
+ *  -	libraries determined from the -l command line option (ie. -lbar),
  *	in this case the `soname' field contains the basename of the located
  *	file.
  *
  * Any shared object specified via the above two conventions must be recorded
  * as a needed dependency.
  *
- *  o	libraries specified as dependencies of those libraries already obtained
+ *  -	libraries specified as dependencies of those libraries already obtained
  *	via the command line (ie. bar.so has a DT_NEEDED entry of fred.so.1),
  *	in this case the `soname' field contains either a full pathname (if the
  *	needed entry contained a `/'), or the basename of the located file.
@@ -2136,7 +2136,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		 * archive descriptor.
 		 */
 		adp = ld_ar_setup(name, elf, ofl);
-		if ((adp == 0) || (adp == (Ar_desc *)S_ERROR))
+		if ((adp == NULL) || (adp == (Ar_desc *)S_ERROR))
 			return ((Ifl_desc *)adp);
 		adp->ad_stdev = status.st_dev;
 		adp->ad_stino = status.st_ino;
@@ -2266,7 +2266,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 		 * file descriptor and continue processing.
 		 */
 		ifl = ifl_setup(name, ehdr, elf, flags, ofl, rej);
-		if ((ifl == 0) || (ifl == (Ifl_desc *)S_ERROR))
+		if ((ifl == NULL) || (ifl == (Ifl_desc *)S_ERROR))
 			return (ifl);
 		ifl->ifl_stdev = status.st_dev;
 		ifl->ifl_stino = status.st_ino;
@@ -2466,7 +2466,7 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
 		Ifl_desc	*ifl;
 		char		*_path;
 
-		if ((_path = libld_malloc(strlen(path) + 1)) == 0)
+		if ((_path = libld_malloc(strlen(path) + 1)) == NULL)
 			return ((Ifl_desc *)S_ERROR);
 		(void) strcpy(_path, path);
 		ifl = ld_process_open(_path, &_path[dlen], &fd, ofl, 0, rej);
@@ -2482,11 +2482,11 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
  * without adding them as explicit dependents of this program, in order to
  * complete our symbol definition process.  The search path rules are:
  *
- *  o	use any user supplied paths, i.e. LD_LIBRARY_PATH and -L, then
+ *  -	use any user supplied paths, i.e. LD_LIBRARY_PATH and -L, then
  *
- *  o	use any RPATH defined within the parent shared object, then
+ *  -	use any RPATH defined within the parent shared object, then
  *
- *  o	use the default directories, i.e. LIBPATH or -YP.
+ *  -	use the default directories, i.e. LIBPATH or -YP.
  */
 uintptr_t
 ld_finish_libs(Ofl_desc *ofl)
@@ -2600,7 +2600,7 @@ ld_finish_libs(Ofl_desc *ofl)
 			char	*rpath, *next;
 
 			rpath = libld_malloc(strlen(sdf->sdf_rpath) + 1);
-			if (rpath == 0)
+			if (rpath == NULL)
 				return (S_ERROR);
 			(void) strcpy(rpath, sdf->sdf_rpath);
 			DBG_CALL(Dbg_libs_path(ofl->ofl_lml, rpath,

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #define	ELF_TARGET_SPARC
 
 #include	<stdio.h>
@@ -59,7 +57,7 @@
  */
 int
 ld_reg_check_sparc(Sym_desc *sdp, Sym *nsym, const char *nname, Ifl_desc *ifl,
-    Ofl_desc * ofl)
+    Ofl_desc *ofl)
 {
 	Sym		*osym = sdp->sd_sym;
 	const char	*oname = sdp->sd_name;
@@ -170,7 +168,7 @@ static const char *registers[] = { 0,
 
 const char *
 ld_is_regsym_sparc(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
-    int symndx, Word shndx, const char *symsecname, Word * flags)
+    int symndx, Word shndx, const char *symsecname, sd_flag_t *flags)
 {
 	const char	*name;
 
@@ -233,21 +231,23 @@ ld_is_regsym_sparc(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs,
 }
 
 Sym_desc *
-ld_reg_find_sparc(Sym * sym, Ofl_desc * ofl)
+ld_reg_find_sparc(Sym *sym, Ofl_desc *ofl)
 {
-	if (ofl->ofl_regsyms == 0)
-		return (0);
+	if (ofl->ofl_regsyms == NULL)
+		return (NULL);
 
 	return (ofl->ofl_regsyms[sym->st_value]);
 }
 
 int
-ld_reg_enter_sparc(Sym_desc * sdp, Ofl_desc * ofl)
+ld_reg_enter_sparc(Sym_desc *sdp, Ofl_desc *ofl)
 {
-	if (ofl->ofl_regsyms == 0) {
+	if (ofl->ofl_regsyms == NULL) {
+
 		ofl->ofl_regsymsno = STO_SPARC_REGISTER_G7 + 1;
+
 		if ((ofl->ofl_regsyms = libld_calloc(sizeof (Sym_desc *),
-		    ofl->ofl_regsymsno)) == 0) {
+		    ofl->ofl_regsymsno)) == NULL) {
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (0);
 		}

@@ -191,22 +191,27 @@ update_osym(Ofl_desc *ofl)
 	int		start_set = 0;
 	Sym		_sym = {0}, *sym, *symtab = NULL;
 	Sym		*dynsym = NULL, *ldynsym = NULL;
-	Word		symtab_ndx = 0;	/* index into .symtab */
+	Word		symtab_ndx = 0;		/* index into .symtab */
 	Word		symtab_gbl_bndx;	/* .symtab ndx 1st global */
 	Word		ldynsym_ndx = 0;	/* index into .SUNW_ldynsym */
 	Word		dynsym_ndx = 0;		/* index into .dynsym */
-	Word		scopesym_ndx = 0; /* index into scoped symbols */
+	Word		scopesym_ndx = 0;	/* index into scoped symbols */
 	Word		scopesym_bndx = 0;	/* .symtab ndx 1st scoped sym */
-	Word		ldynscopesym_ndx = 0; /* index to ldynsym scoped syms */
-	Word		*dynsymsort = NULL; /* SUNW_dynsymsort index vector */
-	Word		*dyntlssort = NULL; /* SUNW_dyntlssort index vector */
+	Word		ldynscopesym_ndx = 0;	/* index to ldynsym scoped */
+						/*	symbols */
+	Word		*dynsymsort = NULL;	/* SUNW_dynsymsort index */
+						/*	vector */
+	Word		*dyntlssort = NULL;	/* SUNW_dyntlssort index */
+						/*	vector */
 	Word		dynsymsort_ndx;		/* index dynsymsort array */
 	Word		dyntlssort_ndx;		/* index dyntlssort array */
-	Word		*symndx;	/* Symbol index (for relocation use) */
+	Word		*symndx;		/* symbol index (for */
+						/*	relocation use) */
 	Word		*symshndx = NULL;	/* .symtab_shndx table */
 	Word		*dynshndx = NULL;	/* .dynsym_shndx table */
 	Word		*ldynshndx = NULL;	/* .SUNW_ldynsym_shndx table */
-	Word		ldynsym_cnt = NULL; /* # of items in .SUNW_ldynsym */
+	Word		ldynsym_cnt = NULL;	/* number of items in */
+						/*	.SUNW_ldynsym */
 	Str_tbl		*shstrtab;
 	Str_tbl		*strtab;
 	Str_tbl		*dynstr;
@@ -217,7 +222,6 @@ update_osym(Ofl_desc *ofl)
 	Wk_desc		*wkp;
 	Alist		*weak = NULL;
 	ofl_flag_t	flags = ofl->ofl_flags;
-	Word		dtflags_1 = ofl->ofl_dtflags_1;
 	Versym		*versym;
 	Gottable	*gottable;	/* used for display got debugging */
 					/*	information */
@@ -281,8 +285,7 @@ update_osym(Ofl_desc *ofl)
 		hashbkt = &hashtab[2];
 		hashchain = &hashtab[2 + ofl->ofl_hashbkts];
 		hashtab[0] = ofl->ofl_hashbkts;
-		hashtab[1] = ofl->ofl_dynshdrcnt + ofl->ofl_globcnt +
-		    ofl->ofl_lregsymcnt + 1;
+		hashtab[1] = DYNSYM_ALL_CNT(ofl);
 		if (ofl->ofl_osdynshndx)
 			dynshndx =
 			    (Word *)ofl->ofl_osdynshndx->os_outdata->d_buf;
@@ -482,7 +485,7 @@ update_osym(Ofl_desc *ofl)
 			if ((rsdp = ofl->ofl_regsyms[ndx]) == NULL)
 				continue;
 
-			if (((rsdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) &&
+			if (((rsdp->sd_flags & FLG_SY_HIDDEN) == 0) &&
 			    (ELF_ST_BIND(rsdp->sd_sym->st_info) != STB_LOCAL))
 				continue;
 
@@ -597,8 +600,6 @@ update_osym(Ofl_desc *ofl)
 		}
 	}
 
-	DBG_CALL(Dbg_syms_up_title(ofl->ofl_lml));
-
 	/*
 	 * Initialize the scoped symbol table entry point.  This is for all
 	 * the global symbols that have been scoped to locals and will be
@@ -629,15 +630,7 @@ update_osym(Ofl_desc *ofl)
 	 * assigning a new virtual address or displacement (value).
 	 */
 	for (APLIST_TRAVERSE(ofl->ofl_objs, idx1, ifl)) {
-		Xword	lndx, local;
-
-		/*
-		 * Check that we have local symbols to process.  If the user
-		 * has indicated scoping then scan the global symbols also
-		 * looking for entries from this file to reduce to locals.
-		 */
-		if ((local = ifl->ifl_locscnt) == 0)
-			continue;
+		Xword	lndx, local = ifl->ifl_locscnt;
 
 		for (lndx = 1; lndx < local; lndx++) {
 			Gotndx		*gnp;
@@ -812,7 +805,7 @@ update_osym(Ofl_desc *ofl)
 				/* LINTED */
 				sym->st_value +=
 				    (Off)_elf_getxoff(isc->is_indata);
-				if (!(flags & FLG_OF_RELOBJ)) {
+				if ((flags & FLG_OF_RELOBJ) == 0) {
 					sym->st_value += osp->os_shdr->sh_addr;
 					/*
 					 * TLS symbols are relative to
@@ -867,11 +860,11 @@ update_osym(Ofl_desc *ofl)
 	 * by crti.o then they are used to represent the total concatenation of
 	 * the `.init' and `.fini' sections.
 	 *
-	 * First, determine whether any .init or .fini sections exist.  If these
-	 * sections exist when a dynamic object is being built, but no `_init'
-	 * or `_fini' symbols are found, then the user is probably building this
-	 * object directly from ld(1) rather than using a compiler driver that
-	 * provides the symbols via crt's.
+	 * Determine whether any .init or .fini sections exist.  If these
+	 * sections exist and a dynamic object is being built, but no `_init'
+	 * or `_fini' symbols are found, then the user is probably building
+	 * this object directly from ld(1) rather than using a compiler driver
+	 * that provides the symbols via crt's.
 	 *
 	 * If the .init or .fini section exist, and their associated symbols,
 	 * determine the size of the sections and updated the symbols value
@@ -948,6 +941,8 @@ update_osym(Ofl_desc *ofl)
 	scndx = 0;
 	ssndx = ofl->ofl_scopecnt + ofl->ofl_elimcnt;
 
+	DBG_CALL(Dbg_syms_up_title(ofl->ofl_lml));
+
 	/*
 	 * Traverse the internal symbol table updating global symbol information
 	 * and allocating common.
@@ -958,7 +953,7 @@ update_osym(Ofl_desc *ofl)
 		int	local;
 		int	restore;
 
-		sdp = sav->sav_symdesc;
+		sdp = sav->sav_sdp;
 
 		/*
 		 * Ignore any symbols that have been marked as invalid during
@@ -977,8 +972,7 @@ update_osym(Ofl_desc *ofl)
 		if (sdp->sd_ref == REF_DYN_SEEN)
 			continue;
 
-		if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
-		    (flags & FLG_OF_PROCRED))
+		if ((sdp->sd_flags & FLG_SY_HIDDEN) && (flags & FLG_OF_PROCRED))
 			local = 1;
 		else
 			local = 0;
@@ -1144,15 +1138,15 @@ update_osym(Ofl_desc *ofl)
 		 * of the .symtab.  Retain the appropriate index for use in
 		 * version symbol indexing and relocation.
 		 */
-		if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) &&
+		if ((sdp->sd_flags & FLG_SY_HIDDEN) &&
 		    (flags & FLG_OF_PROCRED)) {
 			local = 1;
-			if (!(sdp->sd_flags1 & FLG_SY1_ELIM) && !dynsym)
+			if (!(sdp->sd_flags & FLG_SY_ELIM) && !dynsym)
 				sdp->sd_symndx = scopesym_ndx;
 			else
 				sdp->sd_symndx = 0;
 
-			if (sdp->sd_flags1 & FLG_SY1_ELIM) {
+			if (sdp->sd_flags & FLG_SY_ELIM) {
 				enter_in_symtab = 0;
 			} else if (ldynsym && sdp->sd_sym->st_name &&
 			    ldynsym_symtype[
@@ -1183,12 +1177,12 @@ update_osym(Ofl_desc *ofl)
 			if (sdp->sd_flags & FLG_SY_MVTOCOMM) {
 				vndx = VER_NDX_GLOBAL;
 			} else if (sdp->sd_ref == REF_REL_NEED) {
-				Half	symflags1 = sdp->sd_flags1;
+				sd_flag_t	sdflags = sdp->sd_flags;
 
 				vndx = sap->sa_overndx;
 				if ((vndx == 0) &&
 				    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
-					if (symflags1 & FLG_SY1_HIDDEN)
+					if (sdflags & FLG_SY_HIDDEN)
 						vndx = VER_NDX_LOCAL;
 					else
 						vndx = VER_NDX_GLOBAL;
@@ -1211,7 +1205,7 @@ update_osym(Ofl_desc *ofl)
 		if (sdp->sd_symndx && syminfo &&
 		    !(sdp->sd_flags & FLG_SY_NOTAVAIL)) {
 			int	ndx = sdp->sd_symndx;
-			APlist 	**alpp = &(ofl->ofl_syminfsyms);
+			APlist	**alpp = &(ofl->ofl_symdtent);
 
 			if (sdp->sd_flags & FLG_SY_MVTOCOMM)
 				/*
@@ -1256,7 +1250,7 @@ update_osym(Ofl_desc *ofl)
 				 *  -	All symbol references are required to
 				 *	use direct bindings via -Bdirect.
 				 */
-				if (sdp->sd_flags1 & FLG_SY1_DIR)
+				if (sdp->sd_flags & FLG_SY_DIR)
 					syminfo[ndx].si_flags |=
 					    SYMINFO_FLG_DIRECTBIND;
 
@@ -1279,7 +1273,7 @@ update_osym(Ofl_desc *ofl)
 				 */
 				syminfo[ndx].si_flags |= SYMINFO_FLG_DIRECT;
 				syminfo[ndx].si_boundto = SYMINFO_BT_PARENT;
-				if (sdp->sd_flags1 & FLG_SY1_DIR)
+				if (sdp->sd_flags & FLG_SY_DIR)
 					syminfo[ndx].si_flags |=
 					    SYMINFO_FLG_DIRECTBIND;
 
@@ -1290,7 +1284,7 @@ update_osym(Ofl_desc *ofl)
 				 * prevent external direct bindings.
 				 */
 				syminfo[ndx].si_flags |= SYMINFO_FLG_FILTER;
-				if (sdp->sd_flags1 & FLG_SY1_NDIR)
+				if (sdp->sd_flags & FLG_SY_NDIR)
 					syminfo[ndx].si_flags |=
 					    SYMINFO_FLG_NOEXTDIRECT;
 
@@ -1303,21 +1297,24 @@ update_osym(Ofl_desc *ofl)
 				 * prevent external direct bindings.
 				 */
 				syminfo[ndx].si_flags |= SYMINFO_FLG_AUXILIARY;
-				if (sdp->sd_flags1 & FLG_SY1_NDIR)
+				if (sdp->sd_flags & FLG_SY_NDIR)
 					syminfo[ndx].si_flags |=
 					    SYMINFO_FLG_NOEXTDIRECT;
 
 			} else if ((sdp->sd_ref == REF_REL_NEED) &&
 			    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
-
 				/*
 				 * This definition exists within the object
-				 * being created.  Flag whether it is necessary
-				 * to prevent external direct bindings.
+				 * being created.  Provide a default boundto
+				 * definition, which may be overridden later.
 				 */
-				if (sdp->sd_flags1 & FLG_SY1_NDIR) {
-					syminfo[ndx].si_boundto =
-					    SYMINFO_BT_NONE;
+				syminfo[ndx].si_boundto = SYMINFO_BT_NONE;
+
+				/*
+				 * Indicate whether it is necessary to prevent
+				 * external direct bindings.
+				 */
+				if (sdp->sd_flags & FLG_SY_NDIR) {
 					syminfo[ndx].si_flags |=
 					    SYMINFO_FLG_NOEXTDIRECT;
 				}
@@ -1332,40 +1329,24 @@ update_osym(Ofl_desc *ofl)
 				}
 
 				/*
-				 * If external bindings are allowed, or this is
-				 * a translator symbol, indicate the binding,
-				 * and a direct binding if necessary.
+				 * If external bindings are allowed, indicate
+				 * the binding, and a direct binding if
+				 * necessary.
 				 */
-				if (((sdp->sd_flags1 & FLG_SY1_NDIR) == 0) ||
-				    ((dtflags_1 & DF_1_TRANS) && sdp->sd_aux &&
-				    sdp->sd_aux->sa_bindto)) {
-
+				if ((sdp->sd_flags & FLG_SY_NDIR) == 0) {
 					syminfo[ndx].si_flags |=
 					    SYMINFO_FLG_DIRECT;
 
-					if (sdp->sd_flags1 & FLG_SY1_DIR)
+					if (sdp->sd_flags & FLG_SY_DIR)
 						syminfo[ndx].si_flags |=
 						    SYMINFO_FLG_DIRECTBIND;
 
 					/*
-					 * If this is a translator, the symbols
-					 * boundto element will indicate the
-					 * dependency to which it should resolve
-					 * rather than itself.  Save this info
-					 * for updating after the .dynamic
-					 * section has been created.
+					 * Provide a default boundto definition,
+					 * which may be overridden later.
 					 */
-					if ((dtflags_1 & DF_1_TRANS) &&
-					    sdp->sd_aux &&
-					    sdp->sd_aux->sa_bindto) {
-						if (aplist_append(alpp, sdp,
-						    AL_CNT_OFL_SYMINFOSYMS) ==
-						    NULL)
-							return (0);
-					} else {
-						syminfo[ndx].si_boundto =
-						    SYMINFO_BT_SELF;
-					}
+					syminfo[ndx].si_boundto =
+					    SYMINFO_BT_SELF;
 				}
 			}
 		}
@@ -1535,8 +1516,7 @@ update_osym(Ofl_desc *ofl)
 			 * indication of the presence or absence of certain
 			 * functionality).
 			 */
-			if (((flags & (FLG_OF_STATIC | FLG_OF_EXEC)) ==
-			    (FLG_OF_STATIC | FLG_OF_EXEC)) &&
+			if (OFL_IS_STATIC_EXEC(ofl) &&
 			    (ELF_ST_BIND(sym->st_info) == STB_WEAK)) {
 				sdp->sd_flags |= FLG_SY_SPECSEC;
 				sdp->sd_shndx = sectndx = SHN_ABS;
@@ -1795,7 +1775,7 @@ update_osym(Ofl_desc *ofl)
 		 * be local, otherwise if it's from a shared object then we need
 		 * to maintain the binding of the original reference.
 		 */
-		if (sdp->sd_flags1 & FLG_SY1_HIDDEN) {
+		if (sdp->sd_flags & FLG_SY_HIDDEN) {
 			if (flags & FLG_OF_PROCRED)
 				bind = STB_LOCAL;
 			else
@@ -1863,14 +1843,13 @@ update_osym(Ofl_desc *ofl)
 		 *		(correct number of globals entered)
 		 */
 		assert((scopesym_bndx + ofl->ofl_scopecnt) == scopesym_ndx);
-		assert(shdr->sh_info == (ofl->ofl_shdrcnt +
-		    ofl->ofl_locscnt + ofl->ofl_scopecnt + 2));
+		assert(shdr->sh_info == SYMTAB_LOC_CNT(ofl));
 		assert((shdr->sh_info + ofl->ofl_globcnt) == symtab_ndx);
 	}
 	if (dynsym) {
 		Shdr	*shdr = ofl->ofl_osdynsym->os_shdr;
 
-		shdr->sh_info = 1 + ofl->ofl_dynshdrcnt + ofl->ofl_lregsymcnt;
+		shdr->sh_info = DYNSYM_LOC_CNT(ofl);
 		/* LINTED */
 		shdr->sh_link = (Word)elf_ndxscn(ofl->ofl_osdynstr->os_scn);
 
@@ -1980,31 +1959,35 @@ update_odynamic(Ofl_desc *ofl)
 	Shdr		*shdr;
 	Dyn		*_dyn = (Dyn *)ofl->ofl_osdynamic->os_outdata->d_buf;
 	Dyn		*dyn;
-	Str_tbl		*dynstr;
+	Os_desc		*symosp, *strosp;
+	Str_tbl		*strtbl;
 	size_t		stoff;
 	ofl_flag_t	flags = ofl->ofl_flags;
 	int		not_relobj = !(flags & FLG_OF_RELOBJ);
 	Word		cnt;
 
 	/*
-	 * A relocatable object with a dynamic section is possible, though
-	 * rare. One use for this feature is to produce drivers
-	 * for the kernel, loaded by krtld.
+	 * Relocatable objects can be built with -r and -dy to trigger the
+	 * creation of a .dynamic section.  This model is used to create kernel
+	 * device drivers.  The .dynamic section provides a subset of userland
+	 * .dynamic entries, typically entries such as DT_NEEDED and DT_RUNPATH.
 	 *
-	 * Only a limited subset of DT_ entries apply to relocatable
-	 * objects:
-	 *
-	 *	DT_NEEDED
-	 *	DT_RUNPATH/DT_RPATH
-	 *	DT_FLAGS
-	 *	DT_FLAGS1
-	 *	DT_SUNW_STRPAD
-	 *	DT_LDMACH
+	 * Within a dynamic object, any .dynamic string references are to the
+	 * .dynstr table.  Within a relocatable object, these strings can reside
+	 * within the .strtab.
 	 */
-	dynstr = ofl->ofl_dynstrtab;
-	ofl->ofl_osdynamic->os_shdr->sh_link =
-	    /* LINTED */
-	    (Word)elf_ndxscn(ofl->ofl_osdynstr->os_scn);
+	if (OFL_IS_STATIC_OBJ(ofl)) {
+		symosp = ofl->ofl_ossymtab;
+		strosp = ofl->ofl_osstrtab;
+		strtbl = ofl->ofl_strtab;
+	} else {
+		symosp = ofl->ofl_osdynsym;
+		strosp = ofl->ofl_osdynstr;
+		strtbl = ofl->ofl_dynstrtab;
+	}
+
+	/* LINTED */
+	ofl->ofl_osdynamic->os_shdr->sh_link = (Word)elf_ndxscn(strosp->os_scn);
 
 	dyn = _dyn;
 
@@ -2031,7 +2014,7 @@ update_odynamic(Ofl_desc *ofl)
 		else
 			continue;
 
-		(void) st_setstring(dynstr, ifl->ifl_soname, &stoff);
+		(void) st_setstring(strtbl, ifl->ifl_soname, &stoff);
 		dyn->d_un.d_val = stoff;
 		/* LINTED */
 		ifl->ifl_neededndx = (Half)(((uintptr_t)dyn - (uintptr_t)_dyn) /
@@ -2049,7 +2032,7 @@ update_odynamic(Ofl_desc *ofl)
 				else
 					dyn->d_tag = DT_SUNW_FILTER;
 
-				(void) st_setstring(dynstr, dftp->dft_str,
+				(void) st_setstring(strtbl, dftp->dft_str,
 				    &stoff);
 				dyn->d_un.d_val = stoff;
 				dftp->dft_ndx = (Half)(((uintptr_t)dyn -
@@ -2075,7 +2058,7 @@ update_odynamic(Ofl_desc *ofl)
 		}
 		if (ofl->ofl_soname) {
 			dyn->d_tag = DT_SONAME;
-			(void) st_setstring(dynstr, ofl->ofl_soname, &stoff);
+			(void) st_setstring(strtbl, ofl->ofl_soname, &stoff);
 			dyn->d_un.d_val = stoff;
 			dyn++;
 		}
@@ -2085,14 +2068,14 @@ update_odynamic(Ofl_desc *ofl)
 			} else {
 				dyn->d_tag = DT_FILTER;
 			}
-			(void) st_setstring(dynstr, ofl->ofl_filtees, &stoff);
+			(void) st_setstring(strtbl, ofl->ofl_filtees, &stoff);
 			dyn->d_un.d_val = stoff;
 			dyn++;
 		}
 	}
 
 	if (ofl->ofl_rpath) {
-		(void) st_setstring(dynstr, ofl->ofl_rpath, &stoff);
+		(void) st_setstring(strtbl, ofl->ofl_rpath, &stoff);
 		dyn->d_tag = DT_RUNPATH;
 		dyn->d_un.d_val = stoff;
 		dyn++;
@@ -2106,19 +2089,19 @@ update_odynamic(Ofl_desc *ofl)
 
 		if (ofl->ofl_config) {
 			dyn->d_tag = DT_CONFIG;
-			(void) st_setstring(dynstr, ofl->ofl_config, &stoff);
+			(void) st_setstring(strtbl, ofl->ofl_config, &stoff);
 			dyn->d_un.d_val = stoff;
 			dyn++;
 		}
 		if (ofl->ofl_depaudit) {
 			dyn->d_tag = DT_DEPAUDIT;
-			(void) st_setstring(dynstr, ofl->ofl_depaudit, &stoff);
+			(void) st_setstring(strtbl, ofl->ofl_depaudit, &stoff);
 			dyn->d_un.d_val = stoff;
 			dyn++;
 		}
 		if (ofl->ofl_audit) {
 			dyn->d_tag = DT_AUDIT;
-			(void) st_setstring(dynstr, ofl->ofl_audit, &stoff);
+			(void) st_setstring(strtbl, ofl->ofl_audit, &stoff);
 			dyn->d_un.d_val = stoff;
 			dyn++;
 		}
@@ -2127,7 +2110,7 @@ update_odynamic(Ofl_desc *ofl)
 		dyn->d_un.d_ptr = ofl->ofl_oshash->os_shdr->sh_addr;
 		dyn++;
 
-		shdr = ofl->ofl_osdynstr->os_shdr;
+		shdr = strosp->os_shdr;
 		dyn->d_tag = DT_STRTAB;
 		dyn->d_un.d_ptr = shdr->sh_addr;
 		dyn++;
@@ -2136,7 +2119,11 @@ update_odynamic(Ofl_desc *ofl)
 		dyn->d_un.d_ptr = shdr->sh_size;
 		dyn++;
 
-		shdr = ofl->ofl_osdynsym->os_shdr;
+		/*
+		 * Note, the shdr is set and used in the ofl->ofl_osldynsym case
+		 * that follows.
+		 */
+		shdr = symosp->os_shdr;
 		dyn->d_tag = DT_SYMTAB;
 		dyn->d_un.d_ptr = shdr->sh_addr;
 		dyn++;
@@ -2146,6 +2133,8 @@ update_odynamic(Ofl_desc *ofl)
 		dyn++;
 
 		if (ofl->ofl_osldynsym) {
+			Shdr	*lshdr = ofl->ofl_osldynsym->os_shdr;
+
 			/*
 			 * We have arranged for the .SUNW_ldynsym data to be
 			 * immediately in front of the .dynsym data.
@@ -2155,7 +2144,6 @@ update_odynamic(Ofl_desc *ofl)
 			 * provide for DT_SUNW_SYMTAB, which is why we
 			 * add the lengths together.
 			 */
-			Shdr *lshdr = ofl->ofl_osldynsym->os_shdr;
 			dyn->d_tag = DT_SUNW_SYMTAB;
 			dyn->d_un.d_ptr = lshdr->sh_addr;
 			dyn++;
@@ -2172,26 +2160,26 @@ update_odynamic(Ofl_desc *ofl)
 		}
 
 		if (ofl->ofl_osdynsymsort) {
+			shdr = ofl->ofl_osdynsymsort->os_shdr;
+
 			dyn->d_tag = DT_SUNW_SYMSORT;
-			dyn->d_un.d_ptr =
-			    ofl->ofl_osdynsymsort->os_shdr->sh_addr;
+			dyn->d_un.d_ptr = shdr->sh_addr;
 			dyn++;
 
 			dyn->d_tag = DT_SUNW_SYMSORTSZ;
-			dyn->d_un.d_val =
-			    ofl->ofl_osdynsymsort->os_shdr->sh_size;
+			dyn->d_un.d_val = shdr->sh_size;
 			dyn++;
 		}
 
 		if (ofl->ofl_osdyntlssort) {
+			shdr = ofl->ofl_osdyntlssort->os_shdr;
+
 			dyn->d_tag = DT_SUNW_TLSSORT;
-			dyn->d_un.d_ptr =
-			    ofl->ofl_osdyntlssort->os_shdr->sh_addr;
+			dyn->d_un.d_ptr = shdr->sh_addr;
 			dyn++;
 
 			dyn->d_tag = DT_SUNW_TLSSORTSZ;
-			dyn->d_un.d_val =
-			    ofl->ofl_osdyntlssort->os_shdr->sh_size;
+			dyn->d_un.d_val = shdr->sh_size;
 			dyn++;
 		}
 
@@ -2239,6 +2227,7 @@ update_odynamic(Ofl_desc *ofl)
 		if ((flags & (FLG_OF_VERDEF | FLG_OF_NOVERSEC)) ==
 		    FLG_OF_VERDEF) {
 			shdr = ofl->ofl_osverdef->os_shdr;
+
 			dyn->d_tag = DT_VERDEF;
 			dyn->d_un.d_ptr = shdr->sh_addr;
 			dyn++;
@@ -2249,6 +2238,7 @@ update_odynamic(Ofl_desc *ofl)
 		if ((flags & (FLG_OF_VERNEED | FLG_OF_NOVERSEC)) ==
 		    FLG_OF_VERNEED) {
 			shdr = ofl->ofl_osverneed->os_shdr;
+
 			dyn->d_tag = DT_VERNEED;
 			dyn->d_un.d_ptr = shdr->sh_addr;
 			dyn++;
@@ -2309,7 +2299,7 @@ update_odynamic(Ofl_desc *ofl)
 		}
 
 		if (ofl->ofl_pltcnt) {
-			shdr =  ofl->ofl_osplt->os_relosdesc->os_shdr;
+			shdr = ofl->ofl_osplt->os_relosdesc->os_shdr;
 
 			dyn->d_tag = DT_PLTRELSZ;
 			dyn->d_un.d_ptr = shdr->sh_size;
@@ -2322,7 +2312,7 @@ update_odynamic(Ofl_desc *ofl)
 			dyn++;
 		}
 		if (ofl->ofl_pltpad) {
-			shdr =  ofl->ofl_osplt->os_shdr;
+			shdr = ofl->ofl_osplt->os_shdr;
 
 			dyn->d_tag = DT_PLTPAD;
 			if (ofl->ofl_pltcnt) {
@@ -2338,14 +2328,16 @@ update_odynamic(Ofl_desc *ofl)
 			dyn++;
 		}
 		if (ofl->ofl_relocsz) {
+			shdr = ofl->ofl_osrelhead->os_shdr;
+
 			dyn->d_tag = ld_targ.t_m.m_rel_dt_type;
-			dyn->d_un.d_ptr = ofl->ofl_osrelhead->os_shdr->sh_addr;
+			dyn->d_un.d_ptr = shdr->sh_addr;
 			dyn++;
 			dyn->d_tag = ld_targ.t_m.m_rel_dt_size;
 			dyn->d_un.d_ptr = ofl->ofl_relocsz;
 			dyn++;
 			dyn->d_tag = ld_targ.t_m.m_rel_dt_ent;
-			if (ofl->ofl_osrelhead->os_shdr->sh_type == SHT_REL)
+			if (shdr->sh_type == SHT_REL)
 				dyn->d_un.d_ptr = sizeof (Rel);
 			else
 				dyn->d_un.d_ptr = sizeof (Rela);
@@ -2353,6 +2345,7 @@ update_odynamic(Ofl_desc *ofl)
 		}
 		if (ofl->ofl_ossyminfo) {
 			shdr = ofl->ofl_ossyminfo->os_shdr;
+
 			dyn->d_tag = DT_SYMINFO;
 			dyn->d_un.d_ptr = shdr->sh_addr;
 			dyn++;
@@ -2364,17 +2357,16 @@ update_odynamic(Ofl_desc *ofl)
 			dyn++;
 		}
 		if (ofl->ofl_osmove) {
-			Os_desc	*osp;
+			shdr = ofl->ofl_osmove->os_shdr;
 
 			dyn->d_tag = DT_MOVEENT;
-			osp = ofl->ofl_osmove;
-			dyn->d_un.d_val = osp->os_shdr->sh_entsize;
+			dyn->d_un.d_val = shdr->sh_entsize;
 			dyn++;
 			dyn->d_tag = DT_MOVESZ;
-			dyn->d_un.d_val = osp->os_shdr->sh_size;
+			dyn->d_un.d_val = shdr->sh_size;
 			dyn++;
 			dyn->d_tag = DT_MOVETAB;
-			dyn->d_un.d_val = osp->os_shdr->sh_addr;
+			dyn->d_un.d_val = shdr->sh_addr;
 			dyn++;
 		}
 		if (ofl->ofl_regsymcnt) {
@@ -2466,9 +2458,9 @@ update_odynamic(Ofl_desc *ofl)
 	}
 
 	/*
-	 * Ensure that we wrote the right number of entries. If not,
-	 * we either miscounted in make_dynamic(), or we did something wrong
-	 * in this function.
+	 * Ensure that we wrote the right number of entries. If not, we either
+	 * miscounted in make_dynamic(), or we did something wrong in this
+	 * function.
 	 */
 	assert((ofl->ofl_osdynamic->os_shdr->sh_size /
 	    ofl->ofl_osdynamic->os_shdr->sh_entsize) ==
@@ -2488,6 +2480,18 @@ update_overdef(Ofl_desc *ofl)
 	Verdef		*vdf, *_vdf;
 	int		num = 0;
 	Os_desc		*strosp;
+	Str_tbl		*strtbl;
+
+	/*
+	 * Determine which string table to use.
+	 */
+	if (OFL_IS_STATIC_OBJ(ofl)) {
+		strtbl = ofl->ofl_strtab;
+		strosp = ofl->ofl_osstrtab;
+	} else {
+		strtbl = ofl->ofl_dynstrtab;
+		strosp = ofl->ofl_osdynstr;
+	}
 
 	/*
 	 * Traverse the version descriptors and update the version structures
@@ -2506,17 +2510,9 @@ update_overdef(Ofl_desc *ofl)
 			 * version name (there is no corresponding symbol for
 			 * this).
 			 */
-			if (!(ofl->ofl_flags & FLG_OF_DYNAMIC)) {
-				(void) st_setstring(ofl->ofl_strtab,
-				    name, &stoff);
-				/* LINTED */
-				vdp->vd_name = (const char *)stoff;
-			} else {
-				(void) st_setstring(ofl->ofl_dynstrtab,
-				    name, &stoff);
-				/* LINTED */
-				vdp->vd_name = (const char *)stoff;
-			}
+			(void) st_setstring(strtbl, name, &stoff);
+			/* LINTED */
+			vdp->vd_name = (const char *)stoff;
 		} else {
 			sdp = ld_sym_find(vdp->vd_name, vdp->vd_hash, 0, ofl);
 			/* LINTED */
@@ -2590,12 +2586,6 @@ update_overdef(Ofl_desc *ofl)
 	 * table (the actual contents of the version symbol table are filled
 	 * in during symbol update).
 	 */
-	if ((ofl->ofl_flags & FLG_OF_RELOBJ) ||
-	    (ofl->ofl_flags & FLG_OF_STATIC)) {
-		strosp = ofl->ofl_osstrtab;
-	} else {
-		strosp = ofl->ofl_osdynstr;
-	}
 	/* LINTED */
 	ofl->ofl_osverdef->os_shdr->sh_link = (Word)elf_ndxscn(strosp->os_scn);
 
@@ -2611,28 +2601,23 @@ update_overdef(Ofl_desc *ofl)
 /*
  * Finish the version symbol index section
  */
-static int
+static void
 update_oversym(Ofl_desc *ofl)
 {
-	Os_desc		*symosp;
+	Os_desc		*osp;
 
 	/*
-	 * Record the string table association with the version definition
-	 * section, and the symbol table associated with the version symbol
-	 * table (the actual contents of the version symbol table are filled
-	 * in during symbol update).
+	 * Record the symbol table associated with the version symbol table.
+	 * The contents of the version symbol table are filled in during
+	 * symbol update.
 	 */
-	if ((ofl->ofl_flags & FLG_OF_RELOBJ) ||
-	    (ofl->ofl_flags & FLG_OF_STATIC)) {
-		symosp = ofl->ofl_ossymtab;
-	} else {
-		symosp = ofl->ofl_osdynsym;
-	}
+	if (OFL_IS_STATIC_OBJ(ofl))
+		osp = ofl->ofl_ossymtab;
+	else
+		osp = ofl->ofl_osdynsym;
 
 	/* LINTED */
-	ofl->ofl_osversym->os_shdr->sh_link = (Word)elf_ndxscn(symosp->os_scn);
-
-	return (1);
+	ofl->ofl_osversym->os_shdr->sh_link = (Word)elf_ndxscn(osp->os_scn);
 }
 
 /*
@@ -2644,11 +2629,22 @@ update_overneed(Ofl_desc *ofl)
 	Aliste		idx1;
 	Ifl_desc	*ifl;
 	Verneed		*vnd, *_vnd;
-	Str_tbl		*dynstr;
+	Os_desc		*strosp;
+	Str_tbl		*strtbl;
 	Word		num = 0;
 
-	dynstr = ofl->ofl_dynstrtab;
 	_vnd = vnd = (Verneed *)ofl->ofl_osverneed->os_outdata->d_buf;
+
+	/*
+	 * Determine which string table is appropriate.
+	 */
+	if (OFL_IS_STATIC_OBJ(ofl)) {
+		strosp = ofl->ofl_osstrtab;
+		strtbl = ofl->ofl_strtab;
+	} else {
+		strosp = ofl->ofl_osdynstr;
+		strtbl = ofl->ofl_dynstrtab;
+	}
 
 	/*
 	 * Traverse the shared object list looking for dependencies that have
@@ -2665,7 +2661,7 @@ update_overneed(Ofl_desc *ofl)
 
 		vnd->vn_version = VER_NEED_CURRENT;
 
-		(void) st_setstring(dynstr, ifl->ifl_soname, &stoff);
+		(void) st_setstring(strtbl, ifl->ifl_soname, &stoff);
 		vnd->vn_file = stoff;
 
 		_vnap = vnap = (Vernaux *)(vnd + 1);
@@ -2678,7 +2674,7 @@ update_overneed(Ofl_desc *ofl)
 			Ver_index	*vip = &ifl->ifl_verndx[_cnt];
 
 			if (vip->vi_flags & FLG_VER_REFER) {
-				(void) st_setstring(dynstr, vip->vi_name,
+				(void) st_setstring(strtbl, vip->vi_name,
 				    &stoff);
 				vnap->vna_name = stoff;
 
@@ -2735,18 +2731,15 @@ update_overneed(Ofl_desc *ofl)
 	_vnd->vn_next = 0;
 
 	/*
-	 * Record association on string table section and use the
-	 * `info' field to indicate the number of entries in this
-	 * section.
+	 * Use sh_link to record the associated string table section, and
+	 * sh_info to indicate the number of entries contained in the section.
 	 */
-	ofl->ofl_osverneed->os_shdr->sh_link =
-	    /* LINTED */
-	    (Word)elf_ndxscn(ofl->ofl_osdynstr->os_scn);
+	/* LINTED */
+	ofl->ofl_osverneed->os_shdr->sh_link = (Word)elf_ndxscn(strosp->os_scn);
 	ofl->ofl_osverneed->os_shdr->sh_info = num;
 
 	return (1);
 }
-
 
 /*
  * Update syminfo section.
@@ -2780,15 +2773,8 @@ update_osyminfo(Ofl_desc *ofl)
 	/*
 	 * Update any references with the index into the dynamic table.
 	 */
-	for (APLIST_TRAVERSE(ofl->ofl_syminfsyms, idx, sdp)) {
-		Ifl_desc	*ifl;
-
-		if (sdp->sd_aux && sdp->sd_aux->sa_bindto)
-			ifl = sdp->sd_aux->sa_bindto;
-		else
-			ifl = sdp->sd_file;
-		sip[sdp->sd_symndx].si_boundto = ifl->ifl_neededndx;
-	}
+	for (APLIST_TRAVERSE(ofl->ofl_symdtent, idx, sdp))
+		sip[sdp->sd_symndx].si_boundto = sdp->sd_file->ifl_neededndx;
 
 	/*
 	 * Update any filtee references with the index into the dynamic table.
@@ -3733,7 +3719,7 @@ ld_update_outfile(Ofl_desc *ofl)
 	 * If we have a PT_SUNWDTRACE phdr, update it now with the address of
 	 * the symbol.  It's only now been updated via update_sym().
 	 */
-	if (dtracesgp && ofl->ofl_dtracesym) {
+	if (dtracesgp) {
 		Phdr		*aphdr, *phdr = &(dtracesgp->sg_phdr);
 		Sym_desc	*sdp = ofl->ofl_dtracesym;
 
@@ -3755,7 +3741,7 @@ ld_update_outfile(Ofl_desc *ofl)
 	 * If we have a PT_SUNWCAP phdr, update it now from the associated
 	 * section information.
 	 */
-	if (capsgp && ofl->ofl_oscap) {
+	if (capsgp) {
 		Phdr	*phdr = &(capsgp->sg_phdr);
 		Shdr	*shdr = ofl->ofl_oscap->os_shdr;
 
@@ -3793,20 +3779,20 @@ ld_update_outfile(Ofl_desc *ofl)
 		if ((flags & FLG_OF_VERNEED) &&
 		    (update_overneed(ofl) == S_ERROR))
 			return (S_ERROR);
-		if ((flags & (FLG_OF_VERNEED | FLG_OF_VERDEF)) &&
-		    (update_oversym(ofl) == S_ERROR))
-			return (S_ERROR);
+		if (flags & (FLG_OF_VERNEED | FLG_OF_VERDEF))
+			update_oversym(ofl);
 	}
 	if (flags & FLG_OF_DYNAMIC) {
 		if (update_odynamic(ofl) == S_ERROR)
 			return (S_ERROR);
-		if (ofl->ofl_ossyminfo)
-			if (update_osyminfo(ofl) == S_ERROR)
-				return (S_ERROR);
+	}
+	if (ofl->ofl_ossyminfo) {
+		if (update_osyminfo(ofl) == S_ERROR)
+			return (S_ERROR);
 	}
 
 	/*
-	 * Sanity test: First and last data byte of a string table
+	 * Sanity test: the first and last data byte of a string table
 	 * must be NULL.
 	 */
 	assert((ofl->ofl_osshstrtab == NULL) ||

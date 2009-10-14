@@ -89,7 +89,7 @@ remove_scoped(Ofl_desc *ofl, Sym_desc *sdp, int allow_ldynsym)
 		/* Remove from sort section? */
 		DYNSORT_COUNT(sdp, sym, type, --);
 	}
-	sdp->sd_flags1 |= FLG_SY1_ELIM;
+	sdp->sd_flags |= FLG_SY_ELIM;
 }
 
 inline static void
@@ -129,7 +129,7 @@ ignore_sym(Ofl_desc *ofl, Ifl_desc *ifl, Sym_desc *sdp, int allow_ldynsym)
 		 * Global symbols can only be eliminated when the interfaces of
 		 * an object have been defined via versioning/scoping.
 		 */
-		if ((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0)
+		if ((sdp->sd_flags & FLG_SY_HIDDEN) == 0)
 			return;
 
 		/*
@@ -242,8 +242,8 @@ ignore_section_processing(Ofl_desc *ofl)
 			 */
 			sdp = ifl->ifl_oldndx[num];
 			if ((sdp->sd_file != ifl) ||
-			    (sdp->sd_flags & (FLG_SY_ISDISC|FLG_SY_INVALID)) ||
-			    (sdp->sd_flags1 & FLG_SY1_ELIM))
+			    (sdp->sd_flags &
+			    (FLG_SY_ISDISC | FLG_SY_INVALID | FLG_SY_ELIM)))
 				continue;
 
 			/*
@@ -907,9 +907,18 @@ make_dynamic(Ofl_desc *ofl)
 	Ifl_desc	*ifl;
 	Sym_desc	*sdp;
 	size_t		size;
+	Str_tbl		*strtbl;
 	ofl_flag_t	flags = ofl->ofl_flags;
 	int		not_relobj = !(flags & FLG_OF_RELOBJ);
 	int		unused = 0;
+
+	/*
+	 * Select the required string table.
+	 */
+	if (OFL_IS_STATIC_OBJ(ofl))
+		strtbl = ofl->ofl_strtab;
+	else
+		strtbl = ofl->ofl_dynstrtab;
 
 	/*
 	 * Only a limited subset of DT_ entries apply to relocatable
@@ -963,7 +972,7 @@ make_dynamic(Ofl_desc *ofl)
 		    not_relobj)
 			cnt++;
 
-		if (st_insert(ofl->ofl_dynstrtab, ifl->ifl_soname) == -1)
+		if (st_insert(strtbl, ifl->ifl_soname) == -1)
 			return (S_ERROR);
 		cnt++;
 
@@ -990,14 +999,14 @@ make_dynamic(Ofl_desc *ofl)
 		 * Reserve entries for _init() and _fini() section addresses.
 		 */
 		if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U),
-		    SYM_NOHASH, 0, ofl)) != NULL) &&
+		    SYM_NOHASH, NULL, ofl)) != NULL) &&
 		    (sdp->sd_ref == REF_REL_NEED) &&
 		    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
 			sdp->sd_flags |= FLG_SY_UPREQD;
 			cnt++;
 		}
 		if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U),
-		    SYM_NOHASH, 0, ofl)) != NULL) &&
+		    SYM_NOHASH, NULL, ofl)) != NULL) &&
 		    (sdp->sd_ref == REF_REL_NEED) &&
 		    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
 			sdp->sd_flags |= FLG_SY_UPREQD;
@@ -1010,14 +1019,12 @@ make_dynamic(Ofl_desc *ofl)
 		 */
 		if (ofl->ofl_soname) {
 			cnt++;
-			if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_soname) ==
-			    -1)
+			if (st_insert(strtbl, ofl->ofl_soname) == -1)
 				return (S_ERROR);
 		}
 		if (ofl->ofl_filtees) {
 			cnt++;
-			if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_filtees) ==
-			    -1)
+			if (st_insert(strtbl, ofl->ofl_filtees) == -1)
 				return (S_ERROR);
 
 			/*
@@ -1034,7 +1041,7 @@ make_dynamic(Ofl_desc *ofl)
 
 	if (ofl->ofl_rpath) {
 		cnt += 2;	/* DT_RPATH & DT_RUNPATH */
-		if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_rpath) == -1)
+		if (st_insert(strtbl, ofl->ofl_rpath) == -1)
 			return (S_ERROR);
 
 		/*
@@ -1052,8 +1059,7 @@ make_dynamic(Ofl_desc *ofl)
 
 		if (ofl->ofl_config) {
 			cnt++;
-			if (st_insert(ofl->ofl_dynstrtab,
-			    ofl->ofl_config) == -1)
+			if (st_insert(strtbl, ofl->ofl_config) == -1)
 				return (S_ERROR);
 
 			/*
@@ -1067,13 +1073,12 @@ make_dynamic(Ofl_desc *ofl)
 		}
 		if (ofl->ofl_depaudit) {
 			cnt++;
-			if (st_insert(ofl->ofl_dynstrtab,
-			    ofl->ofl_depaudit) == -1)
+			if (st_insert(strtbl, ofl->ofl_depaudit) == -1)
 				return (S_ERROR);
 		}
 		if (ofl->ofl_audit) {
 			cnt++;
-			if (st_insert(ofl->ofl_dynstrtab, ofl->ofl_audit) == -1)
+			if (st_insert(strtbl, ofl->ofl_audit) == -1)
 				return (S_ERROR);
 		}
 
@@ -1456,10 +1461,9 @@ make_hash(Ofl_desc *ofl)
 	 *	i.	the initial nbucket and nchain entries (2)
 	 *	ii.	the number of buckets (calculated above)
 	 *	iii.	the number of chains (this is based on the number of
-	 *		symbols in the .dynsym array + NULL symbol).
+	 *		symbols in the .dynsym array).
 	 */
-	cnt = 2 + ofl->ofl_hashbkts + (ofl->ofl_dynshdrcnt +
-	    ofl->ofl_globcnt + ofl->ofl_lregsymcnt + 1);
+	cnt = 2 + ofl->ofl_hashbkts + DYNSYM_ALL_CNT(ofl);
 	size = cnt * shdr->sh_entsize;
 
 	/*
@@ -1499,9 +1503,8 @@ make_symtab(Ofl_desc *ofl)
 	 * Place the section first since it will affect the local symbol
 	 * count.
 	 */
-	ofl->ofl_ossymtab =
-	    ld_place_section(ofl, isec, ld_targ.t_id.id_symtab, NULL);
-	if (ofl->ofl_ossymtab == (Os_desc *)S_ERROR)
+	if ((ofl->ofl_ossymtab = ld_place_section(ofl, isec,
+	    ld_targ.t_id.id_symtab, NULL)) == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
 	/*
@@ -1525,10 +1528,9 @@ make_symtab(Ofl_desc *ofl)
 
 	/*
 	 * Calculated number of symbols, which need to be augmented by
-	 * the null first entry, the FILE symbol, and the .shstrtab entry.
+	 * the (yet to be created) .shstrtab entry.
 	 */
-	symcnt = (size_t)(3 + ofl->ofl_shdrcnt + ofl->ofl_scopecnt +
-	    ofl->ofl_locscnt + ofl->ofl_globcnt);
+	symcnt = (size_t)(1 + SYMTAB_ALL_CNT(ofl));
 	size = symcnt * shdr->sh_entsize;
 
 	/*
@@ -1612,10 +1614,7 @@ make_dynsym(Ofl_desc *ofl)
 	if (ofl->ofl_osdynsym == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
-	/*
-	 * One extra section header entry for the 'null' entry.
-	 */
-	cnt = 1 + ofl->ofl_dynshdrcnt + ofl->ofl_globcnt + ofl->ofl_lregsymcnt;
+	cnt = DYNSYM_ALL_CNT(ofl);
 	size = (size_t)cnt * shdr->sh_entsize;
 
 	/*
@@ -1843,7 +1842,7 @@ make_dynstr(Ofl_desc *ofl)
 			if ((sdp = ofl->ofl_regsyms[ndx]) == NULL)
 				continue;
 
-			if (((sdp->sd_flags1 & FLG_SY1_HIDDEN) == 0) &&
+			if (((sdp->sd_flags & FLG_SY_HIDDEN) == 0) &&
 			    (ELF_ST_BIND(sdp->sd_sym->st_info) != STB_LOCAL))
 				continue;
 
@@ -2046,6 +2045,7 @@ make_verdef(Ofl_desc *ofl)
 	Elf_Data	*data;
 	Is_desc		*isec;
 	Ver_desc	*vdp;
+	Str_tbl		*strtab;
 
 	/*
 	 * Reserve a string table entry for the base version dependency (other
@@ -2054,13 +2054,13 @@ make_verdef(Ofl_desc *ofl)
 	 */
 	vdp = (Ver_desc *)ofl->ofl_verdesc->apl_data[0];
 
-	if (ofl->ofl_flags & FLG_OF_DYNAMIC) {
-		if (st_insert(ofl->ofl_dynstrtab, vdp->vd_name) == -1)
-			return (S_ERROR);
-	} else {
-		if (st_insert(ofl->ofl_strtab, vdp->vd_name) == -1)
-			return (S_ERROR);
-	}
+	if (OFL_IS_STATIC_OBJ(ofl))
+		strtab = ofl->ofl_strtab;
+	else
+		strtab = ofl->ofl_dynstrtab;
+
+	if (st_insert(strtab, vdp->vd_name) == -1)
+		return (S_ERROR);
 
 	/*
 	 * verdef sections do not have a constant element size, so the
@@ -2585,6 +2585,23 @@ return_s_error:
 	return (S_ERROR);
 }
 
+/*
+ * Update a data buffers size.  A number of sections have to be created, and
+ * the sections header contributes to the size of the eventual section.  Thus,
+ * a section may be created, and once all associated sections have been created,
+ * we return to establish the required section size.
+ */
+inline static void
+update_data_size(Os_desc *osp, ulong_t cnt)
+{
+	Is_desc		*isec = ld_os_first_isdesc(osp);
+	Elf_Data	*data = isec->is_indata;
+	Shdr		*shdr = osp->os_shdr;
+	size_t		size = cnt * shdr->sh_entsize;
+
+	shdr->sh_size = (Xword)size;
+	data->d_size = size;
+}
 
 /*
  * The following sections are built after all input file processing and symbol
@@ -2770,14 +2787,15 @@ ld_make_sections(Ofl_desc *ofl)
 	if (flags & FLG_OF_DYNAMIC) {
 		if (make_dynamic(ofl) == S_ERROR)
 			return (S_ERROR);
-		if (make_dynstr(ofl) == S_ERROR)
-			return (S_ERROR);
+
 		/*
-		 * There is no use for .hash and .dynsym sections in a
-		 * relocatable object.
+		 * A number of sections aren't necessary within a relocatable
+		 * object, even if -dy has been used.
 		 */
 		if (!(flags & FLG_OF_RELOBJ)) {
 			if (make_hash(ofl) == S_ERROR)
+				return (S_ERROR);
+			if (make_dynstr(ofl) == S_ERROR)
 				return (S_ERROR);
 			if (make_dynsym(ofl) == S_ERROR)
 				return (S_ERROR);
@@ -2820,44 +2838,28 @@ ld_make_sections(Ofl_desc *ofl)
 		return (S_ERROR);
 
 	/*
-	 * Now that we've created all of our sections adjust the size
-	 * of SHT_SUNW_versym & SHT_SUNW_syminfo which are dependent on
-	 * the symbol table sizes.
+	 * Now that we've created all output sections, adjust the size of the
+	 * SHT_SUNW_versym and SHT_SUNW_syminfo section, which are dependent on
+	 * the associated symbol table sizes.
 	 */
 	if (ofl->ofl_osversym || ofl->ofl_ossyminfo) {
-		Shdr		*shdr;
-		Is_desc		*isec;
-		Elf_Data	*data;
-		size_t		size;
 		ulong_t		cnt;
+		Is_desc		*isp;
 		Os_desc		*osp;
 
-		if (flags & (FLG_OF_RELOBJ | FLG_OF_STATIC)) {
+		if (OFL_IS_STATIC_OBJ(ofl))
 			osp = ofl->ofl_ossymtab;
-		} else {
+		else
 			osp = ofl->ofl_osdynsym;
-		}
-		isec = ld_os_first_isdesc(osp);
-		cnt = (isec->is_shdr->sh_size / isec->is_shdr->sh_entsize);
 
-		if (ofl->ofl_osversym) {
-			osp = ofl->ofl_osversym;
-			isec = ld_os_first_isdesc(osp);
-			data = isec->is_indata;
-			shdr = osp->os_shdr;
-			size = cnt * shdr->sh_entsize;
-			shdr->sh_size = (Xword)size;
-			data->d_size = size;
-		}
-		if (ofl->ofl_ossyminfo) {
-			osp = ofl->ofl_ossyminfo;
-			isec = ld_os_first_isdesc(osp);
-			data = isec->is_indata;
-			shdr = osp->os_shdr;
-			size = cnt * shdr->sh_entsize;
-			shdr->sh_size = (Xword)size;
-			data->d_size = size;
-		}
+		isp = ld_os_first_isdesc(osp);
+		cnt = (isp->is_shdr->sh_size / isp->is_shdr->sh_entsize);
+
+		if (ofl->ofl_osversym)
+			update_data_size(ofl->ofl_osversym, cnt);
+
+		if (ofl->ofl_ossyminfo)
+			update_data_size(ofl->ofl_ossyminfo, cnt);
 	}
 
 	return (1);

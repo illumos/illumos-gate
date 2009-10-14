@@ -1533,3 +1533,5 @@ Bugid   Risk Synopsis
 6878605 ld should accept '%' syntax when matching input SHT_PROGBITS sections
 6850768 ld option to autogenerate wrappers/interposers similar to GNU ld --wrap
 	PSARC/2009/493 ld -z wrap option
+6888489 Null environment variables are not overriding crle(1) replaceable
+	environment variables.

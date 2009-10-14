@@ -102,7 +102,7 @@ adbmacros:	adb .WAIT $(ADBSCRIPTS)
 adbinstall:	adbmacros .WAIT $(ROOTADB64)
 
 pics/%.o:	../sparc/%.c
-		$(COMPILE.c) -o $@ $< $(WARNFLAGS)
+		$(COMPILE.c) -o $@ $<
 		$(POST_PROCESS_O)
 
 include		$(SRC)/cmd/sgs/rtld/Makefile.targ

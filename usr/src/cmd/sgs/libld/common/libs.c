@@ -386,7 +386,7 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 			if ((allexrt == 0) && ((sdp = aup->au_syms) == NULL)) {
 				if ((sdp = ld_sym_find(arsym->as_name,
 				    /* LINTED */
-				    (Word)arsym->as_hash, 0, ofl)) == NULL) {
+				    (Word)arsym->as_hash, NULL, ofl)) == NULL) {
 					DBG_CALL(Dbg_syms_ar_entry(ofl->ofl_lml,
 					    ndx, arsym));
 					continue;

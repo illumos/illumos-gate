@@ -140,7 +140,7 @@ ld_map_out(Ofl_desc *ofl)
 	 */
 	for (sav = avl_first(&ofl->ofl_symavl); sav;
 	    sav = AVL_NEXT(&ofl->ofl_symavl, sav)) {
-		Sym_desc	*sdp = sav->sav_symdesc;
+		Sym_desc	*sdp = sav->sav_sdp;
 		const char	*name = sdp->sd_name, *ducp, *adcp;
 		APlist		*dfiles;
 		Aliste		idx;

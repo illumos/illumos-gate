@@ -1492,7 +1492,7 @@ static	u_longlong_t		prmisa;		/* permanent ISA specific */
 #define	SEL_ACT_STR		0x0400	/* setting string value */
 #define	SEL_ACT_LML		0x0800	/* setting lml_flags */
 #define	SEL_ACT_LMLT		0x1000	/* setting lml_tflags */
-#define	SEL_ACT_SPEC_1		0x2000	/* For FLG_{FLAGS, LIBPATH} */
+#define	SEL_ACT_SPEC_1		0x2000	/* for FLG_{FLAGS, LIBPATH} */
 #define	SEL_ACT_SPEC_2		0x4000	/* need special handling */
 
 /*
@@ -1892,23 +1892,19 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		return;
 
 	/*
-	 * If the variable is already processed with ISA specific variable,
-	 * no further processing needed.
+	 * If the variable is already processed with and ISA specific variable,
+	 * no further processing is needed.
 	 */
 	if (((select & SEL_REPLACE) && (rplisa & variable)) ||
 	    ((select & SEL_PERMANT) && (prmisa & variable)))
 		return;
 
 	/*
-	 * Now mark the appropriate variables.
-	 * If the replaceable variable is already set, then the
-	 * process environment variable must be set. Any replaceable
-	 * variable specified in a configuration file can be ignored.
+	 * Mark the appropriate variables.
 	 */
 	if (env_flags & ENV_TYP_ISA) {
 		/*
-		 * This is an ISA setting. We do the setting even if s2 is
-		 * NULL.  If s2 is NULL, we might need to undo the setting.
+		 * This is an ISA setting.
 		 */
 		if (select & SEL_REPLACE) {
 			if (rplisa & variable)
@@ -1917,7 +1913,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		} else {
 			prmisa |= variable;
 		}
-	} else if (s2) {
+	} else {
 		/*
 		 * This is a non-ISA setting.
 		 */
@@ -1927,11 +1923,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			rplgen |= variable;
 		} else
 			prmgen |= variable;
-	} else
-		/*
-		 * This is a non-ISA setting which can be ignored.
-		 */
-		return;
+	}
 
 	/*
 	 * Now perform the setting.
@@ -1946,9 +1938,9 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			rtld_flags2 |= val;
 		else
 			rtld_flags2 &= ~val;
-	} else if (select & SEL_ACT_STR)
+	} else if (select & SEL_ACT_STR) {
 		*str = s2;
-	else if (select & SEL_ACT_LML) {
+	} else if (select & SEL_ACT_LML) {
 		if (s2)
 			*lmflags |= val;
 		else
@@ -1979,21 +1971,24 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 	} else if (select & SEL_ACT_SPEC_2) {
 		/*
 		 * variables can be: ENV_FLG_
-		 * 	AUDIT_ARGS, BINDING, CONCURRENCY, CONFGEN,
-		 *	LOADFLTR, PROFILE, SIGNAL, TRACE_OBJS
+		 * 	AUDIT_ARGS, BINDING, CONFGEN, LOADFLTR, PROFILE,
+		 *	SIGNAL, TRACE_OBJS
 		 */
-		if (variable == ENV_FLG_AUDIT_ARGS) {
+		switch (variable) {
+		case ENV_FLG_AUDIT_ARGS:
 			if (s2) {
 				audit_argcnt = atoi(s2);
 				audit_argcnt += audit_argcnt % 2;
 			} else
 				audit_argcnt = 0;
-		} else if (variable == ENV_FLG_BINDINGS) {
+			break;
+		case ENV_FLG_BINDINGS:
 			if (s2)
 				rpl_debug = MSG_ORIG(MSG_TKN_BINDINGS);
 			else
 				rpl_debug = NULL;
-		} else if (variable == ENV_FLG_CONFGEN) {
+			break;
+		case ENV_FLG_CONFGEN:
 			if (s2) {
 				rtld_flags |= RT_FL_CONFGEN;
 				*lmflags |= LML_FLG_IGNRELERR;
@@ -2001,7 +1996,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 				rtld_flags &= ~RT_FL_CONFGEN;
 				*lmflags &= ~LML_FLG_IGNRELERR;
 			}
-		} else if (variable == ENV_FLG_LOADFLTR) {
+			break;
+		case ENV_FLG_LOADFLTR:
 			if (s2) {
 				*lmtflags |= LML_TFLG_LOADFLTR;
 				if (*s2 == '2')
@@ -2010,7 +2006,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 				*lmtflags &= ~LML_TFLG_LOADFLTR;
 				rtld_flags &= ~RT_FL_WARNFLTR;
 			}
-		} else if (variable == ENV_FLG_PROFILE) {
+			break;
+		case ENV_FLG_PROFILE:
 			profile_name = s2;
 			if (s2) {
 				if (strcmp(s2, MSG_ORIG(MSG_FIL_RTLD)) == 0) {
@@ -2035,9 +2032,11 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 				/* END CSTYLED */
 			} else
 				profile_lib = NULL;
-		} else if (variable == ENV_FLG_SIGNAL) {
+			break;
+		case ENV_FLG_SIGNAL:
 			killsig = s2 ? atoi(s2) : SIGKILL;
-		} else if (variable == ENV_FLG_TRACE_OBJS) {
+			break;
+		case ENV_FLG_TRACE_OBJS:
 			if (s2) {
 				*lmflags |= LML_FLG_TRC_ENABLE;
 				if (*s2 == '2')
@@ -2045,6 +2044,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			} else
 				*lmflags &=
 				    ~(LML_FLG_TRC_ENABLE | LML_FLG_TRC_LDDSTUB);
+			break;
 		}
 	}
 }

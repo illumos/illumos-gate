@@ -107,7 +107,6 @@ static Boolean	Bgflag	= FALSE;
 static Boolean	Blflag	= FALSE;
 static Boolean	Beflag	= FALSE;
 static Boolean	Bsflag	= FALSE;
-static Boolean	Btflag	= FALSE;
 static Boolean	Dflag	= FALSE;
 static Boolean	Gflag	= FALSE;
 static Boolean	Vflag	= FALSE;
@@ -476,12 +475,6 @@ check_flags(Ofl_desc * ofl, int argc)
 				    MSG_INTL(MSG_MARG_SONAME));
 				ofl->ofl_flags |= FLG_OF_FATAL;
 			}
-			if (Btflag) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_ARG_DY_INCOMP),
-				    MSG_ORIG(MSG_ARG_BTRANS));
-				ofl->ofl_flags |= FLG_OF_FATAL;
-			}
 		} else if (!rflag) {
 			/*
 			 * Shared library.
@@ -509,13 +502,6 @@ check_flags(Ofl_desc * ofl, int argc)
 				ofl->ofl_flags |= FLG_OF_SYMBOLIC;
 				ofl->ofl_dtflags |= DF_SYMBOLIC;
 			}
-
-			if (Btflag) {
-				ofl->ofl_dtflags_1 |=
-				    (DF_1_TRANS | DF_1_DIRECT);
-				ofl->ofl_flags |= FLG_OF_SYMINFO;
-			}
-
 		} else {
 			/*
 			 * Dynamic relocatable object.
@@ -1420,15 +1406,18 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 				ofl->ofl_flags |= FLG_OF_PROCRED;
 			else if (strcmp(optarg, MSG_ORIG(MSG_STR_LOCAL)) == 0)
 				Blflag = TRUE;
-			else if (strcmp(optarg,
-			    MSG_ORIG(MSG_ARG_TRANSLATOR)) == 0)
-				Btflag = TRUE;
 			else if (strcmp(optarg, MSG_ORIG(MSG_ARG_GROUP)) == 0)
 				Bgflag = TRUE;
 			else if (strcmp(optarg,
 			    MSG_ORIG(MSG_STR_ELIMINATE)) == 0)
 				Beflag = TRUE;
-			else if (strcmp(optarg, MSG_ORIG(MSG_STR_LD_DYNAMIC)) &&
+			else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_TRANSLATOR)) == 0) {
+				eprintf(ofl->ofl_lml, ERR_WARNING,
+				    MSG_INTL(MSG_ARG_UNSUPPORTED),
+				    MSG_ORIG(MSG_ARG_BTRANSLATOR));
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_STR_LD_DYNAMIC)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_STATIC))) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_ARG_ILLEGAL),

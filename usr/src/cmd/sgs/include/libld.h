@@ -200,8 +200,8 @@ struct ofl_desc {
 	Word		ofl_entrelscnt;	/* no of relocations entered */
 	Alist		*ofl_copyrels;	/* list of copy relocations */
 	APlist		*ofl_ordered;	/* list of shf_ordered sections */
-	APlist		*ofl_syminfsyms; /* list of interesting syms */
-					/*	for syminfo processing */
+	APlist		*ofl_symdtent;	/* list of syminfo symbols that need */
+					/*	to reference .dynamic entries */
 	APlist		*ofl_ismove;	/* list of .SUNW_move sections */
 	APlist		*ofl_ismoverel;	/* list of relocation input section */
 					/* targeting to expanded area */
@@ -318,7 +318,7 @@ struct ofl_desc {
 					/*	sloppy_comdat_reloc() */
 	APlist		*ofl_maptext;	/* mapfile added text sections */
 	APlist		*ofl_mapdata;	/* mapfile added data sections */
-	avl_tree_t	*ofl_wrap;	/* -z wrap symbols  */
+	avl_tree_t	*ofl_wrap;	/* -z wrap symbols */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */
@@ -331,7 +331,7 @@ struct ofl_desc {
 #define	FLG_OF_STRIP	0x00000080	/* strip output: -s */
 #define	FLG_OF_NOWARN	0x00000100	/* disable symbol warnings: -t */
 #define	FLG_OF_NOUNDEF	0x00000200	/* allow no undefined symbols: -zdefs */
-#define	FLG_OF_PURETXT	0x00000400	/* allow no text relocations: -ztext  */
+#define	FLG_OF_PURETXT	0x00000400	/* allow no text relocations: -ztext */
 #define	FLG_OF_GENMAP	0x00000800	/* generate a memory map: -m */
 #define	FLG_OF_DYNLIBS	0x00001000	/* dynamic input allowed: -Bdynamic */
 #define	FLG_OF_SYMBOLIC	0x00002000	/* bind global symbols: -Bsymbolic */
@@ -363,11 +363,11 @@ struct ofl_desc {
 #define	FLG_OF_NOCOMREL	0x000800000000	/* -z nocombreloc set */
 #define	FLG_OF_AUTOLCL	0x001000000000	/* automatically reduce unspecified */
 					/*	global symbols to locals */
-#define	FLG_OF_AUTOELM	0x002000000000	/* automatically eliminate  */
+#define	FLG_OF_AUTOELM	0x002000000000	/* automatically eliminate */
 					/*	unspecified global symbols */
 #define	FLG_OF_REDLSYM	0x004000000000	/* reduce local symbols */
 #define	FLG_OF_SECORDER	0x008000000000	/* section ordering is required */
-#define	FLG_OF_OSABI	0x010000000000	/* Tag object as ELFOSABI_SOLARIS */
+#define	FLG_OF_OSABI	0x010000000000	/* tag object as ELFOSABI_SOLARIS */
 
 /*
  * In the flags1 arena, establish any options that are applicable to archive
@@ -443,6 +443,42 @@ struct ofl_desc {
  */
 #define	OFL_DO_RELOC(_ofl) (((_ofl)->ofl_flags & FLG_OF_RELOBJ) || \
 	!((_ofl)->ofl_dtflags_1 & DF_1_NORELOC))
+
+/*
+ * Determine whether a static executable is being built.
+ */
+#define	OFL_IS_STATIC_EXEC(_ofl) (((_ofl)->ofl_flags & \
+	(FLG_OF_STATIC | FLG_OF_EXEC)) == (FLG_OF_STATIC | FLG_OF_EXEC))
+
+/*
+ * Determine whether a static object is being built.  This macro is used
+ * to select the appropriate string table, and symbol table that other
+ * sections need to reference.
+ */
+#define	OFL_IS_STATIC_OBJ(_ofl) ((_ofl)->ofl_flags & \
+	(FLG_OF_RELOBJ | FLG_OF_STATIC))
+
+/*
+ * Macros for counting symbol table entries.  These are used to size symbol
+ * tables and associated sections (.syminfo, SUNW_capinfo, .hash, etc.) and
+ * set required sh_info entries (the offset to the first global symbol).
+ */
+#define	SYMTAB_LOC_CNT(_ofl)		/* local .symtab entries */	\
+	(2 +				/*    NULL and STT_FILE */	\
+	(_ofl)->ofl_shdrcnt +		/*    section symbol */		\
+	(_ofl)->ofl_scopecnt +		/*    scoped symbols */		\
+	(_ofl)->ofl_locscnt)		/*    standard locals */
+#define	SYMTAB_ALL_CNT(_ofl)		/* all .symtab entries */	\
+	(SYMTAB_LOC_CNT(_ofl) +		/*    .symtab locals */		\
+	(_ofl)->ofl_globcnt)		/*    standard globals */
+
+#define	DYNSYM_LOC_CNT(_ofl)		/* local .dynsym entries */	\
+	(1 +				/*    NULL */			\
+	(_ofl)->ofl_dynshdrcnt +	/*    section symbols */	\
+	(_ofl)->ofl_lregsymcnt)		/*    local register symbols */
+#define	DYNSYM_ALL_CNT(_ofl)		/* all .dynsym entries */	\
+	(DYNSYM_LOC_CNT(_ofl) +		/*    .dynsym locals */		\
+	(_ofl)->ofl_globcnt)		/*    standard globals */
 
 /*
  * Define a move descriptor used within relocation structures.
@@ -583,7 +619,7 @@ struct ifl_desc {			/* input file descriptor */
 					/*	flag */
 #define	FLG_IF_IGNORE	0x00000080	/* ignore unused dependencies */
 #define	FLG_IF_NODIRECT	0x00000100	/* object contains symbols that */
-					/*	cannot be directly bound to. */
+					/*	cannot be directly bound to */
 #define	FLG_IF_LAZYLD	0x00000200	/* bindings to this object should be */
 					/*	lazy loaded */
 #define	FLG_IF_GRPPRM	0x00000400	/* this dependency should have the */
@@ -793,6 +829,7 @@ typedef struct {
 /*
  * Symbol descriptor.
  */
+typedef	Lword		sd_flag_t;
 struct sym_desc {
 	Alist		*sd_GOTndxs;	/* list of associated GOT entries */
 	Sym		*sd_sym;	/* pointer to symbol table entry */
@@ -806,8 +843,7 @@ struct sym_desc {
 	Sym_aux		*sd_aux;	/* auxiliary global symbol info. */
 	Word		sd_symndx;	/* index in output symbol table */
 	Word		sd_shndx;	/* sect. index sym is associated w/ */
-	Word		sd_flags;	/* state flags */
-	Half		sd_flags1;	/* more symbol flags */
+	sd_flag_t	sd_flags;	/* state flags */
 	Half		sd_ref;		/* reference definition of symbol */
 };
 
@@ -821,7 +857,6 @@ struct sym_aux {
 	APlist 		*sa_dfiles;	/* files where symbol is defined */
 	Sym		sa_sym;		/* copy of symtab entry */
 	const char	*sa_vfile;	/* first unavailable definition */
-	Ifl_desc	*sa_bindto;	/* symbol to bind to - for translator */
 	const char	*sa_rfile;	/* file with first symbol referenced */
 	Word		sa_hash;	/* the pure hash value of symbol */
 	Word		sa_PLTndx;	/* index into PLT for symbol */
@@ -840,7 +875,7 @@ struct sym_avlnode {
 	avl_node_t	sav_node;	/* AVL node */
 	Word		sav_hash;	/* symbol hash value */
 	const char	*sav_name;	/* symbol name */
-	Sym_desc	*sav_symdesc;	/* SymDesc entry */
+	Sym_desc	*sav_sdp;	/* symbol descriptor */
 };
 
 /*
@@ -920,44 +955,41 @@ struct sym_avlnode {
 #define	FLG_SY_DYNSORT	0x40000000	/* req. in dyn[sym|tls]sort section */
 #define	FLG_SY_NODYNSORT 0x80000000	/* excluded from dyn[sym_tls]sort sec */
 
-/*
- * Sym_desc.sd_flags1
- */
-#define	FLG_SY1_DEFAULT	0x00000001	/* global symbol, default */
-#define	FLG_SY1_SINGLE	0x00000002	/* global symbol, singleton defined */
-#define	FLG_SY1_PROTECT	0x00000004	/* global symbol, protected defined */
-#define	FLG_SY1_EXPORT	0x00000008	/* global symbol, exported defined */
+#define	FLG_SY_DEFAULT	0x0000100000000	/* global symbol, default */
+#define	FLG_SY_SINGLE	0x0000200000000	/* global symbol, singleton defined */
+#define	FLG_SY_PROTECT	0x0000400000000	/* global symbol, protected defined */
+#define	FLG_SY_EXPORT	0x0000800000000	/* global symbol, exported defined */
 
-#define	MSK_SY1_GLOBAL \
-	(FLG_SY1_DEFAULT | FLG_SY1_SINGLE | FLG_SY1_PROTECT | FLG_SY1_EXPORT)
+#define	MSK_SY_GLOBAL \
+	(FLG_SY_DEFAULT | FLG_SY_SINGLE | FLG_SY_PROTECT | FLG_SY_EXPORT)
 					/* this mask indicates that the */
 					/*    symbol has been explicitly */
 					/*    defined within a mapfile */
 					/*    definition, and is a candidate */
 					/*    for versioning */
 
-#define	FLG_SY1_HIDDEN	0x00000010	/* global symbol, reduce to local */
-#define	FLG_SY1_ELIM	0x00000020	/* global symbol, eliminate */
-#define	FLG_SY1_IGNORE	0x00000040	/* global symbol, ignored */
+#define	FLG_SY_HIDDEN	0x0001000000000	/* global symbol, reduce to local */
+#define	FLG_SY_ELIM	0x0002000000000	/* global symbol, eliminate */
+#define	FLG_SY_IGNORE	0x0004000000000	/* global symbol, ignored */
 
-#define	MSK_SY1_LOCAL	(FLG_SY1_HIDDEN | FLG_SY1_ELIM | FLG_SY1_IGNORE)
+#define	MSK_SY_LOCAL	(FLG_SY_HIDDEN | FLG_SY_ELIM | FLG_SY_IGNORE)
 					/* this mask allows all local state */
 					/*    flags to be removed when the */
 					/*    symbol is copy relocated */
 
-#define	FLG_SY1_EXPDEF	0x00000100	/* symbol visibility defined */
+#define	FLG_SY_EXPDEF	0x0008000000000	/* symbol visibility defined */
 					/*    explicitly */
 
-#define	MSK_SY1_NOAUTO	(FLG_SY1_SINGLE | FLG_SY1_EXPORT | FLG_SY1_EXPDEF)
+#define	MSK_SY_NOAUTO	(FLG_SY_SINGLE | FLG_SY_EXPORT | FLG_SY_EXPDEF)
 					/* this mask indicates that the */
-					/*    symbol is not a  candidate for */
+					/*    symbol is not a candidate for */
 					/*    auto-reduction/elimination */
 
-#define	FLG_SY1_MAPFILE 0x00000200	/* symbol attribute defined in a */
+#define	FLG_SY_MAPFILE	0x0010000000000	/* symbol attribute defined in a */
 					/*    mapfile */
-#define	FLG_SY1_DIR	0x00000400	/* global symbol, direct bindings */
-#define	FLG_SY1_NDIR	0x00000800	/* global symbol, nondirect bindings */
-#define	FLG_SY1_OVERLAP	0x00001000	/* Move entry overlap detected */
+#define	FLG_SY_DIR	0x0020000000000	/* global symbol, direct bindings */
+#define	FLG_SY_NDIR	0x0040000000000	/* global symbol, nondirect bindings */
+#define	FLG_SY_OVERLAP	0x0080000000000	/* move entry overlap detected */
 
 /*
  * Create a mask for (sym.st_other & visibility) since the gABI does not yet

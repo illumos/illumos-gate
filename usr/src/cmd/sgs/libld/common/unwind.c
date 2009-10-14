@@ -338,7 +338,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	/*
 	 * Allocate and initialize the Elf_Data structure.
 	 */
-	if ((elfdata = libld_calloc(sizeof (Elf_Data), 1)) == 0)
+	if ((elfdata = libld_calloc(sizeof (Elf_Data), 1)) == NULL)
 		return (S_ERROR);
 	elfdata->d_type = ELF_T_BYTE;
 	elfdata->d_align = ld_targ.t_m.m_word_align;
@@ -347,7 +347,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	/*
 	 * Allocate and initialize the Shdr structure.
 	 */
-	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
+	if ((shdr = libld_calloc(sizeof (Shdr), 1)) == NULL)
 		return (S_ERROR);
 	shdr->sh_type = ld_targ.t_m.m_sht_unwind;
 	shdr->sh_flags = SHF_ALLOC;
@@ -357,7 +357,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	/*
 	 * Allocate and initialize the Is_desc structure.
 	 */
-	if ((isp = libld_calloc(1, sizeof (Is_desc))) == 0)
+	if ((isp = libld_calloc(1, sizeof (Is_desc))) == NULL)
 		return (S_ERROR);
 	isp->is_name = MSG_ORIG(MSG_SCN_UNWINDHDR);
 	isp->is_shdr = shdr;
@@ -446,7 +446,7 @@ ld_unwind_make_hdr(Ofl_desc *ofl)
 	 */
 	size = 12 + (8 * fde_cnt);
 
-	if ((elfdata->d_buf = libld_calloc(size, 1)) == 0)
+	if ((elfdata->d_buf = libld_calloc(size, 1)) == NULL)
 		return (S_ERROR);
 	elfdata->d_size = size;
 	shdr->sh_size = (Xword)size;
