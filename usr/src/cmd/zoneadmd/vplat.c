@@ -1091,11 +1091,7 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 	if (ALT_MOUNT(mount_cmd)) {
 		(void) strlcpy(brand, NATIVE_BRAND_NAME, sizeof (brand));
 	} else {
-		if (zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) {
-			zerror(zlogp, B_FALSE,
-			    "unable to determine zone brand");
-			goto cleanup;
-		}
+		(void) strlcpy(brand, brand_name, sizeof (brand));
 	}
 
 	if ((bh = brand_open(brand)) == NULL) {
@@ -1769,12 +1765,7 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	if (ALT_MOUNT(mount_cmd)) {
 		(void) strlcpy(brand, NATIVE_BRAND_NAME, sizeof (brand));
 	} else {
-		if (zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) {
-			zerror(zlogp, B_FALSE,
-			    "unable to determine zone brand");
-			zonecfg_fini_handle(handle);
-			return (-1);
-		}
+		(void) strlcpy(brand, brand_name, sizeof (brand));
 	}
 
 	/* Get a handle to the brand info for this zone */
@@ -4143,16 +4134,14 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		if (setup_zone_hostid(zlogp, zone_name, zoneid) != Z_OK)
 			goto error;
 
-		if ((zone_get_brand(zone_name, attr.ba_brandname,
-		    MAXNAMELEN) != Z_OK) ||
-		    (bh = brand_open(attr.ba_brandname)) == NULL) {
+		if ((bh = brand_open(brand_name)) == NULL) {
 			zerror(zlogp, B_FALSE,
 			    "unable to determine brand name");
 			goto error;
 		}
 
 		if (!is_system_labeled() &&
-		    (strcmp(attr.ba_brandname, LABELED_BRAND_NAME) == 0)) {
+		    (strcmp(brand_name, LABELED_BRAND_NAME) == 0)) {
 			brand_close(bh);
 			zerror(zlogp, B_FALSE,
 			    "cannot boot labeled zone on unlabeled system");
@@ -4172,7 +4161,10 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		brand_close(bh);
 
 		if (strlen(modname) > 0) {
-			(void) strlcpy(attr.ba_modname, modname, MAXPATHLEN);
+			(void) strlcpy(attr.ba_brandname, brand_name,
+			    sizeof (attr.ba_brandname));
+			(void) strlcpy(attr.ba_modname, modname,
+			    sizeof (attr.ba_modname));
 			if (zone_setattr(zoneid, ZONE_ATTR_BRAND, &attr,
 			    sizeof (attr) != 0)) {
 				zerror(zlogp, B_TRUE,
@@ -4421,7 +4413,6 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	char pool_err[128];
 	char zpath[MAXPATHLEN];
 	char cmdbuf[MAXPATHLEN];
-	char brand[MAXNAMELEN];
 	brand_handle_t bh = NULL;
 	dladm_status_t status;
 	char errmsg[DLADM_STRSIZE];
@@ -4465,8 +4456,7 @@ vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd, boolean_t rebooting)
 	}
 
 	/* Get a handle to the brand info for this zone */
-	if ((zone_get_brand(zone_name, brand, sizeof (brand)) != Z_OK) ||
-	    (bh = brand_open(brand)) == NULL) {
+	if ((bh = brand_open(brand_name)) == NULL) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
 		return (-1);
 	}

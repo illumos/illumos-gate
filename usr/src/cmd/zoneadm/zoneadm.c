@@ -5662,6 +5662,20 @@ main(int argc, char **argv)
 			zerror(gettext("missing or invalid brand"));
 			exit(Z_ERR);
 		}
+		/*
+		 * In the alternate root environment, the only supported
+		 * operations are mount and unmount.  In this case, just treat
+		 * the zone as native if it is cluster.  Cluster zones can be
+		 * native for the purpose of LU or upgrade, and the cluster
+		 * brand may not exist in the miniroot (such as in net install
+		 * upgrade).
+		 */
+		if (strcmp(target_brand, CLUSTER_BRAND_NAME) == 0) {
+			if (zonecfg_in_alt_root()) {
+				(void) strlcpy(target_brand, NATIVE_BRAND_NAME,
+				    sizeof (target_brand));
+			}
+		}
 	}
 
 	err = parse_and_run(argc - optind, &argv[optind]);

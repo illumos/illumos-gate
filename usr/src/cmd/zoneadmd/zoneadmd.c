@@ -95,6 +95,7 @@
 #include <sys/brand.h>
 #include <libcontract.h>
 #include <libcontract_priv.h>
+#include <sys/brand.h>
 #include <sys/contract/process.h>
 #include <sys/ctfs.h>
 #include <libdladm.h>
@@ -1747,14 +1748,36 @@ main(int argc, char *argv[])
 	}
 
 	/* Get a handle to the brand info for this zone */
-	if ((zone_get_brand(zone_name, brand_name, sizeof (brand_name))
-	    != Z_OK) || (bh = brand_open(brand_name)) == NULL) {
+	if (zone_get_brand(zone_name, brand_name, sizeof (brand_name))
+	    != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone brand");
 		return (1);
 	}
-	zone_isnative = brand_is_native(bh);
-	zone_iscluster = (strcmp(brand_name, CLUSTER_BRAND_NAME) == 0);
+	zone_isnative = (strcmp(brand_name, NATIVE_BRAND_NAME) == 0);
 	zone_islabeled = (strcmp(brand_name, LABELED_BRAND_NAME) == 0);
+
+	/*
+	 * In the alternate root environment, the only supported
+	 * operations are mount and unmount.  In this case, just treat
+	 * the zone as native if it is cluster.  Cluster zones can be
+	 * native for the purpose of LU or upgrade, and the cluster
+	 * brand may not exist in the miniroot (such as in net install
+	 * upgrade).
+	 */
+	if (strcmp(brand_name, CLUSTER_BRAND_NAME) == 0) {
+		zone_iscluster = B_TRUE;
+		if (zonecfg_in_alt_root()) {
+			(void) strlcpy(brand_name, NATIVE_BRAND_NAME,
+			    sizeof (brand_name));
+		}
+	} else {
+		zone_iscluster = B_FALSE;
+	}
+
+	if ((bh = brand_open(brand_name)) == NULL) {
+		zerror(zlogp, B_FALSE, "unable to open zone brand");
+		return (1);
+	}
 
 	/* Get state change brand hooks. */
 	if (brand_callback_init(bh, zone_name) == -1) {
