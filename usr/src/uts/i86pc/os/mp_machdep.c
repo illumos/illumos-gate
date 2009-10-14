@@ -85,6 +85,7 @@ static int mach_intr_ops(dev_info_t *, ddi_intr_handle_impl_t *,
 static void mach_notify_error(int level, char *errmsg);
 static hrtime_t dummy_hrtime(void);
 static void dummy_scalehrtime(hrtime_t *);
+static uint64_t dummy_unscalehrtime(hrtime_t);
 void cpu_idle(void);
 static void cpu_wakeup(cpu_t *, int);
 #ifndef __xpv
@@ -133,6 +134,7 @@ void (*psm_enable_intr)(int)	= mp_enable_intr;
 hrtime_t (*gethrtimef)(void)	= dummy_hrtime;
 hrtime_t (*gethrtimeunscaledf)(void)	= dummy_hrtime;
 void (*scalehrtimef)(hrtime_t *)	= dummy_scalehrtime;
+uint64_t (*unscalehrtimef)(hrtime_t)	= dummy_unscalehrtime;
 int (*psm_translate_irq)(dev_info_t *, int) = mach_translate_irq;
 void (*gethrestimef)(timestruc_t *) = pc_gethrestime;
 void (*psm_notify_error)(int, char *) = (void (*)(int, char *))NULL;
@@ -371,6 +373,12 @@ dummy_hrtime(void)
 static void
 dummy_scalehrtime(hrtime_t *ticks)
 {}
+
+static uint64_t
+dummy_unscalehrtime(hrtime_t nsecs)
+{
+	return ((uint64_t)nsecs);
+}
 
 /*
  * Supports Deep C-State power saving idle loop.

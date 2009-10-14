@@ -169,6 +169,7 @@ extern void switch_sp_and_call(void *, void (*)(uint_t, uint_t), uint_t,
 extern hrtime_t (*gethrtimef)(void);
 extern hrtime_t (*gethrtimeunscaledf)(void);
 extern void (*scalehrtimef)(hrtime_t *);
+extern uint64_t (*unscalehrtimef)(hrtime_t);
 extern void (*gethrestimef)(timestruc_t *);
 
 extern void av_dispatch_softvect(uint_t);

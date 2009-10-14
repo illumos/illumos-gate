@@ -25,6 +25,7 @@
 
 #include <sys/cpu_pm.h>
 #include <sys/cmn_err.h>
+#include <sys/time.h>
 #include <sys/sdt.h>
 
 /*
@@ -69,7 +70,7 @@
  *
  * Avoiding state thrashing in the presence of transient periods of utilization
  * and idleness while still being responsive to non-transient periods is key.
- * The power manager implmeents several "governors" that are used to throttle
+ * The power manager implements a "governor" that is used to throttle
  * state transitions when a significant amount of transient idle or transient
  * work is detected.
  *
@@ -81,6 +82,28 @@
  * wait for an event elsewhere in the system. Where the idle period is short
  * enough, the overhead associated with making the state transition doesn't
  * justify the power savings.
+ *
+ * The following is the state machine for the governor implemented by
+ * cpupm_utilization_event():
+ *
+ *         ----->---tw---->-----
+ *        /                     \
+ *      (I)-<-ti-<-     -<-ntw-<(W)
+ *       |         \   /         |
+ *       \          \ /          /
+ *        >-nti/rm->(D)--->-tw->-
+ * Key:
+ *
+ * States
+ * - (D): Default (ungoverned)
+ * - (W): Transient work governed
+ * - (I): Transient idle governed
+ * State Transitions
+ * - tw: transient work
+ * - ti: transient idleness
+ * - ntw: non-transient work
+ * - nti: non-transient idleness
+ * - rm: thread remain event
  */
 
 static cpupm_domain_t *cpupm_domains = NULL;
@@ -109,39 +132,35 @@ hrtime_t cpupm_ti_predict_interval;
 /*
  * Number of mispredictions after which future transitions will be governed.
  */
-int cpupm_mispredict_thresh = 2;
+int cpupm_mispredict_thresh = 4;
 
 /*
  * Likewise, the number of mispredicted governed transitions after which the
  * governor will be removed.
  */
-int cpupm_mispredict_gov_thresh = 10;
+int cpupm_mispredict_gov_thresh = 4;
 
 /*
- * The transient work and transient idle prediction intervals are initialized
- * to be some multiple of the amount of time it takes to transition a power
- * domain from the highest to the lowest power state, and back again, which
- * is measured.
- *
- * The default values of those multiples are specified here. Tuning them higher
- * will result in the transient work, and transient idle governors being used
- * more aggresively, which limits the frequency of state transitions at the
- * expense of performance and power savings, respectively.
+ * The transient work and transient idle prediction intervals are specified
+ * here. Tuning them higher will result in the transient work, and transient
+ * idle governors being used more aggresively, which limits the frequency of
+ * state transitions at the expense of performance and power savings,
+ * respectively. The intervals are specified in nanoseconds.
  */
-#define	CPUPM_TI_GOV_DEFAULT_MULTIPLE 600
-#define	CPUPM_TW_GOV_DEFAULT_MULTIPLE 25
-
 /*
- * Number of high=>low=>high measurements performed, of which the average
- * is taken.
+ * 400 usec
  */
-#define	CPUPM_BENCHMARK_ITERS 5
+#define	CPUPM_DEFAULT_TI_INTERVAL	400000
+/*
+ * 400 usec
+ */
+#define	CPUPM_DEFAULT_TW_INTERVAL	400000
 
-int cpupm_ti_gov_multiple = CPUPM_TI_GOV_DEFAULT_MULTIPLE;
-int cpupm_tw_gov_multiple = CPUPM_TW_GOV_DEFAULT_MULTIPLE;
+hrtime_t cpupm_ti_gov_interval = CPUPM_DEFAULT_TI_INTERVAL;
+hrtime_t cpupm_tw_gov_interval = CPUPM_DEFAULT_TW_INTERVAL;
 
 
-static int	cpupm_governor_initialize(void);
+static void	cpupm_governor_initialize(void);
 static void	cpupm_state_change_global(cpupm_dtype_t, cpupm_state_name_t);
 
 cpupm_policy_t
@@ -201,23 +220,15 @@ cpupm_set_policy(cpupm_policy_t new_policy)
 			break;
 		}
 
-		pause_cpus(NULL);
 		/*
-		 * Attempt to initialize the governor parameters the first
-		 * time through.
+		 * Initialize the governor parameters the first time through.
 		 */
 		if (gov_init == 0) {
-			result = cpupm_governor_initialize();
-			if (result == 0) {
-				gov_init = 1;
-			} else {
-				/*
-				 * Failed to initialize the governor parameters
-				 */
-				start_cpus();
-				break;
-			}
+			cpupm_governor_initialize();
+			gov_init = 1;
 		}
+
+		pause_cpus(NULL);
 		cpupm_policy = CPUPM_POLICY_ELASTIC;
 		start_cpus();
 
@@ -398,7 +409,7 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 	 * If the utilization has dropped to zero, then transition the
 	 * domain to its lowest power state.
 	 *
-	 * Statistics are maintained to implement governors to reduce state
+	 * Statistics are maintained to implement a governor to reduce state
 	 * transitions resulting from either transient work, or periods of
 	 * transient idleness on the domain.
 	 */
@@ -415,8 +426,8 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 		    dom->cpd_named_states[CPUPM_STATE_LOW_POWER]) {
 			new_state =
 			    dom->cpd_named_states[CPUPM_STATE_MAX_PERF];
-			if (dom->cpd_tw_governed == B_TRUE) {
-				dom->cpd_tw_governed = B_FALSE;
+			if (dom->cpd_governor == CPUPM_GOV_TRANS_WORK) {
+				dom->cpd_governor = CPUPM_GOV_DISENGAGED;
 				dom->cpd_tw = 0;
 			}
 		}
@@ -437,10 +448,17 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 			/*
 			 * There's non-zero utilization, and the domain is
 			 * running in the lower power state. Before we
-			 * consider raising power, perform some book keeping
-			 * for the transient idle governor.
+			 * consider raising power, check if the preceeding
+			 * idle period was transient in duration.
+			 *
+			 * If the domain is already transient work governed,
+			 * then we don't bother maintaining transient idle
+			 * statistics, as the presence of enough transient work
+			 * can also make the domain frequently transiently idle.
+			 * In this case, we still want to remain transient work
+			 * governed.
 			 */
-			if (dom->cpd_ti_governed == B_FALSE) {
+			if (dom->cpd_governor == CPUPM_GOV_DISENGAGED) {
 				if ((now - last) < cpupm_ti_predict_interval) {
 					/*
 					 * We're raising the domain power and
@@ -448,18 +466,8 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 					 * this a mispredicted power state
 					 * transition due to a transient
 					 * idle period.
-					 *
-					 * Note: The presence of enough
-					 * transient work across the domain can
-					 * result in frequent transient idle
-					 * periods. We don't want the ti
-					 * governor being installed as a side
-					 * effect of transient work, so the ti
-					 * governor is left alone if the tw
-					 * governor is already installed.
 					 */
-					if (dom->cpd_tw_governed == B_FALSE &&
-					    ++dom->cpd_ti >=
+					if (++dom->cpd_ti >=
 					    cpupm_mispredict_thresh) {
 						/*
 						 * There's enough transient
@@ -467,7 +475,8 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 						 * justify governing future
 						 * lowering requests.
 						 */
-						dom->cpd_ti_governed = B_TRUE;
+						dom->cpd_governor =
+						    CPUPM_GOV_TRANS_IDLE;
 						dom->cpd_ti = 0;
 						DTRACE_PROBE1(
 						    cpupm__ti__governed,
@@ -481,7 +490,7 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 					dom->cpd_ti = 0;
 				}
 			}
-			if (dom->cpd_tw_governed == B_TRUE) {
+			if (dom->cpd_governor == CPUPM_GOV_TRANS_WORK) {
 				/*
 				 * Raise requests are governed due to
 				 * transient work.
@@ -489,22 +498,6 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 				DTRACE_PROBE1(cpupm__raise__governed,
 				    cpupm_domain_t *, dom);
 
-				/*
-				 * It's likely that we'll be governed for a
-				 * while. If the transient idle governor is
-				 * also in place, examine the preceeding idle
-				 * interval to see if that still makes sense.
-				 */
-				if (dom->cpd_ti_governed == B_TRUE &&
-				    ((now - last) >=
-				    cpupm_ti_predict_interval)) {
-					if (++dom->cpd_ti >=
-					    cpupm_mispredict_gov_thresh) {
-						dom->cpd_ti_governed =
-						    B_FALSE;
-						dom->cpd_ti = 0;
-					}
-				}
 				return;
 			}
 			/*
@@ -521,7 +514,8 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 			 * perform some book keeping if the last lowering
 			 * request was governed.
 			 */
-			if (dom->cpd_ti_governed == B_TRUE) {
+			if (dom->cpd_governor == CPUPM_GOV_TRANS_IDLE) {
+
 				if ((now - last) >= cpupm_ti_predict_interval) {
 					/*
 					 * The domain is transient idle
@@ -535,7 +529,8 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 						 * idle periods to justify
 						 * removing the governor.
 						 */
-						dom->cpd_ti_governed = B_FALSE;
+						dom->cpd_governor =
+						    CPUPM_GOV_DISENGAGED;
 						dom->cpd_ti = 0;
 						DTRACE_PROBE1(
 						    cpupm__ti__ungoverned,
@@ -570,7 +565,7 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 			 * perform some book keeping for the transient work
 			 * governor.
 			 */
-			if (dom->cpd_tw_governed == B_FALSE) {
+			if (dom->cpd_governor == CPUPM_GOV_DISENGAGED) {
 				if ((now - last) < cpupm_tw_predict_interval) {
 					/*
 					 * We're lowering the domain power and
@@ -581,12 +576,13 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 					if (++dom->cpd_tw >=
 					    cpupm_mispredict_thresh) {
 						/*
-						 * There's enough transient idle
+						 * There's enough transient work
 						 * transitions to justify
-						 * governing future lowering
+						 * governing future raise
 						 * requests.
 						 */
-						dom->cpd_tw_governed = B_TRUE;
+						dom->cpd_governor =
+						    CPUPM_GOV_TRANS_WORK;
 						dom->cpd_tw = 0;
 						DTRACE_PROBE1(
 						    cpupm__tw__governed,
@@ -600,7 +596,7 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 					dom->cpd_tw = 0;
 				}
 			}
-			if (dom->cpd_ti_governed == B_TRUE) {
+			if (dom->cpd_governor == CPUPM_GOV_TRANS_IDLE) {
 				/*
 				 * Lowering requests are governed due to
 				 * transient idleness.
@@ -608,22 +604,6 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 				DTRACE_PROBE1(cpupm__lowering__governed,
 				    cpupm_domain_t *, dom);
 
-				/*
-				 * It's likely that we'll be governed for a
-				 * while. If the transient work governor is
-				 * also in place, examine the preceeding busy
-				 * interval to see if that still makes sense.
-				 */
-				if (dom->cpd_tw_governed == B_TRUE &&
-				    ((now - last) >=
-				    cpupm_tw_predict_interval)) {
-					if (++dom->cpd_tw >=
-					    cpupm_mispredict_gov_thresh) {
-						dom->cpd_tw_governed =
-						    B_FALSE;
-						dom->cpd_tw = 0;
-					}
-				}
 				return;
 			}
 
@@ -642,7 +622,7 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 			 * perform some book keeping if the last raising
 			 * request was governed.
 			 */
-			if (dom->cpd_tw_governed == B_TRUE) {
+			if (dom->cpd_governor == CPUPM_GOV_TRANS_WORK) {
 				if ((now - last) >= cpupm_tw_predict_interval) {
 					/*
 					 * The domain is transient work
@@ -656,7 +636,8 @@ cpupm_utilization_event(struct cpu *cp, hrtime_t now, cpupm_domain_t *dom,
 						 * work to justify removing
 						 * the governor.
 						 */
-						dom->cpd_tw_governed = B_FALSE;
+						dom->cpd_governor =
+						    CPUPM_GOV_DISENGAGED;
 						dom->cpd_tw = 0;
 						DTRACE_PROBE1(
 						    cpupm__tw__ungoverned,
@@ -741,62 +722,18 @@ cpupm_redefine_max_activepwr_state(struct cpu *cp, int max_perf_level)
 }
 
 /*
- * Benchmark some power state transitions and use the transition latencies as
- * a basis for initializing parameters for the transient idle and transient
- * work governors.
- *
- * Returns 0 on success or -1 if the governor parameters could not be
- * initialized.
+ * Initialize the parameters for the transience governor state machine
  */
-static int
+static void
 cpupm_governor_initialize(void)
 {
-	cpu_t		*cp = CPU;
-	cpupm_domain_t	*dom;
-	cpupm_state_t	*low, *high;
-	id_t		did;
-	hrtime_t	start, delta, deltas = 0;
-	int		iterations;
-
-	did = cpupm_domain_id(cp, CPUPM_DTYPE_ACTIVE);
-	if (did == CPUPM_NO_DOMAIN)
-		return (-1);
-
-	dom = cpupm_domain_find(did, CPUPM_DTYPE_ACTIVE);
-	if (dom == NULL)
-		return (-1);
-
-	low = dom->cpd_named_states[CPUPM_STATE_LOW_POWER];
-	high = dom->cpd_named_states[CPUPM_STATE_MAX_PERF];
-
-	for (iterations = 0; iterations < CPUPM_BENCHMARK_ITERS; iterations++) {
-
-		/*
-		 * Measure the amount of time it takes to transition the
-		 * domain down to the lowest, and back to the highest power
-		 * state.
-		 */
-		start = gethrtime_unscaled();
-		(void) cpupm_change_state(cp, dom, low);
-		(void) cpupm_change_state(cp, dom, high);
-		delta = gethrtime_unscaled() - start;
-
-		DTRACE_PROBE1(cpupm__benchmark__latency,
-		    hrtime_t, delta);
-
-		deltas += delta;
-	}
-
 	/*
-	 * Figure the average latency, and tune the transient work and
-	 * transient idle prediction intervals accordingly.
+	 * The default prediction intervals are specified in nanoseconds.
+	 * Convert these to the equivalent in unscaled hrtime, which is the
+	 * format of the timestamps passed to cpupm_utilization_event()
 	 */
-	delta = deltas / iterations;
-
-	cpupm_ti_predict_interval = delta * cpupm_ti_gov_multiple;
-	cpupm_tw_predict_interval = delta * cpupm_tw_gov_multiple;
-
-	return (0);
+	cpupm_ti_predict_interval = unscalehrtime(cpupm_ti_gov_interval);
+	cpupm_tw_predict_interval = unscalehrtime(cpupm_tw_gov_interval);
 }
 
 /*

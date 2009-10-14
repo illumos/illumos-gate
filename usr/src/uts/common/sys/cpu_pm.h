@@ -65,6 +65,15 @@ typedef enum cpupm_state_name {
 } cpupm_state_name_t;
 
 /*
+ * Possible states for the domain's transience governor
+ */
+typedef enum cpupm_gov_state_t {
+	CPUPM_GOV_DISENGAGED,
+	CPUPM_GOV_TRANS_IDLE,	/* Transient idleness, lowerings disabled */
+	CPUPM_GOV_TRANS_WORK	/* Transient work, raises disabled */
+} cpupm_gov_state_t;
+
+/*
  * Utilization events delivered by the dispatcher.
  */
 typedef enum cpupm_util_event {
@@ -95,10 +104,9 @@ typedef struct cpupm_domain {
 	cpupm_state_t		*cpd_named_states[CPUPM_STATE_NAMES];
 	hrtime_t		cpd_last_raise;	/* Last raise request time */
 	hrtime_t		cpd_last_lower;	/* last lower request time */
-	int			cpd_tw;		/* transient work history */
 	int			cpd_ti;		/* transient idle history */
-	boolean_t		cpd_ti_governed; /* transient idle governor */
-	boolean_t		cpd_tw_governed; /* transient work governor */
+	int			cpd_tw;		/* transient work history */
+	cpupm_gov_state_t	cpd_governor;   /* transience governor */
 	struct cpupm_domain	*cpd_next;
 } cpupm_domain_t;
 

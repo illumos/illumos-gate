@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -1351,6 +1348,12 @@ void
 scalehrtime(hrtime_t *hrt)
 {
 	scalehrtimef(hrt);
+}
+
+uint64_t
+unscalehrtime(hrtime_t nsecs)
+{
+	return (unscalehrtimef(nsecs));
 }
 
 void

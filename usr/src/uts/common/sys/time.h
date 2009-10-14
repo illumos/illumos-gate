@@ -9,7 +9,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -344,6 +344,7 @@ extern	hrtime_t 	gethrtime_unscaled(void);
 extern	hrtime_t	gethrtime_max(void);
 extern	hrtime_t	gethrtime_waitfree(void);
 extern	void		scalehrtime(hrtime_t *);
+extern	uint64_t	unscalehrtime(hrtime_t);
 extern	void 		gethrestime(timespec_t *);
 extern	time_t 		gethrestime_sec(void);
 extern	void		gethrestime_lasttick(timespec_t *);

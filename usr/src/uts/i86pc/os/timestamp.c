@@ -96,6 +96,7 @@
 #define	NSEC_SHIFT 5
 
 static uint_t nsec_scale;
+static uint_t nsec_unscale;
 
 /*
  * These two variables used to be grouped together inside of a structure that
@@ -341,6 +342,20 @@ tsc_gethrtimeunscaled(void)
 	return (tsc);
 }
 
+/*
+ * Convert a nanosecond based timestamp to tsc
+ */
+uint64_t
+tsc_unscalehrtime(hrtime_t nsec)
+{
+	hrtime_t tsc;
+
+	if (tsc_gethrtime_enable) {
+		TSC_CONVERT(nsec, tsc, nsec_unscale);
+		return (tsc);
+	}
+	return ((uint64_t)nsec);
+}
 
 /* Convert a tsc timestamp to nanoseconds */
 void
@@ -603,6 +618,8 @@ tsc_hrtimeinit(uint64_t cpu_freq_hz)
 	ASSERT(cpu_freq_hz > NANOSEC / (1 << NSEC_SHIFT));
 	nsec_scale =
 	    (uint_t)(((uint64_t)NANOSEC << (32 - NSEC_SHIFT)) / cpu_freq_hz);
+	nsec_unscale =
+	    (uint_t)(((uint64_t)cpu_freq_hz << (32 - NSEC_SHIFT)) / NANOSEC);
 
 	flags = clear_int_flag();
 	tsc = tsc_read();
@@ -612,6 +629,7 @@ tsc_hrtimeinit(uint64_t cpu_freq_hz)
 	gethrtimef = tsc_gethrtime;
 	gethrtimeunscaledf = tsc_gethrtimeunscaled;
 	scalehrtimef = tsc_scalehrtime;
+	unscalehrtimef = tsc_unscalehrtime;
 	hrtime_tick = tsc_tick;
 	gethrtime_hires = 1;
 	/*

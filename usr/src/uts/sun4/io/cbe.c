@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/time.h>
@@ -56,7 +54,7 @@ hrtime2tick(hrtime_t ts)
 	return (q * sys_tick_freq + ((r * sys_tick_freq) / NANOSEC));
 }
 
-static uint64_t
+uint64_t
 unscalehrtime(hrtime_t ts)
 {
 	uint64_t unscale = 0;
