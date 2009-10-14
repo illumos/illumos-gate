@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -349,10 +347,15 @@ dt_pid_create_glob_offset_probes(struct ps_prochandle *P, dtrace_hdl_t *dtp,
     fasttrap_probe_spec_t *ftp, const GElf_Sym *symp, const char *pattern)
 {
 	uint8_t *text;
-	ulong_t i, end;
 	int size;
+	ulong_t i, end = symp->st_size;
 	pid_t pid = Pstatus(P)->pr_pid;
 	char dmodel = Pstatus(P)->pr_dmodel;
+
+	ftp->ftps_type = DTFTP_OFFSETS;
+	ftp->ftps_pc = (uintptr_t)symp->st_value;
+	ftp->ftps_size = (size_t)symp->st_size;
+	ftp->ftps_noffs = 0;
 
 	if ((text = malloc(symp->st_size)) == NULL) {
 		dt_dprintf("mr sparkle: malloc() failed\n");
@@ -373,13 +376,6 @@ dt_pid_create_glob_offset_probes(struct ps_prochandle *P, dtrace_hdl_t *dtp,
 		free(text);
 		return (0);
 	}
-
-	ftp->ftps_type = DTFTP_OFFSETS;
-	ftp->ftps_pc = (uintptr_t)symp->st_value;
-	ftp->ftps_size = (size_t)symp->st_size;
-	ftp->ftps_noffs = 0;
-
-	end = ftp->ftps_size;
 
 	if (strcmp("*", pattern) == 0) {
 		for (i = 0; i < end; i += size) {

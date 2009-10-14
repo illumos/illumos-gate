@@ -860,6 +860,7 @@ f none SUNWdtrt/tst/common/printa/tst.dynwidth.d 0444 root bin
 f none SUNWdtrt/tst/common/printa/tst.dynwidth.d.out 0444 root bin
 f none SUNWdtrt/tst/common/printa/tst.fmt.d 0444 root bin
 f none SUNWdtrt/tst/common/printa/tst.fmt.d.out 0444 root bin
+f none SUNWdtrt/tst/common/printa/tst.largeusersym.ksh 0444 root bin
 f none SUNWdtrt/tst/common/printa/tst.many.d 0444 root bin
 f none SUNWdtrt/tst/common/printa/tst.manyval.d 0444 root bin
 f none SUNWdtrt/tst/common/printa/tst.manyval.d.out 0444 root bin

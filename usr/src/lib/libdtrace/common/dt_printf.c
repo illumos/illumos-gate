@@ -328,7 +328,7 @@ pfprint_addr(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 	do {
 		n = len;
 		s = alloca(n);
-	} while ((len = dtrace_addr2str(dtp, val, s, n)) >= n);
+	} while ((len = dtrace_addr2str(dtp, val, s, n)) > n);
 
 	return (dt_printf(dtp, fp, format, s));
 }
@@ -381,7 +381,7 @@ pfprint_uaddr(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 	do {
 		n = len;
 		s = alloca(n);
-	} while ((len = dtrace_uaddr2str(dtp, pid, val, s, n)) >= n);
+	} while ((len = dtrace_uaddr2str(dtp, pid, val, s, n)) > n);
 
 	return (dt_printf(dtp, fp, format, s));
 }
