@@ -18,46 +18,43 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/common/fs/Makefile
-#
-# include global definitions
-include ../../../Makefile.master
 
-HDRS=  fs_subr.h  \
-	fs_reparse.h
+include ../Makefile.lib
 
-PROCHDRS=   prdata.h
+HDRS=		rp_plugin.h
+HDRDIR=		common
 
-ROOTDIR=	$(ROOT)/usr/include/sys
-ROOTDIRS=	$(ROOTDIR) $(ROOTDIR)/proc
+SUBDIRS=		$(MACH)
+$(BUILD64)SUBDIRS +=	$(MACH64)
+POFILE=		libreparse.po
+MSGFILES=	common/fs_reparse_lib.c
 
-ROOTHDRS=	$(HDRS:%=$(ROOTDIR)/%)
-ROOTPROCHDRS=	$(PROCHDRS:%=$(ROOTDIR)/proc/%)
-
-# install rules
-$(ROOTDIR)/%: %
-	$(INS.file)
-
-$(ROOTDIR)/proc/%: proc/%
-	$(INS.file)
-
-# standards checking rules
-proc/%.check:      proc/%.h
-	$(DOT_H_CHECK)
-
-CHECKHDRS= $(HDRS:%.h=%.check)  \
-	$(PROCHDRS:%.h=proc/%.check)
+all :=		TARGET = all
+clean :=	TARGET = clean
+clobber :=	TARGET = clobber
+install :=	TARGET = install
+lint :=		TARGET = lint
 
 .KEEP_STATE:
 
-.PARALLEL: $(CHECKHDRS)
+all clean clobber install lint: $(SUBDIRS)
 
-install_h: $(ROOTDIRS) $(ROOTHDRS) $(ROOTPROCHDRS)
+install_h:	$(ROOTHDRS)
 
-$(ROOTDIRS):
-	$(INS.dir)
+check:		$(CHECKHDRS)
 
-check:	$(CHECKHDRS)
+$(POFILE):	pofile_MSGFILES
+
+_msg:		$(MSGDOMAINPOFILE)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
+
+include $(SRC)/lib/Makefile.targ
+include $(SRC)/Makefile.msg.targ

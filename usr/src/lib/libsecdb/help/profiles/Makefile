@@ -69,6 +69,7 @@ HTMLENTS = \
 	RtObAccessMngmnt.html \
 	RtPrntAdmin.html \
 	RtProcManagement.html \
+	RtReparseMngmnt.html \
 	RtRightsDelegate.html \
 	RtSMBMngmnt.html \
 	RtSMBFSMngmnt.html \

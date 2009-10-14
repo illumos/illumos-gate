@@ -470,6 +470,7 @@ f none usr/include/regexp.h 644 root bin
 f none usr/include/regexpr.h 644 root bin
 f none usr/include/resolv.h 644 root bin
 f none usr/include/rje.h 644 root bin
+f none usr/include/rp_plugin.h 644 root bin
 d none usr/include/iso 755 root bin
 s none usr/include/iso/assert_iso.h=../assert.h
 f none usr/include/iso/ctype_c99.h 644 root bin
@@ -913,6 +914,7 @@ f none usr/include/sys/fs/ufs_quota.h 644 root bin
 f none usr/include/sys/fs/ufs_snap.h 644 root bin
 f none usr/include/sys/fs/ufs_trans.h 644 root bin
 f none usr/include/sys/fs/zfs.h 644 root bin
+f none usr/include/sys/fs_reparse.h 644 root bin
 f none usr/include/sys/fs_subr.h 644 root bin
 f none usr/include/sys/fsid.h 644 root bin
 f none usr/include/sys/fssnap.h 644 root bin

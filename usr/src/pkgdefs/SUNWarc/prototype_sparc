@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -110,6 +110,7 @@ f none usr/lib/sparcv9/llib-l300s.ln 644 root bin
 f none usr/lib/sparcv9/llib-l4014.ln 644 root bin
 f none usr/lib/sparcv9/llib-l450.ln 644 root bin
 s none usr/lib/sparcv9/llib-lpthread.ln=../../../lib/sparcv9/llib-lpthread.ln
+f none usr/lib/sparcv9/llib-lreparse.ln 644 root bin
 s none usr/lib/sparcv9/llib-lresolv.ln=../../../lib/sparcv9/llib-lresolv.ln
 s none usr/lib/sparcv9/llib-lrpcsvc.ln=../../../lib/sparcv9/llib-lrpcsvc.ln
 s none usr/lib/sparcv9/llib-lrt.ln=../../../lib/sparcv9/llib-lrt.ln

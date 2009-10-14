@@ -175,6 +175,9 @@ zfs_log_xvattr(lr_attr_t *lrattr, xvattr_t *xvap)
 		ZFS_TIME_ENCODE(&xoap->xoa_createtime, crtime);
 	if (XVA_ISSET_REQ(xvap, XAT_AV_SCANSTAMP))
 		bcopy(xoap->xoa_av_scanstamp, scanstamp, AV_SCANSTAMP_SZ);
+	if (XVA_ISSET_REQ(xvap, XAT_REPARSE))
+		*attrs |= (xoap->xoa_reparse == 0) ? 0 :
+		    XAT0_REPARSE;
 }
 
 static void *

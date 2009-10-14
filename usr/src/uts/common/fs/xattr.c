@@ -212,6 +212,9 @@ xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
 			VERIFY(nvlist_add_uint64(nvlp, attr_to_name(attr),
 			    fsid) == 0);
 			break;
+		case F_REPARSE:
+			XVA_SET_REQ(&xvattr, XAT_REPARSE);
+			break;
 		default:
 			break;
 		}
@@ -293,6 +296,11 @@ xattr_fill_nvlist(vnode_t *vp, xattr_view_t xattr_view, nvlist_t *nvlp,
 			    (uint64_t *)&(xoap->xoa_createtime),
 			    sizeof (xoap->xoa_createtime) /
 			    sizeof (uint64_t)) == 0);
+		}
+		if (XVA_ISSET_RTN(&xvattr, XAT_REPARSE)) {
+			VERIFY(nvlist_add_boolean_value(nvlp,
+			    attr_to_name(F_REPARSE),
+			    xoap->xoa_reparse) == 0);
 		}
 	}
 	/*
@@ -667,6 +675,10 @@ xattr_file_write(vnode_t *vp, uio_t *uiop, int ioflag, cred_t *cr,
 				return (EINVAL);
 			}
 			break;
+		case F_REPARSE:
+			XVA_SET_REQ(&xvattr, XAT_REPARSE);
+			xoap->xoa_reparse = value;
+			break;
 		default:
 			break;
 		}
@@ -807,6 +819,7 @@ xattr_copy(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 	XVA_SET_REQ(&xvattr, XAT_AV_MODIFIED);
 	XVA_SET_REQ(&xvattr, XAT_AV_QUARANTINED);
 	XVA_SET_REQ(&xvattr, XAT_CREATETIME);
+	XVA_SET_REQ(&xvattr, XAT_REPARSE);
 
 	pdvp = gfs_file_parent(sdvp);
 	error = VOP_GETATTR(pdvp, &xvattr.xva_vattr, 0, cr, ct);

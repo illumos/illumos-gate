@@ -288,6 +288,8 @@ s none usr/lib/sparcv9/libpthread.so.1=../../../lib/sparcv9/libpthread.so.1
 s none usr/lib/sparcv9/libpthread.so=../../../lib/sparcv9/libpthread.so.1
 s none usr/lib/sparcv9/librcm.so.1=../../../lib/sparcv9/librcm.so.1
 s none usr/lib/sparcv9/librcm.so=../../../lib/sparcv9/librcm.so.1
+f none usr/lib/sparcv9/libreparse.so.1 755 root bin
+s none usr/lib/sparcv9/libreparse.so=libreparse.so.1
 s none usr/lib/sparcv9/libresolv.so.2=../../../lib/sparcv9/libresolv.so.2
 s none usr/lib/sparcv9/libresolv.so=../../../lib/sparcv9/libresolv.so.2
 s none usr/lib/sparcv9/librestart.so.1=../../../lib/sparcv9/librestart.so.1

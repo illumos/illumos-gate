@@ -259,6 +259,7 @@ f none usr/lib/help/auths/locale/SmfNscdStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfNADDStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfNWAMStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfPowerStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfReparseStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfRoutingStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSendmailStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfSMBFSStates.html 444 root bin
@@ -380,6 +381,7 @@ f none usr/lib/help/profiles/locale/RtNetWifiSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetLinkSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/RtObAccessMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtProcManagement.html 444 root bin
+f none usr/lib/help/profiles/locale/RtReparseMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtRightsDelegate.html 444 root bin
 f none usr/lib/help/profiles/locale/RtSoftwareInstall.html 444 root bin
 f none usr/lib/help/profiles/locale/RtSMBFSMngmnt.html 444 root bin

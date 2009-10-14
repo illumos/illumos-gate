@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/attr.h>
 #if defined(_KERNEL)
@@ -63,6 +61,8 @@ static xattr_entry_t xattrs[F_ATTR_ALL] = {
 	{ A_OWNERSID, O_NONE, XATTR_VIEW_READWRITE, DATA_TYPE_NVLIST },
 	{ A_GROUPSID, O_NONE, XATTR_VIEW_READWRITE, DATA_TYPE_NVLIST },
 	{ A_FSID, O_NONE, XATTR_VIEW_READONLY, DATA_TYPE_UINT64 },
+	{ A_REPARSE_POINT, O_REPARSE_POINT, XATTR_VIEW_READONLY,
+	    DATA_TYPE_BOOLEAN_VALUE },
 };
 
 const char *

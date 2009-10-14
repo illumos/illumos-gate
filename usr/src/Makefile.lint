@@ -405,6 +405,7 @@ COMMON_SUBDIRS = \
 	lib/libraidcfg \
 	lib/librcm \
 	lib/librdc \
+	lib/libreparse \
 	lib/librestart \
 	lib/librstp \
 	lib/librt \

@@ -64,6 +64,7 @@
 #include <sys/fcntl.h>
 #include <fs/fs_subr.h>
 #include <sys/taskq.h>
+#include <fs/fs_reparse.h>
 
 /* Determine if this vnode is a file that is read-only */
 #define	ISROFILE(vp)	\
@@ -104,6 +105,11 @@ int vopstats_enabled = 1;
  * forward declarations for internal vnode specific data (vsd)
  */
 static void *vsd_realloc(void *, size_t, size_t);
+
+/*
+ * forward declarations for reparse point functions
+ */
+static int fs_reparse_mark(char *target, vattr_t *vap, xvattr_t *xvattr);
 
 /*
  * VSD -- VNODE SPECIFIC DATA
@@ -3604,6 +3610,7 @@ fop_symlink(
 	int flags)
 {
 	int	err;
+	xvattr_t xvattr;
 
 	/*
 	 * If this file system doesn't support case-insensitive access
@@ -3615,6 +3622,14 @@ fop_symlink(
 		return (EINVAL);
 
 	VOPXID_MAP_CR(dvp, cr);
+
+	/* check for reparse point */
+	if ((vfs_has_feature(dvp->v_vfsp, VFSFT_REPARSE)) &&
+	    (strncmp(target, FS_REPARSE_TAG_STR,
+	    strlen(FS_REPARSE_TAG_STR)) == 0)) {
+		if (!fs_reparse_mark(target, vap, &xvattr))
+			vap = (vattr_t *)&xvattr;
+	}
 
 	err = (*(dvp)->v_op->vop_symlink)
 	    (dvp, linkname, vap, target, cr, ct, flags);
@@ -4394,4 +4409,35 @@ vsd_realloc(void *old, size_t osize, size_t nsize)
 		kmem_free(old, osize);
 	}
 	return (new);
+}
+
+/*
+ * Setup the extensible system attribute for creating a reparse point.
+ * The symlink data 'target' is validated for proper format of a reparse
+ * string and a check also made to make sure the symlink data does not
+ * point to an existing file.
+ *
+ * return 0 if ok else -1.
+ */
+static int
+fs_reparse_mark(char *target, vattr_t *vap, xvattr_t *xvattr)
+{
+	xoptattr_t *xoap;
+
+	if ((!target) || (!vap) || (!xvattr))
+		return (-1);
+
+	/* validate reparse string */
+	if (reparse_validate((const char *)target))
+		return (-1);
+
+	xva_init(xvattr);
+	xvattr->xva_vattr = *vap;
+	xvattr->xva_vattr.va_mask |= AT_XVATTR;
+	xoap = xva_getxoptattr(xvattr);
+	ASSERT(xoap);
+	XVA_SET_REQ(xvattr, XAT_REPARSE);
+	xoap->xoa_reparse = 1;
+
+	return (0);
 }

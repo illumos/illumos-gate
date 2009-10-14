@@ -298,6 +298,8 @@ s none usr/lib/amd64/libpthread.so.1=../../../lib/amd64/libpthread.so.1
 s none usr/lib/amd64/libpthread.so=../../../lib/amd64/libpthread.so.1
 s none usr/lib/amd64/librcm.so.1=../../../lib/amd64/librcm.so.1
 s none usr/lib/amd64/librcm.so=../../../lib/amd64/librcm.so.1
+f none usr/lib/amd64/libreparse.so.1 755 root bin
+s none usr/lib/amd64/libreparse.so=libreparse.so.1
 s none usr/lib/amd64/libresolv.so.2=../../../lib/amd64/libresolv.so.2
 s none usr/lib/amd64/libresolv.so=../../../lib/amd64/libresolv.so.2
 s none usr/lib/amd64/librpcsvc.so.1=../../../lib/amd64/librpcsvc.so.1

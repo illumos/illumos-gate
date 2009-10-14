@@ -346,6 +346,7 @@ typedef struct vnode {
 	char		*v_path;
 } vnode_t;
 
+#define	AV_SCANSTAMP_SZ	32		/* length of anti-virus scanstamp */
 
 typedef struct xoptattr {
 	timestruc_t	xoa_createtime;	/* Create time of file */
@@ -361,6 +362,8 @@ typedef struct xoptattr {
 	uint8_t		xoa_opaque;
 	uint8_t		xoa_av_quarantined;
 	uint8_t		xoa_av_modified;
+	uint8_t		xoa_av_scanstamp[AV_SCANSTAMP_SZ];
+	uint8_t		xoa_reparse;
 } xoptattr_t;
 
 typedef struct vattr {

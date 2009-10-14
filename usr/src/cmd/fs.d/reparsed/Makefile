@@ -18,46 +18,43 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/common/fs/Makefile
 #
-# include global definitions
-include ../../../Makefile.master
+include		$(SRC)/Makefile.master
 
-HDRS=  fs_subr.h  \
-	fs_reparse.h
+FSTYPE=		reparse
+TYPEPROG=	reparsed
 
-PROCHDRS=   prdata.h
+include		../Makefile.fstype
 
-ROOTDIR=	$(ROOT)/usr/include/sys
-ROOTDIRS=	$(ROOTDIR) $(ROOTDIR)/proc
+OBJS=		$(TYPEPROG).o
+SRCS=		$(TYPEPROG).c
+POFILE=		$(TYPEPROG).po
 
-ROOTHDRS=	$(HDRS:%=$(ROOTDIR)/%)
-ROOTPROCHDRS=	$(PROCHDRS:%=$(ROOTDIR)/proc/%)
+CLOBBERFILES += $(TYPEPROG)
 
-# install rules
-$(ROOTDIR)/%: %
-	$(INS.file)
+CFLAGS +=	$(CCVERBOSE)
+C99MODE=	$(C99_ENABLE)
 
-$(ROOTDIR)/proc/%: proc/%
-	$(INS.file)
+LDLIBS +=	-lreparse -lnsl
 
-# standards checking rules
-proc/%.check:      proc/%.h
-	$(DOT_H_CHECK)
+CPPFLAGS +=	-I$(SRC)/uts/common
 
-CHECKHDRS= $(HDRS:%.h=%.check)  \
-	$(PROCHDRS:%.h=proc/%.check)
+all:		$(TYPEPROG)
+
+catalog:	$(POFILE)
+
+lint:		lint_SRCS
+
+clean:
+		$(RM) $(OBJS) $(POFILE)
+
+MANIFEST=	reparsed.xml
+ROOTMANIFESTDIR=	$(ROOTSVCNETWORKSHARES)
+$(ROOTMANIFEST) := FILEMODE = 0444
+install:	$(ROOTMANIFEST)
 
 .KEEP_STATE:
-
-.PARALLEL: $(CHECKHDRS)
-
-install_h: $(ROOTDIRS) $(ROOTHDRS) $(ROOTPROCHDRS)
-
-$(ROOTDIRS):
-	$(INS.dir)
-
-check:	$(CHECKHDRS)

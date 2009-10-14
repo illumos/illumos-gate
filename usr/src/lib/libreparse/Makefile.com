@@ -18,46 +18,40 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/common/fs/Makefile
-#
-# include global definitions
-include ../../../Makefile.master
 
-HDRS=  fs_subr.h  \
-	fs_reparse.h
+LIBRARY=	libreparse.a
+VERS=		.1
 
-PROCHDRS=   prdata.h
+LOCOBJS =	fs_reparse_lib.o
+COMOBJS =	fs_reparse.o
+OBJECTS =	$(LOCOBJS) $(COMOBJS)
+COMDIR =	$(SRC)/common/fsreparse
 
-ROOTDIR=	$(ROOT)/usr/include/sys
-ROOTDIRS=	$(ROOTDIR) $(ROOTDIR)/proc
+include ../../Makefile.lib
 
-ROOTHDRS=	$(HDRS:%=$(ROOTDIR)/%)
-ROOTPROCHDRS=	$(PROCHDRS:%=$(ROOTDIR)/proc/%)
+SRCDIR =	../common
+SRCS =		$(LOCOBJS:%.o=$(SRCDIR)/%.c) $(COMOBJS:%.o=$(COMDIR)/%.c)
 
-# install rules
-$(ROOTDIR)/%: %
-	$(INS.file)
+LIBS =		$(DYNLIB) $(LINTLIB)
+LDLIBS += 	-lc -lnvpair
 
-$(ROOTDIR)/proc/%: proc/%
-	$(INS.file)
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-I$(COMDIR) -D_FILE_OFFSET_BITS=64
 
-# standards checking rules
-proc/%.check:      proc/%.h
-	$(DOT_H_CHECK)
-
-CHECKHDRS= $(HDRS:%.h=%.check)  \
-	$(PROCHDRS:%.h=proc/%.check)
+$(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 .KEEP_STATE:
 
-.PARALLEL: $(CHECKHDRS)
+all: $(LIBS)
 
-install_h: $(ROOTDIRS) $(ROOTHDRS) $(ROOTPROCHDRS)
+lint: lintcheck
 
-$(ROOTDIRS):
-	$(INS.dir)
+include ../../Makefile.targ
 
-check:	$(CHECKHDRS)
+pics/%.o: $(COMDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)

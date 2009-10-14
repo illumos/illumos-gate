@@ -72,6 +72,7 @@ Name Service Management:::Non-security name service scripts/commands:help=RtName
 Name Service Security:::Security related name service scripts/commands:help=RtNameServiceSecure.html
 Object Access Management:::Change ownership and permission on files:help=RtObAccessMngmnt.html
 Process Management:::Manage current processes and processors:auths=solaris.smf.manage.cron,solaris.smf.manage.power;help=RtProcManagement.html
+Reparse Management:::Manage the reparse service:auths=solaris.smf.manage.reparse:help=RtReparseMngmnt.html
 Rights Delegation:::Delegate ability to assign rights to users and roles:auths=solaris.role.delegate,solaris.profmgr.delegate,solaris.grant;help=RtRightsDelegate.html
 Rmvolmgr Management:::Manage Removable Volume Manager SMF service:auths=solaris.smf.manage.rmvolmgr;help=RtRmvolmgrMngmnt.html
 Service Management:::Manage services:auths=solaris.smf.manage,solaris.smf.modify

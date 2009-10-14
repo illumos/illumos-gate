@@ -162,6 +162,7 @@ GENUNIX_OBJS +=	\
 		fork.o		\
 		vpm.o		\
 		fsat.o		\
+		fs_reparse.o	\
 		fs_subr.o	\
 		fsflush.o	\
 		ftrace.o	\

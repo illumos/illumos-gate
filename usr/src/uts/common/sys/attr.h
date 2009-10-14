@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_ATTR_H
 #define	_SYS_ATTR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -56,6 +54,7 @@ extern "C" {
 #define	A_AV_SCANSTAMP		"av_scanstamp"
 #define	A_OWNERSID		"ownersid"
 #define	A_GROUPSID		"groupsid"
+#define	A_REPARSE_POINT		"reparse"
 
 /* Attribute option for utilities */
 #define	O_HIDDEN	 "H"
@@ -68,6 +67,7 @@ extern "C" {
 #define	O_NODUMP	 "d"
 #define	O_AV_QUARANTINED "q"
 #define	O_AV_MODIFIED	 "m"
+#define	O_REPARSE_POINT	 "r"
 #define	O_NONE		 ""
 
 /* ownersid and groupsid are composed of two nvpairs */
@@ -92,6 +92,7 @@ typedef enum {
 	F_OWNERSID,
 	F_GROUPSID,
 	F_FSID,
+	F_REPARSE,
 	F_ATTR_ALL
 } f_attr_t;
 

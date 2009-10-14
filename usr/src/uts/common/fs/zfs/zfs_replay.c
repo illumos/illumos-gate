@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -129,6 +127,8 @@ zfs_replay_xvattr(lr_attr_t *lrattr, xvattr_t *xvap)
 		ZFS_TIME_DECODE(&xoap->xoa_createtime, crtime);
 	if (XVA_ISSET_REQ(xvap, XAT_AV_SCANSTAMP))
 		bcopy(scanstamp, xoap->xoa_av_scanstamp, AV_SCANSTAMP_SZ);
+	if (XVA_ISSET_REQ(xvap, XAT_REPARSE))
+		xoap->xoa_reparse = ((*attrs & XAT0_REPARSE) != 0);
 }
 
 static int

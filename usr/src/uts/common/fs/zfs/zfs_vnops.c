@@ -2370,6 +2370,12 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 			ZFS_TIME_DECODE(&xoap->xoa_createtime, pzp->zp_crtime);
 			XVA_SET_RTN(xvap, XAT_CREATETIME);
 		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_REPARSE)) {
+			xoap->xoa_reparse =
+			    ((pzp->zp_flags & ZFS_REPARSE) != 0);
+			XVA_SET_RTN(xvap, XAT_REPARSE);
+		}
 	}
 
 	ZFS_TIME_DECODE(&vap->va_atime, pzp->zp_atime);
@@ -2669,6 +2675,12 @@ top:
 				XVA_CLR_REQ(xvap, XAT_AV_QUARANTINED);
 				XVA_SET_REQ(&tmpxvattr, XAT_AV_QUARANTINED);
 			}
+		}
+
+		if (XVA_ISSET_REQ(xvap, XAT_REPARSE)) {
+			mutex_exit(&zp->z_lock);
+			ZFS_EXIT(zfsvfs);
+			return (EPERM);
 		}
 
 		if (need_policy == FALSE &&

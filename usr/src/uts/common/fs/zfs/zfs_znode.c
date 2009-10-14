@@ -909,6 +909,10 @@ zfs_xvattr_set(znode_t *zp, xvattr_t *xvap)
 		zp->z_phys->zp_flags |= ZFS_BONUS_SCANSTAMP;
 		XVA_SET_RTN(xvap, XAT_AV_SCANSTAMP);
 	}
+	if (XVA_ISSET_REQ(xvap, XAT_REPARSE)) {
+		ZFS_ATTR_SET(zp, ZFS_REPARSE, xoap->xoa_reparse);
+		XVA_SET_RTN(xvap, XAT_REPARSE);
+	}
 }
 
 int

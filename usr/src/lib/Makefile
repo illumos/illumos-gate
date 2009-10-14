@@ -261,6 +261,7 @@ SUBDIRS += \
 	libsun_ima	\
 	mpapi		\
 	librstp		\
+	libreparse	\
 	$($(MACH)_SUBDIRS)
 
 i386_SUBDIRS=		\
@@ -359,7 +360,8 @@ MSGSUBDIRS=		\
 	mpss		\
 	pam_modules	\
 	pyzfs		\
-	rpcsec_gss
+	rpcsec_gss	\
+	libreparse
 MSGSUBDIRS += \
 	$($(MACH)_MSGSUBDIRS)
 
@@ -491,6 +493,7 @@ HDRSUBDIRS=		\
 	libsun_ima	\
 	mpapi		\
 	mms		\
+	libreparse	\
 	$($(MACH)_HDRSUBDIRS)
 
 $(CLOSED_BUILD)HDRSUBDIRS += \
@@ -637,6 +640,7 @@ scsi:		libnvpair
 mpapi:		libpthread libdevinfo libsysevent libnvpair
 libgrubmgmt:	libdevinfo libzfs libfstyp
 pyzfs:		libnvpair libsec libidmap libzfs
+libreparse:	libnvpair
 
 #
 # The reason this rule checks for the existence of the

@@ -501,6 +501,7 @@ f none usr/lib/help/auths/locale/C/SmfNscdStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfNADDStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfNWAMStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfPowerStates.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfReparseStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfRoutingStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSendmailStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfSMBFSStates.html 444 root bin
@@ -604,6 +605,7 @@ f none usr/lib/help/profiles/locale/C/RtNetLinkSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtObAccessMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtPrntAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtProcManagement.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtReparseMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtRightsDelegate.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtSoftwareInstall.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtSMBFSMngmnt.html 444 root bin
@@ -697,6 +699,8 @@ f none usr/lib/rcm/modules/SUNW_aggr_rcm.so 555 root bin
 f none usr/lib/rcm/modules/SUNW_swap_rcm.so 555 root bin
 f none usr/lib/rcm/rcm_daemon 555 root bin
 d none usr/lib/rcm/scripts 755 root bin
+d none usr/lib/reparse 755 root bin
+f none usr/lib/reparse/reparsed 555 root sys
 s none usr/lib/rsh=../../sbin/sh
 d none usr/lib/saf 755 root bin
 f none usr/lib/saf/listen 755 root sys

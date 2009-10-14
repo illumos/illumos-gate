@@ -18,46 +18,11 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/common/fs/Makefile
-#
-# include global definitions
-include ../../../Makefile.master
 
-HDRS=  fs_subr.h  \
-	fs_reparse.h
+include ../Makefile.com
 
-PROCHDRS=   prdata.h
-
-ROOTDIR=	$(ROOT)/usr/include/sys
-ROOTDIRS=	$(ROOTDIR) $(ROOTDIR)/proc
-
-ROOTHDRS=	$(HDRS:%=$(ROOTDIR)/%)
-ROOTPROCHDRS=	$(PROCHDRS:%=$(ROOTDIR)/proc/%)
-
-# install rules
-$(ROOTDIR)/%: %
-	$(INS.file)
-
-$(ROOTDIR)/proc/%: proc/%
-	$(INS.file)
-
-# standards checking rules
-proc/%.check:      proc/%.h
-	$(DOT_H_CHECK)
-
-CHECKHDRS= $(HDRS:%.h=%.check)  \
-	$(PROCHDRS:%.h=proc/%.check)
-
-.KEEP_STATE:
-
-.PARALLEL: $(CHECKHDRS)
-
-install_h: $(ROOTDIRS) $(ROOTHDRS) $(ROOTPROCHDRS)
-
-$(ROOTDIRS):
-	$(INS.dir)
-
-check:	$(CHECKHDRS)
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)

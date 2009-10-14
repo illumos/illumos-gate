@@ -217,6 +217,7 @@ zut_stat64(vnode_t *vp, struct stat64 *sb, uint64_t *xvs, int flag, cred_t *cr)
 	XVA_SET_REQ(&xv, XAT_OPAQUE);
 	XVA_SET_REQ(&xv, XAT_AV_QUARANTINED);
 	XVA_SET_REQ(&xv, XAT_AV_MODIFIED);
+	XVA_SET_REQ(&xv, XAT_REPARSE);
 
 	xv.xva_vattr.va_mask |= AT_STAT | AT_NBLOCKS | AT_BLKSIZE | AT_SIZE;
 	if (error = VOP_GETATTR(vp, &xv.xva_vattr, flag, cr, NULL))
@@ -263,6 +264,8 @@ zut_stat64(vnode_t *vp, struct stat64 *sb, uint64_t *xvs, int flag, cred_t *cr)
 		*xvs |= (1 << F_AV_QUARANTINED);
 	if (XVA_ISSET_RTN(&xv, XAT_AV_MODIFIED) && xoap->xoa_av_modified)
 		*xvs |= (1 << F_AV_MODIFIED);
+	if (XVA_ISSET_RTN(&xv, XAT_REPARSE) && xoap->xoa_reparse)
+		*xvs |= (1 << F_REPARSE);
 
 	return (0);
 }

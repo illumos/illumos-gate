@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4252,6 +4252,8 @@ vfsinit(void)
 	}
 
 	xattr_init();
+
+	reparse_point_init();
 }
 
 vfs_t *

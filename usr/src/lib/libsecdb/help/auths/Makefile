@@ -86,6 +86,7 @@ HTMLENTS = \
 	SmfNDMPStates.html \
 	SmfNWAMStates.html \
 	SmfPowerStates.html \
+	SmfReparseStates.html \
 	SmfRoutingStates.html \
 	SmfSendmailStates.html \
 	SmfSshStates.html \

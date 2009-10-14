@@ -297,6 +297,7 @@ typedef	uint64_t	vfs_feature_t;
 #define	VFSFT_ACEMASKONACCESS	0x100000020	/* Can use ACEMASK for access */
 #define	VFSFT_SYSATTR_VIEWS	0x100000040	/* Supports sysattr view i/f */
 #define	VFSFT_ACCESS_FILTER	0x100000080	/* dirents filtered by access */
+#define	VFSFT_REPARSE		0x100000100	/* Supports reparse point */
 
 /*
  * Argument structure for mount(2).

@@ -531,6 +531,7 @@ d none var/svc/manifest/network/ssl 0755 root sys
 f manifest var/svc/manifest/network/ssl/kssl-proxy.xml 0444 root sys
 d none var/svc/manifest/network/shares 0755 root sys
 f manifest var/svc/manifest/network/shares/group.xml 0444 root sys
+f manifest var/svc/manifest/network/shares/reparsed.xml 0444 root sys
 d none var/svc/manifest/platform 755 root sys
 d none var/svc/manifest/site 755 root sys
 d none var/svc/manifest/system 755 root sys

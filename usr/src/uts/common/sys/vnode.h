@@ -387,6 +387,7 @@ typedef struct xoptattr {
 	uint8_t		xoa_av_quarantined;
 	uint8_t		xoa_av_modified;
 	uint8_t		xoa_av_scanstamp[AV_SCANSTAMP_SZ];
+	uint8_t		xoa_reparse;
 } xoptattr_t;
 
 /*
@@ -565,11 +566,12 @@ typedef vattr_t		vattr32_t;
 #define	XAT0_AV_QUARANTINED	0x00000400	/* anti-virus quarantine */
 #define	XAT0_AV_MODIFIED	0x00000800	/* anti-virus modified */
 #define	XAT0_AV_SCANSTAMP	0x00001000	/* anti-virus scanstamp */
+#define	XAT0_REPARSE	0x00002000	/* FS reparse point */
 
 #define	XAT0_ALL_ATTRS	(XAT0_CREATETIME|XAT0_ARCHIVE|XAT0_SYSTEM| \
     XAT0_READONLY|XAT0_HIDDEN|XAT0_NOUNLINK|XAT0_IMMUTABLE|XAT0_APPENDONLY| \
     XAT0_NODUMP|XAT0_OPAQUE|XAT0_AV_QUARANTINED| \
-    XAT0_AV_MODIFIED|XAT0_AV_SCANSTAMP)
+    XAT0_AV_MODIFIED|XAT0_AV_SCANSTAMP|XAT0_REPARSE)
 
 /* Support for XAT_* optional attributes */
 #define	XVA_MASK		0xffffffff	/* Used to mask off 32 bits */
@@ -602,6 +604,7 @@ typedef vattr_t		vattr32_t;
 #define	XAT_AV_QUARANTINED	((XAT0_INDEX << XVA_SHFT) | XAT0_AV_QUARANTINED)
 #define	XAT_AV_MODIFIED		((XAT0_INDEX << XVA_SHFT) | XAT0_AV_MODIFIED)
 #define	XAT_AV_SCANSTAMP	((XAT0_INDEX << XVA_SHFT) | XAT0_AV_SCANSTAMP)
+#define	XAT_REPARSE		((XAT0_INDEX << XVA_SHFT) | XAT0_REPARSE)
 
 /*
  * The returned attribute map array (xva_rtnattrmap[]) is located past the
@@ -1273,6 +1276,9 @@ void xattr_init(void);		/* Initialize vnodeops for xattrs */
 
 /* GFS tunnel for xattrs */
 int xattr_dir_lookup(vnode_t *, vnode_t **, int, cred_t *);
+
+/* Reparse Point */
+void reparse_point_init(void);
 
 /* Context identification */
 u_longlong_t	fs_new_caller_id();

@@ -48,6 +48,8 @@
 #include <sys/cmn_err.h>
 #include <sys/stream.h>
 #include <fs/fs_subr.h>
+#include <fs/fs_reparse.h>
+#include <sys/door.h>
 #include <sys/acl.h>
 #include <sys/share.h>
 #include <sys/file.h>
@@ -55,6 +57,7 @@
 #include <sys/file.h>
 #include <sys/nbmlock.h>
 #include <acl/acl_common.h>
+#include <sys/pathname.h>
 
 static callb_cpr_t *frlock_serialize_blocked(flk_cb_when_t, void *);
 
@@ -62,6 +65,12 @@ static callb_cpr_t *frlock_serialize_blocked(flk_cb_when_t, void *);
  * Tunable to limit the number of retry to recover from STALE error.
  */
 int fs_estale_retry = 5;
+
+/*
+ * supports for reparse point door upcall
+ */
+static door_handle_t reparsed_door;
+static kmutex_t reparsed_door_lock;
 
 /*
  * The associated operation is not supported by the file system.
@@ -837,4 +846,176 @@ fs_vscan(vnode_t *vp, cred_t *cr, int async)
 		ret = (*fs_av_scan)(vp, cr, async);
 
 	return (ret);
+}
+
+/*
+ * support functions for reparse point
+ */
+/*
+ * reparse_vnode_parse
+ *
+ * Read the symlink data of a reparse point specified by the vnode
+ * and return the reparse data as name-value pair in the nvlist.
+ */
+int
+reparse_vnode_parse(vnode_t *vp, nvlist_t *nvl)
+{
+	int err;
+	char *lkdata;
+	struct uio uio;
+	struct iovec iov;
+
+	if (vp == NULL || nvl == NULL)
+		return (EINVAL);
+
+	lkdata = kmem_alloc(MAXREPARSELEN, KM_SLEEP);
+
+	/*
+	 * Set up io vector to read sym link data
+	 */
+	iov.iov_base = lkdata;
+	iov.iov_len = MAXREPARSELEN;
+	uio.uio_iov = &iov;
+	uio.uio_iovcnt = 1;
+	uio.uio_segflg = UIO_SYSSPACE;
+	uio.uio_extflg = UIO_COPY_CACHED;
+	uio.uio_loffset = (offset_t)0;
+	uio.uio_resid = MAXREPARSELEN;
+
+	if ((err = VOP_READLINK(vp, &uio, kcred, NULL)) == 0) {
+		*(lkdata + MAXREPARSELEN - uio.uio_resid) = '\0';
+		err = reparse_parse(lkdata, nvl);
+	}
+	kmem_free(lkdata, MAXREPARSELEN);	/* done with lkdata */
+
+	return (err);
+}
+
+void
+reparse_point_init()
+{
+	mutex_init(&reparsed_door_lock, NULL, MUTEX_DEFAULT, NULL);
+}
+
+static door_handle_t
+reparse_door_get_handle()
+{
+	door_handle_t dh;
+
+	mutex_enter(&reparsed_door_lock);
+	if ((dh = reparsed_door) == NULL) {
+		if (door_ki_open(REPARSED_DOOR, &reparsed_door) != 0) {
+			reparsed_door = NULL;
+			dh = NULL;
+		} else
+			dh = reparsed_door;
+	}
+	mutex_exit(&reparsed_door_lock);
+	return (dh);
+}
+
+static void
+reparse_door_reset_handle()
+{
+	mutex_enter(&reparsed_door_lock);
+	reparsed_door = NULL;
+	mutex_exit(&reparsed_door_lock);
+}
+
+/*
+ * reparse_kderef
+ *
+ * Accepts the service-specific item from the reparse point and returns
+ * the service-specific data requested.  The caller specifies the size of
+ * the buffer provided via *bufsz; the routine will fail with EOVERFLOW
+ * if the results will not fit in the buffer, in which case, *bufsz will
+ * contain the number of bytes needed to hold the results.
+ *
+ * if ok return 0 and update *bufsize with length of actual result
+ * else return error code.
+ */
+int
+reparse_kderef(const char *svc_type, const char *svc_data, char *buf,
+    size_t *bufsize)
+{
+	int err, retries, need_free;
+	size_t dlen, res_len;
+	char *darg;
+	door_arg_t door_args;
+	reparsed_door_res_t *resp;
+	door_handle_t rp_door;
+
+	if (svc_type == NULL || svc_data == NULL || buf == NULL ||
+	    bufsize == NULL)
+		return (EINVAL);
+
+	/* get reparsed's door handle */
+	if ((rp_door = reparse_door_get_handle()) == NULL)
+		return (EBADF);
+
+	/* setup buffer for door_call args and results */
+	dlen = strlen(svc_type) + strlen(svc_data) + 2;
+	if (*bufsize < dlen) {
+		darg = kmem_alloc(dlen, KM_SLEEP);
+		need_free = 1;
+	} else {
+		darg = buf;	/* use same buffer for door's args & results */
+		need_free = 0;
+	}
+
+	/* build argument string of door call */
+	(void) snprintf(darg, dlen, "%s:%s", svc_type, svc_data);
+
+	/* setup args for door call */
+	door_args.data_ptr = darg;
+	door_args.data_size = dlen;
+	door_args.desc_ptr = NULL;
+	door_args.desc_num = 0;
+	door_args.rbuf = buf;
+	door_args.rsize = *bufsize;
+
+	/* do the door_call */
+	retries = 0;
+	door_ki_hold(rp_door);
+	while ((err = door_ki_upcall_limited(rp_door, &door_args,
+	    NULL, SIZE_MAX, 0)) != 0) {
+		if (err == EAGAIN || err == EINTR) {
+			if (++retries < REPARSED_DOORCALL_MAX_RETRY) {
+				delay(SEC_TO_TICK(1));
+				continue;
+			}
+		} else if (err == EBADF) {
+			/* door server goes away... */
+			reparse_door_reset_handle();
+		}
+		break;
+	}
+	door_ki_rele(rp_door);
+	if (need_free)
+		kmem_free(darg, dlen);		/* done with args buffer */
+
+	if (err != 0)
+		return (err);
+
+	resp = (reparsed_door_res_t *)door_args.rbuf;
+	if ((err = resp->res_status) == 0) {
+		/*
+		 * have to save the length of the results before the
+		 * bcopy below since it's can be an overlap copy that
+		 * overwrites the reparsed_door_res_t structure at
+		 * the beginning of the buffer.
+		 */
+		res_len = (size_t)resp->res_len;
+
+		/* deref call is ok */
+		if (res_len > *bufsize)
+			err = EOVERFLOW;
+		else
+			bcopy(resp->res_data, buf, res_len);
+		*bufsize = res_len;
+	}
+	if (door_args.rbuf != buf)
+		kmem_free(door_args.rbuf, door_args.rsize);
+
+	return (err);
 }

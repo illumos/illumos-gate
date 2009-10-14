@@ -139,6 +139,7 @@ solaris.smf.manage.nwam:::Manage Network Auto-Magic Service States::help=SmfNWAM
 solaris.smf.manage.power:::Manage Power Management Service States::help=SmfPowerStates.html
 solaris.smf.manage.smb:::Manage SMB Service States::help=SmfSMBStates.html
 solaris.smf.manage.smbfs:::Manage SMB Client States::help=SmfSMBFSStates.html
+solaris.smf.manage.reparse:::Manage Reparse Service States::help=SmfReparseStates.html
 solaris.smf.manage.rmvolmgr:::Manage Rmvolmgr Service States::help=SmfRmvolmgrStates.html
 solaris.smf.manage.routing:::Manage Routing Service States::help=SmfRoutingStates.html
 solaris.smf.manage.rpc.bind:::Manage RPC Program number mapper::help=SmfRPCBind.html

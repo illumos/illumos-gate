@@ -21,43 +21,34 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/common/fs/Makefile
+
 #
-# include global definitions
-include ../../../Makefile.master
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
 
-HDRS=  fs_subr.h  \
-	fs_reparse.h
-
-PROCHDRS=   prdata.h
-
-ROOTDIR=	$(ROOT)/usr/include/sys
-ROOTDIRS=	$(ROOTDIR) $(ROOTDIR)/proc
-
-ROOTHDRS=	$(HDRS:%=$(ROOTDIR)/%)
-ROOTPROCHDRS=	$(PROCHDRS:%=$(ROOTDIR)/proc/%)
-
-# install rules
-$(ROOTDIR)/%: %
-	$(INS.file)
-
-$(ROOTDIR)/proc/%: proc/%
-	$(INS.file)
-
-# standards checking rules
-proc/%.check:      proc/%.h
-	$(DOT_H_CHECK)
-
-CHECKHDRS= $(HDRS:%.h=%.check)  \
-	$(PROCHDRS:%.h=proc/%.check)
-
-.KEEP_STATE:
-
-.PARALLEL: $(CHECKHDRS)
-
-install_h: $(ROOTDIRS) $(ROOTHDRS) $(ROOTPROCHDRS)
-
-$(ROOTDIRS):
-	$(INS.dir)
-
-check:	$(CHECKHDRS)
+SUNWprivate {
+    global:
+	reparse_add;
+	reparse_create;
+	reparse_delete;
+	reparse_deref;
+	reparse_free;
+	reparse_init;
+	reparse_parse;
+	reparse_remove;
+	reparse_unparse;
+	reparse_validate;
+	rp_plugin_init;
+    local:
+	*;
+};

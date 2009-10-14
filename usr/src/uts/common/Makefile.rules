@@ -340,6 +340,10 @@ $(OBJS_DIR)/%.o:	$(UTSBASE)/common/io/scsi/adapters/pmcs/%.bin
 	$(COMPILE.b) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(COMMONBASE)/fsreparse/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 KMECHKRB5_BASE=$(UTSBASE)/common/gssapi/mechs/krb5
 
 KGSSDFLAGS=-I $(UTSBASE)/common/gssapi/include 
@@ -2529,4 +2533,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/vr/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/yge/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(COMMONBASE)/fsreparse/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
