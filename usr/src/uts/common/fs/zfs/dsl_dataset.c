@@ -2824,6 +2824,10 @@ dsl_dataset_clone_swap_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	    dsl_dir_space_available(csa->ohds->ds_dir, NULL, 0, TRUE))
 		return (ENOSPC);
 
+	if (csa->ohds->ds_quota != 0 &&
+	    csa->cds->ds_phys->ds_unique_bytes > csa->ohds->ds_quota)
+		return (EDQUOT);
+
 	return (0);
 }
 
@@ -2835,7 +2839,8 @@ dsl_dataset_clone_swap_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	dsl_pool_t *dp = csa->cds->ds_dir->dd_pool;
 
 	ASSERT(csa->cds->ds_reserved == 0);
-	ASSERT(csa->cds->ds_quota == csa->ohds->ds_quota);
+	ASSERT(csa->ohds->ds_quota == 0 ||
+	    csa->cds->ds_phys->ds_unique_bytes <= csa->ohds->ds_quota);
 
 	dmu_buf_will_dirty(csa->cds->ds_dbuf, tx);
 	dmu_buf_will_dirty(csa->ohds->ds_dbuf, tx);
