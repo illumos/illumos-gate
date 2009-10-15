@@ -622,13 +622,18 @@ packet_complete:
 			 */
 			if (length == 1) {
 				/*
-				 * Technically, a length of 1 from the mouse
-				 * driver should only contain a MSEERROR or
-				 * MSERESEND value, but we don't test
-				 * that here because we'd be issuing a reset
-				 * anyway.  For mice that are not connected,
-				 * we will receive a MSERESEND quickly.
+				 * A response with length 1 from the mouse
+				 * driver can be either an ACK (the first part
+				 * of the reset reply) or either MSEERROR or
+				 * MSERESEND.  Issue another reset if either
+				 * of the latter are received.  For mice that
+				 * are not connected, MSERESEND is received
+				 * quickly.
 				 */
+
+				if (code == MSE_ACK)
+					break;
+
 				if (++STATEP->init_count >=
 				    PS2_MAX_INIT_COUNT) {
 					STATEP->inited |= PS2_FLAG_INIT_TIMEOUT;
@@ -636,13 +641,22 @@ packet_complete:
 				} else {
 					put1(WR(qp), MSERESET);
 				}
+
 				break;
 
-			} else if (length != 3) {
+			} else if (length != 2) {
 				break;
 			}
 
-			mp->b_rptr += 2;	/* Skip past the 0xAA 0x00 */
+			/*
+			 * The only possible 2-byte reply from mouse8042 is
+			 * 0xAA 0x00.  If the mouse doesn't send that, mouse8042
+			 * will send a 1-byte error message, handled above by
+			 * resetting the mouse.
+			 */
+
+			/* Skip past the 0x00 (since `code' contains 0xAA) */
+			mp->b_rptr += 1;
 
 			/* Reset completed successfully */
 

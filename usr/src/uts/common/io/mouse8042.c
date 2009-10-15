@@ -107,10 +107,12 @@ struct mouse_state {
 	minor_t			ms_minor;
 	boolean_t		ms_opened;
 	kmutex_t		reset_mutex;
+	kcondvar_t		reset_cv;
 	mouse8042_reset_state_e	reset_state;
 	timeout_id_t		reset_tid;
 	int			ready;
 	mblk_t			*reply_mp;
+	mblk_t			*reset_ack_mp;
 	bufcall_id_t		bc_id;
 };
 
@@ -119,6 +121,7 @@ static int mouse8042_open(queue_t *q, dev_t *devp, int flag, int sflag,
 		cred_t *cred_p);
 static int mouse8042_close(queue_t *q, int flag, cred_t *cred_p);
 static int mouse8042_wsrv(queue_t *qp);
+static int mouse8042_wput(queue_t *q, mblk_t *mp);
 
 static int mouse8042_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
 		void *arg, void **result);
@@ -149,7 +152,7 @@ static struct qinit mouse8042_rinit = {
 };
 
 static struct qinit mouse8042_winit = {
-	putq,		/* put */
+	mouse8042_wput,	/* put */
 	mouse8042_wsrv,	/* service */
 	NULL,		/* open */
 	NULL,		/* close */
@@ -345,6 +348,7 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    state->ms_iblock_cookie);
 	mutex_init(&state->reset_mutex, NULL, MUTEX_DRIVER,
 	    state->ms_iblock_cookie);
+	cv_init(&state->reset_cv, NULL, CV_DRIVER, NULL);
 
 	rc = ddi_add_intr(dip, 0,
 	    (ddi_iblock_cookie_t *)NULL, (ddi_idevice_cookie_t *)NULL,
@@ -390,6 +394,7 @@ mouse8042_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_DETACH:
 		ddi_remove_intr(dip, 0, state->ms_iblock_cookie);
 		mouse8042_dip = NULL;
+		cv_destroy(&state->reset_cv);
 		mutex_destroy(&state->reset_mutex);
 		mutex_destroy(&state->ms_mutex);
 		ddi_prop_remove_all(dip);
@@ -533,21 +538,46 @@ mouse8042_close(queue_t *q, int flag, cred_t *cred_p)
 
 	state = (struct mouse_state *)q->q_ptr;
 
-	mutex_enter(&state->ms_mutex);
-
+	/*
+	 * Disable queue processing now, so that another reset cannot get in
+	 * after we wait for the current reset (if any) to complete.
+	 */
 	qprocsoff(q);
+
+	mutex_enter(&state->reset_mutex);
+	while (state->reset_state != MSE_RESET_IDLE) {
+		/*
+		 * Waiting for the previous reset to finish is
+		 * non-interruptible.  Some upper-level clients
+		 * cannot deal with EINTR and will not close the
+		 * STREAM properly, resulting in failure to reopen it
+		 * within the same process.
+		 */
+		cv_wait(&state->reset_cv, &state->reset_mutex);
+	}
 
 	if (state->reset_tid != 0) {
 		(void) quntimeout(q, state->reset_tid);
 		state->reset_tid = 0;
 	}
-	if (state->bc_id != 0) {
-		(void) qunbufcall(q, state->bc_id);
-		state->bc_id = 0;
-	}
+
 	if (state->reply_mp != NULL) {
 		freemsg(state->reply_mp);
 		state->reply_mp = NULL;
+	}
+
+	if (state->reset_ack_mp != NULL) {
+		freemsg(state->reset_ack_mp);
+		state->reset_ack_mp = NULL;
+	}
+
+	mutex_exit(&state->reset_mutex);
+
+	mutex_enter(&state->ms_mutex);
+
+	if (state->bc_id != 0) {
+		(void) qunbufcall(q, state->bc_id);
+		state->bc_id = 0;
 	}
 
 	q->q_ptr = NULL;
@@ -615,6 +645,7 @@ mouse8042_reset_timeout(void *argp)
 
 		state->reset_tid = 0;
 		state->reset_state = MSE_RESET_IDLE;
+		cv_signal(&state->reset_cv);
 
 		(void) ddi_get8(state->ms_handle, state->ms_addr +
 		    I8042_UNLOCK);
@@ -641,7 +672,7 @@ mouse8042_reset_timeout(void *argp)
  * Returns 1 if the caller should put the message (bp) back on the queue
  */
 static int
-mouse8042_process_reset(queue_t *q, mblk_t *mp, struct mouse_state *state)
+mouse8042_initiate_reset(queue_t *q, mblk_t *mp, struct mouse_state *state)
 {
 	mutex_enter(&state->reset_mutex);
 	/*
@@ -666,15 +697,19 @@ mouse8042_process_reset(queue_t *q, mblk_t *mp, struct mouse_state *state)
 	 */
 	mutex_exit(&state->reset_mutex);
 
-	state->reply_mp = allocb(3, BPRI_MED);
-	if (state->reply_mp == NULL) {
+	if (state->reply_mp == NULL)
+		state->reply_mp = allocb(2, BPRI_MED);
+	if (state->reset_ack_mp == NULL)
+		state->reset_ack_mp = allocb(1, BPRI_MED);
+
+	if (state->reply_mp == NULL || state->reset_ack_mp == NULL) {
 		/*
 		 * Allocation failed -- set up a bufcall to enable the queue
 		 * whenever there is enough memory to allocate the response
 		 * message.
 		 */
-		state->bc_id = qbufcall(q, 3, BPRI_MED,
-		    (void (*)(void *))qenable, q);
+		state->bc_id = qbufcall(q, (state->reply_mp == NULL) ? 2 : 1,
+		    BPRI_MED, (void (*)(void *))qenable, q);
 
 		if (state->bc_id == 0) {
 			/*
@@ -688,6 +723,9 @@ mouse8042_process_reset(queue_t *q, mblk_t *mp, struct mouse_state *state)
 		}
 
 		return (1);
+	} else {
+		/* Bufcall completed successfully (or wasn't needed) */
+		state->bc_id = 0;
 	}
 
 	/*
@@ -740,13 +778,13 @@ mouse8042_process_data_msg(queue_t *q, mblk_t *mp, struct mouse_state *state)
 				/*
 				 * If we couldn't allocate memory and we
 				 * we couldn't register a bufcall,
-				 * mouse8042_process_reset returns 0 and
+				 * mouse8042_initiate_reset returns 0 and
 				 * has already used the message to send an
 				 * error reply back upstream, so there is no
 				 * need to deallocate or put this message back
 				 * on the queue.
 				 */
-				if (mouse8042_process_reset(q, bp, state) == 0)
+				if (mouse8042_initiate_reset(q, bp, state) == 0)
 					return (1);
 
 				/*
@@ -814,6 +852,40 @@ mouse8042_process_msg(queue_t *q, mblk_t *mp, struct mouse_state *state)
 	}
 
 	return (rv);
+}
+
+/*
+ * This is the main mouse input routine.  Commands and parameters
+ * from upstream are sent to the mouse device immediately, unless
+ * the mouse is in the process of being reset, in which case
+ * commands are queued and executed later in the service procedure.
+ */
+static int
+mouse8042_wput(queue_t *q, mblk_t *mp)
+{
+	struct mouse_state *state;
+	state = (struct mouse_state *)q->q_ptr;
+
+	/*
+	 * Process all messages immediately, unless a reset is in
+	 * progress.  If a reset is in progress, deflect processing to
+	 * the service procedure.
+	 */
+	if (state->reset_state != MSE_RESET_IDLE)
+		return (putq(q, mp));
+
+	/*
+	 * If there are still messages outstanding in the queue that
+	 * the service procedure hasn't processed yet, put this
+	 * message in the queue also, to ensure proper message
+	 * ordering.
+	 */
+	if (q->q_first)
+		return (putq(q, mp));
+
+	(void) mouse8042_process_msg(q, mp, state);
+
+	return (0);
 }
 
 static int
@@ -900,6 +972,35 @@ mouse8042_intr(caddr_t arg)
 				    mdata);
 			}
 
+			if (state->reset_state == MSE_RESET_ACK) {
+
+			/*
+			 * We received an ACK from the mouse, so
+			 * send it upstream immediately so that
+			 * consumers depending on the immediate
+			 * ACK don't time out.
+			 */
+				if (state->reset_ack_mp != NULL) {
+
+					mp = state->reset_ack_mp;
+
+					state->reset_ack_mp = NULL;
+
+					if (state->ms_rqp != NULL) {
+						*mp->b_wptr++ = MSE_ACK;
+						putnext(state->ms_rqp, mp);
+					} else
+						freemsg(mp);
+				}
+
+				if (state->ms_wqp != NULL) {
+					enableok(state->ms_wqp);
+					qenable(state->ms_wqp);
+				}
+
+			} else if (state->reset_state == MSE_RESET_IDLE ||
+			    state->reset_state == MSE_RESET_FAILED) {
+
 			/*
 			 * If we transitioned back to the idle reset state (or
 			 * the reset failed), disable the timeout, release the
@@ -912,8 +1013,6 @@ mouse8042_intr(caddr_t arg)
 			 * response is sent at the end of the sequence, or
 			 * on timeout/error).
 			 */
-			if (state->reset_state == MSE_RESET_IDLE ||
-			    state->reset_state == MSE_RESET_FAILED) {
 
 				mutex_exit(&state->reset_mutex);
 				(void) quntimeout(state->ms_wqp,
@@ -924,25 +1023,34 @@ mouse8042_intr(caddr_t arg)
 				    state->ms_addr + I8042_UNLOCK);
 
 				state->reset_tid = 0;
-				mp = state->reply_mp;
-				if (state->reset_state == MSE_RESET_FAILED) {
-					*mp->b_wptr++ = mdata;
+				if (state->reply_mp != NULL) {
+					mp = state->reply_mp;
+					if (state->reset_state ==
+					    MSE_RESET_FAILED) {
+						*mp->b_wptr++ = mdata;
+					} else {
+						*mp->b_wptr++ = MSE_AA;
+						*mp->b_wptr++ = MSE_00;
+					}
+					state->reply_mp = NULL;
 				} else {
-					*mp->b_wptr++ = MSE_ACK;
-					*mp->b_wptr++ = MSE_AA;
-					*mp->b_wptr++ = MSE_00;
+					mp = NULL;
 				}
-				state->reply_mp = NULL;
 
 				state->reset_state = MSE_RESET_IDLE;
+				cv_signal(&state->reset_cv);
 
-				if (state->ms_rqp != NULL)
-					putnext(state->ms_rqp, mp);
-				else
-					freemsg(mp);
+				if (mp != NULL) {
+					if (state->ms_rqp != NULL)
+						putnext(state->ms_rqp, mp);
+					else
+						freemsg(mp);
+				}
 
-				enableok(state->ms_wqp);
-				qenable(state->ms_wqp);
+				if (state->ms_wqp != NULL) {
+					enableok(state->ms_wqp);
+					qenable(state->ms_wqp);
+				}
 			}
 
 			mutex_exit(&state->reset_mutex);
