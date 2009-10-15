@@ -1035,9 +1035,9 @@ do_userquota_callback(objset_t *os, dnode_phys_t *dnp,
 		int64_t delta = DNODE_SIZE + DN_USED_BYTES(dnp);
 		if (subtract)
 			delta = -delta;
-		VERIFY(0 == zap_increment_int(os, DMU_USERUSED_OBJECT,
+		VERIFY3U(0, ==, zap_increment_int(os, DMU_USERUSED_OBJECT,
 		    user, delta, tx));
-		VERIFY(0 == zap_increment_int(os, DMU_GROUPUSED_OBJECT,
+		VERIFY3U(0, ==, zap_increment_int(os, DMU_GROUPUSED_OBJECT,
 		    group, delta, tx));
 	}
 }

@@ -208,7 +208,7 @@ ztest_info_t ztest_info[] = {
 	{ ztest_dmu_object_alloc_free,		1,	&zopt_always	},
 	{ ztest_dmu_commit_callbacks,		10,	&zopt_always	},
 	{ ztest_zap,				30,	&zopt_always	},
-	{ ztest_fzap,				30,	&zopt_always	},
+	{ ztest_fzap,				1,	&zopt_always	},
 	{ ztest_zap_parallel,			100,	&zopt_always	},
 	{ ztest_dmu_read_write_zcopy,		1,	&zopt_sometimes	},
 	{ ztest_dsl_prop_get_set,		1,	&zopt_sometimes	},

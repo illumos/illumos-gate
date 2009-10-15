@@ -608,6 +608,7 @@ upgrade_clones_cb(spa_t *spa, uint64_t dsobj, const char *dsname, void *arg)
 	ASSERT(ds->ds_phys->ds_prev_snap_obj == prev->ds_object);
 
 	if (prev->ds_phys->ds_next_clones_obj == 0) {
+		dmu_buf_will_dirty(prev->ds_dbuf, tx);
 		prev->ds_phys->ds_next_clones_obj =
 		    zap_create(dp->dp_meta_objset,
 		    DMU_OT_NEXT_CLONES, DMU_OT_NONE, 0, tx);
@@ -627,8 +628,8 @@ dsl_pool_upgrade_clones(dsl_pool_t *dp, dmu_tx_t *tx)
 	ASSERT(dmu_tx_is_syncing(tx));
 	ASSERT(dp->dp_origin_snap != NULL);
 
-	(void) dmu_objset_find_spa(dp->dp_spa, NULL, upgrade_clones_cb,
-	    tx, DS_FIND_CHILDREN);
+	VERIFY3U(0, ==, dmu_objset_find_spa(dp->dp_spa, NULL, upgrade_clones_cb,
+	    tx, DS_FIND_CHILDREN));
 }
 
 void

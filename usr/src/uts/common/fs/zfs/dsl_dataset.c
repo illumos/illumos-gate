@@ -1458,6 +1458,33 @@ dsl_dataset_drain_refs(dsl_dataset_t *ds, void *tag)
 	cv_destroy(&arg.cv);
 }
 
+static void
+remove_from_next_clones(dsl_dataset_t *ds, uint64_t obj, dmu_tx_t *tx)
+{
+	objset_t *mos = ds->ds_dir->dd_pool->dp_meta_objset;
+	uint64_t count;
+	int err;
+
+	ASSERT(ds->ds_phys->ds_num_children >= 2);
+	err = zap_remove_int(mos, ds->ds_phys->ds_next_clones_obj, obj, tx);
+	/*
+	 * The err should not be ENOENT, but a bug in a previous version
+	 * of the code could cause upgrade_clones_cb() to not set
+	 * ds_next_snap_obj when it should, leading to a missing entry.
+	 * If we knew that the pool was created after
+	 * SPA_VERSION_NEXT_CLONES, we could assert that it isn't
+	 * ENOENT.  However, at least we can check that we don't have
+	 * too many entries in the next_clones_obj even after failing to
+	 * remove this one.
+	 */
+	if (err != ENOENT) {
+		VERIFY3U(err, ==, 0);
+	}
+	ASSERT3U(0, ==, zap_count(mos, ds->ds_phys->ds_next_clones_obj,
+	    &count));
+	ASSERT3U(count, <=, ds->ds_phys->ds_num_children - 2);
+}
+
 void
 dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 {
@@ -1518,8 +1545,7 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		dmu_buf_will_dirty(ds_prev->ds_dbuf, tx);
 		if (after_branch_point &&
 		    ds_prev->ds_phys->ds_next_clones_obj != 0) {
-			VERIFY3U(0, ==, zap_remove_int(mos,
-			    ds_prev->ds_phys->ds_next_clones_obj, obj, tx));
+			remove_from_next_clones(ds_prev, obj, tx);
 			if (ds->ds_phys->ds_next_snap_obj != 0) {
 				VERIFY(0 == zap_add_int(mos,
 				    ds_prev->ds_phys->ds_next_clones_obj,
@@ -1906,8 +1932,8 @@ dsl_dataset_snapshot_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 			    ds->ds_prev->ds_phys->ds_creation_txg);
 			ds->ds_prev->ds_phys->ds_next_snap_obj = dsobj;
 		} else if (next_clones_obj != 0) {
-			VERIFY3U(0, ==, zap_remove_int(mos,
-			    next_clones_obj, dsphys->ds_next_snap_obj, tx));
+			remove_from_next_clones(ds->ds_prev,
+			    dsphys->ds_next_snap_obj, tx);
 			VERIFY3U(0, ==, zap_add_int(mos,
 			    next_clones_obj, dsobj, tx));
 		}
@@ -2513,9 +2539,7 @@ dsl_dataset_promote_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 	/* change the origin's next clone */
 	if (origin_ds->ds_phys->ds_next_clones_obj) {
-		VERIFY3U(0, ==, zap_remove_int(dp->dp_meta_objset,
-		    origin_ds->ds_phys->ds_next_clones_obj,
-		    origin_ds->ds_phys->ds_next_snap_obj, tx));
+		remove_from_next_clones(origin_ds, snap->ds->ds_object, tx);
 		VERIFY3U(0, ==, zap_add_int(dp->dp_meta_objset,
 		    origin_ds->ds_phys->ds_next_clones_obj,
 		    oldnext_obj, tx));

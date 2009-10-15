@@ -698,17 +698,34 @@ scrub_visitds(dsl_pool_t *dp, uint64_t dsobj, dmu_tx_t *tx)
 		    ds->ds_phys->ds_next_snap_obj, tx) == 0);
 	}
 	if (ds->ds_phys->ds_num_children > 1) {
-		if (spa_version(dp->dp_spa) < SPA_VERSION_DSL_SCRUB) {
+		boolean_t usenext = B_FALSE;
+		if (ds->ds_phys->ds_next_clones_obj != 0) {
+			uint64_t count;
+			/*
+			 * A bug in a previous version of the code could
+			 * cause upgrade_clones_cb() to not set
+			 * ds_next_snap_obj when it should, leading to a
+			 * missing entry.  Therefore we can only use the
+			 * next_clones_obj when its count is correct.
+			 */
+			int err = zap_count(dp->dp_meta_objset,
+			    ds->ds_phys->ds_next_clones_obj, &count);
+			if (err == 0 &&
+			    count == ds->ds_phys->ds_num_children - 1)
+				usenext = B_TRUE;
+		}
+
+		if (usenext) {
+			VERIFY(zap_join(dp->dp_meta_objset,
+			    ds->ds_phys->ds_next_clones_obj,
+			    dp->dp_scrub_queue_obj, tx) == 0);
+		} else {
 			struct enqueue_clones_arg eca;
 			eca.tx = tx;
 			eca.originobj = ds->ds_object;
 
 			(void) dmu_objset_find_spa(ds->ds_dir->dd_pool->dp_spa,
 			    NULL, enqueue_clones_cb, &eca, DS_FIND_CHILDREN);
-		} else {
-			VERIFY(zap_join(dp->dp_meta_objset,
-			    ds->ds_phys->ds_next_clones_obj,
-			    dp->dp_scrub_queue_obj, tx) == 0);
 		}
 	}
 
