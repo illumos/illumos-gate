@@ -16567,7 +16567,7 @@ ipif_usesrc_avail(ill_t *ill, zoneid_t zoneid)
 		uill = ill_lookup_on_ifindex(ifindex, isv6, NULL, NULL, NULL,
 		    NULL, ipst);
 		if (uill == NULL)
-			return (NULL);
+			return (B_FALSE);
 		mutex_enter(&uill->ill_lock);
 		for (ipif = uill->ill_ipif; ipif != NULL;
 		    ipif = ipif->ipif_next) {
