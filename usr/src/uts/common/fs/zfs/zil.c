@@ -1454,6 +1454,53 @@ zil_resume(zilog_t *zilog)
 	mutex_exit(&zilog->zl_lock);
 }
 
+/*
+ * Read in the data for the dmu_sync()ed block, and change the log
+ * record to write this whole block.
+ */
+void
+zil_get_replay_data(zilog_t *zilog, lr_write_t *lr)
+{
+	blkptr_t *wbp = &lr->lr_blkptr;
+	char *wbuf = (char *)(lr + 1); /* data follows lr_write_t */
+	uint64_t blksz;
+
+	if (BP_IS_HOLE(wbp)) {	/* compressed to a hole */
+		blksz = BP_GET_LSIZE(&lr->lr_blkptr);
+		/*
+		 * If the blksz is zero then we must be replaying a log
+		 * from an version prior to setting the blksize of null blocks.
+		 * So we just zero the actual write size reqeusted.
+		 */
+		if (blksz == 0) {
+			bzero(wbuf, lr->lr_length);
+			return;
+		}
+		bzero(wbuf, blksz);
+	} else {
+		/*
+		 * A subsequent write may have overwritten this block, in which
+		 * case wbp may have been been freed and reallocated, and our
+		 * read of wbp may fail with a checksum error.  We can safely
+		 * ignore this because the later write will provide the
+		 * correct data.
+		 */
+		zbookmark_t zb;
+
+		zb.zb_objset = dmu_objset_id(zilog->zl_os);
+		zb.zb_object = lr->lr_foid;
+		zb.zb_level = 0;
+		zb.zb_blkid = -1; /* unknown */
+
+		blksz = BP_GET_LSIZE(&lr->lr_blkptr);
+		(void) zio_wait(zio_read(NULL, zilog->zl_spa, wbp, wbuf, blksz,
+		    NULL, NULL, ZIO_PRIORITY_SYNC_READ,
+		    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE, &zb));
+	}
+	lr->lr_offset -= lr->lr_offset % blksz;
+	lr->lr_length = blksz;
+}
+
 typedef struct zil_replay_arg {
 	objset_t	*zr_os;
 	zil_replay_func_t **zr_replay;
@@ -1503,40 +1550,6 @@ zil_replay_log_record(zilog_t *zilog, lr_t *lr, void *zra, uint64_t claim_txg)
 	 */
 	if (zr->zr_byteswap)
 		byteswap_uint64_array(zr->zr_lrbuf, reclen);
-
-	/*
-	 * If this is a TX_WRITE with a blkptr, suck in the data.
-	 */
-	if (txtype == TX_WRITE && reclen == sizeof (lr_write_t)) {
-		lr_write_t *lrw = (lr_write_t *)lr;
-		blkptr_t *wbp = &lrw->lr_blkptr;
-		uint64_t wlen = lrw->lr_length;
-		char *wbuf = zr->zr_lrbuf + reclen;
-
-		if (BP_IS_HOLE(wbp)) {	/* compressed to a hole */
-			bzero(wbuf, wlen);
-		} else {
-			/*
-			 * A subsequent write may have overwritten this block,
-			 * in which case wbp may have been been freed and
-			 * reallocated, and our read of wbp may fail with a
-			 * checksum error.  We can safely ignore this because
-			 * the later write will provide the correct data.
-			 */
-			zbookmark_t zb;
-
-			zb.zb_objset = dmu_objset_id(zilog->zl_os);
-			zb.zb_object = lrw->lr_foid;
-			zb.zb_level = -1;
-			zb.zb_blkid = lrw->lr_offset / BP_GET_LSIZE(wbp);
-
-			(void) zio_wait(zio_read(NULL, zilog->zl_spa,
-			    wbp, wbuf, BP_GET_LSIZE(wbp), NULL, NULL,
-			    ZIO_PRIORITY_SYNC_READ,
-			    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE, &zb));
-			(void) memmove(wbuf, wbuf + lrw->lr_blkoff, wlen);
-		}
-	}
 
 	/*
 	 * We must now do two things atomically: replay this log record,

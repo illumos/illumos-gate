@@ -961,16 +961,28 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		    lr->lr_common.lrc_txg, zfs_get_done, zgd);
 		ASSERT((error && error != EINPROGRESS) ||
 		    lr->lr_length <= zp->z_blksz);
-		if (error == 0)
+		if (error == 0) {
+			/*
+			 * dmu_sync() can compress a block of zeros to a null
+			 * blkptr but the block size still needs to be passed
+			 * through to replay.
+			 */
+			BP_SET_LSIZE(&lr->lr_blkptr, db->db_size);
 			zil_add_block(zfsvfs->z_log, &lr->lr_blkptr);
+		}
+
 		/*
 		 * If we get EINPROGRESS, then we need to wait for a
 		 * write IO initiated by dmu_sync() to complete before
 		 * we can release this dbuf.  We will finish everything
 		 * up in the zfs_get_done() callback.
 		 */
-		if (error == EINPROGRESS)
+		if (error == EINPROGRESS) {
 			return (0);
+		} else if (error == EALREADY) {
+			lr->lr_common.lrc_txtype = TX_WRITE2;
+			error = 0;
+		}
 		dmu_buf_rele(db, zgd);
 		kmem_free(zgd, sizeof (zgd_t));
 	}

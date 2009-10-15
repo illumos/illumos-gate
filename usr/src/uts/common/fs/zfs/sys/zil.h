@@ -139,7 +139,8 @@ typedef enum zil_create {
 #define	TX_MKDIR_ACL		17	/* mkdir with ACL */
 #define	TX_MKDIR_ATTR		18	/* mkdir with attr */
 #define	TX_MKDIR_ACL_ATTR	19	/* mkdir with ACL + attrs */
-#define	TX_MAX_TYPE		20	/* Max transaction type */
+#define	TX_WRITE2		20	/* dmu_sync EALREADY write */
+#define	TX_MAX_TYPE		21	/* Max transaction type */
 
 /*
  * The transactions for mkdir, symlink, remove, rmdir, link, and rename
@@ -396,8 +397,8 @@ extern int	zil_suspend(zilog_t *zilog);
 extern void	zil_resume(zilog_t *zilog);
 
 extern void	zil_add_block(zilog_t *zilog, blkptr_t *bp);
-
 extern void	zil_set_logbias(zilog_t *zilog, uint64_t slogval);
+extern void	zil_get_replay_data(zilog_t *zilog, lr_write_t *lr);
 
 extern int zil_disable;
 

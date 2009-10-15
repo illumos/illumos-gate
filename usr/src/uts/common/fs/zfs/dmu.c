@@ -869,15 +869,28 @@ static void
 dmu_sync_ready(zio_t *zio, arc_buf_t *buf, void *varg)
 {
 	blkptr_t *bp = zio->io_bp;
+	dmu_sync_arg_t *in = varg;
+	dbuf_dirty_record_t *dr = in->dr;
+	dmu_buf_impl_t *db = dr->dr_dbuf;
+
+	mutex_enter(&db->db_mtx);
+	ASSERT(dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC);
 
 	if (!BP_IS_HOLE(bp)) {
-		dmu_sync_arg_t *in = varg;
-		dbuf_dirty_record_t *dr = in->dr;
-		dmu_buf_impl_t *db = dr->dr_dbuf;
 		ASSERT(BP_GET_TYPE(bp) == db->db_dnode->dn_type);
 		ASSERT(BP_GET_LEVEL(bp) == 0);
 		bp->blk_fill = 1;
+		dr->dt.dl.dr_overridden_by = *zio->io_bp;
+	} else {
+		dr->dt.dl.dr_overridden_by = *zio->io_bp;
+		/*
+		 * dmu_sync() can compress a block of zeros to a null blkptr
+		 * but the block size still needs to be passed through to replay
+		 */
+		BP_SET_LSIZE(bp, db->db.db_size);
 	}
+	dr->dt.dl.dr_override_state = DR_OVERRIDDEN;
+	mutex_exit(&db->db_mtx);
 }
 
 /* ARGSUSED */
@@ -889,13 +902,7 @@ dmu_sync_done(zio_t *zio, arc_buf_t *buf, void *varg)
 	dmu_buf_impl_t *db = dr->dr_dbuf;
 	dmu_sync_cb_t *done = in->done;
 
-	mutex_enter(&db->db_mtx);
-	ASSERT(dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC);
-	dr->dt.dl.dr_overridden_by = *zio->io_bp; /* structure assignment */
-	dr->dt.dl.dr_override_state = DR_OVERRIDDEN;
 	cv_broadcast(&db->db_changed);
-	mutex_exit(&db->db_mtx);
-
 	if (done)
 		done(&(db->db), in->arg);
 

@@ -797,6 +797,13 @@ zil_replay_func_t *ztest_replay_vector[TX_MAX_TYPE] = {
 	NULL,			/* TX_TRUNCATE */
 	NULL,			/* TX_SETATTR */
 	NULL,			/* TX_ACL */
+	NULL,			/* TX_CREATE_ACL */
+	NULL,			/* TX_CREATE_ATTR */
+	NULL,			/* TX_CREATE_ACL_ATTR */
+	NULL,			/* TX_MKDIR_ACL */
+	NULL,			/* TX_MKDIR_ATTR */
+	NULL,			/* TX_MKDIR_ACL_ATTR */
+	NULL,			/* TX_WRITE2 */
 };
 
 /*

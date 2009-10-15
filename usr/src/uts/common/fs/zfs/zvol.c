@@ -369,6 +369,10 @@ zvol_replay_write(zvol_state_t *zv, lr_write_t *lr, boolean_t byteswap)
 	if (byteswap)
 		byteswap_uint64_array(lr, sizeof (*lr));
 
+	/* If it's a dmu_sync() block get the data and write the whole block */
+	if (lr->lr_common.lrc_reclen == sizeof (lr_write_t))
+		zil_get_replay_data(dmu_objset_zil(os), lr);
+
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_write(tx, ZVOL_OBJ, off, len);
 	error = dmu_tx_assign(tx, TXG_WAIT);
@@ -407,6 +411,13 @@ zil_replay_func_t *zvol_replay_vector[TX_MAX_TYPE] = {
 	zvol_replay_err,	/* TX_TRUNCATE */
 	zvol_replay_err,	/* TX_SETATTR */
 	zvol_replay_err,	/* TX_ACL */
+	zvol_replay_err,	/* TX_CREATE_ACL */
+	zvol_replay_err,	/* TX_CREATE_ATTR */
+	zvol_replay_err,	/* TX_CREATE_ACL_ATTR */
+	zvol_replay_err,	/* TX_MKDIR_ACL */
+	zvol_replay_err,	/* TX_MKDIR_ATTR */
+	zvol_replay_err,	/* TX_MKDIR_ACL_ATTR */
+	zvol_replay_err,	/* TX_WRITE2 */
 };
 
 int
@@ -926,10 +937,19 @@ zvol_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 	zgd->zgd_rl = rl;
 
 	VERIFY(0 == dmu_buf_hold(os, ZVOL_OBJ, lr->lr_offset, zgd, &db));
+
 	error = dmu_sync(zio, db, &lr->lr_blkptr,
 	    lr->lr_common.lrc_txg, zvol_get_done, zgd);
-	if (error == 0)
+	if (error == 0) {
+		/*
+		 * dmu_sync() can compress a block of zeros to a null blkptr
+		 * but the block size still needs to be passed through to
+		 * replay.
+		 */
+		BP_SET_LSIZE(&lr->lr_blkptr, db->db_size);
 		zil_add_block(zv->zv_zilog, &lr->lr_blkptr);
+	}
+
 	/*
 	 * If we get EINPROGRESS, then we need to wait for a
 	 * write IO initiated by dmu_sync() to complete before
