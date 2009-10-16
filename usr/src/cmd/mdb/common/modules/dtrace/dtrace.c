@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * explicitly define DTRACE_ERRDEBUG to pull in definition of dtrace_errhash_t
@@ -2342,6 +2340,336 @@ dtrace_ecb_step(mdb_walk_state_t *wsp)
 	return (wsp->walk_callback(ecbp, NULL, wsp->walk_cbdata));
 }
 
+static void
+dtrace_options_numtostr(uint64_t num, char *buf, size_t len)
+{
+	uint64_t n = num;
+	int index = 0;
+	char u;
+
+	while (n >= 1024) {
+		n = (n + (1024 / 2)) / 1024; /* Round up or down */
+		index++;
+	}
+
+	u = " KMGTPE"[index];
+
+	if (index == 0) {
+		(void) mdb_snprintf(buf, len, "%llu", (u_longlong_t)n);
+	} else if (n < 10 && (num & (num - 1)) != 0) {
+		(void) mdb_snprintf(buf, len, "%.2f%c",
+		    (double)num / (1ULL << 10 * index), u);
+	} else if (n < 100 && (num & (num - 1)) != 0) {
+		(void) mdb_snprintf(buf, len, "%.1f%c",
+		    (double)num / (1ULL << 10 * index), u);
+	} else {
+		(void) mdb_snprintf(buf, len, "%llu%c", (u_longlong_t)n, u);
+	}
+}
+
+static void
+dtrace_options_numtohz(uint64_t num, char *buf, size_t len)
+{
+	(void) mdb_snprintf(buf, len, "%dhz", NANOSEC/num);
+}
+
+static void
+dtrace_options_numtobufpolicy(uint64_t num, char *buf, size_t len)
+{
+	char *policy = "unknown";
+
+	switch (num) {
+		case DTRACEOPT_BUFPOLICY_RING:
+			policy = "ring";
+			break;
+
+		case DTRACEOPT_BUFPOLICY_FILL:
+			policy = "fill";
+			break;
+
+		case DTRACEOPT_BUFPOLICY_SWITCH:
+			policy = "switch";
+			break;
+	}
+
+	(void) mdb_snprintf(buf, len, "%s", policy);
+}
+
+static void
+dtrace_options_numtocpu(uint64_t cpu, char *buf, size_t len)
+{
+	if (cpu == DTRACE_CPUALL)
+		(void) mdb_snprintf(buf, len, "%7s", "unbound");
+	else
+		(void) mdb_snprintf(buf, len, "%d", cpu);
+}
+
+typedef void (*dtrace_options_func_t)(uint64_t, char *, size_t);
+
+static struct dtrace_options {
+	char *dtop_optstr;
+	dtrace_options_func_t dtop_func;
+} _dtrace_options[] = {
+	{ "bufsize", dtrace_options_numtostr },
+	{ "bufpolicy", dtrace_options_numtobufpolicy },
+	{ "dynvarsize", dtrace_options_numtostr },
+	{ "aggsize", dtrace_options_numtostr },
+	{ "specsize", dtrace_options_numtostr },
+	{ "nspec", dtrace_options_numtostr },
+	{ "strsize", dtrace_options_numtostr },
+	{ "cleanrate", dtrace_options_numtohz },
+	{ "cpu", dtrace_options_numtocpu },
+	{ "bufresize", dtrace_options_numtostr },
+	{ "grabanon", dtrace_options_numtostr },
+	{ "flowindent", dtrace_options_numtostr },
+	{ "quiet", dtrace_options_numtostr },
+	{ "stackframes", dtrace_options_numtostr },
+	{ "ustackframes", dtrace_options_numtostr },
+	{ "aggrate", dtrace_options_numtohz },
+	{ "switchrate", dtrace_options_numtohz },
+	{ "statusrate", dtrace_options_numtohz },
+	{ "destructive", dtrace_options_numtostr },
+	{ "stackindent", dtrace_options_numtostr },
+	{ "rawbytes", dtrace_options_numtostr },
+	{ "jstackframes", dtrace_options_numtostr },
+	{ "jstackstrsize", dtrace_options_numtostr },
+	{ "aggsortkey", dtrace_options_numtostr },
+	{ "aggsortrev", dtrace_options_numtostr },
+	{ "aggsortpos", dtrace_options_numtostr },
+	{ "aggsortkeypos", dtrace_options_numtostr }
+};
+
+static void
+dtrace_options_help(void)
+{
+	mdb_printf("Given a dtrace_state_t structure, displays the "
+	    "current tunable option\nsettings.\n");
+}
+
+/*ARGSUSED*/
+static int
+dtrace_options(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	dtrace_state_t state;
+	int i = 0;
+	dtrace_optval_t *options;
+	char val[32];
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&state, sizeof (dtrace_state_t), (uintptr_t)addr) == -1) {
+		mdb_warn("failed to read state pointer at %p\n", addr);
+		return (DCMD_ERR);
+	}
+
+	options = &state.dts_options[0];
+
+	mdb_printf("%<u>%-25s %s%</u>\n", "OPTION", "VALUE");
+	for (i = 0; i < DTRACEOPT_MAX; i++) {
+		if (options[i] == DTRACEOPT_UNSET) {
+			mdb_printf("%-25s %s\n",
+			    _dtrace_options[i].dtop_optstr, "UNSET");
+		} else {
+			(void) _dtrace_options[i].dtop_func(options[i],
+			    val, 32);
+			mdb_printf("%-25s %s\n",
+			    _dtrace_options[i].dtop_optstr, val);
+		}
+	}
+
+	return (DCMD_OK);
+}
+
+static int
+pid2state_init(mdb_walk_state_t *wsp)
+{
+	dtrace_state_data_t *data;
+	uintptr_t devi;
+	uintptr_t proc;
+	struct dev_info info;
+	pid_t pid = (pid_t)wsp->walk_addr;
+
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("pid2state walk requires PID\n");
+		return (WALK_ERR);
+	}
+
+	data = mdb_zalloc(sizeof (dtrace_state_data_t), UM_SLEEP | UM_GC);
+
+	if (mdb_readvar(&data->dtsd_softstate, "dtrace_softstate") == -1) {
+		mdb_warn("failed to read 'dtrace_softstate'");
+		return (DCMD_ERR);
+	}
+
+	if ((proc = mdb_pid2proc(pid, NULL)) == NULL) {
+		mdb_warn("PID 0t%d not found\n", pid);
+		return (DCMD_ERR);
+	}
+
+	if (mdb_readvar(&devi, "dtrace_devi") == -1) {
+		mdb_warn("failed to read 'dtrace_devi'");
+		return (DCMD_ERR);
+	}
+
+	if (mdb_vread(&info, sizeof (struct dev_info), devi) == -1) {
+		mdb_warn("failed to read 'dev_info'");
+		return (DCMD_ERR);
+	}
+
+	data->dtsd_major = info.devi_major;
+	data->dtsd_proc = proc;
+
+	wsp->walk_data = data;
+
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+static int
+pid2state_file(uintptr_t addr, struct file *f, dtrace_state_data_t *data)
+{
+	vnode_t vnode;
+	minor_t minor;
+	uintptr_t statep;
+
+	/* Get the vnode for this file */
+	if (mdb_vread(&vnode, sizeof (vnode), (uintptr_t)f->f_vnode) == -1) {
+		mdb_warn("couldn't read vnode at %p", (uintptr_t)f->f_vnode);
+		return (WALK_NEXT);
+	}
+
+
+	/* Is this the dtrace device? */
+	if (getmajor(vnode.v_rdev) != data->dtsd_major)
+		return (WALK_NEXT);
+
+	/* Get the minor number for this device entry */
+	minor = getminor(vnode.v_rdev);
+
+	if (mdb_get_soft_state_byaddr(data->dtsd_softstate, minor,
+	    &statep, NULL, 0) == -1) {
+		mdb_warn("failed to read softstate for minor %d", minor);
+		return (WALK_NEXT);
+	}
+
+	mdb_printf("%p\n", statep);
+
+	return (WALK_NEXT);
+}
+
+static int
+pid2state_step(mdb_walk_state_t *wsp)
+{
+	dtrace_state_data_t *ds = wsp->walk_data;
+
+	if (mdb_pwalk("file",
+	    (mdb_walk_cb_t)pid2state_file, ds, ds->dtsd_proc) == -1) {
+		mdb_warn("couldn't walk 'file' for proc %p", ds->dtsd_proc);
+		return (WALK_ERR);
+	}
+
+	return (WALK_DONE);
+}
+
+/*ARGSUSED*/
+static int
+dtrace_probes_walk(uintptr_t addr, void *ignored, uintptr_t *target)
+{
+	dtrace_ecb_t ecb;
+	dtrace_probe_t probe;
+	dtrace_probedesc_t pd;
+
+	if (addr == NULL)
+		return (WALK_ERR);
+
+	if (mdb_vread(&ecb, sizeof (dtrace_ecb_t), addr) == -1) {
+		mdb_warn("failed to read ecb %p\n", addr);
+		return (WALK_ERR);
+	}
+
+	if (ecb.dte_probe == NULL)
+		return (WALK_ERR);
+
+	if (mdb_vread(&probe, sizeof (dtrace_probe_t),
+	    (uintptr_t)ecb.dte_probe) == -1) {
+		mdb_warn("failed to read probe %p\n", ecb.dte_probe);
+		return (WALK_ERR);
+	}
+
+	pd.dtpd_id = probe.dtpr_id;
+	dtracemdb_probe(NULL, &pd);
+
+	mdb_printf("%5d %10s %17s %33s %s\n", pd.dtpd_id, pd.dtpd_provider,
+	    pd.dtpd_mod, pd.dtpd_func, pd.dtpd_name);
+
+	return (WALK_NEXT);
+}
+
+static void
+dtrace_probes_help(void)
+{
+	mdb_printf("Given a dtrace_state_t structure, displays all "
+	    "its active enablings.  If no\nstate structure is provided, "
+	    "all available probes are listed.\n");
+}
+
+/*ARGSUSED*/
+static int
+dtrace_probes(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	dtrace_probedesc_t pd;
+	uintptr_t caddr, base, paddr;
+	int nprobes, i;
+
+	mdb_printf("%5s %10s %17s %33s %s\n",
+	    "ID", "PROVIDER", "MODULE", "FUNCTION", "NAME");
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		/*
+		 * If no argument is provided just display all available
+		 * probes.
+		 */
+		if (mdb_readvar(&base, "dtrace_probes") == -1) {
+			mdb_warn("failed to read 'dtrace_probes'");
+			return (-1);
+		}
+
+		if (mdb_readvar(&nprobes, "dtrace_nprobes") == -1) {
+			mdb_warn("failed to read 'dtrace_nprobes'");
+			return (-1);
+		}
+
+		for (i = 0; i < nprobes; i++) {
+			caddr = base + i  * sizeof (dtrace_probe_t *);
+
+			if (mdb_vread(&paddr, sizeof (paddr), caddr) == -1) {
+				mdb_warn("couldn't read probe pointer at %p",
+				    caddr);
+				continue;
+			}
+
+			if (paddr == NULL)
+				continue;
+
+			pd.dtpd_id = i + 1;
+			if (dtracemdb_probe(NULL, &pd) == 0) {
+				mdb_printf("%5d %10s %17s %33s %s\n",
+				    pd.dtpd_id, pd.dtpd_provider,
+				    pd.dtpd_mod, pd.dtpd_func, pd.dtpd_name);
+			}
+		}
+	} else {
+		if (mdb_pwalk("dtrace_ecb", (mdb_walk_cb_t)dtrace_probes_walk,
+		    NULL, addr) == -1) {
+			mdb_warn("couldn't walk 'dtrace_ecb'");
+			return (DCMD_ERR);
+		}
+	}
+
+	return (DCMD_OK);
+}
+
 const mdb_dcmd_t kernel_dcmds[] = {
 	{ "id2probe", ":", "translate a dtrace_id_t to a dtrace_probe_t",
 	    id2probe },
@@ -2356,6 +2684,11 @@ const mdb_dcmd_t kernel_dcmds[] = {
 	    "print DTrace aggregation hash statistics", dtrace_aggstat },
 	{ "dtrace_dynstat", ":",
 	    "print DTrace dynamic variable hash statistics", dtrace_dynstat },
+	{ "dtrace_options", ":",
+	    "print a DTrace consumer's current tuneable options",
+	    dtrace_options, dtrace_options_help },
+	{ "dtrace_probes", "?", "print a DTrace consumer's enabled probes",
+	    dtrace_probes, dtrace_probes_help },
 	{ NULL }
 };
 
@@ -2372,5 +2705,7 @@ const mdb_walker_t kernel_walkers[] = {
 		dtrace_dynvar_init, dtrace_dynvar_step, dtrace_dynvar_fini },
 	{ "dtrace_ecb", "walk a DTrace consumer's enabling control blocks",
 		dtrace_ecb_init, dtrace_ecb_step },
+	{ "pid2state", "walk a processes dtrace_state structures",
+	    pid2state_init, pid2state_step },
 	{ NULL }
 };
