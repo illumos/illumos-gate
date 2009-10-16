@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libelf.h>
 #include "decl.h"
@@ -45,6 +43,8 @@
  * _elf_work		Working version given to the lib by application.
  *			See elf_version().
  * _elf_globals_mutex	mutex to protect access to all global data items.
+ * _elf_execfill_func	Fill function for file padding of SHF_EXECINSTR
+ *			sections. See _elf_execfill().
  */
 
 /*
@@ -62,6 +62,7 @@ int			_elf_byte = 0;
 const Elf32_Ehdr	_elf32_ehdr_init = { 0 };
 const Elf64_Ehdr	_elf64_ehdr_init = { 0 };
 unsigned		_elf_encode = ELFDATANONE;
+_elf_execfill_func_t	*_elf_execfill_func = NULL;
 const Snode32		_elf32_snode_init = { 0 };
 const Snode64		_elf64_snode_init = { 0 };
 const Dnode		_elf_dnode_init = { 0 };

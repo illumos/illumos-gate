@@ -2926,6 +2926,15 @@ ld_make_text(Ofl_desc *ofl, size_t size)
 	(void) memcpy(data->d_buf, ld_targ.t_nf.nf_template,
 	    ld_targ.t_nf.nf_size);
 
+	/*
+	 * If size was larger than required, and the target supplies
+	 * a fill function, use it to fill the balance. If there is no
+	 * fill function, we accept the 0-fill supplied by libld_calloc().
+	 */
+	if ((ld_targ.t_ff.ff_execfill != NULL) && (size > ld_targ.t_nf.nf_size))
+		ld_targ.t_ff.ff_execfill(data->d_buf, ld_targ.t_nf.nf_size,
+		    size - ld_targ.t_nf.nf_size);
+
 	if (aplist_append(&ofl->ofl_maptext, isec, AL_CNT_OFL_MAPSECS) == NULL)
 		return ((Is_desc *)S_ERROR);
 

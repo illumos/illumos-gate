@@ -23,14 +23,12 @@
 
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DECL_H
 #define	_DECL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 	/* SVr4.0 1.9	*/
 
 #include <thread.h>
 #include <note.h>
@@ -479,6 +477,7 @@ extern int		_elf_byte;
 extern const Elf32_Ehdr	_elf32_ehdr_init;
 extern const Elf64_Ehdr	_elf64_ehdr_init;
 extern unsigned		_elf_encode;
+extern _elf_execfill_func_t *_elf_execfill_func;
 extern void		_elf_seterr(Msg, int);
 extern const Snode32	_elf32_snode_init;
 extern const Snode64	_elf64_snode_init;

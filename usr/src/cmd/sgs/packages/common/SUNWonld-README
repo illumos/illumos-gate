@@ -1535,3 +1535,4 @@ Bugid   Risk Synopsis
 	PSARC/2009/493 ld -z wrap option
 6888489 Null environment variables are not overriding crle(1) replaceable
 	environment variables.
+6885456 Need to implement GNU-ld behavior in construction of .init/.fini sections

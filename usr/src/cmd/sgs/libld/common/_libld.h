@@ -161,6 +161,26 @@ typedef struct {
 } Target_nullfunc;
 
 /*
+ * Target_fill supplies machine code for fill bytes in executable output
+ * sections. Normally, libelf fills the gaps caused by alignment and size
+ * requirements of the constituent input sections with 0. Depending on the
+ * target architecture, it may be desirable to instead fill with executable
+ * NOP instructions. There are two reasons to do this:
+ *
+ * -	So that .init/.fini sections will not contain unexecutable gaps
+ *	that cause the executing program to trap and die.
+ *
+ * -	To eliminate confusing garbage instructions between sections containing
+ *	executable code when viewed with a dissassembler.
+ *
+ * The ff_execfill function is allowed to be NULL if the underlying target
+ * does not require a special fill for executable sections.
+ */
+typedef struct {
+	_elf_execfill_func_t	*ff_execfill;
+} Target_fillfunc;
+
+/*
  * Target_machrel holds pointers to the reloc_table and machrel functions
  * for a given target machine.
  *
@@ -226,6 +246,7 @@ typedef struct {
 	Target_mach	t_m;
 	Target_machid	t_id;
 	Target_nullfunc	t_nf;
+	Target_fillfunc	t_ff;
 	Target_machrel	t_mr;
 	Target_machsym	t_ms;
 } Target;

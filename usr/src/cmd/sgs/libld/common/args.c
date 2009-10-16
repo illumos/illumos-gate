@@ -622,6 +622,13 @@ check_flags(Ofl_desc * ofl, int argc)
 		ofl->ofl_flags1 |= FLG_OF1_ENCDIFF;
 
 	/*
+	 * If the target has special executable section filling requirements,
+	 * register the fill function with libelf
+	 */
+	if (ld_targ.t_ff.ff_execfill != NULL)
+		_elf_execfill(ld_targ.t_ff.ff_execfill);
+
+	/*
 	 * Initialize string tables.  Symbol definitions within mapfiles can
 	 * result in the creation of input sections.
 	 */

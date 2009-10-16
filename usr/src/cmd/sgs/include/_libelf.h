@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	__LIBELF_H
 #define	__LIBELF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Version of libelf.h that supplies definitions for APIs that
@@ -42,9 +40,12 @@
 extern "C" {
 #endif
 
+typedef void _elf_execfill_func_t(void *, off_t, size_t);
+
+extern void		_elf_execfill(_elf_execfill_func_t *);
 extern Elf64_Off	_elf_getxoff(Elf_Data *);
-extern GElf_Xword	_gelf_getdyndtflags_1(Elf *elf);
-extern int		_elf_swap_wrimage(Elf *elf);
+extern GElf_Xword	_gelf_getdyndtflags_1(Elf *);
+extern int		_elf_swap_wrimage(Elf *);
 extern uint_t		_elf_sys_encoding(void);
 
 #ifdef	__cplusplus

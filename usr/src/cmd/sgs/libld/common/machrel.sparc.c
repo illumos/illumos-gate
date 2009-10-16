@@ -2245,6 +2245,32 @@ ld_targ_init_sparc(void)
 			nullfunc_tmpl,		/* nf_template */
 			sizeof (nullfunc_tmpl),	/* nf_size */
 		},
+		{			/* Target_fillfunc */
+			/*
+			 * On sparc, special filling of executable sections
+			 * is undesirable, and the default 0 fill supplied
+			 * by libelf is preferred:
+			 *
+			 * -	0 fill is interpreted as UNIMP instructions,
+			 *	which cause an illegal_instruction_trap. These
+			 *	serve as a sentinel against poorly written
+			 *	code. The sparc architecture manual discusses
+			 *	this as providing a measure of runtime safety.
+			 *
+			 * -	The one place where a hole should conceivably
+			 *	be filled with NOP instructions is in the
+			 *	.init/.fini sections. However, the sparc
+			 *	assembler sizes the sections it generates
+			 *	to a multiple of the section alignment, and as
+			 *	such, takes the filling task out of our hands.
+			 *	Furthermore, the sparc assembler uses 0-fill
+			 *	for this, forcing the authors of sparc
+			 *	assembler for .init/.fini sections to be aware
+			 *	of this case and explicitly supply NOP fill.
+			 *	Hence, there is no role for the link-editor.
+			 */
+			NULL			/* ff_execfill */
+		},
 		{			/* Target_machrel */
 			reloc_table,
 

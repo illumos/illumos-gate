@@ -1597,6 +1597,29 @@ static const uchar_t nullfunc_tmpl[] = {	/* IA32 */
 
 
 /*
+ * Function used to provide fill padding in SHF_EXECINSTR sections
+ *
+ * entry:
+ *
+ *	base - base address of section being filled
+ *	offset - starting offset for fill within memory referenced by base
+ *	cnt - # bytes to be filled
+ *
+ * exit:
+ *	The fill has been completed.
+ */
+static void
+execfill(void *base, off_t off, size_t cnt)
+{
+	/*
+	 * 0x90 is an X86 NOP instruction in both 32 and 64-bit worlds.
+	 * There are no alignment constraints.
+	 */
+	(void) memset(off + (char *)base, 0x90, cnt);
+}
+
+
+/*
  * Return the ld_targ definition for this target.
  */
 const Target *
@@ -1685,6 +1708,9 @@ ld_targ_init_x86(void)
 		{			/* Target_nullfunc */
 			nullfunc_tmpl,		/* nf_template */
 			sizeof (nullfunc_tmpl),	/* nf_size */
+		},
+		{			/* Target_fillfunc */
+			execfill		/* ff_execfill */
 		},
 		{			/* Target_machrel */
 			reloc_table,

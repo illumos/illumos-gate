@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <memory.h>
 #include <malloc.h>
@@ -449,15 +447,16 @@ static size_t
 wrt(Elf * elf, Xword outsz, unsigned fill, int update_cmd)
 {
 	NOTE(ASSUMING_PROTECTED(*elf))
-	Elf_Data	dst, src;
-	unsigned	flag;
-	Xword		hi, sz;
-	char		*image;
-	Elf_Scn		*s;
-	Ehdr		*eh = elf->ed_ehdr;
-	unsigned	ver = eh->e_version;
-	unsigned	encode;
-	int		byte;
+	Elf_Data		dst, src;
+	unsigned		flag;
+	Xword			hi, sz;
+	char			*image;
+	Elf_Scn			*s;
+	Ehdr			*eh = elf->ed_ehdr;
+	unsigned		ver = eh->e_version;
+	unsigned		encode;
+	int			byte;
+	_elf_execfill_func_t	*execfill_func;
 
 	/*
 	 * If this is an ELF_C_WRIMAGE write, then we encode into the
@@ -567,12 +566,18 @@ wrt(Elf * elf, Xword outsz, unsigned fill, int update_cmd)
 	 */
 
 	ELFACCESSDATA(byte, _elf_byte);
+	ELFACCESSDATA(execfill_func, _elf_execfill_func);
 	for (s = elf->ed_hdscn; s != 0; s = s->s_next) {
 		register Dnode	*d, *prevd;
 		Xword		off = 0;
 		Shdr		*sh = s->s_shdr;
 		char		*start = image + sh->sh_offset;
 		char		*here;
+		_elf_execfill_func_t	*execfill;
+
+		/* Only use the execfill function on SHF_EXECINSTR sections */
+		execfill = (sh->sh_flags & SHF_EXECINSTR) ?
+		    execfill_func : NULL;
 
 		/*
 		 * Just "clean" DIRTY flag for "empty" sections.  Even if
@@ -605,10 +610,20 @@ wrt(Elf * elf, Xword outsz, unsigned fill, int update_cmd)
 			/*
 			 * Clear out the memory between the end of the
 			 * last update and the start of this data buffer.
+			 *
+			 * These buffers represent input sections that have
+			 * been concatenated into an output section, so if
+			 * the output section is executable (SHF_EXECINSTR)
+			 * and a fill function has been registered, use the
+			 * function. Otherwise, use the fill byte.
 			 */
 			if (fill && (d->db_data.d_off > off)) {
 				sz = (Xword)(d->db_data.d_off - off);
-				(void) memset(here - sz, byte, sz);
+				if (execfill != NULL)
+					(* execfill)(start,
+					    here - start - sz, sz);
+				else
+					(void) memset(here - sz, byte, sz);
 			}
 
 			if ((d->db_myflags & DBF_READY) == 0) {

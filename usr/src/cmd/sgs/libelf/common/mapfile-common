@@ -160,6 +160,7 @@ SUNW_0.7 {
 
 SUNWprivate_1.1 {
     global:
+	_elf_execfill;
 	_elf_getxoff;
 	_elf_outsync;
 	_elf_sys_encoding;

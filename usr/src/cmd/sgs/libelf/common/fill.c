@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libelf.h>
 #include "decl.h"
@@ -37,4 +35,10 @@ void
 elf_fill(int fill)
 {
 	ELFACCESSDATA(_elf_byte, fill)
+}
+
+void
+_elf_execfill(_elf_execfill_func_t *execfill_func)
+{
+	ELFACCESSDATA(_elf_execfill_func, execfill_func)
 }
