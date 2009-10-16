@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI configuration space access routines
@@ -44,7 +42,7 @@ int pci_max_nbus = 0xFE;
 
 
 int pci_bios_cfg_type = PCI_MECHANISM_UNKNOWN;
-int pci_bios_nbus;
+int pci_bios_maxbus;
 int pci_bios_mech;
 int pci_bios_vers;
 
@@ -135,7 +133,7 @@ pci_check(void)
 		 * exhaustive search of all PCI buses. We have to do this until
 		 * we start using the PCI information in ACPI.
 		 */
-		pci_bios_nbus = pci_max_nbus;
+		pci_bios_maxbus = pci_max_nbus;
 	}
 
 	return (TRUE);
@@ -229,7 +227,7 @@ pci_check_bios(void)
 
 	pci_bios_mech = (ax & 0x3);
 	pci_bios_vers = regs.ebx.word.bx;
-	pci_bios_nbus = (regs.ecx.word.cx & 0xff);
+	pci_bios_maxbus = (regs.ecx.word.cx & 0xff);
 
 	switch (pci_bios_mech) {
 	default:	/* ?!? */

@@ -100,7 +100,7 @@ struct pci_devfunc {
 };
 
 extern int pseudo_isa;
-extern int pci_bios_nbus;
+extern int pci_bios_maxbus;
 static uchar_t max_dev_pci = 32;	/* PCI standard */
 int pci_boot_debug = 0;
 extern struct memlist *find_bus_res(int, int);
@@ -416,7 +416,7 @@ pci_unitaddr_cache_create(void)
 
 	index = 0;
 	listp = nvf_list(puafd_handle);
-	for (i = 0; i <= pci_bios_nbus; i++) {
+	for (i = 0; i <= pci_bios_maxbus; i++) {
 		/* skip non-root (peer) PCI busses */
 		if ((pci_bus_res[i].par_bus != (uchar_t)-1) ||
 		    (pci_bus_res[i].dip == NULL))
@@ -442,7 +442,7 @@ pci_setup_tree(void)
 	uint_t i, root_bus_addr = 0;
 
 	alloc_res_array();
-	for (i = 0; i <= pci_bios_nbus; i++) {
+	for (i = 0; i <= pci_bios_maxbus; i++) {
 		pci_bus_res[i].par_bus = (uchar_t)-1;
 		pci_bus_res[i].root_addr = (uchar_t)-1;
 		pci_bus_res[i].sub_bus = i;
@@ -455,7 +455,7 @@ pci_setup_tree(void)
 	/*
 	 * Now enumerate peer busses
 	 *
-	 * We loop till pci_bios_nbus. On most systems, there is
+	 * We loop till pci_bios_maxbus. On most systems, there is
 	 * one more bus at the high end, which implements the ISA
 	 * compatibility bus. We don't care about that.
 	 *
@@ -466,7 +466,7 @@ pci_setup_tree(void)
 	 *	However, we stop enumerating phantom peers with no
 	 *	device below.
 	 */
-	for (i = 1; i <= pci_bios_nbus; i++) {
+	for (i = 1; i <= pci_bios_maxbus; i++) {
 		if (pci_bus_res[i].dip == NULL) {
 			pci_bus_res[i].root_addr = root_bus_addr++;
 		}
@@ -520,7 +520,7 @@ pci_roots_have_bbn(void)
 	/*
 	 * Scan the PCI busses and look for at least 1 _BBN
 	 */
-	for (i = 0; i <= pci_bios_nbus; i++) {
+	for (i = 0; i <= pci_bios_maxbus; i++) {
 		/* skip non-root (peer) PCI busses */
 		if (pci_bus_res[i].par_bus != (uchar_t)-1)
 			continue;
@@ -586,7 +586,7 @@ pci_renumber_root_busses(void)
 	if (!pci_roots_have_bbn())
 		return;
 
-	for (i = 0; i <= pci_bios_nbus; i++) {
+	for (i = 0; i <= pci_bios_maxbus; i++) {
 		/* skip non-root (peer) PCI busses */
 		if (pci_bus_res[i].par_bus != (uchar_t)-1)
 			continue;
@@ -631,12 +631,12 @@ remove_subtractive_res()
 	int i, j;
 	struct memlist *list;
 
-	for (i = 0; i <= pci_bios_nbus; i++) {
+	for (i = 0; i <= pci_bios_maxbus; i++) {
 		if (pci_bus_res[i].subtractive) {
 			/* remove used io ports */
 			list = pci_bus_res[i].io_used;
 			while (list) {
-				for (j = 0; j <= pci_bios_nbus; j++)
+				for (j = 0; j <= pci_bios_maxbus; j++)
 					(void) memlist_remove(
 					    &pci_bus_res[j].io_avail,
 					    list->address, list->size);
@@ -645,7 +645,7 @@ remove_subtractive_res()
 			/* remove used mem resource */
 			list = pci_bus_res[i].mem_used;
 			while (list) {
-				for (j = 0; j <= pci_bios_nbus; j++) {
+				for (j = 0; j <= pci_bios_maxbus; j++) {
 					(void) memlist_remove(
 					    &pci_bus_res[j].mem_avail,
 					    list->address, list->size);
@@ -658,7 +658,7 @@ remove_subtractive_res()
 			/* remove used prefetchable mem resource */
 			list = pci_bus_res[i].pmem_used;
 			while (list) {
-				for (j = 0; j <= pci_bios_nbus; j++) {
+				for (j = 0; j <= pci_bios_maxbus; j++) {
 					(void) memlist_remove(
 					    &pci_bus_res[j].pmem_avail,
 					    list->address, list->size);
@@ -1277,7 +1277,7 @@ pci_reprogram(void)
 		int	new_addr;
 		int	index = 0;
 
-		for (bus = 0; bus <= pci_bios_nbus; bus++) {
+		for (bus = 0; bus <= pci_bios_maxbus; bus++) {
 			/* skip non-root (peer) PCI busses */
 			if ((pci_bus_res[bus].par_bus != (uchar_t)-1) ||
 			    (pci_bus_res[bus].dip == NULL))
@@ -1303,7 +1303,7 @@ pci_reprogram(void)
 	/*
 	 * Do root-bus resource discovery
 	 */
-	for (bus = 0; bus <= pci_bios_nbus; bus++) {
+	for (bus = 0; bus <= pci_bios_maxbus; bus++) {
 		/* skip non-root (peer) PCI busses */
 		if (pci_bus_res[bus].par_bus != (uchar_t)-1)
 			continue;
@@ -1339,7 +1339,7 @@ pci_reprogram(void)
 	memlist_free_all(&isa_res.mem_used);
 
 	/* add bus-range property for root/peer bus nodes */
-	for (i = 0; i <= pci_bios_nbus; i++) {
+	for (i = 0; i <= pci_bios_maxbus; i++) {
 		/* create bus-range property on root/peer buses */
 		if (pci_bus_res[i].par_bus == (uchar_t)-1)
 			add_bus_range_prop(i);
@@ -1361,10 +1361,10 @@ pci_reprogram(void)
 
 	/* reprogram the non-subtractive PPB */
 	if (pci_reconfig)
-		for (i = 0; i <= pci_bios_nbus; i++)
+		for (i = 0; i <= pci_bios_maxbus; i++)
 			fix_ppb_res(i, B_FALSE);
 
-	for (i = 0; i <= pci_bios_nbus; i++) {
+	for (i = 0; i <= pci_bios_maxbus; i++) {
 		/* configure devices not configured by BIOS */
 		if (pci_reconfig) {
 			/*
@@ -1378,7 +1378,7 @@ pci_reprogram(void)
 	}
 
 	/* All dev programmed, so we can create available prop */
-	for (i = 0; i <= pci_bios_nbus; i++)
+	for (i = 0; i <= pci_bios_maxbus; i++)
 		add_bus_available_prop(i);
 }
 
@@ -1710,7 +1710,7 @@ add_pci_fixes(void)
 {
 	int i;
 
-	for (i = 0; i <= pci_bios_nbus; i++) {
+	for (i = 0; i <= pci_bios_maxbus; i++) {
 		/*
 		 * For each bus, apply needed fixes to the appropriate devices.
 		 * This must be done before the main enumeration loop because
@@ -2714,8 +2714,8 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	 * Some BIOSes lie about max pci busses, we allow for
 	 * such mistakes here
 	 */
-	if (subbus > pci_bios_nbus) {
-		pci_bios_nbus = subbus;
+	if (subbus > pci_bios_maxbus) {
+		pci_bios_maxbus = subbus;
 		alloc_res_array();
 	}
 
@@ -3148,7 +3148,7 @@ alloc_res_array(void)
 	int old_max;
 	void *old_res;
 
-	if (array_max > pci_bios_nbus + 1)
+	if (array_max > pci_bios_maxbus + 1)
 		return;	/* array is big enough */
 
 	old_max = array_max;
@@ -3157,7 +3157,7 @@ alloc_res_array(void)
 	if (array_max == 0)
 		array_max = 16;	/* start with a reasonable number */
 
-	while (array_max < pci_bios_nbus + 1)
+	while (array_max < pci_bios_maxbus + 1)
 		array_max <<= 1;
 	pci_bus_res = (struct pci_bus_resource *)kmem_zalloc(
 	    array_max * sizeof (struct pci_bus_resource), KM_SLEEP);

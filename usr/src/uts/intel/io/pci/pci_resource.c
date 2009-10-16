@@ -37,7 +37,7 @@
 #include "pcihrt.h"
 
 extern int pci_boot_debug;
-extern int pci_bios_nbus;
+extern int pci_bios_maxbus;
 #define	dprintf	if (pci_boot_debug) printf
 
 static int tbl_init = 0;
@@ -104,7 +104,7 @@ acpi_pci_probe(void)
 	if (acpi_resource_discovery == 0)
 		return;
 
-	for (bus = 0; bus < pci_bios_nbus; bus++) {
+	for (bus = 0; bus <= pci_bios_maxbus; bus++) {
 		/* if no dip or no ACPI handle, no resources to discover */
 		dip = pci_bus_res[bus].dip;
 		if ((dip == NULL) ||
@@ -227,7 +227,7 @@ bus_res_fini(void)
 {
 	int bus;
 
-	for (bus = 0; bus < pci_bios_nbus; bus++) {
+	for (bus = 0; bus <= pci_bios_maxbus; bus++) {
 		memlist_free_all(&acpi_io_res[bus]);
 		memlist_free_all(&acpi_mem_res[bus]);
 		memlist_free_all(&acpi_pmem_res[bus]);
