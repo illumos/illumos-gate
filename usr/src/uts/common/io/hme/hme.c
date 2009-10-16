@@ -38,14 +38,12 @@
 #include	<sys/conf.h>
 #include	<sys/strsun.h>
 #include	<sys/kstat.h>
-#include	<inet/common.h>
-#include	<inet/mi.h>
-#include	<inet/nd.h>
 #include	<sys/pattr.h>
 #include	<sys/dlpi.h>
 #include	<sys/strsubr.h>
 #include	<sys/mac_provider.h>
 #include	<sys/mac_ether.h>
+#include	<sys/mii.h>
 #include	<sys/ethernet.h>
 #include	<sys/vlan.h>
 #include	<sys/pci.h>
@@ -60,37 +58,18 @@ typedef void	(*fptrv_t)();
 
 typedef enum {
 	NO_MSG		= 0,
-	AUTOCONFIG_MSG	= 1,
-	STREAMS_MSG	= 2,
-	IOCTL_MSG	= 3,
-	PROTO_MSG	= 4,
-	INIT_MSG	= 5,
-	TX_MSG		= 6,
-	RX_MSG		= 7,
-	INTR_MSG	= 8,
-	UNINIT_MSG	= 9,
-	CONFIG_MSG	= 10,
-	PROP_MSG	= 11,
-	ENTER_MSG	= 12,
-	RESUME_MSG	= 13,
-	AUTONEG_MSG	= 14,
-	NAUTONEG_MSG	= 15,
-	FATAL_ERR_MSG	= 16,
-	NFATAL_ERR_MSG	= 17,
-	NDD_MSG		= 18,
-	PHY_MSG		= 19,
-	XCVR_MSG	= 20,
-	NOXCVR_MSG	= 21,
-	NSUPPORT_MSG	= 22,
-	ERX_MSG		= 23,
-	FREE_MSG	= 24,
-	IPG_MSG		= 25,
-	DDI_MSG		= 26,
-	DEFAULT_MSG	= 27,
-	DISPLAY_MSG	= 28,
-	LATECOLL_MSG	= 29,
-	MIFPOLL_MSG	= 30,
-	LINKPULSE_MSG	= 31
+	AUTOCONFIG_MSG,
+	DISPLAY_MSG,
+	INIT_MSG,
+	UNINIT_MSG,
+	CONFIG_MSG,
+	MII_MSG,
+	FATAL_ERR_MSG,
+	NFATAL_ERR_MSG,
+	XCVR_MSG,
+	NOXCVR_MSG,
+	ERX_MSG,
+	DDI_MSG,
 } msg_t;
 
 msg_t	hme_debug_level =	NO_MSG;
@@ -98,36 +77,17 @@ msg_t	hme_debug_level =	NO_MSG;
 static char	*msg_string[] = {
 	"NONE       ",
 	"AUTOCONFIG ",
-	"STREAMS    ",
-	"IOCTL      ",
-	"PROTO      ",
+	"DISPLAY	"
 	"INIT       ",
-	"TX         ",
-	"RX         ",
-	"INTR       ",
 	"UNINIT		",
 	"CONFIG	",
-	"PROP	",
-	"ENTER	",
-	"RESUME	",
-	"AUTONEG	",
-	"NAUTONEG	",
+	"MII	",
 	"FATAL_ERR	",
 	"NFATAL_ERR	",
-	"NDD	",
-	"PHY	",
 	"XCVR	",
 	"NOXCVR	",
-	"NSUPPOR	",
 	"ERX	",
-	"FREE	",
-	"IPG	",
 	"DDI	",
-	"DEFAULT	",
-	"DISPLAY	"
-	"LATECOLL_MSG	",
-	"MIFPOLL_MSG	",
-	"LINKPULSE_MSG	"
 };
 
 #define	SEVERITY_NONE	0
@@ -151,30 +111,19 @@ static	int	hme_urun_fix = 0;	/* Bug fixed in Sbus/FEPS 2.0 */
  */
 static	int	hme_64bit_enable =	1;	/* Use 64-bit sbus transfers */
 static	int	hme_reject_own =	1;	/* Reject packets with own SA */
-static	int	hme_autoneg_enable =	1;	/* Enable auto-negotiation */
+static	int	hme_ngu_enable =	0;	/* Never Give Up mode */
 
-static	int	hme_ngu_enable =	1; /* to enable Never Give Up mode */
-static	int	hme_mifpoll_enable =	1; /* to enable mif poll */
-
-/*
- * The following variables are used for configuring link-operation.
- * Later these parameters may be changed per interface using "ndd" command
- * These parameters may also be specified as properties using the .conf
- * file mechanism for each interface.
- */
+mac_priv_prop_t hme_priv_prop[] = {
+	{	"_ipg0",	MAC_PROP_PERM_RW	},
+	{	"_ipg1",	MAC_PROP_PERM_RW	},
+	{	"_ipg2",	MAC_PROP_PERM_RW	},
+	{	"_lance_mode",	MAC_PROP_PERM_RW	},
+};
 
 static	int	hme_lance_mode =	1;	/* to enable lance mode */
 static	int	hme_ipg0 =		16;
 static	int	hme_ipg1 =		8;
 static	int	hme_ipg2 =		4;
-static	int	hme_use_int_xcvr =	0;
-static	int	hme_pace_size =		0;	/* Do not use pacing */
-
-/*
- * The following variable value will be overridden by "link-pulse-disabled"
- * property which may be created by OBP or hme.conf file.
- */
-static	int	hme_link_pulse_disabled = 0;	/* link pulse disabled */
 
 /*
  * The following parameters may be configured by the user. If they are not
@@ -189,66 +138,9 @@ static	int	hme_link_pulse_disabled = 0;	/* link pulse disabled */
 #define	HME_MASK_5BIT	0x1f
 #define	HME_MASK_8BIT	0xff
 
-static	int	hme_adv_autoneg_cap = HME_NOTUSR | 0;
-static	int	hme_adv_100T4_cap = HME_NOTUSR | 0;
-static	int	hme_adv_100fdx_cap = HME_NOTUSR | 0;
-static	int	hme_adv_100hdx_cap = HME_NOTUSR | 0;
-static	int	hme_adv_10fdx_cap = HME_NOTUSR | 0;
-static	int	hme_adv_10hdx_cap = HME_NOTUSR | 0;
-
-/*
- * PHY_IDR1 and PHY_IDR2 values to identify National Semiconductor's DP83840
- * Rev C chip which needs some work-arounds.
- */
-#define	HME_NSIDR1	0x2000
-#define	HME_NSIDR2	0x5c00 /* IDR2 register for with revision no. 0 */
-
-/*
- * PHY_IDR1 and PHY_IDR2 values to identify Quality Semiconductor's QS6612
- * chip which needs some work-arounds.
- * Addition Interface Technologies Group (NPG) 8/28/1997.
- */
-#define	HME_QSIDR1	0x0181
-#define	HME_QSIDR2	0x4400 /* IDR2 register for with revision no. 0 */
-
-/*
- * The least significant 4 bits of HME_NSIDR2 represent the revision
- * no. of the DP83840 chip. For Rev-C of DP83840, the rev. no. is 0.
- * The next revision of the chip is called DP83840A and the value of
- * HME_NSIDR2 is 0x5c01 for this new chip. All the workarounds specific
- * to DP83840 chip are valid for both the revisions of the chip.
- * Assuming that these workarounds are valid for the future revisions
- * also, we will apply these workarounds independent of the revision no.
- * Hence we mask out the last 4 bits of the IDR2 register and compare
- * with 0x5c00 value.
- */
-
-#define	HME_DP83840	((hmep->hme_idr1 == HME_NSIDR1) && \
-			((hmep->hme_idr2 & 0xfff0) == HME_NSIDR2))
-/*
- * Likewise for the QSI 6612 Fast ethernet phy.
- * Addition Interface Technologies Group (NPG) 8/28/1997.
- */
-#define	HME_QS6612	((hmep->hme_idr1 == HME_QSIDR1) && \
-			((hmep->hme_idr2 & 0xfff0) == HME_QSIDR2))
 /*
  * All strings used by hme messaging functions
  */
-
-static	char *par_detect_msg =
-	"Parallel detection fault.";
-
-static	char *xcvr_no_mii_msg =
-	"Transceiver does not talk MII.";
-
-static	char *xcvr_isolate_msg =
-	"Transceiver isolate failed.";
-
-static	char *int_xcvr_msg =
-	"Internal Transceiver Selected.";
-
-static	char *ext_xcvr_msg =
-	"External Transceiver Selected.";
 
 static	char *no_xcvr_msg =
 	"No transceiver found.";
@@ -277,9 +169,6 @@ static	char *mregs_4bmac_reg_fail_msg =
 static	char *mregs_4mif_reg_fail_msg =
 	"ddi_map_regs for mif reg failed";
 
-static  char *param_reg_fail_msg =
-	"parameter register error";
-
 static	char *init_fail_gen_msg =
 	"Failed to initialize hardware/driver";
 
@@ -288,12 +177,6 @@ static	char *ddi_nregs_fail_msg =
 
 static	char *bad_num_regs_msg =
 	"Invalid number of registers.";
-
-static	char *anar_not_set_msg =
-	"External Transceiver: anar not set with speed selection";
-
-static	char *par_detect_anar_not_set_msg =
-	"External Transceiver: anar not set with speed selection";
 
 
 /* FATAL ERR msgs */
@@ -323,44 +206,15 @@ static	void hmesavecntrs(struct hme *);
 static	void hme_fatal_err(struct hme *, uint_t);
 static	void hme_nonfatal_err(struct hme *, uint_t);
 static	int hmeburstsizes(struct hme *);
-static	void hme_start_mifpoll(struct hme *);
-static	void hme_stop_mifpoll(struct hme *);
-static	void hme_param_cleanup(struct hme *);
-static	int hme_param_get(queue_t *q, mblk_t *mp, caddr_t cp);
-static	int hme_param_register(struct hme *, hmeparam_t *, int);
-static	int hme_param_set(queue_t *, mblk_t *, char *, caddr_t);
-static	void send_bit(struct hme *, uint_t);
-static	uint_t get_bit(struct hme *);
-static	uint_t get_bit_std(struct hme *);
-static	uint_t hme_bb_mii_read(struct hme *, uchar_t, uint16_t *);
-static	void hme_bb_mii_write(struct hme *, uchar_t, uint16_t);
+static	void send_bit(struct hme *, uint16_t);
+static	uint16_t get_bit_std(uint8_t, struct hme *);
+static	uint16_t hme_bb_mii_read(struct hme *, uint8_t, uint8_t);
+static	void hme_bb_mii_write(struct hme *, uint8_t, uint8_t, uint16_t);
 static	void hme_bb_force_idle(struct hme *);
-static	uint_t hme_mii_read(struct hme *, uchar_t, uint16_t *);
-static	void hme_mii_write(struct hme *, uchar_t, uint16_t);
-static	void hme_stop_timer(struct hme *);
-static	void hme_start_timer(struct hme *, fptrv_t, int);
-static	int hme_select_speed(struct hme *, int);
-static	void hme_reset_transceiver(struct hme *);
-static	void hme_check_transceiver(struct hme *);
-static	void hme_setup_link_default(struct hme *);
-static	void hme_setup_link_status(struct hme *);
-static	void hme_setup_link_control(struct hme *);
-static	int hme_check_txhung(struct hme *hmep);
-static	void hme_check_link(void *);
-
-static	void hme_init_xcvr_info(struct hme *);
-static	void hme_disable_link_pulse(struct hme *);
-static	void hme_force_speed(void *);
-static	void hme_get_autoinfo(struct hme *);
-static	int hme_try_auto_negotiation(struct hme *);
-static	void hme_try_speed(void *);
-static	void hme_link_now_up(struct hme *);
+static	uint16_t hme_mii_read(void *, uint8_t, uint8_t);
+static	void hme_mii_write(void *, uint8_t, uint8_t, uint16_t);
 static	void hme_setup_mac_address(struct hme *, dev_info_t *);
-
-static	void hme_nd_free(caddr_t *nd_pparam);
-static	int hme_nd_getset(queue_t *q, caddr_t nd_param, MBLKP mp);
-static	boolean_t hme_nd_load(caddr_t *nd_pparam, char *name,
-    pfi_t get_pfi, pfi_t set_pfi, caddr_t data);
+static	void hme_mii_notify(void *, link_state_t);
 
 static void hme_fault_msg(struct hme *, uint_t, msg_t, char *, ...);
 
@@ -377,11 +231,22 @@ static int	hme_m_promisc(void *, boolean_t);
 static int	hme_m_multicst(void *, boolean_t, const uint8_t *);
 static int	hme_m_unicst(void *, const uint8_t *);
 static mblk_t	*hme_m_tx(void *, mblk_t *);
-static void	hme_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t	hme_m_getcapab(void *, mac_capab_t, void *);
+static int hme_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
+    uint_t, void *, uint_t *);
+static int hme_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
+    const void *);
+
+static mii_ops_t hme_mii_ops = {
+	MII_OPS_VERSION,
+	hme_mii_read,
+	hme_mii_write,
+	hme_mii_notify,
+	NULL
+};
 
 static mac_callbacks_t hme_m_callbacks = {
-	MC_IOCTL | MC_GETCAPAB,
+	MC_GETCAPAB | MC_SETPROP | MC_GETPROP,
 	hme_m_stat,
 	hme_m_start,
 	hme_m_stop,
@@ -389,8 +254,12 @@ static mac_callbacks_t hme_m_callbacks = {
 	hme_m_multicst,
 	hme_m_unicst,
 	hme_m_tx,
-	hme_m_ioctl,
+	NULL,
 	hme_m_getcapab,
+	NULL,
+	NULL,
+	hme_m_setprop,
+	hme_m_getprop,
 };
 
 DDI_DEFINE_STREAM_OPS(hme_dev_ops, nulldev, nulldev, hmeattach, hmedetach,
@@ -473,13 +342,6 @@ static struct modlinkage modlinkage = {
 	MODREV_1, &modldrv, NULL
 };
 
-/*
- * Internal PHY Id:
- */
-
-#define	HME_BB1	0x15	/* Babybac1, Rev 1.5 */
-#define	HME_BB2 0x20	/* Babybac2, Rev 0 */
-
 /* <<<<<<<<<<<<<<<<<<<<<<  Register operations >>>>>>>>>>>>>>>>>>>>> */
 
 #define	GET_MIFREG(reg) \
@@ -559,46 +421,26 @@ hmeladrf_bit(const uint8_t *addr)
 
 /* <<<<<<<<<<<<<<<<<<<<<<<<  Bit Bang Operations >>>>>>>>>>>>>>>>>>>>>>>> */
 
-static int hme_internal_phy_id = HME_BB2;	/* Internal PHY is Babybac2  */
-
-
 static void
-send_bit(struct hme *hmep, uint32_t x)
+send_bit(struct hme *hmep, uint16_t x)
 {
 	PUT_MIFREG(mif_bbdata, x);
 	PUT_MIFREG(mif_bbclk, HME_BBCLK_LOW);
 	PUT_MIFREG(mif_bbclk, HME_BBCLK_HIGH);
 }
 
-/*
- * To read the MII register bits from the Babybac1 transceiver
- */
-static uint32_t
-get_bit(struct hme *hmep)
-{
-	uint32_t	x;
-
-	PUT_MIFREG(mif_bbclk, HME_BBCLK_LOW);
-	PUT_MIFREG(mif_bbclk, HME_BBCLK_HIGH);
-	if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER)
-		x = (GET_MIFREG(mif_cfg) & HME_MIF_CFGM0) ? 1 : 0;
-	else
-		x = (GET_MIFREG(mif_cfg) & HME_MIF_CFGM1) ? 1 : 0;
-	return (x);
-}
-
 
 /*
  * To read the MII register bits according to the IEEE Standard
  */
-static uint32_t
-get_bit_std(struct hme *hmep)
+static uint16_t
+get_bit_std(uint8_t phyad, struct hme *hmep)
 {
-	uint32_t	x;
+	uint16_t	x;
 
 	PUT_MIFREG(mif_bbclk, HME_BBCLK_LOW);
 	drv_usecwait(1);	/* wait for  >330 ns for stable data */
-	if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER)
+	if (phyad == HME_INTERNAL_PHYAD)
 		x = (GET_MIFREG(mif_cfg) & HME_MIF_CFGM0) ? 1 : 0;
 	else
 		x = (GET_MIFREG(mif_cfg) & HME_MIF_CFGM1) ? 1 : 0;
@@ -607,18 +449,15 @@ get_bit_std(struct hme *hmep)
 }
 
 #define	SEND_BIT(x)		send_bit(hmep, x)
-#define	GET_BIT(x)		x = get_bit(hmep)
-#define	GET_BIT_STD(x)		x = get_bit_std(hmep)
+#define	GET_BIT_STD(phyad, x)	x = get_bit_std(phyad, hmep)
 
 
 static void
-hme_bb_mii_write(struct hme *hmep, uint8_t regad, uint16_t data)
+hme_bb_mii_write(struct hme *hmep, uint8_t phyad, uint8_t regad, uint16_t data)
 {
-	uint8_t	phyad;
 	int	i;
 
 	PUT_MIFREG(mif_bbopenb, 1);	/* Enable the MII driver */
-	phyad = hmep->hme_phyad;
 	(void) hme_bb_force_idle(hmep);
 	SEND_BIT(0); SEND_BIT(1);	/* <ST> */
 	SEND_BIT(0); SEND_BIT(1);	/* <OP> */
@@ -642,18 +481,14 @@ hme_bb_mii_write(struct hme *hmep, uint8_t regad, uint16_t data)
 }
 
 /* Return 0 if OK, 1 if error (Transceiver does not talk management) */
-static uint_t
-hme_bb_mii_read(struct hme *hmep, uint8_t regad, uint16_t *datap)
+static uint16_t
+hme_bb_mii_read(struct hme *hmep, uint8_t phyad, uint8_t regad)
 {
-	uint8_t		phyad;
 	int		i;
 	uint32_t	x;
-	uint32_t	y;
-
-	*datap = 0;
+	uint16_t	data = 0;
 
 	PUT_MIFREG(mif_bbopenb, 1);	/* Enable the MII driver */
-	phyad = hmep->hme_phyad;
 	(void) hme_bb_force_idle(hmep);
 	SEND_BIT(0); SEND_BIT(1);	/* <ST> */
 	SEND_BIT(1); SEND_BIT(0);	/* <OP> */
@@ -666,36 +501,20 @@ hme_bb_mii_read(struct hme *hmep, uint8_t regad, uint16_t *datap)
 
 	PUT_MIFREG(mif_bbopenb, 0);	/* Disable the MII driver */
 
-	if ((hme_internal_phy_id == HME_BB2) ||
-	    (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER)) {
-		GET_BIT_STD(x);
-		GET_BIT_STD(y);		/* <TA> */
-		for (i = 0xf; i >= 0; i--) {	/* <DDDDDDDDDDDDDDDD> */
-			GET_BIT_STD(x);
-			*datap += (x << i);
-		}
-		/*
-		 * Kludge to get the Transceiver out of hung mode
-		 */
-		GET_BIT_STD(x);
-		GET_BIT_STD(x);
-		GET_BIT_STD(x);
-	} else {
-		GET_BIT(x);
-		GET_BIT(y);		/* <TA> */
-		for (i = 0xf; i >= 0; i--) {	/* <DDDDDDDDDDDDDDDD> */
-			GET_BIT(x);
-			*datap += (x << i);
-		}
-		/*
-		 * Kludge to get the Transceiver out of hung mode
-		 */
-		GET_BIT(x);
-		GET_BIT(x);
-		GET_BIT(x);
+	GET_BIT_STD(phyad, x);
+	GET_BIT_STD(phyad, x);		/* <TA> */
+	for (i = 0xf; i >= 0; i--) {	/* <DDDDDDDDDDDDDDDD> */
+		GET_BIT_STD(phyad, x);
+		data += (x << i);
 	}
+	/*
+	 * Kludge to get the Transceiver out of hung mode
+	 */
+	GET_BIT_STD(phyad, x);
+	GET_BIT_STD(phyad, x);
+	GET_BIT_STD(phyad, x);
 	CHECK_MIFREG();
-	return (y);
+	return (data);
 }
 
 
@@ -715,19 +534,14 @@ hme_bb_force_idle(struct hme *hmep)
 /* <<<<<<<<<<<<< Frame Register used for MII operations >>>>>>>>>>>>>>>>>>>> */
 
 /* Return 0 if OK, 1 if error (Transceiver does not talk management) */
-static uint_t
-hme_mii_read(struct hme *hmep, uchar_t regad, uint16_t *datap)
+static uint16_t
+hme_mii_read(void *arg, uint8_t phyad, uint8_t regad)
 {
+	struct hme	*hmep = arg;
 	uint32_t	frame;
-	uint8_t		phyad;
-
-	if (hmep->hme_transceiver == HME_NO_TRANSCEIVER)
-		return (1);	/* No transceiver present */
 
 	if (!hmep->hme_frame_enable)
-		return (hme_bb_mii_read(hmep, regad, datap));
-
-	phyad = hmep->hme_phyad;
+		return (hme_bb_mii_read(hmep, phyad, regad));
 
 	PUT_MIFREG(mif_frame,
 	    HME_MIF_FRREAD | (phyad << HME_MIF_FRPHYAD_SHIFT) |
@@ -741,28 +555,23 @@ hme_mii_read(struct hme *hmep, uchar_t regad, uint16_t *datap)
 	if ((frame & HME_MIF_FRTA0) == 0) {
 
 
-		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
+		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, MII_MSG,
 		    "MIF Read failure");
-		return (1);
-	} else {
-		*datap = (uint16_t)(frame & HME_MIF_FRDATA);
-		return (0);
+		return (0xffff);
 	}
-
+	return ((uint16_t)(frame & HME_MIF_FRDATA));
 }
 
 static void
-hme_mii_write(struct hme *hmep, uint8_t regad, uint16_t data)
+hme_mii_write(void *arg, uint8_t phyad, uint8_t regad, uint16_t data)
 {
+	struct hme *hmep = arg;
 	uint32_t frame;
-	uint8_t	phyad;
 
 	if (!hmep->hme_frame_enable) {
-		hme_bb_mii_write(hmep, regad, data);
+		hme_bb_mii_write(hmep, phyad, regad, data);
 		return;
 	}
-
-	phyad = hmep->hme_phyad;
 
 	PUT_MIFREG(mif_frame,
 	    HME_MIF_FRWRITE | (phyad << HME_MIF_FRPHYAD_SHIFT) |
@@ -774,1216 +583,22 @@ hme_mii_write(struct hme *hmep, uint8_t regad, uint16_t data)
 	frame = GET_MIFREG(mif_frame);
 	CHECK_MIFREG();
 	if ((frame & HME_MIF_FRTA0) == 0) {
-		HME_FAULT_MSG1(hmep, SEVERITY_MID, NAUTONEG_MSG,
+		HME_FAULT_MSG1(hmep, SEVERITY_MID, MII_MSG,
 		    "MIF Write failure");
 	}
 }
 
-/*
- * hme_stop_timer function is used by a function before doing link-related
- * processing. It locks the "hme_linklock" to protect the link-related data
- * structures. This lock will be subsequently released in hme_start_timer().
- */
 static void
-hme_stop_timer(struct hme *hmep)
-{
-	timeout_id_t	tid;
-
-	mutex_enter(&hmep->hme_linklock);
-
-	if (hmep->hme_timerid) {
-		tid = hmep->hme_timerid;
-		hmep->hme_timerid = 0;
-		mutex_exit(&hmep->hme_linklock);
-		(void) untimeout(tid);
-		mutex_enter(&hmep->hme_linklock);
-	}
-}
-
-static void
-hme_start_timer(struct hme *hmep, fptrv_t func, int msec)
-{
-	hmep->hme_timerid = timeout(func, hmep, drv_usectohz(1000 * msec));
-
-	mutex_exit(&hmep->hme_linklock);
-}
-
-/*
- * hme_select_speed is required only when auto-negotiation is not supported.
- * It should be used only for the Internal Transceiver and not the External
- * transceiver because we wouldn't know how to generate Link Down state on
- * the wire.
- * Currently it is required to support Electron 1.1 Build machines. When all
- * these machines are upgraded to 1.2 or better, remove this function.
- *
- * Returns 1 if the link is up, 0 otherwise.
- */
-
-static int
-hme_select_speed(struct hme *hmep, int speed)
-{
-	uint16_t	stat;
-	uint16_t	fdx;
-
-	if (hmep->hme_linkup_cnt)  /* not first time */
-		goto read_status;
-
-	if (hmep->hme_fdx)
-		fdx = PHY_BMCR_FDX;
-	else
-		fdx = 0;
-
-	switch (speed) {
-	case HME_SPEED_100:
-
-		switch (hmep->hme_transceiver) {
-		case HME_INTERNAL_TRANSCEIVER:
-			hme_mii_write(hmep, HME_PHY_BMCR, fdx | PHY_BMCR_100M);
-			break;
-		case HME_EXTERNAL_TRANSCEIVER:
-			if (hmep->hme_delay == 0) {
-				hme_mii_write(hmep, HME_PHY_BMCR,
-				    fdx | PHY_BMCR_100M);
-			}
-			break;
-		default:
-			break;
-		}
-		break;
-	case HME_SPEED_10:
-		switch (hmep->hme_transceiver) {
-		case HME_INTERNAL_TRANSCEIVER:
-			hme_mii_write(hmep, HME_PHY_BMCR, fdx);
-			break;
-		case HME_EXTERNAL_TRANSCEIVER:
-			if (hmep->hme_delay == 0) {
-				hme_mii_write(hmep, HME_PHY_BMCR, fdx);
-			}
-			break;
-		default:
-			break;
-		}
-		break;
-	default:
-		return (0);
-	}
-
-	if (!hmep->hme_linkup_cnt) {  /* first time; select speed */
-		(void) hme_mii_read(hmep, HME_PHY_BMSR, &stat);
-		hmep->hme_linkup_cnt++;
-		return (0);
-	}
-
-read_status:
-	hmep->hme_linkup_cnt++;
-	(void) hme_mii_read(hmep, HME_PHY_BMSR, &stat);
-	if (stat & PHY_BMSR_LNKSTS)
-		return (1);
-	else
-		return (0);
-}
-
-
-#define	HME_PHYRST_PERIOD 600	/* 600 milliseconds, instead of 500 */
-#define	HME_PDOWN_PERIOD 256	/* 256 milliseconds  power down period to */
-				/* insure a good reset of the QSI PHY */
-
-static void
-hme_reset_transceiver(struct hme *hmep)
-{
-	uint32_t	cfg;
-	uint16_t	stat;
-	uint16_t	anar;
-	uint16_t	control;
-	uint16_t	csc;
-	int		n;
-
-	cfg = GET_MIFREG(mif_cfg);
-
-	if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER) {
-		/* Isolate the Internal Transceiver */
-		PUT_MIFREG(mif_cfg, (cfg & ~HME_MIF_CFGPS));
-		hmep->hme_phyad = HME_INTERNAL_PHYAD;
-		hmep->hme_transceiver = HME_INTERNAL_TRANSCEIVER;
-		hme_mii_write(hmep, HME_PHY_BMCR, (PHY_BMCR_ISOLATE |
-		    PHY_BMCR_PWRDN | PHY_BMCR_LPBK));
-		if (hme_mii_read(hmep, HME_PHY_BMCR, &control) == 1)
-			goto start_again;
-
-		/* select the External transceiver */
-		PUT_MIFREG(mif_cfg, (cfg | HME_MIF_CFGPS));
-		hmep->hme_transceiver = HME_EXTERNAL_TRANSCEIVER;
-		hmep->hme_phyad = HME_EXTERNAL_PHYAD;
-
-	} else if (cfg & HME_MIF_CFGM1) {
-		/* Isolate the External transceiver, if present */
-		PUT_MIFREG(mif_cfg, (cfg | HME_MIF_CFGPS));
-		hmep->hme_phyad = HME_EXTERNAL_PHYAD;
-		hmep->hme_transceiver = HME_EXTERNAL_TRANSCEIVER;
-		hme_mii_write(hmep, HME_PHY_BMCR, (PHY_BMCR_ISOLATE |
-		    PHY_BMCR_PWRDN | PHY_BMCR_LPBK));
-		if (hme_mii_read(hmep, HME_PHY_BMCR, &control) == 1)
-			goto start_again;
-
-		/* select the Internal transceiver */
-		PUT_MIFREG(mif_cfg, (cfg & ~HME_MIF_CFGPS));
-		hmep->hme_transceiver = HME_INTERNAL_TRANSCEIVER;
-		hmep->hme_phyad = HME_INTERNAL_PHYAD;
-	}
-
-	hme_mii_write(hmep, HME_PHY_BMCR, PHY_BMCR_PWRDN);
-	drv_usecwait((clock_t)HME_PDOWN_PERIOD);
-
-	/*
-	 * Now reset the transceiver.
-	 */
-	hme_mii_write(hmep, HME_PHY_BMCR, PHY_BMCR_RESET);
-
-	/*
-	 * Check for transceiver reset completion.
-	 */
-	n = HME_PHYRST_PERIOD / HMEWAITPERIOD;
-
-	while (--n > 0) {
-		if (hme_mii_read(hmep, HME_PHY_BMCR, &control) == 1) {
-			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-			    xcvr_no_mii_msg);
-			goto start_again;
-		}
-		if ((control & PHY_BMCR_RESET) == 0)
-			goto reset_issued;
-		if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER)
-			drv_usecwait((clock_t)HMEWAITPERIOD);
-		else
-			drv_usecwait((clock_t)(500 * HMEWAITPERIOD));
-	}
-	/*
-	 * phy reset failure
-	 */
-	hmep->phyfail++;
-	goto start_again;
-
-reset_issued:
-
-	/*
-	 * Get the PHY id registers. We need this to implement work-arounds
-	 * for bugs in transceivers which use the National DP83840 PHY chip.
-	 * National should fix this in the next release.
-	 */
-
-	(void) hme_mii_read(hmep, HME_PHY_BMSR, &stat);
-	(void) hme_mii_read(hmep, HME_PHY_IDR1, &hmep->hme_idr1);
-	(void) hme_mii_read(hmep, HME_PHY_IDR2, &hmep->hme_idr2);
-	(void) hme_mii_read(hmep, HME_PHY_ANAR, &anar);
-
-	hme_init_xcvr_info(hmep);
-
-	hmep->hme_bmcr = control;
-	hmep->hme_anar = anar;
-	hmep->hme_bmsr = stat;
-
-	/*
-	 * The strapping of AN0 and AN1 pins on DP83840 cannot select
-	 * 10FDX, 100FDX and Auto-negotiation. So select it here for the
-	 * Internal Transceiver.
-	 */
-	if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER) {
-		anar = (PHY_ANAR_TXFDX | PHY_ANAR_10FDX |
-		    PHY_ANAR_TX | PHY_ANAR_10 | PHY_SELECTOR);
-	}
-	/*
-	 * Modify control and bmsr based on anar for Rev-C of DP83840.
-	 */
-	if (HME_DP83840) {
-		n = 0;
-		if (anar & PHY_ANAR_TXFDX) {
-			stat |= PHY_BMSR_100FDX;
-			n++;
-		} else
-			stat &= ~PHY_BMSR_100FDX;
-
-		if (anar & PHY_ANAR_TX) {
-			stat |= PHY_BMSR_100HDX;
-			n++;
-		} else
-			stat &= ~PHY_BMSR_100HDX;
-
-		if (anar & PHY_ANAR_10FDX) {
-			stat |= PHY_BMSR_10FDX;
-			n++;
-		} else
-			stat &= ~PHY_BMSR_10FDX;
-
-		if (anar & PHY_ANAR_10) {
-			stat |= PHY_BMSR_10HDX;
-			n++;
-		} else
-			stat &= ~PHY_BMSR_10HDX;
-
-		if (n == 1) { 	/* only one mode. disable auto-negotiation */
-			stat &= ~PHY_BMSR_ACFG;
-			control &= ~PHY_BMCR_ANE;
-		}
-		if (n) {
-			hmep->hme_bmsr = stat;
-			hmep->hme_bmcr = control;
-		}
-	}
-	hme_setup_link_default(hmep);
-	hme_setup_link_status(hmep);
-
-
-	/*
-	 * Place the Transceiver in normal operation mode
-	 */
-	hme_mii_write(hmep, HME_PHY_BMCR, (control & ~PHY_BMCR_ISOLATE));
-
-	/*
-	 * check if the transceiver is not in Isolate mode
-	 */
-	n = HME_PHYRST_PERIOD / HMEWAITPERIOD;
-
-	while (--n > 0) {
-		if (hme_mii_read(hmep, HME_PHY_BMCR, &control) == 1) {
-			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-			    xcvr_no_mii_msg);
-			goto start_again; /* Transceiver does not talk MII */
-		}
-		if ((control & PHY_BMCR_ISOLATE) == 0)
-			goto setconn;
-		drv_usecwait(HMEWAITPERIOD);
-	}
-	HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-	    xcvr_isolate_msg);
-	goto start_again;	/* transceiver reset failure */
-
-setconn:
-
-	/*
-	 * Work-around for the late-collision problem with 100m cables.
-	 * National should fix this in the next release !
-	 */
-	if (HME_DP83840) {
-		(void) hme_mii_read(hmep, HME_PHY_CSC, &csc);
-
-		hme_mii_write(hmep, HME_PHY_CSC, (csc | PHY_CSCR_FCONN));
-	}
-
-	hmep->hme_linkcheck =		0;
-	hmep->hme_linkup =		0;
-	hme_setup_link_status(hmep);
-	hmep->hme_autoneg =		HME_HWAN_TRY;
-	hmep->hme_force_linkdown =	HME_FORCE_LINKDOWN;
-	hmep->hme_linkup_cnt =		0;
-	hmep->hme_delay =		0;
-	hme_setup_link_control(hmep);
-	hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
-
-	if (hmep->hme_mode == HME_FORCE_SPEED)
-		hme_force_speed(hmep);
-	else {
-		hmep->hme_linkup_10 = 	0;
-		hmep->hme_tryspeed =	HME_SPEED_100;
-		hmep->hme_ntries =	HME_NTRIES_LOW;
-		hmep->hme_nlasttries =	HME_NTRIES_LOW;
-		hme_try_speed(hmep);
-	}
-	return;
-
-start_again:
-	hme_start_timer(hmep, hme_check_link, HME_TICKS);
-}
-
-static void
-hme_check_transceiver(struct hme *hmep)
-{
-	uint32_t	cfgsav;
-	uint32_t 	cfg;
-	uint32_t 	stat;
-
-	/*
-	 * If the MIF Polling is ON, and Internal transceiver is in use, just
-	 * check for the presence of the External Transceiver.
-	 * Otherwise:
-	 * First check to see what transceivers are out there.
-	 * If an external transceiver is present
-	 * then use it, regardless of whether there is a Internal transceiver.
-	 * If Internal transceiver is present and no external transceiver
-	 * then use the Internal transceiver.
-	 * If there is no external transceiver and no Internal transceiver,
-	 * then something is wrong so print an error message.
-	 */
-
-	cfgsav = GET_MIFREG(mif_cfg);
-
-	if (hmep->hme_polling_on) {
-
-		if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER) {
-			if ((cfgsav & HME_MIF_CFGM1) && !hme_param_use_intphy) {
-				hme_stop_mifpoll(hmep);
-				hmep->hme_phyad = HME_EXTERNAL_PHYAD;
-				hmep->hme_transceiver =
-				    HME_EXTERNAL_TRANSCEIVER;
-				PUT_MIFREG(mif_cfg, ((cfgsav & ~HME_MIF_CFGPE)
-				    | HME_MIF_CFGPS));
-			}
-		} else if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER) {
-			stat = (GET_MIFREG(mif_bsts) >> 16);
-			if ((stat == 0x00) || (hme_param_use_intphy)) {
-
-				hme_stop_mifpoll(hmep);
-				hmep->hme_phyad = HME_INTERNAL_PHYAD;
-				hmep->hme_transceiver =
-				    HME_INTERNAL_TRANSCEIVER;
-				PUT_MIFREG(mif_cfg,
-				    (GET_MIFREG(mif_cfg) & ~HME_MIF_CFGPS));
-			}
-		}
-		CHECK_MIFREG();
-		return;
-	}
-
-	cfg = GET_MIFREG(mif_cfg);
-	if ((cfg & HME_MIF_CFGM1) && !hme_param_use_intphy) {
-		PUT_MIFREG(mif_cfg, (cfgsav | HME_MIF_CFGPS));
-		hmep->hme_phyad = HME_EXTERNAL_PHYAD;
-		hmep->hme_transceiver = HME_EXTERNAL_TRANSCEIVER;
-
-	} else if (cfg & HME_MIF_CFGM0) {  /* Internal Transceiver OK */
-		PUT_MIFREG(mif_cfg, (cfgsav & ~HME_MIF_CFGPS));
-		hmep->hme_phyad = HME_INTERNAL_PHYAD;
-		hmep->hme_transceiver = HME_INTERNAL_TRANSCEIVER;
-
-	} else {
-		hmep->hme_transceiver = HME_NO_TRANSCEIVER;
-		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG, no_xcvr_msg);
-	}
-	CHECK_MIFREG();
-}
-
-static void
-hme_setup_link_default(struct hme *hmep)
-{
-	uint16_t	bmsr;
-
-	bmsr = hmep->hme_bmsr;
-	if (hme_param_autoneg & HME_NOTUSR)
-		hme_param_autoneg = HME_NOTUSR |
-		    ((bmsr & PHY_BMSR_ACFG) ? 1 : 0);
-	if (hme_param_anar_100T4 & HME_NOTUSR)
-		hme_param_anar_100T4 = HME_NOTUSR |
-		    ((bmsr & PHY_BMSR_100T4) ? 1 : 0);
-	if (hme_param_anar_100fdx & HME_NOTUSR)
-		hme_param_anar_100fdx = HME_NOTUSR |
-		    ((bmsr & PHY_BMSR_100FDX) ? 1 : 0);
-	if (hme_param_anar_100hdx & HME_NOTUSR)
-		hme_param_anar_100hdx = HME_NOTUSR |
-		    ((bmsr & PHY_BMSR_100HDX) ? 1 : 0);
-	if (hme_param_anar_10fdx & HME_NOTUSR)
-		hme_param_anar_10fdx = HME_NOTUSR |
-		    ((bmsr & PHY_BMSR_10FDX) ? 1 : 0);
-	if (hme_param_anar_10hdx & HME_NOTUSR)
-		hme_param_anar_10hdx = HME_NOTUSR |
-		    ((bmsr & PHY_BMSR_10HDX) ? 1 : 0);
-}
-
-static void
-hme_setup_link_status(struct hme *hmep)
-{
-	uint16_t	tmp;
-
-	if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER)
-		hme_param_transceiver = 1;
-	else
-		hme_param_transceiver = 0;
-
-	tmp = hmep->hme_bmsr;
-	if (tmp & PHY_BMSR_ACFG)
-		hme_param_bmsr_ancap = 1;
-	else
-		hme_param_bmsr_ancap = 0;
-	if (tmp & PHY_BMSR_100T4)
-		hme_param_bmsr_100T4 = 1;
-	else
-		hme_param_bmsr_100T4 = 0;
-	if (tmp & PHY_BMSR_100FDX)
-		hme_param_bmsr_100fdx = 1;
-	else
-		hme_param_bmsr_100fdx = 0;
-	if (tmp & PHY_BMSR_100HDX)
-		hme_param_bmsr_100hdx = 1;
-	else
-		hme_param_bmsr_100hdx = 0;
-	if (tmp & PHY_BMSR_10FDX)
-		hme_param_bmsr_10fdx = 1;
-	else
-		hme_param_bmsr_10fdx = 0;
-	if (tmp & PHY_BMSR_10HDX)
-		hme_param_bmsr_10hdx = 1;
-	else
-		hme_param_bmsr_10hdx = 0;
-
-	if (hmep->hme_link_pulse_disabled) {
-		hme_param_linkup =	1;
-		hme_param_speed =	0;
-		hme_param_mode =	0;
-		hmep->hme_duplex =	LINK_DUPLEX_HALF;
-		mac_link_update(hmep->hme_mh, LINK_STATE_UP);
-		return;
-	}
-
-	if (!hmep->hme_linkup) {
-		hme_param_linkup =	0;
-		hmep->hme_duplex = LINK_DUPLEX_UNKNOWN;
-		mac_link_update(hmep->hme_mh, LINK_STATE_DOWN);
-		return;
-	}
-
-	hme_param_linkup = 1;
-
-	if (hmep->hme_fdx == HME_FULL_DUPLEX) {
-		hme_param_mode = 1;
-		hmep->hme_duplex = LINK_DUPLEX_FULL;
-	} else {
-		hme_param_mode = 0;
-		hmep->hme_duplex = LINK_DUPLEX_HALF;
-	}
-
-	mac_link_update(hmep->hme_mh, LINK_STATE_UP);
-
-	if (hmep->hme_mode == HME_FORCE_SPEED) {
-		if (hmep->hme_forcespeed == HME_SPEED_100)
-			hme_param_speed = 1;
-		else
-			hme_param_speed = 0;
-		return;
-	}
-	if (hmep->hme_tryspeed == HME_SPEED_100)
-		hme_param_speed = 1;
-	else
-		hme_param_speed = 0;
-
-
-	if (!(hmep->hme_aner & PHY_ANER_LPNW)) {
-		hme_param_aner_lpancap =	0;
-		hme_param_anlpar_100T4 =	0;
-		hme_param_anlpar_100fdx =	0;
-		hme_param_anlpar_100hdx =	0;
-		hme_param_anlpar_10fdx =	0;
-		hme_param_anlpar_10hdx =	0;
-		return;
-	}
-	hme_param_aner_lpancap = 1;
-	tmp = hmep->hme_anlpar;
-	if (tmp & PHY_ANLPAR_T4)
-		hme_param_anlpar_100T4 = 1;
-	else
-		hme_param_anlpar_100T4 = 0;
-	if (tmp & PHY_ANLPAR_TXFDX)
-		hme_param_anlpar_100fdx = 1;
-	else
-		hme_param_anlpar_100fdx = 0;
-	if (tmp & PHY_ANLPAR_TX)
-		hme_param_anlpar_100hdx = 1;
-	else
-		hme_param_anlpar_100hdx = 0;
-	if (tmp & PHY_ANLPAR_10FDX)
-		hme_param_anlpar_10fdx = 1;
-	else
-		hme_param_anlpar_10fdx = 0;
-	if (tmp & PHY_ANLPAR_10)
-		hme_param_anlpar_10hdx = 1;
-	else
-		hme_param_anlpar_10hdx = 0;
-}
-
-static void
-hme_setup_link_control(struct hme *hmep)
-{
-	uint16_t anar = PHY_SELECTOR;
-	uint32_t autoneg = ~HME_NOTUSR & hme_param_autoneg;
-	uint32_t anar_100T4 = ~HME_NOTUSR & hme_param_anar_100T4;
-	uint32_t anar_100fdx = ~HME_NOTUSR & hme_param_anar_100fdx;
-	uint32_t anar_100hdx = ~HME_NOTUSR & hme_param_anar_100hdx;
-	uint32_t anar_10fdx = ~HME_NOTUSR & hme_param_anar_10fdx;
-	uint32_t anar_10hdx = ~HME_NOTUSR & hme_param_anar_10hdx;
-
-	if (autoneg) {
-		hmep->hme_mode = HME_AUTO_SPEED;
-		hmep->hme_tryspeed = HME_SPEED_100;
-		if (anar_100T4)
-			anar |= PHY_ANAR_T4;
-		if (anar_100fdx)
-			anar |= PHY_ANAR_TXFDX;
-		if (anar_100hdx)
-			anar |= PHY_ANAR_TX;
-		if (anar_10fdx)
-			anar |= PHY_ANAR_10FDX;
-		if (anar_10hdx)
-			anar |= PHY_ANAR_10;
-		hmep->hme_anar = anar;
-	} else {
-		hmep->hme_mode = HME_FORCE_SPEED;
-		if (anar_100T4) {
-			hmep->hme_forcespeed = HME_SPEED_100;
-			hmep->hme_fdx = HME_HALF_DUPLEX;
-
-		} else if (anar_100fdx) {
-			/* 100fdx needs to be checked first for 100BaseFX */
-			hmep->hme_forcespeed = HME_SPEED_100;
-			hmep->hme_fdx = HME_FULL_DUPLEX;
-
-		} else if (anar_100hdx) {
-			hmep->hme_forcespeed = HME_SPEED_100;
-			hmep->hme_fdx = HME_HALF_DUPLEX;
-		} else if (anar_10hdx) {
-			/* 10hdx needs to be checked first for MII-AUI */
-			/* MII-AUI BugIds 1252776,4032280,4035106,4028558 */
-			hmep->hme_forcespeed = HME_SPEED_10;
-			hmep->hme_fdx = HME_HALF_DUPLEX;
-
-		} else if (anar_10fdx) {
-			hmep->hme_forcespeed = HME_SPEED_10;
-			hmep->hme_fdx = HME_FULL_DUPLEX;
-
-		} else {
-			hmep->hme_forcespeed = HME_SPEED_10;
-			hmep->hme_fdx = HME_HALF_DUPLEX;
-		}
-	}
-}
-
-/* Decide if transmitter went dead and reinitialize everything */
-static int hme_txhung_limit = 3;
-static int
-hme_check_txhung(struct hme *hmep)
-{
-	boolean_t status;
-
-	mutex_enter(&hmep->hme_xmitlock);
-	if (hmep->hme_flags & HMERUNNING)
-		hmereclaim(hmep);
-
-	/* Something needs to be sent out but it is not going out */
-	if ((hmep->hme_txindex != hmep->hme_txreclaim) &&
-	    (hmep->hme_opackets == hmep->hmesave.hme_opackets))
-		hmep->hme_txhung++;
-	else
-		hmep->hme_txhung = 0;
-
-	hmep->hmesave.hme_opackets = hmep->hme_opackets;
-
-	status = hmep->hme_txhung >= hme_txhung_limit;
-	mutex_exit(&hmep->hme_xmitlock);
-
-	return (status);
-}
-
-/*
- * 	hme_check_link ()
- * Called as a result of HME_LINKCHECK_TIMER timeout, to poll for Transceiver
- * change or when a transceiver change has been detected by the hme_try_speed
- * function.
- * This function will also be called from the interrupt handler when polled mode
- * is used. Before calling this function the interrupt lock should be freed
- * so that the hmeinit() may be called.
- * Note that the hmeinit() function calls hme_select_speed() to set the link
- * speed and check for link status.
- */
-
-static void
-hme_check_link(void *arg)
+hme_mii_notify(void *arg, link_state_t link)
 {
 	struct hme *hmep = arg;
-	uint16_t	stat;
-	uint_t 	temp;
 
-	hme_stop_timer(hmep);	/* acquire hme_linklock */
-
-	/*
-	 * This condition was added to work around for
-	 * a problem with the Synoptics/Bay 28115 switch.
-	 * Basically if the link is up but no packets
-	 * are being received. This can be checked using
-	 * ipackets, which in case of reception will
-	 * continue to increment after 'hmep->hme_iipackets'
-	 * has been made equal to it and the 'hme_check_link'
-	 * timer has expired. Note this could also be done
-	 * if there's no traffic on the net.
-	 * 'hmep->hme_ipackets' is incremented in hme_read
-	 * for successfully received packets.
-	 */
-	if ((hmep->hme_flags & HMERUNNING) && (hmep->hme_linkup)) {
-		if (hmep->hme_ipackets != hmep->hme_iipackets)
-			/*
-			 * Receptions are occurring set 'hmep->hme_iipackets'
-			 * to 'hmep->hme_ipackets' to monitor if receptions
-			 * occur during the next timeout interval.
-			 */
-			hmep->hme_iipackets = hmep->hme_ipackets;
-		else
-			/*
-			 * Receptions not occurring could be due to
-			 * Synoptics problem, try switchin of data
-			 * scrabbling. That should bring up the link.
-			 */
-			hme_link_now_up(hmep);
+	if (link == LINK_STATE_UP) {
+		(void) hmeinit(hmep);
 	}
-
-	if ((hmep->hme_flags & HMERUNNING) &&
-	    (hmep->hme_linkup) && (hme_check_txhung(hmep))) {
-
-		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
-		(void) hmeinit(hmep);	/* To reset the transceiver and */
-					/* to init the interface */
-		return;
-	}
-
-	/*
-	 * check if the transceiver is the same.
-	 * init to be done if the external transceiver is
-	 * connected/disconnected
-	 */
-	temp = hmep->hme_transceiver; /* save the transceiver type */
-	hme_check_transceiver(hmep);
-	if ((temp != hmep->hme_transceiver) || (hmep->hme_linkup == 0)) {
-		if (temp != hmep->hme_transceiver) {
-			if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER) {
-				HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN,
-				    XCVR_MSG, ext_xcvr_msg);
-			} else {
-				HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN,
-				    XCVR_MSG, int_xcvr_msg);
-			}
-		}
-		hmep->hme_linkcheck = 0;
-		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
-		(void) hmeinit(hmep); /* To reset xcvr and init interface */
-		return;
-	}
-
-
-	if (hmep->hme_mifpoll_enable) {
-		stat = (GET_MIFREG(mif_bsts) >> 16);
-
-		CHECK_MIFREG(); /* Verify */
-
-		if (!hmep->hme_mifpoll_flag) {
-			if (stat & PHY_BMSR_LNKSTS) {
-				hme_start_timer(hmep, hme_check_link,
-				    HME_LINKCHECK_TIMER);
-				return;
-			}
-			hme_stop_mifpoll(hmep);
-
-			temp = (GET_MIFREG(mif_bsts) >> 16);
-		} else {
-			hmep->hme_mifpoll_flag = 0;
-		}
-	} else {
-		if (hme_mii_read(hmep, HME_PHY_BMSR, &stat) == 1) {
-		/* Transceiver does not talk mii */
-			hme_start_timer(hmep, hme_check_link,
-			    HME_LINKCHECK_TIMER);
-			return;
-		}
-
-		if (stat & PHY_BMSR_LNKSTS) {
-			hme_start_timer(hmep, hme_check_link,
-			    HME_LINKCHECK_TIMER);
-			return;
-		}
-	}
-
-	(void) hme_mii_read(hmep, HME_PHY_BMSR, &stat);
-
-	/*
-	 * The PHY may have automatically renegotiated link speed and mode.
-	 * Get the new link speed and mode.
-	 */
-	if ((stat & PHY_BMSR_LNKSTS) && hme_autoneg_enable) {
-		if (hmep->hme_mode == HME_AUTO_SPEED) {
-			(void) hme_get_autoinfo(hmep);
-			hme_setup_link_status(hmep);
-			hme_start_mifpoll(hmep);
-			if (hmep->hme_fdx != hmep->hme_macfdx) {
-				hme_start_timer(hmep, hme_check_link,
-				    HME_LINKCHECK_TIMER);
-				(void) hmeinit(hmep);
-				return;
-			}
-		}
-		hme_start_mifpoll(hmep);
-		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
-		return;
-	}
-	/* Reset the PHY and bring up the link */
-	hme_reset_transceiver(hmep);
+	mac_link_update(hmep->hme_mh, link);
 }
 
-static void
-hme_init_xcvr_info(struct hme *hmep)
-{
-	uint16_t phy_id1, phy_id2;
-
-	(void) hme_mii_read(hmep, HME_PHY_IDR1, &phy_id1);
-	(void) hme_mii_read(hmep, HME_PHY_IDR2, &phy_id2);
-}
-
-/*
- * Disable link pulses for the Internal Transceiver
- */
-
-static void
-hme_disable_link_pulse(struct hme *hmep)
-{
-	uint16_t	nicr;
-
-	hme_mii_write(hmep, HME_PHY_BMCR, 0); /* force 10 Mbps */
-	(void) hme_mii_read(hmep, HME_PHY_NICR, &nicr);
-
-	hme_mii_write(hmep, HME_PHY_NICR, (nicr & ~PHY_NICR_LD));
-
-	hmep->hme_linkup = 1;
-	hmep->hme_linkcheck = 1;
-	hme_setup_link_status(hmep);
-	hme_start_mifpoll(hmep);
-	hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
-}
-
-static void
-hme_force_speed(void *arg)
-{
-	struct hme	*hmep = arg;
-	int		linkup;
-	uint_t		temp;
-	uint16_t	csc;
-
-	hme_stop_timer(hmep);
-	if (hmep->hme_fdx != hmep->hme_macfdx) {
-		hme_start_timer(hmep, hme_check_link, HME_TICKS*5);
-		return;
-	}
-	temp = hmep->hme_transceiver; /* save the transceiver type */
-	hme_check_transceiver(hmep);
-	if (temp != hmep->hme_transceiver) {
-		if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER) {
-			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-			    ext_xcvr_msg);
-		} else {
-			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-			    int_xcvr_msg);
-		}
-		hme_start_timer(hmep, hme_check_link, HME_TICKS * 10);
-		return;
-	}
-
-	if ((hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER) &&
-	    (hmep->hme_link_pulse_disabled)) {
-		hmep->hme_forcespeed = HME_SPEED_10;
-		hme_disable_link_pulse(hmep);
-		return;
-	}
-
-	/*
-	 * To interoperate with auto-negotiable capable systems
-	 * the link should be brought down for 1 second.
-	 * How to do this using only standard registers ?
-	 */
-	if (HME_DP83840) {
-		if (hmep->hme_force_linkdown == HME_FORCE_LINKDOWN) {
-			hmep->hme_force_linkdown = HME_LINKDOWN_STARTED;
-			hme_mii_write(hmep, HME_PHY_BMCR, PHY_BMCR_100M);
-			(void) hme_mii_read(hmep, HME_PHY_CSC, &csc);
-			hme_mii_write(hmep, HME_PHY_CSC,
-			    (csc | PHY_CSCR_TXOFF));
-			hme_start_timer(hmep, hme_force_speed, 10 * HME_TICKS);
-			return;
-		} else if (hmep->hme_force_linkdown == HME_LINKDOWN_STARTED) {
-			(void) hme_mii_read(hmep, HME_PHY_CSC, &csc);
-			hme_mii_write(hmep, HME_PHY_CSC,
-			    (csc & ~PHY_CSCR_TXOFF));
-			hmep->hme_force_linkdown = HME_LINKDOWN_DONE;
-		}
-	} else {
-		if (hmep->hme_force_linkdown == HME_FORCE_LINKDOWN) {
-			hmep->hme_force_linkdown = HME_LINKDOWN_STARTED;
-			hme_mii_write(hmep, HME_PHY_BMCR, PHY_BMCR_LPBK);
-			hme_start_timer(hmep, hme_force_speed, 10 * HME_TICKS);
-			return;
-		} else if (hmep->hme_force_linkdown == HME_LINKDOWN_STARTED) {
-			hmep->hme_force_linkdown = HME_LINKDOWN_DONE;
-		}
-	}
-
-
-	linkup = hme_select_speed(hmep, hmep->hme_forcespeed);
-	if (hmep->hme_linkup_cnt == 1) {
-		hme_start_timer(hmep, hme_force_speed, SECOND(4));
-		return;
-	}
-	if (linkup) {
-
-		hmep->hme_linkup = 1;
-		hmep->hme_linkcheck = 1;
-		hmep->hme_ifspeed = hmep->hme_forcespeed;
-		hme_link_now_up(hmep);
-		hme_setup_link_status(hmep);
-		hme_start_mifpoll(hmep);
-		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
-	} else {
-		hme_start_timer(hmep, hme_force_speed, HME_TICKS);
-	}
-}
-
-static void
-hme_get_autoinfo(struct hme *hmep)
-{
-	uint16_t	anar;
-	uint16_t	aner;
-	uint16_t	anlpar;
-	uint16_t	tmp;
-	uint16_t	ar;
-
-	(void) hme_mii_read(hmep, HME_PHY_ANER, &aner);
-	(void) hme_mii_read(hmep, HME_PHY_ANLPAR, &anlpar);
-	(void) hme_mii_read(hmep, HME_PHY_ANAR, &anar);
-
-	hmep->hme_anlpar = anlpar;
-	hmep->hme_aner = aner;
-
-	if (aner & PHY_ANER_LPNW) {
-
-		tmp = anar & anlpar;
-		if (tmp & PHY_ANAR_TXFDX) {
-			hmep->hme_tryspeed = HME_SPEED_100;
-			hmep->hme_fdx = HME_FULL_DUPLEX;
-		} else if (tmp & PHY_ANAR_TX) {
-			hmep->hme_tryspeed = HME_SPEED_100;
-			hmep->hme_fdx = HME_HALF_DUPLEX;
-		} else if (tmp & PHY_ANLPAR_10FDX) {
-			hmep->hme_tryspeed = HME_SPEED_10;
-			hmep->hme_fdx = HME_FULL_DUPLEX;
-		} else if (tmp & PHY_ANLPAR_10) {
-			hmep->hme_tryspeed = HME_SPEED_10;
-			hmep->hme_fdx = HME_HALF_DUPLEX;
-		} else {
-			if (HME_DP83840) {
-
-				hmep->hme_fdx = HME_HALF_DUPLEX;
-				(void) hme_mii_read(hmep, HME_PHY_AR, &ar);
-
-				if (ar & PHY_AR_SPEED10)
-					hmep->hme_tryspeed = HME_SPEED_10;
-				else
-					hmep->hme_tryspeed = HME_SPEED_100;
-			} else
-				HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN,
-				    AUTONEG_MSG, anar_not_set_msg);
-		}
-	} else {
-		hmep->hme_fdx = HME_HALF_DUPLEX;
-		if (anlpar & PHY_ANLPAR_TX)
-			hmep->hme_tryspeed = HME_SPEED_100;
-		else if (anlpar & PHY_ANLPAR_10)
-			hmep->hme_tryspeed = HME_SPEED_10;
-		else {
-			if (HME_DP83840) {
-
-				(void) hme_mii_read(hmep, HME_PHY_AR, &ar);
-
-				if (ar & PHY_AR_SPEED10)
-					hmep->hme_tryspeed = HME_SPEED_10;
-				else
-					hmep->hme_tryspeed = HME_SPEED_100;
-			} else
-				HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN,
-				    AUTONEG_MSG, par_detect_anar_not_set_msg);
-		}
-	}
-
-	hmep->hme_linkup = 1;
-	hmep->hme_linkcheck = 1;
-	hmep->hme_ifspeed = hmep->hme_tryspeed;
-	hme_link_now_up(hmep);
-}
-
-/*
- * Return 1 if the link is up or auto-negotiation being tried, 0 otherwise.
- */
-
-static int
-hme_try_auto_negotiation(struct hme *hmep)
-{
-	uint16_t	stat;
-	uint16_t	aner;
-
-	if (hmep->hme_autoneg == HME_HWAN_TRY) {
-		/* auto negotiation not initiated */
-		(void) hme_mii_read(hmep, HME_PHY_BMSR, &stat);
-		if (hme_mii_read(hmep, HME_PHY_BMSR, &stat) == 1) {
-			/*
-			 * Transceiver does not talk mii
-			 */
-			goto hme_anfail;
-		}
-		if ((stat & PHY_BMSR_ACFG) == 0) { /* auto neg. not supported */
-
-			return (hmep->hme_autoneg = HME_HWAN_FAILED);
-		}
-
-		/*
-		 * Read ANER to clear status from previous operations.
-		 */
-		if (hme_mii_read(hmep, HME_PHY_ANER, &aner) == 1) {
-			/*
-			 * Transceiver does not talk mii
-			 */
-			goto hme_anfail;
-		}
-
-		hme_mii_write(hmep, HME_PHY_ANAR, hmep->hme_anar);
-		hme_mii_write(hmep, HME_PHY_BMCR, PHY_BMCR_ANE | PHY_BMCR_RAN);
-		/*
-		 * auto-negotiation initiated
-		 */
-		hmep->hme_delay = 0;
-		hme_start_timer(hmep, hme_try_speed, HME_TICKS);
-		return (hmep->hme_autoneg = HME_HWAN_INPROGRESS);
-		/*
-		 * auto-negotiation in progress
-		 */
-	}
-
-	/*
-	 * Auto-negotiation has been in progress. Wait for at least
-	 * least 3000 ms.
-	 * Changed 8/28/97 to fix bug ID 4070989.
-	 */
-	if (hmep->hme_delay < 30) {
-		hmep->hme_delay++;
-		hme_start_timer(hmep, hme_try_speed, HME_TICKS);
-		return (hmep->hme_autoneg = HME_HWAN_INPROGRESS);
-	}
-
-	(void) hme_mii_read(hmep, HME_PHY_BMSR, &stat);
-	if (hme_mii_read(hmep, HME_PHY_BMSR, &stat) == 1) {
-		/*
-		 * Transceiver does not talk mii
-		 */
-		goto hme_anfail;
-	}
-
-	if ((stat & PHY_BMSR_ANC) == 0) {
-		/*
-		 * wait for a maximum of 5 seconds
-		 */
-		if (hmep->hme_delay < 50) {
-			hmep->hme_delay++;
-			hme_start_timer(hmep, hme_try_speed, HME_TICKS);
-			return (hmep->hme_autoneg = HME_HWAN_INPROGRESS);
-		}
-		if (HME_DP83840) {
-			(void) hme_mii_read(hmep, HME_PHY_ANER, &aner);
-			if (aner & PHY_ANER_MLF) {
-
-				return (hmep->hme_autoneg = HME_HWAN_FAILED);
-			}
-		}
-
-		goto hme_anfail;
-	}
-
-	(void) hme_mii_read(hmep, HME_PHY_ANER, &aner);
-	if (aner & PHY_ANER_MLF) {
-		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-		    par_detect_msg);
-		goto hme_anfail;
-	}
-
-	if (!(stat & PHY_BMSR_LNKSTS)) {
-		/*
-		 * wait for a maximum of 10 seconds
-		 */
-		if (hmep->hme_delay < 100) {
-			hmep->hme_delay++;
-			hme_start_timer(hmep, hme_try_speed, HME_TICKS);
-			return (hmep->hme_autoneg = HME_HWAN_INPROGRESS);
-		}
-		goto hme_anfail;
-	} else {
-		hmep->hme_bmsr |= (PHY_BMSR_LNKSTS);
-		hme_get_autoinfo(hmep);
-		hmep->hme_force_linkdown = HME_LINKDOWN_DONE;
-		hme_setup_link_status(hmep);
-		hme_start_mifpoll(hmep);
-		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
-		if (hmep->hme_fdx != hmep->hme_macfdx) {
-			(void) hmeinit(hmep);
-		}
-		return (hmep->hme_autoneg = HME_HWAN_SUCCESFUL);
-	}
-
-hme_anfail:
-	hme_start_timer(hmep, hme_try_speed, HME_TICKS);
-	return (hmep->hme_autoneg = HME_HWAN_TRY);
-}
-
-/*
- * This function is used to perform automatic speed detection.
- * The Internal Transceiver which is based on the National PHY chip
- * 83840 supports auto-negotiation functionality.
- * Some External transceivers may not support auto-negotiation.
- * In that case, the software performs the speed detection.
- * The software tries to bring down the link for about 2 seconds to
- * force the Link Partner to notice speed change.
- * The software speed detection favors the 100 Mbps speed.
- * It does this by setting the 100 Mbps for longer duration ( 5 seconds )
- * than the 10 Mbps ( 2 seconds ). Also, even after the link is up
- * in 10 Mbps once, the 100 Mbps is also tried. Only if the link
- * is not up in 100 Mbps, the 10 Mbps speed is tried again.
- */
-static void
-hme_try_speed(void *arg)
-{
-	struct hme	*hmep = arg;
-	int		linkup;
-	uint_t		temp;
-
-	hme_stop_timer(hmep);
-	temp = hmep->hme_transceiver; /* save the transceiver type */
-	hme_check_transceiver(hmep);
-	if (temp != hmep->hme_transceiver) {
-		if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER) {
-			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-			    ext_xcvr_msg);
-		} else {
-			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-			    int_xcvr_msg);
-		}
-		hme_start_timer(hmep, hme_check_link, 10 * HME_TICKS);
-		return;
-	}
-
-	if ((hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER) &&
-	    (hmep->hme_link_pulse_disabled)) {
-		hmep->hme_tryspeed = HME_SPEED_10;
-		hme_disable_link_pulse(hmep);
-		return;
-	}
-
-	if (hme_autoneg_enable && (hmep->hme_autoneg != HME_HWAN_FAILED)) {
-		if (hme_try_auto_negotiation(hmep) != HME_HWAN_FAILED)
-			return;	/* auto negotiation successful or being tried */
-	}
-
-	linkup = hme_select_speed(hmep, hmep->hme_tryspeed);
-	if (hmep->hme_linkup_cnt == 1) {
-		hme_start_timer(hmep, hme_try_speed, SECOND(1));
-		return;
-	}
-	if (linkup) {
-		switch (hmep->hme_tryspeed) {
-		case HME_SPEED_100:
-			if (hmep->hme_linkup_cnt == 4) {
-				hmep->hme_ntries =	HME_NTRIES_LOW;
-				hmep->hme_nlasttries =	HME_NTRIES_LOW;
-				hmep->hme_linkup = 1;
-				hmep->hme_linkcheck = 1;
-				hme_link_now_up(hmep);
-				hme_setup_link_status(hmep);
-				hme_start_mifpoll(hmep);
-				hme_start_timer(hmep, hme_check_link,
-				    HME_LINKCHECK_TIMER);
-				if (hmep->hme_fdx != hmep->hme_macfdx) {
-					(void) hmeinit(hmep);
-				}
-			} else
-				hme_start_timer(hmep, hme_try_speed, HME_TICKS);
-			break;
-		case HME_SPEED_10:
-			if (hmep->hme_linkup_cnt == 4) {
-				if (hmep->hme_linkup_10) {
-					hmep->hme_linkup_10 = 0;
-					hmep->hme_ntries = HME_NTRIES_LOW;
-					hmep->hme_nlasttries = HME_NTRIES_LOW;
-					hmep->hme_linkup = 1;
-					hmep->hme_linkcheck = 1;
-					hmep->hme_ifspeed = HME_SPEED_10;
-					hme_setup_link_status(hmep);
-					hme_start_mifpoll(hmep);
-					hme_start_timer(hmep, hme_check_link,
-					    HME_LINKCHECK_TIMER);
-					if (hmep->hme_fdx != hmep->hme_macfdx) {
-						(void) hmeinit(hmep);
-					}
-				} else {
-					hmep->hme_linkup_10 = 1;
-					hmep->hme_tryspeed = HME_SPEED_100;
-					hmep->hme_force_linkdown =
-					    HME_FORCE_LINKDOWN;
-					hmep->hme_linkup_cnt = 0;
-					hmep->hme_ntries = HME_NTRIES_LOW;
-					hmep->hme_nlasttries = HME_NTRIES_LOW;
-					hme_start_timer(hmep,
-					    hme_try_speed, HME_TICKS);
-				}
-
-			} else
-				hme_start_timer(hmep, hme_try_speed, HME_TICKS);
-			break;
-		default:
-			break;
-		}
-		return;
-	}
-
-	hmep->hme_ntries--;
-	hmep->hme_linkup_cnt = 0;
-	if (hmep->hme_ntries == 0) {
-		hmep->hme_force_linkdown = HME_FORCE_LINKDOWN;
-		switch (hmep->hme_tryspeed) {
-		case HME_SPEED_100:
-			hmep->hme_tryspeed = HME_SPEED_10;
-			hmep->hme_ntries = HME_NTRIES_LOW_10;
-			break;
-		case HME_SPEED_10:
-			hmep->hme_ntries = HME_NTRIES_LOW;
-			hmep->hme_tryspeed = HME_SPEED_100;
-			break;
-		default:
-			break;
-		}
-	}
-	hme_start_timer(hmep, hme_try_speed, HME_TICKS);
-}
-
-static void
-hme_link_now_up(struct hme *hmep)
-{
-	uint16_t	btxpc;
-	/*
-	 * Work-around for the scramble problem with QSI
-	 * chip and Synoptics 28115 switch.
-	 * Addition Interface Technologies Group (NPG) 8/28/1997.
-	 */
-	if ((HME_QS6612) && ((hmep->hme_tryspeed  == HME_SPEED_100) ||
-	    (hmep->hme_forcespeed == HME_SPEED_100))) {
-		/*
-		 * Addition of a check for 'hmep->hme_forcespeed'
-		 * This is necessary when the autonegotiation is
-		 * disabled by the 'hme.conf' file. In this case
-		 * hmep->hme_tryspeed is not initialized. Resulting
-		 * in the workaround not being applied.
-		 */
-		if (hme_mii_read(hmep, HME_PHY_BTXPC, &btxpc) == 0) {
-			hme_mii_write(hmep, HME_PHY_BTXPC,
-			    (btxpc | PHY_BTXPC_DSCRAM));
-			drv_usecwait(20);
-			hme_mii_write(hmep, HME_PHY_BTXPC, btxpc);
-		}
-	}
-}
 /* <<<<<<<<<<<<<<<<<<<<<<<<<<<  LOADABLE ENTRIES  >>>>>>>>>>>>>>>>>>>>>>> */
 
 int
@@ -2293,6 +908,9 @@ hme_mapebusrom(dev_info_t *dip, void *arg)
 		return (DDI_WALK_PRUNESIB);
 	}
 
+	if (ddi_get_parent(dip) != rom->parent)
+		return (DDI_WALK_CONTINUE);
+
 	if ((ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0,
 	    "reg", &regs, &nregs)) != DDI_PROP_SUCCESS) {
 		return (DDI_WALK_PRUNECHILD);
@@ -2359,27 +977,14 @@ hmeget_promebus(dev_info_t *dip)
 
 	/*
 	 * The implementation of ddi_walk_devs says that we must not
-	 * be called during autoconfiguration.  However, upon close
-	 * examination, one will find the following is true:
+	 * be called during autoconfiguration.  However, it turns out
+	 * that it is safe to call this during our attach routine,
+	 * because we are not a nexus device.
 	 *
-	 * 1) since we're called at attach time,
-	 *    DEVI_BUSY_OWNED(ddi_get_parent(dip)) is implicitly true.
-	 *
-	 * 2) we carefully ensure that we prune siblings for all cases
-	 *    except our own device, so we can't wind up walking down
-	 *    a changing sibling pointer.
-	 *
-	 * 3) since we are attaching, our peers will already have their
-	 *    dev_info nodes on the tree... hence our own sibling pointer
-	 *    (and those of our siblings) will be stable.
-	 *
-	 * 4) also, because of #3, our parents child pointer will be
-	 *    stable.
-	 *
-	 * So it should be safe to do this, because of our carefully
-	 * constructed restrictions.
+	 * Previously we rooted our search at our immediate parent,
+	 * but this triggered an assertion panic in debug kernels.
 	 */
-	ddi_walk_devs(ddi_get_parent(dip), hme_mapebusrom, &rom);
+	ddi_walk_devs(ddi_root_node(), hme_mapebusrom, &rom);
 
 	if (rom.acch) {
 		hmep->hme_romh = rom.acch;
@@ -2472,7 +1077,6 @@ hmeget_hm_rev_property(struct hme *hmep)
 	case HME_2P1_REVID_OBP:
 		HME_FAULT_MSG2(hmep, SEVERITY_NONE, DISPLAY_MSG,
 		    "SBus 2.1 Found (Rev Id = %x)", hm_rev);
-		hmep->hme_mifpoll_enable = 1;
 		hmep->hme_frame_enable = 1;
 		break;
 
@@ -2487,10 +1091,9 @@ hmeget_hm_rev_property(struct hme *hmep)
 		break;
 
 	default:
-		HME_FAULT_MSG3(hmep, SEVERITY_HIGH, DISPLAY_MSG,
+		HME_FAULT_MSG3(hmep, SEVERITY_NONE, DISPLAY_MSG,
 		    "%s (Rev Id = %x) Found",
 		    (hm_rev == HME_2C0_REVID) ? "PCI IO 2.0" : "Sbus", hm_rev);
-		hmep->hme_mifpoll_enable = 1;
 		hmep->hme_frame_enable = 1;
 		hmep->hme_lance_mode_enable = 1;
 		hmep->hme_rxcv_enable = 1;
@@ -2531,7 +1134,8 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			return (DDI_FAILURE);
 
 		hmep->hme_flags &= ~HMESUSPENDED;
-		hmep->hme_linkcheck = 0;
+
+		mii_resume(hmep->hme_mii);
 
 		if (hmep->hme_started)
 			(void) hmeinit(hmep);
@@ -2722,7 +1326,6 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Based on the hm-rev, set some capabilities
 	 * Set up default capabilities for HM 2.0
 	 */
-	hmep->hme_mifpoll_enable = 0;
 	hmep->hme_frame_enable = 0;
 	hmep->hme_lance_mode_enable = 0;
 	hmep->hme_rxcv_enable = 0;
@@ -2756,7 +1359,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    "hm-rev", (caddr_t)&hm_rev, sizeof (hm_rev)) !=
 		    DDI_SUCCESS) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, AUTOCONFIG_MSG,
-			    "hmeattach: ddi_prop_create error for hm_rev");
+			    "ddi_prop_create error for hm_rev");
 		}
 		ddi_regs_map_free(&cfg_handle);
 
@@ -2765,12 +1368,9 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/* get info via VPD */
 		if (hmeget_promprops(dip) != DDI_SUCCESS) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, AUTOCONFIG_MSG,
-			    "hmeattach: no promprops");
+			    "no promprops");
 		}
 	}
-
-	if (!hme_mifpoll_enable)
-		hmep->hme_mifpoll_enable = 0;
 
 	if (ddi_intr_hilevel(dip, 0)) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, NFATAL_ERR_MSG,
@@ -2789,7 +1389,6 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	mutex_init(&hmep->hme_xmitlock, NULL, MUTEX_DRIVER, hmep->hme_cookie);
 	mutex_init(&hmep->hme_intrlock, NULL, MUTEX_DRIVER, hmep->hme_cookie);
-	mutex_init(&hmep->hme_linklock, NULL, MUTEX_DRIVER, hmep->hme_cookie);
 
 	/*
 	 * Quiesce the hardware.
@@ -2833,6 +1432,15 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	hmestatinit(hmep);
 
+	hmep->hme_mii = mii_alloc(hmep, dip, &hme_mii_ops);
+	if (hmep->hme_mii == NULL) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, CONFIG_MSG,
+		    "mii_alloc failed");
+		goto error_intr;
+	}
+	/* force a probe for the PHY */
+	mii_probe(hmep->hme_mii);
+
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, CONFIG_MSG,
 		    "mac_alloc failed");
@@ -2846,6 +1454,9 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = ETHERMTU;
 	macp->m_margin = VLAN_TAGSZ;
+	macp->m_priv_props = hme_priv_prop;
+	macp->m_priv_prop_count =
+	    sizeof (hme_priv_prop) / sizeof (hme_priv_prop[0]);
 	if (mac_register(macp, &hmep->hme_mh) != 0) {
 		mac_free(macp);
 		goto error_intr;
@@ -2864,10 +1475,12 @@ error_intr:
 	if (hmep->hme_cookie)
 		ddi_remove_intr(dip, 0, (ddi_iblock_cookie_t)0);
 
+	if (hmep->hme_mii)
+		mii_free(hmep->hme_mii);
+
 error_mutex:
 	mutex_destroy(&hmep->hme_xmitlock);
 	mutex_destroy(&hmep->hme_intrlock);
-	mutex_destroy(&hmep->hme_linklock);
 
 error_unmap:
 	if (hmep->hme_globregh)
@@ -2913,6 +1526,7 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		break;
 
 	case DDI_SUSPEND:
+		mii_suspend(hmep->hme_mii);
 		hmep->hme_flags |= HMESUSPENDED;
 		hmeuninit(hmep);
 		return (DDI_SUCCESS);
@@ -2935,6 +1549,9 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		(void) hmestop(hmep);
 	}
 
+	if (hmep->hme_mii)
+		mii_free(hmep->hme_mii);
+
 	/*
 	 * Remove instance of the intr
 	 */
@@ -2950,12 +1567,6 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	hmep->hme_ksp = NULL;
 	hmep->hme_intrstats = NULL;
-
-	/*
-	 * Stop asynchronous timer events.
-	 */
-	hme_stop_timer(hmep);
-	mutex_exit(&hmep->hme_linklock);
 
 	/*
 	 * Destroy all mutexes and data structures allocated during
@@ -2985,12 +1596,9 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	mutex_destroy(&hmep->hme_xmitlock);
 	mutex_destroy(&hmep->hme_intrlock);
-	mutex_destroy(&hmep->hme_linklock);
 
 	hmefreethings(hmep);
 	hmefreebufs(hmep);
-
-	hme_param_cleanup(hmep);
 
 	ddi_set_driver_private(dip, NULL);
 	kmem_free(hmep, sizeof (struct hme));
@@ -3006,7 +1614,6 @@ hmequiesce(dev_info_t *dip)
 	if ((hmep = ddi_get_driver_private(dip)) == NULL)
 		return (DDI_FAILURE);
 
-	hme_stop_mifpoll(hmep);
 	(void) hmestop(hmep);
 	return (DDI_SUCCESS);
 }
@@ -3014,138 +1621,45 @@ hmequiesce(dev_info_t *dip)
 static boolean_t
 hmeinit_xfer_params(struct hme *hmep)
 {
-	int i;
 	int hme_ipg1_conf, hme_ipg2_conf;
-	int hme_use_int_xcvr_conf, hme_pace_count_conf;
-	int hme_autoneg_conf;
-	int hme_anar_100T4_conf;
-	int hme_anar_100fdx_conf, hme_anar_100hdx_conf;
-	int hme_anar_10fdx_conf, hme_anar_10hdx_conf;
 	int hme_ipg0_conf, hme_lance_mode_conf;
 	int prop_len = sizeof (int);
 	dev_info_t *dip;
 
 	dip = hmep->dip;
 
-	for (i = 0; i < A_CNT(hme_param_arr); i++)
-		hmep->hme_param_arr[i] = hme_param_arr[i];
-
-	if (!hmep->hme_g_nd && !hme_param_register(hmep, hmep->hme_param_arr,
-	    A_CNT(hme_param_arr))) {
-		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, NDD_MSG,
-		    param_reg_fail_msg);
-		return (B_FALSE);
-	}
-
 	/*
 	 * Set up the start-up values for user-configurable parameters
 	 * Get the values from the global variables first.
 	 * Use the MASK to limit the value to allowed maximum.
 	 */
-	hme_param_ipg1 = hme_ipg1 & HME_MASK_8BIT;
-	hme_param_ipg2 = hme_ipg2 & HME_MASK_8BIT;
-	hme_param_use_intphy = hme_use_int_xcvr & HME_MASK_1BIT;
-	hme_param_pace_count = hme_pace_size & HME_MASK_8BIT;
-	hme_param_autoneg = hme_adv_autoneg_cap;
-	hme_param_anar_100T4 = hme_adv_100T4_cap;
-	hme_param_anar_100fdx = hme_adv_100fdx_cap;
-	hme_param_anar_100hdx = hme_adv_100hdx_cap;
-	hme_param_anar_10fdx = hme_adv_10fdx_cap;
-	hme_param_anar_10hdx = hme_adv_10hdx_cap;
-	hme_param_ipg0 = hme_ipg0 & HME_MASK_5BIT;
-	hme_param_lance_mode = hme_lance_mode & HME_MASK_1BIT;
-
-	/*
-	 * The link speed may be forced to either 10 Mbps or 100 Mbps using the
-	 * property "transfer-speed". This may be done in OBP by using the
-	 * command "apply transfer-speed=<speed> <device>". The speed may be
-	 * either 10 or 100.
-	 */
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0,
-	    "transfer-speed", (caddr_t)&i, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_autoneg = 0;	/* force speed */
-		hme_param_anar_100T4 = 0;
-		hme_param_anar_100fdx = 0;
-		hme_param_anar_10fdx = 0;
-		if (i == 10) {
-			hme_param_anar_10hdx = 1;
-			hme_param_anar_100hdx = 0;
-		} else {
-			hme_param_anar_10hdx = 0;
-			hme_param_anar_100hdx = 1;
-		}
-	}
+	hmep->hme_ipg1 = hme_ipg1 & HME_MASK_8BIT;
+	hmep->hme_ipg2 = hme_ipg2 & HME_MASK_8BIT;
+	hmep->hme_ipg0 = hme_ipg0 & HME_MASK_5BIT;
 
 	/*
 	 * Get the parameter values configured in .conf file.
 	 */
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "ipg1",
 	    (caddr_t)&hme_ipg1_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_ipg1 = hme_ipg1_conf & HME_MASK_8BIT;
+		hmep->hme_ipg1 = hme_ipg1_conf & HME_MASK_8BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "ipg2",
 	    (caddr_t)&hme_ipg2_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_ipg2 = hme_ipg2_conf & HME_MASK_8BIT;
-	}
-
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "use_int_xcvr",
-	    (caddr_t)&hme_use_int_xcvr_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_use_intphy = hme_use_int_xcvr_conf & HME_MASK_1BIT;
-	}
-
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "pace_size",
-	    (caddr_t)&hme_pace_count_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_pace_count = hme_pace_count_conf & HME_MASK_8BIT;
-	}
-
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_autoneg_cap",
-	    (caddr_t)&hme_autoneg_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_autoneg = hme_autoneg_conf & HME_MASK_1BIT;
-	}
-
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_100T4_cap",
-	    (caddr_t)&hme_anar_100T4_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_anar_100T4 = hme_anar_100T4_conf & HME_MASK_1BIT;
-	}
-
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_100fdx_cap",
-	    (caddr_t)&hme_anar_100fdx_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_anar_100fdx = hme_anar_100fdx_conf & HME_MASK_1BIT;
-	}
-
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_100hdx_cap",
-	    (caddr_t)&hme_anar_100hdx_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_anar_100hdx = hme_anar_100hdx_conf & HME_MASK_1BIT;
-	}
-
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_10fdx_cap",
-	    (caddr_t)&hme_anar_10fdx_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_anar_10fdx = hme_anar_10fdx_conf & HME_MASK_1BIT;
-	}
-
-	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_10hdx_cap",
-	    (caddr_t)&hme_anar_10hdx_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_anar_10hdx = hme_anar_10hdx_conf & HME_MASK_1BIT;
+		hmep->hme_ipg2 = hme_ipg2_conf & HME_MASK_8BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "ipg0",
 	    (caddr_t)&hme_ipg0_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_ipg0 = hme_ipg0_conf & HME_MASK_5BIT;
+		hmep->hme_ipg0 = hme_ipg0_conf & HME_MASK_5BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "lance_mode",
 	    (caddr_t)&hme_lance_mode_conf, &prop_len) == DDI_PROP_SUCCESS) {
-		hme_param_lance_mode = hme_lance_mode_conf & HME_MASK_1BIT;
+		hmep->hme_lance_mode = hme_lance_mode_conf & HME_MASK_1BIT;
 	}
 
-	if (hme_link_pulse_disabled)
-		hmep->hme_link_pulse_disabled = 1;
-	else if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0,
-	    "link-pulse-disabled", (caddr_t)&i, &prop_len)
-	    == DDI_PROP_SUCCESS) {
-		hmep->hme_link_pulse_disabled = 1;
-	}
 	return (B_TRUE);
 }
 
@@ -3325,14 +1839,6 @@ hmestatinit(struct hme *hmep)
 	    KSTAT_DATA_ULONG);
 
 	/*
-	 * I/O bus kstats
-	 * kstat_named_init(&hkp->hk_pci_speed,		"pci_bus_speed",
-	 *		KSTAT_DATA_ULONG);
-	 * kstat_named_init(&hkp->hk_pci_size,		"pci_bus_width",
-	 *		KSTAT_DATA_ULONG);
-	 */
-
-	/*
 	 * xcvr kstats
 	 */
 	kstat_named_init(&hkp->hk_asic_rev,		"asic_rev",
@@ -3343,93 +1849,109 @@ hmestatinit(struct hme *hmep)
 	kstat_install(ksp);
 }
 
-static void
-hme_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
+int
+hme_m_getprop(void *arg, const char *name, mac_prop_id_t num, uint_t flags,
+    uint_t sz, void *val, uint_t *perm)
 {
-	struct	hme	*hmep = arg;
-	struct	iocblk	*iocp = (void *)mp->b_rptr;
-	uint32_t old_ipg1, old_ipg2, old_use_int_xcvr, old_autoneg;
-	uint32_t old_100T4;
-	uint32_t old_100fdx, old_100hdx, old_10fdx, old_10hdx;
-	uint32_t old_ipg0, old_lance_mode;
+	struct hme *hmep = arg;
+	int value;
+	boolean_t is_default;
+	int rv;
 
-	switch (iocp->ioc_cmd) {
+	rv = mii_m_getprop(hmep->hme_mii, name, num, flags, sz, val, perm);
+	if (rv != ENOTSUP)
+		return (rv);
 
-	case HME_ND_GET:
-
-		old_autoneg = hme_param_autoneg;
-		old_100T4 = hme_param_anar_100T4;
-		old_100fdx = hme_param_anar_100fdx;
-		old_100hdx = hme_param_anar_100hdx;
-		old_10fdx = hme_param_anar_10fdx;
-		old_10hdx = hme_param_anar_10hdx;
-
-		hme_param_autoneg = old_autoneg & ~HME_NOTUSR;
-		hme_param_anar_100T4 = old_100T4 & ~HME_NOTUSR;
-		hme_param_anar_100fdx = old_100fdx & ~HME_NOTUSR;
-		hme_param_anar_100hdx = old_100hdx & ~HME_NOTUSR;
-		hme_param_anar_10fdx = old_10fdx & ~HME_NOTUSR;
-		hme_param_anar_10hdx = old_10hdx & ~HME_NOTUSR;
-
-		if (!hme_nd_getset(wq, hmep->hme_g_nd, mp)) {
-			hme_param_autoneg = old_autoneg;
-			hme_param_anar_100T4 = old_100T4;
-			hme_param_anar_100fdx = old_100fdx;
-			hme_param_anar_100hdx = old_100hdx;
-			hme_param_anar_10fdx = old_10fdx;
-			hme_param_anar_10hdx = old_10hdx;
-			miocnak(wq, mp, 0, EINVAL);
-			return;
-		}
-		hme_param_autoneg = old_autoneg;
-		hme_param_anar_100T4 = old_100T4;
-		hme_param_anar_100fdx = old_100fdx;
-		hme_param_anar_100hdx = old_100hdx;
-		hme_param_anar_10fdx = old_10fdx;
-		hme_param_anar_10hdx = old_10hdx;
-
-		qreply(wq, mp);
+	switch (num) {
+	case MAC_PROP_PRIVATE:
 		break;
-
-	case HME_ND_SET:
-		old_ipg0 = hme_param_ipg0;
-		old_lance_mode = hme_param_lance_mode;
-		old_ipg1 = hme_param_ipg1;
-		old_ipg2 = hme_param_ipg2;
-		old_use_int_xcvr = hme_param_use_intphy;
-		old_autoneg = hme_param_autoneg;
-		hme_param_autoneg = 0xff;
-
-		if (!hme_nd_getset(wq, hmep->hme_g_nd, mp)) {
-			hme_param_autoneg = old_autoneg;
-			miocnak(wq, mp, 0, EINVAL);
-			return;
-		}
-
-		qreply(wq, mp);
-
-		if (hme_param_autoneg != 0xff) {
-			hmep->hme_linkcheck = 0;
-			(void) hmeinit(hmep);
-		} else {
-			hme_param_autoneg = old_autoneg;
-			if (old_use_int_xcvr != hme_param_use_intphy) {
-				hmep->hme_linkcheck = 0;
-				(void) hmeinit(hmep);
-			} else if ((old_ipg1 != hme_param_ipg1) ||
-			    (old_ipg2 != hme_param_ipg2) ||
-			    (old_ipg0 != hme_param_ipg0) ||
-			    (old_lance_mode != hme_param_lance_mode)) {
-				(void) hmeinit(hmep);
-			}
-		}
-		break;
-
 	default:
-		miocnak(wq, mp, 0, EINVAL);
-		break;
+		return (ENOTSUP);
 	}
+
+	*perm = MAC_PROP_PERM_RW;
+
+	is_default = (flags & MAC_PROP_DEFAULT) ? B_TRUE : B_FALSE;
+	if (strcmp(name, "_ipg0") == 0) {
+		value = is_default ? hme_ipg0 : hmep->hme_ipg0;
+
+	} else if (strcmp(name, "_ipg1") == 0) {
+		value = is_default ? hme_ipg1 : hmep->hme_ipg1;
+	} else if (strcmp(name, "_ipg2") == 0) {
+		value = is_default ? hme_ipg2 : hmep->hme_ipg2;
+	} else if (strcmp(name, "_lance_mode") == 0) {
+		value = is_default ? hme_lance_mode : hmep->hme_lance_mode;
+	} else {
+		return (ENOTSUP);
+	}
+	(void) snprintf(val, sz, "%d", value);
+	return (0);
 }
+
+int
+hme_m_setprop(void *arg, const char *name, mac_prop_id_t num, uint_t sz,
+    const void *val)
+{
+	struct hme *hmep = arg;
+	int rv;
+	long lval;
+	boolean_t init = B_FALSE;
+
+	rv = mii_m_setprop(hmep->hme_mii, name, num, sz, val);
+	if (rv != ENOTSUP)
+		return (rv);
+	rv = 0;
+
+	switch (num) {
+	case MAC_PROP_PRIVATE:
+		break;
+	default:
+		return (ENOTSUP);
+	}
+
+	(void) ddi_strtol(val, NULL, 0, &lval);
+
+	if (strcmp(name, "_ipg1") == 0) {
+		if ((lval >= 0) && (lval <= 255)) {
+			hmep->hme_ipg1 = lval & 0xff;
+			init = B_TRUE;
+		} else {
+			return (EINVAL);
+		}
+
+	} else if (strcmp(name, "_ipg2") == 0) {
+		if ((lval >= 0) && (lval <= 255)) {
+			hmep->hme_ipg2 = lval & 0xff;
+			init = B_TRUE;
+		} else {
+			return (EINVAL);
+		}
+
+	} else if (strcmp(name, "_ipg0") == 0) {
+		if ((lval >= 0) && (lval <= 31)) {
+			hmep->hme_ipg0 = lval & 0xff;
+			init = B_TRUE;
+		} else {
+			return (EINVAL);
+		}
+	} else if (strcmp(name, "_lance_mode") == 0) {
+		if ((lval >= 0) && (lval <= 1)) {
+			hmep->hme_lance_mode = lval & 0xff;
+			init = B_TRUE;
+		} else {
+			return (EINVAL);
+		}
+
+	} else {
+		rv = ENOTSUP;
+	}
+
+	if (init) {
+		(void) hmeinit(hmep);
+	}
+	return (rv);
+}
+
 
 /*ARGSUSED*/
 static boolean_t
@@ -3520,6 +2042,7 @@ hme_m_start(void *arg)
 		return (EIO);
 	} else {
 		hmep->hme_started = B_TRUE;
+		mii_start(hmep->hme_mii);
 		return (0);
 	}
 }
@@ -3529,6 +2052,7 @@ hme_m_stop(void *arg)
 {
 	struct hme *hmep = arg;
 
+	mii_stop(hmep->hme_mii);
 	hmep->hme_started = B_FALSE;
 	hmeuninit(hmep);
 }
@@ -3546,10 +2070,10 @@ hme_m_stat(void *arg, uint_t stat, uint64_t *val)
 	mutex_exit(&hmep->hme_xmitlock);
 
 
+	if (mii_m_getstat(hmep->hme_mii, stat, val) == 0) {
+		return (0);
+	}
 	switch (stat) {
-	case MAC_STAT_IFSPEED:
-		*val = hmep->hme_ifspeed * 1000000;
-		break;
 	case MAC_STAT_IPACKETS:
 		*val = hmep->hme_ipackets;
 		break;
@@ -3627,79 +2151,6 @@ hme_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 	case ETHER_STAT_CARRIER_ERRORS:
 		*val = hmep->hme_carrier_errors;
-		break;
-	case ETHER_STAT_XCVR_ADDR:
-		*val = hmep->hme_phyad;
-		break;
-	case ETHER_STAT_XCVR_ID:
-		*val = (hmep->hme_idr1 << 16U) | (hmep->hme_idr2);
-		break;
-	case ETHER_STAT_XCVR_INUSE:
-		switch (hmep->hme_transceiver) {
-		case HME_INTERNAL_TRANSCEIVER:
-			*val = XCVR_100X;
-			break;
-		case HME_NO_TRANSCEIVER:
-			*val = XCVR_NONE;
-			break;
-		default:
-			*val = XCVR_UNDEFINED;
-			break;
-		}
-		break;
-	case ETHER_STAT_CAP_100T4:
-		*val = hme_param_bmsr_100T4;
-		break;
-	case ETHER_STAT_ADV_CAP_100T4:
-		*val = hme_param_anar_100T4 & ~HME_NOTUSR;
-		break;
-	case ETHER_STAT_LP_CAP_100T4:
-		*val = hme_param_anlpar_100T4;
-		break;
-	case ETHER_STAT_CAP_100FDX:
-		*val = hme_param_bmsr_100fdx;
-		break;
-	case ETHER_STAT_ADV_CAP_100FDX:
-		*val = hme_param_anar_100fdx & ~HME_NOTUSR;
-		break;
-	case ETHER_STAT_LP_CAP_100FDX:
-		*val = hme_param_anlpar_100fdx;
-		break;
-	case ETHER_STAT_CAP_100HDX:
-		*val = hme_param_bmsr_100hdx;
-		break;
-	case ETHER_STAT_ADV_CAP_100HDX:
-		*val = hme_param_anar_100hdx & ~HME_NOTUSR;
-		break;
-	case ETHER_STAT_LP_CAP_100HDX:
-		*val = hme_param_anlpar_100hdx;
-		break;
-	case ETHER_STAT_CAP_10FDX:
-		*val = hme_param_bmsr_10fdx;
-		break;
-	case ETHER_STAT_ADV_CAP_10FDX:
-		*val = hme_param_anar_10fdx & ~HME_NOTUSR;
-		break;
-	case ETHER_STAT_LP_CAP_10FDX:
-		*val = hme_param_anlpar_10fdx;
-		break;
-	case ETHER_STAT_CAP_10HDX:
-		*val = hme_param_bmsr_10hdx;
-		break;
-	case ETHER_STAT_ADV_CAP_10HDX:
-		*val = hme_param_anar_10hdx & ~HME_NOTUSR;
-		break;
-	case ETHER_STAT_LP_CAP_10HDX:
-		*val = hme_param_anlpar_10hdx;
-		break;
-	case ETHER_STAT_CAP_AUTONEG:
-		*val = hme_param_bmsr_ancap;
-		break;
-	case ETHER_STAT_ADV_CAP_AUTONEG:
-		*val = hme_param_autoneg & ~HME_NOTUSR;
-		break;
-	case ETHER_STAT_LP_CAP_AUTONEG:
-		*val = hme_param_aner_lpancap;
 		break;
 	default:
 		return (EINVAL);
@@ -3902,6 +2353,8 @@ hmeinit(struct hme *hmep)
 {
 	uint32_t		i;
 	int			ret;
+	boolean_t		fdx;
+	int			phyad;
 
 	/*
 	 * Lock sequence:
@@ -3934,23 +2387,13 @@ hmeinit(struct hme *hmep)
 	 * situation as described in bug ID 4065896.
 	 */
 
-	hme_stop_timer(hmep);	/* acquire hme_linklock */
 	mutex_enter(&hmep->hme_xmitlock);
 
 	hmep->hme_flags = 0;
 	hmep->hme_wantw = B_FALSE;
-	hmep->hme_txhung = 0;
-
-	/*
-	 * Initializing 'hmep->hme_iipackets' to match current
-	 * number of received packets.
-	 */
-	hmep->hme_iipackets = hmep->hme_ipackets;
 
 	if (hmep->inits)
 		hmesavecntrs(hmep);
-
-	hme_stop_mifpoll(hmep);
 
 	/*
 	 * Perform Global reset of the Sbus/FEPS ENET channel.
@@ -4001,32 +2444,20 @@ hmeinit(struct hme *hmep)
 	 * ASIC, it selects Internal by default.
 	 */
 
-	hme_check_transceiver(hmep);
-	if (hmep->hme_transceiver == HME_NO_TRANSCEIVER) {
+	switch ((phyad = mii_get_addr(hmep->hme_mii))) {
+	case -1:
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG, no_xcvr_msg);
-		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
 		goto init_fail;	/* abort initialization */
 
-	} else if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER)
+	case HME_INTERNAL_PHYAD:
 		PUT_MACREG(xifc, 0);
-	else
+		break;
+	case HME_EXTERNAL_PHYAD:
+		/* Isolate the Int. xcvr */
 		PUT_MACREG(xifc, BMAC_XIFC_MIIBUFDIS);
-				/* Isolate the Int. xcvr */
-	/*
-	 * Perform transceiver reset and speed selection only if
-	 * the link is down.
-	 */
-	if (!hmep->hme_linkcheck)
-		/*
-		 * Reset the PHY and bring up the link
-		 * If it fails we will then increment a kstat.
-		 */
-		hme_reset_transceiver(hmep);
-	else {
-		if (hmep->hme_linkup)
-			hme_start_mifpoll(hmep);
-		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
+		break;
 	}
+
 	hmep->inits++;
 
 	/*
@@ -4062,8 +2493,8 @@ hmeinit(struct hme *hmep)
 		PUT_MACREG(palen, hme_palen);
 #endif
 
-	PUT_MACREG(ipg1, hme_param_ipg1);
-	PUT_MACREG(ipg2, hme_param_ipg2);
+	PUT_MACREG(ipg1, hmep->hme_ipg1);
+	PUT_MACREG(ipg2, hmep->hme_ipg2);
 
 	PUT_MACREG(rseed,
 	    ((hmep->hme_ouraddr.ether_addr_octet[0] << 8) & 0x3) |
@@ -4203,19 +2634,19 @@ hmeinit(struct hme *hmep)
 
 	drv_usecwait(10);	/* wait after setting Hash Enable bit */
 
+	fdx = (mii_get_duplex(hmep->hme_mii) == LINK_DUPLEX_FULL);
+
 	if (hme_ngu_enable)
-		PUT_MACREG(txcfg, (hmep->hme_fdx ? BMAC_TXCFG_FDX: 0) |
+		PUT_MACREG(txcfg, (fdx ? BMAC_TXCFG_FDX : 0) |
 		    BMAC_TXCFG_NGU);
 	else
-		PUT_MACREG(txcfg, (hmep->hme_fdx ? BMAC_TXCFG_FDX: 0));
-	hmep->hme_macfdx = hmep->hme_fdx;
-
+		PUT_MACREG(txcfg, (fdx ? BMAC_TXCFG_FDX: 0));
 
 	i = 0;
-	if ((hme_param_lance_mode) && (hmep->hme_lance_mode_enable))
-		i = ((hme_param_ipg0 & HME_MASK_5BIT) << BMAC_XIFC_IPG0_SHIFT)
+	if ((hmep->hme_lance_mode) && (hmep->hme_lance_mode_enable))
+		i = ((hmep->hme_ipg0 & HME_MASK_5BIT) << BMAC_XIFC_IPG0_SHIFT)
 		    | BMAC_XIFC_LANCE_ENAB;
-	if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER)
+	if (phyad == HME_INTERNAL_PHYAD)
 		PUT_MACREG(xifc, i | (BMAC_XIFC_ENAB));
 	else
 		PUT_MACREG(xifc, i | (BMAC_XIFC_ENAB | BMAC_XIFC_MIIBUFDIS));
@@ -4406,59 +2837,6 @@ hmefreebufs(struct hme *hmep)
 }
 
 /*
- * hme_start_mifpoll() - Enables the polling of the BMSR register of the PHY.
- * After enabling the poll, delay for atleast 62us for one poll to be done.
- * Then read the MIF status register to auto-clear the MIF status field.
- * Then program the MIF interrupt mask register to enable interrupts for the
- * LINK_STATUS and JABBER_DETECT bits.
- */
-
-static void
-hme_start_mifpoll(struct hme *hmep)
-{
-	uint32_t cfg;
-
-	if (!hmep->hme_mifpoll_enable)
-		return;
-
-	cfg = (GET_MIFREG(mif_cfg) & ~(HME_MIF_CFGPD | HME_MIF_CFGPR));
-	PUT_MIFREG(mif_cfg,
-	    (cfg = (cfg | (hmep->hme_phyad << HME_MIF_CFGPD_SHIFT) |
-	    (HME_PHY_BMSR << HME_MIF_CFGPR_SHIFT) | HME_MIF_CFGPE)));
-
-	drv_usecwait(HME_MIF_POLL_DELAY);
-	hmep->hme_polling_on =		1;
-	hmep->hme_mifpoll_flag =	0;
-	hmep->hme_mifpoll_data =	(GET_MIFREG(mif_bsts) >> 16);
-
-	/* Do not poll for Jabber Detect for 100 Mbps speed */
-	if (((hmep->hme_mode == HME_AUTO_SPEED) &&
-	    (hmep->hme_tryspeed == HME_SPEED_100)) ||
-	    ((hmep->hme_mode == HME_FORCE_SPEED) &&
-	    (hmep->hme_forcespeed == HME_SPEED_100)))
-		PUT_MIFREG(mif_imask, ((uint16_t)~(PHY_BMSR_LNKSTS)));
-	else
-		PUT_MIFREG(mif_imask,
-		    (uint16_t)~(PHY_BMSR_LNKSTS | PHY_BMSR_JABDET));
-
-	CHECK_MIFREG();
-}
-
-static void
-hme_stop_mifpoll(struct hme *hmep)
-{
-	if ((!hmep->hme_mifpoll_enable) || (!hmep->hme_polling_on))
-		return;
-
-	PUT_MIFREG(mif_imask, 0xffff);	/* mask interrupts */
-	PUT_MIFREG(mif_cfg, (GET_MIFREG(mif_cfg) & ~HME_MIF_CFGPE));
-
-	hmep->hme_polling_on = 0;
-	drv_usecwait(HME_MIF_POLL_DELAY);
-	CHECK_MIFREG();
-}
-
-/*
  * Un-initialize (STOP) HME channel.
  */
 static void
@@ -4469,13 +2847,8 @@ hmeuninit(struct hme *hmep)
 	 */
 	HMEDELAY((hmep->hme_txindex == hmep->hme_txreclaim), HMEDRAINTIME);
 
-	hme_stop_timer(hmep);   /* acquire hme_linklock */
-	mutex_exit(&hmep->hme_linklock);
-
 	mutex_enter(&hmep->hme_intrlock);
 	mutex_enter(&hmep->hme_xmitlock);
-
-	hme_stop_mifpoll(hmep);
 
 	hmep->hme_flags &= ~HMERUNNING;
 
@@ -4601,7 +2974,6 @@ hmeintr(caddr_t arg)
 {
 	struct hme	*hmep = (void *)arg;
 	uint32_t	hmesbits;
-	uint32_t	mif_status;
 	uint32_t	serviced = DDI_INTR_UNCLAIMED;
 	uint32_t	num_reads = 0;
 	uint32_t	rflags;
@@ -4667,60 +3039,6 @@ hmeintr(caddr_t arg)
 			return (serviced);
 		}
 		hme_nonfatal_err(hmep, hmesbits);
-	}
-
-	if (hmesbits & HMEG_STATUS_MIF_INTR) {
-		mif_status = (GET_MIFREG(mif_bsts) >> 16);
-		if (!(mif_status & PHY_BMSR_LNKSTS)) {
-
-			if (hmep->hme_intrstats)
-				KIOIP->intrs[KSTAT_INTR_HARD]++;
-
-			hme_stop_mifpoll(hmep);
-			hmep->hme_mifpoll_flag = 1;
-			mutex_exit(&hmep->hme_intrlock);
-			hme_stop_timer(hmep);
-			hme_start_timer(hmep, hme_check_link, MSECOND(1));
-			return (serviced);
-		}
-		/*
-		 *
-		 * BugId 1261889 EscId 50699 ftp hangs @ 10 Mbps
-		 *
-		 * Here could be one cause:
-		 * national PHY sees jabber, goes into "Jabber function",
-		 * (see section 3.7.6 in PHY specs.), disables transmitter,
-		 * and waits for internal transmit enable to be de-asserted
-		 * for at least 750ms (the "unjab" time).  Also, the PHY
-		 * has asserted COL, the collision detect signal.
-		 *
-		 * In the meantime, the Sbus/FEPS, in never-give-up mode,
-		 * continually retries, backs off 16 times as per spec,
-		 * and restarts the transmission, so TX_EN is never
-		 * deasserted long enough, in particular TX_EN is turned
-		 * on approximately once every 4 microseconds on the
-		 * average.  PHY and MAC are deadlocked.
-		 *
-		 * Here is part of the fix:
-		 * On seeing the jabber, treat it like a hme_fatal_err
-		 * and reset both the Sbus/FEPS and the PHY.
-		 */
-
-		if (mif_status & (PHY_BMSR_JABDET)) {
-
-			/* national phy only defines this at 10 Mbps */
-			if (hme_param_speed == 0) { /* 10 Mbps speed ? */
-				hmep->hme_jab++;
-
-				/* treat jabber like a fatal error */
-				hmep->hme_linkcheck = 0; /* force PHY reset */
-				mutex_exit(&hmep->hme_intrlock);
-				(void) hmeinit(hmep);
-
-				return (serviced);
-			}
-		}
-		hme_start_mifpoll(hmep);
 	}
 
 	if (hmesbits & (HMEG_STATUS_TX_ALL | HMEG_STATUS_TINT)) {
@@ -5148,290 +3466,6 @@ hmesavecntrs(struct hme *hmep)
 
 	PUT_MACREG(nccnt, 0);
 	CHECK_MACREG();
-}
-
-/*
- * ndd support functions to get/set parameters
- */
-/* Free the Named Dispatch Table by calling hme_nd_free */
-static void
-hme_param_cleanup(struct hme *hmep)
-{
-	if (hmep->hme_g_nd)
-		(void) hme_nd_free(&hmep->hme_g_nd);
-}
-
-/*
- * Extracts the value from the hme parameter array and prints the
- * parameter value. cp points to the required parameter.
- */
-/* ARGSUSED */
-static int
-hme_param_get(queue_t *q, mblk_t *mp, caddr_t cp)
-{
-	hmeparam_t *hmepa = (void *)cp;
-
-	(void) mi_mpprintf(mp, "%d", hmepa->hme_param_val);
-	return (0);
-}
-
-/*
- * Register each element of the parameter array with the
- * named dispatch handler. Each element is loaded using
- * hme_nd_load()
- */
-/* ARGSUSED */
-static int
-hme_param_register(struct hme *hmep, hmeparam_t *hmepa, int cnt)
-{
-	int i;
-
-	/* First 4 elements are read-only */
-	for (i = 0; i < 4; i++, hmepa++)
-		if (!hme_nd_load(&hmep->hme_g_nd, hmepa->hme_param_name,
-		    (pfi_t)hme_param_get, (pfi_t)0, (caddr_t)hmepa)) {
-			(void) hme_nd_free(&hmep->hme_g_nd);
-			return (B_FALSE);
-		}
-	/* Next 10 elements are read and write */
-	for (i = 0; i < 10; i++, hmepa++)
-		if (hmepa->hme_param_name && hmepa->hme_param_name[0]) {
-			if (!hme_nd_load(&hmep->hme_g_nd,
-			    hmepa->hme_param_name, (pfi_t)hme_param_get,
-			    (pfi_t)hme_param_set, (caddr_t)hmepa)) {
-				(void) hme_nd_free(&hmep->hme_g_nd);
-				return (B_FALSE);
-
-			}
-		}
-	/* next 12 elements are read-only */
-	for (i = 0; i < 12; i++, hmepa++)
-		if (!hme_nd_load(&hmep->hme_g_nd, hmepa->hme_param_name,
-		    (pfi_t)hme_param_get, (pfi_t)0, (caddr_t)hmepa)) {
-			(void) hme_nd_free(&hmep->hme_g_nd);
-			return (B_FALSE);
-		}
-	/* Next 3  elements are read and write */
-	for (i = 0; i < 3; i++, hmepa++)
-		if (hmepa->hme_param_name && hmepa->hme_param_name[0]) {
-			if (!hme_nd_load(&hmep->hme_g_nd,
-			    hmepa->hme_param_name, (pfi_t)hme_param_get,
-			    (pfi_t)hme_param_set, (caddr_t)hmepa)) {
-				(void) hme_nd_free(&hmep->hme_g_nd);
-				return (B_FALSE);
-			}
-		}
-
-	return (B_TRUE);
-}
-
-/*
- * Sets the hme parameter to the value in the hme_param_register using
- * hme_nd_load().
- */
-/* ARGSUSED */
-static int
-hme_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp)
-{
-	char *end;
-	size_t new_value;
-	hmeparam_t *hmepa = (void *)cp;
-
-	new_value = mi_strtol(value, &end, 10);
-	if (end == value || new_value < hmepa->hme_param_min ||
-	    new_value > hmepa->hme_param_max) {
-			return (EINVAL);
-	}
-	hmepa->hme_param_val = (uint32_t)new_value;
-	return (0);
-
-}
-
-/* Free the table pointed to by 'ndp' */
-static void
-hme_nd_free(caddr_t *nd_pparam)
-{
-	ND	*nd;
-
-	if ((nd = (void *)(*nd_pparam)) != NULL) {
-		if (nd->nd_tbl)
-			mi_free((char *)nd->nd_tbl);
-		mi_free((char *)nd);
-		*nd_pparam = NULL;
-	}
-}
-
-static int
-hme_nd_getset(queue_t *q, caddr_t nd_param, MBLKP mp)
-{
-	int	err;
-	IOCP	iocp;
-	MBLKP	mp1;
-	ND	*nd;
-	NDE	*nde;
-	char	*valp;
-	size_t	avail;
-
-	if (!nd_param)
-		return (B_FALSE);
-
-	nd = (void *)nd_param;
-	iocp = (void *)mp->b_rptr;
-	if ((iocp->ioc_count == 0) || !(mp1 = mp->b_cont)) {
-		mp->b_datap->db_type = M_IOCACK;
-		iocp->ioc_count = 0;
-		iocp->ioc_error = EINVAL;
-		return (B_TRUE);
-	}
-
-	/*
-	 * NOTE - logic throughout nd_xxx assumes single data block for ioctl.
-	 *	However, existing code sends in some big buffers.
-	 */
-	avail = iocp->ioc_count;
-	if (mp1->b_cont) {
-		freemsg(mp1->b_cont);
-		mp1->b_cont = NULL;
-	}
-
-	mp1->b_datap->db_lim[-1] = '\0';	/* Force null termination */
-	valp = (char *)mp1->b_rptr;
-	for (nde = nd->nd_tbl; /* */; nde++) {
-		if (!nde->nde_name)
-			return (B_FALSE);
-		if (mi_strcmp(nde->nde_name, valp) == 0)
-			break;
-	}
-
-	err = EINVAL;
-	while (*valp++)
-		;
-	if (!*valp || valp >= (char *)mp1->b_wptr)
-		valp = NULL;
-	switch (iocp->ioc_cmd) {
-	case ND_GET:
-/*
- * (temporary) hack: "*valp" is size of user buffer for copyout. If result
- * of action routine is too big, free excess and return ioc_rval as buffer
- * size needed.  Return as many mblocks as will fit, free the rest.  For
- * backward compatibility, assume size of original ioctl buffer if "*valp"
- * bad or not given.
- */
-		if (valp)
-			avail = mi_strtol(valp, (char **)0, 10);
-		/* We overwrite the name/value with the reply data */
-		{
-			mblk_t *mp2 = mp1;
-
-			while (mp2) {
-				mp2->b_wptr = mp2->b_rptr;
-				mp2 = mp2->b_cont;
-			}
-		}
-		err = (*nde->nde_get_pfi)(q, mp1, nde->nde_data, iocp->ioc_cr);
-		if (!err) {
-			size_t	size_out;
-			ssize_t	excess;
-
-			iocp->ioc_rval = 0;
-
-			/* Tack on the null */
-			(void) mi_mpprintf_putc((char *)mp1, '\0');
-			size_out = msgdsize(mp1);
-			excess = size_out - avail;
-			if (excess > 0) {
-				iocp->ioc_rval = (int)size_out;
-				size_out -= excess;
-				(void) adjmsg(mp1, -(excess + 1));
-				(void) mi_mpprintf_putc((char *)mp1, '\0');
-			}
-			iocp->ioc_count = size_out;
-		}
-		break;
-
-	case ND_SET:
-		if (valp) {
-			if ((iocp->ioc_cr != NULL) &&
-			    ((err = secpolicy_net_config(iocp->ioc_cr, B_FALSE))
-			    == 0)) {
-				err = (*nde->nde_set_pfi)(q, mp1, valp,
-				    nde->nde_data, iocp->ioc_cr);
-			}
-			iocp->ioc_count = 0;
-			freemsg(mp1);
-			mp->b_cont = NULL;
-		}
-		break;
-
-	default:
-		break;
-	}
-
-	iocp->ioc_error = err;
-	mp->b_datap->db_type = M_IOCACK;
-	return (B_TRUE);
-}
-
-/*
- * Load 'name' into the named dispatch table pointed to by 'ndp'.
- * 'ndp' should be the address of a char pointer cell.  If the table
- * does not exist (*ndp == 0), a new table is allocated and 'ndp'
- * is stuffed.  If there is not enough space in the table for a new
- * entry, more space is allocated.
- */
-static boolean_t
-hme_nd_load(caddr_t *nd_pparam, char *name, pfi_t get_pfi,
-    pfi_t set_pfi, caddr_t data)
-{
-	ND	*nd;
-	NDE	*nde;
-
-	if (!nd_pparam)
-		return (B_FALSE);
-
-	if ((nd = (void *)(*nd_pparam)) == NULL) {
-		if ((nd = (void *)mi_alloc(sizeof (ND), BPRI_MED)) == NULL)
-			return (B_FALSE);
-		bzero(nd, sizeof (ND));
-		*nd_pparam = (caddr_t)nd;
-	}
-
-	if (nd->nd_tbl) {
-		for (nde = nd->nd_tbl; nde->nde_name; nde++) {
-			if (mi_strcmp(name, nde->nde_name) == 0)
-				goto fill_it;
-		}
-	}
-
-	if (nd->nd_free_count <= 1) {
-		if ((nde = (NDE *)mi_alloc(nd->nd_size +
-		    NDE_ALLOC_SIZE, BPRI_MED)) == NULL)
-			return (B_FALSE);
-		bzero(nde, nd->nd_size + NDE_ALLOC_SIZE);
-		nd->nd_free_count += NDE_ALLOC_COUNT;
-		if (nd->nd_tbl) {
-			bcopy(nd->nd_tbl, nde, nd->nd_size);
-			mi_free((char *)nd->nd_tbl);
-		} else {
-			nd->nd_free_count--;
-			nde->nde_name = "?";
-			nde->nde_get_pfi = nd_get_names;
-			nde->nde_set_pfi = nd_set_default;
-		}
-		nde->nde_data = (caddr_t)nd;
-		nd->nd_tbl = nde;
-		nd->nd_size += NDE_ALLOC_SIZE;
-	}
-
-	for (nde = nd->nd_tbl; nde->nde_name; nde++)
-		;
-	nd->nd_free_count--;
-fill_it:
-	nde->nde_name = name;
-	nde->nde_get_pfi = get_pfi ? get_pfi : nd_get_default;
-	nde->nde_set_pfi = set_pfi ? set_pfi : nd_set_default;
-	nde->nde_data = data;
-	return (B_TRUE);
 }
 
 /*

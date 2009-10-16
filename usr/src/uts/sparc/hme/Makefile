@@ -21,9 +21,7 @@
 #
 # uts/sparc/hme/Makefile
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the hme driver
@@ -59,16 +57,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Ndrv/ip -Nmisc/mac
-
-#
-# For now, disable these lint checks; maintainers should endeavor
-# to investigate and remove these for maximum lint coverage.
-# Please do not carry these forward to new Makefiles.
-#
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
-LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
-LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
+LDFLAGS		+= -dy -Nmisc/mii -Nmisc/mac
 
 #
 #	Default build targets.

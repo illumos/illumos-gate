@@ -51,6 +51,7 @@ static const struct {
 	OUI(DAVICOM_2, "Davicom Semiconductor"),
 	OUI(ICPLUS, "IC Plus Corp."),
 	OUI(ICS, "Integrated Circuit Systems"),
+	OUI(LUCENT, "Lucent Technologies"),
 	OUI(INTEL, "Intel"),
 	OUI(MARVELL, "Marvell Technology"),
 	OUI(NATIONAL_SEMI, "National Semiconductor"),
@@ -105,6 +106,8 @@ static const struct {
 	ID(ICS, ICS1890, "ICS1890"),
 	ID(ICS, ICS1892, "ICS1892"),
 	ID(ICS, ICS1893, "ICS1893"),
+
+	ID(LUCENT, LU6612, "LU6612"),
 
 	{ 0, 0, NULL },
 };

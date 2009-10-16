@@ -30,99 +30,7 @@
 extern "C" {
 #endif
 
-/* mode */
-#define	HME_AUTO_SPEED	0
-#define	HME_FORCE_SPEED	1
-
-/* speed */
-#define	HME_SPEED_10	10
-#define	HME_SPEED_100	100
-
-/* half-duplex or full-duplex mode */
-
-#define	HME_HALF_DUPLEX	0
-#define	HME_FULL_DUPLEX	1
-
 #ifdef _KERNEL
-
-/* Named Dispatch Parameter Management Structure */
-typedef struct	hmeparam_s {
-	uint32_t hme_param_min;
-	uint32_t hme_param_max;
-	uint32_t hme_param_val;
-	char	*hme_param_name;
-} hmeparam_t;
-
-
-static hmeparam_t	hme_param_arr[] = {
-	/* min		max		value		name */
-	{  0,		1,		1,		"transceiver_inuse"},
-	{  0,		1,		0,		"link_status"},
-	{  0,		1,		0,		"link_speed"},
-	{  0,		1,		0,		"link_mode"},
-	{  0,		255,		8,		"ipg1"},
-	{  0,		255,		4,		"ipg2"},
-	{  0,		1,		0,		"use_int_xcvr"},
-	{  0,		255,		0,		"pace_size"},
-	{  0,		1,		1,		"adv_autoneg_cap"},
-	{  0,		1,		1,		"adv_100T4_cap"},
-	{  0,		1,		1,		"adv_100fdx_cap"},
-	{  0,		1,		1,		"adv_100hdx_cap"},
-	{  0,		1,		1,		"adv_10fdx_cap"},
-	{  0,		1,		1,		"adv_10hdx_cap"},
-	{  0,		1,		1,		"autoneg_cap"},
-	{  0,		1,		1,		"100T4_cap"},
-	{  0,		1,		1,		"100fdx_cap"},
-	{  0,		1,		1,		"100hdx_cap"},
-	{  0,		1,		1,		"10fdx_cap"},
-	{  0,		1,		1,		"10hdx_cap"},
-	{  0,		1,		0,		"lp_autoneg_cap"},
-	{  0,		1,		0,		"lp_100T4_cap"},
-	{  0,		1,		0,		"lp_100fdx_cap"},
-	{  0,		1,		0,		"lp_100hdx_cap"},
-	{  0,		1,		0,		"lp_10fdx_cap"},
-	{  0,		1,		0,		"lp_10hdx_cap"},
-	{  0,		1,		1,		"lance_mode"},
-	{  0,		31,		16,		"ipg0"},
-};
-
-
-#define	hme_param_transceiver	(hmep->hme_param_arr[0].hme_param_val)
-#define	hme_param_linkup	(hmep->hme_param_arr[1].hme_param_val)
-#define	hme_param_speed		(hmep->hme_param_arr[2].hme_param_val)
-#define	hme_param_mode		(hmep->hme_param_arr[3].hme_param_val)
-#define	hme_param_ipg1		(hmep->hme_param_arr[4].hme_param_val)
-#define	hme_param_ipg2		(hmep->hme_param_arr[5].hme_param_val)
-#define	hme_param_use_intphy	(hmep->hme_param_arr[6].hme_param_val)
-#define	hme_param_pace_count	(hmep->hme_param_arr[7].hme_param_val)
-#define	hme_param_autoneg	(hmep->hme_param_arr[8].hme_param_val)
-#define	hme_param_anar_100T4	(hmep->hme_param_arr[9].hme_param_val)
-#define	hme_param_anar_100fdx	(hmep->hme_param_arr[10].hme_param_val)
-#define	hme_param_anar_100hdx	(hmep->hme_param_arr[11].hme_param_val)
-#define	hme_param_anar_10fdx	(hmep->hme_param_arr[12].hme_param_val)
-#define	hme_param_anar_10hdx	(hmep->hme_param_arr[13].hme_param_val)
-#define	hme_param_bmsr_ancap	(hmep->hme_param_arr[14].hme_param_val)
-#define	hme_param_bmsr_100T4	(hmep->hme_param_arr[15].hme_param_val)
-#define	hme_param_bmsr_100fdx	(hmep->hme_param_arr[16].hme_param_val)
-#define	hme_param_bmsr_100hdx	(hmep->hme_param_arr[17].hme_param_val)
-#define	hme_param_bmsr_10fdx	(hmep->hme_param_arr[18].hme_param_val)
-#define	hme_param_bmsr_10hdx	(hmep->hme_param_arr[19].hme_param_val)
-#define	hme_param_aner_lpancap	(hmep->hme_param_arr[20].hme_param_val)
-#define	hme_param_anlpar_100T4	(hmep->hme_param_arr[21].hme_param_val)
-#define	hme_param_anlpar_100fdx	(hmep->hme_param_arr[22].hme_param_val)
-#define	hme_param_anlpar_100hdx	(hmep->hme_param_arr[23].hme_param_val)
-#define	hme_param_anlpar_10fdx	(hmep->hme_param_arr[24].hme_param_val)
-#define	hme_param_anlpar_10hdx	(hmep->hme_param_arr[25].hme_param_val)
-#define	hme_param_lance_mode	(hmep->hme_param_arr[26].hme_param_val)
-#define	hme_param_ipg0		(hmep->hme_param_arr[27].hme_param_val)
-
-#define	HME_PARAM_CNT	29
-
-
-/* command */
-
-#define	HME_ND_GET	ND_GET
-#define	HME_ND_SET	ND_SET
 
 /* default IPG settings */
 #define	IPG1	8
@@ -143,50 +51,12 @@ static hmeparam_t	hme_param_arr[] = {
  * ordered on minor device number.
  */
 
-#define	MSECOND(t)	t
-#define	SECOND(t)	t*1000
-#define	HME_TICKS	MSECOND(100)
-
-#define	HME_LINKCHECK_TIMER	SECOND(30)
-
 #define	HME_2P0_REVID		0xa0 /* hme - feps. */
 #define	HME_2P1_REVID		0x20
 #define	HME_2P1_REVID_OBP	0x21
 #define	HME_1C0_REVID		0xc0 /* cheerio 1.0, hme 2.0 equiv. */
 #define	HME_2C0_REVID		0xc1 /* cheerio 2.0, hme 2.2 equiv. */
 #define	HME_REV_VERS_MASK	0x0f /* Mask to retain bits for cheerio ver */
-
-#define	HME_NTRIES_LOW		(SECOND(5)/HME_TICKS)	/* 5 Seconds */
-#define	HME_NTRIES_HIGH		(SECOND(5)/HME_TICKS)	/* 5 Seconds */
-#define	HME_NTRIES_LOW_10	(SECOND(2)/HME_TICKS)	/* 2 Seconds */
-#define	HME_LINKDOWN_TIME	(SECOND(2)/HME_TICKS)	/* 2 Seconds */
-
-#define	HME_LINKDOWN_OK		0
-#define	HME_FORCE_LINKDOWN	1
-#define	HME_LINKDOWN_STARTED	2
-#define	HME_LINKDOWN_DONE	3
-
-#define	P1_0    0x100
-
-#define	HME_EXTERNAL_TRANSCEIVER	0
-#define	HME_INTERNAL_TRANSCEIVER	1
-#define	HME_NO_TRANSCEIVER		2
-
-#define	HME_HWAN_TRY		0 /* Try Hardware autonegotiation */
-#define	HME_HWAN_INPROGRESS	1 /* Hardware autonegotiation in progress */
-#define	HME_HWAN_SUCCESFUL	2 /* Hardware autonegotiation succesful */
-#define	HME_HWAN_FAILED		3 /* Hardware autonegotiation failed */
-
-#define	RESET_TO_BE_ISSUED	0 /* Reset command to be issued to the PHY */
-#define	RESET_ISSUED		1 /* Reset command has been issued */
-#define	ISOLATE_ISSUED		2 /* Isolate-remove command has been issued */
-#define	POWER_OFF_ISSUED	3 /* The QSI Phy may have problems with */
-					/* Power rampup. Issue powerdown in   */
-					/* the driver to insure good reset.   */
-struct	hmesave {
-	ulong_t		hme_starts;
-	uint32_t	hme_opackets;
-};
 
 typedef struct {
 	ddi_dma_handle_t	dmah;
@@ -202,68 +72,31 @@ typedef struct {
  */
 struct	hme {
 	mac_handle_t		hme_mh;		/* GLDv3 handle */
+	mii_handle_t		hme_mii;
 	dev_info_t		*dip;		/* associated dev_info */
 	int			instance;	/* instance */
 	ulong_t			pagesize;	/* btop(9F) */
-
-	/*
-	 * xcvr information
-	 */
-	uint16_t		hme_idr1;	/* PHY IDR1 register */
-	uint16_t		hme_idr2;	/* PHY IDR2 register */
-	uint16_t		hme_anar;	/* PHY ANAR register */
-	uint16_t		hme_anlpar;	/* PHY ANLPAR register */
-	uint16_t		hme_aner;	/* PHY ANER register */
 
 	int			hme_mifpoll_enable;
 	int			hme_frame_enable;
 	int			hme_lance_mode_enable;
 	int			hme_rxcv_enable;
 
+	uint32_t		hme_lance_mode;
+	uint32_t		hme_ipg0;
+	uint32_t		hme_ipg1;
+	uint32_t		hme_ipg2;
+
 	uint_t			hme_burstsizes; /* binary encoded val */
 	uint32_t		hme_config;	/* Config reg store */
 
-	int			hme_phy_retries; /* phy reset failures */
 	int			hme_phy_failure; /* phy failure type */
 
 	int			hme_64bit_xfer;	/* 64-bit Sbus xfers */
 	int			hme_phyad;
-	int			hme_autoneg;
 
-	caddr_t			hme_g_nd;	/* head of the */
-						/* named dispatch table */
-	hmeparam_t		hme_param_arr[HME_PARAM_CNT];
-	int			hme_transceiver;  /* current PHY in use */
-	int			hme_link_pulse_disabled;
-	uint16_t		hme_bmcr;	/* PHY control register */
-	uint16_t		hme_bmsr;	/* PHY status register */
-	int			hme_mode;	/* auto/forced mode */
-	int			hme_linkup;	/* link status */
-	int			hme_xcvr_state; /* transceiver status */
-	int			hme_forcespeed; /* speed in forced mode */
-	int			hme_tryspeed;	/* speed in auto mode */
-	int			hme_fdx;	/* full-duplex mode */
-	int			hme_pace_count;	/* pacing pkt count */
-
-	int			hme_macfdx;
-	int			hme_linkcheck;
-	int			hme_force_linkdown;
 	int			hme_nlasttries;
-	int			hme_ntries;
-	int			hme_delay;
-	int			hme_linkup_10;
-	int			hme_linkup_cnt;
-	timeout_id_t		hme_timerid;
 	int			hme_cheerio_mode;
-	int			hme_polling_on;
-	int			hme_mifpoll_data;
-	int			hme_mifpoll_flag;
-
-	/*
-	 * This is part of the hardening of the hme driver
-	 * (following x fields)
-	 */
-	ushort_t		hme_disabled;
 
 	struct	ether_addr	hme_factaddr;	/* factory mac address */
 	struct	ether_addr	hme_ouraddr;	/* individual address */
@@ -288,7 +121,6 @@ struct	hme {
 
 	kmutex_t	hme_xmitlock;		/* protect xmit-side fields */
 	kmutex_t	hme_intrlock;		/* protect intr-side fields */
-	kmutex_t	hme_linklock;		/* protect link-side fields */
 	ddi_iblock_cookie_t	hme_cookie;	/* interrupt cookie */
 
 	struct	hme_rmd	*hme_rmdp;	/* receive descriptor ring start */
@@ -331,11 +163,7 @@ struct	hme {
 
 	kstat_t	*hme_ksp;	/* kstat pointer */
 	kstat_t	*hme_intrstats;	/* kstat interrupt counter */
-	uint64_t hme_iipackets;	/* Used to store the Count of packets */
-				/* recieved at the start of 'hme_check_link' */
-				/* watch dog interval. */
 
-	uint64_t hme_ifspeed;		/* ifspeed is now in bits/sec	*/
 	uint64_t hme_ipackets;
 	uint64_t hme_rbytes;
 	uint64_t hme_ierrors;
@@ -393,7 +221,6 @@ struct	hme {
 	uint32_t hme_starts;
 	uint32_t hme_txhung;
 	time_t hme_msg_time;
-	struct hmesave hmesave;
 
 	/*
 	 * Debuging kstats
