@@ -1009,12 +1009,13 @@ localpath(char *path, struct vnode *vrootp, cred_t *cr)
  * (or vfs_vnode_path is not set).
  */
 static int
-dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, cred_t *cr)
+dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, int flags,
+    cred_t *cr)
 {
 	pathname_t pn, rpn, emptypn;
 	vnode_t *cmpvp, *pvp = NULL;
 	vnode_t *startvp = vp;
-	int err = 0;
+	int err = 0, vprivs;
 	size_t complen;
 	char *dbuf;
 	dirent64_t *dp;
@@ -1086,7 +1087,7 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, cred_t *cr)
 				VN_HOLD(vrootp);
 				if (vrootp != rootdir)
 					VN_HOLD(vrootp);
-				if (lookuppnvp(&pn, &rpn, 0, NULL,
+				if (lookuppnvp(&pn, &rpn, flags, NULL,
 				    &cmpvp, vrootp, vrootp, cr) == 0) {
 
 					if (VN_CMP(vp, cmpvp)) {
@@ -1127,7 +1128,7 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, cred_t *cr)
 				VN_HOLD(vrootp);
 				if (vrootp != rootdir)
 					VN_HOLD(vrootp);
-				if (lookuppnvp(&pn, &rpn, 0, NULL,
+				if (lookuppnvp(&pn, &rpn, flags, NULL,
 				    &cmpvp, vrootp, vrootp, cr) == 0) {
 
 					if (VN_CMP(vp, cmpvp)) {
@@ -1179,6 +1180,15 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, cred_t *cr)
 		 */
 		if (VN_CMP(pvp, vp)) {
 			err = ENOENT;
+			goto out;
+		}
+
+		/*
+		 * Check if we have read and search privilege so, that
+		 * we can lookup the path in the directory
+		 */
+		vprivs = (flags & LOOKUP_CHECKREAD) ? VREAD | VEXEC : VEXEC;
+		if ((err = VOP_ACCESS(pvp, vprivs, 0, cr, NULL)) != 0) {
 			goto out;
 		}
 
@@ -1441,7 +1451,18 @@ notcached:
 		 * directory search to find the full path.
 		 */
 		if ((pvp = dnlc_reverse_lookup(vp, path, MAXNAMELEN)) != NULL) {
-			ret = dirtopath(vrootp, pvp, buf, buflen, cr);
+			/*
+			 * Check if we have read privilege so, that
+			 * we can lookup the path in the directory
+			 */
+			ret = 0;
+			if ((flags & LOOKUP_CHECKREAD)) {
+				ret = VOP_ACCESS(pvp, VREAD, 0, cr, NULL);
+			}
+			if (ret == 0) {
+				ret = dirtopath(vrootp, pvp, buf, buflen,
+				    flags, cr);
+			}
 			if (ret == 0) {
 				len = strlen(buf);
 				if (len + strlen(path) + 1 >= buflen) {
@@ -1458,7 +1479,7 @@ notcached:
 		} else
 			ret = ENOENT;
 	} else
-		ret = dirtopath(vrootp, vp, buf, buflen, cr);
+		ret = dirtopath(vrootp, vp, buf, buflen, flags, cr);
 
 	VN_RELE(vrootp);
 	if (doclose) {
