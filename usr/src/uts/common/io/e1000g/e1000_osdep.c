@@ -20,7 +20,7 @@
 
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDLv1.
+ * Use is subject to license terms.
  */
 
 #include "e1000_osdep.h"
@@ -129,7 +129,6 @@ e1000_destroy_hw_mutex(struct e1000_hw *hw)
 	case e1000_ich9lan:
 	case e1000_ich10lan:
 	case e1000_pchlan:
-		cmn_err(CE_WARN, "destroy mutexes in e1000_destroy_hw_mutex\n");
 		dev_spec = &hw->dev_spec.ich8lan;
 		E1000_MUTEX_DESTROY(&dev_spec->nvm_mutex);
 		E1000_MUTEX_DESTROY(&dev_spec->swflag_mutex);

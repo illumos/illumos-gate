@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.15";
+static char e1000g_version[] = "Driver Ver. 5.3.16";
 
 /*
  * Proto types for DDI entry points
@@ -2091,8 +2091,10 @@ e1000g_intr_pciexpress(caddr_t arg)
 	Adapter = (struct e1000g *)(uintptr_t)arg;
 	icr = E1000_READ_REG(&Adapter->shared, E1000_ICR);
 
-	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		return (DDI_INTR_CLAIMED);
+	}
 
 	if (icr & E1000_ICR_INT_ASSERTED) {
 		/*
@@ -2127,8 +2129,10 @@ e1000g_intr(caddr_t arg)
 	Adapter = (struct e1000g *)(uintptr_t)arg;
 	icr = E1000_READ_REG(&Adapter->shared, E1000_ICR);
 
-	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+		return (DDI_INTR_CLAIMED);
+	}
 
 	if (icr) {
 		/*
@@ -3318,9 +3322,11 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 			else
 				e1000g_clear_tx_interrupt(Adapter);
 			if (e1000g_check_acc_handle(
-			    Adapter->osdep.reg_handle) != DDI_FM_OK)
+			    Adapter->osdep.reg_handle) != DDI_FM_OK) {
 				ddi_fm_service_impact(Adapter->dip,
 				    DDI_SERVICE_DEGRADED);
+				err = EIO;
+			}
 		}
 		return (err);
 	}
@@ -3337,9 +3343,11 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 			Adapter->tx_intr_delay = (uint32_t)result;
 			E1000_WRITE_REG(hw, E1000_TIDV, Adapter->tx_intr_delay);
 			if (e1000g_check_acc_handle(
-			    Adapter->osdep.reg_handle) != DDI_FM_OK)
+			    Adapter->osdep.reg_handle) != DDI_FM_OK) {
 				ddi_fm_service_impact(Adapter->dip,
 				    DDI_SERVICE_DEGRADED);
+				err = EIO;
+			}
 		}
 		return (err);
 	}
@@ -3357,9 +3365,11 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 			E1000_WRITE_REG(hw, E1000_TADV,
 			    Adapter->tx_intr_abs_delay);
 			if (e1000g_check_acc_handle(
-			    Adapter->osdep.reg_handle) != DDI_FM_OK)
+			    Adapter->osdep.reg_handle) != DDI_FM_OK) {
 				ddi_fm_service_impact(Adapter->dip,
 				    DDI_SERVICE_DEGRADED);
+				err = EIO;
+			}
 		}
 		return (err);
 	}
@@ -3402,9 +3412,11 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 			Adapter->rx_intr_delay = (uint32_t)result;
 			E1000_WRITE_REG(hw, E1000_RDTR, Adapter->rx_intr_delay);
 			if (e1000g_check_acc_handle(
-			    Adapter->osdep.reg_handle) != DDI_FM_OK)
+			    Adapter->osdep.reg_handle) != DDI_FM_OK) {
 				ddi_fm_service_impact(Adapter->dip,
 				    DDI_SERVICE_DEGRADED);
+				err = EIO;
+			}
 		}
 		return (err);
 	}
@@ -3422,9 +3434,11 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 			E1000_WRITE_REG(hw, E1000_RADV,
 			    Adapter->rx_intr_abs_delay);
 			if (e1000g_check_acc_handle(
-			    Adapter->osdep.reg_handle) != DDI_FM_OK)
+			    Adapter->osdep.reg_handle) != DDI_FM_OK) {
 				ddi_fm_service_impact(Adapter->dip,
 				    DDI_SERVICE_DEGRADED);
+				err = EIO;
+			}
 		}
 		return (err);
 	}
@@ -3444,9 +3458,11 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 				E1000_WRITE_REG(hw, E1000_ITR,
 				    Adapter->intr_throttling_rate);
 				if (e1000g_check_acc_handle(
-				    Adapter->osdep.reg_handle) != DDI_FM_OK)
+				    Adapter->osdep.reg_handle) != DDI_FM_OK) {
 					ddi_fm_service_impact(Adapter->dip,
 					    DDI_SERVICE_DEGRADED);
+					err = EIO;
+				}
 			} else
 				err = EINVAL;
 		}

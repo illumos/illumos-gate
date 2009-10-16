@@ -441,6 +441,7 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 	if (e1000g_check_dma_handle(rx_data->rbd_dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 		Adapter->e1000g_state |= E1000G_ERROR;
+		return (NULL);
 	}
 
 	current_desc = rx_data->rbd_next;
@@ -449,7 +450,7 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 		 * don't send anything up. just clear the RFD
 		 */
 		E1000G_DEBUG_STAT(rx_ring->stat_none);
-		return (ret_mp);
+		return (NULL);
 	}
 
 	max_size = Adapter->max_frame_size - ETHERFCSL - VLAN_TAGSZ;
@@ -512,6 +513,8 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t sz)
 			ddi_fm_service_impact(Adapter->dip,
 			    DDI_SERVICE_DEGRADED);
 			Adapter->e1000g_state |= E1000G_ERROR;
+
+			goto rx_drop;
 		}
 
 		accept_frame = (current_desc->errors == 0) ||

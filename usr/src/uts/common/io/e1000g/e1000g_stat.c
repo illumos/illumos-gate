@@ -307,8 +307,10 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 
 	rw_exit(&Adapter->chip_lock);
 
-	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_UNAFFECTED);
+		return (EIO);
+	}
 
 	return (0);
 }
@@ -690,8 +692,10 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	rw_exit(&Adapter->chip_lock);
 
-	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
+	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_UNAFFECTED);
+		return (EIO);
+	}
 
 	return (0);
 }

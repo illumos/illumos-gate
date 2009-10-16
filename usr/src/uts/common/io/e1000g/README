@@ -685,7 +685,7 @@ Notes on packaging:
 
 5.3.12
 ====
-  This version has the following fix:
+  This version has the following fixes:
    6846262 T2000 fma shows fault.io.pciex.device-interr in snv_115
    6870404 e1000g_reset can call e1000g_start after releasing dma resources
 
@@ -697,13 +697,20 @@ Notes on packaging:
 
 5.3.14
 ====
-  This version has the following fix:
+  This version has the following fixes:
    6820747 kstat output incorrect for MMF version of e1000g making it impossible to troubleshoot
    6847888 HW initialization updates for 82541 and 82547 chips
 
 5.3.15
 ======
-  This version has the following fix:
+  This version has the following fixes:
    6797885 need to add support for network device (8086,10ea) in a new Intel system
    6803799 need to add network device support (8086,10ef) for a new Intel system
    6808388 e1000g inteface experience packet lost when switch between joining and leaving a multicast stream
+
+5.3.16
+======
+  This version has the following fixes:
+   6881588 e1000g functions should return when e1000g_check_dma_handle() fails
+   6888320 e1000g emits scary mutex message on the console
+
