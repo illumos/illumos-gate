@@ -24,7 +24,7 @@
 /*	  All Rights Reserved					*/
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -780,7 +780,7 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			mutex_exit(&asy->asy_excl_hi);
 			mutex_exit(&asy->asy_excl);
 			mutex_exit(&asy->asy_soft_sr);
-			cmn_err(CE_WARN, "Cannot identify UART chip at %p\n",
+			cmn_err(CE_WARN, "!Cannot identify UART chip at %p\n",
 			    (void *)asy->asy_ioaddr);
 			return (DDI_FAILURE);
 		}
@@ -991,7 +991,7 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		mutex_destroy(&asy->asy_excl_hi);
 		mutex_destroy(&asy->asy_soft_sr);
 		ddi_regs_map_free(&asy->asy_iohandle);
-		cmn_err(CE_CONT, "Cannot identify UART chip at %p\n",
+		cmn_err(CE_CONT, "!Cannot identify UART chip at %p\n",
 		    (void *)asy->asy_ioaddr);
 		asy_soft_state_free(asy);
 		return (DDI_FAILURE);
@@ -1253,7 +1253,7 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 			 * 8250 and 8250B don't have scratch registers,
 			 * but only worked in ancient PC XT's anyway.
 			 */
-			cmn_err(CE_CONT, "asy%d: UART @ %p "
+			cmn_err(CE_CONT, "!asy%d: UART @ %p "
 			    "scratch register: expected 0x5a, got 0x%02x\n",
 			    asy->asy_unit, (void *)asy->asy_ioaddr, ret);
 			return (DDI_FAILURE);
