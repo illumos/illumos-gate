@@ -69,6 +69,7 @@
 #include <sys/mdeg.h>
 #include <sys/note.h>
 #include <sys/open.h>
+#include <sys/random.h>
 #include <sys/sdt.h>
 #include <sys/stat.h>
 #include <sys/sunddi.h>
@@ -82,6 +83,7 @@
 #include <sys/cdio.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/dktp/dadkio.h>
+#include <sys/fs/dv_node.h>
 #include <sys/mhd.h>
 #include <sys/scsi/generic/sense.h>
 #include <sys/scsi/impl/uscsi.h>
@@ -174,18 +176,20 @@ static int	vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg);
 static int	vdc_handle_dring_reg_msg(vdc_t *vdc, vio_dring_reg_msg_t *msg);
 static int 	vdc_send_request(vdc_t *vdcp, int operation,
 		    caddr_t addr, size_t nbytes, int slice, diskaddr_t offset,
-		    int cb_type, void *cb_arg, vio_desc_direction_t dir);
+		    buf_t *bufp, vio_desc_direction_t dir, int flags);
 static int	vdc_map_to_shared_dring(vdc_t *vdcp, int idx);
 static int 	vdc_populate_descriptor(vdc_t *vdcp, int operation,
 		    caddr_t addr, size_t nbytes, int slice, diskaddr_t offset,
-		    int cb_type, void *cb_arg, vio_desc_direction_t dir);
+		    buf_t *bufp, vio_desc_direction_t dir, int flags);
 static int 	vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr,
-		    size_t nbytes, int slice, diskaddr_t offset, int cb_type,
-		    void *cb_arg, vio_desc_direction_t dir, boolean_t);
+		    size_t nbytes, int slice, diskaddr_t offset,
+		    vio_desc_direction_t dir, boolean_t);
+static int	vdc_do_op(vdc_t *vdc, int op, caddr_t addr, size_t nbytes,
+		    int slice, diskaddr_t offset, struct buf *bufp,
+		    vio_desc_direction_t dir, int flags);
 
 static int	vdc_wait_for_response(vdc_t *vdcp, vio_msg_t *msgp);
-static int	vdc_drain_response(vdc_t *vdcp, vio_cb_type_t cb_type,
-		    struct buf *buf);
+static int	vdc_drain_response(vdc_t *vdcp, struct buf *buf);
 static int	vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx);
 static int	vdc_populate_mem_hdl(vdc_t *vdcp, vdc_local_desc_t *ldep);
 static int	vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg);
@@ -222,9 +226,12 @@ static int	vdc_set_efi_convert(vdc_t *vdc, void *from, void *to,
 		    int mode, int dir);
 
 static void 	vdc_ownership_update(vdc_t *vdc, int ownership_flags);
-static int	vdc_access_set(vdc_t *vdc, uint64_t flags, int mode);
-static vdc_io_t	*vdc_failfast_io_queue(vdc_t *vdc, struct buf *buf);
-static int	vdc_failfast_check_resv(vdc_t *vdc);
+static int	vdc_access_set(vdc_t *vdc, uint64_t flags);
+static vdc_io_t	*vdc_eio_queue(vdc_t *vdc, int index);
+static void	vdc_eio_unqueue(vdc_t *vdc, clock_t deadline,
+		    boolean_t complete_io);
+static int	vdc_eio_check(vdc_t *vdc, int flags);
+static void	vdc_eio_thread(void *arg);
 
 /*
  * Module variables
@@ -392,7 +399,7 @@ vdc_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,  void *arg, void **resultp)
 static int
 vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	kt_did_t failfast_tid, ownership_tid;
+	kt_did_t eio_tid, ownership_tid;
 	int	instance;
 	int	rv;
 	vdc_server_t *srvr;
@@ -418,14 +425,7 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	/*
-	 * This function is called when vdc is detached or if it has failed to
-	 * attach. In that case, the attach may have fail before the vdisk type
-	 * has been set so we can't call vdc_is_opened(). However as the attach
-	 * has failed, we know that the vdisk is not opened and we can safely
-	 * detach.
-	 */
-	if (vdc->vdisk_type != VD_DISK_TYPE_UNK && vdc_is_opened(vdc)) {
+	if (vdc_is_opened(vdc)) {
 		DMSG(vdc, 0, "[%d] Cannot detach: device is open", instance);
 		return (DDI_FAILURE);
 	}
@@ -449,7 +449,7 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/* If we took ownership, release ownership */
 	mutex_enter(&vdc->ownership_lock);
 	if (vdc->ownership & VDC_OWNERSHIP_GRANTED) {
-		rv = vdc_access_set(vdc, VD_ACCESS_SET_CLEAR, FKIOCTL);
+		rv = vdc_access_set(vdc, VD_ACCESS_SET_CLEAR);
 		if (rv == 0) {
 			vdc_ownership_update(vdc, VDC_OWNERSHIP_NONE);
 		}
@@ -487,6 +487,9 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			    instance);
 			vdc->state = VDC_STATE_RESETTING;
 			cv_signal(&vdc->initwait_cv);
+		} else if (vdc->state == VDC_STATE_FAILED) {
+			vdc->io_pending = B_TRUE;
+			cv_signal(&vdc->io_pending_cv);
 		}
 		mutex_exit(&vdc->lock);
 
@@ -504,12 +507,13 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	vdc_fini_ports(vdc);
 
-	if (vdc->failfast_thread) {
-		failfast_tid = vdc->failfast_thread->t_did;
+	if (vdc->eio_thread) {
+		eio_tid = vdc->eio_thread->t_did;
 		vdc->failfast_interval = 0;
-		cv_signal(&vdc->failfast_cv);
+		ASSERT(vdc->num_servers == 0);
+		cv_signal(&vdc->eio_cv);
 	} else {
-		failfast_tid = 0;
+		eio_tid = 0;
 	}
 
 	if (vdc->ownership & VDC_OWNERSHIP_WANTED) {
@@ -522,8 +526,8 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	mutex_exit(&vdc->lock);
 
-	if (failfast_tid != 0)
-		thread_join(failfast_tid);
+	if (eio_tid != 0)
+		thread_join(eio_tid);
 
 	if (ownership_tid != 0)
 		thread_join(ownership_tid);
@@ -548,13 +552,12 @@ vdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		cv_destroy(&vdc->initwait_cv);
 		cv_destroy(&vdc->dring_free_cv);
 		cv_destroy(&vdc->membind_cv);
-		cv_destroy(&vdc->sync_pending_cv);
 		cv_destroy(&vdc->sync_blocked_cv);
 		cv_destroy(&vdc->read_cv);
 		cv_destroy(&vdc->running_cv);
+		cv_destroy(&vdc->io_pending_cv);
 		cv_destroy(&vdc->ownership_cv);
-		cv_destroy(&vdc->failfast_cv);
-		cv_destroy(&vdc->failfast_io_cv);
+		cv_destroy(&vdc->eio_cv);
 	}
 
 	if (vdc->minfo)
@@ -647,17 +650,16 @@ vdc_do_attach(dev_info_t *dip)
 	cv_init(&vdc->dring_free_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&vdc->membind_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&vdc->running_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&vdc->io_pending_cv, NULL, CV_DRIVER, NULL);
 
+	vdc->io_pending = B_FALSE;
 	vdc->threads_pending = 0;
-	vdc->sync_op_pending = B_FALSE;
 	vdc->sync_op_blocked = B_FALSE;
-	cv_init(&vdc->sync_pending_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&vdc->sync_blocked_cv, NULL, CV_DRIVER, NULL);
 
 	mutex_init(&vdc->ownership_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&vdc->ownership_cv, NULL, CV_DRIVER, NULL);
-	cv_init(&vdc->failfast_cv, NULL, CV_DRIVER, NULL);
-	cv_init(&vdc->failfast_io_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&vdc->eio_cv, NULL, CV_DRIVER, NULL);
 
 	/* init blocking msg read functionality */
 	mutex_init(&vdc->read_lock, NULL, MUTEX_DRIVER, NULL);
@@ -699,6 +701,19 @@ vdc_do_attach(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
+	/*
+	 * If there are multiple servers then start the eio thread.
+	 */
+	if (vdc->num_servers > 1) {
+		vdc->eio_thread = thread_create(NULL, 0, vdc_eio_thread, vdc, 0,
+		    &p0, TS_RUN, v.v_maxsyspri - 2);
+		if (vdc->eio_thread == NULL) {
+			cmn_err(CE_NOTE, "[%d] Failed to create error "
+			    "I/O thread", instance);
+			return (DDI_FAILURE);
+		}
+	}
+
 	vdc->initialized |= VDC_THREAD;
 
 	atomic_inc_32(&vdc_instance_count);
@@ -722,13 +737,6 @@ vdc_do_attach(dev_info_t *dip)
 		DMSG(vdc, 0, "[%d] Failed to create device nodes",
 		    instance);
 		goto return_status;
-	}
-
-	/*
-	 * Setup devid
-	 */
-	if (vdc_setup_devid(vdc)) {
-		DMSG(vdc, 0, "[%d] No device id available\n", instance);
 	}
 
 	/*
@@ -1029,7 +1037,6 @@ vdc_create_device_nodes_vtoc(vdc_t *vdc)
  * Return Values
  *	0		- Success
  *	EIO		- Failed to create node
- *	EINVAL		- Unknown type of disk exported
  */
 static int
 vdc_create_device_nodes(vdc_t *vdc)
@@ -1047,14 +1054,14 @@ vdc_create_device_nodes(vdc_t *vdc)
 
 	switch (vdc->vdisk_type) {
 	case VD_DISK_TYPE_DISK:
+	case VD_DISK_TYPE_UNK:
 		num_slices = V_NUMPAR;
 		break;
 	case VD_DISK_TYPE_SLICE:
 		num_slices = 1;
 		break;
-	case VD_DISK_TYPE_UNK:
 	default:
-		return (EINVAL);
+		ASSERT(0);
 	}
 
 	/*
@@ -1152,22 +1159,10 @@ vdc_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 static boolean_t
 vdc_is_opened(vdc_t *vdc)
 {
-	int i, nslices;
-
-	switch (vdc->vdisk_type) {
-	case VD_DISK_TYPE_DISK:
-		nslices = V_NUMPAR;
-		break;
-	case VD_DISK_TYPE_SLICE:
-		nslices = 1;
-		break;
-	case VD_DISK_TYPE_UNK:
-	default:
-		ASSERT(0);
-	}
+	int i;
 
 	/* check if there's any layered open */
-	for (i = 0; i < nslices; i++) {
+	for (i = 0; i < V_NUMPAR; i++) {
 		if (vdc->open_lyr[i] > 0)
 			return (B_TRUE);
 	}
@@ -1192,6 +1187,15 @@ vdc_mark_opened(vdc_t *vdc, int slice, int flag, int otyp)
 	ASSERT(MUTEX_HELD(&vdc->lock));
 
 	slicemask = 1 << slice;
+
+	/*
+	 * If we have a single-slice disk which was unavailable during the
+	 * attach then a device was created for each 8 slices. Now that
+	 * the type is known, we prevent opening any slice other than 0
+	 * even if a device still exists.
+	 */
+	if (vdc->vdisk_type == VD_DISK_TYPE_SLICE && slice != 0)
+		return (EIO);
 
 	/* check if slice is already exclusively opened */
 	if (vdc->open_excl & slicemask)
@@ -1281,7 +1285,12 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 		return (status);
 	}
 
-	if (nodelay) {
+	/*
+	 * If the disk type is unknown then we have to wait for the
+	 * handshake to complete because we don't know if the slice
+	 * device we are opening effectively exists.
+	 */
+	if (vdc->vdisk_type != VD_DISK_TYPE_UNK && nodelay) {
 
 		/* don't resubmit a validate request if there's already one */
 		if (vdc->validate_pending > 0) {
@@ -1308,8 +1317,10 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 
 	mutex_enter(&vdc->lock);
 
-	if (vdc->vdisk_label == VD_DISK_LABEL_UNK ||
-	    vdc->slice[slice].nblocks == 0) {
+	if (vdc->vdisk_type == VD_DISK_TYPE_UNK ||
+	    (vdc->vdisk_type == VD_DISK_TYPE_SLICE && slice != 0) ||
+	    (!nodelay && (vdc->vdisk_label == VD_DISK_LABEL_UNK ||
+	    vdc->slice[slice].nblocks == 0))) {
 		vdc_mark_closed(vdc, slice, flag, otyp);
 		status = EIO;
 	}
@@ -1381,7 +1392,7 @@ vdc_print(dev_t dev, char *str)
 static int
 vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 {
-	int	rv;
+	int	rv, flags;
 	size_t	nbytes = nblk * DEV_BSIZE;
 	int	instance = VDCUNIT(dev);
 	vdc_t	*vdc = NULL;
@@ -1402,15 +1413,19 @@ vdc_dump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	}
 	vio_blkno = blkno >> vdc->vio_bshift;
 
-	rv = vdc_send_request(vdc, VD_OP_BWRITE, addr, nbytes,
-	    VDCPART(dev), vio_blkno, CB_STRATEGY, 0, VIO_write_dir);
+	/*
+	 * If we are panicking, we need the state to be "running" so that we
+	 * can submit I/Os, but we don't want to check for any backend error.
+	 */
+	flags = (ddi_in_panic())? VDC_OP_STATE_RUNNING : VDC_OP_NORMAL;
+
+	rv = vdc_do_op(vdc, VD_OP_BWRITE, addr, nbytes, VDCPART(dev),
+	    vio_blkno, NULL, VIO_write_dir, flags);
+
 	if (rv) {
 		DMSG(vdc, 0, "Failed to do a disk dump (err=%d)\n", rv);
 		return (rv);
 	}
-
-	if (ddi_in_panic())
-		(void) vdc_drain_response(vdc, CB_STRATEGY, NULL);
 
 	DMSG(vdc, 0, "[%d] End\n", instance);
 
@@ -1435,7 +1450,6 @@ static int
 vdc_strategy(struct buf *buf)
 {
 	diskaddr_t vio_blkno;
-	int	rv = -1;
 	vdc_t	*vdc = NULL;
 	int	instance = VDCUNIT(buf->b_edev);
 	int	op = (buf->b_flags & B_READ) ? VD_OP_BREAD : VD_OP_BWRITE;
@@ -1474,27 +1488,11 @@ vdc_strategy(struct buf *buf)
 	}
 	vio_blkno = buf->b_lblkno >> vdc->vio_bshift;
 
-	rv = vdc_send_request(vdc, op, (caddr_t)buf->b_un.b_addr,
+	/* submit the I/O, any error will be reported in the buf structure */
+	(void) vdc_do_op(vdc, op, (caddr_t)buf->b_un.b_addr,
 	    buf->b_bcount, slice, vio_blkno,
-	    CB_STRATEGY, buf, (op == VD_OP_BREAD) ? VIO_read_dir :
-	    VIO_write_dir);
-
-	/*
-	 * If the request was successfully sent, the strategy call returns and
-	 * the ACK handler calls the bioxxx functions when the vDisk server is
-	 * done otherwise we handle the error here.
-	 */
-	if (rv) {
-		DMSG(vdc, 0, "Failed to read/write (err=%d)\n", rv);
-		bioerror(buf, rv);
-		biodone(buf);
-	} else if (ddi_in_panic()) {
-		rv = vdc_drain_response(vdc, CB_STRATEGY, buf);
-		if (rv != 0) {
-			bioerror(buf, EIO);
-			biodone(buf);
-		}
-	}
+	    buf, (op == VD_OP_BREAD) ? VIO_read_dir : VIO_write_dir,
+	    VDC_OP_NORMAL);
 
 	return (0);
 }
@@ -2368,6 +2366,8 @@ vdc_init_ports(vdc_t *vdc, md_t *mdp, mde_cookie_t vd_nodep)
 		vd_port = portp[idx];
 		srvr = kmem_zalloc(sizeof (vdc_server_t), KM_SLEEP);
 		srvr->vdcp = vdc;
+		srvr->svc_state = VDC_SERVICE_OFFLINE;
+		srvr->log_state = VDC_SERVICE_NONE;
 
 		/* get port id */
 		if (md_get_prop_val(mdp, vd_port, VDC_MD_ID, &srvr->id) != 0) {
@@ -2587,6 +2587,7 @@ vdc_fini_ports(vdc_t *vdc)
 	}
 
 	vdc->server_list = NULL;
+	vdc->num_servers = 0;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -2883,10 +2884,7 @@ vdc_map_to_shared_dring(vdc_t *vdcp, int idx)
  *	nbytes	  - number of bytes to read/write
  *	slice	  - the disk slice this request is for
  *	offset	  - relative disk offset
- *	cb_type   - type of call - STRATEGY or SYNC
- *	cb_arg	  - parameter to be sent to server (depends on VD_OP_XXX type)
- *			. mode for ioctl(9e)
- *			. LP64 diskaddr_t (block I/O)
+ *	bufp	  - buf of operation
  *	dir	  - direction of operation (READ/WRITE/BOTH)
  *
  * Return Codes:
@@ -2895,8 +2893,8 @@ vdc_map_to_shared_dring(vdc_t *vdcp, int idx)
  */
 static int
 vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
-    size_t nbytes, int slice, diskaddr_t offset, int cb_type,
-    void *cb_arg, vio_desc_direction_t dir)
+    size_t nbytes, int slice, diskaddr_t offset, buf_t *bufp,
+    vio_desc_direction_t dir, int flags)
 {
 	int	rv = 0;
 
@@ -2917,8 +2915,18 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 	 * higher up the stack in vdc_strategy() et. al.
 	 */
 	if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
-		DTRACE_IO1(start, buf_t *, cb_arg);
+		DTRACE_IO1(start, buf_t *, bufp);
 		VD_KSTAT_WAITQ_ENTER(vdcp);
+	}
+
+	/*
+	 * If the request does not expect the state to be VDC_STATE_RUNNING
+	 * then we just try to populate the descriptor ring once.
+	 */
+	if (!(flags & VDC_OP_STATE_RUNNING)) {
+		rv = vdc_populate_descriptor(vdcp, operation, addr,
+		    nbytes, slice, offset, bufp, dir, flags);
+		goto done;
 	}
 
 	do {
@@ -2927,12 +2935,6 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 			/* return error if detaching */
 			if (vdcp->state == VDC_STATE_DETACH) {
 				rv = ENXIO;
-				goto done;
-			}
-
-			/* fail request if connection timeout is reached */
-			if (vdcp->ctimeout_reached) {
-				rv = EIO;
 				goto done;
 			}
 
@@ -2946,11 +2948,27 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
 				goto done;
 			}
 
+			/*
+			 * If the state is faulted, notify that a new I/O is
+			 * being submitted to force the system to check if any
+			 * server has recovered.
+			 */
+			if (vdcp->state == VDC_STATE_FAILED) {
+				vdcp->io_pending = B_TRUE;
+				cv_signal(&vdcp->io_pending_cv);
+			}
+
 			cv_wait(&vdcp->running_cv, &vdcp->lock);
+
+			/* if service is still faulted then fail the request */
+			if (vdcp->state == VDC_STATE_FAILED) {
+				rv = EIO;
+				goto done;
+			}
 		}
 
 	} while (vdc_populate_descriptor(vdcp, operation, addr,
-	    nbytes, slice, offset, cb_type, cb_arg, dir));
+	    nbytes, slice, offset, bufp, dir, flags));
 
 done:
 	/*
@@ -2963,11 +2981,11 @@ done:
 	if ((operation == VD_OP_BREAD) || (operation == VD_OP_BWRITE)) {
 		if (rv == 0) {
 			VD_KSTAT_WAITQ_TO_RUNQ(vdcp);
-			DTRACE_PROBE1(send, buf_t *, cb_arg);
+			DTRACE_PROBE1(send, buf_t *, bufp);
 		} else {
 			VD_UPDATE_ERR_STATS(vdcp, vd_transerrs);
 			VD_KSTAT_WAITQ_EXIT(vdcp);
-			DTRACE_IO1(done, buf_t *, cb_arg);
+			DTRACE_IO1(done, buf_t *, bufp);
 		}
 	}
 
@@ -2993,10 +3011,7 @@ done:
  *	nbytes	  - number of bytes to read/write
  *	slice	  - the disk slice this request is for
  *	offset	  - relative disk offset
- *	cb_type   - type of call - STRATEGY or SYNC
- *	cb_arg	  - parameter to be sent to server (depends on VD_OP_XXX type)
- *			. mode for ioctl(9e)
- *			. LP64 diskaddr_t (block I/O)
+ *	bufp	  - buf of operation
  *	dir	  - direction of operation (READ/WRITE/BOTH)
  *
  * Return Codes:
@@ -3007,8 +3022,8 @@ done:
  */
 static int
 vdc_populate_descriptor(vdc_t *vdcp, int operation, caddr_t addr,
-    size_t nbytes, int slice, diskaddr_t offset, int cb_type,
-    void *cb_arg, vio_desc_direction_t dir)
+    size_t nbytes, int slice, diskaddr_t offset,
+    buf_t *bufp, vio_desc_direction_t dir, int flags)
 {
 	vdc_local_desc_t	*local_dep = NULL; /* Local Dring Pointer */
 	int			idx;		/* Index of DRing entry used */
@@ -3050,9 +3065,9 @@ loop:
 	local_dep->nbytes = nbytes;
 	local_dep->slice = slice;
 	local_dep->offset = offset;
-	local_dep->cb_type = cb_type;
-	local_dep->cb_arg = cb_arg;
+	local_dep->buf = bufp;
 	local_dep->dir = dir;
+	local_dep->flags = flags;
 
 	local_dep->is_free = B_FALSE;
 
@@ -3124,11 +3139,127 @@ cleanup_and_exit:
 
 /*
  * Function:
+ *	vdc_do_op
+ *
+ * Description:
+ * 	Wrapper around vdc_submit_request(). Each request is associated with a
+ *	buf structure. If a buf structure is provided (bufp != NULL) then the
+ *	request will be submitted with that buf, and the caller can wait for
+ *	completion of the request with biowait(). If a buf structure is not
+ *	provided (bufp == NULL) then a buf structure is created and the function
+ *	waits for the completion of the request.
+ *
+ *	If the flag VD_OP_STATE_RUNNING is set then vdc_submit_request() will
+ *	submit the request only when the vdisk is in state VD_STATE_RUNNING.
+ *	If the vdisk is not in that state then the vdc_submit_request() will
+ *	wait for that state to be reached. After the request is submitted, the
+ *	reply will be processed asynchronously by the vdc_process_msg_thread()
+ *	thread.
+ *
+ *	If the flag VD_OP_STATE_RUNNING is not set then vdc_submit_request()
+ *	submit the request whatever the state of the vdisk is. Then vdc_do_op()
+ *	will wait for a reply message, process the reply and complete the
+ *	request.
+ *
+ * Arguments:
+ *	vdc	- the soft state pointer
+ *	op	- operation we want vds to perform (VD_OP_XXX)
+ *	addr	- address of data buf to be read/written.
+ *	nbytes	- number of bytes to read/write
+ *	slice	- the disk slice this request is for
+ *	offset	- relative disk offset
+ *	bufp	- buf structure associated with the request (can be NULL).
+ *	dir	- direction of operation (READ/WRITE/BOTH)
+ *	flags	- flags for the request.
+ *
+ * Return Codes:
+ *	0	- the request has been succesfully submitted and completed.
+ *	!= 0	- the request has failed. In that case, if a buf structure
+ *		  was provided (bufp != NULL) then the B_ERROR flag is set
+ *		  and the b_error field of the buf structure is set to EIO.
+ */
+static int
+vdc_do_op(vdc_t *vdc, int op, caddr_t addr, size_t nbytes, int slice,
+    diskaddr_t offset, struct buf *bufp, vio_desc_direction_t dir, int flags)
+{
+	vio_msg_t vio_msg;
+	struct buf buf;
+	int rv;
+
+	if (bufp == NULL) {
+		/*
+		 * We use buf just as a convenient way to get a notification
+		 * that the request is completed, so we initialize buf to the
+		 * minimum we need.
+		 */
+		bioinit(&buf);
+		buf.b_bcount = nbytes;
+		buf.b_flags = B_BUSY;
+		bufp = &buf;
+	}
+
+	rv = vdc_send_request(vdc, op, addr, nbytes, slice, offset, bufp,
+	    dir, flags);
+
+	if (rv != 0)
+		goto done;
+
+	/*
+	 * If the request should be done in VDC_STATE_RUNNING state then the
+	 * reply will be received and processed by vdc_process_msg_thread()
+	 * and we just have to handle the panic case. Otherwise we have to
+	 * wait for the reply message and process it.
+	 */
+	if (flags & VDC_OP_STATE_RUNNING) {
+
+		if (ddi_in_panic()) {
+			rv = vdc_drain_response(vdc, bufp);
+			goto done;
+		}
+
+	} else {
+		/* wait for the response message */
+		rv = vdc_wait_for_response(vdc, &vio_msg);
+		if (rv) {
+			/*
+			 * If this is a block read/write we update the I/O
+			 * statistics kstat to take it off the run queue.
+			 */
+			mutex_enter(&vdc->lock);
+			if (op == VD_OP_BREAD || op == VD_OP_BWRITE) {
+				VD_UPDATE_ERR_STATS(vdc, vd_transerrs);
+				VD_KSTAT_RUNQ_EXIT(vdc);
+				DTRACE_IO1(done, buf_t *, bufp);
+			}
+			mutex_exit(&vdc->lock);
+			goto done;
+		}
+
+		rv = vdc_process_data_msg(vdc, &vio_msg);
+		if (rv)
+			goto done;
+	}
+
+	if (bufp == &buf)
+		rv = biowait(bufp);
+
+done:
+	if (bufp == &buf) {
+		biofini(bufp);
+	} else if (rv != 0) {
+		bioerror(bufp, EIO);
+		biodone(bufp);
+	}
+
+	return (rv);
+}
+
+/*
+ * Function:
  *	vdc_do_sync_op
  *
  * Description:
- * 	Wrapper around vdc_populate_descriptor that blocks until the
- * 	response to the message is available.
+ * 	Wrapper around vdc_do_op that serializes requests.
  *
  * Arguments:
  *	vdcp	  - the soft state pointer
@@ -3137,16 +3268,12 @@ cleanup_and_exit:
  *	nbytes	  - number of bytes to read/write
  *	slice	  - the disk slice this request is for
  *	offset	  - relative disk offset
- *	cb_type   - type of call - STRATEGY or SYNC
- *	cb_arg	  - parameter to be sent to server (depends on VD_OP_XXX type)
- *			. mode for ioctl(9e)
- *			. LP64 diskaddr_t (block I/O)
  *	dir	  - direction of operation (READ/WRITE/BOTH)
  *	rconflict - check for reservation conflict in case of failure
  *
  * rconflict should be set to B_TRUE by most callers. Callers invoking the
  * VD_OP_SCSICMD operation can set rconflict to B_FALSE if they check the
- * result of a successful operation with vd_scsi_status().
+ * result of a successful operation with vdc_scsi_status().
  *
  * Return Codes:
  *	0
@@ -3157,14 +3284,10 @@ cleanup_and_exit:
  */
 static int
 vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
-    int slice, diskaddr_t offset, int cb_type, void *cb_arg,
-    vio_desc_direction_t dir, boolean_t rconflict)
+    int slice, diskaddr_t offset, vio_desc_direction_t dir, boolean_t rconflict)
 {
 	int status;
-	vdc_io_t *vio;
-	boolean_t check_resv_conflict = B_FALSE;
-
-	ASSERT(cb_type == CB_SYNC);
+	int flags = VDC_OP_NORMAL;
 
 	/*
 	 * Grab the lock, if blocked wait until the server
@@ -3192,68 +3315,28 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
 
 	/* now block anyone other thread entering after us */
 	vdcp->sync_op_blocked = B_TRUE;
-	vdcp->sync_op_pending = B_TRUE;
+
 	mutex_exit(&vdcp->lock);
 
-	status = vdc_send_request(vdcp, operation, addr,
-	    nbytes, slice, offset, cb_type, cb_arg, dir);
+	if (!rconflict)
+		flags &= ~VDC_OP_ERRCHK_CONFLICT;
+
+	status = vdc_do_op(vdcp, operation, addr, nbytes, slice, offset,
+	    NULL, dir, flags);
 
 	mutex_enter(&vdcp->lock);
 
-	if (status != 0) {
-		vdcp->sync_op_pending = B_FALSE;
-	} else if (ddi_in_panic()) {
-		if (vdc_drain_response(vdcp, CB_SYNC, NULL) == 0) {
-			status = vdcp->sync_op_status;
-		} else {
-			vdcp->sync_op_pending = B_FALSE;
-			status = EIO;
-		}
-	} else {
-		/*
-		 * block until our transaction completes.
-		 * Also anyone else waiting also gets to go next.
-		 */
-		while (vdcp->sync_op_pending && vdcp->state != VDC_STATE_DETACH)
-			cv_wait(&vdcp->sync_pending_cv, &vdcp->lock);
+	DMSG(vdcp, 2, ": operation returned %d\n", status);
 
-		DMSG(vdcp, 2, ": operation returned %d\n",
-		    vdcp->sync_op_status);
-		if (vdcp->state == VDC_STATE_DETACH) {
-			vdcp->sync_op_pending = B_FALSE;
-			status = ENXIO;
-		} else {
-			status = vdcp->sync_op_status;
-			if (status != 0 && vdcp->failfast_interval != 0) {
-				/*
-				 * Operation has failed and failfast is enabled.
-				 * We need to check if the failure is due to a
-				 * reservation conflict if this was requested.
-				 */
-				check_resv_conflict = rconflict;
-			}
-
-		}
+	if (vdcp->state == VDC_STATE_DETACH) {
+		status = ENXIO;
 	}
 
-	vdcp->sync_op_status = 0;
 	vdcp->sync_op_blocked = B_FALSE;
 	vdcp->sync_op_cnt--;
 
 	/* signal the next waiting thread */
 	cv_signal(&vdcp->sync_blocked_cv);
-
-	/*
-	 * We have to check for reservation conflict after unblocking sync
-	 * operations because some sync operations will be used to do this
-	 * check.
-	 */
-	if (check_resv_conflict) {
-		vio = vdc_failfast_io_queue(vdcp, NULL);
-		while (vio->vio_qtime != 0)
-			cv_wait(&vdcp->failfast_io_cv, &vdcp->lock);
-		kmem_free(vio, sizeof (vdc_io_t));
-	}
 
 	mutex_exit(&vdcp->lock);
 
@@ -3275,23 +3358,16 @@ vdc_do_sync_op(vdc_t *vdcp, int operation, caddr_t addr, size_t nbytes,
  *
  * Arguments:
  *	vdc	- soft state pointer for this instance of the device driver.
- *	cb_type	- the type of request we want to drain. If type is CB_SYNC
- *		  then we drain all responses until we find a CB_SYNC request.
- *		  If the type is CB_STRATEGY then the behavior depends on the
- *		  value of the buf argument.
- *	buf	- if the cb_type argument is CB_SYNC then the buf argument
- *		  must be NULL. If the cb_type argument is CB_STRATEGY and
- *		  if buf is NULL then we drain all responses, otherwise we
+ *	buf	- if buf is NULL then we drain all responses, otherwise we
  *		  poll until we receive a ACK/NACK for the specific I/O
  *		  described by buf.
  *
  * Return Code:
  *	0	- Success. If we were expecting a response to a particular
- *		  CB_SYNC or CB_STRATEGY request then this means that a
- *		  response has been received.
+ *		  request then this means that a response has been received.
  */
 static int
-vdc_drain_response(vdc_t *vdc, vio_cb_type_t cb_type, struct buf *buf)
+vdc_drain_response(vdc_t *vdc, struct buf *buf)
 {
 	int 			rv, idx, retries;
 	size_t			msglen;
@@ -3299,8 +3375,6 @@ vdc_drain_response(vdc_t *vdc, vio_cb_type_t cb_type, struct buf *buf)
 	vio_dring_msg_t		dmsg;
 	struct buf		*mbuf;
 	boolean_t		ack;
-
-	ASSERT(cb_type == CB_STRATEGY || cb_type == CB_SYNC);
 
 	mutex_enter(&vdc->lock);
 
@@ -3369,34 +3443,16 @@ vdc_drain_response(vdc_t *vdc, vio_cb_type_t cb_type, struct buf *buf)
 			continue;
 		}
 
-		switch (ldep->cb_type) {
+		mbuf = ldep->buf;
+		ASSERT(mbuf != NULL);
+		mbuf->b_resid = mbuf->b_bcount - ldep->dep->payload.nbytes;
+		bioerror(mbuf, ack ? ldep->dep->payload.status : EIO);
+		biodone(mbuf);
 
-		case CB_STRATEGY:
-			mbuf = ldep->cb_arg;
-			if (mbuf != NULL) {
-				mbuf->b_resid = mbuf->b_bcount -
-				    ldep->dep->payload.nbytes;
-				bioerror(mbuf,
-				    ack ? ldep->dep->payload.status : EIO);
-				biodone(mbuf);
-			}
-			rv = vdc_depopulate_descriptor(vdc, idx);
-			if (buf != NULL && buf == mbuf) {
-				rv = 0;
-				goto done;
-			}
-			break;
-
-		case CB_SYNC:
-			rv = vdc_depopulate_descriptor(vdc, idx);
-			vdc->sync_op_status = ack ? rv : EIO;
-			vdc->sync_op_pending = B_FALSE;
-			cv_signal(&vdc->sync_pending_cv);
-			if (cb_type == CB_SYNC) {
-				rv = 0;
-				goto done;
-			}
-			break;
+		rv = vdc_depopulate_descriptor(vdc, idx);
+		if (buf != NULL && buf == mbuf) {
+			rv = 0;
+			goto done;
 		}
 
 		/* if this is the last descriptor - break out of loop */
@@ -3406,7 +3462,7 @@ vdc_drain_response(vdc_t *vdc, vio_cb_type_t cb_type, struct buf *buf)
 			 * request then we return with an error otherwise we
 			 * have successfully completed the drain.
 			 */
-			rv = (buf != NULL || cb_type == CB_SYNC)? ESRCH: 0;
+			rv = (buf != NULL)? ESRCH: 0;
 			break;
 		}
 	}
@@ -3683,8 +3739,10 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 			 */
 			vdc->seq_num = 1;
 			vdc->seq_num_reply = 0;
+			vdc->io_pending = B_TRUE;
 			srvr->ldc_state = ldc_state;
 			cv_signal(&vdc->initwait_cv);
+			cv_signal(&vdc->io_pending_cv);
 		}
 	}
 
@@ -3719,6 +3777,9 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 		if (vdc->state == VDC_STATE_INIT_WAITING) {
 			vdc->state = VDC_STATE_RESETTING;
 			cv_signal(&vdc->initwait_cv);
+		} else if (vdc->state == VDC_STATE_FAILED) {
+			vdc->io_pending = B_TRUE;
+			cv_signal(&vdc->io_pending_cv);
 		}
 
 	}
@@ -3820,8 +3881,6 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
 	int		b_idx;
 	int		rv = 0;
 	int		dring_size;
-	int		op;
-	vio_msg_t	vio_msg;
 	vdc_local_desc_t	*curr_ldep;
 
 	ASSERT(MUTEX_NOT_HELD(&vdcp->lock));
@@ -3846,84 +3905,21 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
 
 		/* only resubmit outstanding transactions */
 		if (!curr_ldep->is_free) {
-			/*
-			 * If we are retrying a block read/write operation we
-			 * need to update the I/O statistics to indicate that
-			 * the request is being put back on the waitq to be
-			 * serviced (it will have been taken off after the
-			 * error was reported).
-			 */
-			mutex_enter(&vdcp->lock);
-			op = curr_ldep->operation;
-			if ((op == VD_OP_BREAD) || (op == VD_OP_BWRITE)) {
-				DTRACE_IO1(start, buf_t *, curr_ldep->cb_arg);
-				VD_KSTAT_WAITQ_ENTER(vdcp);
-			}
 
 			DMSG(vdcp, 1, "resubmitting entry idx=%x\n", b_idx);
-			rv = vdc_populate_descriptor(vdcp, op,
+
+			rv = vdc_do_op(vdcp, curr_ldep->operation,
 			    curr_ldep->addr, curr_ldep->nbytes,
 			    curr_ldep->slice, curr_ldep->offset,
-			    curr_ldep->cb_type, curr_ldep->cb_arg,
-			    curr_ldep->dir);
+			    curr_ldep->buf, curr_ldep->dir,
+			    curr_ldep->flags & ~VDC_OP_STATE_RUNNING);
 
 			if (rv) {
-				if (op == VD_OP_BREAD || op == VD_OP_BWRITE) {
-					VD_UPDATE_ERR_STATS(vdcp, vd_transerrs);
-					VD_KSTAT_WAITQ_EXIT(vdcp);
-					DTRACE_IO1(done, buf_t *,
-					    curr_ldep->cb_arg);
-				}
-				DMSG(vdcp, 1, "[%d] cannot resubmit entry %d\n",
+				DMSG(vdcp, 1, "[%d] resubmit entry %d failed\n",
 				    vdcp->instance, b_idx);
-				mutex_exit(&vdcp->lock);
 				goto done;
 			}
 
-			/*
-			 * If this is a block read/write we update the I/O
-			 * statistics kstat to indicate that the request
-			 * has been sent back to the vDisk server and should
-			 * now be put on the run queue.
-			 */
-			if ((op == VD_OP_BREAD) || (op == VD_OP_BWRITE)) {
-				DTRACE_PROBE1(send, buf_t *, curr_ldep->cb_arg);
-				VD_KSTAT_WAITQ_TO_RUNQ(vdcp);
-			}
-			mutex_exit(&vdcp->lock);
-
-			/* Wait for the response message. */
-			DMSG(vdcp, 1, "waiting for response to idx=%x\n",
-			    b_idx);
-			rv = vdc_wait_for_response(vdcp, &vio_msg);
-			if (rv) {
-				/*
-				 * If this is a block read/write we update
-				 * the I/O statistics kstat to take it
-				 * off the run queue.
-				 */
-				mutex_enter(&vdcp->lock);
-				if (op == VD_OP_BREAD || op == VD_OP_BWRITE) {
-					VD_UPDATE_ERR_STATS(vdcp, vd_transerrs);
-					VD_KSTAT_RUNQ_EXIT(vdcp);
-					DTRACE_IO1(done, buf_t *,
-					    curr_ldep->cb_arg);
-				}
-				DMSG(vdcp, 1, "[%d] wait_for_response "
-				    "returned err=%d\n", vdcp->instance,
-				    rv);
-				mutex_exit(&vdcp->lock);
-				goto done;
-			}
-
-			DMSG(vdcp, 1, "processing msg for idx=%x\n", b_idx);
-			rv = vdc_process_data_msg(vdcp, &vio_msg);
-			if (rv) {
-				DMSG(vdcp, 1, "[%d] process_data_msg "
-				    "returned err=%d\n", vdcp->instance,
-				    rv);
-				goto done;
-			}
 			/*
 			 * Mark this entry as free so that we will not resubmit
 			 * this "done" request again, if we were to use the same
@@ -3978,10 +3974,7 @@ vdc_cancel_backup_dring(vdc_t *vdcp)
 	int		cancelled = 0;
 
 	ASSERT(MUTEX_HELD(&vdcp->lock));
-	ASSERT(vdcp->state == VDC_STATE_INIT ||
-	    vdcp->state == VDC_STATE_INIT_WAITING ||
-	    vdcp->state == VDC_STATE_NEGOTIATE ||
-	    vdcp->state == VDC_STATE_RESETTING);
+	ASSERT(vdcp->state == VDC_STATE_FAILED);
 
 	if (vdcp->local_dring_backup == NULL) {
 		/* the pending requests have already been processed */
@@ -4013,29 +4006,17 @@ vdc_cancel_backup_dring(vdc_t *vdcp)
 			 * requests. Now we just have to notify threads waiting
 			 * for replies that the request has failed.
 			 */
-			switch (ldep->cb_type) {
-			case CB_SYNC:
-				ASSERT(vdcp->sync_op_pending);
-				vdcp->sync_op_status = EIO;
-				vdcp->sync_op_pending = B_FALSE;
-				cv_signal(&vdcp->sync_pending_cv);
-				break;
-
-			case CB_STRATEGY:
-				bufp = ldep->cb_arg;
-				ASSERT(bufp != NULL);
-				bufp->b_resid = bufp->b_bcount;
+			bufp = ldep->buf;
+			ASSERT(bufp != NULL);
+			bufp->b_resid = bufp->b_bcount;
+			if (ldep->operation == VD_OP_BREAD ||
+			    ldep->operation == VD_OP_BWRITE) {
 				VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
 				VD_KSTAT_RUNQ_EXIT(vdcp);
 				DTRACE_IO1(done, buf_t *, bufp);
-				bioerror(bufp, EIO);
-				biodone(bufp);
-				break;
-
-			default:
-				ASSERT(0);
 			}
-
+			bioerror(bufp, EIO);
+			biodone(bufp);
 		}
 
 		/* get the next element to cancel */
@@ -4061,14 +4042,12 @@ vdc_cancel_backup_dring(vdc_t *vdcp)
  * Description:
  *	This function is invoked if the timeout set to establish the connection
  *	with vds expires. This will happen if we spend too much time in the
- *	VDC_STATE_INIT_WAITING or VDC_STATE_NEGOTIATE states. Then we will
- *	cancel any pending request and mark them as failed.
+ *	VDC_STATE_INIT_WAITING or VDC_STATE_NEGOTIATE states.
  *
  *	If the timeout does not expire, it will be cancelled when we reach the
- *	VDC_STATE_HANDLE_PENDING or VDC_STATE_RESETTING state. This function can
- *	be invoked while we are in the VDC_STATE_HANDLE_PENDING or
- *	VDC_STATE_RESETTING state in which case we do nothing because the
- *	timeout is being cancelled.
+ *	VDC_STATE_HANDLE_PENDING, VDC_STATE_FAILED or VDC_STATE_DETACH state.
+ *	This function can also be invoked while we are in those states, in
+ *	which case we do nothing because the timeout is being cancelled.
  *
  * Arguments:
  *	arg	- argument of the timeout function actually a soft state
@@ -4085,28 +4064,18 @@ vdc_connection_timeout(void *arg)
 	mutex_enter(&vdcp->lock);
 
 	if (vdcp->state == VDC_STATE_HANDLE_PENDING ||
-	    vdcp->state == VDC_STATE_DETACH) {
+	    vdcp->state == VDC_STATE_DETACH ||
+	    vdcp->state == VDC_STATE_FAILED) {
 		/*
-		 * The connection has just been re-established or
+		 * The connection has just been re-established, has failed or
 		 * we are detaching.
 		 */
 		vdcp->ctimeout_reached = B_FALSE;
-		mutex_exit(&vdcp->lock);
-		return;
+	} else {
+		vdcp->ctimeout_reached = B_TRUE;
 	}
 
-	vdcp->ctimeout_reached = B_TRUE;
-
-	/* notify requests waiting for sending */
-	cv_broadcast(&vdcp->running_cv);
-
-	/* cancel requests waiting for a result */
-	vdc_cancel_backup_dring(vdcp);
-
 	mutex_exit(&vdcp->lock);
-
-	cmn_err(CE_NOTE, "[%d] connection to service domain timeout",
-	    vdcp->instance);
 }
 
 /*
@@ -4202,6 +4171,58 @@ vdc_switch_server(vdc_t *vdcp)
 	    vdcp->instance, vdcp->curr_server->id, vdcp->curr_server->ldc_id);
 }
 
+static void
+vdc_print_svc_status(vdc_t *vdcp)
+{
+	int instance;
+	uint64_t ldc_id, port_id;
+	vdc_service_state_t svc_state;
+
+	ASSERT(mutex_owned(&vdcp->lock));
+
+	svc_state = vdcp->curr_server->svc_state;
+
+	if (vdcp->curr_server->log_state == svc_state)
+		return;
+
+	instance = vdcp->instance;
+	ldc_id = vdcp->curr_server->ldc_id;
+	port_id = vdcp->curr_server->id;
+
+	switch (svc_state) {
+
+	case VDC_SERVICE_OFFLINE:
+		cmn_err(CE_CONT, "?vdisk@%d is offline\n", instance);
+		break;
+
+	case VDC_SERVICE_CONNECTED:
+		cmn_err(CE_CONT, "?vdisk@%d is connected using ldc@%ld,%ld\n",
+		    instance, ldc_id, port_id);
+		break;
+
+	case VDC_SERVICE_ONLINE:
+		cmn_err(CE_CONT, "?vdisk@%d is online using ldc@%ld,%ld\n",
+		    instance, ldc_id, port_id);
+		break;
+
+	case VDC_SERVICE_FAILED:
+		cmn_err(CE_CONT, "?vdisk@%d access to service failed "
+		    "using ldc@%ld,%ld\n", instance, ldc_id, port_id);
+		break;
+
+	case VDC_SERVICE_FAULTED:
+		cmn_err(CE_CONT, "?vdisk@%d access to backend failed "
+		    "using ldc@%ld,%ld\n", instance, ldc_id, port_id);
+		break;
+
+	default:
+		ASSERT(0);
+		break;
+	}
+
+	vdcp->curr_server->log_state = svc_state;
+}
+
 /* -------------------------------------------------------------------------- */
 
 /*
@@ -4232,6 +4253,8 @@ vdc_process_msg_thread(vdc_t *vdcp)
 	int		ctimeout;
 	timeout_id_t	tmid = 0;
 	clock_t		ldcup_timeout = 0;
+	vdc_server_t	*srvr;
+	vdc_service_state_t svc_state;
 
 	mutex_enter(&vdcp->lock);
 
@@ -4243,6 +4266,8 @@ vdc_process_msg_thread(vdc_t *vdcp)
 		    Q(VDC_STATE_INIT_WAITING)
 		    Q(VDC_STATE_NEGOTIATE)
 		    Q(VDC_STATE_HANDLE_PENDING)
+		    Q(VDC_STATE_FAULTED)
+		    Q(VDC_STATE_FAILED)
 		    Q(VDC_STATE_RUNNING)
 		    Q(VDC_STATE_RESETTING)
 		    Q(VDC_STATE_DETACH)
@@ -4277,21 +4302,27 @@ vdc_process_msg_thread(vdc_t *vdcp)
 				    ctimeout * drv_usectohz(MICROSEC));
 			}
 
+			/* Switch to STATE_DETACH if drv is detaching */
+			if (vdcp->lifecycle == VDC_LC_DETACHING) {
+				vdcp->state = VDC_STATE_DETACH;
+				break;
+			}
+
+			/* Check if the timeout has been reached */
+			if (vdcp->ctimeout_reached) {
+				ASSERT(tmid != 0);
+				tmid = 0;
+				vdcp->state = VDC_STATE_FAILED;
+				break;
+			}
+
 			/* Check if we are re-initializing repeatedly */
 			if (vdcp->hshake_cnt > vdc_hshake_retries &&
 			    vdcp->lifecycle != VDC_LC_ONLINE) {
 
 				DMSG(vdcp, 0, "[%d] too many handshakes,cnt=%d",
 				    vdcp->instance, vdcp->hshake_cnt);
-				cmn_err(CE_NOTE, "[%d] disk access failed.\n",
-				    vdcp->instance);
-				vdcp->state = VDC_STATE_DETACH;
-				break;
-			}
-
-			/* Switch to STATE_DETACH if drv is detaching */
-			if (vdcp->lifecycle == VDC_LC_DETACHING) {
-				vdcp->state = VDC_STATE_DETACH;
+				vdcp->state = VDC_STATE_FAILED;
 				break;
 			}
 
@@ -4304,6 +4335,10 @@ vdc_process_msg_thread(vdc_t *vdcp)
 			status = vdc_start_ldc_connection(vdcp);
 			if (status != EINVAL) {
 				vdcp->state = VDC_STATE_INIT_WAITING;
+			} else {
+				vdcp->curr_server->svc_state =
+				    VDC_SERVICE_FAILED;
+				vdc_print_svc_status(vdcp);
 			}
 			break;
 
@@ -4315,26 +4350,23 @@ vdc_process_msg_thread(vdc_t *vdcp)
 				break;
 			}
 
-			/* check if only one server exists */
-			if (vdcp->num_servers == 1) {
-				cv_wait(&vdcp->initwait_cv, &vdcp->lock);
-			} else {
-				/*
-				 * wait for LDC_UP, if it times out, switch
-				 * to another server.
-				 */
-				ldcup_timeout = ddi_get_lbolt() +
-				    (vdc_ldcup_timeout *
-				    drv_usectohz(MICROSEC));
-				status = cv_timedwait(&vdcp->initwait_cv,
-				    &vdcp->lock, ldcup_timeout);
-				if (status == -1 &&
-				    vdcp->state == VDC_STATE_INIT_WAITING &&
-				    vdcp->curr_server->ldc_state != LDC_UP) {
-					/* timed out & still waiting */
-					vdcp->state = VDC_STATE_INIT;
-					break;
-				}
+			/*
+			 * Wait for LDC_UP. If it times out and we have multiple
+			 * servers then we will retry using a different server.
+			 */
+			ldcup_timeout = ddi_get_lbolt() + (vdc_ldcup_timeout *
+			    drv_usectohz(MICROSEC));
+			status = cv_timedwait(&vdcp->initwait_cv, &vdcp->lock,
+			    ldcup_timeout);
+			if (status == -1 &&
+			    vdcp->state == VDC_STATE_INIT_WAITING &&
+			    vdcp->curr_server->ldc_state != LDC_UP) {
+				/* timed out & still waiting */
+				vdcp->curr_server->svc_state =
+				    VDC_SERVICE_FAILED;
+				vdc_print_svc_status(vdcp);
+				vdcp->state = VDC_STATE_INIT;
+				break;
 			}
 
 			if (vdcp->state != VDC_STATE_INIT_WAITING) {
@@ -4386,6 +4418,8 @@ reset:
 			    status);
 			vdcp->state = VDC_STATE_RESETTING;
 			vdcp->self_reset = B_TRUE;
+			vdcp->curr_server->svc_state = VDC_SERVICE_FAILED;
+			vdc_print_svc_status(vdcp);
 done:
 			DMSG(vdcp, 0, "negotiation complete (state=0x%x)...\n",
 			    vdcp->state);
@@ -4393,36 +4427,121 @@ done:
 
 		case VDC_STATE_HANDLE_PENDING:
 
-			if (vdcp->ctimeout_reached) {
-				/*
-				 * The connection timeout had been reached so
-				 * pending requests have been cancelled. Now
-				 * that the connection is back we can reset
-				 * the timeout.
-				 */
-				ASSERT(vdcp->local_dring_backup == NULL);
-				ASSERT(tmid != 0);
-				tmid = 0;
-				vdcp->ctimeout_reached = B_FALSE;
-				vdcp->state = VDC_STATE_RUNNING;
-				DMSG(vdcp, 0, "[%d] connection to service "
-				    "domain is up", vdcp->instance);
+			DMSG(vdcp, 0, "[%d] connection to service domain is up",
+			    vdcp->instance);
+			vdcp->curr_server->svc_state = VDC_SERVICE_CONNECTED;
+
+			mutex_exit(&vdcp->lock);
+
+			/*
+			 * If we have multiple servers, check that the backend
+			 * is effectively available before resubmitting any IO.
+			 */
+			if (vdcp->num_servers > 1 &&
+			    vdc_eio_check(vdcp, 0) != 0) {
+				mutex_enter(&vdcp->lock);
+				vdcp->curr_server->svc_state =
+				    VDC_SERVICE_FAULTED;
+				vdcp->state = VDC_STATE_FAULTED;
 				break;
 			}
 
-			mutex_exit(&vdcp->lock);
+			if (tmid != 0) {
+				(void) untimeout(tmid);
+				tmid = 0;
+				vdcp->ctimeout_reached = B_FALSE;
+			}
+
+			/*
+			 * Setup devid
+			 */
+			(void) vdc_setup_devid(vdcp);
+
+			status = vdc_resubmit_backup_dring(vdcp);
+
+			mutex_enter(&vdcp->lock);
+
+			if (status) {
+				vdcp->state = VDC_STATE_RESETTING;
+				vdcp->self_reset = B_TRUE;
+				vdcp->curr_server->svc_state =
+				    VDC_SERVICE_FAILED;
+				vdc_print_svc_status(vdcp);
+			} else {
+				vdcp->state = VDC_STATE_RUNNING;
+			}
+			break;
+
+		case VDC_STATE_FAULTED:
+			/*
+			 * Server is faulted because the backend is unavailable.
+			 * If all servers are faulted then we mark the service
+			 * as failed, otherwise we reset to switch to another
+			 * server.
+			 */
+			vdc_print_svc_status(vdcp);
+
+			/* check if all servers are faulted */
+			for (srvr = vdcp->server_list; srvr != NULL;
+			    srvr = srvr->next) {
+				svc_state = srvr->svc_state;
+				if (svc_state != VDC_SERVICE_FAULTED)
+					break;
+			}
+
+			if (srvr != NULL) {
+				vdcp->state = VDC_STATE_RESETTING;
+				vdcp->self_reset = B_TRUE;
+			} else {
+				vdcp->state = VDC_STATE_FAILED;
+			}
+			break;
+
+		case VDC_STATE_FAILED:
+			/*
+			 * We reach this state when we are unable to access the
+			 * backend from any server, either because of a maximum
+			 * connection retries or timeout, or because the backend
+			 * is unavailable.
+			 *
+			 * Then we cancel the backup DRing so that errors get
+			 * reported and we wait for a new I/O before attempting
+			 * another connection.
+			 */
+			cmn_err(CE_NOTE, "vdisk@%d disk access failed",
+			    vdcp->instance);
+
+			/* cancel any timeout */
 			if (tmid != 0) {
 				(void) untimeout(tmid);
 				tmid = 0;
 			}
-			status = vdc_resubmit_backup_dring(vdcp);
-			mutex_enter(&vdcp->lock);
 
-			if (status)
-				vdcp->state = VDC_STATE_RESETTING;
-			else
-				vdcp->state = VDC_STATE_RUNNING;
+			/* cancel pending I/Os */
+			cv_broadcast(&vdcp->running_cv);
+			vdc_cancel_backup_dring(vdcp);
 
+			/* wait for new I/O */
+			while (!vdcp->io_pending)
+				cv_wait(&vdcp->io_pending_cv, &vdcp->lock);
+
+			/*
+			 * There's a new IO pending. Try to re-establish a
+			 * connection. Mark all services as offline, so that
+			 * we don't stop again before having retried all
+			 * servers.
+			 */
+			for (srvr = vdcp->server_list; srvr != NULL;
+			    srvr = srvr->next) {
+				srvr->svc_state = VDC_SERVICE_OFFLINE;
+			}
+
+			/* reset variables */
+			vdcp->hshake_cnt = 0;
+			vdcp->ctimeout_reached = B_FALSE;
+
+			vdcp->state = VDC_STATE_RESETTING;
+			vdcp->self_reset = B_TRUE;
 			break;
 
 		/* enter running state */
@@ -4434,17 +4553,18 @@ done:
 			vdcp->hshake_cnt = 0;
 			cv_broadcast(&vdcp->running_cv);
 
-			/* failfast has to been checked after reset */
-			cv_signal(&vdcp->failfast_cv);
+			/* backend has to be checked after reset */
+			if (vdcp->failfast_interval != 0 ||
+			    vdcp->num_servers > 1)
+				cv_signal(&vdcp->eio_cv);
 
 			/* ownership is lost during reset */
 			if (vdcp->ownership & VDC_OWNERSHIP_WANTED)
 				vdcp->ownership |= VDC_OWNERSHIP_RESET;
 			cv_signal(&vdcp->ownership_cv);
 
-			cmn_err(CE_CONT, "?vdisk@%d is online using "
-			    "ldc@%ld,%ld\n", vdcp->instance,
-			    vdcp->curr_server->ldc_id, vdcp->curr_server->id);
+			vdcp->curr_server->svc_state = VDC_SERVICE_ONLINE;
+			vdc_print_svc_status(vdcp);
 
 			mutex_exit(&vdcp->lock);
 
@@ -4467,8 +4587,14 @@ done:
 
 			mutex_enter(&vdcp->lock);
 
-			cmn_err(CE_CONT, "?vdisk@%d is offline\n",
-			    vdcp->instance);
+			/* all servers are now offline */
+			for (srvr = vdcp->server_list; srvr != NULL;
+			    srvr = srvr->next) {
+				srvr->svc_state = VDC_SERVICE_OFFLINE;
+				srvr->log_state = VDC_SERVICE_NONE;
+			}
+
+			vdc_print_svc_status(vdcp);
 
 			vdcp->state = VDC_STATE_RESETTING;
 			vdcp->self_reset = B_TRUE;
@@ -4516,6 +4642,13 @@ done:
 			ASSERT(vdcp->read_state != VDC_READ_WAITING);
 
 			vdcp->read_state = VDC_READ_IDLE;
+			vdcp->io_pending = B_FALSE;
+
+			/*
+			 * Cleanup any pending eio. These I/Os are going to
+			 * be resubmitted.
+			 */
+			vdc_eio_unqueue(vdcp, 0, B_FALSE);
 
 			vdc_backup_local_dring(vdcp);
 
@@ -4545,9 +4678,8 @@ done:
 			 */
 			cv_broadcast(&vdcp->running_cv);
 
-			while (vdcp->sync_op_pending) {
-				cv_signal(&vdcp->sync_pending_cv);
-				cv_signal(&vdcp->sync_blocked_cv);
+			while (vdcp->sync_op_cnt > 0) {
+				cv_broadcast(&vdcp->sync_blocked_cv);
 				mutex_exit(&vdcp->lock);
 				/* give the waiters enough time to wake up */
 				delay(vdc_hz_min_ldc_delay);
@@ -4659,7 +4791,7 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 		ldep = &vdcp->local_dring[idx];
 		op = ldep->operation;
 		if ((op == VD_OP_BREAD) || (op == VD_OP_BWRITE)) {
-			DTRACE_IO1(done, buf_t *, ldep->cb_arg);
+			DTRACE_IO1(done, buf_t *, ldep->buf);
 			VD_KSTAT_RUNQ_EXIT(vdcp);
 		}
 		VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
@@ -4684,62 +4816,57 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 
 	ldep = &vdcp->local_dring[idx];
 
-	DMSG(vdcp, 1, ": state 0x%x - cb_type 0x%x\n",
-	    ldep->dep->hdr.dstate, ldep->cb_type);
+	DMSG(vdcp, 1, ": state 0x%x\n", ldep->dep->hdr.dstate);
 
 	if (ldep->dep->hdr.dstate == VIO_DESC_DONE) {
 		struct buf *bufp;
 
-		switch (ldep->cb_type) {
-		case CB_SYNC:
-			ASSERT(vdcp->sync_op_pending);
+		status = ldep->dep->payload.status;
 
-			status = vdc_depopulate_descriptor(vdcp, idx);
-			vdcp->sync_op_status = status;
-			vdcp->sync_op_pending = B_FALSE;
-			cv_signal(&vdcp->sync_pending_cv);
-			break;
+		bufp = ldep->buf;
+		ASSERT(bufp != NULL);
 
-		case CB_STRATEGY:
-			bufp = ldep->cb_arg;
-			ASSERT(bufp != NULL);
-			bufp->b_resid =
-			    bufp->b_bcount - ldep->dep->payload.nbytes;
-			status = ldep->dep->payload.status; /* Future:ntoh */
-			if (status != 0) {
-				DMSG(vdcp, 1, "strategy status=%d\n", status);
-				VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
-				bioerror(bufp, status);
-			}
+		bufp->b_resid = bufp->b_bcount - ldep->dep->payload.nbytes;
+		bioerror(bufp, status);
 
-			(void) vdc_depopulate_descriptor(vdcp, idx);
+		if (status != 0) {
+			DMSG(vdcp, 1, "I/O status=%d\n", status);
+		}
 
-			DMSG(vdcp, 1,
-			    "strategy complete req=%ld bytes resp=%ld bytes\n",
-			    bufp->b_bcount, ldep->dep->payload.nbytes);
+		DMSG(vdcp, 1,
+		    "I/O complete req=%ld bytes resp=%ld bytes\n",
+		    bufp->b_bcount, ldep->dep->payload.nbytes);
 
-			if (status != 0 && vdcp->failfast_interval != 0) {
-				/*
-				 * The I/O has failed and failfast is enabled.
-				 * We need the failfast thread to check if the
-				 * failure is due to a reservation conflict.
-				 */
-				(void) vdc_failfast_io_queue(vdcp, bufp);
-			} else {
+		/*
+		 * If the request has failed and we have multiple servers or
+		 * failfast is enabled then we will have to defer the completion
+		 * of the request until we have checked that the vdisk backend
+		 * is effectively available (if multiple server) or that there
+		 * is no reservation conflict (if failfast).
+		 */
+		if ((status != 0 &&
+		    (vdcp->num_servers > 1 &&
+		    (ldep->flags & VDC_OP_ERRCHK_BACKEND)) ||
+		    (vdcp->failfast_interval != 0 &&
+		    (ldep->flags & VDC_OP_ERRCHK_CONFLICT)))) {
+			/*
+			 * The I/O has failed and we need to check the error.
+			 */
+			(void) vdc_eio_queue(vdcp, idx);
+		} else {
+			op = ldep->operation;
+			if (op == VD_OP_BREAD || op == VD_OP_BWRITE) {
 				if (status == 0) {
-					op = (bufp->b_flags & B_READ) ?
-					    VD_OP_BREAD : VD_OP_BWRITE;
 					VD_UPDATE_IO_STATS(vdcp, op,
 					    ldep->dep->payload.nbytes);
+				} else {
+					VD_UPDATE_ERR_STATS(vdcp, vd_softerrs);
 				}
 				VD_KSTAT_RUNQ_EXIT(vdcp);
 				DTRACE_IO1(done, buf_t *, bufp);
-				biodone(bufp);
 			}
-			break;
-
-		default:
-			ASSERT(0);
+			(void) vdc_depopulate_descriptor(vdcp, idx);
+			biodone(bufp);
 		}
 	}
 
@@ -4858,6 +4985,7 @@ static int
 vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 {
 	int status = 0;
+	vd_disk_type_t old_type;
 
 	ASSERT(vdc != NULL);
 	ASSERT(mutex_owned(&vdc->lock));
@@ -4902,6 +5030,7 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 		}
 
 		/* update disk, block and transfer sizes */
+		old_type = vdc->vdisk_type;
 		vdc_update_size(vdc, attr_msg->vdisk_size,
 		    attr_msg->vdisk_block_size, attr_msg->max_xfer_sz);
 		vdc->vdisk_type = attr_msg->vdisk_type;
@@ -4932,6 +5061,25 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 		 * fake geometry for the disk.
 		 */
 		vdc_create_fake_geometry(vdc);
+
+		/*
+		 * If the disk type was previously unknown and device nodes
+		 * were created then the driver would have created 8 device
+		 * nodes. If we now find out that this is a single-slice disk
+		 * then we need to re-create the appropriate device nodes.
+		 */
+		if (old_type == VD_DISK_TYPE_UNK &&
+		    (vdc->initialized & VDC_MINOR) &&
+		    vdc->vdisk_type == VD_DISK_TYPE_SLICE) {
+			ddi_remove_minor_node(vdc->dip, NULL);
+			(void) devfs_clean(ddi_get_parent(vdc->dip),
+			    NULL, DV_CLEAN_FORCE);
+			if (vdc_create_device_nodes(vdc) != 0) {
+				DMSG(vdc, 0, "![%d] Failed to update "
+				    "device nodes", vdc->instance);
+			}
+		}
+
 		break;
 
 	case VIO_SUBTYPE_NACK:
@@ -5183,7 +5331,7 @@ vdc_dkio_flush_cb(void *arg)
 	ASSERT(vdc != NULL);
 
 	rv = vdc_do_sync_op(vdc, VD_OP_FLUSH, NULL, 0,
-	    VDCPART(dk_arg->dev), 0, CB_SYNC, 0, VIO_both_dir, B_TRUE);
+	    VDCPART(dk_arg->dev), 0, VIO_both_dir, B_TRUE);
 	if (rv != 0) {
 		DMSG(vdc, 0, "[%d] DKIOCFLUSHWRITECACHE failed %d : model %x\n",
 		    vdc->instance, rv,
@@ -5599,8 +5747,8 @@ vdc_uscsi_cmd(vdc_t *vdc, caddr_t arg, int mode)
 	/* a uscsi reset is converted to a VD_OP_RESET operation */
 	if (uscsi.uscsi_flags & (USCSI_RESET | USCSI_RESET_LUN |
 	    USCSI_RESET_ALL)) {
-		rv = vdc_do_sync_op(vdc, VD_OP_RESET, NULL, 0, 0, 0, CB_SYNC,
-		    (void *)(uint64_t)mode, VIO_both_dir, B_TRUE);
+		rv = vdc_do_sync_op(vdc, VD_OP_RESET, NULL, 0, 0, 0,
+		    VIO_both_dir, B_TRUE);
 		return (rv);
 	}
 
@@ -5677,7 +5825,7 @@ vdc_uscsi_cmd(vdc_t *vdc, caddr_t arg, int mode)
 
 	/* submit the request */
 	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
-	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+	    0, 0, VIO_both_dir, B_FALSE);
 
 	if (rv != 0)
 		goto done;
@@ -5871,7 +6019,7 @@ vdc_mhd_inkeys(vdc_t *vdc, caddr_t arg, int mode)
 
 	/* submit the request */
 	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
-	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+	    0, 0, VIO_both_dir, B_FALSE);
 
 	if (rv != 0)
 		goto done;
@@ -5985,7 +6133,7 @@ vdc_mhd_inresv(vdc_t *vdc, caddr_t arg, int mode)
 
 	/* submit the request */
 	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
-	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+	    0, 0, VIO_both_dir, B_FALSE);
 
 	if (rv != 0)
 		goto done;
@@ -6090,7 +6238,7 @@ vdc_mhd_register(vdc_t *vdc, caddr_t arg, int mode)
 
 	/* submit the request */
 	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
-	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+	    0, 0, VIO_both_dir, B_FALSE);
 
 	if (rv == 0)
 		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
@@ -6131,7 +6279,7 @@ vdc_mhd_reserve(vdc_t *vdc, caddr_t arg, int mode)
 
 	/* submit the request */
 	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
-	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+	    0, 0, VIO_both_dir, B_FALSE);
 
 	if (rv == 0)
 		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
@@ -6176,7 +6324,7 @@ vdc_mhd_preemptabort(vdc_t *vdc, caddr_t arg, int mode)
 
 	/* submit the request */
 	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
-	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+	    0, 0, VIO_both_dir, B_FALSE);
 
 	if (rv == 0)
 		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
@@ -6215,7 +6363,7 @@ vdc_mhd_registerignore(vdc_t *vdc, caddr_t arg, int mode)
 
 	/* submit the request */
 	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
-	    0, 0, CB_SYNC, (void *)(uint64_t)mode, VIO_both_dir, B_FALSE);
+	    0, 0, VIO_both_dir, B_FALSE);
 
 	if (rv == 0)
 		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
@@ -6225,11 +6373,10 @@ vdc_mhd_registerignore(vdc_t *vdc, caddr_t arg, int mode)
 }
 
 /*
- * This function is used by the failfast mechanism to send a SCSI command
- * to check for reservation conflict.
+ * This function is used to send a (simple) SCSI command and check errors.
  */
 static int
-vdc_failfast_scsi_cmd(vdc_t *vdc, uchar_t scmd)
+vdc_eio_scsi_cmd(vdc_t *vdc, uchar_t scmd, int flags)
 {
 	int cdb_len, sense_len, vd_scsi_len;
 	vd_scsi_t *vd_scsi;
@@ -6254,41 +6401,52 @@ vdc_failfast_scsi_cmd(vdc_t *vdc, uchar_t scmd)
 	vd_scsi->timeout = vdc_scsi_timeout;
 
 	/*
-	 * Submit the request. The last argument has to be B_FALSE so that
-	 * vdc_do_sync_op does not loop checking for reservation conflict if
-	 * the operation returns an error.
+	 * Submit the request. Note the operation should not request that any
+	 * error is checked because this function is precisely called when
+	 * checking errors.
 	 */
-	rv = vdc_do_sync_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
-	    0, 0, CB_SYNC, (void *)(uint64_t)FKIOCTL, VIO_both_dir, B_FALSE);
+	ASSERT((flags & VDC_OP_ERRCHK) == 0);
+
+	rv = vdc_do_op(vdc, VD_OP_SCSICMD, (caddr_t)vd_scsi, vd_scsi_len,
+	    0, 0, NULL, VIO_both_dir, flags);
 
 	if (rv == 0)
-		(void) vdc_scsi_status(vdc, vd_scsi, B_FALSE);
+		rv = vdc_scsi_status(vdc, vd_scsi, B_FALSE);
 
 	kmem_free(vd_scsi, vd_scsi_len);
 	return (rv);
 }
 
 /*
- * This function is used by the failfast mechanism to check for reservation
- * conflict. It sends some SCSI commands which will fail with a reservation
- * conflict error if the system does not have access to the disk and this
- * will panic the system.
+ * This function is used to check if a SCSI backend is accessible. It will
+ * also detect reservation conflict if failfast is enabled, and panic the
+ * system in that case.
  *
  * Returned Code:
- *	0	- disk is accessible without reservation conflict error
- *	!= 0	- unable to check if disk is accessible
+ *	0	- disk is accessible
+ *	!= 0	- disk is inaccessible or unable to check if disk is accessible
  */
-int
-vdc_failfast_check_resv(vdc_t *vdc)
+static int
+vdc_eio_scsi_check(vdc_t *vdc, int flags)
 {
 	int failure = 0;
+	int rv;
 
 	/*
 	 * Send a TEST UNIT READY command. The command will panic
-	 * the system if it fails with a reservation conflict.
+	 * the system if it fails with a reservation conflict and
+	 * failfast is enabled. If there is a reservation conflict
+	 * and failfast is not enabled then the function will return
+	 * EACCES. In that case, there's no problem with accessing
+	 * the backend, it is just reserved.
 	 */
-	if (vdc_failfast_scsi_cmd(vdc, SCMD_TEST_UNIT_READY) != 0)
+	rv = vdc_eio_scsi_cmd(vdc, SCMD_TEST_UNIT_READY, flags);
+	if (rv != 0 && rv != EACCES)
 		failure++;
+
+	/* we don't need to do more checking if failfast is not enabled */
+	if (vdc->failfast_interval == 0)
+		return (failure);
 
 	/*
 	 * With SPC-3 compliant devices TEST UNIT READY will succeed on
@@ -6296,61 +6454,124 @@ vdc_failfast_check_resv(vdc_t *vdc)
 	 * order to provoke a Reservation Conflict status on those newer
 	 * devices.
 	 */
-	if (vdc_failfast_scsi_cmd(vdc, SCMD_WRITE_G1) != 0)
+	if (vdc_eio_scsi_cmd(vdc, SCMD_WRITE_G1, flags) != 0)
 		failure++;
 
 	return (failure);
 }
 
 /*
- * Add a pending I/O to the failfast I/O queue. An I/O is added to this
- * queue when it has failed and failfast is enabled. Then we have to check
- * if it has failed because of a reservation conflict in which case we have
- * to panic the system.
+ * This function is used to check if a backend is effectively accessible.
  *
- * Async I/O should be queued with their block I/O data transfer structure
- * (buf). Sync I/O should be queued with buf = NULL.
+ * Returned Code:
+ *	0	- disk is accessible
+ *	!= 0	- disk is inaccessible or unable to check if disk is accessible
+ */
+static int
+vdc_eio_check(vdc_t *vdc, int flags)
+{
+	char *buffer;
+	diskaddr_t blkno;
+	int rv;
+
+	ASSERT((flags & VDC_OP_ERRCHK) == 0);
+
+	if (VD_OP_SUPPORTED(vdc->operations, VD_OP_SCSICMD))
+		return (vdc_eio_scsi_check(vdc, flags));
+
+	ASSERT(vdc->failfast_interval == 0);
+
+	/*
+	 * If the backend does not support SCSI operations then we simply
+	 * check if the backend is accessible by reading some data blocks.
+	 * We first try to read a random block, to try to avoid getting
+	 * a block that might have been cached on the service domain. Then
+	 * we try the last block, and finally the first block.
+	 *
+	 * We return success as soon as we are able to read any block.
+	 */
+	buffer = kmem_alloc(vdc->vdisk_bsize, KM_SLEEP);
+
+	if (vdc->vdisk_size > 0) {
+
+		/* try a random block */
+		(void) random_get_pseudo_bytes((uint8_t *)&blkno,
+		    sizeof (diskaddr_t));
+		blkno = blkno % vdc->vdisk_size;
+		rv = vdc_do_op(vdc, VD_OP_BREAD, (caddr_t)buffer,
+		    vdc->vdisk_bsize, VD_SLICE_NONE, blkno, NULL,
+		    VIO_read_dir, flags);
+
+		if (rv == 0)
+			goto done;
+
+		/* try the last block */
+		blkno = vdc->vdisk_size - 1;
+		rv = vdc_do_op(vdc, VD_OP_BREAD, (caddr_t)buffer,
+		    vdc->vdisk_bsize, VD_SLICE_NONE, blkno, NULL,
+		    VIO_read_dir, flags);
+
+		if (rv == 0)
+			goto done;
+	}
+
+	/* try block 0 */
+	blkno = 0;
+	rv = vdc_do_op(vdc, VD_OP_BREAD, (caddr_t)buffer, vdc->vdisk_bsize,
+	    VD_SLICE_NONE, blkno, NULL, VIO_read_dir, flags);
+
+done:
+	kmem_free(buffer, vdc->vdisk_bsize);
+	return (rv);
+}
+
+/*
+ * Add a pending I/O to the eio queue. An I/O is added to this queue
+ * when it has failed and failfast is enabled or the vdisk has multiple
+ * servers. It will then be handled by the eio thread (vdc_eio_thread).
+ * The eio queue is ordered starting with the most recent I/O added.
  */
 static vdc_io_t *
-vdc_failfast_io_queue(vdc_t *vdc, struct buf *buf)
+vdc_eio_queue(vdc_t *vdc, int index)
 {
 	vdc_io_t *vio;
 
 	ASSERT(MUTEX_HELD(&vdc->lock));
 
 	vio = kmem_alloc(sizeof (vdc_io_t), KM_SLEEP);
-	vio->vio_next = vdc->failfast_io_queue;
-	vio->vio_buf = buf;
+	vio->vio_next = vdc->eio_queue;
+	vio->vio_index = index;
 	vio->vio_qtime = ddi_get_lbolt();
 
-	vdc->failfast_io_queue = vio;
+	vdc->eio_queue = vio;
 
-	/* notify the failfast thread that a new I/O is queued */
-	cv_signal(&vdc->failfast_cv);
+	/* notify the eio thread that a new I/O is queued */
+	cv_signal(&vdc->eio_cv);
 
 	return (vio);
 }
 
 /*
- * Remove and complete I/O in the failfast I/O queue which have been
- * added after the indicated deadline. A deadline of 0 means that all
- * I/O have to be unqueued and marked as completed.
+ * Remove I/Os added before the indicated deadline from the eio queue. A
+ * deadline of 0 means that all I/Os have to be unqueued. The complete_io
+ * boolean specifies if unqueued I/Os should be marked as completed or not.
  */
 static void
-vdc_failfast_io_unqueue(vdc_t *vdc, clock_t deadline)
+vdc_eio_unqueue(vdc_t *vdc, clock_t deadline, boolean_t complete_io)
 {
+	struct buf *buf;
 	vdc_io_t *vio, *vio_tmp;
+	int index, op;
 
 	ASSERT(MUTEX_HELD(&vdc->lock));
 
 	vio_tmp = NULL;
-	vio = vdc->failfast_io_queue;
+	vio = vdc->eio_queue;
 
 	if (deadline != 0) {
 		/*
-		 * Skip any io queued after the deadline. The failfast
-		 * I/O queue is ordered starting with the last I/O added
-		 * to the queue.
+		 * Skip any io queued after the deadline. The eio queue is
+		 * ordered starting with the last I/O added to the queue.
 		 */
 		while (vio != NULL && vio->vio_qtime > deadline) {
 			vio_tmp = vio;
@@ -6364,53 +6585,54 @@ vdc_failfast_io_unqueue(vdc_t *vdc, clock_t deadline)
 
 	/* update the queue */
 	if (vio_tmp == NULL)
-		vdc->failfast_io_queue = NULL;
+		vdc->eio_queue = NULL;
 	else
 		vio_tmp->vio_next = NULL;
 
 	/*
-	 * Complete unqueued I/O. Async I/O have a block I/O data transfer
-	 * structure (buf) and they are completed by calling biodone(). Sync
-	 * I/O do not have a buf and they are completed by setting the
-	 * vio_qtime to zero and signaling failfast_io_cv. In that case, the
-	 * thread waiting for the I/O to complete is responsible for freeing
-	 * the vio structure.
+	 * Free and complete unqueued I/Os if this was requested. All I/Os
+	 * have a block I/O data transfer structure (buf) and they are
+	 * completed by calling biodone().
 	 */
 	while (vio != NULL) {
 		vio_tmp = vio->vio_next;
-		if (vio->vio_buf != NULL) {
-			VD_KSTAT_RUNQ_EXIT(vdc);
-			DTRACE_IO1(done, buf_t *, vio->vio_buf);
-			biodone(vio->vio_buf);
-			kmem_free(vio, sizeof (vdc_io_t));
-		} else {
-			vio->vio_qtime = 0;
+
+		if (complete_io) {
+			index = vio->vio_index;
+			op = vdc->local_dring[index].operation;
+			buf = vdc->local_dring[index].buf;
+			(void) vdc_depopulate_descriptor(vdc, index);
+			ASSERT(buf->b_flags & B_ERROR);
+			if (op == VD_OP_BREAD || op == VD_OP_BWRITE) {
+				VD_UPDATE_ERR_STATS(vdc, vd_softerrs);
+				VD_KSTAT_RUNQ_EXIT(vdc);
+				DTRACE_IO1(done, buf_t *, buf);
+			}
+			biodone(buf);
 		}
+
+		kmem_free(vio, sizeof (vdc_io_t));
 		vio = vio_tmp;
 	}
-
-	cv_broadcast(&vdc->failfast_io_cv);
 }
 
 /*
- * Failfast Thread.
+ * Error I/O Thread.  There is one eio thread for each virtual disk that
+ * has multiple servers or for which failfast is enabled. Failfast can only
+ * be enabled for vdisk supporting SCSI commands.
  *
- * While failfast is enabled, the failfast thread sends a TEST UNIT READY
+ * While failfast is enabled, the eio thread sends a TEST UNIT READY
  * and a zero size WRITE(10) SCSI commands on a regular basis to check that
  * we still have access to the disk. If a command fails with a RESERVATION
  * CONFLICT error then the system will immediatly panic.
  *
- * The failfast thread is also woken up when an I/O has failed. It then check
+ * The eio thread is also woken up when an I/O has failed. It then checks
  * the access to the disk to ensure that the I/O failure was not due to a
- * reservation conflict.
+ * reservation conflict or to the backend been inaccessible.
  *
- * There is one failfast thread for each virtual disk for which failfast is
- * enabled. We could have only one thread sending requests for all disks but
- * this would need vdc to send asynchronous requests and to have callbacks to
- * process replies.
  */
 static void
-vdc_failfast_thread(void *arg)
+vdc_eio_thread(void *arg)
 {
 	int status;
 	vdc_t *vdc = (vdc_t *)arg;
@@ -6418,45 +6640,74 @@ vdc_failfast_thread(void *arg)
 
 	mutex_enter(&vdc->lock);
 
-	while (vdc->failfast_interval != 0) {
+	while (vdc->failfast_interval != 0 || vdc->num_servers > 1) {
+		/*
+		 * Wait if there is nothing in the eio queue or if the state
+		 * is not VDC_STATE_RUNNING.
+		 */
+		if (vdc->eio_queue == NULL || vdc->state != VDC_STATE_RUNNING) {
+			if (vdc->failfast_interval != 0) {
+				timeout = ddi_get_lbolt() +
+				    drv_usectohz(vdc->failfast_interval);
+				(void) cv_timedwait(&vdc->eio_cv, &vdc->lock,
+				    timeout);
+			} else {
+				ASSERT(vdc->num_servers > 1);
+				(void) cv_wait(&vdc->eio_cv, &vdc->lock);
+			}
 
-		starttime = ddi_get_lbolt();
+			if (vdc->state != VDC_STATE_RUNNING)
+				continue;
+		}
 
 		mutex_exit(&vdc->lock);
 
-		/* check for reservation conflict */
-		status = vdc_failfast_check_resv(vdc);
+		starttime = ddi_get_lbolt();
+
+		/* check error */
+		status = vdc_eio_check(vdc, VDC_OP_STATE_RUNNING);
 
 		mutex_enter(&vdc->lock);
 		/*
-		 * We have dropped the lock to send the SCSI command so we have
-		 * to check that failfast is still enabled.
+		 * We have dropped the lock to check the backend so we have
+		 * to check that the eio thread is still enabled.
 		 */
-		if (vdc->failfast_interval == 0)
+		if (vdc->failfast_interval == 0 && vdc->num_servers <= 1)
 			break;
 
 		/*
-		 * If we have successfully check the disk access and there was
-		 * no reservation conflict then we can complete any I/O queued
-		 * before the last check.
+		 * If the eio queue is empty or we are not in running state
+		 * anymore then there is nothing to do.
 		 */
-		if (status == 0)
-			vdc_failfast_io_unqueue(vdc, starttime);
-
-		/* proceed again if some I/O are still in the queue */
-		if (vdc->failfast_io_queue != NULL)
+		if (vdc->state != VDC_STATE_RUNNING || vdc->eio_queue == NULL)
 			continue;
 
-		timeout = ddi_get_lbolt() +
-		    drv_usectohz(vdc->failfast_interval);
-		(void) cv_timedwait(&vdc->failfast_cv, &vdc->lock, timeout);
+		if (status == 0) {
+			/*
+			 * The backend access has been successfully checked,
+			 * we can complete any I/O queued before the last check.
+			 */
+			vdc_eio_unqueue(vdc, starttime, B_TRUE);
+
+		} else if (vdc->num_servers > 1) {
+			/*
+			 * The backend is inaccessible for a disk with multiple
+			 * servers. So we force a reset to switch to another
+			 * server. The reset will also clear the eio queue and
+			 * resubmit all pending I/Os.
+			 */
+			mutex_enter(&vdc->read_lock);
+			vdc->read_state = VDC_READ_RESET;
+			cv_signal(&vdc->read_cv);
+			mutex_exit(&vdc->read_lock);
+		}
 	}
 
 	/*
-	 * Failfast is being stop so we can complete any queued I/O.
+	 * The thread is being stopped so we can complete any queued I/O.
 	 */
-	vdc_failfast_io_unqueue(vdc, 0);
-	vdc->failfast_thread = NULL;
+	vdc_eio_unqueue(vdc, 0, B_TRUE);
+	vdc->eio_thread = NULL;
 	mutex_exit(&vdc->lock);
 	thread_exit();
 }
@@ -6473,14 +6724,14 @@ vdc_failfast(vdc_t *vdc, caddr_t arg, int mode)
 		return (EFAULT);
 
 	mutex_enter(&vdc->lock);
-	if (mh_time != 0 && vdc->failfast_thread == NULL) {
-		vdc->failfast_thread = thread_create(NULL, 0,
-		    vdc_failfast_thread, vdc, 0, &p0, TS_RUN,
+	if (mh_time != 0 && vdc->eio_thread == NULL) {
+		vdc->eio_thread = thread_create(NULL, 0,
+		    vdc_eio_thread, vdc, 0, &p0, TS_RUN,
 		    v.v_maxsyspri - 2);
 	}
 
-	vdc->failfast_interval = mh_time * 1000;
-	cv_signal(&vdc->failfast_cv);
+	vdc->failfast_interval = ((long)mh_time) * MILLISEC;
+	cv_signal(&vdc->eio_cv);
 	mutex_exit(&vdc->lock);
 
 	return (0);
@@ -6491,14 +6742,13 @@ vdc_failfast(vdc_t *vdc, caddr_t arg, int mode)
  * converted to VD_OP_SET_ACCESS operations.
  */
 static int
-vdc_access_set(vdc_t *vdc, uint64_t flags, int mode)
+vdc_access_set(vdc_t *vdc, uint64_t flags)
 {
 	int rv;
 
 	/* submit owership command request */
 	rv = vdc_do_sync_op(vdc, VD_OP_SET_ACCESS, (caddr_t)&flags,
-	    sizeof (uint64_t), 0, 0, CB_SYNC, (void *)(uint64_t)mode,
-	    VIO_both_dir, B_TRUE);
+	    sizeof (uint64_t), 0, 0, VIO_both_dir, B_TRUE);
 
 	return (rv);
 }
@@ -6508,14 +6758,13 @@ vdc_access_set(vdc_t *vdc, uint64_t flags, int mode)
  * VD_OP_GET_ACCESS operation.
  */
 static int
-vdc_access_get(vdc_t *vdc, uint64_t *status, int mode)
+vdc_access_get(vdc_t *vdc, uint64_t *status)
 {
 	int rv;
 
 	/* submit owership command request */
 	rv = vdc_do_sync_op(vdc, VD_OP_GET_ACCESS, (caddr_t)status,
-	    sizeof (uint64_t), 0, 0, CB_SYNC, (void *)(uint64_t)mode,
-	    VIO_both_dir, B_TRUE);
+	    sizeof (uint64_t), 0, 0, VIO_both_dir, B_TRUE);
 
 	return (rv);
 }
@@ -6560,7 +6809,7 @@ vdc_ownership_thread(void *arg)
 			mutex_exit(&vdc->lock);
 
 			status = vdc_access_set(vdc, VD_ACCESS_SET_EXCLUSIVE |
-			    VD_ACCESS_SET_PRESERVE, FKIOCTL);
+			    VD_ACCESS_SET_PRESERVE);
 
 			mutex_enter(&vdc->lock);
 
@@ -6645,7 +6894,7 @@ vdc_get_capacity(vdc_t *vdc, size_t *dsk_size, size_t *blk_size)
 	vd_cap = kmem_zalloc(alloc_len, KM_SLEEP);
 
 	rv = vdc_do_sync_op(vdc, VD_OP_GET_CAPACITY, (caddr_t)vd_cap, alloc_len,
-	    0, 0, CB_SYNC, (void *)(uint64_t)FKIOCTL, VIO_both_dir, B_TRUE);
+	    0, 0, VIO_both_dir, B_TRUE);
 
 	*dsk_size = vd_cap->vdisk_size;
 	*blk_size = vd_cap->vdisk_block_size;
@@ -6940,7 +7189,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 		vdc_ownership_update(vdc, VDC_OWNERSHIP_WANTED);
 
 		rv = vdc_access_set(vdc, VD_ACCESS_SET_EXCLUSIVE |
-		    VD_ACCESS_SET_PREEMPT | VD_ACCESS_SET_PRESERVE, mode);
+		    VD_ACCESS_SET_PREEMPT | VD_ACCESS_SET_PRESERVE);
 		if (rv == 0) {
 			vdc_ownership_update(vdc, VDC_OWNERSHIP_WANTED |
 			    VDC_OWNERSHIP_GRANTED);
@@ -6954,7 +7203,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 	case MHIOCRELEASE:
 	{
 		mutex_enter(&vdc->ownership_lock);
-		rv = vdc_access_set(vdc, VD_ACCESS_SET_CLEAR, mode);
+		rv = vdc_access_set(vdc, VD_ACCESS_SET_CLEAR);
 		if (rv == 0) {
 			vdc_ownership_update(vdc, VDC_OWNERSHIP_NONE);
 		}
@@ -6966,7 +7215,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 	{
 		uint64_t status;
 
-		rv = vdc_access_get(vdc, &status, mode);
+		rv = vdc_access_get(vdc, &status);
 		if (rv == 0 && rvalp != NULL)
 			*rvalp = (status & VD_ACCESS_ALLOWED)? 0 : 1;
 		return (rv);
@@ -6974,7 +7223,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 
 	case MHIOCQRESERVE:
 	{
-		rv = vdc_access_set(vdc, VD_ACCESS_SET_EXCLUSIVE, mode);
+		rv = vdc_access_set(vdc, VD_ACCESS_SET_EXCLUSIVE);
 		return (rv);
 	}
 
@@ -7152,8 +7401,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode, int *rvalp)
 	 * send request to vds to service the ioctl.
 	 */
 	rv = vdc_do_sync_op(vdc, iop->op, mem_p, alloc_len,
-	    VDCPART(dev), 0, CB_SYNC, (void *)(uint64_t)mode,
-	    VIO_both_dir, B_TRUE);
+	    VDCPART(dev), 0, VIO_both_dir, B_TRUE);
 
 	if (rv != 0) {
 		/*
@@ -7833,7 +8081,6 @@ vdc_update_vio_bsize(vdc_t *vdc, uint32_t blk_size)
 static int
 vdc_validate_geometry(vdc_t *vdc)
 {
-	buf_t	*buf;	/* BREAD requests need to be in a buf_t structure */
 	dev_t	dev;
 	int	rv, rval;
 	struct dk_label *label;
@@ -7960,27 +8207,9 @@ vdc_validate_geometry(vdc_t *vdc)
 	 * Read disk label from start of disk
 	 */
 	label = kmem_alloc(vdc->vdisk_bsize, KM_SLEEP);
-	buf = kmem_alloc(sizeof (buf_t), KM_SLEEP);
-	bioinit(buf);
-	buf->b_un.b_addr = (caddr_t)label;
-	buf->b_bcount = vdc->vdisk_bsize;
-	buf->b_flags = B_BUSY | B_READ;
-	buf->b_dev = cmpdev(dev);
-	rv = vdc_send_request(vdc, VD_OP_BREAD, (caddr_t)label,
-	    vdc->vdisk_bsize, VD_SLICE_NONE, 0, CB_STRATEGY, buf, VIO_read_dir);
-	if (rv) {
-		DMSG(vdc, 1, "[%d] Failed to read disk block 0\n",
-		    vdc->instance);
-	} else if (ddi_in_panic()) {
-		rv = vdc_drain_response(vdc, CB_STRATEGY, buf);
-		if (rv == 0) {
-			rv = geterror(buf);
-		}
-	} else {
-		rv = biowait(buf);
-	}
-	biofini(buf);
-	kmem_free(buf, sizeof (buf_t));
+
+	rv = vdc_do_op(vdc, VD_OP_BREAD, (caddr_t)label, vdc->vdisk_bsize,
+	    VD_SLICE_NONE, 0, NULL, VIO_read_dir, VDC_OP_NORMAL);
 
 	if (rv != 0 || label->dkl_magic != DKL_MAGIC ||
 	    label->dkl_cksum != vdc_lbl2cksum(label)) {
@@ -8031,7 +8260,8 @@ vdc_validate(vdc_t *vdc)
 	(void) vdc_validate_geometry(vdc);
 
 	/* if the disk label has changed, update device nodes */
-	if (vdc->vdisk_label != old_label) {
+	if (vdc->vdisk_type == VD_DISK_TYPE_DISK &&
+	    vdc->vdisk_label != old_label) {
 
 		if (vdc->vdisk_label == VD_DISK_LABEL_EFI)
 			rv = vdc_create_device_nodes_efi(vdc);
@@ -8082,6 +8312,8 @@ vdc_setup_devid(vdc_t *vdc)
 	int rv;
 	vd_devid_t *vd_devid;
 	size_t bufsize, bufid_len;
+	ddi_devid_t vdisk_devid;
+	char *devid_str;
 
 	/*
 	 * At first sight, we don't know the size of the devid that the
@@ -8096,10 +8328,10 @@ vdc_setup_devid(vdc_t *vdc)
 	vd_devid = kmem_zalloc(bufsize, KM_SLEEP);
 	bufid_len = bufsize - sizeof (vd_efi_t) - 1;
 
-	rv = vdc_do_sync_op(vdc, VD_OP_GET_DEVID, (caddr_t)vd_devid,
-	    bufsize, 0, 0, CB_SYNC, 0, VIO_both_dir, B_TRUE);
+	rv = vdc_do_op(vdc, VD_OP_GET_DEVID, (caddr_t)vd_devid,
+	    bufsize, 0, 0, NULL, VIO_both_dir, 0);
 
-	DMSG(vdc, 2, "sync_op returned %d\n", rv);
+	DMSG(vdc, 2, "do_op returned %d\n", rv);
 
 	if (rv) {
 		kmem_free(vd_devid, bufsize);
@@ -8117,9 +8349,8 @@ vdc_setup_devid(vdc_t *vdc)
 		vd_devid = kmem_zalloc(bufsize, KM_SLEEP);
 		bufid_len = bufsize - sizeof (vd_efi_t) - 1;
 
-		rv = vdc_do_sync_op(vdc, VD_OP_GET_DEVID,
-		    (caddr_t)vd_devid, bufsize, 0, 0, CB_SYNC, 0,
-		    VIO_both_dir, B_TRUE);
+		rv = vdc_do_sync_op(vdc, VD_OP_GET_DEVID, (caddr_t)vd_devid,
+		    bufsize, 0, 0, VIO_both_dir, B_TRUE);
 
 		if (rv) {
 			kmem_free(vd_devid, bufsize);
@@ -8142,22 +8373,57 @@ vdc_setup_devid(vdc_t *vdc)
 
 	/* build an encapsulated devid based on the returned devid */
 	if (ddi_devid_init(vdc->dip, DEVID_ENCAP, vd_devid->length,
-	    vd_devid->id, &vdc->devid) != DDI_SUCCESS) {
+	    vd_devid->id, &vdisk_devid) != DDI_SUCCESS) {
 		DMSG(vdc, 1, "[%d] Fail to created devid\n", vdc->instance);
 		kmem_free(vd_devid, bufsize);
 		return (1);
 	}
 
-	DEVID_FORMTYPE((impl_devid_t *)vdc->devid, vd_devid->type);
+	DEVID_FORMTYPE((impl_devid_t *)vdisk_devid, vd_devid->type);
 
-	ASSERT(ddi_devid_valid(vdc->devid) == DDI_SUCCESS);
+	ASSERT(ddi_devid_valid(vdisk_devid) == DDI_SUCCESS);
 
 	kmem_free(vd_devid, bufsize);
 
-	if (ddi_devid_register(vdc->dip, vdc->devid) != DDI_SUCCESS) {
-		DMSG(vdc, 1, "[%d] Fail to register devid\n", vdc->instance);
+	if (vdc->devid != NULL) {
+		/* check that the devid hasn't changed */
+		if (ddi_devid_compare(vdisk_devid, vdc->devid) == 0) {
+			ddi_devid_free(vdisk_devid);
+			return (0);
+		}
+
+		cmn_err(CE_WARN, "vdisk@%d backend devid has changed",
+		    vdc->instance);
+
+		devid_str = ddi_devid_str_encode(vdc->devid, NULL);
+
+		cmn_err(CE_CONT, "vdisk@%d backend initial devid: %s",
+		    vdc->instance,
+		    (devid_str)? devid_str : "<encoding error>");
+
+		if (devid_str)
+			ddi_devid_str_free(devid_str);
+
+		devid_str = ddi_devid_str_encode(vdisk_devid, NULL);
+
+		cmn_err(CE_CONT, "vdisk@%d backend current devid: %s",
+		    vdc->instance,
+		    (devid_str)? devid_str : "<encoding error>");
+
+		if (devid_str)
+			ddi_devid_str_free(devid_str);
+
+		ddi_devid_free(vdisk_devid);
 		return (1);
 	}
+
+	if (ddi_devid_register(vdc->dip, vdisk_devid) != DDI_SUCCESS) {
+		DMSG(vdc, 1, "[%d] Fail to register devid\n", vdc->instance);
+		ddi_devid_free(vdisk_devid);
+		return (1);
+	}
+
+	vdc->devid = vdisk_devid;
 
 	return (0);
 }
