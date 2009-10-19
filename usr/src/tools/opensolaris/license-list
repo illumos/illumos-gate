@@ -143,6 +143,7 @@ usr/src/uts/common/io/afe/THIRDPARTYLICENSE
 usr/src/uts/common/io/arn/LICENSE
 usr/src/uts/common/io/ath/LICENSE
 usr/src/uts/common/io/atu/THIRDPARTYLICENSE
+usr/src/uts/common/io/audio/drv/audiosolo/THIRDPARTYLICENSE
 usr/src/uts/common/io/chxge/com/THIRDPARTYLICENSE
 usr/src/uts/common/io/drm/THIRDPARTYLICENSE
 usr/src/uts/common/io/ib/clients/rds/THIRDPARTYLICENSE

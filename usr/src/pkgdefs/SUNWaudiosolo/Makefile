@@ -25,6 +25,8 @@
 
 include ../Makefile.com
 
+LICENSEFILES += ../../uts/common/io/audio/drv/audiosolo/THIRDPARTYLICENSE
+CDDL =
 TMPLFILES += postinstall preremove
 
 .KEEP_STATE:
