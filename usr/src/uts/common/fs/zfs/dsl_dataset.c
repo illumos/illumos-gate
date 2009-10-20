@@ -1284,7 +1284,7 @@ dsl_dataset_destroy_begin_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	 */
 	if (ds->ds_prev != NULL &&
 	    ds->ds_prev->ds_phys->ds_next_snap_obj == ds->ds_object)
-		return (EINVAL);
+		return (EBUSY);
 
 	/*
 	 * This is really a dsl_dir thing, but check it here so that
@@ -1380,7 +1380,7 @@ dsl_dataset_destroy_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	 */
 	if (ds->ds_prev != NULL &&
 	    ds->ds_prev->ds_phys->ds_next_snap_obj == ds->ds_object)
-		return (EINVAL);
+		return (EBUSY);
 
 	/*
 	 * If we made changes this txg, traverse_dsl_dataset won't find
