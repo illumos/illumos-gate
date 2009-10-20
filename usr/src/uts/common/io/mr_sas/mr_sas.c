@@ -65,6 +65,7 @@
 #include <sys/atomic.h>
 #include <sys/signal.h>
 #include <sys/byteorder.h>
+#include <sys/sdt.h>
 #include <sys/fs/dv_node.h>	/* devfs_clean */
 
 #include "mr_sas.h"
@@ -1274,6 +1275,9 @@ mrsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 	if ((pkt->pkt_flags & FLAG_NOINTR) == 0) {
 		if (instance->fw_outstanding > instance->max_fw_cmds) {
 			con_log(CL_ANN, (CE_CONT, "mr_sas:Firmware busy"));
+			DTRACE_PROBE2(start_tran_err,
+			    uint16_t, instance->fw_outstanding,
+			    uint16_t, instance->max_fw_cmds);
 			return_mfi_pkt(instance, cmd);
 			return (TRAN_BUSY);
 		}
@@ -1319,6 +1323,8 @@ mrsas_tran_start(struct scsi_address *ap, register struct scsi_pkt *pkt)
 		}
 
 		(void) mrsas_common_check(instance, cmd);
+		DTRACE_PROBE2(start_nointr_done, uint8_t, hdr->cmd,
+		    uint8_t, hdr->cmd_status);
 		return_mfi_pkt(instance, cmd);
 
 		if (pkt->pkt_comp) {
@@ -1568,6 +1574,8 @@ mrsas_isr(struct mrsas_instance *instance)
 	    producer, consumer));
 	if (producer == consumer) {
 		con_log(CL_ANN1, (CE_WARN, "producer = consumer case"));
+		DTRACE_PROBE2(isr_pc_err, uint32_t, producer,
+		    uint32_t, consumer);
 		return (DDI_INTR_CLAIMED);
 	}
 	mutex_enter(&instance->completed_pool_mtx);
@@ -1965,6 +1973,8 @@ get_ctrl_info(struct mrsas_instance *instance,
 	if (!cmd) {
 		con_log(CL_ANN, (CE_WARN,
 		    "Failed to get a cmd for ctrl info"));
+		DTRACE_PROBE2(info_mfi_err, uint16_t, instance->fw_outstanding,
+		    uint16_t, instance->max_fw_cmds);
 		return (DDI_FAILURE);
 	}
 	/* Clear the frame buffer and assign back the context id */
@@ -2022,10 +2032,10 @@ get_ctrl_info(struct mrsas_instance *instance,
 		ret = -1;
 	}
 
-	return_mfi_pkt(instance, cmd);
 	if (mrsas_common_check(instance, cmd) != DDI_SUCCESS) {
 		ret = -1;
 	}
+	return_mfi_pkt(instance, cmd);
 
 	return (ret);
 }
@@ -2047,6 +2057,8 @@ abort_aen_cmd(struct mrsas_instance *instance,
 	if (!cmd) {
 		con_log(CL_ANN, (CE_WARN,
 		    "Failed to get a cmd for ctrl info"));
+		DTRACE_PROBE2(abort_mfi_err, uint16_t, instance->fw_outstanding,
+		    uint16_t, instance->max_fw_cmds);
 		return (DDI_FAILURE);
 	}
 	/* Clear the frame buffer and assign back the context id */
@@ -2386,6 +2398,8 @@ get_seq_num(struct mrsas_instance *instance,
 
 	if (!cmd) {
 		cmn_err(CE_WARN, "mr_sas: failed to get a cmd");
+		DTRACE_PROBE2(seq_num_mfi_err, uint16_t,
+		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
 		return (ENOMEM);
 	}
 	/* Clear the frame buffer and assign back the context id */
@@ -2750,6 +2764,9 @@ mrsas_softintr(struct mrsas_instance *instance)
 			    "CDB[0] = %x completed for %s: size %lx context %x",
 			    pkt->pkt_cdbp[0], ((acmd->islogical) ? "LD" : "PD"),
 			    acmd->cmd_dmacount, hdr->context));
+			DTRACE_PROBE3(softintr_cdb, uint8_t, pkt->pkt_cdbp[0],
+			    uint_t, acmd->cmd_cdblen, ulong_t,
+			    acmd->cmd_dmacount);
 
 			if (pkt->pkt_cdbp[0] == SCMD_INQUIRY) {
 				struct scsi_inquiry	*inq;
@@ -2777,6 +2794,9 @@ mrsas_softintr(struct mrsas_instance *instance)
 					}
 				}
 			}
+
+			DTRACE_PROBE2(softintr_done, uint8_t, hdr->cmd,
+			    uint8_t, hdr->cmd_status);
 
 			switch (hdr->cmd_status) {
 			case MFI_STAT_OK:
@@ -2873,8 +2893,6 @@ mrsas_softintr(struct mrsas_instance *instance)
 
 			(void) mrsas_common_check(instance, cmd);
 
-			return_mfi_pkt(instance, cmd);
-
 			if (acmd->cmd_dmahandle) {
 				if (mrsas_check_dma_handle(
 				    acmd->cmd_dmahandle) != DDI_SUCCESS) {
@@ -2884,6 +2902,8 @@ mrsas_softintr(struct mrsas_instance *instance)
 					pkt->pkt_statistics = 0;
 				}
 			}
+
+			return_mfi_pkt(instance, cmd);
 
 			/* Call the callback routine */
 			if (((pkt->pkt_flags & FLAG_NOINTR) == 0) &&
@@ -3288,6 +3308,8 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 
 	/* get the command packet */
 	if (!(cmd = get_mfi_pkt(instance))) {
+		DTRACE_PROBE2(build_cmd_mfi_err, uint16_t,
+		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
 		return (NULL);
 	}
 
@@ -3299,6 +3321,8 @@ build_cmd(struct mrsas_instance *instance, struct scsi_address *ap,
 
 	cmd->pkt = pkt;
 	cmd->cmd = acmd;
+	DTRACE_PROBE3(build_cmds, uint8_t, pkt->pkt_cdbp[0],
+	    ulong_t, acmd->cmd_dmacount, ulong_t, acmd->cmd_dma_len);
 
 	/* lets get the command directions */
 	if (acmd->cmd_flags & CFLAG_DMASEND) {
@@ -3623,6 +3647,8 @@ issue_mfi_pthru(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 
 	con_log(CL_ANN, (CE_NOTE, "issue_mfi_pthru: cmd_status %x, "
 	    "scsi_status %x", kpthru->cmd_status, kpthru->scsi_status));
+	DTRACE_PROBE3(issue_pthru, uint8_t, kpthru->cmd, uint8_t,
+	    kpthru->cmd_status, uint8_t, kpthru->scsi_status);
 
 	if (xferlen) {
 		/* free kernel buffer */
@@ -3742,6 +3768,8 @@ issue_mfi_dcmd(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	}
 
 	kdcmd->cmd_status = ddi_get8(acc_handle, &dcmd->cmd_status);
+	DTRACE_PROBE3(issue_dcmd, uint32_t, kdcmd->opcode, uint8_t,
+	    kdcmd->cmd, uint8_t, kdcmd->cmd_status);
 
 	if (xferlen) {
 		/* free kernel buffer */
@@ -3981,7 +4009,7 @@ issue_mfi_smp(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	ksmp->cmd_status = ddi_get8(acc_handle, &smp->cmd_status);
 	con_log(CL_ANN1, (CE_NOTE, "issue_mfi_smp: smp->cmd_status = %d",
 	    ddi_get8(acc_handle, &smp->cmd_status)));
-
+	DTRACE_PROBE2(issue_smp, uint8_t, ksmp->cmd, uint8_t, ksmp->cmd_status);
 
 	if (request_xferlen) {
 		/* free kernel buffer */
@@ -4175,6 +4203,7 @@ issue_mfi_stp(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	}
 
 	kstp->cmd_status = ddi_get8(acc_handle, &stp->cmd_status);
+	DTRACE_PROBE2(issue_stp, uint8_t, kstp->cmd, uint8_t, kstp->cmd_status);
 
 	if (fis_xferlen) {
 		/* free kernel buffer */
@@ -4336,6 +4365,8 @@ handle_mfi_ioctl(struct mrsas_instance *instance, struct mrsas_ioctl *ioctl,
 	if (!cmd) {
 		con_log(CL_ANN, (CE_WARN, "mr_sas: "
 		    "failed to get a cmd packet"));
+		DTRACE_PROBE2(mfi_ioctl_err, uint16_t,
+		    instance->fw_outstanding, uint16_t, instance->max_fw_cmds);
 		return (DDI_FAILURE);
 	}
 
@@ -4464,8 +4495,11 @@ register_mfi_aen(struct mrsas_instance *instance, uint32_t seq_num,
 
 	cmd = get_mfi_pkt(instance);
 
-	if (!cmd)
+	if (!cmd) {
+		DTRACE_PROBE2(mfi_aen_err, uint16_t, instance->fw_outstanding,
+		    uint16_t, instance->max_fw_cmds);
 		return (ENOMEM);
+	}
 	/* Clear the frame buffer and assign back the context id */
 	(void) memset((char *)&cmd->frame[0], 0, sizeof (union mrsas_frame));
 	ddi_put32(cmd->frame_dma_obj.acc_handle, &cmd->frame->hdr.context,
@@ -5390,6 +5424,7 @@ mrsas_service_evt(struct mrsas_instance *instance, int tgt, int lun, int event,
 		kmem_free(mrevt, sizeof (struct mrsas_eventinfo));
 		return (DDI_FAILURE);
 	}
+	DTRACE_PROBE3(service_evt, int, tgt, int, lun, int, event);
 	return (DDI_SUCCESS);
 }
 
