@@ -153,33 +153,48 @@ int
 libfdisk_init(ext_part_t **epp, char *devstr, struct ipart *parttab, int opflag)
 {
 	ext_part_t *temp;
-	char *canonp;
 	struct stat sbuf;
 	int rval = FDISK_SUCCESS;
 
 	if ((temp = calloc(1, sizeof (ext_part_t))) == NULL) {
 		return (ENOMEM);
 	}
-	canonp = strstr(devstr, DEFAULT_PATH_PREFIX);
-	if (canonp == NULL) {
+
+	(void) strncpy(temp->device_name, devstr,
+	    sizeof (temp->device_name));
+
+	/* Try to stat the node as provided */
+	if (stat(temp->device_name, &sbuf) != 0) {
+
+		/* Prefix /dev/rdsk/ and stat again */
 		(void) snprintf(temp->device_name, sizeof (temp->device_name),
 		    "%s%s", DEFAULT_PATH_PREFIX, devstr);
-	} else {
-		(void) strncpy(temp->device_name, devstr,
-		    sizeof (temp->device_name));
-	}
-	/*
-	 * In case of an EFI labeled disk, the device name could be cN[tN]dN.
-	 * There is no pN. So we add "p0" at the end if we do not find it.
-	 */
-	if (strrchr(temp->device_name, 'p') == NULL) {
-		(void) strcat(temp->device_name, "p0");
+
+		if (stat(temp->device_name, &sbuf) != 0) {
+
+			/*
+			 * In case of an EFI labeled disk, the device name
+			 * could be cN[tN]dN. There is no pN. So we add "p0"
+			 * at the end if we do not find it and stat again.
+			 */
+			if (strrchr(temp->device_name, 'p') == NULL) {
+				(void) strcat(temp->device_name, "p0");
+			}
+
+			if (stat(temp->device_name, &sbuf) != 0) {
+
+				/* Failed all options, give up */
+				free(temp);
+				return (EINVAL);
+			}
+		}
 	}
 
-	if (stat(temp->device_name, &sbuf) != 0) {
-		free(temp);
+	/* Make sure the device is a raw device */
+	if ((sbuf.st_mode & S_IFMT) != S_IFCHR) {
 		return (EINVAL);
 	}
+
 	temp->ld_head = NULL;
 	temp->sorted_ld_head = NULL;
 
@@ -1074,6 +1089,14 @@ fdisk_mounted_logical_drives(ext_part_t *epp)
 	int look_for_mounted_slices = 0;
 	uint32_t begsec, numsec;
 
+	/*
+	 * Do not check for mounted logical drives for
+	 * devices other than /dev/rdsk/
+	 */
+	if (strstr(epp->device_name, DEFAULT_PATH_PREFIX) == NULL) {
+		return (0);
+	}
+
 	if ((fp = fopen(MNTTAB, "r")) == NULL) {
 		return (ENOENT);
 	}
@@ -1255,6 +1278,14 @@ skip_check_mounts:
 
 	/* Issue ioctl to the driver to update extended partition info */
 	rval = ioctl(epp->dev_fd, DKIOCSETEXTPART);
+
+	/*
+	 * Certain devices ex:lofi do not support DKIOCSETEXTPART.
+	 * Extended partitions are still created on these devices.
+	 */
+	if (errno == ENOTTY)
+		rval = FDISK_SUCCESS;
+
 error:
 	if (ebr_buf) {
 		free(ebr_buf);
