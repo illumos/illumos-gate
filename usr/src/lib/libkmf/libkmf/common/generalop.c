@@ -1699,6 +1699,7 @@ encode_krb5(char *name, KMF_DATA *derdata)
 {
 	KMF_RETURN rv = KMF_OK;
 	char *at, *realm;
+	char *slash, *inst = NULL;
 	BerElement *asn1 = NULL;
 	BerValue *extdata = NULL;
 
@@ -1706,41 +1707,148 @@ encode_krb5(char *name, KMF_DATA *derdata)
 	if (at == NULL)
 		return (KMF_ERR_ENCODING);
 
-	realm = at+1;
+	realm = at + 1;
 	*at = 0;
 
-	if ((asn1 = kmfder_alloc()) == NULL)
-		return (KMF_ERR_MEMORY);
+	/*
+	 * KRB5PrincipalName ::= SEQUENCE {
+	 *	realm		[0] Realm,
+	 *	principalName	[1] PrincipalName
+	 * }
+	 *
+	 * KerberosString	::= GeneralString (IA5String)
+	 * Realm	::= KerberosString
+	 * PrincipalName	::= SEQUENCE {
+	 *	name-type	[0] Int32,
+	 *	name-string	[1] SEQUENCE OF KerberosString
+	 * }
+	 */
 
-	if (kmfber_printf(asn1, "{D{", &KMFOID_PKINIT_san) == -1)
+	/*
+	 * Construct the "principalName" first.
+	 *
+	 * The name may be split with a "/" to indicate a new instance.
+	 * This must be separated in the ASN.1
+	 */
+	slash = strchr(name, '/');
+	if (slash != NULL) {
+		inst = name;
+		name = slash + 1;
+		*slash = 0;
+	}
+	if ((asn1 = kmfder_alloc()) == NULL) {
+		rv = KMF_ERR_MEMORY;
+		goto cleanup;
+	}
+	if (kmfber_printf(asn1, "{Tli", 0xa0, 3, 0x01) == -1)
 		goto cleanup;
 
-	if (kmfber_printf(asn1, "l", strlen(realm)) == -1)
-		goto cleanup;
-	if (kmfber_write(asn1, realm, strlen(realm), 0) != strlen(realm))
-		goto cleanup;
-	if (kmfber_printf(asn1, "l", strlen(name)) == -1)
-		goto cleanup;
-	if (kmfber_write(asn1, name, strlen(name), 0) != strlen(name))
-		goto cleanup;
+	if (inst != NULL) {
+		if (kmfber_printf(asn1, "Tl{Tl", 0xA1,
+		    strlen(inst) + strlen(name) + 6,
+		    BER_GENERALSTRING, strlen(inst)) == -1)
+			goto cleanup;
+		if (kmfber_write(asn1, inst, strlen(inst), 0) != strlen(inst))
+			goto cleanup;
+		if (kmfber_printf(asn1, "Tl", BER_GENERALSTRING,
+		    strlen(name)) == -1)
+			goto cleanup;
+		if (kmfber_write(asn1, name, strlen(name), 0) != strlen(name))
+			goto cleanup;
+	} else {
+		if (kmfber_printf(asn1, "Tl{Tl", 0xA1,
+		    strlen(name) + 4, BER_GENERALSTRING, strlen(name)) == -1)
+			goto cleanup;
+		if (kmfber_write(asn1, name, strlen(name), 0) != strlen(name))
+			goto cleanup;
+	}
+
 	if (kmfber_printf(asn1, "}}") == -1)
 		goto cleanup;
-
 	if (kmfber_flatten(asn1, &extdata) == -1) {
 		rv = KMF_ERR_ENCODING;
 		goto cleanup;
 	}
+	kmfber_free(asn1, 1);
+	asn1 = NULL;
+
+	/* Next construct the KRB5PrincipalNameSeq */
+	if ((asn1 = kmfder_alloc()) == NULL) {
+		kmfber_bvfree(extdata);
+		rv = KMF_ERR_MEMORY;
+		goto cleanup;
+	}
+	if (kmfber_printf(asn1, "{TlTl", 0xA0, strlen(realm) + 2,
+	    BER_GENERALSTRING, strlen(realm)) == -1)
+		goto cleanup;
+	if (kmfber_write(asn1, realm, strlen(realm), 0) != strlen(realm))
+		goto cleanup;
+	if (kmfber_printf(asn1, "Tl", 0xA1, extdata->bv_len) == -1)
+		goto cleanup;
+	if (kmfber_write(asn1, extdata->bv_val,
+	    extdata->bv_len, 0) != extdata->bv_len)
+		goto cleanup;
+	if (kmfber_printf(asn1, "}") == -1)
+		goto cleanup;
+	kmfber_bvfree(extdata);
+	extdata = NULL;
+	if (kmfber_flatten(asn1, &extdata) == -1) {
+		rv = KMF_ERR_ENCODING;
+		goto cleanup;
+	}
+	kmfber_free(asn1, 1);
+	asn1 = NULL;
+
+	/*
+	 * GeneralName ::= CHOICE {
+	 *	otherName	[0]	OtherName,
+	 *	...
+	 * }
+	 *
+	 * OtherName ::= SEQUENCE {
+	 *	type-id	OBJECT IDENTIFIER,
+	 *	value	[0] EXPLICIT ANY DEFINED BY type-id
+	 * }
+	 */
+
+	/* Now construct the SAN: OID + typed data. */
+	if ((asn1 = kmfder_alloc()) == NULL) {
+		kmfber_bvfree(extdata);
+		rv = KMF_ERR_MEMORY;
+		goto cleanup;
+	}
+	if (kmfber_printf(asn1, "D", &KMFOID_PKINIT_san) == -1)
+		goto cleanup;
+	if (kmfber_printf(asn1, "Tl", 0xA0, extdata->bv_len) == -1)
+		goto cleanup;
+	if (kmfber_write(asn1, extdata->bv_val,
+	    extdata->bv_len, 0) != extdata->bv_len)
+		goto cleanup;
+	kmfber_bvfree(extdata);
+	extdata = NULL;
+	if (kmfber_flatten(asn1, &extdata) == -1) {
+		rv = KMF_ERR_ENCODING;
+		goto cleanup;
+	}
+	kmfber_free(asn1, 1);
+	asn1 = NULL;
 
 	derdata->Data = (uchar_t *)extdata->bv_val;
+	extdata->bv_val = NULL; /* clear it so it is not freed later */
 	derdata->Length = extdata->bv_len;
 
-	free(extdata);
 cleanup:
 	if (asn1 != NULL)
 		kmfber_free(asn1, 1);
 
+	if (extdata != NULL)
+		kmfber_bvfree(extdata);
+
 	if (*at == 0)
 		*at = '@';
+
+	if (inst != NULL)
+		*slash = '/';
 
 	return (rv);
 }
@@ -1864,14 +1972,14 @@ encode_altname(char *namedata,
 				ret = DerEncodeName(&dnname, encodedname);
 			}
 			(void) kmf_free_dn(&dnname);
-			tagval = (0xA0 | nametype);
+			tagval = (0x80 | nametype);
 			break;
 		case GENNAME_KRB5PRINC:
-			tagval = (0x80 | GENNAME_OTHERNAME);
+			tagval = (0xA0 | GENNAME_OTHERNAME);
 			ret = encode_krb5(namedata, encodedname);
 			break;
 		case GENNAME_SCLOGON_UPN:
-			tagval = (0x80 | GENNAME_OTHERNAME);
+			tagval = (0xA0 | GENNAME_OTHERNAME);
 			ret = encode_sclogon(namedata, encodedname);
 			break;
 		default:

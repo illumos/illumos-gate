@@ -30,11 +30,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -455,7 +453,9 @@ ber_start_seqorset(BerElement *ber, ber_tag_t tag)
 
 	ber->ber_sos = new_sos;
 	if (ber->ber_sos->sos_ptr > ber->ber_end) {
-		(void) realloc(ber, ber->ber_sos->sos_ptr - ber->ber_end);
+		if (kmfber_realloc(ber, ber->ber_sos->sos_ptr -
+		    ber->ber_end) != 0)
+			return (-1);
 	}
 	return (0);
 }

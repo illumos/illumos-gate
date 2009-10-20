@@ -29,12 +29,9 @@
  * is provided ``as is'' without express or implied warranty.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdlib.h>
 #include <ber_der.h>
@@ -69,7 +66,7 @@ kmfber_read(BerElement *ber, char *buf, ber_len_t len)
  * enlarge the ber buffer.
  * return 0 on success, -1 on error.
  */
-static int
+int
 kmfber_realloc(BerElement *ber, ber_len_t len)
 {
 	ber_uint_t	need, have, total;
@@ -77,6 +74,7 @@ kmfber_realloc(BerElement *ber, ber_len_t len)
 	Seqorset	*s;
 	size_t		off;
 	char		*oldbuf;
+	boolean_t	freeold = B_FALSE;
 
 	have_bytes = ber->ber_end - ber->ber_buf;
 	have = have_bytes / EXBUFSIZ;
@@ -96,16 +94,19 @@ kmfber_realloc(BerElement *ber, ber_len_t len)
 			/* transition to malloc'd buffer */
 			if ((ber->ber_buf = (char *)malloc(
 			    (size_t)total)) == NULL) {
+				free(oldbuf);
 				return (-1);
 			}
 			ber->ber_flags &= ~KMFBER_FLAG_NO_FREE_BUFFER;
 			/* copy existing data into new malloc'd buffer */
 			(void) memmove(ber->ber_buf, oldbuf, have_bytes);
+			freeold = B_TRUE;
 		} else {
 			if ((ber->ber_buf = (char *)realloc(
 			    ber->ber_buf, (size_t)total)) == NULL) {
 				return (-1);
 			}
+			freeold = B_FALSE; /* it was just realloced */
 		}
 	}
 
@@ -116,7 +117,6 @@ kmfber_realloc(BerElement *ber, ber_len_t len)
 	 * reset all the sos and ber pointers.  Offsets would've been
 	 * a better idea... oh well.
 	 */
-
 	if (ber->ber_buf != oldbuf) {
 		ber->ber_ptr = ber->ber_buf + (ber->ber_ptr - oldbuf);
 
@@ -128,6 +128,8 @@ kmfber_realloc(BerElement *ber, ber_len_t len)
 			s->sos_ptr = ber->ber_buf + off;
 		}
 	}
+	if (freeold && oldbuf != NULL)
+		free(oldbuf);
 
 	return (0);
 }
@@ -162,11 +164,10 @@ void
 kmfber_free(BerElement *ber, int freebuf)
 {
 	if (ber != NULL) {
-		    if (freebuf &&
-			!(ber->ber_flags & KMFBER_FLAG_NO_FREE_BUFFER)) {
-			    free(ber->ber_buf);
-		    }
-		    free((char *)ber);
+		if (freebuf &&
+		    !(ber->ber_flags & KMFBER_FLAG_NO_FREE_BUFFER))
+			free(ber->ber_buf);
+		free((char *)ber);
 	}
 }
 
@@ -351,7 +352,7 @@ kmfder_init(const struct berval *bv)
 		/* copy data from the bv argument into BerElement */
 		/* XXXmcs: had to cast unsigned long bv_len to long */
 		if ((kmfber_write(ber, bv->bv_val, bv->bv_len, 0)) !=
-			(ber_slen_t)bv->bv_len) {
+		    (ber_slen_t)bv->bv_len) {
 			kmfber_free(ber, 1);
 			return (NULL);
 		}
@@ -379,7 +380,7 @@ kmfber_init(const struct berval *bv)
 		/* copy data from the bv argument into BerElement */
 		/* XXXmcs: had to cast unsigned long bv_len to long */
 		if ((kmfber_write(ber, bv->bv_val, bv->bv_len, 0)) !=
-			(ber_slen_t)bv->bv_len) {
+		    (ber_slen_t)bv->bv_len) {
 			kmfber_free(ber, 1);
 			return (NULL);
 		}

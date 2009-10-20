@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -21,8 +21,6 @@
  * Copyright(C) 1998 Netscape Communications Corporation.  All Rights
  * Reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the header file for some Basic Encoding Rules and Distinguished
@@ -49,6 +47,7 @@
 #define	BER_IA5STRING			22
 #define	BER_UTCTIME			23
 #define	BER_GENTIME			24
+#define	BER_GENERALSTRING		27
 #define	BER_UNIVERSAL_STRING		28
 #define	BER_BMP_STRING			30
 
@@ -114,6 +113,7 @@ struct berval *kmfber_bvdup(const struct berval *);
  */
 extern int kmfber_printf(BerElement *, const char *, ...);
 extern int kmfber_flatten(BerElement *, struct berval **);
+extern int kmfber_realloc(BerElement *, ber_len_t);
 
 /*
  * miscellaneous public routines

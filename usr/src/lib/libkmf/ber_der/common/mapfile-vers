@@ -63,6 +63,7 @@ SUNWprivate_1.1 {
 	ExtractX509CertParts;
 	GetKeyFromSpki;
 	kmfber_alloc;
+	kmfber_bvfree;
 	kmfber_first_element;
 	kmfber_flatten;
 	kmfber_free;
@@ -70,6 +71,7 @@ SUNWprivate_1.1 {
 	kmfber_next_element;
 	kmfber_printf;
 	kmfber_read;
+	kmfber_realloc;
 	kmfber_scanf;
 	kmfber_write;
 	kmfder_alloc;

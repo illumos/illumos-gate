@@ -1128,6 +1128,7 @@ free_eku_list(EKU_LIST *ekus)
 		}
 		free(ekus->ekulist);
 		free(ekus->critlist);
+		free(ekus);
 	}
 }
 
@@ -1165,6 +1166,10 @@ verify_ekunames(char *ekuliststr, EKU_LIST **ekulist)
 
 	if (ekuliststr == NULL || strlen(ekuliststr) == 0)
 		return (0);
+
+	ekus = calloc(sizeof (EKU_LIST), 1);
+	if (ekus == NULL)
+		return (KMF_ERR_MEMORY);
 
 	/*
 	 * The list should be comma separated list of EKU Names.
