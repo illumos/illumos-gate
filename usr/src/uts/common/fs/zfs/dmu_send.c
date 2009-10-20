@@ -540,7 +540,6 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 		drc->drc_real_ds = rbsa.ds;
 	} else if (err == ENOENT) {
 		/* target fs does not exist; must be a full backup or clone */
-		dsl_dataset_t *parent;
 		char *cp;
 
 		/*
@@ -553,14 +552,14 @@ dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *drrb,
 		/* Open the parent of tofs */
 		cp = strrchr(tofs, '/');
 		*cp = '\0';
-		err = dsl_dataset_hold(tofs, FTAG, &parent);
+		err = dsl_dataset_hold(tofs, FTAG, &ds);
 		*cp = '/';
 		if (err)
 			return (err);
 
 		err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 		    recv_new_check, recv_new_sync, ds->ds_dir, &rbsa, 5);
-		dsl_dataset_rele(parent, FTAG);
+		dsl_dataset_rele(ds, FTAG);
 		if (err)
 			return (err);
 		drc->drc_logical_ds = drc->drc_real_ds = rbsa.ds;
