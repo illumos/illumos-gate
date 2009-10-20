@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1269,7 +1269,7 @@ rge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			*hcksum_txflags = HCKSUM_INET_FULL_V4 |
 			    HCKSUM_IPHDRCKSUM;
 			break;
-		case MAC_VER_8168B_D:
+		case MAC_VER_8168C:
 		case MAC_VER_8101E_B:
 		case MAC_VER_8101E_C:
 		default:

@@ -707,6 +707,7 @@ rge_chip_ident(rge_t *rgep)
 	case MAC_VER_8168:
 	case MAC_VER_8168B_B:
 	case MAC_VER_8168B_C:
+	case MAC_VER_8168C:
 	case MAC_VER_8101E:
 	case MAC_VER_8101E_B:
 		chip->is_pcie = B_TRUE;
@@ -888,6 +889,7 @@ rge_chip_init(rge_t *rgep)
 		 * Increase the threshold voltage of RX sensitivity
 		 */
 		if (chip->mac_ver != MAC_VER_8168 &&
+		    chip->mac_ver != MAC_VER_8168C &&
 		    chip->mac_ver != MAC_VER_8101E_B)
 			rge_ephy_put16(rgep, 0x01, 0x1bd3);
 
@@ -896,7 +898,8 @@ rge_chip_init(rge_t *rgep)
 		if (rgep->chipid.mac_ver != MAC_VER_8101E &&
 		    rgep->chipid.mac_ver != MAC_VER_8101E_B &&
 		    rgep->chipid.mac_ver != MAC_VER_8101E_C &&
-		    rgep->chipid.mac_ver != MAC_VER_8168B_C) {
+		    rgep->chipid.mac_ver != MAC_VER_8168B_C &&
+		    rgep->chipid.mac_ver != MAC_VER_8168C) {
 			rge_reg_put16(rgep, PHY_STATUS_REG, val16);
 			rge_reg_put32(rgep, RT_CSI_DATA_REG, 0x00021c01);
 			rge_reg_put32(rgep, RT_CSI_ACCESS_REG, 0x8000f088);
@@ -1008,8 +1011,13 @@ rge_chip_init(rge_t *rgep)
 	 * Set multicast register
 	 */
 	hashp = (uint32_t *)rgep->mcast_hash;
-	rge_reg_put32(rgep, MULTICAST_0_REG, hashp[0]);
-	rge_reg_put32(rgep, MULTICAST_4_REG, hashp[1]);
+	if (rgep->promisc) {
+		rge_reg_put32(rgep, MULTICAST_0_REG, ~0U);
+		rge_reg_put32(rgep, MULTICAST_4_REG, ~0U);
+	} else {
+		rge_reg_put32(rgep, MULTICAST_0_REG, RGE_BSWAP_32(hashp[0]));
+		rge_reg_put32(rgep, MULTICAST_4_REG, RGE_BSWAP_32(hashp[1]));
+	}
 
 	/*
 	 * Msic register setting:
@@ -1203,8 +1211,13 @@ rge_set_multi_addr(rge_t *rgep)
 	if (rgep->chipid.mac_ver == MAC_VER_8169SC) {
 		rge_reg_set8(rgep, RT_93c46_COMMOND_REG, RT_93c46_MODE_CONFIG);
 	}
-	rge_reg_put32(rgep, MULTICAST_0_REG, RGE_BSWAP_32(hashp[0]));
-	rge_reg_put32(rgep, MULTICAST_4_REG, RGE_BSWAP_32(hashp[1]));
+	if (rgep->promisc) {
+		rge_reg_put32(rgep, MULTICAST_0_REG, ~0U);
+		rge_reg_put32(rgep, MULTICAST_4_REG, ~0U);
+	} else {
+		rge_reg_put32(rgep, MULTICAST_0_REG, RGE_BSWAP_32(hashp[0]));
+		rge_reg_put32(rgep, MULTICAST_4_REG, RGE_BSWAP_32(hashp[1]));
+	}
 
 	/*
 	 * Return to normal network/host communication mode
@@ -1251,6 +1264,7 @@ rge_chip_sync(rge_t *rgep, enum rge_sync_op todo)
 		break;
 	case RGE_SET_PROMISC:
 		/* Set or clear the PROMISCUOUS mode bit */
+		rge_set_multi_addr(rgep);
 		rge_set_promisc(rgep);
 		break;
 	default:
