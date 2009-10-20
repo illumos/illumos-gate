@@ -29,6 +29,7 @@
 #include <libuutil.h>
 #include <libzfs.h>
 #include <fm/fmd_api.h>
+#include <fm/libtopo.h>
 #include <sys/fs/zfs.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/fs/zfs.h>
@@ -67,9 +68,11 @@ typedef struct zfs_case {
 	fmd_case_t	*zc_case;
 	uu_list_node_t	zc_node;
 	id_t		zc_remove_timer;
+	char		*zc_fru;
 } zfs_case_t;
 
 #define	CASE_DATA			"data"
+#define	CASE_FRU			"fru"
 #define	CASE_DATA_VERSION_INITIAL	1
 #define	CASE_DATA_VERSION_SERD		2
 
@@ -96,6 +99,10 @@ zfs_case_serialize(fmd_hdl_t *hdl, zfs_case_t *zcp)
 	zcp->zc_data.zc_version = CASE_DATA_VERSION_SERD;
 	fmd_buf_write(hdl, zcp->zc_case, CASE_DATA, &zcp->zc_data,
 	    sizeof (zcp->zc_data));
+
+	if (zcp->zc_fru != NULL)
+		fmd_buf_write(hdl, zcp->zc_case, CASE_FRU, zcp->zc_fru,
+		    strlen(zcp->zc_fru));
 }
 
 /*
@@ -105,6 +112,7 @@ static zfs_case_t *
 zfs_case_unserialize(fmd_hdl_t *hdl, fmd_case_t *cp)
 {
 	zfs_case_t *zcp;
+	size_t frulen;
 
 	zcp = fmd_hdl_zalloc(hdl, sizeof (zfs_case_t), FMD_SLEEP);
 	zcp->zc_case = cp;
@@ -115,6 +123,13 @@ zfs_case_unserialize(fmd_hdl_t *hdl, fmd_case_t *cp)
 	if (zcp->zc_data.zc_version > CASE_DATA_VERSION_SERD) {
 		fmd_hdl_free(hdl, zcp, sizeof (zfs_case_t));
 		return (NULL);
+	}
+
+	if ((frulen = fmd_buf_size(hdl, zcp->zc_case, CASE_FRU)) > 0) {
+		zcp->zc_fru = fmd_hdl_alloc(hdl, frulen + 1, FMD_SLEEP);
+		fmd_buf_read(hdl, zcp->zc_case, CASE_FRU, zcp->zc_fru,
+		    frulen);
+		zcp->zc_fru[frulen] = '\0';
 	}
 
 	/*
@@ -285,27 +300,27 @@ static void
 zfs_case_solve(fmd_hdl_t *hdl, zfs_case_t *zcp, const char *faultname,
     boolean_t checkunusable)
 {
+	libzfs_handle_t *zhdl = fmd_hdl_getspecific(hdl);
 	nvlist_t *detector, *fault;
 	boolean_t serialize;
+	nvlist_t *fmri, *fru;
+	topo_hdl_t *thp;
+	int err;
 
 	/*
 	 * Construct the detector from the case data.  The detector is in the
 	 * ZFS scheme, and is either the pool or the vdev, depending on whether
 	 * this is a vdev or pool fault.
 	 */
-	if (nvlist_alloc(&detector, NV_UNIQUE_NAME, 0) != 0)
-		return;
+	detector = fmd_nvl_alloc(hdl, FMD_SLEEP);
 
-	if (nvlist_add_uint8(detector, FM_VERSION, ZFS_SCHEME_VERSION0) != 0 ||
-	    nvlist_add_string(detector, FM_FMRI_SCHEME,
-	    FM_FMRI_SCHEME_ZFS) != 0 ||
-	    nvlist_add_uint64(detector, FM_FMRI_ZFS_POOL,
-	    zcp->zc_data.zc_pool_guid) != 0 ||
-	    (zcp->zc_data.zc_vdev_guid != 0 &&
-	    nvlist_add_uint64(detector, FM_FMRI_ZFS_VDEV,
-	    zcp->zc_data.zc_vdev_guid) != 0)) {
-		nvlist_free(detector);
-		return;
+	(void) nvlist_add_uint8(detector, FM_VERSION, ZFS_SCHEME_VERSION0);
+	(void) nvlist_add_string(detector, FM_FMRI_SCHEME, FM_FMRI_SCHEME_ZFS);
+	(void) nvlist_add_uint64(detector, FM_FMRI_ZFS_POOL,
+	    zcp->zc_data.zc_pool_guid);
+	if (zcp->zc_data.zc_vdev_guid != 0) {
+		(void) nvlist_add_uint64(detector, FM_FMRI_ZFS_VDEV,
+		    zcp->zc_data.zc_vdev_guid);
 	}
 
 	/*
@@ -322,9 +337,53 @@ zfs_case_solve(fmd_hdl_t *hdl, zfs_case_t *zcp, const char *faultname,
 		return;
 	}
 
-	fault = fmd_nvl_create_fault(hdl, faultname, 100, detector, NULL,
-	    detector);
+
+	fru = NULL;
+	if (zcp->zc_fru != NULL &&
+	    (thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) != NULL) {
+		/*
+		 * If the vdev had an associated FRU, then get the FRU nvlist
+		 * from the topo handle and use that in the suspect list.  We
+		 * explicitly lookup the FRU because the fmri reported from the
+		 * kernel may not have up to date details about the disk itself
+		 * (serial, part, etc).
+		 */
+		if (topo_fmri_str2nvl(thp, zcp->zc_fru, &fmri, &err) == 0) {
+			/*
+			 * If the disk is part of the system chassis, but the
+			 * FRU indicates a different chassis ID than our
+			 * current system, then ignore the error.  This
+			 * indicates that the device was part of another
+			 * cluster head, and for obvious reasons cannot be
+			 * imported on this system.
+			 */
+			if (libzfs_fru_notself(zhdl, zcp->zc_fru)) {
+				fmd_case_close(hdl, zcp->zc_case);
+				nvlist_free(fmri);
+				fmd_hdl_topo_rele(hdl, thp);
+				nvlist_free(detector);
+				return;
+			}
+
+			/*
+			 * If the device is no longer present on the system, or
+			 * topo_fmri_fru() fails for other reasons, then fall
+			 * back to the fmri specified in the vdev.
+			 */
+			if (topo_fmri_fru(thp, fmri, &fru, &err) != 0)
+				fru = fmd_nvl_dup(hdl, fmri, FMD_SLEEP);
+			nvlist_free(fmri);
+		}
+
+		fmd_hdl_topo_rele(hdl, thp);
+	}
+
+	fault = fmd_nvl_create_fault(hdl, faultname, 100, detector,
+	    fru, detector);
 	fmd_case_add_suspect(hdl, zcp->zc_case, fault);
+
+	nvlist_free(fru);
+
 	fmd_case_solve(hdl, zcp->zc_case);
 
 	serialize = B_FALSE;
@@ -351,7 +410,17 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	uint64_t ena, pool_guid, vdev_guid;
 	nvlist_t *detector;
 	boolean_t isresource;
-	char *type;
+	char *fru, *type;
+
+	/*
+	 * We subscribe to notifications for vdev or pool removal.  In these
+	 * cases, there may be cases that no longer apply.  Purge any cases
+	 * that no longer apply.
+	 */
+	if (fmd_nvl_class_match(hdl, nvl, "resource.sysevent.EC_zfs.*")) {
+		zfs_purge_cases(hdl);
+		return;
+	}
 
 	isresource = fmd_nvl_class_match(hdl, nvl, "resource.fs.zfs.*");
 
@@ -460,6 +529,25 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 
 		zcp = zfs_case_unserialize(hdl, cs);
 		assert(zcp != NULL);
+	}
+
+	/*
+	 * If this is an ereport for a case with an associated vdev FRU, make
+	 * sure it is accurate and up to date.
+	 */
+	if (nvlist_lookup_string(nvl, FM_EREPORT_PAYLOAD_ZFS_VDEV_FRU,
+	    &fru) == 0) {
+		topo_hdl_t *thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
+		if (zcp->zc_fru == NULL ||
+		    !topo_fmri_strcmp(thp, zcp->zc_fru, fru)) {
+			if (zcp->zc_fru != NULL) {
+				fmd_hdl_strfree(hdl, zcp->zc_fru);
+				fmd_buf_destroy(hdl, zcp->zc_case, CASE_FRU);
+			}
+			zcp->zc_fru = fmd_hdl_strdup(hdl, fru, FMD_SLEEP);
+			zfs_case_serialize(hdl, zcp);
+		}
+		fmd_hdl_topo_rele(hdl, thp);
 	}
 
 	if (isresource) {

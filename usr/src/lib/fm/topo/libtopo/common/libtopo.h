@@ -111,10 +111,13 @@ extern int topo_fmri_facility(topo_hdl_t *, nvlist_t *, const char *,
     uint32_t, topo_walk_cb_t, void *, int *);
 
 /*
- * Private utility functions for fmd
+ * Consolidation private utility functions
  */
 extern ulong_t topo_fmri_strhash(topo_hdl_t *, const char *);
+extern ulong_t topo_fmri_strhash_noauth(topo_hdl_t *, const char *);
 extern boolean_t topo_fmri_strcmp(topo_hdl_t *, const char *, const char *);
+extern boolean_t topo_fmri_strcmp_noauth(topo_hdl_t *, const char *,
+    const char *);
 
 /*
  * Topo node utilities: callable from topo_walk_step() callback or module

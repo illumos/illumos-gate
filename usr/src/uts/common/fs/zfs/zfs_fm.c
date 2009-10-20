@@ -845,3 +845,15 @@ zfs_post_autoreplace(spa_t *spa, vdev_t *vd)
 {
 	zfs_post_common(spa, vd, FM_RESOURCE_AUTOREPLACE);
 }
+
+/*
+ * The 'resource.fs.zfs.statechange' event is an internal signal that the
+ * given vdev has transitioned its state to DEGRADED or HEALTHY.  This will
+ * cause the retire agent to repair any outstanding fault management cases
+ * open because the device was not found (fault.fs.zfs.device).
+ */
+void
+zfs_post_state_change(spa_t *spa, vdev_t *vd)
+{
+	zfs_post_common(spa, vd, FM_RESOURCE_STATECHANGE);
+}

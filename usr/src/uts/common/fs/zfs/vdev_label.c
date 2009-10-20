@@ -320,6 +320,8 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		kmem_free(child, vd->vdev_children * sizeof (nvlist_t *));
 
 	} else {
+		const char *aux = NULL;
+
 		if (vd->vdev_offline && !vd->vdev_tmpoffline)
 			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_OFFLINE,
 			    B_TRUE) == 0);
@@ -338,6 +340,20 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		if (vd->vdev_ishole)
 			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_IS_HOLE,
 			    B_TRUE) == 0);
+
+		switch (vd->vdev_stat.vs_aux) {
+		case VDEV_AUX_ERR_EXCEEDED:
+			aux = "err_exceeded";
+			break;
+
+		case VDEV_AUX_EXTERNAL:
+			aux = "external";
+			break;
+		}
+
+		if (aux != NULL)
+			VERIFY(nvlist_add_string(nv, ZPOOL_CONFIG_AUX_STATE,
+			    aux) == 0);
 	}
 
 	return (nv);

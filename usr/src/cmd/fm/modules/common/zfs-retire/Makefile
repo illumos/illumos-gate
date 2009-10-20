@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = zfs-retire
 CLASS = common
@@ -30,4 +29,5 @@ SRCS = zfs_retire.c
 
 include ../../Makefile.plugin
 
-LDLIBS += -lzfs
+LDLIBS += -lzfs -L$(ROOTLIB)/fm -ltopo
+LDFLAGS += -R/usr/lib/fm

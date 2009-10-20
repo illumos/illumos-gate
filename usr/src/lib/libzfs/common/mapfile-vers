@@ -50,6 +50,11 @@ SUNWprivate_1.1 {
 	libzfs_error_action;
 	libzfs_error_description;
 	libzfs_fini;
+	libzfs_fru_compare;
+	libzfs_fru_devpath;
+	libzfs_fru_lookup;
+	libzfs_fru_notself;
+	libzfs_fru_refresh;
 	libzfs_init;
 	libzfs_mnttab_cache;
 	libzfs_print_on_error;
@@ -161,6 +166,7 @@ SUNWprivate_1.1 {
 	zpool_find_import_cached;
 	zpool_find_vdev;
 	zpool_find_vdev_by_physpath;
+	zpool_fru_set;
 	zpool_get_config;
 	zpool_get_errlog;
 	zpool_get_handle;

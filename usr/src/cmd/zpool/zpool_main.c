@@ -1127,6 +1127,10 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 			(void) printf(gettext("bad intent log"));
 			break;
 
+		case VDEV_AUX_EXTERNAL:
+			(void) printf(gettext("external device fault"));
+			break;
+
 		default:
 			(void) printf(gettext("corrupted data"));
 			break;

@@ -521,7 +521,8 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 		/*
 		 * When importing a pool, we want to ignore the persistent fault
 		 * state, as the diagnosis made on another system may not be
-		 * valid in the current context.
+		 * valid in the current context.  Local vdevs will
+		 * remain in the faulted state.
 		 */
 		if (spa->spa_load_state == SPA_LOAD_OPEN) {
 			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_FAULTED,
@@ -530,6 +531,17 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 			    &vd->vdev_degraded);
 			(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_REMOVED,
 			    &vd->vdev_removed);
+
+			if (vd->vdev_faulted || vd->vdev_degraded) {
+				char *aux;
+
+				vd->vdev_label_aux =
+				    VDEV_AUX_ERR_EXCEEDED;
+				if (nvlist_lookup_string(nv,
+				    ZPOOL_CONFIG_AUX_STATE, &aux) == 0 &&
+				    strcmp(aux, "external") == 0)
+					vd->vdev_label_aux = VDEV_AUX_EXTERNAL;
+			}
 		}
 	}
 
@@ -1086,10 +1098,16 @@ vdev_open(vdev_t *vd)
 	vd->vdev_cant_write = B_FALSE;
 	vd->vdev_min_asize = vdev_get_min_asize(vd);
 
+	/*
+	 * If this vdev is not removed, check its fault status.  If it's
+	 * faulted, bail out of the open.
+	 */
 	if (!vd->vdev_removed && vd->vdev_faulted) {
 		ASSERT(vd->vdev_children == 0);
+		ASSERT(vd->vdev_label_aux == VDEV_AUX_ERR_EXCEEDED ||
+		    vd->vdev_label_aux == VDEV_AUX_EXTERNAL);
 		vdev_set_state(vd, B_TRUE, VDEV_STATE_FAULTED,
-		    VDEV_AUX_ERR_EXCEEDED);
+		    vd->vdev_label_aux);
 		return (ENXIO);
 	} else if (vd->vdev_offline) {
 		ASSERT(vd->vdev_children == 0);
@@ -1119,7 +1137,7 @@ vdev_open(vdev_t *vd)
 		vdev_set_state(vd, B_TRUE, VDEV_STATE_DEGRADED,
 		    VDEV_AUX_ERR_EXCEEDED);
 	} else {
-		vd->vdev_state = VDEV_STATE_HEALTHY;
+		vdev_set_state(vd, B_TRUE, VDEV_STATE_HEALTHY, 0);
 	}
 
 	/*
@@ -1931,7 +1949,7 @@ vdev_psize_to_asize(vdev_t *vd, uint64_t psize)
  * not be opened, and no I/O is attempted.
  */
 int
-vdev_fault(spa_t *spa, uint64_t guid)
+vdev_fault(spa_t *spa, uint64_t guid, vdev_aux_t aux)
 {
 	vdev_t *vd;
 
@@ -1944,11 +1962,18 @@ vdev_fault(spa_t *spa, uint64_t guid)
 		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
 
 	/*
+	 * We don't directly use the aux state here, but if we do a
+	 * vdev_reopen(), we need this value to be present to remember why we
+	 * were faulted.
+	 */
+	vd->vdev_label_aux = aux;
+
+	/*
 	 * Faulted state takes precedence over degraded.
 	 */
 	vd->vdev_faulted = 1ULL;
 	vd->vdev_degraded = 0ULL;
-	vdev_set_state(vd, B_FALSE, VDEV_STATE_FAULTED, VDEV_AUX_ERR_EXCEEDED);
+	vdev_set_state(vd, B_FALSE, VDEV_STATE_FAULTED, aux);
 
 	/*
 	 * If marking the vdev as faulted cause the top-level vdev to become
@@ -1966,10 +1991,8 @@ vdev_fault(spa_t *spa, uint64_t guid)
 		 */
 		vdev_reopen(vd);
 
-		if (vdev_readable(vd)) {
-			vdev_set_state(vd, B_FALSE, VDEV_STATE_DEGRADED,
-			    VDEV_AUX_ERR_EXCEEDED);
-		}
+		if (vdev_readable(vd))
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_DEGRADED, aux);
 	}
 
 	return (spa_vdev_state_exit(spa, vd, 0));
@@ -1981,7 +2004,7 @@ vdev_fault(spa_t *spa, uint64_t guid)
  * as I/O is concerned.
  */
 int
-vdev_degrade(spa_t *spa, uint64_t guid)
+vdev_degrade(spa_t *spa, uint64_t guid, vdev_aux_t aux)
 {
 	vdev_t *vd;
 
@@ -2002,7 +2025,7 @@ vdev_degrade(spa_t *spa, uint64_t guid)
 	vd->vdev_degraded = 1ULL;
 	if (!vdev_is_dead(vd))
 		vdev_set_state(vd, B_FALSE, VDEV_STATE_DEGRADED,
-		    VDEV_AUX_ERR_EXCEEDED);
+		    aux);
 
 	return (spa_vdev_state_exit(spa, vd, 0));
 }
@@ -2758,6 +2781,19 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 	if (vdev_is_dead(vd) && vd->vdev_ops->vdev_op_leaf)
 		vd->vdev_ops->vdev_op_close(vd);
 
+	/*
+	 * If we have brought this vdev back into service, we need
+	 * to notify fmd so that it can gracefully repair any outstanding
+	 * cases due to a missing device.  We do this in all cases, even those
+	 * that probably don't correlate to a repaired fault.  This is sure to
+	 * catch all cases, and we let the zfs-retire agent sort it out.  If
+	 * this is a transient state it's OK, as the retire agent will
+	 * double-check the state of the vdev before repairing it.
+	 */
+	if (state == VDEV_STATE_HEALTHY && vd->vdev_ops->vdev_op_leaf &&
+	    vd->vdev_prevstate != state)
+		zfs_post_state_change(spa, vd);
+
 	if (vd->vdev_removed &&
 	    state == VDEV_STATE_CANT_OPEN &&
 	    (aux == VDEV_AUX_OPEN_FAILED || vd->vdev_checkremove)) {
@@ -2773,11 +2809,6 @@ vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 		vd->vdev_state = VDEV_STATE_REMOVED;
 		vd->vdev_stat.vs_aux = VDEV_AUX_NONE;
 	} else if (state == VDEV_STATE_REMOVED) {
-		/*
-		 * Indicate to the ZFS DE that this device has been removed, and
-		 * any recent errors should be ignored.
-		 */
-		zfs_post_remove(spa, vd);
 		vd->vdev_removed = B_TRUE;
 	} else if (state == VDEV_STATE_CANT_OPEN) {
 		/*

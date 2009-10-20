@@ -38,6 +38,8 @@
 #include <libzfs.h>
 #include <libshare.h>
 
+#include <fm/libtopo.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -46,6 +48,13 @@ extern "C" {
 #undef	VERIFY
 #endif
 #define	VERIFY	verify
+
+typedef struct libzfs_fru {
+	char *zf_device;
+	char *zf_fru;
+	struct libzfs_fru *zf_chain;
+	struct libzfs_fru *zf_next;
+} libzfs_fru_t;
 
 struct libzfs_handle {
 	int libzfs_error;
@@ -65,7 +74,13 @@ struct libzfs_handle {
 	uint_t libzfs_shareflags;
 	boolean_t libzfs_mnttab_enable;
 	avl_tree_t libzfs_mnttab_cache;
+	int libzfs_pool_iter;
+	topo_hdl_t *libzfs_topo_hdl;
+	libzfs_fru_t **libzfs_fru_hash;
+	libzfs_fru_t *libzfs_fru_list;
+	char libzfs_chassis_id[256];
 };
+
 #define	ZFSSHARE_MISS	0x01	/* Didn't find entry in cache */
 
 struct zfs_handle {
@@ -186,6 +201,9 @@ extern int zfs_parse_options(char *, zfs_share_proto_t);
 
 extern int zfs_unshare_proto(zfs_handle_t *,
     const char *, zfs_share_proto_t *);
+
+extern void libzfs_fru_clear(libzfs_handle_t *, boolean_t);
+
 #ifdef	__cplusplus
 }
 #endif

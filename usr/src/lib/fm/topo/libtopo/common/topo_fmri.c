@@ -745,6 +745,9 @@ topo_fmri_create(topo_hdl_t *thp, const char *scheme, const char *name,
  * (ses-enclosure), we hard-code this behavior here.  If there are more
  * instances of this behavior in the future, this function could be made more
  * generic.
+ *
+ * This code also handles changes in the server-id or revision fields of the hc
+ * FMRI, as these fields have no bearing on equivalence of FRUs.
  */
 static ulong_t
 topo_fmri_strhash_one(const char *fmri, size_t len)
@@ -764,55 +767,252 @@ topo_fmri_strhash_one(const char *fmri, size_t len)
 	return (h);
 }
 
+static const char *
+topo_fmri_next_auth(const char *auth)
+{
+	const char *colon, *slash;
+
+	colon = strchr(auth + 1, ':');
+	slash = strchr(auth, '/');
+
+	if (colon == NULL && slash == NULL)
+		return (NULL);
+
+	if (colon == NULL)
+		return (slash);
+	else if (slash < colon)
+		return (slash);
+	else
+		return (colon);
+}
+
+/*
+ * List of authority information we care about.  Note that we explicitly ignore
+ * things that are properties of the chassis and not the resource itself:
+ *
+ * 	FM_FMRI_AUTH_PRODUCT_SN		"product-sn"
+ * 	FM_FMRI_AUTH_PRODUCT		"product-id"
+ * 	FM_FMRI_AUTH_DOMAIN		"domain-id"
+ * 	FM_FMRI_AUTH_SERVER		"server-id"
+ *	FM_FMRI_AUTH_HOST		"host-id"
+ *
+ * We also ignore the "revision" authority member, as that typically indicates
+ * the firmware revision and is not a static property of the FRU.  This leaves
+ * the following interesting members:
+ *
+ * 	FM_FMRI_AUTH_CHASSIS		"chassis-id"
+ *	FM_FMRI_HC_SERIAL_ID		"serial"
+ *	FM_FMRI_HC_PART			"part"
+ */
+typedef enum {
+	HC_AUTH_CHASSIS,
+	HC_AUTH_SERIAL,
+	HC_AUTH_PART,
+	HC_AUTH_MAX
+} hc_auth_type_t;
+
+static char *hc_auth_table[] = {
+	FM_FMRI_AUTH_CHASSIS,
+	FM_FMRI_HC_SERIAL_ID,
+	FM_FMRI_HC_PART
+};
+
+/*
+ * Takes an authority member, with leading ":" and trailing "=", and returns
+ * one of the above types if it's one of the things we care about.  If
+ * 'authlen' is specified, it is filled in with the length of the authority
+ * member, including leading and trailing characters.
+ */
+static hc_auth_type_t
+hc_auth_to_type(const char *auth, size_t *authlen)
+{
+	int i;
+	size_t len;
+
+	if (auth[0] != ':')
+		return (HC_AUTH_MAX);
+
+	for (i = 0; i < HC_AUTH_MAX; i++) {
+		len = strlen(hc_auth_table[i]);
+
+		if (strncmp(auth + 1, hc_auth_table[i], len) == 0 &&
+		    auth[len + 1] == '=') {
+			if (authlen)
+				*authlen = len + 2;
+			break;
+		}
+	}
+
+	return (i);
+}
+
+/*ARGSUSED*/
+ulong_t
+topo_fmri_strhash_internal(topo_hdl_t *thp, const char *fmri, boolean_t noauth)
+{
+	const char *auth, *next;
+	const char *enclosure;
+	ulong_t h;
+	hc_auth_type_t type;
+
+	if (strncmp(fmri, "hc://", 5) != 0)
+		return (topo_fmri_strhash_one(fmri, strlen(fmri)));
+
+	enclosure = strstr(fmri, SES_ENCLOSURE);
+
+	h = 0;
+
+	auth = next = fmri + 5;
+	while (*next != '/') {
+		auth = next;
+
+		if ((next = topo_fmri_next_auth(auth)) == NULL) {
+			next = auth;
+			break;
+		}
+
+		if ((type = hc_auth_to_type(auth, NULL)) == HC_AUTH_MAX)
+			continue;
+
+		if (!noauth || type == HC_AUTH_CHASSIS)
+			h += topo_fmri_strhash_one(auth, next - auth);
+	}
+
+	if (enclosure) {
+		next = enclosure + sizeof (SES_ENCLOSURE);
+		while (isdigit(*next))
+			next++;
+	}
+
+	h += topo_fmri_strhash_one(next, strlen(next));
+
+	return (h);
+}
+
 /*ARGSUSED*/
 ulong_t
 topo_fmri_strhash(topo_hdl_t *thp, const char *fmri)
 {
-	char *e;
-	ulong_t h;
+	return (topo_fmri_strhash_internal(thp, fmri, B_FALSE));
+}
 
-	if (strncmp(fmri, "hc://", 5) != 0 ||
-	    (e = strstr(fmri, SES_ENCLOSURE)) == NULL)
-		return (topo_fmri_strhash_one(fmri, strlen(fmri)));
+/*ARGSUSED*/
+ulong_t
+topo_fmri_strhash_noauth(topo_hdl_t *thp, const char *fmri)
+{
+	return (topo_fmri_strhash_internal(thp, fmri, B_TRUE));
+}
 
-	h = topo_fmri_strhash_one(fmri, e - fmri);
-	e += sizeof (SES_ENCLOSURE);
 
-	while (isdigit(*e))
-		e++;
+static void
+topo_fmri_strcmp_parse_auth(const char *auth, const char *authtype[],
+    size_t authlen[])
+{
+	int i;
+	const char *next;
+	hc_auth_type_t type;
+	size_t len;
 
-	h += topo_fmri_strhash_one(e, strlen(e));
+	for (i = 0; i < HC_AUTH_MAX; i++)
+		authlen[i] = 0;
 
-	return (h);
+	while (*auth != '/' &&
+	    (next = topo_fmri_next_auth(auth)) != NULL) {
+		if ((type = hc_auth_to_type(auth, &len)) == HC_AUTH_MAX) {
+			auth = next;
+			continue;
+		}
+
+		authtype[type] = auth + len;
+		authlen[type] = next - (auth + len);
+		auth = next;
+	}
+}
+
+/*ARGSUSED*/
+static boolean_t
+topo_fmri_strcmp_internal(topo_hdl_t *thp, const char *a, const char *b,
+    boolean_t noauth)
+{
+	const char *fmria, *fmrib;
+	const char *autha[HC_AUTH_MAX], *authb[HC_AUTH_MAX];
+	size_t authlena[HC_AUTH_MAX], authlenb[HC_AUTH_MAX];
+	int i;
+
+	/*
+	 * For non-hc FMRIs, we don't do anything.
+	 */
+	if (strncmp(a, "hc://", 5) != 0 ||
+	    strncmp(b, "hc://", 5) != 0)
+		return (strcmp(a, b) == 0);
+
+	/*
+	 * Get the portion of the FMRI independent of the authority
+	 * information.
+	 */
+	fmria = strchr(a + 5, '/');
+	fmrib = strchr(b + 5, '/');
+	if (fmria == NULL || fmrib == NULL)
+		return (strcmp(a, b));
+	fmria++;
+	fmrib++;
+
+	/*
+	 * Comparing fmri authority information is a bit of a pain, because
+	 * there may be a different number of members, and they can (but
+	 * shouldn't be) in a different order.  We need to create a copy of the
+	 * authority and parse it into pieces.  Because this function is
+	 * intended to be fast (and not necessarily extensible), we hard-code
+	 * the list of possible authority members in an enum and parse it into
+	 * an array.
+	 */
+	topo_fmri_strcmp_parse_auth(a + 5, autha, authlena);
+	topo_fmri_strcmp_parse_auth(b + 5, authb, authlenb);
+
+	for (i = 0; i < HC_AUTH_MAX; i++) {
+		if (noauth && i != HC_AUTH_CHASSIS)
+			continue;
+
+		if (authlena[i] == 0 && authlenb[i] == 0)
+			continue;
+
+		if (authlena[i] != authlenb[i])
+			return (B_FALSE);
+
+		if (strncmp(autha[i], authb[i], authlena[i]) != 0)
+			return (B_FALSE);
+	}
+
+	/*
+	 * If this is rooted at a ses-enclosure node, skip past the instance
+	 * number, as it has no meaning.
+	 */
+	if (strncmp(fmria, SES_ENCLOSURE, sizeof (SES_ENCLOSURE) - 1) == 0 &&
+	    strncmp(fmrib, SES_ENCLOSURE, sizeof (SES_ENCLOSURE) - 1) == 0) {
+		fmria += sizeof (SES_ENCLOSURE);
+		fmrib += sizeof (SES_ENCLOSURE);
+
+		while (isdigit(*fmria))
+			fmria++;
+		while (isdigit(*fmrib))
+			fmrib++;
+	}
+
+	return (strcmp(fmria, fmrib) == 0);
 }
 
 /*ARGSUSED*/
 boolean_t
 topo_fmri_strcmp(topo_hdl_t *thp, const char *a, const char *b)
 {
-	char *ea, *eb;
+	return (topo_fmri_strcmp_internal(thp, a, b, B_FALSE));
+}
 
-	if (strncmp(a, "hc://", 5) != 0 ||
-	    strncmp(b, "hc://", 5) != 0 ||
-	    (ea = strstr(a, SES_ENCLOSURE)) == NULL ||
-	    (eb = strstr(b, SES_ENCLOSURE)) == NULL)
-		return (strcmp(a, b) == 0);
-
-	if ((ea - a) != (eb - b))
-		return (B_FALSE);
-
-	if (strncmp(a, b, ea - a) != 0)
-		return (B_FALSE);
-
-	ea += sizeof (SES_ENCLOSURE);
-	eb += sizeof (SES_ENCLOSURE);
-
-	while (isdigit(*ea))
-		ea++;
-	while (isdigit(*eb))
-		eb++;
-
-	return (strcmp(ea, eb) == 0);
+/*ARGSUSED*/
+boolean_t
+topo_fmri_strcmp_noauth(topo_hdl_t *thp, const char *a, const char *b)
+{
+	return (topo_fmri_strcmp_internal(thp, a, b, B_TRUE));
 }
 
 int

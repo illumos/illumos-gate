@@ -26,11 +26,28 @@
 LIBRARY= libzfs.a
 VERS= .1
 
-OBJS_SHARED= zfs_namecheck.o zprop_common.o zfs_prop.o zpool_prop.o \
-	zfs_deleg.o zfs_comutil.o zfs_fletcher.o
-OBJS_COMMON= libzfs_dataset.o libzfs_util.o libzfs_graph.o libzfs_mount.o \
-	libzfs_pool.o libzfs_changelist.o libzfs_config.o libzfs_import.o \
-	libzfs_status.o libzfs_sendrecv.o
+OBJS_SHARED=			\
+	zfs_comutil.o		\
+	zfs_deleg.o		\
+	zfs_fletcher.o		\
+	zfs_namecheck.o		\
+	zfs_prop.o		\
+	zpool_prop.o		\
+	zprop_common.o
+
+OBJS_COMMON=			\
+	libzfs_changelist.o	\
+	libzfs_config.o		\
+	libzfs_dataset.o	\
+	libzfs_fru.o		\
+	libzfs_graph.o		\
+	libzfs_import.o		\
+	libzfs_mount.o		\
+	libzfs_pool.o		\
+	libzfs_sendrecv.o	\
+	libzfs_status.o		\
+	libzfs_util.o
+
 OBJECTS= $(OBJS_COMMON) $(OBJS_SHARED)
 
 include ../../Makefile.lib

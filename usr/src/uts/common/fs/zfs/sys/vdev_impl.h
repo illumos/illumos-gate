@@ -183,6 +183,7 @@ struct vdev {
 	vdev_cache_t	vdev_cache;	/* physical block cache		*/
 	spa_aux_vdev_t	*vdev_aux;	/* for l2cache vdevs		*/
 	zio_t		*vdev_probe_zio; /* root of current probe	*/
+	vdev_aux_t	vdev_label_aux;	/* on-disk aux state		*/
 
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must

@@ -1267,11 +1267,19 @@ zfs_ioc_vdev_set_state(zfs_cmd_t *zc)
 		break;
 
 	case VDEV_STATE_FAULTED:
-		error = vdev_fault(spa, zc->zc_guid);
+		if (zc->zc_obj != VDEV_AUX_ERR_EXCEEDED &&
+		    zc->zc_obj != VDEV_AUX_EXTERNAL)
+			zc->zc_obj = VDEV_AUX_ERR_EXCEEDED;
+
+		error = vdev_fault(spa, zc->zc_guid, zc->zc_obj);
 		break;
 
 	case VDEV_STATE_DEGRADED:
-		error = vdev_degrade(spa, zc->zc_guid);
+		if (zc->zc_obj != VDEV_AUX_ERR_EXCEEDED &&
+		    zc->zc_obj != VDEV_AUX_EXTERNAL)
+			zc->zc_obj = VDEV_AUX_ERR_EXCEEDED;
+
+		error = vdev_degrade(spa, zc->zc_guid, zc->zc_obj);
 		break;
 
 	default:

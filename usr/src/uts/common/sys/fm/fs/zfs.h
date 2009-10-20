@@ -87,6 +87,7 @@ extern "C" {
 
 #define	FM_RESOURCE_REMOVED			"removed"
 #define	FM_RESOURCE_AUTOREPLACE			"autoreplace"
+#define	FM_RESOURCE_STATECHANGE			"statechange"
 
 #ifdef	__cplusplus
 }

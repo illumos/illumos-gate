@@ -226,8 +226,8 @@ extern int zpool_vdev_attach(zpool_handle_t *, const char *,
 extern int zpool_vdev_detach(zpool_handle_t *, const char *);
 extern int zpool_vdev_remove(zpool_handle_t *, const char *);
 
-extern int zpool_vdev_fault(zpool_handle_t *, uint64_t);
-extern int zpool_vdev_degrade(zpool_handle_t *, uint64_t);
+extern int zpool_vdev_fault(zpool_handle_t *, uint64_t, vdev_aux_t);
+extern int zpool_vdev_degrade(zpool_handle_t *, uint64_t, vdev_aux_t);
 extern int zpool_vdev_clear(zpool_handle_t *, uint64_t);
 
 extern nvlist_t *zpool_find_vdev(zpool_handle_t *, const char *, boolean_t *,
@@ -603,6 +603,17 @@ int zfs_smb_acl_rename(libzfs_handle_t *, char *, char *, char *, char *);
  */
 extern int zpool_enable_datasets(zpool_handle_t *, const char *, int);
 extern int zpool_disable_datasets(zpool_handle_t *, boolean_t);
+
+/*
+ * Mappings between vdev and FRU.
+ */
+extern void libzfs_fru_refresh(libzfs_handle_t *);
+extern const char *libzfs_fru_lookup(libzfs_handle_t *, const char *);
+extern const char *libzfs_fru_devpath(libzfs_handle_t *, const char *);
+extern boolean_t libzfs_fru_compare(libzfs_handle_t *, const char *,
+    const char *);
+extern boolean_t libzfs_fru_notself(libzfs_handle_t *, const char *);
+extern int zpool_fru_set(zpool_handle_t *, uint64_t, const char *);
 
 #ifdef	__cplusplus
 }

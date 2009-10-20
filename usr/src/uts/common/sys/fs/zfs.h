@@ -419,6 +419,7 @@ typedef enum zfs_cache_type {
 #define	ZPOOL_CONFIG_DEGRADED		"degraded"
 #define	ZPOOL_CONFIG_REMOVED		"removed"
 #define	ZPOOL_CONFIG_FRU		"fru"
+#define	ZPOOL_CONFIG_AUX_STATE		"aux_state"
 
 #define	VDEV_TYPE_ROOT			"root"
 #define	VDEV_TYPE_MIRROR		"mirror"
@@ -477,7 +478,8 @@ typedef enum vdev_aux {
 	VDEV_AUX_SPARED,	/* hot spare used in another pool	*/
 	VDEV_AUX_ERR_EXCEEDED,	/* too many errors			*/
 	VDEV_AUX_IO_FAILURE,	/* experienced I/O failure		*/
-	VDEV_AUX_BAD_LOG	/* cannot read log chain(s)		*/
+	VDEV_AUX_BAD_LOG,	/* cannot read log chain(s)		*/
+	VDEV_AUX_EXTERNAL	/* external diagnosis			*/
 } vdev_aux_t;
 
 /*
