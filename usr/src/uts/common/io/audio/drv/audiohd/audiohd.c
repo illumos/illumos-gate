@@ -149,6 +149,7 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 	devid = pci_config_get16(statep->hda_pci_handle, PCI_CONF_VENID);
 	devid <<= 16;
 	devid |= pci_config_get16(statep->hda_pci_handle, PCI_CONF_DEVID);
+	statep->devid = devid;
 
 	name = AUDIOHD_DEV_CONFIG;
 	vers = AUDIOHD_DEV_VERSION;
@@ -180,7 +181,7 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 		break;
 	case 0x10de026c:
 		name = "NVIDIA HD Audio";
-		vers = "6151";
+		vers = "MCP51";
 		break;
 	case 0x10de03e4:
 		name = "NVIDIA HD Audio";
@@ -193,6 +194,10 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 	case 0x10de055c:
 		name = "NVIDIA HD Audio";
 		vers = "MCP67";
+		break;
+	case 0x10de0ac0:
+		name = "NVIDIA HD Audio";
+		vers = "MCP79";
 		break;
 	case 0x1002437b:
 		name = "ATI HD Audio";
@@ -228,13 +233,14 @@ audiohd_add_intrs(audiohd_state_t *statep, int intr_type)
 	int 			intr_size;
 	int 			count;
 	int 			i, j;
-	int 			ret;
+	int 			ret, flag;
 
 	/* Get number of interrupts */
 	ret = ddi_intr_get_nintrs(dip, intr_type, &count);
 	if ((ret != DDI_SUCCESS) || (count == 0)) {
-		audio_dev_warn(statep->adev, "ddi_intr_get_nintrs() failure,"
-		    "ret: %d, count: %d", ret, count);
+		audio_dev_warn(statep->adev,
+		    "ddi_intr_get_nintrs() failure, ret: %d, count: %d",
+		    ret, count);
 		return (DDI_FAILURE);
 	}
 
@@ -246,24 +252,35 @@ audiohd_add_intrs(audiohd_state_t *statep, int intr_type)
 		return (DDI_FAILURE);
 	}
 
+	if (avail < 1) {
+		audio_dev_warn(statep->adev,
+		    "Interrupts count: %d, available: %d",
+		    count, avail);
+	}
+
 	/* Allocate an array of interrupt handles */
 	intr_size = count * sizeof (ddi_intr_handle_t);
 	statep->htable = kmem_alloc(intr_size, KM_SLEEP);
 	statep->intr_rqst = count;
 
+	flag = (intr_type == DDI_INTR_TYPE_MSI) ?
+	    DDI_INTR_ALLOC_STRICT:DDI_INTR_ALLOC_NORMAL;
+
 	/* Call ddi_intr_alloc() */
 	ret = ddi_intr_alloc(dip, statep->htable, intr_type, 0,
-	    count, &actual, DDI_INTR_ALLOC_NORMAL);
+	    count, &actual, flag);
 	if (ret != DDI_SUCCESS || actual == 0) {
 		/* ddi_intr_alloc() failed  */
 		kmem_free(statep->htable, intr_size);
 		return (DDI_FAILURE);
 	}
-	if (actual < count) {
-		audio_dev_warn(statep->adev, "ddi_intr_alloc() Requested: %d,"
-		    "Received: %d",
+
+	if (actual < 1) {
+		audio_dev_warn(statep->adev,
+		    "Interrupts requested: %d, received: %d",
 		    count, actual);
 	}
+
 	statep->intr_cnt = actual;
 
 	/*
@@ -323,6 +340,10 @@ audiohd_add_intrs(audiohd_state_t *statep, int intr_type)
 		return (DDI_FAILURE);
 	}
 
+	for (i = 0; i < actual; i++) {
+		(void) ddi_intr_clr_mask(statep->htable[i]);
+	}
+
 	return (DDI_SUCCESS);
 }
 
@@ -363,7 +384,7 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	audiohd_state_t		*statep;
 	int			instance;
 	int 			intr_types;
-	int			i;
+	int			i, rc = 0;
 
 	instance = ddi_get_instance(dip);
 	switch (cmd) {
@@ -481,11 +502,21 @@ audiohd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	if (statep->intr_cap & DDI_INTR_FLAG_BLOCK) {
 		/* Call ddi_intr_block_enable() for MSI interrupts */
-		(void) ddi_intr_block_enable(statep->htable, statep->intr_cnt);
+		rc = ddi_intr_block_enable(statep->htable, statep->intr_cnt);
+		if (rc != DDI_SUCCESS) {
+			audio_dev_warn(statep->adev,
+			    "Enable block intr failed: %d\n", rc);
+			return (DDI_FAILURE);
+		}
 	} else {
 		/* Call ddi_intr_enable for MSI or FIXED interrupts */
 		for (i = 0; i < statep->intr_cnt; i++) {
-			(void) ddi_intr_enable(statep->htable[i]);
+			rc = ddi_intr_enable(statep->htable[i]);
+			if (rc != DDI_SUCCESS) {
+				audio_dev_warn(statep->adev,
+				    "Enable intr failed: %d\n", rc);
+				return (DDI_FAILURE);
+			}
 		}
 	}
 
@@ -959,6 +990,7 @@ audiohd_reset_port(audiohd_port_t *port)
 
 	return (DDI_SUCCESS);
 }
+
 static int
 audiohd_engine_open(void *arg, int flag,
     unsigned *fragfrp, unsigned *nfragsp, caddr_t *bufp)
@@ -2783,6 +2815,15 @@ audiohd_init_controller(audiohd_state_t *statep)
 	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBRP, 0);
 	AUDIOHD_REG_SET8(AUDIOHD_REG_CORBCTL, AUDIOHDR_CORBCTL_DMARUN);
 
+	/* work around for some chipsets which could not enable MSI */
+	switch (statep->devid) {
+	case AUDIOHD_CONTROLLER_MCP51:
+		statep->msi_enable = B_FALSE;
+		break;
+	default:
+		break;
+	}
+
 	return (DDI_SUCCESS);
 }	/* audiohd_init_controller() */
 
@@ -3170,6 +3211,9 @@ audiohd_set_codec_info(hda_codec_t *codec)
 	case 0x10ec0662:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC662");
 		break;
+	case 0x10ec0663:
+		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC663");
+		break;
 	case 0x10ec861:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC861");
 		break;
@@ -3190,6 +3234,10 @@ audiohd_set_codec_info(hda_codec_t *codec)
 		break;
 	case 0x10ec0888:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC888");
+		break;
+	case 0x10de0007:
+		(void) snprintf(buf, sizeof (buf),
+		    "nVidia HD codec: MCP7A HDMI");
 		break;
 	case 0x13f69880:
 		(void) snprintf(buf, sizeof (buf), "CMedia HD codec: CMI19880");

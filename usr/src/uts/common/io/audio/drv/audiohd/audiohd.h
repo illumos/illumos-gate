@@ -35,7 +35,13 @@ extern "C" {
 #define	AUDIOHD_VID_INTEL	0x8086
 #define	AUDIOHD_VID_ATI		0x1002
 #define	AUDIOHD_VID_NVIDIA	0x10de
+#define	AUDIOHD_VID_REALTEK	0x10ec
 #define	AUDIOHD_VID_SIGMATEL	0x8384
+
+/*
+ * specific audiohd controller device id
+ */
+#define	AUDIOHD_CONTROLLER_MCP51	0x10de026c
 
 /*
  * specific codec id used by specific vendors
@@ -95,7 +101,7 @@ extern "C" {
 #define	AUDIOHD_SP_ON		1
 #define	AUDIOHD_SP_OFF		0
 
-#define	AUDIOHD_PORT_MAX		15
+#define	AUDIOHD_PORT_MAX	15
 #define	AUDIOHD_CODEC_MAX	16
 #define	AUDIOHD_MEMIO_LEN	0x4000
 
@@ -146,8 +152,8 @@ extern "C" {
 #define	AUDIOHD_PIN_VREF_L4	0x02
 #define	AUDIOHD_PIN_VREF_OFF	8
 #define	AUDIOHD_PIN_VREF_MASK	0xff
-#define	AUDIOHD_PIN_CLR_MASK		0xf
-#define	AUDIOHD_PIN_CLR_OFF		12
+#define	AUDIOHD_PIN_CLR_MASK	0xf
+#define	AUDIOHD_PIN_CLR_OFF	12
 
 
 #define	AUDIOHD_VERB_ADDR_OFF	28
@@ -807,6 +813,7 @@ struct audiohd_state {
 
 
 	audio_dev_t	*adev;
+	uint32_t	devid;
 
 
 	int		hda_pint_freq;	/* play intr frequence */
