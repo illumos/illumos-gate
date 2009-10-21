@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -457,7 +457,7 @@ fmd_fmri_contains(nvlist_t *er, nvlist_t *ee)
 int
 fmd_fmri_unusable(nvlist_t *nvl)
 {
-	uint64_t val;
+	uint64_t val1, val2;
 	uint8_t version;
 	int rc, err1 = 0, err2;
 	nvlist_t *nvlcp = NULL;
@@ -478,8 +478,8 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	if (err1 != ETOPO_METHOD_NOTSUP)
 		return (rc);
 
-	err1 = nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val);
-	err2 = nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val);
+	err1 = nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val1);
+	err2 = nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val2);
 
 	if (err1 == ENOENT && err2 == ENOENT)
 		return (0); /* no page, so assume it's still usable */
@@ -487,8 +487,8 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	if ((err1 != 0 && err1 != ENOENT) || (err2 != 0 && err2 != ENOENT))
 		return (fmd_fmri_set_errno(EINVAL));
 
-	if ((err1 = mem_unum_rewrite(nvl, &nvlcp)) != 0)
-		return (fmd_fmri_set_errno(err1));
+	if ((rc = mem_unum_rewrite(nvl, &nvlcp)) != 0)
+		return (fmd_fmri_set_errno(rc));
 
 	/*
 	 * Ask the kernel if the page is retired, using either the rewritten
@@ -520,7 +520,8 @@ fmd_fmri_unusable(nvlist_t *nvl)
 		 */
 		fmd_fmri_warn("failed to determine page %s=%llx usability: "
 		    "rc=%d errno=%d\n", err1 == 0 ? FM_FMRI_MEM_OFFSET :
-		    FM_FMRI_MEM_PHYSADDR, (u_longlong_t)val, rc, errno);
+		    FM_FMRI_MEM_PHYSADDR, err1 == 0 ? (u_longlong_t)val1 :
+		    (u_longlong_t)val2, rc, errno);
 		retval = 1;
 	}
 

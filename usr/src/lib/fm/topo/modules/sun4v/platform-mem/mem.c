@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -454,7 +454,7 @@ mem_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 {
 	int rc = -1;
 	uint8_t version;
-	uint64_t val;
+	uint64_t val1, val2;
 	int err1, err2;
 	uint32_t retval;
 
@@ -462,8 +462,8 @@ mem_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	    version > FM_MEM_SCHEME_VERSION)
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 
-	err1 = nvlist_lookup_uint64(in, FM_FMRI_MEM_OFFSET, &val);
-	err2 = nvlist_lookup_uint64(in, FM_FMRI_MEM_PHYSADDR, &val);
+	err1 = nvlist_lookup_uint64(in, FM_FMRI_MEM_OFFSET, &val1);
+	err2 = nvlist_lookup_uint64(in, FM_FMRI_MEM_PHYSADDR, &val2);
 
 	if (err1 == ENOENT && err2 == ENOENT)
 		return (0); /* no page, so assume it's still usable */
@@ -502,7 +502,8 @@ mem_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 		topo_mod_dprintf(mod,
 		    "failed to determine page %s=%llx usability: "
 		    "rc=%d errno=%d\n", err1 == 0 ? FM_FMRI_MEM_OFFSET :
-		    FM_FMRI_MEM_PHYSADDR, (u_longlong_t)val, rc, errno);
+		    FM_FMRI_MEM_PHYSADDR, err1 == 0 ? (u_longlong_t)val1 :
+		    (u_longlong_t)val2, rc, errno);
 		retval = 1;
 	}
 
