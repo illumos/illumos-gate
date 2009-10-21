@@ -181,6 +181,7 @@ typedef struct {
 	idm_sockaddr_t		cr_ini_dst_addr;
 	ldi_ident_t		cr_li;
 	idm_conn_ops_t		icr_conn_ops;
+	boolean_t		cr_boot_conn;
 } idm_conn_req_t;
 
 typedef struct {

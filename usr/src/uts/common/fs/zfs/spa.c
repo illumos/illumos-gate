@@ -64,6 +64,7 @@
 
 #ifdef	_KERNEL
 #include <sys/zone.h>
+#include <sys/bootprops.h>
 #endif	/* _KERNEL */
 
 #include "zfs_prop.h"
@@ -2420,7 +2421,17 @@ spa_import_rootpool(char *devpath, char *devid)
 	/*
 	 * Read the label from the boot device and generate a configuration.
 	 */
-	if ((config = spa_generate_rootconf(devpath, devid, &guid)) == NULL) {
+	config = spa_generate_rootconf(devpath, devid, &guid);
+#if defined(_OBP) && defined(_KERNEL)
+	if (config == NULL) {
+		if (strstr(devpath, "/iscsi/ssd") != NULL) {
+			/* iscsi boot */
+			get_iscsi_bootpath_phy(devpath);
+			config = spa_generate_rootconf(devpath, devid, &guid);
+		}
+	}
+#endif
+	if (config == NULL) {
 		cmn_err(CE_NOTE, "Can not read the pool label from '%s'",
 		    devpath);
 		return (EIO);

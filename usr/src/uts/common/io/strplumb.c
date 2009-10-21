@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -426,8 +426,6 @@ setifname(ldi_handle_t lh, struct lifreq *lifrp)
 	return (ldi_ioctl(lh, I_STR, (intptr_t)&iocb, FKIOCTL, CRED(), &rval));
 }
 
-extern ib_boot_prop_t	*iscsiboot_prop;
-
 static int
 strplumb_dev(ldi_ident_t li)
 {
@@ -659,15 +657,32 @@ char *
 strplumb_get_netdev_path(void)
 {
 #ifdef	_OBP
-	char fstype[OBP_MAXPROPNAME];
+	char		fstype[OBP_MAXPROPNAME];
+	static char	iscsi_network_path[BO_MAXOBJNAME]	= {0};
+	int		proplen;
+	char		*p	= NULL;
 
 	if (bop_getprop("fstype", fstype) == -1)
 		return (NULL);
 
 	if (strncmp(fstype, "nfs", 3) == 0)
 		return (prom_bootpath());
-	else
-		return (NULL);
+	else if (iscsiboot_prop != NULL) {
+		proplen =  BOP_GETPROPLEN(bootops,
+		    BP_ISCSI_NETWORK_BOOTPATH);
+		if (proplen > 0) {
+			if (BOP_GETPROP(bootops,
+			    BP_ISCSI_NETWORK_BOOTPATH,
+			    iscsi_network_path) > 0) {
+				p = strchr(iscsi_network_path, ':');
+				if (p != NULL) {
+					*p = '\0';
+				}
+				return (iscsi_network_path);
+			}
+		}
+	}
+	return (NULL);
 #else
 
 	char *macstr, *devpath = NULL;

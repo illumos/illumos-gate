@@ -910,8 +910,16 @@ iscsi_net_interface()
 		/* initialize interface */
 		if (t_kopen((file_t *)NULL, dl_udp_netconf.knc_rdev,
 		    FREAD|FWRITE, &tiptr, CRED()) == 0) {
-			if (kdlifconfig(tiptr, AF_INET, &myaddr, &subnet,
-			    &braddr, &defgateway, ifname)) {
+			int	ret	= 0;
+			if (defgateway.s_addr == 0) {
+				/* No default gate way specified */
+				ret = kdlifconfig(tiptr, AF_INET, &myaddr,
+				    &subnet, &braddr, NULL, ifname);
+			} else {
+				ret = kdlifconfig(tiptr, AF_INET, &myaddr,
+				    &subnet, &braddr, &defgateway, ifname);
+			}
+			if (ret != 0) {
 				cmn_err(CE_WARN, "Failed to configure"
 				    " iSCSI boot nic");
 				(void) t_kclose(tiptr, 0);

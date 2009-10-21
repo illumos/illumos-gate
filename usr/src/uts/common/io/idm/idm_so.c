@@ -68,7 +68,8 @@ static idm_status_t idm_so_conn_create_common(idm_conn_t *ic, ksocket_t new_so);
 static void idm_so_conn_destroy_common(idm_conn_t *ic);
 static void idm_so_conn_connect_common(idm_conn_t *ic);
 
-static void idm_set_ini_preconnect_options(idm_so_conn_t *sc);
+static void idm_set_ini_preconnect_options(idm_so_conn_t *sc,
+    boolean_t boot_conn);
 static void idm_set_ini_postconnect_options(idm_so_conn_t *sc);
 static void idm_set_tgt_connect_options(ksocket_t so);
 static idm_status_t idm_i_so_tx(idm_pdu_t *pdu);
@@ -685,7 +686,7 @@ idm_iov_sorecv(ksocket_t so, iovec_t *iop, int iovlen, size_t total_len)
 }
 
 static void
-idm_set_ini_preconnect_options(idm_so_conn_t *sc)
+idm_set_ini_preconnect_options(idm_so_conn_t *sc, boolean_t boot_conn)
 {
 	int	conn_abort = 10000;
 	int	conn_notify = 2000;
@@ -695,11 +696,14 @@ idm_set_ini_preconnect_options(idm_so_conn_t *sc)
 	(void) ksocket_setsockopt(sc->ic_so, IPPROTO_TCP,
 	    TCP_CONN_NOTIFY_THRESHOLD, (char *)&conn_notify, sizeof (int),
 	    CRED());
-	(void) ksocket_setsockopt(sc->ic_so, IPPROTO_TCP,
-	    TCP_CONN_ABORT_THRESHOLD, (char *)&conn_abort, sizeof (int),
-	    CRED());
-	(void) ksocket_setsockopt(sc->ic_so, IPPROTO_TCP, TCP_ABORT_THRESHOLD,
-	    (char *)&abort, sizeof (int), CRED());
+	if (boot_conn == B_FALSE) {
+		(void) ksocket_setsockopt(sc->ic_so, IPPROTO_TCP,
+		    TCP_CONN_ABORT_THRESHOLD, (char *)&conn_abort, sizeof (int),
+		    CRED());
+		(void) ksocket_setsockopt(sc->ic_so, IPPROTO_TCP,
+		    TCP_ABORT_THRESHOLD,
+		    (char *)&abort, sizeof (int), CRED());
+	}
 }
 
 static void
@@ -866,7 +870,7 @@ idm_so_ini_conn_create(idm_conn_req_t *cr, idm_conn_t *ic)
 
 	so_conn = ic->ic_transport_private;
 	/* Set up socket options */
-	idm_set_ini_preconnect_options(so_conn);
+	idm_set_ini_preconnect_options(so_conn, cr->cr_boot_conn);
 
 	return (IDM_STATUS_SUCCESS);
 }

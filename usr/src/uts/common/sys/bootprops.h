@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,24 @@ extern "C" {
 #define	BP_SERVER_PATH			"server-path"
 #define	BP_SERVER_ROOTOPTS		"server-rootopts"
 #define	BP_BOOTP_RESPONSE		"bootp-response"
+
+/*
+ * Boot properties related to iscsiboot:
+ */
 #define	BP_NETWORK_INTERFACE		"network-interface"
+#define	BP_ISCSI_TARGET_NAME		"iscsi-target-name"
+#define	BP_ISCSI_TARGET_IP		"iscsi-target-ip"
+#define	BP_ISCSI_INITIATOR_ID		"iscsi-initiator-id"
+#define	BP_ISCSI_PORT			"iscsi-port"
+#define	BP_ISCSI_TPGT			"iscsi-tpgt"
+#define	BP_ISCSI_LUN			"iscsi-lun"
+#define	BP_ISCSI_PAR			"iscsi-partition"
+#define	BP_ISCSI_NETWORK_BOOTPATH	"iscsi-network-bootpath"
+#define	BP_ISCSI_DISK			"/iscsi-hba/disk"
+#define	BP_BOOTPATH			"bootpath"
+#define	BP_CHAP_USER			"chap-user"
+#define	BP_CHAP_PASSWORD		"chap-password"
+#define	BP_LOCAL_MAC_ADDRESS		"local-mac-address"
 
 /*
  * kifconf prototypes
@@ -70,8 +87,11 @@ kifioctl(TIUSER *tiptr, int cmd, struct netbuf *nbuf, char *ifname);
  */
 typedef struct _ib_ini_prop {
 	uchar_t		*ini_name;
+	size_t		ini_name_len;
 	uchar_t		*ini_chap_name;
+	size_t		ini_chap_name_len;
 	uchar_t		*ini_chap_sec;
+	size_t		ini_chap_sec_len;
 } ib_ini_prop_t;
 
 /*
@@ -109,9 +129,15 @@ typedef struct _ib_tgt_prop {
 	uint32_t	tgt_port;
 	uchar_t		tgt_boot_lun[8];
 	uchar_t		*tgt_name;
+	size_t		tgt_name_len;
 	uchar_t		*tgt_chap_name;
+	size_t		tgt_chap_name_len;
 	uchar_t		*tgt_chap_sec;
+	size_t		tgt_chap_sec_len;
 	int		lun_online;
+	uchar_t		*tgt_boot_par;
+	size_t		tgt_boot_par_len;
+	uint16_t	tgt_tpgt;
 } ib_tgt_prop_t;
 
 /*
@@ -125,6 +151,15 @@ typedef struct _ib_boot_prop {
 
 void
 ld_ib_prop();
+
+void
+iscsi_boot_prop_free();
+
+void
+get_iscsi_bootpath_vhci(char *bootpath);
+
+void
+get_iscsi_bootpath_phy(char *bootpath);
 
 #ifdef	__cplusplus
 }

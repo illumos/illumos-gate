@@ -2150,6 +2150,11 @@ iscsi_login_connect(iscsi_conn_t *icp)
 	    sizeof (cr.cr_ini_dst_addr));
 	bcopy(&icp->conn_bound_addr, &cr.cr_bound_addr,
 	    sizeof (cr.cr_bound_addr));
+	if (isp->sess_boot == B_TRUE) {
+		cr.cr_boot_conn = B_TRUE;
+	} else {
+		cr.cr_boot_conn = B_FALSE;
+	}
 
 	/*
 	 * Allocate IDM connection context

@@ -374,6 +374,8 @@ iscsi_parse_ibft_initiator(char *begin_of_ibft,
 			boot_property.boot_init.ini_name =
 			    (uchar_t *)kmem_zalloc(
 			    initiator->ini_name_len + 1, KM_SLEEP);
+			boot_property.boot_init.ini_name_len =
+			    initiator->ini_name_len + 1;
 			(void) snprintf(
 			    (char *)boot_property.boot_init.ini_name,
 			    initiator->ini_name_len + 1, "%s",
@@ -543,6 +545,8 @@ iscsi_parse_ibft_target(char *begin_of_ibft, iscsi_ibft_tgt_t *tgtp)
 			boot_property.boot_tgt.tgt_name =
 			    (uchar_t *)kmem_zalloc(tgtp->target_name_len + 1,
 			    KM_SLEEP);
+			boot_property.boot_tgt.tgt_name_len =
+			    tgtp->target_name_len + 1;
 			(void) snprintf(
 			    (char *)boot_property.boot_tgt.tgt_name,
 			    tgtp->target_name_len + 1, "%s",
@@ -565,6 +569,8 @@ iscsi_parse_ibft_target(char *begin_of_ibft, iscsi_ibft_tgt_t *tgtp)
 				    (uchar_t *)kmem_zalloc(
 				    tgtp->chap_name_len + 1,
 				    KM_SLEEP);
+				boot_property.boot_init.ini_chap_name_len =
+				    tgtp->chap_name_len + 1;
 				tmp = (char *)
 				    boot_property.boot_init.ini_chap_name;
 				(void) snprintf(
@@ -584,6 +590,8 @@ iscsi_parse_ibft_target(char *begin_of_ibft, iscsi_ibft_tgt_t *tgtp)
 				    (uchar_t *)kmem_zalloc(
 				    tgtp->chap_secret_len + 1,
 				    KM_SLEEP);
+				boot_property.boot_init.ini_chap_sec_len =
+				    tgtp->chap_secret_len + 1;
 				bcopy(begin_of_ibft +
 				    tgtp->chap_secret_offset,
 				    boot_property.boot_init.ini_chap_sec,
@@ -597,14 +605,16 @@ iscsi_parse_ibft_target(char *begin_of_ibft, iscsi_ibft_tgt_t *tgtp)
 				if (tgtp->rev_chap_name_len != 0) {
 					boot_property.boot_tgt.tgt_chap_name =
 					    (uchar_t *)kmem_zalloc(
-					    tgtp->chap_name_len + 1,
+					    tgtp->rev_chap_name_len + 1,
 					    KM_SLEEP);
+					boot_property.boot_tgt.tgt_chap_name_len
+					    = tgtp->rev_chap_name_len + 1;
 #define	TGT_CHAP_NAME	boot_property.boot_tgt.tgt_chap_name
 					tmp = (char *)TGT_CHAP_NAME;
 #undef	TGT_CHAP_NAME
 					(void) snprintf(
 					    tmp,
-					    tgtp->chap_name_len + 1,
+					    tgtp->rev_chap_name_len + 1,
 					    "%s",
 					    begin_of_ibft +
 					    tgtp->rev_chap_name_offset);
@@ -622,6 +632,8 @@ iscsi_parse_ibft_target(char *begin_of_ibft, iscsi_ibft_tgt_t *tgtp)
 					    (uchar_t *)kmem_zalloc(
 					    tgtp->rev_chap_secret_len + 1,
 					    KM_SLEEP);
+					boot_property.boot_tgt.tgt_chap_sec_len
+					    = tgtp->rev_chap_secret_len + 1;
 					tmp = (char *)
 					    boot_property.boot_tgt.tgt_chap_sec;
 					(void) snprintf(

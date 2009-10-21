@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,8 @@ int  iscsi_print_bootprop	=	0;
 #ifndef	NULL
 #define	NULL	0
 #endif
+
+static int replace_sp_c(unsigned char *dst, unsigned char *source, size_t n);
 
 static void
 iscsi_bootprop_print(int level, char *str)
@@ -191,18 +193,21 @@ iscsi_boot_free_ini(ib_ini_prop_t *init)
 	}
 
 	if (init->ini_name != NULL) {
-		kmem_free(init->ini_name, strlen((char *)init->ini_name) + 1);
+		kmem_free(init->ini_name, init->ini_name_len);
 		init->ini_name = NULL;
+		init->ini_name_len = 0;
 	}
 	if (init->ini_chap_name != NULL) {
 		kmem_free(init->ini_chap_name,
-		    strlen((char *)init->ini_chap_name) + 1);
+		    init->ini_chap_name_len);
 		init->ini_chap_name = NULL;
+		init->ini_chap_name_len = 0;
 	}
 	if (init->ini_chap_sec != NULL) {
 		kmem_free(init->ini_chap_sec,
-		    strlen((char *)init->ini_chap_sec) + 1);
+		    init->ini_chap_sec_len);
 		init->ini_chap_sec = NULL;
+		init->ini_chap_sec_len = 0;
 	}
 }
 
@@ -215,18 +220,27 @@ iscsi_boot_free_tgt(ib_tgt_prop_t *target)
 
 	if (target->tgt_name != NULL) {
 		kmem_free(target->tgt_name,
-		    strlen((char *)target->tgt_name) + 1);
+		    target->tgt_name_len);
 		target->tgt_name = NULL;
+		target->tgt_name_len = 0;
 	}
 	if (target->tgt_chap_name != NULL) {
 		kmem_free(target->tgt_chap_name,
-		    strlen((char *)target->tgt_chap_name) + 1);
+		    target->tgt_chap_name_len);
 		target->tgt_chap_name = NULL;
+		target->tgt_chap_name_len = 0;
 	}
 	if (target->tgt_chap_sec != NULL) {
 		kmem_free(target->tgt_chap_sec,
-		    strlen((char *)target->tgt_chap_sec) + 1);
+		    target->tgt_chap_sec_len);
 		target->tgt_chap_sec = NULL;
+		target->tgt_chap_sec_len = 0;
+	}
+	if (target->tgt_boot_par != NULL) {
+		kmem_free(target->tgt_boot_par,
+		    target->tgt_boot_par_len);
+		target->tgt_boot_par = NULL;
+		target->tgt_boot_par_len = 0;
 	}
 }
 
@@ -266,4 +280,112 @@ kinet_ntoa(char *buf, void *in, int af)
 		}
 		(void) sprintf(buf, "%02x%02x", p[i], p[i+1]);
 	}
+}
+
+#ifndef	BO_MAXOBJNAME
+#define	BO_MAXOBJNAME	256
+#endif
+
+#ifndef ISCSI_BOOT_ISID
+#define	ISCSI_BOOT_ISID	"0000"
+#endif
+
+/*
+ * Generate the 'ssd' bootpath of an iSCSI boot device
+ * The caller is responsible to alloc the buf with BO_MAXOBJNAME length
+ */
+void
+get_iscsi_bootpath_vhci(char *bootpath)
+{
+	uint16_t	*lun_num;
+
+	if (iscsiboot_prop == NULL)
+		ld_ib_prop();
+	if (iscsiboot_prop == NULL)
+		return;
+	lun_num = (uint16_t *)(&iscsiboot_prop->boot_tgt.tgt_boot_lun[0]);
+	(void) snprintf(bootpath, BO_MAXOBJNAME, "/iscsi/ssd@%s%s%04X,%d:%s",
+	    ISCSI_BOOT_ISID, iscsiboot_prop->boot_tgt.tgt_name,
+	    iscsiboot_prop->boot_tgt.tgt_tpgt, lun_num[0],
+	    iscsiboot_prop->boot_tgt.tgt_boot_par);
+}
+
+/*
+ * Generate the 'disk' bootpath of an iSCSI boot device
+ * The caller is responsible to alloc the buf with BO_MAXOBJNAME length
+ */
+void
+get_iscsi_bootpath_phy(char *bootpath)
+{
+	uint16_t	lun_num		= 0;
+	uchar_t		replaced_name[BO_MAXOBJNAME] = {0};
+
+	if (iscsiboot_prop == NULL)
+		ld_ib_prop();
+	if (iscsiboot_prop == NULL)
+		return;
+	if (replace_sp_c(replaced_name, iscsiboot_prop->boot_tgt.tgt_name,
+	    iscsiboot_prop->boot_tgt.tgt_name_len) != 0) {
+		return;
+	}
+	lun_num = *(uint16_t *)(&iscsiboot_prop->boot_tgt.tgt_boot_lun[0]);
+	(void) snprintf(bootpath, BO_MAXOBJNAME, "/iscsi/disk@%s%s%04X,%d:%s",
+	    ISCSI_BOOT_ISID, replaced_name, iscsiboot_prop->boot_tgt.tgt_tpgt,
+	    lun_num, iscsiboot_prop->boot_tgt.tgt_boot_par);
+}
+
+static int replace_sp_c(unsigned char *dst, unsigned char *source, size_t n)
+{
+	unsigned char	*p	= NULL;
+	int		i	= 0;
+
+	if (source == NULL || dst == NULL || n == 0) {
+		return (-1);
+	}
+
+	for (p = source; *p != '\0'; p++, i++) {
+		if (i >= n) {
+			return (-1);
+		}
+		switch (*p) {
+		case ':':
+			*dst = '%';
+			dst++;
+			*dst = '3';
+			dst++;
+			*dst = 'A';
+			dst++;
+			break;
+		case ' ':
+			*dst = '%';
+			dst++;
+			*dst = '2';
+			dst++;
+			*dst = '0';
+			dst++;
+			break;
+		case '@':
+			*dst = '%';
+			dst++;
+			*dst = '4';
+			dst++;
+			*dst = '0';
+			dst++;
+			break;
+		case '/':
+			*dst = '%';
+			dst++;
+			*dst = '2';
+			dst++;
+			*dst = 'F';
+			dst++;
+			break;
+		default:
+			*dst = *p;
+			dst++;
+		}
+	}
+	*dst = '\0';
+
+	return (0);
 }

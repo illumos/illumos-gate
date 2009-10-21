@@ -20,7 +20,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* ONC_PLUS EXTRACT END */
@@ -70,7 +70,7 @@
 #include <sys/hwconf.h>
 #include <sys/dc_ki.h>
 #include <sys/promif.h>
-
+#include <sys/bootprops.h>
 
 /*
  * Local routines
@@ -83,7 +83,7 @@ static int load_boot_driver(char *drv);
 static int load_boot_platform_modules(char *drv);
 static dev_info_t *path_to_devinfo(char *path);
 static boolean_t netboot_over_ib(char *bootpath);
-
+static boolean_t netboot_over_iscsi(void);
 
 /*
  * Module linkage information for the kernel.
@@ -114,16 +114,17 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
+extern ib_boot_prop_t *iscsiboot_prop;
 /*
  * Configure root file system.
  */
 int
 rootconf(void)
 {
-	int error;
-	struct vfssw *vsw;
+	int		error;
+	struct vfssw	*vsw;
 	extern void pm_init(void);
-
+	int ret = -1;
 	BMDPRINTF(("rootconf: fstype %s\n", rootfs.bo_fstype));
 	BMDPRINTF(("rootconf: name %s\n", rootfs.bo_name));
 	BMDPRINTF(("rootconf: flags 0x%x\n", rootfs.bo_flags));
@@ -186,10 +187,34 @@ rootconf(void)
 	 */
 	pm_init();
 
-	if (netboot) {
-		if ((error = strplumb()) != 0) {
-			cmn_err(CE_CONT, "Cannot plumb network device\n");
-			return (error);
+	if (netboot && iscsiboot_prop) {
+		cmn_err(CE_WARN, "NFS boot and iSCSI boot"
+		    " shouldn't happen in the same time");
+		return (EINVAL);
+	}
+
+	if (netboot || iscsiboot_prop) {
+		ret = strplumb();
+		if (ret != 0) {
+			cmn_err(CE_WARN, "Cannot plumb network device %d", ret);
+			return (EFAULT);
+		}
+	}
+
+	if ((ret == 0) && iscsiboot_prop) {
+		ret = modload("drv", "iscsi");
+		/* -1 indicates fail */
+		if (ret == -1) {
+			cmn_err(CE_WARN, "Failed to load iscsi module");
+			iscsi_boot_prop_free();
+			return (EINVAL);
+		} else {
+			if (!i_ddi_attach_pseudo_node("iscsi")) {
+				cmn_err(CE_WARN,
+				    "Failed to attach iscsi driver");
+				iscsi_boot_prop_free();
+				return (ENODEV);
+			}
 		}
 	}
 
@@ -263,7 +288,13 @@ getrootdev(void)
 {
 	dev_t	d;
 
-	if ((d = ddi_pathname_to_dev_t(rootfs.bo_name)) == NODEV)
+	d = ddi_pathname_to_dev_t(rootfs.bo_name);
+	if ((d == NODEV) && (iscsiboot_prop != NULL)) {
+		/* Give it another try with the 'disk' path */
+		get_iscsi_bootpath_phy(rootfs.bo_name);
+		d = ddi_pathname_to_dev_t(rootfs.bo_name);
+	}
+	if (d == NODEV)
 		cmn_err(CE_CONT, "Cannot assemble drivers for root %s\n",
 		    rootfs.bo_name);
 	return (d);
@@ -378,7 +409,6 @@ loadrootmodules(void)
 
 loop:
 	(void) getphysdev("root", rootfs.bo_name, BO_MAXOBJNAME);
-
 	/*
 	 * Given a physical pathname, load the correct set of driver
 	 * modules into memory, including all possible parents.
@@ -508,7 +538,40 @@ loop:
 			goto out;
 		}
 	}
-
+	if (netboot_over_iscsi() == B_TRUE) {
+		/* iscsi boot */
+		if ((err = modloadonly("dacf", "net_dacf")) < 0) {
+			cmn_err(CE_CONT, "Cannot load dacf/net_dacf\n");
+			goto out;
+		}
+		if ((err = modload("misc", "tlimod")) < 0) {
+			cmn_err(CE_CONT, "Cannot load misc/tlimod\n");
+			goto out;
+		}
+		if ((err = modload("mac", "mac_ether")) < 0) {
+			cmn_err(CE_CONT, "Cannot load mac/mac_ether\n");
+			goto out;
+		}
+		if ((err = modloadonly("drv", "iscsi")) < 0) {
+			cmn_err(CE_CONT, "Cannot load drv/iscsi\n");
+			goto out;
+		}
+		if ((err = modloadonly("drv", "ssd")) < 0) {
+			cmn_err(CE_CONT, "Cannot load drv/ssd\n");
+			goto out;
+		}
+		if ((err = modloadonly("drv", "sd")) < 0) {
+			cmn_err(CE_CONT, "Cannot load drv/sd\n");
+			goto out;
+		}
+		if ((err = modload("misc", "strplumb")) < 0) {
+			cmn_err(CE_CONT, "Cannot load misc/strplumb\n");
+			goto out;
+		}
+		if ((err = strplumb_load()) < 0) {
+			goto out;
+		}
+	}
 	/*
 	 * Preload modules needed for booting as a cluster.
 	 */
@@ -539,6 +602,11 @@ get_bootpath_prop(char *bootpath)
 			if (BOP_GETPROP(bootops,
 			    "boot-path", bootpath) == -1)
 				return (-1);
+		}
+		if (memcmp(bootpath, BP_ISCSI_DISK,
+		    strlen(BP_ISCSI_DISK)) == 0) {
+			/* iscsi boot */
+			get_iscsi_bootpath_vhci(bootpath);
 		}
 	}
 	return (0);
@@ -837,15 +905,43 @@ load_bootpath_drivers(char *bootpath)
 	int		pathcopy_len;
 	int		rval;
 	char		*p;
+	int		proplen;
+	char		iscsi_network_path[BO_MAXOBJNAME];
 
 	if (bootpath == NULL || *bootpath == 0)
 		return (-1);
 
 	BMDPRINTF(("load_bootpath_drivers: %s\n", bootpath));
-
-	pathcopy = i_ddi_strdup(bootpath, KM_SLEEP);
-	pathcopy_len = strlen(pathcopy) + 1;
-
+#ifdef _OBP
+	if (netboot_over_iscsi()) {
+		/* iscsi boot */
+		if (root_is_ramdisk) {
+			modloadonly("drv", "ramdisk");
+		}
+		proplen = BOP_GETPROPLEN(bootops, BP_ISCSI_NETWORK_BOOTPATH);
+		if (proplen > 0) {
+			if (BOP_GETPROP(bootops, BP_ISCSI_NETWORK_BOOTPATH,
+			    iscsi_network_path) > 0) {
+				p = strchr(iscsi_network_path, ':');
+				if (p != NULL) {
+					*p = '\0';
+				}
+				pathcopy = i_ddi_strdup(iscsi_network_path,
+				    KM_SLEEP);
+				pathcopy_len = strlen(pathcopy) + 1;
+			} else {
+				return (-1);
+			}
+		} else {
+			return (-1);
+		}
+	} else {
+#endif
+		pathcopy = i_ddi_strdup(bootpath, KM_SLEEP);
+		pathcopy_len = strlen(pathcopy) + 1;
+#ifdef _OBP
+	}
+#endif
 	dip = path_to_devinfo(pathcopy);
 
 #if defined(__i386) || defined(__amd64)
@@ -1079,6 +1175,9 @@ netboot_over_ib(char *bootpath)
 	char		devicetype[OBP_MAXDRVNAME];
 
 	/* Is this IB node ? */
+	if (node == OBP_BADNODE || node == OBP_NONODE) {
+		return (B_FALSE);
+	}
 	len = prom_getproplen(node, OBP_DEVICETYPE);
 	if (len <= 1 || len >= OBP_MAXDRVNAME)
 		return (B_FALSE);
@@ -1093,6 +1192,25 @@ netboot_over_ib(char *bootpath)
 				    ",protocol=ip")) != NULL) {
 					ret = B_TRUE;
 				}
+		}
+	}
+	return (ret);
+}
+
+static boolean_t
+netboot_over_iscsi(void)
+{
+	int proplen;
+	boolean_t	ret = B_FALSE;
+	char	bootpath[OBP_MAXPATHLEN];
+
+	proplen = BOP_GETPROPLEN(bootops, BP_BOOTPATH);
+	if (proplen > 0) {
+		if (BOP_GETPROP(bootops, BP_BOOTPATH, bootpath) > 0) {
+			if (memcmp(bootpath, BP_ISCSI_DISK,
+			    strlen(BP_ISCSI_DISK)) == 0) {
+				ret = B_TRUE;
+			}
 		}
 	}
 	return (ret);

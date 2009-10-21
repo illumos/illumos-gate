@@ -4491,7 +4491,6 @@ extern int hvmboot_rootconf();
 #endif /* __x86 */
 
 extern ib_boot_prop_t *iscsiboot_prop;
-extern void iscsi_boot_prop_free();
 
 int
 rootconf()
@@ -4544,8 +4543,13 @@ rootconf()
 		return (EINVAL);
 	}
 
-	if (netboot || iscsiboot_prop)
+	if (netboot || iscsiboot_prop) {
 		ret = strplumb();
+		if (ret != 0) {
+			cmn_err(CE_WARN, "Cannot plumb network device %d", ret);
+			return (EFAULT);
+		}
+	}
 
 	if ((ret == 0) && iscsiboot_prop) {
 		ret = modload("drv", "iscsi");

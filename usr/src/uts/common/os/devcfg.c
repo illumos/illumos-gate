@@ -55,6 +55,8 @@
 #include <sys/fs/sdev_impl.h>
 #include <sys/sunldi.h>
 #include <sys/sunldi_impl.h>
+#include <sys/bootprops.h>
+
 
 #if defined(__i386) || defined(__amd64)
 #if !defined(__xpv)
@@ -3607,6 +3609,38 @@ ddi_find_devinfo(char *nodename, int instance, int attached)
 	return (info.dip);
 }
 
+extern ib_boot_prop_t *iscsiboot_prop;
+static void
+i_ddi_parse_iscsi_name(char *name, char **nodename, char **addrname,
+    char **minorname)
+{
+	char *cp, *colon;
+	static char nulladdrname[] = "";
+
+	/* default values */
+	if (nodename)
+		*nodename = name;
+	if (addrname)
+		*addrname = nulladdrname;
+	if (minorname)
+		*minorname = NULL;
+
+	cp = colon = name;
+	while (*cp != '\0') {
+		if (addrname && *cp == '@') {
+			*addrname = cp + 1;
+			*cp = '\0';
+		} else if (minorname && *cp == ':') {
+			*minorname = cp + 1;
+			colon = cp;
+		}
+		++cp;
+	}
+	if (colon != name) {
+		*colon = '\0';
+	}
+}
+
 /*
  * Parse for name, addr, and minor names. Some args may be NULL.
  */
@@ -3779,8 +3813,13 @@ resolve_pathname(char *pathname,
 
 		/* Get component and chop off minorname */
 		(void) pn_getcomponent(&pn, component);
-		i_ddi_parse_name(component, NULL, NULL, &minorname);
-
+		if ((iscsiboot_prop != NULL) &&
+		    (strcmp((DEVI(parent)->devi_node_name), "iscsi") == 0)) {
+			i_ddi_parse_iscsi_name(component, NULL, NULL,
+			    &minorname);
+		} else {
+			i_ddi_parse_name(component, NULL, NULL, &minorname);
+		}
 		if (prev_minor == NULL) {
 			(void) snprintf(config_name, MAXNAMELEN, "%s",
 			    component);
