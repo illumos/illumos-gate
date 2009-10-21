@@ -151,6 +151,7 @@ SUNWprivate_1.1 {
 	zfs_userquota_prop_prefixes;
 	zpool_add;
 	zpool_clear;
+	zpool_clear_label;
 	zpool_close;
 	zpool_create;
 	zpool_destroy;

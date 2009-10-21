@@ -581,9 +581,10 @@ extern int zpool_in_use(libzfs_handle_t *, int, pool_state_t *, char **,
     boolean_t *);
 
 /*
- * ftyp special.  Read the label from a given device.
+ * Label manipulation.
  */
 extern int zpool_read_label(int, nvlist_t **);
+extern int zpool_clear_label(int);
 
 /* is this zvol valid for use as a dump device? */
 extern int zvol_check_dump_config(char *);

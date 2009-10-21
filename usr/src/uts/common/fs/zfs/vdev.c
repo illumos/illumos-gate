@@ -1132,6 +1132,19 @@ vdev_open(vdev_t *vd)
 
 	vd->vdev_removed = B_FALSE;
 
+	/*
+	 * Recheck the faulted flag now that we have confirmed that
+	 * the vdev is accessible.  If we're faulted, bail.
+	 */
+	if (vd->vdev_faulted) {
+		ASSERT(vd->vdev_children == 0);
+		ASSERT(vd->vdev_label_aux == VDEV_AUX_ERR_EXCEEDED ||
+		    vd->vdev_label_aux == VDEV_AUX_EXTERNAL);
+		vdev_set_state(vd, B_TRUE, VDEV_STATE_FAULTED,
+		    vd->vdev_label_aux);
+		return (ENXIO);
+	}
+
 	if (vd->vdev_degraded) {
 		ASSERT(vd->vdev_children == 0);
 		vdev_set_state(vd, B_TRUE, VDEV_STATE_DEGRADED,
@@ -2231,11 +2244,20 @@ vdev_clear(spa_t *spa, vdev_t *vd)
 	if (vd->vdev_faulted || vd->vdev_degraded ||
 	    !vdev_readable(vd) || !vdev_writeable(vd)) {
 
+		/*
+		 * When reopening in reponse to a clear event, it may be due to
+		 * a fmadm repair request.  In this case, if the device is
+		 * still broken, we want to still post the ereport again.
+		 */
+		vd->vdev_forcefault = B_TRUE;
+
 		vd->vdev_faulted = vd->vdev_degraded = 0;
 		vd->vdev_cant_read = B_FALSE;
 		vd->vdev_cant_write = B_FALSE;
 
 		vdev_reopen(vd);
+
+		vd->vdev_forcefault = B_FALSE;
 
 		if (vd != rvd)
 			vdev_state_dirty(vd->vdev_top);
@@ -2245,6 +2267,16 @@ vdev_clear(spa_t *spa, vdev_t *vd)
 
 		spa_event_notify(spa, vd, ESC_ZFS_VDEV_CLEAR);
 	}
+
+	/*
+	 * When clearing a FMA-diagnosed fault, we always want to
+	 * unspare the device, as we assume that the original spare was
+	 * done in response to the FMA fault.
+	 */
+	if (!vdev_is_dead(vd) && vd->vdev_parent != NULL &&
+	    vd->vdev_parent->vdev_ops == &vdev_spare_ops &&
+	    vd->vdev_parent->vdev_child[0] == vd)
+		vd->vdev_unspare = B_TRUE;
 }
 
 boolean_t
