@@ -479,13 +479,9 @@ extern srpt_ctxt_t *srpt_ctxt;
 /*
  * srpt_errlevel can be set in the debugger to enable additional logging.
  * You can also add set srpt:srpt_errlevel={0,1,2,3,4} in /etc/system.
- * The default log level is L2 for debug builds, otherwise L1.
+ * The default log level is L1.
  */
-#ifdef	DEBUG
-#define	SRPT_LOG_DEFAULT_LEVEL SRPT_LOG_L2
-#else
 #define	SRPT_LOG_DEFAULT_LEVEL SRPT_LOG_L1
-#endif
 
 extern uint_t srpt_errlevel;
 
