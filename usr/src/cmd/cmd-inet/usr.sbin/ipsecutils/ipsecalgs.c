@@ -19,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ipsec_util.h>
 #include <netdb.h>
@@ -56,17 +53,20 @@ static const char *comma = ",";
 static int adddel_flags, increment = 0, default_keylen;
 static boolean_t synch_kernel;
 static cmd_t cmd = CMD_NONE;
-static int proto_number = -1, alg_number = -1;
+static int proto_number = -1, alg_number = -1, alg_flags = 0;
 static char *proto_name, *alg_names_string, *block_sizes_string;
 static char *key_sizes_string, *mech_name, *exec_mode_string;
+static char *flag_string;
 static ipsecalgs_exec_mode_t proto_exec_mode = LIBIPSEC_ALGS_EXEC_SYNC;
+enum param_values {iv_len, mac_len, salt_bytes, max_param};
+static int mech_params[max_param];
 
 /*
  * Used by the algorithm walker callback to populate a SPD_UPDATEALGS
  * request.
  */
 
-#define	SYNC_REQ_SIZE	2048
+#define	SYNC_REQ_SIZE	4096
 
 static uint64_t sync_req_buf[SYNC_REQ_SIZE];
 static struct spd_attribute *sync_req_attr;
@@ -84,24 +84,60 @@ static uint_t sync_req_alg_count, sync_req_proto_count;
 static void dump_alg(struct ipsecalgent *);
 static void algs_walker(void (*)(struct ipsecalgent *), void (*)(uint_t));
 
+static int
+parse_flag(char *flag_str, uint_t flag)
+{
+	static struct flagtable {
+		char *label;
+		int token;
+	} table[] = {
+		{"VALID", 	ALG_FLAG_VALID},
+		{"COUNTER",	ALG_FLAG_COUNTERMODE},
+		{"COMBINED",	ALG_FLAG_COMBINED},
+		{"CCM",		ALG_FLAG_CCM},
+		{"GCM",		ALG_FLAG_GCM},
+		{NULL,		0}
+	};
+	struct flagtable *ft = table;
+
+	if (flag_str == NULL) {
+		/* Print out flag labels for each flag set. */
+		if ((ALG_FLAG_KERNELCHECKED & flag) && !(ALG_FLAG_VALID & flag))
+			(void) printf("INVALID ");
+		while (ft->token != 0) {
+			if (ft->token & flag) {
+				(void) printf("%s ", ft->label);
+			}
+			ft++;
+		}
+		return (0);
+	}
+	/* Or, lookup flag for supplied label. */
+	while (ft->label != NULL && strcmp(ft->label, flag_str) != 0)
+		ft++;
+	return (ft->token);
+}
+
 static void
 usage(void)
 {
 	errx(EXIT_FAILURE, gettext("Usage:\tipsecalgs\n"
-		"\tipsecalgs -l\n"
-		"\tipsecalgs -s\n"
-		"\tipsecalgs -a [-P protocol-number | -p protocol-name]\n"
-		"\t\t-k keylen-list [-i inc]\n"
-		"\t\t[-K default-keylen] -b blocklen-list\n"
-		"\t\t-n alg-names -N alg-number -m mech-name [-f] [-s]\n"
-		"\tipsecalgs -P protocol-number -p protocol-name\n"
-		"\t\t[-e exec-mode] [-f] [-s]\n"
-		"\tipsecalgs -r -p protocol-name -n alg-name [-s]\n"
-		"\tipsecalgs -r -p protocol-name -N alg-number [-s]\n"
-		"\tipsecalgs -R -P protocol-number [-s]\n"
-		"\tipsecalgs -R -p protocol-name [-s]\n"
-		"\tipsecalgs -e exec-mode -P protocol-number [-s]\n"
-		"\tipsecalgs -e exec-mode -p protocol-number [-s]"));
+	    "\tipsecalgs -l\n"
+	    "\tipsecalgs -s\n"
+	    "\tipsecalgs -a [-P protocol-number | -p protocol-name]\n"
+	    "\t\t-k keylen-list [-i inc]\n"
+	    "\t\t[-K default-keylen] -b blocklen-list\n"
+	    "\t\t-n alg-names -N alg-number -m mech-name\n"
+	    "\t\t[-M MAC length] [-S salt length] [-I IV length]\n"
+	    "\t\t[-F COMBINED,COUNTER,CCM|GCM ] [-f] [-s]\n"
+	    "\tipsecalgs -P protocol-number -p protocol-name\n"
+	    "\t\t[-e exec-mode] [-f] [-s]\n"
+	    "\tipsecalgs -r -p protocol-name -n alg-name [-s]\n"
+	    "\tipsecalgs -r -p protocol-name -N alg-number [-s]\n"
+	    "\tipsecalgs -R -P protocol-number [-s]\n"
+	    "\tipsecalgs -R -p protocol-name [-s]\n"
+	    "\tipsecalgs -e exec-mode -P protocol-number [-s]\n"
+	    "\tipsecalgs -e exec-mode -p protocol-number [-s]"));
 }
 
 static void
@@ -132,6 +168,7 @@ static void
 synch_emit_alg(struct ipsecalgent *alg)
 {
 	uint_t nkey_sizes, nblock_sizes, i;
+	uint_t nparams;
 
 	EMIT(sync_req_attr, SPD_ATTR_ALG_ID, alg->a_alg_num);
 	EMIT(sync_req_attr, SPD_ATTR_ALG_PROTO, alg->a_proto_num);
@@ -143,11 +180,18 @@ synch_emit_alg(struct ipsecalgent *alg)
 		EMIT(sync_req_attr, SPD_ATTR_ALG_KEYSIZE, alg->a_key_sizes[i]);
 
 	nblock_sizes = num_sizes(alg->a_block_sizes);
+	nparams = num_sizes(alg->a_mech_params);
 	EMIT(sync_req_attr, SPD_ATTR_ALG_NBLOCKSIZES, nblock_sizes);
 	for (i = 0; i < nblock_sizes; i++) {
 		EMIT(sync_req_attr, SPD_ATTR_ALG_BLOCKSIZE,
 		    alg->a_block_sizes[i]);
 	}
+	EMIT(sync_req_attr, SPD_ATTR_ALG_NPARAMS, nparams);
+	for (i = 0; i < nparams; i++) {
+		EMIT(sync_req_attr, SPD_ATTR_ALG_PARAMS,
+		    alg->a_mech_params[i]);
+	}
+	EMIT(sync_req_attr, SPD_ATTR_ALG_FLAGS, alg->a_alg_flags);
 
 	EMIT(sync_req_attr, SPD_ATTR_ALG_MECHNAME, CRYPTO_MAX_MECH_NAME);
 	(void) strncpy((char *)sync_req_attr, alg->a_mech_name,
@@ -295,7 +339,7 @@ list_kernel_algs(void)
 	uint64_t *start, *end;
 	struct ipsecalgent alg;
 	uint_t cur_key, cur_block;
-	uint_t nkey_sizes, nblock_sizes;
+	uint_t nkey_sizes, nblock_sizes, nparams;
 	char diag_buf[SPDSOCK_DIAG_BUF_LEN];
 
 	if (sfd < 0) {
@@ -379,10 +423,12 @@ list_kernel_algs(void)
 			 * could cause the current algorithm to be only
 			 * partially initialized.
 			 */
+			alg.a_alg_flags |= ALG_FLAG_KERNELCHECKED;
 			dump_alg(&alg);
 			free(alg.a_key_sizes);
 			free(alg.a_block_sizes);
 			free(alg.a_mech_name);
+			free(alg.a_mech_params);
 			bzero(&alg, sizeof (alg));
 			nkey_sizes = nblock_sizes = 0;
 			break;
@@ -438,6 +484,31 @@ list_kernel_algs(void)
 				    "sizes in dump algs reply"));
 			}
 			alg.a_block_sizes[cur_block++] = attr->spd_attr_value;
+			break;
+
+		case SPD_ATTR_ALG_NPARAMS:
+			nparams = attr->spd_attr_value;
+			if (alg.a_mech_params != NULL) {
+				errx(EXIT_FAILURE, gettext("duplicate number "
+				    "of params in dump algs reply"));
+			}
+			alg.a_mech_params = calloc(nparams + 1,
+			    sizeof (int));
+			if (alg.a_mech_params == NULL)
+				bail_nomem();
+			cur_block = 0;
+			break;
+
+		case SPD_ATTR_ALG_PARAMS:
+			if (cur_block >= nparams) {
+				errx(EXIT_FAILURE, gettext("too many params "
+				    "in dump algs reply"));
+			}
+			alg.a_mech_params[cur_block++] = attr->spd_attr_value;
+			break;
+
+		case SPD_ATTR_ALG_FLAGS:
+			alg.a_alg_flags = attr->spd_attr_value;
 			break;
 
 		case SPD_ATTR_ALG_MECHNAME: {
@@ -526,15 +597,32 @@ new_alg(void)
 		warnx(gettext("Missing mechanism name."));
 		usage();
 	}
-
 	newbie.a_proto_num = proto_number;
 	newbie.a_alg_num = alg_number;
 	newbie.a_key_increment = increment;
 	newbie.a_mech_name = mech_name;
+	newbie.a_alg_flags = alg_flags;
 
+	/*
+	 * The ALG_FLAG_VALID is somewhat irrelevant as an input from the
+	 * user, the kernel will decide if the algorithm description is
+	 * valid or not and set the ALG_FLAG_VALID when the user dumps
+	 * the kernel tables. To avoid confusion when the user dumps the
+	 * contents off the ipsecalgs file, we set the ALG_FLAG_VALID here.
+	 */
+	newbie.a_alg_flags |= ALG_FLAG_VALID;
+	while ((holder = strtok((holder == NULL) ? flag_string : NULL,
+	    comma)) != NULL) {
+		alg_flags = parse_flag(holder, 0);
+		if (!alg_flags) {
+			warnx(gettext("Invalid flag: %s\n"), holder);
+			usage();
+		}
+		newbie.a_alg_flags |= alg_flags;
+	}
 	newbie.a_names = NULL;
 	while ((holder = strtok((holder == NULL) ? alg_names_string : NULL,
-		    comma)) != NULL) {
+	    comma)) != NULL) {
 		newbie.a_names = realloc(newbie.a_names,
 		    sizeof (char *) * ((++num_names) + 1));
 		if (newbie.a_names == NULL)
@@ -546,6 +634,7 @@ new_alg(void)
 	/* Extract block sizes. */
 	newbie.a_block_sizes = parse_intlist(block_sizes_string,
 	    &num_block_sizes);
+	newbie.a_mech_params = &mech_params[0];
 
 	/* Extract key sizes. */
 	if ((holder = strchr(key_sizes_string, '-')) != NULL) {
@@ -611,7 +700,7 @@ new_alg(void)
 		} else {
 			/* min key size in range if not specified */
 			newbie.a_key_sizes[LIBIPSEC_ALGS_KEY_DEF_IDX] =
-				newbie.a_key_sizes[LIBIPSEC_ALGS_KEY_MIN_IDX];
+			    newbie.a_key_sizes[LIBIPSEC_ALGS_KEY_MIN_IDX];
 		}
 	} else {
 		/* key sizes by enumeration */
@@ -692,8 +781,8 @@ remove_alg(void)
 		}
 		if (strchr(alg_names_string, ',') != NULL) {
 			errx(EXIT_FAILURE, gettext(
-				"Specify a single algorithm name for removal, "
-				"not a list."));
+			    "Specify a single algorithm name for removal, "
+			    "not a list."));
 		}
 		if ((rc = delipsecalgbyname(alg_names_string, proto_number))
 		    != 0) {
@@ -812,6 +901,17 @@ dump_alg(struct ipsecalgent *alg)
 		(void) list_ints(stdout, alg->a_key_sizes);
 	(void) putchar('\n');
 
+	/* Alg parameters */
+	(void) printf(gettext("\tAlgorithm parameters: "));
+	ifloater = alg->a_mech_params;
+	(void) list_ints(stdout, ifloater);
+	(void) putchar('\n');
+
+	/* Alg flags */
+	(void) printf(gettext("\tAlgorithm flags: "));
+	(void) parse_flag(NULL, alg->a_alg_flags);
+
+	(void) putchar('\n');
 	(void) putchar('\n');
 }
 
@@ -945,7 +1045,7 @@ main(int argc, char *argv[])
 	}
 
 	while ((c = getopt(argc, argv,
-		    "aflrRsb:p:P:i:k:K:m:n:N:e:")) != EOF) {
+	    "aflrRsb:p:P:i:k:K:m:n:N:e:S:M:I:F:")) != EOF) {
 		switch (c) {
 		case 'a':
 			try_cmd(CMD_ADD);
@@ -1027,6 +1127,40 @@ main(int argc, char *argv[])
 			alg_number = try_int(optarg,
 			    gettext("algorithm number"));
 			break;
+		case 'I':
+			if (mech_params[iv_len] != 0)
+				usage();
+			mech_params[iv_len] = try_int(optarg,
+			    gettext("Initialization Vector length"));
+			break;
+		case 'M':
+			if (mech_params[mac_len] != 0)
+				usage();
+			mech_params[mac_len] = try_int(optarg,
+			    gettext("Integrity Check Vector length"));
+			break;
+		case 'S':
+			if (mech_params[salt_bytes] != 0)
+				usage();
+			mech_params[salt_bytes] = try_int(optarg,
+			    gettext("Salt length"));
+			break;
+		case 'F':
+			/*
+			 * Multiple flags can be specified, the results
+			 * are OR'd together.  Flags can be specified as
+			 * number or  a comma separated string
+			 */
+			flags = atoi(optarg);
+			if (flags) {
+				alg_flags |= flags;
+				flag_string = NULL;
+			} else {
+				flag_string = optarg;
+			}
+			break;
+		default:
+			usage();
 		}
 	}
 

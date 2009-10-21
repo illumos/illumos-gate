@@ -159,7 +159,7 @@ extern void bail_msg(char *, ...);
 extern int dump_sockaddr(struct sockaddr *, uint8_t, boolean_t, FILE *,
     boolean_t);
 
-extern int dump_key(uint8_t *, uint_t, FILE *);
+extern int dump_key(uint8_t *, uint_t, uint_t, FILE *, boolean_t);
 
 extern int dump_aalg(uint8_t, FILE *);
 

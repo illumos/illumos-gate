@@ -1,7 +1,6 @@
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -26,6 +25,8 @@
 # DO NOT EDIT OR PARSE THIS FILE!
 #
 # Use the ipsecalgs(1m) command to change the contents of this file.
+# The algorithm descriptions contained in this file are synchronised to the
+# kernel with ipsecalgs -s, the kernel validates the entries at this point.
 
 # PROTO|protocol-id|protocol-name|exec-mode
 ##  NOTE:  Some protocol numbers are well-known and defined in <netdb.h>
@@ -34,7 +35,10 @@ PROTO|2|PROTO_IPSEC_AH|sync
 PROTO|3|PROTO_IPSEC_ESP|sync
 
 # ALG|protocol-id|alg-id|name,name,...|ef-id| \
-#	{default/}{key,key..}or{key-key,inc}|block_size or MAC-size
+#	{default/}{key,key..}or{key-key,inc}|block_size or MAC-size|\
+#	[parameter,parameter..]|[flags]
+#
+## Note:   Parameters and flags only apply to certain algorithms.
 
 ALG|2|0|none,any|-|0|0
 ALG|2|2|hmac-md5,md5|CKM_MD5_HMAC_GENERAL|128|12
@@ -45,6 +49,12 @@ ALG|2|7|hmac-sha512,sha512,sha-512,hmac-sha-512|CKM_SHA512_HMAC_GENERAL|512|32
 ALG|3|0|any|-|0|0
 ALG|3|2|des-cbc,des|CKM_DES_CBC|64|8
 ALG|3|3|3des-cbc,3des|CKM_DES3_CBC|192|8
-ALG|3|7|blowfish-cbc,blowfish|CKM_BLOWFISH_CBC|128/32-448,8|8
+ALG|3|7|blowfish-cbc,blowfish|CKM_BLOWFISH_CBC|128|8
 ALG|3|11|null|-|0|0
 ALG|3|12|aes-cbc,aes|CKM_AES_CBC|128/128-256,64|16
+ALG|3|14|aes-ccm8|CKM_AES_CCM|128/128-256,64|16|8,8,3|15
+ALG|3|15|aes-ccm12|CKM_AES_CCM|128/128-256,64|16|8,12,3|15
+ALG|3|16|aes-ccm,aes-ccm16|CKM_AES_CCM|128/128-256,64|16|8,16,3|15
+ALG|3|18|aes-gcm8|CKM_AES_GCM|128/128-256,64|16|8,8,4|23
+ALG|3|19|aes-gcm12|CKM_AES_GCM|128/128-256,64|16|8,12,4|23
+ALG|3|20|aes-gcm,aes-gcm16|CKM_AES_GCM|128/128-256,64|16|8,16,4|23

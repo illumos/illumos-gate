@@ -45,6 +45,7 @@
 #include <net/if.h>
 #include <netinet/ip6.h>
 #include <net/pfkeyv2.h>
+#include <net/pfpolicy.h>
 
 #include <inet/common.h>
 #include <inet/mi.h>
@@ -1364,6 +1365,7 @@ esp_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs)
 		    MAX(prot->ipp_espe_minbits, ealg->alg_ef_minbits);
 		comb->sadb_comb_encrypt_maxbits =
 		    MIN(prot->ipp_espe_maxbits, ealg->alg_ef_maxbits);
+
 		if (aalg == NULL) {
 			comb->sadb_comb_auth = 0;
 			comb->sadb_comb_auth_minbits = 0;
@@ -1798,8 +1800,14 @@ esp_in_done(mblk_t *ipsec_in_mp)
 	data_mp = ipsec_in_mp->b_cont;
 	esph = (esph_t *)(data_mp->b_rptr + espstart);
 
-	if (assoc->ipsa_auth_alg != IPSA_AALG_NONE) {
-		/* authentication passed if we reach this point */
+	if (assoc->ipsa_auth_alg != IPSA_AALG_NONE ||
+	    (assoc->ipsa_flags & IPSA_F_COMBINED)) {
+		/*
+		 * Authentication passed if we reach this point.
+		 * Packets with authentication will have the ICV
+		 * after the crypto data. Adjust b_wptr before
+		 * making padlen checks.
+		 */
 		ESP_BUMP_STAT(espstack, good_auth);
 		data_mp->b_wptr -= assoc->ipsa_mac_len;
 
@@ -2117,6 +2125,7 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 	uint_t auth_offset, msg_len, auth_len;
 	crypto_call_req_t call_req;
 	mblk_t *esp_mp;
+	esph_t *esph_ptr;
 	int kef_rc = CRYPTO_FAILED;
 	uint_t icv_len = assoc->ipsa_mac_len;
 	crypto_ctx_template_t auth_ctx_tmpl;
@@ -2127,13 +2136,14 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 	netstack_t	*ns = ii->ipsec_in_ns;
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	uchar_t *iv_ptr;
 
 	ASSERT(ii->ipsec_in_type == IPSEC_IN);
 
 	/*
-	 * In case kEF queues and calls back, make sure we have the
-	 * netstackid_t for verification that the IP instance is still around
-	 * in esp_kcf_callback().
+	 * In case kEF queues and calls back, keep netstackid_t for
+	 * verification that the IP instance is still around in
+	 * esp_kcf_callback().
 	 */
 	ASSERT(ii->ipsec_in_stackid == ns->netstack_stackid);
 
@@ -2145,9 +2155,27 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 	 * IPSEC_IN -> [IP,options,ESP,IV,data,ICV,pad]
 	 */
 	esp_mp = ipsec_mp->b_cont;
+	esph_ptr = (esph_t *)(esp_mp->b_rptr + esph_offset);
+	iv_ptr = (uchar_t *)(esph_ptr + 1);
+	/* Packet length starting at IP header ending after ESP ICV. */
 	msg_len = MBLKL(esp_mp);
 
+	encr_offset = esph_offset + sizeof (esph_t) + iv_len;
+	encr_len = msg_len - encr_offset;
+
 	ESP_INIT_CALLREQ(&call_req);
+
+	/*
+	 * Counter mode algs need a nonce. This is setup in sadb_common_add().
+	 * If for some reason we are using a SA which does not have a nonce
+	 * then we must fail here.
+	 */
+	if ((assoc->ipsa_flags & IPSA_F_COUNTERMODE) &&
+	    (assoc->ipsa_nonce == NULL)) {
+		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
+		    DROPPER(ipss, ipds_esp_nomem), &espstack->esp_dropper);
+		return (IPSEC_STATUS_FAILED);
+	}
 
 	if (do_auth) {
 		/* force asynchronous processing? */
@@ -2190,9 +2218,9 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 		IPSEC_CTX_TMPL(assoc, ipsa_encrtmpl, IPSEC_ALG_ENCR,
 		    encr_ctx_tmpl);
 
-		/* skip IV, since it is passed separately */
-		encr_offset = esph_offset + sizeof (esph_t) + iv_len;
-		encr_len = msg_len - encr_offset;
+		/* Call the nonce update function. Also passes in IV */
+		(assoc->ipsa_noncefunc)(assoc, (uchar_t *)esph_ptr, encr_len,
+		    iv_ptr, &ii->ipsec_in_cmm, &ii->ipsec_in_crypto_data);
 
 		if (!do_auth) {
 			/* decryption only */
@@ -2200,14 +2228,9 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 			ESP_INIT_CRYPTO_DATA(&ii->ipsec_in_crypto_data,
 			    esp_mp, encr_offset, encr_len);
 
-			/* specify IV */
-			ii->ipsec_in_crypto_data.cd_miscdata =
-			    (char *)esp_mp->b_rptr + sizeof (esph_t) +
-			    esph_offset;
-
 			/* call the crypto framework */
-			kef_rc = crypto_decrypt(&assoc->ipsa_emech,
-			    &ii->ipsec_in_crypto_data,
+			kef_rc = crypto_decrypt((crypto_mechanism_t *)
+			    &ii->ipsec_in_cmm, &ii->ipsec_in_crypto_data,
 			    &assoc->ipsa_kcfencrkey, encr_ctx_tmpl,
 			    NULL, &call_req);
 		}
@@ -2221,8 +2244,7 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 		    encr_offset, encr_len - icv_len);
 
 		/* specify IV */
-		ii->ipsec_in_crypto_dual_data.dd_miscdata =
-		    (char *)esp_mp->b_rptr + sizeof (esph_t) + esph_offset;
+		ii->ipsec_in_crypto_dual_data.dd_miscdata = (char *)iv_ptr;
 
 		/* call the framework */
 		kef_rc = crypto_mac_verify_decrypt(&assoc->ipsa_amech,
@@ -2396,7 +2418,8 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 	ipsec_out_t *io = (ipsec_out_t *)ipsec_mp->b_rptr;
 	uint_t auth_len;
 	crypto_call_req_t call_req;
-	mblk_t *esp_mp;
+	mblk_t *esp_mp, *data_mp, *ip_mp;
+	esph_t *esph_ptr;
 	int kef_rc = CRYPTO_FAILED;
 	uint_t icv_len = assoc->ipsa_mac_len;
 	crypto_ctx_template_t auth_ctx_tmpl;
@@ -2409,6 +2432,8 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 	netstack_t	*ns = io->ipsec_out_ns;
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	uchar_t *iv_ptr;
+	crypto_data_t *cd_ptr = NULL;
 
 	esp3dbg(espstack, ("esp_submit_req_outbound:%s",
 	    is_natt ? "natt" : "not natt"));
@@ -2432,8 +2457,24 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 	 * IPSEC_OUT -> [IP,options] -> [udp][ESP,IV] -> [data] -> [pad,ICV]
 	 * Get a pointer to the mblk containing the ESP header.
 	 */
-	ASSERT(ipsec_mp->b_cont != NULL && ipsec_mp->b_cont->b_cont != NULL);
+	ip_mp = ipsec_mp->b_cont;
 	esp_mp = ipsec_mp->b_cont->b_cont;
+	ASSERT(ip_mp != NULL && esp_mp != NULL);
+	esph_ptr = (esph_t *)(esp_mp->b_rptr + esph_offset);
+	iv_ptr = (uchar_t *)(esph_ptr + 1);
+	data_mp = ipsec_mp->b_cont->b_cont->b_cont;
+
+	/*
+	 * Combined mode algs need a nonce. This is setup in sadb_common_add().
+	 * If for some reason we are using a SA which does not have a nonce
+	 * then we must fail here.
+	 */
+	if ((assoc->ipsa_flags & IPSA_F_COUNTERMODE) &&
+	    (assoc->ipsa_nonce == NULL)) {
+		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
+		    DROPPER(ipss, ipds_esp_nomem), &espstack->esp_dropper);
+		return (IPSEC_STATUS_FAILED);
+	}
 
 	ESP_INIT_CALLREQ(&call_req);
 
@@ -2476,23 +2517,45 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 		/* encryption context template */
 		IPSEC_CTX_TMPL(assoc, ipsa_encrtmpl, IPSEC_ALG_ENCR,
 		    encr_ctx_tmpl);
+		/* Call the nonce update function. */
+		(assoc->ipsa_noncefunc)(assoc, (uchar_t *)esph_ptr, payload_len,
+		    iv_ptr, &io->ipsec_out_cmm, &io->ipsec_out_crypto_data);
 
 		if (!do_auth) {
 			/* encryption only, skip mblk that contains ESP hdr */
 			/* initialize input data argument */
 			ESP_INIT_CRYPTO_DATA(&io->ipsec_out_crypto_data,
-			    esp_mp->b_cont, 0, payload_len);
+			    data_mp, 0, payload_len);
 
-			/* specify IV */
-			io->ipsec_out_crypto_data.cd_miscdata =
-			    (char *)esp_mp->b_rptr + sizeof (esph_t) +
-			    esph_offset;
+			/*
+			 * For combined mode ciphers, the ciphertext is the same
+			 * size as the clear text, the ICV should follow the
+			 * ciphertext. To convince the kcf to allow in-line
+			 * encryption, with an ICV, use ipsec_out_crypto_mac
+			 * to point to the same buffer as the data. The calling
+			 * function need to ensure the buffer is large enough to
+			 * include the ICV.
+			 *
+			 * The IV is already written to the packet buffer, the
+			 * nonce setup function copied it to the params struct
+			 * for the cipher to use.
+			 */
+			if (assoc->ipsa_flags & IPSA_F_COMBINED) {
+				bcopy(&io->ipsec_out_crypto_data,
+				    &io->ipsec_out_crypto_mac,
+				    sizeof (crypto_data_t));
+				io->ipsec_out_crypto_mac.cd_length =
+				    payload_len + icv_len;
+				cd_ptr = &io->ipsec_out_crypto_mac;
+			}
 
 			/* call the crypto framework */
-			kef_rc = crypto_encrypt(&assoc->ipsa_emech,
+			kef_rc = crypto_encrypt((crypto_mechanism_t *)
+			    &io->ipsec_out_cmm,
 			    &io->ipsec_out_crypto_data,
 			    &assoc->ipsa_kcfencrkey, encr_ctx_tmpl,
-			    NULL, &call_req);
+			    cd_ptr, &call_req);
+
 		}
 	}
 
@@ -2510,8 +2573,7 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 		    esp_mp, MBLKL(esp_mp), payload_len, esph_offset, auth_len);
 
 		/* specify IV */
-		io->ipsec_out_crypto_dual_data.dd_miscdata =
-		    (char *)esp_mp->b_rptr + sizeof (esph_t) + esph_offset;
+		io->ipsec_out_crypto_dual_data.dd_miscdata = (char *)iv_ptr;
 
 		/* call the framework */
 		kef_rc = crypto_encrypt_mac(&assoc->ipsa_emech,
@@ -2536,7 +2598,7 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 		return (IPSEC_STATUS_PENDING);
 	}
 
-	esp_crypto_failed(ipsec_mp, B_TRUE, kef_rc, espstack);
+	esp_crypto_failed(ipsec_mp, B_FALSE, kef_rc, espstack);
 	return (IPSEC_STATUS_FAILED);
 }
 
@@ -2552,14 +2614,14 @@ esp_outbound(mblk_t *mp)
 	ipsec_out_t *io;
 	ipha_t *ipha;
 	ip6_t *ip6h;
-	esph_t *esph;
+	esph_t *esph_ptr, *iv_ptr;
 	uint_t af;
 	uint8_t *nhp;
 	uintptr_t divpoint, datalen, adj, padlen, i, alloclen;
 	uintptr_t esplen = sizeof (esph_t);
 	uint8_t protocol;
 	ipsa_t *assoc;
-	uint_t iv_len, mac_len = 0;
+	uint_t iv_len, block_size, mac_len = 0;
 	uchar_t *icv_buf;
 	udpha_t *udpha;
 	boolean_t is_natt = B_FALSE;
@@ -2651,8 +2713,7 @@ esp_outbound(mblk_t *mp)
 	assoc = io->ipsec_out_esp_sa;
 	ASSERT(assoc != NULL);
 
-	if (assoc->ipsa_auth_alg != SADB_AALG_NONE)
-		mac_len = assoc->ipsa_mac_len;
+	mac_len = assoc->ipsa_mac_len;
 
 	if (assoc->ipsa_flags & IPSA_F_NATT) {
 		/* wedge in fake UDP */
@@ -2667,14 +2728,17 @@ esp_outbound(mblk_t *mp)
 	/* Determine the padding length.  Pad to 4-bytes for no-encryption. */
 	if (assoc->ipsa_encr_alg != SADB_EALG_NULL) {
 		iv_len = assoc->ipsa_iv_len;
+		block_size = assoc->ipsa_datalen;
 
 		/*
+		 * Pad the data to the length of the cipher block size.
 		 * Include the two additional bytes (hence the - 2) for the
 		 * padding length and the next header.  Take this into account
 		 * when calculating the actual length of the padding.
 		 */
 		ASSERT(ISP2(iv_len));
-		padlen = ((unsigned)(iv_len - datalen - 2)) & (iv_len - 1);
+		padlen = ((unsigned)(block_size - datalen - 2)) &
+		    (block_size - 1);
 	} else {
 		iv_len = 0;
 		padlen = ((unsigned)(sizeof (uint32_t) - datalen - 2)) &
@@ -2719,7 +2783,7 @@ esp_outbound(mblk_t *mp)
 		return (IPSEC_STATUS_FAILED);
 	}
 	espmp->b_wptr += esplen;
-	esph = (esph_t *)espmp->b_rptr;
+	esph_ptr = (esph_t *)espmp->b_rptr;
 
 	if (is_natt) {
 		esp3dbg(espstack, ("esp_outbound: NATT"));
@@ -2734,13 +2798,13 @@ esp_outbound(mblk_t *mp)
 		 * can do the right thing.
 		 */
 		udpha->uha_checksum = 0;
-		esph = (esph_t *)(udpha + 1);
+		esph_ptr = (esph_t *)(udpha + 1);
 	}
 
-	esph->esph_spi = assoc->ipsa_spi;
+	esph_ptr->esph_spi = assoc->ipsa_spi;
 
-	esph->esph_replay = htonl(atomic_add_32_nv(&assoc->ipsa_replay, 1));
-	if (esph->esph_replay == 0 && assoc->ipsa_replay_wsize != 0) {
+	esph_ptr->esph_replay = htonl(atomic_add_32_nv(&assoc->ipsa_replay, 1));
+	if (esph_ptr->esph_replay == 0 && assoc->ipsa_replay_wsize != 0) {
 		/*
 		 * XXX We have replay counter wrapping.
 		 * We probably want to nuke this SA (and its peer).
@@ -2748,7 +2812,7 @@ esp_outbound(mblk_t *mp)
 		ipsec_assocfailure(info.mi_idnum, 0, 0,
 		    SL_ERROR | SL_CONSOLE | SL_WARN,
 		    "Outbound ESP SA (0x%x, %s) has wrapped sequence.\n",
-		    esph->esph_spi, assoc->ipsa_dstaddr, af,
+		    esph_ptr->esph_spi, assoc->ipsa_dstaddr, af,
 		    espstack->ipsecesp_netstack);
 
 		ESP_BUMP_STAT(espstack, out_discards);
@@ -2763,14 +2827,34 @@ esp_outbound(mblk_t *mp)
 		return (IPSEC_STATUS_FAILED);
 	}
 
+	iv_ptr = (esph_ptr + 1);
 	/*
-	 * Set the IV to a random quantity.  We do not require the
-	 * highest quality random bits, but for best security with CBC
-	 * mode ciphers, the value must be unlikely to repeat and also
-	 * must not be known in advance to an adversary capable of
-	 * influencing the plaintext.
+	 * iv_ptr points to the mblk which will contain the IV once we have
+	 * written it there. This mblk will be part of a mblk chain that
+	 * will make up the packet.
+	 *
+	 * For counter mode algorithms, the IV is a 64 bit quantity, it
+	 * must NEVER repeat in the lifetime of the SA, otherwise an
+	 * attacker who had recorded enough packets might be able to
+	 * determine some clear text.
+	 *
+	 * To ensure this does not happen, the IV is stored in the SA and
+	 * incremented for each packet, the IV is then copied into the
+	 * "packet" for transmission to the receiving system. The IV will
+	 * also be copied into the nonce, when the packet is encrypted.
+	 *
+	 * CBC mode algorithms use a random IV for each packet. We do not
+	 * require the highest quality random bits, but for best security
+	 * with CBC mode ciphers, the value must be unlikely to repeat and
+	 * must not be known in advance to an adversary capable of influencing
+	 * the clear text.
 	 */
-	(void) random_get_pseudo_bytes((uint8_t *)(esph + 1), iv_len);
+	if (!update_iv((uint8_t *)iv_ptr, espstack->esp_pfkey_q, assoc,
+	    espstack)) {
+		ip_drop_packet(mp, B_FALSE, NULL, NULL,
+		    DROPPER(ipss, ipds_esp_iv_wrap), &espstack->esp_dropper);
+		return (IPSEC_STATUS_FAILED);
+	}
 
 	/* Fix the IP header. */
 	alloclen = padlen + 2 + mac_len;
@@ -2977,6 +3061,8 @@ ipsecesp_rput(queue_t *q, mblk_t *mp)
 
 /*
  * Construct an SADB_REGISTER message with the current algorithms.
+ * This function gets called when 'ipsecalgs -s' is run or when
+ * in.iked (or other KMD) starts.
  */
 static boolean_t
 esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
@@ -3063,9 +3149,10 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 			saalg->sadb_alg_ivlen = 0;
 			saalg->sadb_alg_minbits	= authalgs[i]->alg_ef_minbits;
 			saalg->sadb_alg_maxbits	= authalgs[i]->alg_ef_maxbits;
-			saalg->sadb_x_alg_defincr = authalgs[i]->alg_ef_default;
 			saalg->sadb_x_alg_increment =
 			    authalgs[i]->alg_increment;
+			saalg->sadb_x_alg_saltbits = SADB_8TO1(
+			    authalgs[i]->alg_saltlen);
 			numalgs_snap++;
 			saalg++;
 		}
@@ -3096,12 +3183,19 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 			if (encralgs[i] == NULL || !ALG_VALID(encralgs[i]))
 				continue;
 			saalg->sadb_alg_id = encralgs[i]->alg_id;
-			saalg->sadb_alg_ivlen = encralgs[i]->alg_datalen;
+			saalg->sadb_alg_ivlen = encralgs[i]->alg_ivlen;
 			saalg->sadb_alg_minbits	= encralgs[i]->alg_ef_minbits;
 			saalg->sadb_alg_maxbits	= encralgs[i]->alg_ef_maxbits;
-			saalg->sadb_x_alg_defincr = encralgs[i]->alg_ef_default;
+			/*
+			 * We could advertise the ICV length, except there
+			 * is not a value in sadb_x_algb to do this.
+			 * saalg->sadb_alg_maclen = encralgs[i]->alg_maclen;
+			 */
 			saalg->sadb_x_alg_increment =
 			    encralgs[i]->alg_increment;
+			saalg->sadb_x_alg_saltbits =
+			    SADB_8TO1(encralgs[i]->alg_saltlen);
+
 			numalgs_snap++;
 			saalg++;
 		}
@@ -3636,6 +3730,7 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	 * Then locate the encryption algorithm.
 	 */
 	if (ekey != NULL) {
+		uint_t keybits;
 		ipsec_alginfo_t *ealg;
 
 		ealg = ipss->ipsec_alglists[IPSEC_ALG_ENCR]
@@ -3652,9 +3747,16 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		 * Sanity check key sizes. If the encryption algorithm is
 		 * SADB_EALG_NULL but the encryption key is NOT
 		 * NULL then complain.
+		 *
+		 * The keying material includes salt bits if required by
+		 * algorithm and optionally the Initial IV, check the
+		 * length of whats left.
 		 */
+		keybits = ekey->sadb_key_bits;
+		keybits -= ekey->sadb_key_reserved;
+		keybits -= SADB_8TO1(ealg->alg_saltlen);
 		if ((assoc->sadb_sa_encrypt == SADB_EALG_NULL) ||
-		    (!ipsec_valid_key_size(ekey->sadb_key_bits, ealg))) {
+		    (!ipsec_valid_key_size(keybits, ealg))) {
 			mutex_exit(&ipss->ipsec_alg_lock);
 			*diagnostic = SADB_X_DIAGNOSTIC_BAD_EKEYBITS;
 			return (EINVAL);

@@ -78,6 +78,34 @@ extern "C" {
  */
 #define	IPSEC_IN	(IPSEC_M_CTL + 1)
 #define	IPSEC_OUT	(IPSEC_M_CTL + 2)
+#define	MAXSALTSIZE 8
+
+/*
+ * For combined mode ciphers, store the crypto_mechanism_t in the
+ * per-packet ipsec_in_t/ipsec_out_t structures. This is because the PARAMS
+ * and nonce values change for each packet. For non-combined mode
+ * ciphers, these values are constant for the life of the SA.
+ */
+typedef struct ipsa_cm_mech_s {
+	crypto_mechanism_t combined_mech;
+	union {
+		CK_AES_CCM_PARAMS paramu_ccm;
+		CK_AES_GCM_PARAMS paramu_gcm;
+	} paramu;
+	uint8_t nonce[MAXSALTSIZE + sizeof (uint64_t)];
+#define	param_ulMACSize paramu.paramu_ccm.ulMACSize
+#define	param_ulNonceSize paramu.paramu_ccm.ipsa_ulNonceSize
+#define	param_ulAuthDataSize paramu.paramu_ccm.ipsa_ulAuthDataSize
+#define	param_ulDataSize paramu.paramu_ccm.ipsa_ulDataSize
+#define	param_nonce paramu.paramu_ccm.nonce
+#define	param_authData paramu.paramu_ccm.authData
+#define	param_pIv paramu.paramu_gcm.ipsa_pIv
+#define	param_ulIvLen paramu.paramu_gcm.ulIvLen
+#define	param_ulIvBits paramu.paramu_gcm.ulIvBits
+#define	param_pAAD paramu.paramu_gcm.pAAD
+#define	param_ulAADLen paramu.paramu_gcm.ulAADLen
+#define	param_ulTagBits paramu.paramu_gcm.ulTagBits
+} ipsa_cm_mech_t;
 
 /*
  * This is used for communication between IP and IPSEC (AH/ESP)
@@ -137,6 +165,7 @@ typedef struct ipsec_in_s {
 
 	zoneid_t ipsec_in_zoneid;	/* target zone for the datagram */
 	netstack_t *ipsec_in_ns;	/* Does not have a netstack_hold */
+	ipsa_cm_mech_t ipsec_in_cmm;	/* PARAMS for Combined mode mechs */
 	netstackid_t ipsec_in_stackid;	/* Used while waing for kEF callback */
 } ipsec_in_t;
 
@@ -241,6 +270,7 @@ typedef struct ipsec_out_s {
 #define	ipsec_out_nexthop_addr V4_PART_OF_V6(ipsec_out_nexthop_v6)
 	netstack_t *ipsec_out_ns;	/* Does not have a netstack_hold */
 	netstackid_t ipsec_out_stackid;	/* Used while waing for kEF callback */
+	ipsa_cm_mech_t ipsec_out_cmm;	/* PARAMS for Combined mode mechs */
 } ipsec_out_t;
 
 /*

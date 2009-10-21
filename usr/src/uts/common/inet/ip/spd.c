@@ -5071,13 +5071,11 @@ ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type,
 	 * those defined for an algorithm.
 	 */
 	alg->alg_default_bits = alg->alg_key_sizes[0];
+	alg->alg_default = 0;
 	if (alg->alg_increment != 0) {
 		/* key sizes are defined by range & increment */
 		alg->alg_minbits = alg->alg_key_sizes[1];
 		alg->alg_maxbits = alg->alg_key_sizes[2];
-
-		alg->alg_default = SADB_ALG_DEFAULT_INCR(alg->alg_minbits,
-		    alg->alg_increment, alg->alg_default_bits);
 	} else if (alg->alg_nkey_sizes == 0) {
 		/* no specified key size for algorithm */
 		alg->alg_minbits = alg->alg_maxbits = 0;
@@ -5092,7 +5090,6 @@ ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type,
 			if (alg->alg_key_sizes[i] > alg->alg_maxbits)
 				alg->alg_maxbits = alg->alg_key_sizes[i];
 		}
-		alg->alg_default = 0;
 	}
 
 	if (!(alg->alg_flags & ALG_FLAG_VALID))
@@ -5173,6 +5170,43 @@ ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type,
 	 * those supported by the framework.
 	 */
 	alg->alg_ef_default_bits = alg->alg_key_sizes[0];
+
+	/*
+	 * For backwards compatability, assume that the IV length
+	 * is the same as the data length.
+	 */
+	alg->alg_ivlen = alg->alg_datalen;
+
+	/*
+	 * Copy any algorithm parameters (if provided) into dedicated
+	 * elements in the ipsec_alginfo_t structure.
+	 * There may be a better place to put this code.
+	 */
+	for (i = 0; i < alg->alg_nparams; i++) {
+		switch (i) {
+		case 0:
+			/* Initialisation Vector length (bytes) */
+			alg->alg_ivlen =  alg->alg_params[0];
+			break;
+		case 1:
+			/* Integrity Check Vector length (bytes) */
+			alg->alg_icvlen = alg->alg_params[1];
+			break;
+		case 2:
+			/* Salt length (bytes) */
+			alg->alg_saltlen = (uint8_t)alg->alg_params[2];
+			break;
+		default:
+			break;
+		}
+	}
+
+	/* Default if the IV length is not specified. */
+	if (alg_type == IPSEC_ALG_ENCR && alg->alg_ivlen == 0)
+		alg->alg_ivlen = alg->alg_datalen;
+
+	alg_flag_check(alg);
+
 	if (alg->alg_increment != 0) {
 		/* supported key sizes are defined by range  & increment */
 		crypto_min = ALGBITS_ROUND_UP(crypto_min, alg->alg_increment);
@@ -5193,14 +5227,10 @@ ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type,
 			alg->alg_flags &= ~ALG_FLAG_VALID;
 			return;
 		}
-
 		if (alg->alg_ef_default_bits < alg->alg_ef_minbits)
 			alg->alg_ef_default_bits = alg->alg_ef_minbits;
 		if (alg->alg_ef_default_bits > alg->alg_ef_maxbits)
 			alg->alg_ef_default_bits = alg->alg_ef_maxbits;
-
-		alg->alg_ef_default = SADB_ALG_DEFAULT_INCR(alg->alg_ef_minbits,
-		    alg->alg_increment, alg->alg_ef_default_bits);
 	} else if (alg->alg_nkey_sizes == 0) {
 		/* no specified key size for algorithm */
 		alg->alg_ef_minbits = alg->alg_ef_maxbits = 0;
@@ -5230,6 +5260,50 @@ ipsec_alg_fix_min_max(ipsec_alginfo_t *alg, ipsec_algtype_t alg_type,
 		}
 		alg->alg_ef_default = 0;
 	}
+}
+
+/*
+ * Sanity check parameters provided by ipsecalgs(1m). Assume that
+ * the algoritm is marked as valid, there is a check at the top
+ * of this function. If any of the checks below fail, the algorithm
+ * entry is invalid.
+ */
+void
+alg_flag_check(ipsec_alginfo_t *alg)
+{
+	alg->alg_flags &= ~ALG_FLAG_VALID;
+
+	/*
+	 * Can't have the algorithm marked as CCM and GCM.
+	 * Check the ALG_FLAG_COMBINED and ALG_FLAG_COUNTERMODE
+	 * flags are set for CCM & GCM.
+	 */
+	if ((alg->alg_flags & (ALG_FLAG_CCM|ALG_FLAG_GCM)) ==
+	    (ALG_FLAG_CCM|ALG_FLAG_GCM))
+		return;
+	if (alg->alg_flags & (ALG_FLAG_CCM|ALG_FLAG_GCM)) {
+		if (!(alg->alg_flags & ALG_FLAG_COUNTERMODE))
+			return;
+		if (!(alg->alg_flags & ALG_FLAG_COMBINED))
+			return;
+	}
+
+	/*
+	 * For ALG_FLAG_COUNTERMODE, check the parameters
+	 * fit in the ipsec_nonce_t structure.
+	 */
+	if (alg->alg_flags & ALG_FLAG_COUNTERMODE) {
+		if (alg->alg_ivlen != sizeof (((ipsec_nonce_t *)NULL)->iv))
+			return;
+		if (alg->alg_saltlen > sizeof (((ipsec_nonce_t *)NULL)->salt))
+			return;
+	}
+	if ((alg->alg_flags & ALG_FLAG_COMBINED) &&
+	    (alg->alg_icvlen == 0))
+		return;
+
+	/* all is well. */
+	alg->alg_flags |= ALG_FLAG_VALID;
 }
 
 /*

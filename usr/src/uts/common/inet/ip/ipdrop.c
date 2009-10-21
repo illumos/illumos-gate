@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,6 +166,8 @@ ip_drop_init(ipsec_stack_t *ipss)
 	    "esp_nat_t_ipsec", KSTAT_DATA_UINT64);
 	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_esp_nat_t_ka,
 	    "esp_nat_t_ka", KSTAT_DATA_UINT64);
+	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_esp_iv_wrap,
+	    "esp_iv_wrap", KSTAT_DATA_UINT64);
 
 	/* AH-specific drop statistics. */
 	kstat_named_init(&ipss->ipsec_ip_drop_types->ipds_ah_nomem,

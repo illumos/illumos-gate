@@ -923,6 +923,7 @@ extern int ipsec_set_req(cred_t *, conn_t *, ipsec_req_t *);
 extern void ipsec_insert_always(avl_tree_t *tree, void *new_node);
 
 extern int32_t ipsec_act_ovhd(const ipsec_act_t *act);
+extern boolean_t update_iv(uint8_t *, queue_t *, ipsa_t *, ipsecesp_stack_t *);
 
 /*
  * Tunnel-support SPD functions and variables.

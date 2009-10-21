@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_NET_PFPOLICY_H
 #define	_NET_PFPOLICY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Definitions and structures for PF_POLICY version 1.
@@ -327,6 +325,18 @@ struct spd_attribute
 #define	spd_attr_value spd_attribute_u.spd_attribute_actual.spd_attr_uvalue
 };
 
+/*
+ * These flags are used by the kernel algorithm structures and by ipsecalgs(1m).
+ * ALG_FLAG_KERNELCHECKED is used by ipsecalgs(1m) to tag ipsecalgent_t as
+ * kernel verified. ALG_FLAG_VALID is only meaningful if set by the kernel.
+ */
+#define	ALG_FLAG_VALID		0x01
+#define	ALG_FLAG_COUNTERMODE	0x02
+#define	ALG_FLAG_COMBINED	0x04
+#define	ALG_FLAG_CCM		0x08
+#define	ALG_FLAG_GCM		0x10
+#define	ALG_FLAG_KERNELCHECKED	0x80000000
+
 #define	SPD_ATTR_NOP	0x00000000	/* space filler */
 #define	SPD_ATTR_END	0x00000001	/* end of description */
 #define	SPD_ATTR_EMPTY	0x00000002	/* reset template to default */
@@ -366,6 +376,9 @@ struct spd_attribute
 #define	SPD_ATTR_ALG_MECHNAME		0x0000011f
 #define	SPD_ATTR_PROTO_ID		0x00000120
 #define	SPD_ATTR_PROTO_EXEC_MODE	0x00000121
+#define	SPD_ATTR_ALG_NPARAMS		0x00000122
+#define	SPD_ATTR_ALG_PARAMS		0x00000123
+#define	SPD_ATTR_ALG_FLAGS		0x00000124
 
 /*
  * An interface extension identifies a network interface.

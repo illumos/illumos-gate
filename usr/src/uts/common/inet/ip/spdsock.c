@@ -2361,7 +2361,7 @@ spdsock_alglist(queue_t *q, mblk_t *mp)
  * Process a SPD_DUMPALGS request.
  */
 
-#define	ATTRPERALG	7	/* fixed attributes per algs */
+#define	ATTRPERALG	9	/* fixed attributes per algs */
 
 void
 spdsock_dumpalgs(queue_t *q, mblk_t *mp)
@@ -2388,7 +2388,8 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 	 * ALG / MINBITS / MAXBITS / DEFBITS / INCRBITS / {END, NEXT}
 	 *
 	 * ALG_ID / ALG_PROTO / ALG_INCRBITS / ALG_NKEYSIZES / ALG_KEYSIZE*
-	 * ALG_NBLOCKSIZES / ALG_BLOCKSIZE* / ALG_MECHNAME / {END, NEXT}
+	 * ALG_NBLOCKSIZES / ALG_BLOCKSIZE* / ALG_NPARAMS / ALG_PARAMS* /
+	 * ALG_MECHNAME / ALG_FLAGS / {END, NEXT}
 	 */
 
 	/*
@@ -2403,7 +2404,8 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 			alg = ipss->ipsec_alglists[algtype][algid];
 			alg_size = sizeof (struct spd_attribute) *
 			    (ATTRPERALG + alg->alg_nkey_sizes +
-			    alg->alg_nblock_sizes) + CRYPTO_MAX_MECH_NAME;
+			    alg->alg_nblock_sizes + alg->alg_nparams) +
+			    CRYPTO_MAX_MECH_NAME;
 			size += alg_size;
 		}
 	}
@@ -2472,7 +2474,6 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 			EMIT(SPD_ATTR_ALG_ID, algid);
 			EMIT(SPD_ATTR_ALG_PROTO, algproto[algtype]);
 			EMIT(SPD_ATTR_ALG_INCRBITS, alg->alg_increment);
-
 			EMIT(SPD_ATTR_ALG_NKEYSIZES, alg->alg_nkey_sizes);
 			for (i = 0; i < alg->alg_nkey_sizes; i++)
 				EMIT(SPD_ATTR_ALG_KEYSIZE,
@@ -2482,6 +2483,13 @@ spdsock_dumpalgs(queue_t *q, mblk_t *mp)
 			for (i = 0; i < alg->alg_nblock_sizes; i++)
 				EMIT(SPD_ATTR_ALG_BLOCKSIZE,
 				    alg->alg_block_sizes[i]);
+
+			EMIT(SPD_ATTR_ALG_NPARAMS, alg->alg_nparams);
+			for (i = 0; i < alg->alg_nparams; i++)
+				EMIT(SPD_ATTR_ALG_PARAMS,
+				    alg->alg_params[i]);
+
+			EMIT(SPD_ATTR_ALG_FLAGS, alg->alg_flags);
 
 			EMIT(SPD_ATTR_ALG_MECHNAME, CRYPTO_MAX_MECH_NAME);
 			bcopy(alg->alg_mech_name, attr, CRYPTO_MAX_MECH_NAME);
@@ -2621,6 +2629,16 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 			alg->alg_key_sizes[cur_key++] = attr->spd_attr_value;
 			break;
 
+		case SPD_ATTR_ALG_FLAGS:
+			/*
+			 * Flags (bit mask). The alg_flags element of
+			 * ipsecalg_flags_t is only 8 bits wide. The
+			 * user can set the VALID bit, but we will ignore it
+			 * and make the decision is the algorithm is valid.
+			 */
+			alg->alg_flags |= (uint8_t)attr->spd_attr_value;
+			break;
+
 		case SPD_ATTR_ALG_NBLOCKSIZES:
 			if (alg->alg_block_sizes != NULL) {
 				kmem_free(alg->alg_block_sizes,
@@ -2645,6 +2663,37 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 				goto bail;
 			}
 			alg->alg_block_sizes[cur_block++] =
+			    attr->spd_attr_value;
+			break;
+
+		case SPD_ATTR_ALG_NPARAMS:
+			if (alg->alg_params != NULL) {
+				kmem_free(alg->alg_params,
+				    ALG_BLOCK_SIZES(alg));
+			}
+			alg->alg_nparams = attr->spd_attr_value;
+			/*
+			 * Allocate room for the trailing zero block size
+			 * value as well.
+			 */
+			alg->alg_params = kmem_zalloc(ALG_BLOCK_SIZES(alg),
+			    KM_SLEEP);
+			cur_block = 0;
+			break;
+
+		case SPD_ATTR_ALG_PARAMS:
+			if (alg->alg_params == NULL ||
+			    cur_block >= alg->alg_nparams) {
+				ss1dbg(spds, ("spdsock_do_updatealg: "
+				    "too many params\n"));
+				*diag = SPD_DIAGNOSTIC_ALG_NUM_BLOCK_SIZES;
+				goto bail;
+			}
+			/*
+			 * Array contains: iv_len, icv_len, salt_len
+			 * Any additional parameters are currently ignored.
+			 */
+			alg->alg_params[cur_block++] =
 			    attr->spd_attr_value;
 			break;
 
@@ -3571,7 +3620,7 @@ spdsock_merge_algs(spd_stack_t *spds)
 			 */
 			if (alg->alg_id == SADB_EALG_NULL) {
 				alg->alg_mech_type = CRYPTO_MECHANISM_INVALID;
-				alg->alg_flags = ALG_FLAG_VALID;
+				alg->alg_flags |= ALG_FLAG_VALID;
 				continue;
 			}
 
@@ -3585,7 +3634,7 @@ spdsock_merge_algs(spd_stack_t *spds)
 				}
 			}
 			alg->alg_mech_type = mt;
-			alg->alg_flags = algflags;
+			alg->alg_flags |= algflags;
 		}
 	}
 

@@ -221,17 +221,32 @@ dump_sockaddr(struct sockaddr *sa, uint8_t prefixlen, boolean_t addr_only,
 }
 
 /*
- * Dump a key and bitlen
+ * Dump a key, any salt and bitlen.
+ * The key is made up of a stream of bits. If the algorithm requires a salt
+ * value, this will also be part of the dumped key. The last "saltbits" of the
+ * key string, reading left to right will be the salt value. To make it easier
+ * to see which bits make up the key, the salt value is enclosed in []'s.
+ * This function can also be called when ipseckey(1m) -s is run, this "saves"
+ * the SAs, including the key to a file. When this is the case, the []'s are
+ * not printed.
+ *
+ * The implementation allows the kernel to be told about the length of the salt
+ * in whole bytes only. If this changes, this function will need to be updated.
  */
 int
-dump_key(uint8_t *keyp, uint_t bitlen, FILE *where)
+dump_key(uint8_t *keyp, uint_t bitlen, uint_t saltbits, FILE *where,
+    boolean_t separate_salt)
 {
-	int	numbytes;
+	int	numbytes, saltbytes;
 
 	numbytes = SADB_1TO8(bitlen);
+	saltbytes = SADB_1TO8(saltbits);
+	numbytes += saltbytes;
+
 	/* The & 0x7 is to check for leftover bits. */
 	if ((bitlen & 0x7) != 0)
 		numbytes++;
+
 	while (numbytes-- != 0) {
 		if (pflag) {
 			/* Print no keys if paranoid */
@@ -241,9 +256,21 @@ dump_key(uint8_t *keyp, uint_t bitlen, FILE *where)
 			if (fprintf(where, "%02x", *keyp++) < 0)
 				return (-1);
 		}
+		if (separate_salt && saltbytes != 0 &&
+		    numbytes == saltbytes) {
+			if (fprintf(where, "[") < 0)
+				return (-1);
+		}
 	}
-	if (fprintf(where, "/%u", bitlen) < 0)
-		return (-1);
+
+	if (separate_salt && saltbits != 0) {
+		if (fprintf(where, "]/%u+%u", bitlen, saltbits) < 0)
+			return (-1);
+	} else {
+		if (fprintf(where, "/%u", bitlen + saltbits) < 0)
+			return (-1);
+	}
+
 	return (0);
 }
 
@@ -1977,7 +2004,8 @@ print_key(FILE *file, char *prefix, struct sadb_key *key)
 	}
 
 	(void) fprintf(file, dgettext(TEXT_DOMAIN, " key.\n%s"), prefix);
-	(void) dump_key((uint8_t *)(key + 1), key->sadb_key_bits, file);
+	(void) dump_key((uint8_t *)(key + 1), key->sadb_key_bits,
+	    key->sadb_key_reserved, file, B_TRUE);
 	(void) fprintf(file, "\n");
 }
 
@@ -2200,9 +2228,10 @@ print_eprop(FILE *file, char *prefix, struct sadb_prop *eprop)
 			}
 
 			(void) fprintf(file, dgettext(TEXT_DOMAIN,
-			    "  minbits=%u, maxbits=%u.\n"),
+			    "  minbits=%u, maxbits=%u, saltbits=%u\n"),
 			    algdesc->sadb_x_algdesc_minbits,
-			    algdesc->sadb_x_algdesc_maxbits);
+			    algdesc->sadb_x_algdesc_maxbits,
+			    algdesc->sadb_x_algdesc_reserved);
 
 			sofar = (uint64_t *)(++algdesc);
 		}
@@ -2246,9 +2275,9 @@ print_supp(FILE *file, char *prefix, struct sadb_supported *supp)
 			break;
 		}
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    " minbits=%u, maxbits=%u, ivlen=%u"),
+		    " minbits=%u, maxbits=%u, ivlen=%u, saltbits=%u"),
 		    algs[i].sadb_alg_minbits, algs[i].sadb_alg_maxbits,
-		    algs[i].sadb_alg_ivlen);
+		    algs[i].sadb_alg_ivlen, algs[i].sadb_x_alg_saltbits);
 		if (exttype == SADB_EXT_SUPPORTED_ENCRYPT)
 			(void) fprintf(file, dgettext(TEXT_DOMAIN,
 			    ", increment=%u"), algs[i].sadb_x_alg_increment);
@@ -2618,7 +2647,8 @@ save_key(struct sadb_key *key, FILE *ofile)
 	if (fprintf(ofile, "%skey ", prefix) < 0)
 		return (B_FALSE);
 
-	if (dump_key((uint8_t *)(key + 1), key->sadb_key_bits, ofile) == -1)
+	if (dump_key((uint8_t *)(key + 1), key->sadb_key_bits,
+	    key->sadb_key_reserved, ofile, B_FALSE) == -1)
 		return (B_FALSE);
 
 	return (B_TRUE);

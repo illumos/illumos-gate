@@ -47,6 +47,7 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <net/pfkeyv2.h>
+#include <net/pfpolicy.h>
 
 #include <inet/common.h>
 #include <inet/mi.h>
@@ -745,8 +746,10 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 			saalg->sadb_alg_maxbits = authalgs[i]->alg_ef_maxbits;
 			saalg->sadb_x_alg_increment =
 			    authalgs[i]->alg_increment;
-			saalg->sadb_x_alg_defincr =
-			    authalgs[i]->alg_ef_default;
+			/* For now, salt is meaningless in AH. */
+			ASSERT(authalgs[i]->alg_saltlen == 0);
+			saalg->sadb_x_alg_saltbits =
+			    SADB_8TO1(authalgs[i]->alg_saltlen);
 			numalgs_snap++;
 			saalg++;
 		}

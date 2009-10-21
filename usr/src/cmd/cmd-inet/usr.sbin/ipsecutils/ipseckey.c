@@ -454,6 +454,7 @@ parsesatype(char *type, char *ebuf)
 #define	TOK_REPLAY_VALUE	51
 #define	TOK_IDLE_ADDTIME	52
 #define	TOK_IDLE_USETIME	53
+#define	TOK_RESERVED		54
 
 static struct toktable {
 	char *string;
@@ -538,6 +539,7 @@ static struct toktable {
 	{"outbound",		TOK_FLAG_OUTBOUND,	NULL},
 	{"inbound",		TOK_FLAG_INBOUND,	NULL},
 
+	{"reserved_bits",	TOK_RESERVED,		NEXTNUM},
 	{"replay_value",	TOK_REPLAY_VALUE,	NEXTNUM},
 	{"idle_addtime",	TOK_IDLE_ADDTIME,	NEXTNUM},
 	{"idle_usetime",	TOK_IDLE_USETIME,	NEXTNUM},
@@ -627,6 +629,11 @@ parsealg(char *alg, int proto_num, char *ebuf)
 		uint8_t alg_num;
 
 		alg_num = algent->a_alg_num;
+		if (ALG_FLAG_COUNTERMODE & algent->a_alg_flags)
+			WARN1(ep, ebuf, gettext(
+			    "Using manual keying with a Counter mode algorithm "
+			    "such as \"%s\" may be insecure!\n"),
+			    algent->a_names[0]);
 		freeipsecalgent(algent);
 
 		return (alg_num);
@@ -803,7 +810,7 @@ parseaddr(char *addr, struct hostent **hpp, boolean_t v6only, char *ebuf)
 	(((hd) >= 'a' && (hd) <= 'f') ? ((hd) - 'a' + 10) : ((hd) - 'A' + 10)))
 
 static struct sadb_key *
-parsekey(char *input, char *ebuf)
+parsekey(char *input, char *ebuf, uint_t reserved_bits)
 {
 	struct sadb_key *retval;
 	uint_t i, hexlen = 0, bits, alloclen;
@@ -860,7 +867,9 @@ parsekey(char *input, char *ebuf)
 	if (retval == NULL)
 		Bail("malloc(parsekey)");
 	retval->sadb_key_len = SADB_8TO64(alloclen);
-	retval->sadb_key_reserved = 0;
+
+	retval->sadb_key_reserved = reserved_bits;
+
 	if (bits == 0)
 		retval->sadb_key_bits = (hexlen + (hexlen & 0x1)) << 2;
 	else
@@ -1585,6 +1594,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	/* MLS TODO:  Need sensitivity eventually. */
 	int next, token, sa_len, alloclen, totallen = sizeof (msg), prefix;
 	uint32_t spi = 0;
+	uint_t reserved_bits = 0;
 	uint8_t	sadb_msg_type;
 	char *thiscmd, *pstr;
 	boolean_t readstate = B_FALSE, unspec_src = B_FALSE;
@@ -2251,7 +2261,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 				    "encryption algorithm.\n"));
 				break;
 			}
-			encrypt = parsekey(*argv, ebuf);
+			encrypt = parsekey(*argv, ebuf, reserved_bits);
 			argv++;
 			if (encrypt == NULL) {
 				ERROR(ep, ebuf, gettext(
@@ -2268,7 +2278,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 				    " authentication key.\n"));
 				break;
 			}
-			auth = parsekey(*argv, ebuf);
+			auth = parsekey(*argv, ebuf, 0);
 			argv++;
 			if (auth == NULL) {
 				ERROR(ep, ebuf, gettext(
@@ -2509,6 +2519,15 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 				    B_TRUE, ebuf);
 				break;
 			}
+			argv++;
+			break;
+		case TOK_RESERVED:
+			if (encrypt != NULL)
+				ERROR(ep, ebuf, gettext(
+				    "Reserved bits need to be "
+				    "specified before key.\n"));
+			reserved_bits = (uint_t)parsenum(*argv,
+			    B_TRUE, ebuf);
 			argv++;
 			break;
 		default:

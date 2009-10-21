@@ -45,6 +45,7 @@
 #include <netinet/in.h>
 #include <net/if.h>
 #include <net/pfkeyv2.h>
+#include <net/pfpolicy.h>
 #include <inet/common.h>
 #include <netinet/ip6.h>
 #include <inet/ip.h>
@@ -91,7 +92,6 @@ extern int (*cl_inet_checkspi)(netstackid_t stack_id, uint8_t protocol,
     uint32_t spi, void *args);
 extern void (*cl_inet_deletespi)(netstackid_t stack_id, uint8_t protocol,
     uint32_t spi, void *args);
-
 /*
  * ipsacq_maxpackets is defined here to make it tunable
  * from /etc/system.
@@ -284,6 +284,10 @@ sadb_freeassoc(ipsa_t *ipsa)
 		bzero(ipsa->ipsa_encrkey, ipsa->ipsa_encrkeylen);
 		kmem_free(ipsa->ipsa_encrkey, ipsa->ipsa_encrkeylen);
 	}
+	if (ipsa->ipsa_nonce_buf != NULL) {
+		bzero(ipsa->ipsa_nonce_buf, sizeof (ipsec_nonce_t));
+		kmem_free(ipsa->ipsa_nonce_buf, sizeof (ipsec_nonce_t));
+	}
 	if (ipsa->ipsa_src_cid != NULL) {
 		IPSID_REFRELE(ipsa->ipsa_src_cid);
 	}
@@ -294,6 +298,9 @@ sadb_freeassoc(ipsa_t *ipsa)
 		kmem_free(ipsa->ipsa_integ, ipsa->ipsa_integlen);
 	if (ipsa->ipsa_sens != NULL)
 		kmem_free(ipsa->ipsa_sens, ipsa->ipsa_senslen);
+	if (ipsa->ipsa_emech.cm_param != NULL)
+		kmem_free(ipsa->ipsa_emech.cm_param,
+		    ipsa->ipsa_emech.cm_param_len);
 
 	mutex_destroy(&ipsa->ipsa_lock);
 	kmem_free(ipsa, sizeof (*ipsa));
@@ -1526,8 +1533,8 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 	}
 
 	if (ipsa->ipsa_encrkeylen != 0) {
-		encrsize = roundup(sizeof (sadb_key_t) + ipsa->ipsa_encrkeylen,
-		    sizeof (uint64_t));
+		encrsize = roundup(sizeof (sadb_key_t) + ipsa->ipsa_encrkeylen +
+		    ipsa->ipsa_nonce_len, sizeof (uint64_t));
 		alloclen += encrsize;
 		encr = B_TRUE;
 	} else {
@@ -1728,12 +1735,18 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 	}
 
 	if (encr) {
+		uint8_t *buf_ptr;
 		key = (sadb_key_t *)walker;
 		key->sadb_key_len = SADB_8TO64(encrsize);
 		key->sadb_key_exttype = SADB_EXT_KEY_ENCRYPT;
 		key->sadb_key_bits = ipsa->ipsa_encrkeybits;
-		key->sadb_key_reserved = 0;
-		bcopy(ipsa->ipsa_encrkey, key + 1, ipsa->ipsa_encrkeylen);
+		key->sadb_key_reserved = ipsa->ipsa_saltbits;
+		buf_ptr = (uint8_t *)(key + 1);
+		bcopy(ipsa->ipsa_encrkey, buf_ptr, ipsa->ipsa_encrkeylen);
+		if (ipsa->ipsa_salt != NULL) {
+			buf_ptr += ipsa->ipsa_encrkeylen;
+			bcopy(ipsa->ipsa_salt, buf_ptr, ipsa->ipsa_saltlen);
+		}
 		walker = (sadb_ext_t *)((uint64_t *)walker +
 		    walker->sadb_ext_len);
 	}
@@ -3034,45 +3047,6 @@ get_ipsa_pair(sadb_sa_t *assoc, sadb_address_t *srcext, sadb_address_t *dstext,
 }
 
 /*
- * Initialize the mechanism parameters associated with an SA.
- * These parameters can be shared by multiple packets, which saves
- * us from the overhead of consulting the algorithm table for
- * each packet.
- */
-static void
-sadb_init_alginfo(ipsa_t *sa)
-{
-	ipsec_alginfo_t *alg;
-	ipsec_stack_t	*ipss = sa->ipsa_netstack->netstack_ipsec;
-
-	mutex_enter(&ipss->ipsec_alg_lock);
-
-	if (sa->ipsa_encrkey != NULL) {
-		alg = ipss->ipsec_alglists[IPSEC_ALG_ENCR][sa->ipsa_encr_alg];
-		if (alg != NULL && ALG_VALID(alg)) {
-			sa->ipsa_emech.cm_type = alg->alg_mech_type;
-			sa->ipsa_emech.cm_param = NULL;
-			sa->ipsa_emech.cm_param_len = 0;
-			sa->ipsa_iv_len = alg->alg_datalen;
-		} else
-			sa->ipsa_emech.cm_type = CRYPTO_MECHANISM_INVALID;
-	}
-
-	if (sa->ipsa_authkey != NULL) {
-		alg = ipss->ipsec_alglists[IPSEC_ALG_AUTH][sa->ipsa_auth_alg];
-		if (alg != NULL && ALG_VALID(alg)) {
-			sa->ipsa_amech.cm_type = alg->alg_mech_type;
-			sa->ipsa_amech.cm_param = (char *)&sa->ipsa_mac_len;
-			sa->ipsa_amech.cm_param_len = sizeof (size_t);
-			sa->ipsa_mac_len = (size_t)alg->alg_datalen;
-		} else
-			sa->ipsa_amech.cm_type = CRYPTO_MECHANISM_INVALID;
-	}
-
-	mutex_exit(&ipss->ipsec_alg_lock);
-}
-
-/*
  * Perform NAT-traversal cached checksum offset calculations here.
  */
 static void
@@ -3209,6 +3183,8 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	    (sadb_x_replay_ctr_t *)ksi->ks_in_extv[SADB_X_EXT_REPLAY_VALUE];
 	uint8_t protocol =
 	    (samsg->sadb_msg_satype == SADB_SATYPE_AH) ? IPPROTO_AH:IPPROTO_ESP;
+	int salt_offset;
+	uint8_t *buf_ptr;
 #if 0
 	/*
 	 * XXXMLS - When Trusted Solaris or Multi-Level Secure functionality
@@ -3230,6 +3206,7 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	uint32_t *src_addr_ptr, *dst_addr_ptr, *isrc_addr_ptr, *idst_addr_ptr;
 	mblk_t *ctl_mp = NULL;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsec_alginfo_t *alg;
 	int		rcode;
 
 	if (srcext == NULL) {
@@ -3485,6 +3462,17 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		newbie->ipsa_kcfauthkey.ck_data = newbie->ipsa_authkey;
 
 		mutex_enter(&ipss->ipsec_alg_lock);
+		alg = ipss->ipsec_alglists[IPSEC_ALG_AUTH]
+		    [newbie->ipsa_auth_alg];
+		if (alg != NULL && ALG_VALID(alg)) {
+			newbie->ipsa_amech.cm_type = alg->alg_mech_type;
+			newbie->ipsa_amech.cm_param =
+			    (char *)&newbie->ipsa_mac_len;
+			newbie->ipsa_amech.cm_param_len = sizeof (size_t);
+			newbie->ipsa_mac_len = (size_t)alg->alg_datalen;
+		} else {
+			newbie->ipsa_amech.cm_type = CRYPTO_MECHANISM_INVALID;
+		}
 		error = ipsec_create_ctx_tmpl(newbie, IPSEC_ALG_AUTH);
 		mutex_exit(&ipss->ipsec_alg_lock);
 		if (error != 0) {
@@ -3497,16 +3485,71 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 			 * probably a coding error!
 			 */
 			*diagnostic = SADB_X_DIAGNOSTIC_BAD_CTX;
+
 			goto error;
 		}
 	}
 
 	if (ekey != NULL) {
+		mutex_enter(&ipss->ipsec_alg_lock);
+		alg = ipss->ipsec_alglists[IPSEC_ALG_ENCR]
+		    [newbie->ipsa_encr_alg];
+
+		if (alg != NULL && ALG_VALID(alg)) {
+			newbie->ipsa_emech.cm_type = alg->alg_mech_type;
+			newbie->ipsa_datalen = alg->alg_datalen;
+			if (alg->alg_flags & ALG_FLAG_COUNTERMODE)
+				newbie->ipsa_flags |= IPSA_F_COUNTERMODE;
+
+			if (alg->alg_flags & ALG_FLAG_COMBINED) {
+				newbie->ipsa_flags |= IPSA_F_COMBINED;
+				newbie->ipsa_mac_len =  alg->alg_icvlen;
+			}
+
+			if (alg->alg_flags & ALG_FLAG_CCM)
+				newbie->ipsa_noncefunc = ccm_params_init;
+			else if (alg->alg_flags & ALG_FLAG_GCM)
+				newbie->ipsa_noncefunc = gcm_params_init;
+			else newbie->ipsa_noncefunc = cbc_params_init;
+
+			newbie->ipsa_saltlen = alg->alg_saltlen;
+			newbie->ipsa_saltbits = SADB_8TO1(newbie->ipsa_saltlen);
+			newbie->ipsa_iv_len = alg->alg_ivlen;
+			newbie->ipsa_nonce_len = newbie->ipsa_saltlen +
+			    newbie->ipsa_iv_len;
+			newbie->ipsa_emech.cm_param = NULL;
+			newbie->ipsa_emech.cm_param_len = 0;
+		} else {
+			newbie->ipsa_emech.cm_type = CRYPTO_MECHANISM_INVALID;
+		}
+		mutex_exit(&ipss->ipsec_alg_lock);
+
+		/*
+		 * The byte stream following the sadb_key_t is made up of:
+		 * key bytes, [salt bytes], [IV initial value]
+		 * All of these have variable length. The IV is typically
+		 * randomly generated by this function and not passed in.
+		 * By supporting the injection of a known IV, the whole
+		 * IPsec subsystem and the underlying crypto subsystem
+		 * can be tested with known test vectors.
+		 *
+		 * The keying material has been checked by ext_check()
+		 * and ipsec_valid_key_size(), after removing salt/IV
+		 * bits, whats left is the encryption key. If this is too
+		 * short, ipsec_create_ctx_tmpl() will fail and the SA
+		 * won't get created.
+		 *
+		 * set ipsa_encrkeylen to length of key only.
+		 */
 		newbie->ipsa_encrkeybits = ekey->sadb_key_bits;
-		newbie->ipsa_encrkeylen = SADB_1TO8(ekey->sadb_key_bits);
+		newbie->ipsa_encrkeybits -= ekey->sadb_key_reserved;
+		newbie->ipsa_encrkeybits -= newbie->ipsa_saltbits;
+		newbie->ipsa_encrkeylen = SADB_1TO8(newbie->ipsa_encrkeybits);
+
 		/* In case we have to round up to the next byte... */
 		if ((ekey->sadb_key_bits & 0x7) != 0)
 			newbie->ipsa_encrkeylen++;
+
 		newbie->ipsa_encrkey = kmem_alloc(newbie->ipsa_encrkeylen,
 		    KM_NOSLEEP);
 		if (newbie->ipsa_encrkey == NULL) {
@@ -3514,9 +3557,74 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 			mutex_exit(&newbie->ipsa_lock);
 			goto error;
 		}
-		bcopy(ekey + 1, newbie->ipsa_encrkey, newbie->ipsa_encrkeylen);
-		/* XXX is this safe w.r.t db_ref, etc? */
-		bzero(ekey + 1, newbie->ipsa_encrkeylen);
+
+		buf_ptr = (uint8_t *)(ekey + 1);
+		bcopy(buf_ptr, newbie->ipsa_encrkey, newbie->ipsa_encrkeylen);
+
+		if (newbie->ipsa_flags & IPSA_F_COMBINED) {
+			/*
+			 * Combined mode algs need a nonce. Copy the salt and
+			 * IV into a buffer. The ipsa_nonce is a pointer into
+			 * this buffer, some bytes at the start of the buffer
+			 * may be unused, depends on the salt length. The IV
+			 * is 64 bit aligned so it can be incremented as a
+			 * uint64_t. Zero out key in samsg_t before freeing.
+			 */
+
+			newbie->ipsa_nonce_buf = kmem_alloc(
+			    sizeof (ipsec_nonce_t), KM_NOSLEEP);
+			if (newbie->ipsa_nonce_buf == NULL) {
+				error = ENOMEM;
+				mutex_exit(&newbie->ipsa_lock);
+				goto error;
+			}
+			/*
+			 * Initialize nonce and salt pointers to point
+			 * to the nonce buffer. This is just in case we get
+			 * bad data, the pointers will be valid, the data
+			 * won't be.
+			 *
+			 * See sadb.h for layout of nonce.
+			 */
+			newbie->ipsa_iv = &newbie->ipsa_nonce_buf->iv;
+			newbie->ipsa_salt = (uint8_t *)newbie->ipsa_nonce_buf;
+			newbie->ipsa_nonce = newbie->ipsa_salt;
+			if (newbie->ipsa_saltlen != 0) {
+				salt_offset = MAXSALTSIZE -
+				    newbie->ipsa_saltlen;
+				newbie->ipsa_salt = (uint8_t *)
+				    &newbie->ipsa_nonce_buf->salt[salt_offset];
+				newbie->ipsa_nonce = newbie->ipsa_salt;
+				buf_ptr += newbie->ipsa_encrkeylen;
+				bcopy(buf_ptr, newbie->ipsa_salt,
+				    newbie->ipsa_saltlen);
+			}
+			/*
+			 * The IV for CCM/GCM mode increments, it should not
+			 * repeat. Get a random value for the IV, make a
+			 * copy, the SA will expire when/if the IV ever
+			 * wraps back to the initial value. If an Initial IV
+			 * is passed in via PF_KEY, save this in the SA.
+			 * Initialising IV for inbound is pointless as its
+			 * taken from the inbound packet.
+			 */
+			if (!is_inbound) {
+				if (ekey->sadb_key_reserved != 0) {
+					buf_ptr += newbie->ipsa_saltlen;
+					bcopy(buf_ptr, (uint8_t *)newbie->
+					    ipsa_iv, SADB_1TO8(ekey->
+					    sadb_key_reserved));
+				} else {
+					(void) random_get_pseudo_bytes(
+					    (uint8_t *)newbie->ipsa_iv,
+					    newbie->ipsa_iv_len);
+				}
+				newbie->ipsa_iv_softexpire =
+				    (*newbie->ipsa_iv) << 9;
+				newbie->ipsa_iv_hardexpire = *newbie->ipsa_iv;
+			}
+		}
+		bzero((ekey + 1), SADB_1TO8(ekey->sadb_key_bits));
 
 		/*
 		 * Pre-initialize the kernel crypto framework key
@@ -3536,8 +3644,6 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 			goto error;
 		}
 	}
-
-	sadb_init_alginfo(newbie);
 
 	/*
 	 * Ptrs to processing functions.
@@ -5409,12 +5515,13 @@ sadb_new_algdesc(uint8_t *start, uint8_t *limit,
 		maxbits = algp->alg_ef_maxbits;
 	mutex_exit(&ipss->ipsec_alg_lock);
 
+	algdesc->sadb_x_algdesc_reserved = SADB_8TO1(algp->alg_saltlen);
 	algdesc->sadb_x_algdesc_satype = satype;
 	algdesc->sadb_x_algdesc_algtype = algtype;
 	algdesc->sadb_x_algdesc_alg = alg;
 	algdesc->sadb_x_algdesc_minbits = minbits;
 	algdesc->sadb_x_algdesc_maxbits = maxbits;
-	algdesc->sadb_x_algdesc_reserved = 0;
+
 	return (cur);
 }
 
@@ -6933,7 +7040,6 @@ sadb_set_lpkt(ipsa_t *ipsa, mblk_t *npkt, netstack_t *ns)
 	} else {
 		/* We lost the race. */
 		opkt = NULL;
-		ASSERT(ipsa->ipsa_lpkt == NULL);
 	}
 	mutex_exit(&ipsa->ipsa_lock);
 
@@ -7445,4 +7551,160 @@ age_pair_peer_list(templist_t *haspeerlist, sadb_t *sp, boolean_t outbound)
 		}
 		IPSA_REFRELE(dying);
 	}
+}
+
+/*
+ * Ensure that the IV used for CCM mode never repeats. The IV should
+ * only be updated by this function. Also check to see if the IV
+ * is about to wrap and generate a SOFT Expire. This function is only
+ * called for outgoing packets, the IV for incomming packets is taken
+ * from the wire. If the outgoing SA needs to be expired, update
+ * the matching incomming SA.
+ */
+boolean_t
+update_iv(uint8_t *iv_ptr, queue_t *pfkey_q, ipsa_t *assoc,
+    ipsecesp_stack_t *espstack)
+{
+	boolean_t rc = B_TRUE;
+	isaf_t *inbound_bucket;
+	sadb_t *sp;
+	ipsa_t *pair_sa = NULL;
+	int sa_new_state = 0;
+
+	/* For non counter modes, the IV is random data. */
+	if (!(assoc->ipsa_flags & IPSA_F_COUNTERMODE)) {
+		(void) random_get_pseudo_bytes(iv_ptr, assoc->ipsa_iv_len);
+		return (rc);
+	}
+
+	mutex_enter(&assoc->ipsa_lock);
+
+	(*assoc->ipsa_iv)++;
+
+	if (*assoc->ipsa_iv == assoc->ipsa_iv_hardexpire) {
+		sa_new_state = IPSA_STATE_DEAD;
+		rc = B_FALSE;
+	} else if (*assoc->ipsa_iv == assoc->ipsa_iv_softexpire) {
+		if (assoc->ipsa_state != IPSA_STATE_DYING) {
+			/*
+			 * This SA may have already been expired when its
+			 * PAIR_SA expired.
+			 */
+			sa_new_state = IPSA_STATE_DYING;
+		}
+	}
+	if (sa_new_state) {
+		/*
+		 * If there is a state change, we need to update this SA
+		 * and its "pair", we can find the bucket for the "pair" SA
+		 * while holding the ipsa_t mutex, but we won't actually
+		 * update anything untill the ipsa_t mutex has been released
+		 * for _this_ SA.
+		 */
+		assoc->ipsa_state = sa_new_state;
+		if (assoc->ipsa_addrfam == AF_INET6) {
+			sp = &espstack->esp_sadb.s_v6;
+		} else {
+			sp = &espstack->esp_sadb.s_v4;
+		}
+		inbound_bucket = INBOUND_BUCKET(sp, assoc->ipsa_otherspi);
+		sadb_expire_assoc(pfkey_q, assoc);
+	}
+	if (rc == B_TRUE)
+		bcopy(assoc->ipsa_iv, iv_ptr, assoc->ipsa_iv_len);
+
+	mutex_exit(&assoc->ipsa_lock);
+
+	if (sa_new_state) {
+		/* Find the inbound SA, need to lock hash bucket. */
+		mutex_enter(&inbound_bucket->isaf_lock);
+		pair_sa = ipsec_getassocbyspi(inbound_bucket,
+		    assoc->ipsa_otherspi, assoc->ipsa_dstaddr,
+		    assoc->ipsa_srcaddr, assoc->ipsa_addrfam);
+		mutex_exit(&inbound_bucket->isaf_lock);
+		if (pair_sa != NULL) {
+			mutex_enter(&pair_sa->ipsa_lock);
+			pair_sa->ipsa_state = sa_new_state;
+			mutex_exit(&pair_sa->ipsa_lock);
+			IPSA_REFRELE(pair_sa);
+		}
+	}
+
+	return (rc);
+}
+
+void
+ccm_params_init(ipsa_t *assoc, uchar_t *esph, uint_t data_len, uchar_t *iv_ptr,
+    ipsa_cm_mech_t *cm_mech, crypto_data_t *crypto_data)
+{
+	uchar_t *nonce;
+	crypto_mechanism_t *combined_mech;
+	CK_AES_CCM_PARAMS *params;
+
+	combined_mech = (crypto_mechanism_t *)cm_mech;
+	params = (CK_AES_CCM_PARAMS *)(combined_mech + 1);
+	nonce = (uchar_t *)(params + 1);
+	params->ulMACSize = assoc->ipsa_mac_len;
+	params->ulNonceSize = assoc->ipsa_nonce_len;
+	params->ulAuthDataSize = sizeof (esph_t);
+	params->ulDataSize = data_len;
+	params->nonce = nonce;
+	params->authData = esph;
+
+	cm_mech->combined_mech.cm_type = assoc->ipsa_emech.cm_type;
+	cm_mech->combined_mech.cm_param_len = sizeof (CK_AES_CCM_PARAMS);
+	cm_mech->combined_mech.cm_param = (caddr_t)params;
+	/* See gcm_params_init() for comments. */
+	bcopy(assoc->ipsa_nonce, nonce, assoc->ipsa_saltlen);
+	nonce += assoc->ipsa_saltlen;
+	bcopy(iv_ptr, nonce, assoc->ipsa_iv_len);
+	crypto_data->cd_miscdata = NULL;
+}
+
+/* ARGSUSED */
+void
+cbc_params_init(ipsa_t *assoc, uchar_t *esph, uint_t data_len, uchar_t *iv_ptr,
+    ipsa_cm_mech_t *cm_mech, crypto_data_t *crypto_data)
+{
+	cm_mech->combined_mech.cm_type = assoc->ipsa_emech.cm_type;
+	cm_mech->combined_mech.cm_param_len = 0;
+	cm_mech->combined_mech.cm_param = NULL;
+	crypto_data->cd_miscdata = (char *)iv_ptr;
+}
+
+/* ARGSUSED */
+void
+gcm_params_init(ipsa_t *assoc, uchar_t *esph, uint_t data_len, uchar_t *iv_ptr,
+    ipsa_cm_mech_t *cm_mech, crypto_data_t *crypto_data)
+{
+	uchar_t *nonce;
+	crypto_mechanism_t *combined_mech;
+	CK_AES_GCM_PARAMS *params;
+
+	combined_mech = (crypto_mechanism_t *)cm_mech;
+	params = (CK_AES_GCM_PARAMS *)(combined_mech + 1);
+	nonce = (uchar_t *)(params + 1);
+
+	params->pIv = nonce;
+	params->ulIvLen = assoc->ipsa_nonce_len;
+	params->ulIvBits = SADB_8TO1(assoc->ipsa_nonce_len);
+	params->pAAD = esph;
+	params->ulAADLen = sizeof (esph_t);
+	params->ulTagBits = SADB_8TO1(assoc->ipsa_mac_len);
+
+	cm_mech->combined_mech.cm_type = assoc->ipsa_emech.cm_type;
+	cm_mech->combined_mech.cm_param_len = sizeof (CK_AES_GCM_PARAMS);
+	cm_mech->combined_mech.cm_param = (caddr_t)params;
+	/*
+	 * Create the nonce, which is made up of the salt and the IV.
+	 * Copy the salt from the SA and the IV from the packet.
+	 * For inbound packets we copy the IV from the packet because it
+	 * was set by the sending system, for outbound packets we copy the IV
+	 * from the packet because the IV in the SA may be changed by another
+	 * thread, the IV in the packet was created while holding a mutex.
+	 */
+	bcopy(assoc->ipsa_nonce, nonce, assoc->ipsa_saltlen);
+	nonce += assoc->ipsa_saltlen;
+	bcopy(iv_ptr, nonce, assoc->ipsa_iv_len);
+	crypto_data->cd_miscdata = NULL;
 }

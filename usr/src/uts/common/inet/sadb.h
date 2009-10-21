@@ -47,24 +47,67 @@ typedef enum {
 } ipsec_status_t;
 
 /*
+ * The Initialization Vector (also known as IV or Nonce) used to
+ * initialize the Block Cipher, is made up of a Counter and a Salt.
+ * The Counter is fixed at 64 bits and is incremented for each packet.
+ * The Salt value can be any whole byte value upto 64 bits. This is
+ * algorithm mode specific and can be configured with ipsecalgs(1m).
+ *
+ * We only support whole byte salt lengths, this is because the salt is
+ * stored in an array of uint8_t's. This is enforced by ipsecalgs(1m)
+ * which configures the salt length as a number of bytes. Checks are
+ * made to ensure the salt length defined in ipsecalgs(1m) fits in
+ * the ipsec_nonce_t.
+ *
+ * The Salt value remains constant for the life of the SA, the Salt is
+ * know to both peers, but NOT transmitted on the network. The Counter
+ * portion of the nonce is transmitted over the network with each packet
+ * and is confusingly described as the Initialization Vector by RFCs
+ * 4309/4106.
+ *
+ * The maximum Initialization Vector length is 128 bits, if the actual
+ * size is less, its padded internally by the algorithm.
+ *
+ * The nonce structure is defined like this in the SA (ipsa_t)to ensure
+ * the Initilization Vector (counter) is 64 bit aligned, because it will
+ * be incremented as an uint64_t. The nonce as used by the algorithms is
+ * a straight uint8_t array.
+ *
+ *                     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *                     | | | | |x|x|x|x|               |
+ *                     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ * salt_offset         <------>
+ * ipsa_saltlen                <------->
+ * ipsa_nonce_buf------^
+ * ipsa_salt-------------~~~~~~^
+ * ipsa_nonce------------~~~~~~^
+ * ipsa_iv-----------------------------^
+ */
+typedef struct ipsec_nonce_s {
+	uint8_t		salt[MAXSALTSIZE];
+	uint64_t	iv;
+} ipsec_nonce_t;
+
+/*
  * IP security association.  Synchronization assumes 32-bit loads, so
  * the 64-bit quantities can't even be be read w/o locking it down!
  */
 
 /* keying info */
 typedef struct ipsa_key_s {
-	void *sak_key;		/* Algorithm key. */
+	uint8_t *sak_key;		/* Algorithm key. */
 	uint_t sak_keylen;	/* Algorithm key length (in bytes). */
 	uint_t sak_keybits;	/* Algorithm key length (in bits) */
 	uint_t sak_algid;	/* Algorithm ID number. */
 } ipsa_key_t;
 
-/* the security association */
 typedef struct ipsa_s {
 	struct ipsa_s *ipsa_next;	/* Next in hash bucket */
 	struct ipsa_s **ipsa_ptpn;	/* Pointer to previous next pointer. */
 	kmutex_t *ipsa_linklock;	/* Pointer to hash-chain lock. */
 	void (*ipsa_freefunc)(struct ipsa_s *); /* freeassoc function */
+	void (*ipsa_noncefunc)(struct ipsa_s *, uchar_t *,
+	    uint_t, uchar_t *, ipsa_cm_mech_t *, crypto_data_t *);
 	/*
 	 * NOTE: I may need more pointers, depending on future SA
 	 * requirements.
@@ -139,12 +182,22 @@ typedef struct ipsa_s {
 	time_t ipsa_addtime;	/* Time I was added. */
 	time_t ipsa_usetime;	/* Time of my first use. */
 	time_t ipsa_lastuse;	/* Time of my last use. */
-	time_t	ipsa_idletime;	/* Seconds of idle time */
+	time_t ipsa_idletime;	/* Seconds of idle time */
 	time_t ipsa_last_nat_t_ka;	/* Time of my last NAT-T keepalive. */
 	time_t ipsa_softexpiretime;	/* Time of my first soft expire. */
 	time_t ipsa_hardexpiretime;	/* Time of my first hard expire. */
-	time_t	ipsa_idleexpiretime;	/* Time of my next idle expire time */
+	time_t ipsa_idleexpiretime;	/* Time of my next idle expire time */
 
+	struct ipsec_nonce_s *ipsa_nonce_buf;
+	uint8_t	*ipsa_nonce;
+	uint_t ipsa_nonce_len;
+	uint8_t	*ipsa_salt;
+	uint_t ipsa_saltbits;
+	uint_t ipsa_saltlen;
+	uint64_t *ipsa_iv;
+
+	uint64_t ipsa_iv_hardexpire;
+	uint64_t ipsa_iv_softexpire;
 	/*
 	 * The following fields are directly reflected in PF_KEYv2 LIFETIME
 	 * extensions.  The time_ts are in number-of-seconds, and the bytes
@@ -229,8 +282,9 @@ typedef struct ipsa_s {
 	crypto_ctx_template_t ipsa_encrtmpl;	/* encr context template */
 	crypto_mechanism_t ipsa_amech;		/* auth mech type and ICV len */
 	crypto_mechanism_t ipsa_emech;		/* encr mech type */
-	size_t ipsa_mac_len;			/* auth MAC length */
+	size_t ipsa_mac_len;			/* auth MAC/ICV length */
 	size_t ipsa_iv_len;			/* encr IV length */
+	size_t ipsa_datalen;			/* block length in bytes. */
 
 	/*
 	 * Input and output processing functions called from IP.
@@ -345,6 +399,11 @@ typedef struct ipsa_s {
 #define	IPSA_F_OUTBOUND	SADB_X_SAFLAGS_OUTBOUND	/* SA direction bit */
 #define	IPSA_F_INBOUND	SADB_X_SAFLAGS_INBOUND	/* SA direction bit */
 #define	IPSA_F_TUNNEL	SADB_X_SAFLAGS_TUNNEL
+/*
+ * These flags are only defined here to prevent a flag value collision.
+ */
+#define	IPSA_F_COMBINED	SADB_X_SAFLAGS_EALG1	/* Defined in pfkeyv2.h */
+#define	IPSA_F_COUNTERMODE SADB_X_SAFLAGS_EALG2	/* Defined in pfkeyv2.h */
 
 /*
  * Sets of flags that are allowed to by set or modified by PF_KEY apps.
@@ -630,6 +689,12 @@ int sadb_update_sa(mblk_t *, keysock_in_t *, mblk_t **, sadbp_t *,
     int *, queue_t *, int (*)(mblk_t *, keysock_in_t *, int *, netstack_t *),
     netstack_t *, uint8_t);
 void sadb_acquire(mblk_t *, ipsec_out_t *, boolean_t, boolean_t);
+void gcm_params_init(ipsa_t *, uchar_t *, uint_t, uchar_t *, ipsa_cm_mech_t *,
+    crypto_data_t *);
+void ccm_params_init(ipsa_t *, uchar_t *, uint_t, uchar_t *, ipsa_cm_mech_t *,
+    crypto_data_t *);
+void cbc_params_init(ipsa_t *, uchar_t *, uint_t, uchar_t *, ipsa_cm_mech_t *,
+    crypto_data_t *);
 
 void sadb_destroy_acquire(ipsacq_t *, netstack_t *);
 struct ipsec_stack;
@@ -724,8 +789,13 @@ typedef struct ipsec_alginfo
 	uint8_t		alg_flags;
 	uint16_t	*alg_key_sizes;
 	uint16_t	*alg_block_sizes;
+	uint16_t	*alg_params;
 	uint16_t	alg_nkey_sizes;
+	uint16_t	alg_ivlen;
+	uint16_t	alg_icvlen;
+	uint8_t		alg_saltlen;
 	uint16_t	alg_nblock_sizes;
+	uint16_t	alg_nparams;
 	uint16_t	alg_minbits;
 	uint16_t	alg_maxbits;
 	uint16_t	alg_datalen;
@@ -750,8 +820,6 @@ typedef struct ipsec_alginfo
 } ipsec_alginfo_t;
 
 #define	alg_datalen alg_block_sizes[0]
-
-#define	ALG_FLAG_VALID	0x01
 #define	ALG_VALID(_alg)	((_alg)->alg_flags & ALG_FLAG_VALID)
 
 /*
@@ -766,6 +834,7 @@ extern void ipsec_alg_reg(ipsec_algtype_t, ipsec_alginfo_t *, netstack_t *);
 extern void ipsec_alg_unreg(ipsec_algtype_t, uint8_t, netstack_t *);
 extern void ipsec_alg_fix_min_max(ipsec_alginfo_t *, ipsec_algtype_t,
     netstack_t *ns);
+extern void alg_flag_check(ipsec_alginfo_t *);
 extern void ipsec_alg_free(ipsec_alginfo_t *);
 extern void ipsec_register_prov_update(void);
 extern void sadb_alg_update(ipsec_algtype_t, uint8_t, boolean_t,

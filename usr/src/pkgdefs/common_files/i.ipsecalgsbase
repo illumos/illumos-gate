@@ -19,6 +19,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -48,23 +49,128 @@ do
 		sedcmd="-e 's/CKM_BF_CBC/CKM_BLOWFISH_CBC/'"
 		sedcmd="${sedcmd} -e 's/CKM_BLOWFISH_CBC|128\/32-128,8/"
 		sedcmd="${sedcmd}CKM_BLOWFISH_CBC|128\/32-448,8/'"
+		sedcmd="${sedcmd} -e 's/CKM_BLOWFISH_CBC|128\/32-448,8/"
+		sedcmd="${sedcmd}CKM_BLOWFISH_CBC|128/'"
 		sedcmd="${sedcmd} -e 's/AES_CBC|128|/AES_CBC|128\/128-256,64|/'"
 
 		eval sed $sedcmd $dest > $dest.$$
 		#
 		# Add in SHA-2 support if not already there
 		#
-		awk -F\| '\
-		BEGIN {sha256=0; sha384=0; sha512=0} \
-		/^#/ || /^$/ || /^PROTO/ {print; next}; \
-		{if ($2 == 2) {if ($3 == 5) {sha256=1}; \
-		    if ($3 == 6) {sha384=1}; if ($3 == 7) {sha512=1}; \
-		    print; next}}; \
-		{if ($2 == 3 && $3 == 0) \
-		    {if (!sha256) {print "ALG|2|5|hmac-sha256,sha256,sha-256,hmac-sha-256|CKM_SHA256_HMAC_GENERAL|256|16"; sha256=1}}; \
-		    {if (!sha384) {print "ALG|2|6|hmac-sha384,sha384,sha-384,hmac-sha-384|CKM_SHA384_HMAC_GENERAL|384|24";sha384=1}}; \
-		    {if (!sha512) {print "ALG|2|7|hmac-sha512,sha512,sha-512,hmac-sha-512|CKM_SHA512_HMAC_GENERAL|512|32";sha512=1}} print}' \
-		    $dest.$$ > $dest.2.$$
+		nawk -F\| '\
+		BEGIN {sha256 = 0; sha384 = 0; sha512 = 0;
+		ccm8 = 0; ccm12 = 0; ccm16 = 0;
+		gcm8 = 0; gcm12 = 0; gcm16 = 0; default = 1}
+
+		function add_sha(flag, doi, shasize) {
+			if (flag)
+				return flag;
+
+			printf("ALG|2|%d|", doi);
+			printf("hmac-sha%d,", shasize)
+			printf("sha%d,", shasize)
+			printf("sha-%d,", shasize)
+			printf("hmac-sha-%d|", shasize)
+			printf("CKM_SHA%d_HMAC_GENERAL|", shasize)
+			printf("%d|%d\n", shasize, shasize / 16);
+
+			return 1;
+		}
+
+		function add_combined(doi, block, ivlen, mac, salt, flgs,
+		    mechanism, default, label ) {
+
+			printf("ALG|3|%d|", doi)
+			if (default)
+				printf("%s,", label)
+			printf("%s%d|%s|", label, mac, mechanism)
+			printf("128/128-256,64|%d|", block)
+			printf("%d,%d,%d|%d\n", ivlen, mac, salt, flgs)
+		}
+
+		function add_aes_ccm(flag, doi, block, ivlen, mac, salt, flgs,
+		    default) {
+
+			if (flag)
+				return;
+
+			mechanism = "CKM_AES_CCM"
+			label = "aes-ccm"
+			add_combined(doi, block, ivlen, mac, salt, flgs,
+			    mechanism, default, label)
+		}
+
+		function add_aes_gcm(flag, doi, block, ivlen, mac, salt, flgs,
+		    default) {
+
+			if (flag)
+				return;
+
+			mechanism = "CKM_AES_GCM"
+			label = "aes-gcm"
+			add_combined(doi, block, ivlen, mac, salt, flgs,
+			    mechanism, default, label)
+		}
+
+		/^#/ || /^$/ || /^PROTO/ {print; next};
+		{
+			if ($2 == 2) {
+				if ($3 == 5) {
+					if (sha256) {
+						next;
+					}
+					sha256 = 1;
+				}
+		    		if ($3 == 6) {
+					if (sha384)
+						next;
+					sha384 = 1;
+				}
+				if ($3 == 7) {
+					if (sha512)
+						next;
+					sha512 = 1;
+				}
+
+				print;
+				next;
+			}
+			if ($2 == 3) {
+				if($3 == 0) {
+					# Time to add in missing Auth algs
+					# before the Encr algs.
+					sha256 = add_sha(sha256, 5, 256);
+					sha384 = add_sha(sha384 ,6, 384);
+					sha512 = add_sha(sha512, 7, 512);
+
+					print;
+				} else {
+					if ($3 == 14)
+						ccm8 = 1;
+					if ($3 == 15)
+						ccm12 = 1;
+					if ($3 == 16)
+						ccm16 = 1;
+					if ($3 == 18)
+						gcm8 = 1;
+					if ($3 == 19)
+						gcm12 = 1;	
+					if ($3 == 20)
+						gcm16 = 1;
+
+					print;
+				}
+			}
+		}
+		# Add in ccm/gcm if missing.
+		END {
+			add_aes_ccm(ccm8, 14, 16, 8, 8, 3, 15, 0)
+			add_aes_ccm(ccm12, 15, 16, 8, 12, 3, 15, 0)
+			add_aes_ccm(ccm16, 16, 16, 8, 16, 3, 15, default)
+			add_aes_gcm(gcm8, 18, 16, 8, 8, 4, 23, 0)
+			add_aes_gcm(gcm12, 19, 16, 8, 12, 4, 23, 0)
+			add_aes_gcm(gcm16, 20, 16, 8, 16, 4, 23, default)
+		}' $dest.$$ > $dest.2.$$
 		mv $dest.2.$$ $dest
 		rm $dest.$$
 

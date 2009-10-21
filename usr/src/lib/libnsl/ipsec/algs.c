@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include <sys/types.h>
@@ -159,7 +157,6 @@ build_keysizes(int **sizep, char *input_string)
 			key_sizes[num_sizes] = 0;
 		} while ((token = strtok_r(NULL, comma, &lasts)) != NULL);
 	}
-
 	*sizep = key_sizes;
 
 	return (key_increment);
@@ -193,11 +190,11 @@ build_list(FILE *f, int *num)
 {
 	char line[1024];
 	char *token, *lasts, *alg_names, *ef_name, *key_string, *block_string;
-	char *proto_name;
+	char *proto_name, *params_string;
 	ipsec_proto_t *rc = NULL, *new_proto = NULL;
-	int *block_sizes, *key_sizes;
+	int *block_sizes = NULL, *key_sizes = NULL, *mech_params = NULL;
 	int rc_num = 0, key_increment;
-	int new_num, alg_num, num_sizes;
+	int new_num, alg_num, num_sizes, flags = 0;
 	struct ipsecalgent *curalg, **newalglist;
 	char cur_pkg[1024];
 	boolean_t doing_pkg = B_FALSE;
@@ -364,12 +361,23 @@ build_list(FILE *f, int *num)
 			token = strtok_r(NULL, pipechar, &lasts);
 			if (token == NULL) {
 				(void) snprintf(diag_buf, sizeof (diag_buf),
-				    "cannot read mechanism name for alg %d "
+				    "cannot read block sizes for alg %d "
 				    "(proto %d)", alg_num,
 				    new_proto->proto_num);
 				goto bail;
 			}
 			block_string = token;
+
+			/*
+			 * Check for mechanism params and flags. As these
+			 * are optional, we won't bail if they don't exist.
+			 */
+			token = strtok_r(NULL, pipechar, &lasts);
+			params_string = token;
+
+			token = strtok_r(NULL, pipechar, &lasts);
+			if (token != NULL)
+				flags = atoi(token);
 
 			/* extract key sizes */
 			key_increment = build_keysizes(&key_sizes, key_string);
@@ -383,7 +391,6 @@ build_list(FILE *f, int *num)
 			/* extract block sizes */
 			block_sizes = (int *)malloc(sizeof (int));
 			if (block_sizes == NULL) {
-				free(key_sizes);
 				goto bail;
 			}
 			num_sizes = 0;
@@ -392,7 +399,6 @@ build_list(FILE *f, int *num)
 				(void) snprintf(diag_buf, sizeof (diag_buf),
 				    "invalid block sizes for alg %d (proto %d)",
 				    alg_num, new_proto->proto_num);
-				free(key_sizes);
 				goto bail;
 			}
 			*block_sizes = 0;
@@ -402,8 +408,6 @@ build_list(FILE *f, int *num)
 				nbk = (int *)realloc(block_sizes,
 				    sizeof (int) * ((++num_sizes) + 1));
 				if (nbk == NULL) {
-					free(key_sizes);
-					free(block_sizes);
 					goto bail;
 				}
 				block_sizes = nbk;
@@ -413,17 +417,49 @@ build_list(FILE *f, int *num)
 			} while ((token = strtok_r(NULL, comma, &lasts)) !=
 			    NULL);
 
+			/* extract mech params */
+			mech_params = (int *)malloc(sizeof (int));
+			if (mech_params == NULL) {
+				goto bail;
+			}
+			*mech_params = 0;
+			num_sizes = 0;
+			if (params_string != NULL) {
+				token = strtok_r(params_string, comma, &lasts);
+				if (token == NULL) {
+					(void) snprintf(diag_buf,
+					    sizeof (diag_buf), "invalid mech "
+					    "params for alg %d (proto %d)",
+					    alg_num, new_proto->proto_num);
+					goto bail;
+				}
+				do {
+					int *nbk;
+
+					nbk = (int *)realloc(mech_params,
+					    sizeof (int) * ((++num_sizes) + 1));
+					if (nbk == NULL) {
+						goto bail;
+					}
+					mech_params = nbk;
+					/* Can't check for 0 here... */
+					mech_params[num_sizes - 1] =
+					    atoi(token);
+					mech_params[num_sizes] = 0;
+				} while ((token = strtok_r(NULL, comma, &lasts))
+				    != NULL);
+			}
 			/* Allocate a new struct ipsecalgent. */
 			curalg = (struct ipsecalgent *)calloc(
 			    sizeof (struct ipsecalgent), 1);
 			if (curalg == NULL) {
-				free(key_sizes);
-				free(block_sizes);
 				goto bail;
 			}
 			curalg->a_proto_num = new_num;
 			curalg->a_alg_num = alg_num;
 			curalg->a_block_sizes = block_sizes;
+			curalg->a_alg_flags = flags;
+			curalg->a_mech_params = mech_params;
 			curalg->a_key_sizes = key_sizes;
 			curalg->a_key_increment = key_increment;
 			if ((curalg->a_mech_name = strdup(ef_name)) == NULL) {
@@ -538,6 +574,9 @@ bail:
 		syslog(LOG_ERR, "possibly corrupt %s file: %s\n",
 		    INET_IPSECALGSFILE, diag_buf);
 	}
+	free(key_sizes);
+	free(block_sizes);
+	free(mech_params);
 	_clean_trash(rc, rc_num);
 	return (NULL);
 }
@@ -696,12 +735,15 @@ _duplicate_alg(struct ipsecalgent *orig)
 	rc->a_alg_num = orig->a_alg_num;
 	rc->a_key_increment = orig->a_key_increment;
 	rc->a_mech_name = strdup(orig->a_mech_name);
+	rc->a_alg_flags = orig->a_alg_flags;
 	rc->a_block_sizes = duplicate_intarr(orig->a_block_sizes);
+	rc->a_mech_params = duplicate_intarr(orig->a_mech_params);
 	rc->a_key_sizes = duplicate_intarr(orig->a_key_sizes);
 	rc->a_names = duplicate_strarr(orig->a_names);
 
 	if (rc->a_mech_name == NULL || rc->a_block_sizes == NULL ||
-	    rc->a_key_sizes == NULL || rc->a_names == NULL) {
+	    rc->a_key_sizes == NULL || rc->a_names == NULL ||
+	    rc->a_mech_params == NULL) {
 		freeipsecalgent(rc);
 		return (NULL);
 	}
@@ -924,6 +966,7 @@ freeipsecalgent(struct ipsecalgent *ptr)
 	free(ptr->a_names);
 	free(ptr->a_mech_name);
 	free(ptr->a_block_sizes);
+	free(ptr->a_mech_params);
 	free(ptr->a_key_sizes);
 	free(ptr);
 }

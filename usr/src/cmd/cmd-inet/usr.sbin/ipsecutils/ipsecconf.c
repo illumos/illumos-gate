@@ -3397,6 +3397,18 @@ parse_port(int type, char *port_str, ips_conf_t *conf)
 	return (0);
 }
 
+static boolean_t
+combined_mode(ips_act_props_t *iap)
+{
+	struct ipsecalgent *alg;
+
+	alg = getipsecalgbynum(iap->iap_eencr.alg_id, IPSEC_PROTO_ESP, NULL);
+	if (alg != NULL)
+		freeipsecalgent(alg);
+
+	return (ALG_FLAG_COMBINED & alg->a_alg_flags);
+}
+
 static int
 valid_algorithm(int proto_num, const char *str)
 {
@@ -4150,6 +4162,7 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 	struct protoent *pent;
 	boolean_t saddr, daddr, ipsec_aalg, ipsec_ealg, ipsec_eaalg, dir;
 	boolean_t old_style, new_style, auth_covered, is_no_alg;
+	boolean_t is_combined_mode;
 	struct in_addr mask;
 	int line_no;
 	int ret;
@@ -4177,7 +4190,7 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 
 	(void) memset(cptr, 0, sizeof (ips_conf_t));
 	saddr = daddr = ipsec_aalg = ipsec_ealg = ipsec_eaalg = dir = B_FALSE;
-	old_style = new_style = is_no_alg = B_FALSE;
+	old_style = new_style = is_no_alg = is_combined_mode = B_FALSE;
 	/*
 	 * Get the Pattern. NULL pattern is valid.
 	 */
@@ -4877,11 +4890,7 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 					    IPSEC_CONF_IPSEC_EALGS, line_no);
 					return (-1);
 				}
-				/*
-				 * XXX FUTURE TODO -- set auth_covered here
-				 * if the encryption algorithm is self-
-				 * authenticating, e.g. AES-CCM/GCM.
-				 */
+				is_combined_mode = combined_mode(iap);
 				ipsec_ealg = B_TRUE;
 				break;
 			case SPD_ATTR_ESP_AUTH:
@@ -4897,11 +4906,6 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 					    IPSEC_CONF_IPSEC_EAALGS, line_no);
 					return (-1);
 				}
-				/*
-				 * XXX FUTURE QUESTION -- error if
-				 * auth_covered and ipsec_aalg false
-				 * (e.g. AES-CCM/GCM)?
-				 */
 				i++, line_no++;
 				if (act_props->ap[ap_num].prop[i] == NULL) {
 					error_message(BAD_ERROR,
@@ -4990,6 +4994,17 @@ form_ipsec_conf(act_prop_t *act_props, ips_conf_t *cptr)
 			}
 		}
 
+		if (is_combined_mode) {
+			if (ipsec_eaalg) {
+				warnx(gettext("ERROR: Rule on line %d: "
+				    "Combined mode and esp authentication not "
+				    "supported together."),
+				    arg_indices[line_no] == 0 ? 1 :
+				    arg_indices[line_no]);
+				return (-1);
+			}
+			auth_covered = B_TRUE;
+		}
 		/* Warn here about no authentication! */
 		if (!auth_covered && !is_no_alg) {
 			warnx(gettext("DANGER:  Rule on line %d "

@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,8 +70,6 @@
 
 #ifndef _NETDB_H
 #define	_NETDB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -186,6 +184,8 @@ typedef struct ipsecalgent {
 	int *a_block_sizes;	/* supported block sizes */
 	int *a_key_sizes;	/* supported key sizes */
 	int a_key_increment;	/* key size increment */
+	int *a_mech_params;	/* mechanism specific parameters */
+	int a_alg_flags;	/* algorithm flags */
 } ipsecalgent_t;
 
 /* well-known IPsec protocol numbers */

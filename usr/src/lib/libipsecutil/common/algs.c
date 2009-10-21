@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -42,7 +40,16 @@ static char *preamble =
 "# DO NOT EDIT OR PARSE THIS FILE!\n"
 "#\n"
 "# Use the ipsecalgs(1m) command to change the contents of this file.\n"
-"\n";
+"# The algorithm descriptions contained in this file are synchronised to the\n"
+"# kernel with ipsecalgs -s, the kernel validates the entries at this point."
+"\n\n"
+"# PROTO|protocol-id|protocol-name|exec-mode\n"
+"##  NOTE:  Some protocol numbers are well-known and defined in <netdb.h>\n\n"
+"# ALG|protocol-id|alg-id|name,name,...|ef-id| \n"
+"#        {default/}{key,key..}or{key-key,inc}|block_size or MAC-size|\n"
+"#        [parameter,parameter..]|[flags]\n\n"
+"#\n"
+"## Note:   Parameters and flags only apply to certain algorithms.\n\n";
 
 #define	CFG_PERMS S_IRUSR | S_IRGRP | S_IROTH	/* Perms 0444. */
 #define	CFG_OWNER 0	/* root */
@@ -282,7 +289,23 @@ write_new_algfile(ipsec_proto_t *protos, int num_protos)
 				rc = LIBIPSEC_ALGS_DIAG_ALGSFILEWRITE;
 				goto bail;
 			}
-			FPUT_ERR(fputc('\n', f));
+			FPUT_ERR(fputc('|', f));
+
+			/*
+			 * Some algorithms require extra parameters, these
+			 * are stored in an array. For algorithms that don't
+			 * need these parameters, or flags (below), these
+			 * extra fields in the ipsecalgs file must contain a
+			 * zero. This fuction will get called if a algorithm
+			 * entry is added, at this point the extra fields will
+			 * be added to the file.
+			 */
+			if (list_ints(f, alg->a_mech_params) == -1) {
+				rc = LIBIPSEC_ALGS_DIAG_ALGSFILEWRITE;
+				goto bail;
+			}
+			/* flags */
+			FPRINTF_ERR(fprintf(f, "|%d\n", alg->a_alg_flags));
 		}
 	}
 
@@ -513,7 +536,7 @@ addipsecalg(struct ipsecalgent *newbie, uint_t flags)
 					    current_proto->proto_algs[i]);
 					current_proto->proto_algs[i] = clone;
 					return (write_new_algfile(protos,
-						    num_protos));
+					    num_protos));
 				} else {
 					_clean_trash(protos, num_protos);
 					return (LIBIPSEC_ALGS_DIAG_NOMEM);
