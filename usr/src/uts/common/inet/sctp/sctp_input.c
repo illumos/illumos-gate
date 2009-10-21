@@ -1248,8 +1248,14 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 
 	dlen = ntohs(dc->sdh_len) - sizeof (*dc);
 
-	/* Check for buffer space */
-	if (sctp->sctp_rwnd - sctp->sctp_rxqueued < dlen) {
+	/*
+	 * Check for buffer space. Note if this is the next expected TSN
+	 * we have to take it to avoid deadlock because we cannot deliver
+	 * later queued TSNs and thus clear buffer space without it.
+	 * We drop anything that is purely zero window probe data here.
+	 */
+	if ((sctp->sctp_rwnd - sctp->sctp_rxqueued < dlen) &&
+	    (tsn != sctp->sctp_ftsn || sctp->sctp_rwnd == 0)) {
 		/* Drop and SACK, but don't advance the cumulative TSN. */
 		sctp->sctp_force_sack = 1;
 		dprint(0, ("sctp_data_chunk: exceed rwnd %d rxqueued %d "
@@ -1404,9 +1410,8 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	 */
 	dlen = dmp->b_wptr - (uchar_t *)dc - sizeof (*dc);
 	for (pmp = dmp->b_cont; pmp != NULL; pmp = pmp->b_cont)
-		dlen += pmp->b_wptr - pmp->b_rptr;
+		dlen += MBLKL(pmp);
 	ASSERT(sctp->sctp_rxqueued >= dlen);
-	ASSERT(sctp->sctp_rwnd >= dlen);
 
 	/* Deliver the message. */
 	sctp->sctp_rxqueued -= dlen;
@@ -1424,9 +1429,15 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 			dmp->b_flag = tpfinished ? 0 : SCTP_PARTIAL_DATA;
 			new_rwnd = sctp->sctp_ulp_recv(sctp->sctp_ulpd, dmp,
 			    msgdsize(dmp), 0, &error, NULL);
-			if (new_rwnd > sctp->sctp_rwnd) {
+			/*
+			 * Since we always deliver the next TSN data chunk,
+			 * we may buffer a little more than allowed. In
+			 * that case, just mark the window as 0.
+			 */
+			if (new_rwnd < 0)
+				sctp->sctp_rwnd = 0;
+			else if (new_rwnd > sctp->sctp_rwnd)
 				sctp->sctp_rwnd = new_rwnd;
-			}
 			SCTP_ACK_IT(sctp, tsn);
 		} else {
 			/* Just free the message if we don't have memory. */
@@ -1488,10 +1499,9 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		 */
 		dlen = dmp->b_wptr - dmp->b_rptr - sizeof (*dc);
 		for (pmp = dmp->b_cont; pmp; pmp = pmp->b_cont)
-			dlen += pmp->b_wptr - pmp->b_rptr;
+			dlen += MBLKL(pmp);
 
 		ASSERT(sctp->sctp_rxqueued >= dlen);
-		ASSERT(sctp->sctp_rwnd >= dlen);
 
 		sctp->sctp_rxqueued -= dlen;
 		if (can_deliver) {
@@ -1508,9 +1518,10 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 				    0 : SCTP_PARTIAL_DATA;
 				new_rwnd = sctp->sctp_ulp_recv(sctp->sctp_ulpd,
 				    dmp, msgdsize(dmp), 0, &error, NULL);
-				if (new_rwnd > sctp->sctp_rwnd) {
+				if (new_rwnd < 0)
+					sctp->sctp_rwnd = 0;
+				else if (new_rwnd > sctp->sctp_rwnd)
 					sctp->sctp_rwnd = new_rwnd;
-				}
 				SCTP_ACK_IT(sctp, tsn);
 			} else {
 				freemsg(dmp);
@@ -2150,7 +2161,7 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 			dlen = dmp->b_wptr - dmp->b_rptr - sizeof (*dc);
 			for (pmp = dmp->b_cont; pmp != NULL;
 			    pmp = pmp->b_cont) {
-				dlen += pmp->b_wptr - pmp->b_rptr;
+				dlen += MBLKL(pmp);
 			}
 			if (can_deliver) {
 				int32_t	nrwnd;
@@ -2172,7 +2183,9 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 					nrwnd = sctp->sctp_ulp_recv(
 					    sctp->sctp_ulpd, dmp, msgdsize(dmp),
 					    0, &error, NULL);
-					if (nrwnd > sctp->sctp_rwnd)
+					if (nrwnd < 0)
+						sctp->sctp_rwnd = 0;
+					else if (nrwnd > sctp->sctp_rwnd)
 						sctp->sctp_rwnd = nrwnd;
 				} else {
 					/*

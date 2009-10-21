@@ -2203,7 +2203,7 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 		return (B_FALSE);
 	}
 	/*
-	 * Verify we have atleast ICMP_MIN_TP_HDR_LENGTH bytes of transport
+	 * Verify we have at least ICMP_MIN_TP_HDR_LENGTH bytes of transport
 	 * header.
 	 */
 	if ((uchar_t *)ipha + hdr_length + ICMP_MIN_TP_HDR_LEN >
@@ -2547,13 +2547,13 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 
 	case IPPROTO_SCTP:
 		/*
-		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
-		 * transport header.
+		 * Verify we have at least ICMP_MIN_SCTP_HDR_LEN bytes of
+		 * transport header, in the first mp.
 		 */
-		if ((uchar_t *)ipha + hdr_length + ICMP_MIN_TP_HDR_LEN >
+		if ((uchar_t *)ipha + hdr_length + ICMP_MIN_SCTP_HDR_LEN >
 		    mp->b_wptr) {
 			if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
-			    ICMP_MIN_TP_HDR_LEN - mp->b_rptr)) {
+			    ICMP_MIN_SCTP_HDR_LEN - mp->b_rptr)) {
 				goto discard_pkt;
 			}
 			icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];

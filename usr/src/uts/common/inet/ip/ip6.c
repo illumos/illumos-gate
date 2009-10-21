@@ -79,6 +79,7 @@
 #include <inet/tcp.h>
 #include <inet/tcp_impl.h>
 #include <inet/udp_impl.h>
+#include <inet/sctp/sctp_impl.h>
 #include <inet/ipp_common.h>
 
 #include <inet/ip_multi.h>
@@ -860,12 +861,15 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	}
 	case IPPROTO_SCTP:
 		/*
-		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
-		 * the SCTP header to get the port information.
+		 * Verify we have at least ICMP_MIN_SCTP_HDR_LEN bytes of
+		 * transport header to get the port information.
 		 */
-		if ((uchar_t *)ip6h + hdr_length + ICMP_MIN_TP_HDR_LEN >
+		if ((uchar_t *)ip6h + hdr_length + ICMP_MIN_SCTP_HDR_LEN >
 		    mp->b_wptr) {
-			break;
+			if (!pullupmsg(mp, (uchar_t *)ip6h + hdr_length +
+			    ICMP_MIN_SCTP_HDR_LEN - mp->b_rptr)) {
+				goto drop_pkt;
+			}
 		}
 
 		up = (uint16_t *)((uchar_t *)ip6h + hdr_length);

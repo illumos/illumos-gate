@@ -1134,11 +1134,14 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 		return;
 	}
 
+	/* account for the ip hdr from the icmp message */
 	iph_hdr_length = IPH_HDR_LENGTH(ipha);
 	icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
+	/* now the ip hdr of message resulting in this icmp */
 	ipha = (ipha_t *)&icmph[1];
 	iph_hdr_length = IPH_HDR_LENGTH(ipha);
 	sctph = (sctp_hdr_t *)((char *)ipha + iph_hdr_length);
+	/* first_mp must expose the full sctp header. */
 	if ((uchar_t *)(sctph + 1) >= mp->b_wptr) {
 		/* not enough data for SCTP header */
 		freemsg(first_mp);
@@ -1185,7 +1188,15 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 			fp->sfa_pmss = (new_mtu - sctp->sctp_hdr_len) &
 			    ~(SCTP_ALIGN - 1);
 			fp->pmtu_discovered = 1;
-
+			/*
+			 * It is possible, even likely that a fast retransmit
+			 * attempt has been dropped by ip as a result of this
+			 * error, retransmission bundles as much as possible.
+			 * A retransmit here prevents significant delays waiting
+			 * on the timer. Analogous to behaviour of TCP after
+			 * ICMP too big.
+			 */
+			sctp_rexmit(sctp, fp);
 			break;
 		case ICMP_PORT_UNREACHABLE:
 		case ICMP_PROTOCOL_UNREACHABLE:

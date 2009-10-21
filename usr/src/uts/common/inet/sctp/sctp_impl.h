@@ -191,6 +191,7 @@ typedef struct sctpparam_s {
 #define	SCTP_MAX_COMBINED_HEADER_LENGTH	(60 + 12) /* Maxed out ip + sctp */
 #define	SCTP_MAX_IP_OPTIONS_LENGTH	(60 - IP_SIMPLE_HDR_LENGTH)
 #define	SCTP_MAX_HDR_LENGTH		60
+#define	ICMP_MIN_SCTP_HDR_LEN	(ICMP_MIN_TP_HDR_LEN + sizeof (sctp_hdr_t))
 
 #define	SCTP_SECRET_LEN	16
 
