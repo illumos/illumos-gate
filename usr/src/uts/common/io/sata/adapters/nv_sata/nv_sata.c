@@ -1303,8 +1303,11 @@ nv_sata_probe(dev_info_t *dip, sata_device_t *sd)
 	mutex_exit(&nvp->nvp_mutex);
 
 #ifdef SGPIO_SUPPORT
-	if (nvp->nvp_type != SATA_DTYPE_NONE) {
+	if (nvp->nvp_type == SATA_DTYPE_ATADISK) {
 		nv_sgp_drive_connect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+	} else {
+		nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
 		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
 	}
 #endif
@@ -2140,6 +2143,16 @@ nv_read_signature(nv_port_t *nvp)
 	if (nvp->nvp_signature) {
 		nvp->nvp_state &= ~(NV_PORT_RESET_RETRY | NV_PORT_RESET);
 	}
+
+#ifdef SGPIO_SUPPORT
+	if (nvp->nvp_signature == NV_SIG_DISK) {
+		nv_sgp_drive_connect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+	} else {
+		nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+	}
+#endif
 }
 
 
@@ -2818,6 +2831,13 @@ nv_uninit_port(nv_port_t *nvp)
 
 	NVLOG((NVDBG_INIT, nvp->nvp_ctlp, nvp,
 	    "nv_uninit_port uninitializing"));
+
+#ifdef SGPIO_SUPPORT
+	if (nvp->nvp_type == SATA_DTYPE_ATADISK) {
+		nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+	}
+#endif
 
 	nvp->nvp_type = SATA_DTYPE_NONE;
 
@@ -5379,7 +5399,7 @@ sig_read:
 		 * Clear reset state, set device reset recovery state
 		 */
 		nvp->nvp_state &= ~(NV_PORT_RESET | NV_PORT_RESET_RETRY |
-				    NV_PORT_PROBE);
+		    NV_PORT_PROBE);
 		nvp->nvp_state |= NV_PORT_RESTORE;
 
 		/*
@@ -5490,11 +5510,22 @@ acquire_signature:
 			    nvp->nvp_reset_time)));
 		}
 	}
+
 	if (send_notification) {
 		nv_port_state_change(nvp, SATA_EVNT_DEVICE_RESET,
 		    SATA_ADDR_DCPORT,
 		    SATA_DSTATE_RESET | SATA_DSTATE_PWR_ACTIVE);
 	}
+
+#ifdef SGPIO_SUPPORT
+	if (nvp->nvp_type == SATA_DTYPE_ATADISK) {
+		nv_sgp_drive_connect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+	} else {
+		nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+	}
+#endif
 }
 
 
@@ -5611,7 +5642,7 @@ nv_timeout(void *arg)
 		    spkt->satapkt_time) {
 
 			uint32_t serr = nv_get32(nvp->nvp_ctlp->nvc_bar_hdl[5],
-				nvp->nvp_serror);
+			    nvp->nvp_serror);
 
 			NVLOG((NVDBG_TIMEOUT, nvp->nvp_ctlp, nvp,
 			    "nv_timeout: aborting: "
@@ -5852,11 +5883,6 @@ nv_resume(nv_port_t *nvp)
 	nvp->nvp_state &= ~(NV_PORT_RESTORE | NV_PORT_RESET_RETRY);
 	nv_reset(nvp);
 
-#ifdef SGPIO_SUPPORT
-	nv_sgp_drive_connect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
-	    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
-#endif
-
 	mutex_exit(&nvp->nvp_mutex);
 }
 
@@ -5869,8 +5895,10 @@ nv_suspend(nv_port_t *nvp)
 	mutex_enter(&nvp->nvp_mutex);
 
 #ifdef SGPIO_SUPPORT
-	nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
-	    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+	if (nvp->nvp_type == SATA_DTYPE_ATADISK) {
+		nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+	}
 #endif
 
 	if (nvp->nvp_state & NV_PORT_INACTIVE) {
@@ -6074,6 +6102,10 @@ nv_report_add_remove(nv_port_t *nvp, int flags)
 		    SATA_EVNT_DEVICE_DETACHED,
 		    SATA_ADDR_CPORT, 0);
 
+#ifdef SGPIO_SUPPORT
+		nv_sgp_drive_disconnect(nvp->nvp_ctlp, SGP_CTLR_PORT_TO_DRV(
+		    nvp->nvp_ctlp->nvc_ctlr_num, nvp->nvp_port_num));
+#endif
 	} else {
 		/*
 		 * This is a hot plug or link up indication
@@ -6931,7 +6963,6 @@ nv_sgp_drive_active(nv_ctl_t *nvc, int drive)
 	DTRACE_PROBE1(sgpio__active, int, drive);
 
 	mutex_enter(&cmn->nvs_slock);
-	cmn->nvs_connected |= (1 << drive);
 	cmn->nvs_activity |= (1 << drive);
 	mutex_exit(&cmn->nvs_slock);
 }
