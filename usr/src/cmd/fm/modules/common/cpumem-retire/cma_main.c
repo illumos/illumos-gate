@@ -127,6 +127,8 @@ static const cma_subscriber_t cma_subrs[] = {
 	    NULL },
 	{ "fault.memory.datapath", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
 	    NULL },
+	{ "fault.cpu.intel.quickpath.mem_scrubbing", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, cma_page_retire },
 	{ "fault.cpu.intel.quickpath.*", FM_FMRI_SCHEME_HC,
 	    FM_HC_SCHEME_VERSION, NULL },
 	{ "fault.cpu.generic-x86.mc", FM_FMRI_SCHEME_HC,

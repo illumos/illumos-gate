@@ -94,6 +94,8 @@ f none kernel/drv/intel_nb5000 755 root sys
 f none kernel/drv/intel_nb5000.conf 644 root sys
 f none kernel/drv/intel_nhm 755 root sys
 f none kernel/drv/intel_nhm.conf 644 root sys
+f none kernel/drv/intel_nhmex 755 root sys
+f none kernel/drv/intel_nhmex.conf 644 root sys
 f none kernel/drv/ip 755 root sys
 f none kernel/drv/ip6 755 root sys
 f none kernel/drv/ipnet 755 root sys
@@ -317,6 +319,7 @@ f none kernel/drv/amd64/icmp 755 root sys
 f none kernel/drv/amd64/icmp6 755 root sys
 f none kernel/drv/amd64/intel_nb5000 755 root sys
 f none kernel/drv/amd64/intel_nhm 755 root sys
+f none kernel/drv/amd64/intel_nhmex 755 root sys
 f none kernel/drv/amd64/ip 755 root sys
 f none kernel/drv/amd64/ip6 755 root sys
 f none kernel/drv/amd64/ipnet 755 root sys

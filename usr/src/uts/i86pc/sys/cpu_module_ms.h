@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_CPU_MODULE_MS_H
 #define	_CPU_MODULE_MS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cpuvar.h>
@@ -116,7 +114,8 @@ extern cms_cookie_t cms_disp_match(cmi_hdl_t, int, uint64_t, uint64_t, uint64_t,
     void *);
 extern void cms_ereport_class(cmi_hdl_t, cms_cookie_t, const char **,
     const char **);
-extern nvlist_t *cms_ereport_detector(cmi_hdl_t, cms_cookie_t, nv_alloc_t *);
+extern nvlist_t *cms_ereport_detector(cmi_hdl_t, int, cms_cookie_t,
+    nv_alloc_t *);
 extern boolean_t cms_ereport_includestack(cmi_hdl_t, cms_cookie_t);
 extern void cms_ereport_add_logout(cmi_hdl_t, nvlist_t *, nv_alloc_t *, int,
     uint64_t, uint64_t, uint64_t, void *, cms_cookie_t);

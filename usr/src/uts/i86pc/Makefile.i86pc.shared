@@ -276,6 +276,12 @@ CPU_KMODS	+= authenticamd
 CPU_KMODS	+= genuineintel
 
 #
+# Don't build some of these for OpenSolaris, since they will be
+# replaced by binaries that are signed by Sun Release Engineering.
+#
+$(CLOSED_BUILD)CLOSED_CPU_KMODS	+= intel_nhmex
+
+#
 #	Exec Class Modules (/kernel/exec):
 #
 EXEC_KMODS	+=

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,6 +138,7 @@ extern "C" {
 #define	FM_EREPORT_CPU_GENERIC_MMM_RD		""
 #define	FM_EREPORT_CPU_GENERIC_MMM_WR		""
 #define	FM_EREPORT_CPU_GENERIC_MMM_ADRCMD	""
+#define	FM_EREPORT_CPU_GENERIC_MMM_SCRUB	""
 
 /*
  * Ereport payload member names together with bitmask values to select

@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -76,3 +76,16 @@ fault.cpu.intel.quickpath.mem_spare=47
 fault.cpu.intel.quickpath.mem_bad_id=48
 fault.cpu.intel.quickpath.mem_redundant=49
 fault.cpu.intel.quickpath.interconnect=50
+fault.cpu.intel.quickpath.mem_controller_ce=51
+fault.cpu.intel.quickpath.mem_controller_ue=52
+fault.cpu.intel.quickpath.mem_link_ce=53
+fault.cpu.intel.quickpath.mem_link_ue=54
+fault.cpu.intel.quickpath.mem_failover_mir=55
+fault.cpu.intel.quickpath.mem_scrubbing=56
+fault.cpu.intel.quickpath.llc_ewb=57
+fault.cpu.intel.quickpath.home_agent=58
+fault.cpu.intel.quickpath.sys_cfg=59
+fault.cpu.intel.quickpath.system_cache=60
+fault.cpu.intel.quickpath.bus_interconnect=61
+fault.cpu.intel.has_poison=62
+fault.cpu.intel.discard_fatal=63

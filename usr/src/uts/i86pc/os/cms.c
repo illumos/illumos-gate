@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/cpu_module_ms_impl.h>
@@ -604,12 +602,14 @@ cms_ereport_class(cmi_hdl_t hdl, cms_cookie_t mscookie, const char **cpuclsp,
 }
 
 nvlist_t *
-cms_ereport_detector(cmi_hdl_t hdl, cms_cookie_t mscookie, nv_alloc_t *nva)
+cms_ereport_detector(cmi_hdl_t hdl, int bankno, cms_cookie_t mscookie,
+    nv_alloc_t *nva)
 {
 	cms_t *cms = HDL2CMS(hdl);
 
 	if (CMS_OP_PRESENT(cms, cms_ereport_detector))
-		return (CMS_OPS(cms)->cms_ereport_detector(hdl, mscookie, nva));
+		return (CMS_OPS(cms)->cms_ereport_detector(hdl, bankno,
+		    mscookie, nva));
 	else
 		return (NULL);
 

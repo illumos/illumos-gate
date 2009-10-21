@@ -249,8 +249,10 @@ gintel_ereport_class(cmi_hdl_t hdl, cms_cookie_t mscookie,
 	}
 }
 
+/*ARGSUSED*/
 nvlist_t *
-gintel_ereport_detector(cmi_hdl_t hdl, cms_cookie_t mscookie, nv_alloc_t *nva)
+gintel_ereport_detector(cmi_hdl_t hdl, int bankno, cms_cookie_t mscookie,
+    nv_alloc_t *nva)
 {
 	nvlist_t *nvl = (nvlist_t *)NULL;
 

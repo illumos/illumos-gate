@@ -23,19 +23,10 @@
 # Use is subject to license terms.
 #
 
-SUBDIRS = cpumem-retire \
-	disk-monitor	\
-	disk-transport	\
-	eversholt 	\
-	io-retire	\
-	ip-transport	\
-	sensor-transport \
-	snmp-trapgen	\
-	sp-monitor	\
-	syslog-msgs	\
-	zfs-diagnosis	\
-	zfs-retire	\
-	fdd-msg		\
-	fabric-xlate
+MODULE = fdd-msg
+CLASS = common
+SRCS = fdd_msg.c
 
-include ../../Makefile.subdirs
+include ../../Makefile.plugin
+
+LDLIBS += -lipmi

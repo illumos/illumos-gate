@@ -338,7 +338,7 @@ static struct gcpu_mnexp gcpu_MMM_mnemonics[] = { /* MCAX86_ERRCODE_MMM_* */
 	{ "RD", FM_EREPORT_CPU_GENERIC_MMM_RD },	/* READ  */
 	{ "WR", FM_EREPORT_CPU_GENERIC_MMM_WR },	/* WRITE  */
 	{ "ADDR_CMD", FM_EREPORT_CPU_GENERIC_MMM_ADRCMD },	/* ADDR, CMD  */
-	{ GCPU_MNEMONIC_RESVD, ""},			/* RESERVED  */
+	{ "SCRUB", FM_EREPORT_CPU_GENERIC_MMM_SCRUB },
 	{ GCPU_MNEMONIC_RESVD, ""},			/* RESERVED  */
 	{ GCPU_MNEMONIC_RESVD, ""},			/* RESERVED  */
 	{ GCPU_MNEMONIC_RESVD, ""}			/* RESERVED  */
@@ -843,7 +843,8 @@ gcpu_ereport_post(const gcpu_logout_t *gcl, int bankidx,
 	/*
 	 * The detector FMRI.
 	 */
-	if ((detector = cms_ereport_detector(hdl, mscookie, nva)) == NULL)
+	if ((detector = cms_ereport_detector(hdl, bankidx, mscookie,
+	    nva)) == NULL)
 		detector = gcpu_fmri_create(hdl, nva);
 
 	/*

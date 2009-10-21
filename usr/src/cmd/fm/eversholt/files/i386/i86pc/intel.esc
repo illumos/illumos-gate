@@ -50,7 +50,8 @@ SMPL_EVENT(internal_unclassified, 1s);
  * Propogations for all but "external" and "unknown" simple errors.
  * If the error is uncorrected we produce a fault immediately, otherwise
  * we diagnose it to an upset and decalre a fault when the SERD engine
- * trips.
+ * trips. prop statement for ereport.cpu.intel.internal_unclassified is
+ * moved to the Nehalem EX section to deal with poison case.
  */
 
 engine serd.cpu.intel.simple@chip/core/strand, N=3, T=72h;
@@ -63,7 +64,6 @@ prop fault.cpu.intel.internal@chip/core/strand
     ereport.cpu.intel.internal_timer@chip/core/strand,
     ereport.cpu.intel.internal_parity@chip/core/strand,
     ereport.cpu.intel.unclassified@chip/core/strand,
-    ereport.cpu.intel.internal_unclassified@chip/core/strand,
     ereport.cpu.intel.frc@chip/core/strand;
 
 /*
@@ -174,9 +174,9 @@ CMPND_FLT_PROP_1(l1itlb, l1itlb, 3, 72h);
 CMPND_FLT_PROP_1(l2itlb, l2itlb, 3, 72h);
 CMPND_FLT_PROP_1(itlb, itlb, 12, 72h);
 
-CMPND_FLT_PROP_1(l0tlb, litlb, 3, 72h);
-CMPND_FLT_PROP_1(l1tlb, litlb, 3, 72h);
-CMPND_FLT_PROP_1(l2tlb, litlb, 3, 72h);
+CMPND_FLT_PROP_1(l0tlb, l0tlb, 3, 72h);
+CMPND_FLT_PROP_1(l1tlb, l1tlb, 3, 72h);
+CMPND_FLT_PROP_1(l2tlb, l2tlb, 3, 72h);
 CMPND_FLT_PROP_1(tlb, tlb, 12, 72h);
 
 CMPND_FLT_PROP_1(l0dcache, l0dcache, 3, 72h);
@@ -459,22 +459,26 @@ prop fault.memory.intel.page_ue@
     motherboard/chip/memory-controller/dram-channel/dimm/rank
     { CONTAINS_RANK && (payloadprop_defined("physaddr") ||
     payloadprop_defined("resource[0].hc-specific.offset")) &&
-    SET_ADDR && SET_RES_OFFSET } (1)->
+    SET_ADDR && SET_RES_OFFSET } (0)->
     ereport.cpu.intel.quickpath.mem_ue@motherboard/chip/memory-controller;
 
-event fault.memory.intel.dimm_ue@
-    motherboard/chip/memory-controller/dram-channel/dimm/rank;
+#define	CHIPDIMM motherboard/chip/memory-controller/dram-channel/dimm
 
-prop fault.memory.intel.dimm_ue@
-    motherboard/chip/memory-controller/dram-channel/dimm/rank
+event fault.memory.intel.dimm_ue@CHIPDIMM/rank;
+
+event error.memory.intel.dimm_ue_ep@CHIPDIMM/rank;
+event error.memory.intel.dimm_ue_ex@CHIPDIMM/rank;
+
+prop fault.memory.intel.dimm_ue@CHIPDIMM/rank (1)->
+   error.memory.intel.dimm_ue_ep@CHIPDIMM/rank,
+   error.memory.intel.dimm_ue_ex@CHIPDIMM/rank;
+
+prop error.memory.intel.dimm_ue_ep@CHIPDIMM/rank
     { CONTAINS_RANK } (1)->
     ereport.cpu.intel.quickpath.mem_ue@motherboard/chip/memory-controller;
 
-prop fault.memory.intel.dimm_ue@
-    motherboard/chip/memory-controller/dram-channel/dimm/rank (0)->
-    EREPORT_BUS_ERROR;
+prop fault.memory.intel.dimm_ue@CHIPDIMM/rank (0)-> EREPORT_BUS_ERROR;
 
-#define	CHIPDIMM motherboard/chip/memory-controller/dram-channel/dimm
 event ereport.cpu.intel.quickpath.mem_ce@
     motherboard/chip/memory-controller{within(12s)};
 
@@ -485,7 +489,7 @@ event fault.memory.intel.page_ce@CHIPDIMM/rank, message=0, response=0,
 prop fault.memory.intel.page_ce@CHIPDIMM/rank
     { CONTAINS_RANK && (payloadprop_defined("physaddr") ||
     payloadprop_defined("resource[0].hc-specific.offset")) &&
-    SET_ADDR && SET_RES_OFFSET } (1)->
+    SET_ADDR && SET_RES_OFFSET } (0)->
     ereport.cpu.intel.quickpath.mem_ce@motherboard/chip/memory-controller;
 
 engine serd.memory.intel.dimm_ce@CHIPDIMM, N=PAGE_CE_COUNT, T=PAGE_CE_TIME;
@@ -493,14 +497,14 @@ event fault.memory.intel.dimm_ce@CHIPDIMM,
     engine=serd.memory.intel.dimm_ce@CHIPDIMM;
 prop fault.memory.intel.dimm_ce@CHIPDIMM
     { !confprop_defined(CHIPDIMM, "dimm-size") &&
-    count(STAT_CPU_MEM_CE_PGFLTS) > 512 } (1)->
+    count(STAT_CPU_MEM_CE_PGFLTS) > 512 } (0)->
     ereport.cpu.intel.quickpath.mem_ce@motherboard/chip/memory-controller;
 
 #define	CPU_MEM_DIMM_CE(dimm_size, n, t, fault_rate) \
 	prop fault.memory.intel.dimm_ce@CHIPDIMM { \
 	    confprop(CHIPDIMM, "dimm-size") == dimm_size && \
 	    count(STAT_CPU_MEM_CE_PGFLTS) > fault_rate && \
-	    setserdn(n) & setserdt(t) } (1)-> \
+	    setserdn(n) & setserdt(t) } (0)-> \
 	    ereport.cpu.intel.quickpath.mem_ce@ \
 	    motherboard/chip/memory-controller;
 
@@ -597,7 +601,6 @@ prop upset.cpu.intel.quickpath.interconnect@motherboard/chip
     { !STATUS_UC } (1)->
     ereport.cpu.intel.quickpath.interconnect@motherboard/chip;
 
-
 engine serd.cpu.intel.quickpath.interconnect@motherboard/chip,
 	N=3, T=72h;
 event fault.cpu.intel.quickpath.interconnect@motherboard/chip,
@@ -607,3 +610,340 @@ event fault.cpu.intel.quickpath.interconnect@motherboard/chip,
 prop fault.cpu.intel.quickpath.interconnect@motherboard/chip
     { STATUS_UC } (0)->
     ereport.cpu.intel.quickpath.interconnect@motherboard/chip;
+
+
+/*
+ * Nehalem EX specific rules
+ */
+/* MBox errors */
+#define EX_MEM_EVENT(leafclass, t) \
+	event ereport.cpu.intel.quickpath.leafclass@ \
+        motherboard/chip/memory-controller { within(t) }
+
+EX_MEM_EVENT(mem_lnktrns, 1s);
+EX_MEM_EVENT(mem_lnkpers, 1s);
+EX_MEM_EVENT(mem_sbfbdlinkerr, 1s);
+EX_MEM_EVENT(mem_nbfbdlnkerr, 1s);
+EX_MEM_EVENT(mem_lnkcrcvld, 1s);
+
+engine serd.cpu.intel.quickpath.mem_link_ce@motherboard/chip/memory-controller,
+      N=500, T=1week;
+event fault.cpu.intel.quickpath.mem_link_ce@motherboard/chip/memory-controller,
+      engine=serd.cpu.intel.quickpath.mem_link_ce@motherboard/chip/memory-controller,
+      retire=0, response=0;
+
+prop fault.cpu.intel.quickpath.mem_link_ce@motherboard/chip/memory-controller ->
+    ereport.cpu.intel.quickpath.mem_lnktrns@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_lnkpers@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_sbfbdlinkerr@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_nbfbdlnkerr@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_lnkcrcvld@motherboard/chip/memory-controller;
+
+EX_MEM_EVENT(mem_lnkuncorr_uc, 1s);
+EX_MEM_EVENT(mem_lnkpers_uc, 1s);
+EX_MEM_EVENT(mem_sbfbdlinkerr_uc, 1s);
+EX_MEM_EVENT(mem_nbfbdlnkerr_uc, 1s);
+EX_MEM_EVENT(mem_lnkcrcvld_uc, 1s);
+
+event fault.cpu.intel.quickpath.mem_link_ue@motherboard/chip/memory-controller,
+      retire=0;
+
+prop fault.cpu.intel.quickpath.mem_link_ue@motherboard/chip/memory-controller ->
+    ereport.cpu.intel.quickpath.mem_lnkuncorr_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_lnkpers_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_sbfbdlinkerr_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_nbfbdlnkerr_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_lnkcrcvld_uc@motherboard/chip/memory-controller;
+
+EX_MEM_EVENT(mem_ptrl_fsm_err, 1s);
+EX_MEM_EVENT(mem_errflw_fsm_fail, 1s);
+EX_MEM_EVENT(mem_vberr, 1s);
+
+engine serd.cpu.intel.quickpath.mem_controller_ce@motherboard/chip/memory-controller,
+      N=500, T=1week;
+event fault.cpu.intel.quickpath.mem_controller_ce@motherboard/chip/memory-controller,
+      engine=serd.cpu.intel.quickpath.mem_controller_ce@motherboard/chip/memory-controller,
+      retire=0, response=0;
+
+prop fault.cpu.intel.quickpath.mem_controller_ce@motherboard/chip/memory-controller ->
+    ereport.cpu.intel.quickpath.mem_ptrl_fsm_err@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_errflw_fsm_fail@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_vberr@motherboard/chip/memory-controller;
+
+EX_MEM_EVENT(mem_ptrl_fsm_err_uc, 1s);
+EX_MEM_EVENT(mem_errflw_fsm_fail_uc, 1s);
+EX_MEM_EVENT(mem_mcpar_fsmerr_uc, 1s);
+EX_MEM_EVENT(mem_vberr_uc, 1s);
+EX_MEM_EVENT(mem_fberr_uc, 1s);
+
+event fault.cpu.intel.quickpath.mem_controller_ue@motherboard/chip/memory-controller,
+      retire=0;
+
+prop fault.cpu.intel.quickpath.mem_controller_ue@motherboard/chip/memory-controller ->
+    ereport.cpu.intel.quickpath.mem_ptrl_fsm_err_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_errflw_fsm_fail_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_mcpar_fsmerr_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_vberr_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_fberr_uc@motherboard/chip/memory-controller;
+
+EX_MEM_EVENT(mem_scrubbing_uc, 1s);
+event fault.cpu.intel.quickpath.mem_scrubbing@
+    motherboard/chip/memory-controller/dram-channel/dimm/rank,
+    response=0;
+
+prop fault.cpu.intel.quickpath.mem_scrubbing@
+    motherboard/chip/memory-controller/dram-channel/dimm/rank[rank_num]
+    { payloadprop_defined("rank") && rank_num == payloadprop("rank") &&
+      (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
+      SET_ADDR && SET_OFFSET } (1)->
+    ereport.cpu.intel.quickpath.mem_scrubbing_uc@motherboard/chip/memory-controller;
+
+EX_MEM_EVENT(mem_ecc_uc, 12s);
+EX_MEM_EVENT(mem_even_parity_uc, 1s);
+
+EX_MEM_EVENT(mem_ecc, 12s);
+EX_MEM_EVENT(mem_even_parity, 1s);
+
+event error.memory.intel.ex_dimm_ce@
+    motherboard/chip/memory-controller/dram-channel/dimm/rank;
+
+prop fault.memory.intel.page_ue@
+    motherboard/chip/memory-controller/dram-channel/dimm/rank[rank_num]
+    { payloadprop_defined("rank") && rank_num == payloadprop("rank") &&
+      (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
+      SET_ADDR && SET_OFFSET } (0)->
+    ereport.cpu.intel.quickpath.mem_ecc_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_even_parity_uc@motherboard/chip/memory-controller;
+
+prop fault.memory.intel.page_ce@
+    motherboard/chip/memory-controller/dram-channel/dimm/rank[rank_num]
+    { payloadprop_defined("rank") && rank_num == payloadprop("rank") &&
+      (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
+      SET_ADDR && SET_OFFSET } (0)->
+    ereport.cpu.intel.quickpath.mem_ecc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_even_parity@motherboard/chip/memory-controller;
+
+prop error.memory.intel.dimm_ue_ex@
+    motherboard/chip/memory-controller/dram-channel/dimm/rank[rank_num]
+    { payloadprop_defined("rank") && rank_num == payloadprop("rank") } (1)->
+    ereport.cpu.intel.quickpath.mem_ecc_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_even_parity_uc@motherboard/chip/memory-controller;
+
+prop fault.memory.intel.dimm_ce@
+    motherboard/chip/memory-controller/dram-channel/dimm
+    { !confprop_defined(motherboard/chip/memory-controller/dram-channel/dimm,
+    "dimm-size") && setserdn(10) & setserdt(1week) } (0)->
+    error.memory.intel.ex_dimm_ce@
+     motherboard/chip/memory-controller/dram-channel/dimm/rank;
+prop error.memory.intel.ex_dimm_ce@
+    motherboard/chip/memory-controller/dram-channel/dimm/rank[rank_num]
+    { payloadprop_defined("rank") && rank_num == payloadprop("rank") &&
+      !confprop_defined(motherboard/chip/memory-controller/dram-channel/dimm,
+    "dimm-size") &&
+    count(STAT_CPU_MEM_CE_PGFLTS) > 512 } (1)->
+    ereport.cpu.intel.quickpath.mem_ecc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_even_parity@motherboard/chip/memory-controller;
+
+#define	EX_CPU_MEM_DIMM_CE(dimm_size, n, t, fault_rate) \
+	prop fault.memory.intel.dimm_ce@ \
+	    motherboard/chip/memory-controller/dram-channel/dimm { \
+	    confprop(motherboard/chip/memory-controller/dram-channel/dimm, \
+	    "dimm-size") == dimm_size && \
+	    setserdn(n) & setserdt(t) } (0)-> \
+	    error.memory.intel.ex_dimm_ce@ \
+	    motherboard/chip/memory-controller/dram-channel/dimm/rank; \
+	prop error.memory.intel.ex_dimm_ce@ \
+	    motherboard/chip/memory-controller/dram-channel/dimm/rank[rank_num] { \
+            payloadprop_defined("rank") && rank_num == payloadprop("rank") && \
+	    confprop(motherboard/chip/memory-controller/dram-channel/dimm, \
+	    "dimm-size") == dimm_size && \
+	    count(STAT_CPU_MEM_CE_PGFLTS) > fault_rate } (1)-> \
+            ereport.cpu.intel.quickpath.mem_ecc@motherboard/chip/memory-controller, \
+            ereport.cpu.intel.quickpath.mem_even_parity@motherboard/chip/memory-controller;
+
+EX_CPU_MEM_DIMM_CE("16G", 16, 1week, 2000)
+EX_CPU_MEM_DIMM_CE("8G", 8, 1week, 2000)
+EX_CPU_MEM_DIMM_CE("4G", 4, 1week, 1500)
+EX_CPU_MEM_DIMM_CE("2G", 4, 2week, 1000)
+EX_CPU_MEM_DIMM_CE("1G", 4, 4week, 500)
+
+event upset.memory.intel.discard@motherboard/chip/memory-controller{within(1s)};
+
+prop upset.memory.intel.discard@motherboard/chip/memory-controller (0)->
+    ereport.cpu.intel.quickpath.mem_scrubbing_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_ecc_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_even_parity_uc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_ecc@motherboard/chip/memory-controller,
+    ereport.cpu.intel.quickpath.mem_even_parity@motherboard/chip/memory-controller;
+
+EX_MEM_EVENT(mem_failover_mir, 1s);
+event fault.cpu.intel.quickpath.mem_failover_mir@motherboard/chip/memory-controller,
+      retire=0;
+
+prop fault.cpu.intel.quickpath.mem_failover_mir@motherboard/chip/memory-controller ->
+    ereport.cpu.intel.quickpath.mem_failover_mir@motherboard/chip/memory-controller;
+
+/*
+ * RBox errors
+ */
+#define EX_EVENT(leafclass, t) \
+	event ereport.cpu.intel.quickpath.leafclass@motherboard/chip { within(t) }
+
+engine serd.cpu.intel.quickpath.bus_interconnect@motherboard/chip,
+	N=3, T=72h;
+event fault.cpu.intel.quickpath.bus_interconnect@motherboard/chip,
+    engine=serd.cpu.intel.quickpath.bus_interconnect@motherboard/chip,
+    retire=0;
+
+EX_EVENT(bus_retry_abort, 1s);
+EX_EVENT(bus_link_init_ce, 1s);
+event upset.cpu.intel.quickpath.discard@motherboard/chip;
+
+prop upset.cpu.intel.quickpath.discard@motherboard/chip (0)->
+    ereport.cpu.intel.quickpath.bus_retry_abort@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_link_init_ce@motherboard/chip;
+
+EX_EVENT(bus_unknown, 1s);
+EX_EVENT(bus_single_ecc, 1s);
+EX_EVENT(bus_crc_flit, 1s);
+
+prop fault.cpu.intel.quickpath.bus_interconnect@motherboard/chip (0)->
+    ereport.cpu.intel.quickpath.bus_unknown@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_single_ecc@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_crc_flit@motherboard/chip;
+
+EX_EVENT(bus_unknown_external, 1s);
+EX_EVENT(bus_crc_flit_external, 1s);
+prop upset.cpu.intel.quickpath.discard@motherboard/chip (0)->
+    ereport.cpu.intel.quickpath.bus_unknown_external@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_crc_flit_external@motherboard/chip;
+
+EX_EVENT(bus_unknown_uc, 1s);
+EX_EVENT(bus_opr_poison_err, 1s);
+EX_EVENT(bus_eot_parity, 1s);
+EX_EVENT(bus_rta_parity, 1s);
+EX_EVENT(bus_bad_sbu_route, 1s);
+EX_EVENT(bus_bad_msg, 1s);
+EX_EVENT(bus_bad_vn_credit, 1s);
+EX_EVENT(bus_hdr_double_ecc, 1s);
+EX_EVENT(bus_link_retry_err, 1s);
+
+prop fault.cpu.intel.quickpath.bus_interconnect@motherboard/chip
+    { setserdincrement(4) } (0)->
+    ereport.cpu.intel.quickpath.bus_unknown_uc@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_opr_poison_err@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_eot_parity@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_rta_parity@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_bad_sbu_route@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_bad_msg@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_bad_vn_credit@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_hdr_double_ecc@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_link_retry_err@motherboard/chip;
+
+EX_EVENT(bus_unknown_uc_external, 1s);
+EX_EVENT(bus_opr_poison_err_external, 1s);
+EX_EVENT(bus_eot_parity_external, 1s);
+EX_EVENT(bus_rta_parity_external, 1s);
+EX_EVENT(bus_bad_sbu_route_external, 1s);
+EX_EVENT(bus_bad_msg_external, 1s);
+EX_EVENT(bus_bad_vn_credit_external, 1s);
+EX_EVENT(bus_hdr_double_ecc_external, 1s);
+EX_EVENT(bus_link_retry_err_external, 1s);
+ 
+prop upset.cpu.intel.quickpath.discard@motherboard/chip (0)->
+    ereport.cpu.intel.quickpath.bus_unknown_uc_external@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_opr_poison_err_external@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_eot_parity_external@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_rta_parity_external@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_bad_sbu_route_external@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_bad_msg_external@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_bad_vn_credit_external@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_hdr_double_ecc_external@motherboard/chip,
+    ereport.cpu.intel.quickpath.bus_link_retry_err_external@motherboard/chip;
+
+/*
+ * CBox errors
+ */
+EX_EVENT(llc_ewb_uc, 1s);
+event fault.cpu.intel.quickpath.llc_ewb@motherboard/chip,
+      retire=0, response=0;
+
+prop fault.cpu.intel.quickpath.llc_ewb@motherboard/chip 
+    { (payloadprop_defined("physaddr") || payloadprop_defined("offset")) &&
+    SET_ADDR && SET_OFFSET } (1)->
+    ereport.cpu.intel.quickpath.llc_ewb_uc@motherboard/chip;
+
+prop upset.cpu.intel.quickpath.discard@motherboard/chip (0)->
+    ereport.cpu.intel.quickpath.llc_ewb_uc@motherboard/chip;
+
+/*
+ * SBox errors
+ */
+EX_EVENT(system_cache_uc, 1s);
+event fault.cpu.intel.quickpath.system_cache@motherboard/chip,
+      retire=0, response=0;
+prop fault.cpu.intel.quickpath.system_cache@motherboard/chip ->
+    ereport.cpu.intel.quickpath.system_cache_uc@motherboard/chip;
+
+/*
+ * BBox errors
+ */
+EX_EVENT(home_agent_uc, 1s);
+event fault.cpu.intel.quickpath.home_agent@motherboard/chip,
+      retire=0, response=0;
+prop fault.cpu.intel.quickpath.home_agent@motherboard/chip ->
+    ereport.cpu.intel.quickpath.home_agent_uc@motherboard/chip;
+
+/*
+ * UBox errors
+ */
+EX_EVENT(sys_cfg_cfa_ecc, 1s);
+EX_EVENT(sys_cfg_uc, 1s);
+
+engine serd.cpu.intel.quickpath.sys_cfg@motherboard/chip,
+      N=2, T=72h;
+event fault.cpu.intel.quickpath.sys_cfg@motherboard/chip,
+      engine=serd.cpu.intel.quickpath.sys_cfg@motherboard/chip,
+      retire=0, response=0;
+
+prop fault.cpu.intel.quickpath.sys_cfg@motherboard/chip (0)->
+    ereport.cpu.intel.quickpath.sys_cfg_cfa_ecc@motherboard/chip;
+
+prop fault.cpu.intel.quickpath.sys_cfg@motherboard/chip
+    { setserdincrement(3) } (0)->
+    ereport.cpu.intel.quickpath.sys_cfg_uc@motherboard/chip;
+
+/*
+ * Handling poison errors
+ */
+engine stat.has_poison@motherboard;
+event fault.cpu.intel.has_poison@motherboard,
+      count=stat.has_poison@motherboard[0],
+      message=0, retire=0, response=0;
+engine stat.discard_fatal@motherboard;
+event fault.cpu.intel.discard_fatal@motherboard,
+      count=stat.discard_fatal@motherboard[0],
+      message=0, retire=0, response=0;
+
+prop fault.cpu.intel.has_poison@motherboard
+    { payloadprop_defined("poison") && 1 == payloadprop("poison") } (1)->
+    ereport.cpu.intel.quickpath.mem_scrubbing_uc@motherboard/chip<>/memory-controller<>,
+    ereport.cpu.intel.quickpath.llc_ewb_uc@motherboard/chip<>,
+    ereport.cpu.intel.quickpath.system_cache_uc@motherboard/chip<>,
+    ereport.cpu.intel.quickpath.bus_opr_poison_err@motherboard/chip<>,
+    ereport.cpu.intel.quickpath.bus_opr_poison_err_external@motherboard/chip<>;
+
+prop fault.cpu.intel.discard_fatal@motherboard
+    { count(stat.has_poison@motherboard[0]) > count(stat.discard_fatal@motherboard[0]) &&
+      payloadprop_defined("bank_number") && 5 == payloadprop("bank_number") &&
+      payloadprop_defined("processor_context_corrupt") &&
+      1 == payloadprop("processor_context_corrupt") } (0)->
+    ereport.cpu.intel.internal_unclassified@chip<>/core<>/strand<>;
+
+prop fault.cpu.intel.internal@chip/core/strand
+    { (count(stat.has_poison@motherboard[0]) <= count(stat.discard_fatal@motherboard[0]) ||
+      !payloadprop_defined("bank_number") || 5 != payloadprop("bank_number") ||
+      !payloadprop_defined("processor_context_corrupt") ||
+      0 == payloadprop("processor_context_corrupt")) &&
+      (payloadprop("error_uncorrected") == 1 ? setserdincrement(4) : 1) } (0)->
+    ereport.cpu.intel.internal_unclassified@chip/core/strand;

@@ -53,10 +53,12 @@ d none platform/i86pc/kernel/cpu/amd64 755 root sys
 f none platform/i86pc/kernel/cpu/amd64/cpu_ms.AuthenticAMD 755 root sys
 f none platform/i86pc/kernel/cpu/amd64/cpu_ms.AuthenticAMD.15 755 root sys
 f none platform/i86pc/kernel/cpu/amd64/cpu_ms.GenuineIntel 755 root sys
+f none platform/i86pc/kernel/cpu/amd64/cpu_ms.GenuineIntel.6.46 755 root sys
 f none platform/i86pc/kernel/cpu/amd64/cpu.generic 755 root sys
 f none platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD 755 root sys
 f none platform/i86pc/kernel/cpu/cpu_ms.AuthenticAMD.15 755 root sys
 f none platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel 755 root sys
+f none platform/i86pc/kernel/cpu/cpu_ms.GenuineIntel.6.46 755 root sys
 f none platform/i86pc/kernel/cpu/cpu.generic 755 root sys
 d none platform/i86pc/kernel/dacf 755 root sys
 f none platform/i86pc/kernel/dacf/consconfig_dacf 755 root sys

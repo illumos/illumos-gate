@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_CPU_MODULE_MS_IMPL_H
 #define	_CPU_MODULE_MS_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/cpu_module_ms.h>
 #include <sys/cpuvar.h>
@@ -71,7 +69,7 @@ typedef struct cms_ops {
 	    uint64_t, void *);
 	void (*cms_ereport_class)(cmi_hdl_t, cms_cookie_t, const char **,
 	    const char **);
-	nvlist_t *(*cms_ereport_detector)(cmi_hdl_t, cms_cookie_t,
+	nvlist_t *(*cms_ereport_detector)(cmi_hdl_t, int, cms_cookie_t,
 	    nv_alloc_t *);
 	boolean_t (*cms_ereport_includestack)(cmi_hdl_t, cms_cookie_t);
 	void (*cms_ereport_add_logout)(cmi_hdl_t, nvlist_t *,

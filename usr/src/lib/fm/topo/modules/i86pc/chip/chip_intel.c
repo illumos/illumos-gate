@@ -158,7 +158,7 @@ mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
 
 static void
 mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
-    nvlist_t **nvl, uint_t ndimms, int maxranks)
+    nvlist_t **nvl, uint_t ndimms, int maxdimms, int maxranks)
 {
 	int i;
 	nvlist_t *fmri;
@@ -168,18 +168,21 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 	nvlist_t **ranks_nvp;
 	int32_t start_rank = -1;
 	uint_t nranks = 0;
+	uint32_t dimm_number;
 	char *serial = NULL;
 	char *part = NULL;
 	char *rev = NULL;
 	char *label = NULL;
 	char *name;
 
-	if (topo_node_range_create(mod, pnode, DIMM, 0, ndimms-1) < 0) {
+	if (topo_node_range_create(mod, pnode, DIMM, 0,
+	    maxdimms ? maxdimms-1 : ndimms-1) < 0) {
 		whinge(mod, NULL,
 		    "mc_add_dimms: node range create failed\n");
 		return;
 	}
 	for (i = 0; i < ndimms; i++) {
+		dimm_number = i;
 		for (nvp = nvlist_next_nvpair(nvl[i], NULL); nvp != NULL;
 		    nvp = nvlist_next_nvpair(nvl[i], nvp)) {
 			name = nvpair_name(nvp);
@@ -196,17 +199,19 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 				(void) nvpair_value_string(nvp, &rev);
 			} else if (strcmp(name, FM_FAULT_FRU_LABEL) == 0) {
 				(void) nvpair_value_string(nvp, &label);
+			} else if (strcmp(name, MCINTEL_NVLIST_DIMM_NUM) == 0) {
+				(void) nvpair_value_uint32(nvp, &dimm_number);
 			}
 		}
 		fmri = NULL;
 		fmri = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION,
-		    DIMM, i, NULL, auth, part, rev, serial);
+		    DIMM, dimm_number, NULL, auth, part, rev, serial);
 		if (fmri == NULL) {
 			whinge(mod, NULL,
 			    "mc_add_dimms: topo_mod_hcfmri failed\n");
 			return;
 		}
-		if ((dnode = topo_node_bind(mod, pnode, DIMM, i,
+		if ((dnode = topo_node_bind(mod, pnode, DIMM, dimm_number,
 		    fmri)) == NULL) {
 			nvlist_free(fmri);
 			whinge(mod, NULL, "mc_add_dimms: node bind failed"
@@ -236,15 +241,15 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 			(void) topo_node_label_set(dnode, label, &err);
 
 		if (nranks) {
-			mc_add_ranks(mod, dnode, auth, i, ranks_nvp, start_rank,
-			    nranks, serial, part, rev, maxranks);
+			mc_add_ranks(mod, dnode, auth, dimm_number, ranks_nvp,
+			    start_rank, nranks, serial, part, rev, maxranks);
 		}
 	}
 }
 
 static int
 mc_add_channel(topo_mod_t *mod, tnode_t *pnode, int channel, nvlist_t *auth,
-    nvlist_t *nvl, int maxranks)
+    nvlist_t *nvl, int maxdimms, int maxranks)
 {
 	tnode_t *mc_channel;
 	nvlist_t *fmri;
@@ -270,7 +275,8 @@ mc_add_channel(topo_mod_t *mod, tnode_t *pnode, int channel, nvlist_t *auth,
 	(void) topo_pgroup_create(mc_channel, &dimm_channel_pgroup, &err);
 	if (nvlist_lookup_nvlist_array(nvl, MCINTEL_NVLIST_DIMMS, &dimm_nvl,
 	    &ndimms) == 0) {
-		mc_add_dimms(mod, mc_channel, auth, dimm_nvl, ndimms, maxranks);
+		mc_add_dimms(mod, mc_channel, auth, dimm_nvl, ndimms, maxdimms,
+		    maxranks);
 	}
 	for (nvp = nvlist_next_nvpair(nvl, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(nvl, nvp)) {
@@ -292,6 +298,7 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 	int channel;
 	uint8_t nmc;
 	uint8_t maxranks;
+	uint8_t maxdimms;
 	tnode_t *mcnode;
 	nvlist_t *fmri;
 	nvlist_t **channel_nvl;
@@ -323,6 +330,8 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 	}
 	if (nvlist_lookup_uint8(nvl, MCINTEL_NVLIST_NRANKS, &maxranks) != 0)
 		maxranks = 2;
+	if (nvlist_lookup_uint8(nvl, MCINTEL_NVLIST_NDIMMS, &maxdimms) != 0)
+		maxdimms = 0;
 	if (topo_node_range_create(mod, pnode, name, 0, nmc-1) < 0) {
 		whinge(mod, NULL,
 		    "mc_nb_create: node range create failed\n");
@@ -354,7 +363,7 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 		}
 		for (j = 0; j < nchannels; j++) {
 			if (mc_add_channel(mod, mcnode, channel, auth,
-			    channel_nvl[channel], maxranks) < 0) {
+			    channel_nvl[channel], maxdimms, maxranks) < 0) {
 				return (-1);
 			}
 			channel++;
@@ -365,6 +374,7 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 			if (strcmp(pname, MCINTEL_NVLIST_MC) != 0 &&
 			    strcmp(pname, MCINTEL_NVLIST_NMEM) != 0 &&
 			    strcmp(pname, MCINTEL_NVLIST_NRANKS) != 0 &&
+			    strcmp(pname, MCINTEL_NVLIST_NDIMMS) != 0 &&
 			    strcmp(pname, MCINTEL_NVLIST_VERSTR) != 0 &&
 			    strcmp(pname, MCINTEL_NVLIST_MEM) != 0) {
 				(void) nvprop_add(mod, nvp, PGNAME(MCT),

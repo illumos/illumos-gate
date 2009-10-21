@@ -823,3 +823,211 @@ msgid "INTEL-8001-KP.impact"
 msgstr "System may panic or be reset by BIOS"
 msgid "INTEL-8001-KP.action"
 msgstr "Schedule a repair procedure to check seating of proccessors"
+#
+# code: INTEL-8001-LA
+# keys: fault.cpu.intel.quickpath.mem_controller_ce
+#
+msgid "INTEL-8001-LA.type"
+msgstr "Fault"
+msgid "INTEL-8001-LA.severity"
+msgstr "Major"
+msgid "INTEL-8001-LA.description"
+msgstr "A quickpath memory controller correctable error was detected.  Refer to %s for more information."
+msgid "INTEL-8001-LA.response"
+msgstr "Processor is not off-lined, as the memory controller on the CPU chip is still accessible by other processors"
+msgid "INTEL-8001-LA.impact"
+msgstr "No impact to the system in the presence of this fault."
+msgid "INTEL-8001-LA.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info."
+#
+# code: INTEL-8001-MH
+# keys: fault.cpu.intel.quickpath.mem_controller_ue
+#
+msgid "INTEL-8001-MH.type"
+msgstr "Fault"
+msgid "INTEL-8001-MH.severity"
+msgstr "Critical"
+msgid "INTEL-8001-MH.description"
+msgstr "A quickpath memory controller uncorrectable error was detected.  Refer to %s for more information."
+msgid "INTEL-8001-MH.response"
+msgstr "Processor is not off-lined, as the memory controller on the CPU chip is still accessible by other processors"
+msgid "INTEL-8001-MH.impact"
+msgstr "System may panic or be reset by BIOS."
+msgid "INTEL-8001-MH.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info."
+#
+# code: INTEL-8001-ND
+# keys: fault.cpu.intel.quickpath.mem_link_ce
+#
+msgid "INTEL-8001-ND.type"
+msgstr "Fault"
+msgid "INTEL-8001-ND.severity"
+msgstr "Major"
+msgid "INTEL-8001-ND.description"
+msgstr "A quickpath memory link correctable error was detected.  Refer to %s for more information."
+msgid "INTEL-8001-ND.response"
+msgstr "Processor is not off-lined, as the memory controller on the CPU chip is still accessible by other processors"
+msgid "INTEL-8001-ND.impact"
+msgstr "No impact to the system in the presence of this fault."
+msgid "INTEL-8001-ND.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info."
+#
+# code: INTEL-8001-PY
+# keys: fault.cpu.intel.quickpath.mem_link_ue
+#
+msgid "INTEL-8001-PY.type"
+msgstr "Fault"
+msgid "INTEL-8001-PY.severity"
+msgstr "Critical"
+msgid "INTEL-8001-PY.description"
+msgstr "A quickpath memory link uncorrectable error was detected.  Refer to %s for more information."
+msgid "INTEL-8001-PY.response"
+msgstr "Processor is not off-lined, as the memory controller on the CPU chip is still accessible by other processors"
+msgid "INTEL-8001-PY.impact"
+msgstr "System may panic or be reset by BIOS."
+msgid "INTEL-8001-PY.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info."
+#
+# code: INTEL-8001-Q3
+# keys: fault.cpu.intel.quickpath.mem_failover_mir
+#
+msgid "INTEL-8001-Q3.type"
+msgstr "Fault"
+msgid "INTEL-8001-Q3.severity"
+msgstr "Major"
+msgid "INTEL-8001-Q3.description"
+msgstr "Uncorrectable error on the memory controller.  Refer to %s for more information."
+msgid "INTEL-8001-Q3.response"
+msgstr "None"
+msgid "INTEL-8001-Q3.impact"
+msgstr "System will continue to run, but a loss of memory mirror capability."
+msgid "INTEL-8001-Q3.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+#
+# code: INTEL-8001-RC
+# keys: fault.cpu.intel.quickpath.mem_scrubbing
+#
+msgid "INTEL-8001-RC.type"
+msgstr "Fault"
+msgid "INTEL-8001-RC.severity"
+msgstr "Minor"
+msgid "INTEL-8001-RC.description"
+msgstr "An uncorrectable software recoverable memory scrubbing error has occurred.  Refer to %s for more information."
+msgid "INTEL-8001-RC.response"
+msgstr "A pair of pages on two different DIMM's will be retired."
+msgid "INTEL-8001-RC.impact"
+msgstr "No impact to the system in the presence of this fault."
+msgid "INTEL-8001-RC.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+#
+# code: INTEL-8001-SQ
+# keys: fault.cpu.intel.quickpath.llc_ewb
+#
+msgid "INTEL-8001-SQ.type"
+msgstr "Fault"
+msgid "INTEL-8001-SQ.severity"
+msgstr "Minor"
+msgid "INTEL-8001-SQ.description"
+msgstr "An uncorreactable LLC explicit writeback error has occurred.  Refer to %s for more information."
+msgid "INTEL-8001-SQ.response"
+msgstr "Page is retired, however the page will be unretired upon next reboot."
+msgid "INTEL-8001-SQ.impact"
+msgstr "No impact to the system in the presence of this fault."
+msgid "INTEL-8001-SQ.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+#
+# code: INTEL-8001-T4
+# keys: fault.cpu.intel.quickpath.home_agent
+#
+msgid "INTEL-8001-T4.type"
+msgstr "Fault"
+msgid "INTEL-8001-T4.severity"
+msgstr "Critical"
+msgid "INTEL-8001-T4.description"
+msgstr "A home agent and global coherence engine error has occurred.  Refer to %s for more information."
+msgid "INTEL-8001-T4.response"
+msgstr "None"
+msgid "INTEL-8001-T4.impact"
+msgstr "System will be reset upon fatal event or may continue to run when an uncorrectable event."
+msgid "INTEL-8001-T4.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+#
+# code: INTEL-8001-UR
+# keys: fault.cpu.intel.quickpath.sys_cfg
+#
+msgid "INTEL-8001-UR.type"
+msgstr "Fault"
+msgid "INTEL-8001-UR.severity"
+msgstr "Critical"
+msgid "INTEL-8001-UR.description"
+msgstr "A system configuration controller error has occurred.  Refer to %s for more information."
+msgid "INTEL-8001-UR.response"
+msgstr "None"
+msgid "INTEL-8001-UR.impact"
+msgstr "System will be reset upon fatal event or may continue to run when an uncorrectable event."
+msgid "INTEL-8001-UR.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+#
+# code: INTEL-8001-V2
+# keys: fault.cpu.intel.quickpath.system_cache
+#
+msgid "INTEL-8001-V2.type"
+msgstr "Fault"
+msgid "INTEL-8001-V2.severity"
+msgstr "Critical"
+msgid "INTEL-8001-V2.description"
+msgstr "A system caching agent error has occurred.  Refer to %s for more information."
+msgid "INTEL-8001-V2.response"
+msgstr "None"
+msgid "INTEL-8001-V2.impact"
+msgstr "System will be reset upon fatal event or may continue to run when an uncorrectable event."
+msgid "INTEL-8001-V2.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+#
+# code: INTEL-8001-WX
+# keys: fault.cpu.intel.quickpath.bus_interconnect
+#
+msgid "INTEL-8001-WX.type"
+msgstr "Fault"
+msgid "INTEL-8001-WX.severity"
+msgstr "Critical"
+msgid "INTEL-8001-WX.description"
+msgstr "A quickpath internal port error was detected.  Refer to %s for more information."
+msgid "INTEL-8001-WX.response"
+msgstr "None"
+msgid "INTEL-8001-WX.impact"
+msgstr "System may panic, maybe reset by the BIOS, or may continue to run."
+msgid "INTEL-8001-WX.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+#
+# code: INTEL-8001-XE
+# keys: fault.cpu.intel.has_poison
+#
+msgid "INTEL-8001-XE.type"
+msgstr "Fault"
+msgid "INTEL-8001-XE.severity"
+msgstr "Minor"
+msgid "INTEL-8001-XE.description"
+msgstr "Cache line has been poisoned to protect integrity.  Refer to %s for more information."
+msgid "INTEL-8001-XE.response"
+msgstr "None"
+msgid "INTEL-8001-XE.impact"
+msgstr "No impact to the system in the presence of this fault."
+msgid "INTEL-8001-XE.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
+#
+# code: INTEL-8001-YJ
+# keys: fault.cpu.intel.discard_fatal
+#
+msgid "INTEL-8001-YJ.type"
+msgstr "Fault"
+msgid "INTEL-8001-YJ.severity"
+msgstr "Minor"
+msgid "INTEL-8001-YJ.description"
+msgstr "Discarding cache line to protect data integrity.  Refer to %s for more information."
+msgid "INTEL-8001-YJ.response"
+msgstr "None"
+msgid "INTEL-8001-YJ.impact"
+msgstr "No impact to the system in the presence of this fault."
+msgid "INTEL-8001-YJ.action"
+msgstr "Please refer to the 'Details' section of the knowledge article for additional info"
