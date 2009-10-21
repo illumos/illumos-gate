@@ -588,6 +588,7 @@ prop error.cpu.intel.quickpath.mem_redundant@CHIPDIMM/rank
     ereport.cpu.intel.quickpath.mem_redundant@
     motherboard/chip/memory-controller;
 
+#define	STATUS_UC	(payloadprop("error_uncorrected") == 1)
 event ereport.cpu.intel.quickpath.interconnect@motherboard/chip
     {within(1s)};
 event upset.cpu.intel.quickpath.interconnect@motherboard/chip;
