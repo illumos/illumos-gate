@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/pkcs11/libsoftcrypto/sun4u/Makefile.links
@@ -58,5 +58,4 @@ LINKED_PLATFORMS =		\
 		SUNW,Netra-T12 \
 		SUNW,Netra-T4 \
 		SUNW,Netra-CP2300 \
-		SUNW,Netra-CP3010 \
-		TAD,SPARCLE
+		SUNW,Netra-CP3010

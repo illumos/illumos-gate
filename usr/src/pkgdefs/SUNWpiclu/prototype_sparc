@@ -379,9 +379,6 @@ f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT4.conf 644 root sy
 f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_FT5.conf 644 root sys
 s none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/libpiclfrudr.so.1=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1
 s none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/libpiclfrudr.so=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so
-d none usr/platform/TAD,SPARCLE 755 root sys
-d none usr/platform/TAD,SPARCLE/lib 755 root bin
-s none usr/platform/TAD,SPARCLE/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
 d none usr/lib/sparcv9 755 root bin
 f none usr/lib/sparcv9/libpicl.so.1 755 root bin
 s none usr/lib/sparcv9/libpicl.so=./libpicl.so.1 755 root bin

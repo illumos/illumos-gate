@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -72,7 +70,6 @@ LINKED_PLATFORMS	+= SUNW,UltraSPARC-IIe-NetraCT-60
 LINKED_PLATFORMS	+= SUNW,Sun-Blade-100
 LINKED_PLATFORMS	+= SUNW,Serverblade1
 LINKED_PLATFORMS	+= SUNW,Netra-CP2300
-LINKED_PLATFORMS	+= TAD,SPARCLE
 
 #
 # install rule

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -94,7 +92,6 @@ d none platform/SUNW,Ultra-Enterprise-10000 755 root sys
 d none platform/SUNW,UltraSPARC-IIe-NetraCT-40 755 root sys
 d none platform/SUNW,UltraSPARC-IIe-NetraCT-60 755 root sys
 d none platform/SUNW,UltraSPARC-IIi-Netract 755 root sys
-d none platform/TAD,SPARCLE 755 root sys
 s none platform/SUNW,Sun-Fire-V210=SUNW,Sun-Fire-V240
 s none platform/SUNW,Netra-240=SUNW,Sun-Fire-V240
 s none platform/SUNW,Netra-210=SUNW,Sun-Fire-V240
@@ -135,7 +132,6 @@ d none platform/SUNW,UltraSPARC-IIi-Netract/lib/sparcv9 755 root bin
 d none platform/SUNW,Netra-CP2300/lib/sparcv9 755 root bin
 d none platform/SUNW,Netra-CP3010/lib/sparcv9 755 root bin
 d none platform/SUNW,SPARC-Enterprise/lib/sparcv9 755 root bin
-d none platform/TAD,SPARCLE/lib/sparcv9 755 root bin
 d none platform/sun4u-us3/lib/sparcv9 755 root bin
 d none platform/sun4u-us3/lib/sparcv9/libc_psr 755 root bin
 f none platform/sun4u/lib/sparcv9/libc_psr.so.1 755 root bin
@@ -178,7 +174,6 @@ s none platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/sparcv9/libc_psr.so.1=../../.
 s none platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/sparcv9/libc_psr.so.1=../../../sun4u/lib/sparcv9/libc_psr.so.1
 s none platform/SUNW,UltraSPARC-IIi-Netract/lib/sparcv9/libc_psr.so.1=../../../sun4u/lib/sparcv9/libc_psr.so.1
 s none platform/SUNW,Netra-CP2300/lib/sparcv9/libc_psr.so.1=../../../sun4u/lib/sparcv9/libc_psr.so.1
-s none platform/TAD,SPARCLE/lib/sparcv9/libc_psr.so.1=../../../sun4u/lib/sparcv9/libc_psr.so.1
 f none platform/sun4u/lib/sparcv9/libmd_psr.so.1 755 root bin
 s none platform/SUNW,Netra-T12/lib/sparcv9/libmd_psr.so.1=../../../sun4u/lib/sparcv9/libmd_psr.so.1
 s none platform/SUNW,Netra-T4/lib/sparcv9/libmd_psr.so.1=../../../sun4u/lib/sparcv9/libmd_psr.so.1
@@ -213,7 +208,6 @@ s none platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/sparcv9/libmd_psr.so.1=../../
 s none platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/sparcv9/libmd_psr.so.1=../../../sun4u/lib/sparcv9/libmd_psr.so.1
 s none platform/SUNW,UltraSPARC-IIi-Netract/lib/sparcv9/libmd_psr.so.1=../../../sun4u/lib/sparcv9/libmd_psr.so.1
 s none platform/SUNW,Netra-CP2300/lib/sparcv9/libmd_psr.so.1=../../../sun4u/lib/sparcv9/libmd_psr.so.1
-s none platform/TAD,SPARCLE/lib/sparcv9/libmd_psr.so.1=../../../sun4u/lib/sparcv9/libmd_psr.so.1
 #
 # platform/sun4u/lib/bootblks
 #
@@ -262,7 +256,6 @@ d none platform/SUNW,UltraSPARC-IIi-Netract/lib 755 root bin
 d none platform/SUNW,Netra-CP2300/lib 755 root bin
 d none platform/SUNW,Netra-CP3010/lib 755 root bin
 d none platform/SUNW,SPARC-Enterprise/lib 755 root bin
-d none platform/TAD,SPARCLE/lib 755 root bin
 f none platform/sun4u/lib/libc_psr.so.1 755 root bin
 d none platform/sun4u-us3/lib 755 root sys
 v none platform/sun4u-us3/lib/libc_psr.so.1 755 root bin
@@ -305,7 +298,6 @@ s none platform/SUNW,UltraSPARC-IIi-Netract/lib/libc_psr.so.1=../../sun4u/lib/li
 s none platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libc_psr.so.1=../../sun4u/lib/libc_psr.so.1
 s none platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/libc_psr.so.1=../../sun4u/lib/libc_psr.so.1
 s none platform/SUNW,Netra-CP2300/lib/libc_psr.so.1=../../sun4u/lib/libc_psr.so.1
-s none platform/TAD,SPARCLE/lib/libc_psr.so.1=../../sun4u/lib/libc_psr.so.1
 #
 # lib/libmd_psr.so.1 and links to it for each sun4u platform
 #
@@ -343,4 +335,3 @@ s none platform/SUNW,UltraSPARC-IIi-Netract/lib/libmd_psr.so.1=../../sun4u/lib/l
 s none platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/libmd_psr.so.1=../../sun4u/lib/libmd_psr.so.1
 s none platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/libmd_psr.so.1=../../sun4u/lib/libmd_psr.so.1
 s none platform/SUNW,Netra-CP2300/lib/libmd_psr.so.1=../../sun4u/lib/libmd_psr.so.1
-s none platform/TAD,SPARCLE/lib/libmd_psr.so.1=../../sun4u/lib/libmd_psr.so.1

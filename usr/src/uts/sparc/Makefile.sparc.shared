@@ -304,7 +304,6 @@ DRV_KMODS	+= fp
 DRV_KMODS	+= qlc
 DRV_KMODS	+= sdcard
 DRV_KMODS	+= sdhost
-DRV_KMODS	+= wbsd
 DRV_KMODS	+= dda
 DRV_KMODS	+= dmd
 DRV_KMODS	+= stmf

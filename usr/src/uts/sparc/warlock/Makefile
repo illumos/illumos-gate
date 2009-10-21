@@ -130,7 +130,6 @@ $(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/marvell88sx; \
 warlock.sdcard:
 	@cd ../sda; $(MAKE) clean; $(MAKE) warlock
 	@cd ../sdhost; $(MAKE) clean; $(MAKE) warlock
-	@cd ../wbsd; $(MAKE) clean; $(MAKE) warlock
 
 warlock.wc:
 	@cd ../wc; $(MAKE) clean; $(MAKE) warlock

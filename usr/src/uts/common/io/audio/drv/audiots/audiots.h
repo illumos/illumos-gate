@@ -481,7 +481,6 @@ struct audiots_state {
 	ddi_acc_handle_t	ts_pcih;	/* handle to config regs */
 	ddi_acc_handle_t	ts_acch;	/* handle to mapped regs */
 	boolean_t		ts_suspended;	/* power management state */
-	boolean_t		ts_swapped;	/* swapped left/right? */
 
 	uint32_t		ts_devid;
 	uint8_t			ts_revid;	/* SB Chip Revision ID */

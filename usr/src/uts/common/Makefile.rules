@@ -1043,10 +1043,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/sdcard/adapters/sdhost/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/sdcard/adapters/wbsd/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/sdcard/impl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -2220,9 +2216,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/targets/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/sdcard/adapters/sdhost/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/sdcard/adapters/wbsd/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/sdcard/impl/%.c

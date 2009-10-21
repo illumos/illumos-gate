@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -77,7 +75,6 @@ d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 755 root sys
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 755 root sys
 d none usr/platform/SUNW,Netra-CP2300 755 root sys
 d none usr/platform/SUNW,Netra-CP3010 755 root sys
-d none usr/platform/TAD,SPARCLE 755 root sys
 #
 # create other sun4u platform/lib directories
 #
@@ -111,4 +108,3 @@ d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib 755 root bin
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP2300/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP3010/lib 755 root bin
-d none usr/platform/TAD,SPARCLE/lib 755 root bin

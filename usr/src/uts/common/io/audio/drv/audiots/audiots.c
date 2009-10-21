@@ -1063,7 +1063,6 @@ audiots_alloc_port(audiots_state_t *state, int num)
 	int			rc;
 	ddi_acc_handle_t	regsh = state->ts_acch;
 	uint32_t		*gcptr = &state->ts_regs->aud_regs.ap_cir_gc;
-	char			*namestr;
 
 	port = kmem_zalloc(sizeof (*port), KM_SLEEP);
 	state->ts_ports[num] = port;
@@ -1156,36 +1155,6 @@ audiots_alloc_port(audiots_state_t *state, int num)
 
 	audio_engine_set_private(port->tp_engine, port);
 	audio_dev_add_engine(adev, port->tp_engine);
-
-	state->ts_swapped = B_FALSE;
-
-	/*
-	 * SPARCLE platform specific hack.  For reasons that I can't
-	 * seem to fathom, the SPARCLE platform only gets the
-	 * endianness correct when transferring whole 32-bit words and
-	 * using little endian mapping.  That isn't compatible with
-	 * the audio framework's access mode, so we have to set up
-	 * explicit swapping of the left and right channels.
-	 *
-	 * The real mystery here is why this is required for Tadpole
-	 * SPARCLE, but not for any other standard Sun platforms that
-	 * I've tested.
-	 *
-	 * "swap_channels" property can be used in driver.conf to
-	 * force the left/right as well.
-	 */
-	rc = ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(), 0,
-	    "name", &namestr);
-	if (rc == DDI_PROP_SUCCESS) {
-		if (strcmp(namestr, "TAD,SPARCLE") == 0) {
-			state->ts_swapped = B_TRUE;
-		}
-		ddi_prop_free(namestr);
-	}
-
-	state->ts_swapped = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "swap_channels",
-	    state->ts_swapped);
 
 	return (DDI_SUCCESS);
 }
@@ -1648,14 +1617,8 @@ audiots_start(void *arg)
 static void
 audiots_chinfo(void *arg, int chan, unsigned *offset, unsigned *incr)
 {
-	audiots_port_t *port = arg;
-
-	/* if channels are swapped (SPARCLE), then deal with it */
-	if (port->tp_state->ts_swapped) {
-		*offset = (chan ? 0 : 1);
-	} else {
-		*offset = chan;
-	}
+	_NOTE(ARGUNUSED(arg));
+	*offset = chan;
 	*incr = 2;
 }
 

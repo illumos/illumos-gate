@@ -148,8 +148,6 @@ d none usr/platform/SUNW,Netra-CP2300 755 root sys
 d none usr/platform/SUNW,Netra-CP2300/include 755 root bin
 d none usr/platform/SUNW,Netra-CP3010 755 root sys
 d none usr/platform/SUNW,Netra-CP3010/include 755 root bin
-d none usr/platform/TAD,SPARCLE 755 root sys
-s none usr/platform/TAD,SPARCLE/include=../sun4u/include
 d none usr/platform/sun4u/include/sys 755 root bin
 f none usr/platform/sun4u/include/sys/ac.h 644 root bin
 f none usr/platform/sun4u/include/sys/async.h 644 root bin

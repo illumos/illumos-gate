@@ -81,7 +81,6 @@ d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40 755 root sys
 d none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60 755 root sys
 d none usr/platform/SUNW,Netra-CP2300 755 root sys
 d none usr/platform/SUNW,Netra-CP3010 755 root sys
-d none usr/platform/TAD,SPARCLE 755 root sys
 #
 # create sun4u/sbin and links to it from each sun4u platform
 #
@@ -131,7 +130,6 @@ s none usr/platform/SUNW,Netra-CP2300/sbin/trapstat=../../sun4u/sbin/trapstat
 d none usr/platform/SUNW,Netra-CP3010/sbin 755 root bin
 s none usr/platform/SUNW,Netra-CP3010/sbin/prtdiag=../../sun4u/sbin/prtdiag
 s none usr/platform/SUNW,Netra-CP3010/sbin/trapstat=../../sun4u/sbin/trapstat
-s none usr/platform/TAD,SPARCLE/sbin=../sun4u/sbin
 #
 f none usr/platform/sun4u/sbin/trapstat 555 root bin
 
@@ -227,8 +225,6 @@ d none usr/platform/SUNW,Netra-CP2300/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP2300/lib/sparcv9 755 root bin
 d none usr/platform/SUNW,Netra-CP3010/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP3010/lib/sparcv9 755 root bin
-d none usr/platform/TAD,SPARCLE/lib 755 root bin
-d none usr/platform/TAD,SPARCLE/lib/sparcv9 755 root bin
 #
 # create sun4u/lib/cfgadm and links to it for each sun4u platform
 #
@@ -263,7 +259,6 @@ s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-40/lib/cfgadm=../../sun4u/lib/cf
 s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/cfgadm=../../sun4u/lib/cfgadm
 s none usr/platform/SUNW,Netra-CP2300/lib/cfgadm=../../sun4u/lib/cfgadm
 s none usr/platform/SUNW,Netra-CP3010/lib/cfgadm=../../sun4u/lib/cfgadm
-s none usr/platform/TAD,SPARCLE/lib/cfgadm=../../sun4u/lib/cfgadm
 #
 f none usr/platform/sun4u/lib/cfgadm/sysctrl.so.1 755 root bin
 s none usr/platform/sun4u/lib/cfgadm/sysctrl.so=./sysctrl.so.1
@@ -315,7 +310,6 @@ s none usr/platform/SUNW,UltraSPARC-IIe-NetraCT-60/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,Netra-CP2300/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,Netra-CP3010/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,SPARC-Enterprise/lib/fs=../../sun4u/lib/fs
-s none usr/platform/TAD,SPARCLE/lib/fs=../../sun4u/lib/fs
 #
 d none usr/platform/sun4u/lib/fs/ufs 755 root bin
 s none usr/platform/sun4u/lib/fs/ufs/bootblk=../../../../../../platform/sun4u/lib/fs/ufs/bootblk
@@ -438,7 +432,5 @@ s none usr/platform/SUNW,Netra-CP2300/lib/libsoftcrypto_psr.so.1=../../sun4u/lib
 s none usr/platform/SUNW,Netra-CP2300/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
 s none usr/platform/SUNW,Netra-CP3010/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
 s none usr/platform/SUNW,Netra-CP3010/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
-s none usr/platform/TAD,SPARCLE/lib/libsoftcrypto_psr.so.1=../../sun4u/lib/libsoftcrypto_psr.so.1
-s none usr/platform/TAD,SPARCLE/lib/sparcv9/libsoftcrypto_psr.so.1=../../../sun4u/lib/sparcv9/libsoftcrypto_psr.so.1
 
 

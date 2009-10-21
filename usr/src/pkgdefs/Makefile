@@ -95,8 +95,7 @@ sparc_SUBDIRS= \
 	SUNWssad  \
 	SUNWus.u \
 	SUNWust1.v \
-	SUNWust2.v \
-	SUNWwbsd
+	SUNWust2.v
 
 i386_SUBDIRS= \
 	SUNWad810 \
