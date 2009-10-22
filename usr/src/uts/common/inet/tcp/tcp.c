@@ -5529,7 +5529,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	 * Also check that source is not a multicast or broadcast address.
 	 */
 	eager->tcp_state = TCPS_SYN_RCVD;
-
+	SOCK_CONNID_BUMP(eager->tcp_connid);
 
 	/*
 	 * There should be no ire in the mp as we are being called after
@@ -25858,6 +25858,14 @@ tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error, cred_t *cr, pid_t pid)
 			} else {
 				mblk_setcred(syn_mp, cr, pid);
 			}
+
+			/*
+			 * We must bump the generation before sending the syn
+			 * to ensure that we use the right generation in case
+			 * this thread issues a "connected" up call.
+			 */
+			SOCK_CONNID_BUMP(tcp->tcp_connid);
+
 			tcp_send_data(tcp, tcp->tcp_wq, syn_mp);
 		}
 	after_syn_sent:
@@ -26385,13 +26393,6 @@ tcp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 		 */
 		/* FALLTHRU */
 	case TCPS_BOUND:
-		/*
-		 * We must bump the generation before the operation start.
-		 * This is done to ensure that any upcall made later on sends
-		 * up the right generation to the socket.
-		 */
-		SOCK_CONNID_BUMP(tcp->tcp_connid);
-
 		if (tcp->tcp_family == AF_INET6) {
 			if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 				return (tcp_connect_ipv6(tcp,
@@ -26635,7 +26636,14 @@ tcp_sendmsg(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 		tcpstate = tcp->tcp_state;
 		if (tcpstate < TCPS_ESTABLISHED) {
 			freemsg(mp);
-			return (ENOTCONN);
+			/*
+			 * We return ENOTCONN if the endpoint is trying to
+			 * connect or has never been connected, and EPIPE if it
+			 * has been disconnected. The connection id helps us
+			 * distinguish between the last two cases.
+			 */
+			return ((tcpstate == TCPS_SYN_SENT) ? ENOTCONN :
+			    ((tcp->tcp_connid > 0) ? EPIPE : ENOTCONN));
 		} else if (tcpstate > TCPS_CLOSE_WAIT) {
 			freemsg(mp);
 			return (EPIPE);

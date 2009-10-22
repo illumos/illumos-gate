@@ -597,11 +597,9 @@ typedef struct tcp_s {
 	uint32_t	tcp_snxt_shrunk;
 
 	/*
-	 * The socket generation number is bumped when an outgoing connection
-	 * attempts is made, and it sent up to the socket when the
-	 * connection was successfully established, or an error occured. The
-	 * generation is used to ensure that the socket does not miss the
-	 * asynchronous notification.
+	 * Socket generation number which is bumped when a connection attempt
+	 * is initiated. Its main purpose is to ensure that the socket does not
+	 * miss the asynchronous connected/disconnected notification.
 	 */
 	sock_connid_t	tcp_connid;
 
