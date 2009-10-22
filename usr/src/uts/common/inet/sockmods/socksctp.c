@@ -1225,46 +1225,20 @@ sosctp_getsockopt(struct sonode *so, int level, int option_name,
 	void	*optbuf = &buffer;
 	int	error = 0;
 
-
 	if (level == SOL_SOCKET) {
 		switch (option_name) {
 		/* Not supported options */
 		case SO_SNDTIMEO:
 		case SO_RCVTIMEO:
 		case SO_EXCLBIND:
-			error = ENOPROTOOPT;
-			eprintsoline(so, error);
-			goto done;
-
-		case SO_TYPE:
-		case SO_ERROR:
-		case SO_DEBUG:
-		case SO_ACCEPTCONN:
-		case SO_REUSEADDR:
-		case SO_KEEPALIVE:
-		case SO_DONTROUTE:
-		case SO_BROADCAST:
-		case SO_USELOOPBACK:
-		case SO_OOBINLINE:
-		case SO_SNDBUF:
-		case SO_RCVBUF:
-		case SO_SNDLOWAT:
-		case SO_RCVLOWAT:
-		case SO_DGRAM_ERRIND:
-		case SO_PROTOTYPE:
-		case SO_DOMAIN:
-			if (maxlen < (t_uscalar_t)sizeof (int32_t)) {
-				error = EINVAL;
-				eprintsoline(so, error);
-				goto done;
-			}
-			break;
-		case SO_LINGER:
-			if (maxlen < (t_uscalar_t)sizeof (struct linger)) {
-				error = EINVAL;
-				eprintsoline(so, error);
-				goto done;
-			}
+			eprintsoline(so, ENOPROTOOPT);
+			return (ENOPROTOOPT);
+		default:
+			error = socket_getopt_common(so, level, option_name,
+			    optval, optlenp, flags);
+			if (error >= 0)
+				return (error);
+			/* Pass the request to the protocol */
 			break;
 		}
 	}
@@ -1303,7 +1277,7 @@ free:
 	if (optbuf != &buffer) {
 		kmem_free(optbuf, maxlen);
 	}
-done:
+
 	return (error);
 }
 

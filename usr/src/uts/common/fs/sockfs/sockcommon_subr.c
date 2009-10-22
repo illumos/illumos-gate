@@ -1668,6 +1668,11 @@ socket_strioc_common(struct sonode *so, int cmd, intptr_t arg, int mode,
 	}
 }
 
+/*
+ * This is called for all socket types to verify that the buffer size is large
+ * enough for the option, and if we can, handle the request as well. Most
+ * options will be forwarded to the protocol.
+ */
 int
 socket_getopt_common(struct sonode *so, int level, int option_name,
     void *optval, socklen_t *optlenp, int flags)
