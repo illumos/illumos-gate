@@ -94,7 +94,7 @@ extern	void	px_msiq_detach(px_t *px_p);
 extern	void	px_msiq_resume(px_t *px_p);
 
 extern	int	px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type,
-		    msiqid_t *msiq_id_p);
+		    msgcode_t msg_code, msiqid_t *msiq_id_p);
 extern	int	px_msiq_alloc_based_on_cpuid(px_t *px_p,
 		    msiq_rec_type_t rec_type, cpuid_t cpuid,
 		    msiqid_t *msiq_id_p);

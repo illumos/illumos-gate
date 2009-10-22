@@ -32,6 +32,7 @@
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/sysmacros.h>
 #include <sys/machsystm.h>	/* intr_dist_add */
 #include <sys/modctl.h>
 #include <sys/disp.h>
@@ -49,7 +50,7 @@ px_msiq_attach(px_t *px_p)
 {
 	px_ib_t		*ib_p = px_p->px_ib_p;
 	px_msiq_state_t	*msiq_state_p = &ib_p->ib_msiq_state;
-	int		i, ret = DDI_SUCCESS;
+	int		qcnt, i, ret = DDI_SUCCESS;
 
 	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_attach\n");
 
@@ -66,8 +67,10 @@ px_msiq_attach(px_t *px_p)
 	 * Around 90% of available MSIQs are reserved for the MSI/Xs.
 	 */
 	msiq_state_p->msiq_msg_qcnt = howmany(msiq_state_p->msiq_cnt, 10);
-	msiq_state_p->msiq_msi_qcnt = msiq_state_p->msiq_cnt -
-	    msiq_state_p->msiq_msg_qcnt;
+
+	qcnt = MIN(msiq_state_p->msiq_msg_qcnt, px_max_msiq_msgs);
+	msiq_state_p->msiq_msg_qcnt = qcnt = MAX(qcnt, px_min_msiq_msgs);
+	msiq_state_p->msiq_msi_qcnt = msiq_state_p->msiq_cnt - qcnt;
 
 	msiq_state_p->msiq_1st_msi_qid = msiq_state_p->msiq_1st_msiq_id;
 	msiq_state_p->msiq_1st_msg_qid = msiq_state_p->msiq_1st_msiq_id +
@@ -137,7 +140,8 @@ px_msiq_resume(px_t *px_p)
  * px_msiq_alloc()
  */
 int
-px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msiqid_t *msiq_id_p)
+px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msgcode_t msg_code,
+    msiqid_t *msiq_id_p)
 {
 	px_ib_t		*ib_p = px_p->px_ib_p;
 	px_msiq_state_t	*msiq_state_p = &ib_p->ib_msiq_state;
@@ -152,8 +156,36 @@ px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msiqid_t *msiq_id_p)
 	mutex_enter(&msiq_state_p->msiq_mutex);
 
 	if (rec_type == MSG_REC) {
-		msiq_cnt = msiq_state_p->msiq_msg_qcnt;
+		/*
+		 * The first MSG EQ is dedicated to PCIE_MSG_CODE_ERR_COR
+		 * messages. All other messages will be spread across
+		 * the remaining MSG EQs.
+		 */
 		first_msiq_id = msiq_state_p->msiq_1st_msg_qid;
+
+		if (msg_code == PCIE_MSG_CODE_ERR_COR) {
+			msiq_state_p->msiq_p[first_msiq_id].msiq_state =
+			    MSIQ_STATE_INUSE;
+
+			(void) px_lib_msiq_gethead(px_p->px_dip, first_msiq_id,
+			    &msiq_state_p->msiq_p[first_msiq_id].
+			    msiq_curr_head_index);
+
+			*msiq_id_p =
+			    msiq_state_p->msiq_p[first_msiq_id].msiq_id;
+
+			msiq_state_p->msiq_p[first_msiq_id].msiq_refcnt++;
+
+			DBG(DBG_MSIQ, px_p->px_dip,
+			    "px_msiq_alloc: msiq_id 0x%x\n", *msiq_id_p);
+
+			mutex_exit(&msiq_state_p->msiq_mutex);
+			return (DDI_SUCCESS);
+		}
+
+		/* Jump past the first/dedicated EQ */
+		first_msiq_id++;
+		msiq_cnt = msiq_state_p->msiq_msg_qcnt - 1;
 	} else {
 		msiq_cnt = msiq_state_p->msiq_msi_qcnt;
 		first_msiq_id = msiq_state_p->msiq_1st_msi_qid;

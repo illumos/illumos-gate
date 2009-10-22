@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PX_SPACE_H
 #define	_SYS_PX_SPACE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -94,6 +92,9 @@ extern uint_t px_disable_fdvma;
 
 extern uint_t px_iommu_ctx_lock_failure;
 extern uintptr_t px_kmem_clid;
+
+extern uint_t px_max_msiq_msgs;
+extern uint_t px_min_msiq_msgs;
 
 /* timeout length in micro seconds */
 #define	PX_MSEC_TO_USEC	1000

@@ -1144,8 +1144,9 @@ px_add_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
-	ret = (cpu_id == -1) ? px_msiq_alloc(px_p, rec_type, msiq_id_p) :
-	    px_msiq_alloc_based_on_cpuid(px_p, rec_type, cpu_id, msiq_id_p);
+	ret = (cpu_id == -1) ? px_msiq_alloc(px_p, rec_type, msg_code,
+	    msiq_id_p) : px_msiq_alloc_based_on_cpuid(px_p, rec_type,
+	    cpu_id, msiq_id_p);
 
 	if (ret != DDI_SUCCESS) {
 		DBG(DBG_MSIQ, dip, "px_add_msiq_intr: "

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI Express nexus driver tunables
@@ -139,6 +137,9 @@ uint_t px_dvma_vmem_free = 0;			/* vmem free */
 #endif
 uint_t px_disable_fdvma = 0;
 uint_t px_mmu_ctx_lock_failure = 0;
+
+uint_t px_max_msiq_msgs = 4;
+uint_t px_min_msiq_msgs = 2;
 
 /*
  * memory callback list id callback list for kmem_alloc failure clients
