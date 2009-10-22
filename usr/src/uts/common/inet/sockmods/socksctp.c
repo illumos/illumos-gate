@@ -1693,6 +1693,7 @@ sosctp_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 		 */
 		if ((nfd = ufalloc(0)) == -1) {
 			eprintsoline(so, EMFILE);
+			SOCKPARAMS_DEC_REF(sp);
 			return (EMFILE);
 		}
 
@@ -1782,6 +1783,7 @@ sosctp_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 		return (0);
 
 err:
+		SOCKPARAMS_DEC_REF(sp);
 		setf(nfd, NULL);
 		eprintsoline(so, error);
 		return (error);
