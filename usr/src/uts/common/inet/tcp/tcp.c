@@ -26625,9 +26625,10 @@ tcp_sendmsg(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 	ASSERT(connp->conn_upper_handle != NULL);
 
 	if (msg->msg_controllen != 0) {
+		freemsg(mp);
 		return (EOPNOTSUPP);
-
 	}
+
 	switch (DB_TYPE(mp)) {
 	case M_DATA:
 		tcp = connp->conn_tcp;
@@ -26672,7 +26673,7 @@ tcp_sendmsg(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 		 */
 		CONN_INC_REF(connp);
 
-		if (msg != NULL && msg->msg_flags & MSG_OOB) {
+		if (msg->msg_flags & MSG_OOB) {
 			SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
 			    tcp_output_urgent, connp, tcp_squeue_flag,
 			    SQTAG_TCP_OUTPUT);
