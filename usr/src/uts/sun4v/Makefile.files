@@ -173,6 +173,7 @@ PLATSVC_OBJS	= platsvc.o mdeg.o
 #			Brand modules
 #
 SN1_BRAND_OBJS		= sn1_brand.o sn1_brand_asm.o
+S10_BRAND_OBJS		= s10_brand.o s10_brand_asm.o
 
 #
 #			Performance Counter BackEnd (PCBE) Modules

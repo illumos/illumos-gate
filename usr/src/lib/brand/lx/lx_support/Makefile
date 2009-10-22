@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG =		lx_support
 PROGS =		$(PROG)
@@ -31,13 +30,13 @@ OBJS =		lx_support
 all:		$(PROG)
 
 include ../Makefile.lx
-include ../../../../cmd/Makefile.cmd
+include $(SRC)/cmd/Makefile.cmd
 
 # override the install directory
 ROOTBIN =	$(ROOTBRANDDIR)
 CLOBBERFILES =	$(OBJS) $(ROOTPROGS)
 
-UTSBASE =	../../../../uts
+UTSBASE =	$(SRC)/uts
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I$(UTSBASE)/common/brand/lx
@@ -52,4 +51,4 @@ clean:
 
 lint:		lint_PROG
 
-include ../../../../cmd/Makefile.targ
+include $(SRC)/cmd/Makefile.targ

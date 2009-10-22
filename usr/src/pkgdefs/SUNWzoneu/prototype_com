@@ -60,6 +60,8 @@ f none usr/lib/brand/native/smf_disable.lst 444 root bin
 f none usr/lib/brand/native/sw_support 755 root bin
 d none usr/lib/brand/shared 755 root sys
 f none usr/lib/brand/shared/common.ksh 444 root bin
+f none usr/lib/brand/shared/query 755 root bin
+f none usr/lib/brand/shared/uninstall.ksh 444 root bin
 f none usr/lib/libbrand.so.1 755 root bin
 f none usr/lib/libzonecfg.so.1 755 root bin
 d none usr/lib/zones 755 root bin

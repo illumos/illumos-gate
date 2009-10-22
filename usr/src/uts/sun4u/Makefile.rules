@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This Makefile defines the build rules for the directory uts/sun4u
 #	and its children. These are the source files which sun4u
@@ -106,6 +104,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/pcbe/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4/brand/sn1/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:                $(UTSBASE)/sun4/brand/solaris10/%.s
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/vm/%.c
@@ -221,6 +222,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/pcbe/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4/brand/sn1/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:              $(UTSBASE)/sun4/brand/solaris10/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/vm/%.c

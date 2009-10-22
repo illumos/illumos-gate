@@ -512,7 +512,7 @@ MISC_KMODS	+= md_sp
 #
 #	Brand modules
 #
-BRAND_KMODS	+= sn1_brand lx_brand
+BRAND_KMODS	+= sn1_brand s10_brand lx_brand
 DRV_KMODS	+= lx_systrace lx_ptm lx_audio
 STRMOD_KMODS	+= ldlinux
 

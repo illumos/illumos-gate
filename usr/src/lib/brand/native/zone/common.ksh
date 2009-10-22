@@ -43,6 +43,13 @@ fatal()
 	exit $EXIT_CODE
 }
 
+fail_fatal() {
+	printf "ERROR: "
+	printf "$@"
+	printf "\n"
+	exit $ZONE_SUBPROC_FATAL
+}
+
 #
 # Send the provided printf()-style arguments to the screen and to the logfile.
 #
@@ -68,10 +75,39 @@ vlog()
         [[ -n $LOGFILE ]] && printf "[$(date)] ${MSG_PREFIX}${fmt}\n" "$@" >&2
 }
 
+#
 # Validate that the directory is safe.
+#
+# It is possible for a malicious zone root user to modify a zone's filesystem
+# so that modifications made to the zone's filesystem by administrators in the
+# global zone modify the global zone's filesystem.  We can prevent this by
+# ensuring that all components of paths accessed by scripts are real (i.e.,
+# non-symlink) directories.
+#
+# NOTE: The specified path should be an absolute path as would be seen from
+# within the zone.  Also, this function does not check parent directories.
+# If, for example, you need to ensure that every component of the path
+# '/foo/bar/baz' is a directory and not a symlink, then do the following:
+#
+#	safe_dir /foo
+#	safe_dir /foo/bar
+#	safe_dir /foo/bar/baz
+#
 safe_dir()
 {
 	typeset dir="$1"
+
+	if [[ -h $ZONEROOT/$dir || ! -d $ZONEROOT/$dir ]]; then
+		fatal "$e_baddir" "$dir"
+	fi
+}
+
+# Like safe_dir except the dir doesn't have to exist.
+safe_opt_dir()
+{
+	typeset dir="$1"
+
+	[[ ! -e $ZONEROOT/$dir ]] && return
 
 	if [[ -h $ZONEROOT/$dir || ! -d $ZONEROOT/$dir ]]; then
 		fatal "$e_baddir" "$dir"
@@ -109,6 +145,64 @@ safe_move()
 	if [[ ! -h $src && ! -h $dst && ! -d $dst ]]; then
 		/usr/bin/mv $src $dst || fatal "$e_badfile" "$src"
 	fi
+}
+
+safe_rm()
+{
+	if [[ ! -h $ZONEROOT/$1 && -f $ZONEROOT/$1 ]]; then
+		rm -f "$ZONEROOT/$1"
+	fi
+}
+
+#
+# Replace the file with a wrapper pointing to the native brand code.
+# However, we only do the replacement if the file hasn't already been
+# replaced with our wrapper.  This function expects the cwd to be the
+# location of the file we're replacing.
+#
+# Some of the files we're replacing are hardlinks to isaexec so we need to 'rm'
+# the file before we setup the wrapper while others are hardlinks to rc scripts
+# that we need to maintain.
+#
+safe_replace()
+{
+	typeset filename="$1"
+	typeset runname="$2"
+	typeset mode="$3"
+	typeset own="$4"
+	typeset rem="$5"
+
+	if [ -h $filename -o ! -f $filename ]; then
+		return
+	fi
+
+	egrep -s "Solaris Brand Replacement" $filename
+	if [ $? -eq 0 ]; then
+		return
+	fi
+
+	safe_backup $filename $filename.pre_p2v
+	if [ $rem = "remove" ]; then
+		rm -f $filename
+	fi
+
+	cat <<-END >$filename || exit 1
+	#!/bin/sh
+	#
+	# Solaris Brand Replacement
+	#
+	# Attention.  This file has been replaced with a new version for
+	# use in a virtualized environment.  Modification of this script is not
+	# supported and all changes will be lost upon reboot.  The
+	# {name}.pre_p2v version of this file is a backup copy of the
+	# original and should not be deleted.
+	#
+	END
+
+	echo ". $runname \"\$@\"" >>$filename || exit 1
+
+	chmod $mode $filename
+	chown $own $filename
 }
 
 #
@@ -216,6 +310,19 @@ umnt_fs()
 			printf("command failed: %s\n", cmd);
 		}
 	}' >>$LOGFILE
+}
+
+# Find the dataset mounted on the zonepath.
+get_zonepath_ds() {
+	ZONEPATH_DS=`/usr/sbin/zfs list -H -t filesystem -o name,mountpoint | \
+	    /usr/bin/nawk -v zonepath=$1 '{
+		if ($2 == zonepath)
+			print $1
+	}'`
+
+	if [ -z "$ZONEPATH_DS" ]; then
+		fail_fatal "$f_no_ds"
+	fi
 }
 
 #
@@ -893,6 +1000,9 @@ e_absolute_archive=$(gettext "Error: archive contains absolute paths instead of 
 e_mismatch_archive=$(gettext "Error: the archive top-level directory (%s) does not match the zonepath (%s).")
 e_tmpfile=$(gettext "Unable to create temporary file")
 e_root_full=$(gettext "Zonepath root %s exists and contains data; remove or move aside prior to install.")
+f_mkdir=$(gettext "Unable to create directory %s.")
+f_chmod=$(gettext "Unable to chmod directory %s.")
+f_chown=$(gettext "Unable to chown directory %s.")
 
 
 m_analyse_archive=$(gettext "Analysing the archive")

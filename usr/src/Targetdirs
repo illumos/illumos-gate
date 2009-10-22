@@ -88,6 +88,7 @@ DIRS= \
 	/etc \
 	/etc/brand  \
 	/etc/brand/native  \
+	/etc/brand/solaris10  \
 	/etc/certs	\
 	/etc/cron.d \
 	/etc/crypto \
@@ -209,6 +210,7 @@ DIRS= \
 	/usr/lib/brand/native \
 	/usr/lib/brand/shared \
 	/usr/lib/brand/sn1 \
+	/usr/lib/brand/solaris10 \
 	/usr/lib/class \
 	/usr/lib/class/FSS \
 	/usr/lib/class/FX \
@@ -408,6 +410,7 @@ DIRS64= \
 	/usr/lib/$(MACH64) \
 	/usr/lib/$(MACH64)/gss \
 	/usr/lib/brand/sn1/$(MACH64) \
+	/usr/lib/brand/solaris10/$(MACH64) \
 	/usr/lib/elfedit/$(MACH64) \
 	/usr/lib/fm/$(MACH64) \
 	/usr/lib/fs/nfs/$(MACH64) \
@@ -481,6 +484,7 @@ SYM.DIRS64= \
 	/lib/secure/64 \
 	/usr/lib/64 \
 	/usr/lib/brand/sn1/64 \
+	/usr/lib/brand/solaris10/64 \
 	/usr/lib/elfedit/64 \
 	/usr/lib/libp/64 \
 	/usr/lib/link_audit/64 \
@@ -589,6 +593,7 @@ $(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/elfedit/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/lx/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/brand/sn1/64:=	LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/usr/lib/brand/solaris10/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/libp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/lwp/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/link_audit/64:=	LINKDEST=$(MACH64)

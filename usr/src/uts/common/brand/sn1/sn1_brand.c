@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -604,20 +604,22 @@ sn1_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 * calculated address from above.
 			 */
 			sedp->sed_ldentry = sedp->sed_entry;
+			sedp->sed_entry = NULL;
+			sedp->sed_phdr = NULL;
+			sedp->sed_phent = NULL;
+			sedp->sed_phnum = NULL;
 			sedp->sed_lddata = NULL;
-			sedp->sed_base = NULL;
-		}
-	}
+			sedp->sed_base = voffset;
 
-	if (uphdr_vaddr != (Addr)-1) {
-		if (ehdr.e_type == ET_DYN) {
-			/*
-			 * Delay setting the brkbase until the first call to
-			 * brk(); see elfexec() for details.
-			 */
-			env.ex_bssbase = (caddr_t)0;
-			env.ex_brkbase = (caddr_t)0;
-			env.ex_brksize = 0;
+			if (ehdr.e_type == ET_DYN) {
+				/*
+				 * Delay setting the brkbase until the first
+				 * call to brk(); see elfexec() for details.
+				 */
+				env.ex_bssbase = (caddr_t)0;
+				env.ex_brkbase = (caddr_t)0;
+				env.ex_brksize = 0;
+			}
 		}
 	}
 
@@ -706,42 +708,38 @@ sn1_elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	 * linker.
 	 */
 	for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
+		ulong_t val;
+
 		switch (up->u_auxv[i].a_type) {
 		case AT_SUN_BRAND_SN1_LDDATA:
 			up->u_auxv[i].a_un.a_val = sed.sed_lddata;
-			break;
+			continue;
 		case AT_BASE:
-			if (sedp->sed_base == NULL) {
-				/* Hide base for static binaries */
-				up->u_auxv[i].a_type = AT_IGNORE;
-				up->u_auxv[i].a_un.a_val = NULL;
-			} else {
-				up->u_auxv[i].a_un.a_val = sedp->sed_base;
-			}
+			val = sedp->sed_base;
 			break;
 		case AT_ENTRY:
-			up->u_auxv[i].a_un.a_val = sedp->sed_entry;
+			val = sedp->sed_entry;
 			break;
 		case AT_PHDR:
-			up->u_auxv[i].a_un.a_val = sedp->sed_phdr;
+			val = sedp->sed_phdr;
 			break;
 		case AT_PHENT:
-			up->u_auxv[i].a_un.a_val = sedp->sed_phent;
+			val = sedp->sed_phent;
 			break;
 		case AT_PHNUM:
-			up->u_auxv[i].a_un.a_val = sedp->sed_phnum;
+			val = sedp->sed_phnum;
 			break;
 		case AT_SUN_LDDATA:
-			if (sedp->sed_lddata == NULL) {
-				/* Hide lddata for static binaries */
-				up->u_auxv[i].a_type = AT_IGNORE;
-				up->u_auxv[i].a_un.a_val = NULL;
-			} else {
-				up->u_auxv[i].a_un.a_val = sedp->sed_lddata;
-			}
+			val = sedp->sed_lddata;
 			break;
 		default:
-			break;
+			continue;
+		}
+
+		up->u_auxv[i].a_un.a_val = val;
+		if (val == NULL) {
+			/* Hide the entry for static binaries */
+			up->u_auxv[i].a_type = AT_IGNORE;
 		}
 	}
 

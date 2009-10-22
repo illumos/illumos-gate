@@ -49,6 +49,7 @@
 
 	<!-- Devices to create under /dev -->
 	<device match="arp" />
+	<device match="bpf" />
 	<device match="conslog" />
 	<device match="cpu/self/cpuid" />
 	<device match="crypto" />
@@ -62,6 +63,7 @@
 	<device match="lo0" />
 	<device match="log" />
 	<device match="logindmux" />
+	<device match="nsmb" />
 	<device match="net/*" />
 	<device match="null" />
 	<device match="openprom" arch="sparc" />
@@ -120,7 +122,7 @@
 	<device match="spdsock" ip-type="exclusive" />
 	<device match="sppp" ip-type="exclusive" />
 	<device match="sppptun" ip-type="exclusive" />
-	
+
 	<!-- Renamed devices to create under /dev -->
 	<device match="zcons/%z/zoneconsole" name="zconsole" />
 

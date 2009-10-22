@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -52,9 +52,9 @@ LIBS =		$(DYNLIB)
 LDLIBS +=	-lc -lrtld_db
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I../ -I$(UTSBASE)/common/brand/sn1 \
-			-I../../../../../cmd/sgs/librtld_db/common \
-			-I../../../../../cmd/sgs/include \
-			-I../../../../../cmd/sgs/include/$(MACH)
+			-I$(SRC)/cmd/sgs/librtld_db/common \
+			-I$(SRC)/cmd/sgs/include \
+			-I$(SRC)/cmd/sgs/include/$(MACH)
 
 ROOTLIBDIR =	$(ROOT)/usr/lib/brand/sn1
 ROOTLIBDIR64 =	$(ROOT)/usr/lib/brand/sn1/$(MACH64)

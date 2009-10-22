@@ -407,7 +407,7 @@ MISC_KMODS	+= md5
 #
 #	Brand modules
 #
-BRAND_KMODS	+= sn1_brand
+BRAND_KMODS	+= sn1_brand s10_brand
 
 #
 #	Software Cryptographic Providers (/kernel/crypto):

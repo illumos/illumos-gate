@@ -34,8 +34,8 @@ include ../../Makefile.master
 i386_SUBDIRS= lx
 i386_MSGSUBDIRS= lx
 
-SUBDIRS= sn1 native $($(MACH)_SUBDIRS)
-MSGSUBDIRS= native $($(MACH)_MSGSUBDIRS)
+SUBDIRS= sn1 solaris10 native $($(MACH)_SUBDIRS)
+MSGSUBDIRS= solaris10 native $($(MACH)_MSGSUBDIRS)
 
 all :=		TARGET= all
 install :=	TARGET= install

@@ -439,6 +439,8 @@ COMMON_SUBDIRS= \
 	SUNWrsm	\
 	SUNWrsmo \
 	SUNWrtls \
+	SUNWs10brandr \
+	SUNWs10brandu \
 	SUNWsacom \
 	SUNWsasnm \
 	SUNWsbp2 \

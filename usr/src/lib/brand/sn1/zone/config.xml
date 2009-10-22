@@ -59,6 +59,7 @@
 	<privilege set="default" name="net_bindmlp" />
 	<privilege set="default" name="net_icmpaccess" />
 	<privilege set="default" name="net_mac_aware" />
+	<privilege set="default" name="net_observability" />
 	<privilege set="default" name="net_privaddr" />
 	<privilege set="default" name="net_rawaccess" ip-type="exclusive" />
 	<privilege set="default" name="proc_chroot" />

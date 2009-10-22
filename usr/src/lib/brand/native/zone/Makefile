@@ -24,19 +24,12 @@
 # Use is subject to license terms.
 #
 
-ETCBRANDDIR=	$(ROOT)/etc/brand/native
-ETCUSER=	$(USERFILES:%=$(ETCBRANDDIR)/%)
-$(ETCUSER) :=	FILEMODE = 644
-
-$(ETCBRANDDIR)/%: %
-	$(INS.file)
-
 PROG=		sw_support
 BRAND=		native
 PROGS=		attach_update image_install p2v $(PROG)
 XMLDOCS=	config.xml platform.xml smf_disable.lst pkgrm.lst
 USERFILES=	smf_disable.conf pkgrm.conf
-SHARED=		common.ksh
+SHARED=		common.ksh query uninstall.ksh
 TEMPLATES=	SUNWdefault.xml SUNWblank.xml
 CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ROOTSHARED) \
 	$(ETCUSER)
@@ -46,10 +39,13 @@ all:	$(PROGS)
 include $(SRC)/cmd/Makefile.cmd
 include ../../Makefile.brand
 
+$(ROOTSHAREDDIR)/common.ksh := FILEMODE = 444
+$(ROOTSHAREDDIR)/uninstall.ksh := FILEMODE = 444
+
 CPPFLAGS +=	-I/usr/include/libxml2 -D_REENTRANT
 LDLIBS += -lzonecfg -luutil
 
-POFILES=	$(PROGS:%=%.po) common.po
+POFILES=	$(PROGS:%=%.po) common.po query.po uninstall.po
 POFILE=		native_zone.po
 
 $(POFILE): $(POFILES)

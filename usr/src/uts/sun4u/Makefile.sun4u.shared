@@ -441,7 +441,7 @@ MISC_KMODS	+= gptwo_cpu gptwocfg
 #
 #	Brand modules
 #
-BRAND_KMODS	+= sn1_brand
+BRAND_KMODS	+= sn1_brand s10_brand
 
 #
 #	Software Cryptographic Providers (/kernel/crypto):
