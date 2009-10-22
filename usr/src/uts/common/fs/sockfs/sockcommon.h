@@ -167,7 +167,7 @@ extern int 	so_acceptq_enqueue(struct sonode *, struct sonode *);
 extern int 	so_acceptq_enqueue_locked(struct sonode *, struct sonode *);
 extern int	so_acceptq_dequeue(struct sonode *, boolean_t,
     struct sonode **);
-extern void	so_acceptq_flush(struct sonode *);
+extern void	so_acceptq_flush(struct sonode *, boolean_t);
 
 	/* connect */
 extern int 	so_wait_connected(struct sonode *, boolean_t, sock_connid_t);

@@ -628,7 +628,7 @@ sonode_fini(struct sonode *so)
 		so->so_rcv_timer_tid = 0;
 	}
 
-	so_acceptq_flush(so);
+	so_acceptq_flush(so, B_FALSE);
 
 	if ((mp = so->so_oobmsg) != NULL) {
 		freemsg(mp);

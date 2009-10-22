@@ -175,13 +175,15 @@ so_acceptq_dequeue(struct sonode *so, boolean_t dontblock,
 }
 
 /*
- * void so_acceptq_flush(struct sonode *so)
+ * void so_acceptq_flush(struct sonode *so, boolean_t doclose)
  *
  * Removes all pending connections from a listening socket, and
  * frees the associated resources.
  *
  * Arguments
- *   so	    - listening socket
+ *   so	     - listening socket
+ *   doclose - make a close downcall for each socket on the accept queue
+ *             (Note, only SCTP and SDP sockets rely on this)
  *
  * Return values:
  *   None.
@@ -193,26 +195,26 @@ so_acceptq_dequeue(struct sonode *so, boolean_t dontblock,
  *   would come in, or so_lock needs to be obtained.
  */
 void
-so_acceptq_flush(struct sonode *so)
+so_acceptq_flush(struct sonode *so, boolean_t doclose)
 {
 	struct sonode *nso;
 
-	nso = so->so_acceptq_head;
-
-	while (nso != NULL) {
-		struct sonode *nnso = NULL;
-
-		nnso = nso->so_acceptq_next;
+	while ((nso = so->so_acceptq_head) != NULL) {
+		so->so_acceptq_head = nso->so_acceptq_next;
 		nso->so_acceptq_next = NULL;
-		/*
-		 * Since the socket is on the accept queue, there can
-		 * only be one reference. We drop the reference and
-		 * just blow off the socket.
-		 */
-		ASSERT(nso->so_count == 1);
-		nso->so_count--;
+
+		if (doclose) {
+			socket_close(nso, 0, CRED());
+		} else {
+			/*
+			 * Since the socket is on the accept queue, there can
+			 * only be one reference. We drop the reference and
+			 * just blow off the socket.
+			 */
+			ASSERT(nso->so_count == 1);
+			nso->so_count--;
+		}
 		socket_destroy(nso);
-		nso = nnso;
 	}
 
 	so->so_acceptq_head = NULL;
@@ -2340,7 +2342,7 @@ so_tpi_fallback(struct sonode *so, struct cred *cr)
 	 * Now flush the acceptq, this will destroy all sockets. They will
 	 * be recreated in sotpi_accept().
 	 */
-	so_acceptq_flush(so);
+	so_acceptq_flush(so, B_FALSE);
 
 	mutex_enter(&so->so_lock);
 	so->so_state |= SS_FALLBACK_COMP;

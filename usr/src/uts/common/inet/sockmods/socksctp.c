@@ -1877,7 +1877,7 @@ sosctp_fini(struct sonode *so, struct cred *cr)
 	so_rcv_flush(so);
 
 	/* Free all pending connections */
-	so_acceptq_flush(so);
+	so_acceptq_flush(so, B_TRUE);
 
 	ssi = ss->ss_assocs;
 	for (i = 0; i < ss->ss_maxassoc; i++, ssi++) {

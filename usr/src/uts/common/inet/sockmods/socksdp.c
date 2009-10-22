@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1174,7 +1174,7 @@ sosdp_fini(struct sonode *so, struct cred *cr)
 
 	mutex_enter(&so->so_lock);
 
-	so_acceptq_flush(so);
+	so_acceptq_flush(so, B_TRUE);
 
 	mutex_exit(&so->so_lock);
 
