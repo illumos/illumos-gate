@@ -2616,6 +2616,9 @@ ipf_stack_t *ifs;
 	 */
 	if ((fr != NULL) && (pass & FR_DUP)) {
 		mc = M_DUPLICATE(fin->fin_m);
+#ifdef _KERNEL
+		mc->b_rptr += fin->fin_ipoff;
+#endif
 	}
 
 	if (pass & (FR_RETRST|FR_RETICMP)) {

@@ -301,7 +301,7 @@ typedef unsigned int	u_32_t;
 #  define	GETKTIME(x)	uniqtime((struct timeval *)x)
 #  define	MSGDSIZE(x)	msgdsize(x)
 #  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
-#  define	M_DUPLICATE(x)	dupmsg((x))
+#  define	M_DUPLICATE(x)	copymsg((x))
 #  define	MTOD(m,t)	((t)((m)->b_rptr))
 #  define	MTYPE(m)	((m)->b_datap->db_type)
 #  define	FREE_MB_T(m)	freemsg(m)
