@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "nge.h"
 
@@ -380,18 +379,15 @@ nge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_FIRST_COLLISIONS:
-		regno = KS_BASE + KS_ifHOutZeroRetranCount * sizeof (uint32_t);
-		hw_stp->s.OutZeroRetranCount += nge_reg_get32(ngep, regno);
-		*val = hw_stp->s.OutZeroRetranCount;
+		regno = KS_BASE + KS_ifHOutOneRetranCount * sizeof (uint32_t);
+		hw_stp->s.OutOneRetranCount += nge_reg_get32(ngep, regno);
+		*val = hw_stp->s.OutOneRetranCount;
 		break;
 
 	case ETHER_STAT_MULTI_COLLISIONS:
-		regno = KS_BASE + KS_ifHOutOneRetranCount * sizeof (uint32_t);
-		hw_stp->s.OutOneRetranCount += nge_reg_get32(ngep, regno);
 		regno = KS_BASE + KS_ifHOutMoreRetranCount * sizeof (uint32_t);
 		hw_stp->s.OutMoreRetranCount += nge_reg_get32(ngep, regno);
-		*val =  hw_stp->s.OutOneRetranCount +
-		    hw_stp->s.OutMoreRetranCount;
+		*val =  hw_stp->s.OutMoreRetranCount;
 		break;
 
 	case ETHER_STAT_DEFER_XMTS:
