@@ -75,6 +75,7 @@ struct devnames {
  */
 #define	DN_CONF_PARSED		0x0001
 #define	DN_DRIVER_BUSY		0x0002	/* for ddi_hold_installed_driver */
+#define	DN_DRIVER_INACTIVE	0x0004	/* driver not active */
 #define	DN_DRIVER_HELD		0x0020	/* held via ddi_hold_installed_driver */
 #define	DN_TAKEN_GETUDEV	0x0040	/* getudev() used this entry */
 #define	DN_DRIVER_REMOVED	0x0080	/* driver entry removed */

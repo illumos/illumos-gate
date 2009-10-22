@@ -599,10 +599,10 @@ mod_installdrv(struct modldrv *modl, struct modlinkage *modlp)
 	LOCK_DEV_OPS(&dnp->dn_lock);
 	dp = devopsp[major];
 
-	if (dnp->dn_flags & DN_DRIVER_REMOVED) {
+	if (dnp->dn_flags & (DN_DRIVER_REMOVED|DN_DRIVER_INACTIVE)) {
 #ifdef DEBUG
-		cmn_err(CE_NOTE,
-		    "mod_installdrv: driver has been removed %s", modname);
+		cmn_err(CE_CONT,
+		    "mod_installdrv: driver %s not installed", modname);
 #endif
 		err = ENXIO;
 		goto unlock;

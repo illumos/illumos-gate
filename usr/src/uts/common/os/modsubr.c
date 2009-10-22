@@ -72,6 +72,14 @@ static void hwc_hash_init();
 static void hwc_hash(struct hwc_spec *, major_t);
 static void hwc_unhash(struct hwc_spec *);
 
+int
+driver_installed(major_t major)
+{
+	return ((major < devcnt) && (major != DDI_MAJOR_T_NONE) &&
+	    !(devnamesp[major].dn_flags &
+	    (DN_DRIVER_REMOVED|DN_DRIVER_INACTIVE)));
+}
+
 struct dev_ops *
 mod_hold_dev_by_major(major_t major)
 {
@@ -79,7 +87,7 @@ mod_hold_dev_by_major(major_t major)
 	int loaded;
 	char *drvname;
 
-	if (major >= devcnt)
+	if (!driver_installed(major))
 		return (NULL);
 
 	LOCK_DEV_OPS(&(devnamesp[major].dn_lock));
@@ -113,7 +121,7 @@ mod_rele_dev_by_major(major_t major)
 	struct dev_ops *ops;
 	struct devnames *dnp;
 
-	if (major >= devcnt)
+	if (!driver_installed(major))
 		return;
 
 	dnp = &devnamesp[major];
@@ -621,7 +629,7 @@ mod_name_to_major(char *name)
 char *
 mod_major_to_name(major_t major)
 {
-	if (major >= devcnt)
+	if (!driver_installed(major))
 		return (NULL);
 	return ((&devnamesp[major])->dn_name);
 }
@@ -654,7 +662,8 @@ init_devnamesp(int size)
 	 */
 	for (hshndx = 0; hshndx < MOD_BIND_HASHSIZE; hshndx++) {
 		for (bp = mb_hashtab[hshndx]; bp; bp = bp->b_next) {
-			if (make_devname(bp->b_name, (major_t)bp->b_num) != 0) {
+			if (make_devname(bp->b_name,
+			    (major_t)bp->b_num, 0) != 0) {
 				/*
 				 * If there is not an entry at b_num already,
 				 * then this must be a bad major number.
@@ -676,7 +685,7 @@ init_devnamesp(int size)
 }
 
 int
-make_devname(char *name, major_t major)
+make_devname(char *name, major_t major, int dn_flags)
 {
 	struct devnames *dnp;
 	char *copy;
@@ -698,6 +707,7 @@ make_devname(char *name, major_t major)
 		}
 		/* Adding back a removed driver */
 		dnp->dn_flags &= ~DN_DRIVER_REMOVED;
+		dnp->dn_flags |= dn_flags;
 		UNLOCK_DEV_OPS(&dnp->dn_lock);
 		return (0);
 	}
@@ -716,7 +726,7 @@ make_devname(char *name, major_t major)
 	/* Make sure string is copied before setting dn_name */
 	membar_producer();
 	dnp->dn_name = copy;
-	dnp->dn_flags = 0;
+	dnp->dn_flags = dn_flags;
 	UNLOCK_DEV_OPS(&dnp->dn_lock);
 	return (0);
 }

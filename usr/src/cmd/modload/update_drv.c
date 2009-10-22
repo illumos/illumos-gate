@@ -102,6 +102,7 @@ main(int argc, char *argv[])
 	int	found;
 	major_t major_num;
 	int	rval;
+	int	config_flags;
 
 	(void) setlocale(LC_ALL, "");
 #if	!defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -348,10 +349,12 @@ main(int argc, char *argv[])
 			if (update_conf) {
 				/* paranoia - if we crash whilst configuring */
 				sync();
+				config_flags = (verbose_flag) ?
+				    CONFIG_DRV_VERBOSE : 0;
 				cleanup_flag |= CLEAN_DRV_ALIAS;
 				if (config_driver(driver_name, major_num,
 				    aliases2, NULL, cleanup_flag,
-				    verbose_flag) == ERROR) {
+				    config_flags) == ERROR) {
 					err_exit();
 				}
 			}
@@ -376,6 +379,7 @@ done:
 	 * m_flag: update /etc/minor_perm
 	 * -p: update /etc/security/device_policy
 	 * -P: update /etc/security/extra_privs
+	 * if force_flag is specified continue w/ the next operation
 	 */
 	if (d_flag) {
 		int err = NOERR;
@@ -468,8 +472,14 @@ done:
 			if (err == NOERR && update_conf) {
 				/* paranoia - if we crash whilst configuring */
 				sync();
+
+				config_flags = 0;
+				if (verbose_flag)
+					config_flags |= CONFIG_DRV_VERBOSE;
+				if (force_flag)
+					config_flags |= CONFIG_DRV_FORCE;
 				error = unconfig_driver(driver_name, major_num,
-				    aliases, verbose_flag, force_flag);
+				    aliases, config_flags);
 				if (error == ERROR && force_flag == 0) {
 					(void) fprintf(stderr,
 					    gettext(ERR_DEV_IN_USE),
@@ -537,7 +547,7 @@ done:
 		(void) unload_drv(driver_name, force_flag, verbose_flag);
 
 		if ((modctl(MODUNLOADDRVCONF, major) != 0) ||
-		    (modctl(MODLOADDRVCONF, major) != 0)) {
+		    (modctl(MODLOADDRVCONF, major, 0) != 0)) {
 			(void) fprintf(stderr, gettext(ERR_DRVCONF),
 			    driver_name);
 			err_exit();

@@ -147,7 +147,7 @@ extern int trim_duplicate_aliases(char *, char *, char **);
 extern int get_max_major(char *);
 extern void get_modid(char *, int *);
 extern int config_driver(char *, major_t, char *, char *, int, int);
-extern int unconfig_driver(char *, major_t, char *, int, int);
+extern int unconfig_driver(char *, major_t, char *, int);
 extern void load_driver(char *, int);
 extern int create_reconfig(char *);
 extern void cleanup_moddir(void);
@@ -159,6 +159,11 @@ extern void cleanup_moddir(void);
 /* module path list separators */
 #define	MOD_SEP	" :"
 #define	DIR_SEP "/"
+
+/* [un]config_driver flags */
+#define	CONFIG_DRV_VERBOSE	0x01		/* verbose */
+#define	CONFIG_DRV_FORCE	0x02		/* unconfig even if in use */
+#define	CONFIG_DRV_UPDATE_ONLY	0x04		/* -u update only */
 
 #ifdef	__cplusplus
 }

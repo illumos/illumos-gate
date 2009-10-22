@@ -917,9 +917,7 @@ init_node(dev_info_t *dip)
 	 * to add a path-oriented alias for both paths.
 	 */
 	major = ddi_name_to_major(path);
-	if ((major != DDI_MAJOR_T_NONE) &&
-	    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED) &&
-	    (major != DEVI(dip)->devi_major) &&
+	if (driver_installed(major) && (major != DEVI(dip)->devi_major) &&
 	    (ndi_dev_is_persistent_node(dip) || driver_conf_allow_path_alias)) {
 
 		/* Mark node for rebind processing. */
@@ -2505,7 +2503,7 @@ i_ddi_load_drvconf(major_t major)
 	for (m = low; m <= high; m++) {
 		struct devnames *dnp = &devnamesp[m];
 		LOCK_DEV_OPS(&dnp->dn_lock);
-		dnp->dn_flags &= ~DN_DRIVER_HELD;
+		dnp->dn_flags &= ~(DN_DRIVER_HELD|DN_DRIVER_INACTIVE);
 		(void) impl_make_parlist(m);
 		UNLOCK_DEV_OPS(&dnp->dn_lock);
 	}
@@ -2718,8 +2716,7 @@ ddi_compatible_driver_major(dev_info_t *dip, char **formp)
 	if (devi->devi_flags & DEVI_REBIND) {
 		p = devi->devi_rebinding_name;
 		major = ddi_name_to_major(p);
-		if ((major != DDI_MAJOR_T_NONE) &&
-		    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED)) {
+		if (driver_installed(major)) {
 			if (formp)
 				*formp = p;
 			return (major);
@@ -2742,8 +2739,7 @@ ddi_compatible_driver_major(dev_info_t *dip, char **formp)
 	/* find the highest precedence compatible form with a driver binding */
 	while ((p = prom_decode_composite_string(compat, len, p)) != NULL) {
 		major = ddi_name_to_major(p);
-		if ((major != DDI_MAJOR_T_NONE) &&
-		    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED)) {
+		if (driver_installed(major)) {
 			if (formp)
 				*formp = p;
 			return (major);
@@ -2755,8 +2751,7 @@ ddi_compatible_driver_major(dev_info_t *dip, char **formp)
 	 * the node name has a driver binding.
 	 */
 	major = ddi_name_to_major(ddi_node_name(dip));
-	if ((major != DDI_MAJOR_T_NONE) &&
-	    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED))
+	if (driver_installed(major))
 		return (major);
 
 	/* no driver */
@@ -4288,15 +4283,13 @@ bind_dip(dev_info_t *dip, void *arg)
 			path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 			(void) ddi_pathname(dip, path);
 			pmajor = ddi_name_to_major(path);
-			if ((pmajor != DDI_MAJOR_T_NONE) &&
-			    !(devnamesp[pmajor].dn_flags & DN_DRIVER_REMOVED))
+			if (driver_installed(pmajor))
 				major = pmajor;
 			kmem_free(path, MAXPATHLEN);
 		}
 
 		/* attempt unbind if current driver is incorrect */
-		if ((major != DDI_MAJOR_T_NONE) &&
-		    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED) &&
+		if (driver_installed(major) &&
 		    (major != DEVI(dip)->devi_major))
 			(void) ndi_devi_unbind_driver(dip);
 	}
@@ -6628,8 +6621,7 @@ path_to_major(char *path)
 
 	/* check for path-oriented alias */
 	major = ddi_name_to_major(path);
-	if ((major != DDI_MAJOR_T_NONE) &&
-	    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED)) {
+	if (driver_installed(major)) {
 		NDI_CONFIG_DEBUG((CE_NOTE, "path_to_major: %s path bound %s\n",
 		    path, ddi_major_to_name(major)));
 		return (major);
@@ -7207,6 +7199,8 @@ ddi_hold_installed_driver(major_t major)
 	 */
 	dnp = &devnamesp[major];
 	enter_driver(dnp);
+	ASSERT(driver_installed(major));
+
 	if (dnp->dn_flags & DN_DRIVER_HELD) {
 		exit_driver(dnp);
 		if (i_ddi_devs_attached(major) == DDI_SUCCESS)

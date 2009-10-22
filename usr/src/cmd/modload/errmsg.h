@@ -123,6 +123,9 @@ extern "C" {
 #define	ERR_PATH_SPEC	"Error: driver may not be specified by path (%s)\n"
 #define	ERR_CREATE_RECONFIG	"Error: Could not create /reconfigure.\n"
 
+#define	INFO_UPDATE_ONLY	\
+"System updated but %s driver not yet configured.\n"
+
 /* update_drv messages */
 #define	UPD_DRV_USAGE	\
 	"Usage:\tupdate_drv [ -f | -v ] <driver_module>\n" \

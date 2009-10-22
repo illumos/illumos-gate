@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -405,9 +405,8 @@ dev_to_instance(dev_t dev)
 	void		*vinstance;
 	int		error;
 
-	/* verify that the major number is reasonable and driver is loaded */
-	if ((major >= devcnt) ||
-	    ((ops = mod_hold_dev_by_major(major)) == NULL))
+	/* verify that the driver is loaded */
+	if ((ops = mod_hold_dev_by_major(major)) == NULL)
 		return (-1);
 	ASSERT(CB_DRV_INSTALLED(ops));
 

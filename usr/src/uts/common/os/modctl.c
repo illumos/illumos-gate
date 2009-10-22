@@ -647,21 +647,28 @@ modctl_update_driver_aliases(int add, int *data)
 		 * number.
 		 */
 		(void) make_mbind(mc.drvname, mc.major, NULL, mb_hashtab);
-		if ((rv = make_devname(mc.drvname, mc.major)) != 0)
+		if ((rv = make_devname(mc.drvname, mc.major,
+		    (mc.flags & MOD_ADDMAJBIND_UPDATE) ?
+		    DN_DRIVER_INACTIVE : 0)) != 0) {
 			goto error;
+		}
 
 		if (mc.drvclass[0] != '\0')
 			add_class(mc.drvname, mc.drvclass);
-		(void) i_ddi_load_drvconf(mc.major);
+		if ((mc.flags & MOD_ADDMAJBIND_UPDATE) == 0) {
+			(void) i_ddi_load_drvconf(mc.major);
+		}
 	}
 
 	/*
 	 * Ensure that all nodes are bound to the most appropriate driver
 	 * possible, attempting demotion and rebind when a more appropriate
-	 * driver now exists.
+	 * driver now exists.  But not when adding a driver update-only.
 	 */
-	i_ddi_bind_devs();
-	i_ddi_di_cache_invalidate();
+	if ((add == 0) || ((mc.flags & MOD_ADDMAJBIND_UPDATE) == 0)) {
+		i_ddi_bind_devs();
+		i_ddi_di_cache_invalidate();
+	}
 
 error:
 	if (mc.num_aliases > 0) {
@@ -784,10 +791,24 @@ new_vfs_in_modpath()
 }
 
 static int
-modctl_load_drvconf(major_t major)
+modctl_load_drvconf(major_t major, int flags)
 {
 	int ret;
 
+	/*
+	 * devfsadm -u - read all new driver.conf files
+	 * and bind and configure devices for new drivers.
+	 */
+	if (flags & MOD_LOADDRVCONF_RECONF) {
+		(void) i_ddi_load_drvconf(DDI_MAJOR_T_NONE);
+		i_ddi_bind_devs();
+		i_ddi_di_cache_invalidate();
+		return (0);
+	}
+
+	/*
+	 * update_drv <drv> - reload driver.conf for the specified driver
+	 */
 	if (major != DDI_MAJOR_T_NONE) {
 		ret = i_ddi_load_drvconf(major);
 		if (ret == 0)
@@ -2437,7 +2458,7 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 		break;
 
 	case MODLOADDRVCONF:	/* load driver.conf file for major */
-		error = modctl_load_drvconf((major_t)a1);
+		error = modctl_load_drvconf((major_t)a1, (int)a2);
 		break;
 
 	case MODUNLOADDRVCONF:	/* unload driver.conf file for major */

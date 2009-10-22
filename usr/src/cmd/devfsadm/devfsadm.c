@@ -90,6 +90,9 @@ static char *driver = NULL;
 /* attempt to load drivers or defer attach nodes */
 static int load_attach_drv = TRUE;
 
+/* reload all driver.conf files */
+static int update_all_drivers = FALSE;
+
 /* set if invoked via /usr/lib/devfsadm/devfsadmd */
 static int daemon_mode = FALSE;
 
@@ -233,7 +236,7 @@ static int lookup_door_fd = -1;
 static char *lookup_door_path;
 
 static void load_dev_acl(void);
-static void update_drvconf(major_t);
+static void update_drvconf(major_t, int);
 static void check_reconfig_state(void);
 static int s_stat(const char *, struct stat *);
 
@@ -363,7 +366,7 @@ main(int argc, char *argv[])
 		if (getenv(RECONFIG_BOOT) != NULL && root_dir[0] != '\0') {
 			vprint(INFO_MID, CONFIGURING);
 			load_dev_acl();
-			update_drvconf((major_t)-1);
+			update_drvconf((major_t)-1, 0);
 			process_devinfo_tree();
 			(void) modctl(MODSETMINIROOT);
 		}
@@ -447,13 +450,12 @@ main(int argc, char *argv[])
 }
 
 static void
-update_drvconf(major_t major)
+update_drvconf(major_t major, int flags)
 {
-	if (modctl(MODLOADDRVCONF, major) != 0)
+	if (modctl(MODLOADDRVCONF, major, flags) != 0)
 		err_print(gettext("update_drvconf failed for major %d\n"),
 		    major);
 }
-
 
 static void
 load_dev_acl()
@@ -605,10 +607,11 @@ parse_args(int argc, char *argv[])
 		}
 
 	} else if (strcmp(prog, DRVCONFIG) == 0) {
+		int update_only = 0;
 		build_dev = FALSE;
 
 		while ((opt =
-		    getopt(argc, argv, "a:bc:dfi:m:np:R:r:suvV:")) != EOF) {
+		    getopt(argc, argv, "a:bc:dfi:m:np:R:r:suvV:x")) != EOF) {
 			switch (opt) {
 			case 'a':
 				ap = calloc(sizeof (struct aliases), 1);
@@ -703,6 +706,9 @@ parse_args(int argc, char *argv[])
 				/* undocumented for extra verbose levels */
 				add_verbose_id(optarg);
 				break;
+			case 'x':
+				update_only = 1;
+				break;
 			default:
 				usage();
 			}
@@ -718,7 +724,11 @@ parse_args(int argc, char *argv[])
 				devfsadm_exit(1);
 				/*NOTREACHED*/
 			}
-			mc.flags = (force_flag) ? MOD_UNBIND_OVERRIDE : 0;
+			mc.flags = 0;
+			if (force_flag)
+				mc.flags |= MOD_UNBIND_OVERRIDE;
+			if (update_only)
+				mc.flags |= MOD_ADDMAJBIND_UPDATE;
 			mc.num_aliases = num_aliases;
 			mc.ap = a_head;
 			retval =  modctl((config == TRUE) ? MODADDMAJBIND :
@@ -746,7 +756,7 @@ parse_args(int argc, char *argv[])
 		devlinktab_file = DEVLINKTAB_FILE;
 
 		while ((opt = getopt(argc, argv,
-		    "a:Cc:deIi:l:np:PR:r:sSt:vV:x:")) != EOF) {
+		    "a:Cc:deIi:l:np:PR:r:sSt:uvV:x:")) != EOF) {
 			if (opt == 'I' || opt == 'P' || opt == 'S') {
 				if (public_mode)
 					usage();
@@ -841,6 +851,12 @@ parse_args(int argc, char *argv[])
 			case 't':
 				devlinktab_file = optarg;
 				break;
+			case 'u':	/* complete configuration after */
+					/* adding a driver update-only */
+				if (daemon_mode == TRUE)
+					usage();
+				update_all_drivers = TRUE;
+				break;
 			case 'v':
 				/* documented verbose flag */
 				add_verbose_id(VERBOSE_MID);
@@ -901,7 +917,7 @@ parse_args(int argc, char *argv[])
 				load_dev_acl();
 			}
 			if (init_drvconf)
-				update_drvconf((major_t)-1);
+				update_drvconf((major_t)-1, 0);
 			if (init_sysavail)
 				modctl_sysavail();
 			devfsadm_exit(0);
@@ -1103,8 +1119,10 @@ process_devinfo_tree()
 	 * Update kernel driver.conf cache when devfsadm/drvconfig
 	 * is invoked to build /devices and /dev.
 	 */
-	if (load_attach_drv == TRUE)
-		update_drvconf((major_t)-1);
+	if (update_all_drivers || load_attach_drv) {
+		update_drvconf((major_t)-1,
+		    update_all_drivers ? MOD_LOADDRVCONF_RECONF : 0);
+	}
 
 	if (single_drv == TRUE) {
 		/*
@@ -8479,7 +8497,7 @@ devname_lookup_handler(void *cookie, char *argp, size_t arg_size,
 		dci.dci_arg = NULL;
 
 		lock_dev();
-		update_drvconf((major_t)-1);
+		update_drvconf((major_t)-1, 0);
 		dci.dci_flags |= DCA_FLUSH_PATHINST;
 
 		pre_and_post_cleanup(RM_PRE);

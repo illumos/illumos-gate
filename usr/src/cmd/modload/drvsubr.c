@@ -1216,8 +1216,7 @@ exec_devfsadm(
 	major_t major_num,
 	char *aliases,
 	char *classes,
-	int verbose_flag,
-	int force_flag)
+	int config_flags)
 {
 	int n = 0;
 	char *cmdline[MAX_CMD_LINE];
@@ -1231,10 +1230,10 @@ exec_devfsadm(
 	cmdline[n++] = DRVCONFIG;
 	if (config == B_FALSE) {
 		cmdline[n++] = "-u";		/* unconfigure */
-		if (force_flag)
+		if (config_flags & CONFIG_DRV_FORCE)
 			cmdline[n++] = "-f";	/* force if currently in use */
 	}
-	if (verbose_flag) {
+	if (config_flags & CONFIG_DRV_VERBOSE) {
 		cmdline[n++] = "-v";
 	}
 	cmdline[n++] = "-b";
@@ -1247,6 +1246,8 @@ exec_devfsadm(
 	cmdline[n++] = "-m";
 	(void) snprintf(maj_num, sizeof (maj_num), "%lu", major_num);
 	cmdline[n++] = maj_num;
+	if (config_flags & CONFIG_DRV_UPDATE_ONLY)
+		cmdline[n++] = "-x";
 
 	if (aliases != NULL) {
 		len = strlen(aliases);
@@ -1279,11 +1280,10 @@ unconfig_driver(
 	char *driver_name,
 	major_t major_num,
 	char *aliases,
-	int verbose_flag,
-	int force_flag)
+	int config_flags)
 {
 	return (exec_devfsadm(B_FALSE, driver_name, major_num,
-	    aliases, NULL, verbose_flag, force_flag));
+	    aliases, NULL, config_flags));
 }
 
 /*
@@ -1297,7 +1297,7 @@ config_driver(
 	char *aliases,
 	char *classes,
 	int cleanup_flag,
-	int verbose_flag)
+	int config_flags)
 {
 	int	max_dev;
 	int	rv;
@@ -1316,7 +1316,7 @@ config_driver(
 
 	/* bind major number and driver name */
 	rv = exec_devfsadm(B_TRUE, driver_name, major_num,
-	    aliases, classes, verbose_flag, 0);
+	    aliases, classes, config_flags);
 
 	if (rv == NOERR)
 		return (NOERR);

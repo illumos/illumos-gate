@@ -101,6 +101,7 @@ main(int argc, char *argv[])
 	int noload_flag = 0;
 	int verbose_flag = 0;
 	int force_flag = 0;
+	int update_only = 0;
 	int i_flag = 0;
 	int c_flag = 0;
 	int m_flag = 0;
@@ -113,6 +114,7 @@ main(int argc, char *argv[])
 	di_node_t root_node;	/* for device tree snapshot */
 	char *drvelf_desc = NULL;
 	int drvelf_type = ELFCLASSNONE;
+	int config_flags;
 
 	moddir = NULL;
 
@@ -129,7 +131,7 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	while ((opt = getopt(argc, argv, "vfm:ni:b:c:p:P:")) != EOF) {
+	while ((opt = getopt(argc, argv, "vfm:ni:b:c:p:P:u")) != EOF) {
 		switch (opt) {
 		case 'm' :
 			m_flag = 1;
@@ -171,6 +173,13 @@ main(int argc, char *argv[])
 			break;
 		case 'P':
 			priv = optarg;
+			break;
+		case 'u':
+			/*
+			 * Update binding files and kernel but
+			 * do not load or configure devices.
+			 */
+			update_only = 1;
 			break;
 		case '?' :
 		default:
@@ -259,6 +268,12 @@ main(int argc, char *argv[])
 		if (aliases != NULL)
 			if ((aliases_unique(aliases)) == ERROR)
 				err_exit();
+	}
+
+	/* -u and -n/-b are mutually exclusive */
+	if (update_only && (noload_flag || server)) {
+		usage();
+		err_exit();
 	}
 
 	/* update kernel unless -b or -n */
@@ -427,8 +442,14 @@ main(int argc, char *argv[])
 		 */
 		sync();
 
+		config_flags = 0;
+		if (verbose_flag)
+			config_flags |= CONFIG_DRV_VERBOSE;
+		if (update_only)
+			config_flags |= CONFIG_DRV_UPDATE_ONLY;
+
 		if (config_driver(driver_name, major_num, aliases, classes,
-		    cleanup_flag, verbose_flag) == ERROR) {
+		    cleanup_flag, config_flags) == ERROR) {
 			err_exit();
 		}
 		if (m_flag) {
@@ -437,11 +458,15 @@ main(int argc, char *argv[])
 				err_exit();
 			}
 		}
-		if (!noload_flag)
-			load_driver(driver_name, verbose_flag);
-		else
+		if (update_only) {
+			(void) fprintf(stderr, gettext(INFO_UPDATE_ONLY),
+			    driver_name);
+		} else if (noload_flag) {
 			(void) fprintf(stderr, gettext(ERR_CONFIG_NOLOAD),
 			    driver_name);
+		} else {
+			load_driver(driver_name, verbose_flag);
+		}
 	}
 
 	if (create_reconfig(basedir) == ERROR)
