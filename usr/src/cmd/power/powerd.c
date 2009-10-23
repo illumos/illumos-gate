@@ -31,7 +31,6 @@
 #include <string.h>
 #include <errno.h>
 #include <pwd.h>
-#include <procfs.h>
 #include <dirent.h>
 #include <thread.h>
 #include <limits.h>
@@ -1283,20 +1282,15 @@ open_pidfile(char *me)
 	int fd;
 	const char *e1 = "%s: Cannot open pid file for read: ";
 	const char *e2 = "%s: Cannot unlink obsolete pid file: ";
-	const char *e3 = "%s: Cannot open /proc for pid %ld: ";
-	const char *e4 = "%s: Cannot read /proc for pid %ld: ";
-	const char *e5 = "%s: Another instance (pid %ld) is trying to exit"
-	    "and may be hung.  Please contact sysadmin.\n";
-	const char *e6 = "%s: Another daemon is running\n";
-	const char *e7 = "%s: Cannot create pid file: ";
+	const char *e3 = "%s: Either another daemon is running or the"
+	    " process is defunct (pid %d). \n";
+	const char *e4 = "%s: Cannot create pid file: ";
 
 again:
 	if ((fd = open(pidpath, O_CREAT | O_EXCL | O_WRONLY, 0444)) == -1) {
 		if (errno  == EEXIST) {
 			FILE *fp;
-			int ps_fd;
 			pid_t pid;
-			psinfo_t ps_info;
 
 			if ((fp = fopen(pidpath, "r")) == NULL) {
 				(void) fprintf(stderr, e1, me);
@@ -1317,11 +1311,9 @@ again:
 					goto again;
 			}
 
-			/* Is pid for a running process? */
-			(void) sprintf(scratch, "/proc/%ld/psinfo", pid);
-			ps_fd = open(scratch, O_RDONLY | O_NDELAY);
-			if (ps_fd == -1) {
-				if (errno == ENOENT) {
+			/* Is pid for a running process */
+			if (kill(pid, 0) == -1) {
+				if (errno == ESRCH) {
 					if (unlink(pidpath) == -1) {
 						(void) fprintf(stderr, e2, me);
 						perror(NULL);
@@ -1329,26 +1321,13 @@ again:
 					} else	/* try without obsolete file */
 						goto again;
 				}
+			} else {    /* powerd deamon still running or defunct */
 				(void) fprintf(stderr, e3, me, pid);
 				return (-1);
 			}
-			if (read(ps_fd, &ps_info,
-			    sizeof (ps_info)) != sizeof (ps_info)) {
-				(void) fprintf(stderr, e4, me, pid);
-				perror(NULL);
-				(void) close(ps_fd);
-				return (-1);
-			}
-			(void) close(ps_fd);
-			if (ps_info.pr_nlwp == 0) {	/* defunct process */
-				(void) fprintf(stderr, e5, me, pid);
-				return (-1);
-			} else {	/* instance of daemon already running */
-				(void) fprintf(stderr, e6, me);
-				return (-1);
-			}
+
 		} else {	/* create failure not due to existing file */
-			(void) fprintf(stderr, e7, me);
+			(void) fprintf(stderr, e4, me);
 			perror(NULL);
 			return (-1);
 		}

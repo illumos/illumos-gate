@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1066,7 +1066,7 @@ ppm_convert(char *symbol, uint_t *val)
 
 	if ((s = strchr(symbol, '=')) == NULL) {
 		cmn_err(CE_WARN, "ppm_convert: token \"%s\" syntax error in "
-		    "ppm.conf file, line(%d)", symbol,  __LINE__);
+		    "ppm.conf file", symbol);
 		return (*val = (uint_t)-1);
 	}
 	s++;
@@ -1077,7 +1077,7 @@ ppm_convert(char *symbol, uint_t *val)
 	}
 
 	cmn_err(CE_WARN, "ppm_convert: Unrecognizable token \"%s\" "
-	    "in ppm.conf file, line %d", symbol, __LINE__);
+	    "in ppm.conf file", symbol);
 	return (*val = (uint_t)-1);
 }
 
@@ -1229,7 +1229,7 @@ ppm_parse_dc(char **dc_namep, ppm_dc_t *dc)
 
 		/* we encounted unrecognized field, flag error */
 		cmn_err(CE_WARN, "%s: Unrecognized token \"%s\" in ppm.conf "
-		    "file, line(%d)!", str, dclist[i], __LINE__);
+		    "file!", str, dclist[i]);
 		return (-1);
 	}
 
