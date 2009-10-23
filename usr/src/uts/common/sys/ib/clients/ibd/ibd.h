@@ -144,15 +144,12 @@ typedef enum {
  * Pre-registered copybuf used for send and receive
  */
 typedef struct ibd_copybuf_s {
-	ibt_mr_hdl_t		ic_mr_hdl;
 	ibt_wr_ds_t		ic_sgl;
-	ibt_mr_desc_t		ic_mr_desc;
 	uint8_t			*ic_bufaddr;
 } ibd_copybuf_t;
 
 typedef struct ibd_wqe_s {
 	struct ibd_wqe_s	*w_next;
-	struct ibd_wqe_s	*w_prev;
 	ibd_wqe_type_t		w_type;
 	ibd_copybuf_t		w_copybuf;
 	mblk_t			*im_mblk;
@@ -171,7 +168,6 @@ typedef struct ibd_swqe_s {
 } ibd_swqe_t;
 
 #define	swqe_next		w_ibd_swqe.w_next
-#define	swqe_prev		w_ibd_swqe.w_prev
 #define	swqe_type		w_ibd_swqe.w_type
 #define	swqe_copybuf		w_ibd_swqe.w_copybuf
 #define	swqe_im_mblk		w_ibd_swqe.im_mblk
@@ -187,11 +183,9 @@ typedef struct ibd_rwqe_s {
 	ibt_recv_wr_t		w_rwr;
 	boolean_t		w_freeing_wqe;
 	frtn_t			w_freemsg_cb;
-	ibd_wqe_t		*w_post_link;
 } ibd_rwqe_t;
 
 #define	rwqe_next		w_ibd_rwqe.w_next
-#define	rwqe_prev		w_ibd_rwqe.w_prev
 #define	rwqe_type		w_ibd_rwqe.w_type
 #define	rwqe_copybuf		w_ibd_rwqe.w_copybuf
 #define	rwqe_im_mblk		w_ibd_rwqe.im_mblk
@@ -199,14 +193,13 @@ typedef struct ibd_rwqe_s {
 #define	WQE_TO_RWQE(wqe)	(ibd_rwqe_t *)wqe
 
 typedef struct ibd_list_s {
+	kmutex_t		dl_mutex;
 	ibd_wqe_t		*dl_head;
-	ibd_wqe_t		*dl_tail;
 	union {
 		boolean_t	pending_sends;
 		uint32_t	bufs_outstanding;
 	} ustat;
 	uint32_t		dl_cnt;
-	kmutex_t		dl_mutex;
 } ibd_list_t;
 
 #define	dl_pending_sends	ustat.pending_sends
@@ -240,6 +233,25 @@ typedef struct ibd_lsobkt_s {
 } ibd_lsobkt_t;
 
 /*
+ * Posting to a single software rx post queue is contentious,
+ * so break it out to (multiple) an array of queues.
+ *
+ * Try to ensure rx_queue structs fall in different cache lines using a filler.
+ * Note: the RX_QUEUE_CACHE_LINE needs to change if the struct changes.
+ */
+#define	RX_QUEUE_CACHE_LINE \
+	(64 - ((sizeof (kmutex_t) + 2 * sizeof (ibd_wqe_t *) + \
+	2 * sizeof (uint32_t))))
+typedef struct ibd_rx_queue_s {
+	kmutex_t		rx_post_lock;
+	ibd_wqe_t		*rx_head;
+	ibd_wqe_t		*rx_tail;
+	uint32_t		rx_stat;
+	uint32_t		rx_cnt;
+	uint8_t			rx_cache_filler[RX_QUEUE_CACHE_LINE];
+} ibd_rx_queue_t;
+
+/*
  * This structure maintains information per port per HCA
  * (per network interface).
  */
@@ -250,47 +262,59 @@ typedef struct ibd_state_s {
 	ibt_pd_hdl_t		id_pd_hdl;
 	kmem_cache_t		*id_req_kmc;
 
+	ibd_list_t		id_tx_rel_list;
+
 	uint32_t		id_max_sqseg;
+	uint32_t		id_max_sqseg_hiwm;
 	ibd_list_t		id_tx_list;
 	ddi_softintr_t		id_tx;
 	uint32_t		id_tx_sends;
 
+	kmutex_t		id_txpost_lock;
+	ibd_swqe_t		*id_tx_head;
+	ibd_swqe_t		*id_tx_tail;
+	int			id_tx_busy;
+
+	uint_t			id_tx_buf_sz;
 	uint8_t			*id_tx_bufs;
+	ibd_swqe_t		*id_tx_wqes;
 	ibt_mr_hdl_t		id_tx_mr_hdl;
 	ibt_mr_desc_t		id_tx_mr_desc;
-	uint_t			id_tx_buf_sz;
 
 	kmutex_t		id_lso_lock;
 	ibd_lsobkt_t		*id_lso;
 
-	kmutex_t		id_cq_poll_lock;
-	int			id_cq_poll_busy;
+	kmutex_t		id_scq_poll_lock;
+	int			id_scq_poll_busy;
 
 	ibt_cq_hdl_t		id_scq_hdl;
 	ibt_wc_t		*id_txwcs;
 	uint32_t		id_txwcs_size;
 
-	kmutex_t		id_txpost_lock;
-	ibd_swqe_t		*id_tx_head;
-	ibd_wqe_t		**id_tx_tailp;
-	int			id_tx_busy;
+	kmutex_t		id_rx_post_lock;
+	int			id_rx_post_busy;
+	int			id_rx_nqueues;
+	ibd_rx_queue_t		*id_rx_queues;
+	ibd_wqe_t		*id_rx_post_head;
 
-	kmutex_t		id_rxpost_lock;
-	ibd_rwqe_t		*id_rx_head;
-	ibd_wqe_t		**id_rx_tailp;
-	int			id_rx_busy;
-
-	kmutex_t		id_rx_lock;
-	mblk_t			*id_rx_mp;
-	mblk_t			*id_rx_mp_tail;
-	uint32_t		id_rx_mp_len;
-
+	ibd_rwqe_t		*id_rx_wqes;
+	uint8_t			*id_rx_bufs;
+	ibt_mr_hdl_t		id_rx_mr_hdl;
+	ibt_mr_desc_t		id_rx_mr_desc;
+	uint_t			id_rx_buf_sz;
 	uint32_t		id_num_rwqe;
 	ibd_list_t		id_rx_list;
 	ddi_softintr_t		id_rx;
-	ibt_cq_hdl_t		id_rcq_hdl;
-	ibt_wc_t		*id_rxwcs;
+	uint32_t		id_rx_bufs_outstanding_limit;
+	uint32_t		id_rx_allocb;
+	uint32_t		id_rx_allocb_failed;
+	ibd_list_t		id_rx_free_list;
+
+	kmutex_t		id_rcq_poll_lock;
+	int			id_rcq_poll_busy;
 	uint32_t		id_rxwcs_size;
+	ibt_wc_t		*id_rxwcs;
+	ibt_cq_hdl_t		id_rcq_hdl;
 
 	ibt_channel_hdl_t	id_chnl_hdl;
 	ib_pkey_t		id_pkey;
@@ -315,6 +339,7 @@ typedef struct ibd_state_s {
 	kt_did_t		id_async_thrid;
 
 	kmutex_t		id_ac_mutex;
+	ibd_ace_t		*id_ac_hot_ace;
 	struct list		id_ah_active;
 	struct list		id_ah_free;
 	ipoib_mac_t		id_ah_addr;
@@ -337,6 +362,8 @@ typedef struct ibd_state_s {
 
 	kmutex_t		id_sched_lock;
 	int			id_sched_needed;
+	int			id_sched_cnt;
+	int			id_sched_lso_cnt;
 
 	kmutex_t		id_link_mutex;
 	link_state_t		id_link_state;

@@ -3374,6 +3374,10 @@ hermon_hca_port_init(hermon_state_t *state)
 			goto init_ports_fail;
 		}
 
+		/* Set mtu_cap to 4096 bytes */
+		initport->mmc = 1;	/* set the change bit */
+		initport->mtu_cap = 5;	/* for 4096 bytes */
+
 		/* Validate the max port width */
 		maxval  = state->hs_queryport.ib_port_wid;
 		val	= cfgprof->cp_max_port_width;
@@ -3387,6 +3391,10 @@ hermon_hca_port_init(hermon_state_t *state)
 		if (val > maxval) {
 			goto init_ports_fail;
 		}
+
+		/* Since we're doing mtu_cap, cut vl_cap down */
+		initport->mvc = 1;	/* set this change bit */
+		initport->vl_cap = 3;	/* 3 means vl0-vl3, 4 total */
 
 		/* Validate max GID table size */
 		maxval  = ((uint64_t)1 << state->hs_queryport.log_max_gid);

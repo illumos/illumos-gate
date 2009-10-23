@@ -2399,7 +2399,7 @@ hermon_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
     ibt_all_wr_t *wr, ibc_mi_hdl_t *mi_hdl_p)
 {
 	int			status;
-	int			i, nds, max_nds;
+	int			i, j, nds, max_nds;
 	uint_t			len;
 	ibt_status_t		ibt_status;
 	ddi_dma_handle_t	dmahdl;
@@ -2431,7 +2431,7 @@ hermon_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
 		max_nds -= (iov_attr->iov_lso_hdr_sz + sizeof (uint32_t) +
 		    0xf) >> 4;	/* 0xf is for rounding up to a multiple of 16 */
 	rsvd_lkey = state->hs_devlim.rsv_lkey;
-	if (iov_attr->iov_flags & IBT_IOV_NOSLEEP) {
+	if ((iov_attr->iov_flags & IBT_IOV_NOSLEEP) == 0) {
 		kmflag = KM_SLEEP;
 		callback = DDI_DMA_SLEEP;
 	} else {
@@ -2490,11 +2490,19 @@ hermon_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*sgl))
 
 	len = iov_attr->iov_list_len;
+	for (i = 0, j = 0; j < len; j++) {
+		if (iov_attr->iov[j].iov_len == 0)
+			continue;
+		i++;
+	}
 	mi_hdl = kmem_alloc(sizeof (*mi_hdl) +
-	    (len - 1) * sizeof (ddi_dma_handle_t), kmflag);
+	    (i - 1) * sizeof (ddi_dma_handle_t), kmflag);
 	if (mi_hdl == NULL)
 		return (IBT_INSUFF_RESOURCE);
-	for (i = 0; i < len; i++) {
+	mi_hdl->imh_len = i;
+	for (i = 0, j = 0; j < len; j++) {
+		if (iov_attr->iov[j].iov_len == 0)
+			continue;
 		status = ddi_dma_alloc_handle(state->hs_dip, &dma_attr,
 		    callback, NULL, &dmahdl);
 		if (status != DDI_SUCCESS) {
@@ -2502,7 +2510,7 @@ hermon_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
 			goto fail2;
 		}
 		status = ddi_dma_addr_bind_handle(dmahdl, iov_attr->iov_as,
-		    iov_attr->iov[i].iov_addr, iov_attr->iov[i].iov_len,
+		    iov_attr->iov[j].iov_addr, iov_attr->iov[j].iov_len,
 		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, callback, NULL,
 		    &dmacookie, &cookie_cnt);
 		if (status != DDI_DMA_MAPPED) {
@@ -2522,13 +2530,13 @@ hermon_ci_map_mem_iov(ibc_hca_hdl_t hca, ibt_iov_attr_t *iov_attr,
 				ddi_dma_nextcookie(dmahdl, &dmacookie);
 		}
 		mi_hdl->imh_dmahandle[i] = dmahdl;
+		i++;
 	}
 
 	if (iov_attr->iov_flags & IBT_IOV_RECV)
 		wr->recv.wr_nds = nds;
 	else
 		wr->send.wr_nds = nds;
-	mi_hdl->imh_len = len;
 	*mi_hdl_p = mi_hdl;
 	return (IBT_SUCCESS);
 

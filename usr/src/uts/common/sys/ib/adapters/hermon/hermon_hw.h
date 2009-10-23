@@ -1151,13 +1151,19 @@ struct hermon_hw_set_port_s {
 	uint32_t	cap_mask;
 
 	uint32_t	rqk		:1;	/* reset qkey violation cntr */
-	uint32_t			:15;
+	uint32_t	rcm		:1;	/* reset capability mask */
+	uint32_t			:2;
+	uint32_t	vl_cap		:4;
+	uint32_t			:4;
+	uint32_t	mtu_cap		:4;
 	uint32_t	g0		:1;	/* set port GUID0 */
 	uint32_t	ng		:1;	/* set node GUID (all ports) */
 	uint32_t	sig		:1;	/* set sys image */
 	uint32_t	mg		:1;	/* change GID table */
 	uint32_t	mp		:1;	/* change pkey table size */
-	uint32_t			:11;
+	uint32_t	mvc		:1;	/* change vl_cap */
+	uint32_t	mmc		:1;	/* change mtu_cap */
+	uint32_t			:9;
 
 	uint64_t	sys_img_guid;
 
@@ -1185,13 +1191,19 @@ struct hermon_hw_set_port_s {
 };
 #else	/* BIG ENDIAN */
 struct hermon_hw_set_port_s {
-	uint32_t			:11;
+	uint32_t			:9;
+	uint32_t	mmc		:1;	/* change mtu_cap */
+	uint32_t	mvc		:1;	/* change vl_cap */
 	uint32_t	mp		:1;	/* change pkey table size */
 	uint32_t	mg		:1;	/* change GID table size */
 	uint32_t	sig		:1;	/* set sys image GUID */
 	uint32_t	ng		:1;	/* set node GUID (all ports) */
 	uint32_t	g0		:1;	/* set port GUID0 */
-	uint32_t			:15;
+	uint32_t	mtu_cap		:4;
+	uint32_t			:4;
+	uint32_t	vl_cap		:4;
+	uint32_t			:2;
+	uint32_t	rcm		:1;	/* reset capability mask */
 	uint32_t	rqk		:1;	/* reset qkey violation cntr */
 
 	uint32_t	cap_mask;
