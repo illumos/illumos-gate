@@ -26,11 +26,9 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	_LARGEFILE64_SOURCE
 
@@ -1142,14 +1140,14 @@ print_elf_flags(Elf_Info EI)
 			(void) printf("%s", gettext(", V8+ Required"));
 		if (flags & EF_SPARC_SUN_US3) {
 			(void) printf("%s",
-				gettext(", UltraSPARC3 Extensions Required"));
+			    gettext(", UltraSPARC3 Extensions Required"));
 		} else if (flags & EF_SPARC_SUN_US1) {
 			(void) printf("%s",
-				gettext(", UltraSPARC1 Extensions Required"));
+			    gettext(", UltraSPARC1 Extensions Required"));
 		}
 		if (flags & EF_SPARC_HAL_R1)
 			(void) printf("%s",
-				gettext(", HaL R1 Extensions Required"));
+			    gettext(", HaL R1 Extensions Required"));
 		break;
 	default:
 		break;
@@ -1319,7 +1317,8 @@ lookup(char **tab)
 		i++;
 	for (j = 0; tab[j] != 0; j++) {
 		l = 0;
-		for (k = i; ((r = tab[j][l++]) == fbuf[k] && r != '\0'); k++);
+		for (k = i; ((r = tab[j][l++]) == fbuf[k] && r != '\0'); k++)
+			;
 		if (r == '\0')
 			if (fbuf[k] == ' ' || fbuf[k] == '\n' ||
 			    fbuf[k] == '\t' || fbuf[k] == '{' ||
@@ -1626,11 +1625,16 @@ print_dumphdr(const int fd, const dumphdr_t *dhp, uint32_t (*swap)(uint32_t),
 	 */
 	if (swap(dhp->dump_version) > 8 && pread(fd, &dh, sizeof (dumphdr_t),
 	    (off_t)0) == sizeof (dumphdr_t)) {
+		const char *c = swap(dh.dump_flags) & DF_COMPRESSED ?
+		    "compressed " : "";
+		const char *l = swap(dh.dump_flags) & DF_LIVE ?
+		    "live" : "crash";
+
 		(void) printf(gettext(
-		    "%s %s %s %u-bit %s crash dump from '%s'\n"),
+		    "%s %s %s %u-bit %s %s%s dump from '%s'\n"),
 		    dh.dump_utsname.sysname, dh.dump_utsname.release,
 		    dh.dump_utsname.version, swap(dh.dump_wordsize), isa,
-		    dh.dump_utsname.nodename);
+		    c, l, dh.dump_utsname.nodename);
 	} else {
 		(void) printf(gettext("SunOS %u-bit %s crash dump\n"),
 		    swap(dhp->dump_wordsize), isa);
@@ -1641,11 +1645,11 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr, gettext(
-		"usage: file [-dh] [-M mfile] [-m mfile] [-f ffile] file ...\n"
-		"       file [-dh] [-M mfile] [-m mfile] -f ffile\n"
-		"       file -i [-h] [-f ffile] file ...\n"
-		"       file -i [-h] -f ffile\n"
-		"       file -c [-d] [-M mfile] [-m mfile]\n"));
+	    "usage: file [-dh] [-M mfile] [-m mfile] [-f ffile] file ...\n"
+	    "       file [-dh] [-M mfile] [-m mfile] -f ffile\n"
+	    "       file -i [-h] [-f ffile] file ...\n"
+	    "       file -i [-h] -f ffile\n"
+	    "       file -c [-d] [-M mfile] [-m mfile]\n"));
 	exit(2);
 }
 
@@ -1683,7 +1687,7 @@ is_in_list(char *str)
 	 */
 	for (i = 0; debug_sections[i] != NULL; i++) {
 		if (strncmp(debug_sections[i], str,
-			strlen(debug_sections[i])) == 0) {
+		    strlen(debug_sections[i])) == 0) {
 			return (1);
 		}
 	}

@@ -4267,6 +4267,8 @@ retry:
 	return (pp);
 }
 
+#define	SYNC_PROGRESS_NPAGES	1000
+
 /*
  * Returns a count of dirty pages that are in the process
  * of being written out.  If 'cleanit' is set, try to push the page.
@@ -4277,10 +4279,20 @@ page_busy(int cleanit)
 	page_t *page0 = page_first();
 	page_t *pp = page0;
 	pgcnt_t nppbusy = 0;
+	int counter = 0;
 	u_offset_t off;
 
 	do {
 		vnode_t *vp = pp->p_vnode;
+
+		/*
+		 * Reset the sync timeout. The page list is very long
+		 * on large memory systems.
+		 */
+		if (++counter > SYNC_PROGRESS_NPAGES) {
+			counter = 0;
+			vfs_syncprogress();
+		}
 
 		/*
 		 * A page is a candidate for syncing if it is:
@@ -4299,7 +4311,6 @@ page_busy(int cleanit)
 		    hat_ismod(pp) && !IS_SWAPVP(vp) && vp->v_vfsp != NULL &&
 		    vfs_can_sync(vp->v_vfsp)) {
 			nppbusy++;
-			vfs_syncprogress();
 
 			if (!cleanit)
 				continue;
@@ -4322,6 +4333,7 @@ page_busy(int cleanit)
 		}
 	} while ((pp = page_next(pp)) != page0);
 
+	vfs_syncprogress();
 	return (nppbusy);
 }
 

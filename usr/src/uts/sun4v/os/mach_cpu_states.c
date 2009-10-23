@@ -54,6 +54,7 @@
 #include <sys/hsvc.h>
 #include <sys/ldoms.h>
 #include <sys/kldc.h>
+#include <sys/dumphdr.h>
 
 /*
  * hvdump_buf_va is a pointer to the currently-configured hvdump_buf.
@@ -318,6 +319,8 @@ panic_idle(void)
 
 	CPU->cpu_m.in_prom = 1;
 	membar_stld();
+
+	dumpsys_helper();
 
 	for (;;)
 		;

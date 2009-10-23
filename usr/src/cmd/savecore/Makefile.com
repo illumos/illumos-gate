@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= savecore
@@ -33,27 +31,39 @@ include ../../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
-CPPFLAGS += -D_LARGEFILE64_SOURCE=1
+CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -DBZ_NO_STDIO -I$(SRC)/uts/common
+
+BZIP2OBJS =	bz2blocksort.o	\
+		bz2compress.o	\
+		bz2decompress.o	\
+		bz2randtable.o	\
+		bz2bzlib.o	\
+		bz2crctable.o	\
+		bz2huffman.o
 
 .KEEP_STATE:
 
 all: $(PROG)
 
-$(PROG): $(OBJS)
-	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
+$(PROG): $(OBJS) $(BZIP2OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(BZIP2OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(OBJS) $(BZIP2OBJS)
 
 lint:	lint_SRCS
 
 include ../../Makefile.targ
 
 %.o: ../%.c
-	$(COMPILE.c) $<
+	$(COMPILE.c) -I$(SRC)/common $<
 	$(POST_PROCESS_O)
 
 %.o: ../../../uts/common/os/%.c
 	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+bz2%.o: ../../../common/bzip2/%.c
+	$(COMPILE.c) -o $@ -I$(SRC)/common -I$(SRC)/common/bzip2 $<
 	$(POST_PROCESS_O)

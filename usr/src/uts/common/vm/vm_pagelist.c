@@ -59,6 +59,7 @@
 #include <sys/callb.h>
 #include <sys/mem_cage.h>
 #include <sys/sdt.h>
+#include <sys/dumphdr.h>
 
 extern uint_t	vac_colors;
 
@@ -2951,7 +2952,8 @@ try_again:
 			 * page of each large page.
 			 */
 			first_pp = pp;
-			while (!page_trylock_cons(pp, SE_EXCL)) {
+			while (!page_trylock_cons(pp, SE_EXCL) ||
+			    IS_DUMP_PAGE(pp)) {
 				if (szc == 0) {
 					pp = pp->p_next;
 				} else {

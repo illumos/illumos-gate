@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -401,6 +401,7 @@ identify_xvm_file(const char *file, int *longmode)
 int
 main(int argc, char *argv[], char *envp[])
 {
+	extern int mdb_kvm_is_compressed_dump(mdb_io_t *);
 	mdb_tgt_ctor_f *tgt_ctor = NULL;
 	const char **tgt_argv = alloca(argc * sizeof (char *));
 	int tgt_argc = 0;
@@ -821,6 +822,19 @@ main(int argc, char *argv[], char *envp[])
 			(void) strcpy((char *)tgt_argv[1], "vmcore.");
 			(void) strcat((char *)tgt_argv[1], object);
 
+			if (access(tgt_argv[0], F_OK) == -1 &&
+			    access(tgt_argv[1], F_OK) == -1) {
+				(void) strcpy((char *)tgt_argv[1], "vmdump.");
+				(void) strcat((char *)tgt_argv[1], object);
+				if (access(tgt_argv[1], F_OK) == 0) {
+					mdb_iob_printf(mdb.m_err,
+					    "cannot open compressed dump; "
+					    "decompress using savecore -f %s\n",
+					    tgt_argv[1]);
+					terminate(0);
+				}
+			}
+
 			tgt_argc = 2;
 		}
 
@@ -831,6 +845,20 @@ main(int argc, char *argv[], char *envp[])
 		if ((io = mdb_fdio_create_path(NULL, tgt_argv[0],
 		    O_RDONLY, 0)) == NULL)
 			die("failed to open %s", tgt_argv[0]);
+
+		/*
+		 * Check for a single vmdump.N compressed dump file,
+		 * and give a helpful message.
+		 */
+		if (tgt_argc == 1) {
+			if (mdb_kvm_is_compressed_dump(io)) {
+				mdb_iob_printf(mdb.m_err,
+				    "cannot open compressed dump; "
+				    "decompress using savecore -f %s\n",
+				    tgt_argv[0]);
+				terminate(0);
+			}
+		}
 
 		/*
 		 * If the target is unknown or is not the rawfile target, do
@@ -888,6 +916,16 @@ main(int argc, char *argv[], char *envp[])
 
 			if (access(tgt_argv[1], F_OK) == -1)
 				die("failed to access %s", tgt_argv[1]);
+
+			/* *.N case: drop vmdump.N from the list */
+			if (tgt_argc == 3) {
+				if ((io = mdb_fdio_create_path(NULL,
+				    tgt_argv[2], O_RDONLY, 0)) == NULL)
+					die("failed to open %s", tgt_argv[2]);
+				if (mdb_kvm_is_compressed_dump(io))
+					tgt_argv[--tgt_argc] = NULL;
+				mdb_io_destroy(io);
+			}
 
 			if ((io = mdb_fdio_create_path(NULL, tgt_argv[1],
 			    O_RDONLY, 0)) == NULL)

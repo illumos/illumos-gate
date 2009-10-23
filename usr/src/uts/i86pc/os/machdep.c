@@ -871,6 +871,8 @@ panic_idle(void)
 	splx(ipltospl(CLOCK_LEVEL));
 	(void) setjmp(&curthread->t_pcb);
 
+	dumpsys_helper();
+
 #ifndef __xpv
 	for (;;)
 		i86_halt();
@@ -1193,6 +1195,13 @@ num_phys_pages()
 
 	return (npages);
 }
+
+/* cpu threshold for compressed dumps */
+#ifdef _LP64
+uint_t dump_plat_mincpu = DUMP_PLAT_X86_64_MINCPU;
+#else
+uint_t dump_plat_mincpu = DUMP_PLAT_X86_32_MINCPU;
+#endif
 
 int
 dump_plat_addr()

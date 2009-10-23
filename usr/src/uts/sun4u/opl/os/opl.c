@@ -46,6 +46,7 @@
 #include <sys/sysmacros.h>
 #include <sys/time.h>
 #include <sys/cpu.h>
+#include <sys/dumphdr.h>
 #include <vm/vm_dep.h>
 
 int (*opl_get_mem_unum)(int, uint64_t, char *, int, int *);
@@ -221,6 +222,9 @@ set_platform_defaults(void)
 	tsb_lgrp_affinity = 1;
 
 	set_max_mmu_ctxdoms();
+
+	/* set OPL threshold for compressed dumps */
+	dump_plat_mincpu = DUMP_PLAT_SUN4U_OPL_MINCPU;
 }
 
 /*

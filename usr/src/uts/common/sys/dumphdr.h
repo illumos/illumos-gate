@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_DUMPHDR_H
 #define	_SYS_DUMPHDR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -87,6 +85,7 @@ typedef struct dumphdr {
 #define	DF_VALID	0x00000001	/* Dump is valid (savecore clears) */
 #define	DF_COMPLETE	0x00000002	/* All pages present as configured */
 #define	DF_LIVE		0x00000004	/* Dump was taken on a live system */
+#define	DF_COMPRESSED	0x00000008	/* Dump is compressed */
 #define	DF_KERNEL	0x00010000	/* Contains kernel pages only */
 #define	DF_ALL		0x00020000	/* Contains all pages */
 #define	DF_CURPROC	0x00040000	/* Contains kernel + cur proc pages */
@@ -110,6 +109,58 @@ typedef struct dump_map {
 	((((uintptr_t)(as) >> 3) + ((va) >> (dhp)->dump_pageshift)) & \
 	(dhp)->dump_hashmask)
 
+/*
+ * Encoding of the csize word used to provide meta information
+ * between dumpsys and savecore.
+ *
+ *	tag	size
+ *	1-4095	1..dump_maxcsize	stream block
+ *	0	1..pagesize		one lzjb page
+ *	0	0			marks end of data
+ */
+typedef uint32_t dumpcsize_t;
+
+#define	DUMP_MAX_TAG		(0xfffU)
+#define	DUMP_MAX_CSIZE		(0xfffffU)
+#define	DUMP_SET_TAG(w, v)	(((w) & DUMP_MAX_CSIZE) | ((v) << 20))
+#define	DUMP_GET_TAG(w)		(((w) >> 20) & DUMP_MAX_TAG)
+#define	DUMP_SET_CSIZE(w, v)	\
+	(((w) & (DUMP_MAX_TAG << 20)) | ((v) & DUMP_MAX_CSIZE))
+#define	DUMP_GET_CSIZE(w)	((w) & DUMP_MAX_CSIZE)
+
+typedef struct dumpstreamhdr {
+	char		stream_magic[8];	/* "StrmHdr" */
+	pgcnt_t		stream_pagenum;		/* starting pfn */
+	pgcnt_t		stream_npages;		/* uncompressed size */
+} dumpstreamhdr_t;
+
+#define	DUMP_STREAM_MAGIC	"StrmHdr"
+
+/* The number of helpers is limited by the number of stream tags. */
+#define	DUMP_MAX_NHELPER	DUMP_MAX_TAG
+
+/*
+ * The dump data header is placed after the dumphdr in the compressed
+ * image. It is not needed after savecore runs and the data pages have
+ * been decompressed.
+ */
+typedef struct dumpdatahdr {
+	uint32_t dump_datahdr_magic;	/* data header presence */
+	uint32_t dump_datahdr_version;	/* data header version */
+	uint64_t dump_data_csize;	/* compressed data size */
+	uint32_t dump_maxcsize;		/* compressed data max block size */
+	uint32_t dump_maxrange;		/* max number of pages per range */
+	uint16_t dump_nstreams;		/* number of compression streams */
+	uint16_t dump_clevel;		/* compression level (0-9) */
+	uint32_t dump_metrics;		/* size of metrics data */
+} dumpdatahdr_t;
+
+#define	DUMP_DATAHDR_MAGIC	('d' << 24 | 'h' << 16 | 'd' << 8 | 'r')
+
+#define	DUMP_DATAHDR_VERSION	1
+#define	DUMP_CLEVEL_LZJB	1	/* parallel lzjb compression */
+#define	DUMP_CLEVEL_BZIP2	2	/* parallel bzip2 level 1 */
+
 #ifdef _KERNEL
 
 extern kmutex_t dump_lock;
@@ -131,6 +182,7 @@ extern void dump_resize(void);
 extern void dump_page(pfn_t);
 extern void dump_addpage(struct as *, void *, pfn_t);
 extern void dumpsys(void);
+extern void dumpsys_helper(void);
 extern void dump_messages(void);
 extern void dump_ereports(void);
 extern void dumpvp_write(const void *, size_t);
@@ -138,6 +190,29 @@ extern int dumpvp_resize(void);
 extern int dump_plat_addr(void);
 extern void dump_plat_pfn(void);
 extern int dump_plat_data(void *);
+
+/*
+ * Define a CPU count threshold that determines when to employ
+ * bzip2. The values are defined per-platform in dump_plat_mincpu, and
+ * may be changed with /etc/system. The value 0 disables parallelism,
+ * and the old format dump is produced.
+ */
+extern uint_t dump_plat_mincpu;
+
+#define	DUMP_PLAT_SUN4U_MINCPU		51
+#define	DUMP_PLAT_SUN4U_OPL_MINCPU	8
+#define	DUMP_PLAT_SUN4V_MINCPU		128
+#define	DUMP_PLAT_X86_64_MINCPU		11
+#define	DUMP_PLAT_X86_32_MINCPU		0
+
+/*
+ * Pages may be stolen at dump time. Prevent the pages from ever being
+ * allocated while dump is running.
+ */
+#define	IS_DUMP_PAGE(pp) (dump_check_used && dump_test_used((pp)->p_pagenum))
+
+extern int dump_test_used(pfn_t);
+extern int dump_check_used;
 
 #endif /* _KERNEL */
 

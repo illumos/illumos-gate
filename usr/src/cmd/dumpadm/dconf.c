@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -56,15 +54,19 @@ static int print_device(const dumpconf_t *, FILE *);
 static int print_savdir(const dumpconf_t *, FILE *);
 static int print_content(const dumpconf_t *, FILE *);
 static int print_enable(const dumpconf_t *, FILE *);
+static int print_csave(const dumpconf_t *, FILE *);
 
 static const dc_token_t tokens[] = {
 	{ "DUMPADM_DEVICE", dconf_str2device, print_device },
 	{ "DUMPADM_SAVDIR", dconf_str2savdir, print_savdir },
 	{ "DUMPADM_CONTENT", dconf_str2content, print_content },
 	{ "DUMPADM_ENABLE", dconf_str2enable, print_enable },
+	{ "DUMPADM_CSAVE", dconf_str2csave, print_csave },
 	{ NULL, NULL, NULL }
 };
 
+static const char DC_STR_ON[] = "on";		/* On string */
+static const char DC_STR_OFF[] = "off";		/* Off string */
 static const char DC_STR_YES[] = "yes";		/* Enable on string */
 static const char DC_STR_NO[] = "no";		/* Enable off string */
 static const char DC_STR_SWAP[] = "swap";	/* Default dump device */
@@ -100,10 +102,12 @@ dconf_init(dumpconf_t *dcp, int dcmode)
 	}
 
 	/*
-	 * Default is contents kernel, and savecore enabled on reboot.
+	 * Default is contents kernel, savecore enabled on reboot,
+	 * savecore saves compressed core files.
 	 */
 	dcp->dc_cflags = DUMP_KERNEL;
 	dcp->dc_enable = DC_ON;
+	dcp->dc_csave = DC_COMPRESSED;
 
 	dcp->dc_mode = dcmode;
 	dcp->dc_conf_fp = NULL;
@@ -529,6 +533,10 @@ dconf_print(dumpconf_t *dcp, FILE *fp)
 
 	(void) fprintf(fp, gettext("  Savecore enabled: %s\n"),
 	    (dcp->dc_enable == DC_OFF) ? gettext("no") : gettext("yes"));
+
+	(void) fprintf(fp, gettext("   Save compressed: %s\n"),
+	    (dcp->dc_csave == DC_UNCOMPRESSED) ? gettext("off") :
+	    gettext("on"));
 }
 
 int
@@ -598,6 +606,23 @@ dconf_str2enable(dumpconf_t *dcp, char *buf)
 	return (-1);
 }
 
+int
+dconf_str2csave(dumpconf_t *dcp, char *buf)
+{
+	if (strcasecmp(buf, DC_STR_ON) == 0) {
+		dcp->dc_csave = DC_COMPRESSED;
+		return (0);
+	}
+
+	if (strcasecmp(buf, DC_STR_OFF) == 0) {
+		dcp->dc_csave = DC_UNCOMPRESSED;
+		return (0);
+	}
+
+	warn(gettext("invalid save compressed value -- %s\n"), buf);
+	return (-1);
+}
+
 static int
 print_content(const dumpconf_t *dcp, FILE *fp)
 {
@@ -625,6 +650,13 @@ print_enable(const dumpconf_t *dcp, FILE *fp)
 {
 	return (fprintf(fp, "%s\n", (dcp->dc_enable == DC_OFF) ?
 	    DC_STR_NO : DC_STR_YES));
+}
+
+static int
+print_csave(const dumpconf_t *dcp, FILE *fp)
+{
+	return (fprintf(fp, "%s\n", (dcp->dc_csave == DC_COMPRESSED) ?
+	    DC_STR_ON : DC_STR_OFF));
 }
 
 static int

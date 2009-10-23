@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DCONF_H
 #define	_DCONF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -41,6 +39,7 @@ typedef struct dumpconf {
 	char dc_savdir[MAXPATHLEN];	/* Savecore dir path */
 	int dc_cflags;			/* Config flags (see <sys/dumpadm.h>) */
 	int dc_enable;			/* Run savecore on boot? (see below) */
+	int dc_csave;			/* Save dump compressed? (see below) */
 	int dc_mode;			/* Mode flags (see below) */
 	FILE *dc_conf_fp;		/* File pointer for config file */
 	int dc_conf_fd;			/* File descriptor for config file */
@@ -53,6 +52,12 @@ typedef struct dumpconf {
  */
 #define	DC_OFF		0		/* Savecore disabled */
 #define	DC_ON		1		/* Savecore enabled */
+
+/*
+ * Values for dc_csave (savecore compressed) property:
+ */
+#define	DC_UNCOMPRESSED	0		/* Savecore uncompresses the dump */
+#define	DC_COMPRESSED	1		/* Savecore leaves dump compressed */
 
 /*
  * Values for dconf_open mode:
@@ -71,6 +76,7 @@ extern int dconf_str2device(dumpconf_t *, char *);
 extern int dconf_str2savdir(dumpconf_t *, char *);
 extern int dconf_str2content(dumpconf_t *, char *);
 extern int dconf_str2enable(dumpconf_t *, char *);
+extern int dconf_str2csave(dumpconf_t *, char *);
 
 #ifdef	__cplusplus
 }

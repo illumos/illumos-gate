@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Libkvm Kernel Target
@@ -1562,4 +1560,14 @@ err:
 
 	mdb_free(kt, sizeof (kt_data_t));
 	return (-1);
+}
+
+int
+mdb_kvm_is_compressed_dump(mdb_io_t *io)
+{
+	dumphdr_t h;
+
+	return (IOP_READ(io, &h, sizeof (dumphdr_t)) == sizeof (dumphdr_t) &&
+	    h.dump_magic == DUMP_MAGIC &&
+	    (h.dump_flags & DF_COMPRESSED) != 0);
 }

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stat.h>
 #include <locale.h>
@@ -37,9 +35,9 @@
 
 static const char USAGE[] = "\
 Usage: %s [-nuy] [-c kernel | curproc | all ] [-d dump-device | swap ]\n\
-	[-m min {k|m|%%} ] [-s savecore-dir] [-r root-dir]\n";
+	[-m min {k|m|%%} ] [-s savecore-dir] [-r root-dir] [-z on|off]\n";
 
-static const char OPTS[] = "nuyc:d:m:s:r:";
+static const char OPTS[] = "nuyc:d:m:s:r:z:";
 
 static const char PATH_DEVICE[] = "/dev/dump";
 static const char PATH_CONFIG[] = "/etc/dumpadm.conf";
@@ -146,6 +144,12 @@ main(int argc, char *argv[])
 
 			case 'y':
 				dc.dc_enable = DC_ON;
+				modified++;
+				break;
+
+			case 'z':
+				if (dconf_str2csave(&dc, optarg) == -1)
+					return (E_USAGE);
 				modified++;
 				break;
 			}

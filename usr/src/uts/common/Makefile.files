@@ -98,6 +98,13 @@ GENUNIX_OBJS +=	\
 		bitmap.o	\
 		blabel.o	\
 		brandsys.o	\
+		bz2blocksort.o	\
+		bz2compress.o	\
+		bz2decompress.o	\
+		bz2randtable.o	\
+		bz2bzlib.o	\
+		bz2crctable.o	\
+		bz2huffman.o	\
 		callb.o		\
 		callout.o	\
 		chdir.o		\

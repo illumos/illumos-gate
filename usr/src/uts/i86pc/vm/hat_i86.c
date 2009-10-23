@@ -2436,6 +2436,35 @@ hat_unload_callback(
 }
 
 /*
+ * Invalidate a virtual address translation for the local CPU.
+ * For best performance ensure that the va range is completely
+ * mapped, otherwise the entire TLB will be flushed.
+ */
+void
+hat_flush_range(hat_t *hat, caddr_t va, size_t size)
+{
+	ssize_t sz;
+	caddr_t endva = va + size;
+
+	while (va < endva) {
+		sz = hat_getpagesize(hat, va);
+		if (sz < 0)
+			va = (caddr_t)DEMAP_ALL_ADDR;
+#ifdef __xpv
+		if (va == (caddr_t)DEMAP_ALL_ADDR)
+			xen_flush_tlb();
+		else
+			xen_flush_va(va);
+#else
+		(void) hati_demap_func((xc_arg_t)hat, (xc_arg_t)va, NULL);
+#endif
+		if (sz < 0)
+			break;
+		va += sz;
+	}
+}
+
+/*
  * synchronize mapping with software data structures
  *
  * This interface is currently only used by the working set monitor

@@ -1463,6 +1463,15 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/tpm/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/tpm/%.s
 	$(COMPILE.s) -o $@ $<
 
+$(OBJS_DIR)/bz2%.o:		$(COMMONBASE)/bzip2/%.c
+	$(COMPILE.c) -o $@ -I$(COMMONBASE)/bzip2 $<
+	$(CTFCONVERT_O)
+
+BZ2LINT = -erroff=%all -I$(UTSBASE)/common/bzip2
+
+$(LINTS_DIR)/bz2%.ln:		$(COMMONBASE)/bzip2/%.c
+	 @($(LHEAD) $(LINT.c) -C $(LINTS_DIR)/`basename $@ .ln` $(BZ2LINT) $< $(LTAIL))
+
 #
 # SVM
 #
