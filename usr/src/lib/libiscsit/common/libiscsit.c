@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <strings.h>
 #include <libintl.h>
+#include <libscf.h>
 
 #include <libstmf.h>
 #include <libiscsit.h>
@@ -50,6 +51,8 @@
 /* Default RADIUS server port */
 #define	DEFAULT_RADIUS_PORT	1812
 
+/* The iscsit SMF service FMRI */
+#define	ISCSIT_FMRI		"svc:/network/iscsi/target:default"
 /*
  * The kernel reserves target portal group tag value 1 as the default.
  */
@@ -79,6 +82,9 @@ it_validate_tgtprops(nvlist_t *nvl, nvlist_t *errs);
 
 static int
 it_validate_iniprops(nvlist_t *nvl, nvlist_t *errs);
+
+static boolean_t
+is_iscsit_enabled(void);
 
 /*
  * Function:  it_config_load()
@@ -168,18 +174,21 @@ it_config_commit(it_config_t *cfg)
 		return (EINVAL);
 	}
 
-	iscsit_fd = open(ISCSIT_NODE, O_RDWR|O_EXCL);
-	if (iscsit_fd == -1) {
-		ret = errno;
-		return (ret);
-	}
-
 	ret = it_config_to_nv(cfg, &cfgnv);
 	if (ret == 0) {
 		ret = nvlist_size(cfgnv, &pnv_size, NV_ENCODE_NATIVE);
 	}
 
-	if (ret == 0) {
+	/*
+	 * If the iscsit service is enabled, send the changes to the
+	 * kernel first.  Kernel will be the final sanity check before
+	 * the config is saved persistently.
+	 *
+	 * This somewhat leaves open the simultaneous-change hole
+	 * that STMF was trying to solve, but is a better sanity
+	 * check and allows for graceful handling of target renames.
+	 */
+	if ((ret == 0) && is_iscsit_enabled()) {
 		packednv = malloc(pnv_size);
 		if (!packednv) {
 			ret = ENOMEM;
@@ -187,24 +196,26 @@ it_config_commit(it_config_t *cfg)
 			ret = nvlist_pack(cfgnv, &packednv, &pnv_size,
 			    NV_ENCODE_NATIVE, 0);
 		}
-	}
 
-	/*
-	 * Send the changes to the kernel first, for now.  Kernel
-	 * will be the final sanity check before config is saved
-	 * persistently.
-	 *
-	 * XXX - this leaves open the simultaneous-change hole
-	 * that STMF was trying to solve, but is a better sanity
-	 * check.   Final decision on save order/config generation
-	 * number TBD.
-	 */
-	if (ret == 0) {
-		iop.set_cfg_vers = ISCSIT_API_VERS0;
-		iop.set_cfg_pnvlist = packednv;
-		iop.set_cfg_pnvlist_len = pnv_size;
-		if ((ioctl(iscsit_fd, ISCSIT_IOC_SET_CONFIG, &iop)) != 0) {
-			ret = errno;
+		if (ret == 0) {
+			iscsit_fd = open(ISCSIT_NODE, O_RDWR|O_EXCL);
+			if (iscsit_fd != -1) {
+				iop.set_cfg_vers = ISCSIT_API_VERS0;
+				iop.set_cfg_pnvlist = packednv;
+				iop.set_cfg_pnvlist_len = pnv_size;
+				if ((ioctl(iscsit_fd, ISCSIT_IOC_SET_CONFIG,
+				    &iop)) != 0) {
+					ret = errno;
+				}
+
+				(void) close(iscsit_fd);
+			} else {
+				ret = errno;
+			}
+		}
+
+		if (packednv != NULL) {
+			free(packednv);
 		}
 	}
 
@@ -214,6 +225,8 @@ it_config_commit(it_config_t *cfg)
 	 * the active service.
 	 */
 	if (ret == 0) {
+		boolean_t	changed = B_FALSE;
+
 		tgtp = cfg->config_tgt_list;
 		for (; tgtp != NULL; tgtp = tgtp->tgt_next) {
 			if (!tgtp->tgt_properties) {
@@ -223,7 +236,15 @@ it_config_commit(it_config_t *cfg)
 			    PROP_OLD_TARGET_NAME)) {
 				(void) nvlist_remove_all(tgtp->tgt_properties,
 				    PROP_OLD_TARGET_NAME);
+				changed = B_TRUE;
 			}
+		}
+
+		if (changed) {
+			/* rebuild the config nvlist */
+			nvlist_free(cfgnv);
+			cfgnv = NULL;
+			ret = it_config_to_nv(cfg, &cfgnv);
 		}
 	}
 
@@ -256,12 +277,6 @@ it_config_commit(it_config_t *cfg)
 				it_config_free(rcfg);
 			}
 		}
-	}
-
-	(void) close(iscsit_fd);
-
-	if (packednv) {
-		free(packednv);
 	}
 
 	if (cfgnv) {
@@ -1916,4 +1931,19 @@ validate_iscsi_name(char *in_name)
 	}
 
 	return (B_TRUE);
+}
+
+static boolean_t
+is_iscsit_enabled(void)
+{
+	char		*state;
+
+	state = smf_get_state(ISCSIT_FMRI);
+	if (state != NULL) {
+		if (strcmp(state, SCF_STATE_STRING_ONLINE) == 0) {
+			return (B_TRUE);
+		}
+	}
+
+	return (B_FALSE);
 }
