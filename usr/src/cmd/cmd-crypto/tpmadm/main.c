@@ -126,8 +126,23 @@ print_error(TSS_RESULT ret, char *msg)
 	char *err_string;
 	extern char *Trspi_Error_String();
 
+	/* Print the standard error string and error code. */
 	err_string = Trspi_Error_String(ret);
 	(void) fprintf(stderr, "%s: %s (0x%0x)\n", msg, err_string, ret);
+
+	/* For a few special cases, add a more verbose error message. */
+	switch (ret) {
+	    case TPM_E_DEACTIVATED:
+	    case TPM_E_DISABLED:
+		(void) fprintf(stderr,
+		    gettext("Enable the TPM and restart Solaris.\n"));
+		break;
+	    case TSP_ERROR(TSS_E_COMM_FAILURE):
+		(void) fprintf(stderr,
+		    gettext("Make sure the tcsd service "
+		    "(svc:/application/security/tcsd) is running.\n"));
+		break;
+	}
 }
 
 int
