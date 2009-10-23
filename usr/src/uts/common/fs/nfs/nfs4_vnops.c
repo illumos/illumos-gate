@@ -2894,8 +2894,24 @@ nfs4_fwrite:
 		mutex_enter(&rp->r_statelock);
 		while ((mi->mi_max_threads != 0 &&
 		    rp->r_awcount > 2 * mi->mi_max_threads) ||
-		    rp->r_gcount > 0)
-			cv_wait(&rp->r_cv, &rp->r_statelock);
+		    rp->r_gcount > 0) {
+			if (INTR4(vp)) {
+				klwp_t *lwp = ttolwp(curthread);
+
+				if (lwp != NULL)
+					lwp->lwp_nostop++;
+				if (!cv_wait_sig(&rp->r_cv, &rp->r_statelock)) {
+					mutex_exit(&rp->r_statelock);
+					if (lwp != NULL)
+						lwp->lwp_nostop--;
+					error = EINTR;
+					goto bottom;
+				}
+				if (lwp != NULL)
+					lwp->lwp_nostop--;
+			} else
+				cv_wait(&rp->r_cv, &rp->r_statelock);
+		}
 		mutex_exit(&rp->r_statelock);
 
 		/*
