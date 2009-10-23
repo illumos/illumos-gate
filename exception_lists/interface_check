@@ -84,6 +84,8 @@ NOVERDEF	^usr/MACH(lib)/libkrb5\.so\.1$
 NOVERDEF	^usr/MACH(lib)/libzpool\.so\.1$
 NOVERDEF	^usr/MACH(lib)/madv\.so\.1$
 NOVERDEF	^usr/MACH(lib)/mpss\.so\.1$
+NOVERDEF	^usr/MACH(lib)/s10_brand\.so\.1$
+NOVERDEF	^usr/MACH(lib)/s10_npreload\.so\.1$
 NOVERDEF	^usr/MACH(lib)/sn1_brand\.so\.1$
 NOVERDEF	^usr/lib/fs/[^/]*/fstyp\.so\.1$
 NOVERDEF	^usr/lib/libmilter\.so\.1$
