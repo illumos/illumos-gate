@@ -2030,6 +2030,7 @@ bge_chip_id_init(bge_t *bgep)
 		} else {
 			cidp->chip_label = 5705;
 			cidp->pci_type = BGE_PCI;
+			cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
 		}
 		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
 		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
@@ -2040,7 +2041,6 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
-		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
 		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
 		break;
@@ -2093,7 +2093,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
-		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
+		if (cidp->device == DEVICE_ID_5755M)
+			cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
 		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
 		break;
