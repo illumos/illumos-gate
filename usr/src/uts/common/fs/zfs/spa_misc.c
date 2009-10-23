@@ -1324,24 +1324,6 @@ spa_version(spa_t *spa)
 	return (spa->spa_ubsync.ub_version);
 }
 
-/*
- * if there is a pool on top of zvols, there can be a situation where
- * a second vdev_set_state ioctl can come in (grabbing the pool's config
- * lock and then calling into the zvol's pool) before the config has
- * synced out from a previous vdev_set_state ioctl, resulting in
- * deadlock.
- */
-boolean_t
-spa_uses_zvols(spa_t *spa)
-{
-	boolean_t i;
-
-	spa_config_enter(spa, SCL_STATE_ALL, spa, RW_READER);
-	i = vdev_uses_zvols(spa->spa_root_vdev);
-	spa_config_exit(spa, SCL_STATE_ALL, spa);
-	return (i);
-}
-
 int
 spa_max_replication(spa_t *spa)
 {

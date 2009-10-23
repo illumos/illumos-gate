@@ -1117,6 +1117,11 @@ vdev_open(vdev_t *vd)
 
 	error = vd->vdev_ops->vdev_op_open(vd, &osize, &ashift);
 
+	/*
+	 * Reset the vdev_reopening flag so that we actually close
+	 * the vdev on error.
+	 */
+	vd->vdev_reopening = B_FALSE;
 	if (zio_injection_enabled && error == 0)
 		error = zio_handle_device_injection(vd, NULL, ENXIO);
 
@@ -1352,8 +1357,12 @@ void
 vdev_close(vdev_t *vd)
 {
 	spa_t *spa = vd->vdev_spa;
+	vdev_t *pvd = vd->vdev_parent;
 
 	ASSERT(spa_config_held(spa, SCL_STATE_ALL, RW_WRITER) == SCL_STATE_ALL);
+
+	if (pvd != NULL && pvd->vdev_reopening)
+		vd->vdev_reopening = pvd->vdev_reopening;
 
 	vd->vdev_ops->vdev_op_close(vd);
 
@@ -1373,6 +1382,12 @@ vdev_close(vdev_t *vd)
 	vd->vdev_stat.vs_aux = VDEV_AUX_NONE;
 }
 
+/*
+ * Reopen all interior vdevs and any unopened leaves.  We don't actually
+ * reopen leaf vdevs which had previously been opened as they might deadlock
+ * on the spa_config_lock.  Instead we only obtain the leaf's physical size.
+ * If the leaf has never been opened then open it, as usual.
+ */
 void
 vdev_reopen(vdev_t *vd)
 {
@@ -1380,6 +1395,7 @@ vdev_reopen(vdev_t *vd)
 
 	ASSERT(spa_config_held(spa, SCL_STATE_ALL, RW_WRITER) == SCL_STATE_ALL);
 
+	vd->vdev_reopening = B_TRUE;
 	vdev_close(vd);
 	(void) vdev_open(vd);
 

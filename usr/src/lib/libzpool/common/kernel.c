@@ -444,6 +444,24 @@ vn_close(vnode_t *vp)
 	umem_free(vp, sizeof (vnode_t));
 }
 
+/*
+ * At a minimum we need to update the size since vdev_reopen()
+ * will no longer call vn_openat().
+ */
+int
+fop_getattr(vnode_t *vp, vattr_t *vap)
+{
+	struct stat64 st;
+
+	if (fstat64(vp->v_fd, &st) == -1) {
+		close(vp->v_fd);
+		return (errno);
+	}
+
+	vap->va_size = st.st_size;
+	return (0);
+}
+
 #ifdef ZFS_DEBUG
 
 /*

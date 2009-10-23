@@ -1247,16 +1247,12 @@ zfs_ioc_vdev_remove(zfs_cmd_t *zc)
 static int
 zfs_ioc_vdev_set_state(zfs_cmd_t *zc)
 {
-	boolean_t nslock;
 	spa_t *spa;
 	int error;
 	vdev_state_t newstate = VDEV_STATE_UNKNOWN;
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
-	nslock = spa_uses_zvols(spa);
-	if (nslock)
-		mutex_enter(&spa_namespace_lock);
 	switch (zc->zc_cookie) {
 	case VDEV_STATE_ONLINE:
 		error = vdev_online(spa, zc->zc_guid, zc->zc_obj, &newstate);
@@ -1285,8 +1281,6 @@ zfs_ioc_vdev_set_state(zfs_cmd_t *zc)
 	default:
 		error = EINVAL;
 	}
-	if (nslock)
-		mutex_exit(&spa_namespace_lock);
 	zc->zc_cookie = newstate;
 	spa_close(spa, FTAG);
 	return (error);

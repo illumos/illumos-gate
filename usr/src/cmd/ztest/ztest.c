@@ -1256,14 +1256,30 @@ online_vdev(vdev_t *vd, void *arg)
 	vdev_t *tvd = vd->vdev_top;
 	uint64_t guid = vd->vdev_guid;
 	uint64_t generation = spa->spa_config_generation + 1;
+	vdev_state_t newstate = VDEV_STATE_UNKNOWN;
+	int error;
 
 	ASSERT(spa_config_held(spa, SCL_STATE, RW_READER) == SCL_STATE);
 	ASSERT(vd->vdev_ops->vdev_op_leaf);
 
 	/* Calling vdev_online will initialize the new metaslabs */
 	spa_config_exit(spa, SCL_STATE, spa);
-	(void) vdev_online(spa, guid, ZFS_ONLINE_EXPAND, NULL);
+	error = vdev_online(spa, guid, ZFS_ONLINE_EXPAND, &newstate);
 	spa_config_enter(spa, SCL_STATE, spa, RW_READER);
+
+	/*
+	 * If vdev_online returned an error or the underlying vdev_open
+	 * failed then we abort the expand. The only way to know that
+	 * vdev_open fails is by checking the returned newstate.
+	 */
+	if (error || newstate != VDEV_STATE_HEALTHY) {
+		if (zopt_verbose >= 5) {
+			(void) printf("Unable to expand vdev, state %llu, "
+			    "error %d\n", (u_longlong_t)newstate, error);
+		}
+		return (vd);
+	}
+	ASSERT3U(newstate, ==, VDEV_STATE_HEALTHY);
 
 	/*
 	 * Since we dropped the lock we need to ensure that we're
@@ -1355,7 +1371,7 @@ ztest_vdev_LUN_growth(ztest_args_t *za)
 	newsize = psize + psize / 8;
 	ASSERT3U(newsize, >, psize);
 
-	if (zopt_verbose >= 6) {
+	if (zopt_verbose >= 5) {
 		(void) printf("Expanding vdev %s from %lu to %lu\n",
 		    vd->vdev_path, (ulong_t)psize, (ulong_t)newsize);
 	}

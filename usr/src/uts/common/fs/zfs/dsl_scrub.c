@@ -1044,9 +1044,9 @@ dsl_pool_scrub_clean(dsl_pool_t *dp)
 	spa_t *spa = dp->dp_spa;
 
 	/*
-	 * Purge all vdev caches.  We do this here rather than in sync
-	 * context because this requires a writer lock on the spa_config
-	 * lock, which we can't do from sync context.  The
+	 * Purge all vdev caches and probe all devices.  We do this here
+	 * rather than in sync context because this requires a writer lock
+	 * on the spa_config lock, which we can't do from sync context.  The
 	 * spa_scrub_reopen flag indicates that vdev_open() should not
 	 * attempt to start another scrub.
 	 */
