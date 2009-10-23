@@ -207,6 +207,8 @@ cpupm_init(cpu_t *cp)
 				mach_state->ms_caps |= CPUPM_P_STATES;
 			}
 		}
+	} else {
+		cpupm_disable(CPUPM_P_STATES);
 	}
 
 	if (mach_state->ms_tstate.cma_ops != NULL) {
@@ -217,6 +219,8 @@ cpupm_init(cpu_t *cp)
 		} else {
 			mach_state->ms_caps |= CPUPM_T_STATES;
 		}
+	} else {
+		cpupm_disable(CPUPM_T_STATES);
 	}
 
 	/*
@@ -249,6 +253,8 @@ cpupm_init(cpu_t *cp)
 			idle_cpu = non_deep_idle_cpu;
 			disp_enq_thread = non_deep_idle_disp_enq_thread;
 		}
+	} else {
+		cpupm_disable(CPUPM_C_STATES);
 	}
 
 
@@ -267,9 +273,15 @@ cpupm_init(cpu_t *cp)
 			    mach_state->ms_caps & CPUPM_P_STATES,
 			    mach_state->ms_caps & CPUPM_C_STATES);
 		}
-		cpupm_throttle_manage_notification(cp);
-		cpuidle_manage_cstates(cp);
-		cpupm_power_manage_notifications(cp);
+		if (mach_state->ms_caps & CPUPM_T_STATES) {
+			cpupm_throttle_manage_notification(cp);
+		}
+		if (mach_state->ms_caps & CPUPM_C_STATES) {
+			cpuidle_manage_cstates(cp);
+		}
+		if (mach_state->ms_caps & CPUPM_P_STATES) {
+			cpupm_power_manage_notifications(cp);
+		}
 		cpupm_add_notify_handler(cp, cpupm_event_notify_handler, cp);
 	}
 	first = B_FALSE;
