@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <nss_common.h>
 #include <dlfcn.h>
@@ -210,7 +208,8 @@ _nscd_populate_nsw_backend_info_db(int srci)
 
 	for (i = 0; i < NSCD_NUM_DB; i++) {
 
-		if (nscd_nsw_config[i] == NULL)
+		/* no nsswitch configuration, no backend info db population */
+		if (nscd_nsw_config[i] == NULL || *nscd_nsw_config[i] == NULL)
 			continue;
 
 		nsw_cfg = *nscd_nsw_config[i];
@@ -465,15 +464,6 @@ _nscd_create_sw_struct(
 		(void) (nscd_nss_db_initf[dbi])(&nsw_cfg->fe_params);
 
 	/*
-	 * activate the new nscd_nsw_config_t, the old one
-	 * will either be deleted or left on the side (and be
-	 * deleted eventually)
-	 */
-	nscd_nsw_config[dbi] = (nscd_nsw_config_t **)_nscd_set(
-	    (nscd_acc_data_t *)nscd_nsw_config[dbi],
-	    (nscd_acc_data_t *)nsw_cfg_p);
-
-	/*
 	 * also create a new nsw state base
 	 */
 	if ((rc = _nscd_init_nsw_state_base(dbi, compat_basei, 1)) !=
@@ -504,6 +494,17 @@ _nscd_create_sw_struct(
 	(me, "new nsw config created (database = %s, "
 	"config = %s)\n", dbn, cfgstr);
 
+	/*
+	 * Activate the new nscd_nsw_config_t and make it the
+	 * current nsswitch config. The old one pointed to by
+	 * nscd_nsw_config[dbi] will either be destroyed
+	 * immediately or left on the side line (and be
+	 * destroyed eventually). __nscd_set() will set the
+	 * associated flags to make it happen.
+	 */
+	nscd_nsw_config[dbi] = (nscd_nsw_config_t **)_nscd_set(
+	    (nscd_acc_data_t *)nscd_nsw_config[dbi],
+	    (nscd_acc_data_t *)nsw_cfg_p);
 
 	error_exit:
 
@@ -537,11 +538,40 @@ create_nsw_config(int dbi)
 	char			*me = "create_nsw_config";
 
 	/*
-	 * if pseudo-databases (initf function not defined),
-	 * don't bother now
+	 * Allocate a pointer space for saving a pointer to a
+	 * nscd_nsw_config_t. _nscd_alloc() will also create
+	 * a nscd_access_t header with a rwlock_t and mutex_t
+	 * for controlling later access to the data pointed
+	 * to by the pointer.
 	 */
-	if (nscd_nss_db_initf[dbi] == NULL)
+	nsw_cfg_p = (nscd_nsw_config_t **)_nscd_alloc(NSCD_DATA_NSW_CONFIG,
+	    sizeof (nscd_nsw_config_t **), free_nscd_nsw_config,
+	    NSCD_ALLOC_RWLOCK | NSCD_ALLOC_MUTEX);
+
+	if (nsw_cfg_p == NULL) {
+		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
+		(me, "unable to allocate a space for a nsw config pointer\n");
+		return (NSCD_NO_MEMORY);
+	}
+	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
+		(me, "addr for saving nsw config pointer = %p\n", nsw_cfg_p);
+
+	/*
+	 * If pseudo-databases (initf function not defined),
+	 * no need to create a nscd_nsw_config_t yet,
+	 * so put a NULL pointer in the pointer space.
+	 */
+	if (nscd_nss_db_initf[dbi] == NULL) {
+		*nsw_cfg_p = NULL;
+		nscd_nsw_config[dbi] = (nscd_nsw_config_t **)_nscd_set(
+		    (nscd_acc_data_t *)nscd_nsw_config[dbi],
+		    (nscd_acc_data_t *)nsw_cfg_p);
+
+		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
+		(me, "pointer to nsw config has been set to NULL\n");
+
 		return (NSCD_SUCCESS);
+	}
 
 	/* allocate the space for a nscd_nsw_config_t */
 	nsw_cfg = calloc(1, sizeof (nscd_nsw_config_t));
@@ -552,18 +582,6 @@ create_nsw_config(int dbi)
 	}
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 	(me, "nsw config structure %pallocated\n", nsw_cfg);
-
-	nsw_cfg_p = (nscd_nsw_config_t **)_nscd_alloc(NSCD_DATA_NSW_CONFIG,
-	    sizeof (nscd_nsw_config_t **), free_nscd_nsw_config,
-	    NSCD_ALLOC_RWLOCK);
-
-	if (nsw_cfg_p == NULL) {
-		_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-		(me, "unable to allocate a pointer to nsw config structure\n");
-		return (NSCD_NO_MEMORY);
-	}
-	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
-		(me, "nsw config pointer = %p\n", nsw_cfg_p);
 
 	nsw_cfg->db_name = strdup(NSCD_NSW_DB_NAME(dbi));
 	if (nsw_cfg->db_name == NULL) {

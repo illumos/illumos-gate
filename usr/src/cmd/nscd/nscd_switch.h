@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,8 +125,6 @@ typedef struct nscd_nsw_state {
  */
 typedef struct nscd_getent_ctx_base {
 	int			dbi;		/* which database? */
-	int			deattached;	/* not associated with */
-						/* current config */
 	int			max_getent_ctx;
 	int			num_getent_ctx;
 	int			num_waiter;

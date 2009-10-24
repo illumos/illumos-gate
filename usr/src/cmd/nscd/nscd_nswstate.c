@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -95,7 +93,11 @@ _nscd_free_nsw_state(
 	if (s->be_version_p != NULL)
 		free(s->be_version_p);
 
-	s->base = NULL;
+	/* remove reference to the nsw state base */
+	if (s->base != NULL) {
+		_nscd_release((nscd_acc_data_t *)s->base);
+		s->base = NULL;
+	}
 
 	_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "nsw state %p freed \n", s);
@@ -425,43 +427,74 @@ _get_nsw_state_int(
 	 */
 	if (params->compati != -1) {
 
-		nscd_nsw_config_t	**nswcfg1;
+		nscd_nsw_config_t	**nswcfg1, **nswcfg2;
 		int			i = params->compati;
 
 		dbi = i;
 
+		/*
+		 * retrieve the pointer space which contains a
+		 * pointer pointing to the nsswitch config
+		 * structure for the compat backend
+		 */
 		nswcfg = (nscd_nsw_config_t **)_nscd_get(
 		    (nscd_acc_data_t *)nscd_nsw_config[i]);
 
 		/*
-		 * if nsw data structures not created yet, get the
-		 * config string from the passwd_compat or
-		 * group_compat DB and create the structures
+		 * If nsswitch config structure not created yet,
+		 * get the config string from the passwd_compat
+		 * or group_compat DB and create the structure.
 		 */
-		if (nswcfg == NULL) {
-			nswcfg1 = (nscd_nsw_config_t **)_nscd_get(
-			    (nscd_acc_data_t *)nscd_nsw_config[params->cfgdbi]);
-			if (nswcfg1 == NULL) {
-				_NSCD_LOG(NSCD_LOG_NSW_STATE,
-				    NSCD_LOG_LEVEL_ERROR)
-				(me, "no nsw config for %s\n",
-				    params->p.name);
-				return (NSCD_CREATE_NSW_STATE_FAILED);
+		if (*nswcfg == NULL) {
+			/* Wait first if it's being created. */
+			nswcfg2 = (nscd_nsw_config_t **)_nscd_mutex_lock(
+			    (nscd_acc_data_t *)nscd_nsw_config[i]);
+
+			/* still not created yet */
+			if (*nswcfg2 == NULL) {
+				/*
+				 * get the nsswitch config string specified
+				 * for passwd_compat or group_compat
+				 */
+				nswcfg1 = (nscd_nsw_config_t **)_nscd_get(
+				    (nscd_acc_data_t *)
+				    nscd_nsw_config[params->cfgdbi]);
+				if (nswcfg1 == NULL) {
+					_NSCD_LOG(NSCD_LOG_NSW_STATE,
+					    NSCD_LOG_LEVEL_ERROR)
+					(me, "no nsw config for %s\n",
+					    params->p.name);
+
+					(void) _nscd_mutex_unlock(
+					    (nscd_acc_data_t *)nswcfg2);
+					_nscd_release((nscd_acc_data_t *)
+					    nswcfg);
+
+					return (NSCD_CREATE_NSW_STATE_FAILED);
+				}
+
+				rc = _nscd_create_sw_struct(i, params->cfgdbi,
+				    params->p.name, (*nswcfg1)->nsw_cfg_str,
+				    NULL, params);
+				_nscd_release((nscd_acc_data_t *)nswcfg1);
+
+				if (rc == NSCD_SUCCESS) {
+					_NSCD_LOG(NSCD_LOG_NSW_STATE,
+					    NSCD_LOG_LEVEL_DEBUG)
+					(me, "nsw config created for %s (%s)\n",
+					    params->p.name,
+					    (*nswcfg1)->nsw_cfg_str);
+				} else {
+					(void) _nscd_mutex_unlock(
+					    (nscd_acc_data_t *)nswcfg2);
+					_nscd_release((nscd_acc_data_t *)
+					    nswcfg);
+					return (rc);
+				}
 			}
-
-			rc = _nscd_create_sw_struct(i, params->cfgdbi,
-			    params->p.name, (*nswcfg1)->nsw_cfg_str,
-			    NULL, params);
-			_nscd_release((nscd_acc_data_t *)nswcfg1);
-			if (rc != NSCD_SUCCESS)
-				return (rc);
-
-			_NSCD_LOG(NSCD_LOG_NSW_STATE,
-			    NSCD_LOG_LEVEL_DEBUG)
-				(me, "nsw config created for %s (%s)\n",
-				    params->p.name, (*nswcfg1)->nsw_cfg_str);
-		} else
-			_nscd_release((nscd_acc_data_t *)nswcfg);
+			(void) _nscd_mutex_unlock((nscd_acc_data_t *)nswcfg2);
+		}
+		_nscd_release((nscd_acc_data_t *)nswcfg);
 	}
 
 	(void) rw_rdlock(&nscd_nsw_state_base_lock);
@@ -573,8 +606,6 @@ _get_nsw_state_int(
 
 		ctrl_p->first = _nscd_create_nsw_state(params);
 		if (ctrl_p->first != NULL) {
-			ctrl_p->first->base = base;
-
 			if (tid == NULL) {
 				_NSCD_LOG(NSCD_LOG_NSW_STATE,
 				    NSCD_LOG_LEVEL_DEBUG)
@@ -623,6 +654,13 @@ _get_nsw_state_int(
 	else
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "got old nsw state %p\n", ret);
+
+	/*
+	 * reference count the nsswitch state base bfore handing out
+	 * the nsswitch state
+	 */
+	ret->base = (nscd_nsw_state_base_t *)
+	    _nscd_get((nscd_acc_data_t *)base);
 
 	_nscd_mutex_unlock((nscd_acc_data_t *)base);
 
@@ -687,9 +725,9 @@ _put_nsw_state_int(
 	base = s->base;
 
 	if (_nscd_mutex_lock((nscd_acc_data_t *)base) == NULL) {
-		/* base has been freed, free this db state */
+		/* base has been freed or no longer valid, free the nsw state */
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "nsw state base has been freed, freeing %p\n", s);
+		(me, "nsw state base gone or no longer valid, freeing %p\n", s);
 		_nscd_free_nsw_state(s);
 		return;
 	}
@@ -720,6 +758,12 @@ _put_nsw_state_int(
 		s->next = NULL;
 	}
 	ctrl_p->free++;
+
+	/*
+	 * Remove reference to the nsswitch state base.
+	 */
+	_nscd_release((nscd_acc_data_t *)base);
+	s->base = NULL;
 
 	_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "signaling waiter thread_only = %d..\n", thread_only);

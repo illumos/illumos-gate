@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <locale.h>
 #include <unistd.h>
@@ -204,17 +202,6 @@ _nscd_refresh()
 	char			errmsg[1024];
 
 	/*
-	 * re-read the nsswitch configuration
-	 */
-	rc = _nscd_cfg_read_nsswitch_file("/etc/nsswitch.conf", &err);
-	if (rc != NSCD_SUCCESS) {
-		(void) snprintf(errmsg, sizeof (errmsg),
-		"unable to parse the config file %s (rc = %d), %s\n",
-		"/etc/nsswitch.conf", rc, NSCD_ERR2MSG(err));
-		goto error_exit;
-	}
-
-	/*
 	 * re-read the nscd configuration
 	 */
 	if (cfgfile_save == NULL)
@@ -241,7 +228,7 @@ _nscd_refresh()
 	}
 
 	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ALL)
-	(me, "nsswitch/nscd configuration refreshed successfully\n");
+	(me, "nscd configuration refreshed successfully\n");
 
 	return (NSCD_SUCCESS);
 

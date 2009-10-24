@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,7 +160,7 @@ _nscd_is_getent_ctx(
 
 		/*
 		 * If the ctx is not to be deleted and the cookie numbers
-		 * match, return the ctx if not aborted and not in use,
+		 * match, return the ctx if not aborted and not in use.
 		 * Otherwise return NULL.
 		 */
 		if (gnctx->to_delete == 0 && gnctx->cookie_num == cookie_num) {
@@ -288,6 +288,13 @@ _nscd_free_getent_ctx(
 	(me, "getent context %p\n", gnctx);
 
 	_nscd_put_nsw_state(gnctx->nsw_state);
+
+	if (gnctx->base != NULL) {
+		/* remove reference to the getent context base */
+		_nscd_release((nscd_acc_data_t *)gnctx->base);
+		gnctx->base = NULL;
+	}
+
 	_nscd_del_getent_ctx(gnctx, gnctx->cookie_num);
 	free(gnctx);
 }
@@ -421,11 +428,10 @@ _nscd_get_getent_ctx(
 			base->num_waiter--;
 		} else {
 			base->first = _nscd_create_getent_ctx(params);
-			if (base->first != NULL) {
-				base->first->base = base;
+			if (base->first != NULL)
 				base->num_getent_ctx++;
-			} else {
-				/* not able to create an getent ctx */
+			else {
+				/* not able to create a getent ctx */
 
 				_NSCD_LOG(NSCD_LOG_GETENT_CTX,
 				    NSCD_LOG_LEVEL_ERROR)
@@ -452,6 +458,13 @@ _nscd_get_getent_ctx(
 
 	_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_DEBUG)
 	(me, "got a getent ctx %p\n", c);
+
+	/*
+	 * reference count the getent context base bfore handing out
+	 * the getent context
+	 */
+	c->base = (nscd_getent_ctx_base_t *)
+	    _nscd_get((nscd_acc_data_t *)base);
 
 	_nscd_mutex_unlock((nscd_acc_data_t *)base);
 
@@ -487,7 +500,7 @@ _nscd_put_getent_ctx(
 
 	base = gnctx->base;
 
-	/* if context base is gone, so should this context */
+	/* if context base is gone or no longer current, free this context */
 	if ((_nscd_mutex_lock((nscd_acc_data_t *)base)) == NULL) {
 		_nscd_free_getent_ctx(gnctx);
 		return;
@@ -532,6 +545,10 @@ _nscd_put_getent_ctx(
 	gnctx->thr_id = (thread_t)-1;
 	gnctx->n_src = 0;
 	gnctx->be = NULL;
+
+	/* remove reference to the getent context base */
+	_nscd_release((nscd_acc_data_t *)base);
+	gnctx->base = NULL;
 
 	_nscd_mutex_unlock((nscd_acc_data_t *)base);
 }
