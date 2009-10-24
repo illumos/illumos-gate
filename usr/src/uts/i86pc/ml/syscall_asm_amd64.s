@@ -366,12 +366,11 @@ __no_rupdate_msg:
  * [1] They used to, and we relied on it, but this was broken in 3.1.1.
  * Sigh.
  */
-
 #if defined(__xpv)
-#define	XPV_SYSCALL_PROD		\
-	XPV_TRAP_POP;			\
-	movq	(%rsp), %rcx;		\
-	movq	0x10(%rsp), %r11
+#define	XPV_SYSCALL_PROD						\
+	movq	0x10(%rsp), %rcx;					\
+	movq	0x20(%rsp), %r11;					\
+	movq	0x28(%rsp), %rsp
 #else
 #define	XPV_SYSCALL_PROD /* nothing */
 #endif
@@ -409,12 +408,7 @@ noprod_sys_syscall:
 	ASSERT_UPCALL_MASK_IS_SET
 
 	movq	%r15, %gs:CPU_RTMP_R15
-#if defined(__xpv)
-	movq	0x18(%rsp), %r15		/* save user stack */
-	movq	%r15, %gs:CPU_RTMP_RSP
-#else
 	movq	%rsp, %gs:CPU_RTMP_RSP
-#endif	/* __xpv */
 
 	movq	%gs:CPU_THREAD, %r15
 	movq	T_STACK(%r15), %rsp
@@ -589,9 +583,42 @@ _syscall_invoke:
          * in sn1_brand_syscall_callback for an example.
          */
 	ASSERT_UPCALL_MASK_IS_SET
+#if defined(__xpv)
+	SYSRETQ
+        ALTENTRY(nopop_sys_syscall_swapgs_sysretq)
+
+	/*
+	 * We can only get here after executing a brand syscall
+	 * interposition callback handler and simply need to
+	 * "sysretq" back to userland. On the hypervisor this
+	 * involves the iret hypercall which requires us to construct
+	 * just enough of the stack needed for the hypercall.
+	 * (rip, cs, rflags, rsp, ss).
+	 */
+	movq    %rsp, %gs:CPU_RTMP_RSP		/* save user's rsp */
+	movq	%gs:CPU_THREAD, %r11
+	movq	T_STACK(%r11), %rsp
+
+	movq	%rcx, REGOFF_RIP(%rsp)
+	movl	$UCS_SEL, REGOFF_CS(%rsp)
+	movq	%gs:CPU_RTMP_RSP, %r11
+	movq	%r11, REGOFF_RSP(%rsp)
+	pushfq
+	popq	%r11				/* hypercall enables ints */
+	movq	%r11, REGOFF_RFL(%rsp)
+	movl	$UDS_SEL, REGOFF_SS(%rsp)
+	addq	$REGOFF_RIP, %rsp
+	/*
+	 * XXPV: see comment in SYSRETQ definition for future optimization
+	 *       we could take.
+	 */
+	ASSERT_UPCALL_MASK_IS_SET
+	SYSRETQ
+#else
         ALTENTRY(nopop_sys_syscall_swapgs_sysretq)
 	SWAPGS				/* user gsbase */
 	SYSRETQ
+#endif
         /*NOTREACHED*/
         SET_SIZE(nopop_sys_syscall_swapgs_sysretq)
 
