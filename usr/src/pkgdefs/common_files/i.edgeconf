@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -19,20 +20,34 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved. 
 # Use is subject to license terms.
 #
- 
-include ../Makefile.com
+# Update the usbser_edge.conf file. The distributed usbser_edge.conf consists
+# only of comments, ending in a marker line. To update, the new file
+# (all comments) is appended by any lines in the user's old file that
+# appear after the marker.
+#
 
-LICENSEFILES += $(OSBL)
-CDDL=
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+TMP_FILE=/tmp/usbser_edge.$$
+export TMP_FILE
 
-DATAFILES += i.edgeconf
+while read src dest
+do
+        if [ ! -f $dest ] ; then
+                cp $src $dest
+        else
+		# copy everything after marker line to a tmp file
+		MARKER="# DO NOT MODIFY OR DELETE THIS LINE -- CUSTOMIZED CONFIGURATION BELLOW #"
+		sed -e "1,/^$MARKER$/d" $dest > $TMP_FILE
 
-.KEEP_STATE:
+		# combine new file with saved lines from user's old file
+		cat $src $TMP_FILE > $dest
+		rm $TMP_FILE
+	fi
+done
 
-all: $(FILES) depend postinstall preremove
-install: all pkg
-
-include ../Makefile.targ
+exit 0
