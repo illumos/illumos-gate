@@ -450,6 +450,9 @@ iscsit_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 				goto cleanup;
 			}
 			break;
+		default:
+			rc = EFAULT;
+			goto cleanup;
 		}
 
 		/* Check API version */

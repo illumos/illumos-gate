@@ -394,7 +394,7 @@ idm_get_ipaddr(idm_addr_list_t **ipaddr_p)
 	struct sockaddr_in	*sin;
 	struct sockaddr_in6	*sin6;
 	idm_addr_t		*ip;
-	idm_addr_list_t		*ipaddr;
+	idm_addr_list_t		*ipaddr = NULL;
 	int			size_ipaddr;
 
 	*ipaddr_p = NULL;

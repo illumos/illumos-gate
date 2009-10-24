@@ -71,8 +71,6 @@
 	}\
 }
 
-#define	IS_IQN_NAME(s) (strncmp((s), "iqn.", 4) == 0)
-
 
 static struct option itadm_long[] = {
 	{"alias",		required_argument,	NULL, 'l'},
@@ -221,12 +219,6 @@ list_defaults(boolean_t script);
 
 static void
 tag_name_to_num(char *tagname, uint16_t *tagnum);
-
-static char *
-canonical_target_name(char *tgt);
-
-static char *
-strduplc(char *s);
 
 /* prototype from iscsit_common.h */
 extern int
@@ -615,7 +607,6 @@ create_target(char *tgt, nvlist_t *proplist)
 	uint16_t	tagid = 0;
 	it_tpgt_t	*tpgt;
 	char		*sec = "solaris.smf.modify.stmf";
-	char		*canonical_tgt = NULL;
 	boolean_t	did_it_config_load = B_FALSE;
 
 	ITADM_CHKAUTH(sec);
@@ -624,15 +615,12 @@ create_target(char *tgt, nvlist_t *proplist)
 		/*
 		 * Validate target name.
 		 */
-		if ((strncmp(tgt, "eui.", 4) != 0) &&
-		    (strncmp(tgt, "iqn.", 4) != 0)) {
+		if (!IS_IQN_NAME(tgt) && !IS_EUI_NAME(tgt)) {
 			(void) fprintf(stderr, gettext("Invalid name %s"),
 			    tgt);
 			(void) fprintf(stderr, "\n");
 			return (EINVAL);
 		}
-
-		canonical_tgt = canonical_target_name(tgt);
 	}
 
 	ret = it_config_load(&cfg);
@@ -646,7 +634,7 @@ create_target(char *tgt, nvlist_t *proplist)
 
 	did_it_config_load = B_TRUE;
 
-	ret = it_tgt_create(cfg, &tgtp, canonical_tgt);
+	ret = it_tgt_create(cfg, &tgtp, tgt);
 	if (ret != 0) {
 		if (ret == EFAULT) {
 			(void) fprintf(stderr,
@@ -770,9 +758,6 @@ done:
 
 	if (did_it_config_load)
 		it_config_free(cfg);
-
-	if (canonical_tgt != NULL)
-		free(canonical_tgt);
 
 	return (ret);
 }
@@ -1041,7 +1026,6 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 	uint16_t	tagid;
 	it_tpgt_t	*tpgt = NULL;
 	char		*sec = "solaris.smf.modify.stmf";
-	char 		*canonical_newname = NULL;
 	boolean_t	did_it_config_load = B_FALSE;
 
 	ITADM_CHKAUTH(sec);
@@ -1067,8 +1051,7 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 	did_it_config_load = B_TRUE;
 
 	/*
-	 * If newname is specified, ensure it is a valid name,
-	 * and generate its canonical form.
+	 * If newname is specified, ensure it is a valid name.
 	 */
 	if (newname) {
 		if (!validate_iscsi_name(newname)) {
@@ -1078,8 +1061,6 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 			ret = 1;
 			goto done;
 		}
-
-		canonical_newname = canonical_target_name(newname);
 	}
 
 	/*
@@ -1093,7 +1074,7 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 		 * Does a target with the new name already exist?
 		 */
 		if (newname &&
-		    (strcmp(canonical_newname, ptr->tgt_name) == 0)) {
+		    (strcasecmp(newname, ptr->tgt_name) == 0)) {
 			(void) fprintf(stderr,
 			    gettext("A target with name %s already exists"),
 			    newname);
@@ -1230,7 +1211,7 @@ modify_target(char *tgt, char *newname, nvlist_t *proplist)
 			    gettext("Error renaming target."));
 			goto done;
 		}
-		(void) strlcpy(tgtp->tgt_name, canonical_newname,
+		(void) strlcpy(tgtp->tgt_name, newname,
 		    sizeof (tgtp->tgt_name));
 	}
 
@@ -1276,9 +1257,6 @@ done:
 
 	if (did_it_config_load)
 		it_config_free(cfg);
-
-	if (canonical_newname != NULL)
-		free(canonical_newname);
 
 	return (ret);
 }
@@ -1588,8 +1566,7 @@ modify_initiator(char *ini, nvlist_t *proplist, boolean_t create)
 		 * validate input name - what are the rules for EUI
 		 * and IQN values?
 		 */
-		if ((strncmp(ini, "eui.", 4) != 0) &&
-		    (strncmp(ini, "iqn.", 4) != 0)) {
+		if (!IS_IQN_NAME(ini) && !IS_EUI_NAME(ini)) {
 			(void) fprintf(stderr, gettext("Invalid name %s"),
 			    ini);
 			(void) fprintf(stderr, "\n");
@@ -2178,39 +2155,4 @@ tag_name_to_num(char *tagname, uint16_t *tagnum)
 	if ((id <= UINT16_MAX) && (id > 1)) {
 		*tagnum = (uint16_t)id;
 	}
-}
-
-/*
- * Return a new string containing the canonical (lower-case)
- * form of the target name.
- */
-static char *
-canonical_target_name(char *tgt)
-{
-	if (IS_IQN_NAME(tgt)) {
-		/* lowercase iqn names */
-		return (strduplc(tgt));
-	} else {
-		return (strdup(tgt));
-	}
-}
-
-/*
- * Duplicate a string, converting it to lower case in the process.
- * Returns NULL if no memory.
- */
-static char *
-strduplc(char *s)
-{
-	char *lc = strdup(s);
-
-	if (lc != NULL) {
-		char *l = lc;
-		while (*s) {
-			*l = tolower(*s);
-			s++; l++;
-		}
-	}
-
-	return (lc);
 }

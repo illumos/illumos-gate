@@ -41,6 +41,9 @@ extern "C" {
 #define	MAX_TPGT	256
 #define	CFG_TPGTLIST	"tpgt-list"
 
+#define	IS_IQN_NAME(s) (strncmp((s), "iqn.", 4) == 0)
+#define	IS_EUI_NAME(s) (strncmp((s), "eui.", 4) == 0)
+
 /*
  * Object Hierarchy
  *
@@ -514,6 +517,16 @@ it_ini_free(it_ini_t *ini);
  */
 boolean_t
 validate_iscsi_name(char *in_name);
+
+/*
+ * Function:  canonical_iscsi_name()
+ *
+ * Fold the iqn iscsi name to lower-case and the EUI-64 identifier of
+ * the eui iscsi name to upper-case.
+ * Ensures the passed-in string is a valid IQN or EUI iSCSI name
+ */
+void
+canonical_iscsi_name(char *tgt);
 
 #ifdef	__cplusplus
 }

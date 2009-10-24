@@ -87,6 +87,7 @@ SUNWprivate {
 		it_tpgt_free_cmn;
 		sockaddr_to_str;
 		validate_iscsi_name;
+		canonical_iscsi_name;
 	local:
 	    *;
 };

@@ -86,6 +86,12 @@ it_validate_iniprops(nvlist_t *nvl, nvlist_t *errs);
 static boolean_t
 is_iscsit_enabled(void);
 
+static void
+iqnstr(char *s);
+
+static void
+euistr(char *s);
+
 /*
  * Function:  it_config_load()
  *
@@ -514,31 +520,33 @@ it_tgt_create(it_config_t *cfg, it_tgt_t **tgt, char *tgt_name)
 	int		ret = 0;
 	it_tgt_t	*ptr;
 	it_tgt_t	*cfgtgt;
-	char		*namep = tgt_name;
+	char		*namep;
 	char		buf[ISCSI_NAME_LEN_MAX + 1];
 
 	if (!cfg || !tgt) {
 		return (EINVAL);
 	}
 
-	if (!namep) {
+	if (!tgt_name) {
 		/* generate a name */
 		ret = it_iqn_generate(buf, sizeof (buf), NULL);
 		if (ret != 0) {
 			return (ret);
 		}
-		namep = buf;
 	} else {
 		/* validate the passed-in name */
-		if (!validate_iscsi_name(namep)) {
+		if (!validate_iscsi_name(tgt_name)) {
 			return (EFAULT);
 		}
+		(void) strlcpy(buf, tgt_name, sizeof (buf));
+		canonical_iscsi_name(buf);
 	}
+	namep = buf;
 
 	/* make sure this name isn't already on the list */
 	cfgtgt = cfg->config_tgt_list;
 	while (cfgtgt != NULL) {
-		if (strcmp(namep, cfgtgt->tgt_name) == 0) {
+		if (strcasecmp(namep, cfgtgt->tgt_name) == 0) {
 			return (EEXIST);
 		}
 		cfgtgt = cfgtgt->tgt_next;
@@ -598,6 +606,12 @@ it_tgt_setprop(it_config_t *cfg, it_tgt_t *tgt, nvlist_t *proplist,
 	if (!cfg || !tgt || !proplist) {
 		return (EINVAL);
 	}
+
+	/* verify the target name in case the target node is renamed */
+	if (!validate_iscsi_name(tgt->tgt_name)) {
+		return (EINVAL);
+	}
+	canonical_iscsi_name(tgt->tgt_name);
 
 	if (errlist) {
 		(void) nvlist_alloc(errlist, 0, 0);
@@ -707,7 +721,7 @@ it_tgt_delete(it_config_t *cfg, it_tgt_t *tgt, boolean_t force)
 
 	ptgt = cfg->config_tgt_list;
 	while (ptgt != NULL) {
-		if (strcmp(tgt->tgt_name, ptgt->tgt_name) == 0) {
+		if (strcasecmp(tgt->tgt_name, ptgt->tgt_name) == 0) {
 			break;
 		}
 		prev = ptgt;
@@ -1870,7 +1884,7 @@ validate_iscsi_name(char *in_name)
 		return (B_FALSE);
 	}
 
-	if (strncasecmp(in_name, "iqn.", 4) == 0) {
+	if (IS_IQN_NAME(in_name)) {
 		/*
 		 * IQN names are iqn.yyyy-mm.<xxx>
 		 */
@@ -1913,7 +1927,7 @@ validate_iscsi_name(char *in_name)
 		if (in_len > ISCSI_NAME_LEN_MAX) {
 			return (B_FALSE);
 		}
-	} else if (strncasecmp(in_name, "eui.", 4) == 0) {
+	} else if (IS_EUI_NAME(in_name)) {
 		/*
 		 * EUI names are "eui." + 16 hex chars
 		 */
@@ -1946,4 +1960,52 @@ is_iscsit_enabled(void)
 	}
 
 	return (B_FALSE);
+}
+
+/*
+ * Function:  canonical_iscsi_name()
+ *
+ * Fold the iqn iscsi name to lower-case and the EUI-64 identifier of
+ * the eui iscsi name to upper-case.
+ * Ensures the passed-in string is a valid IQN or EUI iSCSI name
+ */
+void
+canonical_iscsi_name(char *tgt)
+{
+	if (IS_IQN_NAME(tgt)) {
+		/* lowercase iqn names */
+		iqnstr(tgt);
+	} else {
+		/* uppercase EUI-64 identifier */
+		euistr(tgt);
+	}
+}
+
+/*
+ * Fold an iqn name to lower-case.
+ */
+static void
+iqnstr(char *s)
+{
+	if (s != NULL) {
+		while (*s) {
+			*s = tolower(*s);
+			s++;
+		}
+	}
+}
+
+/*
+ * Fold the EUI-64 identifier of a eui name to upper-case.
+ */
+static void
+euistr(char *s)
+{
+	if (s != NULL) {
+		char *l = s + 4;
+		while (*l) {
+			*l = toupper(*l);
+			l++;
+		}
+	}
 }
