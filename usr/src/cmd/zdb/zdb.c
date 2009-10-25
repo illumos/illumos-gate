@@ -540,8 +540,7 @@ dump_history(spa_t *spa)
 {
 	nvlist_t **events = NULL;
 	char buf[SPA_MAXBLOCKSIZE];
-	uint64_t resid, off = 0;
-	uint64_t len = sizeof (buf);
+	uint64_t resid, len, off = 0;
 	uint_t num = 0;
 	int error;
 	time_t tsec;
@@ -550,6 +549,8 @@ dump_history(spa_t *spa)
 	char internalstr[MAXPATHLEN];
 
 	do {
+		len = sizeof (buf);
+
 		if ((error = spa_history_get(spa, &off, &len, buf)) != 0) {
 			(void) fprintf(stderr, "Unable to read history: "
 			    "error %d\n", error);
@@ -673,7 +674,7 @@ static int
 visit_indirect(spa_t *spa, const dnode_phys_t *dnp,
     blkptr_t *bp, const zbookmark_t *zb)
 {
-	int err;
+	int err = 0;
 
 	if (bp->blk_birth == 0)
 		return (0);
@@ -1203,7 +1204,7 @@ dump_dir(objset_t *os)
 	nicenum(refdbytes, numbuf);
 
 	if (verbosity >= 4) {
-		(void) sprintf(blkbuf + strlen(blkbuf), ", rootbp ");
+		(void) sprintf(blkbuf, ", rootbp ");
 		(void) sprintf_blkptr(blkbuf + strlen(blkbuf),
 		    BP_SPRINTF_LEN - strlen(blkbuf), os->os_rootbp);
 	} else {
