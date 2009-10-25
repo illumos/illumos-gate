@@ -452,7 +452,7 @@ blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("DVA[%d]:       GANG: %-5s  GRID:  %04x\t"
 		    "ASIZE: %llx\n", i, DVA_GET_GANG(dva) ? "TRUE" : "FALSE",
 		    (int)DVA_GET_GRID(dva), DVA_GET_ASIZE(dva));
-		mdb_printf("DVA[%d]: :%llu:%llx:%llx:%s%s%s%s\n", i,
+		mdb_printf("DVA[%d]: %llu:%llx:%llx:%s%s%s%s\n", i,
 		    DVA_GET_VDEV(dva), DVA_GET_OFFSET(dva), BP_GET_PSIZE(&bp),
 		    BP_SHOULD_BYTESWAP(&bp) ? "e" : "",
 		    !DVA_GET_GANG(dva) && BP_GET_LEVEL(&bp) != 0 ? "i" : "",

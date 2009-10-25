@@ -98,9 +98,9 @@ usage(void)
 	    "Usage: %s [-CumdibcsvhL] [-S user:cksumalg] "
 	    "poolname [object...]\n"
 	    "       %s [-div] dataset [object...]\n"
-	    "       %s -C [pool]\n"
-	    "       %s -l dev\n"
-	    "       %s -R pool:vdev:offset:size:flags\n\n",
+	    "       %s -R poolname vdev:offset:size[:flags]\n"
+	    "       %s -l device\n"
+	    "       %s -C\n\n",
 	    cmdname, cmdname, cmdname, cmdname, cmdname);
 
 	(void) fprintf(stderr, "    Dataset name must include at least one "
@@ -113,7 +113,7 @@ usage(void)
 	(void) fprintf(stderr, "        -u uberblock\n");
 	(void) fprintf(stderr, "        -d dataset(s)\n");
 	(void) fprintf(stderr, "        -i intent logs\n");
-	(void) fprintf(stderr, "        -C cached pool configuration\n");
+	(void) fprintf(stderr, "        -C config (or cachefile if alone)\n");
 	(void) fprintf(stderr, "        -h pool history\n");
 	(void) fprintf(stderr, "        -b block statistics\n");
 	(void) fprintf(stderr, "        -m metaslabs\n");
@@ -1293,7 +1293,7 @@ dump_uberblock(uberblock_t *ub)
 {
 	time_t timestamp = ub->ub_timestamp;
 
-	(void) printf("Uberblock\n\n");
+	(void) printf("\nUberblock:\n");
 	(void) printf("\tmagic = %016llx\n", (u_longlong_t)ub->ub_magic);
 	(void) printf("\tversion = %llu\n", (u_longlong_t)ub->ub_version);
 	(void) printf("\ttxg = %llu\n", (u_longlong_t)ub->ub_txg);
@@ -1309,18 +1309,27 @@ dump_uberblock(uberblock_t *ub)
 }
 
 static void
-dump_config(const char *pool)
+dump_config(spa_t *spa)
 {
-	spa_t *spa = NULL;
+	dmu_buf_t *db;
+	size_t nvsize = 0;
+	int error = 0;
 
-	mutex_enter(&spa_namespace_lock);
-	while ((spa = spa_next(spa)) != NULL) {
-		if (pool == NULL)
-			(void) printf("%s\n", spa_name(spa));
-		if (pool == NULL || strcmp(pool, spa_name(spa)) == 0)
-			dump_nvlist(spa->spa_config, 4);
+
+	error = dmu_bonus_hold(spa->spa_meta_objset,
+	    spa->spa_config_object, FTAG, &db);
+
+	if (error == 0) {
+		nvsize = *(uint64_t *)db->db_data;
+		dmu_buf_rele(db, FTAG);
+
+		(void) printf("\nMOS Configuration:\n");
+		dump_packed_nvlist(spa->spa_meta_objset,
+		    spa->spa_config_object, (void *)&nvsize, 1);
+	} else {
+		(void) fprintf(stderr, "dmu_bonus_hold(%llu) failed, errno %d",
+		    (u_longlong_t)spa->spa_config_object, error);
 	}
-	mutex_exit(&spa_namespace_lock);
 }
 
 static void
@@ -1855,6 +1864,14 @@ dump_zpool(spa_t *spa)
 	dsl_pool_t *dp = spa_get_dsl(spa);
 	int rc = 0;
 
+	if (!dump_opt['e'] && dump_opt['C'] > 1) {
+		(void) printf("\nCached configuration:\n");
+		dump_nvlist(spa->spa_config, 8);
+	}
+
+	if (dump_opt['C'])
+		dump_config(spa);
+
 	if (dump_opt['u'])
 		dump_uberblock(&spa->spa_uberblock);
 
@@ -1869,8 +1886,8 @@ dump_zpool(spa_t *spa)
 		if (dump_opt['d'] >= 3 || dump_opt['m'])
 			dump_metaslabs(spa);
 
-		(void) dmu_objset_find(spa_name(spa), dump_one_dir, NULL,
-		    DS_FIND_SNAPSHOTS | DS_FIND_CHILDREN);
+		(void) dmu_objset_find(spa_name(spa), dump_one_dir,
+		    NULL, DS_FIND_SNAPSHOTS | DS_FIND_CHILDREN);
 	}
 
 	if (dump_opt['b'] || dump_opt['c'] || dump_opt['S'])
@@ -1919,7 +1936,7 @@ zdb_print_blkptr(blkptr_t *bp, int flags)
 		    DVA_GET_GANG(&dva[d]) ? "TRUE" : "FALSE",
 		    (longlong_t)DVA_GET_GRID(&dva[d]),
 		    (longlong_t)DVA_GET_ASIZE(&dva[d]));
-		(void) printf("\tDVA[%d]: :%llu:%llx:%llx:%s%s%s%s\n", d,
+		(void) printf("\tDVA[%d]: %llu:%llx:%llx:%s%s%s%s\n", d,
 		    (u_longlong_t)DVA_GET_VDEV(&dva[d]),
 		    (longlong_t)DVA_GET_OFFSET(&dva[d]),
 		    (longlong_t)BP_GET_PSIZE(bp),
@@ -2080,21 +2097,18 @@ name:
  *              * = not yet implemented
  */
 static void
-zdb_read_block(char *thing, spa_t **spap)
+zdb_read_block(char *thing, spa_t *spa)
 {
-	spa_t *spa = *spap;
 	int flags = 0;
 	uint64_t offset = 0, size = 0, blkptr_offset = 0;
 	zio_t *zio;
 	vdev_t *vd;
 	void *buf;
-	char *s, *p, *dup, *pool, *vdev, *flagstr;
+	char *s, *p, *dup, *vdev, *flagstr;
 	int i, error, zio_flags;
 
 	dup = strdup(thing);
 	s = strtok(dup, ":");
-	pool = s ? s : "";
-	s = strtok(NULL, ":");
 	vdev = s ? s : "";
 	s = strtok(NULL, ":");
 	offset = strtoull(s ? s : "", NULL, 16);
@@ -2141,16 +2155,6 @@ zdb_read_block(char *thing, spa_t **spap)
 				return;
 			}
 		}
-	}
-
-	if (spa == NULL || strcmp(spa_name(spa), pool) != 0) {
-		if (spa)
-			spa_close(spa, (void *)zdb_read_block);
-		error = spa_open(pool, spap, (void *)zdb_read_block);
-		if (error)
-			fatal("Failed to open pool '%s': %s",
-			    pool, strerror(error));
-		spa = *spap;
 	}
 
 	vd = zdb_vdev_lookup(spa->spa_root_vdev, vdev);
@@ -2300,7 +2304,7 @@ main(int argc, char **argv)
 
 	dprintf_setup(&argc, argv);
 
-	while ((c = getopt(argc, argv, "udhibcmsvCLS:U:lRep:t:")) != -1) {
+	while ((c = getopt(argc, argv, "udhibcmsvCLS:RU:lep:t:")) != -1) {
 		switch (c) {
 		case 'u':
 		case 'd':
@@ -2392,6 +2396,8 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	if (argc < 2 && dump_opt['R'])
+		usage();
 	if (argc < 1) {
 		if (!dump_opt['e'] && dump_opt['C']) {
 			dump_cachefile(spa_config_path);
@@ -2405,30 +2411,6 @@ main(int argc, char **argv)
 		return (0);
 	}
 
-	if (dump_opt['R']) {
-		flagbits['b'] = ZDB_FLAG_PRINT_BLKPTR;
-		flagbits['c'] = ZDB_FLAG_CHECKSUM;
-		flagbits['d'] = ZDB_FLAG_DECOMPRESS;
-		flagbits['e'] = ZDB_FLAG_BSWAP;
-		flagbits['g'] = ZDB_FLAG_GBH;
-		flagbits['i'] = ZDB_FLAG_INDIRECT;
-		flagbits['p'] = ZDB_FLAG_PHYS;
-		flagbits['r'] = ZDB_FLAG_RAW;
-
-		spa = NULL;
-		while (argv[0]) {
-			zdb_read_block(argv[0], &spa);
-			argv++;
-			argc--;
-		}
-		if (spa)
-			spa_close(spa, (void *)zdb_read_block);
-		return (0);
-	}
-
-	if (dump_opt['C'])
-		dump_config(argv[0]);
-
 	error = 0;
 	target = argv[0];
 
@@ -2438,16 +2420,17 @@ main(int argc, char **argv)
 
 		error = ENOENT;
 		if (name) {
+			if (dump_opt['C'] > 1) {
+				(void) printf("\nConfiguration for import:\n");
+				dump_nvlist(cfg, 8);
+			}
 			if ((error = spa_import(name, cfg, NULL)) != 0)
 				error = spa_import_verbatim(name, cfg, NULL);
 		}
 	}
 
 	if (error == 0) {
-		if (strpbrk(target, "/@") != NULL) {
-			error = dmu_objset_own(target, DMU_OST_ANY,
-			    B_TRUE, FTAG, &os);
-		} else {
+		if (strpbrk(target, "/@") == NULL || dump_opt['R']) {
 			error = spa_open(target, &spa, FTAG);
 			if (error) {
 				/*
@@ -2466,32 +2449,44 @@ main(int argc, char **argv)
 				if (!error)
 					error = spa_open(target, &spa, FTAG);
 			}
+		} else {
+			error = dmu_objset_own(target, DMU_OST_ANY,
+			    B_TRUE, FTAG, &os);
 		}
 	}
-
 	if (error)
 		fatal("can't open '%s': %s", target, strerror(error));
 
 	argv++;
-	if (--argc > 0) {
-		zopt_objects = argc;
-		zopt_object = calloc(zopt_objects, sizeof (uint64_t));
-		for (i = 0; i < zopt_objects; i++) {
-			errno = 0;
-			zopt_object[i] = strtoull(argv[i], NULL, 0);
-			if (zopt_object[i] == 0 && errno != 0)
-				fatal("bad object number %s: %s",
-				    argv[i], strerror(errno));
+	argc--;
+	if (!dump_opt['R']) {
+		if (argc > 0) {
+			zopt_objects = argc;
+			zopt_object = calloc(zopt_objects, sizeof (uint64_t));
+			for (i = 0; i < zopt_objects; i++) {
+				errno = 0;
+				zopt_object[i] = strtoull(argv[i], NULL, 0);
+				if (zopt_object[i] == 0 && errno != 0)
+					fatal("bad object number %s: %s",
+					    argv[i], strerror(errno));
+			}
 		}
+		(os != NULL) ? dump_dir(os) : dump_zpool(spa);
+	} else {
+		flagbits['b'] = ZDB_FLAG_PRINT_BLKPTR;
+		flagbits['c'] = ZDB_FLAG_CHECKSUM;
+		flagbits['d'] = ZDB_FLAG_DECOMPRESS;
+		flagbits['e'] = ZDB_FLAG_BSWAP;
+		flagbits['g'] = ZDB_FLAG_GBH;
+		flagbits['i'] = ZDB_FLAG_INDIRECT;
+		flagbits['p'] = ZDB_FLAG_PHYS;
+		flagbits['r'] = ZDB_FLAG_RAW;
+
+		for (i = 0; i < argc; i++)
+			zdb_read_block(argv[i], spa);
 	}
 
-	if (os != NULL) {
-		dump_dir(os);
-		dmu_objset_disown(os, FTAG);
-	} else {
-		dump_zpool(spa);
-		spa_close(spa, FTAG);
-	}
+	(os != NULL) ? dmu_objset_disown(os, FTAG) : spa_close(spa, FTAG);
 
 	fuid_table_destroy();
 
