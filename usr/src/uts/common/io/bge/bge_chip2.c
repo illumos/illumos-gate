@@ -1870,6 +1870,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5723:
 	case DEVICE_ID_5761:
 	case DEVICE_ID_5761E:
+	case DEVICE_ID_5764:
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
 	case DEVICE_ID_5715C:
@@ -2141,9 +2142,20 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5723:
 	case DEVICE_ID_5761:
 	case DEVICE_ID_5761E:
-		cidp->chip_label = cidp->device == DEVICE_ID_5723 ? 5723: 5761;
-		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
 		cidp->msi_enabled = bge_enable_msi;
+		/*
+		 * We don't use MSI for BCM5764, as the status block may
+		 * fail to update when the network traffic is heavy.
+		 */
+		/* FALLTHRU */
+	case DEVICE_ID_5764:
+		if (cidp->device == DEVICE_ID_5723)
+			cidp->chip_label = 5723;
+		else if (cidp->device == DEVICE_ID_5764)
+			cidp->chip_label = 5764;
+		else
+			cidp->chip_label = 5761;
+		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
 		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
