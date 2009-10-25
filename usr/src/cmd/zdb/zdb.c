@@ -87,40 +87,48 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-udibcsvL] [-U cachefile_path] [-t txg]\n"
-	    "\t   [-S user:cksumalg] "
-	    "dataset [object...]\n"
+	    "Usage: %s [-CumdibcsvhL] [-S user:cksumalg] "
+	    "poolname [object...]\n"
+	    "       %s [-div] dataset [object...]\n"
 	    "       %s -C [pool]\n"
 	    "       %s -l dev\n"
-	    "       %s -R pool:vdev:offset:size:flags\n"
-	    "       %s [-p path_to_vdev_dir]\n"
-	    "       %s -e pool | GUID | devid ...\n",
-	    cmdname, cmdname, cmdname, cmdname, cmdname, cmdname);
+	    "       %s -R pool:vdev:offset:size:flags\n\n",
+	    cmdname, cmdname, cmdname, cmdname, cmdname);
 
-	(void) fprintf(stderr, "	-u uberblock\n");
-	(void) fprintf(stderr, "	-d datasets\n");
+	(void) fprintf(stderr, "    Dataset name must include at least one "
+	    "separator character '/' or '@'\n");
+	(void) fprintf(stderr, "    If dataset name is specified, only that "
+	    "dataset is dumped\n");
+	(void) fprintf(stderr, "    If object numbers are specified, only "
+	    "those objects are dumped\n\n");
+	(void) fprintf(stderr, "    Options to control amount of output:\n");
+	(void) fprintf(stderr, "        -u uberblock\n");
+	(void) fprintf(stderr, "        -d dataset(s)\n");
+	(void) fprintf(stderr, "        -i intent logs\n");
 	(void) fprintf(stderr, "        -C cached pool configuration\n");
 	(void) fprintf(stderr, "        -h pool history\n");
-	(void) fprintf(stderr, "	-i intent logs\n");
-	(void) fprintf(stderr, "	-b block statistics\n");
-	(void) fprintf(stderr, "	-m metaslabs\n");
-	(void) fprintf(stderr, "	-c checksum all metadata (twice for "
+	(void) fprintf(stderr, "        -b block statistics\n");
+	(void) fprintf(stderr, "        -m metaslabs\n");
+	(void) fprintf(stderr, "        -c checksum all metadata (twice for "
 	    "all data) blocks\n");
-	(void) fprintf(stderr, "	-s report stats on zdb's I/O\n");
-	(void) fprintf(stderr, "	-S <user|all>:<cksum_alg|all> -- "
+	(void) fprintf(stderr, "        -s report stats on zdb's I/O\n");
+	(void) fprintf(stderr, "        -S <user|all>:<cksum_alg|all> -- "
 	    "dump blkptr signatures\n");
-	(void) fprintf(stderr, "	-v verbose (applies to all others)\n");
+	(void) fprintf(stderr, "        -v verbose (applies to all others)\n");
 	(void) fprintf(stderr, "        -l dump label contents\n");
 	(void) fprintf(stderr, "        -L disable leak tracking (do not "
 	    "load spacemaps)\n");
-	(void) fprintf(stderr, "	-U cachefile_path -- use alternate "
-	    "cachefile\n");
 	(void) fprintf(stderr, "        -R read and display block from a "
-	    "device\n");
-	(void) fprintf(stderr, "        -e Pool is exported/destroyed/"
-	    "has altroot\n");
-	(void) fprintf(stderr, "	-p <Path to vdev dir> (use with -e)\n");
-	(void) fprintf(stderr, "	-t <txg> highest txg to use when "
+	    "device\n\n");
+	(void) fprintf(stderr, "    Below options are intended for use "
+	    "with other options (except -l):\n");
+	(void) fprintf(stderr, "        -U <cachefile_path> -- use alternate "
+	    "cachefile\n");
+	(void) fprintf(stderr, "        -e pool is exported/destroyed/"
+	    "has altroot/not in a cachefile\n");
+	(void) fprintf(stderr, "        -p <path> -- use one or more with "
+	    "-e to specify path to vdev dir\n");
+	(void) fprintf(stderr, "        -t <txg> -- highest txg to use when "
 	    "searching for uberblocks\n");
 	(void) fprintf(stderr, "Specify an option more than once (e.g. -bb) "
 	    "to make only that option verbose\n");
@@ -2178,129 +2186,81 @@ out:
 }
 
 static boolean_t
-nvlist_string_match(nvlist_t *config, char *name, char *tgt)
+pool_match(nvlist_t *cfg, char *tgt)
 {
+	uint64_t v, guid = strtoull(tgt, NULL, 0);
 	char *s;
 
-	if (nvlist_lookup_string(config, name, &s) != 0)
-		return (B_FALSE);
-
-	return (strcmp(s, tgt) == 0);
-}
-
-static boolean_t
-nvlist_uint64_match(nvlist_t *config, char *name, uint64_t tgt)
-{
-	uint64_t val;
-
-	if (nvlist_lookup_uint64(config, name, &val) != 0)
-		return (B_FALSE);
-
-	return (val == tgt);
-}
-
-static boolean_t
-vdev_child_guid_match(nvlist_t *vdev, uint64_t guid)
-{
-	nvlist_t **child;
-	uint_t c, children;
-
-	verify(nvlist_lookup_nvlist_array(vdev, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0);
-	for (c = 0; c < children; ++c)
-		if (nvlist_uint64_match(child[c], ZPOOL_CONFIG_GUID, guid))
-			return (B_TRUE);
-	return (B_FALSE);
-}
-
-static boolean_t
-vdev_child_string_match(nvlist_t *vdev, char *tgt)
-{
-	nvlist_t **child;
-	uint_t c, children;
-
-	verify(nvlist_lookup_nvlist_array(vdev, ZPOOL_CONFIG_CHILDREN,
-	    &child, &children) == 0);
-	for (c = 0; c < children; ++c) {
-		if (nvlist_string_match(child[c], ZPOOL_CONFIG_PATH, tgt) ||
-		    nvlist_string_match(child[c], ZPOOL_CONFIG_DEVID, tgt))
-			return (B_TRUE);
-	}
-	return (B_FALSE);
-}
-
-static boolean_t
-vdev_guid_match(nvlist_t *config, uint64_t guid)
-{
-	nvlist_t *nvroot;
-
-	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-	    &nvroot) == 0);
-
-	return (nvlist_uint64_match(nvroot, ZPOOL_CONFIG_GUID, guid) ||
-	    vdev_child_guid_match(nvroot, guid));
-}
-
-static boolean_t
-vdev_string_match(nvlist_t *config, char *tgt)
-{
-	nvlist_t *nvroot;
-
-	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-	    &nvroot) == 0);
-
-	return (vdev_child_string_match(nvroot, tgt));
-}
-
-static boolean_t
-pool_match(nvlist_t *config, char *tgt)
-{
-	uint64_t guid = strtoull(tgt, NULL, 0);
-
 	if (guid != 0) {
-		return (
-		    nvlist_uint64_match(config, ZPOOL_CONFIG_POOL_GUID, guid) ||
-		    vdev_guid_match(config, guid));
+		if (nvlist_lookup_uint64(cfg, ZPOOL_CONFIG_POOL_GUID, &v) == 0)
+			return (v == guid);
 	} else {
-		return (
-		    nvlist_string_match(config, ZPOOL_CONFIG_POOL_NAME, tgt) ||
-		    vdev_string_match(config, tgt));
+		if (nvlist_lookup_string(cfg, ZPOOL_CONFIG_POOL_NAME, &s) == 0)
+			return (strcmp(s, tgt) == 0);
 	}
+	return (B_FALSE);
 }
 
-static int
-find_exported_zpool(char *pool_id, nvlist_t **configp, char *vdev_dir)
+static char *
+find_zpool(char **target, nvlist_t **configp, int dirc, char **dirv)
 {
 	nvlist_t *pools;
-	int error = ENOENT;
 	nvlist_t *match = NULL;
+	char *name = NULL;
+	char *sepp = NULL;
+	char sep;
+	int count = 0;
 
-	if (vdev_dir != NULL)
-		pools = zpool_find_import_activeok(g_zfs, 1, &vdev_dir);
-	else
-		pools = zpool_find_import_activeok(g_zfs, 0, NULL);
+	if ((sepp = strpbrk(*target, "/@")) != NULL) {
+		sep = *sepp;
+		*sepp = '\0';
+	}
+
+	pools = zpool_find_import_activeok(g_zfs, dirc, dirv);
 
 	if (pools != NULL) {
 		nvpair_t *elem = NULL;
-
 		while ((elem = nvlist_next_nvpair(pools, elem)) != NULL) {
 			verify(nvpair_value_nvlist(elem, configp) == 0);
-			if (pool_match(*configp, pool_id)) {
+			if (pool_match(*configp, *target)) {
+				count++;
 				if (match != NULL) {
-					(void) fatal(
-					    "More than one matching pool - "
-					    "specify guid/devid/device path.");
+					/* print previously found config */
+					if (name != NULL) {
+						(void) printf("%s\n", name);
+						dump_nvlist(match, 8);
+						name = NULL;
+					}
+					(void) printf("%s\n",
+					    nvpair_name(elem));
+					dump_nvlist(*configp, 8);
 				} else {
 					match = *configp;
-					error = 0;
+					name = nvpair_name(elem);
 				}
 			}
 		}
 	}
+	if (count > 1)
+		(void) fatal("\tMatched %d pools - use pool GUID "
+		    "instead of pool name or \n"
+		    "\tpool name part of a dataset name to select pool", count);
 
-	*configp = error ? NULL : match;
+	if (sepp)
+		*sepp = sep;
+	/*
+	 * If pool GUID was specified for pool id, replace it with pool name
+	 */
+	if (name && (strstr(*target, name) != *target)) {
+		int sz = 1 + strlen(name) + ((sepp) ? strlen(sepp) : 0);
 
-	return (error);
+		*target = umem_alloc(sz, UMEM_NOFAIL);
+		(void) snprintf(*target, sz, "%s%s", name, sepp ? sepp : "");
+	}
+
+	*configp = name ? match : NULL;
+
+	return (name);
 }
 
 int
@@ -2308,14 +2268,15 @@ main(int argc, char **argv)
 {
 	int i, c;
 	struct rlimit rl = { 1024, 1024 };
-	spa_t *spa;
+	spa_t *spa = NULL;
 	objset_t *os = NULL;
 	char *endstr;
 	int dump_all = 1;
 	int verbose = 0;
 	int error;
-	int exported = 0;
-	char *vdev_dir = NULL;
+	char **searchdirs = NULL;
+	int nsearch = 0;
+	char *target;
 
 	(void) setrlimit(RLIMIT_NOFILE, &rl);
 	(void) enable_extended_FILE_stdio(-1, -1);
@@ -2339,6 +2300,7 @@ main(int argc, char **argv)
 			dump_all = 0;
 			break;
 		case 'L':
+		case 'e':
 			dump_opt[c]++;
 			break;
 		case 'v':
@@ -2347,11 +2309,20 @@ main(int argc, char **argv)
 		case 'U':
 			spa_config_path = optarg;
 			break;
-		case 'e':
-			exported = 1;
-			break;
 		case 'p':
-			vdev_dir = optarg;
+			if (searchdirs == NULL) {
+				searchdirs = umem_alloc(sizeof (char *),
+				    UMEM_NOFAIL);
+			} else {
+				char **tmp = umem_alloc((nsearch + 1) *
+				    sizeof (char *), UMEM_NOFAIL);
+				bcopy(searchdirs, tmp, nsearch *
+				    sizeof (char *));
+				umem_free(searchdirs,
+				    nsearch * sizeof (char *));
+				searchdirs = tmp;
+			}
+			searchdirs[nsearch++] = optarg;
 			break;
 		case 'S':
 			dump_opt[c]++;
@@ -2385,7 +2356,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	if (vdev_dir != NULL && exported == 0) {
+	if (!dump_opt['e'] && searchdirs != NULL) {
 		(void) fprintf(stderr, "-p option requires use of -e\n");
 		usage();
 	}
@@ -2395,7 +2366,7 @@ main(int argc, char **argv)
 	ASSERT(g_zfs != NULL);
 
 	for (c = 0; c < 256; c++) {
-		if (dump_all && c != 'l' && c != 'R')
+		if (dump_all && !strchr("elLR", c))
 			dump_opt[c] = 1;
 		if (dump_opt[c])
 			dump_opt[c] += verbose;
@@ -2405,7 +2376,7 @@ main(int argc, char **argv)
 	argv += optind;
 
 	if (argc < 1) {
-		if (dump_opt['C']) {
+		if (!dump_opt['e'] && dump_opt['C']) {
 			dump_cachefile(spa_config_path);
 			return (0);
 		}
@@ -2442,46 +2413,25 @@ main(int argc, char **argv)
 		dump_config(argv[0]);
 
 	error = 0;
-	if (exported) {
-		/*
-		 * Check to see if the name refers to an exported zpool
-		 */
-		char *slash;
-		nvlist_t *exported_conf = NULL;
+	target = argv[0];
 
-		if ((slash = strchr(argv[0], '/')) != NULL)
-			*slash = '\0';
+	if (dump_opt['e']) {
+		nvlist_t *cfg = NULL;
+		char *name = find_zpool(&target, &cfg, nsearch, searchdirs);
 
-		error = find_exported_zpool(argv[0], &exported_conf, vdev_dir);
-		if (error == 0) {
-			nvlist_t *nvl = NULL;
-
-			if (vdev_dir != NULL) {
-				if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
-					error = ENOMEM;
-				else if (nvlist_add_string(nvl,
-				    zpool_prop_to_name(ZPOOL_PROP_ALTROOT),
-				    vdev_dir) != 0)
-					error = ENOMEM;
-			}
-
-			if (error == 0)
-				error = spa_import_verbatim(argv[0],
-				    exported_conf, nvl);
-
-			nvlist_free(nvl);
+		error = ENOENT;
+		if (name) {
+			if ((error = spa_import(name, cfg, NULL)) != 0)
+				error = spa_import_verbatim(name, cfg, NULL);
 		}
-
-		if (slash != NULL)
-			*slash = '/';
 	}
 
 	if (error == 0) {
-		if (strchr(argv[0], '/') != NULL) {
-			error = dmu_objset_own(argv[0], DMU_OST_ANY,
+		if (strpbrk(target, "/@") != NULL) {
+			error = dmu_objset_own(target, DMU_OST_ANY,
 			    B_TRUE, FTAG, &os);
 		} else {
-			error = spa_open(argv[0], &spa, FTAG);
+			error = spa_open(target, &spa, FTAG);
 			if (error) {
 				/*
 				 * If we're missing the log device then
@@ -2489,7 +2439,7 @@ main(int argc, char **argv)
 				 * log state.
 				 */
 				mutex_enter(&spa_namespace_lock);
-				if ((spa = spa_lookup(argv[0])) != NULL &&
+				if ((spa = spa_lookup(target)) != NULL &&
 				    spa->spa_log_state == SPA_LOG_MISSING) {
 					spa->spa_log_state = SPA_LOG_CLEAR;
 					error = 0;
@@ -2497,13 +2447,13 @@ main(int argc, char **argv)
 				mutex_exit(&spa_namespace_lock);
 
 				if (!error)
-					error = spa_open(argv[0], &spa, FTAG);
+					error = spa_open(target, &spa, FTAG);
 			}
 		}
 	}
 
 	if (error)
-		fatal("can't open %s: %s", argv[0], strerror(error));
+		fatal("can't open '%s': %s", target, strerror(error));
 
 	argv++;
 	if (--argc > 0) {
