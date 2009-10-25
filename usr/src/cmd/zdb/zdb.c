@@ -98,10 +98,11 @@ usage(void)
 	    "Usage: %s [-CumdibcsvhL] [-S user:cksumalg] "
 	    "poolname [object...]\n"
 	    "       %s [-div] dataset [object...]\n"
+	    "       %s -m [-L] poolname [vdev [metaslab...]]\n"
 	    "       %s -R poolname vdev:offset:size[:flags]\n"
 	    "       %s -l device\n"
 	    "       %s -C\n\n",
-	    cmdname, cmdname, cmdname, cmdname, cmdname);
+	    cmdname, cmdname, cmdname, cmdname, cmdname, cmdname);
 
 	(void) fprintf(stderr, "    Dataset name must include at least one "
 	    "separator character '/' or '@'\n");
@@ -406,14 +407,14 @@ dump_spacemap(objset_t *os, space_map_obj_t *smo, space_map_t *sm)
 		VERIFY(0 == dmu_read(os, smo->smo_object, offset,
 		    sizeof (entry), &entry, DMU_READ_PREFETCH));
 		if (SM_DEBUG_DECODE(entry)) {
-			(void) printf("\t\t[%4llu] %s: txg %llu, pass %llu\n",
+			(void) printf("\t    [%6llu] %s: txg %llu, pass %llu\n",
 			    (u_longlong_t)(offset / sizeof (entry)),
 			    ddata[SM_DEBUG_ACTION_DECODE(entry)],
 			    (u_longlong_t)SM_DEBUG_TXG_DECODE(entry),
 			    (u_longlong_t)SM_DEBUG_SYNCPASS_DECODE(entry));
 		} else {
-			(void) printf("\t\t[%4llu]    %c  range:"
-			    " %08llx-%08llx  size: %06llx\n",
+			(void) printf("\t    [%6llu]    %c  range:"
+			    " %010llx-%010llx  size: %06llx\n",
 			    (u_longlong_t)(offset / sizeof (entry)),
 			    SM_TYPE_DECODE(entry) == SM_ALLOC ? 'A' : 'F',
 			    (u_longlong_t)((SM_OFFSET_DECODE(entry) <<
@@ -445,7 +446,7 @@ dump_metaslab_stats(metaslab_t *msp)
 
 	nicenum(space_map_maxsize(sm), maxbuf);
 
-	(void) printf("\t %20s %10lu   %7s  %6s   %4s %4d%%\n",
+	(void) printf("\t %25s %10lu   %7s  %6s   %4s %4d%%\n",
 	    "segments", avl_numnodes(t), "maxsize", maxbuf,
 	    "freepct", free_pct);
 }
@@ -461,11 +462,12 @@ dump_metaslab(metaslab_t *msp)
 	nicenum(msp->ms_map.sm_size - smo->smo_alloc, freebuf);
 
 	(void) printf(
-	    "\tvdev %5llu   offset %12llx   spacemap %6llu   free    %5s\n",
-	    (u_longlong_t)vd->vdev_id, (u_longlong_t)msp->ms_map.sm_start,
-	    (u_longlong_t)smo->smo_object, freebuf);
+	    "\tmetaslab %6llu   offset %12llx   spacemap %6llu   free    %5s\n",
+	    (u_longlong_t)(msp->ms_map.sm_start / msp->ms_map.sm_size),
+	    (u_longlong_t)msp->ms_map.sm_start, (u_longlong_t)smo->smo_object,
+	    freebuf);
 
-	if (dump_opt['m'] > 1) {
+	if (dump_opt['m'] > 1 && !dump_opt['L']) {
 		mutex_enter(&msp->ms_lock);
 		VERIFY(space_map_load(&msp->ms_map, zfs_metaslab_ops,
 		    SM_FREE, &msp->ms_smo, spa->spa_meta_objset) == 0);
@@ -481,26 +483,55 @@ dump_metaslab(metaslab_t *msp)
 		dump_spacemap(spa->spa_meta_objset, smo, &msp->ms_map);
 		mutex_exit(&msp->ms_lock);
 	}
+}
 
+static void
+print_vdev_metaslab_header(vdev_t *vd)
+{
+	(void) printf("\tvdev %10llu\n\t%-10s%5llu   %-19s   %-15s   %-10s\n",
+	    (u_longlong_t)vd->vdev_id,
+	    "metaslabs", (u_longlong_t)vd->vdev_ms_count,
+	    "offset", "spacemap", "free");
+	(void) printf("\t%15s   %19s   %15s   %10s\n",
+	    "---------------", "-------------------",
+	    "---------------", "-------------");
 }
 
 static void
 dump_metaslabs(spa_t *spa)
 {
-	vdev_t *rvd = spa->spa_root_vdev;
-	vdev_t *vd;
-	int c, m;
+	vdev_t *vd, *rvd = spa->spa_root_vdev;
+	uint64_t m, c = 0, children = rvd->vdev_children;
 
 	(void) printf("\nMetaslabs:\n");
 
-	for (c = 0; c < rvd->vdev_children; c++) {
-		vd = rvd->vdev_child[c];
+	if (!dump_opt['d'] && zopt_objects > 0) {
+		c = zopt_object[0];
 
-		(void) printf("\t%-10s   %-19s   %-15s   %-10s\n",
-		    "vdev", "offset", "spacemap", "free");
-		(void) printf("\t%10s   %19s   %15s   %10s\n",
-		    "----------", "-------------------",
-		    "---------------", "-------------");
+		if (c >= children)
+			(void) fatal("bad vdev id: %llu", (u_longlong_t)c);
+
+		if (zopt_objects > 1) {
+			vd = rvd->vdev_child[c];
+			print_vdev_metaslab_header(vd);
+
+			for (m = 1; m < zopt_objects; m++) {
+				if (zopt_object[m] < vd->vdev_ms_count)
+					dump_metaslab(
+					    vd->vdev_ms[zopt_object[m]]);
+				else
+					(void) fprintf(stderr, "bad metaslab "
+					    "number %llu\n",
+					    (u_longlong_t)zopt_object[m]);
+			}
+			(void) printf("\n");
+			return;
+		}
+		children = c + 1;
+	}
+	for (; c < children; c++) {
+		vd = rvd->vdev_child[c];
+		print_vdev_metaslab_header(vd);
 
 		for (m = 0; m < vd->vdev_ms_count; m++)
 			dump_metaslab(vd->vdev_ms[m]);
@@ -1875,21 +1906,19 @@ dump_zpool(spa_t *spa)
 	if (dump_opt['u'])
 		dump_uberblock(&spa->spa_uberblock);
 
-	if (dump_opt['d'] || dump_opt['i'] || dump_opt['m']) {
+	if (dump_opt['d'] > 2 || dump_opt['m'])
+		dump_metaslabs(spa);
+
+	if (dump_opt['d'] || dump_opt['i']) {
 		dump_dir(dp->dp_meta_objset);
 		if (dump_opt['d'] >= 3) {
 			dump_bplist(dp->dp_meta_objset,
 			    spa->spa_sync_bplist_obj, "Deferred frees");
 			dump_dtl(spa->spa_root_vdev, 0);
 		}
-
-		if (dump_opt['d'] >= 3 || dump_opt['m'])
-			dump_metaslabs(spa);
-
 		(void) dmu_objset_find(spa_name(spa), dump_one_dir,
 		    NULL, DS_FIND_SNAPSHOTS | DS_FIND_CHILDREN);
 	}
-
 	if (dump_opt['b'] || dump_opt['c'] || dump_opt['S'])
 		rc = dump_block_stats(spa);
 
@@ -2467,7 +2496,7 @@ main(int argc, char **argv)
 				errno = 0;
 				zopt_object[i] = strtoull(argv[i], NULL, 0);
 				if (zopt_object[i] == 0 && errno != 0)
-					fatal("bad object number %s: %s",
+					fatal("bad number %s: %s",
 					    argv[i], strerror(errno));
 			}
 		}
