@@ -594,7 +594,7 @@ zone_key_create(zone_key_t *keyp, void *(*create)(zoneid_t),
 	 * see it.
 	 */
 	mutex_enter(&zsd_key_lock);
-	*keyp = key = zsdp->zsd_key = ++zsd_keyval;
+	key = zsdp->zsd_key = ++zsd_keyval;
 	ASSERT(zsd_keyval != 0);
 	list_insert_tail(&zsd_registered_keys, zsdp);
 	mutex_exit(&zsd_key_lock);
@@ -646,6 +646,14 @@ zone_key_create(zone_key_t *keyp, void *(*create)(zoneid_t),
 		/* Now call the create callback for this key */
 		zsd_apply_all_zones(zsd_apply_create, key);
 	}
+	/*
+	* It is safe for consumers to use the key now, make it
+	* globally visible. Specifically zone_getspecific() will
+	* always successfully return the zone specific data associated
+	* with the key.
+	*/
+	*keyp = key;
+
 }
 
 /*
