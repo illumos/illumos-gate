@@ -55,6 +55,14 @@
 #undef verify
 #include <libzfs.h>
 
+#define	ZDB_COMPRESS_NAME(idx) ((idx) < ZIO_COMPRESS_FUNCTIONS ? \
+    zio_compress_table[(idx)].ci_name : "UNKNOWN")
+#define	ZDB_CHECKSUM_NAME(idx) ((idx) < ZIO_CHECKSUM_FUNCTIONS ? \
+    zio_checksum_table[(idx)].ci_name : "UNKNOWN")
+#define	ZDB_OT_NAME(idx) ((idx) < DMU_OT_NUMTYPES ? \
+    dmu_ot[(idx)].ot_name : "UNKNOWN")
+#define	ZDB_OT_TYPE(idx) ((idx) < DMU_OT_NUMTYPES ? (idx) : DMU_OT_NUMTYPES)
+
 const char cmdname[] = "zdb";
 uint8_t dump_opt[256];
 
@@ -269,6 +277,13 @@ dump_zap_stats(objset_t *os, uint64_t object)
 static void
 dump_none(objset_t *os, uint64_t object, void *data, size_t size)
 {
+}
+
+/*ARGSUSED*/
+static void
+dump_unknown(objset_t *os, uint64_t object, void *data, size_t size)
+{
+	(void) printf("\tUNKNOWN OBJECT TYPE\n");
 }
 
 /*ARGSUSED*/
@@ -1018,7 +1033,7 @@ dump_dmu_objset(objset_t *os, uint64_t object, void *data, size_t size)
 {
 }
 
-static object_viewer_t *object_viewer[DMU_OT_NUMTYPES] = {
+static object_viewer_t *object_viewer[DMU_OT_NUMTYPES + 1] = {
 	dump_none,		/* unallocated			*/
 	dump_zap,		/* object directory		*/
 	dump_uint64,		/* object array			*/
@@ -1061,6 +1076,7 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES] = {
 	dump_zap,		/* ZFS user/group used		*/
 	dump_zap,		/* ZFS user/group quota		*/
 	dump_zap,		/* snapshot refcount tags	*/
+	dump_unknown		/* Unknown type, must be last	*/
 };
 
 static void
@@ -1105,22 +1121,22 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 
 	if (doi.doi_checksum != ZIO_CHECKSUM_INHERIT || verbosity >= 6) {
 		(void) snprintf(aux + strlen(aux), sizeof (aux), " (K=%s)",
-		    zio_checksum_table[doi.doi_checksum].ci_name);
+		    ZDB_CHECKSUM_NAME(doi.doi_checksum));
 	}
 
 	if (doi.doi_compress != ZIO_COMPRESS_INHERIT || verbosity >= 6) {
 		(void) snprintf(aux + strlen(aux), sizeof (aux), " (Z=%s)",
-		    zio_compress_table[doi.doi_compress].ci_name);
+		    ZDB_COMPRESS_NAME(doi.doi_compress));
 	}
 
 	(void) printf("%10lld  %3u  %5s  %5s  %5s  %5s  %s%s\n",
 	    (u_longlong_t)object, doi.doi_indirection, iblk, dblk, lsize,
-	    asize, dmu_ot[doi.doi_type].ot_name, aux);
+	    asize, ZDB_OT_NAME(doi.doi_type), aux);
 
 	if (doi.doi_bonus_type != DMU_OT_NONE && verbosity > 3) {
 		(void) printf("%10s  %3s  %5s  %5s  %5s  %5s  %s\n",
 		    "", "", "", "", bonus_size, "bonus",
-		    dmu_ot[doi.doi_bonus_type].ot_name);
+		    ZDB_OT_NAME(doi.doi_bonus_type));
 	}
 
 	if (verbosity >= 4) {
@@ -1132,8 +1148,9 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 		(void) printf("\tdnode maxblkid: %llu\n",
 		    (longlong_t)dn->dn_phys->dn_maxblkid);
 
-		object_viewer[doi.doi_bonus_type](os, object, bonus, bsize);
-		object_viewer[doi.doi_type](os, object, NULL, 0);
+		object_viewer[ZDB_OT_TYPE(doi.doi_bonus_type)](os, object,
+		    bonus, bsize);
+		object_viewer[ZDB_OT_TYPE(doi.doi_type)](os, object, NULL, 0);
 		*print_header = 1;
 	}
 
@@ -1540,9 +1557,9 @@ zdb_count_block(spa_t *spa, zdb_cb_t *zcb, blkptr_t *bp, dmu_object_type_t type)
 			    (u_longlong_t)BP_GET_LEVEL(bp),
 			    (longlong_t)BP_GET_PSIZE(bp),
 			    (longlong_t)BP_GET_NDVAS(bp),
-			    dmu_ot[BP_GET_TYPE(bp)].ot_name,
-			    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name,
-			    zio_compress_table[BP_GET_COMPRESS(bp)].ci_name,
+			    ZDB_OT_NAME(BP_GET_TYPE(bp)),
+			    ZDB_CHECKSUM_NAME(BP_GET_CHECKSUM(bp)),
+			    ZDB_COMPRESS_NAME(BP_GET_COMPRESS(bp)),
 			    (u_longlong_t)bp->blk_cksum.zc_word[0],
 			    (u_longlong_t)bp->blk_cksum.zc_word[1],
 			    (u_longlong_t)bp->blk_cksum.zc_word[2],
@@ -1916,13 +1933,13 @@ zdb_print_blkptr(blkptr_t *bp, int flags)
 	    (longlong_t)BP_GET_LSIZE(bp), (longlong_t)BP_GET_PSIZE(bp));
 	(void) printf("\tENDIAN: %6s\t\t\t\t\tTYPE:  %s\n",
 	    BP_GET_BYTEORDER(bp) ? "LITTLE" : "BIG",
-	    dmu_ot[BP_GET_TYPE(bp)].ot_name);
+	    ZDB_OT_NAME(BP_GET_TYPE(bp)));
 	(void) printf("\tBIRTH:  %-16llx   LEVEL: %-2llu\tFILL:  %llx\n",
 	    (u_longlong_t)bp->blk_birth, (u_longlong_t)BP_GET_LEVEL(bp),
 	    (u_longlong_t)bp->blk_fill);
 	(void) printf("\tCKFUNC: %-16s\t\tCOMP:  %s\n",
-	    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name,
-	    zio_compress_table[BP_GET_COMPRESS(bp)].ci_name);
+	    ZDB_CHECKSUM_NAME(BP_GET_CHECKSUM(bp)),
+	    ZDB_COMPRESS_NAME(BP_GET_COMPRESS(bp)));
 	(void) printf("\tCKSUM:  %llx:%llx:%llx:%llx\n",
 	    (u_longlong_t)bp->blk_cksum.zc_word[0],
 	    (u_longlong_t)bp->blk_cksum.zc_word[1],

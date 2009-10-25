@@ -463,12 +463,15 @@ blkptr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    BP_GET_LSIZE(&bp), BP_GET_PSIZE(&bp));
 	mdb_printf("ENDIAN: %6s\t\t\t\t\tTYPE:  %s\n",
 	    BP_GET_BYTEORDER(&bp) ? "LITTLE" : "BIG",
-	    doti[BP_GET_TYPE(&bp)].ot_name);
+	    BP_GET_TYPE(&bp) < DMU_OT_NUMTYPES ?
+	    doti[BP_GET_TYPE(&bp)].ot_name : "UNKNOWN");
 	mdb_printf("BIRTH:  %-16llx   LEVEL: %-2d\tFILL:  %llx\n",
 	    bp.blk_birth, (int)BP_GET_LEVEL(&bp), bp.blk_fill);
 	mdb_printf("CKFUNC: %-16s\t\tCOMP:  %s\n",
-	    zci[BP_GET_CHECKSUM(&bp)].ci_name,
-	    zct[BP_GET_COMPRESS(&bp)].ci_name);
+	    BP_GET_CHECKSUM(&bp) < ZIO_CHECKSUM_FUNCTIONS ?
+	    zci[BP_GET_CHECKSUM(&bp)].ci_name : "UNKNOWN",
+	    BP_GET_COMPRESS(&bp) < ZIO_COMPRESS_FUNCTIONS ?
+	    zct[BP_GET_COMPRESS(&bp)].ci_name : "UNKNOWN");
 	mdb_printf("CKSUM:  %llx:%llx:%llx:%llx\n",
 	    bp.blk_cksum.zc_word[0],
 	    bp.blk_cksum.zc_word[1],

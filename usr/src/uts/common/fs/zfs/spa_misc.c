@@ -1117,7 +1117,8 @@ sprintf_blkptr(char *buf, int len, const blkptr_t *bp)
 
 	(void) snprintf(buf, len, "[L%llu %s] %llxL/%llxP ",
 	    (u_longlong_t)BP_GET_LEVEL(bp),
-	    dmu_ot[BP_GET_TYPE(bp)].ot_name,
+	    BP_GET_TYPE(bp) < DMU_OT_NUMTYPES ?
+	    dmu_ot[BP_GET_TYPE(bp)].ot_name : "UNKNOWN",
 	    (u_longlong_t)BP_GET_LSIZE(bp),
 	    (u_longlong_t)BP_GET_PSIZE(bp));
 
@@ -1132,8 +1133,10 @@ sprintf_blkptr(char *buf, int len, const blkptr_t *bp)
 
 	(void) snprintf(buf + strlen(buf), len - strlen(buf),
 	    "%s %s %s %s birth=%llu fill=%llu cksum=%llx:%llx:%llx:%llx",
-	    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name,
-	    zio_compress_table[BP_GET_COMPRESS(bp)].ci_name,
+	    BP_GET_CHECKSUM(bp) < ZIO_CHECKSUM_FUNCTIONS ?
+	    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name : "UNKNOWN",
+	    BP_GET_COMPRESS(bp) < ZIO_COMPRESS_FUNCTIONS ?
+	    zio_compress_table[BP_GET_COMPRESS(bp)].ci_name : "UNKNOWN",
 	    BP_GET_BYTEORDER(bp) == 0 ? "BE" : "LE",
 	    BP_IS_GANG(bp) ? "gang" : "contiguous",
 	    (u_longlong_t)bp->blk_birth,
