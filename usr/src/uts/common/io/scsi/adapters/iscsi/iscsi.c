@@ -2676,8 +2676,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		if (ddi_copyin((caddr_t)arg, &e, sizeof (e), mode)) {
 			rtn = EFAULT;
 			break;
-		} else if ((e.e_vers != ISCSI_INTERFACE_VERSION) ||
-		    (e.e_insize == 0)) {
+		} else if (e.e_vers != ISCSI_INTERFACE_VERSION) {
 			rtn = EINVAL;
 			break;
 		}
