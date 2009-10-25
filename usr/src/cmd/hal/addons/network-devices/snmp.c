@@ -1,11 +1,9 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -26,7 +24,7 @@
 #include "network-discovery.h"
 #include "printer.h"
 
-#define NP(x)   (x?x:"NULL")
+#define	NP(x)	(x?x:"NULL")
 
 static GList *new_addrs = NULL;
 
@@ -75,7 +73,7 @@ scan_for_devices_using_snmp(LibHalContext *ctx, char *parent, char *community,
 	GList *elem;
 
 	HAL_DEBUG(("scan_for_devices_using_snmp(0x%8.8x, %s, %s, %s)",
-			ctx, NP(parent), NP(community), NP(network)));
+	    ctx, NP(parent), NP(community), NP(network)));
 
 	init_snmp("snmp-scan");
 	init_mib();
@@ -111,7 +109,7 @@ scan_for_devices_using_snmp(LibHalContext *ctx, char *parent, char *community,
 		fds = select(fds, &fdset, NULL, NULL, block ? NULL : &timeout);
 		if (fds < 0) {
 			perror("select failed");
-			continue;
+			break;
 		} if (fds == 0) {
 			break;
 		} else {
