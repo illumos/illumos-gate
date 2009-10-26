@@ -369,7 +369,7 @@ zil_create(zilog_t *zilog)
 		}
 
 		error = zio_alloc_blk(zilog->zl_spa, ZIL_MIN_BLKSZ, &blk,
-		    NULL, txg, zilog->zl_logbias != ZFS_LOGBIAS_LATENCY);
+		    NULL, txg, zilog->zl_logbias == ZFS_LOGBIAS_LATENCY);
 
 		if (error == 0)
 			zil_init_log_chain(zilog, &blk);
@@ -756,6 +756,16 @@ zil_lwb_write_init(zilog_t *zilog, lwb_t *lwb)
 }
 
 /*
+ * Use the slog as long as the logbias is 'latency' and the current commit size
+ * is less than the limit or the total list size is less than 2X the limit.
+ * Limit checking is disabled by setting zil_slog_limit to UINT64_MAX.
+ */
+uint64_t zil_slog_limit = 1024 * 1024;
+#define	USE_SLOG(zilog) (((zilog)->zl_logbias == ZFS_LOGBIAS_LATENCY) && \
+	(((zilog)->zl_cur_used < zil_slog_limit) || \
+	((zilog)->zl_itx_list_sz < (zil_slog_limit << 1))))
+
+/*
  * Start a log block write and advance to the next log block.
  * Calls are serialized.
  */
@@ -797,7 +807,7 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 	BP_ZERO(bp);
 	/* pass the old blkptr in order to spread log blocks across devs */
 	error = zio_alloc_blk(spa, zil_blksz, bp, &lwb->lwb_blk, txg,
-	    zilog->zl_logbias != ZFS_LOGBIAS_LATENCY);
+	    USE_SLOG(zilog));
 	if (error) {
 		dmu_tx_t *tx = dmu_tx_create_assigned(zilog->zl_dmu_pool, txg);
 
@@ -1042,7 +1052,7 @@ zil_clean(zilog_t *zilog)
 	if ((itx != NULL) &&
 	    (itx->itx_lr.lrc_txg <= spa_last_synced_txg(zilog->zl_spa))) {
 		(void) taskq_dispatch(zilog->zl_clean_taskq,
-		    (task_func_t *)zil_itx_clean, zilog, TQ_SLEEP);
+		    (task_func_t *)zil_itx_clean, zilog, TQ_NOSLEEP);
 	}
 	mutex_exit(&zilog->zl_lock);
 }

@@ -418,7 +418,7 @@ extern zio_t *zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset,
     boolean_t labels);
 
 extern int zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *new_bp,
-    blkptr_t *old_bp, uint64_t txg, boolean_t bypass_slog);
+    blkptr_t *old_bp, uint64_t txg, boolean_t use_slog);
 extern void zio_free_blk(spa_t *spa, blkptr_t *bp, uint64_t txg);
 extern void zio_flush(zio_t *zio, vdev_t *vd);
 
