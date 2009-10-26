@@ -80,10 +80,10 @@ uint32_t retire_failures = 0;
 int	inject_anonymous_tag_error = 0;
 int32_t last_error_injected_way = 0;
 uint8_t last_error_injected_bit = 0;
-extern int32_t last_l3tag_error_injected_way;
-extern uint8_t last_l3tag_error_injected_bit;
-extern int32_t last_l2tag_error_injected_way;
-extern uint8_t last_l2tag_error_injected_bit;
+int32_t last_l3tag_error_injected_way;
+uint8_t last_l3tag_error_injected_bit;
+int32_t last_l2tag_error_injected_way;
+uint8_t last_l2tag_error_injected_bit;
 #endif
 
 /* dev_ops and cb_ops entry point function declarations */
