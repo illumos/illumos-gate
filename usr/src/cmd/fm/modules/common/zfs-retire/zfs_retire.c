@@ -335,7 +335,7 @@ zfs_vdev_repair(fmd_hdl_t *hdl, nvlist_t *nvl)
 
 		thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
 		if (topo_fmri_nvl2str(thp, asru, &fmri, &err) == 0)
-			fmd_repair_asru(hdl, fmri);
+			(void) fmd_repair_asru(hdl, fmri);
 		fmd_hdl_topo_rele(hdl, thp);
 
 		topo_hdl_strfree(thp, fmri);
