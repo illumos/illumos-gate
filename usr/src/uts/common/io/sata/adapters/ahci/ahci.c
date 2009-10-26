@@ -4760,8 +4760,6 @@ ahci_software_reset(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 	    "port_cmd_issue = 0x%x, slot = 0x%x",
 	    loop_count, port_cmd_issue, slot);
 
-	CLEAR_BIT(ahci_portp->ahciport_pending_tags, slot);
-
 	rval = AHCI_SUCCESS;
 out:
 	AHCIDBG(AHCIDBG_ERRS, ahci_ctlp,
