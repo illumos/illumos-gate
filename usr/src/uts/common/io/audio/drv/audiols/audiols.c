@@ -743,6 +743,17 @@ audigyls_setup_intrs(audigyls_dev_t *dev)
 }
 
 void
+audigyls_del_controls(audigyls_dev_t *dev)
+{
+	for (int i = 0; i < CTL_NUM; i++) {
+		if (dev->controls[i].ctrl) {
+			audio_dev_del_control(dev->controls[i].ctrl);
+			dev->controls[i].ctrl = NULL;
+		}
+	}
+}
+
+void
 audigyls_destroy(audigyls_dev_t *dev)
 {
 	if (dev->ih != NULL) {
@@ -780,6 +791,9 @@ audigyls_destroy(audigyls_dev_t *dev)
 	if (dev->ac97 != NULL) {
 		ac97_free(dev->ac97);
 	}
+
+	audigyls_del_controls(dev);
+
 	if (dev->adev != NULL) {
 		audio_dev_free(dev->adev);
 	}
@@ -958,8 +972,6 @@ static void
 audigyls_configure_mixer(audigyls_dev_t *dev)
 {
 	unsigned int	r, v1, v2;
-
-	ASSERT(mutex_owned(&dev->mutex));
 
 	/* output items */
 	/* front */
