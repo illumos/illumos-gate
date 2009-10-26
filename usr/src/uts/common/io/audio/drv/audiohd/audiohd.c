@@ -5760,6 +5760,7 @@ audiohd_suspend(audiohd_state_t *statep)
 	/* Disable h/w */
 	audiohd_disable_intr(statep);
 	audiohd_stop_dma(statep);
+	audiohd_fini_pci(statep);
 	mutex_exit(&statep->hda_mutex);
 
 	return (DDI_SUCCESS);
