@@ -180,7 +180,7 @@ vendorvrfy(struct devicelist *devicenode)
 			if (resp != 'Y' && resp != 'y') {
 				free(vps);
 				logmsg(MSG_ERROR, gettext("Not proceeding with "
-				    "flash operation of %s on %s"),
+				    "flash operation of %s on %s\n"),
 				    verifier->imgfile, devicenode->drvname);
 				return (FWFLASH_FAILURE);
 			}

@@ -50,7 +50,7 @@
 
 #if !defined(lint)
 /* embedded software license agreement */
-static char *sla [] = { "Copyright 2007 Sun Microsystems, Inc., 4150 Network "
+static char *sla [] = { "Copyright 2009 Sun Microsystems, Inc., 4150 Network "
 "Circle, Santa Clara, California 95054, U.S.A. All rights reserved. U.S. "
 "Government Rights - Commercial software.  Government users are subject to the "
 "Sun Microsystems, Inc. standard license agreement and applicable provisions "
@@ -92,7 +92,7 @@ static int fwflash_in_write = 0;
  * actually of any use - it doesn't line up with Mercurial's
  * concept of the changeset.
  */
-#define	FWFLASH_VERSION		"v1.8"
+#define	FWFLASH_VERSION		"v1.9"
 #define	FWFLASH_PROG_NAME	"fwflash"
 
 static int get_fileopts(char *options);

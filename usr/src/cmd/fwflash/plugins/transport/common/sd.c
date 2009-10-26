@@ -286,8 +286,7 @@ fw_identify(int start)
 			logmsg(MSG_INFO, "unable to get device path for "
 			    "current node with errno %d\n", errno);
 			continue;
-		};
-
+		}
 		/*
 		 * We check if this is removable device, in which case
 		 * we really aren't interested, so exit stage left
