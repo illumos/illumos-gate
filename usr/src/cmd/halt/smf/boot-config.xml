@@ -107,6 +107,7 @@
 			<value_node value='VirtualBox' />
 			<value_node value='VMware Virtual Platform' />
 			<value_node value='MCP55' />
+			<value_node value='Precision WorkStation 650    ' />
 		    </astring_list>
 		</property>
 	</property_group>
