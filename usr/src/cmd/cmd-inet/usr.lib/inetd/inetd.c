@@ -728,6 +728,18 @@ create_bound_socket(const instance_t *inst, socket_info_t *sock_info)
 		(void) close(fd);
 		return (-1);
 	}
+	if (inst->config->basic->do_tcp_keepalive &&
+	    !inst->config->basic->iswait && !inst->config->basic->istlx) {
+		/* set the keepalive option */
+		if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &on,
+		    sizeof (on)) == -1) {
+			error_msg(gettext("setsockopt SO_KEEPALIVE failed for "
+			    "service instance %s, proto %s: %s"), fmri,
+			    proto, strerror(errno));
+			(void) close(fd);
+			return (-1);
+		}
+	}
 	if (sock_info->pr_info.v6only) {
 		/* restrict socket to IPv6 communications only */
 		if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &on,

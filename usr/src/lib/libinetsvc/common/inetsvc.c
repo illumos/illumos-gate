@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This library contains a set of routines that are shared amongst inetd,
@@ -103,6 +101,8 @@ static inetd_prop_t inetd_properties[] = {
 	{PR_DO_TCP_WRAPPERS_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_BOOLEAN,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
 	{PR_CONNECTION_BACKLOG_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
+	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
+	{PR_DO_TCP_KEEPALIVE_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_BOOLEAN,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
 	{NULL},
 };

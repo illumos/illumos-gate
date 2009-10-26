@@ -138,6 +138,7 @@
 		<propval name='failrate_cnt' type='integer' value='40' />
 		<propval name='failrate_interval' type='integer' value='60' />
 		<propval name='inherit_env' type='boolean' value='true' />
+		<propval name='tcp_keepalive' type='boolean' value='false' />
 		<propval name='tcp_trace' type='boolean' value='false' />
 		<propval name='tcp_wrappers' type='boolean' value='false' />
 		<propval name='bind_addr' type='astring' value='' />
@@ -401,6 +402,15 @@ Copies limiting is disabled.
 						</description>
 					</value>
 				</values>
+			</prop_pattern>
+			<prop_pattern name='tcp_keepalive' type='boolean'
+			    required='true'>
+				<description>
+					<loctext xml:lang='C'>
+If true, enables periodic transmission of messages for nowait stream services.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
 			</prop_pattern>
 			<prop_pattern name='tcp_trace' type='boolean'
 			    required='true'>
@@ -728,6 +738,15 @@ Lowest supported RPC version.  Required when isrpc is set to true.
 				<description>
 					<loctext xml:lang='C'>
 Highest supported RPC version.  Required when isrpc is set to true.
+					</loctext>
+				</description>
+				<cardinality min='1' max='1' />
+			</prop_pattern>
+			<prop_pattern name='tcp_keepalive' type='boolean'
+			    required='false'>
+				<description>
+					<loctext xml:lang='C'>
+If true, enables periodic transmission of messages for nowait stream services.
 					</loctext>
 				</description>
 				<cardinality min='1' max='1' />

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _INETSVC_H
 #define	_INETSVC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libscf.h>
 #include <sys/socket.h>
@@ -68,6 +66,7 @@ extern "C" {
 #define	PR_INHERIT_ENV_NAME		"inherit_env"
 #define	PR_DO_TCP_WRAPPERS_NAME		"tcp_wrappers"
 #define	PR_DO_TCP_TRACE_NAME		"tcp_trace"
+#define	PR_DO_TCP_KEEPALIVE_NAME	"tcp_keepalive"
 #define	PR_AUTO_CONVERTED_NAME		"converted"
 #define	PR_VERSION_NAME			"version"
 #define	PR_SOURCE_LINE_NAME		"source_line"
@@ -99,6 +98,7 @@ extern "C" {
 #define	PT_DO_TCP_TRACE_INDEX		19
 #define	PT_DO_TCP_WRAPPERS_INDEX	20
 #define	PT_CONNECTION_BACKLOG_INDEX	21
+#define	PT_DO_TCP_KEEPALIVE_INDEX	22
 
 /*
  * Names of method properties.
@@ -254,6 +254,7 @@ typedef struct {
 
 	boolean_t	do_tcp_wrappers;
 	boolean_t	do_tcp_trace;
+	boolean_t	do_tcp_keepalive;
 
 	/* inherit inetd's environment, or take an empty one */
 	boolean_t	inherit_env;

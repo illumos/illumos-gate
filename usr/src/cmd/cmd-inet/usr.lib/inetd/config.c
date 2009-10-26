@@ -315,6 +315,8 @@ populate_defaults(inetd_prop_t *bprops, basic_cfg_t *cfg)
 	    PR_DO_TCP_WRAPPERS_NAME);
 	cfg->do_tcp_trace = get_prop_value_boolean(bprops,
 	    PR_DO_TCP_TRACE_NAME);
+	cfg->do_tcp_keepalive = get_prop_value_boolean(bprops,
+	    PR_DO_TCP_KEEPALIVE_NAME);
 	cfg->inherit_env = get_prop_value_boolean(bprops, PR_INHERIT_ENV_NAME);
 	cfg->wait_fail_cnt = get_prop_value_int(bprops,
 	    PR_MAX_FAIL_RATE_CNT_NAME);
