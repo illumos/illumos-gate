@@ -723,7 +723,8 @@ channel_pre_open(Channel *c, fd_set * readset, fd_set * writeset)
 
 	if (c->istate == CHAN_INPUT_OPEN &&
 	    limit > 0 &&
-	    buffer_len(&c->input) < limit)
+	    buffer_len(&c->input) < limit &&
+	    buffer_check_alloc(&c->input, CHAN_RBUF))
 		FD_SET(c->rfd, readset);
 	if (c->ostate == CHAN_OUTPUT_OPEN ||
 	    c->ostate == CHAN_OUTPUT_WAIT_DRAIN) {
@@ -1383,7 +1384,7 @@ channel_post_connecting(Channel *c, fd_set * readset, fd_set * writeset)
 static int
 channel_handle_rfd(Channel *c, fd_set * readset, fd_set * writeset)
 {
-	char buf[16*1024];
+	char buf[CHAN_RBUF];
 	int len;
 
 	if (c->rfd != -1 &&
@@ -1477,7 +1478,7 @@ channel_handle_wfd(Channel *c, fd_set * readset, fd_set * writeset)
 static int
 channel_handle_efd(Channel *c, fd_set * readset, fd_set * writeset)
 {
-	char buf[16*1024];
+	char buf[CHAN_RBUF];
 	int len;
 
 /** XXX handle drain efd, too */

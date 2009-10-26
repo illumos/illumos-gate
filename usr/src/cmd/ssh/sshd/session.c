@@ -462,20 +462,12 @@ do_exec_no_pty(Session *s, const char *command)
 {
 	pid_t pid;
 
-#ifdef USE_PIPES
-	int pin[2], pout[2], perr[2];
-	/* Allocate pipes for communicating with the program. */
-	if (pipe(pin) < 0 || pipe(pout) < 0 || pipe(perr) < 0)
-		packet_disconnect("Could not create pipes: %.100s",
-				  strerror(errno));
-#else /* USE_PIPES */
 	int inout[2], err[2];
 	/* Uses socket pairs to communicate with the program. */
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, inout) < 0 ||
 	    socketpair(AF_UNIX, SOCK_STREAM, 0, err) < 0)
 		packet_disconnect("Could not create socket pairs: %.100s",
 				  strerror(errno));
-#endif /* USE_PIPES */
 	if (s == NULL)
 		fatal("do_exec_no_pty: no session");
 
@@ -495,28 +487,6 @@ do_exec_no_pty(Session *s, const char *command)
 		if (setsid() < 0)
 			error("setsid failed: %.100s", strerror(errno));
 
-#ifdef USE_PIPES
-		/*
-		 * Redirect stdin.  We close the parent side of the socket
-		 * pair, and make the child side the standard input.
-		 */
-		close(pin[1]);
-		if (dup2(pin[0], 0) < 0)
-			perror("dup2 stdin");
-		close(pin[0]);
-
-		/* Redirect stdout. */
-		close(pout[0]);
-		if (dup2(pout[1], 1) < 0)
-			perror("dup2 stdout");
-		close(pout[1]);
-
-		/* Redirect stderr. */
-		close(perr[0]);
-		if (dup2(perr[1], 2) < 0)
-			perror("dup2 stderr");
-		close(perr[1]);
-#else /* USE_PIPES */
 		/*
 		 * Redirect stdin, stdout, and stderr.  Stdin and stdout will
 		 * use the same socket, as some programs (particularly rdist)
@@ -528,9 +498,18 @@ do_exec_no_pty(Session *s, const char *command)
 			perror("dup2 stdin");
 		if (dup2(inout[0], 1) < 0)	/* stdout.  Note: same socket as stdin. */
 			perror("dup2 stdout");
+		if (s->is_subsystem) {
+			/*
+			 * Redirect the subsystem's stderr to /dev/null. We might send it
+			 * over to the other side but changing that might break existing
+			 * SSH clients.
+			 */
+			close(err[0]);
+			if ((err[0] = open(_PATH_DEVNULL, O_WRONLY)) == -1)
+				fatal("Cannot open /dev/null: %.100s", strerror(errno));
+		} 
 		if (dup2(err[0], 2) < 0)	/* stderr */
 			perror("dup2 stderr");
-#endif /* USE_PIPES */
 
 #ifdef _UNICOS
 		cray_init_job(s->pw); /* set up cray jid and tmpdir */
@@ -553,24 +532,7 @@ do_exec_no_pty(Session *s, const char *command)
 	s->pid = pid;
 	/* Set interactive/non-interactive mode. */
 	packet_set_interactive(s->display != NULL);
-#ifdef USE_PIPES
-	/* We are the parent.  Close the child sides of the pipes. */
-	close(pin[0]);
-	close(pout[1]);
-	close(perr[1]);
 
-	if (compat20) {
-		session_set_fds(s, pin[1], pout[0], s->is_subsystem ? -1 : perr[0]);
-		if (s->is_subsystem)
-                        close(perr[0]);
-		/* Don't close channel before sending exit-status! */
-		channel_set_wait_for_exit(s->chanid, 1);
-	} else {
-		/* Enter the interactive session. */
-		server_loop(pid, pin[1], pout[0], perr[0]);
-		/* server_loop has closed pin[1], pout[0], and perr[0]. */
-	}
-#else /* USE_PIPES */
 	/* We are the parent.  Close the child sides of the socket pairs. */
 	close(inout[0]);
 	close(err[0]);
@@ -589,7 +551,6 @@ do_exec_no_pty(Session *s, const char *command)
 		server_loop(pid, inout[1], inout[1], err[1]);
 		/* server_loop has closed inout[1] and err[1]. */
 	}
-#endif /* USE_PIPES */
 }
 
 /*

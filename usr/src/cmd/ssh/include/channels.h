@@ -33,7 +33,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	$OpenBSD: channels.h,v 1.70 2002/06/24 14:33:27 markus Exp $	*/
@@ -41,8 +41,6 @@
 
 #ifndef	_CHANNELS_H
 #define	_CHANNELS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -153,6 +151,8 @@ struct Channel {
 #define CHAN_CLOSE_RCVD			0x02
 #define CHAN_EOF_SENT			0x04
 #define CHAN_EOF_RCVD			0x08
+
+#define CHAN_RBUF			16*1024
 
 /* check whether 'efd' is still in use */
 #define CHANNEL_EFD_INPUT_ACTIVE(c) \

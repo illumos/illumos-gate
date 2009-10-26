@@ -22,14 +22,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DEFINES_H
 #define	_DEFINES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -535,15 +533,6 @@ typedef unsigned long int fd_mask;
 #elif !defined(HAVE___func__)
 #define	__func__ ""
 #endif
-
-/*
- * Define this to use pipes instead of socketpairs for communicating with the
- * client program.  Socketpairs do not seem to work on all systems.
- *
- * configure.ac sets this for a few OS's which are known to have problems
- * but you may need to set it yourself
- */
-/* #define	USE_PIPES 1 */
 
 /*
  * login recorder definitions

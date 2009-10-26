@@ -1473,23 +1473,12 @@ connect_to_server(char *path, char **args, int *in, int *out)
 {
 	int c_in, c_out;
 
-#ifdef USE_PIPES
-	int pin[2], pout[2];
-
-	if ((pipe(pin) == -1) || (pipe(pout) == -1))
-		fatal("pipe: %s", strerror(errno));
-	*in = pin[0];
-	*out = pout[1];
-	c_in = pout[0];
-	c_out = pin[1];
-#else /* USE_PIPES */
 	int inout[2];
 
 	if (socketpair(AF_UNIX, SOCK_STREAM, 0, inout) == -1)
 		fatal("socketpair: %s", strerror(errno));
 	*in = *out = inout[0];
 	c_in = c_out = inout[1];
-#endif /* USE_PIPES */
 
 	if ((sshpid = fork()) == -1)
 		fatal("fork: %s", strerror(errno));
@@ -1684,10 +1673,8 @@ main(int argc, char **argv)
 
 	err = interactive_loop(in, out, file1, file2);
 
-#if !defined(USE_PIPES)
 	shutdown(in, SHUT_RDWR);
 	shutdown(out, SHUT_RDWR);
-#endif
 
 	close(in);
 	close(out);
