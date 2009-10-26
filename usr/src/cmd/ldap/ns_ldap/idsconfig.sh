@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# idsconfig -- script to setup iDS 5.x/6.x for Native LDAP II.
+# idsconfig -- script to setup iDS 5.x/6.x/7.x for Native LDAP II.
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -61,7 +61,7 @@ Note: idsconfig has created entries for VLV indexes.
       to stop the server.  Then, using directoryserver, follow the
       directoryserver examples below to create the actual VLV indexes.
 
-      For DS6.x, use dsadm command delivered with DS6.x on ${IDS_SERVER}
+      For DS6.x or later, use dsadm command delivered with DS on ${IDS_SERVER}
       to stop the server.  Then, using dsadm, follow the
       dsadm examples below to create the actual VLV indexes.
 
@@ -73,8 +73,6 @@ The following are the supported credential levels:
   2  proxy
   3  proxy anonymous
   4  self
-  5  self proxy
-  6  self proxy anonymous
 EOF
     ;;
     auth_method_menu) cat <<EOF
@@ -1075,8 +1073,8 @@ init()
     SSD_FILE=${TMPDIR}/ssd_list
 
     # GSSAPI setup
+    GSSAPI_ENABLE=0
     LDAP_KRB_REALM=""
-    LDAP_GSSAPI_PROFILE=""
     SCHEMA_UPDATED=0
     
     export DEBUG VERB ECHO EVAL EGREP GREP STEP TMPDIR
@@ -1092,7 +1090,7 @@ init()
     export NEED_SRVAUTH_PAM NEED_SRVAUTH_KEY NEED_SRVAUTH_CMD
     export LDAP_SRV_AUTHMETHOD_PAM LDAP_SRV_AUTHMETHOD_KEY LDAP_SRV_AUTHMETHOD_CMD
     export LDAP_SERV_SRCH_DES SSD_FILE
-    export GEN_CMD LDAP_KRB_REALM LDAP_GSSAPI_PROFILE SCHEMA_UPDATED
+    export GEN_CMD GSSAPI_ENABLE LDAP_KRB_REALM SCHEMA_UPDATED
 }
 
 
@@ -1269,10 +1267,11 @@ chk_ids_version()
     IDS_VER=`cat ${TMPDIR}/checkDSver`
     IDS_MAJVER=`${ECHO} ${IDS_VER} | cut -f1 -d.`
     IDS_MINVER=`${ECHO} ${IDS_VER} | cut -f2 -d.`
-    if [ "${IDS_MAJVER}" != "5" ] && [ "${IDS_MAJVER}" != "6" ]; then
-	${ECHO} "ERROR: $PROG only works with JES DS version 5.x and 6.x, not ${IDS_VER}."
-    	exit 1
-    fi
+    case "${IDS_MAJVER}" in
+        5|6|7)  : ;;
+        *)   ${ECHO} "ERROR: $PROG only works with JES DS version 5.x, 6.x or 7.x, not ${IDS_VER}."; exit 1;;
+    esac
+
     if [ $DEBUG -eq 1 ]; then
 	${ECHO} "  IDS_MAJVER = $IDS_MAJVER"
 	${ECHO} "  IDS_MINVER = $IDS_MINVER"
@@ -1607,85 +1606,15 @@ search_update_schema() {
 }
 
 #
-# $1: 1 - interactive, 0 - no
-#
-create_gssapi_profile() {
-
-
-    if [ ${1} -eq 1 ]; then
-        echo
-        echo "You can create a sasl/GSSAPI enabled profile with default values now."
-        get_confirm "Do you want to create a sasl/GSSAPI default profile ?" "n"
-
-        if [ $? -eq 0 ]; then
-	    return
-        fi
-    fi
-
-    # Add profile container if it does not exist
-    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"ou=profile,${LDAP_BASEDN}\" -s base \"objectclass=*\" > /dev/null 2>&1"
-    if [ $? -ne 0 ]; then
-	( cat << EOF
-dn: ou=profile,${LDAP_BASEDN}
-ou: profile
-objectClass: top
-objectClass: organizationalUnit
-EOF
-) > ${TMPDIR}/profile_people.ldif
-
-        add_entry_by_DN "ou=profile,${LDAP_BASEDN}" "${TMPDIR}/profile_people.ldif"
-
-    fi
-
-    search_update_schema "objectclass" "DUAConfigProfile"
-
-    _P_NAME="gssapi_${LDAP_KRB_REALM}"
-    if [ ${1} -eq 1 ]; then
-    	_P_TMP=${LDAP_PROFILE_NAME}
-    	LDAP_PROFILE_NAME=${_P_NAME}
-   	get_profile_name
-        LDAP_GSSAPI_PROFILE=${LDAP_PROFILE_NAME}
-    	LDAP_PROFILE_NAME=${_P_TMP}
-    fi
-
-    _P_DN="cn=${LDAP_GSSAPI_PROFILE},ou=profile,${LDAP_BASEDN}"
-    if [ ${DEL_OLD_PROFILE} -eq 1 ]; then
-	    DEL_OLD_PROFILE=0
-	    ${EVAL} "${LDAPDELETE} ${LDAP_ARGS} ${_P_DN} ${VERB}"
-    fi
-
-    _SVR=`getent hosts ${IDS_SERVER} | ${NAWK} '{ print $1 }'`
-    if [ ${IDS_PORT} -ne 389 ]; then
-	    _SVR="${_SVR}:${IDS_PORT}"
-    fi
-
-    (cat << EOF
-dn: ${_P_DN}
-objectClass: top
-objectClass: DUAConfigProfile
-defaultServerList: ${_SVR}
-defaultSearchBase: ${LDAP_BASEDN}
-authenticationMethod: sasl/GSSAPI
-followReferrals: ${LDAP_FOLLOWREF}
-defaultSearchScope: ${LDAP_SEARCH_SCOPE}
-searchTimeLimit: ${LDAP_SEARCH_TIME_LIMIT}
-profileTTL: ${LDAP_PROFILE_TTL}
-cn: ${LDAP_GSSAPI_PROFILE}
-credentialLevel: self
-bindTimeLimit: ${LDAP_BIND_LIMIT}
-EOF
-) > ${TMPDIR}/gssapi_profile.ldif
-
-    add_entry_by_DN "${_P_DN}" "${TMPDIR}/gssapi_profile.ldif"
-
-}
-#
 # Set up GSSAPI if necessary
 #
 gssapi_setup() {
 
+	GSSAPI_ENABLE=0
+
 	# assume sasl/GSSAPI is supported by the ldap server and may be used
 	GSSAPI_AUTH_MAY_BE_USED=1
+
 	${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"\" -s base \"objectclass=*\" supportedSASLMechanisms | ${GREP} GSSAPI ${VERB}"
 	if [ $? -ne 0 ]; then
 		GSSAPI_AUTH_MAY_BE_USED=0
@@ -1695,59 +1624,17 @@ gssapi_setup() {
 
 	get_confirm "GSSAPI is supported. Do you want to set up gssapi:(y/n)" "n"
 	if [ $? -eq 0 ]; then
+		GSSAPI_ENABLE=0
 		${ECHO}
 		${ECHO} "GSSAPI is not set up."
 		${ECHO} "sasl/GSSAPI bind may not work if it's not set up first."
 	else
+		GSSAPI_ENABLE=1
 		get_krb_realm
-		add_id_mapping_rules
-		modify_userpassword_acl_for_gssapi
-		create_gssapi_profile 1
-		${ECHO}
-		${ECHO} "GSSAPI setup is done."
-	fi
-
-	cat << EOF
-
-You can continue to create a profile and
-configure the LDAP server.
-Or you can stop now.
-
-EOF
-	get_confirm "Do you want to stop:(y/n)" "n"
-	if [ $? -eq 1 ]; then
-		cleanup
-		exit
 	fi
 
 }
-gssapi_setup_auto() {
-	GSSAPI_AUTH_MAY_BE_USED=0
-	${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"\" -s base \"objectclass=*\" supportedSASLMechanisms | ${GREP} GSSAPI ${VERB}"
-	if [ $? -ne 0 ]; then
-		${ECHO}
-		${ECHO} "sasl/GSSAPI is not supported by this LDAP server"
-		${ECHO}
-		return
-	fi
-	if [ -z "${LDAP_KRB_REALM}" ]; then
-		${ECHO}
-		${ECHO} "LDAP_KRB_REALM is not set. Skip gssapi setup."
-		${ECHO} "sasl/GSSAPI bind won't work properly."
-		${ECHO}
-		return
-	fi
-	GSSAPI_AUTH_MAY_BE_USED=1
-	if [ -z "${LDAP_GSSAPI_PROFILE}" ]; then
-		${ECHO}
-		${ECHO} "LDAP_GSSAPI_PROFILE is not set. Default is gssapi_${LDAP_KRB_REALM}"
-		${ECHO}
-		LDAP_GSSAPI_PROFILE="gssapi_${LDAP_KRB_REALM}"
-	fi
-	add_id_mapping_rules
-	modify_userpassword_acl_for_gssapi
-	create_gssapi_profile 0
-}
+#
 # get_profile_name(): Enter the profile name.
 #
 get_profile_name()
@@ -1895,6 +1782,9 @@ get_cred_level()
     display_msg cred_level_menu
     while :
     do
+	if [ $GSSAPI_ENABLE -eq 1 ]; then
+	    ${ECHO} '"self" is needed for GSSAPI profile'
+	fi
 	get_ans "Choose Credential level [h=help]:" "1"
 	_MENU_CHOICE=$ANS
 	case "$_MENU_CHOICE" in
@@ -1905,16 +1795,9 @@ get_cred_level()
 	    3) LDAP_CRED_LEVEL="proxy anonymous"
 	       return 3 ;;
 	    4) LDAP_CRED_LEVEL="self"
-	       SELF_GSSAPI=1
 	       return 4 ;;
-	    5) LDAP_CRED_LEVEL="self proxy"
-	       SELF_GSSAPI=1
-	       return 5 ;;
-	    6) LDAP_CRED_LEVEL="self proxy anonymous"
-	       SELF_GSSAPI=1
-	       return 6 ;;
 	    h) display_msg cred_lvl_help ;;
-	    *) ${ECHO} "Please enter 1, 2, 3, 4, 5 or 6." ;;
+	    *) ${ECHO} "Please enter 1, 2, 3 or 4." ;;
 	esac
     done
 }
@@ -1971,6 +1854,9 @@ auth_menu_handler()
     # Get a Valid choice.
     while :
     do
+	if [ $GSSAPI_ENABLE -eq 1 ]; then
+	    ${ECHO} '"sasl/GSSAPI" is needed for GSSAPI profile'
+	fi
 	# Display appropriate prompt and get answer.
 	if [ $_FIRST -eq 1 ]; then
 	    get_ans "Choose Authentication Method (h=help):" "1"
@@ -3033,8 +2919,8 @@ LDAP_ROOTDN="$LDAP_ROOTDN"
 LDAP_ROOTPWD=$LDAP_ROOTPWD
 LDAP_DOMAIN="$LDAP_DOMAIN"
 LDAP_SUFFIX="$LDAP_SUFFIX"
+GSSAPI_ENABLE=$GSSAPI_ENABLE
 LDAP_KRB_REALM="$LDAP_KRB_REALM"
-LDAP_GSSAPI_PROFILE="$LDAP_GSSAPI_PROFILE"
 
 # Internal program variables that need to be set.
 NEED_PROXY=$NEED_PROXY
@@ -3085,7 +2971,7 @@ export LDAP_AUTHMETHOD LDAP_FOLLOWREF LDAP_SEARCH_SCOPE LDAP_SEARCH_TIME_LIMIT
 export LDAP_PREF_SRVLIST LDAP_PROFILE_TTL LDAP_CRED_LEVEL LDAP_BIND_LIMIT
 export NEED_SRVAUTH_PAM NEED_SRVAUTH_KEY NEED_SRVAUTH_CMD
 export LDAP_SRV_AUTHMETHOD_PAM LDAP_SRV_AUTHMETHOD_KEY LDAP_SRV_AUTHMETHOD_CMD
-export LDAP_SERV_SRCH_DES SSD_FILE LDAP_KRB_REALM LDAP_GSSAPI_PROFILE
+export LDAP_SERV_SRCH_DES SSD_FILE GSSAPI_ENABLE LDAP_KRB_REALM
 
 # Service Search Descriptors start here if present:
 EOF
@@ -5368,7 +5254,6 @@ then
     INTERACTIVE=0      # Turns off prompts that occur later.
     validate_info      # Validate basic info in file.
     chk_ids_version    # Check iDS version for compatibility.
-    gssapi_setup_auto
 else
     # Display BACKUP warning to user.
     display_msg backup_server
@@ -5446,6 +5331,16 @@ if [ $NEED_ADMIN -eq 1 ]; then
     allow_admin_read_write_shadow
     # deny non-admin access to shadow data
     deny_non_admin_shadow_access
+fi
+
+if [ $GSSAPI_ENABLE -eq 1 ]; then
+    add_id_mapping_rules
+    # do not modify ACI if "sasl/GSSAPI" and "self" are not selected
+    if [ "$LDAP_CRED_LEVEL" = "self" -a "$LDAP_AUTHMETHOD" = "sasl/GSSAPI" ]; then
+        modify_userpassword_acl_for_gssapi
+    else
+        ${ECHO} "  ACL for GSSAPI was not set because of incompatibility in profile."
+    fi
 fi
 
 # If use host principal for shadow update, give read/write permission for
