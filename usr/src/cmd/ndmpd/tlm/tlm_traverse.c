@@ -255,22 +255,19 @@ fs_getdents(int fildes, struct dirent *buf, size_t *nbyte,
 		(void) strlcat(file_path, ptr->d_name, PATH_MAX);
 		(void) memset(&fh, 0, sizeof (fs_fhandle_t));
 
-		rv = lstat64(file_path, &st);
-		if (rv != 0)
+		if (lstat64(file_path, &st) != 0) {
+			rv = -1;
 			break;
+		}
 
 		fh.fh_fid = st.st_ino;
 
 		if (S_ISDIR(st.st_mode))
 			goto skip_entry;
 
-		rv = fs_populate_dents(darg, strlen(ptr->d_name),
-		    (char *)ptr->d_name, n_entries, &st, &fh);
-
-		if (rv != 0) {
-			rv = 0;
+		if (fs_populate_dents(darg, strlen(ptr->d_name),
+		    (char *)ptr->d_name, n_entries, &st, &fh) != 0)
 			break;
-		}
 
 skip_entry:
 		p = p + ptr->d_reclen;
@@ -672,9 +669,7 @@ traverse_level_nondir(struct fs_traverse *ftp,
 		n_entries = 0;
 		rv = fs_getdents(fd, buf, &len, pnp->tn_path, &tsp->ts_dpos,
 		    &cookie_verf, &n_entries, darg);
-		if (n_entries == 0)
-			break;
-		if (rv != 0) {
+		if (rv < 0) {
 			traverse_stats.fss_readdir_err++;
 
 			NDMP_LOG(LOG_DEBUG, "Error %d on readdir(%s) pos %d",
@@ -689,6 +684,12 @@ traverse_level_nondir(struct fs_traverse *ftp,
 			 */
 			rv = SKIP_ENTRY;
 			continue;
+		} else {
+			/* Break at the end of directory */
+			if (rv > 0)
+				rv = 0;
+			else
+				break;
 		}
 
 		/* LINTED imporper alignment */
