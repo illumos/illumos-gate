@@ -204,7 +204,7 @@ so_acceptq_flush(struct sonode *so, boolean_t doclose)
 		nso->so_acceptq_next = NULL;
 
 		if (doclose) {
-			socket_close(nso, 0, CRED());
+			(void) socket_close(nso, 0, CRED());
 		} else {
 			/*
 			 * Since the socket is on the accept queue, there can
