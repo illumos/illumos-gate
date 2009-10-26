@@ -445,6 +445,7 @@ static boolean_t fab_xlate_fake_rp = B_TRUE;
 
 #define	HAS_PROP(node, name) xmlHasProp(node, (const xmlChar *)name)
 #define	GET_PROP(node, name) ((char *)xmlGetProp(node, (const xmlChar *)name))
+#define	FREE_PROP(prop) xmlFree((xmlChar *)prop)
 #define	STRCMP(s1, s2) (strcmp((const char *)s1, (const char *)s2) == 0)
 
 #define	FAB_LOOKUP(sz, name, field) \
@@ -673,12 +674,13 @@ fab_send_tgt_erpt(fmd_hdl_t *hdl, fab_data_t *data, const char *class,
 			nvlist_free(erpt);
 			goto done;
 		}
-		(void) nvlist_add_string(detector, FM_VERSION,
+		(void) nvlist_add_uint8(detector, FM_VERSION,
 		    FM_DEV_SCHEME_VERSION);
 		(void) nvlist_add_string(detector, FM_FMRI_SCHEME,
 		    FM_FMRI_SCHEME_DEV);
 		(void) nvlist_add_string(detector, FM_FMRI_DEV_PATH, fmri);
 		(void) nvlist_add_nvlist(erpt, FM_EREPORT_DETECTOR, detector);
+		nvlist_free(detector);
 
 		/* Add the address payload */
 		(void) nvlist_add_uint64(erpt, PCI_PA, tgt_addr);
@@ -1774,17 +1776,21 @@ fab_find_addr(fmd_hdl_t *hdl, nvlist_t *nvl, uint64_t addr) {
 
 	/* Decode the list of assigned addresses xml nodes for each device */
 	for (i = 0; i < size; i++) {
+		char *tprop;
+
 		devNode = nodes->nodeTab[i];
 		if (!HAS_PROP(devNode, "value"))
 			continue;
 
 		/* Convert "string" assigned-addresses to pci_regspec_t */
 		j = 0;
-		for (token = strtok(GET_PROP(devNode, "value"), " "); token;
+		tprop = GET_PROP(devNode, "value");
+		for (token = strtok(tprop, " "); token;
 		    token = strtok(NULL, " ")) {
 			prop[j++] = strtoul(token, (char **)NULL, 16);
 		}
 		prop[j] = (uint32_t)-1;
+		FREE_PROP(tprop);
 
 		/* Check if address belongs to this device */
 		for (assign_p = (pci_regspec_t *)prop;
@@ -1803,22 +1809,33 @@ found:
 	/* Traverse up the xml tree and back down to find the right propgroup */
 	for (devNode = devNode->parent->parent->children;
 	    devNode; devNode = devNode->next) {
+		char	*tprop;
+
+		tprop = GET_PROP(devNode, "name");
 		if (STRCMP(devNode->name, "propgroup") &&
-		    STRCMP(GET_PROP(devNode, "name"), "io"))
+		    STRCMP(tprop, "io")) {
+			FREE_PROP(tprop);
 			goto propgroup;
+		}
+		FREE_PROP(tprop);
 	}
 	goto fail;
 
 propgroup:
 	/* Retrive the "dev" propval and return */
 	for (devNode = devNode->children; devNode; devNode = devNode->next) {
+		char	*tprop;
+
+		tprop = GET_PROP(devNode, "name");
 		if (STRCMP(devNode->name, "propval") &&
-		    STRCMP(GET_PROP(devNode, "name"), "dev")) {
+		    STRCMP(tprop, "dev")) {
+			FREE_PROP(tprop);
 			retval = GET_PROP(devNode, "value");
 			fmd_hdl_debug(hdl, "Addr Dev Path: %s\n", retval);
 			xmlXPathFreeObject(xpathObj);
 			return (retval);
 		}
+		FREE_PROP(tprop);
 	}
 fail:
 	if (xpathObj != NULL)
