@@ -1628,6 +1628,8 @@ vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 
 	mutex_enter(&vd->vdev_dtl_lock);
 	for (int t = 0; t < DTL_TYPES; t++) {
+		/* account for child's outage in parent's missing map */
+		int s = (t == DTL_MISSING) ? DTL_OUTAGE: t;
 		if (t == DTL_SCRUB)
 			continue;			/* leaf vdevs only */
 		if (t == DTL_PARTIAL)
@@ -1640,7 +1642,7 @@ vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 		for (int c = 0; c < vd->vdev_children; c++) {
 			vdev_t *cvd = vd->vdev_child[c];
 			mutex_enter(&cvd->vdev_dtl_lock);
-			space_map_ref_add_map(&reftree, &cvd->vdev_dtl[t], 1);
+			space_map_ref_add_map(&reftree, &cvd->vdev_dtl[s], 1);
 			mutex_exit(&cvd->vdev_dtl_lock);
 		}
 		space_map_ref_generate_map(&reftree, &vd->vdev_dtl[t], minref);
