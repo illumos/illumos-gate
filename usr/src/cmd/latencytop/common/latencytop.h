@@ -169,13 +169,15 @@ extern lt_config_t g_config;	/* The global settings */
 #define	CAUSE_FLAG_SPECIAL		4
 #define	CAUSE_ALL_FLAGS			0xffffffff
 
+extern boolean_t lt_drop_detected;
+
 /*
  * These functions collect statistics using DTrace.
  */
 extern int lt_dtrace_init(void);
 extern int lt_dtrace_work(int);
 extern int lt_dtrace_collect(void);
-extern void lt_dtrace_deinit(void);
+extern int lt_dtrace_deinit(void);
 
 /*
  * These functions maintain configuration, e.g. symbol to cause mapping.

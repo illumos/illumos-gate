@@ -359,6 +359,7 @@ static int
 drop_handler(const dtrace_dropdata_t *data, void *user)
 {
 	lt_display_error("Drop: %s\n", data->dtdda_msg);
+	lt_drop_detected = B_TRUE;
 
 	/* Pretend nothing happened, so just continue */
 	return (DTRACE_HANDLE_OK);
@@ -565,9 +566,18 @@ lt_dtrace_collect(void)
 /*
  * dtrace clean up.
  */
-void
+int
 lt_dtrace_deinit(void)
 {
-	(void) dtrace_stop(g_dtp);
+	int ret = 0;
+
+	if (dtrace_stop(g_dtp) != 0) {
+		lt_display_error("dtrace_stop failed: %s\n",
+		    dtrace_errmsg(g_dtp, dtrace_errno(g_dtp)));
+		ret = -1;
+	}
+
 	dtrace_close(g_dtp);
+
+	return (ret);
 }

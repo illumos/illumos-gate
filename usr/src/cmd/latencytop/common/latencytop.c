@@ -35,6 +35,12 @@
 
 #define	CMPOPT(a, b)	strncmp((a), (b), sizeof (b))
 
+/*
+ * This variable is used to check if "dynamic variable drop" in dtrace
+ * has happened.
+ */
+boolean_t lt_drop_detected = 0;
+
 lt_config_t g_config;
 
 typedef enum {
@@ -207,6 +213,7 @@ main(int argc, char *argv[])
 	uint64_t current_time;
 	uint64_t delta_time;
 	char logfile[PATH_MAX] = "";
+	boolean_t no_dtrace_cleanup = B_TRUE;
 
 	lt_gpipe_init();
 	(void) signal(SIGINT, signal_handler);
@@ -421,8 +428,12 @@ main(int argc, char *argv[])
 			break;
 		}
 
-		if (tsleep > g_config.lt_cfg_snap_interval * 1000) {
-			tsleep = g_config.lt_cfg_snap_interval * 1000;
+		/*
+		 * Interval when we call dtrace_status() and collect	
+		 * aggregated data.
+		 */
+		if (tsleep > g_config.lt_cfg_snap_interval) {
+			tsleep = g_config.lt_cfg_snap_interval;
 		}
 
 		timeout.tv_sec = tsleep / 1000;
@@ -458,6 +469,24 @@ main(int argc, char *argv[])
 
 		running = lt_display_loop(refresh_interval * 1000 -
 		    delta_time);
+
+		/*
+		 * This is to avoid dynamic variable drop
+		 * in DTrace.
+		 */
+		if (lt_drop_detected == B_TRUE) {
+			if (lt_dtrace_deinit() != 0) {
+				no_dtrace_cleanup = B_FALSE;
+				retval = 1;
+				break;
+			}
+
+			lt_drop_detected = B_FALSE;
+			if (lt_dtrace_init() != 0) {
+				retval = 1;
+				break;
+			}
+		}
 	} while (running != 0);
 
 	lt_klog_write();
@@ -466,7 +495,9 @@ main(int argc, char *argv[])
 	lt_display_deinit();
 
 end_ubreak:
-	lt_dtrace_deinit();
+	if (no_dtrace_cleanup == B_FALSE || lt_dtrace_deinit() != 0)
+		retval = 1;
+
 	lt_stat_free_all();
 
 end_nodtrace:
