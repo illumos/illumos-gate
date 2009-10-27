@@ -443,8 +443,7 @@ spin_lock_set(mutex_t *mp)
 	 * Give up and block in the kernel for the mutex.
 	 */
 	INCR32(self->ul_spin_lock_sleep);
-	(void) ___lwp_mutex_timedlock(mp, NULL);
-	mp->mutex_owner = (uintptr_t)self;
+	(void) ___lwp_mutex_timedlock(mp, NULL, self);
 }
 
 void
@@ -1002,14 +1001,12 @@ mutex_lock_kernel(mutex_t *mp, timespec_t *tsp, tdb_mutex_stats_t *msp)
 
 	DTRACE_PROBE1(plockstat, mutex__block, mp);
 
-	/* defer signals until the assignment of mp->mutex_owner */
-	sigoff(self);
 	for (;;) {
 		/*
 		 * A return value of EOWNERDEAD or ELOCKUNMAPPED
 		 * means we successfully acquired the lock.
 		 */
-		if ((error = ___lwp_mutex_timedlock(mp, tsp)) != 0 &&
+		if ((error = ___lwp_mutex_timedlock(mp, tsp, self)) != 0 &&
 		    error != EOWNERDEAD && error != ELOCKUNMAPPED) {
 			acquired = 0;
 			break;
@@ -1022,19 +1019,16 @@ mutex_lock_kernel(mutex_t *mp, timespec_t *tsp, tdb_mutex_stats_t *msp)
 			 */
 			enter_critical(self);
 			if (mp->mutex_ownerpid == udp->pid) {
-				mp->mutex_owner = (uintptr_t)self;
 				exit_critical(self);
 				acquired = 1;
 				break;
 			}
 			exit_critical(self);
 		} else {
-			mp->mutex_owner = (uintptr_t)self;
 			acquired = 1;
 			break;
 		}
 	}
-	sigon(self);
 
 	if (msp)
 		msp->mutex_sleep_time += gethrtime() - begin_sleep;
@@ -1042,6 +1036,7 @@ mutex_lock_kernel(mutex_t *mp, timespec_t *tsp, tdb_mutex_stats_t *msp)
 	self->ul_sp = 0;
 
 	if (acquired) {
+		ASSERT(mp->mutex_owner == (uintptr_t)self);
 		DTRACE_PROBE2(plockstat, mutex__blocked, mp, 1);
 		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 	} else {
@@ -1065,13 +1060,12 @@ mutex_trylock_kernel(mutex_t *mp)
 	int error;
 	int acquired;
 
-	sigoff(self);
 	for (;;) {
 		/*
 		 * A return value of EOWNERDEAD or ELOCKUNMAPPED
 		 * means we successfully acquired the lock.
 		 */
-		if ((error = ___lwp_mutex_trylock(mp)) != 0 &&
+		if ((error = ___lwp_mutex_trylock(mp, self)) != 0 &&
 		    error != EOWNERDEAD && error != ELOCKUNMAPPED) {
 			acquired = 0;
 			break;
@@ -1084,21 +1078,19 @@ mutex_trylock_kernel(mutex_t *mp)
 			 */
 			enter_critical(self);
 			if (mp->mutex_ownerpid == udp->pid) {
-				mp->mutex_owner = (uintptr_t)self;
 				exit_critical(self);
 				acquired = 1;
 				break;
 			}
 			exit_critical(self);
 		} else {
-			mp->mutex_owner = (uintptr_t)self;
 			acquired = 1;
 			break;
 		}
 	}
-	sigon(self);
 
 	if (acquired) {
+		ASSERT(mp->mutex_owner == (uintptr_t)self);
 		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 	} else if (error != EBUSY) {
 		DTRACE_PROBE2(plockstat, mutex__error, mp, error);

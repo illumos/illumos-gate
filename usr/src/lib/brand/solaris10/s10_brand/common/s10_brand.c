@@ -1233,6 +1233,25 @@ s10_lwp_private(sysret_t *rval, int cmd, int which, uintptr_t base)
 #endif	/* __x86 */
 
 /*
+ * The Opensolaris versions of lwp_mutex_timedlock() and lwp_mutex_trylock()
+ * add an extra argument to the interfaces, a uintptr_t value for the mutex's
+ * mutex_owner field.  The Solaris 10 libc assigns the mutex_owner field at
+ * user-level, so we just make the extra argument be zero in both syscalls.
+ */
+
+static int
+s10_lwp_mutex_timedlock(sysret_t *rval, lwp_mutex_t *lp, timespec_t *tsp)
+{
+	return (__systemcall(rval, SYS_lwp_mutex_timedlock + 1024, lp, tsp, 0));
+}
+
+static int
+s10_lwp_mutex_trylock(sysret_t *rval, lwp_mutex_t *lp)
+{
+	return (__systemcall(rval, SYS_lwp_mutex_trylock + 1024, lp, 0));
+}
+
+/*
  * If the emul_global_zone flag is set then emulate some aspects of the
  * zone system call.  In particular, emulate the global zone ID on the
  * ZONE_LOOKUP subcommand and emulate some of the global zone attributes
@@ -1775,7 +1794,7 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/* 207 */
 	NOSYS,					/* 208 */
 	NOSYS,					/* 209 */
-	NOSYS,					/* 210 */
+	EMULATE(s10_lwp_mutex_timedlock, 2 | RV_DEFAULT),	/* 210 */
 	NOSYS,					/* 211 */
 	NOSYS,					/* 212 */
 	NOSYS,					/* 213 */
@@ -1820,7 +1839,7 @@ s10_sysent_table_t s10_sysent_table[] = {
 	NOSYS,					/* 248 */
 	NOSYS,					/* 249 */
 	NOSYS,					/* 250 */
-	NOSYS,					/* 251 */
+	EMULATE(s10_lwp_mutex_trylock, 1 | RV_DEFAULT),		/* 251 */
 	NOSYS,					/* 252 */
 	NOSYS,					/* 253 */
 	NOSYS,					/* 254 */

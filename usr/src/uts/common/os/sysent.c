@@ -698,7 +698,7 @@ struct sysent sysent[NSYSCALL] =
 		SYSENT_CI("sparc_utrap_install", sparc_utrap_install, 5),
 		SYSENT_NOSYS()),
 	/* 209 */ SYSENT_CI("resolvepath",	resolvepath,	3),
-	/* 210 */ SYSENT_CI("lwp_mutex_timedlock", lwp_mutex_timedlock,	2),
+	/* 210 */ SYSENT_CI("lwp_mutex_timedlock", lwp_mutex_timedlock,	3),
 	/* 211 */ SYSENT_CI("lwp_sema_timedwait", lwp_sema_timedwait,	3),
 	/* 212 */ SYSENT_CI("lwp_rwlock_sys",	lwp_rwlock_sys,	3),
 	/*
@@ -772,7 +772,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 248 */ SYSENT_CI("ntp_gettime",	ntp_gettime,	1),
 	/* 249 */ SYSENT_CI("ntp_adjtime",	ntp_adjtime,	1),
 	/* 250 */ SYSENT_CI("lwp_mutex_unlock",	lwp_mutex_unlock,	1),
-	/* 251 */ SYSENT_CI("lwp_mutex_trylock", lwp_mutex_trylock,	1),
+	/* 251 */ SYSENT_CI("lwp_mutex_trylock", lwp_mutex_trylock,	2),
 	/* 252 */ SYSENT_CI("lwp_mutex_register", lwp_mutex_register,	2),
 	/* 253 */ SYSENT_CI("cladm",		cladm,		3),
 	/* 254 */ SYSENT_CI("uucopy",		uucopy,		3),
@@ -1074,7 +1074,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 207 */ SYSENT_LOADABLE32(),		/* pset */
 	/* 208 */ SYSENT_LOADABLE32(),
 	/* 209 */ SYSENT_CI("resolvepath",	resolvepath,	3),
-	/* 210 */ SYSENT_CI("lwp_mutex_timedlock", lwp_mutex_timedlock, 2),
+	/* 210 */ SYSENT_CI("lwp_mutex_timedlock", lwp_mutex_timedlock, 3),
 	/* 211 */ SYSENT_CI("lwp_sema_timedwait", lwp_sema_timedwait,	3),
 	/* 212 */ SYSENT_CI("lwp_rwlock_sys",	lwp_rwlock_sys,	3),
 	/*
@@ -1118,7 +1118,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 248 */ SYSENT_CI("ntp_gettime",	ntp_gettime,	1),
 	/* 249 */ SYSENT_CI("ntp_adjtime",	ntp_adjtime,	1),
 	/* 250 */ SYSENT_CI("lwp_mutex_unlock",	lwp_mutex_unlock,	1),
-	/* 251 */ SYSENT_CI("lwp_mutex_trylock", lwp_mutex_trylock,	1),
+	/* 251 */ SYSENT_CI("lwp_mutex_trylock", lwp_mutex_trylock,	2),
 	/* 252 */ SYSENT_CI("lwp_mutex_register", lwp_mutex_register,	2),
 	/* 253 */ SYSENT_CI("cladm",		cladm,		3),
 	/* 254 */ SYSENT_CI("uucopy",		uucopy,		3),

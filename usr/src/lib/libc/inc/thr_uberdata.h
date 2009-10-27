@@ -1417,8 +1417,8 @@ extern	id_t	getparam(idtype_t, id_t, int *, struct sched_param *);
  * System call wrappers (direct interfaces to the kernel)
  */
 extern	int	___lwp_mutex_register(mutex_t *, mutex_t **);
-extern	int	___lwp_mutex_trylock(mutex_t *);
-extern	int	___lwp_mutex_timedlock(mutex_t *, timespec_t *);
+extern	int	___lwp_mutex_trylock(mutex_t *, ulwp_t *);
+extern	int	___lwp_mutex_timedlock(mutex_t *, timespec_t *, ulwp_t *);
 extern	int	___lwp_mutex_unlock(mutex_t *);
 extern	int	___lwp_mutex_wakeup(mutex_t *, int);
 extern	int	___lwp_cond_wait(cond_t *, mutex_t *, timespec_t *, int);

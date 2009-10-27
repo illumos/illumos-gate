@@ -67,6 +67,8 @@ static void lwp_unsleep(kthread_t *t);
 static void lwp_change_pri(kthread_t *t, pri_t pri, pri_t *t_prip);
 static void lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg);
 static void lwp_mutex_unregister(void *uaddr);
+static void set_owner_pid(lwp_mutex_t *, uintptr_t, pid_t);
+static int iswanted(kthread_t *, lwpchan_t *);
 
 extern int lwp_cond_signal(lwp_cond_t *cv);
 
@@ -1011,13 +1013,37 @@ lwp_upimutex_unlock(lwp_mutex_t *lp, uint8_t type)
 		flag |= LOCK_NOTRECOVERABLE;
 		suword16_noerr(&lp->mutex_flag, flag);
 	}
-	if (type & USYNC_PROCESS)
-		suword32_noerr(&lp->mutex_ownerpid, 0);
+	set_owner_pid(lp, 0, 0);
 	upimutex_unlock((upimutex_t *)upimutex, flag);
 	upilocked = 0;
 out:
 	no_fault();
 	return (error);
+}
+
+/*
+ * Set the owner and ownerpid fields of a user-level mutex.
+ */
+static void
+set_owner_pid(lwp_mutex_t *lp, uintptr_t owner, pid_t pid)
+{
+	union {
+		uint64_t word64;
+		uint32_t word32[2];
+	} un;
+
+	un.word64 = (uint64_t)owner;
+
+	suword32_noerr(&lp->mutex_ownerpid, pid);
+#if defined(_LP64)
+	if (((uintptr_t)lp & (_LONG_LONG_ALIGNMENT - 1)) == 0) { /* aligned */
+		suword64_noerr(&lp->mutex_owner, un.word64);
+		return;
+	}
+#endif
+	/* mutex is unaligned or we are running on a 32-bit kernel */
+	suword32_noerr((uint32_t *)&lp->mutex_owner, un.word32[0]);
+	suword32_noerr((uint32_t *)&lp->mutex_owner + 1, un.word32[1]);
 }
 
 /*
@@ -1035,9 +1061,7 @@ lwp_clear_mutex(lwp_mutex_t *lp, uint16_t lockflg)
 		flag |= lockflg;
 		suword16_noerr(&lp->mutex_flag, flag);
 	}
-	suword32_noerr((uint32_t *)&lp->mutex_owner, 0);
-	suword32_noerr((uint32_t *)&lp->mutex_owner + 1, 0);
-	suword32_noerr(&lp->mutex_ownerpid, 0);
+	set_owner_pid(lp, 0, 0);
 	suword8_noerr(&lp->mutex_rcount, 0);
 
 	return (flag);
@@ -1116,9 +1140,8 @@ upimutex_cleanup()
 	}
 }
 
-static int iswanted();
 int
-lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
+lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp, uintptr_t owner)
 {
 	kthread_t *t = curthread;
 	klwp_t *lwp = ttolwp(t);
@@ -1178,10 +1201,9 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 	if (UPIMUTEX(type)) {
 		no_fault();
 		error = lwp_upimutex_lock(lp, type, UPIMUTEX_BLOCK, &lwpt);
-		if ((type & USYNC_PROCESS) &&
-		    (error == 0 ||
-		    error == EOWNERDEAD || error == ELOCKUNMAPPED))
-			(void) suword32(&lp->mutex_ownerpid, p->p_pid);
+		if (error == 0 || error == EOWNERDEAD || error == ELOCKUNMAPPED)
+			set_owner_pid(lp, owner,
+			    (type & USYNC_PROCESS)? p->p_pid : 0);
 		if (tsp && !time_error)	/* copyout the residual time left */
 			error = lwp_timer_copyout(&lwpt, error);
 		if (error)
@@ -1309,8 +1331,7 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 		(void) new_mstate(t, LMS_SYSTEM);
 
 	if (error == 0) {
-		if (type & USYNC_PROCESS)
-			suword32_noerr(&lp->mutex_ownerpid, p->p_pid);
+		set_owner_pid(lp, owner, (type & USYNC_PROCESS)? p->p_pid : 0);
 		if (type & LOCK_ROBUST) {
 			fuword16_noerr(&lp->mutex_flag, &flag);
 			if (flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
@@ -1339,7 +1360,7 @@ out:
 
 /*
  * Obsolete lwp_mutex_lock() interface, no longer called from libc.
- * libc now calls lwp_mutex_timedlock(lp, NULL).
+ * libc now calls lwp_mutex_timedlock(lp, NULL, NULL).
  * This system call trap continues to exist solely for the benefit
  * of old statically-linked binaries from Solaris 9 and before.
  * It should be removed from the system when we no longer care
@@ -1348,7 +1369,7 @@ out:
 int
 lwp_mutex_lock(lwp_mutex_t *lp)
 {
-	return (lwp_mutex_timedlock(lp, NULL));
+	return (lwp_mutex_timedlock(lp, NULL, NULL));
 }
 
 static int
@@ -1673,8 +1694,7 @@ lwp_cond_wait(lwp_cond_t *cv, lwp_mutex_t *mp, timespec_t *tsp, int check_park)
 		 * unlock the condition variable's mutex. (pagefaults are
 		 * possible here.)
 		 */
-		if (mtype & USYNC_PROCESS)
-			suword32_noerr(&mp->mutex_ownerpid, 0);
+		set_owner_pid(mp, 0, 0);
 		ulock_clear(&mp->mutex_lockw);
 		fuword8_noerr(&mp->mutex_waiters, &waiters);
 		if (waiters != 0) {
@@ -1790,8 +1810,7 @@ efault:
 	if (UPIMUTEX(mtype) == 0) {
 		lwpchan_lock(&m_lwpchan, LWPCHAN_MPPOOL);
 		m_locked = 1;
-		if (mtype & USYNC_PROCESS)
-			suword32_noerr(&mp->mutex_ownerpid, 0);
+		set_owner_pid(mp, 0, 0);
 		ulock_clear(&mp->mutex_lockw);
 		fuword8_noerr(&mp->mutex_waiters, &waiters);
 		if (waiters != 0) {
@@ -2567,9 +2586,7 @@ lwp_rwlock_lock(lwp_rwlock_t *rw, timespec_t *tsp, int rd_wr)
 	/*
 	 * Unlock the rwlock's mutex (pagefaults are possible here).
 	 */
-	suword32_noerr((uint32_t *)&mp->mutex_owner, 0);
-	suword32_noerr((uint32_t *)&mp->mutex_owner + 1, 0);
-	suword32_noerr(&mp->mutex_ownerpid, 0);
+	set_owner_pid(mp, 0, 0);
 	ulock_clear(&mp->mutex_lockw);
 	fuword8_noerr(&mp->mutex_waiters, &mwaiters);
 	if (mwaiters != 0) {
@@ -2668,9 +2685,7 @@ out_drop:
 		lwpchan_lock(&mlwpchan, LWPCHAN_MPPOOL);
 		mlocked = 1;
 	}
-	suword32_noerr((uint32_t *)&mp->mutex_owner, 0);
-	suword32_noerr((uint32_t *)&mp->mutex_owner + 1, 0);
-	suword32_noerr(&mp->mutex_ownerpid, 0);
+	set_owner_pid(mp, 0, 0);
 	ulock_clear(&mp->mutex_lockw);
 	fuword8_noerr(&mp->mutex_waiters, &mwaiters);
 	if (mwaiters != 0) {
@@ -3024,7 +3039,7 @@ lwp_mutex_unregister(void *uaddr)
 }
 
 int
-lwp_mutex_trylock(lwp_mutex_t *lp)
+lwp_mutex_trylock(lwp_mutex_t *lp, uintptr_t owner)
 {
 	kthread_t *t = curthread;
 	proc_t *p = ttoproc(t);
@@ -3057,10 +3072,9 @@ lwp_mutex_trylock(lwp_mutex_t *lp)
 	if (UPIMUTEX(type)) {
 		no_fault();
 		error = lwp_upimutex_lock(lp, type, UPIMUTEX_TRY, NULL);
-		if ((type & USYNC_PROCESS) &&
-		    (error == 0 ||
-		    error == EOWNERDEAD || error == ELOCKUNMAPPED))
-			(void) suword32(&lp->mutex_ownerpid, p->p_pid);
+		if (error == 0 || error == EOWNERDEAD || error == ELOCKUNMAPPED)
+			set_owner_pid(lp, owner,
+			    (type & USYNC_PROCESS)? p->p_pid : 0);
 		if (error)
 			return (set_errno(error));
 		return (0);
@@ -3086,8 +3100,7 @@ lwp_mutex_trylock(lwp_mutex_t *lp)
 	if (!ulock_try(&lp->mutex_lockw))
 		error = EBUSY;
 	else {
-		if (type & USYNC_PROCESS)
-			suword32_noerr(&lp->mutex_ownerpid, p->p_pid);
+		set_owner_pid(lp, owner, (type & USYNC_PROCESS)? p->p_pid : 0);
 		if (type & LOCK_ROBUST) {
 			fuword16_noerr(&lp->mutex_flag, &flag);
 			if (flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
@@ -3175,8 +3188,7 @@ lwp_mutex_unlock(lwp_mutex_t *lp)
 			suword16_noerr(&lp->mutex_flag, flag);
 		}
 	}
-	if (type & USYNC_PROCESS)
-		suword32_noerr(&lp->mutex_ownerpid, 0);
+	set_owner_pid(lp, 0, 0);
 	ulock_clear(&lp->mutex_lockw);
 	/*
 	 * Always wake up an lwp (if any) waiting on lwpchan. The woken lwp will

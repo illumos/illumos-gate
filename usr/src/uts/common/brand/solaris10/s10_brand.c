@@ -978,8 +978,10 @@ _init(void)
 	s10_emulation_table[SYS_pwrite] = 1;			/* 174 */
 	s10_emulation_table[SYS_auditsys] = 1;			/* 186 */
 	s10_emulation_table[SYS_sigqueue] = 1;			/* 190 */
+	s10_emulation_table[SYS_lwp_mutex_timedlock] = 1;	/* 210 */
 	s10_emulation_table[SYS_pwrite64] = 1;			/* 223 */
 	s10_emulation_table[SYS_zone] = 1;			/* 227 */
+	s10_emulation_table[SYS_lwp_mutex_trylock] = 1;		/* 251 */
 
 	err = mod_install(&modlinkage);
 	if (err) {

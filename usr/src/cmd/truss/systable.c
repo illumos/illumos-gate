@@ -430,7 +430,7 @@ const struct systable systable[] = {
 {"pset",	5, DEC, NOV, DEC, HEX, HEX, HEX, HEX},		/* 207 */
 {"sparc_utrap_install", 5, DEC, NOV, UTT, UTH, UTH, HEX, HEX},	/* 208 */
 {"resolvepath",	3, DEC, NOV, STG, RLK, DEC},			/* 209 */
-{"lwp_mutex_timedlock", 2, DEC, NOV, HEX, HEX},			/* 210 */
+{"lwp_mutex_timedlock", 3, DEC, NOV, HEX, HEX, HEX},		/* 210 */
 {"lwp_sema_timedwait", 3, DEC, NOV, HEX, HEX, DEC},		/* 211 */
 {"lwp_rwlock_sys", 3, DEC, NOV, DEC, HEX, HEX},			/* 212 */
 {"getdents64",	3, DEC, NOV, DEC, HEX, UNS},			/* 213 */
@@ -471,7 +471,7 @@ const struct systable systable[] = {
 {"ntp_gettime",	1, DEC, NOV, HEX},				/* 248 */
 {"ntp_adjtime",	1, DEC, NOV, HEX},				/* 249 */
 {"lwp_mutex_unlock", 1, DEC, NOV, HEX},				/* 250 */
-{"lwp_mutex_trylock", 1, DEC, NOV, HEX},			/* 251 */
+{"lwp_mutex_trylock", 2, DEC, NOV, HEX, HEX},			/* 251 */
 {"lwp_mutex_register", 2, DEC, NOV, HEX, HEX},			/* 252 */
 {"cladm",	3, DEC, NOV, CLC, CLF, HEX},			/* 253 */
 {"uucopy",	3, DEC, NOV, HEX, HEX, UNS},			/* 254 */

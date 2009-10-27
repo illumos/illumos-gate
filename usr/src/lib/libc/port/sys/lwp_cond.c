@@ -20,23 +20,18 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
+#include "thr_uberdata.h"
 #include <sys/types.h>
-
 #include <time.h>
 #include <errno.h>
 #include <synch.h>
 #include <sys/synch32.h>
 #include <pthread.h>
-
-extern int ___lwp_cond_wait(lwp_cond_t *, lwp_mutex_t *, timespec_t *, int);
-extern int ___lwp_mutex_timedlock(lwp_mutex_t *, timespec_t *);
 
 int
 _lwp_cond_wait(cond_t *cv, mutex_t *mp)
@@ -45,7 +40,7 @@ _lwp_cond_wait(cond_t *cv, mutex_t *mp)
 
 	error = ___lwp_cond_wait(cv, mp, NULL, 0);
 	if (mp->mutex_type & (PTHREAD_PRIO_INHERIT|PTHREAD_PRIO_PROTECT))
-		(void) ___lwp_mutex_timedlock(mp, NULL);
+		(void) ___lwp_mutex_timedlock(mp, NULL, NULL);
 	else
 		(void) _lwp_mutex_lock(mp);
 	return (error);
@@ -61,7 +56,7 @@ _lwp_cond_reltimedwait(cond_t *cv, mutex_t *mp, timespec_t *relts)
 		return (EINVAL);
 	error = ___lwp_cond_wait(cv, mp, relts, 0);
 	if (mp->mutex_type & (PTHREAD_PRIO_INHERIT|PTHREAD_PRIO_PROTECT))
-		(void) ___lwp_mutex_timedlock(mp, NULL);
+		(void) ___lwp_mutex_timedlock(mp, NULL, NULL);
 	else
 		(void) _lwp_mutex_lock(mp);
 	return (error);

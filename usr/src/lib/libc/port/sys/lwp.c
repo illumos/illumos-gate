@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include "thr_uberdata.h"
@@ -35,15 +33,12 @@
 #include <sys/synch32.h>
 #include <sys/lwp.h>
 
-extern int ___lwp_mutex_timedlock(mutex_t *, timespec_t *);
-extern int ___lwp_sema_timedwait(lwp_sema_t *, timespec_t *, int);
-
 int
 _lwp_mutex_lock(mutex_t *mp)
 {
 	if (set_lock_byte(&mp->mutex_lockw) == 0)
 		return (0);
-	return (___lwp_mutex_timedlock(mp, NULL));
+	return (___lwp_mutex_timedlock(mp, NULL, NULL));
 }
 
 int

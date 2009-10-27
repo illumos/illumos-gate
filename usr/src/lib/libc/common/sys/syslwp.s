@@ -107,7 +107,7 @@
 
 /*
  * int
- * ___lwp_mutex_timedlock(lwp_mutex_t *, timespec_t *)
+ * ___lwp_mutex_timedlock(lwp_mutex_t *, timespec_t *, uintptr_t)
  */
 	SYSREENTRY(___lwp_mutex_timedlock)
 	SYSTRAP_RVAL1(lwp_mutex_timedlock)
@@ -205,7 +205,7 @@
 
 /*
  * int
- * ___lwp_mutex_trylock(lwp_mutex_t *mp)
+ * ___lwp_mutex_trylock(lwp_mutex_t *mp, uintptr_t)
  */
 	ENTRY(___lwp_mutex_trylock)
 	SYSTRAP_RVAL1(lwp_mutex_trylock)
