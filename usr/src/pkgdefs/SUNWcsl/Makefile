@@ -36,6 +36,7 @@ LICENSEFILES += $(OSBL) $(LICENSEFILES_$(MACH)) \
 	../../lib/libdll/THIRDPARTYLICENSE \
 	../../lib/libkmf/THIRDPARTYLICENSE \
 	../../lib/libldap5/THIRDPARTYLICENSE \
+	../../lib/pkcs11/pkcs11_tpm/THIRDPARTYLICENSE \
 	../../lib/libshell/THIRDPARTYLICENSE \
 	../../lib/libsum/THIRDPARTYLICENSE \
 	../../lib/libwrap/THIRDPARTYLICENSE \
