@@ -159,6 +159,7 @@ i386_SUBDIRS= \
 	SUNWrum \
 	SUNWrwd	\
 	SUNWrwn	\
+	SUNWsdcard \
 	SUNWsi3124 \
 	SUNWuath \
 	SUNWural \
@@ -451,7 +452,6 @@ COMMON_SUBDIRS= \
 	SUNWscplp  \
 	SUNWscsa1394  \
 	SUNWscsip \
-	SUNWsdcard \
 	SUNWses \
 	SUNWsfe \
 	SUNWslpr \
