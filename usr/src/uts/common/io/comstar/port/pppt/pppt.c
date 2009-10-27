@@ -383,8 +383,6 @@ pppt_drv_ioctl(dev_t drv, int cmd, intptr_t argp, int flag, cred_t *cred,
 		break;
 	case PPPT_INSTALL_DOOR:
 
-		cmn_err(CE_NOTE, "RECEIVE DOOR HANDLE");
-
 		new_handle = door_ki_lookup((int)iocd.pppt_door_fd);
 		if (new_handle == NULL)
 			return (EINVAL);

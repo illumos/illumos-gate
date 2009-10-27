@@ -1706,12 +1706,6 @@ stmf_ic_rx_scsi_data(stmf_ic_scsi_data_msg_t *msg)
 
 	itask = (stmf_i_scsi_task_t *)task->task_stmf_private;
 	dbuf = itask->itask_proxy_dbuf;
-	/*
-	 * stmf will now take over the task handling for this task
-	 * but it still needs to be treated differently from other
-	 * default handled tasks, hence the ITASK_PROXY_TASK
-	 */
-	itask->itask_flags |= ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK;
 
 	task->task_cmd_xfer_length = msg->icsd_data_len;
 
@@ -1769,13 +1763,12 @@ stmf_proxy_scsi_cmd(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	stmf_ic_msg_status_t ic_ret;
 	stmf_status_t ret = STMF_FAILURE;
 
-	if (ilport->ilport_proxy_registered == 0) {
-		cmn_err(CE_WARN, "proxy port not registered");
+	if (stmf_state.stmf_alua_state != 1) {
+		cmn_err(CE_WARN, "stmf alua state is disabled");
 		return (STMF_FAILURE);
 	}
 
-	if (stmf_state.stmf_alua_state != 1) {
-		cmn_err(CE_WARN, "stmf alua state is disabled");
+	if (ilport->ilport_proxy_registered == 0) {
 		return (STMF_FAILURE);
 	}
 
@@ -1783,6 +1776,13 @@ stmf_proxy_scsi_cmd(scsi_task_t *task, stmf_data_buf_t *dbuf)
 	itask->itask_proxy_msg_id = stmf_proxy_msg_id++;
 	mutex_exit(&stmf_state.stmf_lock);
 	itask->itask_proxy_dbuf = dbuf;
+
+	/*
+	 * stmf will now take over the task handling for this task
+	 * but it still needs to be treated differently from other
+	 * default handled tasks, hence the ITASK_PROXY_TASK
+	 */
+	itask->itask_flags |= ITASK_DEFAULT_HANDLING | ITASK_PROXY_TASK;
 	if (dbuf) {
 		ic_cmd_msg = ic_scsi_cmd_msg_alloc(itask->itask_proxy_msg_id,
 		    task, dbuf->db_data_size, dbuf->db_sglist[0].seg_addr,
@@ -1949,7 +1949,6 @@ stmf_set_alua_state(stmf_alua_state_desc_t *alua_state)
 		}
 		if (alua_state->alua_node != 0) {
 			/* reset existing rtpids to new base */
-			cmn_err(CE_NOTE, "non-zero alua node set");
 			stmf_rtpid_counter = 255;
 		}
 		stmf_state.stmf_alua_node = alua_state->alua_node;
@@ -3824,6 +3823,7 @@ stmf_task_lu_free(scsi_task_t *task, stmf_i_scsi_session_t *iss)
 
 	ASSERT(rw_lock_held(iss->iss_lockp));
 	itask->itask_flags = ITASK_IN_FREE_LIST;
+	itask->itask_proxy_msg_id = 0;
 	mutex_enter(&ilu->ilu_task_lock);
 	itask->itask_lu_free_next = ilu->ilu_free_tasks;
 	ilu->ilu_free_tasks = itask;
@@ -4430,7 +4430,8 @@ stmf_send_status_done(scsi_task_t *task, stmf_status_t s, uint32_t iof)
 			stmf_task_free(task);
 		} else {
 			cmn_err(CE_PANIC, "LU is done with the task but LPORT "
-			    " is not done, itask %p", (void *)itask);
+			    " is not done, itask %p itask_flags %x",
+			    (void *)itask, itask->itask_flags);
 		}
 	}
 }
