@@ -38,7 +38,7 @@ DUMPADM=/usr/sbin/dumpadm
 METADEVADM=/usr/sbin/metadevadm
 ISROOTDEV=""
 usrmounted=0
-MACH=`/usr/bin/uname -p`
+UNAME=/usr/bin/uname
 ECHO=/usr/bin/echo
 CAT=/usr/bin/cat
 CP=/usr/bin/cp
@@ -54,6 +54,7 @@ UMOUNT=/sbin/mount
 EEPROM=/usr/sbin/eeprom
 BOOTADM=/usr/sbin/bootadm
 SVCADM=/usr/sbin/svcadm
+REBOOT=/usr/sbin/reboot
 
 mpxio_error()
 {
@@ -101,7 +102,7 @@ mpxio_mount_root()
 			$MOUNT -o remount,rw $new_special / >/dev/msglog 2>&1
 		else
 			new_special=`$STMSBOOTUTIL -m $special`
-			if [ "x$new_special" = "xNOT_MAPPED" ]; then
+			if [ "$new_special" = "NOT_MAPPED" ]; then
 				# this is a bad state to be in, exit
 				cecho "Error: Your root device is not mapped."
 				exit 1
@@ -163,7 +164,7 @@ mpxio_mount_usr()
 	if [ -n "$mountp" ]; then
 		new_special=`$STMSBOOTUTIL -m $special`
 		
-		if [ "$fstype" = cachefs ]; then
+		if [ "$fstype" = "cachefs" ]; then
 			# Mount read-only without the cache.
 			case "$mntopts" in
 			*backfstype=nfs*)
@@ -187,16 +188,16 @@ mpxio_mount_usr()
 			# mount does not fail as a result of having a large
 			# file present on /usr.
 			#
-			if [ "x$mntopts" = x- ]; then
+			if [ "$mntopts" = "-" ]; then
 				mntopts='ro,largefiles'
 			else
 				checkopt largefiles $mntopts
-				if [ "x$option" != xlargefiles ]; then
+				if [ "$option" != "largefiles" ]; then
 					mntopts="largefiles,$mntopts"
 				fi
 
 				checkopt ro $mntopts
-				if [ "x$option" != xro ]; then
+				if [ "$option" != "ro" ]; then
 					mntopts="ro,$mntopts"
 				fi
 
@@ -204,7 +205,7 @@ mpxio_mount_usr()
 				# causes errors to be displayed, so remove
 				# "logging" from the list of options.
 				checkopt logging $mntopts
-				if [ "x$option" = xlogging ]; then
+				if [ "$option" = "logging" ]; then
 					mntopts="$otherops"
 				fi
 			fi
@@ -236,9 +237,9 @@ update_dumpconf()
 	export NOINUSE_CHECK
 
 	DUMPISZFS=`$AWK -F"=" '/DUMPADM_DEVICE/ {print $2}' /etc/dumpadm.conf|$EGREP zvol`
-	if [ "x$DUMPISZFS" = "x" ]; then
+	if [ -z "$DUMPISZFS" ]; then
 		set -- `$DUMPADM -u 2>&1 | $EGREP 'cannot use /dev.* as dump device'`
-		if [ "x$4" != x ]; then
+		if [ -n "$4" ]; then
 			newname=`$STMSBOOTUTIL -m $4`
 			if [ $? -eq 0 ]; then
 				if $DUMPADM -d $newname > /dev/msglog 2> /dev/console; then
@@ -264,16 +265,27 @@ update_dumpconf()
 update_bootpath()
 {
 	cur_bootpath=`$STMSBOOTUTIL -b`
-	if [ $? != 0 ]; then
+	if [ $? -ne 0 ]; then
 		cecho "stmsboot: ERROR! Unable to retrieve bootpath property\n"
 		exit 1
+	fi
+
+	# Since on x64 platforms the eeprom command doesn't update the
+	# kernel, the file /boot/solaris/bootenv.rc and the kernel's
+	# bootpath variable have a good chance of differing. We do some
+	# extra handwaving to get the correct bootpath variable setting. 
+
+	ONDISKVER=`$AWK '/bootpath/ {print $3}' /boot/solaris/bootenv.rc|\
+		$SED -e"s,',,g"`
+	if [ "$ONDISKVER" != "$cur_bootpath" ]; then
+		cur_bootpath="$ONDISKVER"
 	fi
 
 	NEWBOOTPATH=""
 	for path in $cur_bootpath; do
 		mapped=`$STMSBOOTUTIL -p $path`
 		if [ "$mapped" != "NOT_MAPPED" ]; then
-			if [ "x$mapped" != "x$path" ]; then
+			if [ "$mapped" != "$path" ]; then
 				NEWBOOTPATH=`echo "$path " | \
 				    $SED -e"s|$path|$mapped|"`" $NEWBOOTPATH"
 			else
@@ -324,7 +336,7 @@ mpxio_main()
 			# boot-device variable gives us
 			if [ -n "$ISROOTDEV" ]; then
 				ROOTDEVCHK=`grep $ISROOTDEV /etc/vfstab`
-				if [ $? != 0 ]; then
+				if [ $? -ne 0 ]; then
 					# we got a different path for root
 					exec < $SAVEDIR/vfstab.new; readvfstab /
 					FILEDEV=`$ECHO $special | \
@@ -338,14 +350,11 @@ mpxio_main()
 			$RM $SAVEDIR/vfstab.new
 			cecho ""
 			cecho "stmsboot: vfstab has been updated"
-			if update_dumpconf; then
-				# update svm configuration to reflect new names
-				if [ -s /kernel/drv/md.conf ] && \
-				    [ -x $METADEVADM ]; then
-					$METADEVADM -r >/dev/msglog 2>&1
-				fi
-			fi
-			if [ "x$MACH" = "xi386" ]; then
+			
+			update_dumpconf 
+			
+			MACH=`$UNAME -p`
+			if [ "$MACH" = "i386" ]; then
 				# only update bootpath here for x86
 				update_bootpath
 			fi
@@ -356,11 +365,13 @@ mpxio_main()
 		fi
 
 		$SVCADM disable system/device/mpxio-upgrade
+		
+		if [ $usrmounted -eq 1 ]; then
+			cecho "stmsboot: rebooting the system now."
+			$REBOOT
+		fi
 	else
 		mpxio_error "failed to mount the root filesystem."
-		if [ $usrmounted -eq 1 ]; then
-			$UMOUNT /usr
-		fi
 	fi
 }
 

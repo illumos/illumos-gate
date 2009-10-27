@@ -74,6 +74,8 @@ reboot_needed=0
 new_bootpath=""
 CLIENT_TYPE_PHCI=""
 CLIENT_TYPE_VHCI="/scsi_vhci"
+new_rootdev=""
+svm_md_device=""
 
 #
 # Copy all entries (including comments) from source driver.conf
@@ -147,7 +149,7 @@ build_recover()
 	echo "\tfsck <your-root-device>" >> $RECOVERFILE
 	echo "\tmount <your-root-device> /mnt" >> $RECOVERFILE
 
-	if [ "x$cmd" = xupdate ]; then
+	if [ "$cmd" = "update" ]; then
 		gettext "\tUndo the modifications you made to STMS configuration.\n\tFor example undo any changes you made to " >> $RECOVERFILE
 		echo "/mnt$KDRVCONF." >> $RECOVERFILE
 	else
@@ -164,7 +166,7 @@ build_recover()
 
 		echo "\t$SVCCFG -f /mnt$SVCCFG_RECOVERY" >> $RECOVERFILE
 
-		if [ "x$MACH" = "xi386" -a "x$new_bootpath" != "x" ]; then
+		if [ -n "$new_bootpath" -a "$MACH" = "i386" ]; then
 			echo "\tcp /mnt${SAVEDIR}/bootenv.rc.$cmd.$NOW /mnt/boot/solaris/$BOOTENV_FILE" >> $RECOVERFILE
 		fi
 	fi
@@ -189,8 +191,8 @@ update_sysfiles()
 	gettext "Do you want to continue ? [y/n] (default: y) "
 	read response
 
-	if [ "x$response" != x -a "x$response" != xy -a \
-	    "x$response" != xY ]; then
+	if [ -n "$response" -a "$response" != "y" -a \
+	    "$response" != "Y" ]; then
 		for d in $DRVLIST; do
 			TMPDRVCONF=/var/run/tmp.$d.conf.$$
 			$RM -f $TMPDRVCONF > /dev/null 2>&1
@@ -202,7 +204,7 @@ update_sysfiles()
 	# we support.
 	need_bootscript=`echo $SUPPORTED_DRIVERS|$AWK -F"|" '{print NF}'`
 
-	if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
+	if [ "$cmd" = "enable" -o "$cmd" = "disable" ]; then
 
 		for d in $DRVLIST; do
 			DRVCONF=$d.conf
@@ -235,11 +237,11 @@ update_sysfiles()
 
 			CLIENT_TYPE_PHCI=`$STMSBOOTUTIL -D $d -N`;
 
-			if [ "x$CLIENT_TYPE_PHCI" = "x" ]; then
+			if [ -z "$CLIENT_TYPE_PHCI" ]; then
 				continue;
 			fi
 
-			if [ "x$cmd" = "xenable" ]; then
+			if [ "$cmd" = "enable" ]; then
 				$LS -l /dev/dsk/*s2 2> /dev/null | \
 				    $EGREP -s "$CLIENT_TYPE_PHCI"
 			else
@@ -255,29 +257,32 @@ update_sysfiles()
 
 	if [ $need_bootscript -gt 0 ]; then
 		need_bootscript=1
-		if [ "x$MACH" = "xi386" -a "x$new_bootpath" != "x" ]; then
+		if [  -n "$new_bootpath" -a "$MACH" = "i386" ]; then
 			#only update bootpath for x86.
 			$CP /boot/solaris/$BOOTENV_FILE $SAVEDIR/$BOOTENV_FILE.$cmd.$NOW
 			$EEPROM bootpath="$new_bootpath"
 		fi
-		# Enable the mpxio-upgrade service for the reboot
-		$SVCADM disable -t $STMSINSTANCE
-		$SVCCFG -s $STMSINSTANCE "setprop general/enabled=true"
+
+		if [ "$svm_md_device" != "NOT_MAPPED" ]; then
+			# Enable the mpxio-upgrade service for the reboot
+			$SVCADM disable -t $STMSINSTANCE
+			$SVCCFG -s $STMSINSTANCE "setprop general/enabled=true"
+		fi
 	else
 		need_bootscript=0
 	fi
 
 	build_recover $need_bootscript
 
-	if [ "x$MACH" = "xi386" ]; then
+	if [ "$MACH" = "i386" ]; then
 		$BOOTADM update-archive
 	fi
 
 	gettext "The changes will come into effect after rebooting the system.\nReboot the system now ? [y/n] (default: y) "
 	read response
 
-	if [ "x$response" = x -o "x$response" = xy -o \
-	    "x$response" = xY ]; then
+	if [ -z "$response" -o "$response" = "y" -o \
+	    "$response" = "Y" ]; then
 		$REBOOT
 	fi
 
@@ -303,7 +308,7 @@ configure_mpxio()
 	satadisableno='disable-sata-mpxio[ 	]*=[ 	]*"no"[ 	]*;'
 	satadisableyes='disable-sata-mpxio[ 	]*=[ 	]*"yes"[ 	]*;'
 
-	if [ "x$cmd" = xenable ]; then
+	if [ "$cmd" = "enable" ]; then
 		mpxiodisable_cur_entry=$mpxiodisableyes
 		satadisable_cur_entry=$satadisableyes
 		propval=no
@@ -332,7 +337,7 @@ configure_mpxio()
 				# if all mpxiodisable entries are no/yes for
 				# enable/disable mpxio, notify the user
 				$EGREP -s "$satadisable_cur_entry" $TMPDRVCONF_SATA_ENTRY
-				if [ $? -eq 0 -a "$d" = mpt ]; then
+				if [ $? -eq 0 -a "$d" = "mpt" ]; then
 					reboot_needed=`$EXPR $reboot_needed + 1`
 				else
 					$RM -f $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY $TMPDRVCONF_SATA_ENTRY > /dev/null 2>&1
@@ -352,7 +357,7 @@ configure_mpxio()
 
 	rm $TMPDRVCONF_MPXIO_ENTRY $TMPDRVCONF_SATA_ENTRY > /dev/null 2>&1
 	echo "mpxio-disable=\"${propval}\";" >> $TMPDRVCONF
-	if [ "$d" = mpt ]; then
+	if [ "$d" = "mpt" ]; then
 		echo "disable-sata-mpxio=\"${propval}\";" >> $TMPDRVCONF
 	fi
 
@@ -360,7 +365,7 @@ configure_mpxio()
 
 setcmd()
 {
-	if [ "x$cmd" = xnone ]; then
+	if [ "$cmd" = "none" ]; then
 		cmd=$1
 	else
 		echo "$USAGE" 1>&2
@@ -376,7 +381,7 @@ setcmd()
 #
 
 get_newbootpath_for_stmsdev() {
-	if [ "x$cmd" = "xenable" ]; then
+	if [ "$cmd" = "enable" ]; then
 		return 0
 	fi
 
@@ -392,7 +397,7 @@ get_newbootpath_for_stmsdev() {
 
 	ONDISKVER=`$AWK '/bootpath/ {print $3}' /boot/solaris/bootenv.rc|\
 		$SED -e"s,',,g"`
-	if [ "x$ONDISKVER" != "x$cur_bootpath" ]; then
+	if [ "$ONDISKVER" != "$cur_bootpath" ]; then
 		cur_bootpath="$ONDISKVER"
 	fi
 
@@ -444,8 +449,8 @@ emit_driver_warning_msg() {
 	gettext "Do you wish to continue? [y/n] (default: y) " 
 	read response
 
-	if [ "x$response" != "x" -a "x$response" != "xY" -a \
-	    "x$response" != "xy" ]; then
+	if [ -n "$response" -a "$response" != "Y" -a \
+	    "$response" != "y" ]; then
 		exit
 	fi
 }
@@ -474,12 +479,12 @@ do
 	esac
 done
 
-if [ "x$cmd" = xnone ]; then
+if [ "$cmd" = "none" ]; then
 	echo "$USAGE" 1>&2
 	exit 2
 fi
 
-if [ "x$DRV" = "x" ]; then
+if [ -z "$DRV" ]; then
 	DRVLIST="fp mpt mpt_sas pmcs"
 else
 	DRVLIST=$DRV
@@ -510,6 +515,7 @@ if [ $? -ne 0 ]; then
 	if [ -f /var/svc/manifest/system/device/mpxio-upgrade.xml ]; then
 		$SVCCFG import /var/svc/manifest/system/device/mpxio-upgrade.xml
 		if [ $? -ne 0 ]; then
+
 			fmt=`gettext "Unable to import the %s service"`
 			printf "$fmt\n" "$STMSINSTANCE" 1>&2
 			exit 1
@@ -533,7 +539,7 @@ fi
 $STMSBOOTUTIL -i
 
 
-if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
+if [ "$cmd" = "enable" -o "$cmd" = "disable" -o "$cmd" = "update" ]; then
 	#
 	# The bootup script doesn't work on cache-only-clients as the script
 	# is executed before the plumbing for cachefs mounting of root is done.
@@ -558,8 +564,8 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 		gettext "Do you wish to reboot the system now? (y/n, default y) "
 		read response
 
-		if [ "x$response" = "x" -o "x$response" = "xY" -o \
-		    "x$response" = "xy" ]; then
+		if [ -z "$response" -o "x$response" = "Y" -o \
+		    "$response" = "y" ]; then
 			$REBOOT
 		else
 			echo ""
@@ -578,7 +584,7 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 		KDRVCONF=/kernel/drv/$d.conf
 		TMPDRVCONF=/var/run/tmp.$d.conf.$$
 		TMPDRVCONF_MPXIO_ENTRY=/var/run/tmp.$d.conf.mpxioentry.$$;
-		if [ "x$MACH" = "xsparc" ]; then
+		if [ "$MACH" = "sparc" ]; then
 			backup_lastsaved $KDRVCONF $VFSTAB
 		else
 			backup_lastsaved $KDRVCONF $VFSTAB /boot/solaris/$BOOTENV_FILE
@@ -586,7 +592,7 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 	done
 fi
 
-if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
+if [ "$cmd" = "enable" -o "$cmd" = "disable" ]; then
 
 	msgneeded=`echo "$DRVLIST" |grep " "`
 	if [ -n "$msgneeded" ]; then
@@ -603,8 +609,8 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
 		# If mpxio is currently disabled, we will update bootpath
 		# on reboot in the mpxio-upgrade service
 		
-		if [ "x$cmd" = "xdisable" ]; then
-			if [ "x$MACH" = "xi386" ]; then
+		if [ "$cmd" = "disable" ]; then
+			if [ "$MACH" = "i386" ]; then
 				get_newbootpath_for_stmsdev
 				if [ $? -ne 0 ]; then
 					$RM -f $TMPDRVCONF > /dev/null 2>&1
@@ -624,14 +630,18 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
 			    $AWK '{print $1}' | $SED -e"s,rdsk,dsk,g" \
 			    >$BOOTDEVICES
 		fi
+		new_rootdev=`$DF /|$AWK -F":" '{print $1}' | \
+			$AWK -F"(" '{print $2}'| \
+			$SED -e"s,dsk,rdsk," -e"s,[ ]*),,"`
+		svm_md_device=`$STMSBOOTUTIL -m $new_rootdev`
 		update_sysfiles
 	else
 		echo "STMS is already ${cmd}d. No changes or reboots needed"
 	fi
 
 
-elif [ "x$cmd" = xupdate ]; then
-	if [ "x$MACH" = "xi386" ]; then
+elif [ "$cmd" = "update" ]; then
+	if [ "$MACH" = "i386" ]; then
 	# In this case we always change the bootpath to phci-based
 	# path first. bootpath will later be modified in mpxio-upgrade
 	# to the vhci-based path if mpxio is enabled on root.
@@ -643,7 +653,7 @@ elif [ "x$cmd" = xupdate ]; then
 	fi
 	update_sysfiles
 
-elif [ "x$cmd" = xlist ]; then
+elif [ "$cmd" = "list" ]; then
 		$STMSBOOTUTIL $GUID -l $controller
 else
 		$STMSBOOTUTIL $GUID -L
