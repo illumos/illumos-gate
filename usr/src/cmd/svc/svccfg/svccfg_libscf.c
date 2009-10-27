@@ -9413,6 +9413,8 @@ export_service(scf_service_t *svc, int flags)
 			} else if (strcmp(exp_str, SCF_PG_DEPENDENTS) == 0) {
 				export_dependents(exp_pg, &elts);
 				continue;
+			} else if (strcmp(exp_str, SCF_PG_MANIFESTFILES) == 0) {
+				continue;
 			}
 		} else if (strcmp(exp_str, SCF_GROUP_TEMPLATE) == 0) {
 			export_template(exp_pg, &elts, &template_elts);
