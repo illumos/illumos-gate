@@ -371,6 +371,21 @@ boolean_t ahci_buf_64bit_dma = B_TRUE;
 boolean_t ahci_commu_64bit_dma = B_TRUE;
 
 /*
+ * By default, 64-bit dma for data buffer will be disabled for AMD/ATI SB600
+ * chipset. If the users want to have a try with 64-bit dma, please change
+ * the below variable value to enable it.
+ */
+boolean_t sb600_buf_64bit_dma_disable = B_TRUE;
+
+/*
+ * By default, 64-bit dma for command buffer will be disabled for AMD/ATI
+ * SB600/700/710/750/800. If the users want to have a try with 64-bit dma,
+ * please change the below value to enable it.
+ */
+boolean_t sbxxx_commu_64bit_dma_disable = B_TRUE;
+
+
+/*
  * End of global tunable variable definition
  */
 
@@ -833,14 +848,29 @@ intr_done:
 	ahci_ctlp->ahcictl_cmd_list_dma_attr = cmd_list_dma_attr;
 	ahci_ctlp->ahcictl_cmd_table_dma_attr = cmd_table_dma_attr;
 
+	/*
+	 * enable 64bit dma for data buffer for SB600 if
+	 * sb600_buf_64bit_dma_disable is B_FALSE
+	 */
 	if ((ahci_buf_64bit_dma == B_FALSE) ||
-	    (ahci_ctlp->ahcictl_cap & AHCI_CAP_BUF_32BIT_DMA)) {
+	    ((ahci_ctlp->ahcictl_cap & AHCI_CAP_BUF_32BIT_DMA) &&
+	    !(sb600_buf_64bit_dma_disable == B_FALSE &&
+	    ahci_ctlp->ahcictl_venid == 0x1002 &&
+	    ahci_ctlp->ahcictl_devid == 0x4380))) {
 		ahci_ctlp->ahcictl_buffer_dma_attr.dma_attr_addr_hi =
 		    0xffffffffull;
 	}
 
+	/*
+	 * enable 64bit dma for command buffer for SB600/700/710/800
+	 * if sbxxx_commu_64bit_dma_disable is B_FALSE
+	 */
 	if ((ahci_commu_64bit_dma == B_FALSE) ||
-	    (ahci_ctlp->ahcictl_cap & AHCI_CAP_COMMU_32BIT_DMA)) {
+	    ((ahci_ctlp->ahcictl_cap & AHCI_CAP_COMMU_32BIT_DMA) &&
+	    !(sbxxx_commu_64bit_dma_disable == B_FALSE &&
+	    ahci_ctlp->ahcictl_venid == 0x1002 &&
+	    (ahci_ctlp->ahcictl_devid == 0x4380 ||
+	    ahci_ctlp->ahcictl_devid == 0x4391)))) {
 		ahci_ctlp->ahcictl_rcvd_fis_dma_attr.dma_attr_addr_hi =
 		    0xffffffffull;
 		ahci_ctlp->ahcictl_cmd_list_dma_attr.dma_attr_addr_hi =
@@ -3656,7 +3686,6 @@ out:
 static int
 ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 {
-	ushort_t venid, devid;
 	ushort_t caps_ptr, cap_count, cap;
 #if AHCI_DEBUG
 	ushort_t pmcap, pmcsr;
@@ -3664,10 +3693,12 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 #endif
 	uint8_t revision;
 
-	venid = pci_config_get16(ahci_ctlp->ahcictl_pci_conf_handle,
+	ahci_ctlp->ahcictl_venid =
+	    pci_config_get16(ahci_ctlp->ahcictl_pci_conf_handle,
 	    PCI_CONF_VENID);
 
-	devid = pci_config_get16(ahci_ctlp->ahcictl_pci_conf_handle,
+	ahci_ctlp->ahcictl_devid =
+	    pci_config_get16(ahci_ctlp->ahcictl_pci_conf_handle,
 	    PCI_CONF_DEVID);
 
 	/*
@@ -3680,7 +3711,7 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	 * of PxCI can be re-written in the register write, so a flag will be
 	 * set to record this defect - AHCI_CAP_NO_MCMDLIST_NONQUEUE.
 	 */
-	if (venid == VIA_VENID) {
+	if (ahci_ctlp->ahcictl_venid == VIA_VENID) {
 		revision = pci_config_get8(ahci_ctlp->ahcictl_pci_conf_handle,
 		    PCI_CONF_REVID);
 		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
@@ -3700,14 +3731,10 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	/*
 	 * AMD/ATI SB600 (0x1002,0x4380) AHCI chipset doesn't support 64-bit
 	 * DMA addressing for communication memory descriptors though S64A bit
-	 * of CAP register declares it supports. However, it does support
-	 * 64-bit DMA for data buffer. So only AHCI_CAP_COMMU_32BIT_DMA is
-	 * set for this controller.
-	 *
-	 * Please note that AHCI_CAP_BUF_32BIT_DMA was ever set because we
-	 * found 64-bit DMA cannot work on ASUS M2A-VM with old BIOS version.
-	 * However, the issue can be resolved by upgrade of 1501+ BIOS, so
-	 * we decided to remove the flag.
+	 * of CAP register declares it supports. Even though 64-bit DMA for
+	 * data buffer works on ASUS M2A-VM with newer BIOS, three other
+	 * motherboards are known not, so both AHCI_CAP_BUF_32BIT_DMA and
+	 * AHCI_CAP_COMMU_32BIT_DMA are set for this controller.
 	 *
 	 * Due to certain hardware issue, the chipset must do port reset during
 	 * initialization, otherwise, when retrieving device signature,
@@ -3721,15 +3748,17 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	 * reset got failure, the driver will try to do another software reset
 	 * with pmport 0.
 	 */
-	if (venid == 0x1002 && devid == 0x4380) {
+	if (ahci_ctlp->ahcictl_venid == 0x1002 &&
+	    ahci_ctlp->ahcictl_devid == 0x4380) {
+		ahci_ctlp->ahcictl_cap |= AHCI_CAP_BUF_32BIT_DMA;
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_COMMU_32BIT_DMA;
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_INIT_PORT_RESET;
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_SRST_NO_HOSTPORT;
 
 		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
-		    "ATI SB600 cannot do 64-bit DMA for communication "
-		    "memory descriptors though CAP indicates support, "
-		    "so force it to use 32-bit DMA", NULL);
+		    "ATI SB600 cannot do 64-bit DMA for both data buffer and "
+		    "communication memory descriptors though CAP indicates "
+		    "support, so force it to use 32-bit DMA", NULL);
 		AHCIDBG(AHCIDBG_INIT, ahci_ctlp,
 		    "ATI SB600 need to do a port reset during initialization",
 		    NULL);
@@ -3754,7 +3783,8 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	 * SB700 also has the same issue about software reset, and thus
 	 * AHCI_CAP_SRST_NO_HOSTPORT flag also is needed.
 	 */
-	if (venid == 0x1002 && devid == 0x4391) {
+	if (ahci_ctlp->ahcictl_venid == 0x1002 &&
+	    ahci_ctlp->ahcictl_devid == 0x4391) {
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_COMMU_32BIT_DMA;
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_INIT_PORT_RESET;
 		ahci_ctlp->ahcictl_cap |= AHCI_CAP_SRST_NO_HOSTPORT;

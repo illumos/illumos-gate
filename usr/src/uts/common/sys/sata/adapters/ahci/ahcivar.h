@@ -345,6 +345,10 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 
 typedef struct ahci_ctl {
 	dev_info_t		*ahcictl_dip;
+
+	ushort_t		ahcictl_venid;
+	ushort_t		ahcictl_devid;
+
 	/* To map port number to cport number */
 	uint8_t			ahcictl_port_to_cport[AHCI_MAX_PORTS];
 	/* To map cport number to port number */
@@ -369,12 +373,14 @@ typedef struct ahci_ctl {
 	 * AHCI_CAP_NO_MCMDLIST_NONQUEUE
 	 * AHCI_CAP_NCQ
 	 * AHCI_CAP_PM
-	 * AHCI_CAP_32BIT_DMA
+	 * AHCI_CAP_BUF_32BIT_DMA
 	 * AHCI_CAP_SCLO
+	 * AHCI_CAP_COMMU_32BIT_DMA
 	 * AHCI_CAP_INIT_PORT_RESET
 	 * AHCI_CAP_SNTF
 	 * AHCI_CAP_PMULT_CBSS
 	 * AHCI_CAP_PMULT_FBSS
+	 * AHCI_CAP_SRST_NO_HOSTPORT
 	 */
 	int			ahcictl_cap;
 
