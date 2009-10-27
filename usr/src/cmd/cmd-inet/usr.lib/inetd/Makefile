@@ -19,12 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/cmd-inet/usr.lib/inetd/%M%
 #
 
 PROG	=	inetd
@@ -36,7 +32,7 @@ SRCS	= $(OBJS:%.o=%.c)
 
 include ../../../Makefile.cmd
 include ../../Makefile.cmd-inet
-include ../../../svc/Makefile.ctf
+include ../../../Makefile.ctf
 
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 
@@ -58,7 +54,7 @@ lint_SRCS := LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
 all:		$(PROG) $(SVCMETHOD)
 
 $(PROG): 	$(OBJS)
-		$(LINK.c) $(OBJS) -o $@ $(LDLIBS) $(CTFMERGE_HOOK)
+		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
 include ../Makefile.lib

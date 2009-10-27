@@ -446,6 +446,10 @@ mdb_ctf_type_size(mdb_ctf_id_t id)
 	mdb_ctf_impl_t *idp = (mdb_ctf_impl_t *)&id;
 	ssize_t ret;
 
+	/* resolve the type in case there's a forward declaration */
+	if ((ret = mdb_ctf_type_resolve(id, &id)) != 0)
+		return (ret);
+
 	if ((ret = ctf_type_size(idp->mci_fp, idp->mci_id)) == CTF_ERR)
 		return (set_errno(ctf_to_errno(ctf_errno(idp->mci_fp))));
 
@@ -586,6 +590,10 @@ mdb_ctf_enum_name(mdb_ctf_id_t id, int value)
 	mdb_ctf_impl_t *idp = (mdb_ctf_impl_t *)&id;
 	const char *ret;
 
+	/* resolve the type in case there's a forward declaration */
+	if (mdb_ctf_type_resolve(id, &id) != 0)
+		return (NULL);
+
 	if ((ret = ctf_enum_name(idp->mci_fp, idp->mci_id, value)) == NULL)
 		(void) set_errno(ctf_to_errno(ctf_errno(idp->mci_fp)));
 
@@ -613,6 +621,10 @@ mdb_ctf_member_iter(mdb_ctf_id_t id, mdb_ctf_member_f *cb, void *data)
 	member_iter_t mi;
 	int ret;
 
+	/* resolve the type in case there's a forward declaration */
+	if ((ret = mdb_ctf_type_resolve(id, &id)) != 0)
+		return (ret);
+
 	mi.mi_cb = cb;
 	mi.mi_arg = data;
 	mi.mi_fp = idp->mci_fp;
@@ -629,6 +641,11 @@ int
 mdb_ctf_enum_iter(mdb_ctf_id_t id, mdb_ctf_enum_f *cb, void *data)
 {
 	mdb_ctf_impl_t *idp = (mdb_ctf_impl_t *)&id;
+	int ret;
+
+	/* resolve the type in case there's a forward declaration */
+	if ((ret = mdb_ctf_type_resolve(id, &id)) != 0)
+		return (ret);
 
 	return (ctf_enum_iter(idp->mci_fp, idp->mci_id, cb, data));
 }

@@ -58,8 +58,6 @@
 #include <sys/sysconf.h>
 #include <sys/task.h>
 #include <sys/project.h>
-#include <sys/taskq.h>
-#include <sys/taskq_impl.h>
 #include <sys/errorq_impl.h>
 #include <sys/cred_impl.h>
 #include <sys/zone.h>
@@ -101,6 +99,7 @@
 #include "sobj.h"
 #include "streams.h"
 #include "sysevent.h"
+#include "taskq.h"
 #include "thread.h"
 #include "tsd.h"
 #include "tsol.h"
@@ -3853,115 +3852,6 @@ sysfile(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-/*
- * Dump a taskq_ent_t given its address.
- */
-/*ARGSUSED*/
-int
-taskq_ent(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	taskq_ent_t	taskq_ent;
-	GElf_Sym	sym;
-	char		buf[MDB_SYM_NAMLEN+1];
-
-
-	if (!(flags & DCMD_ADDRSPEC)) {
-		mdb_warn("expected explicit taskq_ent_t address before ::\n");
-		return (DCMD_USAGE);
-	}
-
-	if (mdb_vread(&taskq_ent, sizeof (taskq_ent_t), addr) == -1) {
-		mdb_warn("failed to read taskq_ent_t at %p", addr);
-		return (DCMD_ERR);
-	}
-
-	if (DCMD_HDRSPEC(flags)) {
-		mdb_printf("%<u>%-?s    %-?s    %-s%</u>\n",
-		"ENTRY", "ARG", "FUNCTION");
-	}
-
-	if (mdb_lookup_by_addr((uintptr_t)taskq_ent.tqent_func, MDB_SYM_EXACT,
-	    buf, sizeof (buf), &sym) == -1) {
-		(void) strcpy(buf, "????");
-	}
-
-	mdb_printf("%-?p    %-?p    %s\n", addr, taskq_ent.tqent_arg, buf);
-
-	return (DCMD_OK);
-}
-
-/*
- * Given the address of the (taskq_t) task queue head, walk the queue listing
- * the address of every taskq_ent_t.
- */
-int
-taskq_walk_init(mdb_walk_state_t *wsp)
-{
-	taskq_t	tq_head;
-
-
-	if (wsp->walk_addr == NULL) {
-		mdb_warn("start address required\n");
-		return (WALK_ERR);
-	}
-
-
-	/*
-	 * Save the address of the list head entry.  This terminates the list.
-	 */
-	wsp->walk_data = (void *)
-	    ((size_t)wsp->walk_addr + offsetof(taskq_t, tq_task));
-
-
-	/*
-	 * Read in taskq head, set walk_addr to point to first taskq_ent_t.
-	 */
-	if (mdb_vread((void *)&tq_head, sizeof (taskq_t), wsp->walk_addr) ==
-	    -1) {
-		mdb_warn("failed to read taskq list head at %p",
-		    wsp->walk_addr);
-	}
-	wsp->walk_addr = (uintptr_t)tq_head.tq_task.tqent_next;
-
-
-	/*
-	 * Check for null list (next=head)
-	 */
-	if (wsp->walk_addr == (uintptr_t)wsp->walk_data) {
-		return (WALK_DONE);
-	}
-
-	return (WALK_NEXT);
-}
-
-
-int
-taskq_walk_step(mdb_walk_state_t *wsp)
-{
-	taskq_ent_t	tq_ent;
-	int		status;
-
-
-	if (mdb_vread((void *)&tq_ent, sizeof (taskq_ent_t), wsp->walk_addr) ==
-	    -1) {
-		mdb_warn("failed to read taskq_ent_t at %p", wsp->walk_addr);
-		return (DCMD_ERR);
-	}
-
-	status = wsp->walk_callback(wsp->walk_addr, (void *)&tq_ent,
-	    wsp->walk_cbdata);
-
-	wsp->walk_addr = (uintptr_t)tq_ent.tqent_next;
-
-
-	/* Check if we're at the last element (next=head) */
-	if (wsp->walk_addr == (uintptr_t)wsp->walk_data) {
-		return (WALK_DONE);
-	}
-
-	return (status);
-}
-
 int
 didmatch(uintptr_t addr, const kthread_t *thr, kt_did_t *didp)
 {
@@ -4325,7 +4215,6 @@ static const mdb_dcmd_t dcmds[] = {
 		"print sysevent subclass list", sysevent_subclass_list},
 	{ "system", NULL, "print contents of /etc/system file", sysfile },
 	{ "task", NULL, "display kernel task(s)", task },
-	{ "taskq_entry", ":", "display a taskq_ent_t", taskq_ent },
 	{ "vnode2path", ":[-F]", "vnode address to pathname", vnode2path },
 	{ "vnode2smap", ":[offset]", "translate vnode to smap", vnode2smap },
 	{ "whereopen", ":", "given a vnode, dumps procs which have it open",
@@ -4571,6 +4460,11 @@ static const mdb_dcmd_t dcmds[] = {
 		"filter and display STREAM sync queue", syncq, syncq_help },
 	{ "syncq2q", ":", "print queue for a given syncq", syncq2q },
 
+	/* from taskq.c */
+	{ "taskq", ":[-atT] [-m min_maxq] [-n name]",
+	    "display a taskq", taskq, taskq_help },
+	{ "taskq_entry", ":", "display a taskq_ent_t", taskq_ent },
+
 	/* from thread.c */
 	{ "thread", "?[-bdfimps]", "display a summarized kthread_t", thread,
 		thread_help },
@@ -4672,8 +4566,6 @@ static const mdb_walker_t walkers[] = {
 		sysevent_subclass_list_walk_fini},
 	{ "task", "given a task pointer, walk its processes",
 		task_walk_init, task_walk_step, NULL },
-	{ "taskq_entry", "given a taskq_t*, list all taskq_ent_t in the list",
-		taskq_walk_init, taskq_walk_step, NULL, NULL },
 
 	/* from avl.c */
 	{ AVL_WALK_NAME, AVL_WALK_DESC,
@@ -4928,6 +4820,14 @@ static const mdb_walker_t walkers[] = {
 		str_walk_init, strr_walk_step, str_walk_fini },
 	{ "writeq", "walk write queue side of stdata",
 		str_walk_init, strw_walk_step, str_walk_fini },
+
+	/* from taskq.c */
+	{ "taskq_thread", "given a taskq_t, list all of its threads",
+		taskq_thread_walk_init,
+		taskq_thread_walk_step,
+		taskq_thread_walk_fini },
+	{ "taskq_entry", "given a taskq_t*, list all taskq_ent_t in the list",
+		taskq_ent_walk_init, taskq_ent_walk_step, NULL },
 
 	/* from thread.c */
 	{ "deathrow", "walk threads on both lwp_ and thread_deathrow",

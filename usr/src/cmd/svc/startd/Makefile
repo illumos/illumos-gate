@@ -52,7 +52,7 @@ SRCS = $(OBJS:%.o=%.c)
 POFILES = $(ALLOBJS:%.o=%.po)
 
 include ../../Makefile.cmd
-include ../Makefile.ctf
+include ../../Makefile.ctf
 
 ROOTCMDDIR=	$(ROOT)/lib/svc/bin
 
@@ -93,7 +93,7 @@ lint_SRCS := CPPFLAGS += \
 all: $(PROG)
 
 $(PROG): $(ALLOBJS)
-	$(LINK.c) -o $@ $(ALLOBJS) $(LDLIBS) $(CTFMERGE_HOOK)
+	$(LINK.c) -o $@ $(ALLOBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 $(POFILE): $(POFILES)

@@ -29,7 +29,7 @@ SRCS =		$(OBJS:%.o=%.c)
 POFILES = 	$(OBJS:.o=.po)
 
 include ../../Makefile.cmd
-include ../Makefile.ctf
+include ../../Makefile.ctf
 
 LDLIBS +=	-lnsl -lsocket
 
@@ -40,7 +40,7 @@ lint := LINTFLAGS = -ux
 all: $(PROG)
 
 $(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS) $(CTFMERGE_HOOK)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 install: all $(ROOTLIBPROG)

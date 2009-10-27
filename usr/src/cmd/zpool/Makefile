@@ -30,6 +30,7 @@ POFILES=$(OBJS:%.o=%.po)
 POFILE= zpool.po
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
 STATCOMMONDIR = $(SRC)/cmd/stat/common
 

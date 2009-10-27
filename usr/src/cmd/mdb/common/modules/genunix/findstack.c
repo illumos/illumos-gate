@@ -690,7 +690,36 @@ stacks_thread_cb(uintptr_t addr, const void *ignored, void *cbarg)
 }
 
 int
-stacks_run(int verbose)
+stacks_run_tlist(mdb_pipe_t *tlist, stacks_info_t *si)
+{
+	size_t idx;
+	size_t found = 0;
+	kthread_t kt;
+	int ret;
+
+	for (idx = 0; idx < tlist->pipe_len; idx++) {
+		uintptr_t addr = tlist->pipe_data[idx];
+
+		if (mdb_vread(&kt, sizeof (kt), addr) == -1) {
+			mdb_warn("unable to read kthread_t at %p", addr);
+			continue;
+		}
+		found++;
+
+		ret = stacks_thread_cb(addr, &kt, si);
+		if (ret == WALK_DONE)
+			break;
+		if (ret != WALK_NEXT)
+			return (-1);
+	}
+
+	if (found)
+		return (0);
+	return (-1);
+}
+
+int
+stacks_run(int verbose, mdb_pipe_t *tlist)
 {
 	stacks_info_t si;
 	findstack_info_t *fsip = &si.si_fsi;
@@ -714,9 +743,14 @@ stacks_run(int verbose)
 	if (verbose)
 		mdb_warn("stacks: processing kernel threads\n");
 
-	if (mdb_walk("thread", stacks_thread_cb, &si) != 0) {
-		mdb_warn("cannot walk \"thread\"");
-		return (DCMD_ERR);
+	if (tlist != NULL) {
+		if (stacks_run_tlist(tlist, &si))
+			return (DCMD_ERR);
+	} else {
+		if (mdb_walk("thread", stacks_thread_cb, &si) != 0) {
+			mdb_warn("cannot walk \"thread\"");
+			return (DCMD_ERR);
+		}
 	}
 
 	if (verbose)
@@ -745,7 +779,8 @@ stacks_run(int verbose)
 	stacks_hash = NULL;
 	mdb_free(si.si_hash, STACKS_HSIZE * sizeof (*si.si_hash));
 
-	stacks_state = STACKS_STATE_DONE;
+	if (tlist == NULL)
+		stacks_state = STACKS_STATE_DONE;
 
 	if (verbose)
 		mdb_warn("stacks: done\n");
@@ -959,6 +994,7 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	const char *excl_tstate_str = NULL;
 	uint_t tstate = -1U;
 	uint_t excl_tstate = -1U;
+	uint_t printed = 0;
 
 	uint_t all = 0;
 	uint_t force = 0;
@@ -1066,27 +1102,6 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	/*
-	 * Force a cleanup if we're connected to a live system. Never
-	 * do a cleanup after the first invocation around the loop.
-	 */
-	force |= (mdb_get_state() == MDB_STATE_RUNNING);
-	if (force && (flags & (DCMD_LOOPFIRST|DCMD_LOOP)) == DCMD_LOOP)
-		force = 0;
-
-	stacks_cleanup(force);
-
-	if (stacks_state == STACKS_STATE_CLEAN) {
-		int res = stacks_run(verbose);
-		if (res != DCMD_OK)
-			return (res);
-	}
-
-	if (!all && DCMD_HDRSPEC(flags) && !(flags & DCMD_PIPE_OUT)) {
-		mdb_printf("%<u>%-?s %-8s %-?s %8s%</u>\n",
-		    "THREAD", "STATE", "SOBJ", "COUNT");
-	}
-
-	/*
 	 * If there's an address specified, we're going to further filter
 	 * to only entries which have an address in the input.  To reduce
 	 * overhead (and make the sorted output come out right), we
@@ -1118,6 +1133,22 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 
 		seen = mdb_zalloc(p.pipe_len, UM_SLEEP | UM_GC);
+	}
+
+	/*
+	 * Force a cleanup if we're connected to a live system. Never
+	 * do a cleanup after the first invocation around the loop.
+	 */
+	force |= (mdb_get_state() == MDB_STATE_RUNNING);
+	if (force && (flags & (DCMD_LOOPFIRST|DCMD_LOOP)) == DCMD_LOOP)
+		force = 0;
+
+	stacks_cleanup(force);
+
+	if (stacks_state == STACKS_STATE_CLEAN) {
+		int res = stacks_run(verbose, addrspec ? &p : NULL);
+		if (res != DCMD_OK)
+			return (res);
 	}
 
 	for (idx = 0; idx < stacks_array_size; idx++) {
@@ -1209,9 +1240,10 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			continue;
 		}
 
-		if (all) {
+		if (all || !printed) {
 			mdb_printf("%<u>%-?s %-8s %-?s %8s%</u>\n",
-			    "THREAD", "STATE", "SOBJTYPE", "COUNT");
+			    "THREAD", "STATE", "SOBJ", "COUNT");
+			printed = 1;
 		}
 
 		do {

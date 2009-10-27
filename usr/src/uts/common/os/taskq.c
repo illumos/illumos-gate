@@ -203,7 +203,7 @@
  *
  *   taskq:
  *   +-------------+
- *   |tq_lock      | +---< taskq_ent_free()
+ *   | tq_lock     | +---< taskq_ent_free()
  *   +-------------+ |
  *   |...          | | tqent:                  tqent:
  *   +-------------+ | +------------+          +------------+
@@ -1238,16 +1238,29 @@ taskq_thread_create(taskq_t *tq)
 	t->t_taskq = tq;
 }
 
-static void
-taskq_thread_wait(taskq_t *tq, kcondvar_t *cv, callb_cpr_t *cprinfo)
+/*
+ * Common "sleep taskq thread" function, which handles CPR stuff, as well
+ * as giving a nice common point for debuggers to find inactive threads.
+ */
+static clock_t
+taskq_thread_wait(taskq_t *tq, kmutex_t *mx, kcondvar_t *cv,
+    callb_cpr_t *cprinfo, clock_t timeout)
 {
-	if (tq->tq_flags & TASKQ_CPR_SAFE) {
-		cv_wait(cv, &tq->tq_lock);
-	} else {
+	clock_t ret = 0;
+
+	if (!(tq->tq_flags & TASKQ_CPR_SAFE)) {
 		CALLB_CPR_SAFE_BEGIN(cprinfo);
-		cv_wait(cv, &tq->tq_lock);
-		CALLB_CPR_SAFE_END(cprinfo, &tq->tq_lock);
 	}
+	if (timeout < 0)
+		cv_wait(cv, mx);
+	else
+		ret = cv_timedwait(cv, mx, lbolt + timeout);
+
+	if (!(tq->tq_flags & TASKQ_CPR_SAFE)) {
+		CALLB_CPR_SAFE_END(cprinfo, mx);
+	}
+
+	return (ret);
 }
 
 /*
@@ -1312,15 +1325,16 @@ taskq_thread(void *arg)
 					break;
 
 				/* Wait for higher thread_ids to exit */
-				taskq_thread_wait(tq, &tq->tq_exit_cv,
-				    &cprinfo);
+				(void) taskq_thread_wait(tq, &tq->tq_lock,
+				    &tq->tq_exit_cv, &cprinfo, -1);
 				continue;
 			}
 		}
 		if ((tqe = tq->tq_task.tqent_next) == &tq->tq_task) {
 			if (--tq->tq_active == 0)
 				cv_broadcast(&tq->tq_wait_cv);
-			taskq_thread_wait(tq, &tq->tq_dispatch_cv, &cprinfo);
+			(void) taskq_thread_wait(tq, &tq->tq_lock,
+			    &tq->tq_dispatch_cv, &cprinfo, -1);
 			tq->tq_active++;
 			continue;
 		}
@@ -1441,10 +1455,8 @@ taskq_d_thread(taskq_ent_t *tqe)
 		 * If a thread is sleeping too long, it dies.
 		 */
 		if (! (bucket->tqbucket_flags & TQBUCKET_CLOSE)) {
-			CALLB_CPR_SAFE_BEGIN(&cprinfo);
-			w = cv_timedwait(cv, lock, lbolt +
-			    taskq_thread_timeout * hz);
-			CALLB_CPR_SAFE_END(&cprinfo, lock);
+			w = taskq_thread_wait(tq, lock, cv,
+			    &cprinfo, taskq_thread_timeout * hz);
 		}
 
 		/*

@@ -23,28 +23,27 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_MDB_PRINT_H
-#define	_MDB_PRINT_H
+#ifndef	_TASKQ_H
+#define	_TASKQ_H
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#ifdef	_MDB
+extern int taskq(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern void taskq_help(void);
 
-extern int cmd_enum(uintptr_t, uint_t, int, const mdb_arg_t *);
-extern void enum_help(void);
-extern int cmd_sizeof(uintptr_t, uint_t, int, const mdb_arg_t *);
-extern int cmd_offsetof(uintptr_t, uint_t, int, const mdb_arg_t *);
-extern int cmd_list(uintptr_t, uint_t, int, const mdb_arg_t *);
-extern int cmd_array(uintptr_t, uint_t, int, const mdb_arg_t *);
-extern int cmd_print(uintptr_t, uint_t, int, const mdb_arg_t *);
-extern void print_help(void);
+extern int taskq_ent(uintptr_t, uint_t, int, const mdb_arg_t *);
 
-#endif	/* _MDB */
+extern int taskq_ent_walk_init(mdb_walk_state_t *);
+extern int taskq_ent_walk_step(mdb_walk_state_t *);
+
+extern int taskq_thread_walk_init(mdb_walk_state_t *);
+extern int taskq_thread_walk_step(mdb_walk_state_t *);
+extern void taskq_thread_walk_fini(mdb_walk_state_t *);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _MDB_PRINT_H */
+#endif	/* _TASKQ_H */

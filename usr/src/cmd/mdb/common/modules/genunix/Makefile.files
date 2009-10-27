@@ -66,6 +66,7 @@ GENUNIX_SRCS =		\
 	sobj.c		\
 	streams.c	\
 	sysevent.c	\
+	taskq.c		\
 	thread.c	\
 	tsd.c		\
 	tsol.c		\

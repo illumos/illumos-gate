@@ -217,6 +217,7 @@ cmd_offsetof(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_ctf_id_t id;
 	ulong_t off;
 	char tn[MDB_SYM_NAMLEN];
+	ssize_t sz;
 	int ret;
 
 	if (flags & DCMD_ADDRSPEC)
@@ -235,35 +236,82 @@ cmd_offsetof(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	member = argv[1].a_un.a_str;
 
-	if (mdb_ctf_offsetof(id, member, &off) != 0) {
+	if (mdb_ctf_member_info(id, member, &off, &id) != 0) {
 		mdb_warn("failed to find member %s of type %s", member, tn);
 		return (DCMD_ERR);
 	}
 
-	if (off % NBBY == 0)
-		mdb_printf("offsetof (%s, %s) = %#lr\n",
-		    tn, member, off / NBBY);
-	else
-		mdb_printf("offsetof (%s, %s) = %#lr bits\n",
-		    tn, member, off);
+	if (flags & DCMD_PIPE_OUT) {
+		if (off % NBBY != 0) {
+			mdb_warn("member %s of type %s is not byte-aligned\n",
+			    member, tn);
+			return (DCMD_ERR);
+		}
+		mdb_printf("%#lr", off / NBBY);
+		return (DCMD_OK);
+	}
+
+	mdb_printf("offsetof (%s, %s) = %#lr",
+	    tn, member, off / NBBY);
+	if (off % NBBY != 0)
+		mdb_printf(".%lr", off % NBBY);
+
+	if ((sz = mdb_ctf_type_size(id)) > 0)
+		mdb_printf(", sizeof (...->%s) = %#lr", member, sz);
+
+	mdb_printf("\n");
 
 	return (DCMD_OK);
 }
 
+/*ARGSUSED*/
+static int
+enum_prefix_scan_cb(const char *name, int value, void *arg)
+{
+	char *str = arg;
+
+	/*
+	 * This function is called with every name in the enum.  We make
+	 * "arg" be the common prefix, if any.
+	 */
+	if (str[0] == 0) {
+		if (strlcpy(arg, name, MDB_SYM_NAMLEN) >= MDB_SYM_NAMLEN)
+			return (1);
+		return (0);
+	}
+
+	while (*name == *str) {
+		if (*str == 0) {
+			if (str != arg) {
+				str--;	/* don't smother a name completely */
+			}
+			break;
+		}
+		name++;
+		str++;
+	}
+	*str = 0;
+
+	return (str == arg);	/* only continue if prefix is non-empty */
+}
+
 struct enum_p2_info {
-	int	e_value;
-	char	*e_buf;
-	size_t	e_size;
-	uint_t	e_bits;
-	uint8_t	e_found;
-	uint8_t	e_zero;
+	intmax_t e_value;	/* value we're processing */
+	char	*e_buf;		/* buffer for holding names */
+	size_t	e_size;		/* size of buffer */
+	size_t	e_prefix;	/* length of initial prefix */
+	uint_t	e_allprefix;	/* apply prefix to first guy, too */
+	uint_t	e_bits;		/* bits seen */
+	uint8_t	e_found;	/* have we seen anything? */
+	uint8_t	e_first;	/* does buf contain the first one? */
+	uint8_t	e_zero;		/* have we seen a zero value? */
 };
 
 static int
 enum_p2_cb(const char *name, int bit_arg, void *arg)
 {
 	struct enum_p2_info *eiip = arg;
-	uint_t bit = bit_arg;
+	uintmax_t bit = bit_arg;
 
 	if (bit != 0 && !ISP2(bit))
 		return (1);	/* non-power-of-2; abort processing */
@@ -279,47 +327,84 @@ enum_p2_cb(const char *name, int bit_arg, void *arg)
 		eiip->e_bits |= bit;
 
 	if (eiip->e_buf != NULL && (eiip->e_value & bit) != 0) {
-		if (eiip->e_found)
-			(void) strlcat(eiip->e_buf, "|", eiip->e_size);
+		char *buf = eiip->e_buf;
+		size_t prefix = eiip->e_prefix;
 
-		if (strlcat(eiip->e_buf, name, eiip->e_size) >=
-		    eiip->e_size)
-			return (1);	/* overflowed */
+		if (eiip->e_found) {
+			(void) strlcat(buf, "|", eiip->e_size);
 
+			if (eiip->e_first && !eiip->e_allprefix && prefix > 0) {
+				char c1 = buf[prefix];
+				char c2 = buf[prefix + 1];
+				buf[prefix] = '{';
+				buf[prefix + 1] = 0;
+				mdb_printf("%s", buf);
+				buf[prefix] = c1;
+				buf[prefix + 1] = c2;
+				mdb_printf("%s", buf + prefix);
+			} else {
+				mdb_printf("%s", buf);
+			}
+
+		}
+		/* skip the common prefix as necessary */
+		if ((eiip->e_found || eiip->e_allprefix) &&
+		    strlen(name) > prefix)
+			name += prefix;
+
+		(void) strlcpy(eiip->e_buf, name, eiip->e_size);
+		eiip->e_first = !eiip->e_found;
 		eiip->e_found = 1;
 	}
 	return (0);
 }
 
 static int
-enum_value_to_name_p2(mdb_ctf_id_t id, int v, char *buf, size_t size)
+enum_is_p2(mdb_ctf_id_t id)
 {
 	struct enum_p2_info eii;
+	bzero(&eii, sizeof (eii));
+
+	return (mdb_ctf_type_kind(id) == CTF_K_ENUM &&
+	    mdb_ctf_enum_iter(id, enum_p2_cb, &eii) == 0 &&
+	    eii.e_bits != 0);
+}
+
+static int
+enum_value_print_p2(mdb_ctf_id_t id, intmax_t value, uint_t allprefix)
+{
+	struct enum_p2_info eii;
+	char prefix[MDB_SYM_NAMLEN + 2];
+	intmax_t missed;
 
 	bzero(&eii, sizeof (eii));
 
-	eii.e_value = v;
-	eii.e_buf = buf;
-	eii.e_size = size;
+	eii.e_value = value;
+	eii.e_buf = prefix;
+	eii.e_size = sizeof (prefix);
+	eii.e_allprefix = allprefix;
 
-	if (buf != NULL && size > 0)
-		buf[0] = '\0';
+	prefix[0] = 0;
+	if (mdb_ctf_enum_iter(id, enum_prefix_scan_cb, prefix) == 0)
+		eii.e_prefix = strlen(prefix);
 
-	if (mdb_ctf_type_kind(id) != CTF_K_ENUM ||
-	    mdb_ctf_enum_iter(id, enum_p2_cb, &eii) != 0 ||
-	    eii.e_bits == 0)
+	if (mdb_ctf_enum_iter(id, enum_p2_cb, &eii) != 0 || eii.e_bits == 0)
 		return (-1);
 
-	if (buf != NULL && (!eii.e_found || (v & ~eii.e_bits) != 0)) {
-		char val[16];
+	missed = (value & ~(intmax_t)eii.e_bits);
 
-		(void) mdb_snprintf(val, sizeof (val),
-		    "0x%x", (v & ~eii.e_bits));
+	if (eii.e_found) {
+		/* push out any final value, with a | if we missed anything */
+		if (!eii.e_first)
+			(void) strlcat(prefix, "}", sizeof (prefix));
+		if (missed != 0)
+			(void) strlcat(prefix, "|", sizeof (prefix));
 
-		if (eii.e_found)
-			(void) strlcat(buf, "|", size);
-		if (strlcat(buf, val, size) >= size)
-			return (-1);
+		mdb_printf("%s", prefix);
+	}
+
+	if (!eii.e_found || missed) {
+		mdb_printf("%#llx", missed);
 	}
 
 	return (0);
@@ -328,24 +413,39 @@ enum_value_to_name_p2(mdb_ctf_id_t id, int v, char *buf, size_t size)
 struct enum_cbinfo {
 	uint_t		e_flags;
 	const char	*e_string;	/* NULL for value searches */
-	int		e_value;
+	size_t		e_prefix;
+	intmax_t	e_value;
 	uint_t		e_found;
+	mdb_ctf_id_t	e_id;
 };
-#define	E_PRETTY		0x1
-#define	E_HEX			0x2
-#define	E_SEARCH_STRING		0x4
-#define	E_SEARCH_VALUE		0x8
+#define	E_PRETTY		0x01
+#define	E_HEX			0x02
+#define	E_SEARCH_STRING		0x04
+#define	E_SEARCH_VALUE		0x08
+#define	E_ELIDE_PREFIX		0x10
 
 static void
 enum_print(struct enum_cbinfo *info, const char *name, int value)
 {
 	uint_t flags = info->e_flags;
+	uint_t elide_prefix = (info->e_flags & E_ELIDE_PREFIX);
+
+	if (name != NULL && info->e_prefix && strlen(name) > info->e_prefix)
+		name += info->e_prefix;
 
 	if (flags & E_PRETTY) {
-		if (flags & E_HEX)
-			mdb_printf("%-8x %s\n", value, name);
-		else
-			mdb_printf("%-11d %s\n", value, name);
+		uint_t indent = 5 + ((flags & E_HEX) ? 8 : 11);
+
+		mdb_printf((flags & E_HEX)? "%8x " : "%11d ", value);
+		(void) mdb_inc_indent(indent);
+		if (name != NULL) {
+			mdb_iob_puts(mdb.m_out, name);
+		} else {
+			(void) enum_value_print_p2(info->e_id, value,
+			    elide_prefix);
+		}
+		(void) mdb_dec_indent(indent);
+		mdb_printf("\n");
 	} else {
 		mdb_printf("%#r\n", value);
 	}
@@ -372,6 +472,23 @@ enum_cb(const char *name, int value, void *arg)
 	return (0);
 }
 
+void
+enum_help(void)
+{
+	mdb_printf("%s",
+"Without an address and name, print all values for the enumeration \"enum\".\n"
+"With an address, look up a particular value in \"enum\".  With a name, look\n"
+"up a particular name in \"enum\".\n");
+
+	(void) mdb_dec_indent(2);
+	mdb_printf("\n%<b>OPTIONS%</b>\n");
+	(void) mdb_inc_indent(2);
+
+	mdb_printf("%s",
+"   -e    remove common prefixes from enum names\n"
+"   -x    report enum values in hexadecimal\n");
+}
+
 /*ARGSUSED*/
 int
 cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -380,11 +497,13 @@ cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	char type[MDB_SYM_NAMLEN + sizeof ("enum ")];
 	char tn2[MDB_SYM_NAMLEN + sizeof ("enum ")];
+	char prefix[MDB_SYM_NAMLEN];
 	mdb_ctf_id_t id;
 	mdb_ctf_id_t idr;
 
 	int i;
 	intmax_t search;
+	uint_t isp2;
 
 	info.e_flags = (flags & DCMD_PIPE_OUT)? 0 : E_PRETTY;
 	info.e_string = NULL;
@@ -392,6 +511,7 @@ cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	info.e_found = 0;
 
 	i = mdb_getopts(argc, argv,
+	    'e', MDB_OPT_SETBITS, E_ELIDE_PREFIX, &info.e_flags,
 	    'x', MDB_OPT_SETBITS, E_HEX, &info.e_flags,
 	    NULL);
 
@@ -433,6 +553,8 @@ cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	info.e_id = idr;
+
 	if (argc > 2)
 		return (DCMD_USAGE);
 
@@ -462,24 +584,31 @@ cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if ((int)search != search) {
 			mdb_warn("value '%lld' out of enumeration range\n",
 			    search);
-			return (DCMD_ERR);
 		}
 		info.e_value = search;
 	}
 
+	isp2 = enum_is_p2(idr);
+	if (isp2)
+		info.e_flags |= E_HEX;
+
 	if (DCMD_HDRSPEC(flags) && (info.e_flags & E_PRETTY)) {
 		if (info.e_flags & E_HEX)
-			mdb_printf("%<b>%-8s %s%</b>\n", "VALUE", "NAME");
+			mdb_printf("%<u>%8s %-64s%</u>\n", "VALUE", "NAME");
 		else
-			mdb_printf("%<b>%-11s %s%</b>\n", "VALUE", "NAME");
+			mdb_printf("%<u>%11s %-64s%</u>\n", "VALUE", "NAME");
 	}
 
 	/* if the enum is a power-of-two one, process it that way */
-	if ((info.e_flags & E_SEARCH_VALUE) &&
-	    enum_value_to_name_p2(idr, info.e_value, tn2, sizeof (tn2)) == 0) {
-		enum_print(&info, tn2, info.e_value);
+	if ((info.e_flags & E_SEARCH_VALUE) && isp2) {
+		enum_print(&info, NULL, info.e_value);
 		return (DCMD_OK);
 	}
+
+	prefix[0] = 0;
+	if ((info.e_flags & E_ELIDE_PREFIX) &&
+	    mdb_ctf_enum_iter(id, enum_prefix_scan_cb, prefix) == 0)
+		info.e_prefix = strlen(prefix);
 
 	if (mdb_ctf_enum_iter(idr, enum_cb, &info) == -1) {
 		mdb_warn("cannot walk '%s' as enum", type);
@@ -492,7 +621,8 @@ cmd_enum(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			mdb_warn("name \"%s\" not in '%s'\n", info.e_string,
 			    type);
 		else
-			mdb_warn("value %#d not in '%s'\n", info.e_value, type);
+			mdb_warn("value %#lld not in '%s'\n", info.e_value,
+			    type);
 
 		return (DCMD_ERR);
 	}
@@ -1153,11 +1283,12 @@ print_enum(const char *type, const char *name, mdb_ctf_id_t id,
     mdb_ctf_id_t base, ulong_t off, printarg_t *pap)
 {
 	mdb_tgt_addr_t addr = pap->pa_addr + off / NBBY;
-	char vname[MDB_SYM_NAMLEN];
 	const char *ename;
 	int value;
+	int isp2 = enum_is_p2(base);
+	int flags = pap->pa_flags | (isp2 ? PA_INTHEX : 0);
 
-	if (!(pap->pa_flags & PA_SHOWVAL))
+	if (!(flags & PA_SHOWVAL))
 		return (0);
 
 	if (mdb_tgt_aread(pap->pa_tgt, pap->pa_as,
@@ -1166,19 +1297,23 @@ print_enum(const char *type, const char *name, mdb_ctf_id_t id,
 		return (1);
 	}
 
-	if (pap->pa_flags & PA_INTHEX)
+	if (flags & PA_INTHEX)
 		mdb_printf("%#x", value);
 	else
 		mdb_printf("%#d", value);
 
-	ename = mdb_ctf_enum_name(base, value);
+	(void) mdb_inc_indent(8);
+	mdb_printf(" (");
 
-	/* If it wasn't an exact match, check if we can do P2 matching */
-	if (ename == NULL &&
-	    enum_value_to_name_p2(base, value, vname, sizeof (vname)) == 0)
-		ename = vname;
-
-	mdb_printf(" (%s)", (ename != NULL)? ename : "???");
+	if (!isp2 || enum_value_print_p2(base, value, 0) != 0) {
+		ename = mdb_ctf_enum_name(base, value);
+		if (ename == NULL) {
+			ename = "???";
+		}
+		mdb_printf("%s", ename);
+	}
+	mdb_printf(")");
+	(void) mdb_dec_indent(8);
 
 	return (0);
 }

@@ -30,6 +30,7 @@ POFILES=	zfs_main.po zfs_iter.po
 POFILE=		zfs.po
 
 include ../Makefile.cmd
+include ../Makefile.ctf
 
 FSTYPE=         zfs
 LINKPROGS=	mount umount

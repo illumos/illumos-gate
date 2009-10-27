@@ -50,7 +50,7 @@ POFILES = 	$(SRCS:%.c=%.po) \
 		../common/manifest_hash.po
 
 include ../../Makefile.cmd
-include ../Makefile.ctf
+include ../../Makefile.ctf
 
 POFILE =	$(PROG)_all.po
 
@@ -120,7 +120,7 @@ native: FRC
 	@NATIVE_BUILD= $(MAKE) $(MFLAGS) all
 
 $(PROG): $(OBJS) $(MAPFILES)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS) $(CTFMERGE_HOOK)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
 $(POFILE): $(POFILES)
@@ -146,15 +146,15 @@ lint: $(LNTS)
 	$(LINT.c) $(LINTFLAGS) $(LNTS) $(LDLIBS)
 
 %-native.o: %.c
-	$(COMPILE.c) -o $@ $< $(CTFCONVERT_HOOK)
+	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
 %-native.o: ../common/%.c
-	$(COMPILE.c) -o $@ $< $(CTFCONVERT_HOOK)
+	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
 %.o: ../common/%.c
-	$(COMPILE.c) $(OUTPUT_OPTION) $< $(CTFCONVERT_HOOK)
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
 	$(POST_PROCESS_O)
 
 %.ln: ../common/%.c
