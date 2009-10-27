@@ -51,10 +51,6 @@ f none usr/include/asm/flush.h 644 root bin
 f none usr/include/rpc/ib.h 644 root bin
 f none usr/include/sys/bpp_var.h 644 root bin
 f none usr/include/sys/bpp_reg.h 644 root bin
-f none usr/include/sys/cg3var.h 644 root bin
-f none usr/include/sys/cg6fbc.h 644 root bin
-f none usr/include/sys/cg6tec.h 644 root bin
-f none usr/include/sys/cg6thc.h 644 root bin
 f none usr/include/sys/cmpregs.h 644 root bin
 f none usr/include/sys/dkmpio.h 644 root bin
 f none usr/include/sys/dmaga.h 644 root bin
@@ -70,7 +66,6 @@ f none usr/include/sys/fpu/fpusystm.h 644 root bin
 f none usr/include/sys/fpu/globals.h 644 root bin
 f none usr/include/sys/fpu/ieee.h 644 root bin
 f none usr/include/sys/fsr.h 644 root bin
-f none usr/include/sys/ramdac.h 644 root bin
 f none usr/include/sys/scsi/adapters/espcmd.h 644 root bin
 f none usr/include/sys/scsi/adapters/espreg.h 644 root bin
 f none usr/include/sys/scsi/adapters/espvar.h 644 root bin

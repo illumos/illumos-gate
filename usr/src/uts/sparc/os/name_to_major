@@ -34,7 +34,6 @@ isadma 35
 fd 36
 su 37
 openeepr 38
-cgsix 39
 udp 41
 tcp 42
 rts 43

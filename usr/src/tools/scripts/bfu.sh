@@ -8019,6 +8019,14 @@ mondo_loop() {
 	rm -f $usr/ucblib/sparcv9/llib-lucb
 	rm -f $usr/ucblib/sparcv9/llib-lucb.ln
 
+	# Remove cgsix
+	rm -f $root/platform/sun4u/kernel/drv/sparcv9/cgsix
+	rm -f $usr/include/sys/cg6reg.h
+	rm -f $usr/include/sys/cg6thc.h
+	rm -f $usr/include/sys/cg6fbc.h
+	rm -f $usr/include/sys/cg6tec.h
+	rm -f $usr/include/sys/ramdac.h
+
 	#
 	# The pkg* commands should not be used after this point and before
 	# archive extraction as libcrypto/libssl may not be available.

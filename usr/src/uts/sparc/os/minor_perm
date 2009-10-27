@@ -1,7 +1,4 @@
 audio:* 0600 root sys
-bwtwo:* 0666 root sys
-cgsix:* 0666 root sys
-cgthree:* 0666 root sys
 clone:dmfe 0666 root sys
 dmfe:* 0666 root sys
 clone:pcelx 0666 root sys

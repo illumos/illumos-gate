@@ -356,7 +356,6 @@ MACH_NOT_YET_KMODS	 = $(AUTOCONF_OBJS)
 #	XXX: How many of these are really machine specific?
 #
 DRV_KMODS	+= bbc_beep
-DRV_KMODS	+= cgsix
 DRV_KMODS	+= cpc
 DRV_KMODS	+= dma fd
 DRV_KMODS	+= rootnex sbusmem upa64s zs zsh

@@ -33,14 +33,6 @@
 #
 #	object lists
 #
-#	XXX -	vuid_* ?, files indicates these should be in the win and
-#		kbd modules.... What gives?
-#
-#
-#	generic-unix module
-#
-GENUNIX_OBJS +=								\
-	mem_kern.o
 
 #
 #			Driver Modules
@@ -48,8 +40,6 @@ GENUNIX_OBJS +=								\
 AUDIOCS_OBJS +=	audio_4231.o audio_4231_apcdma.o audio_4231_eb2dma.o
 
 BPP_OBJS +=	bpp.o
-
-CGSIX_OBJS +=	cgsix.o
 
 DAD_OBJS +=	dad.o
 

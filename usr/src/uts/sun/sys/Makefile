@@ -30,16 +30,11 @@ HDRS=  \
 avintr.h \
 bootconf.h		bpp_reg.h \
 bpp_var.h \
-cg3var.h		\
-cg6fbc.h		cg6reg.h		cg6tec.h \
-cg6thc.h		cg6var.h \
 dkmpio.h		dmaga.h	\
 fdreg.h			fdvar.h \
-memvar.h \
-obpdefs.h		pixrect.h  \
-pr_impl_util.h		pr_planegroups.h \
+obpdefs.h		\
 promif.h		promimpl.h \
-ramdac.h 		ser_async.h		ser_zscc.h \
+ser_async.h		ser_zscc.h \
 socalio.h		socalreg.h \
 socal_cq_defs.h		socalmap.h		socalvar.h \
 stp4020_reg.h		stp4020_var.h \

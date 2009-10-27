@@ -94,6 +94,7 @@ obsolete_sparc()
 		obs["gptwo"] = 1;
 		obs["bwtwo"] = 1;
 		obs["cgthree"] = 1;
+		obs["cgsix"] = 1;
 		obs["obio"] = 1;
 		obs["cpu"] = 1;
 		obs["bootbus"] = 1;

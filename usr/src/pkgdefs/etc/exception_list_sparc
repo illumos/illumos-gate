@@ -384,10 +384,6 @@ usr/include/sys/sha2_consts.h		sparc
 # The following are win and graphics related also ignore and do NOT replace.
 #
 usr/include/sys/ieeefp.h		sparc
-usr/include/sys/memvar.h		sparc
-usr/include/sys/pixrect.h		sparc
-usr/include/sys/pr_planegroups.h	sparc
-usr/include/sys/pr_impl_util.h		sparc
 usr/include/sys/winlockio.h		sparc
 #
 # these are just funky entries - they are fixed up
