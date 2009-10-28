@@ -1888,7 +1888,6 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 		pmcs_prt(pwp, PMCS_PRT_DEBUG,
 		    "%s: cmd 0x%p (tag 0x%x) timed out for %s",
 		    __func__, (void *)sp, pwrk->htag, pptr->path);
-		do_ds_recovery = B_TRUE;
 		goto out;
 	}
 
@@ -2029,9 +2028,6 @@ out:
 	mutex_enter(&xp->statlock);
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
-		mutex_enter(&pwp->cq_lock);
-		STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
-		mutex_exit(&pwp->cq_lock);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG2,
 		    "%s: Completing command for dead target 0x%p", __func__,
 		    (void *)xp);
@@ -2478,9 +2474,6 @@ out:
 
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
-		mutex_enter(&pwp->cq_lock);
-		STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
-		mutex_exit(&pwp->cq_lock);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG2,
 		    "%s: Completing command for dead target 0x%p", __func__,
 		    (void *)xp);

@@ -2138,6 +2138,7 @@ pmcs_discover(pmcs_hw_t *pwp)
 {
 	pmcs_phy_t		*pptr;
 	pmcs_phy_t		*root_phy;
+	boolean_t		config_changed;
 
 	DTRACE_PROBE2(pmcs__discover__entry, ulong_t, pwp->work_flags,
 	    boolean_t, pwp->config_changed);
@@ -2218,17 +2219,18 @@ pmcs_discover(pmcs_hw_t *pwp)
 	 * SAS address or removal of target role will cause us to mark them
 	 * (and their descendents) as dead (and cause any pending commands
 	 * and associated devices to be removed).
+	 *
+	 * NOTE: We don't want to bail on discovery if the config has
+	 * changed until *after* we run pmcs_kill_devices.
 	 */
 	root_phy = pwp->root_phys;
-	if (pmcs_check_expanders(pwp, root_phy) == B_TRUE) {
-		goto out;
-	}
+	config_changed = pmcs_check_expanders(pwp, root_phy);
 
 	/*
 	 * 2. Descend the tree looking for dead devices and kill them
 	 * by aborting all active commands and then deregistering them.
 	 */
-	if (pmcs_kill_devices(pwp, root_phy)) {
+	if (pmcs_kill_devices(pwp, root_phy) || config_changed) {
 		goto out;
 	}
 
@@ -5641,7 +5643,6 @@ pmcs_kill_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 	int r, result;
 	uint32_t msg[PMCS_MSG_SIZE], *ptr, status;
 	struct pmcwork *pwrk;
-	pmcs_xscsi_t *tgt;
 
 	pmcs_prt(pwp, PMCS_PRT_DEBUG, "kill %s device @ %s",
 	    pmcs_get_typename(pptr->dtype), pptr->path);
@@ -5670,19 +5671,6 @@ pmcs_kill_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 			return (r);
 		}
 		pptr->abort_pending = 0;
-	}
-
-	/*
-	 * Now that everything is aborted from the chip's perspective (or even
-	 * if it is not), flush out the wait queue.  We won't flush the active
-	 * queue since it is possible that abort completions may follow after
-	 * the notification that the abort all has completed.
-	 */
-	tgt = pptr->target;
-	if (tgt) {
-		mutex_enter(&tgt->statlock);
-		pmcs_flush_target_queues(pwp, tgt, PMCS_TGT_WAIT_QUEUE);
-		mutex_exit(&tgt->statlock);
 	}
 
 	if (pptr->valid_device_id == 0) {
@@ -6975,7 +6963,8 @@ pmcs_dev_state_recovery(pmcs_hw_t *pwp, pmcs_phy_t *phyp)
 			goto next_phy;
 		}
 
-		if (tgt->dev_state == ds) {
+		if ((tgt->dev_state == ds) &&
+		    (ds == PMCS_DEVICE_STATE_IN_RECOVERY)) {
 			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE,
 			    "%s: Target 0x%p already IN_RECOVERY", __func__,
 			    (void *)tgt);
