@@ -1333,6 +1333,19 @@ pci_reprogram(void)
 		    isa_res.io_used);
 		memlist_remove_list(&pci_bus_res[bus].mem_avail,
 		    isa_res.mem_used);
+
+		/*
+		 * 3. Exclude <1M address range here in case below reserved
+		 * ranges for BIOS data area, ROM area etc are wrongly reported
+		 * in ACPI resource producer entries for PCI root bus.
+		 * 	00000000 - 000003FF	RAM
+		 * 	00000400 - 000004FF	BIOS data area
+		 * 	00000500 - 0009FFFF	RAM
+		 * 	000A0000 - 000BFFFF	VGA RAM
+		 * 	000C0000 - 000FFFFF	ROM area
+		 */
+		memlist_remove(&pci_bus_res[bus].mem_avail, 0, 0x100000);
+		memlist_remove(&pci_bus_res[bus].pmem_avail, 0, 0x100000);
 	}
 
 	memlist_free_all(&isa_res.io_used);
