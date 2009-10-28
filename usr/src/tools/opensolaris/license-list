@@ -156,6 +156,8 @@ usr/src/uts/common/io/iwi/THIRDPARTYLICENSE
 usr/src/uts/common/io/iwi/fw-ipw2200/LICENSE
 usr/src/uts/common/io/iwk/THIRDPARTYLICENSE
 usr/src/uts/common/io/iwk/fw-iw/LICENSE
+usr/src/uts/common/io/iwp/THIRDPARTYLICENSE
+usr/src/uts/common/io/iwp/fw-iw/LICENSE
 usr/src/uts/common/io/ixgbe/THIRDPARTYLICENSE
 usr/src/uts/common/io/mega_sas/THIRDPARTYLICENSE
 usr/src/uts/common/io/mr_sas/THIRDPARTYLICENSE

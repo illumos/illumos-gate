@@ -260,6 +260,7 @@ DRV_KMODS	+= ipw
 DRV_KMODS	+= iwh
 DRV_KMODS	+= iwi
 DRV_KMODS	+= iwk
+DRV_KMODS	+= iwp
 DRV_KMODS	+= iwscn
 DRV_KMODS	+= kb8042
 DRV_KMODS	+= keysock

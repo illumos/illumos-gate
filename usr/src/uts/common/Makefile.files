@@ -1742,6 +1742,8 @@ IWH_OBJS += iwh.o
 
 IWK_OBJS += iwk2.o
 
+IWP_OBJS += iwp.o
+
 MWL_OBJS += mwl.o
 
 MWLFW_OBJS += mwlfw_mode.o

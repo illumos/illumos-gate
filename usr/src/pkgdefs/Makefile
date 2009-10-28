@@ -133,6 +133,7 @@ i386_SUBDIRS= \
 	SUNWiwh	\
 	SUNWiwi \
 	SUNWiwk \
+	SUNWiwp \
 	SUNWkvm.i \
 	SUNWlxr \
 	SUNWlxu \
