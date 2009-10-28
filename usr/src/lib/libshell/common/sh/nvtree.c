@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -193,6 +193,8 @@ void *nv_diropen(Namval_t *np,const char *name)
 				last = 0;
 			}
 		}
+		else
+			dp->hp = (Namval_t*)dtfirst(dp->root);
 	}
 	else
 		dp->hp = (Namval_t*)dtfirst(dp->root);
@@ -283,7 +285,7 @@ char *nv_dirnext(void *dir)
 			if(nv_isarray(np))
 				nv_putsub(np,(char*)0, ARRAY_UNDEF);
 			dp->hp = nextnode(dp);
-			if(nv_isnull(np) && !nv_isarray(np))
+			if(nv_isnull(np) && !nv_isarray(np) && !nv_isattr(np,NV_INTEGER))
 				continue;
 			last_table = sh.last_table;
 #if 0
@@ -417,7 +419,7 @@ void nv_attribute(register Namval_t *np,Sfio_t *out,char *prefix,int noname)
 		{
 			if(nv_isvtree(np))
 				sfprintf(out,"%s -C ",prefix);
-			else if(!np->nvalue.cp && nv_isattr(np,~NV_NOFREE)==NV_MINIMAL && strcmp(np->nvname,"_"))
+			else if((!np->nvalue.cp||np->nvalue.cp==Empty) && nv_isattr(np,~NV_NOFREE)==NV_MINIMAL && strcmp(np->nvname,"_"))
 				sfputr(out,prefix,' ');
 		}
 		return;
@@ -478,7 +480,7 @@ void nv_attribute(register Namval_t *np,Sfio_t *out,char *prefix,int noname)
 					}
 					else if(tp->sh_name[1]=='A')
 						continue;
-					if(ap && (ap->nelem&ARRAY_TREE))
+					if((ap && (ap->nelem&ARRAY_TREE)) || (!ap && nv_isattr(np,NV_NOFREE)))
 					{
 						if(prefix && *prefix)
 							sfwrite(out,"-C ",3);
@@ -592,6 +594,8 @@ void nv_outnode(Namval_t *np, Sfio_t* out, int indent, int special)
 		if(mp && nv_isvtree(mp))
 			nv_onattr(mp,NV_EXPORT);
 		ep = nv_getval(mp?mp:np);
+		if(ep==Empty)
+			ep = 0;
 		xp = 0;
 		if(!ap && nv_isattr(np,NV_INTEGER|NV_LJUST)==NV_LJUST)
 		{
@@ -681,7 +685,7 @@ static void outval(char *name, const char *vname, struct Walk *wp)
 		if(!xp)
 			return;
 	}
-	if((nv_isnull(np) || np->nvalue.cp==Empty) && !nv_isarray(np))
+	if(nv_isnull(np) && !nv_isarray(np) && !nv_isattr(np,NV_INTEGER))
 		return;
 	if(special || (nv_isarray(np) && nv_arrayptr(np)))
 	{
@@ -718,7 +722,7 @@ static void outval(char *name, const char *vname, struct Walk *wp)
 		if(*name!='.')
 			nv_attribute(np,wp->out,"typeset",'=');
 		nv_outname(wp->out,name,-1);
-		if(np->nvalue.cp || nv_isattr(np,~(NV_MINIMAL|NV_NOFREE)) || nv_isvtree(np))  
+		if((np->nvalue.cp && np->nvalue.cp!=Empty) || nv_isattr(np,~(NV_MINIMAL|NV_NOFREE)) || nv_isvtree(np))  
 			sfputc(wp->out,(isarray==2?'\n':'='));
 		if(isarray==2)
 			return;
@@ -819,15 +823,24 @@ static char **genvalue(char **argv, const char *prefix, int n, struct Walk *wp)
 			}
 			else if(outfile && !wp->nofollow && argv[1] && memcmp(arg,argv[1],l=strlen(arg))==0 && argv[1][l]=='[')
 			{
+				int	k=1;
+				Namarr_t *ap=0;
 				Namval_t *np = nv_open(arg,wp->root,NV_VARNAME|NV_NOADD|NV_NOASSIGN|wp->noscope);
 				if(!np)
 					continue;
-				wp->array = nv_isarray(np);
+				if((wp->array = nv_isarray(np)) && (ap=nv_arrayptr(np)))
+					k = array_elem(ap);
+					
 				if(wp->indent>0)
 					sfnputc(outfile,'\t',wp->indent);
 				nv_attribute(np,outfile,"typeset",1);
 				nv_close(np);
-				sfputr(outfile,arg+m+r+(n?n:0),'=');
+				sfputr(outfile,arg+m+r+(n?n:0),(k?'=':'\n'));
+				if(!k)
+				{
+					wp->array=0;
+					continue;
+				}
 				wp->nofollow=1;
 				argv = genvalue(argv,cp,cp-arg ,wp);
 				sfputc(outfile,wp->indent<0?';':'\n');
@@ -1031,7 +1044,7 @@ static void put_tree(register Namval_t *np, const char *val, int flags,Namfun_t 
 		Shell_t		*shp = sh_getinterp();
 		Namval_t	*last_table = shp->last_table;
 		Dt_t		*last_root = shp->last_root;
-		Namval_t 	*mp = val?nv_open(val,shp->var_tree,NV_VARNAME|NV_NOADD|NV_NOASSIGN|NV_NOFAIL):0;
+		Namval_t 	*mp = val?nv_open(val,shp->var_tree,NV_VARNAME|NV_NOADD|NV_NOASSIGN|NV_ARRAY|NV_NOFAIL):0;
 		if(mp && nv_isvtree(mp))
 		{
 			shp->prev_table = shp->last_table;

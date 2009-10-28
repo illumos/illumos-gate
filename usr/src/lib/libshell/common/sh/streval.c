@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -78,11 +78,13 @@ struct vars				/* vars stacked per invocation */
 	Sfdouble_t	(*convert)(const char**,struct lval*,int,Sfdouble_t);
 };
 
-typedef int	   (*Math_0_f)(Sfdouble_t);
-typedef Sfdouble_t (*Fun_t)(Sfdouble_t,...);
-typedef Sfdouble_t (*Math_1_f)(Sfdouble_t);
-typedef Sfdouble_t (*Math_2_f)(Sfdouble_t,Sfdouble_t);
-typedef Sfdouble_t (*Math_3_f)(Sfdouble_t,Sfdouble_t,Sfdouble_t);
+typedef Sfdouble_t (*Math_f)(Sfdouble_t,...);
+typedef Sfdouble_t (*Math_1f_f)(Sfdouble_t);
+typedef int	   (*Math_1i_f)(Sfdouble_t);
+typedef Sfdouble_t (*Math_2f_f)(Sfdouble_t,Sfdouble_t);
+typedef int        (*Math_2i_f)(Sfdouble_t,Sfdouble_t);
+typedef Sfdouble_t (*Math_3f_f)(Sfdouble_t,Sfdouble_t,Sfdouble_t);
+typedef int        (*Math_3i_f)(Sfdouble_t,Sfdouble_t,Sfdouble_t);
 
 #define getchr(vp)	(*(vp)->nextchr++)
 #define peekchr(vp)	(*(vp)->nextchr)
@@ -155,7 +157,7 @@ Sfdouble_t	arith_exec(Arith_t *ep)
 	register char *tp;
 	Sfdouble_t small_stack[SMALL_STACK+1];
 	const char *ptr = "";
-	Fun_t fun;
+	Math_f fun;
 	struct lval node;
 	node.emode = ep->emode;
 	node.expr = ep->expr;
@@ -257,11 +259,12 @@ Sfdouble_t	arith_exec(Arith_t *ep)
 			node.value = (char*)dp;
 			node.flag = c;
 			num = (*ep->fun)(&ptr,&node,ASSIGN,num);
+			c=0;
 			break;
 		    case A_PUSHF:
-			cp = roundptr(ep,cp,Fun_t);
+			cp = roundptr(ep,cp,Math_f);
 			*++sp = (Sfdouble_t)(cp-ep->code);
-			cp += sizeof(Fun_t);
+			cp += sizeof(Math_f);
 			*++tp = *cp++;
 			continue;
 		    case A_PUSHN:
@@ -368,29 +371,35 @@ Sfdouble_t	arith_exec(Arith_t *ep)
 			num = (sp[-1]<num);
 			type=0;
 			break;
-		    case A_CALL0:
+		    case A_CALL1F:
 			sp--,tp--;
-			fun = *((Fun_t*)(ep->code+(int)(*sp)));
+			fun = *((Math_f*)(ep->code+(int)(*sp)));
 			type = 0;
-			num = (*((Math_0_f)fun))(num);
+			num = (*((Math_1f_f)fun))(num);
 			break;
-		    case A_CALL1:
+		    case A_CALL1I:
 			sp--,tp--;
-			fun = *((Fun_t*)(ep->code+(int)(*sp)));
+			fun = *((Math_f*)(ep->code+(int)(*sp)));
 			type = *tp;
-			num = (*fun)(num);
+			num = (*((Math_1i_f)fun))(num);
 			break;
-		    case A_CALL2:
+		    case A_CALL2F:
 			sp-=2,tp-=2;
-			fun = *((Fun_t*)(ep->code+(int)(*sp)));
-			type = *tp;
-			num = (*((Math_2_f)fun))(sp[1],num);
+			fun = *((Math_f*)(ep->code+(int)(*sp)));
+			type = 0;
+			num = (*((Math_2f_f)fun))(sp[1],num);
 			break;
-		    case A_CALL3:
-			sp-=3,tp-=3;
-			fun = *((Fun_t*)(ep->code+(int)(*sp)));
+		    case A_CALL2I:
+			sp-=2,tp-=2;
+			fun = *((Math_f*)(ep->code+(int)(*sp)));
 			type = *tp;
-			num = (*((Math_3_f)fun))(sp[1],sp[2],num);
+			num = (*((Math_2i_f)fun))(sp[1],num);
+			break;
+		    case A_CALL3F:
+			sp-=3,tp-=3;
+			fun = *((Math_f*)(ep->code+(int)(*sp)));
+			type = 0;
+			num = (*((Math_3f_f)fun))(sp[1],sp[2],num);
 			break;
 		}
 		if(c&T_BINARY)
@@ -593,7 +602,10 @@ again:
 				vp->staksize--;
 			}
 			if(!expr(vp,c))
+			{
+				stakseek(-1);
 				return(0);
+			}
 			lvalue.value = 0;
 			break;
 
@@ -610,7 +622,7 @@ again:
 					vp->stakmaxsize = vp->staksize;
 				vp->infun=1;
 				stakputc(A_PUSHF);
-				stakpush(vp,fun,Fun_t);
+				stakpush(vp,fun,Math_f);
 				stakputc(1);
 			}
 			else
@@ -623,13 +635,13 @@ again:
 			vp->paren--;
 			if(fun)
 			{
-				int  x= (nargs>7);
+				int  x= (nargs>7)?2:-1;
 				nargs &= 7;
 				if(vp->infun != nargs)
 					ERROR(vp,e_argcount);
 				if(vp->staksize+=nargs>=vp->stakmaxsize)
 					vp->stakmaxsize = vp->staksize+nargs;
-				stakputc(A_CALL0+nargs -x);
+				stakputc(A_CALL1F+nargs+x);
 				vp->staksize -= nargs;
 			}
 			vp->infun = infun;

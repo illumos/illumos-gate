@@ -55,6 +55,7 @@
 # configuration with upstream.
 #
 ./usr/src/lib/libast/*/src/lib/libast/FEATURE
+./usr/src/lib/libast/*/src/lib/libast/ast_namval.h
 ./usr/src/lib/libast/common/comp/conf.*
 ./usr/src/lib/libast/common/features
 ./usr/src/lib/libast/common/include/ast_windows.h

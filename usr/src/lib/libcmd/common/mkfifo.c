@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -26,9 +26,8 @@
  * mkfifo
  */
 
-
 static const char usage[] =
-"[-?\n@(#)$Id: mkfifo (AT&T Research) 1999-04-20 $\n]"
+"[-?\n@(#)$Id: mkfifo (AT&T Research) 2009-01-02 $\n]"
 USAGE_LICENSE
 "[+NAME?mkfifo - make FIFOs (named pipes)]"
 "[+DESCRIPTION?\bmkfifo\b creates one or more FIFO's.  By "
@@ -50,40 +49,50 @@ USAGE_LICENSE
 #include <cmd.h>
 #include <ls.h>
 
-#define RWALL	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)
-
 int
 b_mkfifo(int argc, char *argv[], void* context)
 {
-	register char *arg;
-	register mode_t mode=RWALL, mask=0;
-	register int n;
+	register char*	arg;
+	register mode_t mode = S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH;
+	register mode_t	mask = 0;
+	register int	mflag = 0;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
-	while (n = optget(argv, usage)) switch (n)
+	for (;;)
 	{
-	  case 'm':
-		mode = strperm(arg=opt_info.arg,&opt_info.arg,mode);
-		if(*opt_info.arg)
-			error(ERROR_exit(0),"%s: invalid mode",arg);
-		break;
-	  case ':':
-		error(2, "%s",opt_info.arg);
-		break;
-	  case '?':
-		error(ERROR_usage(2), "%s",opt_info.arg);
+		switch (optget(argv, usage))
+		{
+		case 0:
+			break;
+		case 'm':
+			mflag = 1;
+			mode = strperm(arg = opt_info.arg, &opt_info.arg, mode);
+			if (*opt_info.arg)
+				error(ERROR_exit(0), "%s: invalid mode", arg);
+			continue;
+		case ':':
+			error(2, "%s", opt_info.arg);
+			continue;
+		case '?':
+			error(ERROR_usage(2), "%s", opt_info.arg);
+			continue;
+		}
 		break;
 	}
 	argv += opt_info.index;
-	if(error_info.errors || !*argv)
-		error(ERROR_usage(2),"%s",optusage(NiL));
-	while(arg = *argv++)
+	if (error_info.errors || !*argv)
+		error(ERROR_usage(2), "%s", optusage(NiL));
+	mask = umask(0);
+	if (!mflag)
 	{
-		if(mkfifo(arg,mode) < 0)
-			error(ERROR_system(0),"%s:",arg);
-	}
-	if(mask)
+		mode &= ~mask;
 		umask(mask);
-	return(error_info.errors!=0);
+		mask = 0;
+	}
+	while (arg = *argv++)
+		if (mkfifo(arg, mode) < 0)
+			error(ERROR_system(0), "%s:", arg);
+	if (mask)
+		umask(mask);
+	return error_info.errors != 0;
 }
-

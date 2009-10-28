@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -58,7 +58,7 @@ function beep
 # array which holds frequency and sample data 
 # (the data are created on demand, "sample_set" indicates whether the "sample" variable
 # needs to be filled or not)
-typeset -A tones=(
+compound -A tones=(
 	["C3"]=(  float freq=261.63  ; typeset sample_set="false" ; typeset -b sample )
 	["C#3"]=( float freq=277.18  ; typeset sample_set="false" ; typeset -b sample )
 	["D3"]=(  float freq=293.66  ; typeset sample_set="false" ; typeset -b sample )
@@ -91,7 +91,7 @@ typeset -A tones=(
 
 # alias table which translates the various names of "notes" to the matching entry
 # in the "tones" table
-typeset -r -A notes=(
+compound -r -A notes=(
 	["C3"]=(  val=tones["C3"]   ) ["key_d"]=(  val=tones["C3"]   )
 	["C#3"]=( val=tones["C#3"]  ) ["key_r"]=(  val=tones["C#3"]  )
 	["D3"]=(  val=tones["D3"]   ) ["key_f"]=(  val=tones["D3"]   )
@@ -1278,18 +1278,24 @@ builtin basename
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r shpiano_usage=$'+
-[-?\n@(#)\$Id: shpiano (Roland Mainz) 2008-11-03 \$\n]
+[-?\n@(#)\$Id: shpiano (Roland Mainz) 2009-05-09 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
+[-author?Valeria Elisabeth Mainz <valeria.mainz@no.such.email.toddler>]
 [+NAME?shpiano - simple audio demo]
 [+DESCRIPTION?\bshpiano\b is a small demo application which converts
         keyboard input into 8bit Mu-law audio samples which are
         send to /dev/audio.]
+[b:babymode?Mode to entertain toddlers. Plays a sound for any key
+	and ignores SIGINT. Requires ESC to quit the application.]
 [+SEE ALSO?\bksh93\b(1), \bau\b(4), \baudio\b(7i)]
 '
+typeset babymode=false
 
 while getopts -a "${progname}" "${shpiano_usage}" OPT ; do 
 #	printmsg "## OPT=|${OPT}|, OPTARG=|${OPTARG}|"
 	case ${OPT} in
+		b)	babymode=true ;;
+		+b)	babymode=false ;;
 		*)	usage ;;
 	esac
 done
@@ -1304,19 +1310,30 @@ float w # temporary "wave" value
 integer i
 integer audiofd # audio device file descriptor
 typeset key
-typeset audio=( typeset -i currpos=0 ; typeset -a -i data=( [0]=0 ) ) # stack object
+compound audio=( integer currpos=0 ; integer -a data=( [0]=0 ) ) # stack object
 
 clear
 print_piano_layout
 
+if ${babymode} ; then
+	[[ -x /usr/bin/banner ]] || fatal_error "-n requires /usr/bin/banner"
+
+	typeset lastkeys
+
+	nameref curr_note=tones["A#4"]
+	(( freq=curr_note.freq ))
+	
+	trap "" INT
+fi
+
 if [[ "${AUDIODEV}" == "" ]] ; then
 	AUDIODEV="/dev/audio"
 fi
-print -u2 -f $"Playing sound to device\n" "${AUDIODEV}"
+print -u2 -f $"Playing sound to device %s\n" "${AUDIODEV}"
 
 # open channel to audio device
-redirect {audiofd}<>"${AUDIODEV}"
-(( $? != 0 )) && fatal_error $"Couldn't open audio device."
+redirect {audiofd}<> "${AUDIODEV}"
+(( $? != 0 )) && fatal_error $"Could not open audio device."
 
 # build pause sample
 stack_init audio
@@ -1332,20 +1349,32 @@ typeset -b au_header=${ bytearraytobase64 audio.data ; }
 # begin playing
 printf "%B" au_header >&${audiofd}
 
+
 # warning: the math used here is so wrong that your head may
 # explode when you continue reading this
 while read -r -N 1 key?$'\r > ' ; do
-	if [[ ${key} == ~(E)($'\E'|'q'|'Q') ]] ; then
+	if [[ ${key} == $'\E' ]] || [[ ${babymode} != "true" && ${key} == ~(E)($'\E'|'q'|'Q') ]] ; then
 		break # quit
 	fi
 
 	printf "\r"
-	if [[ -z "${notes[key_${key}]}" ]] ; then
-		nameref curr_note=tones["p"]
-		(( freq=1.*(1./duration) ))
-	else
+	if [[ -v notes[key_${key}] ]] ; then
 		nameref curr_note="${notes[key_${key}].val}"
 		(( freq=curr_note.freq ))
+	else
+		if ${babymode} ; then
+			nameref curr_note=tones["A#4"]
+			(( freq=curr_note.freq ))
+		else
+			nameref curr_note=tones["p"]
+			(( freq=1.*(1./duration) ))
+		fi
+	fi
+	
+	# babymode: print "keys" to screen via /usr/bin/banner
+	if ${babymode} ; then
+		lastkeys="${lastkeys/~(Er).*(........)/\1}${key}"
+		banner "${lastkeys}"
 	fi
 
 #	printf "note=%s sample_rate=%f, freq=%f\n" "${!curr_note}" sample_rate freq >&2

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -31,6 +31,7 @@
 #undef	sleep
 #include	<error.h>
 #include	<errno.h>
+#include	<tmx.h>
 #include	"builtins.h"
 #include	"FEATURE/time"
 #include	"FEATURE/poll"
@@ -44,14 +45,18 @@
 int	b_sleep(register int argc,char *argv[],void *extra)
 {
 	register char *cp;
-	register double d;
+	register double d=0;
 	register Shell_t *shp = ((Shbltin_t*)extra)->shp;
+	int sflag=0;
 	time_t tloc = 0;
 	char *last;
 	if(!(shp->sigflag[SIGALRM]&(SH_SIGFAULT|SH_SIGOFF)))
 		sh_sigtrap(SIGALRM);
 	while((argc = optget(argv,sh_optsleep))) switch(argc)
 	{
+		case 's':
+			sflag=1;
+			break;
 		case ':':
 			errormsg(SH_DICT,2, "%s", opt_info.arg);
 			break;
@@ -60,20 +65,47 @@ int	b_sleep(register int argc,char *argv[],void *extra)
 			break;
 	}
 	argv += opt_info.index;
-	if(error_info.errors || !(cp= *argv) || ((d=strtod(cp, (char**)&last)),*last))
-		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage((char*)0));
+	if(cp = *argv)
+	{
+		d = strtod(cp, &last);
+		if(*last)
+		{
+			Time_t now,ns;
+			char* pp;
+			now = TMX_NOW;
+			if(*cp == 'P' || *cp == 'p')
+				ns = tmxdate(cp, &last, now);
+			else
+			{
+				if(pp = sfprints("exact %s", cp))
+					ns = tmxdate(pp, &last, now);
+				if(*last && (pp = sfprints("p%s", cp)))
+					ns = tmxdate(pp, &last, now);
+			}
+			if(*last)
+				errormsg(SH_DICT,ERROR_exit(1),e_number,*argv);
+			d = ns - now;
+			d /= TMX_RESOLUTION;
+		}
+		if(argv[1])
+			errormsg(SH_DICT,ERROR_exit(1),e_oneoperand);
+	}
+	else if(!sflag)
+		errormsg(SH_DICT,ERROR_exit(1),e_oneoperand);
 	if(d > .10)
 	{
 		time(&tloc);
 		tloc += (time_t)(d+.5);
 	}
-	while(1)
+	if(sflag && d==0)
+		pause();
+	else while(1)
 	{
 		time_t now;
 		errno = 0;
 		shp->lastsig=0;
 		sh_delay(d);
-		if(tloc==0 || errno!=EINTR || shp->lastsig)
+		if(sflag || tloc==0 || errno!=EINTR || shp->lastsig)
 			break;
 		sh_sigcheck();
 		if(tloc < (now=time(NIL(time_t*))))

@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -27,6 +27,10 @@ alias err_exit='err_exit $LINENO'
 
 Command=${0##*/}
 integer Errors=0
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
+
 function checkref
 {
 	nameref foo=$1 bar=$2
@@ -80,7 +84,7 @@ nameref x=.foo.bar
 if	[[ ${!x} != .foo.bar ]]
 then	err_exit "${!x} not working"
 fi
-typeset +n x $(typeset +n) 
+typeset +n x $(typeset +n)
 unset x
 nameref x=.foo.bar
 function x.set
@@ -96,7 +100,7 @@ fi
 if	[[ $(typeset -n) != x=.foo.bar ]]
 then	err_exit "typeset +n doesn't list values of reference variables"
 fi
-file=/tmp/shtest$$
+file=$tmp/test
 typeset +n foo bar 2> /dev/null
 unset foo bar
 export bar=foo
@@ -104,7 +108,6 @@ nameref foo=bar
 if	[[ $foo != foo ]]
 then	err_exit "value of nameref foo !=  $foo"
 fi
-trap "rm -f $file" EXIT INT
 cat > $file <<\!
 print -r -- $foo
 !
@@ -113,7 +116,7 @@ y=$( $file)
 if	[[ $y != '' ]]
 then	err_exit "reference variable not cleared"
 fi
-{ 
+{
 	command nameref xx=yy
 	command nameref yy=xx
 } 2> /dev/null && err_exit "self reference not detected"
@@ -127,7 +130,7 @@ then	err_exit 'nameref of positional paramters outside of function not working'
 fi
 unset foo bar
 bar=123
-function foobar 
+function foobar
 {
 	typeset -n foo=bar
 	typeset -n foo=bar
@@ -216,7 +219,7 @@ function local
 	qs=(integer  a=3; integer b=4)
 }
 local 2> /dev/null || err_exit 'function local has non-zero exit status'
-[[ ${qs.a} == 3 ]] || err_exit 'function cannot set compound global variable' 
+[[ ${qs.a} == 3 ]] || err_exit 'function cannot set compound global variable'
 unset fun i
 foo=(x=hi)
 function fun
@@ -297,4 +300,66 @@ vars=(data=())
 vars.data._1.a=a.1
 vars.data._1.b=b.1
 [[ $(a) == 'a.1 b.1' ]] || err_exit 'nameref choosing wrong scope -- '
+typeset +n bam zip foo
+unset bam zip foo
+typeset -A foo
+foo[2]=bar
+typeset -n bam=foo[2]
+typeset -n zip=bam
+[[ $zip == bar ]] || err_exit 'nameref to another nameref to array element fails'
+[[ -R zip ]] || err_exit '[[ -R zip ]] should detect that zip is a reference'
+[[ -R bam ]] || err_exit '[[ -R bam ]] should detect that bam is a reference'
+[[ -R zip ]] || err_exit '[[ -v zip ]] should detect that zip is set'
+[[ -v bam ]] || err_exit '[[ -v bam ]] should detect that bam is set'
+[[ -R 123 ]] && err_exit '[[ -R 123 ]] should detect that 123 is not a reference'
+[[ -v 123 ]] && err_exit '[[ -v 123 ]] should detect that 123 is not set'
+
+unset ref x
+typeset -n ref
+x=3
+function foobar
+{
+	typeset xxx=3
+	ref=xxx
+	return 0
+}
+foobar 2> /dev/null && err_exit 'invalid reference should cause foobar to fail'
+[[ -v ref ]] && err_exit '$ref should be unset'
+ref=x
+[[ $ref == 3 ]] || err_exit "\$ref is $ref, it should be 3"
+function foobar
+{
+        typeset fvar=()
+        typeset -n ref=fvar.foo
+        ref=ok
+        print -r $ref
+}
+[[ $(foobar) ==  ok ]] 2> /dev/null  || err_exit 'nameref in function not creating variable in proper scope'
+function foobar
+{
+        nameref doc=docs
+        nameref bar=doc.num
+	[[ $bar == 2 ]] || err_exit 'nameref scoping error'
+}
+
+docs=(num=2)
+foobar
+
+typeset +n x y
+unset x y
+typeset -A x
+x[a]=(b=c)  
+typeset -n y=x[a]
+[[ ${!y.@} == 'x[a].b' ]] || err_exit 'reference to array element not expanded with ${!y.@}'
+
+typeset +n v
+v=()
+k=a.b.c/d
+command typeset -n n=v.${k//['./']/_} 2> /dev/null || err_exit 'patterns with quotes not handled correctly with name reference assignment'
+
+typeset _n sp
+nameref sp=addrsp
+sp[14]=( size=1 )
+[[ -v sp[19] ]]  && err_exit '[[ -v sp[19] ]] where sp is a nameref should not be set'
+
 exit $((Errors))

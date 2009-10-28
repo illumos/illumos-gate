@@ -35,7 +35,8 @@
 # 
 # and here's where it's hung:
 # ---8<---
-#  xxxxx@xxxxx $ pstack 204600
+#  Edward Pilatowicz <edward.pilatowicz@sun.com> 
+# $ pstack 204600
 # 204600: /bin/ksh /opt/onbld/bin/Install -o debug -k i86xpv -T domu-219:/tmp
 #  fffffd7fff2e3d1a write    (1, 4154c0, 64)
 #  fffffd7ffefdafc8 sfwr () + 2d0
@@ -70,68 +71,142 @@
 # 
 # as it turns out, i can easily reproduce this problem as follows:
 # ---8<---
-#  xxxxx@xxxxx $ ksh93
-#  xxxxx@xxxxx $ set -- `cat /etc/termcap | sort | uniq`
+# $ ksh93
+# $ set -- `cat /etc/termcap | sort | uniq`
 # <hang>
 # ---8<---
 # ---- snip ----
 
 
+# test setup
 function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors+=1 ))
+	(( Errors++ ))
 }
-
 alias err_exit='err_exit $LINENO'
 
+set -o nounset
+Command=${0##*/}
 integer Errors=0
 
-integer i j d
+# common functions/variables
+function isvalidpid
+{
+	kill -0 ${1} 2>/dev/null && return 0
+	return 1
+}
+integer testfilesize i maxwait
 typeset tmpfile
+integer testid
+
 
 # test 1: run loop and check various temp filesizes
 tmpfile="$(mktemp "/tmp/sun_solaris_cr_6800929_large_command_substitution_hang.${PPID}.$$.XXXXXX")" || err_exit "Cannot create temporary file."
 
-for (( i=1*1024 ; i <= 512*1024 ; i*=2 )) ; do
+compound -a testcases=(
+	# test 1a: Run test child for $(...)
+	# (note the pipe chain has to end in a builtin command, an external command may not trigger the bug)
+	( name="test1a" cmd="builtin cat ; print -- \"\$(cat \"${tmpfile}\" | cat)\" ; true" )
+	# test 1b: Same as test1a but uses ${... ; } instead if $(...)
+	( name="test1b" cmd="builtin cat ; print -- \"\${ cat \"${tmpfile}\" | cat ; }\" ; true" )
+	# test 1c: Same as test1a but does not use a pipe
+	( name="test1c" cmd="builtin cat ; print -- \"\$(cat \"${tmpfile}\" ; true)\" ; true" )
+	# test 1d: Same as test1a but does not use a pipe
+	( name="test1d" cmd="builtin cat ; print -- \"\${ cat \"${tmpfile}\" ; true ; }\" ; true" )
+
+	# test 1e: Same as test1a but uses an external "cat" command
+	( name="test1e" cmd="builtin -d cat /bin/cat ; print -- \"\$(cat \"${tmpfile}\" | cat)\" ; true" )
+	# test 1f: Same as test1a but uses an external "cat" command
+	( name="test1f" cmd="builtin -d cat /bin/cat ; print -- \"\${ cat \"${tmpfile}\" | cat ; }\" ; true" )
+	# test 1g: Same as test1a but uses an external "cat" command
+	( name="test1g" cmd="builtin -d cat /bin/cat ; print -- \"\$(cat \"${tmpfile}\" ; true)\" ; true" )
+	# test 1h: Same as test1a but uses an external "cat" command
+	( name="test1h" cmd="builtin -d cat /bin/cat ; print -- \"\${ cat \"${tmpfile}\" ; true ; }\" ; true" )
+)
+
+for (( testfilesize=1*1024 ; testfilesize <= 1024*1024 ; testfilesize*=2 )) ; do
 	# Create temp file
 	{
-		for ((j=0 ; j < i ; j+=16 )) ; do
-			print "0123456789abcde"
+		for (( i=0 ; i < testfilesize ; i+=64 )) ; do
+			print "0123456789abcdef01234567890ABCDEF0123456789abcdef01234567890ABCDE"
 		done
 	} >"${tmpfile}"
-	
-	# Run test child
-	${SHELL} -c "builtin cat ; print -- \"\$(cat \"${tmpfile}\" | cat)\" ; true" >/dev/null &
-	(( childpid=$! ))
 
 	# wait up to log2(i) seconds for the child to terminate
 	# (this is 10 seconds for 1KB and 19 seconds for 512KB)
-	(( d=log2(i) ))
-	for (( j=0 ; j < d ; j++ )) ; do
-		kill -0 ${childpid} 2>/dev/null || break
-		sleep 0.5
+	(( maxwait=log2(testfilesize) ))
+		
+	for testid in "${!testcases[@]}" ; do
+		nameref currtst=testcases[testid]
+		${SHELL} -o errexit -c "${currtst.cmd}" >"${tmpfile}.out" &
+		(( childpid=$! ))
+
+		for (( i=0 ; i < maxwait ; i++ )) ; do
+			isvalidpid ${childpid} || break
+			sleep 0.25
+		done
+
+		if isvalidpid ${childpid} ; then
+			err_exit "${currtst.name}: child (pid=${childpid}) still busy, filesize=${testfilesize}."
+			kill -KILL ${childpid} 2>/dev/null
+		fi
+		wait || err_exit "${currtst.name}: Child returned non-zero exit code." # wait for child (and/or avoid zombies/slime)
+
+		# compare input/output
+		cmp -s "${tmpfile}" "${tmpfile}.out" || err_exit "${currtst.name}: ${tmpfile} and ${tmpfile}.out differ, filesize=${testfilesize}."
+		rm "${tmpfile}.out"
 	done
 
-	if kill -0 ${childpid} 2>/dev/null ; then
-		err_exit "test1: child (pid=${childpid}) still busy, filesize=${i}."
-		kill -KILL ${childpid} 2>/dev/null
-	fi
-	wait # wait for child (and/or avoid zombies/slime)
+	# Cleanup
 	rm "${tmpfile}"
 done
 
 
-# test 2: Edward's Solaris-specific testcase
-${SHELL} -c 'builtin uniq ; set -- `cat /etc/termcap | sort | uniq` ; true' >/dev/null &
+# test 2a: Edward Pilatowicz <edward.pilatowicz@sun.com>'s Solaris-specific testcase
+${SHELL} -o errexit -c 'builtin uniq ; set -- `cat /etc/termcap | sort | uniq` ; true' >/dev/null &
 (( childpid=$! ))
 sleep 5
-if kill -0 ${childpid} 2>/dev/null ; then
-	err_exit "test2: child (pid=${childpid}) still busy."
+if isvalidpid ${childpid} ; then
+	err_exit "test2a: child (pid=${childpid}) still busy."
 	kill -KILL ${childpid} 2>/dev/null
 fi
-wait # wait for child (and/or avoid zombies/slime)
+wait || err_exit "test2a: Child returned non-zero exit code." # wait for child (and/or avoid zombies/slime)
+
+
+# test 2b: Same as test 2a but uses ${... ; } instead of $(...)
+${SHELL} -o errexit -c 'builtin uniq ; set -- ${ cat /etc/termcap | sort | uniq ; } ; true' >/dev/null &
+(( childpid=$! ))
+sleep 5
+if isvalidpid ${childpid} ; then
+	err_exit "test2b: child (pid=${childpid}) still busy."
+	kill -KILL ${childpid} 2>/dev/null
+fi
+wait || err_exit "test2b: Child returned non-zero exit code." # wait for child (and/or avoid zombies/slime)
+
+
+# test 2c: Same as test 2a but makes sure that "uniq" is not a builtin
+${SHELL} -o errexit -c 'builtin -d uniq /bin/uniq ; set -- `cat /etc/termcap | sort | uniq` ; true' >/dev/null &
+(( childpid=$! ))
+sleep 5
+if isvalidpid ${childpid} ; then
+	err_exit "test2c: child (pid=${childpid}) still busy."
+	kill -KILL ${childpid} 2>/dev/null
+fi
+wait || err_exit "test2c: Child returned non-zero exit code." # wait for child (and/or avoid zombies/slime)
+
+
+# test 2d: Same as test 2c but uses ${... ; } instead of $(...)
+${SHELL} -o errexit -c 'builtin -d uniq /bin/uniq ; set -- ${ cat /etc/termcap | sort | uniq ; } ; true' >/dev/null &
+(( childpid=$! ))
+sleep 5
+if isvalidpid ${childpid} ; then
+	err_exit "test2d: child (pid=${childpid}) still busy."
+	kill -KILL ${childpid} 2>/dev/null
+fi
+wait || err_exit "test2d: Child returned non-zero exit code." # wait for child (and/or avoid zombies/slime)
+
 
 # tests done
 exit $((Errors))

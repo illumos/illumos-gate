@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -112,7 +112,7 @@ function request_tinyurl
 	typeset url="http://${url_host}${url_path}"
 	integer netfd # http stream number
 	typeset inputurl="$1"
-	typeset -C httpresponse # http response
+	compound httpresponse # http response
 	typeset request=""
 
 	# we assume "inputurl" is a correctly encoded URL which doesn't
@@ -124,8 +124,8 @@ function request_tinyurl
 	request+="User-Agent: ${http_user_agent}\r\n"
 	request+="Connection: close\r\n"
 
-	redirect {netfd}<>"/dev/tcp/${url_host}/80" 
-	(( $? != 0 )) && { print -u2 -f $"%s: Couldn't open connection to %s.\n" "$0" "${url_host}" ;  return 1 ; }
+	redirect {netfd}<> "/dev/tcp/${url_host}/80" 
+	(( $? != 0 )) && { print -u2 -f $"%s: Could not open connection to %s.\n" "$0" "${url_host}" ;  return 1 ; }
 
 	# send http post
 	{
@@ -150,6 +150,53 @@ function request_tinyurl
 	# not reached
 }
 
+function request_trimurl
+{
+	# site setup
+	typeset url_host="api.tr.im"
+	typeset url_path="/api/trim_url.xml"
+	typeset url="http://${url_host}${url_path}"
+	integer netfd # http stream number
+	typeset inputurl="$1"
+	compound httpresponse # http response
+	typeset request=""
+
+	# we assume "inputurl" is a correctly encoded URL which doesn't
+	# require any further mangling
+	url_path+="?url=${inputurl}"
+
+	request="GET ${url_path} HTTP/1.1\r\n"
+	request+="Host: ${url_host}\r\n"
+	request+="User-Agent: ${http_user_agent}\r\n"
+	request+="Connection: close\r\n"
+
+	redirect {netfd}<> "/dev/tcp/${url_host}/80" 
+	(( $? != 0 )) && { print -u2 -f $"%s: Could not open connection to %s.\n" "$0" "${url_host}" ;  return 1 ; }
+
+	# send http post
+	{
+		print -n -- "${request}\r\n"
+	}  >&${netfd}
+
+	# process reply
+	parse_http_response httpresponse <&${netfd}
+	response="${ cat_http_body "${httpresponse.transfer_encoding}" <&${netfd} ; }"
+
+	# close connection
+	redirect {netfd}<&-
+        
+	if (( httpresponse.statuscode >= 200 && httpresponse.statuscode <= 299 )) ; then
+		# the statement below should really parse the XML...
+		print -r -- "${response/~(Elr).*(\<url\>)(.*)(\<\/url\>).*/\2}"
+		return 0
+	else
+		print -u2 -f $"tr.im response was (%s,%s):\n%s\n" "${httpresponse.statuscode}" "${httpresponse.statusmsg}" "${response}"
+		return 1
+	fi
+	
+	# not reached
+}
+
 function usage
 {
 	OPTIND=0
@@ -166,37 +213,54 @@ builtin uname
 typeset progname="${ basename "${0}" ; }"
 
 # HTTP protocol client identifer
-typeset -r http_user_agent="shtinyurl/ksh93 (2008-10-14; ${ uname -s -r -p ; })"
+typeset -r http_user_agent="shtinyurl/ksh93 (2009-08-12; ${ uname -s -r -p ; })"
 
 typeset -r shtinyurl_usage=$'+
-[-?\n@(#)\$Id: shtinyurl (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: shtinyurl (Roland Mainz) 2009-08-12 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
-[+NAME?shtinyurl - create short tinyurl.com alias URL from long URL]
+[+NAME?shtinyurl - create short alias URL from long URL]
 [+DESCRIPTION?\bshtinyurl\b is a small utility which passes a given URL
-	to the tinyurl.com service which creates short aliases in the
-	form of http://tinyurl.com/XXXXXXXX to redirect long URLs.]
+	to internet service which creates short aliases in the
+	form of http://<servicename>/XXXXXXXX to redirect long URLs.]
 [+?The first arg \burl\b describes a long URL which is transformed into
 	a tinyurl.com short alias.]
+[P:provider?Service provider (either \'tinyurl.com\' or \'tr.im\').]:[mode]
 
 url
 
-[+SEE ALSO?\bksh93\b(1), \brssread\b(1), \bshtwitter\b(1), http://www.tinyurl.com]
+[+SEE ALSO?\bksh93\b(1), \brssread\b(1), \bshtwitter\b(1), http://www.tinyurl.com, http://tr.im]
 '
+
+typeset service_provider="tr.im"
 
 while getopts -a "${progname}" "${shtinyurl_usage}" OPT ; do 
 #	printmsg "## OPT=|${OPT}|, OPTARG=|${OPTARG}|"
 	case ${OPT} in
+		P)	service_provider="${OPTARG}" ;;
 		*)	usage ;;
 	esac
 done
 shift $((OPTIND-1))
 
 # expecting at least one more argument
-(($# >= 1)) || usage
+(( $# >= 1 )) || usage
 
 typeset url="$1"
 shift
 
-request_tinyurl "${url}"
-exit $?
+case "${service_provider}" in
+	"tinyurl.com")
+		request_tinyurl "${url}"
+		exit $?
+		;;
+	"tr.im")
+		request_trimurl "${url}"
+		exit $?
+		;;
+	*)
+		fatal_error "Unsupported service provider."
+esac
+
+# not reached
+
 # EOF.

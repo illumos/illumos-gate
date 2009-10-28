@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -73,22 +73,28 @@ b_mkdir(int argc, char** argv, void* context)
 	struct stat	st;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
-	while (n = optget(argv, usage)) switch (n)
+	for (;;)
 	{
-	case 'p':
-		pflag = 1;
-		break;
-	case 'm':
-		mflag = 1;
-		mode = strperm(arg = opt_info.arg, &opt_info.arg, mode);
-		if (*opt_info.arg)
-			error(ERROR_exit(0), "%s: invalid mode", arg);
-		break;
-	case ':':
-		error(2, "%s", opt_info.arg);
-		break;
-	case '?':
-		error(ERROR_usage(2), "%s", opt_info.arg);
+		switch (optget(argv, usage))
+		{
+		case 0:
+			break;
+		case 'p':
+			pflag = 1;
+			continue;
+		case 'm':
+			mflag = 1;
+			mode = strperm(arg = opt_info.arg, &opt_info.arg, mode);
+			if (*opt_info.arg)
+				error(ERROR_exit(0), "%s: invalid mode", arg);
+			continue;
+		case ':':
+			error(2, "%s", opt_info.arg);
+			continue;
+		case '?':
+			error(ERROR_usage(2), "%s", opt_info.arg);
+			continue;
+		}
 		break;
 	}
 	argv += opt_info.index;

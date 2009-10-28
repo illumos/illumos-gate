@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -39,8 +39,8 @@
 #define OPT_long		0x08
 #define OPT_numeric		0x10
 #define OPT_old			0x20
-#define OPT_plus		0x40
-#define OPT_proprietary		0x80
+#define OPT_minus		0x40
+#define OPT_plus		0x80
 
 #define OPT_cache_flag		0x01
 #define OPT_cache_invert	0x02

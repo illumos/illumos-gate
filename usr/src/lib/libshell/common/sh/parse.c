@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -32,8 +32,8 @@
 #include	"defs.h"
 #else
 #include	<shell.h>
-#endif
 #include	<ctype.h>
+#endif
 #include	<fcin.h>
 #include	<error.h>
 #include	"shlex.h"
@@ -293,7 +293,7 @@ void	*sh_parse(Shell_t *shp, Sfio_t *iop, int flag)
 	Fcin_t	sav_input;
 	struct argnod *sav_arg = lexp->arg;
 	int	sav_prompt = shp->nextprompt;
-	if(shp->binscript && sffileno(iop)==shp->infd)
+	if(shp->binscript && (sffileno(iop)==shp->infd || (flag&SH_FUNEVAL)))
 		return((void*)sh_trestore(shp,iop));
 	fcsave(&sav_input);
 	shp->st.staklist = 0;
@@ -323,12 +323,13 @@ void	*sh_parse(Shell_t *shp, Sfio_t *iop, int flag)
 			lexp->arg = sav_arg;
 			if(version > 3)
 				errormsg(SH_DICT,ERROR_exit(1),e_lexversion);
-			if(sffileno(iop)==shp->infd)
+			if(sffileno(iop)==shp->infd || (flag&SH_FUNEVAL))
 				shp->binscript = 1;
 			sfgetc(iop);
 			return((void*)sh_trestore(shp,iop));
 		}
 	}
+	flag &= ~SH_FUNEVAL;
 	if((flag&SH_NL) && (shp->inlineno=error_info.line+shp->st.firstline)==0)
 		shp->inlineno=1;
 #if KSHELL
@@ -718,7 +719,7 @@ static Shnode_t *funct(Lex_t *lexp)
 	{
 		if(fcfill() >= 0)
 			fcseek(-1);
-		if(sh_isstate(SH_HISTORY))
+		if(sh_isstate(SH_HISTORY) && shp->hist_ptr)
 			t->funct.functloc = sfseek(shp->hist_ptr->histfp,(off_t)0,SEEK_CUR);
 		else
 		{
@@ -1177,13 +1178,13 @@ static Shnode_t	*item(Lex_t *lexp,int flag)
 	    case LBRACE:
 		comsub = lexp->comsub;
 		lexp->comsub = 0;
-		t = sh_cmd(lexp,RBRACE,SH_NL);
+		t = sh_cmd(lexp,RBRACE,SH_NL|SH_SEMI);
 		lexp->comsub = comsub;
 		break;
 
 	    case LPAREN:
 		t = getnode(parnod);
-		t->par.partre=sh_cmd(lexp,RPAREN,SH_NL);
+		t->par.partre=sh_cmd(lexp,RPAREN,SH_NL|SH_SEMI);
 		t->par.partyp=TPAR;
 		break;
 
@@ -1223,6 +1224,20 @@ done:
 	lexp->lastline = savline;
 	return(t);
 }
+
+static struct argnod *process_sub(Lex_t *lexp,int tok)
+{
+	struct argnod *argp;
+	Shnode_t *t;
+	int mode = (tok==OPROCSYM);
+	t = sh_cmd(lexp,RPAREN,SH_NL);
+	argp = (struct argnod*)stkalloc(lexp->sh->stk,sizeof(struct argnod));
+	*argp->argval = 0;
+	argp->argchn.ap = (struct argnod*)makeparent(lexp,mode?TFORK|FPIN|FAMP|FPCL:TFORK|FPOU,t);
+	argp->argflag =  (ARG_EXP|mode);
+	return(argp);
+}
+
 
 /*
  * This is for a simple command, for list, or compound assignment
@@ -1278,7 +1293,7 @@ static Shnode_t *simple(Lex_t *lexp,int flag, struct ionod *io)
 				if(assignment==1)
 				{
 					last = strchr(argp->argval,'=');
-					if((cp=strchr(argp->argval,'[')) && (cp < last))
+					if(last && (last[-1]==']'|| (last[-1]=='+' && last[-2]==']')) && (cp=strchr(argp->argval,'[')) && (cp < last))
 						last = cp;
 					stkseek(stkp,ARGVAL);
 					sfwrite(stkp,argp->argval,last-argp->argval);
@@ -1338,17 +1353,11 @@ static Shnode_t *simple(Lex_t *lexp,int flag, struct ionod *io)
 #if SHOPT_DEVFD
 		if((tok==IPROCSYM || tok==OPROCSYM))
 		{
-			Shnode_t *t;
-			int mode = (tok==OPROCSYM);
-			t = sh_cmd(lexp,RPAREN,SH_NL);
-			argp = (struct argnod*)stkalloc(stkp,sizeof(struct argnod));
-			*argp->argval = 0;
+			argp = process_sub(lexp,tok);
 			argmax = 0;
 			argno = -1;
 			*argtail = argp;
 			argtail = &(argp->argnxt.ap);
-			argp->argchn.ap = (struct argnod*)makeparent(lexp,mode?TFORK|FPIN|FAMP|FPCL:TFORK|FPOU,t);
-			argp->argflag =  (ARG_EXP|mode);
 			goto retry;
 		}
 #endif	/* SHOPT_DEVFD */
@@ -1502,9 +1511,7 @@ static struct ionod	*inout(Lex_t *lexp,struct ionod *lastio,int flag)
 	register struct ionod	*iop;
 	Stk_t			*stkp = lexp->sh->stk;
 	char *iovname=0;
-#if SHOPT_BASH
 	register int		errout=0;
-#endif
 	if(token==IOVNAME)
 	{
 		iovname=lexp->arg->argval+1;
@@ -1518,6 +1525,8 @@ static struct ionod	*inout(Lex_t *lexp,struct ionod *lastio,int flag)
 			iof |= (IODOC|IORAW);
 		else if(token==IOMOV0SYM)
 			iof |= IOMOV;
+		else if(token==IORDWRSYMT)
+			iof |= IORDW|IOREWRITE;
 		else if(token==IORDWRSYM)
 			iof |= IORDW;
 		else if((token&SYMSHARP) == SYMSHARP)
@@ -1532,13 +1541,11 @@ static struct ionod	*inout(Lex_t *lexp,struct ionod *lastio,int flag)
 		break;
 
 	    case '>':
-#if SHOPT_BASH
 		if(iof<0)
 		{
 			errout = 1;
 			iof = 1;
 		}
-#endif
 		iof |= IOPUT;
 		if(token==IOAPPSYM)
 			iof |= IOAPP;
@@ -1570,10 +1577,18 @@ static struct ionod	*inout(Lex_t *lexp,struct ionod *lastio,int flag)
 		}
 		else if(token==EXPRSYM && (iof&IOLSEEK))
 			iof |= IOARITH;
+		else if(((token==IPROCSYM && !(iof&IOPUT)) || (token==OPROCSYM && (iof&IOPUT))) && !(iof&(IOLSEEK|IOREWRITE|IOMOV|IODOC)))
+		{
+			lexp->arg = process_sub(lexp,token);
+			iof |= IOPROCSUB;
+		}
 		else
 			sh_syntax(lexp);
 	}
-	iop->ioname=lexp->arg->argval;
+	if( (iof&IOPROCSUB) && !(iof&IOLSEEK))
+		iop->ioname= (char*)lexp->arg->argchn.ap;
+	else
+		iop->ioname=lexp->arg->argval;
 	iop->iovname = iovname;
 	if(iof&IODOC)
 	{
@@ -1622,18 +1637,17 @@ static struct ionod	*inout(Lex_t *lexp,struct ionod *lastio,int flag)
 	{
 		struct ionod *ioq=iop;
 		sh_lex(lexp);
-#if SHOPT_BASH
 		if(errout)
 		{
 			/* redirect standard output to standard error */
 			ioq = (struct ionod*)stkalloc(stkp,sizeof(struct ionod));
+			memset(ioq,0,sizeof(*ioq));
 			ioq->ioname = "1";
 			ioq->iolst = 0;
 			ioq->iodelim = 0;
 			ioq->iofile = IORAW|IOPUT|IOMOV|2;
 			iop->ionxt=ioq;
 		}
-#endif
 		ioq->ionxt=inout(lexp,lastio,flag);
 	}
 	else

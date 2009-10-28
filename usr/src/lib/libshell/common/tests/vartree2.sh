@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -34,7 +34,7 @@ function err_exit
 alias err_exit='err_exit $LINENO'
 
 # "built_tree1" and "built_tree2" are identical except the way how they test
-# whether a variable exists: 
+# whether a variable exists:
 # - "built_tree1" uses "${varname}" != "", e.g. looking whether the variable
 #    as non-zero length content
 # - "built_tree2" uses "! (unset varname)", e.g. "unset" in a subshell
@@ -46,7 +46,7 @@ function build_tree1
 	typeset i
 	typeset dummy
 	typeset a b c d e f
-	
+
 	nameref dest_tree="$1" # destination tree
 	nameref srcdata="$2"   # source data
 	typeset tree_mode="$3" # mode to define the type of leads
@@ -58,15 +58,15 @@ function build_tree1
 
 		for i in "${node.xlfd[@]}" ; do
 			IFS='-' read dummy a b c d e f <<<"$i"
-			
+
 			if [[ "$a" == "" ]] ; then
 				a="$dummy"
 			fi
-			
+
 			[[ "$a" == "" ]] && a='-'
 			[[ "$b" == "" ]] && b='-'
 			[[ "$c" == "" ]] && c='-'
-						
+
 			if [[ "${dest_tree.l1["$a"]}" == "" ]] ; then
 			#if ! (unset dest_tree.l1["$a"]) ; then
 				typeset -A dest_tree.l1["$a"].l2
@@ -80,7 +80,7 @@ function build_tree1
 			if [[ "${!dest_tree.l1["$a"].l2["$b"].l3["$c"].entries[*]}" == "" ]] ; then
 				typeset -A dest_tree.l1["$a"].l2["$b"].l3["$c"].entries
 			fi
-					
+
 			typeset new_index
 			if [[ "${tree_mode}" == "leaf_name" ]] ; then
 				new_index=$(( ${#dest_tree.l1["$a"].l2["$b"].l3["$c"].entries[@]}+1 ))
@@ -92,16 +92,16 @@ function build_tree1
 					continue
 				fi
 			fi
-			
+
 			add_tree_leaf dest_tree.l1["$a"].l2["$b"].l3["$c"].entries[${new_index}] "${index}" "${tree_mode}"
 		done
 	done
-	
-	return 0	
+
+	return 0
 }
 
 # "built_tree1" and "built_tree2" are identical except the way how they test
-# whether a variable exists: 
+# whether a variable exists:
 # - "built_tree1" uses "${varname}" != "", e.g. looking whether the variable
 #    as non-zero length content
 # - "built_tree2" uses "! (unset varname)", e.g. "unset" in a subshell
@@ -113,7 +113,7 @@ function build_tree2
 	typeset i
 	typeset dummy
 	typeset a b c d e f
-	
+
 	nameref dest_tree="$1" # destination tree
 	nameref srcdata="$2"   # source data
 	typeset tree_mode="$3" # mode to define the type of leads
@@ -125,15 +125,15 @@ function build_tree2
 
 		for i in "${node.xlfd[@]}" ; do
 			IFS='-' read dummy a b c d e f <<<"$i"
-			
+
 			if [[ "$a" == "" ]] ; then
 				a="$dummy"
 			fi
-			
+
 			[[ "$a" == "" ]] && a='-'
 			[[ "$b" == "" ]] && b='-'
 			[[ "$c" == "" ]] && c='-'
-						
+
 			#if [[ "${dest_tree.l1["$a"]}" == "" ]] ; then
 			if ! (unset dest_tree.l1["$a"]) ; then
 				typeset -A dest_tree.l1["$a"].l2
@@ -147,7 +147,7 @@ function build_tree2
 			if [[ "${!dest_tree.l1["$a"].l2["$b"].l3["$c"].entries[*]}" == "" ]] ; then
 				typeset -A dest_tree.l1["$a"].l2["$b"].l3["$c"].entries
 			fi
-					
+
 			typeset new_index
 			if [[ "${tree_mode}" == "leaf_name" ]] ; then
 				new_index=$(( ${#dest_tree.l1["$a"].l2["$b"].l3["$c"].entries[@]}+1 ))
@@ -159,12 +159,12 @@ function build_tree2
 					continue
 				fi
 			fi
-			
+
 			add_tree_leaf dest_tree.l1["$a"].l2["$b"].l3["$c"].entries[${new_index}] "${index}" "${tree_mode}"
 		done
 	done
-	
-	return 0	
+
+	return 0
 }
 
 
@@ -173,7 +173,7 @@ function add_tree_leaf
 	nameref tree_leafnode="$1"
 	nameref data_node=srcdata.hashnodes["$2"]
 	typeset add_mode="$3"
-	
+
 	case "${add_mode}" in
 		"leaf_name")
 			tree_leafnode="${data_node.name}"
@@ -193,7 +193,7 @@ function add_tree_leaf
 			return 1
 			;;
 	esac
-	
+
 	# not reached
 	return 1
 }
@@ -224,7 +224,7 @@ typeset mysrcdata_global=(
 
 mytree_global1=()
 mytree_global2=()
-	
+
 function main
 {
 	# "mysrcdata_local" and "mysrcdata_global" must be identical
@@ -254,11 +254,11 @@ function main
 	#### Build tree using global tree variables
 	build_tree1 mytree_global1 mysrcdata_global leaf_compound || \
 		err_exit 'build_tree1 mytree_global1 mysrcdata_global leaf_compound returned an error'
-	(( $(print -r -- "${mytree_global1}" | wc -l) > 10 )) || err_exit "Compound tree 'mytree_global1' too small."
+	(( $(print -r -- "${mytree_global1}" | wc -l) > 10 )) || err_exit "compound tree 'mytree_global1' too small"
 
 	build_tree2 mytree_global2 mysrcdata_global leaf_compound || \
 		err_exit 'build_tree2 mytree_global2 mysrcdata_global leaf_compound returned an error'
-	(( $(print -r -- "${mytree_global2}" | wc -l) > 10 )) || err_exit "Compound tree 'mytree_global2' too small."
+	(( $(print -r -- "${mytree_global2}" | wc -l) > 10 )) || err_exit "compound tree 'mytree_global2' too small"
 
 
 	#### build tree using local tree variables
@@ -267,67 +267,67 @@ function main
 
 	build_tree1 mytree_local1 mysrcdata_local leaf_compound || \
 		err_exit 'build_tree1 mytree_local1 mysrcdata_local leaf_compound returned an error'
-	(( $(print -r -- "${mytree_local1}" | wc -l) > 10 )) || err_exit "Compound tree 'mytree_local1' too small."
+	(( $(print -r -- "${mytree_local1}" | wc -l) > 10 )) || err_exit "compound tree 'mytree_local1' too small"
 
 	build_tree2 mytree_local2 mysrcdata_local leaf_compound || \
 		err_exit 'build_tree2 mytree_local2 mysrcdata_local leaf_compound returned an error'
-	(( $(print -r -- "${mytree_local2}" | wc -l) > 10 )) || err_exit "Compound tree 'mytree_local2' too small."
+	(( $(print -r -- "${mytree_local2}" | wc -l) > 10 )) || err_exit "compound tree 'mytree_local2' too small"
 
-	
+
 	#### Compare treess
 	if [[ "${mytree_global1}" != "${mytree_local1}" ]] ; then
-		err_exit "Compound trees 'mytree_global1' and 'mytree_local1' not identical"
+		err_exit "compound trees 'mytree_global1' and 'mytree_local1' not identical"
 	fi
 
 	if [[ "${mytree_global1}" != "${mytree_global2}" ]] ; then
-		err_exit "Compound trees 'mytree_global1' and 'mytree_global2' not identical"
+		err_exit "compound trees 'mytree_global1' and 'mytree_global2' not identical"
 	fi
 
 	if [[ "${mytree_local1}" != "${mytree_local2}" ]] ; then
-		err_exit "Compound trees 'mytree_local1' and 'mytree_local2' not identical"
+		err_exit "compound trees 'mytree_local1' and 'mytree_local2' not identical"
 	fi
 
 
 	#### test "unset" in a subshell
 	(  unset 'mytree_global1.l1[urw].l2[itc zapfdingbats]'  ) || \
-		err_exit "Try 1: Variable 'mytree_global1.l1[urw].l2[itc zapfdingbats]' not found." 
+		err_exit "try 1: variable 'mytree_global1.l1[urw].l2[itc zapfdingbats]' not found"
 	(  unset 'mytree_global1.l1[urw].l2[itc zapfdingbats]'  ) || \
-		err_exit "Try 2: Variable 'mytree_global1.l1[urw].l2[itc zapfdingbats]' not found." 
+		err_exit "try 2: variable 'mytree_global1.l1[urw].l2[itc zapfdingbats]' not found"
 
 	# remove parent node (array element) and then check whether the child is gone, too:
 	(
 		unset 'mytree_global1.l1[urw].l2[itc zapfdingbats]'
-		unset 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'
-	) && err_exit "Global: Parent node removed (array element), child still exists" 
+		[[ -v 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'} ]]
+	) && err_exit "global: parent node removed (array element), child still exists"
 	(
 		unset 'mytree_local1.l1[urw].l2[itc zapfdingbats]'
-		unset 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'
-	) && err_exit "Local: Parent node removed (array element), child still exists" 
-	
+		[[ -v 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ]]
+	) && err_exit "local: parent node removed (array element), child still exists"
+
 	# remove parent node  (array variable) and then check whether the child is gone, too:
 	(
 		unset 'mytree_local1.l1[urw].l2'
-		unset 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'
-	) && err_exit "Global: Parent node removed (array variable), child still exists" 
+		[[ -v 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ]]
+	) && err_exit "global: parent node removed (array variable), child still exists"
 	(
 		unset 'mytree_local1.l1[urw].l2'
-		unset 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'
-	) && err_exit "Local: Parent node removed (array variable), child still exists" 
+		[[ -v 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ]]
+	) && err_exit "local: parent node removed (array variable), child still exists"
 
 
 	#### test "unset" and compare trees
 	unset 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ||
-		err_exit "Variable 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' not found." 
-	
+		err_exit "variable 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' not found"
+
 	[[ "${mytree_global1}" != "${mytree_local1}" ]] || err_exit "mytree_global1 and mytree_local1 should differ"
 
 	unset 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ||
-		err_exit "Variable 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' not found." 
-	
+		err_exit "variable 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' not found"
+
 	# Compare trees (after "unset")
 	if [[ "${mytree_global1}" != "${mytree_local1}" ]] ; then
-		err_exit "Compound trees 'mytree_local1' and 'mytree_global1' not identical after unset"
-	fi	
+		err_exit "compound trees 'mytree_local1' and 'mytree_global1' not identical after unset"
+	fi
 }
 
 main

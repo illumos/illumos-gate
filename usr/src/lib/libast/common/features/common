@@ -425,7 +425,15 @@ tst	- -DTRY=1 - -DTRY=1 -Dvoid=char - -DTRY=2 - -DTRY=3 - -DTRY=4 output{
 	main()
 	{
 		int	r;
+
 		printf("\n#ifndef va_listref\n");
+		printf("#ifndef	va_start\n");
+		printf("#if __STD_C\n");
+		printf("#include <stdarg.h>\n");
+		printf("#else\n");
+		printf("#include <varargs.h>\n");
+		printf("#endif\n");
+		printf("#endif\n");
 	#if TRY == 4
 		printf("#define va_listref(p) (&(p))\t");
 			printf("/* pass va_list to varargs function */\n");
@@ -478,14 +486,6 @@ tst	- -DTRY=1 - -DTRY=1 -Dvoid=char - -DTRY=2 - -DTRY=3 - -DTRY=4 output{
 	#endif
 	#endif
 	
-		printf("#ifndef	va_start\n");
-		printf("#if __STD_C\n");
-		printf("#include <stdarg.h>\n");
-		printf("#else\n");
-		printf("#include <varargs.h>\n");
-		printf("#endif\n");
-		printf("#endif\n");
-
 		printf("#endif\n");
 		return 0;
 	}

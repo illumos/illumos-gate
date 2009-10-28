@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -44,7 +44,7 @@ fi
 export LC_NUMERIC=C
 
 # constants values for tokenizer/parser stuff
-typeset -r ch=(
+compound -r ch=(
 	newline=$'\n'
 	tab=$'\t'
 	formfeed=$'\f'
@@ -317,7 +317,7 @@ function enumerate_comments_cpp
 	integer content_length
 
 	integer file_pos # file position
-	typeset line_pos=(
+	compound line_pos=(
 		integer x=0 # X position in line
 		integer y=0 # Y position in line (line number)
 	)
@@ -325,20 +325,20 @@ function enumerate_comments_cpp
 
 	typeset comment
 
-	typeset state=(
+	compound state=(
 		# C comment state
 		typeset in_c_comment=false
 		# C++ comment state
-		typeset cxx=(
+		compound cxx=(
 			typeset in_comment=false
 			typeset comment_continued=false
 			# position of current //-pos
-			typeset comment_pos=(
+			compound comment_pos=(
 				integer x=-1 
 				integer y=-1
 			)
 			# position of previous //-pos
-			typeset comment_prev_pos=(
+			compound comment_prev_pos=(
 				integer x=-1
 				integer y=-1
 			)
@@ -708,56 +708,99 @@ function cat_http_body
 	return 0
 }
 
-function cat_http
+function cat_url
 {
 	typeset protocol="${1%://*}"
 	typeset path1="${1#*://}" # "http://foo.bat.net/x/y.html" ----> "foo.bat.net/x/y.html"
-
-	typeset host="${path1%%/*}"
-	typeset path="${path1#*/}"
-	typeset port="${host##*:}"
-    
-	integer netfd
-	typeset -C httpresponse # http response
-
-	# If URL did not contain a port number in the host part then look at the
-	# protocol to get the port number
-	if [[ "${port}" == "${host}" ]] ; then
-		case "${protocol}" in
-			"http") port=80 ;;
-			*)      port="$(getent services "${protocol}" | sed 's/[^0-9]*//;s/\/.*//')" ;;
-		esac
-	else
-		host="${host%:*}"
-	fi
-    
-	printmsg "protocol=${protocol} port=${port} host=${host} path=${path}"
-    
-	# prechecks
-	[[ "${protocol}" == "" ]] && { print -u2 -f "%s: protocol not set.\n" "$0" ; return 1 ; }
-	[[ "${port}"     == "" ]] && { print -u2 -f "%s: port not set.\n"     "$0" ; return 1 ; }
-	[[ "${host}"     == "" ]] && { print -u2 -f "%s: host not set.\n"     "$0" ; return 1 ; }
-	[[ "${path}"     == "" ]] && { print -u2 -f "%s: path not set.\n"     "$0" ; return 1 ; }
-
-	# open TCP channel
-	redirect {netfd}<>"/dev/tcp/${host}/${port}"
-	(( $? != 0 )) && { print -u2 -f "%s: Couldn't open %s\n" "$0" "${1}" ; return 1 ; }
-
-	# send HTTP request    
-	request="GET /${path} HTTP/1.1\r\n"
-	request+="Host: ${host}\r\n"
-	request+="User-Agent: crawlsrccomments/ksh93 (2008-06-14; $(uname -s -r -p))\r\n"
-	request+="Connection: close\r\n"
-	print -n -- "${request}\r\n" >&${netfd}
-    
-	# collect response and send it to stdout
-	parse_http_response httpresponse <&${netfd}
-	cat_http_body "${httpresponse.transfer_encoding}" <&${netfd}
-    
-	# close connection
-	redirect {netfd}<&-
 	
-	return 0
+	if [[ "${protocol}" == "file" ]] ; then
+		cat "${path1}"
+		return $?
+	elif [[ "${protocol}" == ~(Elr)http(|s) ]] ; then
+		typeset host="${path1%%/*}"
+		typeset path="${path1#*/}"
+		typeset port="${host##*:}"
+    
+		integer netfd
+		compound httpresponse # http response
+
+		# If URL did not contain a port number in the host part then look at the
+		# protocol to get the port number
+		if [[ "${port}" == "${host}" ]] ; then
+			case "${protocol}" in
+				"http")  port=80 ;;
+				"https") port=443 ;;
+				*)       port="$(getent services "${protocol}" | sed 's/[^0-9]*//;s/\/.*//')" ;;
+			esac
+		else
+			host="${host%:*}"
+		fi
+    
+		printmsg "protocol=${protocol} port=${port} host=${host} path=${path}"
+    
+		# prechecks
+		[[ "${protocol}" != "" ]] || { print -u2 -f "%s: protocol not set.\n" "$0" ; return 1 ; }
+		[[ "${port}"     != "" ]] || { print -u2 -f "%s: port not set.\n"     "$0" ; return 1 ; }
+		[[ "${host}"     != "" ]] || { print -u2 -f "%s: host not set.\n"     "$0" ; return 1 ; }
+		[[ "${path}"     != "" ]] || { print -u2 -f "%s: path not set.\n"     "$0" ; return 1 ; }
+
+		# open TCP channel
+		if [[ "${protocol}" == "https" ]] ; then
+			compound sslfifo
+			sslfifo.dir="$(mktemp -d)"
+			sslfifo.in="${sslfifo.dir}/in"
+			sslfifo.out="${sslfifo.dir}/out"
+			
+			# register an EXIT trap and use "errexit" to leave it at the first error
+			# (this saves lots of if/fi tests for error checking)
+			trap "rm -r \"${sslfifo.dir}\"" EXIT 
+			set -o errexit
+				
+			mkfifo "${sslfifo.in}" "${sslfifo.out}"
+
+			# create async openssl child to handle https
+			openssl s_client -quiet -connect "${host}:${port}" <"${sslfifo.in}" >>"${sslfifo.out}" &
+
+			# send HTTP request    
+			request="GET /${path} HTTP/1.1\r\n"
+			request+="Host: ${host}\r\n"
+			request+="User-Agent: crawlsrccomments/ksh93(ssl) (2009-05-08; $(uname -s -r -p))\r\n"
+			request+="Connection: close\r\n"
+			print -n -- "${request}\r\n" >>	"${sslfifo.in}"
+			
+			# collect response and send it to stdout
+			{
+				parse_http_response httpresponse
+				cat_http_body "${httpresponse.transfer_encoding}"
+			} <"${sslfifo.out}"
+			
+			wait || { print -u2 -f "%s: openssl failed.\n" ; exit 1 ; }
+					
+			return 0
+		else
+			redirect {netfd}<> "/dev/tcp/${host}/${port}"
+			(( $? != 0 )) && { print -u2 -f "%s: Could not open %s\n" "$0" "${1}" ; return 1 ; }
+
+			# send HTTP request    
+			request="GET /${path} HTTP/1.1\r\n"
+			request+="Host: ${host}\r\n"
+			request+="User-Agent: crawlsrccomments/ksh93 (2009-05-08; $(uname -s -r -p))\r\n"
+			request+="Connection: close\r\n"
+			print -n -- "${request}\r\n" >&${netfd}
+    
+			# collect response and send it to stdout
+			parse_http_response httpresponse <&${netfd}
+			cat_http_body "${httpresponse.transfer_encoding}" <&${netfd}
+    
+			# close connection
+			redirect {netfd}<&-
+			
+			return 0
+		fi
+	else
+		return 1
+	fi
+	# notreached
 }
 
 function print_stats
@@ -765,7 +808,7 @@ function print_stats
 	set -o errexit
 
 	# gather some statistics
-	typeset stats=(
+	compound stats=(
 		integer files_with_comments=0
 		integer files_without_comments=0
 
@@ -797,7 +840,7 @@ function print_stats
 		(( stats.total_num_files++ ))
 	done
 
-	printf "%B\n" stats
+	print -v stats
 	return 0
 }
 
@@ -951,7 +994,7 @@ function do_crawl
 {
 	set -o errexit
 
-	typeset options=(
+	compound options=(
 		integer max_filesize_for_scan=$((256*1024))
 		integer max_num_comments=$((2**62)) # FIXME: This should be "+Inf" (=Infinite)
 	)
@@ -967,7 +1010,7 @@ function do_crawl
 	done
 	shift $((OPTIND-1))
 	
-	typeset scan=(
+	compound scan=(
 		typeset -A records
 	)
 
@@ -978,8 +1021,7 @@ function do_crawl
 	done
 
 	# print compound variable array (we strip the "typeset -A records" for now)
-	printf "%B\n" scan | 
-		sed $'s/^#.*$//;s/^\(//;s/^\)//;s/^\ttypeset -A records=\(//;s/^\t\)//' >"crawlsrccomments_extracted_comments.cpv"
+	print -v scan >"crawlsrccomments_extracted_comments.cpv"
 		
 	print "# Wrote results to crawlsrccomments_extracted_comments.cpv"
 
@@ -991,22 +1033,20 @@ function do_getcomments
 	set -o errexit
 
 	# vars
-	typeset scan=(
-		typeset -A records
-	)
+	compound scan
 	typeset database
 	typeset tmp
 
-	typeset options=(
+	compound options=(
 		typeset database="crawlsrccomments_extracted_comments.cpv"
 
 		typeset print_stats=false
 		typeset zapduplicates=false
-		typeset filepattern=(
+		compound filepattern=(
 			typeset accept="*"
 			typeset reject=""
 		)
-		typeset commentpattern=(
+		compound commentpattern=(
 			typeset accept="~(Ei)(license|copyright)"
 			typeset reject=""
 		)
@@ -1035,11 +1075,11 @@ function do_getcomments
 	trap 'set -o errexit ; print -u2 "# Cleaning up..." ; ((${#tmpfiles[@]} > 0)) && rm -- "${tmpfiles[@]}" ; print -u2 "# Done."' EXIT
 
 	# Support for HTTP URLs
-	if [[ "${options.database}" == ~(El)http://.* ]] ; then
-		database="/tmp/extract_license_cat_http_${PPID}_$$.tmp"
+	if [[ "${options.database}" == ~(El)(http|https)://.* ]] ; then
+		database="/tmp/extract_license_cat_url_${PPID}_$$.tmp"
 		tmpfiles+=( "${database}" )
 		print -u2 "# Loading URL..."
-		cat_http "${options.database}" >"${database}"
+		cat_url "${options.database}" >"${database}"
 		print -u2 "# Loading URL done."
 	else
 		database="${options.database}"
@@ -1071,11 +1111,7 @@ function do_getcomments
 
 	# Read compound variable which contain all recorded comments
 	print -u2 "# reading records..."
-	{
-		printf "("
-		cat "${database}"
-		printf ")\n"
-	} | read -C scan.records || fatal_error 'Error reading data.'
+	read -C scan <"${database}" || fatal_error 'Error reading data.'
 	print -u2 -f "# reading %d records done.\n" "${#scan.records[@]}"
 
 	# print comments
@@ -1105,7 +1141,7 @@ function usage
 }
 
 typeset -r do_getcomments_usage=$'+
-[-?\n@(#)\$Id: getcomments (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: getcomments (Roland Mainz) 2009-05-09 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
 [+NAME?getcomments - extract license information from source files]
 [+DESCRIPTION?\bgetcomments\b is a small utilty script which extracts
@@ -1117,7 +1153,7 @@ typeset -r do_getcomments_usage=$'+
 	the comments and stores this information in a "database" file called
 	"crawlsrccomments_extracted_comments.cpv" and then \bextract_license\b allows
 	queries on this database.]
-[D:database?Database file for input (either file or http://-URL).]:[database]
+[D:database?Database file for input (either file, http:// or https://-URL).]:[database]
 [l:acceptfilepattern?Process only files which match pattern.]:[pattern]
 [L:rejectfilepattern?Process only files which do not match pattern.]:[pattern]
 [c:acceptcommentpattern?Match comments which match pattern. Defaults to ~(Ei)(license|copyright)]:[pattern]
@@ -1128,7 +1164,7 @@ typeset -r do_getcomments_usage=$'+
 '
 
 typeset -r do_crawl_usage=$'+
-[-?\n@(#)\$Id: crawl (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: crawl (Roland Mainz) 2009-05-09 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
 [+NAME?crawl - crawl comment information from source files]
 [+DESCRIPTION?\bcrawl\b is a small utilty script which reads
@@ -1144,7 +1180,7 @@ typeset -r do_crawl_usage=$'+
 '
 
 typeset -r crawlsrccomments_usage=$'+
-[-?\n@(#)\$Id: crawlsrccomments (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: crawlsrccomments (Roland Mainz) 2009-05-09 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
 [+NAME?crawlsrccomments - extract and filter comment information from source files]
 [+DESCRIPTION?\bcrawlsrccomments\b is a small utilty script which reads

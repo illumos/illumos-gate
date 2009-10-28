@@ -3,7 +3,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -43,6 +43,8 @@
 #include <shcmd.h>
 
 #define cmdinit			_cmd_init
+
+#define ERROR_CALLBACK		ERROR_SET
 
 #if _BLD_cmd && defined(__EXPORT__)
 #undef __MANGLE__
@@ -96,7 +98,7 @@ cmdinit __PARAM__((int argc, register char** argv, __V_* context, const char* ca
 		error_info.catalog = (char*)catalog;
 	opt_info.index = 0;
 	if (context)
-		error_info.flags |= flags;
+		error_info.flags |= flags & ~(ERROR_CALLBACK|ERROR_NOTIFY);
 	return 0;
 }
 

@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -192,12 +192,14 @@ function put_twitter_message
 	typeset url="http://${url_host}${url_path}"
 	integer netfd # http stream number
 	typeset msgtext="$1"
-	typeset -C httpresponse # http response
+	compound httpresponse # http response
 
 	# argument for "encode_x_www_form_urlencoded"
-	typeset urlform=(
+	compound urlform=(
 		# input
-		typeset -a form
+		compound -a form=(
+			( name="status"	data="${msgtext}" )
+		)
 		# output
 		typeset content
 		integer content_length
@@ -206,10 +208,6 @@ function put_twitter_message
 	typeset request=""
 	typeset content=""
 
-	urlform.form=(
-		( name="status"	data="${msgtext}" )
-	)
-  
 	encode_x_www_form_urlencoded urlform
           
 	content="${urlform.content}"
@@ -222,7 +220,7 @@ function put_twitter_message
 	request+="Content-Type: application/x-www-form-urlencoded\r\n"
 	request+="Content-Length: $(( urlform.content_length ))\r\n"
 
-	redirect {netfd}<>"/dev/tcp/${url_host}/80" 
+	redirect {netfd}<> "/dev/tcp/${url_host}/80" 
 	(( $? != 0 )) && { print -u2 -f "%s: Could not open connection to %s\n." "$0" "${url_host}" ;  return 1 ; }
 
 	# send http post
@@ -261,7 +259,7 @@ function verify_twitter_credentials
 	typeset url_path="/account/verify_credentials.xml"
 	typeset url="http://${url_host}${url_path}"
 	integer netfd # http stream number
-	typeset -C httpresponse # http response
+	compound httpresponse # http response
 
 	typeset request=""
 
@@ -273,7 +271,7 @@ function verify_twitter_credentials
 	request+="Content-Type: application/x-www-form-urlencoded\r\n"
 	request+="Content-Length: 0\r\n" # dummy
 
-	redirect {netfd}<>"/dev/tcp/${url_host}/80" 
+	redirect {netfd}<> "/dev/tcp/${url_host}/80" 
 	(( $? != 0 )) && { print -u2 -f $"%s: Could not open connection to %s.\n" "$0" "${url_host}" ;  return 1 ; }
 
 	# send http post
@@ -315,10 +313,10 @@ builtin uname
 typeset progname="${ basename "${0}" ; }"
 
 # HTTP protocol client identifer
-typeset -r http_user_agent="shtwitter/ksh93 (2008-10-14; ${ uname -s -r -p ; })"
+typeset -r http_user_agent="shtwitter/ksh93 (2009-06-15; ${ uname -s -r -p ; })"
 
 typeset -r shtwitter_usage=$'+
-[-?\n@(#)\$Id: shtwitter (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: shtwitter (Roland Mainz) 2009-06-15 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?shtwitter - read/write text data to internet clipboards]
 [+DESCRIPTION?\bshtwitter\b is a small utility which can read and write text

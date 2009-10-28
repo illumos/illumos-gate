@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -71,12 +71,6 @@ function get_term_size
 	return 0
 }
 
-function print_color
-{
-	print -r -n -- "${symbollist:${1}:1}"
-	return 0
-}
-
 function mandelbrot
 {
 	nameref result=$1
@@ -109,16 +103,19 @@ function mandelbrot
 function loop_serial
 {
 	integer value
+	typeset line=""
 
 	for (( y=y_min ; y < y_max ; y+=stepwidth )) ; do
 		for (( x=x_min ; x < x_max ; x+=stepwidth )) ; do
 			mandelbrot value ${x} ${y} ${x} ${y} 1 ${symbollistlen}
-			print_color ${value}
+			line+="${symbollist:value:1}"
 		done
 
-		print
+		line+=$'\n'
 	done
-
+	
+	print -r -- "${line}"
+	
 	return 0
 }
 
@@ -128,6 +125,7 @@ function loop_parallel
 	integer numjobs=0
 	# the following calculation suffers from rounding errors
 	integer lines_per_job=$(( ((m_height+(numcpus-1)) / numcpus) ))
+	typeset tmpjobdir
 
 	printmsg $"# lines_per_job=${lines_per_job}"
 	printmsg $"# numcpus=${numcpus}"
@@ -135,16 +133,15 @@ function loop_parallel
 	# "renice" worker jobs
 	set -o bgnice
 
-	if [[ "${TMPDIR}" == "" ]] ; then
-		TMPDIR="/tmp"
-	fi
+	tmpjobdir="$(mktemp --default=/tmp --directory "mandelbrotset1${PPID}_$$_XXXXXX")" || fatal_error $"Could not create temporary directory."
+	trap "rm -r ${tmpjobdir}" EXIT # cleanup
 
 	# try to generate a job identifer prefix which is unique across multiple hosts
 	jobident="job_host_$(uname -n)pid_$$_ppid${PPID}"
 
 	printmsg $"## prepare..."
 	for (( y=y_min ; y < y_max ; y+=(stepwidth*lines_per_job) )) ; do
-		rm -f "${TMPDIR}/mandelbrot_${jobident}_child_$y.joboutput"
+		rm -f "${tmpjobdir}/${jobident}_child_$y.joboutput"
 
 		(( numjobs++ ))
 	done
@@ -153,15 +150,21 @@ function loop_parallel
 	for (( y=y_min ; y < y_max ; y+=(stepwidth*lines_per_job) )) ; do
 		(
 			integer value
+			typeset line=""
+			# save file name since we're going to modify "y"
+			typeset filename="${tmpjobdir}/${jobident}_child_$y.joboutput"
 
 			for (( ; y < y_max && lines_per_job-- > 0 ; y+=stepwidth )) ; do
 				for (( x=x_min ; x < x_max ; x+=stepwidth )) ; do
 					mandelbrot value ${x} ${y} ${x} ${y} 1 ${symbollistlen}
-					print_color ${value}
+					line+="${symbollist:value:1}"
 				done
 
-				print
-			done >"${TMPDIR}/mandelbrot_${jobident}_child_$y.joboutput"
+				line+=$'\n'
+			done
+			print -r -- "${line}" >"${filename}"
+			
+			exit 0
 		) &
 	done
 
@@ -170,8 +173,8 @@ function loop_parallel
 
 	printmsg $"## output:"
 	for (( y=y_min ; y < y_max ; y+=(stepwidth*lines_per_job) )) ; do
-		print -- "$( < "${TMPDIR}/mandelbrot_${jobident}_child_$y.joboutput")"
-		rm "${TMPDIR}/mandelbrot_${jobident}_child_$y.joboutput"
+		print -r -- "$( < "${tmpjobdir}/${jobident}_child_$y.joboutput")"
+		# EXIT trap will cleanup temporary files
 	done
 
 	return 0
@@ -189,6 +192,10 @@ builtin basename
 builtin cat
 builtin rm
 builtin uname # loop_parallel needs the ksh93 builtin version to generate unique job file names
+builtin mktemp
+
+set -o noglob
+set -o nounset
 
 typeset progname="${ basename "${0}" ; }"
 
@@ -203,7 +210,7 @@ float stepwidth
 integer numcpus
 
 # terminal size rect
-typeset -C termsize=(
+compound termsize=(
 	integer columns=-1
 	integer lines=-1
 )
@@ -221,7 +228,7 @@ numcpus=16
 (( m_width=termsize.columns-1 , m_height=termsize.lines-2 ))
 
 typeset -r mandelbrotset1_usage=$'+
-[-?\n@(#)\$Id: mandelbrotset1 (Roland Mainz) 2008-11-04 \$\n]
+[-?\n@(#)\$Id: mandelbrotset1 (Roland Mainz) 2009-06-14 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?mandelbrotset1 - generate mandelbrot set fractals with ksh93]
 [+DESCRIPTION?\bmandelbrotset1\b mandelbrot set fractal generator
@@ -247,7 +254,9 @@ while getopts -a "${progname}" "${mandelbrotset1_usage}" OPT ; do
 		m)	max_mag="${OPTARG}"	;;
 		p)	stepwidth="${OPTARG}"	;;
 		S)	mode="serial"		;;
+		+S)	mode="parallel"		;;
 		P)	mode="parallel"		;;
+		+P)	mode="serial"		;;
 		M)	mode="${OPTARG}"	;;
 		C)	numcpus="${OPTARG}"	;;
 		*)	usage			;;

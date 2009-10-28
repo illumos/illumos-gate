@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -180,8 +180,6 @@ recstr(register const char* s, char** e)
 			case '5': case '6': case '7': case '8': case '9':
 				v = 0;
 				a[n++] = strtol(s, &t, 0);
-				if (t > s && (*(t - 1) == 'l' || *(t - 1) == 'L'))
-					t--;
 				s = (const char*)t - 1;
 				continue;
 			}

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1986-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -51,6 +51,7 @@ ppcall(register struct ppsymbol* sym, int tok)
 	int				last_line;
 	long				old_state;
 	char*				last_file;
+	char*				old_next;
 	char*				old_token;
 	struct ppmacstk*		mp;
 	struct ppinstk*			old_in;
@@ -183,6 +184,7 @@ ppcall(register struct ppsymbol* sym, int tok)
 			for (p = pp.in->nextchr; isspace(*p); p++);
 			if ((c = *p) != '(' && c != '/' && c != 0 && c != MARK)
 				goto disable;
+			old_next = (c == MARK) ? pp.in->nextchr : NiL;
 			old_token = pp.token;
 			mp = pp.macp->next;
 			if ((pp.token = (char*)&mp->arg[mac->arity + 1]) > pp.maxmac)
@@ -200,24 +202,29 @@ ppcall(register struct ppsymbol* sym, int tok)
 			if (c != '(')
 			{
 				pp.state = old_state;
-				if (c)
+				if (old_next)
+					pp.in->nextchr = old_next;
+				else
 				{
-					p = pp.toknxt;
-					while (p > pp.token)
-						ungetchr(*--p);
+					if (c)
+					{
+						p = pp.toknxt;
+						while (p > pp.token)
+							ungetchr(*--p);
 #if COMPATIBLE
-					if ((pp.state & (COMPATIBILITY|STRICT)) == (COMPATIBILITY|STRICT))
-						error(1, "%s: macro arguments omitted", sym->name);
+						if ((pp.state & (COMPATIBILITY|STRICT)) == (COMPATIBILITY|STRICT))
+							error(1, "%s: macro arguments omitted", sym->name);
 #endif
-					if (c == T_ID && !(pp.state & HIDDEN))
-						ungetchr(' ');
-				}
-				if (pp.hidden != old_hidden)
-				{
-					ungetchr('\n');
-					error_info.line--;
-					if (pp.hidden && !--pp.hidden)
-						pp.state &= ~HIDDEN;
+						if (c == T_ID && !(pp.state & HIDDEN))
+							ungetchr(' ');
+					}
+					if (pp.hidden != old_hidden)
+					{
+						ungetchr('\n');
+						error_info.line--;
+						if (pp.hidden && !--pp.hidden)
+							pp.state &= ~HIDDEN;
+					}
 				}
 				pp.token = old_token;
 				goto disable;

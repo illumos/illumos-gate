@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -74,6 +74,7 @@ static Time_t
 gen(register Tm_t* tm, register Set_t* set)
 {
 	register int	n;
+	int		z;
 	Time_t		t;
 
 	if (set->year >= 0)
@@ -132,26 +133,32 @@ gen(register Tm_t* tm, register Set_t* set)
 			tm->tm_hour -= 12;
 	}
 	t = tmxtime(tm, set->zone);
-	tm = 0;
 	if (set->yday >= 0)
 	{
-		tm = tmxmake(t);
+		z = 1;
+		tm = tmxtm(tm, t, tm->tm_zone);
 		tm->tm_mday += set->yday - tm->tm_yday;
 	}
 	else if (set->wday >= 0)
 	{
-		tm = tmxmake(t);
+		z = 1;
+		tm = tmxtm(tm, t, tm->tm_zone);
 		if ((n = set->wday - tm->tm_wday) < 0)
 			n += 7;
 		tm->tm_mday += n;
 	}
+	else
+		z = 0;
 	if (set->nsec < 1000000000L)
 	{
-		if (!tm)
-			tm = tmxmake(t);
+		if (!z)
+		{
+			z = 1;
+			tm = tmxtm(tm, t, tm->tm_zone);
+		}
 		tm->tm_nsec = set->nsec;
 	}
-	return tm ? tmxtime(tm, set->zone) : t;
+	return z ? tmxtime(tm, set->zone) : t;
 }
 
 /*
@@ -175,6 +182,7 @@ scan(register const char* s, char** e, const char* format, char** f, Time_t t, l
 	Time_t		x;
 	Set_t		set;
 	Tm_zone_t*	zp;
+	Tm_t		ts;
 
 	char**		sp = &stack[0];
 
@@ -183,8 +191,7 @@ scan(register const char* s, char** e, const char* format, char** f, Time_t t, l
 	b = s;
  again:
 	CLEAR(set);
-	tm = tmxmake(t);
-	tm_info.date = tm_info.zone;
+	tm = tmxtm(&ts, t, NiL);
 	pedantic = (flags & TM_PEDANTIC) != 0;
 	for (;;)
 	{
@@ -315,7 +322,7 @@ scan(register const char* s, char** e, const char* format, char** f, Time_t t, l
 				x = strtoul(s, &u, 0);
 				if (s == u)
 					goto next;
-				tm = tmxmake(tmxsns(x, 0));
+				tm = tmxtm(tm, tmxsns(x, 0), tm->tm_zone);
 				s = u;
 				CLEAR(set);
 				continue;

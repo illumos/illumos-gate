@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -127,6 +127,8 @@ const Shtable_t shtab_attributes[] =
 	{"-xexport",	NV_EXPORT},
 	{"-rreadonly",	NV_RDONLY},
 	{"-ttagged",	NV_TAGGED},
+	{"-Aassociative array",	NV_ARRAY},
+	{"-aindexed array",	NV_ARRAY},
 	{"-llong",	(NV_DOUBLE|NV_LONG)},
 	{"-Eexponential",(NV_DOUBLE|NV_EXPNOTE)},
 	{"-Xhexfloat",	(NV_DOUBLE|NV_HEXFLOAT)},
@@ -142,8 +144,6 @@ const Shtable_t shtab_attributes[] =
 	{"-Lleftjust",	NV_LJUST},
 	{"-Rrightjust",	NV_RJUST},
 	{"-uuppercase",	NV_LTOU},
-	{"-Aassociative array",	NV_ARRAY},
-	{"-aindexed array",	NV_ARRAY},
 	{"++namespace",	NV_TABLE},
 	{"",		0}
 };

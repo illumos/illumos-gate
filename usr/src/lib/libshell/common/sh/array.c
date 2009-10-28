@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -187,6 +187,18 @@ static union Value *array_getup(Namval_t *np, Namarr_t *arp, int update)
 			nv_offattr(np,NV_NOFREE);
 	}
 	return(up);
+}
+
+int nv_arrayisset(Namval_t *np, Namarr_t *arp)
+{
+	register struct index_array *ap = (struct index_array*)arp;
+	union Value *up;
+	if(is_associative(ap))
+		return((np = nv_opensub(np)) && !nv_isnull(np));
+	if(ap->cur >= ap->maxi)
+		return(0);
+	up = &(ap->val[ap->cur]);
+	return(up->cp && up->cp!=Empty);
 }
 
 /*
@@ -487,7 +499,7 @@ static void array_putval(Namval_t *np, const char *string, int flags, Namfun_t *
 		scan = ap->nelem&ARRAY_SCAN;
 		if(mp && mp!=np)
 		{
-			if(!is_associative(ap) && string && !nv_type(np) && nv_isvtree(mp))
+			if(!is_associative(ap) && string && !(flags&NV_APPEND) && !nv_type(np) && nv_isvtree(mp))
 			{
 				if(!nv_isattr(np,NV_NOFREE))
 					_nv_unset(mp,flags&NV_RDONLY);
@@ -529,7 +541,7 @@ static void array_putval(Namval_t *np, const char *string, int flags, Namfun_t *
 						ap->nelem--;
 				}
 			}
-			if(array_elem(ap)==0 && ((ap->nelem&ARRAY_SCAN) || !is_associative(ap)))
+			if(array_elem(ap)==0 && (ap->nelem&ARRAY_SCAN))
 			{
 				if(is_associative(ap))
 					(*ap->fun)(np, NIL(char*), NV_AFREE);
@@ -602,12 +614,13 @@ static const Namdisc_t array_disc =
 
 static void array_copytree(Namval_t *np, Namval_t *mp)
 {
-	char		*val;
 	Namfun_t	*fp = nv_disc(np,NULL,NV_POP);
 	nv_offattr(np,NV_ARRAY);
 	nv_clone(np,mp,0);
+	if(np->nvalue.cp && !nv_isattr(np,NV_NOFREE))
+		free((void*)np->nvalue.cp);
+	np->nvalue.cp = 0;
 	np->nvalue.up = &mp->nvalue;
-	val = sfstruse(sh.strbuf);
 	fp->nofree  &= ~1;
 	nv_disc(np,(Namfun_t*)fp, NV_FIRST);
 	fp->nofree |= 1;
@@ -662,22 +675,21 @@ static struct index_array *array_grow(Namval_t *np, register struct index_array 
 		if(nv_hasdisc(np,&array_disc) || nv_isvtree(np))
 		{
 			ap->header.table = dtopen(&_Nvdisc,Dtoset);
-			mp = nv_search("0", ap->header.table, 0);
-
+			mp = nv_search("0", ap->header.table,NV_ADD);
 			if(mp && nv_isnull(mp))
 			{
 				Namfun_t *fp;
 				ap->val[0].np = mp;
 				array_setbit(ap->bits,0,ARRAY_CHILD);
 				for(fp=np->nvfun; fp && !fp->disc->readf; fp=fp->next);
-				if(fp)
+				if(fp && fp->disc && fp->disc->readf)
 					(*fp->disc->readf)(mp,(Sfio_t*)0,0,fp);
 				i++;
 			}
 		}
 		else if((ap->val[0].cp=np->nvalue.cp))
 			i++;
-		else if(nv_isattr(np,NV_INTEGER))
+		else if(nv_isattr(np,NV_INTEGER) && !nv_isnull(np))
 		{
 			Sfdouble_t d= nv_getnum(np);
 			i++;
@@ -1077,9 +1089,15 @@ char *nv_endsubscript(Namval_t *np, register char *cp, int mode)
 	}
 	if(mode && np)
 	{
+		Namarr_t *ap = nv_arrayptr(np);
+		int scan = 0;
+		if(ap)
+			scan = ap->nelem&ARRAY_SCAN;
 		if((mode&NV_ASSIGN) && (cp[1]=='=' || cp[1]=='+'))
 			mode |= NV_ADD;
 		nv_putsub(np, sp, ((mode&NV_ADD)?ARRAY_ADD:0)|(cp[1]&&(mode&NV_ADD)?ARRAY_FILL:mode&ARRAY_FILL));
+		if(scan)
+			ap->nelem |= scan;
 	}
 	if(quoted)
 		stakseek(count);
@@ -1252,7 +1270,7 @@ void *nv_associative(register Namval_t *np,const char *sp,int mode)
 			else if(ap->header.nelem&ARRAY_NOSCOPE)
 				mode = HASH_NOSCOPE;
 			if(*sp==0 && (mode&NV_ADD))
-				sfprintf(sfstderr,"adding empty subscript\n"); 
+				errormsg(SH_DICT,ERROR_warn(0),"adding empty subscript"); 
 			if(sh.subshell && (mp=nv_search(sp,ap->header.table,0)) && nv_isnull(mp))
 				ap->cur = mp;
 			if((mp || (mp=nv_search(sp,ap->header.table,mode))) && nv_isnull(mp) && (mode&NV_ADD))
@@ -1280,7 +1298,9 @@ void *nv_associative(register Namval_t *np,const char *sp,int mode)
 				ap->nextpos = (Namval_t*)dtnext(ap->header.table,mp);
 			}
 			np = mp;
-			if(ap->pos != np && !(ap->header.nelem&ARRAY_SCAN))
+			if(ap->pos && ap->pos==np)
+				ap->header.nelem |= ARRAY_SCAN;
+			else if(!(ap->header.nelem&ARRAY_SCAN))
 				ap->pos = 0;
 			ap->cur = np;
 		}

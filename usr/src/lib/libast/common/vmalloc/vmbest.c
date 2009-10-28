@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -887,7 +887,7 @@ Void_t*		data;
 	reg int		local, inuse;
 
 #ifdef DEBUG
-	if((local = (int)data) >= 0 && local <= 0xf)
+	if((local = (int)integralof(data)) >= 0 && local <= 0xf)
 	{	int	vmassert = _Vmassert;
 		_Vmassert = local ? local : vmassert ? vmassert : (VM_check|VM_abort);
 		_vmbestcheck(vd, NIL(Block_t*));
@@ -1279,6 +1279,56 @@ typedef struct _mmapdisc_s
 #endif
 #define BRK_FAILED	((Void_t*)(-1))
 
+/* make sure that allocated memory are addressable */
+
+#if _PACKAGE_ast
+#include	<sig.h>
+#else
+#include	<signal.h>
+typedef void	(*Sig_handler_t)(int);
+#endif
+
+static int	Gotsegv = 0;
+
+#if __STD_C
+static void sigsegv(int sig)
+#else
+static void sigsegv(sig)
+int	sig;
+#endif
+{
+	if(sig == SIGSEGV)
+		Gotsegv = 1;
+}
+
+#if __STD_C
+static int okaddr(Void_t* addr, size_t nsize)
+#else
+static int okaddr(addr, nsize)
+Void_t*	addr;
+size_t	nsize;
+#endif
+{
+	Sig_handler_t	segv;
+	int		rv;
+
+	Gotsegv = 0; /* catch segment fault */
+	segv = signal(SIGSEGV, sigsegv);
+
+	if(Gotsegv == 0)
+		rv = *((char*)addr);
+	if(Gotsegv == 0)
+		rv += *(((char*)addr)+nsize-1);
+	if(Gotsegv == 0)
+		rv = rv == 0 ? 0 : 1;
+	else	rv = -1;
+
+	signal(SIGSEGV, segv); /* restore signal catcher */
+	Gotsegv = 0;
+
+	return rv;
+}
+
 /* A discipline to get raw memory using sbrk/VirtualAlloc/mmap */
 #if __STD_C
 static Void_t* sbrkmem(Vmalloc_t* vm, Void_t* caddr,
@@ -1323,8 +1373,15 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 		{
 			addr = (Vmuchar_t*)sbrk(0); /* old break value */
 			if(addr && addr != (Vmuchar_t*)BRK_FAILED )
+			{
+				if((addr+nsize) < addr)
+					return NIL(Void_t*);
 				if(brk(addr+nsize) == 0 ) 
-					return addr;
+				{	if(okaddr(addr,nsize) >= 0)
+						return addr;
+					(void)brk(addr); /* release reserved address */
+				}
+			}
 		}
 #endif /* _mem_sbrk */
 
@@ -1333,7 +1390,10 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 			addr = (Vmuchar_t*)mmap(0, nsize, PROT_READ|PROT_WRITE,
                                         	MAP_ANON|MAP_PRIVATE, -1, 0);
 			if(addr && addr != (Vmuchar_t*)MAP_FAILED)
-				return addr;
+			{	if(okaddr(addr,nsize) >= 0)
+					return addr;
+				(void)munmap(addr, nsize); /* release reserved address */
+			}
 		}
 #endif /* _mem_mmap_anon */
 
@@ -1357,8 +1417,11 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 			addr = (Vmuchar_t*)mmap(0, nsize, PROT_READ|PROT_WRITE,
 						MAP_PRIVATE, mmdc->fd, mmdc->offset);
 			if(addr && addr != (Vmuchar_t*)MAP_FAILED)
-			{	mmdc->offset += nsize;
-				return addr;
+			{	if(okaddr(addr, nsize) >= 0)
+				{	mmdc->offset += nsize;
+					return addr;
+				}
+				(void)munmap(addr, nsize); /* release reserved address */
 			}
 		}
 #endif /* _mem_mmap_zero */
@@ -1374,10 +1437,11 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 			if(!addr || addr == (Vmuchar_t*)BRK_FAILED)
 				addr = caddr;
 			else if(((Vmuchar_t*)caddr+csize) == addr) /* in sbrk-space */
-			{	if(nsize > csize)
-					addr += nsize-csize;
-				else	addr -= csize-nsize;
-				return brk(addr) == 0 ? caddr : NIL(Void_t*);
+			{	if(nsize <= csize)
+					addr -= csize-nsize;
+				else if((addr += nsize-csize) < (Vmuchar_t*)caddr)
+					return NIL(Void_t*); /* wrapped around address */
+				else	return brk(addr) == 0 ? caddr : NIL(Void_t*);
 			}
 		}
 #endif /* _mem_sbrk */

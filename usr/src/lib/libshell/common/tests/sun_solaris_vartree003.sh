@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -31,15 +31,17 @@
 # and "unset" handling.
 #
 
+# test setup
 function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors+=1 ))
+	(( Errors++ ))
 }
-
 alias err_exit='err_exit $LINENO'
 
+# the test cannot use "nounset"
+Command=${0##*/}
 integer Errors=0
 
 function example_tree

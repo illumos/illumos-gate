@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -63,16 +63,19 @@
 # ---- snip ----
 
 
+# test setup
 function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors+=1 ))
+	(( Errors++ ))
 }
-
 alias err_exit='err_exit $LINENO'
 
+set -o nounset
+Command=${0##*/}
 integer Errors=0
+
 
 typeset testtmpdir=/tmp/ksh93_test_cr_6763594_${PPID}_$$
 mkdir "${testtmpdir}" || { err_exit "Could not create temporary directory ${testtmpdir}." ; exit ${Errors} ; }
@@ -90,6 +93,7 @@ s=$( < out_stderr ) ; [[ "$s" == ~(Elr)(.*:\ \./myfoo:\ \./myfoo:\ .*\[.*\]) ]] 
 rm "myfoo" "out_stdout" "out_stderr" || err_exit "rm failed."
 cd ..
 rmdir "${testtmpdir}" || err_exit "Failed to remove temporary directory ${testtmpdir}."
- 
+
+
 # tests done
 exit $((Errors))

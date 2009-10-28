@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -104,6 +104,7 @@ USAGE_LICENSE
 		"open and is associated with a terminal device.]"
 	"[+-u \afile\a?True if \afile\a exists and has its set-user-id bit "
 		"set.]"
+	"[+-v \avarname\a?True if \avarname\a is a valid variable name that is set.]"
 	"[+-w \afile\a?True if \afile\a exists and is writable.]"
 	"[+-x \afile\a?True if \afile\a exists and is executable.  For a "
 		"directory it means that it can be searched.]"
@@ -115,7 +116,12 @@ USAGE_LICENSE
 		"it was last read.]"
 	"[+-O \afile\a?True if \afile\a exists and owner is the effective "
 		"user id of the current process.]"
+	"[+-R \avarname\a?True if \avarname\a is a name reference.]"
 	"[+-S \afile\a?True if \afile\a exists and is a socket.]"
+#if SHOPT_FS_3D
+	"[+-V \afile\a?True if \afile\a exists and is a version "
+		"directory.]"
+#endif /* SHOPT_FS_3D */
 "}"
 "[+?Binary expressions can be one of the following:]{"
 	"[+\astring1\a = \astring2\a?True if \astring1\a is equal to "
@@ -156,7 +162,7 @@ USAGE_LICENSE
 "[+SEE ALSO?\blet\b(1), \bexpr\b(1)]"
 ;
 
-const char test_opchars[]	= "HLNSVOGCaeohrwxdcbfugk"
+const char test_opchars[]	= "HLNRSVOGCaeohrwxdcbfugkv"
 #if SHOPT_TEST_L
 	"l"
 #endif

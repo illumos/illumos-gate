@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -40,16 +40,19 @@
 # -- snip --
 #
 
+# test setup
 function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors+=1 ))
+	(( Errors++ ))
 }
-
 alias err_exit='err_exit $LINENO'
 
+set -o nounset
+Command=${0##*/}
 integer Errors=0
+
 
 ##
 ## test one:
@@ -114,6 +117,7 @@ print "done"
 
 (( count=$(fgrep "got_child" <<< "$s" | wc -l) )) || err_exit "counting failed."
 (( count == 3 )) || err_exit "Expected count==3, got count==${count}."
+
 
 # tests done
 exit $((Errors))

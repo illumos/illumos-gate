@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -30,9 +30,9 @@ function testfunc
 	typeset cmd="$2"
 	typeset expected_output="$3"
 	typeset output
-	
+
 	output="$($SHELL -c "${cmd}" 2>&1 )"
-	
+
 	[[ "${output}" != "${expected_output}" ]] && err_exit2 ${line_number} "${output} != ${expected_output}"
 }
 alias testfunc='testfunc $LINENO'
@@ -60,9 +60,9 @@ testfunc '(function l { float -S x=0.5 ;  (( x+=.5 )) ;   $1 && print "$x" ; } ;
 	function l
 	{
 		typeset -S s=( a=0 b=0 )
-	
+
 		(( s.a++, s.b++ ))
-	
+
 		$1 && printf 'a=%d, b=%d\n' s.a s.b
 	}
 	l false ; l false ; l true
@@ -75,9 +75,9 @@ got=$(
 	function ar
 	{
 		typeset -a -S s=( "hello" )
-	
+
 		s+=( "an element" )
-	
+
 		$1 && { printf '%s' "${s[@]}" ; printf '\n' ; }
 	}
 	ar false ; ar false ; ar true

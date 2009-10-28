@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -43,6 +43,7 @@ extern char*		getenv(const char*);
 #endif
 
 #include	"vmhdr.h"
+#include	<errno.h>
 
 #if _UWIN
 
@@ -553,6 +554,27 @@ reg size_t	size;
 	addr = VMRECORD((*Vmregion->meth.alignf)(Vmregion,size,align));
 	VMUNBLOCK
 	return addr;
+}
+
+#if __STD_C
+extern int posix_memalign(reg Void_t **memptr, reg size_t align, reg size_t size)
+#else
+extern int posix_memalign(memptr, align, size)
+reg Void_t**	memptr;
+reg size_t	align;
+reg size_t	size;
+#endif
+{
+	Void_t	*mem;
+
+	if(align == 0 || (align%sizeof(Void_t*)) != 0 || ((align-1)&align) != 0 )
+		return EINVAL;
+
+	if(!(mem = memalign(align, size)) )
+		return ENOMEM;
+
+	*memptr = mem;
+	return 0;
 }
 
 #if __STD_C

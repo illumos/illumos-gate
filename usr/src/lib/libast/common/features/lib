@@ -453,6 +453,15 @@ tst	lib_memccpy string.h unistd.h stdlib.h fcntl.h signal.h sys/types.h sys/stat
 		size_t	siz;
 		int	i;
 	#endif
+
+	#if defined(__ia64) || defined(__ia64__) || defined(__itanium__)
+		/*
+		 * 0 faith that the itanium coders will ever get this right
+		 * prove me wrong
+		 */
+
+		return 1;
+	#endif
 	
 		/*
 		 * early mac osx failed here -- fixed 3Q 2001

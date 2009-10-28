@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1986-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -82,7 +82,7 @@
 #define ppsymset(t,n)	(struct ppsymbol*)hashlook(t,n,HASH_CREATE|HASH_SIZE(sizeof(struct ppsymbol)),NiL)
 
 #if CHAR_MIN < 0
-#define pptype		(ppctype-(CHAR_MIN)+1)
+#define pptype		(ppctype-(CHAR_MIN))
 #else
 #define pptype		(ppctype)
 #endif

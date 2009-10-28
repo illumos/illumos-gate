@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -21,13 +21,17 @@
 ***********************************************************************/
 #pragma prototyped
 
+#ifndef _USE_GNU
+#define _USE_GNU
+#endif
+
 #include "stdhdr.h"
 
 int
 fflush(Sfio_t* f)
 {
 	if (!f)
-		return sfsync(NiL);
+		return fcloseall();
 
 	STDIO_INT(f, "fflush", int, (Sfio_t*), (f))
 

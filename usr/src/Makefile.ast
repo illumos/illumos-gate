@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -38,7 +38,9 @@ LIBSHELLCPPFLAGS = \
 	-I$(LIBSHELLBASE)/$(LIBSHELLMACH)/src/cmd/ksh93 \
 	-I$(LIBSHELLBASE)/common/include \
 	-I$(ROOT)/usr/include/ast \
+	-I$(ROOT)/usr/include \
 	-DKSHELL \
+	-DSHOPT_BGX \
 	-DSHOPT_BRACEPAT \
 	-DSHOPT_CMDLIB_BLTIN=0 \
 	'-DSH_CMDLIB_DIR="/usr/ast/bin"' \
@@ -64,7 +66,7 @@ LIBSHELLCPPFLAGS = \
 	-DERROR_CONTEXT_T=Error_context_t \
 	'-DUSAGE_LICENSE=\
 		"[-author?David Korn <dgk@research.att.com>]"\
-		"[-copyright?Copyright (c) 1982-2008 AT&T Intellectual Property]"\
+		"[-copyright?Copyright (c) 1982-2009 AT&T Intellectual Property]"\
 		"[-license?http://www.opensource.org/licenses/cpl1.0.txt]"\
 		"[--catalog?libshell]"'
 

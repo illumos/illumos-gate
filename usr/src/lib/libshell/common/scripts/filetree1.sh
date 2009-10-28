@@ -60,8 +60,8 @@ function do_directory
 	typeset i
 	typeset dummy
 	
-	typeset -A tree.files
-	typeset -A tree.dirs
+	typeset -C -A tree.files
+	typeset -C -A tree.dirs
 
 	find "${basedir}"/* -prune 2>/dev/null | while read i ; do
 		dirname="$(dirname "$i")"
@@ -169,7 +169,7 @@ builtin uname
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r filetree1_usage=$'+
-[-?\n@(#)\$Id: filetree1 (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: filetree1 (Roland Mainz) 2009-05-06 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?filetree1 - file tree demo]
@@ -177,7 +177,7 @@ typeset -r filetree1_usage=$'+
 	which accepts a directory name as input, and then builds tree
 	nodes for all files+directories and stores all file attributes
 	in these notes and then outputs the tree in the format
-	specified by viewmode (either "list", "namelist" or "tree")..]
+	specified by viewmode (either "list", "namelist", "tree" or "compacttree")..]
 
 viewmode dirs
 
@@ -195,7 +195,7 @@ shift $((OPTIND-1))
 typeset viewmode="$1"
 shift
 
-if [[ "${viewmode}" != ~(Elr)(list|namelist|tree) ]] ; then
+if [[ "${viewmode}" != ~(Elr)(list|namelist|tree|compacttree) ]] ; then
 	fatal_error $"Invalid view mode \"${viewmode}\"."
 fi
 
@@ -216,7 +216,10 @@ case "${viewmode}" in
 		typeset + | egrep "^myfiletree\["
 		;;
 	tree)
-		printf "%B\n" myfiletree
+		print -v myfiletree
+		;;
+	compacttree)
+		print -C myfiletree
 		;;
 	*)
 		fatal_error $"Invalid view mode \"${viewmode}\"."

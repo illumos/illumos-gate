@@ -55,11 +55,14 @@ SUNWprivate_1.1 {
 	b_cut;
 	b_date;
 	b_dirname;
+	b_egrep;
 	b_expr;
 	b_fds;
+	b_fgrep;
 	b_fmt;
 	b_fold;
 	b_getconf;
+	b_grep;
 	b_head;
 	b_id;
 	b_join;
@@ -68,10 +71,12 @@ SUNWprivate_1.1 {
 	b_md5sum;
 	b_mkdir;
 	b_mkfifo;
+	b_mktemp;
 	b_mv;
 	b_paste;
 	b_pathchk;
 	b_pids;
+	b_pgrep;
 	b_readlink;
 	b_rev;
 	b_rm;
@@ -85,6 +90,7 @@ SUNWprivate_1.1 {
 	b_uname;
 	b_uniq;
 	b_wc;
+	b_xgrep;
     local:
 	*;
 };

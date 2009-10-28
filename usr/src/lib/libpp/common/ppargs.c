@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1986-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: cpp (AT&T Research) 2007-03-11 $\n]"
+"[-?\n@(#)$Id: cpp (AT&T Research) 2009-02-02 $\n]"
 USAGE_LICENSE
 "[+NAME?cpp - C language preprocessor]"
 "[+DESCRIPTION?\bcpp\b is the preprocessor for all C language dialects. It is"

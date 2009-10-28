@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -106,8 +106,8 @@ function handle_document
             nodepath[${nodesnum}]+=( 
                 typeset tagtype="element"
                 typeset tagname="${tag_value}"
-                typeset -A tagattributes=( )
-                typeset -A nodes=( )
+                compound -A tagattributes
+                compound -A nodes
                 integer nodesnum=0
             )
 
@@ -268,13 +268,13 @@ builtin uname
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r xmldocumenttree1_usage=$'+
-[-?\n@(#)\$Id: xmldocumenttree1 (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: xmldocumenttree1 (Roland Mainz) 2009-05-09 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?xmldocumenttree1 - XML tree demo]
 [+DESCRIPTION?\bxmldocumenttree\b is a small ksh93 compound variable demo
         which reads a XML input file, converts it into an internal
         variable tree representation and outputs it in the format
-        specified by viewmode (either "list", "namelist" or "tree").]
+        specified by viewmode (either "list", "namelist", "tree" or "compacttree").]
 
 file viewmode
 
@@ -296,15 +296,15 @@ if [[ "${xmlfile}" == "" ]] ; then
     fatal_error $"No file given."
 fi
 
-if [[ "${viewmode}" != ~(Elr)(list|namelist|tree) ]] ; then
+if [[ "${viewmode}" != ~(Elr)(list|namelist|tree|compacttree) ]] ; then
     fatal_error $"Invalid view mode \"${viewmode}\"."
 fi
 
-typeset -C xdoc
-typeset -A xdoc.nodes
+compound xdoc
+compound -A xdoc.nodes
 integer xdoc.nodesnum=0
 
-typeset -C stack
+compound stack
 typeset -a stack.items=( [0]="doc.nodes" )
 integer stack.pos=0
 
@@ -343,7 +343,10 @@ case "${viewmode}" in
         typeset + | egrep "xdoc.*(tagname|tagtype|tagval|tagattributes)"
         ;;
     tree)
-        print -- "${xdoc}"
+        print -v xdoc
+        ;;
+    compacttree)
+        print -C xdoc
         ;;
        *)
         fatal_error $"Invalid view mode \"${viewmode}\"."

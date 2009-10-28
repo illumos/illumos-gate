@@ -1,13 +1,15 @@
 # This program runs ksh regression tests
 # shtests [ name=value ... ] [ --all | --compile ] [ --time ] [ a.sh b.sh ... ]
 
-unset DISPLAY ENV FIGNORE
+timesensitive='*@(options|sigchld|subshell).sh'
+
+unset DISPLAY ENV FIGNORE HISTFILE
 LANG=C
 LC_ALL=C
 compile=1
 script=1
 time=1
-vmdebug=1
+vmdebug=a
 while	:
 do	case $1 in
 	-a|--a*)compile=2
@@ -38,9 +40,11 @@ do	case $1 in
 done
 if	[[ ! $vmdebug ]]
 then	unset VMDEBUG
-elif	[[ ! $VMDEBUG ]]
-then	export VMDEBUG=a
+elif	[[ $VMDEBUG ]]
+then	vmdebug=$VMDEBUG
+else	export VMDEBUG=$vmdebug
 fi
+[[ $VMDEBUG ]] || timesensitive=.
 export LANG LC_ALL PATH PWD SHELL
 PWD=`pwd`
 SHELL=${SHELL-ksh}
@@ -65,9 +69,8 @@ fi
 if	[[ $compile ]]
 then	SHCOMP=${SHCOMP:-shcomp}
 	if	whence $SHCOMP > /dev/null
-	then	tmp=/tmp/ksh-$$
-		trap 'rm -rf $tmp' EXIT
-		mkdir $tmp || exit
+	then	tmp=$(mktemp -dt) || { echo mktemp -dt failed >&2; exit 1; }
+		trap "cd /; rm -rf $tmp" EXIT
 	elif	[[ $compile != 1 ]]
 	then	echo $0: --compile: $SHCOMP not found >&2
 		exit 1
@@ -88,6 +91,9 @@ do	t=$(grep -c err_exit $i)
 	E=error
 	if	[[ $script ]]
 	then	echo test $i begins ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"}
+		if	[[ $i == $timesensitive ]]
+		then	unset VMDEBUG
+		fi
 		if	$SHELL $i
 		then	echo test $i passed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} "[ $t $T 0 ${E}s ]"
 		else	e=$?
@@ -99,6 +105,9 @@ do	t=$(grep -c err_exit $i)
 			then	E=${E}s
 			fi
 			echo test $i failed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} with exit code $e "[ $t $T $e $E ]"
+		fi
+		if	[[ $i == $timesensitive ]]
+		then	export VMDEBUG=$vmdebug
 		fi
 	fi
 done
@@ -114,7 +123,10 @@ then	for i in ${*-*.sh}
 		echo test $o begins ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"}
 		E=error
 		if	$SHCOMP $i > $tmp/$o
-		then	if	$SHELL $tmp/$o
+		then	if	[[ $i == $timesensitive ]]
+			then	unset VMDEBUG
+			fi
+			if	$SHELL $tmp/$o
 			then	echo test $o passed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} "[ $t $T 0 ${E}s ]"
 			else	e=$?
 				if	(( e > 256 ))
@@ -125,6 +137,9 @@ then	for i in ${*-*.sh}
 				then	E=${E}s
 				fi
 				echo test $o failed ${time:+"at $(date +%Y-%m-%d+%H:%M:%S)"} with exit code $e "[ $t $T $e $E ]"
+			fi
+			if	[[ $i == $timesensitive ]]
+			then	export VMDEBUG=$vmdebug
 			fi
 		else	e=$?
 			t=1

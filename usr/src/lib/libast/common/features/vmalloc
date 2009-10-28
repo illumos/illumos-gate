@@ -116,6 +116,9 @@ lib	alloca note{ alloca exists }end link{
 }end
 
 tst	mal_alloca note{ alloca is based on malloc() }end execute{
+	#if __CYGWIN__
+	int main() { return 1; }
+	#else
 	#if _hdr_alloca
 	#include	<alloca.h>
 	#endif
@@ -131,6 +134,7 @@ tst	mal_alloca note{ alloca is based on malloc() }end execute{
 	{	alloca(10);
 		return 1;
 	}
+	#endif
 }end
 
 tst	stk_down note{ stack grows downward }end execute{

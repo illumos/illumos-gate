@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -37,6 +37,7 @@
 #include	"path.h"
 #include	"io.h"
 #include	"jobs.h"
+#include	"shlex.h"
 #include	"shnodes.h"
 #include	"history.h"
 #include	"timeout.h"
@@ -114,10 +115,14 @@ int sh_source(Shell_t *shp, Sfio_t *iop, const char *file)
 	int	fd;
 
 	if (!file || !*file || (fd = path_open(file, PATHCOMP)) < 0)
+	{
+		REGRESS(source, "sh_source", ("%s:ENOENT", file));
 		return 0;
+	}
 	oid = error_info.id;
 	nid = error_info.id = strdup(file);
 	shp->st.filename = path_fullname(stakptr(PATH_OFFSET));
+	REGRESS(source, "sh_source", ("%s", file));
 	exfile(shp, iop, fd);
 	error_info.id = oid;
 	free(nid);
@@ -177,6 +182,7 @@ int sh_main(int ac, char *av[], Shinit_f userinit)
 	if((beenhere++)==0)
 	{
 		sh_onstate(SH_PROFILE);
+		((Lex_t*)shp->lex_context)->nonstandard = 0;
 		if(shp->ppid==1)
 			shp->login_sh++;
 		if(shp->login_sh >= 2)
@@ -274,8 +280,10 @@ int sh_main(int ac, char *av[], Shinit_f userinit)
 				/* open stream should have been passed into shell */
 				if(strmatch(name,e_devfdNN))
 				{
+#if !_WINIX
 					char *cp;
 					int type;
+#endif
 					fdin = (int)strtol(name+8, (char**)0, 10);
 					if(fstat(fdin,&statb)<0)
 						errormsg(SH_DICT,ERROR_system(1),e_open,name);

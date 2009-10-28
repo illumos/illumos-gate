@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -20,7 +20,7 @@
 *                                                                      *
 ***********************************************************************/
 #include	"sfhdr.h"
-static char*	Version = "\n@(#)$Id: sfio (AT&T Research) 2008-07-17 $\0\n";
+static char*	Version = "\n@(#)$Id: sfio (AT&T Labs - Research) 2009-09-15 $\0\n";
 
 /*	Functions to set a given stream to some desired mode
 **
@@ -46,6 +46,7 @@ static char*	Version = "\n@(#)$Id: sfio (AT&T Research) 2008-07-17 $\0\n";
 **			   (%I1d is fixed to handle "signed char" correctly)
 **		01/01/2004 Porting issues to various platforms resolved.
 **		06/01/2008 Allowing notify() at entering/exiting thread-safe routines.
+**		09/15/2008 Add sfwalk().
 */
 
 /* the below is for protecting the application from SIGPIPE */

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -264,8 +264,13 @@ int sh_argopts(int argc,register char *argv[], void *context)
 				ap->kiafile = opt_info.arg;
 				n = 'n';
 			}
-			/* FALL THRU */
+			/*FALLTHROUGH*/
 #endif /* SHOPT_KIA */
+#if SHOPT_REGRESS
+			goto skip;
+		    case 'I':
+			continue;
+#endif /* SHOPT_REGRESS */
 		    skip:
 		    default:
 			if(cp=strchr(optksh,n))
@@ -384,9 +389,9 @@ void sh_applyopts(Shell_t* shp,Shopt_t newflags)
 		off_option(&newflags,SH_NOEXEC);
 	if(is_option(&newflags,SH_PRIVILEGED))
 		on_option(&newflags,SH_NOUSRPROFILE);
-	if(is_option(&newflags,SH_PRIVILEGED) != sh_isoption(SH_PRIVILEGED))
+	if(!sh_isstate(SH_INIT) && is_option(&newflags,SH_PRIVILEGED) != sh_isoption(SH_PRIVILEGED) || sh_isstate(SH_INIT) && is_option(&((Arg_t*)shp->arg_context)->sh->offoptions,SH_PRIVILEGED) && shp->userid!=shp->euserid)
 	{
-		if(sh_isoption(SH_PRIVILEGED))
+		if(!is_option(&newflags,SH_PRIVILEGED))
 		{
 			setuid(shp->userid);
 			setgid(shp->groupid);
@@ -789,6 +794,42 @@ static int	arg_pipe(register int pv[])
 }
 #endif
 
+struct argnod *sh_argprocsub(Shell_t *shp,struct argnod *argp)
+{
+	/* argument of the form <(cmd) or >(cmd) */
+	register struct argnod *ap;
+	int monitor, fd, pv[2];
+	int subshell = shp->subshell;
+	ap = (struct argnod*)stkseek(shp->stk,ARGVAL);
+	ap->argflag |= ARG_MAKE;
+	ap->argflag &= ~ARG_RAW;
+	sfwrite(shp->stk,e_devfdNN,8);
+	sh_pipe(pv);
+	fd = argp->argflag&ARG_RAW;
+	sfputr(shp->stk,fmtbase((long)pv[fd],10,0),0);
+	ap = (struct argnod*)stkfreeze(shp->stk,0);
+	shp->inpipe = shp->outpipe = 0;
+	if(monitor = (sh_isstate(SH_MONITOR)!=0))
+		sh_offstate(SH_MONITOR);
+	shp->subshell = 0;
+	if(fd)
+	{
+		shp->inpipe = pv;
+		sh_exec((Shnode_t*)argp->argchn.ap,(int)sh_isstate(SH_ERREXIT));
+	}
+	else
+	{
+		shp->outpipe = pv;
+		sh_exec((Shnode_t*)argp->argchn.ap,(int)sh_isstate(SH_ERREXIT));
+	}
+	shp->subshell = subshell;
+	if(monitor)
+		sh_onstate(SH_MONITOR);
+	close(pv[1-fd]);
+	sh_iosave(shp,-pv[fd], shp->topfd, (char*)0);
+	return(ap);
+}
+
 /* Argument expansion */
 static int arg_expand(Shell_t *shp,register struct argnod *argp, struct argnod **argchain,int flag)
 {
@@ -797,37 +838,11 @@ static int arg_expand(Shell_t *shp,register struct argnod *argp, struct argnod *
 #if SHOPT_DEVFD
 	if(*argp->argval==0 && (argp->argflag&ARG_EXP))
 	{
-		/* argument of the form (cmd) */
-		register struct argnod *ap;
-		int monitor, fd, pv[2];
-		ap = (struct argnod*)stkseek(shp->stk,ARGVAL);
-		ap->argflag |= ARG_MAKE;
-		ap->argflag &= ~ARG_RAW;
+		struct argnod *ap;
+		ap = sh_argprocsub(shp,argp);
 		ap->argchn.ap = *argchain;
 		*argchain = ap;
 		count++;
-		sfwrite(shp->stk,e_devfdNN,8);
-		sh_pipe(pv);
-		fd = argp->argflag&ARG_RAW;
-		sfputr(shp->stk,fmtbase((long)pv[fd],10,0),0);
-		ap = (struct argnod*)stkfreeze(shp->stk,0);
-		shp->inpipe = shp->outpipe = 0;
-		if(monitor = (sh_isstate(SH_MONITOR)!=0))
-			sh_offstate(SH_MONITOR);
-		if(fd)
-		{
-			shp->inpipe = pv;
-			sh_exec((Shnode_t*)argp->argchn.ap,(int)sh_isstate(SH_ERREXIT));
-		}
-		else
-		{
-			shp->outpipe = pv;
-			sh_exec((Shnode_t*)argp->argchn.ap,(int)sh_isstate(SH_ERREXIT));
-		}
-		if(monitor)
-			sh_onstate(SH_MONITOR);
-		close(pv[1-fd]);
-		sh_iosave(shp,-pv[fd], shp->topfd, (char*)0);
 	}
 	else
 #endif	/* SHOPT_DEVFD */

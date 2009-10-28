@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -50,6 +50,7 @@ const char e_histopen[]		= "history file cannot open";
 const char e_option[]		= "%s: bad option(s)";
 const char e_toomany[]		= "open file limit exceeded";
 const char e_argtype[]		= "invalid argument of type %c";
+const char e_oneoperand[]	= "one operand expected";
 const char e_formspec[]		= "%c: unknown format specifier";
 const char e_badregexp[]	= "%s: invalid regular expression";
 const char e_number[]		= "%s: bad number";
@@ -85,6 +86,7 @@ const char e_access[]		= "permission denied";
 #endif /* _cmd_universe */
 const char e_direct[]		= "bad directory";
 const char e_file[]		= "%s: bad file unit number";
+const char e_redirect[]		= "redirection failed";
 const char e_trap[]		= "%s: bad trap";
 const char e_readonly[]		= "%s: is read only";
 const char e_badfield[]		= "%d: negative field size";
@@ -93,12 +95,14 @@ const char e_badname[]		= "%s: invalid name";
 const char e_varname[]		= "%s: invalid variable name";
 const char e_badfun[]		= "%s: invalid function name";
 const char e_aliname[]		= "%s: invalid alias name";
-const char e_badexport[]	= "%s: invalid export name";
+const char e_badexport[]	= "%s: only simple variables can be exported";
 const char e_badref[]		= "%s: reference variable cannot be an array";
+const char e_badsubscript[]	= "%c: invalid subscript in assignment";
 const char e_noarray[]		= "%s: cannot be an array";
 const char e_badappend[]	= "%s: invalid append to associative array";
 const char e_noref[]		= "%s: no reference name";
 const char e_selfref[]		= "%s: invalid self reference";
+const char e_globalref[]	= "%s: global reference cannot refer to local variable";
 const char e_noalias[]		= "%s: alias not found\n";
 const char e_format[]		= "%s: bad format";
 const char e_redef[]		= "%s: type cannot be redefined";

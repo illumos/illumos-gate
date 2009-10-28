@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -27,17 +27,19 @@ alias err_exit='err_exit $LINENO'
 
 Command=${0##*/}
 integer Errors=0
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
+
 null=''
 if	[[ ! -z $null ]]
 then	err_exit "-z: null string should be of zero length"
 fi
-file=/tmp/regresso$$
-newer_file=/tmp/regressn$$
+file=$tmp/original
+newer_file=$tmp/newer
 if	[[ -z $file ]]
 then	err_exit "-z: $file string should not be of zero length"
 fi
-trap "rm -f $file $newer_file" EXIT
-rm -f $file
 if	[[ -a $file ]]
 then	err_exit "-a: $file shouldn't exist"
 fi
@@ -119,11 +121,11 @@ fi
 if	[[ $file -nt $newer_file ]]
 then	err_exit "$newer_file should be newer than $file"
 fi
-if	[[ $file != /tmp/* ]]
-then	err_exit "$file should match /tmp/*"
+if	[[ $file != $tmp/* ]]
+then	err_exit "$file should match $tmp/*"
 fi
-if	[[ $file = '/tmp/*' ]]
-then	err_exit "$file should not equal /tmp/*"
+if	[[ $file = $tmp'/*' ]]
+then	err_exit "$file should not equal $tmp'/*'"
 fi
 [[ ! ( ! -z $null && ! -z x) ]]	|| err_exit "negation and grouping"
 [[ -z '' || -z '' || -z '' ]]	|| err_exit "three ors not working"
@@ -211,17 +213,17 @@ done
 	[[ aaaa == {2,5}(a) ]] || err_exit 'aaaa != {2,4}(a)'
 	[[ abcdcdabcd == {3,6}(ab|cd) ]] || err_exit 'abcdcdabcd == {3,4}(ab|cd)'
 	[[ abcdcdabcde == {5}(ab|cd)e ]] || err_exit 'abcdcdabcd == {5}(ab|cd)e'
-) || err_exit 'Errors with {..}(...) patterns'
+) || err_exit 'errors with {..}(...) patterns'
 [[ D290.2003.02.16.temp == D290.+(2003.02.16).temp* ]] || err_exit 'pattern match bug with +(...)'
 rm -rf $file
 {
-[[ -N $file ]] && err_exit 'test -N /tmp/*: st_mtime>st_atime after creat'
+[[ -N $file ]] && err_exit 'test -N $tmp/*: st_mtime>st_atime after creat'
 sleep 2
 print 'hello world'
-[[ -N $file ]] || err_exit 'test -N /tmp/*: st_mtime<=st_atime after write'
+[[ -N $file ]] || err_exit 'test -N $tmp/*: st_mtime<=st_atime after write'
 sleep 2
 read
-[[ -N $file ]] && err_exit 'test -N /tmp/*: st_mtime>st_atime after read'
+[[ -N $file ]] && err_exit 'test -N $tmp/*: st_mtime>st_atime after read'
 } > $file < $file
 if	rm -rf "$file" && ln -s / "$file"
 then	[[ -L "$file" ]] || err_exit '-L not working'
@@ -242,4 +244,80 @@ i=hell
 test '(' = ')' && err_exit '"test ( = )" should not be true'
 [[ $($SHELL -c 'case  F in ~(Eilr)[a-z0-9#]) print ok;;esac' 2> /dev/null) == ok ]] || err_exit '~(Eilr) not working in case command'
 [[ $($SHELL -c "case  Q in ~(Fi)q |  \$'\E') print ok;;esac" 2> /dev/null) == ok ]] || err_exit '~(Fi)q | \E  not working in case command'
+
+for l in C en_US.ISO8859-15
+do	[[ $($SHELL -c "LC_COLLATE=$l" 2>&1) ]] && continue
+	export LC_COLLATE=$l
+	set -- \
+		'A'   0 1 1   0 1 1      1 0 0   1 0 0   \
+		'Z'   0 1 1   0 1 1      1 0 0   1 0 0   \
+		'/'   0 0 0   0 0 0      1 1 1   1 1 1   \
+		'.'   0 0 0   0 0 0      1 1 1   1 1 1   \
+		'_'   0 0 0   0 0 0      1 1 1   1 1 1   \
+		'-'   1 1 1   1 1 1      0 0 0   0 0 0   \
+		'%'   0 0 0   0 0 0      1 1 1   1 1 1   \
+		'@'   0 0 0   0 0 0      1 1 1   1 1 1   \
+		'!'   0 0 0   0 0 0      1 1 1   1 1 1   \
+		'^'   0 0 0   0 0 0      1 1 1   1 1 1   \
+		# retain this line #
+	while	(( $# >= 13 ))
+	do	c=$1
+		shift
+		for p in \
+			'[![.-.]]' \
+			'[![.-.][:upper:]]' \
+			'[![.-.]A-Z]' \
+			'[!-]' \
+			'[!-[:upper:]]' \
+			'[!-A-Z]' \
+			'[[.-.]]' \
+			'[[.-.][:upper:]]' \
+			'[[.-.]A-Z]' \
+			'[-]' \
+			'[-[:upper:]]' \
+			'[-A-Z]' \
+			# retain this line #
+		do	e=$1
+			shift
+			[[ $c == $p ]]
+			g=$?
+			[[ $g == $e ]] || err_exit "[[ '$c' == $p ]] for LC_COLLATE=$l failed -- expected $e, got $g"
+		done
+	done
+done
+integer n
+if	( : < /dev/tty ) 2>/dev/null && exec {n}< /dev/tty
+then	[[ -t  $n ]] || err_exit "[[ -t  n ]] fails when n > 9"
+fi
+foo=([1]=a [2]=b [3]=c)
+[[ -v foo[1] ]] ||  err_exit 'foo[1] should be set'
+[[ ${foo[1]+x} ]] ||  err_exit '${foo[1]+x} should be x'
+[[ ${foo[@]+x} ]] ||  err_exit '${foo[@]+x} should be x'
+unset foo[1]
+[[ -v foo[1] ]] && err_exit 'foo[1] should not be set'
+[[ ${foo[1]+x} ]] &&  err_exit '${foo[1]+x} should be empty'
+bar=(a b c)
+[[ -v bar[1] ]]  || err_exit 'bar[1] should be set'
+[[ ${bar[1]+x} ]] ||  err_exit '${foo[1]+x} should be x'
+unset bar[1]
+[[ ${bar[1]+x} ]] &&  err_exit '${foo[1]+x} should be empty'
+[[ -v bar ]] || err_exit 'bar should be set'
+[[ -v bar[1] ]] && err_exit 'bar[1] should not be set'
+integer z=( 1 2 4)
+[[ -v z[1] ]] || err_exit 'z[1] should be set'
+unset z[1]
+[[ -v z[1] ]] && err_exit 'z[1] should not be set'
+typeset -si y=( 1 2 4)
+[[ -v y[6] ]] && err_exit 'y[6] should not be set'
+[[ -v y[1] ]] ||  err_exit  'y[1] should be set'
+unset y[1]
+[[ -v y[1] ]] && err_exit 'y[1] should not be set'
+x=abc
+[[ -v x[0] ]] || err_exit  'x[0] should be set'
+[[ ${x[0]+x} ]] || err_exit print  '${x[0]+x} should be x'
+[[ -v x[3] ]] && err_exit 'x[3] should not be set'
+[[ ${x[3]+x} ]] && err_exit  '${x[0]+x} should be Empty'
+unset x
+[[ ${x[@]+x} ]] && err_exit  '${x[@]+x} should be Empty'
+unset x y z foo bar
 exit $((Errors))

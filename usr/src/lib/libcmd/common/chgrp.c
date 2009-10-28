@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -28,7 +28,7 @@
  */
 
 static const char usage_1[] =
-"[-?@(#)$Id: chgrp (AT&T Research) 2008-03-28 $\n]"
+"[-?@(#)$Id: chgrp (AT&T Research) 2009-07-02 $\n]"
 USAGE_LICENSE
 ;
 
@@ -221,6 +221,7 @@ b_chgrp(int argc, char** argv, void* context)
 	register FTSENT*ent;
 	register int	i;
 	Dt_t*		map = 0;
+	int		logical = 1;
 	int		flags;
 	int		uid;
 	int		gid;
@@ -297,16 +298,20 @@ b_chgrp(int argc, char** argv, void* context)
 			continue;
 		case 'H':
 			flags |= FTS_META|FTS_PHYSICAL;
+			logical = 0;
 			continue;
 		case 'L':
 			flags &= ~(FTS_META|FTS_PHYSICAL);
+			logical = 0;
 			continue;
 		case 'P':
 			flags &= ~FTS_META;
 			flags |= FTS_PHYSICAL;
+			logical = 0;
 			continue;
 		case 'R':
 			flags &= ~FTS_TOP;
+			logical = 0;
 			continue;
 		case 'X':
 			options |= OPT_TEST;
@@ -325,6 +330,8 @@ b_chgrp(int argc, char** argv, void* context)
 	if (error_info.errors || argc < 2)
 		error(ERROR_usage(2), "%s", optusage(NiL));
 	s = *argv;
+	if (logical)
+		flags &= ~(FTS_META|FTS_PHYSICAL);
 	if (map)
 	{
 		if (streq(s, "-"))

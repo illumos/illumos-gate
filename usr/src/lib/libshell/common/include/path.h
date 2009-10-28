@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -44,7 +44,7 @@
 #define PATH_STD_DIR		0100	/* directory is on  $(getconf PATH) */
 
 #define PATH_OFFSET	2		/* path offset for path_join */
-#define MAXDEPTH	(sizeof(char*)==2?64:2048) /* maximum recursion depth*/
+#define MAXDEPTH	(sizeof(char*)==2?64:1024) /* maximum recursion depth*/
 
 /*
  * path component structure for path searching

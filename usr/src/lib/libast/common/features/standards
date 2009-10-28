@@ -1,3 +1,4 @@
+set stdio
 if tst note{ _ALL_SOURCE & _ISOC99_SOURCE & _POSIX_SOURCE & _POSIX_C_SOURCE & _XOPEN_SOURCE & __EXTENSIONS__ works }end compile{
 		#define _ALL_SOURCE	1
 		#define _ISOC99_SOURCE	1
@@ -22,6 +23,37 @@ if tst note{ _ALL_SOURCE & _ISOC99_SOURCE & _POSIX_SOURCE & _POSIX_C_SOURCE & _X
 		#endif
 		#ifndef _POSIX_C_SOURCE
 		#define _POSIX_C_SOURCE	21000101L
+		#endif
+		#ifndef _XOPEN_SOURCE
+		#define _XOPEN_SOURCE	9900
+		#endif
+		#ifndef _GNU_SOURCE
+		#define _GNU_SOURCE	1
+		#endif
+		#ifndef __EXTENSIONS__
+		#define __EXTENSIONS__	1
+		#endif
+	}
+elif tst note{ _ALL_SOURCE & _ISOC99_SOURCE & _POSIX_SOURCE & _XOPEN_SOURCE & __EXTENSIONS__ works }end compile{
+		#define _ALL_SOURCE	1
+		#define _ISOC99_SOURCE	1
+		#define _POSIX_SOURCE	1
+		#define _XOPEN_SOURCE	9900
+		#define _GNU_SOURCE	1
+		#define __EXTENSIONS__	1
+		#include <sys/types.h>
+		#include <sys/stat.h>
+		#include <stdlib.h>
+		#include <unistd.h>
+	}end {
+		#ifndef _ALL_SOURCE
+		#define _ALL_SOURCE	1
+		#endif
+		#ifndef _ISOC99_SOURCE
+		#define _ISOC99_SOURCE	1
+		#endif
+		#ifndef _POSIX_SOURCE
+		#define _POSIX_SOURCE	1
 		#endif
 		#ifndef _XOPEN_SOURCE
 		#define _XOPEN_SOURCE	9900

@@ -88,14 +88,11 @@ COMMON_SUBDIRS=		\
 	chmod		\
 	chown		\
 	chroot		\
-	cksum		\
 	clear		\
 	clinfo		\
 	cmd-crypto	\
 	cmd-inet	\
-	cmp		\
 	col		\
-	comm		\
 	compress	\
 	consadm		\
 	coreadm		\
@@ -108,7 +105,6 @@ COMMON_SUBDIRS=		\
 	ctrun		\
 	ctstat		\
 	ctwatch		\
-	cut		\
 	datadm		\
 	date		\
 	dc		\
@@ -218,7 +214,6 @@ COMMON_SUBDIRS=		\
 	isns		\
 	itadm		\
 	java		\
-	join		\
 	kbd		\
 	keyserv		\
 	killall		\
@@ -244,7 +239,6 @@ COMMON_SUBDIRS=		\
 	logger		\
 	login		\
 	logins		\
-	logname		\
 	look		\
 	ls		\
 	luxadm		\
@@ -294,7 +288,6 @@ COMMON_SUBDIRS=		\
 	pagesize	\
 	passmgmt	\
 	passwd		\
-	paste		\
 	pathchk		\
 	pbind		\
 	pcidr		\
@@ -403,7 +396,6 @@ COMMON_SUBDIRS=		\
 	tbl		\
 	tcopy		\
 	tcpd		\
-	tee		\
 	terminfo	\
 	th_tools	\
 	tic		\
@@ -423,7 +415,6 @@ COMMON_SUBDIRS=		\
 	uadmin		\
 	ul		\
 	uname		\
-	uniq		\
 	units		\
 	unlink		\
 	unpack		\
@@ -440,7 +431,6 @@ COMMON_SUBDIRS=		\
 	w		\
 	wall		\
 	wbem		\
-	wc		\
 	which		\
 	who		\
 	whodo		\
@@ -547,12 +537,9 @@ MSGSUBDIRS=		\
 	chgrp		\
 	chmod		\
 	chown		\
-	cksum		\
 	cmd-crypto	\
 	cmd-inet	\
-	cmp		\
 	col		\
-	comm		\
 	compress	\
 	consadm		\
 	coreadm		\
@@ -564,7 +551,6 @@ MSGSUBDIRS=		\
 	ctrun		\
 	ctstat		\
 	ctwatch		\
-	cut		\
 	datadm		\
 	date		\
 	dc		\
@@ -615,7 +601,6 @@ MSGSUBDIRS=		\
 	iscsid		\
 	isns		\
 	itadm		\
-	join		\
 	kbd		\
 	krb5		\
 	ksh		\
@@ -629,7 +614,6 @@ MSGSUBDIRS=		\
 	logadm		\
 	logger		\
 	logins		\
-	logname		\
 	ls		\
 	luxadm		\
 	lvm		\
@@ -653,7 +637,6 @@ MSGSUBDIRS=		\
 	pack		\
 	passwd		\
 	passmgmt	\
-	paste		\
 	pathchk		\
 	pfexec		\
 	pg		\
@@ -714,7 +697,6 @@ MSGSUBDIRS=		\
 	tabs		\
 	tar		\
 	tbl		\
-	tee		\
 	time		\
 	tnf		\
 	touch		\
@@ -725,7 +707,6 @@ MSGSUBDIRS=		\
 	ttymon		\
 	ul		\
 	uname		\
-	uniq		\
 	units		\
 	unlink		\
 	unpack		\
@@ -736,7 +717,6 @@ MSGSUBDIRS=		\
 	volrmmount	\
 	w		\
 	wbem		\
-	wc		\
 	who		\
 	whodo		\
 	wracct		\

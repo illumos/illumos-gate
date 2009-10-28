@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -28,7 +28,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: join (AT&T Research) 2006-10-31 $\n]"
+"[-?\n@(#)$Id: join (AT&T Research) 2009-08-01 $\n]"
 USAGE_LICENSE
 "[+NAME?join - relational database operator]"
 "[+DESCRIPTION?\bjoin\b performs an \aequality join\a on the files \afile1\a "
@@ -351,7 +351,7 @@ outfield(Join_t* jp, int index, register int n, int last)
 		cp = 0;
 	if ((n=jp->delim)<=0)
 	{
-		if (fp->spaces)
+		if (cp && fp->spaces)
 		{
 			/*eliminate leading spaces */
 			while (jp->state[*(unsigned char*)cp++]==S_SPACE);
@@ -365,7 +365,7 @@ outfield(Join_t* jp, int index, register int n, int last)
 		size = cpmax-cp;
 	else
 		size = 0;
-	if (size==0)
+	if (size<=1)
 	{
 		if (!jp->nullfield)
 			sfputc(iop,n);
@@ -800,7 +800,7 @@ b_join(int argc, char** argv, void* context)
 	if (jp->buffered)
 	{
 		sfsetbuf(jp->file[0].iop, jp->file[0].iop, SF_UNBOUND);
-		sfsetbuf(jp->file[1].iop, jp->file[0].iop, SF_UNBOUND);
+		sfsetbuf(jp->file[1].iop, jp->file[1].iop, SF_UNBOUND);
 	}
 	jp->state['\n'] = S_NL;
 	jp->outfile = sfstdout;

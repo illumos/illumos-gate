@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -116,7 +116,7 @@ int    B_login(int argc,char *argv[],void *extra)
 		register struct argnod *arg=shp->envlist;
 		register Namval_t* np;
 		register char *cp;
-		if(shp->subshell)
+		if(shp->subshell && !shp->subshare)
 			sh_subfork();
 		if(logp && logp->clear)
 		{
@@ -572,7 +572,7 @@ int	b_universe(int argc, char *argv[],void *extra)
 	     case 2:
 		if(!shp->lim.fs3d)
 			goto failed;
-		if(shp->subshell)
+		if(shp->subshell && !shp->subshare)
 			sh_subfork();
  		for(n=0;n<argc;n+=2)
 		{

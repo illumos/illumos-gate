@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -55,7 +55,7 @@ function fatal_error
 
 # Definition for a IRC session class
 typeset -T ircsession_t=(
-	typeset -C server=(
+	compound server=(
 		typeset name
 		integer port
 	)
@@ -74,7 +74,7 @@ typeset -T ircsession_t=(
 		_.server.port=$2
 		_.nick=$3
 		
-		redirect {_.fd}<>"/dev/tcp/${_.server.name}/${_.server.port}"
+		redirect {_.fd}<> "/dev/tcp/${_.server.name}/${_.server.port}"
 		(( $? == 0 )) || { print -n2 $"Could not open server connection." ; return 1 ; }
 		
 		printf "fd=%d\n" _.fd
@@ -111,9 +111,7 @@ typeset -T ircsession_t=(
 		linebuf_t serverbuf
 		linebuf_t clientbuf
 		integer fd=${_.fd}
-
-		set -o xtrace
-		
+	
 		_.login
 		
 		while ${_.running} ; do
@@ -148,13 +146,13 @@ typeset -T ircsession_t=(
 		
 		case "${line}" in
 			~(El)PING)
-				typeset -C ping_args=(
+				compound ping_args=(
 					line="$line"
 				)
 				_.serverevent_ping "ping_args"
 				;;
 			~(El):.*\ PRIVMSG)
-				typeset -C privmsg_args=(
+				compound privmsg_args=(
 					typeset line="$line"
 					typeset msguser="${line/~(Elr)([^ ]+) ([^ ]+) ([^ ]+) (.*)/\1}"
 					typeset msgchannel="${line/~(Elr)([^ ]+) ([^ ]+) ([^ ]+) (.*)/\3}"
@@ -163,7 +161,7 @@ typeset -T ircsession_t=(
 				_.serverevent_privmsg "privmsg_args"
 				;;
 			~(El):.*\ INVITE)
-				typeset -C invite_args=(
+				compound invite_args=(
 					typeset line="$line"
 					typeset inviteuser="${line/~(Elr)([^ ]+) ([^ ]+) ([^ ]+) (.*)/\1}"
 					typeset invitenick="${line/~(Elr)([^ ]+) ([^ ]+) ([^ ]+) (.*)/\3}"
@@ -270,7 +268,7 @@ builtin sum
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r shircbot_usage=$'+
-[-?\n@(#)\$Id: shircbot (Roland Mainz) 2008-10-31 \$\n]
+[-?\n@(#)\$Id: shircbot (Roland Mainz) 2009-09-09 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?shircbot - simple IRC bot demo]
@@ -282,7 +280,7 @@ typeset -r shircbot_usage=$'+
 [+SEE ALSO?\bksh93\b(1)]
 '
 
-typeset -C config=(
+compound config=(
 	typeset nickname="${LOGNAME}bot"
 	typeset servername="irc.freenode.net"
 	integer port=6667
@@ -306,6 +304,8 @@ if (( ${#config.join_channels[@]} == 0 )) ; then
 		config.join_channels+=( "#opensolaris" )
 		config.join_channels+=( "#opensolaris-dev" )
 		config.join_channels+=( "#opensolaris-arc" )
+		config.join_channels+=( "#opensolaris-meeting" )
+		config.join_channels+=( "#ospkg" )
 		config.join_channels+=( "#ksh" )
 	elif [[ "${config.servername}" == ~(E)irc.(sfbay|sweden) ]] ; then
 		config.join_channels+=( "#onnv" )
@@ -344,9 +344,9 @@ function mybot.serverevent_privmsg
 	
 	case "$msg" in
 		~(Eli)date)
-			_.send_privmsg "$msgchannel" "$(
-			        ( printf "%(%Y-%m-%d, %Th/%Z)T\n"  )
-			)"
+			_.send_privmsg "$msgchannel" "${
+			        printf "%(%Y-%m-%d, %Th/%Z)T\n"
+			}"
 			;;
 		~(Eli)echo)
 			_.send_privmsg "$msgchannel" "${msg#*echo}"
@@ -358,10 +358,10 @@ function mybot.serverevent_privmsg
 			fi
 			;;
 		~(Eli)help)
-			_.send_privmsg "$msgchannel" "$(
+			_.send_privmsg "$msgchannel" "${
 				printf "Hello, this is shircbot, written in ksh93 (%s). " "${.sh.version}"
 				printf "Subcommands are 'say hello', 'math <math-expr>', 'stocks', 'uuid', 'date' and 'echo'."
-				)"
+				}"
 			;;
 		~(Eli)math)
 			if [[ "${msg}" == ~(E)[\`\$] ]] ; then
@@ -371,9 +371,9 @@ function mybot.serverevent_privmsg
 				typeset mathexpr="${msg#*math}"
 
 				printf "Calculating '%s'\n" "${mathexpr}"
-				_.send_privmsg "$msgchannel" "$(
-				        ( printf 'export PATH=/usr/$RANDOM/foo ; set -o restricted ; printf "%%s = %%.40g\n" "%s" $(( %s ))\n' "${mathexpr}" "${mathexpr}" | source /dev/stdin 2>&1 )
-				)"
+				_.send_privmsg "$msgchannel" "${
+				        ( printf 'export PATH=/usr/${RANDOM}/$$/${RANDOM}/foo ; set -o restricted ; printf "%%s = %%.40g\n" "%s" $(( %s ))\n' "${mathexpr}" "${mathexpr}" | source /dev/stdin 2>&1 )
+				}"
 			fi
 			;;
 		~(Eli)say\ hello)
@@ -381,15 +381,15 @@ function mybot.serverevent_privmsg
 			;;
 		~(Eli)stocks)
 			typeset stockmsg tickersymbol
-			for tickersymbol in "JAVA" "IBM" "AAPL" "HPQ" ; do
+			for tickersymbol in "JAVA" "ORCL" "IBM" "AAPL" "HPQ" ; do
 				stockmsg="$( /usr/sfw/bin/wget -q -O /dev/stdout "http://quote.yahoo.com/d/quotes.csv?f=sl1d1t1c1ohgv&e=.csv&s=${tickersymbol}" 2>&1 )"
 				_.send_privmsg "$msgchannel" "${tickersymbol}: ${stockmsg//,/ }"
 			done
 			;;
 		~(Eli)uuid)
-			_.send_privmsg "$msgchannel" "$(
-			        ( print "%(%Y%M%D%S%N)T$((RANDOM))%s\n" "${msguser}" | sum -x sha256 )
-			)"
+			_.send_privmsg "$msgchannel" "${
+			        print "%(%Y%M%D%S%N)T$((RANDOM))%s\n" "${msguser}" | sum -x sha256
+			}"
 			;;
 	esac
 	

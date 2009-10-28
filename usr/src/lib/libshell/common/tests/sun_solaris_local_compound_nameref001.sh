@@ -28,16 +28,19 @@
 # name reference test #001
 #
 
+# test setup
 function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors+=1 ))
+	(( Errors++ ))
 }
-
 alias err_exit='err_exit $LINENO'
 
+set -o nounset
+Command=${0##*/}
 integer Errors=0
+
 
 function function2
 {
@@ -59,6 +62,7 @@ function function1
 x="$(function1)"
 
 [[ "$x" != 'x=19, y=20' ]] && err_exit "expected 'x=19, y=20', got '${x}'"
+
 
 # tests done
 exit $((Errors))

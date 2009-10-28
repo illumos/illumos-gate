@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -29,7 +29,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: dirname (AT&T Research) 2000-03-07 $\n]"
+"[-?\n@(#)$Id: dirname (AT&T Research) 2009-01-31 $\n]"
 USAGE_LICENSE
 "[+NAME?dirname - return directory portion of file name]"
 "[+DESCRIPTION?\bdirname\b treats \astring\a as a file name and returns "
@@ -48,14 +48,17 @@ USAGE_LICENSE
 	"as \b/\b characters as described above.  Otherwise, all "
 	"trailing slashes are removed and the output will be this string "
 	"unless this string is empty.  If empty the output will be \b.\b.]" 
+"[f:file?Print the \b$PATH\b relative regular file path for \astring\a.]"
+"[r:relative?Print the \b$PATH\b relative readable file path for \astring\a.]"
+"[x:executable?Print the \b$PATH\b relative executable file path for \astring\a.]"
 "\n"
-"\n string\n"
+"\nstring\n"
 "\n"
 "[+EXIT STATUS?]{"
         "[+0?Successful Completion.]"
         "[+>0?An error occurred.]"
 "}"
-"[+SEE ALSO?\bbasename\b(1), \bgetconf\b(1), \bdirname\b(3)]"
+"[+SEE ALSO?\bbasename\b(1), \bgetconf\b(1), \bdirname\b(3), \bpathname\b(3)]"
 ;
 
 #include <cmd.h>
@@ -96,10 +99,22 @@ int
 b_dirname(int argc,register char *argv[], void* context)
 {
 	register int n;
+	int mode = 0;
+	char buf[PATH_MAX];
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
 	while (n = optget(argv, usage)) switch (n)
 	{
+	case 'f':
+		mode |= PATH_REGULAR;
+		break;
+	case 'r':
+		mode &= ~PATH_REGULAR;
+		mode |= PATH_READ;
+		break;
+	case 'x':
+		mode |= PATH_EXECUTE;
+		break;
 	case ':':
 		error(2, "%s", opt_info.arg);
 		break;
@@ -111,6 +126,11 @@ b_dirname(int argc,register char *argv[], void* context)
 	argc -= opt_info.index;
 	if(error_info.errors || argc != 1)
 		error(ERROR_usage(2),"%s", optusage(NiL));
-	l_dirname(sfstdout,argv[0]);
+	if(!mode)
+		l_dirname(sfstdout,argv[0]);
+	else if(pathpath(buf, argv[0], "", mode))
+		sfputr(sfstdout, buf, '\n');
+	else
+		error(1|ERROR_WARNING, "%s: relative path not found", argv[0]);
 	return(0);
 }

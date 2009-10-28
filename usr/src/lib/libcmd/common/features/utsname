@@ -6,6 +6,9 @@ sys	syscall,systeminfo,syssgi
 tst	cross{
 	u=`/bin/uname -o 2>/dev/null`
 	case $u in
+	UWIN-*)	u=UWIN ;;
+	esac
+	case $u in
 	'')	;;
 	*)	echo "#define _UNAME_os_DEFAULT     \"$u\"  /* default os name */" ;;
 	esac

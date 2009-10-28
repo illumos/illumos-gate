@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -154,15 +154,16 @@ int*		uflagp;
 	sflags = oflags = uflag = 0;
 	while(1) switch(*mode++)
 	{
-	case 'w' :
-		sflags |= SF_WRITE;
-		oflags |= O_WRONLY | O_CREAT;
-		if(!(sflags&SF_READ))
-			oflags |= O_TRUNC;
-		continue;
 	case 'a' :
 		sflags |= SF_WRITE | SF_APPENDWR;
 		oflags |= O_WRONLY | O_APPEND | O_CREAT;
+		continue;
+	case 'b' :
+		oflags |= O_BINARY;
+		continue;
+	case 'm' :
+		sflags |= SF_MTSAFE;
+		uflag = 0;
 		continue;
 	case 'r' :
 		sflags |= SF_READ;
@@ -171,30 +172,32 @@ int*		uflagp;
 	case 's' :
 		sflags |= SF_STRING;
 		continue;
-	case 'b' :
-		oflags |= O_BINARY;
-		continue;
 	case 't' :
 		oflags |= O_TEXT;
-		continue;
-	case 'x' :
-		oflags |= O_EXCL;
-		continue;
-	case '+' :
-		if(sflags)
-			sflags |= SF_READ|SF_WRITE;
-		continue;
-	case 'm' :
-		sflags |= SF_MTSAFE;
-		uflag = 0;
 		continue;
 	case 'u' :
 		sflags &= ~SF_MTSAFE;
 		uflag = 1;
 		continue;
+	case 'w' :
+		sflags |= SF_WRITE;
+		oflags |= O_WRONLY | O_CREAT;
+		if(!(sflags&SF_READ))
+			oflags |= O_TRUNC;
+		continue;
+	case 'x' :
+		oflags |= O_EXCL;
+		continue;
+	case 'F':
+		/* stdio compatibility -- fd >= FOPEN_MAX (or other magic number) ok */
+		continue;
 	case 'W' :
 		sflags |= SF_WCWIDTH;
 		uflag = 0;
+		continue;
+	case '+' :
+		if(sflags)
+			sflags |= SF_READ|SF_WRITE;
 		continue;
 	default :
 		if(!(oflags&O_CREAT) )

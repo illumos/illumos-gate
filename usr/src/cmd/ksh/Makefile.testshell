@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -101,7 +101,7 @@ testshell: $(PROG)
 	    printf "# which ksh='%s', ksh93='%s'\n" \
 	        "$$(which ksh)" "$$(which ksh93)" ; \
 	) ; \
-	if [[ "$$(isalist)" != ~(E)$(LIBSHELLMACH) ]] ; then \
+	if [[ "$$(isalist)" != ~(F)$(LIBSHELLMACH) ]] ; then \
 	    printf \
 	        "# ISA='%s' not available on this system, skipping tests...\n" \
 	        "$(LIBSHELLMACH)" ; \
@@ -135,6 +135,7 @@ testshell: $(PROG)
 			    "$$(basename "$${test_item}")" \
 			    "$${mode%:*}"; \
 			( \
+			    ulimit -s 65536 ; \
 		            test_output="$$( ( \
 		        	export \
 		        	    SHELL="$(SRC)/cmd/ksh/$(LIBSHELLMACH)/ksh" \

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -134,16 +134,22 @@ static Shnode_t *r_tree(Shell_t *shp)
 		{
 			Stak_t *savstak;
 			struct slnod *slp;
+			struct functnod *fp;
 			t = getnode(shp->stk,functnod);
 			t->funct.functloc = -1;
 			t->funct.functline = sfgetu(infile);
 			t->funct.functnam = r_string(shp->stk);
 			savstak = stakcreate(STAK_SMALL);
 			savstak = stakinstall(savstak, 0);
-			slp = (struct slnod*)stkalloc(shp->stk,sizeof(struct slnod));
+			slp = (struct slnod*)stkalloc(shp->stk,sizeof(struct slnod)+sizeof(struct functnod));
 			slp->slchild = 0;
 			slp->slnext = shp->st.staklist;
 			shp->st.staklist = 0;
+			fp = (struct functnod*)(slp+1);
+			memset(fp, 0, sizeof(*fp));
+			fp->functtyp = TFUN|FAMP;
+			if(shp->st.filename)
+				fp->functnam = stkcopy(shp->stk,shp->st.filename);
 			t->funct.functtre = r_tree(shp); 
 			t->funct.functstak = slp;
 			slp->slptr =  stakinstall(savstak,0);

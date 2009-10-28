@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -33,6 +33,7 @@
  *	S2F_function	the function name
  *	S2F_static	<0:export =0:extern >0:static
  *	S2F_type	0:float 1:double 2:long.double
+ *	S2F_qualifier	1 for optional [fFlL] qualifier suffix
  *	S2F_size	1 for interface with size_t second arg
  *	S2F_scan	1 for alternate interface with these arguments:
  *				void* handle
@@ -284,6 +285,8 @@ S2F_function(str, end) char* str; char** end;
 					m = -m;
 			}
 
+#if S2F_qualifier
+
 			/*
 			 * consume the optional suffix
 			 */
@@ -297,6 +300,7 @@ S2F_function(str, end) char* str; char** end;
 				c = GET(s);
 				break;
 			}
+#endif
 			PUT(s);
 			if (v == 0)
 				return negative ? -v : v;
@@ -449,6 +453,8 @@ S2F_function(str, end) char* str; char** end;
 			digits += n;
 	}
 
+#if S2F_qualifier
+
 	/*
 	 * consume the optional suffix
 	 */
@@ -462,6 +468,7 @@ S2F_function(str, end) char* str; char** end;
 		c = GET(s);
 		break;
 	}
+#endif
 	PUT(s);
 
 	/*

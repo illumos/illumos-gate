@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1997-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1997-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -50,7 +50,7 @@ dllplug(const char* lib, const char* name, const char* ver, int flags, char* pat
 			while (dle = dllsread(dls))
 			{
 				hit = 1;
-				if (dll = dlopen(dle->path, flags|RTLD_GLOBAL|RTLD_PARENT))
+				if (dll = dllopen(dle->path, flags|RTLD_GLOBAL|RTLD_PARENT))
 				{
 					if (path && size)
 						strncopy(path, dle->path, size);
@@ -67,9 +67,7 @@ dllplug(const char* lib, const char* name, const char* ver, int flags, char* pat
 			break;
 		lib = 0;
 	}
-	if (!(dll = dlopen(name, flags)) && !strchr(name, '/') && strchr(name, '.'))
-		dll = dlopen(sfprints("./%s", name), flags);
-	if (dll && path && size)
+	if ((dll = dllopen(name, flags)) && dll && path && size)
 		strncopy(path, name, size);
 	return dll;
 }

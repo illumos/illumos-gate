@@ -3,7 +3,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -185,7 +185,7 @@ typedef struct
 #define mbcoll()	(ast.mb_xfrm!=0)
 #define mbwide()	(mbmax()>1)
 
-#define mbchar(p)	(mbwide()?((ast.tmp_int=(*ast.mb_towc)(&ast.tmp_wchar,(char*)(p),mbmax()))>0?((p+=ast.tmp_int),ast.tmp_wchar):(p++,ast.tmp_int)):(*(unsigned char*)(p++)))
+#define mbchar(p)	(mbwide()?((ast.tmp_int=(*ast.mb_towc)(&ast.tmp_wchar,(char*)(p),mbmax()))>0?((p+=ast.tmp_int),ast.tmp_wchar):(p+=ast.mb_sync+1,ast.tmp_int)):(*(unsigned char*)(p++)))
 #define mbinit()	(mbwide()?(*ast.mb_towc)((wchar_t*)0,(char*)0,mbmax()):0)
 #define mbsize(p)	(mbwide()?(*ast.mb_len)((char*)(p),mbmax()):((p),1))
 #define mbconv(s,w)	(ast.mb_conv?(*ast.mb_conv)(s,w):((*(s)=(w)),1))
@@ -309,6 +309,7 @@ extern __MANGLE__ size_t		pathnative __PROTO__((const char*, char*, size_t));
 extern __MANGLE__ char*		pathpath __PROTO__((char*, const char*, const char*, int));
 extern __MANGLE__ size_t		pathposix __PROTO__((const char*, char*, size_t));
 extern __MANGLE__ char*		pathprobe __PROTO__((char*, char*, const char*, const char*, const char*, int));
+extern __MANGLE__ size_t		pathprog __PROTO__((const char*, char*, size_t));
 extern __MANGLE__ char*		pathrepl __PROTO__((char*, const char*, const char*));
 extern __MANGLE__ int		pathsetlink __PROTO__((const char*, const char*));
 extern __MANGLE__ char*		pathshell __PROTO__((void));
@@ -329,6 +330,7 @@ extern __MANGLE__ int		strmatch __PROTO__((const char*, const char*));
 extern __MANGLE__ int		strmode __PROTO__((const char*));
 extern __MANGLE__ int		strnacmp __PROTO__((const char*, const char*, size_t));
 extern __MANGLE__ char*		strncopy __PROTO__((char*, const char*, size_t));
+extern __MANGLE__ int		strnpcmp __PROTO__((const char*, const char*, size_t));
 extern __MANGLE__ double		strntod __PROTO__((const char*, size_t, char**));
 extern __MANGLE__ _ast_fltmax_t	strntold __PROTO__((const char*, size_t, char**));
 extern __MANGLE__ long		strntol __PROTO__((const char*, size_t, char**, int));
@@ -337,7 +339,9 @@ extern __MANGLE__ long		strnton __PROTO__((const char*, size_t, char**, char*, i
 extern __MANGLE__ unsigned long	strntoul __PROTO__((const char*, size_t, char**, int));
 extern __MANGLE__ intmax_t		strntonll __PROTO__((const char*, size_t, char**, char*, int));
 extern __MANGLE__ uintmax_t	strntoull __PROTO__((const char*, size_t, char**, int));
+extern __MANGLE__ int		strnvcmp __PROTO__((const char*, const char*, size_t));
 extern __MANGLE__ int		stropt __PROTO__((const char*, const __V_*, int, int(*)(__V_*, const __V_*, int, const char*), __V_*));
+extern __MANGLE__ int		strpcmp __PROTO__((const char*, const char*));
 extern __MANGLE__ int		strperm __PROTO__((const char*, char**, int));
 extern __MANGLE__ __V_*		strpsearch __PROTO__((const __V_*, size_t, size_t, const char*, char**));
 extern __MANGLE__ __V_*		strsearch __PROTO__((const __V_*, size_t, size_t, Strcmp_f, const char*, __V_*));
@@ -350,6 +354,7 @@ extern __MANGLE__ long		strton __PROTO__((const char*, char**, char*, int));
 extern __MANGLE__ intmax_t		strtonll __PROTO__((const char*, char**, char*, int));
 extern __MANGLE__ int		struid __PROTO__((const char*));
 extern __MANGLE__ int		struniq __PROTO__((char**, int));
+extern __MANGLE__ int		strvcmp __PROTO__((const char*, const char*));
 
 #undef __MANGLE__
 #define __MANGLE__ __LINKAGE__

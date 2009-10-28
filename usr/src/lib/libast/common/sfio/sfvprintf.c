@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -323,6 +323,12 @@ loop_fmt :
 			SFSETLOCALE(&decimal,&thousand);
 			if(thousand > 0)
 				flags |= SFFMT_THOUSAND;
+			goto loop_flags;
+		case ',':
+			SFSETLOCALE(&decimal,&thousand);
+			if(thousand < 0)
+				thousand = fmt;
+			flags |= SFFMT_THOUSAND;
 			goto loop_flags;
 
 		case '.' :

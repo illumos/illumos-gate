@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -26,14 +26,17 @@ function err_exit
 	let Errors+=1
 }
 alias err_exit='err_exit $LINENO'
+
 Command=${0##*/}
 integer Errors=0
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
 
 unset HISTFILE
 
 foo=NOVAL bar=NOVAL
-file=/tmp/shtest$$
-trap "rm -f $file" EXIT INT
+file=$tmp/test
 function foo
 {
 	typeset foo=NOEXIT
@@ -125,7 +128,7 @@ then	err_exit "return in script is $ret should be 3"
 fi
 cat > $file <<!
 : line 1
-# next line should fail and cause an exit 
+# next line should fail and cause an exit
 : > /
 exit 4
 !

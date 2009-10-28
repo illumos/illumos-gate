@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -34,6 +34,7 @@ OBJECTS= \
 	dllfind.o \
 	dlllook.o \
 	dllnext.o \
+	dllopen.o \
 	dllplug.o \
 	dllscan.o
 
@@ -70,6 +71,7 @@ CPPFLAGS = \
 	$(DLLPLATFORMCPPFLAGS) \
 	-I. \
 	-I$(ROOT)/usr/include/ast \
+	-I$(ROOT)/usr/include \
 	'-DCONF_LIBSUFFIX=".so"' \
 	'-DCONF_LIBPREFIX="lib"' \
 	-D_BLD_dll \

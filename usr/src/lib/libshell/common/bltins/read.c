@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -28,7 +28,6 @@
 
 #include	<ast.h>
 #include	<error.h>
-#include	<ctype.h>
 #include	"defs.h"
 #include	"variables.h"
 #include	"lexstates.h"
@@ -68,9 +67,14 @@ int	b_read(int argc,char *argv[], void *extra)
 	int save_prompt, fixargs=((Shbltin_t*)extra)->invariant;
 	struct read_save *rp;
 	static char default_prompt[3] = {ESC,ESC};
+	rp = (struct read_save*)(((Shbltin_t*)extra)->data);
 	if(argc==0)
+	{
+		if(rp)
+			free((void*)rp);
 		return(0);
-	if(rp = (struct read_save*)(((Shbltin_t*)extra)->data))
+	}
+	if(rp)
 	{
 		flags = rp->flags;
 		timeout = rp->timeout;
@@ -199,7 +203,7 @@ static void timedout(void *handle)
 
 int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeout)
 {
-	register int		c;
+	register ssize_t	c;
 	register unsigned char	*cp;
 	register Namval_t	*np;
 	register char		*name, *val;
@@ -217,7 +221,7 @@ int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeo
 	void			*timeslot=0;
 	int			delim = '\n';
 	int			jmpval=0;
-	int			size = 0;
+	ssize_t			size = 0;
 	int			binary;
 	struct	checkpt		buff;
 	if(!(iop=shp->sftable[fd]) && !(iop=sh_iostream(shp,fd)))
@@ -225,9 +229,12 @@ int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeo
 	sh_stats(STAT_READS);
 	if(names && (name = *names))
 	{
+		Namval_t *mp;
 		if(val= strchr(name,'?'))
 			*val = 0;
 		np = nv_open(name,shp->var_tree,NV_NOASSIGN|NV_VARNAME);
+		if(np && nv_isarray(np) && (mp=nv_opensub(np)))
+			np = mp;
 		if((flags&V_FLAG) && shp->ed_context)
 			((struct edit*)shp->ed_context)->e_default = np;
 		if(flags&A_FLAG)
@@ -311,7 +318,7 @@ int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeo
 	}
 	if(flags&(N_FLAG|NN_FLAG))
 	{
-		char buf[64],*var=buf,*cur,*end,*up,*v;
+		char buf[256],*var=buf,*cur,*end,*up,*v;
 		/* reserved buffer */
 		if((c=size)>=sizeof(buf))
 		{
@@ -331,21 +338,24 @@ int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeo
 		}
 		else
 		{
-			int	f,m;
+			ssize_t	m;
+			int	f;
 			for (;;)
 			{
 				c = (flags&NN_FLAG) ? -size : -1;
 				cp = sfreserve(iop,c,SF_LOCKR);
 				f = 1;
-				if((m = sfvalue(iop)) > 0)
+				if(cp)
+					m = sfvalue(iop);
+				else
 				{
-					if(!cp)
-					{
-						m = (cp = sfreserve(iop,size,0)) ? sfvalue(iop) : 0;
-						f = 0;
-					}
-					if(m>0 && (flags&N_FLAG) && !binary && (v=memchr(cp,'\n',m)))
-						m = v-(char*)cp;
+					m = (cp = sfreserve(iop,size,0)) ? sfvalue(iop) : 0;
+					f = 0;
+				}
+				if(m>0 && (flags&N_FLAG) && !binary && (v=memchr(cp,'\n',m)))
+				{
+					*v++ = 0;
+					m = v-(char*)cp;
 				}
 				if((c=m)>size)
 					c = size;
@@ -353,18 +363,18 @@ int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeo
 				{
 					if(c > (end-cur))
 					{
-						int	cx = cur - var, ux = up - var;
+						ssize_t	cx = cur - var, ux = up - var;
+						m = (end - var) + (c - (end - cur));
 						if (var == buf)
 						{
-							m = (end - var) + (c - (end - cur));
 							v = (char*)malloc(m+1);
-							memcpy(v, var, cur - var);
+							var = memcpy(v, var, cur - var);
 						}
 						else
-							v = newof(var, char, m, 1);
-						end = v + m;
-						cur = v + cx;
-						up = v + ux;
+							var = newof(var, char, m, 1);
+						end = var + m;
+						cur = var + cx;
+						up = var + ux;
 					}
 					memcpy((void*)cur,cp,c);
 					if(f)
@@ -375,7 +385,6 @@ int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeo
 					{
 						int	x;
 						int	z;
-						int	y = cur - up;
 
 						mbinit();
 						*cur = 0;
@@ -402,16 +411,19 @@ int sh_readline(register Shell_t *shp,char **names, int fd, int flags,long timeo
 		}
 		if(timeslot)
 			timerdel(timeslot);
-		if(binary)
+		if(binary && !((size=nv_size(np)) && nv_isarray(np) && c!=size))
 		{
-			if(c==nv_size(np))
+			if((c==size) && np->nvalue.cp && !nv_isarray(np))
 				memcpy((char*)np->nvalue.cp,var,c);
 			else
 			{
+				Namval_t *mp;
 				if(var==buf)
 					var = memdup(var,c);
 				nv_putval(np,var,NV_RAW);
 				nv_setsize(np,c);
+				if(!nv_isattr(np,NV_IMPORT|NV_EXPORT)  && (mp=(Namval_t*)np->nvenv))
+					nv_setsize(mp,c);
 			}
 		}
 		else

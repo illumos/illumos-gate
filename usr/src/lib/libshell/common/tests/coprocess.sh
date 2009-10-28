@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -29,6 +29,9 @@ alias err_exit='err_exit $LINENO'
 Command=${0##*/}
 integer Errors=0
 
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
+
 if	[[ -d /cygdrive ]]
 then	err_exit cygwin detected - coprocess tests disabled - enable at the risk of wedging your system
 	exit $((Errors))
@@ -46,11 +49,11 @@ function ping # id
 cat |&
 print -p "hello"
 read -p line
-[[ $line == hello ]] || err_exit 'coprocessing fails' 
+[[ $line == hello ]] || err_exit 'coprocessing fails'
 exec 5>&p 6<&p
 print -u5 'hello again' || err_exit 'write on u5 fails'
 read -u6 line
-[[ $line == 'hello again' ]] || err_exit 'coprocess after moving fds fails' 
+[[ $line == 'hello again' ]] || err_exit 'coprocess after moving fds fails'
 exec 5<&- 6<&-
 wait $!
 
@@ -87,8 +90,7 @@ do	(( count-- ))
 done
 kill $(jobs -p) 2>/dev/null
 
-file=/tmp/regress$$
-trap "rm -f $file" EXIT
+file=$tmp/regress
 cat > $file  <<\!
 /bin/cat |&
 !
@@ -100,15 +102,24 @@ exec 5<&- 6>&-
 kill $(jobs -p) 2>/dev/null
 
 ${SHELL-ksh} |&
-print -p  $'print hello | cat\nprint Done'
+cop=$!
+exp=Done
+print -p $'print hello | cat\nprint '$exp
 read -t 5 -p
 read -t 5 -p
-if	[[ $REPLY != Done ]]
-then	err_exit "${SHELL-ksh} coprocess not working"
+got=$REPLY
+if	[[ $got != $exp ]]
+then	err_exit "${SHELL-ksh} coprocess io failed -- got '$got', expected '$exp'"
 fi
 exec 5<&p 6>&p
 exec 5<&- 6>&-
-wait $!
+{ sleep 4; kill $cop; } 2>/dev/null &
+spy=$!
+if	wait $cop 2>/dev/null
+then	kill $spy 2>/dev/null
+else	err_exit "coprocess hung after 'exec 5<&p 6>&p; exec 5<&- 6>&-'"
+fi
+wait
 
 {
 echo line1 | grep 'line2'
@@ -123,7 +134,7 @@ then	err_exit "read -p hanging (SECONDS=$SECONDS count=$count)"
 fi
 wait $!
 
-( sleep 3 |& sleep 1 && kill $!; sleep 1; sleep 3 |& sleep 1 && kill $! ) || 
+( sleep 3 |& sleep 1 && kill $!; sleep 1; sleep 3 |& sleep 1 && kill $! ) ||
 	err_exit "coprocess cleanup not working correctly"
 { : |& } 2>/dev/null ||
 	err_exit "subshell coprocess lingers in parent"
@@ -163,7 +174,7 @@ r=
 	print -u6 ok
 	exec 6>&-
 	sleep 1
-	kill $! 2> /dev/null 
+	kill $! 2> /dev/null
 ) && err_exit 'coprocess with subshell would hang'
 for sig in IOT ABRT
 do	if	( trap - $sig ) 2> /dev/null
@@ -178,7 +189,7 @@ do	if	( trap - $sig ) 2> /dev/null
 					kill -$sig $$
 					kill $pid
 					sleep 2
-					kill  $$
+					kill $$
 				) &
 				read -p
 			++EOF++
@@ -206,7 +217,7 @@ trap - TERM
 trap 'sleep_pid=; kill $pid; err_exit "coprocess 2 hung"' TERM
 { sleep 5; kill $$; } &
 sleep_pid=$!
-cat |& 
+cat |&
 pid=$!
 print foo >&p 2> /dev/null || err_exit 'first write of foo to coprocess failed'
 print foo >&p 2> /dev/null || err_exit 'second write of foo to coprocess failed'
@@ -218,7 +229,7 @@ trap - TERM
 trap 'sleep_pid=; kill $pid; err_exit "coprocess 3 hung"' TERM
 { sleep 5; kill $$; } &
 sleep_pid=$!
-cat |& 
+cat |&
 pid=$!
 print -p foo
 print -p bar
@@ -230,5 +241,73 @@ kill $pid
 wait $pid 2> /dev/null
 trap - TERM
 [[ $sleep_pid ]] && kill $sleep_pid
+
+exp=ksh
+got=$(print -r $'#00315
+COATTRIBUTES=\'label=make \'
+# @(#)$Id: libcoshell (AT&T Research) 2008-04-28 $
+_COSHELL_msgfd=5
+{ { (eval \'function fun { trap \":\" 0; return 1; }; trap \"exit 0\" 0; fun; exit 1\') && PATH= print -u$_COSHELL_msgfd ksh; } || { times && echo bsh >&$_COSHELL_msgfd; } || { echo osh >&$_COSHELL_msgfd; }; } >/dev/null 2>&1' | $SHELL 5>&1)
+[[ $got == $exp ]] || err_exit "coshell(3) identification sequence failed -- expected '$exp', got '$got'"
+
+function cop
+{
+	read
+	print ok
+}
+
+exp=ok
+
+cop |&
+pid=$!
+if	print -p yo 2>/dev/null
+then	read -p got
+else	got='no coprocess'
+fi
+[[ $got == $exp ]] || err_exit "main coprocess main query failed -- expected $exp, got '$got'"
+kill $pid 2>/dev/null
+wait
+
+cop |&
+pid=$!
+(
+if	print -p yo 2>/dev/null
+then	read -p got
+else	got='no coprocess'
+fi
+[[ $got == $exp ]] || err_exit "main coprocess subshell query failed -- expected $exp, got '$got'"
+)
+kill $pid 2>/dev/null
+wait
+
+exp='no coprocess'
+
+(
+cop |&
+print $! > $tmp/pid
+)
+pid=$(<$tmp/pid)
+if	print -p yo 2>/dev/null
+then	read -p got
+else	got=$exp
+fi
+[[ $got == $exp ]] || err_exit "subshell coprocess main query failed -- expected $exp, got '$got'"
+kill $pid 2>/dev/null
+wait
+
+(
+cop |&
+print $! > $tmp/pid
+)
+pid=$(<$tmp/pid)
+(
+if	print -p yo 2>/dev/null
+then	read -p got
+else	got=$exp
+fi
+[[ $got == $exp ]] || err_exit "subshell coprocess subshell query failed -- expected $exp, got '$got'"
+kill $pid 2>/dev/null
+wait
+)
 
 exit $((Errors))

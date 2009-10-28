@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -59,7 +59,55 @@ print foreground=$foreground background=$background
 
 eval $s
 
-(( foreground == FOREGROUND )) || err_exit "expected $FOREGROUND foreground -- got $foreground (DELAY=$DELAY)"
-(( background == BACKGROUND )) || err_exit "expected $BACKGROUND background -- got $background (DELAY=$DELAY)"
+(( foreground == FOREGROUND )) || err_exit "expected '$FOREGROUND foreground' -- got '$foreground' (DELAY=$DELAY)"
+(( background == BACKGROUND )) || err_exit "expected '$BACKGROUND background' -- got '$background' (DELAY=$DELAY)"
+
+set --noerrexit
+
+if	[[ ${.sh.version} == Version?*([[:upper:]])J* ]]
+then
+
+	jobmax=4
+	got=$($SHELL -c '
+		JOBMAX='$jobmax' JOBCOUNT=$(('$jobmax'*2))
+		integer running=0 maxrunning=0
+		trap "((running--))" CHLD
+		for ((i=0; i<JOBCOUNT; i++))
+		do	sleep 1 &
+			if	((++running > maxrunning))
+			then	((maxrunning=running))
+			fi
+		done
+		wait
+		print running=$running maxrunning=$maxrunning
+	')
+	exp='running=0 maxrunning='$jobmax
+	[[ $got == $exp ]] || err_exit "SIGCHLD trap queueing failed -- expected '$exp', got '$got'"
+
+	got=$($SHELL -c '
+		typeset -A proc
+
+		trap "
+			print \${proc[\$!].name} \${proc[\$!].status} \$?
+			unset proc[\$!]
+		" CHLD
+
+		{ sleep 3; print a; exit 1; } &
+		proc[$!]=( name=a status=1 )
+
+		{ sleep 2; print b; exit 2; } &
+		proc[$!]=( name=b status=2 )
+
+		{ sleep 1; print c; exit 3; } &
+		proc[$!]=( name=c status=3 )
+
+		while	(( ${#proc[@]} ))
+		do	sleep -s
+		done
+	')
+	exp='c\nc 3 3\nb\nb 2 2\na\na 1 1'
+	[[ $got == $exp ]] || err_exit "SIGCHLD trap queueing failed -- expected $(printf %q "$exp"), got $(printf %q "$got")"
+
+fi
 
 exit $((Errors))

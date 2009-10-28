@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -21,7 +21,7 @@
 #pragma prototyped
 
 static const char usage[] =
-"[-?\n@(#)$Id: fds (AT&T Research) 2008-08-26 $\n]"
+"[-?\n@(#)$Id: fds (AT&T Research) 2009-09-09 $\n]"
 USAGE_LICENSE
 "[+NAME?fds - list open file descriptor status]"
 "[+DESCRIPTION?\bfds\b lists the status for each open file descriptor. "
@@ -29,6 +29,7 @@ USAGE_LICENSE
     "calling shell, otherwise it lists the file descriptors passed across "
     "\bexec\b(2).]"
 "[l:long?List file descriptor details.]"
+"[u:unit?Write output to \afd\a.]#[fd]"
 "[+SEE ALSO?\blogname\b(1), \bwho\b(1), \bgetgroups\b(2), \bgetsockname\b(2), \bgetsockopts\b(2)]"
 ;
 
@@ -164,6 +165,8 @@ b_fds(int argc, char** argv, void* context)
 	int			flags;
 	int			details;
 	int			open_max;
+	int			unit;
+	Sfio_t*			sp;
 	struct stat		st;
 #ifdef S_IFSOCK
 	struct sockaddr_in	addr;
@@ -175,19 +178,25 @@ b_fds(int argc, char** argv, void* context)
 	int			type;
 	int			port;
 	int			prot;
-	char			nam[256];
 	char			num[64];
 	char			fam[64];
+#ifdef INET6_ADDRSTRLEN
+	char			nam[256];
+#endif
 #endif
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
 	details = 0;
+	unit = 1;
 	for (;;)
 	{
 		switch (optget(argv, usage))
 		{
 		case 'l':
 			details = opt_info.num;
+			continue;
+		case 'u':
+			unit = opt_info.num;
 			continue;
 		case '?':
 			error(ERROR_USAGE|4, "%s", opt_info.arg);
@@ -203,6 +212,10 @@ b_fds(int argc, char** argv, void* context)
 		error(ERROR_USAGE|4, "%s", optusage(NiL));
 	if ((open_max = getconf("OPEN_MAX")) <= 0)
 		open_max = OPEN_MAX;
+	if (unit == 1)
+		sp = sfstdout;
+	else if (fstat(unit, &st) || !(sp = sfnew(NiL, NiL, SF_UNBOUND, unit, SF_WRITE)))
+		error(ERROR_SYSTEM|3, "%d: cannot write to file descriptor");
 	for (i = 0; i <= open_max; i++)
 	{
 		if (fstat(i, &st))
@@ -212,7 +225,7 @@ b_fds(int argc, char** argv, void* context)
 		}
 		if (!details)
 		{
-			sfprintf(sfstdout, "%d\n", i);
+			sfprintf(sp, "%d\n", i);
 			continue;
 		}
 		if ((flags = fcntl(i, F_GETFL, (char*)0)) == -1)
@@ -236,7 +249,7 @@ b_fds(int argc, char** argv, void* context)
 		x = (fcntl(i, F_GETFD, (char*)0) > 0) ? "x" : "-";
 		if (isatty(i) && (s = ttyname(i)))
 		{
-			sfprintf(sfstdout, "%02d %s%s %s %s\n", i, m, x, fmtmode(st.st_mode, 0), s);
+			sfprintf(sp, "%02d %s%s %s %s\n", i, m, x, fmtmode(st.st_mode, 0), s);
 			continue;
 		}
 #ifdef S_IFSOCK
@@ -330,13 +343,18 @@ b_fds(int argc, char** argv, void* context)
 				a = a == fam ? "0" : fam + 1;
 			}
 			if (port)
-				sfprintf(sfstdout, "%02d %s%s %s /dev/%s/%s/%d\n", i, m, x, fmtmode(st.st_mode, 0), s, a, port);
+				sfprintf(sp, "%02d %s%s %s /dev/%s/%s/%d\n", i, m, x, fmtmode(st.st_mode, 0), s, a, port);
 			else
-				sfprintf(sfstdout, "%02d %s%s %s /dev/%s/%s\n", i, m, x, fmtmode(st.st_mode, 0), s, a);
+				sfprintf(sp, "%02d %s%s %s /dev/%s/%s\n", i, m, x, fmtmode(st.st_mode, 0), s, a);
 			continue;
 		}
 #endif
-		sfprintf(sfstdout, "%02d %s%s %s /dev/inode/%u/%u\n", i, m, x, fmtmode(st.st_mode, 0), st.st_dev, st.st_ino);
+		sfprintf(sp, "%02d %s%s %s /dev/inode/%u/%u\n", i, m, x, fmtmode(st.st_mode, 0), st.st_dev, st.st_ino);
+	}
+	if (sp != sfstdout)
+	{
+		sfsetfd(sp, -1);
+		sfclose(sp);
 	}
 	return 0;
 }

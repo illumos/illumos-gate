@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -29,7 +29,6 @@
 
 
 #include	"defs.h"
-#include	<ctype.h>
 #include	<error.h>
 #include	<ls.h>
 #include	"io.h"
@@ -267,8 +266,11 @@ static int e3(struct test *tp)
 		goto skip;
 	if(c2_eq(arg,'-','t'))
 	{
-		if(cp && isdigit(*cp))
-			 return(*(cp+1)?0:tty_check(*cp-'0'));
+		if(cp)
+		{
+			op = strtol(cp,&binop, 10);
+			return(*binop?0:tty_check(op));
+		}
 		else
 		{
 		/* test -t with no arguments */
@@ -300,7 +302,7 @@ skip:
 		cp = nxtarg(tp,0);
 	if(!op)
 		errormsg(SH_DICT,ERROR_exit(2),e_badop,binop);
-	if(op==TEST_AND | op==TEST_OR)
+	if(op==TEST_AND || op==TEST_OR)
 		tp->ap--;
 	return(test_binop(op,arg,cp));
 }
@@ -415,9 +417,34 @@ int test_unop(register int op,register const char *arg)
 		op = sh_lookopt(arg,&f);
 		return(op && (f==(sh_isoption(op)!=0)));
 	    case 't':
-		if(isdigit(*arg) && arg[1]==0)
-			 return(tty_check(*arg-'0'));
-		return(0);
+	    {
+		char *last;
+		op = strtol(arg,&last, 10);
+		return(*last?0:tty_check(op));
+	    }
+	    case 'v':
+	    case 'R':
+	    {
+		Namval_t *np;
+		Namarr_t *ap;
+		int isref;
+		if(!(np = nv_open(arg,sh.var_tree,NV_VARNAME|NV_NOFAIL|NV_NOADD|NV_NOREF)))
+			return(0);
+		isref = nv_isref(np);
+		if(op=='R')
+			return(isref);
+		if(isref)
+		{
+			if(np->nvalue.cp)
+				np = nv_refnode(np);
+			else
+				return(0);
+			
+		}
+		if(ap = nv_arrayptr(np))
+			return(nv_arrayisset(np,ap));
+		return(!nv_isnull(np) || nv_isattr(np,NV_INTEGER));
+	    }
 	    default:
 	    {
 		static char a[3] = "-?";

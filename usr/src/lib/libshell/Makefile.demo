@@ -27,18 +27,14 @@
 ROOTDEMODIRBASE=	$(ROOT)/usr/demo/ksh
 
 DEMOFILES= \
-	doc/RELEASE \
-	doc/README \
-	doc/TYPES \
-	doc/DESIGN \
-	doc/COMPATIBILITY \
-	doc/OBSOLETE \
+	bin/cpvprint \
 	bin/crawlsrccomments \
 	bin/filemutexdemo1 \
 	bin/filetree1 \
 	bin/gnaw \
 	bin/mandelbrotset1 \
 	bin/multifollow \
+	bin/numtree1 \
 	bin/primenumbers1 \
 	bin/rssread \
 	bin/shcalc \
@@ -49,6 +45,8 @@ DEMOFILES= \
 	bin/shpiano \
 	bin/shtinyurl \
 	bin/shtwitter \
+	bin/simplefileattributetree1 \
+	bin/simplefiletree1 \
 	bin/svcproptree1 \
 	bin/termclock \
 	bin/test_net_sctp \
@@ -57,6 +55,31 @@ DEMOFILES= \
 	fun/popd \
 	fun/pushd \
 	fun/title \
+	src/cpvprint.sh \
+	src/crawlsrccomments.sh \
+	src/filemutexdemo1.sh \
+	src/filetree1.sh \
+	src/gnaw.sh \
+	src/mandelbrotset1.sh \
+	src/multifollow.sh \
+	src/numtree1.sh \
+	src/primenumbers1.sh \
+	src/rssread.sh \
+	src/shcalc.sh \
+	src/shircbot.sh \
+	src/shlint.sh \
+	src/shman.sh \
+	src/shnote.sh \
+	src/shpiano.sh \
+	src/shtinyurl.sh \
+	src/shtwitter.sh \
+	src/simplefileattributetree1.sh \
+	src/simplefiletree1.sh \
+	src/svcproptree1.sh \
+	src/termclock.sh \
+	src/test_net_sctp.sh \
+	src/xmldocumenttree1.sh \
+	tests/README.tests \
 	tests/shtests \
 	tests/alias.sh \
 	tests/append.sh \
@@ -79,7 +102,6 @@ DEMOFILES= \
 	tests/grep.sh \
 	tests/heredoc.sh \
 	tests/io.sh \
-	tests/locale.sh \
 	tests/nameref.sh \
 	tests/options.sh \
 	tests/path.sh \
@@ -93,7 +115,14 @@ DEMOFILES= \
 	tests/sigchld.sh \
 	tests/signal.sh \
 	tests/statics.sh \
+	tests/subshell.sh \
+	tests/substring.sh \
+	tests/sun_solaris_array_default_datatype.sh \
+	tests/sun_solaris_builtin_poll.sh \
 	tests/sun_solaris_builtin_sum.sh \
+	tests/sun_solaris_builtin_tail.sh \
+	tests/sun_solaris_command_substitution.sh \
+	tests/sun_solaris_compound_nameref.sh \
 	tests/sun_solaris_compoundvario.sh \
 	tests/sun_solaris_cr_6687139_command_substitution_exec_redirection_allocation_loop.sh \
 	tests/sun_solaris_cr_6713682_compound_var_bleeds_through_subshell.sh \
@@ -102,18 +131,29 @@ DEMOFILES= \
 	tests/sun_solaris_cr_6754020_weird_square_bracket_expansion.sh \
 	tests/sun_solaris_cr_6763594_command_failure_execs_twice.sh \
 	tests/sun_solaris_cr_6766246_pattern_matching_bug.sh \
+	tests/sun_solaris_cr_6769332_substitutions_terminate_shell_after_257_iterations.sh \
+	tests/sun_solaris_cr_6777491_lacks_arithmetric_function_iszero.sh \
+	tests/sun_solaris_cr_6778077_sigthaw_trap.sh \
+	tests/sun_solaris_cr_6789247_printf_hexfloat_rounding.sh \
 	tests/sun_solaris_cr_6800929_large_command_substitution_hang.sh \
+	tests/sun_solaris_cr_6805792_varmovetest1.sh \
+	tests/sun_solaris_cr_6805794_character_to_wchar_not_working.sh \
+	tests/sun_solaris_cr_6805795_negative_zero.sh \
 	tests/sun_solaris_cr_6807179_shellpattern_uses_getpwnam.sh \
+	tests/sun_solaris_cr_6835835_builtin_cat_n_broken.sh \
+	tests/sun_solaris_cr_6848486_echo_test_with_test_undefined_executes_test_builtin.sh \
+	tests/sun_solaris_cr_6855875_typeset_hexfloat_has_too_few_digits.sh \
+	tests/sun_solaris_cr_6862121_shbinexec_kernel_module_defunct.sh \
+	tests/sun_solaris_cr_6881017_background_process_in_subshell_hangs_caller.sh \
 	tests/sun_solaris_getconf.sh \
 	tests/sun_solaris_local_compound_nameref001.sh \
 	tests/sun_solaris_staticvariables.sh \
 	tests/sun_solaris_vartree001.sh \
 	tests/sun_solaris_vartree002.sh \
 	tests/sun_solaris_vartree003.sh \
-	tests/substring.sh \
-	tests/subshell.sh \
 	tests/tilde.sh \
 	tests/timetype.sh \
+	tests/treemove.sh \
 	tests/types.sh \
 	tests/variables.sh \
 	tests/vartree1.sh \
@@ -132,18 +172,14 @@ $(ROOTDEMODIRBASE)/bin/%: common/scripts/%.sh
 	cat "$<" >"$(@F)"
 	$(INS) -s -m $(FILEMODE) -f $(@D) "$(@F)"
 	$(RM) "$(@F)"
+
+$(ROOTDEMODIRBASE)/src/%.sh: common/scripts/%.sh
+	$(INS.file)
 	
-# Documentation rules
-$(ROOTDEMODIRBASE)/doc/%: common/%
-	$(INS.file)
-
-$(ROOTDEMODIRBASE)/doc/%: misc/%
-	$(INS.file)
-
 ROOTDEMODIRS=	$(ROOTDEMODIRBASE) .WAIT \
 		$(ROOTDEMODIRBASE)/bin \
-		$(ROOTDEMODIRBASE)/doc \
 		$(ROOTDEMODIRBASE)/fun \
+		$(ROOTDEMODIRBASE)/src \
 		$(ROOTDEMODIRBASE)/tests
 
 install: $(ROOTDEMODIRS) .WAIT $(ROOTDEMOFILES)

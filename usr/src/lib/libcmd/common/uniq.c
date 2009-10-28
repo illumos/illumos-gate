@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -26,17 +26,17 @@
  */
 
 static const char usage[] =
-"[-n?\n@(#)$Id: uniq (AT&T Research) 2008-04-24 $\n]"
+"[-n?\n@(#)$Id: uniq (AT&T Research) 2009-08-10 $\n]"
 USAGE_LICENSE
 "[+NAME?uniq - Report or filter out repeated lines in a file]"
-"[+DESCRIPTION?\buniq\b reads an input, comparing adjacent lines, and "
-	"writing one copy of each input line on the output.  The second "
+"[+DESCRIPTION?\buniq\b reads the input, compares adjacent lines, and "
+	"writes one copy of each input line on the output.  The second "
 	"and succeeding copies of the repeated adjacent lines are not "
 	"written.]"
 "[+?If the output file, \aoutfile\a, is not specified, \buniq\b writes "
 	"to standard output.  If no \ainfile\a is given, or if the \ainfile\a "
-	"is \b-\b, \buniq\b reads from standard input with  the start of "
-	"the file is defined as the current offset.]"
+	"is \b-\b, \buniq\b reads from standard input with the start of "
+	"the file defined as the current offset.]"
 "[c:count?Output the number of times each line occurred  along with "
 	"the line.]"
 "[d:repeated|duplicates?Output the first of each duplicate line.]"
@@ -49,13 +49,15 @@ USAGE_LICENSE
     "}"
 "[f:skip-fields]#[fields?\afields\a is the number of fields to skip over "
     "before checking for uniqueness. A field is the minimal string matching "
-    "the BRE \b[[:blank:]]]]*[^[:blank:]]]]*\b.]"
+    "the BRE \b[[:blank:]]]]*[^[:blank:]]]]*\b. -\anumber\a is equivalent to "
+    "\b--skip-fields\b=\anumber\a.]"
 "[i:ignore-case?Ignore case in comparisons.]"
 "[s:skip-chars]#[chars?\achars\a is the number of characters to skip over "
 	"before checking for uniqueness.  If specified along with \b-f\b, "
 	"the first \achars\a after the first \afields\a are ignored.  If "
 	"the \achars\a specifies more characters than are on the line, "
-	"an empty string will be used for comparison.]"
+	"an empty string will be used for comparison. +\anumber\a is "
+	"equivalent to \b--skip-chars\b=\anumber\a.]"
 "[u:unique?Output unique lines.]"
 "[w:check-chars]#[chars?\achars\a is the number of characters to compare " 
 	"after skipping any specified fields and characters.]"
@@ -145,11 +147,25 @@ static int uniq(Sfio_t *fdin, Sfio_t *fdout, int fields, int chars, int width, i
 				{
 					if(cwidth)
 					{
-						outp[CWIDTH] = ' ';
-						if(count<MAXCNT)
+						if(count<9)
 						{
-							sfsprintf(outp,cwidth,"%*d",CWIDTH,count+1);
-							outp[CWIDTH] = ' ';
+							f = 0;
+							while(f < CWIDTH-1)
+								outp[f++] = ' ';
+							outp[f++] = '0' + count + 1;
+							outp[f] = ' ';
+						}
+						else if(count<MAXCNT)
+						{
+							count++;
+							f = CWIDTH;
+							outp[f--] = ' ';
+							do
+							{
+								outp[f--] = '0' + (count % 10);
+							} while (count /= 10);
+							while (f >= 0)
+								outp[f--] = ' ';
 						}
 						else
 						{

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -28,7 +28,12 @@
  * only active for non-shared 3d library
  */
 
+#define mount	______mount
+
 #include <ast.h>
+
+#undef	mount
+
 #include <fs3d.h>
 
 int
@@ -91,4 +96,21 @@ fs3d(register int op)
  nope:
 	fsview = -1;
 	return 0;
+}
+
+/*
+ * user code that includes <fs3d.h> will have mount() mapped to fs3d_mount()
+ * this restricts the various "standard" mount prototype conflicts to this spot
+ * this means that code that includes <fs3d.h> cannot access the real mount
+ * (at least without some additional macro hackery
+ */
+
+#undef	mount
+
+extern int	mount(const char*, char*, int, void*);
+
+int
+fs3d_mount(const char* source, char* target, int flags, void* data)
+{
+	return mount(source, target, flags, data);
 }

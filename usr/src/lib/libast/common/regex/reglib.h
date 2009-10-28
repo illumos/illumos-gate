@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -64,6 +64,10 @@ typedef struct regsubop_s
 
 #include <ctype.h>
 #include <errno.h>
+
+#if _BLD_DEBUG && !defined(_AST_REGEX_DEBUG)
+#define _AST_REGEX_DEBUG	1
+#endif
 
 #define MBSIZE(p)	((ast.tmp_int=mbsize(p))>0?ast.tmp_int:1)
 

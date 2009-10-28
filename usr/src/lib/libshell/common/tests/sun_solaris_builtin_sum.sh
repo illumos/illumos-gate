@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,6 +29,7 @@
 # Solaris/SystemV /usr/bin/sum
 #
 
+# test setup
 function err_exit
 {
 	print -u2 -n "\t"
@@ -37,8 +38,10 @@ function err_exit
 }
 alias err_exit='err_exit $LINENO'
 
+set -o nounset
 Command=${0##*/}
 integer Errors=0
+
 
 typeset x
 

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -65,6 +65,7 @@ CPPFLAGS = \
 	$(DTEXTDOM) $(DTS_ERRNO) \
 	-Isrc/lib/libsum \
 	-I$(ROOT)/usr/include/ast \
+	-I$(ROOT)/usr/include \
 	-D_PACKAGE_ast \
 	-D_BLD_DLL
 
@@ -72,6 +73,12 @@ CFLAGS += \
 	$(ASTCFLAGS)
 CFLAGS64 += \
 	$(ASTCFLAGS64)
+
+# This codepath is performance-critical
+sparc_COPTFLAG=-xO5 -_cc=-xprefetch=auto,explicit
+sparcv9_COPTFLAG=-xO5 -_cc=-xprefetch=auto,explicit
+i386_COPTFLAG=-_cc=-xO5 -_cc=-xprefetch=auto,explicit
+amd64_COPTFLAG=-_cc=-xO5  -_cc=-xprefetch=auto,explicit
 
 # Suppress this one warning as the fix would break old gcc, which upstream
 # still supports. This needs a better fix (later).

@@ -3,7 +3,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -276,6 +276,7 @@ extern __MANGLE__ Namfun_t		*nv_isvtree __PROTO__((Namval_t*));
 extern __MANGLE__ Namval_t		*nv_lastdict __PROTO__((void));
 extern __MANGLE__ Namval_t		*nv_mkinttype __PROTO__((char*, size_t, int, const char*, Namdisc_t*));
 extern __MANGLE__ void 		nv_newattr __PROTO__((Namval_t*,unsigned,int));
+extern __MANGLE__ void 		nv_newtype __PROTO__((Namval_t*));
 extern __MANGLE__ Namval_t		*nv_open __PROTO__((const char*,Dt_t*,int));
 extern __MANGLE__ void 		nv_putval __PROTO__((Namval_t*,const char*,int));
 extern __MANGLE__ void 		nv_putv __PROTO__((Namval_t*,const char*,int,Namfun_t*));

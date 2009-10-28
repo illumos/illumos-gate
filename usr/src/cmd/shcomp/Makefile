@@ -27,6 +27,7 @@
 SHELL=/usr/bin/ksh93
 
 include ../Makefile.cmd
+$(SPARC_BLD)include ../Makefile.cmd.64
 
 .KEEP_STATE:
 
@@ -42,6 +43,7 @@ LIBSHELLSRC=$(LIBSHELLBASE)/common/sh
 
 SRCS=	$(OBJECTS:%.o=$(LIBSHELLSRC)/%.c)
 
+GROUP= bin
 LDLIBS += -lshell -last
 
 # 1. Make sure that the -D/-U defines in CFLAGS below are in sync

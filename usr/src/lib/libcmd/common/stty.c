@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -26,7 +26,7 @@
  */
 
 static const char usage[] =
-"[-?@(#)$Id: stty (AT&T Research) 2008-04-01 $\n]"
+"[-?@(#)$Id: stty (AT&T Research) 2008-11-10 $\n]"
 USAGE_LICENSE
 "[+NAME?stty - set or get terminal modes]"
 "[+DESCRIPTION?\bstty\b sets certain terminal I/O modes for the device "
@@ -913,11 +913,9 @@ b_stty(int argc, char** argv, void* context)
 	{
 		switch (n = optget(argv, usage))
 		{
-		case 't':
-			flags |= T_FLAG;
-			continue;
 		case 'a':
 		case 'g':
+		case 't':
 			if (!opt_info.offset || !argv[opt_info.index][opt_info.offset])
 			{
 				switch (n)
@@ -927,6 +925,9 @@ b_stty(int argc, char** argv, void* context)
 					break;
 				case 'g':
 					flags |= G_FLAG;
+					break;
+				case 't':
+					flags |= T_FLAG;
 					break;
 				}
 				continue;

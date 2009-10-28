@@ -3,7 +3,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -52,6 +52,8 @@
 #define fts_parent	parent
 #define fts_path	path
 #define fts_pathlen	pathlen
+#define _fts_status	status
+#define _fts_statb	statb
 
 #define FTSENT		Ftw_t			/* <fts.h> internal	*/
 #define Ftsent		FTW			/* <fts.h> internal	*/
@@ -62,10 +64,6 @@
 	long		number;			/* local numeric value	*/ \
 	__V_*		pointer;		/* local pointer value	*/ \
 	}		local;
-
-#define _FTSENT_PRIVATE_			/* fts internal		*/ \
-	short		status;			/* internal status	*/ \
-	struct stat	statb;			/* fts_statp data	*/
 
 #include <fts.h>
 

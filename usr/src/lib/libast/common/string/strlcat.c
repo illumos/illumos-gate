@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -40,7 +40,7 @@ NoN(strlcat)
 #else
 
 /*
- * append at t onto s limiting total size of s to n
+ * append t onto s limiting total size of s to n
  * s 0 terminated if n>0
  * min(n,strlen(s))+strlen(t) returned
  */
@@ -52,12 +52,17 @@ NoN(strlcat)
 extern size_t
 strlcat(register char* s, register const char* t, register size_t n)
 {
+	register size_t	m;
 	const char*	o = t;
 
-	if (n)
+	if (m = n)
 	{
-		while (--n && *s)
+		while (n && *s)
+		{
+			n--;
 			s++;
+		}
+		m -= n;
 		if (n)
 			do
 			{
@@ -72,7 +77,7 @@ strlcat(register char* s, register const char* t, register size_t n)
 	}
 	if (!n)
 		while (*t++);
-	return t - o - 1;
+	return (t - o) + m - 1;
 }
 
 #endif

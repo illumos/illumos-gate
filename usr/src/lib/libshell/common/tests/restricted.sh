@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -25,11 +25,13 @@ function err_exit
 }
 alias err_exit='err_exit $LINENO'
 
-# test restricted shell
 Command=${0##*/}
 integer Errors=0
-mkdir  /tmp/ksh$$ || err_exit "mkdir /tmp/ksh$$ failed" 
-trap "cd /; rm -rf /tmp/ksh$$" EXIT
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
+
+# test restricted shell
 pwd=$PWD
 case $SHELL in
 /*)	;;
@@ -40,14 +42,14 @@ function check_restricted
 {
 	rm -f out
 	rksh -c "$@" 2> out > /dev/null
-	grep restricted out  > /dev/null 2>&1 
+	grep restricted out  > /dev/null 2>&1
 }
 
 [[ $SHELL != /* ]] && SHELL=$pwd/$SHELL
-cd /tmp/ksh$$ || err_exit "cd /tmp/ksh$$ failed"
+cd $tmp || err_exit "cd $tmp failed"
 ln -s $SHELL rksh
 PATH=$PWD:$PATH
-rksh -c  '[[ -o restricted ]]' || err_exit 'restricted option not set' 
+rksh -c  '[[ -o restricted ]]' || err_exit 'restricted option not set'
 [[ $(rksh -c 'print hello') == hello ]] || err_exit 'unable to run print'
 check_restricted /bin/echo || err_exit '/bin/echo not resticted'
 check_restricted ./echo || err_exit './echo not resticted'
@@ -74,4 +76,7 @@ print hello
 !
 ! check_restricted 'script;:' ||  err_exit 'script with #! pathname should run in restricted mode'
 ! check_restricted 'script' ||  err_exit 'script with #! pathname should run in restricted mode even if last command in script'
+for i in PATH ENV FPATH
+do	check_restricted  "function foo { typeset $i=foobar;};foo" || err_exit "$i can be changed in function by using typeset"
+done
 exit $((Errors))

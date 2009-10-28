@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -24,12 +24,14 @@ function err_exit
 	let Errors+=1
 }
 alias err_exit='err_exit $LINENO'
+
 Command=${0##*/}
 integer Errors=0
 
-mkdir /tmp/ksh$$
-cd /tmp/ksh$$
-trap "PATH=$PATH; cd /; rm -rf /tmp/ksh$$" EXIT
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
+
+cd $tmp || exit
 type /xxxxxx > out1 2> out2
 [[ -s out1 ]] && err_exit 'type should not write on stdout for not found case'
 [[ -s out2 ]] || err_exit 'type should write on stderr for not found case'
@@ -69,37 +71,36 @@ PATH=$FPATH:$p
 PATH=$p
 (PATH="/bin")
 [[ $($SHELL -c 'print -r -- "$PATH"') == "$PATH" ]] || err_exit 'export PATH lost in subshell'
-cat > bug1 <<- \EOF
-	print print ok > /tmp/ok$$
-	/bin/chmod 755 /tmp/ok$$
-	trap 'cd /; rm -f /tmp/ok$$' EXIT
+cat > bug1 <<- EOF
+	print print ok > $tmp/ok
+	/bin/chmod 755 $tmp/ok
 	function a
 	{
-	        typeset -x PATH=/tmp
-	        ok$$
+	        typeset -x PATH=$tmp
+	        ok
 	}
-	path=$PATH
+	path=\$PATH
 	unset PATH
 	a
-	PATH=$path
+	PATH=\$path
 }
 EOF
-[[ $($SHELL ./bug1  2> /dev/null) == ok ]]  || err_exit "PATH in function not working"
+[[ $($SHELL ./bug1 2>/dev/null) == ok ]]  || err_exit "PATH in function not working"
 cat > bug1 <<- \EOF
 	function lock_unlock
 	{
 	typeset PATH=/usr/bin
 	typeset -x PATH=''
 	}
-	
+
 	PATH=/usr/bin
 	: $(PATH=/usr/bin getconf PATH)
 	typeset -ft lock_unlock
 	lock_unlock
 EOF
 ($SHELL ./bug1)  2> /dev/null || err_exit "path_delete bug"
-mkdir tdir$$
-if	$SHELL tdir$$ > /dev/null 2>&1
+mkdir tdir
+if	$SHELL tdir > /dev/null 2>&1
 then	err_exit 'not an error to run ksh on a directory'
 fi
 
@@ -121,7 +122,7 @@ var=$(whence date)
 dir=$(basename "$var")
 for i in 1 2 3 4 5 6 7 8 9 0
 do	if	! whence notfound$i 2> /dev/null
-	then	cmd=notfound$i		
+	then	cmd=notfound$i
 		break
 	fi
 done
@@ -132,7 +133,7 @@ chmod +x "$cmd"
 > foo
 chmod 755 foo
 for PATH in $path :$path $path: .:$path $path: $path:. $PWD::$path $PWD:.:$path $path:$PWD $path:.:$PWD
-do	
+do
 #	print path=$PATH $(whence date)
 #	print path=$PATH $(whence "$cmd")
 		date
@@ -155,19 +156,60 @@ fi
 status=$?
 [[ $status == 126 ]] || err_exit "exit status of non-executable is $status -- 126 expected"
 builtin -d rm 2> /dev/null
+chmod=$(whence chmod)
 rm=$(whence rm)
 d=$(dirname "$rm")
+
+chmod=$(whence chmod)
+
+for cmd in date foo
+do	exp="$cmd found"
+	print print $exp > $cmd
+	$chmod +x $cmd
+	got=$($SHELL -c "unset FPATH; PATH=/dev/null; $cmd" 2>&1)
+	[[ $got == $exp ]] && err_exit "$cmd as last command should not find ./$cmd with PATH=/dev/null"
+	got=$($SHELL -c "unset FPATH; PATH=/dev/null; $cmd" 2>&1)
+	[[ $got == $exp ]] && err_exit "$cmd should not find ./$cmd with PATH=/dev/null"
+	exp=$PWD/./$cmd
+	got=$(unset FPATH; PATH=/dev/null; whence ./$cmd)
+	[[ $got == $exp ]] || err_exit "whence $cmd should find ./$cmd with PATH=/dev/null"
+	exp=$PWD/$cmd
+	got=$(unset FPATH; PATH=/dev/null; whence $PWD/$cmd)
+	[[ $got == $exp ]] || err_exit "whence \$PWD/$cmd should find ./$cmd with PATH=/dev/null"
+done
+
+exp=''
+got=$($SHELL -c "unset FPATH; PATH=/dev/null; whence ./notfound" 2>&1)
+[[ $got == $exp ]] || err_exit "whence ./$cmd failed -- expected '$exp', got '$got'"
+got=$($SHELL -c "unset FPATH; PATH=/dev/null; whence $PWD/notfound" 2>&1)
+[[ $got == $exp ]] || err_exit "whence \$PWD/$cmd failed -- expected '$exp', got '$got'"
+
 unset FPATH
 PATH=/dev/null
-if	date > /dev/null 2>&1
-then	err_exit 'programs in . should not be found'
-fi
-[[ $(whence ./foo) != "$PWD/"./foo ]] && err_exit 'whence ./foo not working'
-[[ $(whence "$PWD/foo") != "$PWD/foo" ]] && err_exit 'whence $PWD/foo not working'
-[[ $(whence ./xxxxx) ]] && err_exit 'whence ./xxxx not working'
+for cmd in date foo
+do	exp="$cmd found"
+	print print $exp > $cmd
+	$chmod +x $cmd
+	got=$($cmd 2>&1)
+	[[ $got == $exp ]] && err_exit "$cmd as last command should not find ./$cmd with PATH=/dev/null"
+	got=$($cmd 2>&1; :)
+	[[ $got == $exp ]] && err_exit "$cmd should not find ./$cmd with PATH=/dev/null"
+	exp=$PWD/./$cmd
+	got=$(whence ./$cmd)
+	[[ $got == $exp ]] || err_exit "whence ./$cmd should find ./$cmd with PATH=/dev/null"
+	exp=$PWD/$cmd
+	got=$(whence $PWD/$cmd)
+	[[ $got == $exp ]] || err_exit "whence \$PWD/$cmd should find ./$cmd with PATH=/dev/null"
+done
+exp=''
+got=$(whence ./notfound)
+[[ $got == $exp ]] || err_exit "whence ./$cmd failed -- expected '$exp', got '$got'"
+got=$(whence $PWD/notfound)
+[[ $got == $exp ]] || err_exit "whence \$PWD/$cmd failed -- expected '$exp', got '$got'"
+
 PATH=$d:
-cp "$rm" kshrm$$
-if	[[ $(whence kshrm$$) != $PWD/kshrm$$  ]]
+cp "$rm" kshrm
+if	[[ $(whence kshrm) != $PWD/kshrm  ]]
 then	err_exit 'trailing : in pathname not working'
 fi
 cp "$rm" rm
@@ -196,7 +238,7 @@ then	PATH=
 	then	err_exit 'unsetting path  not working'
 	fi
 fi
-PATH=/dev:/tmp/ksh$$
+PATH=/dev:$tmp
 x=$(whence rm)
 typeset foo=$(PATH=/xyz:/abc :)
 y=$(whence rm)
@@ -212,11 +254,11 @@ PATH=$PWD:.:${x%/ls}
 [[ $(whence ls) == "$x" ]] || err_exit 'PATH search bug when :$PWD:. in path'
 cd   "${x%/ls}"
 [[ $(whence ls) == /* ]] || err_exit 'whence not generating absolute pathname'
-status=$($SHELL -c $'trap \'print $?\' EXIT;/a/b/c/d/e 2> /dev/null')
+status=$($SHELL -c $'trap \'print $?\' EXIT;/xxx/a/b/c/d/e 2> /dev/null')
 [[ $status == 127 ]] || err_exit "not found command exit status $status -- expected 127"
 status=$($SHELL -c $'trap \'print $?\' EXIT;/dev/null 2> /dev/null')
 [[ $status == 126 ]] || err_exit "non executable command exit status $status -- expected 126"
-status=$($SHELL -c $'trap \'print $?\' ERR;/a/b/c/d/e 2> /dev/null')
+status=$($SHELL -c $'trap \'print $?\' ERR;/xxx/a/b/c/d/e 2> /dev/null')
 [[ $status == 127 ]] || err_exit "not found command with ERR trap exit status $status -- expected 127"
 status=$($SHELL -c $'trap \'print $?\' ERR;/dev/null 2> /dev/null')
 [[ $status == 126 ]] || err_exit "non executable command ERR trap exit status $status -- expected 126"
@@ -231,7 +273,7 @@ getconf UNIVERSE - att # override sticky default 'UNIVERSE = foo'
 
 PATH=$path
 
-scr=/tmp/ksh$$/foo
+scr=$tmp/script
 exp=126
 
 : > $scr

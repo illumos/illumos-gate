@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -187,6 +187,8 @@ main()
 	printf("#define pathposix	_ast_pathposix\n");
 	printf("#undef	pathprobe\n");
 	printf("#define pathprobe	_ast_pathprobe\n");
+	printf("#undef	pathprog\n");
+	printf("#define pathprog	_ast_pathprog\n");
 	printf("#undef	pathrepl\n");
 	printf("#define pathrepl	_ast_pathrepl\n");
 	printf("#undef	pathsetlink\n");

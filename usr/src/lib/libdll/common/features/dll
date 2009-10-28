@@ -75,6 +75,9 @@ tst	run{
 	echo "#define _DLL_NEXT_PATH	\"$lib\""
 }end
 tst	- output{
+	#if defined(__MVS__) && !defined(__SUSV3)
+	#define __SUSV3		1
+	#endif
 	#if _hdr_dlfcn && _lib_dlopen
 	#include <dlfcn.h>
 	#endif
@@ -90,6 +93,9 @@ tst	- output{
 		static char*	local[] = { "__elf_header", "_call_add_gp_range", "_etext" };
 	#endif
 		printf("\n");
+		printf("#if defined(__MVS__) && !defined(__SUSV3)\n");
+		printf("#define __SUSV3		1\n");
+		printf("#endif\n");
 	#if _hdr_dlfcn && _lib_dlopen
 		printf("#include <dlfcn.h>\n");
 	#endif
@@ -206,6 +212,7 @@ tst	- output{
 		printf("extern Dllinfo_t*	dllinfo(void);\n");
 		printf("extern void*		dllplug(const char*, const char*, const char*, int, char*, size_t);\n");
 		printf("extern void*		dllfind(const char*, const char*, int, char*, size_t);\n");
+		printf("extern void*		dllopen(const char*, int);\n");
 		printf("extern void*		dllnext(int);\n");
 		printf("extern void*		dlllook(void*, const char*);\n");
 	#if _hdr_rld_interface

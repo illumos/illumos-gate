@@ -2,7 +2,7 @@
 # Glenn Fowler
 # AT&T Research
 #
-# @(#)pp.probe (AT&T Research) 2006-09-05
+# @(#)pp.probe (AT&T Research) 2009-02-02
 #
 # C probe for libpp
 #
@@ -25,6 +25,7 @@ architecture=
 cpu=
 model=
 machine=
+undef_predef=
 
 #
 # path cleanup
@@ -575,6 +576,13 @@ do	echo "#include <sys/$i.h>" > t.$src
 	eval sys_$i=$x
 done
 
+echo "char* fun() { return (char*)__FUNCTION__; }
+int main() { return !fun(); }" > fun.$src
+rm -f fun.exe
+if	$cc -o fun.exe fun.$src && test -x fun.exe
+then	undef_predef="$undef_predef __FUNCTION__"
+fi
+
 case "`grep -c '__STDC__[-0 	]*[=!]=[ 	]*0' $usrinclude/stdio.h 2>/dev/null`" in
 0)	;;
 *)	hostedtransition=1 ;;
@@ -1033,6 +1041,13 @@ case $so:$dynamic:$static in
 *)	echo "#define #dialect(dynamic)" ;;
 esac
 echo
+case $undef_predef in
+?*)	for m in $undef_predef
+	do	echo "#undef	$m"
+	done
+	echo
+	;;
+esac
 case $plusplus in
 ?*)	echo "#pragma pp:plusplus" ;;
 esac

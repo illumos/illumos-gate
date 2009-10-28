@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -265,6 +265,7 @@ extern Namfun_t		*nv_isvtree(Namval_t*);
 extern Namval_t		*nv_lastdict(void);
 extern Namval_t		*nv_mkinttype(char*, size_t, int, const char*, Namdisc_t*);
 extern void 		nv_newattr(Namval_t*,unsigned,int);
+extern void 		nv_newtype(Namval_t*);
 extern Namval_t		*nv_open(const char*,Dt_t*,int);
 extern void 		nv_putval(Namval_t*,const char*,int);
 extern void 		nv_putv(Namval_t*,const char*,int,Namfun_t*);

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -25,7 +25,6 @@
  */
 
 #include	"defs.h"
-#include	<ctype.h>
 #include	"lexstates.h"
 #include	"name.h"
 #include	"streval.h"
@@ -65,6 +64,7 @@ static Namval_t *scope(Shell_t *shp,register Namval_t *np,register struct lval *
 	register Namval_t *mp;
 	int	flags = HASH_NOSCOPE|HASH_SCOPE|HASH_BUCKET;
 	Dt_t	*sdict = (shp->st.real_fun? shp->st.real_fun->sdict:0);
+	Dt_t	*root = shp->var_tree;
 	assign = assign?NV_ASSIGN:NV_NOASSIGN;
 	if(cp>=lvalue->expr &&  cp < lvalue->expr+lvalue->elen)
 	{
@@ -79,7 +79,11 @@ static Namval_t *scope(Shell_t *shp,register Namval_t *np,register struct lval *
 			cp[flag] = c;
 			return(&FunNode);
 		}
-		np = nv_open(cp,shp->var_tree,assign|NV_VARNAME);
+		if(!np && assign)
+			np = nv_open(cp,shp->var_tree,assign|NV_VARNAME);
+		if(!np)
+			return(0);
+		root = shp->last_root;
 		cp[flag] = c;
 		if(cp[flag+1]=='[')
 			flag++;
@@ -87,7 +91,7 @@ static Namval_t *scope(Shell_t *shp,register Namval_t *np,register struct lval *
 			flag = 0;
 		cp = (char*)np;
 	}
-	if((lvalue->emode&ARITH_COMP) && dtvnext(shp->var_tree) && ((mp=nv_search(cp,shp->var_tree,flags))||(sdict && (mp=nv_search(cp,sdict,flags)))))
+	if((lvalue->emode&ARITH_COMP) && dtvnext(root) && ((mp=nv_search(cp,root,flags))||(sdict && (mp=nv_search(cp,sdict,flags)))))
 	{
 		while(nv_isref(mp))
 		{
@@ -100,10 +104,7 @@ static Namval_t *scope(Shell_t *shp,register Namval_t *np,register struct lval *
 	{
 		if(!sub)
 			sub = (char*)&lvalue->expr[flag];
-		if(((ap=nv_arrayptr(np)) && array_assoc(ap)) || (lvalue->emode&ARITH_COMP))
-			nv_endsubscript(np,sub,NV_ADD|NV_SUBQUOTE);
-		else
-			nv_putsub(np, NIL(char*),flag);
+		nv_endsubscript(np,sub,NV_ADD|NV_SUBQUOTE);
 	}
 	return(np);
 }
@@ -239,28 +240,18 @@ static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdoubl
 			if(!np && lvalue->value)
 				break;
 			lvalue->value = (char*)np;
-			if((lvalue->emode&ARITH_COMP) || (nv_isarray(np) && nv_aindex(np)<0))
-			{
-				/* bind subscript later */
-				lvalue->flag = 0;
-				if(c=='[')
-				{
-					lvalue->flag = (str-lvalue->expr);
-					do
-						str = nv_endsubscript(np,str,0);
-					while((c= *str)=='[');
-				}
-				break;
-			}
-			if(c=='[')
-			{
-				do
-					str = nv_endsubscript(np,str,NV_ADD|NV_SUBQUOTE);
-				while((c=*str)=='[');
-			}
+			/* bind subscript later */
 			if(nv_isattr(np,NV_DOUBLE)==NV_DOUBLE)
 				lvalue->isfloat=1;
-			lvalue->flag = nv_aindex(np);
+			lvalue->flag = 0;
+			if(c=='[')
+			{
+				lvalue->flag = (str-lvalue->expr);
+				do
+					str = nv_endsubscript(np,str,0);
+				while((c= *str)=='[');
+				break;
+			}
 		}
 		else
 		{
@@ -317,9 +308,19 @@ static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdoubl
 		if(sh_isoption(SH_NOEXEC))
 			return(0);
 		np = scope(shp,np,lvalue,0);
+		if(!np)
+		{
+			if(sh_isoption(SH_NOUNSET))
+			{
+				*ptr = lvalue->value;
+				goto skip;
+			}
+			return(0);
+		}
 		if(((lvalue->emode&2) || lvalue->level>1 || sh_isoption(SH_NOUNSET)) && nv_isnull(np) && !nv_isattr(np,NV_INTEGER))
 		{
 			*ptr = nv_name(np);
+		skip:
 			lvalue->value = (char*)ERROR_dictionary(e_notset);
 			lvalue->emode |= 010;
 			return(0);

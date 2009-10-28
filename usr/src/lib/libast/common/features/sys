@@ -45,7 +45,6 @@ header	unistd.h
 header	limits.h
 header	fcntl.h
 header	locale.h
-header	sys/localedef.h
 
 typ dev_t,nlink_t fail{
 	echo "#ifndef $m"

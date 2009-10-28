@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -93,8 +93,9 @@
 #define TM_ERA_YEAR		115
 #define TM_ORDINALS		116
 #define TM_FINAL		126
+#define TM_WORK			129
 
-#define TM_NFORM		129
+#define TM_NFORM		132
 
 typedef struct				/* leap second info		*/
 {
@@ -114,7 +115,7 @@ typedef struct				/* time zone info		*/
 typedef struct				/* tm library readonly data	*/
 {
 	char**		format;		/* default TM_* format strings	*/
-	char*		lex;		/* format lex type classes	*/
+	unsigned char*	lex;		/* format lex type classes	*/
 	char*		digit;		/* output digits		*/
 	short*		days;		/* days in month i		*/
 	short*		sum;		/* days in months before i	*/

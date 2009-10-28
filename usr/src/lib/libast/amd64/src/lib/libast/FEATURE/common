@@ -1,4 +1,4 @@
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20081104/build_i386_64bit/src/lib/libast/features/common by iffe version 2008-01-31 : : */
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20091014/build_i386_64bit/src/lib/libast/features/common by iffe version 2009-10-06 : : */
 #ifndef _AST_COMMON_H
 #define _AST_COMMON_H	1
 #define _sys_types	1	/* #include <sys/types.h> ok */
@@ -156,9 +156,6 @@
 #define _typ_uintmax_t	1	/* uintmax_t is a type */
 
 #ifndef va_listref
-#define va_listref(p) (&(p))	/* pass va_list to varargs function */
-#define va_listval(p) (*(p))	/* retrieve va_list from va_arg(ap,va_listarg) */
-#define va_listarg va_list*	/* va_arg() va_list type */
 #ifndef	va_start
 #if __STD_C
 #include <stdarg.h>
@@ -166,6 +163,9 @@
 #include <varargs.h>
 #endif
 #endif
+#define va_listref(p) (&(p))	/* pass va_list to varargs function */
+#define va_listval(p) (*(p))	/* retrieve va_list from va_arg(ap,va_listarg) */
+#define va_listarg va_list*	/* va_arg() va_list type */
 #endif
 #ifndef _AST_STD_H
 #	if __STD_C && _hdr_stddef

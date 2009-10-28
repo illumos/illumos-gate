@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -39,6 +39,9 @@ struct Ftsent;
 typedef int (*Compar_f)(struct Ftsent* const*, struct Ftsent* const*);
 typedef int (*Stat_f)(const char*, struct stat*);
 
+#define _fts_status	status
+#define _fts_statb	statb
+
 #define _FTS_PRIVATE_ \
 	FTSENT*		parent;			/* top parent		*/ \
 	FTSENT*		todo;			/* todo list		*/ \
@@ -55,11 +58,11 @@ typedef int (*Stat_f)(const char*, struct stat*);
 	FTSENT*		pwd;			/* pwd parent		*/ \
 	DIR*		dir;			/* current dir stream	*/ \
 	Compar_f	comparf;		/* node comparison func	*/ \
-	int		baselen;		/* current strlen(base)	*/ \
+	size_t		baselen;		/* current strlen(base)	*/ \
+	size_t		homesize;		/* sizeof(home)		*/ \
 	int		cd;			/* chdir status		*/ \
 	int		cpname;						   \
 	int		flags;			/* fts_open() flags	*/ \
-	int		homesize;		/* sizeof(home)		*/ \
 	int		nd;						   \
 	unsigned char	children;					   \
 	unsigned char	fs3d;						   \
@@ -78,9 +81,6 @@ typedef int (*Stat_f)(const char*, struct stat*);
  */
 
 #define _FTSENT_PRIVATE_ \
-	short		status;			/* internal status	*/ \
-	struct stat	statb;			/* fts_statp data	*/ \
-	FTS*		fts;			/* fts_open() handle	*/ \
 	int		nd;			/* popdir() count	*/ \
 	FTSENT*		left;			/* left child		*/ \
 	FTSENT*		right;			/* right child		*/ \
@@ -174,10 +174,10 @@ static Notify_t*		notify;
  */
 
 static FTSENT*
-node(FTS* fts, FTSENT* parent, register char* name, register int namelen)
+node(FTS* fts, FTSENT* parent, register char* name, register size_t namelen)
 {
 	register FTSENT*	f;
-	register int		n;
+	register size_t		n;
 
 	if (fts->free && namelen < MINNAME)
 	{
@@ -199,11 +199,17 @@ node(FTS* fts, FTSENT* parent, register char* name, register int namelen)
 	f->status = 0;
 	f->symlink = 0;
 	f->fts_level = (f->fts_parent = parent)->fts_level + 1;
+#if __OBSOLETE__ < 20140101
+	f->_fts_level = (short)f->fts_level;
+#endif
 	f->fts_link = 0;
 	f->fts_pointer = 0;
 	f->fts_number = 0;
 	f->fts_errno = 0;
 	f->fts_namelen = namelen;
+#if __OBSOLETE__ < 20140101
+	f->_fts_namelen = (unsigned short)f->fts_namelen;
+#endif
 	f->fts_name = f->name;
 	f->fts_statp = &f->statb;
 	memcpy(f->fts_name, name, namelen + 1);
@@ -389,7 +395,10 @@ getlist(register FTSENT** top, register FTSENT** bot, register FTSENT* root)
 					break;
 				}
 				if (!(root = stack))
+				{
+					(*bot)->fts_link = 0;
 					return;
+				}
 				stack = stack->stack;
 			}
 		}
@@ -565,27 +574,27 @@ info(FTS* fts, register FTSENT* f, const char* path, struct stat* sp, int flags)
 
 /*
  * get top list of elements to process
+ * ordering delayed until first fts_read()
+ * to give caller a chance to set fts->handle
  */
 
 static FTSENT*
 toplist(FTS* fts, register char* const* pathnames)
 {
 	register char*		path;
-	register struct stat*	sb;
 	register FTSENT*	f;
-	register FTSENT*	root;
+	register FTSENT*	top;
+	register FTSENT*	bot;
 	int			physical;
 	int			metaphysical;
 	char*			s;
-	FTSENT*			top;
-	FTSENT*			bot;
 	struct stat		st;
 
 	if (fts->flags & FTS_NOSEEDOTDIR)
 		fts->flags &= ~FTS_SEEDOTDIR;
 	physical = (fts->flags & FTS_PHYSICAL);
 	metaphysical = (fts->flags & (FTS_META|FTS_PHYSICAL)) == (FTS_META|FTS_PHYSICAL);
-	top = bot = root = 0;
+	top = bot = 0;
 	while (path = *pathnames++)
 	{
 		/*
@@ -625,14 +634,16 @@ toplist(FTS* fts, register char* const* pathnames)
 			*s = 0;
 			f->fts_namelen = s - path;
 		}
-		sb = f->fts_statp;
+#if __OBSOLETE__ < 20140101
+		f->_fts_namelen = (unsigned short)f->fts_namelen;
+#endif
 		if (!*path)
 		{
 			errno = ENOENT;
 			f->fts_info = FTS_NS;
 		}
 		else
-			info(fts, f, path, sb, fts->flags);
+			info(fts, f, path, f->fts_statp, fts->flags);
 #ifdef S_ISLNK
 
 		/*
@@ -642,13 +653,11 @@ toplist(FTS* fts, register char* const* pathnames)
 
 		if (metaphysical && f->fts_info == FTS_SL && stat(path, &st) >= 0)
 		{
-			*sb = st;
-			info(fts, f, NiL, sb, 0);
+			*f->fts_statp = st;
+			info(fts, f, NiL, f->fts_statp, 0);
 		}
 #endif
-		if (fts->comparf)
-			root = search(f, root, fts->comparf, 1);
-		else if (bot)
+		if (bot)
 		{
 			bot->fts_link = f;
 			bot = f;
@@ -656,9 +665,26 @@ toplist(FTS* fts, register char* const* pathnames)
 		else
 			top = bot = f;
 	}
-	if (fts->comparf)
-		getlist(&top, &bot, root);
 	return top;
+}
+
+/*
+ * order fts->todo if fts->comparf != 0
+ */
+
+static void
+order(FTS* fts)
+{
+	register FTSENT*	f;
+	register FTSENT*	root;
+	FTSENT*			top;
+	FTSENT*			bot;
+
+	top = bot = root = 0;
+	for (f = fts->todo; f; f = f->fts_link)
+		root = search(f, root, fts->comparf, 1);
+	getlist(&top, &bot, root);
+	fts->todo = top;
 }
 
 /*
@@ -668,11 +694,11 @@ toplist(FTS* fts, register char* const* pathnames)
  */
 
 static int
-resize(register FTS* fts, int inc)
+resize(register FTS* fts, size_t inc)
 {
 	register char*	old;
 	register char*	newp;
-	register int	n_old;
+	register size_t	n_old;
 
 	/*
 	 * add space for "/." used in testing FTS_DNX
@@ -744,6 +770,9 @@ fts_open(char* const* pathnames, int flags, int (*comparf)(FTSENT* const*, FTSEN
 	fts->parent->fts_info = FTS_D;
 	memcpy(fts->parent->fts_accpath = fts->parent->fts_path = fts->parent->fts_name = fts->parent->name, ".", 2);
 	fts->parent->fts_level = -1;
+#if __OBSOLETE__ < 20140101
+	fts->parent->_fts_level = (short)fts->parent->fts_level;
+#endif
 	fts->parent->fts_statp = &fts->parent->statb;
 	fts->parent->must = 2;
 	fts->parent->type = DT_UNKNOWN;
@@ -782,597 +811,603 @@ fts_read(register FTS* fts)
 	register int		n;
 	register FTSENT*	f;
 	struct dirent*		d;
-	int			i;
+	size_t			i;
 	FTSENT*			t;
 	Notify_t*		p;
 #ifdef verify
 	struct stat		sb;
 #endif
 
-	for (;;) switch (fts->state)
-	{
+	for (;;)
+		switch (fts->state)
+		{
 
-	case FTS_top_return:
+		case FTS_top_return:
 
-		f = fts->todo;
-		t = 0;
-		while (f)
-			if (f->status == FTS_SKIP)
-			{
-				if (t)
+			f = fts->todo;
+			t = 0;
+			while (f)
+				if (f->status == FTS_SKIP)
 				{
-					t->fts_link = f->fts_link;
-					drop(fts, f);
-					f = t->fts_link;
+					if (t)
+					{
+						t->fts_link = f->fts_link;
+						drop(fts, f);
+						f = t->fts_link;
+					}
+					else
+					{
+						fts->todo = f->fts_link;
+						drop(fts, f);
+						f = fts->todo;
+					}
 				}
 				else
 				{
-					fts->todo = f->fts_link;
-					drop(fts, f);
-					f = fts->todo;
+					t = f;
+					f = f->fts_link;
+				}
+			/*FALLTHROUGH*/
+
+		case 0:
+
+			if (!fts->state && fts->comparf)
+				order(fts);
+			if (!(f = fts->todo))
+				return 0;
+			/*FALLTHROUGH*/
+
+		case FTS_todo:
+
+			/*
+			 * process the top object on the stack
+			 */
+
+			fts->root = fts->top = fts->bot = 0;
+
+			/*
+			 * initialize the top level
+			 */
+
+			if (f->fts_level == 0)
+			{
+				fts->parent->fts_number = f->fts_number;
+				fts->parent->fts_pointer = f->fts_pointer;
+				fts->parent->fts_statp = f->fts_statp;
+				fts->parent->statb = *f->fts_statp;
+				f->fts_parent = fts->parent;
+				fts->diroot = 0;
+				if (fts->cd == 0)
+					pathcd(fts->home, NiL);
+				else if (fts->cd < 0)
+					fts->cd = 0;
+				fts->pwd = f->fts_parent;
+				fts->curdir = fts->cd ? 0 : f->fts_parent;
+				*(fts->base = fts->path) = 0;
+			}
+
+			/*
+			 * chdir to parent if asked for
+			 */
+
+			if (fts->cd < 0)
+			{
+				fts->cd = setdir(fts->home, fts->path);
+				fts->pwd = f->fts_parent;
+				fts->curdir = fts->cd ? 0 : f->fts_parent;
+			}
+
+			/*
+			 * add object's name to the path
+			 */
+
+			if ((fts->baselen = f->fts_namelen) >= (fts->endbuf - fts->base) && resize(fts, fts->baselen))
+				return 0;
+			memcpy(fts->base, f->name, fts->baselen + 1);
+			fts->name = fts->cd ? fts->path : fts->base;
+			/*FALLTHROUGH*/
+
+		case FTS_preorder:
+
+			/*
+			 * check for cycle and open dir
+			 */
+
+			if (f->fts_info == FTS_D)
+			{
+				if ((fts->diroot = search(f, fts->diroot, statcmp, 0)) != f || f->fts_level > 0 && (t = f) && statcmp(&t, &f->fts_parent) == 0)
+				{
+					f->fts_info = FTS_DC;
+					f->fts_cycle = fts->diroot;
+				}
+				else if (!(fts->flags & FTS_TOP) && (!(fts->flags & FTS_XDEV) || f->statb.st_dev == f->fts_parent->statb.st_dev))
+				{
+					/*
+					 * buffer is known to be large enough here!
+					 */
+
+					if (fts->base[fts->baselen - 1] != '/')
+						memcpy(fts->base + fts->baselen, "/.", 3);
+					if (!(fts->dir = opendir(fts->name)))
+						f->fts_info = FTS_DNX;
+					fts->base[fts->baselen] = 0;
+					if (!fts->dir && !(fts->dir = opendir(fts->name)))
+						f->fts_info = FTS_DNR;
 				}
 			}
-			else
+			f->nd = f->fts_info & ~FTS_DNX;
+			if (f->nd || !(fts->flags & FTS_NOPREORDER))
 			{
-				t = f;
-				f = f->fts_link;
+				fts->current = f;
+				fts->link = f->fts_link;
+				f->fts_link = 0;
+				f->fts_path = PATH(fts, fts->path, f->fts_level);
+				f->fts_pathlen = (fts->base - f->fts_path) + fts->baselen;
+				f->fts_accpath = ACCESS(fts, f);
+				fts->state = FTS_preorder_return;
+				goto note;
 			}
-		/*FALLTHROUGH*/
+			/*FALLTHROUGH*/
 
-	case 0:
+		case FTS_preorder_resume:
 
-		if (!(f = fts->todo))
-			return 0;
-		/*FALLTHROUGH*/
+			/*
+			 * prune
+			 */
 
-	case FTS_todo:
+			if (!fts->dir || f->nd || f->status == FTS_SKIP)
+			{
+				if (fts->dir)
+				{
+					closedir(fts->dir);
+					fts->dir = 0;
+				}
+				fts->state = FTS_popstack;
+				continue;
+			}
 
-		/*
-		 * process the top object on the stack
-		 */
+			/*
+			 * FTS_D or FTS_DNX, about to read children
+			 */
 
-		fts->root = fts->top = fts->bot = 0;
-
-		/*
-		 * initialize the top level
-		 */
-
-		if (f->fts_level == 0)
-		{
-			fts->parent->fts_number = f->fts_number;
-			fts->parent->fts_pointer = f->fts_pointer;
-			fts->parent->fts_statp = f->fts_statp;
-			fts->parent->statb = *f->fts_statp;
-			f->fts_parent = fts->parent;
-			fts->diroot = 0;
 			if (fts->cd == 0)
-				pathcd(fts->home, NiL);
-			else if (fts->cd < 0)
-				fts->cd = 0;
-			fts->pwd = f->fts_parent;
-			fts->curdir = fts->cd ? 0 : f->fts_parent;
-			*(fts->base = fts->path) = 0;
-		}
-
-		/*
-		 * chdir to parent if asked for
-		 */
-
-		if (fts->cd < 0)
-		{
-			fts->cd = setdir(fts->home, fts->path);
-			fts->pwd = f->fts_parent;
-			fts->curdir = fts->cd ? 0 : f->fts_parent;
-		}
-
-		/*
-		 * add object's name to the path
-		 */
-
-		if ((fts->baselen = f->fts_namelen) >= (fts->endbuf - fts->base) && resize(fts, fts->baselen))
-			return 0;
-		memcpy(fts->base, f->name, fts->baselen + 1);
-		fts->name = fts->cd ? fts->path : fts->base;
-		/*FALLTHROUGH*/
-
-	case FTS_preorder:
-
-		/*
-		 * check for cycle and open dir
-		 */
-
-		if (f->fts_info == FTS_D)
-		{
-			if ((fts->diroot = search(f, fts->diroot, statcmp, 0)) != f || f->fts_level > 0 && (t = f) && statcmp(&t, &f->fts_parent) == 0)
 			{
-				f->fts_info = FTS_DC;
-				f->fts_cycle = fts->diroot;
-			}
-			else if (!(fts->flags & FTS_TOP) && (!(fts->flags & FTS_XDEV) || f->statb.st_dev == f->fts_parent->statb.st_dev))
-			{
-				/*
-				 * buffer is known to be large enough here!
-				 */
-
-				if (fts->base[fts->baselen - 1] != '/')
-					memcpy(fts->base + fts->baselen, "/.", 3);
-				if (!(fts->dir = opendir(fts->name)))
-					f->fts_info = FTS_DNX;
-				fts->base[fts->baselen] = 0;
-				if (!fts->dir && !(fts->dir = opendir(fts->name)))
-					f->fts_info = FTS_DNR;
-			}
-		}
-		f->nd = f->fts_info & ~FTS_DNX;
-		if (f->nd || !(fts->flags & FTS_NOPREORDER))
-		{
-			fts->current = f;
-			fts->link = f->fts_link;
-			f->fts_link = 0;
-			f->fts_path = PATH(fts, fts->path, f->fts_level);
-			f->fts_pathlen = (fts->base - f->fts_path) + fts->baselen;
-			f->fts_accpath = ACCESS(fts, f);
-			fts->state = FTS_preorder_return;
-			goto note;
-		}
-		/*FALLTHROUGH*/
-
-	case FTS_preorder_resume:
-
-		/*
-		 * prune
-		 */
-
-		if (!fts->dir || f->nd || f->status == FTS_SKIP)
-		{
-			if (fts->dir)
-			{
-				closedir(fts->dir);
-				fts->dir = 0;
-			}
-			fts->state = FTS_popstack;
-			continue;
-		}
-
-		/*
-		 * FTS_D or FTS_DNX, about to read children
-		 */
-
-		if (fts->cd == 0)
-		{
-			if ((fts->cd = chdir(fts->name)) < 0)
-				pathcd(fts->home, NiL);
-			else if (fts->pwd != f)
-			{
-				f->pwd = fts->pwd;
-				fts->pwd = f;
-			}
-			fts->curdir = fts->cd < 0 ? 0 : f;
-		}
-		fts->nostat = fts->children > 1 || f->fts_info == FTS_DNX;
-		fts->cpname = fts->cd && !fts->nostat || !fts->children && !fts->comparf;
-		fts->dotdot = 0;
-		fts->endbase = fts->base + fts->baselen;
-		if (fts->endbase[-1] != '/')
-			*fts->endbase++ = '/';
-		fts->current = f;
-		/*FALLTHROUGH*/
-
-	case FTS_readdir:
-
-		while (d = readdir(fts->dir))
-		{
-			s = d->d_name;
-			if (s[0] == '.')
-			{
-				if (s[1] == 0)
+				if ((fts->cd = chdir(fts->name)) < 0)
+					pathcd(fts->home, NiL);
+				else if (fts->pwd != f)
 				{
-					fts->current->nlink--;
-					if (!(fts->flags & FTS_SEEDOT))
-						continue;
-					n = 1;
+					f->pwd = fts->pwd;
+					fts->pwd = f;
 				}
-				else if (s[1] == '.' && s[2] == 0)
+				fts->curdir = fts->cd < 0 ? 0 : f;
+			}
+			fts->nostat = fts->children > 1 || f->fts_info == FTS_DNX;
+			fts->cpname = fts->cd && !fts->nostat || !fts->children && !fts->comparf;
+			fts->dotdot = 0;
+			fts->endbase = fts->base + fts->baselen;
+			if (fts->endbase[-1] != '/')
+				*fts->endbase++ = '/';
+			fts->current = f;
+			/*FALLTHROUGH*/
+
+		case FTS_readdir:
+
+			while (d = readdir(fts->dir))
+			{
+				s = d->d_name;
+				if (s[0] == '.')
 				{
-					fts->current->nlink--;
-					if (fts->current->must == 1)
-						fts->current->must = 0;
-					if (!(fts->flags & FTS_SEEDOT))
-						continue;
-					n = 2;
+					if (s[1] == 0)
+					{
+						fts->current->nlink--;
+						if (!(fts->flags & FTS_SEEDOT))
+							continue;
+						n = 1;
+					}
+					else if (s[1] == '.' && s[2] == 0)
+					{
+						fts->current->nlink--;
+						if (fts->current->must == 1)
+							fts->current->must = 0;
+						if (!(fts->flags & FTS_SEEDOT))
+							continue;
+						n = 2;
+					}
+					else
+						n = 0;
 				}
 				else
 					n = 0;
-			}
-			else
-				n = 0;
 
-			/*
-			 * make a new entry
-			 */
+				/*
+				 * make a new entry
+				 */
 
-			i = D_NAMLEN(d);
-			if (!(f = node(fts, fts->current, s, i)))
-				return 0;
-			TYPE(f, D_TYPE(d));
-
-			/*
-			 * check for space
-			 */
-
-			if (i >= fts->endbuf - fts->endbase)
-			{
-	   	   		if (resize(fts, i))
+				i = D_NAMLEN(d);
+				if (!(f = node(fts, fts->current, s, i)))
 					return 0;
-				fts->endbase = fts->base + fts->baselen;
-				if (fts->endbase[-1] != '/')
-					fts->endbase++;
-			}
-			if (fts->cpname)
-			{
-				memcpy(fts->endbase, s, i + 1);
-				if (fts->cd)
-					s = fts->path;
-			}
-			if (n)
-			{
+				TYPE(f, D_TYPE(d));
+
 				/*
-				 * don't recurse on . and ..
+				 * check for space
 				 */
 
-				if (n == 1)
-					f->fts_statp = fts->current->fts_statp;
-				else
+				if (i >= fts->endbuf - fts->endbase)
 				{
-					if (f->fts_info != FTS_NS)
-						fts->dotdot = f;
-					if (fts->current->fts_parent->fts_level < 0)
-					{
-						f->fts_statp = &fts->current->fts_parent->statb;
-						info(fts, f, s, f->fts_statp, 0);
-					}
+		   	   		if (resize(fts, i))
+						return 0;
+					fts->endbase = fts->base + fts->baselen;
+					if (fts->endbase[-1] != '/')
+						fts->endbase++;
+				}
+				if (fts->cpname)
+				{
+					memcpy(fts->endbase, s, i + 1);
+					if (fts->cd)
+						s = fts->path;
+				}
+				if (n)
+				{
+					/*
+					 * don't recurse on . and ..
+					 */
+
+					if (n == 1)
+						f->fts_statp = fts->current->fts_statp;
 					else
-						f->fts_statp = fts->current->fts_parent->fts_statp;
+					{
+						if (f->fts_info != FTS_NS)
+							fts->dotdot = f;
+						if (fts->current->fts_parent->fts_level < 0)
+						{
+							f->fts_statp = &fts->current->fts_parent->statb;
+							info(fts, f, s, f->fts_statp, 0);
+						}
+						else
+							f->fts_statp = fts->current->fts_parent->fts_statp;
+					}
+					f->fts_info = FTS_DOT;
 				}
-				f->fts_info = FTS_DOT;
-			}
-			else if ((fts->nostat || SKIP(fts, f)) && (f->fts_info = FTS_NSOK) || info(fts, f, s, &f->statb, fts->flags))
-				f->statb.st_ino = D_FILENO(d);
-			if (fts->comparf)
-				fts->root = search(f, fts->root, fts->comparf, 1);
-			else if (fts->children || f->fts_info == FTS_D || f->fts_info == FTS_SL)
-			{
-				if (fts->top)
-					fts->bot = fts->bot->fts_link = f;
+				else if ((fts->nostat || SKIP(fts, f)) && (f->fts_info = FTS_NSOK) || info(fts, f, s, &f->statb, fts->flags))
+					f->statb.st_ino = D_FILENO(d);
+				if (fts->comparf)
+					fts->root = search(f, fts->root, fts->comparf, 1);
+				else if (fts->children || f->fts_info == FTS_D || f->fts_info == FTS_SL)
+				{
+					if (fts->top)
+						fts->bot = fts->bot->fts_link = f;
+					else
+						fts->top = fts->bot = f;
+				}
 				else
-					fts->top = fts->bot = f;
-			}
-			else
-			{
-				/*
-				 * terminal node
-				 */
-
-				f->fts_path = PATH(fts, fts->path, 1);
-				f->fts_pathlen = fts->endbase - f->fts_path + f->fts_namelen;
-				f->fts_accpath = ACCESS(fts, f);
-				fts->previous = fts->current;
-				fts->current = f;
-				fts->state = FTS_terminal;
-				goto note;
-			}
-		}
-
-		/*
-		 * done with the directory
-		 */
-
-		closedir(fts->dir);
-		fts->dir = 0;
-		if (fts->root)
-			getlist(&fts->top, &fts->bot, fts->root);
-		if (fts->children)
-		{	
-			/*
-			 * try moving back to parent dir
-			 */
-
-			fts->base[fts->baselen] = 0;
-			if (fts->cd <= 0)
-			{
-				f = fts->current->fts_parent;
-				if (fts->cd < 0
-				    || f != fts->curdir
-				    || !fts->dotdot
-				    || !SAME(f->fts_statp, fts->dotdot->fts_statp)
-				    || fts->pwd && fts->pwd->symlink
-				    || (fts->cd = chdir("..")) < 0
-#ifdef verify
-				    || stat(".", &sb) < 0
-				    || !SAME(&sb, fts->dotdot->fts_statp)
-#endif
-				    )
-					fts->cd = setpdir(fts->home, fts->path, fts->base);
-				if (fts->pwd)
-					fts->pwd = fts->pwd->pwd;
-				fts->curdir = fts->cd ? 0 : f;
-			}
-			f = fts->current;
-			fts->link = f->fts_link;
-			f->fts_link = fts->top;
-			f->fts_path = PATH(fts, fts->path, f->fts_level);
-			f->fts_pathlen = (fts->base - f->fts_path) + f->fts_namelen;
-			f->fts_accpath = ACCESS(fts, f);
-			fts->state = FTS_children_return;
-			goto note;
-		}
-		/*FALLTHROUGH*/
-
-	case FTS_children_resume:
-
-		fts->base[fts->baselen] = 0;
-		if (fts->top)
-		{
-			fts->bot->fts_link = fts->todo;
-			fts->todo = fts->top;
-			fts->top = 0;
-		}
-		/*FALLTHROUGH*/
-
-	case FTS_popstack:
-
-		/*
-		 * pop objects completely processed
-		 */
-
-		fts->nd = 0;
-		f = fts->current;
-		/*FALLTHROUGH*/
-
-	case FTS_popstack_resume:
-
-		while (fts->todo && f == fts->todo)
-		{
-			t = f->fts_parent;
-			if ((f->fts_info & FTS_DP) == FTS_D)
-			{
-				/*
-				 * delete from <dev,ino> tree
-				 */
-
-				if (f != fts->diroot)
-					fts->diroot = search(f, fts->diroot, statcmp, 0);
-				fts->diroot = deleteroot(fts->diroot);
-				if (f == fts->curdir)
-				{
-					fts->nd++;
-					fts->curdir = t;
-				}
-
-				/*
-				 * perform post-order processing
-				 */
-
-				if (!(fts->flags & FTS_NOPOSTORDER) &&
-				    f->status != FTS_SKIP &&
-				    f->status != FTS_NOPOSTORDER)
 				{
 					/*
-					 * move to parent dir
+					 * terminal node
 					 */
 
-					if (fts->nd > 0)
-						fts->cd = popdirs(fts);
-					if (fts->cd < 0)
-						fts->cd = setpdir(fts->home, fts->path, fts->base);
-					fts->curdir = fts->cd ? 0 : t;
-					f->fts_info = FTS_DP;
-					f->fts_path = PATH(fts, fts->path, f->fts_level);
-					f->fts_pathlen = (fts->base - f->fts_path) + f->fts_namelen;
+					f->fts_path = PATH(fts, fts->path, 1);
+					f->fts_pathlen = fts->endbase - f->fts_path + f->fts_namelen;
 					f->fts_accpath = ACCESS(fts, f);
-
-					/*
-					 * re-stat to update nlink/times
-					 */
-
-					stat(f->fts_accpath, f->fts_statp);
-					fts->link = f->fts_link;
-					f->fts_link = 0;
-					fts->state = FTS_popstack_return;
+					fts->previous = fts->current;
+					fts->current = f;
+					fts->state = FTS_terminal;
 					goto note;
 				}
 			}
 
 			/*
-			 * reset base
+			 * done with the directory
 			 */
 
-			if (fts->base > fts->path + t->fts_namelen)
-				fts->base--;
-			*fts->base = 0;
-			fts->base -= t->fts_namelen;
+			closedir(fts->dir);
+			fts->dir = 0;
+			if (fts->root)
+				getlist(&fts->top, &fts->bot, fts->root);
+			if (fts->children)
+			{	
+				/*
+				 * try moving back to parent dir
+				 */
+
+				fts->base[fts->baselen] = 0;
+				if (fts->cd <= 0)
+				{
+					f = fts->current->fts_parent;
+					if (fts->cd < 0
+					    || f != fts->curdir
+					    || !fts->dotdot
+					    || !SAME(f->fts_statp, fts->dotdot->fts_statp)
+					    || fts->pwd && fts->pwd->symlink
+					    || (fts->cd = chdir("..")) < 0
+#ifdef verify
+					    || stat(".", &sb) < 0
+					    || !SAME(&sb, fts->dotdot->fts_statp)
+#endif
+					    )
+						fts->cd = setpdir(fts->home, fts->path, fts->base);
+					if (fts->pwd)
+						fts->pwd = fts->pwd->pwd;
+					fts->curdir = fts->cd ? 0 : f;
+				}
+				f = fts->current;
+				fts->link = f->fts_link;
+				f->fts_link = fts->top;
+				f->fts_path = PATH(fts, fts->path, f->fts_level);
+				f->fts_pathlen = (fts->base - f->fts_path) + f->fts_namelen;
+				f->fts_accpath = ACCESS(fts, f);
+				fts->state = FTS_children_return;
+				goto note;
+			}
+			/*FALLTHROUGH*/
+
+		case FTS_children_resume:
+
+			fts->base[fts->baselen] = 0;
+			if (fts->top)
+			{
+				fts->bot->fts_link = fts->todo;
+				fts->todo = fts->top;
+				fts->top = 0;
+			}
+			/*FALLTHROUGH*/
+
+		case FTS_popstack:
 
 			/*
-			 * try again or delete from top of stack
+			 * pop objects completely processed
 			 */
 
-			if (f->status == FTS_AGAIN)
+			fts->nd = 0;
+			f = fts->current;
+			/*FALLTHROUGH*/
+
+		case FTS_popstack_resume:
+
+			while (fts->todo && f == fts->todo)
 			{
-				f->fts_info = FTS_D;
-				f->status = 0;
-			}
-			else
-			{
-				fts->todo = fts->todo->fts_link;
-				drop(fts, f);
-			}
-			f = t;
-		}
-
-		/*
-		 * reset current directory
-		 */
-
-		if (fts->nd > 0 && popdirs(fts) < 0)
-		{
-			pathcd(fts->home, NiL);
-			fts->curdir = 0;
-			fts->cd = -1;
-		}
-		if (fts->todo)
-		{
-			if (*fts->base)
-				fts->base += f->fts_namelen;
-			if (*(fts->base - 1) != '/')
-				*fts->base++ = '/';
-			*fts->base = 0;
-			f = fts->todo;
-			fts->state = FTS_todo;
-			continue;
-		}
-		return 0;
-
-	case FTS_children_return:
-
-		f = fts->current;
-		f->fts_link = fts->link;
-
-		/*
-		 * chdir down again
-		 */
-
-		i = f->fts_info != FTS_DNX;
-		n = f->status == FTS_SKIP;
-		if (!n && fts->cd == 0)
-		{
-			if ((fts->cd = chdir(fts->base)) < 0)
-				pathcd(fts->home, NiL);
-			else if (fts->pwd != f)
-			{
-				f->pwd = fts->pwd;
-				fts->pwd = f;
-			}
-			fts->curdir = fts->cd ? 0 : f;
-		}
-
-		/*
-		 * prune
-		 */
-
-		if (fts->base[fts->baselen - 1] != '/')
-			fts->base[fts->baselen] = '/';
-		for (fts->bot = 0, f = fts->top; f; )
-			if (n || f->status == FTS_SKIP)
-			{
-				if (fts->bot)
-					fts->bot->fts_link = f->fts_link;
-				else
-					fts->top = f->fts_link;
-				drop(fts, f);
-				f = fts->bot ? fts->bot->fts_link : fts->top;
-			}
-			else
-			{
-				if (fts->children > 1 && i)
+				t = f->fts_parent;
+				if ((f->fts_info & FTS_DP) == FTS_D)
 				{
-					if (f->status == FTS_STAT)
-						info(fts, f, NiL, f->fts_statp, 0);
-					else if (f->fts_info == FTS_NSOK && !SKIP(fts, f))
+					/*
+					 * delete from <dev,ino> tree
+					 */
+
+					if (f != fts->diroot)
+						fts->diroot = search(f, fts->diroot, statcmp, 0);
+					fts->diroot = deleteroot(fts->diroot);
+					if (f == fts->curdir)
 					{
-						s = f->fts_name;
-						if (fts->cd)
-						{
-							memcpy(fts->endbase, s, f->fts_namelen + 1);
-							s = fts->path;
-						}
-						info(fts, f, s, f->fts_statp, fts->flags);
+						fts->nd++;
+						fts->curdir = t;
+					}
+
+					/*
+					 * perform post-order processing
+					 */
+
+					if (!(fts->flags & FTS_NOPOSTORDER) &&
+					    f->status != FTS_SKIP &&
+					    f->status != FTS_NOPOSTORDER)
+					{
+						/*
+						 * move to parent dir
+						 */
+
+						if (fts->nd > 0)
+							fts->cd = popdirs(fts);
+						if (fts->cd < 0)
+							fts->cd = setpdir(fts->home, fts->path, fts->base);
+						fts->curdir = fts->cd ? 0 : t;
+						f->fts_info = FTS_DP;
+						f->fts_path = PATH(fts, fts->path, f->fts_level);
+						f->fts_pathlen = (fts->base - f->fts_path) + f->fts_namelen;
+						f->fts_accpath = ACCESS(fts, f);
+
+						/*
+						 * re-stat to update nlink/times
+						 */
+
+						stat(f->fts_accpath, f->fts_statp);
+						fts->link = f->fts_link;
+						f->fts_link = 0;
+						fts->state = FTS_popstack_return;
+						goto note;
 					}
 				}
-				fts->bot = f;
-				f = f->fts_link;
-			}
-		fts->children = 0;
-		fts->state = FTS_children_resume;
-		continue;
 
-	case FTS_popstack_return:
+				/*
+				 * reset base
+				 */
 
-		f = fts->todo;
-		f->fts_link = fts->link;
-		f->fts_info = f->status == FTS_AGAIN ? FTS_DP : 0;
-		fts->state = FTS_popstack_resume;
-		continue;
+				if (fts->base > fts->path + t->fts_namelen)
+					fts->base--;
+				*fts->base = 0;
+				fts->base -= t->fts_namelen;
 
-	case FTS_preorder_return:
+				/*
+				 * try again or delete from top of stack
+				 */
 
-		f = fts->current;
-		f->fts_link = fts->link;
-
-		/*
-		 * follow symlink if asked to
-		 */
-
-		if (f->status == FTS_FOLLOW)
-		{
-			f->status = 0;
-			if (f->fts_info == FTS_SL || ISTYPE(f, DT_LNK) || f->fts_info == FTS_NSOK)
-			{
-				info(fts, f, f->fts_accpath, f->fts_statp, 0);
-				if (f->fts_info != FTS_SL)
+				if (f->status == FTS_AGAIN)
 				{
-					fts->state = FTS_preorder;
-					continue;
+					f->fts_info = FTS_D;
+					f->status = 0;
+				}
+				else
+				{
+					fts->todo = fts->todo->fts_link;
+					drop(fts, f);
+				}
+				f = t;
+			}
+
+			/*
+			 * reset current directory
+			 */
+
+			if (fts->nd > 0 && popdirs(fts) < 0)
+			{
+				pathcd(fts->home, NiL);
+				fts->curdir = 0;
+				fts->cd = -1;
+			}
+			if (fts->todo)
+			{
+				if (*fts->base)
+					fts->base += f->fts_namelen;
+				if (*(fts->base - 1) != '/')
+					*fts->base++ = '/';
+				*fts->base = 0;
+				f = fts->todo;
+				fts->state = FTS_todo;
+				continue;
+			}
+			return 0;
+
+		case FTS_children_return:
+
+			f = fts->current;
+			f->fts_link = fts->link;
+
+			/*
+			 * chdir down again
+			 */
+
+			i = f->fts_info != FTS_DNX;
+			n = f->status == FTS_SKIP;
+			if (!n && fts->cd == 0)
+			{
+				if ((fts->cd = chdir(fts->base)) < 0)
+					pathcd(fts->home, NiL);
+				else if (fts->pwd != f)
+				{
+					f->pwd = fts->pwd;
+					fts->pwd = f;
+				}
+				fts->curdir = fts->cd ? 0 : f;
+			}
+
+			/*
+			 * prune
+			 */
+
+			if (fts->base[fts->baselen - 1] != '/')
+				fts->base[fts->baselen] = '/';
+			for (fts->bot = 0, f = fts->top; f; )
+				if (n || f->status == FTS_SKIP)
+				{
+					if (fts->bot)
+						fts->bot->fts_link = f->fts_link;
+					else
+						fts->top = f->fts_link;
+					drop(fts, f);
+					f = fts->bot ? fts->bot->fts_link : fts->top;
+				}
+				else
+				{
+					if (fts->children > 1 && i)
+					{
+						if (f->status == FTS_STAT)
+							info(fts, f, NiL, f->fts_statp, 0);
+						else if (f->fts_info == FTS_NSOK && !SKIP(fts, f))
+						{
+							s = f->fts_name;
+							if (fts->cd)
+							{
+								memcpy(fts->endbase, s, f->fts_namelen + 1);
+								s = fts->path;
+							}
+							info(fts, f, s, f->fts_statp, fts->flags);
+						}
+					}
+					fts->bot = f;
+					f = f->fts_link;
+				}
+			fts->children = 0;
+			fts->state = FTS_children_resume;
+			continue;
+
+		case FTS_popstack_return:
+
+			f = fts->todo;
+			f->fts_link = fts->link;
+			f->fts_info = f->status == FTS_AGAIN ? FTS_DP : 0;
+			fts->state = FTS_popstack_resume;
+			continue;
+
+		case FTS_preorder_return:
+
+			f = fts->current;
+			f->fts_link = fts->link;
+
+			/*
+			 * follow symlink if asked to
+			 */
+
+			if (f->status == FTS_FOLLOW)
+			{
+				f->status = 0;
+				if (f->fts_info == FTS_SL || ISTYPE(f, DT_LNK) || f->fts_info == FTS_NSOK)
+				{
+					info(fts, f, f->fts_accpath, f->fts_statp, 0);
+					if (f->fts_info != FTS_SL)
+					{
+						fts->state = FTS_preorder;
+						continue;
+					}
 				}
 			}
-		}
 
-		/*
-		 * about to prune this f and already at home
-		 */
+			/*
+			 * about to prune this f and already at home
+			 */
 
-		if (fts->cd == 0 && f->fts_level == 0 && f->nd)
-			fts->cd = -1;
-		fts->state = FTS_preorder_resume;
-		continue;
+			if (fts->cd == 0 && f->fts_level == 0 && f->nd)
+				fts->cd = -1;
+			fts->state = FTS_preorder_resume;
+			continue;
 
-	case FTS_terminal:
+		case FTS_terminal:
 
-		f = fts->current;
-		if (f->status == FTS_FOLLOW)
-		{
-			f->status = 0;
-			if (f->fts_info == FTS_SL || ISTYPE(f, DT_LNK) || f->fts_info == FTS_NSOK)
+			f = fts->current;
+			if (f->status == FTS_FOLLOW)
 			{
-				info(fts, f, f->fts_accpath, f->fts_statp, 0);
-				if (f->symlink && f->fts_info != FTS_SL)
+				f->status = 0;
+				if (f->fts_info == FTS_SL || ISTYPE(f, DT_LNK) || f->fts_info == FTS_NSOK)
 				{
-					if (!(f->fts_link = fts->top))
-						fts->bot = f;
-					fts->top = f;
-					fts->current = fts->previous;
-					fts->state = FTS_readdir;
-					continue;
+					info(fts, f, f->fts_accpath, f->fts_statp, 0);
+					if (f->symlink && f->fts_info != FTS_SL)
+					{
+						if (!(f->fts_link = fts->top))
+							fts->bot = f;
+						fts->top = f;
+						fts->current = fts->previous;
+						fts->state = FTS_readdir;
+						continue;
+					}
 				}
 			}
+			f = f->fts_parent;
+			drop(fts, fts->current);
+			fts->current = f;
+			fts->state = FTS_readdir;
+			continue;
+
+		case FTS_error:
+
+			return 0;
+
+		default:
+
+			fts->fts_errno = EINVAL;
+			fts->state = FTS_error;
+			return 0;
+
 		}
-		f = f->fts_parent;
-		drop(fts, fts->current);
-		fts->current = f;
-		fts->state = FTS_readdir;
-		continue;
-
-	case FTS_error:
-
-		return 0;
-
-	default:
-
-		fts->fts_errno = EINVAL;
-		fts->state = FTS_error;
-		return 0;
-
-	}
  note:
+#if __OBSOLETE__ < 20140101
+	f->_fts_pathlen = (unsigned short)f->fts_pathlen;
+#endif
 	for (p = notify; p; p = p->next)
 		if ((n = (*p->notifyf)(fts, f, p->context)) > 0)
 			break;
@@ -1429,6 +1464,8 @@ fts_children(register FTS* fts, int flags)
 
 	case 0:
 
+		if (fts->comparf)
+			order(fts);
 		fts->state = FTS_top_return;
 		return fts->todo;
 

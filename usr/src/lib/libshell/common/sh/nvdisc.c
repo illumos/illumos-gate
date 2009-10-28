@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -150,16 +150,17 @@ void nv_putv(Namval_t *np, const char *value, int flags, register Namfun_t *nfp)
 	}
 }
 
-#define	LOOKUP		0
+#define	LOOKUPS		0
 #define	ASSIGN		1
 #define	APPEND		2
 #define	UNASSIGN	3
+#define	LOOKUPN		4
 #define BLOCKED		((Namval_t*)&nv_local)
 
 struct	vardisc
 {
 	Namfun_t	fun;
-	Namval_t	*disc[4];
+	Namval_t	*disc[5];
 };
 
 struct blocked
@@ -281,12 +282,12 @@ static void	assign(Namval_t *np,const char* val,int flags,Namfun_t *handle)
 	{
 		int bflag;
 		block(bp,type);
-		if (type==APPEND && (bflag= !isblocked(bp,LOOKUP)))
-			block(bp,LOOKUP);
+		if (type==APPEND && (bflag= !isblocked(bp,LOOKUPS)))
+			block(bp,LOOKUPS);
 		sh_fun(nq,np,(char**)0);
 		unblock(bp,type);
 		if(bflag)
-			unblock(bp,LOOKUP);
+			unblock(bp,LOOKUPS);
 		if(!vp->disc[type])
 			chktfree(np,vp);
 	}
@@ -351,15 +352,15 @@ done:
  * This function executes a lookup disc and then performs
  * the lookup on the given node <np>
  */
-static char*	lookup(Namval_t *np, Namfun_t *handle)
+static char*	lookup(Namval_t *np, int type, Sfdouble_t *dp,Namfun_t *handle)
 {
 	register struct vardisc	*vp = (struct vardisc*)handle;
 	struct blocked		block, *bp = block_info(np, &block);
-	register Namval_t	*nq = vp->disc[LOOKUP];
+	register Namval_t	*nq = vp->disc[type];
 	register char		*cp=0;
 	Namval_t		node;
 	union Value		*up = np->nvalue.up;
-	if(nq && !isblocked(bp,LOOKUP))
+	if(nq && !isblocked(bp,type))
 	{
 		node = *SH_VALNOD;
 		if(!nv_isnull(SH_VALNOD))
@@ -367,16 +368,24 @@ static char*	lookup(Namval_t *np, Namfun_t *handle)
 			nv_onattr(SH_VALNOD,NV_NOFREE);
 			nv_unset(SH_VALNOD);
 		}
-		block(bp,LOOKUP);
-		sh_fun(nq,np,(char**)0);
-		unblock(bp,LOOKUP);
-		if(!vp->disc[LOOKUP])
-			chktfree(np,vp);
-		if(cp = nv_getval(SH_VALNOD))
+		if(type==LOOKUPN)
 		{
-			cp = stkcopy(stkstd,cp);
-			_nv_unset(SH_VALNOD,NV_RDONLY);
+			nv_onattr(SH_VALNOD,NV_DOUBLE|NV_INTEGER);
+			nv_setsize(SH_VALNOD,10);
 		}
+		block(bp,type);
+		sh_fun(nq,np,(char**)0);
+		unblock(bp,type);
+		if(!vp->disc[type])
+			chktfree(np,vp);
+		if(type==LOOKUPN)
+		{
+			cp = (char*)(SH_VALNOD->nvalue.cp);
+			*dp = nv_getnum(SH_VALNOD);
+		}
+		else if(cp = nv_getval(SH_VALNOD))
+			cp = stkcopy(stkstd,cp);
+		_nv_unset(SH_VALNOD,NV_RDONLY);
 		if(!nv_isnull(&node))
 		{
 			/* restore everything but the nvlink field */
@@ -386,19 +395,29 @@ static char*	lookup(Namval_t *np, Namfun_t *handle)
 	if(nv_isarray(np))
 		np->nvalue.up = up;
 	if(!cp)
-		cp = nv_getv(np,handle);
+	{
+		if(type==LOOKUPS)
+			cp = nv_getv(np,handle);
+		else
+			*dp = nv_getn(np,handle);
+	}
 	if(bp== &block)
 		block_done(bp);
 	return(cp);
 }
 
-
-static const Namdisc_t shdisc =
+static char*	lookups(Namval_t *np, Namfun_t *handle)
 {
-	sizeof(struct vardisc),
-	assign,
-	lookup
-};
+	return(lookup(np,LOOKUPS,(Sfdouble_t*)0,handle));
+}
+
+static Sfdouble_t lookupn(Namval_t *np, Namfun_t *handle)
+{
+	Sfdouble_t	d;
+	lookup(np,LOOKUPN, &d ,handle);
+	return(d);
+}
+
 
 /*
  * Set disc on given <event> to <action>
@@ -465,11 +484,16 @@ char *nv_setdisc(register Namval_t* np,register const char *event,Namval_t *acti
 		vp = 0;
 	if(!vp)
 	{
+		Namdisc_t	*dp;
 		if(action==np)
 			return((char*)action);
-		if(!(vp = newof(NIL(struct vardisc*),struct vardisc,1,0)))
+		if(!(vp = newof(NIL(struct vardisc*),struct vardisc,1,sizeof(Namdisc_t))))
 			return(0);
-		vp->fun.disc = &shdisc;
+		dp = (Namdisc_t*)(vp+1);
+		vp->fun.disc = dp;
+		memset(dp,0,sizeof(*dp));
+		dp->dsize = sizeof(struct vardisc);
+		dp->putval = assign;
 		nv_stack(np, (Namfun_t*)vp);
 	}
 	if(action==np)
@@ -478,7 +502,14 @@ char *nv_setdisc(register Namval_t* np,register const char *event,Namval_t *acti
 		empty = 0;
 	}
 	else if(action)
+	{
+		Namdisc_t *dp = (Namdisc_t*)vp->fun.disc;
+		if(type==LOOKUPS)
+			dp->getval = lookups;
+		else if(type==LOOKUPN)
+			dp->getnum = lookupn;
 		vp->disc[type] = action;
+	}
 	else
 	{
 		struct blocked *bp;
@@ -573,13 +604,14 @@ Namfun_t *nv_clone_disc(register Namfun_t *fp, int flags)
 {
 	register Namfun_t	*nfp;
 	register int		size;
+	if(!fp->disc && !fp->next && (fp->nofree&1))
+		return(fp);
 	if(!(size=fp->dsize) && (!fp->disc || !(size=fp->disc->dsize)))
 		size = sizeof(Namfun_t);
 	if(!(nfp=newof(NIL(Namfun_t*),Namfun_t,1,size-sizeof(Namfun_t))))
 		return(0);
 	memcpy(nfp,fp,size);
-	if(flags&NV_COMVAR)
-		nfp->nofree &= ~1;
+	nfp->nofree &= ~1;
 	nfp->nofree |= (flags&NV_RDONLY)?1:0;
 	return(nfp);
 }
@@ -901,7 +933,10 @@ int nv_clone(Namval_t *np, Namval_t *mp, int flags)
 		return(1);
 	}
 	if(nv_isattr(np,NV_INTEGER) && mp->nvalue.ip!=np->nvalue.ip)
+	{
 		mp->nvalue.ip = (int*)num_clone(np,(void*)np->nvalue.ip);
+		nv_offattr(mp,NV_NOFREE);
+	}
 	else if(flags&NV_NOFREE)
 	        nv_onattr(np,NV_NOFREE);
 	return(1);
@@ -972,7 +1007,7 @@ Namval_t *nv_search(const char *name, Dt_t *root, int mode)
 	}
 	else
 	{
-		if(*name=='.' && root==sh.var_tree)
+		if(*name=='.' && root==sh.var_tree && !dp)
 			root = sh.var_base;
 		np = dtmatch(root,(void*)name);
 	}

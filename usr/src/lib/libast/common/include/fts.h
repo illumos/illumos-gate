@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -112,16 +112,21 @@ struct Ftsent
 	long		fts_number;	/* local numeric value		*/
 	int		fts_errno;	/* errno for this entry		*/
 	unsigned short	fts_info;	/* info flags			*/
-	unsigned short	fts_namelen;	/* strlen(fts_name)		*/
-	unsigned short	fts_pathlen;	/* strlen(fts_path)		*/
-	short		fts_level;	/* file tree depth, 0 at top	*/
+
+	unsigned short	_fts_namelen;	/* old fts_namelen		*/
+	unsigned short	_fts_pathlen;	/* old fts_pathlen		*/
+	short		_fts_level;	/* old fts_level		*/
+
+	short		_fts_status;	/* <ftwalk.h> compatibility	*/
+	struct stat	_fts_statb;	/* <ftwalk.h> compatibility	*/
+
+	FTS*		fts;		/* fts_open() handle		*/
+	size_t		fts_namelen;	/* strlen(fts_name)		*/
+	size_t		fts_pathlen;	/* strlen(fts_path)		*/
+	ssize_t		fts_level;	/* file tree depth, 0 at top	*/
 
 #ifdef _FTSENT_PRIVATE_
 	_FTSENT_PRIVATE_
-#else
-	short		_fts_pad_1;	/* <ftwalk.h> compatibility	*/
-	struct stat	_fts_pad_2;	/* <ftwalk.h> compatibility	*/
-	FTS*		fts;		/* fts_open() handle		*/
 #endif
 
 };

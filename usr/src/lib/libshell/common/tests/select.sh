@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -27,10 +27,13 @@ alias err_exit='err_exit $LINENO'
 
 Command=${0##*/}
 integer Errors=0
-trap "rm -f /tmp/Sh$$*" EXIT
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
+
 PS3='ABC '
 
-cat > /tmp/Sh$$.1 <<\!
+cat > $tmp/1 <<\!
 1) foo
 2) bar
 3) bam
@@ -57,7 +60,7 @@ do	case $i in
 		( set -u; : $i ) || err_exit "select: i not set to null" 2>&3
 		break;;
 	esac
-done  3>&2 2> /tmp/Sh$$.2 <<!
+done  3>&2 2> $tmp/2 <<!
 foo
 !
 exit $((Errors))

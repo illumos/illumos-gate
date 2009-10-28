@@ -65,7 +65,6 @@ COMMON_SUBDIRS = \
 	cmd/chmod \
 	cmd/chown \
 	cmd/chroot \
-	cmd/cksum \
 	cmd/clinfo \
 	cmd/cmd-crypto \
 	cmd/cmd-inet/lib \
@@ -83,9 +82,7 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/usr.lib/wanboot \
 	cmd/cmd-inet/usr.sadm \
 	cmd/cmd-inet/usr.sbin \
-	cmd/cmp \
 	cmd/col \
-	cmd/comm \
 	cmd/compress \
 	cmd/consadm \
 	cmd/coreadm \
@@ -96,7 +93,6 @@ COMMON_SUBDIRS = \
 	cmd/ctrun \
 	cmd/ctstat \
 	cmd/ctwatch \
-	cmd/cut \
 	cmd/date \
 	cmd/dd \
 	cmd/deroff \
@@ -173,7 +169,6 @@ COMMON_SUBDIRS = \
 	cmd/iscsitsvc \
 	cmd/isns \
 	cmd/itadm \
-	cmd/join \
 	cmd/kbd \
 	cmd/killall \
 	cmd/last \
@@ -188,7 +183,6 @@ COMMON_SUBDIRS = \
 	cmd/logger \
 	cmd/login \
 	cmd/logins \
-	cmd/logname \
 	cmd/ls \
 	cmd/luxadm \
 	cmd/lvm \
@@ -289,7 +283,6 @@ COMMON_SUBDIRS = \
 	cmd/syseventd \
 	cmd/syslogd \
 	cmd/tabs \
-	cmd/tee \
 	cmd/th_tools \
 	cmd/tip \
 	cmd/touch \
@@ -304,7 +297,6 @@ COMMON_SUBDIRS = \
 	cmd/vt \
 	cmd/wall \
 	cmd/wbem \
-	cmd/wc \
 	cmd/who \
 	cmd/whodo \
 	cmd/wracct \

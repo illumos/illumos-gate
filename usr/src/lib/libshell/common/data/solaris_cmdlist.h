@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,7 @@ extern "C" {
 /* undo ast_map.h #defines to avoid collision */
 #undef basename
 #undef dirname
+#undef mktemp
 
 /* Generated data, do not edit. */
 XPG4CMDLIST(basename)
@@ -82,36 +83,52 @@ ASTCMDLIST(chmod)
 XPG4CMDLIST(chown)
 BINCMDLIST(chown)
 ASTCMDLIST(chown)
+BINCMDLIST(cksum)
+ASTCMDLIST(cksum)
+BINCMDLIST(cmp)
 ASTCMDLIST(cmp)
+BINCMDLIST(comm)
 ASTCMDLIST(comm)
 XPG4CMDLIST(cp)
 ASTCMDLIST(cp)
+BINCMDLIST(cut)
 ASTCMDLIST(cut)
 XPG4CMDLIST(date)
 ASTCMDLIST(date)
 ASTCMDLIST(dirname)
+ASTCMDLIST(egrep)
 XPG4CMDLIST(expr)
 ASTCMDLIST(expr)
 ASTCMDLIST(fds)
+ASTCMDLIST(fgrep)
 ASTCMDLIST(fmt)
+BINCMDLIST(fold)
 ASTCMDLIST(fold)
+ASTCMDLIST(grep)
 BINCMDLIST(head)
 ASTCMDLIST(head)
 XPG4CMDLIST(id)
 ASTCMDLIST(id)
+BINCMDLIST(join)
 ASTCMDLIST(join)
 XPG4CMDLIST(ln)
 ASTCMDLIST(ln)
 BINCMDLIST(logname)
 ASTCMDLIST(logname)
+ASTCMDLIST(md5sum)
 BINCMDLIST(mkdir)
 ASTCMDLIST(mkdir)
 BINCMDLIST(mkfifo)
 ASTCMDLIST(mkfifo)
+BINCMDLIST(mktemp)
+ASTCMDLIST(mktemp)
 XPG4CMDLIST(mv)
 ASTCMDLIST(mv)
+BINCMDLIST(paste)
 ASTCMDLIST(paste)
+BINCMDLIST(pathchk)
 ASTCMDLIST(pathchk)
+ASTCMDLIST(readlink)
 BINCMDLIST(rev)
 ASTCMDLIST(rev)
 XPG4CMDLIST(rm)
@@ -127,6 +144,7 @@ SBINCMDLIST(sync)
 BINCMDLIST(sync)
 ASTCMDLIST(sync)
 XPG4CMDLIST(tail)
+BINCMDLIST(tail)
 ASTCMDLIST(tail)
 BINCMDLIST(tee)
 ASTCMDLIST(tee)
@@ -137,6 +155,7 @@ BINCMDLIST(uniq)
 ASTCMDLIST(uniq)
 BINCMDLIST(wc)
 ASTCMDLIST(wc)
+ASTCMDLIST(xgrep)
 
 /* Mandatory for ksh93 test suite and AST scripts */
 BINCMDLIST(getconf)

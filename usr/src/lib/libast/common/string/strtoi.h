@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -37,6 +37,7 @@
  *	S2I_number	the signed number type
  *	S2I_unumber	the unsigned number type
  *	S2I_unsigned	1 for unsigned, 0 for signed
+ *	S2I_qualifier	1 for optional qualifier suffix, 0 otherwise
  *	S2I_multiplier	1 for optional multiplier suffix, 0 otherwise
  *	S2I_size	the second argument is the input string size
  *
@@ -425,6 +426,8 @@ S2I_function(a, e, base) const char* a; char** e; int base;
 		c = *(s - 1);
 	}
 
+#if S2I_qualifier
+
 	/*
 	 * optional qualifier suffix
 	 */
@@ -461,6 +464,7 @@ S2I_function(a, e, base) const char* a; char** e; int base;
 				break;
 		}
 	}
+#endif
 	if (S2I_valid(s))
 	{
 #if S2I_multiplier

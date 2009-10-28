@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -197,11 +197,13 @@ foo=foo
 [[ "$" == '$' ]] || err_exit '"$" != $'
 [[ "${foo}$" == 'foo$' ]] || err_exit 'foo=foo;"${foo}$" != foo$'
 [[ "${foo}${foo}$" == 'foofoo$' ]] || err_exit 'foo=foo;"${foo}${foo}$" != foofoo$'
-foo='$ ' 
+foo='$ '
 [[ "$foo" == ~(Elr)(\\\$|#)\  ]] || err_exit $'\'$ \' not matching RE \\\\\\$|#\''
-[[ "$foo" == ~(Elr)('\$'|#)\  ]] || err_exit $'\'$ \' not matching RE \'\\$\'|#\'' 
+[[ "$foo" == ~(Elr)('\$'|#)\  ]] || err_exit $'\'$ \' not matching RE \'\\$\'|#\''
 foo='# '
-[[ "$foo" == ~(Elr)(\\\$|#)\  ]] || err_exit $'\'# \' not matching RE \\'\$|#\'' 
+[[ "$foo" == ~(Elr)(\\\$|#)\  ]] || err_exit $'\'# \' not matching RE \\'\$|#\''
 [[ "$foo" == ~(Elr)('\$'|#)\  ]] || err_exit $'\'# \' not matching RE \'\\$\'|#\''
 [[ '\$' == '\$'* ]] ||   err_exit $'\'\\$\' not matching \'\\$\'*'
+[[ a+a == ~(E)a\+a ]] || err_exit '~(E)a\+a not matching a+a'
+[[ a+a =~ a\+a ]] || err_exit 'RE a\+a not matching a+a'
 exit $((Errors))

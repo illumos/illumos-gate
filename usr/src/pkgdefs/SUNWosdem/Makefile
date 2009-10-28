@@ -18,21 +18,20 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 include ../Makefile.com
-
-DATAFILES += depend
 
 LICENSEFILES += \
 	../../lib/libshell/THIRDPARTYLICENSE
 
 .KEEP_STATE:
 
-all: $(FILES)
+all: $(FILES) depend
 
 install: all pkg
 

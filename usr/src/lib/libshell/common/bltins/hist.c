@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -22,7 +22,6 @@
 #include	<stak.h>
 #include	<ls.h>
 #include	<error.h>
-#include	<ctype.h>
 #include	"variables.h"
 #include	"io.h"
 #include	"name.h"

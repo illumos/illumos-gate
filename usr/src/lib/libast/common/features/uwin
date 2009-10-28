@@ -1,6 +1,6 @@
 lib	a64l,acosh,asinh,atanh,cbrt,ceil,crypt,erf,exp,expm1,floor
 lib	gamma,getpass,lgamma,log,log1p,random,rcmd,rint,srand48
 lib	copysign,logb,finite,drem,sqrt,ilogb,remainder,scalb
-lib	_copysign,_finite,_scalb,__iob_func,_p__iob
+lib	_copysign,_finite,_scalb,__iob_func,_p__iob,__p__iob
 
 dat	_iob

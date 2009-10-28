@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -47,7 +47,7 @@ const struct shtable2 shtab_variables[] =
 	"EDITOR",	0,				(char*)0,
 	"MAILCHECK",	NV_NOFREE|NV_INTEGER,		(char*)0,
 	"RANDOM",	NV_NOFREE|NV_INTEGER,		(char*)0,
-	"ENV",		NV_NOFREE,			"$HOME/.kshrc",
+	"ENV",		NV_NOFREE,			(char*)0,
 	"HISTFILE",	0,				(char*)0,
 	"HISTSIZE",	0,				(char*)0,
 	"HISTEDIT",	NV_NOFREE,			(char*)0,
@@ -77,6 +77,7 @@ const struct shtable2 shtab_variables[] =
 	"LC_NUMERIC",	0,				(char*)0,
 	"FIGNORE",	0,				(char*)0,
 	"KSH_VERSION",	0,				(char*)0,
+	"JOBMAX",	NV_NOFREE|NV_INTEGER,		(char*)0,
 	".sh",		NV_TABLE|NV_RDONLY|NV_NOFREE|NV_NOPRINT,(char*)0,
 	".sh.edchar",	0,				(char*)0,
 	".sh.edcol",	0,				(char*)0,
@@ -108,7 +109,7 @@ const struct shtable2 shtab_variables[] =
 	"",	0,					(char*)0
 };
 
-const char *nv_discnames[] = { "get", "set", "append", "unset", 0 };
+const char *nv_discnames[] = { "get", "set", "append", "unset", "getn", 0 };
 
 #ifdef SHOPT_STATS
 const Shtable_t shtab_stats[] =

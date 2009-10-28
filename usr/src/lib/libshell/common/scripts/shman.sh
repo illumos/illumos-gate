@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -174,7 +174,7 @@ function browse_manpage
 # /usr/bin/man <keyword>
 function show_manpage
 {
-	typeset -a -C mandirs
+	compound -a mandirs
 	integer i
 	integer j
 
@@ -236,7 +236,7 @@ function show_manpage
 # /usr/bin/man -l <keyword>
 function list_manpages
 {
-	typeset -a -C mandirs
+	compound -a mandirs
 
 	enumerate_mandirs mandirs
 	#debug_print -- "${mandirs[@]}"
@@ -320,7 +320,7 @@ builtin date
 typeset progname="$(basename "${0}")"
 
 typeset -r man_usage=$'+
-[-?\n@(#)\$Id: shman (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: shman (Roland Mainz) 2009-06-26 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [-author?Roland Mainz <roland.mainz@sun.com>]
 [+NAME?man - find and display reference manual pages]
@@ -372,16 +372,24 @@ shift $((OPTIND-1))
 
 # cd /usr/man; LC_MESSAGES=C /usr/lib/sgml/sgml2roff /usr/man/sman1as/asadmin-list-timers.1as  | tbl | eqn | nroff -u0 -Tlp -man -  | col -x > /tmp/mpLQaqac
 
-typeset manname="$1"
-debug_print -f "# searching for %s ...\n" "${manname}"
+# prechecks
+(( $# > 0 )) || usage
 
-if ${do_keyword} ; then
-	list_keywords
-elif ${do_list} ; then
-	list_manpages
-else
-	show_manpage
-fi
+# process arguments
+while (( $# > 0 )) ; do
+	typeset manname="$1"
+	shift
+
+	debug_print -f "# searching for %s ...\n" "${manname}"
+
+	if ${do_keyword} ; then
+		list_keywords
+	elif ${do_list} ; then
+		list_manpages
+	else
+		show_manpage
+	fi
+done
 
 # todo: better exit codes
 exit 0

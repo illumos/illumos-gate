@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -120,7 +120,7 @@ typeset -T Cube_t=(
 for ((i=0; i < n; i++))
 do
 Box_t b=(name=box2)
-[[ ${b.name} == box2 ]] || err_exit "\${b.name} incorrect -- expected box2, got '${b.name}'" 
+[[ ${b.name} == box2 ]] || err_exit "\${b.name} incorrect -- expected box2, got '${b.name}'"
 (( b.len == 5 )) || err_exit "b.len incorrect for box2 -- expected 5, got '$(( b.len ))'"
 (( b.count == 1 )) || err_exit "b.count incorrect -- expected 1, got '$(( b.count ))'"
 Cube_t c=(name=cube1)
@@ -134,7 +134,7 @@ Cube_t c=(name=cube1)
 (( c.count == 2 )) || err_exit 'c.count != 2'
 (( c.count == b.count )) || err_exit 'c.count != b.count'
 c.count=0
-Cube_t d=c 
+Cube_t d=c
 [[ $d == "$c" ]] || err_exit '$d != $c'
 eval "Cube_t zzz=$c"
 [[ $zzz == "$c" ]] || err_exit '$zzz != $c'
@@ -149,6 +149,7 @@ for ((i=0; i < n; i++))
 do
 Cube_t cc
 cc[2]=(x=2 y=3 name=two colors+=([table]=white) items+=(pencil) z=6)
+[[ ${cc[0].x} == 8 ]] || err_exit 'cc[0].x !=8'
 [[ ${cc[2].y} == 3 ]] || err_exit '${cc[2].y} != 3'
 (( cc[2].y == 3 )) || err_exit '(( cc[2].y != 3))'
 [[ ${cc[2].colors[table]} == white ]] || err_exit '${cc[2].colors[table]} != white'
@@ -162,7 +163,7 @@ unset cc[2].x cc[2].y cc[2].z
 (( cc[2].len == cc.len )) || err_exit 'cc[2].len != cc.len'
 (( cc[2].count == 6 )) || err_exit 'cc[2].count != 6'
 unset cc[2].name cc[2].colors cc[2].items
-[[ $cc == "${cc[2]}" ]] || err_exit '$cc != ${cc[2]}' 
+[[ $cc == "${cc[2]}" ]] || err_exit '$cc != ${cc[2]}'
 cc.count=0
 unset cc
 Cube_t -A cc
@@ -181,7 +182,7 @@ unset cc[two].x cc[two].y cc[two].z
 (( cc[two].len == cc[one].len )) || err_exit 'cc[two].len != cc[one].len'
 (( cc[two].count == 4 )) || err_exit 'cc[two].count != 4'
 unset cc[two].name unset cc[two].colors cc[two].items
-[[ ${cc[one]} == "${cc[two]}" ]] || err_exit '${cc[one]} != ${cc[two]}' 
+[[ ${cc[one]} == "${cc[two]}" ]] || err_exit '${cc[one]} != ${cc[two]}'
 cc[two].count=0
 unset cc
 Cube_t cc=(

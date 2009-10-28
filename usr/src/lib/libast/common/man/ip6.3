@@ -1,0 +1,85 @@
+.fp 5 B
+.de Af
+.ds ;G \\*(;G\\f\\$1\\$3\\f\\$2
+.if !\\$4 .Af \\$2 \\$1 "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+..
+.de aF
+.ie \\$3 .ft \\$1
+.el \{\
+.ds ;G \&
+.nr ;G \\n(.f
+.Af "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7" "\\$8" "\\$9"
+\\*(;G
+.ft \\n(;G \}
+..
+.de L
+.aF 5 \\n(.f "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de LR
+.aF 5 1 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de RL
+.aF 1 5 "\\$1" "\\$2" "\\$3" "\\$4" "\\$5" "\\$6" "\\$7"
+..
+.de EX		\" start example
+.ta 1i 2i 3i 4i 5i 6i
+.PP
+.RS 
+.PD 0
+.ft 5
+.nf
+..
+.de EE		\" end example
+.fi
+.ft
+.PD
+.RE
+.PP
+..
+.TH IP6 3
+.SH NAME
+ip6 \- IP V6 address support
+.SH SYNOPSIS
+.EX
+#include <ip6.h>
+
+char*      fmtip6(unsigned char* addr, int bits);
+int        strtoip6(const char* str, char** end, unsigned char* addr, unsigned char* bits);
+.EE
+
+.SH DESCRIPTION
+.L fmtip6()
+formats the IPV6 address
+.L addr
+with optional prefix bits
+.L bits
+(0 if not a prefix) into a thread-specific 0-terminated temporary buffer and returns a pointer
+to the formatted value.
+
+.PP
+.L strtoip6()
+converts a formatted IPV6 address from the 0-terminated string
+.L str
+into a host order IPV6 address in
+.L addr
+which must be a buffer of at least
+.L IP6ADDR
+bytes.
+If
+.L bits
+is not 0 then an optional
+.BI / bits
+(prefix size in bits) is parsed and
+.L *bits
+is set to the number of prefix bits.
+If
+.L end
+is not 0 then
+.L *end
+will point to the first unparsed character in
+.L str
+on return.
+0 is returned on success, -1 on failure.
+
+.SH "SEE ALSO"
+dss(1)

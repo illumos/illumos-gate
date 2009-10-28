@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -32,7 +32,7 @@
 /*
  * use one of the 14 equivalent calendar years to determine
  * daylight savings time for future years beyond the range
- * of the local system (via tmxmake())
+ * of the local system (via tmxtm())
  */
 
 static const short equiv[] =

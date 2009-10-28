@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -84,10 +84,11 @@ CPPFLAGS = \
 	$(DTEXTDOM) $(DTS_ERRNO) \
 	-I. \
 	-I$(ROOT)/usr/include/ast \
+	-I$(ROOT)/usr/include \
 	-D_PACKAGE_ast \
 	'-DUSAGE_LICENSE=\
 		"[-author?Glenn Fowler <gsf@research.att.com>]"\
-		"[-copyright?Copyright (c) 1986-2008 AT&T Intellectual Property]"\
+		"[-copyright?Copyright (c) 1986-2009 AT&T Intellectual Property]"\
 		"[-license?http://www.opensource.org/licenses/cpl1.0.txt]"\
 		"[--catalog?libpp]"'
 
@@ -100,8 +101,8 @@ CFLAGS64 += \
 pics/ppcall.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppcontrol.o 	:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppcpp.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
-pics/pplex.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppexpr.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
+pics/pplex.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppop.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppsearch.o 	:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppsearch.o 	:= CERRWARN += -_gcc=-Wno-sequence-point

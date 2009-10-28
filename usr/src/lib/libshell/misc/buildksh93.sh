@@ -23,18 +23,18 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 #
-# buildksh93.ksh - ast-ksh standalone build script for the 
+# buildksh93.sh - ast-ksh standalone build script for the 
 # OpenSolaris ksh93-integration project
 #
 
 # ksh93t sources can be downloaded like this from the AT&T site:
-# wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/~gsf/download/tgz/INIT.2008-11-04.tgz'
-# wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/~gsf/download/tgz/ast-ksh.2008-11-04.tgz'
+# wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/sw/download/beta/INIT.2009-10-14.tgz'
+# wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/sw/download/beta/ast-ksh.2009-10-14.tgz'
 
 function fatal_error
 {
@@ -93,7 +93,7 @@ cat <<ENDOFTEXT
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,6 +143,7 @@ extern "C" {
 /* undo ast_map.h #defines to avoid collision */
 #undef basename
 #undef dirname
+#undef mktemp
 
 /* Generated data, do not edit. */
 XPG4CMDLIST(basename)
@@ -159,6 +160,7 @@ BINCMDLIST(cksum)
 ASTCMDLIST(cksum)
 BINCMDLIST(cmp)
 ASTCMDLIST(cmp)
+BINCMDLIST(comm)
 ASTCMDLIST(comm)
 XPG4CMDLIST(cp)
 ASTCMDLIST(cp)
@@ -171,11 +173,13 @@ XPG4CMDLIST(expr)
 ASTCMDLIST(expr)
 ASTCMDLIST(fds)
 ASTCMDLIST(fmt)
+BINCMDLIST(fold)
 ASTCMDLIST(fold)
 BINCMDLIST(head)
 ASTCMDLIST(head)
 XPG4CMDLIST(id)
 ASTCMDLIST(id)
+BINCMDLIST(join)
 ASTCMDLIST(join)
 XPG4CMDLIST(ln)
 ASTCMDLIST(ln)
@@ -185,10 +189,13 @@ BINCMDLIST(mkdir)
 ASTCMDLIST(mkdir)
 BINCMDLIST(mkfifo)
 ASTCMDLIST(mkfifo)
+BINCMDLIST(mktemp)
+ASTCMDLIST(mktemp)
 XPG4CMDLIST(mv)
 ASTCMDLIST(mv)
 BINCMDLIST(paste)
 ASTCMDLIST(paste)
+BINCMDLIST(pathchk)
 ASTCMDLIST(pathchk)
 BINCMDLIST(rev)
 ASTCMDLIST(rev)
@@ -204,6 +211,7 @@ SUSRBINCMDLIST(sync)
 SBINCMDLIST(sync)
 BINCMDLIST(sync)
 ASTCMDLIST(sync)
+BINCMDLIST(tail)
 XPG4CMDLIST(tail)
 ASTCMDLIST(tail)
 BINCMDLIST(tee)
@@ -305,14 +313,15 @@ function build_shell
 
             # gcc flags
             bgcc99="/usr/sfw/bin/gcc -std=gnu99 -D_XOPEN_SOURCE=600 -D__EXTENSIONS__=1"
-            bgcc_ccflags="${bon_flags} ${bast_flags} -D_lib_socket=1 -lsocket -lnsl"
+            bgcc_warnflags="-Wall -Wextra -Wno-unknown-pragmas -Wno-missing-braces -Wno-sign-compare -Wno-parentheses -Wno-uninitialized -Wno-implicit-function-declaration -Wno-unused -Wno-trigraphs -Wno-char-subscripts -Wno-switch"
+            bgcc_ccflags="${bon_flags} ${bgcc_warnflags} ${bast_flags} -D_lib_socket=1 -lsocket -lnsl"
  
-
             case "${buildmode}" in
-                *.i386.32bit.suncc*)  HOSTTYPE="sol11.i386" CC="${bsunc99}"                            cc_sharedlib="-G" CCFLAGS="${bsuncc_ccflags}"  ;;
-                *.i386.64bit.suncc*)  HOSTTYPE="sol11.i386" CC="${bsunc99} -xarch=amd64 -KPIC"         cc_sharedlib="-G" CCFLAGS="${bsuncc_ccflags}"  ;;
-                *.sparc.32bit.suncc*) HOSTTYPE="sol11.sun4" CC="${bsunc99}"                            cc_sharedlib="-G" CCFLAGS="${bsuncc_ccflags}" bsuncc_app_ccflags="${bsuncc_app_ccflags_sparc}" ;;
-                *.sparc.64bit.suncc*) HOSTTYPE="sol11.sun4" CC="${bsunc99} -xarch=v9 -dalign -KPIC"    cc_sharedlib="-G" CCFLAGS="${bsuncc_ccflags}" bsuncc_app_ccflags="${bsuncc_app_ccflags_sparc}" ;;
+	        # for -m32/-m64 flags see usr/src/Makefile.master, makefile symbols *_XARCH/co.
+                *.i386.32bit.suncc*)  HOSTTYPE="sol11.i386" CC="${bsunc99} -m32"                  cc_sharedlib="-G" CCFLAGS="${bsuncc_ccflags}"  ;;
+                *.i386.64bit.suncc*)  HOSTTYPE="sol11.i386" CC="${bsunc99} -m64 -KPIC"            cc_sharedlib="-G" CCFLAGS="${bsuncc_ccflags}"  ;;
+                *.sparc.32bit.suncc*) HOSTTYPE="sol11.sun4" CC="${bsunc99} -m32"                  cc_sharedlib="-G" CCFLAGS="${bsuncc_ccflags}" bsuncc_app_ccflags="${bsuncc_app_ccflags_sparc}" ;;
+                *.sparc.64bit.suncc*) HOSTTYPE="sol11.sun4" CC="${bsunc99} -m64 -dalign -KPIC"    cc_sharedlib="-G" CCFLAGS="${bsuncc_ccflags}" bsuncc_app_ccflags="${bsuncc_app_ccflags_sparc}" ;;
 
                 *.i386.32bit.gcc*)  HOSTTYPE="sol11.i386" CC="${bgcc99} -fPIC"                                            cc_sharedlib="-shared" CCFLAGS="${bgcc_ccflags}"  ;;
                 *.i386.64bit.gcc*)  HOSTTYPE="sol11.i386" CC="${bgcc99} -m64 -mtune=opteron -Ui386 -U__i386 -fPIC"        cc_sharedlib="-shared" CCFLAGS="${bgcc_ccflags}"  ;;
@@ -349,17 +358,22 @@ function build_shell
 
     [[ -s $log ]] || fatal_error "build_shell: no make.out log found."
 
+    if [[ -f ${root}/lib/libast-g.a   ]] then link_libast="ast-g"     ; else link_libast="ast"     ; fi
+    if [[ -f ${root}/lib/libdll-g.a   ]] then link_libdll="dll-g"     ; else link_libdll="dll"     ; fi
+    if [[ -f ${root}/lib/libsum-g.a   ]] then link_libsum="sum-g"     ; else link_libsum="sum"     ; fi
+    if [[ -f ${root}/lib/libcmd-g.a   ]] then link_libcmd="cmd-g"     ; else link_libcmd="cmd"     ; fi
+    if [[ -f ${root}/lib/libshell-g.a ]] then link_libshell="shell-g" ; else link_libshell="shell" ; fi
+
     if [[ "${buildmode}" != *.staticshell* ]] ; then
         # libcmd causes some trouble since there is a squatter in solaris
         # This has been fixed in Solaris 11/B48 but may require adjustments
         # for older Solaris releases
         for lib in libast libdll libsum libcmd libshell ; do
-            (( $? == 0 )) || exit 1
             case "$lib" in
             libshell)
-                base="lib/"
+                base="src/cmd/ksh93/"
                 vers=1
-                link="-L${root}/lib/ -lcmd -lsum -ldll -last -lm"
+                link="-L${root}/lib/ -l${link_libcmd} -l${link_libsum} -l${link_libdll} -l${link_libast} -lm"
                 ;;
             libdll)
                 base="src/lib/${lib}"
@@ -374,20 +388,23 @@ function build_shell
             *)
                 base="src/lib/${lib}"
                 vers=1
-                link="-L${root}/lib/ -last -lm"
+                link="-L${root}/lib/ -l${link_libast} -lm"
                 ;;
             esac
 
             (
             cd "${root}/${base}"
+	    
+	    if [[ -f ${lib}-g.a ]] ; then lib_a="${lib}-g.a" ; else lib_a="${lib}.a" ; fi
+	    
             if [[ "${buildmode}" == *solaris* ]] ; then
-                ${CC} ${cc_sharedlib} ${CCFLAGS} -Bdirect -Wl,-zallextract -Wl,-zmuldefs -o "${root}/lib/${lib}.so.${vers}" "${lib}.a"  $link
+                ${CC} ${cc_sharedlib} ${CCFLAGS} -Bdirect -Wl,-zallextract -Wl,-zmuldefs -o "${root}/lib/${lib}.so.${vers}" "${lib_a}"  $link
             else
-                ${CC} ${cc_sharedlib} ${CCFLAGS} -Wl,--whole-archive -Wl,-zmuldefs "${lib}.a" -Wl,--no-whole-archive -o "${root}/lib/${lib}.so.${vers}" $link
+                ${CC} ${cc_sharedlib} ${CCFLAGS} -Wl,--whole-archive -Wl,-zmuldefs "${lib_a}" -Wl,--no-whole-archive -o "${root}/lib/${lib}.so.${vers}" $link
             fi
            
             #rm ${lib}.a
-            mv "${lib}.a" "disabled_${lib}.a_"
+            mv "${lib_a}" "disabled_${lib_a}_"
 
             cd "${root}/lib"
             ln -sf "${lib}.so.${vers}" "${lib}.so"
@@ -398,13 +415,13 @@ function build_shell
           base=src/cmd/ksh93
           cd "${root}/${base}"
           rm -f \
-	      "${root}/lib/libshell.a" \
-              "${root}/lib/libsum.a" \
-              "${root}/lib/libdll.a" \
-              "${root}/lib/libast.a"
+	      "${root}/lib/libshell.a" "${root}/lib/libshell-g.a" \
+              "${root}/lib/libsum.a" "${root}/lib/libsum-g.a" \
+              "${root}/lib/libdll.a" "${root}/lib/libdll-g.a" \
+              "${root}/lib/libast.a""${root}/lib/libast-g.a"
 
           if [[ "${buildmode}" == *solaris* ]] ; then
-              ${CC} ${CCFLAGS} ${bsuncc_app_ccflags} -L${root}/lib/ -Bdirect -o ksh pmain.o -lshell -Bstatic -lcmd -Bdynamic -lsum -ldll -last -lm -lmd -lsecdb
+              ${CC} ${CCFLAGS} ${bsuncc_app_ccflags} -L${root}/lib/ -Bdirect -o ksh pmain.o -lshell -Bstatic -l${link_libcmd} -Bdynamic -lsum -ldll -last -lm -lmd -lsecdb
           else
               ${CC} ${CCFLAGS} ${bsuncc_app_ccflags} -L${root}/lib/ -o ksh pmain.o -lshell -lcmd -lsum -ldll -last -lm
           fi
@@ -445,6 +462,8 @@ function test_shell
 {
     set -o errexit
     set -o xtrace
+    
+    ulimit -s 65536 # need larger stack on 64bit SPARC to pass all tests
 
     export SHELL="$(ls -1 $PWD/arch/*/src/cmd/ksh93/ksh)"
     export LD_LIBRARY_PATH="$(ls -1ad $PWD/arch/*/lib):${LD_LIBRARY_PATH}"
@@ -456,7 +475,7 @@ function test_shell
     [[ ! -f "${SHELL}" ]] && fatal_error "test_shell: |${SHELL}| is not a file."
     [[ ! -x "${SHELL}" ]] && fatal_error "test_shell: |${SHELL}| is not executable."
     
-    [[ "${TEST_LANG}" == "" ]] && TEST_LANG="C"
+    [[ "${TEST_LANG}" == "" ]] && TEST_LANG="C ja_JP.UTF-8"
 
     case "${buildmode}" in
             testshell.bcheck*)

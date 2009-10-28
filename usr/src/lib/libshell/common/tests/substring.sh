@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -192,7 +192,7 @@ fi
 if	[[ ${foo//\//_} != one_two_three ]]
 then	err_exit 'escaping / in replacements failed'
 fi
-function myexport 
+function myexport
 {
 	nameref var=$1
 	if	(( $# > 1 ))
@@ -205,7 +205,7 @@ function myexport
 	typeset val
 	val=$(export | grep "^$1=")
 	print ${val#"$1="}
-	
+
 }
 export dgk=base
 if	[[ $(myexport dgk fun) != fun ]]
@@ -280,7 +280,7 @@ b='[abc 123 def]'
 [[ ${b//$a/\1} == 123 ]] || err_exit "\${var/pattern} not working with \[ in pattern"
 unset foo
 foo='(win32.i386) '
-[[ ${foo/'('/'(x11-'} == '(x11-win32.i386) ' ]] || err_exit "\${var/pattern} not working with ' in pattern" 
+[[ ${foo/'('/'(x11-'} == '(x11-win32.i386) ' ]] || err_exit "\${var/pattern} not working with ' in pattern"
 $SHELL -c $'v=\'$(hello)\'; [[ ${v//\'$(\'/-I\'$(\'} == -I"$v" ]]' 2> /dev/null || err_exit "\${var/pattern} not working with \$( as pattern"
 unset X
 $SHELL -c '[[ ! ${X[@]:0:300} ]]' 2> /dev/null || err_exit '${X[@]:0:300} with X undefined fails'
@@ -303,7 +303,7 @@ done
 [[ $(string=$string $SHELL -c  ": \${string/$pattern/}; print \${.sh.match[26]}") == Z ]] || err_exit -u2 'sh.match[26] not Z'
 : ${string/$pattern/}
 (( ${#.sh.match[@]} == 53 )) || err_exit '.sh.match has wrong number of elements'
-[[ ${.sh.match[@]:2:4} == 'B C D E'  ]] || err_exit '${.sh.match[@]:2:4} incorrect' 
+[[ ${.sh.match[@]:2:4} == 'B C D E'  ]] || err_exit '${.sh.match[@]:2:4} incorrect'
 
 D=$';' E=$'\\\\' Q=$'"' S=$'\'' M='nested pattern substitution failed'
 
@@ -501,7 +501,7 @@ pattern=00
 var=100
 [[ $( print $(( ${var%%00} )) ) == 1 ]] || err_exit "arithmetic with embeddded patterns fails"
 [[ $( print $(( ${var%%$pattern} )) ) == 1 ]] || err_exit "arithmetic with embeddded pattern variables fails"
-if	[[ ax == @(a)* ]] && [[ ${.sh.match[1]:0:${#.sh.match[1]}}  != a ]] 
+if	[[ ax == @(a)* ]] && [[ ${.sh.match[1]:0:${#.sh.match[1]}}  != a ]]
 then	err_exit '${.sh.match[1]:1:${#.sh.match[1]}} not expanding correctly'
 fi
 
@@ -509,10 +509,10 @@ string='foo(d:\nt\box\something)bar'
 expected='d:\nt\box\something'
 [[ ${string/*\(+([!\)])\)*/\1} == "$expected" ]] || err_exit "substring expansion failed '${string/*\(+([!\)])\)*/\1}' returned -- '$expected' expected"
 if	[[ $($SHELL -c $'export LC_ALL=en_US.UTF-8; print -r "\342\202\254\342\202\254\342\202\254\342\202\254w\342\202\254\342\202\254\342\202\254\342\202\254" | wc -m' 2>/dev/null) == 10 ]]
-then	LC_ALL=en_US.UTF-8 $SHELL -c b1=$'"\342\202\254\342\202\254\342\202\254\342\202\254w\342\202\254\342\202\254\342\202\254\342\202\254"; [[ ${b1:4:1} == w ]]' || err_exit 'Multibyte ${var:offset:len} not working correctly'
+then	LC_ALL=en_US.UTF-8 $SHELL -c b1=$'"\342\202\254\342\202\254\342\202\254\342\202\254w\342\202\254\342\202\254\342\202\254\342\202\254"; [[ ${b1:4:1} == w ]]' || err_exit 'multibyte ${var:offset:len} not working correctly'
 fi
-{ $SHELL -c 'unset x;[[ ${SHELL:$x} == $SHELL ]]';} 2> /dev/null || err_exit '${var:$x} fails when x is not set' 
-{ $SHELL -c 'x=;[[ ${SHELL:$x} == $SHELL ]]';} 2> /dev/null || err_exit '${var:$x} fails when x is null' 
+{ $SHELL -c 'unset x;[[ ${SHELL:$x} == $SHELL ]]';} 2> /dev/null || err_exit '${var:$x} fails when x is not set'
+{ $SHELL -c 'x=;[[ ${SHELL:$x} == $SHELL ]]';} 2> /dev/null || err_exit '${var:$x} fails when x is null'
 
 #	subject		mode	pattern			result	#
 set --							\

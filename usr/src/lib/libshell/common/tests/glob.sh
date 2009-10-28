@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -24,7 +24,11 @@ function err_exit
 }
 alias err_exit='err_exit $LINENO'
 
-integer aware=0 contrary=0 ignorant=0
+Command=${0##*/}
+integer aware=0 contrary=0 errors=0 ignorant=0
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
 
 function test_glob
 {
@@ -84,17 +88,11 @@ function test_case
 }
 alias test_case='test_case $LINENO'
 
-Command=${0##*/}
-tmp=/tmp/ksh$$
-integer errors=0
 unset undefined
 
 export LC_COLLATE=C
 
-mkdir $tmp || err_exit "mkdir $tmp failed"
-trap "cd /; rm -rf $tmp" EXIT
-cd $tmp || err_exit "cd $tmp failed"
-rm -rf *
+cd $tmp || { err_exit "cd $tmp failed"; exit 1; }
 
 touch B b
 set -- *

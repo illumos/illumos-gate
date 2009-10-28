@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: rm (AT&T Research) 2008-10-15 $\n]"
+"[-?\n@(#)$Id: rm (AT&T Research) 2009-06-18 $\n]"
 USAGE_LICENSE
 "[+NAME?rm - remove files]"
 "[+DESCRIPTION?\brm\b removes the named \afile\a arguments. By default it"
@@ -81,6 +81,7 @@ USAGE_LICENSE
 
 typedef struct State_s			/* program state		*/
 {
+	void*		context;	/* builtin context		*/
 	int		clobber;	/* clear out file data first	*/
 	int		directory;	/* remove(dir) not rmdir(dir)	*/
 	int		force;		/* force actions		*/
@@ -179,7 +180,7 @@ rm(State_t* state, register FTSENT* ent)
 			{
 				if (state->interactive)
 				{
-					if ((v = astquery(-1, "remove directory %s? ", ent->fts_path)) < 0)
+					if ((v = astquery(-1, "remove directory %s? ", ent->fts_path)) < 0 || sh_checksig(state->context))
 						return -1;
 					if (v > 0)
 					{
@@ -253,7 +254,7 @@ rm(State_t* state, register FTSENT* ent)
 			sfputr(sfstdout, ent->fts_path, '\n');
 		if (state->interactive)
 		{
-			if ((v = astquery(-1, "remove %s? ", ent->fts_path)) < 0)
+			if ((v = astquery(-1, "remove %s? ", ent->fts_path)) < 0 || sh_checksig(state->context))
 				return -1;
 			if (v > 0)
 			{
@@ -277,7 +278,8 @@ rm(State_t* state, register FTSENT* ent)
 					errno == ETXTBSY ? "``running program''" : 
 #endif
 					ent->fts_statp->st_uid != state->uid ? "``not owner''" :
-					fmtmode(ent->fts_statp->st_mode & S_IPERM, 0) + 1, ent->fts_path)) < 0)
+					fmtmode(ent->fts_statp->st_mode & S_IPERM, 0) + 1, ent->fts_path)) < 0 ||
+					sh_checksig(state->context))
 						return -1;
 					if (v > 0)
 					{
@@ -343,6 +345,7 @@ b_rm(int argc, register char** argv, void* context)
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, ERROR_NOTIFY);
 	memset(&state, 0, sizeof(state));
+	state.context = context;
 	state.fs3d = fs3d(FS3D_TEST);
 	state.terminal = isatty(0);
 	for (;;)

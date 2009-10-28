@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -35,6 +35,8 @@ if [[ "$(set +o)" != ~(Er)--(gmacs|emacs|vi)( .*|) ]] ; then
 	set -o gmacs
 	# enable multiline input mode
 	set -o multiline
+	# enable globstar mode (match subdirs with **/)
+	set -o globstar
 fi
 
 # Set a default prompt (<username>@<hostname>:<path><"($|#) ">) if
@@ -66,10 +68,12 @@ fi
 # - Make sure to use absolute paths (e.g. /usr/bin/hostname) to make
 #   sure PS1 works in cases where PATH does not contain /usr/bin/
 if [[ "$(set)" != ~(E)PS1= && "${PS1}" == '' ]] ; then
-	PS1='$(printf "%*s\r%s" COLUMNS "")${LOGNAME}@$(/usr/bin/hostname):$(
-		ellip="$(
+	PS1='$(set +o xtrace +o errexit
+                printf "%*s\r%s" COLUMNS ""
+                printf "%s@%s:" "${LOGNAME}" "$(/usr/bin/hostname)"
+		ellip="${
 			[[ "${LC_ALL}/${LANG}" == ~(Elr)(.*UTF-8/.*|/.*UTF-8) ]] &&
-				printf "\u[2026]\n" || print "..." )"
+				printf "\u[2026]\n" || print "..." ; }"
 		p="${PWD/~(El)${HOME}/\~}"
 		(( ${#p} > 30 )) &&
 			print -r -n -- "${ellip}${p:${#p}-30:30}" ||

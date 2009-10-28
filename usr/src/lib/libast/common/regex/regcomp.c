@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -121,6 +121,7 @@ typedef struct Cenv_s
 	int		parno;		/* number of last open paren	*/
 	int		parnest;	/* paren nest count		*/
 	int		posixkludge; 	/* to make * nonspecial		*/
+	int		regexp; 	/* <regexp.h> compatibility	*/
 	Token_t		token;		/* token lookahead		*/
 	Stats_t		stats;		/* RE statistics		*/
 	int		terminator;	/* pattern terminator		*/
@@ -1289,6 +1290,8 @@ bra(Cenv_t* env)
 			case 0:
 				goto error;
 			case ':':
+				if (env->regexp)
+					goto normal;
 				if (inrange == 1)
 				{
 					setadd(e->re.charclass, last);
@@ -1336,6 +1339,8 @@ bra(Cenv_t* env)
 				elements++;
 				continue;
 			case '=':
+				if (env->regexp)
+					goto normal;
 				if (inrange == 2)
 					goto erange;
 				if (inrange == 1)
@@ -1355,6 +1360,8 @@ bra(Cenv_t* env)
 				elements++;
 				continue;
 			case '.':
+				if (env->regexp)
+					goto normal;
 				if ((c = regcollate((char*)env->cursor, (char**)&env->cursor, (char*)buf, sizeof(buf))) < 0)
 					goto ecollate;
 				if (c > 1)
@@ -1363,6 +1370,7 @@ bra(Cenv_t* env)
 				complicated++;
 				break;
 			default:
+			normal:
 				if (*env->cursor == env->terminator || *env->cursor == env->delimiter && (env->flags & REG_ESCAPE))
 					goto error;
 				break;
@@ -1535,6 +1543,8 @@ bra(Cenv_t* env)
 					case 0:
 						goto error;
 					case ':':
+						if (env->regexp)
+							goto complicated_normal;
 						if (inrange == 1)
 							ce = col(ce, ic, rp, rw, rc, NiL, 0, 0);
 						if (!(f = regclass((char*)env->cursor, (char**)&env->cursor)))
@@ -1569,6 +1579,8 @@ bra(Cenv_t* env)
 						inrange = 0;
 						continue;
 					case '=':
+						if (env->regexp)
+							goto complicated_normal;
 						if (inrange == 2)
 							goto erange;
 						if (inrange == 1)
@@ -1629,12 +1641,15 @@ bra(Cenv_t* env)
 						c = *pp;
 						continue;
 					case '.':
+						if (env->regexp)
+							goto complicated_normal;
 						pp = (unsigned char*)cb[inrange];
 						if ((w = regcollate((char*)env->cursor, (char**)&env->cursor, (char*)pp, COLL_KEY_MAX)) < 0)
 							goto ecollate;
 						c = buf[0];
 						break;
 					default:
+					complicated_normal:
 						if (*env->cursor == env->terminator || *env->cursor == env->delimiter && (env->flags & REG_ESCAPE))
 							goto error;
 						break;
@@ -3226,6 +3241,7 @@ regcomp(regex_t* p, const char* pattern, regflags_t flags)
 		env.explicit = env.mappednewline;
 	p->env->leading = (env.flags & REG_SHELL_DOT) ? env.mappeddot : -1;
 	env.posixkludge = !(env.flags & (REG_EXTENDED|REG_SHELL));
+	env.regexp = !!(env.flags & REG_REGEXP);
 	env.token.lex = 0;
 	env.token.push = 0;
 	if (env.flags & REG_DELIMITED)

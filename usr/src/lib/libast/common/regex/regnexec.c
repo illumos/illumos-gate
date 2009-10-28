@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -406,7 +406,7 @@ parserep(Env_t* env, Rex_t* rex, Rex_t* cont, unsigned char* s, int n)
 	int	r = NONE;
 	Rex_t	catcher;
 
-	DEBUG_TEST(0x0010,(sfprintf(sfstdout, "AHA#%04d 0x%04x parserep %s %d %d %d `%-.*s'\n", __LINE__, debug_flag, rexname(rex->re.group.expr.rex), rex->lo, n, rex->hi, env->end - s, s)),(0));
+	DEBUG_TEST(0x0010,(sfprintf(sfstdout, "AHA#%04d 0x%04x parserep %s %d %d %d %d `%-.*s'\n", __LINE__, debug_flag, rexname(rex->re.group.expr.rex), rex->re.group.number, rex->lo, n, rex->hi, env->end - s, s)),(0));
 	if ((rex->flags & REG_MINIMAL) && n >= rex->lo && n < rex->hi)
 	{
 		if (env->stack && pospush(env, rex, s, END_ANY))
@@ -438,21 +438,19 @@ parserep(Env_t* env, Rex_t* rex, Rex_t* cont, unsigned char* s, int n)
 			rex->re.rep_catch.beg = s;
 		if (env->stack)
 		{
-DEBUG_TEST(0x0004,(sfprintf(sfstdout,"AHA#%04d 0x%04x PUSH (%d,%d)(%d,%d) (%d,%d)(%d,%d)\n", __LINE__, debug_flag, rex->re.group.number, env->best[0].rm_so, env->best[0].rm_eo, env->best[1].rm_so, env->best[1].rm_eo, env->match[0].rm_so, env->match[0].rm_eo, env->match[1].rm_so, env->match[1].rm_eo)),(0));
 			if (matchpush(env, rex))
 				return BAD;
 			if (pospush(env, rex, s, BEG_ONE))	
 				return BAD;
-DEBUG_TEST(0x0004,(sfprintf(sfstdout,"AHA#%04d 0x%04x PUSH (%d,%d)(%d,%d) (%d,%d)(%d,%d)\n", __LINE__, debug_flag, rex->re.group.number, env->best[0].rm_so, env->best[0].rm_eo, env->best[1].rm_so, env->best[1].rm_eo, env->match[0].rm_so, env->match[0].rm_eo, env->match[1].rm_so, env->match[1].rm_eo)),(0));
+DEBUG_TEST(0x0004,(sfprintf(sfstdout,"AHA#%04d 0x%04x PUSH %d   (%d,%d)(%d,%d)(%d,%d) (%d,%d)(%d,%d)(%d,%d)\n", __LINE__, debug_flag, rex->re.group.number, env->best[0].rm_so, env->best[0].rm_eo, env->best[1].rm_so, env->best[1].rm_eo, env->best[2].rm_so, env->best[2].rm_eo, env->match[0].rm_so, env->match[0].rm_eo, env->match[1].rm_so, env->match[1].rm_eo, env->match[2].rm_so, env->match[2].rm_eo)),(0));
 		}
 		r = parse(env, rex->re.group.expr.rex, &catcher, s);
-		DEBUG_TEST(0x0010,(sfprintf(sfstdout, "AHA#%04d 0x%04x parserep parse %d `%-.*s'\n", __LINE__, debug_flag, r, env->end - s, s)),(0));
+		DEBUG_TEST(0x0010,(sfprintf(sfstdout, "AHA#%04d 0x%04x parserep parse %d %d `%-.*s'\n", __LINE__, debug_flag, rex->re.group.number, r, env->end - s, s)),(0));
 		if (env->stack)
 		{
-DEBUG_TEST(0x0004,(sfprintf(sfstdout,"AHA#%04d 0x%04x POP (%d,%d)(%d,%d) (%d,%d)(%d,%d)\n", __LINE__, debug_flag, rex->re.group.number, env->best[0].rm_so, env->best[0].rm_eo, env->best[1].rm_so, env->best[1].rm_eo, env->match[0].rm_so, env->match[0].rm_eo, env->match[1].rm_so, env->match[1].rm_eo)),(0));
 			pospop(env);
 			matchpop(env, rex);
-DEBUG_TEST(0x0004,(sfprintf(sfstdout,"AHA#%04d 0x%04x POP (%d,%d)(%d,%d) (%d,%d)(%d,%d)\n", __LINE__, debug_flag, rex->re.group.number, env->best[0].rm_so, env->best[0].rm_eo, env->best[1].rm_so, env->best[1].rm_eo, env->match[0].rm_so, env->match[0].rm_eo, env->match[1].rm_so, env->match[1].rm_eo)),(0));
+DEBUG_TEST(0x0004,(sfprintf(sfstdout,"AHA#%04d 0x%04x POP  %d %d (%d,%d)(%d,%d)(%d,%d) (%d,%d)(%d,%d)(%d,%d)\n", __LINE__, debug_flag, rex->re.group.number, r, env->best[0].rm_so, env->best[0].rm_eo, env->best[1].rm_so, env->best[1].rm_eo, env->best[2].rm_so, env->best[2].rm_eo, env->match[0].rm_so, env->match[0].rm_eo, env->match[1].rm_so, env->match[1].rm_eo, env->match[2].rm_so, env->match[2].rm_eo)),(0));
 		}
 		switch (r)
 		{

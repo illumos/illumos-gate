@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -27,7 +27,7 @@
  */
 
 static const char usage_head[] =
-"[-?@(#)$Id: cp (AT&T Research) 2007-12-13 $\n]"
+"[-?@(#)$Id: cp (AT&T Research) 2009-06-18 $\n]"
 USAGE_LICENSE
 ;
 
@@ -142,6 +142,7 @@ static const char usage_tail[] =
 
 typedef struct State_s			/* program state		*/
 {
+	void*		context;	/* builtin context		*/
 	int		backup;		/* BAK_* type			*/
 	int		directory;	/* destination is directory	*/
 	int		flags;		/* FTS_* flags			*/
@@ -438,7 +439,7 @@ visit(State_t* state, register FTSENT* ent)
 					/* ok */;
 				else if (state->interactive)
 				{
-					if (astquery(-1, "%s %s? ", state->opname, state->path))
+					if (astquery(-1, "%s %s? ", state->opname, state->path) < 0 || sh_checksig(state->context))
 						return 0;
 				}
 				else if (state->op == LN)
@@ -459,7 +460,7 @@ visit(State_t* state, register FTSENT* ent)
 				    fmtmode(st.st_mode & (S_IRWXU|S_IRWXG|S_IRWXO), 0) + 1;
 				if (state->interactive)
 				{
-					if (astquery(-1, "override protection %s for %s? ", protection, state->path))
+					if (astquery(-1, "override protection %s for %s? ", protection, state->path) < 0 || sh_checksig(state->context))
 						return 0;
 					rm = 1;
 				}
@@ -659,7 +660,7 @@ b_cp(int argc, register char** argv, void* context)
 	char**		v;
 	char*		backup_type;
 	FTS*		fts;
-	FTSENT*	ent;
+	FTSENT*		ent;
 	const char*	usage;
 	int		path_resolve;
 	int		standard;
@@ -677,6 +678,7 @@ b_cp(int argc, register char** argv, void* context)
 	}
 	else
 		memset(state, 0, offsetof(State_t, INITSTATE));
+	state->context = context;
 	state->presiz = -1;
 	backup_type = 0;
 	state->flags = FTS_NOCHDIR|FTS_NOSEEDOTDIR;

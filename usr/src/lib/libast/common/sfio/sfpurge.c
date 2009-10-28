@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -59,7 +59,7 @@ Sfio_t*	f;
 	{	f->here -= f->endb - f->next;
 		if(f->data)
 		{	SFMUNMAP(f,f->data,f->endb-f->data);
-			SFSK(f,f->here,SEEK_SET,f->disc);
+			(void)SFSK(f,f->here,SEEK_SET,f->disc);
 		}
 		SFOPEN(f,0);
 		SFMTXRETURN(f, 0);
@@ -82,7 +82,7 @@ Sfio_t*	f;
 	case SF_READ:
 		if(f->extent >= 0 && f->endb > f->next)
 		{	f->here -= f->endb-f->next;
-			SFSK(f,f->here,SEEK_SET,f->disc);
+			(void)SFSK(f,f->here,SEEK_SET,f->disc);
 		}
 		f->endb = f->next = f->data;
 		break;

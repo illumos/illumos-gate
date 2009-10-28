@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -104,22 +104,26 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 	int		c;
 	int		i;
 	int		flags;
+	int		alt;
 	int		pad;
 	int		delimiter;
 	int		width;
 	int		prec;
 	int		parts;
+	char*		arg;
 	char*		f;
 	const char*	oformat;
-	Tm_t*		tp;
+	Tm_t*		tm;
 	Tm_zone_t*	zp;
 	Time_t		now;
 	Stack_t*	sp;
 	Stack_t		stack[8];
+	Tm_t		ts;
+	char		argbuf[256];
 	char		fmt[32];
 
 	tmlocale();
-	tp = tmxmake(t);
+	tm = tmxtm(&ts, t, NiL);
 	if (!format || !*format)
 		format = tm_info.deformat;
 	oformat = format;
@@ -146,6 +150,8 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 				*cp++ = c;
 			continue;
 		}
+		alt = 0;
+		arg = 0;
 		pad = 0;
 		width = 0;
 		prec = 0;
@@ -162,6 +168,7 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 			case 'O':
 				if (!isalpha(*format))
 					break;
+				alt = c;
 				continue;
 			case '0':
 				if (!parts)
@@ -196,6 +203,26 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 				if (!parts++)
 					parts++;
 				continue;
+			case '(':
+				i = 1;
+				arg = argbuf;
+				for (;;)
+				{
+					if (!(c = *format++))
+					{
+						format--;
+						break;
+					}
+					else if (c == '(')
+						i++;
+					else if (c == ')' && !--i)
+						break;
+					else if (arg < &argbuf[sizeof(argbuf) - 1])
+						*arg++ = c;
+				}
+				*arg = 0;
+				arg = argbuf;
+				continue;
 			default:
 				break;
 			}
@@ -217,38 +244,37 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 				format = tm_info.format[TM_DEFAULT];
 			continue;
 		case 'a':	/* abbreviated day of week name */
-			n = TM_DAY_ABBREV + tp->tm_wday;
+			n = TM_DAY_ABBREV + tm->tm_wday;
 			goto index;
 		case 'A':	/* day of week name */
-			n = TM_DAY + tp->tm_wday;
+			n = TM_DAY + tm->tm_wday;
 			goto index;
 		case 'b':	/* abbreviated month name */
 		case 'h':
-			n = TM_MONTH_ABBREV + tp->tm_mon;
+			n = TM_MONTH_ABBREV + tm->tm_mon;
 			goto index;
 		case 'B':	/* month name */
-			n = TM_MONTH + tp->tm_mon;
+			n = TM_MONTH + tm->tm_mon;
 			goto index;
 		case 'c':	/* `ctime(3)' date sans newline */
 			p = tm_info.format[TM_CTIME];
 			goto push;
 		case 'C':	/* 2 digit century */
-			cp = number(cp, ep, (long)(1900 + tp->tm_year) / 100, 2, width, pad);
+			cp = number(cp, ep, (long)(1900 + tm->tm_year) / 100, 2, width, pad);
 			continue;
 		case 'd':	/* day of month */
-			cp = number(cp, ep, (long)tp->tm_mday, 2, width, pad);
+			cp = number(cp, ep, (long)tm->tm_mday, 2, width, pad);
 			continue;
 		case 'D':	/* date */
 			p = tm_info.format[TM_DATE];
 			goto push;
 		case 'E':       /* OBSOLETE no pad day of month */
-			cp = number(cp, ep, (long)tp->tm_mday, 0, width, pad);
+			cp = number(cp, ep, (long)tm->tm_mday, 0, width, pad);
 			continue;
 		case 'e':       /* blank padded day of month */
-			cp = number(cp, ep, (long)tp->tm_mday, -2, width, pad);
+			cp = number(cp, ep, (long)tm->tm_mday, -2, width, pad);
 			continue;
 		case 'f':	/* TM_DEFAULT override */
-		case 'o':	/* OBSOLETE */
 			p = tm_info.deformat;
 			goto push;
 		case 'F':	/* ISO 8601:2000 standard date format */
@@ -256,15 +282,15 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 			goto push;
 		case 'g':	/* %V 2 digit year */
 		case 'G':	/* %V 4 digit year */
-			n = tp->tm_year + 1900;
-			if (tp->tm_yday < 7)
+			n = tm->tm_year + 1900;
+			if (tm->tm_yday < 7)
 			{
-				if (tmweek(tp, 2, -1, -1) >= 52)
+				if (tmweek(tm, 2, -1, -1) >= 52)
 					n--;
 			}
-			else if (tp->tm_yday > 358)
+			else if (tm->tm_yday > 358)
 			{
-				if (tmweek(tp, 2, -1, -1) <= 1)
+				if (tmweek(tm, 2, -1, -1) <= 1)
 					n++;
 			}
 			if (c == 'g')
@@ -277,27 +303,38 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 			cp = number(cp, ep, (long)n, c, width, pad);
 			continue;
 		case 'H':	/* hour (0 - 23) */
-			cp = number(cp, ep, (long)tp->tm_hour, 2, width, pad);
+			cp = number(cp, ep, (long)tm->tm_hour, 2, width, pad);
 			continue;
 		case 'i':	/* international `date(1)' date */
 			p = tm_info.format[TM_INTERNATIONAL];
 			goto push;
 		case 'I':	/* hour (0 - 12) */
-			if ((n = tp->tm_hour) > 12) n -= 12;
+			if ((n = tm->tm_hour) > 12) n -= 12;
 			else if (n == 0) n = 12;
 			cp = number(cp, ep, (long)n, 2, width, pad);
 			continue;
 		case 'J':	/* Julian date (0 offset) */
-			cp = number(cp, ep, (long)tp->tm_yday, 3, width, pad);
+			cp = number(cp, ep, (long)tm->tm_yday, 3, width, pad);
 			continue;
 		case 'j':	/* Julian date (1 offset) */
-			cp = number(cp, ep, (long)(tp->tm_yday + 1), 3, width, pad);
+			cp = number(cp, ep, (long)(tm->tm_yday + 1), 3, width, pad);
 			continue;
 		case 'k':	/* `date(1)' date */
 			p = tm_info.format[TM_DATE_1];
 			goto push;
 		case 'K':
-			p = "%Y-%m-%d+%H:%M:%S";
+			switch (alt)
+			{
+			case 'E':
+				p = (pad == '_') ? "%Y-%m-%d %H:%M:%S.%N %z" : "%Y-%m-%d+%H:%M:%S.%N%z";
+				break;
+			case 'O':
+				p = (pad == '_') ? "%Y-%m-%d %H:%M:%S.%N" : "%Y-%m-%d+%H:%M:%S.%N";
+				break;
+			default:
+				p = (pad == '_') ? "%Y-%m-%d %H:%M:%S" : "%Y-%m-%d+%H:%M:%S";
+				break;
+			}
 			goto push;
 		case 'l':	/* `ls -l' date */
 			if (t)
@@ -316,25 +353,31 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 			p = tm_info.format[TM_DEFAULT];
 			goto push;
 		case 'm':	/* month number */
-			cp = number(cp, ep, (long)(tp->tm_mon + 1), 2, width, pad);
+			cp = number(cp, ep, (long)(tm->tm_mon + 1), 2, width, pad);
 			continue;
 		case 'M':	/* minutes */
-			cp = number(cp, ep, (long)tp->tm_min, 2, width, pad);
+			cp = number(cp, ep, (long)tm->tm_min, 2, width, pad);
 			continue;
 		case 'n':
 			if (cp < ep)
 				*cp++ = '\n';
 			continue;
 		case 'N':	/* nanosecond part */
-			cp = number(cp, ep, (long)tp->tm_nsec, 9, width, pad);
+			cp = number(cp, ep, (long)tm->tm_nsec, 9, width, pad);
 			continue;
+		case 'o':	/* set options */
+			if (arg)
+				goto options;
+			/*OBSOLETE*/
+			p = tm_info.deformat;
+			goto push;
 		case 'p':	/* meridian */
-			n = TM_MERIDIAN + (tp->tm_hour >= 12);
+			n = TM_MERIDIAN + (tm->tm_hour >= 12);
 			goto index;
 		case 'q':	/* time zone type (nation code) */
 			if (!(flags & TM_UTC))
 			{
-				if ((zp = tm_info.zone) != tm_info.local)
+				if ((zp = tm->tm_zone) != tm_info.local)
 					for (; zp >= tm_data.zone; zp--)
 						if (p = zp->type)
 							goto string;
@@ -393,10 +436,7 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 			goto push;
 		case 's':	/* seconds[.nanoseconds] since the epoch */
 		case '#':
-			if (t)
-				now = t;
-			else
-				now = tmxgettime();
+			now = t;
 			f = fmt;
 			*f++ = '%';
 			if (pad == '0')
@@ -414,7 +454,7 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 			}
 			continue;
 		case 'S':	/* seconds */
-			cp = number(cp, ep, (long)tp->tm_sec, 2, width, pad);
+			cp = number(cp, ep, (long)tm->tm_sec, 2, width, pad);
 			if ((flags & TM_SUBSECOND) && (format - 2) != oformat)
 			{
 				p = ".%N";
@@ -429,21 +469,21 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 			p = tm_info.format[TM_TIME];
 			goto push;
 		case 'u':	/* weekday number [1(Monday)-7] */
-			if (!(i = tp->tm_wday))
+			if (!(i = tm->tm_wday))
 				i = 7;
 			cp = number(cp, ep, (long)i, 0, width, pad);
 			continue;
 		case 'U':	/* week number, Sunday as first day */
-			cp = number(cp, ep, (long)tmweek(tp, 0, -1, -1), 2, width, pad);
+			cp = number(cp, ep, (long)tmweek(tm, 0, -1, -1), 2, width, pad);
 			continue;
 		case 'V':	/* ISO week number */
-			cp = number(cp, ep, (long)tmweek(tp, 2, -1, -1), 2, width, pad);
+			cp = number(cp, ep, (long)tmweek(tm, 2, -1, -1), 2, width, pad);
 			continue;
 		case 'W':	/* week number, Monday as first day */
-			cp = number(cp, ep, (long)tmweek(tp, 1, -1, -1), 2, width, pad);
+			cp = number(cp, ep, (long)tmweek(tm, 1, -1, -1), 2, width, pad);
 			continue;
 		case 'w':	/* weekday number [0(Sunday)-6] */
-			cp = number(cp, ep, (long)tp->tm_wday, 0, width, pad);
+			cp = number(cp, ep, (long)tm->tm_wday, 0, width, pad);
 			continue;
 		case 'x':
 			p = tm_info.format[TM_DATE];
@@ -452,73 +492,43 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 			p = tm_info.format[TM_TIME];
 			goto push;
 		case 'y':	/* year in the form yy */
-			cp = number(cp, ep, (long)(tp->tm_year % 100), 2, width, pad);
+			cp = number(cp, ep, (long)(tm->tm_year % 100), 2, width, pad);
 			continue;
 		case 'Y':	/* year in the form ccyy */
-			cp = number(cp, ep, (long)(1900 + tp->tm_year), 4, width, pad);
+			cp = number(cp, ep, (long)(1900 + tm->tm_year), 4, width, pad);
 			continue;
 		case 'z':	/* time zone west offset */
+			if (arg)
+			{
+				if ((zp = tmzone(arg, &f, 0, 0)) && !*f && tm->tm_zone != zp)
+					tm = tmxtm(tm, tmxtime(tm, tm->tm_zone->west + (tm->tm_isdst ? tm->tm_zone->dst : 0)), zp);
+				continue;
+			}
 			if ((ep - cp) >= 16)
-				cp = tmpoff(cp, ep - cp, "", (flags & TM_UTC) ? 0 : tm_info.zone->west - (tp->tm_isdst ? 60 : 0), 24 * 60);
+				cp = tmpoff(cp, ep - cp, "", (flags & TM_UTC) ? 0 : tm->tm_zone->west + (tm->tm_isdst ? tm->tm_zone->dst : 0), 24 * 60);
 			continue;
 		case 'Z':	/* time zone */
-			p = (flags & TM_UTC) ? tm_info.format[TM_UT] : tp->tm_isdst && tm_info.zone->daylight ? tm_info.zone->daylight : tm_info.zone->standard;
+			if (arg)
+			{
+				if ((zp = tmzone(arg, &f, 0, 0)) && !*f && tm->tm_zone != zp)
+					tm = tmxtm(tm, tmxtime(tm, tm->tm_zone->west + (tm->tm_isdst ? tm->tm_zone->dst : 0)), zp);
+				continue;
+			}
+			p = (flags & TM_UTC) ? tm_info.format[TM_UT] : tm->tm_isdst && tm->tm_zone->daylight ? tm->tm_zone->daylight : tm->tm_zone->standard;
 			goto string;
 		case '+':	/* old %+flag */
 		case '!':	/* old %!flag */
 			format--;
 			/*FALLTHROUGH*/
-		case '=':	/* %=[=][+-]flag */
-			if (i = *format == '=')
+		case '=':	/* old %=[=][+-]flag */
+			for (arg = argbuf; *format == '=' || *format == '-' || *format == '+' || *format == '!'; format++)
+				if (arg < &argbuf[sizeof(argbuf) - 2])
+					*arg++ = *format;
+			if (*arg++ = *format)
 				format++;
-			if (*format == '+' || *format == '-' || *format == '!')
-				c = *format++;
-			else
-				c = '+';
-			switch (*format++)
-			{
-			case 0:
-				format--;
-				continue;
-			case 'l':
-				n = TM_LEAP;
-				break;
-			case 'n':
-			case 's':
-				n = TM_SUBSECOND;
-				break;
-			case 'u':
-				n = TM_UTC;
-				break;
-			}
-			if (n)
-			{
-				/*
-				 * right, the global state stinks
-				 * but we respect its locale-like status
-				 */
-
-				if (c == '+')
-				{
-					if (!(flags & n))
-					{
-						flags |= n;
-						tm_info.flags |= n;
-						tp = tmxmake(t);
-						if (!i)
-							tm_info.flags &= ~n;
-					}
-				}
-				else if (flags & n)
-				{
-					flags &= ~n;
-					tm_info.flags &= ~n;
-					tp = tmxmake(t);
-					if (!i)
-						tm_info.flags |= n;
-				}
-			}
-			continue;
+			*arg = 0;
+			arg = argbuf;
+			goto options;
 		default:
 			if (cp < ep)
 				*cp++ = '%';
@@ -531,6 +541,66 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 	string:
 		while (cp < ep && (*cp = *p++))
 			cp++;
+		continue;
+	options:
+		c = '+';
+		i = 0;
+		for (;;)
+		{
+			switch (*arg++)
+			{
+			case 0:
+				n = 0;
+				break;
+			case '=':
+				i = !i;
+				continue;
+			case '+':
+			case '-':
+			case '!':
+				c = *(arg - 1);
+				continue;
+			case 'l':
+				n = TM_LEAP;
+				break;
+			case 'n':
+			case 's':
+				n = TM_SUBSECOND;
+				break;
+			case 'u':
+				n = TM_UTC;
+				break;
+			default:
+				continue;
+			}
+			if (!n)
+				break;
+
+			/*
+			 * right, the global state stinks
+			 * but we respect its locale-like status
+			 */
+
+			if (c == '+')
+			{
+				if (!(flags & n))
+				{
+					flags |= n;
+					tm_info.flags |= n;
+					tm = tmxtm(tm, t, (flags & TM_UTC) ? &tm_data.zone[2] : tm->tm_zone);
+					if (!i)
+						tm_info.flags &= ~n;
+				}
+			}
+			else if (flags & n)
+			{
+				flags &= ~n;
+				tm_info.flags &= ~n;
+				tm = tmxtm(tm, t, (flags & TM_UTC) ? &tm_data.zone[2] : tm->tm_zone);
+				if (!i)
+					tm_info.flags |= n;
+			}
+		}
 		continue;
 	push:
 		c = 0;

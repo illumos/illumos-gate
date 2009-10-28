@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -38,14 +38,15 @@
 
 #define LC_abbreviated		0x00001
 #define LC_checked		0x00002
-#define LC_default		0x00004
-#define LC_defined		0x00008
-#define LC_debug		0x00010
+#define LC_debug		0x00004
+#define LC_default		0x00008
+#define LC_defined		0x00010
 #define LC_local		0x00020
 #define LC_primary		0x00040
 #define LC_qualified		0x00080
 #define LC_undefined		0x00100
-#define LC_verbose		0x00200
+#define LC_utf8			0x00200
+#define LC_verbose		0x00400
 #define LC_user			0x10000
 #define LC_language_attribute_max		2
 #define LC_territory_language_max		4

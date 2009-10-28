@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -57,6 +57,7 @@ static int		canexecute(char*,int);
 static void		funload(Shell_t*,int,const char*);
 static void		exscript(Shell_t*,char*, char*[], char**);
 static int		path_chkpaths(Pathcomp_t*,Pathcomp_t*,Pathcomp_t*,int);
+static void		path_checkdup(register Pathcomp_t*);
 
 static const char	*std_path;
 
@@ -352,6 +353,7 @@ static char *path_lib(Pathcomp_t *pp, char *path)
 		char save[8];
 		for( ;pp; pp=pp->next)
 		{
+			path_checkdup(pp);
 			if(pp->ino==statb.st_ino && pp->dev==statb.st_dev && pp->mtime==statb.st_mtime)
 				return(pp->lib);
 		}
@@ -380,19 +382,63 @@ void path_dump(register Pathcomp_t *pp)
 #endif
 
 /*
+ * check for duplicate directories on PATH
+ */
+static void path_checkdup(register Pathcomp_t *pp)
+{
+	register char		*name = pp->name;
+	register Pathcomp_t	*oldpp,*first;
+	register int		flag=0;
+	struct stat 		statb;
+	if(stat(name,&statb)<0 || !S_ISDIR(statb.st_mode))
+	{
+		pp->flags |= PATH_SKIP;
+		pp->dev = *name=='/';
+		return;
+	}
+	pp->mtime = statb.st_mtime;
+	pp->ino = statb.st_ino;
+	pp->dev = statb.st_dev;
+	if(*name=='/' && onstdpath(name))
+		flag = PATH_STD_DIR;
+	first = (pp->flags&PATH_CDPATH)?pp->shp->cdpathlist:path_get("");
+	for(oldpp=first; oldpp && oldpp!=pp; oldpp=oldpp->next)
+	{
+		if(pp->ino==oldpp->ino && pp->dev==oldpp->dev && pp->mtime==oldpp->mtime)
+		{
+			flag |= PATH_SKIP;
+			break;
+		}
+	}
+	pp->flags |= flag;
+	if(((pp->flags&(PATH_PATH|PATH_SKIP))==PATH_PATH))
+	{
+		int offset = staktell();
+		stakputs(name);
+		path_chkpaths(first,0,pp,offset);
+		stakseek(offset);
+	}
+}
+
+/*
  * write the next path to search on the current stack
  * if last is given, all paths that come before <last> are skipped
  * the next pathcomp is returned.
  */
 Pathcomp_t *path_nextcomp(register Pathcomp_t *pp, const char *name, Pathcomp_t *last)
 {
+	Pathcomp_t	*ppnext;
 	stakseek(PATH_OFFSET);
 	if(*name=='/')
 		pp = 0;
 	else
 	{
-		for(;pp && pp!=last;pp=pp->next)
+		for(;pp && pp!=last;pp=ppnext)
 		{
+			if(ppnext=pp->next)
+				ppnext->shp = pp->shp;
+			if(!pp->dev && !pp->ino)
+				path_checkdup(pp);
 			if(pp->flags&PATH_SKIP)
 				continue;
 			if(!last || *pp->name!='/')
@@ -523,6 +569,13 @@ static int	path_opentype(const char *name, register Pathcomp_t *pp, int fun)
 	if(fd>=0 && (fd = sh_iomovefd(fd)) > 0)
 	{
 		fcntl(fd,F_SETFD,FD_CLOEXEC);
+		if(!shp)
+		{
+			shp = sh_getinterp();
+#if _UWIN
+			close(0x10001); /* this results in a /var/log/uwin message with "0x10001" for debugging */
+#endif
+		}
 		shp->fdstatus[fd] |= IOCLEX;
 	}
 	return(fd);
@@ -581,16 +634,17 @@ static void funload(Shell_t *shp,int fno, const char *name)
 	pname = path_fullname(stakptr(PATH_OFFSET));
 	if(shp->fpathdict && (rp = dtmatch(shp->fpathdict,(void*)pname)))
 	{
+		Dt_t	*funtree = sh_subfuntree(1);
 		do
 		{
-			if((np = dtsearch(shp->fun_tree,rp->np)) && is_afunction(np))
+			if((np = dtsearch(funtree,rp->np)) && is_afunction(np))
 			{
 				if(np->nvalue.rp)
 					np->nvalue.rp->fdict = 0;
-				nv_delete(np,shp->fun_tree,NV_NOFREE);
+				nv_delete(np,funtree,NV_NOFREE);
 			}
-			dtinsert(shp->fun_tree,rp->np);
-			rp->fdict = shp->fun_tree;
+			dtinsert(funtree,rp->np);
+			rp->fdict = funtree;
 		}
 		while((rp=dtnext(shp->fpathdict,rp)) && strcmp(pname,rp->fname)==0);
 		return;
@@ -601,7 +655,7 @@ static void funload(Shell_t *shp,int fno, const char *name)
 	shp->st.filename = pname;
 	shp->funload = 1;
 	error_info.line = 0;
-	sh_eval(sfnew(NIL(Sfio_t*),buff,IOBSIZE,fno,SF_READ),0);
+	sh_eval(sfnew(NIL(Sfio_t*),buff,IOBSIZE,fno,SF_READ),SH_FUNEVAL);
 	shp->readscript = 0;
 	free((void*)shp->st.filename);
 	shp->funload = oldload;
@@ -652,10 +706,17 @@ int	path_search(register const char *name,Pathcomp_t **oldpp, int flag)
 		path_init(shp);
 	if(flag)
 	{
+		if((np=nv_search(name,shp->track_tree,0)) && !nv_isattr(np,NV_NOALIAS) && (pp=(Pathcomp_t*)np->nvalue.cp))
+		{
+			stakseek(PATH_OFFSET);
+			path_nextcomp(pp,name,pp);
+			stakputc(0);
+			return(0);
+		}
 		pp = path_absolute(name,oldpp?*oldpp:NIL(Pathcomp_t*));
 		if(oldpp)
 			*oldpp = pp;
-		if(!pp && (np=nv_search(name,sh.fun_tree,HASH_NOSCOPE))&&np->nvalue.ip)
+		if(!pp && (np=nv_search(name,shp->fun_tree,HASH_NOSCOPE))&&np->nvalue.ip)
 			return(1);
 		if(!pp)
 			*stakptr(PATH_OFFSET) = 0;
@@ -685,11 +746,9 @@ int	path_search(register const char *name,Pathcomp_t **oldpp, int flag)
 	return(0);
 }
 
-
 /*
  * do a path search and find the full pathname of file name
  */
-
 Pathcomp_t *path_absolute(register const char *name, Pathcomp_t *pp)
 {
 	register int	f,isfun;
@@ -706,7 +765,18 @@ Pathcomp_t *path_absolute(register const char *name, Pathcomp_t *pp)
 		sh_sigcheck();
 		isfun = (pp->flags&PATH_FPATH);
 		if(oldpp=pp)
+		{
 			pp = path_nextcomp(pp,name,0);
+			while(oldpp->flags&PATH_SKIP)
+			{
+				if(!(oldpp=oldpp->next))
+				{
+					shp->path_err = ENOENT;
+					return(0);
+				}
+			}
+		}
+			
 		if(!isfun && !sh_isoption(SH_RESTRICTED))
 		{
 			if(*stakptr(PATH_OFFSET)=='/' && nv_search(stakptr(PATH_OFFSET),sh.bltin_tree,0))
@@ -717,6 +787,7 @@ Pathcomp_t *path_absolute(register const char *name, Pathcomp_t *pp)
 				typedef int (*Fptr_t)(int, char*[], void*);
 				Fptr_t addr;
 				int n = staktell();
+				int libcmd;
 				char *cp;
 				stakputs("b_");
 				stakputs(name);
@@ -727,7 +798,7 @@ Pathcomp_t *path_absolute(register const char *name, Pathcomp_t *pp)
 						cp++;
 					else
 						cp = oldpp->blib;
-					if(strcmp(cp,LIBCMD)==0 && (addr=(Fptr_t)dlllook((void*)0,stakptr(n))))
+					if((libcmd = !strcmp(cp,LIBCMD)) && (addr=(Fptr_t)dlllook((void*)0,stakptr(n))))
 					{
 						if((np = sh_addbuiltin(stakptr(PATH_OFFSET),addr,NiL)) && nv_isattr(np,NV_BLTINOPT))
 							return(oldpp);
@@ -737,7 +808,21 @@ Pathcomp_t *path_absolute(register const char *name, Pathcomp_t *pp)
 #else
 					if (oldpp->bltin_lib = dllfind(oldpp->blib, NiL, RTLD_LAZY, NiL, 0))
 #endif
-						sh_addlib(oldpp->bltin_lib);
+					{
+						/*
+						 * this detects the 2007-05-11 builtin context change and also
+						 * the 2008-03-30 opt_info.num change that hit libcmd::b_head
+						 */
+
+						if (libcmd && !dlllook(oldpp->bltin_lib, "b_pids"))
+						{
+							dlclose(oldpp->bltin_lib);
+							oldpp->bltin_lib = 0;
+							oldpp->blib = 0;
+						}
+						else
+							sh_addlib(oldpp->bltin_lib);
+					}
 				}
 				if((addr=(Fptr_t)dlllook(oldpp->bltin_lib,stakptr(n))) &&
 				   (!(np = sh_addbuiltin(stakptr(PATH_OFFSET),NiL,NiL)) || np->nvalue.bfp!=addr) &&
@@ -753,7 +838,8 @@ Pathcomp_t *path_absolute(register const char *name, Pathcomp_t *pp)
 		f = canexecute(stakptr(PATH_OFFSET),isfun);
 		if(isfun && f>=0)
 		{
-			nv_onattr(nv_open(name,shp->fun_tree,NV_NOARRAY|NV_IDENT|NV_NOSCOPE),NV_LTOU|NV_FUNCTION);
+			nv_onattr(nv_open(name,sh_subfuntree(1),NV_NOARRAY|NV_IDENT|NV_NOSCOPE),NV_LTOU|NV_FUNCTION);
+			funload(shp,f,name);
 			close(f);
 			f = -1;
 			return(0);
@@ -881,7 +967,7 @@ void	path_exec(register const char *arg0,register char *argv[],struct argnod *lo
 	Pathcomp_t *libpath, *pp=0;
 	Shell_t *shp = &sh;
 	int slash=0;
-	nv_setlist(local,NV_EXPORT|NV_IDENT|NV_ASSIGN);
+	nv_setlist(local,NV_EXPORT|NV_IDENT|NV_ASSIGN,0);
 	envp = sh_envgen();
 	if(strchr(arg0,'/'))
 	{
@@ -896,6 +982,8 @@ void	path_exec(register const char *arg0,register char *argv[],struct argnod *lo
 	sfsync(NIL(Sfio_t*));
 	timerdel(NIL(void*));
 	/* find first path that has a library component */
+	while(pp && (pp->flags&PATH_SKIP))
+		pp = pp->next;
 	if(pp || slash) do
 	{
 		sh_sigcheck();
@@ -926,15 +1014,16 @@ pid_t path_spawn(const char *opath,register char **argv, char **envp, Pathcomp_t
 	char **xp=0, *xval, *libenv = (libpath?libpath->lib:0); 
 	Namval_t*	np;
 	char		*s, *v;
-	int		r, n;
+	int		r, n, pidsize;
 	pid_t		pid= -1;
 	/* leave room for inserting _= pathname in environment */
 	envp--;
 #if _lib_readlink
 	/* save original pathname */
 	stakseek(PATH_OFFSET);
+	pidsize = sfprintf(stkstd,"*%d*",spawn?getpid():getppid());
 	stakputs(opath);
-	opath = stakfreeze(1)+PATH_OFFSET;
+	opath = stakfreeze(1)+PATH_OFFSET+pidsize;
 	np=nv_search(argv[0],shp->track_tree,0);
 	while(libpath && !libpath->lib)
 		libpath=libpath->next;
@@ -1012,7 +1101,7 @@ pid_t path_spawn(const char *opath,register char **argv, char **envp, Pathcomp_t
 	}
 	if(!opath)
 		opath = stakptr(PATH_OFFSET);
-	envp[0] =  (char*)opath-PATH_OFFSET;
+	envp[0] =  (char*)opath-(PATH_OFFSET+pidsize);
 	envp[0][0] =  '_';
 	envp[0][1] =  '=';
 	sfsync(sfstderr);
@@ -1219,6 +1308,8 @@ static void exscript(Shell_t *shp,register char *path,register char *argv[],char
 		(HISTCUR)->nvalue.lp = 0;
 	}
 	sh_offstate(SH_FORKED);
+	if(shp->sigflag[SIGCHLD]==SH_SIGOFF)
+		shp->sigflag[SIGCHLD] = SH_SIGFAULT;
 	siglongjmp(*shp->jmplist,SH_JMPSCRIPT);
 }
 
@@ -1322,7 +1413,6 @@ static void exscript(Shell_t *shp,register char *path,register char *argv[],char
 static Pathcomp_t *path_addcomp(Pathcomp_t *first, Pathcomp_t *old,const char *name, int flag)
 {
 	register Pathcomp_t *pp, *oldpp;
-	struct stat statb;
 	int len, offset=staktell();
 	if(!(flag&PATH_BFPATH))
 	{
@@ -1344,65 +1434,26 @@ static Pathcomp_t *path_addcomp(Pathcomp_t *first, Pathcomp_t *old,const char *n
 			return(first);
 		}
 	}
-	if(old && (old=path_dirfind(old,name,0)))
-	{
-		statb.st_ino = old->ino;
-		statb.st_dev = old->dev;
-		statb.st_mtime = old->mtime;
-		if(old->ino==0 && old->dev==0)
-			flag |= PATH_SKIP;
-	}
-	else if(stat(name,&statb)<0 || !S_ISDIR(statb.st_mode))
-	{
-		if(*name=='/')
-		{
-			if(strcmp(name,SH_CMDLIB_DIR))
-				return(first);
-			statb.st_dev = 1;
-		}
-		else
-		{
-			flag |= PATH_SKIP;
-			statb.st_dev = 0;
-		}
-		statb.st_ino = 0;
-		statb.st_mtime = 0;
-	}
-	if(*name=='/' && onstdpath(name))
-		flag |= PATH_STD_DIR;
-	for(pp=first, oldpp=0; pp; oldpp=pp, pp=pp->next)
-	{
-		if(pp->ino==statb.st_ino && pp->dev==statb.st_dev && pp->mtime==statb.st_mtime)
-		{
-			/* if both absolute paths, eliminate second */
-			pp->flags |= flag;
-			if(*name=='/' && *pp->name=='/')
-				return(first);
-			/* keep the path but mark it as skip */
-			flag |= PATH_SKIP;
-		}
-	}
+	for(pp=first, oldpp=0; pp; oldpp=pp, pp=pp->next);
 	pp = newof((Pathcomp_t*)0,Pathcomp_t,1,len+1);
 	pp->refcount = 1;
 	memcpy((char*)(pp+1),name,len+1);
 	pp->name = (char*)(pp+1);
 	pp->len = len;
-	pp->dev = statb.st_dev;
-	pp->ino = statb.st_ino;
-	pp->mtime = statb.st_mtime;
 	if(oldpp)
 		oldpp->next = pp;
 	else
 		first = pp;
 	pp->flags = flag;
-	if(pp->ino==0 && pp->dev==1)
+	if(strcmp(name,SH_CMDLIB_DIR)==0)
 	{
+		pp->dev = 1;
 		pp->flags |= PATH_BUILTIN_LIB;
 		pp->blib = malloc(4);
 		strcpy(pp->blib,LIBCMD);
 		return(first);
 	}
-	if((flag&(PATH_PATH|PATH_SKIP))==PATH_PATH)
+	if(old && ((flag&(PATH_PATH|PATH_SKIP))==PATH_PATH))
 		path_chkpaths(first,old,pp,offset);
 	return(first);
 }

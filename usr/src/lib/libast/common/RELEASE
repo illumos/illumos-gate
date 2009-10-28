@@ -1,3 +1,62 @@
+09-10-05 _sfopen.c: add but ignore 'F' flags for stdio compatibility
+09-09-28 fts.h,ftwalk.h,fts.c: promote { namelen pathlen level } to (s)size_t
+09-09-28 locales: add AST_LC_LANG for $LANG
+09-09-28 setlocale.c: fix logic for dynamic { LANG LC_ALL LC_* } changes
+09-09-17 include/sfio.h,sfio/sfwalk.c: add sfwalk()
+09-09-09 sfio/sfputr.c: add SIGPIPE hang fix
+09-08-24 sfio/sfreserve.c: fix SF_UNBOUND logic with pushed streams
+09-08-18 include/ast_std.h,ast.h: add ast.mb_sync to sync mbchar() after error
+09-08-17 comp/setlocale.c: add AST_LC_utf8 and { utf8_mbtowc() utf8_mblen() }
+09-08-11 comp/setlocale.c: treat "en"/"en_US" AST_LC_MESSAGES as "C"/"POSIX"
+09-08-10 vmalloc/vmhdr.h: add user-defined _AST_PAGESIZE and computed VMHEAPINCR
+09-08-09 comp/conf.tab: add NPROCESSORS_MAX
+09-07-29 astlicense.c: fix first name=value logic error
+09-07-22 string/fmtip6.c: don't drop trailing 0 in 44::1:0:0
+09-06-30 port/astconf.c: standard PATH_RESOLVE is "physical" (not "metaphysical")
+09-06-19 vmalloc: sync with kpv
+09-06-19 include/shcmd.h: add sh_context(p) cast
+09-06-11 misc/magic.tab: differentiate pc 386 32/64 bit dll/exe/obj
+09-06-06 port/astconf.c: fix look->name null pointer reference
+09-06-05 port/astconf.c: fix 'UNIVERSE = value' synthesize logic
+09-05-25 tm/tmxduration.c: add
+09-05-08 comp/syslog.c: add _UWIN /var/log/syslog preference
+09-05-01 comp/setlocale.c: fix _UWIN intercepts to return NiL on unknown locales
+09-04-27 sfio/sfpool.c: fix bug that did not return pool on delete
+09-04-22 include/regex.h,regex/regcomp.c: add REG_REGEXP <regexp.h> compatibility
+09-04-15 tm/tmxdate.c: handle "4th thursday in november"
+09-03-31 string/strvcmp.c,string/strnvcmp.c: add version strcmp(3)
+09-03-31 string/strpcmp.c,string/strnpcmp.c: add path prefix strcmp(3)
+09-03-29 misc/optget.c: clean up num = number casts
+09-03-04 tm/tmxmake.c: add tmxtm() with zone override
+09-03-03 tm/tmxfmt.c: add %(...)<c>, specifically %(...)z for output zone
+09-02-22 tm/tmxdate.c: add iso P... durations
+09-02-02 path/pathprog.c: add
+09-02-02 misc/opthdr.h,optget.c: fix flags mixup, handle old '-' as option
+09-02-02 sfio/sfprints.c: fix sfvaprints() return value to not count trailing '\0'
+09-02-02 misc/cmdarg.c: handle !defined(ARG_MAX)
+09-02-02 port/astconf.c: fix UNIVERSE overwrite of null[] value!
+09-01-31 features/sys: drop header sys/localedef.h
+09-01-28 include/fs3d.h,misc/fs3d.c: mount() => fs3d_mount() for diff std prototypes
+09-01-14 misc/fts_open.c: delay top list reorder until first fts_read()
+09-01-14 include/ls.h: LS_W_INUMBER => 9 to accomodate large st_ino
+09-01-14 misc/optget.c: expand STYLE_usage input text
+09-01-09 features/uwin,stdio/_stdfun.c: iffe for _p__iob and __p__iob
+09-01-09 misc/magic.tab: add ISO filesystem image entries
+09-01-07 string/strtoi.c: strtol() etc. do not consume [lLuU] suffix -- thanks jkf
+09-01-07 sfio/sfstrtof.h: strtod() etc. do not consume [fFlL] suffix -- thanks jkf
+09-01-05 string/strlcat.c: fix logic to match docs (not that easy)
+08-12-30 tm/tmxdate.c,include/tm.h: add TM_WORK { "workday" "working" "work" }
+08-12-28 sfio/sfcvt.c: fix 'a' format rounding
+08-12-21 tm/tmdata.c: add 2008-12-31+23:59:60-0000 leap second event
+08-12-19 tm/tmxdate.c: check for dates near the epoch rolling back to the future
+08-12-19 tm/tmxfmt.c: change %s for now==0 to be the epoch
+08-12-07 include/ast_std.h,misc/getenv.c: no _ast_getenv for uwin ast54 compatibility
+08-12-07 tm/tmxfmt.c: add %[_][EO]K for [space pad] [full|long] iso
+08-12-07 sfio/sfvscanf.c: fix ok[] short by one allocation
+08-12-07 comp/setlocale.c: fix off by one composite initialition loop test
+08-12-07 path/pathkey.c: fix off by one loop test
+08-12-04 vmalloc/vmbest.c: catch sbrk() wraparound
+08-12-04 comp/spawnveg.c: clean up attrs on failure too
 08-11-04 regex/regcomp.c: fix locale [!-...] and [^-...] re-initialization
 08-11-04 stdio: add flockfile.c ftrylockfile.c funlockfile.c
 08-10-24 port/astconf.c: handle multiple/trailing '/' in universe initialization

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -41,6 +41,7 @@ typedef struct  _shlex_
 	int		lastline;	/* last line number */
 	int		lasttok;	/* previous token number */
 	int		digits;		/* numerical value with word token */
+	int		nonstandard;	/* nonstandard construct in profile */
 	char		aliasok;	/* on when alias is legal */
 	char		assignok;	/* on when name=value is legal */
 	char		inexec;		/* on when processing exec */
@@ -110,6 +111,7 @@ typedef struct  _shlex_
 #define FALLTHRUSYM	(SYMAMP|';')
 #define COOPSYM		(SYMAMP|'|')
 #define IORDWRSYM	(SYMGT|'<')
+#define IORDWRSYMT	(SYMSEMI|'<')
 #define IOCLOBSYM	(SYMPIPE|'>')
 #define IPROCSYM	(SYMLPAR|'<')
 #define OPROCSYM	(SYMLPAR|'>')

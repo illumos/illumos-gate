@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1997-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1997-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -80,7 +80,7 @@ _dll_next(int flags, _DLL_RLD_SYM_TYPE* here)
 	{
 		do
 		{
-			if (strcmp(vp, "MAIN") && (lp = dlopen(vp, flags)))
+			if (strcmp(vp, "MAIN") && (lp = dllopen(vp, flags)))
 			{
 				if (xr = (Write_f)dlsym(lp, "write"))
 					wr = xr;
@@ -92,7 +92,7 @@ _dll_next(int flags, _DLL_RLD_SYM_TYPE* here)
 	{
 		do
 		{
-			if (lp = dlopen(strcmp(vp, "MAIN") ? vp : (char*)0, flags))
+			if (lp = dllopen(strcmp(vp, "MAIN") ? vp : (char*)0, flags))
 			{
 				if (found)
 				{
@@ -207,7 +207,7 @@ dllnext(int flags)
 	}
 #endif
 	ver = path + strlen(path);
-	while (!(dll = dlopen(path, flags)))
+	while (!(dll = dllopen(path, flags)))
 	{
 		do
 		{

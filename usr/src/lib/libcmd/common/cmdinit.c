@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -24,14 +24,29 @@
  */
 
 #include <cmd.h>
+#include <shcmd.h>
 
 int
 _cmd_init(int argc, char** argv, void* context, const char* catalog, int flags)
 {
 	register char*	cp;
 
-	if (argc < 0)
+	if (argc <= 0)
 		return -1;
+	if (context)
+	{
+		if (flags & ERROR_CALLBACK)
+		{
+			flags &= ~ERROR_CALLBACK;
+			flags |= ERROR_NOTIFY;
+		}
+		else if (flags & ERROR_NOTIFY)
+		{
+			((Shbltin_t*)(context))->notify = 1;
+			flags &= ~ERROR_NOTIFY;
+		}
+		error_info.flags |= flags;
+	}
 	if (cp = strrchr(argv[0], '/'))
 		cp++;
 	else
@@ -40,8 +55,6 @@ _cmd_init(int argc, char** argv, void* context, const char* catalog, int flags)
 	if (!error_info.catalog)
 		error_info.catalog = catalog;
 	opt_info.index = 0;
-	if (context)
-		error_info.flags |= flags;
 	return 0;
 }
 

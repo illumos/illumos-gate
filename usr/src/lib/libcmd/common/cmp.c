@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -28,7 +28,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: cmp (AT&T Research) 2004-12-01 $\n]"
+"[-?\n@(#)$Id: cmp (AT&T Research) 2009-01-05 $\n]"
 USAGE_LICENSE
 "[+NAME?cmp - compare two files]"
 "[+DESCRIPTION?\bcmp\b compares two files \afile1\a and \afile2\a.  "
@@ -119,7 +119,7 @@ cmp(const char* file1, Sfio_t* f1, const char* file2, Sfio_t* f2, int flags)
 				{
 					ret = 1;
 					if (!(flags & CMP_SILENT))
-						error(ERROR_exit(1), "%s: EOF", file1);
+						error(ERROR_exit(1), "EOF on %s", file1);
 				}
 				return(ret);
 			}
@@ -130,7 +130,7 @@ cmp(const char* file1, Sfio_t* f1, const char* file2, Sfio_t* f2, int flags)
 			if (!(p2 = (unsigned char*)sfreserve(f2, SF_UNBOUND, 0)) || (c2 = sfvalue(f2)) <= 0)
 			{
 				if (!(flags & CMP_SILENT))
-					error(ERROR_exit(1), "%s: EOF", file2);
+					error(ERROR_exit(1), "EOF on %s", file2);
 				return(1);
 			}
 			e2 = p2 + c2;
@@ -263,14 +263,14 @@ b_cmp(int argc, register char** argv, void* context)
 	if (o1 && sfseek(f1, o1, SEEK_SET) != o1)
 	{
 		if (!(flags & CMP_SILENT))
-			error(ERROR_exit(0), "%s: EOF", file1);
+			error(ERROR_exit(0), "EOF on %s", file1);
 		n = 1;
 		goto done;
 	}
 	if (o2 && sfseek(f2, o2, SEEK_SET) != o2)
 	{
 		if (!(flags & CMP_SILENT))
-			error(ERROR_exit(0), "%s: EOF", file2);
+			error(ERROR_exit(0), "EOF on %s", file2);
 		n = 1;
 		goto done;
 	}
@@ -280,7 +280,8 @@ b_cmp(int argc, register char** argv, void* context)
 		error(ERROR_system(0), "%s: cannot stat", file1);
 	else if (s1.st_ino == s2.st_ino && s1.st_dev == s2.st_dev && o1 == o2)
 		n = 0;
-	else n = ((flags & CMP_SILENT) && S_ISREG(s1.st_mode) && S_ISREG(s2.st_mode) && (s1.st_size - o1) != (s2.st_size - o2)) ? 1 : cmp(file1, f1, file2, f2, flags);
+	else
+		n = ((flags & CMP_SILENT) && S_ISREG(s1.st_mode) && S_ISREG(s2.st_mode) && (s1.st_size - o1) != (s2.st_size - o2)) ? 1 : cmp(file1, f1, file2, f2, flags);
  done:
 	if (f1 && f1 != sfstdin) sfclose(f1);
 	if (f2 && f2 != sfstdin) sfclose(f2);

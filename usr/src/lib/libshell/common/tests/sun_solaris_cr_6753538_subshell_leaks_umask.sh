@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -40,16 +40,19 @@
 # -- snip --
 
 
+# test setup
 function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors+=1 ))
+	(( Errors++ ))
 }
-
 alias err_exit='err_exit $LINENO'
 
+set -o nounset
+Command=${0##*/}
 integer Errors=0
+
 
 #
 # test set 1: Simple umask in subshell
@@ -92,6 +95,7 @@ y=$(${SHELL} -c 'umask 20; (ulimit -c 0 ; umask  0); umask') || err_exit "shell 
 x=$(${SHELL} -c 'umask  0; (              umask 20); umask') || err_exit "shell failed."
 y=$(${SHELL} -c 'umask  0; (ulimit -c 0 ; umask 20); umask') || err_exit "shell failed."
 [[ "$x" == "$y" ]] || err_exit "$x != $y"
+
 
 # tests done
 exit $((Errors))

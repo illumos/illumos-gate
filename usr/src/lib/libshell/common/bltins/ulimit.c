@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -29,7 +29,7 @@
 #include	<ast.h>
 #include	<sfio.h>
 #include	<error.h>
-#include	<shell.h>
+#include	"defs.h"
 #include	"builtins.h"
 #include	"name.h"
 #include	"ulimit.h"
@@ -132,7 +132,7 @@ int	b_ulimit(int argc,char *argv[],void *extra)
 		unit = shtab_units[tp->type];
 		if(limit)
 		{
-			if(shp->subshell)
+			if(shp->subshell && !shp->subshare)
 				sh_subfork();
 			if(strcmp(limit,e_unlimited)==0)
 				i = INFINITY;

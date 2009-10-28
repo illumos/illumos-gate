@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -37,6 +37,7 @@
 #include	"fault.h"
 #include	"argnod.h"
 #include	"name.h"
+#include	<ctype.h>
 #define _SH_PRIVATE
 #include	<shcmd.h>
 #undef _SH_PRIVATE
@@ -149,6 +150,7 @@ struct limits
 	pid_t		bckpid;		/* background process id */ \
 	pid_t		cpid; \
 	pid_t		spid; 		/* subshell process id */ \
+	pid_t		pipepid; \
 	int32_t		ppid;		/* parent process id of shell */ \
 	int		topfd; \
 	int		sigmax;		/* maximum number of signals */ \
@@ -167,6 +169,7 @@ struct limits
 	char		indebug; 	/* set when in debug trap */ \
 	unsigned char	lastsig;	/* last signal received */ \
 	char		subshare;	/* set when in ${..} comsub */ \
+	char		toomany;	/* set when out of fd's */ \
 	char		*readscript;	/* set before reading a script */ \
 	int		*inpipe;	/* input pipe pointer */ \
 	int		*outpipe;	/* output pipe pointer */ \
@@ -226,10 +229,12 @@ struct limits
 	Shopt_t		glob_options; \
 	Namval_t	*typeinit; \
 	int		*stats; \
-	Namfun_t	nvfun;
+	Namfun_t	nvfun; \
+	struct Regress_s*regress;
 
 #include	<shell.h>
 
+#include	"regress.h"
 
 /* error exits from various parts of shell */
 #define	NIL(type)	((type)0)
@@ -248,8 +253,7 @@ struct limits
 
 /* states */
 /* low numbered states are same as options */
-#define SH_NOFORK	0	/* set when fork not necessary, not a state */
-#define SH_COMPLETE	0	/* set for command completion */
+#define SH_NOFORK	0	/* set when fork not necessary */
 #define	SH_FORKED	7	/* set when process has been forked */
 #define	SH_PROFILE	8	/* set when processing profiles */
 #define SH_NOALIAS	9	/* do not expand non-exported aliases */
@@ -262,6 +266,7 @@ struct limits
 #define SH_TTYWAIT	16	/* waiting for keyboard input */ 
 #define	SH_FCOMPLETE	17	/* set for filename completion */
 #define	SH_PREINIT	18	/* set with SH_INIT before parsing options */
+#define SH_COMPLETE	19	/* set for command completion */
 
 #define SH_BASH			41
 #define SH_BRACEEXPAND		42
@@ -335,6 +340,7 @@ struct limits
 #define MATCH_MAX		64
 
 #define SH_READEVAL		0x4000	/* for sh_eval */
+#define SH_FUNEVAL		0x10000	/* for sh_eval for function load */
 
 extern Shell_t		*nv_shell(Namval_t*);
 extern int		sh_addlib(void*);
@@ -343,6 +349,7 @@ extern char 		**sh_argbuild(Shell_t*,int*,const struct comnod*,int);
 extern struct dolnod	*sh_argfree(Shell_t *, struct dolnod*,int);
 extern struct dolnod	*sh_argnew(Shell_t*,char*[],struct dolnod**);
 extern void 		*sh_argopen(Shell_t*);
+extern struct argnod	*sh_argprocsub(Shell_t*,struct argnod*);
 extern void 		sh_argreset(Shell_t*,struct dolnod*,struct dolnod*);
 extern Namval_t		*sh_assignok(Namval_t*,int);
 extern struct dolnod	*sh_arguse(Shell_t*);

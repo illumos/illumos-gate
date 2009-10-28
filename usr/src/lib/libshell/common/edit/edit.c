@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -30,7 +30,6 @@
 #include	<ast.h>
 #include	<errno.h>
 #include	<ccode.h>
-#include	<ctype.h>
 #include	"FEATURE/options"
 #include	"FEATURE/time"
 #include	"FEATURE/cmds"
@@ -43,6 +42,7 @@
 #   include	"defs.h"
 #   include	"variables.h"
 #else
+#   include	<ctype.h>
     extern char ed_errbuf[];
     char e_version[] = "\n@(#)$Id: Editlib version 1993-12-28 r $\0\n";
 #endif	/* KSHELL */
@@ -818,7 +818,7 @@ int ed_read(void *context, int fd, char *buff, int size, int reedit)
 	{
 		if(shp->trapnote&(SH_SIGSET|SH_SIGTRAP))
 			goto done;
-		if(ep->sh->winch)
+		if(ep->sh->winch && sh_isstate(SH_INTERACTIVE) && (sh_isoption(SH_VI) || sh_isoption(SH_EMACS)))
 		{
 			Edpos_t	lastpos;
 			int	n, rows, newsize;
@@ -857,9 +857,12 @@ int ed_read(void *context, int fd, char *buff, int size, int reedit)
 				buff[2] = 'a';
 				return(3);
 			}
-			buff[0] = cntl('L');
+			if(sh_isoption(SH_EMACS) || sh_isoption(SH_VI))
+				buff[0] = cntl('L');
 			return(1);
 		}
+		else
+			ep->sh->winch = 0;
 		/* an interrupt that should be ignored */
 		errno = 0;
 		if(!waitevent || (rv=(*waitevent)(fd,-1L,0))>=0)

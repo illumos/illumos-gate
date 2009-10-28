@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -25,6 +25,12 @@ function err_exit
 }
 alias err_exit='err_exit $LINENO'
 
+Command=${0##*/}
+integer Errors=0
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
+
 function fun
 {
 	integer i
@@ -34,8 +40,6 @@ function fun
 	done
 }
 
-Command=${0##*/}
-integer Errors=0
 set -A x zero one two three four 'five six'
 if	[[ $x != zero ]]
 then	err_exit '$x is not element 0'
@@ -268,7 +272,7 @@ fi
 	export foo
 	typeset -i foo
 	[[ $($SHELL -c "print $foo") == 143 ]]'
-) 2> /dev/null || 
+) 2> /dev/null ||
 		err_exit 'exporting associative array not exporting 0-th element'
 unset foo
 typeset -A foo
@@ -283,7 +287,7 @@ for i in one three four five
 do	: ${foo[$i]}
 done
 if	[[ ${!foo[@]} != two ]]
-then	err_exit 'Error in subscript names'
+then	err_exit 'error in subscript names'
 fi
 unset x
 x=( 1 2 3)
@@ -329,24 +333,23 @@ bam[foo]=value
 [[ $bam == value ]] && err_exit 'unset associative array element error'
 : only first element of an array can be exported
 unset bam
-trap 'rm -f /tmp/sharr$$' EXIT
-print 'print ${var[0]} ${var[1]}' > /tmp/sharr$$
-chmod +x /tmp/sharr$$
-[[ $($SHELL -c "var=(foo bar);export var;/tmp/sharr$$") == foo ]] || err_exit 'export array not exporting just first element'
+print 'print ${var[0]} ${var[1]}' > $tmp/script
+chmod +x $tmp/script
+[[ $($SHELL -c "var=(foo bar);export var;$tmp/script") == foo ]] || err_exit 'export array not exporting just first element'
 unset foo
 set -o allexport
 foo=one
 foo[1]=two
 foo[0]=three
 [[ $foo == three ]] || err_exit 'export all not working with arrays'
-cat > /tmp/sharr$$ <<- \!
+cat > $tmp/script <<- \!
 	typeset -A foo
 	print foo${foo[abc]}
 !
 # 04-05-24 bug fix
 unset foo
-[[ $($SHELL -c "typeset -A foo;/tmp/sharr$$")  == foo ]] 2> /dev/null || err_exit 'empty associative arrays not being cleared correctly before scripts'
-[[ $($SHELL -c "typeset -A foo;foo[abc]=abc;/tmp/sharr$$") == foo ]] 2> /dev/null || err_exit 'associative arrays not being cleared correctly before scripts'
+[[ $($SHELL -c "typeset -A foo;$tmp/script")  == foo ]] 2> /dev/null || err_exit 'empty associative arrays not being cleared correctly before scripts'
+[[ $($SHELL -c "typeset -A foo;foo[abc]=abc;$tmp/script") == foo ]] 2> /dev/null || err_exit 'associative arrays not being cleared correctly before scripts'
 unset foo
 foo=(one two)
 [[ ${foo[@]:1} == two ]] || err_exit '${foo[@]:1} == two'
@@ -406,7 +409,7 @@ x=${bar[$foo[5]]}
 	test_array[3]=4
 	print "val=${test_array[3]}"
 ++EOF+++
-) == val=4 ]] 2> /dev/null || err_exit 'after reading array[j] and assign array[j] fails' 
+) == val=4 ]] 2> /dev/null || err_exit 'after reading array[j] and assign array[j] fails'
 [[ $($SHELL <<- \+++EOF+++
 	pastebin=( typeset -a form)
 	pastebin.form+=( name="name"   data="clueless" )
@@ -464,4 +467,10 @@ a[6]=six
 [[ ${a[-1]} == six ]] || err_exit 'a[-1] should be six'
 [[ ${a[-3]} == four ]] || err_exit 'a[-3] should be four'
 [[ ${a[-3..-1]} == 'four six' ]] || err_exit "a[-3,-1] should be 'four six'"
+
+FILTER=(typeset scope)
+FILTER[0].scope=include
+FILTER[1].scope=exclude
+[[ ${#FILTER[@]} == 2 ]] ||  err_exit "FILTER array should have two elements not ${#FILTER[@]}"
+
 exit $((Errors))

@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -20,10 +20,10 @@
 : generate the ksh math builtin table
 : include math.tab
 
-# @(#)math.sh (AT&T Research) 2008-08-29
+# @(#)math.sh (AT&T Research) 2009-08-18
 
 command=$0
-iffeflags="-n -v -F ast_standards.h"
+iffeflags="-n -v"
 iffehdrs="math.h ieeefp.h"
 iffelibs="-lm"
 table=/dev/null
@@ -38,6 +38,13 @@ tests=
 : check long double
 
 eval `iffe $iffeflags -c "$cc" - typ long.double 2>&$stderr`
+
+: check ast_standards.h
+
+eval `iffe $iffeflags -F ast_standards.h -c "$cc" - tst use_ast_standards -lm 'note{' 'math.h needs ast_standards.h' '}end' 'link{' '#include <math.h>' '#ifndef isgreater' '#define isgreater(a,b) 0' '#endif' 'int main() { return isgreater(0.0,1.0); }' '}end'`
+case $_use_ast_standards in
+1)	iffeflags="$iffeflags -F ast_standards.h" ;;
+esac
 
 : read the table
 
@@ -80,13 +87,14 @@ cat <<!
 typedef Sfdouble_t (*Math_f)(Sfdouble_t,...);
 
 !
-echo "#include <ast_standards.h>"
+case $_use_ast_standards in
+1)	echo "#include <ast_standards.h>" ;;
+esac
 echo "#include <math.h>"
 case $_hdr_ieeefp in
-1)	echo "#include <ieeefp.h>"
-	echo
-	;;
+1)	echo "#include <ieeefp.h>" ;;
 esac
+echo
 
 : generate the intercept functions and table entries
 
@@ -105,7 +113,23 @@ do	eval x='$'_lib_${name}l y='$'_lib_${name} r='$'TYPE_${name} a='$'ARGS_${name}
 		t=double
 		local=$_typ_long_double
 		;;
-	*)	continue
+	*)	case $aka in
+		*=*)	f=${aka%%=*}
+			v=${aka#*=}
+			eval x='$'_lib_${f}l y='$'_lib_${f}
+			case $x:$y in
+			1:*)	f=${f}l
+				;;
+			*:1)	;;
+			*)	continue
+				;;
+			esac
+			L=local_$name r=int R=1
+			echo "#ifdef $v${nl}static $r $L(Sfdouble_t x) { return $f(x) == $v; }${nl}#endif"
+			tab="$tab$nl#ifdef $v$nl$ht\"\\0${R}${a}${name}\",$ht(Math_f)${L},${nl}#endif"
+			;;
+		esac
+		continue
 		;;
 	esac
 	eval n='$'_npt_$f m='$'_mac_$f d='$'_dat_$f

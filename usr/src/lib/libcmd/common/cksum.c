@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: sum (AT&T Research) 2007-11-27 $\n]"
+"[-?\n@(#)$Id: sum (AT&T Research) 2009-07-02 $\n]"
 USAGE_LICENSE
 "[+NAME?cksum,md5sum,sum - print file checksum and block count]"
 "[+DESCRIPTION?\bsum\b lists the checksum, and for most methods the block"
@@ -447,6 +447,7 @@ b_cksum(int argc, register char** argv, void* context)
 	Sfio_t*		sp;
 	FTS*		fts;
 	FTSENT*		ent;
+	int		logical;
 	Optdisc_t	optdisc;
 	State_t		state;
 
@@ -456,6 +457,7 @@ b_cksum(int argc, register char** argv, void* context)
 	flags = fts_flags() | FTS_TOP | FTS_NOPOSTORDER | FTS_NOSEEDOTDIR;
 	state.flags = SUM_SIZE;
 	state.warn = 1;
+	logical = 1;
 	method = 0;
 	optinit(&optdisc, optinfo);
 	for (;;)
@@ -493,6 +495,7 @@ b_cksum(int argc, register char** argv, void* context)
 			flags &= ~FTS_TOP;
 			state.recursive = 1;
 			state.sort = order;
+			logical = 0;
 			continue;
 		case 's':
 			method = "sys5";
@@ -511,13 +514,16 @@ b_cksum(int argc, register char** argv, void* context)
 			continue;
 		case 'H':
 			flags |= FTS_META|FTS_PHYSICAL;
+			logical = 0;
 			continue;
 		case 'L':
 			flags &= ~(FTS_META|FTS_PHYSICAL);
+			logical = 0;
 			continue;
 		case 'P':
 			flags &= ~FTS_META;
 			flags |= FTS_PHYSICAL;
+			logical = 0;
 			continue;
 		case 'T':
 			state.text = 1;
@@ -548,6 +554,8 @@ b_cksum(int argc, register char** argv, void* context)
 	 * do it
 	 */
 
+	if (logical)
+		flags &= ~(FTS_META|FTS_PHYSICAL);
 	if (state.permissions)
 	{
 		state.uid = geteuid();

@@ -53,6 +53,8 @@
 #define REG_SHELL_ESCAPED 0x00400000	/* \ not special		*/
 #define REG_SHELL_PATH	0x00800000	/* explicit / match		*/
 
+#define REG_REGEXP	0x40000000	/* <regexp.h> compatibility	*/
+
 /* regexec flags */
 
 #define REG_NOTBOL	0x00000040	/* ^ is not a special char	*/

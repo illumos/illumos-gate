@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -26,50 +26,59 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: pathchk (AT&T Research) 2006-09-19 $\n]"
+"[-?\n@(#)$Id: pathchk (AT&T Research) 2009-07-24 $\n]"
 USAGE_LICENSE
 "[+NAME?pathchk - check pathnames for portability]"
-"[+DESCRIPTION?\bpathchk\b checks each \apathname\a to see if it "
-	"is valid and/or portable.  A \apathname\a is valid if it "
-	"can be used to access or create a file without causing syntax "
-	"errors.  A file is portable, if no truncation will result on "
-	"any conforming POSIX.1 implementation.]"
+"[+DESCRIPTION?\bpathchk\b checks each \apathname\a to see if it is "
+    "valid and/or portable. A \apathname\a is valid if it can be used to "
+    "access or create a file without causing syntax errors. A file is "
+    "portable if no truncation will result on any conforming POSIX.1 "
+    "implementation.]"
 "[+?By default \bpathchk\b checks each component of each \apathname\a "
-	"based on the underlying file system.  A diagnostic is written "
-	"to standard error for each pathname that:]{"
-	"[+-?Is longer than \b$(getconf PATH_MAX)\b bytes.]"
-	"[+-?Contains any component longer than \b$(getconf NAME_MAX)\b bytes.]"
-	"[+-?Contains any directory component in a directory that is "
-		"not searchable.]"
-	"[+-?Contains any character in any component that is not valid in "
-		"its containing directory.]"
-	"[+-?Is empty.]"
-	"}"
-"[p:portability?Instead of performing length checks on the underlying "
-	"file system, write a diagnostic for each pathname operand that:]{"
-	"[+-?Is longer than \b$(getconf _POSIX_PATH_MAX)\b bytes.]"
-	"[+-?Contains any component longer than "
-		"\b$(getconf _POSIX_NAME_MAX)\b bytes.]"
+    "based on the underlying file system. A diagnostic is written to "
+    "standard error for each pathname that:]"
+    "{"
+        "[+-?Is longer than \b$(getconf PATH_MAX)\b bytes.]"
+        "[+-?Contains any component longer than \b$(getconf NAME_MAX)\b "
+            "bytes.]"
+        "[+-?Contains any directory component in a directory that is not "
+            "searchable.]"
+        "[+-?Contains any character in any component that is not valid "
+            "in its containing directory.]"
+        "[+-?Is empty.]"
+    "}"
+"[p:components?Instead of performing length checks on the underlying "
+    "file system, write a diagnostic for each pathname operand that:]"
+    "{"
+        "[+-?Is longer than \b$(getconf _POSIX_PATH_MAX)\b bytes.]"
+        "[+-?Contains any component longer than \b$(getconf "
+            "_POSIX_NAME_MAX)\b bytes.]"
         "[+-?Contains any character in any component that is not in the "
-		"portable filename character set.]"
-#if 0
-	"[+-?Contains any component with \b-\b as the first character.]"
-#endif
-	"[+-?Is empty.]"
-	"}"
+            "portable filename character set.]"
+    "}"
+"[P:path?Write a diagnostic for each pathname operand that:]"
+    "{"
+        "[+-?Contains any component with \b-\b as the first character.]"
+        "[+-?Is empty.]"
+    "}"
+"[a:all|portability?Equivalent to \b--components\b \b--path\b.]"
 "\n"
 "\npathname ...\n"
 "\n"
-"[+EXIT STATUS?]{"
+"[+EXIT STATUS?]"
+    "{"
         "[+0?All \apathname\a operands passed all of the checks.]"
         "[+>0?An error occurred.]"
-"}"
+    "}"
 "[+SEE ALSO?\bgetconf\b(1), \bcreat\b(2), \bpathchk\b(2)]"
 ;
 
 
 #include	<cmd.h>
 #include	<ls.h>
+
+#define COMPONENTS	0x1
+#define PATH	0x2
 
 #define isport(c)	(((c)>='a' && (c)<='z') || ((c)>='A' && (c)<='Z') || ((c)>='0' && (c)<='9') || (strchr("._-",(c))!=0) )
 
@@ -82,10 +91,10 @@ static long mypathconf(const char *path, int op)
 
 	static const char* const	ops[] = { "NAME_MAX", "PATH_MAX" };
 
-	errno=0;
-	if((r=strtol(astconf(ops[op], path, NiL), NiL, 0))<0 && errno==0)
-		return(LONG_MAX);
-	return(r);
+	errno = 0;
+	if ((r = strtol(astconf(ops[op], path, NiL), NiL, 0)) < 0 && !errno)
+		return LONG_MAX;
+	return r;
 }
 
 /*
@@ -100,10 +109,11 @@ static int pathchk(char* path, int mode)
 
 	if(!*path)
 	{
-		error(2,"path is empty");
-		return(0);
+		if (mode & PATH)
+			error(2,"path is empty");
+		return -1;
 	}
-	if(mode)
+	if(mode & COMPONENTS)
 	{
 		name_max = _POSIX_NAME_MAX;
 		path_max = _POSIX_PATH_MAX;
@@ -177,7 +187,7 @@ static int pathchk(char* path, int mode)
 			else if(errno==ENAMETOOLONG)
 			{
 				error(2,"%s: pathname too long",path);
-				return(0);
+				return -1;
 			}
 #endif /*ENAMETOOLONG*/
 			else
@@ -186,18 +196,18 @@ static int pathchk(char* path, int mode)
 	}
 	while(*(cpold=cp))
 	{
-		if(mode && *cp == '-')
+		if((mode & PATH) && *cp == '-')
 		{
 			error(2,"%s: path component begins with '-'",path,fmtquote(buf, NiL, "'", 1, 0));
-			return(0);
+			return -1;
 		}
 		while((c= *cp++) && c!='/')
-			if(mode && !isport(c))
+			if((mode & COMPONENTS) && !isport(c))
 			{
 				buf[0] = c;
 				buf[1] = 0;
 				error(2,"%s: '%s' not in portable character set",path,fmtquote(buf, NiL, "'", 1, 0));
-				return(0);
+				return -1;
 			}
 		if((cp-cpold) > name_max)
 			goto err;
@@ -208,41 +218,51 @@ static int pathchk(char* path, int mode)
 	}
 	if((cp-path) >= path_max)
 	{
-		error(2,"%s: pathname too long",path);
-		return(0);
+		error(2, "%s: pathname too long", path);
+		return -1;
 	}
-	return(1);
-err:
-	error(2,"%s: component name %.*s too long",path,cp-cpold-1,cpold);
-	return(0);
+	return 0;
+ err:
+	error(2, "%s: component name %.*s too long", path, cp-cpold-1, cpold);
+	return -1;
 }
 
 int
 b_pathchk(int argc, char** argv, void* context)
 {
-	register int n, mode=0;
-	register char *cp;
+	register int	n;
+	register int	mode = 0;
+	register char*	s;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
-	while (n = optget(argv, usage)) switch (n)
+	for (;;)
 	{
-  	    case 'p':
-		mode = 1;
-		break;
-	    case ':':
-		error(2, "%s", opt_info.arg);
-		break;
-	    case '?':
-		error(ERROR_usage(2), "%s", opt_info.arg);
+		switch (optget(argv, usage))
+		{
+		case 0:
+			break;
+  		case 'a':
+			mode |= COMPONENTS|PATH;
+			continue;
+  		case 'p':
+			mode |= COMPONENTS;
+			continue;
+  		case 'P':
+			mode |= PATH;
+			continue;
+		case ':':
+			error(2, "%s", opt_info.arg);
+			continue;
+		case '?':
+			error(ERROR_usage(2), "%s", opt_info.arg);
+			continue;
+		}
 		break;
 	}
 	argv += opt_info.index;
-	if(*argv==0 || error_info.errors)
-		error(ERROR_usage(2),"%s", optusage((char*)0));
-	while(cp = *argv++)
-	{
-		if(!pathchk(cp,mode))
-			error_info.errors=1;
-	}
-	return(error_info.errors);
+	if (!*argv || error_info.errors)
+		error(ERROR_usage(2),"%s", optusage(NiL));
+	while (s = *argv++)
+		pathchk(s, mode);
+	return error_info.errors != 0;
 }

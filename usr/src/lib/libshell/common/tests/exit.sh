@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -25,6 +25,12 @@ function err_exit
 }
 alias err_exit='err_exit $LINENO'
 
+Command=${0##*/}
+integer Errors=0
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
+
 function abspath
 {
         base=$(basename $SHELL)
@@ -34,28 +40,20 @@ function abspath
         print $newdir/$base
 }
 #test for proper exit of shell
-Command=${0##*/}
-integer Errors=0
 builtin getconf
 ABSHELL=$(abspath)
-mkdir /tmp/ksh$$ || err_exit "mkdir /tmp/ksh$$ failed"
-cd /tmp/ksh$$ || err_exit "cd /tmp/ksh$$ failed"
+cd $tmp || { err_exit "cd $tmp failed"; exit 1; }
 print exit 0 >.profile
 ${ABSHELL}  <<!
 HOME=$PWD \
 PATH=$PATH \
 SHELL=$ABSSHELL \
 $(
-	set --noglob
-	ifs=$IFS
-	IFS=,
-	set -- $(getconf LIBPATH)
-	IFS=$ifs
-	for v
-	do	IFS=:
-		set -- $v
-		IFS=$ifs
-		eval [[ \$$2 ]] && eval print -n \" \"\$2=\"\$$2\"
+	v=$(getconf LIBPATH)
+	for v in ${v//,/ }
+	do	v=${v#*:}
+		v=${v%%:*}
+		eval [[ \$$v ]] && eval print -n \" \"\$v=\"\$$v\"
 	done
 ) \
 exec -c -a -ksh ${ABSHELL} -c "exit 1" 1>/dev/null 2>&1
@@ -77,6 +75,6 @@ if	[[ $($SHELL ./run.sh) != 123 ]]
 then	err_exit 'subshell trap on exit overwrites parent trap'
 fi
 cd ~- || err_exit "cd back failed"
-rm -r /tmp/ksh$$ || err_exit "rm -r /tmp/ksh$$ failed"
 $SHELL -c 'builtin -f cmd getconf; getconf --"?-version"; exit 0' >/dev/null 2>&1 || err_exit 'ksh plugin exit failed -- was ksh built with CCFLAGS+=$(CC.EXPORT.DYNAMIC)?'
+
 exit $((Errors))

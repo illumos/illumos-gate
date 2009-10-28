@@ -19,7 +19,7 @@
 # CDDL HEADER END
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
  
@@ -31,8 +31,10 @@
 "buildksh93.sh" is a small build script used to build the AT&T "ast-ksh"
 and "ast-open" packages using its native (nmake-based) build system
 which is needed to build the iffe-generated (header) files (each time
-for { 32bit SPARC, 64bit SPARC, 32bit i386, 64bit AMD64 }) which are
-moved later to their matching OS/Net build directories.
+for { 32bit SPARC, 64bit SPARC, 32bit i386, 64bit AMD64, 32bit S390,
+64bit S390x }) which are moved later to their matching OS/Net build
+directories.
+
 THIS SCRIPT IS NOT INTENDED FOR NORMAL USAGE.
 
 
@@ -47,14 +49,14 @@ properly found.
 * Example usage of the script (more information can be found in the
 script itself):
 ## Download AT&T ksh93 sources
-$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/~gsf/download/tgz/INIT.2008-11-04.tgz'
-$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/~gsf/download/tgz/ast-ksh.2008-11-04.tgz'
+$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/sw/download/beta/INIT.2009-10-14.tgz'
+$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/sw/download/beta/ast-ksh.2009-10-14.tgz'
 
 ## Unpack the sources (32bit SPARC):
 $ mkdir build_sparc_32bit
 $ cd build_sparc_32bit
-$ gunzip -c <../INIT.2008-11-04.tgz | tar -xf -
-$ gunzip -c <../ast-ksh.2008-11-04.tgz | tar -xf -
+$ gunzip -c <../INIT.2009-10-14.tgz | tar -xf -
+$ gunzip -c <../ast-ksh.2009-10-14.tgz | tar -xf -
 
 ## Build ast-ksh for 32bit SPARC
 # (build other build flags are:

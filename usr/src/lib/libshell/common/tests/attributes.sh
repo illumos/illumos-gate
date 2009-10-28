@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -27,6 +27,10 @@ alias err_exit='err_exit $LINENO'
 
 Command=${0##*/}
 integer Errors=0
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
+
 r=readonly u=Uppercase l=Lowercase i=22 i8=10 L=abc L5=def uL5=abcdef xi=20
 x=export t=tagged H=hostname LZ5=026 RZ5=026 Z5=123 lR5=ABcdef R5=def n=l
 for option in u l i i8 L L5 LZ5 RZ5 Z5 r x H t R5 uL5 lR5 xi n
@@ -115,18 +119,18 @@ fi
 sz=(typeset -E y=2.2)
 string="$(print $sz)"
 if [[ "${sz}" == *'typeset -E -F'* ]]
-then 	err_exit 'print of exponential shows both -E and -F attributes'  
+then 	err_exit 'print of exponential shows both -E and -F attributes'
 fi
-print 'typeset -i m=48/4+1;print -- $m' > /tmp/ksh$$
-chmod +x /tmp/ksh$$
+print 'typeset -i m=48/4+1;print -- $m' > $tmp/script
+chmod +x $tmp/script
 typeset -Z2 m
-if	[[ $(/tmp/ksh$$) != 13 ]]
+if	[[ $($tmp/script) != 13 ]]
 then	err_exit 'attributes not cleared for script execution'
 fi
-print 'print VAR=$VAR' > /tmp/ksh$$
+print 'print VAR=$VAR' > $tmp/script
 typeset -L70 VAR=var
-/tmp/ksh$$ > /tmp/ksh$$.1
-[[ $(< /tmp/ksh$$.1) == VAR= ]] || err_exit 'typeset -L should not be inherited'
+$tmp/script > $tmp/script.1
+[[ $(< $tmp/script.1) == VAR= ]] || err_exit 'typeset -L should not be inherited'
 typeset -Z  LAST=00
 unset -f foo
 function foo
@@ -145,7 +149,6 @@ if	(( ${#LAST} != 2 ))
 then	err_exit 'LAST!=2'
 fi
 [[ $(set | grep LAST) == LAST=02 ]] || err_exit "LAST not correct in set list"
-rm -rf /tmp/ksh$$*
 set -a
 unset foo
 foo=bar
@@ -195,7 +198,9 @@ hello worldhello worldhello world
 !
 [[ $v1 == "$b1" ]] || err_exit "v1=$v1 should be $b1"
 [[ $v2 == "$x" ]] || err_exit "v1=$v2 should be $x"
-[[ $(env - '!=1' $SHELL -c 'echo ok' 2>/dev/null) == ok ]] || err_exit 'malformed environment terminates shell'
+if	env '!=1' >/dev/null 2>&1
+then	[[ $(env '!=1' $SHELL -c 'echo ok' 2>/dev/null) == ok ]] || err_exit 'malformed environment terminates shell'
+fi
 unset var
 typeset -b var
 printf '12%Z34' | read -r -N 5 var
@@ -211,10 +216,10 @@ unset foo bar
 unset -f fun
 function fun
 {
-	export foo=hello 
+	export foo=hello
 	typeset -x  bar=world
 	[[ $foo == hello ]] || err_exit 'export scoping problem in function'
-} 
+}
 fun
 [[ $(export | grep foo) == 'foo=hello' ]] || err_exit 'export not working in functions'
 [[ $(export | grep bar) ]] && err_exit 'typeset -x not local'
@@ -224,9 +229,9 @@ fred[66]=88
 unset x y z
 typeset -LZ3 x=abcd y z=00abcd
 y=03
-[[ $y == "3  " ]] || err_exit '-LZ3 not working for value 03' 
-[[ $x == "abc" ]] || err_exit '-LZ3 not working for value abcd' 
-[[ $x == "abc" ]] || err_exit '-LZ3 not working for value 00abcd' 
+[[ $y == "3  " ]] || err_exit '-LZ3 not working for value 03'
+[[ $x == "abc" ]] || err_exit '-LZ3 not working for value abcd'
+[[ $x == "abc" ]] || err_exit '-LZ3 not working for value 00abcd'
 unset x z
 set +a
 [[ $(typeset -p z) ]] && err_exit "typeset -p for z undefined failed"
@@ -280,4 +285,43 @@ function foo
 }
 bar=xxx
 [[ $(foo) == bar=xxx ]] || err_exit 'typeset -p not working inside a function'
+unset foo
+typeset -L5 foo
+[[ $(typeset -p foo) == 'typeset -L 5 foo' ]] || err_exit 'typeset -p not working for variables with attributes but without a value'
+{ $SHELL  <<- EOF
+	typeset -L3 foo=aaa
+	typeset -L6 foo=bbbbbb
+	[[ \$foo == bbbbbb ]]
+EOF
+}  || err_exit 'typeset -L should not preserve old attributes'
+{ $SHELL <<- EOF
+	typeset -R3 foo=aaa
+	typeset -R6 foo=bbbbbb
+	[[ \$foo == bbbbbb ]]
+EOF
+} 2> /dev/null || err_exit 'typeset -R should not preserve old attributes'
+
+expected='YWJjZGVmZ2hpag=='
+unset foo
+typeset -b -Z10 foo
+read foo <<< 'abcdefghijklmnop'
+[[ $foo == "$expected" ]] || err_exit 'read foo, where foo is "typeset -b -Z10" not working'
+unset foo
+typeset -b -Z10 foo
+read -N10 foo <<< 'abcdefghijklmnop'
+[[ $foo == "$expected" ]] || err_exit 'read -N10 foo, where foo is "typeset -b -Z10" not working'
+unset foo
+typeset  -b -A foo
+read -N10 foo[4] <<< 'abcdefghijklmnop'
+[[ ${foo[4]} == "$expected" ]] || err_exit 'read -N10 foo, where foo is "typeset  -b -A" foo not working'
+unset foo
+typeset  -b -a foo
+read -N10 foo[4] <<< 'abcdefghijklmnop'
+[[ ${foo[4]} == "$expected" ]] || err_exit 'read -N10 foo, where foo is "typeset  -b -a" foo not working'
+[[ $(printf %B foo[4]) == abcdefghij ]] || err_exit 'printf %B for binary associative array element not working'
+[[ $(printf %B foo[4]) == abcdefghij ]] || err_exit 'printf %B for binary indexed array element not working'
+unset foo
+
+$SHELL 2> /dev/null -c 'export foo=(bar=3)' && err_exit 'compound variables cannot be exported'
+
 exit	$((Errors))

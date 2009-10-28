@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1986-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -2036,7 +2036,7 @@ ppcpp(void)
 						SYNCIN();
 						PUSH_QUOTE(pp.macp->arg[c - ARGOFFSET], pp.macp->line);
 						CACHEIN();
-						bp = ip - 1;
+						*(bp = ip - 1) = '"';
 						if (st & (COLLECTING|EOF2NL|JOINING)) rp = fsm[START];
 						if (state = rp[c = '"']) goto fsm_next;
 						goto fsm_get;

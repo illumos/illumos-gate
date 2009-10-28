@@ -3069,9 +3069,37 @@ bfuscr="
 #
 bfuchameleons="
         /usr/bin/basename
+        /usr/bin/bg
+        /usr/bin/cd
+        /usr/bin/cksum
+        /usr/bin/cmp
+        /usr/bin/comm
+        /usr/bin/command
         /usr/bin/dirname
+        /usr/bin/cut
+        /usr/bin/fc
+        /usr/bin/fg
+        /usr/bin/getopts
+        /usr/bin/hash
+        /usr/bin/jobs
+        /usr/bin/join
+        /usr/bin/kill
+        /usr/bin/logname
+        /usr/bin/paste
+        /usr/bin/print
+        /usr/bin/read
+        /usr/bin/rev
         /usr/bin/sleep
         /usr/bin/sum
+        /usr/bin/tee
+        /usr/bin/test
+        /usr/bin/type
+        /usr/bin/ulimit
+        /usr/bin/umask
+        /usr/bin/unalias
+        /usr/bin/uniq
+        /usr/bin/wait
+        /usr/bin/wc
 "
 
 for chameleon in ${bfuchameleons} ; do

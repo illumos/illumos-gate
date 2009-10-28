@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -28,7 +28,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: chmod (AT&T Research) 2007-09-10 $\n]"
+"[-?\n@(#)$Id: chmod (AT&T Research) 2009-07-02 $\n]"
 USAGE_LICENSE
 "[+NAME?chmod - change the access permissions of files]"
 "[+DESCRIPTION?\bchmod\b changes the permission of each file "
@@ -158,6 +158,7 @@ b_chmod(int argc, char** argv, void* context)
 	register FTSENT*ent;
 	char*		last;
 	int		(*chmodf)(const char*, mode_t);
+	int		logical = 1;
 	int		notify = 0;
 	int		ignore = 0;
 	int		show = 0;
@@ -206,16 +207,20 @@ b_chmod(int argc, char** argv, void* context)
 			continue;
 		case 'H':
 			flags |= FTS_META|FTS_PHYSICAL;
+			logical = 0;
 			continue;
 		case 'L':
 			flags &= ~(FTS_META|FTS_PHYSICAL);
+			logical = 0;
 			continue;
 		case 'P':
 			flags &= ~FTS_META;
 			flags |= FTS_PHYSICAL;
+			logical = 0;
 			continue;
 		case 'R':
 			flags &= ~FTS_TOP;
+			logical = 0;
 			continue;
 		case '?':
 			error(ERROR_usage(2), "%s", opt_info.arg);
@@ -226,6 +231,8 @@ b_chmod(int argc, char** argv, void* context)
 	argv += opt_info.index;
 	if (error_info.errors || !*argv || !amode && !*(argv + 1))
 		error(ERROR_usage(2), "%s", optusage(NiL));
+	if (logical)
+		flags &= ~(FTS_META|FTS_PHYSICAL);
 	if (ignore)
 		ignore = umask(0);
 	if (amode)

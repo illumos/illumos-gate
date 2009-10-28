@@ -56,8 +56,10 @@ install_h: $(ROOTHDRS)
 # We don't check these header files because they're owned by AT&T/AST
 check:
 
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(SPARC_BLD)$(SUBDIRS):	FRC
+$(SPARC_BLD)	@cd $@; pwd; $(MAKE) $(TARGET)
+$(INTEL_BLD)$(SUBDIRS):	FRC
+$(INTEL_BLD)	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 

@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -25,6 +25,12 @@ function err_exit
 }
 alias err_exit='err_exit $LINENO'
 
+Command=${0##*/}
+integer Errors=0
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
+
 function home # id
 {
 	typeset IFS=: pwd=/etc/passwd
@@ -36,8 +42,6 @@ function home # id
 	fi
 }
 
-Command=${0##*/}
-integer Errors=0
 OLDPWD=/bin
 if	[[ ~ != $HOME ]]
 then	err_exit '~' not $HOME
@@ -69,24 +73,23 @@ do	h=$(home $u)
 	if	[[ $h != . ]]
 	then	[[ ~$u -ef $h ]] || err_exit "~$u not $h"
 		x=~$u
-		[[ $x -ef $h ]] || "x=~$u not $h"
+		[[ $x -ef $h ]] || x="~$u not $h"
 		break
 	fi
 done
-x=~%%
-if	[[ $x != '~%%' ]]
-then	err_exit 'x='~%%' not '~%%
+x=~g.r.emlin
+if	[[ $x != '~g.r.emlin' ]]
+then	err_exit "x=~g.r.emlin failed -- expected '~g.r.emlin', got '$x'"
 fi
 x=~:~
 if	[[ $x != "$HOME:$HOME" ]]
-then	err_exit x=~:~ not $HOME:$HOME
+then	err_exit "x=~:~ failed, expected '$HOME:$HOME', got '$x'"
 fi
 HOME=/
 [[ ~ == / ]] || err_exit '~ should be /'
-trap 'rm -rf /tmp/kshtilde$$' EXIT
 [[ ~/foo == /foo ]] || err_exit '~/foo should be /foo when ~==/'
-print $'print ~+\n[[ $1 ]] && $0' > /tmp/kshtilde$$
-chmod +x /tmp/kshtilde$$
+print $'print ~+\n[[ $1 ]] && $0' > $tmp/tilde
+chmod +x $tmp/tilde
 nl=$'\n'
-[[ $(/tmp/kshtilde$$ foo) == "$PWD$nl$PWD" ]] 2> /dev/null  || err_exit 'tilde fails inside a script run by name'
+[[ $($tmp/tilde foo) == "$PWD$nl$PWD" ]] 2> /dev/null  || err_exit 'tilde fails inside a script run by name'
 exit $((Errors))

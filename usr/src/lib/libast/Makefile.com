@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -235,6 +235,7 @@ OBJECTS += \
 	common/path/pathpath.o \
 	common/path/pathposix.o \
 	common/path/pathprobe.o \
+	common/path/pathprog.o \
 	common/path/pathrepl.o \
 	common/path/pathsetlink.o \
 	common/path/pathshell.o \
@@ -354,6 +355,7 @@ OBJECTS += \
 	common/sfio/sfungetc.o \
 	common/sfio/sfvprintf.o \
 	common/sfio/sfvscanf.o \
+	common/sfio/sfwalk.o \
 	common/sfio/sfwr.o \
 	common/sfio/sfwrite.o \
 	common/stdio/_doprnt.o \
@@ -372,6 +374,7 @@ OBJECTS += \
 	common/stdio/asprintf.o \
 	common/stdio/clearerr.o \
 	common/stdio/fclose.o \
+	common/stdio/fcloseall.o \
 	common/stdio/fdopen.o \
 	common/stdio/feof.o \
 	common/stdio/ferror.o \
@@ -383,6 +386,7 @@ OBJECTS += \
 	common/stdio/fgetws.o \
 	common/stdio/fileno.o \
 	common/stdio/flockfile.o \
+	common/stdio/fmemopen.o \
 	common/stdio/fopen.o \
 	common/stdio/fprintf.o \
 	common/stdio/fpurge.o \
@@ -406,6 +410,8 @@ OBJECTS += \
 	common/stdio/fwscanf.o \
 	common/stdio/getc.o \
 	common/stdio/getchar.o \
+	common/stdio/getdelim.o \
+	common/stdio/getline.o \
 	common/stdio/getw.o \
 	common/stdio/getwc.o \
 	common/stdio/getwchar.o \
@@ -428,7 +434,6 @@ OBJECTS += \
 	common/stdio/sprintf.o \
 	common/stdio/sscanf.o \
 	common/stdio/stdio_c99.o \
-	common/stdio/stdio_gnu.o \
 	common/stdio/swprintf.o \
 	common/stdio/swscanf.o \
 	common/stdio/tmpfile.o \
@@ -502,6 +507,7 @@ OBJECTS += \
 	common/string/strmode.o \
 	common/string/strnacmp.o \
 	common/string/strncopy.o \
+	common/string/strnpcmp.o \
 	common/string/strntod.o \
 	common/string/strntol.o \
 	common/string/strntold.o \
@@ -510,7 +516,9 @@ OBJECTS += \
 	common/string/strntoul.o \
 	common/string/strntonll.o \
 	common/string/strntoull.o \
+	common/string/strnvcmp.o \
 	common/string/stropt.o \
+	common/string/strpcmp.o \
 	common/string/strperm.o \
 	common/string/strpsearch.o \
 	common/string/strsearch.o \
@@ -522,6 +530,7 @@ OBJECTS += \
 	common/string/strtonll.o \
 	common/string/struid.o \
 	common/string/struniq.o \
+	common/string/strvcmp.o \
 	common/string/swapget.o \
 	common/string/swapmem.o \
 	common/string/swapop.o \
@@ -549,6 +558,7 @@ OBJECTS += \
 	common/tm/tmweek.o \
 	common/tm/tmword.o \
 	common/tm/tmxdate.o \
+	common/tm/tmxduration.o \
 	common/tm/tmxfmt.o \
 	common/tm/tmxgettime.o \
 	common/tm/tmxleap.o \
@@ -701,10 +711,11 @@ CPPFLAGS = \
 	-I$(SRCDIR)/misc \
 	-I$(SRCDIR)/string \
 	-Iinclude/ast \
+	-I$(ROOT)/usr/include \
 	'-DCONF_LIBSUFFIX=".so"' \
 	'-DCONF_LIBPREFIX="lib"' \
 	-DERROR_CATALOG=\""libast"\" \
-	-D__OBSOLETE__=20080101 \
+	-D__OBSOLETE__=20090101 \
 	-D_BLD_ast \
 	-D_PACKAGE_ast \
 	-D_BLD_DLL
@@ -727,9 +738,12 @@ pics/common/misc/recstr.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/common/misc/translate.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/common/path/pathkey.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
 pics/common/port/astconf.o		:= CERRWARN += -erroff=E_CONST_OBJ_SHOULD_HAVE_INITIZR
+pics/common/stdio/fflush.o 		:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
+pics/common/stdio/getline.o 		:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
 pics/common/sfio/sfmove.o 		:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
 pics/common/sfio/sfrd.o 		:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
 pics/common/sfio/sfvscanf.o 		:= CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
+pics/common/tm/tmxduration.o 		:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
 
 .KEEP_STATE:
 

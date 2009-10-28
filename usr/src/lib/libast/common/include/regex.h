@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -70,6 +70,8 @@
 #define REG_SHELL_DOT	0x00200000	/* explicit leading . match	*/
 #define REG_SHELL_ESCAPED 0x00400000	/* \ not special		*/
 #define REG_SHELL_PATH	0x00800000	/* explicit / match		*/
+
+#define REG_REGEXP	0x40000000	/* <regexp.h> compatibility	*/
 
 /* regexec flags */
 

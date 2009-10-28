@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -95,13 +95,16 @@
 #define FS3D_SIZE(n)	((n)<<4)
 #define FS3D_SIZEOF(n)	((n)>>4)
 
-extern int		mount(const char*, char*, int, void*);
+#if !_BLD_3d
+#define mount(s,t,f,d)	fs3d_mount(s,t,f,d)
+#endif
 
 #if _BLD_ast && defined(__EXPORT__)
 #define extern		__EXPORT__
 #endif
 
 extern int		fs3d(int);
+extern int		fs3d_mount(const char*, char*, int, void*);
 extern char*		pathnext(char*, char*, long*);
 
 #undef	extern

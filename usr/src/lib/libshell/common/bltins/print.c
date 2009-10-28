@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -36,7 +36,6 @@
 #include	"builtins.h"
 #include	"streval.h"
 #include	<tmx.h>
-#include	<ctype.h>
 #include	<ccode.h>
 
 union types_t
@@ -203,7 +202,10 @@ int    b_print(int argc, char *argv[], void *extra)
 				fd = -1;
 			break;
 		case 'v':
-			vflag=1;
+			vflag='v';
+			break;
+		case 'C':
+			vflag='C';
 			break;
 		case ':':
 			/* The following is for backward compatibility */
@@ -240,7 +242,7 @@ int    b_print(int argc, char *argv[], void *extra)
 	if(error_info.errors || (argc<0 && !(format = *argv++)))
 		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage((char*)0));
 	if(vflag && format)
-		errormsg(SH_DICT,ERROR_usage(2),"-v and -f are mutually exclusive");
+		errormsg(SH_DICT,ERROR_usage(2),"-%c and -f are mutually exclusive",vflag);
 skip:
 	if(format)
 		format = genformat(format);
@@ -293,13 +295,19 @@ skip2:
 		} while(*pdata.nextarg && pdata.nextarg!=argv);
 		if(pdata.nextarg == nullarg && pdata.argsize>0)
 			sfwrite(outfile,stakptr(staktell()),pdata.argsize);
+		if(sffileno(outfile)!=sffileno(sfstderr))
+			sfsync(outfile);
 		sfpool(sfstderr,pool,SF_WRITE);
 		exitval = pdata.err;
 	}
 	else if(vflag)
 	{
 		while(*argv)
-			fmtbase64(outfile,*argv++,0);
+		{
+			fmtbase64(outfile,*argv++,vflag=='C');
+			if(!nflag)
+				sfputc(outfile,'\n');
+		}
 	}
 	else
 	{
@@ -519,7 +527,14 @@ static void *fmtbase64(char *string, ssize_t *sz, int alt)
 		else
 		{
 			int n = nv_size(np);
-			cp = (char*)np->nvalue.cp;
+			if(nv_isarray(np))
+			{
+				nv_onattr(np,NV_RAW);
+				cp = nv_getval(np);
+				nv_offattr(np,NV_RAW);
+			}
+			else
+				cp = (char*)np->nvalue.cp;
 			if((size = n)==0)
 				size = strlen(cp);
 			size = sfwrite(iop, cp, size);
@@ -593,6 +608,7 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 	union types_t*	value = (union types_t*)v;
 	struct printf*	pp = (struct printf*)fe;
 	register char*	argp = *pp->nextarg;
+	char*		w;
 
 	if(fe->n_str>0 && varname(fe->t_str,fe->n_str) && (!argp || varname(argp,-1)))
 	{
@@ -712,7 +728,13 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 			fe->flags &= ~SFFMT_LONG;
 			break;
 		case 'c':
-			if(fe->base >=0)
+			if(mbwide() && (n = mbsize(argp)) > 1)
+			{
+				fe->fmt = 's';
+				fe->size = n;
+				value->s = argp;
+			}
+			else if(fe->base >=0)
 				value->s = argp;
 			else
 				value->c = *argp;
@@ -737,8 +759,12 @@ static int extend(Sfio_t* sp, void* v, Sffmt_t* fe)
 			{
 			case '\'':
 			case '"':
-				value->ll = ((unsigned char*)argp)[1];
-				if(argp[2] && (argp[2] != argp[0] || argp[3]))
+				w = argp + 1;
+				if(mbwide() && mbsize(w) > 1)
+					value->ll = mbchar(w);
+				else
+					value->ll = *(unsigned char*)w++;
+				if(w[0] && (w[0] != argp[0] || w[1]))
 				{
 					errormsg(SH_DICT,ERROR_warn(0),e_charconst,argp);
 					pp->err = 1;

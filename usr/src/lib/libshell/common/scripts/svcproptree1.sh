@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -74,11 +74,11 @@ function svcproptovartree
 		servicename="${servicename/~(El)svc:\//}" # strip "svc:/"
 		propname="${name#~(El).*:properties/}"
 
-		if [[ "${tree["${servicename}"].properties[*]}" == "" ]] ; then
-			typeset -A tree["${servicename}"].properties=( )
+		if [[ "$(typeset -p "tree[${servicename}].properties")" == "" ]] ; then
+			compound -A tree[${servicename}].properties
 		fi
 	
-		nameref node=tree["${servicename}"].properties["${propname}"]
+		nameref node=tree[${servicename}].properties[${propname}]
 
 		node=(
 			typeset datatype="${datatype}"
@@ -110,14 +110,14 @@ builtin uname
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r svcproptree1_usage=$'+
-[-?\n@(#)\$Id: svcproptree1 (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: svcproptree1 (Roland Mainz) 2009-06-26 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?svcproptree1 - SMF tree demo]
 [+DESCRIPTION?\bsvcproptree1\b is a small ksh93 compound variable demo
 	which reads accepts a SMF service pattern name input file,
 	reads the matching service properties and converts them into an internal
 	variable tree representation and outputs it in the format
-	specified by viewmode (either "list", "namelist" or "tree")..]
+	specified by viewmode (either "list", "namelist", "tree" or "compacttree")..]
 
 pattern viewmode
 
@@ -135,11 +135,11 @@ shift $((OPTIND-1))
 typeset svcpattern="$1"
 typeset viewmode="$2"
 
-if [[ "${viewmode}" != ~(Elr)(list|namelist|tree) ]] ; then
+if [[ "${viewmode}" != ~(Elr)(list|namelist|tree|compacttree) ]] ; then
 	fatal_error $"Invalid view mode \"${viewmode}\"."
 fi
 
-typeset svc=(
+compound svc=(
 	typeset -A proptree
 )
 
@@ -159,7 +159,10 @@ case "${viewmode}" in
 		typeset + | egrep "^svc.proptree\["
 		;;
 	tree)
-		printf "%B\n" svc
+		print -v svc
+		;;
+	compacttree)
+		print -C svc
 		;;
 	*)
 		fatal_error $"Invalid view mode \"${viewmode}\"."

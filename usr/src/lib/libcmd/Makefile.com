@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -44,6 +44,7 @@ OBJECTS =	\
 	date.o \
 	dirname.o \
 	expr.o \
+	grep.o \
 	fds.o \
 	fmt.o \
 	fold.o \
@@ -56,6 +57,7 @@ OBJECTS =	\
 	md5sum.o \
 	mkdir.o \
 	mkfifo.o \
+	mktemp.o \
 	mv.o \
 	paste.o \
 	pathchk.o \
@@ -112,6 +114,7 @@ CPPFLAGS = \
 	-I../common \
 	-Isrc/lib/libcmd \
 	-I$(ROOT)/usr/include/ast \
+	-I$(ROOT)/usr/include \
 	-D_BLD_cmd \
 	-D_PACKAGE_ast \
 	-D_BLD_DLL \
@@ -119,7 +122,7 @@ CPPFLAGS = \
 	'-DUSAGE_LICENSE=\
 		"[-author?Glenn Fowler <gsf@research.att.com>]"\
 		"[-author?David Korn <dgk@research.att.com>]"\
-		"[-copyright?Copyright (c) 1992-2008 AT&T Intellectual Property]"\
+		"[-copyright?Copyright (c) 1992-2009 AT&T Intellectual Property]"\
 		"[-license?http://www.opensource.org/licenses/cpl1.0.txt]"\
 		"[--catalog?libcmd]"'
 

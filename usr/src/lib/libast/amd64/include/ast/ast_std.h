@@ -3,7 +3,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -117,8 +117,17 @@ struct lconv
 #define __MANGLE__ __LINKAGE__		__EXPORT__
 #endif
 
+#if !_UWIN /* for ast54 compatibility */
+
 #undef	getenv
 #define getenv		_ast_getenv
+
+#undef	setenviron
+#define setenviron	_ast_setenviron
+
+extern __MANGLE__ char*		getenv __PROTO__((const char*));
+
+#endif
 
 #undef	localeconv
 #define localeconv	_ast_localeconv
@@ -126,13 +135,9 @@ struct lconv
 #undef	setlocale
 #define setlocale	_ast_setlocale
 
-#undef	setenviron
-#define setenviron	_ast_setenviron
-
 #undef	strerror
 #define strerror	_ast_strerror
 
-extern __MANGLE__ char*		getenv __PROTO__((const char*));
 extern __MANGLE__ struct lconv*	localeconv __PROTO__((void));
 extern __MANGLE__ char*		setenviron __PROTO__((const char*));
 extern __MANGLE__ char*		setlocale __PROTO__((int, const char*));
@@ -159,6 +164,7 @@ extern __MANGLE__ char*		strerror __PROTO__((int));
 #define AST_LC_MEASUREMENT	12
 #define AST_LC_PAPER		13
 #define AST_LC_COUNT		14
+#define AST_LC_LANG		255
 
 #define AST_LC_find		(1L<<28)
 #define AST_LC_debug		(1L<<29)
@@ -207,6 +213,9 @@ extern __MANGLE__ char*		strerror __PROTO__((int));
 #ifndef LC_PAPER
 #define LC_PAPER		(-AST_LC_PAPER)
 #endif
+#ifndef LC_LANG
+#define LC_LANG			(-AST_LC_LANG)
+#endif
 
 #undef __MANGLE__
 #define __MANGLE__ __LINKAGE__
@@ -248,8 +257,9 @@ typedef struct
 	int		(*mb_conv) __PROTO__((char*, wchar_t));
 
 	uint32_t	env_serial;
+	uint32_t	mb_sync;
 
-	char		pad[944];
+	char		pad[940];
 
 } _Ast_info_t;
 

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -31,7 +31,6 @@
 #include	<fcin.h>
 #include	<ls.h>
 #include	<stdarg.h>
-#include	<ctype.h>
 #include	<regex.h>
 #include	"variables.h"
 #include	"path.h"
@@ -406,7 +405,7 @@ void sh_ioinit(Shell_t *shp)
 	sh_iostream(shp,0);
 	/* all write steams are in the same pool and share outbuff */
 	shp->outpool = sfopen(NIL(Sfio_t*),NIL(char*),"sw");  /* pool identifier */
-	shp->outbuff = (char*)malloc(IOBSIZE);
+	shp->outbuff = (char*)malloc(IOBSIZE+4);
 	shp->errbuff = (char*)malloc(IOBSIZE/4);
 	sfsetbuf(sfstderr,shp->errbuff,IOBSIZE/4);
 	sfsetbuf(sfstdout,shp->outbuff,IOBSIZE);
@@ -548,7 +547,11 @@ static void io_preserve(Shell_t* shp, register Sfio_t *sp, register int f2)
 	if(f2==shp->infd)
 		shp->infd = fd;
 	if(fd<0)
+	{
+		shp->toomany = 1;
+		((struct checkpt*)shp->jmplist)->mode = SH_JMPERREXIT;
 		errormsg(SH_DICT,ERROR_system(1),e_toomany);
+	}
 	if(shp->fdptrs[fd]=shp->fdptrs[f2])
 	{
 		if(f2==job.fd)
@@ -717,6 +720,20 @@ int sh_open(register const char *path, int flags, ...)
 	}
 	if (fd >= 0)
 	{
+		int nfd= -1;
+		if (flags & O_CREAT)
+		{
+			struct stat st;
+			if (stat(path,&st) >=0)
+				nfd = open(path,flags,st.st_mode);
+		}
+		else
+			nfd = open(path,flags);
+		if(nfd>=0)
+		{
+			fd = nfd;
+			goto ok;
+		}
 		if((mode=sh_iocheckfd(shp,fd))==IOCLOSE)
 			return(-1);
 		flags &= O_ACCMODE;
@@ -727,12 +744,21 @@ int sh_open(register const char *path, int flags, ...)
 		if((fd=dup(fd))<0)
 			return(-1);
 	}
-	else while((fd = open(path, flags, mode)) < 0)
-		if(errno!=EINTR || sh.trapnote)
-			return(-1);
-#ifdef O_SERVICE
- ok:
+	else
+	{
+#if SHOPT_REGRESS
+		char	buf[PATH_MAX];
+		if(strncmp(path,"/etc/",5)==0)
+		{
+			sfsprintf(buf, sizeof(buf), "%s%s", sh_regress_etc(path, __LINE__, __FILE__), path+4);
+			path = buf;
+		}
 #endif
+		while((fd = open(path, flags, mode)) < 0)
+			if(errno!=EINTR || sh.trapnote)
+				return(-1);
+ 	}
+ ok:
 	flags &= O_ACCMODE;
 	if(flags==O_WRONLY)
 		mode = IOWRITE;
@@ -939,10 +965,11 @@ int	sh_redirect(Shell_t *shp,struct ionod *iop, int flag)
 	const char *message = e_open;
 	int o_mode;		/* mode flag for open */
 	static char io_op[7];	/* used for -x trace info */
-	int clexec=0, fn, traceon;
+	int trunc=0, clexec=0, fn, traceon;
 	int r, indx = shp->topfd, perm= -1;
 	char *tname=0, *after="", *trace = shp->st.trap[SH_DEBUGTRAP];
 	Namval_t *np=0;
+	int isstring = shp->subshell?(sfset(sfstdout,0,0)&SF_STRING):0;
 	if(flag==2)
 		clexec = 1;
 	if(iop)
@@ -951,7 +978,7 @@ int	sh_redirect(Shell_t *shp,struct ionod *iop, int flag)
 	{
 		iof=iop->iofile;
 		fn = (iof&IOUFD);
-		if(fn==1 && shp->subshell && (flag==2 || (sfset(sfstdout,0,0)&SF_STRING)))
+		if(fn==1 && shp->subshell && !shp->subshare && (flag==2 || isstring))
 			sh_subfork();
 		io_op[0] = '0'+(iof&IOUFD);
 		if(iof&IOPUT)
@@ -977,6 +1004,16 @@ int	sh_redirect(Shell_t *shp,struct ionod *iop, int flag)
 				ap->argflag = ARG_MAC;
 				strcpy(ap->argval,iop->ioname);
 				fname=sh_macpat(shp,ap,(iof&IOARITH)?ARG_ARITH:ARG_EXP);
+			}
+			else if(iof&IOPROCSUB)
+			{
+				struct argnod *ap = (struct argnod*)stakalloc(ARGVAL+strlen(iop->ioname));
+				memset(ap, 0, ARGVAL);
+				if(iof&IOPUT)
+					ap->argflag = ARG_RAW;
+				ap->argchn.ap = (struct argnod*)fname; 
+				ap = sh_argprocsub(shp,ap);
+				fname = ap->argval;
 			}
 			else
 				fname=sh_mactrim(shp,fname,(!sh_isoption(SH_NOGLOB)&&sh_isoption(SH_INTERACTIVE))?2:0);
@@ -1033,7 +1070,7 @@ int	sh_redirect(Shell_t *shp,struct ionod *iop, int flag)
 						message = e_file;
 						goto fail;
 					}
-					if(shp->subshell && dupfd==1)
+					if(shp->subshell && dupfd==1 && (sfset(sfstdout,0,0)&SF_STRING))
 					{
 						sh_subtmpfile(0);
 						dupfd = sffileno(sfstdout);
@@ -1083,6 +1120,8 @@ int	sh_redirect(Shell_t *shp,struct ionod *iop, int flag)
 					errormsg(SH_DICT,ERROR_exit(1),e_restricted,fname);
 				io_op[2] = '>';
 				o_mode = O_RDWR|O_CREAT;
+				if(iof&IOREWRITE)
+					trunc = io_op[2] = ';';
 				goto openit;
 			}
 			else if(!(iof&IOPUT))
@@ -1197,7 +1236,10 @@ int	sh_redirect(Shell_t *shp,struct ionod *iop, int flag)
 					if((off = file_offset(shp,fn,fname))<0)
 						goto fail;
 					if(sp)
+					{
 						off=sfseek(sp, off, SEEK_SET);
+						sfsync(sp);
+					}
 					else
 						off=lseek(fn, off, SEEK_SET);
 					if(off<0)
@@ -1245,7 +1287,7 @@ int	sh_redirect(Shell_t *shp,struct ionod *iop, int flag)
 							sh_close(fn);
 						}
 					}
-					sh_iosave(shp,fn,indx,tname?fname:0);
+					sh_iosave(shp,fn,indx,tname?fname:(trunc?Empty:0));
 				}
 				else if(sh_subsavefd(fn))
 					sh_iosave(shp,fn,indx|IOSUBSHELL,tname?fname:0);
@@ -1422,7 +1464,11 @@ void sh_iosave(Shell_t *shp, register int origfd, int oldtop, char *name)
 #endif /* SHOPT_DEVFD */
 	{
 		if((savefd = sh_fcntl(origfd, F_DUPFD, 10)) < 0 && errno!=EBADF)
+		{
+			shp->toomany=1;
+			((struct checkpt*)shp->jmplist)->mode = SH_JMPERREXIT;
 			errormsg(SH_DICT,ERROR_system(1),e_toomany);
+		}
 	}
 	filemap[shp->topfd].tname = name;
 	filemap[shp->topfd].subshell = flag;
@@ -1492,7 +1538,9 @@ void	sh_iorestore(Shell_t *shp, int last, int jmpval)
 			continue;
 		}
 		origfd = filemap[fd].orig_fd;
-		if(filemap[fd].tname)
+		if(filemap[fd].tname == Empty && shp->exitval==0)
+			ftruncate(origfd,lseek(origfd,0,SEEK_CUR));
+		else if(filemap[fd].tname)
 			io_usename(filemap[fd].tname,(int*)0,shp->exitval?2:1);
 		sh_close(origfd);
 		if ((savefd = filemap[fd].save_fd) >= 0)
@@ -1638,7 +1686,10 @@ static ssize_t piperead(Sfio_t *iop,void *buff,register size_t size,Sfdisc_t *ha
 	int fd = sffileno(iop);
 	NOT_USED(handle);
 	if(job.waitsafe && job.savesig)
-		job_reap(job.savesig);
+	{
+		job_lock();
+		job_unlock();
+	}
 	if(sh.trapnote)
 	{
 		errno = EINTR;
@@ -1942,14 +1993,7 @@ static void	sftrack(Sfio_t* sp, int flag, void* data)
 			if(mode&SF_READ)
 				flag |= IOREAD;
 			shp->fdstatus[fd] = flag;
-#if 0
-			if(flag==IOWRITE)
-				sfpool(sp,shp->outpool,SF_WRITE);
-			else
-#else
-			if(flag!=IOWRITE)
-#endif
-				sh_iostream(shp,fd);
+			sh_iostream(shp,fd);
 		}
 		if((pp=(struct checkpt*)shp->jmplist) && pp->mode==SH_JMPCMD)
 		{

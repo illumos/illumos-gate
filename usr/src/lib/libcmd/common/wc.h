@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -37,15 +37,17 @@
 #define WC_MBYTE	0x08
 #define WC_LONGEST	0x10
 #define WC_QUIET	0x20
+#define WC_NOUTF8	0x40
 
 typedef struct
 {
-	signed char space[1<<CHAR_BIT];
+	char	type[1<<CHAR_BIT];
 	Sfoff_t words;
 	Sfoff_t lines;
 	Sfoff_t chars;
 	Sfoff_t longest;
 	int	mode;
+	int	mb;
 } Wc_t;
 
 #define wc_count	_cmd_wccount

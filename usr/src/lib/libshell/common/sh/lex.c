@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -100,6 +100,7 @@ struct lexdata
 	int		lex_max;
 	int		*lex_match;
 	int		lex_state;
+	int		docextra;
 #if SHOPT_KIA
 	off_t		kiaoff;
 #endif
@@ -196,6 +197,12 @@ static void lex_advance(Sfio_t *iop, const char *buff, register int size, void *
 #endif
 	if(lp->lexd.nocopy)
 		return;
+	if(lp->lexd.dolparen && lp->lexd.docword)
+	{
+		int n = size - (lp->lexd.docend-(char*)buff);
+		sfwrite(shp->strbuf,lp->lexd.docend,n);
+		lp->lexd.docextra  += n;
+	}
 	if(lp->lexd.first)
 	{
 		size -= (lp->lexd.first-(char*)buff);
@@ -222,12 +229,13 @@ static int lexfill(Lex_t *lp)
 	register int c;
 	Lex_t savelex;
 	struct argnod *ap;
-	int aok;
+	int aok,docextra;
 	savelex = *lp;
 	ap = lp->arg;
 	c = fcfill();
 	if(ap)
 		lp->arg = ap;
+	docextra = lp->lexd.docextra;
 	lp->lex = savelex.lex;
 	lp->lexd = savelex.lexd;
 	if(fcfile() ||  c)
@@ -237,6 +245,11 @@ static int lexfill(Lex_t *lp)
 	memcpy(lp, &savelex, offsetof(Lex_t,lexd));
 	lp->arg = ap;
 	lp->aliasok = aok;
+	if(lp->lexd.docword && docextra)
+	{
+		lp->lexd.docextra = docextra;
+		lp->lexd.docend = fcseek(0)-1;
+	}
 	return(c);
 }
 
@@ -533,14 +546,17 @@ int sh_lex(Lex_t* lp)
 						return(lp->token=c);
 					else if(c=='&')
 					{
-#if SHOPT_BASH
-						if(!sh_isoption(SH_POSIX) && n=='>')
+						if(!sh_isoption(SH_POSIX) && n=='>' && (sh_isoption(SH_BASH) || sh_isstate(SH_PROFILE)))
 						{
+							if(!sh_isoption(SH_BASH) && !lp->nonstandard)
+							{
+								lp->nonstandard = 1;
+								errormsg(SH_DICT,ERROR_warn(0),e_lexnonstandard,shp->inlineno);
+							}
 							lp->digits = -1;
 							c = '>';
 						}
 						else
-#endif
 							n = 0;
 					}
 					else if(n=='&')
@@ -556,7 +572,20 @@ int sh_lex(Lex_t* lp)
 					else if(n=='|')
 						c  |= SYMPIPE;
 					else if(c=='<' && n=='>')
+					{
+						lp->digits = 1;
 						c = IORDWRSYM;
+						fcgetc(n);
+						if(fcgetc(n)==';')
+						{
+							lp->token = c = IORDWRSYMT;
+							if(lp->inexec)
+								sh_syntax(lp);
+						}
+						else if(n>0)
+							fcseek(-1);
+						n= 0;
+					}
 					else if(n=='#' && (c=='<'||c=='>'))
 						c |= SYMSHARP;
 					else if(n==';' && c=='>')
@@ -577,7 +606,7 @@ int sh_lex(Lex_t* lp)
 					}
 					else
 					{
-						if((n=fcpeek(0))!=RPAREN && n!=LPAREN && lp->lexd.warn)
+						if(lp->lexd.warn && (n=fcpeek(0))!=RPAREN && n!=' ' && n!='\t')
 							errormsg(SH_DICT,ERROR_warn(0),e_lexspace,shp->inlineno,c,n);
 					}
 				}
@@ -762,7 +791,7 @@ int sh_lex(Lex_t* lp)
 						lp->lastline = shp->inlineno;
 						pushlevel(lp,c,mode);
 					}
-					ingrave = (c=='`');
+					ingrave ^= (c=='`');
 					mode = ST_QUOTE;
 					continue;
 				}
@@ -985,7 +1014,7 @@ int sh_lex(Lex_t* lp)
 				{
 					if(lp->lexd.warn && c!='/' && sh_lexstates[ST_NORM][c]!=S_BREAK && (c!='"' || mode==ST_QUOTE))
 						errormsg(SH_DICT,ERROR_warn(0),e_lexslash,shp->inlineno);
-					else if(c=='"' && mode!=ST_QUOTE)
+					else if(c=='"' && mode!=ST_QUOTE && !ingrave)
 						wordflags |= ARG_MESSAGE;
 					fcseek(-1);
 				}
@@ -1111,6 +1140,16 @@ int sh_lex(Lex_t* lp)
 					(oldmode(lp)==ST_NONE) ||
 					(mode==ST_NAME && (lp->assignok||lp->lexd.level)))
 				{
+					if(mode==ST_NAME)
+					{
+						fcgetc(n);
+						if(n>0)
+						{
+							if(n==']')
+								errormsg(SH_DICT,ERROR_exit(SYNBAD),e_lexsyntax1, shp->inlineno, "[]", "empty subscript");
+							fcseek(-1);
+						}
+					}
 					pushlevel(lp,RBRACT,mode);
 					wordflags |= ARG_QUOTED;
 					mode = ST_NESTED;
@@ -1522,6 +1561,7 @@ static int comsub(register Lex_t *lp, int endtok)
 					fcseek(-1);
 				break;
 			    case IODOCSYM:
+				lp->lexd.docextra = 0;
 				sh_lex(lp);
 				break;
 			    case 0:
@@ -1564,9 +1604,14 @@ static void nested_here(register Lex_t *lp)
 	if(offset=stktell(stkp))
 		base = stkfreeze(stkp,0);
 	n = fcseek(0)-lp->lexd.docend;
-	iop = newof(0,struct ionod,1,n+ARGVAL);
+	iop = newof(0,struct ionod,1,lp->lexd.docextra+n+ARGVAL);
 	iop->iolst = lp->heredoc;
 	stkseek(stkp,ARGVAL);
+	if(lp->lexd.docextra)
+	{
+		sfseek(lp->sh->strbuf,(Sfoff_t)0, SEEK_SET);
+		sfmove(lp->sh->strbuf,stkp,lp->lexd.docextra,-1);
+	}
 	sfwrite(stkp,lp->lexd.docend,n);
 	lp->arg = sh_endword(lp->sh,0);
 	iop->ioname = (char*)(iop+1);
@@ -1839,9 +1884,9 @@ static int here_copy(Lex_t *lp,register struct ionod *iop)
 			{
 				/* new-line joining */
 				lp->sh->inlineno++;
-				if(!lp->lexd.dolparen && (n=(fcseek(0)-bufp)-n)>0)
+				if(!lp->lexd.dolparen && (n=(fcseek(0)-bufp)-n)>=0)
 				{
-					if((n=sfwrite(sp,bufp,n))>0)
+					if(n && (n=sfwrite(sp,bufp,n))>0)
 						iop->iosize += n;
 					bufp = fcseek(0)+1;
 				}
@@ -1872,6 +1917,7 @@ done:
  */
 static char	*fmttoken(Lex_t *lp, register int sym, char *tok)
 {
+	int n=1;
 	if(sym < 0)
 		return((char*)sh_translate(e_lexzerobyte));
 	if(sym==0)
@@ -1891,7 +1937,7 @@ static char	*fmttoken(Lex_t *lp, register int sym, char *tok)
 		return((char*)sh_translate(e_newline));
 	tok[0] = sym;
 	if(sym&SYMREP)
-		tok[1] = sym;
+		tok[n++] = sym;
 	else
 	{
 		switch(sym&SYMMASK)
@@ -1912,14 +1958,16 @@ static char	*fmttoken(Lex_t *lp, register int sym, char *tok)
 				sym = '#';
 				break;
 			case SYMSEMI:
+				if(tok[0]=='<')
+					tok[n++] = '>';
 				sym = ';';
 				break;
 			default:
 				sym = 0;
 		}
-		tok[1] = sym;
+		tok[n++] = sym;
 	}
-	tok[2] = 0;
+	tok[n] = 0;
 	return(tok);
 }
 

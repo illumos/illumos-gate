@@ -4,6 +4,7 @@
 .\"
 .\" @(#)sh.1 (dgk@research.att.com) 12/28/93
 .\"
+.xx labels=5
 .nr Z 1 \" set to 1 when command name is ksh, 2 for ksh93
 .ds OK [\|
 .ds CK \|]
@@ -20,15 +21,14 @@
 .\}
 .SH NAME
 .if \nZ=0 \{\
-sh, rsh, pfsh \- shell, the
+sh, rsh, pfsh \- shell, the standard/restricted command and programming language
 .\}
 .if \nZ=1 \{\
-ksh, rksh, pfksh \- KornShell, a
+ksh, rksh, pfksh \- KornShell, a standard/restricted command and programming language
 .\}
 .if \nZ=2 \{\
-ksh93, rksh93, pfksh93 \- KornShell, a
+ksh93, rksh93, pfksh93 \- KornShell, a standard/restricted command and programming language
 .\}
-standard/restricted command and programming language
 .SH SYNOPSIS
 .if \nZ=0 \{\
 .B sh
@@ -699,7 +699,7 @@ current ones provided that the types are compatible.
 The right hand side of a variable assignment undergoes all the expansion
 list below except word splitting, brace expansion, and file name generation.
 When the left hand side is an assignment is a compound variable and
-the right hand is the name of a compound variable, the coumpound variable
+the right hand is the name of a compound variable, the compound variable
 on the right will be copied or appended to the compound variable on the left.
 .SS Comments.
 .PD 0
@@ -764,6 +764,8 @@ but can be unset or redefined:
 .B "autoload=\(fmtypeset \-fu\(fm"
 .TP
 .B "command=\(fmcommand  \(fm"
+.TP
+.B "compound=\(fmtypeset \-C\(fm"
 .TP
 .B "fc=hist"
 .TP
@@ -945,6 +947,14 @@ is a UNIX
 so programs that expect to
 .IR lseek (2)
 on the file will not work.
+.PP
+Process substitution of the form
+\f3<(\fP\f2list\^\fP\f3)\fP
+can also be used with the
+.B <
+redirection operator which causes the output of
+.I list\^
+to be standard input or the input for whatever file descriptor is specified.
 .SS Parameter Expansion.
 A
 .I parameter\^
@@ -1179,7 +1189,7 @@ elements between
 .I sub1\^
 and
 .I sub2\^
-inclusive (or all elments for
+inclusive (or all elements for
 .B \(**
 and
 .BR @ )
@@ -1914,6 +1924,12 @@ characters,
 then two adjacent
 .B tab
 characters delimit a null field.
+.TP
+.B
+.SM JOBMAX
+This variable defines the maximum number running background jobs
+that can run at a time.  When this limit is reached, the
+shell will wait for a job to complete before staring a new job.
 .TP
 .B
 .SM LANG
@@ -2856,8 +2872,8 @@ can be used within an arithmetic expression:
 .PP
 .if t .RS
 .B
-.if n abs acos acosh asin asinh atan atan2 atanh cbrt copysign cos cosh erf erfc exp exp2 expm1 fabs fdim finite floor fma fmax fmod hypot ilogb int isinf isnan lgamma log log2 logb nearbyint nextafter nexttoward pow remainder rint round sin sinh sqrt tan tanh tgamma trunc
-.if t abs   acos   acosh   asin   asinh   atan   atan2   atanh   cbrt   copysign   cos   cosh   erf  erfc   exp   exp2   expm1   fabs   fdim   finite   floor  fma   fmax   fmod   hypot   ilogb   int   isinf   isnan   lgamma   log   log2   logb   nearbyint   nextafter   nexttoward  pow   rint   round   sin   sinh   sqrt   tan   tanh   tgamma   trunc
+.if n abs acos acosh asin asinh atan atan2 atanh cbrt copysign cos cosh erf erfc exp exp2 expm1 fabs fdim finite floor fma fmax fmod hypot ilogb int isinf isnan j0 j1 jn lgamma log log2 logb nearbyint nextafter nexttoward pow remainder rint round sin sinh sqrt tan tanh tgamma trunc y0 y1 yn
+.if t abs   acos   acosh   asin   asinh   atan   atan2   atanh   cbrt   copysign   cos   cosh   erf  erfc   exp   exp2   expm1   fabs   fdim   finite   floor  fma   fmax   fmod   j0      j1      jn      hypot   ilogb   int   isinf   isnan   lgamma   log   log2   logb   nearbyint   nextafter   nexttoward  pow   rint   round   sin   sinh   sqrt   tan   tanh   tgamma   trunc   y0      y1      yn
 .if t .RE
 .PP
 An internal representation of a
@@ -3305,6 +3321,16 @@ except that it overrides the
 .B noclobber
 option.
 .TP
+.BI >; word
+Write output to a temporary file.  If the command completes
+successfully rename it to
+.IR word  ,
+otherwise, delete the temporary file.
+.BI >; word
+cannot be used with the
+.IR exec (2).
+built-in.
+.TP
 .BI >> word
 Use file
 .I word\^
@@ -3316,7 +3342,18 @@ otherwise, the file is created.
 Open file
 .I word\^
 for reading and writing
-as standard input.
+as standard output.
+.TP
+.BI <>; word
+The same as 
+.BI <> word
+except that if the command completes successfully,
+.I word\^
+is truncated to the offset at command completion.
+.BI <>; word
+cannot be used with the
+.IR exec (2).
+built-in.
 .TP
 \f3<<\fP\*(OK\f3\-\fP\*(CK\f2word\fP
 The shell input is read up to a line that is the same as
@@ -5772,7 +5809,7 @@ The pathname
 is used for each of the parameters that requires
 .IR pathname .
 .TP
-\f3getopts\fP \*(OK \f3\ -a\fP \f2name\^\fP \*(CK \f2optstring vname\^\fP \*(OK \f2arg\^\fP .\|.\|. \*(CK
+\f3getopts\fP \*(OK \f3\ \-a\fP \f2name\^\fP \*(CK \f2optstring vname\^\fP \*(OK \f2arg\^\fP .\|.\|. \*(CK
 Checks
 .I arg
 for legal options.
@@ -6038,7 +6075,7 @@ Equivalent to
 .BI "exec /bin/newgrp" " arg\^"
 \&.\|.\|.\^.
 .TP
-\f3print\fP \*(OK \f3\-Renprs\^\fP \*(CK \*(OK \f3\-u\fP \f2unit\^\fP\*(CK \*(OK \f3\-f\fP \f2format\^\fP \*(CK \*(OK \f2arg\^\fP .\|.\|. \*(CK
+\f3print\fP \*(OK \f3\-CRenprsv\^\fP \*(CK \*(OK \f3\-u\fP \f2unit\^\fP\*(CK \*(OK \f3\-f\fP \f2format\^\fP \*(CK \*(OK \f2arg\^\fP .\|.\|. \*(CK
 With no options or with option
 .B \-
 or
@@ -6060,9 +6097,11 @@ In this case, any
 options are ignored.
 Otherwise,
 unless the
-.B \-R
-or
+.BR \-C ,
+.BR \-R ,
 .BR \-r ,
+or
+.B \-v
 are specified, the following
 escape conventions will be applied:
 .RS
@@ -6133,6 +6172,24 @@ of the process spawned with
 .B \(bv&
 instead of standard output.
 The
+.B \-v
+option treats each
+.I arg\^
+as a variable name and writes the value in
+the
+.B printf
+.B %B
+format.
+The
+.B \-C
+option treats each
+.I arg\^
+as a variable name and writes the value in
+the
+.B printf
+.B %#B
+format.
+The
 .B \-s
 option causes the
 arguments to be written onto the history file
@@ -6164,8 +6221,10 @@ format specifications, the
 .B format\^
 string is reused to format remaining arguments.
 The following extensions can also be used:
-.BL
-.LI
+.RS
+.PD 0
+.TP
+.B %b
 A
 .B %b
 format can be used instead of
@@ -6174,16 +6233,21 @@ to cause escape sequences in the corresponding
 .I arg\^
 to be expanded as described in
 .BR print.
-.LI
+.TP
+.B %B
 A
 .B %B
 option causes each of the arguments to be treated
 as variable names and the binary value of variable
 will be printed. 
-This is most useful for variables whose attribute
+The alternate flag
+.B #
+causes a compound variable to be output on a single line.
+This is most useful for compound variables and variables whose attribute
 is
 .BR \-b .
-.LI
+.TP
+.B %H
 A
 .B %H
 format can be used instead of
@@ -6192,7 +6256,8 @@ to cause characters in
 .I arg\^
 that are special in HTML and XML
 to be output as their entity name.
-.LI
+.TP
+.B %P
 A
 .B %P
 format can be used instead of
@@ -6201,7 +6266,8 @@ to cause
 .I arg\^
 to be interpreted as an extended regular
 expression and be printed as a shell pattern.
-.LI
+.TP
+.B %R
 A
 .B %R
 format can be used instead of
@@ -6210,14 +6276,16 @@ to cause
 .I arg\^
 to be interpreted as a shell pattern
 and to be printed as an extended regular expression.
-.LI
+.TP
+.B %q
 A
 .B %q
 format can be used instead of
 .B %s
 to cause the resulting string to be quoted in a manner than can
 be reinput to the shell.
-.LI
+.TP
+.BI %( date-format )T
 A
 .BI %( date-format )T
 format can be use to treat an argument as a date/time string
@@ -6226,11 +6294,13 @@ and to format the date/time according to the
 as defined for the
 .BR date (1)
 command.
-.LI
+.TP
+.B %Z
 A
 .B %Z
 format will output a byte whose value is 0.
-.LI
+.TP
+.B %d
 The precision field of the
 .B %d
 format can be followed by a
@@ -6241,7 +6311,8 @@ In this case, the
 flag character causes
 .IB base #
 to be prepended.
-.LI
+.TP
+.B #
 The
 .B #
 flag when used with the
@@ -6250,7 +6321,6 @@ specifier without an output base,
 causes the output to be displayed in thousands units with one of the suffixes
 .B "k M G T P E"
 to indicate the unit.
-.LI
 The
 .B #
 flag when used with the
@@ -6258,11 +6328,14 @@ flag when used with the
 specifier causes the output to be displayed in 1024 with one of the suffixes
 .B "Ki Mi Gi Ti Pi Ei"
 to indicate the unit.
-.LI
+.TP
+.B =
 The
 .B =
 flag has been added to center the output within the specified field width.
-.LE
+.PD
+.PP
+.RE
 .TP
 \f3pwd\fP \*(OK \f3\-LP\fP \*(CK
 Outputs the value of the current working
@@ -6881,6 +6954,18 @@ The
 command
 with no arguments prints a list
 of commands associated with each signal number.
+.PP
+An
+.B exit
+or
+.B return
+without an argument in a trap action will
+preserve the exit status of the command that invoked the trap.
+.TP
+\f3true\fP
+Does nothing, and exits 0. Used with
+.B while
+for infinite loops.
 .TP
 \f3true\fP
 Does nothing, and exits 0. Used with
@@ -7122,7 +7207,7 @@ This is usually used to reference a variable inside
 a function whose name has been passed as an argument.
 .TP
 .B \-p
-The name, attributes and values for the give
+The name, attributes and values for the given
 .IR vname s
 are written on standard output in a form that can be
 used as shell input.

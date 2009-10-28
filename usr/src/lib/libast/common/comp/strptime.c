@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -27,7 +27,7 @@
 #define strptime	______strptime
 
 #include <ast.h>
-#include <tm.h>
+#include <tmx.h>
 
 #undef	strptime
 
@@ -51,8 +51,8 @@ strptime(const char* s, const char* format, struct tm* ts)
 	char*	f;
 	time_t	t;
 	Tm_t	tm;
-	Tm_t*	tn;
 
+	memset(&tm, 0, sizeof(tm));
 	tm.tm_sec = ts->tm_sec;
 	tm.tm_min = ts->tm_min;
 	tm.tm_hour = ts->tm_hour;
@@ -66,16 +66,16 @@ strptime(const char* s, const char* format, struct tm* ts)
 	t = tmscan(s, &e, format, &f, &t, 0);
 	if (e == (char*)s || *f)
 		return 0;
-	tn = tmmake(&t);
-	ts->tm_sec = tn->tm_sec;
-	ts->tm_min = tn->tm_min;
-	ts->tm_hour = tn->tm_hour;
-	ts->tm_mday = tn->tm_mday;
-	ts->tm_mon = tn->tm_mon;
-	ts->tm_year = tn->tm_year;
-	ts->tm_wday = tn->tm_wday;
-	ts->tm_yday = tn->tm_yday;
-	ts->tm_isdst = tn->tm_isdst;
+	tmxtm(&tm, tmxclock(&t), NiL);
+	ts->tm_sec = tm.tm_sec;
+	ts->tm_min = tm.tm_min;
+	ts->tm_hour = tm.tm_hour;
+	ts->tm_mday = tm.tm_mday;
+	ts->tm_mon = tm.tm_mon;
+	ts->tm_year = tm.tm_year;
+	ts->tm_wday = tm.tm_wday;
+	ts->tm_yday = tm.tm_yday;
+	ts->tm_isdst = tm.tm_isdst;
 	return e;
 }
 

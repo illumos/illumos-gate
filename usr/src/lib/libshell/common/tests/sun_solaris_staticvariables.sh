@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -45,7 +45,10 @@ function testfunc
 alias testfunc='testfunc $LINENO'
 alias err_exit='err_exit2 $LINENO'
 
+set -o nounset
+Command=${0##*/}
 integer Errors=0
+
 
 # string
 testfunc '(function l { typeset -S x ;     x+="#" ; $1 && print "$x" ; } ; l false ; l false   ; l true)'  "###"

@@ -3,7 +3,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -76,8 +76,8 @@
 #define LS_USER		(1<<10)		/* first user flag bit		*/
 
 #define LS_W_BLOCKS	6		/* LS_BLOCKS field width	*/
-#define LS_W_INUMBER	7		/* LS_INUMBER field width	*/
-#define LS_W_LONG	55		/* LS_LONG width (w/o names)	*/
+#define LS_W_INUMBER	9		/* LS_INUMBER field width	*/
+#define LS_W_LONG	57		/* LS_LONG width (w/o names)	*/
 #define LS_W_LINK	4		/* link text width (w/o names)	*/
 #define LS_W_MARK	1		/* LS_MARK field width		*/
 #define LS_W_NAME	9		/* group|user name field width	*/

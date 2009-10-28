@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -51,112 +51,223 @@ function fatal_error
 	exit 1
 }
 
-# parse HTTP return code, cookies etc.
-function parse_http_response
-{
-	nameref response="$1"
-	typeset h statuscode statusmsg i
-    
-	# we use '\r' as additional IFS to filter the final '\r'
-	IFS=$' \t\r' read -r h statuscode statusmsg  # read HTTP/1.[01] <code>
-	[[ "$h" != ~(Eil)HTTP/.* ]]         && { print -u2 -f $"%s: HTTP/ header missing\n" "$0" ; return 1 ; }
-	[[ "$statuscode" != ~(Elr)[0-9]* ]] && { print -u2 -f $"%s: invalid status code\n"  "$0" ; return 1 ; }
-	response.statuscode="$statuscode"
-	response.statusmsg="$statusmsg"
-    
-	# skip remaining headers
-	while IFS='' read -r i ; do
-		[[ "$i" == $'\r' ]] && break
+typeset -T urlconnection_t=(
+	# public
+	typeset user_agent="ksh93/urlconnection_t"
 
-		# strip '\r' at the end
-		i="${i/~(Er)$'\r'/}"
-
-		case "$i" in
-			~(Eli)Content-Type:.*)
-				response.content_type="${i/~(El).*:[[:blank:]]*/}"
-				;;
-			~(Eli)Content-Length:[[:blank:]]*[0-9]*)
-				integer response.content_length="${i/~(El).*:[[:blank:]]*/}"
-				;;
-			~(Eli)Transfer-Encoding:.*)
-				response.transfer_encoding="${i/~(El).*:[[:blank:]]*/}"
-				;;
-		esac
-	done
-
-	return 0
-}
-
-function cat_http_body
-{
-	typeset emode="$1"
-	typeset hexchunksize="0"
-	integer chunksize=0 
-    
-	if [[ "${emode}" == "chunked" ]] ; then
-		while IFS=$'\r' read hexchunksize &&
-			[[ "${hexchunksize}" == ~(Elri)[0-9abcdef]* ]] &&
-			(( chunksize=16#${hexchunksize} )) && (( chunksize > 0 )) ; do
-			dd bs=1 count="${chunksize}" 2>/dev/null
-		done
-	else
-		cat
-	fi
-
-	return 0
-}
-
-function cat_http
-{
-	typeset protocol="${1%://*}"
-	typeset path1="${1#*://}" # "http://foo.bat.net/x/y.html" ----> "foo.bat.net/x/y.html"
-
-	typeset host="${path1%%/*}"
-	typeset path="${path1#*/}"
-	typeset port="${host##*:}"
-    
-	integer netfd
-	typeset -C httpresponse # http response
-
-	# If URL did not contain a port number in the host part then look at the
-	# protocol to get the port number
-	if [[ "${port}" == "${host}" ]] ; then
-		case "${protocol}" in
-			"http") port=80 ;;
-			*)      port="$(getent services "${protocol}" | sed 's/[^0-9]*//;s/\/.*//')" ;;
-		esac
-	else
-		host="${host%:*}"
-	fi
-    
-	printmsg "protocol=${protocol} port=${port} host=${host} path=${path}"
-    
-	# prechecks
-	[[ "${protocol}" == "" ]] && { print -u2 -f "%s: protocol not set.\n" "$0" ; return 1 ; }
-	[[ "${port}"     == "" ]] && { print -u2 -f "%s: port not set.\n"     "$0" ; return 1 ; }
-	[[ "${host}"     == "" ]] && { print -u2 -f "%s: host not set.\n"     "$0" ; return 1 ; }
-	[[ "${path}"     == "" ]] && { print -u2 -f "%s: path not set.\n"     "$0" ; return 1 ; }
-
-	# open TCP channel
-	redirect {netfd}<>"/dev/tcp/${host}/${port}"
-	(( $? != 0 )) && { print -u2 -f "%s: Couldn't open %s\n" "$0" "${1}" ; return 1 ; }
-
-	# send HTTP request    
-	request="GET /${path} HTTP/1.1\r\n"
-	request+="Host: ${host}\r\n"
-	request+="User-Agent: rssread/ksh93 (2008-10-14; $(uname -s -r -p))\r\n"
-	request+="Connection: close\r\n"
-	print -n -- "${request}\r\n" >&${netfd}
-    
-	# collect response and send it to stdout
-	parse_http_response httpresponse <&${netfd}
-	cat_http_body "${httpresponse.transfer_encoding}" <&${netfd}
-    
-	# close connection
-	redirect {netfd}<&-
+	# private variables
+	typeset protocol
+	typeset path1
+	typeset host
+	typeset path
+	typeset port
 	
-	return 0
-}
+	compound netfd=(
+		integer in=-1  # incoming traffic
+		integer out=-1 # outgoing traffic
+	)
+
+	# only used for https
+	compound ssl=(
+		compound fifo=(
+			typeset dir=""
+			typeset in=""
+			typeset out=""
+		)
+		integer openssl_client_pid=-1
+	)
+				
+	# parse HTTP return code, cookies etc.
+	function parse_http_response
+	{
+		nameref response="$1"
+		typeset h statuscode statusmsg i
+
+		# we use '\r' as additional IFS to filter the final '\r'
+		IFS=$' \t\r' read -r h statuscode statusmsg # read HTTP/1.[01] <code>
+		[[ "$h" != ~(Eil)HTTP/.* ]]         && { print -u2 -f $"%s: HTTP/ header missing\n" "$0" ; return 1 ; }
+		[[ "$statuscode" != ~(Elr)[0-9]* ]] && { print -u2 -f $"%s: invalid status code\n"  "$0" ; return 1 ; }
+		response.statuscode="$statuscode"
+		response.statusmsg="$statusmsg"
+
+		# skip remaining headers
+		while IFS='' read -r i ; do
+			[[ "$i" == $'\r' ]] && break
+
+			# strip '\r' at the end
+			i="${i/~(Er)$'\r'/}"
+
+			case "$i" in
+				~(Eli)Content-Type:.*)
+					response.content_type="${i/~(El).*:[[:blank:]]*/}"
+					;;
+				~(Eli)Content-Length:[[:blank:]]*[0-9]*)
+					integer response.content_length="${i/~(El).*:[[:blank:]]*/}"
+					;;
+				~(Eli)Transfer-Encoding:.*)
+					response.transfer_encoding="${i/~(El).*:[[:blank:]]*/}"
+					;;
+			esac
+		done
+
+		return 0
+	}
+
+	function cat_http_body
+	{
+		typeset emode="$1"
+		typeset hexchunksize="0"
+		integer chunksize=0 
+
+		if [[ "${emode}" == "chunked" ]] ; then
+			while IFS=$'\n' read hexchunksize ; do
+				hexchunksize="${hexchunksize//$'\r'/}"
+				[[ "${hexchunksize}" != "" ]] || continue
+				[[ "${hexchunksize}" == ~(Elri)[0-9abcdef]+ ]] || break
+				(( chunksize=16#${hexchunksize} ))
+				(( chunksize > 0 )) || break
+				dd bs=1 count="${chunksize}" 2>/dev/null
+			done
+		else
+			cat
+		fi
+
+		return 0
+	}
+	
+	function init_url
+	{
+		_.protocol="${1%://*}"
+		_.path1="${1#*://}" # "http://foo.bat.net/x/y.html" ----> "foo.bat.net/x/y.html"
+
+		if  [[ "${_.protocol}" == ~(Elr)http(|s) ]] ; then
+			_.host="${_.path1%%/*}"
+			_.path="${_.path1#*/}"
+			_.port="${_.host##*:}"
+		fi
+		
+		return 0
+	}
+	
+	# close connection
+	function close_connection
+	{
+		integer ret
+		
+		if (( _.netfd.in != -1 )) ; then
+			redirect {_.netfd.in}<&-
+			(( _.netfd.in=-1 ))
+		fi
+		
+		if (( _.netfd.in != _.netfd.out && _.netfd.out != -1 )) ; then
+			redirect {_.netfd.out}<&-
+			((  _.netfd.out=-1 ))
+		fi
+
+		if [[ "${_.protocol}" == "https" ]] ; then
+			wait ${_.ssl.openssl_client_pid} || { print -u2 -f "%s: openssl failed.\n" ; return 1 ; }
+			(( _.ssl.openssl_client_pid=-1 ))
+				
+			rm -r \"${_.ssl.fifo.dir}\"
+			_.ssl.fifo.dir=""
+		fi
+						
+		return 0
+	}
+	
+	function open_connection
+	{
+		if [[ "${_.protocol}" == "https" ]] ; then
+			_.ssl.fifo.dir="$(mktemp -d)"
+			_.ssl.fifo.in="${_.ssl.fifo.dir}/in"
+			_.ssl.fifo.out="${_.ssl.fifo.dir}/out"
+
+			# Use "errexit" to leave it at the first error
+			# (this saves lots of if/fi tests for error checking)
+			set -o errexit
+
+			mkfifo "${_.ssl.fifo.in}" "${_.ssl.fifo.out}"
+
+			# create async openssl child to handle https
+			openssl s_client -quiet -connect "${_.host}:${_.port}" <"${_.ssl.fifo.in}" >>"${_.ssl.fifo.out}" &
+			
+			_.ssl.openssl_client_pid=$!
+		else
+			redirect {_.netfd.in}<> "/dev/tcp/${_.host}/${_.port}"
+			(( $? != 0 )) && { print -u2 -f "%s: Could not open %s\n" "$0" "${1}" ; return 1 ; }
+			(( _.netfd.out=_.netfd.in ))
+		fi
+		return 0
+	}
+
+	function send_request
+	{
+		typeset request="$1"
+		
+		set -o errexit
+		
+		if [[ "${_.protocol}" == "https" ]] ; then
+				print -n -- "${request}\r\n" >>	"${_.ssl.fifo.in}"
+
+				redirect {_.netfd.in}< "${_.ssl.fifo.out}"
+		else
+				print -n -- "${request}\r\n" >&${_.netfd.out}
+		fi
+		return 0
+	}
+	
+	function cat_url
+	{	
+		if [[ "${_.protocol}" == "file" ]] ; then
+			cat "${_.path1}"
+			return $?
+		elif [[ "${_.protocol}" == ~(Elr)http(|s) ]] ; then
+			compound httpresponse # http response
+
+			# If URL did not contain a port number in the host part then look at the
+			# protocol to get the port number
+			if [[ "${_.port}" == "${_.host}" ]] ; then
+				case "${_.protocol}" in
+					"http")  _.port=80 ;;
+					"https") _.port=443 ;;
+					*)       _.port="$(getent services "${_.protocol}" | sed 's/[^0-9]*//;s/\/.*//')" ;;
+				esac
+			else
+				_.host="${_.host%:*}"
+			fi
+
+			printmsg "protocol=${_.protocol} port=${_.port} host=${_.host} path=${_.path}"
+
+			# prechecks
+			[[ "${_.protocol}" != "" ]] || { print -u2 -f "%s: protocol not set.\n" "$0" ; return 1 ; }
+			[[ "${_.port}"     != "" ]] || { print -u2 -f "%s: port not set.\n"     "$0" ; return 1 ; }
+			[[ "${_.host}"     != "" ]] || { print -u2 -f "%s: host not set.\n"     "$0" ; return 1 ; }
+			[[ "${_.path}"     != "" ]] || { print -u2 -f "%s: path not set.\n"     "$0" ; return 1 ; }
+
+			_.open_connection
+
+			# send HTTP request    
+			request="GET /${_.path} HTTP/1.1\r\n"
+			request+="Host: ${_.host}\r\n"
+			request+="User-Agent: ${_.user_agent}\r\n"
+			request+="Connection: close\r\n"
+			_.send_request "${request}\r\n"
+
+			# collect response and send it to stdout
+			{
+				_.parse_http_response httpresponse
+				_.cat_http_body "${httpresponse.transfer_encoding}"
+			} <&${_.netfd.in}
+			
+			_.close_connection
+			
+			return 0
+		else
+			return 1
+		fi
+		# notreached
+	}
+)
 
 function html_entity_to_ascii
 {
@@ -448,10 +559,21 @@ function do_rssread
 		LC_TIME="en_US.UTF-8" \
 		LANG="en_US.UTF-8"
 
-	# need extra newline after cat_http to terminate line with $'\n'
+	# return non-zero exit code for this function if the rss processing below fails
+	set -o errexit
+
+	urlconnection_t hc
+	hc.user_agent="rssread/ksh93(ssl) (2009-08-14; $(uname -s -r -p))"
+	hc.init_url "$1"
+	
+	# need extra newline after cat_url to terminate line with $'\n'
 	# to make "xml_tok" happy
-	{ cat_http "$1" ; print ; } |
-		xml_tok "rsstok_cb"
+	data="${ hc.cat_url ; print ; }"
+	
+	print -u2 -f "# Got %d lines of RSS data, processing...\n" "${ wc -l <<< "${data}" ; }"
+	
+	xml_tok "rsstok_cb" <<< "${data}"
+
 	return 0
 }
 
@@ -465,6 +587,7 @@ function usage
 # make sure we use the ksh93 builtin versions
 builtin basename
 builtin cat
+builtin mkfifo
 
 typeset -A rsstok_cb # callbacks for xml_tok
 rsstok_cb["tag_begin"]="handle_rss"
@@ -488,11 +611,14 @@ bookmark_urls=(
 	["google_blogs_ksh"]="http://blogsearch.google.com/blogsearch_feeds?hl=en&scoring=d&q=(%22ksh93%22%7C%22ksh+93%22+%7C+%22korn93%22+%7C+%22korn+93%22)&ie=utf-8&num=100&output=rss"
 	# OpenSolaris.org sites
 	["ksh93_integration"]="http://www.opensolaris.org/rss/os/project/ksh93-integration/announcements/rss2.xml"
+	["ksh93_integration_ssl"]="https://www.opensolaris.org/rss/os/project/ksh93-integration/announcements/rss2.xml"
 	["shell"]="http://www.opensolaris.org/rss/os/project/shell/announcements/rss2.xml"
 	["systemz"]="http://www.opensolaris.org/rss/os/project/systemz/announcements/rss2.xml"
+	["systemz_ssl"]="https://www.opensolaris.org/rss/os/project/systemz/announcements/rss2.xml"
 	# some Sun staff/sites
 	["blogs_sun_com"]="http://blogs.sun.com/main/feed/entries/rss"
 	["bigadmin"]="http://www.sun.com/bigadmin/content/rss/motd.xml"
+	["bigadmin_scripts"]="https://www.sun.com/bigadmin/content/rss/scripts.xml"
 	["jmcp"]="http://www.jmcp.homeunix.com/roller/jmcp/feed/entries/rss"
 	["katakai"]="http://blogs.sun.com/katakai/feed/entries/rss"
 	["alanc"]="http://blogs.sun.com/alanc/feed/entries/rss"
@@ -502,12 +628,13 @@ bookmark_urls=(
 	["theregister_uk"]="http://www.theregister.co.uk/headlines.rss"
 	["heise"]="http://www.heise.de/newsticker/heise.rdf"
 	["slashdot"]="http://rss.slashdot.org/Slashdot/slashdot"
+	["wikipedia_command_shells"]="http://en.wikipedia.org/w/index.php?title=Comparison_of_command_shells&feed=rss&action=history"
 )
 
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r rssread_usage=$'+
-[-?\n@(#)\$Id: rssread (Roland Mainz) 2008-11-10 \$\n]
+[-?\n@(#)\$Id: rssread (Roland Mainz) 2009-08-14 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?rssread - fetch RSS messages and convert them to plain text]

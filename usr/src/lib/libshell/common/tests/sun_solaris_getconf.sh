@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -38,6 +38,7 @@ function err_exit
 }
 alias err_exit='err_exit $LINENO'
 
+set -o nounset
 Command=${0##*/}
 integer Errors=0
 
@@ -56,6 +57,15 @@ export PATH=/usr/bin:/bin
 # work in compiled shell scripts)
 typeset -r getconf_test_functions="$(
 cat <<EOF
+function err_exit
+{
+	print -u2 -n "\t"
+	print -u2 -r \${Command}[\$1]: "\${@:2}"
+	(( Errors++ ))
+}
+alias err_exit='err_exit \$LINENO'
+Command=\${0##*/}
+integer Errors=0
 # compare builtin getconf output with /usr/bin/getconf
 function compare_normal
 {
@@ -63,13 +73,13 @@ function compare_normal
     /usr/bin/getconf -a | 
         while read i ; do
             (( getconf_keys++ ))
-            t="${i%:*}"
+            t="\${i%:*}"
 
-            a="$(getconf          "$t" 2>/dev/null)"
-            b="$(/usr/bin/getconf "$t" 2>/dev/null)"
+            a="\$(getconf          "\$t" 2>/dev/null)"
+            b="\$(/usr/bin/getconf "\$t" 2>/dev/null)"
 
-            if [[ "$a" != "$b" ]] ; then
-                print -u2 "getconf/normal built mismatch: |$t|:|$a| != |$b|"
+            if [[ "\$a" != "\$b" ]] ; then
+                print -u2 "getconf/normal built mismatch: |\$t|:|\$a| != |\$b|"
                 (( mismatch++ ))
             fi
         done
@@ -82,13 +92,13 @@ function compare_path
     /usr/bin/getconf -a | 
         while read i ; do
             (( getconf_keys++ ))
-            t="${i%:*}"
+            t="\${i%:*}"
 
-            a="$(getconf          "$t" "/tmp" 2>/dev/null)"
-            b="$(/usr/bin/getconf "$t" "/tmp" 2>/dev/null)"
+            a="\$(getconf          "\$t" "/tmp" 2>/dev/null)"
+            b="\$(/usr/bin/getconf "\$t" "/tmp" 2>/dev/null)"
 
-            if [[ "$a" != "$b" ]] ; then
-                print -u2 "getconf/path built mismatch: |$t|:|$a| != |$b|"
+            if [[ "\$a" != "\$b" ]] ; then
+                print -u2 "getconf/path built mismatch: |\$t|:|\$a| != |\$b|"
                 (( mismatch++ ))
             fi
         done
@@ -108,7 +118,7 @@ do
     export PATH="${i}"
 
     ## test whether the getconf builtin is available
-    if [[ "$(builtin | fgrep "/bin/getconf")" = "" ]] ; then
+    if [[ "$(builtin | fgrep "/bin/getconf")" == "" ]] ; then
         err_exit '/bin/getconf not found in the list of builtins.'
     fi
 
@@ -160,6 +170,7 @@ do
         exit $((Errors))"
     (( Errors+=$? ))
 done
+
 
 # tests done
 exit $((Errors))

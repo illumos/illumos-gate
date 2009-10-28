@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -248,6 +248,13 @@ static void put_chtype(Namval_t* np, const char* val, int flag, Namfun_t* fp)
 	}
 }
 
+static Namfun_t *clone_chtype(Namval_t* np, Namval_t *mp, int flags, Namfun_t *fp)
+{
+	if(flags&NV_NODISC)
+		return(0);
+	return(nv_clone_disc(fp,flags));
+}
+
 static const Namdisc_t chtype_disc =
 {
 	sizeof(Namchld_t),
@@ -256,7 +263,7 @@ static const Namdisc_t chtype_disc =
 	0,
 	0,
 	0,
-	0,
+	clone_chtype,
 	name_chtype
 };
 
@@ -394,7 +401,7 @@ static Namfun_t *clone_type(Namval_t* np, Namval_t *mp, int flags, Namfun_t *fp)
 			nrp++;
 			nq = nq->nvalue.nrp->np;
 		}
-		if(nq->nvalue.cp || nv_isarray(nq) || nv_isattr(nq,NV_RDONLY))
+		if(nq->nvalue.cp || !nv_isvtree(nq) || nv_isattr(nq,NV_RDONLY))
 		{
 			/* see if default value has been overwritten */
 			if(!mp->nvname)
@@ -796,7 +803,7 @@ void nv_addtype(Namval_t *np, const char *optstr, Optdisc_t *op, size_t optsz)
 	nv_onattr(np, NV_RDONLY);
 }
 
-static void addtype(Namval_t *mp)
+void nv_newtype(Namval_t *mp)
 {
 	struct	{
 		    Optdisc_t	opt;
@@ -1113,8 +1120,10 @@ else sfprintf(sfstderr,"tp==NULL\n");
 			if(nv_isarray(nq) && !nq->nvfun)
 			{
 				nv_putsub(nq, (char*)0, ARRAY_FILL);
-				((Namarr_t*)nq->nvfun)->nelem--;
-				
+				if(nv_isattr(nq,NV_INTEGER))
+					nv_putval(nq, "0",0);
+				else
+					((Namarr_t*)nq->nvfun)->nelem--;
 			}
 			nv_disc(nq, &pp->childfun.fun, NV_LAST);
 			if(nq->nvfun)
@@ -1139,6 +1148,8 @@ else sfprintf(sfstderr,"tp==NULL\n");
 				if(!j)
 					free((void*)np->nvalue.cp);
 			}
+			if(!nq->nvalue.cp && nq->nvfun== &pp->childfun.fun)
+				nq->nvalue.cp = Empty;
 			np->nvalue.cp = 0;
 #if 0
 			offset += dsize;
@@ -1170,7 +1181,7 @@ else sfprintf(sfstderr,"tp==NULL\n");
 	}
 	if(mnodes!=nodes)
 		free((void*)mnodes);
-	addtype(mp);
+	nv_newtype(mp);
 	return(mp);
 }
 
@@ -1207,7 +1218,7 @@ Namval_t *nv_mkinttype(char *name, size_t size, int sign, const char *help, Namd
 	if(!sign)
 		nv_onattr(mp,NV_UNSIGN);
 	nv_disc(mp, fp, NV_LAST);
-	addtype(mp);
+	nv_newtype(mp);
 	return(mp);
 }
 
@@ -1230,6 +1241,11 @@ void nv_typename(Namval_t *tp, Sfio_t *out)
 Namval_t *nv_type(Namval_t *np)
 {
 	Namfun_t  *fp;
+	if(nv_isattr(np,NV_BLTIN|BLT_DCL)==(NV_BLTIN|BLT_DCL))
+	{
+		Namdecl_t *ntp = (Namdecl_t*)nv_context(np);
+		return(ntp?ntp->tp:0);
+	}
 	for(fp=np->nvfun; fp; fp=fp->next)
 	{
 		if(fp->type)
@@ -1326,6 +1342,7 @@ int nv_settype(Namval_t* np, Namval_t *tp, int flags)
 		np->nvalue.up = 0;
 		nofree = ap->hdr.nofree;
 		ap->hdr.nofree = 0;
+		ap->hdr.type = tp;
 		nv_disc(np, &ap->hdr, NV_FIRST);
 		ap->hdr.nofree = nofree;
 		nv_onattr(np,NV_ARRAY);
@@ -1492,7 +1509,7 @@ Namval_t *nv_mkstruct(const char *name, int rsize, Fields_t *fields)
 	nv_setsize(mp,rsize);
 	nv_disc(mp, &pp->fun, NV_LAST);
 	mp->nvalue.cp = pp->data;
-	addtype(mp);
+	nv_newtype(mp);
 	return(mp);
 }
 

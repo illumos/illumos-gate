@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -352,7 +352,12 @@ static void put_level(Namval_t* np,const char *val,int flags,Namfun_t *fp)
 	int16_t level, oldlevel = (int16_t)nv_getnum(np);
 	nv_putv(np,val,flags,fp);
 	if(!val)
+	{
+		fp = nv_stack(np, NIL(Namfun_t*));
+		if(fp && !fp->nofree)
+			free((void*)fp);
 		return;
+	}
 	level = nv_getnum(np);
 	if(level<0 || level > lp->maxlevel)
 	{
@@ -414,7 +419,7 @@ int sh_debug(Shell_t *shp, const char *trap, const char *name, const char *subsc
 			n -= 2;
 		sfwrite(iop,cp,n);
 	}
-	if(!(flags&ARG_RAW))
+	if(*argv && !(flags&ARG_RAW))
 		out_string(iop, *argv++,' ', 0);
 	n = (flags&ARG_ARITH);
 	while(cp = *argv++)
@@ -466,7 +471,9 @@ int sh_eval(register Sfio_t *iop, int mode)
 	struct checkpt buff;
 	static Sfio_t *io_save;
 	volatile int traceon=0, lineno=0;
+	int binscript=shp->binscript;
 	io_save = iop; /* preserve correct value across longjmp */
+	shp->binscript = 0;
 #define SH_TOPFUN	0x8000	/* this is a temporary tksh hack */
 	if (mode & SH_TOPFUN)
 	{
@@ -476,7 +483,7 @@ int sh_eval(register Sfio_t *iop, int mode)
 	sh_pushcontext(&buff,SH_JMPEVAL);
 	buff.olist = pp->olist;
 	jmpval = sigsetjmp(buff.buff,0);
-	if(jmpval==0)
+	while(jmpval==0)
 	{
 		if(mode&SH_READEVAL)
 		{
@@ -484,22 +491,28 @@ int sh_eval(register Sfio_t *iop, int mode)
 			if(traceon=sh_isoption(SH_XTRACE))
 				sh_offoption(SH_XTRACE);
 		}
-		t = (Shnode_t*)sh_parse(shp,iop,(mode&SH_READEVAL)?0:SH_NL);
-		if(mode&SH_READEVAL)
-			mode &= SH_READEVAL;
-		else
-			sfclose(iop);
-		io_save = 0;
+		t = (Shnode_t*)sh_parse(shp,iop,(mode&(SH_READEVAL|SH_FUNEVAL))?mode&SH_FUNEVAL:SH_NL);
+		if(!(mode&SH_FUNEVAL) || !sfreserve(iop,0,0))
+		{
+			if(!(mode&SH_READEVAL))
+				sfclose(iop);
+			io_save = 0;
+			mode &= ~SH_FUNEVAL;
+		}
+		mode &= ~SH_READEVAL;
 		if(!sh_isoption(SH_VERBOSE))
 			sh_offstate(SH_VERBOSE);
-		if(mode && shp->hist_ptr)
+		if((mode&~SH_FUNEVAL) && shp->hist_ptr)
 		{
 			hist_flush(shp->hist_ptr);
 			mode = sh_state(SH_INTERACTIVE);
 		}
-		sh_exec(t,sh_isstate(SH_ERREXIT)|mode);
+		sh_exec(t,sh_isstate(SH_ERREXIT)|sh_isstate(SH_NOFORK)|(mode&~SH_FUNEVAL));
+		if(!(mode&SH_FUNEVAL))
+			break;
 	}
 	sh_popcontext(&buff);
+	shp->binscript = binscript;
 	if(traceon)
 		sh_onoption(SH_XTRACE);
 	if(lineno)
@@ -597,12 +610,14 @@ static void free_list(struct openlist *olist)
  */
 static int set_instance(Namval_t *nq, Namval_t *node, struct Namref *nr)
 {
-	char		*cp = nv_name(nq);
+	char		*sp=0,*cp = nv_name(nq);
 	Namarr_t	*ap;
 	memset(nr,0,sizeof(*nr));
 	nr->np = nq;
 	nr->root = sh.var_tree;
 	nr->table = sh.last_table;
+	if((ap=nv_arrayptr(nq)) && (sp = nv_getsub(nq)))
+		sp = strdup(sp);
 	if(sh.var_tree!=sh.var_base && !nv_open(cp,nr->root,NV_VARNAME|NV_NOREF|NV_NOSCOPE|NV_NOADD|NV_NOFAIL))
 		nr->root = sh.var_base;
 	nv_putval(SH_NAMENOD, cp, NV_NOFREE);
@@ -611,9 +626,9 @@ static int set_instance(Namval_t *nq, Namval_t *node, struct Namref *nr)
 	L_ARGNOD->nvflag = NV_REF|NV_NOFREE;
 	L_ARGNOD->nvfun = 0;
 	L_ARGNOD->nvenv = 0;
-	if((ap=nv_arrayptr(nq)) && (cp = nv_getsub(nq)) && (cp = strdup(cp)))
+	if(sp)
 	{
-		nv_putval(SH_SUBSCRNOD,nr->sub=cp,NV_NOFREE);
+		nv_putval(SH_SUBSCRNOD,nr->sub=sp,NV_NOFREE);
 		return(ap->nelem&ARRAY_SCAN);
 	}
 	return(0);
@@ -644,9 +659,12 @@ int sh_exec(register const Shnode_t *t, int flags)
 		register char	*com0 = 0;
 		int 		errorflg = (type&sh_state(SH_ERREXIT))|OPTIMIZE;
 		int 		execflg = (type&sh_state(SH_NOFORK));
+		int 		execflg2 = (type&sh_state(SH_FORKED));
 		int 		mainloop = (type&sh_state(SH_INTERACTIVE));
 #if SHOPT_AMP || SHOPT_SPAWN
 		int		ntflag = (type&sh_state(SH_NTFORK));
+#else
+		int		ntflag = 0;
 #endif
 		int		topfd = shp->topfd;
 		char 		*sav=stkptr(stkp,0);
@@ -659,6 +677,8 @@ int sh_exec(register const Shnode_t *t, int flags)
 		int		echeck = 0;
 		if(flags&sh_state(SH_INTERACTIVE))
 		{
+			if(pipejob==2)
+				job_unlock();
 			pipejob = 0;
 			job.curpgid = 0;
 			flags &= ~sh_state(SH_INTERACTIVE);
@@ -746,6 +766,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 			{
 				if(argn==0 || (np && nv_isattr(np,BLT_SPC)))
 				{
+					Namval_t *tp=0;
 					if(argn)
 					{
 						if(checkopt(com,'A'))
@@ -771,13 +792,18 @@ int sh_exec(register const Shnode_t *t, int flags)
 #endif
 					{
 						if(np!=SYSTYPESET)
+						{
 							shp->typeinit = np;
+							tp = nv_type(np);
+						}
 						if(checkopt(com,'C'))
 							flgs |= NV_COMVAR;
 						if(checkopt(com,'S'))
 							flgs |= NV_STATIC;
 						if(checkopt(com,'n'))
 							flgs |= NV_NOREF;
+						else if(!shp->typeinit && (checkopt(com,'L') || checkopt(com,'R') || checkopt(com,'Z')))
+							flgs |= NV_UNJUST;
 #if SHOPT_TYPEDEF
 						else if(argn>=3 && checkopt(com,'T'))
 						{
@@ -799,7 +825,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 					if(OPTIMIZE)
 						flgs |= NV_TAGGED;
 #endif
-					nv_setlist(argp,flgs);
+					nv_setlist(argp,flgs,tp);
 					if(np==shp->typeinit)
 						shp->typeinit = 0;
 					shp->envlist = argp;
@@ -875,6 +901,11 @@ int sh_exec(register const Shnode_t *t, int flags)
 							np = 0;
 					}
 				}
+				if(np && pipejob==2)
+				{
+					job_unlock();
+					pipejob = 1;
+				}
 				/* check for builtins */
 				if(np && is_abuiltin(np))
 				{
@@ -882,6 +913,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 					volatile void *save_ptr;
 					volatile void *save_data;
 					int jmpval, save_prompt;
+					int was_nofork = execflg?sh_isstate(SH_NOFORK):0;
 					struct checkpt buff;
 					unsigned long was_vi=0, was_emacs=0, was_gmacs=0;
 					struct stat statb;
@@ -902,6 +934,8 @@ int sh_exec(register const Shnode_t *t, int flags)
 						sh_offoption(SH_EMACS);
 						sh_offoption(SH_GMACS);
 					}
+					if(execflg)
+						sh_onstate(SH_NOFORK);
 					sh_pushcontext(&buff,SH_JMPCMD);
 					jmpval = sigsetjmp(buff.buff,1);
 					if(jmpval == 0)
@@ -999,6 +1033,8 @@ int sh_exec(register const Shnode_t *t, int flags)
 					}
 					if(bp && bp->ptr!= nv_context(np))
 						np->nvfun = (Namfun_t*)bp->ptr;
+					if(execflg && !was_nofork)
+						sh_offstate(SH_NOFORK);
 					if(!(nv_isattr(np,BLT_ENV)))
 					{
 						if(bp->nosfio && shp->pwd)
@@ -1019,7 +1055,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 					}
 					sh_popcontext(&buff);
 					errorpop(&buff.err);
-					error_info.flags &= ~ERROR_SILENT;
+					error_info.flags &= ~(ERROR_SILENT|ERROR_NOTIFY);
 					shp->bltinfun = 0;
 					if(buff.olist)
 						free_list(buff.olist);
@@ -1127,15 +1163,19 @@ int sh_exec(register const Shnode_t *t, int flags)
 			register pid_t parent;
 			int no_fork,jobid;
 			int pipes[2];
-			no_fork = (execflg && !(type&(FAMP|FPOU)) &&
-#if SHOPT_AMP || SHOPT_SPAWN
-				!ntflag &&
-#endif
-				!shp->subshell && !shp->st.trapcom[0] && 
-				!shp->st.trap[SH_ERRTRAP] && shp->fn_depth==0 &&
-				!(pipejob && sh_isoption(SH_PIPEFAIL)));
 			if(shp->subshell)
-				sh_subtmpfile(1);
+			{
+				if(shp->subshare)
+					sh_subtmpfile(1);
+				else
+					sh_subfork();
+			}
+			no_fork = !ntflag && !(type&(FAMP|FPOU)) &&
+			    !shp->st.trapcom[0] && !shp->st.trap[SH_ERRTRAP] &&
+				(execflg2 || (execflg && 
+				!shp->subshell && shp->fn_depth==0 &&
+				!(pipejob && sh_isoption(SH_PIPEFAIL))
+			    ));
 			if(sh_isstate(SH_PROFILE) || shp->dot_depth)
 			{
 				/* disable foreground job monitor */
@@ -1150,6 +1190,18 @@ int sh_exec(register const Shnode_t *t, int flags)
 				job.parent=parent=0;
 			else
 			{
+#ifdef SHOPT_BGX
+				int maxjob;
+				if(((type&(FAMP|FINT)) == (FAMP|FINT)) && (maxjob=nv_getnum(JOBMAXNOD))>0)
+				{
+					while(job.numbjob >= maxjob)
+					{
+						job_lock();
+						job_reap(0);
+						job_unlock();
+					}
+				}
+#endif /* SHOPT_BGX */
 				if(type&FCOOP)
 					coproc_init(shp,pipes);
 				nv_getval(RANDNOD);
@@ -1183,6 +1235,11 @@ int sh_exec(register const Shnode_t *t, int flags)
 			 * It may or may not wait for the child
 			 */
 			{
+				if(pipejob==2)
+				{
+					pipejob = 1;
+					job_unlock();
+				}
 				if(type&FPCL)
 					sh_close(shp->inpipe[0]);
 				if(type&(FCOOP|FAMP))
@@ -1197,11 +1254,13 @@ int sh_exec(register const Shnode_t *t, int flags)
 							sh_sigtrap(SIGINT);
 						shp->trapnote |= SH_SIGIGNORE;
 					}
-					if(execflg && shp->subshell)
+					if(execflg && shp->subshell && !shp->subshare)
 					{
 						shp->spid = parent;
 						job.pwlist->p_env--;
 					}
+					else if(shp->pipepid)
+						shp->pipepid = parent;
 					else
 						job_wait(parent);
 					if(!sh_isoption(SH_MONITOR))
@@ -1294,7 +1353,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 					 */
 					if(!no_fork && !(type&FPOU))
 						job_clear();
-					sh_exec(t->fork.forktre,flags|sh_state(SH_NOFORK));
+					sh_exec(t->fork.forktre,flags|sh_state(SH_NOFORK)|sh_state(SH_FORKED));
 				}
 				else if(com0)
 				{
@@ -1317,7 +1376,8 @@ int sh_exec(register const Shnode_t *t, int flags)
 		     * save and restore io-streams
 		     */
 			pid_t	pid;
-			int jmpval, waitall;
+			int 	jmpval, waitall;
+			int 	simple = (t->fork.forktre->tre.tretyp&COMMSK)==TCOM;
 			struct checkpt buff;
 			if(shp->subshell)
 				execflg = 0;
@@ -1326,14 +1386,14 @@ int sh_exec(register const Shnode_t *t, int flags)
 			{
 				was_interactive = sh_isstate(SH_INTERACTIVE);
 				sh_offstate(SH_INTERACTIVE);
-				if(!execflg)
-					sh_iosave(shp,0,shp->topfd,(char*)0);
+				sh_iosave(shp,0,shp->topfd,(char*)0);
+				shp->pipepid = simple;
 				sh_iorenumber(shp,shp->inpipe[0],0);
 				/*
 				 * if read end of pipe is a simple command
 				 * treat as non-sharable to improve performance
 				 */
-				if((t->fork.forktre->tre.tretyp&COMMSK)==TCOM)
+				if(simple)
 					sfset(sfstdin,SF_PUBLIC|SF_SHARE,0);
 				waitall = job.waitall;
 				job.waitall = 0;
@@ -1346,7 +1406,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 			{
 				sh_redirect(shp,t->fork.forkio,execflg);
 				(t->fork.forktre)->tre.tretyp |= t->tre.tretyp&FSHOWME;
-				sh_exec(t->fork.forktre,flags);
+				sh_exec(t->fork.forktre,flags&~simple);
 			}
 			else
 				sfsync(shp->outpool);
@@ -1361,11 +1421,23 @@ int sh_exec(register const Shnode_t *t, int flags)
 				if(!(type&SH_EXITSIG))
 				{
 					/* wait for remainder of pipline */
-					job_wait(waitall?pid:0);
+					if(shp->pipepid>1)
+					{
+						job_wait(shp->pipepid);
+						type = shp->exitval;
+					}
+					else
+						job_wait(waitall?pid:0);
 					if(type || !sh_isoption(SH_PIPEFAIL))
 						shp->exitval = type;
 				}
+				shp->pipepid = 0;
 				shp->st.ioset = 0;
+				if(simple && was_errexit)
+				{
+					echeck = 1;
+					sh_onstate(SH_ERREXIT);
+				}
 			}
 			if(jmpval>SH_JMPIO)
 				siglongjmp(*shp->jmplist,jmpval);
@@ -1377,8 +1449,17 @@ int sh_exec(register const Shnode_t *t, int flags)
 			flags &= ~OPTIMIZE_FLAG;
 			if(!shp->subshell && !shp->st.trapcom[0] && !shp->st.trap[SH_ERRTRAP] && (flags&sh_state(SH_NOFORK)))
 			{
-				int jmpval;
+				char *savsig;
+				int nsig,jmpval;
 				struct checkpt buff;
+				shp->st.otrapcom = 0;
+				if((nsig=shp->st.trapmax*sizeof(char*))>0 || shp->st.trapcom[0])
+				{
+					nsig += sizeof(char*);
+					memcpy(savsig=malloc(nsig),(char*)&shp->st.trapcom[0],nsig);
+					shp->st.otrapcom = (char**)savsig;
+				}
+				sh_sigreset(0);
 				sh_pushcontext(&buff,SH_JMPEXIT);
 				jmpval = sigsetjmp(buff.buff,0);
 				if(jmpval==0)
@@ -1419,6 +1500,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 				job.waitall = 1;
 			else
 				job.waitall |= !pipejob && sh_isstate(SH_MONITOR);
+			job_lock();
 			do
 			{
 #if SHOPT_FASTPIPE
@@ -1442,6 +1524,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 			while(!type && t->tre.tretyp==TFIL);
 			shp->inpipe = pvn;
 			shp->outpipe = 0;
+			pipejob = 2;
 			if(type == 0)
 			{
 				/*
@@ -1454,6 +1537,8 @@ int sh_exec(register const Shnode_t *t, int flags)
 			else
 				/* execution failure, close pipe */
 				sh_pclose(pvn);
+			if(pipejob==2)
+				job_unlock();
 			pipejob = savepipe;
 #ifdef SIGTSTP
 			if(!pipejob && sh_isstate(SH_MONITOR))
@@ -1651,7 +1736,7 @@ int sh_exec(register const Shnode_t *t, int flags)
 				shp->offsets[0] = -1;
 				shp->offsets[1] = 0;
 				if(tt->com.comset)
-					nv_setlist(tt->com.comset,NV_IDENT|NV_ASSIGN);
+					nv_setlist(tt->com.comset,NV_IDENT|NV_ASSIGN,0);
 			}
 #endif /*SHOPT_FILESCAN */
 			shp->st.loopcnt++;
@@ -2336,7 +2421,15 @@ pid_t _sh_fork(register pid_t parent,int flags,int *jobid)
 			job.curpgid = parent;
 		if(flags&FCOOP)
 			shp->cpid = parent;
+#ifdef SHOPT_BGX
+		if(!postid && (flags&(FAMP|FINT)) == (FAMP|FINT))
+			postid = 1;
 		myjob = job_post(parent,postid);
+		if(postid==1)
+			postid = 0;
+#else
+		myjob = job_post(parent,postid);
+#endif /* SHOPT_BGX */
 		if(flags&FAMP)
 			job.curpgid = curpgid;
 		if(jobid)
@@ -2388,7 +2481,8 @@ pid_t _sh_fork(register pid_t parent,int flags,int *jobid)
 #endif	/* SHOPT_ACCT */
 	/* Reset remaining signals to parent */
 	/* except for those `lost' by trap   */
-	sh_sigreset(2);
+	if(!(flags&FSHOWME))
+		sh_sigreset(2);
 	shp->subshell = 0;
 	if((flags&FAMP) && shp->coutpipe>1)
 		sh_close(shp->coutpipe);
@@ -2463,6 +2557,8 @@ int sh_funscope(int argn, char *argv[],int(*fun)(void*),void *arg,int execflg)
 	struct funenv		*fp;
 	struct checkpt		buff;
 	Namval_t		*nspace = shp->namespace;
+	Dt_t			*last_root = shp->last_root;
+	Shopt_t			options = shp->options;
 	if(shp->fn_depth==0)
 		shp->glob_options =  shp->options;
 	else
@@ -2534,7 +2630,10 @@ int sh_funscope(int argn, char *argv[],int(*fun)(void*),void *arg,int execflg)
 	if(jmpval == 0)
 	{
 		if(shp->fn_depth++ > MAXDEPTH)
+		{
+			shp->toomany = 1;
 			siglongjmp(*shp->jmplist,SH_JMPERRFN);
+		}
 		else if(fun)
 			r= (*fun)(arg);
 		else
@@ -2567,7 +2666,8 @@ int sh_funscope(int argn, char *argv[],int(*fun)(void*),void *arg,int execflg)
 	shp->trapnote=0;
 	if(nsig)
 		stakset(savstak,0);
-	shp->options = shp->glob_options;
+	shp->options = options;
+	shp->last_root = last_root;
 	if(trap)
 	{
 		sh_trap(trap,0);
@@ -2588,7 +2688,8 @@ static void sh_funct(Shell_t *shp,Namval_t *np,int argn, char *argv[],struct arg
 	struct funenv fun;
 	char *fname = nv_getval(SH_FUNNAMENOD);
 	struct Level	*lp =(struct Level*)(SH_LEVELNOD->nvfun);
-	int		level;
+	int		level, pipepid=shp->pipepid;
+	shp->pipepid = 0;
 	sh_stats(STAT_FUNCT);
 	if(!lp->hdr.disc)
 		lp = init_level(0);
@@ -2632,6 +2733,7 @@ static void sh_funct(Shell_t *shp,Namval_t *np,int argn, char *argv[],struct arg
 	nv_putval(SH_FUNNAMENOD,fname,NV_NOFREE);
 #endif
 	nv_putval(SH_PATHNAMENOD,shp->st.filename,NV_NOFREE);
+	shp->pipepid = pipepid;
 }
 
 /*
@@ -3136,7 +3238,7 @@ static pid_t sh_ntfork(Shell_t *shp,const Shnode_t *t,char *argv[],int *jobid,in
 	{
 		sh_unscope(shp);
 		if(jmpval==SH_JMPSCRIPT)
-			nv_setlist(t->com.comset,NV_EXPORT|NV_IDENT|NV_ASSIGN);
+			nv_setlist(t->com.comset,NV_EXPORT|NV_IDENT|NV_ASSIGN,0);
 	}
 	if(t->com.comio)
 		sh_iorestore(shp,buff.topfd,jmpval);

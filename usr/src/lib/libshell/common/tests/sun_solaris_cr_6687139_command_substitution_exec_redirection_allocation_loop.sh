@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -46,6 +46,7 @@
 # -- snip --
 #
 
+# test setup
 function err_exit
 {
 	print -u2 -n "\t"
@@ -54,14 +55,15 @@ function err_exit
 }
 alias err_exit='err_exit $LINENO'
 
+set -o nounset
+Command=${0##*/}
+integer Errors=0
+
 function isvalidpid
 {
 	kill -0 ${1} 2>/dev/null && return 0
 	return 1
 }
-
-Command=${0##*/}
-integer Errors=0
 
 integer childpid
 typeset testdir
@@ -207,6 +209,7 @@ childretval=$?
 # tests done, remove temporary test subdir
 cd /tmp
 rmdir "${testdir}" || err_exit "Could not remove temporary test directory ${testdir}"
+
 
 # tests done
 exit $((Errors))

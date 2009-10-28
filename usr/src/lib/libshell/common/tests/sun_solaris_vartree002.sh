@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -31,22 +31,24 @@
 # and "unset" handling.
 #
 
+# test setup
 function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors+=1 ))
+	(( Errors++ ))
 }
-
 alias err_exit='err_exit $LINENO'
 
+# the test cannot use "nounset"
+Command=${0##*/}
 integer Errors=0
 
 # "built_tree1" and "built_tree2" are identical except the way how they test
 # whether a variable exists: 
 # - "built_tree1" uses "${varname}" != "", e.g. looking whether the variable
 #    as non-zero length content
-# - "built_tree2" uses "! (unset varname)", e.g. "unset" in a subshell
+# - "built_tree2" uses "! ([[ -v varname ]] ; res=$? ; unset varname ; exit $res)", e.g. "unset" in a subshell.
 function build_tree1
 {
 #set -o errexit -o xtrace
@@ -113,7 +115,7 @@ function build_tree1
 # whether a variable exists: 
 # - "built_tree1" uses "${varname}" != "", e.g. looking whether the variable
 #    as non-zero length content
-# - "built_tree2" uses "! (unset varname)", e.g. "unset" in a subshell
+# - "built_tree2" uses "! ([[ -v varname ]] ; res=$? ; unset varname ; exit $res)", e.g. "unset" in a subshell.
 function build_tree2
 {
 #set -o errexit -o xtrace
@@ -144,12 +146,12 @@ function build_tree2
 			[[ "$c" == "" ]] && c='-'
 						
 			#if [[ "${dest_tree.l1["$a"]}" == "" ]] ; then
-			if ! (unset dest_tree.l1["$a"]) ; then
+			if ! ([[ -v dest_tree.l1["$a"] ]] ; res=$? ; unset dest_tree.l1["$a"] ; exit $res) ; then
 				typeset -A dest_tree.l1["$a"].l2
 			fi
 
 			#if [[ "${dest_tree.l1["$a"].l2["$b"]}" == "" ]] ; then
-			if ! (unset dest_tree.l1["$a"].l2["$b"]) ; then
+			if ! ([[ -v dest_tree.l1["$a"].l2["$b"] ]] ; res=$? ; unset dest_tree.l1["$a"].l2["$b"] ; exit $res) ; then
 				typeset -A dest_tree.l1["$a"].l2["$b"].l3
 			fi
 
@@ -301,43 +303,47 @@ function main
 
 
 	#### test "unset" in a subshell
-	(  unset 'mytree_global1.l1[urw].l2[itc zapfdingbats]'  ) || \
+	(  [[ -v 'mytree_global1.l1[urw].l2[itc zapfdingbats]' ]] ; res=$? ; unset 'mytree_global1.l1[urw].l2[itc zapfdingbats]' ; exit $res ) || \
 		err_exit "Try 1: Variable 'mytree_global1.l1[urw].l2[itc zapfdingbats]' not found." 
-	(  unset 'mytree_global1.l1[urw].l2[itc zapfdingbats]'  ) || \
+	(  [[ -v 'mytree_global1.l1[urw].l2[itc zapfdingbats]' ]] ; res=$? ; unset 'mytree_global1.l1[urw].l2[itc zapfdingbats]' ; exit $res ) || \
 		err_exit "Try 2: Variable 'mytree_global1.l1[urw].l2[itc zapfdingbats]' not found." 
 
 	# remove parent node (array element) and then check whether the child is gone, too:
 	(
 		set -o errexit
 		unset 'mytree_global1.l1[urw].l2[itc zapfdingbats]'
-		! unset 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'
+		! [[ -v 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ]]
 	) || err_exit "Global: Parent node removed (array element), child still exists" 
 	(
 		set -o errexit
 		unset 'mytree_local1.l1[urw].l2[itc zapfdingbats]'
-		! unset 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'
+		! [[ -v 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ]]
 	) || err_exit "Local: Parent node removed (array element), child still exists" 
 	
 	# remove parent node  (array variable) and then check whether the child is gone, too:
 	(
 		set -o errexit
 		unset 'mytree_local1.l1[urw].l2'
-		! unset 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'
+		! [[ -v 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ]]
 	) || err_exit "Global: Parent node removed (array variable), child still exists" 
 	(
 		set -o errexit
 		unset 'mytree_local1.l1[urw].l2'
-		! unset 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'
+		! [[ -v 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ]]
 	) || err_exit "Local: Parent node removed (array variable), child still exists" 
 
 
 	#### test "unset" and compare trees
-	unset 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ||
+	[[ -v 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ]] ; res=$?
+	unset 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'
+	(( res == 0 ))  ||
 		err_exit "Variable 'mytree_global1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' not found." 
 	
 	[[ "${mytree_global1}" != "${mytree_local1}" ]] || err_exit "mytree_global1 and mytree_local1 should differ"
 
-	unset 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ||
+	[[ -v 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ]] ; res=$?
+	unset 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]'
+	(( res == 0 ))  ||
 		err_exit "Variable 'mytree_local1.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' not found." 
 	
 	# Compare trees (after "unset")

@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -41,7 +41,7 @@ function build_tree
 	typeset i
 	typeset dummy
 	typeset a b c d e f
-	
+
 	nameref dest_tree="$1" # destination tree
 	nameref srcdata="$2"   # source data
 	typeset tree_mode="$3" # mode to define the type of leads
@@ -53,15 +53,15 @@ function build_tree
 
 		for i in "${node.xlfd[@]}" ; do
 			IFS='-' read dummy a b c d e f <<<"$i"
-			
+
 			if [[ "$a" == "" ]] ; then
 				a="$dummy"
 			fi
-			
+
 			[[ "$a" == "" ]] && a='-'
 			[[ "$b" == "" ]] && b='-'
 			[[ "$c" == "" ]] && c='-'
-						
+
 			if [[ "${dest_tree.l1["$a"]}" == "" ]] ; then
 			#if ! (unset dest_tree.l1["$a"]) ; then
 				typeset -A dest_tree.l1["$a"].l2
@@ -75,7 +75,7 @@ function build_tree
 			if [[ "${!dest_tree.l1["$a"].l2["$b"].l3["$c"].entries[*]}" == "" ]] ; then
 				typeset -A dest_tree.l1["$a"].l2["$b"].l3["$c"].entries
 			fi
-					
+
 			#dest_tree.l1["$a"].l2["$b"].l3["$c"].entries+=( "$index" )
 			typeset new_index
 			if [[ "${tree_mode}" == "leaf_name" ]] ; then
@@ -88,12 +88,12 @@ function build_tree
 					continue
 				fi
 			fi
-			
+
 			add_tree_leaf dest_tree.l1["$a"].l2["$b"].l3["$c"].entries[${new_index}] "${index}" "${tree_mode}"
 		done
 	done
-	
-	return 0	
+
+	return 0
 }
 
 function add_tree_leaf
@@ -101,7 +101,7 @@ function add_tree_leaf
 	nameref tree_leafnode="$1"
 	nameref data_node=srcdata.hashnodes["$2"]
 	typeset add_mode="$3"
-	
+
 	case "${add_mode}" in
 		"leaf_name")
 			tree_leafnode="${data_node.name}"
@@ -121,7 +121,7 @@ function add_tree_leaf
 			return 1
 			;;
 	esac
-	
+
 	# not reached
 	return 1
 }
@@ -151,7 +151,7 @@ typeset mysrcdata_global=(
 )
 
 mytree_global=()
-	
+
 function main
 {
 	# "mysrcdata_local" and "mysrcdata_global" must be identical
@@ -182,32 +182,32 @@ function main
 	build_tree mytree_global mysrcdata_global leaf_compound || \
 		err_exit 'build_tree mytree_global mysrcdata_global leaf_compound returned an error'
 
-	(( $(print -r -- "${mytree_global}" | wc -l) > 10 )) || err_exit "Compound tree 'mytree_global' too small."
+	(( $(print -r -- "${mytree_global}" | wc -l) > 10 )) || err_exit "compound tree 'mytree_global' too small"
 
 	# build tree using local tree variables
 	mytree_local=()
 	build_tree mytree_local mysrcdata_local leaf_compound || \
 		err_exit 'build_tree mytree_local mysrcdata_local leaf_compound returned an error'
 
-	(( $(print -r -- "${mytree_local}" | wc -l) > 10 )) || err_exit "Compound tree 'mytree_local' too small."
-	
+	(( $(print -r -- "${mytree_local}" | wc -l) > 10 )) || err_exit "compound tree 'mytree_local' too small"
+
 	# Compare trees
 	if [[ "${mytree_global}" != "${mytree_local}" ]] ; then
-		err_exit "Compound trees 'mytree_local' and 'mytree_global' not identical"
+		err_exit "compound trees 'mytree_local' and 'mytree_global' not identical"
 	fi
-	
+
 	unset 'mytree_global.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ||
-		err_exit "Variable 'mytree_global.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' not found." 
-	
+		err_exit "variable 'mytree_global.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' not found"
+
 	[[ "${mytree_global}" != "${mytree_local}" ]] || err_exit "mytree_global and mytree_local should differ"
 
 	unset 'mytree_local.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' ||
-		err_exit "Variable 'mytree_local.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' not found." 
-	
+		err_exit "variable 'mytree_local.l1[urw].l2[itc zapfdingbats].l3[medium].entries[abcd].filenames[0]' not found"
+
 	# Compare trees (after "unset")
 	if [[ "${mytree_global}" != "${mytree_local}" ]] ; then
-		err_exit "Compound trees 'mytree_local' and 'mytree_global' not identical after unset"
-	fi	
+		err_exit "compound trees 'mytree_local' and 'mytree_global' not identical after unset"
+	fi
 }
 
 main

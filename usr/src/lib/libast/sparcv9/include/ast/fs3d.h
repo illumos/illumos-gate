@@ -3,7 +3,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -104,7 +104,9 @@
 #define FS3D_SIZE(n)	((n)<<4)
 #define FS3D_SIZEOF(n)	((n)>>4)
 
-extern __MANGLE__ int		mount __PROTO__((const char*, char*, int, __V_*));
+#if !_BLD_3d
+#define mount(s,t,f,d)	fs3d_mount(s,t,f,d)
+#endif
 
 #if _BLD_ast && defined(__EXPORT__)
 #undef __MANGLE__
@@ -112,6 +114,7 @@ extern __MANGLE__ int		mount __PROTO__((const char*, char*, int, __V_*));
 #endif
 
 extern __MANGLE__ int		fs3d __PROTO__((int));
+extern __MANGLE__ int		fs3d_mount __PROTO__((const char*, char*, int, __V_*));
 extern __MANGLE__ char*		pathnext __PROTO__((char*, char*, long*));
 
 #undef __MANGLE__

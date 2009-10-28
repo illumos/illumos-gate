@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -27,6 +27,9 @@ alias err_exit='err_exit $LINENO'
 
 Command=${0##*/}
 integer Errors=0
+
+tmp=$(mktemp -dt) || { err_exit mktemp -dt failed; exit 1; }
+trap "cd /; rm -rf $tmp" EXIT
 
 function grep
 {
@@ -84,8 +87,7 @@ function grep
 	let tc					#  set the return value
 }
 
-trap 'rm -f /tmp/grep$$' EXIT
-cat > /tmp/grep$$ <<\!
+cat > $tmp/grep <<\!
 this is a food bar test
 to see how many lines find both foo and bar.
 Some line contain foo only,
@@ -96,7 +98,7 @@ There should be six lines with foo and bar.
 There are only two line with out foo but with bar.
 !
 
-if	(( $(grep -c 'foo*bar' /tmp/grep$$ ) != 6))
+if	(( $(grep -c 'foo*bar' $tmp/grep ) != 6))
 then	err_exit
 fi
 exit $((Errors))

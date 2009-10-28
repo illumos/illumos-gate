@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -44,13 +44,13 @@ print "# testing SCTP support"
 print "# (via fetching the main page of http://www.sctp.org/ via SCTP)"
 
 # open sctp stream and print it's number
-redirect {netfd}<>/dev/sctp/www.sctp.org/80
+redirect {netfd}<> /dev/sctp/www.sctp.org/80
 print "sctp fd=${netfd}"
 
 # send HTTP request    
 request="GET / HTTP/1.1\r\n"
 request+="Host: www.sctp.org\r\n"
-request+="User-Agent: ksh93/test_net_sctp (2008-10-14; $(uname -s -r -p))\r\n"
+request+="User-Agent: ksh93/test_net_sctp (2009-04-08; $(uname -s -r -p))\r\n"
 request+="Connection: close\r\n"
 print -u${netfd} -n -- "${request}\r\n"
 

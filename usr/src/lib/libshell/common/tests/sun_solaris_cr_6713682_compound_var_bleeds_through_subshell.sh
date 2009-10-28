@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -51,16 +51,19 @@
 # ... provides the correct output.
 #
 
+# test setup
 function err_exit
 {
 	print -u2 -n "\t"
 	print -u2 -r ${Command}[$1]: "${@:2}"
-	(( Errors+=1 ))
+	(( Errors++ ))
 }
-
 alias err_exit='err_exit $LINENO'
 
+set -o nounset
+Command=${0##*/}
 integer Errors=0
+
 
 typeset var1 var2
 
@@ -75,13 +78,13 @@ var2="$(${SHELL} -c '( ulimit -c 0 ; l=( a=1 b="BE" ) ; print "$l" ) ; print $l'
 [[ "${var1}" == "${var2}" ]] || err_exit "Non-fork()'ed subshell output differes from fork()'ed subshell output (without unset)."
 
 # use unset, typeset -C compound syntax and print
-var1="$(${SHELL} -c 'unset l ; (               typeset -C l ; l.a=1 ; l.b="BE" ; print "$l" ) ; print $l')" || err_exit "Non-zero exit code."
-var2="$(${SHELL} -c 'unset l ; ( ulimit -c 0 ; typeset -C l ; l.a=1 ; l.b="BE" ; print "$l" ) ; print $l')" || err_exit "Non-zero exit code."
+var1="$(${SHELL} -c 'unset l ; (               compound l ; l.a=1 ; l.b="BE" ; print "$l" ) ; print $l')" || err_exit "Non-zero exit code."
+var2="$(${SHELL} -c 'unset l ; ( ulimit -c 0 ; compound l ; l.a=1 ; l.b="BE" ; print "$l" ) ; print $l')" || err_exit "Non-zero exit code."
 [[ "${var1}" == "${var2}" ]] || err_exit "Non-fork()'ed subshell output differes from fork()'ed subshell output (with unset)."
 
 # do not use unset, typeset -C compound syntax and print
-var1="$(${SHELL} -c '(  	     typeset -C l ; l.a=1 ; l.b="BE" ; print "$l" ) ; print $l')" || err_exit "Non-zero exit code."
-var2="$(${SHELL} -c '( ulimit -c 0 ; typeset -C l ; l.a=1 ; l.b="BE" ; print "$l" ) ; print $l')" || err_exit "Non-zero exit code."
+var1="$(${SHELL} -c '(  	     compound l ; l.a=1 ; l.b="BE" ; print "$l" ) ; print $l')" || err_exit "Non-zero exit code."
+var2="$(${SHELL} -c '( ulimit -c 0 ; compound l ; l.a=1 ; l.b="BE" ; print "$l" ) ; print $l')" || err_exit "Non-zero exit code."
 [[ "${var1}" == "${var2}" ]] || err_exit "Non-fork()'ed subshell output differes from fork()'ed subshell output (with unset)."
 
 # use unset, l=() compound syntax and printf "%B\n"
@@ -95,14 +98,15 @@ var2="$(${SHELL} -c '( ulimit -c 0 ; l=( a=1 b="BE" ) ; printf "%B\n" l) ; print
 [[ "${var1}" == "${var2}" ]] || err_exit "Non-fork()'ed subshell output differes from fork()'ed subshell output (without unset)."
 
 # use unset, typeset -C compound syntax and printf "%B\n"
-var1="$(${SHELL} -c 'unset l ; (               typeset -C l ; l.a=1 ; l.b="BE" ; printf "%B\n" l) ; printf "%B\n" l')" || err_exit "Non-zero exit code."
-var2="$(${SHELL} -c 'unset l ; ( ulimit -c 0 ; typeset -C l ; l.a=1 ; l.b="BE" ; printf "%B\n" l) ; printf "%B\n" l')" || err_exit "Non-zero exit code."
+var1="$(${SHELL} -c 'unset l ; (               compound l ; l.a=1 ; l.b="BE" ; printf "%B\n" l) ; printf "%B\n" l')" || err_exit "Non-zero exit code."
+var2="$(${SHELL} -c 'unset l ; ( ulimit -c 0 ; compound l ; l.a=1 ; l.b="BE" ; printf "%B\n" l) ; printf "%B\n" l')" || err_exit "Non-zero exit code."
 [[ "${var1}" == "${var2}" ]] || err_exit "Non-fork()'ed subshell output differes from fork()'ed subshell output (with unset)."
 
 # do not use unset, typeset -C compound syntax and printf "%B\n"
-var1="$(${SHELL} -c '(  	     typeset -C l ; l.a=1 ; l.b="BE" ; printf "%B\n" l) ; printf "%B\n" l')" || err_exit "Non-zero exit code."
-var2="$(${SHELL} -c '( ulimit -c 0 ; typeset -C l ; l.a=1 ; l.b="BE" ; printf "%B\n" l) ; printf "%B\n" l')" || err_exit "Non-zero exit code."
+var1="$(${SHELL} -c '(  	     compound l ; l.a=1 ; l.b="BE" ; printf "%B\n" l) ; printf "%B\n" l')" || err_exit "Non-zero exit code."
+var2="$(${SHELL} -c '( ulimit -c 0 ; compound l ; l.a=1 ; l.b="BE" ; printf "%B\n" l) ; printf "%B\n" l')" || err_exit "Non-zero exit code."
 [[ "${var1}" == "${var2}" ]] || err_exit "Non-fork()'ed subshell output differes from fork()'ed subshell output (with unset)."
+
 
 # tests done
 exit $((Errors))

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -31,7 +31,7 @@
 #include <fcntl.h>
 
 static const char usage[] =
-"[-?\n@(#)$Id: cat (AT&T Research) 2007-07-17 $\n]"
+"[-?\n@(#)$Id: cat (AT&T Research) 2009-03-31 $\n]"
 USAGE_LICENSE
 "[+NAME?cat - concatenate files]"
 "[+DESCRIPTION?\bcat\b copies each \afile\a in sequence to the standard"
@@ -62,6 +62,7 @@ USAGE_LICENSE
 "[D:dos-output?Output files are opened in \atext\amode which inserts carriage"
 "	returns in front of new-lines on some systems.]"
 "[E:show-ends?Causes a \b$\b to be inserted before each new-line.]"
+"[R:regress?Regression test defaults: \b-v\b buffer size 4.]"
 "[S:silent?\bcat\b is silent about non-existent files.]"
 "[T:show-blank?Causes tabs to be copied as \b^I\b and formfeeds as \b^L\b.]"
 
@@ -87,146 +88,306 @@ USAGE_LICENSE
 #define d_FLAG		(1<<9)
 
 /* character types */
-#define T_ENDBUF	1
-#define T_CONTROL	2
-#define T_NEWLINE	3
-#define T_EIGHTBIT	4
-#define T_CNTL8BIT	5
+#define T_ERROR		1
+#define T_EOF		2
+#define T_ENDBUF	3
+#define T_NEWLINE	4
+#define T_CONTROL	5
+#define T_EIGHTBIT	6
+#define T_CNTL8BIT	7
 
 #define printof(c)	((c)^0100)
+
+typedef void* (*Reserve_f)(Sfio_t*, ssize_t, int);
+
+#ifndef sfvalue
+#define sfvalue(f)	((f)->_val)
+#endif
+
+static void*
+regress(Sfio_t* sp, ssize_t n, int f)
+{
+	void*	r;
+
+	if (!(r = sfreserve(sp, 4, f)))
+		r = sfreserve(sp, n, f);
+	else if (sfvalue(sp) > 4)
+		sfvalue(sp) = 4;
+	return r;
+}
 
 /*
  * called for any special output processing
  */
 
 static int
-vcat(register char* states, Sfio_t *fdin, Sfio_t *fdout, int flags)
+vcat(register char* states, Sfio_t* ip, Sfio_t* op, Reserve_f reserve, int flags)
 {
 	register unsigned char*	cp;
-	register unsigned char*	cpold;
+	register unsigned char*	pp;
+	unsigned char*		cur;
+	unsigned char*		end;
+	unsigned char*		buf;
+	unsigned char*		nxt;
 	register int		n;
-	register int		m;
-	register int		line = 1;
-	register unsigned char*	endbuff;
-	unsigned char*		inbuff;
-	int			printdefer = (flags&(B_FLAG|N_FLAG));
-	int			lastchar;
-	int			lastline;
+	register int		line;
+	register int		raw;
+	int			last;
+	int			c;
+	int			m;
+	int			any;
+	int			header;
 
 	unsigned char		meta[4];
+	unsigned char		tmp[32];
 
 	meta[0] = 'M';
 	meta[1] = '-';
+	last = -1;
+	*(cp = buf = end = tmp) = 0;
+	any = 0;
+	header = flags & (B_FLAG|N_FLAG);
+	line = 1;
+	states[0] = T_ENDBUF;
+	raw = !mbwide();
 	for (;;)
 	{
-		/* read in a buffer full */
-		if (!(inbuff = (unsigned char*)sfreserve(fdin, SF_UNBOUND, 0)))
-			return sfvalue(fdin) ? -1 : 0;
-		if ((n = sfvalue(fdin)) <= 0)
-			return n;
-		cp = inbuff;
-		lastchar = *(endbuff = cp + --n);
-		*endbuff = 0;
-		if (printdefer)
-		{
-			if (states[*cp]!=T_NEWLINE || !(flags&B_FLAG))
-				sfprintf(fdout,"%6d\t",line);
-			printdefer = 0;
-		}
-		while (endbuff)
-		{
-			cpold = cp;
-			/* skip over printable characters */
-			if (mbwide())
-				while ((n = (m = mbsize(cp)) < 2 ? states[*cp++] : (cp += m, states['a'])) == 0);
-			else
-				while ((n = states[*cp++]) == 0);
-			if (n==T_ENDBUF)
+		cur = cp;
+		if (raw)
+			while (!(n = states[*cp++]));
+		else
+			for (;;)
 			{
-				if (cp>endbuff)
+				while (!(n = states[*cp++]));
+				if (n < T_CONTROL)
+					break;
+				if ((m = mbsize(pp = cp - 1)) > 1)
+					cp += m - 1;
+				else
 				{
-					if (!(n = states[lastchar]))
+					if (m <= 0)
 					{
-						*endbuff = lastchar;
-						cp++;
+						if (cur == pp)
+						{
+							if (last > 0)
+							{
+								*end = last;
+								last = -1;
+								c = end - pp + 1;
+								if ((m = mbsize(pp)) == c)
+								{
+									any = 1;
+									if (header)
+									{
+										header = 0;
+										sfprintf(op, "%6d\t", line);
+									}
+									sfwrite(op, cur, m);
+									*(cp = cur = end) = 0;
+								}
+								else
+								{
+									memcpy(tmp, pp, c);
+									if (!(nxt = (unsigned char*)(*reserve)(ip, SF_UNBOUND, 0)))
+									{
+										states[0] = sfvalue(ip) ? T_ERROR : T_EOF;
+										*(cp = end = tmp + sizeof(tmp) - 1) = 0;
+										last = -1;
+									}
+									else if ((n = sfvalue(ip)) <= 0)
+									{
+										states[0] = n ? T_ERROR : T_EOF;
+										*(cp = end = tmp + sizeof(tmp) - 1) = 0;
+										last = -1;
+									}
+									else
+									{
+										cp = buf = nxt;
+										end = buf + n - 1;
+										last = *end;
+										*end = 0;
+									}
+ mb:
+									if ((n = end - cp + 1) >= (sizeof(tmp) - c))
+										n = sizeof(tmp) - c - 1;
+									memcpy(tmp + c, cp, n);
+									if ((m = mbsize(tmp)) >= c)
+									{
+										any = 1;
+										if (header)
+										{
+											header = 0;
+											sfprintf(op, "%6d\t", line);
+										}
+										sfwrite(op, tmp, m);
+										cur = cp += m - c;
+									}
+								}
+								continue;
+							}
+						}
+						else
+						{
+							cp = pp + 1;
+							n = 0;
+						}
+					}
+					break;
+				}
+			}
+		c = *--cp;
+		if ((m = cp - cur) || n >= T_CONTROL)
+		{
+ flush:
+			any = 1;
+			if (header)
+			{
+				header = 0;
+				sfprintf(op, "%6d\t", line);
+			}
+			if (m)
+				sfwrite(op, cur, m);
+		}
+ special:
+		switch (n)
+		{
+		case T_ERROR:
+			if (cp != end)
+			{
+				n = T_CONTROL;
+				goto flush;
+			}
+			return -1;
+		case T_EOF:
+			if (cp != end)
+			{
+				n = T_CONTROL;
+				goto flush;
+			}
+			return 0;
+		case T_ENDBUF:
+			if (cp != end)
+			{
+				n = T_CONTROL;
+				goto flush;
+			}
+			c = last;
+			if (!(nxt = (unsigned char*)(*reserve)(ip, SF_UNBOUND, 0)))
+			{
+				*(cp = end = tmp) = 0;
+				states[0] = sfvalue(ip) ? T_ERROR : T_EOF;
+				last = -1;
+			}
+			else if ((m = sfvalue(ip)) <= 0)
+			{
+				*(cp = end = tmp) = 0;
+				states[0] = m ? T_ERROR : T_EOF;
+				last = -1;
+			}
+			else
+			{
+				buf = nxt;
+				end = buf + m - 1;
+				last = *end;
+				*end = 0;
+				cp = buf;
+			}
+			if (c >= 0)
+			{
+				if (!(n = states[c]))
+				{
+					*(cur = tmp) = c;
+					m = 1;
+					goto flush;
+				}
+				if (raw || n < T_CONTROL)
+				{
+					cp--;
+					goto special;
+				}
+				tmp[0] = c;
+				c = 1;
+				goto mb;
+			}
+			break;
+		case T_CONTROL:
+			do
+			{
+				sfputc(op, '^');
+				sfputc(op, printof(c));
+			} while (states[c = *++cp] == T_CONTROL);
+			break;
+		case T_CNTL8BIT:
+			meta[2] = '^';
+			do
+			{
+				n = c & ~0200;
+				meta[3] = printof(n);
+				sfwrite(op, (char*)meta, 4);
+			} while (states[c = *++cp] == T_CNTL8BIT && raw);
+			break;
+		case T_EIGHTBIT:
+			do
+			{
+				meta[2] = c & ~0200;
+				sfwrite(op, (char*)meta, 3);
+			} while (states[c = *++cp] == T_EIGHTBIT && raw);
+			break;
+		case T_NEWLINE:
+			if (header && !(flags & B_FLAG))
+				sfprintf(op, "%6d\t", line);
+			if (flags & E_FLAG)
+				sfputc(op, '$');
+			sfputc(op, '\n');
+			if (!header || !(flags & B_FLAG))
+				line++;
+			header = !(flags & S_FLAG);
+			for (;;)
+			{
+				if ((n = states[*++cp]) == T_ENDBUF)
+				{
+					if (cp != end || last != '\n')
+						break;
+					if (!(nxt = (unsigned char*)(*reserve)(ip, SF_UNBOUND, 0)))
+					{
+						states[0] = sfvalue(ip) ? T_ERROR : T_EOF;
+						cp = end = tmp;
+						*cp-- = 0;
+						last = -1;
+					}
+					else if ((n = sfvalue(ip)) <= 0)
+					{
+						states[0] = n ? T_ERROR : T_EOF;
+						cp = end = tmp;
+						*cp-- = 0;
+						last = -1;
 					}
 					else
 					{
-						if (--cp > cpold)
-							sfwrite(fdout,(char*)cpold,cp-cpold);
-						if (endbuff==inbuff)
-							*++endbuff = 0;
-						cp = cpold = endbuff;
-						cp[-1] = lastchar;
-						if (n==T_ENDBUF)
-							n = T_CONTROL;
-						
+						buf = nxt;
+						end = buf + n - 1;
+						last = *end;
+						*end = 0;
+						cp = buf - 1;
 					}
-					endbuff = 0;
 				}
-				else n = T_CONTROL;
+				else if (n != T_NEWLINE)
+					break;
+				if (!(flags & S_FLAG) || any || header)
+				{
+					any = 0;
+					header = 0;
+					if ((flags & (B_FLAG|N_FLAG)) == N_FLAG)
+						sfprintf(op, "%6d\t", line);
+					if (flags & E_FLAG)
+						sfputc(op, '$');
+					sfputc(op, '\n');
+				}
+				if (!(flags & B_FLAG))
+					line++;
 			}
-			if (--cp>cpold)
-				sfwrite(fdout,(char*)cpold,cp-cpold);
-			switch(n)
-			{
-				case T_CNTL8BIT:
-					meta[2] = '^';
-					do
-					{
-						n = (*cp++)&~0200;
-						meta[3] = printof(n);
-						sfwrite(fdout,(char*)meta,4);
-					}
-					while ((n=states[*cp])==T_CNTL8BIT);
-					break;
-				case T_EIGHTBIT:
-					do
-					{
-						meta[2] = (*cp++)&~0200;
-						sfwrite(fdout,(char*)meta,3);
-					}
-					while ((n=states[*cp])==T_EIGHTBIT);
-					break;
-				case T_CONTROL:
-					do
-					{
-						n = *cp++;
-						sfputc(fdout,'^');
-						sfputc(fdout,printof(n));
-					}
-					while ((n=states[*cp])==T_CONTROL);
-					break;
-				case T_NEWLINE:
-					lastline = line;
-					if (flags&S_FLAG)
-					{
-						while (states[*++cp]==T_NEWLINE)
-							line++;
-						cp--;
-					}
-					do
-					{
-						cp++;
-						if (flags&E_FLAG)
-							sfputc(fdout,'$');
-						sfputc(fdout,'\n');
-						if(line > lastline)
-						{
-							if (flags&E_FLAG)
-								sfputc(fdout,'$');
-							sfputc(fdout,'\n');
-						}
-						if (!(flags&(N_FLAG|B_FLAG)))
-							continue;
-						line++;
-						if (cp < endbuff)
-							sfprintf(fdout,"%6d\t",line);
-						else printdefer = 1;
-					}
-					while (states[*cp]==T_NEWLINE);
-					break;
-			}
+			header = flags & (B_FLAG|N_FLAG);
+			break;
 		}
 	}
 }
@@ -239,60 +400,65 @@ b_cat(int argc, char** argv, void* context)
 	register char*		cp;
 	register Sfio_t*	fp;
 	char*			mode;
+	Reserve_f		reserve = sfreserve;
 	int			att;
-	int			dovcat=0;
+	int			dovcat = 0;
 	char			states[UCHAR_MAX+1];
 
-	NoP(argc);
 	cmdinit(argc, argv, context, ERROR_CATALOG, 0);
+	setlocale(LC_ALL, "");
 	att = !strcmp(astconf("UNIVERSE", NiL, NiL), "att");
 	mode = "r";
 	for (;;)
 	{
+		n = 0;
 		switch (optget(argv, usage))
 		{
 		case 'A':
-			flags |= T_FLAG|E_FLAG|V_FLAG;
-			continue;
+			n = T_FLAG|E_FLAG|V_FLAG;
+			break;
 		case 'B':
-			flags |= S_FLAG;
-			continue;
+			n = S_FLAG;
+			break;
 		case 'b':
-			flags |= B_FLAG;
-			continue;
-		case 'E':
-			flags |= E_FLAG;
-			continue;
-		case 'e':
-			flags |= E_FLAG|V_FLAG;
-			continue;
-		case 'n':
-			flags |= N_FLAG;
-			continue;
-		case 's':
-			flags |= att ? F_FLAG : S_FLAG;
-			continue;
-		case 'S':
-			flags |= F_FLAG;
-			continue;
-		case 'T':
-			flags |= T_FLAG;
-			continue;
-		case 't':
-			flags |= T_FLAG|V_FLAG;
-			continue;
-		case 'u':
-			flags |= U_FLAG;
-			continue;
-		case 'v':
-			flags |= V_FLAG;
-			continue;
+			n = B_FLAG;
+			break;
 		case 'd':
-			mode = "rt";
+			mode = opt_info.num ? "rt" : "r";
 			continue;
 		case 'D':
-			flags |= d_FLAG;
+			n = d_FLAG;
+			break;
+		case 'E':
+			n = E_FLAG;
+			break;
+		case 'e':
+			n = E_FLAG|V_FLAG;
+			break;
+		case 'n':
+			n = N_FLAG;
+			break;
+		case 'R':
+			reserve = opt_info.num ? regress : sfreserve;
 			continue;
+		case 's':
+			n = att ? F_FLAG : S_FLAG;
+			break;
+		case 'S':
+			n = F_FLAG;
+			break;
+		case 'T':
+			n = T_FLAG;
+			break;
+		case 't':
+			n = T_FLAG|V_FLAG;
+			break;
+		case 'u':
+			n = U_FLAG;
+			break;
+		case 'v':
+			n = V_FLAG;
+			break;
 		case ':':
 			error(2, "%s", opt_info.arg);
 			break;
@@ -300,7 +466,12 @@ b_cat(int argc, char** argv, void* context)
 			error(ERROR_usage(2), "%s", opt_info.arg);
 			break;
 		}
-		break;
+		if (!n)
+			break;
+		if (opt_info.num)
+			flags |= n;
+		else
+			flags &= ~n;
 	}
 	argv += opt_info.index;
 	if (error_info.errors)
@@ -340,15 +511,13 @@ b_cat(int argc, char** argv, void* context)
 		states['\n'] = T_NEWLINE;
 		dovcat = 1;
 	}
-	if (flags&B_FLAG)
-		flags |= S_FLAG;
 	if (flags&d_FLAG)
 		sfopen(sfstdout, NiL, "wt");
 	if (cp = *argv)
 		argv++;
 	do
 	{
-		if (!cp || streq(cp,"-"))
+		if (!cp || streq(cp, "-"))
 		{
 			fp = sfstdin;
 			if (flags&D_FLAG)
@@ -364,7 +533,7 @@ b_cat(int argc, char** argv, void* context)
 		if (flags&U_FLAG)
 			sfsetbuf(fp, (void*)fp, -1);
 		if (dovcat)
-			n = vcat(states, fp, sfstdout, flags);
+			n = vcat(states, fp, sfstdout, reserve, flags);
 		else if (sfmove(fp, sfstdout, SF_UNBOUND, -1) >= 0 && sfeof(fp))
 			n = 0;
 		else

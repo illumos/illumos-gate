@@ -1,7 +1,7 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
+#          Copyright (c) 1982-2009 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
 #                    by AT&T Intellectual Property                     #
@@ -212,12 +212,12 @@ fi
 foo=bar
 bar=$(print -r -- ${foo+\\n\ })
 if	[[ $bar != '\n ' ]]
-then	err_exit '${foo+\\n\ } expansion error' 
+then	err_exit '${foo+\\n\ } expansion error'
 fi
 unset bar
 bar=$(print -r -- ${foo+\\n\ $bar})
 if	[[ $bar != '\n ' ]]
-then	err_exit '${foo+\\n\ $bar} expansion error with bar unset' 
+then	err_exit '${foo+\\n\ $bar} expansion error with bar unset'
 fi
 x='\\(..\\)|&\|\|\\&\\|'
 if	[[ $(print -r -- $x) != "$x" ]]
@@ -326,7 +326,7 @@ string='&foo'
 {
 x=x
 x=${x:-`id | sed 's/^[^(]*(\([^)]*\)).*/\1/'`}
-} 2> /dev/null || err_exit 'skipping over `` failed' 
+} 2> /dev/null || err_exit 'skipping over `` failed'
 [[ $x == x ]] || err_exit 'assignment ${x:=`...`} failed'
 [[ $($SHELL -c 'print a[') == 'a[' ]] || err_exit "unbalanced '[' in command arg fails"
 $SHELL -c $'false && (( `wc -l /dev/null | nawk \'{print $1}\'` > 2 )) && true;:' 2> /dev/null ||  err_exit 'syntax error with ` in arithmetic expression'
@@ -334,4 +334,9 @@ $SHELL -c $'false && (( `wc -l /dev/null | nawk \'{print $1}\'` > 2 )) && true;:
 varname=foobarx
 x=`print '"\$'${varname}'"'`
 [[ $x == '"$foobarx"' ]] ||  err_exit $'\\$\' not handled correctly inside ``'
+
+copy1=5 copynum=1
+foo="`eval echo "$"{copy$copynum"-0}"`"
+[[ $foo == "$copy1" ]] || err_exit '$"..." not being ignored inside ``'
+
 exit $((Errors))

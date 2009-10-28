@@ -1,3 +1,12 @@
+09-02-02 pp.probe,probe.win32: check for compiler supplied __FUNCTION__
+09-02-02 ppop.c: include pp_default.h/probe at end of builtin script
+09-01-20 probe.win32: elide #pragma comment.*linker.*manifest
+09-01-06 ppcall.c: fix macro definition overwrite bug -- I know
+09-01-05 ppcontrol.c: fix multiple include guard for #include outside guard
+08-12-07 pp.h,ppdata.c: fix ancient pptype and ppctype[] off by one
+08-11-15 ppsearch.c: '\\' => '/' in first step; msvc complains about '\\' in #line!!
+08-10-31 ppsearch.c: relax pp:nomultiple pedantry
+08-10-30 pplex.c: handle =#x S_CHRB|SPLICE bug
 08-05-11 ppproto.c: fix proto test 10 regression
 07-09-21 ppproto.c: add "Public Domain" to the noticed list
 07-08-11 probe.win32: add cl.exe setuid workaround, CC.VERSION[.STRING]

@@ -1,4 +1,4 @@
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20081104/build_i386_64bit/src/lib/libast/features/mmap by iffe version 2008-01-31 : : */
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20091014/build_i386_64bit/src/lib/libast/features/mmap by iffe version 2009-10-06 : : */
 #ifndef _def_mmap_ast
 #define _def_mmap_ast	1
 #define _sys_types	1	/* #include <sys/types.h> ok */
@@ -7,6 +7,7 @@
 #define _lib_mmap64	1	/* mmap64 interface and implementation work */
 #define _mmap_anon	1	/* use mmap MAP_ANON to get raw memory */
 #define _mmap_devzero	1	/* use mmap on /dev/zero to get raw memory */
+#define _mmap_worthy	2	/* mmap is good */
 
 /* some systems get it wrong but escape concise detection */
 #ifndef _NO_MMAP

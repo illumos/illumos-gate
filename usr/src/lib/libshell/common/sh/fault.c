@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -98,7 +98,7 @@ void	sh_fault(register int sig)
 		}
 		return;
 	}
-	if(shp->subshell && sig!=SIGINT && sig!=SIGQUIT && sig!=SIGWINCH)
+	if(shp->subshell && sig!=SIGINT && sig!=SIGQUIT && sig!=SIGWINCH && sig!=SIGCONT)
 	{
 		shp->exitval = SH_EXITSIG|sig;
 		sh_subfork();
@@ -141,7 +141,7 @@ void	sh_fault(register int sig)
 			}
 			/* mark signal and continue */
 			shp->trapnote |= SH_SIGSET;
-			if(sig < shp->sigmax)
+			if(sig <= shp->sigmax)
 				shp->sigflag[sig] |= SH_SIGSET;
 #if  defined(VMFL) && (VMALLOC_VERSION>=20031205L)
 			if(abortsig(sig))
@@ -186,7 +186,6 @@ void	sh_fault(register int sig)
 #endif /* SIGTSTP */
 	}
 #ifdef ERROR_NOTIFY
-	/* This is obsolete */
 	if((error_info.flags&ERROR_NOTIFY) && shp->bltinfun)
 		action = (*shp->bltinfun)(-sig,(char**)0,(void*)0);
 	if(action>0)
@@ -198,7 +197,7 @@ void	sh_fault(register int sig)
 		return;
 	}
 	shp->trapnote |= flag;
-	if(sig < shp->sigmax)
+	if(sig <= shp->sigmax)
 		shp->sigflag[sig] |= flag;
 	if(pp->mode==SH_JMPCMD && sh_isstate(SH_STOPOK))
 	{
@@ -215,23 +214,28 @@ void	sh_fault(register int sig)
 void sh_siginit(void *ptr)
 {
 	Shell_t	*shp = (Shell_t*)ptr;
-	register int sig, n=SIGTERM+1;
+	register int sig, n;
 	register const struct shtable2	*tp = shtab_signals;
 	sig_begin();
 	/* find the largest signal number in the table */
-#ifdef SIGRTMIN
-	shp->sigruntime[SH_SIGRTMIN] = SIGRTMIN;
-#endif /* SIGRTMIN */
-#ifdef SIGRTMAX
-	shp->sigruntime[SH_SIGRTMAX] = SIGRTMAX;
-#endif /* SIGRTMAX */
+#if defined(SIGRTMIN) && defined(SIGRTMAX)
+	if ((n = SIGRTMIN) > 0 && (sig = SIGRTMAX) > n && sig < SH_TRAP)
+	{
+		shp->sigruntime[SH_SIGRTMIN] = n;
+		shp->sigruntime[SH_SIGRTMAX] = sig;
+	}
+#endif /* SIGRTMIN && SIGRTMAX */
+	n = SIGTERM;
 	while(*tp->sh_name)
 	{
-		sig = tp->sh_number&((1<<SH_SIGBITS)-1);
-		if ((tp->sh_number>>SH_SIGBITS) & SH_SIGRUNTIME)
-			sig = shp->sigruntime[sig-1];
-		if(sig>n && sig<SH_TRAP)
-			n = sig;
+		sig = (tp->sh_number&((1<<SH_SIGBITS)-1));
+		if (!(sig-- & SH_TRAP))
+		{
+			if ((tp->sh_number>>SH_SIGBITS) & SH_SIGRUNTIME)
+				sig = shp->sigruntime[sig];
+			if(sig>n && sig<SH_TRAP)
+				n = sig;
+		}
 		tp++;
 	}
 	shp->sigmax = n++;
@@ -241,7 +245,7 @@ void sh_siginit(void *ptr)
 	for(tp=shtab_signals; sig=tp->sh_number; tp++)
 	{
 		n = (sig>>SH_SIGBITS);
-		if((sig &= ((1<<SH_SIGBITS)-1)) > shp->sigmax)
+		if((sig &= ((1<<SH_SIGBITS)-1)) > (shp->sigmax+1))
 			continue;
 		sig--;
 		if(n&SH_SIGRUNTIME)
@@ -291,7 +295,7 @@ void	sh_sigdone(void)
 {
 	register int 	flag, sig = sh.sigmax;
 	sh.sigflag[0] |= SH_SIGFAULT;
-	while(--sig>0)
+	for(sig=sh.sigmax; sig>0; sig--)
 	{
 		flag = sh.sigflag[sig];
 		if((flag&(SH_SIGDONE|SH_SIGIGNORE|SH_SIGINTERACTIVE)) && !(flag&(SH_SIGFAULT|SH_SIGOFF)))
@@ -321,7 +325,8 @@ void	sh_sigreset(register int mode)
 			}
 			else if(sig && mode>1)
 			{
-				signal(sig,SIG_IGN);
+				if(sig!=SIGCHLD)
+					signal(sig,SIG_IGN);
 				flag &= ~SH_SIGFAULT;
 				flag |= SH_SIGOFF;
 			}
@@ -396,13 +401,25 @@ void	sh_chktrap(void)
 	}
 	if(sh.sigflag[SIGALRM]&SH_SIGALRM)
 		sh_timetraps();
+#ifdef SHOPT_BGX
+	if((sh.sigflag[SIGCHLD]&SH_SIGTRAP) && sh.st.trapcom[SIGCHLD])
+		job_chldtrap(&sh,sh.st.trapcom[SIGCHLD],1);
+	while(--sig>=0 && sig!=SIGCHLD)
+#else
 	while(--sig>=0)
+#endif /* SHOPT_BGX */
 	{
 		if(sh.sigflag[sig]&SH_SIGTRAP)
 		{
 			sh.sigflag[sig] &= ~SH_SIGTRAP;
 			if(trap=sh.st.trapcom[sig])
-				sh_trap(trap,0);
+			{
+				Sfio_t *fp;
+				if(sig==SIGPIPE && (fp=sfpool((Sfio_t*)0,sh.outpool,SF_WRITE)) && sferror(fp))
+					sfclose(fp);
+ 				sh.oldexit = SH_EXITSIG|sig;
+ 				sh_trap(trap,0);
+ 			}
 		}
 	}
 }
@@ -465,7 +482,7 @@ int sh_trap(const char *trap, int mode)
 	if(was_verbose)
 		sh_onstate(SH_VERBOSE);
 	exitset();
-	if(jmpval>SH_JMPTRAP)
+	if(jmpval>SH_JMPTRAP && (((struct checkpt*)shp->jmpbuffer)->prev || ((struct checkpt*)shp->jmpbuffer)->mode==SH_JMPSCRIPT))
 		siglongjmp(*shp->jmplist,jmpval);
 	return(shp->exitval);
 }
@@ -568,8 +585,8 @@ void sh_done(void *ptr, register int sig)
 	register int savxit = shp->exitval;
 	shp->trapnote = 0;
 	indone=1;
-	if(sig==0)
-		sig = shp->lastsig;
+	if(sig)
+		savxit = SH_EXITSIG|sig;
 	if(shp->userinit)
 		(*shp->userinit)(shp, -1);
 	if(t=shp->st.trapcom[0])
@@ -604,6 +621,8 @@ void sh_done(void *ptr, register int sig)
 	sfsync((Sfio_t*)sfstdin);
 	sfsync((Sfio_t*)shp->outpool);
 	sfsync((Sfio_t*)sfstdout);
+	if(savxit&SH_EXITSIG)
+		sig = savxit&SH_EXITMASK;
 	if(sig)
 	{
 		/* generate fault termination code */

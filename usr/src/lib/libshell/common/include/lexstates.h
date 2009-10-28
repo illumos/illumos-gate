@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -138,6 +138,7 @@ extern const char e_lexobsolete3[];
 extern const char e_lexobsolete4[];
 extern const char e_lexobsolete5[];
 extern const char e_lexobsolete6[];
+extern const char e_lexnonstandard[];
 extern const char e_lexusebrace[];
 extern const char e_lexusequote[];
 extern const char e_lexescape[];

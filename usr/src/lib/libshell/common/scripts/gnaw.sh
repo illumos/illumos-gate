@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -926,7 +926,7 @@ builtin wc
 typeset progname="${ basename "${0}" ; }"
 
 # terminal size rect
-typeset -C termsize=(
+compound termsize=(
     integer columns=-1
     integer lines=-1
 )
@@ -942,7 +942,7 @@ integer game_use_colors=0
 integer game_use_unicode=0
 
 typeset -r gnaw_usage=$'+
-[-?\n@(#)\$Id: gnaw (Roland Mainz) 2008-11-04 \$\n]
+[-?\n@(#)\$Id: gnaw (Roland Mainz) 2009-05-09 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?gnaw - maze game written in ksh93]
 [+DESCRIPTION?\bgnaw\b is a maze game.

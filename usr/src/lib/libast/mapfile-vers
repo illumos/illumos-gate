@@ -194,6 +194,7 @@ SUNWprivate_1.1 {
 	_ast_pathpath;
 	_ast_pathposix;
 	_ast_pathprobe;
+	_ast_pathprog;
 	_ast_pathrepl;
 	_ast_pathsetlink;
 	_ast_pathshell;
@@ -462,6 +463,7 @@ SUNWprivate_1.1 {
 	fmtuid;
 	fmtversion;
 	fs3d;
+	fs3d_mount;
 	hashalloc;
 	hashdone;
 	hashdump;

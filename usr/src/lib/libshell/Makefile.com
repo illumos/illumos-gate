@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -37,8 +37,10 @@ OBJECTS= \
 	bltins/getopts.o \
 	bltins/hist.o \
 	bltins/misc.o \
+	bltins/poll_solaris.o \
 	bltins/print.o \
 	bltins/read.o \
+	bltins/regress.o \
 	bltins/shiocmd_solaris.o \
 	bltins/sleep.o \
 	bltins/test.o \

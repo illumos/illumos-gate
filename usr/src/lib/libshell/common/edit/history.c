@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1982-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -74,7 +74,6 @@
 #include	<sfio.h>
 #include	"FEATURE/time"
 #include	<error.h>
-#include	<ctype.h>
 #include	<ls.h>
 #if KSHELL
 #   include	"defs.h"
@@ -82,6 +81,8 @@
 #   include	"path.h"
 #   include	"builtins.h"
 #   include	"io.h"
+#else
+#   include	<ctype.h>
 #endif	/* KSHELL */
 #include	"history.h"
 
@@ -1071,14 +1072,7 @@ char *hist_word(char *string,int size,int word)
 	register int flag = 0;
 	History_t *hp = hist_ptr;
 	if(!hp)
-#if KSHELL
-	{
-		strncpy(string,((Shell_t*)hp->histshell)->lastarg,size);
-		return(string);
-	}
-#else
 		return(NIL(char*));
-#endif /* KSHELL */
 	hist_copy(string,size,(int)hp->histind-1,-1);
 	for(;c = *cp;cp++)
 	{

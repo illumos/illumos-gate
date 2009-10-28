@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -64,7 +64,7 @@ builtin cat
 typeset progname="$(basename "${0}")"
 
 typeset -r multifollow_usage=$'+
-[-?\n@(#)\$Id: multifollow (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: multifollow (Roland Mainz) 2009-04-08 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?multifollow - use tail -f on multiple files]
 [+DESCRIPTION?\bmultifollow\b is a small utilty which can "follow" multiple
@@ -109,7 +109,7 @@ for (( ; $# > 0 ; numfiles++ )) ; do
     )
 
     mkfifo "${files[${numfiles}].pipename}"
-    redirect {files[numfiles].fd}<>"${files[numfiles].pipename}"
+    redirect {files[numfiles].fd}<> "${files[numfiles].pipename}"
 
     tail -f "${files[${numfiles}].name}" >"${files[${numfiles}].pipename}" &
     files[${numfiles}].childpid=$!

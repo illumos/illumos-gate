@@ -66,7 +66,7 @@ builtin basename
 typeset progname="${ basename "${0}" ; }"
 
 typeset -r shlint_usage=$'+
-[-?\n@(#)\$Id: shlint (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: shlint (Roland Mainz) 2009-03-15 \$\n]
 [-author?Roland Mainz <roland.mainz@sun.com>]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?shlint - lint for POSIX shell scripts]
@@ -82,13 +82,15 @@ while getopts -a "${progname}" "${shlint_usage}" OPT ; do
 done
 shift $((OPTIND-1))
 
+(( $# > 0 )) || usage
+
 file="$1"
 [[ ! -f "$file" ]] && fatal_error $"File ${file} not found."
 [[ ! -r "$file" ]] && fatal_error $"File ${file} not readable."
 
-x="$( /usr/bin/ksh93 -n "${file}" 2>&1 1>/dev/null  )"
+x="$( /usr/bin/shcomp -n "${file}" /dev/null 2>&1 1>/dev/null  )"
 
-printf "%s" "$x"
+printf "%s\n" "$x"
 
 [[ "$x" != "" ]] && exit 1 || exit 0
 # EOF.

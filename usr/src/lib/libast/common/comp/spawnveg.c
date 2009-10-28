@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -52,7 +52,7 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid)
 	posix_spawnattr_t	attr;
 
 	if (err = posix_spawnattr_init(&attr))
-		goto bad;
+		goto nope;
 	if (pgid)
 	{
 		if (pgid <= 1)
@@ -76,6 +76,8 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid)
 #endif
 	return pid;
  bad:
+	posix_spawnattr_destroy(&attr);
+ nope:
 	errno = err;
 	return -1;
 }

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -53,7 +53,6 @@ f none usr/bin/bfs 555 root bin
 f none usr/bin/cal 555 root bin
 f none usr/bin/calendar 555 root bin
 f none usr/bin/col 555 root bin
-f none usr/bin/comm 555 root bin
 f none usr/bin/compress 555 root bin
 f none usr/bin/csplit 555 root bin
 f none usr/bin/dc 555 root bin
@@ -68,7 +67,6 @@ f none usr/bin/graph 555 root bin
 f none usr/bin/kstat 555 root bin
 f none usr/bin/last 555 root bin
 f none usr/bin/lastcomm 555 root bin
-f none usr/bin/logname 555 root bin
 f none usr/bin/look 755 root bin
 f none usr/bin/lgrpinfo 555 root bin
 f none usr/bin/mkfifo 555 root bin
@@ -79,7 +77,6 @@ f none usr/bin/nl 555 root bin
 l none usr/bin/oawk=../../usr/bin/awk
 f none usr/bin/pack 555 root bin
 l none usr/bin/pargs=../../usr/lib/isaexec
-f none usr/bin/paste 555 root bin
 s none usr/bin/pcat=./unpack
 l none usr/bin/pcred=../../usr/lib/isaexec
 l none usr/bin/pfiles=../../usr/lib/isaexec
@@ -108,7 +105,6 @@ s none usr/bin/strace=../sbin/strace
 f none usr/bin/tcopy 555 root bin
 l none usr/bin/uncompress=../../usr/bin/compress
 f none usr/bin/unexpand 555 root bin
-f none usr/bin/uniq 555 root bin
 f none usr/bin/units 555 root bin
 f none usr/bin/unix2dos 555 root bin
 f none usr/bin/unpack 555 root bin

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1986-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -841,8 +841,6 @@ ppop(int op, ...)
 					if (!(pp.ppdefault = pathprobe(pp.path, NiL, "C", pp.pass, pp.probe ? pp.probe : PPPROBE, 0)))
 						error(1, "cannot determine default definitions for %s", pp.probe ? pp.probe : PPPROBE);
 				}
-				if (pp.ppdefault)
-					sfprintf(sp, "#%s \"%s\"\n", dirname(INCLUDE), pp.ppdefault);
 				if (pp.probe)
 					pp.lastdir->next->type = c;
 			}
@@ -908,9 +906,6 @@ ppop(int op, ...)
 				);
 			sfprintf(sp,
 "\
-#%s __STDC__\n\
-#%s __STDC__ #(STDC)\n\
-#%s\n\
 #%s #%s(%s)\n\
 #%s %s:%s\n\
 #%s %s:%s\n\
@@ -918,9 +913,6 @@ ppop(int op, ...)
 #%s\n\
 #%s\n\
 "
-				, dirname(IFNDEF)
-				, dirname(DEFINE)
-				, dirname(ENDIF)
 				, dirname(IF)
 				, keyname(X_OPTION)
 				, keyname(X_STRICT)
@@ -977,6 +969,18 @@ ppop(int op, ...)
 				, dirname(PRAGMA)
 				, pp.pass
 				, keyname(X_BUILTIN)
+				);
+			if (pp.ppdefault && *pp.ppdefault)
+				sfprintf(sp, "#%s \"%s\"\n", dirname(INCLUDE), pp.ppdefault);
+			sfprintf(sp,
+"\
+#%s !defined(__STDC__) && (!#option(compatibility) || #option(transition))\n\
+#%s __STDC__ #(STDC)\n\
+#%s\n\
+"
+				, dirname(IF)
+				, dirname(DEFINE)
+				, dirname(ENDIF)
 				);
 			t = sfstruse(sp);
 			debug((-9, "\n/* begin initialization */\n%s/* end initialization */", t));

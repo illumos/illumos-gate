@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -428,7 +428,8 @@ astlicense(char* p, int size, char* file, char* options, int cc1, int cc2, int c
 	line = 0;
 	for (;;)
 	{
-		for (first = 1; c = *s; first = 0)
+		first = 1;
+		while (c = *s)
 		{
 			while (c == ' ' || c == '\t' || c == '\n' && ++line || c == '\r' || c == ',' || c == ';' || c == ')')
 				c = *++s;
@@ -640,6 +641,7 @@ astlicense(char* p, int size, char* file, char* options, int cc1, int cc2, int c
 			}
 			if (*s)
 				s++;
+			first = 0;
 		}
 		if (!options || !*(s = options))
 			break;

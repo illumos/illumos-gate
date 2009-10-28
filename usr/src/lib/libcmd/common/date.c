@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1992-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: date (AT&T Research) 2007-05-21 $\n]"
+"[-?\n@(#)$Id: date (AT&T Research) 2009-03-03 $\n]"
 USAGE_LICENSE
 "[+NAME?date - set/list/convert dates]"
 "[+DESCRIPTION?\bdate\b sets the current date and time (with appropriate"
@@ -106,7 +106,7 @@ USAGE_LICENSE
 "		[+j?1-offset Julian date]"
 "		[+J?0-offset Julian date]"
 "		[+k?\bdate\b(1) style date]"
-"		[+K?all numeric date; equivalent to \b%Y-%m-%d+%H:%M:%S\b]"
+"		[+K?all numeric date; equivalent to \b%Y-%m-%d+%H:%M:%S\b; \b%_[EO]]K\b for space separator, %OK adds \b.%N\b, \b%EK\b adds \b%.N%z\b, \b%_EK\b adds \b.%N %z\b]"
 "		[+l?\bls\b(1) \b-l\b date; equivalent to \b%Q/%g/%G/\b]"
 "		[+L?locale default date format]"
 "		[+m?month number]"
@@ -212,7 +212,7 @@ settime(void* context, const char* cmd, Time_t now, int adjust, int network)
 	char*		s;
 	char**		argv;
 	char*		args[5];
-	char		buf[128];
+	char		buf[1024];
 
 	if (!adjust && !network)
 		return tmxsettime(now);
@@ -276,7 +276,7 @@ b_date(int argc, register char** argv, void* context)
 	Time_t		ts;
 	Time_t		te;
 	Time_t		e;
-	char		buf[128];
+	char		buf[1024];
 	Fmt_t*		fmts;
 	Fmt_t		fmt;
 	struct stat	st;

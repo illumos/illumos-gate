@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -193,7 +193,7 @@ function main_loop
 		6<#((0))
 		cat <&6
 
-		redirect 6<&- ;  rm -f "${scratchfile}" ; redirect 6<>"${scratchfile}"
+		redirect 6<&- ;  rm -f "${scratchfile}" ; redirect 6<> "${scratchfile}"
 
 		c="" ; read -r -t ${update_interval} -N 1 c
 		if [[ "$c" != "" ]] ; then
@@ -221,6 +221,7 @@ function usage
 builtin basename
 builtin cat
 builtin date
+builtin mktemp
 builtin rm
 
 typeset progname="${ basename "${0}" ; }"
@@ -228,14 +229,14 @@ typeset progname="${ basename "${0}" ; }"
 float -r M_PI=3.14159265358979323846
 
 # terminal size rect
-typeset -C termsize=(
+compound termsize=(
 	integer columns=-1
 	integer lines=-1
 )
 
 typeset init_screen="true"
 
-typeset -C clock=(
+compound clock=(
 	float   middle_x
 	float   middle_y
 	integer len_x
@@ -244,17 +245,17 @@ typeset -C clock=(
 
 
 # set clock properties
-typeset -C seconds=(
+compound seconds=(
 	float val
 	typeset ch
 	float   scale
 	integer length )
-typeset -C minutes=(
+compound minutes=(
 	float val
 	typeset ch
 	float   scale
 	integer length )
-typeset -C hours=(
+compound hours=(
 	float val
 	typeset ch
 	float   scale
@@ -267,7 +268,7 @@ hours.length=50   hours.scale=12   hours.ch=$"h"
 float update_interval=0.9
 
 typeset -r termclock_usage=$'+
-[-?\n@(#)\$Id: termclock (Roland Mainz) 2008-11-04 \$\n]
+[-?\n@(#)\$Id: termclock (Roland Mainz) 2009-05-09 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [-author?David Korn <dgk@research.att.com>]
 [+NAME?termclock - analog clock for terminals]
@@ -290,7 +291,6 @@ shift $((OPTIND-1))
 
 # prechecks
 which tput >/dev/null   || fatal_error $"tput not found."
-which mktemp >/dev/null || fatal_error $"mktemp not found."
 (( update_interval >= 0. && update_interval <= 7200. )) || fatal_error $"invalid update_interval value."
 
 # create temporary file for double-buffering and register an EXIT trap
@@ -298,7 +298,7 @@ which mktemp >/dev/null || fatal_error $"mktemp not found."
 scratchfile="${ mktemp "/tmp/termclock.ppid${PPID}_pid$$.XXXXXX" ; }"
 [[ "${scratchfile}" != "" ]] || fatal_error $"Could not create temporary file name."
 trap 'rm -f "${scratchfile}"' EXIT
-rm -f "${scratchfile}" ; redirect 6<>"${scratchfile}" || fatal_error $"Could not create temporary file."
+rm -f "${scratchfile}" ; redirect 6<> "${scratchfile}" || fatal_error $"Could not create temporary file."
 
 # register trap to handle window size changes
 trap 'init_screen="true"' WINCH

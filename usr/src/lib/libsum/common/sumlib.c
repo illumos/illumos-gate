@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1996-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1996-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -25,7 +25,7 @@
  * man this is sum library
  */
 
-static const char id[] = "\n@(#)$Id: sumlib (AT&T Research) 2008-05-01 $\0\n";
+static const char id[] = "\n@(#)$Id: sumlib (AT&T Research) 2009-09-28 $\0\n";
 
 #define _SUM_PRIVATE_	\
 			struct Method_s*	method;	\
@@ -233,6 +233,40 @@ static const Map_t	maps[] =
 };
 
 /*
+ * simple alternation prefix match
+ */
+
+static int
+match(register const char* s, register const char* p)
+{
+	register const char*	b = s;
+
+	for (;;)
+	{
+		do
+		{
+			if (*p == '|' || *p == 0)
+				return 1;
+		} while (*s++ == *p++);
+		for (;;)
+		{
+			switch (*p++)
+			{
+			case 0:
+				return 0;
+			case '|':
+				break;
+			default:
+				continue;
+			}
+			break;
+		}
+		s = b;
+	}
+	return 0;
+}
+
+/*
  * open sum method name
  */
 
@@ -245,20 +279,14 @@ sumopen(register const char* name)
 	if (!name || !name[0] || name[0] == '-' && !name[1])
 		name = "default";
 	for (n = 0; n < elementsof(maps); n++)
-	{
-		sfsprintf(pat, sizeof(pat), "*@(%s)*", maps[n].match);
-		if (strmatch(name, pat))
+		if (match(name, maps[n].match))
 		{
 			name = maps[n].map;
 			break;
 		}
-	}
 	for (n = 0; n < elementsof(methods); n++)
-	{
-		sfsprintf(pat, sizeof(pat), "*@(%s)*", methods[n].match);
-		if (strmatch(name, pat))
+		if (match(name, methods[n].match))
 			return (*methods[n].open)(&methods[n], name);
-	}
 	return 0;
 }
 

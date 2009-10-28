@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -50,13 +50,13 @@
 #define OPT_ignorecase	0x004		/* arg match ignores case	*/
 #define OPT_invert	0x008		/* flag inverts long sense	*/
 #define OPT_listof	0x010		/* arg is ' ' or ',' list	*/
-#define OPT_minus	0x021		/* '-' is an option flag	*/
-#define OPT_number	0x040		/* arg is strtonll() number	*/
-#define OPT_oneof	0x080		/* arg may be set once		*/
-#define OPT_optional	0x100		/* arg is optional		*/
-#define OPT_string	0x200		/* arg is string		*/
+#define OPT_number	0x020		/* arg is strtonll() number	*/
+#define OPT_oneof	0x040		/* arg may be set once		*/
+#define OPT_optional	0x080		/* arg is optional		*/
+#define OPT_string	0x100		/* arg is string		*/
 
 #define OPT_preformat	0001		/* output preformat string	*/
+#define OPT_proprietary	0002		/* proprietary docs		*/
 
 #define OPT_TYPE	(OPT_flag|OPT_number|OPT_string)
 
@@ -902,6 +902,7 @@ init(register char* s, Optpass_t* p)
 		s += n;
 	}
 	p->opts = s;
+	message((-1, "version=%d prefix=%d section=%d flags=%04x catalog=%s", p->version, p->prefix, p->section, p->flags, p->catalog));
 	return 0;
 }
 
@@ -2150,7 +2151,7 @@ opthelp(const char* oopts, const char* what)
 	}
 	else
 		return T(NiL, ID, "[* call optget() before opthelp() *]");
-	if (style < STYLE_usage)
+	if (style <= STYLE_usage)
 	{
 		if (!(sp_text = sfstropen()) || !(sp_info = sfstropen()))
 			goto nospace;
@@ -2212,10 +2213,18 @@ opthelp(const char* oopts, const char* what)
 				sfputc(mp, '\n');
 			else
 				xl = 1;
-			while (c = *p++)
+			psp = 0;
+			for (;;)
 			{
-				switch (c)
+				switch (c = *p++)
 				{
+				case 0:
+					if (!(tsp = psp))
+						goto style_usage;
+					p = psp->ob;
+					psp = psp->next;
+					free(tsp);
+					continue;
 				case '\a':
 					c = 'a';
 					break;
@@ -2223,8 +2232,15 @@ opthelp(const char* oopts, const char* what)
 					c = 'b';
 					break;
 				case '\f':
-					c = 'f';
-					break;
+					psp = info(psp, p, NiL, sp_info);
+					if (psp->nb)
+						p = psp->nb;
+					else
+					{
+						p = psp->ob;
+						psp = psp->next;
+					}
+					continue;
 				case '\n':
 					c = 'n';
 					break;
@@ -2253,6 +2269,7 @@ opthelp(const char* oopts, const char* what)
 				sfputc(mp, '\\');
 				sfputc(mp, c);
 			}
+		style_usage:
 			continue;
 		case STYLE_keys:
 			a = 0;
@@ -3668,7 +3685,7 @@ opterror(register char* p, int version, char* catalog, int err)
 	register int		c;
 
 	if (opt_info.num != LONG_MIN)
-		opt_info.num = opt_info.number = 0;
+		opt_info.num = (long)(opt_info.number = 0);
 	if (!p || !(mp = opt_info.state->mp) && !(mp = opt_info.state->mp = sfstropen()))
 		goto nospace;
 	s = *p == '-' ? p : opt_info.name;
@@ -3762,7 +3779,7 @@ opterror(register char* p, int version, char* catalog, int err)
  *			`Usage: command '
  *	':'		error: opt_info.arg points to message sans `command: '
  *
- * '-' '+' '?' ':' '#' '[' ']' ' '
+ * ':'  '#'  ' '  '['  ']'
  *			invalid option chars
  *
  * -- terminates option list and returns 0
@@ -4015,6 +4032,7 @@ optget(register char** argv, const char* oopts)
 				return 0;
 			if (c == '+')
 				opt_info.arg = 0;
+			message((-2, "c='%c' n=%d", c, n));
 			if (n == 2)
 			{
 				x = 0;
@@ -4117,7 +4135,7 @@ optget(register char** argv, const char* oopts)
 					 */
 
 					if (opt_info.num != LONG_MIN)
-						opt_info.num = opt_info.number = !(k & OPT_cache_invert);
+						opt_info.num = (long)(opt_info.number = !(k & OPT_cache_invert));
 					if (!(k & (OPT_cache_string|OPT_cache_numeric)))
 						return c;
 					if (*(opt_info.arg = &argv[opt_info.index++][opt_info.offset]))
@@ -4259,7 +4277,7 @@ optget(register char** argv, const char* oopts)
 				}
 				continue;
 			}
-			message((-20, "optget: opt %s w %s num %ld", show(s), w, num));
+			message((-20, "optget: opt %s  c %c  w %s  num %ld", show(s), c, w, num));
 			if (*s == c && !w)
 				break;
 			else if (*s == '[')
@@ -4663,6 +4681,7 @@ optget(register char** argv, const char* oopts)
 				if (*s == GO)
 					s = skip(s + 1, 0, 0, 0, 0, 1, 1, version);
 			}
+			message((-21, "optget: opt %s", show(s)));
 		}
 		if (w && x)
 		{
@@ -4725,7 +4744,7 @@ optget(register char** argv, const char* oopts)
 	 */
 
 	if (opt_info.num != LONG_MIN)
-		opt_info.num = opt_info.number = num;
+		opt_info.num = (long)(opt_info.number = num);
 	if ((n = *++s == '#') || *s == ':' || w && !nov && v && (optnumber(v, &e, NiL), n = !*e))
 	{
 		if (w)
@@ -4737,7 +4756,7 @@ optget(register char** argv, const char* oopts)
 					pop(psp);
 					return opterror("!", version, catalog, 0);
 				}
-				opt_info.num = opt_info.number = 0;
+				opt_info.num = (long)(opt_info.number = 0);
 			}
 			else
 			{
@@ -4768,7 +4787,7 @@ optget(register char** argv, const char* oopts)
 								else
 								{
 									opt_info.arg = 0;
-									opt_info.num = opt_info.number = 0;
+									opt_info.num = (long)(opt_info.number = 0);
 								}
 								break;
 							}
@@ -4988,7 +5007,7 @@ optget(register char** argv, const char* oopts)
 						}
 					}
 				} while (*(s = skip(s, 0, 0, 0, 1, 0, 1, version)) == '[');
-				if (!(opt_info.num = opt_info.number = x))
+				if (!(opt_info.num = (long)(opt_info.number = x)))
 				{
 					pop(psp);
 					return opterror("*", version, catalog, 0);
@@ -5003,7 +5022,7 @@ optget(register char** argv, const char* oopts)
 	}
 	else
 	{
-		opt_info.num = opt_info.number = num;
+		opt_info.num = (long)(opt_info.number = num);
 		if (!w && !argv[opt_info.index][opt_info.offset])
 		{
 			opt_info.offset = 0;
@@ -5148,7 +5167,7 @@ optstr(const char* str, const char* opts)
 				e = opt_info.name;
 				while (e < &opt_info.name[sizeof(opt_info.name)-1] && (*e++ = *s++));
 				opt_info.arg = 0;
-				opt_info.num = opt_info.number = 0;
+				opt_info.num = (long)(opt_info.number = 0);
 				opt_info.option[0] = ':';
 				opt_info.option[1] = 0;
 				return '#';

@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -181,11 +181,11 @@ function print_history
 	fi
 
 	# open history file
-	redirect {histfd}<>"${history_file}"
-	(( $? != 0 )) && { print -u2 "Couldn't open history file." ;  return 1 ; }
+	redirect {histfd}<> "${history_file}"
+	(( $? != 0 )) && { print -u2 "Could not open history file." ;  return 1 ; }
     
 	while read -u${histfd} line ; do
-		typeset -C rec
+		compound rec
 	
 		printf "( %s )\n" "${line}"  | read -C rec
 	
@@ -213,13 +213,13 @@ function put_note_pastebin_ca
 	typeset url_path="/quiet-paste.php?api=${pastebin_ca_key}"
 	typeset url="http://${url_host}${url_path}"
 	integer netfd # http stream number
-	typeset -C httpresponse
+	compound httpresponse
 	
 	(( $# != 1 )) && { print -u2 -f $"%s: Wrong number of arguments.\n" "$0" ; return 1 ; }
 	(( ${#1} == 0 )) && { print -u2 -f $"%s: No data.\n" "$0" ; return 1 ; }
 
 	# argument for "encode_multipart_form_data"
-	typeset mimeform=(
+	compound mimeform=(
 		# input
 		typeset boundary
 		typeset -a form
@@ -252,8 +252,8 @@ function put_note_pastebin_ca
 	request+="Content-Type: multipart/form-data; boundary=${boundary}\r\n"
 	request+="Content-Length: $(( mimeform.content_length ))\r\n"
 
-	redirect {netfd}<>"/dev/tcp/${url_host}/80" 
-	(( $? != 0 )) && { print -u2 -f $"$0: Couldn't open connection to %s.\n" "$0" "${url_host}" ;  return 1 ; }
+	redirect {netfd}<> "/dev/tcp/${url_host}/80" 
+	(( $? != 0 )) && { print -u2 -f $"%s: Could not open connection to %s.\n" "$0" "${url_host}" ;  return 1 ; }
 
 	# send http post
 	{
@@ -274,7 +274,7 @@ function put_note_pastebin_ca
 		printf "SUCCESS: http://opensolaris.pastebin.ca/%s\n" "${response_token}"
 	
 		# write history entry
-		typeset histrec=(
+		compound histrec=(
 			title="${mimeform.form[0].data}"
 			description="${mimeform.form[3].data}"
 			providertoken="${response_token}"
@@ -321,8 +321,8 @@ function get_note_pastebin_ca
 	# I hereby curse Solaris for not having an entry for "http" in /etc/services
 
 	# open TCP channel
-	redirect {netfd}<>"/dev/tcp/${url_host}/80"
-	(( $? != 0 )) && { print -u2 -f $"%s: Couldn't open connection to %s.\n" "$0" "${url_host}" ; return 1 ; }
+	redirect {netfd}<> "/dev/tcp/${url_host}/80"
+	(( $? != 0 )) && { print -u2 -f $"%s: Could not open connection to %s.\n" "$0" "${url_host}" ; return 1 ; }
 
 	# send HTTP request    
 	request="GET ${url_path} HTTP/1.1\r\n"
@@ -359,14 +359,14 @@ builtin uname
 typeset progname="${ basename "${0}" ; }"
 
 # HTTP protocol client identifer
-typeset -r http_user_agent="shnote/ksh93 (2008-10-14; $(uname -s -r -p))"
+typeset -r http_user_agent="shnote/ksh93 (2009-05-09; $(uname -s -r -p))"
 
 # name of history log (the number after "history" is some kind of version
 # counter to handle incompatible changes to the history file format)
 typeset -r history_file="${HOME}/.shnote/history0.txt"
 
 typeset -r shnote_usage=$'+
-[-?\n@(#)\$Id: shnote (Roland Mainz) 2008-10-14 \$\n]
+[-?\n@(#)\$Id: shnote (Roland Mainz) 2009-05-09 \$\n]
 [-author?Roland Mainz <roland.mainz@nrubsig.org>]
 [+NAME?shnote - read/write text data to internet clipboards]
 [+DESCRIPTION?\bshnote\b is a small utilty which can read and write text

@@ -1,5 +1,5 @@
 .fp 5 CW
-.TH SFIO 3 "01 February 2005"
+.TH SFIO 3 "01 June 2008"
 .SH NAME
 \fBsfio\fR \- safe/fast string/file input/output
 .SH SYNOPSIS
@@ -218,7 +218,9 @@ int        sferror(Sfio_t* f);
 int        sfclrerr(Sfio_t* f);
 int        sfclrlock(Sfio_t* f);
 
-int        sfnotify(void (*notify)(Sfio_t* f, int type, int fd));
+int        sfnotify(void (*notify)(Sfio_t* f, int type, Void_t* data));
+
+int        sfwalk(Sfwalk_f walkf, Void_t* data, int type);
 .ft 1
 .fi
 .Ss "MISCELLANEOUS FUNCTIONS"
@@ -647,10 +649,11 @@ using the option \f5u\fP when opening a file.
 .Ss "int sfmutex(Sfio_t* f, int type)"
 This function acquires or releases a mutex
 (mutually exclusive) lock on the stream \f5f\fP.
-It can be used by a thread to delineate  a sequence of I/O operations
+It can be used by a thread to serialize a sequence of I/O operations
 executed together in some critical section.
 \f5sfmutex()\fP is implicitly used by
-all Sfio operations on a stream with the flag \f5SF_MTSAFE\fP.
+all Sfio operations on a stream with the flag \f5SF_MTSAFE\fP to
+protect it from concurrent accesses via multiple threads.
 \f5sfmutex()\fP returns \f50\fP on success and some non-zero value on failure.
 
 Each stream has a lock count which starts at \f50\fP.
@@ -666,7 +669,8 @@ The \f5type\fP argument of \f5sfmutex()\fP takes on the below values:
 .Tp
 \f5SFMTX_LOCK\fP:
 Locking a stream if it is unlocked or increasing the lock count of the stream
-if it is already locked by the same thread.
+if it is already locked by the same thread. This call will block until it is
+possible to lock the stream.
 .Tp
 \f5SFMTX_TRYLOCK\fP:
 This is the non-blocking version of \f5SFMTX_LOCK\fP.
@@ -1555,7 +1559,7 @@ If \fIbase\fP is larger than \f536\fP, the set of digits is:
 .Ss "BUFFERING, SYNCHRONIZATION"
 .PP
 .Ss "  Void_t* sfsetbuf(Sfio_t* f, Void_t* buf, size_t size)"
-This function changed the buffering scheme for the stream \f5f\fP.
+This function changes the buffering scheme for the stream \f5f\fP.
 The stream will be synchronized before any buffer modification.
 If a new buffer is successfully set and the old buffer has not been freed,
 \f5sfsetbuf()\fP returns the old buffer. Otherwise, it returns \f5NULL\fP.
@@ -2003,26 +2007,55 @@ For example, it may be used before a long jump (\f5longjmp(3)\fP)
 out of some discipline I/O function to restore the internal stream states.
 \f5sfclrlock()\fP returns the current set of flags.
 
-.Ss "  int sfnotify((void(*)notify)(Sfio_t*, int, int) )"
+.Ss "  int sfnotify((void(*)notify)(Sfio_t*, int, void*) )"
 This sets a function \f5(*notify)()\fP to be called
-as \f5(*notify)(f,type,file)\fP on various stream events.
-Arguments \f5f\fP and \f5file\fP are stream and related file descriptor.
-Argument \f5type\fP indicates the reason for the call:
+as \f5(*notify)(f, type, data)\fP on various stream events.
+Arguments \f5type\fP and \f5data\fP indicate the reason for the call and accompanying data:
 .Tp
 \f5SF_NEW\fP:
-\f5f\fP is being opened and \f5file\fP is the underlying file descriptor.
+\f5f\fP is being opened and \f5data\fP is the underlying file descriptor.
 .Tp
 \f5SF_CLOSING\fP (\f5SF_CLOSE\fP):
-\f5f\fP and \f5file\fP are being closed.
+\f5f\fP is the stream being closed and \f5data\fP is the underlying file descriptor.
 .Tp
 \f5SF_SETFD\fP:
-The file descriptor of \f5f\fP is being changed to \f5file\fP (see \f5sfsetfd()\fP.)
+The file descriptor of \f5f\fP is being changed to the one
+defined by \f5data\fP (see \f5sfsetfd()\fP.)
 .Tp
 \f5SF_READ\fP:
 An attempt to change \f5f\fP to read mode failed.
+\f5data\fP is the file descriptor of the stream.
 .Tp
 \f5SF_WRITE\fP:
 An attempt to change \f5f\fP to write mode failed.
+\f5data\fP is the file descriptor of the stream.
+.Tp
+\f5SF_MTACCESS\fP:
+When a notifying function was registered (see \f5sfnotify()\fP),
+every Sfio call on a stream with flag \f5SF_MTSAFE\fP will
+invoke the notifying function
+once on entry after the stream is locked
+as \f5(*notify)(f, SF_MTACCESS, Sfio_t** fp), and
+once on return before unlocking as
+as \f5(*notify)(f, SF_MTACCESS, (Sfio_t**)0).
+In the call entry case,
+the notification function could use the argument \f5fp\fP
+to set a stream that would be used for performing the actual I/O operation.
+In this way, certain global streams such as the standard streams \f5sfstdin\fP,
+\f5sfstdout\fP and \f5sfstderr\fP could be made to act differently when used
+in different streams.
+
+.Ss "  int sfwalk(Sfwalk_f walkf, Void_t* data, int type)"
+This function invokes \f5(*walkf)(f, data)\fP on every open stream \f5f\fP
+whose flags as defined by \f5sfset()\fP contains all bit flags given in \f5type\fP.
+On such a call, if the return value is negative, \f5sfwalk()\fP will terminate.
+\f5sfwalk()\fP returns 0 if no stream was processed.
+Otherwise, it returns the return value from the last invocation of \f5walkf()\fP.
+
+As an example, the call \f5sfwalk(walkf, data, SF_READ)\fP will iterate over all streams
+opened for reading. Similarly, \f5sfwalk(walkf, data, SF_READ|SF_WRITE)\fP 
+iterates over all streams opened for both reading and writing.
+Lastly, \f5sfwalk(walkf, data, 0)\fP iterates over all streams.
 
 .PP
 .Ss "MISCELLANEOUS FUNCTIONS"

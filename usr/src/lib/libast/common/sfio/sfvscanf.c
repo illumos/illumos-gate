@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -122,7 +122,7 @@ int	flag;
 
 /* structure to match characters in a character class */
 typedef struct _accept_s
-{	char	ok[SF_MAXCHAR];
+{	char	ok[SF_MAXCHAR+1];
 	int	yes;
 	char	*form, *endf;
 #if _has_multibyte

@@ -1,7 +1,7 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
+*          Copyright (c) 1985-2009 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
 *                    by AT&T Intellectual Property                     *
@@ -19,7 +19,7 @@
 *                   Phong Vo <kpv@research.att.com>                    *
 *                                                                      *
 ***********************************************************************/
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20081104/build_sparc_32bit/src/lib/libast/features/lib by iffe version 2008-01-31 : : */
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20091014/build_sparc_32bit/src/lib/libast/features/lib by iffe version 2009-10-06 : : */
 #ifndef _def_lib_ast
 #define _def_lib_ast	1
 #define _sys_types	1	/* #include <sys/types.h> ok */
@@ -152,7 +152,6 @@
 #define _sys_filio	1	/* #include <sys/filio.h> ok */
 #define _sys_jioctl	1	/* #include <sys/jioctl.h> ok */
 #define _sys_localedef	1	/* #include <sys/localedef.h> ok */
-#define _sys_ptem	1	/* #include <sys/ptem.h> ok */
 #define _sys_resource	1	/* #include <sys/resource.h> ok */
 #define _sys_socket	1	/* #include <sys/socket.h> ok */
 #define _sys_stream	1	/* #include <sys/stream.h> ok */
