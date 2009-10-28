@@ -6586,8 +6586,8 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 	rfs4_file_t *fp;
 	bool_t screate = TRUE;
 	bool_t fcreate = TRUE;
-	uint32_t amodes;
-	uint32_t dmodes;
+	uint32_t open_a, share_a;
+	uint32_t open_d, share_d;
 	rfs4_deleg_state_t *dsp;
 	sysid_t sysid;
 	nfsstat4 status;
@@ -6640,10 +6640,17 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 	 * Calculate the new deny and access mode that this open is adding to
 	 * the file for this open owner;
 	 */
-	dmodes = (deny & ~sp->rs_share_deny);
-	amodes = (access & ~sp->rs_share_access);
+	open_d = (deny & ~sp->rs_open_deny);
+	open_a = (access & ~sp->rs_open_access);
 
-	first_open = (sp->rs_share_access & OPEN4_SHARE_ACCESS_BOTH) == 0;
+	/*
+	 * Calculate the new share access and share deny modes that this open
+	 * is adding to the file for this open owner;
+	 */
+	share_a = (access & ~sp->rs_share_access);
+	share_d = (deny & ~sp->rs_share_deny);
+
+	first_open = (sp->rs_open_access & OPEN4_SHARE_ACCESS_BOTH) == 0;
 
 	/*
 	 * Check to see the client has already sent an open for this
@@ -6656,7 +6663,7 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 	 * on shares modes.
 	 */
 
-	if (dmodes || amodes) {
+	if (share_a || share_d) {
 		if ((err = rfs4_share(sp, access, deny)) != 0) {
 			rfs4_dbe_unlock(sp->rs_dbe);
 			resp->status = err;
@@ -6685,7 +6692,7 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 
 		/* if state closed while lock was dropped */
 		if (sp->rs_closed) {
-			if (dmodes || amodes)
+			if (share_a || share_d)
 				(void) rfs4_unshare(sp);
 			rfs4_dbe_unlock(sp->rs_dbe);
 			rfs4_file_rele(fp);
@@ -6701,7 +6708,7 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 		/* Let's see if the delegation was returned */
 		if (rfs4_check_recall(sp, access)) {
 			rfs4_dbe_unlock(fp->rf_dbe);
-			if (dmodes || amodes)
+			if (share_a || share_d)
 				(void) rfs4_unshare(sp);
 			rfs4_dbe_unlock(sp->rs_dbe);
 			rfs4_file_rele(fp);
@@ -6736,7 +6743,7 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 		err = VOP_OPEN(&cs->vp, fflags, cs->cr, &ct);
 		if (err) {
 			rfs4_dbe_unlock(fp->rf_dbe);
-			if (dmodes || amodes)
+			if (share_a || share_d)
 				(void) rfs4_unshare(sp);
 			rfs4_dbe_unlock(sp->rs_dbe);
 			rfs4_file_rele(fp);
@@ -6758,23 +6765,24 @@ rfs4_do_open(struct compound_state *cs, struct svc_req *req,
 		 * by this upgrade.
 		 */
 		fflags = 0;
-		if (amodes & OPEN4_SHARE_ACCESS_READ)
+		if (open_a & OPEN4_SHARE_ACCESS_READ)
 			fflags |= FREAD;
-		if (amodes & OPEN4_SHARE_ACCESS_WRITE)
+		if (open_a & OPEN4_SHARE_ACCESS_WRITE)
 			fflags |= FWRITE;
 		vn_open_upgrade(cs->vp, fflags);
 	}
-	sp->rs_opened = TRUE;
+	sp->rs_open_access |= access;
+	sp->rs_open_deny |= deny;
 
-	if (dmodes & OPEN4_SHARE_DENY_READ)
+	if (open_d & OPEN4_SHARE_DENY_READ)
 		fp->rf_deny_read++;
-	if (dmodes & OPEN4_SHARE_DENY_WRITE)
+	if (open_d & OPEN4_SHARE_DENY_WRITE)
 		fp->rf_deny_write++;
 	fp->rf_share_deny |= deny;
 
-	if (amodes & OPEN4_SHARE_ACCESS_READ)
+	if (open_a & OPEN4_SHARE_ACCESS_READ)
 		fp->rf_access_read++;
-	if (amodes & OPEN4_SHARE_ACCESS_WRITE)
+	if (open_a & OPEN4_SHARE_ACCESS_WRITE)
 		fp->rf_access_write++;
 	fp->rf_share_access |= access;
 
@@ -7659,14 +7667,14 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	 * the new mode is a subset of the current modes we bitwise
 	 * AND them together and check that the result equals the new
 	 * mode. For example:
-	 * New mode, access == R and current mode, sp->rs_share_access  == RW
-	 * access & sp->rs_share_access == R == access, so the new access mode
-	 * is valid. Consider access == RW, sp->rs_share_access = R
-	 * access & sp->rs_share_access == R != access, so the new access mode
+	 * New mode, access == R and current mode, sp->rs_open_access  == RW
+	 * access & sp->rs_open_access == R == access, so the new access mode
+	 * is valid. Consider access == RW, sp->rs_open_access = R
+	 * access & sp->rs_open_access == R != access, so the new access mode
 	 * is invalid.
 	 */
-	if ((access & sp->rs_share_access) != access ||
-	    (deny & sp->rs_share_deny) != deny ||
+	if ((access & sp->rs_open_access) != access ||
+	    (deny & sp->rs_open_deny) != deny ||
 	    (access &
 	    (OPEN4_SHARE_ACCESS_READ | OPEN4_SHARE_ACCESS_WRITE)) == 0) {
 		*cs->statusp = resp->status = NFS4ERR_INVAL;
@@ -7683,6 +7691,14 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	 */
 	(void) rfs4_unshare(sp);
 
+	status = rfs4_share(sp, access, deny);
+	if (status != NFS4_OK) {
+		*cs->statusp = resp->status = NFS4ERR_SERVERFAULT;
+		rfs4_update_open_sequence(sp->rs_owner);
+		rfs4_dbe_unlock(sp->rs_dbe);
+		goto end;
+	}
+
 	fp = sp->rs_finfo;
 	rfs4_dbe_lock(fp->rf_dbe);
 
@@ -7692,7 +7708,7 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	 * and if it goes to zero turn off the deny read bit
 	 * on the file.
 	 */
-	if ((sp->rs_share_deny & OPEN4_SHARE_DENY_READ) &&
+	if ((sp->rs_open_deny & OPEN4_SHARE_DENY_READ) &&
 	    (deny & OPEN4_SHARE_DENY_READ) == 0) {
 		fp->rf_deny_read--;
 		if (fp->rf_deny_read == 0)
@@ -7705,7 +7721,7 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	 * and if it goes to zero turn off the deny write bit
 	 * on the file.
 	 */
-	if ((sp->rs_share_deny & OPEN4_SHARE_DENY_WRITE) &&
+	if ((sp->rs_open_deny & OPEN4_SHARE_DENY_WRITE) &&
 	    (deny & OPEN4_SHARE_DENY_WRITE) == 0) {
 		fp->rf_deny_write--;
 		if (fp->rf_deny_write == 0)
@@ -7719,7 +7735,7 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	 * on the file.  set fflags to FREAD for the call to
 	 * vn_open_downgrade().
 	 */
-	if ((sp->rs_share_access & OPEN4_SHARE_ACCESS_READ) &&
+	if ((sp->rs_open_access & OPEN4_SHARE_ACCESS_READ) &&
 	    (access & OPEN4_SHARE_ACCESS_READ) == 0) {
 		fp->rf_access_read--;
 		if (fp->rf_access_read == 0)
@@ -7734,7 +7750,7 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 	 * on the file.  set fflags to FWRITE for the call to
 	 * vn_open_downgrade().
 	 */
-	if ((sp->rs_share_access & OPEN4_SHARE_ACCESS_WRITE) &&
+	if ((sp->rs_open_access & OPEN4_SHARE_ACCESS_WRITE) &&
 	    (access & OPEN4_SHARE_ACCESS_WRITE) == 0) {
 		fp->rf_access_write--;
 		if (fp->rf_access_write == 0)
@@ -7747,24 +7763,17 @@ rfs4_op_open_downgrade(nfs_argop4 *argop, nfs_resop4 *resop,
 
 	rfs4_dbe_unlock(fp->rf_dbe);
 
-	status = rfs4_share(sp, access, deny);
-	rfs4_dbe_unlock(sp->rs_dbe);
-
-	if (status != NFS4_OK) {
-		*cs->statusp = resp->status = NFS4ERR_SERVERFAULT;
-		rfs4_update_open_sequence(sp->rs_owner);
-		goto end;
-	}
+	/* now set the new open access and deny modes */
+	sp->rs_open_access = access;
+	sp->rs_open_deny = deny;
 
 	/*
 	 * we successfully downgraded the share lock, now we need to downgrade
-	 * the open.  it is possible that the downgrade was only for a deny
+	 * the open. it is possible that the downgrade was only for a deny
 	 * mode and we have nothing else to do.
 	 */
 	if ((fflags & (FREAD|FWRITE)) != 0)
 		vn_open_downgrade(cs->vp, fflags);
-
-	rfs4_dbe_lock(sp->rs_dbe);
 
 	/* Update the stateid */
 	next_stateid(&sp->rs_stateid);
@@ -8273,32 +8282,34 @@ rfs4_release_share_lock_state(rfs4_state_t *sp, cred_t *cr,
 	if (sp->rs_owner->ro_client->rc_sysidt != LM_NOSYSID)
 		(void) rfs4_unshare(sp);
 
-	if (sp->rs_opened) {
+	if (sp->rs_open_access) {
+		rfs4_dbe_lock(fp->rf_dbe);
+
 		/*
 		 * Decrement the count for each access and deny bit that this
 		 * state has contributed to the file.
 		 * If the file counts go to zero
 		 * clear the appropriate bit in the appropriate mask.
 		 */
-		if (sp->rs_share_access & OPEN4_SHARE_ACCESS_READ) {
+		if (sp->rs_open_access & OPEN4_SHARE_ACCESS_READ) {
 			fp->rf_access_read--;
 			fflags |= FREAD;
 			if (fp->rf_access_read == 0)
 				fp->rf_share_access &= ~OPEN4_SHARE_ACCESS_READ;
 		}
-		if (sp->rs_share_access & OPEN4_SHARE_ACCESS_WRITE) {
+		if (sp->rs_open_access & OPEN4_SHARE_ACCESS_WRITE) {
 			fp->rf_access_write--;
 			fflags |= FWRITE;
 			if (fp->rf_access_write == 0)
 				fp->rf_share_access &=
 				    ~OPEN4_SHARE_ACCESS_WRITE;
 		}
-		if (sp->rs_share_deny & OPEN4_SHARE_DENY_READ) {
+		if (sp->rs_open_deny & OPEN4_SHARE_DENY_READ) {
 			fp->rf_deny_read--;
 			if (fp->rf_deny_read == 0)
 				fp->rf_share_deny &= ~OPEN4_SHARE_DENY_READ;
 		}
-		if (sp->rs_share_deny & OPEN4_SHARE_DENY_WRITE) {
+		if (sp->rs_open_deny & OPEN4_SHARE_DENY_WRITE) {
 			fp->rf_deny_write--;
 			if (fp->rf_deny_write == 0)
 				fp->rf_share_deny &= ~OPEN4_SHARE_DENY_WRITE;
@@ -8306,7 +8317,10 @@ rfs4_release_share_lock_state(rfs4_state_t *sp, cred_t *cr,
 
 		(void) VOP_CLOSE(fp->rf_vp, fflags, 1, (offset_t)0, cr, NULL);
 
-		sp->rs_opened = FALSE;
+		rfs4_dbe_unlock(fp->rf_dbe);
+
+		sp->rs_open_access = 0;
+		sp->rs_open_deny = 0;
 	}
 }
 
