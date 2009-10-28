@@ -4007,7 +4007,6 @@ zfs_frlock(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
 {
 	znode_t *zp = VTOZ(vp);
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
-	int error;
 
 	ZFS_ENTER(zfsvfs);
 	ZFS_VERIFY_ZP(zp);
@@ -4022,9 +4021,8 @@ zfs_frlock(vnode_t *vp, int cmd, flock64_t *bfp, int flag, offset_t offset,
 		ZFS_EXIT(zfsvfs);
 		return (EAGAIN);
 	}
-	error = fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr, ct);
 	ZFS_EXIT(zfsvfs);
-	return (error);
+	return (fs_frlock(vp, cmd, bfp, flag, offset, flk_cbp, cr, ct));
 }
 
 /*
