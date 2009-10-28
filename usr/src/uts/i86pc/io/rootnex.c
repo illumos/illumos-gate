@@ -1729,8 +1729,8 @@ rootnex_coredma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 
 	*handlep = (ddi_dma_handle_t)hp;
 
-	ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_HDLS]);
-	DTRACE_PROBE1(rootnex__alloc__handle, uint64_t,
+	ROOTNEX_DPROF_INC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_HDLS]);
+	ROOTNEX_DPROBE1(rootnex__alloc__handle, uint64_t,
 	    rootnex_cnt[ROOTNEX_CNT_ACTIVE_HDLS]);
 
 	return (DDI_SUCCESS);
@@ -1788,8 +1788,8 @@ rootnex_coredma_freehdl(dev_info_t *dip, dev_info_t *rdip,
 	mutex_destroy(&dma->dp_mutex);
 	kmem_cache_free(rootnex_state->r_dmahdl_cache, hp);
 
-	ROOTNEX_PROF_DEC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_HDLS]);
-	DTRACE_PROBE1(rootnex__free__handle, uint64_t,
+	ROOTNEX_DPROF_DEC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_HDLS]);
+	ROOTNEX_DPROBE1(rootnex__free__handle, uint64_t,
 	    rootnex_cnt[ROOTNEX_CNT_ACTIVE_HDLS]);
 
 	if (rootnex_state->r_dvma_call_list_id)
@@ -2008,9 +2008,9 @@ rootnex_sgl_end:
 		hp->dmai_cookie++;
 		hp->dmai_rflags &= ~DDI_DMA_PARTIAL;
 		hp->dmai_nwin = 1;
-		ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
-		DTRACE_PROBE3(rootnex__bind__fast, dev_info_t *, rdip, uint64_t,
-		    rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS], uint_t,
+		ROOTNEX_DPROF_INC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
+		ROOTNEX_DPROBE3(rootnex__bind__fast, dev_info_t *, rdip,
+		    uint64_t, rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS], uint_t,
 		    dma->dp_dma.dmao_size);
 		return (DDI_DMA_MAPPED);
 	}
@@ -2062,8 +2062,8 @@ rootnex_sgl_end:
 	*cookiep = dma->dp_cookies[0];
 	hp->dmai_cookie++;
 
-	ROOTNEX_PROF_INC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
-	DTRACE_PROBE3(rootnex__bind__slow, dev_info_t *, rdip, uint64_t,
+	ROOTNEX_DPROF_INC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
+	ROOTNEX_DPROBE3(rootnex__bind__slow, dev_info_t *, rdip, uint64_t,
 	    rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS], uint_t,
 	    dma->dp_dma.dmao_size);
 	return (e);
@@ -2161,8 +2161,8 @@ rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	if (rootnex_state->r_dvma_call_list_id)
 		ddi_run_callback(&rootnex_state->r_dvma_call_list_id);
 
-	ROOTNEX_PROF_DEC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
-	DTRACE_PROBE1(rootnex__unbind, uint64_t,
+	ROOTNEX_DPROF_DEC(&rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
+	ROOTNEX_DPROBE1(rootnex__unbind, uint64_t,
 	    rootnex_cnt[ROOTNEX_CNT_ACTIVE_BINDS]);
 
 	return (DDI_SUCCESS);

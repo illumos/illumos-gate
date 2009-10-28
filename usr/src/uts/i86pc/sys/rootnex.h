@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <sys/modctl.h>
 #include <sys/sunddi.h>
 #include <sys/iommulib.h>
+#include <sys/sdt.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -49,6 +50,19 @@ extern "C" {
 #define	VEC_MAX			255
 
 /* atomic increment/decrement to keep track of outstanding binds, etc */
+#ifdef DEBUG
+#define	ROOTNEX_DPROF_INC(addr)		atomic_inc_64(addr)
+#define	ROOTNEX_DPROF_DEC(addr)		atomic_add_64(addr, -1)
+#define	ROOTNEX_DPROBE1(name, type1, arg1) \
+	DTRACE_PROBE1(name, type1, arg1)
+#define	ROOTNEX_DPROBE3(name, type1, arg1, type2, arg2, type3, arg3) \
+	DTRACE_PROBE3(name, type1, arg1, type2, arg2, type3, arg3)
+#else
+#define	ROOTNEX_DPROF_INC(addr)
+#define	ROOTNEX_DPROF_DEC(addr)
+#define	ROOTNEX_DPROBE1(name, type1, arg1)
+#define	ROOTNEX_DPROBE3(name, type1, arg1, type2, arg2, type3, arg3)
+#endif
 #define	ROOTNEX_PROF_INC(addr)		atomic_inc_64(addr)
 #define	ROOTNEX_PROF_DEC(addr)		atomic_add_64(addr, -1)
 
