@@ -133,8 +133,9 @@ unset OPT_V
 #
 unset unconfig_zone
 unset preserve_zone
+unset SANITY_SKIP
 
-while getopts "a:d:pr:suv" opt
+while getopts "a:d:Fpr:suv" opt
 do
 	case "$opt" in
 		a)
@@ -151,6 +152,7 @@ do
 		 	inst_type="directory"
 			install_media="$OPTARG"
 			;;
+		F)	SANITY_SKIP=1;;
 		p)	preserve_zone="-p";;
 		r)
 			if [[ -n "$inst_type" ]]; then

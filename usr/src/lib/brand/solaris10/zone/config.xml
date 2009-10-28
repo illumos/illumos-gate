@@ -36,7 +36,7 @@
 	<user_cmd>/usr/bin/getent passwd %u</user_cmd>
 
 	<install>/usr/lib/brand/solaris10/image_install %z %R</install>
-	<installopts>a:d:psuv</installopts>
+	<installopts>a:d:Fpsuv</installopts>
 	<boot>/usr/lib/brand/solaris10/s10_boot %z %R</boot>
 	<sysboot>/usr/lib/brand/solaris10/prestate %z %R 2 0</sysboot>
 	<halt></halt>

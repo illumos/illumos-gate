@@ -32,6 +32,7 @@ export PATH
 # Use the ipkg-brand ZFS property for denoting the zone root's active dataset.
 PROP_ACTIVE="org.opensolaris.libbe:active"
 
+w_sanity_detail=$(gettext "       WARNING: Skipping image sanity checks.")
 f_sanity_detail=$(gettext  "Missing %s at %s")
 f_sanity_sparse=$(gettext  "Is this a sparse zone image?  The image must be whole-root.")
 f_sanity_vers=$(gettext  "The image release version must be 10 (got %s), the zone is not usable on this system.")
@@ -80,6 +81,16 @@ sanity_check()
 			res=1
 		fi
 	done
+
+	if (( $res != 0 )); then
+		log "$sanity_fail"
+		fatal "$install_fail" "$ZONENAME"
+	fi
+
+	if [[ "$SANITY_SKIP" == 1 ]]; then
+		log "$w_sanity_detail"
+		return
+	fi
 
 	#
 	# Check image release to be sure its S10.
