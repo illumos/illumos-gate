@@ -248,7 +248,7 @@ std_path_activate(struct scsi_device *sd, char *pathclass,
 		return (0);
 	}
 
-	if (mode == SCSI_EXPLICIT_FAILOVER) {
+	if (mode != SCSI_IMPLICIT_FAILOVER) {
 		VHCI_DEBUG(4, (CE_NOTE, NULL,
 		    "!mode is EXPLICIT for %p xlf %x\n",
 		    (void *)sd, xlf));
