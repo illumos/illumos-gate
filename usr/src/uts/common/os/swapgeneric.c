@@ -916,7 +916,8 @@ load_bootpath_drivers(char *bootpath)
 	if (netboot_over_iscsi()) {
 		/* iscsi boot */
 		if (root_is_ramdisk) {
-			modloadonly("drv", "ramdisk");
+			if (modloadonly("drv", "ramdisk") < 0)
+				return (-1);
 		}
 		proplen = BOP_GETPROPLEN(bootops, BP_ISCSI_NETWORK_BOOTPATH);
 		if (proplen > 0) {
