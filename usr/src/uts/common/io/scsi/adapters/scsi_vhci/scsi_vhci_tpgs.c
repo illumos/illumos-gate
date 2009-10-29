@@ -75,7 +75,7 @@ vhci_tpgs_set_target_groups(struct scsi_address *ap, int set_state,
 	}
 
 	bp->b_un.b_addr = bufp;
-	bp->b_flags = B_READ;
+	bp->b_flags = B_WRITE;
 	bp->b_bcount = len;
 	bp->b_resid = 0;
 
@@ -172,6 +172,12 @@ vhci_tpgs_set_target_groups(struct scsi_address *ap, int set_state,
 			scsi_destroy_pkt(pkt);
 			return (0);
 		}
+	} else if ((pkt->pkt_reason == CMD_CMPLT) &&
+	    (SCBP_C(pkt) == STATUS_GOOD)) {
+		freerbuf(bp);
+		kmem_free((void *)bufp, len);
+		scsi_destroy_pkt(pkt);
+		return (0);
 	}
 
 	freerbuf(bp);
