@@ -1362,7 +1362,7 @@ main(int argc, char *argv[])
 	Stat_t st;
 	struct rlimit rl;
 	long filebounds = -1;
-	char namelist[30], corefile[30], boundstr[30], metricsname[PATH_MAX];
+	char namelist[30], corefile[30], boundstr[30];
 
 	startts = gethrtime();
 
@@ -1373,8 +1373,9 @@ main(int argc, char *argv[])
 	openlog(progname, LOG_ODELAY, LOG_AUTH);
 
 	(void) defopen("/etc/dumpadm.conf");
-	savedir = strdup(defread("DUMPADM_SAVDIR="));
-	sprintf(metricsname, "%s/%s", savedir, METRICSFILE);
+	savedir = defread("DUMPADM_SAVDIR=");
+	if (savedir != NULL)
+		savedir = strdup(savedir);
 
 	while ((c = getopt(argc, argv, "Lvdmf:")) != EOF) {
 		switch (c) {
@@ -1502,7 +1503,7 @@ main(int argc, char *argv[])
 
 		if (metrics_size > 0) {
 			int sec = (gethrtime() - startts) / 1000 / 1000 / 1000;
-			FILE *mfile = fopen(metricsname, "a");
+			FILE *mfile = fopen(METRICSFILE, "a");
 			char *metrics = Zalloc(metrics_size + 1);
 
 			Pread(dumpfd, metrics, metrics_size, endoff +
@@ -1511,7 +1512,7 @@ main(int argc, char *argv[])
 			if (mfile == NULL) {
 				logprint(LOG_WARNING, 1, -1,
 				    "Can't create %s:\n%s",
-				    metricsname, metrics);
+				    METRICSFILE, metrics);
 			} else {
 				fprintf(mfile, "[[[[,,,");
 				for (i = 0; i < argc; i++)
@@ -1561,9 +1562,9 @@ main(int argc, char *argv[])
 
 		build_corefile(namelist, corefile);
 
-		if (access(metricsname, F_OK) == 0) {
+		if (access(METRICSFILE, F_OK) == 0) {
 			int sec = (gethrtime() - startts) / 1000 / 1000 / 1000;
-			FILE *mfile = fopen(metricsname, "a");
+			FILE *mfile = fopen(METRICSFILE, "a");
 
 			fprintf(mfile, "[[[[,,,");
 			for (i = 0; i < argc; i++)
