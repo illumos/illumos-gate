@@ -16881,6 +16881,20 @@ st_recover(void *arg)
 		}
 
 		/*
+		 * If we have already set a scsi II reserve and get a
+		 * conflict on a scsi III type reserve fail without
+		 * any attempt to recover.
+		 */
+		if ((un->un_rsvd_status & ST_RESERVE | ST_PRESERVE_RESERVE) &&
+		    (errinfo->ei_failed_pkt.pkt_cdbp[0] ==
+		    SCMD_PERSISTENT_RESERVE_OUT) ||
+		    (errinfo->ei_failed_pkt.pkt_cdbp[0] ==
+		    SCMD_PERSISTENT_RESERVE_IN)) {
+			st_recov_ret(un, errinfo, COMMAND_DONE_EACCES);
+			return;
+		}
+
+		/*
 		 * If scsi II lost reserve try and get it back.
 		 */
 		if ((((un->un_rsvd_status &
