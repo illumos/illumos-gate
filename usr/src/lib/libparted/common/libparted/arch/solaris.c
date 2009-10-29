@@ -304,6 +304,11 @@ solaris_destroy(PedDevice* dev)
 	ped_free(dev);
 }
 
+/*
+ * This function constructs the Solaris device name for
+ * partition num on a disk given the *p0 device for that disk.
+ * For example: partition 2 of /dev/dsk/c0d0p0 becomes /dev/dsk/c0d0p2.
+ */
 static char *
 _device_get_part_path(PedDevice* dev, int num)
 {
@@ -312,23 +317,20 @@ _device_get_part_path(PedDevice* dev, int num)
 	char *result;
 
 	PED_ASSERT(dev != NULL, return (NULL));
-	PED_ASSERT(num >= 1 && num <= 4, return (NULL));
+	PED_ASSERT(num >= 1, return (NULL));
 
 	result = (char *)ped_malloc(result_len);
 	if (!result)
 		return (NULL);
 
-	/*
-	 * Create the path name to the *pn device, where n is the partition #
-	 * geom->dev->path looks like this: "/devices/.../cmdk@0,0:q"
-	 * or like this: "/dev/dsk/...p0"
-	 * ":q" is the "/dev/dsk/...p0" device
-	 * :r is p1, :s is p2, :t is p3, :u is p4
-	 * 'q' + 1 == 'r'
-	 * '0' + 1 == '1'
-	 */
 	strncpy(result, dev->path, result_len);
-	result[strlen(result) -1] += num;
+	if (path_len > 10 && result[path_len - 2] == 'p' &&
+	    result[path_len - 1] == '0') {
+		(void) snprintf(result + path_len - 1,
+		    result_len - path_len + 1, "%d", num);
+	} else {
+		(void) snprintf(result, result_len, "partition %d", num);
+	}
 
 	return (result);
 }

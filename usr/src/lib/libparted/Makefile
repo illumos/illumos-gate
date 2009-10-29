@@ -70,7 +70,7 @@ all clean clobber delete install package: $(SUBDIRS)
 install_h: $(ROOTHDRDIR) $(ROOTHDRS)
 
 $(ROOTHDRDIR):
-	mkdir -p $@
+	$(INS.dir)
 
 #
 # This open source is exempt from check
