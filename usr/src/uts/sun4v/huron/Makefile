@@ -20,7 +20,7 @@
 #
 #
 # uts/sun4v/huron/Makefile
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -69,7 +69,6 @@ lintlib:      unix
 
 IMPLEMENTED_PLATFORM	= SUNW,SPARC-Enterprise-T5120
 LINKED_PLATFORMS	= SUNW,SPARC-Enterprise-T5220
-LINKED_PLATFORMS	+= SUNW,SPARC-Enterprise-T3120
 
 
 $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%): $(USR_PLAT_DIR)
