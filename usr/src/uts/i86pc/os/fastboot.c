@@ -149,6 +149,20 @@ static size_t fastboot_mbi_size = 0x2000;	/* 8K */
 static size_t fastboot_pagetable_size = 0x5000;	/* 20K */
 
 /*
+ * Minimum system uptime in clock_t before Fast Reboot should be used
+ * on panic.  Will be initialized in fastboot_post_startup().
+ */
+clock_t fastreboot_onpanic_uptime = LONG_MAX;
+
+/*
+ * lbolt value when the system booted.  This value will be used if the system
+ * panics to calculate how long the system has been up.  If the uptime is less
+ * than fastreboot_onpanic_uptime, a reboot through BIOS will be performed to
+ * avoid a potential panic/reboot loop.
+ */
+clock_t lbolt_at_boot = LONG_MAX;
+
+/*
  * Use below 1G for page tables as
  *	1. we are only doing 1:1 mapping of the bottom 1G of physical memory.
  *	2. we are using 2G as the fake virtual address for the new kernel and
@@ -1411,6 +1425,12 @@ fastboot_get_bootprop(void)
 void
 fastboot_post_startup()
 {
+	lbolt_at_boot = ddi_get_lbolt();
+
+	/* Default to 10 minutes */
+	if (fastreboot_onpanic_uptime == LONG_MAX)
+		fastreboot_onpanic_uptime = SEC_TO_TICK(10 * 60);
+
 	if (!fastreboot_capable)
 		return;
 

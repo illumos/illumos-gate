@@ -265,12 +265,16 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	}
 
 	/*
-	 * If the system is panicking, the preloaded kernel is valid,
-	 * and fastreboot_onpanic has been set, choose Fast Reboot.
+	 * If the system is panicking, the preloaded kernel is valid, and
+	 * fastreboot_onpanic has been set, and the system has been up for
+	 * longer than fastreboot_onpanic_uptime (default to 10 minutes),
+	 * choose Fast Reboot.
 	 */
 	if (fcn == AD_BOOT && panicstr && newkernel.fi_valid &&
-	    fastreboot_onpanic)
+	    fastreboot_onpanic &&
+	    (panic_lbolt - lbolt_at_boot) > fastreboot_onpanic_uptime) {
 		fcn = AD_FASTREBOOT;
+	}
 
 	/*
 	 * Try to quiesce devices.

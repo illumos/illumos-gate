@@ -176,6 +176,10 @@ extern int force_fastreboot;
 extern volatile int fastreboot_onpanic;
 extern char fastreboot_onpanic_cmdline[FASTBOOT_SAVED_CMDLINE_LEN];
 
+/* Variables for avoiding panic/reboot loop */
+extern clock_t fastreboot_onpanic_uptime;
+extern clock_t lbolt_at_boot, panic_lbolt;
+
 #endif	/* _ASM */
 
 #ifdef __cplusplus
