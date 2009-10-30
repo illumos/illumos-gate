@@ -1217,12 +1217,6 @@ ac_hw_reset(ac97_t *ac)
 		WR(AC97_VENDOR_REGISTER_11, 8);
 		break;
 
-	case AC97_CODEC_EM28028:
-		ac_wr(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER,
-		    (ac_rd(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER) &
-		    ~3800) | 0xE0);
-		break;
-
 	case AC97_CODEC_AD1886:
 		/* jack sense */
 		WR(AC97_VENDOR_REGISTER_13,
@@ -1259,7 +1253,7 @@ ac_hw_reset(ac97_t *ac)
 	case AC97_CODEC_VT1612A:
 	case AC97_CODEC_VT1617A:
 	case AC97_CODEC_VT1616:
-		/* Turn off Center, Surround, and LFE DACs */
+		/* Turn on Center, Surround, and LFE DACs */
 		ac_clr(ac, AC97_EXTENDED_AUDIO_STAT_CTRL_REGISTER,
 		    EASCR_PRI | EASCR_PRJ | EASCR_PRK);
 		WR(AC97_VENDOR_REGISTER_01, 0x0230);
@@ -1829,11 +1823,18 @@ static struct vendor {
 	{ AC97_VENDOR_CMI,	"C-Media" },
 	{ AC97_VENDOR_CRY,	"Cirrus Logic" },
 	{ AC97_VENDOR_CXT,	"Conexant" },
+	{ AC97_VENDOR_EMC,	"eMicro" },
 	{ AC97_VENDOR_ESS,	"ESS Technology" },
 	{ AC97_VENDOR_EV,	"Ectiva" },
+	{ AC97_VENDOR_HRS,	"Intersil" },
 	{ AC97_VENDOR_ICE,	"ICEnsemble" },
+	{ AC97_VENDOR_ITE,	"ITE, Inc." },
+	{ AC97_VENDOR_NSC,	"National Semiconductor" },
+	{ AC97_VENDOR_PSC,	"Philips Semiconductor" },
+	{ AC97_VENDOR_SIL,	"Silicon Laboratories" },
 	{ AC97_VENDOR_ST,	"SigmaTel" },
 	{ AC97_VENDOR_TRA,	"TriTech", },
+	{ AC97_VENDOR_TXN,	"Texas Instruments", },
 	{ AC97_VENDOR_VIA,	"VIA Technologies" },
 	{ AC97_VENDOR_WML,	"Wolfson" },
 	{ AC97_VENDOR_YMH,	"Yamaha" },
@@ -1892,6 +1893,7 @@ static struct codec {
 	{ AC97_CODEC_WM9704,	"WM9704" },
 	{ AC97_CODEC_ES1921,	"ES1921" },
 	{ AC97_CODEC_ICE1232,	"ICE1232/VT1611A" },
+	{ AC97_CODEC_LM4550,	"LM4550" },
 	{ AC97_CODEC_VT1612A,	"VT1612A" },
 	{ AC97_CODEC_VT1616,	"VT1616" },
 	{ AC97_CODEC_VT1616A,	"VT1616A" },

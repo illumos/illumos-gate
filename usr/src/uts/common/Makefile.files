@@ -433,6 +433,8 @@ AUDIO_OBJS += audio_client.o audio_ddi.o audio_engine.o \
 	   audio_grc3.o audio_output.o audio_input.o \
 	   audio_oss.o audio_sun.o
 
+AUDIOEMU10K_OBJS += audioemu10k.o
+
 AUDIOENS_OBJS += audioens.o
 
 AUDIOVIA823X_OBJS += audiovia823x.o

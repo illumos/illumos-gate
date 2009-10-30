@@ -515,9 +515,15 @@ extern "C" {
 #define	AC97_VENDOR_EMC			0x454d4300	/* eMicro */
 #define	AC97_VENDOR_EV			0x000f8300	/* Ectiva */
 #define	AC97_VENDOR_ESS			0x45838300	/* ESS */
+#define	AC97_VENDOR_HRS			0x48525300	/* Intersil */
 #define	AC97_VENDOR_ICE			0x49434500	/* ICEnsemble */
+#define	AC97_VENDOR_ITE			0x49544500	/* ITE */
+#define	AC97_VENDOR_NSC			0x4e534300	/* National */
+#define	AC97_VENDOR_PSC			0x50534300	/* Philips */
+#define	AC97_VENDOR_SIL			0x53494c00	/* Silicon Labs */
 #define	AC97_VENDOR_ST			0x83847600	/* SigmaTel */
 #define	AC97_VENDOR_TRA			0x54524100	/* TriTech */
+#define	AC97_VENDOR_TXN			0x54584e00	/* TI */
 #define	AC97_VENDOR_VIA			0x56494100	/* VIA */
 #define	AC97_VENDOR_WML			0x574d4c00	/* Wolfson */
 #define	AC97_VENDOR_YMH			0x594d4800	/* Yamaha */
@@ -567,6 +573,7 @@ extern "C" {
 #define	AC97_CODEC_ES1921		0x45838308
 #define	AC97_CODEC_EV1938		0x000f8384
 #define	AC97_CODEC_ICE1232		0x49434511
+#define	AC97_CODEC_LM4550		0x4e534350
 #define	AC97_CODEC_STAC9700		0x83847600
 #define	AC97_CODEC_STAC9701		0x83847601
 #define	AC97_CODEC_STAC9701_2		0xc250c250

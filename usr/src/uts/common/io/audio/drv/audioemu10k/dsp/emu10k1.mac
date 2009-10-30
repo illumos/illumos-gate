@@ -1,0 +1,154 @@
+//
+// Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+// Use is subject to license terms.
+//
+// Copyright (C) 4Front Technologies 1996-2008.
+//
+// CDDL HEADER START
+//
+// The contents of this file are subject to the terms of the
+// Common Development and Distribution License (the "License").
+// You may not use this file except in compliance with the License.
+//
+// You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+// or http://www.opensolaris.org/os/licensing.
+// See the License for the specific language governing permissions
+// and limitations under the License.
+//
+// When distributing Covered Code, include this CDDL HEADER in each
+// file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+// If applicable, add the following below this CDDL HEADER, with the
+// fields enclosed by brackets "[]" replaced with your own identifying
+// information: Portions Copyright [yyyy] [name of copyright owner]
+//
+// CDDL HEADER END
+
+	// Constants for EMU 10k1 (SB Live)
+
+	// Inputs
+	.input IN_AC97_L	0
+	.input IN_AC97_R	1
+	.input IN_DIGCD_L	2
+	.input IN_DIGCD_R	3
+	.input IN_ZV_L		4
+	.input IN_ZV_R		5
+	.input IN_SPDIF1_L	6	// TOSLink
+	.input IN_SPDIF1_R	7
+	.input IN_LINE2_L	8	// LiveDrive (Line/Mic In 1)
+	.input IN_LINE2_R	9
+	.input IN_SPDIF2_L	10	// LiveDrive (Coax S/PDIF input)
+	.input IN_SPDIF2_R	11
+	.input IN_AUX2_L	12	// LiveDrive (Line/Mic 2)
+	.input IN_AUX2_R	13
+
+	// Outputs
+	.output OUT_FRONT_L	0	// via AC'97
+	.output OUT_FRONT_R	1	// via AC'97
+	.output OUT_SPDIF_L	2
+	.output OUT_SPDIF_R	3
+	.output OUT_DCENTER	4	// Digital Center channel
+	.output OUT_DLFE	5	// Digital LFE
+	.output OUT_HEADPH_L	6	// LiveDrive headphone out
+	.output OUT_HEADPH_R	7
+	.output OUT_SURR_L	8	// Rear output
+	.output OUT_SURR_R	9
+	.output OUT_ADC_L	10	// Send to the ADC recording channel
+	.output OUT_ADC_R	11
+	.output OUT_MICREC	12	// Send to the mic recording buffer
+	.output OUT_AC97SURR_L	13	// AC97 Surround L
+	.output OUT_AC97SURR_R	14	// AC97 Surround R
+
+	.output OUT_ACENTER	17	// Analog center channel
+	.output OUT_ALFE	18	// Analog LFE output
+
+	// Temporaries
+	.gpr PCM_FRONT_L
+	.gpr PCM_FRONT_R
+	.gpr PCM_SURR_L
+	.gpr PCM_SURR_R
+	.gpr PCM_CEN
+	.gpr PCM_LFE
+	.gpr PCM_REC_L
+	.gpr PCM_REC_R
+
+	// Code
+
+	// Load up the PCM inputs.  We multiply each of them by 4, as
+	// otherwise they are too quiet.
+	MACINTS(PCM_FRONT_L, 0 FX_FRONT_L, 4)
+	MACINTS(PCM_FRONT_R, 0 FX_FRONT_R, 4)
+	MACINTS(PCM_SURR_L, 0, FX_SURR_L, 4)
+	MACINTS(PCM_SURR_R, 0, FX_SURR_R, 4)
+	MACINTS(PCM_CEN, 0, FX_CEN, 4)
+	MACINTS(PCM_LFE, 0, FX_LFE, 4)
+
+	// Apply PCM (wave) volume
+	MACS(PCM_FRONT_L, 0, PCM_FRONT_L, VOL_PCM)
+	MACS(PCM_FRONT_R, 0, PCM_FRONT_R, VOL_PCM)
+	MACS(PCM_SURR_L, 0, PCM_SURR_L, VOL_PCM)
+	MACS(PCM_SURR_R, 0, PCM_SURR_R, VOL_PCM)
+	MACS(PCM_CEN, 0, PCM_CEN, VOL_PCM)
+	MACS(PCM_LFE, 0, PCM_LFE, VOL_PCM)
+
+	// Mix any monitor sources into the front PCM
+	// AC'97 (includes Line-In, analog CD, and Mic)
+	MACS(PCM_FRONT_L, PCM_FRONT_L, IN_AC97_L, MON_AC97_L)
+	MACS(PCM_FRONT_R, PCM_FRONT_R, IN_AC97_R, MON_AC97_R)
+	// DIGCD
+	MACS(PCM_FRONT_L, PCM_FRONT_L, IN_DIGCD_L, MON_DIGCD_L)
+	MACS(PCM_FRONT_R, PCM_FRONT_R, IN_DIGCD_R, MON_DIGCD_R)
+	// SPDIF1
+	MACS(PCM_FRONT_L, PCM_FRONT_L, IN_SPDIF1_L, MON_SPDIF1_L)
+	MACS(PCM_FRONT_R, PCM_FRONT_R, IN_SPDIF1_R, MON_SPDIF1_R)
+	// SPDIF2
+	MACS(PCM_FRONT_L, PCM_FRONT_L, IN_SPDIF2_L, MON_SPDIF2_L)
+	MACS(PCM_FRONT_R, PCM_FRONT_R, IN_SPDIF2_R, MON_SPDIF2_R)
+	// Line2/Mic2 (Live! Drive)
+	MACS(PCM_FRONT_L, PCM_FRONT_L, IN_LINE2_L, MON_LINE2_L)
+	MACS(PCM_FRONT_R, PCM_FRONT_R, IN_LINE2_R, MON_LINE2_R)
+	// Aux2 (Live! Drive)
+	MACS(PCM_FRONT_L, PCM_FRONT_L, IN_AUX2_L, MON_AUX2_L)
+	MACS(PCM_FRONT_R, PCM_FRONT_R, IN_AUX2_R, MON_AUX2_R)
+
+	// Outputs
+	MACS(OUT_FRONT_L, 0, PCM_FRONT_L, VOL_FRONT_L)
+	MACS(OUT_FRONT_R, 0, PCM_FRONT_R, VOL_FRONT_R)
+	MACS(OUT_SPDIF_L, 0, PCM_FRONT_L, VOL_FRONT_L)
+	MACS(OUT_SPDIF_R, 0, PCM_FRONT_R, VOL_FRONT_R)
+	MACS(OUT_HEADPH_L, 0, PCM_FRONT_L, VOL_HEADPH_L)
+	MACS(OUT_HEADPH_R, 0, PCM_FRONT_R, VOL_HEADPH_R)
+	MACS(OUT_SURR_L, 0, PCM_SURR_L, VOL_SURR_L)
+	MACS(OUT_SURR_R, 0, PCM_SURR_R, VOL_SURR_R)
+	MACS(OUT_AC97SURR_L, 0, PCM_SURR_L, VOL_SURR_L)
+	MACS(OUT_AC97SURR_R, 0, PCM_SURR_R, VOL_SURR_R)
+	MACS(OUT_DCENTER, 0, PCM_CEN, VOL_CEN)
+	MACS(OUT_ACENTER, 0, PCM_CEN, VOL_CEN)
+	MACS(OUT_DLFE, 0, PCM_LFE, VOL_LFE)
+	MACS(OUT_ALFE, 0, PCM_LFE, VOL_LFE)
+
+	// Inputs (Recording) -- the source variables are treated as
+	// simple boolean enables.
+	MACINTS(PCM_REC_L, 0, IN_AC97_L, REC_AC97)
+	MACINTS(PCM_REC_R, 0, IN_AC97_R, REC_AC97)
+
+	MACINTS(PCM_REC_L, PCM_REC_L, IN_DIGCD_L, REC_DIGCD)
+	MACINTS(PCM_REC_R, PCM_REC_R, IN_DIGCD_R, REC_DIGCD)
+
+	MACINTS(PCM_REC_L, PCM_REC_L, IN_SPDIF1_L, REC_SPDIF1)
+	MACINTS(PCM_REC_R, PCM_REC_R, IN_SPDIF1_R, REC_SPDIF1)
+
+	MACINTS(PCM_REC_L, PCM_REC_L, IN_SPDIF2_L, REC_SPDIF2)
+	MACINTS(PCM_REC_R, PCM_REC_R, IN_SPDIF2_R, REC_SPDIF2)
+
+	MACINTS(PCM_REC_L, PCM_REC_L, IN_AUX2_L, REC_AUX2)
+	MACINTS(PCM_REC_R, PCM_REC_R, IN_AUX2_R, REC_AUX2)
+
+	MACINTS(PCM_REC_L, PCM_REC_L, IN_LINE2_L, REC_LINE2)
+	MACINTS(PCM_REC_R, PCM_REC_R, IN_LINE2_R, REC_LINE2)
+
+	MACINTS(PCM_REC_L, PCM_REC_L, PCM_FRONT_L, REC_PCM)
+	MACINTS(PCM_REC_R, PCM_REC_R, PCM_FRONT_R, REC_PCM)
+
+	// Apply master record gain
+	MACS(OUT_ADC_L, 0, PCM_REC_L, VOL_REC_L)
+	MACS(OUT_ADC_R, 0, PCM_REC_R, VOL_REC_R)

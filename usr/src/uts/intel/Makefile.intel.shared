@@ -200,6 +200,7 @@ DRV_KMODS	+= audio
 DRV_KMODS	+= audio1575
 DRV_KMODS	+= audio810
 DRV_KMODS	+= audiocmi
+DRV_KMODS	+= audioemu10k
 DRV_KMODS	+= audioens
 DRV_KMODS	+= audiohd
 DRV_KMODS	+= audioixp

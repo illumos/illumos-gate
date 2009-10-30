@@ -112,6 +112,7 @@ i386_SUBDIRS= \
 	SUNWatge \
 	SUNWatu \
 	SUNWaudiocmi \
+	SUNWaudioemu10k \
 	SUNWaudiohd \
 	SUNWaudiosolo \
 	SUNWaudiovia97 \
