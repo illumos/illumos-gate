@@ -1344,8 +1344,9 @@ pci_reprogram(void)
 		 * 	000A0000 - 000BFFFF	VGA RAM
 		 * 	000C0000 - 000FFFFF	ROM area
 		 */
-		memlist_remove(&pci_bus_res[bus].mem_avail, 0, 0x100000);
-		memlist_remove(&pci_bus_res[bus].pmem_avail, 0, 0x100000);
+		(void) memlist_remove(&pci_bus_res[bus].mem_avail, 0, 0x100000);
+		(void) memlist_remove(&pci_bus_res[bus].pmem_avail,
+		    0, 0x100000);
 	}
 
 	memlist_free_all(&isa_res.io_used);
