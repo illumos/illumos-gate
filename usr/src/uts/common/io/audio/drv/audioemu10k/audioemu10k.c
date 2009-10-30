@@ -1993,15 +1993,15 @@ emu10k_create_controls(emu10k_devc_t *devc)
 
 	/* set any AC'97 analog outputs to full volume (no attenuation) */
 	if ((ac = ac97_control_find(ac97, AUDIO_CTRL_ID_FRONT)) != NULL)
-		ac97_control_set(ac, (100 << 8) | 100);
+		(void) ac97_control_set(ac, (100 << 8) | 100);
 	if ((ac = ac97_control_find(ac97, AUDIO_CTRL_ID_LINEOUT)) != NULL)
-		ac97_control_set(ac, (100 << 8) | 100);
+		(void) ac97_control_set(ac, (100 << 8) | 100);
 	if ((ac = ac97_control_find(ac97, AUDIO_CTRL_ID_SURROUND)) != NULL)
-		ac97_control_set(ac, (100 << 8) | 100);
+		(void) ac97_control_set(ac, (100 << 8) | 100);
 	if ((ac = ac97_control_find(ac97, AUDIO_CTRL_ID_CENTER)) != NULL)
-		ac97_control_set(ac, 100);
+		(void) ac97_control_set(ac, 100);
 	if ((ac = ac97_control_find(ac97, AUDIO_CTRL_ID_LFE)) != NULL)
-		ac97_control_set(ac, 100);
+		(void) ac97_control_set(ac, 100);
 
 	/* Monitor sources */
 	emu10k_create_stereo(devc, CTL_AC97, GPR_MON_AC97,
