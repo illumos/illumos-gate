@@ -40,8 +40,6 @@
 #include <ctype.h>
 #include <sys/param.h>
 
-#include <sys/soundcard.h>
-
 #define	MAX_GPR	256
 #define	MAX_GPR_PARMS	60
 #define	MAX_CONST_PARMS	128
