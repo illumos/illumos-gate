@@ -51,6 +51,9 @@
 #include <sys/fs/zfs.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/ucontext.h>
+#include <sys/mntio.h>
+#include <sys/mnttab.h>
+#include <atomic.h>
 
 #include <s10_brand.h>
 #include <s10_misc.h>
@@ -343,6 +346,149 @@ s10_indir(sysret_t *rv, int code,
 	return (EINVAL);
 }
 #endif /* __sparc && !__sparcv9 */
+
+/* Free the thread-local storage provided my mntfs_get_mntentbuf() */
+static void
+mntfs_free_mntentbuf(void *arg)
+{
+	struct mntentbuf *embufp = arg;
+
+	if (embufp == NULL)
+		return;
+	if (embufp->mbuf_emp)
+		free(embufp->mbuf_emp);
+	if (embufp->mbuf_buf)
+		free(embufp->mbuf_buf);
+	bzero(embufp, sizeof (struct mntentbuf));
+	free(embufp);
+}
+
+/* Provide the thread-local storage required by mntfs_ioctl() */
+static struct mntentbuf *
+mntfs_get_mntentbuf(size_t size)
+{
+	static mutex_t keylock;
+	static thread_key_t key;
+	static int once_per_keyname = 0;
+	void *tsd = NULL;
+	struct mntentbuf *embufp;
+
+	/* Create the key. */
+	if (!once_per_keyname) {
+		(void) mutex_lock(&keylock);
+		if (!once_per_keyname) {
+			if (thr_keycreate(&key, mntfs_free_mntentbuf)) {
+				(void) mutex_unlock(&keylock);
+				return (NULL);
+			} else {
+				once_per_keyname++;
+			}
+		}
+		(void) mutex_unlock(&keylock);
+	}
+
+	/*
+	 * The thread-specific datum for this key is the address of a struct
+	 * mntentbuf. If this is the first time here then we allocate the struct
+	 * and its contents, and associate its address with the thread; if there
+	 * are any problems then we abort.
+	 */
+	if (thr_getspecific(key, &tsd))
+		return (NULL);
+	if (tsd == NULL) {
+		if (!(embufp = calloc(1, sizeof (struct mntentbuf))) ||
+		    !(embufp->mbuf_emp = malloc(sizeof (struct extmnttab))) ||
+		    thr_setspecific(key, embufp)) {
+			mntfs_free_mntentbuf(embufp);
+			return (NULL);
+		}
+	} else {
+		embufp = tsd;
+	}
+
+	/* Return the buffer, resizing it if necessary. */
+	if (size > embufp->mbuf_bufsize) {
+		if (embufp->mbuf_buf)
+			free(embufp->mbuf_buf);
+		if ((embufp->mbuf_buf = malloc(size)) == NULL) {
+			embufp->mbuf_bufsize = 0;
+			return (NULL);
+		} else {
+			embufp->mbuf_bufsize = size;
+		}
+	}
+	return (embufp);
+}
+
+/*
+ * The MNTIOC_GETMNTENT command in this release differs from that in Solaris 10.
+ * Previously, the command would copy a pointer to a struct extmnttab to an
+ * address provided as an argument. The pointer would be somewhere within a
+ * mapping already present within the user's address space. In addition, the
+ * text to which the struct's members pointed would also be within a
+ * pre-existing mapping. Now, the user is required to allocate memory for both
+ * the struct and the text buffer, and to pass the address of each within a
+ * struct mntentbuf. In order to conceal these details from a Solaris 10 client
+ * we allocate some thread-local storage in which to create the necessary data
+ * structures; this is static, thread-safe memory that will be cleaned up
+ * without the caller's intervention.
+ *
+ * MNTIOC_GETEXTMNTENT and MNTIOC_GETMNTANY are new in this release; they should
+ * not work for older clients.
+ */
+int
+mntfs_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
+{
+	int err;
+	struct stat statbuf;
+	struct mntentbuf *embufp;
+	static size_t bufsize = MNT_LINE_MAX;
+
+	if ((err = __systemcall(rval, SYS_fstat + 1024, fdes, &statbuf)) != 0)
+		return (err);
+	if (strcmp(statbuf.st_fstype, MNTTYPE_MNTFS) != 0)
+		return (__systemcall(rval, SYS_ioctl + 1024, fdes, cmd, arg));
+
+	if (cmd == MNTIOC_GETEXTMNTENT || cmd == MNTIOC_GETMNTANY)
+		return (EINVAL);
+
+	if ((embufp = mntfs_get_mntentbuf(bufsize)) == NULL)
+		return (ENOMEM);
+
+	/*
+	 * MNTIOC_GETEXTMNTENT advances the file pointer once it has
+	 * successfully copied out the result to the address provided. We
+	 * therefore need to check the user-supplied address now since the
+	 * one we'll be providing is guaranteed to work.
+	 */
+	if (s10_uucopy(&embufp->mbuf_emp, (void *)arg, sizeof (void *)) != 0)
+		return (EFAULT);
+
+	/*
+	 * Keep retrying for as long as we fail for want of a large enough
+	 * buffer.
+	 */
+	for (;;) {
+		if ((err = __systemcall(rval, SYS_ioctl + 1024, fdes,
+		    MNTIOC_GETEXTMNTENT, embufp)) != 0)
+			return (err);
+
+		if (rval->sys_rval1 == MNTFS_TOOLONG) {
+			/* The buffer wasn't large enough. */
+			(void) atomic_swap_ulong((unsigned long *)&bufsize,
+			    2 * embufp->mbuf_bufsize);
+			if ((embufp = mntfs_get_mntentbuf(bufsize)) == NULL)
+				return (ENOMEM);
+		} else {
+			break;
+		}
+	}
+
+	if (s10_uucopy(&embufp->mbuf_emp, (void *)arg, sizeof (void *)) != 0)
+		return (EFAULT);
+
+	return (0);
+}
 
 /*
  * Assign the structure member value from the s (source) structure to the
@@ -732,6 +878,12 @@ s10_ioctl(sysret_t *rval, int fdes, int cmd, intptr_t arg)
 		/*FALLTHRU*/
 	case CT_TSET:
 		return (ctfs_ioctl(rval, fdes, cmd, arg));
+	case MNTIOC_GETMNTENT:
+		/*FALLTHRU*/
+	case MNTIOC_GETEXTMNTENT:
+		/*FALLTHRU*/
+	case MNTIOC_GETMNTANY:
+		return (mntfs_ioctl(rval, fdes, cmd, arg));
 	}
 
 	if ((cmd & 0xff00) == ZFS_IOC)

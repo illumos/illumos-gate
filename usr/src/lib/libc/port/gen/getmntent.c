@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <mtlib.h>
@@ -45,9 +43,10 @@
 #include <libc.h>
 #include <unistd.h>
 #include "tsd.h"
+#include <atomic.h>
+#include <strings.h>
 
 static int getmntent_compat(FILE *fp, struct mnttab *mp);
-static int convert_mntent(struct extmnttab *, struct extmnttab *, int);
 
 #define	GETTOK_R(xx, ll, tmp)\
 	if ((mp->xx = (char *)strtok_r(ll, sepstr, tmp)) == NULL)\
@@ -89,9 +88,6 @@ getmntbuf(size_t size)
 {
 	thread_data_t *thread_data;
 
-	if (size < MNT_LINE_MAX)
-		size = MNT_LINE_MAX;
-
 	thread_data = tsdalloc(_T_GETMNTENT,
 	    sizeof (thread_data_t), destroy_thread_data);
 	if (thread_data == NULL)
@@ -108,8 +104,8 @@ getmntbuf(size_t size)
 	return (thread_data->buf);
 }
 
-int
-getmntany(FILE *fp, struct mnttab *mgetp, struct mnttab *mrefp)
+static int
+getmntany_compat(FILE *fp, struct mnttab *mgetp, struct mnttab *mrefp)
 {
 	int	ret, bstat;
 	mode_t	bmode;
@@ -130,7 +126,7 @@ getmntany(FILE *fp, struct mnttab *mgetp, struct mnttab *mrefp)
 		bstat = 0;
 	}
 
-	while ((ret = getmntent(fp, mgetp)) == 0 &&
+	while ((ret = getmntent_compat(fp, mgetp)) == 0 &&
 	    ((bstat == 0 && DIFF(mnt_special)) ||
 	    (bstat == 1 && SDIFF(mnt_special, bmode, brdev)) ||
 	    DIFF(mnt_mountp) ||
@@ -143,21 +139,147 @@ getmntany(FILE *fp, struct mnttab *mgetp, struct mnttab *mrefp)
 }
 
 int
-getmntent(FILE *fp, struct mnttab *mp)
+getmntany(FILE *fp, struct mnttab *mgetp, struct mnttab *mrefp)
 {
-	int	ret;
-	struct	extmnttab *emp;
+	struct mntentbuf embuf;
+	char *copyp, *bufp;
+	int ret;
 
-	ret = ioctl(fileno(fp), MNTIOC_GETMNTENT, &emp);
+
+	/*
+	 * We collect all of the text strings pointed to by members of the
+	 * user's preferences struct into a single buffer. At the same time
+	 * populate the members of the results struct to point to the
+	 * corresponding words. We then ask the kernel to figure out the
+	 * rest; if this is a non-mntfs file then we handover to
+	 * getmntany_compat().
+	 */
+	if ((copyp = bufp = getmntbuf(MNT_LINE_MAX)) == NULL) {
+		errno = ENOMEM;
+		return (-1);
+	}
+	bzero(mgetp, sizeof (struct mnttab));
+	if (mrefp->mnt_special) {
+		mgetp->mnt_special = copyp;
+		copyp += snprintf(mgetp->mnt_special, MNT_LINE_MAX, "%s",
+		    mrefp->mnt_special) + 1;
+	}
+	if (mrefp->mnt_mountp) {
+		mgetp->mnt_mountp = copyp;
+		copyp += snprintf(mgetp->mnt_mountp,
+		    bufp + MNT_LINE_MAX - copyp, "%s", mrefp->mnt_mountp) + 1;
+	}
+	if (mrefp->mnt_fstype) {
+		mgetp->mnt_fstype = copyp;
+		copyp += snprintf(mgetp->mnt_fstype,
+		    bufp + MNT_LINE_MAX - copyp, "%s", mrefp->mnt_fstype) + 1;
+	}
+	if (mrefp->mnt_mntopts) {
+		mgetp->mnt_mntopts = copyp;
+		copyp += snprintf(mgetp->mnt_mntopts,
+		    bufp + MNT_LINE_MAX - copyp, "%s", mrefp->mnt_mntopts) + 1;
+	}
+	if (mrefp->mnt_time) {
+		mgetp->mnt_time = copyp;
+		(void) snprintf(mgetp->mnt_time, bufp + MNT_LINE_MAX - copyp,
+		    "%s", mrefp->mnt_time);
+	}
+
+	embuf.mbuf_emp = (struct extmnttab *)mgetp;
+	embuf.mbuf_bufsize = MNT_LINE_MAX;
+	embuf.mbuf_buf = bufp;
+
+	switch (ret = ioctl(fileno(fp), MNTIOC_GETMNTANY, &embuf)) {
+	case 0:
+		/* Success. */
+		return (0);
+	case MNTFS_EOF:
+		return (-1);
+	case MNTFS_TOOLONG:
+		return (MNT_TOOLONG);
+	default:
+		/* A failure of some kind. */
+		if (errno == ENOTTY)
+			return (getmntany_compat(fp, mgetp, mrefp));
+		else
+			return (ret);
+	}
+}
+
+/*
+ * Common code for getmntent() and getextmntent().
+ *
+ * These functions serve to populate a structure supplied by the user. Common
+ * to both struct mnttab and struct extmnttab is a set of pointers to the
+ * individual text fields that form an entry in /etc/mnttab. We arrange for the
+ * text itself to be stored in some thread-local storage, and for the kernel to
+ * populate both this buffer and the structure directly.
+ *
+ * If getmntent() passes a file that isn't provided by mntfs then we assume that
+ * it is a simple text file and give it to getmntent_compat() to parse. For
+ * getextmntent() we give up; it requires major and minor numbers that only the
+ * kernel can provide.
+ */
+static int
+getmntent_common(FILE *fp, struct extmnttab *emp, int command)
+{
+	struct mntentbuf embuf;
+	static size_t bufsize = MNT_LINE_MAX;
+	int ret;
+
+	embuf.mbuf_emp = emp;
+	embuf.mbuf_bufsize = bufsize;
+	if ((embuf.mbuf_buf = getmntbuf(embuf.mbuf_bufsize)) == NULL) {
+		errno = ENOMEM;
+		return (-1);
+	}
+
+	while ((ret = ioctl(fileno(fp), command, &embuf)) == MNTFS_TOOLONG) {
+		/* The buffer wasn't large enough. */
+		(void) atomic_swap_ulong((unsigned long *)&bufsize,
+		    2 * embuf.mbuf_bufsize);
+		embuf.mbuf_bufsize = bufsize;
+		if ((embuf.mbuf_buf = getmntbuf(embuf.mbuf_bufsize)) == NULL) {
+			errno = ENOMEM;
+			return (-1);
+		}
+	}
 
 	switch (ret) {
-		case 0:
-			return (convert_mntent(emp, (struct extmnttab *)mp, 0));
-		case 1:
-			return (-1);
-		default:
-			return (getmntent_compat(fp, mp));
+	case 0:
+		/*
+		 * We were successful, but we may have to enforce getmntent()'s
+		 * documented limit on the line length.
+		 */
+		if (command == MNTIOC_GETMNTENT &&
+		    (emp->mnt_time + strlen(emp->mnt_time) + 1 -
+		    emp->mnt_special > MNT_LINE_MAX))
+			return (MNT_TOOLONG);
+		else
+			return (0);
+	case MNTFS_EOF:
+		/* EOF. */
+		return (-1);
+	default:
+		/* A non-mntfs file. */
+		if (command == MNTIOC_GETMNTENT)
+			return (getmntent_compat(fp, (struct mnttab *)emp));
+		else
+			return (ret);
 	}
+}
+
+int
+getmntent(FILE *fp, struct mnttab *mp)
+{
+	return (getmntent_common(fp, (struct extmnttab *)mp, MNTIOC_GETMNTENT));
+}
+
+/*ARGSUSED*/
+int
+getextmntent(FILE *fp, struct extmnttab *emp, size_t len)
+{
+	return (getmntent_common(fp, emp, MNTIOC_GETEXTMNTENT));
 }
 
 char *
@@ -207,64 +329,10 @@ hasmntopt(struct mnttab *mnt, char *opt)
 	return (NULL);
 }
 
-/*ARGSUSED*/
-int
-getextmntent(FILE *fp, struct extmnttab *mp, size_t len)
-{
-	int	ret;
-	struct	extmnttab *emp;
-
-	ret = ioctl(fileno(fp), MNTIOC_GETMNTENT, &emp);
-
-	switch (ret) {
-		case 0:
-			return (convert_mntent(emp, mp, 1));
-		case 1:
-			return (-1);
-		default:
-			return (ret);
-	}
-}
-
 void
 resetmnttab(FILE *fp)
 {
 	rewind(fp);
-}
-
-/*
- * This is a horrible function, necessary to support this broken interface.
- * Some callers of get(ext)mntent assume that the memory is valid even after the
- * file is closed.  Since we switched to a direct ioctl() interface, this is no
- * longer true.  In order to support these apps, we have to put the data into a
- * thread specific buffer.
- */
-static int
-convert_mntent(struct extmnttab *src, struct extmnttab *dst, int isext)
-{
-	size_t len;
-	char *buf;
-
-	len = src->mnt_time - src->mnt_special + strlen(src->mnt_time) + 1;
-
-	buf = getmntbuf(len);
-	if (buf == NULL) {
-		errno = ENOMEM;
-		return (-1);
-	}
-
-	memcpy(buf, src->mnt_special, len);
-	dst->mnt_special = buf;
-	dst->mnt_mountp = buf + (src->mnt_mountp - src->mnt_special);
-	dst->mnt_fstype = buf + (src->mnt_fstype - src->mnt_special);
-	dst->mnt_mntopts = buf + (src->mnt_mntopts - src->mnt_special);
-	dst->mnt_time = buf + (src->mnt_time - src->mnt_special);
-	if (isext) {
-		dst->mnt_major = src->mnt_major;
-		dst->mnt_minor = src->mnt_minor;
-	}
-
-	return (0);
 }
 
 /*

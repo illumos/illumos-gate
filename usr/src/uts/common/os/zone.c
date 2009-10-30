@@ -647,11 +647,11 @@ zone_key_create(zone_key_t *keyp, void *(*create)(zoneid_t),
 		zsd_apply_all_zones(zsd_apply_create, key);
 	}
 	/*
-	* It is safe for consumers to use the key now, make it
-	* globally visible. Specifically zone_getspecific() will
-	* always successfully return the zone specific data associated
-	* with the key.
-	*/
+	 * It is safe for consumers to use the key now, make it
+	 * globally visible. Specifically zone_getspecific() will
+	 * always successfully return the zone specific data associated
+	 * with the key.
+	 */
 	*keyp = key;
 
 }
@@ -1937,6 +1937,11 @@ zone_init(void)
 	rw_init(&zone0.zone_mlps.mlpl_rwlock, NULL, RW_DEFAULT, NULL);
 	label_hold(l_admin_low);
 
+	/*
+	 * Initialise the lock for the database structure used by mntfs.
+	 */
+	rw_init(&zone0.zone_mntfs_db_lock, NULL, RW_DEFAULT, NULL);
+
 	mutex_enter(&zonehash_lock);
 	zone_uniqid(&zone0);
 	ASSERT(zone0.zone_uniqid == GLOBAL_ZONEUNIQID);
@@ -2042,6 +2047,7 @@ zone_free(zone_t *zone)
 	mutex_destroy(&zone->zone_lock);
 	cv_destroy(&zone->zone_cv);
 	rw_destroy(&zone->zone_mlps.mlpl_rwlock);
+	rw_destroy(&zone->zone_mntfs_db_lock);
 	kmem_free(zone, sizeof (zone_t));
 }
 
@@ -3813,6 +3819,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	list_create(&zone->zone_dl_list, sizeof (zone_dl_t),
 	    offsetof(zone_dl_t, zdl_linkage));
 	rw_init(&zone->zone_mlps.mlpl_rwlock, NULL, RW_DEFAULT, NULL);
+	rw_init(&zone->zone_mntfs_db_lock, NULL, RW_DEFAULT, NULL);
 
 	if (flags & ZCF_NET_EXCL) {
 		zone->zone_flags |= ZF_NET_EXCL;

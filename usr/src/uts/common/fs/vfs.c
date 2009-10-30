@@ -2964,6 +2964,28 @@ vfs_mnttab_poll(timespec_t *old, struct pollhead **phpp)
 	}
 }
 
+/* Provide a unique and monotonically-increasing timestamp. */
+void
+vfs_mono_time(timespec_t *ts)
+{
+	static volatile hrtime_t hrt;		/* The saved time. */
+	hrtime_t	newhrt, oldhrt;		/* For effecting the CAS. */
+	timespec_t	newts;
+
+	gethrestime(&newts);
+	newhrt = ts2hrt(&newts);
+	do {
+		oldhrt = hrt;
+		if (newhrt <= hrt) {
+			/* Have another go. */
+			gethrestime(&newts);
+			newhrt = ts2hrt(&newts);
+			continue;
+		}
+	} while (cas64((uint64_t *)&hrt, oldhrt, newhrt) != oldhrt);
+	hrt2ts(newhrt, ts);
+}
+
 /*
  * Update the mnttab modification time and wake up any waiters for
  * mnttab changes
@@ -2971,21 +2993,11 @@ vfs_mnttab_poll(timespec_t *old, struct pollhead **phpp)
 void
 vfs_mnttab_modtimeupd()
 {
-	hrtime_t oldhrt, newhrt;
-
 	ASSERT(RW_WRITE_HELD(&vfslist));
-	oldhrt = ts2hrt(&vfs_mnttab_mtime);
-	gethrestime(&vfs_mnttab_mtime);
-	newhrt = ts2hrt(&vfs_mnttab_mtime);
-	if (oldhrt == (hrtime_t)0)
+	vfs_mono_time(&vfs_mnttab_mtime);
+	/* If this is our first visit then let this be the creation time. */
+	if (vfs_mnttab_ctime.tv_sec == 0 && vfs_mnttab_ctime.tv_nsec == 0)
 		vfs_mnttab_ctime = vfs_mnttab_mtime;
-	/*
-	 * Attempt to provide unique mtime (like uniqtime but not).
-	 */
-	if (newhrt == oldhrt) {
-		newhrt++;
-		hrt2ts(newhrt, &vfs_mnttab_mtime);
-	}
 	pollwakeup(&vfs_pollhd, (short)POLLRDBAND);
 	vfs_mnttab_writeop();
 }
@@ -3490,6 +3502,18 @@ void
 vfs_list_add(struct vfs *vfsp)
 {
 	zone_t *zone;
+
+	/*
+	 * Typically, the vfs_t will have been created on behalf of the file
+	 * system in vfs_init, where it will have been provided with a
+	 * vfs_impl_t. This, however, might be lacking if the vfs_t was created
+	 * by an unbundled file system. We therefore check for such an example
+	 * before stamping the vfs_t with its creation time for the benefit of
+	 * mntfs.
+	 */
+	if (vfsp->vfs_implp == NULL)
+		vfsimpl_setup(vfsp);
+	vfs_mono_time(&vfsp->vfs_hrctime);
 
 	/*
 	 * The zone that owns the mount is the one that performed the mount.

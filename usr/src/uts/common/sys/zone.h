@@ -36,6 +36,7 @@
 #include <sys/cred.h>
 #include <sys/netstack.h>
 #include <sys/uadmin.h>
+#include <sys/ksynch.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -435,6 +436,11 @@ typedef struct zone {
 	 * Solaris Auditing per-zone audit context
 	 */
 	struct au_kcontext	*zone_audit_kctxt;
+	/*
+	 * For private use by mntfs.
+	 */
+	struct mntelem	*zone_mntfs_db;
+	krwlock_t	zone_mntfs_db_lock;
 } zone_t;
 
 /*

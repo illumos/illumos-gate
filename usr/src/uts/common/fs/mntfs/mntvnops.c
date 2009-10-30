@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,9 @@
 #include <fs/fs_subr.h>
 #include <sys/vmsystm.h>
 #include <vm/seg_vn.h>
+#include <sys/time.h>
+#include <sys/ksynch.h>
+#include <sys/sdt.h>
 
 #define	MNTROOTINO	2
 
@@ -49,25 +52,51 @@ extern void vfs_mnttab_readop(void);
 /*
  * Design of kernel mnttab accounting.
  *
- * To support whitespace in mount names, we implement an ioctl
- * (MNTIOC_GETMNTENT) which allows a programmatic interface to the data in
- * /etc/mnttab.  The libc functions getmntent() and getextmntent() are built
- * atop this interface.
+ * mntfs provides two methods of reading the in-kernel mnttab, i.e. the state of
+ * the mounted resources: the read-only file /etc/mnttab, and a collection of
+ * ioctl() commands. Most of these interfaces are public and are described in
+ * mnttab(4). Three private ioctl() commands, MNTIOC_GETMNTENT,
+ * MNTIOC_GETEXTMNTENT and MNTIOC_GETMNTANY, provide for the getmntent(3C)
+ * family of functions, allowing them to support white space in mount names.
  *
- * To minimize the amount of memory used in the kernel, we keep all the
- * necessary information in the user's address space.  Large server
- * configurations can have /etc/mnttab files in excess of 64k.
+ * A significant feature of mntfs is that it provides a file descriptor with a
+ * snapshot once it begins to consume mnttab data. Thus, as the process
+ * continues to consume data, its view of the in-kernel mnttab does not change
+ * even if resources are mounted or unmounted. The intent is to ensure that
+ * processes are guaranteed to read self-consistent data even as the system
+ * changes.
  *
- * To support both vanilla read() calls as well as ioctl() calls, we have two
- * different snapshots of the kernel data structures, mnt_read and mnt_ioctl.
- * These snapshots include the base location in user memory, the number of
- * mounts in the snapshot, and any metadata associated with it.  The metadata is
- * used only to support the ioctl() interface, and is a series of extmnttab
- * structures.  When the user issues an ioctl(), we simply copyout a pointer to
- * that structure, and the rest is handled in userland.
- */
-
-/*
+ * The snapshot is implemented by a "database", unique to each zone, that
+ * comprises a linked list of mntelem_ts. The database is identified by
+ * zone_mntfs_db and is protected by zone_mntfs_db_lock. Each element contains
+ * the text entry in /etc/mnttab for a mounted resource, i.e. a vfs_t, and is
+ * marked with its time of "birth", i.e. creation. An element is "killed", and
+ * marked with its time of death, when it is found to be out of date, e.g. when
+ * the corresponding resource has been unmounted.
+ *
+ * When a process performs the first read() or ioctl() for a file descriptor for
+ * /etc/mnttab, the database is updated by a call to mntfs_snapshot() to ensure
+ * that an element exists for each currently mounted resource. Following this,
+ * the current time is written into a snapshot structure, a mntsnap_t, embedded
+ * in the descriptor's mntnode_t.
+ *
+ * mntfs is able to enumerate the /etc/mnttab entries corresponding to a
+ * particular file descriptor by searching the database for entries that were
+ * born before the appropriate snapshot and that either are still alive or died
+ * after the snapshot was created. Consumers use the iterator function
+ * mntfs_get_next_elem() to identify the next suitable element in the database.
+ *
+ * Each snapshot has a hold on its corresponding database elements, effected by
+ * a per-element reference count. At last close(), a snapshot is destroyed in
+ * mntfs_freesnap() by releasing all of its holds; an element is destroyed if
+ * its reference count becomes zero. Therefore the database never exists unless
+ * there is at least one active consumer of /etc/mnttab.
+ *
+ * getmntent(3C) et al. "do not open, close or rewind the file." This implies
+ * that getmntent() and read() must be able to operate without interaction on
+ * the same file descriptor; this is accomplished by the use of separate
+ * mntsnap_ts for both read() and ioctl().
+ *
  * NOTE: The following variable enables the generation of the "dev=xxx"
  * in the option string for a mounted file system.  Really this should
  * be gotten rid of altogether, but for the sake of backwards compatibility
@@ -79,6 +108,16 @@ extern void vfs_mnttab_readop(void);
  * device number handles this check and assigns the proper value.
  */
 int mntfs_enabledev = 1;	/* enable old "dev=xxx" option */
+
+extern void vfs_mono_time(timespec_t *);
+enum { MNTFS_FIRST, MNTFS_SECOND, MNTFS_NEITHER };
+
+/*
+ * Determine whether a field within a line from /etc/mnttab contains actual
+ * content or simply the marker string "-". This never applies to the time,
+ * therefore the delimiter must be a tab.
+ */
+#define	MNTFS_REAL_FIELD(x)	(*(x) != '-' || *((x) + 1) != '\t')
 
 static int
 mntfs_devsize(struct vfs *vfsp)
@@ -96,6 +135,22 @@ mntfs_devprint(struct vfs *vfsp, char *buf)
 
 	(void) cmpldev(&odev, vfsp->vfs_dev);
 	return (snprintf(buf, MAX_MNTOPT_STR, "dev=%x", odev));
+}
+
+/* Identify which, if either, of two supplied timespec structs is newer. */
+static int
+mntfs_newest(timespec_t *a, timespec_t *b)
+{
+	if (a->tv_sec == b->tv_sec &&
+	    a->tv_nsec == b->tv_nsec) {
+		return (MNTFS_NEITHER);
+	} else if (b->tv_sec > a->tv_sec ||
+	    (b->tv_sec == a->tv_sec &&
+	    b->tv_nsec > a->tv_nsec)) {
+		return (MNTFS_SECOND);
+	} else {
+		return (MNTFS_FIRST);
+	}
 }
 
 static int
@@ -185,18 +240,80 @@ mntfs_optprint(struct vfs *vfsp, char *buf)
 	return (buf - origbuf);
 }
 
+void
+mntfs_populate_text(vfs_t *vfsp, zone_t *zonep, mntelem_t *elemp)
+{
+	struct extmnttab *tabp = &elemp->mnte_tab;
+	const char *resource, *mntpt;
+	char *cp = elemp->mnte_text;
+	mntpt = refstr_value(vfsp->vfs_mntpt);
+	resource = refstr_value(vfsp->vfs_resource);
+
+	tabp->mnt_special = 0;
+	if (resource != NULL && resource[0] != '\0') {
+		if (resource[0] != '/') {
+			cp += snprintf(cp, MAXPATHLEN, "%s\t", resource);
+		} else if (!ZONE_PATH_VISIBLE(resource, zonep)) {
+			/*
+			 * Use the mount point as the resource.
+			 */
+			cp += snprintf(cp, MAXPATHLEN, "%s\t",
+			    ZONE_PATH_TRANSLATE(mntpt, zonep));
+		} else {
+			cp += snprintf(cp, MAXPATHLEN, "%s\t",
+			    ZONE_PATH_TRANSLATE(resource, zonep));
+		}
+	} else {
+		cp += snprintf(cp, MAXPATHLEN, "-\t");
+	}
+
+	tabp->mnt_mountp = (char *)(cp - elemp->mnte_text);
+	if (mntpt != NULL && mntpt[0] != '\0') {
+		/*
+		 * We know the mount point is visible from within the zone,
+		 * otherwise it wouldn't be on the zone's vfs list.
+		 */
+		cp += snprintf(cp, MAXPATHLEN, "%s\t",
+		    ZONE_PATH_TRANSLATE(mntpt, zonep));
+	} else {
+		cp += snprintf(cp, MAXPATHLEN, "-\t");
+	}
+
+	tabp->mnt_fstype = (char *)(cp - elemp->mnte_text);
+	cp += snprintf(cp, MAXPATHLEN, "%s\t",
+	    vfssw[vfsp->vfs_fstype].vsw_name);
+
+	tabp->mnt_mntopts = (char *)(cp - elemp->mnte_text);
+	cp += mntfs_optprint(vfsp, cp);
+	*cp++ = '\t';
+
+	tabp->mnt_time = (char *)(cp - elemp->mnte_text);
+	cp += snprintf(cp, MAX_MNTOPT_STR, "%ld", vfsp->vfs_mtime);
+	*cp++ = '\n'; /* over-write snprintf's trailing null-byte */
+
+	tabp->mnt_major = getmajor(vfsp->vfs_dev);
+	tabp->mnt_minor = getminor(vfsp->vfs_dev);
+
+	elemp->mnte_text_size = cp - elemp->mnte_text;
+	elemp->mnte_vfs_ctime = vfsp->vfs_hrctime;
+	elemp->mnte_hidden = vfsp->vfs_flag & VFS_NOMNTTAB;
+}
+
+/* Determine the length of the /etc/mnttab entry for this vfs_t. */
 static size_t
-mntfs_vfs_len(vfs_t *vfsp, zone_t *zone)
+mntfs_text_len(vfs_t *vfsp, zone_t *zone)
 {
 	size_t size = 0;
 	const char *resource, *mntpt;
+	size_t mntsize;
 
 	mntpt = refstr_value(vfsp->vfs_mntpt);
 	if (mntpt != NULL && mntpt[0] != '\0') {
-		size += strlen(ZONE_PATH_TRANSLATE(mntpt, zone)) + 1;
+		mntsize = strlen(ZONE_PATH_TRANSLATE(mntpt, zone)) + 1;
 	} else {
-		size += strlen("-") + 1;
+		mntsize = 2;	/* "-\t" */
 	}
+	size += mntsize;
 
 	resource = refstr_value(vfsp->vfs_resource);
 	if (resource != NULL && resource[0] != '\0') {
@@ -206,12 +323,12 @@ mntfs_vfs_len(vfs_t *vfsp, zone_t *zone)
 			/*
 			 * Same as the zone's view of the mount point.
 			 */
-			size += strlen(ZONE_PATH_TRANSLATE(mntpt, zone)) + 1;
+			size += mntsize;
 		} else {
 			size += strlen(ZONE_PATH_TRANSLATE(resource, zone)) + 1;
 		}
 	} else {
-		size += strlen("-") + 1;
+		size += 2;	/* "-\t" */
 	}
 	size += strlen(vfssw[vfsp->vfs_fstype].vsw_name) + 1;
 	size += mntfs_optsize(vfsp);
@@ -219,421 +336,451 @@ mntfs_vfs_len(vfs_t *vfsp, zone_t *zone)
 	return (size);
 }
 
+/* Destroy the resources associated with a snapshot element. */
 static void
-mntfs_zonerootvfs(zone_t *zone, vfs_t *rootvfsp)
+mntfs_destroy_elem(mntelem_t *elemp)
 {
-	/*
-	 * Basically copy over the real vfs_t on which the root vnode is
-	 * located, changing its mountpoint and resource to match those of
-	 * the zone's rootpath.
-	 */
-	*rootvfsp = *zone->zone_rootvp->v_vfsp;
-	rootvfsp->vfs_mntpt = refstr_alloc(zone->zone_rootpath);
-	rootvfsp->vfs_resource = rootvfsp->vfs_mntpt;
+	kmem_free(elemp->mnte_text, elemp->mnte_text_size);
+	kmem_free(elemp, sizeof (mntelem_t));
 }
-
-static size_t
-mntfs_zone_len(uint_t *nent_ptr, zone_t *zone, int showhidden)
-{
-	struct vfs *zonelist;
-	struct vfs *vfsp;
-	size_t size = 0;
-	uint_t cnt = 0;
-
-	ASSERT(zone->zone_rootpath != NULL);
-
-	/*
-	 * If the zone has a root entry, it will be the first in the list.  If
-	 * it doesn't, we conjure one up.
-	 */
-	vfsp = zonelist = zone->zone_vfslist;
-	if (zonelist == NULL ||
-	    strcmp(refstr_value(vfsp->vfs_mntpt), zone->zone_rootpath) != 0) {
-		vfs_t tvfs;
-		/*
-		 * The root of the zone is not a mount point.  The vfs we want
-		 * to report is that of the zone's root vnode.
-		 */
-		ASSERT(zone != global_zone);
-		mntfs_zonerootvfs(zone, &tvfs);
-		size += mntfs_vfs_len(&tvfs, zone);
-		refstr_rele(tvfs.vfs_mntpt);
-		cnt++;
-	}
-	if (zonelist == NULL)
-		goto out;
-	do {
-		/*
-		 * Skip mounts that should not show up in mnttab
-		 */
-		if (!showhidden && (vfsp->vfs_flag & VFS_NOMNTTAB)) {
-			vfsp = vfsp->vfs_zone_next;
-			continue;
-		}
-		cnt++;
-		size += mntfs_vfs_len(vfsp, zone);
-		vfsp = vfsp->vfs_zone_next;
-	} while (vfsp != zonelist);
-out:
-	*nent_ptr = cnt;
-	return (size);
-}
-
-static size_t
-mntfs_global_len(uint_t *nent_ptr, int showhidden)
-{
-	struct vfs *vfsp;
-	size_t size = 0;
-	uint_t cnt = 0;
-
-	vfsp = rootvfs;
-	do {
-		/*
-		 * Skip mounts that should not show up in mnttab
-		 */
-		if (!showhidden && (vfsp->vfs_flag & VFS_NOMNTTAB)) {
-			vfsp = vfsp->vfs_next;
-			continue;
-		}
-		cnt++;
-		size += mntfs_vfs_len(vfsp, global_zone);
-		vfsp = vfsp->vfs_next;
-	} while (vfsp != rootvfs);
-	*nent_ptr = cnt;
-	return (size);
-}
-
-static void
-mntfs_vfs_generate(vfs_t *vfsp, zone_t *zone, struct extmnttab *tab,
-    char **basep, int forread)
-{
-	const char *resource, *mntpt;
-	char *cp = *basep;
-
-	mntpt = refstr_value(vfsp->vfs_mntpt);
-	resource = refstr_value(vfsp->vfs_resource);
-
-	if (tab)
-		tab->mnt_special = cp;
-	if (resource != NULL && resource[0] != '\0') {
-		if (resource[0] != '/') {
-			cp += snprintf(cp, MAXPATHLEN, "%s", resource);
-		} else if (!ZONE_PATH_VISIBLE(resource, zone)) {
-			/*
-			 * Use the mount point as the resource.
-			 */
-			cp += snprintf(cp, MAXPATHLEN, "%s",
-			    ZONE_PATH_TRANSLATE(mntpt, zone));
-		} else {
-			cp += snprintf(cp, MAXPATHLEN, "%s",
-			    ZONE_PATH_TRANSLATE(resource, zone));
-		}
-	} else {
-		cp += snprintf(cp, MAXPATHLEN, "-");
-	}
-	*cp++ = forread ? '\t' : '\0';
-
-	if (tab)
-		tab->mnt_mountp = cp;
-	if (mntpt != NULL && mntpt[0] != '\0') {
-		/*
-		 * We know the mount point is visible from within the zone,
-		 * otherwise it wouldn't be on the zone's vfs list.
-		 */
-		cp += snprintf(cp, MAXPATHLEN, "%s",
-		    ZONE_PATH_TRANSLATE(mntpt, zone));
-	} else {
-		cp += snprintf(cp, MAXPATHLEN, "-");
-	}
-	*cp++ = forread ? '\t' : '\0';
-
-	if (tab)
-		tab->mnt_fstype = cp;
-	cp += snprintf(cp, MAXPATHLEN, "%s",
-	    vfssw[vfsp->vfs_fstype].vsw_name);
-	*cp++ = forread ? '\t' : '\0';
-
-	if (tab)
-		tab->mnt_mntopts = cp;
-	cp += mntfs_optprint(vfsp, cp);
-	*cp++ = forread ? '\t' : '\0';
-
-	if (tab)
-		tab->mnt_time = cp;
-	cp += snprintf(cp, MAX_MNTOPT_STR, "%ld", vfsp->vfs_mtime);
-	*cp++ = forread ? '\n' : '\0';
-
-	if (tab) {
-		tab->mnt_major = getmajor(vfsp->vfs_dev);
-		tab->mnt_minor = getminor(vfsp->vfs_dev);
-	}
-
-	*basep = cp;
-}
-
-static void
-mntfs_zone_generate(zone_t *zone, int showhidden, struct extmnttab *tab,
-    char *basep, int forread)
-{
-	vfs_t *zonelist;
-	vfs_t *vfsp;
-	char *cp = basep;
-
-	/*
-	 * If the zone has a root entry, it will be the first in the list.  If
-	 * it doesn't, we conjure one up.
-	 */
-	vfsp = zonelist = zone->zone_vfslist;
-	if (zonelist == NULL ||
-	    strcmp(refstr_value(vfsp->vfs_mntpt), zone->zone_rootpath) != 0) {
-		vfs_t tvfs;
-		/*
-		 * The root of the zone is not a mount point.  The vfs we want
-		 * to report is that of the zone's root vnode.
-		 */
-		ASSERT(zone != global_zone);
-		mntfs_zonerootvfs(zone, &tvfs);
-		mntfs_vfs_generate(&tvfs, zone, tab, &cp, forread);
-		refstr_rele(tvfs.vfs_mntpt);
-		if (tab)
-			tab++;
-	}
-	if (zonelist == NULL)
-		return;
-	do {
-		/*
-		 * Skip mounts that should not show up in mnttab
-		 */
-		if (!showhidden && (vfsp->vfs_flag & VFS_NOMNTTAB)) {
-			vfsp = vfsp->vfs_zone_next;
-			continue;
-		}
-		mntfs_vfs_generate(vfsp, zone, tab, &cp, forread);
-		if (tab)
-			tab++;
-		vfsp = vfsp->vfs_zone_next;
-	} while (vfsp != zonelist);
-}
-
-static void
-mntfs_global_generate(int showhidden, struct extmnttab *tab, char *basep,
-    int forread)
-{
-	vfs_t *vfsp;
-	char *cp = basep;
-
-	vfsp = rootvfs;
-	do {
-		/*
-		 * Skip mounts that should not show up in mnttab
-		 */
-		if (!showhidden && vfsp->vfs_flag & VFS_NOMNTTAB) {
-			vfsp = vfsp->vfs_next;
-			continue;
-		}
-		mntfs_vfs_generate(vfsp, global_zone, tab, &cp, forread);
-		if (tab)
-			tab++;
-		vfsp = vfsp->vfs_next;
-	} while (vfsp != rootvfs);
-}
-
-static char *
-mntfs_mapin(char *base, size_t size)
-{
-	size_t rlen = roundup(size, PAGESIZE);
-	struct as *as = curproc->p_as;
-	char *addr = NULL;
-
-	as_rangelock(as);
-	map_addr(&addr, rlen, 0, 1, 0);
-	if (addr == NULL || as_map(as, addr, rlen, segvn_create, zfod_argsp)) {
-		as_rangeunlock(as);
-		return (NULL);
-	}
-	as_rangeunlock(as);
-	if (copyout(base, addr, size)) {
-		(void) as_unmap(as, addr, rlen);
-		return (NULL);
-	}
-	return (addr);
-}
-
-static void
-mntfs_freesnap(mntsnap_t *snap)
-{
-	if (snap->mnts_text != NULL)
-		(void) as_unmap(curproc->p_as, snap->mnts_text,
-		    roundup(snap->mnts_textsize, PAGESIZE));
-	snap->mnts_textsize = snap->mnts_count = 0;
-	if (snap->mnts_metadata != NULL)
-		(void) as_unmap(curproc->p_as, snap->mnts_metadata,
-		    roundup(snap->mnts_metasize, PAGESIZE));
-	snap->mnts_metasize = 0;
-}
-
-#ifdef _SYSCALL32_IMPL
-
-typedef struct extmnttab32 {
-	uint32_t	mnt_special;
-	uint32_t	mnt_mountp;
-	uint32_t	mnt_fstype;
-	uint32_t	mnt_mntopts;
-	uint32_t	mnt_time;
-	uint_t		mnt_major;
-	uint_t		mnt_minor;
-} extmnttab32_t;
-
-#endif
 
 /*
- * Snapshot the latest version of the kernel mounted resource information
- *
- * There are two types of snapshots: one destined for reading, and one destined
- * for ioctl().  The difference is that the ioctl() interface is delimited by
- * NULLs, while the read() interface is delimited by tabs and newlines.
+ * Return 1 if the given snapshot is in the range of the given element; return
+ * 0 otherwise.
  */
-/* ARGSUSED */
 static int
-mntfs_snapshot(mntnode_t *mnp, int forread, int datamodel)
+mntfs_elem_in_range(mntsnap_t *snapp, mntelem_t *elemp)
 {
-	size_t size;
-	timespec_t lastmodt;
-	mntdata_t *mntdata = MTOD(mnp);
-	zone_t *zone = mntdata->mnt_zone;
-	boolean_t global_view = (MTOD(mnp)->mnt_zone == global_zone);
-	boolean_t showhidden = ((mnp->mnt_flags & MNT_SHOWHIDDEN) != 0);
-	struct extmnttab *metadata_baseaddr;
-	char *text_baseaddr;
-	int i;
-	mntsnap_t *snap;
+	timespec_t	*stimep = &snapp->mnts_time;
+	timespec_t	*btimep = &elemp->mnte_birth;
+	timespec_t	*dtimep = &elemp->mnte_death;
 
-	if (forread)
-		snap = &mnp->mnt_read;
-	else
-		snap = &mnp->mnt_ioctl;
-
-	vfs_list_read_lock();
 	/*
-	 * Check if the mnttab info has changed since the last snapshot
+	 * If a snapshot is in range of an element then the snapshot must have
+	 * been created after the birth of the element, and either the element
+	 * is still alive or it died after the snapshot was created.
 	 */
-	vfs_mnttab_modtime(&lastmodt);
-	if (snap->mnts_count &&
-	    lastmodt.tv_sec == snap->mnts_time.tv_sec &&
-	    lastmodt.tv_nsec == snap->mnts_time.tv_nsec) {
-		vfs_list_unlock();
+	if (mntfs_newest(btimep, stimep) == MNTFS_SECOND &&
+	    (MNTFS_ELEM_IS_ALIVE(elemp) ||
+	    mntfs_newest(stimep, dtimep) == MNTFS_SECOND))
+		return (1);
+	else
 		return (0);
+}
+
+/*
+ * Return the next valid database element, after the one provided, for a given
+ * snapshot; return NULL if none exists. The caller must hold the zone's
+ * database lock as a reader before calling this function.
+ */
+static mntelem_t *
+mntfs_get_next_elem(mntsnap_t *snapp, mntelem_t *elemp)
+{
+	int show_hidden = snapp->mnts_flags & MNTS_SHOWHIDDEN;
+
+	do {
+		elemp = elemp->mnte_next;
+	} while (elemp &&
+	    (!mntfs_elem_in_range(snapp, elemp) ||
+	    (!show_hidden && elemp->mnte_hidden)));
+	return (elemp);
+}
+
+/*
+ * This function frees the resources associated with a mntsnap_t. It walks
+ * through the database, decrementing the reference count of any element that
+ * satisfies the snapshot. If the reference count of an element becomes zero
+ * then it is removed from the database.
+ */
+static void
+mntfs_freesnap(mntnode_t *mnp, mntsnap_t *snapp)
+{
+	zone_t *zonep = MTOD(mnp)->mnt_zone;
+	krwlock_t *dblockp = &zonep->zone_mntfs_db_lock;
+	mntelem_t **elempp = &zonep->zone_mntfs_db;
+	mntelem_t *elemp;
+	int show_hidden = snapp->mnts_flags & MNTS_SHOWHIDDEN;
+	size_t number_decremented = 0;
+
+	ASSERT(RW_WRITE_HELD(&mnp->mnt_contents));
+
+	/* Ignore an uninitialised snapshot. */
+	if (snapp->mnts_nmnts == 0)
+		return;
+
+	/* Drop the holds on any matching database elements. */
+	rw_enter(dblockp, RW_WRITER);
+	while ((elemp = *elempp) != NULL) {
+		if (mntfs_elem_in_range(snapp, elemp) &&
+		    (!elemp->mnte_hidden || show_hidden) &&
+		    ++number_decremented && --elemp->mnte_refcnt == 0) {
+			if ((*elempp = elemp->mnte_next) != NULL)
+				(*elempp)->mnte_prev = elemp->mnte_prev;
+			mntfs_destroy_elem(elemp);
+		} else {
+			elempp = &elemp->mnte_next;
+		}
 	}
+	rw_exit(dblockp);
+	ASSERT(number_decremented == snapp->mnts_nmnts);
 
+	/* Clear the snapshot data. */
+	bzero(snapp, sizeof (mntsnap_t));
+}
 
-	if (snap->mnts_count != 0)
-		mntfs_freesnap(snap);
-	if (global_view)
-		size = mntfs_global_len(&snap->mnts_count, showhidden);
+/* Insert the new database element newp after the existing element prevp. */
+static void
+mntfs_insert_after(mntelem_t *newp, mntelem_t *prevp)
+{
+	newp->mnte_prev = prevp;
+	newp->mnte_next = prevp->mnte_next;
+	prevp->mnte_next = newp;
+	if (newp->mnte_next != NULL)
+		newp->mnte_next->mnte_prev = newp;
+}
+
+/* Create and return a copy of a given database element. */
+static mntelem_t *
+mntfs_copy(mntelem_t *origp)
+{
+	mntelem_t *copyp;
+
+	copyp = kmem_zalloc(sizeof (mntelem_t), KM_SLEEP);
+	copyp->mnte_vfs_ctime = origp->mnte_vfs_ctime;
+	copyp->mnte_text_size = origp->mnte_text_size;
+	copyp->mnte_text = kmem_alloc(copyp->mnte_text_size, KM_SLEEP);
+	bcopy(origp->mnte_text, copyp->mnte_text, copyp->mnte_text_size);
+	copyp->mnte_tab = origp->mnte_tab;
+	copyp->mnte_hidden = origp->mnte_hidden;
+
+	return (copyp);
+}
+
+/*
+ * Compare two database elements and determine whether or not the vfs_t payload
+ * data of each are the same. Return 1 if so and 0 otherwise.
+ */
+static int
+mntfs_is_same_element(mntelem_t *a, mntelem_t *b)
+{
+	if (a->mnte_hidden == b->mnte_hidden &&
+	    a->mnte_text_size == b->mnte_text_size &&
+	    bcmp(a->mnte_text, b->mnte_text, a->mnte_text_size) == 0 &&
+	    bcmp(&a->mnte_tab, &b->mnte_tab, sizeof (struct extmnttab)) == 0)
+		return (1);
 	else
-		size = mntfs_zone_len(&snap->mnts_count, zone, showhidden);
-	ASSERT(size != 0);
+		return (0);
+}
 
-	if (!forread)
-		metadata_baseaddr = kmem_alloc(
-		    snap->mnts_count * sizeof (struct extmnttab), KM_SLEEP);
-	else
-		metadata_baseaddr = NULL;
+/*
+ * mntfs_snapshot() updates the database, creating it if necessary, so that it
+ * accurately reflects the state of the in-kernel mnttab. It also increments
+ * the reference count on all database elements that correspond to currently-
+ * mounted resources. Finally, it initialises the appropriate snapshot
+ * structure.
+ *
+ * Each vfs_t is given a high-resolution time stamp, for the benefit of mntfs,
+ * when it is inserted into the in-kernel mnttab. This time stamp is copied into
+ * the corresponding database element when it is created, allowing the element
+ * and the vfs_t to be identified as a pair. It is possible that some file
+ * systems may make unadvertised changes to, for example, a resource's mount
+ * options. Therefore, in order to determine whether a database element is an
+ * up-to-date representation of a given vfs_t, it is compared with a temporary
+ * element generated for this purpose. Although less efficient, this is safer
+ * than implementing an mtime for a vfs_t.
+ *
+ * Some mounted resources are marked as "hidden" with a VFS_NOMNTTAB flag. These
+ * are considered invisible unless the user has already set the MNT_SHOWHIDDEN
+ * flag in the vnode using the MNTIOC_SHOWHIDDEN ioctl.
+ */
+static void
+mntfs_snapshot(mntnode_t *mnp, mntsnap_t *snapp)
+{
+	zone_t		*zonep = MTOD(mnp)->mnt_zone;
+	int		is_global_zone = (zonep == global_zone);
+	int		show_hidden = mnp->mnt_flags & MNT_SHOWHIDDEN;
+	vfs_t		*vfsp, *firstvfsp, *lastvfsp;
+	vfs_t		dummyvfs;
+	vfs_t		*dummyvfsp = NULL;
+	krwlock_t	*dblockp = &zonep->zone_mntfs_db_lock;
+	mntelem_t	**headpp = &zonep->zone_mntfs_db;
+	mntelem_t	*elemp;
+	mntelem_t	*prevp = NULL;
+	int		order;
+	mntelem_t	*tempelemp;
+	mntelem_t	*newp;
+	mntelem_t	*firstp = NULL;
+	size_t		nmnts = 0;
+	size_t		text_size = 0;
+	int		insert_before;
+	timespec_t	last_mtime;
+	size_t		entry_length, new_entry_length;
 
-	text_baseaddr = kmem_alloc(size, KM_SLEEP);
 
-	if (global_view)
-		mntfs_global_generate(showhidden, metadata_baseaddr,
-		    text_baseaddr, forread);
-	else
-		mntfs_zone_generate(zone, showhidden,
-		    metadata_baseaddr, text_baseaddr, forread);
-
-	vfs_mnttab_modtime(&snap->mnts_time);
-	vfs_list_unlock();
-
-	snap->mnts_text = mntfs_mapin(text_baseaddr, size);
-	snap->mnts_textsize = size;
-	kmem_free(text_baseaddr, size);
+	ASSERT(RW_WRITE_HELD(&mnp->mnt_contents));
+	vfs_list_read_lock();
+	vfs_mnttab_modtime(&last_mtime);
 
 	/*
-	 * The pointers in the metadata refer to addreesses in the range
-	 * [base_addr, base_addr + size].  Now that we have mapped the text into
-	 * the user's address space, we have to convert these addresses into the
-	 * new (user) range.  We also handle the conversion for 32-bit and
-	 * 32-bit applications here.
+	 * If this snapshot already exists then we must have been asked to
+	 * rewind the file, i.e. discard the snapshot and create a new one in
+	 * its place. In this case we first see if the in-kernel mnttab has
+	 * advertised a change; if not then we simply reinitialise the metadata.
 	 */
-	if (!forread) {
-		struct extmnttab *tab;
-#ifdef _SYSCALL32_IMPL
-		struct extmnttab32 *tab32;
-
-		if (datamodel == DATAMODEL_ILP32) {
-			tab = (struct extmnttab *)metadata_baseaddr;
-			tab32 = (struct extmnttab32 *)metadata_baseaddr;
-
-			for (i = 0; i < snap->mnts_count; i++) {
-				tab32[i].mnt_special =
-				    (uintptr_t)snap->mnts_text +
-				    (tab[i].mnt_special - text_baseaddr);
-				tab32[i].mnt_mountp =
-				    (uintptr_t)snap->mnts_text +
-				    (tab[i].mnt_mountp - text_baseaddr);
-				tab32[i].mnt_fstype =
-				    (uintptr_t)snap->mnts_text +
-				    (tab[i].mnt_fstype - text_baseaddr);
-				tab32[i].mnt_mntopts =
-				    (uintptr_t)snap->mnts_text +
-				    (tab[i].mnt_mntopts - text_baseaddr);
-				tab32[i].mnt_time = (uintptr_t)snap->mnts_text +
-				    (tab[i].mnt_time - text_baseaddr);
-				tab32[i].mnt_major = tab[i].mnt_major;
-				tab32[i].mnt_minor = tab[i].mnt_minor;
-			}
-
-			snap->mnts_metasize =
-			    snap->mnts_count * sizeof (struct extmnttab32);
-			snap->mnts_metadata = mntfs_mapin(
-			    (char *)metadata_baseaddr,
-			    snap->mnts_metasize);
-
+	if (snapp->mnts_nmnts) {
+		if (mntfs_newest(&last_mtime, &snapp->mnts_last_mtime) ==
+		    MNTFS_NEITHER) {
+			/*
+			 * An unchanged mtime is no guarantee that the
+			 * in-kernel mnttab is unchanged; for example, a
+			 * concurrent remount may be between calls to
+			 * vfs_setmntopt_nolock() and vfs_mnttab_modtimeupd().
+			 * It follows that the database may have changed, and
+			 * in particular that some elements in this snapshot
+			 * may have been killed by another call to
+			 * mntfs_snapshot(). It is therefore not merely
+			 * unnecessary to update the snapshot's time but in
+			 * fact dangerous; it needs to be left alone.
+			 */
+			snapp->mnts_next = snapp->mnts_first;
+			snapp->mnts_flags &= ~MNTS_REWIND;
+			snapp->mnts_foffset = snapp->mnts_ieoffset = 0;
+			vfs_list_unlock();
+			return;
 		} else {
-#endif
-			tab = (struct extmnttab *)metadata_baseaddr;
-			for (i = 0; i < snap->mnts_count; i++) {
-				tab[i].mnt_special = snap->mnts_text +
-				    (tab[i].mnt_special - text_baseaddr);
-				tab[i].mnt_mountp = snap->mnts_text +
-				    (tab[i].mnt_mountp - text_baseaddr);
-				tab[i].mnt_fstype = snap->mnts_text +
-				    (tab[i].mnt_fstype - text_baseaddr);
-				tab[i].mnt_mntopts = snap->mnts_text +
-				    (tab[i].mnt_mntopts - text_baseaddr);
-				tab[i].mnt_time = snap->mnts_text +
-				    (tab[i].mnt_time - text_baseaddr);
+			mntfs_freesnap(mnp, snapp);
+		}
+	}
+
+	/*
+	 * Create a temporary database element. For each vfs_t, the temporary
+	 * element will be populated with the corresponding text. If the vfs_t
+	 * does not have a corresponding element within the database, or if
+	 * there is such an element but it is stale, a copy of the temporary
+	 * element is inserted into the database at the appropriate location.
+	 */
+	tempelemp = kmem_alloc(sizeof (mntelem_t), KM_SLEEP);
+	entry_length = MNT_LINE_MAX;
+	tempelemp->mnte_text = kmem_alloc(entry_length, KM_SLEEP);
+
+	/* Find the first and last vfs_t for the given zone. */
+	if (is_global_zone) {
+		firstvfsp = rootvfs;
+		lastvfsp = firstvfsp->vfs_prev;
+	} else {
+		firstvfsp = zonep->zone_vfslist;
+		/*
+		 * If there isn't already a vfs_t for root then we create a
+		 * dummy which will be used as the head of the list (which will
+		 * therefore no longer be circular).
+		 */
+		if (firstvfsp == NULL ||
+		    strcmp(refstr_value(firstvfsp->vfs_mntpt),
+		    zonep->zone_rootpath) != 0) {
+			/*
+			 * The zone's vfs_ts will have mount points relative to
+			 * the zone's root path. The vfs_t for the zone's
+			 * root file system would therefore have a mount point
+			 * equal to the zone's root path. Since the zone's root
+			 * path isn't a mount point, we copy the vfs_t of the
+			 * zone's root vnode, and provide it with a fake mount
+			 * point and resource.
+			 *
+			 * Note that by cloning another vfs_t we also acquire
+			 * its high-resolution ctime. This might appear to
+			 * violate the requirement that the ctimes in the list
+			 * of vfs_ts are unique and monotonically increasing;
+			 * this is not the case. The dummy vfs_t appears in only
+			 * a non-global zone's vfs_t list, where the cloned
+			 * vfs_t would not ordinarily be visible; the ctimes are
+			 * therefore unique. The zone's root path must be
+			 * available before the zone boots, and so its root
+			 * vnode's vfs_t's ctime must be lower than those of any
+			 * resources subsequently mounted by the zone. The
+			 * ctimes are therefore monotonically increasing.
+			 */
+			dummyvfs = *zonep->zone_rootvp->v_vfsp;
+			dummyvfs.vfs_mntpt = refstr_alloc(zonep->zone_rootpath);
+			dummyvfs.vfs_resource = dummyvfs.vfs_mntpt;
+			dummyvfsp = &dummyvfs;
+			if (firstvfsp == NULL) {
+				lastvfsp = dummyvfsp;
+			} else {
+				lastvfsp = firstvfsp->vfs_zone_prev;
+				dummyvfsp->vfs_zone_next = firstvfsp;
+			}
+			firstvfsp = dummyvfsp;
+		} else {
+			lastvfsp = firstvfsp->vfs_zone_prev;
+		}
+	}
+
+	/*
+	 * Now walk through all the vfs_ts for this zone. For each one, find the
+	 * corresponding database element, creating it first if necessary, and
+	 * increment its reference count.
+	 */
+	rw_enter(dblockp, RW_WRITER);
+	elemp = zonep->zone_mntfs_db;
+	/* CSTYLED */
+	for (vfsp = firstvfsp;;
+	    vfsp = is_global_zone ? vfsp->vfs_next : vfsp->vfs_zone_next) {
+		DTRACE_PROBE1(new__vfs, vfs_t *, vfsp);
+		/* Consider only visible entries. */
+		if ((vfsp->vfs_flag & VFS_NOMNTTAB) == 0 || show_hidden) {
+			/*
+			 * Walk through the existing database looking for either
+			 * an element that matches the current vfs_t, or for the
+			 * correct place in which to insert a new element.
+			 */
+			insert_before = 0;
+			for (; elemp; prevp = elemp, elemp = elemp->mnte_next) {
+				DTRACE_PROBE1(considering__elem, mntelem_t *,
+				    elemp);
+
+				/* Compare the vfs_t with the element. */
+				order = mntfs_newest(&elemp->mnte_vfs_ctime,
+				    &vfsp->vfs_hrctime);
+
+				/*
+				 * If we encounter a database element newer than
+				 * this vfs_t then we've stepped over a gap
+				 * where the element for this vfs_t must be
+				 * inserted.
+				 */
+				if (order == MNTFS_FIRST) {
+					insert_before = 1;
+					break;
+				}
+
+				/* Dead elements no longer interest us. */
+				if (MNTFS_ELEM_IS_DEAD(elemp))
+					continue;
+
+				/*
+				 * If the time stamps are the same then the
+				 * element is potential match for the vfs_t,
+				 * although it may later prove to be stale.
+				 */
+				if (order == MNTFS_NEITHER)
+					break;
+
+				/*
+				 * This element must be older than the vfs_t.
+				 * It must, therefore, correspond to a vfs_t
+				 * that has been unmounted. Since the element is
+				 * still alive, we kill it if it is visible.
+				 */
+				if (!elemp->mnte_hidden || show_hidden)
+					vfs_mono_time(&elemp->mnte_death);
+			}
+			DTRACE_PROBE2(possible__match, vfs_t *, vfsp,
+			    mntelem_t *, elemp);
+
+			/* Create a new database element if required. */
+			new_entry_length = mntfs_text_len(vfsp, zonep);
+			if (new_entry_length > entry_length) {
+				kmem_free(tempelemp->mnte_text, entry_length);
+				tempelemp->mnte_text =
+				    kmem_alloc(new_entry_length, KM_SLEEP);
+				entry_length = new_entry_length;
+			}
+			mntfs_populate_text(vfsp, zonep, tempelemp);
+			ASSERT(tempelemp->mnte_text_size == new_entry_length);
+			if (elemp == NULL) {
+				/*
+				 * We ran off the end of the database. Insert a
+				 * new element at the end.
+				 */
+				newp = mntfs_copy(tempelemp);
+				vfs_mono_time(&newp->mnte_birth);
+				if (prevp) {
+					mntfs_insert_after(newp, prevp);
+				} else {
+					newp->mnte_next = NULL;
+					newp->mnte_prev = NULL;
+					ASSERT(*headpp == NULL);
+					*headpp = newp;
+				}
+				elemp = newp;
+			} else if (insert_before) {
+				/*
+				 * Insert a new element before the current one.
+				 */
+				newp = mntfs_copy(tempelemp);
+				vfs_mono_time(&newp->mnte_birth);
+				if (prevp) {
+					mntfs_insert_after(newp, prevp);
+				} else {
+					newp->mnte_next = elemp;
+					newp->mnte_prev = NULL;
+					elemp->mnte_prev = newp;
+					ASSERT(*headpp == elemp);
+					*headpp = newp;
+				}
+				elemp = newp;
+			} else if (!mntfs_is_same_element(elemp, tempelemp)) {
+				/*
+				 * The element corresponds to the vfs_t, but the
+				 * vfs_t has changed; it must have been
+				 * remounted. Kill the old element and insert a
+				 * new one after it.
+				 */
+				vfs_mono_time(&elemp->mnte_death);
+				newp = mntfs_copy(tempelemp);
+				vfs_mono_time(&newp->mnte_birth);
+				mntfs_insert_after(newp, elemp);
+				elemp = newp;
 			}
 
-			snap->mnts_metasize =
-			    snap->mnts_count * sizeof (struct extmnttab);
-			snap->mnts_metadata = mntfs_mapin(
-			    (char *)metadata_baseaddr, snap->mnts_metasize);
-#ifdef _SYSCALL32_IMPL
+			/* We've found the corresponding element. Hold it. */
+			DTRACE_PROBE1(incrementing, mntelem_t *, elemp);
+			elemp->mnte_refcnt++;
+
+			/*
+			 * Update the parameters used to initialise the
+			 * snapshot.
+			 */
+			nmnts++;
+			text_size += elemp->mnte_text_size;
+			if (!firstp)
+				firstp = elemp;
+
+			prevp = elemp;
+			elemp = elemp->mnte_next;
 		}
-#endif
 
-		kmem_free(metadata_baseaddr,
-		    snap->mnts_count * sizeof (struct extmnttab));
+		if (vfsp == lastvfsp)
+			break;
 	}
 
-	mntdata->mnt_size = size;
-
-	if (snap->mnts_text == NULL ||
-	    (!forread && snap->mnts_metadata == NULL)) {
-		mntfs_freesnap(snap);
-		return (ENOMEM);
+	/*
+	 * Any remaining visible database elements that are still alive must be
+	 * killed now, because their corresponding vfs_ts must have been
+	 * unmounted.
+	 */
+	for (; elemp; elemp = elemp->mnte_next) {
+		if (MNTFS_ELEM_IS_ALIVE(elemp) &&
+		    (!elemp->mnte_hidden || show_hidden))
+			vfs_mono_time(&elemp->mnte_death);
 	}
-	vfs_mnttab_readop();
-	return (0);
+
+	/* Initialise the snapshot. */
+	vfs_mono_time(&snapp->mnts_time);
+	snapp->mnts_last_mtime = last_mtime;
+	snapp->mnts_first = snapp->mnts_next = firstp;
+	snapp->mnts_flags = show_hidden ? MNTS_SHOWHIDDEN : 0;
+	snapp->mnts_nmnts = nmnts;
+	snapp->mnts_text_size = MTOD(mnp)->mnt_size = text_size;
+	snapp->mnts_foffset = snapp->mnts_ieoffset = 0;
+
+	/* Clean up. */
+	rw_exit(dblockp);
+	vfs_list_unlock();
+	if (dummyvfsp != NULL)
+		refstr_rele(dummyvfsp->vfs_mntpt);
+	kmem_free(tempelemp->mnte_text, entry_length);
+	kmem_free(tempelemp, sizeof (mntelem_t));
 }
 
 /*
@@ -664,7 +811,6 @@ mntfs_getmntopts(struct vfs *vfsp, char **bufp, size_t *lenp)
 	*bufp = buf;
 	*lenp = len;
 }
-
 
 /* ARGSUSED */
 static int
@@ -704,8 +850,10 @@ mntclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 	if (count > 1)
 		return (0);
 	if (vp->v_count == 1) {
-		mntfs_freesnap(&mnp->mnt_read);
-		mntfs_freesnap(&mnp->mnt_ioctl);
+		rw_enter(&mnp->mnt_contents, RW_WRITER);
+		mntfs_freesnap(mnp, &mnp->mnt_read);
+		mntfs_freesnap(mnp, &mnp->mnt_ioctl);
+		rw_exit(&mnp->mnt_contents);
 		atomic_add_32(&MTOD(mnp)->mnt_nopen, -1);
 	}
 	return (0);
@@ -715,43 +863,27 @@ mntclose(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr,
 static int
 mntread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred, caller_context_t *ct)
 {
-	int error = 0;
+	mntnode_t *mnp = VTOM(vp);
+	zone_t *zonep = MTOD(mnp)->mnt_zone;
+	mntsnap_t *snapp = &mnp->mnt_read;
 	off_t off = uio->uio_offset;
 	size_t len = uio->uio_resid;
-	mntnode_t *mnp = VTOM(vp);
-	char *buf;
-	mntsnap_t *snap;
-	int datamodel;
+	char *bufferp;
+	size_t available, copylen;
+	size_t written = 0;
+	mntelem_t *elemp;
+	krwlock_t *dblockp = &zonep->zone_mntfs_db_lock;
+	int error = 0;
+	off_t	ieoffset;
 
-	rw_enter(&mnp->mnt_contents, RW_READER);
-	snap = &mnp->mnt_read;
-	if (off == (off_t)0 || snap->mnts_count == 0) {
-		/*
-		 * It is assumed that any kernel callers wishing
-		 * to read mnttab will be using extmnttab entries
-		 * and not extmnttab32 entries, whether or not
-		 * the kernel is LP64 or ILP32.  Thus, force the
-		 * datamodel that mntfs_snapshot uses to be
-		 * DATAMODEL_LP64.
-		 */
-		if (uio->uio_segflg == UIO_SYSSPACE)
-			datamodel = DATAMODEL_LP64;
-		else
-			datamodel = get_udatamodel();
-		if (!rw_tryupgrade(&mnp->mnt_contents)) {
-			rw_exit(&mnp->mnt_contents);
-			rw_enter(&mnp->mnt_contents, RW_WRITER);
-		}
-		if ((error = mntfs_snapshot(mnp, 1, datamodel)) != 0) {
-			rw_exit(&mnp->mnt_contents);
-			return (error);
-		}
-		rw_downgrade(&mnp->mnt_contents);
-	}
-	if ((size_t)(off + len) > snap->mnts_textsize)
-		len = snap->mnts_textsize - off;
+	rw_enter(&mnp->mnt_contents, RW_WRITER);
+	if (snapp->mnts_nmnts == 0 || (off == (off_t)0))
+		mntfs_snapshot(mnp, snapp);
 
-	if (off < 0 || len > snap->mnts_textsize) {
+	if ((size_t)(off + len) > snapp->mnts_text_size)
+		len = snapp->mnts_text_size - off;
+
+	if (off < 0 || len > snapp->mnts_text_size) {
 		rw_exit(&mnp->mnt_contents);
 		return (EFAULT);
 	}
@@ -762,22 +894,81 @@ mntread(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cred, caller_context_t *ct)
 	}
 
 	/*
-	 * The mnttab image is stored in the user's address space,
-	 * so we have to copy it into the kernel from userland,
-	 * then copy it back out to the specified address.
+	 * For the file offset provided, locate the corresponding database
+	 * element and calculate the corresponding offset within its text. If
+	 * the file offset is the same as that reached during the last read(2)
+	 * then use the saved element and intra-element offset.
 	 */
-	buf = kmem_alloc(len, KM_SLEEP);
-	if (copyin(snap->mnts_text + off, buf, len))
-		error = EFAULT;
-	else {
-		error = uiomove(buf, len, UIO_READ, uio);
+	rw_enter(dblockp, RW_READER);
+	if (off == 0 || (off == snapp->mnts_foffset)) {
+		elemp = snapp->mnts_next;
+		ieoffset = snapp->mnts_ieoffset;
+	} else {
+		off_t total_off;
+		/*
+		 * Find the element corresponding to the requested file offset
+		 * by walking through the database and summing the text sizes
+		 * of the individual elements. If the requested file offset is
+		 * greater than that reached on the last visit then we can start
+		 * at the last seen element; otherwise, we have to start at the
+		 * beginning.
+		 */
+		if (off > snapp->mnts_foffset) {
+			elemp = snapp->mnts_next;
+			total_off = snapp->mnts_foffset - snapp->mnts_ieoffset;
+		} else {
+			elemp = snapp->mnts_first;
+			total_off = 0;
+		}
+		while (off > total_off + elemp->mnte_text_size) {
+			total_off += elemp->mnte_text_size;
+			elemp = mntfs_get_next_elem(snapp, elemp);
+			ASSERT(elemp != NULL);
+		}
+		/* Calculate the intra-element offset. */
+		if (off > total_off)
+			ieoffset = off - total_off;
+		else
+			ieoffset = 0;
 	}
-	kmem_free(buf, len);
+
+	/*
+	 * Create a buffer and populate it with the text from successive
+	 * database elements until it is full.
+	 */
+	bufferp = kmem_alloc(len, KM_SLEEP);
+	while (written < len) {
+		available = elemp->mnte_text_size - ieoffset;
+		copylen = MIN(len - written, available);
+		bcopy(elemp->mnte_text + ieoffset, bufferp + written, copylen);
+		written += copylen;
+		if (copylen == available) {
+			elemp = mntfs_get_next_elem(snapp, elemp);
+			ASSERT(elemp != NULL || written == len);
+			ieoffset = 0;
+		} else {
+			ieoffset += copylen;
+		}
+	}
+	rw_exit(dblockp);
+
+	/*
+	 * Write the populated buffer, update the snapshot's state if
+	 * successful and then advertise our read.
+	 */
+	error = uiomove(bufferp, len, UIO_READ, uio);
+	if (error == 0) {
+		snapp->mnts_next = elemp;
+		snapp->mnts_foffset = off + len;
+		snapp->mnts_ieoffset = ieoffset;
+	}
 	vfs_mnttab_readop();
 	rw_exit(&mnp->mnt_contents);
+
+	/* Clean up. */
+	kmem_free(bufferp, len);
 	return (error);
 }
-
 
 static int
 mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
@@ -791,7 +982,7 @@ mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	mntsnap_t *snap;
 
 	rw_enter(&mnp->mnt_contents, RW_READER);
-	snap = mnp->mnt_read.mnts_count ? &mnp->mnt_read : &mnp->mnt_ioctl;
+	snap = mnp->mnt_read.mnts_nmnts ? &mnp->mnt_read : &mnp->mnt_ioctl;
 	/*
 	 * Return all the attributes.  Should be refined
 	 * so that it returns only those asked for.
@@ -801,8 +992,10 @@ mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	/*
 	 * Attributes are same as underlying file with modifications
 	 */
-	if (error = VOP_GETATTR(rvp, vap, flags, cr, ct))
+	if (error = VOP_GETATTR(rvp, vap, flags, cr, ct)) {
+		rw_exit(&mnp->mnt_contents);
 		return (error);
+	}
 
 	/*
 	 * We always look like a regular file
@@ -825,7 +1018,7 @@ mntgetattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	 * If we haven't taken a snapshot yet, set the
 	 * size to the size of the latest snapshot.
 	 */
-	vap->va_size = snap->mnts_textsize ? snap->mnts_textsize :
+	vap->va_size = snap->mnts_text_size ? snap->mnts_text_size :
 	    mntdata->mnt_size;
 	rw_exit(&mnp->mnt_contents);
 	/*
@@ -915,16 +1108,24 @@ mntinactive(vnode_t *vp, cred_t *cr, caller_context_t *ct)
 	mntfreenode(mnp);
 }
 
+/*
+ * lseek(2) is supported only to rewind the file. Rewinding has a special
+ * meaning for /etc/mnttab: it forces mntfs to refresh the snapshot at the next
+ * read() or ioctl().
+ *
+ * The generic lseek() code will have already changed the file offset. Therefore
+ * mntread() can detect a rewind simply by looking for a zero offset. For the
+ * benefit of mntioctl() we advertise a rewind with a specific flag.
+ */
 /* ARGSUSED */
 static int
-mntseek(vnode_t *vp, offset_t ooff, offset_t *noffp,
-	caller_context_t *ct)
+mntseek(vnode_t *vp, offset_t ooff, offset_t *noffp, caller_context_t *ct)
 {
 	mntnode_t *mnp = VTOM(vp);
 
 	if (*noffp == 0) {
 		rw_enter(&mnp->mnt_contents, RW_WRITER);
-		VTOM(vp)->mnt_offset = 0;
+		mnp->mnt_ioctl.mnts_flags |= MNTS_REWIND;
 		rw_exit(&mnp->mnt_contents);
 	}
 
@@ -942,14 +1143,14 @@ mntpoll(vnode_t *vp, short ev, int any, short *revp, pollhead_t **phpp,
 	caller_context_t *ct)
 {
 	mntnode_t *mnp = VTOM(vp);
-	mntsnap_t *snap;
+	mntsnap_t *snapp;
 
 	rw_enter(&mnp->mnt_contents, RW_READER);
-	snap = &mnp->mnt_read;
-	if (mnp->mnt_ioctl.mnts_time.tv_sec > snap->mnts_time.tv_sec ||
-	    (mnp->mnt_ioctl.mnts_time.tv_sec == snap->mnts_time.tv_sec &&
-	    mnp->mnt_ioctl.mnts_time.tv_nsec > snap->mnts_time.tv_nsec))
-		snap = &mnp->mnt_ioctl;
+	if (mntfs_newest(&mnp->mnt_ioctl.mnts_last_mtime,
+	    &mnp->mnt_read.mnts_last_mtime) == MNTFS_FIRST)
+		snapp = &mnp->mnt_ioctl;
+	else
+		snapp = &mnp->mnt_read;
 
 	*revp = 0;
 	*phpp = (pollhead_t *)NULL;
@@ -960,7 +1161,7 @@ mntpoll(vnode_t *vp, short ev, int any, short *revp, pollhead_t **phpp,
 		*revp |= POLLRDNORM;
 
 	if (ev & POLLRDBAND) {
-		vfs_mnttab_poll(&snap->mnts_time, phpp);
+		vfs_mnttab_poll(&snapp->mnts_last_mtime, phpp);
 		if (*phpp == (pollhead_t *)NULL)
 			*revp |= POLLRDBAND;
 	}
@@ -978,92 +1179,293 @@ mntpoll(vnode_t *vp, short ev, int any, short *revp, pollhead_t **phpp,
 	*revp = POLLERR;
 	return (0);
 }
+
+/*
+ * mntfs_same_word() returns 1 if two words are the same in the context of
+ * MNTIOC_GETMNTANY and 0 otherwise.
+ *
+ * worda is a memory address that lies somewhere in the buffer bufa; it cannot
+ * be NULL since this is used to indicate to getmntany(3C) that the user does
+ * not wish to match a particular field. The text to which worda points is
+ * supplied by the user; if it is not null-terminated then it cannot match.
+ *
+ * Buffer bufb contains a line from /etc/mnttab, in which the fields are
+ * delimited by tab or new-line characters. offb is the offset of the second
+ * word within this buffer.
+ *
+ * mntfs_same_word() returns 1 if the words are the same and 0 otherwise.
+ */
+int
+mntfs_same_word(char *worda, char *bufa, size_t sizea, off_t offb, char *bufb,
+    size_t sizeb)
+{
+	char *wordb = bufb + offb;
+	int bytes_remaining;
+
+	ASSERT(worda != NULL);
+
+	bytes_remaining = MIN(((bufa + sizea) - worda),
+	    ((bufb + sizeb) - wordb));
+	while (bytes_remaining && *worda == *wordb) {
+		worda++;
+		wordb++;
+		bytes_remaining--;
+	}
+	if (bytes_remaining &&
+	    *worda == '\0' && (*wordb == '\t' || *wordb == '\n'))
+		return (1);
+	else
+		return (0);
+}
+
+/*
+ * mntfs_special_info_string() returns which, if either, of VBLK or VCHR
+ * corresponds to a supplied path. If the path is a special device then the
+ * function optionally sets the major and minor numbers.
+ */
+vtype_t
+mntfs_special_info_string(char *path, uint_t *major, uint_t *minor, cred_t *cr)
+{
+	vattr_t vattr;
+	vnode_t *vp;
+	vtype_t type;
+	int error;
+
+	if (path == NULL || *path != '/' ||
+	    lookupnameat(path + 1, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp, rootdir))
+		return (0);
+
+	vattr.va_mask = AT_TYPE | AT_RDEV;
+	error = VOP_GETATTR(vp, &vattr, ATTR_REAL, cr, NULL);
+	VN_RELE(vp);
+
+	if (error == 0 && ((type = vattr.va_type) == VBLK || type == VCHR)) {
+		if (major && minor) {
+			*major = getmajor(vattr.va_rdev);
+			*minor = getminor(vattr.va_rdev);
+		}
+		return (type);
+	} else {
+		return (0);
+	}
+}
+
+/*
+ * mntfs_special_info_element() extracts the name of the mounted resource
+ * for a given element and copies it into a null-terminated string, which it
+ * then passes to mntfs_special_info_string().
+ */
+vtype_t
+mntfs_special_info_element(mntelem_t *elemp, cred_t *cr)
+{
+	char *newpath;
+	vtype_t type;
+
+	newpath = kmem_alloc(elemp->mnte_text_size, KM_SLEEP);
+	bcopy(elemp->mnte_text, newpath, (off_t)(elemp->mnte_tab.mnt_mountp));
+	*(newpath + (off_t)elemp->mnte_tab.mnt_mountp - 1) = '\0';
+	type = mntfs_special_info_string(newpath, NULL, NULL, cr);
+	kmem_free(newpath, elemp->mnte_text_size);
+
+	return (type);
+}
+
+/*
+ * Convert an address that points to a byte within a user buffer into an
+ * address that points to the corresponding offset within a kernel buffer. If
+ * the user address is NULL then make no conversion. If the address does not
+ * lie within the buffer then reset it to NULL.
+ */
+char *
+mntfs_import_addr(char *uaddr, char *ubufp, char *kbufp, size_t bufsize)
+{
+	if (uaddr < ubufp || uaddr >= ubufp + bufsize)
+		return (NULL);
+	else
+		return (kbufp + (uaddr - ubufp));
+}
+
+/*
+ * These 32-bit versions are to support STRUCT_DECL(9F) etc. in
+ * mntfs_copyout_element() and mntioctl().
+ */
+#ifdef _SYSCALL32_IMPL
+typedef struct extmnttab32 {
+	uint32_t	mnt_special;
+	uint32_t	mnt_mountp;
+	uint32_t	mnt_fstype;
+	uint32_t	mnt_mntopts;
+	uint32_t	mnt_time;
+	uint_t		mnt_major;
+	uint_t		mnt_minor;
+} extmnttab32_t;
+
+typedef struct mnttab32 {
+	uint32_t	mnt_special;
+	uint32_t	mnt_mountp;
+	uint32_t	mnt_fstype;
+	uint32_t	mnt_mntopts;
+	uint32_t	mnt_time;
+} mnttab32_t;
+
+struct mntentbuf32 {
+	uint32_t	mbuf_emp;
+	uint_t		mbuf_bufsize;
+	uint32_t	mbuf_buf;
+};
+#endif
+
+/*
+ * mntfs_copyout_element() is common code for the MNTIOC_GETMNTENT,
+ * MNTIOC_GETEXTMNTENT and MNTIOC_GETMNTANY ioctls. Having identifed the
+ * database element desired by the user, this function copies out the text and
+ * the pointers to the relevant userland addresses. It returns 0 on success
+ * and non-zero otherwise.
+ */
+int
+mntfs_copyout_elem(mntelem_t *elemp, struct extmnttab *uemp,
+    char *ubufp, int cmd, int datamodel)
+{
+		STRUCT_DECL(extmnttab, ktab);
+		char *dbbufp = elemp->mnte_text;
+		size_t dbbufsize = elemp->mnte_text_size;
+		struct extmnttab *dbtabp = &elemp->mnte_tab;
+		size_t ssize;
+		char *kbufp;
+		int error = 0;
+
+
+		/*
+		 * We create a struct extmnttab within the kernel of the size
+		 * determined by the user's data model. We then populate its
+		 * fields by combining the start address of the text buffer
+		 * supplied by the user, ubufp, with the offsets stored for
+		 * this database element within dbtabp, a pointer to a struct
+		 * extmnttab.
+		 *
+		 * Note that if the corresponding field is "-" this signifies
+		 * no real content, and we set the address to NULL. This does
+		 * not apply to mnt_time.
+		 */
+		STRUCT_INIT(ktab, datamodel);
+		STRUCT_FSETP(ktab, mnt_special,
+		    MNTFS_REAL_FIELD(dbbufp) ? ubufp : NULL);
+		STRUCT_FSETP(ktab, mnt_mountp,
+		    MNTFS_REAL_FIELD(dbbufp + (off_t)dbtabp->mnt_mountp) ?
+		    ubufp + (off_t)dbtabp->mnt_mountp : NULL);
+		STRUCT_FSETP(ktab, mnt_fstype,
+		    MNTFS_REAL_FIELD(dbbufp + (off_t)dbtabp->mnt_fstype) ?
+		    ubufp + (off_t)dbtabp->mnt_fstype : NULL);
+		STRUCT_FSETP(ktab, mnt_mntopts,
+		    MNTFS_REAL_FIELD(dbbufp + (off_t)dbtabp->mnt_mntopts) ?
+		    ubufp + (off_t)dbtabp->mnt_mntopts : NULL);
+		STRUCT_FSETP(ktab, mnt_time,
+		    ubufp + (off_t)dbtabp->mnt_time);
+		if (cmd == MNTIOC_GETEXTMNTENT) {
+			STRUCT_FSETP(ktab, mnt_major, dbtabp->mnt_major);
+			STRUCT_FSETP(ktab, mnt_minor, dbtabp->mnt_minor);
+			ssize = SIZEOF_STRUCT(extmnttab, datamodel);
+		} else {
+			ssize = SIZEOF_STRUCT(mnttab, datamodel);
+		}
+		if (copyout(STRUCT_BUF(ktab), uemp, ssize))
+			return (EFAULT);
+
+		/*
+		 * We create a text buffer in the kernel into which we copy the
+		 * /etc/mnttab entry for this element. We change the tab and
+		 * new-line delimiters to null bytes before copying out the
+		 * buffer.
+		 */
+		kbufp = kmem_alloc(dbbufsize, KM_SLEEP);
+		bcopy(elemp->mnte_text, kbufp, dbbufsize);
+		*(kbufp + (off_t)dbtabp->mnt_mountp - 1) =
+		    *(kbufp + (off_t)dbtabp->mnt_fstype - 1) =
+		    *(kbufp + (off_t)dbtabp->mnt_mntopts - 1) =
+		    *(kbufp + (off_t)dbtabp->mnt_time - 1) =
+		    *(kbufp + dbbufsize - 1) = '\0';
+		if (copyout(kbufp, ubufp, dbbufsize))
+			error = EFAULT;
+
+		kmem_free(kbufp, dbbufsize);
+		return (error);
+}
+
 /* ARGSUSED */
 static int
-mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
-	cred_t *cr, int *rvalp, caller_context_t *ct)
+mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
+    int *rvalp, caller_context_t *ct)
 {
 	uint_t *up = (uint_t *)arg;
 	mntnode_t *mnp = VTOM(vp);
-	mntsnap_t *snap;
-	int error;
+	mntsnap_t *snapp = &mnp->mnt_ioctl;
+	int error = 0;
+	zone_t *zonep = MTOD(mnp)->mnt_zone;
+	krwlock_t *dblockp = &zonep->zone_mntfs_db_lock;
+	model_t datamodel = flag & DATAMODEL_MASK;
 
-	error = 0;
-	rw_enter(&mnp->mnt_contents, RW_READER);
-	snap = &mnp->mnt_ioctl;
 	switch (cmd) {
 
-	case MNTIOC_NMNTS: {		/* get no. of mounted resources */
-		if (snap->mnts_count == 0) {
+	case MNTIOC_NMNTS:  		/* get no. of mounted resources */
+	{
+		rw_enter(&mnp->mnt_contents, RW_READER);
+		if (snapp->mnts_nmnts == 0 ||
+		    (snapp->mnts_flags & MNTS_REWIND)) {
 			if (!rw_tryupgrade(&mnp->mnt_contents)) {
 				rw_exit(&mnp->mnt_contents);
 				rw_enter(&mnp->mnt_contents, RW_WRITER);
 			}
-			if ((error =
-			    mntfs_snapshot(mnp, 0, flag & DATAMODEL_MASK))
-			    != 0) {
-				rw_exit(&mnp->mnt_contents);
-				return (error);
-			}
-			rw_downgrade(&mnp->mnt_contents);
+			if (snapp->mnts_nmnts == 0 ||
+			    (snapp->mnts_flags & MNTS_REWIND))
+				mntfs_snapshot(mnp, snapp);
 		}
-		if (suword32(up, snap->mnts_count) != 0)
+		rw_exit(&mnp->mnt_contents);
+
+		if (suword32(up, snapp->mnts_nmnts) != 0)
 			error = EFAULT;
 		break;
 	}
 
-	case MNTIOC_GETDEVLIST: {	/* get mounted device major/minor nos */
-		uint_t *devlist;
-		int i;
+	case MNTIOC_GETDEVLIST:  	/* get mounted device major/minor nos */
+	{
 		size_t len;
+		uint_t *devlist;
+		mntelem_t *elemp;
+		int i = 0;
 
-		if (snap->mnts_count == 0) {
+		rw_enter(&mnp->mnt_contents, RW_READER);
+		if (snapp->mnts_nmnts == 0 ||
+		    (snapp->mnts_flags & MNTS_REWIND)) {
 			if (!rw_tryupgrade(&mnp->mnt_contents)) {
 				rw_exit(&mnp->mnt_contents);
 				rw_enter(&mnp->mnt_contents, RW_WRITER);
 			}
-			if ((error =
-			    mntfs_snapshot(mnp, 0, flag & DATAMODEL_MASK))
-			    != 0) {
-				rw_exit(&mnp->mnt_contents);
-				return (error);
-			}
+			if (snapp->mnts_nmnts == 0 ||
+			    (snapp->mnts_flags & MNTS_REWIND))
+				mntfs_snapshot(mnp, snapp);
 			rw_downgrade(&mnp->mnt_contents);
 		}
 
-		len = 2 * snap->mnts_count * sizeof (uint_t);
+		/* Create a local buffer to hold the device numbers. */
+		len = 2 * snapp->mnts_nmnts * sizeof (uint_t);
 		devlist = kmem_alloc(len, KM_SLEEP);
-		for (i = 0; i < snap->mnts_count; i++) {
 
-#ifdef _SYSCALL32_IMPL
-			if ((flag & DATAMODEL_MASK) == DATAMODEL_ILP32) {
-				struct extmnttab32 tab;
-
-				if ((error = xcopyin(snap->mnts_text +
-				    i * sizeof (struct extmnttab32), &tab,
-				    sizeof (tab))) != 0)
-					break;
-
-				devlist[i*2] = tab.mnt_major;
-				devlist[i*2+1] = tab.mnt_minor;
-			} else {
-#endif
-				struct extmnttab tab;
-
-				if ((error = xcopyin(snap->mnts_text +
-				    i * sizeof (struct extmnttab), &tab,
-				    sizeof (tab))) != 0)
-					break;
-
-				devlist[i*2] = tab.mnt_major;
-				devlist[i*2+1] = tab.mnt_minor;
-#ifdef _SYSCALL32_IMPL
-			}
-#endif
+		/*
+		 * Walk the database elements for this snapshot and add their
+		 * major and minor numbers.
+		 */
+		rw_enter(dblockp, RW_READER);
+		for (elemp = snapp->mnts_first; elemp;
+		    elemp = mntfs_get_next_elem(snapp, elemp)) {
+				devlist[2 * i] = elemp->mnte_tab.mnt_major;
+				devlist[2 * i + 1] = elemp->mnte_tab.mnt_minor;
+				i++;
 		}
+		rw_exit(dblockp);
+		ASSERT(i == snapp->mnts_nmnts);
+		rw_exit(&mnp->mnt_contents);
 
-		if (error == 0)
-			error = xcopyout(devlist, up, len);
+		error = xcopyout(devlist, up, len);
 		kmem_free(devlist, len);
 		break;
 	}
@@ -1128,54 +1530,251 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 		break;
 	}
 
-	case MNTIOC_GETMNTENT:
+	case MNTIOC_GETMNTANY:
 	{
-		size_t idx;
-		uintptr_t addr;
+		STRUCT_DECL(mntentbuf, embuf);	/* Our copy of user's embuf */
+		STRUCT_DECL(extmnttab, ktab);	/* Out copy of user's emp */
+		struct extmnttab *uemp;		/* uaddr of user's emp */
+		char *ubufp;			/* uaddr of user's text buf */
+		size_t ubufsize;		/* size of the above */
+		struct extmnttab preftab;	/* our version of user's emp */
+		char *prefbuf;			/* our copy of user's text */
+		mntelem_t *elemp;		/* a database element */
+		struct extmnttab *dbtabp;	/* element's extmnttab */
+		char *dbbufp;			/* element's text buf */
+		size_t dbbufsize;		/* size of the above */
+		vtype_t type;			/* type, if any, of special */
 
-		if (!rw_tryupgrade(&mnp->mnt_contents)) {
-			rw_exit(&mnp->mnt_contents);
-			rw_enter(&mnp->mnt_contents, RW_WRITER);
-		}
-		idx = mnp->mnt_offset;
-		if (snap->mnts_count == 0 || idx == 0) {
-			if ((error =
-			    mntfs_snapshot(mnp, 0, flag & DATAMODEL_MASK))
-			    != 0) {
-				rw_exit(&mnp->mnt_contents);
-				return (error);
-			}
-		}
+
 		/*
-		 * If the next index is beyond the end of the current mnttab,
-		 * return EOF
+		 * embuf is a struct embuf within the kernel. We copy into it
+		 * the struct embuf supplied by the user.
 		 */
-		if (idx >= snap->mnts_count) {
-			*rvalp = 1;
-			rw_exit(&mnp->mnt_contents);
-			return (0);
+		STRUCT_INIT(embuf, datamodel);
+		if (copyin((void *) arg, STRUCT_BUF(embuf),
+		    STRUCT_SIZE(embuf))) {
+			error = EFAULT;
+			break;
+		}
+		uemp = STRUCT_FGETP(embuf, mbuf_emp);
+		ubufp = STRUCT_FGETP(embuf, mbuf_buf);
+		ubufsize = STRUCT_FGET(embuf, mbuf_bufsize);
+
+		/*
+		 * Check that the text buffer offered by the user is the
+		 * agreed size.
+		 */
+		if (ubufsize != MNT_LINE_MAX) {
+			error = EINVAL;
+			break;
 		}
 
-#ifdef _SYSCALL32_IMPL
-		if ((flag & DATAMODEL_MASK) == DATAMODEL_ILP32) {
-			addr = (uintptr_t)(snap->mnts_metadata + idx *
-			    sizeof (struct extmnttab32));
-			error = suword32((void *)arg, addr);
+		/* Copy the user-supplied entry into a local buffer. */
+		prefbuf = kmem_alloc(MNT_LINE_MAX, KM_SLEEP);
+		if (copyin(ubufp, prefbuf, MNT_LINE_MAX)) {
+			kmem_free(prefbuf, MNT_LINE_MAX);
+			error = EFAULT;
+			break;
+		}
+
+		/* Ensure that any string within it is null-terminated. */
+		*(prefbuf + MNT_LINE_MAX - 1) = 0;
+
+		/* Copy in the user-supplied mpref */
+		STRUCT_INIT(ktab, datamodel);
+		if (copyin(uemp, STRUCT_BUF(ktab),
+		    SIZEOF_STRUCT(mnttab, datamodel))) {
+			kmem_free(prefbuf, MNT_LINE_MAX);
+			error = EFAULT;
+			break;
+		}
+
+		/*
+		 * Copy the members of the user's pref struct into a local
+		 * struct. The pointers need to be offset and verified to
+		 * ensure that they lie within the bounds of the buffer.
+		 */
+		preftab.mnt_special = mntfs_import_addr(STRUCT_FGETP(ktab,
+		    mnt_special), ubufp, prefbuf, MNT_LINE_MAX);
+		preftab.mnt_mountp = mntfs_import_addr(STRUCT_FGETP(ktab,
+		    mnt_mountp), ubufp, prefbuf, MNT_LINE_MAX);
+		preftab.mnt_fstype = mntfs_import_addr(STRUCT_FGETP(ktab,
+		    mnt_fstype), ubufp, prefbuf, MNT_LINE_MAX);
+		preftab.mnt_mntopts = mntfs_import_addr(STRUCT_FGETP(ktab,
+		    mnt_mntopts), ubufp, prefbuf, MNT_LINE_MAX);
+		preftab.mnt_time = mntfs_import_addr(STRUCT_FGETP(ktab,
+		    mnt_time), ubufp, prefbuf, MNT_LINE_MAX);
+
+		/*
+		 * If the user specifies a mounted resource that is a special
+		 * device then we capture its mode and major and minor numbers;
+		 * c.f. the block comment below.
+		 */
+		type = mntfs_special_info_string(preftab.mnt_special,
+		    &preftab.mnt_major, &preftab.mnt_minor, cr);
+
+		rw_enter(&mnp->mnt_contents, RW_WRITER);
+		if (snapp->mnts_nmnts == 0 ||
+		    (snapp->mnts_flags & MNTS_REWIND))
+			mntfs_snapshot(mnp, snapp);
+
+		/*
+		 * This is the core functionality that implements getmntany().
+		 * We walk through the mntfs database until we find an element
+		 * matching the user's preferences that are contained in
+		 * preftab. Typically, this means checking that the text
+		 * matches. However, the mounted resource is special: if the
+		 * user is looking for a special device then we must find a
+		 * database element with the same major and minor numbers and
+		 * the same type, i.e. VBLK or VCHR. The type is not recorded
+		 * in the element because it cannot be inferred from the vfs_t.
+		 * We therefore check the type of suitable candidates via
+		 * mntfs_special_info_element(); since this calls into the
+		 * underlying file system we make sure to drop the database lock
+		 * first.
+		 */
+		elemp = snapp->mnts_next;
+		rw_enter(dblockp, RW_READER);
+		for (;;) {
+			for (; elemp; elemp = mntfs_get_next_elem(snapp,
+			    elemp)) {
+				dbtabp = &elemp->mnte_tab;
+				dbbufp = elemp->mnte_text;
+				dbbufsize = elemp->mnte_text_size;
+
+				if (((type &&
+				    dbtabp->mnt_major == preftab.mnt_major &&
+				    dbtabp->mnt_minor == preftab.mnt_minor &&
+				    MNTFS_REAL_FIELD(dbbufp)) ||
+				    (!type && (!preftab.mnt_special ||
+				    mntfs_same_word(preftab.mnt_special,
+				    prefbuf, MNT_LINE_MAX, (off_t)0, dbbufp,
+				    dbbufsize)))) &&
+
+				    (!preftab.mnt_mountp || mntfs_same_word(
+				    preftab.mnt_mountp, prefbuf, MNT_LINE_MAX,
+				    (off_t)dbtabp->mnt_mountp, dbbufp,
+				    dbbufsize)) &&
+
+				    (!preftab.mnt_fstype || mntfs_same_word(
+				    preftab.mnt_fstype, prefbuf, MNT_LINE_MAX,
+				    (off_t)dbtabp->mnt_fstype, dbbufp,
+				    dbbufsize)) &&
+
+				    (!preftab.mnt_mntopts || mntfs_same_word(
+				    preftab.mnt_mntopts, prefbuf, MNT_LINE_MAX,
+				    (off_t)dbtabp->mnt_mntopts, dbbufp,
+				    dbbufsize)) &&
+
+				    (!preftab.mnt_time || mntfs_same_word(
+				    preftab.mnt_time, prefbuf, MNT_LINE_MAX,
+				    (off_t)dbtabp->mnt_time, dbbufp,
+				    dbbufsize)))
+					break;
+			}
+			rw_exit(dblockp);
+
+			if (elemp == NULL || type == 0 ||
+			    type == mntfs_special_info_element(elemp, cr))
+				break;
+
+			rw_enter(dblockp, RW_READER);
+			elemp = mntfs_get_next_elem(snapp, elemp);
+		}
+
+		kmem_free(prefbuf, MNT_LINE_MAX);
+
+		/* If we failed to find a match then return EOF. */
+		if (elemp == NULL) {
+			rw_exit(&mnp->mnt_contents);
+			*rvalp = MNTFS_EOF;
+			break;
+		}
+
+		/*
+		 * Check that the text buffer offered by the user will be large
+		 * enough to accommodate the text for this entry.
+		 */
+		if (elemp->mnte_text_size > MNT_LINE_MAX) {
+			rw_exit(&mnp->mnt_contents);
+			*rvalp = MNTFS_TOOLONG;
+			break;
+		}
+
+		/*
+		 * Populate the user's struct mnttab and text buffer using the
+		 * element's contents.
+		 */
+		if (mntfs_copyout_elem(elemp, uemp, ubufp, cmd, datamodel)) {
+			error = EFAULT;
 		} else {
-#endif
-			addr = (uintptr_t)(snap->mnts_metadata + idx *
-			    sizeof (struct extmnttab));
-			error = sulword((void *)arg, addr);
-#ifdef _SYSCALL32_IMPL
+			rw_enter(dblockp, RW_READER);
+			elemp = mntfs_get_next_elem(snapp, elemp);
+			rw_exit(dblockp);
+			snapp->mnts_next = elemp;
 		}
-#endif
+		rw_exit(&mnp->mnt_contents);
+		break;
+	}
 
-		if (error != 0) {
+	case MNTIOC_GETMNTENT:
+	case MNTIOC_GETEXTMNTENT:
+	{
+		STRUCT_DECL(mntentbuf, embuf);	/* Our copy of user's embuf */
+		struct extmnttab *uemp;		/* uaddr of user's emp */
+		char *ubufp;			/* uaddr of user's text buf */
+		size_t ubufsize;		/* size of the above */
+		mntelem_t *elemp;		/* a database element */
+
+
+		rw_enter(&mnp->mnt_contents, RW_WRITER);
+		if (snapp->mnts_nmnts == 0 ||
+		    (snapp->mnts_flags & MNTS_REWIND))
+			mntfs_snapshot(mnp, snapp);
+		if ((elemp = snapp->mnts_next) == NULL) {
 			rw_exit(&mnp->mnt_contents);
-			return (error);
+			*rvalp = MNTFS_EOF;
+			break;
 		}
 
-		mnp->mnt_offset++;
+		/*
+		 * embuf is a struct embuf within the kernel. We copy into it
+		 * the struct embuf supplied by the user.
+		 */
+		STRUCT_INIT(embuf, datamodel);
+		if (copyin((void *) arg, STRUCT_BUF(embuf),
+		    STRUCT_SIZE(embuf))) {
+			rw_exit(&mnp->mnt_contents);
+			error = EFAULT;
+			break;
+		}
+		uemp = STRUCT_FGETP(embuf, mbuf_emp);
+		ubufp = STRUCT_FGETP(embuf, mbuf_buf);
+		ubufsize = STRUCT_FGET(embuf, mbuf_bufsize);
+
+		/*
+		 * Check that the text buffer offered by the user will be large
+		 * enough to accommodate the text for this entry.
+		 */
+		if (elemp->mnte_text_size > ubufsize) {
+			rw_exit(&mnp->mnt_contents);
+			*rvalp = MNTFS_TOOLONG;
+			break;
+		}
+
+		/*
+		 * Populate the user's struct mnttab and text buffer using the
+		 * element's contents.
+		 */
+		if (mntfs_copyout_elem(elemp, uemp, ubufp, cmd, datamodel)) {
+			error = EFAULT;
+		} else {
+			rw_enter(dblockp, RW_READER);
+			elemp = mntfs_get_next_elem(snapp, elemp);
+			rw_exit(dblockp);
+			snapp->mnts_next = elemp;
+		}
+		rw_exit(&mnp->mnt_contents);
 		break;
 	}
 
@@ -1184,7 +1783,6 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
 		break;
 	}
 
-	rw_exit(&mnp->mnt_contents);
 	return (error);
 }
 

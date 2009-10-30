@@ -1405,8 +1405,22 @@ const struct ioc {
 		NULL},
 
 	/* mntio ioctls - ('m' << 8) */
+	{ (uint_t)MNTIOC_NMNTS,		"MNTIOC_NMNTS",
+		NULL},
+	{ (uint_t)MNTIOC_GETDEVLIST,	"MNTIOC_GETDEVLIST",
+		NULL},
+	{ (uint_t)MNTIOC_SETTAG,	"MNTIOC_SETTAG",
+		"struct mnttagdesc"},
+	{ (uint_t)MNTIOC_CLRTAG,	"MNTIOC_CLRTAG",
+		"struct mnttagdesc"},
+	{ (uint_t)MNTIOC_SHOWHIDDEN,	"MNTIOC_SHOWHIDDEN",
+		NULL},
 	{ (uint_t)MNTIOC_GETMNTENT,	"MNTIOC_GETMNTENT",
+		"struct mnttab"},
+	{ (uint_t)MNTIOC_GETEXTMNTENT,	"MNTIOC_GETEXTMNTENT",
 		"struct extmnttab"},
+	{ (uint_t)MNTIOC_GETMNTANY,	"MNTIOC_GETMNTANY",
+		"struct mnttab"},
 
 	/* devinfo ioctls - ('df' << 8) - devinfo_impl.h */
 	{ (uint_t)DINFOUSRLD,		"DINFOUSRLD",

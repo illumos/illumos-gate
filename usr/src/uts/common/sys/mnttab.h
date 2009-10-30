@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,14 +23,12 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_MNTTAB_H
 #define	_SYS_MNTTAB_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -53,6 +50,14 @@ extern "C" {
 
 #define	putmntent(fd, mp)	(-1)
 
+/*
+ * The fields in struct extmnttab should match those in struct mnttab until new
+ * fields are encountered. This allows hasmntopt(), getmntent_common() and
+ * mntioctl() to cast one type to the other safely.
+ *
+ * The fields in struct mnttab, struct extmnttab and struct mntentbuf must all
+ * match those in the corresponding 32-bit versions defined in mntvnops.c.
+ */
 struct mnttab {
 	char	*mnt_special;
 	char	*mnt_mountp;
@@ -61,11 +66,6 @@ struct mnttab {
 	char	*mnt_time;
 };
 
-/*
- * NOTE: fields in extmnttab should match struct mnttab till new fields
- * are encountered, this allows hasmntopt to work properly when its arg is
- * a pointer to an extmnttab struct cast to a mnttab struct pointer.
- */
 struct extmnttab {
 	char	*mnt_special;
 	char	*mnt_mountp;
@@ -74,6 +74,12 @@ struct extmnttab {
 	char	*mnt_time;
 	uint_t	mnt_major;
 	uint_t	mnt_minor;
+};
+
+struct mntentbuf {
+	struct	extmnttab *mbuf_emp;
+	size_t 	mbuf_bufsize;
+	char	*mbuf_buf;
 };
 
 #if !defined(_KERNEL)

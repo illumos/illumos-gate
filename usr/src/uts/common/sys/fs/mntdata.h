@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,28 +28,46 @@
 
 #include <sys/vnode.h>
 #include <sys/poll.h>
+#include <sys/mnttab.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+typedef struct mntelem {
+	/* Metadata. */
+	struct mntelem 	*mnte_next;
+	struct mntelem 	*mnte_prev;
+	timespec_t	mnte_birth;
+	timespec_t	mnte_death;
+	timespec_t	mnte_vfs_ctime;
+	int		mnte_refcnt;
+	/* Payload. */
+	int		mnte_hidden;
+	char		*mnte_text;
+	size_t		mnte_text_size;
+	struct extmnttab mnte_tab;
+} mntelem_t;
+
 typedef struct mntsnap {
-	char	*mnts_text;	/* base address of text in user addr space */
-	size_t	mnts_textsize;	/* size of mapped text */
-	char	*mnts_metadata;	/* base address of metadata in user space */
-	size_t	mnts_metasize;	/* size of mapped metadata */
-	uint_t	mnts_count;	/* number of mounts in snapshot */
-	timespec_t mnts_time;	/* time when snapshot was taken */
+	timespec_t mnts_time;		/* Time of this snapshot. */
+	timespec_t mnts_last_mtime;	/* mnttab modification time. */
+	mntelem_t *mnts_first;		/* First element in this snapshot. */
+	mntelem_t *mnts_next;		/* Next element to use. */
+	int mnts_flags;			/* flags; see below. */
+	size_t mnts_nmnts;		/* # of elements in this snapshot. */
+	size_t mnts_text_size;		/* Text size for this snapshot. */
+	size_t mnts_foffset;		/* File offset of last read(). */
+	size_t mnts_ieoffset;		/* Offset of last read() in element. */
 } mntsnap_t;
 
 typedef struct mntnode {
-	uint_t mnt_flags;	/* flags */
+	krwlock_t mnt_contents;	/* protects mnt_read, mnt_ioctl, mnt_offset */
+	uint_t mnt_flags;	/* flags; see below */
 	vnode_t *mnt_mountvp;	/* vnode mounted on */
 	vnode_t *mnt_vnode;	/* vnode for this mntnode */
 	mntsnap_t mnt_read;	/* Data for read() */
 	mntsnap_t mnt_ioctl;	/* Data for ioctl() */
-	uint_t mnt_offset;	/* offset within ioctl() snapshot */
-	krwlock_t mnt_contents;	/* protects mnt_read, mnt_ioctl, mnt_offset */
 } mntnode_t;
 
 struct zone;
@@ -68,12 +86,21 @@ typedef struct mntdata {
 #define	MTOV(pnp)	((pnp)->mnt_vnode)
 #define	MTOD(pnp)	((struct mntdata *)MTOV(pnp)->v_vfsp->vfs_data)
 
+#define	MNTFS_ELEM_IS_DEAD(x)	((x)->mnte_death.tv_sec || \
+				(x)->mnte_death.tv_nsec)
+#define	MNTFS_ELEM_IS_ALIVE(x)	!MNTFS_ELEM_IS_DEAD(x)
+
 #if defined(_KERNEL)
 
 /*
- * Values for mnt_flags.
+ * Value for a mntsnap_t's mnts_flags.
  */
-#define	MNT_SHOWHIDDEN	0x1	/* Hack to show all mounts, even MS_NOMNTTAB */
+#define	MNTS_SHOWHIDDEN	0x1	/* This snapshot contains hidden mounts. */
+#define	MNTS_REWIND	0x2	/* This snapshot must be refreshed. */
+/*
+ * Values for a mntnode_t's mnt_flags.
+ */
+#define	MNT_SHOWHIDDEN	0x1	/* Include MS_NOMNTTAB mounts in snapshots. */
 
 extern	struct vnodeops	*mntvnodeops;
 extern	void mntfs_getmntopts(struct vfs *, char **, size_t *);
