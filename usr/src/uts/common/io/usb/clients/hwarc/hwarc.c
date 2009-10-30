@@ -1075,7 +1075,7 @@ hwarc_reconnect_callback(dev_info_t *dip)
 	mutex_exit(&hrcp->hrc_mutex);
 
 	/* Reconnect the uwb device will restore uwb device state */
-	uwb_dev_reconnect(dip);
+	(void) uwb_dev_reconnect(dip);
 	return (USB_SUCCESS);
 }
 
@@ -1241,7 +1241,7 @@ hwarc_cpr_resume(dev_info_t *dip)
 	mutex_exit(&hrcp->hrc_mutex);
 
 	/* Reconnect the uwb device will restore uwb device state */
-	uwb_dev_reconnect(dip);
+	(void) uwb_dev_reconnect(dip);
 }
 
 /*

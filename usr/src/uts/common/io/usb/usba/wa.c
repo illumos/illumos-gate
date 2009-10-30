@@ -1272,8 +1272,8 @@ wusb_wa_clear_dev_ep(usba_pipe_handle_data_t *ph)
 	    "wusb_wa_clear_dev_ep:clear endpoint = 0x%02x", ept_addr);
 	if (ept_addr != 0) {
 	/* only clear non-default endpoints */
-		usb_clr_feature(ph->p_dip, USB_DEV_REQ_RCPT_EP, 0, ept_addr,
-		    USB_FLAGS_SLEEP, NULL, NULL);
+		(void) usb_clr_feature(ph->p_dip, USB_DEV_REQ_RCPT_EP, 0,
+		    ept_addr, USB_FLAGS_SLEEP, NULL, NULL);
 	}
 }
 

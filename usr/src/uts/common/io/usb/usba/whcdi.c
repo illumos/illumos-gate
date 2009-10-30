@@ -2721,7 +2721,7 @@ wusb_4way_handshake(wusb_hc_data_t *hc_data, usb_port_t port,
 	    3 * sizeof (wusb_hndshk_data_t), KM_SLEEP);
 
 	/* tkid is generated dynamically and saved in dev_info */
-	random_get_pseudo_bytes(tkid, 3);
+	(void) random_get_pseudo_bytes(tkid, 3);
 
 	(void) memcpy(dev_info->wdev_tkid, tkid, 3);
 

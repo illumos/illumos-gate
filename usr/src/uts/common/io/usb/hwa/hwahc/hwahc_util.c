@@ -501,7 +501,7 @@ hwahc_hcdi_pipe_open(
 	if (rval != USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_HCDI, hwahcp->hwahc_log_handle,
 		    "hwahc_hcdi_pipe_open: set target for rpipe failed");
-		wusb_wa_release_rpipe(wa, pp->pp_rp);
+		(void) wusb_wa_release_rpipe(wa, pp->pp_rp);
 		kmem_free(pp, sizeof (hwahc_pipe_private_t));
 		mutex_exit(&hwahcp->hwahc_mutex);
 
@@ -561,7 +561,7 @@ hwahc_hcdi_pipe_close(
 	wusb_wa_clear_dev_ep(ph); /* clear the remote dev's endpoint */
 	mutex_enter(&hwahcp->hwahc_mutex);
 
-	wusb_wa_release_rpipe(&hwahcp->hwahc_wa_data, pp->pp_rp);
+	(void) wusb_wa_release_rpipe(&hwahcp->hwahc_wa_data, pp->pp_rp);
 
 	mutex_enter(&ph->p_mutex);
 	cv_destroy(&pp->pp_xfer_cmpl_cv);
@@ -663,7 +663,7 @@ hwahc_hcdi_pipe_ctrl_xfer(
 			 * we need to reset this RPipe by ourself
 			 */
 			mutex_exit(&hwahcp->hwahc_mutex);
-			wusb_wa_rpipe_reset(hwahcp->hwahc_dip, ph,
+			(void) wusb_wa_rpipe_reset(hwahcp->hwahc_dip, ph,
 			    pp->pp_rp, 1);
 			mutex_enter(&hwahcp->hwahc_mutex);
 			pp->pp_state = 0;

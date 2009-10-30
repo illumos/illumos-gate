@@ -452,7 +452,7 @@ hwahc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case DDI_ATTACH:
 		break;
 	case DDI_RESUME:
-		hwahc_cpr_resume(dip);
+		(void) hwahc_cpr_resume(dip);
 
 		return (DDI_SUCCESS);
 	default:
@@ -4038,8 +4038,8 @@ hwahc_hc_initial_start(hwahc_state_t *hwahcp)
 	(void) memcpy(hwahcp->hwahc_hc_data.hc_mas, mas, WUSB_SET_WUSB_MAS_LEN);
 
 	/* Set initial GTK/TKID to random values */
-	random_get_pseudo_bytes(dft_gtk, 16);
-	random_get_pseudo_bytes(dft_gtkid, 3);
+	(void) random_get_pseudo_bytes(dft_gtk, 16);
+	(void) random_get_pseudo_bytes(dft_gtkid, 3);
 
 	/* set default GTK, need a way to dynamically compute it */
 	mutex_exit(&hwahcp->hwahc_mutex);

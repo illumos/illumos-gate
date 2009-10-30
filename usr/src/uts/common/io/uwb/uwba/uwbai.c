@@ -270,7 +270,7 @@ uwb_dev_disconnect(dev_info_t *dip)
 	    dip, channel, state);
 
 	if (state == UWB_STATE_BEACON) {
-		uwb_stop_beacon(dip);
+		(void) uwb_stop_beacon(dip);
 	}
 
 	mutex_enter(&uwba_dev->dev_mutex);
@@ -312,10 +312,10 @@ uwb_dev_reconnect(dev_info_t *dip)
 	    dip, channel, state);
 
 
-	uwb_set_dev_addr(dip, uwba_dev->dev_addr);
+	(void) uwb_set_dev_addr(dip, uwba_dev->dev_addr);
 
 	if (state == UWB_STATE_BEACON) {
-		uwb_start_beacon(dip, uwba_dev->channel);
+		(void) uwb_start_beacon(dip, uwba_dev->channel);
 	}
 
 
