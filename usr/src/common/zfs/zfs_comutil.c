@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is intended for functions that ought to be common between user
@@ -33,10 +31,13 @@
 
 #if defined(_KERNEL)
 #include <sys/systm.h>
+#else
+#include <string.h>
 #endif
 
 #include <sys/types.h>
 #include <sys/fs/zfs.h>
+#include <sys/int_limits.h>
 #include <sys/nvpair.h>
 
 /*
@@ -62,4 +63,42 @@ zfs_allocatable_devs(nvlist_t *nv)
 			return (B_TRUE);
 	}
 	return (B_FALSE);
+}
+
+void
+zpool_get_rewind_policy(nvlist_t *nvl, zpool_rewind_policy_t *zrpp)
+{
+	nvlist_t *policy;
+	nvpair_t *elem;
+	char *nm;
+
+	/* Defaults */
+	zrpp->zrp_request = ZPOOL_NO_REWIND;
+	zrpp->zrp_maxmeta = 0;
+	zrpp->zrp_maxdata = UINT32_MAX;
+	zrpp->zrp_txg = UINT64_MAX;
+
+	if (nvl == NULL)
+		return;
+
+	elem = NULL;
+	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
+		nm = nvpair_name(elem);
+		if (strcmp(nm, ZPOOL_REWIND_POLICY) == 0) {
+			if (nvpair_value_nvlist(elem, &policy) == 0)
+				zpool_get_rewind_policy(policy, zrpp);
+			return;
+		} else if (strcmp(nm, ZPOOL_REWIND_REQUEST) == 0) {
+			if (nvpair_value_uint32(elem,
+			    &zrpp->zrp_request) == 0)
+				if (zrpp->zrp_request & ~ZPOOL_REWIND_MASK)
+					zrpp->zrp_request = ZPOOL_NO_REWIND;
+		} else if (strcmp(nm, ZPOOL_REWIND_REQUEST_TXG) == 0) {
+			(void) nvpair_value_uint64(elem, &zrpp->zrp_txg);
+		} else if (strcmp(nm, ZPOOL_REWIND_META_THRESH) == 0) {
+			(void) nvpair_value_uint32(elem, &zrpp->zrp_maxmeta);
+		} else if (strcmp(nm, ZPOOL_REWIND_DATA_THRESH) == 0) {
+			(void) nvpair_value_uint32(elem, &zrpp->zrp_maxdata);
+		}
+	}
 }

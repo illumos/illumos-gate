@@ -236,6 +236,13 @@ usage(void)
 	    "\tzinject -d device -A <degrade|fault> pool\n"
 	    "\t\tPerform a specific action on a particular device\n"
 	    "\n"
+	    "\tzinject -I [-s <seconds> | -g <txgs>] pool\n"
+	    "\t\tCause the pool to stop writing blocks yet not\n"
+	    "\t\treport errors for a duration.  Simulates buggy hardware\n"
+	    "\t\tthat fails to honor cache flush requests.\n"
+	    "\t\tDefault duration is 30 seconds.  The machine is panicked\n"
+	    "\t\tat the end of the duration.\n"
+	    "\n"
 	    "\tzinject -b objset:object:level:blkid pool\n"
 	    "\n"
 	    "\t\tInject an error into pool 'pool' with the numeric bookmark\n"
@@ -479,6 +486,12 @@ register_handler(const char *pool, int flags, zinject_record_t *record,
 		} else if (record->zi_func[0] != '\0') {
 			(void) printf("  panic function: %s\n",
 			    record->zi_func);
+		} else if (record->zi_duration > 0) {
+			(void) printf(" time: %lld seconds\n",
+			    (u_longlong_t)record->zi_duration);
+		} else if (record->zi_duration < 0) {
+			(void) printf(" txgs: %lld \n",
+			    (u_longlong_t)-record->zi_duration);
 		} else {
 			(void) printf("objset: %llu\n",
 			    (u_longlong_t)record->zi_objset);
@@ -537,6 +550,9 @@ main(int argc, char **argv)
 	char pool[MAXNAMELEN];
 	char dataset[MAXNAMELEN];
 	zfs_handle_t *zhp;
+	int nowrites = 0;
+	int dur_txg = 0;
+	int dur_secs = 0;
 	int ret;
 	int flags = 0;
 
@@ -569,7 +585,7 @@ main(int argc, char **argv)
 	}
 
 	while ((c = getopt(argc, argv,
-	    ":aA:b:d:f:Fqhc:t:T:l:mr:e:uL:p:")) != -1) {
+	    ":aA:b:d:f:Fg:qhIc:t:T:l:mr:s:e:uL:p:")) != -1) {
 		switch (c) {
 		case 'a':
 			flags |= ZINJECT_FLUSH_ARC;
@@ -621,9 +637,27 @@ main(int argc, char **argv)
 		case 'F':
 			record.zi_failfast = B_TRUE;
 			break;
+		case 'g':
+			dur_txg = 1;
+			record.zi_duration = (int)strtol(optarg, &end, 10);
+			if (record.zi_duration <= 0 || *end != '\0') {
+				(void) fprintf(stderr, "invalid duration '%s': "
+				    "must be a positive integer\n", optarg);
+				usage();
+				return (1);
+			}
+			/* store duration of txgs as its negative */
+			record.zi_duration *= -1;
+			break;
 		case 'h':
 			usage();
 			return (0);
+		case 'I':
+			/* default duration, if one hasn't yet been defined */
+			nowrites = 1;
+			if (dur_secs == 0 && dur_txg == 0)
+				record.zi_duration = 30;
+			break;
 		case 'l':
 			level = (int)strtol(optarg, &end, 10);
 			if (*end != '\0') {
@@ -645,6 +679,16 @@ main(int argc, char **argv)
 			break;
 		case 'r':
 			range = optarg;
+			break;
+		case 's':
+			dur_secs = 1;
+			record.zi_duration = (int)strtol(optarg, &end, 10);
+			if (record.zi_duration <= 0 || *end != '\0') {
+				(void) fprintf(stderr, "invalid duration '%s': "
+				    "must be a positive integer\n", optarg);
+				usage();
+				return (1);
+			}
 			break;
 		case 'T':
 			if (strcasecmp(optarg, "read") == 0) {
@@ -707,7 +751,8 @@ main(int argc, char **argv)
 		 * '-c' is invalid with any other options.
 		 */
 		if (raw != NULL || range != NULL || type != TYPE_INVAL ||
-		    level != 0 || record.zi_func[0] != '\0') {
+		    level != 0 || record.zi_func[0] != '\0' ||
+		    record.zi_duration != 0) {
 			(void) fprintf(stderr, "cancel (-c) incompatible with "
 			    "any other options\n");
 			usage();
@@ -739,7 +784,8 @@ main(int argc, char **argv)
 		 * for doing injection, so handle it separately here.
 		 */
 		if (raw != NULL || range != NULL || type != TYPE_INVAL ||
-		    level != 0 || record.zi_func[0] != '\0') {
+		    level != 0 || record.zi_func[0] != '\0' ||
+		    record.zi_duration != 0) {
 			(void) fprintf(stderr, "device (-d) incompatible with "
 			    "data error injection\n");
 			usage();
@@ -773,7 +819,7 @@ main(int argc, char **argv)
 
 	} else if (raw != NULL) {
 		if (range != NULL || type != TYPE_INVAL || level != 0 ||
-		    record.zi_func[0] != '\0') {
+		    record.zi_func[0] != '\0' || record.zi_duration != 0) {
 			(void) fprintf(stderr, "raw (-b) format with "
 			    "any other options\n");
 			usage();
@@ -802,7 +848,7 @@ main(int argc, char **argv)
 			error = EIO;
 	} else if (record.zi_func[0] != '\0') {
 		if (raw != NULL || range != NULL || type != TYPE_INVAL ||
-		    level != 0 || device != NULL) {
+		    level != 0 || device != NULL || record.zi_duration != 0) {
 			(void) fprintf(stderr, "panic (-p) incompatible with "
 			    "other options\n");
 			usage();
@@ -818,10 +864,32 @@ main(int argc, char **argv)
 
 		(void) strcpy(pool, argv[0]);
 		dataset[0] = '\0';
+	} else if (record.zi_duration != 0) {
+		if (nowrites == 0) {
+			(void) fprintf(stderr, "-s or -g meaningless "
+			    "without -I (ignore writes)\n");
+			usage();
+			return (2);
+		} else if (dur_secs && dur_txg) {
+			(void) fprintf(stderr, "choose a duration either "
+			    "in seconds (-s) or a number of txgs (-g) "
+			    "but not both\n");
+			usage();
+			return (2);
+		} else if (argc != 1) {
+			(void) fprintf(stderr, "ignore writes (-I) "
+			    "injection requires a single pool name\n");
+			usage();
+			return (2);
+		}
+
+		(void) strcpy(pool, argv[0]);
+		dataset[0] = '\0';
 	} else if (type == TYPE_INVAL) {
 		if (flags == 0) {
 			(void) fprintf(stderr, "at least one of '-b', '-d', "
-			    "'-t', '-a', '-p', or '-u' must be specified\n");
+			    "'-t', '-a', '-p', '-I' or '-u' "
+			    "must be specified\n");
 			usage();
 			return (2);
 		}

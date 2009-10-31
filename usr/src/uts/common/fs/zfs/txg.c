@@ -188,7 +188,11 @@ txg_sync_stop(dsl_pool_t *dp)
 	 * Finish off any work in progress.
 	 */
 	ASSERT(tx->tx_threads == 2);
-	txg_wait_synced(dp, 0);
+
+	/*
+	 * We need to ensure that we've vacated the deferred space_maps.
+	 */
+	txg_wait_synced(dp, tx->tx_open_txg + TXG_DEFER_SIZE);
 
 	/*
 	 * Wake all sync threads and wait for them to die.

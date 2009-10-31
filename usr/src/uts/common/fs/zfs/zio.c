@@ -927,6 +927,10 @@ zio_write_bp_init(zio_t *zio)
 		BP_SET_BYTEORDER(bp, ZFS_HOST_BYTEORDER);
 	}
 
+	if (zio_injection_enabled &&
+	    zio->io_spa->spa_syncing_txg == zio->io_txg)
+		zio_handle_ignored_writes(zio);
+
 	return (ZIO_PIPELINE_CONTINUE);
 }
 

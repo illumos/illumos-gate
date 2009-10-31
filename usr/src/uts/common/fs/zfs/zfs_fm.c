@@ -109,9 +109,11 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 	char class[64];
 
 	/*
-	 * If we are doing a spa_tryimport(), ignore errors.
+	 * If we are doing a spa_tryimport() or in recovery mode,
+	 * ignore errors.
 	 */
-	if (spa->spa_load_state == SPA_LOAD_TRYIMPORT)
+	if (spa->spa_load_state == SPA_LOAD_TRYIMPORT ||
+	    spa->spa_load_state == SPA_LOAD_RECOVER)
 		return;
 
 	/*
@@ -340,6 +342,7 @@ zfs_ereport_start(nvlist_t **ereport_out, nvlist_t **detector_out,
 		    FM_EREPORT_PAYLOAD_ZFS_PREV_STATE,
 		    DATA_TYPE_UINT64, stateoroffset, NULL);
 	}
+
 	mutex_exit(&spa->spa_errlist_lock);
 
 	*ereport_out = ereport;

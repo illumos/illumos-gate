@@ -152,7 +152,8 @@ zio_handle_fault_injection(zio_t *zio, int error)
 
 		/* Ignore device errors and panic injection */
 		if (handler->zi_record.zi_guid != 0 ||
-		    handler->zi_record.zi_func[0] != '\0')
+		    handler->zi_record.zi_func[0] != '\0' ||
+		    handler->zi_record.zi_duration != 0)
 			continue;
 
 		/* If this handler matches, return EIO */
@@ -197,7 +198,8 @@ zio_handle_label_injection(zio_t *zio, int error)
 
 		/* Ignore device only faults or panic injection */
 		if (handler->zi_record.zi_start == 0 ||
-		    handler->zi_record.zi_func[0] != '\0')
+		    handler->zi_record.zi_func[0] != '\0' ||
+		    handler->zi_record.zi_duration != 0)
 			continue;
 
 		/*
@@ -243,9 +245,13 @@ zio_handle_device_injection(vdev_t *vd, zio_t *zio, int error)
 	for (handler = list_head(&inject_handlers); handler != NULL;
 	    handler = list_next(&inject_handlers, handler)) {
 
-		/* Ignore label specific faults or panic injection */
+		/*
+		 * Ignore label specific faults, panic injection
+		 * or fake writes
+		 */
 		if (handler->zi_record.zi_start != 0 ||
-		    handler->zi_record.zi_func[0] != '\0')
+		    handler->zi_record.zi_func[0] != '\0' ||
+		    handler->zi_record.zi_duration != 0)
 			continue;
 
 		if (vd->vdev_guid == handler->zi_record.zi_guid) {
@@ -282,6 +288,80 @@ zio_handle_device_injection(vdev_t *vd, zio_t *zio, int error)
 	rw_exit(&inject_lock);
 
 	return (ret);
+}
+
+/*
+ * Simulate hardware that ignores cache flushes.  For requested number
+ * of seconds nix the actual writing to disk.
+ */
+void
+zio_handle_ignored_writes(zio_t *zio)
+{
+	inject_handler_t *handler;
+
+	rw_enter(&inject_lock, RW_READER);
+
+	for (handler = list_head(&inject_handlers); handler != NULL;
+	    handler = list_next(&inject_handlers, handler)) {
+
+		/* Ignore errors not destined for this pool */
+		if (zio->io_spa != handler->zi_spa)
+			continue;
+
+		if (handler->zi_record.zi_duration == 0)
+			continue;
+
+		/*
+		 * Positive duration implies # of seconds, negative
+		 * a number of txgs
+		 */
+		if (handler->zi_record.zi_timer == 0) {
+			if (handler->zi_record.zi_duration > 0)
+				handler->zi_record.zi_timer = lbolt64;
+			else
+				handler->zi_record.zi_timer = zio->io_txg;
+		}
+		zio->io_pipeline &= ~ZIO_VDEV_IO_STAGES;
+		break;
+	}
+
+	rw_exit(&inject_lock);
+}
+
+void
+spa_handle_ignored_writes(spa_t *spa)
+{
+	inject_handler_t *handler;
+
+	if (zio_injection_enabled == 0)
+		return;
+
+	rw_enter(&inject_lock, RW_READER);
+
+	for (handler = list_head(&inject_handlers); handler != NULL;
+	    handler = list_next(&inject_handlers, handler)) {
+
+		/* Ignore errors not destined for this pool */
+		if (spa != handler->zi_spa)
+			continue;
+
+		if (handler->zi_record.zi_duration == 0)
+			continue;
+
+		if (handler->zi_record.zi_duration > 0) {
+			VERIFY(handler->zi_record.zi_timer == 0 ||
+			    handler->zi_record.zi_timer +
+			    handler->zi_record.zi_duration * hz > lbolt64);
+		} else {
+			/* duration is negative so the subtraction here adds */
+			VERIFY(handler->zi_record.zi_timer == 0 ||
+			    handler->zi_record.zi_timer -
+			    handler->zi_record.zi_duration >=
+			    spa->spa_syncing_txg);
+		}
+	}
+
+	rw_exit(&inject_lock);
 }
 
 /*

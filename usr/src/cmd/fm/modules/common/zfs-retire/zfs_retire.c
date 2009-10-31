@@ -516,7 +516,7 @@ zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 			/*
 			 * For pool-level repair events, clear the entire pool.
 			 */
-			(void) zpool_clear(zhp, NULL);
+			(void) zpool_clear(zhp, NULL, NULL);
 			zpool_close(zhp);
 			continue;
 		}

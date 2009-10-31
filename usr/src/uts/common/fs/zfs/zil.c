@@ -519,6 +519,8 @@ zil_claim(char *osname, void *txarg)
 			zio_free_blk(zilog->zl_spa, &zh->zh_log, first_txg);
 		BP_ZERO(&zh->zh_log);
 		dsl_dataset_dirty(dmu_objset_ds(os), tx);
+		dmu_objset_rele(os, FTAG);
+		return (0);
 	}
 
 	/*

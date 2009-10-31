@@ -420,7 +420,7 @@ spa_lookup(const char *name)
  * exist by calling spa_lookup() first.
  */
 spa_t *
-spa_add(const char *name, const char *altroot)
+spa_add(const char *name, nvlist_t *config, const char *altroot)
 {
 	spa_t *spa;
 	spa_config_dirent_t *dp;
@@ -445,6 +445,7 @@ spa_add(const char *name, const char *altroot)
 	spa->spa_state = POOL_STATE_UNINITIALIZED;
 	spa->spa_freeze_txg = UINT64_MAX;
 	spa->spa_final_txg = UINT64_MAX;
+	spa->spa_load_max_txg = UINT64_MAX;
 
 	refcount_create(&spa->spa_refcount);
 	spa_config_lock_init(spa);
@@ -470,6 +471,9 @@ spa_add(const char *name, const char *altroot)
 	dp = kmem_zalloc(sizeof (spa_config_dirent_t), KM_SLEEP);
 	dp->scd_path = spa_strdup(spa_config_path);
 	list_insert_head(&spa->spa_config_list, dp);
+
+	if (config != NULL)
+		VERIFY(nvlist_dup(config, &spa->spa_config, 0) == 0);
 
 	return (spa);
 }
@@ -818,7 +822,7 @@ spa_l2cache_activate(vdev_t *vd)
 void
 spa_l2cache_space_update(vdev_t *vd, int64_t space, int64_t alloc)
 {
-	vdev_space_update(vd, space, alloc, B_FALSE);
+	vdev_space_update(vd, space, alloc, 0, B_FALSE);
 }
 
 /*
@@ -1290,6 +1294,15 @@ spa_get_dspace(spa_t *spa)
 		return (spa->spa_root_vdev->vdev_stat.vs_dspace);
 	else
 		return (spa->spa_root_vdev->vdev_stat.vs_space);
+}
+
+/*
+ * Return the amount of space deferred from freeing (in in-core maps only)
+ */
+uint64_t
+spa_get_defers(spa_t *spa)
+{
+	return (spa->spa_root_vdev->vdev_stat.vs_defer);
 }
 
 /* ARGSUSED */

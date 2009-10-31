@@ -113,6 +113,7 @@ struct spa {
 	uint64_t	spa_first_txg;		/* first txg after spa_open() */
 	uint64_t	spa_final_txg;		/* txg of export/destroy */
 	uint64_t	spa_freeze_txg;		/* freeze pool at this txg */
+	uint64_t	spa_load_max_txg;	/* best initial ub_txg */
 	objset_t	*spa_meta_objset;	/* copy of dp->dp_meta_objset */
 	txg_list_t	spa_vdev_txg_list;	/* per-txg dirty vdev list */
 	vdev_t		*spa_root_vdev;		/* top-level vdev container */
@@ -128,6 +129,7 @@ struct spa {
 	bplist_t	spa_sync_bplist;	/* deferred-free bplist */
 	uberblock_t	spa_ubsync;		/* last synced uberblock */
 	uberblock_t	spa_uberblock;		/* current uberblock */
+	boolean_t	spa_extreme_rewind;	/* rewind past deferred frees */
 	kmutex_t	spa_scrub_lock;		/* resilver/scrub lock */
 	uint64_t	spa_scrub_inflight;	/* in-flight scrub I/Os */
 	uint64_t	spa_scrub_maxinflight;	/* max in-flight scrub I/Os */
@@ -145,7 +147,15 @@ struct spa {
 	uint16_t	spa_async_tasks;	/* async task mask */
 	char		*spa_root;		/* alternate root directory */
 	uint64_t	spa_ena;		/* spa-wide ereport ENA */
-	boolean_t	spa_last_open_failed;	/* true if last open faled */
+	int		spa_last_open_failed;	/* error if last open failed */
+	nvlist_t	*spa_failed_open_cfg;	/* cached config nvlist */
+	uint64_t	spa_last_ubsync_txg;	/* "best" uberblock txg */
+	uint64_t	spa_last_ubsync_txg_ts;	/* timestamp from that ub */
+	uint64_t	spa_load_txg;		/* ub txg that loaded */
+	uint64_t	spa_load_txg_ts;	/* timestamp from that ub */
+	uint64_t	spa_load_meta_errors;	/* verify metadata err count */
+	uint64_t	spa_load_data_errors;	/* verify data err count */
+	uint64_t	spa_verify_min_txg;	/* start txg of verify scrub */
 	kmutex_t	spa_errlog_lock;	/* error log lock */
 	uint64_t	spa_errlog_last;	/* last error log object */
 	uint64_t	spa_errlog_scrub;	/* scrub error log object */

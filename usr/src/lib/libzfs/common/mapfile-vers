@@ -158,6 +158,7 @@ SUNWprivate_1.1 {
 	zpool_disable_datasets;
 	zpool_enable_datasets;
 	zpool_expand_proplist;
+	zpool_explain_recover;
 	zpool_export;
 	zpool_export_force;
 	zpool_find_import;

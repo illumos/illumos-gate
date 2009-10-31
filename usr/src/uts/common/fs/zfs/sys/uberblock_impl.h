@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,11 +31,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-/*
- * For zdb use and debugging purposes only
- */
-extern uint64_t ub_max_txg;
 
 /*
  * The uberblock version is incremented whenever an incompatible on-disk

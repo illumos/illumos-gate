@@ -84,7 +84,7 @@ traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
 	zb.zb_object = 0;
 	zb.zb_level = -1;
 	zb.zb_blkid = bp->blk_cksum.zc_word[ZIL_ZC_SEQ];
-	VERIFY(0 == td->td_func(td->td_spa, bp, &zb, NULL, td->td_arg));
+	(void) td->td_func(td->td_spa, bp, &zb, NULL, td->td_arg);
 }
 
 /* ARGSUSED */
@@ -108,7 +108,7 @@ traverse_zil_record(zilog_t *zilog, lr_t *lrc, void *arg, uint64_t claim_txg)
 		zb.zb_object = lr->lr_foid;
 		zb.zb_level = BP_GET_LEVEL(bp);
 		zb.zb_blkid = lr->lr_offset / BP_GET_LSIZE(bp);
-		VERIFY(0 == td->td_func(td->td_spa, bp, &zb, NULL, td->td_arg));
+		(void) td->td_func(td->td_spa, bp, &zb, NULL, td->td_arg);
 	}
 }
 
@@ -378,7 +378,7 @@ traverse_dataset(dsl_dataset_t *ds, uint64_t txg_start, int flags,
  * NB: pool must not be changing on-disk (eg, from zdb or sync context).
  */
 int
-traverse_pool(spa_t *spa, blkptr_cb_t func, void *arg)
+traverse_pool(spa_t *spa, blkptr_cb_t func, void *arg, uint64_t txg_start)
 {
 	int err;
 	uint64_t obj;
@@ -387,12 +387,13 @@ traverse_pool(spa_t *spa, blkptr_cb_t func, void *arg)
 
 	/* visit the MOS */
 	err = traverse_impl(spa, 0, spa_get_rootblkptr(spa),
-	    0, TRAVERSE_PRE, func, arg);
+	    txg_start, TRAVERSE_PRE | TRAVERSE_PREFETCH, func, arg);
 	if (err)
 		return (err);
 
 	/* visit each dataset */
-	for (obj = 1; err == 0; err = dmu_object_next(mos, &obj, FALSE, 0)) {
+	for (obj = 1; err == 0; err = dmu_object_next(mos, &obj, FALSE,
+	    txg_start)) {
 		dmu_object_info_t doi;
 
 		err = dmu_object_info(mos, obj, &doi);
@@ -401,14 +402,17 @@ traverse_pool(spa_t *spa, blkptr_cb_t func, void *arg)
 
 		if (doi.doi_type == DMU_OT_DSL_DATASET) {
 			dsl_dataset_t *ds;
+			uint64_t txg = txg_start;
+
 			rw_enter(&dp->dp_config_rwlock, RW_READER);
 			err = dsl_dataset_hold_obj(dp, obj, FTAG, &ds);
 			rw_exit(&dp->dp_config_rwlock);
 			if (err)
 				return (err);
-			err = traverse_dataset(ds,
-			    ds->ds_phys->ds_prev_snap_txg, TRAVERSE_PRE,
-			    func, arg);
+			if (ds->ds_phys->ds_prev_snap_txg > txg)
+				txg = ds->ds_phys->ds_prev_snap_txg;
+			err = traverse_dataset(ds, txg,
+			    TRAVERSE_PRE | TRAVERSE_PREFETCH, func, arg);
 			dsl_dataset_rele(ds, FTAG);
 			if (err)
 				return (err);

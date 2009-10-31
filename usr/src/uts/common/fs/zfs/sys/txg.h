@@ -39,6 +39,9 @@ extern "C" {
 #define	TXG_INITIAL		TXG_SIZE	/* initial txg 		*/
 #define	TXG_IDX			(txg & TXG_MASK)
 
+/* Number of txgs worth of frees we defer adding to in-core spacemaps */
+#define	TXG_DEFER_SIZE		2
+
 #define	TXG_WAIT		1ULL
 #define	TXG_NOWAIT		2ULL
 

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_ZFS_COMUTIL_H
 #define	_ZFS_COMUTIL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fs/zfs.h>
 #include <sys/types.h>
@@ -35,7 +33,8 @@
 extern "C" {
 #endif
 
-extern boolean_t zfs_allocatable_devs(nvlist_t *nv);
+extern boolean_t zfs_allocatable_devs(nvlist_t *);
+extern void zpool_get_rewind_policy(nvlist_t *, zpool_rewind_policy_t *);
 
 #ifdef	__cplusplus
 }

@@ -127,6 +127,7 @@ void dsl_pool_sync(dsl_pool_t *dp, uint64_t txg);
 void dsl_pool_zil_clean(dsl_pool_t *dp);
 int dsl_pool_sync_context(dsl_pool_t *dp);
 uint64_t dsl_pool_adjustedsize(dsl_pool_t *dp, boolean_t netfree);
+uint64_t dsl_pool_adjustedfree(dsl_pool_t *dp, boolean_t netfree);
 int dsl_pool_tempreserve_space(dsl_pool_t *dp, uint64_t space, dmu_tx_t *tx);
 void dsl_pool_tempreserve_clear(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx);
 void dsl_pool_memory_pressure(dsl_pool_t *dp);

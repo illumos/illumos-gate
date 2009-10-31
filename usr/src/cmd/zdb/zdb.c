@@ -1619,7 +1619,7 @@ zdb_blkptr_cb(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
 	zdb_cb_t *zcb = arg;
 	char blkbuf[BP_SPRINTF_LEN];
 	dmu_object_type_t type;
-	boolean_t is_l0_metadata;
+	boolean_t is_metadata;
 
 	if (bp == NULL)
 		return (0);
@@ -1628,23 +1628,15 @@ zdb_blkptr_cb(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
 
 	zdb_count_block(spa, zcb, bp, type);
 
-	/*
-	 * if we do metadata-only checksumming there's no need to checksum
-	 * indirect blocks here because it is done during traverse
-	 */
-	is_l0_metadata = (BP_GET_LEVEL(bp) == 0 && type < DMU_OT_NUMTYPES &&
-	    dmu_ot[type].ot_metadata);
+	is_metadata = (BP_GET_LEVEL(bp) != 0 || dmu_ot[type].ot_metadata);
 
 	if (dump_opt['c'] > 1 || dump_opt['S'] ||
-	    (dump_opt['c'] && is_l0_metadata)) {
-		int ioerr, size;
-		void *data;
-
-		size = BP_GET_LSIZE(bp);
-		data = malloc(size);
-		ioerr = zio_wait(zio_read(NULL, spa, bp, data, size,
+	    (dump_opt['c'] && is_metadata)) {
+		size_t size = BP_GET_PSIZE(bp);
+		void *data = malloc(size);
+		int ioerr = zio_wait(zio_read(NULL, spa, bp, data, size,
 		    NULL, NULL, ZIO_PRIORITY_ASYNC_READ,
-		    ZIO_FLAG_CANFAIL | ZIO_FLAG_SCRUB, zb));
+		    ZIO_FLAG_CANFAIL | ZIO_FLAG_SCRUB | ZIO_FLAG_RAW, zb));
 		free(data);
 
 		/* We expect io errors on intent log */
@@ -1739,7 +1731,7 @@ dump_block_stats(spa_t *spa)
 		bplist_close(bpl);
 	}
 
-	zcb.zcb_haderrors |= traverse_pool(spa, zdb_blkptr_cb, &zcb);
+	zcb.zcb_haderrors |= traverse_pool(spa, zdb_blkptr_cb, &zcb, 0);
 
 	if (zcb.zcb_haderrors && !dump_opt['S']) {
 		(void) printf("\nError counts:\n\n");
@@ -2327,6 +2319,8 @@ main(int argc, char **argv)
 	char **searchdirs = NULL;
 	int nsearch = 0;
 	char *target;
+	nvlist_t *policy = NULL;
+	uint64_t max_txg = UINT64_MAX;
 
 	(void) setrlimit(RLIMIT_NOFILE, &rl);
 	(void) enable_extended_FILE_stdio(-1, -1);
@@ -2393,8 +2387,8 @@ main(int argc, char **argv)
 				usage();
 			break;
 		case 't':
-			ub_max_txg = strtoull(optarg, NULL, 0);
-			if (ub_max_txg < TXG_INITIAL) {
+			max_txg = strtoull(optarg, NULL, 0);
+			if (max_txg < TXG_INITIAL) {
 				(void) fprintf(stderr, "incorrect txg "
 				    "specified: %s\n", optarg);
 				usage();
@@ -2453,8 +2447,17 @@ main(int argc, char **argv)
 				(void) printf("\nConfiguration for import:\n");
 				dump_nvlist(cfg, 8);
 			}
+			if (nvlist_alloc(&policy, NV_UNIQUE_NAME, 0) != 0 ||
+			    nvlist_add_uint64(policy,
+			    ZPOOL_REWIND_REQUEST_TXG, max_txg) != 0 ||
+			    nvlist_add_nvlist(cfg,
+			    ZPOOL_REWIND_POLICY, policy) != 0) {
+				fatal("can't open '%s': %s",
+				    target, strerror(ENOMEM));
+			}
 			if ((error = spa_import(name, cfg, NULL)) != 0)
 				error = spa_import_verbatim(name, cfg, NULL);
+			nvlist_free(policy);
 		}
 	}
 

@@ -367,6 +367,20 @@ typedef enum zfs_cache_type {
 #define	ZPL_VERSION_SYSATTR		ZPL_VERSION_3
 #define	ZPL_VERSION_USERSPACE		ZPL_VERSION_4
 
+/* Rewind request information */
+#define	ZPOOL_NO_REWIND		0
+#define	ZPOOL_TRY_REWIND	1 /* Search for best txg, but do not rewind */
+#define	ZPOOL_DO_REWIND		2 /* Rewind to best txg w/in deferred frees */
+#define	ZPOOL_EXTREME_REWIND	4 /* Allow extreme measures to find best txg */
+#define	ZPOOL_REWIND_MASK	7 /* All the possible policy bits */
+
+typedef struct zpool_rewind_policy {
+	uint32_t	zrp_request;	/* rewind behavior requested */
+	uint32_t	zrp_maxmeta;	/* max acceptable meta-data errors */
+	uint32_t	zrp_maxdata;	/* max acceptable data errors */
+	uint64_t	zrp_txg;	/* specific txg to load */
+} zpool_rewind_policy_t;
+
 /*
  * The following are configuration names used in the nvlist describing a pool's
  * configuration.
@@ -420,6 +434,18 @@ typedef enum zfs_cache_type {
 #define	ZPOOL_CONFIG_REMOVED		"removed"
 #define	ZPOOL_CONFIG_FRU		"fru"
 #define	ZPOOL_CONFIG_AUX_STATE		"aux_state"
+
+/* Rewind policy parameters */
+#define	ZPOOL_REWIND_POLICY		"rewind-policy"
+#define	ZPOOL_REWIND_REQUEST		"rewind-request"
+#define	ZPOOL_REWIND_REQUEST_TXG	"rewind-request-txg"
+#define	ZPOOL_REWIND_META_THRESH	"rewind-meta-thresh"
+#define	ZPOOL_REWIND_DATA_THRESH	"rewind-data-thresh"
+
+/* Rewind data discovered */
+#define	ZPOOL_CONFIG_LOAD_TIME		"rewind_txg_ts"
+#define	ZPOOL_CONFIG_LOAD_DATA_ERRORS	"verify_data_errors"
+#define	ZPOOL_CONFIG_REWIND_TIME	"seconds_of_rewind"
 
 #define	VDEV_TYPE_ROOT			"root"
 #define	VDEV_TYPE_MIRROR		"mirror"
@@ -533,6 +559,7 @@ typedef struct vdev_stat {
 	uint64_t	vs_alloc;		/* space allocated	*/
 	uint64_t	vs_space;		/* total capacity	*/
 	uint64_t	vs_dspace;		/* deflated capacity	*/
+	uint64_t	vs_defer;		/* in-core deferred	*/
 	uint64_t	vs_rsize;		/* replaceable dev size */
 	uint64_t	vs_ops[ZIO_TYPES];	/* operation count	*/
 	uint64_t	vs_bytes[ZIO_TYPES];	/* bytes read/written	*/
@@ -631,7 +658,8 @@ typedef enum {
 	SPA_LOAD_NONE,		/* no load in progress */
 	SPA_LOAD_OPEN,		/* normal open */
 	SPA_LOAD_IMPORT,	/* import in progress */
-	SPA_LOAD_TRYIMPORT	/* tryimport in progress */
+	SPA_LOAD_TRYIMPORT,	/* tryimport in progress */
+	SPA_LOAD_RECOVER	/* recovery requested */
 } spa_load_state_t;
 
 /*

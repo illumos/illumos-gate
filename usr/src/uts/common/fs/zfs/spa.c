@@ -1151,12 +1151,91 @@ spa_aux_check_removed(spa_aux_vdev_t *sav)
 		spa_check_removed(sav->sav_vdevs[i]);
 }
 
+typedef struct spa_load_error {
+	uint64_t	sle_metadata_count;
+	uint64_t	sle_data_count;
+} spa_load_error_t;
+
+static void
+spa_load_verify_done(zio_t *zio)
+{
+	blkptr_t *bp = zio->io_bp;
+	spa_load_error_t *sle = zio->io_private;
+	dmu_object_type_t type = BP_GET_TYPE(bp);
+	int error = zio->io_error;
+
+	if (error) {
+		if ((BP_GET_LEVEL(bp) != 0 || dmu_ot[type].ot_metadata) &&
+		    type != DMU_OT_INTENT_LOG)
+			atomic_add_64(&sle->sle_metadata_count, 1);
+		else
+			atomic_add_64(&sle->sle_data_count, 1);
+	}
+	zio_data_buf_free(zio->io_data, zio->io_size);
+}
+
+/*ARGSUSED*/
+static int
+spa_load_verify_cb(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
+    const dnode_phys_t *dnp, void *arg)
+{
+	if (bp != NULL) {
+		zio_t *rio = arg;
+		size_t size = BP_GET_PSIZE(bp);
+		void *data = zio_data_buf_alloc(size);
+
+		zio_nowait(zio_read(rio, spa, bp, data, size,
+		    spa_load_verify_done, rio->io_private, ZIO_PRIORITY_SCRUB,
+		    ZIO_FLAG_SPECULATIVE | ZIO_FLAG_CANFAIL |
+		    ZIO_FLAG_SCRUB | ZIO_FLAG_RAW, zb));
+	}
+	return (0);
+}
+
+static int
+spa_load_verify(spa_t *spa)
+{
+	zio_t *rio;
+	spa_load_error_t sle = { 0 };
+	zpool_rewind_policy_t policy;
+	boolean_t verify_ok = B_FALSE;
+	int error;
+
+	rio = zio_root(spa, NULL, &sle,
+	    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE);
+
+	error = traverse_pool(spa, spa_load_verify_cb, rio,
+	    spa->spa_verify_min_txg);
+
+	(void) zio_wait(rio);
+
+	zpool_get_rewind_policy(spa->spa_config, &policy);
+
+	spa->spa_load_meta_errors = sle.sle_metadata_count;
+	spa->spa_load_data_errors = sle.sle_data_count;
+
+	if (!error && sle.sle_metadata_count <= policy.zrp_maxmeta &&
+	    sle.sle_data_count <= policy.zrp_maxdata) {
+		verify_ok = B_TRUE;
+		spa->spa_load_txg = spa->spa_uberblock.ub_txg;
+		spa->spa_load_txg_ts = spa->spa_uberblock.ub_timestamp;
+	}
+
+	if (error) {
+		if (error != ENXIO && error != EIO)
+			error = EIO;
+		return (error);
+	}
+
+	return (verify_ok ? 0 : EIO);
+}
+
 /*
  * Load an existing storage pool, using the pool's builtin spa_config as a
  * source of configuration information.
  */
 static int
-spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
+spa_load(spa_t *spa, spa_load_state_t state, int mosconfig)
 {
 	int error = 0;
 	nvlist_t *nvconfig, *nvroot = NULL;
@@ -1168,6 +1247,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	uint64_t autoreplace = 0;
 	int orig_mode = spa->spa_mode;
 	char *ereport = FM_EREPORT_ZFS_POOL;
+	nvlist_t *config = spa->spa_config;
 
 	/*
 	 * If this is an untrusted config, access the pool in read-only mode.
@@ -1296,11 +1376,15 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	 */
 	spa->spa_state = POOL_STATE_ACTIVE;
 	spa->spa_ubsync = spa->spa_uberblock;
-	spa->spa_first_txg = spa_last_synced_txg(spa) + 1;
+	spa->spa_verify_min_txg = spa->spa_extreme_rewind ?
+	    TXG_INITIAL : spa_last_synced_txg(spa) - TXG_DEFER_SIZE;
+	spa->spa_first_txg = spa->spa_last_ubsync_txg ?
+	    spa->spa_last_ubsync_txg : spa_last_synced_txg(spa) + 1;
 	error = dsl_pool_open(spa, spa->spa_first_txg, &spa->spa_dsl_pool);
 	if (error) {
 		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_CORRUPT_DATA);
+		error = EIO;
 		goto out;
 	}
 	spa->spa_meta_objset = spa->spa_dsl_pool->dp_meta_objset;
@@ -1359,7 +1443,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		spa_deactivate(spa);
 		spa_activate(spa, orig_mode);
 
-		return (spa_load(spa, nvconfig, state, B_TRUE));
+		return (spa_load(spa, state, B_TRUE));
 	}
 
 	if (zap_lookup(spa->spa_meta_objset,
@@ -1569,7 +1653,17 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		goto out;
 	}
 
-	if (spa_writeable(spa)) {
+	if (state != SPA_LOAD_TRYIMPORT) {
+		error = spa_load_verify(spa);
+		if (error) {
+			vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_CORRUPT_DATA);
+			goto out;
+		}
+	}
+
+	if (spa_writeable(spa) && (state == SPA_LOAD_RECOVER ||
+	    spa->spa_load_max_txg == UINT64_MAX)) {
 		dmu_tx_t *tx;
 		int need_update = B_FALSE;
 
@@ -1578,6 +1672,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		/*
 		 * Claim log blocks that haven't been committed yet.
 		 * This must all happen in a single txg.
+		 * Price of rollback is that we abandon the log.
 		 */
 		tx = dmu_tx_create_assigned(spa_get_dsl(spa),
 		    spa_first_txg(spa));
@@ -1602,7 +1697,8 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		 * in-core spa_config and update the disk labels.
 		 */
 		if (config_cache_txg != spa->spa_config_txg ||
-		    state == SPA_LOAD_IMPORT || spa->spa_load_verbatim)
+		    state == SPA_LOAD_IMPORT || spa->spa_load_verbatim ||
+		    state == SPA_LOAD_RECOVER)
 			need_update = B_TRUE;
 
 		for (int c = 0; c < rvd->vdev_children; c++)
@@ -1636,6 +1732,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 
 	error = 0;
 out:
+
 	spa->spa_minref = refcount_count(&spa->spa_refcount);
 	if (error && error != EBADF)
 		zfs_ereport_post(ereport, spa, NULL, NULL, 0, 0);
@@ -1643,6 +1740,76 @@ out:
 	spa->spa_ena = 0;
 
 	return (error);
+}
+
+static int
+spa_load_retry(spa_t *spa, spa_load_state_t state, int mosconfig)
+{
+	spa_unload(spa);
+	spa_deactivate(spa);
+
+	spa->spa_load_max_txg--;
+
+	spa_activate(spa, spa_mode_global);
+	spa_async_suspend(spa);
+
+	return (spa_load(spa, state, mosconfig));
+}
+
+static int
+spa_load_best(spa_t *spa, spa_load_state_t state, int mosconfig,
+    uint64_t max_request, boolean_t extreme)
+{
+	nvlist_t *config = NULL;
+	int load_error, rewind_error;
+	uint64_t safe_rollback_txg;
+	uint64_t min_txg;
+
+	if (spa->spa_load_txg && state == SPA_LOAD_RECOVER)
+		spa->spa_load_max_txg = spa->spa_load_txg;
+	else
+		spa->spa_load_max_txg = max_request;
+
+	load_error = rewind_error = spa_load(spa, state, mosconfig);
+	if (load_error == 0)
+		return (0);
+
+	if (spa->spa_root_vdev != NULL)
+		config = spa_config_generate(spa, NULL, -1ULL, B_TRUE);
+
+	spa->spa_last_ubsync_txg = spa->spa_uberblock.ub_txg;
+	spa->spa_last_ubsync_txg_ts = spa->spa_uberblock.ub_timestamp;
+
+	/* specific txg requested */
+	if (spa->spa_load_max_txg != UINT64_MAX && !extreme) {
+		nvlist_free(config);
+		return (load_error);
+	}
+
+	/* Price of rolling back is discarding txgs, including log */
+	if (state == SPA_LOAD_RECOVER)
+		spa->spa_log_state = SPA_LOG_CLEAR;
+
+	spa->spa_load_max_txg = spa->spa_uberblock.ub_txg;
+	safe_rollback_txg = spa->spa_uberblock.ub_txg - TXG_DEFER_SIZE;
+
+	min_txg = extreme ? TXG_INITIAL : safe_rollback_txg;
+	while (rewind_error && (spa->spa_uberblock.ub_txg >= min_txg)) {
+		if (spa->spa_load_max_txg < safe_rollback_txg)
+			spa->spa_extreme_rewind = B_TRUE;
+		rewind_error = spa_load_retry(spa, state, mosconfig);
+	}
+
+	if (config)
+		spa_rewind_data_to_nvlist(spa, config);
+
+	spa->spa_extreme_rewind = B_FALSE;
+	spa->spa_load_max_txg = UINT64_MAX;
+
+	if (config && (rewind_error || state != SPA_LOAD_RECOVER))
+		spa_config_set(spa, config);
+
+	return (state == SPA_LOAD_RECOVER ? rewind_error : load_error);
 }
 
 /*
@@ -1658,13 +1825,24 @@ out:
  * ambiguous state.
  */
 static int
-spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t **config)
+spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t *nvpolicy,
+    nvlist_t **config)
 {
 	spa_t *spa;
+	boolean_t norewind;
+	boolean_t extreme;
+	zpool_rewind_policy_t policy;
+	spa_load_state_t state = SPA_LOAD_OPEN;
 	int error;
 	int locked = B_FALSE;
 
 	*spapp = NULL;
+
+	zpool_get_rewind_policy(nvpolicy, &policy);
+	if (policy.zrp_request & ZPOOL_DO_REWIND)
+		state = SPA_LOAD_RECOVER;
+	norewind = (policy.zrp_request == ZPOOL_NO_REWIND);
+	extreme = ((policy.zrp_request & ZPOOL_EXTREME_REWIND) != 0);
 
 	/*
 	 * As disgusting as this is, we need to support recursive calls to this
@@ -1682,11 +1860,26 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t **config)
 			mutex_exit(&spa_namespace_lock);
 		return (ENOENT);
 	}
+
 	if (spa->spa_state == POOL_STATE_UNINITIALIZED) {
 
 		spa_activate(spa, spa_mode_global);
 
-		error = spa_load(spa, spa->spa_config, SPA_LOAD_OPEN, B_FALSE);
+		if (spa->spa_last_open_failed && norewind) {
+			if (config != NULL && spa->spa_config)
+				VERIFY(nvlist_dup(spa->spa_config,
+				    config, KM_SLEEP) == 0);
+			spa_deactivate(spa);
+			if (locked)
+				mutex_exit(&spa_namespace_lock);
+			return (spa->spa_last_open_failed);
+		}
+
+		if (state != SPA_LOAD_RECOVER)
+			spa->spa_last_ubsync_txg = spa->spa_load_txg = 0;
+
+		error = spa_load_best(spa, state, B_FALSE, policy.zrp_txg,
+		    extreme);
 
 		if (error == EBADF) {
 			/*
@@ -1711,38 +1904,49 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t **config)
 			 * information: the state of each vdev after the
 			 * attempted vdev_open().  Return this to the user.
 			 */
-			if (config != NULL && spa->spa_root_vdev != NULL)
-				*config = spa_config_generate(spa, NULL, -1ULL,
-				    B_TRUE);
+			if (config != NULL && spa->spa_config)
+				VERIFY(nvlist_dup(spa->spa_config, config,
+				    KM_SLEEP) == 0);
 			spa_unload(spa);
 			spa_deactivate(spa);
-			spa->spa_last_open_failed = B_TRUE;
+			spa->spa_last_open_failed = error;
 			if (locked)
 				mutex_exit(&spa_namespace_lock);
 			*spapp = NULL;
 			return (error);
-		} else {
-			spa->spa_last_open_failed = B_FALSE;
 		}
+
 	}
 
 	spa_open_ref(spa, tag);
+
+	spa->spa_last_open_failed = 0;
+
+	if (config != NULL)
+		*config = spa_config_generate(spa, NULL, -1ULL, B_TRUE);
+
+	spa->spa_last_ubsync_txg = 0;
+	spa->spa_load_txg = 0;
 
 	if (locked)
 		mutex_exit(&spa_namespace_lock);
 
 	*spapp = spa;
 
-	if (config != NULL)
-		*config = spa_config_generate(spa, NULL, -1ULL, B_TRUE);
-
 	return (0);
+}
+
+int
+spa_open_rewind(const char *name, spa_t **spapp, void *tag, nvlist_t *policy,
+    nvlist_t **config)
+{
+	return (spa_open_common(name, spapp, tag, policy, config));
 }
 
 int
 spa_open(const char *name, spa_t **spapp, void *tag)
 {
-	return (spa_open_common(name, spapp, tag, NULL));
+	return (spa_open_common(name, spapp, tag, NULL, NULL));
 }
 
 /*
@@ -1883,7 +2087,7 @@ spa_get_stats(const char *name, nvlist_t **config, char *altroot, size_t buflen)
 	spa_t *spa;
 
 	*config = NULL;
-	error = spa_open_common(name, &spa, FTAG, config);
+	error = spa_open_common(name, &spa, FTAG, NULL, config);
 
 	if (spa != NULL) {
 		/*
@@ -2143,7 +2347,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	 */
 	(void) nvlist_lookup_string(props,
 	    zpool_prop_to_name(ZPOOL_PROP_ALTROOT), &altroot);
-	spa = spa_add(pool, altroot);
+	spa = spa_add(pool, NULL, altroot);
 	spa_activate(spa, spa_mode_global);
 
 	spa->spa_uberblock.ub_txg = txg - 1;
@@ -2450,7 +2654,7 @@ spa_import_rootpool(char *devpath, char *devid)
 		spa_remove(spa);
 	}
 
-	spa = spa_add(pname, NULL);
+	spa = spa_add(pname, config, NULL);
 	spa->spa_is_root = B_TRUE;
 	spa->spa_load_verbatim = B_TRUE;
 
@@ -2529,6 +2733,7 @@ int
 spa_import_verbatim(const char *pool, nvlist_t *config, nvlist_t *props)
 {
 	spa_t *spa;
+	zpool_rewind_policy_t policy;
 	char *altroot = NULL;
 
 	mutex_enter(&spa_namespace_lock);
@@ -2539,11 +2744,12 @@ spa_import_verbatim(const char *pool, nvlist_t *config, nvlist_t *props)
 
 	(void) nvlist_lookup_string(props,
 	    zpool_prop_to_name(ZPOOL_PROP_ALTROOT), &altroot);
-	spa = spa_add(pool, altroot);
+	spa = spa_add(pool, config, altroot);
+
+	zpool_get_rewind_policy(config, &policy);
+	spa->spa_load_max_txg = policy.zrp_txg;
 
 	spa->spa_load_verbatim = B_TRUE;
-
-	VERIFY(nvlist_dup(config, &spa->spa_config, 0) == 0);
 
 	if (props != NULL)
 		spa_configfile_set(spa, props, B_FALSE);
@@ -2564,6 +2770,8 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props)
 {
 	spa_t *spa;
 	char *altroot = NULL;
+	spa_load_state_t state = SPA_LOAD_IMPORT;
+	zpool_rewind_policy_t policy;
 	int error;
 	nvlist_t *nvroot;
 	nvlist_t **spares, **l2cache;
@@ -2578,12 +2786,16 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props)
 		return (EEXIST);
 	}
 
+	zpool_get_rewind_policy(config, &policy);
+	if (policy.zrp_request & ZPOOL_DO_REWIND)
+		state = SPA_LOAD_RECOVER;
+
 	/*
 	 * Create and initialize the spa structure.
 	 */
 	(void) nvlist_lookup_string(props,
 	    zpool_prop_to_name(ZPOOL_PROP_ALTROOT), &altroot);
-	spa = spa_add(pool, altroot);
+	spa = spa_add(pool, config, altroot);
 	spa_activate(spa, spa_mode_global);
 
 	/*
@@ -2596,7 +2808,16 @@ spa_import(const char *pool, nvlist_t *config, nvlist_t *props)
 	 * because the user-supplied config is actually the one to trust when
 	 * doing an import.
 	 */
-	error = spa_load(spa, config, SPA_LOAD_IMPORT, B_TRUE);
+	if (state != SPA_LOAD_RECOVER)
+		spa->spa_last_ubsync_txg = spa->spa_load_txg = 0;
+	error = spa_load_best(spa, state, B_TRUE, policy.zrp_txg,
+	    ((policy.zrp_request & ZPOOL_EXTREME_REWIND) != 0));
+
+	/*
+	 * Propagate anything learned about failing or best txgs
+	 * back to caller
+	 */
+	spa_rewind_data_to_nvlist(spa, config);
 
 	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
 	/*
@@ -2726,7 +2947,7 @@ spa_tryimport(nvlist_t *tryconfig)
 	 * Create and initialize the spa structure.
 	 */
 	mutex_enter(&spa_namespace_lock);
-	spa = spa_add(TRYIMPORT_NAME, NULL);
+	spa = spa_add(TRYIMPORT_NAME, tryconfig, NULL);
 	spa_activate(spa, FREAD);
 
 	/*
@@ -2734,7 +2955,7 @@ spa_tryimport(nvlist_t *tryconfig)
 	 * Pass TRUE for mosconfig because the user-supplied config
 	 * is actually the one to trust when doing an import.
 	 */
-	error = spa_load(spa, tryconfig, SPA_LOAD_TRYIMPORT, B_TRUE);
+	error = spa_load(spa, SPA_LOAD_TRYIMPORT, B_TRUE);
 
 	/*
 	 * If 'tryconfig' was at least parsable, return the current config.
@@ -4530,6 +4751,8 @@ spa_sync(spa_t *spa, uint64_t txg)
 	ASSERT(bpl->bpl_queue == NULL);
 
 	spa_config_exit(spa, SCL_CONFIG, FTAG);
+
+	spa_handle_ignored_writes(spa);
 
 	/*
 	 * If any async tasks have been requested, kick them off.

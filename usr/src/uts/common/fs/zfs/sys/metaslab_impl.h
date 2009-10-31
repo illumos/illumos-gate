@@ -67,7 +67,9 @@ struct metaslab {
 	space_map_obj_t	ms_smo_syncing;	/* syncing space map object	*/
 	space_map_t	ms_allocmap[TXG_SIZE];  /* allocated this txg	*/
 	space_map_t	ms_freemap[TXG_SIZE];	/* freed this txg	*/
+	space_map_t	ms_defermap[TXG_DEFER_SIZE]; /* deferred frees	*/
 	space_map_t	ms_map;		/* in-core free space map	*/
+	int64_t		ms_deferspace;	/* sum of ms_defermap[] space	*/
 	uint64_t	ms_weight;	/* weight vs. others in group	*/
 	metaslab_group_t *ms_group;	/* metaslab group		*/
 	avl_node_t	ms_group_node;	/* node in metaslab group tree	*/

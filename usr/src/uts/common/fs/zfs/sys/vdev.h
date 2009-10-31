@@ -85,7 +85,7 @@ extern void vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state,
     vdev_aux_t aux);
 
 extern void vdev_space_update(vdev_t *vd, int64_t space_delta,
-    int64_t alloc_delta, boolean_t update_root);
+    int64_t alloc_delta, int64_t defer_delta, boolean_t update_root);
 
 extern uint64_t vdev_psize_to_asize(vdev_t *vd, uint64_t psize);
 

@@ -320,6 +320,8 @@ typedef struct blkptr {
 
 /* state manipulation functions */
 extern int spa_open(const char *pool, spa_t **, void *tag);
+extern int spa_open_rewind(const char *pool, spa_t **, void *tag,
+    nvlist_t *policy, nvlist_t **config);
 extern int spa_get_stats(const char *pool, nvlist_t **config,
     char *altroot, size_t buflen);
 extern int spa_create(const char *pool, nvlist_t *config, nvlist_t *props,
@@ -402,7 +404,7 @@ extern void spa_config_update_common(spa_t *spa, int what, boolean_t isroot);
 
 /* Namespace manipulation */
 extern spa_t *spa_lookup(const char *name);
-extern spa_t *spa_add(const char *name, const char *altroot);
+extern spa_t *spa_add(const char *name, nvlist_t *config, const char *altroot);
 extern void spa_remove(spa_t *spa);
 extern spa_t *spa_next(spa_t *prev);
 
@@ -457,6 +459,7 @@ extern uint64_t spa_freeze_txg(spa_t *spa);
 extern uint64_t spa_get_alloc(spa_t *spa);
 extern uint64_t spa_get_space(spa_t *spa);
 extern uint64_t spa_get_dspace(spa_t *spa);
+extern uint64_t spa_get_defers(spa_t *spa);
 extern uint64_t spa_get_asize(spa_t *spa, uint64_t lsize);
 extern uint64_t spa_version(spa_t *spa);
 extern int spa_max_replication(spa_t *spa);
@@ -481,6 +484,8 @@ extern uint64_t bp_get_dasize(spa_t *spa, const blkptr_t *bp);
 extern boolean_t spa_has_slogs(spa_t *spa);
 extern boolean_t spa_is_root(spa_t *spa);
 extern boolean_t spa_writeable(spa_t *spa);
+extern void spa_rewind_data_to_nvlist(spa_t *spa, nvlist_t *to);
+
 extern int spa_mode(spa_t *spa);
 extern uint64_t strtonum(const char *str, char **nptr);
 

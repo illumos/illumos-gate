@@ -2564,7 +2564,7 @@ vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type, boolean_t complete)
  */
 void
 vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta,
-    boolean_t update_root)
+    int64_t defer_delta, boolean_t update_root)
 {
 	int64_t dspace_delta = space_delta;
 	spa_t *spa = vd->vdev_spa;
@@ -2587,6 +2587,7 @@ vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta,
 	vd->vdev_stat.vs_space += space_delta;
 	vd->vdev_stat.vs_alloc += alloc_delta;
 	vd->vdev_stat.vs_dspace += dspace_delta;
+	vd->vdev_stat.vs_defer += defer_delta;
 	mutex_exit(&vd->vdev_stat_lock);
 
 	if (update_root) {
@@ -2604,6 +2605,7 @@ vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta,
 		rvd->vdev_stat.vs_space += space_delta;
 		rvd->vdev_stat.vs_alloc += alloc_delta;
 		rvd->vdev_stat.vs_dspace += dspace_delta;
+		rvd->vdev_stat.vs_defer += defer_delta;
 		mutex_exit(&rvd->vdev_stat_lock);
 	}
 }

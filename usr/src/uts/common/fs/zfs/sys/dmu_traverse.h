@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@ typedef int (blkptr_cb_t)(spa_t *spa, blkptr_t *bp,
 
 int traverse_dataset(struct dsl_dataset *ds, uint64_t txg_start,
     int flags, blkptr_cb_t func, void *arg);
-int traverse_pool(spa_t *spa, blkptr_cb_t func, void *arg);
+int traverse_pool(spa_t *spa, blkptr_cb_t func, void *arg, uint64_t txg_start);
 
 #ifdef	__cplusplus
 }

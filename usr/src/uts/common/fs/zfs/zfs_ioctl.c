@@ -950,9 +950,9 @@ zfs_ioc_pool_destroy(zfs_cmd_t *zc)
 static int
 zfs_ioc_pool_import(zfs_cmd_t *zc)
 {
-	int error;
 	nvlist_t *config, *props = NULL;
 	uint64_t guid;
+	int error;
 
 	if ((error = get_nvlist(zc->zc_nvlist_conf, zc->zc_nvlist_conf_size,
 	    zc->zc_iflags, &config)) != 0)
@@ -969,10 +969,12 @@ zfs_ioc_pool_import(zfs_cmd_t *zc)
 	    guid != zc->zc_guid)
 		error = EINVAL;
 	else if (zc->zc_cookie)
-		error = spa_import_verbatim(zc->zc_name, config,
-		    props);
+		error = spa_import_verbatim(zc->zc_name, config, props);
 	else
 		error = spa_import(zc->zc_name, config, props);
+
+	if (zc->zc_nvlist_dst != 0)
+		(void) put_nvlist(zc, config);
 
 	nvlist_free(config);
 
@@ -2980,9 +2982,31 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 		/* we need to let spa_open/spa_load clear the chains */
 		spa->spa_log_state = SPA_LOG_CLEAR;
 	}
+	spa->spa_last_open_failed = 0;
 	mutex_exit(&spa_namespace_lock);
 
-	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+	if (zc->zc_cookie == ZPOOL_NO_REWIND) {
+		error = spa_open(zc->zc_name, &spa, FTAG);
+	} else {
+		nvlist_t *policy;
+		nvlist_t *config = NULL;
+
+		if (zc->zc_nvlist_src == NULL)
+			return (EINVAL);
+
+		if ((error = get_nvlist(zc->zc_nvlist_src,
+		    zc->zc_nvlist_src_size, zc->zc_iflags, &policy)) == 0) {
+			error = spa_open_rewind(zc->zc_name, &spa, FTAG,
+			    policy, &config);
+			if (config != NULL) {
+				(void) put_nvlist(zc, config);
+				nvlist_free(config);
+			}
+			nvlist_free(policy);
+		}
+	}
+
+	if (error)
 		return (error);
 
 	spa_vdev_state_enter(spa, SCL_NONE);

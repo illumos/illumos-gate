@@ -216,7 +216,7 @@ extern int zpool_add(zpool_handle_t *, nvlist_t *);
  * Functions to manipulate pool and vdev state
  */
 extern int zpool_scrub(zpool_handle_t *, pool_scrub_type_t);
-extern int zpool_clear(zpool_handle_t *, const char *);
+extern int zpool_clear(zpool_handle_t *, const char *, nvlist_t *);
 
 extern int zpool_vdev_online(zpool_handle_t *, const char *, int,
     vdev_state_t *);
@@ -347,6 +347,8 @@ extern void zpool_obj_to_path(zpool_handle_t *, uint64_t, uint64_t, char *,
     size_t len);
 extern int zfs_ioctl(libzfs_handle_t *, int, struct zfs_cmd *);
 extern int zpool_get_physpath(zpool_handle_t *, char *, size_t);
+extern void zpool_explain_recover(libzfs_handle_t *, const char *, int,
+    nvlist_t *);
 
 /*
  * Basic handle manipulations.  These functions do not create or destroy the

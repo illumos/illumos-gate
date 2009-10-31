@@ -481,6 +481,7 @@ extern void zio_handle_panic_injection(spa_t *spa, char *tag);
 extern int zio_handle_fault_injection(zio_t *zio, int error);
 extern int zio_handle_device_injection(vdev_t *vd, zio_t *zio, int error);
 extern int zio_handle_label_injection(zio_t *zio, int error);
+extern void zio_handle_ignored_writes(zio_t *zio);
 
 /*
  * Checksum ereport functions
@@ -497,6 +498,9 @@ extern void zfs_ereport_free_checksum(zio_cksum_report_t *report);
 extern void zfs_ereport_post_checksum(spa_t *spa, vdev_t *vd,
     struct zio *zio, uint64_t offset, uint64_t length,
     const void *good_data, const void *bad_data, struct zio_bad_cksum *info);
+
+/* Called from spa_sync(), but primarily an injection handler */
+extern void spa_handle_ignored_writes(spa_t *spa);
 
 #ifdef	__cplusplus
 }
