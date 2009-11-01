@@ -47,6 +47,9 @@
 #include <sys/bplist.h>
 #include <sys/zfs_znode.h>
 #include <sys/arc.h>
+#include <sys/dbuf.h>
+#include <sys/zio_checksum.h>
+#include <sys/ddt.h>
 
 extern uint64_t metaslab_gang_bang;
 extern uint64_t metaslab_df_alloc_threshold;

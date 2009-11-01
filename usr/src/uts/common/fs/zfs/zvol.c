@@ -246,8 +246,8 @@ struct maparg {
 
 /*ARGSUSED*/
 static int
-zvol_map_block(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
-    const dnode_phys_t *dnp, void *arg)
+zvol_map_block(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
+    const zbookmark_t *zb, const dnode_phys_t *dnp, void *arg)
 {
 	struct maparg *ma = arg;
 	zvol_extent_t *ze;
@@ -361,25 +361,32 @@ zvol_replay_write(zvol_state_t *zv, lr_write_t *lr, boolean_t byteswap)
 {
 	objset_t *os = zv->zv_objset;
 	char *data = (char *)(lr + 1);	/* data follows lr_write_t */
-	uint64_t off = lr->lr_offset;
-	uint64_t len = lr->lr_length;
+	uint64_t offset, length;
 	dmu_tx_t *tx;
 	int error;
 
 	if (byteswap)
 		byteswap_uint64_array(lr, sizeof (*lr));
 
-	/* If it's a dmu_sync() block get the data and write the whole block */
-	if (lr->lr_common.lrc_reclen == sizeof (lr_write_t))
-		zil_get_replay_data(dmu_objset_zil(os), lr);
+	offset = lr->lr_offset;
+	length = lr->lr_length;
+
+	/* If it's a dmu_sync() block, write the whole block */
+	if (lr->lr_common.lrc_reclen == sizeof (lr_write_t)) {
+		uint64_t blocksize = BP_GET_LSIZE(&lr->lr_blkptr);
+		if (length < blocksize) {
+			offset -= offset % blocksize;
+			length = blocksize;
+		}
+	}
 
 	tx = dmu_tx_create(os);
-	dmu_tx_hold_write(tx, ZVOL_OBJ, off, len);
+	dmu_tx_hold_write(tx, ZVOL_OBJ, offset, length);
 	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
 		dmu_tx_abort(tx);
 	} else {
-		dmu_write(os, ZVOL_OBJ, off, len, data, tx);
+		dmu_write(os, ZVOL_OBJ, offset, length, data, tx);
 		dmu_tx_commit(tx);
 	}
 
@@ -882,14 +889,16 @@ zvol_close(dev_t dev, int flag, int otyp, cred_t *cr)
 }
 
 static void
-zvol_get_done(dmu_buf_t *db, void *vzgd)
+zvol_get_done(zgd_t *zgd, int error)
 {
-	zgd_t *zgd = (zgd_t *)vzgd;
-	rl_t *rl = zgd->zgd_rl;
+	if (zgd->zgd_db)
+		dmu_buf_rele(zgd->zgd_db, zgd);
 
-	dmu_buf_rele(db, vzgd);
-	zfs_range_unlock(rl);
-	zil_add_block(zgd->zgd_zilog, zgd->zgd_bp);
+	zfs_range_unlock(zgd->zgd_rl);
+
+	if (error == 0 && zgd->zgd_bp)
+		zil_add_block(zgd->zgd_zilog, zgd->zgd_bp);
+
 	kmem_free(zgd, sizeof (zgd_t));
 }
 
@@ -901,15 +910,20 @@ zvol_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 {
 	zvol_state_t *zv = arg;
 	objset_t *os = zv->zv_objset;
+	uint64_t object = ZVOL_OBJ;
+	uint64_t offset = lr->lr_offset;
+	uint64_t size = lr->lr_length;	/* length of user data */
+	blkptr_t *bp = &lr->lr_blkptr;
 	dmu_buf_t *db;
-	rl_t *rl;
 	zgd_t *zgd;
-	uint64_t boff; 			/* block starting offset */
-	int dlen = lr->lr_length;	/* length of user data */
 	int error;
 
-	ASSERT(zio);
-	ASSERT(dlen != 0);
+	ASSERT(zio != NULL);
+	ASSERT(size != 0);
+
+	zgd = kmem_zalloc(sizeof (zgd_t), KM_SLEEP);
+	zgd->zgd_zilog = zv->zv_zilog;
+	zgd->zgd_rl = zfs_range_lock(&zv->zv_znode, offset, size, RL_READER);
 
 	/*
 	 * Write records come in two flavors: immediate and indirect.
@@ -918,49 +932,30 @@ zvol_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 	 * sync the data and get a pointer to it (indirect) so that
 	 * we don't have to write the data twice.
 	 */
-	if (buf != NULL) /* immediate write */
-		return (dmu_read(os, ZVOL_OBJ, lr->lr_offset, dlen, buf,
-		    DMU_READ_NO_PREFETCH));
+	if (buf != NULL) {	/* immediate write */
+		error = dmu_read(os, object, offset, size, buf,
+		    DMU_READ_NO_PREFETCH);
+	} else {
+		size = zv->zv_volblocksize;
+		offset = P2ALIGN(offset, size);
+		error = dmu_buf_hold(os, object, offset, zgd, &db);
+		if (error == 0) {
+			zgd->zgd_db = db;
+			zgd->zgd_bp = bp;
 
-	zgd = (zgd_t *)kmem_alloc(sizeof (zgd_t), KM_SLEEP);
-	zgd->zgd_zilog = zv->zv_zilog;
-	zgd->zgd_bp = &lr->lr_blkptr;
+			ASSERT(db->db_offset == offset);
+			ASSERT(db->db_size == size);
 
-	/*
-	 * Lock the range of the block to ensure that when the data is
-	 * written out and its checksum is being calculated that no other
-	 * thread can change the block.
-	 */
-	boff = P2ALIGN_TYPED(lr->lr_offset, zv->zv_volblocksize, uint64_t);
-	rl = zfs_range_lock(&zv->zv_znode, boff, zv->zv_volblocksize,
-	    RL_READER);
-	zgd->zgd_rl = rl;
+			error = dmu_sync(zio, lr->lr_common.lrc_txg,
+			    zvol_get_done, zgd);
 
-	VERIFY(0 == dmu_buf_hold(os, ZVOL_OBJ, lr->lr_offset, zgd, &db));
-
-	error = dmu_sync(zio, db, &lr->lr_blkptr,
-	    lr->lr_common.lrc_txg, zvol_get_done, zgd);
-	if (error == 0) {
-		/*
-		 * dmu_sync() can compress a block of zeros to a null blkptr
-		 * but the block size still needs to be passed through to
-		 * replay.
-		 */
-		BP_SET_LSIZE(&lr->lr_blkptr, db->db_size);
-		zil_add_block(zv->zv_zilog, &lr->lr_blkptr);
+			if (error == 0)
+				return (0);
+		}
 	}
 
-	/*
-	 * If we get EINPROGRESS, then we need to wait for a
-	 * write IO initiated by dmu_sync() to complete before
-	 * we can release this dbuf.  We will finish everything
-	 * up in the zvol_get_done() callback.
-	 */
-	if (error == EINPROGRESS)
-		return (0);
-	dmu_buf_rele(db, zgd);
-	zfs_range_unlock(rl);
-	kmem_free(zgd, sizeof (zgd_t));
+	zvol_get_done(zgd, error);
+
 	return (error);
 }
 
@@ -984,12 +979,8 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t resid,
 	if (zil_disable)
 		return;
 
-	if (zilog->zl_replay) {
-		dsl_dataset_dirty(dmu_objset_ds(zilog->zl_os), tx);
-		zilog->zl_replayed_seq[dmu_tx_get_txg(tx) & TXG_MASK] =
-		    zilog->zl_replaying_seq;
+	if (zil_replaying(zilog, tx))
 		return;
-	}
 
 	immediate_write_sz = (zilog->zl_logbias == ZFS_LOGBIAS_THROUGHPUT)
 	    ? 0 : zvol_immediate_write_sz;
@@ -1024,8 +1015,7 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t resid,
 		lr = (lr_write_t *)&itx->itx_lr;
 		if (write_state == WR_COPIED && dmu_read(zv->zv_objset,
 		    ZVOL_OBJ, off, len, lr + 1, DMU_READ_NO_PREFETCH) != 0) {
-			kmem_free(itx, offsetof(itx_t, itx_lr) +
-			    itx->itx_lr.lrc_reclen);
+			zil_itx_destroy(itx);
 			itx = zil_itx_create(TX_WRITE, sizeof (*lr));
 			lr = (lr_write_t *)&itx->itx_lr;
 			write_state = WR_NEED_COPY;
@@ -1037,7 +1027,7 @@ zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t resid,
 		lr->lr_foid = ZVOL_OBJ;
 		lr->lr_offset = off;
 		lr->lr_length = len;
-		lr->lr_blkoff = off - P2ALIGN_TYPED(off, blocksize, uint64_t);
+		lr->lr_blkoff = 0;
 		BP_ZERO(&lr->lr_blkptr);
 
 		itx->itx_private = zv;
@@ -1791,7 +1781,8 @@ zvol_dump_fini(zvol_state_t *zv)
 		dmu_tx_abort(tx);
 		return (error);
 	}
-	(void) dmu_object_set_blocksize(os, ZVOL_OBJ, vbs, 0, tx);
+	if (dmu_object_set_blocksize(os, ZVOL_OBJ, vbs, 0, tx) == 0)
+		zv->zv_volblocksize = vbs;
 	dmu_tx_commit(tx);
 
 	return (0);

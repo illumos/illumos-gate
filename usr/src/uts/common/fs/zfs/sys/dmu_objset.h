@@ -67,12 +67,16 @@ struct objset {
 	dnode_t *os_userused_dnode;
 	dnode_t *os_groupused_dnode;
 	zilog_t *os_zil;
-	uint8_t os_checksum;	/* can change, under dsl_dir's locks */
-	uint8_t os_compress;	/* can change, under dsl_dir's locks */
-	uint8_t os_copies;	/* can change, under dsl_dir's locks */
-	uint8_t os_primary_cache;	/* can change, under dsl_dir's locks */
-	uint8_t os_secondary_cache;	/* can change, under dsl_dir's locks */
-	uint8_t os_logbias;	/* can change, under dsl_dir's locks */
+
+	/* can change, under dsl_dir's locks: */
+	uint8_t os_checksum;
+	uint8_t os_compress;
+	uint8_t os_copies;
+	uint8_t os_dedup_checksum;
+	uint8_t os_dedup_verify;
+	uint8_t os_logbias;
+	uint8_t os_primary_cache;
+	uint8_t os_secondary_cache;
 
 	/* no lock needed: */
 	struct dmu_tx *os_synctx; /* XXX sketchy */
@@ -97,6 +101,7 @@ struct objset {
 	void *os_user_ptr;
 };
 
+#define	DMU_META_OBJSET		0
 #define	DMU_META_DNODE_OBJECT	0
 #define	DMU_OBJECT_IS_SPECIAL(obj) ((int64_t)(obj) <= 0)
 
@@ -135,6 +140,7 @@ timestruc_t dmu_objset_snap_cmtime(objset_t *os);
 
 /* called from dsl */
 void dmu_objset_sync(objset_t *os, zio_t *zio, dmu_tx_t *tx);
+boolean_t dmu_objset_is_dirty(objset_t *os, uint64_t txg);
 objset_t *dmu_objset_create_impl(spa_t *spa, struct dsl_dataset *ds,
     blkptr_t *bp, dmu_objset_type_t type, dmu_tx_t *tx);
 int dmu_objset_open_impl(spa_t *spa, struct dsl_dataset *ds, blkptr_t *bp,

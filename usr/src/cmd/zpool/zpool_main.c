@@ -250,12 +250,12 @@ print_prop_cb(int prop, void *cb)
 {
 	FILE *fp = cb;
 
-	(void) fprintf(fp, "\t%-13s  ", zpool_prop_to_name(prop));
+	(void) fprintf(fp, "\t%-15s  ", zpool_prop_to_name(prop));
 
 	if (zpool_prop_readonly(prop))
 		(void) fprintf(fp, "  NO   ");
 	else
-		(void) fprintf(fp, " YES    ");
+		(void) fprintf(fp, " YES   ");
 
 	if (zpool_prop_values(prop) == NULL)
 		(void) fprintf(fp, "-\n");
@@ -302,7 +302,7 @@ usage(boolean_t requested)
 		(void) fprintf(fp,
 		    gettext("\nthe following properties are supported:\n"));
 
-		(void) fprintf(fp, "\n\t%-13s  %s  %s\n\n",
+		(void) fprintf(fp, "\n\t%-15s  %s   %s\n\n",
 		    "PROPERTY", "EDIT", "VALUES");
 
 		/* Iterate over all properties */
@@ -2449,7 +2449,7 @@ zpool_do_list(int argc, char **argv)
 	int ret;
 	list_cbdata_t cb = { 0 };
 	static char default_props[] =
-	    "name,size,used,available,capacity,health,altroot";
+	    "name,size,used,available,capacity,dedupratio,health,altroot";
 	char *props = default_props;
 
 	/* check options */
@@ -3672,9 +3672,12 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 15  user/group space accounting\n"));
 		(void) printf(gettext(" 16  stmf property support\n"));
 		(void) printf(gettext(" 17  Triple-parity RAID-Z\n"));
-		(void) printf(gettext(" 18  snapshot user holds\n"));
+		(void) printf(gettext(" 18  Snapshot user holds\n"));
 		(void) printf(gettext(" 19  Log device removal\n"));
-		(void) printf(gettext("For more information on a particular "
+		(void) printf(gettext(" 20  Compression using zle "
+		    "(zero-length encoding)\n"));
+		(void) printf(gettext(" 21  Deduplication\n"));
+		(void) printf(gettext("\nFor more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"
 		    "version/N\n\n");

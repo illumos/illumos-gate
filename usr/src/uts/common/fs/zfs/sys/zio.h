@@ -79,6 +79,12 @@ enum zio_checksum {
 #define	ZIO_CHECKSUM_ON_VALUE	ZIO_CHECKSUM_FLETCHER_4
 #define	ZIO_CHECKSUM_DEFAULT	ZIO_CHECKSUM_ON
 
+#define	ZIO_CHECKSUM_MASK	0xffULL
+#define	ZIO_CHECKSUM_VERIFY	(1 << 8)
+
+#define	ZIO_DEDUPCHECKSUM	ZIO_CHECKSUM_SHA256
+#define	ZIO_DEDUPDITTO_MIN	100
+
 enum zio_compress {
 	ZIO_COMPRESS_INHERIT = 0,
 	ZIO_COMPRESS_ON,
@@ -94,11 +100,18 @@ enum zio_compress {
 	ZIO_COMPRESS_GZIP_7,
 	ZIO_COMPRESS_GZIP_8,
 	ZIO_COMPRESS_GZIP_9,
+	ZIO_COMPRESS_ZLE,
 	ZIO_COMPRESS_FUNCTIONS
 };
 
 #define	ZIO_COMPRESS_ON_VALUE	ZIO_COMPRESS_LZJB
 #define	ZIO_COMPRESS_DEFAULT	ZIO_COMPRESS_OFF
+
+#define	BOOTFS_COMPRESS_VALID(compress)			\
+	((compress) == ZIO_COMPRESS_LZJB ||		\
+	((compress) == ZIO_COMPRESS_ON &&		\
+	ZIO_COMPRESS_ON_VALUE == ZIO_COMPRESS_LZJB) ||	\
+	(compress) == ZIO_COMPRESS_OFF)
 
 #define	ZIO_FAILURE_MODE_WAIT		0
 #define	ZIO_FAILURE_MODE_CONTINUE	1
@@ -116,75 +129,78 @@ enum zio_compress {
 #define	ZIO_PRIORITY_SCRUB		(zio_priority_table[9])
 #define	ZIO_PRIORITY_TABLE_SIZE		10
 
-#define	ZIO_FLAG_MUSTSUCCEED		0x000000
-#define	ZIO_FLAG_CANFAIL		0x000001
-#define	ZIO_FLAG_SPECULATIVE		0x000002
-#define	ZIO_FLAG_CONFIG_WRITER		0x000004
-#define	ZIO_FLAG_DONT_RETRY		0x000008
-
-#define	ZIO_FLAG_DONT_CACHE		0x000010
-#define	ZIO_FLAG_DONT_QUEUE		0x000020
-#define	ZIO_FLAG_DONT_AGGREGATE		0x000040
-#define	ZIO_FLAG_DONT_PROPAGATE		0x000080
-
-#define	ZIO_FLAG_IO_BYPASS		0x000100
-#define	ZIO_FLAG_IO_REPAIR		0x000200
-#define	ZIO_FLAG_IO_RETRY		0x000400
-#define	ZIO_FLAG_IO_REWRITE		0x000800
-
-#define	ZIO_FLAG_SELF_HEAL		0x001000
-#define	ZIO_FLAG_RESILVER		0x002000
-#define	ZIO_FLAG_SCRUB			0x004000
-#define	ZIO_FLAG_SCRUB_THREAD		0x008000
-
-#define	ZIO_FLAG_PROBE			0x010000
-#define	ZIO_FLAG_GANG_CHILD		0x020000
-#define	ZIO_FLAG_RAW			0x040000
-#define	ZIO_FLAG_GODFATHER		0x080000
-
-#define	ZIO_FLAG_TRYHARD		0x100000
-#define	ZIO_FLAG_NODATA			0x200000
-#define	ZIO_FLAG_OPTIONAL		0x400000
-
-#define	ZIO_FLAG_GANG_INHERIT		\
-	(ZIO_FLAG_CANFAIL |		\
-	ZIO_FLAG_SPECULATIVE |		\
-	ZIO_FLAG_CONFIG_WRITER |	\
-	ZIO_FLAG_DONT_RETRY |		\
-	ZIO_FLAG_DONT_CACHE |		\
-	ZIO_FLAG_DONT_AGGREGATE |	\
-	ZIO_FLAG_SELF_HEAL |		\
-	ZIO_FLAG_RESILVER |		\
-	ZIO_FLAG_SCRUB |		\
-	ZIO_FLAG_SCRUB_THREAD)
-
-#define	ZIO_FLAG_VDEV_INHERIT		\
-	(ZIO_FLAG_GANG_INHERIT |	\
-	ZIO_FLAG_IO_REPAIR |		\
-	ZIO_FLAG_IO_RETRY |		\
-	ZIO_FLAG_PROBE |		\
-	ZIO_FLAG_TRYHARD |		\
-	ZIO_FLAG_NODATA |		\
-	ZIO_FLAG_OPTIONAL)
-
-#define	ZIO_FLAG_AGG_INHERIT		\
-	(ZIO_FLAG_DONT_AGGREGATE |	\
-	ZIO_FLAG_IO_REPAIR |		\
-	ZIO_FLAG_SELF_HEAL |		\
-	ZIO_FLAG_RESILVER |		\
-	ZIO_FLAG_SCRUB |		\
-	ZIO_FLAG_SCRUB_THREAD)
-
 #define	ZIO_PIPELINE_CONTINUE		0x100
 #define	ZIO_PIPELINE_STOP		0x101
+
+enum zio_flag {
+	/*
+	 * Flags inherited by gang, ddt, and vdev children,
+	 * and that must be equal for two zios to aggregate
+	 */
+	ZIO_FLAG_DONT_AGGREGATE	= 1 << 0,
+	ZIO_FLAG_IO_REPAIR	= 1 << 1,
+	ZIO_FLAG_SELF_HEAL	= 1 << 2,
+	ZIO_FLAG_RESILVER	= 1 << 3,
+	ZIO_FLAG_SCRUB		= 1 << 4,
+	ZIO_FLAG_SCRUB_THREAD	= 1 << 5,
+
+#define	ZIO_FLAG_AGG_INHERIT	(ZIO_FLAG_CANFAIL - 1)
+
+	/*
+	 * Flags inherited by ddt, gang, and vdev children.
+	 */
+	ZIO_FLAG_CANFAIL	= 1 << 6,	/* must be first for INHERIT */
+	ZIO_FLAG_SPECULATIVE	= 1 << 7,
+	ZIO_FLAG_CONFIG_WRITER	= 1 << 8,
+	ZIO_FLAG_DONT_RETRY	= 1 << 9,
+	ZIO_FLAG_DONT_CACHE	= 1 << 10,
+	ZIO_FLAG_NODATA		= 1 << 11,
+	ZIO_FLAG_INDUCE_DAMAGE	= 1 << 12,
+
+#define	ZIO_FLAG_DDT_INHERIT	(ZIO_FLAG_IO_RETRY - 1)
+#define	ZIO_FLAG_GANG_INHERIT	(ZIO_FLAG_IO_RETRY - 1)
+
+	/*
+	 * Flags inherited by vdev children.
+	 */
+	ZIO_FLAG_IO_RETRY	= 1 << 13,	/* must be first for INHERIT */
+	ZIO_FLAG_PROBE		= 1 << 14,
+	ZIO_FLAG_TRYHARD	= 1 << 15,
+	ZIO_FLAG_OPTIONAL	= 1 << 16,
+
+#define	ZIO_FLAG_VDEV_INHERIT	(ZIO_FLAG_DONT_QUEUE - 1)
+
+	/*
+	 * Flags not inherited by any children.
+	 */
+	ZIO_FLAG_DONT_QUEUE	= 1 << 17,	/* must be first for INHERIT */
+	ZIO_FLAG_DONT_PROPAGATE	= 1 << 18,
+	ZIO_FLAG_IO_BYPASS	= 1 << 19,
+	ZIO_FLAG_IO_REWRITE	= 1 << 20,
+	ZIO_FLAG_RAW		= 1 << 21,
+	ZIO_FLAG_GANG_CHILD	= 1 << 22,
+	ZIO_FLAG_DDT_CHILD	= 1 << 23,
+	ZIO_FLAG_GODFATHER	= 1 << 24
+};
+
+#define	ZIO_FLAG_MUSTSUCCEED		0
+
+#define	ZIO_DDT_CHILD_FLAGS(zio)				\
+	(((zio)->io_flags & ZIO_FLAG_DDT_INHERIT) |		\
+	ZIO_FLAG_DDT_CHILD | ZIO_FLAG_CANFAIL)
 
 #define	ZIO_GANG_CHILD_FLAGS(zio)				\
 	(((zio)->io_flags & ZIO_FLAG_GANG_INHERIT) |		\
 	ZIO_FLAG_GANG_CHILD | ZIO_FLAG_CANFAIL)
 
+#define	ZIO_VDEV_CHILD_FLAGS(zio)				\
+	(((zio)->io_flags & ZIO_FLAG_VDEV_INHERIT) |		\
+	ZIO_FLAG_CANFAIL)
+
 enum zio_child {
 	ZIO_CHILD_VDEV = 0,
 	ZIO_CHILD_GANG,
+	ZIO_CHILD_DDT,
 	ZIO_CHILD_LOGICAL,
 	ZIO_CHILD_TYPES
 };
@@ -202,7 +218,6 @@ enum zio_wait_type {
 #define	ECKSUM	EBADE
 #define	EFRAGS	EBADR
 
-typedef struct zio zio_t;
 typedef void zio_done_func_t(zio_t *zio);
 
 extern uint8_t zio_priority_table[ZIO_PRIORITY_TABLE_SIZE];
@@ -211,18 +226,15 @@ extern char *zio_type_name[ZIO_TYPES];
 /*
  * A bookmark is a four-tuple <objset, object, level, blkid> that uniquely
  * identifies any block in the pool.  By convention, the meta-objset (MOS)
- * is objset 0, the meta-dnode is object 0, the root block (osphys_t) is
- * level -1 of the meta-dnode, and intent log blocks (which are chained
- * off the root block) have blkid == sequence number.  In summary:
+ * is objset 0, and the meta-dnode is object 0.  This covers all blocks
+ * except root blocks and ZIL blocks, which are defined as follows:
  *
- *	mos is objset 0
- *	meta-dnode is object 0
- *	root block is <objset, 0, -1, 0>
- *	intent log is <objset, 0, -1, ZIL sequence number>
+ * Root blocks (objset_phys_t) are object 0, level -1:  <objset, 0, -1, 0>.
+ * ZIL blocks are bookmarked <objset, 0, -2, blkid == ZIL sequence number>.
+ * dmu_sync()ed ZIL data blocks are bookmarked <objset, object, -2, blkid>.
  *
- * Note: this structure is called a bookmark because its first purpose was
- * to remember where to resume a pool-wide traverse.  The absolute ordering
- * for block visitation during traversal is defined in compare_bookmark().
+ * Note: this structure is called a bookmark because its original purpose
+ * was to remember where to resume a pool-wide traverse.
  *
  * Note: this structure is passed between userland and the kernel.
  * Therefore it must not change size or alignment between 32/64 bit
@@ -235,12 +247,31 @@ typedef struct zbookmark {
 	uint64_t	zb_blkid;
 } zbookmark_t;
 
+#define	SET_BOOKMARK(zb, objset, object, level, blkid)  \
+{                                                       \
+	(zb)->zb_objset = objset;                       \
+	(zb)->zb_object = object;                       \
+	(zb)->zb_level = level;                         \
+	(zb)->zb_blkid = blkid;                         \
+}
+
+#define	ZB_DESTROYED_OBJSET	(-1ULL)
+
+#define	ZB_ROOT_OBJECT		(0ULL)
+#define	ZB_ROOT_LEVEL		(-1LL)
+#define	ZB_ROOT_BLKID		(0ULL)
+
+#define	ZB_ZIL_OBJECT		(0ULL)
+#define	ZB_ZIL_LEVEL		(-2LL)
+
 typedef struct zio_prop {
 	enum zio_checksum	zp_checksum;
 	enum zio_compress	zp_compress;
 	dmu_object_type_t	zp_type;
 	uint8_t			zp_level;
-	uint8_t			zp_ndvas;
+	uint8_t			zp_copies;
+	uint8_t			zp_dedup;
+	uint8_t			zp_dedup_verify;
 } zio_prop_t;
 
 typedef struct zio_cksum_report zio_cksum_report_t;
@@ -255,9 +286,9 @@ struct zio_cksum_report {
 	struct zio_cksum_report *zcr_next;
 	nvlist_t		*zcr_ereport;
 	nvlist_t		*zcr_detector;
-
 	void			*zcr_cbdata;
 	size_t			zcr_cbinfo;	/* passed to zcr_free() */
+	uint64_t		zcr_align;
 	uint64_t		zcr_length;
 	zio_cksum_finish_f	*zcr_finish;
 	zio_cksum_free_f	*zcr_free;
@@ -326,6 +357,7 @@ struct zio {
 	uint64_t	io_txg;
 	spa_t		*io_spa;
 	blkptr_t	*io_bp;
+	blkptr_t	*io_bp_override;
 	blkptr_t	io_bp_copy;
 	list_t		io_parent_list;
 	list_t		io_child_list;
@@ -337,11 +369,14 @@ struct zio {
 	zio_done_func_t	*io_ready;
 	zio_done_func_t	*io_done;
 	void		*io_private;
+	int64_t		io_prev_space_delta;	/* DMU private */
 	blkptr_t	io_bp_orig;
 
 	/* Data represented by this I/O */
 	void		*io_data;
+	void		*io_orig_data;
 	uint64_t	io_size;
+	uint64_t	io_orig_size;
 
 	/* Stuff for the vdev stack */
 	vdev_t		*io_vd;
@@ -355,15 +390,17 @@ struct zio {
 	avl_tree_t	*io_vdev_tree;
 
 	/* Internal pipeline state */
-	int		io_flags;
-	zio_stage_t	io_stage;
-	uint32_t	io_pipeline;
-	int		io_orig_flags;
-	zio_stage_t	io_orig_stage;
-	uint32_t	io_orig_pipeline;
+	enum zio_flag	io_flags;
+	enum zio_stage	io_stage;
+	enum zio_stage	io_pipeline;
+	enum zio_flag	io_orig_flags;
+	enum zio_stage	io_orig_stage;
+	enum zio_stage	io_orig_pipeline;
 	int		io_error;
 	int		io_child_error[ZIO_CHILD_TYPES];
 	uint64_t	io_children[ZIO_CHILD_TYPES][ZIO_WAIT_TYPES];
+	uint64_t	io_child_count;
+	uint64_t	io_parent_count;
 	uint64_t	*io_stall;
 	zio_t		*io_gang_leader;
 	zio_gang_node_t	*io_gang_tree;
@@ -378,48 +415,51 @@ struct zio {
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa, vdev_t *vd,
-    zio_done_func_t *done, void *private, int flags);
+    zio_done_func_t *done, void *private, enum zio_flag flags);
 
 extern zio_t *zio_root(spa_t *spa,
-    zio_done_func_t *done, void *private, int flags);
+    zio_done_func_t *done, void *private, enum zio_flag flags);
 
 extern zio_t *zio_read(zio_t *pio, spa_t *spa, const blkptr_t *bp, void *data,
     uint64_t size, zio_done_func_t *done, void *private,
-    int priority, int flags, const zbookmark_t *zb);
+    int priority, enum zio_flag flags, const zbookmark_t *zb);
 
 extern zio_t *zio_write(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
-    void *data, uint64_t size, zio_prop_t *zp,
+    void *data, uint64_t size, const zio_prop_t *zp,
     zio_done_func_t *ready, zio_done_func_t *done, void *private,
-    int priority, int flags, const zbookmark_t *zb);
+    int priority, enum zio_flag flags, const zbookmark_t *zb);
 
 extern zio_t *zio_rewrite(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     void *data, uint64_t size, zio_done_func_t *done, void *private,
-    int priority, int flags, zbookmark_t *zb);
+    int priority, enum zio_flag flags, zbookmark_t *zb);
 
-extern void zio_skip_write(zio_t *zio);
+extern void zio_write_override(zio_t *zio, blkptr_t *bp, int copies);
 
-extern zio_t *zio_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
-    zio_done_func_t *done, void *private, int flags);
+extern void zio_free(spa_t *spa, uint64_t txg, const blkptr_t *bp);
 
-extern zio_t *zio_claim(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
-    zio_done_func_t *done, void *private, int flags);
+extern zio_t *zio_claim(zio_t *pio, spa_t *spa, uint64_t txg,
+    const blkptr_t *bp,
+    zio_done_func_t *done, void *private, enum zio_flag flags);
 
 extern zio_t *zio_ioctl(zio_t *pio, spa_t *spa, vdev_t *vd, int cmd,
-    zio_done_func_t *done, void *private, int priority, int flags);
+    zio_done_func_t *done, void *private, int priority, enum zio_flag flags);
 
 extern zio_t *zio_read_phys(zio_t *pio, vdev_t *vd, uint64_t offset,
     uint64_t size, void *data, int checksum,
-    zio_done_func_t *done, void *private, int priority, int flags,
+    zio_done_func_t *done, void *private, int priority, enum zio_flag flags,
     boolean_t labels);
 
 extern zio_t *zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset,
     uint64_t size, void *data, int checksum,
-    zio_done_func_t *done, void *private, int priority, int flags,
+    zio_done_func_t *done, void *private, int priority, enum zio_flag flags,
     boolean_t labels);
 
-extern int zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *new_bp,
-    blkptr_t *old_bp, uint64_t txg, boolean_t use_slog);
-extern void zio_free_blk(spa_t *spa, blkptr_t *bp, uint64_t txg);
+extern zio_t *zio_free_sync(zio_t *pio, spa_t *spa, uint64_t txg,
+    const blkptr_t *bp, enum zio_flag flags);
+
+extern int zio_alloc_zil(spa_t *spa, uint64_t txg, blkptr_t *new_bp,
+    blkptr_t *old_bp, uint64_t size, boolean_t use_slog);
+extern void zio_free_zil(spa_t *spa, uint64_t txg, blkptr_t *bp);
 extern void zio_flush(zio_t *zio, vdev_t *vd);
 
 extern int zio_wait(zio_t *zio);
@@ -441,11 +481,11 @@ extern void zio_resubmit_stage_async(void *);
 
 extern zio_t *zio_vdev_child_io(zio_t *zio, blkptr_t *bp, vdev_t *vd,
     uint64_t offset, void *data, uint64_t size, int type, int priority,
-    int flags, zio_done_func_t *done, void *private);
+    enum zio_flag flags, zio_done_func_t *done, void *private);
 
 extern zio_t *zio_vdev_delegated_io(vdev_t *vd, uint64_t offset,
     void *data, uint64_t size, int type, int priority,
-    int flags, zio_done_func_t *done, void *private);
+    enum zio_flag flags, zio_done_func_t *done, void *private);
 
 extern void zio_vdev_io_bypass(zio_t *zio);
 extern void zio_vdev_io_reissue(zio_t *zio);
@@ -454,8 +494,12 @@ extern void zio_vdev_io_redone(zio_t *zio);
 extern void zio_checksum_verified(zio_t *zio);
 extern int zio_worst_error(int e1, int e2);
 
-extern uint8_t zio_checksum_select(uint8_t child, uint8_t parent);
-extern uint8_t zio_compress_select(uint8_t child, uint8_t parent);
+extern enum zio_checksum zio_checksum_select(enum zio_checksum child,
+    enum zio_checksum parent);
+extern enum zio_checksum zio_checksum_dedup_select(spa_t *spa,
+    enum zio_checksum child, enum zio_checksum parent);
+extern enum zio_compress zio_compress_select(enum zio_compress child,
+    enum zio_compress parent);
 
 extern void zio_suspend(spa_t *spa, zio_t *zio);
 extern int zio_resume(spa_t *spa);

@@ -61,6 +61,7 @@ struct zbookmark;
 struct spa;
 struct nvlist;
 struct arc_buf;
+struct zio_prop;
 
 typedef struct objset objset_t;
 typedef struct dmu_tx dmu_tx_t;
@@ -118,6 +119,8 @@ typedef enum dmu_object_type {
 	DMU_OT_USERGROUP_USED,		/* ZAP */
 	DMU_OT_USERGROUP_QUOTA,		/* ZAP */
 	DMU_OT_USERREFS,		/* ZAP */
+	DMU_OT_DDT_ZAP,			/* ZAP */
+	DMU_OT_DDT_STATS,		/* ZAP */
 	DMU_OT_NUMTYPES
 } dmu_object_type_t;
 
@@ -152,6 +155,7 @@ void zfs_znode_byteswap(void *buf, size_t size);
 
 #define	DMU_USERUSED_OBJECT	(-1ULL)
 #define	DMU_GROUPUSED_OBJECT	(-2ULL)
+#define	DMU_DEADLIST_OBJECT	(-3ULL)
 
 /*
  * Public routines to create, destroy, open, and close objsets.
@@ -202,6 +206,8 @@ typedef void dmu_buf_evict_func_t(struct dmu_buf *db, void *user_ptr);
 #define	DMU_POOL_PROPS			"pool_props"
 #define	DMU_POOL_L2CACHE		"l2cache"
 #define	DMU_POOL_TMP_USERREFS		"tmp_userrefs"
+#define	DMU_POOL_DDT			"DDT-%s-%s-%s"
+#define	DMU_POOL_DDT_STATS		"DDT-statistics"
 
 /* 4x8 zbookmark_t */
 #define	DMU_POOL_SCRUB_BOOKMARK		"scrub_bookmark"
@@ -299,11 +305,13 @@ void dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
     dmu_tx_t *tx);
 
 /*
- * Decide how many copies of a given block we should make.  Can be from
- * 1 to SPA_DVAS_PER_BP.
+ * Decide how to write a block: checksum, compression, number of copies, etc.
  */
-int dmu_get_replication_level(objset_t *os, struct zbookmark *zb,
-    dmu_object_type_t ot);
+#define	WP_NOFILL	0x1
+#define	WP_DMU_SYNC	0x2
+
+void dmu_write_policy(objset_t *os, struct dnode *dn, int level, int wp,
+    struct zio_prop *zp);
 /*
  * The bonus data is accessed more or less like a regular buffer.
  * You must dmu_bonus_hold() to get the buffer, which will give you a
@@ -498,19 +506,19 @@ void dmu_prefetch(objset_t *os, uint64_t object, uint64_t offset,
     uint64_t len);
 
 typedef struct dmu_object_info {
-	/* All sizes are in bytes. */
+	/* All sizes are in bytes unless otherwise indicated. */
 	uint32_t doi_data_block_size;
 	uint32_t doi_metadata_block_size;
-	uint64_t doi_bonus_size;
 	dmu_object_type_t doi_type;
 	dmu_object_type_t doi_bonus_type;
+	uint64_t doi_bonus_size;
 	uint8_t doi_indirection;		/* 2 = dnode->indirect->data */
 	uint8_t doi_checksum;
 	uint8_t doi_compress;
 	uint8_t doi_pad[5];
-	/* Values below are number of 512-byte blocks. */
-	uint64_t doi_physical_blks;		/* data + metadata */
-	uint64_t doi_max_block_offset;
+	uint64_t doi_physical_blocks_512;	/* data + metadata, 512b blks */
+	uint64_t doi_max_offset;
+	uint64_t doi_fill_count;		/* number of non-empty blocks */
 } dmu_object_info_t;
 
 typedef void arc_byteswap_func_t(void *buf, size_t size);
@@ -623,9 +631,20 @@ uint64_t dmu_tx_get_txg(dmu_tx_t *tx);
  * storage when the write completes this new data does not become a
  * permanent part of the file until the associated transaction commits.
  */
-typedef void dmu_sync_cb_t(dmu_buf_t *db, void *arg);
-int dmu_sync(struct zio *zio, dmu_buf_t *db,
-    struct blkptr *bp, uint64_t txg, dmu_sync_cb_t *done, void *arg);
+
+/*
+ * {zfs,zvol,ztest}_get_done() args
+ */
+typedef struct zgd {
+	struct zilog	*zgd_zilog;
+	struct blkptr	*zgd_bp;
+	dmu_buf_t	*zgd_db;
+	struct rl	*zgd_rl;
+	void		*zgd_private;
+} zgd_t;
+
+typedef void dmu_sync_cb_t(zgd_t *arg, int error);
+int dmu_sync(struct zio *zio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd);
 
 /*
  * Find the next hole or data block in file starting at *off

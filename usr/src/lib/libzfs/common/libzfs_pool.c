@@ -321,6 +321,12 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
 			    (u_longlong_t)intval);
 			break;
 
+		case ZPOOL_PROP_DEDUPRATIO:
+			(void) snprintf(buf, len, "%llu.%02llux",
+			    (u_longlong_t)(intval / 100),
+			    (u_longlong_t)(intval % 100));
+			break;
+
 		case ZPOOL_PROP_HEALTH:
 			verify(nvlist_lookup_nvlist(zpool_get_config(zhp, NULL),
 			    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);

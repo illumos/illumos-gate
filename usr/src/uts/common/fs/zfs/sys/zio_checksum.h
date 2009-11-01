@@ -27,6 +27,7 @@
 #define	_SYS_ZIO_CHECKSUM_H
 
 #include <sys/zio.h>
+#include <zfs_fletcher.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -44,6 +45,7 @@ typedef struct zio_checksum_info {
 	zio_checksum_t	*ci_func[2]; /* checksum function for each byteorder */
 	int		ci_correctable;	/* number of correctable bits	*/
 	int		ci_zbt;		/* uses zio block tail?	*/
+	int		ci_dedup;	/* strong enough for dedup? */
 	char		*ci_name;	/* descriptive name */
 } zio_checksum_info_t;
 
@@ -61,14 +63,6 @@ extern zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS];
 /*
  * Checksum routines.
  */
-extern zio_checksum_t fletcher_2_native;
-extern zio_checksum_t fletcher_4_native;
-extern zio_checksum_t fletcher_4_incremental_native;
-
-extern zio_checksum_t fletcher_2_byteswap;
-extern zio_checksum_t fletcher_4_byteswap;
-extern zio_checksum_t fletcher_4_incremental_byteswap;
-
 extern zio_checksum_t zio_checksum_SHA256;
 
 extern void zio_checksum_compute(zio_t *zio, enum zio_checksum checksum,

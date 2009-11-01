@@ -51,9 +51,9 @@ PROG = go_filebench
 ROOTFBBINDIR = $(ROOT)/usr/benchmarks/filebench/bin
 OBJS = $(SRCS:%.c=%.o) parser_gram.o parser_lex.o
 LINTFLAGS += -erroff=E_FUNC_ARG_UNUSED -erroff=E_NAME_DEF_NOT_USED2 \
-	-erroff=E_NAME_USED_NOT_DEF2
+	-erroff=E_NAME_USED_NOT_DEF2 -erroff=E_INCONS_ARG_DECL2
 LINTFLAGS64 += -erroff=E_FUNC_ARG_UNUSED -erroff=E_NAME_DEF_NOT_USED2 \
-	-erroff=E_NAME_USED_NOT_DEF2
+	-erroff=E_NAME_USED_NOT_DEF2 -erroff=E_INCONS_ARG_DECL2
 LINTFILES = $(SRCS:%.c=%.ln)
 CLEANFILES += parser_gram.c parser_gram.h parser_lex.c y.tab.h y.tab.c
 

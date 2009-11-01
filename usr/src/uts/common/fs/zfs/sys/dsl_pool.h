@@ -102,6 +102,7 @@ typedef struct dsl_pool {
 	uint64_t dp_scrub_start_time;
 	kmutex_t dp_scrub_cancel_lock; /* protects dp_scrub_restart */
 	boolean_t dp_scrub_restart;
+	boolean_t dp_scrub_ditto;
 
 	/* Has its own locking */
 	tx_state_t dp_tx;
@@ -124,7 +125,7 @@ int dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp);
 void dsl_pool_close(dsl_pool_t *dp);
 dsl_pool_t *dsl_pool_create(spa_t *spa, nvlist_t *zplprops, uint64_t txg);
 void dsl_pool_sync(dsl_pool_t *dp, uint64_t txg);
-void dsl_pool_zil_clean(dsl_pool_t *dp);
+void dsl_pool_sync_done(dsl_pool_t *dp, uint64_t txg);
 int dsl_pool_sync_context(dsl_pool_t *dp);
 uint64_t dsl_pool_adjustedsize(dsl_pool_t *dp, boolean_t netfree);
 uint64_t dsl_pool_adjustedfree(dsl_pool_t *dp, boolean_t netfree);
@@ -132,8 +133,7 @@ int dsl_pool_tempreserve_space(dsl_pool_t *dp, uint64_t space, dmu_tx_t *tx);
 void dsl_pool_tempreserve_clear(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx);
 void dsl_pool_memory_pressure(dsl_pool_t *dp);
 void dsl_pool_willuse_space(dsl_pool_t *dp, int64_t space, dmu_tx_t *tx);
-int dsl_free(zio_t *pio, dsl_pool_t *dp, uint64_t txg, const blkptr_t *bpp,
-    zio_done_func_t *done, void *private, uint32_t arc_flags);
+void dsl_free(dsl_pool_t *dp, uint64_t txg, const blkptr_t *bpp);
 void dsl_pool_ds_destroyed(struct dsl_dataset *ds, struct dmu_tx *tx);
 void dsl_pool_ds_snapshotted(struct dsl_dataset *ds, struct dmu_tx *tx);
 void dsl_pool_ds_clone_swapped(struct dsl_dataset *ds1, struct dsl_dataset *ds2,

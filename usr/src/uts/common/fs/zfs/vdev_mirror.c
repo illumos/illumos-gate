@@ -214,7 +214,7 @@ vdev_mirror_child_select(zio_t *zio)
 	uint64_t txg = zio->io_txg;
 	int i, c;
 
-	ASSERT(zio->io_bp == NULL || zio->io_bp->blk_birth == txg);
+	ASSERT(zio->io_bp == NULL || BP_PHYSICAL_BIRTH(zio->io_bp) == txg);
 
 	/*
 	 * Try to find a child whose DTL doesn't contain the block to read.

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #include <sys/dmu.h>
 #include <sys/spa.h>
 #include <sys/txg.h>
+#include <sys/zio.h>
 #include <sys/zfs_context.h>
 
 #ifdef	__cplusplus
@@ -67,6 +68,10 @@ typedef struct bplist {
 	dmu_buf_t	*bpl_cached_dbuf;
 } bplist_t;
 
+typedef void bplist_sync_cb_t(void *arg, const blkptr_t *bp, dmu_tx_t *tx);
+
+extern void bplist_init(bplist_t *bpl);
+extern void bplist_fini(bplist_t *bpl);
 extern uint64_t bplist_create(objset_t *mos, int blocksize, dmu_tx_t *tx);
 extern void bplist_destroy(objset_t *mos, uint64_t object, dmu_tx_t *tx);
 extern int bplist_open(bplist_t *bpl, objset_t *mos, uint64_t object);
@@ -74,13 +79,15 @@ extern void bplist_close(bplist_t *bpl);
 extern boolean_t bplist_empty(bplist_t *bpl);
 extern int bplist_iterate(bplist_t *bpl, uint64_t *itorp, blkptr_t *bp);
 extern int bplist_enqueue(bplist_t *bpl, const blkptr_t *bp, dmu_tx_t *tx);
+extern void bplist_enqueue_cb(void *bpl, const blkptr_t *bp, dmu_tx_t *tx);
 extern void bplist_enqueue_deferred(bplist_t *bpl, const blkptr_t *bp);
-extern void bplist_sync(bplist_t *bpl, dmu_tx_t *tx);
+extern void bplist_sync(bplist_t *bpl, bplist_sync_cb_t *func,
+    void *arg, dmu_tx_t *tx);
 extern void bplist_vacate(bplist_t *bpl, dmu_tx_t *tx);
 extern int bplist_space(bplist_t *bpl,
     uint64_t *usedp, uint64_t *compp, uint64_t *uncompp);
 extern int bplist_space_birthrange(bplist_t *bpl,
-    uint64_t mintxg, uint64_t maxtxg, uint64_t *dasizep);
+    uint64_t mintxg, uint64_t maxtxg, uint64_t *dsizep);
 
 #ifdef	__cplusplus
 }

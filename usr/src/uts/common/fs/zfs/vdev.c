@@ -409,10 +409,7 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	if (ops == &vdev_raidz_ops) {
 		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NPARITY,
 		    &nparity) == 0) {
-			/*
-			 * Currently, we can only support 3 parity devices.
-			 */
-			if (nparity == 0 || nparity > 3)
+			if (nparity == 0 || nparity > VDEV_RAIDZ_MAXPARITY)
 				return (EINVAL);
 			/*
 			 * Previous versions could only support 1 or 2 parity
@@ -567,6 +564,7 @@ vdev_free(vdev_t *vd)
 	vdev_close(vd);
 
 	ASSERT(!list_link_active(&vd->vdev_config_dirty_node));
+	ASSERT(!list_link_active(&vd->vdev_state_dirty_node));
 
 	/*
 	 * Free all children.
@@ -816,9 +814,9 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 	ASSERT(oldc <= newc);
 
 	if (vd->vdev_islog)
-		mc = spa->spa_log_class;
+		mc = spa_log_class(spa);
 	else
-		mc = spa->spa_normal_class;
+		mc = spa_normal_class(spa);
 
 	if (vd->vdev_mg == NULL)
 		vd->vdev_mg = metaslab_group_create(mc, vd);
@@ -1573,7 +1571,7 @@ vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 		vdev_dtl_reassess(vd->vdev_child[c], txg,
 		    scrub_txg, scrub_done);
 
-	if (vd == spa->spa_root_vdev || vd->vdev_ishole)
+	if (vd == spa->spa_root_vdev || vd->vdev_ishole || vd->vdev_aux)
 		return;
 
 	if (vd->vdev_ops->vdev_op_leaf) {
@@ -2171,11 +2169,10 @@ top:
 			return (spa_vdev_state_exit(spa, NULL, EBUSY));
 
 		/*
-		 * If the top-level is a slog and it's had allocations
-		 * then proceed. We check that the vdev's metaslab
-		 * grop is not NULL since it's possible that we may
-		 * have just added this vdev and have not yet initialized
-		 * it's metaslabs.
+		 * If the top-level is a slog and it has had allocations
+		 * then proceed.  We check that the vdev's metaslab group
+		 * is not NULL since it's possible that we may have just
+		 * added this vdev but not yet initialized its metaslabs.
 		 */
 		if (tvd->vdev_islog && mg != NULL) {
 			/*
@@ -2496,14 +2493,17 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 
 	if (type == ZIO_TYPE_WRITE && txg != 0 &&
 	    (!(flags & ZIO_FLAG_IO_REPAIR) ||
-	    (flags & ZIO_FLAG_SCRUB_THREAD))) {
+	    (flags & ZIO_FLAG_SCRUB_THREAD) ||
+	    spa->spa_claiming)) {
 		/*
-		 * This is either a normal write (not a repair), or it's a
-		 * repair induced by the scrub thread.  In the normal case,
-		 * we commit the DTL change in the same txg as the block
-		 * was born.  In the scrub-induced repair case, we know that
-		 * scrubs run in first-pass syncing context, so we commit
-		 * the DTL change in spa->spa_syncing_txg.
+		 * This is either a normal write (not a repair), or it's
+		 * a repair induced by the scrub thread, or it's a repair
+		 * made by zil_claim() during spa_load() in the first txg.
+		 * In the normal case, we commit the DTL change in the same
+		 * txg as the block was born.  In the scrub-induced repair
+		 * case, we know that scrubs run in first-pass syncing context,
+		 * so we commit the DTL change in spa_syncing_txg(spa).
+		 * In the zil_claim() case, we commit in spa_first_txg(spa).
 		 *
 		 * We currently do not make DTL entries for failed spontaneous
 		 * self-healing writes triggered by normal (non-scrubbing)
@@ -2516,9 +2516,12 @@ vdev_stat_update(zio_t *zio, uint64_t psize)
 				ASSERT(flags & ZIO_FLAG_IO_REPAIR);
 				ASSERT(spa_sync_pass(spa) == 1);
 				vdev_dtl_dirty(vd, DTL_SCRUB, txg, 1);
-				commit_txg = spa->spa_syncing_txg;
+				commit_txg = spa_syncing_txg(spa);
+			} else if (spa->spa_claiming) {
+				ASSERT(flags & ZIO_FLAG_IO_REPAIR);
+				commit_txg = spa_first_txg(spa);
 			}
-			ASSERT(commit_txg >= spa->spa_syncing_txg);
+			ASSERT(commit_txg >= spa_syncing_txg(spa));
 			if (vdev_dtl_contains(vd, DTL_MISSING, txg, 1))
 				return;
 			for (pvd = vd; pvd != rvd; pvd = pvd->vdev_parent)
@@ -2560,15 +2563,18 @@ vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type, boolean_t complete)
 }
 
 /*
- * Update the in-core space usage stats for this vdev and the root vdev.
+ * Update the in-core space usage stats for this vdev, its metaslab class,
+ * and the root vdev.
  */
 void
-vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta,
-    int64_t defer_delta, boolean_t update_root)
+vdev_space_update(vdev_t *vd, int64_t alloc_delta, int64_t defer_delta,
+    int64_t space_delta)
 {
 	int64_t dspace_delta = space_delta;
 	spa_t *spa = vd->vdev_spa;
 	vdev_t *rvd = spa->spa_root_vdev;
+	metaslab_group_t *mg = vd->vdev_mg;
+	metaslab_class_t *mc = mg ? mg->mg_class : NULL;
 
 	ASSERT(vd == vd->vdev_top);
 
@@ -2584,29 +2590,25 @@ vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta,
 	    vd->vdev_deflate_ratio;
 
 	mutex_enter(&vd->vdev_stat_lock);
-	vd->vdev_stat.vs_space += space_delta;
 	vd->vdev_stat.vs_alloc += alloc_delta;
+	vd->vdev_stat.vs_space += space_delta;
 	vd->vdev_stat.vs_dspace += dspace_delta;
-	vd->vdev_stat.vs_defer += defer_delta;
 	mutex_exit(&vd->vdev_stat_lock);
 
-	if (update_root) {
+	if (mc == spa_normal_class(spa)) {
+		mutex_enter(&rvd->vdev_stat_lock);
+		rvd->vdev_stat.vs_alloc += alloc_delta;
+		rvd->vdev_stat.vs_space += space_delta;
+		rvd->vdev_stat.vs_dspace += dspace_delta;
+		mutex_exit(&rvd->vdev_stat_lock);
+	}
+
+	if (mc != NULL) {
 		ASSERT(rvd == vd->vdev_parent);
 		ASSERT(vd->vdev_ms_count != 0);
 
-		/*
-		 * Don't count non-normal (e.g. intent log) space as part of
-		 * the pool's capacity.
-		 */
-		if (vd->vdev_islog)
-			return;
-
-		mutex_enter(&rvd->vdev_stat_lock);
-		rvd->vdev_stat.vs_space += space_delta;
-		rvd->vdev_stat.vs_alloc += alloc_delta;
-		rvd->vdev_stat.vs_dspace += dspace_delta;
-		rvd->vdev_stat.vs_defer += defer_delta;
-		mutex_exit(&rvd->vdev_stat_lock);
+		metaslab_class_space_update(mc,
+		    alloc_delta, defer_delta, space_delta, dspace_delta);
 	}
 }
 
@@ -2722,7 +2724,7 @@ vdev_state_dirty(vdev_t *vd)
 	    (dsl_pool_sync_context(spa_get_dsl(spa)) &&
 	    spa_config_held(spa, SCL_STATE, RW_READER)));
 
-	if (!list_link_active(&vd->vdev_state_dirty_node))
+	if (!list_link_active(&vd->vdev_state_dirty_node) && !vd->vdev_ishole)
 		list_insert_head(&spa->spa_state_dirty_list, vd);
 }
 

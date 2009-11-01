@@ -119,6 +119,7 @@ typedef enum {
 	ZFS_PROP_LOGBIAS,
 	ZFS_PROP_UNIQUE,		/* not exposed to the user */
 	ZFS_PROP_OBJSETID,		/* not exposed to the user */
+	ZFS_PROP_DEDUP,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -155,6 +156,8 @@ typedef enum {
 	ZPOOL_PROP_FAILUREMODE,
 	ZPOOL_PROP_LISTSNAPS,
 	ZPOOL_PROP_AUTOEXPAND,
+	ZPOOL_PROP_DEDUPDITTO,
+	ZPOOL_PROP_DEDUPRATIO,
 	ZPOOL_NUM_PROPS
 } zpool_prop_t;
 
@@ -197,6 +200,7 @@ boolean_t zfs_prop_user(const char *);
 boolean_t zfs_prop_userquota(const char *name);
 int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
 int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
+uint64_t zfs_prop_random_value(zfs_prop_t, uint64_t seed);
 boolean_t zfs_prop_valid_for_type(int, zfs_type_t);
 
 /*
@@ -209,6 +213,7 @@ uint64_t zpool_prop_default_numeric(zpool_prop_t);
 boolean_t zpool_prop_readonly(zpool_prop_t);
 int zpool_prop_index_to_string(zpool_prop_t, uint64_t, const char **);
 int zpool_prop_string_to_index(zpool_prop_t, const char *, uint64_t *);
+uint64_t zpool_prop_random_value(zpool_prop_t, uint64_t seed);
 
 /*
  * Definitions for the Delegation.
@@ -296,14 +301,16 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_17			17ULL
 #define	SPA_VERSION_18			18ULL
 #define	SPA_VERSION_19			19ULL
+#define	SPA_VERSION_20			20ULL
+#define	SPA_VERSION_21			21ULL
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.97/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.  Also bump the version number in
  * usr/src/grub/capability.
  */
-#define	SPA_VERSION			SPA_VERSION_19
-#define	SPA_VERSION_STRING		"19"
+#define	SPA_VERSION			SPA_VERSION_21
+#define	SPA_VERSION_STRING		"21"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -344,6 +351,8 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_RAIDZ3		SPA_VERSION_17
 #define	SPA_VERSION_USERREFS		SPA_VERSION_18
 #define	SPA_VERSION_HOLES		SPA_VERSION_19
+#define	SPA_VERSION_ZLE_COMPRESSION	SPA_VERSION_20
+#define	SPA_VERSION_DEDUP		SPA_VERSION_21
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change
@@ -559,7 +568,6 @@ typedef struct vdev_stat {
 	uint64_t	vs_alloc;		/* space allocated	*/
 	uint64_t	vs_space;		/* total capacity	*/
 	uint64_t	vs_dspace;		/* deflated capacity	*/
-	uint64_t	vs_defer;		/* in-core deferred	*/
 	uint64_t	vs_rsize;		/* replaceable dev size */
 	uint64_t	vs_ops[ZIO_TYPES];	/* operation count	*/
 	uint64_t	vs_bytes[ZIO_TYPES];	/* bytes read/written	*/

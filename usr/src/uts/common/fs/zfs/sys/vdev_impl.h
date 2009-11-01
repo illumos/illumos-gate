@@ -198,6 +198,8 @@ struct vdev {
 	kmutex_t	vdev_probe_lock; /* protects vdev_probe_zio	*/
 };
 
+#define	VDEV_RAIDZ_MAXPARITY	3
+
 #define	VDEV_PAD_SIZE		(8 << 10)
 /* 2 padding areas (vl_pad1 and vl_pad2) to skip */
 #define	VDEV_SKIP_SIZE		VDEV_PAD_SIZE * 2

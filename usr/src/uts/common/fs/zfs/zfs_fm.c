@@ -700,6 +700,7 @@ zfs_ereport_start_checksum(spa_t *spa, vdev_t *vd,
 		bcopy(info, report->zcr_ckinfo, sizeof (*info));
 	}
 
+	report->zcr_align = 1ULL << vd->vdev_top->vdev_ashift;
 	report->zcr_length = length;
 
 #ifdef _KERNEL

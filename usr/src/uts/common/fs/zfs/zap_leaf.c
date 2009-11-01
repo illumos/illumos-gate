@@ -29,6 +29,7 @@
  * the names are stored null-terminated.
  */
 
+#include <sys/zio.h>
 #include <sys/spa.h>
 #include <sys/dmu.h>
 #include <sys/zfs_context.h>
@@ -272,11 +273,12 @@ zap_leaf_array_free(zap_leaf_t *l, uint16_t *chunkp)
 static void
 zap_leaf_array_read(zap_leaf_t *l, uint16_t chunk,
     int array_int_len, int array_len, int buf_int_len, uint64_t buf_len,
-    char *buf)
+    void *buf)
 {
 	int len = MIN(array_len, buf_len);
 	int byten = 0;
 	uint64_t value = 0;
+	char *p = buf;
 
 	ASSERT3U(array_int_len, <=, buf_int_len);
 
@@ -284,7 +286,7 @@ zap_leaf_array_read(zap_leaf_t *l, uint16_t chunk,
 	if (array_int_len == 8 && buf_int_len == 8 && len == 1) {
 		struct zap_leaf_array *la = &ZAP_LEAF_CHUNK(l, chunk).l_array;
 		uint8_t *ip = la->la_array;
-		uint64_t *buf64 = (uint64_t *)buf;
+		uint64_t *buf64 = buf;
 
 		*buf64 = (uint64_t)ip[0] << 56 | (uint64_t)ip[1] << 48 |
 		    (uint64_t)ip[2] << 40 | (uint64_t)ip[3] << 32 |
@@ -299,8 +301,8 @@ zap_leaf_array_read(zap_leaf_t *l, uint16_t chunk,
 		while (chunk != CHAIN_END) {
 			struct zap_leaf_array *la =
 			    &ZAP_LEAF_CHUNK(l, chunk).l_array;
-			bcopy(la->la_array, buf, ZAP_LEAF_ARRAY_BYTES);
-			buf += ZAP_LEAF_ARRAY_BYTES;
+			bcopy(la->la_array, p, ZAP_LEAF_ARRAY_BYTES);
+			p += ZAP_LEAF_ARRAY_BYTES;
 			chunk = la->la_next;
 		}
 		return;
@@ -315,12 +317,12 @@ zap_leaf_array_read(zap_leaf_t *l, uint16_t chunk,
 			value = (value << 8) | la->la_array[i];
 			byten++;
 			if (byten == array_int_len) {
-				stv(buf_int_len, buf, value);
+				stv(buf_int_len, p, value);
 				byten = 0;
 				len--;
 				if (len == 0)
 					return;
-				buf += buf_int_len;
+				p += buf_int_len;
 			}
 		}
 		chunk = la->la_next;
@@ -328,7 +330,6 @@ zap_leaf_array_read(zap_leaf_t *l, uint16_t chunk,
 }
 
 /*
- * Only to be used on 8-bit arrays.
  * array_len is actual len in bytes (not encoded le_value_length).
  * namenorm is null-terminated.
  */
@@ -337,23 +338,44 @@ zap_leaf_array_match(zap_leaf_t *l, zap_name_t *zn, int chunk, int array_len)
 {
 	int bseen = 0;
 
+	if (zap_getflags(zn->zn_zap) & ZAP_FLAG_UINT64_KEY) {
+		uint64_t *thiskey;
+		boolean_t match;
+
+		ASSERT(zn->zn_key_intlen == sizeof (*thiskey));
+		thiskey = kmem_alloc(array_len * sizeof (*thiskey), KM_SLEEP);
+
+		zap_leaf_array_read(l, chunk, sizeof (*thiskey), array_len,
+		    sizeof (*thiskey), array_len, thiskey);
+		match = bcmp(thiskey, zn->zn_key_orig,
+		    array_len * sizeof (*thiskey)) == 0;
+		kmem_free(thiskey, array_len * sizeof (*thiskey));
+		return (match);
+	}
+
 	if (zn->zn_matchtype == MT_FIRST) {
 		char *thisname = kmem_alloc(array_len, KM_SLEEP);
 		boolean_t match;
 
-		zap_leaf_array_read(l, chunk, 1, array_len, 1,
-		    array_len, thisname);
+		zap_leaf_array_read(l, chunk, sizeof (char), array_len,
+		    sizeof (char), array_len, thisname);
 		match = zap_match(zn, thisname);
 		kmem_free(thisname, array_len);
 		return (match);
 	}
 
-	/* Fast path for exact matching */
+	/*
+	 * Fast path for exact matching.
+	 * First check that the lengths match, so that we don't read
+	 * past the end of the zn_key_orig array.
+	 */
+	if (array_len != zn->zn_key_orig_len)
+		return (B_FALSE);
 	while (bseen < array_len) {
 		struct zap_leaf_array *la = &ZAP_LEAF_CHUNK(l, chunk).l_array;
 		int toread = MIN(array_len - bseen, ZAP_LEAF_ARRAY_BYTES);
 		ASSERT3U(chunk, <, ZAP_LEAF_NUMCHUNKS(l));
-		if (bcmp(la->la_array, zn->zn_name_orij + bseen, toread))
+		if (bcmp(la->la_array, (char *)zn->zn_key_orig + bseen, toread))
 			break;
 		chunk = la->la_next;
 		bseen += toread;
@@ -426,7 +448,7 @@ zap_leaf_lookup_closest(zap_leaf_t *l,
 {
 	uint16_t chunk;
 	uint64_t besth = -1ULL;
-	uint32_t bestcd = ZAP_MAXCD;
+	uint32_t bestcd = -1U;
 	uint16_t bestlh = ZAP_LEAF_HASH_NUMENTRIES(l)-1;
 	uint16_t lh;
 	struct zap_leaf_entry *le;
@@ -459,7 +481,7 @@ zap_leaf_lookup_closest(zap_leaf_t *l,
 		}
 	}
 
-	return (bestcd == ZAP_MAXCD ? ENOENT : 0);
+	return (bestcd == -1U ? ENOENT : 0);
 }
 
 int
@@ -483,14 +505,20 @@ zap_entry_read(const zap_entry_handle_t *zeh,
 }
 
 int
-zap_entry_read_name(const zap_entry_handle_t *zeh, uint16_t buflen, char *buf)
+zap_entry_read_name(zap_t *zap, const zap_entry_handle_t *zeh, uint16_t buflen,
+    char *buf)
 {
 	struct zap_leaf_entry *le =
 	    ZAP_LEAF_ENTRY(zeh->zeh_leaf, *zeh->zeh_chunkp);
 	ASSERT3U(le->le_type, ==, ZAP_CHUNK_ENTRY);
 
-	zap_leaf_array_read(zeh->zeh_leaf, le->le_name_chunk, 1,
-	    le->le_name_length, 1, buflen, buf);
+	if (zap_getflags(zap) & ZAP_FLAG_UINT64_KEY) {
+		zap_leaf_array_read(zeh->zeh_leaf, le->le_name_chunk, 8,
+		    le->le_name_length, 8, buflen / 8, buf);
+	} else {
+		zap_leaf_array_read(zeh->zeh_leaf, le->le_name_chunk, 1,
+		    le->le_name_length, 1, buflen, buf);
+	}
 	if (le->le_name_length > buflen)
 		return (EOVERFLOW);
 	return (0);
@@ -549,26 +577,26 @@ zap_entry_remove(zap_entry_handle_t *zeh)
 }
 
 int
-zap_entry_create(zap_leaf_t *l, const char *name, uint64_t h, uint32_t cd,
+zap_entry_create(zap_leaf_t *l, zap_name_t *zn, uint32_t cd,
     uint8_t integer_size, uint64_t num_integers, const void *buf,
     zap_entry_handle_t *zeh)
 {
 	uint16_t chunk;
 	uint16_t *chunkp;
 	struct zap_leaf_entry *le;
-	uint64_t namelen, valuelen;
+	uint64_t valuelen;
 	int numchunks;
+	uint64_t h = zn->zn_hash;
 
 	valuelen = integer_size * num_integers;
-	namelen = strlen(name) + 1;
-	ASSERT(namelen >= 2);
 
-	numchunks = 1 + ZAP_LEAF_ARRAY_NCHUNKS(namelen) +
+	numchunks = 1 +
+	    ZAP_LEAF_ARRAY_NCHUNKS(zn->zn_key_orig_len * zn->zn_key_intlen) +
 	    ZAP_LEAF_ARRAY_NCHUNKS(valuelen);
 	if (numchunks > ZAP_LEAF_NUMCHUNKS(l))
 		return (E2BIG);
 
-	if (cd == ZAP_MAXCD) {
+	if (cd == ZAP_NEED_CD) {
 		/* find the lowest unused cd */
 		if (l->l_phys->l_hdr.lh_flags & ZLF_ENTRIES_CDSORTED) {
 			cd = 0;
@@ -585,7 +613,7 @@ zap_entry_create(zap_leaf_t *l, const char *name, uint64_t h, uint32_t cd,
 			}
 		} else {
 			/* old unsorted format; do it the O(n^2) way */
-			for (cd = 0; cd < ZAP_MAXCD; cd++) {
+			for (cd = 0; ; cd++) {
 				for (chunk = *LEAF_HASH_ENTPTR(l, h);
 				    chunk != CHAIN_END; chunk = le->le_next) {
 					le = ZAP_LEAF_ENTRY(l, chunk);
@@ -600,10 +628,10 @@ zap_entry_create(zap_leaf_t *l, const char *name, uint64_t h, uint32_t cd,
 			}
 		}
 		/*
-		 * we would run out of space in a block before we could
-		 * have ZAP_MAXCD entries
+		 * We would run out of space in a block before we could
+		 * store enough entries to run out of CD values.
 		 */
-		ASSERT3U(cd, <, ZAP_MAXCD);
+		ASSERT3U(cd, <, zap_maxcd(zn->zn_zap));
 	}
 
 	if (l->l_phys->l_hdr.lh_nfree < numchunks)
@@ -613,8 +641,9 @@ zap_entry_create(zap_leaf_t *l, const char *name, uint64_t h, uint32_t cd,
 	chunk = zap_leaf_chunk_alloc(l);
 	le = ZAP_LEAF_ENTRY(l, chunk);
 	le->le_type = ZAP_CHUNK_ENTRY;
-	le->le_name_chunk = zap_leaf_array_create(l, name, 1, namelen);
-	le->le_name_length = namelen;
+	le->le_name_chunk = zap_leaf_array_create(l, zn->zn_key_orig,
+	    zn->zn_key_intlen, zn->zn_key_orig_len);
+	le->le_name_length = zn->zn_key_orig_len;
 	le->le_value_chunk =
 	    zap_leaf_array_create(l, buf, integer_size, num_integers);
 	le->le_value_length = num_integers;

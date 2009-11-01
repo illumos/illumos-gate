@@ -120,7 +120,7 @@ free_blocks(dnode_t *dn, blkptr_t *bp, int num, dmu_tx_t *tx)
 		if (BP_IS_HOLE(bp))
 			continue;
 
-		bytesfreed += dsl_dataset_block_kill(ds, bp, dn->dn_zio, tx);
+		bytesfreed += dsl_dataset_block_kill(ds, bp, tx, B_FALSE);
 		ASSERT3U(bytesfreed, <=, DN_USED_BYTES(dn->dn_phys));
 		bzero(bp, sizeof (blkptr_t));
 		blocks_freed += 1;
@@ -424,6 +424,9 @@ dnode_undirty_dbufs(list_t *list)
 		dmu_buf_impl_t *db = dr->dr_dbuf;
 		uint64_t txg = dr->dr_txg;
 
+		if (db->db_level != 0)
+			dnode_undirty_dbufs(&dr->dt.di.dr_children);
+
 		mutex_enter(&db->db_mtx);
 		/* XXX - use dbuf_undirty()? */
 		list_remove(list, dr);
@@ -434,13 +437,9 @@ dnode_undirty_dbufs(list_t *list)
 			ASSERT(db->db_blkid == DB_BONUS_BLKID ||
 			    dr->dt.dl.dr_data == db->db_buf);
 			dbuf_unoverride(dr);
-			mutex_exit(&db->db_mtx);
-		} else {
-			mutex_exit(&db->db_mtx);
-			dnode_undirty_dbufs(&dr->dt.di.dr_children);
 		}
 		kmem_free(dr, sizeof (dbuf_dirty_record_t));
-		dbuf_rele(db, (void *)(uintptr_t)txg);
+		dbuf_rele_and_unlock(db, (void *)(uintptr_t)txg);
 	}
 }
 

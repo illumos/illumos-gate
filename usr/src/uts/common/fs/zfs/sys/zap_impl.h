@@ -40,12 +40,12 @@ extern int fzap_default_block_shift;
 
 #define	FZAP_BLOCK_SHIFT(zap)	((zap)->zap_f.zap_block_shift)
 
-#define	ZAP_MAXCD		(uint32_t)(-1)
-#define	ZAP_HASHBITS		28
 #define	MZAP_ENT_LEN		64
 #define	MZAP_NAME_LEN		(MZAP_ENT_LEN - 8 - 4 - 2)
 #define	MZAP_MAX_BLKSHIFT	SPA_MAXBLOCKSHIFT
 #define	MZAP_MAX_BLKSZ		(1 << MZAP_MAX_BLKSHIFT)
+
+#define	ZAP_NEED_CD		(-1U)
 
 typedef struct mzap_ent_phys {
 	uint64_t mze_value;
@@ -69,7 +69,6 @@ typedef struct mzap_ent {
 	uint64_t mze_hash;
 	mzap_ent_phys_t mze_phys;
 } mzap_ent_t;
-
 
 /*
  * The (fat) zap is stored in one object. It is an array of
@@ -127,6 +126,7 @@ typedef struct zap_phys {
 	uint64_t zap_num_entries;	/* number of entries */
 	uint64_t zap_salt;		/* salt to stir into hash function */
 	uint64_t zap_normflags;		/* flags for u8_textprep_str() */
+	uint64_t zap_flags;		/* zap_flags_t */
 	/*
 	 * This structure is followed by padding, and then the embedded
 	 * pointer table.  The embedded pointer table takes up second
@@ -168,10 +168,13 @@ typedef struct zap {
 
 typedef struct zap_name {
 	zap_t *zn_zap;
-	const char *zn_name_orij;
+	int zn_key_intlen;
+	const void *zn_key_orig;
+	int zn_key_orig_len;
+	const void *zn_key_norm;
+	int zn_key_norm_len;
 	uint64_t zn_hash;
 	matchtype_t zn_matchtype;
-	const char *zn_name_norm;
 	char zn_normbuf[ZAP_MAXNAMELEN];
 } zap_name_t;
 
@@ -183,8 +186,11 @@ int zap_lockdir(objset_t *os, uint64_t obj, dmu_tx_t *tx,
     krw_t lti, boolean_t fatreader, boolean_t adding, zap_t **zapp);
 void zap_unlockdir(zap_t *zap);
 void zap_evict(dmu_buf_t *db, void *vmzap);
-zap_name_t *zap_name_alloc(zap_t *zap, const char *name, matchtype_t mt);
+zap_name_t *zap_name_alloc(zap_t *zap, const char *key, matchtype_t mt);
 void zap_name_free(zap_name_t *zn);
+int zap_hashbits(zap_t *zap);
+uint32_t zap_maxcd(zap_t *zap);
+uint64_t zap_getflags(zap_t *zap);
 
 #define	ZAP_HASH_IDX(hash, n) (((n) == 0) ? 0 : ((hash) >> (64 - (n))))
 
@@ -209,7 +215,7 @@ void zap_put_leaf(struct zap_leaf *l);
 int fzap_add_cd(zap_name_t *zn,
     uint64_t integer_size, uint64_t num_integers,
     const void *val, uint32_t cd, dmu_tx_t *tx);
-void fzap_upgrade(zap_t *zap, dmu_tx_t *tx);
+void fzap_upgrade(zap_t *zap, dmu_tx_t *tx, zap_flags_t flags);
 int fzap_cursor_move_to_key(zap_cursor_t *zc, zap_name_t *zn);
 
 #ifdef	__cplusplus

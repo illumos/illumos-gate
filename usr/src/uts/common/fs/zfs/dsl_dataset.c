@@ -75,9 +75,9 @@ parent_delta(dsl_dataset_t *ds, int64_t delta)
 }
 
 void
-dsl_dataset_block_born(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx)
+dsl_dataset_block_born(dsl_dataset_t *ds, const blkptr_t *bp, dmu_tx_t *tx)
 {
-	int used = bp_get_dasize(tx->tx_pool->dp_spa, bp);
+	int used = bp_get_dsize_sync(tx->tx_pool->dp_spa, bp);
 	int compressed = BP_GET_PSIZE(bp);
 	int uncompressed = BP_GET_UCSIZE(bp);
 	int64_t delta;
@@ -118,29 +118,26 @@ dsl_dataset_block_born(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx)
 }
 
 int
-dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
-    dmu_tx_t *tx)
+dsl_dataset_block_kill(dsl_dataset_t *ds, const blkptr_t *bp, dmu_tx_t *tx,
+    boolean_t async)
 {
-	int used = bp_get_dasize(tx->tx_pool->dp_spa, bp);
-	int compressed = BP_GET_PSIZE(bp);
-	int uncompressed = BP_GET_UCSIZE(bp);
-
-	ASSERT(pio != NULL);
-	ASSERT(dmu_tx_is_syncing(tx));
-	/* No block pointer => nothing to free */
 	if (BP_IS_HOLE(bp))
 		return (0);
 
+	ASSERT(dmu_tx_is_syncing(tx));
+	ASSERT(bp->blk_birth <= tx->tx_txg);
+
+	int used = bp_get_dsize_sync(tx->tx_pool->dp_spa, bp);
+	int compressed = BP_GET_PSIZE(bp);
+	int uncompressed = BP_GET_UCSIZE(bp);
+
 	ASSERT(used > 0);
 	if (ds == NULL) {
-		int err;
 		/*
 		 * Account for the meta-objset space in its placeholder
 		 * dataset.
 		 */
-		err = dsl_free(pio, tx->tx_pool,
-		    tx->tx_txg, bp, NULL, NULL, ARC_NOWAIT);
-		ASSERT(err == 0);
+		dsl_free(tx->tx_pool, tx->tx_txg, bp);
 
 		dsl_dir_diduse_space(tx->tx_pool->dp_mos_dir, DD_USED_HEAD,
 		    -used, -compressed, -uncompressed, tx);
@@ -153,13 +150,10 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 
 	if (bp->blk_birth > ds->ds_phys->ds_prev_snap_txg) {
-		int err;
 		int64_t delta;
 
 		dprintf_bp(bp, "freeing: %s", "");
-		err = dsl_free(pio, tx->tx_pool,
-		    tx->tx_txg, bp, NULL, NULL, ARC_NOWAIT);
-		ASSERT(err == 0);
+		dsl_free(tx->tx_pool, tx->tx_txg, bp);
 
 		mutex_enter(&ds->ds_dir->dd_lock);
 		mutex_enter(&ds->ds_lock);
@@ -175,7 +169,18 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, zio_t *pio,
 		mutex_exit(&ds->ds_dir->dd_lock);
 	} else {
 		dprintf_bp(bp, "putting on dead list: %s", "");
-		VERIFY(0 == bplist_enqueue(&ds->ds_deadlist, bp, tx));
+		if (async) {
+			/*
+			 * We are here as part of zio's write done callback,
+			 * which means we're a zio interrupt thread.  We can't
+			 * call bplist_enqueue() now because it may block
+			 * waiting for I/O.  Instead, put bp on the deferred
+			 * queue and let dsl_pool_sync() finish the job.
+			 */
+			bplist_enqueue_deferred(&ds->ds_deadlist, bp);
+		} else {
+			VERIFY(0 == bplist_enqueue(&ds->ds_deadlist, bp, tx));
+		}
 		ASSERT3U(ds->ds_prev->ds_object, ==,
 		    ds->ds_phys->ds_prev_snap_obj);
 		ASSERT(ds->ds_prev->ds_phys->ds_num_children > 0);
@@ -261,9 +266,9 @@ dsl_dataset_evict(dmu_buf_t *db, void *dsv)
 	mutex_destroy(&ds->ds_lock);
 	mutex_destroy(&ds->ds_recvlock);
 	mutex_destroy(&ds->ds_opening_lock);
-	mutex_destroy(&ds->ds_deadlist.bpl_lock);
 	rw_destroy(&ds->ds_rwlock);
 	cv_destroy(&ds->ds_exclusive_cv);
+	bplist_fini(&ds->ds_deadlist);
 
 	kmem_free(ds, sizeof (dsl_dataset_t));
 }
@@ -361,10 +366,9 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 		mutex_init(&ds->ds_lock, NULL, MUTEX_DEFAULT, NULL);
 		mutex_init(&ds->ds_recvlock, NULL, MUTEX_DEFAULT, NULL);
 		mutex_init(&ds->ds_opening_lock, NULL, MUTEX_DEFAULT, NULL);
-		mutex_init(&ds->ds_deadlist.bpl_lock, NULL, MUTEX_DEFAULT,
-		    NULL);
 		rw_init(&ds->ds_rwlock, 0, 0, 0);
 		cv_init(&ds->ds_exclusive_cv, NULL, CV_DEFAULT, NULL);
+		bplist_init(&ds->ds_deadlist);
 
 		err = bplist_open(&ds->ds_deadlist,
 		    mos, ds->ds_phys->ds_deadlist_obj);
@@ -380,9 +384,9 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 			mutex_destroy(&ds->ds_lock);
 			mutex_destroy(&ds->ds_recvlock);
 			mutex_destroy(&ds->ds_opening_lock);
-			mutex_destroy(&ds->ds_deadlist.bpl_lock);
 			rw_destroy(&ds->ds_rwlock);
 			cv_destroy(&ds->ds_exclusive_cv);
+			bplist_fini(&ds->ds_deadlist);
 			kmem_free(ds, sizeof (dsl_dataset_t));
 			dmu_buf_rele(dbuf, tag);
 			return (err);
@@ -459,9 +463,9 @@ dsl_dataset_get_ref(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 			mutex_destroy(&ds->ds_lock);
 			mutex_destroy(&ds->ds_recvlock);
 			mutex_destroy(&ds->ds_opening_lock);
-			mutex_destroy(&ds->ds_deadlist.bpl_lock);
 			rw_destroy(&ds->ds_rwlock);
 			cv_destroy(&ds->ds_exclusive_cv);
+			bplist_fini(&ds->ds_deadlist);
 			kmem_free(ds, sizeof (dsl_dataset_t));
 			if (err) {
 				dmu_buf_rele(dbuf, tag);
@@ -1238,31 +1242,31 @@ dsl_dataset_unique(dsl_dataset_t *ds)
 
 struct killarg {
 	dsl_dataset_t *ds;
-	zio_t *zio;
 	dmu_tx_t *tx;
 };
 
 /* ARGSUSED */
 static int
-kill_blkptr(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
-    const dnode_phys_t *dnp, void *arg)
+kill_blkptr(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
+    const zbookmark_t *zb, const dnode_phys_t *dnp, void *arg)
 {
 	struct killarg *ka = arg;
+	dmu_tx_t *tx = ka->tx;
 
 	if (bp == NULL)
 		return (0);
 
-	if ((zb->zb_level == -1ULL && zb->zb_blkid != 0) ||
-	    (zb->zb_object != 0 && dnp == NULL)) {
+	if (zb->zb_level == ZB_ZIL_LEVEL) {
+		ASSERT(zilog != NULL);
 		/*
 		 * It's a block in the intent log.  It has no
 		 * accounting, so just free it.
 		 */
-		VERIFY3U(0, ==, dsl_free(ka->zio, ka->tx->tx_pool,
-		    ka->tx->tx_txg, bp, NULL, NULL, ARC_NOWAIT));
+		dsl_free(ka->tx->tx_pool, ka->tx->tx_txg, bp);
 	} else {
+		ASSERT(zilog == NULL);
 		ASSERT3U(bp->blk_birth, >, ka->ds->ds_phys->ds_prev_snap_txg);
-		(void) dsl_dataset_block_kill(ka->ds, bp, ka->zio, ka->tx);
+		(void) dsl_dataset_block_kill(ka->ds, bp, tx, B_FALSE);
 	}
 
 	return (0);
@@ -1490,7 +1494,6 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 {
 	struct dsl_ds_destroyarg *dsda = arg1;
 	dsl_dataset_t *ds = dsda->ds;
-	zio_t *zio;
 	int err;
 	int after_branch_point = FALSE;
 	dsl_pool_t *dp = ds->ds_dir->dd_pool;
@@ -1577,8 +1580,6 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		}
 	}
 
-	zio = zio_root(dp->dp_spa, NULL, NULL, ZIO_FLAG_MUSTSUCCEED);
-
 	if (ds->ds_phys->ds_next_snap_obj != 0) {
 		blkptr_t bp;
 		dsl_dataset_t *ds_next;
@@ -1616,15 +1617,13 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 				    bp.blk_birth >
 				    ds_prev->ds_phys->ds_prev_snap_txg) {
 					ds_prev->ds_phys->ds_unique_bytes +=
-					    bp_get_dasize(dp->dp_spa, &bp);
+					    bp_get_dsize_sync(dp->dp_spa, &bp);
 				}
 			} else {
-				used += bp_get_dasize(dp->dp_spa, &bp);
+				used += bp_get_dsize_sync(dp->dp_spa, &bp);
 				compressed += BP_GET_PSIZE(&bp);
 				uncompressed += BP_GET_UCSIZE(&bp);
-				/* XXX check return value? */
-				(void) dsl_free(zio, dp, tx->tx_txg,
-				    &bp, NULL, NULL, ARC_NOWAIT);
+				dsl_free(dp, tx->tx_txg, &bp);
 			}
 		}
 
@@ -1726,7 +1725,6 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 		 * freed all the objects in open context.
 		 */
 		ka.ds = ds;
-		ka.zio = zio;
 		ka.tx = tx;
 		err = traverse_dataset(ds, ds->ds_phys->ds_prev_snap_txg,
 		    TRAVERSE_POST, kill_blkptr, &ka);
@@ -1739,9 +1737,6 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 			ds->ds_prev = ds_prev = NULL;
 		}
 	}
-
-	err = zio_wait(zio);
-	ASSERT3U(err, ==, 0);
 
 	if (ds->ds_dir->dd_phys->dd_head_dataset_obj == ds->ds_object) {
 		/* Erase the link in the dir */
@@ -2785,7 +2780,7 @@ out:
 	if (err == 0) {
 		err = dsl_sync_task_do(dp, dsl_dataset_promote_check,
 		    dsl_dataset_promote_sync, ds, &pa,
-		    2 + 2 * doi.doi_physical_blks);
+		    2 + 2 * doi.doi_physical_blocks_512);
 		if (err && pa.err_ds && conflsnap)
 			(void) strncpy(conflsnap, pa.err_ds, MAXNAMELEN);
 	}

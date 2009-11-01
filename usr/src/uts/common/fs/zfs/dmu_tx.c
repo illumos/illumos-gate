@@ -163,38 +163,47 @@ dmu_tx_check_ioerr(zio_t *zio, dnode_t *dn, int level, uint64_t blkid)
 }
 
 static void
-dmu_tx_count_indirects(dmu_tx_hold_t *txh, dmu_buf_impl_t *db,
-    boolean_t freeable, dmu_buf_impl_t **history)
+dmu_tx_count_twig(dmu_tx_hold_t *txh, dnode_t *dn, dmu_buf_impl_t *db,
+    int level, uint64_t blkid, boolean_t freeable, uint64_t *history)
 {
-	int i = db->db_level + 1;
-	dnode_t *dn = db->db_dnode;
+	objset_t *os = dn->dn_objset;
+	dsl_dataset_t *ds = os->os_dsl_dataset;
+	int epbs = dn->dn_indblkshift - SPA_BLKPTRSHIFT;
+	dmu_buf_impl_t *parent = NULL;
+	blkptr_t *bp = NULL;
+	uint64_t space;
 
-	if (i >= dn->dn_nlevels)
+	if (level >= dn->dn_nlevels || history[level] == blkid)
 		return;
 
-	db = db->db_parent;
-	if (db == NULL) {
-		uint64_t lvls = dn->dn_nlevels - i;
+	history[level] = blkid;
 
-		txh->txh_space_towrite += lvls << dn->dn_indblkshift;
-		return;
+	space = (level == 0) ? dn->dn_datablksz : (1ULL << dn->dn_indblkshift);
+
+	if (db == NULL || db == dn->dn_dbuf) {
+		ASSERT(level != 0);
+		db = NULL;
+	} else {
+		ASSERT(db->db_dnode == dn);
+		ASSERT(db->db_level == level);
+		ASSERT(db->db.db_size == space);
+		ASSERT(db->db_blkid == blkid);
+		bp = db->db_blkptr;
+		parent = db->db_parent;
 	}
 
-	if (db != history[i]) {
-		dsl_dataset_t *ds = dn->dn_objset->os_dsl_dataset;
-		uint64_t space = 1ULL << dn->dn_indblkshift;
+	freeable = (bp && (freeable ||
+	    dsl_dataset_block_freeable(ds, bp->blk_birth)));
 
-		freeable = (db->db_blkptr && (freeable ||
-		    dsl_dataset_block_freeable(ds, db->db_blkptr->blk_birth)));
-		if (freeable)
-			txh->txh_space_tooverwrite += space;
-		else
-			txh->txh_space_towrite += space;
-		if (db->db_blkptr)
-			txh->txh_space_tounref += space;
-		history[i] = db;
-		dmu_tx_count_indirects(txh, db, freeable, history);
-	}
+	if (freeable)
+		txh->txh_space_tooverwrite += space;
+	else
+		txh->txh_space_towrite += space;
+	if (bp)
+		txh->txh_space_tounref += bp_get_dsize(os->os_spa, bp);
+
+	dmu_tx_count_twig(txh, dn, parent, level + 1,
+	    blkid >> epbs, freeable, history);
 }
 
 /* ARGSUSED */
@@ -215,7 +224,7 @@ dmu_tx_count_write(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 	max_ibs = DN_MAX_INDBLKSHIFT;
 
 	if (dn) {
-		dmu_buf_impl_t *last[DN_MAX_LEVELS];
+		uint64_t history[DN_MAX_LEVELS];
 		int nlvls = dn->dn_nlevels;
 		int delta;
 
@@ -291,29 +300,18 @@ dmu_tx_count_write(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 		 * If this write is not off the end of the file
 		 * we need to account for overwrites/unref.
 		 */
-		if (start <= dn->dn_maxblkid)
-			bzero(last, sizeof (dmu_buf_impl_t *) * DN_MAX_LEVELS);
+		if (start <= dn->dn_maxblkid) {
+			for (int l = 0; l < DN_MAX_LEVELS; l++)
+				history[l] = -1ULL;
+		}
 		while (start <= dn->dn_maxblkid) {
-			spa_t *spa = txh->txh_tx->tx_pool->dp_spa;
-			dsl_dataset_t *ds = dn->dn_objset->os_dsl_dataset;
 			dmu_buf_impl_t *db;
 
 			rw_enter(&dn->dn_struct_rwlock, RW_READER);
 			db = dbuf_hold_level(dn, 0, start, FTAG);
 			rw_exit(&dn->dn_struct_rwlock);
-			if (db->db_blkptr && dsl_dataset_block_freeable(ds,
-			    db->db_blkptr->blk_birth)) {
-				dprintf_bp(db->db_blkptr, "can free old%s", "");
-				txh->txh_space_tooverwrite += dn->dn_datablksz;
-				txh->txh_space_tounref += dn->dn_datablksz;
-				dmu_tx_count_indirects(txh, db, TRUE, last);
-			} else {
-				txh->txh_space_towrite += dn->dn_datablksz;
-				if (db->db_blkptr)
-					txh->txh_space_tounref +=
-					    bp_get_dasize(spa, db->db_blkptr);
-				dmu_tx_count_indirects(txh, db, FALSE, last);
-			}
+			dmu_tx_count_twig(txh, dn, db, 0, start, B_FALSE,
+			    history);
 			dbuf_rele(db, FTAG);
 			if (++start > end) {
 				/*
@@ -461,7 +459,7 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 			bp += blkid + i;
 			if (dsl_dataset_block_freeable(ds, bp->blk_birth)) {
 				dprintf_bp(bp, "can free old%s", "");
-				space += bp_get_dasize(spa, bp);
+				space += bp_get_dsize(spa, bp);
 			}
 			unref += BP_GET_ASIZE(bp);
 		}
@@ -538,7 +536,7 @@ dmu_tx_count_free(dmu_tx_hold_t *txh, uint64_t off, uint64_t len)
 		for (i = 0; i < tochk; i++) {
 			if (dsl_dataset_block_freeable(ds, bp[i].blk_birth)) {
 				dprintf_bp(&bp[i], "can free old%s", "");
-				space += bp_get_dasize(spa, &bp[i]);
+				space += bp_get_dsize(spa, &bp[i]);
 			}
 			unref += BP_GET_ASIZE(bp);
 		}
@@ -583,6 +581,8 @@ dmu_tx_hold_free(dmu_tx_t *tx, uint64_t object, uint64_t off, uint64_t len)
 	if (len != DMU_OBJECT_END)
 		dmu_tx_count_write(txh, off+len, 1);
 
+	dmu_tx_count_dnode(txh);
+
 	if (off >= (dn->dn_maxblkid+1) * dn->dn_datablksz)
 		return;
 	if (len == DMU_OBJECT_END)
@@ -625,7 +625,6 @@ dmu_tx_hold_free(dmu_tx_t *tx, uint64_t object, uint64_t off, uint64_t len)
 		}
 	}
 
-	dmu_tx_count_dnode(txh);
 	dmu_tx_count_free(txh, off, len);
 }
 

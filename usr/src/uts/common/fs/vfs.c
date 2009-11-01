@@ -81,6 +81,7 @@
 #include <sys/console.h>
 #include <sys/reboot.h>
 #include <sys/attr.h>
+#include <sys/zio.h>
 #include <sys/spa.h>
 #include <sys/lofi.h>
 #include <sys/bootprops.h>

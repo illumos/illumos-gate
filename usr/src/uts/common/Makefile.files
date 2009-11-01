@@ -1296,6 +1296,8 @@ ZFS_COMMON_OBJS +=		\
 	arc.o			\
 	bplist.o		\
 	dbuf.o			\
+	ddt.o			\
+	ddt_zap.o		\
 	dmu.o			\
 	dmu_send.o		\
 	dmu_object.o		\
@@ -1346,7 +1348,8 @@ ZFS_COMMON_OBJS +=		\
 	zio.o			\
 	zio_checksum.o		\
 	zio_compress.o		\
-	zio_inject.o
+	zio_inject.o		\
+	zle.o
 
 ZFS_SHARED_OBJS +=		\
 	zfs_namecheck.o		\

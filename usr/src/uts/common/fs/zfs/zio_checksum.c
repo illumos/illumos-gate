@@ -49,13 +49,13 @@
  *	we want the ability to take advantage of that hardware.
  *
  * Of course, we don't want a checksum upgrade to invalidate existing
- * data, so we store the checksum *function* in five bits of the DVA.
- * This gives us room for up to 32 different checksum functions.
+ * data, so we store the checksum *function* in eight bits of the bp.
+ * This gives us room for up to 256 different checksum functions.
  *
  * When writing a block, we always checksum it with the latest-and-greatest
  * checksum function of the appropriate strength.  When reading a block,
  * we compare the expected checksum against the actual checksum, which we
- * compute via the checksum function specified in the DVA encoding.
+ * compute via the checksum function specified by BP_GET_CHECKSUM(bp).
  */
 
 /*ARGSUSED*/
@@ -66,19 +66,19 @@ zio_checksum_off(const void *buf, uint64_t size, zio_cksum_t *zcp)
 }
 
 zio_checksum_info_t zio_checksum_table[ZIO_CHECKSUM_FUNCTIONS] = {
-	{{NULL,			NULL},			0, 0,	"inherit"},
-	{{NULL,			NULL},			0, 0,	"on"},
-	{{zio_checksum_off,	zio_checksum_off},	0, 0,	"off"},
-	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 1,	"label"},
-	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 1,	"gang_header"},
-	{{fletcher_2_native,	fletcher_2_byteswap},	0, 1,	"zilog"},
-	{{fletcher_2_native,	fletcher_2_byteswap},	0, 0,	"fletcher2"},
-	{{fletcher_4_native,	fletcher_4_byteswap},	1, 0,	"fletcher4"},
-	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 0,	"SHA256"},
+	{{NULL,			NULL},			0, 0, 0, "inherit"},
+	{{NULL,			NULL},			0, 0, 0, "on"},
+	{{zio_checksum_off,	zio_checksum_off},	0, 0, 0, "off"},
+	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 1, 0, "label"},
+	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 1, 0, "gang_header"},
+	{{fletcher_2_native,	fletcher_2_byteswap},	0, 1, 0, "zilog"},
+	{{fletcher_2_native,	fletcher_2_byteswap},	0, 0, 0, "fletcher2"},
+	{{fletcher_4_native,	fletcher_4_byteswap},	1, 0, 0, "fletcher4"},
+	{{zio_checksum_SHA256,	zio_checksum_SHA256},	1, 0, 1, "sha256"},
 };
 
-uint8_t
-zio_checksum_select(uint8_t child, uint8_t parent)
+enum zio_checksum
+zio_checksum_select(enum zio_checksum child, enum zio_checksum parent)
 {
 	ASSERT(child < ZIO_CHECKSUM_FUNCTIONS);
 	ASSERT(parent < ZIO_CHECKSUM_FUNCTIONS);
@@ -93,6 +93,29 @@ zio_checksum_select(uint8_t child, uint8_t parent)
 	return (child);
 }
 
+enum zio_checksum
+zio_checksum_dedup_select(spa_t *spa, enum zio_checksum child,
+    enum zio_checksum parent)
+{
+	ASSERT((child & ZIO_CHECKSUM_MASK) < ZIO_CHECKSUM_FUNCTIONS);
+	ASSERT((parent & ZIO_CHECKSUM_MASK) < ZIO_CHECKSUM_FUNCTIONS);
+	ASSERT(parent != ZIO_CHECKSUM_INHERIT && parent != ZIO_CHECKSUM_ON);
+
+	if (child == ZIO_CHECKSUM_INHERIT)
+		return (parent);
+
+	if (child == ZIO_CHECKSUM_ON)
+		return (spa_dedup_checksum(spa));
+
+	if (child == (ZIO_CHECKSUM_ON | ZIO_CHECKSUM_VERIFY))
+		return (spa_dedup_checksum(spa) | ZIO_CHECKSUM_VERIFY);
+
+	ASSERT(zio_checksum_table[child & ZIO_CHECKSUM_MASK].ci_dedup ||
+	    (child & ZIO_CHECKSUM_VERIFY) || child == ZIO_CHECKSUM_OFF);
+
+	return (child);
+}
+
 /*
  * Set the external verifier for a gang block based on <vdev, offset, txg>,
  * a tuple which is guaranteed to be unique for the life of the pool.
@@ -101,7 +124,7 @@ static void
 zio_checksum_gang_verifier(zio_cksum_t *zcp, blkptr_t *bp)
 {
 	dva_t *dva = BP_IDENTITY(bp);
-	uint64_t txg = bp->blk_birth;
+	uint64_t txg = BP_PHYSICAL_BIRTH(bp);
 
 	ASSERT(BP_IS_GANG(bp));
 

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/dmu.h>
 #include <sys/dmu_tx.h>
@@ -118,8 +116,10 @@ top:
 
 	txg_wait_synced(dstg->dstg_pool, txg);
 
-	if (dstg->dstg_err == EAGAIN)
+	if (dstg->dstg_err == EAGAIN) {
+		txg_wait_synced(dstg->dstg_pool, txg + TXG_DEFER_SIZE);
 		goto top;
+	}
 
 	return (dstg->dstg_err);
 }

@@ -41,7 +41,6 @@
 #include <sys/spa.h>
 #include <sys/spa_impl.h>
 #include <sys/vdev.h>
-#include <sys/vdev_impl.h>
 #include <sys/dmu.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_dataset.h>
@@ -179,7 +178,7 @@ zfs_is_bootfs(const char *name)
 
 	if (dmu_objset_hold(name, FTAG, &os) == 0) {
 		boolean_t ret;
-		ret = (dmu_objset_id(os) == dmu_objset_spa(os)->spa_bootfs);
+		ret = (dmu_objset_id(os) == spa_bootfs(dmu_objset_spa(os)));
 		dmu_objset_rele(os, FTAG);
 		return (ret);
 	}
@@ -1219,7 +1218,7 @@ zfs_ioc_vdev_add(zfs_cmd_t *zc)
 	 *
 	 * l2cache and spare devices are ok to be added to a rootpool.
 	 */
-	if (spa->spa_bootfs != 0 && nl2cache == 0 && nspares == 0) {
+	if (spa_bootfs(spa) != 0 && nl2cache == 0 && nspares == 0) {
 		spa_close(spa, FTAG);
 		return (EDOM);
 	}
@@ -1665,6 +1664,11 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 				    SPA_VERSION_GZIP_COMPRESSION))
 					return (ENOTSUP);
 
+				if (intval == ZIO_COMPRESS_ZLE &&
+				    zfs_earlier_version(name,
+				    SPA_VERSION_ZLE_COMPRESSION))
+					return (ENOTSUP);
+
 				/*
 				 * If this is a bootable dataset then
 				 * verify that the compression algorithm
@@ -1680,6 +1684,11 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 
 		case ZFS_PROP_COPIES:
 			if (zfs_earlier_version(name, SPA_VERSION_DITTO_BLOCKS))
+				return (ENOTSUP);
+			break;
+
+		case ZFS_PROP_DEDUP:
+			if (zfs_earlier_version(name, SPA_VERSION_DEDUP))
 				return (ENOTSUP);
 			break;
 
@@ -2978,9 +2987,9 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 		mutex_exit(&spa_namespace_lock);
 		return (EIO);
 	}
-	if (spa->spa_log_state == SPA_LOG_MISSING) {
+	if (spa_get_log_state(spa) == SPA_LOG_MISSING) {
 		/* we need to let spa_open/spa_load clear the chains */
-		spa->spa_log_state = SPA_LOG_CLEAR;
+		spa_set_log_state(spa, SPA_LOG_CLEAR);
 	}
 	spa->spa_last_open_failed = 0;
 	mutex_exit(&spa_namespace_lock);

@@ -76,6 +76,8 @@ register_impl(int prop, const char *name, zprop_type_t type,
 	pd = &prop_tbl[prop];
 
 	ASSERT(pd->pd_name == NULL || pd->pd_name == name);
+	ASSERT(name != NULL);
+	ASSERT(colname != NULL);
 
 	pd->pd_name = name;
 	pd->pd_propnum = prop;
@@ -89,6 +91,9 @@ register_impl(int prop, const char *name, zprop_type_t type,
 	pd->pd_rightalign = rightalign;
 	pd->pd_visible = visible;
 	pd->pd_table = idx_tbl;
+	pd->pd_table_size = 0;
+	while (idx_tbl && (idx_tbl++)->pi_name != NULL)
+		pd->pd_table_size++;
 }
 
 void
@@ -305,6 +310,25 @@ zprop_index_to_string(int prop, uint64_t index, const char **string,
 	}
 
 	return (-1);
+}
+
+/*
+ * Return a random valid property value.  Used by ztest.
+ */
+uint64_t
+zprop_random_value(int prop, uint64_t seed, zfs_type_t type)
+{
+	zprop_desc_t *prop_tbl;
+	const zprop_index_t *idx_tbl;
+
+	ASSERT((uint_t)prop < zprop_get_numprops(type));
+	prop_tbl = zprop_get_proptable(type);
+	idx_tbl = prop_tbl[prop].pd_table;
+
+	if (idx_tbl == NULL)
+		return (seed);
+
+	return (idx_tbl[seed % prop_tbl[prop].pd_table_size].pi_value);
 }
 
 const char *

@@ -75,8 +75,6 @@
 #include <sys/dsl_synctask.h>
 #include <sys/dsl_deleg.h>
 #include <sys/spa.h>
-#include <sys/spa_impl.h>
-#include <sys/zio_checksum.h> /* for the default checksum value */
 #include <sys/zap.h>
 #include <sys/fs/zfs.h>
 #include <sys/cred.h>
@@ -739,5 +737,5 @@ dsl_deleg_destroy(objset_t *mos, uint64_t zapobj, dmu_tx_t *tx)
 boolean_t
 dsl_delegation_on(objset_t *os)
 {
-	return (os->os_spa->spa_delegation);
+	return (!!spa_delegation(os->os_spa));
 }

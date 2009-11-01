@@ -36,8 +36,9 @@ extern "C" {
 
 struct dnode_phys;
 struct dsl_dataset;
+struct zilog;
 
-typedef int (blkptr_cb_t)(spa_t *spa, blkptr_t *bp,
+typedef int (blkptr_cb_t)(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
     const zbookmark_t *zb, const struct dnode_phys *dnp, void *arg);
 
 #define	TRAVERSE_PRE			(1<<0)

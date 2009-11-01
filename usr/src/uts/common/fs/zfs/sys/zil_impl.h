@@ -43,8 +43,8 @@ typedef struct lwb {
 	int		lwb_sz;		/* size of block and buffer */
 	char		*lwb_buf;	/* log write buffer */
 	zio_t		*lwb_zio;	/* zio for this buffer */
+	dmu_tx_t	*lwb_tx;	/* tx for log block allocation */
 	uint64_t	lwb_max_txg;	/* highest txg in this lwb */
-	txg_handle_t	lwb_txgh;	/* txg handle for txg_exit() */
 	list_node_t	lwb_node;	/* zilog->zl_lwb_list linkage */
 } lwb_t;
 
@@ -68,9 +68,10 @@ struct zilog {
 	objset_t	*zl_os;		/* object set we're logging */
 	zil_get_data_t	*zl_get_data;	/* callback to get object content */
 	zio_t		*zl_root_zio;	/* log writer root zio */
-	uint64_t	zl_itx_seq;	/* next itx sequence number */
+	uint64_t	zl_itx_seq;	/* next in-core itx sequence number */
+	uint64_t	zl_lr_seq;	/* on-disk log record sequence number */
 	uint64_t	zl_commit_seq;	/* committed upto this number */
-	uint64_t	zl_lr_seq;	/* log record sequence number */
+	uint64_t	zl_commit_lr_seq; /* last committed on-disk lr seq */
 	uint64_t	zl_destroy_txg;	/* txg of last zil_destroy() */
 	uint64_t	zl_replayed_seq[TXG_SIZE]; /* last replayed rec seq */
 	uint64_t	zl_replaying_seq; /* current replay seq number */
@@ -82,8 +83,12 @@ struct zilog {
 	uint8_t		zl_replay;	/* replaying records while set */
 	uint8_t		zl_stop_sync;	/* for debugging */
 	uint8_t		zl_writer;	/* boolean: write setup in progress */
-	uint8_t		zl_log_error;	/* boolean: log write error */
 	uint8_t		zl_logbias;	/* latency or throughput */
+	int		zl_parse_error;	/* last zil_parse() error */
+	uint64_t	zl_parse_blk_seq; /* highest blk seq on last parse */
+	uint64_t	zl_parse_lr_seq; /* highest lr seq on last parse */
+	uint64_t	zl_parse_blk_count; /* number of blocks parsed */
+	uint64_t	zl_parse_lr_count; /* number of log records parsed */
 	list_t		zl_itx_list;	/* in-memory itx list */
 	uint64_t	zl_itx_list_sz;	/* total size of records on list */
 	uint64_t	zl_cur_used;	/* current commit log size used */
@@ -92,15 +97,16 @@ struct zilog {
 	kmutex_t	zl_vdev_lock;	/* protects zl_vdev_tree */
 	avl_tree_t	zl_vdev_tree;	/* vdevs to flush in zil_commit() */
 	taskq_t		*zl_clean_taskq; /* runs lwb and itx clean tasks */
-	avl_tree_t	zl_dva_tree;	/* track DVAs during log parse */
+	avl_tree_t	zl_bp_tree;	/* track bps during log parse */
 	clock_t		zl_replay_time;	/* lbolt of when replay started */
 	uint64_t	zl_replay_blks;	/* number of log blocks replayed */
+	zil_header_t	zl_old_header;	/* debugging aid */
 };
 
-typedef struct zil_dva_node {
+typedef struct zil_bp_node {
 	dva_t		zn_dva;
 	avl_node_t	zn_node;
-} zil_dva_node_t;
+} zil_bp_node_t;
 
 #define	ZIL_MAX_LOG_DATA (SPA_MAXBLOCKSIZE - sizeof (zil_trailer_t) - \
     sizeof (lr_write_t))

@@ -43,8 +43,8 @@
 #include <sys/arc.h>
 #include <sys/zio_impl.h>
 #include <sys/zfs_ioctl.h>
-#include <sys/spa_impl.h>
 #include <sys/vdev_impl.h>
+#include <sys/dmu_objset.h>
 #include <sys/fs/zfs.h>
 
 uint32_t zio_injection_enabled;
@@ -70,8 +70,9 @@ zio_match_handler(zbookmark_t *zb, uint64_t type,
 	/*
 	 * Check for a match against the MOS, which is based on type
 	 */
-	if (zb->zb_objset == 0 && record->zi_objset == 0 &&
-	    record->zi_object == 0) {
+	if (zb->zb_objset == DMU_META_OBJSET &&
+	    record->zi_objset == DMU_META_OBJSET &&
+	    record->zi_object == DMU_META_DNODE_OBJECT) {
 		if (record->zi_type == DMU_OT_NONE ||
 		    type == record->zi_type)
 			return (record->zi_freq == 0 ||
@@ -357,7 +358,7 @@ spa_handle_ignored_writes(spa_t *spa)
 			VERIFY(handler->zi_record.zi_timer == 0 ||
 			    handler->zi_record.zi_timer -
 			    handler->zi_record.zi_duration >=
-			    spa->spa_syncing_txg);
+			    spa_syncing_txg(spa));
 		}
 	}
 

@@ -258,8 +258,10 @@ space_map_load_wait(space_map_t *sm)
 {
 	ASSERT(MUTEX_HELD(sm->sm_lock));
 
-	while (sm->sm_loading)
+	while (sm->sm_loading) {
+		ASSERT(!sm->sm_loaded);
 		cv_wait(&sm->sm_load_cv, sm->sm_lock);
+	}
 }
 
 /*

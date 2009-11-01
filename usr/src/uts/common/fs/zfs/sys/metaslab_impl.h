@@ -39,8 +39,12 @@ extern "C" {
 struct metaslab_class {
 	spa_t			*mc_spa;
 	metaslab_group_t	*mc_rotor;
-	uint64_t		mc_allocated;
 	space_map_ops_t		*mc_ops;
+	uint64_t		mc_aliquot;
+	uint64_t		mc_alloc;	/* total allocated space */
+	uint64_t		mc_deferred;	/* total deferred frees */
+	uint64_t		mc_space;	/* total space (alloc + free) */
+	uint64_t		mc_dspace;	/* total deflated space */
 };
 
 struct metaslab_group {

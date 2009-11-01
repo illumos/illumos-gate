@@ -88,6 +88,8 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	zap_byteswap,		TRUE,	"ZFS user/group used"	},
 	{	zap_byteswap,		TRUE,	"ZFS user/group quota"	},
 	{	zap_byteswap,		TRUE,	"snapshot refcount tags"},
+	{	zap_byteswap,		TRUE,	"DDT ZAP algorithm"	},
+	{	zap_byteswap,		TRUE,	"DDT statistics"	},
 };
 
 int
@@ -859,55 +861,114 @@ dmu_assign_arcbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
 }
 
 typedef struct {
-	dbuf_dirty_record_t	*dr;
-	dmu_sync_cb_t		*done;
-	void			*arg;
+	dbuf_dirty_record_t	*dsa_dr;
+	dmu_sync_cb_t		*dsa_done;
+	zgd_t			*dsa_zgd;
+	dmu_tx_t		*dsa_tx;
 } dmu_sync_arg_t;
 
 /* ARGSUSED */
 static void
 dmu_sync_ready(zio_t *zio, arc_buf_t *buf, void *varg)
 {
+	dmu_sync_arg_t *dsa = varg;
+	dmu_buf_t *db = dsa->dsa_zgd->zgd_db;
+	dnode_t *dn = ((dmu_buf_impl_t *)db)->db_dnode;
 	blkptr_t *bp = zio->io_bp;
-	dmu_sync_arg_t *in = varg;
-	dbuf_dirty_record_t *dr = in->dr;
-	dmu_buf_impl_t *db = dr->dr_dbuf;
 
-	if (!BP_IS_HOLE(bp)) {
-		ASSERT(BP_GET_TYPE(bp) == db->db_dnode->dn_type);
-		ASSERT(BP_GET_LEVEL(bp) == 0);
-		bp->blk_fill = 1;
-	} else {
-		/*
-		 * dmu_sync() can compress a block of zeros to a null blkptr
-		 * but the block size still needs to be passed through to replay
-		 */
-		BP_SET_LSIZE(bp, db->db.db_size);
+	if (zio->io_error == 0) {
+		if (BP_IS_HOLE(bp)) {
+			/*
+			 * A block of zeros may compress to a hole, but the
+			 * block size still needs to be known for replay.
+			 */
+			BP_SET_LSIZE(bp, db->db_size);
+		} else {
+			ASSERT(BP_GET_TYPE(bp) == dn->dn_type);
+			ASSERT(BP_GET_LEVEL(bp) == 0);
+			bp->blk_fill = 1;
+		}
 	}
+}
+
+static void
+dmu_sync_late_arrival_ready(zio_t *zio)
+{
+	dmu_sync_ready(zio, NULL, zio->io_private);
 }
 
 /* ARGSUSED */
 static void
 dmu_sync_done(zio_t *zio, arc_buf_t *buf, void *varg)
 {
-	dmu_sync_arg_t *in = varg;
-	dbuf_dirty_record_t *dr = in->dr;
+	dmu_sync_arg_t *dsa = varg;
+	dbuf_dirty_record_t *dr = dsa->dsa_dr;
 	dmu_buf_impl_t *db = dr->dr_dbuf;
-	dmu_sync_cb_t *done = in->done;
 
 	mutex_enter(&db->db_mtx);
 	ASSERT(dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC);
-	dr->dt.dl.dr_overridden_by = *zio->io_bp; /* structure assignment */
-	if (BP_IS_HOLE(&dr->dt.dl.dr_overridden_by))
-		BP_ZERO(&dr->dt.dl.dr_overridden_by);
-	dr->dt.dl.dr_override_state = DR_OVERRIDDEN;
+	if (zio->io_error == 0) {
+		dr->dt.dl.dr_overridden_by = *zio->io_bp;
+		dr->dt.dl.dr_override_state = DR_OVERRIDDEN;
+		dr->dt.dl.dr_copies = zio->io_prop.zp_copies;
+		if (BP_IS_HOLE(&dr->dt.dl.dr_overridden_by))
+			BP_ZERO(&dr->dt.dl.dr_overridden_by);
+	} else {
+		dr->dt.dl.dr_override_state = DR_NOT_OVERRIDDEN;
+	}
 	cv_broadcast(&db->db_changed);
 	mutex_exit(&db->db_mtx);
 
-	if (done)
-		done(&(db->db), in->arg);
+	dsa->dsa_done(dsa->dsa_zgd, zio->io_error);
 
-	kmem_free(in, sizeof (dmu_sync_arg_t));
+	kmem_free(dsa, sizeof (*dsa));
+}
+
+static void
+dmu_sync_late_arrival_done(zio_t *zio)
+{
+	blkptr_t *bp = zio->io_bp;
+	dmu_sync_arg_t *dsa = zio->io_private;
+
+	if (zio->io_error == 0 && !BP_IS_HOLE(bp)) {
+		ASSERT(zio->io_bp->blk_birth == zio->io_txg);
+		ASSERT(zio->io_txg > spa_syncing_txg(zio->io_spa));
+		zio_free(zio->io_spa, zio->io_txg, zio->io_bp);
+	}
+
+	dmu_tx_commit(dsa->dsa_tx);
+
+	dsa->dsa_done(dsa->dsa_zgd, zio->io_error);
+
+	kmem_free(dsa, sizeof (*dsa));
+}
+
+static int
+dmu_sync_late_arrival(zio_t *pio, objset_t *os, dmu_sync_cb_t *done, zgd_t *zgd,
+    zio_prop_t *zp, zbookmark_t *zb)
+{
+	dmu_sync_arg_t *dsa;
+	dmu_tx_t *tx;
+
+	tx = dmu_tx_create(os);
+	dmu_tx_hold_space(tx, zgd->zgd_db->db_size);
+	if (dmu_tx_assign(tx, TXG_NOWAIT) != 0) {
+		dmu_tx_abort(tx);
+		return (EIO);	/* Make zl_get_data do txg_waited_synced() */
+	}
+
+	dsa = kmem_alloc(sizeof (dmu_sync_arg_t), KM_SLEEP);
+	dsa->dsa_dr = NULL;
+	dsa->dsa_done = done;
+	dsa->dsa_zgd = zgd;
+	dsa->dsa_tx = tx;
+
+	zio_nowait(zio_write(pio, os->os_spa, dmu_tx_get_txg(tx), zgd->zgd_bp,
+	    zgd->zgd_db->db_data, zgd->zgd_db->db_size, zp,
+	    dmu_sync_late_arrival_ready, dmu_sync_late_arrival_done, dsa,
+	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_CANFAIL, zb));
+
+	return (0);
 }
 
 /*
@@ -926,156 +987,108 @@ dmu_sync_done(zio_t *zio, arc_buf_t *buf, void *varg)
  *	EALREADY: this block is already in the process of being synced.
  *		The caller should track its progress (somehow).
  *
- *	EINPROGRESS: the IO has been initiated.
- *		The caller should log this blkptr in the callback.
+ *	EIO: could not do the I/O.
+ *		The caller should do a txg_wait_synced().
  *
- *	0: completed.  Sets *bp to the blkptr just written.
- *		The caller should log this blkptr immediately.
+ *	0: the I/O has been initiated.
+ *		The caller should log this blkptr in the done callback.
+ *		It is possible that the I/O will fail, in which case
+ *		the error will be reported to the done callback and
+ *		propagated to pio from zio_done().
  */
 int
-dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
-    blkptr_t *bp, uint64_t txg, dmu_sync_cb_t *done, void *arg)
+dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
 {
-	dmu_buf_impl_t *db = (dmu_buf_impl_t *)db_fake;
+	blkptr_t *bp = zgd->zgd_bp;
+	dmu_buf_impl_t *db = (dmu_buf_impl_t *)zgd->zgd_db;
 	objset_t *os = db->db_objset;
-	dsl_pool_t *dp = os->os_dsl_dataset->ds_dir->dd_pool;
-	tx_state_t *tx = &dp->dp_tx;
+	dsl_dataset_t *ds = os->os_dsl_dataset;
 	dbuf_dirty_record_t *dr;
-	dmu_sync_arg_t *in;
+	dmu_sync_arg_t *dsa;
 	zbookmark_t zb;
-	writeprops_t wp = { 0 };
-	zio_t *zio;
-	int err;
+	zio_prop_t zp;
 
+	ASSERT(pio != NULL);
 	ASSERT(BP_IS_HOLE(bp));
 	ASSERT(txg != 0);
 
-	dprintf("dmu_sync txg=%llu, s,o,q %llu %llu %llu\n",
-	    txg, tx->tx_synced_txg, tx->tx_open_txg, tx->tx_quiesced_txg);
+	SET_BOOKMARK(&zb, ds->ds_object,
+	    db->db.db_object, db->db_level, db->db_blkid);
+
+	dmu_write_policy(os, db->db_dnode, db->db_level, WP_DMU_SYNC, &zp);
 
 	/*
-	 * XXX - would be nice if we could do this without suspending...
+	 * If we're frozen (running ziltest), we always need to generate a bp.
 	 */
-	txg_suspend(dp);
+	if (txg > spa_freeze_txg(os->os_spa))
+		return (dmu_sync_late_arrival(pio, os, done, zgd, &zp, &zb));
 
 	/*
-	 * If this txg already synced, there's nothing to do.
+	 * Grabbing db_mtx now provides a barrier between dbuf_sync_leaf()
+	 * and us.  If we determine that this txg is not yet syncing,
+	 * but it begins to sync a moment later, that's OK because the
+	 * sync thread will block in dbuf_sync_leaf() until we drop db_mtx.
 	 */
-	if (txg <= tx->tx_synced_txg) {
-		txg_resume(dp);
+	mutex_enter(&db->db_mtx);
+
+	if (txg <= spa_last_synced_txg(os->os_spa)) {
 		/*
-		 * If we're running ziltest, we need the blkptr regardless.
+		 * This txg has already synced.  There's nothing to do.
 		 */
-		if (txg > spa_freeze_txg(dp->dp_spa)) {
-			/* if db_blkptr == NULL, this was an empty write */
-			if (db->db_blkptr)
-				*bp = *db->db_blkptr; /* structure assignment */
-			return (0);
-		}
+		mutex_exit(&db->db_mtx);
 		return (EEXIST);
 	}
 
-	mutex_enter(&db->db_mtx);
-
-	if (txg == tx->tx_syncing_txg) {
-		while (db->db_data_pending) {
-			/*
-			 * IO is in-progress.  Wait for it to finish.
-			 * XXX - would be nice to be able to somehow "attach"
-			 * this zio to the parent zio passed in.
-			 */
-			cv_wait(&db->db_changed, &db->db_mtx);
-			if (!db->db_data_pending &&
-			    db->db_blkptr && BP_IS_HOLE(db->db_blkptr)) {
-				/*
-				 * IO was compressed away
-				 */
-				*bp = *db->db_blkptr; /* structure assignment */
-				mutex_exit(&db->db_mtx);
-				txg_resume(dp);
-				return (0);
-			}
-			ASSERT(db->db_data_pending ||
-			    (db->db_blkptr && db->db_blkptr->blk_birth == txg));
-		}
-
-		if (db->db_blkptr && db->db_blkptr->blk_birth == txg) {
-			/*
-			 * IO is already completed.
-			 */
-			*bp = *db->db_blkptr; /* structure assignment */
-			mutex_exit(&db->db_mtx);
-			txg_resume(dp);
-			return (0);
-		}
+	if (txg <= spa_syncing_txg(os->os_spa)) {
+		/*
+		 * This txg is currently syncing, so we can't mess with
+		 * the dirty record anymore; just write a new log block.
+		 */
+		mutex_exit(&db->db_mtx);
+		return (dmu_sync_late_arrival(pio, os, done, zgd, &zp, &zb));
 	}
 
 	dr = db->db_last_dirty;
-	while (dr && dr->dr_txg > txg)
+	while (dr && dr->dr_txg != txg)
 		dr = dr->dr_next;
-	if (dr == NULL || dr->dr_txg < txg) {
+
+	if (dr == NULL) {
 		/*
-		 * This dbuf isn't dirty, must have been free_range'd.
+		 * There's no dr for this dbuf, so it must have been freed.
 		 * There's no need to log writes to freed blocks, so we're done.
 		 */
 		mutex_exit(&db->db_mtx);
-		txg_resume(dp);
 		return (ENOENT);
 	}
 
 	ASSERT(dr->dr_txg == txg);
-	if (dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC) {
+	if (dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC ||
+	    dr->dt.dl.dr_override_state == DR_OVERRIDDEN) {
 		/*
-		 * We have already issued a sync write for this buffer.
-		 */
-		mutex_exit(&db->db_mtx);
-		txg_resume(dp);
-		return (EALREADY);
-	} else if (dr->dt.dl.dr_override_state == DR_OVERRIDDEN) {
-		/*
-		 * This buffer has already been synced.  It could not
+		 * We have already issued a sync write for this buffer,
+		 * or this buffer has already been synced.  It could not
 		 * have been dirtied since, or we would have cleared the state.
 		 */
-		*bp = dr->dt.dl.dr_overridden_by; /* structure assignment */
 		mutex_exit(&db->db_mtx);
-		txg_resume(dp);
-		return (0);
+		return (EALREADY);
 	}
 
+	ASSERT(dr->dt.dl.dr_override_state == DR_NOT_OVERRIDDEN);
 	dr->dt.dl.dr_override_state = DR_IN_DMU_SYNC;
-	in = kmem_alloc(sizeof (dmu_sync_arg_t), KM_SLEEP);
-	in->dr = dr;
-	in->done = done;
-	in->arg = arg;
 	mutex_exit(&db->db_mtx);
-	txg_resume(dp);
 
-	zb.zb_objset = os->os_dsl_dataset->ds_object;
-	zb.zb_object = db->db.db_object;
-	zb.zb_level = db->db_level;
-	zb.zb_blkid = db->db_blkid;
+	dsa = kmem_alloc(sizeof (dmu_sync_arg_t), KM_SLEEP);
+	dsa->dsa_dr = dr;
+	dsa->dsa_done = done;
+	dsa->dsa_zgd = zgd;
+	dsa->dsa_tx = NULL;
 
-	wp.wp_type = db->db_dnode->dn_type;
-	wp.wp_level = db->db_level;
-	wp.wp_copies = os->os_copies;
-	wp.wp_dnchecksum = db->db_dnode->dn_checksum;
-	wp.wp_oschecksum = os->os_checksum;
-	wp.wp_dncompress = db->db_dnode->dn_compress;
-	wp.wp_oscompress = os->os_compress;
+	zio_nowait(arc_write(pio, os->os_spa, txg,
+	    bp, dr->dt.dl.dr_data, DBUF_IS_L2CACHEABLE(db), &zp,
+	    dmu_sync_ready, dmu_sync_done, dsa,
+	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_CANFAIL, &zb));
 
-	ASSERT(BP_IS_HOLE(bp));
-
-	zio = arc_write(pio, os->os_spa, &wp, DBUF_IS_L2CACHEABLE(db),
-	    txg, bp, dr->dt.dl.dr_data, dmu_sync_ready, dmu_sync_done, in,
-	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
-	if (pio) {
-		zio_nowait(zio);
-		err = EINPROGRESS;
-	} else {
-		err = zio_wait(zio);
-		ASSERT(err == 0);
-	}
-	return (err);
+	return (0);
 }
 
 int
@@ -1121,6 +1134,84 @@ dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
 	dnode_rele(dn, FTAG);
 }
 
+int zfs_mdcomp_disable = 0;
+
+void
+dmu_write_policy(objset_t *os, dnode_t *dn, int level, int wp, zio_prop_t *zp)
+{
+	dmu_object_type_t type = dn ? dn->dn_type : DMU_OT_OBJSET;
+	boolean_t ismd = (level > 0 || dmu_ot[type].ot_metadata);
+	enum zio_checksum checksum = os->os_checksum;
+	enum zio_compress compress = os->os_compress;
+	enum zio_checksum dedup_checksum = os->os_dedup_checksum;
+	boolean_t dedup;
+	boolean_t dedup_verify = os->os_dedup_verify;
+	int copies = os->os_copies;
+
+	/*
+	 * Determine checksum setting.
+	 */
+	if (ismd) {
+		/*
+		 * Metadata always gets checksummed.  If the data
+		 * checksum is multi-bit correctable, and it's not a
+		 * ZBT-style checksum, then it's suitable for metadata
+		 * as well.  Otherwise, the metadata checksum defaults
+		 * to fletcher4.
+		 */
+		if (zio_checksum_table[checksum].ci_correctable < 1 ||
+		    zio_checksum_table[checksum].ci_zbt)
+			checksum = ZIO_CHECKSUM_FLETCHER_4;
+	} else {
+		checksum = zio_checksum_select(dn->dn_checksum, checksum);
+	}
+
+	/*
+	 * Determine compression setting.
+	 */
+	if (ismd) {
+		/*
+		 * XXX -- we should design a compression algorithm
+		 * that specializes in arrays of bps.
+		 */
+		compress = zfs_mdcomp_disable ? ZIO_COMPRESS_EMPTY :
+		    ZIO_COMPRESS_LZJB;
+	} else {
+		compress = zio_compress_select(dn->dn_compress, compress);
+	}
+
+	/*
+	 * Determine dedup setting.  If we are in dmu_sync(), we won't
+	 * actually dedup now because that's all done in syncing context;
+	 * but we do want to use the dedup checkum.  If the checksum is not
+	 * strong enough to ensure unique signatures, force dedup_verify.
+	 */
+	dedup = (!ismd && dedup_checksum != ZIO_CHECKSUM_OFF);
+	if (dedup) {
+		checksum = dedup_checksum;
+		if (!zio_checksum_table[checksum].ci_dedup)
+			dedup_verify = 1;
+	}
+
+	if (wp & WP_DMU_SYNC)
+		dedup = 0;
+
+	if (wp & WP_NOFILL) {
+		ASSERT(!ismd && level == 0);
+		checksum = ZIO_CHECKSUM_OFF;
+		compress = ZIO_COMPRESS_OFF;
+		dedup = B_FALSE;
+	}
+
+	zp->zp_checksum = checksum;
+	zp->zp_compress = compress;
+	zp->zp_type = type;
+	zp->zp_level = level;
+	zp->zp_copies = MIN(copies + ismd, spa_max_replication(os->os_spa));
+	zp->zp_dedup = dedup;
+	zp->zp_dedup_verify = dedup && dedup_verify;
+}
+
 int
 dmu_offset_next(objset_t *os, uint64_t object, boolean_t hole, uint64_t *off)
 {
@@ -1155,21 +1246,27 @@ dmu_offset_next(objset_t *os, uint64_t object, boolean_t hole, uint64_t *off)
 void
 dmu_object_info_from_dnode(dnode_t *dn, dmu_object_info_t *doi)
 {
+	dnode_phys_t *dnp;
+
 	rw_enter(&dn->dn_struct_rwlock, RW_READER);
 	mutex_enter(&dn->dn_mtx);
+
+	dnp = dn->dn_phys;
 
 	doi->doi_data_block_size = dn->dn_datablksz;
 	doi->doi_metadata_block_size = dn->dn_indblkshift ?
 	    1ULL << dn->dn_indblkshift : 0;
+	doi->doi_type = dn->dn_type;
+	doi->doi_bonus_type = dn->dn_bonustype;
+	doi->doi_bonus_size = dn->dn_bonuslen;
 	doi->doi_indirection = dn->dn_nlevels;
 	doi->doi_checksum = dn->dn_checksum;
 	doi->doi_compress = dn->dn_compress;
-	doi->doi_physical_blks = (DN_USED_BYTES(dn->dn_phys) +
-	    SPA_MINBLOCKSIZE/2) >> SPA_MINBLOCKSHIFT;
-	doi->doi_max_block_offset = dn->dn_phys->dn_maxblkid;
-	doi->doi_type = dn->dn_type;
-	doi->doi_bonus_size = dn->dn_bonuslen;
-	doi->doi_bonus_type = dn->dn_bonustype;
+	doi->doi_physical_blocks_512 = (DN_USED_BYTES(dnp) + 256) >> 9;
+	doi->doi_max_offset = (dnp->dn_maxblkid + 1) * dn->dn_datablksz;
+	doi->doi_fill_count = 0;
+	for (int i = 0; i < dnp->dn_nblkptr; i++)
+		doi->doi_fill_count += dnp->dn_blkptr[i].blk_fill;
 
 	mutex_exit(&dn->dn_mtx);
 	rw_exit(&dn->dn_struct_rwlock);

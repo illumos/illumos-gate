@@ -19,12 +19,26 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include <sys/bplist.h>
 #include <sys/zfs_context.h>
+
+void
+bplist_init(bplist_t *bpl)
+{
+	bzero(bpl, sizeof (*bpl));
+	mutex_init(&bpl->bpl_lock, NULL, MUTEX_DEFAULT, NULL);
+}
+
+void
+bplist_fini(bplist_t *bpl)
+{
+	ASSERT(bpl->bpl_queue == NULL);
+	mutex_destroy(&bpl->bpl_lock);
+}
 
 static int
 bplist_hold(bplist_t *bpl)
@@ -208,12 +222,13 @@ bplist_enqueue(bplist_t *bpl, const blkptr_t *bp, dmu_tx_t *tx)
 	bparray[off].blk_fill = 0;
 
 	/* The bplist will compress better if we can leave off the checksum */
-	bzero(&bparray[off].blk_cksum, sizeof (bparray[off].blk_cksum));
+	if (!BP_GET_DEDUP(&bparray[off]))
+		bzero(&bparray[off].blk_cksum, sizeof (bparray[off].blk_cksum));
 
 	dmu_buf_will_dirty(bpl->bpl_dbuf, tx);
 	bpl->bpl_phys->bpl_entries++;
 	bpl->bpl_phys->bpl_bytes +=
-	    bp_get_dasize(dmu_objset_spa(bpl->bpl_mos), bp);
+	    bp_get_dsize_sync(dmu_objset_spa(bpl->bpl_mos), bp);
 	if (bpl->bpl_havecomp) {
 		bpl->bpl_phys->bpl_comp += BP_GET_PSIZE(bp);
 		bpl->bpl_phys->bpl_uncomp += BP_GET_UCSIZE(bp);
@@ -223,8 +238,14 @@ bplist_enqueue(bplist_t *bpl, const blkptr_t *bp, dmu_tx_t *tx)
 	return (0);
 }
 
+void
+bplist_enqueue_cb(void *bpl, const blkptr_t *bp, dmu_tx_t *tx)
+{
+	VERIFY(bplist_enqueue(bpl, bp, tx) == 0);
+}
+
 /*
- * Deferred entry; will be written later by bplist_sync().
+ * Deferred entry; will be processed later by bplist_sync().
  */
 void
 bplist_enqueue_deferred(bplist_t *bpl, const blkptr_t *bp)
@@ -240,7 +261,7 @@ bplist_enqueue_deferred(bplist_t *bpl, const blkptr_t *bp)
 }
 
 void
-bplist_sync(bplist_t *bpl, dmu_tx_t *tx)
+bplist_sync(bplist_t *bpl, bplist_sync_cb_t *func, void *arg, dmu_tx_t *tx)
 {
 	bplist_q_t *bpq;
 
@@ -248,7 +269,7 @@ bplist_sync(bplist_t *bpl, dmu_tx_t *tx)
 	while ((bpq = bpl->bpl_queue) != NULL) {
 		bpl->bpl_queue = bpq->bpq_next;
 		mutex_exit(&bpl->bpl_lock);
-		VERIFY(0 == bplist_enqueue(bpl, &bpq->bpq_blk, tx));
+		func(arg, &bpq->bpq_blk, tx);
 		kmem_free(bpq, sizeof (*bpq));
 		mutex_enter(&bpl->bpl_lock);
 	}
@@ -311,12 +332,12 @@ bplist_space(bplist_t *bpl, uint64_t *usedp, uint64_t *compp, uint64_t *uncompp)
 }
 
 /*
- * Return (in *dasizep) the amount of space on the deadlist which is:
+ * Return (in *dsizep) the amount of space on the deadlist which is:
  * mintxg < blk_birth <= maxtxg
  */
 int
 bplist_space_birthrange(bplist_t *bpl, uint64_t mintxg, uint64_t maxtxg,
-    uint64_t *dasizep)
+    uint64_t *dsizep)
 {
 	uint64_t size = 0;
 	uint64_t itor = 0;
@@ -331,19 +352,18 @@ bplist_space_birthrange(bplist_t *bpl, uint64_t mintxg, uint64_t maxtxg,
 		mutex_enter(&bpl->bpl_lock);
 		err = bplist_hold(bpl);
 		if (err == 0)
-			*dasizep = bpl->bpl_phys->bpl_bytes;
+			*dsizep = bpl->bpl_phys->bpl_bytes;
 		mutex_exit(&bpl->bpl_lock);
 		return (err);
 	}
 
 	while ((err = bplist_iterate(bpl, &itor, &bp)) == 0) {
 		if (bp.blk_birth > mintxg && bp.blk_birth <= maxtxg) {
-			size +=
-			    bp_get_dasize(dmu_objset_spa(bpl->bpl_mos), &bp);
+			size += bp_get_dsize(dmu_objset_spa(bpl->bpl_mos), &bp);
 		}
 	}
 	if (err == ENOENT)
 		err = 0;
-	*dasizep = size;
+	*dsizep = size;
 	return (err);
 }

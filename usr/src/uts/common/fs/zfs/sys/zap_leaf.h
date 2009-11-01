@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_ZAP_LEAF_H
 #define	_SYS_ZAP_LEAF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -132,7 +130,7 @@ typedef union zap_leaf_chunk {
 		uint8_t le_int_size;		/* size of ints */
 		uint16_t le_next;		/* next entry in hash chain */
 		uint16_t le_name_chunk;		/* first chunk of the name */
-		uint16_t le_name_length;	/* bytes in name, incl null */
+		uint16_t le_name_length;	/* ints in name (incl null) */
 		uint16_t le_value_chunk;	/* first chunk of the value */
 		uint16_t le_value_length;	/* value length in ints */
 		uint32_t le_cd;			/* collision differentiator */
@@ -193,10 +191,10 @@ extern int zap_leaf_lookup_closest(zap_leaf_t *l,
  * num_integers in the attribute.
  */
 extern int zap_entry_read(const zap_entry_handle_t *zeh,
-	uint8_t integer_size, uint64_t num_integers, void *buf);
+    uint8_t integer_size, uint64_t num_integers, void *buf);
 
-extern int zap_entry_read_name(const zap_entry_handle_t *zeh,
-	uint16_t buflen, char *buf);
+extern int zap_entry_read_name(zap_t *zap, const zap_entry_handle_t *zeh,
+    uint16_t buflen, char *buf);
 
 /*
  * Replace the value of an existing entry.
@@ -204,7 +202,7 @@ extern int zap_entry_read_name(const zap_entry_handle_t *zeh,
  * zap_entry_update may fail if it runs out of space (ENOSPC).
  */
 extern int zap_entry_update(zap_entry_handle_t *zeh,
-	uint8_t integer_size, uint64_t num_integers, const void *buf);
+    uint8_t integer_size, uint64_t num_integers, const void *buf);
 
 /*
  * Remove an entry.
@@ -216,10 +214,9 @@ extern void zap_entry_remove(zap_entry_handle_t *zeh);
  * belong in this leaf (according to its hash value).  Fills in the
  * entry handle on success.  Returns 0 on success or ENOSPC on failure.
  */
-extern int zap_entry_create(zap_leaf_t *l,
-	const char *name, uint64_t h, uint32_t cd,
-	uint8_t integer_size, uint64_t num_integers, const void *buf,
-	zap_entry_handle_t *zeh);
+extern int zap_entry_create(zap_leaf_t *l, zap_name_t *zn, uint32_t cd,
+    uint8_t integer_size, uint64_t num_integers, const void *buf,
+    zap_entry_handle_t *zeh);
 
 /*
  * Return true if there are additional entries with the same normalized

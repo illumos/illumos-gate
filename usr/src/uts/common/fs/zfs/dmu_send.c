@@ -150,9 +150,10 @@ dump_dnode(struct backuparg *ba, uint64_t object, dnode_phys_t *dnp)
 	(((uint64_t)dnp->dn_datablkszsec) << (SPA_MINBLOCKSHIFT + \
 	(level) * (dnp->dn_indblkshift - SPA_BLKPTRSHIFT)))
 
+/* ARGSUSED */
 static int
-backup_cb(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
-    const dnode_phys_t *dnp, void *arg)
+backup_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
+    const zbookmark_t *zb, const dnode_phys_t *dnp, void *arg)
 {
 	struct backuparg *ba = arg;
 	dmu_object_type_t type = bp ? BP_GET_TYPE(bp) : DMU_OT_NONE;
@@ -161,9 +162,10 @@ backup_cb(spa_t *spa, blkptr_t *bp, const zbookmark_t *zb,
 	if (issig(JUSTLOOKING) && issig(FORREAL))
 		return (EINTR);
 
-	if (zb->zb_object != 0 && DMU_OBJECT_IS_SPECIAL(zb->zb_object)) {
+	if (zb->zb_object != DMU_META_DNODE_OBJECT &&
+	    DMU_OBJECT_IS_SPECIAL(zb->zb_object)) {
 		return (0);
-	} else if (bp == NULL && zb->zb_object == 0) {
+	} else if (bp == NULL && zb->zb_object == DMU_META_DNODE_OBJECT) {
 		uint64_t span = BP_SPAN(dnp, zb->zb_level);
 		uint64_t dnobj = (zb->zb_blkid * span) >> DNODE_SHIFT;
 		err = dump_freeobjects(ba, dnobj, span >> DNODE_SHIFT);

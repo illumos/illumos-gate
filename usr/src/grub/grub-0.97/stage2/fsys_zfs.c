@@ -513,7 +513,7 @@ zap_hash(uint64_t salt, const char *name)
 	 * those are the onces that we first pay attention to when
 	 * chosing the bucket.
 	 */
-	crc &= ~((1ULL << (64 - ZAP_HASHBITS)) - 1);
+	crc &= ~((1ULL << (64 - 28)) - 1);
 
 	return (crc);
 }
@@ -623,7 +623,8 @@ fzap_lookup(dnode_phys_t *zap_dnode, zap_phys_t *zap,
 	int blksft = zfs_log2(zap_dnode->dn_datablkszsec << DNODE_SHIFT);
 
 	/* Verify if this is a fat zap header block */
-	if (zap->zap_magic != (uint64_t)ZAP_MAGIC)
+	if (zap->zap_magic != (uint64_t)ZAP_MAGIC ||
+	    zap->zap_flags != 0)
 		return (ERR_FSYS_CORRUPT);
 
 	hash = zap_hash(zap->zap_salt, name);

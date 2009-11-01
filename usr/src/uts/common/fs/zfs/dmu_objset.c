@@ -36,7 +36,6 @@
 #include <sys/dbuf.h>
 #include <sys/zvol.h>
 #include <sys/dmu_tx.h>
-#include <sys/zio_checksum.h>
 #include <sys/zap.h>
 #include <sys/zil.h>
 #include <sys/dmu_impl.h>
@@ -138,6 +137,24 @@ copies_changed_cb(void *arg, uint64_t newval)
 }
 
 static void
+dedup_changed_cb(void *arg, uint64_t newval)
+{
+	objset_t *os = arg;
+	spa_t *spa = os->os_spa;
+	enum zio_checksum checksum;
+
+	/*
+	 * Inheritance should have been done by now.
+	 */
+	ASSERT(newval != ZIO_CHECKSUM_INHERIT);
+
+	checksum = zio_checksum_dedup_select(spa, newval, ZIO_CHECKSUM_OFF);
+
+	os->os_dedup_checksum = checksum & ZIO_CHECKSUM_MASK;
+	os->os_dedup_verify = !!(checksum & ZIO_CHECKSUM_VERIFY);
+}
+
+static void
 primary_cache_changed_cb(void *arg, uint64_t newval)
 {
 	objset_t *os = arg;
@@ -209,10 +226,9 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	if (!BP_IS_HOLE(os->os_rootbp)) {
 		uint32_t aflags = ARC_WAIT;
 		zbookmark_t zb;
-		zb.zb_objset = ds ? ds->ds_object : 0;
-		zb.zb_object = 0;
-		zb.zb_level = -1;
-		zb.zb_blkid = 0;
+		SET_BOOKMARK(&zb, ds ? ds->ds_object : DMU_META_OBJSET,
+		    ZB_ROOT_OBJECT, ZB_ROOT_LEVEL, ZB_ROOT_BLKID);
+
 		if (DMU_OS_IS_L2CACHEABLE(os))
 			aflags |= ARC_L2CACHE;
 
@@ -281,6 +297,9 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 				err = dsl_prop_register(ds, "copies",
 				    copies_changed_cb, os);
 			if (err == 0)
+				err = dsl_prop_register(ds, "dedup",
+				    dedup_changed_cb, os);
+			if (err == 0)
 				err = dsl_prop_register(ds, "logbias",
 				    logbias_changed_cb, os);
 		}
@@ -295,6 +314,9 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		os->os_checksum = ZIO_CHECKSUM_FLETCHER_4;
 		os->os_compress = ZIO_COMPRESS_LZJB;
 		os->os_copies = spa_max_replication(spa);
+		os->os_dedup_checksum = ZIO_CHECKSUM_OFF;
+		os->os_dedup_verify = 0;
+		os->os_logbias = 0;
 		os->os_primary_cache = ZFS_CACHE_ALL;
 		os->os_secondary_cache = ZFS_CACHE_ALL;
 	}
@@ -454,12 +476,9 @@ void
 dmu_objset_evict(objset_t *os)
 {
 	dsl_dataset_t *ds = os->os_dsl_dataset;
-	int i;
 
-	for (i = 0; i < TXG_SIZE; i++) {
-		ASSERT(list_head(&os->os_dirty_dnodes[i]) == NULL);
-		ASSERT(list_head(&os->os_free_dnodes[i]) == NULL);
-	}
+	for (int t = 0; t < TXG_SIZE; t++)
+		ASSERT(!dmu_objset_is_dirty(os, t));
 
 	if (ds) {
 		if (!dsl_dataset_is_snapshot(ds)) {
@@ -469,6 +488,8 @@ dmu_objset_evict(objset_t *os)
 			    compression_changed_cb, os));
 			VERIFY(0 == dsl_prop_unregister(ds, "copies",
 			    copies_changed_cb, os));
+			VERIFY(0 == dsl_prop_unregister(ds, "dedup",
+			    dedup_changed_cb, os));
 			VERIFY(0 == dsl_prop_unregister(ds, "logbias",
 			    logbias_changed_cb, os));
 		}
@@ -873,10 +894,9 @@ dmu_objset_sync_dnodes(list_t *list, list_t *newlist, dmu_tx_t *tx)
 
 /* ARGSUSED */
 static void
-ready(zio_t *zio, arc_buf_t *abuf, void *arg)
+dmu_objset_write_ready(zio_t *zio, arc_buf_t *abuf, void *arg)
 {
 	blkptr_t *bp = zio->io_bp;
-	blkptr_t *bp_orig = &zio->io_bp_orig;
 	objset_t *os = arg;
 	dnode_phys_t *dnp = &os->os_phys->os_meta_dnode;
 
@@ -893,14 +913,24 @@ ready(zio_t *zio, arc_buf_t *abuf, void *arg)
 	bp->blk_fill = 0;
 	for (int i = 0; i < dnp->dn_nblkptr; i++)
 		bp->blk_fill += dnp->dn_blkptr[i].blk_fill;
+}
+
+/* ARGSUSED */
+static void
+dmu_objset_write_done(zio_t *zio, arc_buf_t *abuf, void *arg)
+{
+	blkptr_t *bp = zio->io_bp;
+	blkptr_t *bp_orig = &zio->io_bp_orig;
+	objset_t *os = arg;
 
 	if (zio->io_flags & ZIO_FLAG_IO_REWRITE) {
-		ASSERT(DVA_EQUAL(BP_IDENTITY(bp), BP_IDENTITY(bp_orig)));
+		ASSERT(BP_EQUAL(bp, bp_orig));
 	} else {
-		if (zio->io_bp_orig.blk_birth == os->os_synctx->tx_txg)
-			(void) dsl_dataset_block_kill(os->os_dsl_dataset,
-			    &zio->io_bp_orig, zio, os->os_synctx);
-		dsl_dataset_block_born(os->os_dsl_dataset, bp, os->os_synctx);
+		dsl_dataset_t *ds = os->os_dsl_dataset;
+		dmu_tx_t *tx = os->os_synctx;
+
+		(void) dsl_dataset_block_kill(ds, bp_orig, tx, B_TRUE);
+		dsl_dataset_block_born(ds, bp, tx);
 	}
 }
 
@@ -910,7 +940,7 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 {
 	int txgoff;
 	zbookmark_t zb;
-	writeprops_t wp = { 0 };
+	zio_prop_t zp;
 	zio_t *zio;
 	list_t *list;
 	list_t *newlist = NULL;
@@ -934,26 +964,17 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 	/*
 	 * Create the root block IO
 	 */
-	zb.zb_objset = os->os_dsl_dataset ? os->os_dsl_dataset->ds_object : 0;
-	zb.zb_object = 0;
-	zb.zb_level = -1;	/* for block ordering; it's level 0 on disk */
-	zb.zb_blkid = 0;
-
-	wp.wp_type = DMU_OT_OBJSET;
-	wp.wp_level = 0;	/* on-disk BP level; see above */
-	wp.wp_copies = os->os_copies;
-	wp.wp_oschecksum = os->os_checksum;
-	wp.wp_oscompress = os->os_compress;
-
-	if (BP_IS_OLDER(os->os_rootbp, tx->tx_txg)) {
-		(void) dsl_dataset_block_kill(os->os_dsl_dataset,
-		    os->os_rootbp, pio, tx);
-	}
-
 	arc_release(os->os_phys_buf, &os->os_phys_buf);
 
-	zio = arc_write(pio, os->os_spa, &wp, DMU_OS_IS_L2CACHEABLE(os),
-	    tx->tx_txg, os->os_rootbp, os->os_phys_buf, ready, NULL, os,
+	SET_BOOKMARK(&zb, os->os_dsl_dataset ?
+	    os->os_dsl_dataset->ds_object : DMU_META_OBJSET,
+	    ZB_ROOT_OBJECT, ZB_ROOT_LEVEL, ZB_ROOT_BLKID);
+
+	dmu_write_policy(os, NULL, 0, 0, &zp);
+
+	zio = arc_write(pio, os->os_spa, tx->tx_txg,
+	    os->os_rootbp, os->os_phys_buf, DMU_OS_IS_L2CACHEABLE(os), &zp,
+	    dmu_objset_write_ready, dmu_objset_write_done, os,
 	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
 
 	/*
@@ -1000,6 +1021,13 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 	zil_sync(os->os_zil, tx);
 	os->os_phys->os_zil_header = os->os_zil_header;
 	zio_nowait(zio);
+}
+
+boolean_t
+dmu_objset_is_dirty(objset_t *os, uint64_t txg)
+{
+	return (!list_is_empty(&os->os_dirty_dnodes[txg & TXG_MASK]) ||
+	    !list_is_empty(&os->os_free_dnodes[txg & TXG_MASK]));
 }
 
 static objset_used_cb_t *used_cbs[DMU_OST_NUMTYPES];
@@ -1431,10 +1459,8 @@ dmu_objset_prefetch(char *name, void *arg)
 			uint32_t aflags = ARC_NOWAIT | ARC_PREFETCH;
 			zbookmark_t zb;
 
-			zb.zb_objset = ds->ds_object;
-			zb.zb_object = 0;
-			zb.zb_level = -1;
-			zb.zb_blkid = 0;
+			SET_BOOKMARK(&zb, ds->ds_object, ZB_ROOT_OBJECT,
+			    ZB_ROOT_LEVEL, ZB_ROOT_BLKID);
 
 			(void) arc_read_nolock(NULL, dsl_dataset_get_spa(ds),
 			    &ds->ds_phys->ds_bp, NULL, NULL,

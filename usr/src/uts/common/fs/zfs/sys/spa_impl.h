@@ -78,13 +78,6 @@ typedef struct spa_config_dirent {
 	char		*scd_path;
 } spa_config_dirent_t;
 
-typedef enum spa_log_state {
-	SPA_LOG_UNKNOWN = 0,	/* unknown log state */
-	SPA_LOG_MISSING,	/* missing log(s) */
-	SPA_LOG_CLEAR,		/* clear the log(s) */
-	SPA_LOG_GOOD,		/* log(s) are good */
-} spa_log_state_t;
-
 enum zio_taskq_type {
 	ZIO_TASKQ_ISSUE = 0,
 	ZIO_TASKQ_INTERRUPT,
@@ -114,6 +107,7 @@ struct spa {
 	uint64_t	spa_final_txg;		/* txg of export/destroy */
 	uint64_t	spa_freeze_txg;		/* freeze pool at this txg */
 	uint64_t	spa_load_max_txg;	/* best initial ub_txg */
+	uint64_t	spa_claim_max_txg;	/* highest claimed birth txg */
 	objset_t	*spa_meta_objset;	/* copy of dp->dp_meta_objset */
 	txg_list_t	spa_vdev_txg_list;	/* per-txg dirty vdev list */
 	vdev_t		*spa_root_vdev;		/* top-level vdev container */
@@ -125,8 +119,9 @@ struct spa {
 	uint64_t	spa_config_object;	/* MOS object for pool config */
 	uint64_t	spa_config_generation;	/* config generation number */
 	uint64_t	spa_syncing_txg;	/* txg currently syncing */
-	uint64_t	spa_sync_bplist_obj;	/* object for deferred frees */
-	bplist_t	spa_sync_bplist;	/* deferred-free bplist */
+	uint64_t	spa_deferred_bplist_obj; /* object for deferred frees */
+	bplist_t	spa_deferred_bplist;	/* deferred-free bplist */
+	bplist_t	spa_free_bplist[TXG_SIZE]; /* bplist of stuff to free */
 	uberblock_t	spa_ubsync;		/* last synced uberblock */
 	uberblock_t	spa_uberblock;		/* current uberblock */
 	boolean_t	spa_extreme_rewind;	/* rewind past deferred frees */
@@ -177,11 +172,16 @@ struct spa {
 	kmutex_t	spa_suspend_lock;	/* protects suspend_zio_root */
 	kcondvar_t	spa_suspend_cv;		/* notification of resume */
 	uint8_t		spa_suspended;		/* pool is suspended */
+	uint8_t		spa_claiming;		/* pool is doing zil_claim() */
 	boolean_t	spa_is_root;		/* pool is root */
 	int		spa_minref;		/* num refs when first opened */
 	int		spa_mode;		/* FREAD | FWRITE */
 	spa_log_state_t spa_log_state;		/* log state */
 	uint64_t	spa_autoexpand;		/* lun expansion on/off */
+	ddt_t		*spa_ddt[ZIO_CHECKSUM_FUNCTIONS]; /* in-core DDTs */
+	uint64_t	spa_ddt_stat_object;	/* DDT statistics */
+	uint64_t	spa_dedup_ditto;	/* dedup ditto threshold */
+	uint64_t	spa_dedup_checksum;	/* default dedup checksum */
 	boolean_t	spa_autoreplace;	/* autoreplace set in open */
 	int		spa_vdev_locks;		/* locks grabbed */
 	/*
@@ -195,12 +195,6 @@ struct spa {
 };
 
 extern const char *spa_config_path;
-
-#define	BOOTFS_COMPRESS_VALID(compress) \
-	((compress) == ZIO_COMPRESS_LZJB || \
-	((compress) == ZIO_COMPRESS_ON && \
-	ZIO_COMPRESS_ON_VALUE == ZIO_COMPRESS_LZJB) || \
-	(compress) == ZIO_COMPRESS_OFF)
 
 #ifdef	__cplusplus
 }

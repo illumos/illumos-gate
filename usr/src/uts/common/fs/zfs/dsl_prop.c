@@ -31,7 +31,6 @@
 #include <sys/dsl_prop.h>
 #include <sys/dsl_synctask.h>
 #include <sys/spa.h>
-#include <sys/zio_checksum.h> /* for the default checksum value */
 #include <sys/zap.h>
 #include <sys/fs/zfs.h>
 

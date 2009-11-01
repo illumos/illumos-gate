@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+#include <sys/zio.h>
 #include <sys/spa.h>
 #include <sys/dmu.h>
 #include <sys/zfs_context.h>
@@ -36,33 +37,74 @@
 #include <sys/sunddi.h>
 #endif
 
-static int mzap_upgrade(zap_t **zapp, dmu_tx_t *tx);
+static int mzap_upgrade(zap_t **zapp, dmu_tx_t *tx, zap_flags_t flags);
 
+uint64_t
+zap_getflags(zap_t *zap)
+{
+	if (zap->zap_ismicro)
+		return (0);
+	return (zap->zap_u.zap_fat.zap_phys->zap_flags);
+}
+
+int
+zap_hashbits(zap_t *zap)
+{
+	if (zap_getflags(zap) & ZAP_FLAG_HASH64)
+		return (48);
+	else
+		return (28);
+}
+
+uint32_t
+zap_maxcd(zap_t *zap)
+{
+	if (zap_getflags(zap) & ZAP_FLAG_HASH64)
+		return ((1<<16)-1);
+	else
+		return (-1U);
+}
 
 static uint64_t
-zap_hash(zap_t *zap, const char *normname)
+zap_hash(zap_name_t *zn)
 {
-	const uint8_t *cp;
-	uint8_t c;
-	uint64_t crc = zap->zap_salt;
+	zap_t *zap = zn->zn_zap;
+	uint64_t h = 0;
 
-	/* NB: name must already be normalized, if necessary */
+	if (zap_getflags(zap) & ZAP_FLAG_PRE_HASHED_KEY) {
+		ASSERT(zap_getflags(zap) & ZAP_FLAG_UINT64_KEY);
+		h = *(uint64_t *)zn->zn_key_orig;
+	} else {
+		const uint8_t *cp = (const uint8_t *)zn->zn_key_norm;
+		int i, len;
 
-	ASSERT(crc != 0);
-	ASSERT(zfs_crc64_table[128] == ZFS_CRC64_POLY);
-	for (cp = (const uint8_t *)normname; (c = *cp) != '\0'; cp++) {
-		crc = (crc >> 8) ^ zfs_crc64_table[(crc ^ c) & 0xFF];
+		h = zap->zap_salt;
+		ASSERT(h != 0);
+		ASSERT(zfs_crc64_table[128] == ZFS_CRC64_POLY);
+		len = zn->zn_key_norm_len;
+
+		/*
+		 * Because we previously stored the terminating null on
+		 * disk, but didn't hash it, we need to continue to not
+		 * hash it.  (The zn_key_*_len includes the terminating
+		 * null for non-binary keys.)
+		 */
+		if (!(zap_getflags(zap) & ZAP_FLAG_UINT64_KEY))
+			len--;
+
+		for (i = 0; i < len; cp++, i++)
+			h = (h >> 8) ^ zfs_crc64_table[(h ^ *cp) & 0xFF];
+
 	}
-
 	/*
-	 * Only use 28 bits, since we need 4 bits in the cookie for the
-	 * collision differentiator.  We MUST use the high bits, since
-	 * those are the ones that we first pay attention to when
+	 * Don't use all 64 bits, since we need some in the cookie for
+	 * the collision differentiator.  We MUST use the high bits,
+	 * since those are the ones that we first pay attention to when
 	 * chosing the bucket.
 	 */
-	crc &= ~((1ULL << (64 - ZAP_HASHBITS)) - 1);
+	h &= ~((1ULL << (64 - zap_hashbits(zap))) - 1);
 
-	return (crc);
+	return (h);
 }
 
 static int
@@ -70,6 +112,8 @@ zap_normalize(zap_t *zap, const char *name, char *namenorm)
 {
 	size_t inlen, outlen;
 	int err;
+
+	ASSERT(!(zap_getflags(zap) & ZAP_FLAG_UINT64_KEY));
 
 	inlen = strlen(name) + 1;
 	outlen = ZAP_MAXNAMELEN;
@@ -85,16 +129,18 @@ zap_normalize(zap_t *zap, const char *name, char *namenorm)
 boolean_t
 zap_match(zap_name_t *zn, const char *matchname)
 {
+	ASSERT(!(zap_getflags(zn->zn_zap) & ZAP_FLAG_UINT64_KEY));
+
 	if (zn->zn_matchtype == MT_FIRST) {
 		char norm[ZAP_MAXNAMELEN];
 
 		if (zap_normalize(zn->zn_zap, matchname, norm) != 0)
 			return (B_FALSE);
 
-		return (strcmp(zn->zn_name_norm, norm) == 0);
+		return (strcmp(zn->zn_key_norm, norm) == 0);
 	} else {
 		/* MT_BEST or MT_EXACT */
-		return (strcmp(zn->zn_name_orij, matchname) == 0);
+		return (strcmp(zn->zn_key_orig, matchname) == 0);
 	}
 }
 
@@ -104,30 +150,49 @@ zap_name_free(zap_name_t *zn)
 	kmem_free(zn, sizeof (zap_name_t));
 }
 
-/* XXX combine this with zap_lockdir()? */
 zap_name_t *
-zap_name_alloc(zap_t *zap, const char *name, matchtype_t mt)
+zap_name_alloc(zap_t *zap, const char *key, matchtype_t mt)
 {
 	zap_name_t *zn = kmem_alloc(sizeof (zap_name_t), KM_SLEEP);
 
 	zn->zn_zap = zap;
-	zn->zn_name_orij = name;
+	zn->zn_key_intlen = sizeof (*key);
+	zn->zn_key_orig = key;
+	zn->zn_key_orig_len = strlen(zn->zn_key_orig) + 1;
 	zn->zn_matchtype = mt;
 	if (zap->zap_normflags) {
-		if (zap_normalize(zap, name, zn->zn_normbuf) != 0) {
+		if (zap_normalize(zap, key, zn->zn_normbuf) != 0) {
 			zap_name_free(zn);
 			return (NULL);
 		}
-		zn->zn_name_norm = zn->zn_normbuf;
+		zn->zn_key_norm = zn->zn_normbuf;
+		zn->zn_key_norm_len = strlen(zn->zn_key_norm) + 1;
 	} else {
 		if (mt != MT_EXACT) {
 			zap_name_free(zn);
 			return (NULL);
 		}
-		zn->zn_name_norm = zn->zn_name_orij;
+		zn->zn_key_norm = zn->zn_key_orig;
+		zn->zn_key_norm_len = zn->zn_key_orig_len;
 	}
 
-	zn->zn_hash = zap_hash(zap, zn->zn_name_norm);
+	zn->zn_hash = zap_hash(zn);
+	return (zn);
+}
+
+zap_name_t *
+zap_name_alloc_uint64(zap_t *zap, const uint64_t *key, int numints)
+{
+	zap_name_t *zn = kmem_alloc(sizeof (zap_name_t), KM_SLEEP);
+
+	ASSERT(zap->zap_normflags == 0);
+	zn->zn_zap = zap;
+	zn->zn_key_intlen = sizeof (*key);
+	zn->zn_key_orig = zn->zn_key_norm = key;
+	zn->zn_key_orig_len = zn->zn_key_norm_len = numints;
+	zn->zn_matchtype = MT_EXACT;
+
+	zn->zn_hash = zap_hash(zn);
 	return (zn);
 }
 
@@ -186,7 +251,7 @@ mze_insert(zap_t *zap, int chunkid, uint64_t hash, mzap_ent_phys_t *mzep)
 
 	ASSERT(zap->zap_ismicro);
 	ASSERT(RW_WRITE_HELD(&zap->zap_rwlock));
-	ASSERT(mzep->mze_cd < ZAP_MAXCD);
+	ASSERT(mzep->mze_cd < zap_maxcd(zap));
 
 	mze = kmem_alloc(sizeof (mzap_ent_t), KM_SLEEP);
 	mze->mze_chunkid = chunkid;
@@ -205,9 +270,6 @@ mze_find(zap_name_t *zn)
 
 	ASSERT(zn->zn_zap->zap_ismicro);
 	ASSERT(RW_LOCK_HELD(&zn->zn_zap->zap_rwlock));
-
-	if (strlen(zn->zn_name_norm) >= sizeof (mze_tofind.mze_phys.mze_name))
-		return (NULL);
 
 	mze_tofind.mze_hash = zn->zn_hash;
 	mze_tofind.mze_phys.mze_cd = 0;
@@ -421,7 +483,7 @@ zap_lockdir(objset_t *os, uint64_t obj, dmu_tx_t *tx,
 			dprintf("upgrading obj %llu: num_entries=%u\n",
 			    obj, zap->zap_m.zap_num_entries);
 			*zapp = zap;
-			return (mzap_upgrade(zapp, tx));
+			return (mzap_upgrade(zapp, tx, 0));
 		}
 		err = dmu_object_set_blocksize(os, obj, newsz, 0, tx);
 		ASSERT3U(err, ==, 0);
@@ -441,10 +503,11 @@ zap_unlockdir(zap_t *zap)
 }
 
 static int
-mzap_upgrade(zap_t **zapp, dmu_tx_t *tx)
+mzap_upgrade(zap_t **zapp, dmu_tx_t *tx, zap_flags_t flags)
 {
 	mzap_phys_t *mzp;
-	int i, sz, nchunks, err;
+	int i, sz, nchunks;
+	int err = 0;
 	zap_t *zap = *zapp;
 
 	ASSERT(RW_WRITE_HELD(&zap->zap_rwlock));
@@ -454,11 +517,13 @@ mzap_upgrade(zap_t **zapp, dmu_tx_t *tx)
 	bcopy(zap->zap_dbuf->db_data, mzp, sz);
 	nchunks = zap->zap_m.zap_num_chunks;
 
-	err = dmu_object_set_blocksize(zap->zap_objset, zap->zap_object,
-	    1ULL << fzap_default_block_shift, 0, tx);
-	if (err) {
-		kmem_free(mzp, sz);
-		return (err);
+	if (!flags) {
+		err = dmu_object_set_blocksize(zap->zap_objset, zap->zap_object,
+		    1ULL << fzap_default_block_shift, 0, tx);
+		if (err) {
+			kmem_free(mzp, sz);
+			return (err);
+		}
 	}
 
 	dprintf("upgrading obj=%llu with %u chunks\n",
@@ -466,10 +531,9 @@ mzap_upgrade(zap_t **zapp, dmu_tx_t *tx)
 	/* XXX destroy the avl later, so we can use the stored hash value */
 	mze_destroy(zap);
 
-	fzap_upgrade(zap, tx);
+	fzap_upgrade(zap, tx, flags);
 
 	for (i = 0; i < nchunks; i++) {
-		int err;
 		mzap_ent_phys_t *mze = &mzp->mz_chunk[i];
 		zap_name_t *zn;
 		if (mze->mze_name[0] == 0)
@@ -489,7 +553,8 @@ mzap_upgrade(zap_t **zapp, dmu_tx_t *tx)
 }
 
 static void
-mzap_create_impl(objset_t *os, uint64_t obj, int normflags, dmu_tx_t *tx)
+mzap_create_impl(objset_t *os, uint64_t obj, int normflags, zap_flags_t flags,
+    dmu_tx_t *tx)
 {
 	dmu_buf_t *db;
 	mzap_phys_t *zp;
@@ -510,6 +575,15 @@ mzap_create_impl(objset_t *os, uint64_t obj, int normflags, dmu_tx_t *tx)
 	zp->mz_salt = ((uintptr_t)db ^ (uintptr_t)tx ^ (obj << 1)) | 1ULL;
 	zp->mz_normflags = normflags;
 	dmu_buf_rele(db, FTAG);
+
+	if (flags != 0) {
+		zap_t *zap;
+		/* Only fat zap supports flags; upgrade immediately. */
+		VERIFY(0 == zap_lockdir(os, obj, tx, RW_WRITER,
+		    B_FALSE, B_FALSE, &zap));
+		VERIFY3U(0, ==, mzap_upgrade(&zap, tx, flags));
+		zap_unlockdir(zap);
+	}
 }
 
 int
@@ -530,7 +604,7 @@ zap_create_claim_norm(objset_t *os, uint64_t obj, int normflags,
 	err = dmu_object_claim(os, obj, ot, 0, bonustype, bonuslen, tx);
 	if (err != 0)
 		return (err);
-	mzap_create_impl(os, obj, normflags, tx);
+	mzap_create_impl(os, obj, normflags, 0, tx);
 	return (0);
 }
 
@@ -547,7 +621,26 @@ zap_create_norm(objset_t *os, int normflags, dmu_object_type_t ot,
 {
 	uint64_t obj = dmu_object_alloc(os, ot, 0, bonustype, bonuslen, tx);
 
-	mzap_create_impl(os, obj, normflags, tx);
+	mzap_create_impl(os, obj, normflags, 0, tx);
+	return (obj);
+}
+
+uint64_t
+zap_create_flags(objset_t *os, int normflags, zap_flags_t flags,
+    dmu_object_type_t ot, int leaf_blockshift, int indirect_blockshift,
+    dmu_object_type_t bonustype, int bonuslen, dmu_tx_t *tx)
+{
+	uint64_t obj = dmu_object_alloc(os, ot, 0, bonustype, bonuslen, tx);
+
+	ASSERT(leaf_blockshift >= SPA_MINBLOCKSHIFT &&
+	    leaf_blockshift <= SPA_MAXBLOCKSHIFT &&
+	    indirect_blockshift >= SPA_MINBLOCKSHIFT &&
+	    indirect_blockshift <= SPA_MAXBLOCKSHIFT);
+
+	VERIFY(dmu_object_set_blocksize(os, obj,
+	    1ULL << leaf_blockshift, indirect_blockshift, tx) == 0);
+
+	mzap_create_impl(os, obj, normflags, flags, tx);
 	return (obj);
 }
 
@@ -699,6 +792,30 @@ zap_lookup_norm(objset_t *os, uint64_t zapobj, const char *name,
 }
 
 int
+zap_lookup_uint64(objset_t *os, uint64_t zapobj, const uint64_t *key,
+    int key_numints, uint64_t integer_size, uint64_t num_integers, void *buf)
+{
+	zap_t *zap;
+	int err;
+	zap_name_t *zn;
+
+	err = zap_lockdir(os, zapobj, NULL, RW_READER, TRUE, FALSE, &zap);
+	if (err)
+		return (err);
+	zn = zap_name_alloc_uint64(zap, key, key_numints);
+	if (zn == NULL) {
+		zap_unlockdir(zap);
+		return (ENOTSUP);
+	}
+
+	err = fzap_lookup(zn, integer_size, num_integers, buf,
+	    NULL, 0, NULL);
+	zap_name_free(zn);
+	zap_unlockdir(zap);
+	return (err);
+}
+
+int
 zap_length(objset_t *os, uint64_t zapobj, const char *name,
     uint64_t *integer_size, uint64_t *num_integers)
 {
@@ -733,6 +850,28 @@ zap_length(objset_t *os, uint64_t zapobj, const char *name,
 	return (err);
 }
 
+int
+zap_length_uint64(objset_t *os, uint64_t zapobj, const uint64_t *key,
+    int key_numints, uint64_t *integer_size, uint64_t *num_integers)
+{
+	zap_t *zap;
+	int err;
+	zap_name_t *zn;
+
+	err = zap_lockdir(os, zapobj, NULL, RW_READER, TRUE, FALSE, &zap);
+	if (err)
+		return (err);
+	zn = zap_name_alloc_uint64(zap, key, key_numints);
+	if (zn == NULL) {
+		zap_unlockdir(zap);
+		return (ENOTSUP);
+	}
+	err = fzap_length(zn, integer_size, num_integers);
+	zap_name_free(zn);
+	zap_unlockdir(zap);
+	return (err);
+}
+
 static void
 mzap_addent(zap_name_t *zn, uint64_t value)
 {
@@ -741,20 +880,18 @@ mzap_addent(zap_name_t *zn, uint64_t value)
 	int start = zap->zap_m.zap_alloc_next;
 	uint32_t cd;
 
-	dprintf("obj=%llu %s=%llu\n", zap->zap_object,
-	    zn->zn_name_orij, value);
 	ASSERT(RW_WRITE_HELD(&zap->zap_rwlock));
 
 #ifdef ZFS_DEBUG
 	for (i = 0; i < zap->zap_m.zap_num_chunks; i++) {
 		mzap_ent_phys_t *mze = &zap->zap_m.zap_phys->mz_chunk[i];
-		ASSERT(strcmp(zn->zn_name_orij, mze->mze_name) != 0);
+		ASSERT(strcmp(zn->zn_key_orig, mze->mze_name) != 0);
 	}
 #endif
 
 	cd = mze_find_unused_cd(zap, zn->zn_hash);
 	/* given the limited size of the microzap, this can't happen */
-	ASSERT(cd != ZAP_MAXCD);
+	ASSERT(cd < zap_maxcd(zap));
 
 again:
 	for (i = start; i < zap->zap_m.zap_num_chunks; i++) {
@@ -762,7 +899,7 @@ again:
 		if (mze->mze_name[0] == 0) {
 			mze->mze_value = value;
 			mze->mze_cd = cd;
-			(void) strcpy(mze->mze_name, zn->zn_name_orij);
+			(void) strcpy(mze->mze_name, zn->zn_key_orig);
 			zap->zap_m.zap_num_entries++;
 			zap->zap_m.zap_alloc_next = i+1;
 			if (zap->zap_m.zap_alloc_next ==
@@ -780,7 +917,7 @@ again:
 }
 
 int
-zap_add(objset_t *os, uint64_t zapobj, const char *name,
+zap_add(objset_t *os, uint64_t zapobj, const char *key,
     int integer_size, uint64_t num_integers,
     const void *val, dmu_tx_t *tx)
 {
@@ -793,7 +930,7 @@ zap_add(objset_t *os, uint64_t zapobj, const char *name,
 	err = zap_lockdir(os, zapobj, tx, RW_WRITER, TRUE, TRUE, &zap);
 	if (err)
 		return (err);
-	zn = zap_name_alloc(zap, name, MT_EXACT);
+	zn = zap_name_alloc(zap, key, MT_EXACT);
 	if (zn == NULL) {
 		zap_unlockdir(zap);
 		return (ENOTSUP);
@@ -802,10 +939,8 @@ zap_add(objset_t *os, uint64_t zapobj, const char *name,
 		err = fzap_add(zn, integer_size, num_integers, val, tx);
 		zap = zn->zn_zap;	/* fzap_add() may change zap */
 	} else if (integer_size != 8 || num_integers != 1 ||
-	    strlen(name) >= MZAP_NAME_LEN) {
-		dprintf("upgrading obj %llu: intsz=%u numint=%llu name=%s\n",
-		    zapobj, integer_size, num_integers, name);
-		err = mzap_upgrade(&zn->zn_zap, tx);
+	    strlen(key) >= MZAP_NAME_LEN) {
+		err = mzap_upgrade(&zn->zn_zap, tx, 0);
 		if (err == 0)
 			err = fzap_add(zn, integer_size, num_integers, val, tx);
 		zap = zn->zn_zap;	/* fzap_add() may change zap */
@@ -818,6 +953,31 @@ zap_add(objset_t *os, uint64_t zapobj, const char *name,
 		}
 	}
 	ASSERT(zap == zn->zn_zap);
+	zap_name_free(zn);
+	if (zap != NULL)	/* may be NULL if fzap_add() failed */
+		zap_unlockdir(zap);
+	return (err);
+}
+
+int
+zap_add_uint64(objset_t *os, uint64_t zapobj, const uint64_t *key,
+    int key_numints, int integer_size, uint64_t num_integers,
+    const void *val, dmu_tx_t *tx)
+{
+	zap_t *zap;
+	int err;
+	zap_name_t *zn;
+
+	err = zap_lockdir(os, zapobj, tx, RW_WRITER, TRUE, TRUE, &zap);
+	if (err)
+		return (err);
+	zn = zap_name_alloc_uint64(zap, key, key_numints);
+	if (zn == NULL) {
+		zap_unlockdir(zap);
+		return (ENOTSUP);
+	}
+	err = fzap_add(zn, integer_size, num_integers, val, tx);
+	zap = zn->zn_zap;	/* fzap_add() may change zap */
 	zap_name_free(zn);
 	if (zap != NULL)	/* may be NULL if fzap_add() failed */
 		zap_unlockdir(zap);
@@ -849,7 +1009,7 @@ zap_update(objset_t *os, uint64_t zapobj, const char *name,
 	    strlen(name) >= MZAP_NAME_LEN) {
 		dprintf("upgrading obj %llu: intsz=%u numint=%llu name=%s\n",
 		    zapobj, integer_size, num_integers, name);
-		err = mzap_upgrade(&zn->zn_zap, tx);
+		err = mzap_upgrade(&zn->zn_zap, tx, 0);
 		if (err == 0)
 			err = fzap_update(zn, integer_size, num_integers,
 			    val, tx);
@@ -865,6 +1025,31 @@ zap_update(objset_t *os, uint64_t zapobj, const char *name,
 		}
 	}
 	ASSERT(zap == zn->zn_zap);
+	zap_name_free(zn);
+	if (zap != NULL)	/* may be NULL if fzap_upgrade() failed */
+		zap_unlockdir(zap);
+	return (err);
+}
+
+int
+zap_update_uint64(objset_t *os, uint64_t zapobj, const uint64_t *key,
+    int key_numints,
+    int integer_size, uint64_t num_integers, const void *val, dmu_tx_t *tx)
+{
+	zap_t *zap;
+	zap_name_t *zn;
+	int err;
+
+	err = zap_lockdir(os, zapobj, tx, RW_WRITER, TRUE, TRUE, &zap);
+	if (err)
+		return (err);
+	zn = zap_name_alloc_uint64(zap, key, key_numints);
+	if (zn == NULL) {
+		zap_unlockdir(zap);
+		return (ENOTSUP);
+	}
+	err = fzap_update(zn, integer_size, num_integers, val, tx);
+	zap = zn->zn_zap;	/* fzap_update() may change zap */
 	zap_name_free(zn);
 	if (zap != NULL)	/* may be NULL if fzap_upgrade() failed */
 		zap_unlockdir(zap);
@@ -912,17 +1097,32 @@ zap_remove_norm(objset_t *os, uint64_t zapobj, const char *name,
 	return (err);
 }
 
+int
+zap_remove_uint64(objset_t *os, uint64_t zapobj, const uint64_t *key,
+    int key_numints, dmu_tx_t *tx)
+{
+	zap_t *zap;
+	int err;
+	zap_name_t *zn;
+
+	err = zap_lockdir(os, zapobj, tx, RW_WRITER, TRUE, FALSE, &zap);
+	if (err)
+		return (err);
+	zn = zap_name_alloc_uint64(zap, key, key_numints);
+	if (zn == NULL) {
+		zap_unlockdir(zap);
+		return (ENOTSUP);
+	}
+	err = fzap_remove(zn, tx);
+	zap_name_free(zn);
+	zap_unlockdir(zap);
+	return (err);
+}
+
 /*
  * Routines for iterating over the attributes.
  */
 
-/*
- * We want to keep the high 32 bits of the cursor zero if we can, so
- * that 32-bit programs can access this.  So use a small hash value so
- * we can fit 4 bits of cd into the 32-bit cursor.
- *
- * [ 4 zero bits | 32-bit collision differentiator | 28-bit hash value ]
- */
 void
 zap_cursor_init_serialized(zap_cursor_t *zc, objset_t *os, uint64_t zapobj,
     uint64_t serialized)
@@ -931,15 +1131,9 @@ zap_cursor_init_serialized(zap_cursor_t *zc, objset_t *os, uint64_t zapobj,
 	zc->zc_zap = NULL;
 	zc->zc_leaf = NULL;
 	zc->zc_zapobj = zapobj;
-	if (serialized == -1ULL) {
-		zc->zc_hash = -1ULL;
-		zc->zc_cd = 0;
-	} else {
-		zc->zc_hash = serialized << (64-ZAP_HASHBITS);
-		zc->zc_cd = serialized >> ZAP_HASHBITS;
-		if (zc->zc_cd >= ZAP_MAXCD) /* corrupt serialized */
-			zc->zc_cd = 0;
-	}
+	zc->zc_serialized = serialized;
+	zc->zc_hash = 0;
+	zc->zc_cd = 0;
 }
 
 void
@@ -969,10 +1163,21 @@ zap_cursor_serialize(zap_cursor_t *zc)
 {
 	if (zc->zc_hash == -1ULL)
 		return (-1ULL);
-	ASSERT((zc->zc_hash & (ZAP_MAXCD-1)) == 0);
-	ASSERT(zc->zc_cd < ZAP_MAXCD);
-	return ((zc->zc_hash >> (64-ZAP_HASHBITS)) |
-	    ((uint64_t)zc->zc_cd << ZAP_HASHBITS));
+	if (zc->zc_zap == NULL)
+		return (zc->zc_serialized);
+	ASSERT((zc->zc_hash & zap_maxcd(zc->zc_zap)) == 0);
+	ASSERT(zc->zc_cd < zap_maxcd(zc->zc_zap));
+
+	/*
+	 * We want to keep the high 32 bits of the cursor zero if we can, so
+	 * that 32-bit programs can access this.  So usually use a small
+	 * (28-bit) hash value so we can fit 4 bits of cd into the low 32-bits
+	 * of the cursor.
+	 *
+	 * [ collision differentiator | zap_hashbits()-bit hash value ]
+	 */
+	return ((zc->zc_hash >> (64 - zap_hashbits(zc->zc_zap))) |
+	    ((uint64_t)zc->zc_cd << zap_hashbits(zc->zc_zap)));
 }
 
 int
@@ -987,10 +1192,23 @@ zap_cursor_retrieve(zap_cursor_t *zc, zap_attribute_t *za)
 		return (ENOENT);
 
 	if (zc->zc_zap == NULL) {
+		int hb;
 		err = zap_lockdir(zc->zc_objset, zc->zc_zapobj, NULL,
 		    RW_READER, TRUE, FALSE, &zc->zc_zap);
 		if (err)
 			return (err);
+
+		/*
+		 * To support zap_cursor_init_serialized, advance, retrieve,
+		 * we must add to the existing zc_cd, which may already
+		 * be 1 due to the zap_cursor_advance.
+		 */
+		ASSERT(zc->zc_hash == 0);
+		hb = zap_hashbits(zc->zc_zap);
+		zc->zc_hash = zc->zc_serialized << (64 - hb);
+		zc->zc_cd += zc->zc_serialized >> hb;
+		if (zc->zc_cd >= zap_maxcd(zc->zc_zap)) /* corrupt serialized */
+			zc->zc_cd = 0;
 	} else {
 		rw_enter(&zc->zc_zap->zap_rwlock, RW_READER);
 	}
@@ -1035,12 +1253,6 @@ zap_cursor_advance(zap_cursor_t *zc)
 	if (zc->zc_hash == -1ULL)
 		return;
 	zc->zc_cd++;
-	if (zc->zc_cd >= ZAP_MAXCD) {
-		zc->zc_cd = 0;
-		zc->zc_hash += 1ULL<<(64-ZAP_HASHBITS);
-		if (zc->zc_hash == 0) /* EOF */
-			zc->zc_hash = -1ULL;
-	}
 }
 
 int

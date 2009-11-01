@@ -32,6 +32,7 @@
 #include <sys/dsl_synctask.h>
 #include <sys/dsl_deleg.h>
 #include <sys/spa.h>
+#include <sys/metaslab.h>
 #include <sys/zap.h>
 #include <sys/zio.h>
 #include <sys/arc.h>
@@ -650,7 +651,8 @@ dsl_dir_space_available(dsl_dir_t *dd,
 		 * dsl_pool_adjustedsize()), something is very
 		 * wrong.
 		 */
-		ASSERT3U(used, <=, spa_get_space(dd->dd_pool->dp_spa));
+		ASSERT3U(used, <=, metaslab_class_get_space(
+		    spa_normal_class(dd->dd_pool->dp_spa)));
 	} else {
 		/*
 		 * the lesser of the space provided by our parent and
@@ -736,8 +738,9 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd, uint64_t asize, boolean_t netfree,
 	 * removes to get through.
 	 */
 	if (dd->dd_parent == NULL) {
+		spa_t *spa = dd->dd_pool->dp_spa;
 		uint64_t poolsize = dsl_pool_adjustedsize(dd->dd_pool, netfree);
-		deferred = spa_get_defers(dd->dd_pool->dp_spa);
+		deferred = metaslab_class_get_deferred(spa_normal_class(spa));
 		if (poolsize - deferred < quota) {
 			quota = poolsize - deferred;
 			retval = ENOSPC;

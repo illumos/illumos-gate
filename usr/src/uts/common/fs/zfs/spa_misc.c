@@ -186,7 +186,7 @@
  *
  * SCL_VDEV
  *	Held as reader to prevent changes to the vdev tree during trivial
- *	inquiries such as bp_get_dasize().  SCL_VDEV is distinct from the
+ *	inquiries such as bp_get_dsize().  SCL_VDEV is distinct from the
  *	other locks, and lower than all of them, to ensure that it's safe
  *	to acquire regardless of caller context.
  *
@@ -433,13 +433,16 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	mutex_init(&spa->spa_scrub_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_errlog_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_errlist_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&spa->spa_sync_bplist.bpl_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_history_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_props_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	cv_init(&spa->spa_async_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_scrub_io_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&spa->spa_suspend_cv, NULL, CV_DEFAULT, NULL);
+
+	for (int t = 0; t < TXG_SIZE; t++)
+		bplist_init(&spa->spa_free_bplist[t]);
+	bplist_init(&spa->spa_deferred_bplist);
 
 	(void) strlcpy(spa->spa_name, name, sizeof (spa->spa_name));
 	spa->spa_state = POOL_STATE_UNINITIALIZED;
@@ -514,6 +517,10 @@ spa_remove(spa_t *spa)
 
 	spa_config_lock_destroy(spa);
 
+	for (int t = 0; t < TXG_SIZE; t++)
+		bplist_fini(&spa->spa_free_bplist[t]);
+	bplist_fini(&spa->spa_deferred_bplist);
+
 	cv_destroy(&spa->spa_async_cv);
 	cv_destroy(&spa->spa_scrub_io_cv);
 	cv_destroy(&spa->spa_suspend_cv);
@@ -522,7 +529,6 @@ spa_remove(spa_t *spa)
 	mutex_destroy(&spa->spa_scrub_lock);
 	mutex_destroy(&spa->spa_errlog_lock);
 	mutex_destroy(&spa->spa_errlist_lock);
-	mutex_destroy(&spa->spa_sync_bplist.bpl_lock);
 	mutex_destroy(&spa->spa_history_lock);
 	mutex_destroy(&spa->spa_props_lock);
 	mutex_destroy(&spa->spa_suspend_lock);
@@ -819,12 +825,6 @@ spa_l2cache_activate(vdev_t *vd)
 	mutex_exit(&spa_l2cache_lock);
 }
 
-void
-spa_l2cache_space_update(vdev_t *vd, int64_t space, int64_t alloc)
-{
-	vdev_space_update(vd, space, alloc, 0, B_FALSE);
-}
-
 /*
  * ==========================================================================
  * SPA vdev locking
@@ -890,8 +890,8 @@ spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error, char *tag)
 	/*
 	 * Verify the metaslab classes.
 	 */
-	ASSERT(metaslab_class_validate(spa->spa_normal_class) == 0);
-	ASSERT(metaslab_class_validate(spa->spa_log_class) == 0);
+	ASSERT(metaslab_class_validate(spa_normal_class(spa)) == 0);
+	ASSERT(metaslab_class_validate(spa_log_class(spa)) == 0);
 
 	spa_config_exit(spa, SCL_ALL, spa);
 
@@ -955,6 +955,10 @@ spa_vdev_state_enter(spa_t *spa, int oplocks)
 int
 spa_vdev_state_exit(spa_t *spa, vdev_t *vd, int error)
 {
+	if (vd != NULL || error == 0)
+		vdev_dtl_reassess(vd ? vd->vdev_top : spa->spa_root_vdev,
+		    0, 0, B_FALSE);
+
 	if (vd != NULL) {
 		vdev_state_dirty(vd->vdev_top);
 		spa->spa_config_generation++;
@@ -1105,50 +1109,13 @@ spa_get_random(uint64_t range)
 }
 
 void
-sprintf_blkptr(char *buf, int len, const blkptr_t *bp)
+sprintf_blkptr(char *buf, const blkptr_t *bp)
 {
-	int d;
+	char *type = dmu_ot[BP_GET_TYPE(bp)].ot_name;
+	char *checksum = zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name;
+	char *compress = zio_compress_table[BP_GET_COMPRESS(bp)].ci_name;
 
-	if (bp == NULL) {
-		(void) snprintf(buf, len, "<NULL>");
-		return;
-	}
-
-	if (BP_IS_HOLE(bp)) {
-		(void) snprintf(buf, len, "<hole>");
-		return;
-	}
-
-	(void) snprintf(buf, len, "[L%llu %s] %llxL/%llxP ",
-	    (u_longlong_t)BP_GET_LEVEL(bp),
-	    BP_GET_TYPE(bp) < DMU_OT_NUMTYPES ?
-	    dmu_ot[BP_GET_TYPE(bp)].ot_name : "UNKNOWN",
-	    (u_longlong_t)BP_GET_LSIZE(bp),
-	    (u_longlong_t)BP_GET_PSIZE(bp));
-
-	for (d = 0; d < BP_GET_NDVAS(bp); d++) {
-		const dva_t *dva = &bp->blk_dva[d];
-		(void) snprintf(buf + strlen(buf), len - strlen(buf),
-		    "DVA[%d]=<%llu:%llx:%llx> ", d,
-		    (u_longlong_t)DVA_GET_VDEV(dva),
-		    (u_longlong_t)DVA_GET_OFFSET(dva),
-		    (u_longlong_t)DVA_GET_ASIZE(dva));
-	}
-
-	(void) snprintf(buf + strlen(buf), len - strlen(buf),
-	    "%s %s %s %s birth=%llu fill=%llu cksum=%llx:%llx:%llx:%llx",
-	    BP_GET_CHECKSUM(bp) < ZIO_CHECKSUM_FUNCTIONS ?
-	    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name : "UNKNOWN",
-	    BP_GET_COMPRESS(bp) < ZIO_COMPRESS_FUNCTIONS ?
-	    zio_compress_table[BP_GET_COMPRESS(bp)].ci_name : "UNKNOWN",
-	    BP_GET_BYTEORDER(bp) == 0 ? "BE" : "LE",
-	    BP_IS_GANG(bp) ? "gang" : "contiguous",
-	    (u_longlong_t)bp->blk_birth,
-	    (u_longlong_t)bp->blk_fill,
-	    (u_longlong_t)bp->blk_cksum.zc_word[0],
-	    (u_longlong_t)bp->blk_cksum.zc_word[1],
-	    (u_longlong_t)bp->blk_cksum.zc_word[2],
-	    (u_longlong_t)bp->blk_cksum.zc_word[3]);
+	SPRINTF_BLKPTR(snprintf, ' ', buf, bp, type, checksum, compress);
 }
 
 void
@@ -1254,6 +1221,12 @@ spa_first_txg(spa_t *spa)
 	return (spa->spa_first_txg);
 }
 
+uint64_t
+spa_syncing_txg(spa_t *spa)
+{
+	return (spa->spa_syncing_txg);
+}
+
 pool_state_t
 spa_state(spa_t *spa)
 {
@@ -1266,56 +1239,18 @@ spa_freeze_txg(spa_t *spa)
 	return (spa->spa_freeze_txg);
 }
 
-/*
- * Return how much space is allocated in the pool (ie. sum of all asize)
- */
-uint64_t
-spa_get_alloc(spa_t *spa)
-{
-	return (spa->spa_root_vdev->vdev_stat.vs_alloc);
-}
-
-/*
- * Return how much (raid-z inflated) space there is in the pool.
- */
-uint64_t
-spa_get_space(spa_t *spa)
-{
-	return (spa->spa_root_vdev->vdev_stat.vs_space);
-}
-
-/*
- * Return the amount of raid-z-deflated space in the pool.
- */
-uint64_t
-spa_get_dspace(spa_t *spa)
-{
-	if (spa->spa_deflate)
-		return (spa->spa_root_vdev->vdev_stat.vs_dspace);
-	else
-		return (spa->spa_root_vdev->vdev_stat.vs_space);
-}
-
-/*
- * Return the amount of space deferred from freeing (in in-core maps only)
- */
-uint64_t
-spa_get_defers(spa_t *spa)
-{
-	return (spa->spa_root_vdev->vdev_stat.vs_defer);
-}
-
 /* ARGSUSED */
 uint64_t
 spa_get_asize(spa_t *spa, uint64_t lsize)
 {
 	/*
-	 * For now, the worst case is 512-byte RAID-Z blocks, in which
-	 * case the space requirement is exactly 2x; so just assume that.
-	 * Add to this the fact that we can have up to 3 DVAs per bp, and
-	 * we have to multiply by a total of 6x.
+	 * The worst case is single-sector max-parity RAID-Z blocks, in which
+	 * case the space requirement is exactly (VDEV_RAIDZ_MAXPARITY + 1)
+	 * times the size; so just assume that.  Add to this the fact that
+	 * we can have up to 3 DVAs per bp, and one more factor of 2 because
+	 * the block may be dittoed with up to 3 DVAs by ddt_sync().
 	 */
-	return (lsize * 6);
+	return (lsize * (VDEV_RAIDZ_MAXPARITY + 1) * SPA_DVAS_PER_BP * 2);
 }
 
 /*
@@ -1340,6 +1275,24 @@ spa_version(spa_t *spa)
 	return (spa->spa_ubsync.ub_version);
 }
 
+boolean_t
+spa_deflate(spa_t *spa)
+{
+	return (spa->spa_deflate);
+}
+
+metaslab_class_t *
+spa_normal_class(spa_t *spa)
+{
+	return (spa->spa_normal_class);
+}
+
+metaslab_class_t *
+spa_log_class(spa_t *spa)
+{
+	return (spa->spa_log_class);
+}
+
 int
 spa_max_replication(spa_t *spa)
 {
@@ -1354,23 +1307,45 @@ spa_max_replication(spa_t *spa)
 }
 
 uint64_t
-bp_get_dasize(spa_t *spa, const blkptr_t *bp)
+dva_get_dsize_sync(spa_t *spa, const dva_t *dva)
 {
-	int sz = 0, i;
+	uint64_t asize = DVA_GET_ASIZE(dva);
+	uint64_t dsize = asize;
 
-	if (!spa->spa_deflate)
-		return (BP_GET_ASIZE(bp));
+	ASSERT(spa_config_held(spa, SCL_ALL, RW_READER) != 0);
+
+	if (asize != 0 && spa->spa_deflate) {
+		vdev_t *vd = vdev_lookup_top(spa, DVA_GET_VDEV(dva));
+		dsize = (asize >> SPA_MINBLOCKSHIFT) * vd->vdev_deflate_ratio;
+	}
+
+	return (dsize);
+}
+
+uint64_t
+bp_get_dsize_sync(spa_t *spa, const blkptr_t *bp)
+{
+	uint64_t dsize = 0;
+
+	for (int d = 0; d < SPA_DVAS_PER_BP; d++)
+		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
+
+	return (dsize);
+}
+
+uint64_t
+bp_get_dsize(spa_t *spa, const blkptr_t *bp)
+{
+	uint64_t dsize = 0;
 
 	spa_config_enter(spa, SCL_VDEV, FTAG, RW_READER);
-	for (i = 0; i < SPA_DVAS_PER_BP; i++) {
-		vdev_t *vd =
-		    vdev_lookup_top(spa, DVA_GET_VDEV(&bp->blk_dva[i]));
-		if (vd)
-			sz += (DVA_GET_ASIZE(&bp->blk_dva[i]) >>
-			    SPA_MINBLOCKSHIFT) * vd->vdev_deflate_ratio;
-	}
+
+	for (int d = 0; d < SPA_DVAS_PER_BP; d++)
+		dsize += dva_get_dsize_sync(spa, &bp->blk_dva[d]);
+
 	spa_config_exit(spa, SCL_VDEV, FTAG);
-	return (sz);
+
+	return (dsize);
 }
 
 /*
@@ -1472,9 +1447,18 @@ spa_has_slogs(spa_t *spa)
 	return (spa->spa_log_class->mc_rotor != NULL);
 }
 
-/*
- * Return whether this pool is the root pool.
- */
+spa_log_state_t
+spa_get_log_state(spa_t *spa)
+{
+	return (spa->spa_log_state);
+}
+
+void
+spa_set_log_state(spa_t *spa, spa_log_state_t state)
+{
+	spa->spa_log_state = state;
+}
+
 boolean_t
 spa_is_root(spa_t *spa)
 {
@@ -1491,4 +1475,28 @@ int
 spa_mode(spa_t *spa)
 {
 	return (spa->spa_mode);
+}
+
+uint64_t
+spa_bootfs(spa_t *spa)
+{
+	return (spa->spa_bootfs);
+}
+
+uint64_t
+spa_delegation(spa_t *spa)
+{
+	return (spa->spa_delegation);
+}
+
+objset_t *
+spa_meta_objset(spa_t *spa)
+{
+	return (spa->spa_meta_objset);
+}
+
+enum zio_checksum
+spa_dedup_checksum(spa_t *spa)
+{
+	return (spa->spa_dedup_checksum);
 }

@@ -129,7 +129,6 @@ typedef struct raidz_map {
 #define	VDEV_RAIDZ_P		0
 #define	VDEV_RAIDZ_Q		1
 #define	VDEV_RAIDZ_R		2
-#define	VDEV_RAIDZ_MAXPARITY	3
 
 #define	VDEV_RAIDZ_MUL_2(x)	(((x) << 1) ^ (((x) & 0x80) ? 0x1d : 0))
 #define	VDEV_RAIDZ_MUL_4(x)	(VDEV_RAIDZ_MUL_2(VDEV_RAIDZ_MUL_2(x)))
@@ -1524,7 +1523,6 @@ vdev_raidz_io_start(zio_t *zio)
 	vdev_t *vd = zio->io_vd;
 	vdev_t *tvd = vd->vdev_top;
 	vdev_t *cvd;
-	blkptr_t *bp = zio->io_bp;
 	raidz_map_t *rm;
 	raidz_col_t *rc;
 	int c, i;
@@ -1585,7 +1583,7 @@ vdev_raidz_io_start(zio_t *zio)
 			rc->rc_skipped = 1;
 			continue;
 		}
-		if (vdev_dtl_contains(cvd, DTL_MISSING, bp->blk_birth, 1)) {
+		if (vdev_dtl_contains(cvd, DTL_MISSING, zio->io_txg, 1)) {
 			if (c >= rm->rm_firstdatacol)
 				rm->rm_missingdata++;
 			else

@@ -64,7 +64,6 @@ txg_init(dsl_pool_t *dp, uint64_t txg)
 		}
 	}
 
-	rw_init(&tx->tx_suspend, NULL, RW_DEFAULT, NULL);
 	mutex_init(&tx->tx_sync_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	cv_init(&tx->tx_sync_more_cv, NULL, CV_DEFAULT, NULL);
@@ -87,7 +86,6 @@ txg_fini(dsl_pool_t *dp)
 
 	ASSERT(tx->tx_threads == 0);
 
-	rw_destroy(&tx->tx_suspend);
 	mutex_destroy(&tx->tx_sync_lock);
 
 	cv_destroy(&tx->tx_sync_more_cv);
@@ -397,8 +395,6 @@ txg_sync_thread(dsl_pool_t *dp)
 		if (tx->tx_exiting)
 			txg_thread_exit(tx, &cpr, &tx->tx_sync_thread);
 
-		rw_enter(&tx->tx_suspend, RW_WRITER);
-
 		/*
 		 * Consume the quiesced txg which has been handed off to
 		 * us.  This may cause the quiescing thread to now be
@@ -408,7 +404,6 @@ txg_sync_thread(dsl_pool_t *dp)
 		tx->tx_quiesced_txg = 0;
 		tx->tx_syncing_txg = txg;
 		cv_broadcast(&tx->tx_quiesce_more_cv);
-		rw_exit(&tx->tx_suspend);
 
 		dprintf("txg=%llu quiesce_txg=%llu sync_txg=%llu\n",
 		    txg, tx->tx_quiesce_txg_waiting, tx->tx_sync_txg_waiting);
@@ -419,10 +414,8 @@ txg_sync_thread(dsl_pool_t *dp)
 		delta = lbolt - start;
 
 		mutex_enter(&tx->tx_sync_lock);
-		rw_enter(&tx->tx_suspend, RW_WRITER);
 		tx->tx_synced_txg = txg;
 		tx->tx_syncing_txg = 0;
-		rw_exit(&tx->tx_suspend);
 		cv_broadcast(&tx->tx_sync_done_cv);
 
 		/*
@@ -514,7 +507,7 @@ txg_wait_synced(dsl_pool_t *dp, uint64_t txg)
 	mutex_enter(&tx->tx_sync_lock);
 	ASSERT(tx->tx_threads == 2);
 	if (txg == 0)
-		txg = tx->tx_open_txg;
+		txg = tx->tx_open_txg + TXG_DEFER_SIZE;
 	if (tx->tx_sync_txg_waiting < txg)
 		tx->tx_sync_txg_waiting = txg;
 	dprintf("txg=%llu quiesce_txg=%llu sync_txg=%llu\n",
@@ -563,21 +556,6 @@ txg_sync_waiting(dsl_pool_t *dp)
 
 	return (tx->tx_syncing_txg <= tx->tx_sync_txg_waiting ||
 	    tx->tx_quiesced_txg != 0);
-}
-
-void
-txg_suspend(dsl_pool_t *dp)
-{
-	tx_state_t *tx = &dp->dp_tx;
-	/* XXX some code paths suspend when they are already suspended! */
-	rw_enter(&tx->tx_suspend, RW_READER);
-}
-
-void
-txg_resume(dsl_pool_t *dp)
-{
-	tx_state_t *tx = &dp->dp_tx;
-	rw_exit(&tx->tx_suspend);
 }
 
 /*

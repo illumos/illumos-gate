@@ -70,7 +70,7 @@ fzap_byteswap(void *vbuf, size_t size)
 }
 
 void
-fzap_upgrade(zap_t *zap, dmu_tx_t *tx)
+fzap_upgrade(zap_t *zap, dmu_tx_t *tx, zap_flags_t flags)
 {
 	dmu_buf_t *db;
 	zap_leaf_t *l;
@@ -102,6 +102,7 @@ fzap_upgrade(zap_t *zap, dmu_tx_t *tx)
 	zp->zap_num_entries = 0;
 	zp->zap_salt = zap->zap_salt;
 	zp->zap_normflags = zap->zap_normflags;
+	zp->zap_flags = flags;
 
 	/* block 1 will be the first leaf */
 	for (i = 0; i < (1<<zp->zap_ptrtbl.zt_shift); i++)
@@ -315,8 +316,13 @@ zap_ptrtbl_transfer(const uint64_t *src, uint64_t *dst, int n)
 static int
 zap_grow_ptrtbl(zap_t *zap, dmu_tx_t *tx)
 {
-	/* In case things go horribly wrong. */
-	if (zap->zap_f.zap_phys->zap_ptrtbl.zt_shift >= ZAP_HASHBITS-2)
+	/*
+	 * The pointer table should never use more hash bits than we
+	 * have (otherwise we'd be using useless zero bits to index it).
+	 * If we are within 2 bits of running out, stop growing, since
+	 * this is already an aberrant condition.
+	 */
+	if (zap->zap_f.zap_phys->zap_ptrtbl.zt_shift >= zap_hashbits(zap) - 2)
 		return (ENOSPC);
 
 	if (zap->zap_f.zap_phys->zap_ptrtbl.zt_numblks == 0) {
@@ -702,9 +708,9 @@ zap_put_leaf_maybe_grow_ptrtbl(zap_name_t *zn, zap_leaf_t *l, dmu_tx_t *tx)
 
 
 static int
-fzap_checksize(const char *name, uint64_t integer_size, uint64_t num_integers)
+fzap_checksize(zap_name_t *zn, uint64_t integer_size, uint64_t num_integers)
 {
-	if (name && strlen(name) > ZAP_MAXNAMELEN)
+	if (zn->zn_key_orig_len > ZAP_MAXNAMELEN)
 		return (E2BIG);
 
 	/* Only integer sizes supported by C */
@@ -736,7 +742,7 @@ fzap_lookup(zap_name_t *zn,
 	int err;
 	zap_entry_handle_t zeh;
 
-	err = fzap_checksize(zn->zn_name_orij, integer_size, num_integers);
+	err = fzap_checksize(zn, integer_size, num_integers);
 	if (err != 0)
 		return (err);
 
@@ -746,7 +752,7 @@ fzap_lookup(zap_name_t *zn,
 	err = zap_leaf_lookup(l, zn, &zeh);
 	if (err == 0) {
 		err = zap_entry_read(&zeh, integer_size, num_integers, buf);
-		(void) zap_entry_read_name(&zeh, rn_len, realname);
+		(void) zap_entry_read_name(zn->zn_zap, &zeh, rn_len, realname);
 		if (ncp) {
 			*ncp = zap_entry_normalization_conflict(&zeh,
 			    zn, NULL, zn->zn_zap);
@@ -769,8 +775,7 @@ fzap_add_cd(zap_name_t *zn,
 
 	ASSERT(RW_LOCK_HELD(&zap->zap_rwlock));
 	ASSERT(!zap->zap_ismicro);
-	ASSERT(fzap_checksize(zn->zn_name_orij,
-	    integer_size, num_integers) == 0);
+	ASSERT(fzap_checksize(zn, integer_size, num_integers) == 0);
 
 	err = zap_deref_leaf(zap, zn->zn_hash, tx, RW_WRITER, &l);
 	if (err != 0)
@@ -784,7 +789,7 @@ retry:
 	if (err != ENOENT)
 		goto out;
 
-	err = zap_entry_create(l, zn->zn_name_orij, zn->zn_hash, cd,
+	err = zap_entry_create(l, zn, cd,
 	    integer_size, num_integers, val, &zeh);
 
 	if (err == 0) {
@@ -807,12 +812,12 @@ fzap_add(zap_name_t *zn,
     uint64_t integer_size, uint64_t num_integers,
     const void *val, dmu_tx_t *tx)
 {
-	int err = fzap_checksize(zn->zn_name_orij, integer_size, num_integers);
+	int err = fzap_checksize(zn, integer_size, num_integers);
 	if (err != 0)
 		return (err);
 
 	return (fzap_add_cd(zn, integer_size, num_integers,
-	    val, ZAP_MAXCD, tx));
+	    val, ZAP_NEED_CD, tx));
 }
 
 int
@@ -825,7 +830,7 @@ fzap_update(zap_name_t *zn,
 	zap_t *zap = zn->zn_zap;
 
 	ASSERT(RW_LOCK_HELD(&zap->zap_rwlock));
-	err = fzap_checksize(zn->zn_name_orij, integer_size, num_integers);
+	err = fzap_checksize(zn, integer_size, num_integers);
 	if (err != 0)
 		return (err);
 
@@ -838,8 +843,8 @@ retry:
 	ASSERT(err == 0 || err == ENOENT);
 
 	if (create) {
-		err = zap_entry_create(l, zn->zn_name_orij, zn->zn_hash,
-		    ZAP_MAXCD, integer_size, num_integers, val, &zeh);
+		err = zap_entry_create(l, zn, ZAP_NEED_CD,
+		    integer_size, num_integers, val, &zeh);
 		if (err == 0)
 			zap_increment_num_entries(zap, 1, tx);
 	} else {
@@ -1013,6 +1018,8 @@ fzap_cursor_retrieve(zap_t *zap, zap_cursor_t *zc, zap_attribute_t *za)
 	zap_entry_handle_t zeh;
 	zap_leaf_t *l;
 
+	/* memset(za, 0xba, sizeof (zap_attribute_t)); */
+
 	/* retrieve the next entry at or after zc_hash/zc_cd */
 	/* if no entry, return ENOENT */
 
@@ -1063,7 +1070,7 @@ again:
 			err = zap_entry_read(&zeh, 8, 1, &za->za_first_integer);
 			ASSERT(err == 0 || err == EOVERFLOW);
 		}
-		err = zap_entry_read_name(&zeh,
+		err = zap_entry_read_name(zap, &zeh,
 		    sizeof (za->za_name), za->za_name);
 		ASSERT(err == 0);
 
@@ -1109,7 +1116,7 @@ fzap_cursor_move_to_key(zap_cursor_t *zc, zap_name_t *zn)
 	zap_leaf_t *l;
 	zap_entry_handle_t zeh;
 
-	if (zn->zn_name_orij && strlen(zn->zn_name_orij) > ZAP_MAXNAMELEN)
+	if (zn->zn_key_orig_len > ZAP_MAXNAMELEN)
 		return (E2BIG);
 
 	err = zap_deref_leaf(zc->zc_zap, zn->zn_hash, NULL, RW_READER, &l);

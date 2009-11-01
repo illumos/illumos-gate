@@ -75,7 +75,7 @@ VAR_POUND_2=		$(POUND_SIGN)
 # the system.
 #
 VAR_AVLDIR=		$(SRCBASE)/common/avl
-VAR_AVLINCDIR=
+VAR_AVLINCDIR=		-I $(SRCBASE)/uts/common
 
 #
 # VAR_DTRDIR - directory to find dtrace_data.c in.
