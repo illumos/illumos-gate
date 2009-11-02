@@ -43,6 +43,6 @@ d none kernel/drv 755 root sys
 f none kernel/drv/fm.conf 644 root sys
 d none var/fm 755 root sys
 d none var/fm/fmd 755 root sys
-d none var/fm/fmd/ckpt 700 root sys
-d none var/fm/fmd/rsrc 700 root sys
-d none var/fm/fmd/xprt 700 root sys
+d none var/fm/fmd/ckpt 755 root sys
+d none var/fm/fmd/rsrc 755 root sys
+d none var/fm/fmd/xprt 755 root sys

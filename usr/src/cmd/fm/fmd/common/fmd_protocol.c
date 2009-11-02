@@ -142,7 +142,7 @@ fmd_protocol_fault(const char *class, uint8_t certainty,
 nvlist_t *
 fmd_protocol_list(const char *class, nvlist_t *de_fmri, const char *uuid,
     const char *code, uint_t argc, nvlist_t **argv, uint8_t *flagv, int domsg,
-    struct timeval *tvp)
+    struct timeval *tvp, int injected)
 {
 	int64_t tod[2];
 	nvlist_t *nvl;
@@ -163,6 +163,10 @@ fmd_protocol_list(const char *class, nvlist_t *de_fmri, const char *uuid,
 	err |= nvlist_add_int64_array(nvl, FM_SUSPECT_DIAG_TIME, tod, 2);
 	err |= nvlist_add_nvlist(nvl, FM_SUSPECT_DE, de_fmri);
 	err |= nvlist_add_uint32(nvl, FM_SUSPECT_FAULT_SZ, argc);
+
+	if (injected)
+		err |= nvlist_add_boolean_value(nvl, FM_SUSPECT_INJECTED,
+		    B_TRUE);
 
 	if (!domsg) {
 		err |= nvlist_add_boolean_value(nvl,
@@ -206,7 +210,8 @@ fmd_protocol_rsrc_asru(const char *class,
     nvlist_t *fmri, const char *uuid, const char *code,
     boolean_t faulty, boolean_t unusable, boolean_t message, nvlist_t *event,
     struct timeval *tvp, boolean_t repaired, boolean_t replaced,
-    boolean_t acquitted, boolean_t resolved, nvlist_t *diag_de)
+    boolean_t acquitted, boolean_t resolved, nvlist_t *diag_de,
+    boolean_t injected)
 {
 	nvlist_t *nvl;
 	int64_t tod[2];
@@ -240,6 +245,9 @@ fmd_protocol_rsrc_asru(const char *class,
 
 	if (diag_de != NULL)
 		err |= nvlist_add_nvlist(nvl, FM_SUSPECT_DE, diag_de);
+	if (injected)
+		err |= nvlist_add_boolean_value(nvl, FM_SUSPECT_INJECTED,
+		    B_TRUE);
 
 	if (event != NULL)
 		err |= nvlist_add_nvlist(nvl, FM_RSRC_ASRU_EVENT, event);

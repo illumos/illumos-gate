@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The "program" executed by the injector consists of a tree of commands.
@@ -190,6 +187,10 @@ cmd_run_send(const inj_mode_ops_t *mode, void *hdl, inj_defn_t *ev)
 		(void) printf("sending event %s ... ", ev->defn_name);
 		(void) fflush(stdout);
 	}
+
+	if ((errno = nvlist_add_boolean_value(ev->defn_nvl, "__injected",
+	    1)) != 0)
+		warn("failed to add __injected to %s", ev->defn_name);
 
 	if (ev->defn_decl && (ev->defn_decl->decl_flags & DECL_F_AUTOENA) &&
 	    (errno = nvlist_add_uint64(ev->defn_nvl, "ena", inj_ena())) != 0)

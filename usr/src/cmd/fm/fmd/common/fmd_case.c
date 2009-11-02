@@ -480,7 +480,7 @@ fmd_case_mkevent(fmd_case_t *cp, const char *class)
 	 */
 	nvl = fmd_protocol_list(class, cip->ci_diag_de == NULL ?
 	    cip->ci_mod->mod_fmri : cip->ci_diag_de, cip->ci_uuid, code, count,
-	    nva, ba, msg, &cip->ci_tv);
+	    nva, ba, msg, &cip->ci_tv, cip->ci_injected);
 
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 	return (nvl);
@@ -1607,6 +1607,7 @@ fmd_case_insert_event(fmd_case_t *cp, fmd_event_t *ep)
 	fmd_case_item_t *cit;
 	uint_t state;
 	int new;
+	boolean_t injected;
 
 	(void) pthread_mutex_lock(&cip->ci_lock);
 
@@ -1634,6 +1635,10 @@ fmd_case_insert_event(fmd_case_t *cp, fmd_event_t *ep)
 
 	cit = fmd_alloc(sizeof (fmd_case_item_t), FMD_SLEEP);
 	fmd_event_hold(ep);
+
+	if (nvlist_lookup_boolean_value(((fmd_event_impl_t *)ep)->ev_nvl,
+	    "__injected", &injected) == 0 && injected)
+		fmd_case_set_injected(cp);
 
 	cit->cit_next = cip->ci_items;
 	cit->cit_event = ep;
@@ -2389,6 +2394,12 @@ fmd_case_settime(fmd_case_t *cp, time_t tv_sec, suseconds_t tv_usec)
 }
 
 void
+fmd_case_set_injected(fmd_case_t *cp)
+{
+	((fmd_case_impl_t *)cp)->ci_injected = 1;
+}
+
+void
 fmd_case_set_de_fmri(fmd_case_t *cp, nvlist_t *nvl)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
@@ -2453,6 +2464,8 @@ fmd_case_repair_replay_case(fmd_case_t *cp, void *arg)
 			TRACE((FMD_DBG_CASE, "replay sending list.resolved %s",
 			    cip->ci_uuid));
 			fmd_case_publish(cp, FMD_CASE_RESOLVED);
+			fmd_asru_hash_apply_by_case(fmd.d_asrus, cp,
+			    fmd_asru_log_resolved, NULL);
 			cip->ci_flags |= FMD_CF_RES_CMPL;
 		} else {
 			TRACE((FMD_DBG_CASE, "replay sending list.repaired %s",

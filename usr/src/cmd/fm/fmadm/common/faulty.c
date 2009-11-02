@@ -215,6 +215,7 @@ typedef struct status_record {
 	name_list_t *fru;
 	name_list_t *serial;
 	uint8_t not_suppressed;
+	uint8_t injected;
 } status_record_t;
 
 typedef struct sr_list {
@@ -229,6 +230,7 @@ typedef struct resource_list {
 	sr_list_t *status_rec_list;
 	char *resource;
 	uint8_t not_suppressed;
+	uint8_t injected;
 	uint8_t max_pct;
 } resource_list_t;
 
@@ -259,7 +261,14 @@ format_date(char *buf, size_t len, uint64_t sec)
 		(void) snprintf(buf, len, "0x%llx", sec);
 	} else {
 		time_t tod = (time_t)sec;
-		(void) strftime(buf, len, "%b %d %T", localtime(&tod));
+		time_t now = time(NULL);
+		if (tod > now+60 ||
+		    tod < now - 6L*30L*24L*60L*60L) { /* 6 months ago */
+			(void) strftime(buf, len, "%b %d %Y    ",
+			    localtime(&tod));
+		} else {
+			(void) strftime(buf, len, "%b %d %T", localtime(&tod));
+		}
 	}
 
 	return (buf);
@@ -612,7 +621,7 @@ static status_record_t *
 new_record_init(uurec_t *uurec_p, char *msgid, name_list_t *class,
     name_list_t *fru, name_list_t *asru, name_list_t *resource,
     name_list_t *serial, boolean_t not_suppressed,
-    hostid_t *hostid)
+    hostid_t *hostid, boolean_t injected)
 {
 	status_record_t *status_rec_p;
 
@@ -633,6 +642,7 @@ new_record_init(uurec_t *uurec_p, char *msgid, name_list_t *class,
 	status_rec_p->serial = serial;
 	status_rec_p->msgid = strdup(msgid);
 	status_rec_p->not_suppressed = not_suppressed;
+	status_rec_p->injected = injected;
 	return (status_rec_p);
 }
 
@@ -732,6 +742,7 @@ add_resource_list(status_record_t *status_rec_p, name_list_t *fp,
 	while (np) {
 		if (strcmp(fp->name, np->resource) == 0) {
 			np->not_suppressed |= status_rec_p->not_suppressed;
+			np->injected |= status_rec_p->injected;
 			srp = np->status_rec_list->status_record;
 			order = cmp_priority(status_rec_p->severity,
 			    srp->severity, status_rec_p->uurec->sec,
@@ -761,6 +772,7 @@ add_resource_list(status_record_t *status_rec_p, name_list_t *fp,
 		np = malloc(sizeof (resource_list_t));
 		np->resource = fp->name;
 		np->not_suppressed = status_rec_p->not_suppressed;
+		np->injected = status_rec_p->injected;
 		np->status_rec_list = NULL;
 		np->max_pct = fp->max_pct;
 		add_resource(status_rec_p, rpp, np);
@@ -790,12 +802,12 @@ static void
 catalog_new_record(uurec_t *uurec_p, char *msgid, name_list_t *class,
     name_list_t *fru, name_list_t *asru, name_list_t *resource,
     name_list_t *serial, boolean_t not_suppressed,
-    hostid_t *hostid)
+    hostid_t *hostid, boolean_t injected)
 {
 	status_record_t *status_rec_p;
 
 	status_rec_p = new_record_init(uurec_p, msgid, class, fru, asru,
-	    resource, serial, not_suppressed, hostid);
+	    resource, serial, not_suppressed, hostid, injected);
 	add_rec_list(status_rec_p, &status_rec_list);
 	if (status_rec_p->fru)
 		add_list(status_rec_p, status_rec_p->fru, &status_fru_list);
@@ -924,11 +936,13 @@ add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid)
 	hostid_t *host;
 	boolean_t not_suppressed = 1;
 	boolean_t any_present = 0;
+	boolean_t injected = 0;
 
 	(void) nvlist_lookup_string(nvl, FM_SUSPECT_DIAG_CODE, &msgid);
 	(void) nvlist_lookup_uint32(nvl, FM_SUSPECT_FAULT_SZ, &size);
 	(void) nvlist_lookup_boolean_value(nvl, FM_SUSPECT_MESSAGE,
 	    &not_suppressed);
+	(void) nvlist_lookup_boolean_value(nvl, FM_SUSPECT_INJECTED, &injected);
 
 	if (size != 0) {
 		(void) nvlist_lookup_nvlist_array(nvl, FM_SUSPECT_FAULT_LIST,
@@ -957,7 +971,7 @@ add_fault_record_to_catalog(nvlist_t *nvl, uint64_t sec, char *uuid)
 	(void) nvlist_dup(nvl, &uurec_p->event, 0);
 	host = find_hostid(nvl);
 	catalog_new_record(uurec_p, msgid, class, fru, asru,
-	    resource, serial, not_suppressed, host);
+	    resource, serial, not_suppressed, host, injected);
 }
 
 static void
@@ -1423,15 +1437,17 @@ print_status_record(status_record_t *srp, int summary, int opt_i, int full)
 	if (opt_i) {
 		ari_list = uurp->ari_uuid_list;
 		while (ari_list) {
-			(void) printf("%-15s %-37s %-14s %-9s\n",
+			(void) printf("%-15s %-37s %-14s %-9s %s\n",
 			    format_date(buf, sizeof (buf), uurp->sec),
-			    ari_list->ari_uuid, srp->msgid, srp->severity);
+			    ari_list->ari_uuid, srp->msgid, srp->severity,
+			    srp->injected ? dgettext("FMD", "injected") : "");
 			ari_list = ari_list->next;
 		}
 	} else {
-		(void) printf("%-15s %-37s %-14s %-9s\n",
+		(void) printf("%-15s %-37s %-14s %-9s %s\n",
 		    format_date(buf, sizeof (buf), uurp->sec),
-		    uurp->uuid, srp->msgid, srp->severity);
+		    uurp->uuid, srp->msgid, srp->severity,
+		    srp->injected ? dgettext("FMD", "injected") : "");
 	}
 
 	if (!summary)
@@ -1551,18 +1567,23 @@ print_fru(int summary, int opt_a, int opt_i, int page_feed)
 				slp = slp->next;
 			} while (slp != end);
 			if (status & FM_SUSPECT_NOT_PRESENT)
-				(void) printf(dgettext("FMD", "not present\n"));
+				(void) printf(dgettext("FMD", "not present"));
 			else if (status & FM_SUSPECT_FAULTY)
-				(void) printf(dgettext("FMD", "faulty\n"));
+				(void) printf(dgettext("FMD", "faulty"));
 			else if (status & FM_SUSPECT_REPLACED)
-				(void) printf(dgettext("FMD", "replaced\n"));
+				(void) printf(dgettext("FMD", "replaced"));
 			else if (status & FM_SUSPECT_REPAIRED)
 				(void) printf(dgettext("FMD",
-				    "repair attempted\n"));
+				    "repair attempted"));
 			else if (status & FM_SUSPECT_ACQUITTED)
-				(void) printf(dgettext("FMD", "acquitted\n"));
+				(void) printf(dgettext("FMD", "acquitted"));
 			else
-				(void) printf(dgettext("FMD", "removed\n"));
+				(void) printf(dgettext("FMD", "removed"));
+
+			if (tp->injected)
+				(void) printf(dgettext("FMD", " injected\n"));
+			else
+				(void) printf(dgettext("FMD", "\n"));
 
 			slp = tp->status_rec_list;
 			end = slp;
@@ -1663,7 +1684,11 @@ print_asru(int opt_a)
 				msg = "";
 				break;
 			}
-			(void) printf("%-69s %s\n", tp->resource, msg);
+			(void) printf("%-69s %s", tp->resource, msg);
+			if (tp->injected)
+				(void) printf(dgettext("FMD", " injected\n"));
+			else
+				(void) printf(dgettext("FMD", "\n"));
 		}
 		tp = tp->next;
 		if (tp == status_asru_list)

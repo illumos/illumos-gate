@@ -78,6 +78,7 @@ typedef struct fmd_case_impl {
 	fmd_buf_hash_t ci_bufs;		/* hash of bufs associated with case */
 	struct timeval ci_tv;		/* time of original diagnosis */
 	int ci_tv_valid;		/* time of original diagnosis valid */
+	int ci_injected;		/* was the fault injected */
 } fmd_case_impl_t;
 
 #define	FMD_CASE_CURRENT	-1u	/* flag for current state */
@@ -150,6 +151,7 @@ extern void fmd_case_discard(fmd_case_t *, boolean_t);
 extern void fmd_case_settime(fmd_case_t *, time_t, suseconds_t);
 extern void fmd_case_setcode(fmd_case_t *, char *);
 extern void fmd_case_set_de_fmri(fmd_case_t *, nvlist_t *);
+extern void fmd_case_set_injected(fmd_case_t *);
 extern void fmd_case_update_status(fmd_case_t *, uint8_t *, uint8_t *,
     uint8_t *);
 extern void fmd_case_update_containees(fmd_case_t *);

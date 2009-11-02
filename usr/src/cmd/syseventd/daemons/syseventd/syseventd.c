@@ -696,7 +696,6 @@ client_deliver_event_thr(void *arg)
 			d_pkg->completion_state = SE_OUTSTANDING;
 			scp->eventq = eventq->next;
 			free(eventq);
-			eventq = scp->eventq;
 			(void) mutex_unlock(&scp->client_lock);
 
 
@@ -775,6 +774,7 @@ client_deliver_event_thr(void *arg)
 			(void) sema_post(d_pkg->completion_sema);
 			syseventd_print(3, "Completed delivery with "
 			    "error %d\n", error);
+			eventq = scp->eventq;
 		}
 
 		syseventd_print(3, "No more events to process for client %d\n",

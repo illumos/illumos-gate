@@ -69,10 +69,31 @@ asru_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 	return (0);
 }
 
+/*ARGSUSED*/
 static int
 asru_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 {
-	(void) asru_verb1(lp, rp, fp);
+	char *uuid = "-";
+	boolean_t f = 0, u = 0;
+	char buf[32], state[32];
+
+	(void) nvlist_lookup_string(rp->rec_nvl, FM_RSRC_ASRU_UUID, &uuid);
+	(void) nvlist_lookup_boolean_value(rp->rec_nvl,
+	    FM_RSRC_ASRU_FAULTY, &f);
+	(void) nvlist_lookup_boolean_value(rp->rec_nvl,
+	    FM_RSRC_ASRU_UNUSABLE, &u);
+
+	state[0] = '\0';
+
+	if (f)
+		(void) strcat(state, ",faulty");
+	if (u)
+		(void) strcat(state, ",unusable");
+	if (!f && !u)
+		(void) strcat(state, ",ok");
+
+	fmdump_printf(fp, "%-20s.%9.9llu %-36s %s\n",
+	    fmdump_year(buf, sizeof (buf), rp), rp->rec_nsec, uuid, state + 1);
 
 	nvlist_print(fp, rp->rec_nvl);
 	fmdump_printf(fp, "\n");
@@ -89,7 +110,7 @@ const fmdump_ops_t fmdump_asru_ops = {
 "TIME                 UUID                                 STATE",
 (fmd_log_rec_f *)asru_verb1
 }, {
-"TIME                 UUID                                 STATE",
+"TIME                           UUID                                 STATE",
 (fmd_log_rec_f *)asru_verb2
 }, {
 NULL, NULL

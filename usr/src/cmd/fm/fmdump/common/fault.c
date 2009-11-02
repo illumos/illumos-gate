@@ -141,11 +141,31 @@ static int
 flt_verb2(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 {
 	const struct fmdump_fmt *efp = &fmdump_err_ops.do_formats[FMDUMP_VERB1];
-	const struct fmdump_fmt *ffp = &fmdump_flt_ops.do_formats[FMDUMP_VERB1];
+	const struct fmdump_fmt *ffp = &fmdump_flt_ops.do_formats[FMDUMP_VERB2];
 	uint_t i;
+	char buf[32], str[32];
+	char *class = NULL, *uuid = "-", *code = "-";
+
+	(void) nvlist_lookup_string(rp->rec_nvl, FM_SUSPECT_UUID, &uuid);
+	(void) nvlist_lookup_string(rp->rec_nvl, FM_SUSPECT_DIAG_CODE, &code);
+
+	(void) nvlist_lookup_string(rp->rec_nvl, FM_CLASS, &class);
+	if (class != NULL && strcmp(class, FM_LIST_REPAIRED_CLASS) == 0) {
+		(void) snprintf(str, sizeof (str), "%s %s", code, "Repaired");
+		code = str;
+	}
+	if (class != NULL && strcmp(class, FM_LIST_RESOLVED_CLASS) == 0) {
+		(void) snprintf(str, sizeof (str), "%s %s", code, "Resolved");
+		code = str;
+	}
+	if (class != NULL && strcmp(class, FM_LIST_UPDATED_CLASS) == 0) {
+		(void) snprintf(str, sizeof (str), "%s %s", code, "Updated");
+		code = str;
+	}
 
 	fmdump_printf(fp, "%s\n", ffp->do_hdr);
-	(void) flt_short(lp, rp, fp);
+	fmdump_printf(fp, "%-20s.%9.9llu %-32s %s\n",
+	    fmdump_year(buf, sizeof (buf), rp), rp->rec_nsec, uuid, code);
 
 	if (rp->rec_nrefs != 0)
 		fmdump_printf(fp, "\n  %s\n", efp->do_hdr);
@@ -216,7 +236,8 @@ const fmdump_ops_t fmdump_flt_ops = {
 "TIME                 UUID                                 SUNW-MSG-ID",
 (fmd_log_rec_f *)flt_verb1
 }, {
-NULL,
+"TIME                           UUID"
+"                                 SUNW-MSG-ID",
 (fmd_log_rec_f *)flt_verb2
 }, {
 NULL,

@@ -1063,6 +1063,7 @@ fmd_xprt_list_suspect_local(fmd_xprt_t *xp, nvlist_t *nvl)
 	fmd_xprt_impl_t *xip = (fmd_xprt_impl_t *)xp;
 	fmd_case_t *cp;
 	uint_t nelem = 0, nelem2 = 0, i;
+	boolean_t injected;
 
 	fmd_module_lock(xip->xi_queue->eq_mod);
 	cp = fmd_case_create(xip->xi_queue->eq_mod, NULL);
@@ -1149,6 +1150,13 @@ fmd_xprt_list_suspect_local(fmd_xprt_t *xp, nvlist_t *nvl)
 		fmd_case_set_de_fmri(cp, de_fmri_dup);
 	}
 
+	/*
+	 * copy injected if present
+	 */
+	if (nvlist_lookup_boolean_value(nvl, FM_SUSPECT_INJECTED,
+	    &injected) == 0 && injected)
+		fmd_case_set_injected(cp);
+
 	fmd_case_transition(cp, FMD_CASE_SOLVED, FMD_CF_SOLVED);
 	fmd_module_unlock(xip->xi_queue->eq_mod);
 }
@@ -1182,6 +1190,7 @@ fmd_xprt_list_suspect(fmd_xprt_t *xp, nvlist_t *nvl)
 	fmd_case_t *cp;
 	fmd_case_impl_t *cip;
 	int need_update = 0;
+	boolean_t injected;
 
 	if (nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) != 0)
 		return;
@@ -1361,6 +1370,13 @@ fmd_xprt_list_suspect(fmd_xprt_t *xp, nvlist_t *nvl)
 		(void) nvlist_xdup(de_fmri, &de_fmri_dup, &fmd.d_nva);
 		fmd_case_set_de_fmri(cp, de_fmri_dup);
 	}
+
+	/*
+	 * copy injected if present
+	 */
+	if (nvlist_lookup_boolean_value(nvl, FM_SUSPECT_INJECTED,
+	    &injected) == 0 && injected)
+		fmd_case_set_injected(cp);
 
 	/*
 	 * Transition to solved. This will log the suspect list and create

@@ -730,7 +730,7 @@ main(int argc, char *argv[])
 	if (iflags & FMD_LOG_XITER_OFFS)
 		fmdump_printf(arg.da_fp, "%16s ", "OFFSET");
 
-	if (arg.da_fmt->do_hdr)
+	if (arg.da_fmt->do_hdr && !(opt_V && ops == &fmdump_flt_ops))
 		fmdump_printf(arg.da_fp, "%s\n", arg.da_fmt->do_hdr);
 
 	if (opt_e && opt_u) {

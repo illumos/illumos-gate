@@ -83,6 +83,7 @@ extern "C" {
 #define	FM_SUSPECT_FAULT_LIST		"fault-list"
 #define	FM_SUSPECT_FAULT_SZ		"fault-list-sz"
 #define	FM_SUSPECT_FAULT_STATUS		"fault-status"
+#define	FM_SUSPECT_INJECTED		"__injected"
 #define	FM_SUSPECT_MESSAGE		"message"
 #define	FM_SUSPECT_RETIRE		"retire"
 #define	FM_SUSPECT_RESPONSE		"response"

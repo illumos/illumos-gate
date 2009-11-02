@@ -454,6 +454,7 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	char *class;
 	nvlist_t *rsrc;
 	int err;
+	boolean_t injected;
 
 	/*
 	 * Extract the most recent values of 'faulty' from the event log.
@@ -497,6 +498,9 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	    case_code);
 	fmd_case_hold(cp);
 	fmd_module_unlock(fmd.d_rmod);
+	if (nvlist_lookup_boolean_value(nvl, FM_SUSPECT_INJECTED,
+	    &injected) == 0 && injected)
+		fmd_case_set_injected(cp);
 	if (nvlist_lookup_int64_array(nvl, FM_SUSPECT_DIAG_TIME, &diag_time,
 	    &nelem) == 0 && nelem >= 2)
 		fmd_case_settime(cp, diag_time[0], diag_time[1]);
@@ -1529,7 +1533,7 @@ fmd_asru_logevent(fmd_asru_link_t *alp)
 	    alp->al_asru_fmri, cip->ci_uuid, cip->ci_code, faulty, unusable,
 	    message, alp->al_event, &cip->ci_tv, repaired, replaced, acquitted,
 	    cip->ci_state == FMD_CASE_RESOLVED, cip->ci_diag_de == NULL ?
-	    cip->ci_mod->mod_fmri : cip->ci_diag_de);
+	    cip->ci_mod->mod_fmri : cip->ci_diag_de, cip->ci_injected == 1);
 
 	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
 	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);

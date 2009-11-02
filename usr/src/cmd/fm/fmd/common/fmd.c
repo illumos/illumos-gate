@@ -231,8 +231,8 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "product_sn", &fmd_conf_string, _fmd_psn },	/* product serial number */
 { "chassis", &fmd_conf_string, _fmd_csn },	/* chassis serial number */
 { "ckpt.dir", &fmd_conf_string, "var/fm/fmd/ckpt" }, /* ckpt directory path */
-{ "ckpt.dirmode", &fmd_conf_int32, "0700" },	/* ckpt directory perm mode */
-{ "ckpt.mode", &fmd_conf_int32, "0400" },	/* ckpt file perm mode */
+{ "ckpt.dirmode", &fmd_conf_int32, "0755" },	/* ckpt directory perm mode */
+{ "ckpt.mode", &fmd_conf_int32, "0644" },	/* ckpt file perm mode */
 { "ckpt.restore", &fmd_conf_bool, "true" },	/* restore checkpoints? */
 { "ckpt.save", &fmd_conf_bool, "true" },	/* save checkpoints? */
 { "ckpt.zero", &fmd_conf_bool, "false" },	/* zero checkpoints on start? */
