@@ -221,7 +221,7 @@ kcf_activate()
 		KCF_PROV_REFRELE(pd);
 	}
 
-	/* If we are not in FIPS 140 mode exit */
+	/* If we are not in FIPS 140 mode, then exit */
 	if (global_fips140_mode == FIPS140_MODE_DISABLED)
 		return;
 
@@ -230,6 +230,7 @@ kcf_activate()
 	global_fips140_mode = FIPS140_MODE_ENABLED;
 	cv_signal(&cv_fips140);
 	mutex_exit(&fips140_mode_lock);
+	cmn_err(CE_CONT, "?FIPS 140 enabled. Boundary check complete.");
 
 	verify_unverified_providers();
 }
@@ -362,7 +363,7 @@ kcf_fips140_validate()
 		post_thr = thread_create(NULL, 0,
 		    (*(KCF_PROV_FIPS140_OPS(pd)->fips140_post)), &post_rv[i],
 		    0, &p0, TS_RUN, MAXCLSYSPRI);
-		post_thr->t_did = post_t_did[i];
+		post_t_did[i] = post_thr->t_did;
 		KCF_FRMWRK_DEBUG(1, ("kcf_fips140_validate: started POST "
 		    "for %s\n", fips140_module_list[i]));
 		KCF_PROV_REFRELE(pd);
@@ -375,12 +376,18 @@ kcf_fips140_validate()
 
 	/* Wait for POST threads to come back and verify results */
 	for (i = 0; i < FIPS140_MODULES_MAX; i++) {
-		if (post_t_did[i] != NULL)
+		/* If the POST has already returned a success, we can move on */
+		if (post_rv[i] == CRYPTO_SUCCESS)
+			continue;
+
+		/* POST test is taking more time, need to wait for thread */
+		if (post_rv[i] == CRYPTO_OPERATION_NOT_INITIALIZED &&
+		    post_t_did[i] != NULL)
 			thread_join(post_t_did[i]);
 
-		if (post_rv[i] != 0) {
+		if (post_rv[i] != CRYPTO_SUCCESS) {
 			cmn_err(CE_WARN, "FIPS 140 POST failed for %s. "
-			    "Error = %d", fips140_module_list[i], post_rv[i]);
+			    "Error = 0x%x", fips140_module_list[i], post_rv[i]);
 			goto error;
 		}
 	}
