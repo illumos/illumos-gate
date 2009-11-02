@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is a finger program.  It prints out useful information about users
@@ -167,6 +165,7 @@ char *termopts[] = {
 int unshort;
 FILE *lf;				/* LASTLOG file pointer */
 struct person *person1;			/* list of people */
+size_t nperson;				/* number of people */
 time_t tloc;				/* current time */
 
 char usagestr[] = "Usage: "
@@ -193,6 +192,7 @@ struct passwd *pwdcopy(const struct passwd *pfrom);
 void quickprint(struct person *pers);
 void shortprint(struct person *pers);
 void stimeprint(time_t *dt);
+void sort_by_username(void);
 
 
 int
@@ -252,7 +252,10 @@ main(int argc, char **argv)
 		doall();
 	else
 		donames(&argv[optind]);
-	if (person1)
+
+	sort_by_username();
+
+	if (nperson > 0)
 		print();
 	return (0);
 	/* NOTREACHED */
@@ -272,12 +275,12 @@ doall(void)
 		setpwent();
 		fwopen();
 	}
-	while (u = getutxent()) {
+	while ((u = getutxent()) != NULL) {
 		if (u->ut_name[0] == 0 ||
 		    nonuserx(*u) ||
 		    u->ut_type != USER_PROCESS)
 			continue;
-		if (person1 == 0)
+		if (person1 == NULL)
 			p = person1 = malloc(sizeof (*p));
 		else {
 			p->link = malloc(sizeof (*p));
@@ -290,7 +293,7 @@ doall(void)
 		bcopy(u->ut_host, p->host, HMAX);
 		p->host[HMAX] = 0;
 		p->loginat = u->ut_tv.tv_sec;
-		p->pwd = 0;
+		p->pwd = NULL;
 		p->loggedin = 1;
 		if (unquick && (pw = getpwnam(name))) {
 			p->pwd = pwdcopy(pw);
@@ -299,17 +302,19 @@ doall(void)
 		} else
 			p->name = strdup(name);
 		p->ttyloc = NULL;
+
+		nperson++;
 	}
 	if (unquick) {
 		fwclose();
 		endpwent();
 	}
 	endutxent();
-	if (person1 == 0) {
+	if (nperson == 0) {
 		(void) printf("No one logged on\n");
 		return;
 	}
-	p->link = 0;
+	p->link = NULL;
 }
 
 void
@@ -324,10 +329,10 @@ donames(char **argv)
 	 * logged in
 	 */
 	unshort = !small;
-	for (; *argv != 0; argv++) {
+	for (; *argv != NULL; argv++) {
 		if (netfinger(*argv))
 			continue;
-		if (person1 == 0)
+		if (person1 == NULL)
 			p = person1 = malloc(sizeof (*p));
 		else {
 			p->link = malloc(sizeof (*p));
@@ -336,24 +341,26 @@ donames(char **argv)
 		p->name = *argv;
 		p->loggedin = 0;
 		p->original = 1;
-		p->pwd = 0;
+		p->pwd = NULL;
+
+		nperson++;
 	}
-	if (person1 == 0)
+	if (nperson == 0)
 		return;
-	p->link = 0;
+	p->link = NULL;
 	/*
 	 * if we are doing it, read /etc/passwd for the useful info
 	 */
 	if (unquick) {
 		setpwent();
 		if (!match) {
-			for (p = person1; p != 0; p = p->link) {
-				if (pw = getpwnam(p->name))
+			for (p = person1; p != NULL; p = p->link) {
+				if ((pw = getpwnam(p->name)) != NULL)
 					p->pwd = pwdcopy(pw);
 			}
 		} else {
-			while ((pw = getpwent()) != 0) {
-				for (p = person1; p != 0; p = p->link) {
+			while ((pw = getpwent()) != NULL) {
+				for (p = person1; p != NULL; p = p->link) {
 					if (!p->original)
 						continue;
 					if (strcmp(p->name, pw->pw_name) != 0 &&
@@ -361,7 +368,7 @@ donames(char **argv)
 					    p->name)) {
 						continue;
 					}
-					if (p->pwd == 0) {
+					if (p->pwd == NULL) {
 						p->pwd = pwdcopy(pw);
 					} else {
 						struct person *new;
@@ -380,6 +387,8 @@ donames(char **argv)
 						p->original = 0;
 						p->link = new;
 						p = new;
+
+						nperson++;
 					}
 				}
 			}
@@ -388,14 +397,15 @@ donames(char **argv)
 	}
 	/* Now get login information */
 	setutxent();
-	while (u = getutxent()) {
+	while ((u = getutxent()) != NULL) {
 		if (u->ut_name[0] == 0 || u->ut_type != USER_PROCESS)
 			continue;
-		for (p = person1; p != 0; p = p->link) {
+		for (p = person1; p != NULL; p = p->link) {
 			p->ttyloc = NULL;
 			if (p->loggedin == 2)
 				continue;
-			if (strncmp(p->pwd ? p->pwd->pw_name : p->name,
+			if (strncmp((p->pwd != NULL) ?
+			    p->pwd->pw_name : p->name,
 			    u->ut_name, NMAX) != 0)
 				continue;
 			if (p->loggedin == 0) {
@@ -421,13 +431,15 @@ donames(char **argv)
 				p->loggedin = 2;
 				p->link = new;
 				p = new;
+
+				nperson++;
 			}
 		}
 	}
 	endutxent();
 	if (unquick) {
 		fwopen();
-		for (p = person1; p != 0; p = p->link)
+		for (p = person1; p != NULL; p = p->link)
 			decode(p);
 		fwclose();
 	}
@@ -461,7 +473,7 @@ print(void)
 			(void) putchar('\n');
 		}
 	}
-	for (p = person1; p != 0; p = p->link) {
+	for (p = person1; p != NULL; p = p->link) {
 		if (!unquick) {
 			quickprint(p);
 			continue;
@@ -471,14 +483,14 @@ print(void)
 			continue;
 		}
 		personprint(p);
-		if (p->pwd != 0 && !AlreadyPrinted(p->pwd->pw_uid)) {
+		if (p->pwd != NULL && !AlreadyPrinted(p->pwd->pw_uid)) {
 			AnyMail(p->pwd->pw_name);
 			if (hack) {
 				struct stat sbuf;
 
 				s = malloc(strlen(p->pwd->pw_dir) +
-					sizeof (PROJ));
-				if (s) {
+				    sizeof (PROJ));
+				if (s != NULL) {
 					(void) strcpy(s, p->pwd->pw_dir);
 					(void) strcat(s, PROJ);
 					if (stat(s, &sbuf) != -1 &&
@@ -496,8 +508,8 @@ print(void)
 				struct stat sbuf;
 
 				s = malloc(strlen(p->pwd->pw_dir) +
-					sizeof (PLAN));
-				if (s) {
+				    sizeof (PLAN));
+				if (s != NULL) {
 					(void) strcpy(s, p->pwd->pw_dir);
 					(void) strcat(s, PLAN);
 					if (stat(s, &sbuf) == -1 ||
@@ -513,7 +525,7 @@ print(void)
 				}
 			}
 		}
-		if (p->link != 0)
+		if (p->link != NULL)
 			(void) putchar('\n');
 	}
 }
@@ -548,12 +560,12 @@ quickprint(struct person *pers)
 		if (idle) {
 			findidle(pers);
 			(void) printf("%c%-12s %-16.16s",
-				pers->writable ? ' ' : '*',
-				pers->tty, ctime(&pers->loginat));
+			    pers->writable ? ' ' : '*',
+			    pers->tty, ctime(&pers->loginat));
 			ltimeprint("   ", &pers->idletime, "");
 		} else {
 			(void) printf(" %-12s %-16.16s",
-				pers->tty, ctime(&pers->loginat));
+			    pers->tty, ctime(&pers->loginat));
 		}
 		(void) putchar('\n');
 	} else {
@@ -570,13 +582,13 @@ shortprint(struct person *pers)
 {
 	char *p;
 
-	if (pers->pwd == 0) {
+	if (pers->pwd == NULL) {
 		(void) printf("%-15s       ???\n", pers->name);
 		return;
 	}
 	(void) printf("%-8s", pers->pwd->pw_name);
 	if (wide) {
-		if (pers->realname) {
+		if (pers->realname != NULL) {
 			(void) printf(" %-20.20s", pers->realname);
 		} else {
 			(void) printf("        ???          ");
@@ -621,9 +633,9 @@ shortprint(struct person *pers)
 void
 personprint(struct person *pers)
 {
-	if (pers->pwd == 0) {
+	if (pers->pwd == NULL) {
 		(void) printf("Login name: %-10s\t\t\tIn real life: ???\n",
-			pers->name);
+		    pers->name);
 		return;
 	}
 	(void) printf("Login name: %-10s", pers->pwd->pw_name);
@@ -632,7 +644,7 @@ personprint(struct person *pers)
 	} else {
 		(void) printf("			");
 	}
-	if (pers->realname) {
+	if (pers->realname != NULL) {
 		(void) printf("In real life: %s", pers->realname);
 	}
 	if (unbrief) {
@@ -644,11 +656,11 @@ personprint(struct person *pers)
 		char *ep = ctime(&pers->loginat);
 		if (*pers->host) {
 			(void) printf("\nOn since %15.15s on %s from %s",
-				&ep[4], pers->tty, pers->host);
+			    &ep[4], pers->tty, pers->host);
 			ltimeprint("\n", &pers->idletime, " Idle Time");
 		} else {
 			(void) printf("\nOn since %15.15s on %-12s",
-				&ep[4], pers->tty);
+			    &ep[4], pers->tty);
 			ltimeprint("\n", &pers->idletime, " Idle Time");
 		}
 	} else if (pers->loginat == 0) {
@@ -656,7 +668,7 @@ personprint(struct person *pers)
 	} else if (tloc - pers->loginat > 180 * 24 * 60 * 60) {
 		char *ep = ctime(&pers->loginat);
 		(void) printf("\nLast login %10.10s, %4.4s on %s",
-			ep, ep+20, pers->tty);
+		    ep, ep+20, pers->tty);
 		if (*pers->host) {
 			(void) printf(" from %s", pers->host);
 		}
@@ -680,8 +692,8 @@ decode(struct person *pers)
 	char buffer[256];
 	char *bp, *gp, *lp;
 
-	pers->realname = 0;
-	if (pers->pwd == 0)
+	pers->realname = NULL;
+	if (pers->pwd == NULL)
 		return;
 	gp = pers->pwd->pw_gecos;
 	bp = buffer;
@@ -721,7 +733,7 @@ decode(struct person *pers)
 void
 fwopen(void)
 {
-	if ((lf = fopen(LASTLOG, "r")) == (FILE *)NULL)
+	if ((lf = fopen(LASTLOG, "r")) == NULL)
 		(void) fprintf(stderr, "finger: %s open error\n", LASTLOG);
 }
 
@@ -730,7 +742,7 @@ findwhen(struct person *pers)
 {
 	struct lastlog ll;
 
-	if (lf != (FILE *)NULL) {
+	if (lf != NULL) {
 		if (fseeko(lf, (off_t)pers->pwd->pw_uid * (off_t)sizeof (ll),
 		    SEEK_SET) == 0) {
 			if (fread((char *)&ll, sizeof (ll), 1, lf) == 1) {
@@ -766,7 +778,7 @@ findwhen(struct person *pers)
 void
 fwclose(void)
 {
-	if (lf != (FILE *)0)
+	if (lf != NULL)
 		(void) fclose(lf);
 }
 
@@ -778,9 +790,7 @@ void
 findidle(struct person *pers)
 {
 	struct stat ttystatus;
-#ifdef sun
 	struct stat inputdevstatus;
-#endif
 #define	TTYLEN (sizeof ("/dev/") - 1)
 	static char buffer[TTYLEN + LMAX + 1] = "/dev/";
 	time_t t;
@@ -793,7 +803,6 @@ findidle(struct person *pers)
 		exit(4);
 	}
 	lastinputtime = ttystatus.st_atime;
-#ifdef sun
 	if (strcmp(pers->tty, "console") == 0) {
 		/*
 		 * On the console, the user may be running a window system; if
@@ -811,7 +820,6 @@ findidle(struct person *pers)
 				lastinputtime = inputdevstatus.st_atime;
 		}
 	}
-#endif
 	t = time(NULL);
 	if (t < lastinputtime)
 		pers->idletime = (time_t)0;
@@ -841,7 +849,7 @@ stimeprint(time_t *dt)
 				(void) printf("%3d:", delta->tm_hour);
 			else
 				(void) printf("%1d:%02d",
-					delta->tm_hour, delta->tm_min);
+				    delta->tm_hour, delta->tm_min);
 	else
 		(void) printf("%3dd", delta->tm_yday);
 }
@@ -865,15 +873,15 @@ ltimeprint(char *before, time_t *dt, char *after)
 		(void) printf("%d days", delta->tm_yday);
 	else if (delta->tm_yday > 0)
 		(void) printf("%d day%s %d hour%s",
-			delta->tm_yday, delta->tm_yday == 1 ? "" : "s",
-			delta->tm_hour, delta->tm_hour == 1 ? "" : "s");
+		    delta->tm_yday, delta->tm_yday == 1 ? "" : "s",
+		    delta->tm_hour, delta->tm_hour == 1 ? "" : "s");
 	else
 		if (delta->tm_hour >= 10)
 			(void) printf("%d hours", delta->tm_hour);
 		else if (delta->tm_hour > 0)
 			(void) printf("%d hour%s %d minute%s",
-				delta->tm_hour, delta->tm_hour == 1 ? "" : "s",
-				delta->tm_min, delta->tm_min == 1 ? "" : "s");
+			    delta->tm_hour, delta->tm_hour == 1 ? "" : "s",
+			    delta->tm_min, delta->tm_min == 1 ? "" : "s");
 		else
 			if (delta->tm_min >= 10)
 				(void) printf("%2d minutes", delta->tm_min);
@@ -881,10 +889,10 @@ ltimeprint(char *before, time_t *dt, char *after)
 				(void) printf("%2d seconds", delta->tm_sec);
 			else
 				(void) printf("%d minute%s %d second%s",
-					delta->tm_min,
-					delta->tm_min == 1 ? "" : "s",
-					delta->tm_sec,
-					delta->tm_sec == 1 ? "" : "s");
+				    delta->tm_min,
+				    delta->tm_min == 1 ? "" : "s",
+				    delta->tm_sec,
+				    delta->tm_sec == 1 ? "" : "s");
 	(void) printf("%s", after);
 }
 
@@ -1292,7 +1300,7 @@ AnyMail(char *name)
 	char *timestr;
 
 	mbxpath = malloc(strlen(name) + strlen(MAILDIR) + 1);
-	if (mbxpath == (char *)NULL)
+	if (mbxpath == NULL)
 		return;
 
 	(void) strcpy(mbxpath, mbxdir);	/* copy preamble into path name */
@@ -1396,7 +1404,7 @@ catfile(char *s, mode_t mode, int trunc_at_nl)
 
 			(void) fflush(stdout);
 			while (select(fd + 1, &readfds, (fd_set *) 0,
-				&exceptfds, &tv) != -1) {
+			    &exceptfds, &tv) != -1) {
 				unsigned char buf[BUFSIZ];
 				int nread;
 
@@ -1413,7 +1421,7 @@ catfile(char *s, mode_t mode, int trunc_at_nl)
 							(void) putchar((int)*p);
 						else if (isascii(*p))
 							(void) fputs(unctrl(*p),
-								stdout);
+							    stdout);
 					}
 				} else
 					break;
@@ -1472,4 +1480,56 @@ initscreening(void)
 		}
 		(void) defopen(NULL);	/* close default file */
 	}
+}
+
+int
+person_compare(const void *p1, const void *p2)
+{
+	const struct person *pp1 = *(struct person **)p1;
+	const struct person *pp2 = *(struct person **)p2;
+	int r;
+
+	/*
+	 * Sort by username.
+	 */
+	r = strcmp(pp1->name, pp2->name);
+
+	if (r != 0)
+		return (r);
+
+	/*
+	 * If usernames are the same, sort by idle time.
+	 */
+	r = pp1->idletime - pp2->idletime;
+
+	return (r);
+}
+
+void
+sort_by_username()
+{
+	struct person **sortable, *loop;
+	size_t i;
+
+	sortable = malloc(sizeof (sortable[0]) * nperson);
+
+	if (sortable == NULL)
+		return;
+
+	for (i = 0, loop = person1; i < nperson; i++) {
+		struct person *next = loop->link;
+
+		sortable[i] = loop;
+		loop->link = NULL;
+
+		loop = next;
+	}
+
+	qsort(sortable, nperson, sizeof (sortable[0]), person_compare);
+
+	for (i = 1; i < nperson; i++)
+		sortable[i-1]->link = sortable[i];
+	person1 = sortable[0];
+
+	free(sortable);
 }
