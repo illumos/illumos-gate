@@ -1235,6 +1235,8 @@ mi_print(void)
 			printf(",readdironly");
 		if (mik.mik_flags & MI_ACL)
 			printf(",acl");
+		if (mik.mik_flags & MI_DIRECTIO)
+			printf(",forcedirectio");
 
 		if (mik.mik_vers >= NFS_V4) {
 			if (mik.mik_flags & MI4_MIRRORMOUNT)
