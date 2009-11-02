@@ -1655,7 +1655,12 @@ vhci_set_tpg_access_state(struct scsi_vhci *vhci, mp_iocdata_t *mpioc,
 			} else {
 				vhci_update_pathstates((void *)svl);
 			}
-			if (desired_state != mptpgd->prop.accessState) {
+			if (desired_state != mptpgd->prop.accessState &&
+			    (desired_state != MP_DRVR_ACCESS_STATE_ACTIVE ||
+			    (mptpgd->prop.accessState !=
+			    MP_DRVR_ACCESS_STATE_ACTIVE_OPTIMIZED &&
+			    mptpgd->prop.accessState !=
+			    MP_DRVR_ACCESS_STATE_ACTIVE_NONOPTIMIZED))) {
 				VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_set_tpg_"
 				    "access_state: TPGAccessState NOT Set: "
 				    "des_state=%x, cur_state=%x", desired_state,
