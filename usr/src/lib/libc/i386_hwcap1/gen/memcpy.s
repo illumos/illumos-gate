@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,9 +43,9 @@
 
 	cmpl	%esi,%edi	/ if (source addr > dest addr)
 	leal	-1(%esi,%ecx),%edx	/ %edx = src + size - 1
-	jle	.memcpy_post	/ jump if dst < src
+	jbe	.memcpy_post	/ jump if dst <= src
 	cmpl	%edx,%edi
-	jle	.CopyLeft	/ jump if dst <= src + size - 1
+	jbe	.CopyLeft	/ jump if dst <= src + size - 1
 	jmp	.memcpy_post
 
 	ENTRY(memcpy)

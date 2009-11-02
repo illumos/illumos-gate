@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,9 +66,9 @@
 	movl	$3,%eax		/ heavily used constant
 	cmpl	%esi,%edi	/ if (source addr > dest addr)
 	leal	-1(%esi,%ecx),%edx
-	jle	.CopyRight	/ 
+	jbe	.CopyRight	/ 
 	cmpl	%edx,%edi
-	jle	.CopyLeft
+	jbe	.CopyLeft
 .CopyRight:
 	cmpl	$8,%ecx		/    if (size < 8 bytes)
 	jbe	.OneByteCopy	/        goto fast short copy loop
