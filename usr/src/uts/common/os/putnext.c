@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *		UNIX Device Driver Interface functions
@@ -61,9 +58,9 @@
  *
  * The redzone value is chosen dependent on the default stack size which is 8K
  * on 32-bit kernels and on x86 and 16K on 64-bit kernels. The values are chosen
- * empirically. For 64-bit kernels it is 5000 and for 32-bit kernels it is 2500.
- * Experiments showed that 2500 is not enough for 64-bit kernels and 2048 is not
- * enough for 32-bit.
+ * empirically. For 64-bit kernels it is 5000 and for 32-bit kernels it is 3000.
+ * Experiments showed that 2500 is not enough for either 32-bit or 64-bit
+ * kernels.
  *
  * The redzone value is a tuneable rather then a constant to allow adjustments
  * in the field.
@@ -83,7 +80,7 @@ static ulong_t put_stack_notenough;
 #ifdef	_LP64
 #define	PUT_STACK_NEEDED 5000
 #else
-#define	PUT_STACK_NEEDED 2500
+#define	PUT_STACK_NEEDED 3000
 #endif
 
 int put_stack_needed = PUT_STACK_NEEDED;
@@ -160,7 +157,7 @@ putnext(queue_t *qp, mblk_t *mp)
 	ushort_t	*sqcipcount = NULL;
 
 	TRACE_2(TR_FAC_STREAMS_FR, TR_PUTNEXT_START,
-		"putnext_start:(%p, %p)", qp, mp);
+	    "putnext_start:(%p, %p)", qp, mp);
 
 	ASSERT(mp->b_datap->db_ref != 0);
 	ASSERT(mp->b_next == NULL && mp->b_prev == NULL);
@@ -198,7 +195,7 @@ putnext(queue_t *qp, mblk_t *mp)
 		queued = qp->q_sqflags & Q_SQQUEUED;
 		mutex_exit(sqciplock);
 	} else {
-	    slowlock:
+	slowlock:
 		ASSERT(sqciplock == NULL);
 		mutex_enter(SQLOCK(sq));
 		mutex_exit(sdlock);
@@ -440,7 +437,7 @@ put(queue_t *qp, mblk_t *mp)
 	ushort_t	*sqcipcount = NULL;
 
 	TRACE_2(TR_FAC_STREAMS_FR, TR_PUT_START,
-		"put:(%X, %X)", qp, mp);
+	    "put:(%X, %X)", qp, mp);
 	ASSERT(mp->b_datap->db_ref != 0);
 	ASSERT(mp->b_next == NULL && mp->b_prev == NULL);
 
@@ -466,7 +463,7 @@ put(queue_t *qp, mblk_t *mp)
 		queued = qp->q_sqflags & Q_SQQUEUED;
 		mutex_exit(sqciplock);
 	} else {
-	    slowlock:
+	slowlock:
 		ASSERT(sqciplock == NULL);
 		mutex_enter(SQLOCK(sq));
 		flags = sq->sq_flags;

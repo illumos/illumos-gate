@@ -783,11 +783,11 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 
 		if (isv4)
 			err = tsol_check_label(cr, &iackmp,
-			    connp->conn_mac_exempt,
+			    connp->conn_mac_mode,
 			    sctps->sctps_netstack->netstack_ip, pid);
 		else
 			err = tsol_check_label_v6(cr, &iackmp,
-			    connp->conn_mac_exempt,
+			    connp->conn_mac_mode,
 			    sctps->sctps_netstack->netstack_ip, pid);
 		if (err != 0) {
 			sctp_send_abort(sctp, sctp_init2vtag(ch),

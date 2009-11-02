@@ -131,9 +131,10 @@ typedef enum dpd_status {
 #define	D_PROP		0x00000080	/* proposal construction */
 #define	D_DOOR		0x00000100	/* door server */
 #define	D_CONFIG	0x00000200	/* config file processing */
+#define	D_LABEL		0x00000400	/* MAC labels */
 
-#define	D_HIGHBIT	0x00000200
-#define	D_ALL		0x000003ff
+#define	D_HIGHBIT	0x00000400
+#define	D_ALL		0x000007ff
 
 /*
  * Access privilege levels: define level of access to keying information.

@@ -91,6 +91,8 @@ opdes_t	icmp_opt_arr[] = {
 	},
 { SO_MAC_EXEMPT, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int),
 	0 },
+{ SO_MAC_IMPLICIT, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int),
+	0 },
 
 { SO_ALLZONES, SOL_SOCKET, OA_R, OA_RW, OP_CONFIG, OP_PASSNEXT, sizeof (int),
 	0 },

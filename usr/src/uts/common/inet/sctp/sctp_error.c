@@ -276,12 +276,12 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 	if (is_system_labeled() && (cr = msg_getcred(inmp, &pid)) != NULL &&
 	    crgetlabel(cr) != NULL) {
 		int err;
-		boolean_t exempt = connp->conn_mac_exempt;
+		uint_t mode = connp->conn_mac_mode;
 
 		if (isv4)
-			err = tsol_check_label(cr, &hmp, exempt, ipst, pid);
+			err = tsol_check_label(cr, &hmp, mode, ipst, pid);
 		else
-			err = tsol_check_label_v6(cr, &hmp, exempt, ipst, pid);
+			err = tsol_check_label_v6(cr, &hmp, mode, ipst, pid);
 		if (err != 0) {
 			freemsg(hmp);
 			return;

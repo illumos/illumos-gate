@@ -25,6 +25,7 @@
 
 PROG=		ikeadm ipsecalgs ipsecconf ipseckey ikecert
 SOCKETPROG=	ipsecalgs ipsecconf ipseckey 
+TSOLPROG=	ipseckey
 SRCS=           ikeadm.c ipsecalgs.c ipsecconf.c ipseckey.c
 
 include ../../../Makefile.cmd
@@ -57,6 +58,11 @@ CPPFLAGS +=     -DSYSV -DBSD_COMP -I$(CMDINETCOMMONDIR) -I.
 
 CFLAGS += $(XSTRCONST)
 LDLIBS += -lipsecutil -lnsl
+
+LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
+lint := LAZYLIBS = -ltsol
+
+$(TSOLPROG)	:=	LDLIBS += $(LAZYLIBS)
 $(SOCKETPROG)	:=      LDLIBS += -lsocket
 
 .KEEP_STATE:

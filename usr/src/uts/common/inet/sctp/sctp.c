@@ -237,7 +237,7 @@ sctp_create_eager(sctp_t *psctp)
 		 * MAC exempt mode.  This allows read-down to unlabeled hosts.
 		 */
 		if (getpflags(NET_MAC_AWARE, credp) != 0)
-			connp->conn_mac_exempt = B_TRUE;
+			connp->conn_mac_mode = CONN_MAC_AWARE;
 	}
 
 	connp->conn_allzones = pconnp->conn_allzones;
@@ -1521,7 +1521,7 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
 	 * exempt mode.  This allows read-down to unlabeled hosts.
 	 */
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
-		sctp_connp->conn_mac_exempt = B_TRUE;
+		sctp_connp->conn_mac_mode = CONN_MAC_AWARE;
 
 	/* Initialize SCTP instance values,  our verf tag must never be 0 */
 	(void) random_get_pseudo_bytes((uint8_t *)&sctp->sctp_lvtag,

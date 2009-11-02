@@ -1019,8 +1019,8 @@ ipcl_proto_insert(conn_t *connp, uint8_t protocol)
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	ASSERT(connp != NULL);
-	ASSERT(!connp->conn_mac_exempt || protocol == IPPROTO_AH ||
-	    protocol == IPPROTO_ESP);
+	ASSERT((connp->conn_mac_mode == CONN_MAC_DEFAULT) ||
+	    protocol == IPPROTO_AH || protocol == IPPROTO_ESP);
 
 	connp->conn_ulp = protocol;
 
@@ -1036,8 +1036,8 @@ ipcl_proto_insert_v6(conn_t *connp, uint8_t protocol)
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	ASSERT(connp != NULL);
-	ASSERT(!connp->conn_mac_exempt || protocol == IPPROTO_AH ||
-	    protocol == IPPROTO_ESP);
+	ASSERT((connp->conn_mac_mode == CONN_MAC_DEFAULT) ||
+	    protocol == IPPROTO_AH || protocol == IPPROTO_ESP);
 
 	connp->conn_ulp = protocol;
 
@@ -1221,7 +1221,8 @@ check_exempt_conflict_v4(conn_t *connp, ip_stack_t *ipst)
 		if (connp->conn_af_isv6 != tconn->conn_af_isv6)
 			continue;
 		/* If neither is exempt, then there's no conflict */
-		if (!connp->conn_mac_exempt && !tconn->conn_mac_exempt)
+		if ((connp->conn_mac_mode == CONN_MAC_DEFAULT) &&
+		    (tconn->conn_mac_mode == CONN_MAC_DEFAULT))
 			continue;
 		/* We are only concerned about sockets for a different zone */
 		if (connp->conn_zoneid == tconn->conn_zoneid)
@@ -1252,7 +1253,8 @@ check_exempt_conflict_v6(conn_t *connp, ip_stack_t *ipst)
 		if (connp->conn_af_isv6 != tconn->conn_af_isv6)
 			continue;
 		/* If neither is exempt, then there's no conflict */
-		if (!connp->conn_mac_exempt && !tconn->conn_mac_exempt)
+		if ((connp->conn_mac_mode == CONN_MAC_DEFAULT) &&
+		    (tconn->conn_mac_mode == CONN_MAC_DEFAULT))
 			continue;
 		/* We are only concerned about sockets for a different zone */
 		if (connp->conn_zoneid == tconn->conn_zoneid)
@@ -1751,8 +1753,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		    connp = connp->conn_next) {
 			if (IPCL_BIND_MATCH(connp, protocol, ipha->ipha_dst,
 			    lport) && (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && connp->conn_mac_exempt &&
-			    shared_addr)))
+			    (unlabeled && shared_addr &&
+			    (connp->conn_mac_mode != CONN_MAC_DEFAULT))))
 				break;
 		}
 
@@ -1828,8 +1830,8 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 			if (IPCL_UDP_MATCH(connp, lport, ipha->ipha_dst,
 			    fport, ipha->ipha_src) &&
 			    (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && connp->conn_mac_exempt &&
-			    shared_addr)))
+			    (unlabeled && shared_addr &&
+			    (connp->conn_mac_mode != CONN_MAC_DEFAULT))))
 				break;
 		}
 
@@ -1957,8 +1959,8 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 			if (IPCL_BIND_MATCH_V6(connp, protocol,
 			    ip6h->ip6_dst, lport) &&
 			    (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && connp->conn_mac_exempt &&
-			    shared_addr)))
+			    (unlabeled && shared_addr &&
+			    (connp->conn_mac_mode != CONN_MAC_DEFAULT))))
 				break;
 		}
 
@@ -2033,8 +2035,8 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 			if (IPCL_UDP_MATCH_V6(connp, lport, ip6h->ip6_dst,
 			    fport, ip6h->ip6_src) &&
 			    (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && connp->conn_mac_exempt &&
-			    shared_addr)))
+			    (unlabeled && shared_addr &&
+			    (connp->conn_mac_mode != CONN_MAC_DEFAULT))))
 				break;
 		}
 
@@ -2180,7 +2182,9 @@ ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
 		}
 
 		if (IPCL_ZONE_MATCH(connp, zoneid) ||
-		    (unlabeled && connp->conn_mac_exempt && shared_addr))
+		    (unlabeled &&
+		    (connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+		    shared_addr))
 			break;
 	}
 	/*

@@ -2056,9 +2056,7 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 		ii = (ipsec_in_t *)first_mp->b_rptr;
 		ii->ipsec_in_ns = ipst->ips_netstack;	/* No netstack_hold */
 	}
-	ii->ipsec_in_zoneid = zoneid;
-	ASSERT(zoneid != ALL_ZONES);
-	if (!ipsec_in_to_out(first_mp, ipha, NULL)) {
+	if (!ipsec_in_to_out(first_mp, ipha, NULL, zoneid)) {
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		return;
 	}
@@ -3262,7 +3260,7 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 			/*
 			 * Convert the IPSEC_IN to IPSEC_OUT.
 			 */
-			if (!ipsec_in_to_out(ipsec_mp, ipha, NULL)) {
+			if (!ipsec_in_to_out(ipsec_mp, ipha, NULL, zoneid)) {
 				BUMP_MIB(&ipst->ips_ip_mib,
 				    ipIfStatsOutDiscards);
 				return;
@@ -3304,20 +3302,12 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 
 		/* This is not a secure packet */
 		ii->ipsec_in_secure = B_FALSE;
-		/*
-		 * For trusted extensions using a shared IP address we can
-		 * send using any zoneid.
-		 */
-		if (zoneid == ALL_ZONES)
-			ii->ipsec_in_zoneid = GLOBAL_ZONEID;
-		else
-			ii->ipsec_in_zoneid = zoneid;
 		ipsec_mp->b_cont = mp;
 		ipha = (ipha_t *)mp->b_rptr;
 		/*
 		 * Convert the IPSEC_IN to IPSEC_OUT.
 		 */
-		if (!ipsec_in_to_out(ipsec_mp, ipha, NULL)) {
+		if (!ipsec_in_to_out(ipsec_mp, ipha, NULL, zoneid)) {
 			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
 			return;
 		}
@@ -4427,7 +4417,7 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		if (is_system_labeled() && protocol == IPPROTO_UDP)
 			goto bad_addr;
 
-		if (connp->conn_mac_exempt)
+		if (connp->conn_mac_mode != CONN_MAC_DEFAULT)
 			goto bad_addr;
 
 		/* No hash here really.  The table is big enough. */
@@ -4778,7 +4768,7 @@ ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	 */
 	if (is_system_labeled() && !IPCL_IS_TCP(connp)) {
 		if ((error = tsol_check_dest(cr, &dst_addr, IPV4_VERSION,
-		    connp->conn_mac_exempt, &effective_cred)) != 0) {
+		    connp->conn_mac_mode, &effective_cred)) != 0) {
 			if (ip_debug > 2) {
 				pr_addr_dbg(
 				    "ip_bind_connected_v4:"
@@ -7244,7 +7234,8 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 		while ((connp != NULL) &&
 		    (!IPCL_UDP_MATCH(connp, dstport, dst, srcport, src) ||
 		    (!IPCL_ZONE_MATCH(connp, zoneid) &&
-		    !(unlabeled && connp->conn_mac_exempt && shared_addr)))) {
+		    !(unlabeled && (connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+		    shared_addr)))) {
 			/*
 			 * We keep searching since the conn did not match,
 			 * or its zone did not match and it is not either
@@ -9827,7 +9818,7 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	 * exempt mode.  This allows read-down to unlabeled hosts.
 	 */
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
-		connp->conn_mac_exempt = B_TRUE;
+		connp->conn_mac_mode = CONN_MAC_AWARE;
 
 	connp->conn_rq = q;
 	connp->conn_wq = WR(q);
@@ -10628,7 +10619,18 @@ ip_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				return (EACCES);
 			if (!checkonly) {
 				mutex_enter(&connp->conn_lock);
-				connp->conn_mac_exempt = *i1 != 0 ? 1 : 0;
+				connp->conn_mac_mode = *i1 != 0 ?
+				    CONN_MAC_AWARE : CONN_MAC_DEFAULT;
+				mutex_exit(&connp->conn_lock);
+			}
+			break;	/* goto sizeof (int) option return */
+		case SO_MAC_IMPLICIT:
+			if (secpolicy_net_mac_implicit(cr) != 0)
+				return (EACCES);
+			if (!checkonly) {
+				mutex_enter(&connp->conn_lock);
+				connp->conn_mac_mode = *i1 != 0 ?
+				    CONN_MAC_IMPLICIT : CONN_MAC_DEFAULT;
 				mutex_exit(&connp->conn_lock);
 			}
 			break;	/* goto sizeof (int) option return */
@@ -13957,14 +13959,14 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 		if (ipst->ips_ip4_observe.he_interested) {
 			zoneid_t szone;
 
-			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
-			    ipst, ALL_ZONES);
 			/*
-			 * The IP observability hook expects b_rptr to be
+			 * Both of these functions expect b_rptr to be
 			 * where the IP header starts, so advance past the
-			 * link layer header.
+			 * link layer header if present.
 			 */
 			mp->b_rptr += hlen;
+			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
+			    ipst, ALL_ZONES);
 			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
 			    ALL_ZONES, ill, ipst);
 			mp->b_rptr -= hlen;
@@ -20373,7 +20375,7 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 
 		credp = BEST_CRED(mp, connp, &pid);
 		err = tsol_check_label(credp, &mp,
-		    connp->conn_mac_exempt, ipst, pid);
+		    connp->conn_mac_mode, ipst, pid);
 		ipha = (ipha_t *)mp->b_rptr;
 		if (err != 0) {
 			first_mp = mp;
@@ -20436,12 +20438,11 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 			if (need_decref)
 				CONN_DEC_REF(connp);
 			return;
-		} else {
-			ASSERT(mp->b_datap->db_type == M_CTL);
-			first_mp = mp;
-			mp = mp->b_cont;
-			mctl_present = B_TRUE;
 		}
+		ASSERT(mp->b_datap->db_type == M_CTL);
+		first_mp = mp;
+		mp = mp->b_cont;
+		mctl_present = B_TRUE;
 	} else {
 		first_mp = mp;
 		mctl_present = B_FALSE;
@@ -20866,10 +20867,10 @@ hdrtoosmall:
 			if (connp != NULL) {
 				credp = BEST_CRED(mp, connp, &pid);
 				err = tsol_check_label(credp, &mp,
-				    connp->conn_mac_exempt, ipst, pid);
+				    connp->conn_mac_mode, ipst, pid);
 			} else if ((credp = msg_getcred(mp, &pid)) != NULL) {
 				err = tsol_check_label(credp, &mp,
-				    B_FALSE, ipst, pid);
+				    CONN_MAC_DEFAULT, ipst, pid);
 			}
 			ipha = (ipha_t *)mp->b_rptr;
 			if (mctl_present)
@@ -22166,9 +22167,10 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller,
 		mp = first_mp->b_cont;
 		ipsec_len = ipsec_out_extra_length(first_mp);
 		ASSERT(ipsec_len >= 0);
+		if (zoneid == ALL_ZONES)
+			zoneid = GLOBAL_ZONEID;
 		/* We already picked up the zoneid from the M_CTL above */
 		ASSERT(zoneid == io->ipsec_out_zoneid);
-		ASSERT(zoneid != ALL_ZONES);
 
 		/*
 		 * Drop M_CTL here if IPsec processing is not needed.
@@ -25472,6 +25474,7 @@ ip_wput_ipsec_out_v6(queue_t *q, mblk_t *ipsec_mp, ip6_t *ip6h, ill_t *ill,
 	hwaccel = io->ipsec_out_accelerated;
 	zoneid = io->ipsec_out_zoneid;
 	ASSERT(zoneid != ALL_ZONES);
+	ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
 	match_flags = MATCH_IRE_ILL | MATCH_IRE_SECATTR;
 	/* Multicast addresses should have non-zero ill_index. */
 	v6dstp = &ip6h->ip6_dst;
@@ -25532,6 +25535,7 @@ ip_wput_ipsec_out_v6(queue_t *q, mblk_t *ipsec_mp, ip6_t *ip6h, ill_t *ill,
 			if (ill_need_rele)
 				ill_refrele(ill);
 			freemsg(ipsec_mp);
+			ipif_refrele(ipif);
 			return;
 		}
 

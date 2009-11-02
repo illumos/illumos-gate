@@ -399,6 +399,7 @@ parsesatype(char *type, char *ebuf)
 #define	NEXTIDENT	7
 #define	NEXTADDR4	8
 #define	NEXTADDR6	9
+#define	NEXTLABEL	10
 
 #define	TOK_EOF			0
 #define	TOK_UNKNOWN		1
@@ -455,6 +456,10 @@ parsesatype(char *type, char *ebuf)
 #define	TOK_IDLE_ADDTIME	52
 #define	TOK_IDLE_USETIME	53
 #define	TOK_RESERVED		54
+#define	TOK_LABEL		55
+#define	TOK_OLABEL		56
+#define	TOK_IMPLABEL		57
+
 
 static struct toktable {
 	char *string;
@@ -543,6 +548,11 @@ static struct toktable {
 	{"replay_value",	TOK_REPLAY_VALUE,	NEXTNUM},
 	{"idle_addtime",	TOK_IDLE_ADDTIME,	NEXTNUM},
 	{"idle_usetime",	TOK_IDLE_USETIME,	NEXTNUM},
+
+	{"label",		TOK_LABEL,		NEXTLABEL},
+	{"outer-label",		TOK_OLABEL,		NEXTLABEL},
+	{"implicit-label",	TOK_IMPLABEL,		NEXTLABEL},
+
 	{NULL,			TOK_UNKNOWN,		NEXTEOF}
 };
 
@@ -907,6 +917,58 @@ parsekey(char *input, char *ebuf, uint_t reserved_bits)
 
 	handle_errors(ep, NULL, B_FALSE, B_FALSE);
 	return (retval);
+}
+
+#include <tsol/label.h>
+
+#define	PARSELABEL_BAD_TOKEN ((struct sadb_sens *)-1)
+
+static struct sadb_sens *
+parselabel(int token, char *label)
+{
+	bslabel_t *sl = NULL;
+	int err, len;
+	sadb_sens_t *sens;
+	int doi = 1;  /* XXX XXX DEFAULT_DOI XXX XXX */
+
+	err = str_to_label(label, &sl, MAC_LABEL, L_DEFAULT, NULL);
+	if (err < 0)
+		return (NULL);
+
+	len = ipsec_convert_sl_to_sens(doi, sl, NULL);
+
+	sens = malloc(len);
+	if (sens == NULL) {
+		Bail("malloc parsed label");
+		/* Should exit before reaching here... */
+		return (NULL);
+	}
+
+	(void) ipsec_convert_sl_to_sens(doi, sl, sens);
+
+	switch (token) {
+	case TOK_LABEL:
+		break;
+
+	case TOK_OLABEL:
+		sens->sadb_sens_exttype = SADB_X_EXT_OUTER_SENS;
+		break;
+
+	case TOK_IMPLABEL:
+		sens->sadb_sens_exttype = SADB_X_EXT_OUTER_SENS;
+		sens->sadb_x_sens_flags = SADB_X_SENS_IMPLICIT;
+		break;
+
+	default:
+		free(sens);
+		/*
+		 * Return a different return code for a bad label, but really,
+		 * this would be a caller error.
+		 */
+		return (PARSELABEL_BAD_TOKEN);
+	}
+
+	return (sens);
 }
 
 /*
@@ -1590,6 +1652,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 	struct sadb_lifetime *hard = NULL, *soft = NULL;  /* Current? */
 	struct sadb_lifetime *idle = NULL;
 	struct sadb_x_replay_ctr *replay_ctr = NULL;
+	struct sadb_sens *label = NULL, *olabel = NULL;
 	struct sockaddr_in6 *sin6;
 	/* MLS TODO:  Need sensitivity eventually. */
 	int next, token, sa_len, alloclen, totallen = sizeof (msg), prefix;
@@ -2530,6 +2593,32 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 			    B_TRUE, ebuf);
 			argv++;
 			break;
+		case TOK_LABEL:
+			label = parselabel(token, *argv);
+			argv++;
+			if (label == NULL) {
+				ERROR(ep, ebuf,
+				    gettext("Malformed security label\n"));
+				break;
+			} else if (label == PARSELABEL_BAD_TOKEN) {
+				Bail("Internal token value error");
+			}
+			totallen += SADB_64TO8(label->sadb_sens_len);
+			break;
+
+		case TOK_OLABEL:
+		case TOK_IMPLABEL:
+			olabel = parselabel(token, *argv);
+			argv++;
+			if (label == NULL) {
+				ERROR(ep, ebuf,
+				    gettext("Malformed security label\n"));
+				break;
+			} else if (label == PARSELABEL_BAD_TOKEN) {
+				Bail("Internal token value error");
+			}
+			totallen += SADB_64TO8(olabel->sadb_sens_len);
+			break;
 		default:
 			ERROR1(ep, ebuf, gettext(
 			    "Don't use extension %s for add/update.\n"),
@@ -2830,6 +2919,20 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		free(replay_ctr);
 	}
 
+	if (label != NULL) {
+		bcopy(label, nexthdr, SADB_64TO8(label->sadb_sens_len));
+		nexthdr += label->sadb_sens_len;
+		free(label);
+		label = NULL;
+	}
+
+	if (olabel != NULL) {
+		bcopy(olabel, nexthdr, SADB_64TO8(olabel->sadb_sens_len));
+		nexthdr += olabel->sadb_sens_len;
+		free(olabel);
+		olabel = NULL;
+	}
+
 	if (cflag) {
 		/*
 		 * Assume the checked cmd would have worked if it was actually
@@ -2855,7 +2958,6 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		freehostent(natt_lhp);
 	if (natt_rhp != NULL && natt_rhp != &dummy.he)
 		freehostent(natt_rhp);
-
 	free(ebuf);
 	free(buffer);
 }

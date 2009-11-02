@@ -1284,6 +1284,8 @@ dbgstr(int bit)
 		return (gettext("Door interface"));
 	case D_CONFIG:
 		return (gettext("Config file processing"));
+	case D_LABEL:
+		return (gettext("MAC label processing"));
 	default:
 		(void) snprintf(rtn, MAXLINESIZE,
 		    gettext("<unknown flag 0x%x>"), bit);

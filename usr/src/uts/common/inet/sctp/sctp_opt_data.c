@@ -734,7 +734,10 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			*i1 = connp->conn_allzones;
 			break;
 		case SO_MAC_EXEMPT:
-			*i1 = connp->conn_mac_exempt;
+			*i1 = (connp->conn_mac_mode == CONN_MAC_AWARE);
+			break;
+		case SO_MAC_IMPLICIT:
+			*i1 = (connp->conn_mac_mode == CONN_MAC_IMPLICIT);
 			break;
 		case SO_PROTOTYPE:
 			*i1 = IPPROTO_SCTP;
@@ -1326,7 +1329,20 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				retval = EINVAL;
 				break;
 			}
-			connp->conn_mac_exempt = onoff;
+			connp->conn_mac_mode = onoff ?
+			    CONN_MAC_AWARE : CONN_MAC_DEFAULT;
+			break;
+		case SO_MAC_IMPLICIT:
+			if (secpolicy_net_mac_implicit(sctp->sctp_credp) != 0) {
+				retval = EACCES;
+				break;
+			}
+			if (sctp->sctp_state >= SCTPS_BOUND) {
+				retval = EINVAL;
+				break;
+			}
+			connp->conn_mac_mode = onoff ?
+			    CONN_MAC_AWARE : CONN_MAC_IMPLICIT;
 			break;
 		default:
 			retval = ENOPROTOOPT;

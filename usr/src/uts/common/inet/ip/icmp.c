@@ -1683,7 +1683,7 @@ icmp_open(int family, cred_t *credp, int *err, int flags)
 	 * exempt mode.  This allows read-down to unlabeled hosts.
 	 */
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
-		connp->conn_mac_exempt = B_TRUE;
+		connp->conn_mac_mode = CONN_MAC_AWARE;
 
 	connp->conn_ulp_labeled = is_system_labeled();
 
@@ -1816,7 +1816,10 @@ icmp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 			*i1 = icmp->icmp_timestamp;
 			break;
 		case SO_MAC_EXEMPT:
-			*i1 = connp->conn_mac_exempt;
+			*i1 = (connp->conn_mac_mode == CONN_MAC_AWARE);
+			break;
+		case SO_MAC_IMPLICIT:
+			*i1 = (connp->conn_mac_mode == CONN_MAC_IMPLICIT);
 			break;
 		case SO_DOMAIN:
 			*i1 = icmp->icmp_family;
@@ -4447,7 +4450,7 @@ icmp_update_label(icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
 	 * with a modified label or label flags.
 	 */
 	if ((err = tsol_check_dest(cred, &dst, IPV4_VERSION,
-	    connp->conn_mac_exempt, &effective_cred)) != 0)
+	    connp->conn_mac_mode, &effective_cred)) != 0)
 		goto done;
 	if (effective_cred != NULL)
 		cred = effective_cred;
@@ -4890,7 +4893,7 @@ icmp_update_label_v6(icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
 	 * with a modified label or label flags.
 	 */
 	if ((err = tsol_check_dest(cred, dst, IPV6_VERSION,
-	    connp->conn_mac_exempt, &effective_cred)) != 0)
+	    connp->conn_mac_mode, &effective_cred)) != 0)
 		goto done;
 	if (effective_cred != NULL)
 		cred = effective_cred;

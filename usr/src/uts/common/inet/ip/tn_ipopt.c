@@ -272,7 +272,7 @@ tsol_get_option_v6(mblk_t *mp, tsol_ip_label_t *label_type, uchar_t **buffer)
  *
  * This routine verifies if a destination is allowed to recieve messages
  * based on the message cred's security label. If any adjustments to
- * the cred are needed due to the connection's MAC-exempt status or
+ * the cred are needed due to the connection's MAC mode or
  * the destination's ability to receive labels, an "effective cred"
  * will be returned.
  *
@@ -287,7 +287,7 @@ tsol_get_option_v6(mblk_t *mp, tsol_ip_label_t *label_type, uchar_t **buffer)
  */
 int
 tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
-    boolean_t mac_exempt, cred_t **effective_cred)
+    uint_t mac_mode, cred_t **effective_cred)
 {
 	ts_label_t	*tsl, *newtsl = NULL;
 	tsol_tpc_t	*dst_rhtp;
@@ -305,6 +305,14 @@ tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
 		    char *, "destination ip(1) with null cred was passed",
 		    ipaddr_t, dst);
 		return (0);
+	}
+
+	if (tsl->tsl_flags & TSLF_IMPLICIT_IN) {
+		DTRACE_PROBE3(tx__tnopt__log__info__labeling__unresolved__label,
+		    char *,
+		    "implicit-in packet to ip(1) reached tsol_check_dest "
+		    "with implied security label sl(2)",
+		    ipaddr_t, dst, ts_label_t *, tsl);
 	}
 
 	/* Always pass multicast */
@@ -335,8 +343,10 @@ tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
 		/*
 		 * Can talk to unlabeled hosts if
 		 * (1) zone's label matches the default label, or
-		 * (2) SO_MAC_EXEMPT is on and we dominate the peer's label
-		 * (3) SO_MAC_EXEMPT is on and this is the global zone
+		 * (2) SO_MAC_EXEMPT is on and we
+		 * dominate the peer's label, or
+		 * (3) SO_MAC_EXEMPT is on and
+		 * this is the global zone
 		 */
 		if (dst_rhtp->tpc_tp.tp_doi != tsl->tsl_doi) {
 			DTRACE_PROBE4(tx__tnopt__log__info__labeling__doi,
@@ -349,7 +359,7 @@ tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
 		if (!blequal(&dst_rhtp->tpc_tp.tp_def_label,
 		    &tsl->tsl_label)) {
 			zoneid = crgetzoneid(credp);
-			if (!mac_exempt ||
+			if (mac_mode != CONN_MAC_AWARE ||
 			    !(zoneid == GLOBAL_ZONEID ||
 			    bldominates(&tsl->tsl_label,
 			    &dst_rhtp->tpc_tp.tp_def_label))) {
@@ -403,16 +413,22 @@ tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
 			TPC_RELE(dst_rhtp);
 			return (EHOSTUNREACH);
 		}
-		if (tsl->tsl_flags & TSLF_UNLABELED) {
+		if ((tsl->tsl_flags & TSLF_UNLABELED) ||
+		    (mac_mode == CONN_MAC_IMPLICIT)) {
 			/*
-			 * The security label is a match but we need to
-			 * clear the unlabeled flag for this remote node.
+			 * Copy label so we can modify the flags
 			 */
 			if ((newtsl = labeldup(tsl, KM_NOSLEEP)) == NULL) {
 				TPC_RELE(dst_rhtp);
 				return (ENOMEM);
 			}
-			newtsl->tsl_flags ^= TSLF_UNLABELED;
+			/*
+			 * The security label is a match but we need to
+			 * clear the unlabeled flag for this remote node.
+			 */
+			newtsl->tsl_flags &= ~TSLF_UNLABELED;
+			if (mac_mode == CONN_MAC_IMPLICIT)
+				newtsl->tsl_flags |= TSLF_IMPLICIT_OUT;
 		}
 		break;
 
@@ -471,6 +487,9 @@ tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
 
 	/* always pass multicast */
 	if (CLASSD(dst))
+		return (0);
+
+	if (tsl->tsl_flags & TSLF_IMPLICIT_OUT)
 		return (0);
 
 	if (tsl->tsl_flags & TSLF_UNLABELED) {
@@ -807,7 +826,7 @@ tsol_prepend_option(uchar_t *optbuf, ipha_t *ipha, int buflen)
  *	EINVAL		Label cannot be computed
  */
 int
-tsol_check_label(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
+tsol_check_label(const cred_t *credp, mblk_t **mpp, uint_t mac_mode,
     ip_stack_t *ipst, pid_t pid)
 {
 	mblk_t *mp = *mpp;
@@ -832,7 +851,7 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
 	 * for use in future routing decisions.
 	 */
 	retv = tsol_check_dest(credp, &ipha->ipha_dst, IPV4_VERSION,
-	    isexempt, &effective_cred);
+	    mac_mode, &effective_cred);
 	if (retv != 0)
 		return (retv);
 
@@ -869,6 +888,10 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
 		if (sec_opt_len != 0 &&
 		    bcmp(opt_storage, optr, sec_opt_len) == 0)
 			return (0);
+	}
+
+	if (msg_getcred(mp, NULL) == NULL) {
+		mblk_setcred(mp, (cred_t *)credp, NOPID);
 	}
 
 	/*
@@ -983,6 +1006,9 @@ tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
 	 * that the maximum size of this label is reflected in sys/tsol/tnet.h
 	 * as TSOL_MAX_IPV6_OPTION.
 	 */
+	if (tsl->tsl_flags & TSLF_IMPLICIT_OUT)
+		return (0);
+
 	if (tsl->tsl_flags & TSLF_UNLABELED) {
 		/*
 		 * The destination is unlabeled. Only add a label if the
@@ -1352,7 +1378,7 @@ tsol_prepend_option_v6(uchar_t *optbuf, ip6_t *ip6h, int buflen)
  *      ENOMEM		Memory allocation failure.
  */
 int
-tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
+tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, uint_t mode,
     ip_stack_t *ipst, pid_t pid)
 {
 	mblk_t *mp = *mpp;
@@ -1382,7 +1408,7 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
 	 */
 	ip6h = (ip6_t *)mp->b_rptr;
 	retv = tsol_check_dest(credp, &ip6h->ip6_dst, IPV6_VERSION,
-	    isexempt, &effective_cred);
+	    mode, &effective_cred);
 	if (retv != 0)
 		return (retv);
 
@@ -1430,6 +1456,11 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, boolean_t isexempt,
 		 */
 		return (0);
 	}
+
+	if (msg_getcred(mp, NULL) == NULL) {
+		mblk_setcred(mp, (cred_t *)credp, NOPID);
+	}
+
 	if (secopt != NULL && sec_opt_len != 0 &&
 	    (bcmp(opt_storage, secopt, sec_opt_len + 2) == 0)) {
 		/* The packet has the correct label already */

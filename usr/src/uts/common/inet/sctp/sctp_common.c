@@ -526,11 +526,11 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep, boolean_t first)
 			uint32_t dst;
 			IN6_V4MAPPED_TO_IPADDR(addr, dst);
 			err = tsol_check_dest(CONN_CRED(sctp->sctp_connp),
-			    &dst, IPV4_VERSION, sctp->sctp_mac_exempt,
+			    &dst, IPV4_VERSION, sctp->sctp_mac_mode,
 			    &effective_cred);
 		} else {
 			err = tsol_check_dest(CONN_CRED(sctp->sctp_connp),
-			    addr, IPV6_VERSION, sctp->sctp_mac_exempt,
+			    addr, IPV6_VERSION, sctp->sctp_mac_mode,
 			    &effective_cred);
 		}
 		if (err != 0)

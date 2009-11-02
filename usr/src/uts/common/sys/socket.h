@@ -176,6 +176,7 @@ struct so_snd_bufinfo {
 #define	SCM_TIMESTAMP	SO_TIMESTAMP	/* socket control message timestamp */
 #define	SO_ALLZONES	0x1014		/* bind in all zones */
 #define	SO_EXCLBIND	0x1015		/* exclusive binding */
+#define	SO_MAC_IMPLICIT	0x1016		/* hide mac labels on wire */
 
 #ifdef	_KERNEL
 #define	SO_SRCADDR	0x2001		/* Internal: AF_UNIX source address */

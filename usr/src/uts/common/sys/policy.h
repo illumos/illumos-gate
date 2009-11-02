@@ -112,6 +112,7 @@ int secpolicy_net_bindmlp(const cred_t *);
 int secpolicy_net_config(const cred_t *, boolean_t);
 int secpolicy_net_icmpaccess(const cred_t *);
 int secpolicy_net_mac_aware(const cred_t *);
+int secpolicy_net_mac_implicit(const cred_t *);
 int secpolicy_net_observability(const cred_t *);
 int secpolicy_net_privaddr(const cred_t *, in_port_t, int proto);
 int secpolicy_net_rawaccess(const cred_t *);

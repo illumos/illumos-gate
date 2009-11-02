@@ -1764,6 +1764,7 @@ sol_optname(private_t *pri, long val)
 		case SO_ANON_MLP:	return ("SO_ANON_MLP");
 		case SO_MAC_EXEMPT:	return ("SO_MAC_EXEMPT");
 		case SO_ALLZONES:	return ("SO_ALLZONES");
+		case SO_MAC_IMPLICIT:	return ("SO_MAC_IMPLICIT");
 		case SO_EXCLBIND:	return ("SO_EXCLBIND");
 		case SO_DOMAIN:		return ("SO_DOMAIN");
 

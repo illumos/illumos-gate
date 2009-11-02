@@ -2454,7 +2454,7 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	econnp->conn_zoneid = aconnp->conn_zoneid;
 	econnp->conn_allzones = aconnp->conn_allzones;
 
-	aconnp->conn_mac_exempt = B_FALSE;
+	aconnp->conn_mac_mode = CONN_MAC_DEFAULT;
 
 	/* Do the IPC initialization */
 	CONN_INC_REF(econnp);
@@ -3119,7 +3119,6 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 	/* maximum number of times to run around the loop */
 	int loopmax;
 	conn_t *connp = tcp->tcp_connp;
-	zoneid_t zoneid = connp->conn_zoneid;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/*
@@ -3192,11 +3191,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * privilege as being in all zones, as there's
 			 * otherwise no way to identify the right receiver.
 			 */
-			if (!(IPCL_ZONE_MATCH(ltcp->tcp_connp, zoneid) ||
-			    IPCL_ZONE_MATCH(connp,
-			    ltcp->tcp_connp->conn_zoneid)) &&
-			    !lconnp->conn_mac_exempt &&
-			    !connp->conn_mac_exempt)
+			if (!IPCL_BIND_ZONE_MATCH(ltcp->tcp_connp, connp))
 				continue;
 
 			/*
@@ -3250,7 +3245,8 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			    TCP_IS_SOCKET(tcp));
 			exclbind = ltcp->tcp_exclbind || tcp->tcp_exclbind;
 
-			if (lconnp->conn_mac_exempt || connp->conn_mac_exempt ||
+			if ((lconnp->conn_mac_mode != CONN_MAC_DEFAULT) ||
+			    (connp->conn_mac_mode != CONN_MAC_DEFAULT) ||
 			    (exclbind && (not_socket ||
 			    ltcp->tcp_state <= TCPS_ESTABLISHED))) {
 				if (V6_OR_V4_INADDR_ANY(
@@ -5452,7 +5448,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		if ((cr = msg_getcred(mp, NULL)) != NULL &&
 		    (tsl = crgetlabel(cr)) != NULL &&
 		    (connp->conn_mlp_type != mlptSingle ||
-		    (connp->conn_mac_exempt == B_TRUE &&
+		    (connp->conn_mac_mode != CONN_MAC_AWARE &&
 		    (tsl->tsl_flags & TSLF_UNLABELED)))) {
 			if ((econnp->conn_effective_cred =
 			    copycred_from_tslabel(econnp->conn_cred,
@@ -6191,7 +6187,7 @@ tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
 	if (is_system_labeled()) {
 		ASSERT(tcp->tcp_connp->conn_effective_cred == NULL);
 		if ((error = tsol_check_dest(CONN_CRED(tcp->tcp_connp),
-		    &dstaddr, IPV4_VERSION, tcp->tcp_connp->conn_mac_exempt,
+		    &dstaddr, IPV4_VERSION, tcp->tcp_connp->conn_mac_mode,
 		    &tcp->tcp_connp->conn_effective_cred)) != 0) {
 			if (error != EHOSTUNREACH)
 				error = -TSYSERR;
@@ -6392,7 +6388,7 @@ tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
 	if (is_system_labeled()) {
 		ASSERT(tcp->tcp_connp->conn_effective_cred == NULL);
 		if ((error = tsol_check_dest(CONN_CRED(tcp->tcp_connp),
-		    dstaddrp, IPV6_VERSION, tcp->tcp_connp->conn_mac_exempt,
+		    dstaddrp, IPV6_VERSION, tcp->tcp_connp->conn_mac_mode,
 		    &tcp->tcp_connp->conn_effective_cred)) != 0) {
 			if (error != EHOSTUNREACH)
 				error = -TSYSERR;
@@ -6535,7 +6531,7 @@ tcp_def_q_set(tcp_t *tcp, mblk_t *mp)
 		connp->conn_ulp = IPPROTO_TCP;
 
 		if (ipst->ips_ipcl_proto_fanout_v6[IPPROTO_TCP].connf_head !=
-		    NULL || connp->conn_mac_exempt) {
+		    NULL || (connp->conn_mac_mode != CONN_MAC_DEFAULT)) {
 			error = -TBADADDR;
 		} else {
 			connp->conn_srcv6 = ipv6_all_zeros;
@@ -9333,7 +9329,7 @@ tcp_create_common(queue_t *q, cred_t *credp, boolean_t isv6,
 	 * exempt mode.  This allows read-down to unlabeled hosts.
 	 */
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
-		connp->conn_mac_exempt = B_TRUE;
+		connp->conn_mac_mode = CONN_MAC_AWARE;
 
 	connp->conn_dev = NULL;
 	if (issocket) {
@@ -9618,7 +9614,10 @@ tcp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 			*i1 = connp->conn_anon_mlp;
 			break;
 		case SO_MAC_EXEMPT:
-			*i1 = connp->conn_mac_exempt;
+			*i1 = (connp->conn_mac_mode == CONN_MAC_AWARE);
+			break;
+		case SO_MAC_IMPLICIT:
+			*i1 = (connp->conn_mac_mode == CONN_MAC_IMPLICIT);
 			break;
 		case SO_EXCLBIND:
 			*i1 = tcp->tcp_exclbind ? SO_EXCLBIND : 0;
@@ -15981,9 +15980,17 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 				mlp.tme_flags |= MIB2_TMEF_ANONMLP;
 				needattr = B_TRUE;
 			}
-			if (connp->conn_mac_exempt) {
+			switch (connp->conn_mac_mode) {
+			case CONN_MAC_DEFAULT:
+				break;
+			case CONN_MAC_AWARE:
 				mlp.tme_flags |= MIB2_TMEF_MACEXEMPT;
 				needattr = B_TRUE;
+				break;
+			case CONN_MAC_IMPLICIT:
+				mlp.tme_flags |= MIB2_TMEF_MACIMPLICIT;
+				needattr = B_TRUE;
+				break;
 			}
 			if (connp->conn_fully_bound &&
 			    connp->conn_effective_cred != NULL) {
@@ -18644,15 +18651,14 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 		if (ipst->ips_ip4_observe.he_interested) {
 			zoneid_t szone;
 
-			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
-			    ipst, ALL_ZONES);
-
 			/*
-			 * The IP observability hook expects b_rptr to be
+			 * Both of these functions expect b_rptr to be
 			 * where the IP header starts, so advance past the
-			 * link layer header.
+			 * link layer header if present.
 			 */
 			mp->b_rptr += ire_fp_mp_len;
+			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
+			    ipst, ALL_ZONES);
 			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
 			    ALL_ZONES, ill, ipst);
 			mp->b_rptr -= ire_fp_mp_len;
@@ -20650,10 +20656,10 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 		if (ipst->ips_ip4_observe.he_interested) {
 			zoneid_t szone;
 
-			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
-			    ipst, ALL_ZONES);
 			if (ire_fp_mp_len != 0)
 				mp->b_rptr += ire_fp_mp_len;
+			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
+			    ipst, ALL_ZONES);
 			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
 			    ALL_ZONES, ill, ipst);
 			if (ire_fp_mp_len != 0)
@@ -22226,11 +22232,11 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 
 		if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION)
 			err = tsol_check_label(cr, &mp,
-			    tcp->tcp_connp->conn_mac_exempt,
+			    tcp->tcp_connp->conn_mac_mode,
 			    tcps->tcps_netstack->netstack_ip, pid);
 		else
 			err = tsol_check_label_v6(cr, &mp,
-			    tcp->tcp_connp->conn_mac_exempt,
+			    tcp->tcp_connp->conn_mac_mode,
 			    tcps->tcps_netstack->netstack_ip, pid);
 		if (mctl_present)
 			ipsec_mp->b_cont = mp;
@@ -22251,7 +22257,7 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		ipsec_in_t *ii = (ipsec_in_t *)ipsec_mp->b_rptr;
 
 		ASSERT(ii->ipsec_in_type == IPSEC_IN);
-		if (!ipsec_in_to_out(ipsec_mp, ipha, ip6h)) {
+		if (!ipsec_in_to_out(ipsec_mp, ipha, ip6h, zoneid)) {
 			return;
 		}
 	}

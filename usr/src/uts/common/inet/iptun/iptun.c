@@ -1850,6 +1850,8 @@ iptun_get_maxmtu(iptun_t *iptun, uint32_t new_pmtu)
 		switch (iptun->iptun_typeinfo->iti_ipvers) {
 		case IPV4_VERSION:
 			header_size = sizeof (ipha_t);
+			if (is_system_labeled())
+				header_size += IP_MAX_OPT_LENGTH;
 			break;
 		case IPV6_VERSION:
 			header_size = sizeof (iptun_ipv6hdrs_t);
@@ -2650,7 +2652,7 @@ iptun_input(void *arg, mblk_t *mp, void *arg2)
 		if (tsol_check_dest(msg_cred, (outer4 != NULL ?
 		    (void *)&outer4->ipha_dst : (void *)&outer6->ip6_dst),
 		    (outer4 != NULL ? IPV4_VERSION : IPV6_VERSION),
-		    B_FALSE, NULL) != 0)
+		    CONN_MAC_DEFAULT, NULL) != 0)
 			goto drop;
 	}
 

@@ -632,6 +632,34 @@ gcgrp_inactive(tsol_gcgrp_t *gcgrp)
 	kmem_free(gcgrp, sizeof (*gcgrp));
 }
 
+
+/*
+ * Assign a sensitivity label to inbound traffic which arrived without
+ * an explicit on-the-wire label.
+ *
+ * In the case of CIPSO-type hosts, we assume packets arriving without
+ * a label are at the most sensitive label known for the host, most
+ * likely involving out-of-band key management traffic (such as IKE,
+ * etc.,)
+ */
+static boolean_t
+tsol_find_unlabeled_label(tsol_tpc_t *rhtp, bslabel_t *sl, uint32_t *doi)
+{
+	*doi = rhtp->tpc_tp.tp_doi;
+	switch (rhtp->tpc_tp.host_type) {
+	case UNLABELED:
+		*sl = rhtp->tpc_tp.tp_def_label;
+		break;
+	case SUN_CIPSO:
+		*sl = rhtp->tpc_tp.tp_sl_range_cipso.upper_bound;
+		break;
+	default:
+		return (B_FALSE);
+	}
+	setbltype(sl, SUN_SL_ID);
+	return (B_TRUE);
+}
+
 /*
  * Converts CIPSO option to sensitivity label.
  * Validity checks based on restrictions defined in
@@ -658,13 +686,14 @@ cipso_to_sl(const uchar_t *option, bslabel_t *sl)
 }
 
 /*
- * Parse the CIPSO label in the incoming packet and construct a ts_label_t
- * that reflects the CIPSO label and attach it to the dblk cred. Later as
- * the mblk flows up through the stack any code that needs to examine the
- * packet label can inspect the label from the dblk cred. This function is
- * called right in ip_rput for all packets, i.e. locally destined and
- * to be forwarded packets. The forwarding path needs to examine the label
- * to determine how to forward the packet.
+ * If present, parse a CIPSO label in the incoming packet and
+ * construct a ts_label_t that reflects the CIPSO label and attach it
+ * to the dblk cred.  Later as the mblk flows up through the stack any
+ * code that needs to examine the packet label can inspect the label
+ * from the dblk cred. This function is called right in ip_rput for
+ * all packets, i.e. locally destined and to be forwarded packets. The
+ * forwarding path needs to examine the label to determine how to
+ * forward the packet.
  *
  * This routine pulls all message text up into the first mblk.
  * For IPv4, only the first 20 bytes of the IP header are guaranteed
@@ -673,17 +702,19 @@ cipso_to_sl(const uchar_t *option, bslabel_t *sl)
 boolean_t
 tsol_get_pkt_label(mblk_t *mp, int version)
 {
-	tsol_tpc_t	*src_rhtp;
+	tsol_tpc_t	*src_rhtp = NULL;
 	uchar_t		*opt_ptr = NULL;
 	const ipha_t	*ipha;
 	bslabel_t	sl;
 	uint32_t	doi;
 	tsol_ip_label_t	label_type;
+	uint32_t	label_flags = 0; /* flags to set in label */
 	const cipso_option_t *co;
 	const void	*src;
 	const ip6_t	*ip6h;
 	cred_t		*credp;
 	pid_t		cpid;
+	int 		proto;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
 
@@ -725,21 +756,37 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 		if (!cipso_to_sl(opt_ptr, &sl))
 			return (B_FALSE);
 		setbltype(&sl, SUN_SL_ID);
+
+		/*
+		 * If the source was unlabeled, then flag as such,
+		 * (since CIPSO routers may add headers)
+		 */
+
+		if ((src_rhtp = find_tpc(src, version, B_FALSE)) == NULL)
+			return (B_FALSE);
+
+		if (src_rhtp->tpc_tp.host_type == UNLABELED)
+			label_flags = TSLF_UNLABELED;
+
+		TPC_RELE(src_rhtp);
+
 		break;
 
 	case OPT_NONE:
 		/*
-		 * Handle special cases that are not currently labeled, even
+		 * Handle special cases that may not be labeled, even
 		 * though the sending system may otherwise be configured as
 		 * labeled.
 		 *	- IGMP
 		 *	- IPv4 ICMP Router Discovery
 		 *	- IPv6 Neighbor Discovery
+		 *	- IPsec ESP
 		 */
 		if (version == IPV4_VERSION) {
-			if (ipha->ipha_protocol == IPPROTO_IGMP)
+			proto = ipha->ipha_protocol;
+			if (proto == IPPROTO_IGMP)
 				return (B_TRUE);
-			if (ipha->ipha_protocol == IPPROTO_ICMP) {
+			if (proto == IPPROTO_ICMP) {
 				const struct icmp *icmp = (const struct icmp *)
 				    (mp->b_rptr + IPH_HDR_LENGTH(ipha));
 
@@ -750,7 +797,8 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 					return (B_TRUE);
 			}
 		} else {
-			if (ip6h->ip6_nxt == IPPROTO_ICMPV6) {
+			proto = ip6h->ip6_nxt;
+			if (proto == IPPROTO_ICMPV6) {
 				const icmp6_t *icmp6 = (const icmp6_t *)
 				    (mp->b_rptr + IPV6_HDR_LEN);
 
@@ -765,23 +813,32 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 
 		/*
 		 * Look up the tnrhtp database and get the implicit label
-		 * that is associated with this unlabeled host and attach
+		 * that is associated with the sending host and attach
 		 * it to the packet.
 		 */
 		if ((src_rhtp = find_tpc(src, version, B_FALSE)) == NULL)
 			return (B_FALSE);
 
-		/* If the sender is labeled, drop the unlabeled packet. */
-		if (src_rhtp->tpc_tp.host_type != UNLABELED) {
-			TPC_RELE(src_rhtp);
-			pr_addr_dbg("unlabeled packet forged from %s\n",
-			    version == IPV4_VERSION ? AF_INET : AF_INET6, src);
-			return (B_FALSE);
+		/*
+		 * If peer is label-aware, mark as "implicit" rather than
+		 * "unlabeled" to cause appropriate mac-exempt processing
+		 * to happen.
+		 */
+		if (src_rhtp->tpc_tp.host_type == SUN_CIPSO)
+			label_flags = TSLF_IMPLICIT_IN;
+		else if (src_rhtp->tpc_tp.host_type == UNLABELED)
+			label_flags = TSLF_UNLABELED;
+		else {
+			DTRACE_PROBE2(tx__get__pkt__label, char *,
+			    "template(1) has unknown hosttype",
+			    tsol_tpc_t *, src_rhtp);
 		}
 
-		sl = src_rhtp->tpc_tp.tp_def_label;
-		setbltype(&sl, SUN_SL_ID);
-		doi = src_rhtp->tpc_tp.tp_doi;
+
+		if (!tsol_find_unlabeled_label(src_rhtp, &sl, &doi)) {
+			TPC_RELE(src_rhtp);
+			return (B_FALSE);
+		}
 		TPC_RELE(src_rhtp);
 		break;
 
@@ -805,22 +862,11 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 	}
 	if (credp == NULL)
 		return (B_FALSE);
+
+	crgetlabel(credp)->tsl_flags |= label_flags;
+
 	mblk_setcred(mp, credp, cpid);
 	crfree(credp);			/* mblk has ref on cred */
-
-	/*
-	 * If the source was unlabeled, then flag as such,
-	 * while remembering that CIPSO routers add headers.
-	 */
-	if (label_type == OPT_NONE) {
-		crgetlabel(credp)->tsl_flags |= TSLF_UNLABELED;
-	} else if (label_type == OPT_CIPSO) {
-		if ((src_rhtp = find_tpc(src, version, B_FALSE)) == NULL)
-			return (B_FALSE);
-		if (src_rhtp->tpc_tp.host_type == UNLABELED)
-			crgetlabel(credp)->tsl_flags |= TSLF_UNLABELED;
-		TPC_RELE(src_rhtp);
-	}
 
 	return (B_TRUE);
 }
@@ -870,6 +916,23 @@ tsol_receive_local(const mblk_t *mp, const void *addr, uchar_t version,
 	label = label2bslabel(plabel);
 	conn_label = label2bslabel(crgetlabel(connp->conn_cred));
 
+
+	/*
+	 * Implicitly labeled packets from label-aware sources
+	 * go only to privileged receivers
+	 */
+	if ((plabel->tsl_flags & TSLF_IMPLICIT_IN) &&
+	    (connp->conn_mac_mode != CONN_MAC_IMPLICIT)) {
+		DTRACE_PROBE3(tx__ip__log__drop__receivelocal__mac_impl,
+		    char *,
+		    "implicitly labeled packet mp(1) for conn(2) "
+		    "which isn't in implicit mac mode",
+		    mblk_t *, mp, conn_t *, connp);
+
+		return (B_FALSE);
+	}
+
+
 	/*
 	 * MLPs are always validated using the range and set of the local
 	 * address, even when the remote host is unlabeled.
@@ -895,7 +958,7 @@ tsol_receive_local(const mblk_t *mp, const void *addr, uchar_t version,
 		 * conn_zoneid is global for an exclusive stack, thus we use
 		 * conn_cred to get the zoneid
 		 */
-		if (!connp->conn_mac_exempt ||
+		if ((connp->conn_mac_mode == CONN_MAC_DEFAULT) ||
 		    (crgetzoneid(connp->conn_cred) != GLOBAL_ZONEID &&
 		    (plabel->tsl_doi != conn_plabel->tsl_doi ||
 		    !bldominates(conn_label, label)))) {
@@ -1106,6 +1169,16 @@ tsol_can_reply_error(const mblk_t *mp)
 	if (plabel == NULL)
 		return (B_TRUE);
 
+	if (plabel->tsl_flags & TSLF_IMPLICIT_IN) {
+		DTRACE_PROBE3(tx__ip__log__drop__replyerror__unresolved__label,
+		    char *,
+		    "cannot send error report for packet mp(1) with "
+		    "unresolved security label sl(2)",
+		    mblk_t *, mp, ts_label_t *, plabel);
+		return (B_FALSE);
+	}
+
+
 	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
 		ipha = (const ipha_t *)mp->b_rptr;
 		rhtp = find_tpc(&ipha->ipha_dst, IPV4_VERSION, B_FALSE);
@@ -1212,10 +1285,10 @@ tsol_ire_match_gwattr(ire_t *ire, const ts_label_t *tsl)
 	 */
 	if (tsl == NULL || ire->ire_gw_secattr == NULL) {
 		if (tsl != NULL) {
-			DTRACE_PROBE3(tx__ip__log__drop__irematch__nogwsec,
-			    char *,
-			    "ire(1) lacks ire_gw_secattr matching label(2)",
-			    ire_t *, ire, ts_label_t *, tsl);
+			DTRACE_PROBE3(
+			    tx__ip__log__drop__irematch__nogwsec, char *,
+			    "ire(1) lacks ire_gw_secattr when matching "
+			    "label(2)", ire_t *, ire, ts_label_t *, tsl);
 			error = EACCES;
 		}
 		goto done;
@@ -1498,6 +1571,17 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 	if ((tsl = msg_getlabel(mp)) == NULL)
 		return (mp);
 
+	if (tsl->tsl_flags & TSLF_IMPLICIT_IN) {
+		DTRACE_PROBE3(tx__ip__log__drop__forward__unresolved__label,
+		    char *,
+		    "cannot forward packet mp(1) with unresolved "
+		    "security label sl(2)",
+		    mblk_t *, mp, ts_label_t *, tsl);
+
+		return (NULL);
+	}
+
+
 	ASSERT(psrc != NULL && pdst != NULL);
 	dst_rhtp = find_tpc(pdst, ire->ire_ipversion, B_FALSE);
 
@@ -1648,9 +1732,10 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 
 	credp = msg_getcred(mp, &pid);
 	if ((af == AF_INET &&
-	    tsol_check_label(credp, &mp, B_FALSE, ipst, pid) != 0) ||
+	    tsol_check_label(credp, &mp, CONN_MAC_DEFAULT, ipst, pid) != 0) ||
 	    (af == AF_INET6 &&
-	    tsol_check_label_v6(credp, &mp, B_FALSE, ipst, pid) != 0)) {
+	    tsol_check_label_v6(credp, &mp, CONN_MAC_DEFAULT, ipst,
+	    pid) != 0)) {
 		mp = NULL;
 		goto keep_label;
 	}

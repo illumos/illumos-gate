@@ -647,9 +647,17 @@ done:
 			mlp.tme_flags |= MIB2_TMEF_ANONMLP;
 			needattr = B_TRUE;
 		}
-		if (connp->conn_mac_exempt) {
+		switch (connp->conn_mac_mode) {
+		case CONN_MAC_DEFAULT:
+			break;
+		case CONN_MAC_AWARE:
 			mlp.tme_flags |= MIB2_TMEF_MACEXEMPT;
 			needattr = B_TRUE;
+			break;
+		case CONN_MAC_IMPLICIT:
+			mlp.tme_flags |= MIB2_TMEF_MACIMPLICIT;
+			needattr = B_TRUE;
+			break;
 		}
 		if (connp->conn_fully_bound &&
 		    connp->conn_effective_cred != NULL) {

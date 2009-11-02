@@ -35,6 +35,7 @@
 #include <sys/stropts.h>
 #include <sys/sysmacros.h>
 #include <sys/strsubr.h>
+#include <sys/strsun.h>
 #include <sys/strlog.h>
 #include <sys/cmn_err.h>
 #include <sys/zone.h>
@@ -2221,6 +2222,27 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 			IPPOL_REFHOLD(p);
 		}
 		/*
+		 * The caller may have mistakenly assigned an ip6i_t as the
+		 * ip6h for this packet, so take that corner-case into
+		 * account.
+		 */
+		if (ip6h != NULL && ip6h->ip6_nxt == IPPROTO_RAW) {
+			ip6h++;
+			/* First check for bizarro split-mblk headers. */
+			if ((uintptr_t)ip6h > (uintptr_t)data_mp->b_wptr ||
+			    ((uintptr_t)ip6h) + sizeof (ip6_t) >
+			    (uintptr_t)data_mp->b_wptr) {
+				ipsec_log_policy_failure(IPSEC_POLICY_MISMATCH,
+				    "ipsec_check_global_policy", ipha, ip6h,
+				    B_TRUE, ns);
+				counter = DROPPER(ipss, ipds_spd_nomem);
+				goto fail;
+			}
+			/* Next, see if ip6i is at the end of an mblk. */
+			if (ip6h == (ip6_t *)data_mp->b_wptr)
+				ip6h = (ip6_t *)data_mp->b_cont->b_rptr;
+		}
+		/*
 		 * Fudge sel for UNIQUE_ID setting below.
 		 */
 		pkt_unique = conn_to_unique(connp, data_mp, ipha, ip6h);
@@ -2233,7 +2255,7 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 			 * an internal failure.
 			 */
 			ipsec_log_policy_failure(IPSEC_POLICY_MISMATCH,
-			    "ipsec_init_inbound_sel", ipha, ip6h, B_FALSE, ns);
+			    "ipsec_init_inbound_sel", ipha, ip6h, B_TRUE, ns);
 			counter = DROPPER(ipss, ipds_spd_nomem);
 			goto fail;
 		}
@@ -2708,6 +2730,43 @@ clear:
 }
 
 /*
+ * Handle all sorts of cases like tunnel-mode, ICMP, and ip6i prepending.
+ */
+static int
+prepended_length(mblk_t *mp, uintptr_t hptr)
+{
+	int rc = 0;
+
+	while (mp != NULL) {
+		if (hptr >= (uintptr_t)mp->b_rptr && hptr <
+		    (uintptr_t)mp->b_wptr) {
+			rc += (int)(hptr - (uintptr_t)mp->b_rptr);
+			break;	/* out of while loop */
+		}
+		rc += (int)MBLKL(mp);
+		mp = mp->b_cont;
+	}
+
+	if (mp == NULL) {
+		/*
+		 * IF (big IF) we make it here by naturally exiting the loop,
+		 * then ip6h isn't in the mblk chain "mp" at all.
+		 *
+		 * The only case where this happens is with a reversed IP
+		 * header that gets passed up by inbound ICMP processing.
+		 * This unfortunately triggers longstanding bug 6478464.  For
+		 * now, just pass up 0 for the answer.
+		 */
+#ifdef DEBUG_NOT_UNTIL_6478464
+		ASSERT(mp != NULL);
+#endif
+		rc = 0;
+	}
+
+	return (rc);
+}
+
+/*
  * Returns:
  *
  * SELRET_NOMEM --> msgpullup() needed to gather things failed.
@@ -2726,13 +2785,12 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
     ip6_t *ip6h, uint8_t sel_flags)
 {
 	uint16_t *ports;
+	int outer_hdr_len = 0;	/* For ICMP, tunnel-mode, or ip6i cases... */
 	ushort_t hdr_len;
-	int outer_hdr_len = 0;	/* For ICMP tunnel-mode cases... */
 	mblk_t *spare_mp = NULL;
-	uint8_t *nexthdrp;
+	uint8_t *nexthdrp, *transportp;
 	uint8_t nexthdr;
-	uint8_t *typecode;
-	uint8_t check_proto;
+	uint8_t icmp_proto;
 	ip6_pkt_t ipp;
 	boolean_t port_policy_present = (sel_flags & SEL_PORT_POLICY);
 	boolean_t is_icmp = (sel_flags & SEL_IS_ICMP);
@@ -2743,10 +2801,39 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 	    (ipha != NULL && ip6h == NULL));
 
 	if (ip6h != NULL) {
-		if (is_icmp || tunnel_mode)
-			outer_hdr_len = ((uint8_t *)ip6h) - mp->b_rptr;
+		outer_hdr_len = prepended_length(mp, (uintptr_t)ip6h);
 
-		check_proto = IPPROTO_ICMPV6;
+		nexthdr = ip6h->ip6_nxt;
+
+		/*
+		 * The caller may have mistakenly assigned an ip6i_t as the
+		 * ip6h for this packet, so take that corner-case into
+		 * account.
+		 */
+		if (nexthdr == IPPROTO_RAW) {
+			ip6h++;
+			/* First check for bizarro split-mblk headers. */
+			if ((uintptr_t)ip6h > (uintptr_t)mp->b_wptr ||
+			    ((uintptr_t)ip6h) + sizeof (ip6_t) >
+			    (uintptr_t)mp->b_wptr) {
+				return (SELRET_BADPKT);
+			}
+			/* Next, see if ip6i is at the end of an mblk. */
+			if (ip6h == (ip6_t *)mp->b_wptr)
+				ip6h = (ip6_t *)mp->b_cont->b_rptr;
+
+			nexthdr = ip6h->ip6_nxt;
+
+			/*
+			 * Finally, if we haven't adjusted for ip6i, do so
+			 * now.  ip6i_t structs are prepended, so an ICMP
+			 * or tunnel packet would just be overwritten.
+			 */
+			if (outer_hdr_len == 0)
+				outer_hdr_len = sizeof (ip6i_t);
+		}
+
+		icmp_proto = IPPROTO_ICMPV6;
 		sel->ips_isv4 = B_FALSE;
 		sel->ips_local_addr_v6 = ip6h->ip6_dst;
 		sel->ips_remote_addr_v6 = ip6h->ip6_src;
@@ -2754,7 +2841,6 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 		bzero(&ipp, sizeof (ipp));
 		(void) ip_find_hdr_v6(mp, ip6h, &ipp, NULL);
 
-		nexthdr = ip6h->ip6_nxt;
 		switch (nexthdr) {
 		case IPPROTO_HOPOPTS:
 		case IPPROTO_ROUTING:
@@ -2766,6 +2852,7 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 			 */
 			if ((spare_mp = msgpullup(mp, -1)) == NULL)
 				return (SELRET_NOMEM);
+
 			if (!ip_hdr_length_nexthdr_v6(spare_mp,
 			    (ip6_t *)(spare_mp->b_rptr + outer_hdr_len),
 			    &hdr_len, &nexthdrp)) {
@@ -2786,10 +2873,10 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 			ipsec_freemsg_chain(spare_mp);
 			return (SELRET_TUNFRAG);
 		}
+		transportp = (uint8_t *)ip6h + hdr_len;
 	} else {
-		if (is_icmp || tunnel_mode)
-			outer_hdr_len = ((uint8_t *)ipha) - mp->b_rptr;
-		check_proto = IPPROTO_ICMP;
+		outer_hdr_len = prepended_length(mp, (uintptr_t)ipha);
+		icmp_proto = IPPROTO_ICMP;
 		sel->ips_isv4 = B_TRUE;
 		sel->ips_local_addr_v4 = ipha->ipha_dst;
 		sel->ips_remote_addr_v4 = ipha->ipha_src;
@@ -2803,19 +2890,19 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 			ipsec_freemsg_chain(spare_mp);
 			return (SELRET_TUNFRAG);
 		}
-
+		transportp = (uint8_t *)ipha + hdr_len;
 	}
 	sel->ips_protocol = nexthdr;
 
 	if ((nexthdr != IPPROTO_TCP && nexthdr != IPPROTO_UDP &&
-	    nexthdr != IPPROTO_SCTP && nexthdr != check_proto) ||
+	    nexthdr != IPPROTO_SCTP && nexthdr != icmp_proto) ||
 	    (!port_policy_present && !post_frag && tunnel_mode)) {
 		sel->ips_remote_port = sel->ips_local_port = 0;
 		ipsec_freemsg_chain(spare_mp);
 		return (SELRET_SUCCESS);
 	}
 
-	if (&mp->b_rptr[hdr_len] + 4 > mp->b_wptr) {
+	if (transportp + 4 > mp->b_wptr) {
 		/* If we didn't pullup a copy already, do so now. */
 		/*
 		 * XXX performance, will upper-layers frequently split TCP/UDP
@@ -2827,17 +2914,15 @@ ipsec_init_inbound_sel(ipsec_selector_t *sel, mblk_t *mp, ipha_t *ipha,
 		    (spare_mp = msgpullup(mp, -1)) == NULL) {
 			return (SELRET_NOMEM);
 		}
-		ports = (uint16_t *)&spare_mp->b_rptr[hdr_len + outer_hdr_len];
-	} else {
-		ports = (uint16_t *)&mp->b_rptr[hdr_len + outer_hdr_len];
+		transportp = &spare_mp->b_rptr[hdr_len + outer_hdr_len];
 	}
 
-	if (nexthdr == check_proto) {
-		typecode = (uint8_t *)ports;
-		sel->ips_icmp_type = *typecode++;
-		sel->ips_icmp_code = *typecode;
+	if (nexthdr == icmp_proto) {
+		sel->ips_icmp_type = *transportp++;
+		sel->ips_icmp_code = *transportp;
 		sel->ips_remote_port = sel->ips_local_port = 0;
 	} else {
+		ports = (uint16_t *)transportp;
 		sel->ips_remote_port = *ports++;
 		sel->ips_local_port = *ports;
 	}
@@ -3983,7 +4068,7 @@ ipsec_polhead_split(ipsec_policy_head_t *php, netstack_t *ns)
  *		in IP proper.
  */
 boolean_t
-ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
+ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, zoneid_t zoneid)
 {
 	ipsec_in_t  *ii;
 	ipsec_out_t  *io;
@@ -3993,7 +4078,6 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 	uint_t ifindex;
 	ipsec_selector_t sel;
 	ipsec_action_t *reflect_action = NULL;
-	zoneid_t zoneid;
 	netstack_t	*ns;
 
 	ASSERT(ipsec_mp->b_datap->db_type == M_CTL);
@@ -4013,12 +4097,23 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 		reflect_action = ipsec_in_to_out_action(ii);
 	secure = ii->ipsec_in_secure;
 	ifindex = ii->ipsec_in_ill_index;
-	zoneid = ii->ipsec_in_zoneid;
-	ASSERT(zoneid != ALL_ZONES);
 	ns = ii->ipsec_in_ns;
 	v4 = ii->ipsec_in_v4;
 
 	ipsec_in_release_refs(ii);	/* No netstack_rele/hold needed */
+
+	/*
+	 * Use the global zone's id if we don't have a specific zone
+	 * identified. This is likely to happen when the received packet's
+	 * destination is a Trusted Extensions all-zones address. We did
+	 * not copy the zoneid from ii->ipsec_in_zone id because that
+	 * information represents the zoneid we started input processing
+	 * with. The caller should have a better idea of which zone the
+	 * received packet was destined for.
+	 */
+
+	if (zoneid == ALL_ZONES)
+		zoneid = GLOBAL_ZONEID;
 
 	/*
 	 * The caller is going to send the datagram out which might
@@ -4459,6 +4554,8 @@ ipsec_in_alloc(boolean_t isv4, netstack_t *ns)
 
 	ii->ipsec_in_frtn.free_func = ipsec_in_free;
 	ii->ipsec_in_frtn.free_arg = (char *)ii;
+
+	ii->ipsec_in_zoneid = ALL_ZONES; /* default for received packets */
 
 	ipsec_in = desballoc((uint8_t *)ii, sizeof (ipsec_info_t), BPRI_HI,
 	    &ii->ipsec_in_frtn);

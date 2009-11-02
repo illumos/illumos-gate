@@ -847,7 +847,7 @@ extern mblk_t *ipsec_check_global_policy(mblk_t *, conn_t *, ipha_t *,
 extern mblk_t *ipsec_check_inbound_policy(mblk_t *, conn_t *, ipha_t *, ip6_t *,
     boolean_t);
 
-extern boolean_t ipsec_in_to_out(mblk_t *, ipha_t *, ip6_t *);
+extern boolean_t ipsec_in_to_out(mblk_t *, ipha_t *, ip6_t *, zoneid_t);
 extern void ipsec_log_policy_failure(int, char *, ipha_t *, ip6_t *, boolean_t,
 		    netstack_t *);
 extern boolean_t ipsec_inbound_accept_clear(mblk_t *, ipha_t *, ip6_t *);
@@ -923,6 +923,8 @@ extern int ipsec_set_req(cred_t *, conn_t *, ipsec_req_t *);
 extern void ipsec_insert_always(avl_tree_t *tree, void *new_node);
 
 extern int32_t ipsec_act_ovhd(const ipsec_act_t *act);
+extern int sadb_whack_label(mblk_t **, ipsa_t *);
+extern int sadb_whack_label_v6(mblk_t **, ipsa_t *);
 extern boolean_t update_iv(uint8_t *, queue_t *, ipsa_t *, ipsecesp_stack_t *);
 
 /*
@@ -1017,6 +1019,7 @@ void ip_drop_destroy(ipsec_stack_t *);
  * Common functions
  */
 extern boolean_t ip_addr_match(uint8_t *, int, in6_addr_t *);
+extern boolean_t ipsec_label_match(cred_t *, cred_t *);
 
 /*
  * AH and ESP counters types.

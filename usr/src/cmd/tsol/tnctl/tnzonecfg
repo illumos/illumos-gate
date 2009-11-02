@@ -19,11 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #
 #There are five fields separated by colon in this configuration file:
 #First Field: 	Name for the corresponding zone.
@@ -52,9 +49,11 @@
 #	MLP			PURPOSE
 #	---			-------
 #	111			Port Mapper
+#	500			IKE (IPsec key management)
 #	515			BSD Multilevel Printing
 #	631			IPP Multilevel Printing
 #	2049			NFSv4 server
+#	4500			IKE NAT-T (IPsec/IKE nat traversal)
 #	6000-6003		Multilevel Desktop
 #
-global:ADMIN_LOW:1:111/tcp;111/udp;515/tcp;631/tcp;2049/tcp;6000-6003/tcp:6000-6003/tcp
+global:ADMIN_LOW:1:111/tcp;111/udp;500/udp;4500/udp;515/tcp;631/tcp;2049/tcp;6000-6003/tcp:6000-6003/tcp;500/udp;4500/udp

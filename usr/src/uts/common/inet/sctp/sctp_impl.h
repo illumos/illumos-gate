@@ -639,7 +639,7 @@ typedef struct sctp_s {
 	conn_t		*sctp_connp;		/* conn_t stuff */
 #define	sctp_zoneid	sctp_connp->conn_zoneid
 #define	sctp_allzones	sctp_connp->conn_allzones
-#define	sctp_mac_exempt	sctp_connp->conn_mac_exempt
+#define	sctp_mac_mode	sctp_connp->conn_mac_mode
 #define	sctp_credp	sctp_connp->conn_cred
 #define	sctp_reuseaddr	sctp_connp->conn_reuseaddr
 

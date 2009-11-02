@@ -66,6 +66,10 @@ SUNWprivate_1.1 {
 	ipsecproto_get_exec_mode;
 	ipsecproto_set_exec_mode;
 	ipsecutil_exit;
+	ipsec_convert_sens_to_bslabel;
+	ipsec_convert_bslabel_to_string;
+	ipsec_convert_bslabel_to_hex;
+	ipsec_convert_sl_to_sens;
 	keysock_diag;
 	kmc_insert_mapping;
 	kmc_lookup_by_cookie;

@@ -442,9 +442,7 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, ill_t *inill,
 			ii->ipsec_in_secure = B_FALSE;
 			first_mp->b_cont = mp;
 		}
-		ii->ipsec_in_zoneid = zoneid;
-		ASSERT(zoneid != ALL_ZONES);
-		if (!ipsec_in_to_out(first_mp, NULL, ip6h)) {
+		if (!ipsec_in_to_out(first_mp, NULL, ip6h, zoneid)) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			return;
 		}
@@ -1517,7 +1515,7 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 			/*
 			 * Convert the IPSEC_IN to IPSEC_OUT.
 			 */
-			if (!ipsec_in_to_out(ipsec_mp, NULL, ip6h)) {
+			if (!ipsec_in_to_out(ipsec_mp, NULL, ip6h, zoneid)) {
 				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 				ill_refrele(ill);
 				return;
@@ -1549,20 +1547,12 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 
 		/* This is not a secure packet */
 		ii->ipsec_in_secure = B_FALSE;
-		/*
-		 * For trusted extensions using a shared IP address we can
-		 * send using any zoneid.
-		 */
-		if (zoneid == ALL_ZONES)
-			ii->ipsec_in_zoneid = GLOBAL_ZONEID;
-		else
-			ii->ipsec_in_zoneid = zoneid;
 		ipsec_mp->b_cont = mp;
 		ip6h = (ip6_t *)mp->b_rptr;
 		/*
 		 * Convert the IPSEC_IN to IPSEC_OUT.
 		 */
-		if (!ipsec_in_to_out(ipsec_mp, NULL, ip6h)) {
+		if (!ipsec_in_to_out(ipsec_mp, NULL, ip6h, zoneid)) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			ill_refrele(ill);
 			return;
@@ -2077,8 +2067,8 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 			goto bad_addr;
 
 		/* Allow ipsec plumbing */
-		if (connp->conn_mac_exempt && protocol != IPPROTO_AH &&
-		    protocol != IPPROTO_ESP)
+		if ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+		    (protocol != IPPROTO_AH) && (protocol != IPPROTO_ESP))
 			goto bad_addr;
 
 		connp->conn_srcv6 = ipv6_all_zeros;
@@ -2477,7 +2467,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 	 */
 	if (is_system_labeled() && !IPCL_IS_TCP(connp)) {
 		if ((error = tsol_check_dest(cr, v6dst, IPV6_VERSION,
-		    connp->conn_mac_exempt, &effective_cred)) != 0) {
+		    connp->conn_mac_mode, &effective_cred)) != 0) {
 			if (ip_debug > 2) {
 				pr_addr_dbg(
 				    "ip_bind_connected: no label for dst %s\n",
@@ -9117,9 +9107,10 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 			ASSERT(CONN_CRED(connp) != NULL);
 			cr = BEST_CRED(mp, connp, &pid);
 			err = tsol_check_label_v6(cr, &mp,
-			    connp->conn_mac_exempt, ipst, pid);
+			    connp->conn_mac_mode, ipst, pid);
 		} else if ((cr = msg_getcred(mp, &pid)) != NULL) {
-			err = tsol_check_label_v6(cr, &mp, B_FALSE, ipst, pid);
+			err = tsol_check_label_v6(cr, &mp, CONN_MAC_DEFAULT,
+			    ipst, pid);
 		}
 		if (mctl_present)
 			first_mp->b_cont = mp;
@@ -11891,16 +11882,15 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 			if (ipst->ips_ip6_observe.he_interested) {
 				zoneid_t	szone;
 
-				szone = ip_get_zoneid_v6(&ip6h->ip6_src,
-				    mp_ip6h, out_ill, ipst, ALL_ZONES);
-
 				/*
-				 * The IP observability hook expects b_rptr to
+				 * Both of these functions expect b_rptr to
 				 * be where the IPv6 header starts, so advance
 				 * past the link layer header.
 				 */
 				if (fp_prepend)
 					mp_ip6h->b_rptr += hlen;
+				szone = ip_get_zoneid_v6(&ip6h->ip6_src,
+				    mp_ip6h, out_ill, ipst, ALL_ZONES);
 				ipobs_hook(mp_ip6h, IPOBS_HOOK_OUTBOUND, szone,
 				    ALL_ZONES, out_ill, ipst);
 				if (fp_prepend)

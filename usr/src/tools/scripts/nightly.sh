@@ -575,22 +575,6 @@ build() {
 	/bin/time $MAKE -e install 2>&1 | \
 	    tee -a $SRC/${INSTALLOG}.out >> $LOGFILE
 
-	if [[ "$zero_FLAG" = "y" ]]; then
-		if [[ -d "${G11N_PKGDIR}" ]]; then
-			echo "\n==== Building globalization package" \
-			    "$(basename ${G11N_PKGDIR}) ($LABEL) ====\n" \
-			    >> $LOGFILE
-			cd $G11N_PKGDIR
-			/bin/time $MAKE -e install 2>&1 | \
-			    tee -a $SRC/${INSTALLOG}.out >> $LOGFILE
-			cd $SRC
-		else
-			echo "\n==== Skipping nonexistent globalization" \
-			    "package $(basename ${G11N_PKGDIR})" \
-			    "($LABEL) ====\n" >> $LOGFILE
-		fi
-	fi
-
 	if [[ "$SCM_TYPE" = teamware ]]; then
 		echo "\n==== SCCS Noise ($LABEL) ====\n" >> $mail_msg_file
 		egrep 'sccs(check:| *get)' $SRC/${INSTALLOG}.out >> \
@@ -771,6 +755,22 @@ build() {
 			>> $mail_msg_file
 	else
 		echo "\n==== Not creating $LABEL packages ====\n" >> $LOGFILE
+	fi
+
+	if [[ "$zero_FLAG" = "y" ]]; then
+		if [[ -d "${G11N_PKGDIR}" ]]; then
+			echo "\n==== Building globalization package" \
+			    "$(basename ${G11N_PKGDIR}) ($LABEL) ====\n" \
+			    >> $LOGFILE
+			cd $G11N_PKGDIR
+			/bin/time $MAKE -e install 2>&1 | \
+			    tee -a $SRC/${INSTALLOG}.out >> $LOGFILE
+			cd $SRC
+		else
+			echo "\n==== Skipping nonexistent globalization" \
+			    "package $(basename ${G11N_PKGDIR})" \
+			    "($LABEL) ====\n" >> $LOGFILE
+		fi
 	fi
 
 	ROOT=$ORIGROOT

@@ -535,7 +535,8 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 			 * otherwise no way to identify the right receiver.
 			 */
 			if (lsctp->sctp_zoneid != zoneid &&
-			    !lsctp->sctp_mac_exempt && !sctp->sctp_mac_exempt)
+			    lsctp->sctp_mac_mode == CONN_MAC_DEFAULT &&
+			    sctp->sctp_mac_mode == CONN_MAC_DEFAULT)
 				continue;
 
 			addrcmp = sctp_compare_saddrs(sctp, lsctp);

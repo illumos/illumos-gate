@@ -125,8 +125,6 @@ typedef struct ipsa_s {
 
 	struct ipsid_s *ipsa_src_cid;	/* Source certificate identity */
 	struct ipsid_s *ipsa_dst_cid;	/* Destination certificate identity */
-	uint64_t *ipsa_integ;	/* Integrity bitmap */
-	uint64_t *ipsa_sens;	/* Sensitivity bitmap */
 	mblk_t	*ipsa_lpkt;	/* Packet received while larval (CAS me) */
 	mblk_t	*ipsa_bpkt_head;	/* Packets received while idle */
 	mblk_t	*ipsa_bpkt_tail;
@@ -221,13 +219,7 @@ typedef struct ipsa_s {
 	uint_t ipsa_hardalloc;	/* Allocations allowed (hard). */
 	uint_t ipsa_alloc;	/* Allocations made. */
 
-	uint_t ipsa_integlen;	/* Length of the integrity bitmap (bytes). */
-	uint_t ipsa_senslen;	/* Length of the sensitivity bitmap (bytes). */
-
 	uint_t ipsa_type;	/* Type of security association. (AH/etc.) */
-	uint_t ipsa_dpd;	/* Domain for sensitivity bit vectors. */
-	uint_t ipsa_senslevel;	/* Sensitivity level. */
-	uint_t ipsa_integlevel;	/* Integrity level. */
 	uint_t ipsa_state;	/* State of my association. */
 	uint_t ipsa_replay_wsize; /* Size of replay window */
 	uint32_t ipsa_flags;	/* Flags for security association. */
@@ -296,10 +288,12 @@ typedef struct ipsa_s {
 	 * Soft reference to paired SA
 	 */
 	uint32_t	ipsa_otherspi;
-
-	/* MLS boxen will probably need more fields in here. */
-
 	netstack_t	*ipsa_netstack;	/* Does not have a netstack_hold */
+
+	cred_t *ipsa_cred;			/* MLS: cred_t attributes */
+	cred_t *ipsa_ocred;			/* MLS: outer label */
+	uint8_t	ipsa_mac_exempt;		/* MLS: mac exempt flag */
+	uchar_t	ipsa_opt_storage[IP_MAX_OPT_LENGTH];
 } ipsa_t;
 
 /*
@@ -508,6 +502,9 @@ typedef struct ipsacq_s {
 	/* icmp type and code of triggering packet (if applicable) */
 	uint8_t	ipsacq_icmp_type;
 	uint8_t ipsacq_icmp_code;
+
+	/* credentials associated with triggering packet */
+	cred_t	*ipsacq_cred;
 } ipsacq_t;
 
 /*
@@ -638,6 +635,61 @@ typedef struct templist_s
 #define	SA_SRCPORT(ipsa) ((ipsa)->ipsa_unique_id & 0xffff)
 #define	SA_DSTPORT(ipsa) (((ipsa)->ipsa_unique_id >> 16) & 0xffff)
 
+typedef struct ipsa_query_s ipsa_query_t;
+
+typedef boolean_t (*ipsa_match_fn_t)(ipsa_query_t *, ipsa_t *);
+
+#define	IPSA_NMATCH	10
+
+/*
+ * SADB query structure.
+ *
+ * Provide a generalized mechanism for matching entries in the SADB;
+ * one of these structures is initialized using sadb_form_query(),
+ * and then can be used as a parameter to sadb_match_query() which returns
+ * B_TRUE if the SA matches the query.
+ *
+ * Under the covers, sadb_form_query populates the matchers[] array with
+ * functions which are called one at a time until one fails to match.
+ */
+struct ipsa_query_s {
+	uint32_t req, match;
+	sadb_address_t *srcext, *dstext;
+	sadb_ident_t *srcid, *dstid;
+	sadb_x_kmc_t *kmcext;
+	sadb_sa_t *assoc;
+	uint32_t spi;
+	struct sockaddr_in *src;
+	struct sockaddr_in6 *src6;
+	struct sockaddr_in *dst;
+	struct sockaddr_in6 *dst6;
+	sa_family_t af;
+	uint32_t *srcaddr, *dstaddr;
+	uint32_t ifindex;
+	uint32_t kmc, kmp;
+	char *didstr, *sidstr;
+	uint16_t didtype, sidtype;
+	sadbp_t *spp;
+	sadb_t *sp;
+	isaf_t	*inbound, *outbound;
+	uint32_t outhash;
+	uint32_t inhash;
+	ipsa_match_fn_t matchers[IPSA_NMATCH];
+};
+
+#define	IPSA_Q_SA		0x00000001
+#define	IPSA_Q_DST		0x00000002
+#define	IPSA_Q_SRC		0x00000004
+#define	IPSA_Q_DSTID		0x00000008
+#define	IPSA_Q_SRCID		0x00000010
+#define	IPSA_Q_KMC		0x00000020
+#define	IPSA_Q_INBOUND		0x00000040 /* fill in inbound isaf_t */
+#define	IPSA_Q_OUTBOUND		0x00000080 /* fill in outbound isaf_t */
+
+int sadb_form_query(keysock_in_t *, uint32_t, uint32_t, ipsa_query_t *, int *);
+boolean_t sadb_match_query(ipsa_query_t *q, ipsa_t *sa);
+
+
 /*
  * All functions that return an ipsa_t will return it with IPSA_REFHOLD()
  * already called.
@@ -647,11 +699,7 @@ typedef struct templist_s
 ipsa_t *ipsec_getassocbyspi(isaf_t *, uint32_t, uint32_t *, uint32_t *,
     sa_family_t);
 ipsa_t *ipsec_getassocbyconn(isaf_t *, ipsec_out_t *, uint32_t *, uint32_t *,
-    sa_family_t, uint8_t);
-ipsap_t *get_ipsa_pair(sadb_sa_t *, sadb_address_t *, sadb_address_t *,
-    sadbp_t *);
-void destroy_ipsa_pair(ipsap_t *);
-int update_pairing(ipsap_t *, keysock_in_t *, int *, sadbp_t *);
+    sa_family_t, uint8_t, cred_t *);
 
 /* SA insertion. */
 int sadb_insertassoc(ipsa_t *, isaf_t *);
@@ -668,6 +716,7 @@ void sadb_unlinkassoc(ipsa_t *);
 /* Support routines to interface a keysock consumer to PF_KEY. */
 mblk_t *sadb_keysock_out(minor_t);
 int sadb_hardsoftchk(sadb_lifetime_t *, sadb_lifetime_t *, sadb_lifetime_t *);
+int sadb_labelchk(struct keysock_in_s *);
 void sadb_pfkey_echo(queue_t *, mblk_t *, sadb_msg_t *, struct keysock_in_s *,
     ipsa_t *);
 void sadb_pfkey_error(queue_t *, mblk_t *, int, int, uint_t);
@@ -678,8 +727,8 @@ boolean_t sadb_addrfix(keysock_in_t *, queue_t *, mblk_t *, netstack_t *);
 int sadb_addrset(ire_t *);
 int sadb_delget_sa(mblk_t *, keysock_in_t *, sadbp_t *, int *, queue_t *,
     uint8_t);
-
-int sadb_purge_sa(mblk_t *, keysock_in_t *, sadb_t *, queue_t *, queue_t *);
+int sadb_purge_sa(mblk_t *, keysock_in_t *, sadb_t *, int *, queue_t *,
+    queue_t *);
 int sadb_common_add(queue_t *, queue_t *, mblk_t *, sadb_msg_t *,
     keysock_in_t *, isaf_t *, isaf_t *, ipsa_t *, boolean_t, boolean_t, int *,
     netstack_t *, sadbp_t *);
@@ -839,6 +888,9 @@ extern void ipsec_alg_free(ipsec_alginfo_t *);
 extern void ipsec_register_prov_update(void);
 extern void sadb_alg_update(ipsec_algtype_t, uint8_t, boolean_t,
     netstack_t *);
+
+extern int sadb_sens_len_from_cred(cred_t *);
+extern void sadb_sens_from_cred(sadb_sens_t *, int, cred_t *, int);
 
 /*
  * Context templates management.

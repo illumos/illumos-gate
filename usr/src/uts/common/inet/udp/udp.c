@@ -1849,8 +1849,11 @@ udp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 			*i1 = connp->conn_anon_mlp;
 			break;	/* goto sizeof (int) option return */
 		case SO_MAC_EXEMPT:
-			*i1 = connp->conn_mac_exempt;
-			break;	/* goto sizeof (int) option return */
+			*i1 = (connp->conn_mac_mode == CONN_MAC_AWARE);
+			break;
+		case SO_MAC_IMPLICIT:
+			*i1 = (connp->conn_mac_mode == CONN_MAC_IMPLICIT);
+			break;
 		case SO_ALLZONES:
 			*i1 = connp->conn_allzones;
 			break;	/* goto sizeof (int) option return */
@@ -2231,19 +2234,9 @@ udp_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 				udp->udp_timestamp = onoff;
 			break;
 		case SO_ANON_MLP:
-			if (!checkonly) {
-				connp->conn_anon_mlp = onoff;
-				PASS_OPT_TO_IP(connp);
-			}
-			break;
 		case SO_MAC_EXEMPT:
-			if (secpolicy_net_mac_aware(cr) != 0 ||
-			    udp->udp_state != TS_UNBND)
-				return (EACCES);
-			if (!checkonly) {
-				connp->conn_mac_exempt = onoff;
-				PASS_OPT_TO_IP(connp);
-			}
+		case SO_MAC_IMPLICIT:
+			PASS_OPT_TO_IP(connp);
 			break;
 		case SCM_UCRED: {
 			struct ucred_s *ucr;
@@ -4381,9 +4374,17 @@ udp_snmp_get(queue_t *q, mblk_t *mpctl)
 				mlp.tme_flags |= MIB2_TMEF_ANONMLP;
 				needattr = B_TRUE;
 			}
-			if (connp->conn_mac_exempt) {
+			switch (connp->conn_mac_mode) {
+			case CONN_MAC_DEFAULT:
+				break;
+			case CONN_MAC_AWARE:
 				mlp.tme_flags |= MIB2_TMEF_MACEXEMPT;
 				needattr = B_TRUE;
+				break;
+			case CONN_MAC_IMPLICIT:
+				mlp.tme_flags |= MIB2_TMEF_MACIMPLICIT;
+				needattr = B_TRUE;
+				break;
 			}
 
 			/*
@@ -4714,7 +4715,7 @@ udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst)
 	 * from the message to handle MLP
 	 */
 	if ((err = tsol_check_dest(cred, &dst, IPV4_VERSION,
-	    udp->udp_connp->conn_mac_exempt, &effective_cred)) != 0)
+	    udp->udp_connp->conn_mac_mode, &effective_cred)) != 0)
 		goto done;
 	if (effective_cred != NULL)
 		cred = effective_cred;
@@ -5457,15 +5458,14 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 	if (ipst->ips_ip4_observe.he_interested && mp != NULL) {
 		zoneid_t szone;
 
-		szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
-		    ipst, ALL_ZONES);
-
 		/*
-		 * The IP observability hook expects b_rptr to be
+		 * Both of these functions expect b_rptr to be
 		 * where the IP header starts, so advance past the
-		 * link layer header.
+		 * link layer header if present.
 		 */
 		mp->b_rptr += ire_fp_mp_len;
+		szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
+		    ipst, ALL_ZONES);
 		ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
 		    ALL_ZONES, ill, ipst);
 		mp->b_rptr -= ire_fp_mp_len;
@@ -5558,7 +5558,7 @@ udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst)
 	 * cred/label from the message to handle MLP.
 	 */
 	if ((err = tsol_check_dest(cred, dst, IPV6_VERSION,
-	    udp->udp_connp->conn_mac_exempt, &effective_cred)) != 0)
+	    udp->udp_connp->conn_mac_mode, &effective_cred)) != 0)
 		goto done;
 	if (effective_cred != NULL)
 		cred = effective_cred;
@@ -7489,7 +7489,7 @@ udp_do_open(cred_t *credp, boolean_t isv6, int flags)
 	 * exempt mode.  This allows read-down to unlabeled hosts.
 	 */
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
-		connp->conn_mac_exempt = B_TRUE;
+		connp->conn_mac_mode = CONN_MAC_AWARE;
 
 	connp->conn_ulp_labeled = is_system_labeled();
 
@@ -7679,7 +7679,6 @@ udp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 	int		loopmax;
 	udp_fanout_t	*udpf;
 	in_port_t	lport;		/* Network byte order */
-	zoneid_t	zoneid;
 	udp_t		*udp;
 	boolean_t	is_inaddr_any;
 	mlp_type_t	addrtype, mlptype;
@@ -7873,7 +7872,6 @@ udp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 	}
 
 	is_inaddr_any = V6_OR_V4_INADDR_ANY(v6src);
-	zoneid = connp->conn_zoneid;
 
 	for (;;) {
 		udp_t		*udp1;
@@ -7898,11 +7896,7 @@ udp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 			 * privilege as being in all zones, as there's
 			 * otherwise no way to identify the right receiver.
 			 */
-			if (!(IPCL_ZONE_MATCH(udp1->udp_connp, zoneid) ||
-			    IPCL_ZONE_MATCH(connp,
-			    udp1->udp_connp->conn_zoneid)) &&
-			    !connp->conn_mac_exempt && \
-			    !udp1->udp_connp->conn_mac_exempt)
+			if (!IPCL_BIND_ZONE_MATCH(udp1->udp_connp, connp))
 				continue;
 
 			/*
@@ -7925,8 +7919,7 @@ udp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 			 * as UDP_EXCLBIND, except that zoneid is ignored.
 			 */
 			if (udp1->udp_exclbind || udp->udp_exclbind ||
-			    udp1->udp_connp->conn_mac_exempt ||
-			    connp->conn_mac_exempt) {
+			    IPCL_CONNS_MAC(udp1->udp_connp, connp)) {
 				if (V6_OR_V4_INADDR_ANY(
 				    udp1->udp_bound_v6src) ||
 				    is_inaddr_any ||

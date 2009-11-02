@@ -223,6 +223,14 @@ privilege PRIV_NET_MAC_AWARE
 	This privilege is interpreted only if the system is configured
 	with Trusted Extensions.
 
+privilege PRIV_NET_MAC_IMPLICIT
+
+	Allows a process to set SO_MAC_IMPLICIT option by using 
+	setsockopt(3SOCKET).  This allows a privileged process to 
+	transmit implicitly-labeled packets to a peer.
+	This privilege is interpreted only if the system is configured
+	with Trusted Extensions.
+
 privilege PRIV_NET_OBSERVABILITY
 
 	Allows a process to access /dev/lo0 and the devices in /dev/ipnet/

@@ -839,6 +839,7 @@ static keywdtab_t	dbgtab[] = {
 	{ D_PROP,	"prop" },
 	{ D_DOOR,	"door" },
 	{ D_CONFIG,	"config" },
+	{ D_LABEL,	"label" },
 	{ D_ALL,	"all" },
 	{ 0,		"0" },
 };
@@ -2040,24 +2041,126 @@ print_ident(FILE *file, char *prefix, struct sadb_ident *id)
 }
 
 /*
+ * Convert sadb_sens extension into binary security label.
+ */
+
+#include <tsol/label.h>
+#include <sys/tsol/tndb.h>
+#include <sys/tsol/label_macro.h>
+
+void
+ipsec_convert_sens_to_bslabel(const struct sadb_sens *sens, bslabel_t *sl)
+{
+	uint64_t *bitmap = (uint64_t *)(sens + 1);
+	int bitmap_len = SADB_64TO8(sens->sadb_sens_sens_len);
+
+	bsllow(sl);
+	LCLASS_SET((_bslabel_impl_t *)sl, sens->sadb_sens_sens_level);
+	bcopy(bitmap, &((_bslabel_impl_t *)sl)->compartments,
+	    bitmap_len);
+}
+
+void
+ipsec_convert_bslabel_to_string(bslabel_t *sl, char **plabel)
+{
+	if (label_to_str(sl, plabel, M_LABEL, DEF_NAMES) != 0) {
+		*plabel = strdup(dgettext(TEXT_DOMAIN,
+		    "** Label conversion failed **"));
+	}
+}
+
+void
+ipsec_convert_bslabel_to_hex(bslabel_t *sl, char **plabel)
+{
+	if (label_to_str(sl, plabel, M_INTERNAL, DEF_NAMES) != 0) {
+		*plabel = strdup(dgettext(TEXT_DOMAIN,
+		    "** Label conversion failed **"));
+	}
+}
+
+int
+ipsec_convert_sl_to_sens(int doi, bslabel_t *sl, sadb_sens_t *sens)
+{
+	uint8_t *bitmap;
+	int sens_len = sizeof (sadb_sens_t) + _C_LEN * 4;
+
+
+	if (sens == NULL)
+		return (sens_len);
+
+
+	(void) memset(sens, 0, sens_len);
+
+	sens->sadb_sens_exttype = SADB_EXT_SENSITIVITY;
+	sens->sadb_sens_len = SADB_8TO64(sens_len);
+	sens->sadb_sens_dpd = doi;
+
+	sens->sadb_sens_sens_level = LCLASS(sl);
+	sens->sadb_sens_integ_level = 0;
+	sens->sadb_sens_sens_len = _C_LEN >> 1;
+	sens->sadb_sens_integ_len = 0;
+
+	sens->sadb_x_sens_flags = 0;
+
+	bitmap = (uint8_t *)(sens + 1);
+	bcopy(&(((_bslabel_impl_t *)sl)->compartments), bitmap, _C_LEN * 4);
+
+	return (sens_len);
+}
+
+
+/*
  * Print an SADB_SENSITIVITY extension.
  */
 void
-print_sens(FILE *file, char *prefix, struct sadb_sens *sens)
+print_sens(FILE *file, char *prefix, const struct sadb_sens *sens,
+	boolean_t ignore_nss)
 {
+	char *plabel;
+	char *hlabel;
 	uint64_t *bitmap = (uint64_t *)(sens + 1);
+	bslabel_t sl;
 	int i;
+	int sens_len = sens->sadb_sens_sens_len;
+	int integ_len = sens->sadb_sens_integ_len;
+	boolean_t inner = (sens->sadb_sens_exttype == SADB_EXT_SENSITIVITY);
+	const char *sensname = inner ?
+	    dgettext(TEXT_DOMAIN, "Plaintext Sensitivity") :
+	    dgettext(TEXT_DOMAIN, "Ciphertext Sensitivity");
+
+	ipsec_convert_sens_to_bslabel(sens, &sl);
 
 	(void) fprintf(file, dgettext(TEXT_DOMAIN,
-	    "%sSensitivity DPD %d, sens level=%d, integ level=%d\n"),
-	    prefix, sens->sadb_sens_dpd, sens->sadb_sens_sens_level,
-	    sens->sadb_sens_integ_level);
-	for (i = 0; sens->sadb_sens_sens_len-- > 0; i++, bitmap++)
+	    "%s%s DPD %d, sens level=%d, integ level=%d, flags=%x\n"),
+	    prefix, sensname, sens->sadb_sens_dpd, sens->sadb_sens_sens_level,
+	    sens->sadb_sens_integ_level, sens->sadb_x_sens_flags);
+
+	ipsec_convert_bslabel_to_hex(&sl, &hlabel);
+
+	if (ignore_nss) {
 		(void) fprintf(file, dgettext(TEXT_DOMAIN,
-		    "%s Sensitivity BM extended word %d 0x%" PRIx64 "\n"),
-		    prefix, i, *bitmap);
-	for (i = 0; sens->sadb_sens_integ_len-- > 0; i++, bitmap++)
-		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "%s %s Label: %s\n"), prefix, sensname, hlabel);
+
+		for (i = 0; i < sens_len; i++, bitmap++)
+			(void) fprintf(file, dgettext(TEXT_DOMAIN,
+			    "%s %s BM extended word %d 0x%" PRIx64 "\n"),
+			    prefix, sensname, i, *bitmap);
+
+	} else {
+		ipsec_convert_bslabel_to_string(&sl, &plabel);
+
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
+		    "%s %s Label: %s (%s)\n"),
+		    prefix, sensname, plabel, hlabel);
+		free(plabel);
+
+	}
+	free(hlabel);
+
+	bitmap = (uint64_t *)(sens + 1 + sens_len);
+
+	for (i = 0; i < integ_len; i++, bitmap++)
+		(void) fprintf(file, dgettext(TEXT_DOMAIN,
 		    "%s Integrity BM extended word %d 0x%" PRIx64 "\n"),
 		    prefix, i, *bitmap);
 }
@@ -2429,7 +2532,7 @@ print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
 			break;
 		case SADB_EXT_SENSITIVITY:
 			print_sens(file, dgettext(TEXT_DOMAIN, "SNS: "),
-			    (struct sadb_sens *)current);
+			    (struct sadb_sens *)current, ignore_nss);
 			break;
 		case SADB_EXT_PROPOSAL:
 			print_prop(file, dgettext(TEXT_DOMAIN, "PRP: "),
@@ -2466,6 +2569,10 @@ print_samsg(FILE *file, uint64_t *buffer, boolean_t want_timestamp,
 		case SADB_X_EXT_PAIR:
 			print_pair(file, dgettext(TEXT_DOMAIN, "OTH: "),
 			    (struct sadb_x_pair *)current);
+			break;
+		case SADB_X_EXT_OUTER_SENS:
+			print_sens(file, dgettext(TEXT_DOMAIN, "OSN: "),
+			    (struct sadb_sens *)current, ignore_nss);
 			break;
 		case SADB_X_EXT_REPLAY_VALUE:
 			(void) print_replay(file, dgettext(TEXT_DOMAIN,
@@ -2685,6 +2792,35 @@ save_ident(struct sadb_ident *ident, FILE *ofile)
 	return (B_TRUE);
 }
 
+boolean_t
+save_sens(struct sadb_sens *sens, FILE *ofile)
+{
+	char *prefix;
+	char *hlabel;
+	bslabel_t sl;
+
+	if (putc('\t', ofile) == EOF)
+		return (B_FALSE);
+
+	if (sens->sadb_sens_exttype == SADB_EXT_SENSITIVITY)
+		prefix = "label";
+	else if ((sens->sadb_x_sens_flags & SADB_X_SENS_IMPLICIT) == 0)
+		prefix = "outer-label";
+	else
+		prefix = "implicit-label";
+
+	ipsec_convert_sens_to_bslabel(sens, &sl);
+	ipsec_convert_bslabel_to_hex(&sl, &hlabel);
+
+	if (fprintf(ofile, "%s %s ", prefix, hlabel) < 0) {
+		free(hlabel);
+		return (B_FALSE);
+	}
+	free(hlabel);
+
+	return (B_TRUE);
+}
+
 /*
  * "Save" a security association to an output file.
  *
@@ -2846,6 +2982,13 @@ skip_srcdst:
 			savenl();
 			break;
 		case SADB_EXT_SENSITIVITY:
+		case SADB_X_EXT_OUTER_SENS:
+			if (!save_sens((struct sadb_sens *)ext, ofile)) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN, "save_sens"));
+			}
+			savenl();
+			break;
 		default:
 			/* Skip over irrelevant extensions. */
 			break;

@@ -70,6 +70,8 @@
 #include <sys/kstat.h>
 #include <sys/strsubr.h>
 
+#include <sys/tsol/tnet.h>
+
 /*
  * Table of ND variables supported by ipsecah. These are loaded into
  * ipsecah_g_nd in ipsecah_init_nd.
@@ -148,7 +150,8 @@ static int ipsecah_close(queue_t *);
 static void ipsecah_rput(queue_t *, mblk_t *);
 static void ipsecah_wput(queue_t *, mblk_t *);
 static void ah_send_acquire(ipsacq_t *, mblk_t *, netstack_t *);
-static boolean_t ah_register_out(uint32_t, uint32_t, uint_t, ipsecah_stack_t *);
+static boolean_t ah_register_out(uint32_t, uint32_t, uint_t, ipsecah_stack_t *,
+    mblk_t *);
 static void	*ipsecah_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ipsecah_stack_fini(netstackid_t stackid, void *arg);
 
@@ -673,7 +676,7 @@ ipsecah_rput(queue_t *q, mblk_t *mp)
  */
 static boolean_t
 ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
-    ipsecah_stack_t *ahstack)
+    ipsecah_stack_t *ahstack, mblk_t *in_mp)
 {
 	mblk_t *mp;
 	boolean_t rc = B_TRUE;
@@ -685,12 +688,25 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	ipsec_alginfo_t **authalgs;
 	uint_t num_aalgs;
 	ipsec_stack_t	*ipss = ahstack->ipsecah_netstack->netstack_ipsec;
+	sadb_sens_t *sens;
+	size_t sens_len = 0;
+	sadb_ext_t *nextext;
+	cred_t *sens_cr = NULL;
 
 	/* Allocate the KEYSOCK_OUT. */
 	mp = sadb_keysock_out(serial);
 	if (mp == NULL) {
 		ah0dbg(("ah_register_out: couldn't allocate mblk.\n"));
 		return (B_FALSE);
+	}
+
+	if (is_system_labeled() && (in_mp != NULL)) {
+		sens_cr = msg_getcred(in_mp, NULL);
+
+		if (sens_cr != NULL) {
+			sens_len = sadb_sens_len_from_cred(sens_cr);
+			allocsize += sens_len;
+		}
 	}
 
 	/*
@@ -727,10 +743,11 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	}
 
 	mp->b_cont->b_wptr += allocsize;
+	nextext = (sadb_ext_t *)(mp->b_cont->b_rptr + sizeof (*samsg));
+
 	if (num_aalgs != 0) {
 
-		saalg = (sadb_alg_t *)(mp->b_cont->b_rptr + sizeof (*samsg) +
-		    sizeof (*sasupp));
+		saalg = (sadb_alg_t *)(((uint8_t *)nextext) + sizeof (*sasupp));
 		ASSERT(((ulong_t)saalg & 0x7) == 0);
 
 		numalgs_snap = 0;
@@ -764,9 +781,18 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 				cmn_err(CE_PANIC,
 				    "ah_register_out()!  Missed #%d.\n", i);
 #endif /* DEBUG */
+		nextext = (sadb_ext_t *)saalg;
 	}
 
 	mutex_exit(&ipss->ipsec_alg_lock);
+
+	if (sens_cr != NULL) {
+		sens = (sadb_sens_t *)nextext;
+		sadb_sens_from_cred(sens, SADB_EXT_SENSITIVITY,
+		    sens_cr, sens_len);
+
+		nextext = (sadb_ext_t *)(((uint8_t *)sens) + sens_len);
+	}
 
 	/* Now fill the restof the SADB_REGISTER message. */
 
@@ -784,10 +810,10 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	samsg->sadb_msg_seq = sequence;
 	samsg->sadb_msg_pid = pid;
 
-	if (allocsize > sizeof (*samsg)) {
+	if (num_aalgs != 0) {
 		sasupp = (sadb_supported_t *)(samsg + 1);
-		sasupp->sadb_supported_len =
-		    SADB_8TO64(allocsize - sizeof (sadb_msg_t));
+		sasupp->sadb_supported_len = SADB_8TO64(
+		    sizeof (*sasupp) + sizeof (*saalg) * num_aalgs);
 		sasupp->sadb_supported_exttype = SADB_EXT_SUPPORTED_AUTH;
 		sasupp->sadb_supported_reserved = 0;
 	}
@@ -816,7 +842,7 @@ ipsecah_algs_changed(netstack_t *ns)
 	 * Time to send a PF_KEY SADB_REGISTER message to AH listeners
 	 * everywhere.  (The function itself checks for NULL ah_pfkey_q.)
 	 */
-	(void) ah_register_out(0, 0, 0, ahstack);
+	(void) ah_register_out(0, 0, 0, ahstack, NULL);
 }
 
 /*
@@ -865,22 +891,17 @@ static int
 ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
     int *diagnostic, ipsecah_stack_t *ahstack)
 {
-	isaf_t *primary = NULL, *secondary, *inbound, *outbound;
+	isaf_t *primary = NULL, *secondary;
+	boolean_t clone = B_FALSE, is_inbound = B_FALSE;
 	sadb_sa_t *assoc = (sadb_sa_t *)ksi->ks_in_extv[SADB_EXT_SA];
-	sadb_address_t *dstext =
-	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
-	struct sockaddr_in *dst;
-	struct sockaddr_in6 *dst6;
-	boolean_t is_ipv4, clone = B_FALSE, is_inbound = B_FALSE;
-	uint32_t *dstaddr;
 	ipsa_t *larval;
 	ipsacq_t *acqrec;
 	iacqf_t *acq_bucket;
 	mblk_t *acq_msgs = NULL;
 	mblk_t *lpkt;
 	int rc;
-	sadb_t *sp;
-	int outhash;
+	ipsa_query_t sq;
+	int error;
 	netstack_t	*ns = ahstack->ipsecah_netstack;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
@@ -888,22 +909,13 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	 * Locate the appropriate table(s).
 	 */
 
-	dst = (struct sockaddr_in *)(dstext + 1);
-	dst6 = (struct sockaddr_in6 *)dst;
-	is_ipv4 = (dst->sin_family == AF_INET);
-	if (is_ipv4) {
-		sp = &ahstack->ah_sadb.s_v4;
-		dstaddr = (uint32_t *)(&dst->sin_addr);
-		outhash = OUTBOUND_HASH_V4(sp, *(ipaddr_t *)dstaddr);
-	} else {
-		ASSERT(dst->sin_family == AF_INET6);
-		sp = &ahstack->ah_sadb.s_v6;
-		dstaddr = (uint32_t *)(&dst6->sin6_addr);
-		outhash = OUTBOUND_HASH_V6(sp, *(in6_addr_t *)dstaddr);
-	}
+	sq.spp = &ahstack->ah_sadb;
+	error = sadb_form_query(ksi, IPSA_Q_SA|IPSA_Q_DST,
+	    IPSA_Q_SA|IPSA_Q_DST|IPSA_Q_INBOUND|IPSA_Q_OUTBOUND,
+	    &sq, diagnostic);
+	if (error)
+		return (error);
 
-	inbound = INBOUND_BUCKET(sp, assoc->sadb_sa_spi);
-	outbound = &sp->sdb_of[outhash];
 	/*
 	 * Use the direction flags provided by the KMD to determine
 	 * if the inbound or outbound table should be the primary
@@ -911,18 +923,17 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	 * decision based on the addresses.
 	 */
 	if (assoc->sadb_sa_flags & IPSA_F_INBOUND) {
-		primary = inbound;
-		secondary = outbound;
+		primary = sq.inbound;
+		secondary = sq.outbound;
 		is_inbound = B_TRUE;
 		if (assoc->sadb_sa_flags & IPSA_F_OUTBOUND)
 			clone = B_TRUE;
 	} else {
 		if (assoc->sadb_sa_flags & IPSA_F_OUTBOUND) {
-			primary = outbound;
-			secondary = inbound;
+			primary = sq.outbound;
+			secondary = sq.inbound;
 		}
 	}
-
 	if (primary == NULL) {
 		/*
 		 * The KMD did not set a direction flag, determine which
@@ -943,12 +954,13 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		 */
 		case KS_IN_ADDR_ME:
 			assoc->sadb_sa_flags |= IPSA_F_INBOUND;
-			primary = inbound;
-			secondary = outbound;
+			primary = sq.inbound;
+			secondary = sq.outbound;
 			if (ksi->ks_in_srctype != KS_IN_ADDR_NOTME)
 				clone = B_TRUE;
 			is_inbound = B_TRUE;
 			break;
+
 		/*
 		 * If the source address literally not mine (either
 		 * unspecified or not mine), then this SA may have an
@@ -958,8 +970,8 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		 */
 		case KS_IN_ADDR_NOTME:
 			assoc->sadb_sa_flags |= IPSA_F_OUTBOUND;
-			primary = outbound;
-			secondary = inbound;
+			primary = sq.outbound;
+			secondary = sq.inbound;
 			if (ksi->ks_in_srctype != KS_IN_ADDR_ME) {
 				assoc->sadb_sa_flags |= IPSA_F_INBOUND;
 				clone = B_TRUE;
@@ -980,7 +992,7 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	 */
 
 	if (samsg->sadb_msg_seq & IACQF_LOWEST_SEQ) {
-		acq_bucket = &sp->sdb_acq[outhash];
+		acq_bucket = &(sq.sp->sdb_acq[sq.outhash]);
 		mutex_enter(&acq_bucket->iacqf_lock);
 		for (acqrec = acq_bucket->iacqf_ipsacq; acqrec != NULL;
 		    acqrec = acqrec->ipsacq_next) {
@@ -991,7 +1003,7 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 			 *    that are queued up.
 			 */
 			if (acqrec->ipsacq_seq == samsg->sadb_msg_seq &&
-			    IPSA_ARE_ADDR_EQUAL(dstaddr,
+			    IPSA_ARE_ADDR_EQUAL(sq.dstaddr,
 			    acqrec->ipsacq_dstaddr, acqrec->ipsacq_addrfam))
 				break;
 			mutex_exit(&acqrec->ipsacq_lock);
@@ -1019,10 +1031,10 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	larval = NULL;
 
 	if (samsg->sadb_msg_type == SADB_UPDATE) {
-		mutex_enter(&inbound->isaf_lock);
-		larval = ipsec_getassocbyspi(inbound, assoc->sadb_sa_spi,
-		    ALL_ZEROES_PTR, dstaddr, dst->sin_family);
-		mutex_exit(&inbound->isaf_lock);
+		mutex_enter(&sq.inbound->isaf_lock);
+		larval = ipsec_getassocbyspi(sq.inbound, sq.assoc->sadb_sa_spi,
+		    ALL_ZEROES_PTR, sq.dstaddr, sq.dst->sin_family);
+		mutex_exit(&sq.inbound->isaf_lock);
 
 		if ((larval == NULL) ||
 		    (larval->ipsa_state != IPSA_STATE_LARVAL)) {
@@ -1071,11 +1083,14 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 				if (ah_outbound(mp) == IPSEC_STATUS_SUCCESS) {
 					ipha_t *ipha = (ipha_t *)
 					    mp->b_cont->b_rptr;
-					if (is_ipv4) {
+					if (sq.af == AF_INET) {
 						ip_wput_ipsec_out(NULL, mp,
 						    ipha, NULL, NULL);
 					} else {
 						ip6_t *ip6h = (ip6_t *)ipha;
+
+						ASSERT(sq.af == AF_INET6);
+
 						ip_wput_ipsec_out_v6(NULL,
 						    mp, ip6h, NULL, NULL);
 					}
@@ -1172,14 +1187,22 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	ASSERT(src->sin_family == dst->sin_family);
 
 	/* Stuff I don't support, for now.  XXX Diagnostic? */
-	if (ksi->ks_in_extv[SADB_EXT_LIFETIME_CURRENT] != NULL ||
-	    ksi->ks_in_extv[SADB_EXT_SENSITIVITY] != NULL)
+	if (ksi->ks_in_extv[SADB_EXT_LIFETIME_CURRENT] != NULL)
 		return (EOPNOTSUPP);
 
+	if (ksi->ks_in_extv[SADB_EXT_SENSITIVITY] != NULL) {
+		if (!is_system_labeled())
+			return (EOPNOTSUPP);
+	}
+
+	if (ksi->ks_in_extv[SADB_X_EXT_OUTER_SENS] != NULL) {
+		if (!is_system_labeled())
+			return (EOPNOTSUPP);
+	}
 	/*
-	 * XXX Policy : I'm not checking identities or sensitivity
-	 * labels at this time, but if I did, I'd do them here, before I sent
-	 * the weak key check up to the algorithm.
+	 * XXX Policy : I'm not checking identities at this time, but
+	 * if I did, I'd do them here, before I sent the weak key
+	 * check up to the algorithm.
 	 */
 
 	/* verify that there is a mapping for the specified algorithm */
@@ -1214,6 +1237,7 @@ ah_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	    diagnostic, ahstack));
 }
 
+/* Refactor me */
 /*
  * Update a security association.  Updates come in two varieties.  The first
  * is an update of lifetimes on a non-larval SA.  The second is an update of
@@ -1249,6 +1273,7 @@ ah_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 	return (rcode);
 }
 
+/* Refactor me */
 /*
  * Delete a security association.  This is REALLY likely to be code common to
  * both AH and ESP.  Find the association, then unlink it.
@@ -1275,14 +1300,15 @@ ah_del_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 		}
 		return (sadb_purge_sa(mp, ksi,
 		    (sin->sin_family == AF_INET6) ? &ahstack->ah_sadb.s_v6 :
-		    &ahstack->ah_sadb.s_v4,
-		    ahstack->ah_pfkey_q, ahstack->ah_sadb.s_ip_q));
+		    &ahstack->ah_sadb.s_v4, diagnostic, ahstack->ah_pfkey_q,
+		    ahstack->ah_sadb.s_ip_q));
 	}
 
 	return (sadb_delget_sa(mp, ksi, &ahstack->ah_sadb, diagnostic,
 	    ahstack->ah_pfkey_q, sadb_msg_type));
 }
 
+/* Refactor me */
 /*
  * Convert the entire contents of all of AH's SA tables into PF_KEY SADB_DUMP
  * messages.
@@ -1423,7 +1449,7 @@ ah_parse_pfkey(mblk_t *mp, ipsecah_stack_t *ahstack)
 		 * Keysock takes care of the PF_KEY bookkeeping for this.
 		 */
 		if (ah_register_out(samsg->sadb_msg_seq, samsg->sadb_msg_pid,
-		    ksi->ks_in_serial, ahstack)) {
+		    ksi->ks_in_serial, ahstack, mp)) {
 			freemsg(mp);
 		} else {
 			/*
@@ -1595,6 +1621,7 @@ ipsecah_wput(queue_t *q, mblk_t *mp)
 	}
 }
 
+/* Refactor me */
 /*
  * Updating use times can be tricky business if the ipsa_haspeer flag is
  * set.  This function is called once in an SA's lifetime.
@@ -1693,6 +1720,7 @@ ah_set_usetime(ipsa_t *assoc, boolean_t inbound)
 	}
 }
 
+/* Refactor me */
 /*
  * Add a number of bytes to what the SA has protected so far.  Return
  * B_TRUE if the SA can still protect that many bytes.
@@ -1953,6 +1981,7 @@ ah_send_acquire(ipsacq_t *acqrec, mblk_t *extended, netstack_t *ns)
 	putnext(ahstack->ah_pfkey_q, pfkeymp);
 }
 
+/* Refactor me */
 /*
  * Handle the SADB_GETSPI message.  Create a larval SA.
  */
@@ -3386,6 +3415,27 @@ ah_outbound(mblk_t *ipsec_out)
 	assoc = oi->ipsec_out_ah_sa;
 	ASSERT(assoc != NULL);
 
+
+	/*
+	 * Get the outer IP header in shape to escape this system..
+	 */
+	if (is_system_labeled() && (assoc->ipsa_ocred != NULL)) {
+		int whack;
+
+		mblk_setcred(mp, assoc->ipsa_ocred, NOPID);
+		if (oi->ipsec_out_v4)
+			whack = sadb_whack_label(&mp, assoc);
+		else
+			whack = sadb_whack_label_v6(&mp, assoc);
+		if (whack != 0) {
+			ip_drop_packet(ipsec_out, B_FALSE, NULL,
+			    NULL, DROPPER(ipss, ipds_ah_nomem),
+			    &ahstack->ah_dropper);
+			return (IPSEC_STATUS_FAILED);
+		}
+		ipsec_out->b_cont = mp;
+	}
+
 	/*
 	 * Age SA according to number of bytes that will be sent after
 	 * adding the AH header, ICV, and padding to the packet.
@@ -3414,6 +3464,11 @@ ah_outbound(mblk_t *ipsec_out)
 		freemsg(ipsec_out);
 		return (IPSEC_STATUS_FAILED);
 	}
+
+	/*
+	 * XXX We need to have fixed up the outer label before we get here.
+	 * (AH is computing the checksum over the outer label).
+	 */
 
 	if (oi->ipsec_out_is_capab_ill) {
 		ah3dbg(ahstack, ("ah_outbound: pkt can be accelerated\n"));
@@ -4237,14 +4292,22 @@ ah_auth_in_done(mblk_t *ipsec_in)
 		while (--dest >= mp->b_rptr)
 			*dest = *(dest - newpos);
 	}
+	ipsec_in->b_cont = mp;
+	phdr_mp->b_cont = NULL;
 	/*
 	 * If a db_credp exists in phdr_mp, it must also exist in mp.
 	 */
 	ASSERT(DB_CRED(phdr_mp) == NULL ||
 	    msg_getcred(mp, NULL) != NULL);
-
 	freeb(phdr_mp);
-	ipsec_in->b_cont = mp;
+
+	/*
+	 * If SA is labelled, use its label, else inherit the label
+	 */
+	if (is_system_labeled() && (assoc->ipsa_cred != NULL)) {
+		mblk_setcred(mp, assoc->ipsa_cred, NOPID);
+	}
+
 	if (assoc->ipsa_state == IPSA_STATE_IDLE) {
 		/*
 		 * Cluster buffering case.  Tell caller that we're
@@ -4253,6 +4316,7 @@ ah_auth_in_done(mblk_t *ipsec_in)
 		sadb_buf_pkt(assoc, ipsec_in, ns);
 		return (IPSEC_STATUS_PENDING);
 	}
+
 	return (IPSEC_STATUS_SUCCESS);
 
 ah_in_discard:
@@ -4393,6 +4457,7 @@ ah_auth_out_done(mblk_t *ipsec_out)
 	return (IPSEC_STATUS_SUCCESS);
 }
 
+/* Refactor me */
 /*
  * Wrapper to allow IP to trigger an AH association failure message
  * during SA inbound selection.

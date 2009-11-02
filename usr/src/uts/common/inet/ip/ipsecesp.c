@@ -62,11 +62,14 @@
 #include <sys/kstat.h>
 #include <sys/policy.h>
 #include <sys/strsun.h>
+#include <sys/strsubr.h>
 #include <inet/udp_impl.h>
 #include <sys/taskq.h>
 #include <sys/note.h>
 
 #include <sys/iphada.h>
+
+#include <sys/tsol/tnet.h>
 
 /*
  * Table of ND variables supported by ipsecesp. These are loaded into
@@ -139,7 +142,7 @@ static ipsec_status_t esp_inbound_accelerated(mblk_t *, mblk_t *,
     boolean_t, ipsa_t *);
 
 static boolean_t esp_register_out(uint32_t, uint32_t, uint_t,
-    ipsecesp_stack_t *);
+    ipsecesp_stack_t *, mblk_t *);
 static boolean_t esp_strip_header(mblk_t *, boolean_t, uint32_t,
     kstat_named_t **, ipsecesp_stack_t *);
 static ipsec_status_t esp_submit_req_inbound(mblk_t *, ipsa_t *, uint_t);
@@ -1473,6 +1476,7 @@ esp_send_acquire(ipsacq_t *acqrec, mblk_t *extended, netstack_t *ns)
 	putnext(espstack->esp_pfkey_q, pfkeymp);
 }
 
+/* XXX refactor me */
 /*
  * Handle the SADB_GETSPI message.  Create a larval SA.
  */
@@ -1861,8 +1865,19 @@ esp_in_done(mblk_t *ipsec_in_mp)
 
 	if (esp_strip_header(data_mp, ii->ipsec_in_v4, ivlen, &counter,
 	    espstack)) {
+
+		if (is_system_labeled()) {
+			cred_t *cr = assoc->ipsa_cred;
+
+			if (cr != NULL) {
+				mblk_setcred(data_mp, cr, NOPID);
+			}
+
+		}
 		if (is_natt)
 			return (esp_fix_natt_checksums(data_mp, assoc));
+
+		ASSERT(!is_system_labeled() || (DB_CRED(data_mp) != NULL));
 
 		if (assoc->ipsa_state == IPSA_STATE_IDLE) {
 			/*
@@ -2665,10 +2680,33 @@ esp_outbound(mblk_t *mp)
 		data_mp = ipsec_out_mp->b_cont;
 	}
 
+	assoc = io->ipsec_out_esp_sa;
+	ASSERT(assoc != NULL);
+
+	/*
+	 * Get the outer IP header in shape to escape this system..
+	 */
+	if (is_system_labeled() && (assoc->ipsa_ocred != NULL)) {
+		int whack;
+
+		mblk_setcred(data_mp, assoc->ipsa_ocred, NOPID);
+		if (io->ipsec_out_v4)
+			whack = sadb_whack_label(&data_mp, assoc);
+		else
+			whack = sadb_whack_label_v6(&data_mp, assoc);
+		if (whack != 0) {
+			ip_drop_packet(ipsec_out_mp, B_FALSE, NULL,
+			    NULL, DROPPER(ipss, ipds_esp_nomem),
+			    &espstack->esp_dropper);
+			return (IPSEC_STATUS_FAILED);
+		}
+		ipsec_out_mp->b_cont = data_mp;
+	}
+
+
 	/*
 	 * Reality check....
 	 */
-
 	ipha = (ipha_t *)data_mp->b_rptr;  /* So we can call esp_acquire(). */
 
 	if (io->ipsec_out_v4) {
@@ -2710,13 +2748,11 @@ esp_outbound(mblk_t *mp)
 			nhp = &ip6h->ip6_nxt;
 		}
 	}
-	assoc = io->ipsec_out_esp_sa;
-	ASSERT(assoc != NULL);
 
 	mac_len = assoc->ipsa_mac_len;
 
 	if (assoc->ipsa_flags & IPSA_F_NATT) {
-		/* wedge in fake UDP */
+		/* wedge in UDP header */
 		is_natt = B_TRUE;
 		esplen += UDPH_SIZE;
 	}
@@ -3066,7 +3102,7 @@ ipsecesp_rput(queue_t *q, mblk_t *mp)
  */
 static boolean_t
 esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
-    ipsecesp_stack_t *espstack)
+    ipsecesp_stack_t *espstack, mblk_t *in_mp)
 {
 	mblk_t *pfkey_msg_mp, *keysock_out_mp;
 	sadb_msg_t *samsg;
@@ -3082,6 +3118,10 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	ipsec_alginfo_t **encralgs;
 	uint_t num_ealgs;
 	ipsec_stack_t	*ipss = espstack->ipsecesp_netstack->netstack_ipsec;
+	sadb_sens_t *sens;
+	size_t sens_len = 0;
+	sadb_ext_t *nextext;
+	cred_t *sens_cr = NULL;
 
 	/* Allocate the KEYSOCK_OUT. */
 	keysock_out_mp = sadb_keysock_out(serial);
@@ -3090,12 +3130,20 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 		return (B_FALSE);
 	}
 
+	if (is_system_labeled() && (in_mp != NULL)) {
+		sens_cr = msg_getcred(in_mp, NULL);
+
+		if (sens_cr != NULL) {
+			sens_len = sadb_sens_len_from_cred(sens_cr);
+			allocsize += sens_len;
+		}
+	}
+
 	/*
 	 * Allocate the PF_KEY message that follows KEYSOCK_OUT.
 	 */
 
 	mutex_enter(&ipss->ipsec_alg_lock);
-
 	/*
 	 * Fill SADB_REGISTER message's algorithm descriptors.  Hold
 	 * down the lock while filling it.
@@ -3128,12 +3176,13 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 		freemsg(keysock_out_mp);
 		return (B_FALSE);
 	}
-
 	pfkey_msg_mp = keysock_out_mp->b_cont;
 	pfkey_msg_mp->b_wptr += allocsize;
+
+	nextext = (sadb_ext_t *)(pfkey_msg_mp->b_rptr + sizeof (*samsg));
+
 	if (num_aalgs != 0) {
-		sasupp_auth = (sadb_supported_t *)
-		    (pfkey_msg_mp->b_rptr + sizeof (*samsg));
+		sasupp_auth = (sadb_supported_t *)nextext;
 		saalg = (sadb_alg_t *)(sasupp_auth + 1);
 
 		ASSERT(((ulong_t)saalg & 0x7) == 0);
@@ -3169,12 +3218,11 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 			}
 		}
 #endif /* DEBUG */
-	} else {
-		saalg = (sadb_alg_t *)(pfkey_msg_mp->b_rptr + sizeof (*samsg));
+		nextext = (sadb_ext_t *)saalg;
 	}
 
 	if (num_ealgs != 0) {
-		sasupp_encr = (sadb_supported_t *)saalg;
+		sasupp_encr = (sadb_supported_t *)nextext;
 		saalg = (sadb_alg_t *)(sasupp_encr + 1);
 
 		numalgs_snap = 0;
@@ -3212,12 +3260,21 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 			}
 		}
 #endif /* DEBUG */
+		nextext = (sadb_ext_t *)saalg;
 	}
 
 	current_aalgs = num_aalgs;
 	current_ealgs = num_ealgs;
 
 	mutex_exit(&ipss->ipsec_alg_lock);
+
+	if (sens_cr != NULL) {
+		sens = (sadb_sens_t *)nextext;
+		sadb_sens_from_cred(sens, SADB_EXT_SENSITIVITY,
+		    sens_cr, sens_len);
+
+		nextext = (sadb_ext_t *)(((uint8_t *)sens) + sens_len);
+	}
 
 	/* Now fill the rest of the SADB_REGISTER message. */
 
@@ -3274,7 +3331,7 @@ ipsecesp_algs_changed(netstack_t *ns)
 	 * Time to send a PF_KEY SADB_REGISTER message to ESP listeners
 	 * everywhere.  (The function itself checks for NULL esp_pfkey_q.)
 	 */
-	(void) esp_register_out(0, 0, 0, espstack);
+	(void) esp_register_out(0, 0, 0, espstack, NULL);
 }
 
 /*
@@ -3323,43 +3380,27 @@ static int
 esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
     int *diagnostic, ipsecesp_stack_t *espstack)
 {
-	isaf_t *primary = NULL, *secondary, *inbound, *outbound;
-	sadb_sa_t *assoc = (sadb_sa_t *)ksi->ks_in_extv[SADB_EXT_SA];
-	sadb_address_t *dstext =
-	    (sadb_address_t *)ksi->ks_in_extv[SADB_EXT_ADDRESS_DST];
-	struct sockaddr_in *dst;
-	struct sockaddr_in6 *dst6;
-	boolean_t is_ipv4, clone = B_FALSE, is_inbound = B_FALSE;
-	uint32_t *dstaddr;
+	isaf_t *primary = NULL, *secondary;
+	boolean_t clone = B_FALSE, is_inbound = B_FALSE;
 	ipsa_t *larval = NULL;
 	ipsacq_t *acqrec;
 	iacqf_t *acq_bucket;
 	mblk_t *acq_msgs = NULL;
 	int rc;
-	sadb_t *sp;
-	int outhash;
 	mblk_t *lpkt;
+	int error;
+	ipsa_query_t sq;
 	ipsec_stack_t	*ipss = espstack->ipsecesp_netstack->netstack_ipsec;
 
 	/*
 	 * Locate the appropriate table(s).
 	 */
-
-	dst = (struct sockaddr_in *)(dstext + 1);
-	dst6 = (struct sockaddr_in6 *)dst;
-	is_ipv4 = (dst->sin_family == AF_INET);
-	if (is_ipv4) {
-		sp = &espstack->esp_sadb.s_v4;
-		dstaddr = (uint32_t *)(&dst->sin_addr);
-		outhash = OUTBOUND_HASH_V4(sp, *(ipaddr_t *)dstaddr);
-	} else {
-		sp = &espstack->esp_sadb.s_v6;
-		dstaddr = (uint32_t *)(&dst6->sin6_addr);
-		outhash = OUTBOUND_HASH_V6(sp, *(in6_addr_t *)dstaddr);
-	}
-
-	inbound = INBOUND_BUCKET(sp, assoc->sadb_sa_spi);
-	outbound = &sp->sdb_of[outhash];
+	sq.spp = &espstack->esp_sadb;	/* XXX */
+	error = sadb_form_query(ksi, IPSA_Q_SA|IPSA_Q_DST,
+	    IPSA_Q_SA|IPSA_Q_DST|IPSA_Q_INBOUND|IPSA_Q_OUTBOUND,
+	    &sq, diagnostic);
+	if (error)
+		return (error);
 
 	/*
 	 * Use the direction flags provided by the KMD to determine
@@ -3367,17 +3408,15 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	 * for this SA. If these flags were absent then make this
 	 * decision based on the addresses.
 	 */
-	if (assoc->sadb_sa_flags & IPSA_F_INBOUND) {
-		primary = inbound;
-		secondary = outbound;
+	if (sq.assoc->sadb_sa_flags & IPSA_F_INBOUND) {
+		primary = sq.inbound;
+		secondary = sq.outbound;
 		is_inbound = B_TRUE;
-		if (assoc->sadb_sa_flags & IPSA_F_OUTBOUND)
+		if (sq.assoc->sadb_sa_flags & IPSA_F_OUTBOUND)
 			clone = B_TRUE;
-	} else {
-		if (assoc->sadb_sa_flags & IPSA_F_OUTBOUND) {
-			primary = outbound;
-			secondary = inbound;
-		}
+	} else if (sq.assoc->sadb_sa_flags & IPSA_F_OUTBOUND) {
+		primary = sq.outbound;
+		secondary = sq.inbound;
 	}
 
 	if (primary == NULL) {
@@ -3388,7 +3427,7 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		switch (ksi->ks_in_dsttype) {
 		case KS_IN_ADDR_MBCAST:
 			clone = B_TRUE;	/* All mcast SAs can be bidirectional */
-			assoc->sadb_sa_flags |= IPSA_F_OUTBOUND;
+			sq.assoc->sadb_sa_flags |= IPSA_F_OUTBOUND;
 			/* FALLTHRU */
 		/*
 		 * If the source address is either one of mine, or unspecified
@@ -3399,9 +3438,9 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		 * SA (which allows me to receive the outbound traffic).
 		 */
 		case KS_IN_ADDR_ME:
-			assoc->sadb_sa_flags |= IPSA_F_INBOUND;
-			primary = inbound;
-			secondary = outbound;
+			sq.assoc->sadb_sa_flags |= IPSA_F_INBOUND;
+			primary = sq.inbound;
+			secondary = sq.outbound;
 			if (ksi->ks_in_srctype != KS_IN_ADDR_NOTME)
 				clone = B_TRUE;
 			is_inbound = B_TRUE;
@@ -3414,11 +3453,11 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 		 * SA.
 		 */
 		case KS_IN_ADDR_NOTME:
-			assoc->sadb_sa_flags |= IPSA_F_OUTBOUND;
-			primary = outbound;
-			secondary = inbound;
+			sq.assoc->sadb_sa_flags |= IPSA_F_OUTBOUND;
+			primary = sq.outbound;
+			secondary = sq.inbound;
 			if (ksi->ks_in_srctype != KS_IN_ADDR_ME) {
-				assoc->sadb_sa_flags |= IPSA_F_INBOUND;
+				sq.assoc->sadb_sa_flags |= IPSA_F_INBOUND;
 				clone = B_TRUE;
 			}
 			break;
@@ -3437,7 +3476,7 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	 */
 
 	if (samsg->sadb_msg_seq & IACQF_LOWEST_SEQ) {
-		acq_bucket = &sp->sdb_acq[outhash];
+		acq_bucket = &(sq.sp->sdb_acq[sq.outhash]);
 		mutex_enter(&acq_bucket->iacqf_lock);
 		for (acqrec = acq_bucket->iacqf_ipsacq; acqrec != NULL;
 		    acqrec = acqrec->ipsacq_next) {
@@ -3448,7 +3487,7 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 			 *    that are queued up.
 			 */
 			if (acqrec->ipsacq_seq == samsg->sadb_msg_seq &&
-			    IPSA_ARE_ADDR_EQUAL(dstaddr,
+			    IPSA_ARE_ADDR_EQUAL(sq.dstaddr,
 			    acqrec->ipsacq_dstaddr, acqrec->ipsacq_addrfam))
 				break;
 			mutex_exit(&acqrec->ipsacq_lock);
@@ -3473,12 +3512,11 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	 * Find PF_KEY message, and see if I'm an update.  If so, find entry
 	 * in larval list (if there).
 	 */
-
 	if (samsg->sadb_msg_type == SADB_UPDATE) {
-		mutex_enter(&inbound->isaf_lock);
-		larval = ipsec_getassocbyspi(inbound, assoc->sadb_sa_spi,
-		    ALL_ZEROES_PTR, dstaddr, dst->sin_family);
-		mutex_exit(&inbound->isaf_lock);
+		mutex_enter(&sq.inbound->isaf_lock);
+		larval = ipsec_getassocbyspi(sq.inbound, sq.assoc->sadb_sa_spi,
+		    ALL_ZEROES_PTR, sq.dstaddr, sq.dst->sin_family);
+		mutex_exit(&sq.inbound->isaf_lock);
 
 		if ((larval == NULL) ||
 		    (larval->ipsa_state != IPSA_STATE_LARVAL)) {
@@ -3532,7 +3570,8 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 					ipha = (ipha_t *)mp->b_cont->b_rptr;
 
 					/* finish IPsec processing */
-					if (is_ipv4) {
+					if (IPH_HDR_VERSION(ipha) ==
+					    IP_VERSION) {
 						ip_wput_ipsec_out(NULL, mp,
 						    ipha, NULL, NULL);
 					} else {
@@ -3586,6 +3625,8 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	    (sadb_lifetime_t *)ksi->ks_in_extv[SADB_X_EXT_LIFETIME_IDLE];
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+
+
 
 	/* I need certain extensions present for an ADD message. */
 	if (srcext == NULL) {
@@ -3676,13 +3717,15 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 
 
 	/* Stuff I don't support, for now.  XXX Diagnostic? */
-	if (ksi->ks_in_extv[SADB_EXT_LIFETIME_CURRENT] != NULL ||
-	    ksi->ks_in_extv[SADB_EXT_SENSITIVITY] != NULL)
+	if (ksi->ks_in_extv[SADB_EXT_LIFETIME_CURRENT] != NULL)
 		return (EOPNOTSUPP);
 
+	if ((*diagnostic = sadb_labelchk(ksi)) != 0)
+		return (EINVAL);
+
 	/*
-	 * XXX Policy :  I'm not checking identities or sensitivity
-	 * labels at this time, but if I did, I'd do them here, before I sent
+	 * XXX Policy :  I'm not checking identities at this time,
+	 * but if I did, I'd do them here, before I sent
 	 * the weak key check up to the algorithm.
 	 */
 
@@ -3812,6 +3855,7 @@ esp_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 	return (rcode);
 }
 
+/* XXX refactor me */
 /*
  * Delete a security association.  This is REALLY likely to be code common to
  * both AH and ESP.  Find the association, then unlink it.
@@ -3838,14 +3882,15 @@ esp_del_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 		}
 		return (sadb_purge_sa(mp, ksi,
 		    (sin->sin_family == AF_INET6) ? &espstack->esp_sadb.s_v6 :
-		    &espstack->esp_sadb.s_v4, espstack->esp_pfkey_q,
-		    espstack->esp_sadb.s_ip_q));
+		    &espstack->esp_sadb.s_v4, diagnostic,
+		    espstack->esp_pfkey_q, espstack->esp_sadb.s_ip_q));
 	}
 
 	return (sadb_delget_sa(mp, ksi, &espstack->esp_sadb, diagnostic,
 	    espstack->esp_pfkey_q, sadb_msg_type));
 }
 
+/* XXX refactor me */
 /*
  * Convert the entire contents of all of ESP's SA tables into PF_KEY SADB_DUMP
  * messages.
@@ -3979,7 +4024,7 @@ esp_parse_pfkey(mblk_t *mp, ipsecesp_stack_t *espstack)
 		 * Keysock takes care of the PF_KEY bookkeeping for this.
 		 */
 		if (esp_register_out(samsg->sadb_msg_seq, samsg->sadb_msg_pid,
-		    ksi->ks_in_serial, espstack)) {
+		    ksi->ks_in_serial, espstack, mp)) {
 			freemsg(mp);
 		} else {
 			/*
@@ -4331,6 +4376,9 @@ esp_inbound_accelerated(mblk_t *ipsec_in, mblk_t *data_mp, boolean_t isv4,
 	}
 
 	freeb(hada_mp);
+
+	if (is_system_labeled() && (assoc->ipsa_cred != NULL))
+		mblk_setcred(data_mp, assoc->ipsa_cred, NOPID);
 
 	/*
 	 * Account for usage..

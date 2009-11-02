@@ -34,6 +34,9 @@ SRCDIR =	../common
 
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-ltecla -lsocket -lnsl -lc
+LAZYLIBS = $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
+lint := LAZYLIBS = -ltsol
+LDLIBS += $(LAZYLIBS)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)

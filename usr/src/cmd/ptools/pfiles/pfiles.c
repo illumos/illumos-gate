@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -591,6 +589,8 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 	    { SOL_SOCKET, SO_OOBINLINE,		"SO_OOBINLINE,"	},
 	    { SOL_SOCKET, SO_DGRAM_ERRIND,	"SO_DGRAM_ERRIND,"},
 	    { SOL_SOCKET, SO_ALLZONES,		"SO_ALLZONES,"	},
+	    { SOL_SOCKET, SO_MAC_EXEMPT,	"SO_MAC_EXEMPT," },
+	    { SOL_SOCKET, SO_MAC_IMPLICIT,	"SO_MAC_IMPLICIT," },
 	    { SOL_SOCKET, SO_EXCLBIND,		"SO_EXCLBIND," },
 	    { IPPROTO_UDP, UDP_NAT_T_ENDPOINT,	"UDP_NAT_T_ENDPOINT," },
 	};
