@@ -265,7 +265,7 @@ const struct systable systable[] = {
 {"plock",	1, DEC, NOV, PLK},				/*  45 */
 {"setgid",	1, DEC, NOV, UNS},				/*  46 */
 {"getgid",	0, UNS, UNS},					/*  47 */
-{"signal",	2, HEX, NOV, SIG, ACT},				/*  48 */
+{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
 {"msgsys",	6, DEC, NOV, DEC, DEC, DEC, DEC, DEC, DEC},	/*  49 */
 {"sysi86",	4, HEX, NOV, S86, HEX, HEX, HEX, DEC, DEC},	/*  50 */
 {"acct",	1, DEC, NOV, STG},				/*  51 */
@@ -505,16 +505,6 @@ const	struct systable fcntltable[] = {
 {"fcntl",	3, DEC, NOV, DEC, FCN, FFG},			/* 2: F_SETFL */
 };
 #define	NFCNTLCODE	(sizeof (fcntltable) / sizeof (struct systable))
-
-const	struct systable sigtable[] = {
-{"signal",	2, HEX, NOV, SIG, ACT},				/* 0 */
-{"sigset",	2, HEX, NOV, SIX, ACT},				/* 1 */
-{"sighold",	1, HEX, NOV, SIX},				/* 2 */
-{"sigrelse",	1, HEX, NOV, SIX},				/* 3 */
-{"sigignore",	1, HEX, NOV, SIX},				/* 4 */
-{"sigpause",	1, HEX, NOV, SIX},				/* 5 */
-};
-#define	NSIGCODE	(sizeof (sigtable) / sizeof (struct systable))
 
 const	struct systable msgtable[] = {
 {"msgget",	3, DEC, NOV, HID, KEY, MSF},			/* 0 */
@@ -859,11 +849,6 @@ const	struct sysalias sysalias[] = {
 	{ "getpgid",	SYS_pgrpsys	},
 	{ "setpgid",	SYS_pgrpsys	},
 	{ "getegid",	SYS_getgid	},
-	{ "sigset",	SYS_signal	},
-	{ "sighold",	SYS_signal	},
-	{ "sigrelse",	SYS_signal	},
-	{ "sigignore",	SYS_signal	},
-	{ "sigpause",	SYS_signal	},
 	{ "msgget",	SYS_msgsys	},
 	{ "msgctl",	SYS_msgsys	},
 	{ "msgctl64",	SYS_msgsys	},
@@ -1022,10 +1007,6 @@ subsys(int syscall, int subcode)
 		case SYS_open64:
 			if ((unsigned)subcode < NOPEN64CODE)
 				stp = &open64table[subcode];
-			break;
-		case SYS_signal:	/* signal() + sigset() family */
-			if ((unsigned)subcode < NSIGCODE)
-				stp = &sigtable[subcode];
 			break;
 		case SYS_msgsys:	/* msgsys() */
 			if ((unsigned)subcode < NMSGCODE)
@@ -1264,16 +1245,6 @@ getsubcode(private_t *pri)
 				subcode = arg0;
 			}
 			break;
-		case SYS_signal:	/* signal() + sigset() family */
-			switch (arg0 & ~SIGNO_MASK) {
-			default:	subcode = 0;	break;
-			case SIGDEFER:	subcode = 1;	break;
-			case SIGHOLD:	subcode = 2;	break;
-			case SIGRELSE:	subcode = 3;	break;
-			case SIGIGNORE:	subcode = 4;	break;
-			case SIGPAUSE:	subcode = 5;	break;
-			}
-			break;
 		case SYS_kaio:		/* kaio() */
 			subcode = arg0 & ~AIO_POLL_BIT;
 			break;
@@ -1348,7 +1319,6 @@ maxsyscalls()
 	return (PRMAXSYS + 1
 	    + NOPENCODE - 1
 	    + NOPEN64CODE - 1
-	    + NSIGCODE - 1
 	    + NMSGCODE - 1
 	    + NSEMCODE - 1
 	    + NSHMCODE - 1
@@ -1394,8 +1364,6 @@ nsubcodes(int syscall)
 		return (NOPENCODE);
 	case SYS_open64:
 		return (NOPEN64CODE);
-	case SYS_signal:	/* signal() + sigset() family */
-		return (NSIGCODE);
 	case SYS_msgsys:	/* msgsys() */
 		return (NMSGCODE);
 	case SYS_semsys:	/* semsys() */

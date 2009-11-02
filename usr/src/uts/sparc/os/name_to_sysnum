@@ -45,7 +45,6 @@ times			43
 profil			44
 setgid			46
 getgid			47
-ssig			48
 msgsys			49
 sysacct			51
 shmsys			52

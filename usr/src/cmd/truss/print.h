@@ -49,7 +49,7 @@ extern "C" {
 #define	UTS	9		/* print utssys code */
 #define	OPN	10		/* print open code */
 #define	SIG	11		/* print signal name plus flags */
-#define	ACT	12		/* print signal action value */
+/* Number 12 now available for reuse */
 #define	MSC	13		/* print msgsys command */
 #define	MSF	14		/* print msgsys flags */
 #define	SMC	15		/* print semsys command */
@@ -61,7 +61,7 @@ extern "C" {
 #define	RST	21		/* print string returned by sys call */
 #define	SMF	22		/* print streams message flags */
 #define	IOA	23		/* print ioctl argument */
-#define	SIX	24		/* print signal, masked with SIGNO_MASK */
+/* Number 24 now available for reuse */
 #define	MTF	25		/* print mount flags */
 #define	MFT	26		/* print mount file system type */
 #define	IOB	27		/* print contents of I/O buffer */

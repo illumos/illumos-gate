@@ -109,7 +109,6 @@ int	setpgrp();
 int	setuid();
 uintptr_t	shmsys();
 uint64_t	sidsys();
-int	ssig();
 int	sigprocmask();
 int	sigsuspend();
 int	sigaltstack();
@@ -486,7 +485,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 45 */ SYSENT_LOADABLE(),			/* (was proc lock) */
 	/* 46 */ SYSENT_CI("setgid",		setgid,		1),
 	/* 47 */ SYSENT_2CI("getgid",		getgid,		0),
-	/* 48 */ SYSENT_CI("sig",		ssig,		2),
+	/* 48 */ SYSENT_LOADABLE(),			/* (was ssig) */
 	/* 49 */ SYSENT_LOADABLE(),			/* msgsys */
 	/* 50 */ IF_x86(
 			SYSENT_CI("sysi86",	sysi86,		4),
@@ -889,7 +888,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 45 */ SYSENT_LOADABLE32(),			/* (was proc lock) */
 	/* 46 */ SYSENT_CI("setgid",		setgid,		1),
 	/* 47 */ SYSENT_2CI("getgid",		getgid,		0),
-	/* 48 */ SYSENT_CI("sig",		ssig,		2),
+	/* 48 */ SYSENT_LOADABLE32(),			/* (was ssig) */
 	/* 49 */ SYSENT_LOADABLE32(),			/* msgsys */
 	/* 50 */ IF_386_ABI(
 			SYSENT_CI("sysi86",	sysi86,		4),

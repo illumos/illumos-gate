@@ -1903,34 +1903,6 @@ pathconfname(int code)
 	return (str);
 }
 
-const char *
-sigarg(private_t *pri, int arg)
-{
-	char *str = NULL;
-	int sig = (arg & SIGNO_MASK);
-
-	str = pri->code_buf;
-	arg &= ~SIGNO_MASK;
-	if (arg & ~(SIGDEFER|SIGHOLD|SIGRELSE|SIGIGNORE|SIGPAUSE))
-		(void) snprintf(pri->code_buf, sizeof (pri->code_buf),
-		    "%s|0x%X", signame(pri, sig), arg);
-	else {
-		(void) strcpy(str, signame(pri, sig));
-		if (arg & SIGDEFER)
-			(void) strcat(str, "|SIGDEFER");
-		if (arg & SIGHOLD)
-			(void) strcat(str, "|SIGHOLD");
-		if (arg & SIGRELSE)
-			(void) strcat(str, "|SIGRELSE");
-		if (arg & SIGIGNORE)
-			(void) strcat(str, "|SIGIGNORE");
-		if (arg & SIGPAUSE)
-			(void) strcat(str, "|SIGPAUSE");
-	}
-
-	return ((const char *)str);
-}
-
 #define	ALL_O_FLAGS \
 	(O_NDELAY|O_APPEND|O_SYNC|O_DSYNC|O_NONBLOCK|O_CREAT|O_TRUNC\
 	|O_EXCL|O_NOCTTY|O_LARGEFILE|O_RSYNC|O_XATTR|O_NOFOLLOW|O_NOLINKS)

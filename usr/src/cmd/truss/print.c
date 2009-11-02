@@ -491,43 +491,9 @@ prt_opn(private_t *pri, int raw, long val)	/* print open code */
 }
 
 void
-prt_sig(private_t *pri, int raw, long val) /* print signal name plus flags */
+prt_sig(private_t *pri, int raw, long val)	/* print signal name */
 {
-	const char *s = raw? NULL : sigarg(pri, (int)val);
-
-	if (s == NULL)
-		prt_hex(pri, 0, val);
-	else
-		outstring(pri, s);
-}
-
-/* print signal name, masked with SIGNO_MASK */
-void
-prt_six(private_t *pri, int raw, long val)
-{
-	const char *s = raw? NULL : sigarg(pri, (int)val & SIGNO_MASK);
-
-	if (s == NULL)
-		prt_hex(pri, 0, val);
-	else
-		outstring(pri, s);
-}
-
-void
-prt_act(private_t *pri, int raw, long val)	/* print signal action value */
-{
-	const char *s;
-
-	if (raw)
-		s = NULL;
-	else if (val == (int)SIG_DFL)
-		s = "SIG_DFL";
-	else if (val == (int)SIG_IGN)
-		s = "SIG_IGN";
-	else if (val == (int)SIG_HOLD)
-		s = "SIG_HOLD";
-	else
-		s = NULL;
+	const char *s = raw? NULL : signame(pri, (int)val);
 
 	if (s == NULL)
 		prt_hex(pri, 0, val);
@@ -2659,7 +2625,7 @@ void (* const Print[])() = {
 	prt_uts,	/* UTS -- print utssys code */
 	prt_opn,	/* OPN -- print open code */
 	prt_sig,	/* SIG -- print signal name plus flags */
-	prt_act,	/* ACT -- print signal action value */
+	prt_nov,	/* Was ACT, now available for reuse */
 	prt_msc,	/* MSC -- print msgsys command */
 	prt_msf,	/* MSF -- print msgsys flags */
 	prt_smc,	/* SMC -- print semsys command */
@@ -2671,7 +2637,7 @@ void (* const Print[])() = {
 	prt_rst,	/* RST -- print string returned by syscall */
 	prt_smf,	/* SMF -- print streams message flags */
 	prt_ioa,	/* IOA -- print ioctl argument */
-	prt_six,	/* SIX -- print signal, masked with SIGNO_MASK */
+	prt_nov,	/* Was SIX, now available for reuse */
 	prt_mtf,	/* MTF -- print mount flags */
 	prt_mft,	/* MFT -- print mount file system type */
 	prt_iob,	/* IOB -- print contents of I/O buffer */

@@ -104,17 +104,6 @@ extern "C" {
 #define	SYS_plock	45
 #define	SYS_setgid	46
 #define	SYS_getgid	47
-#define	SYS_signal	48
-	/*
-	 * subcodes:
-	 *	signal(sig, f) :: signal(sig, f)    ((sig&SIGNO_MASK) == sig)
-	 *	sigset(sig, f) :: signal(sig|SIGDEFER, f)
-	 *	sighold(sig)   :: signal(sig|SIGHOLD)
-	 *	sigrelse(sig)  :: signal(sig|SIGRELSE)
-	 *	sigignore(sig) :: signal(sig|SIGIGNORE)
-	 *	sigpause(sig)  :: signal(sig|SIGPAUSE)
-	 *	see <sys/signal.h>
-	 */
 #define	SYS_msgsys	49
 	/*
 	 * subcodes:

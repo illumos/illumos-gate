@@ -18,19 +18,17 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef	_PROTO_H
 #define	_PROTO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/procset.h>
 
@@ -71,7 +69,6 @@ extern	const char *sfsname(int);
 extern	const char *plockname(int);
 extern	const char *si86name(int);
 extern	const char *utscode(int);
-extern	const char *sigarg(private_t *, int);
 extern	const char *openarg(private_t *, int);
 extern	const char *whencearg(int);
 extern	const char *msgflags(private_t *, int);

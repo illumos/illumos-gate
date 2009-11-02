@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,7 +94,7 @@ report_sleeping(private_t *pri, int dotrace)
 		(void) fputc('\t', stdout);
 	if (Lsp->pr_flags & PR_VFORKP)
 		(void) fputs("(waiting for child to exit()/exec()...)\n",
-			stdout);
+		    stdout);
 	else
 		(void) fputs("(sleeping...)\n", stdout);
 	pri->length = 0;
@@ -134,7 +132,7 @@ requested(private_t *pri, int flag, int dotrace)
 			putpname(pri);
 			timestamp(pri);
 			(void) printf("    Continued with signal #%d, %s",
-				sig, signame(pri, sig));
+			    sig, signame(pri, sig));
 			if (Lsp->pr_action.sa_handler == SIG_DFL)
 				(void) printf(" [default]");
 			else if (Lsp->pr_action.sa_handler == SIG_IGN)
@@ -174,11 +172,11 @@ jobcontrol(private_t *pri, int dotrace)
 		putpname(pri);
 		timestamp(pri);
 		(void) printf("    Stopped by signal #%d, %s",
-			sig, signame(pri, sig));
+		    sig, signame(pri, sig));
 		if ((Lsp->pr_flags & PR_ASLEEP) &&
 		    (sys = Lsp->pr_syscall) > 0 && sys <= PRMAXSYS)
 			(void) printf(", in %s()",
-				sysname(pri, sys, getsubcode(pri)));
+			    sysname(pri, sys, getsubcode(pri)));
 		(void) fputc('\n', stdout);
 		Flush();
 	}
@@ -252,11 +250,11 @@ signalled(private_t *pri, int flag, int dotrace)
 		putpname(pri);
 		timestamp(pri);
 		(void) printf("    Received signal #%d, %s",
-			sig, signame(pri, sig));
+		    sig, signame(pri, sig));
 		if ((Lsp->pr_flags & PR_ASLEEP) &&
 		    (sys = Lsp->pr_syscall) > 0 && sys <= PRMAXSYS)
 			(void) printf(", in %s()",
-				sysname(pri, sys, getsubcode(pri)));
+			    sysname(pri, sys, getsubcode(pri)));
 		if (Lsp->pr_action.sa_handler == SIG_DFL)
 			(void) printf(" [default]");
 		else if (Lsp->pr_action.sa_handler == SIG_IGN)
@@ -296,12 +294,12 @@ faulted(private_t *pri, int dotrace)
 	timestamp(pri);
 
 	(void) printf("    Incurred fault #%d, %s  %%pc = 0x%.8lX",
-		flt, proc_fltname(flt, pri->flt_name, sizeof (pri->flt_name)),
-		(long)Lsp->pr_reg[R_PC]);
+	    flt, proc_fltname(flt, pri->flt_name, sizeof (pri->flt_name)),
+	    (long)Lsp->pr_reg[R_PC]);
 
 	if (flt == FLTPAGE)
 		(void) printf("  addr = 0x%.8lX",
-			(long)Lsp->pr_info.si_addr);
+		    (long)Lsp->pr_info.si_addr);
 	(void) fputc('\n', stdout);
 	if (Lsp->pr_info.si_signo != 0)
 		print_siginfo(pri, &Lsp->pr_info);
@@ -329,7 +327,7 @@ setupsysargs(private_t *pri, int what)
 	(void) memset(pri->sys_args, 0, sizeof (pri->sys_args));
 	if (what != Lsp->pr_syscall) {	/* assertion */
 		(void) printf("%s\t*** Inconsistent syscall: %d vs %d ***\n",
-			pri->pname, what, Lsp->pr_syscall);
+		    pri->pname, what, Lsp->pr_syscall);
 	}
 	nargs = Lsp->pr_nsysarg;
 	for (i = 0;
@@ -422,11 +420,11 @@ sysentry(private_t *pri, int dotrace)
 				argv = (long)psinfo.pr_argv;
 				if (data_model == PR_MODEL_LP64)
 					(void) Pread(Proc, &offset,
-						sizeof (offset), argv);
+					    sizeof (offset), argv);
 				else {
 					offset32 = 0;
 					(void) Pread(Proc, &offset32,
-						sizeof (offset32), argv);
+					    sizeof (offset32), argv);
 					offset = offset32;
 				}
 			}
@@ -440,7 +438,7 @@ sysentry(private_t *pri, int dotrace)
 			while (len >= pri->sys_psize) {
 				free(pri->sys_path);
 				pri->sys_path = my_malloc(pri->sys_psize *= 2,
-					"pathname buffer");
+				    "pathname buffer");
 			}
 			(void) strcpy(pri->sys_path, s); /* remember pathname */
 		}
@@ -472,7 +470,7 @@ sysentry(private_t *pri, int dotrace)
 		name = sysname(pri, what, raw? -1 : subcode);
 		grow(pri, strlen(name) + 1);
 		pri->sys_leng = snprintf(pri->sys_string, pri->sys_ssize,
-			"%s(", name);
+		    "%s(", name);
 		for (i = 0; i < nargs; i++) {
 			arg = pri->sys_args[i];
 			x = stp->arg[i];
@@ -486,7 +484,7 @@ sysentry(private_t *pri, int dotrace)
 					outstring(pri, ", ");
 				if (x == LLO)
 					(*Print[x])(pri, raw, arg,
-						pri->sys_args[++i]);
+					    pri->sys_args[++i]);
 				else
 					(*Print[x])(pri, raw, arg);
 				/*
@@ -614,13 +612,13 @@ sysexit(private_t *pri, int dotrace)
 				pri->length += 8;
 			}
 			pri->length +=
-				7 + printf("\t(returning as child ...)");
+			    7 + printf("\t(returning as child ...)");
 		}
 		if (what == SYS_lwp_create &&
 		    pri->Errno == 0 && pri->Rval1 == 0) {
 			pri->length &= ~07;
 			pri->length +=
-				7 + printf("\t(returning as new lwp ...)");
+			    7 + printf("\t(returning as new lwp ...)");
 		}
 		if (pri->Errno != 0 ||
 		    (what != SYS_exec && what != SYS_execve)) {
@@ -721,16 +719,6 @@ sysexit(private_t *pri, int dotrace)
 #endif
 					fmt = "= 0x%.8lX";
 				}
-				break;
-			case SYS_signal:
-				if (raw)
-					/* EMPTY */;
-				else if (rv1 == (int)SIG_DFL)
-					fmt = "= SIG_DFL";
-				else if (rv1 == (int)SIG_IGN)
-					fmt = "= SIG_IGN";
-				else if (rv1 == (int)SIG_HOLD)
-					fmt = "= SIG_HOLD";
 				break;
 			case SYS_sigtimedwait:
 				if (raw)
@@ -860,8 +848,8 @@ sysexit(private_t *pri, int dotrace)
 			if (ISREAD(what) || ISWRITE(what)) {
 				if (pri->iob_buf[0] != '\0')
 					(void) printf("%s     0x%.8lX: %s\n",
-						pri->pname, pri->sys_args[1],
-						pri->iob_buf);
+					    pri->pname, pri->sys_args[1],
+					    pri->iob_buf);
 			}
 		}
 
@@ -928,7 +916,7 @@ showpaths(private_t *pri, const struct systable *stp)
 
 			if (s != (char *)NULL)
 				(void) printf("%s     0x%.8lX: \"%s\"\n",
-					pri->pname, addr, s);
+				    pri->pname, addr, s);
 		}
 	}
 }
@@ -958,14 +946,14 @@ showargs(private_t *pri, int raw)
 	if (data_model == PR_MODEL_LP64) {
 		int64_t xnargs;
 		ap = (long)(Lsp->pr_reg[R_SP]) + 16 * sizeof (int64_t)
-			+ STACK_BIAS;
+		    + STACK_BIAS;
 		fail = (Pread(Proc, &xnargs, sizeof (xnargs), ap) !=
-			sizeof (xnargs));
+		    sizeof (xnargs));
 		nargs = (int)xnargs;
 	} else {
 		ap = (long)(Lsp->pr_reg[R_SP]) + 16 * sizeof (int32_t);
 		fail = (Pread(Proc, &nargs, sizeof (nargs), ap) !=
-			sizeof (nargs));
+		    sizeof (nargs));
 	}
 	ap += ptrsize;
 #endif /* sparc */
@@ -1034,7 +1022,7 @@ dumpargs(private_t *pri, long ap, const char *str)
 	while (!interrupt) {
 		if (Pread(Proc, argaddr, ptrsize, ap) != ptrsize) {
 			(void) printf("\n%s\t*** Bad argument list? ***\n",
-				pri->pname);
+			    pri->pname);
 			return;
 		}
 		ap += ptrsize;
