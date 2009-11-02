@@ -306,7 +306,6 @@ establish_context()
 	gss_name_t				gss_name;
 	char					*gss_svc_name = "audit";
 	char					*svc_name;
-	size_t					ver_str_concat_len;
 	struct gss_channel_bindings_struct	input_chan_bindings;
 
 	/* GSS service name = gss_svc_name + "@" + remote hostname (fqdn) */
@@ -336,8 +335,7 @@ establish_context()
 	bzero(&input_chan_bindings, sizeof (input_chan_bindings));
 	input_chan_bindings.initiator_addrtype = GSS_C_AF_NULLADDR;
 	input_chan_bindings.acceptor_addrtype = GSS_C_AF_NULLADDR;
-	ver_str_concat_len = strlen(ver_str_concat) + 1;
-	input_chan_bindings.application_data.length = ver_str_concat_len;
+	input_chan_bindings.application_data.length = strlen(ver_str_concat);
 	input_chan_bindings.application_data.value = ver_str_concat;
 
 	(void) pthread_mutex_lock(&gss_ctx_lock);
