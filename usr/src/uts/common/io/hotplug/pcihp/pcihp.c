@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -257,9 +257,6 @@ static void pcihp_config_teardown(ddi_acc_handle_t *,
 static int pcihp_get_board_type(struct pcihp_slotinfo *);
 /* sysevent function */
 static void pcihp_gen_sysevent(char *, int, int, dev_info_t *, int);
-
-extern int pcicfg_configure(dev_info_t *, uint_t);
-extern int pcicfg_unconfigure(dev_info_t *, uint_t);
 
 static int pcihp_list_occupants(dev_info_t *, void *);
 static int pcihp_indirect_map(dev_info_t *dip);
@@ -1558,7 +1555,8 @@ pcihp_configure_ap(pcihp_t *pcihp_p, int pci_dev)
 	/*
 	 * Call the configurator to configure the card.
 	 */
-	if (pcicfg_configure(self, pci_dev) != PCICFG_SUCCESS) {
+	if (pcicfg_configure(self, pci_dev, PCICFG_ALL_FUNC, 0)
+	    != PCICFG_SUCCESS) {
 		if (slotinfop->slot_type & HPC_SLOT_TYPE_CPCI) {
 			if (pcihp_cpci_blue_led)
 				pcihp_hs_csr_op(pcihp_p, pci_dev,
@@ -1717,8 +1715,8 @@ pcihp_unconfigure_ap(pcihp_t *pcihp_p, int pci_dev)
 			(void) hpc_nexus_control(slotinfop->slot_hdl,
 			    HPC_CTRL_DEV_UNCONFIG_START, NULL);
 
-			if (pcicfg_unconfigure(self,
-			    pci_dev) == PCICFG_SUCCESS) {
+			if (pcicfg_unconfigure(self, pci_dev,
+			    PCICFG_ALL_FUNC, 0) == PCICFG_SUCCESS) {
 				/*
 				 * Now that resources are freed,
 				 * clear EXT and Turn LED ON.
@@ -2155,7 +2153,8 @@ pcihp_new_slot_state(dev_info_t *dip, hpc_slot_t hdl,
 			/*
 			 * Call the configurator to configure the card.
 			 */
-			if (pcicfg_configure(dip, pci_dev) != PCICFG_SUCCESS) {
+			if (pcicfg_configure(dip, pci_dev, PCICFG_ALL_FUNC, 0)
+			    != PCICFG_SUCCESS) {
 				if (slotinfop->slot_type & HPC_SLOT_TYPE_CPCI) {
 					if (pcihp_cpci_blue_led)
 						pcihp_hs_csr_op(pcihp_p,
@@ -2465,7 +2464,8 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 		/*
 		 * Call the configurator to configure the card.
 		 */
-		if (pcicfg_configure(pcihp_p->dip, pci_dev) != PCICFG_SUCCESS) {
+		if (pcicfg_configure(pcihp_p->dip, pci_dev, PCICFG_ALL_FUNC, 0)
+		    != PCICFG_SUCCESS) {
 			if (slotinfop->slot_type & HPC_SLOT_TYPE_CPCI) {
 				if (pcihp_cpci_blue_led)
 					pcihp_hs_csr_op(pcihp_p, pci_dev,
@@ -2611,8 +2611,8 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 				(void) hpc_nexus_control(slotinfop->slot_hdl,
 				    HPC_CTRL_DEV_UNCONFIG_START, NULL);
 
-				if (pcicfg_unconfigure(pcihp_p->dip,
-				    pci_dev) == PCICFG_SUCCESS) {
+				if (pcicfg_unconfigure(pcihp_p->dip, pci_dev,
+				    PCICFG_ALL_FUNC, 0) == PCICFG_SUCCESS) {
 
 				/* Resources freed. Turn LED on. Clear EXT. */
 				if (slotinfop->slot_type & HPC_SLOT_TYPE_CPCI) {

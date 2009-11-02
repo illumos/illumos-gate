@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  *	Sun4u PCI to PCI bus bridge nexus driver
  */
@@ -35,7 +34,7 @@
 #include <sys/autoconf.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_subrdefs.h>
-#include <sys/pcie.h>
+#include <sys/pci_impl.h>
 #include <sys/pcie_impl.h>
 #include <sys/pci_cap.h>
 #include <sys/pci/pci_nexus.h>
@@ -47,6 +46,7 @@
 #include <sys/ddifm.h>
 #include <sys/pci/pci_pwr.h>
 #include <sys/pci/pci_debug.h>
+#include <sys/hotplug/pci/pcie_hp.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/open.h>
 #include <sys/stat.h>
@@ -130,7 +130,8 @@ struct bus_ops ppb_bus_ops = {
 	ppb_bus_enter,			/* (*bus_enter)()		*/
 	ppb_bus_exit,			/* (*bus_exit)()		*/
 	ppb_bus_power,			/* (*bus_power)()		*/
-	ppb_intr_ops			/* (*bus_intr_op)(); 		*/
+	ppb_intr_ops,			/* (*bus_intr_op)(); 		*/
+	pcie_hp_common_ops		/* (*bus_hp_op)(); 		*/
 };
 
 static int ppb_open(dev_t *devp, int flags, int otyp, cred_t *credp);
@@ -164,7 +165,7 @@ static struct cb_ops ppb_cb_ops = {
 static int ppb_probe(dev_info_t *);
 static int ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd);
 static int ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
-static int ppb_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
+static int ppb_info(dev_info_t *dip, ddi_info_cmd_t cmd,
     void *arg, void **result);
 static int ppb_pwr(dev_info_t *dip, int component, int level);
 
@@ -238,9 +239,6 @@ typedef struct {
 
 	kmutex_t ppb_mutex;
 	uint_t ppb_soft_state;
-#define	PPB_SOFT_STATE_CLOSED		0x00
-#define	PPB_SOFT_STATE_OPEN		0x01
-#define	PPB_SOFT_STATE_OPEN_EXCL	0x02
 	int fm_cap;
 	ddi_iblock_cookie_t fm_ibc;
 
@@ -328,16 +326,18 @@ _info(struct modinfo *modinfop)
 
 /*ARGSUSED*/
 static int
-ppb_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
+ppb_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
-	ppb_devstate_t *ppb_p;	/* per ppb state pointer */
 	minor_t		minor = getminor((dev_t)arg);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
-
-	ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(minor);
+	ppb_devstate_t	*ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
 	    instance);
 
-	switch (infocmd) {
+
+	if (ppb_p->parent_bus != PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+		return (pcihp_info(dip, cmd, arg, result));
+
+	switch (cmd) {
 	default:
 		return (DDI_FAILURE);
 
@@ -364,9 +364,12 @@ ppb_probe(register dev_info_t *devi)
 static int
 ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
+	dev_info_t *root = ddi_root_node();
 	int instance;
 	ppb_devstate_t *ppb;
+	dev_info_t *pdip;
 	ddi_acc_handle_t config_handle;
+	char *bus;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -386,7 +389,7 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		ppb = (ppb_devstate_t *)ddi_get_soft_state(ppb_state, instance);
 		ppb->dip = devi;
 		mutex_init(&ppb->ppb_mutex, NULL, MUTEX_DRIVER, NULL);
-		ppb->ppb_soft_state = PPB_SOFT_STATE_CLOSED;
+		ppb->ppb_soft_state = PCI_SOFT_STATE_CLOSED;
 		if (pci_config_setup(devi, &config_handle) != DDI_SUCCESS) {
 			mutex_destroy(&ppb->ppb_mutex);
 			ddi_soft_state_free(ppb_state, instance);
@@ -435,30 +438,32 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			mutex_exit(&ppb->ppb_pwr_p->pwr_mutex);
 		}
 
+		ppb->parent_bus = PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO;
+		for (pdip = ddi_get_parent(ppb->dip); pdip && (pdip != root) &&
+		    (ppb->parent_bus != PCIE_PCIECAP_DEV_TYPE_PCIE_DEV);
+		    pdip = ddi_get_parent(pdip)) {
+			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
+			    DDI_PROP_DONTPASS, "device_type", &bus) !=
+			    DDI_PROP_SUCCESS)
+				break;
+
+			if (strcmp(bus, "pciex") == 0)
+				ppb->parent_bus =
+				    PCIE_PCIECAP_DEV_TYPE_PCIE_DEV;
+
+			ddi_prop_free(bus);
+		}
+
 		/*
-		 * Initialize hotplug support on this bus. At minimum
-		 * (for non hotplug bus) this would create ":devctl" minor
-		 * node to support DEVCTL_DEVICE_* and DEVCTL_BUS_* ioctls
-		 * to this bus. This all takes place if this nexus has hot-plug
-		 * slots and successfully initializes Hot Plug Framework.
+		 * Initialize hotplug support on this bus.
 		 */
-		ppb->hotplug_capable = B_FALSE;
-		ppb_init_hotplug(ppb);
-		if (ppb->hotplug_capable == B_FALSE) {
-			/*
-			 * create minor node for devctl interfaces
-			 */
-			if (ddi_create_minor_node(devi, "devctl", S_IFCHR,
-			    PCIHP_AP_MINOR_NUM(instance, PCIHP_DEVCTL_MINOR),
-			    DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
-				if (ppb->ppb_pwr_p != NULL) {
-					ppb_pwr_teardown(ppb, devi);
-				}
-				mutex_destroy(&ppb->ppb_mutex);
-				ddi_soft_state_free(ppb_state, instance);
+		if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+			if (pcie_init(devi, NULL) != DDI_SUCCESS) {
+				(void) ppb_detach(devi, DDI_DETACH);
 				return (DDI_FAILURE);
 			}
-		}
+		else
+			ppb_init_hotplug(ppb);
 
 		DEBUG1(DBG_ATTACH, devi,
 		    "ppb_attach(): this nexus %s hotplug slots\n",
@@ -488,6 +493,7 @@ static int
 ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
 	ppb_devstate_t *ppb;
+	int		ret = DDI_SUCCESS;
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -500,11 +506,15 @@ ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 		ppb_fm_fini(ppb);
 
-		if (ppb->hotplug_capable == B_TRUE)
-			if (pcihp_uninit(devi) == DDI_FAILURE)
-				return (DDI_FAILURE);
+		if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+			ret = pcie_uninit(devi);
+		else if (ppb->hotplug_capable == B_TRUE)
+			ret = pcihp_init(devi);
 		else
 			ddi_remove_minor_node(devi, "devctl");
+
+		if (ret != DDI_SUCCESS)
+			return (DDI_FAILURE);
 
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, devi, "device_type");
 
@@ -1428,6 +1438,8 @@ ppb_pwr(dev_info_t *dip, int component, int lvl)
 static void
 ppb_init_hotplug(ppb_devstate_t *ppb)
 {
+	ppb->hotplug_capable = B_FALSE;
+
 	if (ddi_prop_exists(DDI_DEV_T_ANY, ppb->dip, DDI_PROP_DONTPASS,
 	    "hotplug-capable")) {
 		(void) modload("misc", "pcihp");
@@ -1441,6 +1453,18 @@ ppb_init_hotplug(ppb_devstate_t *ppb)
 			ppb->hotplug_capable = B_TRUE;
 	}
 
+	if (ppb->hotplug_capable == B_FALSE) {
+		/*
+		 * create minor node for devctl interfaces
+		 */
+		if (ddi_create_minor_node(ppb->dip, "devctl", S_IFCHR,
+		    PCI_MINOR_NUM(ddi_get_instance(ppb->dip), PCI_DEVCTL_MINOR),
+		    DDI_NT_NEXUS, 0) != DDI_SUCCESS)
+			cmn_err(CE_WARN,
+			    "%s #%d: Failed to create a minor node",
+			    ddi_driver_name(ppb->dip),
+			    ddi_get_instance(ppb->dip));
+	}
 }
 
 static void
@@ -1516,9 +1540,8 @@ ppb_create_ranges_prop(dev_info_t *dip,
 static int
 ppb_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 {
-	ppb_devstate_t *ppb_p;
-	minor_t		minor = getminor(*devp);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(getminor(*devp));
+	ppb_devstate_t	*ppb_p = ddi_get_soft_state(ppb_state, instance);
 
 	/*
 	 * Make sure the open is for the right file type.
@@ -1526,35 +1549,44 @@ ppb_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	if (otyp != OTYP_CHR)
 		return (EINVAL);
 
-	/*
-	 * Get the soft state structure for the device.
-	 */
-	ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
-	    instance);
-
 	if (ppb_p == NULL)
 		return (ENXIO);
 
-	if (ppb_p->hotplug_capable == B_TRUE)
-		return ((pcihp_get_cb_ops())->cb_open(devp, flags,
-		    otyp, credp));
+	mutex_enter(&ppb_p->ppb_mutex);
+
+	/*
+	 * Ioctls will be handled by SPARC PCI Express framework for all
+	 * PCIe platforms
+	 */
+	if (ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
+		int	rv;
+
+		rv = pcie_open(ppb_p->dip, devp, flags, otyp, credp);
+		mutex_exit(&ppb_p->ppb_mutex);
+
+		return (rv);
+	} else if (ppb_p->hotplug_capable == B_TRUE) {
+		mutex_exit(&ppb_p->ppb_mutex);
+
+		return ((pcihp_get_cb_ops())->cb_open(devp, flags, otyp,
+		    credp));
+	}
 
 	/*
 	 * Handle the open by tracking the device state.
 	 */
-	mutex_enter(&ppb_p->ppb_mutex);
 	if (flags & FEXCL) {
-		if (ppb_p->ppb_soft_state != PPB_SOFT_STATE_CLOSED) {
+		if (ppb_p->ppb_soft_state != PCI_SOFT_STATE_CLOSED) {
 			mutex_exit(&ppb_p->ppb_mutex);
 			return (EBUSY);
 		}
-		ppb_p->ppb_soft_state = PPB_SOFT_STATE_OPEN_EXCL;
+		ppb_p->ppb_soft_state = PCI_SOFT_STATE_OPEN_EXCL;
 	} else {
-		if (ppb_p->ppb_soft_state == PPB_SOFT_STATE_OPEN_EXCL) {
+		if (ppb_p->ppb_soft_state == PCI_SOFT_STATE_OPEN_EXCL) {
 			mutex_exit(&ppb_p->ppb_mutex);
 			return (EBUSY);
 		}
-		ppb_p->ppb_soft_state = PPB_SOFT_STATE_OPEN;
+		ppb_p->ppb_soft_state = PCI_SOFT_STATE_OPEN;
 	}
 	mutex_exit(&ppb_p->ppb_mutex);
 	return (0);
@@ -1565,25 +1597,34 @@ ppb_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 static int
 ppb_close(dev_t dev, int flags, int otyp, cred_t *credp)
 {
-	ppb_devstate_t *ppb_p;
-	minor_t		minor = getminor(dev);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
+	ppb_devstate_t	*ppb_p = ddi_get_soft_state(ppb_state, instance);
 
 	if (otyp != OTYP_CHR)
 		return (EINVAL);
 
-	ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
-	    instance);
-
 	if (ppb_p == NULL)
 		return (ENXIO);
 
-	if (ppb_p->hotplug_capable == B_TRUE)
-		return ((pcihp_get_cb_ops())->cb_close(dev, flags,
-		    otyp, credp));
-
 	mutex_enter(&ppb_p->ppb_mutex);
-	ppb_p->ppb_soft_state = PPB_SOFT_STATE_CLOSED;
+	/*
+	 * Ioctls will be handled by SPARC PCI Express framework for all
+	 * PCIe platforms
+	 */
+	if (ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
+		int	rv;
+
+		rv = pcie_close(ppb_p->dip, dev, flags, otyp, credp);
+		mutex_exit(&ppb_p->ppb_mutex);
+
+		return (rv);
+	} else if (ppb_p->hotplug_capable == B_TRUE) {
+		mutex_exit(&ppb_p->ppb_mutex);
+		return ((pcihp_get_cb_ops())->cb_close(dev, flags, otyp,
+		    credp));
+	}
+
+	ppb_p->ppb_soft_state = PCI_SOFT_STATE_CLOSED;
 	mutex_exit(&ppb_p->ppb_mutex);
 	return (0);
 }
@@ -1597,23 +1638,26 @@ static int
 ppb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	int *rvalp)
 {
-	ppb_devstate_t *ppb_p;
-	dev_info_t *self;
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
+	ppb_devstate_t	*ppb_p = ddi_get_soft_state(ppb_state, instance);
 	struct devctl_iocdata *dcp;
-	uint_t bus_state;
-	int rv = 0;
-	minor_t		minor = getminor(dev);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
-
-	ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
-	    instance);
+	uint_t		bus_state;
+	dev_info_t	*self;
+	int		rv = 0;
 
 	if (ppb_p == NULL)
 		return (ENXIO);
 
-	if (ppb_p->hotplug_capable == B_TRUE)
-		return ((pcihp_get_cb_ops())->cb_ioctl(dev, cmd,
-		    arg, mode, credp, rvalp));
+	/*
+	 * Ioctls will be handled by SPARC PCI Express framework for all
+	 * PCIe platforms
+	 */
+	if (ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+		return (pcie_ioctl(ppb_p->dip, dev, cmd, arg, mode, credp,
+		    rvalp));
+	else if (ppb_p->hotplug_capable == B_TRUE)
+		return ((pcihp_get_cb_ops())->cb_ioctl(dev, cmd, arg, mode,
+		    credp, rvalp));
 
 	self = ppb_p->dip;
 
@@ -1670,24 +1714,23 @@ ppb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	return (rv);
 }
 
-static int ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
-    int flags, char *name, caddr_t valuep, int *lengthp)
+static int
+ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int flags,
+    char *name, caddr_t valuep, int *lengthp)
 {
-	ppb_devstate_t *ppb_p;
-	minor_t		minor = getminor(dev);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
-
-	ppb_p = (ppb_devstate_t *)ddi_get_soft_state(ppb_state,
-	    instance);
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
+	ppb_devstate_t	*ppb_p = (ppb_devstate_t *)
+	    ddi_get_soft_state(ppb_state, instance);
 
 	if (ppb_p == NULL)
 		return (ENXIO);
 
-	if (ppb_p->hotplug_capable == B_TRUE)
-		return ((pcihp_get_cb_ops())->cb_prop_op(dev, dip, prop_op,
-		    flags, name, valuep, lengthp));
+	if (ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+		return (pcie_prop_op(dev, dip, prop_op, flags, name,
+		    valuep, lengthp));
 
-	return (ddi_prop_op(dev, dip, prop_op, flags, name, valuep, lengthp));
+	return ((pcihp_get_cb_ops())->cb_prop_op(dev, dip, prop_op, flags,
+	    name, valuep, lengthp));
 }
 
 /*
@@ -1696,10 +1739,6 @@ static int ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 static void
 ppb_fm_init(ppb_devstate_t *ppb_p)
 {
-	dev_info_t *root = ddi_root_node();
-	dev_info_t *pdip;
-	char *bus;
-
 	ppb_p->fm_cap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
 	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 
@@ -1717,21 +1756,6 @@ ppb_fm_init(ppb_devstate_t *ppb_p)
 	 * Register error callback with our parent.
 	 */
 	ddi_fm_handler_register(ppb_p->dip, ppb_err_callback, NULL);
-
-	ppb_p->parent_bus = PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO;
-	for (pdip = ddi_get_parent(ppb_p->dip); pdip && (pdip != root) &&
-	    (ppb_p->parent_bus != PCIE_PCIECAP_DEV_TYPE_PCIE_DEV);
-	    pdip = ddi_get_parent(pdip)) {
-		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
-		    DDI_PROP_DONTPASS, "device_type", &bus) !=
-		    DDI_PROP_SUCCESS)
-			break;
-
-		if (strcmp(bus, "pciex") == 0)
-			ppb_p->parent_bus = PCIE_PCIECAP_DEV_TYPE_PCIE_DEV;
-
-		ddi_prop_free(bus);
-	}
 }
 
 /*

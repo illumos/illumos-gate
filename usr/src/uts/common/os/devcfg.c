@@ -407,6 +407,7 @@ i_ddi_free_node(dev_info_t *dip)
 	ASSERT(devi->devi_addr == NULL);
 	ASSERT(devi->devi_node_state == DS_PROTO);
 	ASSERT(devi->devi_child == NULL);
+	ASSERT(devi->devi_hp_hdlp == NULL);
 
 #if defined(__x86) && !defined(__xpv)
 	for (gfxp = gfx_devinfo_list; gfxp; gfxp = gfxp->g_next) {
@@ -652,7 +653,7 @@ link_node(dev_info_t *dip)
 	 * This is a temporary workaround for Bug 4618861.
 	 * We keep the scsi_vhci nexus node on the left side of the devinfo
 	 * tree (under the root nexus driver), so that virtual nodes under
-	 * scsi_vhci will be SUSPENDed first and RESUMEd last.  This ensures
+	 * scsi_vhci will be SUSPENDed first and RESUMEd last.	This ensures
 	 * that the pHCI nodes are active during times when their clients
 	 * may be depending on them.  This workaround embodies the knowledge
 	 * that system PM and CPR both traverse the tree left-to-right during
@@ -695,6 +696,7 @@ unlink_node(dev_info_t *dip)
 	struct dev_info *devi = DEVI(dip);
 	struct dev_info *parent = devi->devi_parent;
 	dev_info_t **dipp;
+	ddi_hp_cn_handle_t *hdlp;
 
 	ASSERT(parent != NULL);
 	ASSERT(devi->devi_node_state == DS_LINKED);
@@ -737,6 +739,11 @@ unlink_node(dev_info_t *dip)
 		remove_from_dn_list(&orphanlist, dip);
 	}
 
+	/* Update parent's hotplug handle list */
+	for (hdlp = DEVI(parent)->devi_hp_hdlp; hdlp; hdlp = hdlp->next) {
+		if (hdlp->cn_info.cn_child == dip)
+			hdlp->cn_info.cn_child = NULL;
+	}
 	return (DDI_SUCCESS);
 }
 
@@ -2453,7 +2460,7 @@ i_ddi_get_exported_classes(dev_info_t *dip, char ***classes)
 	n += get_class(ddi_driver_name(dip), buf);
 	unlock_hw_class_list();
 
-	ASSERT(n == nclass);    /* make sure buf wasn't overrun */
+	ASSERT(n == nclass);	/* make sure buf wasn't overrun */
 	return (nclass);
 }
 
@@ -3094,7 +3101,7 @@ debug_dtree(dev_info_t *devi, struct dev_info *adevi, char *service)
 }
 #else /* DEBUG */
 #define	debug_dtree(a1, a2, a3)	 /* nothing */
-#endif  /* DEBUG */
+#endif	/* DEBUG */
 
 static void
 ddi_optimize_dtree(dev_info_t *devi)
@@ -3288,7 +3295,7 @@ i_ddi_forceattach_drivers()
 	 * when uhci/ohci reset themselves, it induces a port change on
 	 * the ehci companion controller.  Since there's no interrupt handler
 	 * installed at the time, the moment that interrupt is unmasked, an
-	 * interrupt storm will occur.  All this is averted when ehci is
+	 * interrupt storm will occur.	All this is averted when ehci is
 	 * loaded first.  And now you know..... the REST of the story.
 	 *
 	 * Regardless of platform, ehci needs to initialize first to avoid
@@ -4226,7 +4233,7 @@ reset_leaves(void)
  * outstanding attach or detach operations in progress when quiesce_devices() or
  * reset_leaves()is invoked.  It must be called before the system becomes
  * single-threaded because device attach and detach are multi-threaded
- * operations.  (note that during system shutdown the system doesn't actually
+ * operations.	(note that during system shutdown the system doesn't actually
  * become single-thread since other threads still exist, but the shutdown thread
  * will disable preemption for itself, raise it's pil, and stop all the other
  * cpus in the system there by effectively making the system single-threaded.)
@@ -4420,7 +4427,7 @@ unbind_children_by_driver(dev_info_t *dip, void *arg)
 	 * We are called either from rem_drv or update_drv when reloading
 	 * a driver.conf file. In either case, we unbind persistent nodes
 	 * and destroy .conf nodes. In the case of rem_drv, this will be
-	 * the final state. In the case of update_drv,  i_ddi_bind_devs()
+	 * the final state. In the case of update_drv,	i_ddi_bind_devs()
 	 * may be invoked later to re-enumerate (new) driver.conf rebind
 	 * persistent nodes.
 	 */
@@ -5371,7 +5378,7 @@ devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **cdipp,
 	 * We may have a genericname on a system that creates drivername
 	 * nodes (from .conf files).  Find the drivername by nodeid. If we
 	 * can't find a node with devnm as the node name then we search by
-	 * drivername.  This allows an implementation to supply a genericly
+	 * drivername.	This allows an implementation to supply a genericly
 	 * named boot path (disk) and locate drivename nodes (sd).  The
 	 * NDI_PROMNAME flag does not apply to /devices/pseudo paths.
 	 */
@@ -8480,7 +8487,7 @@ e_ddi_unretire_device(char *path)
 static int
 mark_and_fence(dev_info_t *dip, void *arg)
 {
-	char    *fencepath = (char *)arg;
+	char	*fencepath = (char *)arg;
 
 	/*
 	 * We have already decided to retire this device. The various
@@ -8541,7 +8548,7 @@ i_ddi_check_retire(dev_info_t *dip)
 	    (void *)dip, path));
 
 	/*
-	 * Check if this device is in the "retired" store i.e.  should
+	 * Check if this device is in the "retired" store i.e.	should
 	 * be retired. If not, we have nothing to do.
 	 */
 	if (e_ddi_device_retired(path) == 0) {

@@ -149,7 +149,6 @@ I915_OBJS += i915_dma.o i915_drv.o i915_irq.o i915_mem.o
 NSKERN_OBJS += nsc_asm.o
 PCICFG_OBJS += pcicfg.o
 PCI_PCINEXUS_OBJS += pci_pci.o
-PCIEHPCNEXUS_OBJS += pciehpc_acpi.o
 PCIEB_OBJS += pcieb_x86.o
 PIT_BEEP_OBJS += pit_beep.o
 POWER_OBJS += power.o

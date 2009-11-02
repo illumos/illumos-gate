@@ -475,6 +475,8 @@ f none usr/lib/help/auths/locale/C/DevGrant.html 444 root bin
 f none usr/lib/help/auths/locale/C/DevRevoke.html 444 root bin
 f none usr/lib/help/auths/locale/C/DhcpmgrHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/DhcpmgrWrite.html 444 root bin
+f none usr/lib/help/auths/locale/C/HotplugHeader.html 444 root bin
+f none usr/lib/help/auths/locale/C/HotplugModify.html 444 root bin
 f none usr/lib/help/auths/locale/C/JobHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/JobsGrant.html 444 root bin
 f none usr/lib/help/auths/locale/C/LoginEnable.html 444 root bin
@@ -494,6 +496,7 @@ f none usr/lib/help/auths/locale/C/SmfExAcctTaskStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfExAcctNetStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfManageHeader.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfManageHotplug.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfMDNSStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfModifyAppl.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfModifyDepend.html 444 root bin
@@ -586,6 +589,7 @@ f none usr/lib/help/profiles/locale/C/RtDeviceSecurity.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtFTPMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtFileSysMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtFileSysSecurity.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtHotplugMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtInetdMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtIPFilterMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtKerberosClntMngmnt.html 444 root bin
@@ -633,6 +637,7 @@ f none usr/lib/help/profiles/locale/C/RtCPUPowerManagement.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtMMSAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtMMSOper.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtMMSUser.html 444 root bin
+f none usr/lib/hotplugd 555 root bin
 d none usr/lib/iconv 755 root bin
 f none usr/lib/iconv/646da.8859.t 444 root bin
 f none usr/lib/iconv/646de.8859.t 444 root bin
@@ -864,6 +869,7 @@ f none usr/sbin/groupmod 555 root sys
 f none usr/sbin/grpck 555 root bin
 f none usr/sbin/halt 755 root bin
 s none usr/sbin/hostconfig=../../sbin/hostconfig
+f none usr/sbin/hotplug 555 root bin
 f none usr/sbin/idmap 555 root bin
 f none usr/sbin/if_mpadm 555 root bin
 s none usr/sbin/ifconfig=../../sbin/ifconfig

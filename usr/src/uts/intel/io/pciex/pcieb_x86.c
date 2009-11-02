@@ -667,15 +667,3 @@ pcieb_plat_ctlops(dev_info_t *rdip, ddi_ctl_enum_t ctlop, void *arg)
 
 	return (DDI_SUCCESS);
 }
-
-void
-pcieb_plat_ioctl_hotplug(dev_info_t *dip, int rv, int cmd)
-{
-	/*
-	 * like in attach, since hotplugging can change error registers,
-	 * we need to ensure that the proper bits are set on this port
-	 * after a configure operation
-	 */
-	if ((rv == HPC_SUCCESS) && (cmd == DEVCTL_AP_CONFIGURE))
-		pcieb_intel_error_workaround(dip);
-}

@@ -1041,14 +1041,12 @@ fcnname/**/_info:							\
 #endif
 
 /*
- * Stubs for PCIEHPC (pci-ex hot plug support) module (misc/pciehpc).
+ * Stubs for pcieb nexus driver.
  */
-#ifndef	PCIEHPC_MODULE
-	MODULE(pciehpc,misc);
-	STUB(pciehpc, pciehpc_init, 0);
-	STUB(pciehpc, pciehpc_uninit, 0);
-	WSTUB(pciehpc, pciehpc_intr, nomod_zero);
-	END_MODULE(pciehpc);
+#ifndef PCIEB_MODULE
+	MODULE(pcieb,drv);
+	STUB(pcieb, pcieb_intel_error_workaround, 0);
+	END_MODULE(pcieb);
 #endif
 
 #ifndef IWSCN_MODULE

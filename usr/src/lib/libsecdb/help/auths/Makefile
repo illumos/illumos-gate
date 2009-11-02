@@ -36,6 +36,8 @@ HTMLENTS = \
 	DevCDRW.html \
 	DevGrant.html \
 	DevRevoke.html \
+        HotplugHeader.html \
+	HotplugModify.html \
 	JobHeader.html \
 	AuthJobsAdmin.html \
 	JobsGrant.html \
@@ -75,6 +77,7 @@ HTMLENTS = \
 	SmfInetdStates.html \
 	SmfIPsecStates.html \
 	SmfManageHeader.html \
+	SmfManageHotplug.html \
 	SmfMDNSStates.html \
 	SmfModifyAppl.html \
 	SmfModifyDepend.html \

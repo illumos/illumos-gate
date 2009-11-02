@@ -70,7 +70,6 @@ typedef enum {	/* same sequence as pcieb_debug_sym[] */
 #define	PX_MDT_11	0x01
 #define	PX_MDT_22	0x10
 
-
 #define	NUM_LOGICAL_SLOTS	32
 #define	PCIEB_RANGE_LEN		2
 #define	PCIEB_32BIT_IO		1
@@ -82,29 +81,8 @@ typedef enum {	/* same sequence as pcieb_debug_sym[] */
 #define	PCIEB_LADDR(lo, hi) (((uint16_t)(hi) << 16) | (uint16_t)(lo))
 #define	PCIEB_32bit_MEMADDR(addr) (PCIEB_LADDR(0, ((uint16_t)(addr) & 0xFFF0)))
 
-/*
- * The following typedef is used to represent an entry in the "ranges"
- * property of a device node.
- */
-typedef struct {
-	uint32_t	child_high;
-	uint32_t	child_mid;
-	uint32_t	child_low;
-	uint32_t	parent_high;
-	uint32_t	parent_mid;
-	uint32_t	parent_low;
-	uint32_t	size_high;
-	uint32_t	size_low;
-} pcieb_ranges_t;
-
-typedef enum { HPC_NONE, HPC_PCIE, HPC_SHPC, HPC_OUTBAND } pcieb_hpc_type_t;
-
 typedef struct {
 	dev_info_t		*pcieb_dip;
-
-	/* Hotplug support */
-	boolean_t		pcieb_hotplug_capable;
-	pcieb_hpc_type_t	pcieb_hpc_type;
 
 	/* Interrupt support */
 	ddi_intr_handle_t	*pcieb_htable;		/* Intr Handlers */
@@ -114,7 +92,6 @@ typedef struct {
 	int			pcieb_intr_type;	/* (MSI | FIXED) */
 	int			pcieb_isr_tab[4];	/* MSI source offset */
 
-	uint_t			pcieb_soft_state;
 	int			pcieb_init_flags;
 	kmutex_t		pcieb_mutex;		/* Soft state mutex */
 	kmutex_t		pcieb_intr_mutex;	/* Intr handler mutex */
@@ -156,13 +133,13 @@ extern void *pcieb_state;
  */
 #define	NVIDIA_VENDOR_ID	0x10de	/* Nvidia Vendor Id */
 
-#ifdef	BCM_SW_WORKAROUNDS
+#ifdef	PCIEB_BCM
 
 /* Workaround for address space limitation in Broadcom 5714/5715 */
 #define	PCIEB_ADDR_LIMIT_LO		0ull
 #define	PCIEB_ADDR_LIMIT_HI		((1ull << 40) - 1)
 
-#endif	/* BCM_SW_WORKAROUNDS */
+#endif	/* PCIEB_BCM */
 
 /*
  * The following values are used to initialize the cache line size
@@ -177,7 +154,6 @@ extern void	pcieb_plat_attach_workaround(dev_info_t *dip);
 extern void 	pcieb_plat_intr_attach(pcieb_devstate_t *pcieb);
 extern void 	pcieb_plat_initchild(dev_info_t *child);
 extern void 	pcieb_plat_uninitchild(dev_info_t *child);
-extern void 	pcieb_plat_ioctl_hotplug(dev_info_t *dip, int rv, int cmd);
 extern int	pcieb_plat_ctlops(dev_info_t *rdip, ddi_ctl_enum_t ctlop,
     void *arg);
 extern int 	pcieb_plat_pcishpc_probe(dev_info_t *dip,

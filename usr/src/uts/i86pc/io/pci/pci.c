@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -163,9 +163,9 @@ static int pci_initchild(dev_info_t *child);
  */
 
 static struct modldrv modldrv = {
-	&mod_driverops, /* Type of module */
-	"host to PCI nexus driver",
-	&pci_ops,	/* driver ops */
+	&mod_driverops, 			/* Type of module */
+	"x86 Host to PCI nexus driver",		/* Name of module */
+	&pci_ops,				/* driver ops */
 };
 
 static struct modlinkage modlinkage = {
@@ -247,6 +247,7 @@ pci_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	pcip->pci_dip = devi;
+	pcip->pci_soft_state = PCI_SOFT_STATE_CLOSED;
 
 	/*
 	 * Initialize hotplug support on this bus. At minimum
@@ -267,6 +268,7 @@ pci_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pcip->pci_fmcap = DDI_FM_ERRCB_CAPABLE |
 	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
 	ddi_fm_init(devi, &pcip->pci_fmcap, &pcip->pci_fm_ibc);
+	mutex_init(&pcip->pci_mutex, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&pcip->pci_err_mutex, NULL, MUTEX_DRIVER,
 	    (void *)pcip->pci_fm_ibc);
 	mutex_init(&pcip->pci_peek_poke_mutex, NULL, MUTEX_DRIVER,
@@ -306,6 +308,7 @@ pci_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		}
 		mutex_destroy(&pcip->pci_peek_poke_mutex);
 		mutex_destroy(&pcip->pci_err_mutex);
+		mutex_destroy(&pcip->pci_mutex);
 		ddi_fm_fini(devi);	/* Uninitialize pcitool support. */
 		pcitool_uninit(devi);
 
@@ -768,14 +771,28 @@ static int
 pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 {
 	minor_t		minor = getminor(dev);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(minor);
 	pci_state_t	*pci_p = ddi_get_soft_state(pci_statep, instance);
+	int		ret = ENOTTY;
 
 	if (pci_p == NULL)
 		return (ENXIO);
 
-	return (pci_common_ioctl(pci_p->pci_dip,
-	    dev, cmd, arg, mode, credp, rvalp));
+	switch (PCI_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
+	case PCI_TOOL_REG_MINOR_NUM:
+	case PCI_TOOL_INTR_MINOR_NUM:
+		/* To handle pcitool related ioctls */
+		ret =  pci_common_ioctl(pci_p->pci_dip, dev, cmd, arg, mode,
+		    credp, rvalp);
+		break;
+	default:
+		/* To handle devctl and hotplug related ioctls */
+		ret = (pcihp_get_cb_ops())->cb_ioctl(dev, cmd, arg, mode,
+		    credp, rvalp);
+		break;
+	}
+
+	return (ret);
 }
 
 

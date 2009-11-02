@@ -40,7 +40,6 @@
 #include <sys/cpuvar.h>
 #include <sys/ivintr.h>
 #include <sys/byteorder.h>
-#include <sys/hotplug/pci/pciehpc.h>
 #include <sys/spl.h>
 #include <px_obj.h>
 #include <sys/pcie_pwr.h>
@@ -51,6 +50,7 @@
 #include "px_lib4u.h"
 #include "px_err.h"
 #include "oberon_regs.h"
+#include <sys/hotplug/pci/pcie_hp.h>
 
 #pragma weak jbus_stst_order
 
@@ -1495,7 +1495,7 @@ px_lib_clr_errs(px_t *px_p, dev_info_t *rdip, uint64_t addr)
 	int		rc_err, fab_err, i;
 	int		acctype = pec_p->pec_safeacc_type;
 	ddi_fm_error_t	derr;
-	px_ranges_t	*ranges_p;
+	pci_ranges_t	*ranges_p;
 	int		range_len;
 	uint32_t	addr_high, addr_low;
 	pcie_req_id_t	bdf = PCIE_INVALID_BDF;
@@ -1520,7 +1520,7 @@ px_lib_clr_errs(px_t *px_p, dev_info_t *rdip, uint64_t addr)
 	/* Figure out if this is a cfg or mem32 access */
 	addr_high = (uint32_t)(addr >> 32);
 	addr_low = (uint32_t)addr;
-	range_len = px_p->px_ranges_length / sizeof (px_ranges_t);
+	range_len = px_p->px_ranges_length / sizeof (pci_ranges_t);
 	i = 0;
 	for (ranges_p = px_p->px_ranges_p; i < range_len; i++, ranges_p++) {
 		if (ranges_p->parent_high == addr_high) {
@@ -2350,7 +2350,7 @@ px_fill_rc_status(px_fault_t *px_fault_p, pciex_rc_error_regs_t *rc_status)
 uint32_t
 px_fab_get(px_t *px_p, pcie_req_id_t bdf, uint16_t offset)
 {
-	px_ranges_t	*rp = px_p->px_ranges_p;
+	pci_ranges_t	*rp = px_p->px_ranges_p;
 	uint64_t	range_prop, base_addr;
 	int		bank = PCI_REG_ADDR_G(PCI_ADDR_CONFIG);
 	uint32_t	val;
@@ -2369,7 +2369,7 @@ px_fab_get(px_t *px_p, pcie_req_id_t bdf, uint16_t offset)
 void
 px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
     uint32_t val) {
-	px_ranges_t	*rp = px_p->px_ranges_p;
+	pci_ranges_t	*rp = px_p->px_ranges_p;
 	uint64_t	range_prop, base_addr;
 	int		bank = PCI_REG_ADDR_G(PCI_ADDR_CONFIG);
 
@@ -2509,7 +2509,7 @@ px_get_rng_parent_hi_mask(px_t *px_p)
  * fetch chip's range propery's value
  */
 uint64_t
-px_get_range_prop(px_t *px_p, px_ranges_t *rp, int bank)
+px_get_range_prop(px_t *px_p, pci_ranges_t *rp, int bank)
 {
 	uint64_t mask, range_prop;
 
@@ -2543,11 +2543,11 @@ px_cpr_rem_callb(px_t *px_p)
 static uint_t
 px_hp_intr(caddr_t arg1, caddr_t arg2)
 {
-	px_t	*px_p = (px_t *)arg1;
-	pxu_t 	*pxu_p = (pxu_t *)px_p->px_plat_p;
-	int	rval;
+	px_t		*px_p = (px_t *)arg1;
+	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
+	int		rval;
 
-	rval = pciehpc_intr(px_p->px_dip);
+	rval = pcie_intr(px_p->px_dip);
 
 #ifdef  DEBUG
 	if (rval == DDI_INTR_UNCLAIMED)
@@ -2571,6 +2571,10 @@ px_lib_hotplug_init(dev_info_t *dip, void *arg)
 	pxu_t 	*pxu_p = (pxu_t *)px_p->px_plat_p;
 	uint64_t ret;
 
+	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "hotplug-capable") == 0)
+		return (DDI_FAILURE);
+
 	if ((ret = hvio_hotplug_init(dip, arg)) == DDI_SUCCESS) {
 		if (px_lib_intr_devino_to_sysino(px_p->px_dip,
 		    px_p->px_inos[PX_INTR_HOTPLUG], &pxu_p->hp_sysino) !=
@@ -2583,7 +2587,7 @@ px_lib_hotplug_init(dev_info_t *dip, void *arg)
 			return (DDI_FAILURE);
 		}
 
-		VERIFY(add_ivintr(pxu_p->hp_sysino, PX_PCIEHP_PIL,
+		VERIFY(add_ivintr(pxu_p->hp_sysino, PCIE_INTR_PRI,
 		    (intrfunc)px_hp_intr, (caddr_t)px_p, NULL, NULL) == 0);
 
 		px_ib_intr_enable(px_p, intr_dist_cpuid(),
@@ -2603,7 +2607,7 @@ px_lib_hotplug_uninit(dev_info_t *dip)
 		px_ib_intr_disable(px_p->px_ib_p,
 		    px_p->px_inos[PX_INTR_HOTPLUG], IB_INTR_WAIT);
 
-		VERIFY(rem_ivintr(pxu_p->hp_sysino, PX_PCIEHP_PIL) == 0);
+		VERIFY(rem_ivintr(pxu_p->hp_sysino, PCIE_INTR_PRI) == 0);
 	}
 }
 
@@ -2613,7 +2617,9 @@ px_lib_hotplug_uninit(dev_info_t *dip)
 void
 px_hp_intr_redist(px_t *px_p)
 {
-	if (px_p && (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE)) {
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(px_p->px_dip);
+
+	if (px_p && PCIE_IS_PCIE_HOTPLUG_ENABLED(bus_p)) {
 		px_ib_intr_dist_en(px_p->px_dip, intr_dist_cpuid(),
 		    px_p->px_inos[PX_INTR_HOTPLUG], B_FALSE);
 	}

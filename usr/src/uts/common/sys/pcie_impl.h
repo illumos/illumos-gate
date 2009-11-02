@@ -65,6 +65,14 @@ extern "C" {
 #define	PCIE_HAS_AER(bus_p) (bus_p->bus_aer_off)
 /* IS_ROOT = is RC or RP */
 #define	PCIE_IS_ROOT(bus_p) (PCIE_IS_RC(bus_p) || PCIE_IS_RP(bus_p))
+
+#define	PCIE_IS_HOTPLUG_CAPABLE(dip) \
+	(PCIE_DIP2BUS(dip)->bus_hp_sup_modes)
+
+#define	PCIE_IS_HOTPLUG_ENABLED(dip) \
+	((PCIE_DIP2BUS(dip)->bus_hp_curr_mode == PCIE_PCI_HP_MODE) || \
+	(PCIE_DIP2BUS(dip)->bus_hp_curr_mode == PCIE_NATIVE_HP_MODE))
+
 /*
  * This is a pseudo pcie "device type", but it's needed to explain describe
  * nodes such as PX and NPE, which aren't really PCI devices but do control or
@@ -153,6 +161,14 @@ extern "C" {
 #define	PFD_IS_ROOT(pfd_p)	   PCIE_IS_ROOT(PCIE_PFD2BUS(pfd_p))
 #define	PFD_IS_RC(pfd_p)	   PCIE_IS_RC(PCIE_PFD2BUS(pfd_p))
 #define	PFD_IS_RP(pfd_p)	   PCIE_IS_RP(PCIE_PFD2BUS(pfd_p))
+
+/* bus_hp_mode field */
+typedef enum {
+	PCIE_NONE_HP_MODE	= 0x0,
+	PCIE_ACPI_HP_MODE	= 0x1,
+	PCIE_PCI_HP_MODE	= 0x2,
+	PCIE_NATIVE_HP_MODE	= 0x4
+} pcie_hp_mode_t;
 
 typedef struct pf_pci_bdg_err_regs {
 	uint16_t pci_bdg_sec_stat;	/* PCI secondary status reg */
@@ -244,8 +260,9 @@ typedef struct pcie_bus {
 	/* Needed for PCI/PCIe fabric error handling */
 	dev_info_t	*bus_dip;
 	dev_info_t	*bus_rp_dip;
-	ddi_acc_handle_t bus_cfg_hdl;		/* error handling acc handle */
+	ddi_acc_handle_t bus_cfg_hdl;		/* error handling acc hdle */
 	uint_t		bus_fm_flags;
+	uint_t		bus_soft_state;
 
 	/* Static PCI/PCIe information */
 	pcie_req_id_t	bus_bdf;
@@ -258,6 +275,7 @@ typedef struct pcie_bus {
 	uint16_t	bus_pcie_off;		/* PCIe Capability Offset */
 	uint16_t	bus_aer_off;		/* PCIe Advanced Error Offset */
 	uint16_t	bus_pcix_off;		/* PCIx Capability Offset */
+	uint16_t	bus_pci_hp_off;		/* PCI HP (SHPC) Cap Offset */
 	uint16_t	bus_ecc_ver;		/* PCIX ecc version */
 	pci_bus_range_t	bus_bus_range;		/* pci bus-range property */
 	ppb_ranges_t	*bus_addr_ranges;	/* pci range property */
@@ -271,6 +289,11 @@ typedef struct pcie_bus {
 	int		bus_mps;		/* Maximum Payload Size */
 
 	void		*bus_plat_private;	/* Platform specific */
+	/* Hotplug specific fields */
+	pcie_hp_mode_t	bus_hp_sup_modes;	/* HP modes supported */
+	pcie_hp_mode_t	bus_hp_curr_mode;	/* HP mode used */
+	void		*bus_hp_ctrl;		/* HP bus ctrl data */
+	int		bus_ari;		/* ARI device */
 } pcie_bus_t;
 
 struct pf_data {
@@ -355,8 +378,28 @@ typedef struct {
 	int		highest_common_mps;
 } pcie_max_supported_t;
 
+/*
+ * Default interrupt priority for all PCI and PCIe nexus drivers including
+ * hotplug interrupts.
+ */
+#define	PCIE_INTR_PRI		(LOCK_LEVEL - 1)
+
+/*
+ * XXX - PCIE_IS_PCIE check is required in order not to invoke these macros
+ * for non-standard PCI or PCI Express Hotplug Controllers.
+ */
+#define	PCIE_ENABLE_ERRORS(dip)	\
+	if (PCIE_IS_PCIE(PCIE_DIP2BUS(dip))) {	\
+		pcie_enable_errors(dip);	\
+		(void) pcie_enable_ce(dip);	\
+	}
+
+#define	PCIE_DISABLE_ERRORS(dip)		\
+	if (PCIE_IS_PCIE(PCIE_DIP2BUS(dip))) {	\
+		pcie_disable_errors(dip);	\
+	}
+
 #ifdef	DEBUG
-extern uint_t pcie_debug_flags;
 #define	PCIE_DBG pcie_dbg
 /* Common Debugging shortcuts */
 #define	PCIE_DBG_CFG(dip, bus_p, name, sz, off, org) \
@@ -372,18 +415,29 @@ extern uint_t pcie_debug_flags;
 	    ddi_get_instance(dip), bus_p->bus_bdf, name, off, org, \
 	    PCIE_AER_GET(sz, bus_p, off))
 
-extern void pcie_dbg(char *fmt, ...);
-
 #else	/* DEBUG */
 
 #define	PCIE_DBG_CFG 0 &&
 #define	PCIE_DBG 0 &&
+#define	PCIE_ARI_DBG 0 &&
 #define	PCIE_DBG_CAP 0 &&
 #define	PCIE_DBG_AER 0 &&
 
 #endif	/* DEBUG */
 
 /* PCIe Friendly Functions */
+extern int pcie_init(dev_info_t *dip, caddr_t arg);
+extern int pcie_uninit(dev_info_t *dip);
+extern int pcie_intr(dev_info_t *dip);
+extern int pcie_open(dev_info_t *dip, dev_t *devp, int flags, int otyp,
+    cred_t *credp);
+extern int pcie_close(dev_info_t *dip, dev_t dev, int flags, int otyp,
+    cred_t *credp);
+extern int pcie_ioctl(dev_info_t *dip, dev_t dev, int cmd, intptr_t arg,
+    int mode, cred_t *credp, int *rvalp);
+extern int pcie_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+    int flags, char *name, caddr_t valuep, int *lengthp);
+
 extern void pcie_init_root_port_mps(dev_info_t *dip);
 extern int pcie_initchild(dev_info_t *dip);
 extern void pcie_uninitchild(dev_info_t *dip);
@@ -422,6 +476,26 @@ extern void pcie_set_aer_suce_mask(uint32_t mask);
 extern void pcie_set_serr_mask(uint32_t mask);
 extern void pcie_init_plat(dev_info_t *dip);
 extern void pcie_fini_plat(dev_info_t *dip);
+extern int pcie_read_only_probe(dev_info_t *, char *, dev_info_t **);
+extern dev_info_t *pcie_func_to_dip(dev_info_t *dip, pcie_req_id_t function);
+extern int pcie_ari_disable(dev_info_t *dip);
+extern int pcie_ari_enable(dev_info_t *dip);
+
+#define	PCIE_ARI_FORW_NOT_SUPPORTED	0
+#define	PCIE_ARI_FORW_SUPPORTED		1
+
+extern int pcie_ari_supported(dev_info_t *dip);
+
+#define	PCIE_ARI_FORW_DISABLED	0
+#define	PCIE_ARI_FORW_ENABLED	1
+
+extern int pcie_ari_is_enabled(dev_info_t *dip);
+
+#define	PCIE_NOT_ARI_DEVICE		0
+#define	PCIE_ARI_DEVICE			1
+
+extern int pcie_ari_device(dev_info_t *dip);
+extern int pcie_ari_get_next_function(dev_info_t *dip, int *func);
 
 /* PCIe error handling functions */
 extern int pf_scan_fabric(dev_info_t *rpdip, ddi_fm_error_t *derr,
@@ -431,6 +505,11 @@ extern void pf_fini(dev_info_t *, ddi_detach_cmd_t);
 extern int pf_hdl_lookup(dev_info_t *, uint64_t, uint32_t, uint64_t,
     pcie_req_id_t);
 extern int pf_tlp_decode(pcie_bus_t *, pf_pcie_adv_err_regs_t *);
+
+#ifdef	DEBUG
+extern uint_t pcie_debug_flags;
+extern void pcie_dbg(char *fmt, ...);
+#endif	/* DEBUG */
 
 #ifdef	__cplusplus
 }

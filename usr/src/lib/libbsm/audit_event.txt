@@ -533,6 +533,11 @@
 6417:AUE_tpm_physicalpresence:set the TPM physical presence flag:as
 6418:AUE_tpm_fieldupgrade:update TPM protected capabilities:as
 6419:AUE_tpm_resetlockvalue:reset TPM failed authorization attempt lock:as
+#
+# hotplugd(1m) events
+#
+6500:AUE_hotplug_state:change hotplug connection state:ss
+6501:AUE_hotplug_set:set hotplug bus private options:ss
 
 #
 # Trusted Extensions events:

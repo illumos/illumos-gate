@@ -1028,35 +1028,13 @@ stubs_base:
 #endif
 
 /*
- * Stubs for PCI configurator module (misc/pcicfg.e).
+ * Stubs for PCI configurator module (misc/pcicfg).
  */
-#ifndef	PCICFG_E_MODULE
-	MODULE(pcicfg.e,misc);
-	STUB(pcicfg.e, pcicfg_configure, 0);
-	STUB(pcicfg.e, pcicfg_unconfigure, 0);
-	END_MODULE(pcicfg.e);
-#endif
-
-/*
- * Stubs for PCIEHPC (pci-ex hot plug support) module (misc/pciehpc).
- */
-#ifndef	PCIEHPC_MODULE
-	MODULE(pciehpc,misc);
-	STUB(pciehpc, pciehpc_init, 0);
-	STUB(pciehpc, pciehpc_uninit, 0);
-	WSTUB(pciehpc, pciehpc_intr, 0);
-	END_MODULE(pciehpc);
-#endif
-
-/*
- * Stubs for PCISHPC (pci/pci-x shpc hot plug support) module (misc/pcishpc).
- */
-#ifndef	PCISHPC_MODULE
-	MODULE(pcishpc,misc);
-	STUB(pcishpc, pcishpc_init, 0);
-	STUB(pcishpc, pcishpc_uninit, 0);
-	WSTUB(pcishpc, pcishpc_intr, 0);
-	END_MODULE(pcishpc);
+#ifndef	PCICFG_MODULE
+	MODULE(pcicfg,misc);
+	STUB(pcicfg, pcicfg_configure, 0);
+	STUB(pcicfg, pcicfg_unconfigure, 0);
+	END_MODULE(pcicfg);
 #endif
 
 #ifndef PCIHP_MODULE

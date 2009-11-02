@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI nexus HotPlug devctl interface
@@ -130,7 +128,6 @@ pci_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 		}
 	}
 
-	pci_p->pci_open_count++;
 	mutex_exit(&pci_p->pci_mutex);
 
 	return (0);
@@ -161,7 +158,6 @@ pci_close(dev_t dev, int flags, int otyp, cred_t *credp)
 		}
 
 	pci_p->pci_soft_state = PCI_SOFT_STATE_CLOSED;
-	pci_p->pci_open_count = 0;
 	mutex_exit(&pci_p->pci_mutex);
 	return (0);
 }

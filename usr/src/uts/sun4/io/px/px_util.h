@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PX_UTIL_H
 #define	_SYS_PX_UTIL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -52,7 +50,7 @@ extern int px_reloc_reg(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 extern int px_xlate_reg(px_t *px_p, pci_regspec_t *pci_rp,
 	struct regspec *new_rp);
 extern int px_search_ranges(px_t *px_p, uint32_t space_type, uint32_t reg_begin,
-	uint32_t reg_end, px_ranges_t **sel_rng_p, uint_t *base_offset_p);
+	uint32_t reg_end, pci_ranges_t **sel_rng_p, uint_t *base_offset_p);
 
 /* bus add intrspec */
 extern off_t px_get_reg_set_size(dev_info_t *child, int rnumber);

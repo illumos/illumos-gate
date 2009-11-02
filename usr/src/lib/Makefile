@@ -262,6 +262,7 @@ SUBDIRS += \
 	mpapi		\
 	librstp		\
 	libreparse	\
+	libhotplug	\
 	$($(MACH)_SUBDIRS)
 
 i386_SUBDIRS=		\
@@ -641,6 +642,8 @@ mpapi:		libpthread libdevinfo libsysevent libnvpair
 libgrubmgmt:	libdevinfo libzfs libfstyp
 pyzfs:		libnvpair libsec libidmap libzfs
 libreparse:	libnvpair
+libhotplug:	libnvpair
+cfgadm_plugins:	libhotplug
 
 #
 # The reason this rule checks for the existence of the

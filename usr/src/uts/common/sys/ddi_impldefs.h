@@ -39,6 +39,8 @@
 #include <sys/epm.h>
 #include <sys/ddidmareq.h>
 #include <sys/ddi_intr.h>
+#include <sys/ddi_hp.h>
+#include <sys/ddi_hp_impl.h>
 #include <sys/ddi_isa.h>
 #include <sys/id_space.h>
 #include <sys/modhash.h>
@@ -69,12 +71,12 @@ typedef enum {
  * Definitions for generic callback mechanism.
  */
 typedef enum {
-	DDI_CB_INTR_ADD,
-	DDI_CB_INTR_REMOVE
+	DDI_CB_INTR_ADD,		/* More available interrupts */
+	DDI_CB_INTR_REMOVE		/* Fewer available interrupts */
 } ddi_cb_action_t;
 
 typedef enum {
-	DDI_CB_FLAG_INTR = 0x1
+	DDI_CB_FLAG_INTR = 0x1		/* Driver is IRM aware */
 } ddi_cb_flags_t;
 
 #define	DDI_CB_FLAG_VALID(f)	((f) & DDI_CB_FLAG_INTR)
@@ -119,6 +121,7 @@ typedef struct devi_bus_priv {
 struct iommulib_unit;
 typedef struct iommulib_unit *iommulib_handle_t;
 typedef uint8_t	ndi_flavor_t;
+struct ddi_hp_cn_handle;
 
 struct dev_info  {
 
@@ -231,8 +234,8 @@ struct dev_info  {
 
 	uint_t		devi_cpr_flags;
 
-	/* For interrupt support */
-	devinfo_intr_t		*devi_intr_p;
+	/* Owned by DDI interrupt framework */
+	devinfo_intr_t	*devi_intr_p;
 
 	void		*devi_nex_pm;		/* nexus PM private */
 
@@ -267,6 +270,9 @@ struct dev_info  {
 	ndi_flavor_t	devi_flavor;		/* flavor assigned by parent */
 	ndi_flavor_t	devi_flavorv_n;		/* number of child-flavors */
 	void		**devi_flavorv;		/* child-flavor specific data */
+
+	/* Owned by hotplug framework */
+	struct ddi_hp_cn_handle *devi_hp_hdlp;   /* hotplug handle list */
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))

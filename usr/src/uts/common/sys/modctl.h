@@ -269,6 +269,7 @@ struct modlinkage {
 #define	MODISRETIRED		42
 #define	MODDEVEMPTYDIR		43
 #define	MODREMDRVALIAS		44
+#define	MODHPOPS		45
 
 /*
  * sub cmds for MODEVENTS
@@ -288,6 +289,15 @@ struct modlinkage {
 #define	MODDEVNAME_PROFILE	3
 #define	MODDEVNAME_RECONFIG	4
 #define	MODDEVNAME_SYSAVAIL	5
+
+/*
+ * subcmds for MODHPOPS
+ */
+#define	MODHPOPS_CHANGE_STATE	0
+#define	MODHPOPS_CREATE_PORT	1
+#define	MODHPOPS_REMOVE_PORT	2
+#define	MODHPOPS_BUS_GET	3
+#define	MODHPOPS_BUS_SET	4
 
 
 /*

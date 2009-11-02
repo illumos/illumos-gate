@@ -95,8 +95,10 @@ pcieb_plat_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 	intr = hdlp->ih_vector;
 
+	d = (pcie_ari_is_enabled(dip) == PCIE_ARI_FORW_ENABLED) ? 0 :
+	    PCI_REG_DEV_G(pci_rp[0].pci_phys_hi);
+
 	/* spin the interrupt */
-	d = PCI_REG_DEV_G(pci_rp[0].pci_phys_hi);
 	if ((intr >= PCI_INTA) && (intr <= PCI_INTD))
 		hdlp->ih_vector = ((intr - 1 + (d % 4)) % 4 + 1);
 	else
@@ -156,12 +158,6 @@ pcieb_plat_ctlops(dev_info_t *rdip, ddi_ctl_enum_t ctlop, void *arg)
 	return (DDI_SUCCESS);
 }
 
-/*ARGSUSED*/
-void
-pcieb_plat_ioctl_hotplug(dev_info_t *dip, int rv, int cmd)
-{
-}
-
 void
 pcieb_plat_initchild(dev_info_t *child)
 {
@@ -201,10 +197,16 @@ pcieb_attach_plx_workarounds(pcieb_devstate_t *pcieb)
 	uint_t		bus_num, primary, secondary;
 	uint8_t		dev_type = bus_p->bus_dev_type;
 	uint16_t	vendor_id = bus_p->bus_dev_ven_id & 0xFFFF;
+	uint16_t	device_id = bus_p->bus_dev_ven_id >> 16;
 	int 		ce_mask = 0;
 
 	if (!IS_PLX_VENDORID(vendor_id))
 		return;
+
+	if ((device_id == PXB_DEVICE_PLX_8532) &&
+	    (bus_p->bus_rev_id <= PXB_DEVICE_PLX_AA_REV))
+		/* Clear hotplug capability */
+		bus_p->bus_hp_sup_modes = PCIE_NONE_HP_MODE;
 
 	/*
 	 * Due to a PLX HW bug we need to disable the receiver error CE on all

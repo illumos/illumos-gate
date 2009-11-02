@@ -20,20 +20,33 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DEVINFO_H
 #define	_DEVINFO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #include <mdb/mdb_modapi.h>
+
+/*
+ * Options for prtconf/devinfo/hotplug dcmd.
+ */
+#define	DEVINFO_VERBOSE		0x1
+#define	DEVINFO_PARENT		0x2
+#define	DEVINFO_CHILD		0x4
+#define	DEVINFO_ALLBOLD		0x8
+#define	DEVINFO_SUMMARY		0x10
+#define	DEVINFO_HP_PHYSICAL	0x20
+
+typedef struct devinfo_cb_data {
+	uintptr_t	di_base;
+	uint_t		di_flags;
+} devinfo_cb_data_t;
 
 extern int devinfo_walk_init(mdb_walk_state_t *);
 extern int devinfo_walk_step(mdb_walk_state_t *);

@@ -28,7 +28,6 @@
 #include <sys/cpuvar.h>
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
-#include <sys/hotplug/pci/pcihp.h>
 #include "px_obj.h"
 #include <sys/pci_tools.h>
 #include "px_tools_ext.h"
@@ -774,13 +773,13 @@ pxtool_init(dev_info_t *dip)
 	int instance = ddi_get_instance(dip);
 
 	if (ddi_create_minor_node(dip, PCI_MINOR_REG, S_IFCHR,
-	    PCIHP_AP_MINOR_NUM(instance, PCI_TOOL_REG_MINOR_NUM),
+	    PCI_MINOR_NUM(instance, PCI_TOOL_REG_MINOR_NUM),
 	    DDI_NT_REGACC, 0) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 
 	if (ddi_create_minor_node(dip, PCI_MINOR_INTR, S_IFCHR,
-	    PCIHP_AP_MINOR_NUM(instance, PCI_TOOL_INTR_MINOR_NUM),
+	    PCI_MINOR_NUM(instance, PCI_TOOL_INTR_MINOR_NUM),
 	    DDI_NT_INTRCTL, 0) != DDI_SUCCESS) {
 		ddi_remove_minor_node(dip, PCI_MINOR_REG);
 		return (DDI_FAILURE);

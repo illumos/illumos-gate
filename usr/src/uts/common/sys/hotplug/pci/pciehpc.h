@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,13 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_HOTPLUG_PCI_PCIEHPC_H
 #define	_SYS_HOTPLUG_PCI_PCIEHPC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -37,17 +33,22 @@ extern "C" {
 /*
  * Interfaces exported by PCI-E nexus Hot Plug Controller extension module
  */
-
-/* register ops for read/write of non-standard HPC (e.g: OPL platform) */
-typedef struct pciehpc_regops {
-	uint_t	(*get)(void *cookie, off_t offset);
-	uint_t	(*put)(void *cookie, off_t offset, uint_t val);
-	void	*cookie;
-} pciehpc_regops_t;
-
-int pciehpc_init(dev_info_t *, pciehpc_regops_t *);
-int pciehpc_uninit(dev_info_t *);
-int pciehpc_intr(dev_info_t *);
+int pciehpc_init(dev_info_t *dip, caddr_t arg);
+int pciehpc_uninit(dev_info_t *dip);
+int pciehpc_intr(dev_info_t *dip);
+int pciehpc_hp_ops(dev_info_t *dip, char *cn_name, ddi_hp_op_t op, void *arg,
+    void *result);
+void pciehpc_get_slot_state(pcie_hp_slot_t *slot_p);
+void pciehpc_set_slot_name(pcie_hp_ctrl_t *ctrl_p);
+uint8_t pciehpc_reg_get8(pcie_hp_ctrl_t *ctrl_p, uint_t off);
+uint16_t pciehpc_reg_get16(pcie_hp_ctrl_t *ctrl_p, uint_t off);
+uint32_t pciehpc_reg_get32(pcie_hp_ctrl_t *ctrl_p, uint_t off);
+void pciehpc_reg_put8(pcie_hp_ctrl_t *ctrl_p, uint_t off, uint8_t val);
+void pciehpc_reg_put16(pcie_hp_ctrl_t *ctrl_p, uint_t off, uint16_t val);
+void pciehpc_reg_put32(pcie_hp_ctrl_t *ctrl_p, uint_t off, uint32_t val);
+#if	defined(__i386) || defined(__amd64)
+extern void pciehpc_update_ops(pcie_hp_ctrl_t *ctrl_p);
+#endif	/* defined(__i386) || defined(__amd64) */
 
 #ifdef	__cplusplus
 }

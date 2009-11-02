@@ -26,7 +26,6 @@
 #ifndef _SYS_PX_LIB4U_H
 #define	_SYS_PX_LIB4U_H
 
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -152,6 +151,14 @@ typedef	struct eq_rec {
 #define	EQ_IDLE_STATE	0x1			/* IDLE */
 #define	EQ_ACTIVE_STATE	0x2			/* ACTIVE */
 #define	EQ_ERROR_STATE	0x4			/* ERROR */
+
+/*
+ * Default EQ Configurations
+ */
+#define	EQ_CNT		36
+#define	EQ_REC_CNT	128
+#define	EQ_1ST_ID	0
+#define	EQ_1ST_DEVINO	24
 
 #define	MMU_INVALID_TTE		0ull
 #define	MMU_TTE_VALID(tte)	(((tte) & MMU_TTE_V) == MMU_TTE_V)
@@ -324,7 +331,7 @@ extern uint64_t hvio_iommu_getbypass(devhandle_t dev_hdl, pxu_t *pxu_p,
     r_addr_t ra, io_attributes_t attr, io_addr_t *io_addr_p);
 extern uint64_t hvio_get_bypass_base(pxu_t *pxu_p);
 extern uint64_t hvio_get_bypass_end(pxu_t *pxu_p);
-extern uint64_t px_get_range_prop(px_t *px_p, px_ranges_t *rp, int bank);
+extern uint64_t px_get_range_prop(px_t *px_p, pci_ranges_t *rp, int bank);
 
 
 /*

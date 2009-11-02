@@ -34,6 +34,7 @@
 #include <sys/autoconf.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/pci.h>
+#include <sys/pci_impl.h>
 #include <sys/pcie_impl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -41,6 +42,7 @@
 #include <sys/ddifm.h>
 #include <sys/ndifm.h>
 #include <sys/fm/protocol.h>
+#include <sys/hotplug/pci/pcie_hp.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/pci_intr_lib.h>
 #include <sys/psm.h>
@@ -101,19 +103,20 @@ struct bus_ops ppb_bus_ops = {
 	ddi_dma_mctl,
 	ppb_ctlops,
 	ddi_bus_prop_op,
-	0,		/* (*bus_get_eventcookie)();	*/
-	0,		/* (*bus_add_eventcall)();	*/
-	0,		/* (*bus_remove_eventcall)();	*/
-	0,		/* (*bus_post_event)();		*/
-	0,		/* (*bus_intr_ctl)();		*/
-	0,		/* (*bus_config)(); 		*/
-	0,		/* (*bus_unconfig)(); 		*/
-	ppb_fm_init,	/* (*bus_fm_init)(); 		*/
-	NULL,		/* (*bus_fm_fini)(); 		*/
-	NULL,		/* (*bus_fm_access_enter)(); 	*/
-	NULL,		/* (*bus_fm_access_exit)(); 	*/
-	NULL,		/* (*bus_power)(); 	*/
-	ppb_intr_ops	/* (*bus_intr_op)(); 		*/
+	0,			/* (*bus_get_eventcookie)();	*/
+	0,			/* (*bus_add_eventcall)();	*/
+	0,			/* (*bus_remove_eventcall)();	*/
+	0,			/* (*bus_post_event)();		*/
+	0,			/* (*bus_intr_ctl)();		*/
+	0,			/* (*bus_config)(); 		*/
+	0,			/* (*bus_unconfig)(); 		*/
+	ppb_fm_init,		/* (*bus_fm_init)(); 		*/
+	NULL,			/* (*bus_fm_fini)(); 		*/
+	NULL,			/* (*bus_fm_access_enter)(); 	*/
+	NULL,			/* (*bus_fm_access_exit)(); 	*/
+	NULL,			/* (*bus_power)(); 	*/
+	ppb_intr_ops,		/* (*bus_intr_op)(); 		*/
+	pcie_hp_common_ops	/* (*bus_hp_op)(); 		*/
 };
 
 /*
@@ -175,7 +178,7 @@ struct dev_ops ppb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"PCI to PCI bridge nexus driver",
+	"Standard PCI to PCI bridge nexus driver",
 	&ppb_ops,	/* driver ops */
 };
 
@@ -194,6 +197,7 @@ typedef struct {
 	dev_info_t *dip;
 	int ppb_fmcap;
 	ddi_iblock_cookie_t ppb_fm_ibc;
+	kmutex_t ppb_mutex;
 	kmutex_t ppb_peek_poke_mutex;
 	kmutex_t ppb_err_mutex;
 
@@ -276,6 +280,7 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	dev_info_t *pdip;
 	ddi_acc_handle_t config_handle;
 	char *bus;
+	int ret;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -307,6 +312,7 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			    DDI_FM_DMACHK_CAPABLE;
 
 		ddi_fm_init(devi, &ppb->ppb_fmcap, &ppb->ppb_fm_ibc);
+		mutex_init(&ppb->ppb_mutex, NULL, MUTEX_DRIVER, NULL);
 		mutex_init(&ppb->ppb_err_mutex, NULL, MUTEX_DRIVER,
 		    (void *)ppb->ppb_fm_ibc);
 		mutex_init(&ppb->ppb_peek_poke_mutex, NULL, MUTEX_DRIVER,
@@ -355,14 +361,19 @@ ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		pci_config_teardown(&config_handle);
 
 		/*
-		 * Initialize hotplug support on this bus. At minimum
-		 * (for non hotplug bus) this would create ":devctl" minor
-		 * node to support DEVCTL_DEVICE_* and DEVCTL_BUS_* ioctls
-		 * to this bus.
+		 * Initialize hotplug support on this bus.
 		 */
-		if (pcihp_init(devi) != DDI_SUCCESS)
+		if (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+			ret = pcie_init(devi, NULL);
+		else
+			ret = pcihp_init(devi);
+
+		if (ret != DDI_SUCCESS) {
 			cmn_err(CE_WARN,
 			    "pci: Failed to setup hotplug framework");
+			(void) ppb_detach(devi, DDI_DETACH);
+			return (ret);
+		}
 
 		ddi_report_dev(devi);
 		return (DDI_SUCCESS);
@@ -387,6 +398,7 @@ static int
 ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
 	ppb_devstate_t *ppb;
+	int		ret;
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -398,8 +410,18 @@ ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		if (ppb->ppb_fmcap & (DDI_FM_ERRCB_CAPABLE |
 		    DDI_FM_EREPORT_CAPABLE))
 			pci_ereport_teardown(devi);
+
+		/*
+		 * Uninitialize hotplug support on this bus.
+		 */
+		ret = (ppb->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) ?
+		    pcie_uninit(devi) : pcihp_uninit(devi);
+		if (ret != DDI_SUCCESS)
+			return (DDI_FAILURE);
+
 		mutex_destroy(&ppb->ppb_peek_poke_mutex);
 		mutex_destroy(&ppb->ppb_err_mutex);
+		mutex_destroy(&ppb->ppb_mutex);
 		ddi_fm_fini(devi);
 
 		/*
@@ -407,10 +429,6 @@ ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		 */
 		ddi_soft_state_free(ppb_state, ddi_get_instance(devi));
 
-		/*
-		 * Uninitialize hotplug support on this bus.
-		 */
-		(void) pcihp_uninit(devi);
 		return (DDI_SUCCESS);
 
 	case DDI_SUSPEND:
@@ -886,29 +904,97 @@ OUT:
 	return (rv);
 }
 
+/* ARGSUSED */
 static int
 ppb_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 {
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(getminor(*devp));
+	ppb_devstate_t	*ppb_p = ddi_get_soft_state(ppb_state, instance);
+	int	rv;
+
+	if (ppb_p == NULL)
+		return (ENXIO);
+
+	/*
+	 * Ioctls will be handled by PCI Express framework for all
+	 * PCIe platforms
+	 */
+	if (ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
+		mutex_enter(&ppb_p->ppb_mutex);
+		rv = pcie_open(ppb_p->dip, devp, flags, otyp, credp);
+		mutex_exit(&ppb_p->ppb_mutex);
+		return (rv);
+	}
+
 	return ((pcihp_get_cb_ops())->cb_open(devp, flags, otyp, credp));
 }
 
+/* ARGSUSED */
 static int
 ppb_close(dev_t dev, int flags, int otyp, cred_t *credp)
 {
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
+	ppb_devstate_t	*ppb_p = ddi_get_soft_state(ppb_state, instance);
+	int	rv;
+
+	if (ppb_p == NULL)
+		return (ENXIO);
+
+	mutex_enter(&ppb_p->ppb_mutex);
+	/*
+	 * Ioctls will be handled by PCI Express framework for all
+	 * PCIe platforms
+	 */
+	if (ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) {
+		rv = pcie_close(ppb_p->dip, dev, flags, otyp, credp);
+		mutex_exit(&ppb_p->ppb_mutex);
+		return (rv);
+	}
+
+	mutex_exit(&ppb_p->ppb_mutex);
 	return ((pcihp_get_cb_ops())->cb_close(dev, flags, otyp, credp));
 }
 
+/*
+ * ppb_ioctl: devctl hotplug controls
+ */
+/* ARGSUSED */
 static int
-ppb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
+ppb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+	int *rvalp)
 {
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
+	ppb_devstate_t	*ppb_p = ddi_get_soft_state(ppb_state, instance);
+
+	if (ppb_p == NULL)
+		return (ENXIO);
+
+	/*
+	 * Ioctls will be handled by PCI Express framework for all
+	 * PCIe platforms
+	 */
+	if (ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+		return (pcie_ioctl(ppb_p->dip, dev, cmd, arg, mode, credp,
+		    rvalp));
+
 	return ((pcihp_get_cb_ops())->cb_ioctl(dev, cmd, arg, mode, credp,
 	    rvalp));
 }
 
 static int
-ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
-	int flags, char *name, caddr_t valuep, int *lengthp)
+ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int flags,
+    char *name, caddr_t valuep, int *lengthp)
 {
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
+	ppb_devstate_t	*ppb_p = ddi_get_soft_state(ppb_state, instance);
+
+	if (ppb_p == NULL)
+		return (ENXIO);
+
+	if (ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+		return (pcie_prop_op(dev, dip, prop_op, flags, name,
+		    valuep, lengthp));
+
 	return ((pcihp_get_cb_ops())->cb_prop_op(dev, dip, prop_op, flags,
 	    name, valuep, lengthp));
 }
@@ -916,7 +1002,30 @@ ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 static int
 ppb_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
-	return (pcihp_info(dip, cmd, arg, result));
+	minor_t		minor = getminor((dev_t)arg);
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(minor);
+	ppb_devstate_t	*ppb_p = ddi_get_soft_state(ppb_state, instance);
+
+	if (ppb_p == NULL)
+		return (DDI_FAILURE);
+
+	if (ppb_p->parent_bus != PCIE_PCIECAP_DEV_TYPE_PCIE_DEV)
+		return (pcihp_info(dip, cmd, arg, result));
+
+	switch (cmd) {
+	default:
+		return (DDI_FAILURE);
+
+	case DDI_INFO_DEVT2INSTANCE:
+		*result = (void *)(uintptr_t)instance;
+		return (DDI_SUCCESS);
+
+	case DDI_INFO_DEVT2DEVINFO:
+		if (ppb_p == NULL)
+			return (DDI_FAILURE);
+		*result = (void *)ppb_p->dip;
+		return (DDI_SUCCESS);
+	}
 }
 
 void ppb_peekpoke_cb(dev_info_t *dip, ddi_fm_error_t *derr) {

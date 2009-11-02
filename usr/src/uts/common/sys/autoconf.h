@@ -26,7 +26,6 @@
 #ifndef _SYS_AUTOCONF_H
 #define	_SYS_AUTOCONF_H
 
-
 /* Derived from autoconf.h, SunOS 4.1.1 1.15 */
 
 #ifdef	__cplusplus
@@ -113,6 +112,9 @@ struct devnames {
 #define	LDI_EV_DEBUG		0x8000  /* LDI events debug messages */
 #define	LDI_EV_TRACE		0x10000 /* LDI events trace messages */
 #define	DDI_INTR_IRM		0x20000 /* interrupt resource management */
+#define	DDI_HP_API		0x40000	/* Hotplug interface messages  */
+#define	DDI_HP_IMPL		0x80000	/* Hotplug implementation msgs */
+#define	DDI_HP_NEXUS		0x100000 /* Hotplug messages from nexuses */
 
 extern int ddidebug;
 
@@ -133,6 +135,9 @@ extern int ddidebug;
 #define	LDI_EVDBG(args)		if (ddidebug & LDI_EV_DEBUG) cmn_err args
 #define	LDI_EVTRC(args)		if (ddidebug & LDI_EV_TRACE) cmn_err args
 #define	DDI_INTR_IRMDBG(args)	if (ddidebug & DDI_INTR_IRM) cmn_err args
+#define	DDI_HP_APIDBG(args)	if (ddidebug & DDI_HP_API) cmn_err args
+#define	DDI_HP_IMPLDBG(args)	if (ddidebug & DDI_HP_IMPL) cmn_err args
+#define	DDI_HP_NEXDBG(args)	if (ddidebug & DDI_HP_NEXUS) cmn_err args
 #else
 #define	NDI_CONFIG_DEBUG(args)
 #define	BMDPRINTF(args)
@@ -150,6 +155,9 @@ extern int ddidebug;
 #define	LDI_EVDBG(args)		if (ddidebug & LDI_EV_DEBUG) cmn_err args
 #define	LDI_EVTRC(args)		if (ddidebug & LDI_EV_TRACE) cmn_err args
 #define	DDI_INTR_IRMDBG(args)
+#define	DDI_HP_APIDBG(args)
+#define	DDI_HP_IMPLDBG(args)
+#define	DDI_HP_NEXDBG(args)
 #endif
 
 

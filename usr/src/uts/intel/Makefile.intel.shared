@@ -621,7 +621,6 @@ MISC_KMODS	+= nfssrv
 MISC_KMODS	+= neti
 MISC_KMODS	+= pci_autoconfig
 MISC_KMODS	+= pcicfg
-MISC_KMODS	+= pciehpc
 MISC_KMODS	+= pcihp
 MISC_KMODS	+= pcmcia
 MISC_KMODS	+= rpcsec

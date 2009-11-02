@@ -21,10 +21,8 @@
 #
 # uts/sun4u/px/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the pci driver kernel module
 #
@@ -87,7 +85,7 @@ LINTTAGS	+= -erroff=E_ASSIGN_NARROW_CONV
 #
 #	Dependency
 #
-LDFLAGS += -dy -Nmisc/busra -Nmisc/pcie -Nmisc/pcihp -Nmisc/pciehpc
+LDFLAGS += -dy -Nmisc/pcie
 
 #
 #	Default build targets.

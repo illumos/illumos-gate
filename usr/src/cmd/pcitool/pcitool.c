@@ -136,6 +136,7 @@ static void print_probe_info(pci_conf_hdr_t *config_hdr_p,
     pcitool_reg_t *info_p, boolean_t verbose);
 static int get_config_header(int fd, uint8_t bus_no, uint8_t dev_no,
     uint8_t func_no, pci_conf_hdr_t *config_hdr_p);
+static int supports_ari(int fd, uint8_t bus_no);
 static int probe_dev(int fd, pcitool_reg_t *prg_p,
     pcitool_uiargs_t *input_args_p);
 static int do_probe(int fd, di_node_t di_node, di_prom_handle_t di_phdl,
@@ -457,8 +458,102 @@ get_config_header(int fd, uint8_t bus_no, uint8_t dev_no, uint8_t func_no,
 		}
 		config_hdr_p->dwords[i] = (uint32_t)cfg_prg.data;
 	}
-
 	return (rval);
+}
+
+static int
+supports_ari(int fd, uint8_t bus_no)
+{
+	pcitool_reg_t cfg_prg;
+	int deadcount = 0;
+	uint32_t data, hdr_next_ptr, hdr_cap_id;
+	uint8_t dev_no = 0;
+	uint8_t func_no = 0;
+
+	/* Prepare a local pcitool_reg_t so as to not disturb the caller's. */
+	cfg_prg.bus_no = bus_no;
+	cfg_prg.dev_no = dev_no;
+	cfg_prg.func_no = func_no;
+	cfg_prg.barnum = 0;
+	cfg_prg.user_version = PCITOOL_VERSION;
+	cfg_prg.offset = PCI_CONF_COMM;
+	cfg_prg.acc_attr = PCITOOL_ACC_ATTR_SIZE_4 + PCITOOL_ACC_ATTR_ENDN_LTL;
+
+	if (ioctl(fd, PCITOOL_DEVICE_GET_REG, &cfg_prg) != SUCCESS) {
+		return (FAILURE);
+	}
+
+	data = (uint32_t)cfg_prg.data;
+
+	if (!((data >> 16) & PCI_STAT_CAP))
+		return (FAILURE);
+
+	cfg_prg.offset = PCI_CONF_CAP_PTR;
+	if (ioctl(fd, PCITOOL_DEVICE_GET_REG, &cfg_prg) != SUCCESS) {
+		return (FAILURE);
+	}
+	data = (uint32_t)cfg_prg.data;
+	hdr_next_ptr = data & 0xff;
+	hdr_cap_id = 0;
+
+	/*
+	 * Find the PCIe capability.
+	 */
+	while ((hdr_next_ptr != PCI_CAP_NEXT_PTR_NULL) &&
+	    (hdr_cap_id != PCI_CAP_ID_PCI_E)) {
+
+		if (hdr_next_ptr < 0x40)
+			break;
+
+		cfg_prg.offset = hdr_next_ptr;
+
+		if (ioctl(fd, PCITOOL_DEVICE_GET_REG, &cfg_prg) != SUCCESS)
+			return (FAILURE);
+
+		data = (uint32_t)cfg_prg.data;
+
+		hdr_next_ptr = (data >> 8) & 0xFF;
+		hdr_cap_id = data & 0xFF;
+
+		if (deadcount++ > 100)
+			return (FAILURE);
+	}
+
+	if (hdr_cap_id != PCI_CAP_ID_PCI_E)
+		return (FAILURE);
+
+	/* Found a PCIe Capability */
+
+	hdr_next_ptr = 0x100;
+	hdr_cap_id = 0;
+
+	/*
+	 * Now find the ARI Capability.
+	 */
+	while ((hdr_next_ptr != PCI_CAP_NEXT_PTR_NULL) &&
+	    (hdr_cap_id != 0xe)) {
+
+		if (hdr_next_ptr < 0x40)
+			break;
+
+		cfg_prg.offset = hdr_next_ptr;
+
+		if (ioctl(fd, PCITOOL_DEVICE_GET_REG, &cfg_prg) != SUCCESS) {
+			return (FAILURE);
+		}
+		data = (uint32_t)cfg_prg.data;
+
+		hdr_next_ptr = (data >> 20) & 0xFFF;
+		hdr_cap_id = data & 0xFFFF;
+
+		if (deadcount++ > 100)
+			return (FAILURE);
+	}
+
+	if (hdr_cap_id != 0xe)
+		return (FAILURE);
+
+	return (SUCCESS);
 }
 
 /*
@@ -488,7 +583,7 @@ static int
 probe_dev(int fd, pcitool_reg_t *prg_p, pcitool_uiargs_t *input_args_p)
 {
 	pci_conf_hdr_t	config_hdr;
-	boolean_t	multi_function_device;
+	boolean_t	multi_function_device = B_FALSE;
 	int		func;
 	int		first_func = 0;
 	int		last_func = PCI_REG_FUNC_M >> PCI_REG_FUNC_SHIFT;
@@ -496,6 +591,10 @@ probe_dev(int fd, pcitool_reg_t *prg_p, pcitool_uiargs_t *input_args_p)
 
 	if (input_args_p->flags & FUNC_SPEC_FLAG) {
 		first_func = last_func = input_args_p->function;
+	} else if (supports_ari(fd, prg_p->bus_no) == SUCCESS) {
+		multi_function_device = B_TRUE;
+		if (!(input_args_p->flags & DEV_SPEC_FLAG))
+			last_func = 255;
 	}
 
 	/*
@@ -508,11 +607,14 @@ probe_dev(int fd, pcitool_reg_t *prg_p, pcitool_uiargs_t *input_args_p)
 	 * will force the loop as the user wants a specific function to be
 	 * checked.
 	 */
-	for (func = first_func, multi_function_device = B_FALSE;
-	    ((func <= last_func) &&
+	for (func = first_func;  ((func <= last_func) &&
 	    ((func == first_func) || (multi_function_device)));
 	    func++) {
-		prg_p->func_no = func;
+		if (last_func > 7) {
+			prg_p->func_no = func & 0x7;
+			prg_p->dev_no = (func >> 3) & 0x1f;
+		} else
+			prg_p->func_no = func;
 
 		/*
 		 * Four things can happen here:
@@ -587,8 +689,6 @@ probe_dev(int fd, pcitool_reg_t *prg_p, pcitool_uiargs_t *input_args_p)
 		 */
 		} else if (prg_p->data == 0) {
 			rval = SUCCESS;
-			break;	/* Func loop. */
-
 		/* Found something. */
 		} else {
 			config_hdr.dwords[0] = (uint32_t)prg_p->data;
@@ -718,6 +818,17 @@ do_probe(int fd, di_node_t di_node, di_prom_handle_t di_phdl,
 	 */
 	for (bus = first_bus; ((bus <= last_bus) && (rval == SUCCESS)); bus++) {
 		prg.bus_no = bus;
+
+		/* Device number explicitly specified. */
+		if (input_args_p->flags & DEV_SPEC_FLAG) {
+			first_dev = last_dev = input_args_p->device;
+		} else if (supports_ari(fd, bus) == SUCCESS) {
+			last_dev = 0;
+			first_dev = 0;
+		} else {
+			last_dev = PCI_REG_DEV_M >> PCI_REG_DEV_SHIFT;
+		}
+
 		for (dev = first_dev;
 		    ((dev <= last_dev) && (rval == SUCCESS)); dev++) {
 			prg.dev_no = dev;

@@ -93,9 +93,6 @@ px_fm_attach(px_t *px_p)
 	mutex_init(&px_p->px_fm_mutex, NULL, MUTEX_DRIVER,
 	    (void *)px_p->px_fm_ibc);
 
-
-	pcie_rc_init_bus(dip);
-
 	px_p->px_pfd_idx = 0;
 	for (i = 0; i < 5; i++)
 		pcie_rc_init_pfd(dip, &px_p->px_pfd_arr[i]);
@@ -126,7 +123,6 @@ px_fm_detach(px_t *px_p)
 	ddi_fm_fini(px_p->px_dip);
 	for (i = 0; i < 5; i++)
 		pcie_rc_fini_pfd(&px_p->px_pfd_arr[i]);
-	pcie_rc_fini_bus(px_p->px_dip);
 }
 
 /*
@@ -260,7 +256,7 @@ px_bus_exit(dev_info_t *dip, ddi_acc_handle_t handle)
 }
 
 static uint64_t
-px_in_addr_range(dev_info_t *dip, px_ranges_t *ranges_p, uint64_t addr)
+px_in_addr_range(dev_info_t *dip, pci_ranges_t *ranges_p, uint64_t addr)
 {
 	uint64_t	addr_low, addr_high;
 
@@ -294,7 +290,7 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	uint64_t	addr, base_addr;
 	uint64_t	fault_addr = (uint64_t)derr->fme_bus_specific;
 	pcie_req_id_t	bdf = PCIE_INVALID_BDF;
-	px_ranges_t	*ranges_p;
+	pci_ranges_t	*ranges_p;
 	int		range_len;
 
 	/*
@@ -316,7 +312,7 @@ px_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *impl_data)
 	 * Make sure this failed load came from this PCIe port.	 Check by
 	 * matching the upper 32 bits of the address with the ranges property.
 	 */
-	range_len = px_p->px_ranges_length / sizeof (px_ranges_t);
+	range_len = px_p->px_ranges_length / sizeof (pci_ranges_t);
 	i = 0;
 	for (ranges_p = px_p->px_ranges_p; i < range_len; i++, ranges_p++) {
 		base_addr = px_in_addr_range(dip, ranges_p, fault_addr);
@@ -797,7 +793,7 @@ px_err_pio_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
 {
 	dev_info_t		*px_dip = PCIE_DIP2BUS(dip)->bus_rp_dip;
 	px_t			*px_p = INST_TO_STATE(ddi_get_instance(px_dip));
-	px_ranges_t		*ranges_p;
+	pci_ranges_t		*ranges_p;
 	int			range_len;
 	ddi_acc_handle_t	ap = (ddi_acc_handle_t)handle;
 	ddi_acc_hdl_t		*hp = impl_acc_hdl_get(ap);
@@ -812,7 +808,7 @@ px_err_pio_hdl_check(dev_info_t *dip, const void *handle, const void *arg1,
 
 	/* Normalize the base addr to the addr and strip off the HB info. */
 	base_addr = (hp->ah_pfn << MMU_PAGESHIFT) + hp->ah_offset;
-	range_len = px_p->px_ranges_length / sizeof (px_ranges_t);
+	range_len = px_p->px_ranges_length / sizeof (pci_ranges_t);
 	i = 0;
 	for (ranges_p = px_p->px_ranges_p; i < range_len; i++, ranges_p++) {
 		range_addr = px_in_addr_range(dip, ranges_p, base_addr);

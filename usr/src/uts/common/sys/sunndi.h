@@ -42,11 +42,15 @@ extern "C" {
 
 #define	NDI_SUCCESS	DDI_SUCCESS	/* successful return */
 #define	NDI_FAILURE	DDI_FAILURE	/* unsuccessful return */
-#define	NDI_NOMEM	-2	/* failed to allocate resources */
-#define	NDI_BADHANDLE	-3	/* bad handle passed to in function */
-#define	NDI_FAULT	-4	/* fault during copyin/copyout */
-#define	NDI_BUSY	-5	/* device busy - could not offline */
-#define	NDI_UNBOUND	-6	/* device not bound to a driver */
+#define	NDI_NOMEM	-2		/* failed to allocate resources */
+#define	NDI_BADHANDLE	-3		/* bad handle passed to in function */
+#define	NDI_FAULT	-4		/* fault during copyin/copyout */
+#define	NDI_BUSY	-5		/* device busy - could not offline */
+#define	NDI_UNBOUND	-6		/* device not bound to a driver */
+#define	NDI_EINVAL	-7		/* invalid request or arguments */
+#define	NDI_ENOTSUP	-8		/* operation or event not supported */
+#define	NDI_CLAIMED	NDI_SUCCESS	/* event is claimed */
+#define	NDI_UNCLAIMED	-9		/* event is not claimed */
 
 /*
  * Property functions:   See also, ddipropdefs.h.
@@ -636,6 +640,23 @@ int
 ndi_busop_bus_unconfig(dev_info_t *dip, uint_t flags, ddi_bus_config_op_t op,
     void *arg);
 
+/*
+ * Called by the Nexus/HPC drivers to register, unregister and interact
+ * with the hotplug framework for the specified hotplug connection.
+ */
+int
+ndi_hp_register(dev_info_t *dip, ddi_hp_cn_info_t *info_p);
+
+int
+ndi_hp_unregister(dev_info_t *dip, char *cn_name);
+
+int
+ndi_hp_state_change_req(dev_info_t *dip, char *cn_name,
+    ddi_hp_cn_state_t state, uint_t flag);
+
+void
+ndi_hp_walk_cn(dev_info_t *dip, int (*f)(ddi_hp_cn_info_t *, void *),
+    void *arg);
 
 /*
  * Bus Resource allocation structures and function prototypes exported
@@ -705,11 +726,8 @@ typedef struct ndi_ra_request {
 #define	NDI_RA_TYPE_PCI_PREFETCH_MEM	"pci_prefetchable_memory"
 #define	NDI_RA_TYPE_INTR		"interrupt"
 
-
-
 /* flag bit definition */
 #define	NDI_RA_PASS	0x0001		/* pass request up the dev tree */
-
 
 /*
  * Prototype definitions for functions exported
@@ -728,7 +746,6 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *basep,
 int
 ndi_ra_free(dev_info_t *dip, uint64_t base, uint64_t len, char *type,
 	uint_t flag);
-
 
 /*
  * ndi_dev_is_prom_node: Return non-zero if the node is a prom node

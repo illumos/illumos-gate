@@ -44,6 +44,7 @@ GENUNIX_SRCS =		\
 	fm.c		\
 	genunix.c	\
 	group.c		\
+	hotplug.c	\
 	irm.c		\
 	kgrep.c		\
 	kmem.c		\

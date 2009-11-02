@@ -58,6 +58,9 @@ solaris.file.:::File Operations::help=FileHeader.html
 solaris.file.chown:::Change File Owner::help=FileChown.html
 solaris.file.owner:::Act as File Owner::help=FileOwner.html
 #
+solaris.hotplug.:::Hotplug::help=HotplugHeader.html
+solaris.hotplug.modify:::Modify Hotplug Connections::help=HotplugModify.html
+#
 solaris.jobs.:::Job Scheduler::help=JobHeader.html
 solaris.jobs.admin:::Manage All Jobs::help=AuthJobsAdmin.html
 solaris.jobs.grant:::Delegate Cron & At Administration::help=JobsGrant.html
@@ -129,6 +132,7 @@ solaris.smf.manage.extended-accounting.flow:::Manage Flow Extended Accounting Se
 solaris.smf.manage.extended-accounting.process:::Manage Process Extended Accounting Service States::help=SmfExAcctProcessStates.html
 solaris.smf.manage.extended-accounting.flow:::Manage Task Extended Accounting Service States::help=SmfExAcctTaskStates.html
 solaris.smf.manage.hal:::Manage HAL Service States::help=SmfHALStates.html
+solaris.smf.manage.hotplug:::Manage Hotplug Service::help=SmfManageHotplug.html
 solaris.smf.manage.idmap:::Manage Identity Mapping Service States::help=SmfIdmapStates.html
 solaris.smf.manage.inetd:::Manage inetd and inetd managed services States::help=SmfIntedStates.html
 solaris.smf.manage.ipsec:::Manage IPsec Service States::help=SmfIPsecStates.html

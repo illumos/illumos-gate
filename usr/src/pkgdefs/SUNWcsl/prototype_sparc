@@ -64,6 +64,8 @@ f none usr/lib/cfgadm/sparcv9/sdcard.so.1 755 root bin
 s none usr/lib/cfgadm/sparcv9/sdcard.so=./sdcard.so.1
 f none usr/lib/cfgadm/sparcv9/pci.so.1 755 root bin
 s none usr/lib/cfgadm/sparcv9/pci.so=./pci.so.1
+f none usr/lib/cfgadm/sparcv9/shp.so.1 755 root bin
+s none usr/lib/cfgadm/sparcv9/shp.so=./shp.so.1
 f none usr/lib/cfgadm/sparcv9/usb.so.1 755 root bin
 s none usr/lib/cfgadm/sparcv9/usb.so=./usb.so.1
 f none usr/lib/cfgadm/sparcv9/ib.so.1 755 root bin
@@ -178,6 +180,8 @@ f none usr/lib/sparcv9/libform.so.1 755 root bin
 s none usr/lib/sparcv9/libform.so=libform.so.1
 s none usr/lib/sparcv9/libgen.so.1=../../../lib/sparcv9/libgen.so.1
 s none usr/lib/sparcv9/libgen.so=../../../lib/sparcv9/libgen.so.1
+f none usr/lib/sparcv9/libhotplug.so.1 755 root bin
+s none usr/lib/sparcv9/libhotplug.so=libhotplug.so.1
 f none usr/lib/sparcv9/libidmap.so.1 755 root bin
 s none usr/lib/sparcv9/libidmap.so=./libidmap.so.1
 f none usr/lib/sparcv9/libike.so.1 755 root bin

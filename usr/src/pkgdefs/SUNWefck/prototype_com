@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -54,5 +52,5 @@ d none kernel/misc 755 root sys
 d none kernel/misc/sparcv9 755 root sys
 f none kernel/misc/sparcv9/fcodem 755 root sys
 f none kernel/misc/sparcv9/fcpci 755 root sys
-f none kernel/misc/sparcv9/pcicfg.e 755 root sys
+f none kernel/misc/sparcv9/pcicfg 755 root sys
 

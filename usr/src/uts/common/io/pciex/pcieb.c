@@ -39,18 +39,16 @@
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/fm/util.h>
-#include <sys/pcie.h>
 #include <sys/pci_cap.h>
+#include <sys/pci_impl.h>
 #include <sys/pcie_impl.h>
-#include <sys/hotplug/pci/pcihp.h>
-#include <sys/hotplug/pci/pciehpc.h>
-#include <sys/hotplug/pci/pcishpc.h>
 #include <sys/open.h>
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <sys/promif.h>		/* prom_printf */
 #include <sys/disp.h>
 #include <sys/pcie_pwr.h>
+#include <sys/hotplug/pci/pcie_hp.h>
 #include "pcieb.h"
 #ifdef PX_PLX
 #include <io/pciex/pcieb_plx.h>
@@ -120,14 +118,13 @@ static struct bus_ops pcieb_bus_ops = {
 	i_ndi_busop_access_enter,	/* (*bus_fm_access_enter)(); 	*/
 	i_ndi_busop_access_exit,	/* (*bus_fm_access_exit)(); 	*/
 	pcie_bus_power,			/* (*bus_power)(); 	*/
-	pcieb_intr_ops			/* (*bus_intr_op)(); 		*/
+	pcieb_intr_ops,			/* (*bus_intr_op)(); 		*/
+	pcie_hp_common_ops		/* (*bus_hp_op)(); 		*/
 };
 
 static int	pcieb_open(dev_t *, int, int, cred_t *);
 static int	pcieb_close(dev_t, int, int, cred_t *);
 static int	pcieb_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
-static int	pcieb_prop_op(dev_t, dev_info_t *, ddi_prop_op_t, int, char *,
-		    caddr_t, int *);
 static int	pcieb_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static uint_t 	pcieb_intr_handler(caddr_t arg1, caddr_t arg2);
 
@@ -138,9 +135,6 @@ static void	pcieb_pwr_teardown(dev_info_t *dip);
 static int	pcieb_pwr_disable(dev_info_t *dip);
 
 /* Hotplug related functions */
-static int pcieb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
-static int pcieb_pcishpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
-static int pcieb_init_hotplug(pcieb_devstate_t *pcieb);
 static void pcieb_id_props(pcieb_devstate_t *pcieb);
 
 /*
@@ -161,7 +155,7 @@ static struct cb_ops pcieb_cb_ops = {
 	nodev,				/* mmap */
 	nodev,				/* segmap */
 	nochpoll,			/* poll */
-	pcieb_prop_op,			/* cb_prop_op */
+	pcie_prop_op,			/* cb_prop_op */
 	NULL,				/* streamtab */
 	D_NEW | D_MP | D_HOTPLUG,	/* Driver compatibility flag */
 	CB_REV,				/* rev */
@@ -194,7 +188,7 @@ static struct dev_ops pcieb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"PCIe to PCI nexus driver",
+	"PCIe bridge/switch driver",
 	&pcieb_ops,	/* driver ops */
 };
 
@@ -246,6 +240,36 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
+/* ARGSUSED */
+static int
+pcieb_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
+{
+	minor_t		minor = getminor((dev_t)arg);
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(minor);
+	pcieb_devstate_t *pcieb = ddi_get_soft_state(pcieb_state, instance);
+	int		ret = DDI_SUCCESS;
+
+	switch (infocmd) {
+	case DDI_INFO_DEVT2INSTANCE:
+		*result = (void *)(intptr_t)instance;
+		break;
+	case DDI_INFO_DEVT2DEVINFO:
+		if (pcieb == NULL) {
+			ret = DDI_FAILURE;
+			break;
+		}
+
+		*result = (void *)pcieb->pcieb_dip;
+		break;
+	default:
+		ret = DDI_FAILURE;
+		break;
+	}
+
+	return (ret);
+}
+
+
 /*ARGSUSED*/
 static int
 pcieb_probe(dev_info_t *devi)
@@ -261,7 +285,6 @@ pcieb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pcieb_devstate_t	*pcieb;
 	pcie_bus_t		*bus_p = PCIE_DIP2UPBUS(devi);
 	ddi_acc_handle_t	config_handle = bus_p->bus_cfg_hdl;
-	uint8_t			dev_type = bus_p->bus_dev_type;
 
 	switch (cmd) {
 	case DDI_RESUME:
@@ -297,7 +320,6 @@ pcieb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	pcieb = ddi_get_soft_state(pcieb_state, instance);
 	pcieb->pcieb_dip = devi;
-	pcieb->pcieb_soft_state = PCIEB_SOFT_STATE_CLOSED;
 
 	if ((pcieb_fm_init(pcieb)) != DDI_SUCCESS) {
 		PCIEB_DEBUG(DBG_ATTACH, devi, "Failed in pcieb_fm_init\n");
@@ -356,36 +378,13 @@ pcieb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pcieb_attach_plx_workarounds(pcieb);
 #endif /* PX_PLX */
 
-	/* Initialize hotplug */
-	pcieb->pcieb_hotplug_capable = B_FALSE;
-
-	if ((dev_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
-	    (dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT) ||
-	    (dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) ||
-	    (dev_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE)) {
-		(void) pcieb_init_hotplug(pcieb);
-	}
+	if (pcie_init(devi, NULL) != DDI_SUCCESS)
+		goto fail;
 
 	/*
 	 * Initialize interrupt handlers. Ignore return value.
 	 */
 	(void) pcieb_intr_attach(pcieb);
-
-	if (pcieb->pcieb_hotplug_capable == B_FALSE) {
-		/*
-		 * (for non hotplug bus) this would create ":devctl" minor
-		 * node to support DEVCTL_DEVICE_* and DEVCTL_BUS_* ioctls
-		 * to this bus.
-		 */
-		if (ddi_create_minor_node(devi, "devctl", S_IFCHR,
-		    PCIHP_AP_MINOR_NUM(instance, PCIHP_DEVCTL_MINOR),
-		    DDI_NT_NEXUS, 0) != DDI_SUCCESS)
-			goto fail;
-	}
-
-	PCIEB_DEBUG(DBG_ATTACH, devi,
-	    "pcieb_attach: this nexus %s hotplug slots\n",
-	    pcieb->pcieb_hotplug_capable == B_TRUE ? "has":"has no");
 
 	/* Do any platform specific workarounds needed at this time */
 	pcieb_plat_attach_workaround(devi);
@@ -429,19 +428,8 @@ pcieb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	/* remove interrupt handlers */
 	pcieb_intr_fini(pcieb);
 
-	if (pcieb->pcieb_hotplug_capable == B_TRUE) {
-		if (pcihp_uninit(devi) == DDI_FAILURE)
-			error = DDI_FAILURE;
-
-		if (pcieb->pcieb_hpc_type == HPC_PCIE)
-			(void) pciehpc_uninit(devi);
-		else if (pcieb->pcieb_hpc_type == HPC_SHPC)
-			(void) pcishpc_uninit(devi);
-
-		(void) ndi_prop_remove(DDI_DEV_T_NONE, devi, "hotplug-capable");
-	} else {
-		ddi_remove_minor_node(devi, "devctl");
-	}
+	/* uninitialize inband PCI-E HPC if present */
+	(void) pcie_uninit(devi);
 
 	(void) ddi_prop_remove(DDI_DEV_T_NONE, devi, "device_type");
 
@@ -640,7 +628,7 @@ static int
 pcieb_name_child(dev_info_t *child, char *name, int namelen)
 {
 	pci_regspec_t *pci_rp;
-	uint_t slot, func;
+	uint_t device, func;
 	char **unit_addr;
 	uint_t n;
 
@@ -677,13 +665,19 @@ pcieb_name_child(dev_info_t *child, char *name, int namelen)
 	}
 
 	/* copy the device identifications */
-	slot = PCI_REG_DEV_G(pci_rp[0].pci_phys_hi);
+	device = PCI_REG_DEV_G(pci_rp[0].pci_phys_hi);
 	func = PCI_REG_FUNC_G(pci_rp[0].pci_phys_hi);
 
+	if (pcie_ari_is_enabled(ddi_get_parent(child))
+	    == PCIE_ARI_FORW_ENABLED) {
+		func = (device << 3) | func;
+		device = 0;
+	}
+
 	if (func != 0)
-		(void) snprintf(name, namelen, "%x,%x", slot, func);
+		(void) snprintf(name, namelen, "%x,%x", device, func);
 	else
-		(void) snprintf(name, namelen, "%x", slot);
+		(void) snprintf(name, namelen, "%x", device);
 
 	ddi_prop_free(pci_rp);
 	return (DDI_SUCCESS);
@@ -911,7 +905,7 @@ pcieb_intr_init(pcieb_devstate_t *pcieb, int intr_type)
 	    (intr_type == DDI_INTR_TYPE_MSI) ? "MSI" : "INTx");
 
 	request = 0;
-	if (pcieb->pcieb_hotplug_capable) {
+	if (PCIE_IS_HOTPLUG_ENABLED(dip)) {
 		request++;
 		is_hp = B_TRUE;
 	}
@@ -1220,202 +1214,52 @@ pcieb_fm_fini(pcieb_devstate_t *pcieb_p)
 static int
 pcieb_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 {
-	pcieb_devstate_t *pcieb_p;
-	minor_t		minor = getminor(*devp);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
+	int		inst = PCI_MINOR_NUM_TO_INSTANCE(getminor(*devp));
+	pcieb_devstate_t	*pcieb = ddi_get_soft_state(pcieb_state, inst);
+	int	rv;
 
-	/*
-	 * Make sure the open is for the right file type.
-	 */
-	if (otyp != OTYP_CHR)
-		return (EINVAL);
-
-	/*
-	 * Get the soft state structure for the device.
-	 */
-	pcieb_p = (pcieb_devstate_t *)ddi_get_soft_state(pcieb_state,
-	    instance);
-
-	if (pcieb_p == NULL)
+	if (pcieb == NULL)
 		return (ENXIO);
 
-	if (pcieb_p->pcieb_hotplug_capable == B_TRUE)
-		return ((pcihp_get_cb_ops())->cb_open(devp, flags,
-		    otyp, credp));
+	mutex_enter(&pcieb->pcieb_mutex);
+	rv = pcie_open(pcieb->pcieb_dip, devp, flags, otyp, credp);
+	mutex_exit(&pcieb->pcieb_mutex);
 
-	/*
-	 * Handle the open by tracking the device state.
-	 */
-	mutex_enter(&pcieb_p->pcieb_mutex);
-	if (flags & FEXCL) {
-		if (pcieb_p->pcieb_soft_state != PCIEB_SOFT_STATE_CLOSED) {
-			mutex_exit(&pcieb_p->pcieb_mutex);
-			return (EBUSY);
-		}
-		pcieb_p->pcieb_soft_state = PCIEB_SOFT_STATE_OPEN_EXCL;
-	} else {
-		if (pcieb_p->pcieb_soft_state == PCIEB_SOFT_STATE_OPEN_EXCL) {
-			mutex_exit(&pcieb_p->pcieb_mutex);
-			return (EBUSY);
-		}
-		pcieb_p->pcieb_soft_state = PCIEB_SOFT_STATE_OPEN;
-	}
-	mutex_exit(&pcieb_p->pcieb_mutex);
-	return (0);
+	return (rv);
 }
 
 static int
 pcieb_close(dev_t dev, int flags, int otyp, cred_t *credp)
 {
-	pcieb_devstate_t *pcieb_p;
-	minor_t		minor = getminor(dev);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
+	int		inst = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
+	pcieb_devstate_t	*pcieb = ddi_get_soft_state(pcieb_state, inst);
+	int	rv;
 
-	if (otyp != OTYP_CHR)
-		return (EINVAL);
-
-	pcieb_p = (pcieb_devstate_t *)ddi_get_soft_state(pcieb_state,
-	    instance);
-
-	if (pcieb_p == NULL)
+	if (pcieb == NULL)
 		return (ENXIO);
 
-	if (pcieb_p->pcieb_hotplug_capable == B_TRUE)
-		return ((pcihp_get_cb_ops())->cb_close(dev, flags,
-		    otyp, credp));
+	mutex_enter(&pcieb->pcieb_mutex);
+	rv = pcie_close(pcieb->pcieb_dip, dev, flags, otyp, credp);
+	mutex_exit(&pcieb->pcieb_mutex);
 
-	mutex_enter(&pcieb_p->pcieb_mutex);
-	pcieb_p->pcieb_soft_state = PCIEB_SOFT_STATE_CLOSED;
-	mutex_exit(&pcieb_p->pcieb_mutex);
-	return (0);
+	return (rv);
 }
 
 static int
 pcieb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	int *rvalp)
 {
-	pcieb_devstate_t *pcieb_p;
-	dev_info_t *self;
-	struct devctl_iocdata *dcp;
-	uint_t bus_state;
-	int rv = 0;
-	minor_t		minor = getminor(dev);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
+	int		inst = PCI_MINOR_NUM_TO_INSTANCE(getminor(dev));
+	pcieb_devstate_t	*pcieb = ddi_get_soft_state(pcieb_state, inst);
+	int		rv;
 
-	pcieb_p = (pcieb_devstate_t *)ddi_get_soft_state(pcieb_state,
-	    instance);
-
-	if (pcieb_p == NULL)
+	if (pcieb == NULL)
 		return (ENXIO);
 
-	self = pcieb_p->pcieb_dip;
-	if (pcieb_p->pcieb_hotplug_capable == B_TRUE) {
-		rv = ((pcihp_get_cb_ops())->cb_ioctl(dev, cmd,
-		    arg, mode, credp, rvalp));
+	/* To handle devctl and hotplug related ioctls */
+	rv = pcie_ioctl(pcieb->pcieb_dip, dev, cmd, arg, mode, credp, rvalp);
 
-		pcieb_plat_ioctl_hotplug(self, rv, cmd);
-		return (rv);
-	}
-
-	/*
-	 * We can use the generic implementation for these ioctls
-	 */
-	switch (cmd) {
-	case DEVCTL_DEVICE_GETSTATE:
-	case DEVCTL_DEVICE_ONLINE:
-	case DEVCTL_DEVICE_OFFLINE:
-	case DEVCTL_BUS_GETSTATE:
-		return (ndi_devctl_ioctl(self, cmd, arg, mode, 0));
-	}
-
-	/*
-	 * read devctl ioctl data
-	 */
-	if (ndi_dc_allochdl((void *)arg, &dcp) != NDI_SUCCESS)
-		return (EFAULT);
-
-	switch (cmd) {
-
-	case DEVCTL_DEVICE_RESET:
-		rv = ENOTSUP;
-		break;
-
-	case DEVCTL_BUS_QUIESCE:
-		if (ndi_get_bus_state(self, &bus_state) == NDI_SUCCESS)
-			if (bus_state == BUS_QUIESCED)
-				break;
-		(void) ndi_set_bus_state(self, BUS_QUIESCED);
-		break;
-
-	case DEVCTL_BUS_UNQUIESCE:
-		if (ndi_get_bus_state(self, &bus_state) == NDI_SUCCESS)
-			if (bus_state == BUS_ACTIVE)
-				break;
-		(void) ndi_set_bus_state(self, BUS_ACTIVE);
-		break;
-
-	case DEVCTL_BUS_RESET:
-		rv = ENOTSUP;
-		break;
-
-	case DEVCTL_BUS_RESETALL:
-		rv = ENOTSUP;
-		break;
-
-	default:
-		rv = ENOTTY;
-	}
-
-	ndi_dc_freehdl(dcp);
 	return (rv);
-}
-
-static int
-pcieb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
-	int flags, char *name, caddr_t valuep, int *lengthp)
-{
-	pcieb_devstate_t *pcieb_p;
-	minor_t		minor = getminor(dev);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
-
-	pcieb_p = (pcieb_devstate_t *)ddi_get_soft_state(pcieb_state,
-	    instance);
-
-	if (pcieb_p == NULL)
-		return (ENXIO);
-
-	if (pcieb_p->pcieb_hotplug_capable == B_TRUE)
-		return ((pcihp_get_cb_ops())->cb_prop_op(dev, dip, prop_op,
-		    flags, name, valuep, lengthp));
-
-	return (ddi_prop_op(dev, dip, prop_op, flags, name, valuep, lengthp));
-}
-
-/*ARGSUSED*/
-static int
-pcieb_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
-{
-	pcieb_devstate_t *pcieb_p;	/* per pcieb state pointer */
-	minor_t		minor = getminor((dev_t)arg);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
-
-	pcieb_p = (pcieb_devstate_t *)ddi_get_soft_state(pcieb_state,
-	    instance);
-
-	switch (infocmd) {
-	default:
-		return (DDI_FAILURE);
-
-	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)(intptr_t)instance;
-		return (DDI_SUCCESS);
-
-	case DDI_INFO_DEVT2DEVINFO:
-		if (pcieb_p == NULL)
-			return (DDI_FAILURE);
-		*result = (void *)pcieb_p->pcieb_dip;
-		return (DDI_SUCCESS);
-	}
 }
 
 /*
@@ -1444,12 +1288,8 @@ pcieb_intr_handler(caddr_t arg1, caddr_t arg2)
 	if (isrc == PCIEB_INTR_SRC_UNKNOWN)
 		goto FAIL;
 
-	if (isrc & PCIEB_INTR_SRC_HP) {
-		if (pcieb_p->pcieb_hpc_type == HPC_PCIE)
-			ret = pciehpc_intr(dip);
-		else if (pcieb_p->pcieb_hpc_type == HPC_SHPC)
-			ret = pcishpc_intr(dip);
-	}
+	if (isrc & PCIEB_INTR_SRC_HP)
+		ret = pcie_intr(dip);
 
 	if (isrc & PCIEB_INTR_SRC_PME)
 		ret = DDI_INTR_CLAIMED;
@@ -1574,99 +1414,6 @@ pcieb_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 {
 	return (pcieb_plat_intr_ops(dip, rdip, intr_op, hdlp, result));
 
-}
-
-/*ARGSUSED*/
-static int pcieb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle)
-{
-	uint16_t cap_ptr;
-
-	if ((PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr)) !=
-	    DDI_FAILURE) {
-		uint16_t slotimpl = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-		    PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
-		if (slotimpl)
-			if (PCI_CAP_GET32(config_handle, NULL, cap_ptr,
-			    PCIE_SLOTCAP) & PCIE_SLOTCAP_HP_CAPABLE)
-				return (DDI_SUCCESS);
-	}
-
-	return (DDI_FAILURE);
-}
-
-static int pcieb_pcishpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle)
-{
-	return (pcieb_plat_pcishpc_probe(dip, config_handle));
-}
-
-/*
- * Initialize hotplug framework if we are hotpluggable.
- * Sets flag in the soft state if Hot Plug is supported and initialized
- * properly.
- */
-/*ARGSUSED*/
-static int
-pcieb_init_hotplug(pcieb_devstate_t *pcieb)
-{
-	int rv = DDI_FAILURE;
-	pcie_bus_t *bus_p = PCIE_DIP2BUS(pcieb->pcieb_dip);
-	ddi_acc_handle_t config_handle = bus_p->bus_cfg_hdl;
-	uint8_t dev_type = bus_p->bus_dev_type;
-
-#ifdef PX_PLX
-	uint16_t vid = bus_p->bus_dev_ven_id & 0xFFFF;
-	uint16_t did = bus_p->bus_dev_ven_id >> 16;
-	if ((vid == PXB_VENDOR_PLX) && (did == PXB_DEVICE_PLX_8532) &&
-	    (bus_p->bus_rev_id <= PXB_DEVICE_PLX_AA_REV))
-		return (DDI_SUCCESS);
-#endif /* PX_PLX */
-
-	if (((dev_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
-	    (dev_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE) ||
-	    (dev_type == PCIE_PCIECAP_DEV_TYPE_ROOT)) &&
-	    (pcieb_pciehpc_probe(pcieb->pcieb_dip,
-	    config_handle) == DDI_SUCCESS)) {
-		pcieb->pcieb_hpc_type = HPC_PCIE;
-	} else if ((dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) &&
-	    (pcieb_pcishpc_probe(pcieb->pcieb_dip,
-	    config_handle) == DDI_SUCCESS)) {
-		pcieb->pcieb_hpc_type = HPC_SHPC;
-	} else {
-		pcieb->pcieb_hpc_type = HPC_NONE;
-		return (DDI_SUCCESS);
-	}
-
-	pcieb->pcieb_hotplug_capable = B_TRUE;
-
-	if (pcieb->pcieb_hpc_type == HPC_PCIE)
-		rv = pciehpc_init(pcieb->pcieb_dip, NULL);
-	else if (pcieb->pcieb_hpc_type == HPC_SHPC)
-		rv = pcishpc_init(pcieb->pcieb_dip);
-
-	if (rv != DDI_SUCCESS)
-		goto fail;
-
-	if (pcihp_init(pcieb->pcieb_dip) != DDI_SUCCESS) {
-		if (pcieb->pcieb_hpc_type == HPC_PCIE)
-			(void) pciehpc_uninit(pcieb->pcieb_dip);
-		else if (pcieb->pcieb_hpc_type == HPC_SHPC)
-			(void) pcishpc_uninit(pcieb->pcieb_dip);
-
-		goto fail;
-	}
-
-	(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, pcieb->pcieb_dip,
-	    "hotplug-capable");
-
-	return (DDI_SUCCESS);
-
-fail:
-	pcieb->pcieb_hpc_type = HPC_NONE;
-	pcieb->pcieb_hotplug_capable = B_FALSE;
-	PCIEB_DEBUG(DBG_ATTACH, pcieb->pcieb_dip, "Failed setting hotplug"
-	    " framework\n");
-
-	return (DDI_FAILURE);
 }
 
 /*
@@ -1922,10 +1669,10 @@ pcieb_create_ranges_prop(dev_info_t *dip,
 	ddi_acc_handle_t config_handle)
 {
 	uint32_t base, limit;
-	pcieb_ranges_t	ranges[PCIEB_RANGE_LEN];
+	ppb_ranges_t	ranges[PCIEB_RANGE_LEN];
 	uint8_t io_base_lo, io_limit_lo;
 	uint16_t io_base_hi, io_limit_hi, mem_base, mem_limit;
-	int i = 0, rangelen = sizeof (pcieb_ranges_t)/sizeof (int);
+	int i = 0, rangelen = sizeof (ppb_ranges_t)/sizeof (int);
 
 	io_base_lo = pci_config_get8(config_handle, PCI_BCNF_IO_BASE_LOW);
 	io_limit_lo = pci_config_get8(config_handle, PCI_BCNF_IO_LIMIT_LOW);

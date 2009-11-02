@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +40,9 @@ extern "C" {
 typedef struct pci_state {
 	dev_info_t *pci_dip;
 	int pci_fmcap;
+	uint_t pci_soft_state;
 	ddi_iblock_cookie_t pci_fm_ibc;
+	kmutex_t pci_mutex;
 	kmutex_t pci_peek_poke_mutex;
 	kmutex_t pci_err_mutex;
 } pci_state_t;

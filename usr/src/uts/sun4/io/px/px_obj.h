@@ -19,20 +19,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PX_OBJ_H
 #define	_SYS_PX_OBJ_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#include <sys/pcie.h>
 #include <sys/pcie_impl.h>
 #include <sys/pci_impl.h>
 #include <sys/fm/io/sun4_fire.h>

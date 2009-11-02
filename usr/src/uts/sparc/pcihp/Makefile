@@ -20,10 +20,8 @@
 #
 #
 # uts/sparc/pcihp/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the kernel/misc/pcihp module
 #	for PCI hotplug support in PCI nexus drivers.
@@ -70,7 +68,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 
 #
 #	Dependency
-LDFLAGS		+= -dy -Nmisc/busra -Nmisc/hpcsvc -Nmisc/pcicfg.e
+LDFLAGS		+= -dy -Nmisc/busra -Nmisc/hpcsvc -Nmisc/pcicfg
 
 #
 # For now, disable these lint checks; maintainers should endeavor

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This is an internal header file. Not to be shipped.
@@ -48,6 +48,7 @@ extern "C" {
 #define	SET_DATE_AUTH		"solaris.system.date"
 #define	WIFI_CONFIG_AUTH	"solaris.network.wifi.config"
 #define	WIFI_WEP_AUTH		"solaris.network.wifi.wep"
+#define	HP_MODIFY_AUTH		"solaris.hotplug.modify"
 
 /*
  * Authorizations used by Trusted Solaris.

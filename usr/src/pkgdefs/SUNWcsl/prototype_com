@@ -54,6 +54,8 @@ f none usr/lib/cfgadm/sdcard.so.1 755 root bin
 s none usr/lib/cfgadm/sdcard.so=./sdcard.so.1
 f none usr/lib/cfgadm/pci.so.1 755 root bin
 s none usr/lib/cfgadm/pci.so=./pci.so.1
+f none usr/lib/cfgadm/shp.so.1 755 root bin
+s none usr/lib/cfgadm/shp.so=./shp.so.1
 f none usr/lib/cfgadm/usb.so.1 755 root bin
 s none usr/lib/cfgadm/usb.so=./usb.so.1
 f none usr/lib/cfgadm/ib.so.1 755 root bin
@@ -134,6 +136,8 @@ f none usr/lib/libfstyp.so.1 755 root bin
 s none usr/lib/libgen.so.1=../../lib/libgen.so.1
 s none usr/lib/libgen.so=../../lib/libgen.so.1
 s none usr/ccs/lib/libgen.so=../../../lib/libgen.so.1
+s none usr/lib/libhotplug.so=./libhotplug.so.1
+f none usr/lib/libhotplug.so.1 755 root bin
 f none usr/lib/libidmap.so.1 755 root bin
 s none usr/lib/libidmap.so=./libidmap.so.1
 f none usr/lib/libinetsvc.so.1 755 root bin

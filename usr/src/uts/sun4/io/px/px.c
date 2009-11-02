@@ -24,7 +24,7 @@
  */
 
 /*
- * PCI Express nexus driver interface
+ * SPARC Host to PCI Express nexus driver
  */
 
 #include <sys/types.h>
@@ -33,14 +33,12 @@
 #include <sys/kmem.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
-#include <sys/ddi_impldefs.h>
 #include <sys/ddi_subrdefs.h>
 #include <sys/spl.h>
 #include <sys/epm.h>
 #include <sys/iommutsb.h>
-#include <sys/hotplug/pci/pcihp.h>
-#include <sys/hotplug/pci/pciehpc.h>
 #include "px_obj.h"
+#include <sys/hotplug/pci/pcie_hp.h>
 #include <sys/pci_tools.h>
 #include "px_tools_ext.h"
 #include <sys/pcie_pwr.h>
@@ -62,12 +60,6 @@ static void px_pwr_teardown(dev_info_t *dip);
 static void px_set_mps(px_t *px_p);
 
 extern int pcie_max_mps;
-
-/*
- * function prototypes for hotplug routines:
- */
-static int px_init_hotplug(px_t *px_p);
-static int px_uninit_hotplug(dev_info_t *dip);
 
 /*
  * bus ops and dev ops structures:
@@ -101,7 +93,8 @@ static struct bus_ops px_bus_ops = {
 	px_bus_enter,		/* (*bus_fm_access_enter)(); */
 	px_bus_exit,		/* (*bus_fm_access_fini)(); */
 	pcie_bus_power,		/* (*bus_power)(); */
-	px_intr_ops		/* (*bus_intr_op)(); */
+	px_intr_ops,		/* (*bus_intr_op)(); */
+	pcie_hp_common_ops	/* (*bus_hp_op)(); */
 };
 
 extern struct cb_ops px_cb_ops;
@@ -128,9 +121,13 @@ static struct dev_ops px_ops = {
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
-	&mod_driverops, 		/* Type of module - driver */
-	"PCI Express nexus driver",	/* Name of module. */
-	&px_ops,			/* driver ops */
+	&mod_driverops, 			/* Type of module - driver */
+#if defined(sun4u)
+	"Sun4u Host to PCIe nexus driver",	/* Name of module. */
+#elif defined(sun4v)
+	"Sun4v Host to PCIe nexus driver",	/* Name of module. */
+#endif
+	&px_ops,				/* driver ops */
 };
 
 static struct modlinkage modlinkage = {
@@ -189,31 +186,29 @@ _info(struct modinfo *modinfop)
 static int
 px_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 {
-	int	instance = getminor((dev_t)arg);
+	minor_t	minor = getminor((dev_t)arg);
+	int	instance = PCI_MINOR_NUM_TO_INSTANCE(minor);
 	px_t	*px_p = INST_TO_STATE(instance);
+	int	ret = DDI_SUCCESS;
 
-	/*
-	 * Allow hotplug to deal with ones it manages
-	 * Hot Plug will be done later.
-	 */
-	if (px_p && (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE))
-		return (pcihp_info(dip, infocmd, arg, result));
-
-	/* non-hotplug or not attached */
 	switch (infocmd) {
 	case DDI_INFO_DEVT2INSTANCE:
 		*result = (void *)(intptr_t)instance;
-		return (DDI_SUCCESS);
-
+		break;
 	case DDI_INFO_DEVT2DEVINFO:
-		if (px_p == NULL)
-			return (DDI_FAILURE);
-		*result = (void *)px_p->px_dip;
-		return (DDI_SUCCESS);
+		if (px_p == NULL) {
+			ret = DDI_FAILURE;
+			break;
+		}
 
+		*result = (void *)px_p->px_dip;
+		break;
 	default:
-		return (DDI_FAILURE);
+		ret = DDI_FAILURE;
+		break;
 	}
+
+	return (ret);
 }
 
 /* device driver entry points */
@@ -228,6 +223,7 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	int		instance = DIP_TO_INST(dip);
 	int		ret = DDI_SUCCESS;
 	devhandle_t	dev_hdl = NULL;
+	pcie_hp_regops_t regops;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -245,14 +241,14 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		px_p = INST_TO_STATE(instance);
 		px_p->px_dip = dip;
 		mutex_init(&px_p->px_mutex, NULL, MUTEX_DRIVER, NULL);
-		px_p->px_soft_state = PX_SOFT_STATE_CLOSED;
-		px_p->px_open_count = 0;
+		px_p->px_soft_state = PCI_SOFT_STATE_CLOSED;
 
 		(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip,
 		    "device_type", "pciex");
 
 		/* Initialize px_dbg for high pil printing */
 		px_dbg_attach(dip, &px_p->px_dbg_hdl);
+		pcie_rc_init_bus(dip);
 
 		/*
 		 * Get key properties of the pci bridge node and
@@ -311,20 +307,16 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if ((ret = px_err_add_intr(&px_p->px_fault)) != DDI_SUCCESS)
 			goto err_bad_intr;
 
-		(void) px_init_hotplug(px_p);
+		if (px_lib_hotplug_init(dip, (void *)&regops) == DDI_SUCCESS) {
+			pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+
+			bus_p->bus_hp_sup_modes |= PCIE_NATIVE_HP_MODE;
+		}
 
 		(void) px_set_mps(px_p);
 
-		/*
-		 * Create the "devctl" node for hotplug and pcitool support.
-		 * For non-hotplug bus, we still need ":devctl" to
-		 * support DEVCTL_DEVICE_* and DEVCTL_BUS_* ioctls.
-		 */
-		if (ddi_create_minor_node(dip, "devctl", S_IFCHR,
-		    PCIHP_AP_MINOR_NUM(instance, PCIHP_DEVCTL_MINOR),
-		    DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
-			goto err_bad_devctl_node;
-		}
+		if (pcie_init(dip, (caddr_t)&regops) != DDI_SUCCESS)
+			goto err_bad_hotplug;
 
 		if (pxtool_init(dip) != DDI_SUCCESS)
 			goto err_bad_pcitool_node;
@@ -353,8 +345,9 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		break;
 
 err_bad_pcitool_node:
-		ddi_remove_minor_node(dip, "devctl");
-err_bad_devctl_node:
+		(void) pcie_uninit(dip);
+err_bad_hotplug:
+		(void) px_lib_hotplug_uninit(dip);
 		px_err_rem_intr(&px_p->px_fault);
 err_bad_intr:
 		px_fm_detach(px_p);
@@ -377,6 +370,7 @@ err_bad_ib:
 err_bad_dev_init:
 		px_free_props(px_p);
 err_bad_px_prop:
+		pcie_rc_fini_bus(dip);
 		px_dbg_detach(dip, &px_p->px_dbg_hdl);
 		mutex_destroy(&px_p->px_mutex);
 		ddi_soft_state_free(px_state_p, instance);
@@ -423,9 +417,10 @@ err_bad_px_softstate:
 static int
 px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	int instance = ddi_get_instance(dip);
-	px_t *px_p = INST_TO_STATE(instance);
-	int ret;
+	int		instance = ddi_get_instance(dip);
+	px_t		*px_p = INST_TO_STATE(instance);
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+	int		ret;
 
 	/*
 	 * Make sure we are currently attached
@@ -446,11 +441,13 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 */
 		px_cpr_rem_callb(px_p);
 
-		if (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE)
-			if (px_uninit_hotplug(dip) != DDI_SUCCESS) {
-				mutex_exit(&px_p->px_mutex);
-				return (DDI_FAILURE);
-			}
+		if (PCIE_IS_PCIE_HOTPLUG_ENABLED(bus_p))
+			(void) px_lib_hotplug_uninit(dip);
+
+		if (pcie_uninit(dip) != DDI_SUCCESS) {
+			mutex_exit(&px_p->px_mutex);
+			return (DDI_FAILURE);
+		}
 
 		/*
 		 * things which used to be done in obj_destroy
@@ -461,7 +458,6 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		pxtool_uninit(dip);
 
-		ddi_remove_minor_node(dip, "devctl");
 		px_err_rem_intr(&px_p->px_fault);
 		px_fm_detach(px_p);
 		px_pec_detach(px_p);
@@ -481,20 +477,10 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 * resources it's using.
 		 */
 		px_free_props(px_p);
+		pcie_rc_fini_bus(dip);
 		px_dbg_detach(dip, &px_p->px_dbg_hdl);
 		mutex_exit(&px_p->px_mutex);
 		mutex_destroy(&px_p->px_mutex);
-
-		/* Free the interrupt-priorities prop if we created it. */
-		{
-			int len;
-
-			if (ddi_getproplen(DDI_DEV_T_ANY, dip,
-			    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
-			    "interrupt-priorities", &len) == DDI_PROP_SUCCESS)
-				(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
-				    "interrupt-priorities");
-		}
 
 		px_p->px_dev_hdl = NULL;
 		ddi_soft_state_free(px_state_p, instance);
@@ -1368,81 +1354,6 @@ px_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	}
 
 	return (ret);
-}
-
-static int
-px_init_hotplug(px_t *px_p)
-{
-	px_bus_range_t bus_range;
-	dev_info_t *dip;
-	pciehpc_regops_t regops;
-
-	dip = px_p->px_dip;
-
-	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "hotplug-capable") == 0)
-		return (DDI_FAILURE);
-
-	/*
-	 * Before initializing hotplug - open up bus range.  The busra
-	 * module will initialize its pool of bus numbers from this.
-	 * "busra" will be the agent that keeps track of them during
-	 * hotplug.  Also, note, that busra will remove any bus numbers
-	 * already in use from boot time.
-	 */
-	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "bus-range") == 0) {
-		cmn_err(CE_WARN, "%s%d: bus-range not found\n",
-		    ddi_driver_name(dip), ddi_get_instance(dip));
-#ifdef	DEBUG
-		bus_range.lo = 0x0;
-		bus_range.hi = 0xff;
-
-		if (ndi_prop_update_int_array(DDI_DEV_T_NONE,
-		    dip, "bus-range", (int *)&bus_range, 2)
-		    != DDI_PROP_SUCCESS) {
-			return (DDI_FAILURE);
-		}
-#else
-		return (DDI_FAILURE);
-#endif
-	}
-
-	if (px_lib_hotplug_init(dip, (void *)&regops) != DDI_SUCCESS)
-		return (DDI_FAILURE);
-
-	if (pciehpc_init(dip, &regops) != DDI_SUCCESS) {
-		px_lib_hotplug_uninit(dip);
-		return (DDI_FAILURE);
-	}
-
-	if (pcihp_init(dip) != DDI_SUCCESS) {
-		(void) pciehpc_uninit(dip);
-		px_lib_hotplug_uninit(dip);
-		return (DDI_FAILURE);
-	}
-
-	if (pcihp_get_cb_ops() != NULL) {
-		DBG(DBG_ATTACH, dip, "%s%d hotplug enabled",
-		    ddi_driver_name(dip), ddi_get_instance(dip));
-		px_p->px_dev_caps |= PX_HOTPLUG_CAPABLE;
-	}
-
-	return (DDI_SUCCESS);
-}
-
-static int
-px_uninit_hotplug(dev_info_t *dip)
-{
-	if (pcihp_uninit(dip) != DDI_SUCCESS)
-		return (DDI_FAILURE);
-
-	if (pciehpc_uninit(dip) != DDI_SUCCESS)
-		return (DDI_FAILURE);
-
-	px_lib_hotplug_uninit(dip);
-
-	return (DDI_SUCCESS);
 }
 
 static void

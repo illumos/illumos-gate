@@ -751,6 +751,8 @@ f none usr/include/sys/dc_ki.h 644 root bin
 f none usr/include/sys/ddi.h 644 root bin
 f none usr/include/sys/ddifm.h 644 root bin
 f none usr/include/sys/ddifm_impl.h 644 root bin
+f none usr/include/sys/ddi_hp.h 644 root bin
+f none usr/include/sys/ddi_hp_impl.h 644 root bin
 f none usr/include/sys/ddi_impldefs.h 644 root bin
 f none usr/include/sys/ddi_implfuncs.h 644 root bin
 f none usr/include/sys/ddi_intr.h 644 root bin

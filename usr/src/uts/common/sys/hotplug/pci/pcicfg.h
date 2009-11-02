@@ -20,27 +20,34 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_HOTPLUG_PCI_PCICFG_H
 #define	_SYS_HOTPLUG_PCI_PCICFG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
+typedef enum pcicfg_flags {
+	/* No probing; used in case of virtual hotplug */
+	PCICFG_FLAG_READ_ONLY = 0x1,
+	/* Enable ARI; used in case of boot case */
+	PCICFG_FLAG_ENABLE_ARI = 0x2
+} pcicfg_flags_t;
+
 /*
  * Interfaces exported by PCI configurator module, kernel/misc/pcicfg.
  */
-int pcicfg_configure(dev_info_t *, uint_t);
-int pcicfg_unconfigure(dev_info_t *, uint_t);
+int pcicfg_configure(dev_info_t *, uint_t, uint_t, pcicfg_flags_t);
+int pcicfg_unconfigure(dev_info_t *, uint_t, uint_t, pcicfg_flags_t);
 
 #define	PCICFG_SUCCESS DDI_SUCCESS
 #define	PCICFG_FAILURE DDI_FAILURE
+
+#define	PCICFG_ALL_FUNC 0xffffffff
 
 /*
  * The following subclass definition for Non Transparent bridge should

@@ -375,6 +375,7 @@ f none lib/svc/method/svc-auditd 0555 root bin
 f none lib/svc/method/svc-consadm 0555 root bin
 f none lib/svc/method/svc-cron 0555 root bin
 f none lib/svc/method/svc-forwarding 0555 root bin
+f none lib/svc/method/svc-hotplug 0555 root bin
 f none lib/svc/method/svc-legacy-routing 0555 root bin
 f none lib/svc/method/svc-dlmgmtd 0555 root bin
 f none lib/svc/method/svc-nscd 0555 root bin
@@ -546,6 +547,7 @@ f manifest var/svc/manifest/system/filesystem/local-fs.xml 0444 root sys
 f manifest var/svc/manifest/system/filesystem/minimal-fs.xml 0444 root sys
 f manifest var/svc/manifest/system/filesystem/root-fs.xml 0444 root sys
 f manifest var/svc/manifest/system/filesystem/usr-fs.xml 0444 root sys
+f manifest var/svc/manifest/system/hotplug.xml 0444 root sys
 d none var/svc/manifest/system/security 755 root sys
 f manifest var/svc/manifest/system/auditd.xml 0444 root sys
 f manifest var/svc/manifest/system/consadm.xml 0444 root sys

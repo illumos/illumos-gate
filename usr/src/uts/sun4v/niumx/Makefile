@@ -20,10 +20,8 @@
 #
 #
 # uts/sun4v/niumx/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #	This makefile drives the production of the niumx driver kernel module
@@ -57,9 +55,8 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	Include SUN4 and SUN4U specific headers files
+#	Include SUN4V specific headers files
 #
-INC_PATH	+= -I$(UTSBASE)/sun4/io/niumx
 INC_PATH	+= -I$(UTSBASE)/sun4v/io/niumx
 
 #
@@ -71,11 +68,6 @@ CFLAGS += $(CCVERBOSE)
 # Turn on doubleword alignment for 64 bit registers
 #
 CFLAGS += -dalign
-
-#
-#	Dependency
-#
-LDFLAGS += -dy -Nmisc/busra -Nmisc/pcie
 
 #
 #	Default build targets.

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -405,86 +405,86 @@ main(
 
 	switch (action) {
 	case CFGA_OP_CHANGE_STATE:
-	    /* Sanity check - requires an argument */
-	    if ((argc - optind) <= 0) {
-		usage();
-		break;
-	    }
-	    /* Sanity check - args cannot be ap_types */
-	    for (i = 0; i < (argc - optind); i++) {
-		    if (find_arg_type(ap_args[i]) == AP_TYPE) {
+		/* Sanity check - requires an argument */
+		if ((argc - optind) <= 0) {
 			usage();
-			exit(EXIT_ARGERROR);
-			/*NOTREACHED*/
-		    }
-	    }
-	    ret = config_change_state(sc_opt, argc - optind, ap_args, plat_opts,
-		&confirm, &message, &estrp, flags);
-	    if (ret != CFGA_OK)
-		    cfgadm_error(ret, estrp);
-	    break;
+			break;
+		}
+		/* Sanity check - args cannot be ap_types */
+		for (i = 0; i < (argc - optind); i++) {
+			if (find_arg_type(ap_args[i]) == AP_TYPE) {
+				usage();
+				exit(EXIT_ARGERROR);
+				/*NOTREACHED*/
+			}
+		}
+		ret = config_change_state(sc_opt, argc - optind, ap_args,
+		    plat_opts, &confirm, &message, &estrp, flags);
+		if (ret != CFGA_OK)
+			cfgadm_error(ret, estrp);
+		break;
 	case CFGA_OP_PRIVATE:
-	    /* Sanity check - requires an argument */
-	    if ((argc - optind) <= 0) {
-		usage();
-		break;
-	    }
-	    /* Sanity check - args cannot be ap_types */
-	    for (i = 0; i < (argc - optind); i++) {
-		    if (find_arg_type(ap_args[i]) == AP_TYPE) {
+		/* Sanity check - requires an argument */
+		if ((argc - optind) <= 0) {
 			usage();
-			exit(EXIT_ARGERROR);
-			/*NOTREACHED*/
-		    }
-	    }
+			break;
+		}
+		/* Sanity check - args cannot be ap_types */
+		for (i = 0; i < (argc - optind); i++) {
+			if (find_arg_type(ap_args[i]) == AP_TYPE) {
+				usage();
+				exit(EXIT_ARGERROR);
+				/*NOTREACHED*/
+			}
+		}
 
-	    ret = config_private_func(act_arg, argc - optind, ap_args,
-		plat_opts, &confirm, &message, &estrp, flags);
+		ret = config_private_func(act_arg, argc - optind, ap_args,
+		    plat_opts, &confirm, &message, &estrp, flags);
 
-	    if (ret != CFGA_OK)
-		    cfgadm_error(ret, estrp);
-	    break;
+		if (ret != CFGA_OK)
+			cfgadm_error(ret, estrp);
+		break;
 	case CFGA_OP_TEST:
-	    /* Sanity check - requires an argument */
-	    if ((argc - optind) <= 0) {
-		usage();
-		break;
-	    }
+		/* Sanity check - requires an argument */
+		if ((argc - optind) <= 0) {
+			usage();
+			break;
+		}
 
-	    if ((flags & ~CFGA_FLAG_VERBOSE) != 0) {
-		usage();
-		exit(EXIT_ARGERROR);
-		/*NOTREACHED*/
-	    }
-
-	    /* Sanity check - args cannot be ap_types */
-	    for (i = 0; i < (argc - optind); i++) {
-		    if (find_arg_type(ap_args[i]) == AP_TYPE) {
+		if ((flags & ~CFGA_FLAG_VERBOSE) != 0) {
 			usage();
 			exit(EXIT_ARGERROR);
 			/*NOTREACHED*/
-		    }
-	    }
-	    ret = config_test(argc - optind, ap_args, plat_opts, &message,
-		&estrp, flags);
-	    if (ret != CFGA_OK)
-		    cfgadm_error(ret, estrp);
-	    break;
+		}
+
+		/* Sanity check - args cannot be ap_types */
+		for (i = 0; i < (argc - optind); i++) {
+			if (find_arg_type(ap_args[i]) == AP_TYPE) {
+				usage();
+				exit(EXIT_ARGERROR);
+				/*NOTREACHED*/
+			}
+		}
+		ret = config_test(argc - optind, ap_args, plat_opts, &message,
+		    &estrp, flags);
+		if (ret != CFGA_OK)
+			cfgadm_error(ret, estrp);
+		break;
 	case CFGA_OP_HELP:
 
-	    if ((flags & ~CFGA_FLAG_VERBOSE) != 0) {
-		usage();
-		exit(EXIT_ARGERROR);
-		/*NOTREACHED*/
-	    }
+		if ((flags & ~CFGA_FLAG_VERBOSE) != 0) {
+			usage();
+			exit(EXIT_ARGERROR);
+			/*NOTREACHED*/
+		}
 
-	    /* always do usage? */
-	    usage();
-	    ret = config_help(argc - optind, ap_args, &message, plat_opts,
-		flags);
-	    if (ret != CFGA_OK)
-		    cfgadm_error(ret, estrp);
-	    break;
+		/* always do usage? */
+		usage();
+		ret = config_help(argc - optind, ap_args, &message, plat_opts,
+		    flags);
+		if (ret != CFGA_OK)
+			cfgadm_error(ret, estrp);
+		break;
 
 	case CFGA_OP_LIST: {
 		/*
@@ -604,6 +604,8 @@ main(
 			S_FREE(list_array);
 			S_FREE(post_filtp);
 
+			if (estrp != NULL && *estrp != '\0')
+				cfgadm_error(CFGA_NOTSUPP, estrp);
 			if (exitcode != EXIT_OK) {
 				exit(exitcode);
 				/*NOTREACHED*/
@@ -634,8 +636,7 @@ main(
  * usage - outputs the usage help message.
  */
 static void
-usage(
-	void)
+usage(void)
 {
 	int i;
 

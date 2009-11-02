@@ -29,9 +29,8 @@
 #include <sys/vmem.h>
 #include <sys/machsystm.h>	/* lddphys() */
 #include <sys/iommutsb.h>
-#include <sys/pci.h>
-#include <sys/hotplug/pci/pciehpc.h>
 #include <px_obj.h>
+#include <sys/hotplug/pci/pcie_hp.h>
 #include "px_regs.h"
 #include "oberon_regs.h"
 #include "px_csr.h"
@@ -1389,6 +1388,7 @@ lpu_init(caddr_t csr_base, pxu_t *pxu_p)
 	    LPU_LTSSM_CONFIG4_DATA_RATE) |
 	    (LPU_LTSSM_CONFIG4_N_FTS_DEFAULT <<
 	    LPU_LTSSM_CONFIG4_N_FTS));
+
 	CSR_XS(csr_base, LPU_LTSSM_CONFIG4, val);
 	DBG(DBG_LPU, NULL, "lpu_init - LPU_LTSSM_CONFIG4: 0x%llx\n",
 	    CSR_XR(csr_base, LPU_LTSSM_CONFIG4));
@@ -1734,7 +1734,8 @@ hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 * Write the most significant 30 bits of the TSB physical address
 	 * and the encoded TSB table size.
 	 */
-	for (i = 8; i && (pxu_p->tsb_size < (0x2000 << i)); i--) {}
+	for (i = 8; i && (pxu_p->tsb_size < (0x2000 << i)); i--)
+		;
 
 	val = (((((va_to_pa(pxu_p->tsb_vaddr)) >> 13) << 13) |
 	    ((MMU_PAGE_SHIFT == 13) ? 0 : 1) << 8) | i);
@@ -2128,7 +2129,6 @@ uint64_t
 hvio_intr_settarget(devhandle_t dev_hdl, pxu_t *pxu_p, sysino_t sysino,
     cpuid_t cpuid)
 {
-
 	uint64_t	val, intr_controller;
 	uint32_t	ino = SYSINO_TO_DEVINO(sysino);
 
@@ -2162,8 +2162,7 @@ hvio_intr_settarget(devhandle_t dev_hdl, pxu_t *pxu_p, sysino_t sysino,
 	}
 
 	/* For EQ interrupts, set DATA MONDO bit */
-	if ((ino >= PX_DEFAULT_MSIQ_1ST_DEVINO) &&
-	    (ino < (PX_DEFAULT_MSIQ_1ST_DEVINO + PX_DEFAULT_MSIQ_CNT)))
+	if ((ino >= EQ_1ST_DEVINO) && (ino < (EQ_1ST_DEVINO + EQ_CNT)))
 		val |= (0x1ull << INTERRUPT_MAPPING_ENTRIES_MDO_MODE);
 
 	CSRA_XS((caddr_t)dev_hdl, INTERRUPT_MAPPING, ino, val);
@@ -3093,17 +3092,19 @@ oberon_hp_pwron(caddr_t csr_base)
 			delay(drv_usectohz(link_status_check));
 			reg = CSR_XR(csr_base, DLU_LINK_LAYER_STATUS);
 
-		    if ((((reg >> DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS) &
-			DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS_MASK) ==
-			DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS_FC_INIT_DONE) &&
-			(reg & (1ull << DLU_LINK_LAYER_STATUS_DLUP_STS)) &&
-			((reg & DLU_LINK_LAYER_STATUS_LNK_STATE_MACH_STS_MASK)
-			==
-			DLU_LINK_LAYER_STATUS_LNK_STATE_MACH_STS_DL_ACTIVE)) {
-			DBG(DBG_HP, NULL, "oberon_hp_pwron : link is up\n");
-				link_up = B_TRUE;
-		    } else
+		if ((((reg >> DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS) &
+		    DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS_MASK) ==
+		    DLU_LINK_LAYER_STATUS_INIT_FC_SM_STS_FC_INIT_DONE) &&
+		    (reg & (1ull << DLU_LINK_LAYER_STATUS_DLUP_STS)) &&
+		    ((reg &
+		    DLU_LINK_LAYER_STATUS_LNK_STATE_MACH_STS_MASK) ==
+		    DLU_LINK_LAYER_STATUS_LNK_STATE_MACH_STS_DL_ACTIVE)) {
+			DBG(DBG_HP, NULL, "oberon_hp_pwron : "
+			    "link is up\n");
+			link_up = B_TRUE;
+		} else
 			link_retry = B_TRUE;
+
 		}
 		/* END CSTYLED */
 	}
@@ -3382,7 +3383,7 @@ oberon_hpreg_put(void *cookie, off_t off, uint_t val)
 int
 hvio_hotplug_init(dev_info_t *dip, void *arg)
 {
-	pciehpc_regops_t *regops = (pciehpc_regops_t *)arg;
+	pcie_hp_regops_t *regops = (pcie_hp_regops_t *)arg;
 	px_t	*px_p = DIP_TO_STATE(dip);
 	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
 	volatile uint64_t reg;

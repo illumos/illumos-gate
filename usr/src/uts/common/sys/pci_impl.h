@@ -26,7 +26,6 @@
 #ifndef _SYS_PCI_IMPL_H
 #define	_SYS_PCI_IMPL_H
 
-
 #include <sys/dditypes.h>
 #include <sys/memlist.h>
 
@@ -132,6 +131,24 @@ extern struct memlist *memlist_dup(struct memlist *);
 extern int memlist_count(struct memlist *);
 
 #endif /* __i386 || __amd64 */
+
+/* Definitions for minor numbers */
+#define	PCI_MINOR_NUM(x, y)		(((uint_t)(x) << 8) | ((y) & 0xFF))
+#define	PCI_MINOR_NUM_TO_PCI_DEVNUM(x)	((x) & 0xFF)
+#define	PCI_MINOR_NUM_TO_INSTANCE(x)	((x) >> 8)
+#define	PCI_DEVCTL_MINOR		0xFF
+
+/*
+ * Minor numbers for dedicated pcitool nodes.
+ * Note that FF and FE minor numbers are used for other minor nodes.
+ */
+#define	PCI_TOOL_REG_MINOR_NUM		0xFD
+#define	PCI_TOOL_INTR_MINOR_NUM		0xFC
+
+/* pci devctl soft state flag */
+#define	PCI_SOFT_STATE_CLOSED		0x0
+#define	PCI_SOFT_STATE_OPEN		0x1
+#define	PCI_SOFT_STATE_OPEN_EXCL	0x2
 
 /*
  * PCI capability related definitions.

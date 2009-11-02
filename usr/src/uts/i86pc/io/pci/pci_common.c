@@ -37,7 +37,6 @@
 #include <sys/pci.h>
 #include <sys/sunndi.h>
 #include <sys/mach_intr.h>
-#include <sys/hotplug/pci/pcihp.h>
 #include <sys/pci_intr_lib.h>
 #include <sys/psm.h>
 #include <sys/policy.h>
@@ -904,18 +903,18 @@ pci_common_get_reg_prop(dev_info_t *dip, pci_regspec_t *pci_rp)
 
 
 /*
- * For pci_tools
+ * To handle PCI tool ioctls
  */
 
+/*ARGSUSED*/
 int
 pci_common_ioctl(dev_info_t *dip, dev_t dev, int cmd, intptr_t arg,
     int mode, cred_t *credp, int *rvalp)
 {
-	int rv = ENOTTY;
+	minor_t	minor = getminor(dev);
+	int	rv = ENOTTY;
 
-	minor_t minor = getminor(dev);
-
-	switch (PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
+	switch (PCI_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
 	case PCI_TOOL_REG_MINOR_NUM:
 
 		switch (cmd) {
@@ -963,15 +962,7 @@ pci_common_ioctl(dev_info_t *dip, dev_t dev, int cmd, intptr_t arg,
 		}
 		break;
 
-	/*
-	 * All non-PCItool ioctls go through here, including:
-	 *   devctl ioctls with minor number PCIHP_DEVCTL_MINOR and
-	 *   those for attachment points with where minor number is the
-	 *   device number.
-	 */
 	default:
-		rv = (pcihp_get_cb_ops())->cb_ioctl(dev, cmd, arg, mode,
-		    credp, rvalp);
 		break;
 	}
 

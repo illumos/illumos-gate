@@ -71,6 +71,12 @@ extern "C" {
 
 #define	DI_CHECK_MASK		0xf0
 
+/*
+ * flags for di_walk_hp
+ */
+#define	DI_HP_CONNECTOR		0x1
+#define	DI_HP_PORT		0x2
+
 /* nodeid types */
 #define	DI_PSEUDO_NODEID	-1
 #define	DI_SID_NODEID		-2
@@ -106,6 +112,7 @@ typedef struct di_path		*di_path_t;		/* path_node */
 typedef struct di_link		*di_link_t;		/* link */
 typedef struct di_lnode		*di_lnode_t;		/* endpoint */
 typedef struct di_devlink	*di_devlink_t;		/* devlink */
+typedef struct di_hp		*di_hp_t;		/* hotplug */
 
 typedef struct di_prop		*di_prop_t;		/* node property */
 typedef struct di_path_prop	*di_path_prop_t;	/* path property */
@@ -126,6 +133,7 @@ typedef struct di_devlink_handle *di_devlink_handle_t;	/* devlink snapshot */
 #define	DI_PROP_NIL		NULL
 #define	DI_PROM_PROP_NIL	NULL
 #define	DI_PROM_HANDLE_NIL	NULL
+#define	DI_HP_NIL		NULL
 
 /*
  * IEEE 1275 properties and other standardized property names
@@ -320,6 +328,23 @@ extern void		*di_link_private_get(di_link_t link);
 extern void		di_lnode_private_set(di_lnode_t lnode, void *data);
 extern void		*di_lnode_private_get(di_lnode_t lnode);
 
+/*
+ * hp_node: traversal, data access, and parameters
+ */
+extern int		di_walk_hp(di_node_t node, const char *type,
+			    uint_t flag, void *arg,
+			    int (*hp_callback)(di_node_t node, di_hp_t hp,
+			    void *arg));
+extern di_hp_t		di_hp_next(di_node_t node, di_hp_t hp);
+
+extern char		*di_hp_name(di_hp_t hp);
+extern int		di_hp_connection(di_hp_t hp);
+extern int		di_hp_depends_on(di_hp_t hp);
+extern int		di_hp_state(di_hp_t hp);
+extern int		di_hp_type(di_hp_t hp);
+extern char		*di_hp_description(di_hp_t hp);
+extern time_t		di_hp_last_change(di_hp_t hp);
+extern di_node_t	di_hp_child(di_hp_t hp);
 
 /*
  * Private interfaces

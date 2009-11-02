@@ -156,6 +156,8 @@ COMMON_SUBDIRS = \
 	cmd/head \
 	cmd/hostid \
 	cmd/hostname \
+	cmd/hotplug \
+	cmd/hotplugd \
 	cmd/idmap \
 	cmd/init \
 	cmd/intrstat \
@@ -361,6 +363,7 @@ COMMON_SUBDIRS = \
 	lib/libgen \
 	lib/libgrubmgmt \
 	lib/libgss \
+	lib/libhotplug \
 	lib/libidmap \
 	lib/libinetcfg \
 	lib/libinetsvc \

@@ -212,6 +212,8 @@ f none usr/lib/help/auths/locale/DevAllocate.html 444 root bin
 f none usr/lib/help/auths/locale/DevConfig.html 444 root bin
 f none usr/lib/help/auths/locale/DevGrant.html 444 root bin
 f none usr/lib/help/auths/locale/DevRevoke.html 444 root bin
+f none usr/lib/help/auths/locale/HotplugHeader.html 444 root bin
+f none usr/lib/help/auths/locale/HotplugModify.html 444 root bin
 f none usr/lib/help/auths/locale/JobHeader.html 444 root bin
 f none usr/lib/help/auths/locale/AuthJobsAdmin.html 444 root bin
 f none usr/lib/help/auths/locale/JobsGrant.html 444 root bin
@@ -248,6 +250,7 @@ f none usr/lib/help/auths/locale/SmfExAcctNetStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfInetdStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfManageHeader.html 444 root bin
+f none usr/lib/help/auths/locale/SmfManageHotplug.html 444 root bin
 f none usr/lib/help/auths/locale/SmfMDNSStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfModifyAppl.html 444 root bin
 f none usr/lib/help/auths/locale/SmfModifyDepend.html 444 root bin
@@ -360,6 +363,7 @@ f none usr/lib/help/profiles/locale/RtLogMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtDeviceSecurity.html 444 root bin
 f none usr/lib/help/profiles/locale/RtFileSysMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtFTPMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtHotplugMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtInetdMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtKerberosClntMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtKerberosSrvrMngmnt.html 444 root bin

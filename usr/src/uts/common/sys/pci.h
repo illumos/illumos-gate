@@ -603,7 +603,7 @@ extern "C" {
 #define	PCI_CAP_ID_VS		0x9	/* Vendor Specific */
 #define	PCI_CAP_ID_DEBUG_PORT	0xA	/* Debug Port supported */
 #define	PCI_CAP_ID_cPCI_CRC	0xB	/* CompactPCI central resource ctrl */
-#define	PCI_CAP_ID_PCI_HOTPLUG	0xC	/* PCI Hot Plug supported */
+#define	PCI_CAP_ID_PCI_HOTPLUG	0xC	/* PCI Hot Plug (SHPC) supported */
 #define	PCI_CAP_ID_P2P_SUBSYS	0xD	/* PCI bridge Sub-system ID */
 #define	PCI_CAP_ID_AGP_8X	0xE	/* AGP 8X supported */
 #define	PCI_CAP_ID_SECURE_DEV	0xF	/* Secure Device supported */
@@ -794,6 +794,104 @@ typedef struct pcix_attr {
 #define	PCI_PCIX_BSS_UNEX_SPL	0x8	/* Secondary unexpected split comp */
 #define	PCI_PCIX_BSS_SPL_OR	0x10	/* Secondary split comp overrun */
 #define	PCI_PCIX_BSS_SPL_DLY	0x20	/* Secondary split comp delayed */
+
+/*
+ * PCI Hotplug capability entry offsets
+ *
+ * SHPC based PCI hotplug controller registers accessed via the DWORD
+ * select and DATA registers in PCI configuration space relative to the
+ * PCI HP capibility pointer.
+ */
+#define	PCI_HP_DWORD_SELECT_OFF		0x2
+#define	PCI_HP_DWORD_DATA_OFF		0x4
+
+#define	PCI_HP_BASE_OFFSET_REG		0x00
+#define	PCI_HP_SLOTS_AVAIL_I_REG	0x01
+#define	PCI_HP_SLOTS_AVAIL_II_REG	0x02
+#define	PCI_HP_SLOT_CONFIGURATION_REG	0x03
+#define	PCI_HP_PROF_IF_SBCR_REG		0x04
+#define	PCI_HP_COMMAND_STATUS_REG	0x05
+#define	PCI_HP_IRQ_LOCATOR_REG		0x06
+#define	PCI_HP_SERR_LOCATOR_REG		0x07
+#define	PCI_HP_CTRL_SERR_INT_REG	0x08
+#define	PCI_HP_LOGICAL_SLOT_REGS	0x09
+#define	PCI_HP_VENDOR_SPECIFIC		0x28
+
+/* Definitions used with the PCI_HP_SLOTS_AVAIL_I_REG register */
+#define	PCI_HP_AVAIL_33MHZ_CONV_SPEED_SHIFT	0
+#define	PCI_HP_AVAIL_66MHZ_PCIX_SPEED_SHIFT	8
+#define	PCI_HP_AVAIL_100MHZ_PCIX_SPEED_SHIFT	16
+#define	PCI_HP_AVAIL_133MHZ_PCIX_SPEED_SHIFT	24
+#define	PCI_HP_AVAIL_SPEED_MASK			0x1F
+
+/* Definitions used with the PCI_HP_SLOTS_AVAIL_II_REG register */
+#define	PCI_HP_AVAIL_66MHZ_CONV_SPEED_SHIFT	0
+
+/* Register bits used with the PCI_HP_PROF_IF_SBCR_REG register */
+#define	PCI_HP_SBCR_33MHZ_CONV_SPEED		0x0
+#define	PCI_HP_SBCR_66MHZ_CONV_SPEED		0x1
+#define	PCI_HP_SBCR_66MHZ_PCIX_SPEED		0x2
+#define	PCI_HP_SBCR_100MHZ_PCIX_SPEED		0x3
+#define	PCI_HP_SBCR_133MHZ_PCIX_SPEED		0x4
+#define	PCI_HP_SBCR_SPEED_MASK			0x7
+
+/* Register bits used with the PCI_HP_COMMAND_STATUS_REG register */
+#define	PCI_HP_COMM_STS_ERR_INVALID_SPEED	0x80000
+#define	PCI_HP_COMM_STS_ERR_INVALID_COMMAND	0x40000
+#define	PCI_HP_COMM_STS_ERR_MRL_OPEN		0x20000
+#define	PCI_HP_COMM_STS_ERR_MASK		0xe0000
+#define	PCI_HP_COMM_STS_CTRL_BUSY		0x10000
+#define	PCI_HP_COMM_STS_SET_SPEED		0x40
+
+/* Register bits used with the PCI_HP_CTRL_SERR_INT_REG register */
+#define	PCI_HP_SERR_INT_GLOBAL_IRQ_MASK		0x1
+#define	PCI_HP_SERR_INT_GLOBAL_SERR_MASK	0x2
+#define	PCI_HP_SERR_INT_CMD_COMPLETE_MASK	0x4
+#define	PCI_HP_SERR_INT_ARBITER_SERR_MASK	0x8
+#define	PCI_HP_SERR_INT_CMD_COMPLETE_IRQ	0x10000
+#define	PCI_HP_SERR_INT_ARBITER_IRQ		0x20000
+#define	PCI_HP_SERR_INT_MASK_ALL		0xf
+
+/* Register bits used with the PCI_HP_LOGICAL_SLOT_REGS register */
+#define	PCI_HP_SLOT_POWER_ONLY			0x1
+#define	PCI_HP_SLOT_ENABLED			0x2
+#define	PCI_HP_SLOT_DISABLED			0x3
+#define	PCI_HP_SLOT_STATE_MASK			0x3
+#define	PCI_HP_SLOT_MRL_STATE_MASK		0x100
+#define	PCI_HP_SLOT_66MHZ_CONV_CAPABLE		0x200
+#define	PCI_HP_SLOT_CARD_EMPTY_MASK		0xc00
+#define	PCI_HP_SLOT_66MHZ_PCIX_CAPABLE		0x1000
+#define	PCI_HP_SLOT_100MHZ_PCIX_CAPABLE		0x2000
+#define	PCI_HP_SLOT_133MHZ_PCIX_CAPABLE		0x3000
+#define	PCI_HP_SLOT_PCIX_CAPABLE_MASK		0x3000
+#define	PCI_HP_SLOT_PCIX_CAPABLE_SHIFT		12
+#define	PCI_HP_SLOT_PRESENCE_DETECTED		0x10000
+#define	PCI_HP_SLOT_ISO_PWR_DETECTED		0x20000
+#define	PCI_HP_SLOT_ATTN_DETECTED		0x40000
+#define	PCI_HP_SLOT_MRL_DETECTED		0x80000
+#define	PCI_HP_SLOT_POWER_DETECTED		0x100000
+#define	PCI_HP_SLOT_PRESENCE_MASK		0x1000000
+#define	PCI_HP_SLOT_ISO_PWR_MASK		0x2000000
+#define	PCI_HP_SLOT_ATTN_MASK			0x4000000
+#define	PCI_HP_SLOT_MRL_MASK			0x8000000
+#define	PCI_HP_SLOT_POWER_MASK			0x10000000
+#define	PCI_HP_SLOT_MRL_SERR_MASK		0x20000000
+#define	PCI_HP_SLOT_POWER_SERR_MASK		0x40000000
+#define	PCI_HP_SLOT_MASK_ALL			0x5f000000
+
+/* Register bits used with the PCI_HP_IRQ_LOCATOR_REG register */
+#define	PCI_HP_IRQ_CMD_COMPLETE			0x1
+#define	PCI_HP_IRQ_SLOT_N_PENDING		0x2
+
+/* Register bits used with the PCI_HP_SERR_LOCATOR_REG register */
+#define	PCI_HP_IRQ_SERR_ARBITER_PENDING		0x1
+#define	PCI_HP_IRQ_SERR_SLOT_N_PENDING		0x2
+
+/* Register bits used with the PCI_HP_SLOT_CONFIGURATION_REG register */
+#define	PCI_HP_SLOT_CONFIG_MRL_SENSOR		0x40000000
+#define	PCI_HP_SLOT_CONFIG_ATTN_BUTTON		0x80000000
+#define	PCI_HP_SLOT_CONFIG_PHY_SLOT_NUM_SHIFT	16
+#define	PCI_HP_SLOT_CONFIG_PHY_SLOT_NUM_MASK	0x3FF
 
 /*
  * PCI Message Signalled Interrupts (MSI) capability entry offsets for 32-bit

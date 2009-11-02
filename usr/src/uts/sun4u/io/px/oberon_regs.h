@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_OBERON_REGS_H
 #define	_SYS_OBERON_REGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -226,7 +224,6 @@ extern "C" {
 #define	DRAIN_CONTROL_STATUS					0x51100
 #define	DRAIN_CONTROL_STATUS_DRAIN				0
 
-#define	PX_PCIEHP_PIL (LOCK_LEVEL - 1)
 #ifdef	__cplusplus
 }
 #endif

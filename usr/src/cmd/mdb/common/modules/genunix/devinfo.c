@@ -41,20 +41,11 @@
 #include <mdb/mdb_ks.h>
 
 #include "nvpair.h"
+#include "devinfo.h"
 
 #define	DEVINFO_TREE_INDENT	4	/* Indent for devs one down in tree */
 #define	DEVINFO_PROP_INDENT	4	/* Indent for properties */
 #define	DEVINFO_PROPLIST_INDENT	8	/* Indent for properties lists */
-
-
-/*
- * Options for prtconf/devinfo dcmd.
- */
-#define	DEVINFO_VERBOSE	0x1
-#define	DEVINFO_PARENT	0x2
-#define	DEVINFO_CHILD	0x4
-#define	DEVINFO_ALLBOLD	0x8
-#define	DEVINFO_SUMMARY	0x10
 
 /*
  * devinfo node state map. Used by devinfo() and devinfo_audit().
@@ -953,11 +944,6 @@ devinfo_print_pathing(int mdi_component, void *mdi_client) {
 exit:
 	mdb_dec_indent(DEVINFO_PROP_INDENT);
 }
-
-typedef struct devinfo_cb_data {
-	uintptr_t	di_base;
-	uint_t		di_flags;
-} devinfo_cb_data_t;
 
 static int
 devinfo_print(uintptr_t addr, struct dev_info *dev, devinfo_cb_data_t *data)

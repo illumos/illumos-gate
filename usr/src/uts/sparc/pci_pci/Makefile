@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 # uts/sparc/pci_pci/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the pci driver kernel module
 #
@@ -83,7 +81,7 @@ LINTTAGS	+= -erroff=E_SUSPICIOUS_COMPARISON
 #
 #	Dependency
 #
-LDFLAGS += -dy -Nmisc/pcie
+LDFLAGS += -dy -Nmisc/pcie -Nmisc/pcihp
 
 #
 #	Default build targets.

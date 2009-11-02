@@ -132,6 +132,8 @@ GENUNIX_OBJS +=	\
 		cyclic.o	\
 		ddi.o		\
 		ddifm.o		\
+		ddi_hp_impl.o	\
+		ddi_hp_ndi.o	\
 		ddi_intr.o	\
 		ddi_intr_impl.o	\
 		ddi_intr_irm.o	\
@@ -978,11 +980,9 @@ VUIDPS2_OBJS += vuidmice.o vuidps2.o
 
 HPCSVC_OBJS += hpcsvc.o
 
+PCIE_MISC_OBJS += pcie.o pcie_fault.o pcie_hp.o pciehpc.o pcishpc.o pcie_pwr.o
+
 PCIHPNEXUS_OBJS += pcihp.o
-
-PCIEHPCNEXUS_OBJS += pciehpc.o
-
-PCISHPC_OBJS += pcishpc.o
 
 OPENEEPR_OBJS += openprom.o
 
@@ -1813,8 +1813,6 @@ NATIVE_INC_PATH += $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
 AS_INC_PATH	+= $(INC_PATH) -I$(UTSBASE)/common
 INCLUDE_PATH    += $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
 
-#
-PCIE_MISC_OBJS += pcie.o pcie_fault.o pcie_pwr.o
 PCIEB_OBJS += pcieb.o
 
 #	Chelsio N110 10G NIC driver module

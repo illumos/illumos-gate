@@ -34,10 +34,15 @@
 #include <sys/fm/util.h>
 #include <sys/promif.h>
 #include <sys/disp.h>
-#include <sys/pcie.h>
+#include <sys/stat.h>
+#include <sys/file.h>
 #include <sys/pci_cap.h>
+#include <sys/pci_impl.h>
 #include <sys/pcie_impl.h>
+#include <sys/hotplug/pci/pcie_hp.h>
+#include <sys/hotplug/pci/pcicfg.h>
 
+/* Local functions prototypes */
 static void pcie_init_pfd(dev_info_t *);
 static void pcie_fini_pfd(dev_info_t *);
 
@@ -48,6 +53,7 @@ static void pcie_check_io_mem_range(ddi_acc_handle_t, boolean_t *, boolean_t *);
 #ifdef DEBUG
 uint_t pcie_debug_flags = 0;
 static void pcie_print_bus(pcie_bus_t *bus_p);
+void pcie_dbg(char *fmt, ...);
 #endif /* DEBUG */
 
 /* Variable to control default PCI-Express config settings */
@@ -114,7 +120,7 @@ uint32_t pcie_ecrc_value =
  * If a particular platform wants to disable certain errors such as UR/MA,
  * instead of using #defines have the platform's PCIe Root Complex driver set
  * these masks using the pcie_get_XXX_mask and pcie_set_XXX_mask functions.  For
- * x86 the closest thing to a PCIe root complex driver is NPE.  For SPARC the
+ * x86 the closest thing to a PCIe root complex driver is NPE.	For SPARC the
  * closest PCIe root complex driver is PX.
  *
  * pcie_serr_disable_flag : disable SERR only (in RCR and command reg) x86
@@ -135,13 +141,14 @@ uint32_t pcie_aer_suce_severity = PCIE_AER_SUCE_SERR_ASSERT | \
     PCIE_AER_SUCE_USC_MSG_DATA_ERR;
 
 int pcie_max_mps = PCIE_DEVCTL_MAX_PAYLOAD_4096 >> 5;
+int pcie_disable_ari = 0;
 
 static void pcie_scan_mps(dev_info_t *rc_dip, dev_info_t *dip,
 	int *max_supported);
 static int pcie_get_max_supported(dev_info_t *dip, void *arg);
 static int pcie_map_phys(dev_info_t *dip, pci_regspec_t *phys_spec,
     caddr_t *addrp, ddi_acc_handle_t *handlep);
-static void pcie_unmap_phys(ddi_acc_handle_t *handlep,  pci_regspec_t *ph);
+static void pcie_unmap_phys(ddi_acc_handle_t *handlep,	pci_regspec_t *ph);
 
 /*
  * modload support
@@ -149,7 +156,7 @@ static void pcie_unmap_phys(ddi_acc_handle_t *handlep,  pci_regspec_t *ph);
 
 static struct modlmisc modlmisc	= {
 	&mod_miscops,	/* Type	of module */
-	"PCIE: PCI framework"
+	"PCI Express Framework Module"
 };
 
 static struct modlinkage modlinkage = {
@@ -197,6 +204,195 @@ int
 _info(struct modinfo *modinfop)
 {
 	return (mod_info(&modlinkage, modinfop));
+}
+
+/* ARGSUSED */
+int
+pcie_init(dev_info_t *dip, caddr_t arg)
+{
+	int	ret = DDI_SUCCESS;
+
+	/*
+	 * Create a "devctl" minor node to support DEVCTL_DEVICE_*
+	 * and DEVCTL_BUS_* ioctls to this bus.
+	 */
+	if ((ret = ddi_create_minor_node(dip, "devctl", S_IFCHR,
+	    PCI_MINOR_NUM(ddi_get_instance(dip), PCI_DEVCTL_MINOR),
+	    DDI_NT_NEXUS, 0)) != DDI_SUCCESS) {
+		PCIE_DBG("Failed to create devctl minor node for %s%d\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+
+		return (ret);
+	}
+
+	if ((ret = pcie_hp_init(dip, arg)) != DDI_SUCCESS) {
+		/*
+		 * On a few x86 platforms, we observed unexpected hotplug
+		 * initialization failures in recent years. Continue with
+		 * a message printed because we don't want to stop PCI
+		 * driver attach and system boot because of this hotplug
+		 * initialization failure before we address all those issues.
+		 */
+		cmn_err(CE_WARN, "%s%d: Failed setting hotplug framework\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+
+#if defined(__sparc)
+		ddi_remove_minor_node(dip, "devctl");
+
+		return (ret);
+#endif /* defined(__sparc) */
+	}
+
+	if ((pcie_ari_supported(dip) == PCIE_ARI_FORW_SUPPORTED) &&
+	    (pcie_ari_is_enabled(dip) == PCIE_ARI_FORW_DISABLED))
+		(void) pcicfg_configure(dip, 0, PCICFG_ALL_FUNC,
+		    PCICFG_FLAG_ENABLE_ARI);
+
+	return (DDI_SUCCESS);
+}
+
+/* ARGSUSED */
+int
+pcie_uninit(dev_info_t *dip)
+{
+	int	ret = DDI_SUCCESS;
+
+	if (pcie_ari_is_enabled(dip) == PCIE_ARI_FORW_ENABLED)
+		(void) pcie_ari_disable(dip);
+
+	if ((ret = pcie_hp_uninit(dip)) != DDI_SUCCESS) {
+		PCIE_DBG("Failed to uninitialize hotplug for %s%d\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+
+		return (ret);
+	}
+
+	ddi_remove_minor_node(dip, "devctl");
+
+	return (ret);
+}
+
+/* ARGSUSED */
+int
+pcie_intr(dev_info_t *dip)
+{
+	return (pcie_hp_intr(dip));
+}
+
+/* ARGSUSED */
+int
+pcie_open(dev_info_t *dip, dev_t *devp, int flags, int otyp, cred_t *credp)
+{
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+
+	/*
+	 * Make sure the open is for the right file type.
+	 */
+	if (otyp != OTYP_CHR)
+		return (EINVAL);
+
+	/*
+	 * Handle the open by tracking the device state.
+	 */
+	if ((bus_p->bus_soft_state == PCI_SOFT_STATE_OPEN_EXCL) ||
+	    ((flags & FEXCL) &&
+	    (bus_p->bus_soft_state != PCI_SOFT_STATE_CLOSED))) {
+		return (EBUSY);
+	}
+
+	if (flags & FEXCL)
+		bus_p->bus_soft_state = PCI_SOFT_STATE_OPEN_EXCL;
+	else
+		bus_p->bus_soft_state = PCI_SOFT_STATE_OPEN;
+
+	return (0);
+}
+
+/* ARGSUSED */
+int
+pcie_close(dev_info_t *dip, dev_t dev, int flags, int otyp, cred_t *credp)
+{
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+
+	if (otyp != OTYP_CHR)
+		return (EINVAL);
+
+	bus_p->bus_soft_state = PCI_SOFT_STATE_CLOSED;
+
+	return (0);
+}
+
+/* ARGSUSED */
+int
+pcie_ioctl(dev_info_t *dip, dev_t dev, int cmd, intptr_t arg, int mode,
+    cred_t *credp, int *rvalp)
+{
+	struct devctl_iocdata	*dcp;
+	uint_t			bus_state;
+	int			rv = DDI_SUCCESS;
+
+	/*
+	 * We can use the generic implementation for devctl ioctl
+	 */
+	switch (cmd) {
+	case DEVCTL_DEVICE_GETSTATE:
+	case DEVCTL_DEVICE_ONLINE:
+	case DEVCTL_DEVICE_OFFLINE:
+	case DEVCTL_BUS_GETSTATE:
+		return (ndi_devctl_ioctl(dip, cmd, arg, mode, 0));
+	default:
+		break;
+	}
+
+	/*
+	 * read devctl ioctl data
+	 */
+	if (ndi_dc_allochdl((void *)arg, &dcp) != NDI_SUCCESS)
+		return (EFAULT);
+
+	switch (cmd) {
+	case DEVCTL_BUS_QUIESCE:
+		if (ndi_get_bus_state(dip, &bus_state) == NDI_SUCCESS)
+			if (bus_state == BUS_QUIESCED)
+				break;
+		(void) ndi_set_bus_state(dip, BUS_QUIESCED);
+		break;
+	case DEVCTL_BUS_UNQUIESCE:
+		if (ndi_get_bus_state(dip, &bus_state) == NDI_SUCCESS)
+			if (bus_state == BUS_ACTIVE)
+				break;
+		(void) ndi_set_bus_state(dip, BUS_ACTIVE);
+		break;
+	case DEVCTL_BUS_RESET:
+	case DEVCTL_BUS_RESETALL:
+	case DEVCTL_DEVICE_RESET:
+		rv = ENOTSUP;
+		break;
+	default:
+		rv = ENOTTY;
+	}
+
+	ndi_dc_freehdl(dcp);
+	return (rv);
+}
+
+/* ARGSUSED */
+int
+pcie_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+    int flags, char *name, caddr_t valuep, int *lengthp)
+{
+	if (dev == DDI_DEV_T_ANY)
+		goto skip;
+
+	if (PCIE_IS_HOTPLUG_CAPABLE(dip) &&
+	    strcmp(name, "pci-occupant") == 0) {
+		int	pci_dev = PCI_MINOR_NUM_TO_PCI_DEVNUM(getminor(dev));
+
+		pcie_hp_create_occupant_props(dip, dev, pci_dev);
+	}
+
+skip:
+	return (ddi_prop_op(dev, dip, prop_op, flags, name, valuep, lengthp));
 }
 
 /*
@@ -310,6 +506,13 @@ pcie_initchild(dev_info_t *cdip)
 
 		/* Enable PCIe errors */
 		pcie_enable_errors(cdip);
+	}
+
+	bus_p->bus_ari = B_FALSE;
+	if ((pcie_ari_is_enabled(ddi_get_parent(cdip))
+	    == PCIE_ARI_FORW_ENABLED) && (pcie_ari_device(cdip)
+	    == PCIE_ARI_DEVICE)) {
+		bus_p->bus_ari = B_TRUE;
 	}
 
 	if (pcie_initchild_mps(cdip) == DDI_FAILURE)
@@ -528,6 +731,7 @@ void
 pcie_rc_fini_bus(dev_info_t *dip)
 {
 	pcie_bus_t *bus_p = (pcie_bus_t *)ndi_get_bus_private(dip, B_FALSE);
+
 	ndi_set_bus_private(dip, B_FALSE, NULL, NULL);
 	kmem_free(bus_p, sizeof (pcie_bus_t));
 }
@@ -552,7 +756,6 @@ pcie_init_bus(dev_info_t *cdip)
 	/* allocate memory for pcie bus data */
 	bus_p = kmem_zalloc(sizeof (pcie_bus_t), KM_SLEEP);
 
-
 	/* Set back pointer to dip */
 	bus_p->bus_dip = cdip;
 
@@ -561,8 +764,10 @@ pcie_init_bus(dev_info_t *cdip)
 		errstr = "Cannot setup config access";
 		goto fail;
 	}
+
 	bus_p->bus_cfg_hdl = eh;
 	bus_p->bus_fm_flags = 0;
+	bus_p->bus_soft_state = PCI_SOFT_STATE_CLOSED;
 
 	/* get device's bus/dev/function number */
 	if (pcie_get_bdf_from_dip(cdip, &bus_p->bus_bdf) != DDI_SUCCESS) {
@@ -588,6 +793,14 @@ pcie_init_bus(dev_info_t *cdip)
 		if (PCI_CAP_LOCATE(eh, PCI_CAP_XCFG_SPC(PCIE_EXT_CAP_ID_AER),
 		    &bus_p->bus_aer_off) != DDI_SUCCESS)
 			bus_p->bus_aer_off = NULL;
+
+		/* Check and save PCIe hotplug capability information */
+		if ((PCIE_IS_RP(bus_p) || PCIE_IS_SWD(bus_p)) &&
+		    (PCI_CAP_GET16(eh, NULL, bus_p->bus_pcie_off, PCIE_PCIECAP)
+		    & PCIE_PCIECAP_SLOT_IMPL) &&
+		    (PCI_CAP_GET32(eh, NULL, bus_p->bus_pcie_off, PCIE_SLOTCAP)
+		    & PCIE_SLOTCAP_HP_CAPABLE))
+			bus_p->bus_hp_sup_modes |= PCIE_NATIVE_HP_MODE;
 	} else {
 		bus_p->bus_pcie_off = NULL;
 		bus_p->bus_dev_type = PCIE_PCIECAP_DEV_TYPE_PCI_PSEUDO;
@@ -608,6 +821,11 @@ pcie_init_bus(dev_info_t *cdip)
 
 	/* Save the Range information if device is a switch/bridge */
 	if (PCIE_IS_BDG(bus_p)) {
+		/* Check and save PCI hotplug (SHPC) capability information */
+		if ((PCI_CAP_LOCATE(eh, PCI_CAP_ID_PCI_HOTPLUG,
+		    &bus_p->bus_pci_hp_off)) == DDI_SUCCESS)
+			bus_p->bus_hp_sup_modes |= PCIE_PCI_HP_MODE;
+
 		/* get "bus_range" property */
 		range_size = sizeof (pci_bus_range_t);
 		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
@@ -660,6 +878,10 @@ pcie_init_bus(dev_info_t *cdip)
 	}
 
 	ndi_set_bus_private(cdip, B_TRUE, DEVI_PORT_TYPE_PCI, (void *)bus_p);
+
+	if (PCIE_IS_HOTPLUG_CAPABLE(cdip))
+		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, cdip,
+		    "hotplug-capable");
 
 	pcie_init_pfd(cdip);
 
@@ -717,6 +939,10 @@ pcie_fini_bus(dev_info_t *cdip)
 
 	bus_p = PCIE_DIP2UPBUS(cdip);
 	ASSERT(bus_p);
+
+	if (PCIE_IS_HOTPLUG_CAPABLE(cdip))
+		(void) ndi_prop_remove(DDI_DEV_T_NONE, cdip, "hotplug-capable");
+
 	pci_config_teardown(&bus_p->bus_cfg_hdl);
 	ndi_set_bus_private(cdip, B_TRUE, NULL, NULL);
 	kmem_free(bus_p->bus_assigned_addr,
@@ -1025,7 +1251,7 @@ pcie_get_bdf_for_dma_xfer(dev_info_t *dip, dev_info_t *rdip)
 	/*
 	 * As part of the probing, the PCI fcode interpreter may setup a DMA
 	 * request if a given card has a fcode on it using dip and rdip of the
-	 * AP (attachment point) i.e, dip and rdip of px/pcieb driver. In this
+	 * hotplug connector i.e, dip and rdip of px/pcieb driver. In this
 	 * case, return a invalid value for the bdf since we cannot get to the
 	 * bdf value of the actual device which will be initiating this DMA.
 	 */
@@ -1152,12 +1378,28 @@ pcie_initchild_mps(dev_info_t *cdip)
 	int		max_payload_size;
 	pcie_bus_t	*bus_p;
 	dev_info_t	*pdip = ddi_get_parent(cdip);
+	uint8_t		dev_type;
 
 	bus_p = PCIE_DIP2BUS(cdip);
 	if (bus_p == NULL) {
 		PCIE_DBG("%s: BUS not found.\n",
 		    ddi_driver_name(cdip));
 		return (DDI_FAILURE);
+	}
+
+	dev_type = bus_p->bus_dev_type;
+
+	/*
+	 * For ARI Devices, only function zero's MPS needs to be set.
+	 */
+	if ((dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) &&
+	    (pcie_ari_is_enabled(pdip) == PCIE_ARI_FORW_ENABLED)) {
+		pcie_req_id_t child_bdf;
+
+		if (pcie_get_bdf_from_dip(cdip, &child_bdf) == DDI_FAILURE)
+			return (DDI_FAILURE);
+		if ((child_bdf & PCIE_REQ_ID_ARI_FUNC_MASK) != 0)
+			return (DDI_SUCCESS);
 	}
 
 	if (PCIE_IS_RP(bus_p)) {
@@ -1202,6 +1444,7 @@ pcie_initchild_mps(dev_info_t *cdip)
 
 		bus_p->bus_mps = mps;
 	}
+
 	return (DDI_SUCCESS);
 }
 
@@ -1244,6 +1487,7 @@ pcie_scan_mps(dev_info_t *rc_dip, dev_info_t *dip, int *max_supported)
 	ddi_walk_devs(dip, pcie_get_max_supported,
 	    (void *)&max_pay_load_supported);
 	ndi_devi_exit(ddi_get_parent(dip), circular_count);
+
 	*max_supported = max_pay_load_supported.highest_common_mps;
 }
 
@@ -1313,7 +1557,7 @@ fail1:
  * dip - dip of root complex
  *
  * Returns - DDI_SUCCESS if there is at least one root port otherwise
- *           DDI_FAILURE.
+ *	     DDI_FAILURE.
  */
 int
 pcie_root_port(dev_info_t *dip)
@@ -1471,6 +1715,211 @@ pcie_get_rber_fatal(dev_info_t *dip)
 	pcie_bus_t *bus_p = PCIE_DIP2UPBUS(dip);
 	pcie_bus_t *rp_bus_p = PCIE_DIP2UPBUS(bus_p->bus_rp_dip);
 	return (rp_bus_p->bus_pfd->pe_rber_fatal);
+}
+
+int
+pcie_ari_supported(dev_info_t *dip)
+{
+	uint32_t devcap2;
+	uint16_t pciecap;
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+	uint8_t dev_type;
+
+	PCIE_DBG("pcie_ari_supported: dip=%p\n", dip);
+
+	if (bus_p == NULL)
+		return (PCIE_ARI_FORW_NOT_SUPPORTED);
+
+	dev_type = bus_p->bus_dev_type;
+
+	if ((dev_type != PCIE_PCIECAP_DEV_TYPE_DOWN) &&
+	    (dev_type != PCIE_PCIECAP_DEV_TYPE_ROOT))
+		return (PCIE_ARI_FORW_NOT_SUPPORTED);
+
+	if (pcie_disable_ari) {
+		PCIE_DBG("pcie_ari_supported: dip=%p: ARI Disabled\n", dip);
+		return (PCIE_ARI_FORW_NOT_SUPPORTED);
+	}
+
+	pciecap = PCIE_CAP_GET(16, bus_p, PCIE_PCIECAP);
+
+	if ((pciecap & PCIE_PCIECAP_VER_MASK) < PCIE_PCIECAP_VER_2_0) {
+		PCIE_DBG("pcie_ari_supported: dip=%p: Not 2.0\n", dip);
+		return (PCIE_ARI_FORW_NOT_SUPPORTED);
+	}
+
+	devcap2 = PCIE_CAP_GET(32, bus_p, PCIE_DEVCAP2);
+
+	PCIE_DBG("pcie_ari_supported: dip=%p: DevCap2=0x%x\n",
+	    dip, devcap2);
+
+	if (devcap2 & PCIE_DEVCAP2_ARI_FORWARD) {
+		PCIE_DBG("pcie_ari_supported: "
+		    "dip=%p: ARI Forwarding is supported\n", dip);
+		return (PCIE_ARI_FORW_SUPPORTED);
+	}
+	return (PCIE_ARI_FORW_NOT_SUPPORTED);
+}
+
+int
+pcie_ari_enable(dev_info_t *dip)
+{
+	uint16_t devctl2;
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+
+	PCIE_DBG("pcie_ari_enable: dip=%p\n", dip);
+
+	if (pcie_ari_supported(dip) == PCIE_ARI_FORW_NOT_SUPPORTED)
+		return (DDI_FAILURE);
+
+	devctl2 = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL2);
+	devctl2 |= PCIE_DEVCTL2_ARI_FORWARD_EN;
+	PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL2, devctl2);
+
+	PCIE_DBG("pcie_ari_enable: dip=%p: writing 0x%x to DevCtl2\n",
+	    dip, devctl2);
+
+	return (DDI_SUCCESS);
+}
+
+int
+pcie_ari_disable(dev_info_t *dip)
+{
+	uint16_t devctl2;
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+
+	PCIE_DBG("pcie_ari_disable: dip=%p\n", dip);
+
+	if (pcie_ari_supported(dip) == PCIE_ARI_FORW_NOT_SUPPORTED)
+		return (DDI_FAILURE);
+
+	devctl2 = PCIE_CAP_GET(16, bus_p, PCIE_DEVCTL2);
+	devctl2 &= ~PCIE_DEVCTL2_ARI_FORWARD_EN;
+	PCIE_CAP_PUT(16, bus_p, PCIE_DEVCTL2, devctl2);
+
+	PCIE_DBG("pcie_ari_disable: dip=%p: writing 0x%x to DevCtl2\n",
+	    dip, devctl2);
+
+	return (DDI_SUCCESS);
+}
+
+int
+pcie_ari_is_enabled(dev_info_t *dip)
+{
+	uint16_t devctl2;
+	pcie_bus_t *bus_p = PCIE_DIP2BUS(dip);
+
+	PCIE_DBG("pcie_ari_is_enabled: dip=%p\n", dip);
+
+	if (pcie_ari_supported(dip) == PCIE_ARI_FORW_NOT_SUPPORTED)
+		return (PCIE_ARI_FORW_DISABLED);
+
+	devctl2 = PCIE_CAP_GET(32, bus_p, PCIE_DEVCTL2);
+
+	PCIE_DBG("pcie_ari_is_enabled: dip=%p: DevCtl2=0x%x\n",
+	    dip, devctl2);
+
+	if (devctl2 & PCIE_DEVCTL2_ARI_FORWARD_EN) {
+		PCIE_DBG("pcie_ari_is_enabled: "
+		    "dip=%p: ARI Forwarding is enabled\n", dip);
+		return (PCIE_ARI_FORW_ENABLED);
+	}
+
+	return (PCIE_ARI_FORW_DISABLED);
+}
+
+int
+pcie_ari_device(dev_info_t *dip)
+{
+	ddi_acc_handle_t handle;
+	uint16_t cap_ptr;
+
+	PCIE_DBG("pcie_ari_device: dip=%p\n", dip);
+
+	/*
+	 * XXX - This function may be called before the bus_p structure
+	 * has been populated.  This code can be changed to remove
+	 * pci_config_setup()/pci_config_teardown() when the RFE
+	 * to populate the bus_p structures early in boot is putback.
+	 */
+
+	/* First make sure it is a PCIe device */
+
+	if (pci_config_setup(dip, &handle) != DDI_SUCCESS)
+		return (PCIE_NOT_ARI_DEVICE);
+
+	if ((PCI_CAP_LOCATE(handle, PCI_CAP_ID_PCI_E, &cap_ptr))
+	    != DDI_SUCCESS) {
+		pci_config_teardown(&handle);
+		return (PCIE_NOT_ARI_DEVICE);
+	}
+
+	/* Locate the ARI Capability */
+
+	if ((PCI_CAP_LOCATE(handle, PCI_CAP_XCFG_SPC(PCIE_EXT_CAP_ID_ARI),
+	    &cap_ptr)) == DDI_FAILURE) {
+		pci_config_teardown(&handle);
+		return (PCIE_NOT_ARI_DEVICE);
+	}
+
+	/* ARI Capability was found so it must be a ARI device */
+	PCIE_DBG("pcie_ari_device: ARI Device dip=%p\n", dip);
+
+	pci_config_teardown(&handle);
+	return (PCIE_ARI_DEVICE);
+}
+
+int
+pcie_ari_get_next_function(dev_info_t *dip, int *func)
+{
+	uint32_t val;
+	uint16_t cap_ptr, next_function;
+	ddi_acc_handle_t handle;
+
+	/*
+	 * XXX - This function may be called before the bus_p structure
+	 * has been populated.  This code can be changed to remove
+	 * pci_config_setup()/pci_config_teardown() when the RFE
+	 * to populate the bus_p structures early in boot is putback.
+	 */
+
+	if (pci_config_setup(dip, &handle) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if ((PCI_CAP_LOCATE(handle,
+	    PCI_CAP_XCFG_SPC(PCIE_EXT_CAP_ID_ARI), &cap_ptr)) == DDI_FAILURE) {
+		pci_config_teardown(&handle);
+		return (DDI_FAILURE);
+	}
+
+	val = PCI_CAP_GET32(handle, NULL, cap_ptr, PCIE_ARI_CAP);
+
+	next_function = (val >> PCIE_ARI_CAP_NEXT_FUNC_SHIFT) &
+	    PCIE_ARI_CAP_NEXT_FUNC_MASK;
+
+	pci_config_teardown(&handle);
+
+	*func = next_function;
+
+	return (DDI_SUCCESS);
+}
+
+dev_info_t *
+pcie_func_to_dip(dev_info_t *dip, pcie_req_id_t function)
+{
+	pcie_req_id_t child_bdf;
+	dev_info_t *cdip;
+
+	for (cdip = ddi_get_child(dip); cdip;
+	    cdip = ddi_get_next_sibling(cdip)) {
+
+		if (pcie_get_bdf_from_dip(cdip, &child_bdf) == DDI_FAILURE)
+			return (NULL);
+
+		if ((child_bdf & PCIE_REQ_ID_ARI_FUNC_MASK) == function)
+			return (cdip);
+	}
+	return (NULL);
 }
 
 #ifdef	DEBUG

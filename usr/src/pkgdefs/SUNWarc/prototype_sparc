@@ -85,6 +85,7 @@ f none usr/lib/sparcv9/llib-lidmap.ln 644 root bin
 f none usr/lib/sparcv9/llib-lform.ln 644 root bin
 s none usr/lib/sparcv9/llib-lgen.ln=../../../lib/sparcv9/llib-lgen.ln
 f none usr/lib/sparcv9/llib-lgss.ln 644 root bin
+f none usr/lib/sparcv9/llib-lhotplug.ln 644 root bin
 s none usr/lib/sparcv9/llib-lintl.ln=../../../lib/sparcv9/llib-lintl.ln
 f none usr/lib/sparcv9/llib-lipmi.ln 644 root bin
 f none usr/lib/sparcv9/llib-lipp.ln 644 root bin

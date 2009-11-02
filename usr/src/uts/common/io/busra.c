@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,6 +127,15 @@ static int isnot_pow2(uint64_t value);
 static int claim_pci_busnum(dev_info_t *dip, void *arg);
 static int ra_map_exist(dev_info_t *dip, char *type);
 
+static int pci_get_available_prop(dev_info_t *dip, uint64_t base,
+    uint64_t len, char *busra_type);
+static int pci_put_available_prop(dev_info_t *dip, uint64_t base,
+    uint64_t len, char *busra_type);
+static uint32_t pci_type_ra2pci(char *type);
+static boolean_t is_pcie_fabric(dev_info_t *dip);
+
+#define	PCI_ADDR_TYPE_MASK	(PCI_REG_ADDR_M | PCI_REG_PF_M)
+#define	PCI_ADDR_TYPE_INVAL	0xffffffff
 
 #define	RA_INSERT(prev, el) \
 	el->ra_next = *prev; \
@@ -151,7 +160,7 @@ _init()
 	int	ret;
 
 	mutex_init(&ra_lock, NULL, MUTEX_DRIVER,
-		(void *)(intptr_t)__ipltospl(SPL7 - 1));
+	    (void *)(intptr_t)__ipltospl(SPL7 - 1));
 	if ((ret = mod_install(&modlinkage)) != 0) {
 		mutex_destroy(&ra_lock);
 	}
@@ -206,9 +215,9 @@ ndi_ra_map_setup(dev_info_t *dip, char *type)
 	if (dipmap == NULL) {
 		if (backtype == NULL) {
 			typemapp = (struct ra_type_map *)
-			kmem_zalloc(sizeof (*typemapp), KM_SLEEP);
+			    kmem_zalloc(sizeof (*typemapp), KM_SLEEP);
 			typemapp->type = (char *)kmem_zalloc(strlen(type) + 1,
-				KM_SLEEP);
+			    KM_SLEEP);
 			(void) strcpy(typemapp->type, type);
 			RA_INSERT(&ra_map_list_head, typemapp);
 		} else {
@@ -217,7 +226,7 @@ ndi_ra_map_setup(dev_info_t *dip, char *type)
 		if (backdip == NULL) {
 			/* allocate and insert in list of dips for this type */
 			dipmap = (struct ra_dip_type *)
-			kmem_zalloc(sizeof (*dipmap), KM_SLEEP);
+			    kmem_zalloc(sizeof (*dipmap), KM_SLEEP);
 			dipmap->ra_dip = dip;
 			RA_INSERT(&typemapp->ra_dip_list, dipmap);
 		}
@@ -413,7 +422,7 @@ ndi_ra_free(dev_info_t *dip, uint64_t base, uint64_t len, char *type,
 		} else if (base < mapp->ra_base) {
 			/* somewhere in between so just an insert */
 			newmap = (struct ra_resource *)
-				kmem_zalloc(sizeof (*newmap), KM_SLEEP);
+			    kmem_zalloc(sizeof (*newmap), KM_SLEEP);
 			newmap->ra_base = base;
 			newmap->ra_len = len;
 			RA_INSERT(backp, newmap);
@@ -423,13 +432,20 @@ ndi_ra_free(dev_info_t *dip, uint64_t base, uint64_t len, char *type,
 	if (mapp == NULL) {
 		/* stick on end */
 		newmap = (struct ra_resource *)
-				kmem_zalloc(sizeof (*newmap), KM_SLEEP);
+		    kmem_zalloc(sizeof (*newmap), KM_SLEEP);
 		newmap->ra_base = base;
 		newmap->ra_len = len;
 		RA_INSERT(backp, newmap);
 	}
 
 	mutex_exit(&ra_lock);
+
+	/*
+	 * Update dip's "available" property, adding this piece of
+	 * resource to the pool.
+	 */
+	(void) pci_put_available_prop(dip, base, len, type);
+done:
 	return (NDI_SUCCESS);
 
 overlap:
@@ -485,10 +501,9 @@ adjust_link(struct ra_resource **backp, struct ra_resource *mapp,
 		} else {
 			/* in the middle */
 			newmap = (struct ra_resource *)
-					kmem_zalloc(sizeof (*newmap), KM_SLEEP);
+			    kmem_zalloc(sizeof (*newmap), KM_SLEEP);
 			newmap->ra_base = base + len;
-			newmap->ra_len = mapp->ra_len -
-				(len + newlen);
+			newmap->ra_len = mapp->ra_len - (len + newlen);
 			mapp->ra_len = newlen;
 			RA_INSERT(&(mapp->ra_next), newmap);
 		}
@@ -523,7 +538,7 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 	if (req->ra_flags & NDI_RA_ALIGN_SIZE) {
 		if (isnot_pow2(req->ra_len)) {
 			DEBUGPRT(CE_WARN, "ndi_ra_alloc: bad length(pow2) 0x%"
-				PRIx64, req->ra_len);
+			    PRIx64, req->ra_len);
 			*retbasep = 0;
 			*retlenp = 0;
 			return (NDI_FAILURE);
@@ -543,7 +558,7 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 	}
 
 	DEBUGPRT(CE_CONT, "ndi_ra_alloc: mapp = %p len=%" PRIx64 ", mask=%"
-			PRIx64 "\n", (void *)mapp, len, mask);
+	    PRIx64 "\n", (void *)mapp, len, mask);
 
 	backp = &(dipmap->ra_rangeset);
 	backlargestp = NULL;
@@ -560,11 +575,10 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 		if ((upper == 0) || (upper < req->ra_boundlen))
 			upper = ~(uint64_t)0;
 		DEBUGPRT(CE_CONT, "ndi_ra_alloc: ra_len = %" PRIx64 ", len = %"
-				PRIx64 " ra_base=%" PRIx64 ", mask=%" PRIx64
-				"\n", mapp->ra_len, len, mapp->ra_base, mask);
-		for (; mapp != NULL &&
-			(mapp->ra_base + mapp->ra_len) < lower;
-			backp = &(mapp->ra_next), mapp = mapp->ra_next) {
+		    PRIx64 " ra_base=%" PRIx64 ", mask=%" PRIx64
+		    "\n", mapp->ra_len, len, mapp->ra_base, mask);
+		for (; mapp != NULL && (mapp->ra_base + mapp->ra_len) < lower;
+		    backp = &(mapp->ra_next), mapp = mapp->ra_next) {
 			if (((mapp->ra_len + mapp->ra_base) == 0) ||
 			    ((mapp->ra_len + mapp->ra_base) < mapp->ra_len))
 				/*
@@ -583,9 +597,9 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 	if (!(req->ra_flags & NDI_RA_ALLOC_SPECIFIED)) {
 		/* first fit - not user specified */
 		DEBUGPRT(CE_CONT, "ndi_ra_alloc(unspecified request)"
-			"lower=%" PRIx64 ", upper=%" PRIx64 "\n", lower, upper);
+		    "lower=%" PRIx64 ", upper=%" PRIx64 "\n", lower, upper);
 		for (; mapp != NULL && mapp->ra_base <= upper;
-			backp = &(mapp->ra_next), mapp = mapp->ra_next) {
+		    backp = &(mapp->ra_next), mapp = mapp->ra_next) {
 
 			DEBUGPRT(CE_CONT, "ndi_ra_alloc: ra_len = %" PRIx64
 			    ", len = %" PRIx64 "", mapp->ra_len, len);
@@ -606,7 +620,7 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 				base = base & ~mask;
 				base += (mask + 1);
 				DEBUGPRT(CE_CONT, "\tnew base=%" PRIx64 "\n",
-					base);
+				    base);
 
 				/*
 				 * Check to see if the new base is past
@@ -622,7 +636,7 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 					remlen = upper - base;
 				else
 					remlen = mapp->ra_len -
-						(base - mapp->ra_base);
+					    (base - mapp->ra_base);
 
 				if ((backlargestp == NULL) ||
 				    (largestlen < remlen)) {
@@ -656,7 +670,7 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 		base = req->ra_addr;
 		len = req->ra_len;
 		for (; mapp != NULL && mapp->ra_base <= upper;
-			backp = &(mapp->ra_next), mapp = mapp->ra_next) {
+		    backp = &(mapp->ra_next), mapp = mapp->ra_next) {
 			if (base >= mapp->ra_base &&
 			    ((base - mapp->ra_base) < mapp->ra_len)) {
 				/*
@@ -696,7 +710,7 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 	    (req->ra_flags & NDI_RA_ALLOC_PARTIAL_OK) &&
 	    (backlargestp != NULL)) {
 		adjust_link(backlargestp, *backlargestp, largestbase,
-			largestlen);
+		    largestlen);
 
 		base = largestbase;
 		len = largestlen;
@@ -712,6 +726,14 @@ ndi_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, uint64_t *retbasep,
 		*retbasep = base;
 		*retlenp = len;
 	}
+
+	/*
+	 * Update dip's "available" property, substract this piece of
+	 * resource from the pool.
+	 */
+	if ((rval == NDI_SUCCESS) || (rval == NDI_RA_PARTIAL_REQ))
+		(void) pci_get_available_prop(dip, *retbasep, *retlenp, type);
+
 	return (rval);
 }
 
@@ -748,7 +770,7 @@ isa_resource_setup()
 	used = ddi_find_devinfo("used-resources", -1, 0);
 	if (used == NULL) {
 		DEBUGPRT(CE_CONT,
-			"isa_resource_setup: used-resources not found");
+		    "isa_resource_setup: used-resources not found");
 		return (NDI_FAILURE);
 	}
 
@@ -869,7 +891,7 @@ ra_dump_all(char *type, dev_info_t *dip)
 		}
 		cmn_err(CE_CONT, "type is %s\n", typemap->type);
 		for (dipmap = typemap->ra_dip_list; dipmap != NULL;
-			dipmap = dipmap->ra_next) {
+		    dipmap = dipmap->ra_next) {
 			if (dip != NULL) {
 				if ((dipmap->ra_dip) != dip)
 					continue;
@@ -877,7 +899,7 @@ ra_dump_all(char *type, dev_info_t *dip)
 			cmn_err(CE_CONT, "  dip is %p\n",
 			    (void *)dipmap->ra_dip);
 			for (res = dipmap->ra_rangeset; res != NULL;
-				res = res->ra_next) {
+			    res = res->ra_next) {
 				cmn_err(CE_CONT, "\t  range is %" PRIx64
 				    " %" PRIx64 "\n", res->ra_base,
 				    res->ra_len);
@@ -942,6 +964,26 @@ pci_resource_setup(dev_info_t *dip)
 	 * code would really become an assert to make sure this
 	 * function is not called for the same dip twice.
 	 */
+	/*
+	 * Another user for the check below is hotplug PCI/PCIe bridges.
+	 *
+	 * For PCI/PCIE devices under a PCIE hierarchy, ndi_ra_alloc/free
+	 * will update the devinfo node's "available" property, to reflect
+	 * the fact that a piece of resource has been removed/added to
+	 * a devinfo node.
+	 * During probe of a new PCI bridge in the hotplug case, PCI
+	 * configurator firstly allocates maximum MEM/IO from its parent,
+	 * then calls ndi_ra_free() to use these resources to setup busra
+	 * pool for the new bridge, as well as adding these resources to
+	 * the "available" property of the new devinfo node. Then configu-
+	 * rator will attach driver for the bridge before probing its
+	 * children, and the bridge driver will then initialize its hotplug
+	 * contollers (if it supports hotplug) and HPC driver will call
+	 * this function to setup the busra pool, but the resource pool
+	 * has already been setup at the first of pcicfg_probe_bridge(),
+	 * thus we need the check below to return directly in this case.
+	 * Otherwise the ndi_ra_free() below will see overlapping resources.
+	 */
 	{
 		if (ra_map_exist(dip, NDI_RA_TYPE_MEM) == NDI_SUCCESS) {
 			return (NDI_FAILURE);
@@ -979,45 +1021,54 @@ pci_resource_setup(dev_info_t *dip)
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "available", (caddr_t)&regs, &rlen) == DDI_SUCCESS) {
 		/*
+		 * Remove "available" property as the entries will be
+		 * re-created in ndi_ra_free() below, note prom based
+		 * property will not be removed. But in ndi_ra_free()
+		 * we'll be creating non prom based property entries.
+		 */
+		(void) ndi_prop_remove(DDI_DEV_T_NONE, dip, "available");
+		/*
 		 * create the available resource list for both memory and
 		 * io space
 		 */
 		rcount = rlen / sizeof (pci_regspec_t);
 		for (i = 0; i < rcount; i++) {
-		    switch (PCI_REG_ADDR_G(regs[i].pci_phys_hi)) {
-		    case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
-			(void) ndi_ra_free(dip,
-			    (uint64_t)regs[i].pci_phys_low,
-			    (uint64_t)regs[i].pci_size_low,
-			    (regs[i].pci_phys_hi & PCI_REG_PF_M) ?
-			    NDI_RA_TYPE_PCI_PREFETCH_MEM : NDI_RA_TYPE_MEM,
-			    0);
-			break;
-		    case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
-			(void) ndi_ra_free(dip,
-			    ((uint64_t)(regs[i].pci_phys_mid) << 32) |
-			    ((uint64_t)(regs[i].pci_phys_low)),
-			    ((uint64_t)(regs[i].pci_size_hi) << 32) |
-			    ((uint64_t)(regs[i].pci_size_low)),
-			    (regs[i].pci_phys_hi & PCI_REG_PF_M) ?
-			    NDI_RA_TYPE_PCI_PREFETCH_MEM : NDI_RA_TYPE_MEM,
-			    0);
-			break;
-		    case PCI_REG_ADDR_G(PCI_ADDR_IO):
-			(void) ndi_ra_free(dip,
-			    (uint64_t)regs[i].pci_phys_low,
-			    (uint64_t)regs[i].pci_size_low,
-			    NDI_RA_TYPE_IO,
-			    0);
-			break;
-		    case PCI_REG_ADDR_G(PCI_ADDR_CONFIG):
-			break;
-		    default:
-			cmn_err(CE_WARN,
-			    "pci_resource_setup: bad addr type: %x\n",
-			    PCI_REG_ADDR_G(regs[i].pci_phys_hi));
-			break;
-		    }
+			switch (PCI_REG_ADDR_G(regs[i].pci_phys_hi)) {
+			case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
+				(void) ndi_ra_free(dip,
+				    (uint64_t)regs[i].pci_phys_low,
+				    (uint64_t)regs[i].pci_size_low,
+				    (regs[i].pci_phys_hi & PCI_REG_PF_M) ?
+				    NDI_RA_TYPE_PCI_PREFETCH_MEM :
+				    NDI_RA_TYPE_MEM,
+				    0);
+				break;
+			case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
+				(void) ndi_ra_free(dip,
+				    ((uint64_t)(regs[i].pci_phys_mid) << 32) |
+				    ((uint64_t)(regs[i].pci_phys_low)),
+				    ((uint64_t)(regs[i].pci_size_hi) << 32) |
+				    ((uint64_t)(regs[i].pci_size_low)),
+				    (regs[i].pci_phys_hi & PCI_REG_PF_M) ?
+				    NDI_RA_TYPE_PCI_PREFETCH_MEM :
+				    NDI_RA_TYPE_MEM,
+				    0);
+				break;
+			case PCI_REG_ADDR_G(PCI_ADDR_IO):
+				(void) ndi_ra_free(dip,
+				    (uint64_t)regs[i].pci_phys_low,
+				    (uint64_t)regs[i].pci_size_low,
+				    NDI_RA_TYPE_IO,
+				    0);
+				break;
+			case PCI_REG_ADDR_G(PCI_ADDR_CONFIG):
+				break;
+			default:
+				cmn_err(CE_WARN,
+				    "pci_resource_setup: bad addr type: %x\n",
+				    PCI_REG_ADDR_G(regs[i].pci_phys_hi));
+				break;
+			}
 		}
 		kmem_free(regs, rlen);
 	}
@@ -1174,22 +1225,16 @@ pci_resource_setup_avail(dev_info_t *dip, pci_regspec_t *avail_p, int entries)
 
 		switch (PCI_REG_ADDR_G(avail_p->pci_phys_hi)) {
 		case PCI_REG_ADDR_G(PCI_ADDR_MEM32): {
-			(void) ndi_ra_free(dip,
-				(uint64_t)avail_p->pci_phys_low,
-				(uint64_t)avail_p->pci_size_low,
-				(avail_p->pci_phys_hi &
-					PCI_REG_PF_M) ?
-					NDI_RA_TYPE_PCI_PREFETCH_MEM :
-					NDI_RA_TYPE_MEM,
-				0);
+			(void) ndi_ra_free(dip, (uint64_t)avail_p->pci_phys_low,
+			    (uint64_t)avail_p->pci_size_low,
+			    (avail_p->pci_phys_hi & PCI_REG_PF_M) ?
+			    NDI_RA_TYPE_PCI_PREFETCH_MEM : NDI_RA_TYPE_MEM,
+			    0);
 			}
 			break;
 		case PCI_REG_ADDR_G(PCI_ADDR_IO):
-			(void) ndi_ra_free(dip,
-				(uint64_t)avail_p->pci_phys_low,
-				(uint64_t)avail_p->pci_size_low,
-				NDI_RA_TYPE_IO,
-				0);
+			(void) ndi_ra_free(dip, (uint64_t)avail_p->pci_phys_low,
+			    (uint64_t)avail_p->pci_size_low, NDI_RA_TYPE_IO, 0);
 			break;
 		default:
 			goto err;
@@ -1204,6 +1249,457 @@ pci_resource_setup_avail(dev_info_t *dip, pci_regspec_t *avail_p, int entries)
 
 err:
 	cmn_err(CE_WARN, "pci_resource_setup_avail: bad entry[%d]=%x\n",
-		i, avail_p->pci_phys_hi);
+	    i, avail_p->pci_phys_hi);
 	return (NDI_FAILURE);
+}
+
+/*
+ * Return true if the devinfo node resides on PCI or PCI Express bus,
+ * sitting in a PCI Express hierarchy.
+ */
+static boolean_t
+is_pcie_fabric(dev_info_t *dip)
+{
+	dev_info_t *root = ddi_root_node();
+	dev_info_t *pdip;
+	boolean_t found = B_FALSE;
+	char *bus;
+
+	/*
+	 * Is this pci/pcie ?
+	 */
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "device_type", &bus) !=
+	    DDI_PROP_SUCCESS) {
+		DEBUGPRT(CE_WARN, "is_pcie_fabric: cannot find "
+		    "\"device_type\" property for dip %p\n", (void *)dip);
+		return (B_FALSE);
+	}
+
+	if (strcmp(bus, "pciex") == 0) {
+		/* pcie bus, done */
+		ddi_prop_free(bus);
+		return (B_TRUE);
+	} else if (strcmp(bus, "pci") == 0) {
+		/*
+		 * pci bus, fall through to check if it resides in
+		 * a pcie hierarchy.
+		 */
+		ddi_prop_free(bus);
+	} else {
+		/* other bus, return failure */
+		ddi_prop_free(bus);
+		return (B_FALSE);
+	}
+
+	/*
+	 * Does this device reside in a pcie fabric ?
+	 */
+	for (pdip = ddi_get_parent(dip); pdip && (pdip != root) &&
+	    !found; pdip = ddi_get_parent(pdip)) {
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
+		    DDI_PROP_DONTPASS, "device_type", &bus) !=
+		    DDI_PROP_SUCCESS)
+			break;
+
+		if (strcmp(bus, "pciex") == 0)
+			found = B_TRUE;
+
+		ddi_prop_free(bus);
+	}
+
+	return (found);
+}
+
+/*
+ * Remove a piece of IO/MEM resource from "available" property of 'dip'.
+ */
+static int
+pci_get_available_prop(dev_info_t *dip, uint64_t base, uint64_t len,
+    char *busra_type)
+{
+	pci_regspec_t	*regs, *newregs;
+	uint_t		status;
+	int		rlen, rcount;
+	int		i, j, k;
+	uint64_t	dlen;
+	boolean_t	found = B_FALSE;
+	uint32_t	type;
+
+	/* check if we're manipulating MEM/IO resource */
+	if ((type = pci_type_ra2pci(busra_type)) == PCI_ADDR_TYPE_INVAL)
+		return (DDI_SUCCESS);
+
+	/* check if dip is a pci/pcie device resides in a pcie fabric */
+	if (!is_pcie_fabric(dip))
+		return (DDI_SUCCESS);
+
+	status = ddi_getlongprop(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "available", (caddr_t)&regs, &rlen);
+
+	ASSERT(status == DDI_SUCCESS);
+	if (status != DDI_SUCCESS)
+		return (status);
+
+	/*
+	 * The updated "available" property will at most have one more entry
+	 * than existing one (when the requested range is in the middle of
+	 * the matched property entry)
+	 */
+	newregs = kmem_alloc(rlen + sizeof (pci_regspec_t), KM_SLEEP);
+
+	rcount = rlen / sizeof (pci_regspec_t);
+	for (i = 0, j = 0; i < rcount; i++) {
+		if (type == (regs[i].pci_phys_hi & PCI_ADDR_TYPE_MASK)) {
+			uint64_t range_base, range_len;
+
+			range_base = ((uint64_t)(regs[i].pci_phys_mid) << 32) |
+			    ((uint64_t)(regs[i].pci_phys_low));
+			range_len = ((uint64_t)(regs[i].pci_size_hi) << 32) |
+			    ((uint64_t)(regs[i].pci_size_low));
+
+			if ((base < range_base) ||
+			    (base + len > range_base + range_len)) {
+				/*
+				 * not a match, copy the entry
+				 */
+				goto copy_entry;
+			}
+
+			/*
+			 * range_base	base	base+len	range_base
+			 *					+range_len
+			 *   +------------+-----------+----------+
+			 *   |		  |///////////|		 |
+			 *   +------------+-----------+----------+
+			 */
+			/*
+			 * Found a match, remove the range out of this entry.
+			 */
+			found = B_TRUE;
+
+			dlen = base - range_base;
+			if (dlen != 0) {
+				newregs[j].pci_phys_hi = regs[i].pci_phys_hi;
+				newregs[j].pci_phys_mid =
+				    (uint32_t)(range_base >> 32);
+				newregs[j].pci_phys_low =
+				    (uint32_t)(range_base);
+				newregs[j].pci_size_hi = (uint32_t)(dlen >> 32);
+				newregs[j].pci_size_low = (uint32_t)dlen;
+				j++;
+			}
+
+			dlen = (range_base + range_len) - (base + len);
+			if (dlen != 0) {
+				newregs[j].pci_phys_hi = regs[i].pci_phys_hi;
+				newregs[j].pci_phys_mid =
+				    (uint32_t)((base + len)>> 32);
+				newregs[j].pci_phys_low =
+				    (uint32_t)(base + len);
+				newregs[j].pci_size_hi = (uint32_t)(dlen >> 32);
+				newregs[j].pci_size_low = (uint32_t)dlen;
+				j++;
+			}
+
+			/*
+			 * We've allocated the resource from the matched
+			 * entry, almost finished but still need to copy
+			 * the rest entries from the original property
+			 * array.
+			 */
+			for (k = i + 1; k < rcount; k++) {
+				newregs[j] = regs[k];
+				j++;
+			}
+
+			goto done;
+
+		} else {
+copy_entry:
+			newregs[j] = regs[i];
+			j++;
+		}
+	}
+
+done:
+	/*
+	 * This should not fail so assert it. For non-debug kernel we don't
+	 * want to panic thus only logging a warning message.
+	 */
+	ASSERT(found == B_TRUE);
+	if (!found) {
+		cmn_err(CE_WARN, "pci_get_available_prop: failed to remove "
+		    "resource from dip %p : base 0x%" PRIx64 ", len 0x%" PRIX64
+		    ", type 0x%x\n", (void *)dip, base, len, type);
+		kmem_free(newregs, rlen + sizeof (pci_regspec_t));
+		kmem_free(regs, rlen);
+
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Found the resources from parent, update the "available"
+	 * property.
+	 */
+	if (j == 0) {
+		/* all the resources are consumed, remove the property */
+		(void) ndi_prop_remove(DDI_DEV_T_NONE, dip, "available");
+	} else {
+		/*
+		 * There are still resource available in the parent dip,
+		 * update with the remaining resources.
+		 */
+		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
+		    "available", (int *)newregs,
+		    (j * sizeof (pci_regspec_t)) / sizeof (int));
+	}
+
+	kmem_free(newregs, rlen + sizeof (pci_regspec_t));
+	kmem_free(regs, rlen);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * Add a piece of IO/MEM resource to "available" property of 'dip'.
+ */
+static int
+pci_put_available_prop(dev_info_t *dip, uint64_t base, uint64_t len,
+    char *busra_type)
+{
+	pci_regspec_t	*regs, *newregs;
+	uint_t		status;
+	int		rlen, rcount;
+	int		i, j, k;
+	int		matched = 0;
+	uint64_t	orig_base = base;
+	uint64_t	orig_len = len;
+	uint32_t	type;
+
+	/* check if we're manipulating MEM/IO resource */
+	if ((type = pci_type_ra2pci(busra_type)) == PCI_ADDR_TYPE_INVAL)
+		return (DDI_SUCCESS);
+
+	/* check if dip is a pci/pcie device resides in a pcie fabric */
+	if (!is_pcie_fabric(dip))
+		return (DDI_SUCCESS);
+
+	status = ddi_getlongprop(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    "available", (caddr_t)&regs, &rlen);
+
+	switch (status) {
+		case DDI_PROP_NOT_FOUND:
+			goto not_found;
+
+		case DDI_PROP_SUCCESS:
+			break;
+
+		default:
+			return (status);
+	}
+
+	/*
+	 * The "available" property exist on the node, try to put this
+	 * resource back, merge if there are adjacent resources.
+	 *
+	 * The updated "available" property will at most have one more entry
+	 * than existing one (when there is no adjacent entries thus the new
+	 * resource is appended at the end)
+	 */
+	newregs = kmem_alloc(rlen + sizeof (pci_regspec_t), KM_SLEEP);
+
+	rcount = rlen / sizeof (pci_regspec_t);
+	for (i = 0, j = 0; i < rcount; i++) {
+		if (type == (regs[i].pci_phys_hi & PCI_ADDR_TYPE_MASK)) {
+			uint64_t range_base, range_len;
+
+			range_base = ((uint64_t)(regs[i].pci_phys_mid) << 32) |
+			    ((uint64_t)(regs[i].pci_phys_low));
+			range_len = ((uint64_t)(regs[i].pci_size_hi) << 32) |
+			    ((uint64_t)(regs[i].pci_size_low));
+
+			if ((base + len < range_base) ||
+			    (base > range_base + range_len)) {
+				/*
+				 * Not adjacent, copy the entry and contiue
+				 */
+				goto copy_entry;
+			}
+
+			/*
+			 * Adjacent or overlap?
+			 *
+			 * Should not have overlapping resources so assert it.
+			 * For non-debug kernel we don't want to panic thus
+			 * only logging a warning message.
+			 */
+#if 0
+			ASSERT((base + len == range_base) ||
+			    (base == range_base + range_len));
+#endif
+			if ((base + len != range_base) &&
+			    (base != range_base + range_len)) {
+				cmn_err(CE_WARN, "pci_put_available_prop: "
+				    "failed to add resource to dip %p : "
+				    "base 0x%" PRIx64 ", len 0x%" PRIx64 " "
+				    "overlaps with existing resource "
+				    "base 0x%" PRIx64 ", len 0x%" PRIx64 "\n",
+				    (void *)dip, orig_base, orig_len,
+				    range_base, range_len);
+
+				goto failure;
+			}
+
+			/*
+			 * On the left:
+			 *
+			 * base		range_base
+			 *   +-------------+-------------+
+			 *   |/////////////|		 |
+			 *   +-------------+-------------+
+			 *	len		range_len
+			 *
+			 * On the right:
+			 *
+			 * range_base	 base
+			 *   +-------------+-------------+
+			 *   |		   |/////////////|
+			 *   +-------------+-------------+
+			 *	range_len	len
+			 */
+			/*
+			 * There are at most two piece of resources adjacent
+			 * with this resource, assert it.
+			 */
+			ASSERT(matched < 2);
+
+			if (!(matched < 2)) {
+				cmn_err(CE_WARN, "pci_put_available_prop: "
+				    "failed to add resource to dip %p : "
+				    "base 0x%" PRIx64 ", len 0x%" PRIx64 " "
+				    "found overlaps in existing resources\n",
+				    (void *)dip, orig_base, orig_len);
+
+				goto failure;
+			}
+
+			/* setup base & len to refer to the merged range */
+			len += range_len;
+			if (base == range_base + range_len)
+				base = range_base;
+
+			if (matched == 0) {
+				/*
+				 * One adjacent entry, add this resource in
+				 */
+				newregs[j].pci_phys_hi = regs[i].pci_phys_hi;
+				newregs[j].pci_phys_mid =
+				    (uint32_t)(base >> 32);
+				newregs[j].pci_phys_low = (uint32_t)(base);
+				newregs[j].pci_size_hi = (uint32_t)(len >> 32);
+				newregs[j].pci_size_low = (uint32_t)len;
+
+				matched = 1;
+				k = j;
+				j++;
+			} else { /* matched == 1 */
+				/*
+				 * Two adjacent entries, merge them together
+				 */
+				newregs[k].pci_phys_hi = regs[i].pci_phys_hi;
+				newregs[k].pci_phys_mid =
+				    (uint32_t)(base >> 32);
+				newregs[k].pci_phys_low = (uint32_t)(base);
+				newregs[k].pci_size_hi = (uint32_t)(len >> 32);
+				newregs[k].pci_size_low = (uint32_t)len;
+
+				matched = 2;
+			}
+		} else {
+copy_entry:
+			newregs[j] = regs[i];
+			j++;
+		}
+	}
+
+	if (matched == 0) {
+		/* No adjacent entries, append at end */
+		ASSERT(j == rcount);
+
+		/*
+		 * According to page 15 of 1275 spec, bit "n" of "available"
+		 * should be set to 1.
+		 */
+		newregs[j].pci_phys_hi = type;
+		newregs[j].pci_phys_hi |= PCI_REG_REL_M;
+
+		newregs[j].pci_phys_mid = (uint32_t)(base >> 32);
+		newregs[j].pci_phys_low = (uint32_t)base;
+		newregs[j].pci_size_hi = (uint32_t)(len >> 32);
+		newregs[j].pci_size_low = (uint32_t)len;
+
+		j++;
+	}
+
+	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
+	    "available", (int *)newregs,
+	    (j * sizeof (pci_regspec_t)) / sizeof (int));
+
+	kmem_free(newregs, rlen + sizeof (pci_regspec_t));
+	kmem_free(regs, rlen);
+	return (DDI_SUCCESS);
+
+not_found:
+	/*
+	 * There is no "available" property on the parent node, create it.
+	 */
+	newregs = kmem_alloc(sizeof (pci_regspec_t), KM_SLEEP);
+
+	/*
+	 * According to page 15 of 1275 spec, bit "n" of "available" should
+	 * be set to 1.
+	 */
+	newregs[0].pci_phys_hi = type;
+	newregs[0].pci_phys_hi |= PCI_REG_REL_M;
+
+	newregs[0].pci_phys_mid = (uint32_t)(base >> 32);
+	newregs[0].pci_phys_low = (uint32_t)base;
+	newregs[0].pci_size_hi = (uint32_t)(len >> 32);
+	newregs[0].pci_size_low = (uint32_t)len;
+
+	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
+	    "available", (int *)newregs,
+	    sizeof (pci_regspec_t) / sizeof (int));
+	kmem_free(newregs, sizeof (pci_regspec_t));
+	return (DDI_SUCCESS);
+
+failure:
+	kmem_free(newregs, rlen + sizeof (pci_regspec_t));
+	kmem_free(regs, rlen);
+	return (DDI_FAILURE);
+}
+
+static uint32_t
+pci_type_ra2pci(char *type)
+{
+	uint32_t	pci_type = PCI_ADDR_TYPE_INVAL;
+
+	/*
+	 * No 64 bit mem support for now
+	 */
+	if (strcmp(type, NDI_RA_TYPE_IO) == 0) {
+		pci_type = PCI_ADDR_IO;
+
+	} else if (strcmp(type, NDI_RA_TYPE_MEM) == 0) {
+		pci_type = PCI_ADDR_MEM32;
+
+	} else if (strcmp(type, NDI_RA_TYPE_PCI_PREFETCH_MEM)  == 0) {
+		pci_type = PCI_ADDR_MEM32;
+		pci_type |= PCI_REG_PF_M;
+	}
+
+	return (pci_type);
 }

@@ -30,6 +30,7 @@
 
 #include <sys/conf.h>
 #include <sys/modctl.h>
+#include <sys/file.h>
 #include <sys/pci_impl.h>
 #include <sys/pcie_impl.h>
 #include <sys/sysmacros.h>
@@ -39,7 +40,7 @@
 #include <sys/ddifm.h>
 #include <sys/ndifm.h>
 #include <sys/fm/util.h>
-#include <sys/hotplug/pci/pcihp.h>
+#include <sys/hotplug/pci/pcie_hp.h>
 #include <io/pci/pci_tools_ext.h>
 #include <io/pci/pci_common.h>
 #include <io/pciex/pcie_nvidia.h>
@@ -96,33 +97,25 @@ struct bus_ops npe_bus_ops = {
 	ddi_dma_mctl,
 	npe_ctlops,
 	ddi_bus_prop_op,
-	0,		/* (*bus_get_eventcookie)();	*/
-	0,		/* (*bus_add_eventcall)();	*/
-	0,		/* (*bus_remove_eventcall)();	*/
-	0,		/* (*bus_post_event)();		*/
-	0,		/* (*bus_intr_ctl)(); */
-	0,		/* (*bus_config)(); */
-	0,		/* (*bus_unconfig)(); */
-	npe_fm_init,	/* (*bus_fm_init)(); */
-	NULL,		/* (*bus_fm_fini)(); */
-	NULL,		/* (*bus_fm_access_enter)(); */
-	NULL,		/* (*bus_fm_access_exit)(); */
-	NULL,		/* (*bus_power)(); */
-	npe_intr_ops	/* (*bus_intr_op)(); */
+	0,			/* (*bus_get_eventcookie)();	*/
+	0,			/* (*bus_add_eventcall)();	*/
+	0,			/* (*bus_remove_eventcall)();	*/
+	0,			/* (*bus_post_event)();		*/
+	0,			/* (*bus_intr_ctl)(); */
+	0,			/* (*bus_config)(); */
+	0,			/* (*bus_unconfig)(); */
+	npe_fm_init,		/* (*bus_fm_init)(); */
+	NULL,			/* (*bus_fm_fini)(); */
+	NULL,			/* (*bus_fm_access_enter)(); */
+	NULL,			/* (*bus_fm_access_exit)(); */
+	NULL,			/* (*bus_power)(); */
+	npe_intr_ops,		/* (*bus_intr_op)(); */
+	pcie_hp_common_ops	/* (*bus_hp_op)(); */
 };
 
-/*
- * One goal here is to leverage off of the pcihp.c source without making
- * changes to it.  Call into it's cb_ops directly if needed, piggybacking
- * anything else needed by the pci_tools.c module.  Only pci_tools and pcihp
- * will be using the PCI devctl node.
- */
 static int	npe_open(dev_t *, int, int, cred_t *);
 static int	npe_close(dev_t, int, int, cred_t *);
 static int	npe_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
-static int	npe_prop_op(dev_t, dev_info_t *, ddi_prop_op_t, int, char *,
-		    caddr_t, int *);
-static int	npe_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 
 struct cb_ops npe_cb_ops = {
 	npe_open,			/* open */
@@ -137,7 +130,7 @@ struct cb_ops npe_cb_ops = {
 	nodev,				/* mmap */
 	nodev,				/* segmap */
 	nochpoll,			/* poll */
-	npe_prop_op,			/* cb_prop_op */
+	pcie_prop_op,			/* cb_prop_op */
 	NULL,				/* streamtab */
 	D_NEW | D_MP | D_HOTPLUG,	/* Driver compatibility flag */
 	CB_REV,				/* rev */
@@ -151,6 +144,7 @@ struct cb_ops npe_cb_ops = {
  */
 static int	npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd);
 static int	npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
+static int	npe_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
 
 struct dev_ops npe_ops = {
 	DEVO_REV,		/* devo_rev */
@@ -190,9 +184,9 @@ extern int	npe_restore_htconfig_children(dev_info_t *dip);
  * Module linkage information for the kernel.
  */
 static struct modldrv modldrv = {
-	&mod_driverops, /* Type of module */
-	"Host to PCIe nexus driver",
-	&npe_ops,	/* driver ops */
+	&mod_driverops,				/* Type of module */
+	"Host to PCIe nexus driver",		/* Name of module */
+	&npe_ops,				/* driver ops */
 };
 
 static struct modlinkage modlinkage = {
@@ -245,14 +239,39 @@ _info(struct modinfo *modinfop)
 
 /*ARGSUSED*/
 static int
+npe_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
+{
+	minor_t		minor = getminor((dev_t)arg);
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(minor);
+	pci_state_t	*pcip = ddi_get_soft_state(npe_statep, instance);
+	int		ret = DDI_SUCCESS;
+
+	switch (cmd) {
+	case DDI_INFO_DEVT2INSTANCE:
+		*result = (void *)(intptr_t)instance;
+		break;
+	case DDI_INFO_DEVT2DEVINFO:
+		if (pcip == NULL) {
+			ret = DDI_FAILURE;
+			break;
+		}
+
+		*result = (void *)pcip->pci_dip;
+		break;
+	default:
+		ret = DDI_FAILURE;
+		break;
+	}
+
+	return (ret);
+}
+
+/*ARGSUSED*/
+static int
 npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
-	/*
-	 * Use the minor number as constructed by pcihp, as the index value to
-	 * ddi_soft_state_zalloc.
-	 */
-	int instance = ddi_get_instance(devi);
-	pci_state_t *pcip = NULL;
+	int		instance = ddi_get_instance(devi);
+	pci_state_t	*pcip = NULL;
 
 	if (cmd == DDI_RESUME) {
 		/*
@@ -287,27 +306,16 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	pcip->pci_dip = devi;
+	pcip->pci_soft_state = PCI_SOFT_STATE_CLOSED;
 
 	pcie_rc_init_bus(devi);
 
-	/*
-	 * Initialize hotplug support on this bus. At minimum
-	 * (for non hotplug bus) this would create ":devctl" minor
-	 * node to support DEVCTL_DEVICE_* and DEVCTL_BUS_* ioctls
-	 * to this bus.
-	 */
-	if (pcihp_init(devi) != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "npe: Failed to setup hotplug framework");
-		ddi_soft_state_free(npe_statep, instance);
-		return (DDI_FAILURE);
-	}
+	if (pcie_init(devi, NULL) != DDI_SUCCESS)
+		goto fail1;
 
 	/* Second arg: initialize for pci_express root nexus */
-	if (pcitool_init(devi, B_TRUE) != DDI_SUCCESS) {
-		(void) pcihp_uninit(devi);
-		ddi_soft_state_free(npe_statep, instance);
-		return (DDI_FAILURE);
-	}
+	if (pcitool_init(devi, B_TRUE) != DDI_SUCCESS)
+		goto fail2;
 
 	pcip->pci_fmcap = DDI_FM_EREPORT_CAPABLE | DDI_FM_ERRCB_CAPABLE |
 	    DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
@@ -322,8 +330,16 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	npe_query_acpi_mcfg(devi);
 	ddi_report_dev(devi);
+
 	return (DDI_SUCCESS);
 
+fail2:
+	(void) pcie_uninit(devi);
+fail1:
+	pcie_rc_fini_bus(devi);
+	ddi_soft_state_free(npe_statep, instance);
+
+	return (DDI_FAILURE);
 }
 
 /*ARGSUSED*/
@@ -341,10 +357,8 @@ npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		/* Uninitialize pcitool support. */
 		pcitool_uninit(devi);
 
-		/*
-		 * Uninitialize hotplug support on this bus.
-		 */
-		(void) pcihp_uninit(devi);
+		if (pcie_uninit(devi) != DDI_SUCCESS)
+			return (DDI_FAILURE);
 
 		if (pcip->pci_fmcap & DDI_FM_ERRCB_CAPABLE)
 			ddi_fm_handler_unregister(devi);
@@ -961,53 +975,112 @@ npe_removechild(dev_info_t *dip)
 	return (DDI_SUCCESS);
 }
 
-
-/*
- * When retrofitting this module for pci_tools, functions such as open, close,
- * and ioctl are now pulled into this module.  Before this, the functions in
- * the pcihp module were referenced directly.  Now they are called or
- * referenced through the pcihp cb_ops structure from functions in this module.
- */
 static int
 npe_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 {
-	return ((pcihp_get_cb_ops())->cb_open(devp, flags, otyp, credp));
+	minor_t		minor = getminor(*devp);
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(minor);
+	pci_state_t	*pci_p = ddi_get_soft_state(npe_statep, instance);
+	int	rv;
+
+	/*
+	 * Make sure the open is for the right file type.
+	 */
+	if (otyp != OTYP_CHR)
+		return (EINVAL);
+
+	if (pci_p == NULL)
+		return (ENXIO);
+
+	mutex_enter(&pci_p->pci_mutex);
+	switch (PCI_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
+	case PCI_TOOL_REG_MINOR_NUM:
+	case PCI_TOOL_INTR_MINOR_NUM:
+		break;
+	default:
+		/* Handle devctl ioctls */
+		rv = pcie_open(pci_p->pci_dip, devp, flags, otyp, credp);
+		mutex_exit(&pci_p->pci_mutex);
+		return (rv);
+	}
+
+	/* Handle pcitool ioctls */
+	if (flags & FEXCL) {
+		if (pci_p->pci_soft_state != PCI_SOFT_STATE_CLOSED) {
+			mutex_exit(&pci_p->pci_mutex);
+			cmn_err(CE_NOTE, "npe_open: busy");
+			return (EBUSY);
+		}
+		pci_p->pci_soft_state = PCI_SOFT_STATE_OPEN_EXCL;
+	} else {
+		if (pci_p->pci_soft_state == PCI_SOFT_STATE_OPEN_EXCL) {
+			mutex_exit(&pci_p->pci_mutex);
+			cmn_err(CE_NOTE, "npe_open: busy");
+			return (EBUSY);
+		}
+		pci_p->pci_soft_state = PCI_SOFT_STATE_OPEN;
+	}
+	mutex_exit(&pci_p->pci_mutex);
+
+	return (0);
 }
 
 static int
 npe_close(dev_t dev, int flags, int otyp, cred_t *credp)
 {
-	return ((pcihp_get_cb_ops())->cb_close(dev, flags, otyp, credp));
+	minor_t		minor = getminor(dev);
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(minor);
+	pci_state_t	*pci_p = ddi_get_soft_state(npe_statep, instance);
+	int	rv;
+
+	if (pci_p == NULL)
+		return (ENXIO);
+
+	mutex_enter(&pci_p->pci_mutex);
+
+	switch (PCI_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
+	case PCI_TOOL_REG_MINOR_NUM:
+	case PCI_TOOL_INTR_MINOR_NUM:
+		break;
+	default:
+		/* Handle devctl ioctls */
+		rv = pcie_close(pci_p->pci_dip, dev, flags, otyp, credp);
+		mutex_exit(&pci_p->pci_mutex);
+		return (rv);
+	}
+
+	/* Handle pcitool ioctls */
+	pci_p->pci_soft_state = PCI_SOFT_STATE_CLOSED;
+	mutex_exit(&pci_p->pci_mutex);
+	return (0);
 }
 
 static int
 npe_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 {
 	minor_t		minor = getminor(dev);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
+	int		instance = PCI_MINOR_NUM_TO_INSTANCE(minor);
 	pci_state_t	*pci_p = ddi_get_soft_state(npe_statep, instance);
-	dev_info_t	*dip;
+	int		ret = ENOTTY;
 
 	if (pci_p == NULL)
 		return (ENXIO);
 
-	dip = pci_p->pci_dip;
+	switch (PCI_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
+	case PCI_TOOL_REG_MINOR_NUM:
+	case PCI_TOOL_INTR_MINOR_NUM:
+		/* To handle pcitool related ioctls */
+		ret =  pci_common_ioctl(pci_p->pci_dip, dev, cmd, arg, mode,
+		    credp, rvalp);
+		break;
+	default:
+		/* To handle devctl and hotplug related ioctls */
+		ret = pcie_ioctl(pci_p->pci_dip, dev, cmd, arg, mode, credp,
+		    rvalp);
+		break;
+	}
 
-	return (pci_common_ioctl(dip, dev, cmd, arg, mode, credp, rvalp));
-}
-
-static int
-npe_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
-	int flags, char *name, caddr_t valuep, int *lengthp)
-{
-	return ((pcihp_get_cb_ops())->cb_prop_op(dev, dip, prop_op, flags,
-	    name, valuep, lengthp));
-}
-
-static int
-npe_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
-{
-	return (pcihp_info(dip, cmd, arg, result));
+	return (ret);
 }
 
 /*ARGSUSED*/

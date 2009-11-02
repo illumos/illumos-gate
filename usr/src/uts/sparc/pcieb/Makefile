@@ -74,7 +74,7 @@ CPPFLAGS += -DPX_PLX
 #
 #	Dependency
 #
-LDFLAGS += -dy -Nmisc/pcie -Nmisc/pcishpc -Nmisc/pcihp -Nmisc/pciehpc
+LDFLAGS += -dy -Nmisc/pcie
 
 #
 # For now, disable these lint checks; maintainers should endeavor

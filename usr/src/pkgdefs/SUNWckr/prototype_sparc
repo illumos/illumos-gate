@@ -211,8 +211,6 @@ f none kernel/misc/sparcv9/mii 755 root sys
 f none kernel/misc/sparcv9/neti 755 root sys
 f none kernel/misc/sparcv9/pcie 755 root sys
 f none kernel/misc/sparcv9/pcihp 755 root sys
-f none kernel/misc/sparcv9/pciehpc 755 root sys
-f none kernel/misc/sparcv9/pcishpc 755 root sys
 f none kernel/misc/sparcv9/pcmcia 755 root sys
 f none kernel/misc/sparcv9/rpcsec 755 root sys
 f none kernel/misc/sparcv9/scsi 755 root sys

@@ -90,7 +90,7 @@ KRTLD_OBJS +=		\
 	kobj_reloc.o
 
 SWAPGENERIC_OBJS += swapgeneric.o
-PCICFG_E_OBJS	+= pcicfg.e.o
+PCICFG_OBJS	+= pcicfg.o
 FCPCI_OBJS	+= fcpci.o
 FCODEM_OBJS	+= fc_ddi.o fc_physio.o fc_ops.o fc_subr.o
 

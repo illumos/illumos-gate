@@ -54,9 +54,9 @@ px_pec_attach(px_t *px_p)
 {
 	px_pec_t *pec_p;
 	int i, len;
-	int nrange = px_p->px_ranges_length / sizeof (px_ranges_t);
+	int nrange = px_p->px_ranges_length / sizeof (pci_ranges_t);
 	dev_info_t *dip = px_p->px_dip;
-	px_ranges_t *rangep = px_p->px_ranges_p;
+	pci_ranges_t *rangep = px_p->px_ranges_p;
 	int ret;
 
 	/*

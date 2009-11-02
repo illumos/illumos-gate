@@ -229,7 +229,6 @@ f none kernel/misc/mii 755 root sys
 f none kernel/misc/net80211 755 root sys
 f none kernel/misc/neti 755 root sys
 f none kernel/misc/pcicfg 755 root sys
-f none kernel/misc/pciehpc 755 root sys
 f none kernel/misc/pcihp 755 root sys
 f none kernel/misc/pci_autoconfig 755 root sys
 f none kernel/misc/pcmcia 755 root sys
@@ -450,7 +449,6 @@ f none kernel/misc/amd64/mii 755 root sys
 f none kernel/misc/amd64/net80211 755 root sys
 f none kernel/misc/amd64/neti 755 root sys
 f none kernel/misc/amd64/pcicfg 755 root sys
-f none kernel/misc/amd64/pciehpc 755 root sys
 f none kernel/misc/amd64/pcihp 755 root sys
 f none kernel/misc/amd64/pci_autoconfig 755 root sys
 f none kernel/misc/amd64/pcmcia 755 root sys

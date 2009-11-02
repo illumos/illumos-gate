@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PCI_VAR_H
 #define	_SYS_PCI_VAR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -126,10 +124,6 @@ struct pci {
 	 */
 	pci_state_t pci_state;
 	uint_t pci_soft_state;
-#define	PCI_SOFT_STATE_OPEN		0x01
-#define	PCI_SOFT_STATE_OPEN_EXCL	0x02
-#define	PCI_SOFT_STATE_CLOSED		0x04
-	uint_t pci_open_count;
 	uint16_t pci_tsb_cookie;	/* IOMMU TSB allocation */
 	kmutex_t pci_mutex;
 

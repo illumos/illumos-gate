@@ -39,7 +39,7 @@
 #include "../../../../common/pci/pci_strings.h"
 #include <sys/apic.h>
 #include <io/pciex/pcie_nvidia.h>
-#include <io/hotplug/pciehpc/pciehpc_acpi.h>
+#include <sys/hotplug/pci/pciehpc_acpi.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
 #include <sys/intel_iommu.h>

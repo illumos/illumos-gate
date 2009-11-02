@@ -106,6 +106,7 @@
 #include "typegraph.h"
 #include "vfs.h"
 #include "zone.h"
+#include "hotplug.h"
 
 /*
  * Surely this is defined somewhere...
@@ -4502,6 +4503,10 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "zone", "?", "display kernel zone(s)", zoneprt },
 	{ "zsd", ":[-v] [zsd_key]", "display zone-specific-data entries for "
 	    "selected zones", zsd },
+
+	/* from hotplug.c */
+	{ "hotplug", "?[-p]", "display a registered hotplug attachment",
+	    hotplug, hotplug_help },
 
 	{ NULL }
 };

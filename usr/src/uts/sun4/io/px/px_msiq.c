@@ -40,7 +40,7 @@
 #include <sys/ddi_impldefs.h>
 #include "px_obj.h"
 
-static void px_msiq_get_props(px_t *px_p);
+static int px_msiq_get_props(px_t *px_p);
 
 /*
  * px_msiq_attach()
@@ -60,7 +60,8 @@ px_msiq_attach(px_t *px_p)
 	 *
 	 * Avaialble MSIQs and its properties.
 	 */
-	px_msiq_get_props(px_p);
+	if (px_msiq_get_props(px_p) != DDI_SUCCESS)
+		return (DDI_FAILURE);
 
 	/*
 	 * 10% of available MSIQs are reserved for the PCIe messages.
@@ -406,49 +407,63 @@ px_devino_to_msiqid(px_t *px_p, devino_t devino)
 /*
  * px_msiq_get_props()
  */
-static void
+static int
 px_msiq_get_props(px_t *px_p)
 {
-	px_msiq_state_t *msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
-	int	ret = DDI_SUCCESS;
-	int	length = sizeof (int);
-	char	*valuep = NULL;
+	px_msiq_state_t	*msiq_state_p = &px_p->px_ib_p->ib_msiq_state;
+	int		length = sizeof (int);
+	char		*valuep = NULL;
+	int		ret;
 
 	DBG(DBG_MSIQ, px_p->px_dip, "px_msiq_get_props\n");
 
 	/* #msi-eqs */
 	msiq_state_p->msiq_cnt = ddi_getprop(DDI_DEV_T_ANY, px_p->px_dip,
-	    DDI_PROP_DONTPASS, "#msi-eqs", PX_DEFAULT_MSIQ_CNT);
+	    DDI_PROP_DONTPASS, "#msi-eqs", 0);
 
-	DBG(DBG_MSIQ, px_p->px_dip, "obp: msiq_cnt=%d\n",
-	    msiq_state_p->msiq_cnt);
+	DBG(DBG_MSIQ, px_p->px_dip, "msiq_cnt=%d\n", msiq_state_p->msiq_cnt);
 
 	/* msi-eq-size */
 	msiq_state_p->msiq_rec_cnt = ddi_getprop(DDI_DEV_T_ANY, px_p->px_dip,
-	    DDI_PROP_DONTPASS, "msi-eq-size", PX_DEFAULT_MSIQ_REC_CNT);
+	    DDI_PROP_DONTPASS, "msi-eq-size", 0);
 
-	DBG(DBG_MSIQ, px_p->px_dip, "obp: msiq_rec_cnt=%d\n",
+	DBG(DBG_MSIQ, px_p->px_dip, "msiq_rec_cnt=%d\n",
 	    msiq_state_p->msiq_rec_cnt);
+
+	if ((msiq_state_p->msiq_cnt == 0) || (msiq_state_p->msiq_rec_cnt == 0))
+		return (DDI_FAILURE);
 
 	/* msi-eq-to-devino: msi-eq#, devino# fields */
 	ret = ddi_prop_op(DDI_DEV_T_ANY, px_p->px_dip, PROP_LEN_AND_VAL_ALLOC,
-	    DDI_PROP_DONTPASS, "msi-eq-to-devino", (caddr_t)&valuep,
-	    &length);
+	    DDI_PROP_DONTPASS, "msi-eq-to-devino", (caddr_t)&valuep, &length);
 
-	if (ret == DDI_PROP_SUCCESS) {
-		msiq_state_p->msiq_1st_msiq_id =
-		    ((px_msi_eq_to_devino_t *)valuep)->msi_eq_no;
-		msiq_state_p->msiq_1st_devino =
-		    ((px_msi_eq_to_devino_t *)valuep)->devino_no;
-		kmem_free(valuep, (size_t)length);
-	} else {
-		msiq_state_p->msiq_1st_msiq_id = PX_DEFAULT_MSIQ_1ST_MSIQ_ID;
-		msiq_state_p->msiq_1st_devino = PX_DEFAULT_MSIQ_1ST_DEVINO;
+	/*
+	 * NOTE:
+	 * On sun4u PCIe systems, the msi-eq-to-devino property is broken and
+	 * these systems defines this property as msi-eq-devino.
+	 */
+	if (ret == DDI_PROP_NOT_FOUND) {
+		DBG(DBG_MSIQ, px_p->px_dip, "msi-eq-to-devino is not found\n");
+		ret = ddi_prop_op(DDI_DEV_T_ANY, px_p->px_dip,
+		    PROP_LEN_AND_VAL_ALLOC, DDI_PROP_DONTPASS, "msi-eq-devino",
+		    (caddr_t)&valuep, &length);
 	}
 
-	DBG(DBG_MSIQ, px_p->px_dip, "obp: msiq_1st_msiq_id=%d\n",
+	if (ret != DDI_PROP_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	msiq_state_p->msiq_1st_msiq_id =
+	    ((px_msi_eq_to_devino_t *)valuep)->msi_eq_no;
+	msiq_state_p->msiq_1st_devino =
+	    ((px_msi_eq_to_devino_t *)valuep)->devino_no;
+
+	DBG(DBG_MSIQ, px_p->px_dip, "msiq_1st_msiq_id=%d\n",
 	    msiq_state_p->msiq_1st_msiq_id);
 
-	DBG(DBG_MSIQ, px_p->px_dip, "obp: msiq_1st_devino=%d\n",
+	DBG(DBG_MSIQ, px_p->px_dip, "msiq_1st_devino=%d\n",
 	    msiq_state_p->msiq_1st_devino);
+
+	kmem_free(valuep, (size_t)length);
+	return (DDI_SUCCESS);
 }

@@ -21,10 +21,8 @@
 #
 # uts/i86pc/npe/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the PCI-E nexus driver
 #
@@ -57,16 +55,13 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# depends on misc/pcihp, misc/acpica and misc/pcie
-#
-# For PCI Hotplug support, the misc/pcihp module provides devctl control
-# device and cb_ops functions to support hotplug operations.
+# depends on misc/acpica and misc/pcie
 #
 # acpica supplies ACPI access routines
 #
 # pcie supplies PCI Express fabric error support
 #
-LDFLAGS	+= -dy -Nmisc/pcihp -Nmisc/acpica -Nmisc/pcie
+LDFLAGS	+= -dy -Nmisc/acpica -Nmisc/pcie
 
 #
 # Name of the module is needed by the source, to distinguish from other

@@ -199,6 +199,15 @@ SUNWprivate_1.1 {
 	di_dli_openw;
 	di_driver_private_data;
 	di_flags;
+	di_hp_child;
+	di_hp_connection;
+	di_hp_depends_on;
+	di_hp_description;
+	di_hp_last_change;
+	di_hp_name;
+	di_hp_next;
+	di_hp_state;
+	di_hp_type;
 	di_init_driver;
 	di_init_impl;
 	di_lookup_node;
@@ -238,6 +247,7 @@ SUNWprivate_1.1 {
 	di_unretire_device;
 	di_vhci_first_node;
 	di_vhci_next_node;
+	di_walk_hp;
 	finddev_close;
 	finddev_emptydir;
 	finddev_next;

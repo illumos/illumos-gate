@@ -192,6 +192,8 @@ COMMON_SUBDIRS=		\
 	head		\
 	hostid		\
 	hostname	\
+	hotplug		\
+	hotplugd	\
 	hwdata		\
 	id		\
 	idmap		\
@@ -593,6 +595,7 @@ MSGSUBDIRS=		\
 	halt		\
 	head		\
 	hostname	\
+	hotplug		\
 	id		\
 	idmap		\
 	isaexec		\

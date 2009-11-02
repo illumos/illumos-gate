@@ -170,6 +170,7 @@ px_reloc_reg(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 
 	i = ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
 	    "assigned-addresses", (caddr_t)&assign_p, &assign_len);
+
 	if (i) {
 		DBG(DBG_MAP | DBG_CONT, dip, "%s%d: assigned-addresses %d\n",
 		    ddi_driver_name(rdip), ddi_get_instance(rdip), i);
@@ -210,8 +211,8 @@ int
 px_xlate_reg(px_t *px_p, pci_regspec_t *px_rp, struct regspec *new_rp)
 {
 	int n;
-	px_ranges_t *rng_p = px_p->px_ranges_p;
-	int rng_n = px_p->px_ranges_length / sizeof (px_ranges_t);
+	pci_ranges_t *rng_p = px_p->px_ranges_p;
+	int rng_n = px_p->px_ranges_length / sizeof (pci_ranges_t);
 	uint32_t space_type = PCI_REG_ADDR_G(px_rp->pci_phys_hi);
 	uint64_t reg_begin, reg_end, reg_sz;
 	uint64_t rng_begin, rng_end, rng_sz;
@@ -631,8 +632,8 @@ uint64_t
 px_get_cfg_pabase(px_t *px_p)
 {
 	int i;
-	px_ranges_t *rangep = px_p->px_ranges_p;
-	int nrange = px_p->px_ranges_length / sizeof (px_ranges_t);
+	pci_ranges_t *rangep = px_p->px_ranges_p;
+	int nrange = px_p->px_ranges_length / sizeof (pci_ranges_t);
 	uint32_t cfg_space_type = PCI_REG_ADDR_G(PCI_ADDR_CONFIG);
 
 	ASSERT(cfg_space_type == 0);

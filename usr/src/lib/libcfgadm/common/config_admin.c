@@ -22,11 +22,9 @@
 /* Portions Copyright 2005 Cyril Plisko */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <stdio.h>
@@ -177,6 +175,7 @@ typedef struct list_stat {
 	stat_data_list_t *sdl;	/* Linked list of stat structures */
 	array_list_t *al;	/* Linked list of arrays of list structures */
 	vers_req_t use_vers;	/* plugin versions to be stat'ed */
+	char *shp_errstr;	/* only for shp plugin */
 } list_stat_t;
 
 /*
@@ -205,13 +204,24 @@ static void *config_calloc_check(size_t, size_t, char **);
 static cfga_err_t resolve_lib_ref(plugin_lib_t *, lib_loc_t *);
 static cfga_err_t config_get_lib(const char *, lib_loc_t *, char **);
 static int check_ap(di_node_t, di_minor_t, void *);
+static int check_ap_hp(di_node_t, di_hp_t, void *);
+static int check_ap_impl(di_node_t, di_minor_t, di_hp_t, void *);
 static int check_ap_phys(di_node_t, di_minor_t, void *);
+static int check_ap_phys_hp(di_node_t, di_hp_t, void *);
+static int check_ap_phys_impl(di_node_t, di_minor_t, di_hp_t, void *);
 
 static cfga_err_t find_ap_common(lib_loc_t *libloc_p, const char *rootpath,
-    int (*fcn)(di_node_t node, di_minor_t minor, void *arg), char **errstring);
+    int (*fcn)(di_node_t node, di_minor_t minor, void *arg),
+    int (*fcn_hp)(di_node_t node, di_hp_t hp, void *arg),
+    char **errstring);
 
 static plugin_lib_t *lib_in_list(char *);
+static cfga_err_t find_lib(di_node_t, di_minor_t, lib_loc_t *);
+static cfga_err_t find_lib_hp(di_node_t, di_hp_t, lib_loc_t *);
+static cfga_err_t find_lib_impl(char *, lib_loc_t *);
 static cfga_err_t load_lib(di_node_t, di_minor_t, lib_loc_t *);
+static cfga_err_t load_lib_hp(di_node_t, di_hp_t, lib_loc_t *);
+static cfga_err_t load_lib_impl(di_node_t, di_minor_t, di_hp_t, lib_loc_t *);
 extern void bcopy(const void *, void *, size_t);
 static void config_err(int, int, char **);
 static void hold_lib(plugin_lib_t *);
@@ -222,6 +232,9 @@ static cfga_err_t parse_listopt(char *listopts, char **classpp,
 
 static cfga_err_t list_common(list_stat_t *lstatp, const char *class);
 static int do_list_common(di_node_t node, di_minor_t minor, void *arg);
+static int do_list_common_hp(di_node_t node, di_hp_t hp, void *arg);
+static int do_list_common_impl(di_node_t node, di_minor_t minor,
+    di_hp_t hp, void *arg);
 static cfga_err_t stat_common(int num_ap_ids, char *const *ap_ids,
     const char *class, list_stat_t *lstatp);
 
@@ -575,6 +588,7 @@ config_stat(
 	lstat.countp = &nstat;
 	lstat.opts = options;
 	lstat.errstr = errstring;
+	lstat.shp_errstr = NULL;
 	/*
 	 * This is a V1 interface which can use only V1 plugins
 	 */
@@ -611,6 +625,7 @@ config_list(
 	lstat.countp = &nstat;
 	lstat.opts = options;
 	lstat.errstr = errstring;
+	lstat.shp_errstr = NULL;
 	/*
 	 * This is a V1 interface which can use only V1 plugins
 	 */
@@ -683,6 +698,7 @@ config_list_ext(
 	lstat.countp = &nstat;
 	lstat.opts = options;
 	lstat.errstr = errstring;
+	lstat.shp_errstr = NULL;
 	lstat.flags = flags;
 	/*
 	 * We support both V1 and V2 plugins through this entry
@@ -1127,6 +1143,35 @@ mklog_common(
 }
 
 /*
+ * mklog_common - make a logical name from the driver and instance
+ */
+/*ARGSUSED*/
+static cfga_err_t
+mklog_hp(
+	di_node_t node,
+	di_hp_t hp,
+	plugin_lib_t *libp,
+	lib_loc_t *liblocp)
+{
+	const size_t len = CFGA_LOG_EXT_LEN;
+	int inst;
+	char *drv, *hp_name;
+
+	drv = di_driver_name(node);
+	inst = di_instance(node);
+	hp_name = di_hp_name(hp);
+
+	errno = 0;
+	if (drv != NULL && inst != -1 && hp_name != NULL &&
+	    snprintf(liblocp->ap_logical, len, "%s%d:%s", drv, inst,
+	    hp_name) < len) {	/* snprintf returns strlen */
+		return (CFGA_OK);
+	}
+
+	return (CFGA_LIB_ERROR);
+}
+
+/*
  * resolve_lib_ref - relocate to use plugin lib
  */
 static cfga_err_t
@@ -1352,6 +1397,9 @@ config_get_lib(
 	/*
 	 * find and load the library
 	 * The base component of the ap_id is used to locate the plug-in
+	 *
+	 * NOTE that PCIE/PCISHPC connectors also have minor nodes &
+	 * dev links created for now.
 	 */
 	if ((type = find_arg_type(lib_loc_p->ap_base)) == PHYSICAL_AP) {
 		/*
@@ -1360,14 +1408,15 @@ config_get_lib(
 		 * ap_id.
 		 */
 		ret = find_ap_common(lib_loc_p, lib_loc_p->ap_base,
-		    check_ap_phys, errstring);
+		    check_ap_phys, check_ap_phys_hp, errstring);
 	} else if ((type == LOGICAL_DRV_AP) ||
 	    (type == AP_TYPE && dyncomp == NULL)) {
 		/*
 		 * logical ap_id or ap_type: Use "/" as root for tree walk
 		 * Note: an aptype cannot have a dynamic component
 		 */
-		ret = find_ap_common(lib_loc_p, "/", check_ap, errstring);
+		ret = find_ap_common(lib_loc_p, "/", check_ap,
+		    check_ap_hp, errstring);
 	} else {
 		ret = CFGA_APID_NOEXIST;
 	}
@@ -1418,20 +1467,49 @@ out:
 	return (ret);
 }
 
-
-/*
- * load_lib - Given a library pathname, create a entry for it
- * in the library list, if one does not already exist, and read
- * lock it to keep it there.
- */
+/* load_lib - load library for non-SHP attachment point node */
 static cfga_err_t
 load_lib(
 	di_node_t node,
 	di_minor_t minor,
 	lib_loc_t *libloc_p)
 {
+	return (load_lib_impl(node, minor, NULL, libloc_p));
+}
+
+/* load_lib_hp - load library for SHP attachment point node */
+static cfga_err_t
+load_lib_hp(
+	di_node_t node,
+	di_hp_t hp,
+	lib_loc_t *libloc_p)
+{
+	return (load_lib_impl(node, NULL, hp, libloc_p));
+}
+
+/*
+ * load_lib_impl - Given a library pathname, create a entry for it
+ * in the library list, * if one does not already exist, and read
+ * lock it to keep it there.
+ */
+static cfga_err_t
+load_lib_impl(
+	di_node_t node,
+	di_minor_t minor,
+	di_hp_t hp,
+	lib_loc_t *libloc_p)
+{
 	plugin_lib_t *libp, *list_libp;
 	char *devfs_path;
+	char *name;
+
+	if (minor != DI_MINOR_NIL && hp != DI_HP_NIL)
+		return (CFGA_LIB_ERROR);
+
+	if (minor != DI_MINOR_NIL)
+		name = di_minor_name(minor);
+	else
+		name = di_hp_name(hp);
 
 	/*
 	 * lock the library list
@@ -1448,15 +1526,22 @@ load_lib(
 
 		/* fill in logical and physical name in libloc_p */
 		libloc_p->libp = libp = list_libp;
-		if (libp->vers_ops->mklog(node, minor, libp, libloc_p)
-		    != CFGA_OK) {
-			rele_lib(list_libp);
-			return (CFGA_LIB_ERROR);
+		if (minor != DI_MINOR_NIL) {
+			if (libp->vers_ops->mklog(node, minor, libp, libloc_p)
+			    != CFGA_OK) {
+				rele_lib(list_libp);
+				return (CFGA_LIB_ERROR);
+			}
+		} else {
+			if (mklog_hp(node, hp, libp, libloc_p) != CFGA_OK) {
+				rele_lib(list_libp);
+				return (CFGA_LIB_ERROR);
+			}
 		}
 
 		devfs_path = di_devfs_path(node);
 		(void) snprintf(libloc_p->ap_physical, MAXPATHLEN, "%s%s:%s",
-		    DEVICES_DIR, devfs_path, di_minor_name(minor));
+		    DEVICES_DIR, devfs_path, name);
 		di_devfs_path_free(devfs_path);
 
 		return (CFGA_OK);
@@ -1482,12 +1567,23 @@ load_lib(
 		return (CFGA_NO_LIB);
 	}
 
-	if (resolve_lib_ref(libp, libloc_p) != CFGA_OK ||
-	    libp->vers_ops->mklog(node, minor, libp, libloc_p) != CFGA_OK) {
-		(void) mutex_unlock(&plugin_list_lock);
-		(void) dlclose(libp->handle);
-		free(libp);
-		return (CFGA_NO_LIB);
+	if (minor != DI_MINOR_NIL) {
+		if (resolve_lib_ref(libp, libloc_p) != CFGA_OK ||
+		    libp->vers_ops->mklog(node, minor, libp, libloc_p)
+		    != CFGA_OK) {
+			(void) mutex_unlock(&plugin_list_lock);
+			(void) dlclose(libp->handle);
+			free(libp);
+			return (CFGA_NO_LIB);
+		}
+	} else {
+		if (resolve_lib_ref(libp, libloc_p) != CFGA_OK ||
+		    mklog_hp(node, hp, libp, libloc_p) != CFGA_OK) {
+			(void) mutex_unlock(&plugin_list_lock);
+			(void) dlclose(libp->handle);
+			free(libp);
+			return (CFGA_NO_LIB);
+		}
 	}
 
 	/*
@@ -1511,7 +1607,7 @@ load_lib(
 	libloc_p->libp = libp;
 	devfs_path = di_devfs_path(node);
 	(void) snprintf(libloc_p->ap_physical, MAXPATHLEN, "%s%s:%s",
-	    DEVICES_DIR, devfs_path, di_minor_name(minor));
+	    DEVICES_DIR, devfs_path, name);
 	di_devfs_path_free(devfs_path);
 
 	return (CFGA_OK);
@@ -1521,8 +1617,7 @@ load_lib(
 #define	NUM_LIB_NAMES   2
 
 /*
- * find_lib - Given an attachment point node find it's library
- *
+ * find_lib - find library for non-SHP attachment point node
  */
 static cfga_err_t
 find_lib(
@@ -1530,34 +1625,13 @@ find_lib(
 	di_minor_t minor,
 	lib_loc_t *libloc_p)
 {
-	char lib[MAXPATHLEN];
 	char name[NUM_LIB_NAMES][MAXPATHLEN];
-	struct stat lib_stat;
-	void *dlhandle = NULL;
-	static char plat_name[SYSINFO_LENGTH];
-	static char machine_name[SYSINFO_LENGTH];
-	static char arch_name[SYSINFO_LENGTH];
-	int i = 0;
 	char *class = NULL, *drv = NULL;
+	int i;
 
 
 	/* Make sure pathname and class is null if we fail */
-	*libloc_p->ap_class = *libloc_p->pathname = *lib = '\0';
-
-	/*
-	 * Initialize machine name and arch name
-	 */
-	if (strncmp("", machine_name, MAXPATHLEN) == 0) {
-		if (sysinfo(SI_PLATFORM, plat_name, SYSINFO_LENGTH) == -1) {
-			return (CFGA_ERROR);
-		}
-		if (sysinfo(SI_ARCHITECTURE, arch_name, SYSINFO_LENGTH) == -1) {
-			return (CFGA_ERROR);
-		}
-		if (sysinfo(SI_MACHINE, machine_name, SYSINFO_LENGTH) == -1) {
-			return (CFGA_ERROR);
-		}
-	}
+	*libloc_p->ap_class = *libloc_p->pathname = '\0';
 
 	/*
 	 * Initialize possible library tags.
@@ -1584,72 +1658,174 @@ find_lib(
 			continue;
 		}
 
-		/*
-		 * Try path based upon platform name
-		 */
-		(void) snprintf(lib, sizeof (lib), "%s%s%s%s%s",
-		    LIB_PATH_BASE1, plat_name, LIB_PATH_MIDDLE,
-		    name[i], LIB_PATH_TAIL);
+		if (find_lib_impl(name[i], libloc_p) == CFGA_OK)
+			goto found;
+	}
 
-		if (stat(lib, &lib_stat) == 0) {
-			/* file exists, is it a lib */
-			dlhandle = dlopen(lib, RTLD_LAZY);
-			if (dlhandle != NULL) {
-				goto found;
-			}
+	return (CFGA_NO_LIB);
+
+found:
+
+	/* Record class name (if any) */
+	(void) snprintf(libloc_p->ap_class, sizeof (libloc_p->ap_class), "%s",
+	    class);
+
+	return (CFGA_OK);
+}
+
+/*
+ * find_lib_hp - find library for SHP attachment point
+ */
+/*ARGSUSED*/
+static cfga_err_t
+find_lib_hp(
+	di_node_t node,
+	di_hp_t hp,
+	lib_loc_t *libloc_p)
+{
+	char name[MAXPATHLEN];
+	char *class = NULL;
+
+
+	/* Make sure pathname and class is null if we fail */
+	*libloc_p->ap_class = *libloc_p->pathname = '\0';
+
+	/*
+	 * Initialize possible library tags.
+	 *
+	 * Only support PCI class for now, this will need to be
+	 * changed as other plugins are migrated to SHP plugin.
+	 */
+	class = "pci";
+#if 0
+	/*
+	 * No type check for now as PCI is the only class SHP plugin
+	 * supports. In the future we'll need to enable the type check
+	 * and set class accordingly, when non PCI plugins are migrated
+	 * to SHP. In that case we'll probably need to add an additional
+	 * interface between libcfgadm and the plugins, and SHP plugin will
+	 * implement this interface which will translate the bus specific
+	 * strings to standard classes that libcfgadm can recognize, for
+	 * all the buses it supports, e.g. for pci/pcie it will translate
+	 * PCIE_NATIVE_HP_TYPE to string "pci". We'll also need to bump up
+	 * SHP plugin version to 3 to use the new interface.
+	 */
+	class = di_hp_type(hp);
+	if ((strcmp(class, PCIE_NATIVE_HP_TYPE) == 0) ||
+	    (strcmp(class, PCIE_ACPI_HP_TYPE) == 0) ||
+	    (strcmp(class, PCIE_PCI_HP_TYPE) == 0)) {
+		class = "pci";
+	} else {
+		goto fail;
+	}
+#endif
+	(void) snprintf(&name[0], sizeof (name), "%s", "shp");
+
+	if (find_lib_impl(name, libloc_p) == CFGA_OK)
+		goto found;
+fail:
+	return (CFGA_NO_LIB);
+
+found:
+
+	/* Record class name (if any) */
+	(void) snprintf(libloc_p->ap_class, sizeof (libloc_p->ap_class), "%s",
+	    class);
+
+	return (CFGA_OK);
+}
+
+/*
+ * find_lib_impl - Given an attachment point node find it's library
+ */
+static cfga_err_t
+find_lib_impl(
+	char *name,
+	lib_loc_t *libloc_p)
+{
+	char lib[MAXPATHLEN];
+	struct stat lib_stat;
+	void *dlhandle = NULL;
+	static char plat_name[SYSINFO_LENGTH];
+	static char machine_name[SYSINFO_LENGTH];
+	static char arch_name[SYSINFO_LENGTH];
+
+	/*
+	 * Initialize machine name and arch name
+	 */
+	if (strncmp("", machine_name, MAXPATHLEN) == 0) {
+		if (sysinfo(SI_PLATFORM, plat_name, SYSINFO_LENGTH) == -1) {
+			return (CFGA_ERROR);
 		}
-
-		/*
-		 * Try path based upon machine name
-		 */
-		(void) snprintf(lib, sizeof (lib), "%s%s%s%s%s",
-		    LIB_PATH_BASE1, machine_name, LIB_PATH_MIDDLE,
-		    name[i], LIB_PATH_TAIL);
-
-
-		if (stat(lib, &lib_stat) == 0) {
-			/* file exists, is it a lib */
-			dlhandle = dlopen(lib, RTLD_LAZY);
-			if (dlhandle != NULL) {
-				goto found;
-			}
+		if (sysinfo(SI_ARCHITECTURE, arch_name, SYSINFO_LENGTH) == -1) {
+			return (CFGA_ERROR);
 		}
-
-		/*
-		 * Try path based upon arch name
-		 */
-		(void) snprintf(lib, sizeof (lib), "%s%s%s%s%s",
-		    LIB_PATH_BASE1, arch_name, LIB_PATH_MIDDLE,
-		    name[i], LIB_PATH_TAIL);
-
-		if (stat(lib, &lib_stat) == 0) {
-			/* file exists, is it a lib */
-			dlhandle = dlopen(lib, RTLD_LAZY);
-			if (dlhandle != NULL) {
-				goto found;
-			}
-
-		}
-
-		/*
-		 * Try generic location
-		 */
-		(void) snprintf(lib, sizeof (lib), "%s%s%s%s",
-		    LIB_PATH_BASE2, LIB_PATH_MIDDLE, name[i], LIB_PATH_TAIL);
-
-
-
-		if (stat(lib, &lib_stat) == 0) {
-			/* file exists, is it a lib */
-			dlhandle = dlopen(lib, RTLD_LAZY);
-			if (dlhandle != NULL) {
-				goto found;
-			}
-
+		if (sysinfo(SI_MACHINE, machine_name, SYSINFO_LENGTH) == -1) {
+			return (CFGA_ERROR);
 		}
 	}
 
+	/*
+	 * Try path based upon platform name
+	 */
+	(void) snprintf(lib, sizeof (lib), "%s%s%s%s%s",
+	    LIB_PATH_BASE1, plat_name, LIB_PATH_MIDDLE,
+	    name, LIB_PATH_TAIL);
 
+	if (stat(lib, &lib_stat) == 0) {
+		/* file exists, is it a lib */
+		dlhandle = dlopen(lib, RTLD_LAZY);
+		if (dlhandle != NULL) {
+			goto found;
+		}
+	}
+
+	/*
+	 * Try path based upon machine name
+	 */
+	(void) snprintf(lib, sizeof (lib), "%s%s%s%s%s",
+	    LIB_PATH_BASE1, machine_name, LIB_PATH_MIDDLE,
+	    name, LIB_PATH_TAIL);
+
+
+	if (stat(lib, &lib_stat) == 0) {
+		/* file exists, is it a lib */
+		dlhandle = dlopen(lib, RTLD_LAZY);
+		if (dlhandle != NULL) {
+			goto found;
+		}
+	}
+
+	/*
+	 * Try path based upon arch name
+	 */
+	(void) snprintf(lib, sizeof (lib), "%s%s%s%s%s",
+	    LIB_PATH_BASE1, arch_name, LIB_PATH_MIDDLE,
+	    name, LIB_PATH_TAIL);
+
+	if (stat(lib, &lib_stat) == 0) {
+		/* file exists, is it a lib */
+		dlhandle = dlopen(lib, RTLD_LAZY);
+		if (dlhandle != NULL) {
+			goto found;
+		}
+
+	}
+
+	/*
+	 * Try generic location
+	 */
+	(void) snprintf(lib, sizeof (lib), "%s%s%s%s",
+	    LIB_PATH_BASE2, LIB_PATH_MIDDLE, name, LIB_PATH_TAIL);
+
+	if (stat(lib, &lib_stat) == 0) {
+		/* file exists, is it a lib */
+		dlhandle = dlopen(lib, RTLD_LAZY);
+		if (dlhandle != NULL) {
+			goto found;
+		}
+
+	}
 	return (CFGA_NO_LIB);
 
 found:
@@ -1658,10 +1834,6 @@ found:
 	    lib);
 
 	(void) dlclose(dlhandle);
-
-	/* Record class name (if any) */
-	(void) snprintf(libloc_p->ap_class, sizeof (libloc_p->ap_class), "%s",
-	    class);
 
 	return (CFGA_OK);
 }
@@ -1746,6 +1918,7 @@ find_ap_common(
 	lib_loc_t *libloc_p,
 	const char *physpath,
 	int (*fcn)(di_node_t node, di_minor_t minor, void *arg),
+	int (*fcn_hp)(di_node_t node, di_hp_t hp, void *arg),
 	char **errstring)
 {
 	di_node_t rnode, wnode;
@@ -1781,36 +1954,83 @@ find_ap_common(
 
 	/*
 	 * begin walk of device tree
+	 *
+	 * Since we create minor nodes & dev links for both all PCI/PCIE
+	 * connectors, but only create hp nodes for PCIE/PCISHPC connectors
+	 * of the new framework, we should first match with hp nodes. If
+	 * the ap_id refers to a PCIE/PCISHPC connector, we'll be able to
+	 * find it here.
 	 */
-	rnode = di_init("/", DINFOCACHE);
+	rnode = di_init("/", DINFOSUBTREE | DINFOHP);
 	if (rnode)
 		wnode = di_lookup_node(rnode, rpath);
 	else
 		wnode = DI_NODE_NIL;
-	S_FREE(rpath);
 
 	if (wnode == DI_NODE_NIL) {
 		if (rnode == DI_NODE_NIL) {
+			S_FREE(rpath);
 			config_err(errno, DI_INIT_FAILED, errstring);
 			return (CFGA_LIB_ERROR);
 		} else {
 			/*
-			 * di_lookup_node() may fail because the ap_id
-			 * does not exist
+			 * di_lookup_node() may fail, either because the
+			 * ap_id does not exist, or because the ap_id refers
+			 * to a legacy PCI slot, thus we'll not able to
+			 * find node using DINFOHP, try to see if we can
+			 * find one using DINFOCACHE.
 			 */
 			di_fini(rnode);
-			return (CFGA_APID_NOEXIST);
+			goto find_minor;
 		}
 	}
 
 	libloc_p->libp = NULL;
 	libloc_p->status = CFGA_APID_NOEXIST;
 
-	(void) di_walk_minor(wnode, "ddi_ctl:attachment_point",
-	    DI_CHECK_ALIAS|DI_CHECK_INTERNAL_PATH,
-	    libloc_p, fcn);
+	(void) di_walk_hp(wnode, NULL, DI_HP_CONNECTOR,
+	    libloc_p, fcn_hp);
 
 	di_fini(rnode);
+
+	/*
+	 * Failed to find a matching hp node, try minor node.
+	 */
+	if (libloc_p->libp == NULL) {
+find_minor:
+		rnode = di_init("/", DINFOCACHE);
+		if (rnode)
+			wnode = di_lookup_node(rnode, rpath);
+		else
+			wnode = DI_NODE_NIL;
+
+		if (wnode == DI_NODE_NIL) {
+			if (rnode == DI_NODE_NIL) {
+				S_FREE(rpath);
+				config_err(errno, DI_INIT_FAILED, errstring);
+				return (CFGA_LIB_ERROR);
+			} else {
+				/*
+				 * di_lookup_node() may fail, because the
+				 * ap_id does not exist.
+				 */
+				S_FREE(rpath);
+				di_fini(rnode);
+				return (CFGA_APID_NOEXIST);
+			}
+		}
+
+		libloc_p->libp = NULL;
+		libloc_p->status = CFGA_APID_NOEXIST;
+
+		(void) di_walk_minor(wnode, "ddi_ctl:attachment_point",
+		    DI_CHECK_ALIAS|DI_CHECK_INTERNAL_PATH,
+		    libloc_p, fcn);
+
+		di_fini(rnode);
+	}
+
+	S_FREE(rpath);
 
 	if (libloc_p->libp != NULL) {
 		update_cache(libloc_p);
@@ -1821,18 +2041,42 @@ find_ap_common(
 }
 
 /*
- * check_ap - called for each attachment point found
+ * check_ap - called for each non-SHP attachment point found
+ */
+static int
+check_ap(
+	di_node_t node,
+	di_minor_t minor,
+	void *arg)
+{
+	return (check_ap_impl(node, minor, NULL, arg));
+}
+
+/*
+ * check_ap_hp - called for each SHP attachment point found
+ */
+static int
+check_ap_hp(
+	di_node_t node,
+	di_hp_t hp,
+	void *arg)
+{
+	return (check_ap_impl(node, NULL, hp, arg));
+}
+
+/*
+ * check_ap_impl - called for each attachment point found
  *
  * This is used in cases where a particular attachment point
  * or type of attachment point is specified via a logical name or ap_type.
  * Not used for physical names or in the list case with no
  * ap's specified.
  */
-
 static int
-check_ap(
+check_ap_impl(
 	di_node_t node,
 	di_minor_t minor,
+	di_hp_t hp,
 	void *arg)
 {
 	char *cp = NULL;
@@ -1847,6 +2091,8 @@ check_ap(
 	int instance;
 	cfga_ap_types_t type;
 
+	if (minor != DI_MINOR_NIL && hp != DI_HP_NIL)
+		return (DI_WALK_CONTINUE);
 
 	libloc_p = (lib_loc_t *)arg;
 
@@ -1873,7 +2119,11 @@ check_ap(
 		return (DI_WALK_CONTINUE);
 	}
 
-	node_minor = di_minor_name(minor);
+	if (minor != DI_MINOR_NIL)
+		node_minor = di_minor_name(minor);
+	else
+		node_minor = di_hp_name(hp);
+
 	drv_name = di_driver_name(node);
 	instance = di_instance(node);
 
@@ -1910,13 +2160,24 @@ check_ap(
 		/*
 		 * save the correct type of error so user does not get confused
 		 */
-		if (find_lib(node, minor, libloc_p) != CFGA_OK) {
-			libloc_p->status = CFGA_NO_LIB;
-			return (DI_WALK_CONTINUE);
-		}
-		if (load_lib(node, minor, libloc_p) != CFGA_OK) {
-			libloc_p->status = CFGA_LIB_ERROR;
-			return (DI_WALK_CONTINUE);
+		if (minor != DI_MINOR_NIL) {
+			if (find_lib(node, minor, libloc_p) != CFGA_OK) {
+				libloc_p->status = CFGA_NO_LIB;
+				return (DI_WALK_CONTINUE);
+			}
+			if (load_lib(node, minor, libloc_p) != CFGA_OK) {
+				libloc_p->status = CFGA_LIB_ERROR;
+				return (DI_WALK_CONTINUE);
+			}
+		} else {
+			if (find_lib_hp(node, hp, libloc_p) != CFGA_OK) {
+				libloc_p->status = CFGA_NO_LIB;
+				return (DI_WALK_CONTINUE);
+			}
+			if (load_lib_hp(node, hp, libloc_p) != CFGA_OK) {
+				libloc_p->status = CFGA_LIB_ERROR;
+				return (DI_WALK_CONTINUE);
+			}
 		}
 		libloc_p->status = CFGA_OK;
 		return (DI_WALK_TERMINATE);
@@ -1928,17 +2189,41 @@ check_ap(
 
 
 /*
- * check_ap_phys - called for each attachment point found
+ * check_ap_phys - called for each non-SHP attachment point found
+ */
+static int
+check_ap_phys(
+	di_node_t node,
+	di_minor_t minor,
+	void *arg)
+{
+	return (check_ap_phys_impl(node, minor, DI_HP_NIL, arg));
+}
+
+/*
+ * check_ap_phys_hp - called for each SHP attachment point found
+ */
+static int
+check_ap_phys_hp(
+	di_node_t node,
+	di_hp_t hp,
+	void *arg)
+{
+	return (check_ap_phys_impl(node, DI_HP_NIL, hp, arg));
+}
+
+/*
+ * check_ap_phys_impl - called for each attachment point found
  *
  * This is used in cases where a particular attachment point
  * is specified via a physical name. If the name matches then
  * we try and find and load the library for it.
  */
-
 static int
-check_ap_phys(
+check_ap_phys_impl(
 	di_node_t node,
 	di_minor_t minor,
+	di_hp_t hp,
 	void *arg)
 {
 	lib_loc_t *libloc_p;
@@ -1946,9 +2231,15 @@ check_ap_phys(
 	char *devfs_path;
 	char *minor_name;
 
+	if (minor != DI_MINOR_NIL && hp != DI_HP_NIL)
+		return (DI_WALK_CONTINUE);
+
 	libloc_p = (lib_loc_t *)arg;
 	devfs_path = di_devfs_path(node);
-	minor_name = di_minor_name(minor);
+	if (minor != DI_MINOR_NIL)
+		minor_name = di_minor_name(minor);
+	else
+		minor_name = di_hp_name(hp);
 
 	if (devfs_path == NULL || minor_name == NULL) {
 		libloc_p->status = CFGA_APID_NOEXIST;
@@ -1961,14 +2252,26 @@ check_ap_phys(
 	di_devfs_path_free(devfs_path);
 
 	if (strcmp(phys_name, libloc_p->ap_base) == 0) {
-		if (find_lib(node, minor, libloc_p) != CFGA_OK) {
-			libloc_p->status = CFGA_NO_LIB;
-			return (DI_WALK_CONTINUE);
+		if (minor != DI_MINOR_NIL) {
+			if (find_lib(node, minor, libloc_p) != CFGA_OK) {
+				libloc_p->status = CFGA_NO_LIB;
+				return (DI_WALK_CONTINUE);
+			}
+			if (load_lib(node, minor, libloc_p) != CFGA_OK) {
+				libloc_p->status = CFGA_LIB_ERROR;
+				return (DI_WALK_CONTINUE);
+			}
+		} else {
+			if (find_lib_hp(node, hp, libloc_p) != CFGA_OK) {
+				libloc_p->status = CFGA_NO_LIB;
+				return (DI_WALK_CONTINUE);
+			}
+			if (load_lib_hp(node, hp, libloc_p) != CFGA_OK) {
+				libloc_p->status = CFGA_LIB_ERROR;
+				return (DI_WALK_CONTINUE);
+			}
 		}
-		if (load_lib(node, minor, libloc_p) != CFGA_OK) {
-			libloc_p->status = CFGA_LIB_ERROR;
-			return (DI_WALK_CONTINUE);
-		}
+
 		libloc_p->status = CFGA_OK;
 		return (DI_WALK_TERMINATE);
 	} else {
@@ -2167,15 +2470,6 @@ list_common(list_stat_t *lstatp, const char *class)
 	char nodetype[MAXPATHLEN];
 	const char *l_class, *l_sep;
 
-
-	/*
-	 * begin walk of device tree
-	 */
-	if ((rnode = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
-		config_err(errno, DI_INIT_FAILED, lstatp->errstr);
-		return (CFGA_LIB_ERROR);
-	}
-
 	/*
 	 * May walk a subset of all attachment points in the device tree if
 	 * a class is specified
@@ -2190,9 +2484,37 @@ list_common(list_stat_t *lstatp, const char *class)
 	(void) snprintf(nodetype, sizeof (nodetype), "%s%s%s",
 	    DDI_NT_ATTACHMENT_POINT, l_sep, l_class);
 
+	/*
+	 * Walk all hp nodes
+	 */
+	if ((rnode = di_init("/", DINFOSUBTREE | DINFOHP)) == DI_NODE_NIL) {
+		config_err(errno, DI_INIT_FAILED, lstatp->errstr);
+		return (CFGA_LIB_ERROR);
+	}
+	/* No need to filter on class for now */
+	(void) di_walk_hp(rnode, NULL, DI_HP_CONNECTOR,
+	    lstatp, do_list_common_hp);
+
+	di_fini(rnode);
+
+	/*
+	 * Walk all minor nodes
+	 * but exclude PCIE/PCIESHPC connectors which have been walked above.
+	 */
+	if ((rnode = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
+		config_err(errno, DI_INIT_FAILED, lstatp->errstr);
+		return (CFGA_LIB_ERROR);
+	}
 	(void) di_walk_minor(rnode, nodetype,
 	    DI_CHECK_ALIAS|DI_CHECK_INTERNAL_PATH, lstatp, do_list_common);
+
 	di_fini(rnode);
+
+	if (lstatp->shp_errstr != NULL) {
+		*(lstatp->errstr) = strdup(lstatp->shp_errstr);
+		free(lstatp->shp_errstr);
+		lstatp->shp_errstr = NULL;
+	}
 
 	return (CFGA_OK);
 }
@@ -2245,11 +2567,7 @@ config_err(int errnum, int err_type, char **errstring)
 }
 
 /*
- * do_list_common - Routine to list attachment point as part of
- * a config_list opertion. Used by both v1 and v2 interfaces.
- * This is somewhat similar to config_get_lib() and its helper routines
- * except that the ap_ids are always physical and don't have dynamic
- * components.
+ * do_list_common - list non-SHP attachment point
  */
 static int
 do_list_common(
@@ -2257,11 +2575,67 @@ do_list_common(
 	di_minor_t minor,
 	void *arg)
 {
+	di_node_t rnode;
+	di_hp_t hp;
+	char *minor_name;
+
+	minor_name = di_minor_name(minor);
+
+	/*
+	 * since PCIE/PCIHSHPC connectors have both hp nodes and minor nodes
+	 * created for now, we need to specifically exclude these connectors
+	 * during walking minor nodes.
+	 */
+	if ((rnode = di_init(di_devfs_path(node), DINFOSUBTREE | DINFOHP))
+	    == DI_NODE_NIL) {
+		return (DI_WALK_CONTINUE);
+	}
+
+	for (hp = DI_HP_NIL; (hp = di_hp_next(rnode, hp)) != DI_HP_NIL; ) {
+		if (strcmp(di_hp_name(hp), minor_name) == 0) {
+			di_fini(rnode);
+			return (DI_WALK_CONTINUE);
+		}
+	}
+
+	di_fini(rnode);
+
+	return (do_list_common_impl(node, minor, NULL, arg));
+}
+
+/*
+ * do_list_common_hp - list SHP attachment point
+ */
+static int
+do_list_common_hp(
+	di_node_t node,
+	di_hp_t hp,
+	void *arg)
+{
+	return (do_list_common_impl(node, NULL, hp, arg));
+}
+
+/*
+ * do_list_common_impl - Routine to list attachment point as part of
+ * a config_list opertion. Used by both v1 and v2 interfaces.
+ * This is somewhat similar to config_get_lib() and its helper routines
+ * except that the ap_ids are always physical and don't have dynamic
+ * components.
+ */
+static int
+do_list_common_impl(
+	di_node_t node,
+	di_minor_t minor,
+	di_hp_t hp,
+	void *arg)
+{
 	lib_loc_t lib_loc;
 	plugin_lib_t *libp;
 	list_stat_t *lstatp = NULL;
 	cfga_err_t ret = CFGA_ERROR;
 
+	if (minor != DI_MINOR_NIL && hp != DI_HP_NIL)
+		return (DI_WALK_CONTINUE);
 
 	lstatp = (list_stat_t *)arg;
 
@@ -2269,7 +2643,12 @@ do_list_common(
 	/*
 	 * try and find a lib for this node
 	 */
-	if (find_lib(node, minor, &lib_loc) != CFGA_OK) {
+	if (minor != DI_MINOR_NIL) {
+		ret = find_lib(node, minor, &lib_loc);
+	} else {
+		ret = find_lib_hp(node, hp, &lib_loc);
+	}
+	if (ret != CFGA_OK) {
 		return (DI_WALK_CONTINUE);
 	}
 
@@ -2280,7 +2659,11 @@ do_list_common(
 	lib_loc.vers_req.v_min = CFGA_HSL_V1;
 	lib_loc.vers_req.v_max = CFGA_HSL_VERS;
 
-	ret = load_lib(node, minor, &lib_loc);
+	if (minor != DI_MINOR_NIL) {
+		ret = load_lib(node, minor, &lib_loc);
+	} else {
+		ret = load_lib_hp(node, hp, &lib_loc);
+	}
 	if (ret != CFGA_OK) {
 		return (DI_WALK_CONTINUE);
 	}
@@ -2294,7 +2677,32 @@ do_list_common(
 	 * stop the walk if an error occurs in the plugin.
 	 */
 	if (compat_plugin(&lstatp->use_vers, libp->plugin_vers)) {
-		(void) libp->vers_ops->stat_plugin(lstatp, &lib_loc, NULL);
+		if (minor != DI_MINOR_NIL) {
+			(void) libp->vers_ops->stat_plugin(lstatp,
+			    &lib_loc, NULL);
+		} else {
+			/*
+			 * If the underlying hotplug daemon is not enabled,
+			 * the SHP attach points will not be shown, this
+			 * could confuse the uesrs. We specifically pass the
+			 * errstring to SHP plugin so that it can set the
+			 * errstring accordingly in this case, giving users
+			 * a hint.
+			 */
+			ret = libp->vers_ops->stat_plugin(lstatp,
+			    &lib_loc, lstatp->errstr);
+			if (ret == CFGA_NOTSUPP && *(lstatp->errstr) != NULL) {
+				if (lstatp->shp_errstr == NULL) {
+					lstatp->shp_errstr =
+					    strdup(*(lstatp->errstr));
+				}
+			}
+
+			if (*(lstatp->errstr) != NULL) {
+				free(*(lstatp->errstr));
+				*(lstatp->errstr) = NULL;
+			}
+		}
 	}
 	rele_lib(libp);
 

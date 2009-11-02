@@ -38,7 +38,6 @@
 #include <sys/hsvc.h>
 #include <px_obj.h>
 #include <sys/machsystm.h>
-#include <sys/hotplug/pci/pcihp.h>
 #include "px_lib4v.h"
 #include "px_err.h"
 
@@ -103,7 +102,7 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	 * any indirect PCI config access services
 	 */
 	(void) ddi_prop_update_int(makedevice(ddi_driver_major(dip),
-	    PCIHP_AP_MINOR_NUM(ddi_get_instance(dip), PCIHP_DEVCTL_MINOR)), dip,
+	    PCI_MINOR_NUM(ddi_get_instance(dip), PCI_DEVCTL_MINOR)), dip,
 	    PCI_BUS_CONF_MAP_PROP, 1);
 
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dev_hdl 0x%llx\n", *dev_hdl);
@@ -136,7 +135,7 @@ px_lib_dev_fini(dev_info_t *dip)
 	DBG(DBG_DETACH, dip, "px_lib_dev_fini: dip 0x%p\n", dip);
 
 	(void) ddi_prop_remove(makedevice(ddi_driver_major(dip),
-	    PCIHP_AP_MINOR_NUM(ddi_get_instance(dip), PCIHP_DEVCTL_MINOR)), dip,
+	    PCI_MINOR_NUM(ddi_get_instance(dip), PCI_DEVCTL_MINOR)), dip,
 	    PCI_BUS_CONF_MAP_PROP);
 
 	if (--px_vpci_users == 0)
@@ -1508,7 +1507,7 @@ px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag,
 {
 	uint32_t	addr_high, addr_low;
 	pcie_req_id_t	bdf = PCIE_INVALID_BDF;
-	px_ranges_t	*ranges_p;
+	pci_ranges_t	*ranges_p;
 	int		range_len, i;
 	ddi_acc_impl_t *hp = (ddi_acc_impl_t *)handle;
 	ddi_fm_error_t derr;
@@ -1528,7 +1527,7 @@ px_lib_log_safeacc_err(px_t *px_p, ddi_acc_handle_t handle, int fme_flag,
 	 * Make sure this failed load came from this PCIe port.  Check by
 	 * matching the upper 32 bits of the address with the ranges property.
 	 */
-	range_len = px_p->px_ranges_length / sizeof (px_ranges_t);
+	range_len = px_p->px_ranges_length / sizeof (pci_ranges_t);
 	i = 0;
 	for (ranges_p = px_p->px_ranges_p; i < range_len; i++, ranges_p++) {
 		if (ranges_p->parent_high == addr_high) {

@@ -55,14 +55,9 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
-# depends on misc/pcihp and misc/pcie
+# depends on misc/pcie
 #
-# For PCI Hotplug support, the misc/pcihp module provides devctl control
-# device and cb_ops functions to support hotplug operations.
-#
-# pcie supplies PCI Express fabric error support
-#
-LDFLAGS		+= -dy -Nmisc/pcihp -Nmisc/pcie
+LDFLAGS		+= -dy -Nmisc/pcie
 
 #
 #	Override defaults to build a unique, local modstubs.o.

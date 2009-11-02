@@ -2016,8 +2016,83 @@ Use is subject to license terms.
 	<see>tcsd(8)</see>
     </event>
 
+<!-- hotplug events recorded by hotplugd(1m) -->
+
+    <event id="AUE_hotplug_state" header="0" idNo="117" omit="JNI">
+        <title>change hotplug connection state</title>
+        <program>/usr/lib/hotplugd</program>
+        <see>hotplugd(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="device_path">
+            <internal token="path"/>
+            <external opt="required" type="char *"/>
+            <comment>device path</comment>
+        </entry>
+        <entry id="connection">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>connector or port</comment>
+        </entry>
+        <entry id="new_state">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>new connection state</comment>
+        </entry>
+        <entry id="old_state">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>old connection state</comment>
+        </entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_hotplug_set" header="0" idNo="118" omit="JNI">
+        <title>set hotplug bus private options</title>
+        <program>/usr/lib/hotplugd</program>
+        <see>hotplugd(1M)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="device_path">
+            <internal token="path"/>
+            <external opt="required" type="char *"/>
+            <comment>device path</comment>
+        </entry>
+        <entry id="connection">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>connector or port</comment>
+        </entry>
+        <entry id="options">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>bus private options</comment>
+        </entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 116, so next is 117, then fix this comment -->
+<!-- Highest idNo is 119, so next is 120, then fix this comment -->
 <!-- end of C Only events -->
 
 <!--

@@ -40,8 +40,10 @@ UTSBASE	= ../..
 #	Define the module and object file sets.
 #
 MODULE		= pcie
-OBJECTS		= $(PCIE_MISC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCIE_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln)
+OBJECTS		= $(PCIE_MISC_OBJS:%=$(OBJS_DIR)/%) \
+		  $(PCI_STRING_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCIE_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln) \
+		  $(PCI_STRING_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
@@ -49,7 +51,10 @@ ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 #
 include $(UTSBASE)/i86pc/Makefile.i86pc
 
-LDFLAGS         += -dy -Nmisc/acpica
+#
+#	Dependency
+#
+LDFLAGS		+= -dy -Nmisc/acpica -Nmisc/busra
 
 #
 #	Define targets

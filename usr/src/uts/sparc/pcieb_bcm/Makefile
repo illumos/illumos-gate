@@ -69,12 +69,12 @@ CFLAGS += -dalign
 # Enable Broadcom 5714/5715 workaround code and lint duplicate symbol
 # avoidance hack
 #
-CPPFLAGS += -DBCM_SW_WORKAROUNDS -DPX_MOD_NAME=pcieb_bcm
+CPPFLAGS += -DPCIEB_BCM -DPX_MOD_NAME=pcieb_bcm
 
 #
 #	Dependency
 #
-LDFLAGS += -dy -Nmisc/pcie -Nmisc/pcishpc -Nmisc/pcihp -Nmisc/pciehpc
+LDFLAGS += -dy -Nmisc/pcie
 
 #
 # For now, disable these lint checks; maintainers should endeavor

@@ -57,7 +57,6 @@ find_files "s.*"	\
 	usr/src/uts/i86xpv/npe			\
 	usr/src/uts/intel/pci_autoconfig	\
 	usr/src/uts/intel/pcieb			\
-	usr/src/uts/intel/pciehpc		\
 	usr/src/uts/intel/pcicfg
 
 # packaging files

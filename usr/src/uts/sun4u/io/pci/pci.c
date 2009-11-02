@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * PCI nexus driver interface
  */
@@ -124,9 +123,9 @@ static struct dev_ops pci_ops = {
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
-	&mod_driverops, 	/* Type of module - driver */
-	"PCI Bus nexus driver",	/* Name of module. */
-	&pci_ops,		/* driver ops */
+	&mod_driverops, 			/* Type of module - driver */
+	"Sun4u Host to PCI nexus driver",	/* Name of module. */
+	&pci_ops,				/* driver ops */
 };
 
 static struct modlinkage modlinkage = {
@@ -296,7 +295,6 @@ pci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		pci_p->pci_dip = dip;
 		mutex_init(&pci_p->pci_mutex, NULL, MUTEX_DRIVER, NULL);
 		pci_p->pci_soft_state = PCI_SOFT_STATE_CLOSED;
-		pci_p->pci_open_count = 0;
 
 		/*
 		 * Get key properties of the pci bridge node and

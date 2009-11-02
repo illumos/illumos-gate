@@ -32,7 +32,6 @@
 #include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 #include <sys/time.h>
-#include <sys/pcie.h>
 #include "px_obj.h"
 
 /*LINTLIBRARY*/

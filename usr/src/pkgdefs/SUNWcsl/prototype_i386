@@ -67,6 +67,8 @@ f none usr/lib/cfgadm/amd64/sdcard.so.1 755 root bin
 s none usr/lib/cfgadm/amd64/sdcard.so=./sdcard.so.1
 f none usr/lib/cfgadm/amd64/pci.so.1 755 root bin
 s none usr/lib/cfgadm/amd64/pci.so=./pci.so.1
+f none usr/lib/cfgadm/amd64/shp.so.1 755 root bin
+s none usr/lib/cfgadm/amd64/shp.so=./shp.so.1
 f none usr/lib/cfgadm/amd64/usb.so.1 755 root bin
 s none usr/lib/cfgadm/amd64/usb.so=./usb.so.1
 f none usr/lib/cfgadm/amd64/ib.so.1 755 root bin
@@ -184,6 +186,8 @@ f none usr/lib/amd64/libform.so.1 755 root bin
 s none usr/lib/amd64/libform.so=libform.so.1
 s none usr/lib/amd64/libgen.so.1=../../../lib/amd64/libgen.so.1
 s none usr/lib/amd64/libgen.so=../../../lib/amd64/libgen.so.1
+f none usr/lib/amd64/libhotplug.so.1 755 root bin
+s none usr/lib/amd64/libhotplug.so=libhotplug.so.1
 f none usr/lib/amd64/libidmap.so.1 755 root bin
 s none usr/lib/amd64/libidmap.so=./libidmap.so.1
 f none usr/lib/amd64/libike.so.1 755 root bin

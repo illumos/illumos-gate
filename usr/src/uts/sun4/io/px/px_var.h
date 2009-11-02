@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PX_VAR_H
 #define	_SYS_PX_VAR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/callb.h>
 
@@ -44,29 +42,6 @@ extern "C" {
 #define	PX_B_MEMORY		0x180000000ull
 #define	PX_IO_SIZE		0x000010000ull
 #define	PX_MEM_SIZE		0x080000000ull
-
-/*
- * The following typedef is used to represent a
- * 1275 "bus-range" property of a PCI Bus node.
- */
-typedef struct px_bus_range {
-	uint32_t lo;
-	uint32_t hi;
-} px_bus_range_t;
-
-/*
- * The following typedef is used to represent an entry in the "ranges"
- * property of a device node.
- */
-typedef struct px_ranges {
-	uint32_t child_high;
-	uint32_t child_mid;
-	uint32_t child_low;
-	uint32_t parent_high;
-	uint32_t parent_low;
-	uint32_t size_high;
-	uint32_t size_low;
-} px_ranges_t;
 
 /*
  * The following typedef is used to represent a
@@ -99,7 +74,6 @@ struct px {
 	 */
 	px_state_t px_state;
 	uint_t px_soft_state;
-	uint_t px_open_count;
 	kmutex_t px_mutex;
 
 	/*
@@ -115,8 +89,8 @@ struct px {
 	 * px device node properties:
 	 */
 	pcie_req_id_t px_bdf;
-	px_bus_range_t px_bus_range;	/* "bus-range" */
-	px_ranges_t *px_ranges_p;	/* "ranges" data & length */
+	pci_bus_range_t px_bus_range;	/* "bus-range" */
+	pci_ranges_t *px_ranges_p;	/* "ranges" data & length */
 	int px_ranges_length;
 	devino_t *px_inos;		/* inos from "interrupts" prop */
 	int px_inos_len;		/* "interrupts" length */
@@ -154,14 +128,8 @@ struct px {
 	ddi_softint_handle_t    px_dbg_hdl; /* HDL for dbg printing */
 };
 
-/* px soft state flag */
-#define	PX_SOFT_STATE_OPEN		1
-#define	PX_SOFT_STATE_OPEN_EXCL		2
-#define	PX_SOFT_STATE_CLOSED		4
-
 /* px_dev_caps definition */
 #define	PX_BYPASS_DMA_ALLOWED		1
-#define	PX_HOTPLUG_CAPABLE		2
 #define	PX_DMA_SYNC_REQUIRED		4
 
 /* px_pm_flags definitions used with interrupts and FMA code */
@@ -174,7 +142,7 @@ struct px {
 #define	DIP_TO_STATE(dip)	INST_TO_STATE(DIP_TO_INST(dip))
 
 #define	PX_DEV_TO_SOFTSTATE(dev)	((px_t *)ddi_get_soft_state( \
-	px_state_p, PCIHP_AP_MINOR_NUM_TO_INSTANCE(getminor(dev))))
+	px_state_p, PCI_MINOR_NUM_TO_INSTANCE(getminor(dev))))
 
 extern void *px_state_p;
 

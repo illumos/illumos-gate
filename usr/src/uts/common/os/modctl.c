@@ -174,7 +174,7 @@ mod_setup(void)
 	num_devs = read_binding_file(majbind, mb_hashtab, make_mbind);
 	/*
 	 * Since read_binding_file is common code, it doesn't enforce that all
-	 * of the binding file entries have major numbers <= MAXMAJ32.  Thus,
+	 * of the binding file entries have major numbers <= MAXMAJ32.	Thus,
 	 * ensure that we don't allocate some massive amount of space due to a
 	 * bad entry.  We can't have major numbers bigger than MAXMAJ32
 	 * until file system support for larger major numbers exists.
@@ -1232,7 +1232,7 @@ modctl_devid2paths(ddi_devid_t udevid, char *uminor_name, uint_t flag,
 	char		*minor_name = NULL;
 	dev_info_t	*dip = NULL;
 	int		circ;
-	struct ddi_minor_data   *dmdp;
+	struct ddi_minor_data	*dmdp;
 	char		*path = NULL;
 	int		ulens;
 	int		lens;
@@ -1998,7 +1998,7 @@ modctl_remdrv_cleanup(const char *u_drvname)
 	 * instance of a device bound to the driver being
 	 * removed, remove any underlying devfs attribute nodes.
 	 *
-	 * This is a two-step process.  First we go through
+	 * This is a two-step process.	First we go through
 	 * the instance data itself, constructing a list of
 	 * the nodes discovered.  The second step is then
 	 * to find and remove any devfs attribute nodes
@@ -2261,6 +2261,67 @@ err:
 	return (ret);
 }
 
+static int
+modctl_hp(int subcmd, const char *path, char *cn_name, uintptr_t arg,
+    uintptr_t rval)
+{
+	int error = 0;
+	size_t pathsz, namesz;
+	char *devpath, *cn_name_str;
+
+	if (path == NULL)
+		return (EINVAL);
+
+	devpath = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	error = copyinstr(path, devpath, MAXPATHLEN, &pathsz);
+	if (error != 0) {
+		kmem_free(devpath, MAXPATHLEN);
+		return (EFAULT);
+	}
+
+	cn_name_str = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
+	error = copyinstr(cn_name, cn_name_str, MAXNAMELEN, &namesz);
+	if (error != 0) {
+		kmem_free(devpath, MAXPATHLEN);
+		kmem_free(cn_name_str, MAXNAMELEN);
+
+		return (EFAULT);
+	}
+
+	switch (subcmd) {
+	case MODHPOPS_CHANGE_STATE:
+		error = ddihp_modctl(DDI_HPOP_CN_CHANGE_STATE, devpath,
+		    cn_name_str, arg, NULL);
+		break;
+	case MODHPOPS_CREATE_PORT:
+		/* Create an empty PORT */
+		error = ddihp_modctl(DDI_HPOP_CN_CREATE_PORT, devpath,
+		    cn_name_str, NULL, NULL);
+		break;
+	case MODHPOPS_REMOVE_PORT:
+		/* Remove an empty PORT */
+		error = ddihp_modctl(DDI_HPOP_CN_REMOVE_PORT, devpath,
+		    cn_name_str, NULL, NULL);
+		break;
+	case MODHPOPS_BUS_GET:
+		error = ddihp_modctl(DDI_HPOP_CN_GET_PROPERTY, devpath,
+		    cn_name_str, arg, rval);
+		break;
+	case MODHPOPS_BUS_SET:
+		error = ddihp_modctl(DDI_HPOP_CN_SET_PROPERTY, devpath,
+		    cn_name_str, arg, rval);
+		break;
+	default:
+		error = ENOTSUP;
+		break;
+	}
+
+	kmem_free(devpath, MAXPATHLEN);
+	kmem_free(cn_name_str, MAXNAMELEN);
+
+	return (error);
+}
+
 int
 modctl_moddevname(int subcmd, uintptr_t a1, uintptr_t a2)
 {
@@ -2421,7 +2482,7 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 #endif
 		break;
 
-	case MODGETDEVFSPATH:   	/* get path name of (dev_t,spec) type */
+	case MODGETDEVFSPATH:		/* get path name of (dev_t,spec) type */
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
 			error = modctl_devfspath((dev_t)a1, (int)a2,
 			    (uint_t)a3, (char *)a4);
@@ -2439,7 +2500,7 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 		    (uint_t *)a3);
 		break;
 
-	case MODGETDEVFSPATH_MI:   	/* get path name of (major,instance) */
+	case MODGETDEVFSPATH_MI:	/* get path name of (major,instance) */
 		error = modctl_devfspath_mi((major_t)a1, (int)a2,
 		    (uint_t)a3, (char *)a4);
 		break;
@@ -2534,6 +2595,11 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 
 	case MODUNRETIRE:	/* unretire device named by physpath a1 */
 		error = modctl_unretire((char *)a1);
+		break;
+
+	case MODHPOPS:	/* hotplug operations */
+		/* device named by physpath a2 and Connection name a3 */
+		error = modctl_hp((int)a1, (char *)a2, (char *)a3, a4, a5);
 		break;
 
 	default:
@@ -3235,7 +3301,7 @@ modgetsymname(uintptr_t value, ulong_t *offset)
 
 /*
  * Lookup a symbol in a specified module.  These are wrapper routines that
- * call kobj_lookup().  kobj_lookup() may go away but these wrappers will
+ * call kobj_lookup().	kobj_lookup() may go away but these wrappers will
  * prevent callers from noticing.
  */
 uintptr_t
@@ -4171,7 +4237,7 @@ mod_make_requisite(struct modctl *dependent, struct modctl *on_mod)
 		 * which are dependent on it from being uninstalled and
 		 * unloaded. "on_mod"'s mod_ref count decremented in
 		 * mod_release_requisites when the "dependent" module
-		 * unload is complete.  "on_mod" must be loaded, but may not
+		 * unload is complete.	"on_mod" must be loaded, but may not
 		 * yet be installed.
 		 */
 		on_mod->mod_ref++;

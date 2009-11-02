@@ -148,6 +148,8 @@ CHKHDRS=			\
 	ddi.h			\
 	ddifm.h			\
 	ddifm_impl.h		\
+	ddi_hp.h		\
+	ddi_hp_impl.h		\
 	ddi_intr.h		\
 	ddi_intr_impl.h		\
 	ddi_impldefs.h		\

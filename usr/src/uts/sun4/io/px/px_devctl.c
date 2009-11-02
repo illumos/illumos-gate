@@ -38,7 +38,6 @@
 #include <sys/errno.h>
 #include <sys/file.h>
 #include <sys/policy.h>
-#include <sys/hotplug/pci/pcihp.h>
 #include "px_obj.h"
 #include <sys/pci_tools.h>
 #include "px_tools_ext.h"
@@ -50,8 +49,6 @@ static int px_open(dev_t *devp, int flags, int otyp, cred_t *credp);
 static int px_close(dev_t dev, int flags, int otyp, cred_t *credp);
 static int px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 						cred_t *credp, int *rvalp);
-static int px_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
-    int flags, char *name, caddr_t valuep, int *lengthp);
 
 struct cb_ops px_cb_ops = {
 	px_open,			/* open */
@@ -66,7 +63,7 @@ struct cb_ops px_cb_ops = {
 	nodev,				/* mmap */
 	nodev,				/* segmap */
 	nochpoll,			/* poll */
-	px_prop_op,			/* cb_prop_op */
+	pcie_prop_op,			/* cb_prop_op */
 	NULL,				/* streamtab */
 	D_NEW | D_MP | D_HOTPLUG,	/* Driver compatibility flag */
 	CB_REV,				/* rev */
@@ -78,9 +75,9 @@ struct cb_ops px_cb_ops = {
 static int
 px_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 {
-	px_t *px_p;
-	int rval;
-	uint_t orig_px_soft_state;
+	px_t		*px_p = PX_DEV_TO_SOFTSTATE(*devp);
+	int		minor = getminor(*devp);
+	int		rval;
 
 	/*
 	 * Make sure the open is for the right file type.
@@ -91,41 +88,44 @@ px_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	/*
 	 * Get the soft state structure for the device.
 	 */
-	px_p = PX_DEV_TO_SOFTSTATE(*devp);
 	if (px_p == NULL)
 		return (ENXIO);
+
+	DBG(DBG_OPEN, px_p->px_dip, "devp=%x: flags=%x\n", devp, flags);
 
 	/*
 	 * Handle the open by tracking the device state.
 	 */
-	DBG(DBG_OPEN, px_p->px_dip, "devp=%x: flags=%x\n", devp, flags);
 	mutex_enter(&px_p->px_mutex);
-	orig_px_soft_state = px_p->px_soft_state;
-	if (flags & FEXCL) {
-		if (px_p->px_soft_state != PX_SOFT_STATE_CLOSED) {
-			mutex_exit(&px_p->px_mutex);
-			DBG(DBG_OPEN, px_p->px_dip, "busy\n");
-			return (EBUSY);
-		}
-		px_p->px_soft_state = PX_SOFT_STATE_OPEN_EXCL;
-	} else {
-		if (px_p->px_soft_state == PX_SOFT_STATE_OPEN_EXCL) {
-			mutex_exit(&px_p->px_mutex);
-			DBG(DBG_OPEN, px_p->px_dip, "busy\n");
-			return (EBUSY);
-		}
-		px_p->px_soft_state = PX_SOFT_STATE_OPEN;
-	}
 
-	if (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE)
-		if (rval = (pcihp_get_cb_ops())->cb_open(devp, flags,
-		    otyp, credp)) {
-			px_p->px_soft_state = orig_px_soft_state;
+	switch (PCI_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
+	case PCI_TOOL_REG_MINOR_NUM:
+	case PCI_TOOL_INTR_MINOR_NUM:
+		break;
+	default:
+		/* To handle devctl and hotplug related ioctls */
+		if (rval = pcie_open(px_p->px_dip, devp, flags, otyp, credp)) {
 			mutex_exit(&px_p->px_mutex);
 			return (rval);
 		}
+	}
 
-	px_p->px_open_count++;
+	if (flags & FEXCL) {
+		if (px_p->px_soft_state != PCI_SOFT_STATE_CLOSED) {
+			mutex_exit(&px_p->px_mutex);
+			DBG(DBG_OPEN, px_p->px_dip, "busy\n");
+			return (EBUSY);
+		}
+		px_p->px_soft_state = PCI_SOFT_STATE_OPEN_EXCL;
+	} else {
+		if (px_p->px_soft_state == PCI_SOFT_STATE_OPEN_EXCL) {
+			mutex_exit(&px_p->px_mutex);
+			DBG(DBG_OPEN, px_p->px_dip, "busy\n");
+			return (EBUSY);
+		}
+		px_p->px_soft_state = PCI_SOFT_STATE_OPEN;
+	}
+
 	mutex_exit(&px_p->px_mutex);
 	return (0);
 }
@@ -135,28 +135,32 @@ px_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 static int
 px_close(dev_t dev, int flags, int otyp, cred_t *credp)
 {
-	px_t *px_p;
-	int rval;
+	px_t		*px_p = PX_DEV_TO_SOFTSTATE(dev);
+	int		minor = getminor(dev);
+	int		rval;
 
 	if (otyp != OTYP_CHR)
 		return (EINVAL);
 
-	px_p = PX_DEV_TO_SOFTSTATE(dev);
 	if (px_p == NULL)
 		return (ENXIO);
 
 	DBG(DBG_CLOSE, px_p->px_dip, "dev=%x: flags=%x\n", dev, flags);
 	mutex_enter(&px_p->px_mutex);
 
-	if (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE)
-		if (rval = (pcihp_get_cb_ops())->cb_close(dev, flags,
-		    otyp, credp)) {
+	switch (PCI_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
+	case PCI_TOOL_REG_MINOR_NUM:
+	case PCI_TOOL_INTR_MINOR_NUM:
+		break;
+	default:
+		/* To handle devctl and hotplug related ioctls */
+		if (rval = pcie_close(px_p->px_dip, dev, flags, otyp, credp)) {
 			mutex_exit(&px_p->px_mutex);
 			return (rval);
 		}
+	}
 
-	px_p->px_soft_state = PX_SOFT_STATE_CLOSED;
-	px_p->px_open_count = 0;
+	px_p->px_soft_state = PCI_SOFT_STATE_CLOSED;
 	mutex_exit(&px_p->px_mutex);
 	return (0);
 }
@@ -165,14 +169,11 @@ px_close(dev_t dev, int flags, int otyp, cred_t *credp)
 static int
 px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 {
-	px_t *px_p;
-	dev_info_t *dip;
-	struct devctl_iocdata *dcp;
-	uint_t bus_state;
-	int rv = DDI_SUCCESS;
-	int minor = getminor(dev);
+	px_t		*px_p = PX_DEV_TO_SOFTSTATE(dev);
+	int		minor = getminor(dev);
+	dev_info_t	*dip;
+	int		rv = ENOTTY;
 
-	px_p = PX_DEV_TO_SOFTSTATE(dev);
 	if (px_p == NULL)
 		return (ENXIO);
 
@@ -186,13 +187,11 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	}
 #endif	/* PX_DMA_TEST */
 
-	switch (PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
-
+	switch (PCI_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
 	/*
 	 * PCI tools.
 	 */
 	case PCI_TOOL_REG_MINOR_NUM:
-
 		switch (cmd) {
 		case PCITOOL_DEVICE_SET_REG:
 		case PCITOOL_DEVICE_GET_REG:
@@ -220,9 +219,7 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			rv = ENOTTY;
 		}
 		return (rv);
-
 	case PCI_TOOL_INTR_MINOR_NUM:
-
 		switch (cmd) {
 		case PCITOOL_DEVICE_SET_INTR:
 
@@ -243,11 +240,9 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			rv = ENOTTY;
 		}
 		return (rv);
-
 	default:
-		if (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE)
-			return ((pcihp_get_cb_ops())->cb_ioctl(dev, cmd,
-			    arg, mode, credp, rvalp));
+		/* To handle devctl and hotplug related ioctls */
+		rv = pcie_ioctl(dip, dev, cmd, arg, mode, credp, rvalp);
 		break;
 	}
 
@@ -263,72 +258,5 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		return (px_lib_pmctl(cmd, px_p));
 	}
 
-	/*
-	 * We can use the generic implementation for these ioctls
-	 */
-	switch (cmd) {
-	case DEVCTL_DEVICE_GETSTATE:
-	case DEVCTL_DEVICE_ONLINE:
-	case DEVCTL_DEVICE_OFFLINE:
-	case DEVCTL_BUS_GETSTATE:
-		return (ndi_devctl_ioctl(dip, cmd, arg, mode, 0));
-	}
-
-	/*
-	 * read devctl ioctl data
-	 */
-	if (ndi_dc_allochdl((void *)arg, &dcp) != NDI_SUCCESS)
-		return (EFAULT);
-
-	switch (cmd) {
-
-	case DEVCTL_DEVICE_RESET:
-		DBG(DBG_IOCTL, dip, "DEVCTL_DEVICE_RESET\n");
-		rv = ENOTSUP;
-		break;
-
-
-	case DEVCTL_BUS_QUIESCE:
-		DBG(DBG_IOCTL, dip, "DEVCTL_BUS_QUIESCE\n");
-		if (ndi_get_bus_state(dip, &bus_state) == NDI_SUCCESS)
-			if (bus_state == BUS_QUIESCED)
-				break;
-		(void) ndi_set_bus_state(dip, BUS_QUIESCED);
-		break;
-
-	case DEVCTL_BUS_UNQUIESCE:
-		DBG(DBG_IOCTL, dip, "DEVCTL_BUS_UNQUIESCE\n");
-		if (ndi_get_bus_state(dip, &bus_state) == NDI_SUCCESS)
-			if (bus_state == BUS_ACTIVE)
-				break;
-		(void) ndi_set_bus_state(dip, BUS_ACTIVE);
-		break;
-
-	case DEVCTL_BUS_RESET:
-		DBG(DBG_IOCTL, dip, "DEVCTL_BUS_RESET\n");
-		rv = ENOTSUP;
-		break;
-
-	case DEVCTL_BUS_RESETALL:
-		DBG(DBG_IOCTL, dip, "DEVCTL_BUS_RESETALL\n");
-		rv = ENOTSUP;
-		break;
-
-	default:
-		rv = ENOTTY;
-	}
-
-	ndi_dc_freehdl(dcp);
 	return (rv);
-}
-
-static int px_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
-    int flags, char *name, caddr_t valuep, int *lengthp)
-{
-	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "hotplug-capable"))
-		return ((pcihp_get_cb_ops())->cb_prop_op(dev, dip,
-		    prop_op, flags, name, valuep, lengthp));
-
-	return (ddi_prop_op(dev, dip, prop_op, flags, name, valuep, lengthp));
 }

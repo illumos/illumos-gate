@@ -50,6 +50,15 @@ extern "C" {
 #define	PCIE_SLOTSTS			0x1A	/* Slot Status */
 #define	PCIE_ROOTCTL			0x1C	/* Root Control */
 #define	PCIE_ROOTSTS			0x20	/* Root Status */
+#define	PCIE_DEVCAP2			0x24	/* Device Capability 2 */
+#define	PCIE_DEVCTL2			0x28	/* Device Control 2 */
+#define	PCIE_DEVSTS2			0x2A	/* Device Status 2 */
+#define	PCIE_LINKCAP2			0x2C	/* Link Capability 2 */
+#define	PCIE_LINKCTL2			0x30	/* Link Control 2 */
+#define	PCIE_LINKSTS2			0x32	/* Link Status 2 */
+#define	PCIE_SLOTCAP2			0x34	/* Slot Capability 2 */
+#define	PCIE_SLOTCTL2			0x38	/* Slot Control 2 */
+#define	PCIE_SLOTSTS2			0x3A	/* Slot Status 2 */
 
 /*
  * PCI-Express Config Space size
@@ -60,6 +69,7 @@ extern "C" {
  * PCI-Express Capabilities Register (2 bytes)
  */
 #define	PCIE_PCIECAP_VER_1_0		0x1	/* PCI-E spec 1.0 */
+#define	PCIE_PCIECAP_VER_2_0		0x2	/* PCI-E spec 2.0 */
 #define	PCIE_PCIECAP_VER_MASK		0xF	/* Version Mask */
 #define	PCIE_PCIECAP_DEV_TYPE_PCIE_DEV	0x00	/* PCI-E Endpont Device */
 #define	PCIE_PCIECAP_DEV_TYPE_PCI_DEV	0x10	/* "Leg PCI" Endpont Device */
@@ -303,6 +313,7 @@ extern "C" {
 #define	PCIE_SLOTCTL_DLL_STATE_EN	0x1000	/* DLL State Changed En */
 #define	PCIE_SLOTCTL_ATTN_INDICATOR_MASK 0x00C0	/* Attn Indicator mask */
 #define	PCIE_SLOTCTL_PWR_INDICATOR_MASK	0x0300	/* Power Indicator mask */
+#define	PCIE_SLOTCTL_INTR_MASK		0x103f	/* Supported intr mask */
 
 /* State values for the Power and Attention Indicators */
 #define	PCIE_SLOTCTL_INDICATOR_STATE_ON		0x1	/* indicator ON */
@@ -334,6 +345,7 @@ extern "C" {
 #define	PCIE_SLOTSTS_PRESENCE_DETECTED	0x40	/* Card Present in slot */
 #define	PCIE_SLOTSTS_EMI_LOCK_SET	0x0080	/* EMI Lock set */
 #define	PCIE_SLOTSTS_DLL_STATE_CHANGED	0x0100	/* DLL State Changed */
+#define	PCIE_SLOTSTS_STATUS_EVENTS	0x11f	/* Supported events */
 
 /*
  * Root Control Register (2 bytes)
@@ -351,6 +363,49 @@ extern "C" {
 
 #define	PCIE_ROOTSTS_PME_STATUS		0x10000	/* PME Status */
 #define	PCIE_ROOTSTS_PME_PENDING	0x20000	/* PME Pending */
+
+/*
+ * Device Capabilities 2 Register (4 bytes)
+ */
+#define	PCIE_DEVCAP2_COM_TO_RANGE_MASK	0xF
+#define	PCIE_DEVCAP2_COM_TO_DISABLE	0x10
+#define	PCIE_DEVCAP2_ARI_FORWARD	0x20
+#define	PCIE_DEVCAP2_ATOMICOP_ROUTING	0x40
+#define	PCIE_DEVCAP2_32_ATOMICOP_COMPL  0x80
+#define	PCIE_DEVCAP2_64_ATOMICOP_COMPL  0x100
+#define	PCIE_DEVCAP2_128_CAS_COMPL	0x200
+#define	PCIE_DEVCAP2_NO_RO_PR_PR_PASS	0x400
+#define	PCIE_DEVCAP2_LTR_MECH		0x800
+#define	PCIE_DEVCAP2_TPH_COMP_SHIFT	12
+#define	PCIE_DEVCAP2_TPH_COMP_MASK	0x3
+#define	PCIE_DEVCAP2_EXT_FMT_FIELD	0x100000
+#define	PCIE_DEVCAP2_END_END_TLP_PREFIX	0x200000
+#define	PCIE_DEVCAP2_MAX_END_END_SHIFT	22
+#define	PCIE_DEVCAP2_MAX_END_END_MASK	0x3
+
+/*
+ * Device Control 2 Register (2 bytes)
+ */
+#define	PCIE_DEVCTL2_COM_TO_RANGE_0	0x0
+#define	PCIE_DEVCTL2_COM_TO_RANGE_1	0x1
+#define	PCIE_DEVCTL2_COM_TO_RANGE_2	0x2
+#define	PCIE_DEVCTL2_COM_TO_RANGE_3	0x5
+#define	PCIE_DEVCTL2_COM_TO_RANGE_4	0x6
+#define	PCIE_DEVCTL2_COM_TO_RANGE_5	0x9
+#define	PCIE_DEVCTL2_COM_TO_RANGE_6	0xa
+#define	PCIE_DEVCTL2_COM_TO_RANGE_7	0xd
+#define	PCIE_DEVCTL2_COM_TO_RANGE_8	0xe
+#define	PCIE_DEVCTL2_COM_TO_DISABLE	0x10
+#define	PCIE_DEVCTL2_ARI_FORWARD_EN	0x20
+#define	PCIE_DEVCTL2_ATOMICOP_REQ_EN	0x40
+#define	PCIE_DEVCTL2_ATOMICOP_EGRS_BLK	0x80
+#define	PCIE_DEVCTL2_IDO_REQ_EN		0x100
+#define	PCIE_DEVCTL2_IDO_COMPL_EN	0x200
+#define	PCIE_DEVCTL2_LTR_MECH_EN	0x400
+#define	PCIE_DEVCTL2_END_END_TLP_PREFIX	0x8000
+
+
+
 
 
 /*
@@ -549,6 +604,25 @@ extern "C" {
 #define	PCIE_SER_SID_UPPER_DW	0x8	/* Upper 32-bit Serial Number */
 
 /*
+ * ARI Capability Offsets
+ */
+#define	PCIE_ARI_HDR	0x0		/* Enhanced Capability Header */
+#define	PCIE_ARI_CAP	0x4		/* ARI Capability Register */
+#define	PCIE_ARI_CTL	0x6		/* ARI Control Register */
+
+#define	PCIE_ARI_CAP_MFVC_FUNC_GRP	0x01
+#define	PCIE_ARI_CAP_ASC_FUNC_GRP	0x02
+
+#define	PCIE_ARI_CAP_NEXT_FUNC_SHIFT	8
+#define	PCIE_ARI_CAP_NEXT_FUNC_MASK	0xffff
+
+#define	PCIE_ARI_CTRL_MFVC_FUNC_GRP	0x01
+#define	PCIE_ARI_CTRL_ASC_FUNC_GRP	0x02
+
+#define	PCIE_ARI_CTRL_FUNC_GRP_SHIFT	4
+#define	PCIE_ARI_CTRL_FUNC_GRP_MASK	0x7
+
+/*
  * PCI-E Common TLP Header Fields
  */
 #define	PCIE_TLP_FMT_3DW	0x00
@@ -595,6 +669,7 @@ typedef uint16_t pcie_req_id_t;
 #define	PCIE_REQ_ID_DEV_MASK	0x00F8
 #define	PCIE_REQ_ID_FUNC_SHIFT	0
 #define	PCIE_REQ_ID_FUNC_MASK	0x0007
+#define	PCIE_REQ_ID_ARI_FUNC_MASK	0x00FF
 
 #define	PCIE_CPL_STS_SUCCESS	0
 #define	PCIE_CPL_STS_UR		1

@@ -18,32 +18,26 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_PCISHPC_H
-#define	_SYS_PCISHPC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef	_SYS_HOTPLUG_PCI_PCISHPC_H
+#define	_SYS_HOTPLUG_PCI_PCISHPC_H
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-/*
- * Interfaces exported by SHPC Nexus extension module
- */
+int pcishpc_init(dev_info_t *dip);
+int pcishpc_uninit(dev_info_t *dip);
+int pcishpc_intr(dev_info_t *dip);
+int pcishpc_hp_ops(dev_info_t *dip, char *cn_name, ddi_hp_op_t op, void *arg,
+    void *result);
 
-int pcishpc_init(dev_info_t *);
-int pcishpc_uninit(dev_info_t *);
-int pcishpc_intr(dev_info_t *);
-
-#define	PCISHPC_INTR_PRI	(LOCK_LEVEL - 1)
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SYS_PCISHPC_H */
+#endif	/* _SYS_HOTPLUG_PCI_PCISHPC_H */

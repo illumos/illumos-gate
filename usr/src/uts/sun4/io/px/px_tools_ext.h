@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,28 +19,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PX_TOOLS_EXT_H
 #define	_SYS_PX_TOOLS_EXT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-/*
- * Minor numbers for dedicated pcitool nodes.
- * Note that FF and FE minor numbers are used for other minor nodes.
- */
-#define	PCI_TOOL_REG_MINOR_NUM  0xFD
-#define	PCI_TOOL_INTR_MINOR_NUM 0xFC
-
 /* Stuff exported by px_tools.c and px_tools_4[u/v].c */
-
 int pxtool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode);
 int pxtool_bus_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode);
 int pxtool_intr(dev_info_t *dip, void *arg, int cmd, int mode);

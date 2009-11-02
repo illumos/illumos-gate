@@ -23,7 +23,6 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
 #	This makefile drives the production of the PCIE driver kernel module.
 #
 #	sparc architecture dependent
@@ -38,8 +37,10 @@ UTSBASE	= ../..
 #	Define the module and object file sets.
 #
 MODULE		= pcie
-OBJECTS		= $(PCIE_MISC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PCIE_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln)
+OBJECTS		= $(PCIE_MISC_OBJS:%=$(OBJS_DIR)/%) \
+		  $(PCI_STRING_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCIE_MISC_OBJS:%.o=$(LINTS_DIR)/%.ln) \
+		  $(PCI_STRING_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
@@ -58,6 +59,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE)
+
+#
+#	Dependency
+#
+LDFLAGS += -dy -Nmisc/busra
 
 #
 # Overrides

@@ -21,10 +21,8 @@
 #
 # uts/intel/pci_pci/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the pci_pci driver kernel module.
 #
@@ -57,9 +55,9 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# depends on misc/pcihp
+# depends on misc/pcie and misc/pcihp
 #
-LDFLAGS		+= -dy -Nmisc/pcihp -Nmisc/pcie
+LDFLAGS		+= -dy -Nmisc/pcie -Nmisc/pcihp
 
 #
 #	Override defaults to build a unique, local modstubs.o.

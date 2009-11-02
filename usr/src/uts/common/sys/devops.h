@@ -19,13 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_DEVOPS_H
 #define	_SYS_DEVOPS_H
-
 
 #include <sys/types.h>
 #include <sys/cred.h>
@@ -42,6 +41,8 @@
 #include <sys/ddifm.h>
 #include <sys/nexusdefs.h>
 #include <sys/ddi_intr.h>
+#include <sys/ddi_hp.h>
+#include <sys/ddi_hp_impl.h>
 #include <sys/aio_req.h>
 #include <vm/page.h>
 
@@ -145,7 +146,8 @@ struct cb_ops  {
 #define	BUSO_REV_7	7
 #define	BUSO_REV_8	8
 #define	BUSO_REV_9	9
-#define	BUSO_REV	BUSO_REV_9
+#define	BUSO_REV_10	10
+#define	BUSO_REV	BUSO_REV_10
 
 
 struct bus_ops  {
@@ -268,6 +270,13 @@ struct bus_ops  {
 	int		(*bus_intr_op)(dev_info_t *dip, dev_info_t *rdip,
 			    ddi_intr_op_t op, ddi_intr_handle_impl_t *hdlp,
 			    void *result);
+
+	/*
+	 * NOTE: the following busop entrypoint is available with version
+	 * 10 or greater.
+	 */
+	int		(*bus_hp_op)(dev_info_t *dip, char *cn_name,
+			    ddi_hp_op_t op, void *arg, void *result);
 };
 
 /*

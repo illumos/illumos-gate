@@ -33,12 +33,12 @@
 #include <sys/ontrap.h>
 #include <sys/psm.h>
 #include <sys/pcie.h>
-#include <sys/hotplug/pci/pcihp.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_tools.h>
 #include <io/pci/pci_tools_ext.h>
 #include <sys/apic.h>
 #include <io/pci/pci_var.h>
+#include <sys/pci_impl.h>
 #include <sys/promif.h>
 #include <sys/x86_archext.h>
 #include <sys/cpuvar.h>
@@ -98,13 +98,13 @@ pcitool_init(dev_info_t *dip, boolean_t is_pciex)
 	/* Create pcitool nodes for register access and interrupt routing. */
 
 	if (ddi_create_minor_node(dip, PCI_MINOR_REG, S_IFCHR,
-	    PCIHP_AP_MINOR_NUM(instance, PCI_TOOL_REG_MINOR_NUM),
+	    PCI_MINOR_NUM(instance, PCI_TOOL_REG_MINOR_NUM),
 	    DDI_NT_REGACC, 0) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 
 	if (ddi_create_minor_node(dip, PCI_MINOR_INTR, S_IFCHR,
-	    PCIHP_AP_MINOR_NUM(instance, PCI_TOOL_INTR_MINOR_NUM),
+	    PCI_MINOR_NUM(instance, PCI_TOOL_INTR_MINOR_NUM),
 	    DDI_NT_INTRCTL, 0) != DDI_SUCCESS) {
 		ddi_remove_minor_node(dip, PCI_MINOR_REG);
 		return (DDI_FAILURE);

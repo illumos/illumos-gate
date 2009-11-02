@@ -44,6 +44,7 @@
 #include <sys/time.h>
 #include <sys/autoconf.h>
 #include <stdarg.h>
+#include <sys/ddi_hp.h>
 
 #define	NDEBUG 1
 #include <assert.h>
@@ -2519,6 +2520,284 @@ di_driver_private_data(di_node_t node)
 		errno = ENOTSUP;
 
 	return (NULL);
+}
+
+/*
+ * Hotplug information access
+ */
+
+typedef struct {
+	void		*arg;
+	const char	*type;
+	uint_t		flag;
+	int		(*hp_callback)(di_node_t, di_hp_t, void *);
+} di_walk_hp_arg_t;
+
+static int
+di_walk_hp_callback(di_node_t node, void *argp)
+{
+	di_walk_hp_arg_t 	*arg = (di_walk_hp_arg_t *)argp;
+	di_hp_t			hp;
+	char			*type_str;
+
+	for (hp = DI_HP_NIL; (hp = di_hp_next(node, hp)) != DI_HP_NIL; ) {
+
+		/* Exclude non-matching types if a type filter is specified */
+		if (arg->type != NULL) {
+			type_str = di_hp_description(hp);
+			if (type_str && (strcmp(arg->type, type_str) != 0))
+				continue;
+		}
+
+		/* Exclude ports if DI_HP_PORT flag not specified */
+		if (!(arg->flag & DI_HP_PORT) &&
+		    (di_hp_type(hp) == DDI_HP_CN_TYPE_VIRTUAL_PORT))
+			continue;
+
+		/* Exclude connectors if DI_HP_CONNECTOR flag not specified */
+		if (!(arg->flag & DI_HP_CONNECTOR) &&
+		    !(di_hp_type(hp) == DDI_HP_CN_TYPE_VIRTUAL_PORT))
+			continue;
+
+		/* Perform callback */
+		if (arg->hp_callback(node, hp, arg->arg) != DI_WALK_CONTINUE)
+			return (DI_WALK_TERMINATE);
+	}
+
+	return (DI_WALK_CONTINUE);
+}
+
+int
+di_walk_hp(di_node_t node, const char *type, uint_t flag, void *arg,
+    int (*hp_callback)(di_node_t node, di_hp_t hp, void *arg))
+{
+	di_walk_hp_arg_t	walk_arg;
+	caddr_t			pa;
+
+#ifdef DEBUG
+	char	*devfspath = di_devfs_path(node);
+	DPRINTF((DI_INFO, "walking hotplug nodes under %s\n", devfspath));
+	di_devfs_path_free(devfspath);
+#endif
+	/*
+	 * paranoid error checking
+	 */
+	if ((node == DI_NODE_NIL) || (hp_callback == NULL)) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	/* check if hotplug data is included in snapshot */
+	pa = (caddr_t)node - DI_NODE(node)->self;
+	if (!(DI_ALL(pa)->command & DINFOHP)) {
+		errno = ENOTSUP;
+		return (-1);
+	}
+
+	walk_arg.arg = arg;
+	walk_arg.type = type;
+	walk_arg.flag = flag;
+	walk_arg.hp_callback = hp_callback;
+	return (di_walk_node(node, DI_WALK_CLDFIRST, &walk_arg,
+	    di_walk_hp_callback));
+}
+
+di_hp_t
+di_hp_next(di_node_t node, di_hp_t hp)
+{
+	caddr_t pa;
+
+	/*
+	 * paranoid error checking
+	 */
+	if (node == DI_NODE_NIL) {
+		errno = EINVAL;
+		return (DI_HP_NIL);
+	}
+
+	/*
+	 * hotplug node is not NIL
+	 */
+	if (hp != DI_HP_NIL) {
+		if (DI_HP(hp)->next != 0)
+			return (DI_HP((caddr_t)hp - hp->self + hp->next));
+		else {
+			errno = ENXIO;
+			return (DI_HP_NIL);
+		}
+	}
+
+	/*
+	 * hotplug node is NIL-->caller asks for first hotplug node
+	 */
+	if (DI_NODE(node)->hp_data != 0) {
+		return (DI_HP((caddr_t)node - DI_NODE(node)->self +
+		    DI_NODE(node)->hp_data));
+	}
+
+	/*
+	 * no hotplug data-->check if snapshot includes hotplug data
+	 *	in order to set the correct errno
+	 */
+	pa = (caddr_t)node - DI_NODE(node)->self;
+	if (DINFOHP & DI_ALL(pa)->command)
+		errno = ENXIO;
+	else
+		errno = ENOTSUP;
+
+	return (DI_HP_NIL);
+}
+
+char *
+di_hp_name(di_hp_t hp)
+{
+	caddr_t pa;
+
+	/*
+	 * paranoid error checking
+	 */
+	if (hp == DI_HP_NIL) {
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	pa = (caddr_t)hp - DI_HP(hp)->self;
+
+	if (DI_HP(hp)->hp_name == 0) {
+		errno = ENXIO;
+		return (NULL);
+	}
+
+	return ((char *)(pa + DI_HP(hp)->hp_name));
+}
+
+int
+di_hp_connection(di_hp_t hp)
+{
+	/*
+	 * paranoid error checking
+	 */
+	if (hp == DI_HP_NIL) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	if (DI_HP(hp)->hp_connection == -1)
+		errno = ENOENT;
+
+	return (DI_HP(hp)->hp_connection);
+}
+
+int
+di_hp_depends_on(di_hp_t hp)
+{
+	/*
+	 * paranoid error checking
+	 */
+	if (hp == DI_HP_NIL) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	if (DI_HP(hp)->hp_depends_on == -1)
+		errno = ENOENT;
+
+	return (DI_HP(hp)->hp_depends_on);
+}
+
+int
+di_hp_state(di_hp_t hp)
+{
+	/*
+	 * paranoid error checking
+	 */
+	if (hp == DI_HP_NIL) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	return (DI_HP(hp)->hp_state);
+}
+
+int
+di_hp_type(di_hp_t hp)
+{
+	/*
+	 * paranoid error checking
+	 */
+	if (hp == DI_HP_NIL) {
+		errno = EINVAL;
+		return (-1);
+	}
+
+	return (DI_HP(hp)->hp_type);
+}
+
+char *
+di_hp_description(di_hp_t hp)
+{
+	caddr_t pa;
+
+	/*
+	 * paranoid error checking
+	 */
+	if (hp == DI_HP_NIL) {
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	pa = (caddr_t)hp - DI_HP(hp)->self;
+
+	if (DI_HP(hp)->hp_type_str == 0)
+		return (NULL);
+
+	return ((char *)(pa + DI_HP(hp)->hp_type_str));
+}
+
+di_node_t
+di_hp_child(di_hp_t hp)
+{
+	caddr_t pa;		/* starting address of map */
+
+	/*
+	 * paranoid error checking
+	 */
+	if (hp == DI_HP_NIL) {
+		errno = EINVAL;
+		return (DI_NODE_NIL);
+	}
+
+	pa = (caddr_t)hp - DI_HP(hp)->self;
+
+	if (DI_HP(hp)->hp_child > 0) {
+		return (DI_NODE(pa + DI_HP(hp)->hp_child));
+	}
+
+	/*
+	 * Deal with error condition:
+	 *   Child doesn't exist, figure out if DINFOSUBTREE is set.
+	 *   If it isn't, set errno to ENOTSUP.
+	 */
+	if (!(DINFOSUBTREE & DI_ALL(pa)->command))
+		errno = ENOTSUP;
+	else
+		errno = ENXIO;
+
+	return (DI_NODE_NIL);
+}
+
+time_t
+di_hp_last_change(di_hp_t hp)
+{
+	/*
+	 * paranoid error checking
+	 */
+	if (hp == DI_HP_NIL) {
+		errno = EINVAL;
+		return ((time_t)0);
+	}
+
+	return ((time_t)DI_HP(hp)->hp_last_change);
 }
 
 /*
