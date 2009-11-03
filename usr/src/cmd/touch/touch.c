@@ -239,7 +239,7 @@ main(int argc, char *argv[])
 		}
 
 		if ((fd >= 0 && futimens(fd, tsp) != 0) ||
-		    utimensat(AT_FDCWD, argv[c], tsp, 0) != 0) {
+		    (fd < 0 && utimensat(AT_FDCWD, argv[c], tsp, 0) != 0)) {
 			(void) fprintf(stderr,
 			    gettext("%s: cannot change times on %s: %s\n"),
 			    myname, argv[c], strerror(errno));
