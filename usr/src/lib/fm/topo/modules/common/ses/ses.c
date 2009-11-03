@@ -1294,8 +1294,7 @@ ses_enum_gather(ses_node_t *np, void *data)
 		if (nvlist_lookup_string(props, LIBSES_EN_PROP_SUBCHASSIS_ID,
 		    &lid) != 0) {
 			have_subchassis = B_FALSE;
-			if ((lid = topo_mod_zalloc(mod, sizeof (char))) == NULL)
-				goto error;
+			lid = "";
 		}
 
 		topo_mod_dprintf(mod, "ses_enum_gather: Enclosure Node (%s) "
