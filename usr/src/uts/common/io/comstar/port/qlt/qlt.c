@@ -1093,6 +1093,7 @@ qlt_port_start(caddr_t arg)
 	 * state struct.
 	 */
 	port->port_fca_private = qlt;
+	port->port_fca_version = FCT_FCA_MODREV_1;
 	port->port_fca_abort_timeout = 5 * 1000;	/* 5 seconds */
 	bcopy(qlt->nvram->node_name, port->port_nwwn, 8);
 	bcopy(qlt->nvram->port_name, port->port_pwwn, 8);

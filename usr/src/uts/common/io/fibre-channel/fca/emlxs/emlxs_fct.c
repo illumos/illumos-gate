@@ -1230,6 +1230,7 @@ emlxs_fct_bind_port(emlxs_port_t *port)
 
 	/* Intialize */
 	fct_port = port->fct_port;
+	fct_port->port_fca_version = FCT_FCA_MODREV_1;
 	fct_port->port_fca_private = port;
 	fct_port->port_fca_abort_timeout = 30 * 1000;	/* 30 seconds */
 

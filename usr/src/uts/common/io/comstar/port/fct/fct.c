@@ -1118,6 +1118,12 @@ fct_register_local_port(fct_local_port_t *port)
 	char			taskq_name[24];
 
 	iport = (fct_i_local_port_t *)port->port_fct_private;
+	if (port->port_fca_version != FCT_FCA_MODREV_1) {
+		cmn_err(CE_WARN,
+		    "fct: %s driver version mismatch",
+		    port->port_default_alias);
+		return (FCT_FAILURE);
+	}
 	if (port->port_default_alias) {
 		int l = strlen(port->port_default_alias);
 
