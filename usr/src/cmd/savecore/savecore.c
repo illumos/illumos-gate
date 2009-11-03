@@ -1509,6 +1509,9 @@ main(int argc, char *argv[])
 			Pread(dumpfd, metrics, metrics_size, endoff +
 			    sizeof (dumphdr) + sizeof (datahdr));
 
+			if (sec < 1)
+				sec = 1;
+
 			if (mfile == NULL) {
 				logprint(LOG_WARNING, 1, -1,
 				    "Can't create %s:\n%s",
@@ -1565,6 +1568,9 @@ main(int argc, char *argv[])
 		if (access(METRICSFILE, F_OK) == 0) {
 			int sec = (gethrtime() - startts) / 1000 / 1000 / 1000;
 			FILE *mfile = fopen(METRICSFILE, "a");
+
+			if (sec < 1)
+				sec = 1;
 
 			fprintf(mfile, "[[[[,,,");
 			for (i = 0; i < argc; i++)
