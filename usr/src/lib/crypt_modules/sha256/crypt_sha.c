@@ -112,7 +112,7 @@ static void
 to64(char *s, uint64_t v, int n)
 {
 	while (--n >= 0) {
-		*s++ = b64t[v&0x3f];
+		*s++ = b64t[v & 0x3f];
 		v >>= 6;
 	}
 }
@@ -146,7 +146,7 @@ getrounds(const char *s)
 	errno = 0;
 	val = strtol(p, &e, 10);
 	/*
-	 * An error occured or there is non-numeric stuff at the end
+	 * An error occurred or there is non-numeric stuff at the end
 	 * which isn't one of the crypt(3c) special chars ',' or '$'
 	 */
 	if (errno != 0 || val < 0 ||
@@ -158,6 +158,7 @@ getrounds(const char *s)
 }
 
 
+/* ARGSUSED4 */
 char *
 crypt_genhash_impl(char *ctbuffer,
 	    size_t ctbufflen,
@@ -243,7 +244,7 @@ crypt_genhash_impl(char *ctbuffer,
 	for (i = plaintext_len; i >= MIXCHARS; i -= MIXCHARS) {
 		Pp = (char *)(memcpy(Pp, DP, MIXCHARS)) + MIXCHARS;
 	}
-	memcpy(Pp, DP, i);
+	(void) memcpy(Pp, DP, i);
 
 	/* 17. - 19. */
 	DIGESTInit(&ctxDS);
@@ -256,7 +257,7 @@ crypt_genhash_impl(char *ctbuffer,
 	for (i = salt_len; i >= MIXCHARS; i -= MIXCHARS) {
 		Sp = (char *)(memcpy(Sp, DS, MIXCHARS)) + MIXCHARS;
 	}
-	memcpy(Sp, DS, i);
+	(void) memcpy(Sp, DS, i);
 
 	/*  21. */
 	for (i = 0; i < rounds; i++) {
@@ -350,6 +351,8 @@ crypt_genhash_impl(char *ctbuffer,
 	return (ctbuffer);
 }
 
+
+/* ARGSUSED3 */
 char *
 crypt_gensalt_impl(char *gsbuffer,
 	    size_t gsbufflen,

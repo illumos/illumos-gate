@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Portions of this code:
@@ -62,12 +59,13 @@ static void
 to64(char *s, uint64_t v, int n)
 {
 	while (--n >= 0) {
-		*s++ = itoa64[v&0x3f];
+		*s++ = itoa64[v & 0x3f];
 		v >>= 6;
 	}
 }
 
 
+/* ARGSUSED4 */
 char *
 crypt_genhash_impl(char *ctbuffer,
 	    size_t ctbufflen,
@@ -117,7 +115,7 @@ crypt_genhash_impl(char *ctbuffer,
 		MD5Update(&ctx, final, pl > 16 ? 16 : pl);
 
 	/* Don't leave anything around in vm they could use. */
-	memset(final, 0, sizeof (final));
+	(void) memset(final, 0, sizeof (final));
 
 	/* Then something really weird... */
 	for (i = strlen(plaintext); i; i >>= 1) {
@@ -174,12 +172,13 @@ crypt_genhash_impl(char *ctbuffer,
 	*p = '\0';
 
 	/* Don't leave anything around in vm they could use. */
-	memset(final, 0, sizeof (final));
+	(void) memset(final, 0, sizeof (final));
 
 	return (ctbuffer);
 }
 
 
+/* ARGSUSED2 */
 char *
 crypt_gensalt_impl(char *gsbuffer,
 	    size_t gsbufflen,

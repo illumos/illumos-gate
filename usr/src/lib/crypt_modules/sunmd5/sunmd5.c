@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -116,7 +112,7 @@ static void
 to64(char *s, uint64_t v, int n)
 {
 	while (--n >= 0) {
-		*s++ = itoa64[v&0x3f];
+		*s++ = itoa64[v & 0x3f];
 		v >>= 6;
 	}
 }
@@ -150,7 +146,7 @@ getrounds(const char *s)
 	errno = 0;
 	val = strtol(p, &e, 10);
 	/*
-	 * An error occured or there is non-numeric stuff at the end
+	 * An error occurred or there is non-numeric stuff at the end
 	 * which isn't one of the crypt(3c) special chars ',' or '$'
 	 */
 	if (errno != 0 || val < 0 ||
@@ -163,7 +159,7 @@ getrounds(const char *s)
 	return ((uint32_t)val);
 }
 
-/*ARGSUSED*/
+/* ARGSUSED3 */
 char *
 crypt_gensalt_impl(char *gsbuffer,
 	    size_t gsbufflen,
@@ -401,15 +397,15 @@ crypt_genhash_impl(char *ctbuffer,
 
 #if ALGDEBUG
 		for (i = 0; i < 15; i++) {
-			printf("%1x-", data.indirect_4[i]);
+			(void) printf("%1x-", data.indirect_4[i]);
 		}
-		printf("%1x ", data.indirect_4[15]);
+		(void) printf("%1x ", data.indirect_4[15]);
 		for (i = 0; i < 15; i++) {
-			printf("%02x-", data.indirect_7[i]);
+			(void) printf("%02x-", data.indirect_7[i]);
 		}
-		printf("%02x ", data.indirect_7[15]);
-		printf("%02x/%02x ", data.indirect_a, data.indirect_b);
-		printf("%d^%d\n", data.bit_a, data.bit_b);
+		(void) printf("%02x ", data.indirect_7[15]);
+		(void) printf("%02x/%02x ", data.indirect_a, data.indirect_b);
+		(void) printf("%d^%d\n", data.bit_a, data.bit_b);
 #endif
 
 
@@ -420,14 +416,14 @@ crypt_genhash_impl(char *ctbuffer,
 			    (unsigned char *) constant_phrase,
 			    sizeof (constant_phrase));
 #if ALGDEBUG
-			printf("mixing constant_phrase\n");
+			(void) printf("mixing constant_phrase\n");
 #endif
 		}
 
 
 		/* digest a decimal sprintf of the current roundcount */
 
-		snprintf(data.roundascii, ROUND_BUFFER_LEN, "%d", round);
+		(void) snprintf(data.roundascii, ROUND_BUFFER_LEN, "%d", round);
 		MD5Update(&data.context,
 		    (unsigned char *) data.roundascii, strlen(data.roundascii));
 
@@ -440,9 +436,9 @@ crypt_genhash_impl(char *ctbuffer,
 #if ALGDEBUG
 	/* print the digest */
 	for (i = 0; i < 16; i++) {
-		printf("%02x", data.digest[i]);
+		(void) printf("%02x", data.digest[i]);
 	}
-	printf("\n");
+	(void) printf("\n");
 #endif
 
 	(void) snprintf(ctbuffer, ctbufflen, "%s$", puresalt);
