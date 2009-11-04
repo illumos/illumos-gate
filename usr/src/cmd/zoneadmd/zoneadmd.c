@@ -2057,10 +2057,16 @@ main(int argc, char *argv[])
 	 * fdetach(), the door will go unreferenced; once any
 	 * outstanding requests (like the door thread doing Z_HALT) are
 	 * done, the door will get an UNREF notification; when it handles
-	 * the UNREF, the door server will cause the exit.
+	 * the UNREF, the door server will cause the exit.  It's possible
+	 * that fdetach() can fail because the file is in use, in which
+	 * case we'll retry the operation.
 	 */
 	assert(!MUTEX_HELD(&lock));
-	(void) fdetach(zone_door_path);
+	for (;;) {
+		if ((fdetach(zone_door_path) == 0) || (errno != EBUSY))
+			break;
+		yield();
+	}
 
 	for (;;)
 		(void) pause();
