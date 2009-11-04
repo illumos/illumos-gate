@@ -101,6 +101,7 @@
 #include <inet/iptun/iptun_impl.h>
 #include <inet/ipdrop.h>
 #include <inet/ip_netinfo.h>
+#include <inet/ilb_ip.h>
 
 #include <sys/ethernet.h>
 #include <net/if_types.h>
@@ -1345,6 +1346,10 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 	/* SIOCSENABLESDP is handled by SDP */
 	/* 183 */ { IPI_DONTCARE /* SIOCSENABLESDP */, 0, 0, 0, NULL, NULL },
 	/* 184 */ { IPI_DONTCARE /* SIOCSQPTR */, 0, 0, 0, NULL, NULL },
+	/* 185 */ { IPI_DONTCARE /* SIOCGIFHWADDR */, 0, 0, 0, NULL, NULL },
+	/* 186 */ { IPI_DONTCARE /* SIOCGSTAMP */, 0, 0, 0, NULL, NULL },
+	/* 187 */ { SIOCILB, 0, IPI_PRIV | IPI_GET_CMD, MISC_CMD,
+			ip_sioctl_ilb_cmd, NULL },
 };
 
 int ip_ndx_ioctl_count = sizeof (ip_ndx_ioctl_table) / sizeof (ip_ioctl_cmd_t);
@@ -5661,6 +5666,7 @@ ip_ddi_destroy(void)
 	udp_ddi_g_destroy();
 	sctp_ddi_g_destroy();
 	tcp_ddi_g_destroy();
+	ilb_ddi_g_destroy();
 	ipsec_policy_g_destroy();
 	ipcl_g_destroy();
 	ip_net_g_destroy();
@@ -5927,6 +5933,7 @@ ip_ddi_init(void)
 	udp_ddi_g_init();
 	rts_ddi_g_init();
 	icmp_ddi_g_init();
+	ilb_ddi_g_init();
 }
 
 /*
@@ -14829,6 +14836,8 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 	mblk_t			*mp;
 	mblk_t			*dmp;
 	uint8_t			tag;
+	ilb_stack_t		*ilbs;
+	ipaddr_t		lb_dst;
 
 	ASSERT(mp_chain != NULL);
 	ASSERT(ill != NULL);
@@ -14839,6 +14848,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 
 #define	rptr	((uchar_t *)ipha)
 
+	ilbs = ipst->ips_netstack->netstack_ilb;
 	while (mp_chain != NULL) {
 		mp = mp_chain;
 		mp_chain = mp_chain->b_next;
@@ -15064,6 +15074,62 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			    ill, ipst);
 		}
 
+		/*
+		 * Here we check to see if we machine is setup as
+		 * L3 loadbalancer and if the incoming packet is for a VIP
+		 *
+		 * Check the following:
+		 * - there is at least a rule
+		 * - protocol of the packet is supported
+		 */
+		if (ilb_has_rules(ilbs) && ILB_SUPP_L4(ipha->ipha_protocol)) {
+			int lb_ret;
+
+			/* For convenience, we pull up the mblk. */
+			if (mp->b_cont != NULL) {
+				if (pullupmsg(mp, -1) == 0) {
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsInDiscards);
+					freemsg(first_mp);
+					continue;
+				}
+				ipha = (ipha_t *)mp->b_rptr;
+			}
+
+			/*
+			 * We just drop all fragments going to any VIP, at
+			 * least for now....
+			 */
+			if (ntohs(ipha->ipha_fragment_offset_and_flags) &
+			    (IPH_MF | IPH_OFFSET)) {
+				if (!ilb_rule_match_vip_v4(ilbs,
+				    ipha->ipha_dst, NULL)) {
+					goto after_ilb;
+				}
+
+				ILB_KSTAT_UPDATE(ilbs, ip_frag_in, 1);
+				ILB_KSTAT_UPDATE(ilbs, ip_frag_dropped, 1);
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				freemsg(first_mp);
+				continue;
+			}
+			lb_ret = ilb_check_v4(ilbs, ill, mp, ipha,
+			    ipha->ipha_protocol, (uint8_t *)ipha +
+			    IPH_HDR_LENGTH(ipha), &lb_dst);
+
+			if (lb_ret == ILB_DROPPED) {
+				/* Is this the right counter to increase? */
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				freemsg(first_mp);
+				continue;
+			} else if (lb_ret == ILB_BALANCED) {
+				/* Set the dst to that of the chosen server */
+				dst = lb_dst;
+				DB_CKSUMFLAGS(mp) = 0;
+			}
+		}
+
+after_ilb:
 		/*
 		 * Reuse the cached ire only if the ipha_dst of the previous
 		 * packet is the same as the current packet AND it is not
@@ -15399,6 +15465,7 @@ ip_accept_tcp(ill_t *ill, ill_rx_ring_t *ip_ring, squeue_t *target_sqp,
 	mblk_t		*uhead = NULL;	/* Unaccepted tail */
 	uint_t		ucnt = 0;	/* Unaccepted cnt */
 	ip_stack_t	*ipst = ill->ill_ipst;
+	ilb_stack_t	*ilbs = ipst->ips_netstack->netstack_ilb;
 
 	*cnt = 0;
 
@@ -15406,6 +15473,12 @@ ip_accept_tcp(ill_t *ill, ill_rx_ring_t *ip_ring, squeue_t *target_sqp,
 	ASSERT(ip_ring != NULL);
 
 	TRACE_1(TR_FAC_IP, TR_IP_RPUT_START, "ip_accept_tcp: q %p", q);
+
+	/* If ILB is enabled, don't do fast processing. */
+	if (ilb_has_rules(ilbs)) {
+		uhead = mp_chain;
+		goto all_reject;
+	}
 
 #define	rptr	((uchar_t *)ipha)
 
@@ -15574,6 +15647,7 @@ local_accept:
 	if (ire != NULL)
 		ire_refrele(ire);
 
+all_reject:
 	if (uhead != NULL)
 		ip_input(ill, ip_ring, uhead, NULL);
 

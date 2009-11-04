@@ -82,6 +82,7 @@ MANIFEST_SUBDIRS=			\
 	agents/snmp/snmprelayd		\
 	boot/scripts			\
 	cmd-crypto/scripts		\
+	cmd-inet/usr.lib/ilbd		\
 	cmd-inet/usr.lib/in.chargend	\
 	cmd-inet/usr.lib/in.daytimed	\
 	cmd-inet/usr.lib/in.dhcpd	\

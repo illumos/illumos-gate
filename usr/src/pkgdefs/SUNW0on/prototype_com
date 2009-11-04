@@ -295,6 +295,8 @@ f none usr/lib/help/auths/locale/SmfValueVt.html 444 root bin
 f none usr/lib/help/auths/locale/SmfWpaStates.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkAutoconf.html 444 root bin
 f none usr/lib/help/auths/locale/NetworkHeader.html 444 root bin
+f none usr/lib/help/auths/locale/NetworkILBconf.html 444 root bin
+f none usr/lib/help/auths/locale/NetworkILBenable.html 444 root bin
 f none usr/lib/help/auths/locale/WifiConfig.html 444 root bin
 f none usr/lib/help/auths/locale/WifiWep.html 444 root bin
 f none usr/lib/help/auths/locale/LinkSecurity.html 444 root bin
@@ -303,6 +305,7 @@ f none usr/lib/help/auths/locale/MailQueue.html 0444 root bin
 f none usr/lib/help/auths/locale/DevCDRW.html 0444 root bin
 f none usr/lib/help/auths/locale/IdmapRules.html 0444 root bin
 f none usr/lib/help/auths/locale/SmfIdmapStates.html 0444 root bin
+f none usr/lib/help/auths/locale/SmfILBStates.html 0444 root bin
 f none usr/lib/help/auths/locale/SmfValueIdmap.html 0444 root bin
 f none usr/lib/help/auths/locale/FileChown.html 444 root bin
 f none usr/lib/help/auths/locale/FileHeader.html 444 root bin
@@ -376,6 +379,7 @@ f none usr/lib/help/profiles/locale/RtMediaRestore.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNameServiceAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNameServiceSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetAutoconf.html 444 root bin
+f none usr/lib/help/profiles/locale/RtNetILB.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetIPsec.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtNetObservability.html 444 root bin

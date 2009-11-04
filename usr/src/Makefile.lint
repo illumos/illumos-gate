@@ -72,6 +72,7 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/usr.bin \
 	cmd/cmd-inet/usr.lib/bridged \
 	cmd/cmd-inet/usr.lib/dsvclockd \
+	cmd/cmd-inet/usr.lib/ilbd \
 	cmd/cmd-inet/usr.lib/in.dhcpd \
 	cmd/cmd-inet/usr.lib/in.mpathd \
 	cmd/cmd-inet/usr.lib/in.ndpd \
@@ -82,6 +83,7 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/usr.lib/wanboot \
 	cmd/cmd-inet/usr.sadm \
 	cmd/cmd-inet/usr.sbin \
+	cmd/cmd-inet/usr.sbin/ilbadm \
 	cmd/col \
 	cmd/compress \
 	cmd/consadm \
@@ -365,6 +367,7 @@ COMMON_SUBDIRS = \
 	lib/libgss \
 	lib/libhotplug \
 	lib/libidmap \
+	lib/libilb \
 	lib/libinetcfg \
 	lib/libinetsvc \
 	lib/libinetutil \

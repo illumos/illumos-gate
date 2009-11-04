@@ -255,6 +255,7 @@ SUBDIRS += \
 	libvscan	\
 	libgrubmgmt	\
 	smbsrv		\
+	libilb		\
 	scsi		\
 	mms		\
 	libima		\
@@ -329,6 +330,7 @@ MSGSUBDIRS=		\
 	libidmap	\
 	libinetcfg	\
 	libipmp		\
+	libilb		\
 	libinetutil	\
 	libinstzones	\
 	libnsl		\
@@ -487,6 +489,7 @@ HDRSUBDIRS=		\
 	libvscan	\
 	libgrubmgmt	\
 	smbsrv		\
+	libilb		\
 	scsi		\
 	hbaapi		\
 	smhba		\
@@ -644,6 +647,7 @@ pyzfs:		libnvpair libsec libidmap libzfs
 libreparse:	libnvpair
 libhotplug:	libnvpair
 cfgadm_plugins:	libhotplug
+libilb:		libsocket
 
 #
 # The reason this rule checks for the existence of the

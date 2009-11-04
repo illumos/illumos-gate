@@ -1,0 +1,115 @@
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
+
+ CDDL HEADER START
+
+ The contents of this file are subject to the terms of the
+ Common Development and Distribution License (the "License").
+ You may not use this file except in compliance with the License.
+
+ You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ or http://www.opensolaris.org/os/licensing.
+ See the License for the specific language governing permissions
+ and limitations under the License.
+
+ When distributing Covered Code, include this CDDL HEADER in each
+ file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ If applicable, add the following below this CDDL HEADER, with the
+ fields enclosed by brackets "[]" replaced with your own identifying
+ information: Portions Copyright [yyyy] [name of copyright owner]
+
+ CDDL HEADER END
+
+	NOTE:  This service manifest is not editable; its contents will
+	be overwritten by package or patch operations, including
+	operating system upgrade.  Make customizations in a different
+	file.
+
+	Service manifest for Integrated Load balancer(ILB).
+-->
+
+<service_bundle type='manifest' name='SUNWilbr:ilb'>
+
+<service
+	name='network/loadbalancer/ilb'
+	type='service'
+	version='1'>
+
+	<create_default_instance enabled='false' />
+
+	<single_instance />
+
+	<!--
+	  Ensure that name services is enabled before ILB service begins.
+	-->
+	<dependency
+		name='name-services'
+		grouping='require_all'
+		restart_on='error'
+		type='service'>
+		<service_fmri value='svc:/milestone/name-services' />
+	</dependency>
+
+
+	<!--
+	  Ensure that forwarding service is enabled before load balancing
+	  service begins. The forwarding service is dependent on
+	  the filesystem and devices services.
+	-->
+	<dependency
+		name='network'
+		grouping='require_any'
+		restart_on='error'
+		type='service'>
+		<service_fmri value='svc:/network/ipv4-forwarding' />
+		<service_fmri value='svc:/network/ipv6-forwarding' />
+	</dependency>
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec=':kill'
+		timeout_seconds='60' >
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/usr/lib/inet/ilbd'
+		timeout_seconds='60' >
+		<method_context>
+			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+        <!-- to start stop routing services -->
+        <property_group name='general' type='framework'>
+                <propval name='action_authorization' type='astring'
+                        value='solaris.smf.manage.ilb' />
+                <propval name='value_authorization' type='astring'
+                        value='solaris.smf.manage.ilb' />
+        </property_group>
+
+
+	<stability value='Unstable' />
+
+	<template>
+
+	<common_name>
+		<loctext xml:lang='C'> Integrated layer 3/4 load balancer
+		</loctext>
+	</common_name>
+	<documentation>
+		<manpage title='ilbd' section='1M'
+			manpath='/usr/share/man' />
+		<manpage title='ilbadm' section='1M'
+			manpath='/usr/share/man' />
+	</documentation>
+
+	</template>
+</service>
+
+</service_bundle>

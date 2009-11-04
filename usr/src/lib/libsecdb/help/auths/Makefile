@@ -74,6 +74,7 @@ HTMLENTS = \
 	SmfExAcctTaskStates.html \
 	SmfExAcctNetStates.html \
 	SmfHeader.html \
+	SmfILBStates.html \
 	SmfInetdStates.html \
 	SmfIPsecStates.html \
 	SmfManageHeader.html \
@@ -120,6 +121,8 @@ HTMLENTS = \
 	SmfValueVt.html	\
 	SmfWpaStates.html \
 	NetworkAutoconf.html \
+	NetworkILBconf.html \
+	NetworkILBenable.html \
 	NetworkHeader.html \
 	WifiConfig.html \
 	WifiWep.html \

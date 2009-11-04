@@ -92,6 +92,8 @@ solaris.mms.io.write:::Read and Write Permission for MMS Volumes::help=AuthMMSIO
 #
 solaris.network.:::Network::help=NetworkHeader.html
 solaris.network.autoconf:::Network Auto-Magic Configuration::help=NetworkAutoconf.html
+solaris.network.ilb.config:::Network ILB Configuration::help=NetworkILBconf.html
+solaris.network.ilb.enable:::Network ILB Enable Configuration::help=NetworkILBenable.html
 solaris.network.link.security:::Link Security::help=LinkSecurity.html
 solaris.network.wifi.config:::Wifi Config::help=WifiConfig.html
 solaris.network.wifi.wep:::Wifi Wep::help=WifiWep.html
@@ -134,6 +136,7 @@ solaris.smf.manage.extended-accounting.flow:::Manage Task Extended Accounting Se
 solaris.smf.manage.hal:::Manage HAL Service States::help=SmfHALStates.html
 solaris.smf.manage.hotplug:::Manage Hotplug Service::help=SmfManageHotplug.html
 solaris.smf.manage.idmap:::Manage Identity Mapping Service States::help=SmfIdmapStates.html
+solaris.smf.manage.ilb:::Manage Integrated Load Balancer Service States::help=SmfILBStates.html
 solaris.smf.manage.inetd:::Manage inetd and inetd managed services States::help=SmfIntedStates.html
 solaris.smf.manage.ipsec:::Manage IPsec Service States::help=SmfIPsecStates.html
 solaris.smf.manage.labels:::Manage label server::help=LabelServer.html

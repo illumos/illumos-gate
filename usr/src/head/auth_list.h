@@ -45,6 +45,8 @@ extern "C" {
 #define	LINK_SEC_AUTH		"solaris.network.link.security"
 #define	MAILQ_AUTH		"solaris.mail.mailq"
 #define	NET_AUTOCONF_AUTH	"solaris.network.autoconf"
+#define	NET_ILB_CONFIG_AUTH	"solaris.network.ilb.config"
+#define	NET_ILB_ENABLE_AUTH	"solaris.network.ilb.enable"
 #define	SET_DATE_AUTH		"solaris.system.date"
 #define	WIFI_CONFIG_AUTH	"solaris.network.wifi.config"
 #define	WIFI_WEP_AUTH		"solaris.network.wifi.wep"

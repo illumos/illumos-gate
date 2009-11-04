@@ -66,6 +66,8 @@ typedef struct ofmt_state_s {
 	boolean_t	os_wrap;
 	int		os_nbad;
 	char		**os_badfields;
+	boolean_t	os_multiline;
+	int		os_maxnamelen;	/* longest name (f. multiline) */
 } ofmt_state_t;
 /*
  * A B_TRUE return value from the callback function will print out the contents
@@ -187,9 +189,12 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 	ofmt_status_t	err = OFMT_SUCCESS;
 	boolean_t	parsable = ((flags & OFMT_PARSABLE) != 0);
 	boolean_t	wrap = ((flags & OFMT_WRAP) != 0);
+	boolean_t	multiline = (flags & OFMT_MULTILINE);
 
 	*ofmt = NULL;
 	if (parsable) {
+		if (multiline)
+			return (OFMT_EPARSEMULTI);
 		/*
 		 * For parsable output mode, the caller always needs
 		 * to specify precisely which fields are to be selected,
@@ -229,6 +234,7 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 	os->os_parsable = parsable;
 	os->os_wrap = wrap;
 
+	os->os_multiline = multiline;
 	of = os->os_fields;
 	of_index = 0;
 	/*
@@ -260,6 +266,11 @@ ofmt_open(const char *str, const ofmt_field_t *template, uint_t flags,
 		of[of_index].of_name = strdup(template[j].of_name);
 		if (of[of_index].of_name == NULL)
 			goto nomem;
+		if (multiline) {
+			int n = strlen(of[of_index].of_name);
+
+			os->os_maxnamelen = MAX(n, os->os_maxnamelen);
+		}
 		of[of_index].of_width = template[j].of_width;
 		of[of_index].of_id = template[j].of_id;
 		of[of_index].of_cb = template[j].of_cb;
@@ -310,14 +321,13 @@ ofmt_print_field(ofmt_state_t *os, ofmt_field_t *ofp, const char *value,
 	uint_t	width = ofp->of_width;
 	uint_t	valwidth;
 	uint_t	compress;
-	boolean_t parsable = os->os_parsable;
 	char	c;
 
 	/*
 	 * Parsable fields are separated by ':'. If such a field contains
 	 * a ':' or '\', this character is prefixed by a '\'.
 	 */
-	if (parsable) {
+	if (os->os_parsable) {
 		if (os->os_nfields == 1) {
 			(void) printf("%s", value);
 			return;
@@ -329,7 +339,13 @@ ofmt_print_field(ofmt_state_t *os, ofmt_field_t *ofp, const char *value,
 		}
 		if (!os->os_lastfield)
 			(void) putchar(':');
-		return;
+	} else if (os->os_multiline) {
+		if (value[0] == '\0')
+			value = OFMT_VAL_UNDEF;
+		(void) printf("%*.*s: %s", os->os_maxnamelen,
+		    os->os_maxnamelen, ofp->of_name, value);
+		if (!os->os_lastfield)
+			(void) putchar('\n');
 	} else {
 		if (os->os_lastfield) {
 			(void) printf("%s", value);
@@ -408,10 +424,14 @@ ofmt_print(ofmt_handle_t ofmt, void *arg)
 			return;
 	}
 
-	if ((os->os_nrow++ % os->os_winsize.ws_row) == 0 && !os->os_parsable) {
+	if ((os->os_nrow++ % os->os_winsize.ws_row) == 0 && !os->os_parsable &&
+	    !os->os_multiline) {
 		ofmt_print_header(os);
 		os->os_nrow++;
 	}
+
+	if (os->os_multiline && os->os_nrow > 1)
+		(void) putchar('\n');
 
 	of = os->os_fields;
 	escsep = (os->os_nfields > 1);
@@ -548,6 +568,9 @@ ofmt_strerror(ofmt_handle_t ofmt, ofmt_status_t err, char *buf, uint_t bufsize)
 		break;
 	case OFMT_ENOFIELDS:
 		s = "no valid output fields";
+		break;
+	case OFMT_EPARSEMULTI:
+		s = "multiline mode incompatible with parsable mode";
 		break;
 	case OFMT_EPARSEALL:
 		s = "output field `all' invalid in parsable mode";

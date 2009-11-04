@@ -23,12 +23,12 @@
 # Use is subject to license terms.
 #
 
-SUBDIRS=	bridged dhcp dsvclockd in.chargend in.daytimed \
+SUBDIRS=	bridged dhcp dsvclockd ilbd in.chargend in.daytimed \
 		in.discardd in.echod in.dhcpd in.mpathd in.ndpd \
 		in.ripngd in.timed inetd mdnsd ncaconfd pppoe \
 		slpd wanboot wpad
 
-MSGSUBDIRS=	dsvclockd in.dhcpd inetd ncaconfd wanboot
+MSGSUBDIRS=	dsvclockd ilbd in.dhcpd inetd ncaconfd wanboot
 
 include ../../Makefile.cmd
 

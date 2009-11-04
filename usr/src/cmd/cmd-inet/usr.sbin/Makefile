@@ -65,14 +65,14 @@ K5RSHDOBJS=	in.rshd.o
 K5TELNETOBJS=	in.telnetd.o
 SRCS=		$(PROGSRCS) $(OTHERSRC)
 
-SUBDIRS=	bootconfchk htable ifconfig in.ftpd in.rdisc in.routed \
+SUBDIRS=	bootconfchk htable ifconfig ilbadm in.ftpd in.rdisc in.routed \
 		in.talkd inetadm inetconv ipmpstat ipqosconf ipsecutils \
 		kssl/kssladm kssl/ksslcfg ping routeadm snoop sppptun \
 		traceroute wificonfig
 
-MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd inetadm \
-		inetconv ipmpstat ipqosconf ipsecutils kssl/ksslcfg routeadm \
-		sppptun snoop wificonfig
+MSGSUBDIRS=	bootconfchk htable ifconfig ilbadm in.ftpd in.routed in.talkd \
+		inetadm inetconv ipmpstat ipqosconf ipsecutils kssl/ksslcfg \
+		routeadm sppptun snoop wificonfig
 
 # As programs get lint-clean, add them here and to the 'lint' target.
 # Eventually this hack should go away, and all in PROG should be
@@ -84,9 +84,9 @@ LINTCLEAN=	6to4relay arp in.rlogind in.rshd in.telnetd in.tftpd \
 # they're all clean, replace the dependency of the lint target
 # with SUBDIRS.  Also (sigh) deal with the commented-out build lines
 # for the lint rule.
-LINTSUBDIRS=	bootconfchk in.rdisc in.routed in.talkd inetadm inetconv \
-		ipmpstat ipqosconf ipsecutils ping routeadm sppptun traceroute \
-		wificonfig
+LINTSUBDIRS=	bootconfchk ilbadm in.rdisc in.routed in.talkd inetadm \
+		inetconv ipmpstat ipqosconf ipsecutils ping routeadm sppptun \
+		traceroute wificonfig
 # And as programs are verified not to attempt to write into constants,
 # -xstrconst should be used to ensure they stay that way.
 CONSTCLEAN=

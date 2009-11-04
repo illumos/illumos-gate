@@ -81,6 +81,7 @@
 #include <inet/udp_impl.h>
 #include <inet/sctp/sctp_impl.h>
 #include <inet/ipp_common.h>
+#include <inet/ilb_ip.h>
 
 #include <inet/ip_multi.h>
 #include <inet/ip_if.h>
@@ -6922,6 +6923,9 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	boolean_t	cksum_err;
 	mblk_t		*mp1;
 	ip_stack_t	*ipst = inill->ill_ipst;
+	ilb_stack_t	*ilbs = ipst->ips_netstack->netstack_ilb;
+	in6_addr_t	lb_dst;
+	int		lb_ret = ILB_PASSED;
 
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
 
@@ -7087,8 +7091,32 @@ drop_pkt:		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		    IRE_CACHE|IRE_LOCAL, ill->ill_ipif, ALL_ZONES, NULL,
 		    MATCH_IRE_TYPE | MATCH_IRE_ILL, ipst);
 	} else {
-		ire = ire_cache_lookup_v6(&ip6h->ip6_dst, ALL_ZONES,
-		    msg_getlabel(mp), ipst);
+		if (ilb_has_rules(ilbs) && ILB_SUPP_L4(nexthdr)) {
+			/* For convenience, we just pull up the mblk. */
+			if (mp->b_cont != NULL) {
+				if (pullupmsg(mp, -1) == 0) {
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsInDiscards);
+					freemsg(hada_mp);
+					freemsg(first_mp);
+					return;
+				}
+				hdr_len = pkt_len - remlen;
+				ip6h = (ip6_t *)mp->b_rptr;
+				whereptr = (uint8_t *)ip6h + hdr_len;
+			}
+			lb_ret = ilb_check_v6(ilbs, ill, mp, ip6h, nexthdr,
+			    whereptr, &lb_dst);
+			if (lb_ret == ILB_DROPPED) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				freemsg(hada_mp);
+				freemsg(first_mp);
+				return;
+			}
+		}
+
+		ire = ire_cache_lookup_v6((lb_ret == ILB_BALANCED) ? &lb_dst :
+		    &ip6h->ip6_dst, ALL_ZONES, msg_getlabel(mp), ipst);
 
 		if (ire != NULL && ire->ire_stq != NULL &&
 		    ire->ire_zoneid != GLOBAL_ZONEID &&
@@ -7139,7 +7167,8 @@ drop_pkt:		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		}
 		mp->b_prev = (mblk_t *)(uintptr_t)
 		    ill->ill_phyint->phyint_ifindex;
-		ip_newroute_v6(q, mp, &ip6h->ip6_dst, &ip6h->ip6_src,
+		ip_newroute_v6(q, mp, (lb_ret == ILB_BALANCED) ? &lb_dst :
+		    &ip6h->ip6_dst, &ip6h->ip6_src,
 		    IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_dst) ? ill : NULL,
 		    GLOBAL_ZONEID, ipst);
 		return;

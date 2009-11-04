@@ -313,6 +313,11 @@ extern "C" {
 #define	SIOCGIFHWADDR	_IOWR('i', 185, int)	/* PF_PACKET */
 #define	SIOCGSTAMP	_IOWR('i', 186, struct timeval)	/* PF_PACKET */
 
+/*
+ * Private ioctl for Integrated Load Balancer.  The ioctl length varies.
+ */
+#define	SIOCILB		_IOWR('i', 187, 0)
+
 #ifdef	__cplusplus
 }
 #endif

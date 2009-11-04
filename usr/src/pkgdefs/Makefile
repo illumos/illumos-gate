@@ -292,6 +292,8 @@ COMMON_SUBDIRS= \
 	SUNWiir \
 	SUNWiiu \
 	SUNWigb \
+	SUNWilb \
+	SUNWilbr \
 	SUNWima \
 	SUNWimac \
 	SUNWimar \

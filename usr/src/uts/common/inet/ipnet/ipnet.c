@@ -1951,16 +1951,17 @@ ipobs_bounce_func(hook_event_token_t token, hook_data_t info, void *arg)
 	mblk_t			*mp;
 
 	hdr = (hook_pkt_observe_t *)info;
-	mp = dupmsg(hdr->hpo_pkt);
-	if (mp == NULL) {
-		mp = copymsg(hdr->hpo_pkt);
-		if (mp == NULL)  {
-			netstack_t *ns = hdr->hpo_ctx;
-			ipnet_stack_t *ips = ns->netstack_ipnet;
+	/*
+	 * Code in ip_input() expects that it is the only one accessing the
+	 * packet.
+	 */
+	mp = copymsg(hdr->hpo_pkt);
+	if (mp == NULL)  {
+		netstack_t *ns = hdr->hpo_ctx;
+		ipnet_stack_t *ips = ns->netstack_ipnet;
 
-			IPSK_BUMP(ips, ik_dispatchDupDrop);
-			return (0);
-		}
+		IPSK_BUMP(ips, ik_dispatchDupDrop);
+		return (0);
 	}
 
 	hdr = (hook_pkt_observe_t *)mp->b_rptr;

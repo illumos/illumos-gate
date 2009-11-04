@@ -86,6 +86,7 @@
 #include <inet/ip_impl.h>
 #include <inet/sctp_ip.h>
 #include <inet/ip_netinfo.h>
+#include <inet/ilb_ip.h>
 
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
@@ -10192,6 +10193,15 @@ ip_sioctl_copyin_setup(queue_t *q, mblk_t *mp)
 	case IP_IOCTL:
 		ip_wput_ioctl(q, mp);
 		return;
+
+	case SIOCILB:
+		/* The ioctl length varies depending on the ILB command. */
+		copyin_size = iocp->ioc_count;
+		if (copyin_size < sizeof (ilb_cmd_t))
+			goto nak;
+		mi_copyin(q, mp, NULL, copyin_size);
+		return;
+
 	default:
 		cmn_err(CE_PANIC, "should not happen ");
 	}
@@ -20340,4 +20350,263 @@ ipif_up_notify(ipif_t *ipif)
 	sctp_update_ipif(ipif, SCTP_IPIF_UP);
 	ill_nic_event_dispatch(ipif->ipif_ill, MAP_IPIF_ID(ipif->ipif_id),
 	    NE_LIF_UP, NULL, 0);
+}
+
+/*
+ * ILB ioctl uses cv_wait (such as deleting a rule or adding a server) and
+ * this assumes the context is cv_wait'able.  Hence it shouldnt' be used on
+ * TPI end points with STREAMS modules pushed above.  This is assured by not
+ * having the IPI_MODOK flag for the ioctl.  And IP ensures the ILB ioctl
+ * never ends up on an ipsq, otherwise we may end up processing the ioctl
+ * while unwinding from the ispq and that could be a thread from the bottom.
+ */
+/* ARGSUSED */
+int
+ip_sioctl_ilb_cmd(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
+    ip_ioctl_cmd_t *ipip, void *arg)
+{
+	mblk_t *cmd_mp = mp->b_cont->b_cont;
+	ilb_cmd_t command = *((ilb_cmd_t *)cmd_mp->b_rptr);
+	int ret = 0;
+	int i;
+	size_t size;
+	ip_stack_t *ipst;
+	zoneid_t zoneid;
+	ilb_stack_t *ilbs;
+
+	ipst = CONNQ_TO_IPST(q);
+	ilbs = ipst->ips_netstack->netstack_ilb;
+	zoneid = Q_TO_CONN(q)->conn_zoneid;
+
+	switch (command) {
+	case ILB_CREATE_RULE: {
+		ilb_rule_cmd_t *cmd = (ilb_rule_cmd_t *)cmd_mp->b_rptr;
+
+		if (MBLKL(cmd_mp) != sizeof (ilb_rule_cmd_t)) {
+			ret = EINVAL;
+			break;
+		}
+
+		ret = ilb_rule_add(ilbs, zoneid, cmd);
+		break;
+	}
+	case ILB_DESTROY_RULE:
+	case ILB_ENABLE_RULE:
+	case ILB_DISABLE_RULE: {
+		ilb_name_cmd_t *cmd = (ilb_name_cmd_t *)cmd_mp->b_rptr;
+
+		if (MBLKL(cmd_mp) != sizeof (ilb_name_cmd_t)) {
+			ret = EINVAL;
+			break;
+		}
+
+		if (cmd->flags & ILB_RULE_ALLRULES) {
+			if (command == ILB_DESTROY_RULE) {
+				ilb_rule_del_all(ilbs, zoneid);
+				break;
+			} else if (command == ILB_ENABLE_RULE) {
+				ilb_rule_enable_all(ilbs, zoneid);
+				break;
+			} else if (command == ILB_DISABLE_RULE) {
+				ilb_rule_disable_all(ilbs, zoneid);
+				break;
+			}
+		} else {
+			if (command == ILB_DESTROY_RULE) {
+				ret = ilb_rule_del(ilbs, zoneid, cmd->name);
+			} else if (command == ILB_ENABLE_RULE) {
+				ret = ilb_rule_enable(ilbs, zoneid, cmd->name,
+				    NULL);
+			} else if (command == ILB_DISABLE_RULE) {
+				ret = ilb_rule_disable(ilbs, zoneid, cmd->name,
+				    NULL);
+			}
+		}
+		break;
+	}
+	case ILB_NUM_RULES: {
+		ilb_num_rules_cmd_t *cmd;
+
+		if (MBLKL(cmd_mp) != sizeof (ilb_num_rules_cmd_t)) {
+			ret = EINVAL;
+			break;
+		}
+		cmd = (ilb_num_rules_cmd_t *)cmd_mp->b_rptr;
+		ilb_get_num_rules(ilbs, zoneid, &(cmd->num));
+		break;
+	}
+	case ILB_RULE_NAMES: {
+		ilb_rule_names_cmd_t *cmd;
+
+		cmd = (ilb_rule_names_cmd_t *)cmd_mp->b_rptr;
+		if (MBLKL(cmd_mp) < sizeof (ilb_rule_names_cmd_t) ||
+		    cmd->num_names == 0) {
+			ret = EINVAL;
+			break;
+		}
+		size = cmd->num_names * ILB_RULE_NAMESZ;
+		if (cmd_mp->b_rptr + offsetof(ilb_rule_names_cmd_t, buf) +
+		    size != cmd_mp->b_wptr) {
+			ret = EINVAL;
+			break;
+		}
+		ilb_get_rulenames(ilbs, zoneid, &cmd->num_names, cmd->buf);
+		break;
+	}
+	case ILB_NUM_SERVERS: {
+		ilb_num_servers_cmd_t *cmd;
+
+		if (MBLKL(cmd_mp) != sizeof (ilb_num_servers_cmd_t)) {
+			ret = EINVAL;
+			break;
+		}
+		cmd = (ilb_num_servers_cmd_t *)cmd_mp->b_rptr;
+		ret = ilb_get_num_servers(ilbs, zoneid, cmd->name,
+		    &(cmd->num));
+		break;
+	}
+	case ILB_LIST_RULE: {
+		ilb_rule_cmd_t *cmd = (ilb_rule_cmd_t *)cmd_mp->b_rptr;
+
+		if (MBLKL(cmd_mp) != sizeof (ilb_rule_cmd_t)) {
+			ret = EINVAL;
+			break;
+		}
+		ret = ilb_rule_list(ilbs, zoneid, cmd);
+		break;
+	}
+	case ILB_LIST_SERVERS: {
+		ilb_servers_info_cmd_t *cmd;
+
+		cmd = (ilb_servers_info_cmd_t *)cmd_mp->b_rptr;
+		if (MBLKL(cmd_mp) < sizeof (ilb_servers_info_cmd_t) ||
+		    cmd->num_servers == 0) {
+			ret = EINVAL;
+			break;
+		}
+		size = cmd->num_servers * sizeof (ilb_server_info_t);
+		if (cmd_mp->b_rptr + offsetof(ilb_servers_info_cmd_t, servers) +
+		    size != cmd_mp->b_wptr) {
+			ret = EINVAL;
+			break;
+		}
+
+		ret = ilb_get_servers(ilbs, zoneid, cmd->name, cmd->servers,
+		    &cmd->num_servers);
+		break;
+	}
+	case ILB_ADD_SERVERS: {
+		ilb_servers_info_cmd_t *cmd;
+		ilb_rule_t *rule;
+
+		cmd = (ilb_servers_info_cmd_t *)cmd_mp->b_rptr;
+		if (MBLKL(cmd_mp) < sizeof (ilb_servers_info_cmd_t)) {
+			ret = EINVAL;
+			break;
+		}
+		size = cmd->num_servers * sizeof (ilb_server_info_t);
+		if (cmd_mp->b_rptr + offsetof(ilb_servers_info_cmd_t, servers) +
+		    size != cmd_mp->b_wptr) {
+			ret = EINVAL;
+			break;
+		}
+		rule = ilb_find_rule(ilbs, zoneid, cmd->name, &ret);
+		if (rule == NULL) {
+			ASSERT(ret != 0);
+			break;
+		}
+		for (i = 0; i < cmd->num_servers; i++) {
+			ilb_server_info_t *s;
+
+			s = &cmd->servers[i];
+			s->err = ilb_server_add(ilbs, rule, s);
+		}
+		ILB_RULE_REFRELE(rule);
+		break;
+	}
+	case ILB_DEL_SERVERS:
+	case ILB_ENABLE_SERVERS:
+	case ILB_DISABLE_SERVERS: {
+		ilb_servers_cmd_t *cmd;
+		ilb_rule_t *rule;
+		int (*f)();
+
+		cmd = (ilb_servers_cmd_t *)cmd_mp->b_rptr;
+		if (MBLKL(cmd_mp) < sizeof (ilb_servers_cmd_t)) {
+			ret = EINVAL;
+			break;
+		}
+		size = cmd->num_servers * sizeof (ilb_server_arg_t);
+		if (cmd_mp->b_rptr + offsetof(ilb_servers_cmd_t, servers) +
+		    size != cmd_mp->b_wptr) {
+			ret = EINVAL;
+			break;
+		}
+
+		if (command == ILB_DEL_SERVERS)
+			f = ilb_server_del;
+		else if (command == ILB_ENABLE_SERVERS)
+			f = ilb_server_enable;
+		else if (command == ILB_DISABLE_SERVERS)
+			f = ilb_server_disable;
+
+		rule = ilb_find_rule(ilbs, zoneid, cmd->name, &ret);
+		if (rule == NULL) {
+			ASSERT(ret != 0);
+			break;
+		}
+
+		for (i = 0; i < cmd->num_servers; i++) {
+			ilb_server_arg_t *s;
+
+			s = &cmd->servers[i];
+			s->err = f(ilbs, zoneid, NULL, rule, &s->addr);
+		}
+		ILB_RULE_REFRELE(rule);
+		break;
+	}
+	case ILB_LIST_NAT_TABLE: {
+		ilb_list_nat_cmd_t *cmd;
+
+		cmd = (ilb_list_nat_cmd_t *)cmd_mp->b_rptr;
+		if (MBLKL(cmd_mp) < sizeof (ilb_list_nat_cmd_t)) {
+			ret = EINVAL;
+			break;
+		}
+		size = cmd->num_nat * sizeof (ilb_nat_entry_t);
+		if (cmd_mp->b_rptr + offsetof(ilb_list_nat_cmd_t, entries) +
+		    size != cmd_mp->b_wptr) {
+			ret = EINVAL;
+			break;
+		}
+
+		ret = ilb_list_nat(ilbs, zoneid, cmd->entries, &cmd->num_nat,
+		    &cmd->flags);
+		break;
+	}
+	case ILB_LIST_STICKY_TABLE: {
+		ilb_list_sticky_cmd_t *cmd;
+
+		cmd = (ilb_list_sticky_cmd_t *)cmd_mp->b_rptr;
+		if (MBLKL(cmd_mp) < sizeof (ilb_list_sticky_cmd_t)) {
+			ret = EINVAL;
+			break;
+		}
+		size = cmd->num_sticky * sizeof (ilb_sticky_entry_t);
+		if (cmd_mp->b_rptr + offsetof(ilb_list_sticky_cmd_t, entries) +
+		    size != cmd_mp->b_wptr) {
+			ret = EINVAL;
+			break;
+		}
+
+		ret = ilb_list_sticky(ilbs, zoneid, cmd->entries,
+		    &cmd->num_sticky, &cmd->flags);
+		break;
+	}
+	default:
+		ret = EINVAL;
+		break;
+	}
+done:
+	return (ret);
 }

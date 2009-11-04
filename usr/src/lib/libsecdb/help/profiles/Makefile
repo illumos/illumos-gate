@@ -60,6 +60,7 @@ HTMLENTS = \
 	RtNameServiceAdmin.html \
 	RtNameServiceSecure.html \
 	RtNetAutoconf.html \
+	RtNetILB.html \
 	RtNetIPsec.html \
 	RtNetMngmnt.html \
 	RtNetObservability.html \

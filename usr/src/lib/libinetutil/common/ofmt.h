@@ -35,6 +35,8 @@
  * are separated by ':', with the ':' character itself escaped by a \
  * (e.g., IPv6 addresses  may be printed as "fe80\:\:1"); single field output
  * is printed as-is.
+ * In multiline mode, every [field,value] pair is printed in a line of
+ * its own, thus: "field: value".
  *
  * The caller must open a handle for each set of fields to be printed by
  * invoking ofmt_open(). The invocation to ofmt_open must provide the list of
@@ -57,6 +59,9 @@
  * (non machine-parsable) mode, a NULL fields_str, or a value of "all" for
  * fields_str, is treated as a request to print all allowable fields that fit
  * other applicable constraints.
+ * To achieve multiline mode, OFMT_MULTILINE needs to be specified in oflags.
+ * Specifying both OFMT_MULTILINE and OFMT_PARSABLE will result in
+ * OFMT_EPARSEMULTI.
  *
  * Thus a typical invocation to open the ofmt_handle would be:
  *
@@ -135,7 +140,8 @@ typedef enum {
 	OFMT_EPARSEALL,		/* 'all' invalid in parsable mode */
 	OFMT_EPARSENONE,	/* output fields missing in parsable mode */
 	OFMT_EPARSEWRAP,	/* parsable mode incompatible with wrap mode */
-	OFMT_ENOTEMPLATE	/* no template provided for fields */
+	OFMT_ENOTEMPLATE,	/* no template provided for fields */
+	OFMT_EPARSEMULTI	/* parsable and multiline don't mix */
 } ofmt_status_t;
 
 /*
@@ -171,6 +177,7 @@ extern ofmt_status_t ofmt_open(const char *, const ofmt_field_t *, uint_t,
 
 #define	OFMT_PARSABLE	0x00000001 /* machine parsable mode */
 #define	OFMT_WRAP	0x00000002 /* wrap output if field width is exceeded */
+#define	OFMT_MULTILINE	0x00000004 /* "long" output: "name: value" lines */
 
 /*
  * ofmt_close() must be called to free resources associated

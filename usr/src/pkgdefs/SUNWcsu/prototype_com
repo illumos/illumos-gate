@@ -484,6 +484,8 @@ f none usr/lib/help/auths/locale/C/LoginHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/LoginRemote.html 444 root bin
 f none usr/lib/help/auths/locale/C/NetworkAutoconf.html 444 root bin
 f none usr/lib/help/auths/locale/C/NetworkHeader.html 444 root bin
+f none usr/lib/help/auths/locale/C/NetworkILBconf.html 444 root bin
+f none usr/lib/help/auths/locale/C/NetworkILBenable.html 444 root bin
 f none usr/lib/help/auths/locale/C/PriAdmin.html 444 root bin
 f none usr/lib/help/auths/locale/C/ProfmgrHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/RoleHeader.html 444 root bin
@@ -503,6 +505,7 @@ f none usr/lib/help/auths/locale/C/SmfModifyDepend.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfModifyFramework.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfModifyHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfModifyMethod.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfILBStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfInetdStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfIPsecStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfNscdStates.html 444 root bin
@@ -604,6 +607,7 @@ f none usr/lib/help/profiles/locale/C/RtMediaRestore.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNameServiceAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNameServiceSecure.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetAutoconf.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtNetILB.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetIPsec.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtNetObservability.html 444 root bin

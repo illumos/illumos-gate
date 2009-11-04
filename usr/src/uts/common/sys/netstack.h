@@ -80,7 +80,8 @@ typedef id_t	netstackid_t;
 #define	NS_IPSECAH	15
 #define	NS_IPSECESP	16
 #define	NS_IPNET	17
-#define	NS_MAX		(NS_IPNET+1)
+#define	NS_ILB		18
+#define	NS_MAX		(NS_ILB+1)
 
 /*
  * State maintained for each module which tracks the state of
@@ -155,6 +156,7 @@ struct netstack {
 			struct ipsecah_stack	*nu_ipsecah;
 			struct ipsecesp_stack	*nu_ipsecesp;
 			struct ipnet_stack	*nu_ipnet;
+			struct ilb_stack	*nu_ilb;
 		} nu_s;
 	} netstack_u;
 #define	netstack_modules	netstack_u.nu_modules
@@ -176,6 +178,7 @@ struct netstack {
 #define	netstack_ipsecah	netstack_u.nu_s.nu_ipsecah
 #define	netstack_ipsecesp	netstack_u.nu_s.nu_ipsecesp
 #define	netstack_ipnet		netstack_u.nu_s.nu_ipnet
+#define	netstack_ilb		netstack_u.nu_s.nu_ilb
 
 	nm_state_t	netstack_m_state[NS_MAX]; /* module state */
 

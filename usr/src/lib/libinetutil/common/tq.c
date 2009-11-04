@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <limits.h>
@@ -342,7 +339,14 @@ iu_expire_timers(iu_tq_t *tq)
 	for (node = tq->iutq_head; node != NULL;
 	    node = node->iutn_expire_next) {
 
-		if (node->iutn_abs_timeout > current_time)
+		/*
+		 * If the timeout is within 1 millisec of current time,
+		 * consider it as expired already.  We do this because
+		 * iu_earliest_timer() only has millisec granularity.
+		 * So we should also use millisec grandularity in
+		 * comparing timeout values.
+		 */
+		if (node->iutn_abs_timeout - current_time > 1000000)
 			break;
 
 		/*

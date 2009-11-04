@@ -531,6 +531,7 @@ IP_SCTP_OBJS =	sctp.o sctp_opt_data.o sctp_output.o \
 		sctp_timer.o sctp_heartbeat.o sctp_hash.o \
 		sctp_ioc.o sctp_bind.o sctp_notify.o sctp_asconf.o \
 		sctp_addr.o tn_ipopt.o tnet.o ip_netinfo.o
+IP_ILB_OBJS =	ilb.o ilb_nat.o ilb_conn.o ilb_alg_hash.o ilb_alg_rr.o
 
 IP_OBJS +=	igmp.o ipmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
 		ip_if.o ip_ire.o ip_listutils.o ip_mroute.o \
@@ -543,7 +544,8 @@ IP_OBJS +=	igmp.o ipmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
 		$(IP_RTS_OBJS) \
 		$(IP_TCP_OBJS) \
 		$(IP_UDP_OBJS) \
-		$(IP_SCTP_OBJS)
+		$(IP_SCTP_OBJS) \
+		$(IP_ILB_OBJS)
 
 IP6_OBJS +=	ip6ddi.o
 

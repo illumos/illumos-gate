@@ -2091,8 +2091,450 @@ Use is subject to license terms.
 	</entry>
     </event>
 
+    <event id="AUE_ilb_create_healthcheck" header="0" idNo="120" omit="JNI">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="hc_test">
+            <internal token="path"/>
+            <external opt="required" type="char *"/>
+            <comment>healthcheck type-PING,TCP,UDP or 3rd party script</comment>
+        </entry>
+        <entry id="hc_name">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>healthcheck name</comment>
+        </entry>
+        <entry id="hc_timeout">
+            <internal token="text"/>
+            <external opt="required" type="int32_t" />
+            <comment>timeout(secs) to kill a hung healthcheck probe
+		- 0 means default value (see man page)
+	    </comment>
+        </entry>
+        <entry id="hc_count">
+            <internal token="text"/>
+            <external opt="required" type="int"/>
+            <comment>number of times to run a health check probe
+		before declaring a server to be dead - 0 means
+		default value (see man page)
+	    </comment>
+        </entry>
+        <entry id="hc_interval">
+            <internal token="text"/>
+            <external opt="required" type="int32_t"/>
+            <comment>time(secs) between 2 healthcheck events -
+		0 means default value(see man page)
+	    </comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event> 
+
+    <event id="AUE_ilb_delete_healthcheck" header="0" idNo="121" omit="JNI">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="hc_name">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>healthcheck name</comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event>
+
+    <!--
+	virtual_address and proxy-src token are set to be char *.
+	But they should be in6_addr See audit bug 6864075 	.
+     -->
+    <event id="AUE_ilb_create_rule" header="0" idNo="122" omit="JNI">
+        <title>Integrated Loadbalancer</title>
+	<program>/usr/sbin/ilbadm</program>
+	<see>ilbadm(1m)</see>
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="virtual_ipaddress">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>LB virtual IP address</comment>
+	</entry>
+	<entry id="min_port">
+	    <internal token="text"/>
+	    <external opt="required" type="uint32_t"/>
+	    <comment>minimum value in port range</comment>
+	</entry>
+	<entry id="max_port">
+	    <internal token="text"/>
+	    <external opt="required" type="uint32_t"/>
+	    <comment>maximum value in port range - max=min means single
+		port is specified
+	    </comment>
+	</entry>
+	<entry id="protocol">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>protocol</comment>
+	</entry>
+        <entry id="algo_optype">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>[rr,hip,hipp,hipv],[dsr,nat,half-nat]</comment>
+        </entry>
+        <entry id="proxy_src">
+            <internal token="text"/>
+            <external opt="optional" type="char *"/>
+            <comment>proxy source address for NAT - may be single
+		address or a address range
+	    </comment>
+        </entry>
+        <entry id="persist_mask">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>prefix length</comment>
+        </entry>
+        <entry id="hcname">
+            <internal token="text"/>
+            <external opt="optional" type="char *"/>
+            <comment>healthcheck name</comment>
+        </entry>
+        <entry id="hcport">
+            <internal token="text"/>
+            <external opt="optional" type="char *"/>
+            <comment>healthcheck port - ANY(dynamically determined by ilbd)
+		or a positive integer
+	    </comment>
+        </entry>
+        <entry id="conndrain_timeout">
+            <internal token="text"/>
+            <external opt="required" type="uint32_t"/>
+            <comment>connection timeout for NAT/half-NAT in sec. - 0 means
+		no forced removal)
+	    </comment>
+	</entry>
+        <entry id="nat_timeout">
+            <internal token="text"/>
+            <external opt="required" type="uint32_t"/>
+            <comment>nat entry timeout for NAT/half-NAT in sec - 0 means
+		default value(see man page)
+	    </comment>
+	</entry>
+        <entry id="persist_timeout">
+            <internal token="text"/>
+            <external opt="required" type="uint32_t"/>
+            <comment>session persistence mapping in sec - 0 means no
+		persistence
+	    </comment>
+	</entry>
+        <entry id="server_group">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>server group name</comment>
+        </entry>
+        <entry id="rule_name">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>rule name</comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event>
+
+<!-- generic ILB rule event -->
+
+    <event id="AUE_generic_ILB_rule" type="generic" omit="always">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+	<entry id="rule_name">
+	    <internal token="text"/>
+	    <external opt="required" type="char *"/>
+	    <comment>rule name - "all" means all rules</comment>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!--  instances of the ILB generic rule  event. -->
+    <event id="AUE_ilb_delete_rule" instance_of="AUE_generic_ILB_rule"
+        header="0" idNo="123">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+    </event>
+
+    <event id="AUE_ilb_disable_rule" instance_of="AUE_generic_ILB_rule"
+        header="0" idNo="124">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+    </event>
+
+    <event id="AUE_ilb_enable_rule" instance_of="AUE_generic_ILB_rule"
+        header="0" idNo="125">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+    </event>
+
+    <!--
+	server_ipaddress token is set to be char *. But it should be
+	in6_addr See audit bug 6864075.
+     -->
+    <event id="AUE_ilb_add_server" header="0" idNo="126" omit="JNI">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_ipaddress">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>IP address</comment>
+        </entry>
+        <entry id="server_id">
+            <internal token="text"/>
+            <external opt="optional" type="char *"/>
+            <comment>serverid that corresponds IP address - empty
+		if authorization fails, user specified IP address
+		is invalid or server cannot be added because
+		server group is full
+	    </comment>  
+        </entry>
+        <entry id="server_group">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>server group name</comment>
+        </entry>
+	<entry id="server_minport">
+	    <internal token="text"/>
+	    <external opt="optional" type="uint32_t" />
+	    <comment>server's minimum value in port range - empty
+		means default value (see man page)
+	    </comment>
+	</entry>
+	<entry id="server_maxport">
+	    <internal token="text"/>
+	    <external opt="optional" type="uint32_t" />
+	    <comment>server's maximum value in port range - empty 
+		means default value(see man page)
+	    </comment>
+	</entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event> 
+
+    <!--
+	server_ipaddress token is set to be char *. But it should be
+	in6_addr See audit bug 6864075.
+     -->
+    <event id="AUE_ilb_disable_server" header="0" idNo="127" omit="JNI">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_id">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>serverid</comment>
+        </entry>
+        <entry id="server_ipaddress">
+            <internal token="text"/>
+            <external opt="optional" type="char *"/>
+            <comment>IPaddr corresponding to the serverid - empty
+		if authorization fails, or user specified serverid
+		is nonexistent
+	    </comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event> 
+
+    <!--
+	server_ipaddress token is set to be char *. But it should be
+	in6_addr See audit bug 6864075.
+     -->
+    <event id="AUE_ilb_enable_server" header="0" idNo="128" omit="JNI">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_id">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>serverid</comment>
+        </entry>
+        <entry id="server_ipaddress">
+            <internal token="text"/>
+            <external opt="optional" type="char *"/>
+            <comment>IPaddr corresponding to the serverid - empty
+		if authorization fails, or user specified serverid
+		is nonexistent
+	    </comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event> 
+
+    <!--
+	server_ipaddress token is set to be char *. But it should be
+	in6_addr See audit bug 6864075 	.
+     -->
+    <event id="AUE_ilb_remove_server" header="0" idNo="129" omit="JNI">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_id">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>serverid</comment>
+        </entry>
+        <entry id="server_group">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>server group name</comment>
+        </entry>
+        <entry id="server_ipaddress">
+            <internal token="text"/>
+            <external opt="optional" type="char *"/>
+            <comment>IPaddr corresponding to serverid - empty
+		if authorization fails or user specified serverid
+		serverid is nonexistent
+	    </comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+	    <external opt="none"/>
+        </entry>
+    </event> 
+
+    <event id="AUE_ilb_create_servergroup" header="0" idNo="130" omit="JNI">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_group">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>server group name</comment>
+        </entry>
+        <entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event> 
+
+    <event id="AUE_ilb_delete_servergroup" header="0" idNo="131" omit="JNI">
+        <title>Integrated Loadbalancer</title>
+        <program>/usr/sbin/ilbadm</program>
+        <see>ilbadm(1m)</see>
+        <entry id="subject">
+            <internal token="subject"/>
+            <external opt="none"/>
+        </entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
+	</entry>
+        <entry id="server_group">
+            <internal token="text"/>
+            <external opt="required" type="char *"/>
+            <comment>server group name</comment>
+        </entry>
+        <entry id="return">
+            <internal token="return"/>
+            <external opt="none"/>
+        </entry>
+    </event> 
+
 <!-- add new events here with the next higher idNo -->
-<!-- Highest idNo is 119, so next is 120, then fix this comment -->
+<!-- Highest idNo is 131, so next is 132, then fix this comment -->
 <!-- end of C Only events -->
 
 <!--

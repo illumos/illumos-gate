@@ -158,7 +158,7 @@ typedef struct iu_timer_queue iu_tq_t;
 
 typedef int iu_timer_id_t;
 
-#define	IU_TIMER_ID_MAX	1024	/* max number of concurrent timers */
+#define	IU_TIMER_ID_MAX	4096	/* max number of concurrent timers */
 
 /*
  * a iu_tq_callback_t is a function that is called back in response to a
