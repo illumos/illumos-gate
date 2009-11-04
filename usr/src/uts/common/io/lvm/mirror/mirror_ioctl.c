@@ -1019,6 +1019,8 @@ mirror_detach(
 	mddb_recid_t		recids[2];
 	int			nsv = 0;
 	int			smi_remove;
+	mm_submirror_ic_t	*old_smic;
+	mm_submirror_ic_t	*new_smic;
 
 	mdclrerror(&det->mde);
 
@@ -1135,6 +1137,10 @@ mirror_detach(
 			new_sm->sm_hsp_id = old_sm->sm_hsp_id;
 			new_sm->sm_timestamp = old_sm->sm_timestamp;
 			bzero(old_sm, sizeof (mm_submirror_t));
+			old_smic = &un->un_smic[smi];
+			new_smic = &un->un_smic[smi - 1];
+			bcopy(old_smic, new_smic, sizeof (mm_submirror_ic_t));
+			bzero(old_smic, sizeof (mm_submirror_ic_t));
 		}
 	}
 	mirror_commit(un, 0, NULL);
