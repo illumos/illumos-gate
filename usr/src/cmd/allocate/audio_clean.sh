@@ -136,7 +136,7 @@ fi
 ZONENAME=$4
 ZONEPATH=$5
 SAVEDIR=/etc/security/audio
-MAP=`dminfo -v -n $AUDIO`
+MAP=`dminfo -v -n $DEVICE`
 DEVICE=`echo $MAP | cut -f1 -d:`
 TYPE=`echo $MAP | cut -f2 -d:`
 FILES=`echo $MAP | cut -f3 -d:`

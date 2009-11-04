@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <auth_attr.h>
 #include <auth_list.h>
@@ -363,10 +361,7 @@ _list_device(int optflag, uid_t uid, devalloc_t *da, char *zonename)
 		error = DACACCERR;
 		goto out;
 	}
-	if (optflag & USERID)
-		is_authorized = 1;
-	else
-		is_authorized = _is_dev_authorized(da, uid);
+	is_authorized = _is_dev_authorized(da, uid);
 	if (optflag & LISTFREE) {	/* list_devices -n */
 		/*
 		 * list all free devices

@@ -19,10 +19,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
 
@@ -61,12 +60,13 @@ rewrite_logindev()
 		return
 	fi
 	for line in \
-		"/dev/console	0600	/dev/sound/" \
-		"/dev/console	0400	/dev/removable-media/" \
-		"/dev/console	0400	/dev/hotpluggable/" \
-		"/dev/console	0600	/dev/usb/\[0-9a-f\]" \
+		"/dev/sound/" \
+		"/dev/removable-media/" \
+		"/dev/hotpluggable/" \
+		"/dev/usb/\[0-9a-f\]" \
 			; do
-		sed -e "s!^$from$line!$to$line!" $LOGINDEVPERM > /tmp/tmp.$$
+		sed -e "s!^$from\([^# 	]\{1,\}[ 	}\{1,\}[0-9]\{1,\}[ 	]\{1,\}\)$line!$to\1$line!" \
+		    $LOGINDEVPERM > /tmp/tmp.$$
 		cp /tmp/tmp.$$ $LOGINDEVPERM
 	done
 	rm -f /tmp/tmp.$$
