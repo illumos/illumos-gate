@@ -722,7 +722,7 @@ dsl_pool_user_hold_create_obj(dsl_pool_t *dp, dmu_tx_t *tx)
 
 static int
 dsl_pool_user_hold_rele_impl(dsl_pool_t *dp, uint64_t dsobj,
-    const char *tag, time_t *t, dmu_tx_t *tx, boolean_t holding)
+    const char *tag, uint64_t *now, dmu_tx_t *tx, boolean_t holding)
 {
 	objset_t *mos = dp->dp_meta_objset;
 	uint64_t zapobj = dp->dp_tmp_userrefs_obj;
@@ -747,7 +747,7 @@ dsl_pool_user_hold_rele_impl(dsl_pool_t *dp, uint64_t dsobj,
 
 	name = kmem_asprintf("%llx-%s", (u_longlong_t)dsobj, tag);
 	if (holding)
-		error = zap_add(mos, zapobj, name, 8, 1, t, tx);
+		error = zap_add(mos, zapobj, name, 8, 1, now, tx);
 	else
 		error = zap_remove(mos, zapobj, name, tx);
 	strfree(name);
@@ -760,9 +760,9 @@ dsl_pool_user_hold_rele_impl(dsl_pool_t *dp, uint64_t dsobj,
  */
 int
 dsl_pool_user_hold(dsl_pool_t *dp, uint64_t dsobj, const char *tag,
-    time_t *t, dmu_tx_t *tx)
+    uint64_t *now, dmu_tx_t *tx)
 {
-	return (dsl_pool_user_hold_rele_impl(dp, dsobj, tag, t, tx, B_TRUE));
+	return (dsl_pool_user_hold_rele_impl(dp, dsobj, tag, now, tx, B_TRUE));
 }
 
 /*

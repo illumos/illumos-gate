@@ -149,7 +149,7 @@ void dsl_pool_scrub_restart(dsl_pool_t *dp);
 taskq_t *dsl_pool_vnrele_taskq(dsl_pool_t *dp);
 
 extern int dsl_pool_user_hold(dsl_pool_t *dp, uint64_t dsobj,
-    const char *tag, time_t *t, dmu_tx_t *tx);
+    const char *tag, uint64_t *now, dmu_tx_t *tx);
 extern int dsl_pool_user_release(dsl_pool_t *dp, uint64_t dsobj,
     const char *tag, dmu_tx_t *tx);
 extern void dsl_pool_clean_tmp_userrefs(dsl_pool_t *dp);

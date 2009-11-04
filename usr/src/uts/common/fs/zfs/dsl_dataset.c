@@ -3239,6 +3239,12 @@ struct dsl_ds_holdarg {
 	char failed[MAXPATHLEN];
 };
 
+/*
+ * The max length of a temporary tag prefix is the number of hex digits
+ * required to express UINT64_MAX plus one for the hyphen.
+ */
+#define	MAX_TAG_PREFIX_LEN	17
+
 static int
 dsl_dataset_user_hold_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
@@ -3266,6 +3272,10 @@ dsl_dataset_user_hold_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	}
 	mutex_exit(&ds->ds_lock);
 
+	if (error == 0 && ha->temphold &&
+	    strlen(htag) + MAX_TAG_PREFIX_LEN >= MAXNAMELEN)
+		error = E2BIG;
+
 	return (error);
 }
 
@@ -3277,7 +3287,7 @@ dsl_dataset_user_hold_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	char *htag = ha->htag;
 	dsl_pool_t *dp = ds->ds_dir->dd_pool;
 	objset_t *mos = dp->dp_meta_objset;
-	time_t now = gethrestime_sec();
+	uint64_t now = gethrestime_sec();
 	uint64_t zapobj;
 
 	mutex_enter(&ds->ds_lock);
