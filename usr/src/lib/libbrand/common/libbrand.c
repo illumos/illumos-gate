@@ -688,13 +688,6 @@ brand_get_sysboot(brand_handle_t bh, const char *zonename,
 	    buf, len, DTD_ELEM_SYSBOOT, B_TRUE, B_TRUE));
 }
 
-int
-brand_is_native(brand_handle_t bh)
-{
-	struct brand_handle *bhp = (struct brand_handle *)bh;
-	return ((strcmp(bhp->bh_name, NATIVE_BRAND_NAME) == 0) ? 1 : 0);
-}
-
 boolean_t
 brand_allow_exclusive_ip(brand_handle_t bh)
 {

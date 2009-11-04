@@ -69,7 +69,6 @@ SUNWprivate {
 	brand_get_validatesnap;
 	brand_get_verify_adm;
 	brand_get_verify_cfg;
-	brand_is_native;
 	brand_open;
 	brand_platform_iter_devices;
 	brand_platform_iter_gmounts;

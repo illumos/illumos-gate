@@ -106,6 +106,7 @@
 
 static char *progname;
 char *zone_name;	/* zone which we are managing */
+char default_brand[MAXNAMELEN];
 char brand_name[MAXNAMELEN];
 boolean_t zone_isnative;
 boolean_t zone_iscluster;
@@ -1239,11 +1240,11 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			eventstream_write(Z_EVT_ZONE_READIED);
 
 			/*
-			 * Get a handle to the native brand info.
-			 * We must always use the native brand file system
+			 * Get a handle to the default brand info.
+			 * We must always use the default brand file system
 			 * list when mounting the zone.
 			 */
-			if ((bh = brand_open(NATIVE_BRAND_NAME)) == NULL) {
+			if ((bh = brand_open(default_brand)) == NULL) {
 				rval = -1;
 				break;
 			}
@@ -1747,6 +1748,12 @@ main(int argc, char *argv[])
 		return (1);
 	}
 
+	if (zonecfg_default_brand(default_brand,
+	    sizeof (default_brand)) != Z_OK) {
+		zerror(zlogp, B_FALSE, "unable to determine default brand");
+		return (1);
+	}
+
 	/* Get a handle to the brand info for this zone */
 	if (zone_get_brand(zone_name, brand_name, sizeof (brand_name))
 	    != Z_OK) {
@@ -1767,7 +1774,7 @@ main(int argc, char *argv[])
 	if (strcmp(brand_name, CLUSTER_BRAND_NAME) == 0) {
 		zone_iscluster = B_TRUE;
 		if (zonecfg_in_alt_root()) {
-			(void) strlcpy(brand_name, NATIVE_BRAND_NAME,
+			(void) strlcpy(brand_name, default_brand,
 			    sizeof (brand_name));
 		}
 	} else {

@@ -87,6 +87,7 @@ extern boolean_t in_death_throes;
 extern boolean_t bringup_failure_recovery;
 extern char *zone_name;
 extern char brand_name[MAXNAMELEN];
+extern char default_brand[MAXNAMELEN];
 extern char boot_args[BOOTARGS_MAX];
 extern char bad_boot_arg[BOOTARGS_MAX];
 extern boolean_t zone_isnative;

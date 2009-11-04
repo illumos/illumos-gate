@@ -44,8 +44,6 @@ typedef struct priv_iter_s {
 extern brand_handle_t brand_open(const char *);
 extern void brand_close(brand_handle_t);
 
-extern int brand_is_native(brand_handle_t);
-
 extern boolean_t brand_allow_exclusive_ip(brand_handle_t);
 
 extern int brand_get_attach(brand_handle_t, const char *, const char *,

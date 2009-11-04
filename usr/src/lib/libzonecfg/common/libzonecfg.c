@@ -914,23 +914,37 @@ zonecfg_set_zonepath(zone_dochandle_t handle, char *zonepath)
 	return (setrootattr(handle, DTD_ATTR_ZONEPATH, zonepath));
 }
 
-int
-zonecfg_get_brand(zone_dochandle_t handle, char *brand, size_t brandsize)
+static int
+i_zonecfg_get_brand(zone_dochandle_t handle, char *brand, size_t brandsize,
+    boolean_t default_query)
 {
 	int ret, sz;
 
 	ret = getrootattr(handle, DTD_ATTR_BRAND, brand, brandsize);
 
-	/* If the zone has no brand, it is native. */
-	if (ret == Z_OK && brand[0] == '\0') {
-		sz = strlcpy(brand, NATIVE_BRAND_NAME, brandsize);
-		if (sz >= brandsize)
-			ret = Z_TOO_BIG;
-		else
-			ret = Z_OK;
+	/*
+	 * If the lookup failed, or succeeded in finding a non-null brand
+	 * string then return.
+	 */
+	if (ret != Z_OK || brand[0] != '\0')
+		return (ret);
+
+	if (!default_query) {
+		/* If the zone has no brand, it is the default brand. */
+		return (zonecfg_default_brand(brand, sizeof (brandsize)));
 	}
 
-	return (ret);
+	/* if SUNWdefault didn't specify a brand, fallback to "native" */
+	sz = strlcpy(brand, NATIVE_BRAND_NAME, brandsize);
+	if (sz >= brandsize)
+		return (Z_TOO_BIG);
+	return (Z_OK);
+}
+
+int
+zonecfg_get_brand(zone_dochandle_t handle, char *brand, size_t brandsize)
+{
+	return (i_zonecfg_get_brand(handle, brand, brandsize, B_FALSE));
 }
 
 int
@@ -4905,18 +4919,21 @@ priv_lists_destroy(priv_lists_t *plp)
 }
 
 static int
-priv_lists_create(zone_dochandle_t handle, priv_lists_t **plpp,
+priv_lists_create(zone_dochandle_t handle, char *brand, priv_lists_t **plpp,
     const char *curr_iptype)
 {
 	priv_lists_t *plp;
 	brand_handle_t bh;
-	char brand[MAXNAMELEN];
+	char brand_str[MAXNAMELEN];
+
+	/* handle or brand must be set, but never both */
+	assert((handle != NULL) || (brand != NULL));
+	assert((handle == NULL) || (brand == NULL));
 
 	if (handle != NULL) {
-		if (zonecfg_get_brand(handle, brand, sizeof (brand)) != 0)
+		brand = brand_str;
+		if (zonecfg_get_brand(handle, brand, sizeof (brand_str)) != 0)
 			return (Z_BRAND_ERROR);
-	} else {
-		(void) strlcpy(brand, NATIVE_BRAND_NAME, MAXNAMELEN);
 	}
 
 	if ((bh = brand_open(brand)) == NULL)
@@ -4963,12 +4980,31 @@ get_default_privset(priv_set_t *privs, priv_lists_t *plp)
 }
 
 int
+zonecfg_default_brand(char *brand, size_t brandsize)
+{
+	zone_dochandle_t handle;
+	int ret;
+
+	if ((handle = zonecfg_init_handle()) == NULL)
+		return (Z_NOMEM);
+	if ((ret = zonecfg_get_handle("SUNWdefault", handle)) == Z_OK) {
+		ret = i_zonecfg_get_brand(handle, brand, brandsize, B_TRUE);
+		zonecfg_fini_handle(handle);
+		return (ret);
+	}
+	return (ret);
+}
+
+int
 zonecfg_default_privset(priv_set_t *privs, const char *curr_iptype)
 {
 	priv_lists_t *plp;
+	char buf[MAXNAMELEN];
 	int ret;
 
-	if ((ret = priv_lists_create(NULL, &plp, curr_iptype)) != Z_OK)
+	if ((ret = zonecfg_default_brand(buf, sizeof (buf))) != Z_OK)
+		return (ret);
+	if ((ret = priv_lists_create(NULL, buf, &plp, curr_iptype)) != Z_OK)
 		return (ret);
 	ret = get_default_privset(privs, plp);
 	priv_lists_destroy(plp);
@@ -5140,7 +5176,7 @@ zonecfg_get_privset(zone_dochandle_t handle, priv_set_t *privs,
 		break;
 	}
 
-	if ((err = priv_lists_create(handle, &plp, curr_iptype)) != Z_OK)
+	if ((err = priv_lists_create(handle, NULL, &plp, curr_iptype)) != Z_OK)
 		return (err);
 
 	limitlen = strlen(limitpriv);
@@ -5278,10 +5314,9 @@ zone_get_brand(char *zone_name, char *brandname, size_t rp_sz)
 		return (Z_OK);
 	}
 
-	if (strcmp(zone_name, "global") == 0) {
-		(void) strlcpy(brandname, NATIVE_BRAND_NAME, rp_sz);
-		return (Z_OK);
-	}
+	if (strcmp(zone_name, "global") == 0)
+		return (zonecfg_default_brand(brandname, rp_sz));
+
 	if ((handle = zonecfg_init_handle()) == NULL)
 		return (Z_NOMEM);
 

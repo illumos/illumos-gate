@@ -69,6 +69,7 @@ SUNWprivate_1.1 {
 	zonecfg_close_scratch;
 	zonecfg_construct_rctlblk;
 	zonecfg_create_snapshot;
+	zonecfg_default_brand;
 	zonecfg_default_privset;
 	zonecfg_delete_attr;
 	zonecfg_delete_dev;

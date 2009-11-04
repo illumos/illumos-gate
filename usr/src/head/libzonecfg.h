@@ -504,6 +504,7 @@ extern	int	zone_set_state(char *, zone_state_t);
 extern	char	*zone_state_str(zone_state_t);
 extern	int	zonecfg_get_name_by_uuid(const uuid_t, char *, size_t);
 extern	int	zonecfg_get_uuid(const char *, uuid_t);
+extern	int	zonecfg_default_brand(char *, size_t);
 
 /*
  * Iterator for configured zones.

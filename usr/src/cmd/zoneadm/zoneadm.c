@@ -198,6 +198,7 @@ static struct cmd cmdtab[] = {
 /* set early in main(), never modified thereafter, used all over the place */
 static char *execname;
 static char target_brand[MAXNAMELEN];
+static char default_brand[MAXPATHLEN];
 static char *locale;
 char *target_zone;
 static char *target_uuid;
@@ -525,7 +526,7 @@ lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 	 */
 	if (getzoneid() != GLOBAL_ZONEID) {
 		assert(is_system_labeled() != 0);
-		(void) strlcpy(zent->zbrand, NATIVE_BRAND_NAME,
+		(void) strlcpy(zent->zbrand, default_brand,
 		    sizeof (zent->zbrand));
 	} else if (zone_get_brand(zent->zname, zent->zbrand,
 	    sizeof (zent->zbrand)) != Z_OK) {
@@ -5651,6 +5652,13 @@ main(int argc, char **argv)
 	 */
 	zonecfg_init_lock_file(target_zone, &zone_lock_env);
 
+	/* Figure out what the system's default brand is */
+	if (zonecfg_default_brand(default_brand,
+	    sizeof (default_brand)) != Z_OK) {
+		zerror(gettext("unable to determine default brand"));
+		return (Z_ERR);
+	}
+
 	/*
 	 * If we are going to be operating on a single zone, retrieve its
 	 * brand type and determine whether it is native or not.
@@ -5672,7 +5680,7 @@ main(int argc, char **argv)
 		 */
 		if (strcmp(target_brand, CLUSTER_BRAND_NAME) == 0) {
 			if (zonecfg_in_alt_root()) {
-				(void) strlcpy(target_brand, NATIVE_BRAND_NAME,
+				(void) strlcpy(target_brand, default_brand,
 				    sizeof (target_brand));
 			}
 		}

@@ -1679,6 +1679,7 @@ main(int argc, char **argv)
 	priv_set_t *privset;
 	int tmpl_fd;
 	char zonebrand[MAXNAMELEN];
+	char default_brand[MAXNAMELEN];
 	struct stat sb;
 	char kernzone[ZONENAME_MAX];
 	brand_handle_t bh;
@@ -1908,11 +1909,16 @@ main(int argc, char **argv)
 	 * brand may not exist in the miniroot (such as in net install
 	 * upgrade).
 	 */
+	if (zonecfg_default_brand(default_brand,
+	    sizeof (default_brand)) != Z_OK) {
+		zerror(gettext("unable to determine default brand"));
+		return (1);
+	}
 	if (zonecfg_in_alt_root() &&
 	    strcmp(zonebrand, CLUSTER_BRAND_NAME) == 0) {
-		(void) strlcpy(zonebrand, NATIVE_BRAND_NAME,
-		    sizeof (zonebrand));
+		(void) strlcpy(zonebrand, default_brand, sizeof (zonebrand));
 	}
+
 	if ((bh = brand_open(zonebrand)) == NULL) {
 		zerror(gettext("could not open brand for zone %s"), zonename);
 		return (1);

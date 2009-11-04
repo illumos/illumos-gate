@@ -1085,11 +1085,11 @@ mount_one_dev(zlog_t *zlogp, char *devpath, zone_mnt_t mount_cmd)
 
 	/*
 	 * Get a handle to the brand info for this zone.
-	 * If we are mounting the zone, then we must always use the native
+	 * If we are mounting the zone, then we must always use the default
 	 * brand device mounts.
 	 */
 	if (ALT_MOUNT(mount_cmd)) {
-		(void) strlcpy(brand, NATIVE_BRAND_NAME, sizeof (brand));
+		(void) strlcpy(brand, default_brand, sizeof (brand));
 	} else {
 		(void) strlcpy(brand, brand_name, sizeof (brand));
 	}
@@ -1759,11 +1759,11 @@ mount_filesystems(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	}
 
 	/*
-	 * If we are mounting the zone, then we must always use the native
+	 * If we are mounting the zone, then we must always use the default
 	 * brand global mounts.
 	 */
 	if (ALT_MOUNT(mount_cmd)) {
-		(void) strlcpy(brand, NATIVE_BRAND_NAME, sizeof (brand));
+		(void) strlcpy(brand, default_brand, sizeof (brand));
 	} else {
 		(void) strlcpy(brand, brand_name, sizeof (brand));
 	}
