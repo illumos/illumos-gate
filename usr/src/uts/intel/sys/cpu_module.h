@@ -150,10 +150,11 @@ extern uint_t cmi_hdl_family(cmi_hdl_t);
 extern uint_t cmi_hdl_model(cmi_hdl_t);
 extern uint_t cmi_hdl_stepping(cmi_hdl_t);
 extern uint_t cmi_hdl_chipid(cmi_hdl_t);
-extern uint_t cmi_hdl_dieid(cmi_hdl_t);
+extern uint_t cmi_hdl_procnodeid(cmi_hdl_t);
 extern uint_t cmi_hdl_coreid(cmi_hdl_t);
 extern uint_t cmi_hdl_strandid(cmi_hdl_t);
 extern uint_t cmi_hdl_strand_apicid(cmi_hdl_t);
+extern uint_t cmi_hdl_procnodes_per_pkg(cmi_hdl_t);
 extern boolean_t cmi_hdl_is_cmt(cmi_hdl_t);
 extern uint32_t cmi_hdl_chiprev(cmi_hdl_t);
 extern const char *cmi_hdl_chiprevstr(cmi_hdl_t);
@@ -168,6 +169,7 @@ extern int cmi_hdl_online(cmi_hdl_t, int, int *);
 
 #ifndef	__xpv
 extern uint_t cmi_ntv_hwchipid(cpu_t *);
+extern uint_t cmi_ntv_hwprocnodeid(cpu_t *);
 extern uint_t cmi_ntv_hwcoreid(cpu_t *);
 extern uint_t cmi_ntv_hwstrandid(cpu_t *);
 #endif	/* __xpv */

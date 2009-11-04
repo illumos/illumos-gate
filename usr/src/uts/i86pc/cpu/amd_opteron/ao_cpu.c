@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/pghw.h>
@@ -61,23 +59,23 @@ enum {
 } ao_scrub_policy = AO_SCRUB_MAX;
 
 void
-ao_pcicfg_write(uint_t chipid, uint_t func, uint_t reg, uint32_t val)
+ao_pcicfg_write(uint_t procnodeid, uint_t func, uint_t reg, uint32_t val)
 {
-	ASSERT(chipid + 24 <= 31);
+	ASSERT(procnodeid + 24 <= 31);
 	ASSERT((func & 7) == func);
 	ASSERT((reg & 3) == 0 && reg < 256);
 
-	cmi_pci_putl(0, chipid + 24, func, reg, 0, val);
+	cmi_pci_putl(0, procnodeid + 24, func, reg, 0, val);
 }
 
 uint32_t
-ao_pcicfg_read(uint_t chipid, uint_t func, uint_t reg)
+ao_pcicfg_read(uint_t procnodeid, uint_t func, uint_t reg)
 {
-	ASSERT(chipid + 24 <= 31);
+	ASSERT(procnodeid + 24 <= 31);
 	ASSERT((func & 7) == func);
 	ASSERT((reg & 3) == 0 && reg < 256);
 
-	return (cmi_pci_getl(0, chipid + 24, func, reg, 0, 0));
+	return (cmi_pci_getl(0, procnodeid + 24, func, reg, 0, 0));
 }
 
 
@@ -97,17 +95,17 @@ ao_scrubber_max(uint32_t r1, uint32_t r2)
 }
 
 /*
- * Enable the chip-specific hardware scrubbers for the D$ and L2$.  We set
+ * Enable the node-specific hardware scrubbers for the D$ and L2$.  We set
  * the scrubber rate based on a set of tunables defined at the top of the file.
  */
 void
-ao_chip_scrubber_enable(cmi_hdl_t hdl, ao_ms_data_t *ao)
+ao_procnode_scrubber_enable(cmi_hdl_t hdl, ao_ms_data_t *ao)
 {
-	chipid_t chipid = cmi_hdl_chipid(hdl);
+	uint_t procnodeid = cmi_hdl_procnodeid(hdl);
 	union mcreg_scrubctl scrubctl;
 
 	ao->ao_ms_shared->aos_bcfg_scrubctl = MCREG_VAL32(&scrubctl) =
-	    ao_pcicfg_read(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBCTL);
+	    ao_pcicfg_read(procnodeid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBCTL);
 
 	if (ao_scrub_policy == AO_SCRUB_BIOSDEFAULT)
 		return;
@@ -148,6 +146,6 @@ ao_chip_scrubber_enable(cmi_hdl_t hdl, ao_ms_data_t *ao)
 	MCREG_FIELD_CMN(&scrubctl, DcacheScrub) = ao_scrub_rate_dcache;
 	MCREG_FIELD_CMN(&scrubctl, L2Scrub) = ao_scrub_rate_l2cache;
 
-	ao_pcicfg_write(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBCTL,
+	ao_pcicfg_write(procnodeid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBCTL,
 	    MCREG_VAL32(&scrubctl));
 }

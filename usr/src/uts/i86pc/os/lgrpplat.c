@@ -1152,12 +1152,12 @@ lgrp_plat_cpu_to_node(cpu_t *cp, cpu_node_map_t *cpu_node,
 
 	/*
 	 * SRAT doesn't exist, isn't enabled, or there was an error processing
-	 * it, so return chip ID for Opteron and -1 otherwise.
+	 * it, so return node ID for Opteron and -1 otherwise.
 	 */
 	if (srat_ptr == NULL || !lgrp_plat_srat_enable ||
 	    lgrp_plat_srat_error) {
 		if (is_opteron())
-			return (pg_plat_hw_instance_id(cp, PGHW_CHIP));
+			return (pg_plat_hw_instance_id(cp, PGHW_PROCNODE));
 		return (-1);
 	}
 

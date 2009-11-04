@@ -52,6 +52,10 @@ extern "C" {
 	    (*(int *)topo_mod_getspecific(mod) == X86PI_FULL))
 #define	IGNORE_ID	0xFFFF
 
+/*
+ * These definitions are for the Tree Nodes
+ * in the FM Topology
+ */
 #define	CHIP_NODE_NAME		"chip"
 #define	CORE_NODE_NAME		"core"
 #define	STRAND_NODE_NAME	"strand"
@@ -73,14 +77,23 @@ extern "C" {
 #define	CHIP_NCORE		"ncore_per_chip"
 
 /*
+ * memory-controller-properties
+ * check usr/src/uts/i86pc/os/cpuid.c to understand more
+ * on procnodeid values for AMD & Intel
+ */
+#define	MCT_PROCNODE_ID		"procnodeid"
+
+/*
  * core-properties
  */
 #define	CORE_CHIP_ID		"chip_id"
+#define	CORE_PROCNODE_ID	"procnodeid"
 
 /*
  * strand-properties
  */
 #define	STRAND_CHIP_ID		"chip_id"
+#define	STRAND_PROCNODE_ID	"procnodeid"
 #define	STRAND_CORE_ID		"core_id"
 #define	STRAND_PKG_CORE_ID	"pkg_core_id"
 #define	STRAND_CPU_ID		"cpuid"
@@ -176,8 +189,8 @@ extern int mem_asru_create(topo_mod_t *, nvlist_t *, nvlist_t **);
 /*
  * Prototypes for chip_amd.c
  */
-extern void amd_mc_create(topo_mod_t *, uint16_t, tnode_t *,
-    const char *, nvlist_t *, int, int, int, int *);
+extern void amd_mc_create(topo_mod_t *, uint16_t, tnode_t *, const char *,
+    nvlist_t *, int32_t, int32_t, int, int, int *);
 
 /*
  * Prototypes for chip_intel.c

@@ -33,9 +33,11 @@ typedef struct cmi_hdl_impl {
 	enum cmi_hdl_class cmih_class;		/* Handle nature */
 	struct cmi_hdl_ops *cmih_ops;		/* Operations vector */
 	uint_t cmih_chipid;			/* Chipid of cpu resource */
+	uint_t cmih_procnodeid;			/* Nodeid of cpu resource */
 	uint_t cmih_coreid;			/* Core within die */
 	uint_t cmih_strandid;			/* Thread within core */
 	boolean_t cmih_mstrand;			/* cores are multithreaded */
+	uint_t cmih_procnodes_per_pkg;		/* Nodes in a processor */
 	volatile uint32_t *cmih_refcntp;	/* Reference count pointer */
 	uint64_t cmih_msrsrc;			/* MSR data source flags */
 	void *cmih_hdlpriv;			/* cmi_hw.c private data */

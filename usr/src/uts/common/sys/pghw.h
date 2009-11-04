@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -55,6 +56,15 @@ typedef enum pghw_type {
 	PGHW_POW_IDLE,		/* Idle Power Management Domain */
 	PGHW_NUM_COMPONENTS
 } pghw_type_t;
+
+/*
+ * See comments in usr/src/uts/i86pc/os/cpuid.c
+ * for description of processor nodes
+ *
+ * From sharing point of view processor nodes are
+ * very similar to memory pipes, hence the #define below.
+ */
+#define	PGHW_PROCNODE	PGHW_MPIPE
 
 /*
  * Returns true if the hardware is a type of power management domain

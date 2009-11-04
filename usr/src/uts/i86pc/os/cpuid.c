@@ -26,6 +26,9 @@
  * Copyright (c) 2009, Intel Corporation.
  * All rights reserved.
  */
+/*
+ * Portions Copyright 2009 Advanced Micro Devices, Inc.
+ */
 
 /*
  * Various routines to handle identification
@@ -49,6 +52,7 @@
 #include <sys/auxv_386.h>
 #include <sys/bitmap.h>
 #include <sys/memnode.h>
+#include <sys/pci_cfgspace.h>
 
 #ifdef __xpv
 #include <sys/hypervisor.h>
@@ -153,7 +157,21 @@ struct mwait_info {
  */
 
 #define	NMAX_CPI_STD	6		/* eax = 0 .. 5 */
-#define	NMAX_CPI_EXTD	9		/* eax = 0x80000000 .. 0x80000008 */
+#define	NMAX_CPI_EXTD	0x1c		/* eax = 0x80000000 .. 0x8000001b */
+
+/*
+ * Some terminology needs to be explained:
+ *  - Socket: Something that can be plugged into a motherboard.
+ *  - Package: Same as socket
+ *  - Chip: Same as socket. Note that AMD's documentation uses term "chip"
+ *    differently: there, chip is the same as processor node (below)
+ *  - Processor node: Some AMD processors have more than one
+ *    "subprocessor" embedded in a package. These subprocessors (nodes)
+ *    are fully-functional processors themselves with cores, caches,
+ *    memory controllers, PCI configuration spaces. They are connected
+ *    inside the package with Hypertransport links. On single-node
+ *    processors, processor node is equivalent to chip/socket/package.
+ */
 
 struct cpuid_info {
 	uint_t cpi_pass;		/* last pass completed */
@@ -167,7 +185,8 @@ struct cpuid_info {
 	uint_t cpi_family;		/* fn 1: extended family */
 	uint_t cpi_model;		/* fn 1: extended model */
 	uint_t cpi_step;		/* fn 1: stepping */
-	chipid_t cpi_chipid;		/* fn 1: %ebx: chip # on ht cpus */
+	chipid_t cpi_chipid;		/* fn 1: %ebx:  Intel: chip # */
+					/*		AMD: package/socket # */
 	uint_t cpi_brandid;		/* fn 1: %ebx: brand ID */
 	int cpi_clogid;			/* fn 1: %ebx: thread # */
 	uint_t cpi_ncpu_per_chip;	/* fn 1: %ebx: logical cpu count */
@@ -184,8 +203,9 @@ struct cpuid_info {
 	uint_t cpi_xmaxeax;		/* fn 0x80000000: %eax */
 	char cpi_brandstr[49];		/* fn 0x8000000[234] */
 	uint8_t cpi_pabits;		/* fn 0x80000006: %eax */
-	uint8_t cpi_vabits;		/* fn 0x80000006: %eax */
-	struct cpuid_regs cpi_extd[NMAX_CPI_EXTD]; /* 0x8000000[0-8] */
+	uint8_t	cpi_vabits;		/* fn 0x80000006: %eax */
+	struct	cpuid_regs cpi_extd[NMAX_CPI_EXTD];	/* 0x800000XX */
+
 	id_t cpi_coreid;		/* same coreid => strands share core */
 	int cpi_pkgcoreid;		/* core number within single package */
 	uint_t cpi_ncore_per_chip;	/* AMD: fn 0x80000008: %ecx[7-0] */
@@ -208,6 +228,9 @@ struct cpuid_info {
 
 	struct mwait_info cpi_mwait;	/* fn 5: monitor/mwait info */
 	uint32_t cpi_apicid;
+	uint_t cpi_procnodeid;		/* AMD: nodeID on HT, Intel: chipid */
+	uint_t cpi_procnodes_per_pkg;	/* AMD: # of nodes in the package */
+					/* Intel: 1 */
 };
 
 
@@ -504,6 +527,178 @@ is_controldom(void)
 }
 
 #endif	/* __xpv */
+
+static void
+cpuid_intel_getids(cpu_t *cpu, uint_t feature)
+{
+	uint_t i;
+	uint_t chipid_shift = 0;
+	uint_t coreid_shift = 0;
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	for (i = 1; i < cpi->cpi_ncpu_per_chip; i <<= 1)
+		chipid_shift++;
+
+	cpi->cpi_chipid = cpi->cpi_apicid >> chipid_shift;
+	cpi->cpi_clogid = cpi->cpi_apicid & ((1 << chipid_shift) - 1);
+
+	if (feature & X86_CMP) {
+		/*
+		 * Multi-core (and possibly multi-threaded)
+		 * processors.
+		 */
+		uint_t ncpu_per_core;
+		if (cpi->cpi_ncore_per_chip == 1)
+			ncpu_per_core = cpi->cpi_ncpu_per_chip;
+		else if (cpi->cpi_ncore_per_chip > 1)
+			ncpu_per_core = cpi->cpi_ncpu_per_chip /
+			    cpi->cpi_ncore_per_chip;
+		/*
+		 * 8bit APIC IDs on dual core Pentiums
+		 * look like this:
+		 *
+		 * +-----------------------+------+------+
+		 * | Physical Package ID   |  MC  |  HT  |
+		 * +-----------------------+------+------+
+		 * <------- chipid -------->
+		 * <------- coreid --------------->
+		 *			   <--- clogid -->
+		 *			   <------>
+		 *			   pkgcoreid
+		 *
+		 * Where the number of bits necessary to
+		 * represent MC and HT fields together equals
+		 * to the minimum number of bits necessary to
+		 * store the value of cpi->cpi_ncpu_per_chip.
+		 * Of those bits, the MC part uses the number
+		 * of bits necessary to store the value of
+		 * cpi->cpi_ncore_per_chip.
+		 */
+		for (i = 1; i < ncpu_per_core; i <<= 1)
+			coreid_shift++;
+		cpi->cpi_coreid = cpi->cpi_apicid >> coreid_shift;
+		cpi->cpi_pkgcoreid = cpi->cpi_clogid >> coreid_shift;
+	} else if (feature & X86_HTT) {
+		/*
+		 * Single-core multi-threaded processors.
+		 */
+		cpi->cpi_coreid = cpi->cpi_chipid;
+		cpi->cpi_pkgcoreid = 0;
+	}
+	cpi->cpi_procnodeid = cpi->cpi_chipid;
+}
+
+static void
+cpuid_amd_getids(cpu_t *cpu)
+{
+	int first_half, mnc, coreidsz;
+	uint32_t nb_caps_reg;
+	uint_t node2_1;
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+
+	/*
+	 * AMD CMP chips currently have a single thread per core.
+	 *
+	 * Since no two cpus share a core we must assign a distinct coreid
+	 * per cpu, and we do this by using the cpu_id.  This scheme does not,
+	 * however, guarantee that sibling cores of a chip will have sequential
+	 * coreids starting at a multiple of the number of cores per chip -
+	 * that is usually the case, but if the ACPI MADT table is presented
+	 * in a different order then we need to perform a few more gymnastics
+	 * for the pkgcoreid.
+	 *
+	 * All processors in the system have the same number of enabled
+	 * cores. Cores within a processor are always numbered sequentially
+	 * from 0 regardless of how many or which are disabled, and there
+	 * is no way for operating system to discover the real core id when some
+	 * are disabled.
+	 */
+
+	cpi->cpi_coreid = cpu->cpu_id;
+
+	if (cpi->cpi_xmaxeax >= 0x80000008) {
+
+		coreidsz = BITX((cpi)->cpi_extd[8].cp_ecx, 15, 12);
+
+		/*
+		 * In AMD parlance chip is really a node while Solaris
+		 * sees chip as equivalent to socket/package.
+		 */
+		cpi->cpi_ncore_per_chip =
+		    BITX((cpi)->cpi_extd[8].cp_ecx, 7, 0) + 1;
+		if (coreidsz == 0)
+			/* Use legacy method */
+			mnc = cpi->cpi_ncore_per_chip;
+		else
+			mnc = (1 << coreidsz);
+	} else {
+		/* Assume single-core part */
+		cpi->cpi_ncore_per_chip = mnc = 1;
+	}
+
+	cpi->cpi_clogid = cpi->cpi_pkgcoreid = cpi->cpi_apicid & (mnc - 1);
+	cpi->cpi_ncpu_per_chip = cpi->cpi_ncore_per_chip;
+
+	/* Get nodeID */
+	if (cpi->cpi_family == 0xf) {
+		cpi->cpi_procnodeid = BITX(cpi->cpi_apicid, 3, mnc-1);
+		cpi->cpi_chipid = cpi->cpi_procnodeid;
+	} else if (cpi->cpi_family == 0x10) {
+		/*
+		 * See if we are a multi-node processor.
+		 * All processors in the system have the same number of nodes
+		 */
+		nb_caps_reg =  pci_getl_func(0, 24, 3, 0xe8);
+		if ((cpi->cpi_model < 8) || BITX(nb_caps_reg, 29, 29) == 0) {
+			/* Single-node */
+			cpi->cpi_procnodeid = BITX(cpi->cpi_apicid, 5, 3);
+			cpi->cpi_chipid = cpi->cpi_procnodeid;
+		} else {
+
+			/*
+			 * Multi-node revision D (2 nodes per package
+			 * are supported)
+			 */
+			cpi->cpi_procnodes_per_pkg = 2;
+
+			first_half = (cpi->cpi_pkgcoreid <=
+			    (cpi->cpi_ncore_per_chip/2 - 1));
+
+			if (cpi->cpi_apicid == cpi->cpi_pkgcoreid) {
+				/* We are BSP */
+				cpi->cpi_procnodeid = (first_half ? 0 : 1);
+				cpi->cpi_chipid = cpi->cpi_procnodeid >> 1;
+			} else {
+
+				/* We are AP */
+				/* NodeId[2:1] bits to use for reading F3xe8 */
+				node2_1 = BITX(cpi->cpi_apicid, 5, 4) << 1;
+
+				nb_caps_reg =
+				    pci_getl_func(0, 24 + node2_1, 3, 0xe8);
+
+				/*
+				 * Check IntNodeNum bit (31:30, but bit 31 is
+				 * always 0 on dual-node processors)
+				 */
+				if (BITX(nb_caps_reg, 30, 30) == 0)
+					cpi->cpi_procnodeid = node2_1 +
+					    !first_half;
+				else
+					cpi->cpi_procnodeid = node2_1 +
+					    first_half;
+
+				cpi->cpi_chipid = cpi->cpi_procnodeid >> 1;
+			}
+		}
+	} else if (cpi->cpi_family >= 0x11) {
+		cpi->cpi_procnodeid = (cpi->cpi_apicid >> coreidsz) & 7;
+		cpi->cpi_chipid = cpi->cpi_procnodeid;
+	} else {
+		cpi->cpi_procnodeid = 0;
+		cpi->cpi_chipid = cpi->cpi_procnodeid;
+	}
+}
 
 uint_t
 cpuid_pass1(cpu_t *cpu)
@@ -1124,6 +1319,9 @@ cpuid_pass1(cpu_t *cpu)
 	if (cpi->cpi_ncpu_per_chip == cpi->cpi_ncore_per_chip)
 		feature &= ~X86_HTT;
 
+	cpi->cpi_apicid = CPI_APIC_ID(cpi);
+	cpi->cpi_procnodes_per_pkg = 1;
+
 	if ((feature & (X86_HTT | X86_CMP)) == 0) {
 		/*
 		 * Single-core single-threaded processors.
@@ -1132,114 +1330,25 @@ cpuid_pass1(cpu_t *cpu)
 		cpi->cpi_clogid = 0;
 		cpi->cpi_coreid = cpu->cpu_id;
 		cpi->cpi_pkgcoreid = 0;
+		if (cpi->cpi_vendor == X86_VENDOR_AMD)
+			cpi->cpi_procnodeid = BITX(cpi->cpi_apicid, 3, 0);
+		else
+			cpi->cpi_procnodeid = cpi->cpi_chipid;
 	} else if (cpi->cpi_ncpu_per_chip > 1) {
-		uint_t i;
-		uint_t chipid_shift = 0;
-		uint_t coreid_shift = 0;
-		uint_t apic_id = CPI_APIC_ID(cpi);
-
-		for (i = 1; i < cpi->cpi_ncpu_per_chip; i <<= 1)
-			chipid_shift++;
-		cpi->cpi_chipid = apic_id >> chipid_shift;
-		cpi->cpi_clogid = apic_id & ((1 << chipid_shift) - 1);
-
-		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
-			if (feature & X86_CMP) {
-				/*
-				 * Multi-core (and possibly multi-threaded)
-				 * processors.
-				 */
-				uint_t ncpu_per_core;
-				if (cpi->cpi_ncore_per_chip == 1)
-					ncpu_per_core = cpi->cpi_ncpu_per_chip;
-				else if (cpi->cpi_ncore_per_chip > 1)
-					ncpu_per_core = cpi->cpi_ncpu_per_chip /
-					    cpi->cpi_ncore_per_chip;
-				/*
-				 * 8bit APIC IDs on dual core Pentiums
-				 * look like this:
-				 *
-				 * +-----------------------+------+------+
-				 * | Physical Package ID   |  MC  |  HT  |
-				 * +-----------------------+------+------+
-				 * <------- chipid -------->
-				 * <------- coreid --------------->
-				 *			   <--- clogid -->
-				 *			   <------>
-				 *			   pkgcoreid
-				 *
-				 * Where the number of bits necessary to
-				 * represent MC and HT fields together equals
-				 * to the minimum number of bits necessary to
-				 * store the value of cpi->cpi_ncpu_per_chip.
-				 * Of those bits, the MC part uses the number
-				 * of bits necessary to store the value of
-				 * cpi->cpi_ncore_per_chip.
-				 */
-				for (i = 1; i < ncpu_per_core; i <<= 1)
-					coreid_shift++;
-				cpi->cpi_coreid = apic_id >> coreid_shift;
-				cpi->cpi_pkgcoreid = cpi->cpi_clogid >>
-				    coreid_shift;
-			} else if (feature & X86_HTT) {
-				/*
-				 * Single-core multi-threaded processors.
-				 */
-				cpi->cpi_coreid = cpi->cpi_chipid;
-				cpi->cpi_pkgcoreid = 0;
-			}
-		} else if (cpi->cpi_vendor == X86_VENDOR_AMD) {
-			/*
-			 * AMD CMP chips currently have a single thread per
-			 * core, with 2 cores on family 0xf and 2, 3 or 4
-			 * cores on family 0x10.
-			 *
-			 * Since no two cpus share a core we must assign a
-			 * distinct coreid per cpu, and we do this by using
-			 * the cpu_id.  This scheme does not, however,
-			 * guarantee that sibling cores of a chip will have
-			 * sequential coreids starting at a multiple of the
-			 * number of cores per chip - that is usually the
-			 * case, but if the ACPI MADT table is presented
-			 * in a different order then we need to perform a
-			 * few more gymnastics for the pkgcoreid.
-			 *
-			 * In family 0xf CMPs there are 2 cores on all nodes
-			 * present - no mixing of single and dual core parts.
-			 *
-			 * In family 0x10 CMPs cpuid fn 2 ECX[15:12]
-			 * "ApicIdCoreIdSize[3:0]" tells us how
-			 * many least-significant bits in the ApicId
-			 * are used to represent the core number
-			 * within the node.  Cores are always
-			 * numbered sequentially from 0 regardless
-			 * of how many or which are disabled, and
-			 * there seems to be no way to discover the
-			 * real core id when some are disabled.
-			 */
-			cpi->cpi_coreid = cpu->cpu_id;
-
-			if (cpi->cpi_family == 0x10 &&
-			    cpi->cpi_xmaxeax >= 0x80000008) {
-				int coreidsz =
-				    BITX((cpi)->cpi_extd[8].cp_ecx, 15, 12);
-
-				cpi->cpi_pkgcoreid =
-				    apic_id & ((1 << coreidsz) - 1);
-			} else {
-				cpi->cpi_pkgcoreid = cpi->cpi_clogid;
-			}
-		} else {
+		if (cpi->cpi_vendor == X86_VENDOR_Intel)
+			cpuid_intel_getids(cpu, feature);
+		else if (cpi->cpi_vendor == X86_VENDOR_AMD)
+			cpuid_amd_getids(cpu);
+		else {
 			/*
 			 * All other processors are currently
 			 * assumed to have single cores.
 			 */
 			cpi->cpi_coreid = cpi->cpi_chipid;
 			cpi->cpi_pkgcoreid = 0;
+			cpi->cpi_procnodeid = cpi->cpi_chipid;
 		}
 	}
-
-	cpi->cpi_apicid = CPI_APIC_ID(cpi);
 
 	/*
 	 * Synthesize chip "revision" and socket type
@@ -2554,6 +2663,20 @@ cpuid_get_clogid(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 1));
 	return (cpu->cpu_m.mcpu_cpi->cpi_clogid);
+}
+
+uint_t
+cpuid_get_procnodeid(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_procnodeid);
+}
+
+uint_t
+cpuid_get_procnodes_per_pkg(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_procnodes_per_pkg);
 }
 
 /*ARGSUSED*/

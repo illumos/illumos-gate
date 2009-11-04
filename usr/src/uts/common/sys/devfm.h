@@ -83,13 +83,15 @@ typedef struct fm_ioc_data32 {
 /*
  * Constants
  */
-#define	FM_PAGE_RETIRE_FMRI	"fmri"
-#define	FM_PHYSCPU_INFO_CPUS	"cpus"
-#define	FM_CPU_RETIRE_CHIP_ID	"chip_id"
-#define	FM_CPU_RETIRE_CORE_ID	"core_id"
-#define	FM_CPU_RETIRE_STRAND_ID	"strand_id"
-#define	FM_CPU_RETIRE_OLDSTATUS	"oldstatus"
-#define	FM_GENTOPO_LEGACY	"gentopolegacy"
+#define	FM_PAGE_RETIRE_FMRI		"fmri"
+#define	FM_PHYSCPU_INFO_CPUS		"cpus"
+#define	FM_CPU_RETIRE_CHIP_ID		"chip_id"
+#define	FM_PHYSCPU_INFO_NPROCNODES	"procnodes_per_pkg"
+#define	FM_PHYSCPU_INFO_PROCNODE_ID	"procnodeid"
+#define	FM_CPU_RETIRE_CORE_ID		"core_id"
+#define	FM_CPU_RETIRE_STRAND_ID		"strand_id"
+#define	FM_CPU_RETIRE_OLDSTATUS		"oldstatus"
+#define	FM_GENTOPO_LEGACY		"gentopolegacy"
 
 /*
  * Properties set by FM_PHYSCPU_INFO

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _AUTHAMD_H
 #define	_AUTHAMD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mca_amd.h>
@@ -37,8 +35,8 @@
 extern "C" {
 #endif
 
-#define	AUTHAMD_MAX_CHIPS		8	/* max number of chips */
-#define	AUTHAMD_DRAM_NCHANNEL		2	/* dram channels per chip */
+#define	AUTHAMD_MAX_NODES		8	/* max number of nodes */
+#define	AUTHAMD_DRAM_NCHANNEL		2	/* dram channels per node */
 #define	AUTHAMD_DRAM_NCS		8	/* chip-selects per channel */
 
 #define	AUTHAMD_FAMILY_6		0x6
@@ -66,10 +64,11 @@ typedef struct authamd_logout {
 #pragma pack()
 
 /*
- * Per chip shared state
+ * Per node shared state
  */
-struct authamd_chipshared {
+struct authamd_nodeshared {
 	uint_t acs_chipid;
+	uint_t acs_procnodeid;
 	uint_t acs_family;		/* family number */
 	uint32_t acs_rev;		/* revision per cpuid_getchiprev */
 	volatile ulong_t acs_cfgonce;	/* Config performed once per chip */
@@ -91,7 +90,7 @@ enum authamd_cfgonce_bitnum {
 struct authamd_data {
 	cmi_hdl_t amd_hdl;			/* cpu we're associated with */
 	uint64_t amd_hwcr;
-	struct authamd_chipshared *amd_shared;
+	struct authamd_nodeshared *amd_shared;
 };
 
 #ifdef _KERNEL

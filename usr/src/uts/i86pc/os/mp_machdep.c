@@ -231,6 +231,11 @@ pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
 		} else {
 			return (0);
 		}
+	case PGHW_PROCNODE:
+		if (cpuid_get_procnodes_per_pkg(cp) > 1)
+			return (1);
+		else
+			return (0);
 	case PGHW_CHIP:
 		if (x86_feature & (X86_CMP|X86_HTT))
 			return (1);
@@ -286,6 +291,8 @@ pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 		return (cpuid_get_coreid(cpu));
 	case PGHW_CACHE:
 		return (cpuid_get_last_lvl_cacheid(cpu));
+	case PGHW_PROCNODE:
+		return (cpuid_get_procnodeid(cpu));
 	case PGHW_CHIP:
 		return (cpuid_get_chipid(cpu));
 	case PGHW_POW_ACTIVE:
@@ -309,6 +316,7 @@ pg_plat_hw_rank(pghw_type_t hw1, pghw_type_t hw2)
 	static pghw_type_t hw_hier[] = {
 		PGHW_IPIPE,
 		PGHW_CACHE,
+		PGHW_PROCNODE,
 		PGHW_CHIP,
 		PGHW_POW_IDLE,
 		PGHW_POW_ACTIVE,
@@ -1654,6 +1662,7 @@ pg_cmt_load_bal_hw(pghw_type_t hw)
 {
 	if (hw == PGHW_IPIPE ||
 	    hw == PGHW_FPU ||
+	    hw == PGHW_PROCNODE ||
 	    hw == PGHW_CHIP)
 		return (1);
 	else

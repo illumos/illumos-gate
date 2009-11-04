@@ -278,7 +278,8 @@ create_strand(topo_mod_t *mod, tnode_t *pnode, nvlist_t *cpu,
 
 	(void) topo_pgroup_create(strand, &strand_pgroup, &err);
 	nerr -= add_nvlist_longprops(mod, strand, cpu, PGNAME(STRAND), NULL,
-	    STRAND_CHIP_ID, STRAND_CORE_ID, STRAND_CPU_ID, NULL);
+	    STRAND_CHIP_ID, STRAND_PROCNODE_ID, STRAND_CORE_ID, STRAND_CPU_ID,
+	    NULL);
 
 	if (FM_AWARE_SMBIOS(mod)) {
 		(void) topo_node_label_set(strand, NULL, &perr);
@@ -381,8 +382,8 @@ create_core(topo_mod_t *mod, tnode_t *pnode, nvlist_t *cpu,
 			    "topo_method_register failed\n");
 
 		(void) topo_pgroup_create(core, &core_pgroup, &err);
-		nerr -= add_nvlist_longprop(mod, core, cpu, PGNAME(CORE),
-		    CORE_CHIP_ID, NULL);
+		nerr -= add_nvlist_longprops(mod, core, cpu, PGNAME(CORE), NULL,
+		    CORE_CHIP_ID, CORE_PROCNODE_ID, NULL);
 
 		if (topo_node_range_create(mod, core, STRAND_NODE_NAME,
 		    0, 255) != 0)
@@ -456,11 +457,11 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
     int mc_offchip)
 {
 	tnode_t *chip;
-	int32_t chipid;
 	nvlist_t *fmri = NULL;
 	int err, perr, nerr = 0;
-	int32_t fms[3];
+	int32_t chipid, procnodeid, procnodes_per_pkg;
 	const char *vendor;
+	int32_t family, model;
 	boolean_t create_mc = B_FALSE;
 	uint16_t smbios_id;
 
@@ -468,9 +469,17 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 	 * /dev/fm will export the chipid based on SMBIOS' ordering
 	 * of Type-4 structures, if SMBIOS meets FMA needs
 	 */
-	if ((err = nvlist_lookup_int32(cpu, FM_PHYSCPU_INFO_CHIP_ID, &chipid))
-	    != 0) {
-		whinge(mod, &nerr, "create_chip: lookup chip_id failed: %s\n",
+	err = nvlist_lookup_pairs(cpu, 0,
+	    FM_PHYSCPU_INFO_CHIP_ID, DATA_TYPE_INT32, &chipid,
+	    FM_PHYSCPU_INFO_NPROCNODES, DATA_TYPE_INT32, &procnodes_per_pkg,
+	    FM_PHYSCPU_INFO_PROCNODE_ID, DATA_TYPE_INT32, &procnodeid,
+	    FM_PHYSCPU_INFO_VENDOR_ID, DATA_TYPE_STRING, &vendor,
+	    FM_PHYSCPU_INFO_FAMILY, DATA_TYPE_INT32, &family,
+	    FM_PHYSCPU_INFO_MODEL, DATA_TYPE_INT32, &model,
+	    NULL);
+
+	if (err) {
+		whinge(mod, NULL, "create_chip: lookup failed: %s\n",
 		    strerror(err));
 		return (-1);
 	}
@@ -513,9 +522,9 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 
 		(void) topo_pgroup_create(chip, &chip_pgroup, &err);
 		nerr -= add_nvlist_strprop(mod, chip, cpu, PGNAME(CHIP),
-		    CHIP_VENDOR_ID, &vendor);
+		    CHIP_VENDOR_ID, NULL);
 		nerr -= add_nvlist_longprops(mod, chip, cpu, PGNAME(CHIP),
-		    fms, CHIP_FAMILY, CHIP_MODEL, CHIP_STEPPING, NULL);
+		    NULL, CHIP_FAMILY, CHIP_MODEL, CHIP_STEPPING, NULL);
 
 		if (FM_AWARE_SMBIOS(mod)) {
 			int fru = 0;
@@ -598,9 +607,14 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 			whinge(mod, &nerr, "create_chip: "
 			    "topo_method_register failed\n");
 
-		if (topo_node_range_create(mod, chip, CORE_NODE_NAME,
-		    0, 255) != 0)
+		if (topo_node_range_create(mod, chip, CORE_NODE_NAME, 0, 255))
 			return (-1);
+
+		if (strcmp(vendor, "AuthenticAMD") == 0) {
+			if (topo_node_range_create(mod, chip, MCT_NODE_NAME,
+			    0, 255))
+				return (-1);
+		}
 
 		create_mc = B_TRUE;
 	}
@@ -637,15 +651,11 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 	 * If SMBIOS meets FMA needs, when Multi-Chip-Module is
 	 * addressed, mc instances should be derived from SMBIOS
 	 */
-	if (create_mc) {
-		if (strcmp(vendor, "AuthenticAMD") == 0)
-			amd_mc_create(mod, smbios_id, chip, MCT_NODE_NAME, auth,
-			    fms[0], fms[1], fms[2], &nerr);
-		else if (!mc_offchip) {
-			onchip_mc_create(mod, smbios_id, chip,
-			    MCT_NODE_NAME, auth);
-		}
-	}
+	if (strcmp(vendor, "AuthenticAMD") == 0) {
+		amd_mc_create(mod, smbios_id, chip, MCT_NODE_NAME, auth,
+		    procnodeid, procnodes_per_pkg, family, model, &nerr);
+	} else if (create_mc && !mc_offchip)
+		onchip_mc_create(mod, smbios_id, chip, MCT_NODE_NAME, auth);
 
 	return (err == 0 && nerr == 0 ? 0 : -1);
 }

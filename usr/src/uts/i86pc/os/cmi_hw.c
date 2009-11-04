@@ -70,8 +70,10 @@ typedef struct cmi_hdl_impl {
 	enum cmi_hdl_class cmih_class;		/* Handle nature */
 	const struct cmi_hdl_ops *cmih_ops;	/* Operations vector */
 	uint_t cmih_chipid;			/* Chipid of cpu resource */
+	uint_t cmih_procnodeid;			/* Nodeid of cpu resource */
 	uint_t cmih_coreid;			/* Core within die */
 	uint_t cmih_strandid;			/* Thread within core */
+	uint_t cmih_procnodes_per_pkg;		/* Nodes in a processor */
 	boolean_t cmih_mstrand;			/* cores are multithreaded */
 	volatile uint32_t *cmih_refcntp;	/* Reference count pointer */
 	uint64_t cmih_msrsrc;			/* MSR data source flags */
@@ -105,8 +107,10 @@ struct cmi_hdl_ops {
 	uint_t (*cmio_model)(cmi_hdl_impl_t *);
 	uint_t (*cmio_stepping)(cmi_hdl_impl_t *);
 	uint_t (*cmio_chipid)(cmi_hdl_impl_t *);
+	uint_t (*cmio_procnodeid)(cmi_hdl_impl_t *);
 	uint_t (*cmio_coreid)(cmi_hdl_impl_t *);
 	uint_t (*cmio_strandid)(cmi_hdl_impl_t *);
+	uint_t (*cmio_procnodes_per_pkg)(cmi_hdl_impl_t *);
 	uint_t (*cmio_strand_apicid)(cmi_hdl_impl_t *);
 	uint32_t (*cmio_chiprev)(cmi_hdl_impl_t *);
 	const char *(*cmio_chiprevstr)(cmi_hdl_impl_t *);
@@ -610,6 +614,18 @@ ntv_chipid(cmi_hdl_impl_t *hdl)
 }
 
 static uint_t
+ntv_procnodeid(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_procnodeid);
+}
+
+static uint_t
+ntv_procnodes_per_pkg(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_procnodes_per_pkg);
+}
+
+static uint_t
 ntv_coreid(cmi_hdl_impl_t *hdl)
 {
 	return (hdl->cmih_coreid);
@@ -887,6 +903,18 @@ static uint_t
 xpv_chipid(cmi_hdl_impl_t *hdl)
 {
 	return (hdl->cmih_chipid);
+}
+
+static uint_t
+xpv_procnodeid(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_procnodeid);
+}
+
+static uint_t
+xpv_procnodes_per_pkg(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_procnodes_per_pkg);
 }
 
 static uint_t
@@ -1213,10 +1241,20 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 #ifdef __xpv
 	hdl->cmih_msrsrc = CMI_MSR_FLAG_RD_INTERPOSEOK |
 	    CMI_MSR_FLAG_WR_INTERPOSEOK;
-#else	/* __xpv */
+
+	/*
+	 * XXX: need hypervisor support for procnodeid, for now assume
+	 * single-node processors (procnodeid = chipid)
+	 */
+	hdl->cmih_procnodeid = xen_physcpu_chipid((xen_mc_lcpu_cookie_t)priv);
+	hdl->cmih_procnodes_per_pkg = 1;
+#else   /* __xpv */
 	hdl->cmih_msrsrc = CMI_MSR_FLAG_RD_HWOK | CMI_MSR_FLAG_RD_INTERPOSEOK |
 	    CMI_MSR_FLAG_WR_HWOK | CMI_MSR_FLAG_WR_INTERPOSEOK;
-#endif
+	hdl->cmih_procnodeid = cpuid_get_procnodeid((cpu_t *)priv);
+	hdl->cmih_procnodes_per_pkg =
+	    cpuid_get_procnodes_per_pkg((cpu_t *)priv);
+#endif  /* __xpv */
 
 	ent = cmi_hdl_ent_lookup(chipid, coreid, strandid);
 	if (ent->cmae_refcnt != 0 || ent->cmae_hdlp != NULL) {
@@ -1508,8 +1546,10 @@ CMI_HDL_OPFUNC(family, uint_t)
 CMI_HDL_OPFUNC(model, uint_t)
 CMI_HDL_OPFUNC(stepping, uint_t)
 CMI_HDL_OPFUNC(chipid, uint_t)
+CMI_HDL_OPFUNC(procnodeid, uint_t)
 CMI_HDL_OPFUNC(coreid, uint_t)
 CMI_HDL_OPFUNC(strandid, uint_t)
+CMI_HDL_OPFUNC(procnodes_per_pkg, uint_t)
 CMI_HDL_OPFUNC(strand_apicid, uint_t)
 CMI_HDL_OPFUNC(chiprev, uint32_t)
 CMI_HDL_OPFUNC(chiprevstr, const char *)
@@ -1552,6 +1592,15 @@ uint_t
 cmi_ntv_hwchipid(cpu_t *cp)
 {
 	return (cpuid_get_chipid(cp));
+}
+
+/*
+ * Return hardware node instance; cpuid_get_procnodeid provides this directly.
+ */
+uint_t
+cmi_ntv_hwprocnodeid(cpu_t *cp)
+{
+	return (cpuid_get_procnodeid(cp));
 }
 
 /*
@@ -1844,8 +1893,10 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	xpv_model,		/* cmio_model */
 	xpv_stepping,		/* cmio_stepping */
 	xpv_chipid,		/* cmio_chipid */
+	xpv_procnodeid,		/* cmio_procnodeid */
 	xpv_coreid,		/* cmio_coreid */
 	xpv_strandid,		/* cmio_strandid */
+	xpv_procnodes_per_pkg,	/* cmio_procnodes_per_pkg */
 	xpv_strand_apicid,	/* cmio_strand_apicid */
 	xpv_chiprev,		/* cmio_chiprev */
 	xpv_chiprevstr,		/* cmio_chiprevstr */
@@ -1874,9 +1925,11 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	ntv_model,		/* cmio_model */
 	ntv_stepping,		/* cmio_stepping */
 	ntv_chipid,		/* cmio_chipid */
+	ntv_procnodeid,		/* cmio_procnodeid */
 	ntv_coreid,		/* cmio_coreid */
 	ntv_strandid,		/* cmio_strandid */
-	ntv_strand_apicid,	/* cmio_strandid */
+	ntv_procnodes_per_pkg,	/* cmio_procnodes_per_pkg */
+	ntv_strand_apicid,	/* cmio_strand_apicid */
 	ntv_chiprev,		/* cmio_chiprev */
 	ntv_chiprevstr,		/* cmio_chiprevstr */
 	ntv_getsockettype,	/* cmio_getsockettype */

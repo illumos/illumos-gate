@@ -253,6 +253,7 @@ pg_cmt_policy(pghw_type_t hw)
 	switch (hw) {
 	case PGHW_IPIPE:
 	case PGHW_FPU:
+	case PGHW_PROCNODE:
 	case PGHW_CHIP:
 		return (CMT_BALANCE);
 	case PGHW_CACHE:
@@ -1122,7 +1123,8 @@ pg_cmt_cpu_belongs(pg_t *pg, cpu_t *cp)
 static void
 pg_cmt_hier_sort(pg_cmt_t **hier, int size)
 {
-	int		i, j, inc;
+	int		i, j, inc, sz;
+	int		start, end;
 	pg_t		*tmp;
 	pg_t		**h = (pg_t **)hier;
 
@@ -1151,12 +1153,29 @@ pg_cmt_hier_sort(pg_cmt_t **hier, int size)
 	 * Break ties by asking the platform.
 	 * Determine if h[i] outranks h[i + 1] and if so, swap them.
 	 */
-	for (i = 0; i < size - 1; i++) {
-		if ((PG_NUM_CPUS(h[i]) == PG_NUM_CPUS(h[i + 1])) &&
-		    pg_cmt_hier_rank(hier[i], hier[i + 1]) == hier[i]) {
+	for (start = 0; start < size; start++) {
+
+		/*
+		 * Find various contiguous sets of elements,
+		 * in the array, with the same number of cpus
+		 */
+		end = start;
+		sz = PG_NUM_CPUS(h[start]);
+		while ((end < size) && (sz == PG_NUM_CPUS(h[end])))
+			end++;
+		/*
+		 * Sort each such set of the array by rank
+		 */
+		for (i = start + 1; i < end; i++) {
+			j = i - 1;
 			tmp = h[i];
-			h[i] = h[i + 1];
-			h[i + 1] = tmp;
+			while (j >= start &&
+			    pg_cmt_hier_rank(hier[j],
+			    (pg_cmt_t *)tmp) == hier[j]) {
+				h[j + 1] = h[j];
+				j--;
+			}
+			h[j + 1] = tmp;
 		}
 	}
 }

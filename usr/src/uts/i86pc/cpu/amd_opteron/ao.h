@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _AO_H
 #define	_AO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mc.h>
@@ -189,7 +187,7 @@ extern cms_errno_t ao_ms_msrinject(cmi_hdl_t, uint_t, uint64_t);
 /*
  * Local functions
  */
-extern void ao_chip_scrubber_enable(cmi_hdl_t, ao_ms_data_t *);
+extern void ao_procnode_scrubber_enable(cmi_hdl_t, ao_ms_data_t *);
 extern void ao_pcicfg_write(uint_t, uint_t, uint_t, uint32_t);
 extern uint32_t ao_pcicfg_read(uint_t, uint_t, uint_t);
 extern void ao_bankstatus_prewrite(cmi_hdl_t, ao_ms_data_t *);

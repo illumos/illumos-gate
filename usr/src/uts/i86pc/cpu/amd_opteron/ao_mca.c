@@ -405,7 +405,7 @@ static void
 ao_nb_cfg(ao_ms_data_t *ao, uint32_t rev)
 {
 	const struct ao_nb_cfg *nbcp = &ao_cfg_extra[0];
-	uint_t chipid = pg_plat_hw_instance_id(CPU, PGHW_CHIP);
+	uint_t procnodeid = pg_plat_hw_instance_id(CPU, PGHW_PROCNODE);
 	uint32_t val;
 
 	/*
@@ -416,7 +416,7 @@ ao_nb_cfg(ao_ms_data_t *ao, uint32_t rev)
 	 * memory errors.
 	 */
 	ao->ao_ms_shared->aos_bcfg_nb_cfg = val =
-	    ao_pcicfg_read(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_NBCFG);
+	    ao_pcicfg_read(procnodeid, MC_FUNC_MISCCTL, MC_CTL_REG_NBCFG);
 
 	switch (ao_nb_watchdog_policy) {
 	case AO_NB_WDOG_LEAVEALONE:
@@ -461,26 +461,25 @@ ao_nb_cfg(ao_ms_data_t *ao, uint32_t rev)
 		nbcp++;
 	}
 
-	ao_pcicfg_write(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_NBCFG, val);
+	ao_pcicfg_write(procnodeid, MC_FUNC_MISCCTL, MC_CTL_REG_NBCFG, val);
 }
 
 static void
 ao_dram_cfg(ao_ms_data_t *ao, uint32_t rev)
 {
-	uint_t chipid = pg_plat_hw_instance_id(CPU, PGHW_CHIP);
+	uint_t procnodeid = pg_plat_hw_instance_id(CPU, PGHW_PROCNODE);
 	union mcreg_dramcfg_lo dcfglo;
 
 	ao->ao_ms_shared->aos_bcfg_dcfg_lo = MCREG_VAL32(&dcfglo) =
-	    ao_pcicfg_read(chipid, MC_FUNC_DRAMCTL, MC_DC_REG_DRAMCFGLO);
+	    ao_pcicfg_read(procnodeid, MC_FUNC_DRAMCTL, MC_DC_REG_DRAMCFGLO);
 	ao->ao_ms_shared->aos_bcfg_dcfg_hi =
-	    ao_pcicfg_read(chipid, MC_FUNC_DRAMCTL, MC_DC_REG_DRAMCFGHI);
-
+	    ao_pcicfg_read(procnodeid, MC_FUNC_DRAMCTL, MC_DC_REG_DRAMCFGHI);
 #ifdef OPTERON_ERRATUM_172
 	if (X86_CHIPREV_MATCH(rev, AO_F_REVS_FG) &&
 	    MCREG_FIELD_F_revFG(&dcfglo, ParEn)) {
 		MCREG_FIELD_F_revFG(&dcfglo, ParEn) = 0;
-		ao_pcicfg_write(chipid, MC_FUNC_DRAMCTL, MC_DC_REG_DRAMCFGLO,
-		    MCREG_VAL32(&dcfglo));
+		ao_pcicfg_write(procnodeid, MC_FUNC_DRAMCTL,
+		    MC_DC_REG_DRAMCFGLO, MCREG_VAL32(&dcfglo));
 	}
 #endif
 }
@@ -501,12 +500,12 @@ int ao_nb_cfg_sparectl_noseize = 0;
 static void
 ao_sparectl_cfg(ao_ms_data_t *ao)
 {
-	uint_t chipid = pg_plat_hw_instance_id(CPU, PGHW_CHIP);
+	uint_t procnodeid = pg_plat_hw_instance_id(CPU, PGHW_PROCNODE);
 	union mcreg_sparectl sparectl;
 	int chan, cs;
 
 	ao->ao_ms_shared->aos_bcfg_nb_sparectl = MCREG_VAL32(&sparectl) =
-	    ao_pcicfg_read(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SPARECTL);
+	    ao_pcicfg_read(procnodeid, MC_FUNC_MISCCTL, MC_CTL_REG_SPARECTL);
 
 	if (ao_nb_cfg_sparectl_noseize)
 		return;	/* stash BIOS value, but no changes */
@@ -528,7 +527,7 @@ ao_sparectl_cfg(ao_ms_data_t *ao)
 
 		for (cs = 0; cs < MC_CHIP_NCS; cs++) {
 			MCREG_FIELD_F_revFG(&sparectl, EccErrCntDramCs) = cs;
-			ao_pcicfg_write(chipid, MC_FUNC_MISCCTL,
+			ao_pcicfg_write(procnodeid, MC_FUNC_MISCCTL,
 			    MC_CTL_REG_SPARECTL, MCREG_VAL32(&sparectl));
 		}
 	}
@@ -884,7 +883,7 @@ ao_ms_mca_init(cmi_hdl_t hdl, int nbanks)
 	if (ao_chip_once(ao, AO_CFGONCE_DRAMCFG) == B_TRUE)
 		ao_dram_cfg(ao, rev);
 
-	ao_chip_scrubber_enable(hdl, ao);
+	ao_procnode_scrubber_enable(hdl, ao);
 }
 
 /*

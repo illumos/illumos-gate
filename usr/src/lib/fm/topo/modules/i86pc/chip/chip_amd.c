@@ -133,26 +133,23 @@ static nvlist_t *cs_fmri[MC_CHIP_NCS];
  * We create a tree of dram-channel and chip-select nodes below the
  * memory-controller node.  There will be two dram channels and 8 chip-selects
  * below each, regardless of actual socket type, processor revision and so on.
- * This is adequate for generic diagnosis up to family 0x10 revision C.
- * When support for revision D is implemented (or maybe C) we should take
- * the opportunity to rework the topology tree completely (socket change will
- * mean there can be no diagnosis history tied to the topology).
+ * This is adequate for generic diagnosis up to family 0x10 revision D.
  */
 /*ARGSUSED*/
 static int
 amd_generic_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *cnode,
-    tnode_t *mcnode, int family, int model, int stepping, nvlist_t *auth)
+    tnode_t *mcnode, int family, int model, nvlist_t *auth)
 {
 	int chan, cs;
 
 	/*
 	 * Elsewhere we have already returned for families less than 0xf.
 	 * This "generic" topology is adequate for all of family 0xf and
-	 * for revisions A, B and C of family 0x10 (for the list of models
+	 * for revisions A to D of family 0x10 (for the list of models
 	 * in each revision, refer to usr/src/uts/i86pc/os/cpuid_subr.c).
-	 * We cover all family 0x10 models, till model 8.
+	 * We cover all family 0x10 models, till model 9.
 	 */
-	if (family > 0x10 || (family == 0x10 && model > 8))
+	if (family > 0x10 || (family == 0x10 && model > 9))
 		return (1);
 
 	if (topo_node_range_create(mod, mcnode, CHAN_NODE_NAME, 0,
@@ -719,24 +716,30 @@ amd_htconfig(topo_mod_t *mod, tnode_t *cnode, nvlist_t *htnvl)
 }
 
 void
-amd_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *pnode, const char *name,
-    nvlist_t *auth, int family, int model, int stepping, int *nerrp)
+amd_mc_create(topo_mod_t *mod,  uint16_t smbid, tnode_t *pnode,
+    const char *name, nvlist_t *auth, int32_t procnodeid,
+    int32_t procnodes_per_pkg, int family,
+    int model, int *nerrp)
 {
 	tnode_t *mcnode;
 	nvlist_t *fmri;
 	nvpair_t *nvp;
 	nvlist_t *mc = NULL;
 	int i, err;
+	int mcnum = procnodeid % procnodes_per_pkg;
 	char *serial = NULL;
 	char *part = NULL;
 	char *rev = NULL;
 
 	/*
 	 * Return with no error for anything before AMD family 0xf - we
-	 * won't generate even a generic memory topolofy for earlier
+	 * won't generate even a generic memory topology for earlier
 	 * families.
 	 */
 	if (family < 0xf)
+		return;
+
+	if (topo_node_lookup(pnode, name, mcnum) != NULL)
 		return;
 
 	if (FM_AWARE_SMBIOS(mod)) {
@@ -744,16 +747,11 @@ amd_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *pnode, const char *name,
 		(void) nvlist_lookup_string(fmri, "serial", &serial);
 		(void) nvlist_lookup_string(fmri, "part", &part);
 		(void) nvlist_lookup_string(fmri, "revision", &rev);
-	}
-
-	if (mkrsrc(mod, pnode, name, 0, auth, &fmri) != 0) {
-		whinge(mod, nerrp, "mc_create: mkrsrc failed\n");
-		return;
-	}
-
-	if (topo_node_range_create(mod, pnode, name, 0, 0) < 0) {
 		nvlist_free(fmri);
-		whinge(mod, nerrp, "mc_create: node range create failed\n");
+	}
+
+	if (mkrsrc(mod, pnode, name, mcnum, auth, &fmri) != 0) {
+		whinge(mod, nerrp, "mc_create: mkrsrc failed\n");
 		return;
 	}
 
@@ -763,10 +761,8 @@ amd_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *pnode, const char *name,
 		(void) nvlist_add_string(fmri, "revision", rev);
 	}
 
-	if ((mcnode = topo_node_bind(mod, pnode, name, 0,
+	if ((mcnode = topo_node_bind(mod, pnode, name, mcnum,
 	    fmri)) == NULL) {
-		nvlist_free(mc);
-		topo_node_range_destroy(pnode, name);
 		nvlist_free(fmri);
 		whinge(mod, nerrp, "mc_create: mc bind failed\n");
 		return;
@@ -781,6 +777,14 @@ amd_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *pnode, const char *name,
 
 	nvlist_free(fmri);
 
+	if (topo_pgroup_create(mcnode, &mc_pgroup, &err) < 0)
+		whinge(mod, nerrp, "mc_create: topo_pgroup_create failed\n");
+
+	if (topo_prop_set_int32(mcnode, PGNAME(MCT), MCT_PROCNODE_ID,
+	    TOPO_PROP_IMMUTABLE, procnodeid, nerrp) != 0)
+		whinge(mod, nerrp, "mc_create: topo_prop_set_int32 failed to"
+		    "add node id\n");
+
 	if ((mc = amd_lookup_by_mcid(mod, topo_node_instance(pnode))) == NULL) {
 		/*
 		 * If a memory-controller driver exists for this chip model
@@ -790,7 +794,7 @@ amd_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *pnode, const char *name,
 		 * creating a generic maximal topology.
 		 */
 		if (amd_generic_mc_create(mod, smbid, pnode, mcnode,
-		    family, model, stepping, auth) != 0)
+		    family, model, auth) != 0)
 			whinge(mod, nerrp,
 			    "mc_create: amd_generic_mc_create failed\n");
 		return;
@@ -799,9 +803,6 @@ amd_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *pnode, const char *name,
 	/*
 	 * Add memory controller properties
 	 */
-	if (topo_pgroup_create(mcnode, &mc_pgroup, &err) < 0)
-		whinge(mod, nerrp, "mc_create: topo_pgroup_create failed\n");
-
 	for (nvp = nvlist_next_nvpair(mc, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(mc, nvp)) {
 		char *name = nvpair_name(nvp);
