@@ -6840,8 +6840,9 @@ rfs4_do_opennull(struct compound_state *cs, struct svc_req *req,
 
 		/* cs->vp cs->fh now reference the desired file */
 
-		rfs4_do_open(cs, req, oo, DELEG_ANY, args->share_access,
-		    args->share_deny, resp, 0);
+		rfs4_do_open(cs, req, oo,
+		    oo->ro_need_confirm ? DELEG_NONE : DELEG_ANY,
+		    args->share_access, args->share_deny, resp, 0);
 
 		/*
 		 * If rfs4_createfile set attrset, we must
