@@ -2773,7 +2773,6 @@ spa_import_rootpool(char *devpath, char *devid)
 		goto out;
 	}
 
-	VERIFY(nvlist_dup(config, &spa->spa_config, 0) == 0);
 	error = 0;
 	spa_history_log_version(spa, LOG_POOL_IMPORT);
 out:
