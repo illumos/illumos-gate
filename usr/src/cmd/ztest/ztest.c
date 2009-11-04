@@ -1655,8 +1655,12 @@ ztest_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		ASSERT(error == 0);
 	} else {
 		size = doi.doi_data_block_size;
-		if (ISP2(size))
+		if (ISP2(size)) {
 			offset = P2ALIGN(offset, size);
+		} else {
+			ASSERT(offset < size);
+			offset = 0;
+		}
 
 		zgd->zgd_rl = ztest_range_lock(zd, object, offset, size,
 		    RL_READER);

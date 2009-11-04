@@ -929,7 +929,7 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		for (;;) {
 			uint64_t blkoff;
 			size = zp->z_blksz;
-			blkoff = ISP2(size) ? P2PHASE(offset, size) : 0;
+			blkoff = ISP2(size) ? P2PHASE(offset, size) : offset;
 			offset -= blkoff;
 			zgd->zgd_rl = zfs_range_lock(zp, offset, size,
 			    RL_READER);
@@ -939,7 +939,7 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 			zfs_range_unlock(zgd->zgd_rl);
 		}
 		/* test for truncation needs to be done while range locked */
-		if (offset >= zp->z_phys->zp_size)
+		if (lr->lr_offset >= zp->z_phys->zp_size)
 			error = ENOENT;
 #ifdef DEBUG
 		if (zil_fault_io) {
