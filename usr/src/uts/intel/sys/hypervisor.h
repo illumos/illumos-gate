@@ -132,6 +132,7 @@ extern int xen_physcpu_stepping(xen_mc_lcpu_cookie_t);
 extern id_t xen_physcpu_chipid(xen_mc_lcpu_cookie_t);
 extern id_t xen_physcpu_coreid(xen_mc_lcpu_cookie_t);
 extern id_t xen_physcpu_strandid(xen_mc_lcpu_cookie_t);
+extern id_t xen_physcpu_initial_apicid(xen_mc_lcpu_cookie_t);
 extern boolean_t xen_physcpu_is_cmt(xen_mc_lcpu_cookie_t);
 extern id_t xen_physcpu_logical_id(xen_mc_lcpu_cookie_t);
 extern uint64_t xen_physcpu_mcg_cap(xen_mc_lcpu_cookie_t);

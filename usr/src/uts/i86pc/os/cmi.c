@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,6 +112,7 @@ extern void *cmi_hdl_getcmi(cmi_hdl_t);
 extern void cmi_hdl_setmc(cmi_hdl_t, const struct cmi_mc_ops *, void *);
 extern void cmi_hdl_inj_begin(cmi_hdl_t);
 extern void cmi_hdl_inj_end(cmi_hdl_t);
+extern void cmi_read_smbios(cmi_hdl_t);
 
 #define	HDL2CMI(hdl)		cmi_hdl_getcmi(hdl)
 
@@ -474,6 +475,8 @@ cmi_init(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 	cmi_hdl_setcmi(hdl, cmi, data);
 
 	cms_init(hdl);
+
+	cmi_read_smbios(hdl);
 
 	mutex_exit(&cmi_load_lock);
 

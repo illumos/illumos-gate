@@ -45,6 +45,7 @@ CORE_OBJS +=		\
 	desctbls_asm.o	\
 	exception.o	\
 	float.o		\
+	fmsmb.o		\
 	fpu.o		\
 	i86_subr.o	\
 	lock_prim.o	\

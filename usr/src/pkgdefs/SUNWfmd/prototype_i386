@@ -82,11 +82,13 @@ d none usr/platform/i86pc/lib/fm/topo/plugins 755 root bin
 f none usr/platform/i86pc/lib/fm/topo/plugins/chip.so 555 root bin
 f none usr/platform/i86pc/lib/fm/topo/plugins/hostbridge.so 555 root bin
 f none usr/platform/i86pc/lib/fm/topo/plugins/pcibus.so 555 root bin
+f none usr/platform/i86pc/lib/fm/topo/plugins/x86pi.so 555 root bin
 d none usr/platform/i86pc/lib/fm/topo/maps 755 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/chassis-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/chip-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/fan-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/i86pc-hc-topology.xml 444 root bin
+f none usr/platform/i86pc/lib/fm/topo/maps/i86pc-legacy-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/psu-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4200-M2-disk-hc-topology.xml 444 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4200-Server-disk-hc-topology.xml 444 root bin

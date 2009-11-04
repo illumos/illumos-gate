@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,13 +35,18 @@
 #include <sys/varargs.h>
 #include <sys/fm/util.h>
 #include <sys/fm/cpu/AMD.h>
+#include <sys/fm/smb/fmsmb.h>
 #include <sys/fm/protocol.h>
 #include <sys/mc.h>
+#include <sys/smbios.h>
+#include <sys/smbios_impl.h>
 
 #include <mcamd.h>
 #include <mcamd_off.h>
 
 int mcamd_debug = 0; /* see mcamd_api.h for MCAMD_DBG_* values */
+
+extern int x86gentopo_legacy;
 
 struct mc_offmap {
 	int mcom_code;
@@ -557,7 +562,8 @@ mcamd_unumtopa_wrap(void *arg, mc_unum_t *unump, nvlist_t *nvl, uint64_t *pap)
 }
 
 static void
-mc_ereport_dimm_resource(mc_unum_t *unump, nvlist_t *elems[], int *nump)
+mc_ereport_dimm_resource(mc_unum_t *unump, nvlist_t *elems[], int *nump,
+    mc_t *mc)
 {
 	int i;
 
@@ -566,24 +572,44 @@ mc_ereport_dimm_resource(mc_unum_t *unump, nvlist_t *elems[], int *nump)
 			break;
 
 		elems[(*nump)++] = fm_nvlist_create(NULL);
-		fm_fmri_hc_set(elems[i], FM_HC_SCHEME_VERSION, NULL, NULL, 5,
-		    "motherboard",  unump->unum_board,
-		    "chip", unump->unum_chip,
-		    "memory-controller", unump->unum_mc,
-		    "dimm", unump->unum_dimms[i],
-		    "rank", unump->unum_rank);
+
+		if (!x86gentopo_legacy && mc->smb_bboard != NULL) {
+			fm_fmri_hc_create(elems[i], FM_HC_SCHEME_VERSION,
+			    NULL, NULL, mc->smb_bboard, 4,
+			    "chip", mc->smb_chipid,
+			    "memory-controller", unump->unum_mc,
+			    "dimm", unump->unum_dimms[i],
+			    "rank", unump->unum_rank);
+		} else {
+			fm_fmri_hc_set(elems[i], FM_HC_SCHEME_VERSION,
+			    NULL, NULL, 5,
+			    "motherboard",  unump->unum_board,
+			    "chip", unump->unum_chip,
+			    "memory-controller", unump->unum_mc,
+			    "dimm", unump->unum_dimms[i],
+			    "rank", unump->unum_rank);
+		}
 	}
 }
 
 static void
-mc_ereport_cs_resource(mc_unum_t *unump, nvlist_t *elems[], int *nump)
+mc_ereport_cs_resource(mc_unum_t *unump, nvlist_t *elems[], int *nump, mc_t *mc)
 {
 	elems[0] = fm_nvlist_create(NULL);
-	fm_fmri_hc_set(elems[0], FM_HC_SCHEME_VERSION, NULL, NULL, 4,
-	    "motherboard",  unump->unum_board,
-	    "chip", unump->unum_chip,
-	    "memory-controller", unump->unum_mc,
-	    "chip-select", unump->unum_cs);
+
+	if (!x86gentopo_legacy && mc->smb_bboard != NULL) {
+		fm_fmri_hc_create(elems[0], FM_HC_SCHEME_VERSION, NULL, NULL,
+		    mc->smb_bboard, 3,
+		    "chip", mc->smb_chipid,
+		    "memory-controller", unump->unum_mc,
+		    "chip-select", unump->unum_cs);
+	} else {
+		fm_fmri_hc_set(elems[0], FM_HC_SCHEME_VERSION, NULL, NULL, 4,
+		    "motherboard",  unump->unum_board,
+		    "chip", unump->unum_chip,
+		    "memory-controller", unump->unum_mc,
+		    "chip-select", unump->unum_cs);
+	}
 	*nump = 1;
 }
 
@@ -595,16 +621,16 @@ mc_ereport_cs_resource(mc_unum_t *unump, nvlist_t *elems[], int *nump)
  * topology node.
  */
 static void
-mc_ereport_add_resource(nvlist_t *payload, mc_unum_t *unump)
+mc_ereport_add_resource(nvlist_t *payload, mc_unum_t *unump, mc_t *mc)
 {
 	nvlist_t *elems[MC_UNUM_NDIMM];
 	int nelems = 0;
 	int i;
 
 	if (unump->unum_dimms[0] != MC_INVALNUM)
-		mc_ereport_dimm_resource(unump, elems, &nelems);
+		mc_ereport_dimm_resource(unump, elems, &nelems, mc);
 	else if (unump->unum_cs != MC_INVALNUM)
-		mc_ereport_cs_resource(unump, elems, &nelems);
+		mc_ereport_cs_resource(unump, elems, &nelems, mc);
 
 	if (nelems > 0) {
 		fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
@@ -616,11 +642,12 @@ mc_ereport_add_resource(nvlist_t *payload, mc_unum_t *unump)
 }
 
 static void
-mc_ereport_add_payload(nvlist_t *ereport, uint64_t members, mc_unum_t *unump)
+mc_ereport_add_payload(nvlist_t *ereport, uint64_t members, mc_unum_t *unump,
+    mc_t *mc)
 {
 	if (members & FM_EREPORT_PAYLOAD_FLAG_RESOURCE &&
 	    unump != NULL)
-		mc_ereport_add_resource(ereport, unump);
+		mc_ereport_add_resource(ereport, unump, mc);
 }
 
 static nvlist_t *
@@ -628,10 +655,17 @@ mc_fmri_create(mc_t *mc)
 {
 	nvlist_t *nvl = fm_nvlist_create(NULL);
 
-	fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 3,
-	    "motherboard", 0,
-	    "chip", mc->mc_props.mcp_num,
-	    "memory-controller", 0);
+	if (!x86gentopo_legacy && mc->smb_bboard != NULL) {
+		fm_fmri_hc_create(nvl, FM_HC_SCHEME_VERSION, NULL, NULL,
+		    mc->smb_bboard, 2,
+		    "chip", mc->smb_chipid,
+		    "memory-controller", 0);
+	} else {
+		fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 3,
+		    "motherboard", 0,
+		    "chip", mc->mc_props.mcp_num,
+		    "memory-controller", 0);
+	}
 
 	return (nvl);
 }
@@ -668,7 +702,7 @@ mcamd_ereport_post(mc_t *mc, const char *class_sfx, mc_unum_t *unump,
 	    fm_ena_generate(gethrtime(), FM_ENA_FMT1), detector, NULL);
 	fm_nvlist_destroy(detector, FM_NVA_FREE);
 
-	mc_ereport_add_payload(ereport, payload, unump);
+	mc_ereport_add_payload(ereport, payload, unump, mc);
 
 	(void) fm_ereport_post(ereport, EVCH_TRYHARD);
 	fm_nvlist_destroy(ereport, FM_NVA_FREE);

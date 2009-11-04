@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@ extern "C" {
 #define	FM_PAGE_OP_VERSION	"page-operation-version"
 #define	FM_CPU_OP_VERSION	"cpu-operation-version"
 #define	FM_CPU_INFO_VERSION	"cpu-info-version"
+#define	FM_TOPO_LEGACY_VERSION	"topo-legacy-version"
 
 /*
  * FMA driver ioctl interfaces
@@ -55,6 +56,7 @@ extern "C" {
 #define	FM_IOC_CPU_RETIRE	(FM_IOC | 6)
 #define	FM_IOC_CPU_STATUS	(FM_IOC | 7)
 #define	FM_IOC_CPU_UNRETIRE	(FM_IOC | 8)
+#define	FM_IOC_GENTOPO_LEGACY	(FM_IOC | 9)
 #endif	/* __x86 */
 
 /*
@@ -87,6 +89,7 @@ typedef struct fm_ioc_data32 {
 #define	FM_CPU_RETIRE_CORE_ID	"core_id"
 #define	FM_CPU_RETIRE_STRAND_ID	"strand_id"
 #define	FM_CPU_RETIRE_OLDSTATUS	"oldstatus"
+#define	FM_GENTOPO_LEGACY	"gentopolegacy"
 
 /*
  * Properties set by FM_PHYSCPU_INFO
@@ -95,9 +98,21 @@ typedef struct fm_ioc_data32 {
 #define	FM_PHYSCPU_INFO_FAMILY		"family"
 #define	FM_PHYSCPU_INFO_MODEL		"model"
 #define	FM_PHYSCPU_INFO_STEPPING	"stepping"
+
+/*
+ * When Multi-Chip-Module(MCM) support is added
+ * chip_id should map to the processor package
+ * and not the die in the processor package.
+ * This is for FMA; kernel's perception of
+ * chip_id could differ for MCM.
+ */
 #define	FM_PHYSCPU_INFO_CHIP_ID		"chip_id"
+
 #define	FM_PHYSCPU_INFO_CORE_ID		"core_id"
 #define	FM_PHYSCPU_INFO_STRAND_ID	"strand_id"
+#define	FM_PHYSCPU_INFO_STRAND_APICID	"strand_initial_apicid"
+#define	FM_PHYSCPU_INFO_SMBIOS_ID	"smbios_id"
+#define	FM_PHYSCPU_INFO_CHIP_ROOTS	"chip_roots"
 #define	FM_PHYSCPU_INFO_CHIP_REV	"chip_rev"
 #define	FM_PHYSCPU_INFO_SOCKET_TYPE	"socket_type"
 #define	FM_PHYSCPU_INFO_CPU_ID		"cpuid"

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@ extern int fm_get_paddr(nvlist_t *, uint64_t *);
 #if defined(__x86)
 extern int fm_ioctl_physcpu_info(int, nvlist_t *, nvlist_t **);
 extern int fm_ioctl_cpu_retire(int, nvlist_t *, nvlist_t **);
+extern int fm_ioctl_gentopo_legacy(int, nvlist_t *, nvlist_t **);
 #endif /* __x86 */
 
 static int fm_ioctl_versions(int, nvlist_t *, nvlist_t **);
@@ -73,6 +74,7 @@ static const fm_vers_t fm_versions[] = {
 	{ FM_PAGE_OP_VERSION, 1 },
 	{ FM_CPU_OP_VERSION, 1 },
 	{ FM_CPU_INFO_VERSION, 1 },
+	{ FM_TOPO_LEGACY_VERSION, 1 },
 	{ NULL, 0 }
 };
 
@@ -93,6 +95,8 @@ static const fm_subr_t fm_subrs[] = {
 	    fm_ioctl_cpu_retire },
 	{ FM_IOC_CPU_UNRETIRE, B_TRUE, FM_CPU_OP_VERSION,
 	    fm_ioctl_cpu_retire },
+	{ FM_IOC_GENTOPO_LEGACY, B_FALSE, FM_TOPO_LEGACY_VERSION,
+	    fm_ioctl_gentopo_legacy },
 #endif	/* __x86 */
 	{ -1, B_FALSE, NULL, NULL },
 };

@@ -323,6 +323,8 @@ extern void fm_fmri_mem_set(nvlist_t *, int, const nvlist_t *, const char *,
 extern void fm_authority_set(nvlist_t *, int, const char *, const char *,
     const char *, const char *);
 extern void fm_fmri_zfs_set(nvlist_t *, int, uint64_t, uint64_t);
+extern void fm_fmri_hc_create(nvlist_t *, int, const nvlist_t *, nvlist_t *,
+    nvlist_t *, int, ...);
 
 extern uint64_t fm_ena_increment(uint64_t);
 extern uint64_t fm_ena_generate(uint64_t, uchar_t);

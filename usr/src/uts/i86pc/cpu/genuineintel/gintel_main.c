@@ -38,6 +38,10 @@
 #include <sys/mc_intel.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
+#include <sys/fm/smb/fmsmb.h>
+
+extern int x86gentopo_legacy;
 
 int gintel_ms_support_disable = 0;
 int gintel_error_action_return = 0;
@@ -249,12 +253,47 @@ gintel_ereport_class(cmi_hdl_t hdl, cms_cookie_t mscookie,
 	}
 }
 
+static nvlist_t *
+gintel_gentopo_ereport_detector(cmi_hdl_t hdl, cms_cookie_t mscookie,
+    nv_alloc_t *nva)
+{
+	nvlist_t *nvl = (nvlist_t *)NULL;
+	nvlist_t *board_list = (nvlist_t *)NULL;
+
+	if (mscookie) {
+		board_list = cmi_hdl_smb_bboard(hdl);
+
+		if (board_list == NULL)
+			return (NULL);
+
+		if ((nvl = fm_nvlist_create(nva)) == NULL)
+			return (NULL);
+
+		if ((uintptr_t)mscookie & GINTEL_ERROR_QUICKPATH) {
+			fm_fmri_hc_create(nvl, FM_HC_SCHEME_VERSION,
+			    NULL, NULL, board_list, 1,
+			    "chip", cmi_hdl_smb_chipid(hdl));
+		} else {
+			fm_fmri_hc_create(nvl, FM_HC_SCHEME_VERSION,
+			    NULL, NULL, board_list, 2,
+			    "chip", cmi_hdl_smb_chipid(hdl),
+			    "memory-controller", 0);
+		}
+	}
+	return (nvl);
+}
+
 /*ARGSUSED*/
 nvlist_t *
 gintel_ereport_detector(cmi_hdl_t hdl, int bankno, cms_cookie_t mscookie,
     nv_alloc_t *nva)
 {
 	nvlist_t *nvl = (nvlist_t *)NULL;
+
+	if (!x86gentopo_legacy) {
+		nvl = gintel_gentopo_ereport_detector(hdl, mscookie, nva);
+		return (nvl);
+	}
 
 	if (mscookie) {
 		if ((nvl = fm_nvlist_create(nva)) == NULL)
@@ -270,6 +309,62 @@ gintel_ereport_detector(cmi_hdl_t hdl, int bankno, cms_cookie_t mscookie,
 			    "memory-controller", 0);
 		}
 	}
+	return (nvl);
+}
+
+static nvlist_t *
+gintel_gentopo_ereport_create_resource_elem(cmi_hdl_t hdl, nv_alloc_t *nva,
+    mc_unum_t *unump)
+{
+	nvlist_t *nvl, *snvl;
+	nvlist_t *board_list = NULL;
+
+	board_list = cmi_hdl_smb_bboard(hdl);
+	if (board_list == NULL) {
+		return (NULL);
+	}
+
+	if ((nvl = fm_nvlist_create(nva)) == NULL)	/* freed by caller */
+		return (NULL);
+
+	if ((snvl = fm_nvlist_create(nva)) == NULL) {
+		fm_nvlist_destroy(nvl, nva ? FM_NVA_RETAIN : FM_NVA_FREE);
+		return (NULL);
+	}
+
+	(void) nvlist_add_uint64(snvl, FM_FMRI_HC_SPECIFIC_OFFSET,
+	    unump->unum_offset);
+
+	if (unump->unum_chan == -1) {
+		fm_fmri_hc_create(nvl, FM_HC_SCHEME_VERSION, NULL, snvl,
+		    board_list, 2,
+		    "chip", cmi_hdl_smb_chipid(hdl),
+		    "memory-controller", unump->unum_mc);
+	} else if (unump->unum_cs == -1) {
+		fm_fmri_hc_create(nvl, FM_HC_SCHEME_VERSION, NULL, snvl,
+		    board_list, 3,
+		    "chip", cmi_hdl_smb_chipid(hdl),
+		    "memory-controller", unump->unum_mc,
+		    "dram-channel", unump->unum_chan);
+	} else if (unump->unum_rank == -1) {
+		fm_fmri_hc_create(nvl, FM_HC_SCHEME_VERSION, NULL, snvl,
+		    board_list, 4,
+		    "chip", cmi_hdl_smb_chipid(hdl),
+		    "memory-controller", unump->unum_mc,
+		    "dram-channel", unump->unum_chan,
+		    "dimm", unump->unum_cs);
+	} else {
+		fm_fmri_hc_create(nvl, FM_HC_SCHEME_VERSION, NULL, snvl,
+		    board_list, 5,
+		    "chip", cmi_hdl_smb_chipid(hdl),
+		    "memory-controller", unump->unum_mc,
+		    "dram-channel", unump->unum_chan,
+		    "dimm", unump->unum_cs,
+		    "rank", unump->unum_rank);
+	}
+
+	fm_nvlist_destroy(snvl, nva ? FM_NVA_RETAIN : FM_NVA_FREE);
+
 	return (nvl);
 }
 
@@ -400,7 +495,15 @@ gintel_ereport_add_logout(cmi_hdl_t hdl, nvlist_t *ereport,
 				    TCODE_OFFSET_RAS(unum.unum_offset), NULL);
 			}
 		}
-		resource = gintel_ereport_create_resource_elem(nva, &unum);
+
+		if (!x86gentopo_legacy) {
+			resource = gintel_gentopo_ereport_create_resource_elem(
+			    hdl, nva, &unum);
+		} else {
+			resource = gintel_ereport_create_resource_elem(nva,
+			    &unum);
+		}
+
 		fm_payload_set(ereport, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
 		    DATA_TYPE_NVLIST_ARRAY, 1, &resource, NULL);
 		fm_nvlist_destroy(resource, nva ? FM_NVA_RETAIN:FM_NVA_FREE);

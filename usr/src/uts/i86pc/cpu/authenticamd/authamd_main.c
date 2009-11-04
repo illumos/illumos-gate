@@ -44,6 +44,8 @@
 #include <sys/mc_amd.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/cpu/GENAMD.h>
+#include <sys/fm/smb/fmsmb.h>
+#include <sys/fm/util.h>
 #include <sys/nvpair.h>
 #include <sys/controlregs.h>
 #include <sys/pghw.h>
@@ -52,6 +54,8 @@
 #include <sys/cpu_module_ms_impl.h>
 
 #include "authamd.h"
+
+extern int x86gentopo_legacy; /* x86 generic topo support */
 
 int authamd_ms_support_disable = 0;
 
@@ -982,6 +986,7 @@ authamd_ereport_add_resource(cmi_hdl_t hdl, authamd_data_t *authamd,
 	nvlist_t *nvl;
 	int nelems = 0;
 	int i, chan, cs;
+	nvlist_t *board_list = NULL;
 
 	if ((msl = mslogout) == NULL)
 		return;
@@ -997,12 +1002,25 @@ authamd_ereport_add_resource(cmi_hdl_t hdl, authamd_data_t *authamd,
 			elems[nelems] = nvl;
 			counts[nelems++] = msl->aal_eccerrcnt[chan][cs];
 
-			fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 5,
-			    "motherboard", 0,
-			    "chip", authamd->amd_shared->acs_chipid,
-			    "memory-controller", 0,
-			    "dram-channel", chan,
-			    "chip-select", cs);
+			if (!x86gentopo_legacy) {
+				board_list = cmi_hdl_smb_bboard(hdl);
+				if (board_list == NULL)
+					continue;
+				fm_fmri_hc_create(nvl, FM_HC_SCHEME_VERSION,
+				    NULL, NULL, board_list, 4,
+				    "chip", cmi_hdl_smb_chipid(hdl),
+				    "memory-controller", 0,
+				    "dram-channel", chan,
+				    "chip-select", cs);
+			} else {
+				fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION,
+				    NULL, NULL, 5,
+				    "motherboard", 0,
+				    "chip", authamd->amd_shared->acs_chipid,
+				    "memory-controller", 0,
+				    "dram-channel", chan,
+				    "chip-select", cs);
+			}
 		}
 	}
 

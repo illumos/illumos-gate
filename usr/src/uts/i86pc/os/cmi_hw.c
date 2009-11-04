@@ -48,6 +48,18 @@
 #include <sys/trap.h>
 #include <sys/mca_x86.h>
 #include <sys/processor.h>
+#include <sys/cmn_err.h>
+#include <sys/nvpair.h>
+#include <sys/fm/util.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/smb/fmsmb.h>
+#include <sys/cpu_module_impl.h>
+
+/*
+ * Variable which determines if the SMBIOS supports x86 generic topology; or
+ * if legacy topolgy enumeration will occur.
+ */
+extern int x86gentopo_legacy;
 
 /*
  * Outside of this file consumers use the opaque cmi_hdl_t.  This
@@ -70,6 +82,9 @@ typedef struct cmi_hdl_impl {
 	const struct cmi_mc_ops *cmih_mcops;	/* Memory-controller ops */
 	void *cmih_mcdata;			/* Memory-controller data */
 	uint64_t cmih_flags;			/* See CMIH_F_* below */
+	uint16_t cmih_smbiosid;			/* SMBIOS Type 4 struct ID */
+	uint_t cmih_smb_chipid;			/* SMBIOS factored chipid */
+	nvlist_t *cmih_smb_bboard;		/* SMBIOS bboard nvlist */
 } cmi_hdl_impl_t;
 
 #define	IMPLHDL(ophdl)	((cmi_hdl_impl_t *)ophdl)
@@ -92,6 +107,7 @@ struct cmi_hdl_ops {
 	uint_t (*cmio_chipid)(cmi_hdl_impl_t *);
 	uint_t (*cmio_coreid)(cmi_hdl_impl_t *);
 	uint_t (*cmio_strandid)(cmi_hdl_impl_t *);
+	uint_t (*cmio_strand_apicid)(cmi_hdl_impl_t *);
 	uint32_t (*cmio_chiprev)(cmi_hdl_impl_t *);
 	const char *(*cmio_chiprevstr)(cmi_hdl_impl_t *);
 	uint32_t (*cmio_getsockettype)(cmi_hdl_impl_t *);
@@ -108,6 +124,9 @@ struct cmi_hdl_ops {
 	cmi_errno_t (*cmio_msrinterpose)(cmi_hdl_impl_t *, uint_t, uint64_t);
 	void (*cmio_int)(cmi_hdl_impl_t *, int);
 	int (*cmio_online)(cmi_hdl_impl_t *, int, int *);
+	uint16_t (*cmio_smbiosid) (cmi_hdl_impl_t *);
+	uint_t (*cmio_smb_chipid)(cmi_hdl_impl_t *);
+	nvlist_t *(*cmio_smb_bboard)(cmi_hdl_impl_t *);
 };
 
 static const struct cmi_hdl_ops cmi_hdl_ops;
@@ -602,6 +621,30 @@ ntv_strandid(cmi_hdl_impl_t *hdl)
 	return (hdl->cmih_strandid);
 }
 
+static uint_t
+ntv_strand_apicid(cmi_hdl_impl_t *hdl)
+{
+	return (cpuid_get_apicid(HDLPRIV(hdl)));
+}
+
+static uint16_t
+ntv_smbiosid(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_smbiosid);
+}
+
+static uint_t
+ntv_smb_chipid(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_smb_chipid);
+}
+
+static nvlist_t *
+ntv_smb_bboard(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_smb_bboard);
+}
+
 static uint32_t
 ntv_chiprev(cmi_hdl_impl_t *hdl)
 {
@@ -856,6 +899,30 @@ static uint_t
 xpv_strandid(cmi_hdl_impl_t *hdl)
 {
 	return (hdl->cmih_strandid);
+}
+
+static uint_t
+xpv_strand_apicid(cmi_hdl_impl_t *hdl)
+{
+	return (xen_physcpu_initial_apicid(HDLPRIV(hdl)));
+}
+
+static uint16_t
+xpv_smbiosid(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_smbiosid);
+}
+
+static uint_t
+xpv_smb_chipid(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_smb_chipid);
+}
+
+static nvlist_t *
+xpv_smb_bboard(cmi_hdl_impl_t *hdl)
+{
+	return (hdl->cmih_smb_bboard);
 }
 
 extern uint32_t _cpuid_chiprev(uint_t, uint_t, uint_t, uint_t);
@@ -1186,6 +1253,51 @@ cmi_hdl_create(enum cmi_hdl_class class, uint_t chipid, uint_t coreid,
 }
 
 void
+cmi_read_smbios(cmi_hdl_t ophdl)
+{
+
+	uint_t strand_apicid;
+	uint_t chip_inst;
+	uint16_t smb_id;
+	int rc = 0;
+
+	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
+
+	/* set x86gentopo compatibility */
+	fm_smb_fmacompat();
+
+#ifndef __xpv
+	strand_apicid = ntv_strand_apicid(hdl);
+#else
+	strand_apicid = xpv_strand_apicid(hdl);
+#endif
+
+	if (!x86gentopo_legacy) {
+		/*
+		 * If fm_smb_chipinst() or fm_smb_bboard() fails,
+		 * topo reverts to legacy mode
+		 */
+		rc = fm_smb_chipinst(strand_apicid, &chip_inst, &smb_id);
+		if (rc == 0) {
+			hdl->cmih_smb_chipid = chip_inst;
+			hdl->cmih_smbiosid = smb_id;
+		} else {
+#ifdef DEBUG
+			cmn_err(CE_NOTE, "cmi reads smbios chip info failed");
+#endif /* DEBUG */
+			return;
+		}
+
+		hdl->cmih_smb_bboard  = fm_smb_bboard(strand_apicid);
+#ifdef DEBUG
+		if (hdl->cmih_smb_bboard == NULL)
+			cmn_err(CE_NOTE,
+			    "cmi reads smbios base boards info failed");
+#endif /* DEBUG */
+	}
+}
+
+void
 cmi_hdl_hold(cmi_hdl_t ophdl)
 {
 	cmi_hdl_impl_t *hdl = IMPLHDL(ophdl);
@@ -1398,11 +1510,15 @@ CMI_HDL_OPFUNC(stepping, uint_t)
 CMI_HDL_OPFUNC(chipid, uint_t)
 CMI_HDL_OPFUNC(coreid, uint_t)
 CMI_HDL_OPFUNC(strandid, uint_t)
+CMI_HDL_OPFUNC(strand_apicid, uint_t)
 CMI_HDL_OPFUNC(chiprev, uint32_t)
 CMI_HDL_OPFUNC(chiprevstr, const char *)
 CMI_HDL_OPFUNC(getsockettype, uint32_t)
 CMI_HDL_OPFUNC(getsocketstr, const char *)
 CMI_HDL_OPFUNC(logical_id, id_t)
+CMI_HDL_OPFUNC(smbiosid, uint16_t)
+CMI_HDL_OPFUNC(smb_chipid, uint_t)
+CMI_HDL_OPFUNC(smb_bboard, nvlist_t *)
 
 boolean_t
 cmi_hdl_is_cmt(cmi_hdl_t ophdl)
@@ -1730,6 +1846,7 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	xpv_chipid,		/* cmio_chipid */
 	xpv_coreid,		/* cmio_coreid */
 	xpv_strandid,		/* cmio_strandid */
+	xpv_strand_apicid,	/* cmio_strand_apicid */
 	xpv_chiprev,		/* cmio_chiprev */
 	xpv_chiprevstr,		/* cmio_chiprevstr */
 	xpv_getsockettype,	/* cmio_getsockettype */
@@ -1741,7 +1858,10 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	xpv_wrmsr,		/* cmio_wrmsr */
 	xpv_msrinterpose,	/* cmio_msrinterpose */
 	xpv_int,		/* cmio_int */
-	xpv_online		/* cmio_online */
+	xpv_online,		/* cmio_online */
+	xpv_smbiosid,		/* cmio_smbiosid */
+	xpv_smb_chipid,		/* cmio_smb_chipid */
+	xpv_smb_bboard		/* cmio_smb_bboard */
 
 #else	/* __xpv */
 
@@ -1756,6 +1876,7 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	ntv_chipid,		/* cmio_chipid */
 	ntv_coreid,		/* cmio_coreid */
 	ntv_strandid,		/* cmio_strandid */
+	ntv_strand_apicid,	/* cmio_strandid */
 	ntv_chiprev,		/* cmio_chiprev */
 	ntv_chiprevstr,		/* cmio_chiprevstr */
 	ntv_getsockettype,	/* cmio_getsockettype */
@@ -1767,6 +1888,9 @@ static const struct cmi_hdl_ops cmi_hdl_ops = {
 	ntv_wrmsr,		/* cmio_wrmsr */
 	ntv_msrinterpose,	/* cmio_msrinterpose */
 	ntv_int,		/* cmio_int */
-	ntv_online		/* cmio_online */
+	ntv_online,		/* cmio_online */
+	ntv_smbiosid,		/* cmio_smbiosid */
+	ntv_smb_chipid,		/* cmio_smb_chipid */
+	ntv_smb_bboard		/* cmio_smb_bboard */
 #endif
 };

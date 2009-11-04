@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,15 +129,23 @@ txprop_t RC_common_props[] = {
 	{ NULL, &io_pgroup, TOPO_IO_MODULE, MODULEprop_set },
 	{ NULL, &pci_pgroup, TOPO_PCI_EXCAP, EXCAP_set },
 	{ NULL, &pci_pgroup, TOPO_PCI_BDF, BDF_set },
+	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set },
+	/*
+	 * These props need to be put at the end of table.  x86pi has its
+	 * own way to set them.
+	 */
 	{ NULL, &protocol_pgroup, TOPO_PROP_LABEL, label_set },
-	{ NULL, &protocol_pgroup, TOPO_PROP_FRU, FRU_set },
-	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set }
+	{ NULL, &protocol_pgroup, TOPO_PROP_FRU, FRU_set }
 };
 
 txprop_t ExHB_common_props[] = {
+	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set },
+	/*
+	 * These props need to be put at the end of table.  x86pi has its
+	 * own way to set them.
+	 */
 	{ NULL, &protocol_pgroup, TOPO_PROP_LABEL, label_set },
-	{ NULL, &protocol_pgroup, TOPO_PROP_FRU, FRU_set },
-	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set }
+	{ NULL, &protocol_pgroup, TOPO_PROP_FRU, FRU_set }
 };
 
 txprop_t IOB_common_props[] = {
@@ -150,9 +158,13 @@ txprop_t HB_common_props[] = {
 	{ NULL, &io_pgroup, TOPO_IO_DEV, DEVprop_set },
 	{ NULL, &io_pgroup, TOPO_IO_DRIVER, DRIVERprop_set },
 	{ NULL, &io_pgroup, TOPO_IO_MODULE, MODULEprop_set },
+	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set },
+	/*
+	 * These props need to be put at the end of table.  x86pi has its
+	 * own way to set them.
+	 */
 	{ NULL, &protocol_pgroup, TOPO_PROP_LABEL, label_set },
-	{ NULL, &protocol_pgroup, TOPO_PROP_FRU, FRU_set },
-	{ NULL, &protocol_pgroup, TOPO_PROP_ASRU, ASRU_set }
+	{ NULL, &protocol_pgroup, TOPO_PROP_FRU, FRU_set }
 };
 
 int Bus_propcnt = sizeof (Bus_common_props) / sizeof (txprop_t);

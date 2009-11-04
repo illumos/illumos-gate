@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +34,6 @@
 
 #ifndef	_SYS_SMBIOS_IMPL_H
 #define	_SYS_SMBIOS_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/smbios.h>
 #include <sys/sysmacros.h>
@@ -359,6 +356,35 @@ typedef struct smb_powersup {
 	uint16_t smbpsup_cooldev;	/* cooling device handle */
 	uint16_t smbpsup_iprobe;	/* current probe handle */
 } smb_powersup_t;
+
+typedef struct smb_processor_ext {
+	smb_header_t smbpre_hdr;	/* structure header */
+	uint16_t smbpre_processor;	/* processor handle */
+	uint8_t smbpre_fru;		/* FRU indicator */
+	uint8_t smbpre_n;		/* number of APIC IDs */
+	uint16_t smbpre_apicid[1];	/* strand initial apic id */
+} smb_processor_ext_t;
+
+typedef struct smb_pciexrc {
+	smb_header_t smbpciexrc_hdr;	/* structure header */
+	uint16_t smbpciexrc_bboard;	/* base board handle */
+	uint16_t smbpciexrc_bdf;	/* PCI Bus/Dev/Func */
+} smb_pciexrc_t;
+
+typedef struct smb_memarray_ext {
+	smb_header_t smbmarre_hdr;	/* structure header */
+	uint16_t smbmarre_ma;		/* memory array handle */
+	uint16_t smbmarre_component;	/* component parent handle */
+	uint16_t smbmarre_bdf;		/* PCI bus/dev/funct */
+} smb_memarray_ext_t;
+
+typedef struct smb_memdevice_ext {
+	smb_header_t smbmdeve_hdr;	/* structure header */
+	uint16_t smbmdeve_mdev;		/* memory device handle */
+	uint8_t smbmdeve_dchan;		/* DRAM channel */
+	uint8_t smbmdeve_ncs;		/* number of chip select */
+	uint8_t smbmdeve_cs[1];		/* chip selects */
+} smb_memdevice_ext_t;
 
 #pragma pack()
 

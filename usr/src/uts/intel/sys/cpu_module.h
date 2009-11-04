@@ -153,12 +153,16 @@ extern uint_t cmi_hdl_chipid(cmi_hdl_t);
 extern uint_t cmi_hdl_dieid(cmi_hdl_t);
 extern uint_t cmi_hdl_coreid(cmi_hdl_t);
 extern uint_t cmi_hdl_strandid(cmi_hdl_t);
+extern uint_t cmi_hdl_strand_apicid(cmi_hdl_t);
 extern boolean_t cmi_hdl_is_cmt(cmi_hdl_t);
 extern uint32_t cmi_hdl_chiprev(cmi_hdl_t);
 extern const char *cmi_hdl_chiprevstr(cmi_hdl_t);
 extern uint32_t cmi_hdl_getsockettype(cmi_hdl_t);
 extern const char *cmi_hdl_getsocketstr(cmi_hdl_t);
 extern id_t cmi_hdl_logical_id(cmi_hdl_t);
+extern uint16_t cmi_hdl_smbiosid(cmi_hdl_t);
+extern uint_t cmi_hdl_smb_chipid(cmi_hdl_t);
+extern nvlist_t *cmi_hdl_smb_bboard(cmi_hdl_t);
 
 extern int cmi_hdl_online(cmi_hdl_t, int, int *);
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sysmacros.h>
 #include <sys/param.h>
@@ -266,6 +263,7 @@ static void
 print_bboard(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
 	smbios_bboard_t b;
+	int chdl_cnt;
 
 	(void) smbios_info_bboard(shp, id, &b);
 
@@ -276,12 +274,32 @@ print_bboard(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	desc_printf(smbios_bboard_type_desc(b.smbb_type),
 	    fp, "  Board Type: 0x%x", b.smbb_type);
+
+	chdl_cnt = b.smbb_contn;
+	if (chdl_cnt != 0) {
+		id_t *chdl;
+		uint16_t hdl;
+		int i, n, cnt;
+
+		chdl = alloca(chdl_cnt * sizeof (id_t));
+		cnt = smbios_info_contains(shp, id, chdl_cnt, chdl);
+		if (cnt > SMB_CONT_MAX)
+			return;
+		n = MIN(chdl_cnt, cnt);
+
+		oprintf(fp, "\n");
+		for (i = 0; i < n; i++) {
+			hdl = (uint16_t)chdl[i];
+			oprintf(fp, "  Contained Handle: %u\n", hdl);
+		}
+	}
 }
 
 static void
 print_chassis(smbios_hdl_t *shp, id_t id, FILE *fp)
 {
 	smbios_chassis_t c;
+	int elem_cnt;
 
 	(void) smbios_info_chassis(shp, id, &c);
 
@@ -302,7 +320,37 @@ print_chassis(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 	oprintf(fp, "  Chassis Height: %uu\n", c.smbc_uheight);
 	oprintf(fp, "  Power Cords: %u\n", c.smbc_cords);
-	oprintf(fp, "  Element Records: %u\n", c.smbc_elems);
+
+	elem_cnt = c.smbc_elems;
+	oprintf(fp, "  Element Records: %u\n", elem_cnt);
+
+	if (elem_cnt > 0) {
+		id_t *elems;
+		uint8_t type;
+		int i, n, cnt;
+
+		elems = alloca(c.smbc_elems * sizeof (id_t));
+		cnt = smbios_info_contains(shp, id, elem_cnt, elems);
+		if (cnt > SMB_CONT_MAX)
+			return;
+		n = MIN(elem_cnt, cnt);
+
+		oprintf(fp, "\n");
+		for (i = 0; i < n; i++) {
+			type = (uint8_t)elems[i];
+			if (type & 0x80) {
+				/* SMBIOS structrure Type */
+				desc_printf(smbios_type_name(type & 0x7f), fp,
+				    "  Contained SMBIOS structure Type: %u",
+				    type & 0x80);
+			} else {
+				/* SMBIOS Base Board Type */
+				desc_printf(smbios_bboard_type_desc(type), fp,
+				    "  Contained SMBIOS Base Board Type: 0x%x",
+				    type);
+			}
+		}
+	}
 }
 
 static void
@@ -767,6 +815,109 @@ print_ipmi(smbios_hdl_t *shp, FILE *fp)
 }
 
 static int
+check_oem(smbios_hdl_t *shp)
+{
+	int i;
+	int cnt;
+	int rv;
+	id_t oem_id;
+	smbios_struct_t s;
+	const char **oem_str;
+
+	rv = smbios_lookup_type(shp, SMB_TYPE_OEMSTR, &s);
+	if (rv != 0) {
+		return (-1);
+	}
+
+	oem_id = s.smbstr_id;
+
+	cnt = smbios_info_strtab(shp, oem_id, 0, NULL);
+	if (cnt > 0) {
+		oem_str =  alloca(sizeof (char *) * cnt);
+		(void) smbios_info_strtab(shp, oem_id, cnt, oem_str);
+
+		for (i = 0; i < cnt; i++) {
+			if (strncmp(oem_str[i], SMB_PRMS1,
+			    strlen(SMB_PRMS1) + 1) == 0) {
+				return (0);
+			}
+		}
+	}
+
+	return (-1);
+}
+
+static void
+print_extprocessor(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	int i;
+	smbios_processor_ext_t ep;
+
+	if (check_oem(shp) != 0)
+		return;
+
+	(void) smbios_info_extprocessor(shp, id, &ep);
+
+	oprintf(fp, "  Processor: %u\n", ep.smbpe_processor);
+	oprintf(fp, "  FRU: %u\n", ep.smbpe_fru);
+	oprintf(fp, "  Initial APIC ID count: %u\n\n", ep.smbpe_n);
+
+	for (i = 0; i < ep.smbpe_n; i++) {
+		oprintf(fp, "  Logical Strand %u: Initial APIC ID: %u\n", i,
+		    ep.smbpe_apicid[i]);
+	}
+}
+
+static void
+print_pciexrc(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	smbios_pciexrc_t pcie;
+
+	if (check_oem(shp) != 0)
+		return;
+
+	(void) smbios_info_pciexrc(shp, id, &pcie);
+
+	oprintf(fp, "  Component ID: %u\n", pcie.smbpcie_bb);
+	oprintf(fp, "  BDF: 0x%x\n", pcie.smbpcie_bdf);
+}
+
+static void
+print_extmemarray(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	smbios_memarray_ext_t em;
+
+	if (check_oem(shp) != 0)
+		return;
+
+	(void) smbios_info_extmemarray(shp, id, &em);
+
+	oprintf(fp, "  Physical Memory Array Handle: %u\n", em.smbmae_ma);
+	oprintf(fp, "  Component Parent Handle: %u\n", em.smbmae_comp);
+	oprintf(fp, "  BDF: 0x%x\n", em.smbmae_bdf);
+}
+
+static void
+print_extmemdevice(smbios_hdl_t *shp, id_t id, FILE *fp)
+{
+	int i;
+	smbios_memdevice_ext_t emd;
+
+	if (check_oem(shp) != 0)
+		return;
+
+	(void) smbios_info_extmemdevice(shp, id, &emd);
+
+	oprintf(fp, "  Memory Device Handle: %u\n", emd.smbmdeve_md);
+	oprintf(fp, "  DRAM Channel: %u\n", emd.smbmdeve_drch);
+	oprintf(fp, "  Number of Chip Selects: %u\n", emd.smbmdeve_ncs);
+
+	for (i = 0; i < emd.smbmdeve_ncs; i++) {
+		oprintf(fp, "  Chip Select: %u\n", emd.smbmdeve_cs[i]);
+	}
+}
+
+static int
 print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 {
 	smbios_info_t info;
@@ -885,6 +1036,22 @@ print_struct(smbios_hdl_t *shp, const smbios_struct_t *sp, void *fp)
 	case SMB_TYPE_IPMIDEV:
 		oprintf(fp, "\n");
 		print_ipmi(shp, fp);
+		break;
+	case SUN_OEM_EXT_PROCESSOR:
+		oprintf(fp, "\n");
+		print_extprocessor(shp, sp->smbstr_id, fp);
+		break;
+	case SUN_OEM_PCIEXRC:
+		oprintf(fp, "\n");
+		print_pciexrc(shp, sp->smbstr_id, fp);
+		break;
+	case SUN_OEM_EXT_MEMARRAY:
+		oprintf(fp, "\n");
+		print_extmemarray(shp, sp->smbstr_id, fp);
+		break;
+	case SUN_OEM_EXT_MEMDEVICE:
+		oprintf(fp, "\n");
+		print_extmemdevice(shp, sp->smbstr_id, fp);
 		break;
 	default:
 		hex++;

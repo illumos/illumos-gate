@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 #include <sys/time.h>
 
 #include <sys/fm/protocol.h>
+#include <sys/fm/smb/fmsmb.h>
 #include <sys/devfm.h>
 
 #include <sys/cpu_module.h>
@@ -51,6 +52,8 @@ typedef struct fm_cmi_walk_t
 	int	nhdl_max;	/* allocated array size */
 	int	nhdl;		/* handles saved */
 } fm_cmi_walk_t;
+
+extern int x86gentopo_legacy;
 
 int
 fm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
@@ -145,7 +148,33 @@ select_cmi_hdl(cmi_hdl_t hdl, void *arg1, void *arg2, void *arg3)
 static void
 populate_cpu(nvlist_t **nvlp, cmi_hdl_t hdl)
 {
+	uint_t	fm_chipid;
+	uint16_t smbios_id;
+
 	(void) nvlist_alloc(nvlp, NV_UNIQUE_NAME, KM_SLEEP);
+
+	/*
+	 * If SMBIOS satisfies FMA Topology needs, gather
+	 * more information on the chip's physical roots
+	 * like /chassis=x/motherboard=y/cpuboard=z and
+	 * set the chip_id to match the SMBIOS' Type 4
+	 * ordering & this has to match the ereport's chip
+	 * resource instance derived off of SMBIOS.
+	 * Multi-Chip-Module support should set the chipid
+	 * in terms of the processor package rather than
+	 * the die/node in the processor package, for FM.
+	 */
+
+	if (!x86gentopo_legacy) {
+		smbios_id = cmi_hdl_smbiosid(hdl);
+		fm_chipid = cmi_hdl_smb_chipid(hdl);
+		(void) nvlist_add_nvlist(*nvlp, FM_PHYSCPU_INFO_CHIP_ROOTS,
+		    cmi_hdl_smb_bboard(hdl));
+		(void) nvlist_add_uint16(*nvlp, FM_PHYSCPU_INFO_SMBIOS_ID,
+		    (uint16_t)smbios_id);
+	} else
+		fm_chipid = cmi_hdl_chipid(hdl);
+
 	fm_payload_set(*nvlp,
 	    FM_PHYSCPU_INFO_VENDOR_ID, DATA_TYPE_STRING,
 	    cmi_hdl_vendorstr(hdl),
@@ -156,11 +185,13 @@ populate_cpu(nvlist_t **nvlp, cmi_hdl_t hdl)
 	    FM_PHYSCPU_INFO_STEPPING, DATA_TYPE_INT32,
 	    (int32_t)cmi_hdl_stepping(hdl),
 	    FM_PHYSCPU_INFO_CHIP_ID, DATA_TYPE_INT32,
-	    (int32_t)cmi_hdl_chipid(hdl),
+	    (int32_t)fm_chipid,
 	    FM_PHYSCPU_INFO_CORE_ID, DATA_TYPE_INT32,
 	    (int32_t)cmi_hdl_coreid(hdl),
 	    FM_PHYSCPU_INFO_STRAND_ID, DATA_TYPE_INT32,
 	    (int32_t)cmi_hdl_strandid(hdl),
+	    FM_PHYSCPU_INFO_STRAND_APICID, DATA_TYPE_INT32,
+	    (int32_t)cmi_hdl_strand_apicid(hdl),
 	    FM_PHYSCPU_INFO_CHIP_REV, DATA_TYPE_STRING,
 	    cmi_hdl_chiprevstr(hdl),
 	    FM_PHYSCPU_INFO_SOCKET_TYPE, DATA_TYPE_UINT32,
@@ -256,4 +287,31 @@ fm_ioctl_cpu_retire(int cmd, nvlist_t *invl, nvlist_t **onvlp)
 	}
 
 	return (rc);
+}
+
+/*
+ * Retrun the value of x86gentopo_legacy variable as an nvpair.
+ *
+ * The caller is responsible for freeing the nvlist.
+ */
+/* ARGSUSED */
+int
+fm_ioctl_gentopo_legacy(int cmd, nvlist_t *invl, nvlist_t **onvlp)
+{
+	nvlist_t *nvl;
+
+	if (cmd != FM_IOC_GENTOPO_LEGACY) {
+		return (ENOTTY);
+	}
+
+	/*
+	 * Inform the caller of the intentions of the ereport generators to
+	 * generate either a "generic" or "legacy" x86 topology.
+	 */
+
+	(void) nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP);
+	(void) nvlist_add_int32(nvl, FM_GENTOPO_LEGACY, x86gentopo_legacy);
+	*onvlp = nvl;
+
+	return (0);
 }

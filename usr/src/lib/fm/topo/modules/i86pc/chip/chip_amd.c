@@ -98,6 +98,19 @@ const topo_method_t ntv_page_retire_methods[] = {
 	{ NULL }
 };
 
+/*
+ * Serials, Labels are obtained from SMBIOS, so
+ * we leave out the related methods, any other
+ * methods that will be added to gen_cs_methods
+ * should be added to x86pi_gen_cs_methods too
+ */
+static const topo_method_t x86pi_gen_cs_methods[] = {
+	{ TOPO_METH_ASRU_COMPUTE, TOPO_METH_ASRU_COMPUTE_DESC,
+	    TOPO_METH_ASRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL,
+	    mem_asru_compute },
+	{ NULL }
+};
+
 static const topo_method_t gen_cs_methods[] = {
 	{ TOPO_METH_ASRU_COMPUTE, TOPO_METH_ASRU_COMPUTE_DESC,
 	    TOPO_METH_ASRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL,
@@ -127,8 +140,8 @@ static nvlist_t *cs_fmri[MC_CHIP_NCS];
  */
 /*ARGSUSED*/
 static int
-amd_generic_mc_create(topo_mod_t *mod, tnode_t *cnode, tnode_t *mcnode,
-    int family, int model, int stepping, nvlist_t *auth)
+amd_generic_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *cnode,
+    tnode_t *mcnode, int family, int model, int stepping, nvlist_t *auth)
 {
 	int chan, cs;
 
@@ -176,6 +189,15 @@ amd_generic_mc_create(topo_mod_t *mod, tnode_t *cnode, tnode_t *mcnode,
 		(void) topo_prop_set_string(chnode, PGNAME(CHAN), "channel",
 		    TOPO_PROP_IMMUTABLE, chan == 0 ? "A" : "B", &err);
 
+		if (FM_AWARE_SMBIOS(mod)) {
+			if (topo_node_label_set(chnode, NULL, &err) == -1)
+				whinge(mod, NULL, "amd_generic_mc_create: "
+				    "topo_node_label_set\n");
+			if (topo_node_fru_set(chnode, NULL, 0, &err) != 0)
+				whinge(mod, NULL, "amd_generic_mc_create: "
+				    "topo_node_fru_set failed\n");
+		}
+
 		if (topo_node_range_create(mod, chnode, CS_NODE_NAME,
 		    0, MAX_CSNUM) < 0) {
 			whinge(mod, NULL, "amd_generic_mc_create: "
@@ -206,16 +228,76 @@ amd_generic_mc_create(topo_mod_t *mod, tnode_t *cnode, tnode_t *mcnode,
 			 * The topology does not represent pages (there are
 			 * too many) so when a page is faulted we generate
 			 * an ASRU to represent the individual page.
+			 * If SMBIOS meets FMA needs, derive labels & serials
+			 * for DIMMS and apply to chip-select nodes.
+			 * If deriving from SMBIOS, skip IPMI
 			 */
-			if (topo_method_register(mod, csnode,
-			    gen_cs_methods) < 0)
-				whinge(mod, NULL, "amd_generic_mc_create: "
-				    "method registration failed\n");
+			if (FM_AWARE_SMBIOS(mod)) {
+				if (topo_method_register(mod, csnode,
+				    x86pi_gen_cs_methods) < 0)
+					whinge(mod, NULL,
+					    "amd_generic_mc_create: "
+					    "method registration failed\n");
+			} else {
+				if (topo_method_register(mod, csnode,
+				    gen_cs_methods) < 0)
+					whinge(mod, NULL,
+					    "amd_generic_mc_create: method"
+					    "registration failed\n");
+			}
 
 			(void) topo_node_asru_set(csnode, fmri,
 			    TOPO_ASRU_COMPUTE, &err);
-
 			nvlist_free(fmri);
+
+			/*
+			 * If SMBIOS meets FMA needs, set DIMM as the FRU for
+			 * the chip-select node. Use the channel & chip-select
+			 * numbers to get the DIMM instance.
+			 * Send via inst : dram channel number
+			 * Receive via inst : dimm instance
+			 */
+			if (FM_AWARE_SMBIOS(mod)) {
+				int inst;
+				id_t dimm_smbid;
+				const char *serial;
+				const char *part;
+				const char *rev;
+				char *label;
+
+				(void) topo_pgroup_create(csnode,
+				    &cs_pgroup, &err);
+				inst = chan;
+				dimm_smbid = memnode_to_smbiosid(smbid,
+				    CS_NODE_NAME, cs, &inst);
+				serial = chip_serial_smbios_get(mod,
+				    dimm_smbid);
+				part = chip_part_smbios_get(mod,
+				    dimm_smbid);
+				rev = chip_rev_smbios_get(mod, dimm_smbid);
+				label = (char *)chip_label_smbios_get(mod,
+				    chnode, dimm_smbid, NULL);
+
+				(void) topo_prop_set_string(csnode, PGNAME(CS),
+				    FM_FMRI_HC_SERIAL_ID, TOPO_PROP_IMMUTABLE,
+				    serial, &err);
+				(void) topo_prop_set_string(csnode, PGNAME(CS),
+				    FM_FMRI_HC_PART, TOPO_PROP_IMMUTABLE,
+				    part, &err);
+				(void) topo_prop_set_string(csnode, PGNAME(CS),
+				    FM_FMRI_HC_REVISION, TOPO_PROP_IMMUTABLE,
+				    rev, &err);
+
+				/*
+				 * We apply DIMM labels to chip-select nodes,
+				 * FRU for chip-selects should be DIMMs, and
+				 * we do not derive dimm nodes for Family 0x10
+				 * so FRU fmri is NULL, but FRU Labels are set,
+				 * the FRU labels point to the DIMM.
+				 */
+				(void) topo_node_label_set(csnode, label, &err);
+				topo_mod_strfree(mod, label);
+			}
 		}
 	}
 
@@ -266,7 +348,6 @@ amd_lookup_by_mcid(topo_mod_t *mod, topo_instance_t id)
 	(void) close(fd);
 	err = nvlist_unpack(buf, mcs.mcs_size, &nvl, 0);
 	topo_mod_free(mod, buf, mcs.mcs_size);
-
 
 	if (nvlist_lookup_uint8(nvl, MC_NVLIST_VERSTR, &ver) != 0) {
 		whinge(mod, NULL, "mc nvlist is not versioned\n");
@@ -339,8 +420,10 @@ amd_rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl,
 		}
 
 		nvlist_free(fmri);
-
-		(void) topo_node_fru_set(ranknode, pfmri, 0, &err);
+		if (FM_AWARE_SMBIOS(mod))
+			(void) topo_node_fru_set(ranknode, NULL, 0, &err);
+		else
+			(void) topo_node_fru_set(ranknode, pfmri, 0, &err);
 
 		/*
 		 * If a rank is faulted the asru is the associated
@@ -378,15 +461,20 @@ amd_rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl,
 }
 
 static int
-amd_dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    nvlist_t *mc, nvlist_t *auth)
+amd_dimm_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
+    const char *name, nvlist_t *mc, nvlist_t *auth)
 {
 	int i, err, nerr = 0;
+	int perr = 0;
 	nvpair_t *nvp;
 	tnode_t *dimmnode;
 	nvlist_t *fmri, **dimmarr = NULL;
 	uint64_t num;
 	uint_t ndimm;
+	id_t smbid;
+	const char *serial;
+	const char *part;
+	const char *rev;
 
 	if (nvlist_lookup_nvlist_array(mc, "dimmlist", &dimmarr, &ndimm) != 0) {
 		whinge(mod, NULL, "amd_dimm_create: dimmlist lookup failed\n");
@@ -412,6 +500,23 @@ amd_dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 			whinge(mod, &nerr, "amd_dimm_create: mkrsrc failed\n");
 			continue;
 		}
+		if (FM_AWARE_SMBIOS(mod)) {
+			smbid = memnode_to_smbiosid(chip_smbid, DIMM_NODE_NAME,
+			    i, NULL);
+			serial = chip_serial_smbios_get(mod, smbid);
+			part = chip_part_smbios_get(mod, smbid);
+			rev = chip_rev_smbios_get(mod, smbid);
+			perr += nvlist_add_string(fmri, FM_FMRI_HC_SERIAL_ID,
+			    serial);
+			perr += nvlist_add_string(fmri, FM_FMRI_HC_PART,
+			    part);
+			perr += nvlist_add_string(fmri, FM_FMRI_HC_REVISION,
+			    rev);
+
+			if (perr != 0)
+				whinge(mod, NULL, "amd_dimm_create:"
+				    "nvlist_add_string failed\n");
+		}
 
 		if ((dimmnode = topo_node_bind(mod, pnode, name, num, fmri))
 		    == NULL) {
@@ -421,16 +526,43 @@ amd_dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 			continue;
 		}
 
-		if (topo_method_register(mod, dimmnode, dimm_methods) < 0)
-			whinge(mod, &nerr, "amd_dimm_create: "
-			    "topo_method_register failed");
+		if (!FM_AWARE_SMBIOS(mod))
+			if (topo_method_register(mod,
+			    dimmnode, dimm_methods) < 0)
+				whinge(mod, &nerr, "amd_dimm_create: "
+				    "topo_method_register failed");
+
+		(void) topo_pgroup_create(dimmnode, &dimm_pgroup, &err);
+
+		if (FM_AWARE_SMBIOS(mod)) {
+			char *label;
+
+			nvlist_free(fmri);
+			(void) topo_node_resource(dimmnode,
+			    &fmri, &err);
+
+			label = (char *)chip_label_smbios_get(mod,
+			    pnode, smbid, NULL);
+			if (topo_node_label_set(dimmnode, label,
+			    &perr) == -1)
+				topo_mod_dprintf(mod, "Failed"
+				    "to set label\n");
+			topo_mod_strfree(mod, label);
+
+			(void) topo_prop_set_string(dimmnode, PGNAME(DIMM),
+			    FM_FMRI_HC_SERIAL_ID, TOPO_PROP_IMMUTABLE,
+			    serial, &err);
+			(void) topo_prop_set_string(dimmnode, PGNAME(DIMM),
+			    FM_FMRI_HC_PART, TOPO_PROP_IMMUTABLE,
+			    part, &err);
+			(void) topo_prop_set_string(dimmnode, PGNAME(DIMM),
+			    FM_FMRI_HC_REVISION, TOPO_PROP_IMMUTABLE,
+			    rev, &err);
+		}
 
 		(void) topo_node_asru_set(dimmnode, fmri, 0, &err);
 		(void) topo_node_fru_set(dimmnode, fmri, 0, &err);
-
 		nvlist_free(fmri);
-
-		(void) topo_pgroup_create(dimmnode, &dimm_pgroup, &err);
 
 		for (nvp = nvlist_next_nvpair(dimmarr[i], NULL); nvp != NULL;
 		    nvp = nvlist_next_nvpair(dimmarr[i], nvp)) {
@@ -587,14 +719,17 @@ amd_htconfig(topo_mod_t *mod, tnode_t *cnode, nvlist_t *htnvl)
 }
 
 void
-amd_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
-    int family, int model, int stepping, int *nerrp)
+amd_mc_create(topo_mod_t *mod, uint16_t smbid, tnode_t *pnode, const char *name,
+    nvlist_t *auth, int family, int model, int stepping, int *nerrp)
 {
 	tnode_t *mcnode;
 	nvlist_t *fmri;
 	nvpair_t *nvp;
 	nvlist_t *mc = NULL;
 	int i, err;
+	char *serial = NULL;
+	char *part = NULL;
+	char *rev = NULL;
 
 	/*
 	 * Return with no error for anything before AMD family 0xf - we
@@ -603,6 +738,13 @@ amd_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 	 */
 	if (family < 0xf)
 		return;
+
+	if (FM_AWARE_SMBIOS(mod)) {
+		(void) topo_node_resource(pnode, &fmri, &err);
+		(void) nvlist_lookup_string(fmri, "serial", &serial);
+		(void) nvlist_lookup_string(fmri, "part", &part);
+		(void) nvlist_lookup_string(fmri, "revision", &rev);
+	}
 
 	if (mkrsrc(mod, pnode, name, 0, auth, &fmri) != 0) {
 		whinge(mod, nerrp, "mc_create: mkrsrc failed\n");
@@ -613,6 +755,12 @@ amd_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 		nvlist_free(fmri);
 		whinge(mod, nerrp, "mc_create: node range create failed\n");
 		return;
+	}
+
+	if (FM_AWARE_SMBIOS(mod)) {
+		(void) nvlist_add_string(fmri, "serial", serial);
+		(void) nvlist_add_string(fmri, "part", part);
+		(void) nvlist_add_string(fmri, "revision", rev);
 	}
 
 	if ((mcnode = topo_node_bind(mod, pnode, name, 0,
@@ -626,6 +774,11 @@ amd_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 	if (topo_node_fru_set(mcnode, NULL, 0, &err) < 0)
 		whinge(mod, nerrp, "mc_create: topo_node_fru_set failed\n");
 
+	if (FM_AWARE_SMBIOS(mod)) {
+		if (topo_node_label_set(mcnode, NULL, &err) == -1)
+			topo_mod_dprintf(mod, "Failed to set label\n");
+	}
+
 	nvlist_free(fmri);
 
 	if ((mc = amd_lookup_by_mcid(mod, topo_node_instance(pnode))) == NULL) {
@@ -636,7 +789,7 @@ amd_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 		 * (presumably newly-released) cpu model.  We fallback to
 		 * creating a generic maximal topology.
 		 */
-		if (amd_generic_mc_create(mod, pnode, mcnode,
+		if (amd_generic_mc_create(mod, smbid, pnode, mcnode,
 		    family, model, stepping, auth) != 0)
 			whinge(mod, nerrp,
 			    "mc_create: amd_generic_mc_create failed\n");
@@ -678,7 +831,7 @@ amd_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 
 	if (amd_dramchan_create(mod, mcnode, CHAN_NODE_NAME, auth) != 0 ||
 	    amd_cs_create(mod, mcnode, CS_NODE_NAME, mc, auth) != 0 ||
-	    amd_dimm_create(mod, mcnode, DIMM_NODE_NAME, mc, auth) != 0)
+	    amd_dimm_create(mod, smbid, mcnode, DIMM_NODE_NAME, mc, auth) != 0)
 		whinge(mod, nerrp, "mc_create: create children failed\n");
 
 	/*

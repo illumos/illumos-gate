@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include <sys/fm/util.h>
 #include <sys/fm/protocol.h>
 #include <sys/fm/cpu/AMD.h>
+#include <sys/fm/smb/fmsmb.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpi/acpi_pci.h>
 #include <sys/acpica.h>
@@ -59,6 +60,8 @@
 #define	AO_F_REVS_FG (X86_CHIPREV_AMD_F_REV_F | X86_CHIPREV_AMD_F_REV_G)
 
 int ao_mca_smi_disable = 1;		/* attempt to disable SMI polling */
+
+extern int x86gentopo_legacy;	/* x86 generic topology support */
 
 struct ao_ctl_init {
 	uint32_t ctl_revmask;	/* rev(s) to which this applies */
@@ -617,9 +620,11 @@ ao_ereport_synd(ao_ms_data_t *ao, uint64_t status, uint_t *typep,
 }
 
 static nvlist_t *
-ao_ereport_create_resource_elem(nv_alloc_t *nva, mc_unum_t *unump, int dimmnum)
+ao_ereport_create_resource_elem(cmi_hdl_t hdl, nv_alloc_t *nva,
+    mc_unum_t *unump, int dimmnum)
 {
 	nvlist_t *nvl, *snvl;
+	nvlist_t *board_list = NULL;
 
 	if ((nvl = fm_nvlist_create(nva)) == NULL)	/* freed by caller */
 		return (NULL);
@@ -632,12 +637,31 @@ ao_ereport_create_resource_elem(nv_alloc_t *nva, mc_unum_t *unump, int dimmnum)
 	(void) nvlist_add_uint64(snvl, FM_FMRI_HC_SPECIFIC_OFFSET,
 	    unump->unum_offset);
 
-	fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, snvl, 5,
-	    "motherboard", unump->unum_board,
-	    "chip", unump->unum_chip,
-	    "memory-controller", unump->unum_mc,
-	    "dimm", unump->unum_dimms[dimmnum],
-	    "rank", unump->unum_rank);
+	if (!x86gentopo_legacy) {
+		board_list = cmi_hdl_smb_bboard(hdl);
+
+		if (board_list == NULL) {
+			fm_nvlist_destroy(nvl,
+			    nva ? FM_NVA_RETAIN : FM_NVA_FREE);
+			fm_nvlist_destroy(snvl,
+			    nva ? FM_NVA_RETAIN : FM_NVA_FREE);
+			return (NULL);
+		}
+
+		fm_fmri_hc_create(nvl, FM_HC_SCHEME_VERSION, NULL, snvl,
+		    board_list, 4,
+		    "chip", cmi_hdl_smb_chipid(hdl),
+		    "memory-controller", unump->unum_mc,
+		    "dimm", unump->unum_dimms[dimmnum],
+		    "rank", unump->unum_rank);
+	} else {
+		fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, snvl, 5,
+		    "motherboard", unump->unum_board,
+		    "chip", unump->unum_chip,
+		    "memory-controller", unump->unum_mc,
+		    "dimm", unump->unum_dimms[dimmnum],
+		    "rank", unump->unum_rank);
+	}
 
 	fm_nvlist_destroy(snvl, nva ? FM_NVA_RETAIN : FM_NVA_FREE);
 
@@ -645,7 +669,8 @@ ao_ereport_create_resource_elem(nv_alloc_t *nva, mc_unum_t *unump, int dimmnum)
 }
 
 static void
-ao_ereport_add_resource(nvlist_t *payload, nv_alloc_t *nva, mc_unum_t *unump)
+ao_ereport_add_resource(cmi_hdl_t hdl, nvlist_t *payload, nv_alloc_t *nva,
+    mc_unum_t *unump)
 {
 
 	nvlist_t *elems[MC_UNUM_NDIMM];
@@ -656,7 +681,7 @@ ao_ereport_add_resource(nvlist_t *payload, nv_alloc_t *nva, mc_unum_t *unump)
 		if (unump->unum_dimms[i] == MC_INVALNUM)
 			break;
 
-		if ((elems[nelems] = ao_ereport_create_resource_elem(nva,
+		if ((elems[nelems] = ao_ereport_create_resource_elem(hdl, nva,
 		    unump, i)) == NULL)
 			break;
 
@@ -711,7 +736,7 @@ ao_ms_ereport_add_logout(cmi_hdl_t hdl, nvlist_t *ereport,
 		    cmi_mc_patounum(addr, aed->aed_addrvalid_hi,
 		    aed->aed_addrvalid_lo, synd, syndtype, &unum) ==
 		    CMI_SUCCESS)
-			ao_ereport_add_resource(ereport, nva, &unum);
+			ao_ereport_add_resource(hdl, ereport, nva, &unum);
 	}
 }
 

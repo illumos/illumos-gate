@@ -126,6 +126,10 @@ typedef struct smbios_entry {
 #define	SMB_TYPE_EOT		127	/* end of table */
 
 #define	SMB_TYPE_OEM_LO		128	/* start of OEM-specific type range */
+#define	SUN_OEM_EXT_PROCESSOR	132	/* processor extended info */
+#define	SUN_OEM_PCIEXRC		138	/* PCIE RootComplex/RootPort info */
+#define	SUN_OEM_EXT_MEMARRAY	144	/* phys memory array extended info */
+#define	SUN_OEM_EXT_MEMDEVICE	145	/* memory device extended info */
 #define	SMB_TYPE_OEM_HI		256	/* end of OEM-specific type range */
 
 /*
@@ -159,6 +163,10 @@ typedef struct smbios_version {
 	uint8_t smbv_major;		/* version major number */
 	uint8_t smbv_minor;		/* version minor number */
 } smbios_version_t;
+
+#define	SMB_CONT_BYTE	1		/* contained elements are byte size */
+#define	SMB_CONT_WORD	2		/* contained elements are word size */
+#define	SMB_CONT_MAX	255		/* maximum contained objects */
 
 /*
  * SMBIOS Bios Information.  See DSP0134 Section 3.3.1 for more information.
@@ -261,6 +269,7 @@ typedef struct smbios_bboard {
 	id_t smbb_chassis;		/* chassis containing this board */
 	uint8_t smbb_flags;		/* flags (see below) */
 	uint8_t smbb_type;		/* board type (see below) */
+	uint8_t smbb_contn;		/* number of contained object hdls */
 } smbios_bboard_t;
 
 #define	SMB_BBFL_MOTHERBOARD	0x01	/* board is a motherboard */
@@ -286,8 +295,6 @@ typedef struct smbios_bboard {
 /*
  * SMBIOS Chassis description.  See DSP0134 Section 3.3.4 for more information.
  * We move the lock bit of the type field into smbc_lock for easier processing.
- * NOTE: We do not currently export the contained element data for each chassis
- * as this seems useless: see DSP0134 3.3.4.4.  It can be added if necessary.
  */
 typedef struct smbios_chassis {
 	uint32_t smbc_oemdata;		/* OEM-specific data */
@@ -299,7 +306,8 @@ typedef struct smbios_chassis {
 	uint8_t smbc_security;		/* security status */
 	uint8_t smbc_uheight;		/* enclosure height in U's */
 	uint8_t smbc_cords;		/* number of power cords */
-	uint8_t smbc_elems;		/* number of element records */
+	uint8_t smbc_elems;		/* number of element records (n) */
+	uint8_t smbc_elemlen;		/* length of contained element (m) */
 } smbios_chassis_t;
 
 #define	SMB_CHT_OTHER		0x01	/* other */
@@ -1071,6 +1079,43 @@ typedef struct smbios_ipmi {
 #define	SMB_IPMI_F_INTREDGE	0x08	/* intr is edge triggered (else lvl) */
 
 /*
+ * SMBIOS OEM-specific (Type 132) Processor Extended Information.
+ */
+typedef struct smbios_processor_ext {
+	uint16_t smbpe_processor;	/* extending processor handle */
+	uint8_t smbpe_fru;		/* FRU indicaor */
+	uint8_t smbpe_n;		/* number of APIC IDs */
+	uint16_t *smbpe_apicid;		/* strand Inital APIC IDs */
+} smbios_processor_ext_t;
+
+/*
+ * SMBIOS OEM-specific (Type 138) PCI-Express RC/RP Information.
+ */
+typedef struct smbios_pciexrc {
+	uint16_t smbpcie_bb;		/* base board handle */
+	uint16_t smbpcie_bdf;		/* Bus/Dev/Funct (PCI) */
+} smbios_pciexrc_t;
+
+/*
+ * SMBIOS OEM-specific (Type 144) Memory Array Extended Information.
+ */
+typedef struct smbios_memarray_ext {
+	uint16_t smbmae_ma;		/* memory array handle */
+	uint16_t smbmae_comp;		/* component parent handle */
+	uint16_t smbmae_bdf;		/* Bus/Dev/Funct (PCI) */
+} smbios_memarray_ext_t;
+
+/*
+ * SMBIOS OEM-specific (Type 145) Memory Device Extended Information.
+ */
+typedef struct smbios_memdevice_ext {
+	uint16_t smbmdeve_md;		/* memory device handle */
+	uint8_t smbmdeve_drch;		/* DRAM channel */
+	uint8_t smbmdeve_ncs;		/* number of chip selects */
+	uint8_t *smbmdeve_cs;		/* array of chip select numbers */
+} smbios_memdevice_ext_t;
+
+/*
  * SMBIOS Interfaces.  An SMBIOS image can be opened by either providing a file
  * pathname, device pathname, file descriptor, or raw memory buffer.  Once an
  * image is opened the functions below can be used to iterate over the various
@@ -1123,15 +1168,19 @@ extern int smbios_errno(smbios_hdl_t *);
 extern const char *smbios_errmsg(int);
 
 extern int smbios_lookup_id(smbios_hdl_t *, id_t, smbios_struct_t *);
+extern int smbios_lookup_type(smbios_hdl_t *, uint_t, smbios_struct_t *);
 extern int smbios_iter(smbios_hdl_t *, smbios_struct_f *, void *);
 
 extern void smbios_info_smbios(smbios_hdl_t *, smbios_entry_t *);
 extern int smbios_info_common(smbios_hdl_t *, id_t, smbios_info_t *);
+extern int smbios_info_contains(smbios_hdl_t *, id_t, uint_t, id_t *);
 extern id_t smbios_info_bios(smbios_hdl_t *, smbios_bios_t *);
 extern id_t smbios_info_system(smbios_hdl_t *, smbios_system_t *);
 extern int smbios_info_bboard(smbios_hdl_t *, id_t, smbios_bboard_t *);
 extern int smbios_info_chassis(smbios_hdl_t *, id_t, smbios_chassis_t *);
 extern int smbios_info_processor(smbios_hdl_t *, id_t, smbios_processor_t *);
+extern int smbios_info_extprocessor(smbios_hdl_t *, id_t,
+    smbios_processor_ext_t *);
 extern int smbios_info_cache(smbios_hdl_t *, id_t, smbios_cache_t *);
 extern int smbios_info_port(smbios_hdl_t *, id_t, smbios_port_t *);
 extern int smbios_info_slot(smbios_hdl_t *, id_t, smbios_slot_t *);
@@ -1140,12 +1189,17 @@ extern int smbios_info_strtab(smbios_hdl_t *, id_t, int, const char *[]);
 extern id_t smbios_info_lang(smbios_hdl_t *, smbios_lang_t *);
 extern id_t smbios_info_eventlog(smbios_hdl_t *, smbios_evlog_t *);
 extern int smbios_info_memarray(smbios_hdl_t *, id_t, smbios_memarray_t *);
+extern int smbios_info_extmemarray(smbios_hdl_t *, id_t,
+    smbios_memarray_ext_t *);
 extern int smbios_info_memarrmap(smbios_hdl_t *, id_t, smbios_memarrmap_t *);
 extern int smbios_info_memdevice(smbios_hdl_t *, id_t, smbios_memdevice_t *);
+extern int smbios_info_extmemdevice(smbios_hdl_t *, id_t,
+    smbios_memdevice_ext_t *);
 extern int smbios_info_memdevmap(smbios_hdl_t *, id_t, smbios_memdevmap_t *);
 extern id_t smbios_info_hwsec(smbios_hdl_t *, smbios_hwsec_t *);
 extern id_t smbios_info_boot(smbios_hdl_t *, smbios_boot_t *);
 extern id_t smbios_info_ipmi(smbios_hdl_t *, smbios_ipmi_t *);
+extern int smbios_info_pciexrc(smbios_hdl_t *, id_t, smbios_pciexrc_t *);
 
 extern const char *smbios_psn(smbios_hdl_t *);
 extern const char *smbios_csn(smbios_hdl_t *);

@@ -1269,3 +1269,102 @@ print_msg_hwerr(ctid_t ct_id, proc_t *p)
 	uprintf("Killed process %d (%s) in contract id %d "
 	    "due to hardware error\n", p->p_pid, p->p_user.u_comm, ct_id);
 }
+
+void
+fm_fmri_hc_create(nvlist_t *fmri, int version, const nvlist_t *auth,
+    nvlist_t *snvl, nvlist_t *bboard, int npairs, ...)
+{
+	nv_alloc_t *nva = nvlist_lookup_nv_alloc(fmri);
+	nvlist_t *pairs[HC_MAXPAIRS];
+	nvlist_t **hcl;
+	uint_t n;
+	int i, j;
+	va_list ap;
+	char *hcname, *hcid;
+
+	if (!fm_fmri_hc_set_common(fmri, version, auth))
+		return;
+
+	/*
+	 * copy the bboard nvpairs to the pairs array
+	 */
+	if (nvlist_lookup_nvlist_array(bboard, FM_FMRI_HC_LIST, &hcl, &n)
+	    != 0) {
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		return;
+	}
+
+	for (i = 0; i < n; i++) {
+		if (nvlist_lookup_string(hcl[i], FM_FMRI_HC_NAME,
+		    &hcname) != 0) {
+			atomic_add_64(
+			    &erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+			return;
+		}
+		if (nvlist_lookup_string(hcl[i], FM_FMRI_HC_ID, &hcid) != 0) {
+			atomic_add_64(
+			    &erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+			return;
+		}
+
+		pairs[i] = fm_nvlist_create(nva);
+		if (nvlist_add_string(pairs[i], FM_FMRI_HC_NAME, hcname) != 0 ||
+		    nvlist_add_string(pairs[i], FM_FMRI_HC_ID, hcid) != 0) {
+			for (j = 0; j <= i; j++) {
+				if (pairs[j] != NULL)
+					fm_nvlist_destroy(pairs[j],
+					    FM_NVA_RETAIN);
+			}
+			atomic_add_64(
+			    &erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+			return;
+		}
+	}
+
+	/*
+	 * create the pairs from passed in pairs
+	 */
+	npairs = MIN(npairs, HC_MAXPAIRS);
+
+	va_start(ap, npairs);
+	for (i = n; i < npairs + n; i++) {
+		const char *name = va_arg(ap, const char *);
+		uint32_t id = va_arg(ap, uint32_t);
+		char idstr[11];
+		(void) snprintf(idstr, sizeof (idstr), "%u", id);
+		pairs[i] = fm_nvlist_create(nva);
+		if (nvlist_add_string(pairs[i], FM_FMRI_HC_NAME, name) != 0 ||
+		    nvlist_add_string(pairs[i], FM_FMRI_HC_ID, idstr) != 0) {
+			for (j = 0; j <= i; j++) {
+				if (pairs[j] != NULL)
+					fm_nvlist_destroy(pairs[j],
+					    FM_NVA_RETAIN);
+			}
+			atomic_add_64(
+			    &erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+			return;
+		}
+	}
+	va_end(ap);
+
+	/*
+	 * Create the fmri hc list
+	 */
+	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST, pairs,
+	    npairs + n) != 0) {
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		return;
+	}
+
+	for (i = 0; i < npairs + n; i++) {
+			fm_nvlist_destroy(pairs[i], FM_NVA_RETAIN);
+	}
+
+	if (snvl != NULL) {
+		if (nvlist_add_nvlist(fmri, FM_FMRI_HC_SPECIFIC, snvl) != 0) {
+			atomic_add_64(
+			    &erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+			return;
+		}
+	}
+}

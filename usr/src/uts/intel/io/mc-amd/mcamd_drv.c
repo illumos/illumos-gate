@@ -47,11 +47,16 @@
 #include <sys/pci_cfgspace.h>
 #include <sys/mc.h>
 #include <sys/mc_amd.h>
+#include <sys/smbios.h>
+#include <sys/pci.h>
 #include <mcamd.h>
 #include <mcamd_dimmcfg.h>
 #include <mcamd_pcicfg.h>
 #include <mcamd_api.h>
 #include <sys/fm/cpu/AMD.h>
+#include <sys/fm/smb/fmsmb.h>
+#include <sys/fm/protocol.h>
+#include <sys/fm/util.h>
 
 /*
  * Set to prevent mc-amd from attaching.
@@ -1270,6 +1275,41 @@ mc_fm_init(dev_info_t *dip)
 	ddi_fm_handler_register(dip, mc_fm_handle, NULL);
 }
 
+static void
+mc_read_smbios(mc_t *mc, dev_info_t *dip)
+{
+
+	uint16_t bdf;
+	pci_regspec_t *pci_rp;
+	uint32_t phys_hi;
+	int m;
+	uint_t chip_inst;
+	int rc = 0;
+
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS, "reg",
+	    (caddr_t)&pci_rp, &m) == DDI_SUCCESS) {
+		phys_hi = pci_rp->pci_phys_hi;
+		bdf = (uint16_t)(PCI_REG_BDFR_G(phys_hi) >>
+		    PCI_REG_FUNC_SHIFT);
+
+		rc = fm_smb_mc_chipinst(bdf, &chip_inst);
+		if (rc == 0) {
+			mc->smb_chipid = chip_inst;
+		} else {
+#ifdef DEBUG
+			cmn_err(CE_NOTE, "mc reads smbios chip info failed");
+#endif /* DEBUG */
+			return;
+		}
+		mc->smb_bboard = fm_smb_mc_bboards(bdf);
+#ifdef DEBUG
+		if (mc->smb_bboard == NULL)
+			cmn_err(CE_NOTE,
+			    "mc reads smbios base boards info failed");
+#endif /* DEBUG */
+	}
+}
+
 /*ARGSUSED*/
 static int
 mc_create_cb(cmi_hdl_t whdl, void *arg1, void *arg2, void *arg3)
@@ -1287,7 +1327,7 @@ mc_create_cb(cmi_hdl_t whdl, void *arg1, void *arg2, void *arg3)
 }
 
 static mc_t *
-mc_create(chipid_t chipid)
+mc_create(chipid_t chipid, dev_info_t *dip)
 {
 	mc_t *mc;
 	cmi_hdl_t hdl = NULL;
@@ -1314,6 +1354,8 @@ mc_create(chipid_t chipid)
 	mc->mc_props.mcp_rev = cmi_hdl_chiprev(hdl);
 	mc->mc_revname = cmi_hdl_chiprevstr(hdl);
 	mc->mc_socket = cmi_hdl_getsockettype(hdl);
+
+	mc_read_smbios(mc, dip);
 
 	if (mc_list == NULL)
 		mc_list = mc;
@@ -1552,7 +1594,7 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Integrate this memory controller device into existing set */
 	if (mc == NULL) {
-		mc = mc_create(chipid);
+		mc = mc_create(chipid, dip);
 
 		if (mc == NULL) {
 			/*

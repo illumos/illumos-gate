@@ -37,6 +37,21 @@ extern "C" {
 
 #define	CHIP_VERSION		TOPO_VERSION
 
+/* Below should match the definitions in x86pi_impl.h */
+#define	X86PI_FULL		1
+#define	X86PI_NONE		2
+
+/*
+ * FM_AWARE_SMBIOS means SMBIOS meets FMA needs
+ * X86PI_FULL is defined as 1 in x86pi.so
+ * And passed from x86pi.so to chip.so as module
+ * private data
+ */
+#define	FM_AWARE_SMBIOS(mod)	\
+	(topo_mod_getspecific(mod) != NULL && \
+	    (*(int *)topo_mod_getspecific(mod) == X86PI_FULL))
+#define	IGNORE_ID	0xFFFF
+
 #define	CHIP_NODE_NAME		"chip"
 #define	CORE_NODE_NAME		"core"
 #define	STRAND_NODE_NAME	"strand"
@@ -161,18 +176,33 @@ extern int mem_asru_create(topo_mod_t *, nvlist_t *, nvlist_t **);
 /*
  * Prototypes for chip_amd.c
  */
-extern void amd_mc_create(topo_mod_t *, tnode_t *, const char *, nvlist_t *,
-    int, int, int, int *);
+extern void amd_mc_create(topo_mod_t *, uint16_t, tnode_t *,
+    const char *, nvlist_t *, int, int, int, int *);
 
 /*
  * Prototypes for chip_intel.c
  */
 extern int mc_offchip_open(void);
 extern int mc_offchip_create(topo_mod_t *, tnode_t *, const char *, nvlist_t *);
-extern void onchip_mc_create(topo_mod_t *, tnode_t *, const char *, nvlist_t *);
+extern void onchip_mc_create(topo_mod_t *, uint16_t, tnode_t *,
+    const char *, nvlist_t *);
 
 extern char *get_fmtstr(topo_mod_t *, nvlist_t *);
 extern int store_prop_val(topo_mod_t *, char *, char *, nvlist_t **out);
+
+/*
+ * Prototypes for chip_smbios.c
+ */
+
+extern int init_chip_smbios(topo_mod_t *);
+extern int chip_status_smbios_get(topo_mod_t *, id_t);
+extern int chip_fru_smbios_get(topo_mod_t *, id_t);
+extern const char *chip_label_smbios_get(topo_mod_t *, tnode_t *, id_t, char *);
+extern const char *chip_serial_smbios_get(topo_mod_t *, id_t);
+extern const char *chip_part_smbios_get(topo_mod_t *, id_t);
+extern const char *chip_rev_smbios_get(topo_mod_t *, id_t);
+extern id_t memnode_to_smbiosid(uint16_t, const char *, uint64_t, void *);
+
 
 #ifdef __cplusplus
 }

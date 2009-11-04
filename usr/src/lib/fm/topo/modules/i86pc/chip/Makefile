@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -27,7 +27,7 @@ MODULE = chip
 ARCH = i86pc
 CLASS = arch
 MODULESRCS = chip.c chip_label.c chip_subr.c chip_amd.c chip_intel.c\
-chip_serial.c
+chip_serial.c chip_smbios.c
 
 include ../../Makefile.plugin
-LDLIBS += -lipmi -lfmd_agent -lumem
+LDLIBS += -lipmi -lfmd_agent -lumem -lsmbios

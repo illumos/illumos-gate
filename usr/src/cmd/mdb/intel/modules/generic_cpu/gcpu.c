@@ -45,6 +45,9 @@ typedef struct cmi_hdl_impl {
 	const struct cmi_mc_ops *cmih_mcops;	/* Memory-controller ops */
 	void *cmih_mcdata;			/* Memory-controller data */
 	uint64_t cmih_flags;
+	uint16_t cmih_smbiosid;			/* SMBIOS Type 4 struct ID */
+	uint_t cmih_smb_chipid;			/* smbios chipid */
+	nvlist_t *cmih_smb_bboard;		/* smbios bboard */
 } cmi_hdl_impl_t;
 
 typedef struct cmi_hdl_ent {

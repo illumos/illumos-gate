@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -209,6 +209,8 @@ struct mc {
 	size_t mc_snapshotsz;			/* packed nvlist buffer size */
 	uint_t mc_snapshotgen;			/* snapshot generation number */
 	int mc_csdiscontig;			/* chip-selects discontiguous */
+	uint_t smb_chipid;			/* smbios chip instance */
+	nvlist_t *smb_bboard;			/* smbios chip's parent */
 };
 
 typedef struct mcamd_hdl {

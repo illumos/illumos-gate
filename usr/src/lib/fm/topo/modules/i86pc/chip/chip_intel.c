@@ -145,6 +145,9 @@ mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
 
 		(void) topo_node_asru_set(rnode, fmri, TOPO_ASRU_COMPUTE, &err);
 
+		if (FM_AWARE_SMBIOS(mod))
+			topo_node_label_set(rnode, NULL, &err);
+
 		nvlist_free(fmri);
 
 		(void) topo_pgroup_create(rnode, &rank_pgroup, &err);
@@ -157,8 +160,8 @@ mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
 }
 
 static void
-mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
-    nvlist_t **nvl, uint_t ndimms, int maxdimms, int maxranks)
+mc_add_dimms(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
+    nvlist_t *auth, nvlist_t **nvl, uint_t ndimms, int maxdimms, int maxranks)
 {
 	int i;
 	nvlist_t *fmri;
@@ -174,6 +177,7 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 	char *rev = NULL;
 	char *label = NULL;
 	char *name;
+	id_t smbid;
 
 	if (topo_node_range_create(mod, pnode, DIMM, 0,
 	    maxdimms ? maxdimms-1 : ndimms-1) < 0) {
@@ -204,6 +208,24 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 			}
 		}
 		fmri = NULL;
+
+		if (FM_AWARE_SMBIOS(mod)) {
+			int channum;
+
+			channum = topo_node_instance(pnode);
+			smbid = memnode_to_smbiosid(chip_smbid, DIMM_NODE_NAME,
+			    i, &channum);
+			if (serial == NULL)
+				serial = (char *)chip_serial_smbios_get(mod,
+				    smbid);
+			if (part == NULL)
+				part = (char *)chip_part_smbios_get(mod,
+				    smbid);
+			if (rev == NULL)
+				rev = (char *)chip_rev_smbios_get(mod,
+				    smbid);
+		}
+
 		fmri = topo_mod_hcfmri(mod, pnode, FM_HC_SCHEME_VERSION,
 		    DIMM, dimm_number, NULL, auth, part, rev, serial);
 		if (fmri == NULL) {
@@ -219,12 +241,11 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 			return;
 		}
 
-		if (topo_method_register(mod, dnode, dimm_methods) < 0)
-			whinge(mod, NULL, "mc_add_dimms: "
-			    "topo_method_register failed");
+		if (!FM_AWARE_SMBIOS(mod))
+			if (topo_method_register(mod, dnode, dimm_methods) < 0)
+				whinge(mod, NULL, "mc_add_dimms: "
+				    "topo_method_register failed");
 
-		(void) topo_node_fru_set(dnode, fmri, 0, &err);
-		nvlist_free(fmri);
 		(void) topo_pgroup_create(dnode, &dimm_pgroup, &err);
 
 		for (nvp = nvlist_next_nvpair(nvl[i], NULL); nvp != NULL;
@@ -237,8 +258,25 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 				    dnode);
 			}
 		}
-		if (label)
-			(void) topo_node_label_set(dnode, label, &err);
+
+		if (FM_AWARE_SMBIOS(mod)) {
+			nvlist_free(fmri);
+			(void) topo_node_resource(dnode, &fmri, &err);
+			/*
+			 * We will use a full absolute parent/child label
+			 */
+			label = (char *)chip_label_smbios_get(mod,
+			    pnode, smbid, label);
+		}
+
+		(void) topo_node_label_set(dnode, label, &err);
+
+		if (FM_AWARE_SMBIOS(mod))
+			topo_mod_strfree(mod, label);
+
+		(void) topo_node_fru_set(dnode, fmri, 0, &err);
+		(void) topo_node_asru_set(dnode, fmri, 0, &err);
+		nvlist_free(fmri);
 
 		if (nranks) {
 			mc_add_ranks(mod, dnode, auth, dimm_number, ranks_nvp,
@@ -248,8 +286,8 @@ mc_add_dimms(topo_mod_t *mod, tnode_t *pnode, nvlist_t *auth,
 }
 
 static int
-mc_add_channel(topo_mod_t *mod, tnode_t *pnode, int channel, nvlist_t *auth,
-    nvlist_t *nvl, int maxdimms, int maxranks)
+mc_add_channel(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
+    int channel, nvlist_t *auth, nvlist_t *nvl, int maxdimms, int maxranks)
 {
 	tnode_t *mc_channel;
 	nvlist_t *fmri;
@@ -273,10 +311,14 @@ mc_add_channel(topo_mod_t *mod, tnode_t *pnode, int channel, nvlist_t *auth,
 	(void) topo_node_fru_set(mc_channel, NULL, 0, &err);
 	nvlist_free(fmri);
 	(void) topo_pgroup_create(mc_channel, &dimm_channel_pgroup, &err);
+
+	if (FM_AWARE_SMBIOS(mod))
+		(void) topo_node_label_set(mc_channel, NULL, &err);
+
 	if (nvlist_lookup_nvlist_array(nvl, MCINTEL_NVLIST_DIMMS, &dimm_nvl,
 	    &ndimms) == 0) {
-		mc_add_dimms(mod, mc_channel, auth, dimm_nvl, ndimms, maxdimms,
-		    maxranks);
+		mc_add_dimms(mod, chip_smbid, mc_channel, auth, dimm_nvl,
+		    ndimms, maxdimms, maxranks);
 	}
 	for (nvp = nvlist_next_nvpair(nvl, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(nvl, nvp)) {
@@ -286,12 +328,13 @@ mc_add_channel(topo_mod_t *mod, tnode_t *pnode, int channel, nvlist_t *auth,
 			    mc_channel);
 		}
 	}
+
 	return (0);
 }
 
 static int
-mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
-    nvlist_t *nvl)
+mc_nb_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
+    const char *name, nvlist_t *auth, nvlist_t *nvl)
 {
 	int err;
 	int i, j;
@@ -355,6 +398,9 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 		nvlist_free(fmri);
 		(void) topo_pgroup_create(mcnode, &mc_pgroup, &err);
 
+		if (FM_AWARE_SMBIOS(mod))
+			(void) topo_node_label_set(mcnode, NULL, &err);
+
 		if (topo_node_range_create(mod, mcnode, DRAMCHANNEL, channel,
 		    channel + nchannels - 1) < 0) {
 			whinge(mod, NULL,
@@ -362,8 +408,9 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 			return (-1);
 		}
 		for (j = 0; j < nchannels; j++) {
-			if (mc_add_channel(mod, mcnode, channel, auth,
-			    channel_nvl[channel], maxdimms, maxranks) < 0) {
+			if (mc_add_channel(mod, chip_smbid, mcnode, channel,
+			    auth, channel_nvl[channel], maxdimms,
+			    maxranks) < 0) {
 				return (-1);
 			}
 			channel++;
@@ -387,8 +434,8 @@ mc_nb_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *auth,
 }
 
 int
-mc_node_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    nvlist_t *auth)
+mc_node_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
+    const char *name, nvlist_t *auth)
 {
 	mc_snapshot_info_t mcs;
 	void *buf = NULL;
@@ -421,23 +468,23 @@ mc_node_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		return (NULL);
 	}
 
-	rc = mc_nb_create(mod, pnode, name, auth, nvl);
+	rc = mc_nb_create(mod, chip_smbid, pnode, name, auth, nvl);
 
 	nvlist_free(nvl);
 	return (rc);
 }
 
 void
-onchip_mc_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
-    nvlist_t *auth)
+onchip_mc_create(topo_mod_t *mod, uint16_t chip_smbid, tnode_t *pnode,
+    const char *name, nvlist_t *auth)
 {
 	if (mc_onchip(topo_node_instance(pnode)))
-		(void) mc_node_create(mod, pnode, name, auth);
+		(void) mc_node_create(mod, chip_smbid, pnode, name, auth);
 }
 
 int
 mc_offchip_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
     nvlist_t *auth)
 {
-	return (mc_node_create(mod, pnode, name, auth));
+	return (mc_node_create(mod, IGNORE_ID, pnode, name, auth));
 }

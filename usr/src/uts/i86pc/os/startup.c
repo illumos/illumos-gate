@@ -1545,6 +1545,18 @@ startup_modules(void)
 	 */
 	setup_ddi();
 
+#ifdef __xpv
+	if (DOMAIN_IS_INITDOMAIN(xen_info))
+#endif
+	{
+		/*
+		 * Load the System Management BIOS into the global ksmbios
+		 * handle, if an SMBIOS is present on this system.
+		 */
+		ksmbios = smbios_open(NULL, SMB_VERSION, ksmbios_flags, NULL);
+	}
+
+
 	/*
 	 * Set up the CPU module subsystem for the boot cpu in the native
 	 * case, and all physical cpu resource in the xpv dom0 case.
@@ -2186,12 +2198,6 @@ post_startup(void)
 	if (DOMAIN_IS_INITDOMAIN(xen_info))
 #endif
 	{
-		/*
-		 * Load the System Management BIOS into the global ksmbios
-		 * handle, if an SMBIOS is present on this system.
-		 */
-		ksmbios = smbios_open(NULL, SMB_VERSION, ksmbios_flags, NULL);
-
 #if defined(__xpv)
 		xpv_panic_init();
 #else

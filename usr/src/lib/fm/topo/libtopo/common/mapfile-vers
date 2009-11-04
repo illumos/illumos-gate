@@ -121,6 +121,7 @@ SUNWprivate {
 	topo_mod_unregister;
 	topo_mod_walk_init;
 	topo_mod_zalloc;
+	topo_mod_smbios;
 	topo_node_asru;
 	topo_node_asru_set;
 	topo_node_bind;

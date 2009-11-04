@@ -18,20 +18,35 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-ARCH = i86pc
-CLASS = arch
-DTDFILE = topology.dtd.1
-TOPOFILE = i86pc-hc-topology.xml chip-hc-topology.xml psu-hc-topology.xml \
-fan-hc-topology.xml i86pc-legacy-hc-topology.xml chassis-hc-topology.xml
+MODULE	= x86pi
+ARCH	= i86pc
+CLASS	= arch
 
-SRCDIR = ../i86pc
+TOPODIR		= ../../../libtopo/common
 
-PLATFORM = unused
-TOPOBASE = i86pc-hc-topology.xml
+UTILDIR		= ../../common/pcibus
+BRDIR		= ../../common/hostbridge
+UTILSRCS	= did.c did_hash.c did_props.c
+X86PISRCS	= x86pi.c x86pi_bboard.c x86pi_chassis.c \
+		  x86pi_generic.c x86pi_hostbridge.c x86pi_subr.c
+MODULESRCS	= $(X86PISRCS) $(UTILSRCS)
 
-include ../Makefile.map
+include ../../Makefile.plugin
+
+LDLIBS += -lsmbios -ldevinfo -luutil
+
+CPPFLAGS += -I. -I$(ROOT)/usr/platform/i86pc/include -I$(TOPODIR)
+CPPFLAGS += -I$(UTILDIR) -I$(BRDIR)
+
+%.o: $(UTILDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.ln: $(UTILDIR)/%.c
+	$(LINT.c) -c $<

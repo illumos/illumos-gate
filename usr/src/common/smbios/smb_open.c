@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/smbios_impl.h>
 
@@ -295,6 +292,20 @@ int
 smbios_lookup_id(smbios_hdl_t *shp, id_t id, smbios_struct_t *sp)
 {
 	const smb_struct_t *stp = smb_lookup_id(shp, id);
+
+	if (stp == NULL)
+		return (-1); /* errno is set for us */
+
+	if (sp != NULL)
+		(void) smb_export(stp, sp);
+
+	return (0);
+}
+
+int
+smbios_lookup_type(smbios_hdl_t *shp, uint_t type, smbios_struct_t *sp)
+{
+	const smb_struct_t *stp = smb_lookup_type(shp, type);
 
 	if (stp == NULL)
 		return (-1); /* errno is set for us */

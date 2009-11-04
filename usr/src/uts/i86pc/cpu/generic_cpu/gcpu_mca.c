@@ -43,10 +43,13 @@
 #include <sys/errorq.h>
 #include <sys/mca_x86.h>
 #include <sys/fm/cpu/GMCA.h>
+#include <sys/fm/smb/fmsmb.h>
 #include <sys/sysevent.h>
 #include <sys/ontrap.h>
 
 #include "gcpu.h"
+
+extern int x86gentopo_legacy;	/* x86 generic topology support */
 
 /*
  * Clear to log telemetry found at initialization.  While processor docs
@@ -501,16 +504,28 @@ gcpu_erpt_clsfmt(const char *fmt, char *buf, size_t buflen, uint64_t status,
 static nvlist_t *
 gcpu_fmri_create(cmi_hdl_t hdl, nv_alloc_t *nva)
 {
-	nvlist_t *nvl;
+	nvlist_t *nvl, *fmri;
 
 	if ((nvl = fm_nvlist_create(nva)) == NULL)
 		return (NULL);
 
-	fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 4,
-	    "motherboard", 0,
-	    "chip", cmi_hdl_chipid(hdl),
-	    "core", cmi_hdl_coreid(hdl),
-	    "strand", cmi_hdl_strandid(hdl));
+	if (!x86gentopo_legacy) {
+		fmri = cmi_hdl_smb_bboard(hdl);
+		if (fmri == NULL)
+			return (NULL);
+
+		fm_fmri_hc_create(nvl, FM_HC_SCHEME_VERSION,
+		    NULL, NULL, fmri, 3,
+		    "chip", cmi_hdl_smb_chipid(hdl),
+		    "core", cmi_hdl_coreid(hdl),
+		    "strand", cmi_hdl_strandid(hdl));
+	} else {
+		fm_fmri_hc_set(nvl, FM_HC_SCHEME_VERSION, NULL, NULL, 4,
+		    "motherboard", 0,
+		    "chip", cmi_hdl_chipid(hdl),
+		    "core", cmi_hdl_coreid(hdl),
+		    "strand", cmi_hdl_strandid(hdl));
+	}
 
 	return (nvl);
 }

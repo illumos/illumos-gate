@@ -1275,6 +1275,12 @@ xen_physcpu_strandid(xen_mc_lcpu_cookie_t cookie)
 }
 
 id_t
+xen_physcpu_initial_apicid(xen_mc_lcpu_cookie_t cookie)
+{
+	return (COOKIE2XCP(cookie)->mc_clusterid);
+}
+
+id_t
 xen_physcpu_logical_id(xen_mc_lcpu_cookie_t cookie)
 {
 	return (COOKIE2XCP(cookie)->mc_cpunr);
