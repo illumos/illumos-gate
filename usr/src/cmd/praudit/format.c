@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2477,6 +2477,11 @@ do_mtime32(pr_context_t *context, int status, int flag, uint32_t scale)
 			uval.uvaltype = PRA_UINT32;
 			uval.uint32_val = (uint32_t)tv_sec;
 			(void) pa_print(context, &uval, 0);
+			if (context->format & PRF_XMLM) {
+				uval.uvaltype = PRA_CHAR;
+				uval.char_val = '.';
+				(void) pa_print(context, &uval, 0);
+			}
 			uval.uvaltype = PRA_UINT32;
 			uval.uint32_val = t32;
 		}
@@ -2586,6 +2591,11 @@ do_mtime64(pr_context_t *context, int status, int flag, uint64_t scale)
 			uval.uvaltype = PRA_UINT64;
 			uval.uint64_val = t64_sec;
 			(void) pa_print(context, &uval, 0);
+			if (context->format & PRF_XMLM) {
+				uval.uvaltype = PRA_CHAR;
+				uval.char_val = '.';
+				(void) pa_print(context, &uval, 0);
+			}
 			uval.uvaltype = PRA_UINT64;
 			uval.uint64_val = t64_msec;
 		}
