@@ -3560,9 +3560,11 @@ zfs_prune_proplist(zfs_handle_t *zhp, uint8_t *props)
 		nvpair_t *next = nvlist_next_nvpair(zhp->zfs_props, curr);
 
 		/*
-		 * We leave user:props in the nvlist, so there will be
-		 * some ZPROP_INVAL.  To be extra safe, don't prune
-		 * those.
+		 * User properties will result in ZPROP_INVAL, and since we
+		 * only know how to prune standard ZFS properties, we always
+		 * leave these in the list.  This can also happen if we
+		 * encounter an unknown DSL property (when running older
+		 * software, for example).
 		 */
 		if (zfs_prop != ZPROP_INVAL && props[zfs_prop] == B_FALSE)
 			(void) nvlist_remove(zhp->zfs_props,

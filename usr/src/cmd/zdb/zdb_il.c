@@ -56,13 +56,23 @@ static void
 zil_prt_rec_create(zilog_t *zilog, int txtype, lr_create_t *lr)
 {
 	time_t crtime = lr->lr_crtime[0];
-	char *name = (char *)(lr + 1);
-	char *link = name + strlen(name) + 1;
+	char *name, *link;
+	lr_attr_t *lrattr;
 
-	if (txtype == TX_SYMLINK)
+	name = (char *)(lr + 1);
+
+	if (lr->lr_common.lrc_txtype == TX_CREATE_ATTR ||
+	    lr->lr_common.lrc_txtype == TX_MKDIR_ATTR) {
+		lrattr = (lr_attr_t *)(lr + 1);
+		name += ZIL_XVAT_SIZE(lrattr->lr_attr_masksize);
+	}
+
+	if (txtype == TX_SYMLINK) {
+		link = name + strlen(name) + 1;
 		(void) printf("%s%s -> %s\n", prefix, name, link);
-	else
+	} else if (txtype != TX_MKXATTR) {
 		(void) printf("%s%s\n", prefix, name);
+	}
 
 	(void) printf("%s%s", prefix, ctime(&crtime));
 	(void) printf("%sdoid %llu, foid %llu, mode %llo\n", prefix,

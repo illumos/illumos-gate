@@ -234,10 +234,21 @@ send_iterate_prop(zfs_handle_t *zhp, nvlist_t *nv)
 		zfs_prop_t prop = zfs_name_to_prop(propname);
 		nvlist_t *propnv;
 
-		assert(zfs_prop_user(propname) || prop != ZPROP_INVAL);
+		if (!zfs_prop_user(propname)) {
+			/*
+			 * Realistically, this should never happen.  However,
+			 * we want the ability to add DSL properties without
+			 * needing to make incompatible version changes.  We
+			 * need to ignore unknown properties to allow older
+			 * software to still send datasets containing these
+			 * properties, with the unknown properties elided.
+			 */
+			if (prop == ZPROP_INVAL)
+				continue;
 
-		if (!zfs_prop_user(propname) && zfs_prop_readonly(prop))
-			continue;
+			if (zfs_prop_readonly(prop))
+				continue;
+		}
 
 		verify(nvpair_value_nvlist(elem, &propnv) == 0);
 		if (prop == ZFS_PROP_QUOTA || prop == ZFS_PROP_RESERVATION ||

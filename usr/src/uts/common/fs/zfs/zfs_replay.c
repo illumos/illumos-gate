@@ -498,7 +498,6 @@ zfs_replay_create(zfsvfs_t *zfsvfs, lr_create_t *lr, boolean_t byteswap)
 		    &vp, kcred, NULL, vflg, NULL);
 		break;
 	case TX_MKXATTR:
-		name = (char *)(lr + 1);
 		error = zfs_make_xattrdir(dzp, &xva.xva_vattr, &vp, kcred);
 		break;
 	case TX_SYMLINK:
