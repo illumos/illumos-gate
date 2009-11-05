@@ -380,6 +380,7 @@ continue_delegates()
 }
 
 #define	FMRI_GDM "svc:/application/graphical-login/gdm:default"
+#define	GDM_STOP_TIMEOUT	10	/* Give gdm 10 seconds to shut down */
 
 /*
  * If gdm is running, try to stop gdm.
@@ -395,8 +396,16 @@ stop_gdm()
 	 * If gdm is running, try to stop gdm.
 	 */
 	while ((gdm_state = smf_get_state(FMRI_GDM)) != NULL &&
-	    strcmp(gdm_state, SCF_STATE_STRING_ONLINE) == 0 && retry++ < 5) {
-		if (smf_disable_instance(FMRI_GDM, SMF_TEMPORARY) != 0) {
+	    strcmp(gdm_state, SCF_STATE_STRING_ONLINE) == 0 &&
+	    retry++ < GDM_STOP_TIMEOUT) {
+
+		free(gdm_state);
+
+		/*
+		 * Only need to disable once.
+		 */
+		if (retry == 1 &&
+		    smf_disable_instance(FMRI_GDM, SMF_TEMPORARY) != 0) {
 			(void) fprintf(stderr,
 			    gettext("%s: Failed to stop %s: %s.\n"),
 			    cmdname, FMRI_GDM, scf_strerror(scf_error()));
@@ -405,7 +414,7 @@ stop_gdm()
 		(void) sleep(1);
 	}
 
-	if (retry >= 5) {
+	if (retry >= GDM_STOP_TIMEOUT) {
 		(void) fprintf(stderr, gettext("%s: Failed to stop %s.\n"),
 		    cmdname, FMRI_GDM);
 		return (-1);
@@ -1250,6 +1259,7 @@ main(int argc, char *argv[])
 	zoneid_t zoneid = getzoneid();
 	int need_check_zones = 0;
 	char bootargs_buf[BOOTARGS_MAX];
+	char *bootargs_orig = NULL;
 	char *bename = NULL;
 
 	const char * const resetting = "/etc/svc/volatile/resetting";
@@ -1350,6 +1360,7 @@ main(int argc, char *argv[])
 			return (1);
 		}
 
+		bootargs_orig = strdup(bootargs_buf);
 		mdep = (uintptr_t)bootargs_buf;
 	} else {
 		/*
@@ -1536,6 +1547,9 @@ main(int argc, char *argv[])
 		(void) fprintf(stderr,
 		    gettext("%s: Falling back to regular reboot.\n"), cmdname);
 		fast_reboot = 0;
+		mdep = (uintptr_t)bootargs_orig;
+	} else if (bootargs_orig) {
+		free(bootargs_orig);
 	}
 
 	if (cmd != A_DUMP) {
