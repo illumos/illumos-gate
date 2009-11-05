@@ -526,7 +526,6 @@ cpupm_remove_domains(cpu_t *cp, int state, cpupm_state_domains_t **dom_ptr)
 	    (cpupm_mach_state_t *)(cp->cpu_m.mcpu_pm_mach_state);
 	cpupm_state_domains_t *dptr;
 	uint32_t pm_domain;
-	ulong_t iflag;
 
 	ASSERT(mach_state);
 
@@ -560,15 +559,13 @@ cpupm_remove_domains(cpu_t *cp, int state, cpupm_state_domains_t **dom_ptr)
 
 	/*
 	 * We found one matched power domain, remove CPU from its cpuset.
-	 * Interrupt is disabled here to avoid the race conditions between
+	 * pm_lock(spin lock) here to avoid the race conditions between
 	 * event change notification and cpu remove.
 	 */
-	iflag = intr_clear();
 	mutex_enter(&dptr->pm_lock);
 	if (CPU_IN_SET(dptr->pm_cpus, cp->cpu_id))
 		CPUSET_DEL(dptr->pm_cpus, cp->cpu_id);
 	mutex_exit(&dptr->pm_lock);
-	intr_restore(iflag);
 }
 
 void

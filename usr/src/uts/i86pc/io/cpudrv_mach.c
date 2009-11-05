@@ -335,6 +335,12 @@ cpudrv_mach_fini(cpudrv_devstate_t *cpudsp)
 uint_t
 cpudrv_get_speeds(cpudrv_devstate_t *cpudsp, int **speeds)
 {
+	/*
+	 * return nspeeds = 0 if can't get cpu_t
+	 */
+	if (cpudrv_get_cpu(cpudsp) != DDI_SUCCESS)
+		return (0);
+
 	return (cpupm_get_speeds(cpudsp->cp, speeds));
 }
 

@@ -741,7 +741,7 @@ cpu_idle_fini(cpu_t *cp)
 	/*
 	 * idle cpu points back to the generic one
 	 */
-	idle_cpu = CPU->cpu_m.mcpu_idle_cpu = non_deep_idle_cpu;
+	idle_cpu = cp->cpu_m.mcpu_idle_cpu = non_deep_idle_cpu;
 	disp_enq_thread = non_deep_idle_disp_enq_thread;
 
 	cstate = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
@@ -779,6 +779,14 @@ cpu_idle_stop(cpu_t *cp)
 	cpu_acpi_handle_t handle = mach_state->ms_acpi_handle;
 	cpu_acpi_cstate_t *cstate;
 	uint_t cpu_max_cstates, i;
+
+	/*
+	 * place the CPUs in a safe place so that we can disable
+	 * deep c-state on them.
+	 */
+	pause_cpus(NULL);
+	cp->cpu_m.mcpu_idle_cpu = non_deep_idle_cpu;
+	start_cpus();
 
 	cstate = (cpu_acpi_cstate_t *)CPU_ACPI_CSTATES(handle);
 	if (cstate) {

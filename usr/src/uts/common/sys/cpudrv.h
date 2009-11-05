@@ -204,6 +204,7 @@ extern boolean_t cpudrv_mach_fini(cpudrv_devstate_t *);
 extern boolean_t cpudrv_power_ready(cpu_t *);
 extern boolean_t cpudrv_is_enabled(cpudrv_devstate_t *);
 extern void cpudrv_set_supp_freqs(cpudrv_devstate_t *);
+extern int cpudrv_get_cpu(cpudrv_devstate_t *);
 
 #endif /* _KERNEL */
 
