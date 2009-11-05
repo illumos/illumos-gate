@@ -825,6 +825,7 @@ sbd_swap_lu_info_1_1(sbd_lu_info_1_1_t *sli)
 	sli->sli_data_fname_offset	= BSWAP_64(sli->sli_data_fname_offset);
 	sli->sli_serial_offset		= BSWAP_64(sli->sli_serial_offset);
 	sli->sli_alias_offset		= BSWAP_64(sli->sli_alias_offset);
+	sli->sli_mgmt_url_offset	= BSWAP_64(sli->sli_mgmt_url_offset);
 }
 
 sbd_status_t
