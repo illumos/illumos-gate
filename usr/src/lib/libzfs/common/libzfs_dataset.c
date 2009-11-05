@@ -815,9 +815,14 @@ zfs_valid_proplist(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 				goto error;
 			}
 
+			/*
+			 * Encode the prop name as
+			 * userquota@<hex-rid>-domain, to make it easy
+			 * for the kernel to decode.
+			 */
 			(void) snprintf(newpropname, sizeof (newpropname),
-			    "%s%s", zfs_userquota_prop_prefixes[uqtype],
-			    domain);
+			    "%s%llx-%s", zfs_userquota_prop_prefixes[uqtype],
+			    (longlong_t)rid, domain);
 			valary[0] = uqtype;
 			valary[1] = rid;
 			valary[2] = intval;

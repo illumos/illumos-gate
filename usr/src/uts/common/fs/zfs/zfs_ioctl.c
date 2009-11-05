@@ -1729,8 +1729,11 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 				type = valary[0];
 				rid = valary[1];
 				quota = valary[2];
-				domain = propname +
-				    strlen(zfs_userquota_prop_prefixes[type]);
+				/*
+				 * The propname is encoded as
+				 * userquota@<rid>-<domain>.
+				 */
+				domain = strchr(propname, '-') + 1;
 
 				error = zfsvfs_hold(name, FTAG, &zfsvfs);
 				if (error == 0) {
