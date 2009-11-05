@@ -67,7 +67,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/list.h>
-#include <smbsrv/smb_i18n.h>
+#include <smbsrv/string.h>
 #include <smbsrv/alloc.h>
 
 #ifdef __cplusplus

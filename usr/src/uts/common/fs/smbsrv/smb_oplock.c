@@ -37,7 +37,7 @@
  * that is not the case anymore.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <inet/tcp.h>
 

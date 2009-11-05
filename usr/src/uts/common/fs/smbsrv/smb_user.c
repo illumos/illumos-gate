@@ -163,7 +163,7 @@
  *       being queued in that list is NOT registered by incrementing the
  *       reference count.
  */
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_door_svc.h>
 
 
@@ -230,8 +230,8 @@ smb_user_login(
 	user->u_privileges = privileges;
 	user->u_name_len = strlen(account_name) + 1;
 	user->u_domain_len = strlen(domain_name) + 1;
-	user->u_name = smb_kstrdup(account_name, user->u_name_len);
-	user->u_domain = smb_kstrdup(domain_name, user->u_domain_len);
+	user->u_name = smb_strdup(account_name);
+	user->u_domain = smb_strdup(domain_name);
 	user->u_cred = cr;
 	user->u_privcred = smb_cred_create_privs(cr, privileges);
 	user->u_audit_sid = audit_sid;
@@ -254,8 +254,8 @@ smb_user_login(
 		}
 		smb_idpool_free(&session->s_uid_pool, user->u_uid);
 	}
-	kmem_free(user->u_name, (size_t)user->u_name_len);
-	kmem_free(user->u_domain, (size_t)user->u_domain_len);
+	smb_mfree(user->u_name);
+	smb_mfree(user->u_domain);
 	kmem_cache_free(session->s_server->si_cache_user, user);
 	return (NULL);
 }
@@ -582,7 +582,7 @@ smb_user_lookup_share(
 	while (tree) {
 		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 		ASSERT(tree->t_user == user);
-		if (utf8_strcasecmp(tree->t_sharename, sharename) == 0) {
+		if (smb_strcasecmp(tree->t_sharename, sharename, 0) == 0) {
 			if (smb_tree_hold(tree)) {
 				smb_llist_exit(&user->u_tree_list);
 				return (tree);
@@ -625,7 +625,7 @@ smb_user_lookup_volume(
 		ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 		ASSERT(tree->t_user == user);
 
-		if (utf8_strcasecmp(tree->t_volume, name) == 0) {
+		if (smb_strcasecmp(tree->t_volume, name, 0) == 0) {
 			if (smb_tree_hold(tree)) {
 				smb_llist_exit(&user->u_tree_list);
 				return (tree);
@@ -776,7 +776,7 @@ smb_user_namecmp(smb_user_t *user, const char *name)
 	char		*fq_name;
 	boolean_t	match;
 
-	if (utf8_strcasecmp(name, user->u_name) == 0)
+	if (smb_strcasecmp(name, user->u_name, 0) == 0)
 		return (B_TRUE);
 
 	fq_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -784,12 +784,12 @@ smb_user_namecmp(smb_user_t *user, const char *name)
 	(void) snprintf(fq_name, MAXNAMELEN, "%s\\%s",
 	    user->u_domain, user->u_name);
 
-	match = (utf8_strcasecmp(name, fq_name) == 0);
+	match = (smb_strcasecmp(name, fq_name, 0) == 0);
 	if (!match) {
 		(void) snprintf(fq_name, MAXNAMELEN, "%s@%s",
 		    user->u_name, user->u_domain);
 
-		match = (utf8_strcasecmp(name, fq_name) == 0);
+		match = (smb_strcasecmp(name, fq_name, 0) == 0);
 	}
 
 	kmem_free(fq_name, MAXNAMELEN);
@@ -891,8 +891,8 @@ smb_user_delete(
 	crfree(user->u_cred);
 	if (user->u_privcred)
 		crfree(user->u_privcred);
-	kmem_free(user->u_name, (size_t)user->u_name_len);
-	kmem_free(user->u_domain, (size_t)user->u_domain_len);
+	smb_mfree(user->u_name);
+	smb_mfree(user->u_domain);
 	kmem_cache_free(user->u_server->si_cache_user, user);
 }
 
@@ -1018,15 +1018,15 @@ smb_user_netinfo_init(smb_user_t *user, smb_netuserinfo_t *info)
 	info->ui_flags = user->u_flags;
 
 	info->ui_domain_len = user->u_domain_len;
-	info->ui_domain = smb_kstrdup(user->u_domain, info->ui_domain_len);
+	info->ui_domain = smb_strdup(user->u_domain);
 
 	info->ui_account_len = user->u_name_len;
-	info->ui_account = smb_kstrdup(user->u_name, info->ui_account_len);
+	info->ui_account = smb_strdup(user->u_name);
 
 	buf = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	smb_session_getclient(session, buf, MAXNAMELEN);
 	info->ui_workstation_len = strlen(buf) + 1;
-	info->ui_workstation = smb_kstrdup(buf, info->ui_workstation_len);
+	info->ui_workstation = smb_strdup(buf);
 	kmem_free(buf, MAXNAMELEN);
 }
 
@@ -1037,11 +1037,11 @@ smb_user_netinfo_fini(smb_netuserinfo_t *info)
 		return;
 
 	if (info->ui_domain)
-		kmem_free(info->ui_domain, info->ui_domain_len);
+		smb_mfree(info->ui_domain);
 	if (info->ui_account)
-		kmem_free(info->ui_account, info->ui_account_len);
+		smb_mfree(info->ui_account);
 	if (info->ui_workstation)
-		kmem_free(info->ui_workstation, info->ui_workstation_len);
+		smb_mfree(info->ui_workstation);
 
 	bzero(info, sizeof (smb_netuserinfo_t));
 }

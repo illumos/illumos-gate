@@ -186,7 +186,7 @@ smb_wka_lookup_name(char *name)
 	(void) rw_rdlock(&wk_rwlock);
 	for (i = 0; i < SMB_WKA_NUM; ++i) {
 		entry = &wka_tbl[i];
-		if (!utf8_strcasecmp(name, entry->wka_name)) {
+		if (!smb_strcasecmp(name, entry->wka_name, 0)) {
 			(void) rw_unlock(&wk_rwlock);
 			return (entry);
 		}

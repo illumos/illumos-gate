@@ -1299,7 +1299,7 @@ struct mslm_NetNameValidate {
  */
 
 /*
- * Share types for shiX_type fields - duplicated from cifs.h
+ * Share types for shiX_type fields - duplicated from smb.h
  */
 #ifndef _SHARE_TYPES_DEFINED_
 #define _SHARE_TYPES_DEFINED_

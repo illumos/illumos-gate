@@ -23,10 +23,8 @@
  * Use is subject to license terms.
  */
 
-#include <smbsrv/nterror.h>
-#include <smbsrv/ntstatus.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smbinfo.h>
-#include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
 
 typedef struct smb_dirpath {
@@ -259,13 +257,12 @@ smb_dirpath_new(smb_request_t *sr)
 	char *xpath;
 	smb_dirpath_t *spp;
 
-	/* Malloc from the request storage area. This is freed automatically */
-	/* so we don't need to worry about freeing it later */
-	spp = smbsr_malloc(&sr->request_storage, sizeof (smb_dirpath_t));
+	/* Allocate using request specific memory. */
+	spp = smb_srm_alloc(sr, sizeof (smb_dirpath_t));
 	spp->sp_path = sr->arg.dirop.fqi.fq_path.pn_path;
 	pathLen = strlen(spp->sp_path);
 	spp->sp_curp = spp->sp_path;
-	xpath = smbsr_malloc(&sr->request_storage, pathLen + 1);
+	xpath = smb_srm_alloc(sr, pathLen + 1);
 	sr->arg.dirop.fqi.fq_path.pn_path = xpath;
 	spp->sp_sr = sr;
 
@@ -589,7 +586,7 @@ smb_dirpath_isvalid(const char *path)
 	if (*path == '\0')
 		return (B_TRUE);
 
-	cp = smb_kstrdup(path, MAXPATHLEN);
+	cp = smb_strdup(path);
 	p = strcanon(cp, "\\");
 	p += strspn(p, "\\");
 
@@ -597,11 +594,11 @@ smb_dirpath_isvalid(const char *path)
 		bad = &bad_paths[i];
 
 		if (strncmp(p, bad->name, bad->len) == 0) {
-			kmem_free(cp, MAXPATHLEN);
+			smb_mfree(cp);
 			return (B_FALSE);
 		}
 	}
 
-	kmem_free(cp, MAXPATHLEN);
+	smb_mfree(cp);
 	return (B_TRUE);
 }

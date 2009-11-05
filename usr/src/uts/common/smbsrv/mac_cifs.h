@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_MAC_CIFS_H
 #define	_SMBSRV_MAC_CIFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file provides definitions for the Macintosh Extensions for CIFS
@@ -42,7 +40,7 @@ extern "C" {
  * Macintosh information level extensions. The entire list is presented
  * here for convenience but for consistency with the existing CIFS
  * information levels don't use these values directly. Use the SMB_MAC_
- * definitions in cifs.h.
+ * definitions in smb.h.
  *
  * SmbTrans2QueryFsInformation:		MAC_QUERY_FS_INFO
  * SmbTrans2Find{First|Next}2:		MAC_FIND_BOTH_HFS_INFO

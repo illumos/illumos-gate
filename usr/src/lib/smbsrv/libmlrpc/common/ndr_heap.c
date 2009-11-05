@@ -186,8 +186,8 @@ ndr_heap_mstring(ndr_heap_t *heap, const char *s, ndr_mstring_t *out)
 	if (s == NULL || out == NULL)
 		return (-1);
 
-	out->length = mts_wcequiv_strlen(s);
-	out->allosize = out->length + sizeof (mts_wchar_t);
+	out->length = smb_wcequiv_strlen(s);
+	out->allosize = out->length + sizeof (smb_wchar_t);
 
 	if ((out->str = ndr_heap_strdup(heap, s)) == NULL)
 		return (-1);
@@ -209,17 +209,17 @@ ndr_heap_mkvcs(ndr_heap_t *heap, char *s, ndr_vcstr_t *vc)
 {
 	int mlen;
 
-	vc->wclen = mts_wcequiv_strlen(s);
+	vc->wclen = smb_wcequiv_strlen(s);
 	vc->wcsize = vc->wclen;
 
-	mlen = sizeof (ndr_vcs_t) + vc->wcsize + sizeof (mts_wchar_t);
+	mlen = sizeof (ndr_vcs_t) + vc->wcsize + sizeof (smb_wchar_t);
 
 	vc->vcs = ndr_heap_malloc(heap, mlen);
 
 	if (vc->vcs) {
 		vc->vcs->vc_first_is = 0;
-		vc->vcs->vc_length_is = vc->wclen / sizeof (mts_wchar_t);
-		(void) mts_mbstowcs((mts_wchar_t *)vc->vcs->buffer, s,
+		vc->vcs->vc_length_is = vc->wclen / sizeof (smb_wchar_t);
+		(void) smb_mbstowcs((smb_wchar_t *)vc->vcs->buffer, s,
 		    vc->vcs->vc_length_is);
 	}
 }

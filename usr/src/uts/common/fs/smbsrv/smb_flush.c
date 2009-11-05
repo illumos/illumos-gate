@@ -36,7 +36,7 @@
  * draft-heizer-cifs-v1-spec-00.txt
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 
 

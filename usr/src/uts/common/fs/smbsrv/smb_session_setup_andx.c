@@ -222,7 +222,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_token.h>
 #include <smbsrv/smb_door_svc.h>
 
@@ -477,8 +477,7 @@ smb_authenticate(smb_request_t *sr, smb_sessionsetup_info_t *sinfo,
 	boolean_t need_lookup = B_FALSE;
 	uint32_t privileges;
 	cred_t *cr;
-	char *buf;
-	size_t buflen = 0;
+	char *buf = NULL;
 	char *p;
 
 	bzero(&clnt_info, sizeof (netr_client_t));
@@ -500,8 +499,7 @@ smb_authenticate(smb_request_t *sr, smb_sessionsetup_info_t *sinfo,
 	 * for some forms of authentication.
 	 */
 	if (*sinfo->ssi_domain == '\0') {
-		buflen = strlen(sinfo->ssi_user) + 1;
-		buf = smb_kstrdup(sinfo->ssi_user, buflen);
+		buf = smb_strdup(sinfo->ssi_user);
 		if ((p = strchr(buf, '@')) != NULL) {
 			*p = '\0';
 			clnt_info.e_username = buf;
@@ -531,8 +529,7 @@ smb_authenticate(smb_request_t *sr, smb_sessionsetup_info_t *sinfo,
 		sr->smb_uid = user->u_uid;
 		sr->uid_user = user;
 
-		if (buflen != 0)
-			kmem_free(buf, buflen);
+		smb_mfree(buf);
 
 		return ((user->u_flags & SMB_USER_FLAG_GUEST)
 		    ? SMB_AUTH_GUEST : SMB_AUTH_USER);
@@ -561,8 +558,7 @@ smb_authenticate(smb_request_t *sr, smb_sessionsetup_info_t *sinfo,
 
 	usr_token = smb_get_token(&clnt_info);
 
-	if (buflen != 0)
-		kmem_free(buf, buflen);
+	smb_mfree(buf);
 
 	if (usr_token == NULL) {
 		smbsr_error(sr, 0, ERRSRV, ERRbadpw);

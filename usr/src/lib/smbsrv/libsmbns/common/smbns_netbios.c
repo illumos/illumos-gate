@@ -214,7 +214,7 @@ smb_encode_netbios_name(unsigned char *name, char suffix, unsigned char *scope,
 		    sizeof (dest->scope));
 	}
 
-	(void) utf8_strupr((char *)dest->scope);
+	(void) smb_strupr((char *)dest->scope);
 }
 
 void

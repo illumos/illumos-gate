@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_MSGBUF_H
 #define	_SMBSRV_MSGBUF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Definition and interface for smb_msgbuf buffer management.  The
@@ -36,7 +34,7 @@
  */
 
 #include <sys/types.h>
-#include <smbsrv/smb_i18n.h>
+#include <smbsrv/string.h>
 
 #ifdef __cplusplus
 extern "C" {

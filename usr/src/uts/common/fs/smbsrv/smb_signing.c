@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_signing.c	1.4	08/07/08 SMI"
 
 /*
  * These routines provide the SMB MAC signing for the SMB server.
@@ -42,10 +40,9 @@
  */
 
 #include <sys/uio.h>
-#include <smbsrv/mbuf.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/msgbuf.h>
 #include <sys/crypto/api.h>
-#include <smbsrv/smb_incl.h>
 
 #define	SMBAUTH_SESSION_KEY_SZ 16
 #define	SMB_SIG_SIZE	8

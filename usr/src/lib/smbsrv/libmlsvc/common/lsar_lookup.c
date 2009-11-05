@@ -239,10 +239,10 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name, smb_account_t *info)
 				name = p;
 		}
 
-		length = mts_wcequiv_strlen(name) + sizeof (mts_wchar_t);
+		length = smb_wcequiv_strlen(name) + sizeof (smb_wchar_t);
 		arg.lookup_level = MSLSA_LOOKUP_LEVEL_1;
 	} else {
-		length = mts_wcequiv_strlen(name);
+		length = smb_wcequiv_strlen(name);
 		arg.lookup_level = MSLSA_LOOKUP_LEVEL_1;
 	}
 
@@ -594,9 +594,9 @@ lsar_lookup_priv_value(mlsvc_handle_t *lsa_handle, char *name,
 	bzero(&arg, sizeof (struct mslsa_LookupPrivValue));
 	(void) memcpy(&arg.handle, lsa_handle, sizeof (mslsa_handle_t));
 
-	length = mts_wcequiv_strlen(name);
+	length = smb_wcequiv_strlen(name);
 	if (ndr_rpc_server_os(lsa_handle) == NATIVE_OS_WIN2000)
-		length += sizeof (mts_wchar_t);
+		length += sizeof (smb_wchar_t);
 
 	arg.name.length = length;
 	arg.name.allosize = length;
@@ -682,7 +682,7 @@ lsar_lookup_priv_display_name(mlsvc_handle_t *lsa_handle, char *name,
 	bzero(&arg, sizeof (struct mslsa_LookupPrivDisplayName));
 	(void) memcpy(&arg.handle, lsa_handle, sizeof (mslsa_handle_t));
 
-	length = mts_wcequiv_strlen(name);
+	length = smb_wcequiv_strlen(name);
 	arg.name.length = length;
 	arg.name.allosize = length;
 	arg.name.str = (unsigned char *)name;
@@ -827,7 +827,7 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name, smb_account_t *info)
 	arg.name_table = (struct mslsa_lup_name_table *)&name_table;
 	name_table.n_entry = 1;
 
-	length = mts_wcequiv_strlen(name) + sizeof (mts_wchar_t);
+	length = smb_wcequiv_strlen(name) + sizeof (smb_wchar_t);
 	name_table.name[0].length = length;
 	name_table.name[0].allosize = length;
 	name_table.name[0].str = (unsigned char *)name;

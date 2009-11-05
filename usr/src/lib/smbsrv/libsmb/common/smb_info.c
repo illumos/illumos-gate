@@ -166,7 +166,7 @@ smb_gethostname(char *buf, size_t buflen, int upcase)
 		*p = '\0';
 
 	if (upcase)
-		(void) utf8_strupr(buf);
+		(void) smb_strupr(buf);
 
 	return (0);
 }
@@ -517,25 +517,24 @@ void
 smb_tonetbiosname(char *name, char *nb_name, char suffix)
 {
 	char tmp_name[NETBIOS_NAME_SZ];
-	mts_wchar_t wtmp_name[NETBIOS_NAME_SZ];
-	unsigned int cpid;
+	smb_wchar_t wtmp_name[NETBIOS_NAME_SZ];
 	int len;
 	size_t rc;
 
 	len = 0;
-	rc = mts_mbstowcs(wtmp_name, (const char *)name, NETBIOS_NAME_SZ);
+	rc = smb_mbstowcs(wtmp_name, (const char *)name, NETBIOS_NAME_SZ);
 
 	if (rc != (size_t)-1) {
 		wtmp_name[NETBIOS_NAME_SZ - 1] = 0;
-		cpid = oem_get_smb_cpid();
-		rc = unicodestooems(tmp_name, wtmp_name, NETBIOS_NAME_SZ, cpid);
+		rc = ucstooem(tmp_name, wtmp_name, NETBIOS_NAME_SZ,
+		    OEM_CPG_850);
 		if (rc > 0)
 			len = strlen(tmp_name);
 	}
 
 	(void) memset(nb_name, ' ', NETBIOS_NAME_SZ - 1);
 	if (len) {
-		(void) utf8_strupr(tmp_name);
+		(void) smb_strupr(tmp_name);
 		(void) memcpy(nb_name, tmp_name, len);
 	}
 	nb_name[NETBIOS_NAME_SZ - 1] = suffix;

@@ -30,7 +30,7 @@
  * This header file contains all the functions for the interface between
  * the smb layer and the fs layer.
  */
-#include <smbsrv/smb_i18n.h>
+#include <smbsrv/string.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_ktypes.h>
 #include <smbsrv/smb_vops.h>
@@ -69,7 +69,7 @@ int smb_fsop_link(smb_request_t *, cred_t *, smb_node_t *, smb_node_t *,
 
 int smb_fsop_rename(smb_request_t *, cred_t *,
     smb_node_t *, char *, smb_node_t *,
-    char *);
+	char *);
 
 int smb_fsop_setattr(smb_request_t *, cred_t *, smb_node_t *, smb_attr_t *);
 
@@ -112,12 +112,14 @@ int smb_fsop_frlock(smb_node_t *, smb_lock_t *, boolean_t, cred_t *);
  * SMB_IGNORE_CASE	Perform case-insensitive lookup.
  * SMB_CATIA		Perform CATIA character substitution.
  * SMB_ABE		Perform Access based enumeration/lookup.
+ * SMB_CASE_SENSITIVE	Don't set SMB_IGNORE_CASE based on tree.
  */
 
 #define	SMB_FOLLOW_LINKS	0x00000001
 #define	SMB_IGNORE_CASE		0x00000002
 #define	SMB_CATIA		0x00000004
 #define	SMB_ABE			0x00000008
+#define	SMB_CASE_SENSITIVE	0x00000010
 
 #ifdef	__cplusplus
 }

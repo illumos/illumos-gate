@@ -241,7 +241,7 @@ smb_ads_refresh(void)
 	(void) smb_config_getstr(SMB_CI_ADS_SITE, new_site, SMB_ADS_SITE_MAX);
 	(void) smb_config_getip(SMB_CI_DOMAIN_SRV, &new_pdc);
 	(void) mutex_lock(&smb_ads_cfg.c_mtx);
-	if (utf8_strcasecmp(smb_ads_cfg.c_site, new_site)) {
+	if (smb_strcasecmp(smb_ads_cfg.c_site, new_site, 0)) {
 		(void) strlcpy(smb_ads_cfg.c_site, new_site, SMB_ADS_SITE_MAX);
 		purge = B_TRUE;
 	}
@@ -380,7 +380,7 @@ smb_ads_is_sought_host(smb_ads_host_info_t *host, char *sought_host_name)
 	if ((host == NULL) || (sought_host_name == NULL))
 		return (B_FALSE);
 
-	if (utf8_strcasecmp(host->name, sought_host_name))
+	if (smb_strcasecmp(host->name, sought_host_name, 0))
 		return (B_FALSE);
 
 	return (B_TRUE);
@@ -405,7 +405,7 @@ smb_ads_is_same_domain(char *cached_host_name, char *current_domain)
 		return (B_FALSE);
 
 	++cached_host_domain;
-	if (utf8_strcasecmp(cached_host_domain, current_domain))
+	if (smb_strcasecmp(cached_host_domain, current_domain, 0))
 		return (B_FALSE);
 
 	return (B_TRUE);
@@ -559,7 +559,7 @@ smb_ads_decode_host_ip(int addit_cnt, int ans_cnt, uchar_t **ptr,
 		for (j = 0; j < ans_cnt; j++) {
 			if ((name = ads_host_list[j].name) == NULL)
 				continue;
-			if (utf8_strcasecmp(name, hostname) == 0) {
+			if (smb_strcasecmp(name, hostname, 0) == 0) {
 				ads_host_list[j].ipaddr = ipaddr;
 			}
 		}

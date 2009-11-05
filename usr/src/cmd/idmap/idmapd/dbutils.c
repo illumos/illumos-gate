@@ -602,6 +602,7 @@ gen_sql_expr_from_rule(idmap_namerule *rule, char **out)
 {
 	char	*s_windomain = NULL, *s_winname = NULL;
 	char	*s_unixname = NULL;
+	char	*dir;
 	char	*lower_winname;
 	int	retcode = IDMAP_SUCCESS;
 
@@ -642,10 +643,28 @@ gen_sql_expr_from_rule(idmap_namerule *rule, char **out)
 		}
 	}
 
-	*out = sqlite_mprintf("%s %s %s",
+	switch (rule->direction) {
+	case IDMAP_DIRECTION_BI:
+		dir = "AND w2u_order > 0 AND u2w_order > 0";
+		break;
+	case IDMAP_DIRECTION_W2U:
+		dir = "AND w2u_order > 0"
+		    " AND (u2w_order = 0 OR u2w_order ISNULL)";
+		break;
+	case IDMAP_DIRECTION_U2W:
+		dir = "AND u2w_order > 0"
+		    " AND (w2u_order = 0 OR w2u_order ISNULL)";
+		break;
+	default:
+		dir = "";
+		break;
+	}
+
+	*out = sqlite_mprintf("%s %s %s %s",
 	    s_windomain ? s_windomain : "",
 	    s_winname ? s_winname : "",
-	    s_unixname ? s_unixname : "");
+	    s_unixname ? s_unixname : "",
+	    dir);
 
 	if (*out == NULL) {
 		retcode = IDMAP_ERR_MEMORY;
@@ -945,31 +964,17 @@ rm_namerule(sqlite *db, idmap_namerule *rule)
 {
 	char		*sql = NULL;
 	idmap_stat	retcode;
-	char		buf[80];
 	char		*expr = NULL;
 
 	if (rule->direction < 0 && EMPTY_STRING(rule->windomain) &&
 	    EMPTY_STRING(rule->winname) && EMPTY_STRING(rule->unixname))
 		return (IDMAP_SUCCESS);
 
-	buf[0] = 0;
-
-	if (rule->direction == IDMAP_DIRECTION_BI)
-		(void) snprintf(buf, sizeof (buf), "AND w2u_order > 0"
-		    " AND u2w_order > 0");
-	else if (rule->direction == IDMAP_DIRECTION_W2U)
-		(void) snprintf(buf, sizeof (buf), "AND w2u_order > 0"
-		    " AND (u2w_order = 0 OR u2w_order ISNULL)");
-	else if (rule->direction == IDMAP_DIRECTION_U2W)
-		(void) snprintf(buf, sizeof (buf), "AND u2w_order > 0"
-		    " AND (w2u_order = 0 OR w2u_order ISNULL)");
-
 	retcode = gen_sql_expr_from_rule(rule, &expr);
 	if (retcode != IDMAP_SUCCESS)
 		goto out;
 
-	sql = sqlite_mprintf("DELETE FROM namerules WHERE 1 %s %s;", expr,
-	    buf);
+	sql = sqlite_mprintf("DELETE FROM namerules WHERE 1 %s;", expr);
 
 	if (sql == NULL) {
 		retcode = IDMAP_ERR_INTERNAL;
@@ -2683,8 +2688,6 @@ ns_lookup_byname(const char *name, const char *lower_name, idmap_id *id)
 	struct passwd	pwd, *pwdp;
 	struct group	grp, *grpp;
 	char		*buf;
-	int		errnum;
-	const char	*me = "ns_lookup_byname";
 	static size_t	pwdbufsiz = 0;
 	static size_t	grpbufsiz = 0;
 
@@ -2698,11 +2701,7 @@ ns_lookup_byname(const char *name, const char *lower_name, idmap_id *id)
 		    name != lower_name && strcmp(name, lower_name) != 0)
 			pwdp = getpwnam_r(lower_name, &pwd, buf, pwdbufsiz);
 		if (pwdp == NULL) {
-			errnum = errno;
-			idmapdlog(LOG_WARNING,
-			    "%s: getpwnam_r(%s) failed (%s).",
-			    me, name, errnum ? strerror(errnum) : "not found");
-			if (errnum == 0)
+			if (errno == 0)
 				return (IDMAP_ERR_NOTFOUND);
 			else
 				return (IDMAP_ERR_INTERNAL);
@@ -2718,11 +2717,7 @@ ns_lookup_byname(const char *name, const char *lower_name, idmap_id *id)
 		    name != lower_name && strcmp(name, lower_name) != 0)
 			grpp = getgrnam_r(lower_name, &grp, buf, grpbufsiz);
 		if (grpp == NULL) {
-			errnum = errno;
-			idmapdlog(LOG_WARNING,
-			    "%s: getgrnam_r(%s) failed (%s).",
-			    me, name, errnum ? strerror(errnum) : "not found");
-			if (errnum == 0)
+			if (errno == 0)
 				return (IDMAP_ERR_NOTFOUND);
 			else
 				return (IDMAP_ERR_INTERNAL);
@@ -2746,8 +2741,6 @@ ns_lookup_bypid(uid_t pid, int is_user, char **unixname)
 	struct passwd	pwd;
 	struct group	grp;
 	char		*buf;
-	int		errnum;
-	const char	*me = "ns_lookup_bypid";
 	static size_t	pwdbufsiz = 0;
 	static size_t	grpbufsiz = 0;
 
@@ -2757,11 +2750,7 @@ ns_lookup_bypid(uid_t pid, int is_user, char **unixname)
 		buf = alloca(pwdbufsiz);
 		errno = 0;
 		if (getpwuid_r(pid, &pwd, buf, pwdbufsiz) == NULL) {
-			errnum = errno;
-			idmapdlog(LOG_WARNING,
-			    "%s: getpwuid_r(%u) failed (%s).",
-			    me, pid, errnum ? strerror(errnum) : "not found");
-			if (errnum == 0)
+			if (errno == 0)
 				return (IDMAP_ERR_NOTFOUND);
 			else
 				return (IDMAP_ERR_INTERNAL);
@@ -2773,11 +2762,7 @@ ns_lookup_bypid(uid_t pid, int is_user, char **unixname)
 		buf = alloca(grpbufsiz);
 		errno = 0;
 		if (getgrgid_r(pid, &grp, buf, grpbufsiz) == NULL) {
-			errnum = errno;
-			idmapdlog(LOG_WARNING,
-			    "%s: getgrgid_r(%u) failed (%s).",
-			    me, pid, errnum ? strerror(errnum) : "not found");
-			if (errnum == 0)
+			if (errno == 0)
 				return (IDMAP_ERR_NOTFOUND);
 			else
 				return (IDMAP_ERR_INTERNAL);

@@ -175,7 +175,7 @@ void ndr_rpc_status(mlsvc_handle_t *, int, uint32_t);
  * Calculate the wide-char equivalent string length required to
  * store a string - including the terminating null wide-char.
  */
-#define	SVCCTL_WNSTRLEN(S)	((strlen((S)) + 1) * sizeof (mts_wchar_t))
+#define	SVCCTL_WNSTRLEN(S)	((strlen((S)) + 1) * sizeof (smb_wchar_t))
 
 /* An AVL-storable node representing each service in the SCM database. */
 typedef struct svcctl_svc_node {

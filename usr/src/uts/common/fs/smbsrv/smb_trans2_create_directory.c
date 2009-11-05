@@ -51,9 +51,7 @@
  *                             occurred while setting EAs
  */
 
-#include <smbsrv/nterror.h>
-#include <smbsrv/ntstatus.h>
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 
 
 /*

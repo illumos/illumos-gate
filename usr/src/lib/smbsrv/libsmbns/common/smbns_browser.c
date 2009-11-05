@@ -39,7 +39,7 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
-#include <smbsrv/cifs.h>
+#include <smbsrv/smb.h>
 #include <smbsrv/mailslot.h>
 #include <smbns_browser.h>
 #include <smbns_netbios.h>
@@ -780,7 +780,7 @@ smb_browser_send_HostAnnouncement(smb_hostinfo_t *hinfo,
 
 	if (smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN) != 0)
 		return;
-	(void) utf8_strupr(resource_domain);
+	(void) smb_strupr(resource_domain);
 
 	if (addr == NULL) {
 		/* Local master Browser */
@@ -1058,7 +1058,7 @@ smb_browser_config(void)
 
 	if (smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN) != 0)
 		return;
-	(void) utf8_strupr(resource_domain);
+	(void) smb_strupr(resource_domain);
 
 	/* domain<00> */
 	smb_init_name_struct((unsigned char *)resource_domain, NBT_WKSTA,
@@ -1156,7 +1156,7 @@ smb_browser_init(void)
 		/* This is the name used for HostAnnouncement */
 		(void) strlcpy(hinfo->hi_nbname, hinfo->hi_nic.nic_host,
 		    NETBIOS_NAME_SZ);
-		(void) utf8_strupr(hinfo->hi_nbname);
+		(void) smb_strupr(hinfo->hi_nbname);
 		/* 0x20: file server service  */
 		smb_init_name_struct((unsigned char *)hinfo->hi_nbname,
 		    NBT_SERVER, 0, hinfo->hi_nic.nic_ip.a_ipv4,
@@ -1193,7 +1193,7 @@ smb_browser_non_master_duties(smb_hostinfo_t *hinfo, boolean_t remove)
 	if (smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN) != 0)
 		return;
 
-	(void) utf8_strupr(resource_domain);
+	(void) smb_strupr(resource_domain);
 
 	smb_init_name_struct((unsigned char *)resource_domain, NBT_MB,
 	    0, 0, 0, 0, 0, &name);

@@ -175,7 +175,7 @@
  * Connectionless clients must set Sid to 0 in the SMB request header.
  *
  * Capabilities allows the server to tell the client what it supports.
- * The bit definitions defined in cifs.h. Bit 0x2000 used to be set in
+ * The bit definitions defined in smb.h. Bit 0x2000 used to be set in
  * the negotiate response capabilities but it caused problems with
  * Windows 2000. It is probably not valid, it doesn't appear in the
  * CIFS spec.
@@ -191,9 +191,8 @@
 #include <sys/socket.h>
 #include <sys/random.h>
 #include <netinet/in.h>
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smbinfo.h>
-#include <smbsrv/smb_i18n.h>
 
 /*
  * Maximum buffer size for DOS: chosen to be the same as NT.
@@ -400,8 +399,8 @@ smb_com_negotiate(smb_request_t *sr)
 		 * skc_nbdomain is not expected to be aligned.
 		 * Use temporary buffer to avoid alignment padding
 		 */
-		buflen = mts_wcequiv_strlen(sr->sr_cfg->skc_nbdomain) +
-		    sizeof (mts_wchar_t);
+		buflen = smb_wcequiv_strlen(sr->sr_cfg->skc_nbdomain) +
+		    sizeof (smb_wchar_t);
 		tmpbuf = kmem_zalloc(buflen, KM_SLEEP);
 		smb_msgbuf_init(&mb, (uint8_t *)tmpbuf, buflen,
 		    SMB_MSGBUF_UNICODE);

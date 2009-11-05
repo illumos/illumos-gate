@@ -987,18 +987,8 @@ usr/include/sys/srn.h			i386
 #
 usr/include/smbsrv			i386
 usr/include/smbsrv/alloc.h		i386
-usr/include/smbsrv/cifs.h		i386
-usr/include/smbsrv/codepage.h		i386
-usr/include/smbsrv/cp_cyrillic.h	i386
-usr/include/smbsrv/cp_latin1.h		i386
-usr/include/smbsrv/cp_latin2.h		i386
-usr/include/smbsrv/cp_latin3.h		i386
-usr/include/smbsrv/cp_latin4.h		i386
-usr/include/smbsrv/cp_latin5.h		i386
-usr/include/smbsrv/cp_latin6.h		i386
 usr/include/smbsrv/cp_unicode.h		i386
 usr/include/smbsrv/cp_usascii.h		i386
-usr/include/smbsrv/ctype.h		i386
 usr/include/smbsrv/doserror.h		i386
 usr/include/smbsrv/hash_table.h		i386
 usr/include/smbsrv/libmlrpc.h		i386
@@ -1006,7 +996,6 @@ usr/include/smbsrv/libmlsvc.h		i386
 usr/include/smbsrv/libsmb.h		i386
 usr/include/smbsrv/libsmbns.h		i386
 usr/include/smbsrv/libsmbrdr.h		i386
-usr/include/smbsrv/lm.h			i386
 usr/include/smbsrv/lmdfs.h		i386
 usr/include/smbsrv/lmerr.h		i386
 usr/include/smbsrv/mac_cifs.h		i386
@@ -1022,14 +1011,11 @@ usr/include/smbsrv/nterror.h		i386
 usr/include/smbsrv/ntifs.h		i386
 usr/include/smbsrv/ntlocale.h		i386
 usr/include/smbsrv/ntstatus.h		i386
-usr/include/smbsrv/oem.h		i386
 usr/include/smbsrv/smb.h		i386
 usr/include/smbsrv/smb_common_door.h	i386
 usr/include/smbsrv/smb_door_svc.h	i386
 usr/include/smbsrv/smb_fsops.h		i386
-usr/include/smbsrv/smb_i18n.h		i386
 usr/include/smbsrv/smb_idmap.h		i386
-usr/include/smbsrv/smb_incl.h		i386
 usr/include/smbsrv/smb_inet.h		i386
 usr/include/smbsrv/smb_ioctl.h		i386
 usr/include/smbsrv/smb_kproto.h		i386
@@ -1041,7 +1027,6 @@ usr/include/smbsrv/smb_sid.h		i386
 usr/include/smbsrv/smb_token.h		i386
 usr/include/smbsrv/smb_vops.h		i386
 usr/include/smbsrv/smb_xdr.h		i386
-usr/include/smbsrv/smbfmt.h		i386
 usr/include/smbsrv/smbinfo.h		i386
 usr/include/smbsrv/string.h		i386
 usr/include/smbsrv/svrapi.h		i386

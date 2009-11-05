@@ -109,7 +109,7 @@
  * FILE_ACTION_MODIFIED_STREAM  0x00000008
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <sys/sdt.h>
 
 static void smb_notify_change_daemon(smb_thread_t *, void *);

@@ -44,8 +44,6 @@
 
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/netbios.h>
-#include <smbsrv/cifs.h>
-#include <smbsrv/ntstatus.h>
 #include <smbrdr.h>
 
 #define	SMBRDR_DOMAIN_MAX		32
@@ -219,9 +217,8 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 	struct sockaddr_in sin;
 	struct sockaddr_in6 sin6;
 	int sock, rc;
-	mts_wchar_t unicode_server_name[SMB_PI_MAX_DOMAIN];
+	smb_wchar_t unicode_server_name[SMB_PI_MAX_DOMAIN];
 	char server_name[SMB_PI_MAX_DOMAIN];
-	unsigned int cpid = oem_get_smb_cpid();
 	char ipstr[INET6_ADDRSTRLEN];
 
 	if ((sock = socket(sess->srv_ipaddr.a_family, SOCK_STREAM, 0)) <= 0) {
@@ -253,10 +250,10 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 		return (-1);
 	}
 
-	(void) mts_mbstowcs(unicode_server_name, sess->srv_name,
+	(void) smb_mbstowcs(unicode_server_name, sess->srv_name,
 	    SMB_PI_MAX_DOMAIN);
-	rc = unicodestooems(server_name, unicode_server_name,
-	    SMB_PI_MAX_DOMAIN, cpid);
+	rc = ucstooem(server_name, unicode_server_name, SMB_PI_MAX_DOMAIN,
+	    OEM_CPG_850);
 	if (rc == 0) {
 		syslog(LOG_DEBUG, "smbrdr: unicode conversion failed");
 		if (sock != 0)
@@ -417,11 +414,11 @@ smbrdr_session_init(char *domain_controller, char *domain)
 			smbrdr_session_clear(session);
 			(void) strlcpy(session->srv_name, domain_controller,
 			    MAXHOSTNAMELEN);
-			(void) utf8_strupr(session->srv_name);
+			(void) smb_strupr(session->srv_name);
 
 			session->srv_ipaddr = ipaddr;
 			(void) strlcpy(session->domain, domain, MAXHOSTNAMELEN);
-			(void) utf8_strupr(session->domain);
+			(void) smb_strupr(session->domain);
 
 			(void) smb_config_getstr(SMB_CI_NBSCOPE, session->scope,
 			    sizeof (session->scope));

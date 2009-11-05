@@ -215,10 +215,15 @@
 #include <sys/priv.h>
 #include <sys/socketvar.h>
 #include <sys/zone.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/ip_var.h>
+#include <netinet/tcp.h>
 #include <smbsrv/smb_kproto.h>
+#include <smbsrv/string.h>
 #include <smbsrv/netbios.h>
-#include <smbsrv/smb_incl.h>
-#include <smbsrv/cifs.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_share.h>
 #include <smbsrv/smb_door_svc.h>
@@ -559,6 +564,7 @@ smb_server_start(smb_ioc_start_t *ioc)
 	mutex_enter(&sv->sv_mutex);
 	switch (sv->sv_state) {
 	case SMB_SERVER_STATE_CONFIGURED:
+		smb_codepage_init();
 
 		sv->sv_thread_pool = taskq_create("smb_workers",
 		    sv->sv_cfg.skc_maxworkers, SMB_WORKER_PRIORITY,
@@ -588,8 +594,6 @@ smb_server_start(smb_ioc_start_t *ioc)
 			cmn_err(CE_WARN, "Cannot open opipe door");
 			break;
 		}
-
-		(void) oem_language_set("english");
 
 		sv->sv_state = SMB_SERVER_STATE_RUNNING;
 		mutex_exit(&sv->sv_mutex);

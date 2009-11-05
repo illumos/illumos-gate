@@ -172,7 +172,7 @@ mlsvc_join(smb_domainex_t *dxi, char *user, char *plain_text)
 			if (status == NT_STATUS_SUCCESS) {
 				(void) smb_getnetbiosname(machine_passwd,
 				    sizeof (machine_passwd));
-				(void) utf8_strlwr(machine_passwd);
+				(void) smb_strlwr(machine_passwd);
 			}
 		}
 

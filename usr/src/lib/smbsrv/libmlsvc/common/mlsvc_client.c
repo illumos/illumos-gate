@@ -580,8 +580,8 @@ static boolean_t
 ndr_svinfo_match(const char *server, const char *domain,
     const ndr_svinfo_t *svi)
 {
-	if ((utf8_strcasecmp(server, svi->svi_server) == 0) &&
-	    (utf8_strcasecmp(domain, svi->svi_domain) == 0)) {
+	if ((smb_strcasecmp(server, svi->svi_server, 0) == 0) &&
+	    (smb_strcasecmp(domain, svi->svi_domain, 0) == 0)) {
 		return (B_TRUE);
 	}
 

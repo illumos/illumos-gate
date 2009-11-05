@@ -23,14 +23,13 @@
  * Use is subject to license terms.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_share.h>
-#include <smbsrv/oem.h>
+#include <smbsrv/string.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/mailslot.h>
 #include <smbsrv/lmerr.h>
-#include <smbsrv/nterror.h>
 
 #define	SMB_QUOTA_UNLIMITED	0xFFFFFFFFFFFFFFFF;
 
@@ -105,8 +104,8 @@ smb_com_transaction(smb_request_t *sr)
 		smb_xa_rele(sr->session, xa);
 		return (SDRC_ERROR);
 	}
-	xa->xa_smb_trans_name = MEM_STRDUP("smb", stn);
 
+	xa->xa_pipe_name = smb_strdup(stn);
 	xa->smb_flags  = flags;
 	xa->smb_timeout = timeo;
 	xa->req_disp_param = pscnt;
@@ -459,6 +458,10 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	case NT_TRANSACT_SET_QUOTA:
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
 		return (SDRC_ERROR);
+
+	case NT_TRANSACT_RENAME:
+		rc = smb_nt_transact_rename(sr, xa);
+		break;
 
 	default:
 		smbsr_error(sr, 0, ERRSRV, ERRsmbcmd);
@@ -1014,7 +1017,7 @@ smb_trans_net_share_getinfo(smb_request_t *sr, struct smb_xa *xa)
 	    &share, &level, &max_bytes) != 0)
 		return (SDRC_NOT_IMPLEMENTED);
 
-	(void) utf8_strlwr(share);
+	(void) smb_strlwr(share);
 	rc = smb_kshare_getinfo(sr->sr_server->sv_lmshrd, share, &si, NULL);
 	if ((rc != NERR_Success) || (si.shr_flags & SMB_SHRF_LONGNAME)) {
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "www",
@@ -1377,7 +1380,7 @@ smb_trans_net_server_enum2(struct smb_request *sr, struct smb_xa *xa)
 
 	si = sr->sr_cfg;
 
-	if (utf8_strcasecmp(si->skc_nbdomain, (char *)domain) != 0) {
+	if (smb_strcasecmp(si->skc_nbdomain, (char *)domain, 0) != 0) {
 		(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww", 0, 0, 0, 0);
 		return (SDRC_SUCCESS);
 	}
@@ -1405,19 +1408,36 @@ smb_trans_net_server_enum2(struct smb_request *sr, struct smb_xa *xa)
 	return (SDRC_SUCCESS);
 }
 
-/*
- * is_supported_pipe
- *
- * Currently, just return 0 if the pipe is \\PIPE\repl otherwise
- * return 1.
- */
-int
-is_supported_pipe(char *pname)
+static boolean_t
+is_supported_mailslot(const char *mailslot)
 {
-	if (utf8_strcasecmp(pname, PIPE_REPL) == 0)
-		return (0);
+	static char *mailslots[] = {
+		PIPE_LANMAN,
+		MAILSLOT_LANMAN,
+		MAILSLOT_BROWSE,
+		MAILSLOT_MSBROWSE
+	};
 
-	return (1);
+	int i;
+
+	for (i = 0; i < sizeof (mailslots)/sizeof (mailslots[0]); ++i)
+		if (smb_strcasecmp(mailslot, mailslots[i], 0) == 0)
+			return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+/*
+ * Currently, just return false if the pipe is \\PIPE\repl.
+ * Otherwise, return true.
+ */
+static boolean_t
+is_supported_pipe(const char *pname)
+{
+	if (smb_strcasecmp(pname, PIPE_REPL, 0) == 0)
+		return (B_FALSE);
+
+	return (B_TRUE);
 }
 
 static smb_sdrc_t
@@ -1476,7 +1496,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 			break;
 
 		case TRANS_WAIT_NMPIPE:
-			if (is_supported_pipe(xa->xa_smb_trans_name) == 0) {
+			if (!is_supported_pipe(xa->xa_pipe_name)) {
 				smbsr_error(sr, 0, ERRDOS, ERRbadfile);
 				return (SDRC_ERROR);
 			}
@@ -1487,14 +1507,7 @@ smb_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 			goto trans_err_not_supported;
 		}
 	} else {
-		if ((utf8_strcasecmp(xa->xa_smb_trans_name,
-		    PIPE_LANMAN) != 0) &&
-		    (utf8_strcasecmp(
-		    xa->xa_smb_trans_name, MAILSLOT_LANMAN) != 0) &&
-		    (utf8_strcasecmp(
-		    xa->xa_smb_trans_name, MAILSLOT_BROWSE) != 0) &&
-		    (utf8_strcasecmp(
-		    xa->xa_smb_trans_name, MAILSLOT_MSBROWSE) != 0))
+		if (!is_supported_mailslot(xa->xa_pipe_name))
 			goto trans_err_not_supported;
 
 		if ((rc = smb_mbc_decodef(&xa->req_param_mb, "%wss", sr,
@@ -1839,7 +1852,7 @@ smb_xa_create(
 	smb_xa_t	*xa, *nxa;
 	smb_llist_t	*xlist;
 
-	xa = MEM_ZALLOC("xa", sizeof (smb_xa_t));
+	xa = kmem_zalloc(sizeof (smb_xa_t), KM_SLEEP);
 	xa->xa_refcnt = 1;
 	xa->smb_com = sr->smb_com;
 	xa->smb_flg = sr->smb_flg;
@@ -1872,7 +1885,7 @@ smb_xa_create(
 		    !SMB_XA_CLOSED(nxa) &&
 		    !(nxa->xa_flags & SMB_XA_FLAG_COMPLETE)) {
 			smb_llist_exit(xlist);
-			MEM_FREE("xa", xa);
+			kmem_free(xa, sizeof (smb_xa_t));
 			return (NULL);
 		}
 		nxa = smb_llist_next(xlist, nxa);
@@ -1888,8 +1901,8 @@ smb_xa_delete(smb_xa_t *xa)
 	ASSERT(xa->xa_refcnt == 0);
 	ASSERT(SMB_XA_CLOSED(xa));
 
-	if (xa->xa_smb_trans_name)
-		MEM_FREE("smb", xa->xa_smb_trans_name);
+	if (xa->xa_pipe_name)
+		smb_mfree(xa->xa_pipe_name);
 
 	if (xa->rep_setup_mb.chain != NULL)
 		m_freem(xa->rep_setup_mb.chain);
@@ -1899,7 +1912,7 @@ smb_xa_delete(smb_xa_t *xa)
 		m_freem(xa->rep_data_mb.chain);
 
 	xa->xa_magic = (uint32_t)~SMB_XA_MAGIC;
-	MEM_FREE("xa", xa);
+	kmem_free(xa, sizeof (smb_xa_t));
 }
 
 smb_xa_t *

@@ -34,12 +34,17 @@
 extern "C" {
 #endif
 
+#include <sys/types.h>
+#include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
 #include <sys/strsubr.h>
 #include <sys/socketvar.h>
 #include <sys/ksocket.h>
 #include <sys/cred.h>
+#include <sys/sunddi.h>
+#include <smbsrv/smb.h>
+#include <smbsrv/string.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_token.h>
@@ -149,6 +154,7 @@ smb_sdrc_t smb_nt_transact_notify_change(smb_request_t *, smb_xa_t *);
 smb_sdrc_t smb_nt_transact_query_security_info(smb_request_t *, smb_xa_t *);
 smb_sdrc_t smb_nt_transact_set_security_info(smb_request_t *, smb_xa_t *);
 smb_sdrc_t smb_nt_transact_ioctl(smb_request_t *, smb_xa_t *);
+smb_sdrc_t smb_nt_transact_rename(smb_request_t *, smb_xa_t *);
 
 smb_sdrc_t smb_com_trans2_open2(smb_request_t *, smb_xa_t *);
 smb_sdrc_t smb_com_trans2_create_directory(smb_request_t *, smb_xa_t *);
@@ -159,6 +165,7 @@ smb_sdrc_t smb_com_trans2_query_path_information(smb_request_t *, smb_xa_t *);
 smb_sdrc_t smb_com_trans2_query_file_information(smb_request_t *, smb_xa_t *);
 smb_sdrc_t smb_com_trans2_set_path_information(smb_request_t *, smb_xa_t *);
 smb_sdrc_t smb_com_trans2_set_file_information(smb_request_t *, smb_xa_t *);
+int smb_trans2_rename(smb_request_t *, smb_node_t *, char *, int);
 
 /*
  * Logging functions
@@ -399,12 +406,6 @@ void smb_vfs_rele_all(smb_server_t *);
 boolean_t smb_vfs_cmp(vfs_t *, vfs_t *);
 boolean_t smb_vfs_is_readonly(vfs_t *);
 
-
-/*
- * String manipulation function
- */
-char *smb_kstrdup(const char *s, size_t n);
-
 /* NOTIFY CHANGE */
 void smb_process_session_notify_change_queue(smb_session_t *, smb_tree_t *);
 void smb_process_node_notify_change_queue(smb_node_t *);
@@ -420,11 +421,10 @@ void smb_fem_fini(void);
 
 int smb_try_grow(smb_request_t *sr, int64_t new_size);
 
-/* functions from smb_memory_manager.c */
-
-void *smbsr_malloc(smb_malloc_list *, size_t);
-void *smbsr_realloc(void *, size_t);
-void smbsr_free_malloc_list(smb_malloc_list *);
+void smb_srm_init(smb_request_t *sr);
+void smb_srm_fini(smb_request_t *sr);
+void *smb_srm_alloc(smb_request_t *, size_t);
+void *smb_srm_realloc(smb_request_t *, void *, size_t);
 
 unsigned short smb_worker_getnum();
 
@@ -611,13 +611,6 @@ void smb_time_nt_to_unix(uint64_t nt_time, timestruc_t *unix_time);
 uint64_t smb_time_unix_to_nt(timestruc_t *);
 
 int netbios_name_isvalid(char *in, char *out);
-
-size_t
-unicodestooems(char *oemstring, const mts_wchar_t *unicodestring,
-    size_t nbytes, unsigned int cpid);
-
-size_t oemstounicodes(mts_wchar_t *unicodestring, const char *oemstring,
-    size_t nwchars, unsigned int cpid);
 
 int uioxfer(struct uio *src_uio, struct uio *dst_uio, int n);
 

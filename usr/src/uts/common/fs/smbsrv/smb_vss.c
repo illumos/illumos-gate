@@ -39,9 +39,9 @@
  * in the snapshot.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
+#include <smbsrv/string.h>
 #include <smbsrv/winioctl.h>
-#include <smbsrv/ntstatus.h>
 #include <smbsrv/smb_door_svc.h>
 
 /* Size of the token on the wire due to encoding */
@@ -249,7 +249,7 @@ smb_vss_is_gmttoken(const char *s)
 
 	while (*template) {
 		if (*template == 'N') {
-			if (!mts_isdigit(*str))
+			if (!smb_isdigit(*str))
 				return (B_FALSE);
 		} else if (*template != *str) {
 			return (B_FALSE);

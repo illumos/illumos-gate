@@ -27,9 +27,6 @@
 #include <sys/nbmlock.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/ntstatus.h>
-#include <smbsrv/ntaccess.h>
-#include <smbsrv/smb_incl.h>
 #include <acl/acl_common.h>
 #include <sys/fcntl.h>
 #include <sys/flock.h>
@@ -972,8 +969,8 @@ smb_fsop_getattr(smb_request_t *sr, cred_t *cr, smb_node_t *snode,
  * into this routine.
  */
 int
-smb_fsop_link(smb_request_t *sr, cred_t *cr, smb_node_t *to_dnode,
-    smb_node_t *from_fnode, char *to_name)
+smb_fsop_link(smb_request_t *sr, cred_t *cr, smb_node_t *from_fnode,
+    smb_node_t *to_dnode, char *to_name)
 {
 	char	*longname = NULL;
 	int	flags = 0;
@@ -1101,6 +1098,28 @@ smb_fsop_rename(
 	    (!isdir && SMB_TREE_HAS_ACCESS(sr, ACE_DELETE | ACE_ADD_FILE) !=
 	    (ACE_DELETE | ACE_ADD_FILE)))
 		return (EACCES);
+
+	/*
+	 * SMB checks access on open and retains an access granted
+	 * mask for use while the file is open.  ACL changes should
+	 * not affect access to an open file.
+	 *
+	 * If the rename is being performed on an ofile:
+	 * - Check the ofile's access granted mask to see if the
+	 *   rename is permitted - requires DELETE access.
+	 * - If the file system does access checking, set the
+	 *   ATTR_NOACLCHECK flag to ensure that the file system
+	 *   does not check permissions on subsequent calls.
+	 */
+	if (sr && sr->fid_ofile) {
+		rc = smb_ofile_access(sr->fid_ofile, cr, DELETE);
+		if (rc != NT_STATUS_SUCCESS)
+			return (EACCES);
+
+		if (smb_tree_has_feature(sr->tid_tree,
+		    SMB_TREE_ACEMASKONACCESS))
+			flags = ATTR_NOACLCHECK;
+	}
 
 	rc = smb_vop_rename(from_dnode->vp, from_name, to_dnode->vp,
 	    to_name, flags, cr);
@@ -1648,6 +1667,13 @@ smb_fsop_lookup_name(
  *
  * Other smb_fsop_* routines will call SMB_TREE_CONTAINS_NODE() to prevent
  * operations on files not in the parent mount.
+ *
+ * Case sensitivity flags (SMB_IGNORE_CASE, SMB_CASE_SENSITIVE):
+ * if SMB_CASE_SENSITIVE is set, the SMB_IGNORE_CASE flag will NOT be set
+ * based on the tree's case sensitivity. However, if the SMB_IGNORE_CASE
+ * flag is set in the flags value passed as a parameter, a case insensitive
+ * lookup WILL be done (regardless of whether SMB_CASE_SENSITIVE is set
+ * or not).
  */
 int
 smb_fsop_lookup(
@@ -1678,8 +1704,10 @@ smb_fsop_lookup(
 	if (SMB_TREE_CONTAINS_NODE(sr, dnode) == 0)
 		return (EACCES);
 
-	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
-		flags |= SMB_IGNORE_CASE;
+	if (!(flags & SMB_CASE_SENSITIVE)) {
+		if (SMB_TREE_IS_CASEINSENSITIVE(sr))
+			flags |= SMB_IGNORE_CASE;
+	}
 	if (SMB_TREE_SUPPORTS_CATIA(sr))
 		flags |= SMB_CATIA;
 	if (SMB_TREE_SUPPORTS_ABE(sr))

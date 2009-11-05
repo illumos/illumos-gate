@@ -1189,8 +1189,8 @@ ndr_outer_string(ndr_ref_t *outer_ref)
 			 * size_is is the number of characters in the
 			 * (multibyte) string, including the null.
 			 */
-			size_is = (mts_wcequiv_strlen(valp) /
-			    sizeof (mts_wchar_t)) + 1;
+			size_is = (smb_wcequiv_strlen(valp) /
+			    sizeof (smb_wchar_t)) + 1;
 
 			if (size_is > NDR_STRING_MAX) {
 				NDR_SET_ERROR(outer_ref, NDR_ERR_STRLEN);
@@ -1919,7 +1919,7 @@ ndr_s_wchar(ndr_ref_t *encl_ref)
 		(void) sprintf(name, "[%lu]", i);
 
 		if (nds->m_op == NDR_M_OP_MARSHALL) {
-			count = mts_mbtowc((mts_wchar_t *)&wide_char, valp,
+			count = smb_mbtowc((smb_wchar_t *)&wide_char, valp,
 			    MTS_MB_CHAR_MAX);
 			if (count < 0) {
 				return (0);
@@ -1941,7 +1941,7 @@ ndr_s_wchar(ndr_ref_t *encl_ref)
 			return (0);
 
 		if (nds->m_op == NDR_M_OP_UNMARSHALL) {
-			count = mts_wctomb(valp, wide_char);
+			count = smb_wctomb(valp, wide_char);
 
 			if ((++char_count) == encl_ref->strlen_is) {
 				valp += count;
@@ -1970,10 +1970,10 @@ ndr_s_wchar(ndr_ref_t *encl_ref)
  * multibyte character is encountered.
  */
 size_t
-ndr_mbstowcs(ndr_stream_t *nds, mts_wchar_t *wcs, const char *mbs,
+ndr_mbstowcs(ndr_stream_t *nds, smb_wchar_t *wcs, const char *mbs,
     size_t nwchars)
 {
-	mts_wchar_t *start = wcs;
+	smb_wchar_t *start = wcs;
 	int nbytes;
 
 	while (nwchars--) {
@@ -1998,16 +1998,16 @@ ndr_mbstowcs(ndr_stream_t *nds, mts_wchar_t *wcs, const char *mbs,
  * is stored in wcharp.  Up to nbytes bytes are examined.
  *
  * If mbchar is valid, returns the number of bytes processed in mbchar.
- * If mbchar is invalid, returns -1.  See also mts_mbtowc().
+ * If mbchar is invalid, returns -1.  See also smb_mbtowc().
  */
 /*ARGSUSED*/
 int
-ndr_mbtowc(ndr_stream_t *nds, mts_wchar_t *wcharp, const char *mbchar,
+ndr_mbtowc(ndr_stream_t *nds, smb_wchar_t *wcharp, const char *mbchar,
     size_t nbytes)
 {
 	int rc;
 
-	if ((rc = mts_mbtowc(wcharp, mbchar, nbytes)) < 0)
+	if ((rc = smb_mbtowc(wcharp, mbchar, nbytes)) < 0)
 		return (rc);
 
 #ifdef _BIG_ENDIAN

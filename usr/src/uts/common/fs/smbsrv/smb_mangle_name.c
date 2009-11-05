@@ -28,14 +28,9 @@
 #include <sys/sunddi.h>
 #include <sys/errno.h>
 #include <smbsrv/string.h>
-#include <smbsrv/ctype.h>
-#include <smbsrv/smb_i18n.h>
 #include <smbsrv/smb_vops.h>
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
-
-#define	SMB_NAME83_BASELEN	8
-#define	SMB_NAME83_LEN		12
 
 /*
  * Characters we don't allow in DOS file names.
@@ -138,7 +133,7 @@ smb_match_unknown(char *name, char *pattern)
 	char *np, *pp;
 
 	rc = 0;
-	if (utf8_isstrupr(pattern) <= 0)
+	if (smb_isstrupr(pattern) <= 0)
 		return (rc);
 
 	np = name;
@@ -149,7 +144,7 @@ smb_match_unknown(char *name, char *pattern)
 		if (nc == ' ')
 			continue;
 
-		nc = mts_toupper(nc);
+		nc = smb_toupper(nc);
 		if ((pc = *pp++) != nc)
 			break;
 	}
@@ -157,7 +152,7 @@ smb_match_unknown(char *name, char *pattern)
 	if ((pc == '~') &&
 	    (pp != (pattern + 1)) &&
 	    ((pc = *pp++) != 0)) {
-		while (mts_isdigit(pc))
+		while (smb_isdigit(pc))
 			pc = *pp++;
 
 		if (pc == '.') {
@@ -167,7 +162,7 @@ smb_match_unknown(char *name, char *pattern)
 			}
 
 			while ((nc = *np++) != 0) {
-				nc = mts_toupper(nc);
+				nc = smb_toupper(nc);
 				if ((pc = *pp++) != nc)
 					break;
 			}
@@ -222,7 +217,7 @@ smb_is_reserved_dos_name(const char *name)
 	int	len;
 	int	i;
 
-	ch = mts_toupper(*name);
+	ch = smb_toupper(*name);
 
 	switch (ch) {
 	case 'A':
@@ -246,7 +241,7 @@ smb_is_reserved_dos_name(const char *name)
 	for (i  = 0; i < n_reserved; ++i) {
 		len = strlen(reserved[i]);
 
-		if (utf8_strncasecmp(reserved[i], name, len) == 0) {
+		if (smb_strcasecmp(reserved[i], name, len) == 0) {
 			ch = *(name + len);
 			if ((ch == '\0') || (ch == '.'))
 				return (B_TRUE);
@@ -329,7 +324,7 @@ smb_needs_mangle(char *name, char **dot_pos)
 	}
 
 	for (namep = name; *namep; namep++) {
-		if (!mts_isascii(*namep) ||
+		if (!smb_isascii(*namep) ||
 		    strchr(special_chars, *namep) ||
 		    strchr(invalid_dos_chars, *namep))
 			return (1);
@@ -391,7 +386,7 @@ smb_needs_shortname(char *name)
 	if (len) {
 		(void) snprintf(buf, len + 1, "%s", name);
 		/* if the name contains both lower and upper cases */
-		if (utf8_isstrupr(buf) == 0 && utf8_isstrlwr(buf) == 0) {
+		if (smb_isstrupr(buf) == 0 && smb_isstrlwr(buf) == 0) {
 			/* create shortname */
 			create = 1;
 		} else 	if (dot_pos) {
@@ -401,7 +396,7 @@ smb_needs_shortname(char *name)
 			 * if the extension contains both lower and upper
 			 * cases
 			 */
-			if (utf8_isstrupr(buf) == 0 && utf8_isstrlwr(buf) == 0)
+			if (smb_isstrupr(buf) == 0 && smb_isstrlwr(buf) == 0)
 				/* create shortname */
 				create = 1;
 		}
@@ -430,7 +425,7 @@ smb_mangle_char(unsigned char ch)
 	if (strchr(special_chars, ch))
 		return ('_');
 
-	return (mts_toupper(ch));
+	return (smb_toupper(ch));
 }
 
 /*
@@ -565,21 +560,21 @@ int smb_mangle_name(
 		if (smb_needs_shortname(name)) {
 			namep = (unsigned char *)name;
 			while (*namep)
-				*out_short++ = mts_toupper(*namep++);
+				*out_short++ = smb_toupper(*namep++);
 			*out_short = '\0';
 		}
 
 		out_83 = (unsigned char *)name83;
 		(void) strcpy((char *)out_83, "        .   ");
 		while (*name && *name != '.')
-			*out_83++ = mts_toupper(*name++);
+			*out_83++ = smb_toupper(*name++);
 
 		if (*name == '.') {
 			/* copy extension */
 			name++;
 			out_83 = (unsigned char *)name83 + 9;
 			while (*name)
-				*out_83++ = mts_toupper(*name++);
+				*out_83++ = smb_toupper(*name++);
 		}
 		return (1);
 	}
@@ -723,10 +718,15 @@ smb_unmangle_name(smb_node_t *dnode, char *name, char *namebuf,
 				namep = dp->d_name;
 			}
 
+			/* skip non utf8 filename */
+			if (u8_validate(namep, strlen(namep), NULL,
+			    U8_VALIDATE_ENTIRE, &err) < 0)
+				continue;
+
 			(void) smb_mangle_name(ino, namep,
 			    shortname, name83, 1);
 
-			if (utf8_strcasecmp(name, shortname) == 0) {
+			if (smb_strcasecmp(name, shortname, 0) == 0) {
 				(void) strlcpy(namebuf, namep, buflen);
 				kmem_free(buf, SMB_UNMANGLE_BUFSIZE);
 				return (0);

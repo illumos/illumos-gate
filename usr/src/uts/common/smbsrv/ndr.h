@@ -46,7 +46,7 @@
 #include <string.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/ndl/rpcpdu.ndl>
-#include <smbsrv/smb_i18n.h>
+#include <smbsrv/string.h>
 #endif
 
 #ifdef __cplusplus
@@ -465,8 +465,8 @@ int ndr_inner_pointer(ndr_ref_t *);
 int ndr_inner_reference(ndr_ref_t *);
 int ndr_inner_array(ndr_ref_t *);
 
-size_t ndr_mbstowcs(struct ndr_stream *, mts_wchar_t *, const char *, size_t);
-int ndr_mbtowc(struct ndr_stream *, mts_wchar_t *, const char *, size_t);
+size_t ndr_mbstowcs(struct ndr_stream *, smb_wchar_t *, const char *, size_t);
+int ndr_mbtowc(struct ndr_stream *, smb_wchar_t *, const char *, size_t);
 
 void nds_bswap(void *src, void *dst, size_t len);
 

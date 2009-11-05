@@ -52,6 +52,7 @@
 
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_ioctl.h>
+#include <smbsrv/string.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
@@ -433,8 +434,7 @@ smbd_service_init(void)
 		return (1);
 	}
 
-
-	(void) oem_language_set("english");
+	smb_codepage_init();
 
 	if (!smb_wka_init()) {
 		smbd_report("out of memory");

@@ -105,7 +105,7 @@ smbnative_os_value(const char *native_os)
 		name = os_table[i].sn_name;
 		len = strlen(name);
 
-		if (utf8_strncasecmp(name, native_os, len) == 0)
+		if (smb_strcasecmp(name, native_os, len) == 0)
 			return (os_table[i].sn_value);
 	}
 
@@ -159,8 +159,8 @@ smbnative_lm_value(const char *native_lm)
 		name = lm_table[i].sn_name;
 		len = strlen(name);
 
-		if ((utf8_strncasecmp(name, native_lm, len) == 0) ||
-		    (utf8_strncasecmp(&name[1], native_lm, len - 1) == 0)) {
+		if ((smb_strcasecmp(name, native_lm, len) == 0) ||
+		    (smb_strcasecmp(&name[1], native_lm, len - 1) == 0)) {
 			return (lm_table[i].sn_value);
 		}
 	}
@@ -209,8 +209,8 @@ smbnative_pdc_value(const char *native_lm)
 		name = pdc_table[i].sn_name;
 		len = strlen(name);
 
-		if ((utf8_strncasecmp(name, native_lm, len) == 0) ||
-		    (utf8_strncasecmp(&name[1], native_lm, len - 1) == 0)) {
+		if ((smb_strcasecmp(name, native_lm, len) == 0) ||
+		    (smb_strcasecmp(&name[1], native_lm, len - 1) == 0)) {
 			return (pdc_table[i].sn_value);
 		}
 	}

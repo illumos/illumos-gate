@@ -23,9 +23,8 @@
  * Use is subject to license terms.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/winioctl.h>
-#include <smbsrv/ntstatus.h>
 
 
 static uint32_t smb_nt_trans_ioctl_noop(smb_request_t *, smb_xa_t *);

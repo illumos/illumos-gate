@@ -41,7 +41,7 @@
  * file offset is beyond the 32-bit limit.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 
 
 /*

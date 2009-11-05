@@ -23,8 +23,7 @@
  * Use is subject to license terms.
  */
 
-#include <smbsrv/smb_incl.h>
-
+#include <smbsrv/smb_kproto.h>
 
 /*
  * Close a file by fid.  All locks or other resources held by the

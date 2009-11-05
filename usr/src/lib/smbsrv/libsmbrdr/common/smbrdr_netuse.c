@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smbrdr_netuse.c	1.4	08/07/16 SMI"
 
 /*
  * Tree connect and disconnect functions to support SMB shares.
@@ -124,7 +122,7 @@ smbrdr_tree_connect(char *hostname, char *username, char *sharename,
 	bzero(path, path_len);
 	(void) snprintf(path, path_len, "\\\\%s\\%s", hostname, sharename);
 	if (session->remote_caps & CAP_UNICODE)
-		path_len = mts_wcequiv_strlen(path);
+		path_len = smb_wcequiv_strlen(path);
 	else
 		path_len = strlen(path);
 

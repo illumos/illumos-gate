@@ -27,11 +27,9 @@
 #include <strings.h>
 #include <assert.h>
 
-#include <smbsrv/ntifs.h>
+#include <smbsrv/smb.h>
 #include <smbsrv/smb_sid.h>
 #include <smbsrv/smb_idmap.h>
-#include <smbsrv/ntstatus.h>
-#include <smbsrv/ntaccess.h>
 
 #define	ACE_ALL_TYPES	0x001F
 

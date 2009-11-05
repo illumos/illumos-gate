@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_vops.h>
-#include <smbsrv/smb_incl.h>
 
 int smb_open_dsize_check = 0;
 

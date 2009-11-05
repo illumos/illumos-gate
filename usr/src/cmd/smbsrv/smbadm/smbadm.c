@@ -754,7 +754,7 @@ smbadm_valid_workgroup(const char *workgroup)
 		return (B_FALSE);
 
 	if (smb_getnetbiosname(netbiosname, NETBIOS_NAME_SZ) == 0) {
-		if (utf8_strcasecmp(workgroup, netbiosname) == 0)
+		if (smb_strcasecmp(workgroup, netbiosname, 0) == 0)
 			return (B_FALSE);
 	}
 

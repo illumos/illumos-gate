@@ -31,7 +31,7 @@
  * error code.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <sys/nbmlock.h>
 #include <sys/param.h>

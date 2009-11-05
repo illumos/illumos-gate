@@ -30,7 +30,8 @@
 #include <sys/types.h>
 #include <sys/sunddi.h>
 #endif
-#include <smbsrv/ctype.h>
+#include <smbsrv/string.h>
+#include <smbsrv/smb.h>
 
 /*
  * Maximum recursion depth for the wildcard match functions.
@@ -80,8 +81,8 @@ smb_match_private(const char *patn, const char *str, int *depth)
 
 	for (;;) {
 		switch (*patn) {
-		case 0:
-			return (*str == 0);
+		case '\0':
+			return (*str == '\0');
 
 		case '?':
 			if (*str != 0) {
@@ -95,7 +96,7 @@ smb_match_private(const char *patn, const char *str, int *depth)
 
 		case '*':
 			patn += strspn(patn, "*");
-			if (*patn == 0)
+			if (*patn == '\0')
 				return (1);
 
 			if ((*depth)++ >= SMB_MATCH_DEPTH_MAX)
@@ -128,7 +129,8 @@ smb_match83(char *patn, char *str83)
 	char	name83[14];
 
 	ptr = name83;
-	for (avail = 8; (avail > 0) && (*patn != '.') && (*patn != 0);
+	for (avail = SMB_NAME83_BASELEN;
+	    (avail > 0) && (*patn != '.') && (*patn != 0);
 	    avail--) {
 		*(ptr++) = *(patn++);
 	}
@@ -141,7 +143,7 @@ smb_match83(char *patn, char *str83)
 	else if (*patn != 0)
 		return (0);
 
-	for (avail = 3; (avail > 0) && (*patn != 0); avail--) {
+	for (avail = SMB_NAME83_EXTLEN; (avail > 0) && (*patn != 0); avail--) {
 		*(ptr++) = *(patn++);
 	}
 	if (*patn != 0)
@@ -187,8 +189,10 @@ smb_match_ci(char *patn, char *str)
 static int
 smb_match_ci_private(const char *patn, const char *str, int *depth)
 {
-	const char *p;
-	int rc;
+	const char	*p;
+	smb_wchar_t	wc1, wc2;
+	int		nbytes1, nbytes2;
+	int		rc;
 
 	/*
 	 * "<" is a special pattern that matches only those names that do
@@ -204,8 +208,8 @@ smb_match_ci_private(const char *patn, const char *str, int *depth)
 
 	for (;;) {
 		switch (*patn) {
-		case 0:
-			return (*str == 0);
+		case '\0':
+			return (*str == '\0');
 
 		case '?':
 			if (*str != 0) {
@@ -221,7 +225,7 @@ smb_match_ci_private(const char *patn, const char *str, int *depth)
 
 		case '*':
 			patn += strspn(patn, "*");
-			if (*patn == 0)
+			if (*patn == '\0')
 				return (1);
 
 			if ((*depth)++ >= SMB_MATCH_DEPTH_MAX)
@@ -236,17 +240,20 @@ smb_match_ci_private(const char *patn, const char *str, int *depth)
 			return (0);
 
 		default:
-			if (*str != *patn) {
-				int	c1 = *str;
-				int	c2 = *patn;
+			nbytes1 = smb_mbtowc(&wc1, patn, MTS_MB_CHAR_MAX);
+			nbytes2 = smb_mbtowc(&wc2, str, MTS_MB_CHAR_MAX);
+			if ((nbytes1 == -1) || (nbytes2 == -1))
+				return (-1);
 
-				c1 = mts_tolower(c1);
-				c2 = mts_tolower(c2);
-				if (c1 != c2)
+			if (wc1 != wc2) {
+				wc1 = smb_tolower(wc1);
+				wc2 = smb_tolower(wc2);
+				if (wc1 != wc2)
 					return (0);
 			}
-			str++;
-			patn++;
+
+			patn += nbytes1;
+			str += nbytes2;
 			continue;
 		}
 	}

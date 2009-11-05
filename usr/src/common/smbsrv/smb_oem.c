@@ -19,108 +19,83 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Support for oem <-> unicode translations.
  */
 
 #ifndef _KERNEL
-#include <stdio.h>
 #include <stdlib.h>
 #include <thread.h>
 #include <synch.h>
 #include <string.h>
+#else
+#include <sys/ksynch.h>
 #endif /* _KERNEL */
+
+#include <sys/byteorder.h>
 #include <smbsrv/alloc.h>
 #include <smbsrv/string.h>
-#include <smbsrv/oem.h>
-#include <sys/byteorder.h>
+
 /*
- * name: Name used to show on the telnet/GUI.
- * filename: The actual filename contains the codepage.
- * doublebytes: The codepage is double or single byte.
- * oempage: The oempage is used to convert Unicode to OEM chars.
- *		Memory needs to be allocated for value field of oempage
- *		to store the entire table.
- * unipage: The unipage is used to convert OEM to Unicode chars.
- *		Memory needs to be allocated for value field of unipage
- *		to store the entire table.
- * valid: This field indicates if the page is valid or not.
- * ref: This ref count is used to keep track of the usage of BOTH
- *		oempage and unipage.
- * Note: If the cpid of the table is changed, please change the
- * codepage_id in oem.h as well.
+ * cpid		The oemcpg_table index for this oempage.
+ * value	The conversion values.
+ */
+typedef struct oempage {
+	uint32_t	cpid;
+	smb_wchar_t	*value;
+} oempage_t;
+
+/*
+ * filename	The actual filename contains the codepage.
+ * bytesperchar	The codepage uses double or single bytes per char.
+ * oempage	The oempage is used to convert Unicode characters to
+ *		OEM characters.  Memory needs to be allocated for
+ *		the value field of oempage to store the table.
+ * ucspage	The unicode page is used to convert OEM characters
+ *		to Unicode characters.  Memory needs to be allocated
+ *		for the value field of ucspage to store the table.
+ * valid	True if the codepage has been initialized.
  */
 typedef struct oem_codepage {
-	char *filename;
-	unsigned int bytesperchar;
-	oempage_t oempage;
-	oempage_t unicodepage;
-	unsigned int valid;
-	unsigned int ref;
+	char		*filename;
+	uint32_t	bytesperchar;
+	oempage_t	oempage;
+	oempage_t	ucspage;
+	boolean_t	valid;
 } oem_codepage_t;
 
-static oem_codepage_t oemcp_table[] = {
-	{"850.cpg", 1, {0, 0}, {0, 0}, 0, 0},	/* Multilingual Latin1 */
-	{"950.cpg", 2, {1, 0}, {1, 0}, 0, 0},	/* Chinese Traditional */
-	{"1252.cpg", 1, {2, 0}, {2, 0}, 0, 0},	/* MS Latin1 */
-	{"949.cpg", 2, {3, 0}, {3, 0}, 0, 0},	/* Korean */
-	{"936.cpg", 2, {4, 0}, {4, 0}, 0, 0},	/* Chinese Simplified */
-	{"932.cpg", 2, {5, 0}, {5, 0}, 0, 0},	/* Japanese */
-	{"852.cpg", 1, {6, 0}, {6, 0}, 0, 0},	/* Multilingual Latin2 */
-	{"1250.cpg", 1, {7, 0}, {7, 0}, 0, 0},	/* MS Latin2 */
-	{"1253.cpg", 1, {8, 0}, {8, 0}, 0, 0},	/* MS Greek */
-	{"737.cpg", 1, {9, 0}, {9, 0}, 0, 0},	/* Greek */
-	{"1254.cpg", 1, {10, 0}, {10, 0}, 0, 0}, /* MS Turkish */
-	{"857.cpg", 1, {11, 0}, {11, 0}, 0, 0},	/* Multilingual Latin5 */
-	{"1251.cpg", 1, {12, 0}, {12, 0}, 0, 0}, /* MS Cyrillic */
-	{"866.cpg", 1, {13, 0}, {13, 0}, 0, 0},	/* Cyrillic II */
-	{"1255.cpg", 1, {14, 0}, {14, 0}, 0, 0}, /* MS Hebrew */
-	{"862.cpg", 1, {15, 0}, {15, 0}, 0, 0},	/* Hebrew */
-	{"1256.cpg", 1, {16, 0}, {16, 0}, 0, 0}, /* MS Arabic */
-	{"720.cpg", 1, {17, 0}, {17, 0}, 0, 0}	/* Arabic */
+static oem_codepage_t oemcpg_table[] = {
+	{"850.cpg",  1, {0, 0},  {0, 0},  0},	/* Multilingual Latin1 */
+	{"950.cpg",  2, {1, 0},  {1, 0},  0},	/* Chinese Traditional */
+	{"1252.cpg", 1, {2, 0},  {2, 0},  0},	/* MS Latin1 */
+	{"949.cpg",  2, {3, 0},  {3, 0},  0},	/* Korean */
+	{"936.cpg",  2, {4, 0},  {4, 0},  0},	/* Chinese Simplified */
+	{"932.cpg",  2, {5, 0},  {5, 0},  0},	/* Japanese */
+	{"852.cpg",  1, {6, 0},  {6, 0},  0},	/* Multilingual Latin2 */
+	{"1250.cpg", 1, {7, 0},  {7, 0},  0},	/* MS Latin2 */
+	{"1253.cpg", 1, {8, 0},  {8, 0},  0},	/* MS Greek */
+	{"737.cpg",  1, {9, 0},  {9, 0},  0},	/* Greek */
+	{"1254.cpg", 1, {10, 0}, {10, 0}, 0},	/* MS Turkish */
+	{"857.cpg",  1, {11, 0}, {11, 0}, 0},	/* Multilingual Latin5 */
+	{"1251.cpg", 1, {12, 0}, {12, 0}, 0},	/* MS Cyrillic */
+	{"866.cpg",  1, {13, 0}, {13, 0}, 0},	/* Cyrillic II */
+	{"1255.cpg", 1, {14, 0}, {14, 0}, 0},	/* MS Hebrew */
+	{"862.cpg",  1, {15, 0}, {15, 0}, 0},	/* Hebrew */
+	{"1256.cpg", 1, {16, 0}, {16, 0}, 0},	/* MS Arabic */
+	{"720.cpg",  1, {17, 0}, {17, 0}, 0}	/* Arabic */
 };
 
-static language lang_table[] = {
-	{"Arabic", OEM_CP_IND_720, OEM_CP_IND_1256},
-	{"Brazilian", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"Chinese Traditional", OEM_CP_IND_950, OEM_CP_IND_950},
-	{"Chinese Simplified", OEM_CP_IND_936, OEM_CP_IND_936},
-	{"Czech", OEM_CP_IND_852, OEM_CP_IND_1250},
-	{"Danish", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"Dutch", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"English", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"Finnish", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"French", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"German", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"Greek", OEM_CP_IND_737, OEM_CP_IND_1253},
-	{"Hebrew", OEM_CP_IND_862, OEM_CP_IND_1255},
-	{"Hungarian", OEM_CP_IND_852, OEM_CP_IND_1250},
-	{"Italian", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"Japanese", OEM_CP_IND_932, OEM_CP_IND_932},
-	{"Korean", OEM_CP_IND_949, OEM_CP_IND_949},
-	{"Norwegian", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"Polish", OEM_CP_IND_852, OEM_CP_IND_1250},
-	{"Russian", OEM_CP_IND_866, OEM_CP_IND_1251},
-	{"Slovak", OEM_CP_IND_852, OEM_CP_IND_1250},
-	{"Slovenian", OEM_CP_IND_852, OEM_CP_IND_1250},
-	{"Spanish", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"Swedish", OEM_CP_IND_850, OEM_CP_IND_1252},
-	{"Turkish", OEM_CP_IND_857, OEM_CP_IND_1254}
-};
-
-
+#define	MAX_OEMPAGES	(sizeof (oemcpg_table) / sizeof (oemcpg_table[0]))
+#define	MAX_UNICODE_IDX	65536
 
 /*
- * The oem_default_smb_cp is the default smb codepage for English.
- * It is actually codepage 850.
+ * The default SMB OEM codepage for English is codepage 850.
  */
-mts_wchar_t oem_default_smb_cp[256] = {
+smb_wchar_t oem_codepage_850[256] = {
 	0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007,
 	0x0008, 0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x000E, 0x000F,
 	0x0010, 0x0011, 0x0012, 0x0013, 0x0014, 0x0015, 0x0016, 0x0017,
@@ -155,13 +130,10 @@ mts_wchar_t oem_default_smb_cp[256] = {
 	0x00B0, 0x00A8, 0x00B7, 0x00B9, 0x00B3, 0x00B2, 0x25A0, 0x00A0
 };
 
-
-
 /*
- * The oem_default_telnet_cp is the default telnet codepage for English.
- * It is actually codepage 1252.
+ * The default telnet OEM codepage for English is codepage 1252.
  */
-mts_wchar_t oem_default_telnet_cp[256] = {
+smb_wchar_t oem_codepage_1252[256] = {
 	0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8,
 	0x9, 0x000A, 0x000B, 0x000C, 0x000D, 0x000E, 0x000F, 0x10,
 	0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
@@ -196,567 +168,206 @@ mts_wchar_t oem_default_telnet_cp[256] = {
 	0x00F9, 0x00FA, 0x00FB, 0x00FC, 0x00FD, 0x00FE, 0x00FF
 };
 
-
-#define	MAX_OEMPAGES (sizeof (oemcp_table) / sizeof (oemcp_table[0]))
-#define	MAX_UNI_IDX 65536
-
-
-
-/*
- * oem_codepage_bytesperchar
- *
- * This function returns the max bytes per oem char for the specified
- * oem table. This basically shows if the oem codepage is single or
- * double bytes.
- */
-static unsigned int
-oem_codepage_bytesperchar(unsigned int cpid)
-{
-	if (cpid >= MAX_OEMPAGES)
-		return (0);
-	else
-		return (oemcp_table[cpid].bytesperchar);
-}
-
-
+static oempage_t *oem_get_oempage(uint32_t);
+static oempage_t *oem_get_ucspage(uint32_t);
+static void oem_codepage_init(uint32_t);
+static void oem_codepage_setup(uint32_t);
 
 /*
- * oem_get_codepage_path
+ * Convert a unicode string to an oem string.
  *
- * This function will get the codepage path.
- */
-const char *
-oem_get_codepage_path(void)
-{
-#ifdef PBSHORTCUT /* */
-	const char *path = getenv("codepage.oem.directory");
-	if (path == 0)
-		return ("/");
-	else
-		return (path);
-#else /* PBSHORTCUT */
-	return ("/");
-#endif /* PBSHORTCUT */
-}
-
-/*
- * oem_codepage_init
+ * The conversion will stop at the end of the unicode string
+ * or when (nbytes - 1) oem characters have been stored.
  *
- * This function will init oem page via the cpid of the oem table.
- * The function oem_codepage_free must be called when the oempage is
- * no longer needed to free up the allocated memory. If the codepage is
- * successfully initialized, zero will be the return value; otherwise
- * -1 will be the return value.
- */
-int
-oem_codepage_init(unsigned int cpid)
-{
-#ifndef _KERNEL
-	FILE *fp;
-	static mutex_t mutex;
-	char buf[32];
-	char filePath[100];
-#endif /* _KERNEL */
-	unsigned int max_oem_index;
-	const char *codepagePath = oem_get_codepage_path();
-	mts_wchar_t *default_oem_cp = 0;
-	oem_codepage_t *oemcp;
-
-	/*
-	 * The OEM codepages 850 and 1252 are stored in kernel; therefore,
-	 * no need for codepagePath to be defined to work.
-	 */
-	if (cpid >= MAX_OEMPAGES ||
-	    (codepagePath == 0 &&
-	    cpid != oem_default_smb_cpid && cpid != oem_default_telnet_cpid))
-		return (-1);
-
-	max_oem_index = 1 << oem_codepage_bytesperchar(cpid) * 8;
-	/*
-	 * Use mutex so no two same index can be initialize
-	 * at the same time.
-	 */
-#ifndef _KERNEL
-	(void) mutex_lock(&mutex);
-#endif /* _KERNEL */
-
-	oemcp = &oemcp_table[cpid];
-	if (oemcp->valid) {
-		oemcp->valid++;
-#ifndef _KERNEL
-		(void) mutex_unlock(&mutex);
-#endif /* _KERNEL */
-		return (0);
-	}
-
-	oemcp->oempage.value =
-	    MEM_ZALLOC("oem", max_oem_index * sizeof (mts_wchar_t));
-	if (oemcp->oempage.value == 0) {
-#ifndef _KERNEL
-		(void) mutex_unlock(&mutex);
-#endif /* _KERNEL */
-		return (-1);
-	}
-
-	oemcp->unicodepage.value =
-	    MEM_ZALLOC("oem", MAX_UNI_IDX * sizeof (mts_wchar_t));
-	if (oemcp->unicodepage.value == 0) {
-		MEM_FREE("oem", oemcp->oempage.value);
-		oemcp->oempage.value = 0;
-#ifndef _KERNEL
-		(void) mutex_unlock(&mutex);
-#endif /* _KERNEL */
-		return (-1);
-	}
-
-	/*
-	 * The default English page is stored in kernel.
-	 * Therefore, no need to go to codepage files.
-	 */
-#ifndef _KERNEL
-	if (cpid == oem_default_smb_cpid)
-		default_oem_cp = oem_default_smb_cp;
-	else if (cpid == oem_default_telnet_cpid)
-		default_oem_cp = oem_default_telnet_cp;
-	else
-		default_oem_cp = 0;
-#else /* _KERNEL */
-	default_oem_cp = oem_default_smb_cp;
-#endif /* _KERNEL */
-
-	if (default_oem_cp) {
-		int i;
-
-		for (i = 0; i < max_oem_index; i++) {
-			oemcp->oempage.value[i] = default_oem_cp[i];
-			oemcp->unicodepage.value[default_oem_cp[i]] =
-			    (mts_wchar_t)i;
-		}
-#ifdef _KERNEL
-	}
-	/*
-	 * XXX This doesn't seem right.  How do we handle the situation
-	 * where default_oem_cp == 0 in the kernel?
-	 * Is this a PBSHORTCUT?
-	 */
-#else
-	} else {
-
-		/*
-		 * The codepage is not one of the default that stores
-		 * in the include
-		 * file; therefore, we need to read from the file.
-		 */
-		(void) snprintf(filePath, sizeof (filePath),
-		    "%s/%s", codepagePath, oemcp->filename);
-		fp = fopen(filePath, "r");
-
-		if (fp == 0) {
-			MEM_FREE("oem", oemcp->oempage.value);
-			MEM_FREE("oem", oemcp->unicodepage.value);
-#ifndef _KERNEL
-			(void) mutex_unlock(&mutex);
-#endif /* _KERNEL */
-			return (-1);
-		}
-
-		while (fgets(buf, 32, fp) != 0) {
-			char *endptr;
-			unsigned int oemval, unival;
-
-			endptr = (char *)strchr(buf, ' ');
-			if (endptr == 0) {
-				continue;
-			}
-
-			oemval = strtol(buf, &endptr, 0);
-			unival = strtol(endptr+1, 0, 0);
-
-			if (oemval >= max_oem_index || unival >= MAX_UNI_IDX) {
-				continue;
-			}
-
-			oemcp->oempage.value[oemval] = unival;
-			oemcp->unicodepage.value[unival] = oemval;
-		}
-		(void) fclose(fp);
-	}
-#endif /* _KERNEL */
-
-	oemcp->valid = 1;
-#ifndef _KERNEL
-	(void) mutex_unlock(&mutex);
-#endif /* _KERNEL */
-	return (0);
-}
-
-
-
-
-/*
- * oem_codepage_free
- *
- * This function will clear the valid bit and free the memory
- * allocated to the oem/unipage by oem_codepage_init if the ref count
- * is zero.
- */
-void
-oem_codepage_free(unsigned int cpid)
-{
-	oem_codepage_t *oemcp;
-
-	if (cpid >= MAX_OEMPAGES || !oemcp_table[cpid].valid)
-		return;
-
-	oemcp = &oemcp_table[cpid];
-	oemcp->valid--;
-
-	if (oemcp->ref != 0 || oemcp->valid != 0)
-		return;
-
-	if (oemcp->oempage.value != 0) {
-		MEM_FREE("oem", oemcp->oempage.value);
-		oemcp->oempage.value = 0;
-	}
-
-	if (oemcp->unicodepage.value != 0) {
-		MEM_FREE("oem", oemcp->unicodepage.value);
-		oemcp->unicodepage.value = 0;
-	}
-}
-
-
-
-/*
- * oem_get_oempage
- *
- * This function will return the current oempage and increment
- * the ref count. The function oem_release_page should always
- * be called when finish using the oempage to decrement the
- * ref count.
- */
-static oempage_t *
-oem_get_oempage(unsigned int cpid)
-{
-	if (cpid >= MAX_OEMPAGES)
-		return (0);
-
-	if (oemcp_table[cpid].valid) {
-		oemcp_table[cpid].ref++;
-		return (&oemcp_table[cpid].oempage);
-	}
-	return (0);
-}
-
-
-
-/*
- * oem_get_unipage
- *
- * This function will return the current unipage and increment
- * the ref count. The function oem_release_page should always
- * be called when finish using the unipage to decrement the
- * ref count.
- */
-static oempage_t *
-oem_get_unipage(unsigned int cpid)
-{
-	if (cpid >= MAX_OEMPAGES)
-		return (0);
-
-	if (oemcp_table[cpid].valid) {
-		oemcp_table[cpid].ref++;
-		return (&oemcp_table[cpid].unicodepage);
-	}
-	return (0);
-}
-
-
-
-/*
- * oem_release_page
- *
- * This function will decrement the ref count and check the valid
- * bit. It will free the memory allocated for the pages
- * if the
- * valid bit is not set, ref count is zero and the page is not
- * already freed.
- */
-static void
-oem_release_page(oempage_t *page)
-{
-	oem_codepage_t *oemcp = &oemcp_table[page->cpid];
-
-	page = 0;
-
-	if (oemcp->ref > 0)
-		oemcp->ref--;
-
-	if (oemcp->ref != 0 || oemcp->valid)
-		return;
-
-	if (oemcp->oempage.value != 0) {
-		MEM_FREE("oem", oemcp->oempage.value);
-		oemcp->oempage.value = 0;
-	}
-
-	if (oemcp->unicodepage.value != 0) {
-		MEM_FREE("oem", oemcp->unicodepage.value);
-		oemcp->unicodepage.value = 0;
-	}
-}
-
-
-
-/*
- * unicodestooems
- *
- * Convert unicode string to oem string. The function will stop
- * converting the unicode string when size nbytes - 1 is reached
- * or when there is not enough room to store another unicode.
- * If the function is called when the codepage is not initialized
- * or when the codepage initialize failed, it will return 0.
- * Otherwise, the total # of the converted unicode is returned.
+ * The number of converted unicode characters is returned,
+ * or 0 on error.
  */
 size_t
-unicodestooems(
-    char *oemstring,
-    const mts_wchar_t *unicodestring,
-    size_t nbytes,
-    unsigned int cpid)
+ucstooem(char *oem, const smb_wchar_t *ucs, size_t nbytes, uint32_t cpid)
 {
-	oempage_t *unipage;
-	unsigned int count = 0;
-	mts_wchar_t oemchar;
+	oempage_t	*ucspage;
+	uint32_t	count = 0;
+	smb_wchar_t	oemchar;
 
-	if (cpid >= MAX_OEMPAGES)
+	if (ucs == NULL || oem == NULL)
 		return (0);
 
-	if (unicodestring == 0 || oemstring == 0)
+	if ((ucspage = oem_get_ucspage(cpid)) == NULL)
 		return (0);
 
-	if ((unipage = oem_get_unipage(cpid)) == 0)
-		return (0);
-
-	while ((oemchar = unipage->value[*unicodestring]) != 0) {
+	while (nbytes != 0 && (oemchar = ucspage->value[*ucs]) != 0) {
 		if (oemchar & 0xff00 && nbytes >= MTS_MB_CHAR_MAX) {
-			*oemstring++ = oemchar >> 8;
-			*oemstring++ = (char)oemchar;
+			*oem++ = oemchar >> 8;
+			*oem++ = (char)oemchar;
 			nbytes -= 2;
 		} else if (nbytes > 1) {
-			*oemstring++ = (char)oemchar;
+			*oem++ = (char)oemchar;
 			nbytes--;
-		} else
+		} else {
 			break;
+		}
 
 		count++;
-		unicodestring++;
+		ucs++;
 	}
 
-	*oemstring = 0;
-
-	oem_release_page(unipage);
-
+	*oem = '\0';
 	return (count);
 }
 
-
-
 /*
- * oemstounicodes
+ * Convert an oem string to a unicode string.
  *
- * Convert oem string to unicode string. The function will stop
- * converting the oem string when unicodestring len reaches nwchars - 1.
- * or when there is not enough room to store another oem char.
- * If the function is called when the codepage is not initialized
- * or when the codepage initialize failed, it will return 0.
- * Otherwise, the total # of the converted oem chars is returned.
- * The oem char can be either 1 or 2 bytes.
+ * The conversion will stop at the end of the oem string or
+ * when nwchars - 1 have been converted.
+ *
+ * The number of converted oem chars is returned, or 0 on error.
+ * An oem char may be either 1 or 2 bytes.
  */
 size_t
-oemstounicodes(
-    mts_wchar_t *unicodestring,
-    const char *oemstring,
-    size_t nwchars,
-    unsigned int cpid)
+oemtoucs(smb_wchar_t *ucs, const char *oem, size_t nwchars, uint32_t cpid)
 {
-	oempage_t *oempage;
-	size_t count = nwchars;
-	mts_wchar_t oemchar;
+	oempage_t	*oempage;
+	size_t		count = nwchars;
+	smb_wchar_t	oemchar;
 
-	if (cpid >= MAX_OEMPAGES)
+	if (ucs == NULL || oem == NULL)
 		return (0);
 
-	if (unicodestring == 0 || oemstring == 0)
+	if ((oempage = oem_get_oempage(cpid)) == NULL)
 		return (0);
 
-	if ((oempage = oem_get_oempage(cpid)) == 0)
-		return (0);
-
-	while ((oemchar = (mts_wchar_t)*oemstring++ & 0xff) != 0) {
+	while ((oemchar = (smb_wchar_t)*oem++ & 0xff) != 0) {
 		/*
-		 * Cannot find one byte oemchar in table. Must be
-		 * a lead byte. Try two bytes.
+		 * Cannot find one byte oemchar in table.
+		 * Must be a lead byte. Try two bytes.
 		 */
-
 		if ((oempage->value[oemchar] == 0) && (oemchar != 0)) {
-			oemchar = oemchar << 8 | (*oemstring++ & 0xff);
+			oemchar = oemchar << 8 | (*oem++ & 0xff);
 			if (oempage->value[oemchar] == 0) {
-				*unicodestring = 0;
+				*ucs = 0;
 				break;
 			}
 		}
 #ifdef _BIG_ENDIAN
-		*unicodestring = LE_IN16(&oempage->value[oemchar]);
+		*ucs = LE_IN16(&oempage->value[oemchar]);
 #else
-		*unicodestring = oempage->value[oemchar];
+		*ucs = oempage->value[oemchar];
 #endif
 		count--;
-		unicodestring++;
+		ucs++;
 	}
 
-	*unicodestring = 0;
-
-	oem_release_page(oempage);
-
+	*ucs = 0;
 	return (nwchars - count);
 }
 
 /*
- * oem_get_lang_table
- *
- * This function returns a pointer to the language table.
+ * Get a pointer to the oem page for the specific codepage id.
  */
-language *
-oem_get_lang_table(void)
+static oempage_t *
+oem_get_oempage(uint32_t cpid)
 {
-	return (lang_table);
+	if (cpid >= MAX_OEMPAGES)
+		return (NULL);
+
+	if (!oemcpg_table[cpid].valid) {
+		oem_codepage_init(cpid);
+
+		if (!oemcpg_table[cpid].valid)
+			return (NULL);
+	}
+
+	return (&oemcpg_table[cpid].oempage);
 }
 
 /*
- * oem_no_of_languages
- *
- * This function returns total languages support in the system.
+ * Get a pointer to the ucs page for the specific codepage id.
  */
-int
-oem_no_of_languages(void)
+static oempage_t *
+oem_get_ucspage(uint32_t cpid)
 {
-	return (sizeof (lang_table)/sizeof (lang_table[0]));
+	if (cpid >= MAX_OEMPAGES)
+		return (NULL);
+
+	if (!oemcpg_table[cpid].valid) {
+		oem_codepage_init(cpid);
+
+		if (!oemcpg_table[cpid].valid)
+			return (NULL);
+	}
+
+	return (&oemcpg_table[cpid].ucspage);
 }
 
-
+/*
+ * Initialize the oem page in the oem table.
+ */
+static void
+oem_codepage_init(uint32_t cpid)
+{
 #ifndef _KERNEL
-#if 1
-/*
- * TESTING Functions
- */
-void
-oemcp_print(unsigned int cpid)
-{
-	unsigned int bytesperchar, max_index, i;
-	oempage_t *oempage, *unipage;
-	unsigned int counter = 0;
+	static mutex_t mutex;
 
-	if (cpid >= MAX_OEMPAGES) {
-		(void) printf("oemcp cpid %d is invalid\n", cpid);
-		return;
-	}
+	(void) mutex_lock(&mutex);
+	oem_codepage_setup(cpid);
+	(void) mutex_unlock(&mutex);
+#else
+	static kmutex_t mutex;
 
-	if ((oempage = oem_get_oempage(cpid)) == 0) {
-		(void) printf("oemcp of cpid %d is invalid\n", cpid);
-		return;
-	}
-
-	if ((unipage = oem_get_unipage(cpid)) == 0) {
-		(void) printf("unicp of cpid %d is invalid\n", cpid);
-		return;
-	}
-
-	if ((bytesperchar = oem_codepage_bytesperchar(cpid)) == 0) {
-		(void) printf("bytesperchar of cpid %d is not correct\n", cpid);
-		return;
-	}
-
-	max_index = 1 << bytesperchar * 8;
-
-	(void) printf("OEMPAGE:\n");
-	for (i = 0; i < max_index; i++) {
-		if ((counter + 1) % 4 == 0 &&
-		    (oempage->value[i] != 0 || i == 0)) {
-			(void) printf("%x %x\n", i, oempage->value[i]);
-			counter++;
-		} else if (oempage->value[i] != 0 || i == 0) {
-			(void) printf("%x %x, ", i, oempage->value[i]);
-			counter++;
-		}
-	}
-	counter = 0;
-	(void) printf("\n\nUNIPAGE:\n");
-	for (i = 0; i < 65536; i++) {
-		if ((counter + 1) % 8 == 0 &&
-		    (unipage->value[i] != 0 || i == 0)) {
-			(void) printf("%x %x\n", i, unipage->value[i]);
-			counter++;
-		} else if (unipage->value[i] != 0 || i == 0) {
-			(void) printf("%x %x, ", i, unipage->value[i]);
-			counter++;
-		}
-	}
-	(void) printf("\n");
-	oem_release_page(oempage);
-	oem_release_page(unipage);
-}
-
-
-
-void
-oemstringtest(unsigned int cpid)
-{
-	unsigned char *c, *cbuf;
-	unsigned char cbuf1[100] = {0xfe, 0xfd, 0xf2, 0xe9,
-		0x63, 0xce, 0xdb, 0x8c, 0x9c, 0x21, 0};
-	unsigned char cbuf2[100] = {0xfe, 0xfc, 0x63, 0x81, 0x42,
-		0x91, 0x40, 0x24, 0xff, 0x49};
-	mts_wchar_t buf[100], *wc;
-
-	if (cpid == 1)
-		cbuf = cbuf1;
-	else if (cpid == 2)
-		cbuf = cbuf2;
-
-	/*
-	 * Before oem->uni conversion.
-	 */
-	(void) printf("Before oem->uni conversion: ");
-	for (c = cbuf; *c != 0; c++)
-		(void) printf("%x ", *c);
-	(void) printf("\n");
-
-	/*
-	 * oem->uni conversion
-	 */
-	(void) oemstounicodes(buf, (const char *)cbuf, 100, cpid);
-
-	/*
-	 * After oem->uni conversion.
-	 */
-	(void) printf("After oem->uni conversion: ");
-	for (wc = buf; *wc != 0; wc++)
-		(void) printf("%x ", *wc);
-	(void) printf("\n");
-
-	/*
-	 * uni->oem conversion
-	 */
-	(void) unicodestooems((char *)cbuf, buf, 100, cpid);
-
-	/*
-	 * After uni->oem conversion.
-	 */
-	(void) printf("After uni->oem conversion: ");
-	for (c = cbuf; *c != 0; c++)
-		(void) printf("%x ", *c);
-	(void) printf("\n");
-}
-#endif
+	mutex_enter(&mutex);
+	oem_codepage_setup(cpid);
+	mutex_exit(&mutex);
 #endif /* _KERNEL */
+}
+
+static void
+oem_codepage_setup(uint32_t cpid)
+{
+	smb_wchar_t	*default_oem_cp;
+	oem_codepage_t	*oemcpg;
+	uint32_t	bytesperchar;
+	uint32_t	max_oem_index;
+	int		i;
+
+	switch (cpid) {
+	case OEM_CPG_850:
+		default_oem_cp = oem_codepage_850;
+		break;
+	case OEM_CPG_1252:
+		default_oem_cp = oem_codepage_1252;
+	default:
+		return;
+	}
+
+	oemcpg = &oemcpg_table[cpid];
+	if (oemcpg->valid)
+		return;
+
+	/*
+	 * max_oem_index will be 256 or 65536 dependent
+	 * on the OEM codepage.
+	 */
+	bytesperchar = oemcpg_table[cpid].bytesperchar;
+	max_oem_index = 1 << (bytesperchar * 8);
+
+	oemcpg->oempage.value =
+	    MEM_ZALLOC("oem", max_oem_index * sizeof (smb_wchar_t));
+	if (oemcpg->oempage.value == NULL)
+		return;
+
+	oemcpg->ucspage.value =
+	    MEM_ZALLOC("oem", MAX_UNICODE_IDX * sizeof (smb_wchar_t));
+	if (oemcpg->ucspage.value == NULL) {
+		MEM_FREE("oem", oemcpg->oempage.value);
+		oemcpg->oempage.value = NULL;
+		return;
+	}
+
+	for (i = 0; i < max_oem_index; i++) {
+		oemcpg->oempage.value[i] = default_oem_cp[i];
+		oemcpg->ucspage.value[default_oem_cp[i]] = (smb_wchar_t)i;
+	}
+
+	oemcpg->valid = B_TRUE;
+}

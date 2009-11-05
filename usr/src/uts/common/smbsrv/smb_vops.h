@@ -41,7 +41,7 @@
 #include <sys/refstr.h>
 #include <sys/acl.h>
 #include <sys/fcntl.h>
-#include <smbsrv/smb_i18n.h>
+#include <smbsrv/string.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -243,7 +243,6 @@
  * See smb_search, smb_find, smb_find_unique, and smb_trans2_find for details
  */
 
-#include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_share.h>
@@ -573,7 +572,7 @@ int
 smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
     smb_fileinfo_t *fileinfo, boolean_t *eof)
 {
-	int		rc;
+	int		rc, errnum;
 	smb_odirent_t	*odirent;
 	boolean_t	ignore_case;
 
@@ -611,6 +610,12 @@ smb_odir_read_fileinfo(smb_request_t *sr, smb_odir_t *od,
 			bzero(fileinfo, sizeof (smb_fileinfo_t));
 			if ((rc = smb_odir_next_odirent(od, odirent)) != 0)
 				break;
+
+			/* skip non utf8 filename */
+			if (u8_validate(odirent->od_name,
+			    strlen(odirent->od_name), NULL,
+			    U8_VALIDATE_ENTIRE, &errnum) < 0)
+				continue;
 
 			if (!smb_match_name(odirent->od_ino, odirent->od_name,
 			    od->d_pattern, ignore_case))

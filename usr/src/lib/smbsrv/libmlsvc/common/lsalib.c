@@ -316,7 +316,7 @@ lsa_lookup_name_builtin(char *domain, char *name, smb_account_t *info)
 	if ((wkadom = smb_wka_get_domain(wka->wka_domidx)) == NULL)
 		return (NT_STATUS_INTERNAL_ERROR);
 
-	if ((domain != NULL) && (utf8_strcasecmp(domain, wkadom) != 0))
+	if ((domain != NULL) && (smb_strcasecmp(domain, wkadom, 0) != 0))
 		return (NT_STATUS_NONE_MAPPED);
 
 	info->a_name = strdup(name);

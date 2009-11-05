@@ -382,7 +382,7 @@ int
 sam_oem_password(oem_password_t *oem_password, unsigned char *new_password,
     unsigned char *old_password)
 {
-	mts_wchar_t *unicode_password;
+	smb_wchar_t *unicode_password;
 	int length;
 
 #ifdef PBSHORTCUT
@@ -390,7 +390,7 @@ sam_oem_password(oem_password_t *oem_password, unsigned char *new_password,
 #endif /* PBSHORTCUT */
 
 	length = strlen((char const *)new_password);
-	unicode_password = alloca((length + 1) * sizeof (mts_wchar_t));
+	unicode_password = alloca((length + 1) * sizeof (smb_wchar_t));
 
 	length = smb_auth_qnd_unicode((unsigned short *)unicode_password,
 	    (char *)new_password, length);

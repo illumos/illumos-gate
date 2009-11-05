@@ -19,26 +19,24 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_CP_UNICODE_H
 #define	_SMBSRV_CP_UNICODE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <smbsrv/smb_i18n.h>
+#include <smbsrv/string.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct unicode_cp {
-	mts_wchar_t val;
-	mts_wchar_t ctype;
-	mts_wchar_t lower;
-	mts_wchar_t upper;
+	smb_wchar_t val;
+	smb_wchar_t ctype;
+	smb_wchar_t lower;
+	smb_wchar_t upper;
 };
 
 struct unicode_cp a_unicode[] = {

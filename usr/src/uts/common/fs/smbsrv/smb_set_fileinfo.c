@@ -33,8 +33,10 @@
  * SMB_SET_FILE_END_OF_FILE_INFO
  * SMB_SET_FILE_ALLOCATION_INFO
  *
- * Supported Passthrough levels:
+ * Handled Passthrough levels:
  * SMB_FILE_BASIC_INFORMATION
+ * SMB_FILE_RENAME_INFORMATION
+ * SMB_FILE_LINK_INFORMATION
  * SMB_FILE_DISPOSITION_INFORMATION
  * SMB_FILE_END_OF_FILE_INFORMATION
  * SMB_FILE_ALLOCATION_INFORMATION
@@ -61,7 +63,7 @@
  *   attributes.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 
 typedef struct smb_setinfo {
@@ -84,6 +86,7 @@ static int smb_set_basic_info(smb_request_t *, smb_setinfo_t *);
 static int smb_set_disposition_info(smb_request_t *, smb_setinfo_t *);
 static int smb_set_eof_info(smb_request_t *sr, smb_setinfo_t *);
 static int smb_set_alloc_info(smb_request_t *sr, smb_setinfo_t *);
+static int smb_set_rename_info(smb_request_t *sr, smb_setinfo_t *);
 
 /*
  * smb_com_trans2_set_file_information
@@ -285,7 +288,12 @@ smb_set_by_path(smb_request_t *sr, smb_xa_t *xa,
 	kmem_free(name, MAXNAMELEN);
 
 	if (rc != 0) {
-		smbsr_errno(sr, rc);
+		if (rc == ENOENT) {
+			smbsr_error(sr, NT_STATUS_OBJECT_NAME_NOT_FOUND,
+			    ERRDOS, ERROR_FILE_NOT_FOUND);
+		} else {
+			smbsr_errno(sr, rc);
+		}
 		return (-1);
 	}
 
@@ -305,6 +313,9 @@ smb_set_by_path(smb_request_t *sr, smb_xa_t *xa,
 
 /*
  * smb_set_fileinfo
+ *
+ * For compatibility with windows servers, SMB_FILE_LINK_INFORMATION
+ * is handled by returning NT_STATUS_NOT_SUPPORTED.
  */
 static int
 smb_set_fileinfo(smb_request_t *sr, smb_setinfo_t *sinfo)
@@ -339,6 +350,13 @@ smb_set_fileinfo(smb_request_t *sr, smb_setinfo_t *sinfo)
 	case SMB_FILE_ALLOCATION_INFORMATION:
 		return (smb_set_alloc_info(sr, sinfo));
 
+	case SMB_FILE_RENAME_INFORMATION:
+		return (smb_set_rename_info(sr, sinfo));
+
+	case SMB_FILE_LINK_INFORMATION:
+		smbsr_error(sr, NT_STATUS_NOT_SUPPORTED,
+		    ERRDOS, ERROR_NOT_SUPPORTED);
+		return (-1);
 	default:
 		break;
 	}
@@ -680,4 +698,45 @@ smb_set_disposition_info(smb_request_t *sr, smb_setinfo_t *sinfo)
 		smb_node_reset_delete_on_close(sinfo->si_node);
 	}
 	return (0);
+}
+
+/*
+ * smb_set_rename_info
+ *
+ * Explicity specified parameter validation rules:
+ * - If rootdir is not NULL respond with NT_STATUS_INVALID_PARAMETER.
+ * - If the filename contains a separator character respond with
+ *   NT_STATUS_INVALID_PARAMETER.
+ */
+static int
+smb_set_rename_info(smb_request_t *sr, smb_setinfo_t *sinfo)
+{
+	int rc;
+	uint32_t flags, rootdir, namelen;
+	char *fname;
+
+	rc = smb_mbc_decodef(&sinfo->si_xa->req_data_mb, "lll",
+	    &flags, &rootdir, &namelen);
+	if (rc == 0) {
+		rc = smb_mbc_decodef(&sinfo->si_xa->req_data_mb, "%#U",
+		    sr, namelen, &fname);
+	}
+	if (rc != 0)
+		return (-1);
+
+	if ((rootdir != 0) || (namelen == 0) || (namelen >= MAXNAMELEN)) {
+		smbsr_error(sr, NT_STATUS_INVALID_PARAMETER,
+		    ERRDOS, ERROR_INVALID_PARAMETER);
+		return (-1);
+	}
+
+	if (strchr(fname, '\\') != NULL) {
+		smbsr_error(sr, NT_STATUS_NOT_SUPPORTED,
+		    ERRDOS, ERROR_NOT_SUPPORTED);
+		return (-1);
+	}
+
+	rc = smb_trans2_rename(sr, sinfo->si_node, fname, flags);
+
+	return ((rc == 0) ? 0 : -1);
 }

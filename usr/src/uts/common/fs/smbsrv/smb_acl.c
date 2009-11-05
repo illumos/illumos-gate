@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_acl.c	1.5	08/07/28 SMI"
 
 #include <sys/acl.h>
 #include <acl/acl_common.h>
@@ -31,8 +29,6 @@
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_idmap.h>
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/ntstatus.h>
-#include <smbsrv/ntaccess.h>
 
 #define	ACE_FD_INHERIT_ACE (ACE_FILE_INHERIT_ACE | ACE_DIRECTORY_INHERIT_ACE)
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,6 @@
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_idmap.h>
-#include <smbsrv/ntstatus.h>
 
 static void smb_sd_set_sacl(smb_sd_t *, smb_acl_t *, boolean_t, int);
 static void smb_sd_set_dacl(smb_sd_t *, smb_acl_t *, boolean_t, int);

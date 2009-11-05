@@ -43,7 +43,7 @@
 #define	LOGR_RECORD_SIGNATURE	0x654C664C
 
 #define	LOGR_PRI(p)		((p) & LOG_PRIMASK)
-#define	LOGR_WNSTRLEN(S)	((strlen((S)) + 1) * sizeof (mts_wchar_t))
+#define	LOGR_WNSTRLEN(S)	((strlen((S)) + 1) * sizeof (smb_wchar_t))
 
 #define	LOGR_MSG_DWORD_OFFSET	12
 #define	LOGR_MSG_WORD_OFFSET	4
@@ -437,15 +437,15 @@ logr_set_logrecord(char *src_name, logr_entry_t *le,
 {
 	int srcname_len = 0, hostname_len = 0, len;
 	int str_offs, sh_len;
-	mts_wchar_t wcs_hostname[MAXHOSTNAMELEN];
-	mts_wchar_t wcs_srcname[SYS_NMLN * 2];
+	smb_wchar_t wcs_hostname[MAXHOSTNAMELEN];
+	smb_wchar_t wcs_srcname[SYS_NMLN * 2];
 
-	(void) mts_mbstowcs(wcs_srcname, src_name,
+	(void) smb_mbstowcs(wcs_srcname, src_name,
 	    strlen(src_name) + 1);
 	srcname_len = LOGR_WNSTRLEN(src_name);
 
 	/* Because, Solaris allows remote logging, need to get hostname here */
-	(void) mts_mbstowcs(wcs_hostname, le->le_hostname,
+	(void) smb_mbstowcs(wcs_hostname, le->le_hostname,
 	    strlen(le->le_hostname) + 1);
 	hostname_len = LOGR_WNSTRLEN(le->le_hostname);
 
@@ -476,7 +476,7 @@ logr_set_logrecord(char *src_name, logr_entry_t *le,
 	len = strlen(le->le_msg) + 1;
 	if (len > 0)
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		(void) mts_mbstowcs((mts_wchar_t *)(rec->info + sh_len),
+		(void) smb_mbstowcs((smb_wchar_t *)(rec->info + sh_len),
 		    le->le_msg, len);
 
 	rec->Length2 = sizeof (logr_record_t);

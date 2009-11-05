@@ -24,9 +24,8 @@
  */
 
 #include <sys/sdt.h>
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
-#include <smbsrv/mbuf.h>
 #include <smbsrv/netbios.h>
 
 

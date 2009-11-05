@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_NMPIPES_H
 #define	_SMBSRV_NMPIPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file defines pre-defined and system common named pipes.
@@ -111,7 +109,7 @@ extern "C" {
 #define	PIPE_REPL			"\\PIPE\\repl"
 
 /*
- * Named pipe function codes (NTDDK cifs.h).
+ * Named pipe function codes (NTDDK).
  */
 #define	TRANS_SET_NMPIPE_STATE		0x01
 #define	TRANS_RAW_READ_NMPIPE		0x11

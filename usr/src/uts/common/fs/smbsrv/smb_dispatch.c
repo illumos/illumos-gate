@@ -135,7 +135,7 @@
  *			empty if an error.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_kstat.h>
 #include <sys/sdt.h>
 

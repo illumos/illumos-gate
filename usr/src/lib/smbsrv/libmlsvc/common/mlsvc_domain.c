@@ -287,7 +287,7 @@ smb_ddiscover_nbt(char *domain, char *server, smb_domainex_t *dxi)
 		return (B_FALSE);
 
 	if ((*dnsdomain != '\0') &&
-	    utf8_strcasecmp(domain, dxi->d_primary.di_nbname))
+	    smb_strcasecmp(domain, dxi->d_primary.di_nbname, 0))
 		return (B_FALSE);
 
 	/*
@@ -335,7 +335,7 @@ smb_ddiscover_domain_match(char *nb_domain, char *buf, uint32_t len)
 				first_label[15] = '\0';
 		}
 
-		if (utf8_strcasecmp(nb_domain, first_label) == 0) {
+		if (smb_strcasecmp(nb_domain, first_label, 0) == 0) {
 			found = B_TRUE;
 			(void) strlcpy(buf, entry, len);
 			break;
@@ -418,9 +418,9 @@ smb_ddiscover_use_config(char *domain, smb_domainex_t *dxi)
 	    NULL, NULL, NULL);
 
 	if (SMB_IS_FQDN(domain))
-		use = (utf8_strcasecmp(dinfo->di_fqname, domain) == 0);
+		use = (smb_strcasecmp(dinfo->di_fqname, domain, 0) == 0);
 	else
-		use = (utf8_strcasecmp(dinfo->di_nbname, domain) == 0);
+		use = (smb_strcasecmp(dinfo->di_nbname, domain, 0) == 0);
 
 	if (use)
 		smb_config_getdomaininfo(NULL, NULL, dinfo->di_sid,

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 
 
 /*
@@ -251,8 +251,7 @@ smb_pre_tree_connect_andx(smb_request_t *sr)
 	    &sr->arg.tcon.flags, &pwlen);
 	if (rc == 0) {
 		if (pwlen != 0) {
-			pwbuf = (uint8_t *)smbsr_malloc(&sr->request_storage,
-			    pwlen);
+			pwbuf = smb_srm_alloc(sr, pwlen);
 			bzero(pwbuf, pwlen);
 		}
 

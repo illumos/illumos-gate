@@ -47,11 +47,8 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
-
-#include <smbsrv/lm.h>
 #include <smbsrv/smb_share.h>
-#include <smbsrv/cifs.h>
-#include <smbsrv/nterror.h>
+#include <smbsrv/smb.h>
 #include <mlsvc.h>
 
 #define	SMB_SHR_ERROR_THRESHOLD		3
@@ -800,7 +797,7 @@ smb_shr_is_restricted(char *sharename)
 		return (B_FALSE);
 
 	for (i = 0; i < sizeof (restricted)/sizeof (restricted[0]); i++) {
-		if (utf8_strcasecmp(restricted[i], sharename) == 0)
+		if (smb_strcasecmp(restricted[i], sharename, 0) == 0)
 			return (B_TRUE);
 	}
 
@@ -825,7 +822,7 @@ smb_shr_is_admin(char *sharename)
 		return (B_FALSE);
 
 	if (strlen(sharename) == 2 &&
-	    mts_isalpha(sharename[0]) && sharename[1] == '$') {
+	    smb_isalpha(sharename[0]) && sharename[1] == '$') {
 		return (B_TRUE);
 	}
 
@@ -1122,24 +1119,23 @@ smb_shr_addipc(void)
 static void
 smb_shr_set_oemname(smb_share_t *si)
 {
-	unsigned int cpid = oem_get_smb_cpid();
-	mts_wchar_t *unibuf;
+	smb_wchar_t *unibuf;
 	char *oem_name;
 	int length;
 
 	length = strlen(si->shr_name) + 1;
 
 	oem_name = malloc(length);
-	unibuf = malloc(length * sizeof (mts_wchar_t));
+	unibuf = malloc(length * sizeof (smb_wchar_t));
 	if ((oem_name == NULL) || (unibuf == NULL)) {
 		free(oem_name);
 		free(unibuf);
 		return;
 	}
 
-	(void) mts_mbstowcs(unibuf, si->shr_name, length);
+	(void) smb_mbstowcs(unibuf, si->shr_name, length);
 
-	if (unicodestooems(oem_name, unibuf, length, cpid) == 0)
+	if (ucstooem(oem_name, unibuf, length, OEM_CPG_850) == 0)
 		(void) strcpy(oem_name, si->shr_name);
 
 	free(unibuf);
@@ -1284,7 +1280,7 @@ smb_shr_cache_findent(char *sharename)
 {
 	HT_ITEM *item;
 
-	(void) utf8_strlwr(sharename);
+	(void) smb_strlwr(sharename);
 	item = ht_find_item(smb_shr_cache.sc_cache, sharename);
 	if (item && item->hi_data)
 		return ((smb_share_t *)item->hi_data);
@@ -1333,7 +1329,7 @@ smb_shr_cache_addent(smb_share_t *si)
 
 	bcopy(si, cache_ent, sizeof (smb_share_t));
 
-	(void) utf8_strlwr(cache_ent->shr_name);
+	(void) smb_strlwr(cache_ent->shr_name);
 	smb_shr_set_oemname(cache_ent);
 
 	if ((si->shr_type & STYPE_IPC) == 0)
@@ -1363,7 +1359,7 @@ smb_shr_cache_addent(smb_share_t *si)
 static void
 smb_shr_cache_delent(char *sharename)
 {
-	(void) utf8_strlwr(sharename);
+	(void) smb_strlwr(sharename);
 	(void) ht_remove_item(smb_shr_cache.sc_cache, sharename);
 }
 
@@ -2192,8 +2188,7 @@ smb_shr_expand_subs(char **cmd_toks, smb_share_t *si, smb_execsub_info_t *subs)
 	char hostname[MAXHOSTNAMELEN];
 	char ip_str[INET6_ADDRSTRLEN];
 	char name[SMB_PI_MAX_HOST];
-	mts_wchar_t wbuf[SMB_PI_MAX_HOST];
-	unsigned int cpid = oem_get_smb_cpid();
+	smb_wchar_t wbuf[SMB_PI_MAX_HOST];
 	int i;
 
 	if (cmd_toks == NULL || *cmd_toks == NULL)
@@ -2236,12 +2231,12 @@ smb_shr_expand_subs(char **cmd_toks, smb_share_t *si, smb_execsub_info_t *subs)
 				if (*subs->e_cli_netbiosname == '\0')
 					unknown = B_TRUE;
 				else {
-					(void) mts_mbstowcs(wbuf,
+					(void) smb_mbstowcs(wbuf,
 					    subs->e_cli_netbiosname,
 					    SMB_PI_MAX_HOST - 1);
 
-					if (unicodestooems(name, wbuf,
-					    SMB_PI_MAX_HOST, cpid) == 0)
+					if (ucstooem(name, wbuf,
+					    SMB_PI_MAX_HOST, OEM_CPG_850) == 0)
 						(void) strlcpy(name,
 						    subs->e_cli_netbiosname,
 						    SMB_PI_MAX_HOST);

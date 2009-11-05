@@ -35,11 +35,6 @@
 
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
-#include <smbsrv/ntstatus.h>
-#include <smbsrv/ntaccess.h>
-#include <smbsrv/nterror.h>
-#include <smbsrv/cifs.h>
-#include <smbsrv/doserror.h>
 
 /*
  * smb_nt_transact_create
@@ -136,6 +131,9 @@ smb_post_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 		smb_sd_term(sd);
 		kmem_free(sd, sizeof (smb_sd_t));
 	}
+
+	if (sr->arg.open.dir != NULL)
+		smb_ofile_release(sr->arg.open.dir);
 }
 
 smb_sdrc_t
@@ -176,16 +174,14 @@ smb_nt_transact_create(smb_request_t *sr, smb_xa_t *xa)
 	if (op->rootdirfid == 0) {
 		op->fqi.fq_dnode = sr->tid_tree->t_snode;
 	} else {
-		sr->smb_fid = (ushort_t)op->rootdirfid;
-		smbsr_lookup_file(sr);
-		if (sr->fid_ofile == NULL) {
+		op->dir = smb_ofile_lookup_by_fid(sr->tid_tree,
+		    (uint16_t)op->rootdirfid);
+		if (op->dir == NULL) {
 			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
 			    ERRDOS, ERRbadfid);
 			return (SDRC_ERROR);
 		}
-
-		op->fqi.fq_dnode = sr->fid_ofile->f_node;
-		smbsr_release_file(sr);
+		op->fqi.fq_dnode = op->dir->f_node;
 	}
 
 	status = smb_common_open(sr);

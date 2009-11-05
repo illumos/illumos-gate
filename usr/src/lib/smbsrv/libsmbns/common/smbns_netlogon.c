@@ -92,7 +92,7 @@ smb_netlogon_request(struct name_entry *server, char *domain)
 	(void) mutex_unlock(&ntdomain_mtx);
 
 	smb_config_getdomaininfo(di.di_nbname, NULL, di.di_sid, NULL, NULL);
-	if (utf8_strcasecmp(di.di_nbname, domain) == 0) {
+	if (smb_strcasecmp(di.di_nbname, domain, 0) == 0) {
 		if ((sid = smb_sid_fromstr(di.di_sid)) != NULL)
 			protocol = NETLOGON_PROTO_SAMLOGON;
 	}
@@ -132,8 +132,7 @@ smb_netlogon_receive(struct datagram *datagram,
 	smb_msgbuf_t mb;
 	unsigned short opcode;
 	char src_name[SMB_PI_MAX_HOST];
-	mts_wchar_t unicode_src_name[SMB_PI_MAX_HOST];
-	unsigned int cpid = oem_get_smb_cpid();
+	smb_wchar_t unicode_src_name[SMB_PI_MAX_HOST];
 	uint32_t src_ipaddr;
 	char *junk;
 	char *primary;
@@ -149,9 +148,9 @@ smb_netlogon_receive(struct datagram *datagram,
 	 * Therefore, we need to convert it to unicode and
 	 * store it in multi-bytes format.
 	 */
-	(void) oemstounicodes(unicode_src_name, (char *)datagram->src.name,
-	    SMB_PI_MAX_HOST, cpid);
-	(void) mts_wcstombs(src_name, unicode_src_name, SMB_PI_MAX_HOST);
+	(void) oemtoucs(unicode_src_name, (char *)datagram->src.name,
+	    SMB_PI_MAX_HOST, OEM_CPG_850);
+	(void) smb_wcstombs(src_name, unicode_src_name, SMB_PI_MAX_HOST);
 
 	(void) trim_whitespace(src_name);
 
@@ -288,7 +287,7 @@ smb_netlogon_query(struct name_entry *server,
 	 * zero bytes that terminate the wchar string.
 	 */
 	data_length = sizeof (short) + name_lengths + (name_lengths & 1) +
-	    mts_wcequiv_strlen(hostname) + 2 + sizeof (long) + sizeof (short) +
+	    smb_wcequiv_strlen(hostname) + 2 + sizeof (long) + sizeof (short) +
 	    sizeof (short);
 
 	offset = smb_browser_load_transact_header(buffer,
@@ -381,8 +380,8 @@ smb_netlogon_samlogon(struct name_entry *server,
 
 	data_length = sizeof (short)
 	    + sizeof (short)
-	    + mts_wcequiv_strlen(hostname) + 2
-	    + mts_wcequiv_strlen(username) + 2
+	    + smb_wcequiv_strlen(hostname) + 2
+	    + smb_wcequiv_strlen(username) + 2
 	    + name_length
 	    + sizeof (long)
 	    + sizeof (long)

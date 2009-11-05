@@ -57,8 +57,7 @@
  *
  */
 
-#include <smbsrv/smb_incl.h>
-#include <smbsrv/mbuf.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_kstat.h>
 
 static kmem_cache_t	*smb_mbc_cache = NULL;

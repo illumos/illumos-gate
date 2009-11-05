@@ -122,7 +122,7 @@ smbd_set_netlogon_cred(void)
 	 */
 	(void) smb_getsamaccount(sam_acct, sizeof (sam_acct));
 	smb_ipc_get_user(ipc_usr, SMB_USERNAME_MAXLEN);
-	if (utf8_strcasecmp(ipc_usr, sam_acct))
+	if (smb_strcasecmp(ipc_usr, sam_acct, 0))
 		return (B_FALSE);
 
 	di = &dxi.d_primary;
@@ -133,7 +133,7 @@ smbd_set_netlogon_cred(void)
 	    sizeof (kpasswd_domain));
 
 	if (*kpasswd_domain != '\0' &&
-	    utf8_strcasecmp(kpasswd_domain, di->di_fqname)) {
+	    smb_strcasecmp(kpasswd_domain, di->di_fqname, 0)) {
 		dom = kpasswd_domain;
 		new_domain = B_TRUE;
 	} else {
@@ -145,7 +145,7 @@ smbd_set_netlogon_cred(void)
 	 * currently cached or the SMB daemon has previously discovered a DC
 	 * that is different than the kpasswd server.
 	 */
-	if (new_domain || utf8_strcasecmp(dxi.d_dc, kpasswd_srv) != 0) {
+	if (new_domain || smb_strcasecmp(dxi.d_dc, kpasswd_srv, 0) != 0) {
 		if (*dxi.d_dc != '\0')
 			mlsvc_disconnect(dxi.d_dc);
 
@@ -217,7 +217,7 @@ smbd_locate_dc_thread(void *arg)
 	} else {
 		if (smb_getfqdomainname(domain, MAXHOSTNAMELEN) != 0) {
 			(void) smb_getdomainname(domain, MAXHOSTNAMELEN);
-			(void) utf8_strupr(domain);
+			(void) smb_strupr(domain);
 		}
 
 		if (smb_locate_dc(domain, "", &new_domain)) {

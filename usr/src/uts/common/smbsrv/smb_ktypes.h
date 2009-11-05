@@ -58,7 +58,6 @@ extern "C" {
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_vops.h>
-#include <smbsrv/ntifs.h>
 
 struct smb_disp_entry;
 struct smb_request;
@@ -305,11 +304,6 @@ typedef struct {
 
 
 typedef uint32_t 	UTIME;		/* seconds since Jan 1 1970 */
-
-typedef struct smb_malloc_list {
-	struct smb_malloc_list	*forw;
-	struct smb_malloc_list	*back;
-} smb_malloc_list;
 
 typedef struct smb_llist {
 	krwlock_t	ll_lock;
@@ -939,7 +933,7 @@ typedef struct smb_opipe {
 
 /*
  * The of_ftype	of an open file should contain the SMB_FTYPE value
- * (cifs.h) returned when the file/pipe was opened. The following
+ * returned when the file/pipe was opened. The following
  * assumptions are currently made:
  *
  * File Type	    Node       PipeInfo
@@ -1215,6 +1209,7 @@ typedef struct open_param {
 	uint32_t	action_taken;
 	uint64_t	fileid;
 	uint32_t	rootdirfid;
+	smb_ofile_t	*dir;
 	/* This is only set by NTTransactCreate */
 	struct smb_sd	*sd;
 	uint8_t		op_oplock_level;
@@ -1388,7 +1383,7 @@ typedef struct smb_request {
 	struct mbuf_chain	command;
 	struct mbuf_chain	reply;
 	struct mbuf_chain	raw_data;
-	smb_malloc_list		request_storage;
+	list_t			sr_storage;
 	struct smb_xa		*r_xa;
 	int			andx_prev_wct;
 	int 			cur_reply_offset;
@@ -1442,6 +1437,7 @@ typedef struct smb_request {
 		smb_fqi_t	fqi;
 		smb_fqi_t	dst_fqi;
 		uint16_t	info_level;
+		uint16_t	flags;
 	    } dirop;
 
 	    open_param_t	open;
@@ -1453,14 +1449,23 @@ typedef struct smb_request {
 	kthread_t		*sr_worker;
 } smb_request_t;
 
-#define	SMB_READ_PROTOCOL(smb_nh_ptr) \
-	LE_IN32(((smb_nethdr_t *)(smb_nh_ptr))->sh_protocol)
+/*
+ * SMB request-specific memory node.
+ */
+typedef struct smb_srm {
+	list_node_t	srm_lnd;
+	size_t		srm_size;
+	smb_request_t	*srm_sr;
+} smb_srm_t;
+
+#define	SMB_READ_PROTOCOL(hdr) \
+	LE_IN32(((smb_hdr_t *)(hdr))->protocol)
 
 #define	SMB_PROTOCOL_MAGIC_INVALID(rd_sr) \
 	(SMB_READ_PROTOCOL((rd_sr)->sr_request_buf) != SMB_PROTOCOL_MAGIC)
 
-#define	SMB_READ_COMMAND(smb_nh_ptr) \
-	(((smb_nethdr_t *)(smb_nh_ptr))->sh_command)
+#define	SMB_READ_COMMAND(hdr) \
+	(((smb_hdr_t *)(hdr))->command)
 
 #define	SMB_IS_WRITERAW(rd_sr) \
 	(SMB_READ_COMMAND((rd_sr)->sr_request_buf) == SMB_COM_WRITE_RAW)
@@ -1512,8 +1517,7 @@ typedef struct smb_xa {
 	int32_t	smb_timeout;	/* number of milliseconds to await completion */
 	uint32_t	smb_suwcnt;	/* set up word count */
 
-
-	char			*xa_smb_trans_name;
+	char			*xa_pipe_name;
 
 	int			req_disp_param;
 	int			req_disp_data;

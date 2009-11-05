@@ -42,7 +42,7 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/smb_share.h>
 #include <smbsrv/lmerr.h>
-#include <smbsrv/cifs.h>
+#include <smbsrv/smb.h>
 
 #define	SMB_SHARE_DOOR_CALL_RETRIES		3
 

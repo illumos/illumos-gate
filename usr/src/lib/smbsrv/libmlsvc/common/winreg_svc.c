@@ -780,7 +780,7 @@ winreg_s_QueryValue(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
-	slen = mts_wcequiv_strlen(value) + sizeof (mts_wchar_t);
+	slen = smb_wcequiv_strlen(value) + sizeof (smb_wchar_t);
 	msize = sizeof (struct winreg_value) + slen;
 
 	param->value = (struct winreg_value *)NDR_MALLOC(mxa, msize);
@@ -799,7 +799,7 @@ winreg_s_QueryValue(void *arg, ndr_xa_t *mxa)
 	pv->vc_first_is = 0;
 	pv->vc_length_is = slen;
 	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	(void) ndr_mbstowcs(NULL, (mts_wchar_t *)pv->value, value, slen);
+	(void) ndr_mbstowcs(NULL, (smb_wchar_t *)pv->value, value, slen);
 
 	*param->type = 1;
 	*param->value_size = slen;

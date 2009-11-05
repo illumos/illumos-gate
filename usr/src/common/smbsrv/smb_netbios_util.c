@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef _KERNEL
 #include <sys/types.h>
@@ -32,7 +30,6 @@
 #include <string.h>
 #endif
 #include <smbsrv/string.h>
-#include <smbsrv/ctype.h>
 #include <smbsrv/netbios.h>
 
 static int domainname_is_valid(char *domain_name);
@@ -286,7 +283,7 @@ netbios_first_level_name_decode(char *in, char *name, char *scope)
 	 * to Appendix 1 - Domain Name Syntax Specification in RFC883.
 	 */
 	if (domainname_is_valid(scope))	{
-		(void) utf8_strupr(scope);
+		(void) smb_strupr(scope);
 		/*LINTED E_PTRDIFF_OVERFLOW*/
 		return (cp - in);
 	}
@@ -377,14 +374,14 @@ domainname_is_valid(char *domain_name)
 		}
 
 		if (first_char)	{
-			if (mts_isalpha_ascii(*name) == 0)
+			if (smb_isalpha_ascii(*name) == 0)
 				return (0);
 
 			first_char = 0;
 			continue;
 		}
 
-		if (mts_isalnum_ascii(*name) || dns_is_allowed(*name))
+		if (smb_isalnum_ascii(*name) || dns_is_allowed(*name))
 			continue;
 
 		return (0);

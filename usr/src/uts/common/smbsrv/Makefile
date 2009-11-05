@@ -25,21 +25,10 @@
 include ../../../Makefile.master
 
 HDRS=	alloc.h			\
-	cifs.h			\
-	codepage.h		\
-	cp_cyrillic.h		\
-	cp_latin1.h		\
-	cp_latin2.h		\
-	cp_latin3.h		\
-	cp_latin4.h		\
-	cp_latin5.h		\
-	cp_latin6.h		\
 	cp_unicode.h		\
 	cp_usascii.h		\
-	ctype.h			\
 	doserror.h		\
 	hash_table.h		\
-	lm.h			\
 	lmdfs.h			\
 	lmerr.h			\
 	mac_cifs.h		\
@@ -56,14 +45,11 @@ HDRS=	alloc.h			\
 	ntlocale.h		\
 	smb_sid.h		\
 	ntstatus.h		\
-	oem.h			\
 	smb.h			\
 	smb_common_door.h	\
 	smb_door_svc.h		\
 	smb_fsops.h		\
-	smb_i18n.h		\
 	smb_idmap.h		\
-	smb_incl.h		\
 	smb_inet.h		\
 	smb_ioctl.h		\
 	smb_kproto.h		\
@@ -74,7 +60,6 @@ HDRS=	alloc.h			\
 	smb_token.h		\
 	smb_vops.h		\
 	smb_xdr.h		\
-	smbfmt.h		\
 	smbinfo.h		\
 	string.h		\
 	svrapi.h		\

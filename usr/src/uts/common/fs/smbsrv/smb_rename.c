@@ -23,9 +23,8 @@
  * Use is subject to license terms.
  */
 
-#include <smbsrv/nterror.h>
 #include <sys/synch.h>
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <sys/nbmlock.h>
 
@@ -42,10 +41,19 @@
 #define	SMB_NT_RENAME_RENAME_FILE	0x0104
 #define	SMB_NT_RENAME_MOVE_FILE		0x0105
 
-static int smb_do_rename(smb_request_t *, smb_fqi_t *, smb_fqi_t *);
+/*
+ * SMB_TRANS2_SET_FILE/PATH_INFO (RENAME_INFORMATION level) flag
+ */
+#define	SMB_RENAME_FLAG_OVERWRITE	0x001
+
+static int smb_common_rename(smb_request_t *, smb_fqi_t *, smb_fqi_t *);
 static int smb_make_link(smb_request_t *, smb_fqi_t *, smb_fqi_t *);
+static int smb_rename_check_stream(smb_fqi_t *, smb_fqi_t *);
 static int smb_rename_check_attr(smb_request_t *, smb_node_t *, uint16_t);
 static void smb_rename_set_error(smb_request_t *, int);
+
+static int smb_rename_lookup_src(smb_request_t *);
+static void smb_rename_release_src(smb_request_t *);
 
 /*
  * smb_com_rename
@@ -62,8 +70,7 @@ static void smb_rename_set_error(smb_request_t *, int);
  * have. If SearchAttributes is zero then only normal files are renamed.
  * If the system file or hidden attributes are specified then the rename
  * is inclusive - both the specified type(s) of files and normal files are
- * renamed. The encoding of SearchAttributes is described in section 3.10
- * - File Attribute Encoding.
+ * renamed.
  */
 smb_sdrc_t
 smb_pre_rename(smb_request_t *sr)
@@ -104,7 +111,7 @@ smb_com_rename(smb_request_t *sr)
 		return (SDRC_ERROR);
 	}
 
-	rc = smb_do_rename(sr, src_fqi, dst_fqi);
+	rc = smb_common_rename(sr, src_fqi, dst_fqi);
 
 	if (rc != 0) {
 		smb_rename_set_error(sr, rc);
@@ -116,208 +123,17 @@ smb_com_rename(smb_request_t *sr)
 }
 
 /*
- * smb_do_rename
- *
- * Common code for renaming a file.
- *
- * If the source and destination are identical, we go through all
- * the checks but we don't actually do the rename.  If the source
- * and destination files differ only in case, we do a case-sensitive
- * rename.  Otherwise, we do a full case-insensitive rename.
- *
- * Returns errno values.
- */
-static int
-smb_do_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
-{
-	smb_node_t *src_node, *tnode;
-	char *dstname;
-	DWORD status;
-	int rc;
-	int count;
-	char *path;
-
-	tnode = sr->tid_tree->t_snode;
-
-	/* Lookup the source node. It MUST exist. */
-	path = src_fqi->fq_path.pn_path;
-	rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
-	    &src_fqi->fq_dnode, src_fqi->fq_last_comp);
-	if (rc != 0)
-		return (rc);
-
-	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS, tnode,
-	    src_fqi->fq_dnode, src_fqi->fq_last_comp, &src_fqi->fq_fnode);
-	if (rc != 0) {
-		smb_node_release(src_fqi->fq_dnode);
-		return (rc);
-	}
-
-	src_node = src_fqi->fq_fnode;
-	rc = smb_rename_check_attr(sr, src_node, src_fqi->fq_sattr);
-	if (rc != 0) {
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		return (rc);
-	}
-
-	/*
-	 * Break the oplock before access checks. If a client
-	 * has a file open, this will force a flush or close,
-	 * which may affect the outcome of any share checking.
-	 */
-	(void) smb_oplock_break(src_node, sr->session, B_FALSE);
-
-	for (count = 0; count <= 3; count++) {
-		if (count) {
-			smb_node_end_crit(src_node);
-			delay(MSEC_TO_TICK(400));
-		}
-
-		smb_node_start_crit(src_node, RW_READER);
-
-		status = smb_node_rename_check(src_node);
-
-		if (status != NT_STATUS_SHARING_VIOLATION)
-			break;
-	}
-
-	if (status == NT_STATUS_SHARING_VIOLATION) {
-		smb_node_end_crit(src_node);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		return (EPIPE); /* = ERRbadshare */
-	}
-
-	status = smb_range_check(sr, src_node, 0, UINT64_MAX, B_TRUE);
-
-	if (status != NT_STATUS_SUCCESS) {
-		smb_node_end_crit(src_node);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		return (EACCES);
-	}
-
-	/* Lookup destination node. */
-	path = dst_fqi->fq_path.pn_path;
-	rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
-	    &dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
-	if (rc != 0) {
-		smb_node_end_crit(src_node);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		return (rc);
-	}
-
-	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS, tnode,
-	    dst_fqi->fq_dnode, dst_fqi->fq_last_comp, &dst_fqi->fq_fnode);
-	if ((rc != 0) && (rc != ENOENT)) {
-		smb_node_end_crit(src_node);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		smb_node_release(dst_fqi->fq_dnode);
-		return (rc);
-	}
-
-	if (utf8_strcasecmp(src_fqi->fq_path.pn_path,
-	    dst_fqi->fq_path.pn_path) == 0) {
-
-		if (dst_fqi->fq_fnode)
-			smb_node_release(dst_fqi->fq_fnode);
-
-		rc = strcmp(src_fqi->fq_fnode->od_name, dst_fqi->fq_last_comp);
-		if (rc == 0) {
-			smb_node_end_crit(src_node);
-			smb_node_release(src_fqi->fq_fnode);
-			smb_node_release(src_fqi->fq_dnode);
-			smb_node_release(dst_fqi->fq_dnode);
-			return (0);
-		}
-
-		rc = smb_fsop_rename(sr, sr->user_cr,
-		    src_fqi->fq_dnode, src_fqi->fq_fnode->od_name,
-		    dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
-
-		smb_node_end_crit(src_node);
-		if (rc == 0)
-			smb_node_notify_change(dst_fqi->fq_dnode);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		smb_node_release(dst_fqi->fq_dnode);
-		return (rc);
-	}
-
-	/* dst node must not exist */
-	if (dst_fqi->fq_fnode) {
-		smb_node_end_crit(src_node);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		smb_node_release(dst_fqi->fq_fnode);
-		smb_node_release(dst_fqi->fq_dnode);
-		return (EEXIST);
-	}
-
-	/*
-	 * If the source name is mangled but the source and destination
-	 * on-disk names are identical, we'll use the on-disk name.
-	 */
-	if ((smb_maybe_mangled_name(src_fqi->fq_last_comp)) &&
-	    (strcmp(src_fqi->fq_last_comp, dst_fqi->fq_last_comp) == 0)) {
-		dstname = src_fqi->fq_fnode->od_name;
-	} else {
-		dstname = dst_fqi->fq_last_comp;
-	}
-
-	rc = smb_fsop_rename(sr, sr->user_cr,
-	    src_fqi->fq_dnode, src_fqi->fq_fnode->od_name,
-	    dst_fqi->fq_dnode, dstname);
-
-	smb_node_end_crit(src_node);
-	if (rc == 0)
-		smb_node_notify_change(dst_fqi->fq_dnode);
-	smb_node_release(src_fqi->fq_fnode);
-	smb_node_release(src_fqi->fq_dnode);
-	smb_node_release(dst_fqi->fq_dnode);
-	return (rc);
-}
-
-/*
  * smb_com_nt_rename
  *
  * Rename a file. Files OldFileName must exist and NewFileName must not.
  * Both pathnames must be relative to the Tid specified in the request.
  * Open files may be renamed.
  *
- * Multiple files may be renamed in response to a single request as Rename
- * File supports wildcards in the file name (last component of the path).
- * NOTE: we don't support rename with wildcards.
- *
  * SearchAttributes indicates the attributes that the target file(s) must
  * have. If SearchAttributes is zero then only normal files are renamed.
  * If the system file or hidden attributes are specified then the rename
  * is inclusive - both the specified type(s) of files and normal files are
- * renamed. The encoding of SearchAttributes is described in section 3.10
- * - File Attribute Encoding.
- *
- *  Client Request                     Description
- *  =================================  ==================================
- *  UCHAR WordCount;                   Count of parameter words = 4
- *  USHORT SearchAttributes;
- *  USHORT InformationLevel;           0x0103 Create a hard link
- *                                     0x0104 In-place rename
- *                                     0x0105 Move (rename) a file
- *  ULONG ClusterCount                 Servers should ignore this value
- *  USHORT ByteCount;                  Count of data bytes; min = 4
- *  UCHAR Buffer[];                    Buffer containing:
- *                                     UCHAR BufferFormat1 0x04
- *                                     UCHAR OldFileName[] OldFileName
- *                                     UCHAR BufferFormat1 0x04
- *                                     UCHAR OldFileName[] NewFileName
- *
- *  Server Response                    Description
- *  =================================  ==================================
- *  UCHAR WordCount;                   Count of parameter words = 0
- *  UCHAR ByteCount;                   Count of data bytes = 0
+ * renamed.
  */
 smb_sdrc_t
 smb_pre_nt_rename(smb_request_t *sr)
@@ -373,7 +189,7 @@ smb_com_nt_rename(smb_request_t *sr)
 		break;
 	case SMB_NT_RENAME_RENAME_FILE:
 	case SMB_NT_RENAME_MOVE_FILE:
-		rc = smb_do_rename(sr, src_fqi, dst_fqi);
+		rc = smb_common_rename(sr, src_fqi, dst_fqi);
 		break;
 	case SMB_NT_RENAME_MOVE_CLUSTER_INFO:
 		rc = EINVAL;
@@ -393,43 +209,423 @@ smb_com_nt_rename(smb_request_t *sr)
 }
 
 /*
+ * smb_nt_transact_rename
+ *
+ * Windows servers return SUCCESS without renaming file.
+ * The only check required is to check that the handle (fid) is valid.
+ */
+smb_sdrc_t
+smb_nt_transact_rename(smb_request_t *sr, smb_xa_t *xa)
+{
+	if (smb_mbc_decodef(&xa->req_param_mb, "w", &sr->smb_fid) != 0)
+		return (SDRC_ERROR);
+
+	smbsr_lookup_file(sr);
+	if (sr->fid_ofile == NULL) {
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
+		return (SDRC_ERROR);
+	}
+	smbsr_release_file(sr);
+
+	return (SDRC_SUCCESS);
+}
+
+/*
+ * smb_trans2_rename
+ *
+ * Implements SMB_FILE_RENAME_INFORMATION level of Trans2_Set_FileInfo
+ * and Trans2_Set_PathInfo.
+ * If the new filename (dst_fqi) already exists it may be overwritten
+ * if flags == 1.
+ */
+int
+smb_trans2_rename(smb_request_t *sr, smb_node_t *node, char *fname, int flags)
+{
+	int rc;
+	smb_fqi_t *src_fqi = &sr->arg.dirop.fqi;
+	smb_fqi_t *dst_fqi = &sr->arg.dirop.dst_fqi;
+
+	sr->arg.dirop.flags = flags ? SMB_RENAME_FLAG_OVERWRITE : 0;
+	sr->arg.dirop.info_level = SMB_NT_RENAME_RENAME_FILE;
+
+	src_fqi->fq_sattr = SMB_SEARCH_ATTRIBUTES;
+	src_fqi->fq_fnode = node;
+	src_fqi->fq_dnode = node->n_dnode;
+
+	dst_fqi->fq_path.pn_path = fname;
+	dst_fqi->fq_dnode = node->n_dnode;
+	(void) strlcpy(dst_fqi->fq_last_comp, fname, MAXNAMELEN);
+
+	rc = smb_common_rename(sr, src_fqi, dst_fqi);
+	if (rc != 0) {
+		smb_rename_set_error(sr, rc);
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
+ * smb_common_rename
+ *
+ * Common code for renaming a file.
+ *
+ * If the source and destination are identical, we go through all
+ * the checks but we don't actually do the rename.  If the source
+ * and destination files differ only in case, we do a case-sensitive
+ * rename.  Otherwise, we do a full case-insensitive rename.
+ *
+ * Returns errno values.
+ */
+static int
+smb_common_rename(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
+{
+	smb_node_t *src_fnode, *src_dnode, *dst_fnode, *dst_dnode;
+	smb_node_t *tnode;
+	int rc, count;
+	DWORD status;
+	char *new_name, *path;
+
+	path = dst_fqi->fq_path.pn_path;
+
+	/* Check if attempting to rename a stream - not yet supported */
+	rc = smb_rename_check_stream(src_fqi, dst_fqi);
+	if (rc != 0)
+		return (rc);
+
+	/* The source node may already have been provided */
+	if (src_fqi->fq_fnode) {
+		smb_node_start_crit(src_fqi->fq_fnode, RW_READER);
+		smb_node_ref(src_fqi->fq_fnode);
+		smb_node_ref(src_fqi->fq_dnode);
+	} else {
+		/* lookup and validate src node */
+		rc = smb_rename_lookup_src(sr);
+		if (rc != 0)
+			return (rc);
+	}
+
+	src_fnode = src_fqi->fq_fnode;
+	src_dnode = src_fqi->fq_dnode;
+
+	/* Find destination dnode and last_comp */
+	if (dst_fqi->fq_dnode) {
+		smb_node_ref(dst_fqi->fq_dnode);
+	} else {
+		tnode = sr->tid_tree->t_snode;
+		rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
+		    &dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
+		if (rc != 0) {
+			smb_rename_release_src(sr);
+			return (rc);
+		}
+	}
+
+	dst_dnode = dst_fqi->fq_dnode;
+	new_name = dst_fqi->fq_last_comp;
+
+	/* If exact name match in same directory, we're done */
+	if ((src_dnode == dst_dnode) &&
+	    (strcmp(src_fnode->od_name, new_name) == 0)) {
+		smb_rename_release_src(sr);
+		smb_node_release(dst_dnode);
+		return (0);
+	}
+
+	/* Lookup destination node */
+	rc = smb_fsop_lookup(sr, sr->user_cr, 0, tnode,
+	    dst_dnode, new_name, &dst_fqi->fq_fnode);
+
+	/*
+	 * Handle case where changing case of the same directory entry.
+	 *
+	 * If we found the dst node in the same directory as the src node,
+	 * and their names differ only in case:
+	 *
+	 * If the tree is case sensitive (or mixed):
+	 *  Do case sensitive lookup to see if exact match exists.
+	 *  If the exact match is the same node as src_node we're done.
+	 *
+	 * If the tree is case insensitive:
+	 *  There is currently no way to tell if the case is different
+	 *  or not, so do the rename (unless the specified new name was
+	 *  mangled).
+	 */
+	if ((rc == 0) &&
+	    (src_dnode == dst_dnode) &&
+	    (smb_strcasecmp(src_fnode->od_name,
+	    dst_fqi->fq_fnode->od_name, 0) == 0)) {
+		smb_node_release(dst_fqi->fq_fnode);
+		dst_fqi->fq_fnode = NULL;
+
+		if (smb_tree_has_feature(sr->tid_tree,
+		    SMB_TREE_NO_CASESENSITIVE)) {
+			if (smb_strcasecmp(src_fnode->od_name,
+			    dst_fqi->fq_last_comp, 0) != 0) {
+				smb_rename_release_src(sr);
+				smb_node_release(dst_dnode);
+				return (0);
+			}
+		} else {
+			rc = smb_fsop_lookup(sr, sr->user_cr,
+			    SMB_CASE_SENSITIVE, tnode, dst_dnode, new_name,
+			    &dst_fqi->fq_fnode);
+
+			if ((rc == 0) &&
+			    (dst_fqi->fq_fnode == src_fnode)) {
+				smb_rename_release_src(sr);
+				smb_node_release(dst_fqi->fq_fnode);
+				smb_node_release(dst_dnode);
+				return (0);
+			}
+		}
+	}
+
+	if ((rc != 0) && (rc != ENOENT)) {
+		smb_rename_release_src(sr);
+		smb_node_release(dst_fqi->fq_dnode);
+		return (rc);
+	}
+
+	if (dst_fqi->fq_fnode) {
+		dst_fnode = dst_fqi->fq_fnode;
+
+		if (!(sr->arg.dirop.flags && SMB_RENAME_FLAG_OVERWRITE)) {
+			smb_rename_release_src(sr);
+			smb_node_release(dst_fnode);
+			smb_node_release(dst_dnode);
+			return (EEXIST);
+		}
+
+		(void) smb_oplock_break(dst_fnode, sr->session, B_FALSE);
+
+		for (count = 0; count <= 3; count++) {
+			if (count) {
+				smb_node_end_crit(dst_fnode);
+				delay(MSEC_TO_TICK(400));
+			}
+
+			smb_node_start_crit(dst_fnode, RW_READER);
+			status = smb_node_delete_check(dst_fnode);
+
+			if (status != NT_STATUS_SHARING_VIOLATION)
+				break;
+		}
+
+		if (status != NT_STATUS_SHARING_VIOLATION)
+			status = smb_range_check(sr, dst_fnode,
+			    0, UINT64_MAX, B_TRUE);
+
+		if (status != NT_STATUS_SUCCESS) {
+			smb_rename_release_src(sr);
+			smb_node_end_crit(dst_fnode);
+			smb_node_release(dst_fnode);
+			smb_node_release(dst_dnode);
+			return (EACCES);
+		}
+
+		if (smb_maybe_mangled_name(new_name)) {
+			(void) strlcpy(new_name, dst_fnode->od_name,
+			    MAXNAMELEN);
+		}
+	}
+
+	rc = smb_fsop_rename(sr, sr->user_cr,
+	    src_dnode, src_fnode->od_name,
+	    dst_dnode, new_name);
+
+	smb_rename_release_src(sr);
+
+	if (rc == 0)
+		smb_node_notify_change(dst_dnode);
+
+	if (dst_fqi->fq_fnode) {
+		smb_node_end_crit(dst_fnode);
+		smb_node_release(dst_fnode);
+	}
+	smb_node_release(dst_dnode);
+
+	return (rc);
+}
+
+/*
+ * smb_rename_check_stream
+ *
+ * For a stream rename the dst path must begin with ':', or "\\:".
+ * We don't yet support stream rename, Return EACCES.
+ *
+ * If not a stream rename, in accordance with the above rule,
+ * it is not valid for either the src or dst to be a stream.
+ * Return EINVAL.
+ */
+static int
+smb_rename_check_stream(smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
+{
+	smb_node_t *src_fnode = src_fqi->fq_fnode;
+	char *src_path = src_fqi->fq_path.pn_path;
+	char *dst_path = dst_fqi->fq_path.pn_path;
+
+	/* We do not yet support named stream rename - ACCESS DENIED */
+	if ((dst_path[0] == ':') ||
+	    ((dst_path[0] == '\\') && (dst_path[1] == ':'))) {
+		return (EACCES);
+	}
+
+	/*
+	 * If not stream rename (above) neither src or dst can be
+	 * a named stream.
+	 */
+
+	if (smb_is_stream_name(dst_path))
+		return (EINVAL);
+
+	if (src_fqi->fq_fnode) {
+		if (SMB_IS_STREAM(src_fnode))
+			return (EINVAL);
+	} else {
+		if (smb_is_stream_name(src_path))
+			return (EINVAL);
+	}
+
+	return (0);
+}
+
+
+/*
  * smb_make_link
  *
- * Common code for creating a hard link (adding an additional name
- * for a file.
+ * Creating a hard link (adding an additional name) for a file.
  *
  * If the source and destination are identical, we go through all
  * the checks but we don't create a link.
+ *
+ * If the file is a symlink we create the hardlink on the target
+ * of the symlink (i.e. use SMB_FOLLOW_LINKS when looking up src).
+ * If the target of the symlink does not exist we fail with ENOENT.
  *
  * Returns errno values.
  */
 static int
 smb_make_link(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 {
-	smb_node_t *src_fnode, *tnode;
+	smb_node_t *tnode;
+	char *path;
+	int rc;
+
+	/* Cannnot create link on named stream */
+	if (smb_is_stream_name(src_fqi->fq_path.pn_path) ||
+	    smb_is_stream_name(dst_fqi->fq_path.pn_path)) {
+		return (EINVAL);
+	}
+
+	/* lookup and validate src node */
+	rc = smb_rename_lookup_src(sr);
+	if (rc != 0)
+		return (rc);
+
+	/* if src and dest paths match we're done */
+	if (smb_strcasecmp(src_fqi->fq_path.pn_path,
+	    dst_fqi->fq_path.pn_path, 0) == 0) {
+		smb_rename_release_src(sr);
+		return (0);
+	}
+
+	/* find the destination dnode and last_comp */
+	tnode = sr->tid_tree->t_snode;
+	path = dst_fqi->fq_path.pn_path;
+	rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
+	    &dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
+	if (rc != 0) {
+		smb_rename_release_src(sr);
+		return (rc);
+	}
+
+	/* If name match in same directory, we're done */
+	if ((src_fqi->fq_dnode == dst_fqi->fq_dnode) &&
+	    (smb_strcasecmp(src_fqi->fq_fnode->od_name,
+	    dst_fqi->fq_last_comp, 0) == 0)) {
+		smb_rename_release_src(sr);
+		smb_node_release(dst_fqi->fq_dnode);
+		return (0);
+	}
+
+	/* Lookup the destination node. It MUST NOT exist. */
+	rc = smb_fsop_lookup(sr, sr->user_cr, 0, tnode,
+	    dst_fqi->fq_dnode, dst_fqi->fq_last_comp, &dst_fqi->fq_fnode);
+	if (rc == 0) {
+		smb_node_release(dst_fqi->fq_fnode);
+		rc = EEXIST;
+	}
+	if (rc != ENOENT) {
+		smb_rename_release_src(sr);
+		smb_node_release(dst_fqi->fq_dnode);
+		return (rc);
+	}
+
+	rc = smb_fsop_link(sr, sr->user_cr, src_fqi->fq_fnode,
+	    dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
+
+	smb_rename_release_src(sr);
+	if (rc == 0)
+		smb_node_notify_change(dst_fqi->fq_dnode);
+	smb_node_release(dst_fqi->fq_dnode);
+	return (rc);
+}
+
+/*
+ * smb_rename_lookup_src
+ *
+ * Lookup the src node, checking for sharing violations and
+ * breaking any existing oplock.
+ * Populate sr->arg.dirop.fqi
+ *
+ * Upon success, the dnode and fnode will have holds and the
+ * fnode will be in a critical section. These should be
+ * released using smb_rename_release_src().
+ *
+ * Returns errno values.
+ */
+static int
+smb_rename_lookup_src(smb_request_t *sr)
+{
+	smb_node_t *src_node, *tnode;
 	DWORD status;
 	int rc;
 	int count;
 	char *path;
 
-	tnode = sr->tid_tree->t_snode;
+	struct dirop *dirop = &sr->arg.dirop;
+	smb_fqi_t *src_fqi = &sr->arg.dirop.fqi;
 
-	/* Lookup the source node. It MUST exist. */
+	if (smb_is_stream_name(src_fqi->fq_path.pn_path))
+		return (EINVAL);
+
+	/* Lookup the source node */
+	tnode = sr->tid_tree->t_snode;
 	path = src_fqi->fq_path.pn_path;
 	rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
 	    &src_fqi->fq_dnode, src_fqi->fq_last_comp);
 	if (rc != 0)
 		return (rc);
 
-	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS, tnode,
+	rc = smb_fsop_lookup(sr, sr->user_cr, 0, tnode,
 	    src_fqi->fq_dnode, src_fqi->fq_last_comp, &src_fqi->fq_fnode);
 	if (rc != 0) {
 		smb_node_release(src_fqi->fq_dnode);
 		return (rc);
 	}
 
-	src_fnode = src_fqi->fq_fnode;
-	rc = smb_rename_check_attr(sr, src_fnode, src_fqi->fq_sattr);
+	/* Not valid to create hardlink for directory */
+	if ((dirop->info_level == SMB_NT_RENAME_SET_LINK_INFO) &&
+	    (smb_node_is_dir(src_fqi->fq_fnode))) {
+		smb_node_release(src_fqi->fq_fnode);
+		smb_node_release(src_fqi->fq_dnode);
+		return (EISDIR);
+	}
+
+	src_node = src_fqi->fq_fnode;
+
+	rc = smb_rename_check_attr(sr, src_node, src_fqi->fq_sattr);
 	if (rc != 0) {
 		smb_node_release(src_fqi->fq_fnode);
 		smb_node_release(src_fqi->fq_dnode);
@@ -441,80 +637,52 @@ smb_make_link(smb_request_t *sr, smb_fqi_t *src_fqi, smb_fqi_t *dst_fqi)
 	 * has a file open, this will force a flush or close,
 	 * which may affect the outcome of any share checking.
 	 */
-	(void) smb_oplock_break(src_fnode, sr->session, B_FALSE);
+	(void) smb_oplock_break(src_node, sr->session, B_FALSE);
 
 	for (count = 0; count <= 3; count++) {
 		if (count) {
-			smb_node_end_crit(src_fnode);
+			smb_node_end_crit(src_node);
 			delay(MSEC_TO_TICK(400));
 		}
 
-		smb_node_start_crit(src_fnode, RW_READER);
-		status = smb_node_rename_check(src_fnode);
+		smb_node_start_crit(src_node, RW_READER);
 
+		status = smb_node_rename_check(src_node);
 		if (status != NT_STATUS_SHARING_VIOLATION)
 			break;
 	}
 
 	if (status == NT_STATUS_SHARING_VIOLATION) {
-		smb_node_end_crit(src_fnode);
+		smb_node_end_crit(src_node);
 		smb_node_release(src_fqi->fq_fnode);
 		smb_node_release(src_fqi->fq_dnode);
 		return (EPIPE); /* = ERRbadshare */
 	}
 
-	status = smb_range_check(sr, src_fnode, 0, UINT64_MAX, B_TRUE);
+	status = smb_range_check(sr, src_node, 0, UINT64_MAX, B_TRUE);
 	if (status != NT_STATUS_SUCCESS) {
-		smb_node_end_crit(src_fnode);
+		smb_node_end_crit(src_node);
 		smb_node_release(src_fqi->fq_fnode);
 		smb_node_release(src_fqi->fq_dnode);
 		return (EACCES);
 	}
 
-	if (utf8_strcasecmp(src_fqi->fq_path.pn_path,
-	    dst_fqi->fq_path.pn_path) == 0) {
-		smb_node_end_crit(src_fnode);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		return (0);
-	}
+	return (0);
+}
 
-	/* Lookup the destination node. It MUST NOT exist. */
-	path = dst_fqi->fq_path.pn_path;
-	rc = smb_pathname_reduce(sr, sr->user_cr, path, tnode, tnode,
-	    &dst_fqi->fq_dnode, dst_fqi->fq_last_comp);
-	if (rc != 0) {
-		smb_node_end_crit(src_fnode);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		return (rc);
-	}
+/*
+ * smb_rename_release_src
+ */
+static void
+smb_rename_release_src(smb_request_t *sr)
+{
+	smb_fqi_t *src_fqi = &sr->arg.dirop.fqi;
 
-	rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS, tnode,
-	    dst_fqi->fq_dnode, dst_fqi->fq_last_comp, &dst_fqi->fq_fnode);
-	if (rc == 0) {
-		smb_node_release(dst_fqi->fq_fnode);
-		rc = EEXIST;
-	}
-	if (rc != ENOENT) {
-		smb_node_end_crit(src_fnode);
-		smb_node_release(src_fqi->fq_fnode);
-		smb_node_release(src_fqi->fq_dnode);
-		smb_node_release(dst_fqi->fq_dnode);
-		return (rc);
-	}
-
-	rc = smb_fsop_link(sr, sr->user_cr, dst_fqi->fq_dnode, src_fnode,
-	    dst_fqi->fq_last_comp);
-
-	smb_node_end_crit(src_fnode);
-	if (rc == 0)
-		smb_node_notify_change(dst_fqi->fq_dnode);
+	smb_node_end_crit(src_fqi->fq_fnode);
 	smb_node_release(src_fqi->fq_fnode);
 	smb_node_release(src_fqi->fq_dnode);
-	smb_node_release(dst_fqi->fq_dnode);
-	return (rc);
 }
+
 
 static int
 smb_rename_check_attr(smb_request_t *sr, smb_node_t *node, uint16_t sattr)
@@ -558,6 +726,7 @@ smb_rename_set_error(smb_request_t *sr, int errnum)
 	{ ESRCH,  ERROR_FILE_NOT_FOUND,	NT_STATUS_NO_SUCH_FILE },
 	{ EINVAL, ERROR_INVALID_PARAMETER, NT_STATUS_INVALID_PARAMETER },
 	{ EACCES, ERROR_ACCESS_DENIED,	NT_STATUS_ACCESS_DENIED },
+	{ EISDIR, ERROR_ACCESS_DENIED,	NT_STATUS_FILE_IS_A_DIRECTORY },
 	{ EIO,    ERROR_INTERNAL_ERROR,	NT_STATUS_INTERNAL_ERROR }
 	};
 

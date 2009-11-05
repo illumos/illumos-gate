@@ -282,9 +282,9 @@ main(int argc, char **argv)
 				_idmapdstate.daemon_mode = FALSE;
 				break;
 			default:
-				fprintf(stderr, "Usage: /usr/lib/idmapd");
+				(void) fprintf(stderr,
+				    "Usage: /usr/lib/idmapd [-d]\n");
 				return (SMF_EXIT_ERR_CONFIG);
-				break;
 		}
 	}
 

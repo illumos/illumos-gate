@@ -32,6 +32,7 @@
  */
 
 #include <sys/errno.h>
+#include <sys/tzfile.h>
 #include <unistd.h>
 #include <netdb.h>
 #include <strings.h>
@@ -49,9 +50,8 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/lmerr.h>
-#include <smbsrv/nterror.h>
 #include <smbsrv/nmpipes.h>
-#include <smbsrv/cifs.h>
+#include <smbsrv/smb.h>
 #include <smbsrv/netrauth.h>
 #include <smbsrv/ndl/srvsvc.ndl>
 #include <smbsrv/smb_common_door.h>
@@ -1196,7 +1196,7 @@ srvsvc_modify_transient_share(smb_share_t *si, srvsvc_netshare_setinfo_t *info)
 	uint32_t nerr;
 
 	if (info->nss_netname != NULL && info->nss_netname[0] != '\0' &&
-	    utf8_strcasecmp(info->nss_netname, si->shr_name) != 0) {
+	    smb_strcasecmp(info->nss_netname, si->shr_name, 0) != 0) {
 		nerr = smb_shr_rename(si->shr_name, info->nss_netname);
 		if (nerr != NERR_Success)
 			return (nerr);
@@ -1790,6 +1790,9 @@ netservergetinfo_no_memory:
  * positive; for time zones east of Greenwich, the value is negative.
  * A value of -1 indicates that the time zone is undefined.
  *
+ * Determine offset from GMT. If daylight saving time use altzone,
+ * otherwise use timezone.
+ *
  * The clock tick value represents a resolution of one ten-thousandth
  * (0.0001) second.
  */
@@ -1800,6 +1803,8 @@ srvsvc_s_NetRemoteTOD(void *arg, ndr_xa_t *mxa)
 	struct mslm_TIME_OF_DAY_INFO *tod;
 	struct timeval		time_val;
 	struct tm		tm;
+	time_t			gmtoff;
+
 
 	(void) gettimeofday(&time_val, 0);
 	(void) gmtime_r(&time_val.tv_sec, &tm);
@@ -1809,6 +1814,8 @@ srvsvc_s_NetRemoteTOD(void *arg, ndr_xa_t *mxa)
 		bzero(param, sizeof (struct mslm_NetRemoteTOD));
 		return (ERROR_NOT_ENOUGH_MEMORY);
 	}
+
+	bzero(tod, sizeof (struct mslm_TIME_OF_DAY_INFO));
 
 	tod->tod_elapsedt = time_val.tv_sec;
 	tod->tod_msecs = time_val.tv_usec;
@@ -1823,6 +1830,8 @@ srvsvc_s_NetRemoteTOD(void *arg, ndr_xa_t *mxa)
 	tod->tod_weekday = tm.tm_wday;
 
 	(void) localtime_r(&time_val.tv_sec, &tm);
+	gmtoff = (tm.tm_isdst) ? altzone : timezone;
+	tod->tod_timezone = gmtoff / SECSPERMIN;
 
 	param->bufptr = tod;
 	param->status = ERROR_SUCCESS;
@@ -2703,7 +2712,7 @@ srvsvc_s_NetShareCheck(void *arg, ndr_xa_t *mxa)
 	while ((si = smb_shr_iterate(&iterator)) != NULL) {
 		path = srvsvc_share_mkpath(mxa, si->shr_path);
 
-		if (utf8_strcasecmp(path, (char *)param->path) == 0) {
+		if (smb_strcasecmp(path, (char *)param->path, 0) == 0) {
 			param->stype = (si->shr_type & STYPE_MASK);
 			param->status = NERR_Success;
 			return (NDR_DRC_OK);
@@ -2908,7 +2917,7 @@ srvsvc_sa_modify(smb_share_t *si, srvsvc_netshare_setinfo_t *info)
 	}
 
 	if (info->nss_netname != NULL && info->nss_netname[0] != '\0' &&
-	    utf8_strcasecmp(info->nss_netname, si->shr_name) != 0) {
+	    smb_strcasecmp(info->nss_netname, si->shr_name, 0) != 0) {
 		(void) sa_set_resource_attr(resource, SHOPT_NAME,
 		    info->nss_netname);
 		renamed = B_TRUE;

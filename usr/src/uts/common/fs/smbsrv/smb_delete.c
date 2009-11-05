@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
 #include <sys/nbmlock.h>

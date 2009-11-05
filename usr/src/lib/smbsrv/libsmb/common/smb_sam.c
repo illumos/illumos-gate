@@ -109,14 +109,14 @@ smb_sam_lookup_name(char *domain, char *name, uint16_t type,
 			return (NT_STATUS_NOT_FOUND);
 
 		/* Only Netbios hostname is accepted */
-		if (utf8_strcasecmp(domain, di.di_nbname) != 0)
+		if (smb_strcasecmp(domain, di.di_nbname, 0) != 0)
 			return (NT_STATUS_NONE_MAPPED);
 	} else {
 		if (!smb_domain_lookup_type(SMB_DOMAIN_LOCAL, &di))
 			return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 	}
 
-	if (utf8_strcasecmp(name, di.di_nbname) == 0) {
+	if (smb_strcasecmp(name, di.di_nbname, 0) == 0) {
 		/* This is the local domain name */
 		account->a_type = SidTypeDomain;
 		account->a_name = strdup("");
@@ -474,7 +474,7 @@ smb_lwka_lookup_name(char *name)
 	int i;
 
 	for (i = 0; i < SMB_LWKA_NUM; i++) {
-		if (utf8_strcasecmp(name, lwka_tbl[i].lwka_name) == 0)
+		if (smb_strcasecmp(name, lwka_tbl[i].lwka_name, 0) == 0)
 			return (&lwka_tbl[i]);
 	}
 

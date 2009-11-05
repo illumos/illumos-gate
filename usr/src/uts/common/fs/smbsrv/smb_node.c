@@ -128,7 +128,7 @@
  *    course the state of the node should be tested/updated under the
  *    protection of the mutex).
  */
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_kstat.h>
 #include <sys/pathname.h>
@@ -1283,6 +1283,7 @@ smb_node_getattr(smb_request_t *sr, smb_node_t *node, smb_attr_t *attr)
 	if (node->vp->v_type == VDIR) {
 		attr->sa_vattr.va_size = 0;
 		attr->sa_allocsz = 0;
+		attr->sa_vattr.va_nlink = 1;
 	}
 
 	if (node->readonly_creator)

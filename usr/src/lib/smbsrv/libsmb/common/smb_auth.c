@@ -25,9 +25,7 @@
 
 #include <strings.h>
 #include <stdlib.h>
-#include <smbsrv/codepage.h>
-#include <smbsrv/oem.h>
-#include <smbsrv/ctype.h>
+#include <smbsrv/string.h>
 #include <smbsrv/libsmb.h>
 
 extern void randomize(char *data, unsigned len);
@@ -40,24 +38,22 @@ static uint64_t unix_micro_to_nt_time(struct timeval *unix_time);
  * Returns the length of dst in bytes.
  */
 int
-smb_auth_qnd_unicode(mts_wchar_t *dst, const char *src, int length)
+smb_auth_qnd_unicode(smb_wchar_t *dst, const char *src, int length)
 {
 	int i;
-
-	unsigned int cpid = oem_get_telnet_cpid();
 	unsigned int count;
-	mts_wchar_t new_char;
+	smb_wchar_t new_char;
 
-	if ((count = oemstounicodes(dst, src, length, cpid)) == 0) {
+	if ((count = oemtoucs(dst, src, length, OEM_CPG_1252)) == 0) {
 		for (i = 0; i < length; ++i) {
-			new_char = (mts_wchar_t)src[i] & 0xff;
+			new_char = (smb_wchar_t)src[i] & 0xff;
 			dst[i] = LE_IN16(&new_char);
 		}
 		dst[i] = 0;
 		count = length;
 	}
 
-	return (count * sizeof (mts_wchar_t));
+	return (count * sizeof (smb_wchar_t));
 }
 
 /*
@@ -75,8 +71,8 @@ smb_auth_lmupr(unsigned char *lm_pwd)
 	int i;
 
 	for (i = 0; (*p) && (i < SMBAUTH_LM_PWD_SZ); i++) {
-		if (mts_isascii(*p)) {
-			*p = codepage_toupper(*p);
+		if (smb_isascii(*p)) {
+			*p = smb_toupper(*p);
 			p++;
 		}
 	}
@@ -148,7 +144,7 @@ smb_auth_lm_response(unsigned char *hash,
 int
 smb_auth_ntlm_hash(const char *password, unsigned char *hash)
 {
-	mts_wchar_t *unicode_password;
+	smb_wchar_t *unicode_password;
 	int length;
 	int rc;
 
@@ -156,8 +152,8 @@ smb_auth_ntlm_hash(const char *password, unsigned char *hash)
 		return (SMBAUTH_FAILURE);
 
 	length = strlen(password);
-	unicode_password = (mts_wchar_t *)
-	    malloc((length + 1) * sizeof (mts_wchar_t));
+	unicode_password = (smb_wchar_t *)
+	    malloc((length + 1) * sizeof (smb_wchar_t));
 
 	if (unicode_password == NULL)
 		return (SMBAUTH_FAILURE);
@@ -290,7 +286,7 @@ smb_auth_ntlmv2_hash(unsigned char *ntlm_hash,
     char *ntdomain,
     unsigned char *ntlmv2_hash)
 {
-	mts_wchar_t *data;
+	smb_wchar_t *data;
 	int data_len;
 	unsigned char *buf;
 	int rc;
@@ -298,7 +294,7 @@ smb_auth_ntlmv2_hash(unsigned char *ntlm_hash,
 	if (username == NULL || ntdomain == NULL)
 		return (SMBAUTH_FAILURE);
 
-	(void) utf8_strupr(username);
+	(void) smb_strupr(username);
 
 	data_len = strlen(username) + strlen(ntdomain);
 	buf = (unsigned char *)malloc((data_len + 1) * sizeof (char));
@@ -306,7 +302,7 @@ smb_auth_ntlmv2_hash(unsigned char *ntlm_hash,
 		return (SMBAUTH_FAILURE);
 
 	(void) snprintf((char *)buf, data_len + 1, "%s%s", username, ntdomain);
-	data = (mts_wchar_t *)malloc((data_len + 1) * sizeof (mts_wchar_t));
+	data = (smb_wchar_t *)malloc((data_len + 1) * sizeof (smb_wchar_t));
 	if (data == NULL) {
 		free(buf);
 		return (SMBAUTH_FAILURE);
@@ -423,7 +419,7 @@ smb_auth_set_info(char *username,
 		if ((uppercase_dom = strdup(domain)) == NULL)
 			return (-1);
 
-		(void) utf8_strupr(uppercase_dom);
+		(void) smb_strupr(uppercase_dom);
 
 		if (smb_auth_ntlmv2_hash(auth->hash, username,
 		    uppercase_dom, auth->hash_v2) != SMBAUTH_SUCCESS) {
@@ -570,7 +566,7 @@ smb_ntlmv2_password_ok(
 	dest[0] = domain;
 	if ((dest[1] = strdup(domain)) == NULL)
 		return (B_FALSE);
-	(void) utf8_strupr(dest[1]);
+	(void) smb_strupr(dest[1]);
 	dest[2] = "";
 
 	/*
@@ -642,7 +638,7 @@ smb_lmv2_password_ok(
 	dest[0] = domain;
 	if ((dest[1] = strdup(domain)) == NULL)
 		return (B_FALSE);
-	(void) utf8_strupr(dest[1]);
+	(void) smb_strupr(dest[1]);
 	dest[2] = "";
 
 	/*

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SMBSRV_ALLOC_H
 #define	_SMBSRV_ALLOC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,17 +66,16 @@ extern "C" {
 
 #else /* _KERNEL */
 
-void *mem_malloc(uint32_t size);
-void *mem_zalloc(uint32_t size);
-char *mem_strdup(const char *ptr);
-void *mem_realloc(void *ptr, uint32_t size);
-void smb_mem_free(void *ptr);
+void *smb_malloc(uint32_t);
+char *smb_strdup(const char *);
+void *smb_realloc(void *, uint32_t);
+void smb_mfree(void *);
 
-#define	MEM_MALLOC(AREA, SIZE) mem_malloc(SIZE)
-#define	MEM_ZALLOC(AREA, SIZE) mem_zalloc(SIZE)
-#define	MEM_STRDUP(AREA, PTR) mem_strdup(PTR)
-#define	MEM_REALLOC(AREA, PTR, SIZE) mem_realloc((PTR), (SIZE))
-#define	MEM_FREE(AREA, PTR) smb_mem_free(PTR)
+#define	MEM_MALLOC(AREA, SIZE) smb_malloc(SIZE)
+#define	MEM_ZALLOC(AREA, SIZE) smb_malloc(SIZE)
+#define	MEM_STRDUP(AREA, PTR) smb_strdup(PTR)
+#define	MEM_REALLOC(AREA, PTR, SIZE) smb_realloc((PTR), (SIZE))
+#define	MEM_FREE(AREA, PTR) smb_mfree(PTR)
 
 #endif /* _KERNEL */
 

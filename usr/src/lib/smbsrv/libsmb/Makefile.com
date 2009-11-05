@@ -33,11 +33,9 @@ OBJS_SHARED = 			\
 	smb_msgbuf.o		\
 	smb_native.o		\
 	smb_oem.o		\
-	smb_opmlang.o		\
 	smb_share_door_decode.o	\
 	smb_sid.o		\
 	smb_status_xlat.o	\
-	smb_strcase.o		\
 	smb_string.o 		\
 	smb_token.o		\
 	smb_token_xdr.o		\

@@ -454,8 +454,8 @@ smbrdr_ntcreatex(struct sdb_ofile *ofile)
 		(void) strcpy(path, ofile->path);
 
 	if (sess->remote_caps & CAP_UNICODE) {
-		path_len = mts_wcequiv_strlen(path);
-		null_size = sizeof (mts_wchar_t);
+		path_len = smb_wcequiv_strlen(path);
+		null_size = sizeof (smb_wchar_t);
 	} else {
 		path_len = strlen(path);
 		null_size = sizeof (char);

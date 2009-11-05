@@ -34,8 +34,7 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
-
-#include <smbsrv/cifs.h>
+#include <smbsrv/smb.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb.h>
 #include <smbsrv/wintypes.h>
@@ -185,6 +184,77 @@ typedef struct smbrdr_handle {
 	struct sdb_logon *srh_user;
 	struct sdb_netuse *srh_tree;
 } smbrdr_handle_t;
+
+typedef struct smb_nt_negotiate_rsp {
+	uint8_t word_count;
+	uint16_t dialect_index;
+	uint8_t security_mode;
+	uint16_t max_mpx;
+	uint16_t max_vc;
+	uint32_t max_buffer_size;
+	uint32_t max_raw_size;
+	uint32_t session_key;
+	uint32_t capabilities;
+	uint32_t time_low;
+	uint32_t time_high;
+	uint16_t server_tz;
+	uint8_t security_len;
+	uint16_t byte_count;
+	uint8_t *guid;
+	uint8_t *challenge;
+	uint8_t *oem_domain;
+} smb_nt_negotiate_rsp_t;
+
+/*
+ * SMB_COM_TRANSACTION
+ */
+typedef struct smb_transact_rsp {
+	uint8_t WordCount;		/* Count of data bytes */
+					/* value = 10 + SetupCount */
+	uint16_t TotalParamCount;	/* Total parameter bytes being sent */
+	uint16_t TotalDataCount;	/* Total data bytes being sent */
+	uint16_t Reserved;
+	uint16_t ParamCount;		/* Parameter bytes sent this buffer */
+	uint16_t ParamOffset;		/* Offset (from hdr start) to params */
+	uint16_t ParamDisplacement;	/* Displacement of these param bytes */
+	uint16_t DataCount;		/* Data bytes sent this buffer */
+	uint16_t DataOffset;		/* Offset (from hdr start) to data */
+	uint16_t DataDisplacement;	/* Displacement of these data bytes */
+	uint8_t SetupCount;		/* Count of setup words */
+	uint16_t BCC;
+#if 0
+	uint8_t Reserved2;		/* Reserved (pad above to word) */
+	uint8_t Buffer[1];		/* Buffer containing: */
+	uint16_t Setup[];		/*  Setup words (# = SetupWordCount) */
+	uint16_t ByteCount;		/*  Count of data bytes */
+	uint8_t Pad[];			/*  Pad to SHORT or LONG */
+	uint8_t Params[];		/*  Param. bytes (# = ParamCount) */
+	uint8_t Pad1[];			/*  Pad to SHORT or LONG */
+	uint8_t Data[];			/*  Data bytes (# = DataCount) */
+#endif
+} smb_transact_rsp_t;
+
+/*
+ * SMBreadX
+ */
+typedef struct smb_read_andx_rsp {
+	uint8_t WordCount;
+	uint8_t AndXCmd;
+	uint8_t AndXReserved;
+	uint16_t AndXOffset;
+	uint16_t Remaining;
+	uint16_t DataCompactionMode;
+	uint16_t Reserved;
+	uint16_t DataLength;
+	uint16_t DataOffset;
+	uint32_t DataLengthHigh;
+	uint16_t Reserved2[3];
+	uint16_t ByteCount;
+#if 0
+	uint8_t Pad[];
+	uint8_t Data[];
+#endif
+} smb_read_andx_rsp_t;
 
 /*
  * smbrdr_netbios.c

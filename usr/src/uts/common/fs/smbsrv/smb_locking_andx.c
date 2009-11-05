@@ -208,7 +208,7 @@
  * ERRSRV/ERRbaduid
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 
 smb_sdrc_t
 smb_pre_locking_andx(smb_request_t *sr)

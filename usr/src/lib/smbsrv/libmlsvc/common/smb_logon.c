@@ -502,7 +502,7 @@ smb_logon_local(netr_client_t *clnt, smb_token_t *token)
 	}
 
 	smb_guest_account(guest, SMB_USERNAME_MAXLEN);
-	isguest = (utf8_strcasecmp(guest, clnt->e_username) == 0);
+	isguest = (smb_strcasecmp(guest, clnt->e_username, 0) == 0);
 
 	status = smb_token_auth_local(clnt, token, &smbpw);
 	if (status == NT_STATUS_SUCCESS) {

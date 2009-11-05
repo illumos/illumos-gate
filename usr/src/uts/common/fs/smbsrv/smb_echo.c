@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 
 /*
  * The echo request is used to test the connection to the server,
@@ -62,7 +60,7 @@ smb_com_echo(struct smb_request *sr)
 		return (SDRC_ERROR);
 
 	nbytes = sr->smb_bcc;
-	data = smbsr_malloc(&sr->request_storage, nbytes);
+	data = smb_srm_alloc(sr, nbytes);
 
 	if (smb_mbc_decodef(&sr->smb_data, "#c", nbytes, data))
 		return (SDRC_ERROR);

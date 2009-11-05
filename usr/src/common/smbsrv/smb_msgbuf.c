@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Msgbuf buffer management implementation. The smb_msgbuf interface is
@@ -52,7 +50,7 @@ static int buf_decode(smb_msgbuf_t *, char *, va_list ap);
 static int buf_encode(smb_msgbuf_t *, char *, va_list ap);
 static void *smb_msgbuf_malloc(smb_msgbuf_t *, size_t);
 static int smb_msgbuf_chkerc(char *text, int erc);
-static void buf_decode_wcs(mts_wchar_t *, mts_wchar_t *, int wcstrlen);
+static void buf_decode_wcs(smb_wchar_t *, smb_wchar_t *, int wcstrlen);
 
 /*
  * Returns the offset or number of bytes used within the buffer.
@@ -221,7 +219,7 @@ buf_decode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 	uint16_t *wvalp;
 	uint32_t *lvalp;
 	uint64_t *llvalp;
-	mts_wchar_t *wcs;
+	smb_wchar_t *wcs;
 	int repc;
 	int rc;
 
@@ -328,7 +326,7 @@ buf_decode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 			if ((cvalp = smb_msgbuf_malloc(mb, ival * 2)) == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
 
-			if ((ival = mts_stombs((char *)cvalp,
+			if ((ival = smb_stombs((char *)cvalp,
 			    (char *)mb->scan, ival * 2)) ==
 			    (uint32_t)-1) {
 				return (SMB_MSGBUF_DATA_ERROR);
@@ -349,12 +347,12 @@ unicode_translation:
 			 */
 			smb_msgbuf_word_align(mb);
 			/*LINTED E_BAD_PTR_CAST_ALIGN*/
-			wcs = (mts_wchar_t *)mb->scan;
+			wcs = (smb_wchar_t *)mb->scan;
 
 			/* count the null wchar */
-			repc = sizeof (mts_wchar_t);
+			repc = sizeof (smb_wchar_t);
 			while (*wcs++)
-				repc += sizeof (mts_wchar_t);
+				repc += sizeof (smb_wchar_t);
 
 			if (smb_msgbuf_has_space(mb, repc) == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
@@ -364,15 +362,15 @@ unicode_translation:
 				return (SMB_MSGBUF_UNDERFLOW);
 
 			/*LINTED E_BAD_PTR_CAST_ALIGN*/
-			buf_decode_wcs(wcs, (mts_wchar_t *)mb->scan,
-			    repc / sizeof (mts_wchar_t));
+			buf_decode_wcs(wcs, (smb_wchar_t *)mb->scan,
+			    repc / sizeof (smb_wchar_t));
 
 			/* Get space for translated string */
 			if ((cvalp = smb_msgbuf_malloc(mb, repc * 2)) == 0)
 				return (SMB_MSGBUF_UNDERFLOW);
 
 			/* Translate string */
-			(void) mts_wcstombs((char *)cvalp, wcs, repc * 2);
+			(void) smb_wcstombs((char *)cvalp, wcs, repc * 2);
 
 			cvalpp = va_arg(ap, uint8_t **);
 			*cvalpp = cvalp;
@@ -450,7 +448,7 @@ buf_encode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 	uint32_t ival;
 	uint8_t *cvalp;
 	uint8_t c;
-	mts_wchar_t wcval;
+	smb_wchar_t wcval;
 	int count;
 	int repc = 1;
 	int rc;
@@ -559,7 +557,7 @@ buf_encode(smb_msgbuf_t *mb, char *fmt, va_list ap)
 				return (SMB_MSGBUF_OVERFLOW);
 
 			ival =
-			    mts_mbstos((char *)mb->scan, (const char *)cvalp);
+			    smb_mbstos((char *)mb->scan, (const char *)cvalp);
 			mb->scan += ival + 1;
 			break;
 
@@ -573,11 +571,11 @@ unicode_translation:
 
 			for (;;) {
 				rc = smb_msgbuf_has_space(mb,
-				    sizeof (mts_wchar_t));
+				    sizeof (smb_wchar_t));
 				if (rc == 0)
 					return (SMB_MSGBUF_OVERFLOW);
 
-				count = mts_mbtowc(&wcval, (const char *)cvalp,
+				count = smb_mbtowc(&wcval, (const char *)cvalp,
 				    MTS_MB_CHAR_MAX);
 
 				if (count < 0) {
@@ -605,11 +603,11 @@ unicode_translation:
 					if ((mb->flags & SMB_MSGBUF_NOTERM) ==
 					    0)
 						mb->scan +=
-						    sizeof (mts_wchar_t);
+						    sizeof (smb_wchar_t);
 					break;
 				}
 
-				mb->scan += sizeof (mts_wchar_t);
+				mb->scan += sizeof (smb_wchar_t);
 				cvalp += count;
 			}
 			break;
@@ -697,7 +695,7 @@ smb_msgbuf_chkerc(char *text, int erc)
 }
 
 static void
-buf_decode_wcs(mts_wchar_t *dst_wcstr, mts_wchar_t *src_wcstr, int wcstrlen)
+buf_decode_wcs(smb_wchar_t *dst_wcstr, smb_wchar_t *src_wcstr, int wcstrlen)
 {
 	int i;
 

@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 
 #define	SMB_CREATE_NAMEBUF_SZ	16
 
@@ -159,7 +159,7 @@ smb_com_create_temporary(smb_request_t *sr)
 	bcc = 1; /* null terminator */
 	bcc += snprintf(name, SMB_CREATE_NAMEBUF_SZ, "tt%05d.tmp", tmp_id);
 
-	buf = smbsr_malloc(&sr->request_storage, MAXPATHLEN);
+	buf = smb_srm_alloc(sr, MAXPATHLEN);
 	(void) snprintf(buf, MAXPATHLEN, "%s\\%s",
 	    op->fqi.fq_path.pn_path, name);
 	op->fqi.fq_path.pn_path = buf;

@@ -30,10 +30,9 @@
 #include <sys/ioccom.h>
 #include <sys/policy.h>
 #include <sys/cmn_err.h>
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_ioctl.h>
-#include <smbsrv/smb_kproto.h>
 
 static int smb_drv_open(dev_t *, int, int, cred_t *);
 static int smb_drv_close(dev_t, int, int, cred_t *);

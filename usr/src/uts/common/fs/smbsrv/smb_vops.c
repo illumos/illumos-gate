@@ -37,12 +37,10 @@
 #include <sys/fcntl.h>
 #include <nfs/lm.h>
 
-#include <smbsrv/smb_vops.h>
-#include <smbsrv/string.h>
-
-#include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/string.h>
+#include <smbsrv/smb_vops.h>
+#include <smbsrv/smb_fsops.h>
 
 /*
  * CATIA support
@@ -110,7 +108,7 @@
 typedef struct smb_catia_map
 {
 	unsigned char unixchar;	/* v4 */
-	mts_wchar_t winchar;	/* v5 */
+	smb_wchar_t winchar;	/* v5 */
 } smb_catia_map_t;
 
 smb_catia_map_t catia_maps[SMB_CATIA_NUM_MAPS] =
@@ -126,8 +124,8 @@ smb_catia_map_t catia_maps[SMB_CATIA_NUM_MAPS] =
 	{'|',  SMB_CATIA_WIN_BROKEN_BAR}
 };
 
-static mts_wchar_t smb_catia_v5_lookup[SMB_CATIA_V5_LOOKUP_MAX];
-static mts_wchar_t smb_catia_v4_lookup[SMB_CATIA_V4_LOOKUP_MAX];
+static smb_wchar_t smb_catia_v5_lookup[SMB_CATIA_V5_LOOKUP_MAX];
+static smb_wchar_t smb_catia_v4_lookup[SMB_CATIA_V4_LOOKUP_MAX];
 
 static void smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr);
 static void smb_sa_to_va_mask(uint_t sa_mask, uint_t *va_maskp);
@@ -1400,11 +1398,11 @@ smb_vop_catia_init_v4_lookup()
 	int i, idx, offset = SMB_CATIA_V4_LOOKUP_LOW;
 
 	for (i = 0; i < SMB_CATIA_V4_LOOKUP_MAX; i++)
-		smb_catia_v4_lookup[i] = (mts_wchar_t)(i + offset);
+		smb_catia_v4_lookup[i] = (smb_wchar_t)(i + offset);
 
 	for (i = 0; i < SMB_CATIA_NUM_MAPS; i++) {
 		idx = (int)catia_maps[i].winchar - offset;
-		smb_catia_v4_lookup[idx] = (mts_wchar_t)catia_maps[i].unixchar;
+		smb_catia_v4_lookup[idx] = (smb_wchar_t)catia_maps[i].unixchar;
 	}
 }
 
@@ -1420,7 +1418,7 @@ smb_vop_catia_init_v5_lookup()
 	int i, idx;
 
 	for (i = 0; i < SMB_CATIA_V5_LOOKUP_MAX; i++)
-		smb_catia_v5_lookup[i] = (mts_wchar_t)i;
+		smb_catia_v5_lookup[i] = (smb_wchar_t)i;
 
 	for (i = 0; i < SMB_CATIA_NUM_MAPS; i++) {
 		idx = (int)catia_maps[i].unixchar;
@@ -1452,7 +1450,7 @@ smb_vop_catia_v5tov4(char *name, char *buf, int buflen)
 {
 	int v4_idx, numbytes, inc;
 	int space_left = buflen - 1; /* one byte reserved for null */
-	mts_wchar_t wc;
+	smb_wchar_t wc;
 	char mbstring[MTS_MB_CHAR_MAX];
 	char *p, *src = name, *dst = buf;
 
@@ -1465,7 +1463,7 @@ smb_vop_catia_v5tov4(char *name, char *buf, int buflen)
 	bzero(buf, buflen);
 
 	while (*src) {
-		if ((numbytes = mts_mbtowc(&wc, src, MTS_MB_CHAR_MAX)) < 0)
+		if ((numbytes = smb_mbtowc(&wc, src, MTS_MB_CHAR_MAX)) < 0)
 			return (name);
 
 		if (wc < SMB_CATIA_V4_LOOKUP_LOW ||
@@ -1475,7 +1473,7 @@ smb_vop_catia_v5tov4(char *name, char *buf, int buflen)
 		} else {
 			/* Lookup required. */
 			v4_idx = (int)wc - SMB_CATIA_V4_LOOKUP_LOW;
-			inc = mts_wctomb(mbstring, smb_catia_v4_lookup[v4_idx]);
+			inc = smb_wctomb(mbstring, smb_catia_v4_lookup[v4_idx]);
 			p = mbstring;
 		}
 
@@ -1509,7 +1507,7 @@ smb_vop_catia_v4tov5(char *name, char *buf, int buflen)
 {
 	int v5_idx, numbytes;
 	int space_left = buflen - 1; /* one byte reserved for null */
-	mts_wchar_t wc;
+	smb_wchar_t wc;
 	char mbstring[MTS_MB_CHAR_MAX];
 	char *src = name, *dst = buf;
 
@@ -1521,16 +1519,16 @@ smb_vop_catia_v4tov5(char *name, char *buf, int buflen)
 
 	(void) bzero(buf, buflen);
 	while (*src) {
-		if (mts_isascii(*src)) {
+		if (smb_isascii(*src)) {
 			/* Lookup required */
 			v5_idx = (int)*src++;
-			numbytes = mts_wctomb(mbstring,
+			numbytes = smb_wctomb(mbstring,
 			    smb_catia_v5_lookup[v5_idx]);
 			if (space_left < numbytes)
 				break;
 			(void) strncpy(dst, mbstring, numbytes);
 		} else {
-			if ((numbytes = mts_mbtowc(&wc, src,
+			if ((numbytes = smb_mbtowc(&wc, src,
 			    MTS_MB_CHAR_MAX)) < 0)
 				break;
 			if (space_left < numbytes)

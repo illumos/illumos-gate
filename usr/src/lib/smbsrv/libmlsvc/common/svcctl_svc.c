@@ -1194,7 +1194,7 @@ svcctl_s_QueryServiceConfig2W(void *arg, ndr_xa_t *mxa)
 	svcctl_svc_node_t *svc;
 	svc_config_rsp_t svc_rsp;
 	int offset, input_bufsize, bytes_needed = 0;
-	mts_wchar_t *wide_desc;
+	smb_wchar_t *wide_desc;
 	char *desc;
 	DWORD status;
 
@@ -1245,8 +1245,8 @@ svcctl_s_QueryServiceConfig2W(void *arg, ndr_xa_t *mxa)
 		offset = sizeof (svc_description_t);
 		svc_rsp.svc_desc->desc = offset;
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		wide_desc = (mts_wchar_t *)&param->buffer[offset];
-		(void) mts_mbstowcs(wide_desc, desc, (strlen(desc) + 1));
+		wide_desc = (smb_wchar_t *)&param->buffer[offset];
+		(void) smb_mbstowcs(wide_desc, desc, (strlen(desc) + 1));
 		offset += SVCCTL_WNSTRLEN(desc);
 
 		param->bytes_needed = offset;

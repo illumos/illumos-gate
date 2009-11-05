@@ -2306,7 +2306,7 @@ idmap_info_cpy(idmap_info *to, idmap_info *from)
 /*
  * This routine is similar to idmap_info_cpy, but the strings
  * are moved from the "from" info to the "to" info.
- * This routine is equivelent of:
+ * This routine is equivalent to:
  *
  *	idmap_info_cpy(to,from);
  *	idmap_info_free(from);

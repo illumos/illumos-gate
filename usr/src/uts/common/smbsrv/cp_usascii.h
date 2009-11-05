@@ -19,33 +19,25 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_CP_USASCII_H
 #define	_SMBSRV_CP_USASCII_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * This file specifies a codepage mapping for a given character set as
- * specified below:
- *
- * This is the codepage for the US-ASCII Character Set
- * This codepage defines values for the characters of the
- * written alphabet of the English language.  The US-ASCII
- * character set is used in the USA.  It is a proper
- * subset of the Latin-1 character set.
+ * This file specifies the codepage mapping the US-ASCII Character Set,
+ * which is a subset of the Latin-1 character set.
  */
 
-#include <smbsrv/codepage.h>
+#include <smbsrv/string.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-codepage_t usascii_codepage[256] = {
+smb_codepage_t usascii_codepage[256] = {
 	{ CODEPAGE_ISNONE,  0x0000, 0x0000 },    /* 0x0000 */
 	{ CODEPAGE_ISNONE,  0x0001, 0x0001 },    /* 0x0001 */
 	{ CODEPAGE_ISNONE,  0x0002, 0x0002 },    /* 0x0002 */

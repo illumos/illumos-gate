@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,8 +48,6 @@
  * October 1996
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef _KERNEL
 #include <sys/types.h>
 #include <sys/sunddi.h>
@@ -59,7 +57,6 @@
 #include <assert.h>
 #include <strings.h>
 #endif
-#include <smbsrv/smb_i18n.h>
 #include <smbsrv/string.h>
 
 
@@ -76,13 +73,13 @@
  * multibyte character is encountered.
  */
 size_t
-mts_mbstowcs(mts_wchar_t *wcstring, const char *mbstring, size_t nwchars)
+smb_mbstowcs(smb_wchar_t *wcstring, const char *mbstring, size_t nwchars)
 {
 	int len;
-	mts_wchar_t	*start = wcstring;
+	smb_wchar_t	*start = wcstring;
 
 	while (nwchars--) {
-		len = mts_mbtowc(wcstring, mbstring, MTS_MB_CHAR_MAX);
+		len = smb_mbtowc(wcstring, mbstring, MTS_MB_CHAR_MAX);
 		if (len < 0) {
 			*wcstring = 0;
 			return ((size_t)-1);
@@ -117,10 +114,10 @@ mts_mbstowcs(mts_wchar_t *wcstring, const char *mbstring, size_t nwchars)
  * mbchar.  If mbchar is invalid, returns -1.
  */
 int /*ARGSUSED*/
-mts_mbtowc(mts_wchar_t *wcharp, const char *mbchar, size_t nbytes)
+smb_mbtowc(smb_wchar_t *wcharp, const char *mbchar, size_t nbytes)
 {
 	unsigned char mbyte;
-	mts_wchar_t wide_char;
+	smb_wchar_t wide_char;
 	int count;
 	int bytes_left;
 
@@ -130,7 +127,7 @@ mts_mbtowc(mts_wchar_t *wcharp, const char *mbchar, size_t nbytes)
 	/* 0xxxxxxx -> 1 byte ASCII encoding */
 	if (((mbyte = *mbchar++) & 0x80) == 0) {
 		if (wcharp)
-			*wcharp = (mts_wchar_t)mbyte;
+			*wcharp = (smb_wchar_t)mbyte;
 
 		return (mbyte ? 1 : 0);
 	}
@@ -176,7 +173,7 @@ mts_mbtowc(mts_wchar_t *wcharp, const char *mbchar, size_t nbytes)
  * Returns the numberof bytes written to mbchar.
  */
 int
-mts_wctomb(char *mbchar, mts_wchar_t wchar)
+smb_wctomb(char *mbchar, smb_wchar_t wchar)
 {
 	if ((wchar & ~0x7f) == 0) {
 		*mbchar = (char)wchar;
@@ -209,11 +206,11 @@ mts_wctomb(char *mbchar, mts_wchar_t wchar)
  * null byte.
  */
 size_t
-mts_wcstombs(char *mbstring, const mts_wchar_t *wcstring, size_t nbytes)
+smb_wcstombs(char *mbstring, const smb_wchar_t *wcstring, size_t nbytes)
 {
 	char *start = mbstring;
-	const mts_wchar_t *wcp = wcstring;
-	mts_wchar_t wide_char;
+	const smb_wchar_t *wcp = wcstring;
+	smb_wchar_t wide_char;
 	char buf[4];
 	size_t len;
 
@@ -222,7 +219,7 @@ mts_wcstombs(char *mbstring, const mts_wchar_t *wcstring, size_t nbytes)
 
 	while (nbytes > MTS_MB_CHAR_MAX) {
 		wide_char = *wcp++;
-		len = mts_wctomb(mbstring, wide_char);
+		len = smb_wctomb(mbstring, wide_char);
 
 		if (wide_char == 0)
 			/*LINTED E_PTRDIFF_OVERFLOW*/
@@ -234,7 +231,7 @@ mts_wcstombs(char *mbstring, const mts_wchar_t *wcstring, size_t nbytes)
 
 	while (wide_char && nbytes) {
 		wide_char = *wcp++;
-		if ((len = mts_wctomb(buf, wide_char)) > nbytes) {
+		if ((len = smb_wctomb(buf, wide_char)) > nbytes) {
 			*mbstring = 0;
 			break;
 		}
@@ -255,18 +252,18 @@ mts_wcstombs(char *mbstring, const mts_wchar_t *wcstring, size_t nbytes)
  * counting the terminating null wide character.
  */
 size_t
-mts_wcequiv_strlen(const char *mbs)
+smb_wcequiv_strlen(const char *mbs)
 {
-	mts_wchar_t	wide_char;
+	smb_wchar_t	wide_char;
 	size_t bytes;
 	size_t len = 0;
 
 	while (*mbs) {
-		bytes = mts_mbtowc(&wide_char, mbs, MTS_MB_CHAR_MAX);
+		bytes = smb_mbtowc(&wide_char, mbs, MTS_MB_CHAR_MAX);
 		if (bytes == ((size_t)-1))
 			return ((size_t)-1);
 
-		len += sizeof (mts_wchar_t);
+		len += sizeof (smb_wchar_t);
 		mbs += bytes;
 	}
 
@@ -280,19 +277,19 @@ mts_wcequiv_strlen(const char *mbs)
  * not counting the terminating null character.
  */
 size_t
-mts_sbequiv_strlen(const char *mbs)
+smb_sbequiv_strlen(const char *mbs)
 {
-	mts_wchar_t	wide_char;
+	smb_wchar_t	wide_char;
 	size_t nbytes;
 	size_t len = 0;
 
 	while (*mbs) {
-		nbytes = mts_mbtowc(&wide_char, mbs, MTS_MB_CHAR_MAX);
+		nbytes = smb_mbtowc(&wide_char, mbs, MTS_MB_CHAR_MAX);
 		if (nbytes == ((size_t)-1))
 			return ((size_t)-1);
 
 		if (wide_char & 0xFF00)
-			len += sizeof (mts_wchar_t);
+			len += sizeof (smb_wchar_t);
 		else
 			++len;
 
@@ -319,13 +316,13 @@ mts_sbequiv_strlen(const char *mbs)
  * If either mbstring or string is a null pointer, -1 is returned.
  */
 int
-mts_stombs(char *mbstring, char *string, int max_mblen)
+smb_stombs(char *mbstring, char *string, int max_mblen)
 {
 	char *start = mbstring;
 	unsigned char *p = (unsigned char *)string;
 	int space_left = max_mblen;
 	int	len;
-	mts_wchar_t	wide_char;
+	smb_wchar_t	wide_char;
 	char buf[4];
 
 	if (!mbstring || !string)
@@ -333,14 +330,14 @@ mts_stombs(char *mbstring, char *string, int max_mblen)
 
 	while (*p && space_left > 2) {
 		wide_char = *p++;
-		len = mts_wctomb(mbstring, wide_char);
+		len = smb_wctomb(mbstring, wide_char);
 		mbstring += len;
 		space_left -= len;
 	}
 
 	if (*p) {
 		wide_char = *p;
-		if ((len = mts_wctomb(buf, wide_char)) < 2) {
+		if ((len = smb_wctomb(buf, wide_char)) < 2) {
 			*mbstring = *buf;
 			mbstring += len;
 			space_left -= len;
@@ -371,9 +368,9 @@ mts_stombs(char *mbstring, char *string, int max_mblen)
  * If either mbstring or string is a null pointer, -1 is returned.
  */
 int
-mts_mbstos(char *string, const char *mbstring)
+smb_mbstos(char *string, const char *mbstring)
 {
-	mts_wchar_t wc;
+	smb_wchar_t wc;
 	unsigned char *start = (unsigned char *)string;
 	int len;
 
@@ -381,15 +378,15 @@ mts_mbstos(char *string, const char *mbstring)
 		return (-1);
 
 	while (*mbstring) {
-		if ((len = mts_mbtowc(&wc, mbstring, MTS_MB_CHAR_MAX)) < 0) {
+		if ((len = smb_mbtowc(&wc, mbstring, MTS_MB_CHAR_MAX)) < 0) {
 			*string = 0;
 			return (-1);
 		}
 
 		if (wc & 0xFF00) {
 			/*LINTED E_BAD_PTR_CAST_ALIGN*/
-			*((mts_wchar_t *)string) = wc;
-			string += sizeof (mts_wchar_t);
+			*((smb_wchar_t *)string) = wc;
+			string += sizeof (smb_wchar_t);
 		}
 		else
 		{

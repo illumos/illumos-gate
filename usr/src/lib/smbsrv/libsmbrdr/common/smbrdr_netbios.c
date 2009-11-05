@@ -47,7 +47,7 @@
 #include <stdio.h>
 #include <pthread.h>
 
-#include <smbsrv/cifs.h>
+#include <smbsrv/smb.h>
 
 #define	MAX_NETBIOS_NAME_SIZE	16
 

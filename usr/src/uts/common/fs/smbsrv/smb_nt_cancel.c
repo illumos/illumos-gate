@@ -41,7 +41,7 @@
  * the original request.  No other response is generated for this SMB.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 
 smb_sdrc_t
 smb_pre_nt_cancel(smb_request_t *sr)

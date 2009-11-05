@@ -51,7 +51,7 @@
  * USHORT ByteCount;                  Count of data bytes = 0
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 
 smb_sdrc_t
 smb_pre_unlock_byte_range(smb_request_t *sr)

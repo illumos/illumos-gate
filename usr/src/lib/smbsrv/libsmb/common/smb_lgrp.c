@@ -214,7 +214,7 @@ smb_lgrp_add(char *gname, char *cmnt)
 		return (SMB_LGRP_INVALID_ARG);
 
 	bzero(&grp, sizeof (grp));
-	grp.sg_name = utf8_strlwr(gname);
+	grp.sg_name = smb_strlwr(gname);
 	grp.sg_cmnt = cmnt;
 
 	wka = smb_wka_lookup_name(gname);
@@ -286,7 +286,7 @@ smb_lgrp_rename(char *gname, char *new_gname)
 	if (!smb_lgrp_chkname(gname))
 		return (SMB_LGRP_INVALID_NAME);
 
-	if (utf8_strcasecmp(gname, new_gname) == 0)
+	if (smb_strcasecmp(gname, new_gname, 0) == 0)
 		return (SMB_LGRP_SUCCESS);
 
 	/* Cannot rename well-known groups */
@@ -2161,7 +2161,7 @@ smb_lgrp_chkname(char *name)
 		if (strchr(invalid_chars, name[i]))
 			return (B_FALSE);
 
-	(void) utf8_strlwr(name);
+	(void) smb_strlwr(name);
 	return (B_TRUE);
 }
 
@@ -2173,12 +2173,12 @@ smb_lgrp_chkname(char *name)
 static void
 smb_lgrp_set_default_privs(smb_group_t *grp)
 {
-	if (utf8_strcasecmp(grp->sg_name, "Administrators") == 0) {
+	if (smb_strcasecmp(grp->sg_name, "Administrators", 0) == 0) {
 		smb_privset_enable(grp->sg_privs, SE_TAKE_OWNERSHIP_LUID);
 		return;
 	}
 
-	if (utf8_strcasecmp(grp->sg_name, "Backup Operators") == 0) {
+	if (smb_strcasecmp(grp->sg_name, "Backup Operators", 0) == 0) {
 		smb_privset_enable(grp->sg_privs, SE_BACKUP_LUID);
 		smb_privset_enable(grp->sg_privs, SE_RESTORE_LUID);
 		return;

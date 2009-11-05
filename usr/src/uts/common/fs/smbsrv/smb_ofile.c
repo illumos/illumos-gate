@@ -160,7 +160,6 @@
  *       being queued in that list is NOT registered by incrementing the
  *       reference count.
  */
-#include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 
@@ -616,7 +615,7 @@ smb_ofile_disallow_fclose(smb_ofile_t *of)
 
 	case SMB_FTYPE_MESG_PIPE:
 		ASSERT(of->f_pipe);
-		if (utf8_strcasecmp(of->f_pipe->p_name, "SRVSVC") == 0)
+		if (smb_strcasecmp(of->f_pipe->p_name, "SRVSVC", 0) == 0)
 			return (B_TRUE);
 		break;
 	default:
@@ -1282,7 +1281,7 @@ smb_ofile_netinfo_init(smb_ofile_t *of, smb_netfileinfo_t *fi)
 	fi->fi_fid = of->f_fid;
 	fi->fi_uniqid = of->f_uniqid;
 	fi->fi_pathlen = strlen(buf) + 1;
-	fi->fi_path = smb_kstrdup(buf, fi->fi_pathlen);
+	fi->fi_path = smb_strdup(buf);
 	kmem_free(buf, MAXPATHLEN);
 
 	fi->fi_namelen = user->u_domain_len + user->u_name_len + 2;
@@ -1299,7 +1298,7 @@ smb_ofile_netinfo_fini(smb_netfileinfo_t *fi)
 		return;
 
 	if (fi->fi_path)
-		kmem_free(fi->fi_path, fi->fi_pathlen);
+		smb_mfree(fi->fi_path);
 	if (fi->fi_username)
 		kmem_free(fi->fi_username, fi->fi_namelen);
 

@@ -1137,8 +1137,6 @@ SMBSRV_SHARED_OBJS += \
 		smb_match.o \
 		smb_msgbuf.o \
 		smb_oem.o \
-		smb_opmlang.o \
-		smb_strcase.o \
 		smb_string.o \
 		smb_utf8.o \
 		smb_common_door_decode.o \
@@ -1176,7 +1174,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_logoff_andx.o			\
 		smb_mangle_name.o			\
 		smb_mbuf_marshaling.o			\
-		smb_memory_manager.o			\
 		smb_mbuf_util.o				\
 		smb_negotiate.o				\
 		smb_net.o				\

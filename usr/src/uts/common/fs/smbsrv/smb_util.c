@@ -29,10 +29,9 @@
 #include <sys/atomic.h>
 #include <sys/kidmap.h>
 #include <sys/time.h>
-#include <smbsrv/smb_incl.h>
+#include <sys/cpuvar.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
-#include <smbsrv/string.h>
-#include <smbsrv/mbuf.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smb_vops.h>
@@ -40,9 +39,6 @@
 
 #include <sys/sid.h>
 #include <sys/priv_names.h>
-
-#define	SMB_NAME83_BASELEN		8
-#define	SMB_NAME83_EXTLEN		3
 
 static void smb_replace_wildcards(char *);
 
@@ -77,7 +73,7 @@ int
 smb_ascii_or_unicode_strlen(struct smb_request *sr, char *str)
 {
 	if (sr->smb_flg2 & SMB_FLAGS2_UNICODE)
-		return (mts_wcequiv_strlen(str));
+		return (smb_wcequiv_strlen(str));
 	return (strlen(str));
 }
 
@@ -85,7 +81,7 @@ int
 smb_ascii_or_unicode_strlen_null(struct smb_request *sr, char *str)
 {
 	if (sr->smb_flg2 & SMB_FLAGS2_UNICODE)
-		return (mts_wcequiv_strlen(str) + 2);
+		return (smb_wcequiv_strlen(str) + 2);
 	return (strlen(str) + 1);
 }
 
@@ -310,7 +306,7 @@ smb_stream_parse_name(char *path, char *filename, char *stream)
 	if (stype == NULL)
 		(void) strlcat(stream, ":$DATA", MAXNAMELEN);
 	else
-		(void) utf8_strupr(stype);
+		(void) smb_strupr(stype);
 }
 
 /*
@@ -1440,7 +1436,7 @@ smb_idmap_batch_destroy(smb_idmap_batch_t *sib)
 		for (i = 0; i < sib->sib_nmap; i++) {
 			domsid = sib->sib_maps[i].sim_domsid;
 			if (domsid)
-				kmem_free(domsid, strlen(domsid) + 1);
+				smb_mfree(domsid);
 		}
 	}
 
@@ -1474,7 +1470,7 @@ smb_idmap_batch_getid(idmap_get_handle_t *idmaph, smb_idmap_t *sim,
 	smb_sid_tostr(sid, strsid);
 	if (smb_sid_splitstr(strsid, &sim->sim_rid) != 0)
 		return (IDMAP_ERR_SID);
-	sim->sim_domsid = smb_kstrdup(strsid, strlen(strsid) + 1);
+	sim->sim_domsid = smb_strdup(strsid);
 
 	switch (idtype) {
 	case SMB_IDMAP_USER:
@@ -2033,23 +2029,6 @@ smb_cred_is_member(cred_t *cr, smb_sid_t *sid)
 
 	ksid_rele(&ksid1);
 	return (rc);
-}
-
-/*
- * smb_kstrdup
- *
- * Duplicate the given string s.
- */
-char *
-smb_kstrdup(const char *s, size_t n)
-{
-	char *s2;
-
-	ASSERT(s);
-	ASSERT(n);
-	s2 = kmem_alloc(n, KM_SLEEP);
-	(void) strlcpy(s2, s, n);
-	return (s2);
 }
 
 /*

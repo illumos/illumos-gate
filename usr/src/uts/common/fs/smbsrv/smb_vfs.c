@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_vfs.c	1.3	08/08/07 SMI"
 
 #include <sys/types.h>
 #include <sys/fsid.h>
@@ -31,7 +29,6 @@
 #include <sys/stat.h>
 #include <smbsrv/smb_ktypes.h>
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/string.h>
 
 static smb_vfs_t *smb_vfs_lookup(smb_server_t *, vnode_t *);
 

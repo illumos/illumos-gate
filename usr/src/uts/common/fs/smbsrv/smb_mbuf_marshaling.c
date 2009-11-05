@@ -27,9 +27,7 @@
  * SMB mbuf marshaling encode/decode.
  */
 
-#include <smbsrv/smb_incl.h>
-
-#include <sys/sunddi.h>
+#include <smbsrv/smb_kproto.h>
 
 
 #define	MALLOC_QUANTUM	80
@@ -58,10 +56,10 @@ static int mbc_marshal_get_long(mbuf_chain_t *mbc, uint32_t *data);
 static uint64_t qswap(uint64_t ll);
 static int mbc_marshal_get_odd_long_long(mbuf_chain_t *mbc, uint64_t *data);
 static int mbc_marshal_get_long_long(mbuf_chain_t *mbc, uint64_t *data);
-static int mbc_marshal_get_ascii_string(struct smb_malloc_list *,
-    mbuf_chain_t *, uint8_t **ascii, int);
-static int mbc_marshal_get_unicode_string(struct smb_malloc_list *,
-    mbuf_chain_t *, uint8_t **, int);
+static int mbc_marshal_get_ascii_string(smb_request_t *, mbuf_chain_t *,
+    uint8_t **ascii, int);
+static int mbc_marshal_get_unicode_string(smb_request_t *, mbuf_chain_t *,
+    uint8_t **, int);
 static int mbc_marshal_get_mbufs(mbuf_chain_t *, int32_t, mbuf_t **);
 static int mbc_marshal_get_mbuf_chain(mbuf_chain_t *, int32_t, mbuf_chain_t *);
 static int mbc_marshal_get_uio(mbuf_chain_t *, struct uio *);
@@ -298,7 +296,7 @@ ascii_conversion:
 			cvalpp = va_arg(ap, uint8_t **);
 			if (repc <= 1)
 				repc = 0;
-			if (mbc_marshal_get_ascii_string(&sr->request_storage,
+			if (mbc_marshal_get_ascii_string(sr,
 			    mbc, cvalpp, repc) != 0)
 				return (-1);
 			break;
@@ -311,7 +309,7 @@ unicode_translation:
 				repc = 0;
 			if (mbc->chain_offset & 1)
 				mbc->chain_offset++;
-			if (mbc_marshal_get_unicode_string(&sr->request_storage,
+			if (mbc_marshal_get_unicode_string(sr,
 			    mbc, cvalpp, repc) != 0)
 				return (-1);
 			break;
@@ -909,11 +907,11 @@ mbc_marshal_put_long_long(mbuf_chain_t *mbc, uint64_t data)
 static int
 mbc_marshal_put_ascii_string(mbuf_chain_t *mbc, char *mbs, int repc)
 {
-	mts_wchar_t	wide_char;
+	smb_wchar_t	wide_char;
 	int		nbytes;
 	int		length;
 
-	if ((length = mts_sbequiv_strlen(mbs)) == -1)
+	if ((length = smb_sbequiv_strlen(mbs)) == -1)
 		return (DECODE_NO_MORE_DATA);
 
 	length += sizeof (char);
@@ -927,7 +925,7 @@ mbc_marshal_put_ascii_string(mbuf_chain_t *mbc, char *mbs, int repc)
 		/*
 		 * We should restore oem chars here.
 		 */
-		nbytes = mts_mbtowc(&wide_char, mbs, MTS_MB_CHAR_MAX);
+		nbytes = smb_mbtowc(&wide_char, mbs, MTS_MB_CHAR_MAX);
 		if (nbytes == -1)
 			return (DECODE_NO_MORE_DATA);
 
@@ -946,14 +944,14 @@ mbc_marshal_put_ascii_string(mbuf_chain_t *mbc, char *mbs, int repc)
 static int
 mbc_marshal_put_unicode_string(mbuf_chain_t *mbc, char *ascii, int repc)
 {
-	mts_wchar_t	wchar;
+	smb_wchar_t	wchar;
 	int		consumed;
 	int		length;
 
-	if ((length = mts_wcequiv_strlen(ascii)) == -1)
+	if ((length = smb_wcequiv_strlen(ascii)) == -1)
 		return (DECODE_NO_MORE_DATA);
 
-	length += sizeof (mts_wchar_t);
+	length += sizeof (smb_wchar_t);
 
 	if ((repc > 1) && (repc < length))
 		length = repc;
@@ -961,7 +959,7 @@ mbc_marshal_put_unicode_string(mbuf_chain_t *mbc, char *ascii, int repc)
 	if (mbc_marshal_make_room(mbc, length))
 		return (DECODE_NO_MORE_DATA);
 	while (length > 0) {
-		consumed = mts_mbtowc(&wchar, ascii, MTS_MB_CHAR_MAX);
+		consumed = smb_mbtowc(&wchar, ascii, MTS_MB_CHAR_MAX);
 		if (consumed == -1)
 			break;	/* Invalid sequence */
 		/*
@@ -973,7 +971,7 @@ mbc_marshal_put_unicode_string(mbuf_chain_t *mbc, char *ascii, int repc)
 		ascii += consumed;
 		mbc_marshal_store_byte(mbc, wchar);
 		mbc_marshal_store_byte(mbc, wchar >> 8);
-		length -= sizeof (mts_wchar_t);
+		length -= sizeof (smb_wchar_t);
 	}
 	return (0);
 }
@@ -1215,10 +1213,10 @@ mbc_marshal_get_long_long(mbuf_chain_t *mbc, uint64_t *data)
  */
 static int
 mbc_marshal_get_ascii_string(
-    struct smb_malloc_list	*ml,
-    mbuf_chain_t		*mbc,
+    smb_request_t	*sr,
+    mbuf_chain_t	*mbc,
     uint8_t		**ascii,
-    int				max_ascii)
+    int			max_ascii)
 {
 	char		*rcvbuf;
 	char		*ch;
@@ -1226,7 +1224,7 @@ mbc_marshal_get_ascii_string(
 	int		length = 0;
 
 	max = MALLOC_QUANTUM;
-	rcvbuf = smbsr_malloc(ml, max);
+	rcvbuf = smb_srm_alloc(sr, max);
 
 	if (max_ascii == 0)
 		max_ascii = 0xffff;
@@ -1247,7 +1245,7 @@ mbc_marshal_get_ascii_string(
 			length++;
 		}
 		max += MALLOC_QUANTUM;
-		rcvbuf = smbsr_realloc(rcvbuf, max);
+		rcvbuf = smb_srm_realloc(sr, rcvbuf, max);
 		ch = rcvbuf + length;
 	}
 
@@ -1256,13 +1254,13 @@ multibyte_encode:
 	 * UTF-8 encode the string for internal system use.
 	 */
 	length = strlen(rcvbuf) + 1;
-	*ascii = smbsr_malloc(ml, length * MTS_MB_CHAR_MAX);
+	*ascii = smb_srm_alloc(sr, length * MTS_MB_CHAR_MAX);
 	return (mbc_marshal_cstou8("CP850", (char *)*ascii,
 	    (size_t)length * MTS_MB_CHAR_MAX, rcvbuf, (size_t)length));
 }
 
 static int
-mbc_marshal_get_unicode_string(struct smb_malloc_list *ml,
+mbc_marshal_get_unicode_string(smb_request_t *sr,
     mbuf_chain_t *mbc, uint8_t **ascii, int max_unicode)
 {
 	int		max;
@@ -1275,7 +1273,7 @@ mbc_marshal_get_unicode_string(struct smb_malloc_list *ml,
 		max_unicode = 0xffff;
 
 	max = MALLOC_QUANTUM;
-	*ascii = smbsr_malloc(ml, max);
+	*ascii = smb_srm_alloc(sr, max);
 
 	ch = (char *)*ascii;
 	for (;;) {
@@ -1289,12 +1287,12 @@ mbc_marshal_get_unicode_string(struct smb_malloc_list *ml,
 
 			if (wchar == 0)	goto done;
 
-			emitted = mts_wctomb(ch, wchar);
+			emitted = smb_wctomb(ch, wchar);
 			length += emitted;
 			ch += emitted;
 		}
 		max += MALLOC_QUANTUM;
-		*ascii = smbsr_realloc(*ascii, max);
+		*ascii = smb_srm_realloc(sr, *ascii, max);
 		ch = (char *)*ascii + length;
 	}
 done:	*ch = 0;

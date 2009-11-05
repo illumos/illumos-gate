@@ -230,7 +230,7 @@
  * ERRSRV/ERRinvdevice - resource identified by TID is not a file system
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smbinfo.h>
 
@@ -315,7 +315,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 	case SMB_QUERY_FS_VOLUME_INFO:
 		if ((sr->smb_flg2 & SMB_FLAGS2_UNICODE) ||
 		    (sr->session->native_os == NATIVE_OS_WIN95)) {
-			length = mts_wcequiv_strlen(tree->t_volume);
+			length = smb_wcequiv_strlen(tree->t_volume);
 			encode_str = "%qllb.U";
 		} else {
 			length = strlen(tree->t_volume);
@@ -364,7 +364,7 @@ smb_com_trans2_query_fs_information(struct smb_request *sr, struct smb_xa *xa)
 		    (sr->session->native_os == NATIVE_OS_WIN2000) ||
 		    (sr->session->native_os == NATIVE_OS_WIN95) ||
 		    (sr->session->native_os == NATIVE_OS_MACOS)) {
-			length = mts_wcequiv_strlen(fsname);
+			length = smb_wcequiv_strlen(fsname);
 			encode_str = "%lllU";
 			sr->smb_flg2 |= SMB_FLAGS2_UNICODE;
 		} else {

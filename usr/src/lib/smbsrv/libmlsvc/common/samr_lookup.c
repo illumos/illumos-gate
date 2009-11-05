@@ -71,9 +71,9 @@ samr_lookup_domain(mlsvc_handle_t *samr_handle, char *domain_name)
 	(void) memcpy(&arg.handle, &samr_handle->handle,
 	    sizeof (samr_handle_t));
 
-	length = mts_wcequiv_strlen(domain_name);
+	length = smb_wcequiv_strlen(domain_name);
 	if (ndr_rpc_server_os(samr_handle) == NATIVE_OS_WIN2000)
-		length += sizeof (mts_wchar_t);
+		length += sizeof (smb_wchar_t);
 
 	arg.domain_name.length = length;
 	arg.domain_name.allosize = length;
@@ -161,9 +161,9 @@ samr_lookup_domain_names(mlsvc_handle_t *domain_handle, char *name,
 	arg.index = 0;
 	arg.total = 1;
 
-	length = mts_wcequiv_strlen(name);
+	length = smb_wcequiv_strlen(name);
 	if (ndr_rpc_server_os(domain_handle) == NATIVE_OS_WIN2000)
-		length += sizeof (mts_wchar_t);
+		length += sizeof (smb_wchar_t);
 
 	arg.name.length = length;
 	arg.name.allosize = length;
@@ -511,7 +511,7 @@ samr_set_user_password(unsigned char *nt_key, BYTE *oem_password)
 	if (smb_getnetbiosname(hostname, sizeof (hostname)) != 0)
 		return (-1);
 
-	(void) utf8_strlwr(hostname);
+	(void) smb_strlwr(hostname);
 
 	/*
 	 * Generate the OEM password from the hostname and the user session

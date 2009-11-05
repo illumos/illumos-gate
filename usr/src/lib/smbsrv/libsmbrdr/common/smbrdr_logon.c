@@ -189,7 +189,7 @@ smbrdr_authenticate(char *domain_controller, char *primary_domain,
 	/*
 	 * Ensure that the domain name is uppercase.
 	 */
-	(void) utf8_strupr(primary_domain);
+	(void) smb_strupr(primary_domain);
 	return (smbrdr_logon_user(domain_controller, account_name, pwd));
 }
 
@@ -302,8 +302,8 @@ smbrdr_session_setupx(struct sdb_logon *logon)
 		return (-1);
 
 	if (session->remote_caps & CAP_UNICODE) {
-		strlen_fn = mts_wcequiv_strlen;
-		null_size = sizeof (mts_wchar_t);
+		strlen_fn = smb_wcequiv_strlen;
+		null_size = sizeof (smb_wchar_t);
 		session->smb_flags2 |= SMB_FLAGS2_UNICODE;
 	} else {
 		strlen_fn = strlen;

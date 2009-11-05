@@ -24,10 +24,6 @@
  */
 
 #include <smbsrv/smb_kproto.h>
-#include <smbsrv/ntstatus.h>
-#include <smbsrv/nterror.h>
-#include <smbsrv/doserror.h>
-#include <smbsrv/cifs.h>
 
 static void smb_encode_sd(struct smb_xa *, smb_sd_t *, uint32_t);
 static void smb_encode_sacl(struct smb_xa *, smb_acl_t *);

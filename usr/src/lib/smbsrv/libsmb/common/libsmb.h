@@ -50,12 +50,8 @@ extern "C" {
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/alloc.h>
-#include <smbsrv/codepage.h>
-#include <smbsrv/ctype.h>
 #include <smbsrv/hash_table.h>
 #include <smbsrv/msgbuf.h>
-#include <smbsrv/oem.h>
-#include <smbsrv/smb_i18n.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/smbinfo.h>
@@ -324,7 +320,7 @@ void smb_tracef(const char *fmt, ...);
 typedef struct smb_auth_name_entry {
 	unsigned short nne_type;
 	unsigned short nne_len;
-	mts_wchar_t nne_name[SMB_PI_MAX_DOMAIN * 2];
+	smb_wchar_t nne_name[SMB_PI_MAX_DOMAIN * 2];
 } smb_auth_name_entry_t;
 
 /*
@@ -449,7 +445,7 @@ extern int smb_pwd_iteropen(smb_pwditer_t *);
 extern smb_luser_t *smb_pwd_iterate(smb_pwditer_t *);
 extern void smb_pwd_iterclose(smb_pwditer_t *);
 
-extern int smb_auth_qnd_unicode(mts_wchar_t *, const char *, int);
+extern int smb_auth_qnd_unicode(smb_wchar_t *, const char *, int);
 extern int smb_auth_hmac_md5(unsigned char *, int, unsigned char *, int,
     unsigned char *);
 

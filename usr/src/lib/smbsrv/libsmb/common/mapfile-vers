@@ -39,10 +39,6 @@
 SUNWprivate {
     global:
 	bintohex;
-	codepage_islower;
-	codepage_isupper;
-	codepage_tolower;
-	codepage_toupper;
 	hexdump;
 	hextobin;
 	ht_add_item;
@@ -74,20 +70,9 @@ SUNWprivate {
 	list_prev;
 	list_remove;
 	list_tail;
-	mts_mbstos;
-	mts_mbstowcs;
-	mts_mbtowc;
-	mts_sbequiv_strlen;
-	mts_stombs;
-	mts_wcequiv_strlen;
-	mts_wcstombs;
-	mts_wctomb;
 	netr_client_mkabsolute;
 	netr_client_xfree;
-	oem_get_smb_cpid;
-	oem_get_telnet_cpid;
-	oem_language_set;
-	oemstounicodes;
+	oemtoucs;
 	rand_hash;
 	randomize;
 	smb_account_free;
@@ -109,6 +94,7 @@ SUNWprivate {
 	smb_auth_validate_lm;
 	smb_auth_validate_nt;
 	smb_chk_hostaccess;
+	smb_codepage_init;
 	smb_config_get;
 	smb_config_get_fg_flag;
 	smb_config_get_localsid;
@@ -226,6 +212,10 @@ SUNWprivate {
 	smb_ipc_rollback;
 	smb_ipc_get_user;
 	smb_ipc_get_passwd;
+	smb_islower;
+	smb_isupper;
+	smb_isstrlwr;
+	smb_isstrupr;
 	smb_kmod_bind;
 	smb_kmod_enum;
 	smb_kmod_enum_init;
@@ -275,6 +265,9 @@ SUNWprivate {
 	smb_match;
 	smb_match_ci;
 	smb_match_netlogon_seqnum;
+	smb_mbstos;
+	smb_mbstowcs;
+	smb_mbtowc;
 	smb_msgbuf_base;
 	smb_msgbuf_decode;
 	smb_msgbuf_dword_align;
@@ -335,6 +328,7 @@ SUNWprivate {
 	smb_sam_grp_cnt;
 	smb_sam_usr_cnt;
 	smb_sam_usr_groups;
+	smb_sbequiv_strlen;
 	smb_sd_get_secinfo;
 	smb_sd_init;
 	smb_sd_len;
@@ -358,12 +352,21 @@ SUNWprivate {
 	smb_sid_type2str;
 	smb_smf_maintenance_mode;
 	smb_smf_restart_service;
+	smb_stombs;
+	smb_strcasecmp;
+	smb_strlwr;
+	smb_strupr;
+	smb_tolower;
+	smb_toupper;
 	smb_token_mkselfrel;
 	smb_token_query_privilege;
 	smb_tonetbiosname;
 	smb_trace;
 	smb_tracef;
 	smb_update_netlogon_seqnum;
+	smb_wcequiv_strlen;
+	smb_wcstombs;
+	smb_wctomb;
 	smb_wka_fini;
 	smb_wka_get_domain;
 	smb_wka_get_sid;
@@ -379,14 +382,7 @@ SUNWprivate {
 	strsubst;
 	strtrim;
 	trim_whitespace;
-	unicodestooems;
-	utf8_isstrascii;
-	utf8_isstrlwr;
-	utf8_isstrupr;
-	utf8_strcasecmp;
-	utf8_strlwr;
-	utf8_strncasecmp;
-	utf8_strupr;
+	ucstooem;
 	xdr_smb_dr_bytes_t;
 	xdr_smb_dr_joininfo_t;
 	xdr_smb_dr_string_t;

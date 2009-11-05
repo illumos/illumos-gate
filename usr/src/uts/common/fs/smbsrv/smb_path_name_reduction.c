@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  */
 
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_fsops.h>
 #include <sys/pathname.h>
 #include <sys/sdt.h>
@@ -41,7 +41,7 @@ smb_is_executable(char *path)
 
 	if ((len >= 4) && (path[len - 4] == '.')) {
 		(void) strcpy(extension, &path[len - 3]);
-		(void) utf8_strupr(extension);
+		(void) smb_strupr(extension);
 
 		if (strcmp(extension, "EXE") == 0)
 			return (NODE_FLAGS_EXECUTABLE);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -184,7 +184,7 @@ dssetup_member_server(ds_primary_domain_info_t *info, ndr_xa_t *mxa)
 			return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 		}
 
-		(void) utf8_strlwr(dns_domain);
+		(void) smb_strlwr(dns_domain);
 
 		info->flags = 0;
 		info->nt_domain = NDR_STRDUP(mxa, nt_domain);

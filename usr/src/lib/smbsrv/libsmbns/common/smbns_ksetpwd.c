@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,7 +98,7 @@ smb_krb5_get_upn(char *spn, char *domain)
 	if (!realm)
 		return (NULL);
 
-	(void) utf8_strupr(realm);
+	(void) smb_strupr(realm);
 
 	len = strlen(spn) + 1 + strlen(realm) + 1;
 	upn = (char *)malloc(len);
@@ -133,7 +133,7 @@ smb_krb5_get_host_upn(const char *fqhn)
 	if ((realm = strdup(++dom)) == NULL)
 		return (NULL);
 
-	(void) utf8_strupr(realm);
+	(void) smb_strupr(realm);
 
 	len = strlen(spn_prefix[SMBKRB5_SPN_IDX_HOST]) + strlen(fqhn) +
 	    + 1 + strlen(realm) + 1;

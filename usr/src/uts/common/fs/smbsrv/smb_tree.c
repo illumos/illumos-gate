@@ -170,7 +170,7 @@
 #include <sys/stat.h>
 #include <sys/varargs.h>
 #include <sys/cred_impl.h>
-#include <smbsrv/smb_incl.h>
+#include <smbsrv/smb_kproto.h>
 #include <smbsrv/lmerr.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_door_svc.h>
@@ -215,7 +215,7 @@ smb_tree_connect(smb_request_t *sr)
 	const char *name;
 	int32_t stype;
 
-	(void) utf8_strlwr(unc_path);
+	(void) smb_strlwr(unc_path);
 
 	if ((name = smb_tree_get_sharename(unc_path)) == NULL) {
 		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
@@ -1048,7 +1048,7 @@ smb_tree_get_flags(const smb_share_t *si, vfs_t *vfsp, smb_tree_t *tree)
 	}
 
 	(void) strlcpy(tree->t_typename, name, SMB_TYPENAMELEN);
-	(void) utf8_strupr((char *)tree->t_typename);
+	(void) smb_strupr((char *)tree->t_typename);
 
 	if (vfs_has_feature(vfsp, VFSFT_XVATTR))
 		flags |= SMB_TREE_XVATTR;
@@ -1339,7 +1339,7 @@ smb_tree_netinfo_init(smb_tree_t *tree, smb_netconnectinfo_t *info)
 	info->ci_time = gethrestime_sec() - tree->t_connect_time;
 
 	info->ci_sharelen = strlen(tree->t_sharename) + 1;
-	info->ci_share = smb_kstrdup(tree->t_sharename, info->ci_sharelen);
+	info->ci_share = smb_strdup(tree->t_sharename);
 
 	user = tree->t_user;
 	ASSERT(user);
@@ -1359,7 +1359,7 @@ smb_tree_netinfo_fini(smb_netconnectinfo_t *info)
 	if (info->ci_username)
 		kmem_free(info->ci_username, info->ci_namelen);
 	if (info->ci_share)
-		kmem_free(info->ci_share, info->ci_sharelen);
+		smb_mfree(info->ci_share);
 
 	bzero(info, sizeof (smb_netconnectinfo_t));
 }

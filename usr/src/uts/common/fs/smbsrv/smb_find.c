@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+#include <smbsrv/smb_kproto.h>
 
 /*
  * smb_com_search
@@ -194,8 +195,6 @@
  * circuit to the consumer.
  */
 
-#include <smbsrv/smb_incl.h>
-
 /* *** smb_com_search *** */
 
 smb_sdrc_t
@@ -329,7 +328,7 @@ smb_com_search(smb_request_t *sr)
 			(void) strlcpy(name, fileinfo.fi_name,
 			    SMB_SHORTNAMELEN - 1);
 			if (to_upper)
-				(void) utf8_strupr(name);
+				(void) smb_strupr(name);
 		} else {
 			(void) strlcpy(name, fileinfo.fi_shortname,
 			    SMB_SHORTNAMELEN - 1);

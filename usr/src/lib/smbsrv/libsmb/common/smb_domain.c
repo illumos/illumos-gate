@@ -176,8 +176,8 @@ smb_domain_lookup_name(char *name, smb_domain_t *di)
 
 	dcnode = list_head(&smb_dcache.dc_cache);
 	while (dcnode) {
-		found = (utf8_strcasecmp(dcnode->di_nbname, name) == 0) ||
-		    (utf8_strcasecmp(dcnode->di_fqname, name) == 0);
+		found = (smb_strcasecmp(dcnode->di_nbname, name, 0) == 0) ||
+		    (smb_strcasecmp(dcnode->di_fqname, name, 0) == 0);
 
 		if (found) {
 			if (di)
@@ -187,7 +187,8 @@ smb_domain_lookup_name(char *name, smb_domain_t *di)
 
 		if ((p = strchr(dcnode->di_fqname, '.')) != NULL) {
 			*p = '\0';
-			found = (utf8_strcasecmp(dcnode->di_fqname, name) == 0);
+			found = (smb_strcasecmp(dcnode->di_fqname, name,
+			    0) == 0);
 			*p = '.';
 			if (found) {
 				if (di)
@@ -458,7 +459,7 @@ smb_domain_set_basic_info(char *sid, char *nb_domain, char *fq_domain,
 
 	(void) strlcpy(di->di_sid, sid, SMB_SID_STRSZ);
 	(void) strlcpy(di->di_nbname, nb_domain, NETBIOS_NAME_SZ);
-	(void) utf8_strupr(di->di_nbname);
+	(void) smb_strupr(di->di_nbname);
 	(void) strlcpy(di->di_fqname, fq_domain, MAXHOSTNAMELEN);
 	di->di_binsid = NULL;
 }
