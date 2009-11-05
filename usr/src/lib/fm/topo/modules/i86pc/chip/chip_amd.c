@@ -722,7 +722,7 @@ amd_mc_create(topo_mod_t *mod,  uint16_t smbid, tnode_t *pnode,
     int model, int *nerrp)
 {
 	tnode_t *mcnode;
-	nvlist_t *fmri;
+	nvlist_t *rfmri, *fmri;
 	nvpair_t *nvp;
 	nvlist_t *mc = NULL;
 	int i, err;
@@ -743,14 +743,15 @@ amd_mc_create(topo_mod_t *mod,  uint16_t smbid, tnode_t *pnode,
 		return;
 
 	if (FM_AWARE_SMBIOS(mod)) {
-		(void) topo_node_resource(pnode, &fmri, &err);
-		(void) nvlist_lookup_string(fmri, "serial", &serial);
-		(void) nvlist_lookup_string(fmri, "part", &part);
-		(void) nvlist_lookup_string(fmri, "revision", &rev);
-		nvlist_free(fmri);
+		(void) topo_node_resource(pnode, &rfmri, &err);
+		(void) nvlist_lookup_string(rfmri, "serial", &serial);
+		(void) nvlist_lookup_string(rfmri, "part", &part);
+		(void) nvlist_lookup_string(rfmri, "revision", &rev);
 	}
 
 	if (mkrsrc(mod, pnode, name, mcnum, auth, &fmri) != 0) {
+		if (FM_AWARE_SMBIOS(mod))
+			nvlist_free(rfmri);
 		whinge(mod, nerrp, "mc_create: mkrsrc failed\n");
 		return;
 	}
@@ -759,6 +760,7 @@ amd_mc_create(topo_mod_t *mod,  uint16_t smbid, tnode_t *pnode,
 		(void) nvlist_add_string(fmri, "serial", serial);
 		(void) nvlist_add_string(fmri, "part", part);
 		(void) nvlist_add_string(fmri, "revision", rev);
+		nvlist_free(rfmri);
 	}
 
 	if ((mcnode = topo_node_bind(mod, pnode, name, mcnum,
