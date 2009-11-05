@@ -181,6 +181,7 @@ struct scsi_pkt {
  */
 #define	FLAG_NOQUEUE		0x80000000
 #define	FLAG_PKT_PATH_INSTANCE	0x40000000	/* Tell vhci the path to use */
+#define	FLAG_PKT_COMP_CALLED	0x20000000	/* Set once pkt_comp called */
 
 /*
  * Definitions for the pkt_reason field.

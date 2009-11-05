@@ -2283,7 +2283,8 @@ try_again:
 				}
 				goto bind_path;
 			}
-		} else if (rval == MDI_FAILURE) {
+		} else if ((rval == MDI_FAILURE) ||
+		    ((rval == MDI_NOPATH) && (path_instance))) {
 			if (pgr_sema_held) {
 				sema_v(&vlun->svl_pgr_sema);
 			}

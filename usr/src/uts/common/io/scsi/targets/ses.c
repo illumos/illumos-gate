@@ -754,6 +754,10 @@ ses_ioctl(dev_t dev, int cmd, intptr_t arg, int flg, cred_t *cred_p, int *rvalp)
 		break;
 
 	case SESIOC_INIT:
+		if (drv_priv(cred_p) != 0) {
+			rv = EPERM;
+			break;
+		}
 		rv = (*ssc->ses_vec.init_enc)(ssc);
 		break;
 
@@ -776,6 +780,10 @@ ses_ioctl(dev_t dev, int cmd, intptr_t arg, int flg, cred_t *cred_p, int *rvalp)
 		break;
 
 	case SESIOC_SETENCSTAT:
+		if (drv_priv(cred_p) != 0) {
+			rv = EPERM;
+			break;
+		}
 		if (ddi_copyin((void *)arg, &t, sizeof (t), flg))
 			rv = EFAULT;
 		else
@@ -809,6 +817,10 @@ ses_ioctl(dev_t dev, int cmd, intptr_t arg, int flg, cred_t *cred_p, int *rvalp)
 		break;
 
 	case SESIOC_SETOBJSTAT:
+		if (drv_priv(cred_p) != 0) {
+			rv = EPERM;
+			break;
+		}
 		if (ddi_copyin((void *)arg, &x, sizeof (x), flg)) {
 			rv = EFAULT;
 			break;
@@ -826,6 +838,10 @@ ses_ioctl(dev_t dev, int cmd, intptr_t arg, int flg, cred_t *cred_p, int *rvalp)
 		break;
 
 	case USCSICMD:
+		if (drv_priv(cred_p) != 0) {
+			rv = EPERM;
+			break;
+		}
 		rv = ses_uscsi_cmd(ssc, (Uscmd *)arg, flg);
 		break;
 

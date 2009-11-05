@@ -9708,7 +9708,7 @@ st_intr(struct scsi_pkt *pkt)
 	if (un->un_multipath) {
 
 		struct uscsi_cmd *ucmd = BP_UCMD(bp);
-		int pkt_valid;
+		int pkt_valid = 0;
 
 		if (ucmd) {
 			/*
@@ -9730,7 +9730,13 @@ st_intr(struct scsi_pkt *pkt)
 		 */
 		if ((pkt_valid != 0) &&
 		    (un->un_last_path_instance != pkt->pkt_path_instance)) {
-			if (un->un_state > ST_STATE_OPENING) {
+			/*
+			 * Don't recover the path change if it was done
+			 * intentionally or if the device has not completely
+			 * opened yet.
+			 */
+			if (((pkt->pkt_flags & FLAG_PKT_PATH_INSTANCE) == 0) &&
+			    (un->un_state > ST_STATE_OPENING)) {
 				ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
 				    "Failover detected, action is %s\n",
 				    errstatenames[action]);

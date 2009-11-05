@@ -5206,6 +5206,23 @@ scsi_hba_pkt_comp(struct scsi_pkt *pkt)
 	uint8_t		*sensep;
 
 	ASSERT(pkt);
+
+	/*
+	 * Catch second call on the same packet before doing anything else.
+	 */
+	if (pkt->pkt_flags & FLAG_PKT_COMP_CALLED) {
+		cmn_err(
+#ifdef DEBUG
+		    CE_PANIC,
+#else
+		    CE_WARN,
+#endif
+		    "%s duplicate scsi_hba_pkt_comp(9F) on same scsi_pkt(9S)",
+		    mod_containing_pc(caller()));
+	}
+
+	pkt->pkt_flags |= FLAG_PKT_COMP_CALLED;
+
 	if (pkt->pkt_comp == NULL)
 		return;
 
