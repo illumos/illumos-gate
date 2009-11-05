@@ -239,7 +239,7 @@ static void fastboot_build_pagetables(fastboot_info_t *);
 static int fastboot_build_mbi(char *, fastboot_info_t *);
 static void fastboot_free_file(fastboot_file_t *);
 
-static const char fastboot_enomem_msg[] = "Fastboot: Couldn't allocate 0x%"
+static const char fastboot_enomem_msg[] = "!Fastboot: Couldn't allocate 0x%"
 	PRIx64" bytes below %s to do fast reboot";
 
 static void
@@ -490,7 +490,7 @@ fastboot_build_mbi(char *mdep, fastboot_info_t *nk)
 		if ((nk->fi_new_mbi_va =
 		    (uintptr_t)contig_alloc(size, &fastboot_below_1G_dma_attr,
 		    PAGESIZE, 0)) == NULL) {
-			cmn_err(CE_WARN, fastboot_enomem_msg,
+			cmn_err(CE_NOTE, fastboot_enomem_msg,
 			    (uint64_t)size, "1G");
 			return (-1);
 		}
@@ -949,14 +949,14 @@ load_kernel_retry:
 
 		if ((file = kobj_open_file(fastboot_filename[i])) ==
 		    (struct _buf *)-1) {
-			cmn_err(CE_WARN, "Fastboot: Couldn't open %s",
+			cmn_err(CE_NOTE, "!Fastboot: Couldn't open %s",
 			    fastboot_filename[i]);
 			goto err_out;
 		}
 
 		if (kobj_get_filesize(file, &fsize) != 0) {
-			cmn_err(CE_WARN,
-			    "Fastboot: Couldn't get filesize for %s",
+			cmn_err(CE_NOTE,
+			    "!Fastboot: Couldn't get filesize for %s",
 			    fastboot_filename[i]);
 			goto err_out;
 		}
@@ -969,7 +969,7 @@ load_kernel_retry:
 		 */
 		end_addr += fsize_roundup;
 		if (end_addr > fastboot_below_1G_dma_attr.dma_attr_addr_hi) {
-			cmn_err(CE_WARN, "Fastboot: boot archive is too big");
+			cmn_err(CE_NOTE, "!Fastboot: boot archive is too big");
 			goto err_out;
 		}
 
@@ -985,8 +985,8 @@ load_kernel_retry:
 				 * If we have already tried and didn't succeed,
 				 * just give up.
 				 */
-				cmn_err(CE_WARN,
-				    "Fastboot: boot archive is too big");
+				cmn_err(CE_NOTE,
+				    "!Fastboot: boot archive is too big");
 				goto err_out;
 			} else {
 				/* Set the flag so we don't keep retrying */
@@ -1014,14 +1014,14 @@ load_kernel_retry:
 
 		if ((buf = contig_alloc(fsize, &dma_attr, PAGESIZE, 0))
 		    == NULL) {
-			cmn_err(CE_WARN, fastboot_enomem_msg, fsize, "64G");
+			cmn_err(CE_NOTE, fastboot_enomem_msg, fsize, "64G");
 			goto err_out;
 		}
 
 		va = P2ROUNDUP_TYPED((uintptr_t)buf, PAGESIZE, uintptr_t);
 
 		if (kobj_read_file(file, (char *)va, fsize, 0) < 0) {
-			cmn_err(CE_WARN, "Fastboot: Couldn't read %s",
+			cmn_err(CE_NOTE, "!Fastboot: Couldn't read %s",
 			    fastboot_filename[i]);
 			goto err_out;
 		}
@@ -1047,7 +1047,7 @@ load_kernel_retry:
 			    (x86pte_t *)contig_alloc(pt_size,
 			    &fastboot_below_1G_dma_attr, PAGESIZE, 0))
 			    == NULL) {
-				cmn_err(CE_WARN, fastboot_enomem_msg,
+				cmn_err(CE_NOTE, fastboot_enomem_msg,
 				    (uint64_t)pt_size, "1G");
 				goto err_out;
 			}
@@ -1092,7 +1092,7 @@ load_kernel_retry:
 			 */
 			for (j = 0; j < SELFMAG; j++) {
 				if (ehdr->e_ident[j] != ELFMAG[j]) {
-					cmn_err(CE_WARN, "Fastboot: Bad ELF "
+					cmn_err(CE_NOTE, "!Fastboot: Bad ELF "
 					    "signature");
 					goto err_out;
 				}
@@ -1108,13 +1108,13 @@ load_kernel_retry:
 				if (fastboot_elf32_find_loadables((void *)va,
 				    fsize, &fb->fb_sections[0],
 				    &fb->fb_sectcnt, &dboot_start_offset) < 0) {
-					cmn_err(CE_WARN, "Fastboot: ELF32 "
+					cmn_err(CE_NOTE, "!Fastboot: ELF32 "
 					    "program section failure");
 					goto err_out;
 				}
 
 				if (fb->fb_sectcnt == 0) {
-					cmn_err(CE_WARN, "Fastboot: No ELF32 "
+					cmn_err(CE_NOTE, "!Fastboot: No ELF32 "
 					    "program sections found");
 					goto err_out;
 				}
@@ -1141,14 +1141,14 @@ load_kernel_retry:
 				if (fastboot_elf64_find_dboot_load_offset(
 				    (void *)va, fsize, &dboot_start_offset)
 				    != 0) {
-					cmn_err(CE_WARN, "Fastboot: Couldn't "
+					cmn_err(CE_NOTE, "!Fastboot: Couldn't "
 					    "find ELF64 dboot entry offset");
 					goto err_out;
 				}
 
 				if ((x86_feature & X86_64) == 0 ||
 				    (x86_feature & X86_PAE) == 0) {
-					cmn_err(CE_WARN, "Fastboot: Cannot "
+					cmn_err(CE_NOTE, "!Fastboot: Cannot "
 					    "reboot to %s: "
 					    "not a 64-bit capable system",
 					    kern_bootfile);
@@ -1170,7 +1170,7 @@ load_kernel_retry:
 					    sizeof (BOOTARCHIVE64));
 				}
 			} else {
-				cmn_err(CE_WARN, "Fastboot: Unknown ELF type");
+				cmn_err(CE_NOTE, "!Fastboot: Unknown ELF type");
 				goto err_out;
 			}
 
@@ -1234,7 +1234,7 @@ load_kernel_retry:
 			if ((newkernel.fi_pagetable_va = (uintptr_t)
 			    contig_alloc(size, &fastboot_below_1G_dma_attr,
 			    MMU_PAGESIZE, 0)) == NULL) {
-				cmn_err(CE_WARN, fastboot_enomem_msg,
+				cmn_err(CE_NOTE, fastboot_enomem_msg,
 				    (uint64_t)size, "1G");
 				goto err_out;
 			}
@@ -1405,7 +1405,7 @@ fastboot_get_bootprop(void)
 			fastreboot_onpanic = val;
 		ddi_prop_free(propstr);
 	} else if (ret != DDI_PROP_NOT_FOUND && ret != DDI_PROP_UNDEFINED) {
-		cmn_err(CE_WARN, "%s value is invalid, will be ignored",
+		cmn_err(CE_NOTE, "!%s value is invalid, will be ignored",
 		    FASTREBOOT_ONPANIC);
 	}
 
@@ -1414,7 +1414,7 @@ fastboot_get_bootprop(void)
 	    FASTREBOOT_ONPANIC_CMDLINE, fastreboot_onpanic_cmdline, &len);
 
 	if (ret == DDI_PROP_BUF_TOO_SMALL)
-		cmn_err(CE_WARN, "%s value is too long, will be ignored",
+		cmn_err(CE_NOTE, "!%s value is too long, will be ignored",
 		    FASTREBOOT_ONPANIC_CMDLINE);
 }
 
