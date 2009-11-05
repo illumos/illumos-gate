@@ -306,72 +306,90 @@ have_valid_ku(char *zonename)
 }
 
 /*
- * Get the emulation version from the /usr/lib/brand/solaris10/version file
- * in either the global zone or the non-global zone.
+ * Determine which features/behaviors should be emulated and construct a bitmap
+ * representing the results.  Associate the bitmap with the zone so that
+ * the brand's emulation library will be able to retrieve the bitmap and
+ * determine how the zone's process' behaviors should be emulated.
+ *
+ * This function does not return if an error occurs.
  */
-static int
-get_emul_version_number(char *verspath)
+static void
+set_zone_emul_bitmap(char *zonename)
 {
-	int	vers = 0;
-	FILE	*fp;
-	char	buf[LINE_MAX];
+	char			req_emulation_dir_path[MAXPATHLEN];
+	DIR			*req_emulation_dirp;
+	struct dirent		*emul_feature_filep;
+	char			*filename_endptr;
+	s10_emul_bitmap_t	bitmap;
+	unsigned int		bit_index;
+	zoneid_t		zoneid;
 
-	/* If the file doesn't exist, assume version 0 */
-	if ((fp = fopen(verspath, "r")) == NULL)
-		return (vers);
+	/*
+	 * If the Solaris 10 directory containing emulation feature files
+	 * doesn't exist in the zone, then assume that it only needs the
+	 * most basic emulation and, therefore, doesn't need a bitmap.
+	 */
+	if (zone_get_rootpath(zonename, req_emulation_dir_path,
+	    sizeof (req_emulation_dir_path)) != Z_OK)
+		s10_err(gettext("error getting zone's path"));
+	if (strlcat(req_emulation_dir_path, S10_REQ_EMULATION_DIR,
+	    sizeof (req_emulation_dir_path)) >= sizeof (req_emulation_dir_path))
+		s10_err(gettext("error formatting version path"));
+	if ((req_emulation_dirp = opendir(req_emulation_dir_path)) == NULL)
+		return;
+	bzero(bitmap, sizeof (bitmap));
 
-	while (fgets(buf, sizeof (buf), fp) != NULL) {
-		if (buf[0] == '#')
+	/*
+	 * Iterate over the contents of the directory and determine which
+	 * features the brand should emulate for this zone.
+	 */
+	while ((emul_feature_filep = readdir(req_emulation_dirp)) != NULL) {
+		if (strcmp(emul_feature_filep->d_name, ".") == 0 ||
+		    strcmp(emul_feature_filep->d_name, "..") == 0)
 			continue;
 
+		/*
+		 * Convert the file's name to an unsigned integer.  Ignore
+		 * files whose names aren't unsigned integers.
+		 */
 		errno = 0;
-		vers = strtol(buf, (char **)NULL, 10);
-		if (errno != 0) {
-			(void) fclose(fp);
-			s10_err(gettext("error reading minimum version"));
+		bit_index = (unsigned int)strtoul(emul_feature_filep->d_name,
+		    &filename_endptr, 10);
+		if (errno != 0 || *filename_endptr != '\0' ||
+		    filename_endptr == emul_feature_filep->d_name)
+			continue;
+
+		/*
+		 * Determine if the brand can emulate the feature specified
+		 * by bit_index.
+		 */
+		/*LINTED*/
+		if (bit_index >= S10_NUM_EMUL_FEATURES) {
+			/*
+			 * The zone requires emulation that the brand can't
+			 * provide.  Notify the user by displaying an error
+			 * message.
+			 */
+			s10_err(gettext("The zone's version of Solaris 10 is "
+			    "incompatible with the\ncurrent version of the "
+			    "solaris10 brand.\nPlease update your Solaris "
+			    "system to the latest release."));
+		} else {
+			/*
+			 * Set the feature's flag in the bitmap.
+			 */
+			bitmap[(bit_index >> 3)] |= (1 << (bit_index & 0x7));
 		}
 	}
 
-	(void) fclose(fp);
-
-	return (vers);
-}
-
-/*
- * Get the current emulation version that is implemented.
- */
-static int
-get_current_emul_version()
-{
-	return (get_emul_version_number("/usr/lib/brand/solaris10/version"));
-}
-
-/*
- * Get the emulation version that the S10 image requires.  This
- * reads the optional /usr/lib/brand/solaris10/version file that might
- * exist on Solaris 10.  That file specifies the minimal solaris10 brand
- * emulation version that the specific release of S10 requires.  If no
- * minimal version is specified, the initial emulation remains compatible.
- *
- * If a new KU patch is created which needs different handling by the
- * emulation, then the S10 /usr/lib/brand/solaris10/version file should be
- * updated to specify a new version.
- */
-static int
-get_image_emul_rqd_version(char *zonename)
-{
-	char	zonepath[MAXPATHLEN];
-	char	verspath[MAXPATHLEN];
-
-	if (zone_get_zonepath(zonename, zonepath, sizeof (zonepath)) != Z_OK)
-		s10_err(gettext("error getting zone's path"));
-
-	if (snprintf(verspath, sizeof (verspath),
-	    "%s/root/usr/lib/brand/solaris10/version",
-	    zonepath) >= sizeof (verspath))
-		s10_err(gettext("error formating version path"));
-
-	return (get_emul_version_number(verspath));
+	/*
+	 * We're done scanning files.  Set the zone's emulation bitmap.
+	 */
+	(void) closedir(req_emulation_dirp);
+	if ((zoneid = getzoneidbyname(zonename)) < 0)
+		s10_err(gettext("unable to get zoneid"));
+	if (zone_setattr(zoneid, S10_EMUL_BITMAP, bitmap, sizeof (bitmap)) != 0)
+		s10_err(gettext("error setting zone's emulation bitmap"));
 }
 
 static void
@@ -388,29 +406,11 @@ fail_xvm()
 static int
 s10_boot(char *zonename)
 {
-	zoneid_t zoneid;
-	int emul_vers;
-	int rqd_emul_vers;
-
 	if (!have_valid_ku(zonename))
 		s10_err(gettext("The installed version of Solaris 10 is "
 		    "not supported"));
 
-	emul_vers = get_current_emul_version();
-	rqd_emul_vers = get_image_emul_rqd_version(zonename);
-
-	if (rqd_emul_vers > emul_vers)
-		s10_err(gettext("The zone's version of Solaris 10 is "
-		    "incompatible with the current version of the solaris10 "
-		    "brand."));
-
-	if ((zoneid = getzoneidbyname(zonename)) < 0)
-		s10_err(gettext("unable to get zoneid"));
-
-	if (zone_setattr(zoneid, S10_EMUL_VERSION_NUM, &rqd_emul_vers,
-	    sizeof (int)) == -1)
-		s10_err(gettext("error setting zone's emulation version "
-		    "property"));
+	set_zone_emul_bitmap(zonename);
 
 	fail_xvm();
 

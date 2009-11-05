@@ -146,40 +146,17 @@ s10_setbrand(proc_t *p)
 	(void) s10_initlwp(p->p_tlist->t_lwp);
 }
 
-int
-s10_get_zone_emul_version(zone_t *zone)
-{
-	return (((s10_zone_data_t *)
-	    zone->zone_brand_data)->s10zd_emul_version);
-}
-
-int
-s10_get_emul_version()
-{
-	return (s10_get_zone_emul_version(curzone));
-}
-
-void
-s10_set_emul_version(zone_t *zone, int vers)
-{
-	s10_zone_data_t *s10zd = (s10_zone_data_t *)zone->zone_brand_data;
-	s10zd->s10zd_emul_version = vers;
-}
-
 /*ARGSUSED*/
 int
 s10_getattr(zone_t *zone, int attr, void *buf, size_t *bufsize)
 {
-	int num;
-
 	ASSERT(zone->zone_brand == &s10_brand);
-	if (attr == S10_EMUL_VERSION_NUM) {
-		if (*bufsize < sizeof (int))
-			return (ERANGE);
-		num = s10_get_emul_version();
-		if (copyout(&num, buf, sizeof (int)) != 0)
+	if (attr == S10_EMUL_BITMAP) {
+		if (buf == NULL || *bufsize != sizeof (s10_emul_bitmap_t))
+			return (EINVAL);
+		if (copyout(((s10_zone_data_t *)zone->zone_brand_data)->
+		    emul_bitmap, buf, sizeof (s10_emul_bitmap_t)) != 0)
 			return (EFAULT);
-		*bufsize = sizeof (int);
 		return (0);
 	}
 
@@ -189,15 +166,13 @@ s10_getattr(zone_t *zone, int attr, void *buf, size_t *bufsize)
 int
 s10_setattr(zone_t *zone, int attr, void *buf, size_t bufsize)
 {
-	int num;
-
 	ASSERT(zone->zone_brand == &s10_brand);
-	if (attr == S10_EMUL_VERSION_NUM) {
-		if (bufsize > sizeof (int))
-			return (ERANGE);
-		if (copyin(buf, &num, sizeof (num)) != 0)
+	if (attr == S10_EMUL_BITMAP) {
+		if (buf == NULL || bufsize != sizeof (s10_emul_bitmap_t))
+			return (EINVAL);
+		if (copyin(buf, ((s10_zone_data_t *)zone->zone_brand_data)->
+		    emul_bitmap, sizeof (s10_emul_bitmap_t)) != 0)
 			return (EFAULT);
-		s10_set_emul_version(zone, num);
 		return (0);
 	}
 
@@ -536,8 +511,6 @@ s10_freelwp(klwp_t *l)
 void
 s10_lwpexit(klwp_t *l)
 {
-	proc_t	*p = l->lwp_procp;
-
 	ASSERT(l->lwp_procp->p_brand == &s10_brand);
 	ASSERT(l->lwp_procp->p_brand_data != NULL);
 	ASSERT(l->lwp_brand != NULL);
@@ -547,7 +520,7 @@ s10_lwpexit(klwp_t *l)
 	 * (That case is handled by s10_proc_exit().)  There for this lwp
 	 * must be exiting from a multi-threaded process.
 	 */
-	ASSERT(p->p_tlist != p->p_tlist->t_forw);
+	ASSERT(l->lwp_procp->p_tlist != l->lwp_procp->p_tlist->t_forw);
 
 	l->lwp_brand = NULL;
 }
@@ -561,17 +534,9 @@ s10_free_brand_data(zone_t *zone)
 void
 s10_init_brand_data(zone_t *zone)
 {
-	s10_zone_data_t *data;
 	ASSERT(zone->zone_brand == &s10_brand);
 	ASSERT(zone->zone_brand_data == NULL);
-	data = (s10_zone_data_t *)kmem_zalloc(sizeof (s10_zone_data_t),
-	    KM_SLEEP);
-	/*
-	 * Initialize the default s10zd_emul_version to S10_EMUL_UNDEF.
-	 * This can be changed by a call to setattr() during zone boot.
-	 */
-	data->s10zd_emul_version = S10_EMUL_UNDEF;
-	zone->zone_brand_data = data;
+	zone->zone_brand_data = kmem_zalloc(sizeof (s10_zone_data_t), KM_SLEEP);
 }
 
 #if defined(_LP64)

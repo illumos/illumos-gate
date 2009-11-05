@@ -31,7 +31,6 @@
 #include <unistd.h>
 #include <thread.h>
 #include <sys/auxv.h>
-#include <sys/bitmap.h>
 #include <sys/brand.h>
 #include <sys/inttypes.h>
 #include <sys/lwp.h>
@@ -166,8 +165,48 @@
 
 static zoneid_t zoneid;
 static boolean_t emul_global_zone = B_FALSE;
-static int emul_vers;
+static s10_emul_bitmap_t emul_bitmap;
 pid_t zone_init_pid;
+
+/*
+ * S10_FEATURE_IS_PRESENT is a macro that helps facilitate conditional
+ * emulation.  For each constant N defined in the s10_emulated_features
+ * enumeration in usr/src/uts/common/brand/solaris10/s10_brand.h,
+ * S10_FEATURE_IS_PRESENT(N) is true iff the feature/backport represented by N
+ * is present in the Solaris 10 image hosted within the zone.  In other words,
+ * S10_FEATURE_IS_PRESENT(N) is true iff the file /usr/lib/brand/solaris10/M,
+ * where M is the enum value of N, was present in the zone when the zone booted.
+ *
+ *
+ * *** Sample Usage
+ *
+ * Suppose that you need to backport a fix to Solaris 10 and there is
+ * emulation in place for the fix.  Suppose further that the emulation won't be
+ * needed if the fix is backported (i.e., if the fix is present in the hosted
+ * Solaris 10 environment, then the brand won't need the emulation).  Then if
+ * you add a constant named "S10_FEATURE_X" to the end of the
+ * s10_emulated_features enumeration that represents the backported fix and
+ * S10_FEATURE_X evaluates to four, then you should create a file named
+ * /usr/lib/brand/solaris10/4 as part of your backport.  Additionally, you
+ * should retain the aforementioned emulation but modify it so that it's
+ * performed only when S10_FEATURE_IS_PRESENT(S10_FEATURE_X) is false.  Thus the
+ * emulation function should look something like the following:
+ *
+ *	static int
+ *	my_emul_function(sysret_t *rv, ...)
+ *	{
+ *		if (S10_FEATURE_IS_PRESENT(S10_FEATURE_X)) {
+ *			// Don't emulate
+ *			return (__systemcall(rv, ...));
+ *		} else {
+ *			// Emulate whatever needs to be emulated when the
+ *			// backport isn't present in the Solaris 10 image.
+ *		}
+ *	}
+ */
+#define	S10_FEATURE_IS_PRESENT(s10_emulated_features_constant)	\
+	((emul_bitmap[(s10_emulated_features_constant) >> 3] &	\
+	(1 << ((s10_emulated_features_constant) & 0x7))) != 0)
 
 #define	EMULATE(cb, args)	{ (sysent_cb_t)(cb), (args) }
 #define	NOSYS			EMULATE(s10_unimpl, (0 | RV_DEFAULT))
@@ -1567,10 +1606,9 @@ s10_init(int argc, char *argv[], char *envp[])
 	s10_assert(err == 0);
 	zoneid = (zoneid_t)rval.sys_rval1;
 
-	/* Get the emulation version number. */
+	/* Get the zone's emulation bitmap. */
 	if ((err = __systemcall(&rval, SYS_zone, ZONE_GETATTR, zoneid,
-	    S10_EMUL_VERSION_NUM, &emul_vers, sizeof (emul_vers))) != 0 ||
-	    emul_vers != 0) {
+	    S10_EMUL_BITMAP, emul_bitmap, sizeof (emul_bitmap))) != 0) {
 		s10_abort(err, "The zone's patch level is unsupported");
 		/*NOTREACHED*/
 	}
