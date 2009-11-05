@@ -146,7 +146,7 @@ static void
 spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 {
 	uint64_t size;
-	uint64_t used;
+	uint64_t alloc;
 	uint64_t cap, version;
 	zprop_source_t src = ZPROP_SRC_NONE;
 	spa_config_dirent_t *dp;
@@ -154,15 +154,15 @@ spa_prop_get_config(spa_t *spa, nvlist_t **nvp)
 	ASSERT(MUTEX_HELD(&spa->spa_props_lock));
 
 	if (spa->spa_root_vdev != NULL) {
-		used = metaslab_class_get_alloc(spa_normal_class(spa));
+		alloc = metaslab_class_get_alloc(spa_normal_class(spa));
 		size = metaslab_class_get_space(spa_normal_class(spa));
 		spa_prop_add_list(*nvp, ZPOOL_PROP_NAME, spa_name(spa), 0, src);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_SIZE, NULL, size, src);
-		spa_prop_add_list(*nvp, ZPOOL_PROP_USED, NULL, used, src);
-		spa_prop_add_list(*nvp, ZPOOL_PROP_AVAILABLE, NULL,
-		    size - used, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_ALLOCATED, NULL, alloc, src);
+		spa_prop_add_list(*nvp, ZPOOL_PROP_FREE, NULL,
+		    size - alloc, src);
 
-		cap = (size == 0) ? 0 : (used * 100 / size);
+		cap = (size == 0) ? 0 : (alloc * 100 / size);
 		spa_prop_add_list(*nvp, ZPOOL_PROP_CAPACITY, NULL, cap, src);
 
 		spa_prop_add_list(*nvp, ZPOOL_PROP_DEDUPRATIO, NULL,
@@ -1683,6 +1683,8 @@ spa_load(spa_t *spa, spa_load_state_t state, int mosconfig)
 		goto out;
 	}
 
+	spa_update_dspace(spa);
+
 	if (state != SPA_LOAD_TRYIMPORT) {
 		error = spa_load_verify(spa);
 		if (error) {
@@ -2495,6 +2497,13 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	spa->spa_dsl_pool = dp = dsl_pool_create(spa, zplprops, txg);
 	spa->spa_meta_objset = dp->dp_meta_objset;
 
+	/*
+	 * Create DDTs (dedup tables).
+	 */
+	ddt_create(spa);
+
+	spa_update_dspace(spa);
+
 	tx = dmu_tx_create_assigned(dp, txg);
 
 	/*
@@ -2554,11 +2563,6 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 		spa_configfile_set(spa, props, B_FALSE);
 		spa_sync_props(spa, props, CRED(), tx);
 	}
-
-	/*
-	 * Create DDTs (dedup tables).
-	 */
-	ddt_create(spa);
 
 	dmu_tx_commit(tx);
 
@@ -4817,6 +4821,8 @@ spa_sync(spa_t *spa, uint64_t txg)
 	 */
 	while (vd = txg_list_remove(&spa->spa_vdev_txg_list, TXG_CLEAN(txg)))
 		vdev_sync_done(vd, txg);
+
+	spa_update_dspace(spa);
 
 	/*
 	 * It had better be the case that we didn't dirty anything

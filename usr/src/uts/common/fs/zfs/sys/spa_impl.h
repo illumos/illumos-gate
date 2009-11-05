@@ -182,6 +182,7 @@ struct spa {
 	uint64_t	spa_ddt_stat_object;	/* DDT statistics */
 	uint64_t	spa_dedup_ditto;	/* dedup ditto threshold */
 	uint64_t	spa_dedup_checksum;	/* default dedup checksum */
+	uint64_t	spa_dspace;		/* dspace in normal class */
 	boolean_t	spa_autoreplace;	/* autoreplace set in open */
 	int		spa_vdev_locks;		/* locks grabbed */
 	/*

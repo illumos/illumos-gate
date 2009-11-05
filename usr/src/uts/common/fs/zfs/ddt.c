@@ -398,11 +398,10 @@ ddt_histogram_empty(const ddt_histogram_t *ddh)
 	return (B_TRUE);
 }
 
-uint64_t
-ddt_get_pool_dedup_ratio(spa_t *spa)
+static void
+ddt_get_dedup_stats(spa_t *spa, ddt_stat_t *dds_total)
 {
 	ddt_histogram_t ddh_total = { 0 };
-	ddt_stat_t dds_total = { 0 };
 
 	for (enum zio_checksum c = 0; c < ZIO_CHECKSUM_FUNCTIONS; c++) {
 		ddt_t *ddt = spa->spa_ddt[c];
@@ -415,8 +414,24 @@ ddt_get_pool_dedup_ratio(spa_t *spa)
 		}
 	}
 
-	ddt_histogram_stat(&dds_total, &ddh_total);
+	ddt_histogram_stat(dds_total, &ddh_total);
+}
 
+uint64_t
+ddt_get_dedup_dspace(spa_t *spa)
+{
+	ddt_stat_t dds_total = { 0 };
+
+	ddt_get_dedup_stats(spa, &dds_total);
+	return (dds_total.dds_ref_dsize - dds_total.dds_dsize);
+}
+
+uint64_t
+ddt_get_pool_dedup_ratio(spa_t *spa)
+{
+	ddt_stat_t dds_total = { 0 };
+
+	ddt_get_dedup_stats(spa, &dds_total);
 	if (dds_total.dds_dsize == 0)
 		return (100);
 

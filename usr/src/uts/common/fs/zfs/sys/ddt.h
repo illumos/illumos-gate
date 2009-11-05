@@ -203,6 +203,7 @@ extern void ddt_histogram_add(ddt_histogram_t *dst, const ddt_histogram_t *src);
 extern void ddt_histogram_stat(ddt_stat_t *dds, const ddt_histogram_t *ddh);
 extern boolean_t ddt_histogram_empty(const ddt_histogram_t *ddh);
 
+extern uint64_t ddt_get_dedup_dspace(spa_t *spa);
 extern uint64_t ddt_get_pool_dedup_ratio(spa_t *spa);
 
 extern int ddt_ditto_copies_needed(ddt_t *ddt, ddt_entry_t *dde,

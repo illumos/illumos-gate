@@ -45,6 +45,7 @@
 #include <sys/metaslab_impl.h>
 #include <sys/sunddi.h>
 #include <sys/arc.h>
+#include <sys/ddt.h>
 #include "zfs_prop.h"
 
 /*
@@ -1251,6 +1252,19 @@ spa_get_asize(spa_t *spa, uint64_t lsize)
 	 * the block may be dittoed with up to 3 DVAs by ddt_sync().
 	 */
 	return (lsize * (VDEV_RAIDZ_MAXPARITY + 1) * SPA_DVAS_PER_BP * 2);
+}
+
+uint64_t
+spa_get_dspace(spa_t *spa)
+{
+	return (spa->spa_dspace);
+}
+
+void
+spa_update_dspace(spa_t *spa)
+{
+	spa->spa_dspace = metaslab_class_get_dspace(spa_normal_class(spa)) +
+	    ddt_get_dedup_dspace(spa);
 }
 
 /*

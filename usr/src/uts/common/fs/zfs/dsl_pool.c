@@ -472,7 +472,7 @@ dsl_pool_adjustedsize(dsl_pool_t *dp, boolean_t netfree)
 	 * cut the reservation in half to allow forward progress
 	 * (e.g. make it possible to rm(1) files from a full pool).
 	 */
-	space = metaslab_class_get_dspace(spa_normal_class(dp->dp_spa));
+	space = spa_get_dspace(dp->dp_spa);
 	resv = MAX(space >> 6, SPA_MINDEVSIZE >> 1);
 	if (netfree)
 		resv >>= 1;

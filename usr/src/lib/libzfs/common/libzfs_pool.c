@@ -311,8 +311,8 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *buf, size_t len,
 
 		switch (prop) {
 		case ZPOOL_PROP_SIZE:
-		case ZPOOL_PROP_USED:
-		case ZPOOL_PROP_AVAILABLE:
+		case ZPOOL_PROP_ALLOCATED:
+		case ZPOOL_PROP_FREE:
 			(void) zfs_nicenum(intval, buf, len);
 			break;
 

@@ -74,10 +74,10 @@ zpool_prop_init(void)
 	/* readonly number properties */
 	register_number(ZPOOL_PROP_SIZE, "size", 0, PROP_READONLY,
 	    ZFS_TYPE_POOL, "<size>", "SIZE");
-	register_number(ZPOOL_PROP_USED, "used", 0, PROP_READONLY,
-	    ZFS_TYPE_POOL, "<size>", "USED");
-	register_number(ZPOOL_PROP_AVAILABLE, "available", 0, PROP_READONLY,
-	    ZFS_TYPE_POOL, "<size>", "AVAIL");
+	register_number(ZPOOL_PROP_FREE, "free", 0, PROP_READONLY,
+	    ZFS_TYPE_POOL, "<size>", "FREE");
+	register_number(ZPOOL_PROP_ALLOCATED, "allocated", 0, PROP_READONLY,
+	    ZFS_TYPE_POOL, "<size>", "ALLOC");
 	register_number(ZPOOL_PROP_CAPACITY, "capacity", 0, PROP_READONLY,
 	    ZFS_TYPE_POOL, "<size>", "CAP");
 	register_number(ZPOOL_PROP_GUID, "guid", 0, PROP_READONLY,

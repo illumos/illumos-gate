@@ -1923,7 +1923,7 @@ print_iostat_header(iostat_cbdata_t *cb)
 {
 	(void) printf("%*s     capacity     operations    bandwidth\n",
 	    cb->cb_namewidth, "");
-	(void) printf("%-*s   used  avail   read  write   read  write\n",
+	(void) printf("%-*s  alloc   free   read  write   read  write\n",
 	    cb->cb_namewidth, "pool");
 	print_iostat_separator(cb);
 }
@@ -2437,7 +2437,7 @@ list_callback(zpool_handle_t *zhp, void *data)
  *	-H	Scripted mode.  Don't display headers, and separate properties
  *		by a single tab.
  *	-o	List of properties to display.  Defaults to
- *		"name,size,used,available,capacity,health,altroot"
+ *		"name,size,allocated,free,capacity,health,altroot"
  *
  * List all pools in the system, whether or not they're healthy.  Output space
  * statistics for each one, as well as health status summary.
@@ -2449,7 +2449,7 @@ zpool_do_list(int argc, char **argv)
 	int ret;
 	list_cbdata_t cb = { 0 };
 	static char default_props[] =
-	    "name,size,used,available,capacity,dedupratio,health,altroot";
+	    "name,size,allocated,free,capacity,dedupratio,health,altroot";
 	char *props = default_props;
 
 	/* check options */
