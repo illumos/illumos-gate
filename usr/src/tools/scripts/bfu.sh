@@ -8095,6 +8095,25 @@ mondo_loop() {
 	rm -f $usr/include/sys/cg6tec.h
 	rm -f $usr/include/sys/ramdac.h
 
+	# Remove ucb plotting bits
+	rm -rf $usr/ucb/aedplot
+	rm -rf $usr/ucb/atoplot
+	rm -rf $usr/ucb/bgplot
+	rm -rf $usr/ucb/crtplot
+	rm -rf $usr/ucb/dumbplot
+	rm -rf $usr/ucb/gigiplot
+	rm -rf $usr/ucb/hp7221plot
+	rm -rf $usr/ucb/hpplot
+	rm -rf $usr/ucb/implot
+	rm -rf $usr/ucb/plot
+	rm -rf $usr/ucb/plottoa
+	rm -rf $usr/ucb/t300
+	rm -rf $usr/ucb/t300s
+	rm -rf $usr/ucb/t4013
+	rm -rf $usr/ucb/t450
+	rm -rf $usr/ucb/tek
+	rm -rf $usr/ucb/vplot
+
 	#
 	# The pkg* commands should not be used after this point and before
 	# archive extraction as libcrypto/libssl may not be available.
