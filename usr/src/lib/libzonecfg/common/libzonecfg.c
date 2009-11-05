@@ -931,7 +931,7 @@ i_zonecfg_get_brand(zone_dochandle_t handle, char *brand, size_t brandsize,
 
 	if (!default_query) {
 		/* If the zone has no brand, it is the default brand. */
-		return (zonecfg_default_brand(brand, sizeof (brandsize)));
+		return (zonecfg_default_brand(brand, brandsize));
 	}
 
 	/* if SUNWdefault didn't specify a brand, fallback to "native" */
