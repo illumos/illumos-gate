@@ -51,18 +51,13 @@ d none usr/share/lib/zoneinfo 755 root bin
 s none usr/share/lib/zoneinfo/posixrules=./US/Eastern
 d none usr/ucb 755 root bin
 s none usr/ucb/Mail=../bin/mailx
-f none usr/ucb/aedplot 755 root bin
 s none usr/ucb/arch=../bin/arch
-f none usr/ucb/atoplot 755 root bin
 f none usr/ucb/basename 755 root bin
-f none usr/ucb/bgplot 755 root bin
 f none usr/ucb/biff 755 root bin
 f none usr/ucb/chown 755 root bin
 s none usr/ucb/clear=../bin/clear
-f none usr/ucb/crtplot 755 root bin
 f none usr/ucb/df 755 root bin
 f none usr/ucb/du 755 root bin
-f none usr/ucb/dumbplot 755 root bin
 s none usr/ucb/e=../bin/ex
 f none usr/ucb/echo 755 root bin
 s none usr/ucb/edit=../bin/edit
@@ -76,14 +71,10 @@ s none usr/ucb/fmt=../bin/fmt
 s none usr/ucb/fold=../bin/fold
 f none usr/ucb/from 755 root bin
 s none usr/ucb/ftp=../bin/ftp
-f none usr/ucb/gigiplot 755 root bin
 f none usr/ucb/groups 755 root bin
 s none usr/ucb/head=../bin/head
 s none usr/ucb/hostid=../bin/hostid
 s none usr/ucb/hostname=../bin/hostname
-f none usr/ucb/hp7221plot 755 root bin
-f none usr/ucb/hpplot 755 root bin
-f none usr/ucb/implot 755 root bin
 f none usr/ucb/install 755 root bin
 f none usr/ucb/ln 755 root bin
 s none usr/ucb/logger=../bin/logger
@@ -95,8 +86,6 @@ s none usr/ucb/more=../bin/more
 s none usr/ucb/netstat=../bin/netstat
 s none usr/ucb/page=../bin/more
 s none usr/ucb/pagesize=../bin/pagesize
-f none usr/ucb/plot 755 root bin
-f none usr/ucb/plottoa 755 root bin
 f none usr/ucb/printenv 755 root bin
 l none usr/ucb/ps=../../usr/lib/isaexec
 s none usr/ucb/quota=../lib/fs/ufs/quota
@@ -115,14 +104,9 @@ f none usr/ucb/sed 555 root bin
 f none usr/ucb/shutdown 755 root bin
 f none usr/ucb/stty 755 root bin
 f none usr/ucb/sum 755 root bin
-f none usr/ucb/t300 755 root bin
-f none usr/ucb/t300s 755 root bin
-f none usr/ucb/t4013 755 root bin
-f none usr/ucb/t450 755 root bin
 s none usr/ucb/tail=../bin/tail
 s none usr/ucb/talk=../bin/talk
 s none usr/ucb/tcopy=../bin/tcopy
-f none usr/ucb/tek 755 root bin
 s none usr/ucb/telnet=../bin/telnet
 f none usr/ucb/test 755 root bin
 s none usr/ucb/tftp=../bin/tftp
@@ -137,7 +121,6 @@ s none usr/ucb/vi=../bin/vi
 s none usr/ucb/view=../bin/view
 f none usr/ucb/vipw 555 root bin
 s none usr/ucb/vmstat=../bin/vmstat
-f none usr/ucb/vplot 755 root bin
 s none usr/ucb/w=../bin/w
 s none usr/ucb/wc=../bin/wc
 f none usr/ucb/whereis 755 root bin

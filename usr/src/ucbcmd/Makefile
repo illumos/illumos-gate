@@ -46,7 +46,6 @@ COMMON_SUBDIRS=		\
 	ln		\
 	ls		\
 	mkstr		\
-	plot		\
 	printenv	\
 	rusage		\
 	sed		\

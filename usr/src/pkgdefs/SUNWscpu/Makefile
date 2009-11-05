@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -34,7 +32,6 @@ LICENSEFILES += \
 	../../ucbcmd/groups/THIRDPARTYLICENSE \
 	../../ucbcmd/ln/THIRDPARTYLICENSE \
 	../../ucbcmd/ls/THIRDPARTYLICENSE \
-	../../ucbcmd/plot/THIRDPARTYLICENSE \
 	../../ucbcmd/sum/THIRDPARTYLICENSE \
 	../../ucbcmd/test/THIRDPARTYLICENSE \
 	../../ucbcmd/tset/THIRDPARTYLICENSE \
