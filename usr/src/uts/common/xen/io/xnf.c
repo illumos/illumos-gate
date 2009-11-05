@@ -57,7 +57,50 @@
  */
 
 /*
- * xnf.c - Nemo-based network driver for domU
+ * xnf.c - GLDv3 network driver for domU.
+ */
+
+/*
+ * This driver uses four per-instance locks:
+ *
+ * xnf_gref_lock:
+ *
+ *    Protects access to the grant reference list stored in
+ *    xnf_gref_head. Grant references should be acquired and released
+ *    using gref_get() and gref_put() respectively.
+ *
+ * xnf_schedlock:
+ *
+ *    Protects:
+ *    xnf_need_sched - used to record that a previous transmit attempt
+ *       failed (and consequently it will be necessary to call
+ *       mac_tx_update() when transmit resources are available).
+ *    xnf_pending_multicast - the number of multicast requests that
+ *       have been submitted to the backend for which we have not
+ *       processed responses.
+ *
+ * xnf_txlock:
+ *
+ *    Protects the transmit ring (xnf_tx_ring) and associated
+ *    structures (notably xnf_tx_pkt_id and xnf_tx_pkt_id_head).
+ *
+ * xnf_rxlock:
+ *
+ *    Protects the receive ring (xnf_rx_ring) and associated
+ *    structures (notably xnf_rx_pkt_info).
+ *
+ * If driver-global state that affects both the transmit and receive
+ * rings is manipulated, both xnf_txlock and xnf_rxlock should be
+ * held, in that order.
+ *
+ * xnf_schedlock is acquired both whilst holding xnf_txlock and
+ * without. It should always be acquired after xnf_txlock if both are
+ * held.
+ *
+ * Notes:
+ * - atomic_add_64() is used to manipulate counters where we require
+ *   accuracy. For counters intended only for observation by humans,
+ *   post increment/decrement are used instead.
  */
 
 #include <sys/types.h>
@@ -67,6 +110,7 @@
 #include <sys/systm.h>
 #include <sys/stream.h>
 #include <sys/strsubr.h>
+#include <sys/strsun.h>
 #include <sys/conf.h>
 #include <sys/ddi.h>
 #include <sys/devops.h>
@@ -96,17 +140,18 @@
 #include <sys/gnttab.h>
 #include <xen/sys/xendev.h>
 #include <sys/sdt.h>
+#include <sys/note.h>
+#include <sys/debug.h>
 
 #include <io/xnf.h>
 
-
-/*
- *  Declarations and Module Linkage
- */
-
 #if defined(DEBUG) || defined(__lint)
 #define	XNF_DEBUG
-int	xnfdebug = 0;
+#endif
+
+#ifdef XNF_DEBUG
+int xnf_debug = 0;
+xnf_t *xnf_debug_instance = NULL;
 #endif
 
 /*
@@ -117,23 +162,39 @@ int	xnfdebug = 0;
  */
 #define	xnf_btop(addr)	((addr) >> PAGESHIFT)
 
-boolean_t	xnf_cksum_offload = B_TRUE;
-
-/* Default value for hypervisor-based copy operations */
-boolean_t	xnf_rx_hvcopy = B_TRUE;
-
-/*
- * Should pages used for transmit be readonly for the peer?
- */
-boolean_t	xnf_tx_pages_readonly = B_FALSE;
-/*
- * Packets under this size are bcopied instead of using desballoc.
- * Choose a value > XNF_FRAMESIZE (1514) to force the receive path to
- * always copy.
- */
-unsigned int	xnf_rx_bcopy_thresh = 64;
-
 unsigned int	xnf_max_tx_frags = 1;
+
+/*
+ * Should we use the multicast control feature if the backend provides
+ * it?
+ */
+boolean_t xnf_multicast_control = B_TRUE;
+
+/*
+ * Received packets below this size are copied to a new streams buffer
+ * rather than being desballoc'ed.
+ *
+ * This value is chosen to accommodate traffic where there are a large
+ * number of small packets. For data showing a typical distribution,
+ * see:
+ *
+ * Sinha07a:
+ *	Rishi Sinha, Christos Papadopoulos, and John
+ *	Heidemann. Internet Packet Size Distributions: Some
+ *	Observations. Technical Report ISI-TR-2007-643,
+ *	USC/Information Sciences Institute, May, 2007. Orignally
+ *	released October 2005 as web page
+ *	http://netweb.usc.edu/~sinha/pkt-sizes/.
+ *	<http://www.isi.edu/~johnh/PAPERS/Sinha07a.html>.
+ */
+size_t xnf_rx_copy_limit = 64;
+
+#define	INVALID_GRANT_HANDLE	((grant_handle_t)-1)
+#define	INVALID_GRANT_REF	((grant_ref_t)-1)
+#define	INVALID_TX_ID		((uint16_t)-1)
+
+#define	TX_ID_TO_TXID(p, id) (&((p)->xnf_tx_pkt_id[(id)]))
+#define	TX_ID_VALID(i) (((i) != INVALID_TX_ID) && ((i) < NET_TX_RING_SIZE))
 
 /* Required system entry points */
 static int	xnf_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -148,35 +209,46 @@ static int	xnf_set_promiscuous(void *, boolean_t);
 static mblk_t	*xnf_send(void *, mblk_t *);
 static uint_t	xnf_intr(caddr_t);
 static int	xnf_stat(void *, uint_t, uint64_t *);
-static void	xnf_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t xnf_getcapab(void *, mac_capab_t, void *);
 
 /* Driver private functions */
 static int xnf_alloc_dma_resources(xnf_t *);
 static void xnf_release_dma_resources(xnf_t *);
-static mblk_t *xnf_process_recv(xnf_t *);
-static void xnf_rcv_complete(struct xnf_buffer_desc *);
 static void xnf_release_mblks(xnf_t *);
-static struct xnf_buffer_desc *xnf_alloc_tx_buffer(xnf_t *);
-static struct xnf_buffer_desc *xnf_alloc_buffer(xnf_t *);
-static struct xnf_buffer_desc *xnf_get_tx_buffer(xnf_t *);
-static struct xnf_buffer_desc *xnf_get_buffer(xnf_t *);
-static void xnf_free_buffer(struct xnf_buffer_desc *);
-static void xnf_free_tx_buffer(struct xnf_buffer_desc *);
+
+static int xnf_buf_constructor(void *, void *, int);
+static void xnf_buf_destructor(void *, void *);
+static xnf_buf_t *xnf_buf_get(xnf_t *, int, boolean_t);
+#pragma inline(xnf_buf_get)
+static void xnf_buf_put(xnf_t *, xnf_buf_t *, boolean_t);
+#pragma inline(xnf_buf_put)
+static void xnf_buf_refresh(xnf_buf_t *);
+#pragma inline(xnf_buf_refresh)
+static void xnf_buf_recycle(xnf_buf_t *);
+
+static int xnf_tx_buf_constructor(void *, void *, int);
+static void xnf_tx_buf_destructor(void *, void *);
+
+static grant_ref_t gref_get(xnf_t *);
+#pragma inline(gref_get)
+static void gref_put(xnf_t *, grant_ref_t);
+#pragma inline(gref_put)
+
+static xnf_txid_t *txid_get(xnf_t *);
+#pragma inline(txid_get)
+static void txid_put(xnf_t *, xnf_txid_t *);
+#pragma inline(txid_put)
+
 void xnf_send_driver_status(int, int);
-static void rx_buffer_hang(xnf_t *, struct xnf_buffer_desc *);
-static int xnf_clean_tx_ring(xnf_t  *);
+static void xnf_rxbuf_hang(xnf_t *, xnf_buf_t *);
+static int xnf_tx_clean_ring(xnf_t  *);
 static void oe_state_change(dev_info_t *, ddi_eventcookie_t,
     void *, void *);
-static mblk_t *xnf_process_hvcopy_recv(xnf_t *xnfp);
-static boolean_t xnf_hvcopy_peer_status(dev_info_t *devinfo);
-static boolean_t xnf_kstat_init(xnf_t *xnfp);
+static boolean_t xnf_kstat_init(xnf_t *);
+static void xnf_rx_collect(xnf_t *);
 
-/*
- * XXPV dme: remove MC_IOCTL?
- */
 static mac_callbacks_t xnf_callbacks = {
-	MC_IOCTL | MC_GETCAPAB,
+	MC_GETCAPAB,
 	xnf_stat,
 	xnf_start,
 	xnf_stop,
@@ -184,13 +256,9 @@ static mac_callbacks_t xnf_callbacks = {
 	xnf_set_multicast,
 	xnf_set_mac_addr,
 	xnf_send,
-	xnf_ioctl,
+	NULL,
 	xnf_getcapab
 };
-
-#define	GRANT_INVALID_REF	0
-const int xnf_rx_bufs_lowat = 4 * NET_RX_RING_SIZE;
-const int xnf_rx_bufs_hiwat = 8 * NET_RX_RING_SIZE; /* default max */
 
 /* DMA attributes for network ring buffer */
 static ddi_dma_attr_t ringbuf_dma_attr = {
@@ -208,24 +276,8 @@ static ddi_dma_attr_t ringbuf_dma_attr = {
 	0,			/* flags (reserved) */
 };
 
-/* DMA attributes for transmit data */
-static ddi_dma_attr_t tx_buffer_dma_attr = {
-	DMA_ATTR_V0,		/* version of this structure */
-	0,			/* lowest usable address */
-	0xffffffffffffffffULL,	/* highest usable address */
-	0x7fffffff,		/* maximum DMAable byte count */
-	MMU_PAGESIZE,		/* alignment in bytes */
-	0x7ff,			/* bitmap of burst sizes */
-	1,			/* minimum transfer */
-	0xffffffffU,		/* maximum transfer */
-	0xffffffffffffffffULL,	/* maximum segment length */
-	1,			/* maximum number of segments */
-	1,			/* granularity */
-	0,			/* flags (reserved) */
-};
-
-/* DMA attributes for a receive buffer */
-static ddi_dma_attr_t rx_buffer_dma_attr = {
+/* DMA attributes for transmit and receive data */
+static ddi_dma_attr_t buf_dma_attr = {
 	DMA_ATTR_V0,		/* version of this structure */
 	0,			/* lowest usable address */
 	0xffffffffffffffffULL,	/* highest usable address */
@@ -253,9 +305,6 @@ static ddi_device_acc_attr_t data_accattr = {
 	DDI_NEVERSWAP_ACC,
 	DDI_STRICTORDER_ACC
 };
-
-unsigned char xnf_broadcastaddr[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-int xnf_diagnose = 0; /* Patchable global for diagnostic purposes */
 
 DDI_DEFINE_STREAM_OPS(xnf_dev_ops, nulldev, nulldev, xnf_attach, xnf_detach,
     nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
@@ -286,7 +335,7 @@ _init(void)
 int
 _fini(void)
 {
-	return (EBUSY); /* XXPV dme: should be removable */
+	return (EBUSY); /* XXPV should be removable */
 }
 
 int
@@ -295,19 +344,148 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
+/*
+ * Acquire a grant reference.
+ */
+static grant_ref_t
+gref_get(xnf_t *xnfp)
+{
+	grant_ref_t gref;
+
+	mutex_enter(&xnfp->xnf_gref_lock);
+
+	do {
+		gref = gnttab_claim_grant_reference(&xnfp->xnf_gref_head);
+
+	} while ((gref == INVALID_GRANT_REF) &&
+	    (gnttab_alloc_grant_references(16, &xnfp->xnf_gref_head) == 0));
+
+	mutex_exit(&xnfp->xnf_gref_lock);
+
+	if (gref == INVALID_GRANT_REF) {
+		xnfp->xnf_stat_gref_failure++;
+	} else {
+		atomic_add_64(&xnfp->xnf_stat_gref_outstanding, 1);
+		if (xnfp->xnf_stat_gref_outstanding > xnfp->xnf_stat_gref_peak)
+			xnfp->xnf_stat_gref_peak =
+			    xnfp->xnf_stat_gref_outstanding;
+	}
+
+	return (gref);
+}
+
+/*
+ * Release a grant reference.
+ */
+static void
+gref_put(xnf_t *xnfp, grant_ref_t gref)
+{
+	ASSERT(gref != INVALID_GRANT_REF);
+
+	mutex_enter(&xnfp->xnf_gref_lock);
+	gnttab_release_grant_reference(&xnfp->xnf_gref_head, gref);
+	mutex_exit(&xnfp->xnf_gref_lock);
+
+	atomic_add_64(&xnfp->xnf_stat_gref_outstanding, -1);
+}
+
+/*
+ * Acquire a transmit id.
+ */
+static xnf_txid_t *
+txid_get(xnf_t *xnfp)
+{
+	xnf_txid_t *tidp;
+
+	ASSERT(MUTEX_HELD(&xnfp->xnf_txlock));
+
+	if (xnfp->xnf_tx_pkt_id_head == INVALID_TX_ID)
+		return (NULL);
+
+	ASSERT(TX_ID_VALID(xnfp->xnf_tx_pkt_id_head));
+
+	tidp = TX_ID_TO_TXID(xnfp, xnfp->xnf_tx_pkt_id_head);
+	xnfp->xnf_tx_pkt_id_head = tidp->next;
+	tidp->next = INVALID_TX_ID;
+
+	ASSERT(tidp->txbuf == NULL);
+
+	return (tidp);
+}
+
+/*
+ * Release a transmit id.
+ */
+static void
+txid_put(xnf_t *xnfp, xnf_txid_t *tidp)
+{
+	ASSERT(MUTEX_HELD(&xnfp->xnf_txlock));
+	ASSERT(TX_ID_VALID(tidp->id));
+	ASSERT(tidp->next == INVALID_TX_ID);
+
+	tidp->txbuf = NULL;
+	tidp->next = xnfp->xnf_tx_pkt_id_head;
+	xnfp->xnf_tx_pkt_id_head = tidp->id;
+}
+
+/*
+ * Get `wanted' slots in the transmit ring, waiting for at least that
+ * number if `wait' is B_TRUE. Force the ring to be cleaned by setting
+ * `wanted' to zero.
+ *
+ * Return the number of slots available.
+ */
+static int
+tx_slots_get(xnf_t *xnfp, int wanted, boolean_t wait)
+{
+	int slotsfree;
+	boolean_t forced_clean = (wanted == 0);
+
+	ASSERT(MUTEX_HELD(&xnfp->xnf_txlock));
+
+	/* LINTED: constant in conditional context */
+	while (B_TRUE) {
+		slotsfree = RING_FREE_REQUESTS(&xnfp->xnf_tx_ring);
+
+		if ((slotsfree < wanted) || forced_clean)
+			slotsfree = xnf_tx_clean_ring(xnfp);
+
+		/*
+		 * If there are more than we need free, tell other
+		 * people to come looking again. We hold txlock, so we
+		 * are able to take our slots before anyone else runs.
+		 */
+		if (slotsfree > wanted)
+			cv_broadcast(&xnfp->xnf_cv_tx_slots);
+
+		if (slotsfree >= wanted)
+			break;
+
+		if (!wait)
+			break;
+
+		cv_wait(&xnfp->xnf_cv_tx_slots, &xnfp->xnf_txlock);
+	}
+
+	ASSERT(slotsfree <= RING_SIZE(&(xnfp->xnf_tx_ring)));
+
+	return (slotsfree);
+}
+
 static int
 xnf_setup_rings(xnf_t *xnfp)
 {
-	int			ix, err;
-	RING_IDX		i;
-	struct xnf_buffer_desc	*bdesc, *rbp;
-	struct xenbus_device	*xsd;
 	domid_t			oeid;
+	struct xenbus_device	*xsd;
+	RING_IDX		i;
+	int			err;
+	xnf_txid_t		*tidp;
+	xnf_buf_t **bdescp;
 
 	oeid = xvdi_get_oeid(xnfp->xnf_devinfo);
 	xsd = xvdi_get_xsd(xnfp->xnf_devinfo);
 
-	if (xnfp->xnf_tx_ring_ref != GRANT_INVALID_REF)
+	if (xnfp->xnf_tx_ring_ref != INVALID_GRANT_REF)
 		gnttab_end_foreign_access(xnfp->xnf_tx_ring_ref, 0, 0);
 
 	err = gnttab_grant_foreign_access(oeid,
@@ -319,7 +497,7 @@ xnf_setup_rings(xnf_t *xnfp)
 	}
 	xnfp->xnf_tx_ring_ref = (grant_ref_t)err;
 
-	if (xnfp->xnf_rx_ring_ref != GRANT_INVALID_REF)
+	if (xnfp->xnf_rx_ring_ref != INVALID_GRANT_REF)
 		gnttab_end_foreign_access(xnfp->xnf_rx_ring_ref, 0, 0);
 
 	err = gnttab_grant_foreign_access(oeid,
@@ -331,138 +509,129 @@ xnf_setup_rings(xnf_t *xnfp)
 	}
 	xnfp->xnf_rx_ring_ref = (grant_ref_t)err;
 
-
-	mutex_enter(&xnfp->xnf_intrlock);
-
-	/*
-	 * Cleanup the TX ring.  We just clean up any valid tx_pktinfo structs
-	 * and reset the ring.  Note that this can lose packets after a resume,
-	 * but we expect to stagger on.
-	 */
 	mutex_enter(&xnfp->xnf_txlock);
 
-	for (i = 0; i < xnfp->xnf_n_tx; i++) {
-		struct tx_pktinfo *txp = &xnfp->xnf_tx_pkt_info[i];
+	/*
+	 * Setup/cleanup the TX ring.  Note that this can lose packets
+	 * after a resume, but we expect to stagger on.
+	 */
+	xnfp->xnf_tx_pkt_id_head = INVALID_TX_ID; /* I.e. emtpy list. */
+	for (i = 0, tidp = &xnfp->xnf_tx_pkt_id[0];
+	    i < NET_TX_RING_SIZE;
+	    i++, tidp++) {
+		xnf_txbuf_t *txp;
 
-		txp->id = i + 1;
+		tidp->id = i;
 
-		if (txp->grant_ref == GRANT_INVALID_REF) {
-			ASSERT(txp->mp == NULL);
-			ASSERT(txp->bdesc == NULL);
+		txp = tidp->txbuf;
+		if (txp == NULL) {
+			tidp->next = INVALID_TX_ID; /* Appease txid_put(). */
+			txid_put(xnfp, tidp);
 			continue;
 		}
 
-		if (gnttab_query_foreign_access(txp->grant_ref) != 0)
-			panic("tx grant still in use by backend domain");
+		ASSERT(txp->tx_txreq.gref != INVALID_GRANT_REF);
+		ASSERT(txp->tx_mp != NULL);
 
-		freemsg(txp->mp);
-		txp->mp = NULL;
+		switch (txp->tx_type) {
+		case TX_DATA:
+			VERIFY(gnttab_query_foreign_access(txp->tx_txreq.gref)
+			    == 0);
 
-		(void) ddi_dma_unbind_handle(txp->dma_handle);
+			if (txp->tx_bdesc == NULL) {
+				(void) gnttab_end_foreign_access_ref(
+				    txp->tx_txreq.gref, 1);
+				gref_put(xnfp, txp->tx_txreq.gref);
+				(void) ddi_dma_unbind_handle(
+				    txp->tx_dma_handle);
+			} else {
+				xnf_buf_put(xnfp, txp->tx_bdesc, B_TRUE);
+			}
 
-		if (txp->bdesc != NULL) {
-			xnf_free_tx_buffer(txp->bdesc);
-			txp->bdesc = NULL;
+			freemsg(txp->tx_mp);
+			txid_put(xnfp, tidp);
+			kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
+
+			break;
+
+		case TX_MCAST_REQ:
+			txp->tx_type = TX_MCAST_RSP;
+			txp->tx_status = NETIF_RSP_DROPPED;
+			cv_broadcast(&xnfp->xnf_cv_multicast);
+
+			/*
+			 * The request consumed two slots in the ring,
+			 * yet only a single xnf_txid_t is used. Step
+			 * over the empty slot.
+			 */
+			i++;
+			ASSERT(i < NET_TX_RING_SIZE);
+
+			break;
+
+		case TX_MCAST_RSP:
+			break;
 		}
-
-		(void) gnttab_end_foreign_access_ref(txp->grant_ref,
-		    xnfp->xnf_tx_pages_readonly);
-		gnttab_release_grant_reference(&xnfp->xnf_gref_tx_head,
-		    txp->grant_ref);
-		txp->grant_ref = GRANT_INVALID_REF;
 	}
-
-	xnfp->xnf_tx_pkt_id_list = 0;
-	xnfp->xnf_tx_ring.rsp_cons = 0;
-	xnfp->xnf_tx_ring.req_prod_pvt = 0;
 
 	/* LINTED: constant in conditional context */
 	SHARED_RING_INIT(xnfp->xnf_tx_ring.sring);
+	/* LINTED: constant in conditional context */
+	FRONT_RING_INIT(&xnfp->xnf_tx_ring,
+	    xnfp->xnf_tx_ring.sring, PAGESIZE);
 
 	mutex_exit(&xnfp->xnf_txlock);
 
+	mutex_enter(&xnfp->xnf_rxlock);
+
 	/*
-	 * Rebuild the RX ring.  We have to rebuild the RX ring because some of
-	 * our pages are currently flipped out/granted so we can't just free
-	 * the RX buffers.  Reclaim any unprocessed recv buffers, they won't be
-	 * useable anyway since the mfn's they refer to are no longer valid.
-	 * Grant the backend domain access to each hung rx buffer.
+	 * Clean out any buffers currently posted to the receive ring
+	 * before we reset it.
 	 */
-	i = xnfp->xnf_rx_ring.rsp_cons;
-	while (i++ != xnfp->xnf_rx_ring.sring->req_prod) {
-		volatile netif_rx_request_t	*rxrp;
-
-		rxrp = RING_GET_REQUEST(&xnfp->xnf_rx_ring, i);
-		ix = rxrp - RING_GET_REQUEST(&xnfp->xnf_rx_ring, 0);
-		rbp = xnfp->xnf_rxpkt_bufptr[ix];
-		if (rbp != NULL) {
-			grant_ref_t	ref = rbp->grant_ref;
-
-			ASSERT(ref != GRANT_INVALID_REF);
-			if (xnfp->xnf_rx_hvcopy) {
-				pfn_t pfn = xnf_btop(rbp->buf_phys);
-				mfn_t mfn = pfn_to_mfn(pfn);
-
-				gnttab_grant_foreign_access_ref(ref, oeid,
-				    mfn, 0);
-			} else {
-				gnttab_grant_foreign_transfer_ref(ref,
-				    oeid, 0);
-			}
-			rxrp->id = ix;
-			rxrp->gref = ref;
+	for (i = 0, bdescp = &xnfp->xnf_rx_pkt_info[0];
+	    i < NET_RX_RING_SIZE;
+	    i++, bdescp++) {
+		if (*bdescp != NULL) {
+			xnf_buf_put(xnfp, *bdescp, B_FALSE);
+			*bdescp = NULL;
 		}
 	}
 
-	/*
-	 * Reset the ring pointers to initial state.
-	 * Hang buffers for any empty ring slots.
-	 */
-	xnfp->xnf_rx_ring.rsp_cons = 0;
-	xnfp->xnf_rx_ring.req_prod_pvt = 0;
-
 	/* LINTED: constant in conditional context */
 	SHARED_RING_INIT(xnfp->xnf_rx_ring.sring);
+	/* LINTED: constant in conditional context */
+	FRONT_RING_INIT(&xnfp->xnf_rx_ring,
+	    xnfp->xnf_rx_ring.sring, PAGESIZE);
 
+	/*
+	 * Fill the ring with buffers.
+	 */
 	for (i = 0; i < NET_RX_RING_SIZE; i++) {
-		xnfp->xnf_rx_ring.req_prod_pvt = i;
-		if (xnfp->xnf_rxpkt_bufptr[i] != NULL)
-			continue;
-		if ((bdesc = xnf_get_buffer(xnfp)) == NULL)
-			break;
-		rx_buffer_hang(xnfp, bdesc);
+		xnf_buf_t *bdesc;
+
+		bdesc = xnf_buf_get(xnfp, KM_SLEEP, B_FALSE);
+		VERIFY(bdesc != NULL);
+		xnf_rxbuf_hang(xnfp, bdesc);
 	}
-	xnfp->xnf_rx_ring.req_prod_pvt = i;
+
 	/* LINTED: constant in conditional context */
 	RING_PUSH_REQUESTS(&xnfp->xnf_rx_ring);
 
-	mutex_exit(&xnfp->xnf_intrlock);
+	mutex_exit(&xnfp->xnf_rxlock);
 
 	return (0);
 
 out:
-	if (xnfp->xnf_tx_ring_ref != GRANT_INVALID_REF)
+	if (xnfp->xnf_tx_ring_ref != INVALID_GRANT_REF)
 		gnttab_end_foreign_access(xnfp->xnf_tx_ring_ref, 0, 0);
-	xnfp->xnf_tx_ring_ref = GRANT_INVALID_REF;
+	xnfp->xnf_tx_ring_ref = INVALID_GRANT_REF;
 
-	if (xnfp->xnf_rx_ring_ref != GRANT_INVALID_REF)
+	if (xnfp->xnf_rx_ring_ref != INVALID_GRANT_REF)
 		gnttab_end_foreign_access(xnfp->xnf_rx_ring_ref, 0, 0);
-	xnfp->xnf_rx_ring_ref = GRANT_INVALID_REF;
+	xnfp->xnf_rx_ring_ref = INVALID_GRANT_REF;
 
 	return (err);
 }
-
-
-/* Called when the upper layers free a message we passed upstream */
-static void
-xnf_copy_rcv_complete(struct xnf_buffer_desc *bdesc)
-{
-	(void) ddi_dma_unbind_handle(bdesc->dma_handle);
-	ddi_dma_mem_free(&bdesc->acc_handle);
-	ddi_dma_free_handle(&bdesc->dma_handle);
-	kmem_free(bdesc, sizeof (*bdesc));
-}
-
 
 /*
  * Connect driver to back end, called to set up communication with
@@ -523,31 +692,24 @@ again:
 		goto abort_transaction;
 	}
 
-	if (!xnfp->xnf_tx_pages_readonly) {
-		err = xenbus_printf(xbt, xsname, "feature-tx-writable",
-		    "%d", 1);
-		if (err != 0) {
-			message = "writing feature-tx-writable";
-			goto abort_transaction;
-		}
-	}
-
-	err = xenbus_printf(xbt, xsname, "feature-no-csum-offload", "%d",
-	    xnfp->xnf_cksum_offload ? 0 : 1);
-	if (err != 0) {
-		message = "writing feature-no-csum-offload";
-		goto abort_transaction;
-	}
-	err = xenbus_printf(xbt, xsname, "request-rx-copy", "%d",
-	    xnfp->xnf_rx_hvcopy ? 1 : 0);
+	err = xenbus_printf(xbt, xsname, "request-rx-copy", "%d", 1);
 	if (err != 0) {
 		message = "writing request-rx-copy";
 		goto abort_transaction;
 	}
 
-	err = xenbus_printf(xbt, xsname, "state", "%d", XenbusStateConnected);
+	if (xnfp->xnf_be_mcast_control) {
+		err = xenbus_printf(xbt, xsname, "request-multicast-control",
+		    "%d", 1);
+		if (err != 0) {
+			message = "writing request-multicast-control";
+			goto abort_transaction;
+		}
+	}
+
+	err = xvdi_switch_state(xnfp->xnf_devinfo, xbt, XenbusStateConnected);
 	if (err != 0) {
-		message = "writing frontend XenbusStateConnected";
+		message = "switching state to XenbusStateConnected";
 		goto abort_transaction;
 	}
 
@@ -566,15 +728,16 @@ abort_transaction:
 }
 
 /*
- * Read config info from xenstore
+ * Read configuration information from xenstore.
  */
 void
 xnf_read_config(xnf_t *xnfp)
 {
-	char		mac[ETHERADDRL * 3];
-	int		err, be_no_cksum_offload;
+	int err, be_cap;
+	char mac[ETHERADDRL * 3];
+	char *oename = xvdi_get_oename(xnfp->xnf_devinfo);
 
-	err = xenbus_scanf(XBT_NULL, xvdi_get_oename(xnfp->xnf_devinfo), "mac",
+	err = xenbus_scanf(XBT_NULL, oename, "mac",
 	    "%s", (char *)&mac[0]);
 	if (err != 0) {
 		/*
@@ -593,27 +756,31 @@ xnf_read_config(xnf_t *xnfp)
 		return;
 	}
 
-	err = xenbus_scanf(XBT_NULL, xvdi_get_oename(xnfp->xnf_devinfo),
-	    "feature-no-csum-offload", "%d", &be_no_cksum_offload);
+	err = xenbus_scanf(XBT_NULL, oename,
+	    "feature-rx-copy", "%d", &be_cap);
 	/*
 	 * If we fail to read the store we assume that the key is
 	 * absent, implying an older domain at the far end.  Older
-	 * domains always support checksum offload.
+	 * domains cannot do HV copy.
 	 */
 	if (err != 0)
-		be_no_cksum_offload = 0;
+		be_cap = 0;
+	xnfp->xnf_be_rx_copy = (be_cap != 0);
+
+	err = xenbus_scanf(XBT_NULL, oename,
+	    "feature-multicast-control", "%d", &be_cap);
 	/*
-	 * If the far end cannot do checksum offload or we do not wish
-	 * to do it, disable it.
+	 * If we fail to read the store we assume that the key is
+	 * absent, implying an older domain at the far end.  Older
+	 * domains do not support multicast control.
 	 */
-	if ((be_no_cksum_offload == 1) || !xnfp->xnf_cksum_offload)
-		xnfp->xnf_cksum_offload = B_FALSE;
+	if (err != 0)
+		be_cap = 0;
+	xnfp->xnf_be_mcast_control = (be_cap != 0) && xnf_multicast_control;
 }
 
 /*
  *  attach(9E) -- Attach a device to the system
- *
- *  Called once for each board successfully probed.
  */
 static int
 xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
@@ -621,9 +788,10 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	mac_register_t *macp;
 	xnf_t *xnfp;
 	int err;
+	char cachename[32];
 
 #ifdef XNF_DEBUG
-	if (xnfdebug & XNF_DEBUG_DDI)
+	if (xnf_debug & XNF_DEBUG_DDI)
 		printf("xnf%d: attach(0x%p)\n", ddi_get_instance(devinfo),
 		    (void *)devinfo);
 #endif
@@ -631,6 +799,7 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_RESUME:
 		xnfp = ddi_get_driver_private(devinfo);
+		xnfp->xnf_gen++;
 
 		(void) xvdi_resume(devinfo);
 		(void) xvdi_alloc_evtchn(devinfo);
@@ -642,16 +811,6 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		(void) ddi_add_intr(devinfo, 0, NULL, NULL, xnf_intr,
 		    (caddr_t)xnfp);
 #endif
-		xnf_be_connect(xnfp);
-		/*
-		 * Our MAC address may have changed if we're resuming:
-		 * - on a different host
-		 * - on the same one and got a different MAC address
-		 *   because we didn't specify one of our own.
-		 * so it's useful to claim that it changed in order that
-		 * IP send out a gratuitous ARP.
-		 */
-		mac_unicst_update(xnfp->xnf_mh, xnfp->xnf_mac_addr);
 		return (DDI_SUCCESS);
 
 	case DDI_ATTACH:
@@ -681,11 +840,14 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	xnfp->xnf_running = B_FALSE;
 	xnfp->xnf_connected = B_FALSE;
-	xnfp->xnf_cksum_offload = xnf_cksum_offload;
-	xnfp->xnf_tx_pages_readonly = xnf_tx_pages_readonly;
+	xnfp->xnf_be_rx_copy = B_FALSE;
+	xnfp->xnf_be_mcast_control = B_FALSE;
 	xnfp->xnf_need_sched = B_FALSE;
 
-	xnfp->xnf_rx_hvcopy = xnf_hvcopy_peer_status(devinfo) && xnf_rx_hvcopy;
+	xnfp->xnf_rx_head = NULL;
+	xnfp->xnf_rx_tail = NULL;
+	xnfp->xnf_rx_new_buffers_posted = B_FALSE;
+
 #ifdef XPV_HVM_DRIVER
 	/*
 	 * Report our version to dom0.
@@ -693,12 +855,6 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	if (xenbus_printf(XBT_NULL, "guest/xnf", "version", "%d",
 	    HVMPV_XNF_VERS))
 		cmn_err(CE_WARN, "xnf: couldn't write version\n");
-
-	if (!xnfp->xnf_rx_hvcopy) {
-		cmn_err(CE_WARN, "The xnf driver requires a dom0 that "
-		    "supports 'feature-rx-copy'");
-		goto failure;
-	}
 #endif
 
 	/*
@@ -707,59 +863,58 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	if (ddi_get_iblock_cookie(devinfo, 0, &xnfp->xnf_icookie)
 	    != DDI_SUCCESS)
 		goto failure;
-	/*
-	 * Driver locking strategy: the txlock protects all paths
-	 * through the driver, except the interrupt thread.
-	 * If the interrupt thread needs to do something which could
-	 * affect the operation of any other part of the driver,
-	 * it needs to acquire the txlock mutex.
-	 */
-	mutex_init(&xnfp->xnf_tx_buf_mutex,
-	    NULL, MUTEX_DRIVER, xnfp->xnf_icookie);
-	mutex_init(&xnfp->xnf_rx_buf_mutex,
-	    NULL, MUTEX_DRIVER, xnfp->xnf_icookie);
+
 	mutex_init(&xnfp->xnf_txlock,
 	    NULL, MUTEX_DRIVER, xnfp->xnf_icookie);
-	mutex_init(&xnfp->xnf_intrlock,
+	mutex_init(&xnfp->xnf_rxlock,
 	    NULL, MUTEX_DRIVER, xnfp->xnf_icookie);
-	cv_init(&xnfp->xnf_cv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&xnfp->xnf_schedlock,
+	    NULL, MUTEX_DRIVER, xnfp->xnf_icookie);
+	mutex_init(&xnfp->xnf_gref_lock,
+	    NULL, MUTEX_DRIVER, xnfp->xnf_icookie);
 
-	xnfp->xnf_gref_tx_head = (grant_ref_t)-1;
-	xnfp->xnf_gref_rx_head = (grant_ref_t)-1;
-	if (gnttab_alloc_grant_references(NET_TX_RING_SIZE,
-	    &xnfp->xnf_gref_tx_head) < 0) {
-		cmn_err(CE_WARN, "xnf%d: can't alloc tx grant refs",
-		    ddi_get_instance(xnfp->xnf_devinfo));
+	cv_init(&xnfp->xnf_cv_state, NULL, CV_DEFAULT, NULL);
+	cv_init(&xnfp->xnf_cv_multicast, NULL, CV_DEFAULT, NULL);
+	cv_init(&xnfp->xnf_cv_tx_slots, NULL, CV_DEFAULT, NULL);
+
+	(void) sprintf(cachename, "xnf_buf_cache_%d",
+	    ddi_get_instance(devinfo));
+	xnfp->xnf_buf_cache = kmem_cache_create(cachename,
+	    sizeof (xnf_buf_t), 0,
+	    xnf_buf_constructor, xnf_buf_destructor,
+	    NULL, xnfp, NULL, 0);
+	if (xnfp->xnf_buf_cache == NULL)
+		goto failure_0;
+
+	(void) sprintf(cachename, "xnf_tx_buf_cache_%d",
+	    ddi_get_instance(devinfo));
+	xnfp->xnf_tx_buf_cache = kmem_cache_create(cachename,
+	    sizeof (xnf_txbuf_t), 0,
+	    xnf_tx_buf_constructor, xnf_tx_buf_destructor,
+	    NULL, xnfp, NULL, 0);
+	if (xnfp->xnf_tx_buf_cache == NULL)
 		goto failure_1;
-	}
-	if (gnttab_alloc_grant_references(NET_RX_RING_SIZE,
-	    &xnfp->xnf_gref_rx_head) < 0) {
-		cmn_err(CE_WARN, "xnf%d: can't alloc rx grant refs",
-		    ddi_get_instance(xnfp->xnf_devinfo));
-		goto failure_1;
-	}
+
+	xnfp->xnf_gref_head = INVALID_GRANT_REF;
+
 	if (xnf_alloc_dma_resources(xnfp) == DDI_FAILURE) {
 		cmn_err(CE_WARN, "xnf%d: failed to allocate and initialize "
 		    "driver data structures",
 		    ddi_get_instance(xnfp->xnf_devinfo));
-		goto failure_1;
+		goto failure_2;
 	}
 
 	xnfp->xnf_rx_ring.sring->rsp_event =
 	    xnfp->xnf_tx_ring.sring->rsp_event = 1;
 
-	xnfp->xnf_tx_ring_ref = GRANT_INVALID_REF;
-	xnfp->xnf_rx_ring_ref = GRANT_INVALID_REF;
+	xnfp->xnf_tx_ring_ref = INVALID_GRANT_REF;
+	xnfp->xnf_rx_ring_ref = INVALID_GRANT_REF;
 
 	/* set driver private pointer now */
 	ddi_set_driver_private(devinfo, xnfp);
 
-	if (xvdi_add_event_handler(devinfo, XS_OE_STATE, oe_state_change, NULL)
-	    != DDI_SUCCESS)
-		goto failure_1;
-
 	if (!xnf_kstat_init(xnfp))
-		goto failure_2;
+		goto failure_3;
 
 	/*
 	 * Allocate an event channel, add the interrupt handler and
@@ -773,12 +928,15 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	(void) ddi_add_intr(devinfo, 0, NULL, NULL, xnf_intr, (caddr_t)xnfp);
 #endif
 
-	xnf_read_config(xnfp);
 	err = mac_register(macp, &xnfp->xnf_mh);
 	mac_free(macp);
 	macp = NULL;
 	if (err != 0)
-		goto failure_3;
+		goto failure_4;
+
+	if (xvdi_add_event_handler(devinfo, XS_OE_STATE, oe_state_change, NULL)
+	    != DDI_SUCCESS)
+		goto failure_5;
 
 #ifdef XPV_HVM_DRIVER
 	/*
@@ -792,15 +950,17 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    "Ethernet controller");
 #endif
 
-	/*
-	 * connect to the backend
-	 */
-	xnf_be_connect(xnfp);
+#ifdef XNF_DEBUG
+	if (xnf_debug_instance == NULL)
+		xnf_debug_instance = xnfp;
+#endif
 
 	return (DDI_SUCCESS);
 
-failure_3:
-	kstat_delete(xnfp->xnf_kstat_aux);
+failure_5:
+	mac_unregister(xnfp->xnf_mh);
+
+failure_4:
 #ifdef XPV_HVM_DRIVER
 	ec_unbind_evtchn(xnfp->xnf_evtchn);
 	xvdi_free_evtchn(devinfo);
@@ -808,20 +968,26 @@ failure_3:
 	ddi_remove_intr(devinfo, 0, xnfp->xnf_icookie);
 #endif
 	xnfp->xnf_evtchn = INVALID_EVTCHN;
+	kstat_delete(xnfp->xnf_kstat_aux);
+
+failure_3:
+	xnf_release_dma_resources(xnfp);
 
 failure_2:
-	xvdi_remove_event_handler(devinfo, XS_OE_STATE);
+	kmem_cache_destroy(xnfp->xnf_tx_buf_cache);
 
 failure_1:
-	if (xnfp->xnf_gref_tx_head != (grant_ref_t)-1)
-		gnttab_free_grant_references(xnfp->xnf_gref_tx_head);
-	if (xnfp->xnf_gref_rx_head != (grant_ref_t)-1)
-		gnttab_free_grant_references(xnfp->xnf_gref_rx_head);
-	xnf_release_dma_resources(xnfp);
-	cv_destroy(&xnfp->xnf_cv);
-	mutex_destroy(&xnfp->xnf_rx_buf_mutex);
+	kmem_cache_destroy(xnfp->xnf_buf_cache);
+
+failure_0:
+	cv_destroy(&xnfp->xnf_cv_tx_slots);
+	cv_destroy(&xnfp->xnf_cv_multicast);
+	cv_destroy(&xnfp->xnf_cv_state);
+
+	mutex_destroy(&xnfp->xnf_gref_lock);
+	mutex_destroy(&xnfp->xnf_schedlock);
+	mutex_destroy(&xnfp->xnf_rxlock);
 	mutex_destroy(&xnfp->xnf_txlock);
-	mutex_destroy(&xnfp->xnf_intrlock);
 
 failure:
 	kmem_free(xnfp, sizeof (*xnfp));
@@ -836,10 +1002,9 @@ static int
 xnf_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 {
 	xnf_t *xnfp;		/* Our private device info */
-	int i;
 
 #ifdef XNF_DEBUG
-	if (xnfdebug & XNF_DEBUG_DDI)
+	if (xnf_debug & XNF_DEBUG_DDI)
 		printf("xnf_detach(0x%p)\n", (void *)devinfo);
 #endif
 
@@ -856,13 +1021,13 @@ xnf_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 
 		xvdi_suspend(devinfo);
 
-		mutex_enter(&xnfp->xnf_intrlock);
+		mutex_enter(&xnfp->xnf_rxlock);
 		mutex_enter(&xnfp->xnf_txlock);
 
 		xnfp->xnf_evtchn = INVALID_EVTCHN;
 		xnfp->xnf_connected = B_FALSE;
 		mutex_exit(&xnfp->xnf_txlock);
-		mutex_exit(&xnfp->xnf_intrlock);
+		mutex_exit(&xnfp->xnf_rxlock);
 
 		/* claim link to be down after disconnect */
 		mac_link_update(xnfp->xnf_mh, LINK_STATE_DOWN);
@@ -878,25 +1043,11 @@ xnf_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	if (xnfp->xnf_connected)
 		return (DDI_FAILURE);
 
-	/* Wait for receive buffers to be returned; give up after 5 seconds */
-	i = 50;
-
-	mutex_enter(&xnfp->xnf_rx_buf_mutex);
-	while (xnfp->xnf_rx_bufs_outstanding > 0) {
-		mutex_exit(&xnfp->xnf_rx_buf_mutex);
-		delay(drv_usectohz(100000));
-		if (--i == 0) {
-			cmn_err(CE_WARN,
-			    "xnf%d: never reclaimed all the "
-			    "receive buffers.  Still have %d "
-			    "buffers outstanding.",
-			    ddi_get_instance(xnfp->xnf_devinfo),
-			    xnfp->xnf_rx_bufs_outstanding);
-			return (DDI_FAILURE);
-		}
-		mutex_enter(&xnfp->xnf_rx_buf_mutex);
-	}
-	mutex_exit(&xnfp->xnf_rx_buf_mutex);
+	/*
+	 * Cannot detach if we have xnf_buf_t outstanding.
+	 */
+	if (xnfp->xnf_stat_buf_allocated > 0)
+		return (DDI_FAILURE);
 
 	if (mac_unregister(xnfp->xnf_mh) != 0)
 		return (DDI_FAILURE);
@@ -922,10 +1073,17 @@ xnf_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	/* Release all DMA resources */
 	xnf_release_dma_resources(xnfp);
 
-	cv_destroy(&xnfp->xnf_cv);
-	mutex_destroy(&xnfp->xnf_rx_buf_mutex);
+	cv_destroy(&xnfp->xnf_cv_tx_slots);
+	cv_destroy(&xnfp->xnf_cv_multicast);
+	cv_destroy(&xnfp->xnf_cv_state);
+
+	kmem_cache_destroy(xnfp->xnf_tx_buf_cache);
+	kmem_cache_destroy(xnfp->xnf_buf_cache);
+
+	mutex_destroy(&xnfp->xnf_gref_lock);
+	mutex_destroy(&xnfp->xnf_schedlock);
+	mutex_destroy(&xnfp->xnf_rxlock);
 	mutex_destroy(&xnfp->xnf_txlock);
-	mutex_destroy(&xnfp->xnf_intrlock);
 
 	kmem_free(xnfp, sizeof (*xnfp));
 
@@ -935,24 +1093,13 @@ xnf_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 /*
  *  xnf_set_mac_addr() -- set the physical network address on the board.
  */
-/*ARGSUSED*/
 static int
 xnf_set_mac_addr(void *arg, const uint8_t *macaddr)
 {
-	xnf_t *xnfp = arg;
+	_NOTE(ARGUNUSED(arg, macaddr));
 
-#ifdef XNF_DEBUG
-	if (xnfdebug & XNF_DEBUG_TRACE)
-		printf("xnf%d: set_mac_addr(0x%p): "
-		    "%02x:%02x:%02x:%02x:%02x:%02x\n",
-		    ddi_get_instance(xnfp->xnf_devinfo),
-		    (void *)xnfp, macaddr[0], macaddr[1], macaddr[2],
-		    macaddr[3], macaddr[4], macaddr[5]);
-#endif
 	/*
 	 * We can't set our macaddr.
-	 *
-	 * XXPV dme: Why not?
 	 */
 	return (ENOTSUP);
 }
@@ -961,33 +1108,113 @@ xnf_set_mac_addr(void *arg, const uint8_t *macaddr)
  *  xnf_set_multicast() -- set (enable) or disable a multicast address.
  *
  *  Program the hardware to enable/disable the multicast address
- *  in "mcast".  Enable if "add" is true, disable if false.
+ *  in "mca".  Enable if "add" is true, disable if false.
  */
-/*ARGSUSED*/
 static int
 xnf_set_multicast(void *arg, boolean_t add, const uint8_t *mca)
 {
 	xnf_t *xnfp = arg;
-
-#ifdef XNF_DEBUG
-	if (xnfdebug & XNF_DEBUG_TRACE)
-		printf("xnf%d set_multicast(0x%p): "
-		    "%02x:%02x:%02x:%02x:%02x:%02x\n",
-		    ddi_get_instance(xnfp->xnf_devinfo),
-		    (void *)xnfp, mca[0], mca[1], mca[2],
-		    mca[3], mca[4], mca[5]);
-#endif
+	xnf_txbuf_t *txp;
+	int n_slots;
+	RING_IDX slot;
+	xnf_txid_t *tidp;
+	netif_tx_request_t *txrp;
+	struct netif_extra_info *erp;
+	boolean_t notify, result;
 
 	/*
-	 * XXPV dme: Ideally we'd relay the address to the backend for
-	 * enabling.  The protocol doesn't support that (interesting
-	 * extension), so we simply succeed and hope that the relevant
-	 * packets are going to arrive.
-	 *
-	 * If protocol support is added for enable/disable then we'll
-	 * need to keep a list of those in use and re-add on resume.
+	 * If the backend does not support multicast control then we
+	 * must assume that the right packets will just arrive.
 	 */
-	return (0);
+	if (!xnfp->xnf_be_mcast_control)
+		return (0);
+
+	txp = kmem_cache_alloc(xnfp->xnf_tx_buf_cache, KM_SLEEP);
+	if (txp == NULL)
+		return (1);
+
+	mutex_enter(&xnfp->xnf_txlock);
+
+	/*
+	 * If we're not yet connected then claim success. This is
+	 * acceptable because we refresh the entire set of multicast
+	 * addresses when we get connected.
+	 *
+	 * We can't wait around here because the MAC layer expects
+	 * this to be a non-blocking operation - waiting ends up
+	 * causing a deadlock during resume.
+	 */
+	if (!xnfp->xnf_connected) {
+		mutex_exit(&xnfp->xnf_txlock);
+		return (0);
+	}
+
+	/*
+	 * 1. Acquire two slots in the ring.
+	 * 2. Fill in the slots.
+	 * 3. Request notification when the operation is done.
+	 * 4. Kick the peer.
+	 * 5. Wait for the response via xnf_tx_clean_ring().
+	 */
+
+	n_slots = tx_slots_get(xnfp, 2, B_TRUE);
+	ASSERT(n_slots >= 2);
+
+	slot = xnfp->xnf_tx_ring.req_prod_pvt;
+	tidp = txid_get(xnfp);
+	VERIFY(tidp != NULL);
+
+	txp->tx_type = TX_MCAST_REQ;
+	txp->tx_slot = slot;
+
+	txrp = RING_GET_REQUEST(&xnfp->xnf_tx_ring, slot);
+	erp = (struct netif_extra_info *)
+	    RING_GET_REQUEST(&xnfp->xnf_tx_ring, slot + 1);
+
+	txrp->gref = 0;
+	txrp->size = 0;
+	txrp->offset = 0;
+	/* Set tx_txreq.id to appease xnf_tx_clean_ring(). */
+	txrp->id = txp->tx_txreq.id = tidp->id;
+	txrp->flags = NETTXF_extra_info;
+
+	erp->type = add ? XEN_NETIF_EXTRA_TYPE_MCAST_ADD :
+	    XEN_NETIF_EXTRA_TYPE_MCAST_DEL;
+	bcopy((void *)mca, &erp->u.mcast.addr, ETHERADDRL);
+
+	tidp->txbuf = txp;
+
+	xnfp->xnf_tx_ring.req_prod_pvt = slot + 2;
+
+	mutex_enter(&xnfp->xnf_schedlock);
+	xnfp->xnf_pending_multicast++;
+	mutex_exit(&xnfp->xnf_schedlock);
+
+	/* LINTED: constant in conditional context */
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&xnfp->xnf_tx_ring,
+	    notify);
+	if (notify)
+		ec_notify_via_evtchn(xnfp->xnf_evtchn);
+
+	while (txp->tx_type == TX_MCAST_REQ)
+		cv_wait(&xnfp->xnf_cv_multicast,
+		    &xnfp->xnf_txlock);
+
+	ASSERT(txp->tx_type == TX_MCAST_RSP);
+
+	mutex_enter(&xnfp->xnf_schedlock);
+	xnfp->xnf_pending_multicast--;
+	mutex_exit(&xnfp->xnf_schedlock);
+
+	result = (txp->tx_status == NETIF_RSP_OKAY);
+
+	txid_put(xnfp, tidp);
+
+	mutex_exit(&xnfp->xnf_txlock);
+
+	kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
+
+	return (result ? 0 : 1);
 }
 
 /*
@@ -995,18 +1222,11 @@ xnf_set_multicast(void *arg, boolean_t add, const uint8_t *mca)
  *
  *  Program the hardware to enable/disable promiscuous mode.
  */
-/*ARGSUSED*/
 static int
 xnf_set_promiscuous(void *arg, boolean_t on)
 {
-	xnf_t *xnfp = arg;
+	_NOTE(ARGUNUSED(arg, on));
 
-#ifdef XNF_DEBUG
-	if (xnfdebug & XNF_DEBUG_TRACE)
-		printf("xnf%d set_promiscuous(0x%p, %x)\n",
-		    ddi_get_instance(xnfp->xnf_devinfo),
-		    (void *)xnfp, on);
-#endif
 	/*
 	 * We can't really do this, but we pretend that we can in
 	 * order that snoop will work.
@@ -1018,51 +1238,88 @@ xnf_set_promiscuous(void *arg, boolean_t on)
  * Clean buffers that we have responses for from the transmit ring.
  */
 static int
-xnf_clean_tx_ring(xnf_t *xnfp)
+xnf_tx_clean_ring(xnf_t *xnfp)
 {
-	RING_IDX		next_resp, i;
-	struct tx_pktinfo	*reap;
-	int			id;
-	grant_ref_t		ref;
-	boolean_t		work_to_do;
+	boolean_t work_to_do;
 
 	ASSERT(MUTEX_HELD(&xnfp->xnf_txlock));
 
 loop:
 	while (RING_HAS_UNCONSUMED_RESPONSES(&xnfp->xnf_tx_ring)) {
-		/*
-		 * index of next transmission ack
-		 */
-		next_resp = xnfp->xnf_tx_ring.sring->rsp_prod;
+		RING_IDX cons, prod, i;
+
+		cons = xnfp->xnf_tx_ring.rsp_cons;
+		prod = xnfp->xnf_tx_ring.sring->rsp_prod;
 		membar_consumer();
 		/*
-		 * Clean tx packets from ring that we have responses for
+		 * Clean tx requests from ring that we have responses
+		 * for.
 		 */
-		for (i = xnfp->xnf_tx_ring.rsp_cons; i != next_resp; i++) {
-			id = RING_GET_RESPONSE(&xnfp->xnf_tx_ring, i)->id;
-			reap = &xnfp->xnf_tx_pkt_info[id];
-			ref = reap->grant_ref;
-			/*
-			 * Return id to free list
-			 */
-			reap->id = xnfp->xnf_tx_pkt_id_list;
-			xnfp->xnf_tx_pkt_id_list = id;
-			if (gnttab_query_foreign_access(ref) != 0)
-				panic("tx grant still in use "
-				    "by backend domain");
-			(void) ddi_dma_unbind_handle(reap->dma_handle);
-			(void) gnttab_end_foreign_access_ref(ref,
-			    xnfp->xnf_tx_pages_readonly);
-			gnttab_release_grant_reference(&xnfp->xnf_gref_tx_head,
-			    ref);
-			freemsg(reap->mp);
-			reap->mp = NULL;
-			reap->grant_ref = GRANT_INVALID_REF;
-			if (reap->bdesc != NULL)
-				xnf_free_tx_buffer(reap->bdesc);
-			reap->bdesc = NULL;
+		DTRACE_PROBE2(xnf_tx_clean_range, int, cons, int, prod);
+		for (i = cons; i != prod; i++) {
+			netif_tx_response_t *trp;
+			xnf_txid_t *tidp;
+			xnf_txbuf_t *txp;
+
+			trp = RING_GET_RESPONSE(&xnfp->xnf_tx_ring, i);
+			ASSERT(TX_ID_VALID(trp->id));
+
+			tidp = TX_ID_TO_TXID(xnfp, trp->id);
+			ASSERT(tidp->id == trp->id);
+			ASSERT(tidp->next == INVALID_TX_ID);
+
+			txp = tidp->txbuf;
+			ASSERT(txp != NULL);
+			ASSERT(txp->tx_txreq.id == trp->id);
+
+			switch (txp->tx_type) {
+			case TX_DATA:
+				if (gnttab_query_foreign_access(
+				    txp->tx_txreq.gref) != 0)
+					cmn_err(CE_PANIC,
+					    "tx grant %d still in use by "
+					    "backend domain",
+					    txp->tx_txreq.gref);
+
+				if (txp->tx_bdesc == NULL) {
+					(void) gnttab_end_foreign_access_ref(
+					    txp->tx_txreq.gref, 1);
+					gref_put(xnfp, txp->tx_txreq.gref);
+					(void) ddi_dma_unbind_handle(
+					    txp->tx_dma_handle);
+				} else {
+					xnf_buf_put(xnfp, txp->tx_bdesc,
+					    B_TRUE);
+				}
+
+				freemsg(txp->tx_mp);
+				txid_put(xnfp, tidp);
+				kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
+
+				break;
+
+			case TX_MCAST_REQ:
+				txp->tx_type = TX_MCAST_RSP;
+				txp->tx_status = trp->status;
+				cv_broadcast(&xnfp->xnf_cv_multicast);
+
+				break;
+
+			case TX_MCAST_RSP:
+				break;
+
+			default:
+				cmn_err(CE_PANIC, "xnf_tx_clean_ring: "
+				    "invalid xnf_txbuf_t type: %d",
+				    txp->tx_type);
+				break;
+			}
 		}
-		xnfp->xnf_tx_ring.rsp_cons = next_resp;
+		/*
+		 * Record the last response we dealt with so that we
+		 * know where to start next time around.
+		 */
+		xnfp->xnf_tx_ring.rsp_cons = prod;
 		membar_enter();
 	}
 
@@ -1075,40 +1332,40 @@ loop:
 }
 
 /*
- * If we need to pull up data from either a packet that crosses a page
- * boundary or consisting of multiple mblks, do it here.  We allocate
- * a page aligned buffer and copy the data into it.  The header for the
- * allocated buffer is returned. (which is also allocated here)
+ * Allocate and fill in a look-aside buffer for the packet `mp'. Used
+ * to ensure that the packet is physically contiguous and contained
+ * within a single page.
  */
-static struct xnf_buffer_desc *
-xnf_pullupmsg(xnf_t *xnfp, mblk_t *mp)
+static xnf_buf_t *
+xnf_tx_pullup(xnf_t *xnfp, mblk_t *mp)
 {
-	struct xnf_buffer_desc	*bdesc;
-	mblk_t			*mptr;
-	caddr_t			bp;
-	int			len;
+	xnf_buf_t *bd;
+	caddr_t bp;
 
-	/*
-	 * get a xmit buffer from the xmit buffer pool
-	 */
-	mutex_enter(&xnfp->xnf_rx_buf_mutex);
-	bdesc = xnf_get_tx_buffer(xnfp);
-	mutex_exit(&xnfp->xnf_rx_buf_mutex);
-	if (bdesc == NULL)
-		return (bdesc);
-	/*
-	 * Copy the data into the buffer
-	 */
-	xnfp->xnf_stat_tx_pullup++;
-	bp = bdesc->buf;
-	for (mptr = mp; mptr != NULL; mptr = mptr->b_cont) {
-		len = mptr->b_wptr - mptr->b_rptr;
-		bcopy(mptr->b_rptr, bp, len);
+	bd = xnf_buf_get(xnfp, KM_SLEEP, B_TRUE);
+	if (bd == NULL)
+		return (NULL);
+
+	bp = bd->buf;
+	while (mp != NULL) {
+		size_t len = MBLKL(mp);
+
+		bcopy(mp->b_rptr, bp, len);
 		bp += len;
+
+		mp = mp->b_cont;
 	}
-	return (bdesc);
+
+	ASSERT((bp - bd->buf) <= PAGESIZE);
+
+	xnfp->xnf_stat_tx_pullup++;
+
+	return (bd);
 }
 
+/*
+ * Insert the pseudo-header checksum into the packet `buf'.
+ */
 void
 xnf_pseudo_cksum(caddr_t buf, int length)
 {
@@ -1179,280 +1436,419 @@ xnf_pseudo_cksum(caddr_t buf, int length)
 }
 
 /*
- *  xnf_send_one() -- send a packet
- *
- *  Called when a packet is ready to be transmitted. A pointer to an
- *  M_DATA message that contains the packet is passed to this routine.
- *  At least the complete LLC header is contained in the message's
- *  first message block, and the remainder of the packet is contained
- *  within additional M_DATA message blocks linked to the first
- *  message block.
- *
+ * Push a list of prepared packets (`txp') into the transmit ring.
  */
-static boolean_t
-xnf_send_one(xnf_t *xnfp, mblk_t *mp)
+static xnf_txbuf_t *
+tx_push_packets(xnf_t *xnfp, xnf_txbuf_t *txp)
 {
-	struct xnf_buffer_desc	*xmitbuf;
-	struct tx_pktinfo	*txp_info;
-	mblk_t			*mptr;
-	ddi_dma_cookie_t	dma_cookie;
-	RING_IDX		slot;
-	int			length = 0, i, pktlen = 0, rc, tx_id;
-	int			tx_ring_freespace, page_oops;
-	uint_t			ncookies;
-	volatile netif_tx_request_t	*txrp;
-	caddr_t			bufaddr;
-	grant_ref_t		ref;
-	unsigned long		mfn;
-	uint32_t		pflags;
-	domid_t			oeid;
-
-#ifdef XNF_DEBUG
-	if (xnfdebug & XNF_DEBUG_SEND)
-		printf("xnf%d send(0x%p, 0x%p)\n",
-		    ddi_get_instance(xnfp->xnf_devinfo),
-		    (void *)xnfp, (void *)mp);
-#endif
-
-	ASSERT(mp != NULL);
-	ASSERT(mp->b_next == NULL);
-	ASSERT(MUTEX_HELD(&xnfp->xnf_txlock));
-
-	tx_ring_freespace = xnf_clean_tx_ring(xnfp);
-	ASSERT(tx_ring_freespace >= 0);
-
-	oeid = xvdi_get_oeid(xnfp->xnf_devinfo);
-	xnfp->xnf_stat_tx_attempt++;
-	/*
-	 * If there are no xmit ring slots available, return.
-	 */
-	if (tx_ring_freespace == 0) {
-		xnfp->xnf_stat_tx_defer++;
-		return (B_FALSE);	/* Send should be retried */
-	}
-
-	slot = xnfp->xnf_tx_ring.req_prod_pvt;
-	/* Count the number of mblks in message and compute packet size */
-	for (i = 0, mptr = mp; mptr != NULL; mptr = mptr->b_cont, i++)
-		pktlen += (mptr->b_wptr - mptr->b_rptr);
-
-	/* Make sure packet isn't too large */
-	if (pktlen > XNF_FRAMESIZE) {
-		cmn_err(CE_WARN, "xnf%d: oversized packet (%d bytes) dropped",
-		    ddi_get_instance(xnfp->xnf_devinfo), pktlen);
-		freemsg(mp);
-		return (B_TRUE);
-	}
-
-	/*
-	 * Test if we cross a page boundary with our buffer
-	 */
-	page_oops = (i == 1) &&
-	    (xnf_btop((size_t)mp->b_rptr) !=
-	    xnf_btop((size_t)(mp->b_rptr + pktlen)));
-	/*
-	 * XXPV - unfortunately, the Xen virtual net device currently
-	 * doesn't support multiple packet frags, so this will always
-	 * end up doing the pullup if we got more than one packet.
-	 */
-	if (i > xnf_max_tx_frags || page_oops) {
-		if (page_oops)
-			xnfp->xnf_stat_tx_pagebndry++;
-		if ((xmitbuf = xnf_pullupmsg(xnfp, mp)) == NULL) {
-			/* could not allocate resources? */
-#ifdef XNF_DEBUG
-			cmn_err(CE_WARN, "xnf%d: pullupmsg failed",
-			    ddi_get_instance(xnfp->xnf_devinfo));
-#endif
-			xnfp->xnf_stat_tx_defer++;
-			return (B_FALSE);	/* Retry send */
-		}
-		bufaddr = xmitbuf->buf;
-	} else {
-		xmitbuf = NULL;
-		bufaddr = (caddr_t)mp->b_rptr;
-	}
-
-	/* set up data descriptor */
-	length = pktlen;
-
-	/*
-	 * Get packet id from free list
-	 */
-	tx_id = xnfp->xnf_tx_pkt_id_list;
-	ASSERT(tx_id < NET_TX_RING_SIZE);
-	txp_info = &xnfp->xnf_tx_pkt_info[tx_id];
-	xnfp->xnf_tx_pkt_id_list = txp_info->id;
-	txp_info->id = tx_id;
-
-	/* Prepare for DMA mapping of tx buffer(s) */
-	rc = ddi_dma_addr_bind_handle(txp_info->dma_handle,
-	    NULL, bufaddr, length, DDI_DMA_WRITE | DDI_DMA_STREAMING,
-	    DDI_DMA_DONTWAIT, 0, &dma_cookie, &ncookies);
-	if (rc != DDI_DMA_MAPPED) {
-		ASSERT(rc != DDI_DMA_INUSE);
-		ASSERT(rc != DDI_DMA_PARTIAL_MAP);
-		/*
-		 *  Return id to free list
-		 */
-		txp_info->id = xnfp->xnf_tx_pkt_id_list;
-		xnfp->xnf_tx_pkt_id_list = tx_id;
-		if (rc == DDI_DMA_NORESOURCES) {
-			xnfp->xnf_stat_tx_defer++;
-			return (B_FALSE); /* Retry later */
-		}
-#ifdef XNF_DEBUG
-		cmn_err(CE_WARN, "xnf%d: bind_handle failed (%x)",
-		    ddi_get_instance(xnfp->xnf_devinfo), rc);
-#endif
-		return (B_FALSE);
-	}
-
-	ASSERT(ncookies == 1);
-	ref = gnttab_claim_grant_reference(&xnfp->xnf_gref_tx_head);
-	ASSERT((signed short)ref >= 0);
-	mfn = xnf_btop(pa_to_ma((paddr_t)dma_cookie.dmac_laddress));
-	gnttab_grant_foreign_access_ref(ref, oeid, mfn,
-	    xnfp->xnf_tx_pages_readonly);
-	txp_info->grant_ref = ref;
-	txrp = RING_GET_REQUEST(&xnfp->xnf_tx_ring, slot);
-	txrp->gref = ref;
-	txrp->size = dma_cookie.dmac_size;
-	txrp->offset = (uintptr_t)bufaddr & PAGEOFFSET;
-	txrp->id = tx_id;
-	txrp->flags = 0;
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &pflags);
-	if (pflags != 0) {
-		ASSERT(xnfp->xnf_cksum_offload);
-		/*
-		 * If the local protocol stack requests checksum
-		 * offload we set the 'checksum blank' flag,
-		 * indicating to the peer that we need the checksum
-		 * calculated for us.
-		 *
-		 * We _don't_ set the validated flag, because we haven't
-		 * validated that the data and the checksum match.
-		 */
-		xnf_pseudo_cksum(bufaddr, length);
-		txrp->flags |= NETTXF_csum_blank;
-		xnfp->xnf_stat_tx_cksum_deferred++;
-	}
-	membar_producer();
-	xnfp->xnf_tx_ring.req_prod_pvt = slot + 1;
-
-	txp_info->mp = mp;
-	txp_info->bdesc = xmitbuf;
-
-	xnfp->xnf_stat_opackets++;
-	xnfp->xnf_stat_obytes += pktlen;
-
-	return (B_TRUE);	/* successful transmit attempt */
-}
-
-mblk_t *
-xnf_send(void *arg, mblk_t *mp)
-{
-	xnf_t *xnfp = arg;
-	mblk_t *next;
-	boolean_t sent_something = B_FALSE;
+	int slots_free;
+	RING_IDX slot;
+	boolean_t notify;
 
 	mutex_enter(&xnfp->xnf_txlock);
 
-	/*
-	 * Transmission attempts should be impossible without having
-	 * previously called xnf_start().
-	 */
 	ASSERT(xnfp->xnf_running);
 
 	/*
-	 * Wait for getting connected to the backend
+	 * Wait until we are connected to the backend.
 	 */
-	while (!xnfp->xnf_connected) {
-		cv_wait(&xnfp->xnf_cv, &xnfp->xnf_txlock);
+	while (!xnfp->xnf_connected)
+		cv_wait(&xnfp->xnf_cv_state, &xnfp->xnf_txlock);
+
+	slots_free = tx_slots_get(xnfp, 1, B_FALSE);
+	DTRACE_PROBE1(xnf_send_slotsfree, int, slots_free);
+
+	slot = xnfp->xnf_tx_ring.req_prod_pvt;
+
+	while ((txp != NULL) && (slots_free > 0)) {
+		xnf_txid_t *tidp;
+		netif_tx_request_t *txrp;
+
+		tidp = txid_get(xnfp);
+		VERIFY(tidp != NULL);
+
+		txrp = RING_GET_REQUEST(&xnfp->xnf_tx_ring, slot);
+
+		txp->tx_slot = slot;
+		txp->tx_txreq.id = tidp->id;
+		*txrp = txp->tx_txreq;
+
+		tidp->txbuf = txp;
+
+		xnfp->xnf_stat_opackets++;
+		xnfp->xnf_stat_obytes += txp->tx_txreq.size;
+
+		txp = txp->tx_next;
+		slots_free--;
+		slot++;
+
 	}
 
-	while (mp != NULL) {
-		next = mp->b_next;
-		mp->b_next = NULL;
+	xnfp->xnf_tx_ring.req_prod_pvt = slot;
 
-		if (!xnf_send_one(xnfp, mp)) {
-			mp->b_next = next;
-			break;
-		}
-
-		mp = next;
-		sent_something = B_TRUE;
-	}
-
-	if (sent_something) {
-		boolean_t notify;
-
-		/* LINTED: constant in conditional context */
-		RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&xnfp->xnf_tx_ring,
-		    notify);
-		if (notify)
-			ec_notify_via_evtchn(xnfp->xnf_evtchn);
-	}
-
-	if (mp != NULL)
-		xnfp->xnf_need_sched = B_TRUE;
+	/*
+	 * Tell the peer that we sent something, if it cares.
+	 */
+	/* LINTED: constant in conditional context */
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&xnfp->xnf_tx_ring,
+	    notify);
+	if (notify)
+		ec_notify_via_evtchn(xnfp->xnf_evtchn);
 
 	mutex_exit(&xnfp->xnf_txlock);
+
+	return (txp);
+}
+
+/*
+ * Send the chain of packets `mp'. Called by the MAC framework.
+ */
+static mblk_t *
+xnf_send(void *arg, mblk_t *mp)
+{
+	xnf_t *xnfp = arg;
+	domid_t oeid;
+	xnf_txbuf_t *head, *tail;
+	mblk_t *ml;
+	int prepared;
+
+	oeid = xvdi_get_oeid(xnfp->xnf_devinfo);
+
+	/*
+	 * Prepare packets for transmission.
+	 */
+	head = tail = NULL;
+	prepared = 0;
+	while (mp != NULL) {
+		xnf_txbuf_t *txp;
+		int n_chunks, length;
+		boolean_t page_oops;
+		uint32_t pflags;
+
+		for (ml = mp, n_chunks = length = 0, page_oops = B_FALSE;
+		    ml != NULL;
+		    ml = ml->b_cont, n_chunks++) {
+
+			/*
+			 * Test if this buffer includes a page
+			 * boundary. The test assumes that the range
+			 * b_rptr...b_wptr can include only a single
+			 * boundary.
+			 */
+			if (xnf_btop((size_t)ml->b_rptr) !=
+			    xnf_btop((size_t)ml->b_wptr)) {
+				xnfp->xnf_stat_tx_pagebndry++;
+				page_oops = B_TRUE;
+			}
+
+			length += MBLKL(ml);
+		}
+		DTRACE_PROBE1(xnf_send_b_cont, int, n_chunks);
+
+		/*
+		 * Make sure packet isn't too large.
+		 */
+		if (length > XNF_FRAMESIZE) {
+			cmn_err(CE_WARN,
+			    "xnf%d: oversized packet (%d bytes) dropped",
+			    ddi_get_instance(xnfp->xnf_devinfo), length);
+			freemsg(mp);
+			continue;
+		}
+
+		txp = kmem_cache_alloc(xnfp->xnf_tx_buf_cache, KM_SLEEP);
+		if (txp == NULL)
+			break;
+
+		txp->tx_type = TX_DATA;
+
+		if ((n_chunks > xnf_max_tx_frags) || page_oops) {
+			/*
+			 * Loan a side buffer rather than the mblk
+			 * itself.
+			 */
+			txp->tx_bdesc = xnf_tx_pullup(xnfp, mp);
+			if (txp->tx_bdesc == NULL) {
+				kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
+				break;
+			}
+
+			txp->tx_bufp = txp->tx_bdesc->buf;
+			txp->tx_mfn = txp->tx_bdesc->buf_mfn;
+			txp->tx_txreq.gref = txp->tx_bdesc->grant_ref;
+
+		} else {
+			int rc;
+			ddi_dma_cookie_t dma_cookie;
+			uint_t ncookies;
+
+			rc = ddi_dma_addr_bind_handle(txp->tx_dma_handle,
+			    NULL, (char *)mp->b_rptr, length,
+			    DDI_DMA_WRITE | DDI_DMA_STREAMING,
+			    DDI_DMA_DONTWAIT, 0, &dma_cookie,
+			    &ncookies);
+			if (rc != DDI_DMA_MAPPED) {
+				ASSERT(rc != DDI_DMA_INUSE);
+				ASSERT(rc != DDI_DMA_PARTIAL_MAP);
+
+#ifdef XNF_DEBUG
+				if (rc != DDI_DMA_NORESOURCES)
+					cmn_err(CE_WARN,
+					    "xnf%d: bind_handle failed (%x)",
+					    ddi_get_instance(xnfp->xnf_devinfo),
+					    rc);
+#endif
+				kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
+				break;
+			}
+			ASSERT(ncookies == 1);
+
+			txp->tx_bdesc = NULL;
+			txp->tx_bufp = (caddr_t)mp->b_rptr;
+			txp->tx_mfn =
+			    xnf_btop(pa_to_ma(dma_cookie.dmac_laddress));
+			txp->tx_txreq.gref = gref_get(xnfp);
+			if (txp->tx_txreq.gref == INVALID_GRANT_REF) {
+				(void) ddi_dma_unbind_handle(
+				    txp->tx_dma_handle);
+				kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
+				break;
+			}
+			gnttab_grant_foreign_access_ref(txp->tx_txreq.gref,
+			    oeid, txp->tx_mfn, 1);
+		}
+
+		txp->tx_next = NULL;
+		txp->tx_mp = mp;
+		txp->tx_txreq.size = length;
+		txp->tx_txreq.offset = (uintptr_t)txp->tx_bufp & PAGEOFFSET;
+		txp->tx_txreq.flags = 0;
+		hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL,
+		    &pflags);
+		if (pflags != 0) {
+			/*
+			 * If the local protocol stack requests checksum
+			 * offload we set the 'checksum blank' flag,
+			 * indicating to the peer that we need the checksum
+			 * calculated for us.
+			 *
+			 * We _don't_ set the validated flag, because we haven't
+			 * validated that the data and the checksum match.
+			 */
+			xnf_pseudo_cksum(txp->tx_bufp, length);
+			txp->tx_txreq.flags |= NETTXF_csum_blank;
+
+			xnfp->xnf_stat_tx_cksum_deferred++;
+		}
+
+		if (head == NULL) {
+			ASSERT(tail == NULL);
+
+			head = txp;
+		} else {
+			ASSERT(tail != NULL);
+
+			tail->tx_next = txp;
+		}
+		tail = txp;
+
+		mp = mp->b_next;
+		prepared++;
+
+		/*
+		 * There is no point in preparing more than
+		 * NET_TX_RING_SIZE, as we won't be able to push them
+		 * into the ring in one go and would hence have to
+		 * un-prepare the extra.
+		 */
+		if (prepared == NET_TX_RING_SIZE)
+			break;
+	}
+
+	DTRACE_PROBE1(xnf_send_prepared, int, prepared);
+
+	if (mp != NULL) {
+#ifdef XNF_DEBUG
+		int notprepared = 0;
+		mblk_t *l = mp;
+
+		while (l != NULL) {
+			notprepared++;
+			l = l->b_next;
+		}
+
+		DTRACE_PROBE1(xnf_send_notprepared, int, notprepared);
+#else /* !XNF_DEBUG */
+		DTRACE_PROBE1(xnf_send_notprepared, int, -1);
+#endif /* XNF_DEBUG */
+	}
+
+	/*
+	 * Push the packets we have prepared into the ring. They may
+	 * not all go.
+	 */
+	if (head != NULL)
+		head = tx_push_packets(xnfp, head);
+
+	/*
+	 * If some packets that we prepared were not sent, unprepare
+	 * them and add them back to the head of those we didn't
+	 * prepare.
+	 */
+	{
+		xnf_txbuf_t *loop;
+		mblk_t *mp_head, *mp_tail;
+		int unprepared = 0;
+
+		mp_head = mp_tail = NULL;
+		loop = head;
+
+		while (loop != NULL) {
+			xnf_txbuf_t *next = loop->tx_next;
+
+			if (loop->tx_bdesc == NULL) {
+				(void) gnttab_end_foreign_access_ref(
+				    loop->tx_txreq.gref, 1);
+				gref_put(xnfp, loop->tx_txreq.gref);
+				(void) ddi_dma_unbind_handle(
+				    loop->tx_dma_handle);
+			} else {
+				xnf_buf_put(xnfp, loop->tx_bdesc, B_TRUE);
+			}
+
+			ASSERT(loop->tx_mp != NULL);
+			if (mp_head == NULL)
+				mp_head = loop->tx_mp;
+			mp_tail = loop->tx_mp;
+
+			kmem_cache_free(xnfp->xnf_tx_buf_cache, loop);
+			loop = next;
+			unprepared++;
+		}
+
+		if (mp_tail == NULL) {
+			ASSERT(mp_head == NULL);
+		} else {
+			ASSERT(mp_head != NULL);
+
+			mp_tail->b_next = mp;
+			mp = mp_head;
+		}
+
+		DTRACE_PROBE1(xnf_send_unprepared, int, unprepared);
+	}
+
+	/*
+	 * If any mblks are left then we have deferred for some reason
+	 * and need to ask for a re-schedule later. This is typically
+	 * due to the ring filling.
+	 */
+	if (mp != NULL) {
+		mutex_enter(&xnfp->xnf_schedlock);
+		xnfp->xnf_need_sched = B_TRUE;
+		mutex_exit(&xnfp->xnf_schedlock);
+
+		xnfp->xnf_stat_tx_defer++;
+	}
 
 	return (mp);
 }
 
 /*
- *  xnf_intr() -- ring interrupt service routine
+ * Notification of RX packets. Currently no TX-complete interrupt is
+ * used, as we clean the TX ring lazily.
  */
 static uint_t
 xnf_intr(caddr_t arg)
 {
 	xnf_t *xnfp = (xnf_t *)arg;
-	boolean_t sched = B_FALSE;
+	mblk_t *mp;
+	boolean_t need_sched, clean_ring;
 
-	mutex_enter(&xnfp->xnf_intrlock);
+	mutex_enter(&xnfp->xnf_rxlock);
 
-	/* spurious intr */
+	/*
+	 * Interrupts before we are connected are spurious.
+	 */
 	if (!xnfp->xnf_connected) {
-		mutex_exit(&xnfp->xnf_intrlock);
+		mutex_exit(&xnfp->xnf_rxlock);
 		xnfp->xnf_stat_unclaimed_interrupts++;
 		return (DDI_INTR_UNCLAIMED);
 	}
 
-#ifdef XNF_DEBUG
-	if (xnfdebug & XNF_DEBUG_INT)
-		printf("xnf%d intr(0x%p)\n",
-		    ddi_get_instance(xnfp->xnf_devinfo), (void *)xnfp);
-#endif
-	if (RING_HAS_UNCONSUMED_RESPONSES(&xnfp->xnf_rx_ring)) {
-		mblk_t *mp;
+	/*
+	 * Receive side processing.
+	 */
+	do {
+		/*
+		 * Collect buffers from the ring.
+		 */
+		xnf_rx_collect(xnfp);
 
-		if (xnfp->xnf_rx_hvcopy)
-			mp = xnf_process_hvcopy_recv(xnfp);
-		else
-			mp = xnf_process_recv(xnfp);
+		/*
+		 * Interrupt me when the next receive buffer is consumed.
+		 */
+		xnfp->xnf_rx_ring.sring->rsp_event =
+		    xnfp->xnf_rx_ring.rsp_cons + 1;
+		xen_mb();
 
-		if (mp != NULL)
-			mac_rx(xnfp->xnf_mh, NULL, mp);
+	} while (RING_HAS_UNCONSUMED_RESPONSES(&xnfp->xnf_rx_ring));
+
+	if (xnfp->xnf_rx_new_buffers_posted) {
+		boolean_t notify;
+
+		/*
+		 * Indicate to the peer that we have re-filled the
+		 * receive ring, if it cares.
+		 */
+		/* LINTED: constant in conditional context */
+		RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&xnfp->xnf_rx_ring, notify);
+		if (notify)
+			ec_notify_via_evtchn(xnfp->xnf_evtchn);
+		xnfp->xnf_rx_new_buffers_posted = B_FALSE;
 	}
+
+	mp = xnfp->xnf_rx_head;
+	xnfp->xnf_rx_head = xnfp->xnf_rx_tail = NULL;
 
 	xnfp->xnf_stat_interrupts++;
-	mutex_exit(&xnfp->xnf_intrlock);
+	mutex_exit(&xnfp->xnf_rxlock);
+
+	if (mp != NULL)
+		mac_rx(xnfp->xnf_mh, NULL, mp);
 
 	/*
-	 * Clean tx ring and try to start any blocked xmit streams if
-	 * there is now some space.
+	 * Transmit side processing.
+	 *
+	 * If a previous transmit attempt failed or we have pending
+	 * multicast requests, clean the ring.
+	 *
+	 * If we previously stalled transmission and cleaning produces
+	 * some free slots, tell upstream to attempt sending again.
+	 *
+	 * The odd style is to avoid acquiring xnf_txlock unless we
+	 * will actually look inside the tx machinery.
 	 */
-	mutex_enter(&xnfp->xnf_txlock);
-	if (xnf_clean_tx_ring(xnfp) > 0) {
-		sched = xnfp->xnf_need_sched;
-		xnfp->xnf_need_sched = B_FALSE;
-	}
-	mutex_exit(&xnfp->xnf_txlock);
+	mutex_enter(&xnfp->xnf_schedlock);
+	need_sched = xnfp->xnf_need_sched;
+	clean_ring = need_sched || (xnfp->xnf_pending_multicast > 0);
+	mutex_exit(&xnfp->xnf_schedlock);
 
-	if (sched)
-		mac_tx_update(xnfp->xnf_mh);
+	if (clean_ring) {
+		int free_slots;
+
+		mutex_enter(&xnfp->xnf_txlock);
+		free_slots = tx_slots_get(xnfp, 0, B_FALSE);
+
+		if (need_sched && (free_slots > 0)) {
+			mutex_enter(&xnfp->xnf_schedlock);
+			xnfp->xnf_need_sched = B_FALSE;
+			mutex_exit(&xnfp->xnf_schedlock);
+
+			mac_tx_update(xnfp->xnf_mh);
+		}
+		mutex_exit(&xnfp->xnf_txlock);
+	}
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -1466,19 +1862,19 @@ xnf_start(void *arg)
 	xnf_t *xnfp = arg;
 
 #ifdef XNF_DEBUG
-	if (xnfdebug & XNF_DEBUG_TRACE)
+	if (xnf_debug & XNF_DEBUG_TRACE)
 		printf("xnf%d start(0x%p)\n",
 		    ddi_get_instance(xnfp->xnf_devinfo), (void *)xnfp);
 #endif
 
-	mutex_enter(&xnfp->xnf_intrlock);
+	mutex_enter(&xnfp->xnf_rxlock);
 	mutex_enter(&xnfp->xnf_txlock);
 
 	/* Accept packets from above. */
 	xnfp->xnf_running = B_TRUE;
 
 	mutex_exit(&xnfp->xnf_txlock);
-	mutex_exit(&xnfp->xnf_intrlock);
+	mutex_exit(&xnfp->xnf_rxlock);
 
 	return (0);
 }
@@ -1490,389 +1886,217 @@ xnf_stop(void *arg)
 	xnf_t *xnfp = arg;
 
 #ifdef XNF_DEBUG
-	if (xnfdebug & XNF_DEBUG_TRACE)
+	if (xnf_debug & XNF_DEBUG_TRACE)
 		printf("xnf%d stop(0x%p)\n",
 		    ddi_get_instance(xnfp->xnf_devinfo), (void *)xnfp);
 #endif
 
-	mutex_enter(&xnfp->xnf_intrlock);
+	mutex_enter(&xnfp->xnf_rxlock);
 	mutex_enter(&xnfp->xnf_txlock);
 
 	xnfp->xnf_running = B_FALSE;
 
 	mutex_exit(&xnfp->xnf_txlock);
-	mutex_exit(&xnfp->xnf_intrlock);
+	mutex_exit(&xnfp->xnf_rxlock);
 }
 
 /*
- * Driver private functions follow
- */
-
-/*
- * Hang buffer on rx ring
+ * Hang buffer `bdesc' on the RX ring.
  */
 static void
-rx_buffer_hang(xnf_t *xnfp, struct xnf_buffer_desc *bdesc)
+xnf_rxbuf_hang(xnf_t *xnfp, xnf_buf_t *bdesc)
 {
-	volatile netif_rx_request_t	*reqp;
-	RING_IDX			hang_ix;
-	grant_ref_t			ref;
-	domid_t				oeid;
+	netif_rx_request_t *reqp;
+	RING_IDX hang_ix;
 
-	oeid = xvdi_get_oeid(xnfp->xnf_devinfo);
+	ASSERT(MUTEX_HELD(&xnfp->xnf_rxlock));
 
-	ASSERT(MUTEX_HELD(&xnfp->xnf_intrlock));
 	reqp = RING_GET_REQUEST(&xnfp->xnf_rx_ring,
 	    xnfp->xnf_rx_ring.req_prod_pvt);
 	hang_ix = (RING_IDX) (reqp - RING_GET_REQUEST(&xnfp->xnf_rx_ring, 0));
-	ASSERT(xnfp->xnf_rxpkt_bufptr[hang_ix] == NULL);
-	if (bdesc->grant_ref == GRANT_INVALID_REF) {
-		ref = gnttab_claim_grant_reference(&xnfp->xnf_gref_rx_head);
-		ASSERT((signed short)ref >= 0);
-		bdesc->grant_ref = ref;
-		if (xnfp->xnf_rx_hvcopy) {
-			pfn_t pfn = xnf_btop(bdesc->buf_phys);
-			mfn_t mfn = pfn_to_mfn(pfn);
+	ASSERT(xnfp->xnf_rx_pkt_info[hang_ix] == NULL);
 
-			gnttab_grant_foreign_access_ref(ref, oeid, mfn, 0);
-		} else {
-			gnttab_grant_foreign_transfer_ref(ref, oeid, 0);
-		}
-	}
-	reqp->id = hang_ix;
+	reqp->id = bdesc->id = hang_ix;
 	reqp->gref = bdesc->grant_ref;
-	bdesc->id = hang_ix;
-	xnfp->xnf_rxpkt_bufptr[hang_ix] = bdesc;
-	membar_producer();
+
+	xnfp->xnf_rx_pkt_info[hang_ix] = bdesc;
 	xnfp->xnf_rx_ring.req_prod_pvt++;
+
+	xnfp->xnf_rx_new_buffers_posted = B_TRUE;
 }
 
-static mblk_t *
-xnf_process_hvcopy_recv(xnf_t *xnfp)
+/*
+ * Collect packets from the RX ring, storing them in `xnfp' for later
+ * use.
+ */
+static void
+xnf_rx_collect(xnf_t *xnfp)
 {
-	netif_rx_response_t *rxpkt;
-	mblk_t		*mp, *head, *tail;
-	struct		xnf_buffer_desc *bdesc;
-	boolean_t	hwcsum = B_FALSE, notify, work_to_do;
-	size_t 		len;
+	mblk_t *head, *tail;
+
+	ASSERT(MUTEX_HELD(&xnfp->xnf_rxlock));
 
 	/*
-	 * in loop over unconsumed responses, we do:
+	 * Loop over unconsumed responses:
 	 * 1. get a response
 	 * 2. take corresponding buffer off recv. ring
 	 * 3. indicate this by setting slot to NULL
 	 * 4. create a new message and
 	 * 5. copy data in, adjust ptr
-	 *
-	 * outside loop:
-	 * 7. make sure no more data has arrived; kick HV
 	 */
 
 	head = tail = NULL;
 
-loop:
 	while (RING_HAS_UNCONSUMED_RESPONSES(&xnfp->xnf_rx_ring)) {
+		netif_rx_response_t *rxpkt;
+		xnf_buf_t *bdesc;
+		ssize_t len;
+		size_t off;
+		mblk_t *mp = NULL;
+		boolean_t hwcsum = B_FALSE;
+		grant_ref_t ref;
 
 		/* 1. */
 		rxpkt = RING_GET_RESPONSE(&xnfp->xnf_rx_ring,
 		    xnfp->xnf_rx_ring.rsp_cons);
 
-		DTRACE_PROBE4(got_PKT, int, (int)rxpkt->id, int,
-		    (int)rxpkt->offset,
-		    int, (int)rxpkt->flags, int, (int)rxpkt->status);
+		DTRACE_PROBE4(xnf_rx_got_rsp, int, (int)rxpkt->id,
+		    int, (int)rxpkt->offset,
+		    int, (int)rxpkt->flags,
+		    int, (int)rxpkt->status);
 
 		/*
 		 * 2.
-		 * Take buffer off of receive ring
 		 */
-		hwcsum = B_FALSE;
-		bdesc = xnfp->xnf_rxpkt_bufptr[rxpkt->id];
-		/* 3 */
-		xnfp->xnf_rxpkt_bufptr[rxpkt->id] = NULL;
-		ASSERT(bdesc->id == rxpkt->id);
-		mp = NULL;
-		if (!xnfp->xnf_running) {
-			DTRACE_PROBE4(pkt_dropped, int, rxpkt->status,
-			    char *, bdesc->buf, int, rxpkt->offset,
-			    char *, ((char *)bdesc->buf) + rxpkt->offset);
-			xnfp->xnf_stat_drop++;
-			/*
-			 * re-hang the buffer
-			 */
-			rx_buffer_hang(xnfp, bdesc);
-		} else if (rxpkt->status <= 0) {
-			DTRACE_PROBE4(pkt_status_negative, int, rxpkt->status,
-			    char *, bdesc->buf, int, rxpkt->offset,
-			    char *, ((char *)bdesc->buf) + rxpkt->offset);
-			xnfp->xnf_stat_errrx++;
-			if (rxpkt->status == 0)
-				xnfp->xnf_stat_runt++;
-			if (rxpkt->status == NETIF_RSP_ERROR)
-				xnfp->xnf_stat_mac_rcv_error++;
-			if (rxpkt->status == NETIF_RSP_DROPPED)
-				xnfp->xnf_stat_norxbuf++;
-			/*
-			 * re-hang the buffer
-			 */
-			rx_buffer_hang(xnfp, bdesc);
-		} else {
-			grant_ref_t		ref =  bdesc->grant_ref;
-			struct xnf_buffer_desc	*new_bdesc;
-			unsigned long		off = rxpkt->offset;
-
-			DTRACE_PROBE4(pkt_status_ok, int, rxpkt->status,
-			    char *, bdesc->buf, int, rxpkt->offset,
-			    char *, ((char *)bdesc->buf) + rxpkt->offset);
-			len = rxpkt->status;
-			ASSERT(off + len <= PAGEOFFSET);
-			if (ref == GRANT_INVALID_REF) {
-				mp = NULL;
-				new_bdesc = bdesc;
-				cmn_err(CE_WARN, "Bad rx grant reference %d "
-				    "from dom %d", ref,
-				    xvdi_get_oeid(xnfp->xnf_devinfo));
-				goto luckless;
-			}
-			/*
-			 * Release ref which we'll be re-claiming in
-			 * rx_buffer_hang().
-			 */
-			bdesc->grant_ref = GRANT_INVALID_REF;
-			(void) gnttab_end_foreign_access_ref(ref, 0);
-			gnttab_release_grant_reference(&xnfp->xnf_gref_rx_head,
-			    ref);
-			if (rxpkt->flags & NETRXF_data_validated)
-				hwcsum = B_TRUE;
-
-			/*
-			 * XXPV for the initial implementation of HVcopy,
-			 * create a new msg and copy in the data
-			 */
-			/* 4. */
-			if ((mp = allocb(len, BPRI_MED)) == NULL) {
-				/*
-				 * Couldn't get buffer to copy to,
-				 * drop this data, and re-hang
-				 * the buffer on the ring.
-				 */
-				xnfp->xnf_stat_norxbuf++;
-				DTRACE_PROBE(alloc_nix);
-			} else {
-				/* 5. */
-				DTRACE_PROBE(alloc_ok);
-				bcopy(bdesc->buf + off, mp->b_wptr,
-				    len);
-				mp->b_wptr += len;
-			}
-			new_bdesc = bdesc;
-luckless:
-
-			/* Re-hang old or hang new buffer. */
-			rx_buffer_hang(xnfp, new_bdesc);
-		}
-		if (mp) {
-			if (hwcsum) {
-				/*
-				 * See comments in xnf_process_recv().
-				 */
-
-				(void) hcksum_assoc(mp, NULL,
-				    NULL, 0, 0, 0, 0,
-				    HCK_FULLCKSUM |
-				    HCK_FULLCKSUM_OK,
-				    0);
-				xnfp->xnf_stat_rx_cksum_no_need++;
-			}
-			if (head == NULL) {
-				head = tail = mp;
-			} else {
-				tail->b_next = mp;
-				tail = mp;
-			}
-
-			ASSERT(mp->b_next == NULL);
-
-			xnfp->xnf_stat_ipackets++;
-			xnfp->xnf_stat_rbytes += len;
-		}
-
-		xnfp->xnf_rx_ring.rsp_cons++;
-
-		xnfp->xnf_stat_hvcopy_packet_processed++;
-	}
-
-	/* 7. */
-	/*
-	 * Has more data come in since we started?
-	 */
-	/* LINTED: constant in conditional context */
-	RING_FINAL_CHECK_FOR_RESPONSES(&xnfp->xnf_rx_ring, work_to_do);
-	if (work_to_do)
-		goto loop;
-
-	/*
-	 * Indicate to the backend that we have re-filled the receive
-	 * ring.
-	 */
-	/* LINTED: constant in conditional context */
-	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&xnfp->xnf_rx_ring, notify);
-	if (notify)
-		ec_notify_via_evtchn(xnfp->xnf_evtchn);
-
-	return (head);
-}
-
-/* Process all queued received packets */
-static mblk_t *
-xnf_process_recv(xnf_t *xnfp)
-{
-	volatile netif_rx_response_t *rxpkt;
-	mblk_t *mp, *head, *tail;
-	struct xnf_buffer_desc *bdesc;
-	extern mblk_t *desballoc(unsigned char *, size_t, uint_t, frtn_t *);
-	boolean_t hwcsum = B_FALSE, notify, work_to_do;
-	size_t len;
-	pfn_t pfn;
-	long cnt;
-
-	head = tail = NULL;
-loop:
-	while (RING_HAS_UNCONSUMED_RESPONSES(&xnfp->xnf_rx_ring)) {
-
-		rxpkt = RING_GET_RESPONSE(&xnfp->xnf_rx_ring,
-		    xnfp->xnf_rx_ring.rsp_cons);
+		bdesc = xnfp->xnf_rx_pkt_info[rxpkt->id];
 
 		/*
-		 * Take buffer off of receive ring
+		 * 3.
 		 */
-		hwcsum = B_FALSE;
-		bdesc = xnfp->xnf_rxpkt_bufptr[rxpkt->id];
-		xnfp->xnf_rxpkt_bufptr[rxpkt->id] = NULL;
+		xnfp->xnf_rx_pkt_info[rxpkt->id] = NULL;
 		ASSERT(bdesc->id == rxpkt->id);
-		mp = NULL;
+
+		ref = bdesc->grant_ref;
+		off = rxpkt->offset;
+		len = rxpkt->status;
+
 		if (!xnfp->xnf_running) {
+			DTRACE_PROBE4(xnf_rx_not_running,
+			    int, rxpkt->status,
+			    char *, bdesc->buf, int, rxpkt->offset,
+			    char *, ((char *)bdesc->buf) + rxpkt->offset);
+
 			xnfp->xnf_stat_drop++;
-			/*
-			 * re-hang the buffer
-			 */
-			rx_buffer_hang(xnfp, bdesc);
-		} else if (rxpkt->status <= 0) {
+
+		} else if (len <= 0) {
+			DTRACE_PROBE4(xnf_rx_pkt_status_negative,
+			    int, rxpkt->status,
+			    char *, bdesc->buf, int, rxpkt->offset,
+			    char *, ((char *)bdesc->buf) + rxpkt->offset);
+
 			xnfp->xnf_stat_errrx++;
-			if (rxpkt->status == 0)
+
+			switch (len) {
+			case 0:
 				xnfp->xnf_stat_runt++;
-			if (rxpkt->status == NETIF_RSP_ERROR)
+				break;
+			case NETIF_RSP_ERROR:
 				xnfp->xnf_stat_mac_rcv_error++;
-			if (rxpkt->status == NETIF_RSP_DROPPED)
+				break;
+			case NETIF_RSP_DROPPED:
 				xnfp->xnf_stat_norxbuf++;
-			/*
-			 * re-hang the buffer
-			 */
-			rx_buffer_hang(xnfp, bdesc);
-		} else {
-			grant_ref_t ref =  bdesc->grant_ref;
-			struct xnf_buffer_desc *new_bdesc;
-			unsigned long off = rxpkt->offset;
-			unsigned long mfn;
-
-			len = rxpkt->status;
-			ASSERT(off + len <= PAGEOFFSET);
-			if (ref == GRANT_INVALID_REF) {
-				mp = NULL;
-				new_bdesc = bdesc;
-				cmn_err(CE_WARN, "Bad rx grant reference %d "
-				    "from dom %d", ref,
-				    xvdi_get_oeid(xnfp->xnf_devinfo));
-				goto luckless;
+				break;
 			}
-			bdesc->grant_ref = GRANT_INVALID_REF;
-			mfn = gnttab_end_foreign_transfer_ref(ref);
-			ASSERT(mfn != MFN_INVALID);
-			ASSERT(hat_getpfnum(kas.a_hat, bdesc->buf) ==
-			    PFN_INVALID);
 
-			gnttab_release_grant_reference(&xnfp->xnf_gref_rx_head,
-			    ref);
-			reassign_pfn(xnf_btop(bdesc->buf_phys), mfn);
-			hat_devload(kas.a_hat, bdesc->buf, PAGESIZE,
-			    xnf_btop(bdesc->buf_phys),
-			    PROT_READ | PROT_WRITE, HAT_LOAD);
-			balloon_drv_added(1);
+		} else if (bdesc->grant_ref == INVALID_GRANT_REF) {
+			cmn_err(CE_WARN, "Bad rx grant reference %d "
+			    "from domain %d", ref,
+			    xvdi_get_oeid(xnfp->xnf_devinfo));
+
+		} else if ((off + len) > PAGESIZE) {
+			cmn_err(CE_WARN, "Rx packet overflows page "
+			    "(offset %ld, length %ld) from domain %d",
+			    off, len, xvdi_get_oeid(xnfp->xnf_devinfo));
+		} else {
+			xnf_buf_t *nbuf = NULL;
+
+			DTRACE_PROBE4(xnf_rx_packet, int, len,
+			    char *, bdesc->buf, int, off,
+			    char *, ((char *)bdesc->buf) + off);
+
+			ASSERT(off + len <= PAGEOFFSET);
 
 			if (rxpkt->flags & NETRXF_data_validated)
 				hwcsum = B_TRUE;
-			if (len <= xnf_rx_bcopy_thresh) {
-				/*
-				 * For small buffers, just copy the data
-				 * and send the copy upstream.
-				 */
-				new_bdesc = NULL;
-			} else {
-				/*
-				 * We send a pointer to this data upstream;
-				 * we need a new buffer to replace this one.
-				 */
-				mutex_enter(&xnfp->xnf_rx_buf_mutex);
-				new_bdesc = xnf_get_buffer(xnfp);
-				if (new_bdesc != NULL) {
-					xnfp->xnf_rx_bufs_outstanding++;
+
+			/*
+			 * If the packet is below a pre-determined
+			 * size we will copy data out rather than
+			 * replace it.
+			 */
+			if (len > xnf_rx_copy_limit)
+				nbuf = xnf_buf_get(xnfp, KM_NOSLEEP, B_FALSE);
+
+			/*
+			 * If we have a replacement buffer, attempt to
+			 * wrap the existing one with an mblk_t in
+			 * order that the upper layers of the stack
+			 * might use it directly.
+			 */
+			if (nbuf != NULL) {
+				mp = desballoc((unsigned char *)bdesc->buf,
+				    bdesc->len, 0, &bdesc->free_rtn);
+				if (mp == NULL) {
+					xnfp->xnf_stat_rx_desballoc_fail++;
+					xnfp->xnf_stat_norxbuf++;
+
+					xnf_buf_put(xnfp, nbuf, B_FALSE);
+					nbuf = NULL;
 				} else {
-					xnfp->xnf_stat_rx_no_ringbuf++;
+					mp->b_rptr = mp->b_rptr + off;
+					mp->b_wptr = mp->b_rptr + len;
+
+					/*
+					 * Release the grant reference
+					 * associated with this buffer
+					 * - they are scarce and the
+					 * upper layers of the stack
+					 * don't need it.
+					 */
+					(void) gnttab_end_foreign_access_ref(
+					    bdesc->grant_ref, 0);
+					gref_put(xnfp, bdesc->grant_ref);
+					bdesc->grant_ref = INVALID_GRANT_REF;
+
+					bdesc = nbuf;
 				}
-				mutex_exit(&xnfp->xnf_rx_buf_mutex);
 			}
 
-			if (new_bdesc == NULL) {
+			if (nbuf == NULL) {
 				/*
-				 * Don't have a new ring buffer; bcopy the data
-				 * from the buffer, and preserve the
-				 * original buffer
+				 * No replacement buffer allocated -
+				 * attempt to copy the data out and
+				 * re-hang the existing buffer.
 				 */
-				if ((mp = allocb(len, BPRI_MED)) == NULL) {
-					/*
-					 * Could't get buffer to copy to,
-					 * drop this data, and re-hang
-					 * the buffer on the ring.
-					 */
+
+				/* 4. */
+				mp = allocb(len, BPRI_MED);
+				if (mp == NULL) {
+					xnfp->xnf_stat_rx_allocb_fail++;
 					xnfp->xnf_stat_norxbuf++;
 				} else {
+					/* 5. */
 					bcopy(bdesc->buf + off, mp->b_wptr,
 					    len);
+					mp->b_wptr += len;
 				}
-				/*
-				 * Give the buffer page back to xen
-				 */
-				pfn = xnf_btop(bdesc->buf_phys);
-				cnt = balloon_free_pages(1, &mfn, bdesc->buf,
-				    &pfn);
-				if (cnt != 1) {
-					cmn_err(CE_WARN, "unable to give a "
-					    "page back to the hypervisor\n");
-				}
-				new_bdesc = bdesc;
-			} else {
-				if ((mp = desballoc((unsigned char *)bdesc->buf,
-				    off + len, 0, (frtn_t *)bdesc)) == NULL) {
-					/*
-					 * Couldn't get mblk to pass recv data
-					 * up with, free the old ring buffer
-					 */
-					xnfp->xnf_stat_norxbuf++;
-					xnf_rcv_complete(bdesc);
-					goto luckless;
-				}
-				(void) ddi_dma_sync(bdesc->dma_handle,
-				    0, 0, DDI_DMA_SYNC_FORCPU);
-
-				mp->b_wptr += off;
-				mp->b_rptr += off;
 			}
-luckless:
-			if (mp)
-				mp->b_wptr += len;
-			/* re-hang old or hang new buffer */
-			rx_buffer_hang(xnfp, new_bdesc);
 		}
-		if (mp) {
+
+		/* Re-hang the buffer. */
+		xnf_rxbuf_hang(xnfp, bdesc);
+
+		if (mp != NULL) {
 			if (hwcsum) {
 				/*
 				 * If the peer says that the data has
@@ -1895,20 +2119,22 @@ luckless:
 				 * If it was necessary we could grovel
 				 * in the packet to find it.
 				 */
-
 				(void) hcksum_assoc(mp, NULL,
 				    NULL, 0, 0, 0, 0,
 				    HCK_FULLCKSUM |
-				    HCK_FULLCKSUM_OK,
-				    0);
+				    HCK_FULLCKSUM_OK, 0);
 				xnfp->xnf_stat_rx_cksum_no_need++;
 			}
 			if (head == NULL) {
-				head = tail = mp;
+				ASSERT(tail == NULL);
+
+				head = mp;
 			} else {
+				ASSERT(tail != NULL);
+
 				tail->b_next = mp;
-				tail = mp;
 			}
+			tail = mp;
 
 			ASSERT(mp->b_next == NULL);
 
@@ -1920,67 +2146,21 @@ luckless:
 	}
 
 	/*
-	 * Has more data come in since we started?
+	 * Store the mblks we have collected.
 	 */
-	/* LINTED: constant in conditional context */
-	RING_FINAL_CHECK_FOR_RESPONSES(&xnfp->xnf_rx_ring, work_to_do);
-	if (work_to_do)
-		goto loop;
+	if (head != NULL) {
+		ASSERT(tail != NULL);
 
-	/*
-	 * Indicate to the backend that we have re-filled the receive
-	 * ring.
-	 */
-	/* LINTED: constant in conditional context */
-	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&xnfp->xnf_rx_ring, notify);
-	if (notify)
-		ec_notify_via_evtchn(xnfp->xnf_evtchn);
+		if (xnfp->xnf_rx_head == NULL) {
+			ASSERT(xnfp->xnf_rx_tail == NULL);
 
-	return (head);
-}
+			xnfp->xnf_rx_head = head;
+		} else {
+			ASSERT(xnfp->xnf_rx_tail != NULL);
 
-/* Called when the upper layers free a message we passed upstream */
-static void
-xnf_rcv_complete(struct xnf_buffer_desc *bdesc)
-{
-	xnf_t *xnfp = bdesc->xnfp;
-	pfn_t pfn;
-	long cnt;
-
-	/* One less outstanding receive buffer */
-	mutex_enter(&xnfp->xnf_rx_buf_mutex);
-	--xnfp->xnf_rx_bufs_outstanding;
-	/*
-	 * Return buffer to the free list, unless the free list is getting
-	 * too large.  XXPV - this threshold may need tuning.
-	 */
-	if (xnfp->xnf_rx_descs_free < xnf_rx_bufs_lowat) {
-		/*
-		 * Unmap the page, and hand the machine page back
-		 * to xen so it can be re-used as a backend net buffer.
-		 */
-		pfn = xnf_btop(bdesc->buf_phys);
-		cnt = balloon_free_pages(1, NULL, bdesc->buf, &pfn);
-		if (cnt != 1) {
-			cmn_err(CE_WARN, "unable to give a page back to the "
-			    "hypervisor\n");
+			xnfp->xnf_rx_tail->b_next = head;
 		}
-
-		bdesc->next = xnfp->xnf_free_list;
-		xnfp->xnf_free_list = bdesc;
-		xnfp->xnf_rx_descs_free++;
-		mutex_exit(&xnfp->xnf_rx_buf_mutex);
-	} else {
-		/*
-		 * We can return everything here since we have a free buffer
-		 * that we have not given the backing page for back to xen.
-		 */
-		--xnfp->xnf_rx_buffer_count;
-		mutex_exit(&xnfp->xnf_rx_buf_mutex);
-		(void) ddi_dma_unbind_handle(bdesc->dma_handle);
-		ddi_dma_mem_free(&bdesc->acc_handle);
-		ddi_dma_free_handle(&bdesc->dma_handle);
-		kmem_free(bdesc, sizeof (*bdesc));
+		xnfp->xnf_rx_tail = tail;
 	}
 }
 
@@ -1991,34 +2171,16 @@ static int
 xnf_alloc_dma_resources(xnf_t *xnfp)
 {
 	dev_info_t 		*devinfo = xnfp->xnf_devinfo;
-	int			i;
 	size_t			len;
 	ddi_dma_cookie_t	dma_cookie;
 	uint_t			ncookies;
-	struct xnf_buffer_desc	*bdesc;
 	int			rc;
 	caddr_t			rptr;
-
-	xnfp->xnf_n_rx = NET_RX_RING_SIZE;
-	xnfp->xnf_max_rx_bufs = xnf_rx_bufs_hiwat;
-
-	xnfp->xnf_n_tx = NET_TX_RING_SIZE;
 
 	/*
 	 * The code below allocates all the DMA data structures that
 	 * need to be released when the driver is detached.
 	 *
-	 * First allocate handles for mapping (virtual address) pointers to
-	 * transmit data buffers to physical addresses
-	 */
-	for (i = 0; i < xnfp->xnf_n_tx; i++) {
-		if ((rc = ddi_dma_alloc_handle(devinfo,
-		    &tx_buffer_dma_attr, DDI_DMA_SLEEP, 0,
-		    &xnfp->xnf_tx_pkt_info[i].dma_handle)) != DDI_SUCCESS)
-			return (DDI_FAILURE);
-	}
-
-	/*
 	 * Allocate page for the transmit descriptor ring.
 	 */
 	if (ddi_dma_alloc_handle(devinfo, &ringbuf_dma_attr,
@@ -2092,18 +2254,6 @@ xnf_alloc_dma_resources(xnf_t *xnfp)
 	FRONT_RING_INIT(&xnfp->xnf_rx_ring, (netif_rx_sring_t *)rptr, PAGESIZE);
 	xnfp->xnf_rx_ring_phys_addr = dma_cookie.dmac_laddress;
 
-	/*
-	 * Preallocate receive buffers for each receive descriptor.
-	 */
-
-	/* Set up the "free list" of receive buffer descriptors */
-	for (i = 0; i < xnfp->xnf_n_rx; i++) {
-		if ((bdesc = xnf_alloc_buffer(xnfp)) == NULL)
-			goto alloc_error;
-		bdesc->next = xnfp->xnf_free_list;
-		xnfp->xnf_free_list = bdesc;
-	}
-
 	return (DDI_SUCCESS);
 
 alloc_error:
@@ -2116,8 +2266,6 @@ error:
 
 /*
  * Release all DMA resources in the opposite order from acquisition
- * Should not be called until all outstanding esballoc buffers
- * have been returned.
  */
 static void
 xnf_release_dma_resources(xnf_t *xnfp)
@@ -2126,25 +2274,27 @@ xnf_release_dma_resources(xnf_t *xnfp)
 
 	/*
 	 * Free receive buffers which are currently associated with
-	 * descriptors
+	 * descriptors.
 	 */
-	for (i = 0; i < xnfp->xnf_n_rx; i++) {
-		struct xnf_buffer_desc *bp;
+	mutex_enter(&xnfp->xnf_rxlock);
+	for (i = 0; i < NET_RX_RING_SIZE; i++) {
+		xnf_buf_t *bp;
 
-		if ((bp = xnfp->xnf_rxpkt_bufptr[i]) == NULL)
+		if ((bp = xnfp->xnf_rx_pkt_info[i]) == NULL)
 			continue;
-		xnf_free_buffer(bp);
-		xnfp->xnf_rxpkt_bufptr[i] = NULL;
+		xnfp->xnf_rx_pkt_info[i] = NULL;
+		xnf_buf_put(xnfp, bp, B_FALSE);
 	}
+	mutex_exit(&xnfp->xnf_rxlock);
 
-	/* Free the receive ring buffer */
+	/* Free the receive ring buffer. */
 	if (xnfp->xnf_rx_ring_dma_acchandle != NULL) {
 		(void) ddi_dma_unbind_handle(xnfp->xnf_rx_ring_dma_handle);
 		ddi_dma_mem_free(&xnfp->xnf_rx_ring_dma_acchandle);
 		ddi_dma_free_handle(&xnfp->xnf_rx_ring_dma_handle);
 		xnfp->xnf_rx_ring_dma_acchandle = NULL;
 	}
-	/* Free the transmit ring buffer */
+	/* Free the transmit ring buffer. */
 	if (xnfp->xnf_tx_ring_dma_acchandle != NULL) {
 		(void) ddi_dma_unbind_handle(xnfp->xnf_tx_ring_dma_handle);
 		ddi_dma_mem_free(&xnfp->xnf_tx_ring_dma_acchandle);
@@ -2152,219 +2302,75 @@ xnf_release_dma_resources(xnf_t *xnfp)
 		xnfp->xnf_tx_ring_dma_acchandle = NULL;
 	}
 
-	/*
-	 * Free handles for mapping (virtual address) pointers to
-	 * transmit data buffers to physical addresses
-	 */
-	for (i = 0; i < xnfp->xnf_n_tx; i++) {
-		if (xnfp->xnf_tx_pkt_info[i].dma_handle != NULL) {
-			ddi_dma_free_handle(
-			    &xnfp->xnf_tx_pkt_info[i].dma_handle);
-		}
-	}
-
 }
 
+/*
+ * Release any packets and associated structures used by the TX ring.
+ */
 static void
 xnf_release_mblks(xnf_t *xnfp)
 {
-	int	i;
+	RING_IDX i;
+	xnf_txid_t *tidp;
 
-	for (i = 0; i < xnfp->xnf_n_tx; i++) {
-		if (xnfp->xnf_tx_pkt_info[i].mp == NULL)
-			continue;
-		freemsg(xnfp->xnf_tx_pkt_info[i].mp);
-		xnfp->xnf_tx_pkt_info[i].mp = NULL;
-		(void) ddi_dma_unbind_handle(
-		    xnfp->xnf_tx_pkt_info[i].dma_handle);
-	}
-}
+	for (i = 0, tidp = &xnfp->xnf_tx_pkt_id[0];
+	    i < NET_TX_RING_SIZE;
+	    i++, tidp++) {
+		xnf_txbuf_t *txp = tidp->txbuf;
 
-/*
- * Remove a xmit buffer descriptor from the head of the free list and return
- * a pointer to it.  If no buffers on list, attempt to allocate a new one.
- * Called with the tx_buf_mutex held.
- */
-static struct xnf_buffer_desc *
-xnf_get_tx_buffer(xnf_t *xnfp)
-{
-	struct xnf_buffer_desc *bdesc;
+		if (txp != NULL) {
+			ASSERT(txp->tx_mp != NULL);
+			freemsg(txp->tx_mp);
 
-	bdesc = xnfp->xnf_tx_free_list;
-	if (bdesc != NULL) {
-		xnfp->xnf_tx_free_list = bdesc->next;
-	} else {
-		bdesc = xnf_alloc_tx_buffer(xnfp);
-	}
-	return (bdesc);
-}
-
-/*
- * Remove a buffer descriptor from the head of the free list and return
- * a pointer to it.  If no buffers on list, attempt to allocate a new one.
- * Called with the rx_buf_mutex held.
- */
-static struct xnf_buffer_desc *
-xnf_get_buffer(xnf_t *xnfp)
-{
-	struct xnf_buffer_desc *bdesc;
-
-	bdesc = xnfp->xnf_free_list;
-	if (bdesc != NULL) {
-		xnfp->xnf_free_list = bdesc->next;
-		xnfp->xnf_rx_descs_free--;
-	} else {
-		bdesc = xnf_alloc_buffer(xnfp);
-	}
-	return (bdesc);
-}
-
-/*
- * Free a xmit buffer back to the xmit free list
- */
-static void
-xnf_free_tx_buffer(struct xnf_buffer_desc *bp)
-{
-	xnf_t *xnfp = bp->xnfp;
-
-	mutex_enter(&xnfp->xnf_tx_buf_mutex);
-	bp->next = xnfp->xnf_tx_free_list;
-	xnfp->xnf_tx_free_list = bp;
-	mutex_exit(&xnfp->xnf_tx_buf_mutex);
-}
-
-/*
- * Put a buffer descriptor onto the head of the free list.
- * for page-flip:
- * We can't really free these buffers back to the kernel
- * since we have given away their backing page to be used
- * by the back end net driver.
- * for hvcopy:
- * release all the memory
- */
-static void
-xnf_free_buffer(struct xnf_buffer_desc *bdesc)
-{
-	xnf_t *xnfp = bdesc->xnfp;
-
-	mutex_enter(&xnfp->xnf_rx_buf_mutex);
-	if (xnfp->xnf_rx_hvcopy) {
-		if (ddi_dma_unbind_handle(bdesc->dma_handle) != DDI_SUCCESS)
-			goto out;
-		ddi_dma_mem_free(&bdesc->acc_handle);
-		ddi_dma_free_handle(&bdesc->dma_handle);
-		kmem_free(bdesc, sizeof (*bdesc));
-		xnfp->xnf_rx_buffer_count--;
-	} else {
-		bdesc->next = xnfp->xnf_free_list;
-		xnfp->xnf_free_list = bdesc;
-		xnfp->xnf_rx_descs_free++;
-	}
-out:
-	mutex_exit(&xnfp->xnf_rx_buf_mutex);
-}
-
-/*
- * Allocate a DMA-able xmit buffer, including a structure to
- * keep track of the buffer.  Called with tx_buf_mutex held.
- */
-static struct xnf_buffer_desc *
-xnf_alloc_tx_buffer(xnf_t *xnfp)
-{
-	struct xnf_buffer_desc *bdesc;
-	size_t len;
-
-	if ((bdesc = kmem_zalloc(sizeof (*bdesc), KM_NOSLEEP)) == NULL)
-		return (NULL);
-
-	/* allocate a DMA access handle for receive buffer */
-	if (ddi_dma_alloc_handle(xnfp->xnf_devinfo, &tx_buffer_dma_attr,
-	    0, 0, &bdesc->dma_handle) != DDI_SUCCESS)
-		goto failure;
-
-	/* Allocate DMA-able memory for transmit buffer */
-	if (ddi_dma_mem_alloc(bdesc->dma_handle,
-	    PAGESIZE, &data_accattr, DDI_DMA_STREAMING, 0, 0,
-	    &bdesc->buf, &len, &bdesc->acc_handle) != DDI_SUCCESS)
-		goto failure_1;
-
-	bdesc->xnfp = xnfp;
-	xnfp->xnf_tx_buffer_count++;
-
-	return (bdesc);
-
-failure_1:
-	ddi_dma_free_handle(&bdesc->dma_handle);
-
-failure:
-	kmem_free(bdesc, sizeof (*bdesc));
-	return (NULL);
-}
-
-/*
- * Allocate a DMA-able receive buffer, including a structure to
- * keep track of the buffer.  Called with rx_buf_mutex held.
- */
-static struct xnf_buffer_desc *
-xnf_alloc_buffer(xnf_t *xnfp)
-{
-	struct			xnf_buffer_desc *bdesc;
-	size_t			len;
-	uint_t			ncookies;
-	ddi_dma_cookie_t	dma_cookie;
-	long			cnt;
-	pfn_t			pfn;
-
-	if (xnfp->xnf_rx_buffer_count >= xnfp->xnf_max_rx_bufs)
-		return (NULL);
-
-	if ((bdesc = kmem_zalloc(sizeof (*bdesc), KM_NOSLEEP)) == NULL)
-		return (NULL);
-
-	/* allocate a DMA access handle for receive buffer */
-	if (ddi_dma_alloc_handle(xnfp->xnf_devinfo, &rx_buffer_dma_attr,
-	    0, 0, &bdesc->dma_handle) != DDI_SUCCESS)
-		goto failure;
-
-	/* Allocate DMA-able memory for receive buffer */
-	if (ddi_dma_mem_alloc(bdesc->dma_handle,
-	    PAGESIZE, &data_accattr, DDI_DMA_STREAMING, 0, 0,
-	    &bdesc->buf, &len, &bdesc->acc_handle) != DDI_SUCCESS)
-		goto failure_1;
-
-	/* bind to virtual address of buffer to get physical address */
-	if (ddi_dma_addr_bind_handle(bdesc->dma_handle, NULL,
-	    bdesc->buf, PAGESIZE, DDI_DMA_READ | DDI_DMA_STREAMING,
-	    DDI_DMA_SLEEP, 0, &dma_cookie, &ncookies) != DDI_DMA_MAPPED)
-		goto failure_2;
-
-	bdesc->buf_phys = dma_cookie.dmac_laddress;
-	bdesc->xnfp = xnfp;
-	if (xnfp->xnf_rx_hvcopy) {
-		bdesc->free_rtn.free_func = xnf_copy_rcv_complete;
-	} else {
-		bdesc->free_rtn.free_func = xnf_rcv_complete;
-	}
-	bdesc->free_rtn.free_arg = (char *)bdesc;
-	bdesc->grant_ref = GRANT_INVALID_REF;
-	ASSERT(ncookies == 1);
-
-	xnfp->xnf_rx_buffer_count++;
-
-	if (!xnfp->xnf_rx_hvcopy) {
-		/*
-		 * Unmap the page, and hand the machine page back
-		 * to xen so it can be used as a backend net buffer.
-		 */
-		pfn = xnf_btop(bdesc->buf_phys);
-		cnt = balloon_free_pages(1, NULL, bdesc->buf, &pfn);
-		if (cnt != 1) {
-			cmn_err(CE_WARN, "unable to give a page back to the "
-			    "hypervisor\n");
+			txid_put(xnfp, tidp);
+			kmem_cache_free(xnfp->xnf_tx_buf_cache, txp);
 		}
 	}
+}
 
-	return (bdesc);
+static int
+xnf_buf_constructor(void *buf, void *arg, int kmflag)
+{
+	int (*ddiflags)(caddr_t) = DDI_DMA_SLEEP;
+	xnf_buf_t *bdesc = buf;
+	xnf_t *xnfp = arg;
+	ddi_dma_cookie_t dma_cookie;
+	uint_t ncookies;
+	size_t len;
+
+	if (kmflag & KM_NOSLEEP)
+		ddiflags = DDI_DMA_DONTWAIT;
+
+	/* Allocate a DMA access handle for the buffer. */
+	if (ddi_dma_alloc_handle(xnfp->xnf_devinfo, &buf_dma_attr,
+	    ddiflags, 0, &bdesc->dma_handle) != DDI_SUCCESS)
+		goto failure;
+
+	/* Allocate DMA-able memory for buffer. */
+	if (ddi_dma_mem_alloc(bdesc->dma_handle,
+	    PAGESIZE, &data_accattr, DDI_DMA_STREAMING, ddiflags, 0,
+	    &bdesc->buf, &len, &bdesc->acc_handle) != DDI_SUCCESS)
+		goto failure_1;
+
+	/* Bind to virtual address of buffer to get physical address. */
+	if (ddi_dma_addr_bind_handle(bdesc->dma_handle, NULL,
+	    bdesc->buf, len, DDI_DMA_RDWR | DDI_DMA_STREAMING,
+	    ddiflags, 0, &dma_cookie, &ncookies) != DDI_DMA_MAPPED)
+		goto failure_2;
+	ASSERT(ncookies == 1);
+
+	bdesc->free_rtn.free_func = xnf_buf_recycle;
+	bdesc->free_rtn.free_arg = (caddr_t)bdesc;
+	bdesc->xnfp = xnfp;
+	bdesc->buf_phys = dma_cookie.dmac_laddress;
+	bdesc->buf_mfn = pfn_to_mfn(xnf_btop(bdesc->buf_phys));
+	bdesc->len = dma_cookie.dmac_size;
+	bdesc->grant_ref = INVALID_GRANT_REF;
+	bdesc->gen = xnfp->xnf_gen;
+
+	atomic_add_64(&xnfp->xnf_stat_buf_allocated, 1);
+
+	return (0);
 
 failure_2:
 	ddi_dma_mem_free(&bdesc->acc_handle);
@@ -2373,8 +2379,117 @@ failure_1:
 	ddi_dma_free_handle(&bdesc->dma_handle);
 
 failure:
-	kmem_free(bdesc, sizeof (*bdesc));
-	return (NULL);
+
+	return (-1);
+}
+
+static void
+xnf_buf_destructor(void *buf, void *arg)
+{
+	xnf_buf_t *bdesc = buf;
+	xnf_t *xnfp = arg;
+
+	(void) ddi_dma_unbind_handle(bdesc->dma_handle);
+	ddi_dma_mem_free(&bdesc->acc_handle);
+	ddi_dma_free_handle(&bdesc->dma_handle);
+
+	atomic_add_64(&xnfp->xnf_stat_buf_allocated, -1);
+}
+
+static xnf_buf_t *
+xnf_buf_get(xnf_t *xnfp, int flags, boolean_t readonly)
+{
+	grant_ref_t gref;
+	xnf_buf_t *bufp;
+
+	/*
+	 * Usually grant references are more scarce than memory, so we
+	 * attempt to acquire a grant reference first.
+	 */
+	gref = gref_get(xnfp);
+	if (gref == INVALID_GRANT_REF)
+		return (NULL);
+
+	bufp = kmem_cache_alloc(xnfp->xnf_buf_cache, flags);
+	if (bufp == NULL) {
+		gref_put(xnfp, gref);
+		return (NULL);
+	}
+
+	ASSERT(bufp->grant_ref == INVALID_GRANT_REF);
+
+	bufp->grant_ref = gref;
+
+	if (bufp->gen != xnfp->xnf_gen)
+		xnf_buf_refresh(bufp);
+
+	gnttab_grant_foreign_access_ref(bufp->grant_ref,
+	    xvdi_get_oeid(bufp->xnfp->xnf_devinfo),
+	    bufp->buf_mfn, readonly ? 1 : 0);
+
+	atomic_add_64(&xnfp->xnf_stat_buf_outstanding, 1);
+
+	return (bufp);
+}
+
+static void
+xnf_buf_put(xnf_t *xnfp, xnf_buf_t *bufp, boolean_t readonly)
+{
+	if (bufp->grant_ref != INVALID_GRANT_REF) {
+		(void) gnttab_end_foreign_access_ref(
+		    bufp->grant_ref, readonly ? 1 : 0);
+		gref_put(xnfp, bufp->grant_ref);
+		bufp->grant_ref = INVALID_GRANT_REF;
+	}
+
+	kmem_cache_free(xnfp->xnf_buf_cache, bufp);
+
+	atomic_add_64(&xnfp->xnf_stat_buf_outstanding, -1);
+}
+
+/*
+ * Refresh any cached data about a buffer after resume.
+ */
+static void
+xnf_buf_refresh(xnf_buf_t *bdesc)
+{
+	bdesc->buf_mfn = pfn_to_mfn(xnf_btop(bdesc->buf_phys));
+	bdesc->gen = bdesc->xnfp->xnf_gen;
+}
+
+/*
+ * Streams `freeb' routine for `xnf_buf_t' when used as transmit
+ * look-aside buffers.
+ */
+static void
+xnf_buf_recycle(xnf_buf_t *bdesc)
+{
+	xnf_t *xnfp = bdesc->xnfp;
+
+	xnf_buf_put(xnfp, bdesc, B_TRUE);
+}
+
+static int
+xnf_tx_buf_constructor(void *buf, void *arg, int kmflag)
+{
+	_NOTE(ARGUNUSED(kmflag));
+	xnf_txbuf_t *txp = buf;
+	xnf_t *xnfp = arg;
+
+	if (ddi_dma_alloc_handle(xnfp->xnf_devinfo, &buf_dma_attr,
+	    0, 0, &txp->tx_dma_handle) != DDI_SUCCESS)
+		return (-1);
+
+	return (0);
+}
+
+static void
+xnf_tx_buf_destructor(void *buf, void *arg)
+{
+	_NOTE(ARGUNUSED(arg));
+	xnf_txbuf_t *txp = buf;
+
+	ddi_dma_free_handle(&txp->tx_dma_handle);
 }
 
 /*
@@ -2388,8 +2503,13 @@ static char *xnf_aux_statistics[] = {
 	"tx_pullup",
 	"tx_pagebndry",
 	"tx_attempt",
-	"rx_no_ringbuf",
-	"hvcopy_packet_processed",
+	"buf_allocated",
+	"buf_outstanding",
+	"gref_outstanding",
+	"gref_failure",
+	"gref_peak",
+	"rx_allocb_fail",
+	"rx_desballoc_fail",
 };
 
 static int
@@ -2416,9 +2536,14 @@ xnf_kstat_aux_update(kstat_t *ksp, int flag)
 	(knp++)->value.ui64 = xnfp->xnf_stat_tx_pullup;
 	(knp++)->value.ui64 = xnfp->xnf_stat_tx_pagebndry;
 	(knp++)->value.ui64 = xnfp->xnf_stat_tx_attempt;
-	(knp++)->value.ui64 = xnfp->xnf_stat_rx_no_ringbuf;
 
-	(knp++)->value.ui64 = xnfp->xnf_stat_hvcopy_packet_processed;
+	(knp++)->value.ui64 = xnfp->xnf_stat_buf_allocated;
+	(knp++)->value.ui64 = xnfp->xnf_stat_buf_outstanding;
+	(knp++)->value.ui64 = xnfp->xnf_stat_gref_outstanding;
+	(knp++)->value.ui64 = xnfp->xnf_stat_gref_failure;
+	(knp++)->value.ui64 = xnfp->xnf_stat_gref_peak;
+	(knp++)->value.ui64 = xnfp->xnf_stat_rx_allocb_fail;
+	(knp++)->value.ui64 = xnfp->xnf_stat_rx_desballoc_fail;
 
 	return (0);
 }
@@ -2462,7 +2587,7 @@ xnf_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	xnf_t *xnfp = arg;
 
-	mutex_enter(&xnfp->xnf_intrlock);
+	mutex_enter(&xnfp->xnf_rxlock);
 	mutex_enter(&xnfp->xnf_txlock);
 
 #define	mac_stat(q, r)				\
@@ -2500,7 +2625,7 @@ xnf_stat(void *arg, uint_t stat, uint64_t *val)
 
 	default:
 		mutex_exit(&xnfp->xnf_txlock);
-		mutex_exit(&xnfp->xnf_intrlock);
+		mutex_exit(&xnfp->xnf_rxlock);
 
 		return (ENOTSUP);
 	}
@@ -2509,22 +2634,15 @@ xnf_stat(void *arg, uint_t stat, uint64_t *val)
 #undef ether_stat
 
 	mutex_exit(&xnfp->xnf_txlock);
-	mutex_exit(&xnfp->xnf_intrlock);
+	mutex_exit(&xnfp->xnf_rxlock);
 
 	return (0);
-}
-
-/*ARGSUSED*/
-static void
-xnf_ioctl(void *arg, queue_t *q, mblk_t *mp)
-{
-	miocnak(q, mp, 0, EINVAL);
 }
 
 static boolean_t
 xnf_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
-	xnf_t *xnfp = arg;
+	_NOTE(ARGUNUSED(arg));
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
@@ -2547,10 +2665,7 @@ xnf_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		 * field and must insert the pseudo-header checksum
 		 * before passing the packet to the IO domain.
 		 */
-		if (xnfp->xnf_cksum_offload)
-			*capab = HCKSUM_INET_FULL_V4;
-		else
-			*capab = 0;
+		*capab = HCKSUM_INET_FULL_V4;
 		break;
 	}
 	default:
@@ -2560,74 +2675,95 @@ xnf_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	return (B_TRUE);
 }
 
-/*ARGSUSED*/
+/*
+ * The state of the peer has changed - react accordingly.
+ */
 static void
 oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
     void *arg, void *impl_data)
 {
+	_NOTE(ARGUNUSED(id, arg));
 	xnf_t *xnfp = ddi_get_driver_private(dip);
 	XenbusState new_state = *(XenbusState *)impl_data;
 
 	ASSERT(xnfp != NULL);
 
 	switch (new_state) {
+	case XenbusStateUnknown:
+	case XenbusStateInitialising:
+	case XenbusStateInitialised:
+	case XenbusStateClosing:
+	case XenbusStateClosed:
+	case XenbusStateReconfiguring:
+	case XenbusStateReconfigured:
+		break;
+
+	case XenbusStateInitWait:
+		xnf_read_config(xnfp);
+
+		if (!xnfp->xnf_be_rx_copy) {
+			cmn_err(CE_WARN,
+			    "The xnf driver requires a dom0 that "
+			    "supports 'feature-rx-copy'.");
+			(void) xvdi_switch_state(xnfp->xnf_devinfo,
+			    XBT_NULL, XenbusStateClosed);
+			break;
+		}
+
+		/*
+		 * Connect to the backend.
+		 */
+		xnf_be_connect(xnfp);
+
+		/*
+		 * Our MAC address as discovered by xnf_read_config().
+		 */
+		mac_unicst_update(xnfp->xnf_mh, xnfp->xnf_mac_addr);
+
+		break;
+
 	case XenbusStateConnected:
-		mutex_enter(&xnfp->xnf_intrlock);
+		mutex_enter(&xnfp->xnf_rxlock);
 		mutex_enter(&xnfp->xnf_txlock);
 
 		xnfp->xnf_connected = B_TRUE;
 		/*
-		 * wake up threads wanting to send data to backend,
-		 * but got blocked due to backend is not ready
+		 * Wake up any threads waiting to send data to
+		 * backend.
 		 */
-		cv_broadcast(&xnfp->xnf_cv);
+		cv_broadcast(&xnfp->xnf_cv_state);
 
 		mutex_exit(&xnfp->xnf_txlock);
-		mutex_exit(&xnfp->xnf_intrlock);
+		mutex_exit(&xnfp->xnf_rxlock);
 
 		/*
-		 * kick backend in case it missed any tx request
-		 * in the TX ring buffer
+		 * Kick the peer in case it missed any transmits
+		 * request in the TX ring.
 		 */
 		ec_notify_via_evtchn(xnfp->xnf_evtchn);
 
 		/*
-		 * there maybe already queued rx data in the RX ring
-		 * sent by backend after it gets connected but before
-		 * we see its state change here, so we call our intr
-		 * handling routine to handle them, if any
+		 * There may already be completed receive requests in
+		 * the ring sent by backend after it gets connected
+		 * but before we see its state change here, so we call
+		 * xnf_intr() to handle them, if any.
 		 */
 		(void) xnf_intr((caddr_t)xnfp);
 
-		/* mark as link up after get connected */
+		/*
+		 * Mark the link up now that we are connected.
+		 */
 		mac_link_update(xnfp->xnf_mh, LINK_STATE_UP);
+
+		/*
+		 * Tell the backend about the multicast addresses in
+		 * which we are interested.
+		 */
+		mac_multicast_refresh(xnfp->xnf_mh, NULL, xnfp, B_TRUE);
 
 		break;
 
 	default:
 		break;
 	}
-}
-
-/*
- * Check whether backend is capable of and willing to talk
- * to us via hypervisor copy, as opposed to page flip.
- */
-static boolean_t
-xnf_hvcopy_peer_status(dev_info_t *devinfo)
-{
-	int	be_rx_copy;
-	int	err;
-
-	err = xenbus_scanf(XBT_NULL, xvdi_get_oename(devinfo),
-	    "feature-rx-copy", "%d", &be_rx_copy);
-	/*
-	 * If we fail to read the store we assume that the key is
-	 * absent, implying an older domain at the far end.  Older
-	 * domains cannot do HV copy (we assume ..).
-	 */
-	if (err != 0)
-		be_rx_copy = 0;
-
-	return (be_rx_copy?B_TRUE:B_FALSE);
 }

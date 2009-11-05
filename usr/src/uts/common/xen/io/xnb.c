@@ -35,7 +35,7 @@
 #include <sys/modctl.h>
 #include <sys/conf.h>
 #include <sys/mac.h>
-#include <sys/mac_impl.h> /* XXXXBOW - remove, included for mac_fix_cksum() */
+#include <sys/mac_impl.h> /* For mac_fix_cksum(). */
 #include <sys/dlpi.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
@@ -49,11 +49,10 @@
 #include <sys/evtchn_impl.h>
 #include <sys/gnttab.h>
 #include <vm/vm_dep.h>
-
+#include <sys/note.h>
 #include <sys/gld.h>
 #include <inet/ip.h>
 #include <inet/ip_impl.h>
-#include <sys/vnic_impl.h> /* blech. */
 
 /*
  * The terms "transmit" and "receive" are used in alignment with domU,
@@ -62,23 +61,9 @@
  */
 
 /*
- * XXPV dme: things to do, as well as various things indicated
- * throughout the source:
- * - copy avoidance outbound.
- * - copy avoidance inbound.
- * - transfer credit limiting.
- * - MAC address based filtering.
+ * Should we allow guests to manipulate multicast group membership?
  */
-
-/*
- * Should we attempt to defer checksum calculation?
- */
-static boolean_t	xnb_cksum_offload = B_TRUE;
-/*
- * When receiving packets from a guest, should they be copied
- * or used as-is (esballoc)?
- */
-static boolean_t	xnb_tx_always_copy = B_TRUE;
+static boolean_t	xnb_multicast_control = B_TRUE;
 
 static boolean_t	xnb_connect_rings(dev_info_t *);
 static void		xnb_disconnect_rings(dev_info_t *);
@@ -89,29 +74,53 @@ static void		xnb_hp_state_change(dev_info_t *, ddi_eventcookie_t,
 
 static int	xnb_txbuf_constructor(void *, void *, int);
 static void	xnb_txbuf_destructor(void *, void *);
-static xnb_txbuf_t *xnb_txbuf_get(xnb_t *, int);
-static void	xnb_txbuf_put(xnb_t *, xnb_txbuf_t *);
-static void	xnb_tx_notify_peer(xnb_t *);
-static void	xnb_tx_complete(xnb_txbuf_t *);
+static void	xnb_tx_notify_peer(xnb_t *, boolean_t);
 static void	xnb_tx_mark_complete(xnb_t *, RING_IDX, int16_t);
-static void 	xnb_tx_schedule_unmop(xnb_t *, gnttab_map_grant_ref_t *,
-    xnb_txbuf_t *);
-static void	xnb_tx_perform_pending_unmop(xnb_t *);
+
+mblk_t		*xnb_to_peer(xnb_t *, mblk_t *);
 mblk_t		*xnb_copy_to_peer(xnb_t *, mblk_t *);
 
-int		xnb_unmop_lowwat = NET_TX_RING_SIZE >> 2;
-int		xnb_unmop_hiwat = NET_TX_RING_SIZE - (NET_TX_RING_SIZE >> 2);
+static void		setup_gop(xnb_t *, gnttab_copy_t *, uchar_t *,
+    size_t, size_t, size_t, grant_ref_t);
+#pragma inline(setup_gop)
+static boolean_t	is_foreign(void *);
+#pragma inline(is_foreign)
 
-
-boolean_t	xnb_hv_copy = B_TRUE;
-boolean_t	xnb_explicit_pageflip_set = B_FALSE;
-
-/* XXPV dme: are these really invalid? */
 #define	INVALID_GRANT_HANDLE	((grant_handle_t)-1)
 #define	INVALID_GRANT_REF	((grant_ref_t)-1)
 
-static kmem_cache_t *xnb_txbuf_cachep;
 static kmutex_t	xnb_alloc_page_lock;
+
+/*
+ * On a 32 bit PAE system physical and machine addresses are larger
+ * than 32 bits.  ddi_btop() on such systems take an unsigned long
+ * argument, and so addresses above 4G are truncated before ddi_btop()
+ * gets to see them.  To avoid this, code the shift operation here.
+ */
+#define	xnb_btop(addr)	((addr) >> PAGESHIFT)
+
+/* DMA attributes for transmit and receive data */
+static ddi_dma_attr_t buf_dma_attr = {
+	DMA_ATTR_V0,		/* version of this structure */
+	0,			/* lowest usable address */
+	0xffffffffffffffffULL,	/* highest usable address */
+	0x7fffffff,		/* maximum DMAable byte count */
+	MMU_PAGESIZE,		/* alignment in bytes */
+	0x7ff,			/* bitmap of burst sizes */
+	1,			/* minimum transfer */
+	0xffffffffU,		/* maximum transfer */
+	0xffffffffffffffffULL,	/* maximum segment length */
+	1,			/* maximum number of segments */
+	1,			/* granularity */
+	0,			/* flags (reserved) */
+};
+
+/* DMA access attributes for data: NOT to be byte swapped. */
+static ddi_device_acc_attr_t data_accattr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_NEVERSWAP_ACC,
+	DDI_STRICTORDER_ACC
+};
 
 /*
  * Statistics.
@@ -226,14 +235,15 @@ xnb_ks_free(xnb_t *xnbp)
 }
 
 /*
- * Software checksum calculation and insertion for an arbitrary packet.
+ * Calculate and insert the transport checksum for an arbitrary packet.
  */
-/*ARGSUSED*/
 static mblk_t *
 xnb_software_csum(xnb_t *xnbp, mblk_t *mp)
 {
+	_NOTE(ARGUNUSED(xnbp));
+
 	/*
-	 * XXPV dme: shouldn't rely on vnic_fix_cksum(), not least
+	 * XXPV dme: shouldn't rely on mac_fix_cksum(), not least
 	 * because it doesn't cover all of the interesting cases :-(
 	 */
 	(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
@@ -254,7 +264,7 @@ xnb_process_cksum_flags(xnb_t *xnbp, mblk_t *mp, uint32_t capab)
 
 	/*
 	 * Check that the packet is contained in a single mblk.  In
-	 * the "from peer" path this is true today, but will change
+	 * the "from peer" path this is true today, but may change
 	 * when scatter gather support is added.  In the "to peer"
 	 * path we cannot be sure, but in most cases it will be true
 	 * (in the xnbo case the packet has come from a MAC device
@@ -393,7 +403,8 @@ int
 xnb_attach(dev_info_t *dip, xnb_flavour_t *flavour, void *flavour_data)
 {
 	xnb_t *xnbp;
-	char *xsname, mac[ETHERADDRL * 3];
+	char *xsname;
+	char cachename[32];
 
 	xnbp = kmem_zalloc(sizeof (*xnbp), KM_SLEEP);
 
@@ -404,18 +415,17 @@ xnb_attach(dev_info_t *dip, xnb_flavour_t *flavour, void *flavour_data)
 	xnbp->xnb_irq = B_FALSE;
 	xnbp->xnb_tx_ring_handle = INVALID_GRANT_HANDLE;
 	xnbp->xnb_rx_ring_handle = INVALID_GRANT_HANDLE;
-	xnbp->xnb_cksum_offload = xnb_cksum_offload;
 	xnbp->xnb_connected = B_FALSE;
 	xnbp->xnb_hotplugged = B_FALSE;
 	xnbp->xnb_detachable = B_FALSE;
 	xnbp->xnb_peer = xvdi_get_oeid(dip);
-	xnbp->xnb_tx_pages_writable = B_FALSE;
-	xnbp->xnb_tx_always_copy = xnb_tx_always_copy;
+	xnbp->xnb_be_status = XNB_STATE_INIT;
+	xnbp->xnb_fe_status = XNB_STATE_INIT;
 
 	xnbp->xnb_tx_buf_count = 0;
-	xnbp->xnb_tx_unmop_count = 0;
 
-	xnbp->xnb_hv_copy = B_FALSE;
+	xnbp->xnb_rx_hv_copy = B_FALSE;
+	xnbp->xnb_multicast_control = B_FALSE;
 
 	xnbp->xnb_rx_va = vmem_alloc(heap_arena, PAGESIZE, VM_SLEEP);
 	ASSERT(xnbp->xnb_rx_va != NULL);
@@ -424,17 +434,27 @@ xnb_attach(dev_info_t *dip, xnb_flavour_t *flavour, void *flavour_data)
 	    != DDI_SUCCESS)
 		goto failure;
 
-	/* allocated on demand, when/if we enter xnb_copy_to_peer() */
+	/* Allocated on demand, when/if we enter xnb_copy_to_peer(). */
 	xnbp->xnb_rx_cpop = NULL;
-	xnbp->xnb_cpop_sz = 0;
+	xnbp->xnb_rx_cpop_count = 0;
 
 	mutex_init(&xnbp->xnb_tx_lock, NULL, MUTEX_DRIVER,
 	    xnbp->xnb_icookie);
 	mutex_init(&xnbp->xnb_rx_lock, NULL, MUTEX_DRIVER,
 	    xnbp->xnb_icookie);
+	mutex_init(&xnbp->xnb_state_lock, NULL, MUTEX_DRIVER,
+	    xnbp->xnb_icookie);
 
-	/* set driver private pointer now */
+	/* Set driver private pointer now. */
 	ddi_set_driver_private(dip, xnbp);
+
+	(void) sprintf(cachename, "xnb_tx_buf_cache_%d", ddi_get_instance(dip));
+	xnbp->xnb_tx_buf_cache = kmem_cache_create(cachename,
+	    sizeof (xnb_txbuf_t), 0,
+	    xnb_txbuf_constructor, xnb_txbuf_destructor,
+	    NULL, xnbp, NULL, 0);
+	if (xnbp->xnb_tx_buf_cache == NULL)
+		goto failure_0;
 
 	if (!xnb_ks_init(xnbp))
 		goto failure_1;
@@ -457,16 +477,12 @@ xnb_attach(dev_info_t *dip, xnb_flavour_t *flavour, void *flavour_data)
 	xsname = xvdi_get_xsname(dip);
 
 	if (xenbus_printf(XBT_NULL, xsname,
-	    "feature-no-csum-offload", "%d",
-	    xnbp->xnb_cksum_offload ? 0 : 1) != 0)
+	    "feature-multicast-control", "%d",
+	    xnb_multicast_control ? 1 : 0) != 0)
 		goto failure_3;
 
-	/*
-	 * Use global xnb_hv_copy to export this feature. This means that
-	 * we have to decide what to do before starting up a guest domain
-	 */
 	if (xenbus_printf(XBT_NULL, xsname,
-	    "feature-rx-copy", "%d", xnb_hv_copy ? 1 : 0) != 0)
+	    "feature-rx-copy", "%d",  1) != 0)
 		goto failure_3;
 	/*
 	 * Linux domUs seem to depend on "feature-rx-flip" being 0
@@ -475,23 +491,8 @@ xnb_attach(dev_info_t *dip, xnb_flavour_t *flavour, void *flavour_data)
 	 * but we might as well play nice.
 	 */
 	if (xenbus_printf(XBT_NULL, xsname,
-	    "feature-rx-flip", "%d", xnb_explicit_pageflip_set ? 1 : 0) != 0)
+	    "feature-rx-flip", "%d", 0) != 0)
 		goto failure_3;
-
-	if (xenbus_scanf(XBT_NULL, xsname,
-	    "mac", "%s", mac) != 0) {
-		cmn_err(CE_WARN, "xnb_attach: "
-		    "cannot read mac address from %s",
-		    xsname);
-		goto failure_3;
-	}
-
-	if (ether_aton(mac, xnbp->xnb_mac_addr) != ETHERADDRL) {
-		cmn_err(CE_WARN,
-		    "xnb_attach: cannot parse mac address %s",
-		    mac);
-		goto failure_3;
-	}
 
 	(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateInitWait);
 	(void) xvdi_post_event(dip, XEN_HP_ADD);
@@ -505,6 +506,10 @@ failure_2:
 	xnb_ks_free(xnbp);
 
 failure_1:
+	kmem_cache_destroy(xnbp->xnb_tx_buf_cache);
+
+failure_0:
+	mutex_destroy(&xnbp->xnb_state_lock);
 	mutex_destroy(&xnbp->xnb_rx_lock);
 	mutex_destroy(&xnbp->xnb_tx_lock);
 
@@ -514,7 +519,6 @@ failure:
 	return (DDI_FAILURE);
 }
 
-/*ARGSUSED*/
 void
 xnb_detach(dev_info_t *dip)
 {
@@ -530,14 +534,17 @@ xnb_detach(dev_info_t *dip)
 
 	xnb_ks_free(xnbp);
 
+	kmem_cache_destroy(xnbp->xnb_tx_buf_cache);
+
 	ddi_set_driver_private(dip, NULL);
 
-	mutex_destroy(&xnbp->xnb_tx_lock);
+	mutex_destroy(&xnbp->xnb_state_lock);
 	mutex_destroy(&xnbp->xnb_rx_lock);
+	mutex_destroy(&xnbp->xnb_tx_lock);
 
-	if (xnbp->xnb_cpop_sz > 0)
-		kmem_free(xnbp->xnb_rx_cpop, sizeof (*xnbp->xnb_rx_cpop)
-		    * xnbp->xnb_cpop_sz);
+	if (xnbp->xnb_rx_cpop_count > 0)
+		kmem_free(xnbp->xnb_rx_cpop, sizeof (xnbp->xnb_rx_cpop[0])
+		    * xnbp->xnb_rx_cpop_count);
 
 	ASSERT(xnbp->xnb_rx_va != NULL);
 	vmem_free(heap_arena, xnbp->xnb_rx_va, PAGESIZE);
@@ -545,7 +552,12 @@ xnb_detach(dev_info_t *dip)
 	kmem_free(xnbp, sizeof (*xnbp));
 }
 
-
+/*
+ * Allocate a page from the hypervisor to be flipped to the peer.
+ *
+ * Try to get pages in batches to reduce the overhead of calls into
+ * the balloon driver.
+ */
 static mfn_t
 xnb_alloc_page(xnb_t *xnbp)
 {
@@ -591,10 +603,16 @@ xnb_alloc_page(xnb_t *xnbp)
 #undef WARNING_RATE_LIMIT
 }
 
-/*ARGSUSED*/
+/*
+ * Free a page back to the hypervisor.
+ *
+ * This happens only in the error path, so batching is not worth the
+ * complication.
+ */
 static void
 xnb_free_page(xnb_t *xnbp, mfn_t mfn)
 {
+	_NOTE(ARGUNUSED(xnbp));
 	int r;
 	pfn_t pfn;
 
@@ -602,10 +620,6 @@ xnb_free_page(xnb_t *xnbp, mfn_t mfn)
 	pfnzero(pfn, 0, PAGESIZE);
 	xen_release_pfn(pfn);
 
-	/*
-	 * This happens only in the error path, so batching is
-	 * not worth the complication.
-	 */
 	if ((r = balloon_free_pages(1, &mfn, NULL, NULL)) != 1) {
 		cmn_err(CE_WARN, "free_page: cannot decrease memory "
 		    "reservation (%d): page kept but unusable (mfn = 0x%lx).",
@@ -614,8 +628,8 @@ xnb_free_page(xnb_t *xnbp, mfn_t mfn)
 }
 
 /*
- * Similar to RING_HAS_UNCONSUMED_REQUESTS(&xnbp->rx_ring) but
- * using local variables.
+ * Similar to RING_HAS_UNCONSUMED_REQUESTS(&xnbp->rx_ring) but using
+ * local variables. Used in both xnb_to_peer() and xnb_copy_to_peer().
  */
 #define	XNB_RING_HAS_UNCONSUMED_REQUESTS(_r)		\
 	((((_r)->sring->req_prod - loop) <		\
@@ -623,6 +637,9 @@ xnb_free_page(xnb_t *xnbp, mfn_t mfn)
 	    ((_r)->sring->req_prod - loop) :		\
 	    (RING_SIZE(_r) - (loop - prod)))
 
+/*
+ * Pass packets to the peer using page flipping.
+ */
 mblk_t *
 xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 {
@@ -835,66 +852,38 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 	return (mp);
 }
 
-/* helper functions for xnb_copy_to_peer */
+/* Helper functions for xnb_copy_to_peer(). */
 
 /*
  * Grow the array of copy operation descriptors.
- * Returns a pointer to the next available entry.
  */
-gnttab_copy_t *
-grow_cpop_area(xnb_t *xnbp, gnttab_copy_t *o_cpop)
+static boolean_t
+grow_cpop_area(xnb_t *xnbp)
 {
-	/*
-	 * o_cpop (arg.1) is a ptr to the area we would like to copy
-	 * something into but cannot, because we haven't alloc'ed it
-	 * yet, or NULL.
-	 * old_cpop and new_cpop (local) are pointers to old/new
-	 * versions of xnbp->xnb_rx_cpop.
-	 */
-	gnttab_copy_t	*new_cpop, *old_cpop, *ret_cpop;
-	size_t		newcount;
+	size_t count;
+	gnttab_copy_t *new;
 
 	ASSERT(MUTEX_HELD(&xnbp->xnb_rx_lock));
 
-	old_cpop = xnbp->xnb_rx_cpop;
-	/*
-	 * o_cpop is a pointer into the array pointed to by old_cpop;
-	 * it would be an error for exactly one of these pointers to be NULL.
-	 * We shouldn't call this function if xnb_rx_cpop has already
-	 * been allocated, but we're starting to fill it from the beginning
-	 * again.
-	 */
-	ASSERT((o_cpop == NULL && old_cpop == NULL) ||
-	    (o_cpop != NULL && old_cpop != NULL && o_cpop != old_cpop));
+	count = xnbp->xnb_rx_cpop_count + CPOP_DEFCNT;
 
-	newcount = xnbp->xnb_cpop_sz + CPOP_DEFCNT;
-
-	new_cpop = kmem_alloc(sizeof (*new_cpop) * newcount, KM_NOSLEEP);
-	if (new_cpop == NULL) {
+	if ((new = kmem_alloc(sizeof (new[0]) * count, KM_NOSLEEP)) == NULL) {
 		xnbp->xnb_stat_other_allocation_failure++;
-		return (NULL);
+		return (B_FALSE);
 	}
 
-	if (o_cpop != NULL) {
-		size_t	 offset = (o_cpop - old_cpop);
+	bcopy(xnbp->xnb_rx_cpop, new,
+	    sizeof (xnbp->xnb_rx_cpop[0]) * xnbp->xnb_rx_cpop_count);
 
-		/* we only need to move the parts in use ... */
-		(void) memmove(new_cpop, old_cpop, xnbp->xnb_cpop_sz *
-		    (sizeof (*old_cpop)));
+	kmem_free(xnbp->xnb_rx_cpop,
+	    sizeof (xnbp->xnb_rx_cpop[0]) * xnbp->xnb_rx_cpop_count);
 
-		kmem_free(old_cpop, xnbp->xnb_cpop_sz * sizeof (*old_cpop));
-
-		ret_cpop = new_cpop + offset;
-	} else {
-		ret_cpop = new_cpop;
-	}
-
-	xnbp->xnb_rx_cpop = new_cpop;
-	xnbp->xnb_cpop_sz = newcount;
+	xnbp->xnb_rx_cpop = new;
+	xnbp->xnb_rx_cpop_count = count;
 
 	xnbp->xnb_stat_rx_cpoparea_grown++;
 
-	return (ret_cpop);
+	return (B_TRUE);
 }
 
 /*
@@ -903,9 +892,9 @@ grow_cpop_area(xnb_t *xnbp, gnttab_copy_t *o_cpop)
 static boolean_t
 is_foreign(void *addr)
 {
-	pfn_t	pfn = hat_getpfnum(kas.a_hat, addr);
+	pfn_t pfn = hat_getpfnum(kas.a_hat, addr);
 
-	return (pfn & PFN_IS_FOREIGN_MFN ? B_TRUE : B_FALSE);
+	return ((pfn & PFN_IS_FOREIGN_MFN) == PFN_IS_FOREIGN_MFN);
 }
 
 /*
@@ -965,17 +954,23 @@ setup_gop(xnb_t *xnbp, gnttab_copy_t *gp, uchar_t *rptr,
 	gp->dest.domid = xnbp->xnb_peer;
 }
 
+/*
+ * Pass packets to the peer using hypervisor copy operations.
+ */
 mblk_t *
 xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 {
 	mblk_t		*free = mp, *mp_prev = NULL, *saved_mp = mp;
 	mblk_t		*ml, *ml_prev;
-	gnttab_copy_t	*gop_cp;
 	boolean_t	notify;
 	RING_IDX	loop, prod;
 	int		i;
 
-	if (!xnbp->xnb_hv_copy)
+	/*
+	 * If the peer does not pre-post buffers for received packets,
+	 * use page flipping to pass packets to it.
+	 */
+	if (!xnbp->xnb_rx_hv_copy)
 		return (xnb_to_peer(xnbp, mp));
 
 	/*
@@ -989,13 +984,12 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 	 *
 	 * NOTE ad 2.
 	 *  In order to reduce the number of hypercalls, we prepare
-	 *  several packets (mp->b_cont != NULL) for the peer and
-	 *  perform a single hypercall to transfer them.
-	 *  We also have to set up a seperate copy operation for
-	 *  every page.
+	 *  several mblks (mp->b_cont != NULL) for the peer and
+	 *  perform a single hypercall to transfer them.  We also have
+	 *  to set up a seperate copy operation for every page.
 	 *
-	 * If we have more than one message (mp->b_next != NULL),
-	 * we do this whole dance repeatedly.
+	 * If we have more than one packet (mp->b_next != NULL), we do
+	 * this whole dance repeatedly.
 	 */
 
 	mutex_enter(&xnbp->xnb_rx_lock);
@@ -1013,12 +1007,12 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 	while ((mp != NULL) &&
 	    XNB_RING_HAS_UNCONSUMED_REQUESTS(&xnbp->xnb_rx_ring)) {
 		netif_rx_request_t	*rxreq;
+		size_t			d_offset, len;
+		int			item_count;
+		gnttab_copy_t		*gop_cp;
 		netif_rx_response_t	*rxresp;
-		size_t			d_offset;
-		size_t			len;
 		uint16_t		cksum_flags;
 		int16_t			status = NETIF_RSP_OKAY;
-		int			item_count;
 
 		/* 1 */
 		rxreq = RING_GET_REQUEST(&xnbp->xnb_rx_ring, loop);
@@ -1038,8 +1032,9 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 		gop_cp = xnbp->xnb_rx_cpop;
 
 		/*
-		 * We walk the b_cont pointers and set up a gop_cp
-		 * structure for every page in every data block we have.
+		 * We walk the b_cont pointers and set up a
+		 * gnttab_copy_t for each sub-page chunk in each data
+		 * block.
 		 */
 		/* 2a */
 		for (ml = mp, ml_prev = NULL; ml != NULL; ml = ml->b_cont) {
@@ -1048,8 +1043,13 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 			size_t	r_offset;
 
 			/*
-			 * If we get an mblk on a page that doesn't belong to
-			 * this domain, get a new mblk to replace the old one.
+			 * The hypervisor will not allow us to
+			 * reference a foreign page (e.g. one
+			 * belonging to another domain) by mfn in the
+			 * copy operation. If the data in this mblk is
+			 * on such a page we must copy the data into a
+			 * local page before initiating the hypervisor
+			 * copy operation.
 			 */
 			if (is_foreign(ml->b_rptr) || is_foreign(ml->b_wptr)) {
 				mblk_t *ml_new = replace_msg(ml, chunk,
@@ -1080,15 +1080,14 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 			while (chunk > 0) {
 				size_t part_len;
 
-				item_count++;
-				if (item_count > xnbp->xnb_cpop_sz) {
-					gop_cp = grow_cpop_area(xnbp, gop_cp);
-					if (gop_cp == NULL)
+				if (item_count == xnbp->xnb_rx_cpop_count) {
+					if (!grow_cpop_area(xnbp))
 						goto failure;
+					gop_cp = &xnbp->xnb_rx_cpop[item_count];
 				}
 				/*
 				 * If our mblk crosses a page boundary, we need
-				 * to do a seperate copy for every page.
+				 * to do a seperate copy for each page.
 				 */
 				if (r_offset + chunk > PAGESIZE) {
 					part_len = PAGESIZE - r_offset;
@@ -1116,8 +1115,10 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 				 */
 				r_offset = 0;
 				gop_cp++;
+				item_count++;
 			}
 			ml_prev = ml;
+
 			DTRACE_PROBE4(mblk_loop_end, (mblk_t *), ml, int,
 			    chunk, int, len, int, item_count);
 		}
@@ -1152,7 +1153,7 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 
 		for (i = 0; i < item_count; i++) {
 			if (xnbp->xnb_rx_cpop[i].status != 0) {
-				DTRACE_PROBE2(cpop__status__nonnull, int,
+				DTRACE_PROBE2(cpop_status_nonnull, int,
 				    (int)xnbp->xnb_rx_cpop[i].status,
 				    int, i);
 				status = NETIF_RSP_ERROR;
@@ -1213,54 +1214,9 @@ failure:
 	return (mp);
 }
 
-/*ARGSUSED*/
-static int
-xnb_txbuf_constructor(void *buf, void *arg, int kmflag)
-{
-	xnb_txbuf_t *txp = buf;
-
-	bzero(txp, sizeof (*txp));
-
-	txp->xt_free_rtn.free_func = xnb_tx_complete;
-	txp->xt_free_rtn.free_arg = (caddr_t)txp;
-
-	txp->xt_mop.host_addr =
-	    (uint64_t)(uintptr_t)vmem_alloc(heap_arena, PAGESIZE,
-	    ((kmflag & KM_NOSLEEP) == KM_NOSLEEP) ?
-	    VM_NOSLEEP : VM_SLEEP);
-
-	if (txp->xt_mop.host_addr == NULL) {
-		cmn_err(CE_WARN, "xnb_txbuf_constructor: "
-		    "cannot get address space");
-		return (-1);
-	}
-
-	/*
-	 * Have the hat ensure that page table exists for the VA.
-	 */
-	hat_prepare_mapping(kas.a_hat,
-	    (caddr_t)(uintptr_t)txp->xt_mop.host_addr, NULL);
-
-	return (0);
-}
-
-/*ARGSUSED*/
-static void
-xnb_txbuf_destructor(void *buf, void *arg)
-{
-	xnb_txbuf_t *txp = buf;
-
-	ASSERT(txp->xt_mop.host_addr != NULL);
-	ASSERT((txp->xt_flags & XNB_TXBUF_INUSE) == 0);
-
-	hat_release_mapping(kas.a_hat,
-	    (caddr_t)(uintptr_t)txp->xt_mop.host_addr);
-	vmem_free(heap_arena,
-	    (caddr_t)(uintptr_t)txp->xt_mop.host_addr, PAGESIZE);
-}
 
 static void
-xnb_tx_notify_peer(xnb_t *xnbp)
+xnb_tx_notify_peer(xnb_t *xnbp, boolean_t force)
 {
 	boolean_t notify;
 
@@ -1268,24 +1224,12 @@ xnb_tx_notify_peer(xnb_t *xnbp)
 
 	/* LINTED: constant in conditional context */
 	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&xnbp->xnb_tx_ring, notify);
-	if (notify) {
+	if (notify || force) {
 		ec_notify_via_evtchn(xnbp->xnb_evtchn);
 		xnbp->xnb_stat_tx_notify_sent++;
 	} else {
 		xnbp->xnb_stat_tx_notify_deferred++;
 	}
-}
-
-static void
-xnb_tx_complete(xnb_txbuf_t *txp)
-{
-	xnb_t *xnbp = txp->xt_xnbp;
-
-	ASSERT((txp->xt_flags & XNB_TXBUF_INUSE) == XNB_TXBUF_INUSE);
-
-	mutex_enter(&xnbp->xnb_tx_lock);
-	xnb_tx_schedule_unmop(xnbp, &txp->xt_mop, txp);
-	mutex_exit(&xnbp->xnb_tx_lock);
 }
 
 static void
@@ -1311,185 +1255,105 @@ xnb_tx_mark_complete(xnb_t *xnbp, RING_IDX id, int16_t status)
 }
 
 static void
-xnb_tx_schedule_unmop(xnb_t *xnbp, gnttab_map_grant_ref_t *mop,
-    xnb_txbuf_t *txp)
+xnb_txbuf_recycle(xnb_txbuf_t *txp)
 {
-	gnttab_unmap_grant_ref_t	*unmop;
-	int				u_count;
-	int				reqs_on_ring;
+	xnb_t *xnbp = txp->xt_xnbp;
 
-	ASSERT(MUTEX_HELD(&xnbp->xnb_tx_lock));
-	ASSERT(xnbp->xnb_tx_unmop_count < NET_TX_RING_SIZE);
+	kmem_cache_free(xnbp->xnb_tx_buf_cache, txp);
 
-	u_count = xnbp->xnb_tx_unmop_count++;
+	xnbp->xnb_tx_buf_outstanding--;
+}
 
-	/* Cache data for the time when we actually unmap grant refs */
-	xnbp->xnb_tx_unmop_txp[u_count] = txp;
+static int
+xnb_txbuf_constructor(void *buf, void *arg, int kmflag)
+{
+	_NOTE(ARGUNUSED(kmflag));
+	xnb_txbuf_t *txp = buf;
+	xnb_t *xnbp = arg;
+	size_t len;
+	ddi_dma_cookie_t dma_cookie;
+	uint_t ncookies;
 
-	unmop = &xnbp->xnb_tx_unmop[u_count];
-	unmop->host_addr = mop->host_addr;
-	unmop->dev_bus_addr = mop->dev_bus_addr;
-	unmop->handle = mop->handle;
+	txp->xt_free_rtn.free_func = xnb_txbuf_recycle;
+	txp->xt_free_rtn.free_arg = (caddr_t)txp;
+	txp->xt_xnbp = xnbp;
+	txp->xt_next = NULL;
 
-	/*
-	 * We cannot check the ring once we're disconnected from it. Batching
-	 * doesn't seem to be a useful optimisation in this case either,
-	 * so we directly call into the actual unmap function.
-	 */
-	if (xnbp->xnb_connected) {
-		reqs_on_ring = RING_HAS_UNCONSUMED_REQUESTS(&xnbp->xnb_tx_ring);
+	if (ddi_dma_alloc_handle(xnbp->xnb_devinfo, &buf_dma_attr,
+	    0, 0, &txp->xt_dma_handle) != DDI_SUCCESS)
+		goto failure;
 
-		/*
-		 * By tuning xnb_unmop_hiwat to N, we can emulate "N per batch"
-		 * or (with N == 1) "immediate unmop" behaviour.
-		 * The "> xnb_unmop_lowwat" is a guard against ring exhaustion.
-		 */
-		if (xnbp->xnb_tx_unmop_count < xnb_unmop_hiwat &&
-		    reqs_on_ring > xnb_unmop_lowwat)
-			return;
-	}
+	if (ddi_dma_mem_alloc(txp->xt_dma_handle, PAGESIZE, &data_accattr,
+	    DDI_DMA_STREAMING, 0, 0, &txp->xt_buf, &len,
+	    &txp->xt_acc_handle) != DDI_SUCCESS)
+		goto failure_1;
 
-	xnb_tx_perform_pending_unmop(xnbp);
+	if (ddi_dma_addr_bind_handle(txp->xt_dma_handle, NULL, txp->xt_buf,
+	    len, DDI_DMA_RDWR | DDI_DMA_STREAMING, DDI_DMA_DONTWAIT, 0,
+	    &dma_cookie, &ncookies)
+	    != DDI_DMA_MAPPED)
+		goto failure_2;
+	ASSERT(ncookies == 1);
+
+	txp->xt_mfn = xnb_btop(dma_cookie.dmac_laddress);
+	txp->xt_buflen = dma_cookie.dmac_size;
+
+	DTRACE_PROBE(txbuf_allocated);
+
+	atomic_add_32(&xnbp->xnb_tx_buf_count, 1);
+	xnbp->xnb_tx_buf_outstanding++;
+
+	return (0);
+
+failure_2:
+	ddi_dma_mem_free(&txp->xt_acc_handle);
+
+failure_1:
+	ddi_dma_free_handle(&txp->xt_dma_handle);
+
+failure:
+
+	return (-1);
+}
+
+static void
+xnb_txbuf_destructor(void *buf, void *arg)
+{
+	xnb_txbuf_t *txp = buf;
+	xnb_t *xnbp = arg;
+
+	(void) ddi_dma_unbind_handle(txp->xt_dma_handle);
+	ddi_dma_mem_free(&txp->xt_acc_handle);
+	ddi_dma_free_handle(&txp->xt_dma_handle);
+
+	atomic_add_32(&xnbp->xnb_tx_buf_count, -1);
 }
 
 /*
- * Here we perform the actual unmapping of the data that was
- * accumulated in xnb_tx_schedule_unmop().
- * Note that it is the caller's responsibility to make sure that
- * there's actually something there to unmop.
+ * Take packets from the peer and deliver them onward.
  */
-static void
-xnb_tx_perform_pending_unmop(xnb_t *xnbp)
-{
-	RING_IDX loop;
-#ifdef XNB_DEBUG
-	gnttab_unmap_grant_ref_t *unmop;
-#endif /* XNB_DEBUG */
-
-	ASSERT(MUTEX_HELD(&xnbp->xnb_tx_lock));
-	ASSERT(xnbp->xnb_tx_unmop_count > 0);
-
-	if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref,
-	    xnbp->xnb_tx_unmop, xnbp->xnb_tx_unmop_count) < 0) {
-		cmn_err(CE_WARN, "xnb_tx_perform_pending_unmop: "
-		    "unmap grant operation failed, "
-		    "%d pages lost", xnbp->xnb_tx_unmop_count);
-	}
-
-#ifdef XNB_DEBUG
-	for (loop = 0, unmop = xnbp->xnb_tx_unmop;
-	    loop < xnbp->xnb_tx_unmop_count;
-	    loop++, unmop++) {
-		if (unmop->status != 0) {
-			cmn_err(CE_WARN, "xnb_tx_perform_pending_unmop: "
-			    "unmap grant reference failed (%d)",
-			    unmop->status);
-		}
-	}
-#endif /* XNB_DEBUG */
-
-	for (loop = 0; loop < xnbp->xnb_tx_unmop_count; loop++) {
-		xnb_txbuf_t	*txp = xnbp->xnb_tx_unmop_txp[loop];
-
-		if (txp == NULL)
-			cmn_err(CE_PANIC,
-			    "xnb_tx_perform_pending_unmop: "
-			    "unexpected NULL txp (loop %d; count %d)!",
-			    loop, xnbp->xnb_tx_unmop_count);
-
-		if (xnbp->xnb_connected)
-			xnb_tx_mark_complete(xnbp, txp->xt_id, txp->xt_status);
-		xnb_txbuf_put(xnbp, txp);
-	}
-	if (xnbp->xnb_connected)
-		xnb_tx_notify_peer(xnbp);
-
-	xnbp->xnb_tx_unmop_count = 0;
-
-#ifdef XNB_DEBUG
-	bzero(xnbp->xnb_tx_unmop, sizeof (xnbp->xnb_tx_unmop));
-	bzero(xnbp->xnb_tx_unmop_txp, sizeof (xnbp->xnb_tx_unmop_txp));
-#endif /* XNB_DEBUG */
-}
-
-static xnb_txbuf_t *
-xnb_txbuf_get(xnb_t *xnbp, int flags)
-{
-	xnb_txbuf_t *txp;
-
-	ASSERT(MUTEX_HELD(&xnbp->xnb_tx_lock));
-
-	txp = kmem_cache_alloc(xnb_txbuf_cachep, flags);
-	if (txp != NULL) {
-		ASSERT((txp->xt_flags & XNB_TXBUF_INUSE) == 0);
-		txp->xt_flags |= XNB_TXBUF_INUSE;
-
-		txp->xt_xnbp = xnbp;
-		txp->xt_mop.dom = xnbp->xnb_peer;
-
-		txp->xt_mop.flags = GNTMAP_host_map;
-		if (!xnbp->xnb_tx_pages_writable)
-			txp->xt_mop.flags |= GNTMAP_readonly;
-
-		xnbp->xnb_tx_buf_count++;
-	}
-
-	return (txp);
-}
-
-static void
-xnb_txbuf_put(xnb_t *xnbp, xnb_txbuf_t *txp)
-{
-	ASSERT(MUTEX_HELD(&xnbp->xnb_tx_lock));
-	ASSERT((txp->xt_flags & XNB_TXBUF_INUSE) == XNB_TXBUF_INUSE);
-
-	txp->xt_flags &= ~XNB_TXBUF_INUSE;
-	xnbp->xnb_tx_buf_count--;
-
-	kmem_cache_free(xnb_txbuf_cachep, txp);
-}
-
 static mblk_t *
 xnb_from_peer(xnb_t *xnbp)
 {
 	RING_IDX start, end, loop;
-	gnttab_map_grant_ref_t *mop;
+	gnttab_copy_t *cop;
 	xnb_txbuf_t **txpp;
 	netif_tx_request_t *txreq;
-	boolean_t work_to_do;
+	boolean_t work_to_do, need_notify = B_FALSE;
 	mblk_t *head, *tail;
-	/*
-	 * If the peer granted a read-only mapping to the page then we
-	 * must copy the data, as the local protocol stack (should the
-	 * packet be destined for this host) will modify the packet
-	 * 'in place'.
-	 */
-	boolean_t copy = xnbp->xnb_tx_always_copy ||
-	    !xnbp->xnb_tx_pages_writable;
+	int n_data_req, i;
 
-	/*
-	 * For each individual request, the sequence of actions is:
-	 *
-	 * 1. get the request.
-	 * 2. map the page based on the grant ref.
-	 * 3. allocate an mblk, copy the data to it.
-	 * 4. release the grant.
-	 * 5. update the ring.
-	 * 6. pass the packet upward.
-	 * 7. kick the peer.
-	 *
-	 * In fact, we try to perform the grant operations in batches,
-	 * so there are two loops.
-	 */
+	ASSERT(MUTEX_HELD(&xnbp->xnb_tx_lock));
 
 	head = tail = NULL;
 around:
-	ASSERT(MUTEX_HELD(&xnbp->xnb_tx_lock));
 
 	/* LINTED: constant in conditional context */
 	RING_FINAL_CHECK_FOR_REQUESTS(&xnbp->xnb_tx_ring, work_to_do);
 	if (!work_to_do) {
 finished:
+		xnb_tx_notify_peer(xnbp, need_notify);
+
 		return (head);
 	}
 
@@ -1517,118 +1381,147 @@ finished:
 		goto around;
 	}
 
-	for (loop = start, mop = xnbp->xnb_tx_mop, txpp = xnbp->xnb_tx_bufp;
-	    loop != end;
-	    loop++, mop++, txpp++) {
-		xnb_txbuf_t *txp;
+	loop = start;
+	cop = xnbp->xnb_tx_cop;
+	txpp = xnbp->xnb_tx_bufp;
+	n_data_req = 0;
 
-		txp = xnb_txbuf_get(xnbp, KM_NOSLEEP);
-		if (txp == NULL)
-			break;
-
-		ASSERT(xnbp->xnb_tx_pages_writable ||
-		    ((txp->xt_mop.flags & GNTMAP_readonly)
-		    == GNTMAP_readonly));
-
-		txp->xt_mop.ref =
-		    RING_GET_REQUEST(&xnbp->xnb_tx_ring, loop)->gref;
-
-		*mop = txp->xt_mop;
-		*txpp = txp;
-	}
-
-	if ((loop - start) == 0)
-		goto finished;
-
-	end = loop;
-
-	if (xen_map_gref(GNTTABOP_map_grant_ref, xnbp->xnb_tx_mop,
-	    end - start, B_FALSE) != 0) {
-
-		cmn_err(CE_WARN, "xnb_from_peer: map grant operation failed");
-
-		loop = start;
-		txpp = xnbp->xnb_tx_bufp;
-
-		while (loop != end) {
-			xnb_txbuf_put(xnbp, *txpp);
-
-			loop++;
-			txpp++;
-		}
-
-		goto finished;
-	}
-
-	for (loop = start, mop = xnbp->xnb_tx_mop, txpp = xnbp->xnb_tx_bufp;
-	    loop != end;
-	    loop++, mop++, txpp++) {
-		mblk_t *mp = NULL;
-		int16_t status = NETIF_RSP_OKAY;
-		xnb_txbuf_t *txp = *txpp;
-
-		if (mop->status != 0) {
-			cmn_err(CE_WARN, "xnb_from_peer: "
-			    "failed to map buffer: %d",
-			    mop->status);
-			status = NETIF_RSP_ERROR;
-		}
-
+	while (loop < end) {
 		txreq = RING_GET_REQUEST(&xnbp->xnb_tx_ring, loop);
 
-		if (status == NETIF_RSP_OKAY) {
-			if (copy) {
-				mp = allocb(txreq->size, BPRI_MED);
-				if (mp == NULL) {
-					status = NETIF_RSP_ERROR;
-					xnbp->xnb_stat_tx_allocb_failed++;
-				} else {
-					bcopy((caddr_t)(uintptr_t)
-					    mop->host_addr + txreq->offset,
-					    mp->b_wptr, txreq->size);
-					mp->b_wptr += txreq->size;
-				}
-			} else {
-				mp = desballoc((uchar_t *)(uintptr_t)
-				    mop->host_addr + txreq->offset,
-				    txreq->size, 0, &txp->xt_free_rtn);
-				if (mp == NULL) {
-					status = NETIF_RSP_ERROR;
-					xnbp->xnb_stat_tx_allocb_failed++;
-				} else {
-					txp->xt_id = txreq->id;
-					txp->xt_status = status;
-					txp->xt_mop = *mop;
+		if (txreq->flags & NETTXF_extra_info) {
+			struct netif_extra_info *erp;
+			boolean_t status;
 
-					mp->b_wptr += txreq->size;
-				}
+			loop++; /* Consume another slot in the ring. */
+			ASSERT(loop <= end);
+
+			erp = (struct netif_extra_info *)
+			    RING_GET_REQUEST(&xnbp->xnb_tx_ring, loop);
+
+			switch (erp->type) {
+			case XEN_NETIF_EXTRA_TYPE_MCAST_ADD:
+				ASSERT(xnbp->xnb_multicast_control);
+				status = xnbp->xnb_flavour->xf_mcast_add(xnbp,
+				    &erp->u.mcast.addr);
+				break;
+			case XEN_NETIF_EXTRA_TYPE_MCAST_DEL:
+				ASSERT(xnbp->xnb_multicast_control);
+				status = xnbp->xnb_flavour->xf_mcast_del(xnbp,
+				    &erp->u.mcast.addr);
+				break;
+			default:
+				status = B_FALSE;
+				cmn_err(CE_WARN, "xnb_from_peer: "
+				    "unknown extra type %d", erp->type);
+				break;
 			}
 
+			xnb_tx_mark_complete(xnbp, txreq->id,
+			    status ? NETIF_RSP_OKAY : NETIF_RSP_ERROR);
+			need_notify = B_TRUE;
+		} else {
+			xnb_txbuf_t *txp;
+
+			txp = kmem_cache_alloc(xnbp->xnb_tx_buf_cache,
+			    KM_NOSLEEP);
+			if (txp == NULL)
+				break;
+
+			txp->xt_mblk = desballoc((unsigned char *)txp->xt_buf,
+			    txp->xt_buflen, 0, &txp->xt_free_rtn);
+			if (txp->xt_mblk == NULL) {
+				kmem_cache_free(xnbp->xnb_tx_buf_cache, txp);
+				break;
+			}
+
+			txp->xt_idx = loop;
+			txp->xt_id = txreq->id;
+
+			cop->source.u.ref = txreq->gref;
+			cop->source.domid = xnbp->xnb_peer;
+			cop->source.offset = txreq->offset;
+
+			cop->dest.u.gmfn = txp->xt_mfn;
+			cop->dest.domid = DOMID_SELF;
+			cop->dest.offset = 0;
+
+			cop->len = txreq->size;
+			cop->flags = GNTCOPY_source_gref;
+			cop->status = 0;
+
+			*txpp = txp;
+
+			txpp++;
+			cop++;
+			n_data_req++;
+
+			ASSERT(n_data_req <= NET_TX_RING_SIZE);
+		}
+
+		loop++;
+	}
+
+	xnbp->xnb_tx_ring.req_cons = loop;
+
+	if (n_data_req == 0)
+		goto around;
+
+	if (HYPERVISOR_grant_table_op(GNTTABOP_copy,
+	    xnbp->xnb_tx_cop, n_data_req) != 0) {
+
+		cmn_err(CE_WARN, "xnb_from_peer: copy operation failed");
+
+		txpp = xnbp->xnb_tx_bufp;
+		i = n_data_req;
+		while (i > 0) {
+			kmem_cache_free(xnbp->xnb_tx_buf_cache, *txpp);
+			txpp++;
+			i--;
+		}
+
+		goto finished;
+	}
+
+	txpp = xnbp->xnb_tx_bufp;
+	cop = xnbp->xnb_tx_cop;
+	i = n_data_req;
+
+	while (i > 0) {
+		xnb_txbuf_t *txp = *txpp;
+
+		txreq = RING_GET_REQUEST(&xnbp->xnb_tx_ring, txp->xt_idx);
+
+		if (cop->status != 0) {
+#ifdef XNB_DEBUG
+			cmn_err(CE_WARN, "xnb_from_peer: "
+			    "txpp 0x%p failed (%d)",
+			    (void *)*txpp, cop->status);
+#endif /* XNB_DEBUG */
+			xnb_tx_mark_complete(xnbp, txp->xt_id, cop->status);
+			freemsg(txp->xt_mblk);
+		} else {
+			mblk_t *mp;
+
+			mp = txp->xt_mblk;
+			mp->b_rptr = mp->b_wptr = (unsigned char *)txp->xt_buf;
+			mp->b_wptr += txreq->size;
+			mp->b_next = NULL;
+
 			/*
-			 * If we have a buffer and there are checksum
-			 * flags, process them appropriately.
+			 * If there are checksum flags, process them
+			 * appropriately.
 			 */
-			if ((mp != NULL) &&
-			    ((txreq->flags &
+			if ((txreq->flags &
 			    (NETTXF_csum_blank | NETTXF_data_validated))
-			    != 0)) {
+			    != 0) {
 				mp = xnbp->xnb_flavour->xf_cksum_from_peer(xnbp,
 				    mp, txreq->flags);
 				xnbp->xnb_stat_tx_cksum_no_need++;
+
+				txp->xt_mblk = mp;
 			}
-		}
 
-		if (copy || (mp == NULL)) {
-			txp->xt_status = status;
-			txp->xt_id = txreq->id;
-			xnb_tx_schedule_unmop(xnbp, mop, txp);
-		}
-
-		if (mp != NULL) {
-			xnbp->xnb_stat_opackets++;
-			xnbp->xnb_stat_obytes += txreq->size;
-
-			mp->b_next = NULL;
 			if (head == NULL) {
 				ASSERT(tail == NULL);
 				head = mp;
@@ -1637,18 +1530,22 @@ finished:
 				tail->b_next = mp;
 			}
 			tail = mp;
-		}
-	}
 
-	xnbp->xnb_tx_ring.req_cons = loop;
+			xnbp->xnb_stat_opackets++;
+			xnbp->xnb_stat_obytes += txreq->size;
+
+			xnb_tx_mark_complete(xnbp, txp->xt_id, cop->status);
+		}
+
+		txpp++;
+		cop++;
+		i--;
+	}
 
 	goto around;
 	/* NOTREACHED */
 }
 
-/*
- *  intr() -- ring interrupt service routine
- */
 static uint_t
 xnb_intr(caddr_t arg)
 {
@@ -1683,51 +1580,141 @@ fail:
 	return (DDI_INTR_CLAIMED);
 }
 
+/*
+ * Read our configuration from xenstore.
+ */
+boolean_t
+xnb_read_xs_config(xnb_t *xnbp)
+{
+	char *xsname;
+	char mac[ETHERADDRL * 3];
+
+	xsname = xvdi_get_xsname(xnbp->xnb_devinfo);
+
+	if (xenbus_scanf(XBT_NULL, xsname,
+	    "mac", "%s", mac) != 0) {
+		cmn_err(CE_WARN, "xnb_attach: "
+		    "cannot read mac address from %s",
+		    xsname);
+		return (B_FALSE);
+	}
+
+	if (ether_aton(mac, xnbp->xnb_mac_addr) != ETHERADDRL) {
+		cmn_err(CE_WARN,
+		    "xnb_attach: cannot parse mac address %s",
+		    mac);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Read the configuration of the peer from xenstore.
+ */
+boolean_t
+xnb_read_oe_config(xnb_t *xnbp)
+{
+	char *oename;
+	int i;
+
+	oename = xvdi_get_oename(xnbp->xnb_devinfo);
+
+	if (xenbus_gather(XBT_NULL, oename,
+	    "event-channel", "%u", &xnbp->xnb_fe_evtchn,
+	    "tx-ring-ref", "%lu", &xnbp->xnb_tx_ring_ref,
+	    "rx-ring-ref", "%lu", &xnbp->xnb_rx_ring_ref,
+	    NULL) != 0) {
+		cmn_err(CE_WARN, "xnb_read_oe_config: "
+		    "cannot read other-end details from %s",
+		    oename);
+		return (B_FALSE);
+	}
+
+	/*
+	 * Check whether our peer requests receive side hypervisor
+	 * copy.
+	 */
+	if (xenbus_scanf(XBT_NULL, oename,
+	    "request-rx-copy", "%d", &i) != 0)
+		i = 0;
+	if (i != 0)
+		xnbp->xnb_rx_hv_copy = B_TRUE;
+
+	/*
+	 * Check whether our peer requests multicast_control.
+	 */
+	if (xenbus_scanf(XBT_NULL, oename,
+	    "request-multicast-control", "%d", &i) != 0)
+		i = 0;
+	if (i != 0)
+		xnbp->xnb_multicast_control = B_TRUE;
+
+	/*
+	 * The Linux backend driver here checks to see if the peer has
+	 * set 'feature-no-csum-offload'. This is used to indicate
+	 * that the guest cannot handle receiving packets without a
+	 * valid checksum. We don't check here, because packets passed
+	 * to the peer _always_ have a valid checksum.
+	 *
+	 * There are three cases:
+	 *
+	 * - the NIC is dedicated: packets from the wire should always
+	 *   have a valid checksum. If the hardware validates the
+	 *   checksum then the relevant bit will be set in the packet
+	 *   attributes and we will inform the peer. It can choose to
+	 *   ignore the hardware verification.
+	 *
+	 * - the NIC is shared (VNIC) and a packet originates from the
+	 *   wire: this is the same as the case above - the packets
+	 *   will have a valid checksum.
+	 *
+	 * - the NIC is shared (VNIC) and a packet originates from the
+	 *   host: the MAC layer ensures that all such packets have a
+	 *   valid checksum by calculating one if the stack did not.
+	 */
+
+	return (B_TRUE);
+}
+
+void
+xnb_start_connect(xnb_t *xnbp)
+{
+	dev_info_t  *dip = xnbp->xnb_devinfo;
+
+	if (!xnb_connect_rings(dip)) {
+		cmn_err(CE_WARN, "xnb_start_connect: "
+		    "cannot connect rings");
+		goto failed;
+	}
+
+	if (!xnbp->xnb_flavour->xf_start_connect(xnbp)) {
+		cmn_err(CE_WARN, "xnb_start_connect: "
+		    "flavour failed to connect");
+		goto failed;
+	}
+
+	(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateConnected);
+	return;
+
+failed:
+	xnbp->xnb_flavour->xf_peer_disconnected(xnbp);
+	xnb_disconnect_rings(dip);
+	(void) xvdi_switch_state(dip, XBT_NULL,
+	    XenbusStateClosed);
+	(void) xvdi_post_event(dip, XEN_HP_REMOVE);
+}
+
 static boolean_t
 xnb_connect_rings(dev_info_t *dip)
 {
 	xnb_t *xnbp = ddi_get_driver_private(dip);
-	char *oename;
 	struct gnttab_map_grant_ref map_op;
-	evtchn_port_t evtchn;
-	int i;
 
 	/*
 	 * Cannot attempt to connect the rings if already connected.
 	 */
 	ASSERT(!xnbp->xnb_connected);
-
-	oename = xvdi_get_oename(dip);
-
-	if (xenbus_gather(XBT_NULL, oename,
-	    "event-channel", "%u", &evtchn,
-	    "tx-ring-ref", "%lu", &xnbp->xnb_tx_ring_ref,
-	    "rx-ring-ref", "%lu", &xnbp->xnb_rx_ring_ref,
-	    NULL) != 0) {
-		cmn_err(CE_WARN, "xnb_connect_rings: "
-		    "cannot read other-end details from %s",
-		    oename);
-		goto fail;
-	}
-
-	if (xenbus_scanf(XBT_NULL, oename,
-	    "feature-tx-writable", "%d", &i) != 0)
-		i = 0;
-	if (i != 0)
-		xnbp->xnb_tx_pages_writable = B_TRUE;
-
-	if (xenbus_scanf(XBT_NULL, oename,
-	    "feature-no-csum-offload", "%d", &i) != 0)
-		i = 0;
-	if ((i == 1) || !xnbp->xnb_cksum_offload)
-		xnbp->xnb_cksum_offload = B_FALSE;
-
-	/* Check whether our peer knows and requests hypervisor copy */
-	if (xenbus_scanf(XBT_NULL, oename, "request-rx-copy", "%d", &i)
-	    != 0)
-		i = 0;
-	if (i != 0)
-		xnbp->xnb_hv_copy = B_TRUE;
 
 	/*
 	 * 1. allocate a vaddr for the tx page, one for the rx page.
@@ -1736,8 +1723,7 @@ xnb_connect_rings(dev_info_t *dip)
 	 * 3. call EVTCHNOP_bind_interdomain to have the event channel
 	 *    bound to this domain.
 	 * 4. associate the event channel with an interrupt.
-	 * 5. declare ourselves connected.
-	 * 6. enable the interrupt.
+	 * 5. enable the interrupt.
 	 */
 
 	/* 1.tx */
@@ -1785,7 +1771,7 @@ xnb_connect_rings(dev_info_t *dip)
 	    (netif_rx_sring_t *)xnbp->xnb_rx_ring_addr, PAGESIZE);
 
 	/* 3 */
-	if (xvdi_bind_evtchn(dip, evtchn) != DDI_SUCCESS) {
+	if (xvdi_bind_evtchn(dip, xnbp->xnb_fe_evtchn) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "xnb_connect_rings: "
 		    "cannot bind event channel %d", xnbp->xnb_evtchn);
 		xnbp->xnb_evtchn = INVALID_EVTCHN;
@@ -1802,22 +1788,18 @@ xnb_connect_rings(dev_info_t *dip)
 	mutex_enter(&xnbp->xnb_tx_lock);
 	mutex_enter(&xnbp->xnb_rx_lock);
 
-	/* 5.1 */
 	xnbp->xnb_connected = B_TRUE;
 
 	mutex_exit(&xnbp->xnb_rx_lock);
 	mutex_exit(&xnbp->xnb_tx_lock);
 
-	/* 4, 6 */
+	/* 4, 5 */
 	if (ddi_add_intr(dip, 0, NULL, NULL, xnb_intr, (caddr_t)xnbp)
 	    != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "xnb_connect_rings: cannot add interrupt");
 		goto fail;
 	}
 	xnbp->xnb_irq = B_TRUE;
-
-	/* 5.2 */
-	(void) xvdi_switch_state(dip, XBT_NULL, XenbusStateConnected);
 
 	return (B_TRUE);
 
@@ -1826,6 +1808,7 @@ fail:
 	mutex_enter(&xnbp->xnb_rx_lock);
 
 	xnbp->xnb_connected = B_FALSE;
+
 	mutex_exit(&xnbp->xnb_rx_lock);
 	mutex_exit(&xnbp->xnb_tx_lock);
 
@@ -1841,9 +1824,6 @@ xnb_disconnect_rings(dev_info_t *dip)
 		ddi_remove_intr(dip, 0, NULL);
 		xnbp->xnb_irq = B_FALSE;
 	}
-
-	if (xnbp->xnb_tx_unmop_count > 0)
-		xnb_tx_perform_pending_unmop(xnbp);
 
 	if (xnbp->xnb_evtchn != INVALID_EVTCHN) {
 		xvdi_free_evtchn(dip);
@@ -1895,11 +1875,11 @@ xnb_disconnect_rings(dev_info_t *dip)
 	}
 }
 
-/*ARGSUSED*/
 static void
 xnb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
     void *arg, void *impl_data)
 {
+	_NOTE(ARGUNUSED(id, arg));
 	xnb_t *xnbp = ddi_get_driver_private(dip);
 	XenbusState new_state = *(XenbusState *)impl_data;
 
@@ -1911,15 +1891,23 @@ xnb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 		if (xnbp->xnb_connected)
 			return;
 
-		if (xnb_connect_rings(dip)) {
-			xnbp->xnb_flavour->xf_peer_connected(xnbp);
-		} else {
-			xnbp->xnb_flavour->xf_peer_disconnected(xnbp);
-			xnb_disconnect_rings(dip);
+		if (!xnb_read_oe_config(xnbp) ||
+		    !xnbp->xnb_flavour->xf_peer_connected(xnbp)) {
+			cmn_err(CE_WARN, "xnb_oe_state_change: "
+			    "read otherend config error");
 			(void) xvdi_switch_state(dip, XBT_NULL,
 			    XenbusStateClosed);
 			(void) xvdi_post_event(dip, XEN_HP_REMOVE);
+
+			break;
 		}
+
+
+		mutex_enter(&xnbp->xnb_state_lock);
+		xnbp->xnb_fe_status = XNB_STATE_READY;
+		if (xnbp->xnb_be_status == XNB_STATE_READY)
+			xnb_start_connect(xnbp);
+		mutex_exit(&xnbp->xnb_state_lock);
 
 		/*
 		 * Now that we've attempted to connect it's reasonable
@@ -1964,33 +1952,42 @@ xnb_oe_state_change(dev_info_t *dip, ddi_eventcookie_t id,
 	}
 }
 
-/*ARGSUSED*/
 static void
 xnb_hp_state_change(dev_info_t *dip, ddi_eventcookie_t id,
     void *arg, void *impl_data)
 {
+	_NOTE(ARGUNUSED(id, arg));
 	xnb_t *xnbp = ddi_get_driver_private(dip);
 	xendev_hotplug_state_t state = *(xendev_hotplug_state_t *)impl_data;
-	boolean_t success;
 
 	ASSERT(xnbp != NULL);
 
 	switch (state) {
 	case Connected:
-
 		/* spurious hotplug event */
 		if (xnbp->xnb_hotplugged)
-			return;
+			break;
 
-		success = xnbp->xnb_flavour->xf_hotplug_connected(xnbp);
+		if (!xnb_read_xs_config(xnbp))
+			break;
+
+		if (!xnbp->xnb_flavour->xf_hotplug_connected(xnbp))
+			break;
 
 		mutex_enter(&xnbp->xnb_tx_lock);
 		mutex_enter(&xnbp->xnb_rx_lock);
 
-		xnbp->xnb_hotplugged = success;
+		xnbp->xnb_hotplugged = B_TRUE;
 
 		mutex_exit(&xnbp->xnb_rx_lock);
 		mutex_exit(&xnbp->xnb_tx_lock);
+
+		mutex_enter(&xnbp->xnb_state_lock);
+		xnbp->xnb_be_status = XNB_STATE_READY;
+		if (xnbp->xnb_fe_status == XNB_STATE_READY)
+			xnb_start_connect(xnbp);
+		mutex_exit(&xnbp->xnb_state_lock);
+
 		break;
 
 	default:
@@ -2013,16 +2010,10 @@ _init(void)
 
 	mutex_init(&xnb_alloc_page_lock, NULL, MUTEX_DRIVER, NULL);
 
-	xnb_txbuf_cachep = kmem_cache_create("xnb_txbuf_cachep",
-	    sizeof (xnb_txbuf_t), 0, xnb_txbuf_constructor,
-	    xnb_txbuf_destructor, NULL, NULL, NULL, 0);
-	ASSERT(xnb_txbuf_cachep != NULL);
-
 	i = mod_install(&modlinkage);
-	if (i != DDI_SUCCESS) {
-		kmem_cache_destroy(xnb_txbuf_cachep);
+	if (i != DDI_SUCCESS)
 		mutex_destroy(&xnb_alloc_page_lock);
-	}
+
 	return (i);
 }
 
@@ -2038,9 +2029,8 @@ _fini(void)
 	int i;
 
 	i = mod_remove(&modlinkage);
-	if (i == DDI_SUCCESS) {
-		kmem_cache_destroy(xnb_txbuf_cachep);
+	if (i == DDI_SUCCESS)
 		mutex_destroy(&xnb_alloc_page_lock);
-	}
+
 	return (i);
 }

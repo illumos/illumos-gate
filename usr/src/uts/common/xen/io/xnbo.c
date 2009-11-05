@@ -46,7 +46,16 @@
 #include <sys/pattr.h>
 #include <xen/sys/xenbus_impl.h>
 #include <xen/sys/xendev.h>
+#include <sys/sdt.h>
+#include <sys/note.h>
 
+/* Track multicast addresses. */
+typedef struct xmca {
+	struct xmca *next;
+	ether_addr_t addr;
+} xmca_t;
+
+/* State about this device instance. */
 typedef struct xnbo {
 	mac_handle_t		o_mh;
 	mac_client_handle_t	o_mch;
@@ -55,9 +64,14 @@ typedef struct xnbo {
 	boolean_t		o_running;
 	boolean_t		o_promiscuous;
 	uint32_t		o_hcksum_capab;
+	xmca_t			*o_mca;
+	char			o_link_name[LIFNAMSIZ];
+	boolean_t		o_need_rx_filter;
+	boolean_t		o_need_setphysaddr;
+	boolean_t		o_multicast_control;
 } xnbo_t;
 
-static void xnbo_close_mac(xnbo_t *);
+static void xnbo_close_mac(xnb_t *);
 
 /*
  * Packets from the peer come here.  We pass them to the mac device.
@@ -85,6 +99,10 @@ fail:
 	freemsgchain(mp);
 }
 
+/*
+ * Process the checksum flags `flags' provided by the peer for the
+ * packet `mp'.
+ */
 static mblk_t *
 xnbo_cksum_from_peer(xnb_t *xnbp, mblk_t *mp, uint16_t flags)
 {
@@ -94,11 +112,6 @@ xnbo_cksum_from_peer(xnb_t *xnbp, mblk_t *mp, uint16_t flags)
 
 	if ((flags & NETTXF_csum_blank) != 0) {
 		/*
-		 * It would be nice to ASSERT that xnbp->xnb_cksum_offload
-		 * is TRUE here, but some peers insist on assuming
-		 * that it is available even when they have been told
-		 * otherwise.
-		 *
 		 * The checksum in the packet is blank.  Determine
 		 * whether we can do hardware offload and, if so,
 		 * update the flags on the mblk according.  If not,
@@ -111,10 +124,16 @@ xnbo_cksum_from_peer(xnb_t *xnbp, mblk_t *mp, uint16_t flags)
 	return (mp);
 }
 
+/*
+ * Calculate the checksum flags to be relayed to the peer for the
+ * packet `mp'.
+ */
 static uint16_t
 xnbo_cksum_to_peer(xnb_t *xnbp, mblk_t *mp)
 {
+	_NOTE(ARGUNUSED(xnbp));
 	uint16_t r = 0;
+	uint32_t pflags, csum;
 
 	/*
 	 * We might also check for HCK_PARTIALCKSUM here and,
@@ -126,29 +145,24 @@ xnbo_cksum_to_peer(xnb_t *xnbp, mblk_t *mp)
 	 * capabilities tend to use HCK_FULLCKSUM on the receive side
 	 * - they are actually saying that in the output path the
 	 * caller must use HCK_PARTIALCKSUM.
+	 *
+	 * Then again, if a NIC supports HCK_PARTIALCKSUM in its'
+	 * output path, the host IP stack will use it. If such packets
+	 * are destined for the peer (i.e. looped around) we would
+	 * gain some advantage.
 	 */
 
-	if (xnbp->xnb_cksum_offload) {
-		uint32_t pflags, csum;
+	hcksum_retrieve(mp, NULL, NULL, NULL, NULL,
+	    NULL, &csum, &pflags);
 
-		/*
-		 * XXPV dme: Pull in improved hcksum_retrieve() from
-		 * Crossbow, which gives back the csum in the seventh
-		 * argument for HCK_FULLCKSUM.
-		 */
-		hcksum_retrieve(mp, NULL, NULL, NULL, NULL,
-		    NULL, NULL, &pflags);
-		csum = DB_CKSUM16(mp);
-
-		/*
-		 * If the MAC driver has asserted that the checksum is
-		 * good, let the peer know.
-		 */
-		if (((pflags & HCK_FULLCKSUM) != 0) &&
-		    (((pflags & HCK_FULLCKSUM_OK) != 0) ||
-		    (csum == 0xffff)))
-			r |= NETRXF_data_validated;
-	}
+	/*
+	 * If the MAC driver has asserted that the checksum is
+	 * good, let the peer know.
+	 */
+	if (((pflags & HCK_FULLCKSUM) != 0) &&
+	    (((pflags & HCK_FULLCKSUM_OK) != 0) ||
+	    (csum == 0xffff)))
+		r |= NETRXF_data_validated;
 
 	return (r);
 }
@@ -174,11 +188,11 @@ xnbo_from_mac(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
  * the destination mac address matches or it's a multicast/broadcast
  * address.
  */
-/*ARGSUSED*/
 static void
 xnbo_from_mac_filter(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
     boolean_t loopback)
 {
+	_NOTE(ARGUNUSED(loopback));
 	xnb_t *xnbp = arg;
 	xnbo_t *xnbop = xnbp->xnb_flavour_data;
 	mblk_t *next, *keep, *keep_head, *free, *free_head;
@@ -230,15 +244,12 @@ static boolean_t
 xnbo_open_mac(xnb_t *xnbp, char *mac)
 {
 	xnbo_t *xnbop = xnbp->xnb_flavour_data;
-	int err, need_rx_filter, need_setphysaddr, need_promiscuous;
+	int err;
 	const mac_info_t *mi;
-	char *xsname;
 	void (*rx_fn)(void *, mac_resource_handle_t, mblk_t *, boolean_t);
 	struct ether_addr ea;
 	uint_t max_sdu;
 	mac_diag_t diag;
-
-	xsname = xvdi_get_xsname(xnbp->xnb_devinfo);
 
 	if ((err = mac_open_by_linkname(mac, &xnbop->o_mh)) != 0) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
@@ -253,14 +264,14 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	if (mi->mi_media != DL_ETHER) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
 		    "device is not DL_ETHER (%d)", mi->mi_media);
-		xnbo_close_mac(xnbop);
+		xnbo_close_mac(xnbp);
 		return (B_FALSE);
 	}
 	if (mi->mi_media != mi->mi_nativemedia) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
 		    "device media and native media mismatch (%d != %d)",
 		    mi->mi_media, mi->mi_nativemedia);
-		xnbo_close_mac(xnbop);
+		xnbo_close_mac(xnbp);
 		return (B_FALSE);
 	}
 
@@ -268,7 +279,7 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	if (max_sdu > XNBMAXPKT) {
 		cmn_err(CE_WARN, "xnbo_open_mac: mac device SDU too big (%d)",
 		    max_sdu);
-		xnbo_close_mac(xnbop);
+		xnbo_close_mac(xnbp);
 		return (B_FALSE);
 	}
 
@@ -286,40 +297,25 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	    MAC_OPEN_FLAGS_MULTI_PRIMARY) != 0) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
 		    "error (%d) opening mac client", err);
-		xnbo_close_mac(xnbop);
+		xnbo_close_mac(xnbp);
 		return (B_FALSE);
 	}
 
-	/*
-	 * Should the receive path filter packets from the downstream
-	 * NIC before passing them to the peer? The default is "no".
-	 */
-	if (xenbus_scanf(XBT_NULL, xsname,
-	    "SUNW-need-rx-filter", "%d", &need_rx_filter) != 0)
-		need_rx_filter = 0;
-	if (need_rx_filter > 0)
+	if (xnbop->o_need_rx_filter)
 		rx_fn = xnbo_from_mac_filter;
 	else
 		rx_fn = xnbo_from_mac;
 
-	/*
-	 * Should we set the underlying NIC into promiscuous mode? The
-	 * default is "no".
-	 */
-	if (xenbus_scanf(XBT_NULL, xsname,
-	    "SUNW-need-promiscuous", "%d", &need_promiscuous) != 0) {
-		need_promiscuous = 0;
-	}
 	err = mac_unicast_add_set_rx(xnbop->o_mch, NULL, MAC_UNICAST_PRIMARY,
-	    &xnbop->o_mah, 0, &diag, need_promiscuous == 0 ? rx_fn :
-	    NULL, xnbp);
+	    &xnbop->o_mah, 0, &diag, xnbop->o_multicast_control ? rx_fn : NULL,
+	    xnbp);
 	if (err != 0) {
 		cmn_err(CE_WARN, "xnbo_open_mac: failed to get the primary "
 		    "MAC address of %s: %d", mac, err);
-		xnbo_close_mac(xnbop);
+		xnbo_close_mac(xnbp);
 		return (B_FALSE);
 	}
-	if (need_promiscuous != 0) {
+	if (!xnbop->o_multicast_control) {
 		err = mac_promisc_add(xnbop->o_mch, MAC_CLIENT_PROMISC_ALL,
 		    rx_fn, xnbp, &xnbop->o_mphp, MAC_PROMISC_FLAGS_NO_TX_LOOP |
 		    MAC_PROMISC_FLAGS_VLAN_TAG_STRIP);
@@ -327,24 +323,13 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 			cmn_err(CE_WARN, "xnbo_open_mac: "
 			    "cannot enable promiscuous mode of %s: %d",
 			    mac, err);
-			xnbo_close_mac(xnbop);
+			xnbo_close_mac(xnbp);
 			return (B_FALSE);
 		}
 		xnbop->o_promiscuous = B_TRUE;
 	}
 
-	if (!mac_capab_get(xnbop->o_mh, MAC_CAPAB_HCKSUM,
-	    &xnbop->o_hcksum_capab))
-		xnbop->o_hcksum_capab = 0;
-
-	/*
-	 * Should we set the physical address of the underlying NIC
-	 * to match that assigned to the peer? The default is "no".
-	 */
-	if (xenbus_scanf(XBT_NULL, xsname,
-	    "SUNW-need-set-physaddr", "%d", &need_setphysaddr) != 0)
-		need_setphysaddr = 0;
-	if (need_setphysaddr > 0) {
+	if (xnbop->o_need_setphysaddr) {
 		err = mac_unicast_primary_set(xnbop->o_mh, xnbp->xnb_mac_addr);
 		/* Warn, but continue on. */
 		if (err != 0) {
@@ -356,41 +341,42 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 		}
 	}
 
+	if (!mac_capab_get(xnbop->o_mh, MAC_CAPAB_HCKSUM,
+	    &xnbop->o_hcksum_capab))
+		xnbop->o_hcksum_capab = 0;
+
 	xnbop->o_running = B_TRUE;
 
 	return (B_TRUE);
 }
 
-/*
- * xnb calls back here when the user-level hotplug code reports that
- * the hotplug has successfully completed. For this flavour that means
- * that the underlying MAC device that we will use is ready to be
- * opened.
- */
-static boolean_t
-xnbo_hotplug(xnb_t *xnbp)
-{
-	char *xsname;
-	char mac[LIFNAMSIZ];
-
-	xsname = xvdi_get_xsname(xnbp->xnb_devinfo);
-	if (xenbus_scanf(XBT_NULL, xsname, "nic", "%s", mac) != 0) {
-		cmn_err(CE_WARN, "xnbo_hotplug: "
-		    "cannot read nic name from %s", xsname);
-		return (B_FALSE);
-	}
-
-	return (xnbo_open_mac(xnbp, mac));
-}
-
 static void
-xnbo_close_mac(xnbo_t *xnbop)
+xnbo_close_mac(xnb_t *xnbp)
 {
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
+	xmca_t *loop;
+
 	if (xnbop->o_mh == NULL)
 		return;
 
-	if (xnbop->o_running) {
+	if (xnbop->o_running)
 		xnbop->o_running = B_FALSE;
+
+	mutex_enter(&xnbp->xnb_state_lock);
+	loop = xnbop->o_mca;
+	xnbop->o_mca = NULL;
+	mutex_exit(&xnbp->xnb_state_lock);
+
+	while (loop != NULL) {
+		xmca_t *next = loop->next;
+
+		DTRACE_PROBE3(mcast_remove,
+		    (char *), "close",
+		    (void *), xnbp,
+		    (etheraddr_t *), loop->addr);
+		(void) mac_multicast_remove(xnbop->o_mch, loop->addr);
+		kmem_free(loop, sizeof (*loop));
+		loop = next;
 	}
 
 	if (xnbop->o_promiscuous) {
@@ -419,32 +405,194 @@ xnbo_close_mac(xnbo_t *xnbop)
 }
 
 /*
- * xnb calls back here when we successfully synchronize with the
- * driver in the guest domain. In this flavour there is nothing to do as
- * we open the underlying MAC device on successful hotplug completion.
+ * Hotplug has completed and we are connected to the peer. We have all
+ * the information we need to exchange traffic, so open the MAC device
+ * and configure it appropriately.
  */
-/*ARGSUSED*/
-static void
-xnbo_connected(xnb_t *xnbp)
+static boolean_t
+xnbo_start_connect(xnb_t *xnbp)
 {
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
+
+	return (xnbo_open_mac(xnbp, xnbop->o_link_name));
 }
 
 /*
- * xnb calls back here when the driver in the guest domain has closed
- * down the inter-domain connection. We close the underlying MAC device.
+ * The guest has successfully synchronize with this instance. We read
+ * the configuration of the guest from xenstore to check whether the
+ * guest requests multicast control. If not (the default) we make a
+ * note that the MAC device needs to be used in promiscious mode.
+ */
+static boolean_t
+xnbo_peer_connected(xnb_t *xnbp)
+{
+	char *oename;
+	int request;
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
+
+	oename = xvdi_get_oename(xnbp->xnb_devinfo);
+
+	if (xenbus_scanf(XBT_NULL, oename,
+	    "request-multicast-control", "%d", &request) != 0)
+		request = 0;
+	xnbop->o_multicast_control = (request > 0);
+
+	return (B_TRUE);
+}
+
+/*
+ * The guest domain has closed down the inter-domain connection. We
+ * close the underlying MAC device.
  */
 static void
-xnbo_disconnected(xnb_t *xnbp)
+xnbo_peer_disconnected(xnb_t *xnbp)
 {
-	xnbo_close_mac(xnbp->xnb_flavour_data);
+	xnbo_close_mac(xnbp);
+}
+
+/*
+ * The hotplug script has completed. We read information from xenstore
+ * about our configuration, most notably the name of the MAC device we
+ * should use.
+ */
+static boolean_t
+xnbo_hotplug_connected(xnb_t *xnbp)
+{
+	char *xsname;
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
+	int need;
+
+	xsname = xvdi_get_xsname(xnbp->xnb_devinfo);
+
+	if (xenbus_scanf(XBT_NULL, xsname,
+	    "nic", "%s", xnbop->o_link_name) != 0) {
+		cmn_err(CE_WARN, "xnbo_connect: "
+		    "cannot read nic name from %s", xsname);
+		return (B_FALSE);
+	}
+
+	if (xenbus_scanf(XBT_NULL, xsname,
+	    "SUNW-need-rx-filter", "%d", &need) != 0)
+		need = 0;
+	xnbop->o_need_rx_filter = (need > 0);
+
+	if (xenbus_scanf(XBT_NULL, xsname,
+	    "SUNW-need-set-physaddr", "%d", &need) != 0)
+		need = 0;
+	xnbop->o_need_setphysaddr = (need > 0);
+
+	return (B_TRUE);
+}
+
+/*
+ * Find the multicast address `addr', return B_TRUE if it is one that
+ * we receive. If `remove', remove it from the set received.
+ */
+static boolean_t
+xnbo_mcast_find(xnb_t *xnbp, ether_addr_t *addr, boolean_t remove)
+{
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
+	xmca_t *prev, *del, *this;
+
+	ASSERT(MUTEX_HELD(&xnbp->xnb_state_lock));
+	ASSERT(xnbop->o_promiscuous == B_FALSE);
+
+	prev = del = NULL;
+
+	this = xnbop->o_mca;
+
+	while (this != NULL) {
+		if (bcmp(&this->addr, addr, sizeof (this->addr)) == 0) {
+			del = this;
+			if (remove) {
+				if (prev == NULL)
+					xnbop->o_mca = this->next;
+				else
+					prev->next = this->next;
+			}
+			break;
+		}
+
+		prev = this;
+		this = this->next;
+	}
+
+	if (del == NULL)
+		return (B_FALSE);
+
+	if (remove) {
+		DTRACE_PROBE3(mcast_remove,
+		    (char *), "remove",
+		    (void *), xnbp,
+		    (etheraddr_t *), del->addr);
+		mac_multicast_remove(xnbop->o_mch, del->addr);
+		kmem_free(del, sizeof (*del));
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Add the multicast address `addr' to the set received.
+ */
+static boolean_t
+xnbo_mcast_add(xnb_t *xnbp, ether_addr_t *addr)
+{
+	xnbo_t *xnbop = xnbp->xnb_flavour_data;
+	boolean_t r = B_FALSE;
+
+	ASSERT(xnbop->o_promiscuous == B_FALSE);
+
+	mutex_enter(&xnbp->xnb_state_lock);
+
+	if (xnbo_mcast_find(xnbp, addr, B_FALSE)) {
+		r = B_TRUE;
+	} else if (mac_multicast_add(xnbop->o_mch,
+	    (const uint8_t *)addr) == 0) {
+		xmca_t *mca;
+
+		DTRACE_PROBE3(mcast_add,
+		    (char *), "add",
+		    (void *), xnbp,
+		    (etheraddr_t *), addr);
+
+		mca = kmem_alloc(sizeof (*mca), KM_SLEEP);
+		bcopy(addr, &mca->addr, sizeof (mca->addr));
+
+		mca->next = xnbop->o_mca;
+		xnbop->o_mca = mca;
+
+		r = B_TRUE;
+	}
+
+	mutex_exit(&xnbp->xnb_state_lock);
+
+	return (r);
+}
+
+/*
+ * Remove the multicast address `addr' from the set received.
+ */
+static boolean_t
+xnbo_mcast_del(xnb_t *xnbp, ether_addr_t *addr)
+{
+	boolean_t r;
+
+	mutex_enter(&xnbp->xnb_state_lock);
+	r = xnbo_mcast_find(xnbp, addr, B_TRUE);
+	mutex_exit(&xnbp->xnb_state_lock);
+
+	return (r);
 }
 
 static int
 xnbo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	static xnb_flavour_t flavour = {
-		xnbo_to_mac, xnbo_connected, xnbo_disconnected, xnbo_hotplug,
+		xnbo_to_mac, xnbo_peer_connected, xnbo_peer_disconnected,
+		xnbo_hotplug_connected, xnbo_start_connect,
 		xnbo_cksum_from_peer, xnbo_cksum_to_peer,
+		xnbo_mcast_add, xnbo_mcast_del,
 	};
 	xnbo_t *xnbop;
 
@@ -458,13 +606,6 @@ xnbo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	xnbop = kmem_zalloc(sizeof (*xnbop), KM_SLEEP);
-
-	xnbop->o_mh = NULL;
-	xnbop->o_mch = NULL;
-	xnbop->o_mah = NULL;
-	xnbop->o_mphp = NULL;
-	xnbop->o_running = B_FALSE;
-	xnbop->o_hcksum_capab = 0;
 
 	if (xnb_attach(dip, &flavour, xnbop) != DDI_SUCCESS) {
 		kmem_free(xnbop, sizeof (*xnbop));
@@ -503,7 +644,7 @@ xnbo_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_exit(&xnbp->xnb_rx_lock);
 	mutex_exit(&xnbp->xnb_tx_lock);
 
-	xnbo_close_mac(xnbop);
+	xnbo_close_mac(xnbp);
 	kmem_free(xnbop, sizeof (*xnbop));
 
 	xnb_detach(dip);

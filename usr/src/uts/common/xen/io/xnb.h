@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * xnb.h - definitions for Xen dom0 network driver
@@ -54,6 +54,9 @@ extern "C" {
 #define	XNBRING		0x20
 #define	XNBCKSUM	0x40
 
+#define	XNB_STATE_INIT	0x01
+#define	XNB_STATE_READY	0x02
+
 typedef struct xnb xnb_t;
 
 /*
@@ -70,19 +73,32 @@ typedef struct xnb xnb_t;
  */
 typedef struct xnb_flavour {
 	void		(*xf_from_peer)(xnb_t *, mblk_t *);
-	void		(*xf_peer_connected)(xnb_t *);
+	boolean_t	(*xf_peer_connected)(xnb_t *);
 	void		(*xf_peer_disconnected)(xnb_t *);
 	boolean_t	(*xf_hotplug_connected)(xnb_t *);
+	boolean_t	(*xf_start_connect)(xnb_t *);
 	mblk_t		*(*xf_cksum_from_peer)(xnb_t *, mblk_t *, uint16_t);
 	uint16_t	(*xf_cksum_to_peer)(xnb_t *, mblk_t *);
+	boolean_t	(*xf_mcast_add)(xnb_t *, ether_addr_t *);
+	boolean_t	(*xf_mcast_del)(xnb_t *, ether_addr_t *);
 } xnb_flavour_t;
 
 typedef struct xnb_txbuf {
 	frtn_t			xt_free_rtn;
 	xnb_t			*xt_xnbp;
-	gnttab_map_grant_ref_t	xt_mop;
+	struct xnb_txbuf	*xt_next;
 	RING_IDX		xt_id;
+	RING_IDX		xt_idx;
 	uint16_t		xt_status;
+
+	ddi_dma_handle_t	xt_dma_handle;
+	ddi_acc_handle_t	xt_acc_handle;
+	caddr_t			xt_buf;
+	size_t			xt_buflen;
+	mfn_t			xt_mfn;
+
+	mblk_t			*xt_mblk;
+
 	unsigned int		xt_flags;
 
 #define	XNB_TXBUF_INUSE	0x01
@@ -140,17 +156,18 @@ struct xnb {
 
 	kstat_t			*xnb_kstat_aux;
 
-	boolean_t		xnb_cksum_offload;
-
 	ddi_iblock_cookie_t	xnb_icookie;
 
 	kmutex_t		xnb_rx_lock;
 	kmutex_t		xnb_tx_lock;
+	kmutex_t		xnb_state_lock;
 
-	int			xnb_tx_unmop_count;
-	int			xnb_tx_buf_count;
-	boolean_t		xnb_tx_pages_writable;
-	boolean_t		xnb_tx_always_copy;
+	int			xnb_be_status;
+	int			xnb_fe_status;
+
+	kmem_cache_t		*xnb_tx_buf_cache;
+	uint32_t		xnb_tx_buf_count;
+	int			xnb_tx_buf_outstanding;
 
 	netif_rx_back_ring_t	xnb_rx_ring;	/* rx interface struct ptr */
 	void			*xnb_rx_ring_addr;
@@ -166,22 +183,22 @@ struct xnb {
 	boolean_t		xnb_hotplugged;
 	boolean_t		xnb_detachable;
 	int			xnb_evtchn;	/* channel to front end */
+	evtchn_port_t		xnb_fe_evtchn;
 	domid_t			xnb_peer;
 
-	xnb_txbuf_t			*xnb_tx_bufp[NET_TX_RING_SIZE];
-	gnttab_map_grant_ref_t		xnb_tx_mop[NET_TX_RING_SIZE];
-	gnttab_unmap_grant_ref_t	xnb_tx_unmop[NET_TX_RING_SIZE];
-
-	/* store information for unmop */
-	xnb_txbuf_t		*xnb_tx_unmop_txp[NET_TX_RING_SIZE];
+	xnb_txbuf_t		*xnb_tx_bufp[NET_TX_RING_SIZE];
+	gnttab_copy_t		xnb_tx_cop[NET_TX_RING_SIZE];
 
 	caddr_t			xnb_rx_va;
 	gnttab_transfer_t	xnb_rx_top[NET_RX_RING_SIZE];
 
-	boolean_t		xnb_hv_copy;	/* do we do hypervisor copy? */
+	boolean_t		xnb_rx_hv_copy;
+	boolean_t		xnb_multicast_control;
+	boolean_t		xnb_no_csum_offload;
+
 	gnttab_copy_t		*xnb_rx_cpop;
 #define	CPOP_DEFCNT 	8
-	size_t			xnb_cpop_sz; 	/* in elements, not bytes */
+	size_t			xnb_rx_cpop_count; 	/* in elements */
 };
 
 extern int xnb_attach(dev_info_t *, xnb_flavour_t *, void *);

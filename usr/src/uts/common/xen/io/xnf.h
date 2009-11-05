@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,70 +37,74 @@ extern "C" {
 #define	XNF_MAXPKT	1500		/* MTU size */
 #define	XNF_FRAMESIZE	1514		/* frame size including MAC header */
 
-#define	XNF_MAX_RXDESCS	256
-
-#define	MCAST_HASHBITS		256
-
-extern int	xnf_diagnose;	/* Available for use any time. */
-
-/* Flags to set in the global xnf_diagnose */
-#define	XNF_DIAG_RX		0x01
-#define	XNF_DIAG_TX		0x02
-#define	XNF_DIAG_STATS		0x04
-#define	XNF_DIAG_RX_BUFS	0x08
-
 /* DEBUG flags */
 #define	XNF_DEBUG_DDI		0x01
 #define	XNF_DEBUG_TRACE		0x02
-#define	XNF_DEBUG_SEND		0x04
-#define	XNF_DEBUG_INT		0x08
 
-#define	XNF_DESC_ALIGN		8
-
-
-/* Info pertaining to each xmit/receive buffer */
-struct xnf_buffer_desc {
-	frtn_t			free_rtn;	/* desballoc() structure */
+/*
+ * Information about each receive buffer and any transmit look-aside
+ * buffers.
+ */
+typedef struct xnf_buf {
+	frtn_t			free_rtn;
 	struct xnf		*xnfp;
 	ddi_dma_handle_t	dma_handle;
 	caddr_t			buf;		/* DMA-able data buffer */
 	paddr_t			buf_phys;
-	struct xnf_buffer_desc	*next;	/* For linking into free list */
+	mfn_t			buf_mfn;
+	size_t			len;
+	struct xnf_buf		*next;	/* For linking into free list */
 	ddi_acc_handle_t	acc_handle;
 	grant_ref_t		grant_ref;	/* grant table reference */
 	uint16_t		id;		/* buffer id */
-};
+	unsigned int		gen;
+} xnf_buf_t;
 
-/* Various information about each transmit packet */
-struct tx_pktinfo {
-	mblk_t			*mp;	/* mblk associated with packet */
-	ddi_dma_handle_t	dma_handle;
-	struct xnf_buffer_desc	*bdesc; /* pointer to buffer descriptor */
-	grant_ref_t		grant_ref;	/* grant table reference */
-	uint16_t		id;	/* tx pkt id/free list next pointer */
-};
+/*
+ * Information about each transmit buffer.
+ */
+typedef struct xnf_txbuf {
+	struct xnf_txbuf	*tx_next;
+	mblk_t			*tx_mp;	/* mblk associated with packet */
+	netif_tx_request_t	tx_txreq;
+	caddr_t			tx_bufp;
+	ddi_dma_handle_t	tx_dma_handle;
+	mfn_t			tx_mfn;
+	xnf_buf_t		*tx_bdesc; /* Look-aside buffer, if used. */
+	unsigned char		tx_type;
+	int16_t			tx_status;
+	RING_IDX		tx_slot;
 
-/* Per network-interface-controller driver private structure */
+#define	TX_DATA		1
+#define	TX_MCAST_REQ	2
+#define	TX_MCAST_RSP	3
+} xnf_txbuf_t;
+
+/*
+ * Information about each outstanding transmit operation.
+ */
+typedef struct xnf_txid {
+	uint16_t	id;	/* Id of this transmit buffer. */
+	uint16_t	next;	/* Freelist of ids. */
+	xnf_txbuf_t	*txbuf;	/* Buffer details. */
+} xnf_txid_t;
+
+/*
+ * Per-instance data.
+ */
 typedef struct xnf {
 	/* most interesting stuff first to assist debugging */
-	dev_info_t		*xnf_devinfo;	/* System per-device info. */
-	mac_handle_t		xnf_mh;		/* Nemo per-device info. */
-	int			xnf_rx_bufs_outstanding;
-	int			xnf_tx_descs_free;
-	int			xnf_rx_descs_free; /* count of free rx bufs */
-	int			xnf_n_tx;	/* No. xmit descriptors */
-	int			xnf_n_rx;	/* No. recv descriptors */
-	int			xnf_n_rx_bufs;	/* No. recv DMA buffers */
-	int			xnf_tx_start_thresh_regval;
+	dev_info_t		*xnf_devinfo;
+	mac_handle_t		xnf_mh;
 	unsigned char		xnf_mac_addr[ETHERADDRL];
-	int			xnf_max_rx_bufs;
-	int			xnf_rx_buffer_count;
-	int			xnf_tx_buffer_count;
+
+	unsigned int		xnf_gen;	/* Increments on resume. */
 
 	boolean_t		xnf_connected;
 	boolean_t		xnf_running;
 
-	boolean_t		xnf_cksum_offload;
+	boolean_t		xnf_be_rx_copy;
+	boolean_t		xnf_be_mcast_control;
 
 	uint64_t		xnf_stat_interrupts;
 	uint64_t		xnf_stat_unclaimed_interrupts;
@@ -112,7 +116,6 @@ typedef struct xnf {
 	uint64_t		xnf_stat_tx_pullup;
 	uint64_t		xnf_stat_tx_pagebndry;
 	uint64_t		xnf_stat_tx_defer;
-	uint64_t		xnf_stat_rx_no_ringbuf;
 	uint64_t		xnf_stat_mac_rcv_error;
 	uint64_t		xnf_stat_runt;
 
@@ -123,44 +126,54 @@ typedef struct xnf {
 
 	uint64_t		xnf_stat_tx_cksum_deferred;
 	uint64_t		xnf_stat_rx_cksum_no_need;
-	uint64_t		xnf_stat_hvcopy_enabled; /* on/off */
-	uint64_t		xnf_stat_hvcopy_packet_processed;
+
+	uint64_t		xnf_stat_buf_allocated;
+	uint64_t		xnf_stat_buf_outstanding;
+	uint64_t		xnf_stat_gref_outstanding;
+	uint64_t		xnf_stat_gref_failure;
+	uint64_t		xnf_stat_gref_peak;
+	uint64_t		xnf_stat_rx_allocb_fail;
+	uint64_t		xnf_stat_rx_desballoc_fail;
 
 	kstat_t			*xnf_kstat_aux;
 
-	struct xnf_buffer_desc	*xnf_free_list;
-	struct xnf_buffer_desc	*xnf_tx_free_list;
-	int			xnf_tx_pkt_id_list;
-				/* free list of avail pkt ids */
-	struct tx_pktinfo	xnf_tx_pkt_info[NET_TX_RING_SIZE];
-	struct xnf_buffer_desc	*xnf_rxpkt_bufptr[XNF_MAX_RXDESCS];
-
 	ddi_iblock_cookie_t	xnf_icookie;
-	kmutex_t		xnf_tx_buf_mutex;
-	kmutex_t		xnf_rx_buf_mutex;
-	kmutex_t		xnf_txlock;
-	kmutex_t		xnf_intrlock;
-	boolean_t		xnf_tx_pages_readonly;
-	boolean_t		xnf_need_sched;
 
-	netif_tx_front_ring_t	xnf_tx_ring;	/* tx interface struct ptr */
+	netif_tx_front_ring_t	xnf_tx_ring;
 	ddi_dma_handle_t	xnf_tx_ring_dma_handle;
 	ddi_acc_handle_t	xnf_tx_ring_dma_acchandle;
 	paddr_t			xnf_tx_ring_phys_addr;
 	grant_ref_t		xnf_tx_ring_ref;
 
-	netif_rx_front_ring_t	xnf_rx_ring;	/* rx interface struct ptr */
+	xnf_txid_t		xnf_tx_pkt_id[NET_TX_RING_SIZE];
+	uint16_t		xnf_tx_pkt_id_head;
+	kmutex_t		xnf_txlock;
+	kmutex_t		xnf_schedlock;
+	boolean_t		xnf_need_sched;
+	kcondvar_t		xnf_cv_tx_slots;
+	kmem_cache_t		*xnf_tx_buf_cache;
+
+	netif_rx_front_ring_t	xnf_rx_ring;
 	ddi_dma_handle_t	xnf_rx_ring_dma_handle;
 	ddi_acc_handle_t	xnf_rx_ring_dma_acchandle;
 	paddr_t			xnf_rx_ring_phys_addr;
 	grant_ref_t		xnf_rx_ring_ref;
 
-	uint16_t		xnf_evtchn;	/* channel to back end ctlr */
-	grant_ref_t		xnf_gref_tx_head;	/* tx grant free list */
-	grant_ref_t		xnf_gref_rx_head;	/* rx grant free list */
-	kcondvar_t		xnf_cv;
+	xnf_buf_t		*xnf_rx_pkt_info[NET_RX_RING_SIZE];
+	kmutex_t		xnf_rxlock;
+	mblk_t			*xnf_rx_head;
+	mblk_t			*xnf_rx_tail;
+	boolean_t		xnf_rx_new_buffers_posted;
+	kmem_cache_t		*xnf_buf_cache;
 
-	boolean_t		xnf_rx_hvcopy;	/* do we do HV copy? */
+	uint16_t		xnf_evtchn;
+
+	kmutex_t		xnf_gref_lock;
+	grant_ref_t		xnf_gref_head;
+
+	kcondvar_t		xnf_cv_state;
+	kcondvar_t		xnf_cv_multicast;
+	uint_t			xnf_pending_multicast;
 } xnf_t;
 
 #ifdef __cplusplus

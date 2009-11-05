@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 #include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <xen/sys/xendev.h>
+#include <sys/note.h>
 
 /* Required driver entry points for GLDv3 */
 static int	xnbu_m_start(void *);
@@ -59,7 +60,7 @@ typedef struct xnbu {
 	boolean_t		u_need_sched;
 } xnbu_t;
 
-static mac_callbacks_t xnb_callbacks = {
+static mac_callbacks_t xnbu_callbacks = {
 	MC_GETCAPAB,
 	xnbu_m_stat,
 	xnbu_m_start,
@@ -147,28 +148,26 @@ xnbu_cksum_from_peer(xnb_t *xnbp, mblk_t *mp, uint16_t flags)
 static uint16_t
 xnbu_cksum_to_peer(xnb_t *xnbp, mblk_t *mp)
 {
+	_NOTE(ARGUNUSED(xnbp));
 	uint16_t r = 0;
+	uint32_t pflags;
 
-	if (xnbp->xnb_cksum_offload) {
-		uint32_t pflags;
+	hcksum_retrieve(mp, NULL, NULL, NULL, NULL,
+	    NULL, NULL, &pflags);
 
-		hcksum_retrieve(mp, NULL, NULL, NULL, NULL,
-		    NULL, NULL, &pflags);
-
-		/*
-		 * If the protocol stack has requested checksum
-		 * offload, inform the peer that we have not
-		 * calculated the checksum.
-		 */
-		if ((pflags & HCK_FULLCKSUM) != 0)
-			r |= NETRXF_csum_blank;
-	}
+	/*
+	 * If the protocol stack has requested checksum
+	 * offload, inform the peer that we have not
+	 * calculated the checksum.
+	 */
+	if ((pflags & HCK_FULLCKSUM) != 0)
+		r |= NETRXF_csum_blank;
 
 	return (r);
 }
 
-static void
-xnbu_connected(xnb_t *xnbp)
+static boolean_t
+xnbu_start_connect(xnb_t *xnbp)
 {
 	xnbu_t *xnbup = xnbp->xnb_flavour_data;
 
@@ -177,10 +176,20 @@ xnbu_connected(xnb_t *xnbp)
 	 * We are able to send packets now - bring them on.
 	 */
 	mac_tx_update(xnbup->u_mh);
+
+	return (B_TRUE);
+}
+
+static boolean_t
+xnbu_peer_connected(xnb_t *xnbp)
+{
+	_NOTE(ARGUNUSED(xnbp));
+
+	return (B_TRUE);
 }
 
 static void
-xnbu_disconnected(xnb_t *xnbp)
+xnbu_peer_disconnected(xnb_t *xnbp)
 {
 	xnbu_t *xnbup = xnbp->xnb_flavour_data;
 
@@ -189,7 +198,7 @@ xnbu_disconnected(xnb_t *xnbp)
 
 /*ARGSUSED*/
 static boolean_t
-xnbu_hotplug(xnb_t *xnbp)
+xnbu_hotplug_connected(xnb_t *xnbp)
 {
 	return (B_TRUE);
 }
@@ -199,28 +208,30 @@ xnbu_m_send(void *arg, mblk_t *mp)
 {
 	xnb_t *xnbp = arg;
 	xnbu_t *xnbup = xnbp->xnb_flavour_data;
+	boolean_t sched = B_FALSE;
 
 	mp = xnb_copy_to_peer(arg, mp);
 
-	/* XXPV dme: playing with need_sched without txlock? */
-
+	mutex_enter(&xnbp->xnb_rx_lock);
 	/*
 	 * If we consumed all of the mblk_t's offered, perhaps we need
 	 * to indicate that we can accept more.  Otherwise we are full
 	 * and need to wait for space.
 	 */
 	if (mp == NULL) {
-		/*
-		 * If a previous transmit attempt failed because the ring
-		 * was full, try again now.
-		 */
-		if (xnbup->u_need_sched) {
-			xnbup->u_need_sched = B_FALSE;
-			mac_tx_update(xnbup->u_mh);
-		}
+		sched = xnbup->u_need_sched;
+		xnbup->u_need_sched = B_FALSE;
 	} else {
 		xnbup->u_need_sched = B_TRUE;
 	}
+	mutex_exit(&xnbp->xnb_rx_lock);
+
+	/*
+	 * If a previous transmit attempt failed because the ring
+	 * was full, try again now.
+	 */
+	if (sched)
+		mac_tx_update(xnbup->u_mh);
 
 	return (mp);
 }
@@ -327,16 +338,13 @@ xnbu_m_stat(void *arg, uint_t stat, uint64_t *val)
 static boolean_t
 xnbu_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
-	xnb_t *xnbp = arg;
+	_NOTE(ARGUNUSED(arg));
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
 		uint32_t *capab = cap_data;
 
-		if (xnbp->xnb_cksum_offload)
-			*capab = HCKSUM_INET_PARTIAL;
-		else
-			*capab = 0;
+		*capab = HCKSUM_INET_PARTIAL;
 		break;
 	}
 	default:
@@ -346,12 +354,34 @@ xnbu_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	return (B_TRUE);
 }
 
+/*
+ * All packets are passed to the peer, so adding and removing
+ * multicast addresses is meaningless.
+ */
+static boolean_t
+xnbu_mcast_add(xnb_t *xnbp, ether_addr_t *addr)
+{
+	_NOTE(ARGUNUSED(xnbp, addr));
+
+	return (B_TRUE);
+}
+
+static boolean_t
+xnbu_mcast_del(xnb_t *xnbp, ether_addr_t *addr)
+{
+	_NOTE(ARGUNUSED(xnbp, addr));
+
+	return (B_TRUE);
+}
+
 static int
 xnbu_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	static xnb_flavour_t flavour = {
-		xnbu_to_host, xnbu_connected, xnbu_disconnected, xnbu_hotplug,
+		xnbu_to_host, xnbu_peer_connected, xnbu_peer_disconnected,
+		xnbu_hotplug_connected, xnbu_start_connect,
 		xnbu_cksum_from_peer, xnbu_cksum_to_peer,
+		xnbu_mcast_add, xnbu_mcast_del,
 	};
 	xnbu_t *xnbup;
 	xnb_t *xnbp;
@@ -392,7 +422,7 @@ xnbu_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	mr->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
 	mr->m_src_addr = xnbp->xnb_mac_addr;
-	mr->m_callbacks = &xnb_callbacks;
+	mr->m_callbacks = &xnbu_callbacks;
 	mr->m_min_sdu = 0;
 	mr->m_max_sdu = XNBMAXPKT;
 	/*
