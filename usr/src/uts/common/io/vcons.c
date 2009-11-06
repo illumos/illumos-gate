@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -667,7 +667,7 @@ vt_reset(vc_state_t *pvc)
 /*
  * switch to vt_no from vc_active_console
  */
-static void
+static int
 vt_switch(uint_t vt_no, cred_t *credp)
 {
 	vc_state_t *pvc_active = vt_minor2vc(vc_active_console);
@@ -675,6 +675,14 @@ vt_switch(uint_t vt_no, cred_t *credp)
 	minor_t index;
 
 	ASSERT(pvc_active && pvc);
+
+	/* sanity test for the target VT and the active VT */
+	if (!((pvc->vc_flags & WCS_ISOPEN) && (pvc->vc_flags & WCS_INIT)))
+		return (EINVAL);
+
+	if (!((pvc_active->vc_flags & WCS_ISOPEN) &&
+	    (pvc_active->vc_flags & WCS_INIT)))
+		return (EINVAL);
 
 	mutex_enter(&vc_lock);
 
@@ -720,6 +728,8 @@ vt_switch(uint_t vt_no, cred_t *credp)
 			}
 		}
 	}
+
+	return (0);
 
 }
 
@@ -800,10 +810,8 @@ vt_activate(uint_t vt_no, cred_t *credp)
 	pvc = vt_minor2vc(vc_active_console);
 	if (pvc == NULL)
 		return (ENXIO);
-	if (pvc->vc_switch_mode != VT_PROCESS) {
-		vt_switch(minor, credp);
-		return (0);
-	}
+	if (pvc->vc_switch_mode != VT_PROCESS)
+		return (vt_switch(minor, credp));
 
 	/*
 	 * Validate the process, reset the
@@ -857,8 +865,7 @@ vt_reldisp(vc_state_t *pvc, int arg, cred_t *credp)
 		return (0); /* refuse to release */
 
 	/* Xserver has left VT */
-	vt_switch(target_vtno, credp);
-	return (0);
+	return (vt_switch(target_vtno, credp));
 }
 
 void
