@@ -462,7 +462,7 @@ get_dev_link_path(di_node_t node, char *nodetype, char *re, char **devlink, char
 			 * situation, we will read the devlink name from
 			 * /dev/usb directory.
 			 */
-			if ((*devlink == NULL) &&
+			if ((*devlink == NULL) && (re != NULL) &&
 			    ((strstr(re, "hid") != NULL) || (strstr(re, "video") != NULL))) {
 				*devlink = get_usb_devlink(*minor_path, "/dev/usb/");
 			}
@@ -494,7 +494,7 @@ devinfo_usb_video4linux_add(HalDevice *usbd, di_node_t node)
 	char	*s;
 
 	get_dev_link_path(node, "usb_video",
-	    "^usb/video+",  &devlink, &minor_path, &minor_name);
+	    "^usb/video[0-9]+",  &devlink, &minor_path, &minor_name);
 
 	if ((minor_path == NULL) || (devlink == NULL)) {
 
@@ -555,7 +555,7 @@ devinfo_usb_input_add(HalDevice *usbd, di_node_t node)
 	char	udi[HAL_PATH_MAX];
 
 	get_dev_link_path(node, "ddi_pseudo",
-	    "^usb/hid+",  &devlink, &minor_path, &minor_name);
+	    "^usb/hid[0-9]+",  &devlink, &minor_path, &minor_name);
 
 	if ((minor_path == NULL) || (devlink == NULL)) {
 
@@ -629,7 +629,8 @@ devinfo_usb_scsa2usb_add(HalDevice *usbd, di_node_t node)
 	char	*devlink = NULL;
 	char	udi[HAL_PATH_MAX];
 
-	get_dev_link_path(node, "ddi_ctl:devctl:scsi", NULL,  &devlink, &minor_path, &minor_name);
+	get_dev_link_path(node, "ddi_ctl:devctl:scsi",
+	    "^usb/mass-storage[0-9]+", &devlink, &minor_path, &minor_name);
 
 	if ((devlink == NULL) || (minor_path == NULL)) {
 		goto out;
