@@ -146,7 +146,7 @@ mc_add_ranks(topo_mod_t *mod, tnode_t *dnode, nvlist_t *auth, int dimm,
 		(void) topo_node_asru_set(rnode, fmri, TOPO_ASRU_COMPUTE, &err);
 
 		if (FM_AWARE_SMBIOS(mod))
-			topo_node_label_set(rnode, NULL, &err);
+			(void) topo_node_label_set(rnode, NULL, &err);
 
 		nvlist_free(fmri);
 

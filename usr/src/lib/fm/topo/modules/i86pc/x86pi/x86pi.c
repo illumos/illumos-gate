@@ -83,7 +83,7 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 	topo_mod_dprintf(mod, "module initializing.\n");
 
 	if (version != TOPO_VERSION) {
-		topo_mod_seterrno(mod, EMOD_VER_NEW);
+		(void) topo_mod_seterrno(mod, EMOD_VER_NEW);
 		topo_mod_dprintf(mod, "incompatible topo version %d\n",
 		    version);
 		return (-1);

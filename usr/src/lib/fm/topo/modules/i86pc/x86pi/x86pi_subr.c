@@ -183,7 +183,7 @@ x86pi_set_auth(topo_mod_t *mod, x86pi_hcfmri_t *hcfmri, tnode_t *t_parent,
 		 * We failed to create the property group and it was not
 		 * already defined.  Set the err code and return failure.
 		 */
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		return (-1);
 	}
 
@@ -231,7 +231,7 @@ x86pi_set_auth(topo_mod_t *mod, x86pi_hcfmri_t *hcfmri, tnode_t *t_parent,
 			    &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod, "%s: failed to set "
 				    "property %s (%d) : %s\n", f,
 				    FM_FMRI_AUTH_PRODUCT, err,
@@ -262,7 +262,7 @@ x86pi_set_auth(topo_mod_t *mod, x86pi_hcfmri_t *hcfmri, tnode_t *t_parent,
 			    &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod, "%s: failed to "
 				    "set property %s (%d) : %s\n", f,
 				    FM_FMRI_AUTH_PRODUCT_SN, err,
@@ -316,7 +316,7 @@ x86pi_set_auth(topo_mod_t *mod, x86pi_hcfmri_t *hcfmri, tnode_t *t_parent,
 
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod, "%s: failed to "
 				    "set property %s (%d) : %s\n", f,
 				    FM_FMRI_AUTH_CHASSIS, err,
@@ -359,7 +359,7 @@ x86pi_set_auth(topo_mod_t *mod, x86pi_hcfmri_t *hcfmri, tnode_t *t_parent,
 			    &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod, "%s: failed to "
 				    "set property %s (%d) : %s\n", f,
 				    FM_FMRI_AUTH_SERVER, err,
@@ -400,7 +400,7 @@ x86pi_set_frufmri(topo_mod_t *mod, x86pi_hcfmri_t *hcfmri, tnode_t *t_parent,
 	 */
 	if (!(flag & X86PI_ENUM_FRU)) {
 		/* This node is not a FRU.  Inherit from parent and return */
-		topo_node_fru_set(t_node, NULL, 0, &result);
+		(void) topo_node_fru_set(t_node, NULL, 0, &result);
 		return (0);
 	}
 
@@ -420,7 +420,7 @@ x86pi_set_frufmri(topo_mod_t *mod, x86pi_hcfmri_t *hcfmri, tnode_t *t_parent,
 	/* Set the FRU, whether NULL or not */
 	result = topo_node_fru_set(t_node, frufmri, 0, &err);
 	if (result != 0)  {
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 	}
 	nvlist_free(frufmri);
 
@@ -449,7 +449,7 @@ x86pi_set_label(topo_mod_t *mod, const char *label, const char *name,
 	 */
 	result = topo_node_label_set(t_node, (char *)label, &err);
 	if (result != 0) {
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		topo_mod_dprintf(mod, "x86pi_set_label: failed with label %s "
 		    "on %s node: %s\n", (label == NULL ? "NULL" : label),
 		    name, topo_strerror(err));
@@ -481,7 +481,7 @@ x86pi_set_system(topo_mod_t *mod, tnode_t *t_node)
 		 * We failed to create the property group and it was not
 		 * already defined.  Set the err code and return failure.
 		 */
-		topo_mod_seterrno(mod, err);
+		(void) topo_mod_seterrno(mod, err);
 		return (-1);
 	}
 
@@ -501,7 +501,7 @@ x86pi_set_system(topo_mod_t *mod, tnode_t *t_node)
 			    TOPO_PROP_IMMUTABLE, isa, &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod,
 				    "x86pi_set_auth: failed to "
 				    "set property %s (%d) : %s\n",
@@ -516,7 +516,7 @@ x86pi_set_system(topo_mod_t *mod, tnode_t *t_node)
 		result = uname(&uts);
 		if (result == -1) {
 			/* Preserve the error and continue */
-			topo_mod_seterrno(mod, errno);
+			(void) topo_mod_seterrno(mod, errno);
 			topo_mod_dprintf(mod, "x86pi_set_system: failed to "
 			    "read uname: %d\n", errno);
 		}
@@ -526,7 +526,7 @@ x86pi_set_system(topo_mod_t *mod, tnode_t *t_node)
 			    TOPO_PROP_IMMUTABLE, uts.machine, &err);
 			if (result != 0) {
 				/* Preserve the error and continue */
-				topo_mod_seterrno(mod, err);
+				(void) topo_mod_seterrno(mod, err);
 				topo_mod_dprintf(mod,
 				    "x86pi_set_auth: failed to "
 				    "set property %s (%d) : %s\n",
