@@ -196,6 +196,7 @@ _init(void)
 {
 	int	err;
 
+	mac_init_ops(NULL, SOFTMAC_DEV_NAME);
 	softmac_init();
 
 	softmac_upper_cachep = kmem_cache_create("softmac_upper_cache",

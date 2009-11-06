@@ -462,10 +462,27 @@ mac_fini(void)
 	return (0);
 }
 
+/*
+ * Initialize a GLDv3 driver's device ops.  A driver that manages its own ops
+ * (e.g. softmac) may pass in a NULL ops argument.
+ */
 void
 mac_init_ops(struct dev_ops *ops, const char *name)
 {
-	dld_init_ops(ops, name);
+	major_t major = ddi_name_to_major((char *)name);
+
+	/*
+	 * By returning on error below, we are not letting the driver continue
+	 * in an undefined context.  The mac_register() function will faill if
+	 * DN_GLDV3_DRIVER isn't set.
+	 */
+	if (major == DDI_MAJOR_T_NONE)
+		return;
+	LOCK_DEV_OPS(&devnamesp[major].dn_lock);
+	devnamesp[major].dn_flags |= (DN_GLDV3_DRIVER | DN_NETWORK_DRIVER);
+	UNLOCK_DEV_OPS(&devnamesp[major].dn_lock);
+	if (ops != NULL)
+		dld_init_ops(ops, name);
 }
 
 void

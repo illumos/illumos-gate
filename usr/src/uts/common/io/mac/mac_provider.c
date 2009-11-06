@@ -128,6 +128,10 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	char			*driver;
 	minor_t			minor = 0;
 
+	/* A successful call to mac_init_ops() sets the DN_GLDV3_DRIVER flag. */
+	if (!GLDV3_DRV(ddi_driver_major(mregp->m_dip)))
+		return (EINVAL);
+
 	/* Find the required MAC-Type plugin. */
 	if ((mtype = mactype_getplugin(mregp->m_type_ident)) == NULL)
 		return (EINVAL);
@@ -396,12 +400,6 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 
 	/* Zero out any properties. */
 	bzero(&mip->mi_resource_props, sizeof (mac_resource_props_t));
-
-	/* set the gldv3 flag in dn_flags */
-	dnp = &devnamesp[ddi_driver_major(mip->mi_dip)];
-	LOCK_DEV_OPS(&dnp->dn_lock);
-	dnp->dn_flags |= (DN_GLDV3_DRIVER | DN_NETWORK_DRIVER);
-	UNLOCK_DEV_OPS(&dnp->dn_lock);
 
 	if (mip->mi_minor <= MAC_MAX_MINOR) {
 		/* Create a style-2 DLPI device */

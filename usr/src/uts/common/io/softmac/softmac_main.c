@@ -1501,46 +1501,55 @@ int
 softmac_hold_device(dev_t dev, dls_dev_handle_t *ddhp)
 {
 	dev_info_t	*dip;
-	const char	*drvname;
 	char		devname[MAXNAMELEN];
 	softmac_t	*softmac;
-	int		ppa, err, inst;
+	major_t		major;
+	int		ppa, err = 0, inst;
 
-	drvname = ddi_major_to_name(getmajor(dev));
-
-	/*
-	 * We have to lookup the device instance using getinfo(9e).
-	 */
-	inst = dev_to_instance(dev);
-	if (inst < 0)
-		return (ENOENT);
-
-	if ((ppa = getminor(dev) - 1) > DLS_MAX_PPA)
-		return (ENOENT);
+	major = getmajor(dev);
+	ppa = getminor(dev) - 1;
 
 	/*
-	 * First try to hold this device instance to force the MAC
-	 * to be registered.
+	 * For GLDv3 devices, look up the device instance using getinfo(9e).
+	 * Otherwise, fall back to the old assumption that inst == ppa.  The
+	 * GLDV3_DRV() macro depends on the driver module being loaded, hence
+	 * the call to ddi_hold_driver().
 	 */
-	if ((dip = ddi_hold_devi_by_instance(getmajor(dev), inst, 0)) == NULL)
+	if (ddi_hold_driver(major) == NULL)
+		return (ENXIO);
+	if (GLDV3_DRV(major)) {
+		if ((inst = dev_to_instance(dev)) < 0)
+			err = ENOENT;
+	} else {
+		inst = ppa;
+	}
+	ddi_rele_driver(major);
+	if (err != 0)
+		return (err);
+
+	/*
+	 * First try to hold this device instance to force device to attach
+	 * and ensure that the softmac entry gets created in net_postattach().
+	 */
+	if ((dip = ddi_hold_devi_by_instance(major, inst, 0)) == NULL)
 		return (ENOENT);
 
 	/*
 	 * Exclude non-physical network device instances, for example, aggr0.
 	 * Note: this check *must* occur after the dip is held, or else
-	 * NETWORK_PHYSDRV might return false incorrectly.  (Essentially, the
-	 * driver needs to be loaded to populate the dev_ops structure
-	 * that NETWORK_PHYSDRV checks.)
+	 * NETWORK_PHYSDRV might return false incorrectly.  The
+	 * DN_NETWORK_PHYSDRIVER flag used by NETWORK_PHYSDRV() gets set if
+	 * ddi_create_minor_node() is called during the device's attach
+	 * phase.
 	 */
-	if (!NETWORK_PHYSDRV(getmajor(dev))) {
+	if (!NETWORK_PHYSDRV(major)) {
 		ddi_release_devi(dip);
 		return (ENOENT);
 	}
 
-	/*
-	 * This is a network device; wait for its softmac to be registered.
-	 */
-	(void) snprintf(devname, MAXNAMELEN, "%s%d", drvname, ppa);
+	/* Now wait for its softmac to be created. */
+	(void) snprintf(devname, MAXNAMELEN, "%s%d", ddi_major_to_name(major),
+	    ppa);
 again:
 	rw_enter(&softmac_hash_lock, RW_READER);
 
