@@ -330,7 +330,7 @@ ilb_conn_hash_init(ilb_stack_t *ilbs)
 		ilb_conn_cache_init();
 
 	(void) snprintf(tq_name, sizeof (tq_name), "ilb_conn_taskq_%p",
-	    ilbs->ilbs_netstack);
+	    (void *)ilbs->ilbs_netstack);
 	ASSERT(ilbs->ilbs_conn_taskq == NULL);
 	ilbs->ilbs_conn_taskq = taskq_create(tq_name,
 	    ilb_conn_timer_size * 2, minclsyspri, ilb_conn_timer_size,
@@ -1381,7 +1381,7 @@ ilb_sticky_hash_init(ilb_stack_t *ilbs)
 		ilb_sticky_cache_init();
 
 	(void) snprintf(tq_name, sizeof (tq_name), "ilb_sticky_taskq_%p",
-	    ilbs->ilbs_netstack);
+	    (void *)ilbs->ilbs_netstack);
 	ASSERT(ilbs->ilbs_sticky_taskq == NULL);
 	ilbs->ilbs_sticky_taskq = taskq_create(tq_name,
 	    ilb_sticky_timer_size * 2, minclsyspri, ilb_sticky_timer_size,

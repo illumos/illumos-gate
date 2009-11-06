@@ -2096,7 +2096,8 @@ ilb_stack_init(netstackid_t stackid, netstack_t *ns)
 	ilbs->ilbs_sticky_list_cur = 0;
 	ilbs->ilbs_sticky_list_curp = NULL;
 
-	(void) snprintf(tq_name, sizeof (tq_name), "ilb_rule_taskq_%p", ns);
+	(void) snprintf(tq_name, sizeof (tq_name), "ilb_rule_taskq_%p",
+	    (void *)ns);
 	ilbs->ilbs_rule_taskq = taskq_create(tq_name, ILB_RULE_TASKQ_NUM_THR,
 	    minclsyspri, 1, INT_MAX, TASKQ_PREPOPULATE|TASKQ_DYNAMIC);
 
