@@ -86,6 +86,8 @@ typedef struct entry {
 #define	BAM_ENTRY_UPGFSKERNEL	0x800	/* Upgrade failsafe kernel entry */
 #define	BAM_ENTRY_UPGFSMODULE	0x1000  /* Upgrade failsafe module entry */
 
+#define	BAM_ENTRY_LIBBE		0x2000	/* entry created by libbe */
+
 typedef struct {
 	line_t	*start;
 	line_t	*end;
@@ -202,6 +204,11 @@ extern int is_sparc(void);
 
 #define	BAM_OLDDEF	"BOOTADM SAVED DEFAULT: "
 #define	BAM_OLD_RC_DEF	"BOOTADM RC SAVED DEFAULT: "
+
+/*
+ * menu.lst comment created by libbe
+ */
+#define	BAM_LIBBE_FTR	"============ End of LIBBE entry ============="
 
 /* Title used for failsafe entries */
 #define	FAILSAFE_TITLE	"Solaris failsafe"

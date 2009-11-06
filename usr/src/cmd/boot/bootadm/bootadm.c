@@ -4206,6 +4206,7 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 	static line_t *prev = NULL;
 	static entry_t *curr_ent = NULL;
 	static int in_liveupgrade = 0;
+	static int is_libbe_ent = 0;
 
 	line_t	*lp;
 	char *cmd, *sep, *arg;
@@ -4236,6 +4237,8 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 			in_liveupgrade = 1;
 		} else if (strstr(arg, BAM_LU_FTR) != NULL) {
 			in_liveupgrade = 0;
+		} else if (strstr(arg, BAM_LIBBE_FTR) != NULL) {
+			is_libbe_ent = 1;
 		}
 	} else if (*str == '\0') {	/* blank line */
 		cmd = sep = arg = NULL;
@@ -4353,7 +4356,12 @@ line_parser(menu_t *mp, char *str, int *lineNum, int *entryNum)
 		mp->old_rc_default = lp;
 	} else if (lp->flags == BAM_ENTRY ||
 	    (lp->flags == BAM_COMMENT &&
-	    strcmp(lp->arg, BAM_BOOTADM_FTR) == 0)) {
+	    ((strcmp(lp->arg, BAM_BOOTADM_FTR) == 0) || is_libbe_ent))) {
+		if (is_libbe_ent) {
+			curr_ent->flags |= BAM_ENTRY_LIBBE;
+			is_libbe_ent = 0;
+		}
+
 		boot_entry_addline(curr_ent, lp);
 	}
 	append_line(mp, lp);
@@ -4754,9 +4762,17 @@ delete_boot_entry(menu_t *mp, int entryNum, int quiet)
 	ent = mp->entries;
 	while (ent) {
 		lp = ent->start;
-		/* check entry number and make sure it's a bootadm entry */
-		if (lp->flags != BAM_COMMENT ||
-		    strcmp(lp->arg, BAM_BOOTADM_HDR) != 0 ||
+
+		/*
+		 * Check entry number and make sure it's a modifiable entry.
+		 *
+		 * Guidelines:
+		 *	+ We can modify a bootadm-created entry
+		 *	+ We can modify a libbe-created entry
+		 */
+		if ((lp->flags != BAM_COMMENT &&
+		    (((ent->flags & BAM_ENTRY_LIBBE) == 0) &&
+		    strcmp(lp->arg, BAM_BOOTADM_HDR) != 0)) ||
 		    (entryNum != ALL_ENTRIES && lp->entryNum != entryNum)) {
 			ent = ent->next;
 			continue;

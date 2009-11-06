@@ -50,8 +50,10 @@
 #define	WHITESPC(x)			(x)
 
 static char *serial_config[2] = { NULL, NULL };
-
 static char *console_dev = NULL;
+
+static char *bootenv_rc_serial[2] = { NULL, NULL };
+static char *bootenv_rc_console = NULL;
 
 static unsigned zfs_boot = 0;
 
@@ -212,6 +214,9 @@ set_serial_rate(int com, char *rate)
 {
 	char **rp = &serial_config[com - 1];
 
+	if ((com < 1) || (com > 2))
+		return (-1);
+
 	/*
 	 * If rate is a NULL pointer, erase any existing serial configuration
 	 * for this serial port.
@@ -305,88 +310,6 @@ serial_metal_to_hyper(char *metal_port, char *metal_serial)
 }
 
 /*
- * Convert bootenv.rc boot property strings of the form:
- *
- *     setprop property value
- *
- * into boot option lines suitable for use with the hypervisor.
- *
- * Our main concerns are the console device and serial port settings.
- *
- * Return values:
- *
- *    -1:	Unparseable line
- *    0:	Success
- *    (n > 0):	A property unimportant to us
- */
-static int
-cvt_bootprop(char *propstr)
-{
-	char *parsestr, *port, *token;
-
-	int retval = 0;
-
-	/* get initial "setprop" */
-	if ((parsestr = get_token(&token, propstr, " \t")) == NULL) {
-		if (token != NULL)
-			free(token);
-
-		return (-1);
-	}
-
-	if (strcmp(token, "setprop")) {
-		free(token);
-		return (1);
-	}
-
-	free(token);
-
-	/* get property name */
-	if ((parsestr = get_token(&token, parsestr, " \t")) == NULL) {
-		if (token != NULL)
-			free(token);
-
-		return (-2);
-	}
-
-	if (strcmp(token, "console") == 0) {
-		free(token);
-
-		/* get console property value */
-		parsestr = get_token(&token, parsestr, " \t");
-		if (token == NULL)
-			return (-3);
-
-		console_metal_to_hyper(token);
-		free(token);
-		return (0);
-	}
-
-	/* check if it's a serial port setting */
-	if ((strcmp(token, "ttya-mode") == 0) ||
-	    (strcmp(token, "ttyb-mode") == 0)) {
-		port = token;
-	} else {
-		free(token);
-		return (3);
-	}
-
-	/* get serial port setting */
-	parsestr = get_token(&token, parsestr, " \t");
-
-	if (token == NULL) {
-		free(port);
-		return (-1);
-	}
-
-	retval = serial_metal_to_hyper(port, token);
-
-	free(port);
-	free(token);
-	return (retval);
-}
-
-/*
  * Convert "name=value" metal options to values suitable for use with the
  * hypervisor.
  *
@@ -447,7 +370,7 @@ cvt_metal_option(char *optstr)
 static int
 cvt_hyper_option(char *optstr)
 {
-#define	SER_LEN		27	/* strlen("ttyb-mode='115200,8,n,1,-'") */
+#define	SER_LEN		15	/* strlen("115200,8,n,1,-") + 1 */
 
 	char ser[SER_LEN];
 	char *value;
@@ -496,11 +419,11 @@ cvt_hyper_option(char *optstr)
 			return (0);
 
 		if (strncmp(value, "com1", 4) == 0)
-			console_dev = "console=ttya";
+			console_dev = "ttya";
 		else if (strncmp(value, "com2", 4) == 0)
-			console_dev = "console=ttyb";
+			console_dev = "ttyb";
 		else
-			console_dev = "console=text";
+			console_dev = "text";
 	}
 
 	/* serial port parameter conversion */
@@ -519,54 +442,49 @@ cvt_hyper_option(char *optstr)
 		 * parameters to be the same as that used by the hypervisor.
 		 */
 		if (strcmp(value, "auto") == 0) {
-			(void) snprintf(ser, SER_LEN,
-			    "tty%c-mode='9600,8,n,1,-'", '`' + com);
-
-			if (set_serial_rate(com, ser) != 0)
+			(void) snprintf(ser, SER_LEN, "9600,8,n,1,-");
+		} else {
+			/*
+			 * Extract the "B,PS" setting from the com line; ignore
+			 * other settings like io_base or IRQ.
+			 */
+			if (sscanf(value, "%u,%c%c%c", &baud, &bits, &parity,
+			    &stop) != 4)
 				return (-1);
 
-			return (0);
-		}
-
-		/*
-		 * Extract the "B,PS" setting from the com line; ignore other
-		 * settings like io_base or IRQ.
-		 */
-		if (sscanf(value, "%u,%c%c%c", &baud, &bits, &parity,
-		    &stop) != 4)
-			return (-1);
-
-		/* validate serial port parameters */
-		if (((stop != '0') && (stop != '1')) ||
-		    ((bits < '5') && (bits > '8')) ||
-		    ((parity != 'n') && (parity != 'e') && (parity != 'o')))
-			return (-1);
-
-		/* validate baud rate */
-		switch (baud) {
-			case 150:
-			case 300:
-			case 600:
-			case 1200:
-			case 2400:
-			case 4800:
-			case 19200:
-			case 38400:
-			case 57600:
-			case 115200:
-				break;
-
-			default:
+			/* validate serial port parameters */
+			if (((stop != '0') && (stop != '1')) ||
+			    ((bits < '5') && (bits > '8')) ||
+			    ((parity != 'n') && (parity != 'e') &&
+			    (parity != 'o')))
 				return (-1);
-		}
 
-		/*
-		 * As the hypervisor has no way to denote handshaking in its
-		 * serial port settings, emit a metal serial port configuration
-		 * with none as well.
-		 */
-		(void) snprintf(ser, SER_LEN, "tty%c-mode='%u,%c,%c,%c,-'",
-		    '`' + com, baud, bits, parity, stop);
+			/* validate baud rate */
+			switch (baud) {
+				case 150:
+				case 300:
+				case 600:
+				case 1200:
+				case 2400:
+				case 4800:
+				case 19200:
+				case 38400:
+				case 57600:
+				case 115200:
+					break;
+
+				default:
+					return (-1);
+			}
+
+			/*
+			 * As the hypervisor has no way to denote handshaking
+			 * in its serial port settings, emit a metal serial
+			 * port configuration with none as well.
+			 */
+			(void) snprintf(ser, SER_LEN, "%u,%c,%c,%c,-", baud,
+			    bits, parity, stop);
+		}
 
 		if (set_serial_rate(com, ser) != 0)
 			return (-1);
@@ -756,11 +674,75 @@ parse_bootenvrc(char *osroot)
 	}
 
 	while (s_fgets(line, LINEBUF_SZ, fp) != NULL) {
+		char *parsestr, *token;
+		int port = 0;
+
 		/* we're only interested in parsing "setprop" directives. */
 		if (strncmp(line, "setprop", 7) != NULL)
 			continue;
 
-		(void) cvt_bootprop(line);
+		/* eat initial "setprop" */
+		if ((parsestr = get_token(&token, line, " \t")) == NULL) {
+			if (token != NULL)
+				free(token);
+
+			continue;
+		}
+
+		if (strcmp(token, "setprop") != 0) {
+			free(token);
+			continue;
+		}
+
+		free(token);
+
+		/* get property name */
+		if ((parsestr = get_token(&token, parsestr, " \t")) == NULL) {
+			if (token != NULL)
+				free(token);
+
+			continue;
+		}
+
+		if (strcmp(token, "console") == 0) {
+			free(token);
+
+			/* get console property value */
+			parsestr = get_token(&token, parsestr, " \t");
+			if (token == NULL)
+				continue;
+
+			if (bootenv_rc_console != NULL)
+				free(bootenv_rc_console);
+
+			bootenv_rc_console = s_strdup(token);
+			continue;
+		}
+
+		/* check if it's a serial port setting */
+		if (strcmp(token, "ttya-mode") == 0) {
+			free(token);
+			port = 0;
+		} else if (strcmp(token, "ttyb-mode") == 0) {
+			free(token);
+			port = 1;
+		} else {
+			/* nope, so check the next line */
+			free(token);
+			continue;
+		}
+
+		/* get serial port setting */
+		parsestr = get_token(&token, parsestr, " \t");
+
+		if (token == NULL)
+			continue;
+
+		if (bootenv_rc_serial[port] != NULL)
+			free(bootenv_rc_serial[port]);
+
+		bootenv_rc_serial[port] = s_strdup(token);
+		free(token);
 	}
 
 	(void) fclose(fp);
@@ -788,7 +770,7 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	char *kern_path = NULL;
 	char *kern_bargs = NULL;
 
-	int curdef;
+	int curdef, newdef;
 	int kp_allocated = 0;
 	int ret = BAM_ERROR;
 
@@ -841,6 +823,15 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	 */
 	parse_bootenvrc(osroot);
 
+	if (bootenv_rc_console != NULL)
+		console_metal_to_hyper(bootenv_rc_console);
+
+	if (bootenv_rc_serial[0] != NULL)
+		(void) serial_metal_to_hyper("ttya-mode", bootenv_rc_serial[0]);
+
+	if (bootenv_rc_serial[1] != NULL)
+		(void) serial_metal_to_hyper("ttyb-mode", bootenv_rc_serial[1]);
+
 	/*
 	 * Now process the entry itself.
 	 */
@@ -877,7 +868,8 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	}
 
 	/*
-	 * If findroot, module or kern_path are NULL, boot entry was malformed
+	 * If findroot, module or kern_path are NULL, the boot entry is
+	 * malformed.
 	 */
 	if (findroot == NULL) {
 		bam_error(FINDROOT_NOT_FOUND, curdef);
@@ -976,25 +968,25 @@ cvt_to_hyper(menu_t *mp, char *osroot, char *extra_args)
 	BAM_DPRINTF((D_CVT_CMD_KERN_DOLLAR, fcn, kernel));
 	BAM_DPRINTF((D_CVT_CMD_MOD_DOLLAR, fcn, mod_kernel));
 
+	if ((newdef = add_boot_entry(mp, title, findroot, kernel, mod_kernel,
+	    module, bootfs)) == BAM_ERROR)
+		return (newdef);
+
 	/*
 	 * Now try to delete the current default entry from the menu and add
 	 * the new hypervisor entry with the parameters we've setup.
 	 */
-	if (delete_boot_entry(mp, curdef, DBE_QUIET) != BAM_SUCCESS)
+	if (delete_boot_entry(mp, curdef, DBE_QUIET) == BAM_SUCCESS)
+		newdef--;
+	else
 		bam_print(NEW_BOOT_ENTRY, title);
-
-	curdef = add_boot_entry(mp, title, findroot, kernel, mod_kernel,
-	    module, bootfs);
 
 	/*
 	 * If we successfully created the new entry, set the default boot
 	 * entry to that entry and let the caller know the new menu should
 	 * be written out.
 	 */
-	if (curdef != BAM_ERROR)
-		return (set_global(mp, menu_cmds[DEFAULT_CMD], curdef));
-
-	return (BAM_ERROR);
+	return (set_global(mp, menu_cmds[DEFAULT_CMD], newdef));
 
 abort:
 	if (ret != BAM_NOCHANGE)
@@ -1026,7 +1018,7 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 	char *barchive_path = DIRECT_BOOT_ARCHIVE;
 	char *kern_path = NULL;
 
-	int curdef;
+	int curdef, newdef;
 	int emit_bflag = 1;
 	int ret = BAM_ERROR;
 
@@ -1098,7 +1090,8 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 	}
 
 	/*
-	 * If findroot, module or kern_path are NULL, boot entry was malformed
+	 * If findroot, module or kern_path are NULL, the boot entry is
+	 * malformed.
 	 */
 	if (findroot == NULL) {
 		bam_error(FINDROOT_NOT_FOUND, curdef);
@@ -1146,32 +1139,46 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 		emit_bflag = 0;
 	}
 
-	if (console_dev != NULL) {
+	/*
+	 * Process the bootenv.rc file to look for boot options that would be
+	 * the same as what the hypervisor had manually set, as we need not set
+	 * those explicitly.
+	 *
+	 * If there's no bootenv.rc, it's not an issue.
+	 */
+	parse_bootenvrc(osroot);
+
+	/*
+	 * Don't emit a console setting if it's the same as what would be
+	 * set by bootenv.rc.
+	 */
+	if ((console_dev != NULL) && (bootenv_rc_console == NULL ||
+	    (strcmp(console_dev, bootenv_rc_console) != 0))) {
 		if (emit_bflag) {
 			newstr = append_str(kernel, BFLAG, " ");
 			free(kernel);
-			kernel = append_str(newstr, console_dev, " ");
+			kernel = append_str(newstr, "console=", " ");
 			free(newstr);
-			emit_bflag = 0;
-		} else {
-			newstr = append_str(kernel, console_dev, ",");
+			newstr = append_str(kernel, console_dev, "");
 			free(kernel);
 			kernel = newstr;
+			emit_bflag = 0;
+		} else {
+			newstr = append_str(kernel, "console=", ",");
+			free(kernel);
+			kernel = append_str(newstr, console_dev, "");
+			free(newstr);
 		}
 	}
 
 	/*
-	 * We have to do some strange processing here because the
-	 * hypervisor's serial ports default to "9600,8,n,1,-" if
-	 * "comX=auto" is specified, or to "auto" if nothing is
-	 * specified.
+	 * We have to do some strange processing here because the hypervisor's
+	 * serial ports default to "9600,8,n,1,-" if "comX=auto" is specified,
+	 * or to "auto" if nothing is specified.
 	 *
-	 * Since there could be entries in the bootenv.rc file that
-	 * set the serial port to some other setting, when converting
-	 * a hypervisor entry to a metal entry we must force the
-	 * serial ports to their defaults.
+	 * This could result in a serial mode setting string being added when
+	 * it would otherwise not be needed, but it's better to play it safe.
 	 */
-
 	if (emit_bflag) {
 		newstr = append_str(kernel, BFLAG, " ");
 		free(kernel);
@@ -1180,19 +1187,37 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 		emit_bflag = 0;
 	}
 
-	if (serial_config[0] != NULL)
-		newstr = append_str(kernel, serial_config[0], delim);
-	else
-		newstr = append_str(kernel, "ttya-mode='9600,8,n,1,-'", delim);
+	if ((serial_config[0] != NULL) && (bootenv_rc_serial[0] == NULL ||
+	    (strcmp(serial_config[0], bootenv_rc_serial[0]) != 0))) {
+		newstr = append_str(kernel, "ttya-mode='", delim);
+		free(kernel);
 
-	free(kernel);
+		/*
+		 * Pass the serial configuration as the delimiter to
+		 * append_str() as it will be inserted between the current
+		 * string and the string we're appending, in this case the
+		 * closing single quote.
+		 */
+		kernel = append_str(newstr, "'", serial_config[0]);
+		free(newstr);
+		delim = ",";
+	}
 
-	if (serial_config[1] != NULL)
-		kernel = append_str(newstr, serial_config[1], ",");
-	else
-		kernel = append_str(newstr, "ttyb-mode='9600,8,n,1,-'", ",");
+	if ((serial_config[1] != NULL) && (bootenv_rc_serial[1] == NULL ||
+	    (strcmp(serial_config[1], bootenv_rc_serial[1]) != 0))) {
+		newstr = append_str(kernel, "ttyb-mode='", delim);
+		free(kernel);
 
-	free(newstr);
+		/*
+		 * Pass the serial configuration as the delimiter to
+		 * append_str() as it will be inserted between the current
+		 * string and the string we're appending, in this case the
+		 * closing single quote.
+		 */
+		kernel = append_str(newstr, "'", serial_config[1]);
+		free(newstr);
+		delim = ",";
+	}
 
 	/* shut off warning messages from the entry line parser */
 	if (ent->flags & BAM_ENTRY_BOOTADM)
@@ -1201,25 +1226,29 @@ cvt_to_metal(menu_t *mp, char *osroot, char *menu_root)
 	BAM_DPRINTF((D_CVT_CMD_KERN_DOLLAR, fcn, kernel));
 	BAM_DPRINTF((D_CVT_CMD_MOD_DOLLAR, fcn, module));
 
+	if ((newdef = add_boot_entry(mp, title, findroot, kernel, NULL,
+	    barchive_path, bootfs)) == BAM_ERROR) {
+		free(kernel);
+		return (newdef);
+	}
+
 	/*
 	 * Now try to delete the current default entry from the menu and add
 	 * the new hypervisor entry with the parameters we've setup.
 	 */
-	if (delete_boot_entry(mp, curdef, DBE_QUIET) != BAM_SUCCESS)
+	if (delete_boot_entry(mp, curdef, DBE_QUIET) == BAM_SUCCESS)
+		newdef--;
+	else
 		bam_print(NEW_BOOT_ENTRY, title);
 
-	curdef = add_boot_entry(mp, title, findroot, kernel, NULL,
-	    barchive_path, bootfs);
+	free(kernel);
 
 	/*
 	 * If we successfully created the new entry, set the default boot
 	 * entry to that entry and let the caller know the new menu should
 	 * be written out.
 	 */
-	if (curdef != BAM_ERROR)
-		return (set_global(mp, menu_cmds[DEFAULT_CMD], curdef));
-
-	return (BAM_ERROR);
+	return (set_global(mp, menu_cmds[DEFAULT_CMD], newdef));
 
 abort:
 	if (ret != BAM_NOCHANGE)
