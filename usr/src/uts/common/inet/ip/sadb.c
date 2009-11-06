@@ -3849,11 +3849,16 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		newbie->ipsa_ocred = cred;
 
 		if (af == AF_INET6) {
-			tsol_compute_label_v6(cred, (in6_addr_t *)peer_addr_ptr,
+			error = tsol_compute_label_v6(cred,
+			    (in6_addr_t *)peer_addr_ptr,
 			    newbie->ipsa_opt_storage, ipst);
 		} else {
-			tsol_compute_label(cred, *peer_addr_ptr,
+			error = tsol_compute_label(cred, *peer_addr_ptr,
 			    newbie->ipsa_opt_storage, ipst);
+		}
+		if (error != 0) {
+			mutex_exit(&newbie->ipsa_lock);
+			goto error;
 		}
 	}
 
