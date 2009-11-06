@@ -35,7 +35,6 @@
 #include <zone.h>
 #include <sys/stat.h>
 #include "cryptoadm.h"
-#include <cryptoutil.h>
 
 static int err; /* To store errno which may be overwritten by gettext() */
 static int build_entrylist(entry_t *, entrylist_t **);
@@ -145,7 +144,6 @@ dup_entry(entry_t *pent1)
 		return (NULL);
 	}
 
-	pent2->flag_fips_enabled = pent1->flag_fips_enabled;
 	pent2->sup_count = pent1->sup_count;
 	pent2->dis_count = pent1->dis_count;
 	pent2->load = pent1->load;
@@ -248,35 +246,6 @@ parse_sup_dis_list(char *buf, entry_t *pent)
 	return (rc);
 }
 
-static int
-parse_fips(char *buf, entry_t *pent)
-{
-	char *value;
-
-	if (strncmp(buf, EF_FIPS_STATUS, sizeof (EF_FIPS_STATUS) - 1) == 0) {
-		if (value = strpbrk(buf, SEP_EQUAL)) {
-			value++; /* get rid of = */
-			if (strcmp(value, DISABLED_KEYWORD) == 0) {
-				pent->flag_fips_enabled = B_FALSE;
-			} else if (strcmp(value, ENABLED_KEYWORD) == 0) {
-				pent->flag_fips_enabled = B_TRUE;
-			} else {
-				cryptoerror(LOG_ERR, gettext(
-				    "Failed to parse kcf.conf file.\n"));
-				return (FAILURE);
-			}
-			return (SUCCESS);
-		} else {
-			return (FAILURE);
-		}
-	} else {
-		/* should not come here */
-		cryptoerror(LOG_ERR, gettext(
-		    "Failed to parse kcf.conf file.\n"));
-		return (FAILURE);
-	}
-
-}
 
 /*
  * Convert a char string containing a line about a provider
@@ -303,15 +272,6 @@ interpret(char *buf, entry_t **ppent)
 	if (pent == NULL) {
 		cryptodebug("out of memory.");
 		return (FAILURE);
-	}
-
-	if (is_fips(token1)) {
-		if ((rc = parse_fips(buf + strlen(token1) + 1,
-		    pent)) != SUCCESS) {
-			free_entry(pent);
-		}
-		*ppent = pent;
-		return (rc);
 	}
 
 	if ((token2 = strtok(NULL, SEP_SEMICOLON)) == NULL) {
@@ -666,16 +626,6 @@ is_device(char *path)
 	}
 }
 
-boolean_t
-is_fips(char *name)
-{
-	if (strcmp(name, FIPS_KEYWORD) == 0) {
-		return (B_TRUE);
-	} else {
-		return (B_FALSE);
-	}
-}
-
 /*
  * Split a hardware provider name with the "name/inst_num" format into
  * a name and a number (e.g., split "mca/0" into "mca" instance 0).
@@ -717,8 +667,7 @@ split_hw_provname(char *provname, char *pname, int *inst_num)
  * The kcf.conf file is available only in the global zone.
  */
 int
-get_kcfconf_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist,
-    entrylist_t **ppfipslist)
+get_kcfconf_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 {
 	FILE	*pfile = NULL;
 	char	buffer[BUFSIZ];
@@ -733,8 +682,6 @@ get_kcfconf_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist,
 
 	*ppdevlist = NULL;
 	*ppsoftlist = NULL;
-	*ppfipslist = NULL;
-
 	while (fgets(buffer, BUFSIZ, pfile) != NULL) {
 		if (buffer[0] == '#' || buffer[0] == ' ' ||
 		    buffer[0] == '\n'|| buffer[0] == '\t') {
@@ -748,15 +695,7 @@ get_kcfconf_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist,
 		buffer[len] = '\0';
 
 		if ((rc = interpret(buffer,  &pent)) == SUCCESS) {
-			if (is_fips(pent->name)) {
-				if (*ppfipslist != NULL) {
-					cryptoerror(LOG_STDERR, gettext(
-					"multiple fips entries."));
-					rc = FAILURE;
-				} else {
-					rc = build_entrylist(pent, ppfipslist);
-				}
-			} else if (is_device(pent->name)) {
+			if (is_device(pent->name)) {
 				rc = build_entrylist(pent, ppdevlist);
 			} else {
 				rc = build_entrylist(pent, ppsoftlist);
@@ -764,13 +703,11 @@ get_kcfconf_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist,
 		} else {
 			cryptoerror(LOG_STDERR, gettext(
 			    "failed to parse configuration."));
-			rc = FAILURE;
 		}
 
 		if (rc != SUCCESS) {
 			free_entrylist(*ppdevlist);
 			free_entrylist(*ppsoftlist);
-			free_entrylist(*ppfipslist);
 			free_entry(pent);
 			break;
 		}
@@ -800,7 +737,6 @@ get_admindev_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 	entrylist_t		*tmp_pdev = NULL;
 	entrylist_t		*tmp_psoft = NULL;
 	entrylist_t		*phardlist = NULL, *psoftlist = NULL;
-	entrylist_t		*pfipslist = NULL;
 
 	/*
 	 * Get hardware providers
@@ -844,8 +780,7 @@ get_admindev_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 	 * Get software providers
 	 */
 	if (getzoneid() == GLOBAL_ZONEID) {
-		if (get_kcfconf_info(&phardlist, &psoftlist, &pfipslist) !=
-		    SUCCESS) {
+		if (get_kcfconf_info(&phardlist, &psoftlist) != SUCCESS) {
 			goto fail_out;
 		}
 	}
@@ -859,8 +794,8 @@ get_admindev_info(entrylist_t **ppdevlist, entrylist_t **ppsoftlist)
 	    i < psoftlist_kernel->sl_soft_count;
 	    i++, psoftname = psoftname + strlen(psoftname) + 1) {
 		pmech = NULL;
-		if (get_soft_info(psoftname, &pmech, phardlist, psoftlist,
-		    pfipslist) != SUCCESS) {
+		if (get_soft_info(psoftname, &pmech, phardlist, psoftlist) !=
+		    SUCCESS) {
 			cryptodebug(
 			    "failed to retrieve the mechanism list for %s.",
 			    psoftname);
@@ -914,15 +849,13 @@ fail_out:
  * If NULL, this function calls get_kcfconf_info() internally.
  */
 entry_t *
-getent_kef(char *provname, entrylist_t *phardlist, entrylist_t *psoftlist,
-    entrylist_t *pfipslist)
+getent_kef(char *provname, entrylist_t *phardlist, entrylist_t *psoftlist)
 {
 	entry_t		*pent = NULL;
 	boolean_t	memory_allocated = B_FALSE;
 
-	if ((phardlist == NULL) || (psoftlist == NULL) || (pfipslist == NULL)) {
-		if (get_kcfconf_info(&phardlist, &psoftlist, &pfipslist) !=
-		    SUCCESS) {
+	if ((phardlist == NULL) || (psoftlist == NULL)) {
+		if (get_kcfconf_info(&phardlist, &psoftlist) != SUCCESS) {
 			return (NULL);
 		}
 		memory_allocated = B_TRUE;
@@ -930,8 +863,6 @@ getent_kef(char *provname, entrylist_t *phardlist, entrylist_t *psoftlist,
 
 	if (is_device(provname)) {
 		pent = getent(provname, phardlist);
-	} else if (is_fips(provname)) {
-		pent = getent(provname, pfipslist);
 	} else {
 		pent = getent(provname, psoftlist);
 	}
@@ -939,7 +870,6 @@ getent_kef(char *provname, entrylist_t *phardlist, entrylist_t *psoftlist,
 	if (memory_allocated) {
 		free_entrylist(phardlist);
 		free_entrylist(psoftlist);
-		free_entrylist(pfipslist);
 	}
 
 	return (pent);

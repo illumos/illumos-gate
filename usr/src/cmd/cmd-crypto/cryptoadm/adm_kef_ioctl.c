@@ -402,8 +402,7 @@ get_dev_info(char *devname, int inst_num, int count, mechlist_t **ppmechlist)
  */
 int
 get_soft_info(char *provname, mechlist_t **ppmechlist,
-	entrylist_t *phardlist, entrylist_t *psoftlist,
-	entrylist_t *pfipslist)
+	entrylist_t *phardlist, entrylist_t *psoftlist)
 {
 	boolean_t		in_kernel = B_FALSE;
 	crypto_get_soft_info_t	*psoft_info;
@@ -422,8 +421,8 @@ get_soft_info(char *provname, mechlist_t **ppmechlist,
 
 	if (getzoneid() == GLOBAL_ZONEID) {
 		/* use kcf.conf for kernel software providers in global zone */
-		if ((pent = getent_kef(provname, phardlist, psoftlist,
-		    pfipslist)) == NULL) {
+		if ((pent = getent_kef(provname, phardlist, psoftlist)) ==
+		    NULL) {
 
 			/* No kcf.conf entry for this provider */
 			if (check_kernel_for_soft(provname, NULL, &in_kernel)
@@ -617,13 +616,13 @@ do_fips_actions(int action, int caller)
 	crypto_fips140_t	fips_info;
 	int	fd;
 	int	rc = SUCCESS;
-	int	kcf_fips_mode = 0;
+	int	pkcs11_fips_mode = 0;
 
-	/* Get FIPS-140 status from kcf.conf */
-	fips_status_kcfconf(&kcf_fips_mode);
+	/* Get FIPS-140 status from pkcs11.conf */
+	fips_status_pkcs11conf(&pkcs11_fips_mode);
 
 	if (action == FIPS140_STATUS) {
-		if (kcf_fips_mode == CRYPTO_FIPS_MODE_ENABLED)
+		if (pkcs11_fips_mode == CRYPTO_FIPS_MODE_ENABLED)
 			(void) printf(gettext(
 			    "\tFIPS-140 mode is enabled.\n"));
 		else
@@ -635,7 +634,7 @@ do_fips_actions(int action, int caller)
 	if (caller == NOT_REFRESH) {
 		/* Is it a duplicate operation? */
 		if ((action == FIPS140_ENABLE) &&
-		    (kcf_fips_mode == CRYPTO_FIPS_MODE_ENABLED)) {
+		    (pkcs11_fips_mode == CRYPTO_FIPS_MODE_ENABLED)) {
 			cryptoerror(LOG_STDERR,
 			    gettext("FIPS-140 mode has already "
 			    "been enabled.\n"));
@@ -643,7 +642,7 @@ do_fips_actions(int action, int caller)
 		}
 
 		if ((action == FIPS140_DISABLE) &&
-		    (kcf_fips_mode == CRYPTO_FIPS_MODE_DISABLED)) {
+		    (pkcs11_fips_mode == CRYPTO_FIPS_MODE_DISABLED)) {
 			cryptoerror(LOG_STDERR,
 			    gettext("FIPS-140 mode has already "
 			    "been disabled.\n"));
@@ -651,8 +650,8 @@ do_fips_actions(int action, int caller)
 		}
 
 		if ((action == FIPS140_ENABLE) || (action == FIPS140_DISABLE)) {
-			/* Update kcf.conf */
-			if ((rc = fips_update_kcfconf(action)) != SUCCESS)
+			/* Update pkcs11.conf */
+			if ((rc = fips_update_pkcs11conf(action)) != SUCCESS)
 				return (rc);
 		}
 

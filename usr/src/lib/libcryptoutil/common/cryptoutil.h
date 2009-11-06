@@ -106,6 +106,7 @@ typedef struct uentry {
 	CK_UTF8CHAR	metaslot_ks_slot[SLOT_DESCRIPTION_SIZE + 1];
 	CK_UTF8CHAR	metaslot_ks_token[TOKEN_LABEL_SIZE + 1];
 	int 		count;
+	boolean_t	flag_fips_enabled;
 } uentry_t;
 
 typedef struct uentrylist {

@@ -86,6 +86,8 @@ int
 fips_sha1_hash(SHA1_CTX *sha1_context, uchar_t *in, ulong_t inlen, uchar_t *out)
 {
 
+	int rv;
+
 	if (in != NULL) {
 #ifdef	__sparcv9
 		SHA1Update((SHA1_CTX *)sha1_context, in, (uint_t)inlen);
@@ -93,10 +95,17 @@ fips_sha1_hash(SHA1_CTX *sha1_context, uchar_t *in, ulong_t inlen, uchar_t *out)
 		SHA1Update((SHA1_CTX *)sha1_context, in, inlen);
 #endif	/* __sparcv9 */
 		SHA1Final(out, (SHA1_CTX *)sha1_context);
-		return (CKR_OK);
+		rv = CKR_OK;
 	} else
-		return (CKR_ARGUMENTS_BAD);
+		rv = CKR_ARGUMENTS_BAD;
 
+	if (sha1_context)
+#ifdef _KERNEL
+		kmem_free(sha1_context, sizeof (SHA1_CTX));
+#else
+		free(sha1_context);
+#endif
+	return (rv);
 }
 
 
@@ -246,6 +255,7 @@ fips_hmac_sha1_hash(sha1_hmac_ctx_t *sha1_hmac_ctx,
 	 */
 	SHA1Final(hmac_computed, &((sha1_hmac_ctx)->hc_ocontext));
 
+	kmem_free(sha1_hmac_ctx, sizeof (sha1_hmac_ctx_t));
 }
 
 #endif

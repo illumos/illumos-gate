@@ -399,6 +399,11 @@ fips_rsa_sign_verify_test(CK_MECHANISM_TYPE mechanism,
 		(void) memcpy(der_data, der_prefix, der_len);
 		(void) memcpy(der_data + der_len, hash, hash_len);
 		der_data_len = der_len + hash_len;
+#ifdef _KERNEL
+		kmem_free(sha1_context, sizeof (SHA1_CTX));
+#else
+		free(sha1_context);
+#endif
 		break;
 	}
 

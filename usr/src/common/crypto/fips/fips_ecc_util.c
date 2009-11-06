@@ -50,6 +50,10 @@
 #define	MAX_ECKEY_LEN		72
 #define	SHA1_DIGEST_SIZE	20
 
+static void free_ecparams(ECParams *, boolean_t);
+static void free_ecprivkey(ECPrivateKey *);
+static void free_ecpubkey(ECPublicKey *);
+
 static int
 fips_ecdsa_sign_verify(uint8_t *encodedParams,
 	unsigned int encodedParamsLen,
@@ -77,7 +81,9 @@ fips_ecdsa_sign_verify(uint8_t *encodedParams,
 	ECPublicKey ecdsa_public_key;
 	SECStatus ecdsaStatus = SECSuccess;
 	SHA1_CTX *sha1_context = NULL;
+	int rv = CKR_DEVICE_ERROR;
 
+	(void) memset(&ecdsa_public_key, 0, sizeof (ECPublicKey));
 	/* construct the ECDSA private/public key pair */
 	encodedparams.type = siBuffer;
 	encodedparams.data = (unsigned char *) encodedParams;
@@ -98,7 +104,7 @@ fips_ecdsa_sign_verify(uint8_t *encodedParams,
 	    ecdsa_Known_Seed, sizeof (ecdsa_Known_Seed), 0);
 
 	if (ecdsaStatus != SECSuccess) {
-		return (CKR_DEVICE_ERROR);
+		goto loser;
 	}
 
 	/* construct public key from private key. */
@@ -132,11 +138,14 @@ fips_ecdsa_sign_verify(uint8_t *encodedParams,
 	 */
 #ifdef _KERNEL
 	if ((sha1_context = kmem_zalloc(sizeof (SHA1_CTX),
-	    KM_SLEEP)) == NULL)
+	    KM_SLEEP)) == NULL) {
 #else
-	if ((sha1_context = malloc(sizeof (SHA1_CTX))) == NULL)
+	if ((sha1_context = malloc(sizeof (SHA1_CTX))) == NULL) {
 #endif
-		return (CKR_HOST_MEMORY);
+		ecdsaStatus = SECFailure;
+		rv = CKR_HOST_MEMORY;
+		goto loser;
+	}
 
 	SHA1Init(sha1_context);
 
@@ -177,8 +186,21 @@ fips_ecdsa_sign_verify(uint8_t *encodedParams,
 	    &digest, 0);
 
 loser:
+	if (ecdsa_public_key.publicValue.data != NULL)
+		free_ecpubkey(&ecdsa_public_key);
+	if (ecdsa_private_key != NULL)
+		free_ecprivkey(ecdsa_private_key);
+	free_ecparams(ecparams, B_TRUE);
+
+	if (sha1_context != NULL)
+#ifdef _KERNEL
+		kmem_free(sha1_context, sizeof (SHA1_CTX));
+#else
+		free(sha1_context);
+#endif
+
 	if (ecdsaStatus != SECSuccess) {
-		return (CKR_DEVICE_ERROR);
+		return (rv);
 	}
 
 	return (CKR_OK);
@@ -217,4 +239,44 @@ fips_ecdsa_post() {
 	}
 
 	return (CKR_OK);
+}
+
+static void
+free_ecparams(ECParams *params, boolean_t freeit)
+{
+	SECITEM_FreeItem(&params->fieldID.u.prime, B_FALSE);
+	SECITEM_FreeItem(&params->curve.a, B_FALSE);
+	SECITEM_FreeItem(&params->curve.b, B_FALSE);
+	SECITEM_FreeItem(&params->curve.seed, B_FALSE);
+	SECITEM_FreeItem(&params->base, B_FALSE);
+	SECITEM_FreeItem(&params->order, B_FALSE);
+	SECITEM_FreeItem(&params->DEREncoding, B_FALSE);
+	SECITEM_FreeItem(&params->curveOID, B_FALSE);
+	if (freeit)
+#ifdef _KERNEL
+		kmem_free(params, sizeof (ECParams));
+#else
+		free(params);
+#endif
+}
+
+static void
+free_ecprivkey(ECPrivateKey *key)
+{
+	free_ecparams(&key->ecParams, B_FALSE);
+	SECITEM_FreeItem(&key->publicValue, B_FALSE);
+	bzero(key->privateValue.data, key->privateValue.len);
+	SECITEM_FreeItem(&key->privateValue, B_FALSE);
+	SECITEM_FreeItem(&key->version, B_FALSE);
+#ifdef _KERNEL
+	kmem_free(key, sizeof (ECPrivateKey));
+#else
+	free(key);
+#endif
+}
+
+static void
+free_ecpubkey(ECPublicKey *key)
+{
+	free_ecparams(&key->ecParams, B_FALSE);
 }

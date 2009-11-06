@@ -259,6 +259,7 @@ clean2:
 	else
 		rv = CKR_FUNCTION_FAILED;
 clean1:
+	free(sha1_context);
 	return (rv);
 }
 
@@ -366,6 +367,7 @@ clean7:
 clean6:
 	DSA_key_finish(&dsakey);
 clean1:
+	free(sha1_context);
 	return (rv);
 }
 
@@ -484,7 +486,7 @@ soft_fips_dsa_post(void)
 	if ((rv != CKR_OK) ||
 	    (memcmp(dsa_computed_signature, dsa_known_signature,
 	    FIPS_DSA_SIGNATURE_LENGTH) != 0)) {
-		return (rv);
+		goto clean;
 	}
 
 	/*
@@ -494,6 +496,10 @@ soft_fips_dsa_post(void)
 	/* Perform DSA verification process. */
 	rv = fips_dsa_verify(&dsa_params, &dsa_public_key,
 	    dsa_known_digest, dsa_computed_signature);
+
+clean:
+	free(dsa_private_key.key);
+	free(dsa_public_key.key);
 
 	if (rv != CKR_OK)
 		return (CKR_DEVICE_ERROR);

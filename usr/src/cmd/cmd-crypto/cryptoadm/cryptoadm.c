@@ -659,7 +659,7 @@ do_list(int argc, char **argv)
 				break;
 			case PROV_KEF_SOFT:
 				rc = list_mechlist_for_soft(provname,
-				    NULL, NULL, NULL);
+				    NULL, NULL);
 				break;
 			case PROV_KEF_HARD:
 				rc = list_mechlist_for_hard(provname);
@@ -676,7 +676,7 @@ do_list(int argc, char **argv)
 			case PROV_KEF_SOFT:
 				if (getzoneid() == GLOBAL_ZONEID) {
 					rc = list_policy_for_soft(provname,
-					    NULL, NULL, NULL);
+					    NULL, NULL);
 				} else {
 					/*
 					 * TRANSLATION_NOTE
@@ -693,7 +693,7 @@ do_list(int argc, char **argv)
 			case PROV_KEF_HARD:
 				if (getzoneid() == GLOBAL_ZONEID) {
 					rc = list_policy_for_hard(
-					    provname, NULL, NULL, NULL, NULL);
+					    provname, NULL, NULL, NULL);
 				} else {
 					/*
 					 * TRANSLATION_NOTE
@@ -1186,7 +1186,7 @@ do_unload(int argc, char **argv)
 	}
 
 	/* Get kcf.conf entry.  If none, build a new entry */
-	if ((pent = getent_kef(provname, NULL, NULL, NULL)) == NULL) {
+	if ((pent = getent_kef(provname, NULL, NULL)) == NULL) {
 		if ((pent = create_entry(provname)) == NULL) {
 			cryptoerror(LOG_STDERR, gettext("out of memory."));
 			rc = FAILURE;
@@ -1299,7 +1299,9 @@ list_simple_for_all(boolean_t verbose)
 	}
 
 	for (plibptr = pliblist; plibptr != NULL; plibptr = plibptr->next) {
-		if (strcmp(plibptr->puent->name, METASLOT_KEYWORD) != 0) {
+		/* skip metaslot and fips-140 entry */
+		if ((strcmp(plibptr->puent->name, METASLOT_KEYWORD) != 0) &&
+		    (strcmp(plibptr->puent->name, FIPS_KEYWORD) != 0)) {
 			(void) printf(gettext("Provider: %s\n"),
 			    plibptr->puent->name);
 			if (verbose) {
@@ -1322,7 +1324,6 @@ list_simple_for_all(boolean_t verbose)
 		char				*psoftname;
 		entrylist_t			*pdevlist_conf = NULL;
 		entrylist_t			*psoftlist_conf = NULL;
-		entrylist_t			*pfipslist_conf = NULL;
 
 		if (get_soft_list(&psoftlist_kernel) == FAILURE) {
 			cryptoerror(LOG_ERR, gettext("Failed to retrieve the "
@@ -1331,8 +1332,8 @@ list_simple_for_all(boolean_t verbose)
 		} else {
 			sl_soft_count = psoftlist_kernel->sl_soft_count;
 
-			if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf,
-			    &pfipslist_conf) == FAILURE) {
+			if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf)
+			    == FAILURE) {
 				cryptoerror(LOG_ERR,
 				    "failed to retrieve the providers' "
 				    "information from file kcf.conf - %s.",
@@ -1346,15 +1347,13 @@ list_simple_for_all(boolean_t verbose)
 				    i < sl_soft_count;
 				    ++i, psoftname += strlen(psoftname) + 1) {
 					pent = getent_kef(psoftname,
-					    pdevlist_conf, psoftlist_conf,
-					    pfipslist_conf);
+					    pdevlist_conf, psoftlist_conf);
 					(void) printf("\t%s%s\n", psoftname,
 					    (pent == NULL) || (pent->load) ?
 					    "" : gettext(" (inactive)"));
 				}
 				free_entrylist(pdevlist_conf);
 				free_entrylist(psoftlist_conf);
-				free_entrylist(pfipslist_conf);
 			}
 			free(psoftlist_kernel);
 		}
@@ -1439,8 +1438,9 @@ list_mechlist_for_all(boolean_t verbose)
 
 	plibptr = pliblist;
 	while (plibptr != NULL) {
-		/* skip metaslot entry */
-		if (strcmp(plibptr->puent->name, METASLOT_KEYWORD) != 0) {
+		/* skip metaslot and fips-140 entry */
+		if ((strcmp(plibptr->puent->name, METASLOT_KEYWORD) != 0) &&
+		    (strcmp(plibptr->puent->name, FIPS_KEYWORD) != 0)) {
 			(void) printf(gettext("\nProvider: %s\n"),
 			    plibptr->puent->name);
 			rv = list_mechlist_for_lib(plibptr->puent->name,
@@ -1470,7 +1470,6 @@ list_mechlist_for_all(boolean_t verbose)
 		int				i;
 		entrylist_t			*pdevlist_conf = NULL;
 		entrylist_t			*psoftlist_conf = NULL;
-		entrylist_t			*pfipslist_conf = NULL;
 
 		if (get_soft_list(&psoftlist_kernel) == FAILURE) {
 			cryptoerror(LOG_ERR, gettext("Failed to retrieve the "
@@ -1479,8 +1478,8 @@ list_mechlist_for_all(boolean_t verbose)
 		}
 		sl_soft_count = psoftlist_kernel->sl_soft_count;
 
-		if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf,
-		    &pfipslist_conf) == FAILURE) {
+		if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf)
+		    == FAILURE) {
 			cryptoerror(LOG_ERR,
 			    "failed to retrieve the providers' "
 			    "information from file kcf.conf - %s.",
@@ -1493,10 +1492,10 @@ list_mechlist_for_all(boolean_t verbose)
 		    i < sl_soft_count;
 		    ++i, psoftname += strlen(psoftname) + 1) {
 			pent = getent_kef(psoftname, pdevlist_conf,
-			    psoftlist_conf, pfipslist_conf);
+			    psoftlist_conf);
 			if ((pent == NULL) || (pent->load)) {
 				rv = list_mechlist_for_soft(psoftname,
-				    NULL, NULL, NULL);
+				    NULL, NULL);
 				if (rv == FAILURE) {
 					rc = FAILURE;
 				}
@@ -1509,13 +1508,11 @@ list_mechlist_for_all(boolean_t verbose)
 		free(psoftlist_kernel);
 		free_entrylist(pdevlist_conf);
 		free_entrylist(psoftlist_conf);
-		free_entrylist(pfipslist_conf);
 
 	} else {
 		/* kcf.conf not there in non-global zone, use /dev/cryptoadm */
 		entrylist_t	*pdevlist_zone = NULL;
 		entrylist_t	*psoftlist_zone = NULL;
-		entrylist_t	*pfipslist_zone = NULL;
 		entrylist_t	*ptr;
 
 		if (get_admindev_info(&pdevlist_zone, &psoftlist_zone) !=
@@ -1527,7 +1524,7 @@ list_mechlist_for_all(boolean_t verbose)
 
 		for (ptr = psoftlist_zone; ptr != NULL; ptr = ptr->next) {
 			rv = list_mechlist_for_soft(ptr->pent->name,
-			    pdevlist_zone, psoftlist_zone, pfipslist_zone);
+			    pdevlist_zone, psoftlist_zone);
 			if (rv == FAILURE) {
 				(void) printf(gettext(
 				    "%s: failed to get the mechanism list.\n"),
@@ -1588,7 +1585,6 @@ list_policy_for_all(void)
 	uentrylist_t		*pliblist = NULL;
 	entrylist_t		*pdevlist_conf = NULL;
 	entrylist_t		*psoftlist_conf = NULL;
-	entrylist_t		*pfipslist_conf = NULL;
 	entrylist_t		*ptr = NULL;
 	entrylist_t		*phead = NULL;
 	boolean_t		found = B_FALSE;
@@ -1612,9 +1608,11 @@ list_policy_for_all(void)
 		uentrylist_t	*plibptr = pliblist;
 
 		while (plibptr != NULL) {
-			/* skip metaslot entry */
-			if (strcmp(plibptr->puent->name,
-			    METASLOT_KEYWORD) != 0) {
+			/* skip metaslot and fips-140 entry */
+			if ((strcmp(plibptr->puent->name,
+			    METASLOT_KEYWORD) != 0) &&
+			    (strcmp(plibptr->puent->name,
+			    FIPS_KEYWORD) != 0)) {
 				if (print_uef_policy(plibptr->puent)
 				    == FAILURE) {
 					rc = FAILURE;
@@ -1653,8 +1651,7 @@ list_policy_for_all(void)
 			    i < sl_soft_count;
 			    ++i, psoftname += strlen(psoftname) + 1) {
 				(void) list_policy_for_soft(psoftname,
-				    pdevlist_conf, psoftlist_conf,
-				    pfipslist_conf);
+				    pdevlist_conf, psoftlist_conf);
 			}
 			free(psoftlist_kernel);
 		}
@@ -1698,8 +1695,7 @@ list_policy_for_all(void)
 		return (FAILURE);
 	}
 
-	if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf,
-	    &pfipslist_conf) == FAILURE) {
+	if (get_kcfconf_info(&pdevlist_conf, &psoftlist_conf) == FAILURE) {
 		cryptoerror(LOG_ERR, "failed to retrieve the providers' "
 		    "information from file kcf.conf - %s.",
 		    _PATH_KCF_CONF);
@@ -1733,8 +1729,7 @@ list_policy_for_all(void)
 
 		if (found) {
 			(void) list_policy_for_hard(ptr->pent->name,
-			    pdevlist_conf, psoftlist_conf, pfipslist_conf,
-			    pdevlist_kernel);
+			    pdevlist_conf, psoftlist_conf, pdevlist_kernel);
 			if (phead == ptr) {
 				pdevlist_conf = pdevlist_conf->next;
 			} else {
@@ -1744,7 +1739,7 @@ list_policy_for_all(void)
 			free(ptr);
 		} else {
 			(void) list_policy_for_hard(provname, pdevlist_conf,
-			    psoftlist_conf, pfipslist_conf, pdevlist_kernel);
+			    psoftlist_conf, pdevlist_kernel);
 		}
 	}
 
@@ -1759,7 +1754,6 @@ list_policy_for_all(void)
 
 	free_entrylist(pdevlist_conf);
 	free_entrylist(psoftlist_conf);
-	free_entrylist(pfipslist_conf);
 	free(pdevlist_kernel);
 
 	return (rc);

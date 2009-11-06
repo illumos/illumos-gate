@@ -492,6 +492,15 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 			goto contparse;
 		}
 
+		if (!strcasecmp(phead->puent->name, FIPS_KEYWORD)) {
+			/*
+			 * Skip standard processing for fips-140
+			 * entry since it is not an actual library
+			 * that can be dlopened.
+			 */
+			goto contparse;
+		}
+
 		/* Check for Instruction Set Architecture indicator */
 		if ((isa = strstr(phead->puent->name, PKCS11_ISA)) != NULL) {
 			/* Substitute the architecture dependent path */

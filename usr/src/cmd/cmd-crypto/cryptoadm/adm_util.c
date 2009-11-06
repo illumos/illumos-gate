@@ -110,6 +110,7 @@ update_conf(char *conf_file, char *entry)
 {
 
 	boolean_t	found;
+	boolean_t	fips_entry = B_FALSE;
 	FILE	*pfile;
 	FILE	*pfile_tmp;
 	char	tmpfile_name[MAXPATHLEN];
@@ -179,19 +180,6 @@ update_conf(char *conf_file, char *entry)
 					found = B_TRUE;
 					found_count++;
 				}
-			}
-		} else { /* _PATH_KCF_CONF */
-			if (buffer[0] == '#') {
-				(void) strlcpy(buffer2, buffer, BUFSIZ);
-				ptr = buffer2;
-				ptr++; /* skip # */
-				if ((name = strtok(ptr, SEP_COLON)) == NULL) {
-					rc = FAILURE;
-					break;
-				} else if (strcmp(FIPS_KEYWORD, name) == 0) {
-					found = B_TRUE;
-					found_count++;
-				}
 			} else {
 				(void) strlcpy(buffer2, buffer, BUFSIZ);
 				ptr = buffer2;
@@ -201,6 +189,24 @@ update_conf(char *conf_file, char *entry)
 				} else if (strcmp(FIPS_KEYWORD, name) == 0) {
 					found = B_TRUE;
 					found_count++;
+					fips_entry = B_TRUE;
+				}
+			}
+		} else { /* _PATH_KCF_CONF */
+			if (buffer[0] == '#') {
+				(void) strlcpy(buffer2, buffer, BUFSIZ);
+				ptr = buffer2;
+				ptr++; /* skip # */
+				if ((name = strtok(ptr, SEP_COLON)) == NULL) {
+					rc = FAILURE;
+					break;
+				}
+			} else {
+				(void) strlcpy(buffer2, buffer, BUFSIZ);
+				ptr = buffer2;
+				if ((name = strtok(ptr, SEP_COLON)) == NULL) {
+					rc = FAILURE;
+					break;
 				}
 			}
 		}
@@ -212,8 +218,17 @@ update_conf(char *conf_file, char *entry)
 		} else {
 			if (found_count == 1) {
 				if (strcmp(conf_file, _PATH_PKCS11_CONF) == 0) {
-					if (fputs(ptr, pfile_tmp) == EOF) {
-						rc = FAILURE;
+					if (fips_entry == B_TRUE) {
+						if (fputs(entry, pfile_tmp) ==
+						    EOF) {
+							rc = FAILURE;
+						}
+						fips_entry = B_FALSE;
+					} else {
+						if (fputs(ptr, pfile_tmp) ==
+						    EOF) {
+							rc = FAILURE;
+						}
 					}
 				} else {
 					if (fputs(entry, pfile_tmp) == EOF) {

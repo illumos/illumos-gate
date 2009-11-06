@@ -33,6 +33,7 @@
 
 static int uef_interpret(char *, uentry_t **);
 static int parse_policylist(char *, uentry_t *);
+static boolean_t is_fips(char *);
 
 /*
  * Retrieve the user-level provider info from the pkcs11.conf file.
@@ -103,6 +104,35 @@ get_pkcs11conf_info(uentrylist_t **ppliblist)
 	return (rc);
 }
 
+static int
+parse_fips_mode(char *buf, boolean_t *mode)
+{
+	char *value;
+
+	if (strncmp(buf, EF_FIPS_STATUS, sizeof (EF_FIPS_STATUS) - 1) == 0) {
+		if (value = strpbrk(buf, SEP_EQUAL)) {
+			value++; /* get rid of = */
+			if (strcmp(value, DISABLED_KEYWORD) == 0) {
+				*mode = B_FALSE;
+			} else if (strcmp(value, ENABLED_KEYWORD) == 0) {
+				*mode = B_TRUE;
+			} else {
+				cryptoerror(LOG_ERR, gettext(
+				    "Failed to parse pkcs11.conf file.\n"));
+				return (CKR_FUNCTION_FAILED);
+			}
+			return (CKR_OK);
+		} else {
+			return (CKR_FUNCTION_FAILED);
+		}
+	} else {
+		/* should not come here */
+		cryptoerror(LOG_ERR, gettext(
+		    "Failed to parse pkcs11.conf file.\n"));
+		return (CKR_FUNCTION_FAILED);
+	}
+
+}
 
 /*
  * This routine converts a char string into a uentry_t structure
@@ -147,6 +177,18 @@ uef_interpret(char *buf, uentry_t **ppent)
 		return (FAILURE);
 	}
 	(void) strlcpy(pent->name, token1, sizeof (pent->name));
+
+	if (is_fips(token1)) {
+		if ((rc = parse_fips_mode(buf + strlen(token1) + 1,
+		    &pent->flag_fips_enabled)) != SUCCESS) {
+			free_uentry(pent);
+			return (rc);
+		}
+
+		*ppent = pent;
+		return (SUCCESS);
+	}
+
 	/*
 	 * in case metaslot_auto_key_migrate is not specified, it should
 	 * be default to true
@@ -444,6 +486,7 @@ dup_uentry(uentry_t *puent1)
 		(void) memcpy(puent2->metaslot_ks_token,
 		    puent1->metaslot_ks_token, TOKEN_LABEL_SIZE);
 		puent2->count = puent1->count;
+		puent2->flag_fips_enabled = puent1->flag_fips_enabled;
 		return (puent2);
 	}
 }
@@ -547,35 +590,6 @@ out:
 	return (rc);
 }
 
-static CK_RV
-parse_fips_mode(char *buf, int *mode)
-{
-
-	char *value;
-
-	if (strncmp(buf, EF_FIPS_STATUS, sizeof (EF_FIPS_STATUS) - 1) == 0) {
-		if (value = strpbrk(buf, SEP_EQUAL)) {
-			value++; /* get rid of = */
-			if (strcmp(value, DISABLED_KEYWORD) == 0) {
-				*mode = CRYPTO_FIPS_MODE_DISABLED;
-			} else if (strcmp(value, ENABLED_KEYWORD) == 0) {
-				*mode = CRYPTO_FIPS_MODE_ENABLED;
-			} else {
-				cryptoerror(LOG_ERR,
-				    "failed to parse kcf.conf file.\n");
-				return (CKR_FUNCTION_FAILED);
-			}
-			return (CKR_OK);
-		} else {
-			return (CKR_FUNCTION_FAILED);
-		}
-	} else {
-		/* should not come here */
-		return (CKR_FUNCTION_FAILED);
-	}
-
-}
-
 static boolean_t
 is_fips(char *name)
 {
@@ -595,10 +609,11 @@ get_fips_mode(int *mode)
 	CK_RV	rc = CKR_OK;
 	int found = 0;
 	char *token1;
+	boolean_t fips_mode = B_FALSE;
 
-	if ((pfile = fopen(_PATH_KCF_CONF, "r")) == NULL) {
+	if ((pfile = fopen(_PATH_PKCS11_CONF, "r")) == NULL) {
 		cryptoerror(LOG_DEBUG,
-		    "failed to open the kcf.conf file for read only.");
+		    "failed to open the pkcs11.conf file for read only.");
 		*mode = CRYPTO_FIPS_MODE_DISABLED;
 		return (CKR_OK);
 	}
@@ -623,10 +638,14 @@ get_fips_mode(int *mode)
 
 		if (is_fips(token1)) {
 			if ((rc = parse_fips_mode(buffer + strlen(token1) + 1,
-			    mode)) != CKR_OK) {
+			    &fips_mode)) != CKR_OK) {
 				goto out;
 			} else {
 				found++;
+				if (fips_mode == B_TRUE)
+					*mode = CRYPTO_FIPS_MODE_ENABLED;
+				else
+					*mode = CRYPTO_FIPS_MODE_DISABLED;
 				break;
 			}
 		} else {

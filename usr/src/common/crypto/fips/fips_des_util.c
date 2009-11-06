@@ -238,6 +238,8 @@ fips_des_free_context(des_ctx_t *des_ctx)
 			kmem_free(des_ctx->dc_keysched,
 			    des_ctx->dc_keysched_len);
 		}
+		bzero(des_ctx, sizeof (des_ctx_t));
+		kmem_free(des_ctx, sizeof (des_ctx_t));
 	}
 }
 #endif

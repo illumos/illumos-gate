@@ -121,13 +121,24 @@ fips_sha2_hash(SHA2_CTX *sha2_context, uchar_t *in,
 	ulong_t inlen, uchar_t *out)
 {
 
+	int rv;
+
 	if (in != NULL) {
 		SHA2Update((SHA2_CTX *)sha2_context, in, inlen);
 		SHA2Final(out, (SHA2_CTX *)sha2_context);
-		return (CKR_OK);
+		rv = CKR_OK;
 	} else {
-		return (CKR_ARGUMENTS_BAD);
+		rv = CKR_ARGUMENTS_BAD;
 	}
+
+	if (sha2_context)
+#ifdef _KERNEL
+		kmem_free(sha2_context, sizeof (SHA2_CTX));
+#else
+		free(sha2_context);
+#endif
+	return (rv);
+
 }
 
 #ifndef _KERNEL
@@ -376,6 +387,8 @@ fips_hmac_sha2_hash(sha2_hmac_ctx_t *sha2_hmac_ctx,
 	}
 
 	SHA2Final(hmac_computed, &((sha2_hmac_ctx)->hc_ocontext));
+
+	kmem_free(sha2_hmac_ctx, sizeof (sha2_hmac_ctx_t));
 }
 
 #endif
