@@ -1297,7 +1297,7 @@ mc_read_smbios(mc_t *mc, dev_info_t *dip)
 			mc->smb_chipid = chip_inst;
 		} else {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "mc reads smbios chip info failed");
+			cmn_err(CE_NOTE, "!mc reads smbios chip info failed");
 #endif /* DEBUG */
 			return;
 		}
@@ -1305,7 +1305,7 @@ mc_read_smbios(mc_t *mc, dev_info_t *dip)
 #ifdef DEBUG
 		if (mc->smb_bboard == NULL)
 			cmn_err(CE_NOTE,
-			    "mc reads smbios base boards info failed");
+			    "!mc reads smbios base boards info failed");
 #endif /* DEBUG */
 	}
 }

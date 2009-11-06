@@ -368,7 +368,7 @@ fm_smb_check(smbios_hdl_t *shp)
 	    expr_cnt != pr_cnt || exma_cnt != ma_cnt ||
 	    exmdev_cnt != mdev_cnt) {
 #ifdef	DEBUG
-		cmn_err(CE_NOTE, "Structure mismatch: ext_proc (%d) "
+		cmn_err(CE_NOTE, "!Structure mismatch: ext_proc (%d) "
 		    "proc (%d) ext_ma (%d) ma (%d) ext_mdev (%d) mdev (%d)\n",
 		    expr_cnt, pr_cnt, exma_cnt, ma_cnt, exmdev_cnt,
 		    mdev_cnt);
@@ -398,7 +398,7 @@ fm_smb_check(smbios_hdl_t *shp)
 		(void) smbios_info_extprocessor(shp, expr_id, &exproc);
 		if (exproc.smbpe_processor != pr_id) {
 #ifdef	DEBUG
-			cmn_err(CE_NOTE, "Processor struct linkage (%d)", i);
+			cmn_err(CE_NOTE, "!Processor struct linkage (%d)", i);
 #endif	/* DEBUG */
 			smb_free_strcnt(pr_stype, pr_cnt);
 			smb_free_strcnt(expr_stype, expr_cnt);
@@ -427,7 +427,8 @@ fm_smb_check(smbios_hdl_t *shp)
 		(void) smbios_info_extmemarray(shp, exma_id, &exma);
 		if (exma.smbmae_ma != ma_id) {
 #ifdef	DEBUG
-			cmn_err(CE_NOTE, "Memory Array struct linkage (%d)", i);
+			cmn_err(CE_NOTE,
+			    "!Memory Array struct linkage (%d)", i);
 #endif	/* DEBUG */
 			smb_free_strcnt(ma_stype, ma_cnt);
 			smb_free_strcnt(exma_stype, exma_cnt);
@@ -456,7 +457,7 @@ fm_smb_check(smbios_hdl_t *shp)
 		(void) smbios_info_extmemdevice(shp, exmdev_id, &exmdev);
 		if (exmdev.smbmdeve_md != mdev_id) {
 #ifdef	DEBUG
-			cmn_err(CE_NOTE, "Memory Device struct linkage (%d)",
+			cmn_err(CE_NOTE, "!Memory Device struct linkage (%d)",
 			    i);
 #endif	/* DEBUG */
 			smb_free_strcnt(mdev_stype, mdev_cnt);
@@ -488,7 +489,7 @@ fm_smb_check(smbios_hdl_t *shp)
 			(void) smbios_info_bboard(shp, bb_id, &bb);
 			if (bb.smbb_contn == 0) {
 #ifdef	DEBUG
-				cmn_err(CE_NOTE, "No contained hanldes (%d)",
+				cmn_err(CE_NOTE, "!No contained hanldes (%d)",
 				    i);
 #endif	/* DEBUG */
 				smb_free_strcnt(bb_stype, bb_cnt);
@@ -517,9 +518,6 @@ fm_smb_fmacompat()
 
 	/* check for BKS */
 	if (x86gentopo_legacy == 1) {
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "forced legacy x86 topology enumeration");
-#endif /* DEBUG */
 		return;
 	}
 
@@ -576,8 +574,9 @@ fm_smb_fmacompat()
 bad:
 	/* not compatible with x86gentopo; revert to legacy enumeration */
 #ifdef	DEBUG
-	cmn_err(CE_NOTE, "SMBIOS is not compatible with x86 generic topology.");
-	cmn_err(CE_NOTE, "Invoking legacy x86 topology enumeration.");
+	cmn_err(CE_NOTE,
+	    "!SMBIOS is not compatible with x86 generic topology.");
+	cmn_err(CE_NOTE, "!Invoking legacy x86 topology enumeration.");
 #endif	/* DEBUG */
 	x86gentopo_legacy = 1;
 }

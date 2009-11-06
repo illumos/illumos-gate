@@ -1321,7 +1321,7 @@ cmi_read_smbios(cmi_hdl_t ophdl)
 			hdl->cmih_smbiosid = smb_id;
 		} else {
 #ifdef DEBUG
-			cmn_err(CE_NOTE, "cmi reads smbios chip info failed");
+			cmn_err(CE_NOTE, "!cmi reads smbios chip info failed");
 #endif /* DEBUG */
 			return;
 		}
@@ -1330,7 +1330,7 @@ cmi_read_smbios(cmi_hdl_t ophdl)
 #ifdef DEBUG
 		if (hdl->cmih_smb_bboard == NULL)
 			cmn_err(CE_NOTE,
-			    "cmi reads smbios base boards info failed");
+			    "!cmi reads smbios base boards info failed");
 #endif /* DEBUG */
 	}
 }
