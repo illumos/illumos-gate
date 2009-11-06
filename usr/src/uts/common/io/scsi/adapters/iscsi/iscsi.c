@@ -1887,8 +1887,13 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 
 		if ((e.e_oid != ihp->hba_oid) &&
 		    (e.e_oid != ISCSI_OID_NOTSET)) {
+			boolean_t rval1, rval2, rval3;
 			uchar_t	    *t_name;
 			iscsi_sess_t *t_isp;
+			boolean_t    t_rtn = B_TRUE;
+			persistent_param_t  t_param;
+			iscsi_config_sess_t t_ics;
+			persistent_tunable_param_t t_tpsg;
 
 			rw_enter(&ihp->hba_sess_list_rwlock, RW_READER);
 			/*
@@ -1925,6 +1930,22 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			name = kmem_zalloc(ISCSI_MAX_NAME_LEN, KM_SLEEP);
 			(void) strncpy((char *)name, (char *)t_name,
 			    ISCSI_MAX_NAME_LEN);
+
+			t_ics.ics_in = 1;
+			rval1 = persistent_param_get((char *)name, &t_param);
+			rval2 = persistent_get_config_session((char *)name,
+			    &t_ics);
+			rval3 = persistent_get_tunable_param((char *)name,
+			    &t_tpsg);
+
+			if ((rval1 == B_FALSE) && (rval2 == B_FALSE) &&
+			    (rval3 == B_FALSE)) {
+				/* no any target parameters get */
+				kmem_free(name, ISCSI_MAX_NAME_LEN);
+				rw_exit(&ihp->hba_sess_list_rwlock);
+				rtn = EIO;
+				break;
+			}
 
 			if (persistent_param_clear((char *)name) == B_FALSE) {
 				kmem_free(name, ISCSI_MAX_NAME_LEN);
@@ -1977,14 +1998,8 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 						 */
 						if (!ISCSI_SUCCESS(
 						    iscsi_sess_destroy(isp))) {
-							kmem_free(ics,
-							    sizeof (*ics));
-							kmem_free(name,
-							    ISCSI_MAX_NAME_LEN);
-						rw_exit(&ihp->
-						    hba_sess_list_rwlock);
-							rtn = EBUSY;
-							break;
+							t_rtn = B_FALSE;
+							continue;
 						}
 						isp = ihp->hba_sess_list;
 					} else {
@@ -2017,6 +2032,38 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 						    sess_state_mutex);
 					}
 				}
+			}
+			if (t_rtn == B_FALSE) {
+				boolean_t t_rval = B_TRUE;
+				/* Failure!, restore target's parameters */
+				if (rval1 == B_TRUE) {
+					rval1 = persistent_param_set(
+					    (char *)name, &t_param);
+					if (rval1 == B_FALSE) {
+						t_rval = B_FALSE;
+					}
+				}
+				if (rval2 == B_TRUE) {
+					rval2 = persistent_set_config_session(
+					    (char *)name, &t_ics);
+					if (rval2 == B_FALSE) {
+						t_rval = B_FALSE;
+					}
+				}
+				if (rval3 == B_TRUE) {
+					rval3 = persistent_set_tunable_param(
+					    (char *)name, &t_tpsg);
+					if (rval3 == B_FALSE) {
+						t_rval = B_FALSE;
+					}
+				}
+				if (t_rval == B_FALSE) {
+					cmn_err(CE_WARN, "Failed to restore "
+					    "target's parameters after remove "
+					    "session related to target "
+					    "parameters failure.");
+				}
+				rtn = EBUSY;
 			}
 			kmem_free(ics, sizeof (*ics));
 			kmem_free(name, ISCSI_MAX_NAME_LEN);
@@ -2488,8 +2535,6 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			}
 
 			if (name == NULL) {
-				rw_exit(
-				    &ihp->hba_sess_list_rwlock);
 				rtn = EFAULT;
 				break;
 			}
@@ -3728,8 +3773,6 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		}
 
 		if (name == NULL) {
-			rw_exit(
-			    &ihp->hba_sess_list_rwlock);
 			rtn = EFAULT;
 			break;
 		}
