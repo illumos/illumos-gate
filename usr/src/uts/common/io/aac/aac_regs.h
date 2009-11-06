@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,6 +138,14 @@ extern "C" {
 #define	AAC_SUPPORTED_NEW_COMM			0x20000
 #define	AAC_SUPPORTED_64BIT_ARRAYSIZE		0x40000
 #define	AAC_SUPPORTED_HEAT_SENSOR		0x80000
+
+/*
+ * More options from supplement info - SupportedOptions2
+ */
+#define	AAC_SUPPORTED_MU_RESET			0x01
+#define	AAC_SUPPORTED_IGNORE_RESET		0x02
+#define	AAC_SUPPORTED_POWER_MANAGEMENT		0x04
+#define	AAC_SUPPORTED_ARCIO_PHYDEV		0x08
 
 #pragma	pack(1)
 
@@ -331,8 +339,12 @@ struct aac_supplement_adapter_info {
 	uint8_t		MfgPcbaSerialNo[MFG_PCBA_SERIAL_NUMBER_WIDTH];
 	/* WWN from the MFG sector */
 	uint8_t		MfgWWNName[MFG_WWN_WIDTH];
-	/* Growth Area for future expansion ((7*4) - 12 - 8)/4 = 2 words */
-	uint32_t	ReservedGrowth[2];
+	uint32_t	SupportedOptions2;	/* more supported features */
+	uint32_t	ExpansionFlag;	/* 1 - following fields are valid */
+	uint32_t	FeatureBits3;
+	uint32_t	SupportedPerformanceMode;
+	/* Growth Area for future expansion */
+	uint32_t	ReservedGrowth[80];
 };
 
 /* Container creation data */
@@ -674,12 +686,21 @@ typedef enum {
 	/* 210 added to support firmware cache sync operations */
 	CT_GET_CACHE_SYNC_INFO,
 	CT_SET_CACHE_SYNC_MODE,		/* 211 */
+	CT_PM_DRIVER_SUPPORT,		/* 212 */
+	CT_PM_CONFIGURATION,		/* 213 */
 
 	CT_LAST_COMMAND			/* last command */
 } AAC_CTCommand;
 
 /* General return status */
 #define	CT_OK				218
+
+/* CT_PM_DRIVER_SUPPORT parameter */
+typedef enum {
+	AAC_PM_DRIVERSUP_GET_STATUS = 1,
+	AAC_PM_DRIVERSUP_START_UNIT,
+	AAC_PM_DRIVERSUP_STOP_UNIT
+} AAC_CT_PM_DRIVER_SUPPORT_SUB_COM;
 
 struct aac_fsa_ctm {
 	uint32_t	command;
@@ -993,7 +1014,11 @@ struct aac_ctcfg_resp {
 #define	AAC_INIT_STRUCT_REVISION		3
 #define	AAC_INIT_STRUCT_REVISION_4		4
 #define	AAC_INIT_STRUCT_MINIPORT_REVISION	1
+
 #define	AAC_INIT_FLAGS_NEW_COMM_SUPPORTED	1
+#define	AAC_INIT_FLAGS_DRIVER_USES_UTC_TIME	0x10
+#define	AAC_INIT_FLAGS_DRIVER_SUPPORTS_PM	0x20
+
 #define	AAC_PAGE_SIZE				4096
 struct aac_adapter_init {
 	uint32_t	InitStructRevision;

@@ -308,6 +308,7 @@ static void aac_cmd_fib_brw(struct aac_softstate *, struct aac_cmd *);
 static void aac_cmd_fib_sync(struct aac_softstate *, struct aac_cmd *);
 static void aac_cmd_fib_scsi32(struct aac_softstate *, struct aac_cmd *);
 static void aac_cmd_fib_scsi64(struct aac_softstate *, struct aac_cmd *);
+static void aac_cmd_fib_startstop(struct aac_softstate *, struct aac_cmd *);
 static void aac_start_waiting_io(struct aac_softstate *);
 static void aac_drain_comp_q(struct aac_softstate *);
 int aac_do_io(struct aac_softstate *, struct aac_cmd *);
@@ -2048,6 +2049,26 @@ aac_synccache_complete(struct aac_softstate *softs, struct aac_cmd *acp)
 		aac_set_arq_data_hwerr(acp);
 }
 
+static void
+aac_startstop_complete(struct aac_softstate *softs, struct aac_cmd *acp)
+{
+	struct aac_slot *slotp = acp->slotp;
+	ddi_acc_handle_t acc = slotp->fib_acc_handle;
+	struct aac_Container_resp *resp;
+	uint32_t status;
+
+	ASSERT(!(acp->flags & AAC_CMD_SYNC));
+
+	acp->pkt->pkt_state |= STATE_GOT_STATUS;
+
+	resp = (struct aac_Container_resp *)&slotp->fibp->data[0];
+	status = ddi_get32(acc, &resp->Status);
+	if (status != 0) {
+		AACDB_PRINT(softs, CE_WARN, "Cannot start/stop a unit");
+		aac_set_arq_data_hwerr(acp);
+	}
+}
+
 /*
  * Access PCI space to see if the driver can support the card
  */
@@ -2451,7 +2472,15 @@ aac_get_adapter_info(struct aac_softstate *softs,
 		    MFG_PCBA_SERIAL_NUMBER_WIDTH);
 		AAC_REP_GET_FIELD8(acc, sinfr, sinfp, MfgWWNName[0],
 		    MFG_WWN_WIDTH);
-		AAC_REP_GET_FIELD32(acc, sinfr, sinfp, ReservedGrowth[0], 2);
+		AAC_GET_FIELD32(acc, sinfr, sinfp, SupportedOptions2);
+		AAC_GET_FIELD32(acc, sinfr, sinfp, ExpansionFlag);
+		if (sinfr->ExpansionFlag == 1) {
+			AAC_GET_FIELD32(acc, sinfr, sinfp, FeatureBits3);
+			AAC_GET_FIELD32(acc, sinfr, sinfp,
+			    SupportedPerformanceMode);
+			AAC_REP_GET_FIELD32(acc, sinfr, sinfp,
+			    ReservedGrowth[0], 80);
+		}
 	}
 	return (AACOK);
 }
@@ -2699,6 +2728,9 @@ aac_common_attach(struct aac_softstate *softs)
 		if (aac_get_adapter_info(softs, NULL, &sinf) != AACOK) {
 			cmn_err(CE_CONT, "?Query adapter information failed");
 		} else {
+			softs->feature_bits = sinf.FeatureBits;
+			softs->support_opt2 = sinf.SupportedOptions2;
+
 			char *p, *p0, *p1;
 
 			/*
@@ -3448,11 +3480,17 @@ aac_setup_comm_space(struct aac_softstate *softs)
 
 	/* Setup new/old comm. specific data */
 	if (softs->flags & AAC_FLAGS_RAW_IO) {
+		uint32_t init_flags = 0;
+
+		if (softs->flags & AAC_FLAGS_NEW_COMM)
+			init_flags |= AAC_INIT_FLAGS_NEW_COMM_SUPPORTED;
+		/* AAC_SUPPORTED_POWER_MANAGEMENT */
+		init_flags |= AAC_INIT_FLAGS_DRIVER_SUPPORTS_PM;
+		init_flags |= AAC_INIT_FLAGS_DRIVER_USES_UTC_TIME;
+
 		ddi_put32(acc, &initp->InitStructRevision,
 		    AAC_INIT_STRUCT_REVISION_4);
-		ddi_put32(acc, &initp->InitFlags,
-		    (softs->flags & AAC_FLAGS_NEW_COMM) ?
-		    AAC_INIT_FLAGS_NEW_COMM_SUPPORTED : 0);
+		ddi_put32(acc, &initp->InitFlags, init_flags);
 		/* Setup the preferred settings */
 		ddi_put32(acc, &initp->MaxIoCommands, softs->aac_max_fibs);
 		ddi_put32(acc, &initp->MaxIoSize,
@@ -4640,10 +4678,17 @@ do_io:
 		break;
 	}
 
+	case SCMD_START_STOP:
+		if (softs->support_opt2 & AAC_SUPPORTED_POWER_MANAGEMENT) {
+			acp->aac_cmd_fib = aac_cmd_fib_startstop;
+			acp->ac_comp = aac_startstop_complete;
+			rval = aac_do_io(softs, acp);
+			break;
+		}
+	/* FALLTHRU */
 	case SCMD_TEST_UNIT_READY:
 	case SCMD_REQUEST_SENSE:
 	case SCMD_FORMAT:
-	case SCMD_START_STOP:
 		aac_free_dmamap(acp);
 		if (bp && bp->b_un.b_addr && bp->b_bcount) {
 			if (acp->flags & AAC_CMD_BUF_READ) {
@@ -5481,6 +5526,31 @@ aac_cmd_fib_sync(struct aac_softstate *softs, struct aac_cmd *acp)
 	ddi_put32(acc, &sync->Cid, ((struct aac_container *)acp->dvp)->cid);
 	ddi_put32(acc, &sync->Count,
 	    sizeof (((struct aac_synchronize_reply *)0)->Data));
+}
+
+/*
+ * Start/Stop unit (Power Management)
+ */
+static void
+aac_cmd_fib_startstop(struct aac_softstate *softs, struct aac_cmd *acp)
+{
+	struct aac_slot *slotp = acp->slotp;
+	ddi_acc_handle_t acc = slotp->fib_acc_handle;
+	struct aac_Container *cmd =
+	    (struct aac_Container *)&slotp->fibp->data[0];
+	union scsi_cdb *cdbp = (void *)acp->pkt->pkt_cdbp;
+
+	acp->fib_size = AAC_FIB_SIZEOF(struct aac_Container);
+
+	aac_cmd_fib_header(softs, slotp, ContainerCommand, acp->fib_size);
+	bzero(cmd, sizeof (*cmd) - CT_PACKET_SIZE);
+	ddi_put32(acc, &cmd->Command, VM_ContainerConfig);
+	ddi_put32(acc, &cmd->CTCommand.command, CT_PM_DRIVER_SUPPORT);
+	ddi_put32(acc, &cmd->CTCommand.param[0], cdbp->cdb_opaque[4] & 1 ? \
+	    AAC_PM_DRIVERSUP_START_UNIT : AAC_PM_DRIVERSUP_STOP_UNIT);
+	ddi_put32(acc, &cmd->CTCommand.param[1],
+	    ((struct aac_container *)acp->dvp)->cid);
+	ddi_put32(acc, &cmd->CTCommand.param[2], cdbp->cdb_opaque[1] & 1);
 }
 
 /*

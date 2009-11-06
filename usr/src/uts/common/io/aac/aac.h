@@ -55,7 +55,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	2
-#define	AAC_DRIVER_BUGFIX_LEVEL		6
+#define	AAC_DRIVER_BUGFIX_LEVEL		7
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -276,6 +276,8 @@ struct aac_softstate {
 	char vendor_name[AAC_VENDOR_LEN + 1];
 	char product_name[AAC_PRODUCT_LEN + 1];
 	uint32_t support_opt;	/* firmware features */
+	uint32_t support_opt2;
+	uint32_t feature_bits;
 	uint32_t atu_size;	/* actual size of PCI mem space */
 	uint32_t map_size;	/* mapped PCI mem space size */
 	uint32_t map_size_min;	/* minimum size of PCI mem that must be */
