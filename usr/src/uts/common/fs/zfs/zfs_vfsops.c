@@ -1295,7 +1295,6 @@ zfs_mount_label_policy(vfs_t *vfsp, char *osname)
 	bslabel_t	*mnt_sl;
 	bslabel_t	ds_sl;
 	char		ds_hexsl[MAXNAMELEN];
-	char		*str2 = NULL;
 
 	retv = EACCES;				/* assume the worst */
 

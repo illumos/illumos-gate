@@ -948,7 +948,7 @@ zfs_valid_proplist(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 			}
 
 			/* Replace the label string with the internal form. */
-			nvlist_remove(ret, zfs_prop_to_name(prop),
+			(void) nvlist_remove(ret, zfs_prop_to_name(prop),
 			    DATA_TYPE_STRING);
 			verify(nvlist_add_string(ret, zfs_prop_to_name(prop),
 			    hex) == 0);
