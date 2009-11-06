@@ -36,11 +36,13 @@
 #include <sys/cmn_err.h>
 #include <sys/stat.h>
 #include <sys/zfs_ioctl.h>
+#include <sys/zfs_vfsops.h>
 #include <sys/zfs_znode.h>
 #include <sys/zap.h>
 #include <sys/spa.h>
 #include <sys/spa_impl.h>
 #include <sys/vdev.h>
+#include <sys/priv_impl.h>
 #include <sys/dmu.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_dataset.h>
@@ -99,6 +101,8 @@ static const char *userquota_perms[] = {
 	ZFS_DELEG_PERM_GROUPUSED,
 	ZFS_DELEG_PERM_GROUPQUOTA,
 };
+
+static char *setsl_tag = "setsl_tag";
 
 static int zfs_ioc_userspace_upgrade(zfs_cmd_t *zc);
 static void clear_props(char *dataset, nvlist_t *props, nvlist_t *newprops);
@@ -326,6 +330,104 @@ zfs_secpolicy_write_perms(const char *name, const char *perm, cred_t *cr)
 	return (error);
 }
 
+/*
+ * Policy for setting the security label property.
+ *
+ * Returns 0 for success, non-zero for access and other errors.
+ *
+ * If the objset is non-NULL upon return, the caller is responsible
+ * for dis-owning it, using the tag: setsl_tag.
+ *
+ */
+static int
+zfs_set_slabel_policy(const char *name, char *strval, cred_t *cr,
+    objset_t **osp)
+{
+	char		ds_hexsl[MAXNAMELEN];
+	bslabel_t	ds_sl, new_sl;
+	boolean_t	new_default = FALSE;
+	uint64_t	zoned;
+	int		needed_priv = -1;
+	int		error;
+
+	/* First get the existing dataset label. */
+	error = dsl_prop_get(name, zfs_prop_to_name(ZFS_PROP_MLSLABEL),
+	    1, sizeof (ds_hexsl), &ds_hexsl, NULL);
+	if (error)
+		return (EPERM);
+
+	if (strcasecmp(strval, ZFS_MLSLABEL_DEFAULT) == 0)
+		new_default = TRUE;
+
+	/* The label must be translatable */
+	if (!new_default && (hexstr_to_label(strval, &new_sl) != 0))
+		return (EINVAL);
+
+	/*
+	 * In a non-global zone, disallow attempts to set a label that
+	 * doesn't match that of the zone; otherwise no other checks
+	 * are needed.
+	 */
+	if (!INGLOBALZONE(curproc)) {
+		if (new_default || !blequal(&new_sl, CR_SL(CRED())))
+			return (EPERM);
+		return (0);
+	}
+
+	/*
+	 * For global-zone datasets (i.e., those whose zoned property is
+	 * "off", verify that the specified new label is valid for the
+	 * global zone.
+	 */
+	if (dsl_prop_get_integer(name,
+	    zfs_prop_to_name(ZFS_PROP_ZONED), &zoned, NULL))
+		return (EPERM);
+	if (!zoned) {
+		if (zfs_check_global_label(name, strval) != 0)
+			return (EPERM);
+	}
+
+	/*
+	 * If the existing dataset label is nondefault, check if the
+	 * dataset is mounted (label cannot be changed while mounted).
+	 * Get the zfsvfs; if there isn't one, then the dataset isn't
+	 * mounted (or isn't a dataset, doesn't exist, ...).
+	 */
+	if (strcasecmp(ds_hexsl, ZFS_MLSLABEL_DEFAULT) != 0) {
+		ASSERT(osp != NULL);
+		/*
+		 * Try to own the dataset; abort if there is any error,
+		 * (e.g., already mounted, in use, or other error).
+		 */
+		error = dmu_objset_own(name, DMU_OST_ZFS, B_TRUE,
+		    setsl_tag, osp);
+		if (error)
+			return (EPERM);
+
+		if (new_default) {
+			needed_priv = PRIV_FILE_DOWNGRADE_SL;
+			goto out_check;
+		}
+
+		if (hexstr_to_label(strval, &new_sl) != 0)
+			return (EPERM);
+
+		if (blstrictdom(&ds_sl, &new_sl))
+			needed_priv = PRIV_FILE_DOWNGRADE_SL;
+		else if (blstrictdom(&new_sl, &ds_sl))
+			needed_priv = PRIV_FILE_UPGRADE_SL;
+	} else {
+		/* dataset currently has a default label */
+		if (!new_default)
+			needed_priv = PRIV_FILE_UPGRADE_SL;
+	}
+
+out_check:
+	if (needed_priv != -1)
+		return (PRIV_POLICY(cr, needed_priv, B_FALSE, EPERM, NULL));
+	return (0);
+}
+
 static int
 zfs_secpolicy_setprop(const char *name, zfs_prop_t prop, cred_t *cr)
 {
@@ -356,6 +458,11 @@ zfs_secpolicy_setprop(const char *name, zfs_prop_t prop, cred_t *cr)
 			if (!zoned || strlen(name) <= strlen(setpoint))
 				return (EPERM);
 		}
+		break;
+
+	case ZFS_PROP_MLSLABEL:
+		if (!is_system_labeled())
+			return (EPERM);
 		break;
 	}
 
@@ -1807,6 +1914,28 @@ zfs_set_prop_nvlist(const char *name, nvlist_t *nvl)
 				(void) zfs_ioc_userspace_upgrade(&zc);
 			}
 			if (error)
+				goto out;
+			break;
+		}
+
+		case ZFS_PROP_MLSLABEL:
+		{
+			objset_t *os = NULL;
+
+			if ((error = nvpair_value_string(elem, &strval)) != 0)
+				goto out;
+			if ((error = zfs_set_slabel_policy(name, strval,
+			    CRED(), &os)) != 0) {
+				/* error; first release the dataset if needed */
+				if (os)
+					dmu_objset_disown(os, setsl_tag);
+				goto out;
+			}
+
+			error = nvlist_add_nvpair(genericnvl, elem);
+			if (os)
+				dmu_objset_disown(os, setsl_tag);
+			if (error != 0)
 				goto out;
 			break;
 		}

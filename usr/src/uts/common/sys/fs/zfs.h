@@ -120,6 +120,7 @@ typedef enum {
 	ZFS_PROP_UNIQUE,		/* not exposed to the user */
 	ZFS_PROP_OBJSETID,		/* not exposed to the user */
 	ZFS_PROP_DEDUP,
+	ZFS_PROP_MLSLABEL,
 	ZFS_NUM_PROPS
 } zfs_prop_t;
 
@@ -243,6 +244,8 @@ typedef enum {
 #define	ZFS_DELEG_PERM_UID	"uid"
 #define	ZFS_DELEG_PERM_GID	"gid"
 #define	ZFS_DELEG_PERM_GROUPS	"groups"
+
+#define	ZFS_MLSLABEL_DEFAULT	"none"
 
 #define	ZFS_SMB_ACL_SRC		"src"
 #define	ZFS_SMB_ACL_TARGET	"target"

@@ -3141,6 +3141,134 @@ validate_datasets(zlog_t *zlogp)
 }
 
 /*
+ * Return true if the path is its own zfs file system.  We determine this
+ * by stat-ing the path to see if it is zfs and stat-ing the parent to see
+ * if it is a different fs.
+ */
+boolean_t
+is_zonepath_zfs(char *zonepath)
+{
+	int res;
+	char *path;
+	char *parent;
+	struct statvfs64 buf1, buf2;
+
+	if (statvfs64(zonepath, &buf1) != 0)
+		return (B_FALSE);
+
+	if (strcmp(buf1.f_basetype, "zfs") != 0)
+		return (B_FALSE);
+
+	if ((path = strdup(zonepath)) == NULL)
+		return (B_FALSE);
+
+	parent = dirname(path);
+	res = statvfs64(parent, &buf2);
+	free(path);
+
+	if (res != 0)
+		return (B_FALSE);
+
+	if (buf1.f_fsid == buf2.f_fsid)
+		return (B_FALSE);
+
+	return (B_TRUE);
+}
+
+/*
+ * Verify the MAC label in the root dataset for the zone.
+ * If the label exists, it must match the label configured for the zone.
+ * Otherwise if there's no label on the dataset, create one here.
+ */
+
+static int
+validate_rootds_label(zlog_t *zlogp, char *rootpath, m_label_t *zone_sl)
+{
+	int		error = -1;
+	zfs_handle_t	*zhp;
+	libzfs_handle_t	*hdl;
+	m_label_t	ds_sl;
+	char		zonepath[MAXPATHLEN];
+	char		ds_hexsl[MAXNAMELEN];
+
+	if (!is_system_labeled())
+		return (0);
+
+	if (zone_get_zonepath(zone_name, zonepath, sizeof (zonepath)) != Z_OK) {
+		zerror(zlogp, B_TRUE, "unable to determine zone path");
+		return (-1);
+	}
+
+	if (!is_zonepath_zfs(zonepath))
+		return (0);
+
+	if ((hdl = libzfs_init()) == NULL) {
+		zerror(zlogp, B_FALSE, "opening ZFS library");
+		return (-1);
+	}
+
+	if ((zhp = zfs_path_to_zhandle(hdl, rootpath,
+	    ZFS_TYPE_FILESYSTEM)) == NULL) {
+		zerror(zlogp, B_FALSE, "cannot open ZFS dataset for path '%s'",
+		    rootpath);
+		libzfs_fini(hdl);
+		return (-1);
+	}
+
+	/* Get the mlslabel property if it exists. */
+	if ((zfs_prop_get(zhp, ZFS_PROP_MLSLABEL, ds_hexsl, MAXNAMELEN,
+	    NULL, NULL, 0, B_TRUE) != 0) ||
+	    (strcmp(ds_hexsl, ZFS_MLSLABEL_DEFAULT) == 0)) {
+		char		*str2 = NULL;
+
+		/*
+		 * No label on the dataset (or default only); create one.
+		 * (Only do this automatic labeling for the labeled brand.)
+		 */
+		if (strcmp(brand_name, LABELED_BRAND_NAME) != 0) {
+			error = 0;
+			goto out;
+		}
+
+		error = l_to_str_internal(zone_sl, &str2);
+		if (error)
+			goto out;
+		if (str2 == NULL) {
+			error = -1;
+			goto out;
+		}
+		if ((error = zfs_prop_set(zhp,
+		    zfs_prop_to_name(ZFS_PROP_MLSLABEL), str2)) != 0) {
+			zerror(zlogp, B_FALSE, "cannot set 'mlslabel' "
+			    "property for root dataset at '%s'\n", rootpath);
+		}
+		free(str2);
+		goto out;
+	}
+
+	/* Convert the retrieved dataset label to binary form. */
+	error = hexstr_to_label(ds_hexsl, &ds_sl);
+	if (error) {
+		zerror(zlogp, B_FALSE, "invalid 'mlslabel' "
+		    "property on root dataset at '%s'\n", rootpath);
+		goto out;			/* exit with error */
+	}
+
+	/*
+	 * Perform a MAC check by comparing the zone label with the
+	 * dataset label.
+	 */
+	error = (!blequal(zone_sl, &ds_sl));
+	if (error)
+		zerror(zlogp, B_FALSE, "Rootpath dataset has mismatched label");
+out:
+	zfs_close(zhp);
+	libzfs_fini(hdl);
+
+	return (error);
+}
+
+/*
  * Mount lower level home directories into/from current zone
  * Share exported directories specified in dfstab for zone
  */
@@ -4013,6 +4141,8 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		} else {
 			goto error;
 		}
+		if (validate_rootds_label(zlogp, rootpath, zlabel) != 0)
+			goto error;
 	}
 
 	kzone = zone_name;

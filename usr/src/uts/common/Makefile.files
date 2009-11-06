@@ -210,6 +210,7 @@ GENUNIX_OBJS +=	\
 		logsubr.o	\
 		lookup.o	\
 		lseek.o		\
+		ltos.o		\
 		lwp.o		\
 		lwp_create.o	\
 		lwp_info.o	\
@@ -313,6 +314,7 @@ GENUNIX_OBJS +=	\
 		stat.o		\
 		statfs.o	\
 		statvfs.o	\
+		stol.o		\
 		str_conf.o	\
 		strcalls.o	\
 		stream.o	\

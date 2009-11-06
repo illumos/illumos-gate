@@ -145,6 +145,7 @@ extern boolean_t zfs_usergroup_overquota(zfsvfs_t *zfsvfs,
 extern int zfs_set_version(zfsvfs_t *zfsvfs, uint64_t newvers);
 extern int zfsvfs_create(const char *name, zfsvfs_t **zvp);
 extern void zfsvfs_free(zfsvfs_t *zfsvfs);
+extern int zfs_check_global_label(const char *dsname, const char *hexsl);
 
 #ifdef	__cplusplus
 }

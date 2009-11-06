@@ -19,18 +19,23 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 LIBRARY =	libtsol.a
 VERS =		.2
 
-OBJECTS = \
-	blabel.o btohex.o btos.o call_labeld.o \
+COMMONOBJS = \
+	blabel.o ltos.o stol.o
+
+NONCOMMONOBJS = \
+	btohex.o btos.o call_labeld.o \
 	getlabel.o getplabel.o hextob.o \
-	ltos.o misc.o getpathbylabel.o private.o privlib.o \
-	setflabel.o stob.o stol.o zone.o
+	misc.o getpathbylabel.o private.o privlib.o \
+	setflabel.o stob.o zone.o \
+
+OBJECTS = $(NONCOMMONOBJS) $(COMMONOBJS)
 
 include ../../Makefile.lib
 
@@ -43,8 +48,9 @@ LDLIBS +=	-lsecdb -lc
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
-NONCOMMON =	$(OBJECTS:blabel.o=)
-lint:=		SRCS = $(NONCOMMON:%.o=$(SRCDIR)/%.c) $(COMMONDIR)/blabel.c
+lint:=		SRCS = \
+	$(NONCOMMONOBJS:%.o=$(SRCDIR)/%.c) \
+	$(COMMONOBJS:%.o=$(COMMONDIR)/%.c)
 
 COMMONDIR=	$(SRC)/common/tsol
 

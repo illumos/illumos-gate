@@ -23,20 +23,31 @@
  * Use is subject to license terms.
  */
 
-#include <ctype.h>
+#if !defined(_KERNEL)
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <strings.h>
+#else /* !defined(_KERNEL) */
+#include <sys/systm.h>
+#endif /* !defined(_KERNEL) */
 
 #include <sys/mman.h>
 #include <sys/tsol/label_macro.h>
 
-#include <tsol/label.h>
+#include <sys/tsol/label.h>
 
+#if !defined(_KERNEL)
 #include "clnt.h"
 #include "labeld.h"
+#else /* !defined(_KERNEL) */
+#include <util/strtolctype.h>
+
+#define	L_DEFAULT	0x0
+#define	L_NO_CORRECTION	0x2
+#endif /* !defined(_KERNEL) */
 
 #define	IS_LOW(s) \
 	((strncasecmp(s, ADMIN_LOW, (sizeof (ADMIN_LOW) - 1)) == 0) && \
@@ -49,9 +60,9 @@
 	(((s)[0] == '0') && (((s)[1] == 'x') || ((s)[1] == 'X'))))
 
 static boolean_t
-unhex(char **h, uchar_t *l, int len)
+unhex(const char **h, uchar_t *l, int len)
 {
-	char	*hx = *h;
+	const char	*hx = *h;
 	char	ch;
 	uchar_t	byte;
 
@@ -91,9 +102,9 @@ unhex(char **h, uchar_t *l, int len)
  */
 
 static int
-htol(char *s, m_label_t *l)
+htol(const char *s, m_label_t *l)
 {
-	char	*h = &s[2];	/* skip 0[xX] */
+	const char	*h = &s[2];	/* skip 0[xX] */
 	uchar_t *lp = (uchar_t *)&(((_mac_label_impl_t *)l)->_lclass);
 	size_t	len = sizeof (_mac_label_impl_t) - 4;
 	int	bytes;
@@ -131,6 +142,36 @@ htol(char *s, m_label_t *l)
 	return (0);
 }
 
+/*
+ * hexstr_to_label -- parse a string representing a hex label into a
+ *			binary label.  Only admin high/low and hex are
+ *			accepted.
+ *
+ *	Returns	 0, success.
+ *		-1, failure
+ */
+int
+hexstr_to_label(const char *s, m_label_t *l)
+{
+	uint_t	f = L_DEFAULT;
+
+	/* translate hex, admin_low and admin_high */
+	if (IS_LOW(s)) {
+		_LOW_LABEL(l, SUN_MAC_ID);
+		return (0);
+	} else if (IS_HIGH(s)) {
+		_HIGH_LABEL(l, SUN_MAC_ID);
+		return (0);
+	} else if (IS_HEX(f, s)) {
+		_LOW_LABEL(l, SUN_MAC_ID);
+		if (htol(s, l) == 0)
+			return (0);
+	}
+
+	return (-1);
+}
+
+#if !defined(_KERNEL)
 static int
 convert_id(m_label_type_t t)
 {
@@ -404,3 +445,4 @@ m_label_free(m_label_t *l)
 	if (l)
 		free(l);
 }
+#endif /* !defined(_KERNEL) */

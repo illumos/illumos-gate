@@ -43,6 +43,10 @@ extern "C" {
 #define	EQUALITY_CHECK	0
 #define	DOMINANCE_CHECK	1
 
+/* Manifest human readable label names */
+#define	ADMIN_LOW	"ADMIN_LOW"
+#define	ADMIN_HIGH	"ADMIN_HIGH"
+
 /* Binary Label Structure Definitions */
 
 typedef	struct _mac_label_impl	m_label_t;
@@ -144,6 +148,9 @@ extern int		getlabel(const char *, m_label_t *);
 extern int		fgetlabel(int, m_label_t *);
 extern int		_blinrange(const m_label_t *, const brange_t *);
 extern int		blinlset(const m_label_t *, const blset_t);
+
+extern int		l_to_str_internal(const m_label_t *, char **);
+extern int		hexstr_to_label(const char *, m_label_t *);
 
 /*
  * The use of '!!' here prevents users from referencing this function-like

@@ -167,11 +167,6 @@ extern int	stobclear(const char *, m_label_t *, int, int *);
 extern int	bslvalid(const m_label_t *);
 extern int	bclearvalid(const m_label_t *);
 
-/* Manifest human readable label names */
-
-#define	ADMIN_LOW	"ADMIN_LOW"
-#define	ADMIN_HIGH	"ADMIN_HIGH"
-
 /* DIA label conversion and parsing */
 
 /* Conversion types */
@@ -193,6 +188,7 @@ typedef	enum _m_label_str {
 
 extern int label_to_str(const m_label_t *, char **, const m_label_str_t,
     uint_t);
+extern int l_to_str_internal(const m_label_t *, char **);
 
 /* Parsing types */
 typedef enum _m_label_type {
@@ -216,6 +212,7 @@ typedef enum _m_label_type {
 
 extern int str_to_label(const char *, m_label_t **, const m_label_type_t,
     uint_t, int *);
+extern int hexstr_to_label(const char *, m_label_t *);
 
 extern m_label_t *m_label_alloc(const m_label_type_t);
 

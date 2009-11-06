@@ -19,28 +19,46 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
+#if !defined(_KERNEL)
 #include <errno.h>
-#include <stdlib.h>
-#include <string.h>
+#endif /* !defined(_KERNEL) */
 
-#include <sys/mman.h>
 #include <sys/types.h>
+#include <sys/mman.h>
 #include <sys/tsol/label_macro.h>
 
-#include <tsol/label.h>
+#include <sys/tsol/label.h>
 
+#if !defined(_KERNEL)
 #include "clnt.h"
 #include "labeld.h"
+#endif /* !defined(_KERNEL) */
+
+#if defined(_KERNEL)
+#include <sys/systm.h>
+#include <sys/sunddi.h>
+#else
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#endif
+
+
 
 static _mac_label_impl_t low;
 static _mac_label_impl_t high;
 static int	inited = 0;
+
+#if defined(_KERNEL)
+#define	malloc(l)	kmem_alloc(l, KM_NOSLEEP)
+#define	freeit(a, l)		kmem_free(a, l)
+#else /* defined(_KERNEL) */
+#define	freeit(a, l)		free(a)
+#endif /* defined(_KERNEL) */
 
 /* 0x + Classification + '-' + ll + '-' + Compartments + end of string */
 #define	_HEX_SIZE 2+(sizeof (Classification_t)*2)+4+\
@@ -106,15 +124,48 @@ __hex(char **s, const m_label_t *l)
 	hex[i] = '\0';
 
 	if ((*s = strdup(hex)) == NULL) {
-		free(hex);
+		freeit(hex, hex_len);
 		return (-1);
 	}
 
-	free(hex);
+	freeit(hex, hex_len);
 	return (0);
 
 }
 
+int
+l_to_str_internal(const m_label_t *l, char **s)
+{
+	if (inited == 0) {
+		inited = 1;
+		_BSLLOW(&low);
+		_BSLHIGH(&high);
+	}
+
+	if (!(_MTYPE(l, SUN_MAC_ID) || _MTYPE(l, SUN_UCLR_ID))) {
+#if !defined(_KERNEL)
+		errno = EINVAL;
+#endif /* !defined(_KERNEL) */
+		*s = NULL;
+		return (-1);
+	}
+	if (_MEQUAL(&low, (_mac_label_impl_t *)l)) {
+		if ((*s = strdup(ADMIN_LOW)) == NULL) {
+			return (-1);
+		}
+		return (0);
+	}
+	if (_MEQUAL(&high, (_mac_label_impl_t *)l)) {
+		if ((*s = strdup(ADMIN_HIGH)) == NULL) {
+			return (-1);
+		}
+		return (0);
+	}
+
+	return (__hex(s, l));
+}
+
+#if !defined(_KERNEL)
 /*
  * label_to_str -- convert a label to the requested type of string.
  *
@@ -200,26 +251,7 @@ label_to_str(const m_label_t *l, char **s, const m_label_str_t t, uint_t f)
 #undef	lsret
 
 	case M_INTERNAL: {
-		if (!(_MTYPE(l, SUN_MAC_ID) ||
-		    _MTYPE(l, SUN_UCLR_ID))) {
-			errno = EINVAL;
-			*s = NULL;
-			return (-1);
-		}
-		if (_MEQUAL(&low, (_mac_label_impl_t *)l)) {
-			if ((*s = strdup(ADMIN_LOW)) == NULL) {
-				return (-1);
-			}
-			return (0);
-		}
-		if (_MEQUAL(&high, (_mac_label_impl_t *)l)) {
-			if ((*s = strdup(ADMIN_HIGH)) == NULL) {
-				return (-1);
-			}
-			return (0);
-		}
-
-		return (__hex(s, l));
+		return (l_to_str_internal(l, s));
 	}
 
 #define	ccall callp->param.acall.cargs.color_arg
@@ -300,3 +332,4 @@ label_to_str(const m_label_t *l, char **s, const m_label_str_t t, uint_t f)
 #undef	prcall
 #undef	prret
 }
+#endif /* !defined(_KERNEL) */

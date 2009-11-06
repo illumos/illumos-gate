@@ -95,8 +95,10 @@ SUNWprivate_1.1 {
 	getpathbylabel;
 	h_alloc;
 	h_free;
+	hexstr_to_label;
 	htobclear;
 	htobsl;
+	l_to_str_internal;
 	labelfields;
 	labelinfo;
 	labelvers;
