@@ -628,8 +628,8 @@ librestart:	libuutil libscf
 pkcs11:		libcryptoutil
 print:		libldap5
 udapl/udapl_tavor:	udapl/libdat
-libzfs:		libdevinfo libdevid libgen libnvpair libuutil libiscsitgt \
-		libavl libefi libidmap
+libzfs:		libdevid libgen libnvpair libuutil libiscsitgt \
+		libadm libavl libefi libidmap
 libzfs_jni:	libdiskmgt libnvpair libzfs
 libzpool:	libavl libumem libnvpair
 libsec:		libavl libidmap

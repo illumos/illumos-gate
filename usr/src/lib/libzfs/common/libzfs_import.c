@@ -39,15 +39,21 @@
  * using our derived config, and record the results.
  */
 
+#include <ctype.h>
 #include <devid.h>
 #include <dirent.h>
 #include <errno.h>
 #include <libintl.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/vtoc.h>
+#include <sys/dktp/fdisk.h>
+#include <sys/efi_partition.h>
+#include <thread_pool.h>
 
 #include <sys/vdev_impl.h>
 
@@ -897,6 +903,176 @@ zpool_read_label(int fd, nvlist_t **config)
 	return (0);
 }
 
+typedef struct rdsk_node {
+	char *rn_name;
+	int rn_dfd;
+	libzfs_handle_t *rn_hdl;
+	nvlist_t *rn_config;
+	avl_tree_t *rn_avl;
+	avl_node_t rn_node;
+	boolean_t rn_nozpool;
+} rdsk_node_t;
+
+static int
+slice_cache_compare(const void *arg1, const void *arg2)
+{
+	const char  *nm1 = ((rdsk_node_t *)arg1)->rn_name;
+	const char  *nm2 = ((rdsk_node_t *)arg2)->rn_name;
+	char *nm1slice, *nm2slice;
+	int rv;
+
+	/*
+	 * slices zero and two are the most likely to provide results,
+	 * so put those first
+	 */
+	nm1slice = strstr(nm1, "s0");
+	nm2slice = strstr(nm2, "s0");
+	if (nm1slice && !nm2slice) {
+		return (-1);
+	}
+	if (!nm1slice && nm2slice) {
+		return (1);
+	}
+	nm1slice = strstr(nm1, "s2");
+	nm2slice = strstr(nm2, "s2");
+	if (nm1slice && !nm2slice) {
+		return (-1);
+	}
+	if (!nm1slice && nm2slice) {
+		return (1);
+	}
+
+	rv = strcmp(nm1, nm2);
+	if (rv == 0)
+		return (0);
+	return (rv > 0 ? 1 : -1);
+}
+
+static void
+check_one_slice(avl_tree_t *r, char *diskname, uint_t partno,
+    diskaddr_t size, uint_t blksz)
+{
+	rdsk_node_t tmpnode;
+	rdsk_node_t *node;
+	char sname[MAXNAMELEN];
+
+	tmpnode.rn_name = &sname[0];
+	(void) snprintf(tmpnode.rn_name, MAXNAMELEN, "%s%u",
+	    diskname, partno);
+	/* too small to contain a zpool? */
+	if ((size < (SPA_MINDEVSIZE / blksz)) &&
+	    (node = avl_find(r, &tmpnode, NULL)))
+		node->rn_nozpool = B_TRUE;
+}
+
+static void
+nozpool_all_slices(avl_tree_t *r, const char *sname)
+{
+	char diskname[MAXNAMELEN];
+	char *ptr;
+	int i;
+
+	(void) strncpy(diskname, sname, MAXNAMELEN);
+	if (((ptr = strrchr(diskname, 's')) == NULL) &&
+	    ((ptr = strrchr(diskname, 'p')) == NULL))
+		return;
+	ptr[0] = 's';
+	ptr[1] = '\0';
+	for (i = 0; i < NDKMAP; i++)
+		check_one_slice(r, diskname, i, 0, 1);
+	ptr[0] = 'p';
+	for (i = 0; i <= FD_NUMPART; i++)
+		check_one_slice(r, diskname, i, 0, 1);
+}
+
+static void
+check_slices(avl_tree_t *r, int fd, const char *sname)
+{
+	struct extvtoc vtoc;
+	struct dk_gpt *gpt;
+	char diskname[MAXNAMELEN];
+	char *ptr;
+	int i;
+
+	(void) strncpy(diskname, sname, MAXNAMELEN);
+	if ((ptr = strrchr(diskname, 's')) == NULL || !isdigit(ptr[1]))
+		return;
+	ptr[1] = '\0';
+
+	if (read_extvtoc(fd, &vtoc) >= 0) {
+		for (i = 0; i < NDKMAP; i++)
+			check_one_slice(r, diskname, i,
+			    vtoc.v_part[i].p_size, vtoc.v_sectorsz);
+	} else if (efi_alloc_and_read(fd, &gpt) >= 0) {
+		/*
+		 * on x86 we'll still have leftover links that point
+		 * to slices s[9-15], so use NDKMAP instead
+		 */
+		for (i = 0; i < NDKMAP; i++)
+			check_one_slice(r, diskname, i,
+			    gpt->efi_parts[i].p_size, gpt->efi_lbasize);
+		/* nodes p[1-4] are never used with EFI labels */
+		ptr[0] = 'p';
+		for (i = 1; i <= FD_NUMPART; i++)
+			check_one_slice(r, diskname, i, 0, 1);
+		efi_free(gpt);
+	}
+}
+
+static void
+zpool_open_func(void *arg)
+{
+	rdsk_node_t *rn = arg;
+	struct stat64 statbuf;
+	nvlist_t *config;
+	int fd;
+
+	if (rn->rn_nozpool)
+		return;
+	if ((fd = openat64(rn->rn_dfd, rn->rn_name, O_RDONLY)) < 0) {
+		/* symlink to a device that's no longer there */
+		if (errno == ENOENT)
+			nozpool_all_slices(rn->rn_avl, rn->rn_name);
+		return;
+	}
+	/*
+	 * Ignore failed stats.  We only want regular
+	 * files, character devs and block devs.
+	 */
+	if (fstat64(fd, &statbuf) != 0 ||
+	    (!S_ISREG(statbuf.st_mode) &&
+	    !S_ISCHR(statbuf.st_mode) &&
+	    !S_ISBLK(statbuf.st_mode))) {
+		(void) close(fd);
+		return;
+	}
+	/* this file is too small to hold a zpool */
+	if (S_ISREG(statbuf.st_mode) &&
+	    statbuf.st_size < SPA_MINDEVSIZE) {
+		(void) close(fd);
+		return;
+	} else if (!S_ISREG(statbuf.st_mode)) {
+		/*
+		 * Try to read the disk label first so we don't have to
+		 * open a bunch of minor nodes that can't have a zpool.
+		 */
+		check_slices(rn->rn_avl, fd, rn->rn_name);
+	}
+
+	if ((zpool_read_label(fd, &config)) != 0) {
+		(void) close(fd);
+		(void) no_memory(rn->rn_hdl);
+		return;
+	}
+	(void) close(fd);
+
+
+	rn->rn_config = config;
+	if (config != NULL) {
+		assert(rn->rn_nozpool == B_FALSE);
+	}
+}
+
 /*
  * Given a file descriptor, clear (zero) the label information.  This function
  * is currently only used in the appliance stack as part of the ZFS sysevent
@@ -944,15 +1120,16 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 	char path[MAXPATHLEN];
 	char *end;
 	size_t pathleft;
-	struct stat64 statbuf;
-	nvlist_t *ret = NULL, *config;
+	nvlist_t *ret = NULL;
 	static char *default_dir = "/dev/dsk";
-	int fd;
 	pool_list_t pools = { 0 };
 	pool_entry_t *pe, *penext;
 	vdev_entry_t *ve, *venext;
 	config_entry_t *ce, *cenext;
 	name_entry_t *ne, *nenext;
+	avl_tree_t slice_cache;
+	rdsk_node_t *slice;
+	void *cookie;
 
 	verify(poolname == NULL || guid == 0);
 
@@ -967,6 +1144,7 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 	 * and toplevel GUID.
 	 */
 	for (i = 0; i < argc; i++) {
+		tpool_t *t;
 		char *rdsk;
 		int dfd;
 
@@ -1001,6 +1179,8 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 			goto error;
 		}
 
+		avl_create(&slice_cache, slice_cache_compare,
+		    sizeof (rdsk_node_t), offsetof(rdsk_node_t, rn_node));
 		/*
 		 * This is not MT-safe, but we have no MT consumers of libzfs
 		 */
@@ -1010,30 +1190,37 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 			    (name[1] == 0 || (name[1] == '.' && name[2] == 0)))
 				continue;
 
-			if ((fd = openat64(dfd, name, O_RDONLY)) < 0)
-				continue;
+			slice = zfs_alloc(hdl, sizeof (rdsk_node_t));
+			slice->rn_name = zfs_strdup(hdl, name);
+			slice->rn_avl = &slice_cache;
+			slice->rn_dfd = dfd;
+			slice->rn_hdl = hdl;
+			slice->rn_nozpool = B_FALSE;
+			avl_add(&slice_cache, slice);
+		}
+		/*
+		 * create a thread pool to do all of this in parallel;
+		 * rn_nozpool is not protected, so this is racy in that
+		 * multiple tasks could decide that the same slice can
+		 * not hold a zpool, which is benign.  Also choose
+		 * double the number of processors; we hold a lot of
+		 * locks in the kernel, so going beyond this doesn't
+		 * buy us much.
+		 */
+		t = tpool_create(1, 2 * sysconf(_SC_NPROCESSORS_ONLN),
+		    0, NULL);
+		for (slice = avl_first(&slice_cache); slice;
+		    (slice = avl_walk(&slice_cache, slice,
+		    AVL_AFTER)))
+			(void) tpool_dispatch(t, zpool_open_func, slice);
+		tpool_wait(t);
+		tpool_destroy(t);
 
-			/*
-			 * Ignore failed stats.  We only want regular
-			 * files, character devs and block devs.
-			 */
-			if (fstat64(fd, &statbuf) != 0 ||
-			    (!S_ISREG(statbuf.st_mode) &&
-			    !S_ISCHR(statbuf.st_mode) &&
-			    !S_ISBLK(statbuf.st_mode))) {
-				(void) close(fd);
-				continue;
-			}
-
-			if ((zpool_read_label(fd, &config)) != 0) {
-				(void) close(fd);
-				(void) no_memory(hdl);
-				goto error;
-			}
-
-			(void) close(fd);
-
-			if (config != NULL) {
+		cookie = NULL;
+		while ((slice = avl_destroy_nodes(&slice_cache,
+		    &cookie)) != NULL) {
+			if (slice->rn_config != NULL) {
+				nvlist_t *config = slice->rn_config;
 				boolean_t matched = B_TRUE;
 
 				if (poolname != NULL) {
@@ -1057,11 +1244,14 @@ zpool_find_import_impl(libzfs_handle_t *hdl, int argc, char **argv,
 					continue;
 				}
 				/* use the non-raw path for the config */
-				(void) strlcpy(end, name, pathleft);
+				(void) strlcpy(end, slice->rn_name, pathleft);
 				if (add_config(hdl, &pools, path, config) != 0)
 					goto error;
 			}
+			free(slice->rn_name);
+			free(slice);
 		}
+		avl_destroy(&slice_cache);
 
 		(void) closedir(dirp);
 		dirp = NULL;

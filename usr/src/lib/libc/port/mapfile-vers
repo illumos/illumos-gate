@@ -1714,6 +1714,14 @@ SUNWprivate_1.1 {
 	__towlower_std;
 	__towupper_bc;
 	__towupper_std;
+	tpool_create;
+	tpool_dispatch;
+	tpool_destroy;
+	tpool_wait;
+	tpool_suspend;
+	tpool_suspended;
+	tpool_resume;
+	tpool_member;
 	_trwctype;
 	__trwctype_std;
 	_ttyname_dev;

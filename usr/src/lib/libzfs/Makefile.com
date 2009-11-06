@@ -62,11 +62,12 @@ SRCDIR =	../common
 INCS += -I$(SRCDIR)
 INCS += -I../../../uts/common/fs/zfs
 INCS += -I../../../common/zfs
+INCS += -I../../libc/inc
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
 LDLIBS +=	-lc -lm -ldevid -lgen -lnvpair -luutil -lavl -lefi \
-	-lidmap -lsec -ltsol
+	-ladm -lidmap -lsec -ltsol
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
