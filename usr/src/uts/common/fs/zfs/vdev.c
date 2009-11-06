@@ -493,7 +493,8 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 
 	if (parent && !parent->vdev_parent) {
 		ASSERT(alloctype == VDEV_ALLOC_LOAD ||
-		    alloctype == VDEV_ALLOC_ADD);
+		    alloctype == VDEV_ALLOC_ADD ||
+		    alloctype == VDEV_ALLOC_ROOTPOOL);
 		vd->vdev_mg = metaslab_group_create(islog ?
 		    spa_log_class(spa) : spa_normal_class(spa), vd);
 	}
