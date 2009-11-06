@@ -52,6 +52,7 @@ struct metaslab_group {
 	avl_tree_t		mg_metaslab_tree;
 	uint64_t		mg_aliquot;
 	int64_t			mg_bias;
+	int64_t			mg_activation_count;
 	metaslab_class_t	*mg_class;
 	vdev_t			*mg_vd;
 	metaslab_group_t	*mg_prev;

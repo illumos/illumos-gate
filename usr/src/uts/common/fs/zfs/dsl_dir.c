@@ -651,8 +651,7 @@ dsl_dir_space_available(dsl_dir_t *dd,
 		 * dsl_pool_adjustedsize()), something is very
 		 * wrong.
 		 */
-		ASSERT3U(used, <=, metaslab_class_get_space(
-		    spa_normal_class(dd->dd_pool->dp_spa)));
+		ASSERT3U(used, <=, spa_get_dspace(dd->dd_pool->dp_spa));
 	} else {
 		/*
 		 * the lesser of the space provided by our parent and

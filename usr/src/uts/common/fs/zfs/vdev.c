@@ -491,6 +491,13 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 		    &vd->vdev_asize);
 	}
 
+	if (parent && !parent->vdev_parent) {
+		ASSERT(alloctype == VDEV_ALLOC_LOAD ||
+		    alloctype == VDEV_ALLOC_ADD);
+		vd->vdev_mg = metaslab_group_create(islog ?
+		    spa_log_class(spa) : spa_normal_class(spa), vd);
+	}
+
 	/*
 	 * If we're a leaf vdev, try to load the DTL object and other state.
 	 */
@@ -578,8 +585,10 @@ vdev_free(vdev_t *vd)
 	/*
 	 * Discard allocation state.
 	 */
-	if (vd == vd->vdev_top)
+	if (vd->vdev_mg != NULL) {
 		vdev_metaslab_fini(vd);
+		metaslab_group_destroy(vd->vdev_mg);
+	}
 
 	ASSERT3U(vd->vdev_stat.vs_space, ==, 0);
 	ASSERT3U(vd->vdev_stat.vs_dspace, ==, 0);
@@ -787,12 +796,13 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 {
 	spa_t *spa = vd->vdev_spa;
 	objset_t *mos = spa->spa_meta_objset;
-	metaslab_class_t *mc;
 	uint64_t m;
 	uint64_t oldc = vd->vdev_ms_count;
 	uint64_t newc = vd->vdev_asize >> vd->vdev_ms_shift;
 	metaslab_t **mspp;
 	int error;
+
+	ASSERT(txg == 0 || spa_config_held(spa, SCL_ALLOC, RW_WRITER));
 
 	/*
 	 * This vdev is not being allocated from yet or is a hole.
@@ -812,14 +822,6 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 	    (vdev_psize_to_asize(vd, 1 << 17) >> SPA_MINBLOCKSHIFT);
 
 	ASSERT(oldc <= newc);
-
-	if (vd->vdev_islog)
-		mc = spa_log_class(spa);
-	else
-		mc = spa_normal_class(spa);
-
-	if (vd->vdev_mg == NULL)
-		vd->vdev_mg = metaslab_group_create(mc, vd);
 
 	mspp = kmem_zalloc(newc * sizeof (*mspp), KM_SLEEP);
 
@@ -855,6 +857,15 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 		    m << vd->vdev_ms_shift, 1ULL << vd->vdev_ms_shift, txg);
 	}
 
+	if (txg == 0)
+		spa_config_enter(spa, SCL_ALLOC, FTAG, RW_WRITER);
+
+	if (oldc == 0)
+		metaslab_group_activate(vd->vdev_mg);
+
+	if (txg == 0)
+		spa_config_exit(spa, SCL_ALLOC, FTAG);
+
 	return (0);
 }
 
@@ -865,6 +876,7 @@ vdev_metaslab_fini(vdev_t *vd)
 	uint64_t count = vd->vdev_ms_count;
 
 	if (vd->vdev_ms != NULL) {
+		metaslab_group_passivate(vd->vdev_mg);
 		for (m = 0; m < count; m++)
 			if (vd->vdev_ms[m] != NULL)
 				metaslab_fini(vd->vdev_ms[m]);
@@ -2134,8 +2146,8 @@ vdev_offline_log(spa_t *spa)
 	return (error);
 }
 
-int
-vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
+static int
+vdev_offline_locked(spa_t *spa, uint64_t guid, uint64_t flags)
 {
 	vdev_t *vd, *tvd;
 	int error = 0;
@@ -2178,7 +2190,7 @@ top:
 			/*
 			 * Prevent any future allocations.
 			 */
-			metaslab_class_remove(spa->spa_log_class, mg);
+			metaslab_group_passivate(mg);
 			(void) spa_vdev_state_exit(spa, vd, 0);
 
 			error = vdev_offline_log(spa);
@@ -2189,7 +2201,7 @@ top:
 			 * Check to see if the config has changed.
 			 */
 			if (error || generation != spa->spa_config_generation) {
-				metaslab_class_add(spa->spa_log_class, mg);
+				metaslab_group_activate(mg);
 				if (error)
 					return (spa_vdev_state_exit(spa,
 					    vd, error));
@@ -2220,12 +2232,24 @@ top:
 		 * once we online the device it's open for business.
 		 */
 		if (tvd->vdev_islog && mg != NULL)
-			metaslab_class_add(spa->spa_log_class, mg);
+			metaslab_group_activate(mg);
 	}
 
 	vd->vdev_tmpoffline = !!(flags & ZFS_OFFLINE_TEMPORARY);
 
 	return (spa_vdev_state_exit(spa, vd, 0));
+}
+
+int
+vdev_offline(spa_t *spa, uint64_t guid, uint64_t flags)
+{
+	int error;
+
+	mutex_enter(&spa->spa_vdev_top_lock);
+	error = vdev_offline_locked(spa, guid, flags);
+	mutex_exit(&spa->spa_vdev_top_lock);
+
+	return (error);
 }
 
 /*

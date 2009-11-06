@@ -3789,32 +3789,13 @@ spa_vdev_remove_aux(nvlist_t *config, char *name, nvlist_t **dev, int count,
  */
 
 /*
- * Initial phase of device removal - stop future allocations from this device.
- */
-void
-spa_vdev_remove_start(spa_t *spa, vdev_t *vd)
-{
-	metaslab_group_t *mg = vd->vdev_mg;
-
-	ASSERT(MUTEX_HELD(&spa_namespace_lock));
-	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == SCL_ALL);
-	ASSERT(vd == vd->vdev_top);
-
-	/*
-	 * Remove our vdev from the allocatable vdevs
-	 */
-	if (mg)
-		metaslab_class_remove(mg->mg_class, mg);
-}
-
-/*
  * Evacuate the device.
  */
 int
 spa_vdev_remove_evacuate(spa_t *spa, vdev_t *vd)
 {
+	int error = 0;
 	uint64_t txg;
-	int error;
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 	ASSERT(spa_config_held(spa, SCL_ALL, RW_WRITER) == 0);
@@ -3827,23 +3808,20 @@ spa_vdev_remove_evacuate(spa_t *spa, vdev_t *vd)
 	 * should no longer have any blocks allocated on it.
 	 */
 	if (vd->vdev_islog) {
-		/*
-		 * Evacuate the device.
-		 */
-		if (error = dmu_objset_find(spa_name(spa),
-		    zil_vdev_offline, NULL, DS_FIND_CHILDREN)) {
-			uint64_t txg;
-
-			txg = spa_vdev_config_enter(spa);
-			metaslab_class_add(spa->spa_log_class,
-			    vd->vdev_mg);
-			return (spa_vdev_exit(spa, NULL, txg, error));
-		}
-		txg_wait_synced(spa_get_dsl(spa), 0);
+		error = dmu_objset_find(spa_name(spa), zil_vdev_offline,
+		    NULL, DS_FIND_CHILDREN);
+	} else {
+		error = ENOTSUP;	/* until we have bp rewrite */
 	}
 
+	txg_wait_synced(spa_get_dsl(spa), 0);
+
+	if (error)
+		return (error);
+
 	/*
-	 * Remove any remaining MOS metadata associated with the device.
+	 * The evacuation succeeded.  Remove any remaining MOS metadata
+	 * associated with this vdev, and wait for these changes to sync.
 	 */
 	txg = spa_vdev_config_enter(spa);
 	vd->vdev_removing = B_TRUE;
@@ -3858,10 +3836,9 @@ spa_vdev_remove_evacuate(spa_t *spa, vdev_t *vd)
  * Complete the removal by cleaning up the namespace.
  */
 void
-spa_vdev_remove_done(spa_t *spa, vdev_t *vd)
+spa_vdev_remove_from_namespace(spa_t *spa, vdev_t *vd)
 {
 	vdev_t *rvd = spa->spa_root_vdev;
-	metaslab_group_t *mg = vd->vdev_mg;
 	uint64_t id = vd->vdev_id;
 	boolean_t last_vdev = (id == (rvd->vdev_children - 1));
 
@@ -3877,14 +3854,6 @@ spa_vdev_remove_done(spa_t *spa, vdev_t *vd)
 		vdev_config_clean(vd);
 
 	vdev_free(vd);
-
-	/*
-	 * It's possible that another thread is trying todo a spa_vdev_add()
-	 * at the same time we're trying remove it. As a result the
-	 * added vdev may not have initialized its metaslabs yet.
-	 */
-	if (mg != NULL)
-		metaslab_group_destroy(mg);
 
 	if (last_vdev) {
 		vdev_compact_children(rvd);
@@ -3908,6 +3877,7 @@ int
 spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 {
 	vdev_t *vd;
+	metaslab_group_t *mg;
 	nvlist_t **spares, **l2cache, *nv;
 	uint64_t txg = 0;
 	uint_t nspares, nl2cache;
@@ -3955,13 +3925,12 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		 * become the common case.
 		 */
 
+		mg = vd->vdev_mg;
+
 		/*
-		 * 1. Stop allocations
-		 * 2. Evacuate the device (i.e. kill off stubby and
-		 *    metadata) and wait for it to complete (i.e. sync).
-		 * 3. Cleanup the vdev namespace.
+		 * Stop allocating from this vdev.
 		 */
-		spa_vdev_remove_start(spa, vd);
+		metaslab_group_passivate(mg);
 
 		/*
 		 * Wait for the youngest allocations and frees to sync,
@@ -3970,11 +3939,25 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		spa_vdev_config_exit(spa, NULL,
 		    txg + TXG_CONCURRENT_STATES + TXG_DEFER_SIZE, 0, FTAG);
 
-		if ((error = spa_vdev_remove_evacuate(spa, vd)) != 0)
-			return (error);
+		/*
+		 * Attempt to evacuate the vdev.
+		 */
+		error = spa_vdev_remove_evacuate(spa, vd);
+
 		txg = spa_vdev_config_enter(spa);
 
-		spa_vdev_remove_done(spa, vd);
+		/*
+		 * If we couldn't evacuate the vdev, unwind.
+		 */
+		if (error) {
+			metaslab_group_activate(mg);
+			return (spa_vdev_exit(spa, NULL, txg, error));
+		}
+
+		/*
+		 * Clean up the vdev namespace.
+		 */
+		spa_vdev_remove_from_namespace(spa, vd);
 
 	} else if (vd != NULL) {
 		/*

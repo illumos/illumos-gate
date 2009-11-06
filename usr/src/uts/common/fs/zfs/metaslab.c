@@ -77,58 +77,13 @@ metaslab_class_create(spa_t *spa, space_map_ops_t *ops)
 void
 metaslab_class_destroy(metaslab_class_t *mc)
 {
-	metaslab_group_t *mg;
-
-	while ((mg = mc->mc_rotor) != NULL) {
-		metaslab_class_remove(mc, mg);
-		metaslab_group_destroy(mg);
-	}
+	ASSERT(mc->mc_rotor == NULL);
+	ASSERT(mc->mc_alloc == 0);
+	ASSERT(mc->mc_deferred == 0);
+	ASSERT(mc->mc_space == 0);
+	ASSERT(mc->mc_dspace == 0);
 
 	kmem_free(mc, sizeof (metaslab_class_t));
-}
-
-void
-metaslab_class_add(metaslab_class_t *mc, metaslab_group_t *mg)
-{
-	metaslab_group_t *mgprev, *mgnext;
-
-	ASSERT(mg->mg_class == NULL);
-
-	if ((mgprev = mc->mc_rotor) == NULL) {
-		mg->mg_prev = mg;
-		mg->mg_next = mg;
-	} else {
-		mgnext = mgprev->mg_next;
-		mg->mg_prev = mgprev;
-		mg->mg_next = mgnext;
-		mgprev->mg_next = mg;
-		mgnext->mg_prev = mg;
-	}
-	mc->mc_rotor = mg;
-	mg->mg_class = mc;
-}
-
-void
-metaslab_class_remove(metaslab_class_t *mc, metaslab_group_t *mg)
-{
-	metaslab_group_t *mgprev, *mgnext;
-
-	ASSERT(mg->mg_class == mc);
-
-	mgprev = mg->mg_prev;
-	mgnext = mg->mg_next;
-
-	if (mg == mgnext) {
-		mc->mc_rotor = NULL;
-	} else {
-		mc->mc_rotor = mgnext;
-		mgprev->mg_next = mgnext;
-		mgnext->mg_prev = mgprev;
-	}
-
-	mg->mg_prev = NULL;
-	mg->mg_next = NULL;
-	mg->mg_class = NULL;
 }
 
 int
@@ -165,11 +120,6 @@ metaslab_class_space_update(metaslab_class_t *mc, int64_t alloc_delta,
 	atomic_add_64(&mc->mc_deferred, defer_delta);
 	atomic_add_64(&mc->mc_space, space_delta);
 	atomic_add_64(&mc->mc_dspace, dspace_delta);
-
-	ASSERT((int64_t)mc->mc_alloc >= 0 &&
-	    (int64_t)mc->mc_deferred >= 0 &&
-	    (int64_t)mc->mc_space >= 0 &&
-	    (int64_t)mc->mc_dspace >= 0);
 }
 
 uint64_t
@@ -234,9 +184,9 @@ metaslab_group_create(metaslab_class_t *mc, vdev_t *vd)
 	mutex_init(&mg->mg_lock, NULL, MUTEX_DEFAULT, NULL);
 	avl_create(&mg->mg_metaslab_tree, metaslab_compare,
 	    sizeof (metaslab_t), offsetof(struct metaslab, ms_group_node));
-	mg->mg_aliquot = metaslab_aliquot * MAX(1, vd->vdev_children);
 	mg->mg_vd = vd;
-	metaslab_class_add(mc, mg);
+	mg->mg_class = mc;
+	mg->mg_activation_count = 0;
 
 	return (mg);
 }
@@ -244,9 +194,75 @@ metaslab_group_create(metaslab_class_t *mc, vdev_t *vd)
 void
 metaslab_group_destroy(metaslab_group_t *mg)
 {
+	ASSERT(mg->mg_prev == NULL);
+	ASSERT(mg->mg_next == NULL);
+	ASSERT(mg->mg_activation_count + mg->mg_vd->vdev_removing == 0);
+
 	avl_destroy(&mg->mg_metaslab_tree);
 	mutex_destroy(&mg->mg_lock);
 	kmem_free(mg, sizeof (metaslab_group_t));
+}
+
+void
+metaslab_group_activate(metaslab_group_t *mg)
+{
+	metaslab_class_t *mc = mg->mg_class;
+	metaslab_group_t *mgprev, *mgnext;
+
+	ASSERT(spa_config_held(mc->mc_spa, SCL_ALLOC, RW_WRITER));
+
+	ASSERT(mc->mc_rotor != mg);
+	ASSERT(mg->mg_prev == NULL);
+	ASSERT(mg->mg_next == NULL);
+	ASSERT(mg->mg_activation_count <= 0);
+
+	if (++mg->mg_activation_count <= 0)
+		return;
+
+	mg->mg_aliquot = metaslab_aliquot * MAX(1, mg->mg_vd->vdev_children);
+
+	if ((mgprev = mc->mc_rotor) == NULL) {
+		mg->mg_prev = mg;
+		mg->mg_next = mg;
+	} else {
+		mgnext = mgprev->mg_next;
+		mg->mg_prev = mgprev;
+		mg->mg_next = mgnext;
+		mgprev->mg_next = mg;
+		mgnext->mg_prev = mg;
+	}
+	mc->mc_rotor = mg;
+}
+
+void
+metaslab_group_passivate(metaslab_group_t *mg)
+{
+	metaslab_class_t *mc = mg->mg_class;
+	metaslab_group_t *mgprev, *mgnext;
+
+	ASSERT(spa_config_held(mc->mc_spa, SCL_ALLOC, RW_WRITER));
+
+	if (--mg->mg_activation_count != 0) {
+		ASSERT(mc->mc_rotor != mg);
+		ASSERT(mg->mg_prev == NULL);
+		ASSERT(mg->mg_next == NULL);
+		ASSERT(mg->mg_activation_count < 0);
+		return;
+	}
+
+	mgprev = mg->mg_prev;
+	mgnext = mg->mg_next;
+
+	if (mg == mgnext) {
+		mc->mc_rotor = NULL;
+	} else {
+		mc->mc_rotor = mgnext;
+		mgprev->mg_next = mgnext;
+		mgnext->mg_prev = mgprev;
+	}
+
+	mg->mg_prev = NULL;
+	mg->mg_next = NULL;
 }
 
 static void
@@ -1052,7 +1068,7 @@ metaslab_alloc_dva(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
 		 * longer exists (i.e. removed). Consult the rotor when
 		 * all else fails.
 		 */
-		if (vd != NULL && vd->vdev_mg != NULL) {
+		if (vd != NULL) {
 			mg = vd->vdev_mg;
 
 			if (flags & METASLAB_HINTBP_AVOID &&
@@ -1069,15 +1085,18 @@ metaslab_alloc_dva(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
 	}
 
 	/*
-	 * If the hint put us into the wrong class, just follow the rotor.
+	 * If the hint put us into the wrong metaslab class, or into a
+	 * metaslab group that has been passivated, just follow the rotor.
 	 */
-	if (mg->mg_class != mc)
+	if (mg->mg_class != mc || mg->mg_activation_count <= 0)
 		mg = mc->mc_rotor;
 
 	rotor = mg;
 top:
 	all_zero = B_TRUE;
 	do {
+		ASSERT(mg->mg_activation_count == 1);
+
 		vd = mg->mg_vd;
 
 		/*

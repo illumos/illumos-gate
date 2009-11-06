@@ -57,8 +57,6 @@ extern int metaslab_claim(spa_t *spa, const blkptr_t *bp, uint64_t txg);
 extern metaslab_class_t *metaslab_class_create(spa_t *spa,
     space_map_ops_t *ops);
 extern void metaslab_class_destroy(metaslab_class_t *mc);
-extern void metaslab_class_add(metaslab_class_t *mc, metaslab_group_t *mg);
-extern void metaslab_class_remove(metaslab_class_t *mc, metaslab_group_t *mg);
 extern int metaslab_class_validate(metaslab_class_t *mc);
 
 extern void metaslab_class_space_update(metaslab_class_t *mc,
@@ -72,6 +70,8 @@ extern uint64_t metaslab_class_get_deferred(metaslab_class_t *mc);
 extern metaslab_group_t *metaslab_group_create(metaslab_class_t *mc,
     vdev_t *vd);
 extern void metaslab_group_destroy(metaslab_group_t *mg);
+extern void metaslab_group_activate(metaslab_group_t *mg);
+extern void metaslab_group_passivate(metaslab_group_t *mg);
 
 #ifdef	__cplusplus
 }
