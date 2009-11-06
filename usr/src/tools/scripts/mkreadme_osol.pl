@@ -21,10 +21,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -47,8 +45,8 @@ my $tries = 2;
 #
 # Markers in the web pages that we download.
 #
-my $begin_data = qr/<!-- begin_data --><pre>/;
-my $end_data = qr/<\/pre><!-- end_data -->/;
+my $begin_data = qr/\[begin README tag - do not delete\]/;
+my $end_data = qr/\[end README tag - do not delete\]/;
 
 my $readme_fn = shift || die "missing README filepath\n";
 open(README_OUT, ">$readme_fn") || die "couldn't open $readme_fn\n";
@@ -67,24 +65,64 @@ if (! $ENV{"http_proxy"}) {
 	$ENV{"http_proxy"} = $ENV{"HTTP_PROXY"};
 }
 
+#
+# Make a pass through the input file and download any web pages that
+# are included by reference.
+#
 foreach (@lines) {
 	chomp;
 	if (/^<!-- #include (.+) -->$/) {
 		my $url = $1;
 		print "Getting $url\n";
+		# Download the page into $content{$url}.
 		$content{$url} =
 		    `/usr/sfw/bin/wget -q -O - -T $timeout -t $tries $url`;
 		if (! $content{$url}) {
 			die "$url: invalid or empty URI.\n";
 		}
+		#
+		# Clean up the downloaded contents: remove carriage
+		# returns, strip out content that is outside the
+		# delimiter tags, convert HTML-encoded characters back
+		# into plain text.
+		#
 		$content{$url} =~ s/\r//g;
 		my @c = split /\n/, $content{$url};
-		while ((my $l = shift @c) !~ /$begin_data/) {};
-		while ((pop @c) !~ /$end_data/) {};
+		my $l;
+		# Work forwards to find start.
+		while (defined ($l = shift @c)) {
+			if ($l =~ /$begin_data/) {
+				last;
+			}
+		}
+		if (! defined $l) {
+			print "Warning: content start delimiter not found\n";
+		} else {
+			# Work backwards to find end.
+			while (defined ($l = pop @c)) {
+				if ($l =~ /$end_data/) {
+					last;
+				}
+			}
+			if (! defined $l) {
+				print "Warning: content end delimiter ",
+				    "not found\n";
+			}
+		}
 		$content{$url} = join "\n", @c;
+		$content{$url} =~ s/&amp;/&/g;
+		$content{$url} =~ s/&lt;/</g;
+		$content{$url} =~ s/&#60;/</g;
+		$content{$url} =~ s/&gt;/>/g;
+		$content{$url} =~ s/&#62;/>/g;
 	}
 }
 
+#
+# Make a second pass through the input file.  Pass most text on
+# verbatim; replace #include directives with the content that was
+# downloaded by the previous pass.
+#
 foreach (@lines) {
 	if (/^<!-- #include (.+) -->$/ && exists($content{$1})) {
 		print README_OUT $content{$1};
