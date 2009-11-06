@@ -958,7 +958,7 @@ xnf_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 failure_5:
-	mac_unregister(xnfp->xnf_mh);
+	(void) mac_unregister(xnfp->xnf_mh);
 
 failure_4:
 #ifdef XPV_HVM_DRIVER
