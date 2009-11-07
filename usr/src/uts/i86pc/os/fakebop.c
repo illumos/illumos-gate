@@ -1574,9 +1574,11 @@ bop_traceback(bop_frame_t *frame)
 {
 	pc_t pc;
 	int cnt;
-	int a;
 	char *ksym;
 	ulong_t off;
+#if defined(__i386)
+	int a;
+#endif
 
 	bop_printf(NULL, "Stack traceback:\n");
 	for (cnt = 0; cnt < 30; ++cnt) {	/* up to 30 frames */
