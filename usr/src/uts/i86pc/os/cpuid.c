@@ -4145,6 +4145,33 @@ cpuid_arat_supported(void)
 	}
 }
 
+/*
+ * Check support for Intel ENERGY_PERF_BIAS feature
+ */
+int
+cpuid_iepb_supported(struct cpu *cp)
+{
+	struct cpuid_info *cpi = cp->cpu_m.mcpu_cpi;
+	struct cpuid_regs regs;
+
+	ASSERT(cpuid_checkpass(cp, 1));
+
+	if (!(x86_feature & X86_CPUID) || !(x86_feature & X86_MSR)) {
+		return (0);
+	}
+
+	/*
+	 * Intel ENERGY_PERF_BIAS MSR is indicated by
+	 * capability bit CPUID.6.ECX.3
+	 */
+	if ((cpi->cpi_vendor != X86_VENDOR_Intel) || (cpi->cpi_maxeax < 6))
+		return (0);
+
+	regs.cp_eax = 0x6;
+	(void) cpuid_insn(NULL, &regs);
+	return (regs.cp_ecx & CPUID_EPB_SUPPORT);
+}
+
 #if defined(__amd64) && !defined(__xpv)
 /*
  * Patch in versions of bcopy for high performance Intel Nhm processors

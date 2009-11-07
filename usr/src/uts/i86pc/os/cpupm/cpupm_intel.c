@@ -24,6 +24,11 @@
  */
 
 /*
+ * Copyright (c) 2009, Intel Corporation.
+ * All rights reserved.
+ */
+
+/*
  * Intel specific CPU power management support.
  */
 
@@ -32,6 +37,7 @@
 #include <sys/speedstep.h>
 #include <sys/cpupm_throttle.h>
 #include <sys/cpu_idle.h>
+#include <sys/archsystm.h>
 
 /*
  * The Intel Processor Driver Capabilities (_PDC).
@@ -50,6 +56,31 @@
 #define	CPUPM_INTEL_PDC_HW_PSD		0x0800
 
 static uint32_t cpupm_intel_pdccap = 0;
+
+/*
+ * MSR for Intel ENERGY_PERF_BIAS feature.
+ * The default processor power operation policy is max performance.
+ * Power control unit drives to max performance at any energy cost.
+ * This MSR is designed to be a power master control knob,
+ * it provides 4-bit OS input to the HW for the logical CPU, based on
+ * user power-policy preference(scale of 0 to 15). 0 is highest
+ * performance, 15 is minimal energy consumption.
+ * 7 is a good balance between performance and energy consumption.
+ */
+#define	IA32_ENERGY_PERF_BIAS_MSR	0x1B0
+#define	EPB_MSR_MASK			0xF
+#define	EPB_MAX_PERF			0
+#define	EPB_BALANCE			7
+#define	EPB_MAX_POWER_SAVE		15
+
+/*
+ * The value is used to initialize the user power policy preference
+ * in IA32_ENERGY_PERF_BIAS_MSR. Variable is used here to allow tuning
+ * from the /etc/system file.
+ */
+uint64_t cpupm_iepb_policy = EPB_MAX_PERF;
+
+static void cpupm_iepb_set_policy(uint64_t power_policy);
 
 boolean_t
 cpupm_intel_init(cpu_t *cp)
@@ -105,5 +136,30 @@ cpupm_intel_init(cpu_t *cp)
 	(void) cpu_acpi_write_pdc(mach_state->ms_acpi_handle,
 	    CPUPM_INTEL_PDC_REVISION, 1, &cpupm_intel_pdccap);
 
+	/*
+	 * If Intel ENERGY PERFORMANCE BIAS feature is supported,
+	 * provides input to the HW, based on user power-policy.
+	 */
+	if (cpuid_iepb_supported(cp)) {
+		cpupm_iepb_set_policy(cpupm_iepb_policy);
+	}
+
 	return (B_TRUE);
+}
+
+/*
+ * ENERGY_PERF_BIAS setting,
+ * A hint to HW, based on user power-policy
+ */
+static void
+cpupm_iepb_set_policy(uint64_t iepb_policy)
+{
+	ulong_t		iflag;
+	uint64_t	epb_value;
+
+	epb_value = iepb_policy & EPB_MSR_MASK;
+
+	iflag = intr_clear();
+	wrmsr(IA32_ENERGY_PERF_BIAS_MSR, epb_value);
+	intr_restore(iflag);
 }

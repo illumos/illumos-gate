@@ -383,6 +383,11 @@ extern "C" {
 #define	CPUID_CSTATE_ARAT	(0x4)
 
 /*
+ * Intel ENERGY_PERF_BIAS MSR indicated by feature bit CPUID.6.ECX[3].
+ */
+#define	CPUID_EPB_SUPPORT	(1 << 3)
+
+/*
  * x86_type is a legacy concept; this is supplanted
  * for most purposes by x86_feature; modern CPUs
  * should be X86_TYPE_OTHER
@@ -657,6 +662,7 @@ extern uint32_t *cpuid_mwait_alloc(struct cpu *);
 extern void cpuid_mwait_free(struct cpu *);
 extern int cpuid_deep_cstates_supported(void);
 extern int cpuid_arat_supported(void);
+extern int cpuid_iepb_supported(struct cpu *);
 extern int vmware_platform(void);
 #endif
 
