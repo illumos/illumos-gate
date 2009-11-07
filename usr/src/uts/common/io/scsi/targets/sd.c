@@ -22930,6 +22930,7 @@ skip_ready_valid:
 	case DKIOCSETWCE: {
 
 		int wce, sync_supported;
+		int cur_wce = 0;
 
 		if (ddi_copyin((void *)arg, &wce, sizeof (wce), flag)) {
 			err = EFAULT;
@@ -22961,6 +22962,18 @@ skip_ready_valid:
 			cv_wait(&un->un_wcc_cv, SD_MUTEX(un));
 
 		un->un_f_wcc_inprog = 1;
+
+		mutex_exit(SD_MUTEX(un));
+
+		/*
+		 * Get the current write cache state
+		 */
+		if ((err = sd_get_write_cache_enabled(ssc, &cur_wce)) != 0) {
+			break;
+		}
+
+		mutex_enter(SD_MUTEX(un));
+		un->un_f_write_cache_enabled = (cur_wce != 0);
 
 		if (un->un_f_write_cache_enabled && wce == 0) {
 			/*
