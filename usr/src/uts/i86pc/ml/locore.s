@@ -1342,9 +1342,12 @@ bop_trap_handler(void)
 	/*
 	 * Handle traps early in boot. Just revectors into C quickly as
 	 * these are always fatal errors.
+	 *
+	 * Adjust %rsp to get same stack layout as in 32bit mode for bop_trap().
 	 */
 	ENTRY(bop_trap_handler)
 	movq	%rsp, %rdi
+	sub	$8, %rsp
 	call	bop_trap
 	SET_SIZE(bop_trap_handler)
 #endif

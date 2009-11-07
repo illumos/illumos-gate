@@ -1594,8 +1594,8 @@ bop_traceback(bop_frame_t *frame)
 			bop_printf(NULL, "\n");
 			break;
 		}
-		for (a = 0; a < 6; ++a) {	/* try for 6 args */
 #if defined(__i386)
+		for (a = 0; a < 6; ++a) {	/* try for 6 args */
 			if ((void *)&frame->arg[a] == (void *)frame->old_frame)
 				break;
 			if (a == 0)
@@ -1603,14 +1603,14 @@ bop_traceback(bop_frame_t *frame)
 			else
 				bop_printf(NULL, ",");
 			bop_printf(NULL, "0x%lx", frame->arg[a]);
-#endif
 		}
-		bop_printf(NULL, ")\n");
+		bop_printf(NULL, ")");
+#endif
+		bop_printf(NULL, "\n");
 	}
 }
 
 struct trapframe {
-	ulong_t frame_ptr;	/* %[er]bp pushed by our code */
 	ulong_t error_code;	/* optional */
 	ulong_t inst_ptr;
 	ulong_t code_seg;
@@ -1622,8 +1622,9 @@ struct trapframe {
 };
 
 void
-bop_trap(struct trapframe *tf)
+bop_trap(ulong_t *tfp)
 {
+	struct trapframe *tf = (struct trapframe *)tfp;
 	bop_frame_t fakeframe;
 	static int depth = 0;
 
@@ -1633,23 +1634,27 @@ bop_trap(struct trapframe *tf)
 	if (++depth > 2)
 		bop_panic("Nested trap");
 
+	bop_printf(NULL, "Unexpected trap\n");
+
 	/*
 	 * adjust the tf for optional error_code by detecting the code selector
 	 */
 	if (tf->code_seg != bcode_sel)
-		tf = (struct trapframe *)((uintptr_t)tf - sizeof (ulong_t));
+		tf = (struct trapframe *)(tfp - 1);
+	else
+		bop_printf(NULL, "error code           0x%lx\n",
+		    tf->error_code & 0xffffffff);
 
-	bop_printf(NULL, "Unexpected trap\n");
 	bop_printf(NULL, "instruction pointer  0x%lx\n", tf->inst_ptr);
-	bop_printf(NULL, "error code, optional 0x%lx\n",
-	    tf->error_code & 0xffffffff);
 	bop_printf(NULL, "code segment         0x%lx\n", tf->code_seg & 0xffff);
 	bop_printf(NULL, "flags register       0x%lx\n", tf->flags_reg);
 #ifdef __amd64
-	bop_printf(NULL, "return %%rsp         0x%lx\n", tf->stk_ptr);
-	bop_printf(NULL, "return %%ss          0x%lx\n", tf->stk_seg & 0xffff);
+	bop_printf(NULL, "return %%rsp          0x%lx\n", tf->stk_ptr);
+	bop_printf(NULL, "return %%ss           0x%lx\n", tf->stk_seg & 0xffff);
 #endif
-	fakeframe.old_frame = (bop_frame_t *)tf->frame_ptr;
+
+	/* grab %[er]bp pushed by our code from the stack */
+	fakeframe.old_frame = (bop_frame_t *)*(tfp - 3);
 	fakeframe.retaddr = (pc_t)tf->inst_ptr;
 	bop_printf(NULL, "Attempting stack backtrace:\n");
 	bop_traceback(&fakeframe);
