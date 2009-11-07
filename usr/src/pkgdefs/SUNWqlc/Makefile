@@ -20,21 +20,22 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 include ../Makefile.com
 
+TMPLFILES += postinstall preremove
 DATAFILES += i.qlc
-
 LICENSEFILES += $(PKGDEFS)/SUNWqlc/lic_Qlogic
 
 .KEEP_STATE:
 
-all: $(FILES) depend preremove postinstall
+all: $(FILES) depend
 
 install: all pkg 
 
 include ../Makefile.targ
+include ../Makefile.prtarg

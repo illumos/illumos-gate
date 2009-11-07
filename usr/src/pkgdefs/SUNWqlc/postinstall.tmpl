@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -19,15 +19,42 @@
 #
 # CDDL HEADER END
 #
-#
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-DRVR_NAME=qlc
+include drv_utils
 
-# Remove the driver entries but leave it attached.
-/usr/sbin/rem_drv -b ${BASEDIR} ${DRVR_NAME}
+ret=0
 
-exit 0
+if [ ${ARCH} = "sparc" ]; then
+	pkg_drvadd -i \
+	    '"pci1077,2200"
+	    "pci1077,2300"
+	    "pci1077,2312"
+	    "pci1077,2422"
+	    "pciex1077,2432"
+	    "pciex1077,2532"
+	    "pciex1077,5432"
+	    "pciex1077,8001"' \
+	    -m '* 0666 root sys' -c "fibre-channel" qlc || ret=1
+elif [ ${ARCH} = "i386" ]; then
+	pkg_drvadd -i \
+	    '"pci1077,2200"
+	    "pci1077,2300"
+	    "pci1077,2312"
+	    "pci1077,132"
+	    "pci1077,2422"
+	    "pciex1077,2432"
+	    "pciex1077,2532"
+	    "pciex1077,5432"
+	    "pciex1077,8001"' \
+	    -m '* 0666 root sys' -c "fibre-channel" qlc || ret=1
+else
+	echo "\n$0 Failed: ${ARCH} is not supported.\n" >&2
+	ret=1
+fi
+
+pkg_drvadd -i "pciex1077,8000" -m '* 0666 root sys' qlge || ret=1
+
+exit $ret

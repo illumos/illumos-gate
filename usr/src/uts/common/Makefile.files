@@ -1028,6 +1028,8 @@ QLC_FW_6322_OBJS += ql_fw_6322.o
 
 QLC_FW_8100_OBJS += ql_fw_8100.o
 
+QLGE_OBJS += qlge.o qlge_dbg.o qlge_flash.o qlge_gld.o qlge_mpi.o
+
 ZCONS_OBJS += zcons.o
 
 NV_SATA_OBJS += nv_sata.o

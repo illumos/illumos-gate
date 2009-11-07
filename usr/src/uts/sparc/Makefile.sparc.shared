@@ -302,6 +302,7 @@ DRV_KMODS	+= fcip
 DRV_KMODS	+= fcsm
 DRV_KMODS	+= fp
 DRV_KMODS	+= qlc
+DRV_KMODS	+= qlge
 DRV_KMODS	+= dda
 DRV_KMODS	+= dmd
 DRV_KMODS	+= stmf

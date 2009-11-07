@@ -47,6 +47,7 @@
 #
 d none kernel/drv/sparcv9 0755 root sys
 f none kernel/drv/sparcv9/qlc 0755 root sys
+f none kernel/drv/sparcv9/qlge 0755 root sys
 d none kernel/misc/qlc/sparcv9 0755 root sys
 f none kernel/misc/qlc/sparcv9/qlc_fw_2200 0755 root sys
 f none kernel/misc/qlc/sparcv9/qlc_fw_2300 0755 root sys

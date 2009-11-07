@@ -46,8 +46,10 @@
 # SUNWqlc
 #
 f none kernel/drv/qlc 0755 root sys
+f none kernel/drv/qlge 0755 root sys
 d none kernel/drv/amd64 0755 root sys
 f none kernel/drv/amd64/qlc 0755 root sys
+f none kernel/drv/amd64/qlge 0755 root sys
 f none kernel/misc/qlc/qlc_fw_2200 0755 root sys
 f none kernel/misc/qlc/qlc_fw_2300 0755 root sys
 f none kernel/misc/qlc/qlc_fw_2400 0755 root sys
