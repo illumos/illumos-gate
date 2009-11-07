@@ -804,15 +804,18 @@ nfs4open_otw(vnode_t *dvp, char *file_name, struct vattr *in_va,
 	if (create_flag && in_va) {
 
 		/*
-		 * If the parent's directory has the setgid bit set
+		 * If there is grpid mount flag used or
+		 * the parent's directory has the setgid bit set
 		 * _and_ the client was able to get a valid mapping
 		 * for the parent dir's owner_group, we want to
 		 * append NVERIFY(owner_group == dva.va_gid) and
 		 * SETATTR to the CREATE compound.
 		 */
 		mutex_enter(&drp->r_statelock);
-		if (drp->r_attr.va_mode & VSGID &&
+		if ((VTOMI4(dvp)->mi_flags & MI4_GRPID ||
+		    drp->r_attr.va_mode & VSGID) &&
 		    drp->r_attr.va_gid != GID_NOBODY) {
+			in_va->va_mask |= AT_GID;
 			in_va->va_gid = drp->r_attr.va_gid;
 			setgid_flag = 1;
 		}
@@ -1140,10 +1143,6 @@ recov_retry:
 			return (e.error);
 		}
 	} else if (create_flag) {
-		/*
-		 * For setgid case, we need to:
-		 * 4:savefh(new) 5:putfh(dir) 6:getattr(dir) 7:restorefh(new)
-		 */
 		argop[1].argop = OP_SAVEFH;
 
 		argop[5].argop = OP_RESTOREFH;
