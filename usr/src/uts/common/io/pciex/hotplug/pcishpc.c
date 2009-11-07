@@ -523,7 +523,7 @@ pcishpc_slot_get_property(pcie_hp_slot_t *slot_p, ddi_hp_property_t *arg,
 			value = pcie_slot_condition_text(slot_p->hs_condition);
 		} else {
 			/* unsupported property */
-			cmn_err(CE_WARN, "Unsupported property: %s\n", name);
+			PCIE_DBG("Unsupported property: %s\n", name);
 
 			ret = DDI_ENOTSUP;
 			goto get_prop_cleanup2;
@@ -669,14 +669,14 @@ set_prop_cleanup1:
 	while (prop_pair = nvlist_next_nvpair(prop_list, prop_pair)) {
 		name = nvpair_name(prop_pair);
 		if (nvpair_type(prop_pair) != DATA_TYPE_STRING) {
-			cmn_err(CE_WARN, "Unexpected data type of setting "
+			PCIE_DBG("Unexpected data type of setting "
 			    "property %s.\n", name);
 			ret = DDI_EINVAL;
 			goto set_prop_cleanup;
 		}
 		if (nvpair_value_string(prop_pair, &value)) {
-			cmn_err(CE_WARN, "Get string value failed for property "
-			    "%s.\n", name);
+			PCIE_DBG("Get string value failed for property %s.\n",
+			    name);
 			ret = DDI_FAILURE;
 			goto set_prop_cleanup;
 		}
@@ -685,13 +685,13 @@ set_prop_cleanup1:
 			if ((strcmp(value, PCIEHPC_PROP_VALUE_ON) != 0) &&
 			    (strcmp(value, PCIEHPC_PROP_VALUE_OFF) != 0) &&
 			    (strcmp(value, PCIEHPC_PROP_VALUE_BLINK) != 0)) {
-				cmn_err(CE_WARN, "Unsupported value of setting "
+				PCIE_DBG("Unsupported value of setting "
 				    "property %s\n", name);
 				ret = DDI_ENOTSUP;
 				goto set_prop_cleanup;
 			}
 		} else {
-			cmn_err(CE_WARN, "Unsupported property: %s\n", name);
+			PCIE_DBG("Unsupported property: %s\n", name);
 			ret = DDI_ENOTSUP;
 			goto set_prop_cleanup;
 		}
@@ -718,6 +718,21 @@ set_prop_cleanup1:
 			(void) pcishpc_setled(slot_p, PCIE_HP_ATTN_LED,
 			    led_state);
 		}
+	}
+	if (rval) {
+		if (get_udatamodel() == DATAMODEL_NATIVE) {
+			result.buf_size = 0;
+			if (copyout(&result, rval, sizeof (ddi_hp_property_t)))
+				ret =  DDI_FAILURE;
+		}
+#ifdef _SYSCALL32_IMPL
+		else {
+			result32.buf_size = 0;
+			if (copyout(&result32, rval,
+			    sizeof (ddi_hp_property32_t)))
+				ret =  DDI_FAILURE;
+		}
+#endif
 	}
 
 	mutex_exit(&ctrl_p->hc_mutex);
