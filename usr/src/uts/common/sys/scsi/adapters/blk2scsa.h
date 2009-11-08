@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +72,7 @@ struct b2s_leaf_info {
 	uint_t		leaf_lun;
 	uint32_t	leaf_flags;
 	const char	*leaf_unique_id;
+	uint64_t	leaf_eui;
 };
 
 #define	B2S_LEAF_REMOVABLE	(1U << 0)
@@ -143,7 +144,7 @@ struct b2s_request {
 
 	/* note that this member should come last for future expansion */
 	union {
-		uint64_t	a_ints[3];
+		uint64_t	a_ints[6];
 		b2s_media_t	a_media;
 		b2s_inquiry_t	a_inquiry;
 	} br_args;

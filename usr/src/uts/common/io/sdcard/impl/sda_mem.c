@@ -404,6 +404,7 @@ sda_mem_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		leafinfo.leaf_flags =
 		    B2S_LEAF_REMOVABLE | B2S_LEAF_HOTPLUGGABLE;
 		leafinfo.leaf_unique_id = slot->s_uuid;
+		leafinfo.leaf_eui = 0;
 
 		slot->s_leaf = b2s_attach_leaf(nexus, &leafinfo);
 		if (slot->s_leaf == NULL) {

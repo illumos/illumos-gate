@@ -63,7 +63,6 @@ struct b2s_request_impl {
 	b2s_request_t		ri_public;
 	struct scsi_pkt		*ri_pkt;
 	struct scsi_arq_status	*ri_sts;
-	buf_t			*ri_bp;
 
 	size_t			ri_resid;
 	b2s_nexus_t		*ri_nexus;
@@ -115,6 +114,7 @@ struct b2s_leaf {
 	uint32_t		l_refcnt;
 	list_node_t		l_node;
 	struct scsi_inquiry	l_inq;
+	uint64_t		l_eui;
 };
 
 _NOTE(MUTEX_PROTECTS_DATA(b2s_nexus::n_lock, b2s_leaf::l_node))
@@ -203,10 +203,8 @@ static void b2s_tran_tgt_free(dev_info_t *, dev_info_t *,
     scsi_hba_tran_t *, struct scsi_device *);
 static int b2s_tran_getcap(struct scsi_address *, char *, int);
 static int b2s_tran_setcap(struct scsi_address *, char *, int, int);
-static void b2s_tran_destroy_pkt(struct scsi_address *, struct scsi_pkt *);
-static struct scsi_pkt *b2s_tran_init_pkt(struct scsi_address *,
-    struct scsi_pkt *, struct buf *, int, int, int, int,
-    int (*)(caddr_t), caddr_t);
+static void b2s_tran_teardown_pkt(struct scsi_pkt *);
+static int b2s_tran_setup_pkt(struct scsi_pkt *, int (*)(caddr_t), caddr_t);
 static int b2s_tran_start(struct scsi_address *, struct scsi_pkt *);
 static int b2s_tran_abort(struct scsi_address *, struct scsi_pkt *);
 static int b2s_tran_reset(struct scsi_address *, int);
@@ -454,11 +452,14 @@ void
 b2s_request_mapin(b2s_request_t *req, caddr_t *addrp, size_t *lenp)
 {
 	b2s_request_impl_t	 *ri = (void *)req;
+	struct scsi_pkt		*pkt = ri->ri_pkt;
 	buf_t			*bp;
 
-	if (((bp = ri->ri_bp) != NULL) && (bp->b_bcount != 0)) {
-		*addrp = bp->b_un.b_addr;
-		*lenp = bp->b_bcount;
+	if ((pkt != NULL) && ((bp = scsi_pkt2bp(pkt)) != NULL) &&
+	    (bp->b_bcount != 0)) {
+		bp_mapin(bp);
+		*addrp = bp->b_un.b_addr + pkt->pkt_dma_offset;
+		*lenp = pkt->pkt_dma_len;
 	} else {
 		*addrp = 0;
 		*lenp = 0;
@@ -468,14 +469,11 @@ b2s_request_mapin(b2s_request_t *req, caddr_t *addrp, size_t *lenp)
 void
 b2s_request_dma(b2s_request_t *req, uint_t *ndmacp, ddi_dma_cookie_t **dmacsp)
 {
-	/*
-	 * We don't support direct DMA right now... there are no
-	 * clients that need it.  Frankly, bcopy is safer right now.
-	 */
-	_NOTE(ARGUNUSED(req));
+	b2s_request_impl_t	*ri = (void *)req;
+	struct scsi_pkt		*pkt = ri->ri_pkt;
 
-	*ndmacp = 0;
-	*dmacsp = NULL;
+	*ndmacp = pkt->pkt_numcookies;
+	*dmacsp = pkt->pkt_cookies;
 }
 
 void
@@ -595,15 +593,6 @@ b2s_request_done(b2s_request_t *req, b2s_err_t err, size_t resid)
 		ri->ri_done(ri);
 
 	/*
-	 * Undo the effect of any specific mapin that may have been done to
-	 * process the request.
-	 */
-	if (ri->ri_flags & B2S_REQUEST_FLAG_MAPIN) {
-		bp_mapout(ri->ri_bp);
-		ri->ri_flags &= ~B2S_REQUEST_FLAG_MAPIN;
-	}
-
-	/*
 	 * For SCSI packets, we have special completion handling.  For
 	 * internal requests, we just mark the request done so the caller
 	 * can free it.
@@ -672,55 +661,28 @@ b2s_tran_tgt_free(dev_info_t *hbadip, dev_info_t *tgtdip,
 	b2s_rele_leaf(l);
 }
 
-struct scsi_pkt *
-b2s_tran_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
-    struct buf *bp, int cmdlen, int statuslen, int tgtlen, int flags,
-    int (*cb)(caddr_t), caddr_t cbarg)
+int
+b2s_tran_setup_pkt(struct scsi_pkt *pkt, int (*cb)(caddr_t), caddr_t arg)
 {
-	int			(*func)(caddr_t);
-	dev_info_t		*dip;
-	scsi_hba_tran_t		*tran;
-	b2s_request_impl_t	*ri;
+	b2s_request_impl_t *ri = pkt->pkt_ha_private;
 
-	_NOTE(ARGUNUSED(flags));
-	_NOTE(ARGUNUSED(cbarg));
+	_NOTE(ARGUNUSED(cb));
+	_NOTE(ARGUNUSED(arg));
 
-	tran = ap->a_hba_tran;
-	dip = tran->tran_hba_dip;
+	ri->ri_pkt = pkt;
+	ri->ri_sts = (struct scsi_arq_status *)(void *)pkt->pkt_scbp;
 
 	/*
-	 * We just unconditionally map this in for now.  This makes
-	 * sure that we will always have kernel virtual addresses for
-	 * copying with.
+	 * NB: The other fields are initialized properly at tran_start(9e).
+	 * We don't care about their values the rest of the time.
 	 */
-	if (bp && (bp->b_bcount)) {
-		bp_mapin(bp);
-	}
-
-	if (pkt == NULL) {
-		func = (cb == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC;
-		pkt = scsi_hba_pkt_alloc(dip, ap, cmdlen, statuslen,
-		    tgtlen, sizeof (b2s_request_impl_t), func, NULL);
-		if (pkt == NULL)
-			return (NULL);
-
-		ri = pkt->pkt_ha_private;
-		ri->ri_pkt = pkt;
-		ri->ri_sts = (struct scsi_arq_status *)(void *)pkt->pkt_scbp;
-		ri->ri_bp = bp;
-
-		/*
-		 * NB: This would be the time to do DMA allocation.
-		 */
-	}
-
-	return (pkt);
+	return (0);
 }
 
 void
-b2s_tran_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
+b2s_tran_teardown_pkt(struct scsi_pkt *pkt)
 {
-	scsi_hba_pkt_free(ap, pkt);
+	_NOTE(ARGUNUSED(pkt));
 }
 
 int
@@ -1284,11 +1246,13 @@ b2s_scmd_inq(b2s_request_impl_t *ri)
 	size_t			resid, len;
 	uint8_t			hdr[4];
 	const uint8_t		*data;
+	uint8_t			page83[12];
+
 	/*
 	 * Suppport inquiry pages: 0 is the list itself, and 80 is the
 	 * unit serial number (in ASCII).
 	 */
-	const uint8_t		supp[2] = { 0, 0x80 };
+	const uint8_t		supp[3] = { 0, 0x80, 0x83 };
 
 	b2s_request_mapin(&ri->ri_public, &ptr, &len);
 
@@ -1305,8 +1269,6 @@ b2s_scmd_inq(b2s_request_impl_t *ri)
 		len = min(resid, len);
 		bcopy(&l->l_inq, ptr, len);
 		ri->ri_resid = resid - len;
-		bcopy(&l->l_inq, ptr, len);
-		ri->ri_resid = resid - len;
 		b2s_request_done(&ri->ri_public, B2S_EOK, 0);
 		return (TRAN_ACCEPT);
 
@@ -1315,7 +1277,7 @@ b2s_scmd_inq(b2s_request_impl_t *ri)
 		hdr[0] = DTYPE_DIRECT;
 		hdr[1] = 0;	/* page code */
 		hdr[2] = 0;
-		hdr[3] = 2;	/* page length */
+		hdr[3] = l->l_eui ? 3 : 2;	/* page length */
 		break;
 
 	case 0x18000:		/* page 80 unit serial number */
@@ -1324,6 +1286,27 @@ b2s_scmd_inq(b2s_request_impl_t *ri)
 		hdr[1] = 0x80;	/* page code */
 		hdr[2] = 0;
 		hdr[3] = l->l_uuid ? strlen(l->l_uuid) : 0; 	/* page len */
+		break;
+
+	case 0x18300:		/* page 83 WWN */
+		if (l->l_eui == 0) {
+			b2s_request_done(&ri->ri_public, B2S_EINVAL, 0);
+			return (TRAN_ACCEPT);
+		}
+		data = page83;
+		hdr[0] = DTYPE_DIRECT;
+		hdr[1] = 0x83;	/* page code */
+		hdr[2] = 0;
+		hdr[3] = 12;	/* length, only 12 bytes */
+
+		/* lun designator */
+		page83[0] = 1;		/* binary */
+		page83[1] = 2;		/* lun association, eui-64 type */
+		page83[2] = 0;		/* reserved */
+		page83[3] = 8;		/* designator length */
+		SCSI_WRITE64(&page83[4], l->l_eui);
+
+		/* Note that we don't bother with port or target ids */
 		break;
 
 	default:
@@ -1833,10 +1816,8 @@ b2s_alloc_nexus(b2s_nexus_info_t *info)
 	tran->tran_abort = 		b2s_tran_abort;
 	tran->tran_getcap = 		b2s_tran_getcap;
 	tran->tran_setcap = 		b2s_tran_setcap;
-	tran->tran_init_pkt = 		b2s_tran_init_pkt;
-	tran->tran_destroy_pkt = 	b2s_tran_destroy_pkt;
-	tran->tran_setup_pkt =		NULL;
-	tran->tran_teardown_pkt =	NULL;
+	tran->tran_setup_pkt =		b2s_tran_setup_pkt;
+	tran->tran_teardown_pkt =	b2s_tran_teardown_pkt;
 	tran->tran_hba_len =		sizeof (b2s_request_impl_t);
 	tran->tran_bus_config =		b2s_bus_config;
 
@@ -1901,6 +1882,7 @@ b2s_attach_leaf(b2s_nexus_t *n, b2s_leaf_info_t *info)
 	uint_t		lun	= info->leaf_lun;
 	const char	*uuid	= info->leaf_unique_id;
 	uint32_t	flags	= info->leaf_flags;
+	uint64_t	eui	= info->leaf_eui;
 
 	if (uuid == NULL) {
 		uuid = "";
@@ -1936,6 +1918,7 @@ b2s_attach_leaf(b2s_nexus_t *n, b2s_leaf_info_t *info)
 		l->l_target = target;
 		l->l_lun = lun;
 		l->l_flags = flags;
+		l->l_eui = eui;
 
 		/* strdup would be nice here */
 		l->l_uuid = kmem_alloc(strlen(uuid) + 1, KM_NOSLEEP);
