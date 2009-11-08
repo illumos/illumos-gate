@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.120 v2-9-1-1_2009-6-10_NSW1 */
+/* IntelVersion: 1.131 scm_100309_002210 */
 
 #include "ixgbe_api.h"
 #include "ixgbe_common.h"
@@ -50,6 +50,8 @@ s32
 ixgbe_init_shared_code(struct ixgbe_hw *hw)
 {
 	s32 status;
+
+	DEBUGFUNC("ixgbe_init_shared_code");
 
 	/*
 	 * Set the mac type
@@ -92,6 +94,7 @@ ixgbe_set_mac_type(struct ixgbe_hw *hw)
 		case IXGBE_DEV_ID_82598AF_SINGLE_PORT:
 		case IXGBE_DEV_ID_82598AF_DUAL_PORT:
 		case IXGBE_DEV_ID_82598AT:
+		case IXGBE_DEV_ID_82598AT2:
 		case IXGBE_DEV_ID_82598EB_CX4:
 		case IXGBE_DEV_ID_82598_CX4_DUAL_PORT:
 		case IXGBE_DEV_ID_82598_DA_DUAL_PORT:
@@ -101,10 +104,11 @@ ixgbe_set_mac_type(struct ixgbe_hw *hw)
 			hw->mac.type = ixgbe_mac_82598EB;
 			break;
 		case IXGBE_DEV_ID_82599_KX4:
-		case IXGBE_DEV_ID_82599_KX4_SIK:
+		case IXGBE_DEV_ID_82599_KX4_MEZZ:
 		case IXGBE_DEV_ID_82599_XAUI_LOM:
+		case IXGBE_DEV_ID_82599_COMBO_BACKPLANE:
 		case IXGBE_DEV_ID_82599_SFP:
-		case IXGBE_DEV_ID_82599_SPW:
+		case IXGBE_DEV_ID_82599_SFP_EM:
 		case IXGBE_DEV_ID_82599_CX4:
 			hw->mac.type = ixgbe_mac_82599EB;
 			break;
@@ -251,6 +255,22 @@ ixgbe_get_device_caps(struct ixgbe_hw *hw, u16 *device_caps)
 {
 	return ixgbe_call_func(hw, hw->mac.ops.get_device_caps,
 	    (hw, device_caps), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_get_wwn_prefix - Get alternative WWNN/WWPN prefix from the EEPROM
+ * @hw: pointer to hardware structure
+ * @wwnn_prefix: the alternative WWNN prefix
+ * @wwpn_prefix: the alternative WWPN prefix
+ *
+ * This function will read the EEPROM from the alternative SAN MAC address
+ * block to check the support for the alternative WWNN/WWPN prefix support.
+ */
+s32
+ixgbe_get_wwn_prefix(struct ixgbe_hw *hw, u16 *wwnn_prefix, u16 *wwpn_prefix)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.get_wwn_prefix,
+	    (hw, wwnn_prefix, wwpn_prefix), IXGBE_NOT_IMPLEMENTED);
 }
 
 /*
@@ -460,20 +480,6 @@ ixgbe_setup_phy_link_speed(struct ixgbe_hw *hw, ixgbe_link_speed speed,
 }
 
 /*
- * ixgbe_setup_link - Configure link settings
- * @hw: pointer to hardware structure
- *
- * Configures link settings based on values in the ixgbe_hw struct.
- * Restarts the link.  Performs autonegotiation if needed.
- */
-s32
-ixgbe_setup_link(struct ixgbe_hw *hw)
-{
-	return ixgbe_call_func(hw, hw->mac.ops.setup_link, (hw),
-	    IXGBE_NOT_IMPLEMENTED);
-}
-
-/*
  * ixgbe_check_link - Get link and speed status
  * @hw: pointer to hardware structure
  *
@@ -488,18 +494,19 @@ ixgbe_check_link(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
 }
 
 /*
- * ixgbe_setup_link_speed - Set link speed
+ * ixgbe_setup_link - Set link speed
  * @hw: pointer to hardware structure
  * @speed: new link speed
  * @autoneg: true if autonegotiation enabled
  *
- * Set the link speed and restarts the link.
+ * Configures link settings.  Restarts the link.
+ * Performs autonegotiation if needed.
  */
-s32 ixgbe_setup_link_speed(struct ixgbe_hw *hw, ixgbe_link_speed speed,
+s32 ixgbe_setup_link(struct ixgbe_hw *hw, ixgbe_link_speed speed,
     bool autoneg,
     bool autoneg_wait_to_complete)
 {
-	return ixgbe_call_func(hw, hw->mac.ops.setup_link_speed, (hw, speed,
+	return ixgbe_call_func(hw, hw->mac.ops.setup_link, (hw, speed,
 	    autoneg, autoneg_wait_to_complete),
 	    IXGBE_NOT_IMPLEMENTED);
 }

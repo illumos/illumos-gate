@@ -276,8 +276,9 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case ETHER_STAT_LINK_AUTONEG:
-		*val = hw->mac.autoneg;
+		*val = ixgbe->param_adv_autoneg_cap;
 		break;
+
 	case ETHER_STAT_LINK_DUPLEX:
 		*val = LINK_DUPLEX_FULL;
 		break;

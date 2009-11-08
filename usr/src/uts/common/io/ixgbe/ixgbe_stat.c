@@ -51,10 +51,9 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 	 * Basic information
 	 */
 	ixgbe_ks->link_speed.value.ui64 = ixgbe->link_speed;
-
-#ifdef IXGBE_DEBUG
 	ixgbe_ks->reset_count.value.ui64 = ixgbe->reset_count;
 
+#ifdef IXGBE_DEBUG
 	ixgbe_ks->rx_frame_error.value.ui64 = 0;
 	ixgbe_ks->rx_cksum_error.value.ui64 = 0;
 	ixgbe_ks->rx_exceed_pkt.value.ui64 = 0;
@@ -207,10 +206,10 @@ ixgbe_init_stats(ixgbe_t *ixgbe)
 	 */
 	kstat_named_init(&ixgbe_ks->link_speed, "link_speed",
 	    KSTAT_DATA_UINT64);
-
-#ifdef IXGBE_DEBUG
 	kstat_named_init(&ixgbe_ks->reset_count, "reset_count",
 	    KSTAT_DATA_UINT64);
+
+#ifdef IXGBE_DEBUG
 	kstat_named_init(&ixgbe_ks->rx_frame_error, "rx_frame_error",
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ixgbe_ks->rx_cksum_error, "rx_cksum_error",

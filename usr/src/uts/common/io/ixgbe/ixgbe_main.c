@@ -27,7 +27,8 @@
 
 #include "ixgbe_sw.h"
 
-static char ident[] = "Intel 10Gb Ethernet 1.1.0";
+static char ident[] = "Intel 10Gb Ethernet";
+static char ixgbe_version[] = "ixgbe 1.1.1";
 
 /*
  * Local function protoypes
@@ -505,6 +506,7 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 	ixgbe->attach_progress |= ATTACH_PROGRESS_ENABLE_INTR;
 
+	ixgbe_log(ixgbe, "%s", ixgbe_version);
 	ixgbe->ixgbe_state |= IXGBE_INITIALIZED;
 
 	return (DDI_SUCCESS);
@@ -1106,11 +1108,6 @@ ixgbe_init(ixgbe_t *ixgbe)
 	hw->fc.low_water = DEFAULT_FCRTL;
 	hw->fc.pause_time = DEFAULT_FCPAUSE;
 	hw->fc.send_xon = B_TRUE;
-
-	/*
-	 * Don't wait for auto-negotiation to complete
-	 */
-	hw->phy.autoneg_wait_to_complete = B_FALSE;
 
 	/*
 	 * Initialize link settings
@@ -2504,44 +2501,32 @@ ixgbe_get_prop(ixgbe_t *ixgbe,
 int
 ixgbe_driver_setup_link(ixgbe_t *ixgbe, boolean_t setup_hw)
 {
-	struct ixgbe_mac_info *mac;
-	struct ixgbe_phy_info *phy;
-	boolean_t invalid;
+	u32 autoneg_advertised = 0;
 
-	mac = &ixgbe->hw.mac;
-	phy = &ixgbe->hw.phy;
-	invalid = B_FALSE;
+	/*
+	 * No half duplex support with 10Gb parts
+	 */
+	if (ixgbe->param_adv_10000fdx_cap == 1)
+		autoneg_advertised |= IXGBE_LINK_SPEED_10GB_FULL;
 
-	if (ixgbe->param_adv_autoneg_cap == 1) {
-		mac->autoneg = B_TRUE;
-		phy->autoneg_advertised = 0;
+	if (ixgbe->param_adv_1000fdx_cap == 1)
+		autoneg_advertised |= IXGBE_LINK_SPEED_1GB_FULL;
 
-		/*
-		 * No half duplex support with 10Gb parts
-		 */
-		if (ixgbe->param_adv_10000fdx_cap == 1)
-			phy->autoneg_advertised |= IXGBE_LINK_SPEED_10GB_FULL;
+	if (ixgbe->param_adv_100fdx_cap == 1)
+		autoneg_advertised |= IXGBE_LINK_SPEED_100_FULL;
 
-		if (ixgbe->param_adv_1000fdx_cap == 1)
-			phy->autoneg_advertised |= IXGBE_LINK_SPEED_1GB_FULL;
+	if (ixgbe->param_adv_autoneg_cap == 1 && autoneg_advertised == 0) {
+		ixgbe_notice(ixgbe, "Invalid link settings. Setup link "
+		    "to autonegotiation with full link capabilities.");
 
-		if (ixgbe->param_adv_100fdx_cap == 1)
-			phy->autoneg_advertised |= IXGBE_LINK_SPEED_100_FULL;
-
-		if (phy->autoneg_advertised == 0)
-			invalid = B_TRUE;
-	} else {
-		ixgbe->hw.mac.autoneg = B_FALSE;
-	}
-
-	if (invalid) {
-		ixgbe_notice(ixgbe, "Invalid link settings. Setup link to "
-		    "autonegotiation with full link capabilities.");
-		ixgbe->hw.mac.autoneg = B_TRUE;
+		autoneg_advertised = IXGBE_LINK_SPEED_10GB_FULL |
+		    IXGBE_LINK_SPEED_1GB_FULL |
+		    IXGBE_LINK_SPEED_100_FULL;
 	}
 
 	if (setup_hw) {
-		if (ixgbe_setup_link(&ixgbe->hw) != IXGBE_SUCCESS) {
+		if (ixgbe_setup_link(&ixgbe->hw, autoneg_advertised,
+		    ixgbe->param_adv_autoneg_cap, B_TRUE) != IXGBE_SUCCESS) {
 			ixgbe_notice(ixgbe, "Setup link failed on this "
 			    "device.");
 			return (IXGBE_FAILURE);
@@ -2636,16 +2621,14 @@ ixgbe_sfp_check(void *arg)
 	ixgbe_t *ixgbe = (ixgbe_t *)arg;
 	uint32_t eicr = ixgbe->eicr;
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	uint32_t autoneg;
 
 	if (eicr & IXGBE_EICR_GPI_SDP1) {
 		/* clear the interrupt */
 		IXGBE_WRITE_REG(hw, IXGBE_EICR, IXGBE_EICR_GPI_SDP1);
 
 		/* if link up, do multispeed fiber setup */
-		(void) ixgbe_get_link_capabilities(hw, &autoneg,
-		    &hw->mac.autoneg);
-		(void) ixgbe_setup_link_speed(hw, autoneg, B_TRUE, B_TRUE);
+		(void) ixgbe_setup_link(hw, IXGBE_LINK_SPEED_82599_AUTONEG,
+		    B_TRUE, B_TRUE);
 		ixgbe_driver_link_check(ixgbe);
 	} else if (eicr & IXGBE_EICR_GPI_SDP2) {
 		/* clear the interrupt */
@@ -2655,9 +2638,8 @@ ixgbe_sfp_check(void *arg)
 		(void) hw->mac.ops.setup_sfp(hw);
 
 		/* do multispeed fiber setup */
-		(void) ixgbe_get_link_capabilities(hw, &autoneg,
-		    &hw->mac.autoneg);
-		(void) ixgbe_setup_link_speed(hw, autoneg, B_TRUE, B_TRUE);
+		(void) ixgbe_setup_link(hw, IXGBE_LINK_SPEED_82599_AUTONEG,
+		    B_TRUE, B_TRUE);
 		ixgbe_driver_link_check(ixgbe);
 	}
 }
@@ -3096,12 +3078,8 @@ ixgbe_loopback_ioctl(ixgbe_t *ixgbe, struct iocblk *iocp, mblk_t *mp)
 static boolean_t
 ixgbe_set_loopback_mode(ixgbe_t *ixgbe, uint32_t mode)
 {
-	struct ixgbe_hw *hw;
-
 	if (mode == ixgbe->loopback_mode)
 		return (B_TRUE);
-
-	hw = &ixgbe->hw;
 
 	ixgbe->loopback_mode = mode;
 
@@ -3109,9 +3087,7 @@ ixgbe_set_loopback_mode(ixgbe_t *ixgbe, uint32_t mode)
 		/*
 		 * Reset the chip
 		 */
-		hw->phy.autoneg_wait_to_complete = B_TRUE;
 		(void) ixgbe_reset(ixgbe);
-		hw->phy.autoneg_wait_to_complete = B_FALSE;
 		return (B_TRUE);
 	}
 

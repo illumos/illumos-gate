@@ -26,7 +26,7 @@
  * Use is subject to license terms.
  */
 
-/* IntelVersion: 1.34 v2-9-1-1_2009-6-10_NSW1 */
+/* IntelVersion: 1.36 scm_100309_002210 */
 
 #ifndef _IXGBE_PHY_H
 #define	_IXGBE_PHY_H
@@ -100,9 +100,10 @@ s32 ixgbe_get_copper_link_capabilities_generic(struct ixgbe_hw *hw,
 /* PHY specific */
 s32 ixgbe_check_phy_link_tnx(struct ixgbe_hw *hw,
     ixgbe_link_speed *speed, bool *link_up);
+s32 ixgbe_setup_phy_link_tnx(struct ixgbe_hw *hw);
 s32 ixgbe_get_phy_firmware_version_tnx(struct ixgbe_hw *hw,
     u16 *firmware_version);
-s32 ixgbe_get_phy_firmware_version_aq(struct ixgbe_hw *hw,
+s32 ixgbe_get_phy_firmware_version_generic(struct ixgbe_hw *hw,
     u16 *firmware_version);
 
 s32 ixgbe_reset_phy_nl(struct ixgbe_hw *hw);
