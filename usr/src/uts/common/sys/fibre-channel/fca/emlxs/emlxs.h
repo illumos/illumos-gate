@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef	_EMLXS_H
 #define	_EMLXS_H
@@ -31,9 +30,13 @@
 #include <emlxs_os.h>
 #include <emlxs_fcio.h>
 #include <emlxs_hw.h>
+#include <emlxs_mbox.h>
+#include <emlxs_queue.h>
+#include <emlxs_iocb.h>
 #include <emlxs_fw.h>
 #include <emlxs_adapters.h>
 #include <emlxs_msg.h>
+#include <emlxs_event.h>
 #include <emlxs_thread.h>
 #include <emlxs_config.h>
 #include <emlxs_dfclib.h>

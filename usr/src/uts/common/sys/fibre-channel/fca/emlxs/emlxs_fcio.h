@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_FCIO_H
 #define	_EMLXS_FCIO_H
@@ -61,6 +60,7 @@ extern "C" {
 #define	EMLXS_GET_BOOT_STATE		(EMLXS_DIAG | 213)
 #define	EMLXS_GET_DFC_REV   		(EMLXS_DIAG | 214)
 
+#define	EMLXS_BAR_IO			(EMLXS_DIAG | 253)
 #define	EMLXS_TEST_CODE   		(EMLXS_DIAG | 254)
 #define	EMLXS_HW_ERROR_TEST   		(EMLXS_DIAG | 255)
 
@@ -71,6 +71,7 @@ extern "C" {
 #define	EMLXS_TXT_FILE_ID			1
 #define	EMLXS_DMP_FILE_ID			2
 #define	EMLXS_CEE_FILE_ID			3
+#define	EMLXS_FAT_FILE_ID			4
 
 
 /* Emulex specific error codes */

@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_FW_H
 #define	_EMLXS_FW_H
@@ -85,85 +84,81 @@ typedef struct emlxs_firmware
 #include <fw_lpe12000.h>
 
 /* Build the firmware table */
-static emlxs_firmware_t emlxs_fw_table[] =
-{
-	{
-		LP10000_FW,
-		emlxs_lp10000_size,
-		emlxs_lp10000_image,
-		emlxs_lp10000_label,
-		emlxs_lp10000_kern,
-		emlxs_lp10000_stub,
-		emlxs_lp10000_sli1,
-		emlxs_lp10000_sli2,
-		emlxs_lp10000_sli3,
-		emlxs_lp10000_sli4
-	},
-	{
-		LP11000_FW,
-		emlxs_lp11000_size,
-		emlxs_lp11000_image,
-		emlxs_lp11000_label,
-		emlxs_lp11000_kern,
-		emlxs_lp11000_stub,
-		emlxs_lp11000_sli1,
-		emlxs_lp11000_sli2,
-		emlxs_lp11000_sli3,
-		emlxs_lp11000_sli4,
-	},
-	{
-		LP11002_FW,
-		emlxs_lp11002_size,
-		emlxs_lp11002_image,
-		emlxs_lp11002_label,
-		emlxs_lp11002_kern,
-		emlxs_lp11002_stub,
-		emlxs_lp11002_sli1,
-		emlxs_lp11002_sli2,
-		emlxs_lp11002_sli3,
-		emlxs_lp11002_sli4
-	},
-	{
-		LPe11000_FW,
-		emlxs_lpe11000_size,
-		emlxs_lpe11000_image,
-		emlxs_lpe11000_label,
-		emlxs_lpe11000_kern,
-		emlxs_lpe11000_stub,
-		emlxs_lpe11000_sli1,
-		emlxs_lpe11000_sli2,
-		emlxs_lpe11000_sli3,
-		emlxs_lpe11000_sli4
-	},
-	{
-		LPe11002_FW,
-		emlxs_lpe11002_size,
-		emlxs_lpe11002_image,
-		emlxs_lpe11002_label,
-		emlxs_lpe11002_kern,
-		emlxs_lpe11002_stub,
-		emlxs_lpe11002_sli1,
-		emlxs_lpe11002_sli2,
-		emlxs_lpe11002_sli3,
-		emlxs_lpe11002_sli4
-	},
-	{
-		LPe12000_FW,
-		emlxs_lpe12000_size,
-		emlxs_lpe12000_image,
-		emlxs_lpe12000_label,
-		emlxs_lpe12000_kern,
-		emlxs_lpe12000_stub,
-		emlxs_lpe12000_sli1,
-		emlxs_lpe12000_sli2,
-		emlxs_lpe12000_sli3,
-		emlxs_lpe12000_sli4
-	}
-
-}; /* emlxs_fw_table[] */
-
-#define	EMLXS_FW_COUNT	(sizeof (emlxs_fw_table) / sizeof (emlxs_firmware_t))
-
+#define	EMLXS_FW_TABLE	\
+{\
+	{\
+		LP10000_FW,\
+		emlxs_lp10000_size,\
+		emlxs_lp10000_image,\
+		emlxs_lp10000_label,\
+		emlxs_lp10000_kern,\
+		emlxs_lp10000_stub,\
+		emlxs_lp10000_sli1,\
+		emlxs_lp10000_sli2,\
+		emlxs_lp10000_sli3,\
+		emlxs_lp10000_sli4\
+	},\
+	{\
+		LP11000_FW,\
+		emlxs_lp11000_size,\
+		emlxs_lp11000_image,\
+		emlxs_lp11000_label,\
+		emlxs_lp11000_kern,\
+		emlxs_lp11000_stub,\
+		emlxs_lp11000_sli1,\
+		emlxs_lp11000_sli2,\
+		emlxs_lp11000_sli3,\
+		emlxs_lp11000_sli4,\
+	},\
+	{\
+		LP11002_FW,\
+		emlxs_lp11002_size,\
+		emlxs_lp11002_image,\
+		emlxs_lp11002_label,\
+		emlxs_lp11002_kern,\
+		emlxs_lp11002_stub,\
+		emlxs_lp11002_sli1,\
+		emlxs_lp11002_sli2,\
+		emlxs_lp11002_sli3,\
+		emlxs_lp11002_sli4\
+	},\
+	{\
+		LPe11000_FW,\
+		emlxs_lpe11000_size,\
+		emlxs_lpe11000_image,\
+		emlxs_lpe11000_label,\
+		emlxs_lpe11000_kern,\
+		emlxs_lpe11000_stub,\
+		emlxs_lpe11000_sli1,\
+		emlxs_lpe11000_sli2,\
+		emlxs_lpe11000_sli3,\
+		emlxs_lpe11000_sli4\
+	},\
+	{\
+		LPe11002_FW,\
+		emlxs_lpe11002_size,\
+		emlxs_lpe11002_image,\
+		emlxs_lpe11002_label,\
+		emlxs_lpe11002_kern,\
+		emlxs_lpe11002_stub,\
+		emlxs_lpe11002_sli1,\
+		emlxs_lpe11002_sli2,\
+		emlxs_lpe11002_sli3,\
+		emlxs_lpe11002_sli4\
+	},\
+	{\
+		LPe12000_FW,\
+		emlxs_lpe12000_size,\
+		emlxs_lpe12000_image,\
+		emlxs_lpe12000_label,\
+		emlxs_lpe12000_kern,\
+		emlxs_lpe12000_stub,\
+		emlxs_lpe12000_sli1,\
+		emlxs_lpe12000_sli2,\
+		emlxs_lpe12000_sli3,\
+		emlxs_lpe12000_sli4\
+	}\
+}
 #endif /* EMLXS_FW_TABLE_DEF */
 
 #ifdef	__cplusplus

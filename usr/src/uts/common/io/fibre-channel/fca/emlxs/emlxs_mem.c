@@ -21,26 +21,13 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #include <emlxs.h>
 
 EMLXS_MSG_DEF(EMLXS_MEM_C);
-
-
-/*
- *  emlxs_mem_alloc_buffer
- *
- *  This routine will allocate iocb/data buffer
- *  space and setup the buffers for all rings on
- *  the specified board to use. The data buffers
- *  can be posted to the ring with the
- *  fc_post_buffer routine.  The iocb buffers
- *  are used to make a temp copy of the response
- *  ring iocbs. Returns 0 if not enough memory,
- *  Returns 1 if successful.
- */
 
 
 extern int32_t
@@ -49,772 +36,217 @@ emlxs_mem_alloc_buffer(emlxs_hba_t *hba)
 	emlxs_port_t *port = &PPORT;
 	emlxs_config_t *cfg;
 	MBUF_INFO *buf_info;
-	uint8_t *bp;
-	uint8_t *oldbp;
-	MEMSEG *mp;
-	MATCHMAP *matp;
-	NODELIST *ndlp;
-	IOCBQ *iocbq;
-	MAILBOXQ *mbox;
+	MEMSEG *seg;
 	MBUF_INFO bufinfo;
 	int32_t i;
-	RING *fcp_rp;
-	RING *ip_rp;
-	RING *els_rp;
-	RING *ct_rp;
-	uint32_t total_iotags;
+	int32_t cnt;
 #ifdef EMLXS_SPARC
-	int32_t j;
-	ULP_BDE64 *p_bpl;
-	ULP_BDE64 *v_bpl;
+	MATCHMAP *mp;
+	MATCHMAP **fcp_bpl_table;
 #endif	/* EMLXS_SPARC */
 
 	buf_info = &bufinfo;
 	cfg = &CFG;
 
-	mutex_enter(&EMLXS_MEMGET_LOCK);
-
-	/*
-	 * Allocate and Initialize MEM_NLP (0)
-	 */
-	mp = &hba->memseg[MEM_NLP];
-	mp->fc_memsize = sizeof (NODELIST);
-	mp->fc_numblks = (int16_t)hba->max_nodes + 2;
-	mp->fc_total_memsize = mp->fc_memsize * mp->fc_numblks;
-	mp->fc_memstart_virt = kmem_zalloc(mp->fc_total_memsize, KM_SLEEP);
-	mp->fc_memget_cnt = mp->fc_numblks;
-	mp->fc_memput_cnt = 0;
-	mp->fc_memstart_phys = 0;
-	mp->fc_memflag = 0;
-	mp->fc_lowmem = 0;
-	mp->fc_mem_dma_handle = 0;
-	mp->fc_mem_dat_handle = 0;
-	mp->fc_memget_ptr = 0;
-	mp->fc_memget_end = 0;
-	mp->fc_memput_ptr = 0;
-	mp->fc_memput_end = 0;
-
-	if (mp->fc_memstart_virt == NULL) {
-		mutex_exit(&EMLXS_MEMGET_LOCK);
-
-		(void) emlxs_mem_free_buffer(hba);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-		    "NLP memory pool.");
-
-		return (0);
-	}
-	bzero(mp->fc_memstart_virt, mp->fc_memsize);
-	ndlp = (NODELIST *)mp->fc_memstart_virt;
-
-	/*
-	 * Link buffer into beginning of list. The first pointer
-	 * in each buffer is a forward pointer to the next buffer.
-	 */
-	for (i = 0; i < mp->fc_numblks; i++, ndlp++) {
-		ndlp->flag |= NODE_POOL_ALLOCATED;
-
-		oldbp = mp->fc_memget_ptr;
-		bp = (uint8_t *)ndlp;
-		if (oldbp == NULL) {
-			mp->fc_memget_end = bp;
-		}
-		mp->fc_memget_ptr = bp;
-		*((uint8_t **)bp) = oldbp;
-	}
-
-
-	/*
-	 * Allocate and Initialize MEM_IOCB (1)
-	 */
-	mp = &hba->memseg[MEM_IOCB];
-	mp->fc_memsize = sizeof (IOCBQ);
-	mp->fc_numblks = (uint16_t)cfg[CFG_NUM_IOCBS].current;
-	mp->fc_total_memsize = mp->fc_memsize * mp->fc_numblks;
-	mp->fc_memstart_virt = kmem_zalloc(mp->fc_total_memsize, KM_SLEEP);
-	mp->fc_lowmem = (mp->fc_numblks >> 4);
-	mp->fc_memget_cnt = mp->fc_numblks;
-	mp->fc_memput_cnt = 0;
-	mp->fc_memflag = 0;
-	mp->fc_memstart_phys = 0;
-	mp->fc_mem_dma_handle = 0;
-	mp->fc_mem_dat_handle = 0;
-	mp->fc_memget_ptr = 0;
-	mp->fc_memget_end = 0;
-	mp->fc_memput_ptr = 0;
-	mp->fc_memput_end = 0;
-
-	if (mp->fc_memstart_virt == NULL) {
-		mutex_exit(&EMLXS_MEMGET_LOCK);
-
-		(void) emlxs_mem_free_buffer(hba);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-		    "IOCB memory pool.");
-
-		return (0);
-	}
-	bzero(mp->fc_memstart_virt, mp->fc_memsize);
-	iocbq = (IOCBQ *)mp->fc_memstart_virt;
-
-	/*
-	 * Link buffer into beginning of list. The first pointer
-	 * in each buffer is a forward pointer to the next buffer.
-	 */
-	for (i = 0; i < mp->fc_numblks; i++, iocbq++) {
-		iocbq->flag |= IOCB_POOL_ALLOCATED;
-
-		oldbp = mp->fc_memget_ptr;
-		bp = (uint8_t *)iocbq;
-		if (oldbp == NULL) {
-			mp->fc_memget_end = bp;
-		}
-		mp->fc_memget_ptr = bp;
-		*((uint8_t **)bp) = oldbp;
-	}
-
-	/*
-	 * Allocate and Initialize MEM_MBOX (2)
-	 */
-	mp = &hba->memseg[MEM_MBOX];
-	mp->fc_memsize = sizeof (MAILBOXQ);
-	mp->fc_numblks = (int16_t)hba->max_nodes + 32;
-	mp->fc_total_memsize = mp->fc_memsize * mp->fc_numblks;
-	mp->fc_memstart_virt = kmem_zalloc(mp->fc_total_memsize, KM_SLEEP);
-	mp->fc_lowmem = (mp->fc_numblks >> 3);
-	mp->fc_memget_cnt = mp->fc_numblks;
-	mp->fc_memput_cnt = 0;
-	mp->fc_memflag = 0;
-	mp->fc_memstart_phys = 0;
-	mp->fc_mem_dma_handle = 0;
-	mp->fc_mem_dat_handle = 0;
-	mp->fc_memget_ptr = 0;
-	mp->fc_memget_end = 0;
-	mp->fc_memput_ptr = 0;
-	mp->fc_memput_end = 0;
-
-	if (mp->fc_memstart_virt == NULL) {
-		mutex_exit(&EMLXS_MEMGET_LOCK);
-
-		(void) emlxs_mem_free_buffer(hba);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-		    "MBOX memory pool.");
-
-		return (0);
-	}
-	bzero(mp->fc_memstart_virt, mp->fc_memsize);
-	mbox = (MAILBOXQ *)mp->fc_memstart_virt;
-
-	/*
-	 * Link buffer into beginning of list. The first pointer
-	 * in each buffer is a forward pointer to the next buffer.
-	 */
-	for (i = 0; i < mp->fc_numblks; i++, mbox++) {
-		mbox->flag |= MBQ_POOL_ALLOCATED;
-
-		oldbp = mp->fc_memget_ptr;
-		bp = (uint8_t *)mbox;
-		if (oldbp == NULL) {
-			mp->fc_memget_end = bp;
-		}
-		mp->fc_memget_ptr = bp;
-		*((uint8_t **)bp) = oldbp;
-	}
+	bzero(hba->memseg, sizeof (hba->memseg));
 
 	/*
 	 * Initialize fc_table
 	 */
-	fcp_rp = &hba->ring[FC_FCP_RING];
-	ip_rp = &hba->ring[FC_IP_RING];
-	els_rp = &hba->ring[FC_ELS_RING];
-	ct_rp = &hba->ring[FC_CT_RING];
-
-	fcp_rp->max_iotag = cfg[CFG_NUM_IOTAGS].current;
-	ip_rp->max_iotag = hba->max_nodes;
-	els_rp->max_iotag = hba->max_nodes;
-	ct_rp->max_iotag = hba->max_nodes;
+	cnt = cfg[CFG_NUM_IOTAGS].current;
+	if (cnt) {
+		hba->max_iotag = cnt;
+	}
+	/* ioatg 0 is not used, iotags 1 thru max_iotag-1 are used */
 
 	/* Allocate the fc_table */
-	total_iotags = fcp_rp->max_iotag + ip_rp->max_iotag +
-	    els_rp->max_iotag + ct_rp->max_iotag;
-
 	bzero(buf_info, sizeof (MBUF_INFO));
-	buf_info->size = total_iotags * sizeof (emlxs_buf_t *);
-	buf_info->align = sizeof (void *);
+	buf_info->size = (hba->max_iotag * sizeof (emlxs_buf_t *));
 
 	(void) emlxs_mem_alloc(hba, buf_info);
 	if (buf_info->virt == NULL) {
-		mutex_exit(&EMLXS_MEMGET_LOCK);
-
-		(void) emlxs_mem_free_buffer(hba);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
 		    "fc_table buffer.");
 
-		return (0);
+		goto failed;
 	}
-	hba->iotag_table = buf_info->virt;
-	fcp_rp->fc_table = &hba->iotag_table[0];
-	ip_rp->fc_table = &hba->iotag_table[fcp_rp->max_iotag];
-	els_rp->fc_table =
-	    &hba->iotag_table[fcp_rp->max_iotag + ip_rp->max_iotag];
-	ct_rp->fc_table =
-	    &hba->iotag_table[fcp_rp->max_iotag + ip_rp->max_iotag +
-	    els_rp->max_iotag];
-
+	hba->fc_table = buf_info->virt;
+	bzero(hba->fc_table, buf_info->size);
 
 #ifdef EMLXS_SPARC
+	if (!(hba->model_info.sli_mask & EMLXS_SLI4_MASK)) {
 	/*
-	 * Allocate and Initialize FCP MEM_BPL's.
+	 * Allocate and Initialize FCP MEM_BPL table
 	 * This is for increased performance on sparc
 	 */
-
 	bzero(buf_info, sizeof (MBUF_INFO));
-	buf_info->size = fcp_rp->max_iotag * sizeof (MATCHMAP);
-	buf_info->align = sizeof (void *);
+	buf_info->size = hba->max_iotag * sizeof (MATCHMAP *);
 
 	(void) emlxs_mem_alloc(hba, buf_info);
 	if (buf_info->virt == NULL) {
-		mutex_exit(&EMLXS_MEMGET_LOCK);
-
-		(void) emlxs_mem_free_buffer(hba);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
 		    "FCP BPL table buffer.");
 
-		return (0);
+		goto failed;
 	}
-	hba->fcp_bpl_table = buf_info->virt;
-	bzero(hba->fcp_bpl_table, buf_info->size);
+	hba->sli.sli3.fcp_bpl_table = buf_info->virt;
+	bzero(hba->sli.sli3.fcp_bpl_table, buf_info->size);
 
-	bzero(buf_info, sizeof (MBUF_INFO));
-	buf_info->size = (fcp_rp->max_iotag * (3 * sizeof (ULP_BDE64)));
-	buf_info->flags = FC_MBUF_DMA;
-	buf_info->align = 32;
+	/* Allocate a pool of BPLs for the FCP MEM_BPL table */
+	seg = &hba->sli.sli3.fcp_bpl_seg;
+	bzero(seg, sizeof (MEMSEG));
+	(void) strcpy(seg->fc_label, "FCP BPL Pool");
+	seg->fc_memtag	= MEM_BPL;
+	seg->fc_memsize	= (3 * sizeof (ULP_BDE64));
+	seg->fc_numblks	= hba->max_iotag;
+	seg->fc_reserved = 0;
+	seg->fc_memflag	= FC_MBUF_DMA | FC_MBUF_SNGLSG;
+	seg->fc_memalign = 32;
 
-	(void) emlxs_mem_alloc(hba, buf_info);
-	if (buf_info->virt == NULL) {
-		mutex_exit(&EMLXS_MEMGET_LOCK);
-
-		(void) emlxs_mem_free_buffer(hba);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-		    "FCP BPL DMA buffers.");
-
-		return (0);
+	if (emlxs_mem_pool_alloc(hba, seg) == NULL) {
+		goto failed;
 	}
-	bzero(buf_info->virt, buf_info->size);
 
-	hba->fcp_bpl_mp.size = buf_info->size;
-	hba->fcp_bpl_mp.virt = buf_info->virt;
-	hba->fcp_bpl_mp.phys = buf_info->phys;
-	hba->fcp_bpl_mp.data_handle = buf_info->data_handle;
-	hba->fcp_bpl_mp.dma_handle = buf_info->dma_handle;
-	hba->fcp_bpl_mp.tag = NULL;
+	/* Initialize the FCP MEM_BPL table */
+	fcp_bpl_table = (MATCHMAP**)hba->sli.sli3.fcp_bpl_table;
+	mp = (MATCHMAP*)seg->fc_memget_ptr;
+	for (i = 0; i < seg->fc_numblks; i++) {
+		mp->flag |= MAP_TABLE_ALLOCATED;
+		*fcp_bpl_table = mp;
 
-	v_bpl = (ULP_BDE64 *)hba->fcp_bpl_mp.virt;
-	p_bpl = (ULP_BDE64 *)hba->fcp_bpl_mp.phys;
-	for (i = 0, j = 0; i < fcp_rp->max_iotag; i++, j += 3) {
-		matp = &hba->fcp_bpl_table[i];
-
-		matp->fc_mptr = NULL;
-		matp->size = (3 * sizeof (ULP_BDE64));
-		matp->virt = (uint8_t *)&v_bpl[j];
-		matp->phys = (uint64_t)&p_bpl[j];
-		matp->dma_handle = NULL;
-		matp->data_handle = NULL;
-		matp->tag = MEM_BPL;
-		matp->flag |= MAP_TABLE_ALLOCATED;
+		mp = (MATCHMAP *)mp->fc_mptr;
+		fcp_bpl_table++;
+	}
 	}
 #endif /* EMLXS_SPARC */
 
-	/*
-	 * Allocate and Initialize MEM_BPL (3)
-	 */
-
-	mp = &hba->memseg[MEM_BPL];
-	mp->fc_memsize = hba->mem_bpl_size;	/* Set during attach */
-	mp->fc_numblks = (uint16_t)cfg[CFG_NUM_IOCBS].current;
-	mp->fc_memflag = FC_MEM_DMA;
-	mp->fc_lowmem = (mp->fc_numblks >> 4);
-	mp->fc_memstart_virt = 0;
-	mp->fc_memstart_phys = 0;
-	mp->fc_mem_dma_handle = 0;
-	mp->fc_mem_dat_handle = 0;
-	mp->fc_memget_ptr = 0;
-	mp->fc_memget_end = 0;
-	mp->fc_memput_ptr = 0;
-	mp->fc_memput_end = 0;
-	mp->fc_total_memsize = 0;
-	mp->fc_memget_cnt = mp->fc_numblks;
-	mp->fc_memput_cnt = 0;
-
-	/* Allocate buffer pools for above buffer structures */
-	for (i = 0; i < mp->fc_numblks; i++) {
-		/*
-		 * If this is a DMA buffer we need alignment on a page
-		 * so we don't want to worry about buffers spanning page
-		 * boundries when mapping memory for the adapter.
-		 */
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = sizeof (MATCHMAP);
-		buf_info->align = sizeof (void *);
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-		if (buf_info->virt == NULL) {
-			mutex_exit(&EMLXS_MEMGET_LOCK);
-
-			(void) emlxs_mem_free_buffer(hba);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "BPL segment buffer.");
-
-			return (0);
-		}
-
-		matp = (MATCHMAP *)buf_info->virt;
-		bzero(matp, sizeof (MATCHMAP));
-
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = mp->fc_memsize;
-		buf_info->flags = FC_MBUF_DMA;
-		buf_info->align = 32;
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-		if (buf_info->virt == NULL) {
-			mutex_exit(&EMLXS_MEMGET_LOCK);
-
-			(void) emlxs_mem_free_buffer(hba);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "BPL DMA buffer.");
-
-			return (0);
-		}
-		bp = (uint8_t *)buf_info->virt;
-		bzero(bp, mp->fc_memsize);
-
-		/*
-		 * Link buffer into beginning of list. The first pointer
-		 * in each buffer is a forward pointer to the next buffer.
-		 */
-		oldbp = mp->fc_memget_ptr;
-
-		if (oldbp == 0) {
-			mp->fc_memget_end = (uint8_t *)matp;
-		}
-
-		mp->fc_memget_ptr = (uint8_t *)matp;
-		matp->fc_mptr = oldbp;
-		matp->virt = buf_info->virt;
-		matp->phys = buf_info->phys;
-		matp->size = buf_info->size;
-		matp->dma_handle = buf_info->dma_handle;
-		matp->data_handle = buf_info->data_handle;
-		matp->tag = MEM_BPL;
-		matp->flag |= MAP_POOL_ALLOCATED;
-	}
-
-
-	/*
-	 * These represent the unsolicited ELS buffers we preallocate.
-	 */
-
-	mp = &hba->memseg[MEM_BUF];
-	mp->fc_memsize = MEM_BUF_SIZE;
-	mp->fc_numblks = MEM_ELSBUF_COUNT + MEM_BUF_COUNT;
-	mp->fc_memflag = FC_MEM_DMA;
-	mp->fc_lowmem = 3;
-	mp->fc_memstart_virt = 0;
-	mp->fc_memstart_phys = 0;
-	mp->fc_mem_dma_handle = 0;
-	mp->fc_mem_dat_handle = 0;
-	mp->fc_memget_ptr = 0;
-	mp->fc_memget_end = 0;
-	mp->fc_memput_ptr = 0;
-	mp->fc_memput_end = 0;
-	mp->fc_total_memsize = 0;
-	mp->fc_memget_cnt = mp->fc_numblks;
-	mp->fc_memput_cnt = 0;
-
-	/* Allocate buffer pools for above buffer structures */
-	for (i = 0; i < mp->fc_numblks; i++) {
-		/*
-		 * If this is a DMA buffer we need alignment on a page
-		 * so we don't want to worry about buffers spanning page
-		 * boundries when mapping memory for the adapter.
-		 */
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = sizeof (MATCHMAP);
-		buf_info->align = sizeof (void *);
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-		if (buf_info->virt == NULL) {
-			mutex_exit(&EMLXS_MEMGET_LOCK);
-
-			(void) emlxs_mem_free_buffer(hba);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "MEM_BUF Segment buffer.");
-
-			return (0);
-		}
-
-		matp = (MATCHMAP *)buf_info->virt;
-		bzero(matp, sizeof (MATCHMAP));
-
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = mp->fc_memsize;
-		buf_info->flags = FC_MBUF_DMA;
-		buf_info->align = 32;
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-		if (buf_info->virt == NULL) {
-			mutex_exit(&EMLXS_MEMGET_LOCK);
-
-			(void) emlxs_mem_free_buffer(hba);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "MEM_BUF DMA buffer.");
-
-			return (0);
-		}
-		bp = (uint8_t *)buf_info->virt;
-		bzero(bp, mp->fc_memsize);
-
-		/*
-		 * Link buffer into beginning of list. The first pointer
-		 * in each buffer is a forward pointer to the next buffer.
-		 */
-		oldbp = mp->fc_memget_ptr;
-
-		if (oldbp == 0) {
-			mp->fc_memget_end = (uint8_t *)matp;
-		}
-
-		mp->fc_memget_ptr = (uint8_t *)matp;
-		matp->fc_mptr = oldbp;
-		matp->virt = buf_info->virt;
-		matp->phys = buf_info->phys;
-		matp->size = buf_info->size;
-		matp->dma_handle = buf_info->dma_handle;
-		matp->data_handle = buf_info->data_handle;
-		matp->tag = MEM_BUF;
-		matp->flag |= MAP_POOL_ALLOCATED;
-	}
-
-
-	/*
-	 * These represent the unsolicited IP buffers we preallocate.
-	 */
-
-	mp = &hba->memseg[MEM_IPBUF];
-	mp->fc_memsize = MEM_IPBUF_SIZE;
-	mp->fc_numblks = MEM_IPBUF_COUNT;
-	mp->fc_memflag = FC_MEM_DMA;
-	mp->fc_lowmem = 3;
-	mp->fc_memstart_virt = 0;
-	mp->fc_memstart_phys = 0;
-	mp->fc_mem_dma_handle = 0;
-	mp->fc_mem_dat_handle = 0;
-	mp->fc_memget_ptr = 0;
-	mp->fc_memget_end = 0;
-	mp->fc_memput_ptr = 0;
-	mp->fc_memput_end = 0;
-	mp->fc_total_memsize = 0;
-	mp->fc_memget_cnt = mp->fc_numblks;
-	mp->fc_memput_cnt = 0;
-
-	/* Allocate buffer pools for above buffer structures */
-	for (i = 0; i < mp->fc_numblks; i++) {
-		/*
-		 * If this is a DMA buffer we need alignment on a page
-		 * so we don't want to worry about buffers spanning page
-		 * boundries when mapping memory for the adapter.
-		 */
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = sizeof (MATCHMAP);
-		buf_info->align = sizeof (void *);
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-		if (buf_info->virt == NULL) {
-			mutex_exit(&EMLXS_MEMGET_LOCK);
-
-			(void) emlxs_mem_free_buffer(hba);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "IP_BUF Segment buffer.");
-
-			return (0);
-		}
-
-		matp = (MATCHMAP *)buf_info->virt;
-		bzero(matp, sizeof (MATCHMAP));
-
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = mp->fc_memsize;
-		buf_info->flags = FC_MBUF_DMA;
-		buf_info->align = 32;
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-		if (buf_info->virt == NULL) {
-			mutex_exit(&EMLXS_MEMGET_LOCK);
-
-			(void) emlxs_mem_free_buffer(hba);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "IP_BUF DMA buffer.");
-
-			return (0);
-		}
-		bp = (uint8_t *)buf_info->virt;
-		bzero(bp, mp->fc_memsize);
-
-		/*
-		 * Link buffer into beginning of list. The first pointer
-		 * in each buffer is a forward pointer to the next buffer.
-		 */
-		oldbp = mp->fc_memget_ptr;
-
-		if (oldbp == 0) {
-			mp->fc_memget_end = (uint8_t *)matp;
-		}
-
-		mp->fc_memget_ptr = (uint8_t *)matp;
-		matp->fc_mptr = oldbp;
-		matp->virt = buf_info->virt;
-		matp->phys = buf_info->phys;
-		matp->size = buf_info->size;
-		matp->dma_handle = buf_info->dma_handle;
-		matp->data_handle = buf_info->data_handle;
-		matp->tag = MEM_IPBUF;
-		matp->flag |= MAP_POOL_ALLOCATED;
-	}
-
-	/*
-	 * These represent the unsolicited CT buffers we preallocate.
-	 */
-	mp = &hba->memseg[MEM_CTBUF];
-	mp->fc_memsize = MEM_CTBUF_SIZE;
-	mp->fc_numblks = MEM_CTBUF_COUNT;
-	mp->fc_memflag = FC_MEM_DMA;
-	mp->fc_lowmem = 0;
-	mp->fc_memstart_virt = 0;
-	mp->fc_memstart_phys = 0;
-	mp->fc_mem_dma_handle = 0;
-	mp->fc_mem_dat_handle = 0;
-	mp->fc_memget_ptr = 0;
-	mp->fc_memget_end = 0;
-	mp->fc_memput_ptr = 0;
-	mp->fc_memput_end = 0;
-	mp->fc_total_memsize = 0;
-	mp->fc_memget_cnt = mp->fc_numblks;
-	mp->fc_memput_cnt = 0;
-
-	/* Allocate buffer pools for above buffer structures */
-	for (i = 0; i < mp->fc_numblks; i++) {
-		/*
-		 * If this is a DMA buffer we need alignment on a page
-		 * so we don't want to worry about buffers spanning page
-		 * boundries when mapping memory for the adapter.
-		 */
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = sizeof (MATCHMAP);
-		buf_info->align = sizeof (void *);
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-		if (buf_info->virt == NULL) {
-			mutex_exit(&EMLXS_MEMGET_LOCK);
-
-			(void) emlxs_mem_free_buffer(hba);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "CT_BUF Segment buffer.");
-
-			return (0);
-		}
-
-		matp = (MATCHMAP *)buf_info->virt;
-		bzero(matp, sizeof (MATCHMAP));
-
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = mp->fc_memsize;
-		buf_info->flags = FC_MBUF_DMA;
-		buf_info->align = 32;
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-		if (buf_info->virt == NULL) {
-			mutex_exit(&EMLXS_MEMGET_LOCK);
-
-			(void) emlxs_mem_free_buffer(hba);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "CT_BUF DMA buffer.");
-
-			return (0);
-		}
-		bp = (uint8_t *)buf_info->virt;
-		bzero(bp, mp->fc_memsize);
-
-		/*
-		 * Link buffer into beginning of list. The first pointer
-		 * in each buffer is a forward pointer to the next buffer.
-		 */
-		oldbp = mp->fc_memget_ptr;
-
-		if (oldbp == 0) {
-			mp->fc_memget_end = (uint8_t *)matp;
-		}
-
-		mp->fc_memget_ptr = (uint8_t *)matp;
-		matp->fc_mptr = oldbp;
-		matp->virt = buf_info->virt;
-		matp->phys = buf_info->phys;
-		matp->size = buf_info->size;
-		matp->dma_handle = buf_info->dma_handle;
-		matp->data_handle = buf_info->data_handle;
-		matp->tag = MEM_CTBUF;
-		matp->flag |= MAP_POOL_ALLOCATED;
-	}
-
-#ifdef SFCT_SUPPORT
-
-	/*
-	 * These represent the unsolicited FCT buffers we preallocate.
-	 */
-	mp = &hba->memseg[MEM_FCTBUF];
-	mp->fc_memsize = MEM_FCTBUF_SIZE;
-	mp->fc_numblks = (hba->tgt_mode) ? MEM_FCTBUF_COUNT : 0;
-	mp->fc_memflag = FC_MEM_DMA;
-	mp->fc_lowmem = 0;
-	mp->fc_memstart_virt = 0;
-	mp->fc_memstart_phys = 0;
-	mp->fc_mem_dma_handle = 0;
-	mp->fc_mem_dat_handle = 0;
-	mp->fc_memget_ptr = 0;
-	mp->fc_memget_end = 0;
-	mp->fc_memput_ptr = 0;
-	mp->fc_memput_end = 0;
-	mp->fc_total_memsize = 0;
-	mp->fc_memget_cnt = mp->fc_numblks;
-	mp->fc_memput_cnt = 0;
-
-	/* Allocate buffer pools for above buffer structures */
-	for (i = 0; i < mp->fc_numblks; i++) {
-		/*
-		 * If this is a DMA buffer we need alignment on a page
-		 * so we don't want to worry about buffers spanning page
-		 * boundries when mapping memory for the adapter.
-		 */
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = sizeof (MATCHMAP);
-		buf_info->align = sizeof (void *);
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-		if (buf_info->virt == NULL) {
-			mutex_exit(&EMLXS_MEMGET_LOCK);
-
-			(void) emlxs_mem_free_buffer(hba);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "FCT_BUF Segment buffer.");
-
-			return (0);
-		}
-
-		matp = (MATCHMAP *)buf_info->virt;
-		bzero(matp, sizeof (MATCHMAP));
-
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = mp->fc_memsize;
-		buf_info->flags = FC_MBUF_DMA;
-		buf_info->align = 32;
-
-		(void) emlxs_mem_alloc(hba, buf_info);
-		if (buf_info->virt == NULL) {
-			mutex_exit(&EMLXS_MEMGET_LOCK);
-
-			(void) emlxs_mem_free_buffer(hba);
-
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "FCT_BUF DMA buffer.");
-
-			return (0);
-		}
-		bp = (uint8_t *)buf_info->virt;
-		bzero(bp, mp->fc_memsize);
-
-		/*
-		 * Link buffer into beginning of list. The first pointer
-		 * in each buffer is a forward pointer to the next buffer.
-		 */
-		oldbp = mp->fc_memget_ptr;
-
-		if (oldbp == 0) {
-			mp->fc_memget_end = (uint8_t *)matp;
-		}
-
-		mp->fc_memget_ptr = (uint8_t *)matp;
-		matp->fc_mptr = oldbp;
-		matp->virt = buf_info->virt;
-		matp->phys = buf_info->phys;
-		matp->size = buf_info->size;
-		matp->dma_handle = buf_info->dma_handle;
-		matp->data_handle = buf_info->data_handle;
-		matp->tag = MEM_FCTBUF;
-		matp->flag |= MAP_POOL_ALLOCATED;
-	}
-#endif /* SFCT_SUPPORT */
-
+	/* Prepare the memory pools */
 	for (i = 0; i < FC_MAX_SEG; i++) {
-		char *seg;
+		seg = &hba->memseg[i];
 
 		switch (i) {
 		case MEM_NLP:
-			seg = "MEM_NLP";
+			(void) strcpy(seg->fc_label, "Node Pool");
+			seg->fc_memtag	= MEM_NLP;
+			seg->fc_memsize	= sizeof (NODELIST);
+			seg->fc_numblks	= (int16_t)hba->max_nodes + 2;
+			seg->fc_reserved = 0;
+			seg->fc_memflag	= 0;
 			break;
+
 		case MEM_IOCB:
-			seg = "MEM_IOCB";
+			(void) strcpy(seg->fc_label, "IOCB Pool");
+			seg->fc_memtag	= MEM_IOCB;
+			seg->fc_memsize	= sizeof (IOCBQ);
+			seg->fc_numblks	= (uint16_t)cfg[CFG_NUM_IOCBS].current;
+			seg->fc_reserved = 0;
+			seg->fc_memflag	= 0;
 			break;
+
 		case MEM_MBOX:
-			seg = "MEM_MBOX";
+			(void) strcpy(seg->fc_label, "MBOX Pool");
+			seg->fc_memtag	= MEM_MBOX;
+			seg->fc_memsize	= sizeof (MAILBOXQ);
+			seg->fc_numblks	= (int16_t)hba->max_nodes + 32;
+			seg->fc_reserved = 0;
+			seg->fc_memflag	= 0;
 			break;
+
 		case MEM_BPL:
-			seg = "MEM_BPL";
+			if (hba->model_info.sli_mask & EMLXS_SLI4_MASK) {
+				continue;
+			}
+			(void) strcpy(seg->fc_label, "BPL Pool");
+			seg->fc_memtag	= MEM_BPL;
+			seg->fc_memsize	= hba->sli.sli3.mem_bpl_size;
+			seg->fc_numblks	= (int16_t)hba->max_iotag + 2;
+			seg->fc_reserved = 0;
+			seg->fc_memflag	= FC_MBUF_DMA | FC_MBUF_SNGLSG;
+			seg->fc_memalign = 32;
 			break;
+
 		case MEM_BUF:
-			seg = "MEM_BUF";
+			/* These are the unsolicited ELS buffers. */
+			(void) strcpy(seg->fc_label, "BUF Pool");
+			seg->fc_memtag	= MEM_BUF;
+			seg->fc_memsize	= MEM_BUF_SIZE;
+			seg->fc_numblks	= MEM_ELSBUF_COUNT + MEM_BUF_COUNT;
+			seg->fc_reserved = 0;
+			seg->fc_memflag	= FC_MBUF_DMA | FC_MBUF_SNGLSG;
+			seg->fc_memalign = 32;
 			break;
+
 		case MEM_IPBUF:
-			seg = "MEM_IPBUF";
+			/* These are the unsolicited IP buffers. */
+			if (cfg[CFG_NETWORK_ON].current == 0) {
+				continue;
+			}
+
+			(void) strcpy(seg->fc_label, "IPBUF Pool");
+			seg->fc_memtag	= MEM_IPBUF;
+			seg->fc_memsize	= MEM_IPBUF_SIZE;
+			seg->fc_numblks	= MEM_IPBUF_COUNT;
+			seg->fc_reserved = 0;
+			seg->fc_memflag	= FC_MBUF_DMA | FC_MBUF_SNGLSG;
+			seg->fc_memalign = 32;
 			break;
+
 		case MEM_CTBUF:
-			seg = "MEM_CTBUF";
+			/* These are the unsolicited CT buffers. */
+			(void) strcpy(seg->fc_label, "CTBUF Pool");
+			seg->fc_memtag	= MEM_CTBUF;
+			seg->fc_memsize	= MEM_CTBUF_SIZE;
+			seg->fc_numblks	= MEM_CTBUF_COUNT;
+			seg->fc_reserved = 0;
+			seg->fc_memflag	= FC_MBUF_DMA | FC_MBUF_SNGLSG;
+			seg->fc_memalign = 32;
 			break;
-#ifdef SFCT_SUPPORT
+
 		case MEM_FCTBUF:
-			seg = "MEM_FCTBUF";
-			break;
+#ifdef SFCT_SUPPORT
+			/* These are the unsolicited FCT buffers. */
+			if (hba->tgt_mode == 0) {
+				continue;
+			}
+
+			(void) strcpy(seg->fc_label, "FCTBUF Pool");
+			seg->fc_memtag	= MEM_FCTBUF;
+			seg->fc_memsize	= MEM_FCTBUF_SIZE;
+			seg->fc_numblks	= MEM_FCTBUF_COUNT;
+			seg->fc_reserved = 0;
+			seg->fc_memflag	= FC_MBUF_DMA | FC_MBUF_SNGLSG;
+			seg->fc_memalign = 32;
 #endif /* SFCT_SUPPORT */
-		default:
 			break;
+
+		default:
+			continue;
 		}
 
-		mp = &hba->memseg[i];
+		if (seg->fc_memsize == 0) {
+			continue;
+		}
+
+		if (emlxs_mem_pool_alloc(hba, seg) == NULL) {
+			goto failed;
+		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_msg,
-		    "Segment: %s mp=%p size=%x count=%d flags=%x base=%p",
-		    seg, mp, mp->fc_memsize, mp->fc_numblks, mp->fc_memflag,
-		    mp->fc_memget_ptr);
+		    "%s: seg=%p size=%x count=%d flags=%x base=%p",
+		    seg->fc_label, seg, seg->fc_memsize, seg->fc_numblks,
+		    seg->fc_memflag, seg->fc_memget_ptr);
 	}
-
-	mutex_exit(&EMLXS_MEMGET_LOCK);
 
 	return (1);
 
-}  /* emlxs_mem_alloc_buffer() */
+failed:
 
+	(void) emlxs_mem_free_buffer(hba);
+	return (0);
+
+} /* emlxs_mem_alloc_buffer() */
 
 
 /*
@@ -826,199 +258,75 @@ emlxs_mem_alloc_buffer(emlxs_hba_t *hba)
 extern int
 emlxs_mem_free_buffer(emlxs_hba_t *hba)
 {
-	emlxs_port_t *port = &PPORT;
 	emlxs_port_t *vport;
 	int32_t j;
-	uint8_t *bp;
-	MEMSEG *mp;
-	MATCHMAP *mm;
+	MATCHMAP *mp;
+	CHANNEL *cp;
 	RING *rp;
-	IOCBQ *iocbq;
-	IOCB *iocb;
-	MAILBOXQ *mbox, *mbsave;
 	MBUF_INFO *buf_info;
 	MBUF_INFO bufinfo;
-	emlxs_buf_t *sbp;
-	fc_unsol_buf_t *ubp;
-	RING *fcp_rp;
-	RING *ip_rp;
-	RING *els_rp;
-	RING *ct_rp;
-	uint32_t total_iotags;
-	emlxs_ub_priv_t *ub_priv;
 
 	buf_info = &bufinfo;
 
-	/* Check for deferred pkt completion */
-	if (hba->mbox_sbp) {
-		sbp = (emlxs_buf_t *)hba->mbox_sbp;
-		hba->mbox_sbp = 0;
-
-		emlxs_pkt_complete(sbp, -1, 0, 1);
-	}
-
-	/* Check for deferred ub completion */
-	if (hba->mbox_ubp) {
-		ubp = (fc_unsol_buf_t *)hba->mbox_ubp;
-		ub_priv = (emlxs_ub_priv_t *)ubp->ub_fca_private;
-		port = ub_priv->port;
-		hba->mbox_ubp = 0;
-
-		emlxs_ub_callback(port, ubp);
-	}
-
-#ifdef NPIV_SUPPORT
-	/* Special handle for vport PLOGI */
-	if (hba->mbox_iocbq == (uint8_t *)1) {
-		hba->mbox_iocbq = NULL;
-	}
-#endif /* NPIV_SUPPORT */
-
-	/* Check for deferred iocb tx */
-	if (hba->mbox_iocbq) {	/* iocb */
-		iocbq = (IOCBQ *)hba->mbox_iocbq;
-		hba->mbox_iocbq = 0;
-		iocb = &iocbq->iocb;
-
-		/* Set the error status of the iocb */
-		iocb->ulpStatus = IOSTAT_LOCAL_REJECT;
-		iocb->un.grsp.perr.statLocalError = IOERR_ABORT_REQUESTED;
-
-		switch (iocb->ulpCommand) {
-		case CMD_FCP_ICMND_CR:
-		case CMD_FCP_ICMND_CX:
-		case CMD_FCP_IREAD_CR:
-		case CMD_FCP_IREAD_CX:
-		case CMD_FCP_IWRITE_CR:
-		case CMD_FCP_IWRITE_CX:
-		case CMD_FCP_ICMND64_CR:
-		case CMD_FCP_ICMND64_CX:
-		case CMD_FCP_IREAD64_CR:
-		case CMD_FCP_IREAD64_CX:
-		case CMD_FCP_IWRITE64_CR:
-		case CMD_FCP_IWRITE64_CX:
-			rp = &hba->ring[FC_FCP_RING];
-			emlxs_handle_fcp_event(hba, rp, iocbq);
-			break;
-
-		case CMD_ELS_REQUEST_CR:
-		case CMD_ELS_REQUEST_CX:
-		case CMD_XMIT_ELS_RSP_CX:
-		case CMD_ELS_REQUEST64_CR:	/* This is the only one used */
-						/* for deferred iocb tx */
-		case CMD_ELS_REQUEST64_CX:
-		case CMD_XMIT_ELS_RSP64_CX:
-			rp = &hba->ring[FC_ELS_RING];
-			(void) emlxs_els_handle_event(hba, rp, iocbq);
-			break;
-
-		case CMD_GEN_REQUEST64_CR:
-		case CMD_GEN_REQUEST64_CX:
-			rp = &hba->ring[FC_CT_RING];
-			(void) emlxs_ct_handle_event(hba, rp, iocbq);
-			break;
-
-		default:
-			rp = (RING *)iocbq->ring;
-
-			if (rp) {
-				if (rp->ringno == FC_ELS_RING) {
-					(void) emlxs_mem_put(hba, MEM_ELSBUF,
-					    (uint8_t *)iocbq->bp);
-				} else if (rp->ringno == FC_CT_RING) {
-					(void) emlxs_mem_put(hba, MEM_CTBUF,
-					    (uint8_t *)iocbq->bp);
-				} else if (rp->ringno == FC_IP_RING) {
-					(void) emlxs_mem_put(hba, MEM_IPBUF,
-					    (uint8_t *)iocbq->bp);
-				}
-#ifdef SFCT_SUPPORT
-				else if (rp->ringno == FC_FCT_RING) {
-					(void) emlxs_mem_put(hba, MEM_FCTBUF,
-					    (uint8_t *)iocbq->bp);
-				}
-#endif /* SFCT_SUPPORT */
-
-			} else if (iocbq->bp) {
-				(void) emlxs_mem_put(hba, MEM_BUF,
-				    (uint8_t *)iocbq->bp);
-			}
-
-			if (!iocbq->sbp) {
-				(void) emlxs_mem_put(hba, MEM_IOCB,
-				    (uint8_t *)iocbq);
-			}
-		}
-	}
-
-	/* free the mapped address match area for each ring */
-	for (j = 0; j < hba->ring_count; j++) {
-		rp = &hba->ring[j];
+	for (j = 0; j < hba->chan_count; j++) {
+		cp = &hba->chan[j];
 
 		/* Flush the ring */
-		(void) emlxs_tx_ring_flush(hba, rp, 0);
+		(void) emlxs_tx_channel_flush(hba, cp, 0);
+	}
 
-		while (rp->fc_mpoff) {
-			uint64_t addr;
+	if (!(hba->model_info.sli_mask & EMLXS_SLI4_MASK)) {
+		/* free the mapped address match area for each ring */
+		for (j = 0; j < MAX_RINGS; j++) {
+			rp = &hba->sli.sli3.ring[j];
 
-			addr = 0;
-			mm = (MATCHMAP *)(rp->fc_mpoff);
+			while (rp->fc_mpoff) {
+				uint64_t addr;
 
-			if ((j == FC_ELS_RING) || (j == FC_CT_RING) ||
+				addr = 0;
+				mp = (MATCHMAP *)(rp->fc_mpoff);
+
+				if ((j == hba->channel_els) ||
+				    (j == hba->channel_ct) ||
 #ifdef SFCT_SUPPORT
-			    (j == FC_FCT_RING) ||
+				    (j == hba->CHANNEL_FCT) ||
 #endif /* SFCT_SUPPORT */
-			    (j == FC_IP_RING)) {
-				addr = mm->phys;
-			}
-
-			if ((mm = emlxs_mem_get_vaddr(hba, rp, addr))) {
-				if (j == FC_ELS_RING) {
-					(void) emlxs_mem_put(hba, MEM_ELSBUF,
-					    (uint8_t *)mm);
-				} else if (j == FC_CT_RING) {
-					(void) emlxs_mem_put(hba, MEM_CTBUF,
-					    (uint8_t *)mm);
-				} else if (j == FC_IP_RING) {
-					(void) emlxs_mem_put(hba, MEM_IPBUF,
-					    (uint8_t *)mm);
+				    (j == hba->channel_ip)) {
+					addr = mp->phys;
 				}
+
+				if ((mp = emlxs_mem_get_vaddr(hba, rp, addr))) {
+					if (j == hba->channel_els) {
+						(void) emlxs_mem_put(hba,
+						    MEM_ELSBUF, (uint8_t *)mp);
+					} else if (j == hba->channel_ct) {
+						(void) emlxs_mem_put(hba,
+						    MEM_CTBUF, (uint8_t *)mp);
+					} else if (j == hba->channel_ip) {
+						(void) emlxs_mem_put(hba,
+						    MEM_IPBUF, (uint8_t *)mp);
+					}
 #ifdef SFCT_SUPPORT
-				else if (j == FC_FCT_RING) {
-					(void) emlxs_mem_put(hba, MEM_FCTBUF,
-					    (uint8_t *)mm);
-				}
+					else if (j == hba->CHANNEL_FCT) {
+						(void) emlxs_mem_put(hba,
+						    MEM_FCTBUF, (uint8_t *)mp);
+					}
 #endif /* SFCT_SUPPORT */
 
+				}
 			}
 		}
 	}
 
-#ifdef SLI3_SUPPORT
 	if (hba->flag & FC_HBQ_ENABLED) {
 		emlxs_hbq_free_all(hba, EMLXS_ELS_HBQ_ID);
 		emlxs_hbq_free_all(hba, EMLXS_IP_HBQ_ID);
 		emlxs_hbq_free_all(hba, EMLXS_CT_HBQ_ID);
-#ifdef SFCT_SUPPORT
+
 		if (hba->tgt_mode) {
 			emlxs_hbq_free_all(hba, EMLXS_FCT_HBQ_ID);
 		}
-#endif /* SFCT_SUPPORT */
-
 	}
-#endif /* SLI3_SUPPORT */
-
-	/* Free everything on mbox queue */
-	mbox = (MAILBOXQ *)(hba->mbox_queue.q_first);
-	while (mbox) {
-		mbsave = mbox;
-		mbox = (MAILBOXQ *)mbox->next;
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbsave);
-	}
-	hba->mbox_queue.q_first = NULL;
-	hba->mbox_queue.q_last = NULL;
-	hba->mbox_queue.q_cnt = 0;
-	hba->mbox_queue_flag = 0;
 
 	/* Free the nodes */
 	for (j = 0; j < MAX_VPORTS; j++) {
@@ -1028,124 +336,446 @@ emlxs_mem_free_buffer(emlxs_hba_t *hba)
 		}
 	}
 
+	/* Make sure the mailbox queue is empty */
+	emlxs_mb_flush(hba);
+
 	/* Free memory associated with all buffers on get buffer pool */
-	if (hba->iotag_table) {
-		fcp_rp = &hba->ring[FC_FCP_RING];
-		ip_rp = &hba->ring[FC_IP_RING];
-		els_rp = &hba->ring[FC_ELS_RING];
-		ct_rp = &hba->ring[FC_CT_RING];
-
-		total_iotags = fcp_rp->max_iotag + ip_rp->max_iotag +
-		    els_rp->max_iotag + ct_rp->max_iotag;
-
+	if (hba->fc_table) {
 		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = total_iotags * sizeof (emlxs_buf_t *);
-		buf_info->virt = hba->iotag_table;
+		buf_info->size = hba->max_iotag * sizeof (emlxs_buf_t *);
+		buf_info->virt = hba->fc_table;
 		emlxs_mem_free(hba, buf_info);
-
-		hba->iotag_table = 0;
+		hba->fc_table = NULL;
 	}
+
 #ifdef EMLXS_SPARC
-	if (hba->fcp_bpl_table) {
+	if (hba->sli.sli3.fcp_bpl_table) {
 		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = fcp_rp->max_iotag * sizeof (MATCHMAP);
-		buf_info->virt = hba->fcp_bpl_table;
+		buf_info->size = hba->max_iotag * sizeof (MATCHMAP *);
+		buf_info->virt = hba->sli.sli3.fcp_bpl_table;
 		emlxs_mem_free(hba, buf_info);
-
-		hba->fcp_bpl_table = 0;
+		hba->sli.sli3.fcp_bpl_table = NULL;
 	}
 
-	if (hba->fcp_bpl_mp.virt) {
-		bzero(buf_info, sizeof (MBUF_INFO));
-		buf_info->size = hba->fcp_bpl_mp.size;
-		buf_info->virt = hba->fcp_bpl_mp.virt;
-		buf_info->phys = hba->fcp_bpl_mp.phys;
-		buf_info->dma_handle = hba->fcp_bpl_mp.dma_handle;
-		buf_info->data_handle = hba->fcp_bpl_mp.data_handle;
-		buf_info->flags = FC_MBUF_DMA;
-		emlxs_mem_free(hba, buf_info);
-
-		bzero(&hba->fcp_bpl_mp, sizeof (MATCHMAP));
+	if (hba->sli.sli3.fcp_bpl_seg.fc_memsize) {
+		emlxs_mem_pool_free(hba, &hba->sli.sli3.fcp_bpl_seg);
+		bzero(&hba->sli.sli3.fcp_bpl_seg, sizeof (MEMSEG));
 	}
 #endif /* EMLXS_SPARC */
 
 	/* Free the memory segments */
 	for (j = 0; j < FC_MAX_SEG; j++) {
-		mp = &hba->memseg[j];
-
-		/* MEM_NLP, MEM_IOCB, MEM_MBOX */
-		if (j < MEM_BPL) {
-			if (mp->fc_memstart_virt) {
-				kmem_free(mp->fc_memstart_virt,
-				    mp->fc_total_memsize);
-				bzero((char *)mp, sizeof (MEMSEG));
-			}
-
-			continue;
-		}
-
-		/*
-		 * MEM_BPL, MEM_BUF, MEM_ELSBUF,
-		 * MEM_IPBUF, MEM_CTBUF, MEM_FCTBUF
-		 */
-
-		/* Free memory associated with all buffers on get buffer pool */
-		mutex_enter(&EMLXS_MEMGET_LOCK);
-		while ((bp = mp->fc_memget_ptr) != NULL) {
-			mp->fc_memget_ptr = *((uint8_t **)bp);
-			mm = (MATCHMAP *)bp;
-
-			bzero(buf_info, sizeof (MBUF_INFO));
-			buf_info->size = mm->size;
-			buf_info->virt = mm->virt;
-			buf_info->phys = mm->phys;
-			buf_info->dma_handle = mm->dma_handle;
-			buf_info->data_handle = mm->data_handle;
-			buf_info->flags = FC_MBUF_DMA;
-			emlxs_mem_free(hba, buf_info);
-
-			bzero(buf_info, sizeof (MBUF_INFO));
-			buf_info->size = sizeof (MATCHMAP);
-			buf_info->virt = (uint32_t *)mm;
-			emlxs_mem_free(hba, buf_info);
-		}
-		mutex_exit(&EMLXS_MEMGET_LOCK);
-
-		/* Free memory associated with all buffers on put buffer pool */
-		mutex_enter(&EMLXS_MEMPUT_LOCK);
-		while ((bp = mp->fc_memput_ptr) != NULL) {
-			mp->fc_memput_ptr = *((uint8_t **)bp);
-			mm = (MATCHMAP *)bp;
-
-			bzero(buf_info, sizeof (MBUF_INFO));
-			buf_info->size = mm->size;
-			buf_info->virt = mm->virt;
-			buf_info->phys = mm->phys;
-			buf_info->dma_handle = mm->dma_handle;
-			buf_info->data_handle = mm->data_handle;
-			buf_info->flags = FC_MBUF_DMA;
-			emlxs_mem_free(hba, buf_info);
-
-			bzero(buf_info, sizeof (MBUF_INFO));
-			buf_info->size = sizeof (MATCHMAP);
-			buf_info->virt = (uint32_t *)mm;
-			emlxs_mem_free(hba, buf_info);
-		}
-		mutex_exit(&EMLXS_MEMPUT_LOCK);
-		bzero((char *)mp, sizeof (MEMSEG));
+		emlxs_mem_pool_free(hba, &hba->memseg[j]);
 	}
 
 	return (0);
 
-}  /* emlxs_mem_free_buffer() */
+} /* emlxs_mem_free_buffer() */
 
 
-extern uint8_t *
-emlxs_mem_buf_alloc(emlxs_hba_t *hba)
+extern MEMSEG *
+emlxs_mem_pool_alloc(emlxs_hba_t *hba, MEMSEG *seg)
 {
 	emlxs_port_t *port = &PPORT;
 	uint8_t *bp = NULL;
-	MATCHMAP *matp = NULL;
+	MATCHMAP *mp = NULL;
+	MBUF_INFO *buf_info;
+	MBUF_INFO local_buf_info;
+	uint32_t i;
+
+	buf_info = &local_buf_info;
+
+	mutex_enter(&EMLXS_MEMGET_LOCK);
+	mutex_enter(&EMLXS_MEMPUT_LOCK);
+
+	/* Calculate total memory size */
+	seg->fc_total_memsize = (seg->fc_memsize * seg->fc_numblks);
+
+	if (seg->fc_total_memsize == 0) {
+		mutex_exit(&EMLXS_MEMPUT_LOCK);
+		mutex_exit(&EMLXS_MEMGET_LOCK);
+		return (NULL);
+	}
+
+	if (!(seg->fc_memflag & FC_MBUF_DMA)) {
+		goto vmem_pool;
+	}
+
+/* dma_pool */
+
+	for (i = 0; i < seg->fc_numblks; i++) {
+		bzero(buf_info, sizeof (MBUF_INFO));
+		buf_info->size = sizeof (MATCHMAP);
+		buf_info->align = sizeof (void *);
+
+		(void) emlxs_mem_alloc(hba, buf_info);
+		if (buf_info->virt == NULL) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
+			    "%s desc[%d]. size=%d", seg->fc_label, i,
+			    buf_info->size);
+
+			goto failed;
+		}
+
+		mp = (MATCHMAP *)buf_info->virt;
+		bzero(mp, sizeof (MATCHMAP));
+
+		bzero(buf_info, sizeof (MBUF_INFO));
+		buf_info->size  = seg->fc_memsize;
+		buf_info->flags = seg->fc_memflag;
+		buf_info->align = seg->fc_memalign;
+
+		(void) emlxs_mem_alloc(hba, buf_info);
+		if (buf_info->virt == NULL) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
+			    "%s buffer[%d]. size=%d", seg->fc_label, i,
+			    buf_info->size);
+
+			/* Free the mp object */
+			bzero(buf_info, sizeof (MBUF_INFO));
+			buf_info->size = sizeof (MATCHMAP);
+			buf_info->virt = (uint32_t *)mp;
+			emlxs_mem_free(hba, buf_info);
+
+			goto failed;
+		}
+		bp = (uint8_t *)buf_info->virt;
+		bzero(bp, seg->fc_memsize);
+
+		mp->virt = buf_info->virt;
+		mp->phys = buf_info->phys;
+		mp->size = buf_info->size;
+		mp->dma_handle = buf_info->dma_handle;
+		mp->data_handle = buf_info->data_handle;
+		mp->tag = seg->fc_memtag;
+		mp->segment = seg;
+		mp->flag |= MAP_POOL_ALLOCATED;
+
+		/* Add the buffer desc to the tail of the pool freelist */
+		if (seg->fc_memget_end == NULL) {
+			seg->fc_memget_ptr = (uint8_t *)mp;
+			seg->fc_memget_cnt = 1;
+		} else {
+			*((uint8_t **)(seg->fc_memget_end)) = (uint8_t *)mp;
+			seg->fc_memget_cnt++;
+		}
+		seg->fc_memget_end = (uint8_t *)mp;
+	}
+
+	mutex_exit(&EMLXS_MEMPUT_LOCK);
+	mutex_exit(&EMLXS_MEMGET_LOCK);
+	return (seg);
+
+vmem_pool:
+
+	mutex_exit(&EMLXS_MEMPUT_LOCK);
+	mutex_exit(&EMLXS_MEMGET_LOCK);
+
+	seg->fc_memstart_virt = kmem_zalloc(seg->fc_total_memsize, KM_SLEEP);
+
+	mutex_enter(&EMLXS_MEMGET_LOCK);
+	mutex_enter(&EMLXS_MEMPUT_LOCK);
+
+	if (seg->fc_memstart_virt == NULL) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
+		    "%s base. size=%d", seg->fc_label,
+		    seg->fc_total_memsize);
+
+		goto failed;
+	}
+
+	bp = (uint8_t *)seg->fc_memstart_virt;
+	for (i = 0; i < seg->fc_numblks; i++) {
+
+		/* Add the buffer to the tail of the pool freelist */
+		if (seg->fc_memget_end == NULL) {
+			seg->fc_memget_ptr = (uint8_t *)bp;
+			seg->fc_memget_cnt = 1;
+		} else {
+			*((uint8_t **)(seg->fc_memget_end)) = (uint8_t *)bp;
+			seg->fc_memget_cnt++;
+		}
+		seg->fc_memget_end = (uint8_t *)bp;
+
+		bp += seg->fc_memsize;
+	}
+
+	mutex_exit(&EMLXS_MEMPUT_LOCK);
+	mutex_exit(&EMLXS_MEMGET_LOCK);
+	return (seg);
+
+failed:
+
+	mutex_exit(&EMLXS_MEMPUT_LOCK);
+	mutex_exit(&EMLXS_MEMGET_LOCK);
+	emlxs_mem_pool_free(hba, seg);
+	return (NULL);
+
+} /* emlxs_mem_pool_alloc() */
+
+
+extern void
+emlxs_mem_pool_free(emlxs_hba_t *hba, MEMSEG *seg)
+{
+	emlxs_port_t *port = &PPORT;
+	uint8_t *bp = NULL;
+	MATCHMAP *mp = NULL;
+	MBUF_INFO *buf_info;
+	MBUF_INFO local_buf_info;
+	MEMSEG segment;
+	uint32_t free;
+
+	/* Save a local copy of the segment and */
+	/* destroy the original outside of locks */
+	mutex_enter(&EMLXS_MEMGET_LOCK);
+	mutex_enter(&EMLXS_MEMPUT_LOCK);
+
+	free = seg->fc_memget_cnt + seg->fc_memput_cnt;
+	if (free < seg->fc_numblks) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_detail_msg,
+		    "emlxs_mem_pool_free: %s not full. (%d < %d)",
+		    seg->fc_label, free, seg->fc_numblks);
+	}
+
+	bcopy(seg, &segment, sizeof (MEMSEG));
+	bzero((char *)seg, sizeof (MEMSEG));
+	seg = &segment;
+
+	mutex_exit(&EMLXS_MEMPUT_LOCK);
+	mutex_exit(&EMLXS_MEMGET_LOCK);
+
+	/* Now free the memory  */
+
+	if (!(seg->fc_memflag & FC_MBUF_DMA)) {
+		if (seg->fc_memstart_virt) {
+			kmem_free(seg->fc_memstart_virt, seg->fc_total_memsize);
+		}
+
+		return;
+	}
+
+	buf_info = &local_buf_info;
+
+	/* Free memory associated with all buffers on get buffer pool */
+	while ((bp = seg->fc_memget_ptr) != NULL) {
+		seg->fc_memget_ptr = *((uint8_t **)bp);
+		mp = (MATCHMAP *)bp;
+
+		bzero(buf_info, sizeof (MBUF_INFO));
+		buf_info->size = mp->size;
+		buf_info->virt = mp->virt;
+		buf_info->phys = mp->phys;
+		buf_info->dma_handle = mp->dma_handle;
+		buf_info->data_handle = mp->data_handle;
+		buf_info->flags = seg->fc_memflag;
+		emlxs_mem_free(hba, buf_info);
+
+		bzero(buf_info, sizeof (MBUF_INFO));
+		buf_info->size = sizeof (MATCHMAP);
+		buf_info->virt = (uint32_t *)mp;
+		emlxs_mem_free(hba, buf_info);
+	}
+
+	/* Free memory associated with all buffers on put buffer pool */
+	while ((bp = seg->fc_memput_ptr) != NULL) {
+		seg->fc_memput_ptr = *((uint8_t **)bp);
+		mp = (MATCHMAP *)bp;
+
+		bzero(buf_info, sizeof (MBUF_INFO));
+		buf_info->size = mp->size;
+		buf_info->virt = mp->virt;
+		buf_info->phys = mp->phys;
+		buf_info->dma_handle = mp->dma_handle;
+		buf_info->data_handle = mp->data_handle;
+		buf_info->flags = seg->fc_memflag;
+		emlxs_mem_free(hba, buf_info);
+
+		bzero(buf_info, sizeof (MBUF_INFO));
+		buf_info->size = sizeof (MATCHMAP);
+		buf_info->virt = (uint32_t *)mp;
+		emlxs_mem_free(hba, buf_info);
+	}
+
+	return;
+
+} /* emlxs_mem_pool_free() */
+
+
+extern uint8_t *
+emlxs_mem_pool_get(emlxs_hba_t *hba, MEMSEG *seg, uint32_t priority)
+{
+	emlxs_port_t *port = &PPORT;
+	uint8_t *bp = NULL;
+	MATCHMAP *mp;
+	uint32_t free;
+
+	mutex_enter(&EMLXS_MEMGET_LOCK);
+
+	/* Check if memory segment destroyed! */
+	if (seg->fc_total_memsize == 0) {
+		mutex_exit(&EMLXS_MEMGET_LOCK);
+		return (NULL);
+	}
+
+	/* Check priority and reserved status */
+	if ((priority == 0) && seg->fc_reserved) {
+		free = seg->fc_memget_cnt + seg->fc_memput_cnt;
+		if (free <= seg->fc_reserved) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_alloc_failed_msg,
+			    "%s low. (%d <= %d)", seg->fc_label,
+			    free, seg->fc_reserved);
+
+			mutex_exit(&EMLXS_MEMGET_LOCK);
+			return (NULL);
+		}
+	}
+
+top:
+
+	if (seg->fc_memget_ptr) {
+
+		bp = seg->fc_memget_ptr;
+
+		/* Remove buffer from freelist */
+		if (seg->fc_memget_end == bp) {
+			seg->fc_memget_ptr = NULL;
+			seg->fc_memget_end = NULL;
+			seg->fc_memget_cnt = 0;
+
+		} else {
+			seg->fc_memget_ptr = *((uint8_t **)bp);
+			seg->fc_memget_cnt--;
+		}
+
+		if (!(seg->fc_memflag & FC_MBUF_DMA)) {
+			bzero(bp, seg->fc_memsize);
+		} else {
+			mp = (MATCHMAP *)bp;
+			mp->fc_mptr = NULL;
+			mp->flag |= MAP_POOL_ALLOCATED;
+		}
+
+	} else {
+		mutex_enter(&EMLXS_MEMPUT_LOCK);
+		if (seg->fc_memput_ptr) {
+			/*
+			 * Move list from memput to memget
+			 */
+			seg->fc_memget_ptr = seg->fc_memput_ptr;
+			seg->fc_memget_end = seg->fc_memput_end;
+			seg->fc_memget_cnt = seg->fc_memput_cnt;
+			seg->fc_memput_ptr = NULL;
+			seg->fc_memput_end = NULL;
+			seg->fc_memput_cnt = 0;
+			mutex_exit(&EMLXS_MEMPUT_LOCK);
+
+			goto top;
+		}
+		mutex_exit(&EMLXS_MEMPUT_LOCK);
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_alloc_failed_msg,
+		    "%s empty.", seg->fc_label);
+	}
+
+	mutex_exit(&EMLXS_MEMGET_LOCK);
+
+	return (bp);
+
+} /* emlxs_mem_pool_get() */
+
+
+extern MEMSEG *
+emlxs_mem_pool_put(emlxs_hba_t *hba, MEMSEG *seg, uint8_t *bp)
+{
+	emlxs_port_t *port = &PPORT;
+	MATCHMAP *mp;
+	uint8_t *base;
+	uint8_t *end;
+
+	/* Free the pool object */
+	mutex_enter(&EMLXS_MEMPUT_LOCK);
+
+	/* Check if memory segment destroyed! */
+	if (seg->fc_total_memsize == 0) {
+		mutex_exit(&EMLXS_MEMPUT_LOCK);
+		return (NULL);
+	}
+
+	/* Check if buffer was just freed */
+	if (seg->fc_memput_ptr == bp) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_error_msg,
+		    "%s: Freeing free object: bp=%p", seg->fc_label, bp);
+
+		mutex_exit(&EMLXS_MEMPUT_LOCK);
+		return (NULL);
+	}
+
+	/* Validate the buffer belongs to this pool */
+	if (seg->fc_memflag & FC_MBUF_DMA) {
+		mp = (MATCHMAP *)bp;
+
+		if (!(mp->flag & MAP_POOL_ALLOCATED) ||
+		    (mp->segment != seg)) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_error_msg,
+			    "emlxs_mem_pool_put: %s invalid: mp=%p " \
+			    "tag=0x%x flag=%x", seg->fc_label,
+			    mp, mp->tag, mp->flag);
+
+			EMLXS_STATE_CHANGE(hba, FC_ERROR);
+
+			mutex_exit(&EMLXS_MEMPUT_LOCK);
+
+			emlxs_thread_spawn(hba, emlxs_shutdown_thread,
+			    NULL, NULL);
+
+			return (NULL);
+		}
+
+	} else { /* Vmem_pool */
+		base = seg->fc_memstart_virt;
+		end = seg->fc_memstart_virt + seg->fc_total_memsize;
+
+		if (bp < base || bp >= end) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_error_msg,
+			    "emlxs_mem_pool_put: %s Invalid: bp=%p base=%p " \
+			    "end=%p", seg->fc_label,
+			    bp, base, end);
+
+			EMLXS_STATE_CHANGE(hba, FC_ERROR);
+
+			mutex_exit(&EMLXS_MEMPUT_LOCK);
+
+			emlxs_thread_spawn(hba, emlxs_shutdown_thread,
+			    NULL, NULL);
+
+			return (NULL);
+		}
+	}
+
+	/* Release buffer to the end of the freelist */
+	if (seg->fc_memput_end == NULL) {
+		seg->fc_memput_ptr = bp;
+		seg->fc_memput_cnt = 1;
+	} else {
+		*((uint8_t **)(seg->fc_memput_end)) = bp;
+		seg->fc_memput_cnt++;
+	}
+	seg->fc_memput_end = bp;
+	*((uint8_t **)(bp)) = NULL;
+
+	mutex_exit(&EMLXS_MEMPUT_LOCK);
+
+	return (seg);
+
+} /* emlxs_mem_pool_put() */
+
+
+extern MATCHMAP *
+emlxs_mem_buf_alloc(emlxs_hba_t *hba, uint32_t size)
+{
+	emlxs_port_t *port = &PPORT;
+	uint8_t *bp = NULL;
+	MATCHMAP *mp = NULL;
 	MBUF_INFO *buf_info;
 	MBUF_INFO bufinfo;
 
@@ -1160,15 +790,15 @@ emlxs_mem_buf_alloc(emlxs_hba_t *hba)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
 		    "MEM_BUF_ALLOC buffer.");
 
-		return (0);
+		return (NULL);
 	}
 
-	matp = (MATCHMAP *)buf_info->virt;
-	bzero(matp, sizeof (MATCHMAP));
+	mp = (MATCHMAP *)buf_info->virt;
+	bzero(mp, sizeof (MATCHMAP));
 
 	bzero(buf_info, sizeof (MBUF_INFO));
-	buf_info->size = MEM_BUF_SIZE;
-	buf_info->flags = FC_MBUF_DMA;
+	buf_info->size = size;
+	buf_info->flags = FC_MBUF_DMA | FC_MBUF_SNGLSG | FC_MBUF_DMA32;
 	buf_info->align = 32;
 
 	(void) emlxs_mem_alloc(hba, buf_info);
@@ -1177,10 +807,10 @@ emlxs_mem_buf_alloc(emlxs_hba_t *hba)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
 		    "MEM_BUF_ALLOC DMA buffer.");
 
-		/* Free the matp object */
+		/* Free the mp object */
 		bzero(buf_info, sizeof (MBUF_INFO));
 		buf_info->size = sizeof (MATCHMAP);
-		buf_info->virt = (uint32_t *)matp;
+		buf_info->virt = (uint32_t *)mp;
 		emlxs_mem_free(hba, buf_info);
 
 		return (0);
@@ -1188,371 +818,180 @@ emlxs_mem_buf_alloc(emlxs_hba_t *hba)
 	bp = (uint8_t *)buf_info->virt;
 	bzero(bp, MEM_BUF_SIZE);
 
-	matp->fc_mptr = NULL;
-	matp->virt = buf_info->virt;
-	matp->phys = buf_info->phys;
-	matp->size = buf_info->size;
-	matp->dma_handle = buf_info->dma_handle;
-	matp->data_handle = buf_info->data_handle;
-	matp->tag = MEM_BUF;
-	matp->flag |= MAP_BUF_ALLOCATED;
+	mp->virt = buf_info->virt;
+	mp->phys = buf_info->phys;
+	mp->size = buf_info->size;
+	mp->dma_handle = buf_info->dma_handle;
+	mp->data_handle = buf_info->data_handle;
+	mp->tag = MEM_BUF;
+	mp->flag |= MAP_BUF_ALLOCATED;
 
-	return ((uint8_t *)matp);
+	return (mp);
 
-}  /* emlxs_mem_buf_alloc() */
+} /* emlxs_mem_buf_alloc() */
 
 
-extern uint8_t *
-emlxs_mem_buf_free(emlxs_hba_t *hba, uint8_t *bp)
+extern MATCHMAP *
+emlxs_mem_buf_free(emlxs_hba_t *hba, MATCHMAP *mp)
 {
-	MATCHMAP *matp;
 	MBUF_INFO bufinfo;
 	MBUF_INFO *buf_info;
 
 	buf_info = &bufinfo;
 
-	matp = (MATCHMAP *)bp;
-
-	if (!(matp->flag & MAP_BUF_ALLOCATED)) {
+	if (!(mp->flag & MAP_BUF_ALLOCATED)) {
 		return (NULL);
 	}
 
 	bzero(buf_info, sizeof (MBUF_INFO));
-	buf_info->size = matp->size;
-	buf_info->virt = matp->virt;
-	buf_info->phys = matp->phys;
-	buf_info->dma_handle = matp->dma_handle;
-	buf_info->data_handle = matp->data_handle;
+	buf_info->size = mp->size;
+	buf_info->virt = mp->virt;
+	buf_info->phys = mp->phys;
+	buf_info->dma_handle = mp->dma_handle;
+	buf_info->data_handle = mp->data_handle;
 	buf_info->flags = FC_MBUF_DMA;
 	emlxs_mem_free(hba, buf_info);
 
 	bzero(buf_info, sizeof (MBUF_INFO));
 	buf_info->size = sizeof (MATCHMAP);
-	buf_info->virt = (uint32_t *)matp;
+	buf_info->virt = (uint32_t *)mp;
 	emlxs_mem_free(hba, buf_info);
 
-	return (bp);
+	return (mp);
 
-}  /* emlxs_mem_buf_free() */
+} /* emlxs_mem_buf_free() */
 
 
-
-/*
- * emlxs_mem_get
- *
- * This routine will get a free memory buffer.
- * seg identifies which buffer pool to use.
- * Returns the free buffer ptr or 0 for no buf
- */
 extern uint8_t *
-emlxs_mem_get(emlxs_hba_t *hba, uint32_t arg)
+emlxs_mem_get(emlxs_hba_t *hba, uint32_t seg_id, uint32_t priority)
 {
 	emlxs_port_t *port = &PPORT;
-	MEMSEG *mp;
-	uint8_t *bp = NULL;
-	uint32_t seg = arg & MEM_SEG_MASK;
+	uint8_t *bp;
 	MAILBOXQ *mbq;
-	MATCHMAP *matp;
 	IOCBQ *iocbq;
 	NODELIST *node;
-	uint8_t *base;
-	uint8_t *end;
+	MEMSEG *seg;
 
-	/* range check on seg argument */
-	if (seg >= FC_MAX_SEG) {
+	if (seg_id >= FC_MAX_SEG) {
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_error_msg,
+		    "emlxs_mem_get: Invalid segment id = %d",
+		    seg_id);
+
 		return (NULL);
 	}
+	seg = &hba->memseg[seg_id];
 
-	mp = &hba->memseg[seg];
+	/* Alloc a buffer from the pool */
+	bp = emlxs_mem_pool_get(hba, seg, priority);
 
-	/* Check if memory segment destroyed! */
-	if (mp->fc_memsize == 0) {
-		return (NULL);
-	}
-
-	mutex_enter(&EMLXS_MEMGET_LOCK);
-
-top:
-
-	if (mp->fc_memget_ptr) {
-		bp = mp->fc_memget_ptr;
-
-		/* Checking if seg == MEM_MBOX, MEM_IOCB or MEM_NLP */
-		/* Verify buffer is in this memory region */
-		if (mp->fc_memstart_virt && mp->fc_total_memsize) {
-			base = mp->fc_memstart_virt;
-			end = mp->fc_memstart_virt + mp->fc_total_memsize;
-			if (bp < base || bp >= end) {
-				/* Invalidate the the get list */
-				mp->fc_memget_ptr = NULL;
-				mp->fc_memget_end = NULL;
-				mp->fc_memget_cnt = 0;
-
-				EMLXS_MSGF(EMLXS_CONTEXT,
-				    &emlxs_pool_error_msg,
-				    "Corruption detected: seg=%x bp=%p "
-				    "base=%p end=%p.", seg, bp, base, end);
-
-				emlxs_ffstate_change(hba, FC_ERROR);
-
-				mutex_exit(&EMLXS_MEMGET_LOCK);
-
-				emlxs_thread_spawn(hba, emlxs_shutdown_thread,
-				    NULL, NULL);
-
-				return (NULL);
-			}
-		}
-
-		/*
-		 * If a memory block exists, take it off freelist
-		 * and return it to the user.
-		 */
-		if (mp->fc_memget_end == bp) {
-			mp->fc_memget_ptr = NULL;
-			mp->fc_memget_end = NULL;
-			mp->fc_memget_cnt = 0;
-
-		} else {
-			/*
-			 * Pointer to the next free buffer
-			 */
-			mp->fc_memget_ptr = *((uint8_t **)bp);
-			mp->fc_memget_cnt--;
-		}
-
-		switch (seg) {
+	if (bp) {
+		switch (seg_id) {
 		case MEM_MBOX:
-			bzero(bp, sizeof (MAILBOXQ));
-
 			mbq = (MAILBOXQ *)bp;
 			mbq->flag |= MBQ_POOL_ALLOCATED;
 			break;
 
 		case MEM_IOCB:
-			bzero(bp, sizeof (IOCBQ));
-
 			iocbq = (IOCBQ *)bp;
 			iocbq->flag |= IOCB_POOL_ALLOCATED;
 			break;
 
 		case MEM_NLP:
-			bzero(bp, sizeof (NODELIST));
-
 			node = (NODELIST *)bp;
 			node->flag |= NODE_POOL_ALLOCATED;
 			break;
-
-		case MEM_BPL:
-		case MEM_BUF:	/* MEM_ELSBUF */
-		case MEM_IPBUF:
-		case MEM_CTBUF:
-#ifdef SFCT_SUPPORT
-		case MEM_FCTBUF:
-#endif /* SFCT_SUPPORT */
-		default:
-			matp = (MATCHMAP *)bp;
-			matp->fc_mptr = NULL;
-			matp->flag |= MAP_POOL_ALLOCATED;
-			break;
 		}
-	} else {
-		mutex_enter(&EMLXS_MEMPUT_LOCK);
-		if (mp->fc_memput_ptr) {
-			/*
-			 * Move buffer from memput to memget
-			 */
-			mp->fc_memget_ptr = mp->fc_memput_ptr;
-			mp->fc_memget_end = mp->fc_memput_end;
-			mp->fc_memget_cnt = mp->fc_memput_cnt;
-			mp->fc_memput_ptr = NULL;
-			mp->fc_memput_end = NULL;
-			mp->fc_memput_cnt = 0;
-			mutex_exit(&EMLXS_MEMPUT_LOCK);
-
-			goto top;
-		}
-		mutex_exit(&EMLXS_MEMPUT_LOCK);
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_alloc_failed_msg,
-		    "Pool empty: seg=%x lowmem=%x free=%x", seg,
-		    mp->fc_lowmem, mp->fc_memget_cnt);
-
-		/* HBASTATS.memAllocErr++; */
 	}
-
-	mutex_exit(&EMLXS_MEMGET_LOCK);
 
 	return (bp);
 
-}  /* emlxs_mem_get() */
-
+} /* emlxs_mem_get() */
 
 
 extern uint8_t *
-emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg, uint8_t *bp)
+emlxs_mem_put(emlxs_hba_t *hba, uint32_t seg_id, uint8_t *bp)
 {
 	emlxs_port_t *port = &PPORT;
-	MEMSEG *mp;
-	uint8_t *oldbp;
-	MATCHMAP *matp;
-	IOCBQ *iocbq;
 	MAILBOXQ *mbq;
+	IOCBQ *iocbq;
 	NODELIST *node;
-	uint8_t *base;
-	uint8_t *end;
+	MEMSEG *seg;
+	MATCHMAP *mp;
 
-	if (!bp) {
+	if (seg_id >= FC_MAX_SEG) {
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_error_msg,
+		    "emlxs_mem_put: Invalid segment id = %d: bp=%p",
+		    seg_id, bp);
+
 		return (NULL);
 	}
+	seg = &hba->memseg[seg_id];
 
-	/* Check on seg argument */
-	if (seg >= FC_MAX_SEG) {
-		return (NULL);
-	}
-
-	mp = &hba->memseg[seg];
-
-	switch (seg) {
+	/* Verify buffer */
+	switch (seg_id) {
 	case MEM_MBOX:
 		mbq = (MAILBOXQ *)bp;
 
 		if (!(mbq->flag & MBQ_POOL_ALLOCATED)) {
-			return (bp);
+			return (NULL);
 		}
 		break;
 
 	case MEM_IOCB:
 		iocbq = (IOCBQ *)bp;
 
-		/* Check to make sure the IOCB is pool allocated */
 		if (!(iocbq->flag & IOCB_POOL_ALLOCATED)) {
-			return (bp);
+			return (NULL);
 		}
 
 		/* Any IOCBQ with a packet attached did not come */
 		/* from our pool */
 		if (iocbq->sbp) {
-			return (bp);
+			return (NULL);
 		}
 		break;
 
 	case MEM_NLP:
 		node = (NODELIST *)bp;
 
-		/* Check to make sure the NODE is pool allocated */
 		if (!(node->flag & NODE_POOL_ALLOCATED)) {
-			return (bp);
+			return (NULL);
 		}
 		break;
 
-	case MEM_BPL:
-	case MEM_BUF:	/* MEM_ELSBUF */
-	case MEM_IPBUF:
-	case MEM_CTBUF:
-#ifdef SFCT_SUPPORT
-	case MEM_FCTBUF:
-#endif /* SFCT_SUPPORT */
 	default:
-		matp = (MATCHMAP *)bp;
+		mp = (MATCHMAP *)bp;
 
-		if (matp->flag & MAP_BUF_ALLOCATED) {
-			return (emlxs_mem_buf_free(hba, bp));
+		if (mp->flag & MAP_BUF_ALLOCATED) {
+			return ((uint8_t *)emlxs_mem_buf_free(hba, mp));
 		}
 
-		if (matp->flag & MAP_TABLE_ALLOCATED) {
+		if (mp->flag & MAP_TABLE_ALLOCATED) {
 			return (bp);
 		}
 
-		/* Check to make sure the MATCHMAP is pool allocated */
-		if (!(matp->flag & MAP_POOL_ALLOCATED)) {
-			return (bp);
+		if (!(mp->flag & MAP_POOL_ALLOCATED)) {
+			return (NULL);
 		}
 		break;
 	}
 
-	/* Free the pool object */
-	mutex_enter(&EMLXS_MEMPUT_LOCK);
-
-	/* Check if memory segment destroyed! */
-	if (mp->fc_memsize == 0) {
-		mutex_exit(&EMLXS_MEMPUT_LOCK);
+	/* Free a buffer to the pool */
+	if (emlxs_mem_pool_put(hba, seg, bp) == NULL) {
 		return (NULL);
 	}
-
-	/* Check if buffer was just freed */
-	if (mp->fc_memput_ptr == bp) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_error_msg,
-		    "Freeing Free object: seg=%x bp=%p", seg, bp);
-
-		mutex_exit(&EMLXS_MEMPUT_LOCK);
-		return (NULL);
-	}
-
-	/* Validate the buffer */
-
-	/* Checking if seg == MEM_BUF, MEM_BPL, MEM_CTBUF, */
-	/* MEM_IPBUF or MEM_FCTBUF */
-	if (mp->fc_memflag & FC_MEM_DMA) {
-		if (matp->tag != seg) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_error_msg,
-			    "Corruption detected: seg=%x tag=%x bp=%p", seg,
-			    matp->tag, bp);
-
-			emlxs_ffstate_change(hba, FC_ERROR);
-
-			mutex_exit(&EMLXS_MEMPUT_LOCK);
-
-			emlxs_thread_spawn(hba, emlxs_shutdown_thread,
-			    NULL, NULL);
-
-			return (NULL);
-		}
-	}
-
-	/* Checking (seg == MEM_MBOX || seg == MEM_IOCB || seg == MEM_NLP) */
-	else if (mp->fc_memstart_virt && mp->fc_total_memsize) {
-		base = mp->fc_memstart_virt;
-		end = mp->fc_memstart_virt + mp->fc_total_memsize;
-		if (bp < base || bp >= end) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pool_error_msg,
-			    "Corruption detected: seg=%x bp=%p base=%p end=%p",
-			    seg, bp, base, end);
-
-			emlxs_ffstate_change(hba, FC_ERROR);
-
-			mutex_exit(&EMLXS_MEMPUT_LOCK);
-
-			emlxs_thread_spawn(hba, emlxs_shutdown_thread,
-			    NULL, NULL);
-
-			return (NULL);
-		}
-	}
-
-	/* Release to the first place of the freelist */
-	oldbp = mp->fc_memput_ptr;
-	mp->fc_memput_ptr = bp;
-	*((uint8_t **)bp) = oldbp;
-
-	if (oldbp == NULL) {
-		mp->fc_memput_end = bp;
-		mp->fc_memput_cnt = 1;
-	} else {
-		mp->fc_memput_cnt++;
-	}
-
-	mutex_exit(&EMLXS_MEMPUT_LOCK);
 
 	return (bp);
 
-}  /* emlxs_mem_put() */
-
+} /* emlxs_mem_put() */
 
 
 /*
  * Look up the virtual address given a mapped address
  */
+/* SLI3 */
 extern MATCHMAP *
 emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 {
@@ -1560,8 +999,7 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 	MATCHMAP *prev;
 	MATCHMAP *mp;
 
-	switch (rp->ringno) {
-	case FC_ELS_RING:
+	if (rp->ringno == hba->channel_els) {
 		mp = (MATCHMAP *)rp->fc_mpoff;
 		prev = 0;
 
@@ -1579,7 +1017,7 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 
 				mp->fc_mptr = 0;
 
-				emlxs_mpdata_sync(mp->dma_handle, 0, mp->size,
+				EMLXS_MPDATA_SYNC(mp->dma_handle, 0, mp->size,
 				    DDI_DMA_SYNC_FORKERNEL);
 
 				HBASTATS.ElsUbPosted--;
@@ -1595,9 +1033,8 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 		    "ELS Buffer not mapped: bp=%lx ringno=%x mpoff=%p mpon=%p",
 		    mapbp, rp->ringno, rp->fc_mpoff, rp->fc_mpon);
 
-		break;
+	} else if (rp->ringno == hba->channel_ct) {
 
-	case FC_CT_RING:
 		mp = (MATCHMAP *)rp->fc_mpoff;
 		prev = 0;
 
@@ -1615,7 +1052,7 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 
 				mp->fc_mptr = 0;
 
-				emlxs_mpdata_sync(mp->dma_handle, 0, mp->size,
+				EMLXS_MPDATA_SYNC(mp->dma_handle, 0, mp->size,
 				    DDI_DMA_SYNC_FORKERNEL);
 
 				HBASTATS.CtUbPosted--;
@@ -1631,9 +1068,8 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 		    "CT Buffer not mapped: bp=%lx ringno=%x mpoff=%p mpon=%p",
 		    mapbp, rp->ringno, rp->fc_mpoff, rp->fc_mpon);
 
-		break;
+	} else if (rp->ringno == hba->channel_ip) {
 
-	case FC_IP_RING:
 		mp = (MATCHMAP *)rp->fc_mpoff;
 		prev = 0;
 
@@ -1651,7 +1087,7 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 
 				mp->fc_mptr = 0;
 
-				emlxs_mpdata_sync(mp->dma_handle, 0, mp->size,
+				EMLXS_MPDATA_SYNC(mp->dma_handle, 0, mp->size,
 				    DDI_DMA_SYNC_FORKERNEL);
 
 				HBASTATS.IpUbPosted--;
@@ -1667,10 +1103,8 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 		    "IP Buffer not mapped: bp=%lx ringno=%x mpoff=%p mpon=%p",
 		    mapbp, rp->ringno, rp->fc_mpoff, rp->fc_mpon);
 
-		break;
-
 #ifdef SFCT_SUPPORT
-	case FC_FCT_RING:
+	} else if (rp->ringno == hba->CHANNEL_FCT) {
 		mp = (MATCHMAP *)rp->fc_mpoff;
 		prev = 0;
 
@@ -1688,7 +1122,7 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 
 				mp->fc_mptr = 0;
 
-				emlxs_mpdata_sync(mp->dma_handle, 0, mp->size,
+				EMLXS_MPDATA_SYNC(mp->dma_handle, 0, mp->size,
 				    DDI_DMA_SYNC_FORKERNEL);
 
 				HBASTATS.FctUbPosted--;
@@ -1704,25 +1138,24 @@ emlxs_mem_get_vaddr(emlxs_hba_t *hba, RING *rp, uint64_t mapbp)
 		    "FCT Buffer not mapped: bp=%lx ringno=%x mpoff=%p mpon=%p",
 		    mapbp, rp->ringno, rp->fc_mpoff, rp->fc_mpon);
 
-		break;
 #endif /* SFCT_SUPPORT */
 	}
 
 	return (0);
 
-}  /* emlxs_mem_get_vaddr() */
+} /* emlxs_mem_get_vaddr() */
 
 
 /*
  * Given a virtual address bp, generate the physical mapped address and
  * place it where addr points to. Save the address pair for lookup later.
  */
+/* SLI3 */
 extern void
 emlxs_mem_map_vaddr(emlxs_hba_t *hba, RING *rp, MATCHMAP *mp,
     uint32_t *haddr, uint32_t *laddr)
 {
-	switch (rp->ringno) {
-	case FC_ELS_RING:
+	if (rp->ringno == hba->channel_els) {
 		/*
 		 * Update slot fc_mpon points to then bump it
 		 * fc_mpoff is pointer head of the list.
@@ -1741,19 +1174,17 @@ emlxs_mem_map_vaddr(emlxs_hba_t *hba, RING *rp, MATCHMAP *mp,
 		if (hba->flag & FC_SLIM2_MODE) {
 
 			/* return mapped address */
-			*haddr = putPaddrHigh(mp->phys);
+			*haddr = PADDR_HI(mp->phys);
 			/* return mapped address */
-			*laddr = putPaddrLow(mp->phys);
+			*laddr = PADDR_LO(mp->phys);
 		} else {
 			/* return mapped address */
-			*laddr = putPaddrLow(mp->phys);
+			*laddr = PADDR_LO(mp->phys);
 		}
 
 		HBASTATS.ElsUbPosted++;
 
-		break;
-
-	case FC_CT_RING:
+	} else if (rp->ringno == hba->channel_ct) {
 		/*
 		 * Update slot fc_mpon points to then bump it
 		 * fc_mpoff is pointer head of the list.
@@ -1771,20 +1202,18 @@ emlxs_mem_map_vaddr(emlxs_hba_t *hba, RING *rp, MATCHMAP *mp,
 
 		if (hba->flag & FC_SLIM2_MODE) {
 			/* return mapped address */
-			*haddr = putPaddrHigh(mp->phys);
+			*haddr = PADDR_HI(mp->phys);
 			/* return mapped address */
-			*laddr = putPaddrLow(mp->phys);
+			*laddr = PADDR_LO(mp->phys);
 		} else {
 			/* return mapped address */
-			*laddr = putPaddrLow(mp->phys);
+			*laddr = PADDR_LO(mp->phys);
 		}
 
 		HBASTATS.CtUbPosted++;
 
-		break;
 
-
-	case FC_IP_RING:
+	} else if (rp->ringno == hba->channel_ip) {
 		/*
 		 * Update slot fc_mpon points to then bump it
 		 * fc_mpoff is pointer head of the list.
@@ -1802,18 +1231,17 @@ emlxs_mem_map_vaddr(emlxs_hba_t *hba, RING *rp, MATCHMAP *mp,
 
 		if (hba->flag & FC_SLIM2_MODE) {
 			/* return mapped address */
-			*haddr = putPaddrHigh(mp->phys);
-			*laddr = putPaddrLow(mp->phys);
+			*haddr = PADDR_HI(mp->phys);
+			*laddr = PADDR_LO(mp->phys);
 		} else {
-			*laddr = putPaddrLow(mp->phys);
+			*laddr = PADDR_LO(mp->phys);
 		}
 
 		HBASTATS.IpUbPosted++;
-		break;
 
 
 #ifdef SFCT_SUPPORT
-	case FC_FCT_RING:
+	} else if (rp->ringno == hba->CHANNEL_FCT) {
 		/*
 		 * Update slot fc_mpon points to then bump it
 		 * fc_mpoff is pointer head of the list.
@@ -1831,23 +1259,22 @@ emlxs_mem_map_vaddr(emlxs_hba_t *hba, RING *rp, MATCHMAP *mp,
 
 		if (hba->flag & FC_SLIM2_MODE) {
 			/* return mapped address */
-			*haddr = putPaddrHigh(mp->phys);
+			*haddr = PADDR_HI(mp->phys);
 			/* return mapped address */
-			*laddr = putPaddrLow(mp->phys);
+			*laddr = PADDR_LO(mp->phys);
 		} else {
 			/* return mapped address */
-			*laddr = putPaddrLow(mp->phys);
+			*laddr = PADDR_LO(mp->phys);
 		}
 
 		HBASTATS.FctUbPosted++;
-		break;
+
 #endif /* SFCT_SUPPORT */
 	}
-}  /* emlxs_mem_map_vaddr() */
+} /* emlxs_mem_map_vaddr() */
 
 
-#ifdef SLI3_SUPPORT
-
+/* SLI3 */
 uint32_t
 emlxs_hbq_alloc(emlxs_hba_t *hba, uint32_t hbq_id)
 {
@@ -1856,7 +1283,7 @@ emlxs_hbq_alloc(emlxs_hba_t *hba, uint32_t hbq_id)
 	MBUF_INFO *buf_info;
 	MBUF_INFO bufinfo;
 
-	hbq = &hba->hbq_table[hbq_id];
+	hbq = &hba->sli.sli3.hbq_table[hbq_id];
 
 	if (hbq->HBQ_host_buf.virt == 0) {
 		buf_info = &bufinfo;
@@ -1887,7 +1314,4 @@ emlxs_hbq_alloc(emlxs_hba_t *hba, uint32_t hbq_id)
 
 	return (0);
 
-}  /* emlxs_hbq_alloc() */
-
-
-#endif /* SLI3_SUPPORT */
+} /* emlxs_hbq_alloc() */

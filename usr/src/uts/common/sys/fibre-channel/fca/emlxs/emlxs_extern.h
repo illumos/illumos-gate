@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_EXTERN_H
 #define	_EMLXS_EXTERN_H
@@ -58,7 +57,6 @@ extern ddi_dma_attr_t		emlxs_dma_attr_1sg;
 extern void			emlxs_msg_printf(emlxs_port_t *port,
 					const uint32_t fileno,
 					const uint32_t line,
-					void *bp, uint32_t size,
 					emlxs_msg_t *msg,
 					const char *fmt, ...);
 extern uint32_t			emlxs_msg_log_create(emlxs_hba_t *hba);
@@ -66,9 +64,21 @@ extern uint32_t			emlxs_msg_log_destroy(emlxs_hba_t *hba);
 extern uint32_t			emlxs_msg_log_get(emlxs_hba_t *hba,
 					emlxs_log_req_t *req,
 					emlxs_log_resp_t *resp);
+
+/* Module emlxs_event.c External Routine Declarations */
+extern void			emlxs_timer_check_events(emlxs_hba_t *hba);
+
+extern uint32_t			emlxs_event_queue_create(emlxs_hba_t *hba);
+
+extern void			emlxs_event_queue_destroy(emlxs_hba_t *hba);
+
+extern void			emlxs_event(emlxs_port_t *port,
+					emlxs_event_t *evt, void *bp,
+					uint32_t size);
 extern void			emlxs_log_dump_event(emlxs_port_t *port,
 					uint8_t *buffer, uint32_t size);
 extern void			emlxs_log_link_event(emlxs_port_t *port);
+
 extern uint32_t			emlxs_log_ct_event(emlxs_port_t *port,
 					uint8_t *payload, uint32_t size,
 					uint32_t rxid);
@@ -91,6 +101,33 @@ extern void			emlxs_log_fcoe_event(emlxs_port_t *port,
 					menlo_init_rsp_t *init_rsp);
 extern void			emlxs_log_async_event(emlxs_port_t *port,
 					IOCB *iocb);
+
+#ifdef SAN_DIAG_SUPPORT
+extern uint32_t			emlxs_get_sd_event(emlxs_port_t *port,
+					emlxs_dfc_event_t *dfc_event,
+					uint32_t sleep);
+extern void			emlxs_log_sd_basic_els_event(emlxs_port_t *port,
+					uint32_t subcat, HBA_WWN *portname,
+					HBA_WWN *nodename);
+extern void			emlxs_log_sd_prlo_event(emlxs_port_t *port,
+					HBA_WWN *portname);
+extern void			emlxs_log_sd_lsrjt_event(emlxs_port_t *port,
+					HBA_WWN *remoteport, uint32_t orig_cmd,
+					uint32_t reason, uint32_t reason_expl);
+extern void			emlxs_log_sd_fc_bsy_event(emlxs_port_t *port,
+					HBA_WWN *remoteport);
+extern void			emlxs_log_sd_fc_rdchk_event(emlxs_port_t *port,
+					HBA_WWN *remoteport, uint32_t lun,
+					uint32_t opcode, uint32_t fcp_param);
+extern void			emlxs_log_sd_scsi_event(emlxs_port_t *port,
+					uint32_t type, HBA_WWN *remoteport,
+					int32_t lun);
+extern void			emlxs_log_sd_scsi_check_event(
+					emlxs_port_t *port,
+					HBA_WWN *remoteport, uint32_t lun,
+					uint32_t cmdcode, uint32_t sensekey,
+					uint32_t asc, uint32_t ascq);
+#endif  /* SAN_DIAG_SUPPORT */
 
 /* Module emlxs_solaris.c External Routine Declarations */
 extern int32_t			emlxs_pkt_abort(opaque_t fca_port_handle,
@@ -143,7 +180,7 @@ extern int			emlxs_ub_release(opaque_t fca_port_handle,
 					uint32_t count, uint64_t tokens[]);
 extern void			emlxs_swap_els_ub(fc_unsol_buf_t *ubp);
 extern void			emlxs_unswap_pkt(emlxs_buf_t *sbp);
-extern uint32_t			emlxs_get_key(emlxs_hba_t *hba, MAILBOX *mb);
+extern uint32_t			emlxs_get_key(emlxs_hba_t *hba, MAILBOXQ *mbq);
 extern int			emlxs_pm_busy_component(dev_info_t *dip);
 extern int			emlxs_pm_idle_component(dev_info_t *dip);
 extern void			emlxs_pm_idle_timer(dev_info_t *dip);
@@ -162,6 +199,11 @@ extern int32_t			emlxs_port_manage(opaque_t fca_port_handle,
 					fc_fca_pm_t *pm);
 extern void			emlxs_port_init(emlxs_port_t *port);
 extern void			emlxs_get_fcode_version(emlxs_hba_t *hba);
+
+extern void			emlxs_swap32_buffer(uint8_t *buffer,
+					uint32_t size);
+extern void			emlxs_swap32_bcopy(uint8_t *src,
+					uint8_t *dst, uint32_t size);
 
 #ifdef MENLO_SUPPORT
 extern char			*emlxs_menlo_cmd_xlate(uint32_t cmd);
@@ -203,8 +245,8 @@ extern clock_t			emlxs_timeout(emlxs_hba_t *hba,
 /* Module emlxs_dhchap.c External Routine Declarations */
 #ifdef DHCHAP_SUPPORT
 extern int			emlxs_dhchap_state_machine(emlxs_port_t *port,
-					RING *ring, IOCBQ *iocbq, MATCHMAP *mp,
-					NODELIST *node, int event);
+					CHANNEL *cp, IOCBQ *iocbq,
+					MATCHMAP *mp, NODELIST *node, int evt);
 
 extern void			emlxs_dhc_attach(emlxs_hba_t *hba);
 extern void			emlxs_dhc_detach(emlxs_hba_t *hba);
@@ -278,17 +320,17 @@ extern uint32_t			emlxs_nport_count(emlxs_port_t *port);
 
 /* Module emlxs_els.c External Routine Declarations */
 extern int32_t			emlxs_els_handle_event(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *temp);
+					CHANNEL *cp, IOCBQ *temp);
 extern int32_t			emlxs_els_handle_unsol_req(emlxs_port_t *port,
-					RING *rp, IOCBQ *iocbq, MATCHMAP *mp,
-					uint32_t size);
+					CHANNEL *cp, IOCBQ *iocbq,
+					MATCHMAP *mp, uint32_t size);
 extern uint32_t			emlxs_generate_rscn(emlxs_port_t *port,
 					uint32_t d_id);
 extern int32_t			emlxs_ct_handle_event(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *temp);
+					CHANNEL *cp, IOCBQ *temp);
 extern int32_t			emlxs_ct_handle_unsol_req(emlxs_port_t *port,
-					RING *rp, IOCBQ *iocbq, MATCHMAP *mp,
-					uint32_t size);
+					CHANNEL *cp, IOCBQ *iocbq,
+					MATCHMAP *mp, uint32_t size);
 extern int32_t			emlxs_els_reply(emlxs_port_t *port,
 					IOCBQ *iocbq, uint32_t type,
 					uint32_t type2, uint32_t reason,
@@ -308,64 +350,65 @@ extern uint32_t			emlxs_ub_send_login_acc(emlxs_port_t *port,
 
 #ifdef MENLO_SUPPORT
 extern int			emlxs_menlo_handle_event(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *iocbq);
+					CHANNEL *cp, IOCBQ *iocbq);
 #endif /* MENLO_SUPPORT */
 
 /* Module emlxs_ip.c External Routine Declarations */
 extern int32_t			emlxs_ip_handle_event(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *temp);
+					CHANNEL *cp, IOCBQ *temp);
 extern int			emlxs_ip_handle_rcv_seq_list(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *saveq);
+					CHANNEL *cp, IOCBQ *saveq);
 extern int			emlxs_ip_handle_unsol_req(emlxs_port_t *port,
-					RING *rp, IOCBQ *iocbq, MATCHMAP *mp,
+					CHANNEL *cp, IOCBQ *iocbq, MATCHMAP *mp,
 					uint32_t size);
-extern int			emlxs_create_xri(emlxs_port_t *port, RING *rp,
-					NODELIST *ndlp);
+extern int			emlxs_create_xri(emlxs_port_t *port,
+					CHANNEL *cp, NODELIST *ndlp);
 extern int			emlxs_handle_create_xri(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *temp);
+					CHANNEL *cp, IOCBQ *temp);
 extern int			emlxs_handle_xri_aborted(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *temp);
+					CHANNEL *cp, IOCBQ *temp);
 
 /* Module emlxs_mbox.c External Routine Declarations */
 extern void			emlxs_mb_config_msi(emlxs_hba_t *hba,
-					MAILBOX *mb, uint32_t *intr_map,
+					MAILBOXQ *mbq, uint32_t *intr_map,
 					uint32_t intr_count);
 extern void			emlxs_mb_config_msix(emlxs_hba_t *hba,
-					MAILBOX *mb, uint32_t *intr_map,
+					MAILBOXQ *mbq, uint32_t *intr_map,
 					uint32_t intr_count);
 extern void			emlxs_mb_read_lnk_stat(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern void			emlxs_mb_config_link(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern void			emlxs_mb_config_ring(emlxs_hba_t *hba,
-					int32_t ring, MAILBOX *mb);
+					int32_t ring, MAILBOXQ *mbq);
 extern void			emlxs_mb_init_link(emlxs_hba_t *hba,
-					MAILBOX *mb, uint32_t topology,
+					MAILBOXQ *mbq, uint32_t topology,
 					uint32_t linkspeed);
 extern void			emlxs_mb_down_link(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern uint32_t			emlxs_mb_read_la(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern void			emlxs_mb_read_nv(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern void			emlxs_mb_read_rev(emlxs_hba_t *hba,
-					MAILBOX *mb, uint32_t v3);
+					MAILBOXQ *mbq, uint32_t v3);
 extern uint32_t			emlxs_mb_read_rpi(emlxs_hba_t *hba,
-					uint32_t rpi, MAILBOX *mb,
+					uint32_t rpi, MAILBOXQ *mbq,
 					uint32_t flg);
 extern uint32_t			emlxs_mb_read_xri(emlxs_hba_t *hba,
-					uint32_t xri, MAILBOX *mb,
+					uint32_t xri, MAILBOXQ *mbq,
 					uint32_t flg);
 extern uint32_t			emlxs_mb_read_sparam(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern uint32_t			emlxs_mb_reg_did(emlxs_port_t *port,
 					uint32_t did, SERV_PARM *param,
 					emlxs_buf_t *sbp, fc_unsol_buf_t *ubp,
 					IOCBQ *iocbq);
 extern void			emlxs_disable_tc(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern uint32_t			emlxs_mb_run_biu_diag(emlxs_hba_t *hba,
-					MAILBOX *mb, uint64_t in, uint64_t out);
+					MAILBOXQ *mbq, uint64_t in,
+					uint64_t out);
 extern uint32_t			emlxs_mb_unreg_rpi(emlxs_port_t *port,
 					uint32_t rpi, emlxs_buf_t *sbp,
 					fc_unsol_buf_t *ubp, IOCBQ *iocbq);
@@ -373,67 +416,112 @@ extern uint32_t			emlxs_mb_unreg_did(emlxs_port_t *port,
 					uint32_t did, emlxs_buf_t *sbp,
 					fc_unsol_buf_t *ubp, IOCBQ *iocbq);
 extern void			emlxs_mb_dump_vpd(emlxs_hba_t *hba,
-					MAILBOX *mb, uint32_t offset);
+					MAILBOXQ *mbq, uint32_t offset);
+extern void			emlxs_mb_dump_fcoe(emlxs_hba_t *hba,
+					MAILBOXQ *mbq, uint32_t offset);
 extern void			emlxs_mb_config_farp(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern void			emlxs_mb_read_config(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern void			emlxs_mb_put(emlxs_hba_t *hba,
 					MAILBOXQ *mbq);
 extern MAILBOXQ			*emlxs_mb_get(emlxs_hba_t *hba);
 extern void			emlxs_mb_clear_la(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern void			emlxs_mb_set_var(emlxs_hba_t *hba,
-					MAILBOX *mb, uint32_t addr,
+					MAILBOXQ *mbq, uint32_t addr,
 					uint32_t value);
 extern void			emlxs_mb_reset_ring(emlxs_hba_t *hba,
-					MAILBOX *mb, uint32_t ringno);
+					MAILBOXQ *mbq, uint32_t ringno);
 extern char			*emlxs_mb_cmd_xlate(uint8_t command);
 extern void			emlxs_mb_read_status(emlxs_hba_t *hba,
-					MAILBOX *mb);
-extern uint32_t			emlxs_mb_reg_vpi(emlxs_port_t *port);
+					MAILBOXQ *mbq);
+extern int			emlxs_cmpl_init_vpi(void *arg1, MAILBOXQ *mbq);
+extern uint32_t			emlxs_mb_init_vpi(emlxs_port_t *port);
+extern int			emlxs_cmpl_reg_vpi(void *arg1, MAILBOXQ *mbq);
+extern uint32_t			emlxs_mb_reg_vpi(emlxs_port_t *port,
+					emlxs_buf_t *sbp);
+extern int			emlxs_cmpl_unreg_vpi(void *arg1, MAILBOXQ *mbq);
 extern uint32_t			emlxs_mb_unreg_vpi(emlxs_port_t *port);
 extern void			emlxs_mb_fini(emlxs_hba_t *hba,
 					MAILBOX *mb, uint32_t mbxStatus);
+extern void			emlxs_mb_flush(emlxs_hba_t *hba);
 extern void			emlxs_mb_heartbeat(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
+extern void			emlxs_mb_request_features(emlxs_hba_t *hba,
+					MAILBOXQ *mbq);
+extern int			emlxs_mb_resume_rpi(emlxs_hba_t *hba,
+					emlxs_buf_t *sbp, uint16_t rpi);
+extern void			emlxs_mb_noop(emlxs_hba_t *hba,
+					MAILBOXQ *mbq);
+extern int			emlxs_mbext_noop(emlxs_hba_t *hba,
+					MAILBOXQ *mbq);
+extern void			emlxs_mb_resetport(emlxs_hba_t *hba,
+					MAILBOXQ *mbq);
+extern void			emlxs_mb_eq_create(emlxs_hba_t *hba,
+					MAILBOXQ *mbq, uint32_t num);
+extern void			emlxs_mb_cq_create(emlxs_hba_t *hba,
+					MAILBOXQ *mbq, uint32_t num);
+extern void			emlxs_mb_wq_create(emlxs_hba_t *hba,
+					MAILBOXQ *mbq, uint32_t num);
+extern void			emlxs_mb_rq_create(emlxs_hba_t *hba,
+					MAILBOXQ *mbq, uint32_t num);
+extern void			emlxs_mb_mq_create(emlxs_hba_t *hba,
+					MAILBOXQ *mbq);
+extern void			emlxs_mb_reg_fcfi(emlxs_hba_t *hba,
+					MAILBOXQ *mbq, FCFIobj_t *fcfp);
+extern int			emlxs_mb_unreg_fcfi(emlxs_hba_t *hba,
+					FCFIobj_t *fcfp);
+extern int			emlxs_mb_reg_vfi(emlxs_hba_t *hba,
+					MAILBOXQ *mb, VFIobj_t *vfip,
+					emlxs_port_t *vpip);
+extern int			emlxs_mb_unreg_vfi(emlxs_hba_t *hba,
+					VFIobj_t *vfip);
+extern int			emlxs_mbext_read_fcf_table(emlxs_hba_t *hba,
+					MAILBOXQ *mbq, uint32_t index);
+extern int			emlxs_mbext_add_fcf_table(emlxs_hba_t *hba,
+					MAILBOXQ *mbq, uint32_t index);
 extern void			emlxs_mb_async_event(emlxs_hba_t *hba,
-					MAILBOX *mb);
+					MAILBOXQ *mbq);
 extern int32_t			emlxs_mb_check_sparm(emlxs_hba_t *hba,
 					SERV_PARM *nsp);
-extern void			emlxs_mb_dump(emlxs_hba_t *hba, MAILBOX *mb,
+extern void			emlxs_cmpl_mbox(emlxs_hba_t *hba, MAILBOXQ *mq);
+extern void			emlxs_mb_dump(emlxs_hba_t *hba, MAILBOXQ *mbq,
 					uint32_t offset, uint32_t words);
-extern void			emlxs_mb_retry(emlxs_hba_t *hba, MAILBOX *mb);
+extern void			emlxs_mb_retry(emlxs_hba_t *hba, MAILBOXQ *mbq);
 extern void			emlxs_mb_init(emlxs_hba_t *hba, MAILBOXQ *mbq,
 					uint32_t flag, uint32_t tmo);
-
-#ifdef SLI3_SUPPORT
 extern void			emlxs_mb_config_hbq(emlxs_hba_t *hba,
-					MAILBOX *mb, int hbq_id);
-#endif	/* SLI3_SUPPORT */
+					MAILBOXQ *mbq, int hbq_id);
 
 /* Module emlxs_mem.c External Routine Declarations */
 extern MATCHMAP			*emlxs_mem_get_vaddr(emlxs_hba_t *hba,
 					RING *rp, uint64_t mapbp);
 extern uint8_t			*emlxs_mem_get(emlxs_hba_t *hba,
-					uint32_t seg);
+					uint32_t seg_id, uint32_t priority);
 extern uint8_t			*emlxs_mem_put(emlxs_hba_t *hba,
-					uint32_t seg, uint8_t *bp);
+					uint32_t seg_id, uint8_t *bp);
 extern int32_t			emlxs_mem_free_buffer(emlxs_hba_t *hba);
 extern int32_t			emlxs_mem_alloc_buffer(emlxs_hba_t *hba);
 extern void			emlxs_mem_map_vaddr(emlxs_hba_t *hba,
 					RING *rp, MATCHMAP *mp, uint32_t *haddr,
 					uint32_t *laddr);
-extern uint8_t			*emlxs_mem_buf_alloc(emlxs_hba_t *hba);
-extern uint8_t			*emlxs_mem_buf_free(emlxs_hba_t *hba,
-					uint8_t *bp);
-#ifdef SLI3_SUPPORT
+extern MATCHMAP			*emlxs_mem_buf_alloc(emlxs_hba_t *hba,
+					uint32_t size);
+extern MATCHMAP			*emlxs_mem_buf_free(emlxs_hba_t *hba,
+					MATCHMAP *mp);
 extern uint32_t			emlxs_hbq_alloc(emlxs_hba_t *hba,
 					uint32_t hbq_id);
-#endif	/* SLI3_SUPPORT */
+extern MEMSEG			*emlxs_mem_pool_alloc(emlxs_hba_t *hba,
+				    MEMSEG *seg);
+extern void			emlxs_mem_pool_free(emlxs_hba_t *hba,
+				    MEMSEG *seg);
+extern uint8_t 			*emlxs_mem_pool_get(emlxs_hba_t *hba,
+				    MEMSEG *seg, uint32_t priority);
+extern MEMSEG			*emlxs_mem_pool_put(emlxs_hba_t *hba,
+				    MEMSEG *seg, uint8_t *bp);
 
 /* Module emlxs_hba.c  External Routine Declarations */
-extern int			emlxs_ffinit(emlxs_hba_t *hba);
 extern void			emlxs_decode_firmware_rev(emlxs_hba_t *hba,
 					emlxs_vpd_t *vp);
 extern uint32_t			emlxs_init_adapter_info(emlxs_hba_t *hba);
@@ -443,16 +531,22 @@ extern void			emlxs_decode_version(uint32_t version,
 					char *buffer);
 extern char			*emlxs_ffstate_xlate(uint32_t new_state);
 extern char			*emlxs_ring_xlate(uint32_t ringno);
-extern void			emlxs_proc_ring(emlxs_hba_t *hba,
-					RING *rp, void *arg2);
+extern void			emlxs_proc_channel(emlxs_hba_t *hba,
+					CHANNEL *cp, void *arg2);
 extern void			emlxs_pcix_mxr_update(emlxs_hba_t *hba,
 					uint32_t verbose);
 extern void			emlxs_restart_thread(emlxs_hba_t *hba,
 					void *arg1, void *arg2);
 extern void			emlxs_fw_show(emlxs_hba_t *hba);
-extern void			emlxs_proc_ring_event(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *iocbq);
+extern void			emlxs_proc_channel_event(emlxs_hba_t *hba,
+					CHANNEL *cp, IOCBQ *iocbq);
 
+#ifdef MODFW_SUPPORT
+extern void			emlxs_fw_load(emlxs_hba_t *hba,
+					emlxs_firmware_t *fw);
+extern void			emlxs_fw_unload(emlxs_hba_t *hba,
+					emlxs_firmware_t *fw);
+#endif /* MODFW_SUPPORT */
 
 #ifdef MSI_SUPPORT
 extern int32_t			emlxs_msi_add(emlxs_hba_t *hba);
@@ -466,118 +560,70 @@ extern int32_t			emlxs_intx_remove(emlxs_hba_t *hba);
 extern int32_t			emlxs_intx_init(emlxs_hba_t *hba, uint32_t max);
 extern int32_t			emlxs_intx_uninit(emlxs_hba_t *hba);
 
-/* Module emlxs_sli.c  External Routine Declarations */
-extern int			emlxs_sli3_map_hdw(emlxs_hba_t *hba);
-extern int			emlxs_sli4_map_hdw(emlxs_hba_t *hba);
+extern void			emlxs_parse_prog_types(emlxs_hba_t *hba,
+					char *types);
+extern int32_t			emlxs_parse_vpd(emlxs_hba_t *hba, uint8_t *vpd,
+					uint32_t size);
+extern int32_t			emlxs_parse_fcoe(emlxs_hba_t *hba, uint8_t *p,
+					uint32_t size);
 
-extern void			emlxs_sli3_unmap_hdw(emlxs_hba_t *hba);
-extern void			emlxs_sli4_unmap_hdw(emlxs_hba_t *hba);
+extern void			emlxs_decode_label(char *label, char *buffer,
+					int bige);
+extern void			emlxs_build_prog_types(emlxs_hba_t *hba,
+					char *prog_types);
+extern void			emlxs_process_link_speed(emlxs_hba_t *hba);
 
-extern int32_t			emlxs_sli3_online(emlxs_hba_t *hba);
-extern int32_t			emlxs_sli4_online(emlxs_hba_t *hba);
+extern uint32_t			emlxs_iotag_flush(emlxs_hba_t *hba);
 
-extern void			emlxs_sli3_offline(emlxs_hba_t *hba);
-extern void			emlxs_sli4_offline(emlxs_hba_t *hba);
+extern int			emlxs_pci_model_count;
+extern emlxs_model_t		emlxs_pci_model[];
 
-extern uint32_t			emlxs_sli3_hba_reset(emlxs_hba_t *hba,
-					uint32_t restart, uint32_t skip_post);
-extern uint32_t			emlxs_sli4_hba_reset(emlxs_hba_t *hba,
-					uint32_t restart, uint32_t skip_post);
-
-extern uint32_t			emlxs_sli2_bde_setup(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-#ifdef SLI3_SUPPORT
-extern uint32_t			emlxs_sli3_bde_setup(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-#endif
-extern uint32_t			emlxs_sli4_bde_setup(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-
-extern uint32_t			emlxs_sli2_fct_bde_setup(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-extern uint32_t			emlxs_sli3_fct_bde_setup(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-extern uint32_t			emlxs_sli4_fct_bde_setup(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-
-extern void			emlxs_sli3_issue_iocb_cmd(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *iocb_cmd);
-extern void			emlxs_sli4_issue_iocb_cmd(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *iocb_cmd);
-
-extern uint32_t			emlxs_sli3_issue_mbox_cmd(emlxs_hba_t *hba,
-					MAILBOX *mb, int32_t flg, uint32_t tmo);
-extern uint32_t			emlxs_sli4_issue_mbox_cmd(emlxs_hba_t *hba,
-					MAILBOX *mb, int32_t flg, uint32_t tmo);
-
-#ifdef SFCT_SUPPORT
-extern uint32_t			emlxs_sli3_prep_fct_iocb(emlxs_port_t *port,
-					emlxs_buf_t *cmd_sbp);
-extern uint32_t			emlxs_sli4_prep_fct_iocb(emlxs_port_t *port,
-					emlxs_buf_t *cmd_sbp);
-#endif /* SFCT_SUPPORT */
-
-extern uint32_t			emlxs_sli3_prep_fcp_iocb(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-extern uint32_t			emlxs_sli4_prep_fcp_iocb(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-
-extern uint32_t			emlxs_sli3_prep_ip_iocb(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-extern uint32_t			emlxs_sli4_prep_ip_iocb(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-
-extern uint32_t			emlxs_sli3_prep_els_iocb(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-extern uint32_t			emlxs_sli4_prep_els_iocb(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-
-extern uint32_t			emlxs_sli3_prep_ct_iocb(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-extern uint32_t			emlxs_sli4_prep_ct_iocb(emlxs_port_t *port,
-					emlxs_buf_t *sbp);
-
-extern void			emlxs_sli3_poll_intr(emlxs_hba_t *hba,
-					uint32_t att_bit);
-extern void			emlxs_sli4_poll_intr(emlxs_hba_t *hba,
-					uint32_t att_bit);
-extern int32_t			emlxs_sli3_intx_intr(char *arg);
-extern int32_t			emlxs_sli4_intx_intr(char *arg);
-#ifdef MSI_SUPPORT
-extern uint32_t			emlxs_sli3_msi_intr(char *arg1, char *arg2);
-extern uint32_t			emlxs_sli4_msi_intr(char *arg1, char *arg2);
-#endif /* MSI_SUPPORT */
+extern int			emlxs_fw_count;
+extern emlxs_firmware_t		emlxs_fw_table[];
 
 
-extern uint32_t			emlxs_interlock(emlxs_hba_t *hba);
-extern uint32_t			emlxs_reset_ring(emlxs_hba_t *hba,
-					uint32_t ringno);
-extern void			emlxs_handle_ff_error(emlxs_hba_t *hba);
-extern uint32_t			emlxs_handle_mb_event(emlxs_hba_t *hba);
-extern uint32_t			emlxs_mb_issue_cmd(emlxs_hba_t *hba,
-					MAILBOX *mb, int32_t flag,
-					uint32_t timeout);
-extern void			emlxs_timer_check_mbox(emlxs_hba_t *hba);
-extern uint32_t			emlxs_mb_config_port(emlxs_hba_t *hba,
-					MAILBOX *mb, uint32_t sli_mode,
-					uint32_t hbainit);
-extern void			emlxs_enable_latt(emlxs_hba_t *hba);
-extern void			emlxs_disable_intr(emlxs_hba_t *hba,
-					uint32_t att);
-extern uint32_t			emlxs_check_attention(emlxs_hba_t *hba);
-extern uint32_t			emlxs_get_attention(emlxs_hba_t *hba,
-					uint32_t msgid);
-extern void			emlxs_proc_attention(emlxs_hba_t *hba,
-					uint32_t ha_copy);
+/* Module emlxs_sli3.c  External Routine Declarations */
+extern emlxs_sli_api_t		emlxs_sli3_api;
+
 extern int			emlxs_handle_rcv_seq(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *iocbq);
-extern void			emlxs_intr_initialize(emlxs_hba_t *hba);
+					CHANNEL *cp, IOCBQ *iocbq);
 extern void			emlxs_update_HBQ_index(emlxs_hba_t *hba,
 					uint32_t hbq_id);
 extern void			emlxs_hbq_free_all(emlxs_hba_t *hba,
 					uint32_t hbq_id);
-extern uint32_t			emlxs_hbq_setup(emlxs_hba_t *hba,
-					uint32_t hbq_id);
+
+/* Module emlxs_sli4.c  External Routine Declarations */
+extern int 			emlxs_sli4_unreg_all_rpi_by_port(
+				    emlxs_port_t *port);
+extern emlxs_sli_api_t		emlxs_sli4_api;
+
+extern FCFIobj_t		*emlxs_sli4_assign_fcfi(emlxs_hba_t *hba,
+					FCF_RECORD_t *fcfrec);
+extern void			emlxs_data_dump(emlxs_hba_t *hba, char *str,
+					uint32_t *data, int cnt, int err);
+extern void			emlxs_ue_dump(emlxs_hba_t *hba, char *str);
+
+extern RPIobj_t 		*emlxs_sli4_find_rpi(emlxs_hba_t *hba,
+					uint16_t rpi);
+extern XRIobj_t			*emlxs_sli4_find_xri(emlxs_hba_t *hba,
+					uint16_t xri);
+
+extern RPIobj_t 		*emlxs_sli4_alloc_rpi(emlxs_port_t *port);
+
+extern void			emlxs_sli4_free_rpi(emlxs_hba_t *hba,
+					RPIobj_t *xp);
+extern VFIobj_t			*emlxs_sli4_alloc_vfi(emlxs_hba_t *hba,
+					FCFIobj_t *fp);
+extern void			emlxs_sli4_free_vfi(emlxs_hba_t *hba,
+					VFIobj_t *xp);
+extern void			emlxs_sli4_free_fcfi(emlxs_hba_t *hba,
+					FCFIobj_t *xp);
+extern void			emlxs_sli4_free_xri(emlxs_hba_t *hba,
+					emlxs_buf_t *sbp, XRIobj_t *xp);
+extern FCFIobj_t		*emlxs_sli4_bind_fcfi(emlxs_hba_t *hba);
+
+extern uint32_t			emlxs_sli4_unreserve_xri(emlxs_hba_t *hba,
+					uint16_t xri);
 
 /* Module emlxs_diag.c  External Routine Declarations */
 extern uint32_t			emlxs_diag_post_run(emlxs_hba_t *hba);
@@ -586,9 +632,6 @@ extern uint32_t			emlxs_diag_biu_run(emlxs_hba_t *hba,
 extern uint32_t			emlxs_diag_pattern[256];
 extern uint32_t			emlxs_diag_echo_run(emlxs_port_t *port,
 					uint32_t did, uint32_t pattern);
-extern uint32_t			emlxs_core_size(emlxs_hba_t *hba);
-extern uint32_t			emlxs_core_dump(emlxs_hba_t *hba,
-					char *buffer, uint32_t size);
 
 /* Module emlxs_download.c External Routine Declarations */
 extern int32_t			emlxs_fw_download(emlxs_hba_t *hba,
@@ -610,53 +653,63 @@ extern int32_t			emlxs_boot_code_disable(emlxs_hba_t *hba);
 extern int32_t			emlxs_boot_code_enable(emlxs_hba_t *hba);
 extern int32_t			emlxs_boot_code_state(emlxs_hba_t *hba);
 
+extern int32_t			emlxs_sli4_read_fw_version(emlxs_hba_t *hba,
+					emlxs_firmware_t *fw);
+
 /* Module emlxs_fcp.c External Routine Declarations */
 extern int			emlxs_power_up(emlxs_hba_t *hba);
 extern int			emlxs_power_down(emlxs_hba_t *hba);
 extern int			emlxs_reset_link(emlxs_hba_t *hba,
-					uint32_t linkup);
-extern emlxs_buf_t		*emlxs_unregister_pkt(RING *rp,
+					uint32_t linkup, uint32_t wait);
+extern emlxs_buf_t		*emlxs_unregister_pkt(CHANNEL *cp,
 					uint16_t iotag, uint32_t forced);
-extern uint16_t			emlxs_register_pkt(RING *rp,
+extern uint16_t			emlxs_register_pkt(CHANNEL *cp,
 					emlxs_buf_t *sbp);
 
 extern IOCBQ			*emlxs_create_abort_xri_cn(emlxs_port_t *port,
 					NODELIST *ndlp, uint16_t iotag,
-					RING *rp, uint8_t class, int32_t flag);
+					CHANNEL *cp, uint8_t class,
+					int32_t flag);
 extern IOCBQ			*emlxs_create_close_xri_cn(emlxs_port_t *port,
 					NODELIST *ndlp, uint16_t iotag,
-					RING *rp);
+					CHANNEL *cp);
 extern IOCBQ			*emlxs_create_abort_xri_cx(emlxs_port_t *port,
-					NODELIST *ndlp, uint16_t xid, RING *rp,
-					uint8_t class, int32_t flag);
+					NODELIST *ndlp, uint16_t xid,
+					CHANNEL *cp, uint8_t class,
+					int32_t flag);
 extern IOCBQ			*emlxs_create_close_xri_cx(emlxs_port_t *port,
-					NODELIST *ndlp, uint16_t xid, RING *rp);
+					NODELIST *ndlp, uint16_t xid,
+					CHANNEL *cp);
 extern void			emlxs_abort_ct_exchange(emlxs_hba_t *hba,
 					emlxs_port_t *port, uint32_t rxid);
 
-extern emlxs_buf_t		*emlxs_chipq_get(RING *rp, uint16_t iotag);
-extern void			emlxs_chipq_put(RING *rp, emlxs_buf_t *sbp);
+extern emlxs_buf_t		*emlxs_chipq_get(CHANNEL *cp, uint16_t iotag);
+extern void			emlxs_chipq_put(CHANNEL *cp, emlxs_buf_t *sbp);
 extern uint32_t			emlxs_chipq_node_flush(emlxs_port_t *port,
-					RING *rp, NODELIST *ndlp,
+					CHANNEL *cp, NODELIST *ndlp,
 					emlxs_buf_t *fpkt);
 extern uint32_t			emlxs_chipq_lun_flush(emlxs_port_t *port,
 					NODELIST *ndlp, uint32_t lun,
 					emlxs_buf_t *fpkt);
 extern uint32_t			emlxs_chipq_node_check(emlxs_port_t *port,
-					RING *ring, NODELIST *ndlp);
+					CHANNEL *cp, NODELIST *ndlp);
 
-extern IOCBQ			*emlxs_tx_get(RING *rp, uint32_t lock);
+extern IOCBQ			*emlxs_tx_get(CHANNEL *cp, uint32_t lock);
 extern void			emlxs_tx_put(IOCBQ *iocbq, uint32_t lock);
+extern void			emlxs_tx_move(NODELIST *ndlp, CHANNEL *from,
+					CHANNEL *to, uint32_t cmd,
+					emlxs_buf_t *fpkt, uint32_t lock);
+
 extern uint32_t			emlxs_tx_node_check(emlxs_port_t *port,
-					NODELIST *ndlp, RING *ring);
+					NODELIST *ndlp, CHANNEL *cp);
 extern uint32_t			emlxs_tx_node_flush(emlxs_port_t *port,
-					NODELIST *ndlp, RING *ring,
+					NODELIST *ndlp, CHANNEL *cp,
 					uint32_t shutdown, emlxs_buf_t *fpkt);
 extern uint32_t			emlxs_tx_lun_flush(emlxs_port_t *port,
 					NODELIST *ndlp, uint32_t lun,
 					emlxs_buf_t *fpkt);
-extern uint32_t			emlxs_tx_ring_flush(emlxs_hba_t *hba,
-					RING *rp, emlxs_buf_t *fpkt);
+extern uint32_t			emlxs_tx_channel_flush(emlxs_hba_t *hba,
+					CHANNEL *cp, emlxs_buf_t *fpkt);
 
 extern void			emlxs_linkdown(emlxs_hba_t *hba);
 extern void			emlxs_linkup(emlxs_hba_t *hba);
@@ -666,17 +719,13 @@ extern int32_t			emlxs_port_offline(emlxs_port_t *port,
 extern void			emlxs_ffcleanup(emlxs_hba_t *hba);
 extern int32_t			emlxs_offline(emlxs_hba_t *hba);
 extern int32_t			emlxs_online(emlxs_hba_t *hba);
-extern void			emlxs_pcimem_bcopy(uint32_t *src,
-					uint32_t *dest, uint32_t cnt);
 extern int32_t			emlxs_post_buffer(emlxs_hba_t *hba,
 					RING *rp, int16_t cnt);
-extern void			emlxs_swap_bcopy(uint32_t *src,
-					uint32_t *dest, uint32_t cnt);
 extern void			emlxs_ff_start(emlxs_hba_t *hba);
 extern void			emlxs_handle_fcp_event(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *temp);
+					CHANNEL *rp, IOCBQ *temp);
 extern int			emlxs_fct_handle_abort(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *iocbq);
+					CHANNEL *rp, IOCBQ *iocbq);
 
 /* Module emlxs_thread.c External Routine Declarations */
 extern void			emlxs_taskq_destroy(emlxs_taskq_t *taskq);
@@ -690,7 +739,7 @@ extern void			emlxs_thread_destroy(emlxs_thread_t *ethread);
 extern void			emlxs_thread_trigger1(emlxs_thread_t *ethread,
 					void (*func) ());
 extern void			emlxs_thread_trigger2(emlxs_thread_t *ethread,
-					void (*func) (), RING *rp);
+					void (*func) (), CHANNEL *cp);
 extern void			emlxs_thread_spawn(emlxs_hba_t *hba,
 					void (*func) (), void *arg1,
 					void *arg2);
@@ -701,10 +750,10 @@ extern void			emlxs_thread_spawn_destroy(emlxs_hba_t *hba);
 extern int32_t			emlxs_dfc_manage(emlxs_hba_t *hba, void *dfc,
 					int32_t mode);
 extern int32_t			emlxs_dfc_handle_event(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *temp);
+					CHANNEL *cp, IOCBQ *temp);
 extern int			emlxs_dfc_handle_unsol_req(emlxs_port_t *port,
-					RING *rp, IOCBQ *iocbq, MATCHMAP *mp,
-					uint32_t size);
+					CHANNEL *cp, IOCBQ *iocbq,
+					MATCHMAP *mp, uint32_t size);
 extern void			emlxs_fcoe_attention_thread(emlxs_hba_t *hba,
 					void *arg1, void *arg2);
 extern uint32_t		emlxs_set_hba_mode(emlxs_hba_t *hba, uint32_t mode);
@@ -721,13 +770,13 @@ extern void			emlxs_fct_link_up(emlxs_port_t *port);
 extern void			emlxs_fct_init(emlxs_hba_t *hba);
 extern void			emlxs_fct_detach(emlxs_hba_t *hba);
 extern int			emlxs_fct_handle_unsol_els(emlxs_port_t *port,
-					RING *rp, IOCBQ *iocbq, MATCHMAP *mp,
+					CHANNEL *cp, IOCBQ *iocbq, MATCHMAP *mp,
 					uint32_t size);
 extern int			emlxs_fct_handle_unsol_req(emlxs_port_t *port,
-					RING *rp, IOCBQ *iocbq, MATCHMAP *mp,
+					CHANNEL *cp, IOCBQ *iocbq, MATCHMAP *mp,
 					uint32_t size);
 extern int			emlxs_fct_handle_fcp_event(emlxs_hba_t *hba,
-					RING *rp, IOCBQ *iocbq);
+					CHANNEL *cp, IOCBQ *iocbq);
 extern void			emlxs_fct_bind_port(emlxs_port_t *port);
 extern void			emlxs_fct_unbind_port(emlxs_port_t *port);
 extern void			emlxs_fct_unsol_callback(emlxs_port_t *port,
@@ -746,34 +795,6 @@ extern void			emlxs_fct_io_trace(emlxs_port_t *,
 					fct_cmd_t *, uint32_t);
 #endif /* FCT_IO_TRACE */
 #endif /* SFCT_SUPPORT */
-
-#ifdef SAN_DIAG_SUPPORT
-extern uint32_t			emlxs_get_sd_event(emlxs_port_t *port,
-					emlxs_dfc_event_t *dfc_event,
-					uint32_t sleep);
-extern void			emlxs_log_sd_basic_els_event(emlxs_port_t *port,
-					uint32_t subcat, HBA_WWN *portname,
-					HBA_WWN *nodename);
-extern void			emlxs_log_sd_prlo_event(emlxs_port_t *port,
-					HBA_WWN *portname);
-extern void			emlxs_log_sd_lsrjt_event(emlxs_port_t *port,
-					HBA_WWN *remoteport, uint32_t orig_cmd,
-					uint32_t reason, uint32_t reason_expl);
-extern void			emlxs_log_sd_fc_bsy_event(emlxs_port_t *port,
-					HBA_WWN *remoteport);
-extern void			emlxs_log_sd_fc_rdchk_event(emlxs_port_t *port,
-					HBA_WWN *remoteport, uint32_t lun,
-					uint32_t opcode, uint32_t fcp_param);
-extern void			emlxs_log_sd_scsi_event(emlxs_port_t *port,
-					uint32_t type, HBA_WWN *remoteport,
-					int32_t lun);
-extern void			emlxs_log_sd_scsi_check_event(
-					emlxs_port_t *port,
-					HBA_WWN *remoteport, uint32_t lun,
-					uint32_t cmdcode, uint32_t sensekey,
-					uint32_t asc, uint32_t ascq);
-#endif  /* SAN_DIAG_SUPPORT */
-
 
 #ifdef DUMP_SUPPORT
 /* Module emlxs_dump.c External Routine Declarations */
@@ -794,6 +815,12 @@ extern void		emlxs_dump_wait(emlxs_hba_t *hba);
 extern void		emlxs_dump(emlxs_hba_t *hba, uint32_t type,
 			    uint32_t temp_type, uint32_t temp);
 
+extern emlxs_file_t	*emlxs_fopen(emlxs_hba_t *hba, uint32_t file_type);
+extern void		emlxs_fflush(emlxs_file_t *fp);
+extern uint32_t		emlxs_fclose(emlxs_file_t *fp);
+extern uint32_t		emlxs_dump_word_dmpfile(emlxs_file_t *fpDmpFile,
+				uint8_t *pBuffer, uint32_t bufferLen,
+				int fSwap);
 #endif /* DUMP_SUPPORT */
 
 #ifdef	__cplusplus

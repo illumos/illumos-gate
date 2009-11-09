@@ -21,8 +21,9 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #include <emlxs.h>
 
@@ -31,7 +32,7 @@ EMLXS_MSG_DEF(EMLXS_IP_C);
 
 
 extern int32_t
-emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
+emlxs_ip_handle_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 {
 	emlxs_port_t *port = &PPORT;
 	IOCB *cmd;
@@ -49,13 +50,13 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_ip_completion_msg,
 		    "cmd=0x%x iotag=0x%x status=0x%x perr=0x%x",
-		    (uint32_t)cmd->ulpCommand, (uint32_t)cmd->ulpIoTag,
-		    cmd->ulpStatus, cmd->un.ulpWord[4]);
+		    (uint32_t)cmd->ULPCOMMAND, (uint32_t)cmd->ULPIOTAG,
+		    cmd->ULPSTATUS, cmd->un.ulpWord[4]);
 
 		return (EIO);
 	}
 
-	if (rp->ringno != FC_IP_RING) {
+	if (cp->channelno != hba->channel_ip) {
 		HBASTATS.IpStray++;
 
 		return (0);
@@ -63,7 +64,7 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 	port = sbp->iocbq.port;
 
-	switch (cmd->ulpCommand) {
+	switch (cmd->ULPCOMMAND) {
 		/*
 		 * Error: Abnormal BCAST command completion  (Local error)
 		 */
@@ -75,10 +76,10 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
 		    "XMIT BCAST completion error cmd=0x%x status=0x%x "
-		    "[%08x,%08x]", cmd->ulpCommand, cmd->ulpStatus,
+		    "[%08x,%08x]", cmd->ULPCOMMAND, cmd->ULPSTATUS,
 		    cmd->un.ulpWord[4], cmd->un.ulpWord[5]);
 
-		emlxs_pkt_complete(sbp, cmd->ulpStatus,
+		emlxs_pkt_complete(sbp, cmd->ULPSTATUS,
 		    cmd->un.grsp.perr.statLocalError, 1);
 
 		break;
@@ -95,10 +96,10 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
 		    "XMIT SEQUENCE CR completion error: cmd=%x status=0x%x "
-		    "[%08x,%08x]", cmd->ulpCommand, cmd->ulpStatus,
+		    "[%08x,%08x]", cmd->ULPCOMMAND, cmd->ULPSTATUS,
 		    cmd->un.ulpWord[4], cmd->un.ulpWord[5]);
 
-		emlxs_pkt_complete(sbp, cmd->ulpStatus,
+		emlxs_pkt_complete(sbp, cmd->ULPSTATUS,
 		    cmd->un.grsp.perr.statLocalError, 1);
 
 		break;
@@ -114,10 +115,10 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
 		    "XMIT BCAST CN completion: cmd=%x status=0x%x [%08x,%08x]",
-		    cmd->ulpCommand, cmd->ulpStatus, cmd->un.ulpWord[4],
+		    cmd->ULPCOMMAND, cmd->ULPSTATUS, cmd->un.ulpWord[4],
 		    cmd->un.ulpWord[5]);
 
-		emlxs_pkt_complete(sbp, cmd->ulpStatus,
+		emlxs_pkt_complete(sbp, cmd->ULPSTATUS,
 		    cmd->un.grsp.perr.statLocalError, 1);
 
 		break;
@@ -132,27 +133,27 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
 		    "XMIT SEQUENCE CR completion: cmd=%x status=0x%x"
-		    "[%08x,%08x]", cmd->ulpCommand, cmd->ulpStatus,
+		    "[%08x,%08x]", cmd->ULPCOMMAND, cmd->ULPSTATUS,
 		    cmd->un.ulpWord[4], cmd->un.ulpWord[5]);
 
-		if (cmd->ulpStatus) {
+		if (cmd->ULPSTATUS) {
 			HBASTATS.IpSeqError++;
 
-			if ((cmd->ulpStatus == IOSTAT_LOCAL_REJECT) &&
+			if ((cmd->ULPSTATUS == IOSTAT_LOCAL_REJECT) &&
 			    ((cmd->un.ulpWord[4] & 0xff) == IOERR_NO_XRI)) {
 				ndlp = (NODELIST *)sbp->node;
-				if ((cmd->ulpContext == ndlp->nlp_Xri) &&
-				    !(ndlp->nlp_flag[FC_IP_RING] &
+				if ((cmd->ULPCONTEXT == ndlp->nlp_Xri) &&
+				    !(ndlp->nlp_flag[hba->channel_ip] &
 				    NLP_RPI_XRI)) {
 					ndlp->nlp_Xri = 0;
-					(void) emlxs_create_xri(port, rp, ndlp);
+					(void) emlxs_create_xri(port, cp, ndlp);
 				}
 			}
 		} else {
 			HBASTATS.IpSeqGood++;
 		}
 
-		emlxs_pkt_complete(sbp, cmd->ulpStatus,
+		emlxs_pkt_complete(sbp, cmd->ULPSTATUS,
 		    cmd->un.grsp.perr.statLocalError, 1);
 
 		break;
@@ -162,20 +163,20 @@ emlxs_ip_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		HBASTATS.IpStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_invalid_ip_msg,
-		    "Invalid iocb: cmd=0x%x", cmd->ulpCommand);
+		    "Invalid iocb: cmd=0x%x", cmd->ULPCOMMAND);
 
 		break;
 
-	}	/* switch(cmd->ulpCommand) */
+	}	/* switch(cmd->ULPCOMMAND) */
 
 
 	return (0);
 
-}  /* emlxs_ip_handle_event() */
+} /* emlxs_ip_handle_event() */
 
 
 extern int32_t
-emlxs_ip_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_ip_handle_unsol_req(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
 	emlxs_hba_t *hba = HBA;
@@ -214,7 +215,7 @@ emlxs_ip_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ip_dropped_msg,
 			    "Buffer not found. paddr=%lx",
-			    getPaddr(cmd->un.cont64[0].addrHigh,
+			    PADDR(cmd->un.cont64[0].addrHigh,
 			    cmd->un.cont64[0].addrLow));
 
 			continue;
@@ -231,8 +232,8 @@ emlxs_ip_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 			sid = ndlp->nlp_DID;
 
 			if ((ndlp->nlp_Xri == 0) &&
-			    !(ndlp->nlp_flag[FC_IP_RING] & NLP_RPI_XRI)) {
-				(void) emlxs_create_xri(port, rp, ndlp);
+			    !(ndlp->nlp_flag[hba->channel_ip] & NLP_RPI_XRI)) {
+				(void) emlxs_create_xri(port, cp, ndlp);
 			}
 		}
 
@@ -270,7 +271,7 @@ emlxs_ip_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 		ubp->ub_frame.type = cmd->un.xrseq.w5.hcsw.Type;
 		ubp->ub_frame.s_id = sid;
 		ubp->ub_frame.ox_id = ub_priv->token;
-		ubp->ub_frame.rx_id = cmd->ulpContext;
+		ubp->ub_frame.rx_id = cmd->ULPCONTEXT;
 		ubp->ub_class = FC_TRAN_CLASS3;
 
 		emlxs_ub_callback(port, ubp);
@@ -294,38 +295,38 @@ out:
 
 	return (0);
 
-}  /* emlxs_ip_handle_unsol_req() */
+} /* emlxs_ip_handle_unsol_req() */
 
 
 extern int32_t
-emlxs_ip_handle_rcv_seq_list(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
+emlxs_ip_handle_rcv_seq_list(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 {
 	emlxs_port_t *port = &PPORT;
 	IOCB *cmd;
 	uint64_t bdeAddr;
 	MATCHMAP *mp = NULL;
-#ifdef SLI3_SUPPORT
 	HBQE_t *hbqE;
 	uint32_t hbq_id;
 	uint32_t hbqe_tag;
-#endif /* SLI3_SUPPORT */
+	RING *rp;
 
 	/*
 	 * No action required for now.
 	 */
 	cmd = &iocbq->iocb;
+	rp = &hba->sli.sli3.ring[cp->channelno];
 
 	HBASTATS.IpRcvEvent++;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
 	    "Receive sequence list: cmd=0x%x iotag=0x%x status=0x%x "
-	    "w4=0x%x ringno=0x%x", cmd->ulpCommand, cmd->ulpIoTag,
-	    cmd->ulpStatus, cmd->un.ulpWord[4], rp->ringno);
+	    "w4=0x%x channelno=0x%x", cmd->ULPCOMMAND, cmd->ULPIOTAG,
+	    cmd->ULPSTATUS, cmd->un.ulpWord[4], cp->channelno);
 
-	if (cmd->ulpStatus) {
+	if (cmd->ULPSTATUS) {
 		goto out;
 	}
-#ifdef SLI3_SUPPORT
+
 	hbqE = (HBQE_t *)&iocbq->iocb;
 	hbq_id = hbqE->unt.ext.HBQ_tag;
 	hbqe_tag = hbqE->unt.ext.HBQE_tag;
@@ -333,22 +334,21 @@ emlxs_ip_handle_rcv_seq_list(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 	if (hba->flag & FC_HBQ_ENABLED) {
 		HBQ_INIT_t *hbq;
 
-		hbq = &hba->hbq_table[hbq_id];
+		hbq = &hba->sli.sli3.hbq_table[hbq_id];
 
 		HBASTATS.IpUbPosted--;
 
 		if (hbqe_tag >= hbq->HBQ_numEntries) {
 			mp = NULL;
 		} else {
-			mp = hba->hbq_table[hbq_id].HBQ_PostBufs[hbqe_tag];
+			mp = hba->sli.sli3.hbq_table
+			    [hbq_id].HBQ_PostBufs[hbqe_tag];
 		}
-	} else
-#endif /* SLI3_SUPPORT */
-	{
+	} else {
 		/* Check for valid buffer */
 		if (!(cmd->un.cont64[0].tus.f.bdeFlags & BUFF_TYPE_INVALID)) {
 			bdeAddr =
-			    getPaddr(cmd->un.cont64[0].addrHigh,
+			    PADDR(cmd->un.cont64[0].addrHigh,
 			    cmd->un.cont64[0].addrLow);
 			mp = emlxs_mem_get_vaddr(hba, rp, bdeAddr);
 		}
@@ -356,12 +356,9 @@ emlxs_ip_handle_rcv_seq_list(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 out:
 
-#ifdef SLI3_SUPPORT
 	if (hba->flag & FC_HBQ_ENABLED) {
 		emlxs_update_HBQ_index(hba, hbq_id);
-	} else
-#endif /* SLI3_SUPPORT */
-	{
+	} else {
 		if (mp) {
 			(void) emlxs_mem_put(hba, MEM_IPBUF, (uint8_t *)mp);
 		}
@@ -372,7 +369,7 @@ out:
 
 	return (0);
 
-}  /* emlxs_ip_handle_rcv_seq_list() */
+} /* emlxs_ip_handle_rcv_seq_list() */
 
 
 
@@ -380,7 +377,7 @@ out:
  * Process a create_xri command completion.
  */
 extern int32_t
-emlxs_handle_create_xri(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
+emlxs_handle_create_xri(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 {
 	emlxs_port_t *port = &PPORT;
 	IOCB *cmd;
@@ -395,7 +392,7 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 	if (!sbp) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_ip_completion_msg,
 		    "create_xri: cmd=0x%x iotag=0x%x status=0x%x w4=0x%x",
-		    cmd->ulpCommand, cmd->ulpIoTag, cmd->ulpStatus,
+		    cmd->ULPCOMMAND, cmd->ULPIOTAG, cmd->ULPSTATUS,
 		    cmd->un.ulpWord[4]);
 
 		return (EIO);
@@ -404,34 +401,34 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 	/* check for first xmit completion in sequence */
 	ndlp = (NODELIST *)sbp->node;
 
-	if (cmd->ulpStatus) {
+	if (cmd->ULPSTATUS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_bad_ip_completion_msg,
 		    "create_xri: cmd=0x%x iotag=0x%x status=0x%x w4=0x%x",
-		    cmd->ulpCommand, cmd->ulpIoTag, cmd->ulpStatus,
+		    cmd->ULPCOMMAND, cmd->ULPIOTAG, cmd->ULPSTATUS,
 		    cmd->un.ulpWord[4]);
 
-		mutex_enter(&EMLXS_RINGTX_LOCK);
-		ndlp->nlp_flag[rp->ringno] &= ~NLP_RPI_XRI;
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+		mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
+		ndlp->nlp_flag[cp->channelno] &= ~NLP_RPI_XRI;
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 		return (EIO);
 	}
 
-	mutex_enter(&EMLXS_RINGTX_LOCK);
-	ndlp->nlp_Xri = cmd->ulpContext;
-	ndlp->nlp_flag[rp->ringno] &= ~NLP_RPI_XRI;
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
+	ndlp->nlp_Xri = cmd->ULPCONTEXT;
+	ndlp->nlp_flag[cp->channelno] &= ~NLP_RPI_XRI;
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
 	    "create_xri completed: DID=0x%x Xri=0x%x iotag=0x%x",
-	    ndlp->nlp_DID, ndlp->nlp_Xri, cmd->ulpIoTag);
+	    ndlp->nlp_DID, ndlp->nlp_Xri, cmd->ULPIOTAG);
 
 	pkt = sbp->pkt;
 	emlxs_pkt_free(pkt);
 
 	return (0);
 
-}  /* emlxs_handle_create_xri()  */
+} /* emlxs_handle_create_xri()  */
 
 
 /*
@@ -439,7 +436,7 @@ emlxs_handle_create_xri(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
  * specified by the NODELIST entry.
  */
 extern int32_t
-emlxs_create_xri(emlxs_port_t *port, RING *rp, NODELIST *ndlp)
+emlxs_create_xri(emlxs_port_t *port, CHANNEL *cp, NODELIST *ndlp)
 {
 	emlxs_hba_t *hba = HBA;
 	IOCB *icmd;
@@ -449,13 +446,14 @@ emlxs_create_xri(emlxs_port_t *port, RING *rp, NODELIST *ndlp)
 	uint16_t iotag;
 
 	/* Check if an XRI has already been requested */
-	mutex_enter(&EMLXS_RINGTX_LOCK);
-	if (ndlp->nlp_Xri != 0 || (ndlp->nlp_flag[rp->ringno] & NLP_RPI_XRI)) {
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
+	if (ndlp->nlp_Xri != 0 ||
+	    (ndlp->nlp_flag[cp->channelno] & NLP_RPI_XRI)) {
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 		return (0);
 	}
-	ndlp->nlp_flag[rp->ringno] |= NLP_RPI_XRI;
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	ndlp->nlp_flag[cp->channelno] |= NLP_RPI_XRI;
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	if (!(pkt = emlxs_pkt_alloc(port, 0, 0, 0, KM_NOSLEEP))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
@@ -468,8 +466,11 @@ emlxs_create_xri(emlxs_port_t *port, RING *rp, NODELIST *ndlp)
 	sbp = (emlxs_buf_t *)pkt->pkt_fca_private;
 	iocbq = &sbp->iocbq;
 
+	/* Clear the PACKET_ULP_OWNED flag */
+	sbp->pkt_flags &= ~PACKET_ULP_OWNED;
+
 	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(rp, sbp);
+	iotag = emlxs_register_pkt(cp, sbp);
 
 	if (!iotag) {
 		/*
@@ -485,37 +486,37 @@ emlxs_create_xri(emlxs_port_t *port, RING *rp, NODELIST *ndlp)
 	}
 
 	icmd = &iocbq->iocb;
-	icmd->ulpIoTag = iotag;
-	icmd->ulpContext = ndlp->nlp_Rpi;
-	icmd->ulpLe = 1;
-	icmd->ulpCommand = CMD_CREATE_XRI_CR;
-	icmd->ulpOwner = OWN_CHIP;
+	icmd->ULPIOTAG = iotag;
+	icmd->ULPCONTEXT = ndlp->nlp_Rpi;
+	icmd->ULPLE = 1;
+	icmd->ULPCOMMAND = CMD_CREATE_XRI_CR;
+	icmd->ULPOWNER = OWN_CHIP;
 
 	/* Initalize iocbq */
 	iocbq->port = (void *)port;
 	iocbq->node = (void *)ndlp;
-	iocbq->ring = (void *)rp;
+	iocbq->channel = (void *)cp;
 
 	mutex_enter(&sbp->mtx);
 	sbp->node = (void *)ndlp;
-	sbp->ring = rp;
+	sbp->channel = cp;
 	mutex_exit(&sbp->mtx);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ip_detail_msg,
 	    "create_xri sent: DID=0x%x Xri=0x%x iotag=0x%x", ndlp->nlp_DID,
 	    ndlp->nlp_Xri, iotag);
 
-	emlxs_sli_issue_iocb_cmd(hba, rp, iocbq);
+	EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 
 	return (0);
 
 fail:
 
 	/* Clear the XRI flag */
-	mutex_enter(&EMLXS_RINGTX_LOCK);
-	ndlp->nlp_flag[rp->ringno] &= ~NLP_RPI_XRI;
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
+	ndlp->nlp_flag[cp->channelno] &= ~NLP_RPI_XRI;
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	return (1);
 
-}  /* emlxs_create_xri() */
+} /* emlxs_create_xri() */

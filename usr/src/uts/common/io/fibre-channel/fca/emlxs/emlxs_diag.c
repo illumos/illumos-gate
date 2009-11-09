@@ -21,8 +21,9 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #include <emlxs.h>
 
@@ -127,7 +128,7 @@ emlxs_diag_pkt_callback(fc_packet_t *pkt)
 
 	return;
 
-}  /* emlxs_diag_pkt_callback() */
+} /* emlxs_diag_pkt_callback() */
 
 
 extern uint32_t
@@ -288,14 +289,14 @@ done:
 
 	return (rval);
 
-}  /* emlxs_diag_echo_run() */
+} /* emlxs_diag_echo_run() */
 
 
 extern uint32_t
 emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 {
 	emlxs_port_t *port = &PPORT;
-	MAILBOX *mb;
+	MAILBOXQ *mbq;
 	MATCHMAP *mp;
 	MATCHMAP *mp1;
 	uint32_t i;
@@ -305,7 +306,7 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 	uint32_t *lptr;
 
 	mp1 = 0;
-	mb = 0;
+	mbq = 0;
 
 	/* Check if device is ready */
 	if (hba->state < FC_LINK_DOWN) {
@@ -318,7 +319,7 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 	/*
 	 * Get a buffer which will be used for the mailbox command
 	 */
-	if ((mb = (MAILBOX *) emlxs_mem_get(hba, MEM_MBOX | MEM_PRI)) == 0) {
+	if ((mbq = (MAILBOXQ *) emlxs_mem_get(hba, MEM_MBOX, 1)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_diag_error_msg,
 		    "BIU: Mailbox allocation failed.");
 
@@ -329,8 +330,8 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 	/*
 	 * Setup and issue mailbox RUN BIU DIAG command Setup test buffers
 	 */
-	if (((mp = (MATCHMAP *) emlxs_mem_get(hba, MEM_BUF | MEM_PRI)) == 0) ||
-	    ((mp1 = (MATCHMAP *) emlxs_mem_get(hba, MEM_BUF | MEM_PRI)) == 0)) {
+	if (((mp = (MATCHMAP *) emlxs_mem_get(hba, MEM_BUF, 1)) == 0) ||
+	    ((mp1 = (MATCHMAP *) emlxs_mem_get(hba, MEM_BUF, 1)) == 0)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_diag_error_msg,
 		    "BIU: Buffer allocation failed.");
 
@@ -350,17 +351,17 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 		bcopy((caddr_t)&emlxs_diag_pattern[0], (caddr_t)mp->virt,
 		    MEM_ELSBUF_SIZE);
 	}
-	emlxs_mpdata_sync(mp->dma_handle, 0, MEM_ELSBUF_SIZE,
+	EMLXS_MPDATA_SYNC(mp->dma_handle, 0, MEM_ELSBUF_SIZE,
 	    DDI_DMA_SYNC_FORDEV);
 
 	bzero(mp1->virt, MEM_ELSBUF_SIZE);
-	emlxs_mpdata_sync(mp1->dma_handle, 0, MEM_ELSBUF_SIZE,
+	EMLXS_MPDATA_SYNC(mp1->dma_handle, 0, MEM_ELSBUF_SIZE,
 	    DDI_DMA_SYNC_FORDEV);
 
 	/* Create the biu diag request */
-	(void) emlxs_mb_run_biu_diag(hba, mb, mp->phys, mp1->phys);
+	(void) emlxs_mb_run_biu_diag(hba, mbq, mp->phys, mp1->phys);
 
-	rval = emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 60);
+	rval = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 60);
 
 	if (rval == MBX_TIMEOUT) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_biu_failed_msg,
@@ -370,7 +371,7 @@ emlxs_diag_biu_run(emlxs_hba_t *hba, uint32_t pattern)
 		goto done;
 	}
 
-	emlxs_mpdata_sync(mp1->dma_handle, 0, MEM_ELSBUF_SIZE,
+	EMLXS_MPDATA_SYNC(mp1->dma_handle, 0, MEM_ELSBUF_SIZE,
 	    DDI_DMA_SYNC_FORKERNEL);
 
 	outptr = mp->virt;
@@ -401,13 +402,13 @@ done:
 	if (mp1) {
 		(void) emlxs_mem_put(hba, MEM_BUF, (uint8_t *)mp1);
 	}
-	if (mb) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mb);
+	if (mbq) {
+		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
 	}
 
 	return (rval);
 
-}  /* emlxs_diag_biu_run() */
+} /* emlxs_diag_biu_run() */
 
 
 extern uint32_t
@@ -432,7 +433,7 @@ emlxs_diag_post_run(emlxs_hba_t *hba)
 	}
 
 	/* Restart the adapter */
-	rval = emlxs_sli_hba_reset(hba, 1, 1);
+	rval = EMLXS_SLI_HBA_RESET(hba, 1, 1, 0);
 
 	switch (rval) {
 	case 0:
@@ -469,35 +470,4 @@ emlxs_diag_post_run(emlxs_hba_t *hba)
 
 	return (rval);
 
-}  /* emlxs_diag_post_run() */
-
-
-/* ARGSUSED */
-extern uint32_t
-emlxs_core_size(emlxs_hba_t *hba)
-{
-
-	return (256);
-
-
-
-}  /* emlxs_core_size() */
-
-
-/* ARGSUSED */
-extern uint32_t
-emlxs_core_dump(emlxs_hba_t *hba, char *buffer, uint32_t size)
-{
-	uint32_t i;
-
-	bzero(buffer, size);
-
-	/* Fill the buffer with dummy data */
-	for (i = 0; i < 256; i++) {
-		buffer[i] = (char)(i & 0xff);
-	}
-	return (FC_SUCCESS);
-
-
-
-}  /* emlxs_core_dump() */
+} /* emlxs_diag_post_run() */

@@ -1,0 +1,48 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+include drv_utils
+
+pkg_drvadd -i \
+    '"pci10df,fc00"
+    "pci10df,f800"
+    "pci10df,f900"
+    "pci10df,f980"
+    "pci10df,fa00"
+    "pci10df,fd00"
+    "pci10df,f0a5"
+    "pci10df,fc10"
+    "pci10df,fc20"
+    "pci10df,fe00"
+    "pciex10df,f100"
+    "pciex10df,f111"
+    "pciex10df,f112"
+    "pciex10df,fc20"
+    "pciex10df,fc40"
+    "pciex10df,fe00"
+    "pciex10df,fe05"
+    "pciex19a2,704"
+    "lpfs"' \
+    -m '* 0666 root sys' -c "fibre-channel" emlxs || exit 1

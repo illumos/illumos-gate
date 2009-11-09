@@ -21,8 +21,9 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #include <emlxs.h>
 
@@ -31,33 +32,9 @@
 /* Required for EMLXS_CONTEXT in EMLXS_MSGF calls */
 EMLXS_MSG_DEF(EMLXS_DUMP_C);
 
-
 /* ************************************************************************* */
 /* Utility functions */
 /* ************************************************************************* */
-
-static void
-emlxs_swap32_buffer(
-	uint8_t *buffer,
-	uint32_t size)
-{
-	uint32_t word;
-	uint32_t *wptr;
-	uint32_t i;
-
-	wptr = (uint32_t *)buffer;
-	for (i = 0; i < size / 4; i++) {
-		word = *wptr;
-		*wptr++ =
-		    ((((word)&0xFF) << 24) | (((word)&0xFF00) << 8) |
-		    (((word)&0xFF0000) >> 8) | (((word)&0xFF000000) >>
-		    24));
-	}
-
-	return;
-
-}  /* emlxs_swap32_buffer() */
-
 
 static uint32_t
 emlxs_menlo_set_mode(
@@ -71,24 +48,15 @@ emlxs_menlo_set_mode(
 	menlo_rsp_t *rsp_buf = NULL;
 	uint32_t rval = 0;
 
-	cmd_size = sizeof (menlo_set_cmd_t);
-	if ((cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_set_mode: Unable to allocate command buffer.");
-
-		rval = DFC_SYSRES_ERROR;
-		goto done;
+	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+		return (DFC_INVALID_ADAPTER);
 	}
+
+	cmd_size = sizeof (menlo_set_cmd_t);
+	cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP);
 
 	rsp_size = 4;
-	if ((rsp_buf = (menlo_rsp_t *)kmem_zalloc(rsp_size, KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_set_mode: "\
-		    "Unable to allocate response buffer.");
-
-		rval = DFC_SYSRES_ERROR;
-		goto done;
-	}
+	rsp_buf = (menlo_rsp_t *)kmem_zalloc(rsp_size, KM_SLEEP);
 
 	cmd_buf->code = MENLO_CMD_SET_MODE;
 	cmd_buf->set.value1 = mode;
@@ -128,7 +96,7 @@ done:
 
 	return (rval);
 
-}  /* emlxs_menlo_set_mode() */
+} /* emlxs_menlo_set_mode() */
 
 
 static uint32_t
@@ -143,23 +111,15 @@ emlxs_menlo_reset(
 	menlo_rsp_t *rsp_buf = NULL;
 	uint32_t rval = 0;
 
-	cmd_size = sizeof (menlo_reset_cmd_t);
-	if ((cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_reset: Unable to allocate command buffer.");
-
-		rval = DFC_SYSRES_ERROR;
-		goto done;
+	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+		return (DFC_INVALID_ADAPTER);
 	}
+
+	cmd_size = sizeof (menlo_reset_cmd_t);
+	cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP);
 
 	rsp_size = 4;
-	if ((rsp_buf = (menlo_rsp_t *)kmem_zalloc(rsp_size, KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_reset: Unable to allocate response buffer.");
-
-		rval = DFC_SYSRES_ERROR;
-		goto done;
-	}
+	rsp_buf = (menlo_rsp_t *)kmem_zalloc(rsp_size, KM_SLEEP);
 
 	cmd_buf->code = MENLO_CMD_RESET;
 	cmd_buf->reset.firmware = firmware;
@@ -198,7 +158,7 @@ done:
 
 	return (rval);
 
-}  /* emlxs_menlo_reset() */
+} /* emlxs_menlo_reset() */
 
 
 static uint32_t
@@ -212,14 +172,12 @@ emlxs_menlo_get_cfg(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	cmd_size = sizeof (menlo_get_cmd_t);
-	if ((cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_cfg: Unable to allocate command buffer.");
-
-		rval = DFC_SYSRES_ERROR;
-		goto done;
+	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+		return (DFC_INVALID_ADAPTER);
 	}
+
+	cmd_size = sizeof (menlo_get_cmd_t);
+	cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP);
 
 	rsp_size = sizeof (menlo_get_config_rsp_t);
 
@@ -257,7 +215,7 @@ done:
 
 	return (rval);
 
-}  /* emlxs_menlo_get_cfg() */
+} /* emlxs_menlo_get_cfg() */
 
 
 
@@ -272,15 +230,12 @@ emlxs_menlo_get_logcfg(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	cmd_size = sizeof (menlo_get_cmd_t);
-	if ((cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_logcfg: "\
-		    "Unable to allocate command buffer.");
-
-		rval = DFC_SYSRES_ERROR;
-		goto done;
+	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+		return (DFC_INVALID_ADAPTER);
 	}
+
+	cmd_size = sizeof (menlo_get_cmd_t);
+	cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP);
 
 	cmd_buf->code = MENLO_CMD_GET_LOG_CONFIG;
 	cmd_buf->get.context = 0;
@@ -316,7 +271,7 @@ done:
 
 	return (rval);
 
-}  /* emlxs_menlo_get_logcfg() */
+} /* emlxs_menlo_get_logcfg() */
 
 
 static uint32_t
@@ -331,14 +286,12 @@ emlxs_menlo_get_log(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	cmd_size = sizeof (menlo_get_cmd_t);
-	if ((cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_log: Unable to allocate command buffer.");
-
-		rval = DFC_SYSRES_ERROR;
-		goto done;
+	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+		return (DFC_INVALID_ADAPTER);
 	}
+
+	cmd_size = sizeof (menlo_get_cmd_t);
+	cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP);
 
 	cmd_buf->code = MENLO_CMD_GET_LOG_DATA;
 	cmd_buf->get.context = id;
@@ -374,7 +327,7 @@ done:
 
 	return (rval);
 
-}  /* emlxs_menlo_get_log() */
+} /* emlxs_menlo_get_log() */
 
 
 static uint32_t
@@ -388,15 +341,12 @@ emlxs_menlo_get_paniclog(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	cmd_size = sizeof (menlo_get_cmd_t);
-	if ((cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_paniclog: Unable to allocate "\
-		    "command buffer.");
-
-		rval = DFC_SYSRES_ERROR;
-		goto done;
+	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+		return (DFC_INVALID_ADAPTER);
 	}
+
+	cmd_size = sizeof (menlo_get_cmd_t);
+	cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP);
 
 	cmd_buf->code = MENLO_CMD_GET_PANIC_LOG;
 	cmd_buf->get.context = 0;
@@ -432,7 +382,7 @@ done:
 
 	return (rval);
 
-}  /* emlxs_menlo_get_paniclog() */
+} /* emlxs_menlo_get_paniclog() */
 
 
 static uint32_t
@@ -446,14 +396,12 @@ emlxs_menlo_get_sfp(
 	menlo_cmd_t *cmd_buf = NULL;
 	uint32_t rval = 0;
 
-	cmd_size = sizeof (menlo_get_cmd_t);
-	if ((cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "emlxs_menlo_get_sfp: Unable to allocate command buffer.");
-
-		rval = DFC_SYSRES_ERROR;
-		goto done;
+	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+		return (DFC_INVALID_ADAPTER);
 	}
+
+	cmd_size = sizeof (menlo_get_cmd_t);
+	cmd_buf = (menlo_cmd_t *)kmem_zalloc(cmd_size, KM_SLEEP);
 
 	cmd_buf->code = MENLO_CMD_GET_SFP_DATA;
 	cmd_buf->get.context = 0;
@@ -489,16 +437,7 @@ done:
 
 	return (rval);
 
-}  /* emlxs_menlo_get_sfp() */
-
-
-static uint32_t
-emlxs_ishornet(
-	emlxs_hba_t *hba)
-{
-	return ((hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) ? 1 : 0);
-
-}  /* emlxs_ishornet() */
+} /* emlxs_menlo_get_sfp() */
 
 
 static uint32_t
@@ -511,10 +450,10 @@ emlxs_isgraph(
 
 	return (0);
 
-}  /* emlxs_isgraph() */
+} /* emlxs_isgraph() */
 
 
-static void
+extern void
 emlxs_fflush(
 	emlxs_file_t *fp)
 {
@@ -528,7 +467,7 @@ emlxs_fflush(
 
 	return;
 
-}  /* emlxs_fflush() */
+} /* emlxs_fflush() */
 
 
 extern uint32_t
@@ -541,7 +480,7 @@ emlxs_ftell(
 
 	return (offset);
 
-}  /* emlxs_ftell() */
+} /* emlxs_ftell() */
 
 
 static void
@@ -559,7 +498,7 @@ emlxs_fputc(
 
 	return;
 
-}  /* emlxs_fputc() */
+} /* emlxs_fputc() */
 
 
 static uint32_t
@@ -590,7 +529,7 @@ emlxs_fwrite(
 
 	return (length);
 
-}  /* emlxs_fwrite() */
+} /* emlxs_fwrite() */
 
 
 static uint32_t
@@ -610,15 +549,14 @@ emlxs_fprintf(
 
 	return (length);
 
-}  /* emlxs_fprintf() */
+} /* emlxs_fprintf() */
 
 
-static emlxs_file_t *
+extern emlxs_file_t *
 emlxs_fopen(
 	emlxs_hba_t *hba,
 	uint32_t file_type)
 {
-	emlxs_port_t *port = &PPORT;
 	emlxs_file_t *fp;
 
 	switch (file_type) {
@@ -645,17 +583,9 @@ emlxs_fopen(
 	fp->size &= 0xFFFFFFFC;
 
 	if (!fp->buffer) {
-		if (!(fp->buffer =
-		    (uint8_t *)kmem_zalloc(fp->size, KM_SLEEP))) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-			    "emlxs_fopen: Unable to allocate dump file. "\
-			    "type=%d",
-			    file_type);
+		fp->buffer =
+		    (uint8_t *)kmem_zalloc(fp->size, KM_SLEEP);
 
-			fp->size = 0;
-			fp->ptr = 0;
-			return (NULL);
-		}
 	} else {
 		bzero(fp->buffer, fp->size);
 	}
@@ -664,10 +594,10 @@ emlxs_fopen(
 
 	return (fp);
 
-}  /* emlxs_fopen() */
+} /* emlxs_fopen() */
 
 
-static uint32_t
+extern uint32_t
 emlxs_fclose(
 	emlxs_file_t *fp)
 {
@@ -702,7 +632,7 @@ emlxs_fclose(
 
 	return (0);
 
-}  /* emlxs_fclose() */
+} /* emlxs_fclose() */
 
 
 static void
@@ -723,7 +653,7 @@ emlxs_fdelete(
 
 	return;
 
-}  /* emlxs_fdelete() */
+} /* emlxs_fdelete() */
 
 
 /* This builds a single core buffer for the IOCTL interface */
@@ -809,7 +739,12 @@ emlxs_get_dump(
 	}
 
 	if (size_cee) {
-		wptr[i++] = EMLXS_CEE_FILE_ID;
+		if (hba->model_info.chip == EMLXS_TIGERSHARK_CHIP) {
+			wptr[i++] = EMLXS_FAT_FILE_ID;
+		} else {
+			wptr[i++] = EMLXS_CEE_FILE_ID;
+		}
+
 		wptr[i++] = size_cee;
 	}
 
@@ -838,7 +773,7 @@ done:
 
 	return (0);
 
-}  /* emlxs_get_dump() */
+} /* emlxs_get_dump() */
 
 
 static uint32_t
@@ -851,21 +786,14 @@ emlxs_read_cfg_region(
 {
 	emlxs_port_t *port = &PPORT;
 	MAILBOXQ *mbq;
-	MAILBOX *mb;
 	uint32_t ByteCountRem;	/* remaining portion of original byte count */
 	uint32_t ByteCountReq;	/* requested byte count for a particular dump */
 	uint32_t CopyCount;	/* bytes to copy after each successful dump */
 	uint32_t Offset;	/* Offset into Config Region, for each dump */
 	uint8_t *pLocalBuf;	/* ptr to buffer to receive each dump */
 
-	if ((mbq =
-	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "DUMP: Unable to allocate mailbox buffer.");
-
-		return (1);
-	}
-	mb = (MAILBOX *) mbq;
+	mbq =
+	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP);
 
 	pLocalBuf = pBuffer;	/* init local pointer to caller's buffer */
 	Offset = 0;	/* start at offset 0 */
@@ -874,49 +802,115 @@ emlxs_read_cfg_region(
 
 	for (ByteCountRem = ByteCount; ByteCountRem > 0;
 	    ByteCountRem -= CopyCount) {
-		ByteCountReq =
-		    (ByteCountRem < DUMP_BC_MAX) ? ByteCountRem : DUMP_BC_MAX;
 
-		bzero((void *)mb, MAILBOX_CMD_BSIZE);
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			MAILBOX4 *mb = (MAILBOX4 *)mbq;
 
-		mb->mbxCommand = MBX_DUMP_MEMORY;
-		mb->un.varDmp.type = DMP_NV_PARAMS, mb->un.varDmp.cv = 1;
-		mb->un.varDmp.region_id = Identifier;
-		mb->un.varDmp.entry_index = Offset;
-		mb->un.varDmp.word_cnt = ByteCountReq / 4;
-		mb->mbxOwner = OWN_HOST;
+			ByteCountReq =
+			    (ByteCountRem < hba->sli.sli4.dump_region.size) ?
+			    ByteCountRem : hba->sli.sli4.dump_region.size;
 
-		if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0) !=
-		    MBX_SUCCESS) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
-			    "Unable to read config region. id=%x "\
-			    "offset=%x status=%x",
-			    Identifier, Offset, mb->mbxStatus);
+			/* Clear the local dump_region */
+			bzero(hba->sli.sli4.dump_region.virt,
+			    hba->sli.sli4.dump_region.size);
 
-			kmem_free(mbq, sizeof (MAILBOXQ));
-			return (1);
+			bzero((void *) mb, MAILBOX_CMD_SLI4_BSIZE);
+
+			mb->mbxCommand = MBX_DUMP_MEMORY;
+			mb->un.varDmp4.type = DMP_NV_PARAMS;
+			mb->un.varDmp4.entry_index = Offset;
+			mb->un.varDmp4.region_id = Identifier;
+
+			mb->un.varDmp4.available_cnt = ByteCountReq;
+			mb->un.varDmp4.addrHigh =
+			    PADDR_HI(hba->sli.sli4.dump_region.phys);
+			mb->un.varDmp4.addrLow =
+			    PADDR_LO(hba->sli.sli4.dump_region.phys);
+			mb->un.varDmp4.rsp_cnt = 0;
+
+			mb->mbxOwner = OWN_HOST;
+			mbq->mbox_cmpl = NULL;
+
+			if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) !=
+			    MBX_SUCCESS) {
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+				    "Unable to read config region. id=%x "\
+				    "offset=%x status=%x",
+				    Identifier, Offset, mb->mbxStatus);
+
+				kmem_free(mbq, sizeof (MAILBOXQ));
+				return (1);
+			}
+
+			CopyCount = mb->un.varDmp4.rsp_cnt;
+
+			/* if no more data returned */
+			if (CopyCount == 0) {
+				break;
+			}
+
+			if (CopyCount > ByteCountReq) {
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+				    "emlxs_read_cfg_region: " \
+				    "Byte count too big. %d > %d\n",
+				    CopyCount, ByteCountReq);
+
+				CopyCount = ByteCountReq;
+			}
+
+			bcopy((uint8_t *)hba->sli.sli4.dump_region.virt,
+			    pLocalBuf, CopyCount);
+
+		} else {
+			MAILBOX *mb = (MAILBOX *)mbq;
+
+			ByteCountReq =
+			    (ByteCountRem < DUMP_BC_MAX) ? ByteCountRem :
+			    DUMP_BC_MAX;
+
+			bzero((void *)mb, MAILBOX_CMD_BSIZE);
+
+			mb->mbxCommand = MBX_DUMP_MEMORY;
+			mb->un.varDmp.type = DMP_NV_PARAMS;
+			mb->un.varDmp.cv = 1;
+			mb->un.varDmp.region_id = Identifier;
+			mb->un.varDmp.entry_index = Offset;
+			mb->un.varDmp.word_cnt = ByteCountReq / 4;
+			mb->mbxOwner = OWN_HOST;
+			mbq->mbox_cmpl = NULL;
+
+			if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) !=
+			    MBX_SUCCESS) {
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+				    "Unable to read config region. id=%x "\
+				    "offset=%x status=%x",
+				    Identifier, Offset, mb->mbxStatus);
+
+				kmem_free(mbq, sizeof (MAILBOXQ));
+				return (1);
+			}
+
+			/* Note: for Type 2/3 Dumps, varDmp.word_cnt is */
+			/* actually a byte count. */
+			CopyCount = mb->un.varDmp.word_cnt;
+
+			/* if no more data returned */
+			if (CopyCount == 0) {
+				break;
+			}
+
+			if (CopyCount > ByteCountReq) {
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
+				    "emlxs_read_cfg_region: " \
+				    "Byte count too big. %d > %d\n",
+				    CopyCount, ByteCountReq);
+
+				CopyCount = ByteCountReq;
+			}
+
+			bcopy((uint8_t *)&mb->un.varDmp.resp_offset, pLocalBuf,
+			    CopyCount);
 		}
-
-		/* Note: for Type 2/3 Dumps, varDmp.word_cnt is */
-		/* actually a byte count. */
-		CopyCount = mb->un.varDmp.word_cnt;
-
-		/* if no more data returned */
-		if (CopyCount == 0) {
-			break;
-		}
-
-		if (CopyCount > ByteCountReq) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
-			    "emlxs_read_cfg_region: Word count too big. "\
-			    "%d > %d\n",
-			    CopyCount, ByteCountReq);
-
-			CopyCount = ByteCountReq;
-		}
-
-		bcopy((uint8_t *)&mb->un.varDmp.resp_offset, pLocalBuf,
-		    CopyCount);
 
 		pLocalBuf += CopyCount;
 		Offset += CopyCount;
@@ -925,7 +919,7 @@ emlxs_read_cfg_region(
 
 	return (0);
 
-}  /* emlxs_read_cfg_region() */
+} /* emlxs_read_cfg_region() */
 
 
 
@@ -975,7 +969,7 @@ emlxs_dump_string_txtfile(
 
 	return (0);
 
-}  /* emlxs_dump_string_txtfile() */
+} /* emlxs_dump_string_txtfile() */
 
 
 static uint32_t
@@ -1020,7 +1014,7 @@ emlxs_dump_word_txtfile(
 	emlxs_fflush(fpTxtFile);
 	return (0);
 
-}  /* emlxs_dump_word_txtfile() */
+} /* emlxs_dump_word_txtfile() */
 
 
 static uint32_t
@@ -1091,7 +1085,7 @@ emlxs_dump_byte_txtfile(
 	emlxs_fflush(fpTxtFile);
 	return (0);
 
-}  /* emlxs_dump_byte_txtfile() */
+} /* emlxs_dump_byte_txtfile() */
 
 
 static uint32_t
@@ -1132,14 +1126,16 @@ emlxs_dump_string_dmpfile(
 	emlxs_fputc(byte, fpDmpFile);
 	byte = (uint8_t)((length & 0xFF0000) >> 16);
 	emlxs_fputc(byte, fpDmpFile);
-#else
+#endif /* EMLXS_LITTLE_ENDIAN */
+
+#ifdef EMLXS_BIG_ENDIAN
 	byte = (uint8_t)((length & 0xFF0000) >> 16);
 	emlxs_fputc(byte, fpDmpFile);
 	byte = (uint8_t)((length & 0x00FF00) >> 8);
 	emlxs_fputc(byte, fpDmpFile);
 	byte = (uint8_t)(length & 0x0000FF);
 	emlxs_fputc(byte, fpDmpFile);
-#endif /* EMLXS_LITTLE_ENDIAN */
+#endif /* EMLXS_BIG_ENDIAN */
 
 	/* Write Argument String to the DMP File, including a Null Byte */
 	(void) emlxs_fwrite((uint8_t *)pString, strlen(pString), 1, fpDmpFile);
@@ -1171,7 +1167,7 @@ emlxs_dump_string_dmpfile(
 
 	return (0);
 
-}  /* emlxs_dump_string_dmpfile() */
+} /* emlxs_dump_string_dmpfile() */
 
 
 /* ************************************************************************** */
@@ -1188,7 +1184,7 @@ emlxs_dump_string_dmpfile(
 /* So, if Big Endian, On-demand Dump, we must swap the words. */
 /* ************************************************************************* */
 /*ARGSUSED*/
-static uint32_t
+extern uint32_t
 emlxs_dump_word_dmpfile(
 	emlxs_file_t *fpDmpFile,
 	uint8_t *pBuffer,
@@ -1204,13 +1200,11 @@ emlxs_dump_word_dmpfile(
 
 	wptr = (uint32_t *)pBuffer;
 	for (i = 0; i < bufferLen / 4; i++, wptr++) {
-#ifdef EMLXS_BIG_ENDIAN
 		if (fSwap) {
 			uint32_t w1;
 			w1 = *wptr;
-			*wptr = SWAP_LONG(w1);
+			*wptr = BE_SWAP32(w1);
 		}
-#endif /* EMLXS_BIG_ENDIAN */
 
 		(void) emlxs_fwrite((uint8_t *)wptr, 4, 1, fpDmpFile);
 	}
@@ -1219,7 +1213,7 @@ emlxs_dump_word_dmpfile(
 
 	return (0);
 
-}  /* emlxs_dump_word_dmpfile() */
+} /* emlxs_dump_word_dmpfile() */
 
 
 static uint32_t
@@ -1242,27 +1236,18 @@ emlxs_dump_port_block(
 	b = (uint8_t)entry.un.PortBlock.un.s.sid;
 	emlxs_fputc(b, fpDmpFile);
 
-	w = entry.un.PortBlock.un.s.bc;
 #ifdef EMLXS_LITTLE_ENDIAN
 	/* Write Buffer Length to the DMP File */
+	w = entry.un.PortBlock.un.s.bc;
 	b = (uint8_t)(w & 0x000000FF);
 	emlxs_fputc(b, fpDmpFile);
 	b = (uint8_t)((w & 0x0000FF00) >> 8);
 	emlxs_fputc(b, fpDmpFile);
 	b = (uint8_t)((w & 0x00FF0000) >> 16);
 	emlxs_fputc(b, fpDmpFile);
-#else
-	b = (uint8_t)((w & 0x00FF0000) >> 16);
-	emlxs_fputc(b, fpDmpFile);
-	b = (uint8_t)((w & 0x0000FF00) >> 8);
-	emlxs_fputc(b, fpDmpFile);
-	b = (uint8_t)(w & 0x000000FF);
-	emlxs_fputc(b, fpDmpFile);
-#endif /* EMLXS_LITTLE_ENDIAN */
 
 	/* Write address to the DMP File */
 	w = entry.un.PortBlock.un.s.addr;
-#ifdef EMLXS_LITTLE_ENDIAN
 	b = (uint8_t)(w & 0x000000FF);
 	emlxs_fputc(b, fpDmpFile);
 	b = (uint8_t)((w & 0x0000FF00) >> 8);
@@ -1270,17 +1255,30 @@ emlxs_dump_port_block(
 	b = (uint8_t)((w & 0x00FF0000) >> 16);
 	emlxs_fputc(b, fpDmpFile);
 	b = (uint8_t)((w & 0xFF000000) >> 24);
-	emlxs_fputc(b, fpDmpFile);
-#else
-	b = (uint8_t)((w & 0xFF000000) >> 24);
-	emlxs_fputc(b, fpDmpFile);
-	b = (uint8_t)((w & 0x00FF0000) >> 16);
-	emlxs_fputc(b, fpDmpFile);
-	b = (uint8_t)((w & 0x0000FF00) >> 8);
-	emlxs_fputc(b, fpDmpFile);
-	b = (uint8_t)(w & 0x000000FF);
 	emlxs_fputc(b, fpDmpFile);
 #endif /* EMLXS_LITTLE_ENDIAN */
+
+#ifdef EMLXS_BIG_ENDIAN
+	/* Write Buffer Length to the DMP File */
+	w = entry.un.PortBlock.un.s.bc;
+	b = (uint8_t)((w & 0x00FF0000) >> 16);
+	emlxs_fputc(b, fpDmpFile);
+	b = (uint8_t)((w & 0x0000FF00) >> 8);
+	emlxs_fputc(b, fpDmpFile);
+	b = (uint8_t)(w & 0x000000FF);
+	emlxs_fputc(b, fpDmpFile);
+
+	/* Write address to the DMP File */
+	w = entry.un.PortBlock.un.s.addr;
+	b = (uint8_t)((w & 0xFF000000) >> 24);
+	emlxs_fputc(b, fpDmpFile);
+	b = (uint8_t)((w & 0x00FF0000) >> 16);
+	emlxs_fputc(b, fpDmpFile);
+	b = (uint8_t)((w & 0x0000FF00) >> 8);
+	emlxs_fputc(b, fpDmpFile);
+	b = (uint8_t)(w & 0x000000FF);
+	emlxs_fputc(b, fpDmpFile);
+#endif /* EMLXS_BIG_ENDIAN */
 
 	status =
 	    emlxs_dump_word_dmpfile(fpDmpFile, pBuffer, bufferLen, fSwap);
@@ -1289,7 +1287,7 @@ emlxs_dump_port_block(
 
 	return (status);
 
-}  /* emlxs_dump_port_block() */
+} /* emlxs_dump_port_block() */
 
 
 static uint32_t
@@ -1316,23 +1314,16 @@ emlxs_dump_port_struct(
 	b = (uint8_t)entry.un.PortStruct.un.s.length;
 	emlxs_fputc(b, fpDmpFile);
 
+#ifdef EMLXS_LITTLE_ENDIAN
 	/* Write Element Count to the DMP File */
 	w = entry.un.PortStruct.un.s.count;
-#ifdef EMLXS_LITTLE_ENDIAN
 	b = (uint8_t)(w & 0x000000FF);
 	emlxs_fputc(b, fpDmpFile);
 	b = (uint8_t)((w & 0x0000FF00) >> 8);
 	emlxs_fputc(b, fpDmpFile);
-#else
-	b = (uint8_t)((w & 0x0000FF00) >> 8);
-	emlxs_fputc(b, fpDmpFile);
-	b = (uint8_t)(w & 0x000000FF);
-	emlxs_fputc(b, fpDmpFile);
-#endif /* EMLXS_LITTLE_ENDIAN */
 
 	/* Write Address to the DMP File */
 	w = entry.un.PortStruct.un.s.addr;
-#ifdef EMLXS_LITTLE_ENDIAN
 	b = (uint8_t)(w & 0x000000FF);
 	emlxs_fputc(b, fpDmpFile);
 	b = (uint8_t)((w & 0x0000FF00) >> 8);
@@ -1340,17 +1331,28 @@ emlxs_dump_port_struct(
 	b = (uint8_t)((w & 0x00FF0000) >> 16);
 	emlxs_fputc(b, fpDmpFile);
 	b = (uint8_t)((w & 0xFF000000) >> 24);
-	emlxs_fputc(b, fpDmpFile);
-#else
-	b = (uint8_t)((w & 0xFF000000) >> 24);
-	emlxs_fputc(b, fpDmpFile);
-	b = (uint8_t)((w & 0x00FF0000) >> 16);
-	emlxs_fputc(b, fpDmpFile);
-	b = (uint8_t)((w & 0x0000FF00) >> 8);
-	emlxs_fputc(b, fpDmpFile);
-	b = (uint8_t)(w & 0x000000FF);
 	emlxs_fputc(b, fpDmpFile);
 #endif /* EMLXS_LITTLE_ENDIAN */
+
+#ifdef EMLXS_BIG_ENDIAN
+	/* Write Element Count to the DMP File */
+	w = entry.un.PortStruct.un.s.count;
+	b = (uint8_t)((w & 0x0000FF00) >> 8);
+	emlxs_fputc(b, fpDmpFile);
+	b = (uint8_t)(w & 0x000000FF);
+	emlxs_fputc(b, fpDmpFile);
+
+	/* Write Address to the DMP File */
+	w = entry.un.PortStruct.un.s.addr;
+	b = (uint8_t)((w & 0xFF000000) >> 24);
+	emlxs_fputc(b, fpDmpFile);
+	b = (uint8_t)((w & 0x00FF0000) >> 16);
+	emlxs_fputc(b, fpDmpFile);
+	b = (uint8_t)((w & 0x0000FF00) >> 8);
+	emlxs_fputc(b, fpDmpFile);
+	b = (uint8_t)(w & 0x000000FF);
+	emlxs_fputc(b, fpDmpFile);
+#endif /* EMLXS_BIG_ENDIAN */
 
 	status =
 	    emlxs_dump_word_dmpfile(fpDmpFile, pBuffer, bufferLen, fSwap);
@@ -1359,7 +1361,7 @@ emlxs_dump_port_struct(
 
 	return (status);
 
-}  /* emlxs_dump_port_struct() */
+} /* emlxs_dump_port_struct() */
 
 
 static uint32_t
@@ -1402,14 +1404,16 @@ emlxs_dump_host_block(
 	emlxs_fputc(byte, fpDmpFile);
 	byte = (uint8_t)((length & 0xFF0000) >> 16);
 	emlxs_fputc(byte, fpDmpFile);
-#else
+#endif /* EMLXS_LITTLE_ENDIAN */
+
+#ifdef EMLXS_BIG_ENDIAN
 	byte = (uint8_t)((length & 0xFF0000) >> 16);
 	emlxs_fputc(byte, fpDmpFile);
 	byte = (uint8_t)((length & 0x00FF00) >> 8);
 	emlxs_fputc(byte, fpDmpFile);
 	byte = (uint8_t)(length & 0x0000FF);
 	emlxs_fputc(byte, fpDmpFile);
-#endif /* EMLXS_LITTLE_ENDIAN */
+#endif /* EMLXS_BIG_ENDIAN */
 
 	status =
 	    emlxs_dump_word_dmpfile(fpDmpFile, pBuffer, bufferLen, fSwap);
@@ -1418,7 +1422,7 @@ emlxs_dump_host_block(
 
 	return (status);
 
-}  /* emlxs_dump_host_block() */
+} /* emlxs_dump_host_block() */
 
 
 static uint32_t
@@ -1465,12 +1469,14 @@ emlxs_dump_host_struct(
 	emlxs_fputc(b, fpDmpFile);
 	b = (uint8_t)((w & 0x0000FF00) >> 8);
 	emlxs_fputc(b, fpDmpFile);
-#else
+#endif /* EMLXS_LITTLE_ENDIAN */
+
+#ifdef EMLXS_BIG_ENDIAN
 	b = (uint8_t)((w & 0x0000FF00) >> 8);
 	emlxs_fputc(b, fpDmpFile);
 	b = (uint8_t)(w & 0x000000FF);
 	emlxs_fputc(b, fpDmpFile);
-#endif /* EMLXS_LITTLE_ENDIAN */
+#endif /* EMLXS_BIG_ENDIAN */
 
 	status =
 	    emlxs_dump_word_dmpfile(fpDmpFile, pBuffer, bufferLen, fSwap);
@@ -1479,7 +1485,7 @@ emlxs_dump_host_struct(
 
 	return (status);
 
-}  /* emlxs_dump_host_struct() */
+} /* emlxs_dump_host_struct() */
 
 
 /* ************************************************************************* */
@@ -1494,7 +1500,6 @@ emlxs_dump_parm_table(
 	emlxs_file_t *fpTxtFile,
 	emlxs_file_t *fpDmpFile)
 {
-	emlxs_port_t *port = &PPORT;
 	emlxs_config_t *cfg = &CFG;
 	uint32_t status;
 	uint32_t i;
@@ -1504,21 +1509,7 @@ emlxs_dump_parm_table(
 	char *buf2;
 
 	buf1 = (char *)kmem_zalloc(8192, KM_SLEEP);
-	if (buf1 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_parm_table: Unable to allocate buf1.");
-
-		return (1);
-	}
-
 	buf2 = (char *)kmem_zalloc(8192, KM_SLEEP);
-	if (buf1 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_parm_table: Unable to allocate buf2.");
-
-		kmem_free(buf1, 8192);
-		return (1);
-	}
 
 	/* Driver Parameters Heading */
 	(void) sprintf(buf1,
@@ -1549,7 +1540,7 @@ emlxs_dump_parm_table(
 
 	return (status);
 
-}  /* emlxs_dump_parm_table() */
+} /* emlxs_dump_parm_table() */
 
 
 static uint32_t
@@ -1585,7 +1576,7 @@ emlxs_dump_model(
 
 	return (status);
 
-}  /* emlxs_dump_model() */
+} /* emlxs_dump_model() */
 
 
 static uint32_t
@@ -1632,7 +1623,7 @@ emlxs_dump_wwn(
 
 	return (status);
 
-}  /* emlxs_dump_wwn() */
+} /* emlxs_dump_wwn() */
 
 
 static uint32_t
@@ -1664,7 +1655,7 @@ emlxs_dump_serial_number(
 
 	return (status);
 
-}  /* emlxs_dump_serial_number() */
+} /* emlxs_dump_serial_number() */
 
 
 static uint32_t
@@ -1673,7 +1664,6 @@ emlxs_dump_fw_version(
 	emlxs_file_t *fpTxtFile,
 	emlxs_file_t *fpDmpFile)
 {
-	emlxs_port_t *port = &PPORT;
 	emlxs_vpd_t *vpd = &VPD;
 	uint32_t status;
 
@@ -1686,21 +1676,7 @@ emlxs_dump_fw_version(
 	buf2_size = 1024;
 
 	buf1 = (char *)kmem_zalloc(buf1_size, KM_SLEEP);
-	if (buf1 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_fw_version: Unable to allocate buf1.");
-
-		return (1);
-	}
-
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
-	if (buf2 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_fw_version: Unable to allocate buf2.");
-
-		kmem_free(buf1, buf1_size);
-		return (1);
-	}
 
 	/* Write the Firmware Version into the buffer */
 	(void) sprintf(buf2, "%s", vpd->fw_version);
@@ -1756,7 +1732,7 @@ emlxs_dump_fw_version(
 
 	return (status);
 
-}  /* emlxs_dump_fw_version() */
+} /* emlxs_dump_fw_version() */
 
 
 static uint32_t
@@ -1765,7 +1741,6 @@ emlxs_dump_boot_version(
 	emlxs_file_t *fpTxtFile,
 	emlxs_file_t *fpDmpFile)
 {
-	emlxs_port_t *port = &PPORT;
 	emlxs_vpd_t *vpd = &VPD;
 	uint32_t status;
 	uint32_t state;
@@ -1779,21 +1754,7 @@ emlxs_dump_boot_version(
 	buf2_size = 1024;
 
 	buf1 = (char *)kmem_zalloc(buf1_size, KM_SLEEP);
-	if (buf1 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_boot_version: Unable to allocate buf1.");
-
-		return (1);
-	}
-
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
-	if (buf2 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_boot_version: Unable to allocate buf2.");
-
-		kmem_free(buf1, buf1_size);
-		return (1);
-	}
 
 #ifdef EMLXS_SPARC
 	if (strcmp(vpd->fcode_version, "none") == 0)
@@ -1841,7 +1802,7 @@ emlxs_dump_boot_version(
 
 	return (status);
 
-}  /* emlxs_dump_boot_version() */
+} /* emlxs_dump_boot_version() */
 
 
 /* ARGSUSED */
@@ -1853,7 +1814,6 @@ emlxs_dump_cfg_region4_decoded(
 	DUMP_WAKE_UP_PARAMS *pBuffer,
 	uint32_t ByteCount)
 {
-	emlxs_port_t *port = &PPORT;
 	uint32_t status;
 	char *buf1;	/* text buffer */
 	char *buf2;	/* text buffer */
@@ -1864,21 +1824,7 @@ emlxs_dump_cfg_region4_decoded(
 	buf2_size = 1024;
 
 	buf1 = (char *)kmem_zalloc(buf1_size, KM_SLEEP);
-	if (buf1 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_cfg_region4_decoded: Unable to allocate buf1.");
-
-		return (1);
-	}
-
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
-	if (buf2 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_cfg_region4_decoded: Unable to allocate buf2.");
-
-		kmem_free(buf1, buf1_size);
-		return (1);
-	}
 
 	/* Write the Initial ID into the buffer */
 	(void) sprintf(buf2, "%s: %08x %08x", LEGEND_CR4_INITIAL_LOAD,
@@ -1928,7 +1874,7 @@ emlxs_dump_cfg_region4_decoded(
 
 	return (status);
 
-}  /* emlxs_dump_cfg_region4_decoded() */
+} /* emlxs_dump_cfg_region4_decoded() */
 
 
 /* ARGSUSED */
@@ -1940,7 +1886,6 @@ emlxs_dump_cfg_region14_decoded(
 	char *pBuffer,
 	uint32_t ByteCount)
 {
-	emlxs_port_t *port = &PPORT;
 	uint32_t status;
 	char *buf1;	/* text buffer */
 	char *buf2;	/* text buffer */
@@ -1962,23 +1907,7 @@ emlxs_dump_cfg_region14_decoded(
 	buf2_size = 1024;
 
 	buf1 = (char *)kmem_zalloc(buf1_size, KM_SLEEP);
-	if (buf1 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_cfg_region14_decoded: "\
-		    "Unable to allocate buf1.");
-
-		return (1);
-	}
-
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
-	if (buf2 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_cfg_region14_decoded: "\
-		    "Unable to allocate buf2.");
-
-		kmem_free(buf1, buf1_size);
-		return (1);
-	}
 
 /* If Big Endian, swap the data in place, */
 /* because it's PCI Data (Little Endian) */
@@ -1986,7 +1915,7 @@ emlxs_dump_cfg_region14_decoded(
 	wptr = (uint32_t *)pBuffer;
 	for (i = 0; i < (int)ByteCount / 4; i++, wptr++) {
 		w1 = *wptr;
-		*wptr = SWAP_LONG(w1);
+		*wptr = BE_SWAP32(w1);
 	}
 #endif /* EMLXS_BIG_ENDIAN */
 
@@ -2074,7 +2003,7 @@ emlxs_dump_cfg_region14_decoded(
 
 	return (status);
 
-}  /* emlxs_dump_cfg_region14_decoded() */
+} /* emlxs_dump_cfg_region14_decoded() */
 
 
 static uint32_t
@@ -2086,7 +2015,6 @@ emlxs_dump_cfg_region(
 	char *pLidLegend,
 	int fSwap)
 {
-	emlxs_port_t *port = &PPORT;
 	uint32_t status;
 	uint32_t RetByteCount = 0;	/* returned byte count */
 	char *buf1;	/* string ops buffer */
@@ -2104,32 +2032,10 @@ emlxs_dump_cfg_region(
 	buf2_size = 1024;
 
 	buf1 = (char *)kmem_zalloc(buf1_size, KM_SLEEP);
-	if (buf1 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_cfg_region: Unable to allocate buf1.");
-
-		return (1);
-	}
-
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
-	if (buf2 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_cfg_region: Unable to allocate buf2.");
-
-		kmem_free(buf1, buf1_size);
-		return (1);
-	}
 
 	buffer =
 	    (uint32_t *)kmem_zalloc(DUMP_MAX_CONFIG_REGION_LENGTH, KM_SLEEP);
-	if (buffer == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_cfg_region: Unable to allocate buffer.");
-
-		kmem_free(buf1, buf1_size);
-		kmem_free(buf2, buf2_size);
-		return (1);
-	}
 
 	status =
 	    emlxs_read_cfg_region(hba, Region, DUMP_MAX_CONFIG_REGION_LENGTH,
@@ -2179,7 +2085,7 @@ emlxs_dump_cfg_region(
 
 	return (status);
 
-}  /* emlxs_dump_cfg_region() */
+} /* emlxs_dump_cfg_region() */
 
 
 static uint32_t
@@ -2324,16 +2230,16 @@ emlxs_dump_cfg_regions(
 
 	return (status);
 
-}  /* emlxs_dump_cfg_regions() */
+} /* emlxs_dump_cfg_regions() */
 
 
+/*ARGSUSED*/
 static uint32_t
 emlxs_dump_os_version(
 	emlxs_hba_t *hba,
 	emlxs_file_t *fpTxtFile,
 	emlxs_file_t *fpDmpFile)
 {
-	emlxs_port_t *port = &PPORT;
 	uint32_t status;
 	char *buf1;
 	char *buf2;
@@ -2344,22 +2250,7 @@ emlxs_dump_os_version(
 	buf2_size = 1024;
 
 	buf1 = (char *)kmem_zalloc(buf1_size, KM_SLEEP);
-	if (buf1 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_os_version: Unable to allocate buf1.");
-
-		return (1);
-	}
-
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
-	if (buf2 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_os_version: Unable to allocate buf2.");
-
-		kmem_free(buf1, buf1_size);
-		return (1);
-	}
-
 
 	/* First, write the OS Name string into the buffer */
 	(void) strcpy(buf1, utsname.sysname);
@@ -2381,17 +2272,16 @@ emlxs_dump_os_version(
 
 	return (status);
 
-}  /* emlxs_dump_os_version() */
+} /* emlxs_dump_os_version() */
 
 
+/*ARGSUSED*/
 static uint32_t
 emlxs_dump_drv_version(
 	emlxs_hba_t *hba,
 	emlxs_file_t *fpTxtFile,
 	emlxs_file_t *fpDmpFile)
 {
-	emlxs_port_t *port = &PPORT;
-
 	uint32_t status;
 	char *buf1;
 	char *buf2;
@@ -2402,21 +2292,7 @@ emlxs_dump_drv_version(
 	buf2_size = 1024;
 
 	buf1 = (char *)kmem_zalloc(buf1_size, KM_SLEEP);
-	if (buf1 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_os_version: Unable to allocate buf1.");
-
-		return (1);
-	}
-
 	buf2 = (char *)kmem_zalloc(buf2_size, KM_SLEEP);
-	if (buf2 == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_os_version: Unable to allocate buf2.");
-
-		kmem_free(buf1, buf1_size);
-		return (1);
-	}
 
 	/* Write the Driver Type into the buffer */
 	(void) strcpy(buf1, "Driver Type: ");
@@ -2445,7 +2321,7 @@ emlxs_dump_drv_version(
 
 	return (status);
 
-}  /* emlxs_dump_drv_version() */
+} /* emlxs_dump_drv_version() */
 
 
 static uint32_t
@@ -2465,7 +2341,8 @@ emlxs_dump_file_create(
 	if (fpCeeFile) {
 		*fpCeeFile = NULL;
 
-		if (emlxs_ishornet(hba)) {
+		if ((hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) ||
+		    (hba->model_info.chip == EMLXS_TIGERSHARK_CHIP)) {
 			if ((*fpCeeFile =
 			    emlxs_fopen(hba, EMLXS_CEE_FILE)) == NULL) {
 				emlxs_fdelete(*fpTxtFile);
@@ -2486,9 +2363,12 @@ emlxs_dump_file_create(
 		/* SID to the DMP File */
 #ifdef EMLXS_LITTLE_ENDIAN
 		emlxs_fputc(SID_DUMP_ID_LE, *fpDmpFile);
-#else
-		emlxs_fputc(SID_DUMP_ID_BE, *fpDmpFile);
 #endif /* EMLXS_LITTLE_ENDIAN */
+
+#ifdef EMLXS_BIG_ENDIAN
+		emlxs_fputc(SID_DUMP_ID_BE, *fpDmpFile);
+#endif /* EMLXS_BIG_ENDIAN */
+
 		emlxs_fputc(SID_NULL, *fpDmpFile);
 		emlxs_fputc(SID_NULL, *fpDmpFile);
 		emlxs_fputc(SID_NULL, *fpDmpFile);
@@ -2497,11 +2377,12 @@ emlxs_dump_file_create(
 
 	return (0);
 
-}  /* emlxs_dump_file_create() */
+} /* emlxs_dump_file_create() */
 
 
 static uint32_t
 emlxs_dump_file_terminate(
+	emlxs_hba_t *hba,
 	emlxs_file_t *fpTxtFile,
 	emlxs_file_t *fpDmpFile,
 	emlxs_file_t *fpCeeFile)
@@ -2514,7 +2395,10 @@ emlxs_dump_file_terminate(
 	}
 
 	if (fpCeeFile) {
-		(void) emlxs_fprintf(fpCeeFile, "Dump File End\n");
+		if (hba->model_info.device_id == PCI_DEVICE_ID_LP21000_M) {
+			(void) emlxs_fprintf(fpCeeFile, "Dump File End\n");
+		}
+
 		emlxs_fflush(fpCeeFile);
 	}
 
@@ -2527,7 +2411,7 @@ emlxs_dump_file_terminate(
 
 	return (0);
 
-}  /* emlxs_dump_file_terminate() */
+} /* emlxs_dump_file_terminate() */
 
 
 static uint32_t
@@ -2551,7 +2435,7 @@ emlxs_dump_file_close(
 
 	return (0);
 
-}  /* emlxs_dump_file_close() */
+} /* emlxs_dump_file_close() */
 
 
 /* ************************************************************************* */
@@ -2571,7 +2455,7 @@ emlxs_dump_rev_info(
 	(void) emlxs_dump_drv_version(hba, fpTxtFile, fpDmpFile);
 	return (0);
 
-}  /* emlxs_dump_rev_info() */
+} /* emlxs_dump_rev_info() */
 
 
 /* ARGSUSED */
@@ -2591,7 +2475,7 @@ emlxs_dump_hba_info(
 
 	return (0);
 
-}  /* emlxs_dump_hba_info() */
+} /* emlxs_dump_hba_info() */
 
 
 /* ************************************************************************* */
@@ -2619,18 +2503,13 @@ emlxs_dump_table_check(
 	/* Read 1 word from low memory at address 654; */
 	/* save the returned Dump Table Base Address */
 
-	if ((mbq =
-	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "DUMP: Unable to allocate mailbox buffer.");
-
-		return (1);
-	}
+	mbq =
+	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP);
 	mb = (MAILBOX *) mbq;
 
 	/* Read the dump table address */
-	emlxs_mb_dump(hba, mb, 0x654, 1);
-	if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0) != MBX_SUCCESS) {
+	emlxs_mb_dump(hba, mbq, 0x654, 1);
+	if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) != MBX_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
 		    "Unable to read dump table address. "\
 		    "offset=0x654 status=%x",
@@ -2650,8 +2529,8 @@ emlxs_dump_table_check(
 	/* Now loop reading Dump Table Entries.. */
 	/* break out when we see a Terminator SID */
 	while (!fDone) {
-		emlxs_mb_dump(hba, mb, DumpTableAddr, 2);
-		if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0) !=
+		emlxs_mb_dump(hba, mbq, DumpTableAddr, 2);
+		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) !=
 		    MBX_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
 			    "Unable to read dump table entry. "\
@@ -2707,7 +2586,7 @@ emlxs_dump_table_check(
 	kmem_free(mbq, sizeof (MAILBOXQ));
 	return (0);
 
-}  /* emlxs_dump_table_check() */
+} /* emlxs_dump_table_check() */
 
 
 /* ************************************************************************ */
@@ -2743,40 +2622,22 @@ emlxs_dump_table_read(
 	}
 
 	buf1 = (char *)kmem_zalloc(size, KM_SLEEP);
-	if (buf1 == 0) {
-		return (1);
-	}
 
 	/* Allocate a buffer to hold the Dump Table */
 	*ppDumpTable = (uint32_t *)kmem_zalloc(*pDumpTableSize, KM_SLEEP);
-	if (*ppDumpTable == 0) {
-		kmem_free(buf1, size);
-
-		*pDumpTableSize = 0;
-		return (1);
-	}
 
 	pDumpTableEntry = *ppDumpTable;
 
 	/* Read 1 word from low memory at address 654; */
 	/* save the returned Dump Table Base Address */
-	if ((mbq =
-	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "DUMP: Unable to allocate mailbox buffer.");
+	mbq =
+	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP);
 
-		kmem_free(buf1, size);
-		kmem_free(*ppDumpTable, *pDumpTableSize);
-		*pDumpTableSize = 0;
-		*ppDumpTable = NULL;
-
-		return (1);
-	}
 	mb = (MAILBOX *) mbq;
 
 	/* Read the dump table address */
-	emlxs_mb_dump(hba, mb, 0x654, 1);
-	if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0) != MBX_SUCCESS) {
+	emlxs_mb_dump(hba, mbq, 0x654, 1);
+	if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) != MBX_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
 		    "Unable to read dump table address. "\
 		    "offset=0x654 status=%x",
@@ -2809,8 +2670,8 @@ emlxs_dump_table_read(
 	/* Now loop reading Dump Table Entries.. */
 	/* break out when we see a Terminator SID */
 	while (!fDone) {
-		emlxs_mb_dump(hba, mb, DumpTableAddr, 2);
-		if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0) !=
+		emlxs_mb_dump(hba, mbq, DumpTableAddr, 2);
+		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) !=
 		    MBX_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
 			    "Unable to read dump table entry. "\
@@ -2902,7 +2763,7 @@ emlxs_dump_table_read(
 
 	return (0);
 
-}  /* emlxs_dump_table_read() */
+} /* emlxs_dump_table_read() */
 
 
 /* ************************************************************************* */
@@ -2941,13 +2802,9 @@ emlxs_dump_hba_memory(
 		return (1);
 	}
 
-	if ((mbq =
-	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "DUMP: Unable to allocate mailbox buffer.");
+	mbq =
+	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP);
 
-		return (1);
-	}
 	mb = (MAILBOX *) mbq;
 
 	/* loop reading Dump Table Entries.. break out when */
@@ -2995,8 +2852,8 @@ emlxs_dump_hba_memory(
 				offset =
 				    (entry.un.PortBlock.un.s.
 				    addr & 0x01FFFFFF);
-				emlxs_mb_dump(hba, mb, offset, 1);
-				if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT,
+				emlxs_mb_dump(hba, mbq, offset, 1);
+				if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT,
 				    0) != MBX_SUCCESS) {
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_init_debug_msg,
@@ -3035,10 +2892,6 @@ emlxs_dump_hba_memory(
 
 			/* allocate a buffer to receive the dump data */
 			pBuf = (uint8_t *)kmem_zalloc(byteCount, KM_SLEEP);
-			if (pBuf == 0) {
-				kmem_free(mbq, sizeof (MAILBOXQ));
-				return (1);
-			}
 
 			/* loop issuing MBX commands, 18x measly words at */
 			/* a time */
@@ -3056,8 +2909,8 @@ emlxs_dump_hba_memory(
 				wcount =
 				    (byteCountRem / 4 >=
 				    0x18) ? 0x18 : (byteCountRem / 4);
-				emlxs_mb_dump(hba, mb, portAddr, wcount);
-				if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT,
+				emlxs_mb_dump(hba, mbq, portAddr, wcount);
+				if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT,
 				    0) != MBX_SUCCESS) {
 					EMLXS_MSGF(EMLXS_CONTEXT,
 					    &emlxs_init_debug_msg,
@@ -3103,7 +2956,7 @@ emlxs_dump_hba_memory(
 
 	return (status);
 
-}  /* emlxs_dump_hba_memory() */
+} /* emlxs_dump_hba_memory() */
 
 
 static uint32_t
@@ -3116,6 +2969,11 @@ emlxs_dump_hba(
 	uint32_t *pDumpTable = 0;
 	uint32_t DumpTableSize = 0;
 
+	if (hba->sli_mode >= EMLXS_HBA_SLI4_MODE) {
+		return (1);
+	}
+
+	/* HBA should be in WARM state here */
 	status =
 	    emlxs_dump_table_read(hba, fpTxtFile, &pDumpTable,
 	    &DumpTableSize);
@@ -3131,7 +2989,7 @@ emlxs_dump_hba(
 
 	return (status);
 
-}  /* emlxs_dump_hba() */
+} /* emlxs_dump_hba() */
 
 
 /* ************************************************************************* */
@@ -3163,10 +3021,6 @@ emlxs_dump_drv_region(
 	/* Now that we know the required length, request the actual data */
 	*pBuf = (uint8_t *)kmem_zalloc(size, KM_SLEEP);
 
-	if (*pBuf == 0) {
-		return (1);
-	}
-
 	status = emlxs_get_dump_region(hba, regionId, *pBuf, &size);
 
 	if (status != 0) {
@@ -3180,7 +3034,7 @@ emlxs_dump_drv_region(
 
 	return (status);
 
-}  /* emlxs_dump_drv_region() */
+} /* emlxs_dump_drv_region() */
 
 
 static uint32_t
@@ -3215,7 +3069,7 @@ emlxs_dump_sli_regs(
 
 	return (status);
 
-}  /* emlxs_dump_sli_regs() */
+} /* emlxs_dump_sli_regs() */
 
 
 static uint32_t
@@ -3256,7 +3110,7 @@ emlxs_dump_slim(
 
 	return (status);
 
-}  /* emlxs_dump_slim() */
+} /* emlxs_dump_slim() */
 
 
 static uint32_t
@@ -3290,7 +3144,7 @@ emlxs_dump_pcb(
 
 	return (status);
 
-}  /* emlxs_dump_pcb() */
+} /* emlxs_dump_pcb() */
 
 
 static uint32_t
@@ -3324,7 +3178,7 @@ emlxs_dump_mbox(
 
 	return (status);
 
-}  /* emlxs_dump_mbox() */
+} /* emlxs_dump_mbox() */
 
 
 static uint32_t
@@ -3358,7 +3212,7 @@ emlxs_dump_host_pointers(
 
 	return (status);
 
-}  /* emlxs_dump_host_pointers() */
+} /* emlxs_dump_host_pointers() */
 
 
 static uint32_t
@@ -3392,7 +3246,7 @@ emlxs_dump_port_pointers(
 
 	return (status);
 
-}  /* emlxs_dump_port_pointers() */
+} /* emlxs_dump_port_pointers() */
 
 
 static uint32_t
@@ -3427,7 +3281,7 @@ emlxs_dump_rings(
 
 	return (status);
 
-}  /* emlxs_dump_rings() */
+} /* emlxs_dump_rings() */
 
 
 static uint32_t
@@ -3461,7 +3315,7 @@ emlxs_dump_drv_internals(
 
 	return (status);
 
-}  /* emlxs_dump_drv_internals() */
+} /* emlxs_dump_drv_internals() */
 
 
 static uint32_t
@@ -3471,26 +3325,31 @@ emlxs_dump_sli_interface(
 	emlxs_file_t *fpDmpFile,
 	uint32_t dump_type)
 {
-	(void) emlxs_dump_sli_regs(hba, fpDmpFile);
-	(void) emlxs_dump_slim(hba, fpTxtFile, fpDmpFile, dump_type);
-	(void) emlxs_dump_pcb(hba, fpDmpFile);
-	(void) emlxs_dump_mbox(hba, fpDmpFile);
-	(void) emlxs_dump_host_pointers(hba, fpDmpFile);
-	(void) emlxs_dump_port_pointers(hba, fpDmpFile);
-	(void) emlxs_dump_rings(hba, fpDmpFile);
+
+	if (hba->sli_mode <= EMLXS_HBA_SLI3_MODE) {
+		/* HBA should be in OFFLINE state here */
+
+		(void) emlxs_dump_sli_regs(hba, fpDmpFile);
+		(void) emlxs_dump_slim(hba, fpTxtFile, fpDmpFile, dump_type);
+		(void) emlxs_dump_pcb(hba, fpDmpFile);
+		(void) emlxs_dump_mbox(hba, fpDmpFile);
+		(void) emlxs_dump_host_pointers(hba, fpDmpFile);
+		(void) emlxs_dump_port_pointers(hba, fpDmpFile);
+		(void) emlxs_dump_rings(hba, fpDmpFile);
+	}
+
 	(void) emlxs_dump_drv_internals(hba, fpDmpFile);
 
 	return (0);
 
-}  /* emlxs_dump_sli_interface() */
+} /* emlxs_dump_sli_interface() */
 
 
 static uint32_t
-emlxs_dump_hornet_logs(
+emlxs_dump_menlo_log(
 	emlxs_hba_t *hba,
 	emlxs_file_t *fpCeeFile)
 {
-	emlxs_port_t *port = &PPORT;
 	uint32_t RmStatus;
 	int i, j;
 	int isWrapped = FALSE;
@@ -3520,6 +3379,10 @@ emlxs_dump_hornet_logs(
 	uint32_t PanicLogEntryCount;
 	uint32_t PanicLogEntrySize;
 
+	if (hba->model_info.device_id != PCI_DEVICE_ID_LP21000_M) {
+		return (DFC_INVALID_ADAPTER);
+	}
+
 	/* First, issue a GetConfig command, which gives us */
 	/* the Log Config and Panic Log sizes */
 
@@ -3534,12 +3397,6 @@ emlxs_dump_hornet_logs(
 	PlBufSize = GcBuf.panic_log_size;
 
 	pLcBuf = (menlo_rsp_t *)kmem_zalloc(LcBufSize, KM_SLEEP);
-	if (pLcBuf == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_hornet_logs: Unable to allocate LcBuf.");
-		RmStatus = 1;
-		goto done;
-	}
 
 	RmStatus = emlxs_menlo_get_logcfg(hba, pLcBuf, LcBufSize);
 
@@ -3582,13 +3439,6 @@ emlxs_dump_hornet_logs(
 		    (pLcEntry[i].num_entries *pLcEntry[i].entry_size) + 8;
 
 		pLdBuf = (menlo_rsp_t *)kmem_zalloc(LdBufSize, KM_SLEEP);
-		if (pLdBuf == 0) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-			    "emlxs_dump_hornet_logs: "\
-			    "Unable to allocate LdBuf.");
-			RmStatus = 1;
-			goto done;
-		}
 
 		RmStatus = emlxs_menlo_get_log(hba, i, pLdBuf, LdBufSize);
 
@@ -3667,12 +3517,6 @@ emlxs_dump_hornet_logs(
 	RmStatus = emlxs_dump_string_txtfile(fpCeeFile, buf1, 0, 0, 1);
 
 	pPlBuf = (menlo_rsp_t *)kmem_zalloc(PlBufSize, KM_SLEEP);
-	if (pPlBuf == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
-		    "emlxs_dump_hornet_logs: Unable to allocate PlBuf.");
-		RmStatus = 1;
-		goto done;
-	}
 
 	RmStatus = emlxs_menlo_get_paniclog(hba, pPlBuf, PlBufSize);
 
@@ -3788,11 +3632,11 @@ done:
 
 	return (RmStatus);
 
-}  /* emlxs_dump_hornet_logs() */
+} /* emlxs_dump_menlo_log() */
 
 
 static uint32_t
-emlxs_dump_saturn_logs(
+emlxs_dump_saturn_log(
 	emlxs_hba_t *hba,
 	emlxs_file_t *fpTxtFile,
 	emlxs_file_t *fpDmpFile)
@@ -3800,14 +3644,10 @@ emlxs_dump_saturn_logs(
 	emlxs_port_t *port = &PPORT;
 	MAILBOXQ *mbq;
 	MAILBOX *mb;
+	MATCHMAP *mp = NULL;
 	uint32_t status;
 	uint32_t logSize = 0;
-	uint8_t *pDataBuf = NULL;
 	uintptr_t tempAddress;
-	char *NV_LOG_NOT_INCLUDED_IN_DMP =
-	    "Non-Volatile Log Dump is not included in the DMP file";
-	char *NV_LOG_INCLUDED_IN_DMP =
-	    "Non-Volatile Log Dump is included in the DMP file";
 	int fSwap = FALSE;
 	uint32_t i;
 	uint32_t block_size;
@@ -3817,21 +3657,22 @@ emlxs_dump_saturn_logs(
 	fSwap = TRUE;
 #endif /* EMLXS_BIG_ENDIAN */
 
-	if ((mbq =
-	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP)) == 0) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_dfc_error_msg,
-		    "Unable to allocate mailbox buffer.");
-
+	if (hba->model_info.chip != EMLXS_SATURN_CHIP) {
 		return (1);
 	}
+
+	mbq =
+	    (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ), KM_SLEEP);
+
 	mb = (MAILBOX *) mbq;
 
 	/* Step 1: Call MBX_READ_EVENT_LOG_STATUS to get the log size. */
 	for (i = 0; i < 10; i++) {
 		bzero((void *)mb, MAILBOX_CMD_BSIZE);
 		mb->mbxCommand = MBX_READ_EVENT_LOG_STATUS;
+		mbq->mbox_cmpl = NULL;
 
-		if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0) ==
+		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) ==
 		    MBX_SUCCESS) {
 			break;
 		}
@@ -3877,9 +3718,12 @@ emlxs_dump_saturn_logs(
 
 	/* Step 2: Use the log size from step 1 to call MBX_READ_EVENT_LOG */
 	logSize = mb->un.varLogStat.size;
-	if ((pDataBuf = (uint8_t *)kmem_zalloc(logSize, KM_SLEEP)) == NULL) {
+
+	if ((mp = emlxs_mem_buf_alloc(hba, logSize)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
-		    "Unable to allocate log buffer. size=%d", logSize);
+		    "Unable to allocate receive buffer. "
+		    "size=%d",
+		    logSize);
 
 		kmem_free(mbq, sizeof (MAILBOXQ));
 		return (1);
@@ -3892,7 +3736,7 @@ emlxs_dump_saturn_logs(
 			block_size = 1024;
 		}
 
-		tempAddress = (uintptr_t)(pDataBuf + offset);
+		tempAddress = (uintptr_t)(mp->phys + offset);
 
 		bzero((void *)mb, MAILBOX_CMD_BSIZE);
 		mb->mbxCommand = MBX_READ_EVENT_LOG;	/* 0x38 */
@@ -3901,16 +3745,17 @@ emlxs_dump_saturn_logs(
 		mb->un.varRdEvtLog.offset = offset;
 		mb->un.varRdEvtLog.un.sp64.tus.f.bdeFlags = 0x0;
 		mb->un.varRdEvtLog.un.sp64.tus.f.bdeSize = block_size;
-		mb->un.varRdEvtLog.un.sp64.addrLow = putPaddrLow(tempAddress);
-		mb->un.varRdEvtLog.un.sp64.addrHigh = putPaddrHigh(tempAddress);
+		mb->un.varRdEvtLog.un.sp64.addrLow = PADDR_LO(tempAddress);
+		mb->un.varRdEvtLog.un.sp64.addrHigh = PADDR_HI(tempAddress);
+		mbq->mbox_cmpl = NULL;
 
-		if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0) !=
+		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) !=
 		    MBX_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
 			    "Unable to read event log. status=%x",
 			    mb->mbxStatus);
 
-			kmem_free(pDataBuf, logSize);
+			(void) emlxs_mem_buf_free(hba, mp);
 			kmem_free(mbq, sizeof (MAILBOXQ));
 			return (1);
 		}
@@ -3925,16 +3770,206 @@ emlxs_dump_saturn_logs(
 	    LEGEND_NON_VOLATILE_LOG, LEGEND_NULL, 0);
 
 	/* Write the real log to the DMP file. */
+	EMLXS_MPDATA_SYNC(mp->dma_handle, 0, logSize, DDI_DMA_SYNC_FORKERNEL);
+
 	status =
-	    emlxs_dump_host_block(fpDmpFile, pDataBuf, logSize,
+	    emlxs_dump_host_block(fpDmpFile, mp->virt, logSize,
 	    SID_NON_VOLATILE_LOG, LEGEND_NON_VOLATILE_LOG, LEGEND_NULL,
 	    fSwap);
 
-	kmem_free(pDataBuf, logSize);
+	(void) emlxs_mem_buf_free(hba, mp);
 	kmem_free(mbq, sizeof (MAILBOXQ));
 	return (status);
 
-}  /* emlxs_dump_saturn_logs() */
+} /* emlxs_dump_saturn_log() */
+
+
+static uint32_t
+emlxs_dump_tigershark_log(
+	emlxs_hba_t *hba,
+	emlxs_file_t *fpTxtFile,
+	emlxs_file_t *fpCeeFile)
+{
+	emlxs_port_t *port = &PPORT;
+	uint32_t rval = 0;
+	uint32_t offset;
+	uint32_t log_size;
+	uint32_t xfer_size;
+	uint32_t buffer_size;
+	uint8_t *buffer = NULL;
+	uint8_t *bptr;
+	uint8_t *payload;
+	MAILBOXQ *mbq = NULL;
+	MAILBOX4 *mb = NULL;
+	MATCHMAP *mp = NULL;
+	IOCTL_COMMON_MANAGE_FAT *fat;
+	mbox_req_hdr_t *hdr_req;
+
+	if (hba->model_info.chip != EMLXS_TIGERSHARK_CHIP) {
+		return (1);
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+	    "Querying FAT...");
+
+	mbq = (MAILBOXQ *)kmem_zalloc(sizeof (MAILBOXQ),
+	    KM_SLEEP);
+
+	mb = (MAILBOX4*)mbq;
+
+	if ((mp = emlxs_mem_buf_alloc(hba, (sizeof (mbox_req_hdr_t) +
+	    sizeof (IOCTL_COMMON_MANAGE_FAT) + BE_MAX_XFER_SIZE))) == NULL) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+		    "Unable to allocate FAT buffer.");
+
+		rval = 1;
+		goto done;
+	}
+
+	/* Query FAT */
+	mb->un.varSLIConfig.be.embedded = 0;
+	mbq->nonembed = (uint8_t *)mp;
+	mbq->mbox_cmpl = NULL;
+
+	mb->mbxCommand = MBX_SLI_CONFIG;
+	mb->mbxOwner = OWN_HOST;
+
+	hdr_req = (mbox_req_hdr_t *)mp->virt;
+	hdr_req->subsystem = IOCTL_SUBSYSTEM_COMMON;
+	hdr_req->opcode = COMMON_OPCODE_MANAGE_FAT;
+	hdr_req->timeout = 0;
+	hdr_req->req_length = sizeof (IOCTL_COMMON_MANAGE_FAT);
+
+	fat = (IOCTL_COMMON_MANAGE_FAT *)(hdr_req + 1);
+	fat->params.request.fat_operation = QUERY_FAT;
+	fat->params.request.read_log_offset = 0;
+	fat->params.request.read_log_length = 0;
+	fat->params.request.data_buffer_size = BE_MAX_XFER_SIZE;
+
+	if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) !=
+	    MBX_SUCCESS) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+		    "FAT Query failed. status=%x",
+		    mb->mbxStatus);
+
+		rval = 1;
+		goto done;
+	}
+
+	log_size = fat->params.response.log_size;
+	buffer_size = fat->params.response.log_size;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+	    "FAT: log_size=%d", log_size);
+
+	if (log_size) {
+		if ((buffer = (uint8_t *)kmem_alloc(
+		    buffer_size, KM_NOSLEEP)) == NULL) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+			    "Unable to allocate log buffer.");
+
+			rval = 1;
+			goto done;
+		}
+		bzero(buffer, buffer_size);
+	}
+
+	/* Upload Log */
+	bptr = buffer;
+	offset = 0;
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+	    "Uploading log... (%d bytes)", log_size);
+
+	while (log_size) {
+		bzero((void *) mb, MAILBOX_CMD_SLI4_BSIZE);
+		bzero((void *) mp->virt, mp->size);
+
+		xfer_size = min(BE_MAX_XFER_SIZE, log_size);
+
+		mb->un.varSLIConfig.be.embedded = 0;
+		mbq->nonembed = (uint8_t *)mp;
+		mbq->mbox_cmpl = NULL;
+
+		mb->mbxCommand = MBX_SLI_CONFIG;
+		mb->mbxOwner = OWN_HOST;
+
+		hdr_req = (mbox_req_hdr_t *)mp->virt;
+		hdr_req->subsystem = IOCTL_SUBSYSTEM_COMMON;
+		hdr_req->opcode = COMMON_OPCODE_MANAGE_FAT;
+		hdr_req->timeout = 0;
+		hdr_req->req_length =
+		    sizeof (IOCTL_COMMON_MANAGE_FAT) + xfer_size;
+
+		fat = (IOCTL_COMMON_MANAGE_FAT *)(hdr_req + 1);
+		fat->params.request.fat_operation = RETRIEVE_FAT;
+		fat->params.request.read_log_offset = offset;
+		fat->params.request.read_log_length = xfer_size;
+		fat->params.request.data_buffer_size = BE_MAX_XFER_SIZE;
+
+		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0) !=
+		    MBX_SUCCESS) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+			    "Failed to upload log. status=%x",
+			    mb->mbxStatus);
+
+			(void) emlxs_dump_string_txtfile(fpTxtFile,
+			    NV_LOG_NOT_INCLUDED_IN_FAT,
+			    LEGEND_NON_VOLATILE_LOG,
+			    LEGEND_NV_LOG_STATUS_ERROR, 0);
+
+			rval = 1;
+			goto done;
+		}
+
+		payload = (uint8_t *)(&fat->params.response.data_buffer);
+
+		BE_SWAP32_BCOPY(payload, bptr, xfer_size);
+
+		log_size -= xfer_size;
+		offset += xfer_size;
+		bptr += xfer_size;
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+	    "Log upload complete.");
+
+	/* Write a string to text file to direct the user to the CEE */
+	/* file for the actual log. */
+	rval =
+	    emlxs_dump_string_txtfile(fpTxtFile, NV_LOG_INCLUDED_IN_FAT,
+	    LEGEND_NON_VOLATILE_LOG, LEGEND_NULL, 0);
+
+
+	/* Write the log to the CEE file. */
+	/* First word is the log size */
+	bptr = buffer + sizeof (uint32_t);
+	log_size = buffer_size - sizeof (uint32_t);
+	rval = emlxs_dump_word_dmpfile(fpCeeFile, (uint8_t *)bptr,
+	    log_size, 0);
+
+done:
+
+	if (mbq) {
+		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+	}
+
+	if (mp) {
+		(void) emlxs_mem_buf_free(hba, mp);
+	}
+
+	if (buffer) {
+		kmem_free(buffer, buffer_size);
+	}
+
+	if (rval == 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+		    "Dump complete.");
+	}
+
+	return (rval);
+
+} /* emlxs_dump_tigershark_log() */
 
 
 extern uint32_t
@@ -3943,21 +3978,14 @@ emlxs_dump_user_event(
 {
 	emlxs_port_t *port = &PPORT;
 	uint32_t status;
-
-	/* Dump File Pointers */
 	emlxs_file_t *fpTxtFile;
 	emlxs_file_t *fpDmpFile;
 	emlxs_file_t *fpCeeFile;
-
-	/* flag indicating Hornet board */
-	uint32_t bHornet;
 
 	mutex_enter(&EMLXS_DUMP_LOCK);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
 	    "User Event: Firmware core dump initiated...");
-
-	bHornet = emlxs_ishornet(hba);
 
 	status =
 	    emlxs_dump_file_create(hba, &fpTxtFile, &fpDmpFile, &fpCeeFile);
@@ -3971,51 +3999,44 @@ emlxs_dump_user_event(
 	(void) emlxs_dump_parm_table(hba, fpTxtFile, fpDmpFile);
 	(void) emlxs_dump_cfg_regions(hba, fpTxtFile, fpDmpFile);
 
-	/* Check for Saturn Enterprise. If yes, trigger the NV Log. */
 	if (hba->model_info.chip == EMLXS_SATURN_CHIP) {
-		(void) emlxs_dump_saturn_logs(hba, fpTxtFile, fpDmpFile);
+		(void) emlxs_set_hba_mode(hba, DDI_ONDI);
+		(void) emlxs_dump_saturn_log(hba, fpTxtFile, fpDmpFile);
 	}
 
-	/* Take HBA (port) offline before we proceed */
-	status = emlxs_set_hba_mode(hba, DDI_SHOW);
-	if (status != DDI_OFFDI) {
-		(void) emlxs_set_hba_mode(hba, DDI_OFFDI);
+	if (hba->model_info.chip == EMLXS_TIGERSHARK_CHIP) {
+		(void) emlxs_dump_tigershark_log(hba, fpTxtFile, fpCeeFile);
+	}
+
+	if (hba->sli_mode <= EMLXS_HBA_SLI3_MODE) {
+		(void) emlxs_set_hba_mode(hba, DDI_DIAGDI);
 	}
 
 	(void) emlxs_dump_sli_interface(hba, fpTxtFile, fpDmpFile,
 	    DUMP_TYPE_USER);
 
-	/* Take HBA (port) to Warm-start Noram Mode before we proceed */
-	status = emlxs_set_hba_mode(hba, DDI_SHOW);
-	if (status != DDI_WARMDI) {
+	if (hba->sli_mode <= EMLXS_HBA_SLI3_MODE) {
 		(void) emlxs_set_hba_mode(hba, DDI_WARMDI);
 	}
 
 	(void) emlxs_dump_hba(hba, fpTxtFile, fpDmpFile);
 
-	/* Set HBA (port) back online */
-	status = emlxs_set_hba_mode(hba, DDI_SHOW);
-	if (status != DDI_ONDI) {
-		(void) emlxs_set_hba_mode(hba, DDI_ONDI);
+	(void) emlxs_set_hba_mode(hba, DDI_ONDI);
+
+	status = emlxs_menlo_set_mode(hba, MENLO_MAINTENANCE_MODE_ENABLE);
+	if (status == 0) {
+		(void) emlxs_dump_menlo_log(hba, fpCeeFile);
+		(void) emlxs_menlo_set_mode(hba,
+		    MENLO_MAINTENANCE_MODE_DISABLE);
 	}
 
-	if (bHornet) {
-		status =
-		    emlxs_menlo_set_mode(hba, MENLO_MAINTENANCE_MODE_ENABLE);
-		if (status == 0) {
-			(void) emlxs_dump_hornet_logs(hba, fpCeeFile);
-			(void) emlxs_menlo_set_mode(hba,
-			    MENLO_MAINTENANCE_MODE_DISABLE);
-		}
-	}
-
-	(void) emlxs_dump_file_terminate(fpTxtFile, fpDmpFile, fpCeeFile);
+	(void) emlxs_dump_file_terminate(hba, fpTxtFile, fpDmpFile, fpCeeFile);
 	(void) emlxs_dump_file_close(fpTxtFile, fpDmpFile, fpCeeFile);
 
 	mutex_exit(&EMLXS_DUMP_LOCK);
 	return (0);
 
-}  /* emlxs_dump_user_event() */
+} /* emlxs_dump_user_event() */
 
 
 extern uint32_t
@@ -4026,14 +4047,21 @@ emlxs_dump_temp_event(
 {
 	emlxs_port_t *port = &PPORT;
 	uint32_t status;
-
-	/* Dump File Pointers */
 	emlxs_file_t *fpTxtFile;
 
 	/* misc vars */
 	char sBuf1[512];	/* general purpose string buffer */
 	char sBuf2[256];	/* general purpose string buffer */
 	char sBuf3[256];	/* general purpose string buffer */
+
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
+		    "Temperature Event: type=%d temp=%d.  "\
+		    "Invalid SLI4 event.",
+		    tempType, temp);
+
+		return (1);
+	}
 
 	mutex_enter(&EMLXS_DUMP_LOCK);
 
@@ -4049,7 +4077,7 @@ emlxs_dump_temp_event(
 	}
 
 	/* Now generate the Dump */
-	/* Note: ignore return(status); if one part fails, */
+	/* Note: ignore return (status); if one part fails, */
 	/* keep trying to dump more stuff. */
 
 	/* Write a warning at the top of the file */
@@ -4080,13 +4108,13 @@ emlxs_dump_temp_event(
 	(void) emlxs_dump_rev_info(hba, fpTxtFile, NULL);
 	(void) emlxs_dump_hba_info(hba, fpTxtFile, NULL, DUMP_TYPE_TEMP);
 
-	(void) emlxs_dump_file_terminate(fpTxtFile, NULL, NULL);
+	(void) emlxs_dump_file_terminate(hba, fpTxtFile, NULL, NULL);
 	(void) emlxs_dump_file_close(fpTxtFile, NULL, NULL);
 
 	mutex_exit(&EMLXS_DUMP_LOCK);
 	return (0);
 
-}  /* emlxs_dump_temp_event() */
+} /* emlxs_dump_temp_event() */
 
 
 extern uint32_t
@@ -4095,21 +4123,14 @@ emlxs_dump_drv_event(
 {
 	emlxs_port_t *port = &PPORT;
 	uint32_t status;
-
-	/* Dump File Pointers */
 	emlxs_file_t *fpTxtFile;
 	emlxs_file_t *fpDmpFile;
 	emlxs_file_t *fpCeeFile;
-
-	/* Flag for Hornet Converged Enhanced Ethernet dump */
-	uint32_t bHornet;
 
 	mutex_enter(&EMLXS_DUMP_LOCK);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fw_dump_msg,
 	    "Dump Event: Firmware core dump initiated...");
-
-	bHornet = emlxs_ishornet(hba);
 
 	status =
 	    emlxs_dump_file_create(hba, &fpTxtFile, &fpDmpFile, &fpCeeFile);
@@ -4119,70 +4140,54 @@ emlxs_dump_drv_event(
 	}
 
 	if (hba->model_info.chip == EMLXS_SATURN_CHIP) {
-		/* Make sure the port is online before asking for NV log. */
-		status = emlxs_set_hba_mode(hba, DDI_SHOW);
-		if (status != DDI_ONDI) {
-			(void) emlxs_set_hba_mode(hba, DDI_ONDI);
-		}
-
-		(void) emlxs_dump_saturn_logs(hba, fpTxtFile, fpDmpFile);
+		(void) emlxs_set_hba_mode(hba, DDI_ONDI);
+		(void) emlxs_dump_saturn_log(hba, fpTxtFile, fpDmpFile);
 	}
 
-	/* Take HBA (port) offline before we proceed */
-	status = emlxs_set_hba_mode(hba, DDI_SHOW);
-	if (status != DDI_OFFDI) {
-		(void) emlxs_set_hba_mode(hba, DDI_OFFDI);
+	if (hba->model_info.chip == EMLXS_TIGERSHARK_CHIP) {
+		(void) emlxs_dump_tigershark_log(hba, fpTxtFile, fpCeeFile);
+	}
+
+	if (hba->sli_mode <= EMLXS_HBA_SLI3_MODE) {
+		(void) emlxs_set_hba_mode(hba, DDI_DIAGDI);
 	}
 
 	(void) emlxs_dump_sli_interface(hba, fpTxtFile, fpDmpFile,
 	    DUMP_TYPE_DRIVER);
 
-	status = emlxs_set_hba_mode(hba, DDI_SHOW);
-	if (status != DDI_WARMDI) {
+	if (hba->sli_mode <= EMLXS_HBA_SLI3_MODE) {
 		(void) emlxs_set_hba_mode(hba, DDI_WARMDI);
 	}
 
 	(void) emlxs_dump_hba(hba, fpTxtFile, fpDmpFile);
 
-	status = emlxs_set_hba_mode(hba, DDI_SHOW);
-	if (status != DDI_ONDI) {
-		(void) emlxs_set_hba_mode(hba, DDI_ONDI);
+	(void) emlxs_set_hba_mode(hba, DDI_ONDI);
+
+	status = emlxs_menlo_set_mode(hba, MENLO_MAINTENANCE_MODE_ENABLE);
+	if (status == 0) {
+		(void) emlxs_dump_menlo_log(hba, fpCeeFile);
 	}
 
-	if (bHornet) {
-		status =
-		    emlxs_menlo_set_mode(hba, MENLO_MAINTENANCE_MODE_ENABLE);
-		if (status == 0) {
-			(void) emlxs_dump_hornet_logs(hba, fpCeeFile);
-		}
-	}
-
-
-	/* end if bHornet */
 	/* Now generate the rest of the Dump */
 	(void) emlxs_dump_rev_info(hba, fpTxtFile, fpDmpFile);
 	(void) emlxs_dump_hba_info(hba, fpTxtFile, fpDmpFile, DUMP_TYPE_DRIVER);
 	(void) emlxs_dump_parm_table(hba, fpTxtFile, fpDmpFile);
 	(void) emlxs_dump_cfg_regions(hba, fpTxtFile, fpDmpFile);
 
-	/* The last step of the Menlo Dump. */
-	if (bHornet) {
-		(void) emlxs_menlo_reset(hba, MENLO_FW_OPERATIONAL);
-	}
-	/* end if bHornet */
-	(void) emlxs_dump_file_terminate(fpTxtFile, fpDmpFile, fpCeeFile);
+	(void) emlxs_dump_file_terminate(hba, fpTxtFile, fpDmpFile, fpCeeFile);
 	(void) emlxs_dump_file_close(fpTxtFile, fpDmpFile, fpCeeFile);
 
-	status = emlxs_set_hba_mode(hba, DDI_SHOW);
-	if (status != DDI_WARMDI) {
-		(void) emlxs_set_hba_mode(hba, DDI_WARMDI);
-	}
+	/* The last step of the Menlo Dump. */
+	(void) emlxs_menlo_reset(hba, MENLO_FW_OPERATIONAL);
+
+	(void) emlxs_set_hba_mode(hba, DDI_WARMDI);
 
 	mutex_exit(&EMLXS_DUMP_LOCK);
 
+
 	return (0);
 
-}  /* emlxs_dump_drv_event() */
+} /* emlxs_dump_drv_event() */
 
 
 /* ARGSUSED */
@@ -4199,7 +4204,7 @@ emlxs_dump_drv_thread(emlxs_hba_t *hba,
 
 	return;
 
-}  /* emlxs_dump_drv_thread() */
+} /* emlxs_dump_drv_thread() */
 
 
 /* ARGSUSED */
@@ -4216,7 +4221,7 @@ emlxs_dump_user_thread(emlxs_hba_t *hba,
 
 	return;
 
-}  /* emlxs_dump_user_thread() */
+} /* emlxs_dump_user_thread() */
 
 
 /* ARGSUSED */
@@ -4239,7 +4244,7 @@ emlxs_dump_temp_thread(emlxs_hba_t *hba,
 
 	return;
 
-}  /* emlxs_dump_temp_thread() */
+} /* emlxs_dump_temp_thread() */
 
 
 /* Schedules a dump thread */

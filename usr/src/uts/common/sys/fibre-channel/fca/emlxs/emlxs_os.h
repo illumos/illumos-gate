@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_OS_H
 #define	_EMLXS_OS_H
@@ -45,19 +44,17 @@ extern "C" {
 /*
  * DRIVER LEVEL FEATURES
  */
-#define	DFC_SUPPORT		/* 2.20 driver */
 #define	DHCHAP_SUPPORT		/* 2.21 driver */
 
 #define	SATURN_MSI_SUPPORT	/* 2.30 driver */
-
 #define	MENLO_SUPPORT		/* 2.30 driver */
-
 #define	MBOX_EXT_SUPPORT	/* 2.30 driver */
-#define	SLI3_SUPPORT		/* 2.30 driver - Required for NPIV */
 
 #define	DUMP_SUPPORT		/* 2.40 driver */
 #define	SAN_DIAG_SUPPORT	/* 2.40 driver */
 #define	FMA_SUPPORT		/* 2.40 driver */
+
+#define	SLI4_FASTPATH_DEBUG
 
 /* #define	IDLE_TIMER	 Not yet - untested */
 
@@ -68,13 +65,10 @@ extern "C" {
 #define	 EMLXS_MODREV EMLXS_MODREV3
 #define	 MSI_SUPPORT
 
-#ifdef SLI3_SUPPORT
-#define	NPIV_SUPPORT
-#endif	/* SLI3_SUPPORT */
 
 #ifdef EMLXS_I386
 #define	 EMLXS_MODREVX EMLXS_MODREV2X
-#endif	/* EMLXS_I386 */
+#endif	/* i386 */
 #endif	/* S10 */
 
 
@@ -82,24 +76,11 @@ extern "C" {
 #define	MSI_SUPPORT
 #define	SFCT_SUPPORT  /* COMSTAR Support */
 #define	MODFW_SUPPORT /* Dynamic firmware module support */
-
-#ifdef SLI3_SUPPORT
-#define	NPIV_SUPPORT
-
-#ifdef NPIV_SUPPORT
-#define	SUN_NPIV_SUPPORT  /* Nevada Build 92+ */
-#endif /* NPIV_SUPPORT */
-#endif	/* SLI3_SUPPORT */
-
-#ifdef SUN_NPIV_SUPPORT
-#define	 EMLXS_MODREV EMLXS_MODREV5		/* Sun NPIV Enhancement */
-#else
-define	EMLXS_MODREV	EMLXS_MODREV4
-#endif /* SUN_NPIV_SUPPORT */
+#define	EMLXS_MODREV EMLXS_MODREV5	/* Sun NPIV Enhancement */
 
 #ifdef EMLXS_I386
-#define	 EMLXS_MODREVX EMLXS_MODREV2X
-#endif	/* EMLXS_I386 */
+#define	EMLXS_MODREVX EMLXS_MODREV2X
+#endif	/* i386 */
 #endif	/* S11 */
 
 /*
@@ -297,9 +278,9 @@ extern void ddi_fm_acc_err_clear();
 #define	DEFAULT_BURSTSIZE	(BURSTSIZE_MASK)	/* all burst sizes */
 #endif	/* BURSTSIZE */
 
-#define	putPaddrLow(addr)	((uint32_t)(((uint64_t)(addr)) & 0xffffffff))
-#define	putPaddrHigh(addr)	((uint32_t)(((uint64_t)(addr)) >> 32))
-#define	getPaddr(high, low)	((uint64_t)((((uint64_t)(high)) << 32) \
+#define	PADDR_LO(addr)		((uint32_t)(((uint64_t)(addr)) & 0xffffffff))
+#define	PADDR_HI(addr)		((uint32_t)(((uint64_t)(addr)) >> 32))
+#define	PADDR(high, low)	((uint64_t)((((uint64_t)(high)) << 32) \
 					| (((uint64_t)(low)) & 0xffffffff)))
 
 #ifndef TRUE
@@ -322,7 +303,7 @@ extern void ddi_fm_acc_err_clear();
 #define	DELAYUS(us)		drv_usecwait(us)
 
 #ifdef FMA_SUPPORT
-#define	emlxs_mpdata_sync(h, a, b, c)  \
+#define	EMLXS_MPDATA_SYNC(h, a, b, c)  \
 	if (h)  { \
 		(void) ddi_dma_sync((ddi_dma_handle_t)(h), \
 			(off_t)(a), (size_t)(b), (uint_t)c); \
@@ -335,13 +316,12 @@ extern void ddi_fm_acc_err_clear();
 		} \
 	}
 #else	/* !FMA_SUPPORT */
-#define	emlxs_mpdata_sync(h, a, b, c)  \
+#define	EMLXS_MPDATA_SYNC(h, a, b, c)  \
 	if (h)  { \
 		(void) ddi_dma_sync((ddi_dma_handle_t)(h), \
 			(off_t)(a), (size_t)(b), (uint_t)c); \
 	}
 #endif	/* FMA_SUPPORT */
-
 
 
 #define	PKT2PRIV(pkt)		((emlxs_buf_t *)(pkt)->pkt_fca_private)
@@ -372,6 +352,10 @@ extern void ddi_fm_acc_err_clear();
 #define	PCI_CFG_RINDEX		  0
 #define	PCI_SLIM_RINDEX		  1
 #define	PCI_CSR_RINDEX		  2
+
+#define	PCI_BAR1_RINDEX		  2
+#define	PCI_BAR2_RINDEX		  3
+
 
 #define	EMLXS_MAX_UBUFS		65535
 
@@ -478,6 +462,78 @@ typedef struct emlxs_table
 	uint32_t	code;
 	char		string[32];
 } emlxs_table_t;
+
+
+/* PATCH MASK DEFINES */
+#define	EMLXS_PATCH1		0x00000001
+#define	EMLXS_PATCH2		0x00000002
+#define	EMLXS_PATCH3		0x00000004
+#define	EMLXS_PATCH4		0x00000008
+#define	EMLXS_PATCH5		0x00000010
+#define	EMLXS_PATCH6		0x00000020
+#define	EMLXS_PATCH7		0x00000040
+#define	EMLXS_PATCH8		0x00000080
+#define	EMLXS_PATCH9		0x00000100
+#define	EMLXS_PATCH10		0x00000200
+#define	EMLXS_PATCH11		0x00000400
+#define	EMLXS_PATCH12		0x00000800
+#define	EMLXS_PATCH13		0x00001000
+#define	EMLXS_PATCH14		0x00002000
+#define	EMLXS_PATCH15		0x00004000
+#define	EMLXS_PATCH16		0x00008000
+#define	EMLXS_PATCH17		0x00010000
+#define	EMLXS_PATCH18		0x00020000
+#define	EMLXS_PATCH19		0x00040000
+#define	EMLXS_PATCH20		0x00080000
+#define	EMLXS_PATCH21		0x00100000
+#define	EMLXS_PATCH22		0x00200000
+#define	EMLXS_PATCH23		0x00400000
+#define	EMLXS_PATCH24		0x00800000
+#define	EMLXS_PATCH25		0x01000000
+#define	EMLXS_PATCH26		0x02000000
+#define	EMLXS_PATCH27		0x04000000
+#define	EMLXS_PATCH28		0x08000000
+#define	EMLXS_PATCH29		0x10000000
+#define	EMLXS_PATCH30		0x20000000
+#define	EMLXS_PATCH31		0x40000000
+#define	EMLXS_PATCH32		0x80000000
+
+
+/* ULP Patches: */
+
+/* This patch enables the driver to auto respond to unsolicited LOGO's */
+/* This is needed because ULP is sometimes doesn't reply itself */
+#define	ULP_PATCH2	EMLXS_PATCH2
+
+/* This patch enables the driver to auto respond to unsolicited PRLI's */
+/* This is needed because ULP is known to panic sometimes */
+#define	ULP_PATCH3	EMLXS_PATCH3
+
+/* This patch enables the driver to auto respond to unsolicited PRLO's */
+/* This is needed because ULP is known to panic sometimes */
+#define	ULP_PATCH4	EMLXS_PATCH4
+
+/* This patch enables the driver to fail pkt abort requests */
+#define	ULP_PATCH5	EMLXS_PATCH5
+
+/* This patch enables the driver to generate an RSCN for unsolicited PRLO's */
+/* and LOGO's */
+#define	ULP_PATCH6	EMLXS_PATCH6
+
+/* Sun Disk Array Patches: */
+
+/* This patch enables the driver to fix a residual underrun issue with */
+/* check conditions */
+#define	FCP_UNDERRUN_PATCH1	EMLXS_PATCH9
+
+/* This patch enables the driver to fix a residual underrun issue with */
+/* SCSI inquiry commands */
+#define	FCP_UNDERRUN_PATCH2	EMLXS_PATCH10
+
+
+#define	DEFAULT_PATCHES	(ULP_PATCH2 | ULP_PATCH3 | \
+			    ULP_PATCH5 | ULP_PATCH6 | \
+			    FCP_UNDERRUN_PATCH1 | FCP_UNDERRUN_PATCH2)
 
 #ifdef	__cplusplus
 }

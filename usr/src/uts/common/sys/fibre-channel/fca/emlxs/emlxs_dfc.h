@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_DFC_H
 #define	_EMLXS_DFC_H
@@ -35,22 +34,15 @@ extern "C" {
 #include <sys/fibre-channel/fcio.h>
 #include <emlxs_fcio.h>
 
-
-#ifndef DFC_SUPPORT
-#define	DFC_REV		0
-#else
 #define	DFC_REV		1
 
 #ifdef DHCHAP_SUPPORT
 #undef	DFC_REV
-#define	DFC_REV		2
+#define	DFC_REV		2  /* DHCHAP_SUPPORT */
 #endif /* DHCHAP_SUPPORT */
 
-#ifdef NPIV_SUPPORT
 #undef	DFC_REV
-#define	DFC_REV		3
-#endif /* NPIV_SUPPORT */
-#endif	/* DFC_SUPPORT */
+#define	DFC_REV		3  /* NPIV_SUPPORT */
 
 
 typedef struct dfc
@@ -175,6 +167,16 @@ typedef struct sd_bucket_info
 /* SFCT_SUPPORT */
 #define	EMLXS_GET_FCTSTAT		70
 
+#define	EMLXS_GET_PERSIST_LINKDOWN	71
+#define	EMLXS_SET_PERSIST_LINKDOWN	72
+
+/* FCOE_SUPPORT */
+#define	EMLXS_GET_FCOE_FCFLIST		80
+#define	EMLXS_SEND_MBOX4		81
+#define	EMLXS_RD_BE_FCF			82
+#define	EMLXS_SET_BE_DCBX		83
+#define	EMLXS_GET_BE_DCBX		84
+
 /* SAN DIAG SUPPORT */
 #define	EMLXS_SD_SET_BUCKET		100
 #define	EMLXS_SD_START_DATA_COLLECTION  101
@@ -220,6 +222,9 @@ typedef struct sd_bucket_info
 #define	DFC_NPIV_DISABLED	(DFC_ERRNO_START + 18) /* NPIV disabled */
 #define	DFC_NPIV_UNSUPPORTED	(DFC_ERRNO_START + 19) /* NPIV not supported */
 #define	DFC_NPIV_ACTIVE		(DFC_ERRNO_START + 20) /* NPIV active */
+
+/* FCOE_SUPPORT */
+#define	DFC_FCOE_NOTSUPPORTED	(DFC_ERRNO_START + 21) /* FCoE not supported */
 
 /* DHCHAP_SUPPORT */
 #define	DFC_AUTH_NOT_CONFIGURED			(DFC_ERRNO_START + 30)
@@ -295,6 +300,10 @@ typedef struct dfc_hbainfo
 #define	HBA_FLAG_E2E_AUTH		0x00000020 /* Supports E2E Auth */
 #define	HBA_FLAG_TARGET_MODE		0x00000040 /* Supports Target Mode */
 #define	HBA_FLAG_TARGET_MODE_ENA	0x00000080 /* Target Mode is enabled */
+#define	HBA_FLAG_SAN_DIAG		0x00000100 /* Supports SAN Diags */
+#define	HBA_FLAG_FCOE			0x00000200 /* Supports FCoE */
+#define	HBA_FLAG_PERSISTLINK		0x00000400 /* Supports Persist Link */
+						    /* Up/Down */
 
 	uint32_t	device_id;
 	uint32_t	vendor_id;
@@ -367,6 +376,10 @@ typedef struct dfc_hbainfo
 	uint8_t		fabric_wwpn[8];
 	uint8_t		fabric_wwnn[8];
 	uint32_t	node_count;
+
+	uint8_t		pci_function_number;
+	uint8_t		pci_device_number;
+	uint8_t		pci_bus_number;
 } dfc_hbainfo_t;
 
 

@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_FCT_H
 #define	_EMLXS_FCT_H
@@ -64,6 +63,10 @@ extern "C" {
 #ifndef LINK_SPEED_10G
 #define	LINK_SPEED_10G		6
 #endif /* LINK_SPEED_10G */
+
+#ifndef PORT_SPEED_10G
+#define	PORT_SPEED_10G		0x10
+#endif /* PORT_SPEED_10G */
 
 #ifndef MODSYM_SUPPORT
 #pragma weak fct_alloc

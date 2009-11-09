@@ -21,8 +21,9 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #include <emlxs.h>
 
@@ -30,47 +31,10 @@
 EMLXS_MSG_DEF(EMLXS_FCP_C);
 
 #define	EMLXS_GET_VADDR(hba, rp, icmd) emlxs_mem_get_vaddr(hba, rp, \
-	getPaddr(icmd->un.cont64[i].addrHigh, icmd->un.cont64[i].addrLow));
+	PADDR(icmd->un.cont64[i].addrHigh, icmd->un.cont64[i].addrLow));
 
 static void	emlxs_sbp_abort_add(emlxs_port_t *port, emlxs_buf_t *sbp,
     Q *abort, uint8_t *flag, emlxs_buf_t *fpkt);
-static uint32_t	emlxs_iotag_flush(emlxs_hba_t *hba);
-
-/*
- * This routine copies data from src then potentially swaps the destination to
- * big endian. Assumes cnt is a multiple of sizeof(uint32_t).
- */
-extern void
-emlxs_pcimem_bcopy(uint32_t *src, uint32_t *dest, uint32_t cnt)
-{
-	uint32_t ldata;
-	int32_t i;
-
-	for (i = 0; i < (int)cnt; i += sizeof (uint32_t)) {
-		ldata = *src++;
-		ldata = PCIMEM_LONG(ldata);
-		*dest++ = ldata;
-	}
-}  /* emlxs_pcimem_bcopy */
-
-
-/*
- * This routine copies data from src then swaps the destination to big endian.
- * Assumes cnt is a multiple of sizeof(uint32_t).
- */
-extern void
-emlxs_swap_bcopy(uint32_t *src, uint32_t *dest, uint32_t cnt)
-{
-	uint32_t ldata;
-	int32_t i;
-
-	for (i = 0; i < (int)cnt; i += sizeof (uint32_t)) {
-		ldata = *src++;
-		ldata = SWAP_DATA32(ldata);
-		*dest++ = ldata;
-	}
-}  /* End fc_swap_bcopy */
-
 
 #define	SCSI3_PERSISTENT_RESERVE_IN	0x5e
 #define	SCSI_INQUIRY			0x12
@@ -85,9 +49,10 @@ emlxs_swap_bcopy(uint32_t *src, uint32_t *dest, uint32_t cnt)
  */
 /* ARGSUSED */
 extern void
-emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
+emlxs_handle_fcp_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 {
 	emlxs_port_t *port = &PPORT;
+	emlxs_config_t	*cfg = &CFG;
 	IOCB *cmd;
 	emlxs_buf_t *sbp;
 	fc_packet_t *pkt = NULL;
@@ -113,7 +78,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 	cmd = &iocbq->iocb;
 
 	/* Initialize the status */
-	iostat = cmd->ulpStatus;
+	iostat = cmd->ULPSTATUS;
 	localstat = 0;
 	scsi_status = 0;
 	asc = 0;
@@ -131,7 +96,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		HBASTATS.FcpStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_fcp_completion_msg,
-		    "cmd=%x iotag=%x", cmd->ulpCommand, cmd->ulpIoTag);
+		    "cmd=%x iotag=%x", cmd->ULPCOMMAND, cmd->ULPIOTAG);
 
 		return;
 	}
@@ -144,14 +109,14 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 	pkt = PRIV2PKT(sbp);
 
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 	scsi_cmd = (uint8_t *)pkt->pkt_cmd;
 	scsi_opcode = scsi_cmd[12];
 	data_rx = 0;
 
 	/* Sync data in data buffer only on FC_PKT_FCP_READ */
 	if (pkt->pkt_datalen && (pkt->pkt_tran_type == FC_PKT_FCP_READ)) {
-		emlxs_mpdata_sync(pkt->pkt_data_dma, 0, pkt->pkt_datalen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_data_dma, 0, pkt->pkt_datalen,
 		    DDI_DMA_SYNC_FORKERNEL);
 
 #ifdef TEST_SUPPORT
@@ -179,7 +144,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 	if ((iostat == IOSTAT_SUCCESS) &&
 	    (pkt->pkt_comp) &&
 	    !(sbp->pkt_flags &
-	    (PACKET_RETURNED | PACKET_COMPLETED |
+	    (PACKET_ULP_OWNED | PACKET_COMPLETED |
 	    PACKET_IN_COMPLETION | PACKET_IN_TXQ | PACKET_IN_CHIPQ |
 	    PACKET_IN_DONEQ | PACKET_IN_TIMEOUT | PACKET_IN_FLUSH |
 	    PACKET_IN_ABORT | PACKET_POLLED))) {
@@ -187,13 +152,13 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		sbp->pkt_flags |=
 		    (PACKET_STATE_VALID | PACKET_IN_COMPLETION |
-		    PACKET_COMPLETED | PACKET_RETURNED);
+		    PACKET_COMPLETED | PACKET_ULP_OWNED);
 		mutex_exit(&sbp->mtx);
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 		emlxs_unswap_pkt(sbp);
 #endif /* EMLXS_MODREV2X */
-
+		cp->ulpCmplCmd++;
 		(*pkt->pkt_comp) (pkt);
 
 		return;
@@ -206,7 +171,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 	/* Check if a response buffer was provided */
 	if ((iostat == IOSTAT_FCP_RSP_ERROR) && pkt->pkt_rsplen) {
-		emlxs_mpdata_sync(pkt->pkt_resp_dma, 0, pkt->pkt_rsplen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_resp_dma, 0, pkt->pkt_rsplen,
 		    DDI_DMA_SYNC_FORKERNEL);
 
 		/* Get the response buffer pointer */
@@ -250,7 +215,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 			if (pkt->pkt_datalen) {
 				rsp->fcp_u.fcp_status.resid_under = 1;
 				rsp->fcp_resid =
-				    SWAP_DATA32(pkt->pkt_datalen);
+				    LE_SWAP32(pkt->pkt_datalen);
 			} else {
 				rsp->fcp_u.fcp_status.resid_under = 0;
 				rsp->fcp_resid = 0;
@@ -273,7 +238,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 			check_underrun = 1;
 
 			/* Check if sense data was provided */
-			if (SWAP_DATA32(rsp->fcp_sense_len) >= 14) {
+			if (LE_SWAP32(rsp->fcp_sense_len) >= 14) {
 				sense = *((uint8_t *)rsp + 32 + 2);
 				asc = *((uint8_t *)rsp + 32 + 12);
 				ascq = *((uint8_t *)rsp + 32 + 13);
@@ -293,7 +258,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		/* Get the residual underrun count reported by the SCSI reply */
 		rsp_data_resid = (pkt->pkt_datalen &&
-		    rsp->fcp_u.fcp_status.resid_under) ? SWAP_DATA32(rsp->
+		    rsp->fcp_u.fcp_status.resid_under) ? LE_SWAP32(rsp->
 		    fcp_resid) : 0;
 
 		/* Set the pkt resp_resid field */
@@ -342,6 +307,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				}
 
 #ifdef FCP_UNDERRUN_PATCH1
+if (cfg[CFG_ENABLE_PATCH].current & FCP_UNDERRUN_PATCH1) {
 				/*
 				 * If status is not good and no data was
 				 * actually transferred, then we must fix
@@ -363,10 +329,12 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					    rsp_data_resid);
 
 				}
+}
 #endif /* FCP_UNDERRUN_PATCH1 */
 
 
 #ifdef FCP_UNDERRUN_PATCH2
+if (cfg[CFG_ENABLE_PATCH].current & FCP_UNDERRUN_PATCH2) {
 				if ((scsi_status == SCSI_STAT_GOOD)) {
 					emlxs_msg_t	*msg;
 
@@ -423,6 +391,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					}
 
 				}
+}
 #endif /* FCP_UNDERRUN_PATCH2 */
 
 				/*
@@ -436,7 +405,7 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					 */
 					rsp->fcp_u.fcp_status.resid_under = 1;
 					rsp->fcp_resid =
-					    SWAP_DATA32(pkt->pkt_data_resid);
+					    LE_SWAP32(pkt->pkt_data_resid);
 				} else {
 					/*
 					 * Change the status from
@@ -470,23 +439,6 @@ emlxs_handle_fcp_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 			/* Report whatever the target reported */
 			pkt->pkt_data_resid = rsp_data_resid;
 		}
-	}
-
-	/*
-	 * If pkt is tagged for timeout then set the return codes
-	 * appropriately
-	 */
-	if (sbp->pkt_flags & PACKET_IN_TIMEOUT) {
-		iostat = IOSTAT_LOCAL_REJECT;
-		localstat = IOERR_ABORT_TIMEOUT;
-		goto done;
-	}
-
-	/* If pkt is tagged for abort then set the return codes appropriately */
-	if (sbp->pkt_flags & (PACKET_IN_FLUSH | PACKET_IN_ABORT)) {
-		iostat = IOSTAT_LOCAL_REJECT;
-		localstat = IOERR_ABORT_REQUESTED;
-		goto done;
 	}
 
 	/* Print completion message */
@@ -614,7 +566,7 @@ done:
 
 	return;
 
-}  /* emlxs_handle_fcp_event() */
+} /* emlxs_handle_fcp_event() */
 
 
 
@@ -626,6 +578,7 @@ done:
  *  allows 2 buffers / command to be posted.
  *  Returns the number of buffers NOT posted.
  */
+/* SLI3 */
 extern int
 emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 {
@@ -645,18 +598,18 @@ emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 	tag = (uint16_t)cnt;
 	cnt += rp->fc_missbufcnt;
 
-	if (rp->ringno == FC_ELS_RING) {
+	if (rp->ringno == hba->channel_els) {
 		seg = MEM_BUF;
 		size = MEM_ELSBUF_SIZE;
-	} else if (rp->ringno == FC_IP_RING) {
+	} else if (rp->ringno == hba->channel_ip) {
 		seg = MEM_IPBUF;
 		size = MEM_IPBUF_SIZE;
-	} else if (rp->ringno == FC_CT_RING) {
+	} else if (rp->ringno == hba->channel_ct) {
 		seg = MEM_CTBUF;
 		size = MEM_CTBUF_SIZE;
 	}
 #ifdef SFCT_SUPPORT
-	else if (rp->ringno == FC_FCT_RING) {
+	else if (rp->ringno == hba->CHANNEL_FCT) {
 		seg = MEM_FCTBUF;
 		size = MEM_FCTBUF_SIZE;
 	}
@@ -669,12 +622,12 @@ emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 	 * While there are buffers to post
 	 */
 	while (cnt) {
-		if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB)) == 0) {
+		if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB, 0)) == 0) {
 			rp->fc_missbufcnt = cnt;
 			return (cnt);
 		}
 
-		iocbq->ring = (void *)rp;
+		iocbq->channel = (void *)&hba->chan[rp->ringno];
 		iocbq->port = (void *)port;
 		iocbq->flag |= (IOCB_PRIORITY | IOCB_SPECIAL);
 
@@ -688,8 +641,9 @@ emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 				break;
 
 			/* fill in BDEs for command */
-			if ((mp = (MATCHMAP *)emlxs_mem_get(hba, seg)) == 0) {
-				icmd->ulpBdeCount = i;
+			if ((mp = (MATCHMAP *)emlxs_mem_get(hba, seg, 1))
+			    == 0) {
+				icmd->ULPBDECOUNT = i;
 				for (j = 0; j < i; j++) {
 					mp = EMLXS_GET_VADDR(hba, rp, icmd);
 					if (mp) {
@@ -717,7 +671,7 @@ emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 			    (uint32_t *)&icmd->un.cont64[i].addrLow);
 
 			icmd->un.cont64[i].tus.f.bdeSize = size;
-			icmd->ulpCommand = CMD_QUE_RING_BUF64_CN;
+			icmd->ULPCOMMAND = CMD_QUE_RING_BUF64_CN;
 
 			/*
 			 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
@@ -729,21 +683,21 @@ emlxs_post_buffer(emlxs_hba_t *hba, RING *rp, int16_t cnt)
 			cnt--;
 		}
 
-		icmd->ulpIoTag = tag;
-		icmd->ulpBdeCount = i;
-		icmd->ulpLe = 1;
-		icmd->ulpOwner = OWN_CHIP;
+		icmd->ULPIOTAG = tag;
+		icmd->ULPBDECOUNT = i;
+		icmd->ULPLE = 1;
+		icmd->ULPOWNER = OWN_CHIP;
 		/* used for delimiter between commands */
 		iocbq->bp = (uint8_t *)mp;
 
-		emlxs_sli_issue_iocb_cmd(hba, rp, iocbq);
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, &hba->chan[rp->ringno], iocbq);
 	}
 
 	rp->fc_missbufcnt = 0;
 
 	return (0);
 
-}  /* emlxs_post_buffer() */
+} /* emlxs_post_buffer() */
 
 
 extern int
@@ -1012,8 +966,10 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 				 * Close the node for any further normal IO
 				 * A PLOGI with reopen the node
 				 */
-				emlxs_node_close(port, nlp, FC_FCP_RING, 60);
-				emlxs_node_close(port, nlp, FC_IP_RING, 60);
+				emlxs_node_close(port, nlp,
+				    hba->channel_fcp, 60);
+				emlxs_node_close(port, nlp,
+				    hba->channel_ip, 60);
 
 				/* Flush tx queue */
 				(void) emlxs_tx_node_flush(port, nlp, 0, 0, 0);
@@ -1101,8 +1057,10 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 				 * Close the node for any further normal IO
 				 * A PLOGI with reopen the node
 				 */
-				emlxs_node_close(port, nlp, FC_FCP_RING, 60);
-				emlxs_node_close(port, nlp, FC_IP_RING, 60);
+				emlxs_node_close(port, nlp,
+				    hba->channel_fcp, 60);
+				emlxs_node_close(port, nlp,
+				    hba->channel_ip, 60);
 
 				/* Flush tx queue */
 				(void) emlxs_tx_node_flush(port, nlp, 0, 0, 0);
@@ -1121,25 +1079,26 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 				 * Close the node for any further normal IO
 				 * An ADISC or a PLOGI with reopen the node
 				 */
-				emlxs_node_close(port, nlp, FC_FCP_RING, -1);
-				emlxs_node_close(port, nlp, FC_IP_RING,
+				emlxs_node_close(port, nlp,
+				    hba->channel_fcp, -1);
+				emlxs_node_close(port, nlp, hba->channel_ip,
 				    ((linkdown) ? 0 : 60));
 
 				/* Flush tx queues except for FCP ring */
 				(void) emlxs_tx_node_flush(port, nlp,
-				    &hba->ring[FC_CT_RING], 0, 0);
+				    &hba->chan[hba->channel_ct], 0, 0);
 				(void) emlxs_tx_node_flush(port, nlp,
-				    &hba->ring[FC_ELS_RING], 0, 0);
+				    &hba->chan[hba->channel_els], 0, 0);
 				(void) emlxs_tx_node_flush(port, nlp,
-				    &hba->ring[FC_IP_RING], 0, 0);
+				    &hba->chan[hba->channel_ip], 0, 0);
 
 				/* Flush chip queues except for FCP ring */
 				(void) emlxs_chipq_node_flush(port,
-				    &hba->ring[FC_CT_RING], nlp, 0);
+				    &hba->chan[hba->channel_ct], nlp, 0);
 				(void) emlxs_chipq_node_flush(port,
-				    &hba->ring[FC_ELS_RING], nlp, 0);
+				    &hba->chan[hba->channel_els], nlp, 0);
 				(void) emlxs_chipq_node_flush(port,
-				    &hba->ring[FC_IP_RING], nlp, 0);
+				    &hba->chan[hba->channel_ip], nlp, 0);
 			}
 		}
 		break;
@@ -1215,8 +1174,10 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 				 * Close the node for any further normal IO
 				 * A PLOGI with reopen the node
 				 */
-				emlxs_node_close(port, nlp, FC_FCP_RING, 60);
-				emlxs_node_close(port, nlp, FC_IP_RING, 60);
+				emlxs_node_close(port, nlp,
+				    hba->channel_fcp, 60);
+				emlxs_node_close(port, nlp,
+				    hba->channel_ip, 60);
 
 				/* Flush tx queue */
 				(void) emlxs_tx_node_flush(port, nlp, 0, 0, 0);
@@ -1231,25 +1192,26 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 				 * Close the node for any further normal IO
 				 * An ADISC or a PLOGI with reopen the node
 				 */
-				emlxs_node_close(port, nlp, FC_FCP_RING, -1);
-				emlxs_node_close(port, nlp, FC_IP_RING,
+				emlxs_node_close(port, nlp,
+				    hba->channel_fcp, -1);
+				emlxs_node_close(port, nlp, hba->channel_ip,
 				    ((linkdown) ? 0 : 60));
 
 				/* Flush tx queues except for FCP ring */
 				(void) emlxs_tx_node_flush(port, nlp,
-				    &hba->ring[FC_CT_RING], 0, 0);
+				    &hba->chan[hba->channel_ct], 0, 0);
 				(void) emlxs_tx_node_flush(port, nlp,
-				    &hba->ring[FC_ELS_RING], 0, 0);
+				    &hba->chan[hba->channel_els], 0, 0);
 				(void) emlxs_tx_node_flush(port, nlp,
-				    &hba->ring[FC_IP_RING], 0, 0);
+				    &hba->chan[hba->channel_ip], 0, 0);
 
 				/* Flush chip queues except for FCP ring */
 				(void) emlxs_chipq_node_flush(port,
-				    &hba->ring[FC_CT_RING], nlp, 0);
+				    &hba->chan[hba->channel_ct], nlp, 0);
 				(void) emlxs_chipq_node_flush(port,
-				    &hba->ring[FC_ELS_RING], nlp, 0);
+				    &hba->chan[hba->channel_els], nlp, 0);
 				(void) emlxs_chipq_node_flush(port,
-				    &hba->ring[FC_IP_RING], nlp, 0);
+				    &hba->chan[hba->channel_ip], nlp, 0);
 			}
 		}
 
@@ -1259,13 +1221,15 @@ emlxs_port_offline(emlxs_port_t *port, uint32_t scope)
 
 done:
 
-	if (unreg_vpi) {
-		(void) emlxs_mb_unreg_vpi(port);
+	if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
+		if (unreg_vpi) {
+			(void) emlxs_mb_unreg_vpi(port);
+		}
 	}
 
 	return (0);
 
-}  /* emlxs_port_offline() */
+} /* emlxs_port_offline() */
 
 
 extern void
@@ -1364,12 +1328,14 @@ emlxs_port_online(emlxs_port_t *vport)
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
+
 	/*
 	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_up_msg,
-	 *    "linkup_callback: update=%d vpi=%d flag=%d fc_flag=%x state=%x
-	 *    statec=%x", update, vport->vpi, npiv_linkup, hba->flag,
+	 *    "linkup_callback: update=%d vpi=%d flag=%d fc_flag=%x state=%x"
+	 *    "statec=%x", update, vport->vpi, npiv_linkup, hba->flag,
 	 *    hba->state, vport->ulp_statec);
 	 */
+
 	if (update) {
 		if (vport->flag & EMLXS_PORT_BOUND) {
 			if (vport->vpi == 0) {
@@ -1417,24 +1383,37 @@ emlxs_port_online(emlxs_port_t *vport)
 
 	return;
 
-}  /* emlxs_port_online() */
+} /* emlxs_port_online() */
 
 
 extern void
 emlxs_linkdown(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
+	RPIobj_t *rp;
 	int i;
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 
-	HBASTATS.LinkDown++;
-	emlxs_ffstate_change_locked(hba, FC_LINK_DOWN);
+	if (hba->state > FC_LINK_DOWN) {
+		HBASTATS.LinkDown++;
+		EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_DOWN);
+	}
 
 	/* Filter hba flags */
 	hba->flag &= FC_LINKDOWN_MASK;
 	hba->discovery_timer = 0;
 	hba->linkup_timer = 0;
+
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		rp = hba->sli.sli4.RPIp;
+		for (i = 0; i < hba->sli.sli4.RPICount; i++) {
+			if (rp->state & RESOURCE_ALLOCATED) {
+				rp->state |= RESOURCE_RPI_PAUSED;
+			}
+			rp++;
+		}
+	}
 
 	mutex_exit(&EMLXS_PORT_LOCK);
 
@@ -1451,7 +1430,7 @@ emlxs_linkdown(emlxs_hba_t *hba)
 
 	return;
 
-}  /* emlxs_linkdown() */
+} /* emlxs_linkdown() */
 
 
 extern void
@@ -1463,7 +1442,7 @@ emlxs_linkup(emlxs_hba_t *hba)
 	mutex_enter(&EMLXS_PORT_LOCK);
 
 	HBASTATS.LinkUp++;
-	emlxs_ffstate_change_locked(hba, FC_LINK_UP);
+	EMLXS_STATE_CHANGE_LOCKED(hba, FC_LINK_UP);
 
 #ifdef MENLO_SUPPORT
 	if (hba->flag & FC_MENLO_MODE) {
@@ -1491,7 +1470,7 @@ emlxs_linkup(emlxs_hba_t *hba)
 
 	return;
 
-}  /* emlxs_linkup() */
+} /* emlxs_linkup() */
 
 
 /*
@@ -1504,31 +1483,70 @@ emlxs_linkup(emlxs_hba_t *hba)
  *
  */
 extern int
-emlxs_reset_link(emlxs_hba_t *hba, uint32_t linkup)
+emlxs_reset_link(emlxs_hba_t *hba, uint32_t linkup, uint32_t wait)
 {
 	emlxs_port_t *port = &PPORT;
 	emlxs_config_t *cfg;
-	MAILBOX *mb;
+	MAILBOXQ *mbq = NULL;
+	MAILBOX *mb = NULL;
+	int rval = 0;
+	int rc;
 
 	/*
 	 * Get a buffer to use for the mailbox command
 	 */
-	if ((mb = (MAILBOX *)emlxs_mem_get(hba, MEM_MBOX | MEM_PRI)) == NULL) {
+	if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))
+	    == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_reset_failed_msg,
 		    "Unable to allocate mailbox buffer.");
-
-		return (1);
+		rval = 1;
+		goto reset_link_fail;
 	}
 
-	cfg = &CFG;
+	mb = (MAILBOX *)mbq;
+
+	/* Bring link down first */
+	emlxs_mb_down_link(hba, mbq);
+
+#define	MBXERR_LINK_DOWN	0x33
+
+	if (wait) {
+		wait = MBX_WAIT;
+	} else {
+		wait = MBX_NOWAIT;
+	}
+	rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, wait, 0);
+	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS) &&
+	    (rc != MBXERR_LINK_DOWN)) {
+		rval = 1;
+		goto reset_link_fail;
+	}
+
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_reset_msg,
+	    "Disabling link...");
 
 	if (linkup) {
 		/*
 		 * Setup and issue mailbox INITIALIZE LINK command
 		 */
 
-		emlxs_mb_init_link(hba,
-		    (MAILBOX *) mb,
+		if (wait == MBX_NOWAIT) {
+			if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))
+			    == NULL) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_link_reset_failed_msg,
+				    "Unable to allocate mailbox buffer.");
+				rval = 1;
+				goto reset_link_fail;
+			}
+			mb = (MAILBOX *)mbq;
+		} else {
+			/* Reuse mbq from previous mbox */
+			mb = (MAILBOX *)mbq;
+		}
+		cfg = &CFG;
+
+		emlxs_mb_init_link(hba, mbq,
 		    cfg[CFG_TOPOLOGY].current, cfg[CFG_LINK_SPEED].current);
 
 		mb->un.varInitLnk.lipsr_AL_PA = 0;
@@ -1539,29 +1557,23 @@ emlxs_reset_link(emlxs_hba_t *hba, uint32_t linkup)
 		hba->loopback_tics = 0;
 		mutex_exit(&EMLXS_PORT_LOCK);
 
-		if (emlxs_sli_issue_mbox_cmd(hba, (MAILBOX *)mb, MBX_NOWAIT,
-		    0) != MBX_BUSY) {
-			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mb);
+		rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, wait, 0);
+		if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
+			rval = 1;
+			goto reset_link_fail;
 		}
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_reset_msg, NULL);
-
-	} else {	/* hold link down */
-
-		emlxs_mb_down_link(hba, (MAILBOX *)mb);
-
-		if (emlxs_sli_issue_mbox_cmd(hba, (MAILBOX *)mb, MBX_NOWAIT,
-		    0) != MBX_BUSY) {
-			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mb);
-		}
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_link_reset_msg,
-		    "Disabling link...");
 	}
 
-	return (0);
+reset_link_fail:
 
-}  /* emlxs_reset_link() */
+	if ((wait == MBX_WAIT) && mbq) {
+		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+	}
+
+	return (rval);
+} /* emlxs_reset_link() */
 
 
 extern int
@@ -1605,7 +1617,7 @@ emlxs_online(emlxs_hba_t *hba)
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_adapter_trans_msg,
 	    "Going online...");
 
-	if (rval = emlxs_ffinit(hba)) {
+	if (rval = EMLXS_SLI_ONLINE(hba)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_failed_msg, "status=%x",
 		    rval);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_offline_msg, NULL);
@@ -1638,7 +1650,7 @@ emlxs_online(emlxs_hba_t *hba)
 
 	return (rval);
 
-}  /* emlxs_online() */
+} /* emlxs_online() */
 
 
 extern int
@@ -1685,7 +1697,6 @@ emlxs_offline(emlxs_hba_t *hba)
 	if (port->ini_mode) {
 		/* Flush all IO */
 		emlxs_linkdown(hba);
-
 	}
 #ifdef SFCT_SUPPORT
 	else {
@@ -1708,16 +1719,11 @@ emlxs_offline(emlxs_hba_t *hba)
 	/* Unregister all nodes */
 	emlxs_ffcleanup(hba);
 
-
 	if (hba->bus_type == SBUS_FC) {
-		WRITE_SBUS_CSR_REG(hba, FC_SHS_REG(hba, hba->sbus_csr_addr),
-		    0x9A);
+		WRITE_SBUS_CSR_REG(hba, FC_SHS_REG(hba), 0x9A);
 #ifdef FMA_SUPPORT
-		if (emlxs_fm_check_acc_handle(hba, hba->sbus_csr_handle)
-		    != DDI_FM_OK) {
-			EMLXS_MSGF(EMLXS_CONTEXT,
-			    &emlxs_invalid_access_handle_msg, NULL);
-		}
+		/* Access handle validation */
+		EMLXS_CHK_ACC_HANDLE(hba, hba->sli.sli3.sbus_csr_handle);
 #endif  /* FMA_SUPPORT */
 	}
 
@@ -1735,10 +1741,8 @@ emlxs_offline(emlxs_hba_t *hba)
 		delay(drv_usectohz(2000000));   /* 2 sec */
 	}
 
-	emlxs_sli_offline(hba);
-
-	/* Free all the shared memory */
-	(void) emlxs_mem_free_buffer(hba);
+	/* Shutdown the adapter interface */
+	EMLXS_SLI_OFFLINE(hba);
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 	hba->flag |= FC_OFFLINE_MODE;
@@ -1754,7 +1758,7 @@ done:
 
 	return (rval);
 
-}  /* emlxs_offline() */
+} /* emlxs_offline() */
 
 
 
@@ -1771,6 +1775,7 @@ emlxs_power_down(emlxs_hba_t *hba)
 	if ((rval = emlxs_offline(hba))) {
 		return (rval);
 	}
+	EMLXS_SLI_HBA_RESET(hba, 1, 1, 0);
 
 	/* Save pci config space */
 	ptr = (uint32_t *)hba->pm_config;
@@ -1796,7 +1801,7 @@ emlxs_power_down(emlxs_hba_t *hba)
 
 	return (0);
 
-}  /* End emlxs_power_down */
+} /* End emlxs_power_down */
 
 
 extern int
@@ -1845,7 +1850,7 @@ emlxs_power_up(emlxs_hba_t *hba)
 
 	return (rval);
 
-}  /* End emlxs_power_up */
+} /* End emlxs_power_up */
 
 
 /*
@@ -1869,109 +1874,112 @@ emlxs_ffcleanup(emlxs_hba_t *hba)
 	uint32_t i;
 
 	/* Disable all but the mailbox interrupt */
-	emlxs_disable_intr(hba, HC_MBINT_ENA);
+	EMLXS_SLI_DISABLE_INTR(hba, HC_MBINT_ENA);
 
 	/* Make sure all port nodes are destroyed */
 	for (i = 0; i < MAX_VPORTS; i++) {
 		port = &VPORT(i);
 
 		if (port->node_count) {
-			(void) emlxs_mb_unreg_rpi(port, 0xffff, 0, 0, 0);
+			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+				(void) emlxs_sli4_unreg_all_rpi_by_port(port);
+			} else {
+				(void) emlxs_mb_unreg_rpi(port, 0xffff, 0, 0,
+				    0);
+			}
 		}
 	}
 
 	/* Clear all interrupt enable conditions */
-	emlxs_disable_intr(hba, 0);
+	EMLXS_SLI_DISABLE_INTR(hba, 0);
 
 	return;
 
-}  /* emlxs_ffcleanup() */
+} /* emlxs_ffcleanup() */
 
 
 extern uint16_t
-emlxs_register_pkt(RING *rp, emlxs_buf_t *sbp)
+emlxs_register_pkt(CHANNEL *cp, emlxs_buf_t *sbp)
 {
 	emlxs_hba_t *hba;
 	emlxs_port_t *port;
 	uint16_t iotag;
 	uint32_t i;
 
-	hba = rp->hba;
+	hba = cp->hba;
 
-	mutex_enter(&EMLXS_FCTAB_LOCK(rp->ringno));
+	mutex_enter(&EMLXS_FCTAB_LOCK);
 
 	if (sbp->iotag != 0) {
 		port = &PPORT;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-		    "Pkt already registered! ringo=%d iotag=%d sbp=%p",
-		    sbp->ring, sbp->iotag, sbp);
+		    "Pkt already registered! channel=%d iotag=%d sbp=%p",
+		    sbp->channel, sbp->iotag, sbp);
 	}
 
 	iotag = 0;
-	for (i = 0; i < rp->max_iotag; i++) {
-		if (!rp->fc_iotag || rp->fc_iotag >= rp->max_iotag) {
-			rp->fc_iotag = 1;
+	for (i = 0; i < hba->max_iotag; i++) {
+		if (!hba->fc_iotag || hba->fc_iotag >= hba->max_iotag) {
+			hba->fc_iotag = 1;
 		}
-		iotag = rp->fc_iotag++;
+		iotag = hba->fc_iotag++;
 
-		if (rp->fc_table[iotag] == 0 ||
-		    rp->fc_table[iotag] == STALE_PACKET) {
-			hba->io_count[rp->ringno]++;
-			rp->fc_table[iotag] = sbp;
+		if (hba->fc_table[iotag] == 0 ||
+		    hba->fc_table[iotag] == STALE_PACKET) {
+			hba->io_count++;
+			hba->fc_table[iotag] = sbp;
 
 			sbp->iotag = iotag;
-			sbp->ring = rp;
+			sbp->channel = cp;
 
 			break;
 		}
 		iotag = 0;
 	}
 
-	mutex_exit(&EMLXS_FCTAB_LOCK(rp->ringno));
+	mutex_exit(&EMLXS_FCTAB_LOCK);
 
 	/*
 	 * EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
-	 *    "emlxs_register_pkt: ringo=%d iotag=%d sbp=%p",
-	 *    rp->ringno, iotag, sbp);
+	 *    "emlxs_register_pkt: channel=%d iotag=%d sbp=%p",
+	 *    cp->channelno, iotag, sbp);
 	 */
 
 	return (iotag);
 
-}  /* emlxs_register_pkt() */
+} /* emlxs_register_pkt() */
 
 
 
 extern emlxs_buf_t *
-emlxs_unregister_pkt(RING *rp, uint16_t iotag, uint32_t forced)
+emlxs_unregister_pkt(CHANNEL *cp, uint16_t iotag, uint32_t forced)
 {
 	emlxs_hba_t *hba;
 	emlxs_buf_t *sbp;
-	uint32_t ringno;
+
+	sbp = NULL;
+	hba = cp->hba;
 
 	/* Check the iotag range */
-	if ((iotag == 0) || (iotag >= rp->max_iotag)) {
+	if ((iotag == 0) || (iotag >= hba->max_iotag)) {
 		return (NULL);
 	}
 
-	sbp = NULL;
-	hba = rp->hba;
-	ringno = rp->ringno;
-
 	/* Remove the sbp from the table */
-	mutex_enter(&EMLXS_FCTAB_LOCK(ringno));
-	sbp = rp->fc_table[iotag];
+	mutex_enter(&EMLXS_FCTAB_LOCK);
+	sbp = hba->fc_table[iotag];
 
 	if (!sbp || (sbp == STALE_PACKET)) {
-		mutex_exit(&EMLXS_FCTAB_LOCK(ringno));
+		mutex_exit(&EMLXS_FCTAB_LOCK);
 		return (sbp);
 	}
 
-	rp->fc_table[iotag] = ((forced) ? STALE_PACKET : NULL);
-	hba->io_count[ringno]--;
+	hba->fc_table[iotag] = ((forced) ? STALE_PACKET : NULL);
+	hba->io_count--;
 	sbp->iotag = 0;
 
-	mutex_exit(&EMLXS_FCTAB_LOCK(ringno));
+	mutex_exit(&EMLXS_FCTAB_LOCK);
 
 
 	/* Clean up the sbp */
@@ -1979,7 +1987,7 @@ emlxs_unregister_pkt(RING *rp, uint16_t iotag, uint32_t forced)
 
 	if (sbp->pkt_flags & PACKET_IN_TXQ) {
 		sbp->pkt_flags &= ~PACKET_IN_TXQ;
-		hba->ring_tx_count[ringno]--;
+		hba->channel_tx_count--;
 	}
 
 	if (sbp->pkt_flags & PACKET_IN_CHIPQ) {
@@ -1995,90 +2003,93 @@ emlxs_unregister_pkt(RING *rp, uint16_t iotag, uint32_t forced)
 
 	return (sbp);
 
-}  /* emlxs_unregister_pkt() */
+} /* emlxs_unregister_pkt() */
 
 
 
-/* Flush all IO's to all nodes for a given ring */
+/* Flush all IO's to all nodes for a given IO Channel */
 extern uint32_t
-emlxs_tx_ring_flush(emlxs_hba_t *hba, RING *rp, emlxs_buf_t *fpkt)
+emlxs_tx_channel_flush(emlxs_hba_t *hba, CHANNEL *cp, emlxs_buf_t *fpkt)
 {
 	emlxs_port_t *port = &PPORT;
 	emlxs_buf_t *sbp;
 	IOCBQ *iocbq;
 	IOCBQ *next;
 	IOCB *iocb;
-	uint32_t ringno;
+	uint32_t channelno;
 	Q abort;
 	NODELIST *ndlp;
 	IOCB *icmd;
 	MATCHMAP *mp;
 	uint32_t i;
+	uint8_t flag[MAX_CHANNEL];
 
-	ringno = rp->ringno;
+	channelno = cp->channelno;
 	bzero((void *)&abort, sizeof (Q));
+	bzero((void *)flag, MAX_CHANNEL * sizeof (uint8_t));
 
-	mutex_enter(&EMLXS_RINGTX_LOCK);
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
 	/* While a node needs servicing */
-	while (rp->nodeq.q_first) {
-		ndlp = (NODELIST *) rp->nodeq.q_first;
+	while (cp->nodeq.q_first) {
+		ndlp = (NODELIST *) cp->nodeq.q_first;
 
 		/* Check if priority queue is not empty */
-		if (ndlp->nlp_ptx[ringno].q_first) {
+		if (ndlp->nlp_ptx[channelno].q_first) {
 			/* Transfer all iocb's to local queue */
 			if (abort.q_first == 0) {
-				abort.q_first = ndlp->nlp_ptx[ringno].q_first;
+				abort.q_first =
+				    ndlp->nlp_ptx[channelno].q_first;
 			} else {
 				((IOCBQ *)abort.q_last)->next =
-				    (IOCBQ *)ndlp->nlp_ptx[ringno].q_first;
+				    (IOCBQ *)ndlp->nlp_ptx[channelno].q_first;
 			}
+			flag[channelno] = 1;
 
-			abort.q_last = ndlp->nlp_ptx[ringno].q_last;
-			abort.q_cnt += ndlp->nlp_ptx[ringno].q_cnt;
+			abort.q_last = ndlp->nlp_ptx[channelno].q_last;
+			abort.q_cnt += ndlp->nlp_ptx[channelno].q_cnt;
 		}
 
 		/* Check if tx queue is not empty */
-		if (ndlp->nlp_tx[ringno].q_first) {
+		if (ndlp->nlp_tx[channelno].q_first) {
 			/* Transfer all iocb's to local queue */
 			if (abort.q_first == 0) {
-				abort.q_first = ndlp->nlp_tx[ringno].q_first;
+				abort.q_first = ndlp->nlp_tx[channelno].q_first;
 			} else {
 				((IOCBQ *)abort.q_last)->next =
-				    (IOCBQ *)ndlp->nlp_tx[ringno].q_first;
+				    (IOCBQ *)ndlp->nlp_tx[channelno].q_first;
 			}
 
-			abort.q_last = ndlp->nlp_tx[ringno].q_last;
-			abort.q_cnt += ndlp->nlp_tx[ringno].q_cnt;
-
+			abort.q_last = ndlp->nlp_tx[channelno].q_last;
+			abort.q_cnt += ndlp->nlp_tx[channelno].q_cnt;
 		}
 
 		/* Clear the queue pointers */
-		ndlp->nlp_ptx[ringno].q_first = NULL;
-		ndlp->nlp_ptx[ringno].q_last = NULL;
-		ndlp->nlp_ptx[ringno].q_cnt = 0;
+		ndlp->nlp_ptx[channelno].q_first = NULL;
+		ndlp->nlp_ptx[channelno].q_last = NULL;
+		ndlp->nlp_ptx[channelno].q_cnt = 0;
 
-		ndlp->nlp_tx[ringno].q_first = NULL;
-		ndlp->nlp_tx[ringno].q_last = NULL;
-		ndlp->nlp_tx[ringno].q_cnt = 0;
+		ndlp->nlp_tx[channelno].q_first = NULL;
+		ndlp->nlp_tx[channelno].q_last = NULL;
+		ndlp->nlp_tx[channelno].q_cnt = 0;
 
 		/* Remove node from service queue */
 
 		/* If this is the last node on list */
-		if (rp->nodeq.q_last == (void *)ndlp) {
-			rp->nodeq.q_last = NULL;
-			rp->nodeq.q_first = NULL;
-			rp->nodeq.q_cnt = 0;
+		if (cp->nodeq.q_last == (void *)ndlp) {
+			cp->nodeq.q_last = NULL;
+			cp->nodeq.q_first = NULL;
+			cp->nodeq.q_cnt = 0;
 		} else {
 			/* Remove node from head */
-			rp->nodeq.q_first = ndlp->nlp_next[ringno];
-			((NODELIST *)rp->nodeq.q_last)->nlp_next[ringno] =
-			    rp->nodeq.q_first;
-			rp->nodeq.q_cnt--;
+			cp->nodeq.q_first = ndlp->nlp_next[channelno];
+			((NODELIST *)cp->nodeq.q_last)->nlp_next[channelno] =
+			    cp->nodeq.q_first;
+			cp->nodeq.q_cnt--;
 		}
 
 		/* Clear node */
-		ndlp->nlp_next[ringno] = NULL;
+		ndlp->nlp_next[channelno] = NULL;
 	}
 
 	/* First cleanup the iocb's while still holding the lock */
@@ -2086,17 +2097,22 @@ emlxs_tx_ring_flush(emlxs_hba_t *hba, RING *rp, emlxs_buf_t *fpkt)
 	while (iocbq) {
 		/* Free the IoTag and the bmp */
 		iocb = &iocbq->iocb;
-		sbp = emlxs_unregister_pkt(iocbq->ring, iocb->ulpIoTag, 0);
+
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			sbp = iocbq->sbp;
+			if (sbp) {
+				hba->fc_table[sbp->iotag] = NULL;
+				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+			}
+		} else {
+			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
+			    iocb->ULPIOTAG, 0);
+		}
 
 		if (sbp && (sbp != STALE_PACKET)) {
 			mutex_enter(&sbp->mtx);
 
-			if (sbp->pkt_flags & PACKET_IN_TXQ) {
-				sbp->pkt_flags &= ~PACKET_IN_TXQ;
-				hba->ring_tx_count[ringno]--;
-			}
 			sbp->pkt_flags |= PACKET_IN_FLUSH;
-
 			/*
 			 * If the fpkt is already set, then we will leave it
 			 * alone. This ensures that this pkt is only accounted
@@ -2113,10 +2129,9 @@ emlxs_tx_ring_flush(emlxs_hba_t *hba, RING *rp, emlxs_buf_t *fpkt)
 		}
 
 		iocbq = (IOCBQ *)iocbq->next;
-
 	}	/* end of while */
 
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	/* Now abort the iocb's */
 	iocbq = (IOCBQ *)abort.q_first;
@@ -2146,18 +2161,23 @@ emlxs_tx_ring_flush(emlxs_hba_t *hba, RING *rp, emlxs_buf_t *fpkt)
 		/* Free the iocb and its associated buffers */
 		else {
 			icmd = &iocbq->iocb;
-			if (icmd->ulpCommand == CMD_QUE_RING_BUF64_CN ||
-			    icmd->ulpCommand == CMD_QUE_RING_BUF_CN ||
-			    icmd->ulpCommand == CMD_QUE_RING_LIST64_CN) {
+
+			/* SLI3 */
+			if (icmd->ULPCOMMAND == CMD_QUE_RING_BUF64_CN ||
+			    icmd->ULPCOMMAND == CMD_QUE_RING_BUF_CN ||
+			    icmd->ULPCOMMAND == CMD_QUE_RING_LIST64_CN) {
 				if ((hba->flag &
 				    (FC_ONLINE_MODE | FC_ONLINING_MODE)) == 0) {
 					/* HBA is detaching or offlining */
-					if (icmd->ulpCommand !=
+					if (icmd->ULPCOMMAND !=
 					    CMD_QUE_RING_LIST64_CN) {
 						uint8_t	*tmp;
+						RING *rp;
 
+						rp = &hba->sli.sli3.
+						    ring[channelno];
 						for (i = 0;
-						    i < icmd->ulpBdeCount;
+						    i < icmd->ULPBDECOUNT;
 						    i++) {
 							mp = EMLXS_GET_VADDR(
 							    hba, rp, icmd);
@@ -2174,9 +2194,13 @@ emlxs_tx_ring_flush(emlxs_hba_t *hba, RING *rp, emlxs_buf_t *fpkt)
 					    (uint8_t *)iocbq);
 				} else {
 					/* repost the unsolicited buffer */
-					emlxs_sli_issue_iocb_cmd(hba, rp,
+					EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp,
 					    iocbq);
 				}
+			} else if (icmd->ULPCOMMAND == CMD_CLOSE_XRI_CN ||
+			    icmd->ULPCOMMAND == CMD_CLOSE_XRI_CX) {
+
+				emlxs_tx_put(iocbq, 1);
 			}
 		}
 
@@ -2184,20 +2208,29 @@ emlxs_tx_ring_flush(emlxs_hba_t *hba, RING *rp, emlxs_buf_t *fpkt)
 
 	}	/* end of while */
 
+	/* Now trigger channel service */
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		if (!flag[channelno]) {
+			continue;
+		}
+
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, &hba->chan[channelno], 0);
+	}
+
 	return (abort.q_cnt);
 
-}  /* emlxs_tx_ring_flush() */
+} /* emlxs_tx_channel_flush() */
 
 
 /* Flush all IO's on all or a given ring for a given node */
 extern uint32_t
-emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, RING *ring,
+emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, CHANNEL *chan,
     uint32_t shutdown, emlxs_buf_t *fpkt)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_buf_t *sbp;
-	uint32_t ringno;
-	RING *rp;
+	uint32_t channelno;
+	CHANNEL *cp;
 	IOCB *icmd;
 	IOCBQ *iocbq;
 	NODELIST *prev;
@@ -2206,100 +2239,103 @@ emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, RING *ring,
 	Q abort;
 	uint32_t i;
 	MATCHMAP *mp;
-
+	uint8_t flag[MAX_CHANNEL];
 
 	bzero((void *)&abort, sizeof (Q));
 
 	/* Flush all I/O's on tx queue to this target */
-	mutex_enter(&EMLXS_RINGTX_LOCK);
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
 	if (!ndlp->nlp_base && shutdown) {
 		ndlp->nlp_active = 0;
 	}
 
-	for (ringno = 0; ringno < hba->ring_count; ringno++) {
-		rp = &hba->ring[ringno];
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		cp = &hba->chan[channelno];
 
-		if (ring && rp != ring) {
+		if (chan && cp != chan) {
 			continue;
 		}
 
 		if (!ndlp->nlp_base || shutdown) {
 			/* Check if priority queue is not empty */
-			if (ndlp->nlp_ptx[ringno].q_first) {
+			if (ndlp->nlp_ptx[channelno].q_first) {
 				/* Transfer all iocb's to local queue */
 				if (abort.q_first == 0) {
 					abort.q_first =
-					    ndlp->nlp_ptx[ringno].q_first;
+					    ndlp->nlp_ptx[channelno].q_first;
 				} else {
-					((IOCBQ *)abort.q_last)->next =
-					    (IOCBQ *)ndlp->nlp_ptx[ringno].
+					((IOCBQ *)(abort.q_last))->next =
+					    (IOCBQ *)ndlp->nlp_ptx[channelno].
 					    q_first;
 				}
 
-				abort.q_last = ndlp->nlp_ptx[ringno].q_last;
-				abort.q_cnt += ndlp->nlp_ptx[ringno].q_cnt;
+				flag[channelno] = 1;
+
+				abort.q_last = ndlp->nlp_ptx[channelno].q_last;
+				abort.q_cnt += ndlp->nlp_ptx[channelno].q_cnt;
 			}
 		}
 
 		/* Check if tx queue is not empty */
-		if (ndlp->nlp_tx[ringno].q_first) {
+		if (ndlp->nlp_tx[channelno].q_first) {
+
 			/* Transfer all iocb's to local queue */
 			if (abort.q_first == 0) {
-				abort.q_first = ndlp->nlp_tx[ringno].q_first;
+				abort.q_first = ndlp->nlp_tx[channelno].q_first;
 			} else {
 				((IOCBQ *)abort.q_last)->next =
-				    (IOCBQ *)ndlp->nlp_tx[ringno].q_first;
+				    (IOCBQ *)ndlp->nlp_tx[channelno].q_first;
 			}
 
-			abort.q_last = ndlp->nlp_tx[ringno].q_last;
-			abort.q_cnt += ndlp->nlp_tx[ringno].q_cnt;
+			abort.q_last = ndlp->nlp_tx[channelno].q_last;
+			abort.q_cnt += ndlp->nlp_tx[channelno].q_cnt;
 		}
 
 		/* Clear the queue pointers */
-		ndlp->nlp_ptx[ringno].q_first = NULL;
-		ndlp->nlp_ptx[ringno].q_last = NULL;
-		ndlp->nlp_ptx[ringno].q_cnt = 0;
+		ndlp->nlp_ptx[channelno].q_first = NULL;
+		ndlp->nlp_ptx[channelno].q_last = NULL;
+		ndlp->nlp_ptx[channelno].q_cnt = 0;
 
-		ndlp->nlp_tx[ringno].q_first = NULL;
-		ndlp->nlp_tx[ringno].q_last = NULL;
-		ndlp->nlp_tx[ringno].q_cnt = 0;
+		ndlp->nlp_tx[channelno].q_first = NULL;
+		ndlp->nlp_tx[channelno].q_last = NULL;
+		ndlp->nlp_tx[channelno].q_cnt = 0;
 
-		/* If this node was on the ring queue, remove it */
-		if (ndlp->nlp_next[ringno]) {
+		/* If this node was on the channel queue, remove it */
+		if (ndlp->nlp_next[channelno]) {
 			/* If this is the only node on list */
-			if (rp->nodeq.q_first == (void *)ndlp &&
-			    rp->nodeq.q_last == (void *)ndlp) {
-				rp->nodeq.q_last = NULL;
-				rp->nodeq.q_first = NULL;
-				rp->nodeq.q_cnt = 0;
-			} else if (rp->nodeq.q_first == (void *)ndlp) {
-				rp->nodeq.q_first = ndlp->nlp_next[ringno];
-				((NODELIST *) rp->nodeq.q_last)->
-				    nlp_next[ringno] = rp->nodeq.q_first;
-				rp->nodeq.q_cnt--;
+			if (cp->nodeq.q_first == (void *)ndlp &&
+			    cp->nodeq.q_last == (void *)ndlp) {
+				cp->nodeq.q_last = NULL;
+				cp->nodeq.q_first = NULL;
+				cp->nodeq.q_cnt = 0;
+			} else if (cp->nodeq.q_first == (void *)ndlp) {
+				cp->nodeq.q_first = ndlp->nlp_next[channelno];
+				((NODELIST *) cp->nodeq.q_last)->
+				    nlp_next[channelno] = cp->nodeq.q_first;
+				cp->nodeq.q_cnt--;
 			} else {
 				/*
 				 * This is a little more difficult find the
-				 * previous node in the circular ring queue
+				 * previous node in the circular channel queue
 				 */
 				prev = ndlp;
-				while (prev->nlp_next[ringno] != ndlp) {
-					prev = prev->nlp_next[ringno];
+				while (prev->nlp_next[channelno] != ndlp) {
+					prev = prev->nlp_next[channelno];
 				}
 
-				prev->nlp_next[ringno] =
-				    ndlp->nlp_next[ringno];
+				prev->nlp_next[channelno] =
+				    ndlp->nlp_next[channelno];
 
-				if (rp->nodeq.q_last == (void *)ndlp) {
-					rp->nodeq.q_last = (void *)prev;
+				if (cp->nodeq.q_last == (void *)ndlp) {
+					cp->nodeq.q_last = (void *)prev;
 				}
-				rp->nodeq.q_cnt--;
+				cp->nodeq.q_cnt--;
 
 			}
 
 			/* Clear node */
-			ndlp->nlp_next[ringno] = NULL;
+			ndlp->nlp_next[channelno] = NULL;
 		}
 
 	}
@@ -2309,16 +2345,21 @@ emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, RING *ring,
 	while (iocbq) {
 		/* Free the IoTag and the bmp */
 		iocb = &iocbq->iocb;
-		sbp = emlxs_unregister_pkt(iocbq->ring, iocb->ulpIoTag, 0);
+
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			sbp = iocbq->sbp;
+			if (sbp) {
+				hba->fc_table[sbp->iotag] = NULL;
+				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+			}
+		} else {
+			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
+			    iocb->ULPIOTAG, 0);
+		}
 
 		if (sbp && (sbp != STALE_PACKET)) {
 			mutex_enter(&sbp->mtx);
-			if (sbp->pkt_flags & PACKET_IN_TXQ) {
-				sbp->pkt_flags &= ~PACKET_IN_TXQ;
-				hba->ring_tx_count[ring->ringno]--;
-			}
 			sbp->pkt_flags |= PACKET_IN_FLUSH;
-
 			/*
 			 * If the fpkt is already set, then we will leave it
 			 * alone. This ensures that this pkt is only accounted
@@ -2338,7 +2379,7 @@ emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, RING *ring,
 
 	}	/* end of while */
 
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	/* Now abort the iocb's outside the locks */
 	iocbq = (IOCBQ *)abort.q_first;
@@ -2367,19 +2408,27 @@ emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, RING *ring,
 		}
 		/* Free the iocb and its associated buffers */
 		else {
+			/* CMD_CLOSE_XRI_CN should also free the memory */
 			icmd = &iocbq->iocb;
-			if (icmd->ulpCommand == CMD_QUE_RING_BUF64_CN ||
-			    icmd->ulpCommand == CMD_QUE_RING_BUF_CN ||
-			    icmd->ulpCommand == CMD_QUE_RING_LIST64_CN) {
+
+			/* SLI3 */
+			if (icmd->ULPCOMMAND == CMD_QUE_RING_BUF64_CN ||
+			    icmd->ULPCOMMAND == CMD_QUE_RING_BUF_CN ||
+			    icmd->ULPCOMMAND == CMD_QUE_RING_LIST64_CN) {
 				if ((hba->flag &
 				    (FC_ONLINE_MODE | FC_ONLINING_MODE)) == 0) {
 					/* HBA is detaching or offlining */
-					if (icmd->ulpCommand !=
+					if (icmd->ULPCOMMAND !=
 					    CMD_QUE_RING_LIST64_CN) {
 						uint8_t	*tmp;
+						RING *rp;
+						int ch;
 
+						ch = ((CHANNEL *)
+						    iocbq->channel)->channelno;
+						rp = &hba->sli.sli3.ring[ch];
 						for (i = 0;
-						    i < icmd->ulpBdeCount;
+						    i < icmd->ULPBDECOUNT;
 						    i++) {
 							mp = EMLXS_GET_VADDR(
 							    hba, rp, icmd);
@@ -2396,9 +2445,15 @@ emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, RING *ring,
 					    (uint8_t *)iocbq);
 				} else {
 					/* repost the unsolicited buffer */
-					emlxs_sli_issue_iocb_cmd(hba, rp,
-					    iocbq);
+					EMLXS_SLI_ISSUE_IOCB_CMD(hba,
+					    (CHANNEL *)iocbq->channel, iocbq);
 				}
+			} else if (icmd->ULPCOMMAND == CMD_CLOSE_XRI_CN ||
+			    icmd->ULPCOMMAND == CMD_CLOSE_XRI_CX) {
+				/*
+				 * Resend the abort iocbq if any
+				 */
+				emlxs_tx_put(iocbq, 1);
 			}
 		}
 
@@ -2406,60 +2461,69 @@ emlxs_tx_node_flush(emlxs_port_t *port, NODELIST *ndlp, RING *ring,
 
 	}	/* end of while */
 
+	/* Now trigger channel service */
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		if (!flag[channelno]) {
+			continue;
+		}
+
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, &hba->chan[channelno], 0);
+	}
+
 	return (abort.q_cnt);
 
-}  /* emlxs_tx_node_flush() */
+} /* emlxs_tx_node_flush() */
 
 
 /* Check for IO's on all or a given ring for a given node */
 extern uint32_t
-emlxs_tx_node_check(emlxs_port_t *port, NODELIST *ndlp, RING *ring)
+emlxs_tx_node_check(emlxs_port_t *port, NODELIST *ndlp, CHANNEL *chan)
 {
 	emlxs_hba_t *hba = HBA;
-	uint32_t ringno;
-	RING *rp;
+	uint32_t channelno;
+	CHANNEL *cp;
 	uint32_t count;
 
 	count = 0;
 
 	/* Flush all I/O's on tx queue to this target */
-	mutex_enter(&EMLXS_RINGTX_LOCK);
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
-	for (ringno = 0; ringno < hba->ring_count; ringno++) {
-		rp = &hba->ring[ringno];
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		cp = &hba->chan[channelno];
 
-		if (ring && rp != ring) {
+		if (chan && cp != chan) {
 			continue;
 		}
 
 		/* Check if priority queue is not empty */
-		if (ndlp->nlp_ptx[ringno].q_first) {
-			count += ndlp->nlp_ptx[ringno].q_cnt;
+		if (ndlp->nlp_ptx[channelno].q_first) {
+			count += ndlp->nlp_ptx[channelno].q_cnt;
 		}
 
 		/* Check if tx queue is not empty */
-		if (ndlp->nlp_tx[ringno].q_first) {
-			count += ndlp->nlp_tx[ringno].q_cnt;
+		if (ndlp->nlp_tx[channelno].q_first) {
+			count += ndlp->nlp_tx[channelno].q_cnt;
 		}
 
 	}
 
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	return (count);
 
-}  /* emlxs_tx_node_check() */
+} /* emlxs_tx_node_check() */
 
 
 
-/* Flush all IO's on the FCP ring for a given node's lun */
+/* Flush all IO's on the any ring for a given node's lun */
 extern uint32_t
 emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
     emlxs_buf_t *fpkt)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_buf_t *sbp;
-	uint32_t ringno;
+	uint32_t channelno;
 	IOCBQ *iocbq;
 	IOCBQ *prev;
 	IOCBQ *next;
@@ -2468,130 +2532,144 @@ emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 	Q abort;
 	uint32_t i;
 	MATCHMAP *mp;
-	RING *rp;
-
-	ringno = FC_FCP_RING;
-	rp = &hba->ring[ringno];
+	CHANNEL *cp;
+	CHANNEL *channel;
+	uint8_t flag[MAX_CHANNEL];
 
 	bzero((void *)&abort, sizeof (Q));
 
 	/* Flush I/O's on txQ to this target's lun */
-	mutex_enter(&EMLXS_RINGTX_LOCK);
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
-	/* Scan the priority queue first */
-	prev = NULL;
-	iocbq = (IOCBQ *) ndlp->nlp_ptx[ringno].q_first;
+	channel = &hba->chan[hba->channel_fcp];
 
-	while (iocbq) {
-		next = (IOCBQ *)iocbq->next;
-		iocb = &iocbq->iocb;
-		sbp = (emlxs_buf_t *)iocbq->sbp;
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		cp = &hba->chan[channelno];
 
-		/* Check if this IO is for our lun */
-		if (sbp->lun == lun) {
-			/* Remove iocb from the node's tx queue */
-			if (next == 0) {
-				ndlp->nlp_ptx[ringno].q_last =
-				    (uint8_t *)prev;
-			}
-
-			if (prev == 0) {
-				ndlp->nlp_ptx[ringno].q_first =
-				    (uint8_t *)next;
-			} else {
-				prev->next = next;
-			}
-
-			iocbq->next = NULL;
-			ndlp->nlp_ptx[ringno].q_cnt--;
-
-			/*
-			 * Add this iocb to our local abort Q
-			 * This way we don't hold the RINGTX lock too long
-			 */
-			if (abort.q_first) {
-				((IOCBQ *)abort.q_last)->next = iocbq;
-				abort.q_last = (uint8_t *)iocbq;
-				abort.q_cnt++;
-			} else {
-				abort.q_first = (uint8_t *)iocbq;
-				abort.q_last = (uint8_t *)iocbq;
-				abort.q_cnt = 1;
-			}
-			iocbq->next = NULL;
-		} else {
-			prev = iocbq;
+		if (channel && cp != channel) {
+			continue;
 		}
 
-		iocbq = next;
+		/* Scan the priority queue first */
+		prev = NULL;
+		iocbq = (IOCBQ *) ndlp->nlp_ptx[channelno].q_first;
 
-	}	/* while (iocbq) */
+		while (iocbq) {
+			next = (IOCBQ *)iocbq->next;
+			iocb = &iocbq->iocb;
+			sbp = (emlxs_buf_t *)iocbq->sbp;
 
+			/* Check if this IO is for our lun */
+			if (sbp && (sbp->lun == lun)) {
+				/* Remove iocb from the node's ptx queue */
+				if (next == 0) {
+					ndlp->nlp_ptx[channelno].q_last =
+					    (uint8_t *)prev;
+				}
 
-	/* Scan the regular queue */
-	prev = NULL;
-	iocbq = (IOCBQ *)ndlp->nlp_tx[ringno].q_first;
+				if (prev == 0) {
+					ndlp->nlp_ptx[channelno].q_first =
+					    (uint8_t *)next;
+				} else {
+					prev->next = next;
+				}
 
-	while (iocbq) {
-		next = (IOCBQ *)iocbq->next;
-		iocb = &iocbq->iocb;
-		sbp = (emlxs_buf_t *)iocbq->sbp;
+				iocbq->next = NULL;
+				ndlp->nlp_ptx[channelno].q_cnt--;
 
-		/* Check if this IO is for our lun */
-		if (sbp->lun == lun) {
-			/* Remove iocb from the node's tx queue */
-			if (next == 0) {
-				ndlp->nlp_tx[ringno].q_last =
-				    (uint8_t *)prev;
-			}
+				/*
+				 * Add this iocb to our local abort Q
+				 */
+				if (abort.q_first) {
+					((IOCBQ *)abort.q_last)->next = iocbq;
+					abort.q_last = (uint8_t *)iocbq;
+					abort.q_cnt++;
+				} else {
+					abort.q_first = (uint8_t *)iocbq;
+					abort.q_last = (uint8_t *)iocbq;
+					abort.q_cnt = 1;
+				}
+				iocbq->next = NULL;
+				flag[channelno] = 1;
 
-			if (prev == 0) {
-				ndlp->nlp_tx[ringno].q_first =
-				    (uint8_t *)next;
 			} else {
-				prev->next = next;
+				prev = iocbq;
 			}
 
-			iocbq->next = NULL;
-			ndlp->nlp_tx[ringno].q_cnt--;
+			iocbq = next;
 
-			/*
-			 * Add this iocb to our local abort Q
-			 * This way we don't hold the RINGTX lock too long
-			 */
-			if (abort.q_first) {
-				((IOCBQ *) abort.q_last)->next = iocbq;
-				abort.q_last = (uint8_t *)iocbq;
-				abort.q_cnt++;
+		}	/* while (iocbq) */
+
+
+		/* Scan the regular queue */
+		prev = NULL;
+		iocbq = (IOCBQ *)ndlp->nlp_tx[channelno].q_first;
+
+		while (iocbq) {
+			next = (IOCBQ *)iocbq->next;
+			iocb = &iocbq->iocb;
+			sbp = (emlxs_buf_t *)iocbq->sbp;
+
+			/* Check if this IO is for our lun */
+			if (sbp && (sbp->lun == lun)) {
+				/* Remove iocb from the node's tx queue */
+				if (next == 0) {
+					ndlp->nlp_tx[channelno].q_last =
+					    (uint8_t *)prev;
+				}
+
+				if (prev == 0) {
+					ndlp->nlp_tx[channelno].q_first =
+					    (uint8_t *)next;
+				} else {
+					prev->next = next;
+				}
+
+				iocbq->next = NULL;
+				ndlp->nlp_tx[channelno].q_cnt--;
+
+				/*
+				 * Add this iocb to our local abort Q
+				 */
+				if (abort.q_first) {
+					((IOCBQ *) abort.q_last)->next = iocbq;
+					abort.q_last = (uint8_t *)iocbq;
+					abort.q_cnt++;
+				} else {
+					abort.q_first = (uint8_t *)iocbq;
+					abort.q_last = (uint8_t *)iocbq;
+					abort.q_cnt = 1;
+				}
+				iocbq->next = NULL;
 			} else {
-				abort.q_first = (uint8_t *)iocbq;
-				abort.q_last = (uint8_t *)iocbq;
-				abort.q_cnt = 1;
+				prev = iocbq;
 			}
-			iocbq->next = NULL;
-		} else {
-			prev = iocbq;
-		}
 
-		iocbq = next;
+			iocbq = next;
 
-	}	/* while (iocbq) */
+		}	/* while (iocbq) */
+	}	/* for loop */
 
 	/* First cleanup the iocb's while still holding the lock */
 	iocbq = (IOCBQ *)abort.q_first;
 	while (iocbq) {
 		/* Free the IoTag and the bmp */
 		iocb = &iocbq->iocb;
-		sbp = emlxs_unregister_pkt(iocbq->ring, iocb->ulpIoTag, 0);
+
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			sbp = iocbq->sbp;
+			if (sbp) {
+				hba->fc_table[sbp->iotag] = NULL;
+				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+			}
+		} else {
+			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
+			    iocb->ULPIOTAG, 0);
+		}
 
 		if (sbp && (sbp != STALE_PACKET)) {
 			mutex_enter(&sbp->mtx);
-			if (sbp->pkt_flags & PACKET_IN_TXQ) {
-				sbp->pkt_flags &= ~PACKET_IN_TXQ;
-				hba->ring_tx_count[ringno]--;
-			}
 			sbp->pkt_flags |= PACKET_IN_FLUSH;
-
 			/*
 			 * If the fpkt is already set, then we will leave it
 			 * alone. This ensures that this pkt is only accounted
@@ -2611,7 +2689,7 @@ emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 
 	}	/* end of while */
 
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	/* Now abort the iocb's outside the locks */
 	iocbq = (IOCBQ *)abort.q_first;
@@ -2640,20 +2718,27 @@ emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 
 		/* Free the iocb and its associated buffers */
 		else {
+			/* Should never happen! */
 			icmd = &iocbq->iocb;
 
-			if (icmd->ulpCommand == CMD_QUE_RING_BUF64_CN ||
-			    icmd->ulpCommand == CMD_QUE_RING_BUF_CN ||
-			    icmd->ulpCommand == CMD_QUE_RING_LIST64_CN) {
+			/* SLI3 */
+			if (icmd->ULPCOMMAND == CMD_QUE_RING_BUF64_CN ||
+			    icmd->ULPCOMMAND == CMD_QUE_RING_BUF_CN ||
+			    icmd->ULPCOMMAND == CMD_QUE_RING_LIST64_CN) {
 				if ((hba->flag &
 				    (FC_ONLINE_MODE | FC_ONLINING_MODE)) == 0) {
 					/* HBA is detaching or offlining */
-					if (icmd->ulpCommand !=
+					if (icmd->ULPCOMMAND !=
 					    CMD_QUE_RING_LIST64_CN) {
 						uint8_t	*tmp;
+						RING *rp;
+						int ch;
 
+						ch = ((CHANNEL *)
+						    iocbq->channel)->channelno;
+						rp = &hba->sli.sli3.ring[ch];
 						for (i = 0;
-						    i < icmd->ulpBdeCount;
+						    i < icmd->ULPBDECOUNT;
 						    i++) {
 							mp = EMLXS_GET_VADDR(
 							    hba, rp, icmd);
@@ -2670,9 +2755,15 @@ emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 					    (uint8_t *)iocbq);
 				} else {
 					/* repost the unsolicited buffer */
-					emlxs_sli_issue_iocb_cmd(hba, rp,
-					    iocbq);
+					EMLXS_SLI_ISSUE_IOCB_CMD(hba,
+					    (CHANNEL *)iocbq->channel, iocbq);
 				}
+			} else if (icmd->ULPCOMMAND == CMD_CLOSE_XRI_CN ||
+			    icmd->ULPCOMMAND == CMD_CLOSE_XRI_CX) {
+				/*
+				 * Resend the abort iocbq if any
+				 */
+				emlxs_tx_put(iocbq, 1);
 			}
 		}
 
@@ -2680,10 +2771,18 @@ emlxs_tx_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 
 	}	/* end of while */
 
+	/* Now trigger channel service */
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		if (!flag[channelno]) {
+			continue;
+		}
+
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, &hba->chan[channelno], 0);
+	}
 
 	return (abort.q_cnt);
 
-}  /* emlxs_tx_lun_flush() */
+} /* emlxs_tx_lun_flush() */
 
 
 extern void
@@ -2691,18 +2790,19 @@ emlxs_tx_put(IOCBQ *iocbq, uint32_t lock)
 {
 	emlxs_hba_t *hba;
 	emlxs_port_t *port;
-	uint32_t ringno;
+	uint32_t channelno;
 	NODELIST *nlp;
-	RING *rp;
+	CHANNEL *cp;
 	emlxs_buf_t *sbp;
 
 	port = (emlxs_port_t *)iocbq->port;
 	hba = HBA;
-	rp = (RING *)iocbq->ring;
+	cp = (CHANNEL *)iocbq->channel;
 	nlp = (NODELIST *)iocbq->node;
-	ringno = rp->ringno;
+	channelno = cp->channelno;
 	sbp = (emlxs_buf_t *)iocbq->sbp;
 
+	/* under what cases, nlp is NULL */
 	if (nlp == NULL) {
 		/* Set node to base node by default */
 		nlp = &port->node_base;
@@ -2715,26 +2815,24 @@ emlxs_tx_put(IOCBQ *iocbq, uint32_t lock)
 	}
 
 	if (lock) {
-		mutex_enter(&EMLXS_RINGTX_LOCK);
+		mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 	}
 
 	if (!nlp->nlp_active || (sbp && (sbp->pkt_flags & PACKET_IN_ABORT))) {
 		if (sbp) {
 			mutex_enter(&sbp->mtx);
-
-			if (sbp->pkt_flags & PACKET_IN_TXQ) {
-				sbp->pkt_flags &= ~PACKET_IN_TXQ;
-				hba->ring_tx_count[ringno]--;
-			}
 			sbp->pkt_flags |= PACKET_IN_FLUSH;
-
 			mutex_exit(&sbp->mtx);
 
-			/* Free the ulpIoTag and the bmp */
-			(void) emlxs_unregister_pkt(rp, sbp->iotag, 0);
+			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+				hba->fc_table[sbp->iotag] = NULL;
+				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+			} else {
+				(void) emlxs_unregister_pkt(cp, sbp->iotag, 0);
+			}
 
 			if (lock) {
-				mutex_exit(&EMLXS_RINGTX_LOCK);
+				mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 			}
 
 			if (hba->state >= FC_LINK_UP) {
@@ -2747,7 +2845,7 @@ emlxs_tx_put(IOCBQ *iocbq, uint32_t lock)
 			return;
 		} else {
 			if (lock) {
-				mutex_exit(&EMLXS_RINGTX_LOCK);
+				mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 			}
 
 			(void) emlxs_mem_put(hba, MEM_IOCB, (uint8_t *)iocbq);
@@ -2764,29 +2862,30 @@ emlxs_tx_put(IOCBQ *iocbq, uint32_t lock)
 		    (PACKET_IN_COMPLETION | PACKET_IN_CHIPQ | PACKET_IN_TXQ)) {
 			mutex_exit(&sbp->mtx);
 			if (lock) {
-				mutex_exit(&EMLXS_RINGTX_LOCK);
+				mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 			}
 			return;
 		}
 
 		sbp->pkt_flags |= PACKET_IN_TXQ;
-		hba->ring_tx_count[ringno]++;
+		hba->channel_tx_count++;
 
 		mutex_exit(&sbp->mtx);
 	}
 
 
 	/* Check iocbq priority */
+	/* Some IOCB has the high priority like reset/close xri etc */
 	if (iocbq->flag & IOCB_PRIORITY) {
 		/* Add the iocb to the bottom of the node's ptx queue */
-		if (nlp->nlp_ptx[ringno].q_first) {
-			((IOCBQ *)nlp->nlp_ptx[ringno].q_last)->next = iocbq;
-			nlp->nlp_ptx[ringno].q_last = (uint8_t *)iocbq;
-			nlp->nlp_ptx[ringno].q_cnt++;
+		if (nlp->nlp_ptx[channelno].q_first) {
+			((IOCBQ *)nlp->nlp_ptx[channelno].q_last)->next = iocbq;
+			nlp->nlp_ptx[channelno].q_last = (uint8_t *)iocbq;
+			nlp->nlp_ptx[channelno].q_cnt++;
 		} else {
-			nlp->nlp_ptx[ringno].q_first = (uint8_t *)iocbq;
-			nlp->nlp_ptx[ringno].q_last = (uint8_t *)iocbq;
-			nlp->nlp_ptx[ringno].q_cnt = 1;
+			nlp->nlp_ptx[channelno].q_first = (uint8_t *)iocbq;
+			nlp->nlp_ptx[channelno].q_last = (uint8_t *)iocbq;
+			nlp->nlp_ptx[channelno].q_cnt = 1;
 		}
 
 		iocbq->next = NULL;
@@ -2794,14 +2893,14 @@ emlxs_tx_put(IOCBQ *iocbq, uint32_t lock)
 
 
 		/* Add the iocb to the bottom of the node's tx queue */
-		if (nlp->nlp_tx[ringno].q_first) {
-			((IOCBQ *)nlp->nlp_tx[ringno].q_last)->next = iocbq;
-			nlp->nlp_tx[ringno].q_last = (uint8_t *)iocbq;
-			nlp->nlp_tx[ringno].q_cnt++;
+		if (nlp->nlp_tx[channelno].q_first) {
+			((IOCBQ *)nlp->nlp_tx[channelno].q_last)->next = iocbq;
+			nlp->nlp_tx[channelno].q_last = (uint8_t *)iocbq;
+			nlp->nlp_tx[channelno].q_cnt++;
 		} else {
-			nlp->nlp_tx[ringno].q_first = (uint8_t *)iocbq;
-			nlp->nlp_tx[ringno].q_last = (uint8_t *)iocbq;
-			nlp->nlp_tx[ringno].q_cnt = 1;
+			nlp->nlp_tx[channelno].q_first = (uint8_t *)iocbq;
+			nlp->nlp_tx[channelno].q_last = (uint8_t *)iocbq;
+			nlp->nlp_tx[channelno].q_cnt = 1;
 		}
 
 		iocbq->next = NULL;
@@ -2809,66 +2908,67 @@ emlxs_tx_put(IOCBQ *iocbq, uint32_t lock)
 
 
 	/*
-	 * Check if the node is not already on ring queue and
+	 * Check if the node is not already on channel queue and
 	 * (is not closed or  is a priority request)
 	 */
-	if (!nlp->nlp_next[ringno] && (!(nlp->nlp_flag[ringno] & NLP_CLOSED) ||
+	if (!nlp->nlp_next[channelno] &&
+	    (!(nlp->nlp_flag[channelno] & NLP_CLOSED) ||
 	    (iocbq->flag & IOCB_PRIORITY))) {
-		/* If so, then add it to the ring queue */
-		if (rp->nodeq.q_first) {
-			((NODELIST *)rp->nodeq.q_last)->nlp_next[ringno] =
+		/* If so, then add it to the channel queue */
+		if (cp->nodeq.q_first) {
+			((NODELIST *)cp->nodeq.q_last)->nlp_next[channelno] =
 			    (uint8_t *)nlp;
-			nlp->nlp_next[ringno] = rp->nodeq.q_first;
+			nlp->nlp_next[channelno] = cp->nodeq.q_first;
 
 			/*
 			 * If this is not the base node then add it
 			 * to the tail
 			 */
 			if (!nlp->nlp_base) {
-				rp->nodeq.q_last = (uint8_t *)nlp;
+				cp->nodeq.q_last = (uint8_t *)nlp;
 			} else {	/* Otherwise, add it to the head */
 
 				/* The command node always gets priority */
-				rp->nodeq.q_first = (uint8_t *)nlp;
+				cp->nodeq.q_first = (uint8_t *)nlp;
 			}
 
-			rp->nodeq.q_cnt++;
+			cp->nodeq.q_cnt++;
 		} else {
-			rp->nodeq.q_first = (uint8_t *)nlp;
-			rp->nodeq.q_last = (uint8_t *)nlp;
-			nlp->nlp_next[ringno] = nlp;
-			rp->nodeq.q_cnt = 1;
+			cp->nodeq.q_first = (uint8_t *)nlp;
+			cp->nodeq.q_last = (uint8_t *)nlp;
+			nlp->nlp_next[channelno] = nlp;
+			cp->nodeq.q_cnt = 1;
 		}
 	}
 
-	HBASTATS.IocbTxPut[ringno]++;
+	HBASTATS.IocbTxPut[channelno]++;
 
-	/* Adjust the ring timeout timer */
-	rp->timeout = hba->timer_tics + 5;
+	/* Adjust the channel timeout timer */
+	cp->timeout = hba->timer_tics + 5;
 
 	if (lock) {
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 	}
 
 	return;
 
-}  /* emlxs_tx_put() */
+} /* emlxs_tx_put() */
 
 
 extern IOCBQ *
-emlxs_tx_get(RING *rp, uint32_t lock)
+emlxs_tx_get(CHANNEL *cp, uint32_t lock)
 {
 	emlxs_hba_t *hba;
-	uint32_t ringno;
+	uint32_t channelno;
 	IOCBQ *iocbq;
 	NODELIST *nlp;
 	emlxs_buf_t *sbp;
 
-	hba = rp->hba;
-	ringno = rp->ringno;
+	hba = cp->hba;
+	channelno = cp->channelno;
 
 	if (lock) {
-		mutex_enter(&EMLXS_RINGTX_LOCK);
+		mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 	}
 
 begin:
@@ -2876,44 +2976,44 @@ begin:
 	iocbq = NULL;
 
 	/* Check if a node needs servicing */
-	if (rp->nodeq.q_first) {
-		nlp = (NODELIST *)rp->nodeq.q_first;
+	if (cp->nodeq.q_first) {
+		nlp = (NODELIST *)cp->nodeq.q_first;
 
 		/* Get next iocb from node's priority queue */
 
-		if (nlp->nlp_ptx[ringno].q_first) {
-			iocbq = (IOCBQ *)nlp->nlp_ptx[ringno].q_first;
+		if (nlp->nlp_ptx[channelno].q_first) {
+			iocbq = (IOCBQ *)nlp->nlp_ptx[channelno].q_first;
 
 			/* Check if this is last entry */
-			if (nlp->nlp_ptx[ringno].q_last == (void *)iocbq) {
-				nlp->nlp_ptx[ringno].q_first = NULL;
-				nlp->nlp_ptx[ringno].q_last = NULL;
-				nlp->nlp_ptx[ringno].q_cnt = 0;
+			if (nlp->nlp_ptx[channelno].q_last == (void *)iocbq) {
+				nlp->nlp_ptx[channelno].q_first = NULL;
+				nlp->nlp_ptx[channelno].q_last = NULL;
+				nlp->nlp_ptx[channelno].q_cnt = 0;
 			} else {
 				/* Remove iocb from head */
-				nlp->nlp_ptx[ringno].q_first =
+				nlp->nlp_ptx[channelno].q_first =
 				    (void *)iocbq->next;
-				nlp->nlp_ptx[ringno].q_cnt--;
+				nlp->nlp_ptx[channelno].q_cnt--;
 			}
 
 			iocbq->next = NULL;
 		}
 
 		/* Get next iocb from node tx queue if node not closed */
-		else if (nlp->nlp_tx[ringno].q_first &&
-		    !(nlp->nlp_flag[ringno] & NLP_CLOSED)) {
-			iocbq = (IOCBQ *)nlp->nlp_tx[ringno].q_first;
+		else if (nlp->nlp_tx[channelno].q_first &&
+		    !(nlp->nlp_flag[channelno] & NLP_CLOSED)) {
+			iocbq = (IOCBQ *)nlp->nlp_tx[channelno].q_first;
 
 			/* Check if this is last entry */
-			if (nlp->nlp_tx[ringno].q_last == (void *)iocbq) {
-				nlp->nlp_tx[ringno].q_first = NULL;
-				nlp->nlp_tx[ringno].q_last = NULL;
-				nlp->nlp_tx[ringno].q_cnt = 0;
+			if (nlp->nlp_tx[channelno].q_last == (void *)iocbq) {
+				nlp->nlp_tx[channelno].q_first = NULL;
+				nlp->nlp_tx[channelno].q_last = NULL;
+				nlp->nlp_tx[channelno].q_cnt = 0;
 			} else {
 				/* Remove iocb from head */
-				nlp->nlp_tx[ringno].q_first =
+				nlp->nlp_tx[channelno].q_first =
 				    (void *)iocbq->next;
-				nlp->nlp_tx[ringno].q_cnt--;
+				nlp->nlp_tx[channelno].q_cnt--;
 			}
 
 			iocbq->next = NULL;
@@ -2922,9 +3022,9 @@ begin:
 		/* Now deal with node itself */
 
 		/* Check if node still needs servicing */
-		if ((nlp->nlp_ptx[ringno].q_first) ||
-		    (nlp->nlp_tx[ringno].q_first &&
-		    !(nlp->nlp_flag[ringno] & NLP_CLOSED))) {
+		if ((nlp->nlp_ptx[channelno].q_first) ||
+		    (nlp->nlp_tx[channelno].q_first &&
+		    !(nlp->nlp_flag[channelno] & NLP_CLOSED))) {
 
 			/*
 			 * If this is the base node, then don't shift the
@@ -2933,31 +3033,31 @@ begin:
 			 */
 			if (!nlp->nlp_base) {
 				/*
-				 * Just shift ring queue pointers to next
+				 * Just shift channel queue pointers to next
 				 * node
 				 */
-				rp->nodeq.q_last = (void *)nlp;
-				rp->nodeq.q_first = nlp->nlp_next[ringno];
+				cp->nodeq.q_last = (void *)nlp;
+				cp->nodeq.q_first = nlp->nlp_next[channelno];
 			}
 		} else {
-			/* Remove node from ring queue */
+			/* Remove node from channel queue */
 
 			/* If this is the last node on list */
-			if (rp->nodeq.q_last == (void *)nlp) {
-				rp->nodeq.q_last = NULL;
-				rp->nodeq.q_first = NULL;
-				rp->nodeq.q_cnt = 0;
+			if (cp->nodeq.q_last == (void *)nlp) {
+				cp->nodeq.q_last = NULL;
+				cp->nodeq.q_first = NULL;
+				cp->nodeq.q_cnt = 0;
 			} else {
 				/* Remove node from head */
-				rp->nodeq.q_first = nlp->nlp_next[ringno];
-				((NODELIST *)rp->nodeq.q_last)->
-				    nlp_next[ringno] = rp->nodeq.q_first;
-				rp->nodeq.q_cnt--;
+				cp->nodeq.q_first = nlp->nlp_next[channelno];
+				((NODELIST *)cp->nodeq.q_last)->
+				    nlp_next[channelno] = cp->nodeq.q_first;
+				cp->nodeq.q_cnt--;
 
 			}
 
 			/* Clear node */
-			nlp->nlp_next[ringno] = NULL;
+			nlp->nlp_next[channelno] = NULL;
 		}
 
 		/*
@@ -2991,31 +3091,359 @@ begin:
 			}
 
 			sbp->pkt_flags &= ~PACKET_IN_TXQ;
-			hba->ring_tx_count[ringno]--;
+			hba->channel_tx_count--;
 
 			mutex_exit(&sbp->mtx);
 		}
 	}
 
 	if (iocbq) {
-		HBASTATS.IocbTxGet[ringno]++;
+		HBASTATS.IocbTxGet[channelno]++;
 	}
 
 	/* Adjust the ring timeout timer */
-	rp->timeout = (rp->nodeq.q_first) ? (hba->timer_tics + 5) : 0;
+	cp->timeout = (cp->nodeq.q_first) ? (hba->timer_tics + 5) : 0;
 
 	if (lock) {
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 	}
 
 	return (iocbq);
 
-}  /* emlxs_tx_get() */
+} /* emlxs_tx_get() */
 
+
+/*
+ * Remove all cmd from from_rp's txq to to_rp's txq for ndlp.
+ * The old IoTag has to be released, the new one has to be
+ * allocated.  Others no change
+ * TX_CHANNEL lock is held
+ */
+extern void
+emlxs_tx_move(NODELIST *ndlp, CHANNEL *from_chan, CHANNEL *to_chan,
+    uint32_t cmd, emlxs_buf_t *fpkt, uint32_t lock)
+{
+	emlxs_hba_t *hba;
+	emlxs_port_t *port;
+	uint32_t fchanno, tchanno, i;
+
+	IOCBQ *iocbq;
+	IOCBQ *prev;
+	IOCBQ *next;
+	IOCB *iocb, *icmd;
+	Q tbm;		/* To Be Moved Q */
+	MATCHMAP *mp;
+
+	NODELIST *nlp = ndlp;
+	emlxs_buf_t *sbp;
+
+	NODELIST *n_prev = NULL;
+	NODELIST *n_next = NULL;
+	uint16_t count = 0;
+
+	hba = from_chan->hba;
+	port = &PPORT;
+	cmd = cmd; /* To pass lint */
+
+	fchanno = from_chan->channelno;
+	tchanno = to_chan->channelno;
+
+	if (lock) {
+		mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
+	}
+
+	bzero((void *)&tbm, sizeof (Q));
+
+	/* Scan the ndlp's fchanno txq to get the iocb of fcp cmd */
+	prev = NULL;
+	iocbq = (IOCBQ *)nlp->nlp_tx[fchanno].q_first;
+
+	while (iocbq) {
+		next = (IOCBQ *)iocbq->next;
+		/* Check if this iocb is fcp cmd */
+		iocb = &iocbq->iocb;
+
+		switch (iocb->ULPCOMMAND) {
+		/* FCP commands */
+		case CMD_FCP_ICMND_CR:
+		case CMD_FCP_ICMND_CX:
+		case CMD_FCP_IREAD_CR:
+		case CMD_FCP_IREAD_CX:
+		case CMD_FCP_IWRITE_CR:
+		case CMD_FCP_IWRITE_CX:
+		case CMD_FCP_ICMND64_CR:
+		case CMD_FCP_ICMND64_CX:
+		case CMD_FCP_IREAD64_CR:
+		case CMD_FCP_IREAD64_CX:
+		case CMD_FCP_IWRITE64_CR:
+		case CMD_FCP_IWRITE64_CX:
+			/* We found a fcp cmd */
+			break;
+		default:
+			/* this is not fcp cmd continue */
+			prev = iocbq;
+			iocbq = next;
+			continue;
+		}
+
+		/* found a fcp cmd iocb in fchanno txq, now deque it */
+		if (next == NULL) {
+			/* This is the last iocbq */
+			nlp->nlp_tx[fchanno].q_last =
+			    (uint8_t *)prev;
+		}
+
+		if (prev == NULL) {
+			/* This is the first one then remove it from head */
+			nlp->nlp_tx[fchanno].q_first =
+			    (uint8_t *)next;
+		} else {
+			prev->next = next;
+		}
+
+		iocbq->next = NULL;
+		nlp->nlp_tx[fchanno].q_cnt--;
+
+		/* Add this iocb to our local toberemovedq */
+		/* This way we donot hold the TX_CHANNEL lock too long */
+
+		if (tbm.q_first) {
+			((IOCBQ *)tbm.q_last)->next = iocbq;
+			tbm.q_last = (uint8_t *)iocbq;
+			tbm.q_cnt++;
+		} else {
+			tbm.q_first = (uint8_t *)iocbq;
+			tbm.q_last = (uint8_t *)iocbq;
+			tbm.q_cnt = 1;
+		}
+
+		iocbq = next;
+
+	}	/* While (iocbq) */
+
+	if ((tchanno == hba->channel_fcp) && (tbm.q_cnt != 0)) {
+
+		/* from_chan->nodeq.q_first must be non NULL */
+		if (from_chan->nodeq.q_first) {
+
+			/* nodeq is not empty, now deal with the node itself */
+			if ((nlp->nlp_tx[fchanno].q_first)) {
+
+				if (!nlp->nlp_base) {
+					from_chan->nodeq.q_last =
+					    (void *)nlp;
+					from_chan->nodeq.q_first =
+					    nlp->nlp_next[fchanno];
+				}
+
+			} else {
+				n_prev = (NODELIST *)from_chan->nodeq.q_first;
+				count = from_chan->nodeq.q_cnt;
+
+				if (n_prev == nlp) {
+
+					/* If this is the only node on list */
+					if (from_chan->nodeq.q_last ==
+					    (void *)nlp) {
+						from_chan->nodeq.q_last =
+						    NULL;
+						from_chan->nodeq.q_first =
+						    NULL;
+						from_chan->nodeq.q_cnt = 0;
+					} else {
+						from_chan->nodeq.q_first =
+						    nlp->nlp_next[fchanno];
+						((NODELIST *)from_chan->
+						    nodeq.q_last)->
+						    nlp_next[fchanno] =
+						    from_chan->nodeq.q_first;
+						from_chan->nodeq.q_cnt--;
+					}
+					/* Clear node */
+					nlp->nlp_next[fchanno] = NULL;
+				} else {
+					count--;
+					do {
+						n_next =
+						    n_prev->nlp_next[fchanno];
+						if (n_next == nlp) {
+							break;
+						}
+						n_prev = n_next;
+					} while (count--);
+
+					if (count != 0) {
+
+						if (n_next ==
+						    (NODELIST *)from_chan->
+						    nodeq.q_last) {
+							n_prev->
+							    nlp_next[fchanno]
+							    =
+							    ((NODELIST *)
+							    from_chan->
+							    nodeq.q_last)->
+							    nlp_next
+							    [fchanno];
+							from_chan->nodeq.q_last
+							    = (uint8_t *)n_prev;
+						} else {
+
+							n_prev->
+							    nlp_next[fchanno]
+							    =
+							    n_next-> nlp_next
+							    [fchanno];
+						}
+						from_chan->nodeq.q_cnt--;
+						/* Clear node */
+						nlp->nlp_next[fchanno] =
+						    NULL;
+					}
+				}
+			}
+		}
+	}
+
+	/* Now cleanup the iocb's */
+	prev = NULL;
+	iocbq = (IOCBQ *)tbm.q_first;
+
+	while (iocbq) {
+
+		next = (IOCBQ *)iocbq->next;
+
+		/* Free the IoTag and the bmp */
+		iocb = &iocbq->iocb;
+
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			sbp = iocbq->sbp;
+			if (sbp) {
+				hba->fc_table[sbp->iotag] = NULL;
+				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+			}
+		} else {
+			sbp = emlxs_unregister_pkt((CHANNEL *)iocbq->channel,
+			    iocb->ULPIOTAG, 0);
+		}
+
+		if (sbp && (sbp != STALE_PACKET)) {
+			mutex_enter(&sbp->mtx);
+			sbp->pkt_flags |= PACKET_IN_FLUSH;
+
+			/*
+			 * If the fpkt is already set, then we will leave it
+			 * alone. This ensures that this pkt is only accounted
+			 * for on one fpkt->flush_count
+			 */
+			if (!sbp->fpkt && fpkt) {
+				mutex_enter(&fpkt->mtx);
+				sbp->fpkt = fpkt;
+				fpkt->flush_count++;
+				mutex_exit(&fpkt->mtx);
+			}
+			mutex_exit(&sbp->mtx);
+		}
+		iocbq = next;
+
+	}	/* end of while */
+
+	iocbq = (IOCBQ *)tbm.q_first;
+	while (iocbq) {
+		/* Save the next iocbq for now */
+		next = (IOCBQ *)iocbq->next;
+
+		/* Unlink this iocbq */
+		iocbq->next = NULL;
+
+		/* Get the pkt */
+		sbp = (emlxs_buf_t *)iocbq->sbp;
+
+		if (sbp) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_flush_msg,
+			"tx: sbp=%p node=%p", sbp, sbp->node);
+
+			if (hba->state >= FC_LINK_UP) {
+				emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
+				    IOERR_ABORT_REQUESTED, 1);
+			} else {
+				emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
+				    IOERR_LINK_DOWN, 1);
+			}
+
+		}
+		/* Free the iocb and its associated buffers */
+		else {
+			icmd = &iocbq->iocb;
+
+			/* SLI3 */
+			if (icmd->ULPCOMMAND == CMD_QUE_RING_BUF64_CN ||
+			    icmd->ULPCOMMAND == CMD_QUE_RING_BUF_CN ||
+			    icmd->ULPCOMMAND == CMD_QUE_RING_LIST64_CN) {
+				if ((hba->flag &
+				    (FC_ONLINE_MODE | FC_ONLINING_MODE)) == 0) {
+					/* HBA is detaching or offlining */
+					if (icmd->ULPCOMMAND !=
+					    CMD_QUE_RING_LIST64_CN) {
+						uint8_t *tmp;
+						RING *rp;
+						int ch;
+
+						ch = from_chan->channelno;
+						rp = &hba->sli.sli3.ring[ch];
+
+						for (i = 0;
+						    i < icmd->ULPBDECOUNT;
+						    i++) {
+							mp = EMLXS_GET_VADDR(
+							    hba, rp, icmd);
+
+							tmp = (uint8_t *)mp;
+							if (mp) {
+							(void) emlxs_mem_put(
+							    hba,
+							    MEM_BUF,
+							    tmp);
+							}
+						}
+
+					}
+
+					(void) emlxs_mem_put(hba, MEM_IOCB,
+					    (uint8_t *)iocbq);
+				} else {
+					/* repost the unsolicited buffer */
+					EMLXS_SLI_ISSUE_IOCB_CMD(hba,
+					    from_chan, iocbq);
+				}
+			}
+		}
+
+		iocbq = next;
+
+	}	/* end of while */
+
+	/* Now flush the chipq if any */
+	if (!(nlp->nlp_flag[fchanno] & NLP_CLOSED)) {
+
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
+
+		(void) emlxs_chipq_node_flush(port, from_chan, nlp, 0);
+
+		mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
+	}
+
+	if (lock) {
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
+	}
+
+	return;
+
+} /* emlxs_tx_move */
 
 
 extern uint32_t
-emlxs_chipq_node_flush(emlxs_port_t *port, RING *ring, NODELIST *ndlp,
+emlxs_chipq_node_flush(emlxs_port_t *port, CHANNEL *chan, NODELIST *ndlp,
     emlxs_buf_t *fpkt)
 {
 	emlxs_hba_t *hba = HBA;
@@ -3023,37 +3451,37 @@ emlxs_chipq_node_flush(emlxs_port_t *port, RING *ring, NODELIST *ndlp,
 	IOCBQ *iocbq;
 	IOCBQ *next;
 	Q abort;
-	RING *rp;
-	uint32_t ringno;
-	uint8_t flag[MAX_RINGS];
+	CHANNEL *cp;
+	uint32_t channelno;
+	uint8_t flag[MAX_CHANNEL];
 	uint32_t iotag;
 
 	bzero((void *)&abort, sizeof (Q));
 	bzero((void *)flag, sizeof (flag));
 
-	for (ringno = 0; ringno < hba->ring_count; ringno++) {
-		rp = &hba->ring[ringno];
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		cp = &hba->chan[channelno];
 
-		if (ring && rp != ring) {
+		if (chan && cp != chan) {
 			continue;
 		}
 
-		mutex_enter(&EMLXS_FCTAB_LOCK(ringno));
+		mutex_enter(&EMLXS_FCTAB_LOCK);
 
-		for (iotag = 1; iotag < rp->max_iotag; iotag++) {
-			sbp = rp->fc_table[iotag];
+		for (iotag = 1; iotag < hba->max_iotag; iotag++) {
+			sbp = hba->fc_table[iotag];
 
 			if (sbp && (sbp != STALE_PACKET) &&
 			    (sbp->pkt_flags & PACKET_IN_CHIPQ) &&
 			    (sbp->node == ndlp) &&
-			    (sbp->ring == rp) &&
+			    (sbp->channel == cp) &&
 			    !(sbp->pkt_flags & PACKET_XRI_CLOSED)) {
 				emlxs_sbp_abort_add(port, sbp, &abort, flag,
 				    fpkt);
 			}
 
 		}
-		mutex_exit(&EMLXS_FCTAB_LOCK(ringno));
+		mutex_exit(&EMLXS_FCTAB_LOCK);
 
 	}	/* for */
 
@@ -3072,24 +3500,22 @@ emlxs_chipq_node_flush(emlxs_port_t *port, RING *ring, NODELIST *ndlp,
 		iocbq = next;
 	}
 
-	/* Now trigger ring service */
-	for (ringno = 0; ringno < hba->ring_count; ringno++) {
-		if (!flag[ringno]) {
+	/* Now trigger channel service */
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		if (!flag[channelno]) {
 			continue;
 		}
 
-		rp = &hba->ring[ringno];
-
-		emlxs_sli_issue_iocb_cmd(hba, rp, 0);
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, &hba->chan[channelno], 0);
 	}
 
 	return (abort.q_cnt);
 
-}  /* emlxs_chipq_node_flush() */
+} /* emlxs_chipq_node_flush() */
 
 
 /* Flush all IO's left on all iotag lists */
-static uint32_t
+extern uint32_t
 emlxs_iotag_flush(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
@@ -3097,61 +3523,73 @@ emlxs_iotag_flush(emlxs_hba_t *hba)
 	IOCBQ *iocbq;
 	IOCB *iocb;
 	Q abort;
-	RING *rp;
-	uint32_t ringno;
+	CHANNEL *cp;
+	uint32_t channelno;
 	uint32_t iotag;
 	uint32_t count;
 
 	count = 0;
-	for (ringno = 0; ringno < hba->ring_count; ringno++) {
-		rp = &hba->ring[ringno];
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		cp = &hba->chan[channelno];
 
 		bzero((void *)&abort, sizeof (Q));
 
-		mutex_enter(&EMLXS_FCTAB_LOCK(ringno));
+		mutex_enter(&EMLXS_FCTAB_LOCK);
 
-		for (iotag = 1; iotag < rp->max_iotag; iotag++) {
-			sbp = rp->fc_table[iotag];
+		for (iotag = 1; iotag < hba->max_iotag; iotag++) {
+			sbp = hba->fc_table[iotag];
 
+			/* Check if the slot is empty */
 			if (!sbp || (sbp == STALE_PACKET)) {
 				continue;
 			}
 
-			/* Unregister the packet */
-			rp->fc_table[iotag] = STALE_PACKET;
-			hba->io_count[ringno]--;
-			sbp->iotag = 0;
-
-			/* Clean up the sbp */
-			mutex_enter(&sbp->mtx);
+			/* We are building an abort list per channel */
+			if (sbp->channel != cp) {
+				continue;
+			}
 
 			/* Set IOCB status */
 			iocbq = &sbp->iocbq;
 			iocb = &iocbq->iocb;
 
-			iocb->ulpStatus = IOSTAT_LOCAL_REJECT;
+			iocb->ULPSTATUS = IOSTAT_LOCAL_REJECT;
 			iocb->un.grsp.perr.statLocalError = IOERR_LINK_DOWN;
-			iocb->ulpLe = 1;
+			iocb->ULPLE = 1;
 			iocbq->next = NULL;
 
-			if (sbp->pkt_flags & PACKET_IN_TXQ) {
-				sbp->pkt_flags &= ~PACKET_IN_TXQ;
-				hba->ring_tx_count[ringno]--;
-			}
+			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+				hba->fc_table[iotag] = NULL;
+				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+			} else {
+				hba->fc_table[iotag] = STALE_PACKET;
+				hba->io_count --;
+				sbp->iotag = 0;
 
-			if (sbp->pkt_flags & PACKET_IN_CHIPQ) {
-				sbp->pkt_flags &= ~PACKET_IN_CHIPQ;
-			}
+				/* Clean up the sbp */
+				mutex_enter(&sbp->mtx);
 
-			if (sbp->bmp) {
-				(void) emlxs_mem_put(hba, MEM_BPL,
-				    (uint8_t *)sbp->bmp);
-				sbp->bmp = 0;
+				if (sbp->pkt_flags & PACKET_IN_TXQ) {
+					sbp->pkt_flags &= ~PACKET_IN_TXQ;
+					hba->channel_tx_count --;
+				}
+
+				if (sbp->pkt_flags & PACKET_IN_CHIPQ) {
+					sbp->pkt_flags &= ~PACKET_IN_CHIPQ;
+				}
+
+				if (sbp->bmp) {
+					(void) emlxs_mem_put(hba, MEM_BPL,
+					    (uint8_t *)sbp->bmp);
+					sbp->bmp = 0;
+				}
+
+				mutex_exit(&sbp->mtx);
 			}
 
 			/* At this point all nodes are assumed destroyed */
+			mutex_enter(&sbp->mtx);
 			sbp->node = 0;
-
 			mutex_exit(&sbp->mtx);
 
 			/* Add this iocb to our local abort Q */
@@ -3166,26 +3604,26 @@ emlxs_iotag_flush(emlxs_hba_t *hba)
 			}
 		}
 
-		mutex_exit(&EMLXS_FCTAB_LOCK(ringno));
+		mutex_exit(&EMLXS_FCTAB_LOCK);
 
 		/* Trigger deferred completion */
 		if (abort.q_first) {
-			mutex_enter(&rp->rsp_lock);
-			if (rp->rsp_head == NULL) {
-				rp->rsp_head = (IOCBQ *)abort.q_first;
-				rp->rsp_tail = (IOCBQ *)abort.q_last;
+			mutex_enter(&cp->rsp_lock);
+			if (cp->rsp_head == NULL) {
+				cp->rsp_head = (IOCBQ *)abort.q_first;
+				cp->rsp_tail = (IOCBQ *)abort.q_last;
 			} else {
-				rp->rsp_tail->next = (IOCBQ *)abort.q_first;
-				rp->rsp_tail = (IOCBQ *)abort.q_last;
+				cp->rsp_tail->next = (IOCBQ *)abort.q_first;
+				cp->rsp_tail = (IOCBQ *)abort.q_last;
 			}
-			mutex_exit(&rp->rsp_lock);
+			mutex_exit(&cp->rsp_lock);
 
-			emlxs_thread_trigger2(&rp->intr_thread,
-			    emlxs_proc_ring, rp);
+			emlxs_thread_trigger2(&cp->intr_thread,
+			    emlxs_proc_channel, cp);
 
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_flush_msg,
-			    "Forced iotag completion. ring=%d count=%d",
-			    ringno, abort.q_cnt);
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_err_msg,
+			    "Forced iotag completion. channel=%d count=%d",
+			    channelno, abort.q_cnt);
 
 			count += abort.q_cnt;
 		}
@@ -3193,86 +3631,85 @@ emlxs_iotag_flush(emlxs_hba_t *hba)
 
 	return (count);
 
-}  /* emlxs_iotag_flush() */
+} /* emlxs_iotag_flush() */
 
 
 
-/* Checks for IO's on all or a given ring for a given node */
+/* Checks for IO's on all or a given channel for a given node */
 extern uint32_t
-emlxs_chipq_node_check(emlxs_port_t *port, RING *ring, NODELIST *ndlp)
+emlxs_chipq_node_check(emlxs_port_t *port, CHANNEL *chan, NODELIST *ndlp)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_buf_t *sbp;
-	RING *rp;
-	uint32_t ringno;
+	CHANNEL *cp;
+	uint32_t channelno;
 	uint32_t count;
 	uint32_t iotag;
 
 	count = 0;
 
-	for (ringno = 0; ringno < hba->ring_count; ringno++) {
-		rp = &hba->ring[ringno];
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		cp = &hba->chan[channelno];
 
-		if (ring && rp != ring) {
+		if (chan && cp != chan) {
 			continue;
 		}
 
-		mutex_enter(&EMLXS_FCTAB_LOCK(ringno));
+		mutex_enter(&EMLXS_FCTAB_LOCK);
 
-		for (iotag = 1; iotag < rp->max_iotag; iotag++) {
-			sbp = rp->fc_table[iotag];
+		for (iotag = 1; iotag < hba->max_iotag; iotag++) {
+			sbp = hba->fc_table[iotag];
 
 			if (sbp && (sbp != STALE_PACKET) &&
 			    (sbp->pkt_flags & PACKET_IN_CHIPQ) &&
 			    (sbp->node == ndlp) &&
-			    (sbp->ring == rp) &&
+			    (sbp->channel == cp) &&
 			    !(sbp->pkt_flags & PACKET_XRI_CLOSED)) {
 				count++;
 			}
 
 		}
-		mutex_exit(&EMLXS_FCTAB_LOCK(ringno));
+		mutex_exit(&EMLXS_FCTAB_LOCK);
 
 	}	/* for */
 
 	return (count);
 
-}  /* emlxs_chipq_node_check() */
+} /* emlxs_chipq_node_check() */
 
 
 
-/* Flush all IO's for a given node's lun (FC_FCP_RING only) */
+/* Flush all IO's for a given node's lun (on any channel) */
 extern uint32_t
-emlxs_chipq_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
-    emlxs_buf_t *fpkt)
+emlxs_chipq_lun_flush(emlxs_port_t *port, NODELIST *ndlp,
+    uint32_t lun, emlxs_buf_t *fpkt)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_buf_t *sbp;
-	RING *rp;
 	IOCBQ *iocbq;
 	IOCBQ *next;
 	Q abort;
 	uint32_t iotag;
-	uint8_t flag[MAX_RINGS];
+	uint8_t flag[MAX_CHANNEL];
+	uint32_t channelno;
 
 	bzero((void *)flag, sizeof (flag));
 	bzero((void *)&abort, sizeof (Q));
-	rp = &hba->ring[FC_FCP_RING];
 
-	mutex_enter(&EMLXS_FCTAB_LOCK(FC_FCP_RING));
-	for (iotag = 1; iotag < rp->max_iotag; iotag++) {
-		sbp = rp->fc_table[iotag];
+	mutex_enter(&EMLXS_FCTAB_LOCK);
+	for (iotag = 1; iotag < hba->max_iotag; iotag++) {
+		sbp = hba->fc_table[iotag];
 
 		if (sbp && (sbp != STALE_PACKET) &&
 		    sbp->pkt_flags & PACKET_IN_CHIPQ &&
 		    sbp->node == ndlp &&
-		    sbp->ring == rp &&
 		    sbp->lun == lun &&
 		    !(sbp->pkt_flags & PACKET_XRI_CLOSED)) {
-			emlxs_sbp_abort_add(port, sbp, &abort, flag, fpkt);
+			emlxs_sbp_abort_add(port, sbp,
+			    &abort, flag, fpkt);
 		}
 	}
-	mutex_exit(&EMLXS_FCTAB_LOCK(FC_FCP_RING));
+	mutex_exit(&EMLXS_FCTAB_LOCK);
 
 	/* Now put the iocb's on the tx queue */
 	iocbq = (IOCBQ *)abort.q_first;
@@ -3289,14 +3726,18 @@ emlxs_chipq_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
 		iocbq = next;
 	}
 
-	/* Now trigger ring service */
-	if (abort.q_cnt) {
-		emlxs_sli_issue_iocb_cmd(hba, rp, 0);
+	/* Now trigger channel service */
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		if (!flag[channelno]) {
+			continue;
+		}
+
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, &hba->chan[channelno], 0);
 	}
 
 	return (abort.q_cnt);
 
-}  /* emlxs_chipq_lun_flush() */
+} /* emlxs_chipq_lun_flush() */
 
 
 
@@ -3306,193 +3747,273 @@ emlxs_chipq_lun_flush(emlxs_port_t *port, NODELIST *ndlp, uint32_t lun,
  */
 extern IOCBQ *
 emlxs_create_abort_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
-    uint16_t iotag, RING *rp, uint8_t class, int32_t flag)
+    uint16_t iotag, CHANNEL *cp, uint8_t class, int32_t flag)
 {
 	emlxs_hba_t *hba = HBA;
 	IOCBQ *iocbq;
 	IOCB *iocb;
+	emlxs_wqe_t *wqe;
+	emlxs_buf_t *sbp;
 	uint16_t abort_iotag;
 
-	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB)) == NULL) {
+	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB, 0)) == NULL) {
 		return (NULL);
 	}
 
-	iocbq->ring = (void *)rp;
+	iocbq->channel = (void *)cp;
 	iocbq->port = (void *)port;
 	iocbq->node = (void *)ndlp;
 	iocbq->flag |= (IOCB_PRIORITY | IOCB_SPECIAL);
-	iocb = &iocbq->iocb;
 
 	/*
 	 * set up an iotag using special Abort iotags
 	 */
-	if ((rp->fc_abort_iotag < rp->max_iotag)) {
-		rp->fc_abort_iotag = rp->max_iotag;
+	if ((hba->fc_oor_iotag >= EMLXS_MAX_ABORT_TAG)) {
+		hba->fc_oor_iotag = hba->max_iotag;
 	}
+	abort_iotag = hba->fc_oor_iotag++;
 
-	abort_iotag = rp->fc_abort_iotag++;
 
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		wqe = &iocbq->wqe;
+		sbp = hba->fc_table[iotag];
 
-	iocb->ulpIoTag = abort_iotag;
-	iocb->un.acxri.abortType = flag;
-	iocb->un.acxri.abortContextTag = ndlp->nlp_Rpi;
-	iocb->un.acxri.abortIoTag = iotag;
-	iocb->ulpLe = 1;
-	iocb->ulpClass = class;
-	iocb->ulpCommand = CMD_ABORT_XRI_CN;
-	iocb->ulpOwner = OWN_CHIP;
+		/* Try to issue abort by XRI if possible */
+		if (sbp == NULL || sbp == STALE_PACKET || sbp->xp == NULL) {
+			wqe->un.Abort.Criteria = ABORT_REQ_TAG;
+			wqe->AbortTag = iotag;
+		} else {
+			wqe->un.Abort.Criteria = ABORT_XRI_TAG;
+			wqe->AbortTag = sbp->xp->XRI;
+		}
+		wqe->un.Abort.IA = 0;
+		wqe->RequestTag = abort_iotag;
+		wqe->Command = CMD_ABORT_XRI_CX;
+		wqe->Class = CLASS3;
+		wqe->CQId = 0x3ff;
+		wqe->CmdType = WQE_TYPE_ABORT;
+	} else {
+		iocb = &iocbq->iocb;
+		iocb->ULPIOTAG = abort_iotag;
+		iocb->un.acxri.abortType = flag;
+		iocb->un.acxri.abortContextTag = ndlp->nlp_Rpi;
+		iocb->un.acxri.abortIoTag = iotag;
+		iocb->ULPLE = 1;
+		iocb->ULPCLASS = class;
+		iocb->ULPCOMMAND = CMD_ABORT_XRI_CN;
+		iocb->ULPOWNER = OWN_CHIP;
+	}
 
 	return (iocbq);
 
-}  /* emlxs_create_abort_xri_cn() */
+} /* emlxs_create_abort_xri_cn() */
 
 
 extern IOCBQ *
 emlxs_create_abort_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
-    RING *rp, uint8_t class, int32_t flag)
+    CHANNEL *cp, uint8_t class, int32_t flag)
 {
 	emlxs_hba_t *hba = HBA;
 	IOCBQ *iocbq;
 	IOCB *iocb;
+	emlxs_wqe_t *wqe;
 	uint16_t abort_iotag;
 
-	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB)) == NULL) {
+	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB, 0)) == NULL) {
 		return (NULL);
 	}
 
-	iocbq->ring = (void *)rp;
+	iocbq->channel = (void *)cp;
 	iocbq->port = (void *)port;
 	iocbq->node = (void *)ndlp;
 	iocbq->flag |= (IOCB_PRIORITY | IOCB_SPECIAL);
-	iocb = &iocbq->iocb;
 
 	/*
 	 * set up an iotag using special Abort iotags
 	 */
-	if ((rp->fc_abort_iotag < rp->max_iotag)) {
-		rp->fc_abort_iotag = rp->max_iotag;
+	if ((hba->fc_oor_iotag >= EMLXS_MAX_ABORT_TAG)) {
+		hba->fc_oor_iotag = hba->max_iotag;
 	}
+	abort_iotag = hba->fc_oor_iotag++;
 
-	abort_iotag = rp->fc_abort_iotag++;
-
-	iocb->ulpContext = xid;
-	iocb->ulpIoTag = abort_iotag;
-	iocb->un.acxri.abortType = flag;
-	iocb->ulpLe = 1;
-	iocb->ulpClass = class;
-	iocb->ulpCommand = CMD_ABORT_XRI_CX;
-	iocb->ulpOwner = OWN_CHIP;
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		wqe = &iocbq->wqe;
+		wqe->un.Abort.Criteria = ABORT_XRI_TAG;
+		wqe->un.Abort.IA = 0;
+		wqe->RequestTag = abort_iotag;
+		wqe->AbortTag = xid;
+		wqe->Command = CMD_ABORT_XRI_CX;
+		wqe->Class = CLASS3;
+		wqe->CQId = 0x3ff;
+		wqe->CmdType = WQE_TYPE_ABORT;
+	} else {
+		iocb = &iocbq->iocb;
+		iocb->ULPCONTEXT = xid;
+		iocb->ULPIOTAG = abort_iotag;
+		iocb->un.acxri.abortType = flag;
+		iocb->ULPLE = 1;
+		iocb->ULPCLASS = class;
+		iocb->ULPCOMMAND = CMD_ABORT_XRI_CX;
+		iocb->ULPOWNER = OWN_CHIP;
+	}
 
 	return (iocbq);
 
-}  /* emlxs_create_abort_xri_cx() */
+} /* emlxs_create_abort_xri_cx() */
 
 
 
 /* This must be called while holding the EMLXS_FCCTAB_LOCK */
 extern IOCBQ *
 emlxs_create_close_xri_cn(emlxs_port_t *port, NODELIST *ndlp,
-    uint16_t iotag, RING *rp)
+    uint16_t iotag, CHANNEL *cp)
 {
 	emlxs_hba_t *hba = HBA;
 	IOCBQ *iocbq;
 	IOCB *iocb;
+	emlxs_wqe_t *wqe;
+	emlxs_buf_t *sbp;
 	uint16_t abort_iotag;
 
-	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB)) == NULL) {
+	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB, 0)) == NULL) {
 		return (NULL);
 	}
 
-	iocbq->ring = (void *)rp;
+	iocbq->channel = (void *)cp;
 	iocbq->port = (void *)port;
 	iocbq->node = (void *)ndlp;
 	iocbq->flag |= (IOCB_PRIORITY | IOCB_SPECIAL);
-	iocb = &iocbq->iocb;
 
 	/*
 	 * set up an iotag using special Abort iotags
 	 */
-	if ((rp->fc_abort_iotag < rp->max_iotag)) {
-		rp->fc_abort_iotag = rp->max_iotag;
+	if ((hba->fc_oor_iotag >= EMLXS_MAX_ABORT_TAG)) {
+		hba->fc_oor_iotag = hba->max_iotag;
 	}
+	abort_iotag = hba->fc_oor_iotag++;
 
-	abort_iotag = rp->fc_abort_iotag++;
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		wqe = &iocbq->wqe;
+		sbp = hba->fc_table[iotag];
 
-	iocb->ulpIoTag = abort_iotag;
-	iocb->un.acxri.abortType = 0;
-	iocb->un.acxri.abortContextTag = ndlp->nlp_Rpi;
-	iocb->un.acxri.abortIoTag = iotag;
-	iocb->ulpLe = 1;
-	iocb->ulpClass = 0;
-	iocb->ulpCommand = CMD_CLOSE_XRI_CN;
-	iocb->ulpOwner = OWN_CHIP;
+		/* Try to issue close by XRI if possible */
+		if (sbp == NULL || sbp == STALE_PACKET || sbp->xp == NULL) {
+			wqe->un.Abort.Criteria = ABORT_REQ_TAG;
+			wqe->AbortTag = iotag;
+		} else {
+			wqe->un.Abort.Criteria = ABORT_XRI_TAG;
+			wqe->AbortTag = sbp->xp->XRI;
+		}
+		wqe->un.Abort.IA = 1;
+		wqe->RequestTag = abort_iotag;
+		wqe->Command = CMD_ABORT_XRI_CX;
+		wqe->Class = CLASS3;
+		wqe->CQId = 0x3ff;
+		wqe->CmdType = WQE_TYPE_ABORT;
+	} else {
+		iocb = &iocbq->iocb;
+		iocb->ULPIOTAG = abort_iotag;
+		iocb->un.acxri.abortType = 0;
+		iocb->un.acxri.abortContextTag = ndlp->nlp_Rpi;
+		iocb->un.acxri.abortIoTag = iotag;
+		iocb->ULPLE = 1;
+		iocb->ULPCLASS = 0;
+		iocb->ULPCOMMAND = CMD_CLOSE_XRI_CN;
+		iocb->ULPOWNER = OWN_CHIP;
+	}
 
 	return (iocbq);
 
-}  /* emlxs_create_close_xri_cn() */
+} /* emlxs_create_close_xri_cn() */
 
 
 /* This must be called while holding the EMLXS_FCCTAB_LOCK */
 extern IOCBQ *
 emlxs_create_close_xri_cx(emlxs_port_t *port, NODELIST *ndlp, uint16_t xid,
-    RING *rp)
+    CHANNEL *cp)
 {
 	emlxs_hba_t *hba = HBA;
 	IOCBQ *iocbq;
 	IOCB *iocb;
+	emlxs_wqe_t *wqe;
 	uint16_t abort_iotag;
 
-	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB)) == NULL) {
+	if ((iocbq = (IOCBQ *)emlxs_mem_get(hba, MEM_IOCB, 0)) == NULL) {
 		return (NULL);
 	}
 
-	iocbq->ring = (void *)rp;
+	iocbq->channel = (void *)cp;
 	iocbq->port = (void *)port;
 	iocbq->node = (void *)ndlp;
 	iocbq->flag |= (IOCB_PRIORITY | IOCB_SPECIAL);
-	iocb = &iocbq->iocb;
 
 	/*
 	 * set up an iotag using special Abort iotags
 	 */
-	if ((rp->fc_abort_iotag < rp->max_iotag)) {
-		rp->fc_abort_iotag = rp->max_iotag;
+	if ((hba->fc_oor_iotag >= EMLXS_MAX_ABORT_TAG)) {
+		hba->fc_oor_iotag = hba->max_iotag;
 	}
+	abort_iotag = hba->fc_oor_iotag++;
 
-	abort_iotag = rp->fc_abort_iotag++;
-
-	iocb->ulpContext = xid;
-	iocb->ulpIoTag = abort_iotag;
-	iocb->ulpLe = 1;
-	iocb->ulpClass = 0;
-	iocb->ulpCommand = CMD_CLOSE_XRI_CX;
-	iocb->ulpOwner = OWN_CHIP;
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		wqe = &iocbq->wqe;
+		wqe->un.Abort.Criteria = ABORT_XRI_TAG;
+		wqe->un.Abort.IA = 1;
+		wqe->RequestTag = abort_iotag;
+		wqe->AbortTag = xid;
+		wqe->Command = CMD_ABORT_XRI_CX;
+		wqe->Class = CLASS3;
+		wqe->CQId = 0x3ff;
+		wqe->CmdType = WQE_TYPE_ABORT;
+	} else {
+		iocb = &iocbq->iocb;
+		iocb->ULPCONTEXT = xid;
+		iocb->ULPIOTAG = abort_iotag;
+		iocb->ULPLE = 1;
+		iocb->ULPCLASS = 0;
+		iocb->ULPCOMMAND = CMD_CLOSE_XRI_CX;
+		iocb->ULPOWNER = OWN_CHIP;
+	}
 
 	return (iocbq);
 
-}  /* emlxs_create_close_xri_cx() */
+} /* emlxs_create_close_xri_cx() */
 
 
 void
 emlxs_abort_ct_exchange(emlxs_hba_t *hba, emlxs_port_t *port, uint32_t rxid)
 {
-	RING *rp;
+	CHANNEL *cp;
 	IOCBQ *iocbq;
 
-	rp = &hba->ring[FC_CT_RING];
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ct_msg,
+	    "Aborting CT exchange: xid=%x", rxid);
+
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		if (emlxs_sli4_unreserve_xri(hba, rxid) == 0) {
+			/* We have no way to abort unsolicited exchanges */
+			/* that we have not responded to at this time */
+			/* So we will return for now */
+			return;
+		}
+	}
+
+	cp = &hba->chan[hba->channel_ct];
 
 	/* Create the abort IOCB */
 	if (hba->state >= FC_LINK_UP) {
 		iocbq =
-		    emlxs_create_abort_xri_cx(port, NULL, rxid, rp, CLASS3,
+		    emlxs_create_abort_xri_cx(port, NULL, rxid, cp, CLASS3,
 		    ABORT_TYPE_ABTS);
 	} else {
-		iocbq = emlxs_create_close_xri_cx(port, NULL, rxid, rp);
+		iocbq = emlxs_create_close_xri_cx(port, NULL, rxid, cp);
 	}
+
 	if (iocbq) {
-		emlxs_sli_issue_iocb_cmd(hba, rp, iocbq);
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 	}
-}
+
+} /* emlxs_abort_ct_exchange() */
 
 
 /* This must be called while holding the EMLXS_FCCTAB_LOCK */
@@ -3502,14 +4023,14 @@ emlxs_sbp_abort_add(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abort,
 {
 	emlxs_hba_t *hba = HBA;
 	IOCBQ *iocbq;
-	RING *rp;
+	CHANNEL *cp;
 	NODELIST *ndlp;
 
-	rp = (RING *)sbp->ring;
+	cp = (CHANNEL *)sbp->channel;
 	ndlp = sbp->node;
 
 	/* Create the close XRI IOCB */
-	iocbq = emlxs_create_close_xri_cn(port, ndlp, sbp->iotag, rp);
+	iocbq = emlxs_create_close_xri_cn(port, ndlp, sbp->iotag, cp);
 
 	/*
 	 * Add this iocb to our local abort Q
@@ -3532,10 +4053,11 @@ emlxs_sbp_abort_add(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abort,
 	mutex_enter(&sbp->mtx);
 
 	sbp->pkt_flags |= (PACKET_IN_FLUSH | PACKET_XRI_CLOSED);
+
 	sbp->ticks = hba->timer_tics + 10;
 	sbp->abort_attempts++;
 
-	flag[rp->ringno] = 1;
+	flag[cp->channelno] = 1;
 
 	/*
 	 * If the fpkt is already set, then we will leave it alone
@@ -3553,4 +4075,4 @@ emlxs_sbp_abort_add(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abort,
 
 	return;
 
-}  /* emlxs_sbp_abort_add() */
+}	/* emlxs_sbp_abort_add() */

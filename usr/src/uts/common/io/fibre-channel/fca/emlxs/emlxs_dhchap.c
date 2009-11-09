@@ -21,8 +21,9 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #include <emlxs.h>
 
@@ -454,7 +455,7 @@ emlxs_dhc_state(emlxs_port_t *port, emlxs_node_t *ndlp, uint32_t state,
 
 		case NODE_STATE_AUTH_SUCCESS:
 			/* Record auth time */
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				port_dhc->auth_time = DRV_TIME;
 			} else if (node_dhc->parent_auth_cfg) {
 				node_dhc->parent_auth_cfg->auth_time = DRV_TIME;
@@ -472,7 +473,7 @@ emlxs_dhc_state(emlxs_port_t *port, emlxs_node_t *ndlp, uint32_t state,
 		}
 
 		/* Check for switch port */
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			switch (state) {
 			case NODE_STATE_UNKNOWN:
 				pstate = ELX_FABRIC_STATE_UNKNOWN;
@@ -540,7 +541,7 @@ emlxs_dhc_status(emlxs_port_t *port, emlxs_node_t *ndlp, uint32_t reason,
 	node_dhc = &ndlp->node_dhc;
 
 	/* Get auth status object */
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		auth_status = &port_dhc->auth_status;
 	} else if (node_dhc->parent_auth_cfg) {
 		auth_status = &node_dhc->parent_auth_cfg->auth_status;
@@ -1018,14 +1019,14 @@ static void *emlxs_dhchap_action[] =
 
 
 extern int
-emlxs_dhchap_state_machine(emlxs_port_t *port, RING *rp,
+emlxs_dhchap_state_machine(emlxs_port_t *port, CHANNEL *cp,
 		IOCBQ *iocbq, MATCHMAP *mp,
 		NODELIST *ndlp, int evt)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_node_dhc_t *node_dhc = &ndlp->node_dhc;
 	uint32_t rc;
-	uint32_t(*func) (emlxs_port_t *, RING *, IOCBQ *, MATCHMAP *,
+	uint32_t(*func) (emlxs_port_t *, CHANNEL *, IOCBQ *, MATCHMAP *,
 	    NODELIST *, uint32_t);
 
 	mutex_enter(&hba->dhc_lock);
@@ -1036,11 +1037,11 @@ emlxs_dhchap_state_machine(emlxs_port_t *port, RING *rp,
 
 	node_dhc->disc_refcnt++;
 
-	func = (uint32_t(*) (emlxs_port_t *, RING *, IOCBQ *, MATCHMAP *,
+	func = (uint32_t(*) (emlxs_port_t *, CHANNEL *, IOCBQ *, MATCHMAP *,
 	    NODELIST *, uint32_t))
 	    emlxs_dhchap_action[(node_dhc->state * NODE_EVENT_MAX_EVENT) + evt];
 
-	rc = (func) (port, rp, iocbq, mp, ndlp, evt);
+	rc = (func) (port, cp, iocbq, mp, ndlp, evt);
 
 	node_dhc->disc_refcnt--;
 
@@ -1054,7 +1055,7 @@ emlxs_dhchap_state_machine(emlxs_port_t *port, RING *rp,
 static uint32_t
 emlxs_disc_neverdev(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -1196,7 +1197,7 @@ emlxs_issue_dhchap_success(
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
 	    "emlxs_issue_dhchap_success: did=0x%x", ndlp->nlp_DID);
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		if (node_dhc->nlp_auth_hashid == AUTH_MD5)
 			len = MD5_LEN;
 		else
@@ -1251,30 +1252,30 @@ emlxs_issue_dhchap_success(
 	    node_dhc->nlp_auth_tranid_ini, cmdsize, rsp);
 
 	if (rsp == NULL) {
-		ap->msg_len = SWAP_DATA32(0x00000004);
+		ap->msg_len = LE_SWAP32(0x00000004);
 		ap->RspVal_len = 0x0;
 
 		node_dhc->fc_dhchap_success_expected = 0;
 	} else {
 		node_dhc->fc_dhchap_success_expected = 1;
 
-		ap->msg_len = SWAP_DATA32(4 + len);
+		ap->msg_len = LE_SWAP32(4 + len);
 
 		tmp += sizeof (DHCHAP_SUCCESS_HDR) - sizeof (uint32_t);
-		*(uint32_t *)tmp = SWAP_DATA32(len);
+		*(uint32_t *)tmp = LE_SWAP32(len);
 		tmp += sizeof (uint32_t);
 		bcopy((void *)rsp, (void *)tmp, len);
 	}
 
 	if (node_dhc->nlp_reauth_status == NLP_HOST_REAUTH_IN_PROGRESS) {
-		ap->tran_id = SWAP_DATA32(node_dhc->nlp_auth_tranid_rsp);
+		ap->tran_id = LE_SWAP32(node_dhc->nlp_auth_tranid_rsp);
 	} else {
 		if (node_dhc->nlp_auth_flag == 2) {
 			ap->tran_id =
-			    SWAP_DATA32(node_dhc->nlp_auth_tranid_rsp);
+			    LE_SWAP32(node_dhc->nlp_auth_tranid_rsp);
 		} else if (node_dhc->nlp_auth_flag == 1) {
 			ap->tran_id =
-			    SWAP_DATA32(node_dhc->nlp_auth_tranid_ini);
+			    LE_SWAP32(node_dhc->nlp_auth_tranid_ini);
 		} else {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_debug_msg,
 			    "emlxs_is_dhch_success: (1) 0x%x 0x%x 0x%x 0x%x",
@@ -1396,12 +1397,12 @@ emlxs_issue_auth_reject(
 	ap->auth_els_flags = 0x0;
 	ap->auth_msg_code = AUTH_REJECT;
 	ap->proto_version = 0x01;
-	ap->msg_len = SWAP_DATA32(4);
+	ap->msg_len = LE_SWAP32(4);
 
 	if (node_dhc->nlp_auth_flag == 2) {
-		ap->tran_id = SWAP_DATA32(node_dhc->nlp_auth_tranid_rsp);
+		ap->tran_id = LE_SWAP32(node_dhc->nlp_auth_tranid_rsp);
 	} else if (node_dhc->nlp_auth_flag == 1) {
-		ap->tran_id = SWAP_DATA32(node_dhc->nlp_auth_tranid_ini);
+		ap->tran_id = LE_SWAP32(node_dhc->nlp_auth_tranid_ini);
 	} else {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
 		    "Auth reject failed.Invalid flag=%d. 0x%x %x expl=%x",
@@ -1463,9 +1464,9 @@ static fc_packet_t *
 	pkt->pkt_timeout = 35;
 
 	/* Build the fc header */
-	pkt->pkt_cmd_fhdr.d_id = SWAP_DATA24_LO(d_id);
+	pkt->pkt_cmd_fhdr.d_id = LE_SWAP24_LO(d_id);
 	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_ELS_REQ;
-	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
+	pkt->pkt_cmd_fhdr.s_id = LE_SWAP24_LO(port->did);
 	pkt->pkt_cmd_fhdr.type = FC_TYPE_EXTENDED_LS;
 	pkt->pkt_cmd_fhdr.f_ctl =
 	    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
@@ -1636,7 +1637,7 @@ static int
 			ap1->auth_els_flags = 0x00;
 			ap1->auth_msg_code = AUTH_NEGOTIATE;
 			ap1->proto_version = 0x01;
-			ap1->msg_len = SWAP_DATA32(cmdsize -
+			ap1->msg_len = LE_SWAP32(cmdsize -
 			    sizeof (AUTH_MSG_NEGOT_NULL));
 		} else {
 			ap2 = (AUTH_MSG_NEGOT_2 *)pkt->pkt_cmd;
@@ -1644,7 +1645,7 @@ static int
 			ap2->auth_els_flags = 0x00;
 			ap2->auth_msg_code = AUTH_NEGOTIATE;
 			ap2->proto_version = 0x01;
-			ap2->msg_len = SWAP_DATA32(cmdsize -
+			ap2->msg_len = LE_SWAP32(cmdsize -
 			    sizeof (AUTH_MSG_NEGOT_NULL));
 		}
 	} else {
@@ -1654,7 +1655,7 @@ static int
 			null_ap1->auth_els_flags = 0x0;
 			null_ap1->auth_msg_code = AUTH_NEGOTIATE;
 			null_ap1->proto_version = 0x01;
-			null_ap1->msg_len = SWAP_DATA32(cmdsize -
+			null_ap1->msg_len = LE_SWAP32(cmdsize -
 			    sizeof (AUTH_MSG_NEGOT_NULL));
 
 		} else {
@@ -1663,7 +1664,7 @@ static int
 			null_ap2->auth_els_flags = 0x0;
 			null_ap2->auth_msg_code = AUTH_NEGOTIATE;
 			null_ap2->proto_version = 0x01;
-			null_ap2->msg_len = SWAP_DATA32(cmdsize -
+			null_ap2->msg_len = LE_SWAP32(cmdsize -
 			    sizeof (AUTH_MSG_NEGOT_NULL));
 		}
 	}
@@ -1692,21 +1693,21 @@ static int
 	if (flag == 1) {
 		if (hash_wcnt == 1) {
 			ap1->tran_id =
-			    SWAP_DATA32(node_dhc->nlp_auth_tranid_rsp);
+			    LE_SWAP32(node_dhc->nlp_auth_tranid_rsp);
 
 			ap1->params.name_tag = AUTH_NAME_ID;
 			ap1->params.name_len = AUTH_NAME_LEN;
 			bcopy((void *)&port->wwpn,
 			    (void *) &ap1->params.nodeName, sizeof (NAME_TYPE));
 			ap1->params.proto_num = AUTH_PROTO_NUM;
-			ap1->params.para_len = SWAP_DATA32(para_len);
+			ap1->params.para_len = LE_SWAP32(para_len);
 			ap1->params.proto_id = AUTH_DHCHAP;
 			ap1->params.HashList_tag = HASH_LIST_TAG;
-			ap1->params.HashList_wcnt = SWAP_DATA16(hash_wcnt);
+			ap1->params.HashList_wcnt = LE_SWAP16(hash_wcnt);
 			ap1->params.HashList_value1 =
 			    node_dhc->auth_cfg.hash_priority[0];
 			ap1->params.DHgIDList_tag = DHGID_LIST_TAG;
-			ap1->params.DHgIDList_wnt = SWAP_DATA16(dhgp_wcnt);
+			ap1->params.DHgIDList_wnt = LE_SWAP16(dhgp_wcnt);
 
 			switch (dhgp_wcnt) {
 			case 5:
@@ -1752,24 +1753,24 @@ static int
 			}
 		} else {
 			ap2->tran_id =
-			    SWAP_DATA32(node_dhc->nlp_auth_tranid_rsp);
+			    LE_SWAP32(node_dhc->nlp_auth_tranid_rsp);
 
 			ap2->params.name_tag = AUTH_NAME_ID;
 			ap2->params.name_len = AUTH_NAME_LEN;
 			bcopy((void *) &port->wwpn,
 			    (void *) &ap2->params.nodeName, sizeof (NAME_TYPE));
 			ap2->params.proto_num = AUTH_PROTO_NUM;
-			ap2->params.para_len = SWAP_DATA32(para_len);
+			ap2->params.para_len = LE_SWAP32(para_len);
 			ap2->params.proto_id = AUTH_DHCHAP;
 			ap2->params.HashList_tag = HASH_LIST_TAG;
-			ap2->params.HashList_wcnt = SWAP_DATA16(hash_wcnt);
+			ap2->params.HashList_wcnt = LE_SWAP16(hash_wcnt);
 			ap2->params.HashList_value1 =
 			    (node_dhc->auth_cfg.hash_priority[0]);
 			ap2->params.HashList_value2 =
 			    (node_dhc->auth_cfg.hash_priority[1]);
 
 			ap2->params.DHgIDList_tag = DHGID_LIST_TAG;
-			ap2->params.DHgIDList_wnt = SWAP_DATA16(dhgp_wcnt);
+			ap2->params.DHgIDList_wnt = LE_SWAP16(dhgp_wcnt);
 
 			switch (dhgp_wcnt) {
 			case 5:
@@ -1817,7 +1818,7 @@ static int
 	} else {
 		if (num_hs == 1) {
 			null_ap1->tran_id =
-			    SWAP_DATA32(node_dhc->nlp_auth_tranid_rsp);
+			    LE_SWAP32(node_dhc->nlp_auth_tranid_rsp);
 
 			null_ap1->params.name_tag = AUTH_NAME_ID;
 			null_ap1->params.name_len = AUTH_NAME_LEN;
@@ -1825,18 +1826,18 @@ static int
 			    (void *) &null_ap1->params.nodeName,
 			    sizeof (NAME_TYPE));
 			null_ap1->params.proto_num = AUTH_PROTO_NUM;
-			null_ap1->params.para_len = SWAP_DATA32(0x00000014);
+			null_ap1->params.para_len = LE_SWAP32(0x00000014);
 			null_ap1->params.proto_id = AUTH_DHCHAP;
 			null_ap1->params.HashList_tag = HASH_LIST_TAG;
-			null_ap1->params.HashList_wcnt = SWAP_DATA16(0x0001);
+			null_ap1->params.HashList_wcnt = LE_SWAP16(0x0001);
 			null_ap1->params.HashList_value1 =
 			    (node_dhc->auth_cfg.hash_priority[0]);
 			null_ap1->params.DHgIDList_tag = DHGID_LIST_TAG;
-			null_ap1->params.DHgIDList_wnt = SWAP_DATA16(0x0001);
+			null_ap1->params.DHgIDList_wnt = LE_SWAP16(0x0001);
 			null_ap1->params.DHgIDList_g0 = 0x0;
 		} else {
 			null_ap2->tran_id =
-			    SWAP_DATA32(node_dhc->nlp_auth_tranid_rsp);
+			    LE_SWAP32(node_dhc->nlp_auth_tranid_rsp);
 
 			null_ap2->params.name_tag = AUTH_NAME_ID;
 			null_ap2->params.name_len = AUTH_NAME_LEN;
@@ -1844,18 +1845,18 @@ static int
 			    (void *) &null_ap2->params.nodeName,
 			    sizeof (NAME_TYPE));
 			null_ap2->params.proto_num = AUTH_PROTO_NUM;
-			null_ap2->params.para_len = SWAP_DATA32(0x00000018);
+			null_ap2->params.para_len = LE_SWAP32(0x00000018);
 			null_ap2->params.proto_id = AUTH_DHCHAP;
 
 			null_ap2->params.HashList_tag = HASH_LIST_TAG;
-			null_ap2->params.HashList_wcnt = SWAP_DATA16(0x0002);
+			null_ap2->params.HashList_wcnt = LE_SWAP16(0x0002);
 			null_ap2->params.HashList_value1 =
 			    (node_dhc->auth_cfg.hash_priority[0]);
 			null_ap2->params.HashList_value2 =
 			    (node_dhc->auth_cfg.hash_priority[1]);
 
 			null_ap2->params.DHgIDList_tag = DHGID_LIST_TAG;
-			null_ap2->params.DHgIDList_wnt = SWAP_DATA16(0x0001);
+			null_ap2->params.DHgIDList_wnt = LE_SWAP16(0x0001);
 			null_ap2->params.DHgIDList_g0 = 0x0;
 		}
 	}
@@ -1946,7 +1947,7 @@ emlxs_cmpl_auth_negotiate_issue(fc_packet_t *pkt)
 /*
  * ! emlxs_cmpl_auth_msg_auth_negotiate_issue
  *
- * \pre \post \param   port \param   RING * rp \param   arg \param   evt
+ * \pre \post \param   port \param   CHANNEL * rp \param   arg \param   evt
  * \return  uint32_t \b Description:
  *
  * This routine is invoked when the host receive the solicited ACC/RJT ELS
@@ -1961,7 +1962,7 @@ emlxs_cmpl_auth_negotiate_issue(fc_packet_t *pkt)
 static uint32_t
 emlxs_cmpl_auth_msg_auth_negotiate_issue(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp, */ void *arg4,
@@ -2024,7 +2025,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_auth_negotiate_issue(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -2221,7 +2222,7 @@ emlxs_issue_dhchap_challenge(
 	    cmdsize, tran_id, hash_id, dhgp_id);
 
 	/* store the tran_id : ndlp is the initiator */
-	node_dhc->nlp_auth_tranid_ini = SWAP_DATA32(tran_id);
+	node_dhc->nlp_auth_tranid_ini = LE_SWAP32(tran_id);
 
 	tmp += sizeof (uint32_t);
 
@@ -2230,7 +2231,7 @@ emlxs_issue_dhchap_challenge(
 	chal->cnul.msg_hdr.auth_els_flags = 0x0;
 	chal->cnul.msg_hdr.auth_msg_code = DHCHAP_CHALLENGE;
 	chal->cnul.msg_hdr.proto_version = 0x01;
-	chal->cnul.msg_hdr.msg_len = SWAP_DATA32(cmdsize - 12);
+	chal->cnul.msg_hdr.msg_len = LE_SWAP32(cmdsize - 12);
 	chal->cnul.msg_hdr.tran_id = tran_id;
 	chal->cnul.msg_hdr.name_tag = (AUTH_NAME_ID);
 	chal->cnul.msg_hdr.name_len = (AUTH_NAME_LEN);
@@ -2242,20 +2243,20 @@ emlxs_issue_dhchap_challenge(
 	chal->cnul.dhgp_id = dhgp_id;
 
 	chal->cnul.cval_len = ((chal->cnul.hash_id == AUTH_SHA1) ?
-	    SWAP_DATA32(SHA1_LEN) : SWAP_DATA32(MD5_LEN));
+	    LE_SWAP32(SHA1_LEN) : LE_SWAP32(MD5_LEN));
 
 	tmp = (uint8_t *)pCmd;
 	tmp += sizeof (DHCHAP_CHALL_NULL);
 
 #ifdef RAND
 	/* generate a random number as the challenge */
-	bzero(random_number, SWAP_DATA32(chal->cnul.cval_len));
+	bzero(random_number, LE_SWAP32(chal->cnul.cval_len));
 
 	if (hba->rdn_flag == 1) {
 		emlxs_get_random_bytes(ndlp, random_number, 20);
 	} else {
 		random_get_pseudo_bytes(random_number,
-		    SWAP_DATA32(chal->cnul.cval_len));
+		    LE_SWAP32(chal->cnul.cval_len));
 	}
 
 	/*
@@ -2265,53 +2266,53 @@ emlxs_issue_dhchap_challenge(
 	 * challenge as the random_number should be stored in
 	 * node_dhc->hrsp_cval[]
 	 */
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		bcopy((void *) &random_number[0],
 		    (void *) &node_dhc->hrsp_cval[0],
-		    SWAP_DATA32(chal->cnul.cval_len));
+		    LE_SWAP32(chal->cnul.cval_len));
 		/* save another copy in partner's ndlp */
 		bcopy((void *) &random_number[0],
 		    (void *) &node_dhc->nlp_auth_misc.hrsp_cval[0],
-		    SWAP_DATA32(chal->cnul.cval_len));
+		    LE_SWAP32(chal->cnul.cval_len));
 	} else {
 		bcopy((void *) &random_number[0],
 		    (void *) &node_dhc->nlp_auth_misc.hrsp_cval[0],
-		    SWAP_DATA32(chal->cnul.cval_len));
+		    LE_SWAP32(chal->cnul.cval_len));
 	}
 	bcopy((void *) &random_number[0], (void *) tmp,
-	    SWAP_DATA32(chal->cnul.cval_len));
+	    LE_SWAP32(chal->cnul.cval_len));
 
 #endif	/* RAND */
 
 	/* for test only hardcode the challenge value */
 #ifdef MYRAND
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		bcopy((void *) myrand, (void *) &node_dhc->hrsp_cval[0],
-		    SWAP_DATA32(chal->cnul.cval_len));
+		    LE_SWAP32(chal->cnul.cval_len));
 		/* save another copy in partner's ndlp */
 		bcopy((void *) myrand,
 		    (void *) &node_dhc->nlp_auth_misc.hrsp_cval[0],
-		    SWAP_DATA32(chal->cnul.cval_len));
+		    LE_SWAP32(chal->cnul.cval_len));
 	} else {
 		bcopy((void *) myrand,
 		    (void *) &node_dhc->nlp_auth_misc.hrsp_cval[0],
-		    SWAP_DATA32(chal->cnul.cval_len));
+		    LE_SWAP32(chal->cnul.cval_len));
 	}
 	bcopy((void *) myrand, (void *) tmp,
-	    SWAP_DATA32(chal->cnul.cval_len));
+	    LE_SWAP32(chal->cnul.cval_len));
 
 #endif	/* MYRAND */
 
-	if (ndlp->nlp_DID == Fabric_DID) {
-		node_dhc->hrsp_cval_len = SWAP_DATA32(chal->cnul.cval_len);
+	if (ndlp->nlp_DID == FABRIC_DID) {
+		node_dhc->hrsp_cval_len = LE_SWAP32(chal->cnul.cval_len);
 		node_dhc->nlp_auth_misc.hrsp_cval_len =
-		    SWAP_DATA32(chal->cnul.cval_len);
+		    LE_SWAP32(chal->cnul.cval_len);
 	} else {
 		node_dhc->nlp_auth_misc.hrsp_cval_len =
-		    SWAP_DATA32(chal->cnul.cval_len);
+		    LE_SWAP32(chal->cnul.cval_len);
 	}
 
-	tmp += SWAP_DATA32(chal->cnul.cval_len);
+	tmp += LE_SWAP32(chal->cnul.cval_len);
 
 	/*
 	 * we need another random number as the private key x which will be
@@ -2323,26 +2324,26 @@ emlxs_issue_dhchap_challenge(
 
 	if (dhgp_id != GROUP_NULL) {
 
-		bzero(random_number, SWAP_DATA32(chal->cnul.cval_len));
+		bzero(random_number, LE_SWAP32(chal->cnul.cval_len));
 
 		if (hba->rdn_flag == 1) {
 			emlxs_get_random_bytes(ndlp, random_number, 20);
 		} else {
 			random_get_pseudo_bytes(random_number,
-			    SWAP_DATA32(chal->cnul.cval_len));
+			    LE_SWAP32(chal->cnul.cval_len));
 		}
 
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			bcopy((void *) &random_number[0],
 			    (void *) node_dhc->hrsp_priv_key,
-			    SWAP_DATA32(chal->cnul.cval_len));
+			    LE_SWAP32(chal->cnul.cval_len));
 			bcopy((void *) &random_number[0],
 			    (void *) node_dhc->nlp_auth_misc.hrsp_priv_key,
-			    SWAP_DATA32(chal->cnul.cval_len));
+			    LE_SWAP32(chal->cnul.cval_len));
 		} else {
 			bcopy((void *) &random_number[0],
 			    (void *) node_dhc->nlp_auth_misc.hrsp_priv_key,
-			    SWAP_DATA32(chal->cnul.cval_len));
+			    LE_SWAP32(chal->cnul.cval_len));
 		}
 	}
 #endif	/* RAND */
@@ -2351,19 +2352,19 @@ emlxs_issue_dhchap_challenge(
 	if (dhgp_id != GROUP_NULL) {
 		/* For test only we hardcode the priv_key here */
 		bcopy((void *) myrand, (void *) node_dhc->hrsp_priv_key,
-		    SWAP_DATA32(chal->cnul.cval_len));
+		    LE_SWAP32(chal->cnul.cval_len));
 
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			bcopy((void *) myrand,
 			    (void *) node_dhc->hrsp_priv_key,
-			    SWAP_DATA32(chal->cnul.cval_len));
+			    LE_SWAP32(chal->cnul.cval_len));
 			bcopy((void *) myrand,
 			    (void *) node_dhc->nlp_auth_misc.hrsp_priv_key,
-			    SWAP_DATA32(chal->cnul.cval_len));
+			    LE_SWAP32(chal->cnul.cval_len));
 		} else {
 			bcopy((void *) myrand,
 			    (void *) node_dhc->nlp_auth_misc.hrsp_priv_key,
-			    SWAP_DATA32(chal->cnul.cval_len));
+			    LE_SWAP32(chal->cnul.cval_len));
 		}
 	}
 #endif	/* MYRAND */
@@ -2386,7 +2387,7 @@ emlxs_issue_dhchap_challenge(
 
 		err = emlxs_BIGNUM_get_dhval(port, port_dhc, ndlp, dhval,
 		    &dhval_len, chal->cnul.dhgp_id,
-		    myrand, SWAP_DATA32(chal->cnul.cval_len));
+		    myrand, LE_SWAP32(chal->cnul.cval_len));
 
 		if (err != BIG_OK) {
 			emlxs_pkt_free(pkt);
@@ -2400,12 +2401,12 @@ emlxs_issue_dhchap_challenge(
 		/* we are not going to use dhval and dhval_len */
 
 		/* *(uint32_t *)tmp = dhval_len; */
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			*(uint32_t *)tmp =
-			    SWAP_DATA32(node_dhc->hrsp_pubkey_len);
+			    LE_SWAP32(node_dhc->hrsp_pubkey_len);
 		} else {
 			*(uint32_t *)tmp =
-			    SWAP_DATA32(
+			    LE_SWAP32(
 			    node_dhc->nlp_auth_misc.hrsp_pubkey_len);
 		}
 
@@ -2415,7 +2416,7 @@ emlxs_issue_dhchap_challenge(
 
 		tmp += sizeof (uint32_t);
 
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			bcopy((void *) node_dhc->hrsp_pub_key, (void *)tmp,
 			    node_dhc->hrsp_pubkey_len);
 		} else {
@@ -2437,7 +2438,7 @@ emlxs_issue_dhchap_challenge(
 
 		err = emlxs_BIGNUM_get_dhval(port, port_dhc, ndlp, dhval,
 		    &dhval_len, chal->cnul.dhgp_id,
-		    random_number, SWAP_DATA32(chal->cnul.cval_len));
+		    random_number, LE_SWAP32(chal->cnul.cval_len));
 
 		if (err != BIG_OK) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
@@ -2450,12 +2451,12 @@ emlxs_issue_dhchap_challenge(
 		/* we are not going to use dhval and dhval_len */
 
 		/* *(uint32_t *)tmp = dhval_len; */
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			*(uint32_t *)tmp =
-			    SWAP_DATA32(node_dhc->hrsp_pubkey_len);
+			    LE_SWAP32(node_dhc->hrsp_pubkey_len);
 		} else {
 			*(uint32_t *)tmp =
-			    SWAP_DATA32(
+			    LE_SWAP32(
 			    node_dhc->nlp_auth_misc.hrsp_pubkey_len);
 		}
 
@@ -2465,7 +2466,7 @@ emlxs_issue_dhchap_challenge(
 
 		tmp += sizeof (uint32_t);
 
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			bcopy((void *) node_dhc->hrsp_pub_key, (void *)tmp,
 			    node_dhc->hrsp_pubkey_len);
 		} else {
@@ -2533,7 +2534,7 @@ emlxs_issue_dhchap_reply(
 	cmdsize = sizeof (DHCHAP_REPLY_HDR);
 
 	/* Rsp value len size (4) + Response value size */
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		if (node_dhc->hash_id == AUTH_MD5) {
 			cmdsize += 4 + MD5_LEN;
 		}
@@ -2550,7 +2551,7 @@ emlxs_issue_dhchap_reply(
 	}
 
 	/* DH value len size (4) + DH value size */
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		switch (node_dhc->dhgp_id) {
 		case GROUP_NULL:
 
@@ -2571,7 +2572,7 @@ emlxs_issue_dhchap_reply(
 	if (node_dhc->auth_cfg.bidirectional == 0) {
 		cmdsize += 4;
 	} else {
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			cmdsize += 4 + ((node_dhc->hash_id == AUTH_MD5) ?
 			    MD5_LEN : SHA1_LEN);
 		} else {
@@ -2599,28 +2600,28 @@ emlxs_issue_dhchap_reply(
 	ap->auth_els_flags = 0x0;
 	ap->auth_msg_code = DHCHAP_REPLY;
 	ap->proto_version = 0x01;
-	ap->msg_len = SWAP_DATA32(cmdsize - sizeof (DHCHAP_REPLY_HDR));
-	ap->tran_id = SWAP_DATA32(node_dhc->nlp_auth_tranid_rsp);
+	ap->msg_len = LE_SWAP32(cmdsize - sizeof (DHCHAP_REPLY_HDR));
+	ap->tran_id = LE_SWAP32(node_dhc->nlp_auth_tranid_rsp);
 
 	pCmd = (uint8_t *)(pCmd + sizeof (DHCHAP_REPLY_HDR));
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		if (node_dhc->hash_id == AUTH_MD5) {
-			*(uint32_t *)pCmd = SWAP_DATA32(MD5_LEN);
+			*(uint32_t *)pCmd = LE_SWAP32(MD5_LEN);
 		} else {
-			*(uint32_t *)pCmd = SWAP_DATA32(SHA1_LEN);
+			*(uint32_t *)pCmd = LE_SWAP32(SHA1_LEN);
 		}
 	} else {
 		if (node_dhc->nlp_auth_hashid == AUTH_MD5) {
-			*(uint32_t *)pCmd = SWAP_DATA32(MD5_LEN);
+			*(uint32_t *)pCmd = LE_SWAP32(MD5_LEN);
 		} else {
-			*(uint32_t *)pCmd = SWAP_DATA32(SHA1_LEN);
+			*(uint32_t *)pCmd = LE_SWAP32(SHA1_LEN);
 		}
 	}
 
 	pCmd = (uint8_t *)(pCmd + 4);
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		if (node_dhc->hash_id == AUTH_MD5) {
 			bcopy((void *)arg1, pCmd, MD5_LEN);
 			pCmd = (uint8_t *)(pCmd + MD5_LEN);
@@ -2639,7 +2640,7 @@ emlxs_issue_dhchap_reply(
 		}
 	}
 
-	*(uint32_t *)pCmd = SWAP_DATA32(dhval_len);
+	*(uint32_t *)pCmd = LE_SWAP32(dhval_len);
 
 	if (dhval_len != 0) {
 		pCmd = (uint8_t *)(pCmd + 4);
@@ -2663,7 +2664,7 @@ emlxs_issue_dhchap_reply(
 		 */
 		/* pubkey_len should be equal to dhval_len */
 
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			bcopy((void *) node_dhc->pub_key, (void *)pCmd,
 			    node_dhc->pubkey_len);
 		} else {
@@ -2678,24 +2679,24 @@ emlxs_issue_dhchap_reply(
 	if (node_dhc->auth_cfg.bidirectional == 0) {
 		*(uint32_t *)pCmd = 0x0;
 	} else {
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			if (node_dhc->hash_id == AUTH_MD5) {
-				*(uint32_t *)pCmd = SWAP_DATA32(MD5_LEN);
+				*(uint32_t *)pCmd = LE_SWAP32(MD5_LEN);
 				pCmd = (uint8_t *)(pCmd + 4);
 				bcopy((void *)arg2, (void *)pCmd, arg2_len);
 			} else if (node_dhc->hash_id == AUTH_SHA1) {
-				*(uint32_t *)pCmd = SWAP_DATA32(SHA1_LEN);
+				*(uint32_t *)pCmd = LE_SWAP32(SHA1_LEN);
 				pCmd = (uint8_t *)(pCmd + 4);
 				/* store the challenge */
 				bcopy((void *)arg2, (void *)pCmd, arg2_len);
 			}
 		} else {
 			if (node_dhc->nlp_auth_hashid == AUTH_MD5) {
-				*(uint32_t *)pCmd = SWAP_DATA32(MD5_LEN);
+				*(uint32_t *)pCmd = LE_SWAP32(MD5_LEN);
 				pCmd = (uint8_t *)(pCmd + 4);
 				bcopy((void *)arg2, (void *)pCmd, arg2_len);
 			} else if (node_dhc->nlp_auth_hashid == AUTH_SHA1) {
-				*(uint32_t *)pCmd = SWAP_DATA32(SHA1_LEN);
+				*(uint32_t *)pCmd = LE_SWAP32(SHA1_LEN);
 				pCmd = (uint8_t *)(pCmd + 4);
 				bcopy((void *)arg2, (void *)pCmd, arg2_len);
 			}
@@ -2708,7 +2709,7 @@ emlxs_issue_dhchap_reply(
 	    "emlxs_issue_dhchap_reply: did=0x%x  (%x,%x,%x,%x,%x,%x)",
 	    ndlp->nlp_DID, dhval_len, arg2_len, cmdsize,
 	    node_dhc->hash_id, node_dhc->nlp_auth_hashid,
-	    SWAP_DATA32(ap->tran_id));
+	    LE_SWAP32(ap->tran_id));
 
 	if (emlxs_pkt_send(pkt, 1) != FC_SUCCESS) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
@@ -2749,7 +2750,7 @@ emlxs_issue_dhchap_reply(
 static uint32_t
 emlxs_rcv_auth_msg_auth_negotiate_cmpl_wait4next(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -2871,10 +2872,10 @@ uint32_t evt)
 	}
 	tran_id = ncval->msg_hdr.tran_id;
 
-	if (SWAP_DATA32(tran_id) != node_dhc->nlp_auth_tranid_rsp) {
+	if (LE_SWAP32(tran_id) != node_dhc->nlp_auth_tranid_rsp) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
 		    "rcv_auth_msg_auth_negotiate_cmpl_wait4next:0x%x %x!=%x",
-		    ndlp->nlp_DID, SWAP_DATA32(tran_id),
+		    ndlp->nlp_DID, LE_SWAP32(tran_id),
 		    node_dhc->nlp_auth_tranid_rsp);
 
 		ReasonCode = AUTHRJT_FAILURE;
@@ -2897,10 +2898,10 @@ uint32_t evt)
 	tmp = (uint8_t *)((uint8_t *)lp + sizeof (DHCHAP_CHALL_NULL));
 
 	if (ncval->hash_id == AUTH_MD5) {
-		if (ncval->cval_len != SWAP_DATA32(MD5_LEN)) {
+		if (ncval->cval_len != LE_SWAP32(MD5_LEN)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
 		    "rcv_auth_msg_auth_negotiate_cmpl_wait4next:0x%x.%x!=%x",
-		    ndlp->nlp_DID, ncval->cval_len, SWAP_DATA32(MD5_LEN));
+		    ndlp->nlp_DID, ncval->cval_len, LE_SWAP32(MD5_LEN));
 
 			ReasonCode = AUTHRJT_FAILURE;
 			ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
@@ -2914,10 +2915,10 @@ uint32_t evt)
 		arg2len = MD5_LEN;
 
 	} else if (ncval->hash_id == AUTH_SHA1) {
-		if (ncval->cval_len != SWAP_DATA32(SHA1_LEN)) {
+		if (ncval->cval_len != LE_SWAP32(SHA1_LEN)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
 		    "rcv_auth_msg_auth_negotiate_cmpl_wait4next: 0x%x %x!=%x",
-		    ndlp->nlp_DID, ncval->cval_len, SWAP_DATA32(MD5_LEN));
+		    ndlp->nlp_DID, ncval->cval_len, LE_SWAP32(MD5_LEN));
 
 			ReasonCode = AUTHRJT_FAILURE;
 			ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
@@ -2970,10 +2971,10 @@ uint32_t evt)
 	switch (ncval->dhgp_id) {
 	case GROUP_NULL:
 		/* null DHCHAP only */
-		if (SWAP_DATA32(dhvallen) != 0) {
+		if (LE_SWAP32(dhvallen) != 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
 		    "rcv_auth_msg_auth_negotiate_cmpl_wait4next: 0x%x %x %x",
-		    ndlp->nlp_DID, ncval->dhgp_id, SWAP_DATA32(dhvallen));
+		    ndlp->nlp_DID, ncval->dhgp_id, LE_SWAP32(dhvallen));
 
 			ReasonCode = AUTHRJT_FAILURE;
 			ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
@@ -2988,7 +2989,7 @@ uint32_t evt)
 		/* Collect the DH Value */
 		tmp += sizeof (uint32_t);
 
-		dhval = (uint8_t *)kmem_zalloc(SWAP_DATA32(dhvallen),
+		dhval = (uint8_t *)kmem_zalloc(LE_SWAP32(dhvallen),
 		    KM_NOSLEEP);
 		if (dhval == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
@@ -2999,7 +3000,7 @@ uint32_t evt)
 			ReasonCodeExplanation = AUTHEXP_RESTART_AUTH;
 			goto AUTH_Reject;
 		}
-		bcopy((void *)tmp, (void *)dhval, SWAP_DATA32(dhvallen));
+		bcopy((void *)tmp, (void *)dhval, LE_SWAP32(dhvallen));
 		break;
 
 	default:
@@ -3019,7 +3020,7 @@ uint32_t evt)
 
 	/* arg5 has the response with NULL or Full DH group support */
 	arg5 = (uint32_t *)emlxs_hash_rsp(port, port_dhc,
-	    ndlp, tran_id, un_cval, dhval, SWAP_DATA32(dhvallen));
+	    ndlp, tran_id, un_cval, dhval, LE_SWAP32(dhvallen));
 
 	/* Or should check ndlp->auth_cfg..... */
 	if (node_dhc->auth_cfg.bidirectional == 1) {
@@ -3037,7 +3038,7 @@ uint32_t evt)
 		}
 
 		/* cache it for later verification usage */
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			bcopy((void *)&random_number[0],
 			    (void *)&node_dhc->bi_cval[0], arg2len);
 			node_dhc->bi_cval_len = arg2len;
@@ -3068,13 +3069,13 @@ uint32_t evt)
 
 	/* return 0 success, otherwise failure */
 	if (emlxs_issue_dhchap_reply(port, ndlp, 0, arg5, dhval,
-	    SWAP_DATA32(dhvallen),
+	    LE_SWAP32(dhvallen),
 	    random_number, arg2len)) {
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
 	    "rcv_auth_msg_auth_negotiate_cmpl_wait4next: 0x%x.failed.",
 	    ndlp->nlp_DID);
 
-		kmem_free(dhval, SWAP_DATA32(dhvallen));
+		kmem_free(dhval, LE_SWAP32(dhvallen));
 		ReasonCode = AUTHRJT_LOGIC_ERR;
 		ReasonCodeExplanation = AUTHEXP_RESTART_AUTH;
 		goto AUTH_Reject;
@@ -3102,7 +3103,7 @@ AUTH_Reject:
 static uint32_t
 emlxs_cmpl_auth_msg_auth_negotiate_cmpl_wait4next(
 emlxs_port_t	*port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3133,7 +3134,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_dhchap_reply_issue(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ   * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3164,7 +3165,7 @@ uint32_t evt)
 static uint32_t
 emlxs_cmpl_auth_msg_dhchap_reply_issue(
 emlxs_port_t *port,
-/* RING  * rp, */ void *arg1,
+/* CHANNEL  * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3218,7 +3219,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_dhchap_reply_cmpl_wait4next(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3325,14 +3326,14 @@ uint32_t evt)
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
 	    "rcv_auth_msg_dhchap_reply_cmpl_wait4next: 0x%x 0x%x 0x%x 0x%x",
-	    ndlp->nlp_DID, SWAP_DATA32(tran_id),
+	    ndlp->nlp_DID, LE_SWAP32(tran_id),
 	    node_dhc->nlp_auth_tranid_rsp,
 	    node_dhc->nlp_auth_tranid_ini);
 
-		if (SWAP_DATA32(tran_id) != node_dhc->nlp_auth_tranid_rsp) {
+		if (LE_SWAP32(tran_id) != node_dhc->nlp_auth_tranid_rsp) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
 		    "rcv_auth_msg_dhchap_reply_cmpl_wait4next:0x%x %x!=%x",
-		    ndlp->nlp_DID, SWAP_DATA32(tran_id),
+		    ndlp->nlp_DID, LE_SWAP32(tran_id),
 		    node_dhc->nlp_auth_tranid_rsp);
 
 			ReasonCode = AUTHRJT_FAILURE;
@@ -3350,7 +3351,7 @@ uint32_t evt)
 			emlxs_dhc_auth_complete(port, ndlp, 0);
 		} else {
 			/* bidir auth needed */
-			/* if (SWAP_DATA32(dh_success->msg_len) > 4) { */
+			/* if (LE_SWAP32(dh_success->msg_len) > 4) { */
 
 			tmp = (uint8_t *)((uint8_t *)lp);
 			tmp += 8;
@@ -3366,30 +3367,30 @@ uint32_t evt)
 			 * from initiator
 			 */
 
-			if (SWAP_DATA32(rsp_size) == 16) {
-				bzero(un_cval.md5.val, SWAP_DATA32(rsp_size));
-				if (ndlp->nlp_DID == Fabric_DID)
+			if (LE_SWAP32(rsp_size) == 16) {
+				bzero(un_cval.md5.val, LE_SWAP32(rsp_size));
+				if (ndlp->nlp_DID == FABRIC_DID)
 					bcopy((void *)node_dhc->bi_cval,
 					    (void *)un_cval.md5.val,
-					    SWAP_DATA32(rsp_size));
+					    LE_SWAP32(rsp_size));
 				else
 				bcopy(
 				    (void *)node_dhc->nlp_auth_misc.bi_cval,
 				    (void *)un_cval.md5.val,
-				    SWAP_DATA32(rsp_size));
+				    LE_SWAP32(rsp_size));
 
-			} else if (SWAP_DATA32(rsp_size) == 20) {
+			} else if (LE_SWAP32(rsp_size) == 20) {
 
-				bzero(un_cval.sha1.val, SWAP_DATA32(rsp_size));
-				if (ndlp->nlp_DID == Fabric_DID)
+				bzero(un_cval.sha1.val, LE_SWAP32(rsp_size));
+				if (ndlp->nlp_DID == FABRIC_DID)
 					bcopy((void *)node_dhc->bi_cval,
 					    (void *)un_cval.sha1.val,
-					    SWAP_DATA32(rsp_size));
+					    LE_SWAP32(rsp_size));
 				else
 				bcopy(
 				    (void *)node_dhc->nlp_auth_misc.bi_cval,
 				    (void *)un_cval.sha1.val,
-				    SWAP_DATA32(rsp_size));
+				    LE_SWAP32(rsp_size));
 			}
 			/* verify the response */
 			/* NULL DHCHAP works for now */
@@ -3405,7 +3406,7 @@ uint32_t evt)
 			    tran_id, un_cval);
 
 			if (bcmp((void *)tmp, (void *)hash_val,
-			    SWAP_DATA32(rsp_size))) {
+			    LE_SWAP32(rsp_size))) {
 				if (hash_val != NULL) {
 					/* not identical */
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
@@ -3456,7 +3457,7 @@ out:
 static uint32_t
 emlxs_cmpl_auth_msg_dhchap_reply_cmpl_wait4next(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ  * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3499,7 +3500,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_dhchap_success_issue_wait4next(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3531,7 +3532,7 @@ uint32_t evt)
 static uint32_t
 emlxs_cmpl_auth_msg_dhchap_success_issue_wait4next(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3576,7 +3577,7 @@ uint32_t evt)
 static uint32_t
 emlxs_cmpl_auth_msg_auth_negotiate_rcv(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3610,7 +3611,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_dhchap_challenge_issue(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3643,7 +3644,7 @@ uint32_t evt)
 static uint32_t
 emlxs_cmpl_auth_msg_dhchap_challenge_issue(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3703,7 +3704,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_dhchap_challenge_cmpl_wait4next(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3746,7 +3747,7 @@ uint32_t evt)
 
 	tran_id = dh_reply->tran_id;
 
-	if (SWAP_DATA32(tran_id) != node_dhc->nlp_auth_tranid_ini) {
+	if (LE_SWAP32(tran_id) != node_dhc->nlp_auth_tranid_ini) {
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
 	    "rcv_auth_msg_dhchap_challenge_cmpl_wait4next:0x%x 0x%x 0x%x",
@@ -3830,14 +3831,14 @@ uint32_t evt)
 		 * verification result
 		 */
 		tmp += sizeof (DHCHAP_REPLY_HDR);
-		rsp_len = SWAP_DATA32(*(uint32_t *)tmp);
+		rsp_len = LE_SWAP32(*(uint32_t *)tmp);
 		tmp += sizeof (uint32_t);
 
 		/* collect the response data */
 		bcopy((void *)tmp, (void *)rsp, rsp_len);
 
 		tmp += rsp_len;
-		dhval_len = SWAP_DATA32(*(uint32_t *)tmp);
+		dhval_len = LE_SWAP32(*(uint32_t *)tmp);
 
 		tmp += sizeof (uint32_t);
 
@@ -3852,13 +3853,13 @@ uint32_t evt)
 		 * Check to see if there is any challenge for bi-dir auth in
 		 * the reply msg
 		 */
-		cval_len = SWAP_DATA32(*(uint32_t *)tmp);
+		cval_len = LE_SWAP32(*(uint32_t *)tmp);
 		if (cval_len != 0) {
 			/* collect challenge value */
 			tmp += sizeof (uint32_t);
 			bcopy((void *)tmp, (void *)cval, cval_len);
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				node_dhc->nlp_auth_bidir = 1;
 			} else {
 				node_dhc->nlp_auth_bidir = 1;
@@ -3960,7 +3961,7 @@ out:
 static uint32_t
 emlxs_cmpl_auth_msg_dhchap_challenge_cmpl_wait4next(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -3993,7 +3994,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_dhchap_success_issue(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -4027,7 +4028,7 @@ uint32_t evt)
 static uint32_t
 emlxs_cmpl_auth_msg_dhchap_success_issue(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -4321,7 +4322,7 @@ emlxs_device_recov_npr_node(
 static uint32_t
 emlxs_device_rem_auth(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -4348,7 +4349,7 @@ uint32_t evt)
 static uint32_t
 emlxs_device_recov_auth(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -4384,7 +4385,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_dhchap_success_cmpl_wait4next(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -4468,7 +4469,7 @@ uint32_t evt)
 		goto Reject;
 
 	} else if (dh_success->auth_msg_code == DHCHAP_SUCCESS) {
-		if (SWAP_DATA32(dh_success->tran_id) !=
+		if (LE_SWAP32(dh_success->tran_id) !=
 		    node_dhc->nlp_auth_tranid_ini) {
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
 	    "rcv_a_m_dhch_success_cmpl_wait4next: 0x%x 0x%lx, 0x%lx",
@@ -4511,7 +4512,7 @@ out:
 static uint32_t
 emlxs_cmpl_auth_msg_dhchap_success_cmpl_wait4next(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -4527,7 +4528,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_auth_negotiate_rcv(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -4548,7 +4549,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_npr_node(
 emlxs_port_t *port,
-/* RING  * rp, */ void *arg1,
+/* CHANNEL  * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -4593,7 +4594,7 @@ emlxs_port_t *port,
 	/* temp is used for error checking */
 	temp = (uint8_t *)((uint8_t *)lp);
 	/* Check the auth_els_code */
-	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != SWAP_DATA32(0x90000B01)) {
+	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != LE_SWAP32(0x90000B01)) {
 		/* ReasonCode = AUTHRJT_FAILURE; */
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
@@ -4605,7 +4606,7 @@ emlxs_port_t *port,
 	}
 	temp += 3 * sizeof (uint32_t);
 	/* Check name tag and name length */
-	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != SWAP_DATA32(0x00010008)) {
+	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != LE_SWAP32(0x00010008)) {
 		/* ReasonCode = AUTHRJT_FAILURE; */
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
@@ -4617,7 +4618,7 @@ emlxs_port_t *port,
 	}
 	temp += sizeof (uint32_t) + 8;
 	/* Check proto_num */
-	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != SWAP_DATA32(0x00000001)) {
+	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != LE_SWAP32(0x00000001)) {
 		/* ReasonCode = AUTHRJT_FAILURE; */
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
@@ -4629,7 +4630,7 @@ emlxs_port_t *port,
 	}
 	temp += sizeof (uint32_t);
 	/* Get para_len */
-	/* para_len = SWAP_DATA32(*(uint32_t *)temp); */
+	/* para_len = LE_SWAP32(*(uint32_t *)temp); */
 
 	temp += sizeof (uint32_t);
 	/* Check proto_id */
@@ -4645,19 +4646,19 @@ emlxs_port_t *port,
 	}
 	temp += sizeof (uint32_t);
 	/* Check hashlist tag */
-	if ((SWAP_DATA32(*(uint32_t *)temp) & 0xFFFF0000) >> 16 !=
-	    SWAP_DATA16(HASH_LIST_TAG)) {
+	if ((LE_SWAP32(*(uint32_t *)temp) & 0xFFFF0000) >> 16 !=
+	    LE_SWAP16(HASH_LIST_TAG)) {
 		/* ReasonCode = AUTHRJT_FAILURE; */
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_error_msg,
 		    "emlxs_rcv_auth_msg_npr_node: payload(5)=0x%x",
-		    (SWAP_DATA32(*(uint32_t *)temp) & 0xFFFF0000) >> 16);
+		    (LE_SWAP32(*(uint32_t *)temp) & 0xFFFF0000) >> 16);
 
 		goto AUTH_Reject;
 	}
 	/* Get num_hs  */
-	num_hs = SWAP_DATA32(*(uint32_t *)temp) & 0x0000FFFF;
+	num_hs = LE_SWAP32(*(uint32_t *)temp) & 0x0000FFFF;
 
 	temp += sizeof (uint32_t);
 	/* Check HashList_value1 */
@@ -4741,8 +4742,8 @@ emlxs_port_t *port,
 
 	temp += sizeof (uint32_t);
 	/* Check DHgIDList_tag */
-	if ((SWAP_DATA32(*(uint32_t *)temp) & 0xFFFF0000) >> 16 !=
-	    SWAP_DATA16(DHGID_LIST_TAG)) {
+	if ((LE_SWAP32(*(uint32_t *)temp) & 0xFFFF0000) >> 16 !=
+	    LE_SWAP16(DHGID_LIST_TAG)) {
 		/* ReasonCode = AUTHRJT_FAILURE; */
 		/* ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD; */
 
@@ -4753,7 +4754,7 @@ emlxs_port_t *port,
 		goto AUTH_Reject;
 	}
 	/* Get num_dh */
-	num_dh = SWAP_DATA32(*(uint32_t *)temp) & 0x0000FFFF;
+	num_dh = LE_SWAP32(*(uint32_t *)temp) & 0x0000FFFF;
 
 	if (num_dh == 0) {
 		/* ReasonCode = AUTHRJT_FAILURE; */
@@ -4800,7 +4801,7 @@ emlxs_port_t *port,
 
 		/* Send back the DHCHAP_Challenge with the proper paramaters */
 		if (emlxs_issue_dhchap_challenge(port, ndlp, 0, tmp,
-		    SWAP_DATA32(msglen),
+		    LE_SWAP32(msglen),
 		    hash_id, dhgp_id)) {
 			goto AUTH_Reject;
 		}
@@ -4827,7 +4828,7 @@ AUTH_Reject:
 static uint32_t
 emlxs_cmpl_auth_msg_npr_node(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -4889,7 +4890,7 @@ uint32_t evt)
 static uint32_t
 emlxs_rcv_auth_msg_unmapped_node(
 emlxs_port_t *port,
-/* RING * rp, */ void *arg1,
+/* CHANNEL * rp, */ void *arg1,
 /* IOCBQ * iocbq, */ void *arg2,
 /* MATCHMAP * mp, */ void *arg3,
 /* NODELIST * ndlp */ void *arg4,
@@ -4936,7 +4937,7 @@ emlxs_port_t *port,
 	/* temp is used for error checking */
 	temp = (uint8_t *)((uint8_t *)lp);
 	/* Check the auth_els_code */
-	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != SWAP_DATA32(0x90000B01)) {
+	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != LE_SWAP32(0x90000B01)) {
 		ReasonCode = AUTHRJT_FAILURE;
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
@@ -4948,7 +4949,7 @@ emlxs_port_t *port,
 	}
 	temp += 3 * sizeof (uint32_t);
 	/* Check name tag and name length */
-	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != SWAP_DATA32(0x00010008)) {
+	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != LE_SWAP32(0x00010008)) {
 		ReasonCode = AUTHRJT_FAILURE;
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
@@ -4960,7 +4961,7 @@ emlxs_port_t *port,
 	}
 	temp += sizeof (uint32_t) + 8;
 	/* Check proto_num */
-	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != SWAP_DATA32(0x00000001)) {
+	if (((*(uint32_t *)temp) & 0xFFFFFFFF) != LE_SWAP32(0x00000001)) {
 		ReasonCode = AUTHRJT_FAILURE;
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
@@ -4989,19 +4990,19 @@ emlxs_port_t *port,
 	}
 	temp += sizeof (uint32_t);
 	/* Check hashlist tag */
-	if ((SWAP_DATA32(*(uint32_t *)temp) & 0xFFFF0000) >> 16 !=
-	    SWAP_DATA16(HASH_LIST_TAG)) {
+	if ((LE_SWAP32(*(uint32_t *)temp) & 0xFFFF0000) >> 16 !=
+	    LE_SWAP16(HASH_LIST_TAG)) {
 		ReasonCode = AUTHRJT_FAILURE;
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
 		    "emlxs_rcv_auth_msg_unmapped_node: payload(5)=0x%x",
-		    (SWAP_DATA32(*(uint32_t *)temp) & 0xFFFF0000) >> 16);
+		    (LE_SWAP32(*(uint32_t *)temp) & 0xFFFF0000) >> 16);
 
 		goto AUTH_Reject;
 	}
 	/* Get num_hs  */
-	num_hs = SWAP_DATA32(*(uint32_t *)temp) & 0x0000FFFF;
+	num_hs = LE_SWAP32(*(uint32_t *)temp) & 0x0000FFFF;
 
 	temp += sizeof (uint32_t);
 	/* Check HashList_value1 */
@@ -5085,8 +5086,8 @@ emlxs_port_t *port,
 
 	temp += sizeof (uint32_t);
 	/* Check DHgIDList_tag */
-	if ((SWAP_DATA32(*(uint32_t *)temp) & 0xFFFF0000) >> 16 !=
-	    SWAP_DATA16(DHGID_LIST_TAG)) {
+	if ((LE_SWAP32(*(uint32_t *)temp) & 0xFFFF0000) >> 16 !=
+	    LE_SWAP16(DHGID_LIST_TAG)) {
 		ReasonCode = AUTHRJT_FAILURE;
 		ReasonCodeExplanation = AUTHEXP_BAD_PAYLOAD;
 
@@ -5097,7 +5098,7 @@ emlxs_port_t *port,
 		goto AUTH_Reject;
 	}
 	/* Get num_dh */
-	num_dh = SWAP_DATA32(*(uint32_t *)temp) & 0x0000FFFF;
+	num_dh = LE_SWAP32(*(uint32_t *)temp) & 0x0000FFFF;
 
 	if (num_dh == 0) {
 		ReasonCode = AUTHRJT_FAILURE;
@@ -5144,7 +5145,7 @@ emlxs_port_t *port,
 	 * since ndlp is the initiator, tran_id is store in
 	 * nlp_auth_tranid_ini
 	 */
-	node_dhc->nlp_auth_tranid_ini = SWAP_DATA32(msg->tran_id);
+	node_dhc->nlp_auth_tranid_ini = LE_SWAP32(msg->tran_id);
 
 	if (msg->auth_msg_code == AUTH_NEGOTIATE) {
 
@@ -5179,7 +5180,7 @@ emlxs_port_t *port,
 		}
 		/* Send back the DHCHAP_Challenge with the proper paramaters */
 		if (emlxs_issue_dhchap_challenge(port, ndlp, 0, tmp,
-		    SWAP_DATA32(msglen),
+		    LE_SWAP32(msglen),
 		    hash_id, dhgp_id)) {
 
 			goto AUTH_Reject;
@@ -5275,10 +5276,10 @@ emlxs_hash_vrf(
 	char *remote_key;
 
 	tran_id = (AUTH_TRAN_ID_MASK & tran_id);
-	mytran_id = (uint8_t)(SWAP_DATA32(tran_id));
+	mytran_id = (uint8_t)(LE_SWAP32(tran_id));
 
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		remote_key = (char *)node_dhc->auth_key.remote_password;
 		hash_id = node_dhc->hash_id;
 		dhgp_id = node_dhc->dhgp_id;
@@ -5373,7 +5374,7 @@ emlxs_hash_vrf(
 			MD5Update(&mdctx,
 			    (void *)&(un_cval.md5.val[0]), MD5_LEN);
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				MD5Update(&mdctx,
 				    (void *)&node_dhc->ses_key[0],
 				    node_dhc->seskey_len);
@@ -5415,7 +5416,7 @@ emlxs_hash_vrf(
 			SHA1Update(&sha1ctx,
 			    (void *)&(un_cval.sha1.val[0]), SHA1_LEN);
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				SHA1Update(&sha1ctx,
 				    (void *)&node_dhc->ses_key[0],
 				    node_dhc->seskey_len);
@@ -5487,7 +5488,7 @@ uint32_t dhvallen)
 	char *mykey;
 	BIG_ERR_CODE err = BIG_OK;
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		hash_id = node_dhc->hash_id;
 		dhgp_id = node_dhc->dhgp_id;
 	} else {
@@ -5496,13 +5497,13 @@ uint32_t dhvallen)
 	}
 
 	tran_id = (AUTH_TRAN_ID_MASK & tran_id);
-	mytran_id = (uint8_t)(SWAP_DATA32(tran_id));
+	mytran_id = (uint8_t)(LE_SWAP32(tran_id));
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
 	    "emlxs_hash_rsp: 0x%x 0x%x 0x%x 0x%x dhvallen=0x%x",
 	    ndlp->nlp_DID, hash_id, dhgp_id, mytran_id, dhvallen);
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		mykey = (char *)node_dhc->auth_key.local_password;
 
 	} else {
@@ -5686,7 +5687,7 @@ uint32_t *dhvallen)
 	uint32_t hash_size;
 	BIG_ERR_CODE err = BIG_OK;
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		hash_id = node_dhc->hash_id;
 		dhgp_id = node_dhc->dhgp_id;
 	} else {
@@ -5711,7 +5712,7 @@ uint32_t *dhvallen)
 		if (err != BIG_OK) {
 			return (err);
 		}
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			MD5Update(&mdctx,
 			    (unsigned char *)&node_dhc->ses_key[0],
 			    node_dhc->seskey_len);
@@ -5741,7 +5742,7 @@ uint32_t *dhvallen)
 		if (err != BIG_OK) {
 			return (err);
 		}
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			SHA1Update(&sha1ctx, (void *)&node_dhc->ses_key[0],
 			    node_dhc->seskey_len);
 		} else {
@@ -5912,7 +5913,7 @@ emlxs_BIGNUM_get_pubkey(
 		goto ret4;
 	}
 	/* convert big number ses_key to bytestring */
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		/*
 		 * This call converts from big number format to
 		 * byte-big-endian format. big number format is words in
@@ -5968,7 +5969,7 @@ emlxs_BIGNUM_get_pubkey(
 		goto ret6;
 	}
 	/* convert big number pub_key to bytestring */
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 
 		bignum2bytestring(node_dhc->pub_key, &result1,
 		    sizeof (BIG_CHUNK_TYPE) * (result1.len));
@@ -6114,7 +6115,7 @@ uint32_t privkey_len)
 		goto ret4;
 	}
 	/* convert big number pub_key to bytestring */
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		bignum2bytestring(node_dhc->hrsp_pub_key, &result1,
 		    sizeof (BIG_CHUNK_TYPE) * (result1.len));
 		node_dhc->hrsp_pubkey_len =
@@ -6136,7 +6137,7 @@ uint32_t privkey_len)
 	}
 
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		bcopy((void *)node_dhc->hrsp_pub_key, (void *)dhval,
 		    node_dhc->hrsp_pubkey_len);
 	} else {
@@ -6345,7 +6346,7 @@ emlxs_hash_Cai(
 			err = BIG_GENERAL_ERR;
 			return (err);
 		}
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			bcopy((void *)pubkey,
 			    (void *)node_dhc->hrsp_ses_key, pubkey_len);
 			node_dhc->hrsp_seskey_len = pubkey_len;
@@ -6391,7 +6392,7 @@ emlxs_hash_Cai(
 			err = BIG_GENERAL_ERR;
 			return (err);
 		}
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			bcopy((void *)pubkey,
 			    (void *)node_dhc->hrsp_ses_key,
 			    pubkey_len);
@@ -6461,9 +6462,9 @@ emlxs_hash_verification(
 	BIG_ERR_CODE err = BIG_OK;
 
 	tran_id = (AUTH_TRAN_ID_MASK & tran_id);
-	mytran_id = (uint8_t)(SWAP_DATA32(tran_id));
+	mytran_id = (uint8_t)(LE_SWAP32(tran_id));
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		remote_key = (char *)node_dhc->auth_key.remote_password;
 	} else {
 		/*
@@ -6495,7 +6496,7 @@ emlxs_hash_verification(
 
 			MD5Update(&mdctx, (unsigned char *)&mytran_id, 1);
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				MD5Update(&mdctx,
 				    (unsigned char *)remote_key,
 				    node_dhc->auth_key.remote_password_length);
@@ -6505,7 +6506,7 @@ emlxs_hash_verification(
 				    node_dhc->auth_key.remote_password_length);
 			}
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				MD5Update(&mdctx,
 				    (unsigned char *)&node_dhc->hrsp_cval[0],
 				    MD5_LEN);
@@ -6535,7 +6536,7 @@ emlxs_hash_verification(
 			SHA1Init(&sha1ctx);
 			SHA1Update(&sha1ctx, (void *)&mytran_id, 1);
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				SHA1Update(&sha1ctx, (void *)remote_key,
 				    node_dhc->auth_key.remote_password_length);
 			} else {
@@ -6543,7 +6544,7 @@ emlxs_hash_verification(
 				    node_dhc->auth_key.remote_password_length);
 			}
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				SHA1Update(&sha1ctx,
 				    (void *)&node_dhc->hrsp_cval[0],
 				    SHA1_LEN);
@@ -6584,7 +6585,7 @@ emlxs_hash_verification(
 		 * obtained above.
 		 */
 		if (hash_id == AUTH_MD5) {
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				bcopy((void *)node_dhc->hrsp_priv_key,
 				    (void *)key, MD5_LEN);
 			} else {
@@ -6594,7 +6595,7 @@ emlxs_hash_verification(
 			}
 		}
 		if (hash_id == AUTH_SHA1) {
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				bcopy((void *)node_dhc->hrsp_priv_key,
 				    (void *)key, SHA1_LEN);
 			} else {
@@ -6603,7 +6604,7 @@ emlxs_hash_verification(
 			    (void *)key, SHA1_LEN);
 			}
 		}
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			bcopy((void *)node_dhc->hrsp_cval,
 			    (void *)cval, node_dhc->hrsp_cval_len);
 			cval_len = node_dhc->hrsp_cval_len;
@@ -6637,7 +6638,7 @@ emlxs_hash_verification(
 			MD5Init(&mdctx);
 			MD5Update(&mdctx, (unsigned char *)&mytran_id, 1);
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				MD5Update(&mdctx,
 				    (unsigned char *)remote_key,
 				    node_dhc->auth_key.remote_password_length);
@@ -6669,7 +6670,7 @@ emlxs_hash_verification(
 			SHA1Init(&sha1ctx);
 			SHA1Update(&sha1ctx, (void *)&mytran_id, 1);
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				SHA1Update(&sha1ctx, (void *)remote_key,
 				    node_dhc->auth_key.remote_password_length);
 			} else {
@@ -6755,7 +6756,7 @@ emlxs_hash_get_R2(
 	char *mykey;
 	BIG_ERR_CODE err = BIG_OK;
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		dhgp_id = node_dhc->nlp_auth_dhgpid;
 		hash_id = node_dhc->nlp_auth_hashid;
 	} else {
@@ -6769,13 +6770,13 @@ emlxs_hash_get_R2(
 	}
 
 	tran_id = (AUTH_TRAN_ID_MASK & tran_id);
-	mytran_id = (uint8_t)(SWAP_DATA32(tran_id));
+	mytran_id = (uint8_t)(LE_SWAP32(tran_id));
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_fcsp_detail_msg,
 	    "emlxs_hash_get_R2:0x%x 0x%x dhgp_id=0x%x mytran_id=0x%x",
 	    ndlp->nlp_DID, hash_id, dhgp_id, mytran_id);
 
-	if (ndlp->nlp_DID == Fabric_DID) {
+	if (ndlp->nlp_DID == FABRIC_DID) {
 		mykey = (char *)node_dhc->auth_key.local_password;
 
 	} else {
@@ -6792,7 +6793,7 @@ emlxs_hash_get_R2(
 
 			MD5Update(&mdctx, (unsigned char *)&mytran_id, 1);
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				MD5Update(&mdctx, (unsigned char *)mykey,
 				    node_dhc->auth_key.local_password_length);
 			} else {
@@ -6819,7 +6820,7 @@ emlxs_hash_get_R2(
 			SHA1Init(&sha1ctx);
 			SHA1Update(&sha1ctx, (void *)&mytran_id, 1);
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				SHA1Update(&sha1ctx, (void *)mykey,
 				    node_dhc->auth_key.local_password_length);
 			} else {
@@ -6840,7 +6841,7 @@ emlxs_hash_get_R2(
 		}
 	} else {
 		/* NON-NULL DHCHAP */
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			if (hash_id == AUTH_MD5) {
 				bcopy((void *)node_dhc->hrsp_priv_key,
 				    (void *)key, MD5_LEN);
@@ -6896,7 +6897,7 @@ emlxs_hash_get_R2(
 			 * should be the key associated with the
 			 * authentication responder i.e. the remote key.
 			 */
-			if (ndlp->nlp_DID == Fabric_DID)
+			if (ndlp->nlp_DID == FABRIC_DID)
 				MD5Update(&mdctx, (unsigned char *)mykey,
 				    node_dhc->auth_key.local_password_length);
 			else
@@ -6925,7 +6926,7 @@ emlxs_hash_get_R2(
 			SHA1Init(&sha1ctx);
 			SHA1Update(&sha1ctx, (void *)&mytran_id, 1);
 
-			if (ndlp->nlp_DID == Fabric_DID) {
+			if (ndlp->nlp_DID == FABRIC_DID) {
 				SHA1Update(&sha1ctx, (void *)mykey,
 				    node_dhc->auth_key.local_password_length);
 			} else {
@@ -7067,8 +7068,8 @@ emlxs_dhc_auth_start(
 	/* The ubp represents an unsolicted PLOGI */
 	/* The sbp represents a solicted PLOGI    */
 
-	fabric = ((ndlp->nlp_DID & Fabric_DID_MASK) == Fabric_DID_MASK) ? 1 : 0;
-	fabric_switch = ((ndlp->nlp_DID == Fabric_DID) ? 1 : 0);
+	fabric = ((ndlp->nlp_DID & FABRIC_DID_MASK) == FABRIC_DID_MASK) ? 1 : 0;
+	fabric_switch = ((ndlp->nlp_DID == FABRIC_DID) ? 1 : 0);
 
 	/* Return is authentication is not enabled */
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
@@ -7447,7 +7448,7 @@ emlxs_dhc_auth_stop(
 			/* Nothing to stop */
 			return;
 		}
-		if (ndlp->nlp_DID != Fabric_DID) {
+		if (ndlp->nlp_DID != FABRIC_DID) {
 			emlxs_dhc_state(port, ndlp, NODE_STATE_UNKNOWN, 0, 0);
 		}
 		emlxs_dhc_auth_complete(port, ndlp, 2);
@@ -7464,7 +7465,7 @@ emlxs_dhc_auth_stop(
 			if (node_dhc->state == NODE_STATE_UNKNOWN) {
 				continue;
 			}
-			if (ndlp->nlp_DID != Fabric_DID) {
+			if (ndlp->nlp_DID != FABRIC_DID) {
 				emlxs_dhc_state(port, ndlp,
 				    NODE_STATE_UNKNOWN, 0, 0);
 			}
@@ -7494,8 +7495,8 @@ emlxs_dhc_auth_complete(
 	uint32_t fabric;
 	uint32_t fabric_switch;
 
-	fabric = ((ndlp->nlp_DID & Fabric_DID_MASK) == Fabric_DID_MASK) ? 1 : 0;
-	fabric_switch = ((ndlp->nlp_DID == Fabric_DID) ? 1 : 0);
+	fabric = ((ndlp->nlp_DID & FABRIC_DID_MASK) == FABRIC_DID_MASK) ? 1 : 0;
+	fabric_switch = ((ndlp->nlp_DID == FABRIC_DID) ? 1 : 0);
 
 	EMLXS_MSGF(EMLXS_CONTEXT,
 	    &emlxs_fcsp_complete_msg,
@@ -7594,8 +7595,8 @@ emlxs_dhc_init_sp(emlxs_port_t *port, uint32_t did, SERV_PARM *sp, char **msg)
 	emlxs_auth_cfg_t *auth_cfg = NULL;
 	emlxs_auth_key_t *auth_key = NULL;
 
-	fabric = ((did & Fabric_DID_MASK) == Fabric_DID_MASK) ? 1 : 0;
-	fabric_switch = ((did == Fabric_DID) ? 1 : 0);
+	fabric = ((did & FABRIC_DID_MASK) == FABRIC_DID_MASK) ? 1 : 0;
+	fabric_switch = ((did == FABRIC_DID) ? 1 : 0);
 
 	/* Return is authentication is not enabled */
 	if (cfg[CFG_AUTH_ENABLE].current == 0) {
@@ -7658,8 +7659,8 @@ emlxs_dhc_verify_login(emlxs_port_t *port, uint32_t sid, SERV_PARM *sp)
 	uint32_t fabric;
 	uint32_t fabric_switch;
 
-	fabric = ((sid & Fabric_DID_MASK) == Fabric_DID_MASK) ? 1 : 0;
-	fabric_switch = ((sid == Fabric_DID) ? 1 : 0);
+	fabric = ((sid & FABRIC_DID_MASK) == FABRIC_DID_MASK) ? 1 : 0;
+	fabric_switch = ((sid == FABRIC_DID) ? 1 : 0);
 
 	if (port->port_dhc.state == ELX_FABRIC_AUTH_FAILED) {
 		/* Reject login */
@@ -7864,7 +7865,7 @@ emlxs_dhc_set_reauth_time(
 		drv_time = DRV_TIME;
 
 		/* Get last successful auth time */
-		if (ndlp->nlp_DID == Fabric_DID) {
+		if (ndlp->nlp_DID == FABRIC_DID) {
 			last_auth_time = port_dhc->auth_time;
 		} else if (node_dhc->parent_auth_cfg) {
 			last_auth_time = node_dhc->parent_auth_cfg->auth_time;
@@ -9298,7 +9299,6 @@ out:
 } /* emlxs_auth_key_parse() */
 
 
-#ifdef DFC_SUPPORT
 /* ************************** AUTH DFCLIB SUPPORT *********************** */
 
 /* Provides DFC support for emlxs_dfc_init_auth() */
@@ -9341,7 +9341,7 @@ emlxs_dhc_init_auth(emlxs_hba_t *hba, uint8_t *lwwpn, uint8_t *rwwpn)
 	}
 	if (bcmp(rwwpn, emlxs_fabric_wwn, 8) == 0) {
 		/* Scan for fabric node */
-		if ((ndlp = emlxs_node_find_did(port, Fabric_DID)) == NULL) {
+		if ((ndlp = emlxs_node_find_did(port, FABRIC_DID)) == NULL) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_dfc_error_msg,
 			    "emlxs_dhc_init_auth: fabric node not found.");
@@ -9360,7 +9360,7 @@ emlxs_dhc_init_auth(emlxs_hba_t *hba, uint8_t *lwwpn, uint8_t *rwwpn)
 		}
 	}
 
-	if ((ndlp->nlp_DID != Fabric_DID) &&
+	if ((ndlp->nlp_DID != FABRIC_DID) &&
 	    ((port->port_dhc.state != ELX_FABRIC_AUTH_SUCCESS))) {
 		return (DFC_IO_ERROR);
 	}
@@ -9538,7 +9538,7 @@ emlxs_dhc_add_auth_cfg(
 		    emlxs_fabric_wwn, 8) == 0) {
 			/* Scan for fabric node */
 			if ((ndlp = emlxs_node_find_did(port,
-			    Fabric_DID)) == NULL) {
+			    FABRIC_DID)) == NULL) {
 				break;
 			}
 		} else {
@@ -9937,7 +9937,7 @@ emlxs_dhc_get_auth_status(emlxs_hba_t *hba, dfc_auth_status_t *fcsp_status)
 	    (uint8_t *)emlxs_fabric_wwn, 8) == 0) {
 		auth_status = &port->port_dhc.auth_status;
 		auth_time = port->port_dhc.auth_time;
-		ndlp = emlxs_node_find_did(port, Fabric_DID);
+		ndlp = emlxs_node_find_did(port, FABRIC_DID);
 	} else {
 		auth_status = &auth_cfg->auth_status;
 		auth_time = auth_cfg->auth_time;
@@ -10093,8 +10093,5 @@ emlxs_dhc_get_auth_key_table(emlxs_hba_t *hba, dfc_auth_password_t *auth_pwd)
 	return (0);
 
 } /* emlxs_dhc_get_auth_key_table() */
-
-
-#endif	/* DFC_SUPPORT */
 
 #endif	/* DHCHAP_SUPPORT */

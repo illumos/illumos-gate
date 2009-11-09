@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_DUMP_H
 #define	_EMLXS_DUMP_H
@@ -49,7 +48,8 @@ typedef struct dump_temp_event
 } dump_temp_event_t;
 
 #define	EMLXS_TXT_FILE_SIZE	(1024*1024)
-#define	EMLXS_DMP_FILE_SIZE	(4*1024*1024)
+#define	EMLXS_DMP_FILE_SIZE	((8*1024*1024)+0x100)
+/* #define	EMLXS_DMP_FILE_SIZE	(4*1024*1024) */
 #define	EMLXS_CEE_FILE_SIZE	(1024*1024)
 
 /* Maximum BC for DUMP w/o MBX Extension */
@@ -146,7 +146,7 @@ typedef struct dump_temp_event
 #define	SID_INTERNAL_L7X	0x98	/* Driver-specific Intrnl, Lnx 7x */
 #define	SID_INTERNAL_L8X	0x99	/* Driver-specific Intrnl, Lnx 8x */
 #define	SID_CONFIG_REGION	0x9A	/* Config Region Data */
-#define	SID_NON_VOLATILE_LOG	0x9B	/* Saturn NV Log (Enterprise only) */
+#define	SID_NON_VOLATILE_LOG	0x9B	/* NV Log (Enterprise only) */
 
 /* Legend Strings */
 
@@ -166,7 +166,7 @@ typedef struct dump_temp_event
 #define	LEGEND_MENLO_LOG_CONFIG		"Converged Enhanced Ethernet (CEE) Log"
 #define	LEGEND_MENLO_LOG_PANIC_REGS	"\n\nPanic Log Registers\n"
 #define	LEGEND_MENLO_LOG_PANIC_LOGS	"\n\nPanic Log Entries\n"
-#define	LEGEND_NON_VOLATILE_LOG		"Non-Volatile Log Data"	/* peter */
+#define	LEGEND_NON_VOLATILE_LOG		"Non-Volatile Log Data"
 
 /* Sub-Legends associated with SID_HBA_MEM_DUMP // HBA Memory Dump */
 #define	LEGEND_HBA_MEM_DUMP_TABLE	"Dump Table"
@@ -249,7 +249,7 @@ typedef struct dump_temp_event
 #define	LEGEND_RINGS		"Cmd/Rsp Rings"
 #define	LEGEND_DRIVER_SPEC	"Driver-Specific Internal Structures"
 
-/* Misc Legend DAta */
+/* Misc Legend Data */
 #define	LEGEND_NULL	""
 #define	LEGEND_NV_LOG_DRIVER_NOT_SUPPORTED \
 	"NV Log not supported by the driver"
@@ -257,6 +257,16 @@ typedef struct dump_temp_event
 	"Error in getting NV Log status"
 #define	LEGEND_NV_LOG_ERROR \
 	"Error in getting NV Log"
+
+#define	NV_LOG_NOT_INCLUDED_IN_DMP \
+	"Non-Volatile Log Dump is not included in the DMP file"
+#define	NV_LOG_INCLUDED_IN_DMP \
+	"Non-Volatile Log Dump is included in the DMP file"
+
+#define	NV_LOG_NOT_INCLUDED_IN_FAT \
+	"Non-Volatile Log Dump is not included in the FAT file"
+#define	NV_LOG_INCLUDED_IN_FAT \
+	"Non-Volatile Log Dump is included in the FAT file"
 
 /* Dump Regions Definitions */
 #define	DR_SLI_REGS	0x0000

@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_FC_H
 #define	_EMLXS_FC_H
@@ -31,43 +30,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-
-/* ULP Patches: */
-/* #define	ULP_PATCH1 -  Obsolete */
-
-/* This patch enables the driver to auto respond to unsolicited LOGO's */
-/* This is needed because ULP is sometimes doesn't reply itself */
-#define	ULP_PATCH2
-
-/* This patch enables the driver to auto respond to unsolicited PRLI's */
-/* This is needed because ULP is known to panic sometimes */
-#define	ULP_PATCH3
-
-/* This patch enables the driver to auto respond to unsolicited PRLO's */
-/* This is needed because ULP is known to panic sometimes */
-/* #define	ULP_PATCH4 -  Obsolete */
-
-/* This patch enables the driver to fail pkt abort requests */
-#define	ULP_PATCH5
-
-/* This patch enables the driver to generate an RSCN for unsolicited PRLO's */
-/* and LOGO's */
-#define	ULP_PATCH6
-
-/* Sun Disk Array Patches: */
-
-/* This patch enables the driver to fix a residual underrun issue with */
-/* check conditions */
-#define	FCP_UNDERRUN_PATCH1
-
-/* This patch enables the driver to fix a residual underrun issue with */
-/* SCSI inquiry commands */
-#define	FCP_UNDERRUN_PATCH2
-
-/* This patch enables the driver to adjust MAX_RRDY on private loop */
-/* #define	MAX_RRDY_PATCH */
-
 
 typedef struct emlxs_buf
 {
@@ -80,9 +42,10 @@ typedef struct emlxs_buf
 	struct emlxs_buf	*next;		/* Use it when the iodone */
 	void 			*node;		/* Save node and used by */
 						/* abort */
-	void			*ring;		/* Save ring and used by */
+	void			*channel;	/* Save channel and used by */
 						/* abort */
-	struct emlxs_buf	 *fpkt;		/* Flush pkt pointer */
+	struct emlxs_buf	*fpkt;		/* Flush pkt pointer */
+	struct XRIobject	*xp;		/* Exchange resource */
 	IOCBQ			iocbq;
 	kmutex_t		mtx;
 	uint32_t		pkt_flags;
@@ -119,9 +82,8 @@ typedef struct emlxs_buf
 	uint8_t			fct_flags;
 
 #define	EMLXS_FCT_SEND_STATUS		0x01
-#define	EMLXS_FCT_ABORT			0x02
-#define	EMLXS_FCT_ABORT_INP		0x04
-#define	EMLXS_FCT_IO_INP		0x08
+#define	EMLXS_FCT_ABORT_INP		0x02
+#define	EMLXS_FCT_IO_INP		0x04
 #define	EMLXS_FCT_REGISTERED		0x10
 #define	EMLXS_FCT_PLOGI_RECEIVED	0x20
 #define	EMLXS_FCT_FLOGI			0x40
@@ -132,32 +94,32 @@ typedef struct emlxs_buf
 #define	EMLXS_FCT_ELS_CMD_RECEIVED	2
 #define	EMLXS_FCT_CMD_POSTED		3
 #define	EMLXS_FCT_CMD_WAITQ		4
-#define	EMLXS_FCT_SEND_ELS_RSP		5
-#define	EMLXS_FCT_SEND_ELS_REQ		6
-#define	EMLXS_FCT_SEND_CT_REQ		7
-#define	EMLXS_FCT_RSP_PENDING		8
-#define	EMLXS_FCT_REQ_PENDING		9
-#define	EMLXS_FCT_REG_PENDING		10
-#define	EMLXS_FCT_REG_COMPLETE		11
-#define	EMLXS_FCT_OWNED			12
-#define	EMLXS_FCT_SEND_FCP_DATA		13
-#define	EMLXS_FCT_SEND_FCP_STATUS	14
-#define	EMLXS_FCT_DATA_PENDING		15
-#define	EMLXS_FCT_STATUS_PENDING	16
-#define	EMLXS_FCT_IOCB_ISSUED		17
-#define	EMLXS_FCT_IOCB_COMPLETE		18
-#define	EMLXS_FCT_PKT_COMPLETE		19
-#define	EMLXS_FCT_PKT_FCPRSP_COMPLETE	20
-#define	EMLXS_FCT_PKT_ELSRSP_COMPLETE	21
-#define	EMLXS_FCT_PKT_ELSCMD_COMPLETE	22
-#define	EMLXS_FCT_PKT_CTCMD_COMPLETE	23
-#define	EMLXS_FCT_REQ_COMPLETE		24
-#define	EMLXS_FCT_SEND_ABORT		25
-#define	EMLXS_FCT_CLOSE_PENDING		26
-#define	EMLXS_FCT_ABORT_PENDING		27
-#define	EMLXS_FCT_ABORT_COMPLETE	28
-#define	EMLXS_FCT_ABORT_DONE		30
-#define	EMLXS_FCT_IO_DONE		32
+#define	EMLXS_FCT_SEND_CMD_RSP		5
+#define	EMLXS_FCT_SEND_ELS_RSP		6
+#define	EMLXS_FCT_SEND_ELS_REQ		7
+#define	EMLXS_FCT_SEND_CT_REQ		8
+#define	EMLXS_FCT_RSP_PENDING		9
+#define	EMLXS_FCT_REQ_PENDING		10
+#define	EMLXS_FCT_REG_PENDING		11
+#define	EMLXS_FCT_REG_COMPLETE		12
+#define	EMLXS_FCT_OWNED			13
+#define	EMLXS_FCT_SEND_FCP_DATA		14
+#define	EMLXS_FCT_SEND_FCP_STATUS	15
+#define	EMLXS_FCT_DATA_PENDING		16
+#define	EMLXS_FCT_STATUS_PENDING	17
+#define	EMLXS_FCT_PKT_COMPLETE		18
+#define	EMLXS_FCT_PKT_FCPRSP_COMPLETE	19
+#define	EMLXS_FCT_PKT_ELSRSP_COMPLETE	20
+#define	EMLXS_FCT_PKT_ELSCMD_COMPLETE	21
+#define	EMLXS_FCT_PKT_CTCMD_COMPLETE	22
+#define	EMLXS_FCT_REQ_COMPLETE		23
+#define	EMLXS_FCT_CLOSE_PENDING		24
+#define	EMLXS_FCT_ABORT_PENDING		25
+#define	EMLXS_FCT_ABORT_DONE		26
+#define	EMLXS_FCT_IO_DONE		27
+
+#define	EMLXS_FCT_IOCB_ISSUED		256 /* For tracing only */
+#define	EMLXS_FCT_IOCB_COMPLETE		257 /* For tracing only */
 
 	stmf_data_buf_t		*fct_buf;
 
@@ -169,18 +131,15 @@ typedef struct emlxs_buf
 } emlxs_buf_t;
 
 
-#if 0
-#define	FCT_IO_TRACE  /* Used to trace IOs */
-#endif
 
 #ifdef FCT_IO_TRACE
-#define	emlxs_fct_state_chg(fct_cmd, sbp, state)	\
-	(sbp)->fct_state = state;			\
-	emlxs_fct_io_trace((sbp)->port, fct_cmd, state)
+#define	EMLXS_FCT_STATE_CHG(_fct_cmd, _cmd_sbp, _state)	\
+	(_cmd_sbp)->fct_state = _state;			\
+	emlxs_fct_io_trace((_cmd_sbp)->port, _fct_cmd, _state)
 #else
 /* define to set fct_state */
-#define	emlxs_fct_state_chg(fct_cmd, sbp, state)	\
-	(sbp)->fct_state = state;
+#define	EMLXS_FCT_STATE_CHG(_fct_cmd, _cmd_sbp, _state)	\
+	(_cmd_sbp)->fct_state = _state
 #endif /* FCT_IO_TRACE */
 
 
@@ -212,7 +171,7 @@ typedef struct emlxs_buf
 
 #define	PACKET_CHIP_COMP	0x00100000
 #define	PACKET_COMPLETED	0x00200000
-#define	PACKET_RETURNED		0x00400000
+#define	PACKET_ULP_OWNED	0x00400000
 
 #define	PACKET_STATE_VALID	0x01000000
 #define	PACKET_FCP_RSP_VALID	0x02000000
@@ -339,9 +298,6 @@ typedef struct emlxs_buf_info
 typedef emlxs_buf_info_t MBUF_INFO;
 
 
-
-#ifdef SLI3_SUPPORT
-
 #define	EMLXS_MAX_HBQ   	16	/* Max HBQs handled by firmware */
 #define	EMLXS_ELS_HBQ_ID	0
 #define	EMLXS_IP_HBQ_ID		1
@@ -354,34 +310,66 @@ typedef emlxs_buf_info_t MBUF_INFO;
 #define	EMLXS_NUM_HBQ		3	/* Number of HBQs supported by driver */
 #endif /* SFCT_SUPPORT */
 
-#endif	/* SLI3_SUPPORT */
 
-
-
-/* Structure used to access adapter rings */
-typedef struct emlxs_ring
+/*
+ * An IO Channel is a object that comprises a xmit/cmpl
+ * path for IOs.
+ * For SLI3, an IO path maps to a ring (cmd/rsp)
+ * For SLI4, an IO path map to a queue pair (WQ/CQ)
+ */
+typedef struct emlxs_channel
 {
-	IOCBQ		*fc_iocbhd;		/* ptr to head iocb rsp list */
-						/* for ring */
-	IOCBQ		*fc_iocbtl;		/* ptr to tail iocb rsp list */
-						/* for ring */
-	void		*fc_cmdringaddr;	/* virtual offset for cmd */
-						/* rings */
-	void		*fc_rspringaddr;	/* virtual offset for rsp */
-						/* rings */
-
-	emlxs_buf_t	**fc_table;		/* sc_buf pointers indexed by */
-						/* iotag */
-	uint8_t		*fc_mpon;		/* index ptr for match */
-						/* structure */
-	uint8_t		*fc_mpoff;		/* index ptr for match */
-						/* structure */
-	struct emlxs_hba *hba;	/* ptr to hba for ring */
+	struct emlxs_hba *hba;			/* ptr to hba for channel */
+	void		*iopath;		/* ptr to SLI3/4 io path */
 
 	kmutex_t	rsp_lock;
 	IOCBQ		*rsp_head;	/* deferred completion head */
 	IOCBQ		*rsp_tail;	/* deferred completion tail */
 	emlxs_thread_t  intr_thread;
+
+
+	uint16_t	channelno;
+	uint16_t	chan_flag;
+
+#define	EMLXS_NEEDS_TRIGGER 1
+
+	/* Protected by EMLXS_TX_CHANNEL_LOCK */
+	emlxs_queue_t	nodeq;			/* Node service queue */
+
+	kmutex_t	channel_cmd_lock;
+	uint32_t	timeout;
+
+	/* Channel command counters */
+	uint32_t	ulpSendCmd;
+	uint32_t	ulpCmplCmd;
+	uint32_t	hbaSendCmd;
+	uint32_t	hbaCmplCmd;
+	uint32_t	hbaSendCmd_sbp;
+	uint32_t	hbaCmplCmd_sbp;
+
+} emlxs_channel_t;
+typedef emlxs_channel_t CHANNEL;
+
+/*
+ * Should be able to handle max number of io paths for a
+ * SLI4 HBA (EMLXS_MAX_WQS) or for a SLI3 HBA (MAX_RINGS)
+ */
+#define	MAX_CHANNEL EMLXS_MSI_MAX_INTRS
+
+
+/* Structure used to access adapter rings */
+typedef struct emlxs_ring
+{
+	void		*fc_cmdringaddr;	/* virtual offset for cmd */
+						/* rings */
+	void		*fc_rspringaddr;	/* virtual offset for rsp */
+						/* rings */
+
+	uint8_t		*fc_mpon;		/* index ptr for match */
+						/* structure */
+	uint8_t		*fc_mpoff;		/* index ptr for match */
+						/* structure */
+	struct emlxs_hba *hba;			/* ptr to hba for ring */
 
 	uint8_t		fc_numCiocb;		/* number of command iocb's */
 						/* per ring */
@@ -396,15 +384,9 @@ typedef struct emlxs_ring
 	uint8_t		ringno;
 
 	uint16_t	fc_missbufcnt;		/* buf cnt we need to repost */
-	uint16_t	fc_iotag;		/* used to identify I/Os */
-	uint16_t	fc_abort_iotag;		/* used to identify Abort or */
-						/* close requests */
-	uint16_t	max_iotag;
+	CHANNEL		*channelp;
 
-	uint32_t	timeout;
 
-	/* Protected by EMLXS_RINGTX_LOCK */
-	emlxs_queue_t	nodeq;			/* Node service queue */
 } emlxs_ring_t;
 typedef emlxs_ring_t RING;
 
@@ -443,6 +425,7 @@ typedef struct emlxs_node
 #define	NLP_FCP_2_DEVICE	0x40	/* FCP-2 TGT device */
 #define	NLP_EMLX_VPORT		0x80    /* Virtual port */
 
+	uint32_t		nlp_force_rscn;
 	uint32_t		nlp_tag;	/* Tag used by port_offline */
 	uint32_t		flag;
 
@@ -450,10 +433,10 @@ typedef struct emlxs_node
 
 	SERV_PARM		sparm;
 
-	/* Protected by EMLXS_RINGTX_LOCK */
+	/* Protected by EMLXS_TX_CHANNEL_LOCK */
 	uint32_t		nlp_active;	/* Node active flag */
 	uint32_t		nlp_base;
-	uint32_t		nlp_flag[MAX_RINGS];	/* Node level ring */
+	uint32_t		nlp_flag[MAX_CHANNEL];	/* Node level channel */
 							/* flags */
 
 	/* nlp_flag */
@@ -461,11 +444,11 @@ typedef struct emlxs_node
 #define	NLP_OFFLINE		0x2
 #define	NLP_RPI_XRI		0x4
 
-	uint32_t		nlp_tics[MAX_RINGS];	/* gate timeout */
-	emlxs_queue_t		nlp_tx[MAX_RINGS];	/* Transmit Q head */
-	emlxs_queue_t		nlp_ptx[MAX_RINGS];	/* Priority transmit */
+	uint32_t		nlp_tics[MAX_CHANNEL];	/* gate timeout */
+	emlxs_queue_t		nlp_tx[MAX_CHANNEL];	/* Transmit Q head */
+	emlxs_queue_t		nlp_ptx[MAX_CHANNEL];	/* Priority transmit */
 							/* Queue head */
-	void			*nlp_next[MAX_RINGS];	/* Service Request */
+	void			*nlp_next[MAX_CHANNEL];	/* Service Request */
 							/* Queue pointer used */
 							/* when node needs */
 							/* servicing */
@@ -476,6 +459,11 @@ typedef struct emlxs_node
 #ifdef SAN_DIAG_SUPPORT
 	sd_timestat_level0_t	sd_dev_bucket[SD_IO_LATENCY_MAX_BUCKETS];
 #endif
+
+	struct RPIobject	*RPIp;	/* SLI4 only */
+#define	EMLXS_NODE_TO_RPI(_h, _n)	\
+	((_n)?((_n->RPIp)?_n->RPIp:emlxs_sli4_find_rpi(_h, _n->nlp_Rpi)):NULL)
+
 } emlxs_node_t;
 typedef emlxs_node_t NODELIST;
 
@@ -509,8 +497,11 @@ typedef emlxs_fcip_nethdr_t NETHDR;
 
 /* A BPL entry is 12 bytes. Subtract 2 for command and response buffers */
 #define	BPL_TO_SGLLEN(_bpl)   ((_bpl/12)-2)
-
 #define	MEM_BPL_SIZE		1024  /* Default size */
+
+/* A SGL entry is 16 bytes. Subtract 2 for command and response buffers */
+#define	SGL_TO_SGLLEN(_sgl)   ((_sgl/16)-2)
+#define	MEM_SGL_SIZE		1024  /* Default size */
 
 #ifdef EMLXS_I386
 #define	EMLXS_SGLLEN		BPL_TO_SGLLEN(MEM_BPL_SIZE)
@@ -530,13 +521,6 @@ typedef emlxs_fcip_nethdr_t NETHDR;
 #define	MEM_FCTBUF_SIZE  	65535
 #define	MEM_FCTBUF_COUNT	128
 
-#define	MEM_SEG_MASK		0xff	/* mask used to mask off the */
-					/* priority bit */
-#define	MEM_PRI			0x100	/* Priority bit: set to exceed */
-					/* low water */
-
-
-
 typedef struct emlxs_memseg
 {
 	uint8_t			*fc_memget_ptr;
@@ -555,19 +539,15 @@ typedef struct emlxs_memseg
 	uint32_t		fc_numblks;		/* no of mem blks */
 	uint32_t		fc_memget_cnt;		/* no of mem get blks */
 	uint32_t		fc_memput_cnt;		/* no of mem put blks */
-	uint32_t		fc_memflag;		/* what to do when */
-							/* list is exhausted */
-	uint32_t		fc_lowmem;		/* low water mark */
-							/* used w/MEM_PRI */
+	uint32_t		fc_memflag;  /* emlxs_buf_info_t FLAGS */
+	uint32_t		fc_reserved; /* used with priority flag */
+	uint32_t		fc_memalign;
+	uint32_t		fc_memtag;
+	char			fc_label[32];
+
 } emlxs_memseg_t;
 typedef emlxs_memseg_t MEMSEG;
 
-
-#define	FC_MEM_ERR	1	/* return error memflag */
-#define	FC_MEM_GETMORE	2	/* get more memory memflag */
-#define	FC_MEM_DMA	4	/* blocks are for DMA */
-#define	FC_MEM_LOWHIT	8	/* low water mark was hit */
-#define	FC_MEMPAD	16	/* offset used for a FC_MEM_DMA buffer */
 
 /* Board stat counters */
 typedef struct emlxs_stats
@@ -584,11 +564,11 @@ typedef struct emlxs_stats
 	uint32_t	MboxBusy;
 	uint32_t	MboxInvalid;
 
-	uint32_t	IocbIssued[MAX_RINGS];
-	uint32_t	IocbReceived[MAX_RINGS];
-	uint32_t	IocbTxPut[MAX_RINGS];
-	uint32_t	IocbTxGet[MAX_RINGS];
-	uint32_t	IocbRingFull[MAX_RINGS];
+	uint32_t	IocbIssued[MAX_CHANNEL];
+	uint32_t	IocbReceived[MAX_CHANNEL];
+	uint32_t	IocbTxPut[MAX_CHANNEL];
+	uint32_t	IocbTxGet[MAX_CHANNEL];
+	uint32_t	IocbRingFull[MAX_CHANNEL];
 	uint32_t	IocbThrottled;
 
 	uint32_t	IntrEvent[8];
@@ -744,7 +724,7 @@ typedef struct emlxs_hba_event
  * to classify the IO in one of 16 ranges. A binary search
  * to locate the high bit in the size is used.
  */
-#define	emlxs_bump_rdioctr(port, cnt) \
+#define	EMLXS_BUMP_RDIOCTR(port, cnt) \
 { \
 	/* Use binary search to find the first high bit */ \
 	if (cnt & 0xffff0000) { \
@@ -840,7 +820,7 @@ typedef struct emlxs_hba_event
 }
 
 
-#define	emlxs_bump_wrioctr(port, cnt) \
+#define	EMLXS_BUMP_WRIOCTR(port, cnt) \
 { \
 /* Use binary search to find the first high bit */ \
 	if (cnt & 0xffff0000) { \
@@ -1000,6 +980,8 @@ typedef struct emlxs_port
 #define	EMLXS_PORT_BOUND		0x00000002
 
 #define	EMLXS_PORT_REGISTERED		0x00010000	/* VPI registered */
+#define	EMLXS_PORT_INIT_VPI_CMPL	0x00020000	/* Init VPI - SLI4 */
+#define	EMLXS_PORT_REG_VPI_CMPL		0x00040000	/* Reg VPI - SLI4 */
 #define	EMLXS_PORT_IP_UP		0x00000010
 #define	EMLXS_PORT_CONFIG		0x00000020
 #define	EMLXS_PORT_RESTRICTED		0x00000040	/* Restrict logins */
@@ -1034,6 +1016,9 @@ typedef struct emlxs_port
 	uint32_t		did;
 	uint32_t		prev_did;
 
+	/* support FC_PORT_GET_P2P_INFO only */
+	uint32_t		rdid;
+
 	/* FC_AL management */
 	uint8_t			lip_type;
 	uint8_t			alpa_map[128];
@@ -1060,7 +1045,7 @@ typedef struct emlxs_port
 	kmutex_t		ub_lock;
 	uint32_t		ub_count;
 	emlxs_unsol_buf_t	*ub_pool;
-	uint32_t		ub_post[MAX_RINGS];
+	uint32_t		ub_post[MAX_CHANNEL];
 	uint32_t		ub_timer;
 
 	emlxs_ub_priv_t		*ub_wait_head;	/* Unsolicited IO received */
@@ -1124,107 +1109,146 @@ typedef struct emlxs_port
 #define	SD_STOPPED	0x02
 
 	/* SD event management list */
-	uint32_t		sd_reg_events;   /* bit-mask */
+	uint32_t		sd_event_mask;   /* bit-mask */
 	emlxs_dfc_event_t	sd_events[MAX_DFC_EVENTS];
 #endif
+	/* Used for SLI4 */
+	uint16_t	outstandingRPIs;
+	struct VFIobject *VFIp;
 } emlxs_port_t;
 
 
 
 /* Host Attn reg */
-#define	FC_HA_REG(_hba, _sa)	((volatile uint32_t *)\
-	((volatile char *)_sa + ((_hba)->ha_reg_addr)))
+#define	FC_HA_REG(_hba)		((volatile uint32_t *) \
+				    ((_hba)->sli.sli3.ha_reg_addr))
 
 /* Chip Attn reg */
-#define	FC_CA_REG(_hba, _sa)	((volatile uint32_t *)\
-	((volatile char *)_sa + ((_hba)->ca_reg_addr)))
+#define	FC_CA_REG(_hba)		((volatile uint32_t *) \
+				    ((_hba)->sli.sli3.ca_reg_addr))
 
 /* Host Status reg */
-#define	FC_HS_REG(_hba, _sa)	((volatile uint32_t *)\
-	((volatile char *)_sa + ((_hba)->hs_reg_addr)))
+#define	FC_HS_REG(_hba)		((volatile uint32_t *) \
+				    ((_hba)->sli.sli3.hs_reg_addr))
 
 /* Host Cntl reg */
-#define	FC_HC_REG(_hba, _sa)	((volatile uint32_t *)\
-	((volatile char *)_sa + ((_hba)->hc_reg_addr)))
+#define	FC_HC_REG(_hba)		((volatile uint32_t *) \
+				    ((_hba)->sli.sli3.hc_reg_addr))
 
 /* BIU Configuration reg */
-#define	FC_BC_REG(_hba, _sa)	((volatile uint32_t *)\
-	((volatile char *)_sa + ((_hba)->bc_reg_addr)))
+#define	FC_BC_REG(_hba)		((volatile uint32_t *) \
+				    ((_hba)->sli.sli3.bc_reg_addr))
 
 /* Used by SBUS adapter */
 /* TITAN Cntl reg */
-#define	FC_SHC_REG(_hba, _sa)	((volatile uint32_t *)\
-	((volatile char *)_sa + ((_hba)->shc_reg_addr)))
+#define	FC_SHC_REG(_hba)	((volatile uint32_t *) \
+				    ((_hba)->sli.sli3.shc_reg_addr))
 
 /* TITAN Status reg */
-#define	FC_SHS_REG(_hba, _sa)	((volatile uint32_t *)\
-	((volatile char *)_sa + ((_hba)->shs_reg_addr)))
+#define	FC_SHS_REG(_hba)	((volatile uint32_t *) \
+				    ((_hba)->sli.sli3.shs_reg_addr))
 
 /* TITAN Update reg */
-#define	FC_SHU_REG(_hba, _sa)	((volatile uint32_t *)\
-	((volatile char *)_sa + ((_hba)->shu_reg_addr)))
+#define	FC_SHU_REG(_hba)	((volatile uint32_t *) \
+				    ((_hba)->sli.sli3.shu_reg_addr))
+
+/* MPU Semaphore reg */
+#define	FC_SEMA_REG(_hba)	((volatile uint32_t *)\
+				    ((_hba)->sli.sli4.MPUEPSemaphore_reg_addr))
+
+/* Bootstrap Mailbox Doorbell reg */
+#define	FC_MBDB_REG(_hba)	((volatile uint32_t *) \
+				    ((_hba)->sli.sli4.MBDB_reg_addr))
+
+/* MQ Doorbell reg */
+#define	FC_MQDB_REG(_hba)	((volatile uint32_t *) \
+				    ((_hba)->sli.sli4.MQDB_reg_addr))
+
+/* CQ Doorbell reg */
+#define	FC_CQDB_REG(_hba)	((volatile uint32_t *) \
+				    ((_hba)->sli.sli4.CQDB_reg_addr))
+
+/* WQ Doorbell reg */
+#define	FC_WQDB_REG(_hba)	((volatile uint32_t *) \
+				    ((_hba)->sli.sli4.WQDB_reg_addr))
+
+/* RQ Doorbell reg */
+#define	FC_RQDB_REG(_hba)	((volatile uint32_t *) \
+				    ((_hba)->sli.sli4.RQDB_reg_addr))
 
 
-#define	FC_SLIM2_MAILBOX(_hba)	((MAILBOX *)(_hba)->slim2.virt)
+#define	FC_SLIM2_MAILBOX(_hba)	((MAILBOX *)(_hba)->sli.sli3.slim2.virt)
 
-#define	FC_SLIM1_MAILBOX(_hba)	((MAILBOX *)(_hba)->slim_addr)
+#define	FC_SLIM1_MAILBOX(_hba)	((MAILBOX *)(_hba)->sli.sli3.slim_addr)
 
 #define	FC_MAILBOX(_hba)	(((_hba)->flag & FC_SLIM2_MODE) ? \
 	FC_SLIM2_MAILBOX(_hba) : FC_SLIM1_MAILBOX(_hba))
 
 #define	WRITE_CSR_REG(_hba, _regp, _value) ddi_put32(\
-	(_hba)->csr_acc_handle, (uint32_t *)(_regp), (uint32_t)(_value))
+	(_hba)->sli.sli3.csr_acc_handle, (uint32_t *)(_regp), \
+	(uint32_t)(_value))
 
 #define	READ_CSR_REG(_hba, _regp) ddi_get32(\
-	(_hba)->csr_acc_handle, (uint32_t *)(_regp))
+	(_hba)->sli.sli3.csr_acc_handle, (uint32_t *)(_regp))
 
 #define	WRITE_SLIM_ADDR(_hba, _regp, _value) ddi_put32(\
-	(_hba)->slim_acc_handle, (uint32_t *)(_regp), (uint32_t)(_value))
+	(_hba)->sli.sli3.slim_acc_handle, (uint32_t *)(_regp), \
+	(uint32_t)(_value))
 
 #define	READ_SLIM_ADDR(_hba, _regp) ddi_get32(\
-	(_hba)->slim_acc_handle, (uint32_t *)(_regp))
+	(_hba)->sli.sli3.slim_acc_handle, (uint32_t *)(_regp))
 
 #define	WRITE_SLIM_COPY(_hba, _bufp, _slimp, _wcnt) ddi_rep_put32(\
-	(_hba)->slim_acc_handle, (uint32_t *)(_bufp), (uint32_t *)(_slimp), \
-	(_wcnt), DDI_DEV_AUTOINCR)
+	(_hba)->sli.sli3.slim_acc_handle, (uint32_t *)(_bufp), \
+	(uint32_t *)(_slimp), (_wcnt), DDI_DEV_AUTOINCR)
 
 #define	READ_SLIM_COPY(_hba, _bufp, _slimp, _wcnt) ddi_rep_get32(\
-	(_hba)->slim_acc_handle, (uint32_t *)(_bufp), (uint32_t *)(_slimp), \
-	(_wcnt), DDI_DEV_AUTOINCR)
-
-#define	WRITE_FLASH_COPY(_hba, _bufp, _flashp, _wcnt) ddi_rep_put32(\
-	(_hba)->fc_flash_handle, (uint32_t *)(_bufp), (uint32_t *)(_flashp), \
-	(_wcnt), DDI_DEV_AUTOINCR)
-
-#define	READ_FLASH_COPY(_hba, _bufp, _flashp, _wcnt) ddi_rep_get32(\
-	(_hba)->fc_flash_handle, (uint32_t *)(_bufp), (uint32_t *)(_flashp), \
-	(_wcnt), DDI_DEV_AUTOINCR)
+	(_hba)->sli.sli3.slim_acc_handle, (uint32_t *)(_bufp), \
+	(uint32_t *)(_slimp), (_wcnt), DDI_DEV_AUTOINCR)
 
 /* Used by SBUS adapter */
 #define	WRITE_SBUS_CSR_REG(_hba, _regp, _value)	ddi_put32(\
-	(_hba)->sbus_csr_handle, (uint32_t *)(_regp), (uint32_t)(_value))
+	(_hba)->sli.sli3.sbus_csr_handle, (uint32_t *)(_regp), \
+	(uint32_t)(_value))
 
 #define	READ_SBUS_CSR_REG(_hba, _regp) ddi_get32(\
-	(_hba)->sbus_csr_handle, (uint32_t *)(_regp))
+	(_hba)->sli.sli3.sbus_csr_handle, (uint32_t *)(_regp))
 
 #define	SBUS_WRITE_FLASH_COPY(_hba, _offset, _value) ddi_put8(\
-	(_hba)->sbus_flash_acc_handle, \
-	(uint8_t *)((volatile uint8_t *)(_hba)->sbus_flash_addr + (_offset)), \
-	(uint8_t)(_value))
+	(_hba)->sli.sli3.sbus_flash_acc_handle, \
+	(uint8_t *)((volatile uint8_t *)(_hba)->sli.sli3.sbus_flash_addr + \
+	(_offset)), (uint8_t)(_value))
 
 #define	SBUS_READ_FLASH_COPY(_hba, _offset) ddi_get8(\
-	(_hba)->sbus_flash_acc_handle, \
-	(uint8_t *)((volatile uint8_t *)(_hba)->sbus_flash_addr + (_offset)))
+	(_hba)->sli.sli3.sbus_flash_acc_handle, \
+	(uint8_t *)((volatile uint8_t *)(_hba)->sli.sli3.sbus_flash_addr + \
+	(_offset)))
 
-#define	emlxs_ffstate_change(_hba, _state)\
+/* SLI4 registers */
+#define	WRITE_BAR1_REG(_hba, _regp, _value) ddi_put32(\
+	(_hba)->sli.sli4.bar1_acc_handle, (uint32_t *)(_regp), \
+	(uint32_t)(_value))
+
+#define	READ_BAR1_REG(_hba, _regp) ddi_get32(\
+	(_hba)->sli.sli4.bar1_acc_handle, (uint32_t *)(_regp))
+
+#define	WRITE_BAR2_REG(_hba, _regp, _value) ddi_put32(\
+	(_hba)->sli.sli4.bar2_acc_handle, (uint32_t *)(_regp), \
+	(uint32_t)(_value))
+
+#define	READ_BAR2_REG(_hba, _regp) ddi_get32(\
+	(_hba)->sli.sli4.bar2_acc_handle, (uint32_t *)(_regp))
+
+
+#define	EMLXS_STATE_CHANGE(_hba, _state)\
 {									\
 	mutex_enter(&EMLXS_PORT_LOCK);					\
-	emlxs_ffstate_change_locked((_hba), (_state));			\
+	EMLXS_STATE_CHANGE_LOCKED((_hba), (_state));			\
 	mutex_exit(&EMLXS_PORT_LOCK);					\
 }
 
 /* Used when EMLXS_PORT_LOCK is already held */
-#define	emlxs_ffstate_change_locked(_hba, _state)			\
+#define	EMLXS_STATE_CHANGE_LOCKED(_hba, _state)			\
 {									\
 	if ((_hba)->state != (_state))					\
 	{								\
@@ -1233,13 +1257,21 @@ typedef struct emlxs_port
 			&emlxs_state_msg, "%s --> %s",			\
 			emlxs_ffstate_xlate((_hba)->state),		\
 			emlxs_ffstate_xlate(_state));			\
-		(_hba)->state = (_state);				\
-		if ((_st) == FC_ERROR)				\
+			(_hba)->state = (_state);			\
+		if ((_st) == FC_ERROR)					\
 		{							\
 			(_hba)->flag |= FC_HARDWARE_ERROR;		\
 		}							\
 	}								\
 }
+
+#ifdef FMA_SUPPORT
+#define	EMLXS_CHK_ACC_HANDLE(_hba, _acc) \
+	if (emlxs_fm_check_acc_handle(_hba, _acc) != DDI_FM_OK) { \
+		EMLXS_MSGF(EMLXS_CONTEXT, \
+		    &emlxs_invalid_access_handle_msg, NULL); \
+	}
+#endif  /* FMA_SUPPORT */
 
 /*
  * This is the HBA control area for the adapter
@@ -1257,6 +1289,9 @@ typedef struct emlxs_modsym
 	int		(*fc_fca_init)(struct dev_ops *);
 
 #ifdef SFCT_SUPPORT
+	uint32_t	fct_modopen;
+	uint32_t	reserved;  /* Padding for alignment */
+
 	ddi_modhandle_t  mod_fct;	/* For Comstar */
 	ddi_modhandle_t  mod_stmf;	/* For Comstar */
 
@@ -1303,13 +1338,362 @@ extern emlxs_modsym_t emlxs_modsym;
 
 
 
+/* defines for resource state */
+#define	RESOURCE_FREE		0
+#define	RESOURCE_ALLOCATED	1
+
+#define	RESOURCE_FCFI_REG	2
+#define	RESOURCE_FCFI_DISC	4
+#define	RESOURCE_FCFI_VLAN_ID	8
+
+#define	RESOURCE_VFI_REG	2
+
+#define	RESOURCE_RPI_PAUSED	2
+
+#define	RESOURCE_XRI_RESERVED		2
+#define	RESOURCE_XRI_PENDING_IO		4
+#define	RESOURCE_XRI_ABORT_INP		8
+
+typedef struct VFIobject
+{
+	uint16_t	index;
+	uint16_t	VFI;
+	uint16_t	state;
+	uint16_t	outstandingVPIs;
+	struct FCFIobject *FCFIp;
+} VFIobj_t;
+
+typedef struct RPIobject
+{
+	uint16_t	index;
+	uint16_t	RPI;
+	uint16_t	state;
+	uint16_t	outstandingXRIs;
+	emlxs_port_t	*VPIp;
+	uint32_t	did;
+	emlxs_node_t	*node;
+} RPIobj_t;
+
+typedef struct XRIobject
+{
+	struct XRIobject *_f;
+	struct XRIobject *_b;
+	uint16_t	XRI;
+	uint16_t	state;
+	uint16_t	sge_count;
+	uint16_t	iotag;
+	MBUF_INFO	SGList;
+	RPIobj_t	*RPIp;
+	emlxs_buf_t	*sbp;
+	uint32_t 	rx_id; /* Used for unsol exchanges */
+} XRIobj_t;
+
+typedef struct FCFIobject
+{
+	uint16_t	index;
+	uint16_t	FCFI;
+	uint16_t	FCF_index;
+	uint16_t	state;
+	uint16_t	outstandingVFIs;
+	uint16_t	vlan_id;
+	uint32_t	EventTag;
+	struct VFIobject *fcf_vfi;
+	emlxs_port_t	*fcf_vpi;
+	struct RPIobject scratch_rpi;
+	SERV_PARM	fcf_sparam;
+	FCF_RECORD_t	fcf_rec;
+} FCFIobj_t;
+
+typedef struct RPIHdrTmplate
+{
+	uint32_t	Word[16];  /* 64 bytes */
+} RPIHdrTmplate_t;
+
+typedef struct EQ_DESC
+{
+	uint16_t	host_index;
+	uint16_t	max_index;
+	uint16_t	qid;
+	uint16_t	msix_vector;
+	kmutex_t	lastwq_lock;
+	uint16_t	lastwq;
+	MBUF_INFO	addr;
+} EQ_DESC_t;
+
+typedef struct CQ_DESC
+{
+	uint16_t	host_index;
+	uint16_t	max_index;
+	uint16_t	qid;
+	uint16_t	eqid;
+	uint16_t	type;
+#define	EMLXS_CQ_TYPE_GROUP1	1  /* associated with a MQ and async events */
+#define	EMLXS_CQ_TYPE_GROUP2	2  /* associated with a WQ and RQ */
+	uint16_t	rsvd;
+
+	MBUF_INFO	addr;
+	CHANNEL		*channelp; /* ptr to CHANNEL associated with CQ */
+
+} CQ_DESC_t;
+
+typedef struct WQ_DESC
+{
+	uint16_t	host_index;
+	uint16_t	max_index;
+	uint16_t	port_index;
+	uint16_t	release_depth;
+#define	WQE_RELEASE_DEPTH	(8 * EMLXS_NUM_WQ_PAGES)
+	uint16_t	qid;
+	uint16_t	cqid;
+	MBUF_INFO	addr;
+} WQ_DESC_t;
+
+typedef struct RQ_DESC
+{
+	uint16_t	host_index;
+	uint16_t	max_index;
+	uint16_t	qid;
+	uint16_t	cqid;
+
+	MBUF_INFO	addr;
+	MEMSEG		rqb_pool;
+	MATCHMAP	*rqb[RQ_DEPTH];
+
+	kmutex_t	lock;
+
+} RQ_DESC_t;
+
+
+typedef struct RXQ_DESC
+{
+	kmutex_t	lock;
+	emlxs_queue_t	active;
+
+} RXQ_DESC_t;
+
+
+typedef struct MQ_DESC
+{
+	uint16_t	host_index;
+	uint16_t	max_index;
+	uint16_t	qid;
+	uint16_t	cqid;
+	MBUF_INFO	addr;
+} MQ_DESC_t;
+
+/* Define the number of queues the driver will be using */
+#define	EMLXS_MAX_EQS	EMLXS_MSI_MAX_INTRS
+#define	EMLXS_MAX_WQS	EMLXS_MSI_MAX_INTRS
+#define	EMLXS_MAX_RQS	2	/* ONLY 1 pair is allowed */
+#define	EMLXS_MAX_MQS	1
+
+/* One CQ for each WQ & (RQ pair) plus one for the MQ */
+#define	EMLXS_MAX_CQS	(EMLXS_MAX_WQS + (EMLXS_MAX_RQS/2) + 1)
+
+/* The First CQ created is ALWAYS for mbox / event handling */
+#define	EMLXS_CQ_MBOX		0
+
+/* The Second CQ created is ALWAYS for unsol rcv handling */
+/* At this time we are allowing ONLY 1 pair of RQs */
+#define	EMLXS_CQ_RCV		1
+
+/* The remaining CQs are for WQ completions */
+#define	EMLXS_CQ_OFFSET_WQ	2
+
+
+/* FCFI RQ Configuration */
+#define	EMLXS_FCFI_RQ0_INDEX	0
+#define	EMLXS_FCFI_RQ0_RMASK	0 /* match all */
+#define	EMLXS_FCFI_RQ0_RCTL	0 /* match all */
+#define	EMLXS_FCFI_RQ0_TMASK	0 /* match all */
+#define	EMLXS_FCFI_RQ0_TYPE	0 /* match all */
+
+/* Define the maximum value for a Queue Id */
+#define	EMLXS_MAX_EQ_IDS	256
+#define	EMLXS_MAX_CQ_IDS	1024
+#define	EMLXS_MAX_WQ_IDS	1024
+#define	EMLXS_MAX_RQ_IDS	4
+
+#define	EMLXS_RXQ_ELS		0
+#define	EMLXS_RXQ_CT		1
+#define	EMLXS_MAX_RXQS		2
+
 #define	PCI_CONFIG_SIZE   0x80
+
+typedef struct emlxs_sli3
+{
+	/* SLIM management */
+	MATCHMAP	slim2;
+
+	/* HBQ management */
+	uint32_t	hbq_count;	/* Total number of HBQs */
+					/* configured */
+	HBQ_INIT_t	hbq_table[EMLXS_NUM_HBQ];
+
+	/* Adapter memory management */
+	caddr_t		csr_addr;
+	caddr_t		slim_addr;
+	ddi_acc_handle_t csr_acc_handle;
+	ddi_acc_handle_t slim_acc_handle;
+
+	/* SBUS adapter management */
+	caddr_t		sbus_flash_addr;	/* Virt addr of R/W */
+						/* Flash */
+	caddr_t		sbus_core_addr;		/* Virt addr of TITAN */
+						/* CORE */
+	caddr_t		sbus_csr_addr;		/* Virt addr of TITAN */
+						/* CSR */
+	ddi_acc_handle_t sbus_flash_acc_handle;
+	ddi_acc_handle_t sbus_core_acc_handle;
+	ddi_acc_handle_t sbus_csr_handle;
+
+	/* SLI 2/3 Adapter register management */
+	uint32_t	*bc_reg_addr;	/* virtual offset for BIU */
+					/* config reg */
+	uint32_t	*ha_reg_addr;	/* virtual offset for host */
+					/* attn reg */
+	uint32_t	*hc_reg_addr;	/* virtual offset for host */
+					/* ctl reg */
+	uint32_t	*ca_reg_addr;	/* virtual offset for FF */
+					/* attn reg */
+	uint32_t	*hs_reg_addr;	/* virtual offset for */
+					/* status reg */
+	uint32_t	*shc_reg_addr;	/* virtual offset for SBUS */
+					/* Ctrl reg */
+	uint32_t	*shs_reg_addr;	/* virtual offset for SBUS */
+					/* Status reg */
+	uint32_t	*shu_reg_addr;	/* virtual offset for SBUS */
+					/* Update reg */
+	uint16_t	hgp_ring_offset;
+	uint16_t	hgp_hbq_offset;
+	uint16_t	iocb_cmd_size;
+	uint16_t	iocb_rsp_size;
+	uint32_t	hc_copy;	/* local copy of HC register */
+
+	/* Ring management */
+	uint32_t	ring_count;
+	emlxs_ring_t	ring[MAX_RINGS];
+	kmutex_t	ring_cmd_lock[MAX_RINGS];
+	uint8_t		ring_masks[4];	/* number of masks/rings used */
+	uint8_t		ring_rval[6];
+	uint8_t		ring_rmask[6];
+	uint8_t		ring_tval[6];
+	uint8_t		ring_tmask[6];
+
+	/* Protected by EMLXS_FCTAB_LOCK */
+#ifdef EMLXS_SPARC
+	MEMSEG		fcp_bpl_seg;
+	MATCHMAP	**fcp_bpl_table; /* iotag table for */
+					/* bpl buffers */
+#endif	/* EMLXS_SPARC */
+	uint32_t	mem_bpl_size;
+} emlxs_sli3_t;
+
+typedef struct emlxs_sli4
+{
+	MATCHMAP	bootstrapmb;
+	caddr_t		bar1_addr;
+	caddr_t		bar2_addr;
+	ddi_acc_handle_t bar1_acc_handle;
+	ddi_acc_handle_t bar2_acc_handle;
+
+	/* SLI4 Adapter register management */
+	uint32_t	*MPUEPSemaphore_reg_addr;
+	uint32_t	*MBDB_reg_addr;
+
+	uint32_t	*CQDB_reg_addr;
+	uint32_t	*MQDB_reg_addr;
+	uint32_t	*WQDB_reg_addr;
+	uint32_t	*RQDB_reg_addr;
+
+	uint32_t	flag;
+#define	EMLXS_SLI4_INTR_ENABLED		0x1
+
+	uint16_t	XRICount;
+	uint16_t	XRIBase;
+	uint16_t	RPICount;
+	uint16_t	RPIBase;
+	uint16_t	VPICount;
+	uint16_t	VPIBase;
+	uint16_t	VFICount;
+	uint16_t	VFIBase;
+	uint16_t	FCFICount;
+
+	kmutex_t	id_lock; /* for FCFI, VFI, VPI, RPI, XRI mgmt */
+	FCFIobj_t	*FCFIp;
+	VFIobj_t	*VFIp;
+
+	/* Save Config Region 23 info */
+	tlv_fcoe_t	cfgFCOE;
+	tlv_fcfconnectlist_t	cfgFCF;
+
+	MBUF_INFO	dump_region;
+#define	EMLXS_DUMP_REGION_SIZE	1024
+
+	RPIobj_t	*RPIp;
+	MBUF_INFO	HeaderTmplate;
+	XRIobj_t	*XRIp;
+	/* Single linked list for available XRIs */
+	XRIobj_t	*XRIfree_list;
+	XRIobj_t	*XRIfree_tail;
+	uint32_t	xrif_count;
+	uint32_t	mem_sgl_size;
+
+	/* Double linked list for XRIs in use */
+	XRIobj_t	*XRIinuse_f;
+	XRIobj_t	*XRIinuse_b;
+	uint32_t	xria_count;
+
+	EQ_DESC_t	eq[EMLXS_MAX_EQS];
+	CQ_DESC_t	cq[EMLXS_MAX_CQS];
+	WQ_DESC_t	wq[EMLXS_MAX_WQS];
+	RQ_DESC_t	rq[EMLXS_MAX_RQS];
+	MQ_DESC_t	mq;
+
+	/* Used to map a queue ID to a queue DESC_t */
+	uint16_t	eq_map[EMLXS_MAX_EQ_IDS];
+	uint16_t	cq_map[EMLXS_MAX_CQ_IDS];
+	uint16_t	wq_map[EMLXS_MAX_WQ_IDS];
+	uint16_t	rq_map[EMLXS_MAX_RQ_IDS];
+
+	RXQ_DESC_t	rxq[EMLXS_MAX_RXQS];
+
+} emlxs_sli4_t;
+
+
+typedef struct emlxs_sli_api
+{
+	int		(*sli_map_hdw)();
+	void		(*sli_unmap_hdw)();
+	int32_t		(*sli_online)();
+	void		(*sli_offline)();
+	uint32_t	(*sli_hba_reset)();
+	void		(*sli_hba_kill)();
+	void		(*sli_issue_iocb_cmd)();
+	uint32_t	(*sli_issue_mbox_cmd)();
+	uint32_t	(*sli_prep_fct_iocb)();
+	uint32_t	(*sli_prep_fcp_iocb)();
+	uint32_t	(*sli_prep_ip_iocb)();
+	uint32_t	(*sli_prep_els_iocb)();
+	uint32_t	(*sli_prep_ct_iocb)();
+	void		(*sli_poll_intr)();
+	int32_t		(*sli_intx_intr)();
+	uint32_t	(*sli_msi_intr)();
+	void		(*sli_disable_intr)();
+	void		(*sli_timer)();
+	void		(*sli_poll_erratt)();
+
+} emlxs_sli_api_t;
+
 
 typedef struct emlxs_hba
 {
 	dev_info_t	*dip;
 	int32_t		emlxinst;
 	int32_t		ddiinst;
+	uint8_t		pci_function_number;
+	uint8_t		pci_device_number;
+	uint8_t		pci_bus_number;
 #ifdef FMA_SUPPORT
 	int32_t		fm_caps;	/* FMA capabilities */
 #endif	/* FMA_SUPPORT */
@@ -1340,7 +1724,6 @@ typedef struct emlxs_hba
 	kmutex_t	linkup_lock;
 
 	/* Memory Pool management */
-	uint32_t	mem_bpl_size;
 	emlxs_memseg_t	memseg[FC_MAX_SEG];	/* memory for buffer */
 							/* structures */
 	kmutex_t	memget_lock;	/* locks all memory pools get */
@@ -1356,22 +1739,6 @@ typedef struct emlxs_hba
 	uint32_t	fc_crtov;	/* C_R_TOV timer value */
 	uint32_t	fc_citov;	/* C_I_TOV timer value */
 
-	uint32_t	sli_mode;
-#define	EMLXS_HBA_SLI1_MODE	1
-#define	EMLXS_HBA_SLI2_MODE	2
-#define	EMLXS_HBA_SLI3_MODE	3
-#define	EMLXS_HBA_SLI4_MODE	4
-
-	/* SLIM management */
-	MATCHMAP	slim2;
-#ifdef SLI3_SUPPORT
-	/* HBQ management */
-	uint32_t	hbq_count;	/* Total number of HBQs */
-					/* configured */
-	HBQ_INIT_t	hbq_table[EMLXS_NUM_HBQ];
-#endif	/* SLI3_SUPPORT	 */
-
-
 	/* Adapter State management */
 	int32_t		state;
 #define	FC_ERROR		0x01	/* Adapter shutdown */
@@ -1384,6 +1751,7 @@ typedef struct emlxs_hba
 #define	FC_INIT_CFGRING		0x14
 #define	FC_INIT_INITLINK	0x15
 #define	FC_LINK_DOWN		0x20
+#define	FC_LINK_DOWN_PERSIST	0x21
 #define	FC_LINK_UP		0x30
 #define	FC_CLEAR_LA		0x31
 #define	FC_READY		0x40
@@ -1401,6 +1769,9 @@ typedef struct emlxs_hba
 						/* and link is ready */
 #define	FC_NPIV_DELAY_REQUIRED	0x00000200	/* Delay issuing FLOGI/FDISC */
 						/* and NameServer cmds */
+
+#define	FC_BOOTSTRAPMB_INIT	0x00000400
+#define	FC_FIP_SUPPORTED	0x00000800	/* FIP supported */
 
 #define	FC_FABRIC_ATTACHED	0x00001000
 #define	FC_PT_TO_PT		0x00002000
@@ -1427,56 +1798,36 @@ typedef struct emlxs_hba
 						/* mailbox timeout event */
 #define	FC_HARDWARE_ERROR	0x80000000	/* FC_ERROR state triggered */
 
-#define	FC_RESET_MASK		0x0003001F	/* Bits to protect during */
+#define	FC_RESET_MASK		0x00030C1F	/* Bits to protect during */
 						/* a hard reset */
-#define	FC_LINKDOWN_MASK	0xFFF3001F	/* Bits to protect during */
+#define	FC_LINKDOWN_MASK	0xFFF30C1F	/* Bits to protect during */
 						/* a linkdown */
 
-
-	/* Adapter memory management */
-	caddr_t		csr_addr;
-	caddr_t		slim_addr;
-	caddr_t		pci_addr;
-	ddi_acc_handle_t csr_acc_handle;
-	ddi_acc_handle_t slim_acc_handle;
-	ddi_acc_handle_t pci_acc_handle;
+	uint32_t temperature;			/* Last reported temperature */
 
 	/* SBUS adapter management */
-	caddr_t		sbus_flash_addr;	/* Virt addr of R/W */
-						/* Flash */
-	caddr_t		sbus_core_addr;		/* Virt addr of TITAN */
-						/* CORE */
 	caddr_t		sbus_pci_addr;		/* Virt addr of TITAN */
 						/* pci config */
-	caddr_t		sbus_csr_addr;		/* Virt addr of TITAN */
-						/* CSR */
-	ddi_acc_handle_t sbus_flash_acc_handle;
-	ddi_acc_handle_t sbus_core_acc_handle;
 	ddi_acc_handle_t sbus_pci_handle;
-	ddi_acc_handle_t sbus_csr_handle;
 
-	/* Adapter register management */
-	uint32_t	bc_reg_addr;	/* virtual offset for BIU */
-					/* config reg */
-	uint32_t	ha_reg_addr;	/* virtual offset for host */
-					/* attn reg */
-	uint32_t	hc_reg_addr;	/* virtual offset for host */
-					/* ctl reg */
-	uint32_t	ca_reg_addr;	/* virtual offset for FF */
-					/* attn reg */
-	uint32_t	hs_reg_addr;	/* virtual offset for */
-					/* status reg */
-	uint32_t	shc_reg_addr;	/* virtual offset for SBUS */
-					/* Ctrl reg */
-	uint32_t	shs_reg_addr;	/* virtual offset for SBUS */
-					/* Status reg */
-	uint32_t	shu_reg_addr;	/* virtual offset for SBUS */
-					/* Update reg */
-	uint16_t	hgp_ring_offset;
-	uint16_t	hgp_hbq_offset;
-	uint16_t	iocb_cmd_size;
-	uint16_t	iocb_rsp_size;
-	uint32_t	hc_copy;	/* local copy of HC register */
+	/* PCI BUS adapter management */
+	caddr_t		pci_addr;
+	ddi_acc_handle_t pci_acc_handle;
+
+	uint32_t	sli_mode;
+#define	EMLXS_HBA_SLI1_MODE	1
+#define	EMLXS_HBA_SLI2_MODE	2
+#define	EMLXS_HBA_SLI3_MODE	3
+#define	EMLXS_HBA_SLI4_MODE	4
+
+	/* SLI private data */
+	union {
+		emlxs_sli3_t sli3;
+		emlxs_sli4_t sli4;
+	} sli;
+
+	/* SLI API entry point routines */
+	emlxs_sli_api_t sli_api;
 
 	uint32_t	io_poll_count;	/* Number of poll commands */
 					/* in progress */
@@ -1492,52 +1843,37 @@ typedef struct emlxs_hba
 	kmutex_t	spawn_lock;
 	uint32_t	spawn_open;
 
-	/* Ring management */
-	int32_t		ring_count;
-	emlxs_ring_t	ring[MAX_RINGS];
-	kmutex_t	ring_cmd_lock[MAX_RINGS];
-	uint8_t		ring_masks[4];	/* number of masks/rings used */
-	uint8_t		ring_rval[6];
-	uint8_t		ring_rmask[6];
-	uint8_t		ring_tval[6];
-	uint8_t		ring_tmask[6];
+	/* IO Channel management */
+	int32_t		chan_count;
+	emlxs_channel_t	chan[MAX_CHANNEL];
+	kmutex_t	channel_tx_lock;
+	uint8_t		channel_fcp;	/* Default channel to use for FCP IO */
+#define	CHANNEL_FCT channel_fcp
+	uint8_t		channel_ip;	/* Default channel to use for IP IO */
+	uint8_t		channel_els;	/* Default channel to use for ELS IO */
+	uint8_t		channel_ct;	/* Default channel to use for CT IO */
 
-	kmutex_t	ring_tx_lock;
-	uint32_t	ring_tx_count[MAX_RINGS];	/* No of IO */
-							/* on tx Q */
+	/* IOTag management */
+	emlxs_buf_t	**fc_table;	/* sc_buf pointers indexed by */
+					/* iotag */
+	uint16_t	fc_iotag;	/* used to identify I/Os */
+	uint16_t	fc_oor_iotag;	/* OutOfRange (fc_table) iotags */
+					/* typically used for Abort/close */
+#define	EMLXS_MAX_ABORT_TAG	0x7fff
+	uint16_t	max_iotag;	/* ALL IOCBs except aborts */
+	kmutex_t	iotag_lock;
+	uint32_t	io_count;		/* No of IO holding */
+						/* regular iotag */
+	uint32_t	channel_tx_count;	/* No of IO on tx Q */
 
 	/* Mailbox Management */
 	uint32_t	mbox_queue_flag;
 	emlxs_queue_t	mbox_queue;
-	uint8_t		*mbox_bp;	/* buffer ptr for MBX cmd */
-	uint8_t		*mbox_sbp;	/* emlxs_buf_t ptr for MBX */
-					/* cmd used by reg_login only */
-	uint8_t		*mbox_ubp;	/* fc_unsol_buf_t ptr for MBX */
-					/* cmd used by reg_login only */
-	uint8_t		*mbox_iocbq;	/* IOCBQ ptr for MBX cmd */
-					/* used by reg_login only */
-	uint8_t		*mbox_mbq;	/* MBX_SLEEP context */
-	uint32_t	mbox_mbqflag;
+	uint32_t	*mbox_mqe;	/* active mbox mqe */
+	uint8_t		*mbox_mbq;	/* active MAILBOXQ */
 	kcondvar_t	mbox_lock_cv;	/* MBX_SLEEP */
 	kmutex_t	mbox_lock;	/* MBX_SLEEP */
 	uint32_t	mbox_timer;
-
-#ifdef MBOX_EXT_SUPPORT
-	uint8_t		*mbox_ext;	/* ptr to MBX ext buffer */
-	uint32_t	mbox_ext_size;	/* size of MBX ext buffer */
-#endif /* MBOX_EXT_SUPPORT */
-
-	/* IOtag management */
-	emlxs_buf_t	**iotag_table;
-	kmutex_t	iotag_lock[MAX_RINGS];
-	uint32_t	io_count[MAX_RINGS];	/* No of IO holding */
-						/* regular iotag */
-	/* Protected by EMLXS_FCTAB_LOCK */
-#ifdef EMLXS_SPARC
-	MATCHMAP	fcp_bpl_mp;
-	MATCHMAP	*fcp_bpl_table;	/* iotag table for */
-					/* bpl buffers */
-#endif	/* EMLXS_SPARC */
 
 	/* Interrupt management */
 	void		*intr_arg;
@@ -1620,15 +1956,14 @@ typedef struct emlxs_hba
 	uint32_t	pm_active;	/* Only used by timer */
 #endif	/* IDLE_TIMER */
 
-
-#ifdef DFC_SUPPORT
 	/* Loopback management */
 	uint32_t	loopback_tics;
 	void		*loopback_pkt;
-#endif	/* DFC_SUPPORT */
 
 	/* Event management */
-	uint32_t	log_events;
+	emlxs_event_queue_t event_queue;
+	uint32_t	event_mask;
+	uint32_t	event_timer;
 	emlxs_dfc_event_t dfc_event[MAX_DFC_EVENTS];
 	emlxs_hba_event_t hba_event;
 
@@ -1643,6 +1978,7 @@ typedef struct emlxs_hba
 	emlxs_msg_log_t	log;
 
 	/* Port managment */
+	uint32_t	vpi_base;
 	uint32_t	vpi_max;
 	uint32_t	vpi_high;
 	uint32_t	num_of_ports;
@@ -1693,42 +2029,29 @@ typedef struct emlxs_hba
 
 #endif /* DUMP_SUPPORT */
 
-/* Entry points for SLI API routines */
-	int		(*emlxs_sli_api_map_hdw)();
-	void		(*emlxs_sli_api_unmap_hdw)();
-	int32_t		(*emlxs_sli_api_online)();
-	void		(*emlxs_sli_api_offline)();
-	uint32_t	(*emlxs_sli_api_hba_reset)();
-	void		(*emlxs_sli_api_issue_iocb_cmd)();
-	uint32_t	(*emlxs_sli_api_issue_mbox_cmd)();
-	uint32_t	(*emlxs_sli_api_prep_fct_iocb)();
-	uint32_t	(*emlxs_sli_api_prep_fcp_iocb)();
-	uint32_t	(*emlxs_sli_api_prep_ip_iocb)();
-	uint32_t	(*emlxs_sli_api_prep_els_iocb)();
-	uint32_t	(*emlxs_sli_api_prep_ct_iocb)();
-	void		(*emlxs_sli_api_poll_intr)();
-	int32_t		(*emlxs_sli_api_intx_intr)();
-	uint32_t	(*emlxs_sli_api_msi_intr)();
 } emlxs_hba_t;
 
-#define	emlxs_sli_map_hdw		(hba->emlxs_sli_api_map_hdw)
-#define	emlxs_sli_unmap_hdw		(hba->emlxs_sli_api_unmap_hdw)
-#define	emlxs_sli_online		(hba->emlxs_sli_api_online)
-#define	emlxs_sli_offline		(hba->emlxs_sli_api_offline)
-#define	emlxs_sli_hba_reset		(hba->emlxs_sli_api_hba_reset)
-#define	emlxs_sli_issue_iocb_cmd	(hba->emlxs_sli_api_issue_iocb_cmd)
-#define	emlxs_sli_issue_mbox_cmd	(hba->emlxs_sli_api_issue_mbox_cmd)
-#define	emlxs_sli_prep_fct_iocb		(hba->emlxs_sli_api_prep_fct_iocb)
-#define	emlxs_sli_prep_fcp_iocb		(hba->emlxs_sli_api_prep_fcp_iocb)
-#define	emlxs_sli_prep_ip_iocb		(hba->emlxs_sli_api_prep_ip_iocb)
-#define	emlxs_sli_prep_els_iocb		(hba->emlxs_sli_api_prep_els_iocb)
-#define	emlxs_sli_prep_ct_iocb		(hba->emlxs_sli_api_prep_ct_iocb)
-#define	emlxs_sli_poll_intr		(hba->emlxs_sli_api_poll_intr)
-#define	emlxs_sli_intx_intr		(hba->emlxs_sli_api_intx_intr)
-#define	emlxs_sli_msi_intr		(hba->emlxs_sli_api_msi_intr)
+#define	EMLXS_SLI_MAP_HDW 		(hba->sli_api.sli_map_hdw)
+#define	EMLXS_SLI_UNMAP_HDW		(hba->sli_api.sli_unmap_hdw)
+#define	EMLXS_SLI_ONLINE		(hba->sli_api.sli_online)
+#define	EMLXS_SLI_OFFLINE		(hba->sli_api.sli_offline)
+#define	EMLXS_SLI_HBA_RESET		(hba->sli_api.sli_hba_reset)
+#define	EMLXS_SLI_HBA_KILL		(hba->sli_api.sli_hba_kill)
+#define	EMLXS_SLI_ISSUE_IOCB_CMD	(hba->sli_api.sli_issue_iocb_cmd)
+#define	EMLXS_SLI_ISSUE_MBOX_CMD	(hba->sli_api.sli_issue_mbox_cmd)
+#define	EMLXS_SLI_PREP_FCT_IOCB		(hba->sli_api.sli_prep_fct_iocb)
+#define	EMLXS_SLI_PREP_FCP_IOCB		(hba->sli_api.sli_prep_fcp_iocb)
+#define	EMLXS_SLI_PREP_IP_IOCB		(hba->sli_api.sli_prep_ip_iocb)
+#define	EMLXS_SLI_PREP_ELS_IOCB		(hba->sli_api.sli_prep_els_iocb)
+#define	EMLXS_SLI_PREP_CT_IOCB		(hba->sli_api.sli_prep_ct_iocb)
+#define	EMLXS_SLI_POLL_INTR		(hba->sli_api.sli_poll_intr)
+#define	EMLXS_SLI_INTX_INTR		(hba->sli_api.sli_intx_intr)
+#define	EMLXS_SLI_MSI_INTR		(hba->sli_api.sli_msi_intr)
+#define	EMLXS_SLI_DISABLE_INTR		(hba->sli_api.sli_disable_intr)
+#define	EMLXS_SLI_TIMER			(hba->sli_api.sli_timer)
+#define	EMLXS_SLI_POLL_ERRATT		(hba->sli_api.sli_poll_erratt)
 
 #define	EMLXS_HBA_T  1  /* flag emlxs_hba_t is already typedefed */
-
 
 #ifdef MSI_SUPPORT
 #define	EMLXS_INTR_INIT(_hba, _m)		emlxs_msi_init(_hba, _m)
@@ -1756,17 +2079,18 @@ typedef struct emlxs_hba
 #define	VPD			hba->vpd
 #define	CFG			hba->config[0]
 #define	LOG			hba->log
+#define	EVENTQ			hba->event_queue
 #define	EMLXS_MBOX_LOCK		hba->mbox_lock
 #define	EMLXS_MBOX_CV		hba->mbox_lock_cv
 #define	EMLXS_LINKUP_LOCK	hba->linkup_lock
 #define	EMLXS_LINKUP_CV		hba->linkup_lock_cv
-#define	EMLXS_RINGTX_LOCK	hba->ring_tx_lock	/* ring txq lock */
+#define	EMLXS_TX_CHANNEL_LOCK	hba->channel_tx_lock	/* ring txq lock */
 #define	EMLXS_MEMGET_LOCK	hba->memget_lock	/* mempool get lock */
 #define	EMLXS_MEMPUT_LOCK	hba->memput_lock	/* mempool put lock */
 #define	EMLXS_IOCTL_LOCK	hba->ioctl_lock		/* ioctl lock */
 #define	HBASTATS		hba->stats
-#define	EMLXS_CMD_RING_LOCK(n)	hba->ring_cmd_lock[n]
-#define	EMLXS_FCTAB_LOCK(n)	hba->iotag_lock[n]
+#define	EMLXS_CMD_RING_LOCK(n)	hba->sli.sli3.ring_cmd_lock[n]
+#define	EMLXS_FCTAB_LOCK	hba->iotag_lock
 #define	EMLXS_PORT_LOCK		hba->port_lock		/* locks ports, */
 							/* nodes, rings */
 #define	EMLXS_INTR_LOCK(_id)	hba->intr_lock[_id]	/* locks intr threads */
@@ -1778,66 +2102,76 @@ typedef struct emlxs_hba
 #define	EMLXS_UB_LOCK		port->ub_lock		/* locks unsolicited */
 							/* buffer pool */
 
-#ifdef EMLXS_LITTLE_ENDIAN
-#define	SWAP_SHORT(x)	(x)
-#define	SWAP_LONG(x)	(x)
-#define	SWAP_DATA64(x)	((((x) & 0xFF)<<56) | (((x) & 0xFF00)<< 40) | \
-	(((x) & 0xFF0000)<<24) | (((x) & 0xFF000000)<<8) | \
-	(((x) & 0xFF00000000)>>8) | (((x) & 0xFF0000000000)>>24) | \
-	(((x) & 0xFF000000000000)>>40) | (((x) & 0xFF00000000000000)>>56))
-#define	SWAP_DATA32(x)	((((x) & 0xFF)<<24) | (((x) & 0xFF00)<<8) | \
-	(((x) & 0xFF0000)>>8) | (((x) & 0xFF000000)>>24))
-#define	SWAP_DATA16(x)	((((x) & 0xFF) << 8) | ((x) >> 8))
-#define	PCIMEM_SHORT(x)	SWAP_SHORT(x)
-#define	PCIMEM_LONG(x)	SWAP_LONG(x)
-#define	PCIMEM_DATA(x)	SWAP_DATA32(x)
+/* These SWAPs will swap on any platform */
+#define	SWAP32_BUFFER(_b, _c)		emlxs_swap32_buffer(_b, _c)
+#define	SWAP32_BCOPY(_s, _d, _c)	emlxs_swap32_bcopy(_s, _d, _c)
 
+#define	SWAP64(_x)	((((uint64_t)(_x) & 0xFF)<<56) | \
+			    (((uint64_t)(_x) & 0xFF00)<<40) | \
+			    (((uint64_t)(_x) & 0xFF0000)<<24) | \
+			    (((uint64_t)(_x) & 0xFF000000)<<8) | \
+			    (((uint64_t)(_x) & 0xFF00000000)>>8) | \
+			    (((uint64_t)(_x) & 0xFF0000000000)>>24) | \
+			    (((uint64_t)(_x) & 0xFF000000000000)>>40) | \
+			    (((uint64_t)(_x) & 0xFF00000000000000)>>56))
+
+#define	SWAP32(_x)	((((uint32_t)(_x) & 0xFF)<<24) | \
+			    (((uint32_t)(_x) & 0xFF00)<<8) | \
+			    (((uint32_t)(_x) & 0xFF0000)>>8) | \
+			    (((uint32_t)(_x) & 0xFF000000)>>24))
+
+#define	SWAP16(_x)	((((uint16_t)(_x) & 0xFF)<<8) | \
+			    (((uint16_t)(_x) & 0xFF00)>>8))
+
+#define	SWAP24_LO(_x)	((((uint32_t)(_x) & 0xFF)<<16) | \
+			    ((uint32_t)(_x) & 0xFF00FF00) | \
+			    (((uint32_t)(_x) & 0x00FF0000)>>16))
+
+#define	SWAP24_HI(_x)	(((uint32_t)(_x) & 0x00FF00FF) | \
+			    (((uint32_t)(_x) & 0x0000FF00)<<16) | \
+			    (((uint32_t)(_x) & 0xFF000000)>>16))
+
+/* These LE_SWAPs will only swap on a LE platform */
+#ifdef EMLXS_LITTLE_ENDIAN
+#define	LE_SWAP32_BUFFER(_b, _c)	SWAP32_BUFFER(_b, _c)
+#define	LE_SWAP32_BCOPY(_s, _d, _c)	SWAP32_BCOPY(_s, _d, _c)
+#define	LE_SWAP64(_x)			SWAP64(_x)
+#define	LE_SWAP32(_x)			SWAP32(_x)
+#define	LE_SWAP16(_x)			SWAP16(_x)
+#define	LE_SWAP24_LO(_x)		SWAP24_LO(X)
+#define	LE_SWAP24_HI(_x)		SWAP24_HI(X)
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
-#define	SWAP_DATA24_LO(x)	(x)
-#define	SWAP_DATA24_HI(x)	(x)
+#undef	LE_SWAP24_LO
+#define	LE_SWAP24_LO(_x)		(_x)
+#undef	LE_SWAP24_HI
+#define	LE_SWAP24_HI(_x)		(_x)
 #endif	/* EMLXS_MODREV2X */
 
-#if (EMLXS_MODREVX == EMLXS_MODREV3X)
-#define	SWAP_DATA24_LO(x)	((((x) & 0xFF)<<16) | \
-	((x) & 0xFF00FF00) | (((x) & 0x00FF0000)>>16))
-#define	SWAP_DATA24_HI(x)	(((x) & 0x00FF00FF) | \
-	(((x) & 0x0000FF00)<<16) | (((x) & 0xFF000000)>>16))
-#endif	/* EMLXS_MODREV3X */
+#else /* BIG ENDIAN */
+#define	LE_SWAP32_BUFFER(_b, _c)
+#define	LE_SWAP32_BCOPY(_s, _d, _c)	bcopy(_s, _d, _c)
+#define	LE_SWAP64(_x)			(_x)
+#define	LE_SWAP32(_x)			(_x)
+#define	LE_SWAP16(_x)			(_x)
+#define	LE_SWAP24_LO(_x)		(_x)
+#define	LE_SWAP24_HI(_x)		(_x)
+#endif /* EMLXS_LITTLE_ENDIAN */
 
-#endif	/* EMLXS_LITTLE_ENDIAN */
-
-
-
+/* These BE_SWAPs will only swap on a BE platform */
 #ifdef EMLXS_BIG_ENDIAN
-
-#define	SWAP_SHORT(x)	((((x) & 0xFF) << 8) | ((x) >> 8))
-#define	SWAP_LONG(x)	((((x) & 0xFF)<<24) | (((x) & 0xFF00)<<8) | \
-	(((x) & 0xFF0000)>>8) | (((x) & 0xFF000000)>>24))
-
-#define	SWAP_DATA64(x)	(x)
-#define	SWAP_DATA32(x)	(x)
-#define	SWAP_DATA16(x)	(x)
-
-#define	PCIMEM_SHORT(x)	SWAP_SHORT(x)
-#define	PCIMEM_LONG(x)	SWAP_LONG(x)
-#define	PCIMEM_DATA(x)	SWAP_DATA32(x)
-
-#define	SWAP_DATA24_LO(x)	(x)
-#define	SWAP_DATA24_HI(x)	(x)
-
-#endif	/* EMLXS_BIG_ENDIAN */
-
-#define	SWAP_ALWAYS(x)	((((x) & 0xFF)<<24) | (((x) & 0xFF00)<<8) | \
-	(((x) & 0xFF0000)>>8) | (((x) & 0xFF000000)>>24))
-#define	SWAP_ALWAYS16(x)	((((x) & 0xFF) << 8) | ((x) >> 8))
-
-/*
- * For PCI configuration
- */
-#define	ADDR_LO(addr)	((int)(addr) & 0xffff)	/* low 16 bits */
-#define	ADDR_HI(addr)	(((int)(addr) >> 16) & 0xffff)	/* high 16 bits */
-
+#define	BE_SWAP32_BUFFER(_b, _c)	SWAP32_BUFFER(_b, _c)
+#define	BE_SWAP32_BCOPY(_s, _d, _c)	SWAP32_BCOPY(_s, _d, _c)
+#define	BE_SWAP64(_x)			SWAP64(_x)
+#define	BE_SWAP32(_x)			SWAP32(_x)
+#define	BE_SWAP16(_x)			SWAP16(_x)
+#else /* LITTLE ENDIAN */
+#define	BE_SWAP32_BUFFER(_b, _c)
+#define	BE_SWAP32_BCOPY(_s, _d, _c)	bcopy(_s, _d, _c)
+#define	BE_SWAP64(_x)			(_x)
+#define	BE_SWAP32(_x)			(_x)
+#define	BE_SWAP16(_x)			(_x)
+#endif /* EMLXS_BIG_ENDIAN */
 
 #ifdef	__cplusplus
 }

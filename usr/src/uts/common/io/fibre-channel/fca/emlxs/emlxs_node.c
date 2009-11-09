@@ -21,8 +21,9 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #include <emlxs.h>
 
@@ -31,22 +32,24 @@
 EMLXS_MSG_DEF(EMLXS_NODE_C);
 
 /* Timeout == -1 will enable the offline timer */
+/* Timeout not -1 will apply the timeout */
 extern void
-emlxs_node_close(emlxs_port_t *port, NODELIST *ndlp, uint32_t ringno,
+emlxs_node_close(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno,
     int32_t timeout)
 {
 	emlxs_hba_t *hba = HBA;
 	emlxs_config_t *cfg = &CFG;
-	RING *rp;
+	CHANNEL *cp;
 	NODELIST *prev;
 	uint32_t offline = 0;
 
-	/* If node is on a ring service queue, then remove it */
-	mutex_enter(&EMLXS_RINGTX_LOCK);
+
+	/* If node is on a channel service queue, then remove it */
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
 	/* Return if node destroyed */
 	if (!ndlp || !ndlp->nlp_active) {
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 		return;
 	}
@@ -61,219 +64,231 @@ emlxs_node_close(emlxs_port_t *port, NODELIST *ndlp, uint32_t ringno,
 		}
 	}
 
-	if (ringno == FC_IP_RING) {
+	if (channelno == hba->channel_ip) {
 		/* Clear IP XRI */
 		ndlp->nlp_Xri = 0;
 	}
 
 	/* Check if node is already closed */
-	if (ndlp->nlp_flag[ringno] & NLP_CLOSED) {
-		if (ndlp->nlp_flag[ringno] & NLP_OFFLINE) {
-			mutex_exit(&EMLXS_RINGTX_LOCK);
+	if (ndlp->nlp_flag[channelno] & NLP_CLOSED) {
+		if (ndlp->nlp_flag[channelno] & NLP_OFFLINE) {
+			mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 			return;
 		}
 
 		if (offline) {
-			ndlp->nlp_tics[ringno] = hba->timer_tics + timeout;
-			ndlp->nlp_flag[ringno] |= NLP_OFFLINE;
-			mutex_exit(&EMLXS_RINGTX_LOCK);
+			ndlp->nlp_tics[channelno] = hba->timer_tics + timeout;
+			ndlp->nlp_flag[channelno] |= NLP_OFFLINE;
+			mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
-			    "node=%p did=%06x %s. offline=%d set.", ndlp,
-			    ndlp->nlp_DID, emlxs_ring_xlate(ringno), timeout);
+			    "node=%p did=%06x channel=%d. offline=%d set.",
+			    ndlp, ndlp->nlp_DID, channelno, timeout);
 
 		} else if (timeout) {
-			ndlp->nlp_tics[ringno] = hba->timer_tics + timeout;
-			mutex_exit(&EMLXS_RINGTX_LOCK);
+			ndlp->nlp_tics[channelno] = hba->timer_tics + timeout;
+			mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_closed_msg,
-			    "node=%p did=%06x %s. timeout=%d set.", ndlp,
-			    ndlp->nlp_DID, emlxs_ring_xlate(ringno), timeout);
+			    "node=%p did=%06x channel=%d. timeout=%d set.",
+			    ndlp, ndlp->nlp_DID, channelno, timeout);
 		} else {
-			mutex_exit(&EMLXS_RINGTX_LOCK);
+			mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 		}
 
 		return;
 	}
 
 	/* Set the node closed */
-	ndlp->nlp_flag[ringno] |= NLP_CLOSED;
+	ndlp->nlp_flag[channelno] |= NLP_CLOSED;
 
 	if (offline) {
-		ndlp->nlp_tics[ringno] = hba->timer_tics + timeout;
-		ndlp->nlp_flag[ringno] |= NLP_OFFLINE;
+		ndlp->nlp_tics[channelno] = hba->timer_tics + timeout;
+		ndlp->nlp_flag[channelno] |= NLP_OFFLINE;
 
 	} else if (timeout) {
-		ndlp->nlp_tics[ringno] = hba->timer_tics + timeout;
-
+		ndlp->nlp_tics[channelno] = hba->timer_tics + timeout;
 	}
 
-	if (ndlp->nlp_next[ringno]) {
-		/* Remove node from ring queue */
-		rp = &hba->ring[ringno];
+
+	/*
+	 * ndlp->nlp_next[] and cp->nodeq list have to be updated
+	 * simulaneously
+	 */
+	if (ndlp->nlp_next[channelno]) {
+		/* Remove node from channel queue */
+		cp = &hba->chan[channelno];
 
 		/* If this is the only node on list */
-		if (rp->nodeq.q_first == (void *)ndlp &&
-		    rp->nodeq.q_last == (void *)ndlp) {
-			rp->nodeq.q_last = NULL;
-			rp->nodeq.q_first = NULL;
-			rp->nodeq.q_cnt = 0;
-		} else if (rp->nodeq.q_first == (void *)ndlp) {
-			rp->nodeq.q_first = ndlp->nlp_next[ringno];
-			((NODELIST *)rp->nodeq.q_last)->nlp_next[ringno] =
-			    rp->nodeq.q_first;
-			rp->nodeq.q_cnt--;
+		if (cp->nodeq.q_first == (void *)ndlp &&
+		    cp->nodeq.q_last == (void *)ndlp) {
+			cp->nodeq.q_last = NULL;
+			cp->nodeq.q_first = NULL;
+			cp->nodeq.q_cnt = 0;
+		} else if (cp->nodeq.q_first == (void *)ndlp) {
+			cp->nodeq.q_first = ndlp->nlp_next[channelno];
+			((NODELIST *)cp->nodeq.q_last)->nlp_next[channelno] =
+			    cp->nodeq.q_first;
+			cp->nodeq.q_cnt--;
 		} else {	/* This is a little more difficult */
 
-			/* Find the previous node in the circular ring queue */
+			/* Find the previous node in circular channel queue */
 			prev = ndlp;
-			while (prev->nlp_next[ringno] != ndlp) {
-				prev = prev->nlp_next[ringno];
+			while (prev->nlp_next[channelno] != ndlp) {
+				prev = prev->nlp_next[channelno];
 			}
 
-			prev->nlp_next[ringno] = ndlp->nlp_next[ringno];
+			prev->nlp_next[channelno] = ndlp->nlp_next[channelno];
 
-			if (rp->nodeq.q_last == (void *)ndlp) {
-				rp->nodeq.q_last = (void *)prev;
+			if (cp->nodeq.q_last == (void *)ndlp) {
+				cp->nodeq.q_last = (void *)prev;
 			}
-			rp->nodeq.q_cnt--;
+			cp->nodeq.q_cnt--;
 
 		}
 
 		/* Clear node */
-		ndlp->nlp_next[ringno] = NULL;
+		ndlp->nlp_next[channelno] = NULL;
 	}
 
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	return;
 
-}  /* emlxs_node_close() */
+} /* emlxs_node_close() */
 
 
 /* Called by emlxs_timer_check_nodes() */
 extern void
-emlxs_node_timeout(emlxs_port_t *port, NODELIST *ndlp, uint32_t ringno)
+emlxs_node_timeout(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno)
 {
 	emlxs_hba_t *hba = HBA;
 
-	/* If node needs servicing, then add it to the ring queues */
-	mutex_enter(&EMLXS_RINGTX_LOCK);
+	/* If node needs servicing, then add it to the channel queues */
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
 	/* Return if node destroyed */
 	if (!ndlp || !ndlp->nlp_active) {
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 		return;
 	}
 
 	/* Open the node if not offline */
-	if (!(ndlp->nlp_flag[ringno] & NLP_OFFLINE)) {
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+	if (!(ndlp->nlp_flag[channelno] & NLP_OFFLINE)) {
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_timeout_msg,
-		    "node=%p did=%06x %s. Opening.", ndlp, ndlp->nlp_DID,
-		    emlxs_ring_xlate(ringno));
+		    "node=%p did=%06x channel=%d Opening.", ndlp, ndlp->nlp_DID,
+		    channelno);
 
-		emlxs_node_open(port, ndlp, ringno);
+		emlxs_node_open(port, ndlp, channelno);
 		return;
 	}
 
 	/* OFFLINE TIMEOUT OCCURRED! */
 
 	/* Clear the timer */
-	ndlp->nlp_tics[ringno] = 0;
+	ndlp->nlp_tics[channelno] = 0;
 
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_timeout_msg,
 	    "node=%p did=%06x %s. Flushing.", ndlp, ndlp->nlp_DID,
-	    emlxs_ring_xlate(ringno));
+	    channelno);
 
-	/* Flush tx queue for this ring */
-	(void) emlxs_tx_node_flush(port, ndlp, &hba->ring[ringno], 0, 0);
+	/* Flush tx queue for this channel */
+	(void) emlxs_tx_node_flush(port, ndlp, &hba->chan[channelno], 0, 0);
 
-	/* Flush chip queue for this ring */
-	(void) emlxs_chipq_node_flush(port, &hba->ring[ringno], ndlp, 0);
+	/* Flush chip queue for this channel */
+	(void) emlxs_chipq_node_flush(port, &hba->chan[channelno], ndlp, 0);
 
 	return;
 
-}  /* emlxs_node_timeout() */
+} /* emlxs_node_timeout() */
 
 
 extern void
-emlxs_node_open(emlxs_port_t *port, NODELIST *ndlp, uint32_t ringno)
+emlxs_node_open(emlxs_port_t *port, NODELIST *ndlp, uint32_t channelno)
 {
 	emlxs_hba_t *hba = HBA;
-	RING *rp;
+	CHANNEL *cp;
 	uint32_t found;
 	NODELIST *nlp;
 	MAILBOXQ *mbox;
 	uint32_t i;
+	int rc;
 
-	/* If node needs servicing, then add it to the ring queues */
-	mutex_enter(&EMLXS_RINGTX_LOCK);
+	/* If node needs servicing, then add it to the channel queues */
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
 	/* Return if node destroyed */
 	if (!ndlp || !ndlp->nlp_active) {
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 		return;
 	}
 
 	/* Return if node already open */
-	if (!(ndlp->nlp_flag[ringno] & NLP_CLOSED)) {
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+	if (!(ndlp->nlp_flag[channelno] & NLP_CLOSED)) {
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 		return;
 	}
 
 	/* Set the node open (not closed) */
-	ndlp->nlp_flag[ringno] &= ~(NLP_CLOSED|NLP_OFFLINE);
+	ndlp->nlp_flag[channelno] &= ~(NLP_CLOSED|NLP_OFFLINE);
 
 	/* Clear the timer */
-	ndlp->nlp_tics[ringno] = 0;
+	ndlp->nlp_tics[channelno] = 0;
 
 	/*
 	 * If the ptx or the tx queue needs servicing and
-	 * the node is not already on the ring queue
+	 * the node is not already on the channel queue
 	 */
-	if ((ndlp->nlp_ptx[ringno].q_first || ndlp->nlp_tx[ringno].q_first) &&
-	    !ndlp->nlp_next[ringno]) {
-		rp = &hba->ring[ringno];
+	if ((ndlp->nlp_ptx[channelno].q_first ||
+	    ndlp->nlp_tx[channelno].q_first) && !ndlp->nlp_next[channelno]) {
+		cp = &hba->chan[channelno];
 
-		/* If so, then add it to the ring queue */
-		if (rp->nodeq.q_first) {
-			((NODELIST *)rp->nodeq.q_last)->nlp_next[ringno] =
+		/* If so, then add it to the channel queue */
+		if (cp->nodeq.q_first) {
+			((NODELIST *)cp->nodeq.q_last)->nlp_next[channelno] =
 			    (uint8_t *)ndlp;
-			ndlp->nlp_next[ringno] = rp->nodeq.q_first;
+			ndlp->nlp_next[channelno] = cp->nodeq.q_first;
 
 			/* If this is not the base node then */
 			/* add it to the tail */
 			if (!ndlp->nlp_base) {
-				rp->nodeq.q_last = (uint8_t *)ndlp;
+				cp->nodeq.q_last = (uint8_t *)ndlp;
 			} else {	/* Otherwise, add it to the head */
 
 				/* The command node always gets priority */
-				rp->nodeq.q_first = (uint8_t *)ndlp;
+				cp->nodeq.q_first = (uint8_t *)ndlp;
 			}
 
-			rp->nodeq.q_cnt++;
+			cp->nodeq.q_cnt++;
 		} else {
-			rp->nodeq.q_first = (uint8_t *)ndlp;
-			rp->nodeq.q_last = (uint8_t *)ndlp;
-			ndlp->nlp_next[ringno] = ndlp;
-			rp->nodeq.q_cnt = 1;
+			cp->nodeq.q_first = (uint8_t *)ndlp;
+			cp->nodeq.q_last = (uint8_t *)ndlp;
+			ndlp->nlp_next[channelno] = ndlp;
+			cp->nodeq.q_cnt = 1;
 		}
 	}
 
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_opened_msg,
-	    "node=%p did=%06x %s.", ndlp, ndlp->nlp_DID,
-	    emlxs_ring_xlate(ringno));
+	    "node=%p did=%06x channel=%d", ndlp, ndlp->nlp_DID, channelno);
 
 	/* If link attention needs to be cleared */
-	if ((hba->state == FC_LINK_UP) && (ringno == FC_FCP_RING)) {
+	if ((hba->state == FC_LINK_UP) && (channelno == hba->channel_fcp)) {
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		/* re Think this code path. For SLI4 channel fcp == els */
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+			    "ADD CODE to RESUME RPIs node=%p did=%06x chan=%d",
+			    ndlp, ndlp->nlp_DID, channelno);
+
+			goto done;
+		}
 
 		/* Scan to see if any FCP2 devices are still closed */
 		found = 0;
@@ -282,7 +297,8 @@ emlxs_node_open(emlxs_port_t *port, NODELIST *ndlp, uint32_t ringno)
 			nlp = port->node_table[i];
 			while (nlp != NULL) {
 				if ((nlp->nlp_fcp_info & NLP_FCP_2_DEVICE) &&
-				    (nlp->nlp_flag[FC_FCP_RING] & NLP_CLOSED)) {
+				    (nlp->nlp_flag[hba->channel_fcp] &
+				    NLP_CLOSED)) {
 					found = 1;
 					break;
 
@@ -300,7 +316,7 @@ emlxs_node_open(emlxs_port_t *port, NODELIST *ndlp, uint32_t ringno)
 		if (!found) {
 			/* Clear link attention */
 			if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
-			    MEM_MBOX | MEM_PRI))) {
+			    MEM_MBOX, 1))) {
 				mutex_enter(&EMLXS_PORT_LOCK);
 
 				/*
@@ -315,22 +331,22 @@ emlxs_node_open(emlxs_port_t *port, NODELIST *ndlp, uint32_t ringno)
 					goto done;
 				}
 
-				emlxs_ffstate_change_locked(hba, FC_CLEAR_LA);
+				EMLXS_STATE_CHANGE_LOCKED(hba, FC_CLEAR_LA);
 				hba->discovery_timer = 0;
 				mutex_exit(&EMLXS_PORT_LOCK);
 
-				emlxs_mb_clear_la(hba, (MAILBOX *)mbox);
+				emlxs_mb_clear_la(hba, mbox);
 
-				if (emlxs_sli_issue_mbox_cmd(hba,
-				    (MAILBOX *)mbox, MBX_NOWAIT, 0) !=
-				    MBX_BUSY) {
+				rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba,
+				    mbox, MBX_NOWAIT, 0);
+				if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
 					(void) emlxs_mem_put(hba, MEM_MBOX,
 					    (uint8_t *)mbox);
 				}
 			} else {
 				/* Close the node and try again */
 				/* in a few seconds */
-				emlxs_node_close(port, ndlp, ringno, 5);
+				emlxs_node_close(port, ndlp, channelno, 5);
 				return;
 			}
 		}
@@ -345,7 +361,7 @@ done:
 
 	return;
 
-}  /* emlxs_node_open() */
+} /* emlxs_node_open() */
 
 
 static int
@@ -394,7 +410,7 @@ out:
 
 	return (0);
 
-}  /* End emlxs_node_match_did */
+} /* End emlxs_node_match_did */
 
 
 
@@ -413,9 +429,9 @@ emlxs_node_find_mac(emlxs_port_t *port, uint8_t *mac)
 			 * return NODELIST entry
 			 */
 			if ((nlp->nlp_portname.IEEE[0] == mac[0])) {
-				if ((nlp->nlp_DID != Bcast_DID) &&
-				    ((nlp->nlp_DID & Fabric_DID_MASK) ==
-				    Fabric_DID_MASK)) {
+				if ((nlp->nlp_DID != BCAST_DID) &&
+				    ((nlp->nlp_DID & FABRIC_DID_MASK) ==
+				    FABRIC_DID_MASK)) {
 					nlp = (NODELIST *)nlp->nlp_list_next;
 					continue;
 				}
@@ -442,7 +458,7 @@ emlxs_node_find_mac(emlxs_port_t *port, uint8_t *mac)
 
 	return (NULL);
 
-}  /* emlxs_node_find_mac() */
+} /* emlxs_node_find_mac() */
 
 
 extern NODELIST *
@@ -462,7 +478,7 @@ emlxs_node_find_did(emlxs_port_t *port, uint32_t did)
 	}
 
 	/* Check for bcast node */
-	if (did == Bcast_DID) {
+	if (did == BCAST_DID) {
 		/* Use the base node here */
 		return (&port->node_base);
 	}
@@ -481,11 +497,11 @@ emlxs_node_find_did(emlxs_port_t *port, uint32_t did)
 	}
 
 	/*
-	 * Convert well known fabric addresses to the Fabric_DID,
+	 * Convert well known fabric addresses to the FABRIC_DID,
 	 * since we don't login to some of them
 	 */
 	if ((did == SCR_DID)) {
-		did = Fabric_DID;
+		did = FABRIC_DID;
 	}
 
 	rw_enter(&port->node_rwlock, RW_READER);
@@ -514,7 +530,7 @@ emlxs_node_find_did(emlxs_port_t *port, uint32_t did)
 	/* no match found */
 	return ((NODELIST *)0);
 
-}  /* emlxs_node_find_did() */
+} /* emlxs_node_find_did() */
 
 
 extern NODELIST *
@@ -543,7 +559,7 @@ emlxs_node_find_rpi(emlxs_port_t *port, uint32_t rpi)
 	/* no match found */
 	return ((NODELIST *)0);
 
-}  /* emlxs_node_find_rpi() */
+} /* emlxs_node_find_rpi() */
 
 
 extern NODELIST *
@@ -587,7 +603,7 @@ emlxs_node_find_wwpn(emlxs_port_t *port, uint8_t *wwpn)
 	/* no match found */
 	return ((NODELIST *)0);
 
-}  /* emlxs_node_find_wwpn() */
+} /* emlxs_node_find_wwpn() */
 
 
 extern NODELIST *
@@ -633,7 +649,7 @@ emlxs_node_find_index(emlxs_port_t *port, uint32_t index,
 	/* no match found */
 	return ((NODELIST *)0);
 
-}  /* emlxs_node_find_wwpn() */
+} /* emlxs_node_find_wwpn() */
 
 
 extern uint32_t
@@ -658,7 +674,7 @@ emlxs_nport_count(emlxs_port_t *port)
 
 	return (nport_count);
 
-}  /* emlxs_nport_count() */
+} /* emlxs_nport_count() */
 
 
 
@@ -668,6 +684,7 @@ emlxs_node_destroy_all(emlxs_port_t *port)
 	emlxs_hba_t *hba = HBA;
 	NODELIST *next;
 	NODELIST *ndlp;
+	RPIobj_t *rp;
 	uint8_t *wwn;
 	uint32_t i;
 
@@ -696,6 +713,17 @@ emlxs_node_destroy_all(emlxs_port_t *port)
 
 			(void) emlxs_tx_node_flush(port, ndlp, 0, 0, 0);
 
+			/* Break Node/RPI binding */
+			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+				rp = EMLXS_NODE_TO_RPI(hba, ndlp);
+				ndlp->RPIp = NULL;
+
+				if (rp) {
+					rp->node = NULL;
+					(void) emlxs_sli4_free_rpi(hba, rp);
+				}
+			}
+
 			(void) emlxs_mem_put(hba, MEM_NLP, (uint8_t *)ndlp);
 
 			ndlp = next;
@@ -717,15 +745,17 @@ emlxs_node_destroy_all(emlxs_port_t *port)
 
 	return;
 
-}  /* emlxs_node_destroy_all() */
+} /* emlxs_node_destroy_all() */
 
 
 extern void
 emlxs_node_add(emlxs_port_t *port, NODELIST *ndlp)
 {
+	emlxs_hba_t *hba = HBA;
 	NODELIST *np;
 	uint8_t *wwn;
 	uint32_t hash;
+	RPIobj_t *rp;
 
 	rw_enter(&port->node_rwlock, RW_WRITER);
 	hash = EMLXS_DID_HASH(ndlp->nlp_DID);
@@ -748,11 +778,25 @@ emlxs_node_add(emlxs_port_t *port, NODELIST *ndlp)
 	    "count=%d", ndlp, ndlp->nlp_DID, ndlp->nlp_Rpi, wwn[0], wwn[1],
 	    wwn[2], wwn[3], wwn[4], wwn[5], wwn[6], wwn[7], port->node_count);
 
+	/* Add Node/RPI binding */
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		rp = emlxs_sli4_find_rpi(hba, ndlp->nlp_Rpi);
+
+		if (rp) {
+			rp->node = ndlp;
+			ndlp->RPIp = rp;
+		} else {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_node_create_msg,
+			    "Unable to find RPI! did=%x rpi=%x",
+			    ndlp->nlp_DID, ndlp->nlp_Rpi);
+		}
+	}
+
 	rw_exit(&port->node_rwlock);
 
 	return;
 
-}  /* emlxs_node_add() */
+} /* emlxs_node_add() */
 
 
 extern void
@@ -761,6 +805,7 @@ emlxs_node_rm(emlxs_port_t *port, NODELIST *ndlp)
 	emlxs_hba_t *hba = HBA;
 	NODELIST *np;
 	NODELIST *prevp;
+	RPIobj_t *rp;
 	uint8_t *wwn;
 	uint32_t hash;
 
@@ -791,6 +836,18 @@ emlxs_node_rm(emlxs_port_t *port, NODELIST *ndlp)
 			(void) emlxs_tx_node_flush(port, ndlp, 0, 1, 0);
 
 			ndlp->nlp_active = 0;
+
+			/* Break Node/RPI binding */
+			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+				rp = EMLXS_NODE_TO_RPI(hba, ndlp);
+				ndlp->RPIp = NULL;
+
+				if (rp) {
+					rp->node = NULL;
+					(void) emlxs_sli4_free_rpi(hba, rp);
+				}
+			}
+
 			(void) emlxs_mem_put(hba, MEM_NLP, (uint8_t *)ndlp);
 
 			break;
@@ -802,4 +859,4 @@ emlxs_node_rm(emlxs_port_t *port, NODELIST *ndlp)
 
 	return;
 
-}  /* emlxs_node_rm() */
+} /* emlxs_node_rm() */

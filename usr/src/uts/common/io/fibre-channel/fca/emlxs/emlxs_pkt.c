@@ -21,8 +21,9 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #include <emlxs.h>
 
@@ -63,6 +64,7 @@ emlxs_pkt_thread(emlxs_hba_t *hba, void *arg1, void *arg2)
 		if (pkt->pkt_comp) {
 			emlxs_set_pkt_state(sbp, IOSTAT_LOCAL_REJECT, 0, 1);
 
+			((CHANNEL *)sbp->channel)->ulpCmplCmd++;
 			(*pkt->pkt_comp) (pkt);
 		} else {
 			emlxs_pkt_free(pkt);
@@ -71,7 +73,7 @@ emlxs_pkt_thread(emlxs_hba_t *hba, void *arg1, void *arg2)
 
 	return;
 
-}  /* emlxs_pkt_thread() */
+} /* emlxs_pkt_thread() */
 
 
 extern int32_t
@@ -92,7 +94,7 @@ emlxs_pkt_send(fc_packet_t *pkt, uint32_t now)
 
 	return (rval);
 
-}  /* emlxs_pkt_send() */
+} /* emlxs_pkt_send() */
 
 
 extern void
@@ -128,7 +130,7 @@ emlxs_pkt_free(fc_packet_t *pkt)
 
 	return;
 
-}  /* emlxs_pkt_free() */
+} /* emlxs_pkt_free() */
 
 
 /* Default pkt callback routine */
@@ -139,7 +141,7 @@ emlxs_pkt_callback(fc_packet_t *pkt)
 
 	return;
 
-}  /* emlxs_pkt_callback() */
+} /* emlxs_pkt_callback() */
 
 
 
@@ -386,7 +388,7 @@ emlxs_pkt_alloc(emlxs_port_t *port, uint32_t cmdlen, uint32_t rsplen,
 	bzero((void *)sbp, sizeof (emlxs_buf_t));
 
 	mutex_init(&sbp->mtx, NULL, MUTEX_DRIVER, (void *)hba->intr_arg);
-	sbp->pkt_flags = PACKET_VALID | PACKET_RETURNED | PACKET_ALLOCATED;
+	sbp->pkt_flags = PACKET_VALID | PACKET_ULP_OWNED | PACKET_ALLOCATED;
 	sbp->port = port;
 	sbp->pkt = pkt;
 	sbp->iocbq.sbp = sbp;
@@ -419,4 +421,4 @@ failed:
 
 	return (NULL);
 
-}  /* emlxs_pkt_alloc() */
+} /* emlxs_pkt_alloc() */

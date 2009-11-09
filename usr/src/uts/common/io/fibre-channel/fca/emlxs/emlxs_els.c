@@ -21,8 +21,9 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #include <emlxs.h>
 
@@ -36,23 +37,23 @@ static void	emlxs_handle_sol_adisc(emlxs_port_t *port, emlxs_buf_t *sbp);
 static void	emlxs_handle_sol_logo(emlxs_port_t *port, emlxs_buf_t *sbp);
 static void	emlxs_handle_sol_prli(emlxs_port_t *port, emlxs_buf_t *sbp);
 
-static void	emlxs_handle_unsol_rscn(emlxs_port_t *port, RING *rp,
+static void	emlxs_handle_unsol_rscn(emlxs_port_t *port, CHANNEL *cp,
 			IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
-static void	emlxs_handle_unsol_flogi(emlxs_port_t *port, RING *rp,
+static void	emlxs_handle_unsol_flogi(emlxs_port_t *port, CHANNEL *cp,
 			IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
-static void	emlxs_handle_unsol_plogi(emlxs_port_t *port, RING *rp,
+static void	emlxs_handle_unsol_plogi(emlxs_port_t *port, CHANNEL *cp,
 			IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
-static void	emlxs_handle_unsol_logo(emlxs_port_t *port, RING *rp,
+static void	emlxs_handle_unsol_logo(emlxs_port_t *port, CHANNEL *cp,
 			IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
-static void	emlxs_handle_unsol_adisc(emlxs_port_t *port, RING *rp,
+static void	emlxs_handle_unsol_adisc(emlxs_port_t *port, CHANNEL *cp,
 			IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
-static void	emlxs_handle_unsol_prli(emlxs_port_t *port, RING *rp,
+static void	emlxs_handle_unsol_prli(emlxs_port_t *port, CHANNEL *cp,
 			IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
-static void	emlxs_handle_unsol_prlo(emlxs_port_t *port, RING *rp,
+static void	emlxs_handle_unsol_prlo(emlxs_port_t *port, CHANNEL *cp,
 			IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
-static void	emlxs_handle_unsol_auth(emlxs_port_t *port, RING *rp,
+static void	emlxs_handle_unsol_auth(emlxs_port_t *port, CHANNEL *cp,
 			IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
-static void	emlxs_handle_unsol_gen_cmd(emlxs_port_t *port, RING *rp,
+static void	emlxs_handle_unsol_gen_cmd(emlxs_port_t *port, CHANNEL *cp,
 			IOCBQ *iocbq, MATCHMAP *mp, uint32_t size);
 static void	emlxs_handle_acc(emlxs_port_t *port, emlxs_buf_t *sbp,
 			IOCBQ *iocbq, uint32_t flag);
@@ -73,7 +74,7 @@ static void	emlxs_send_rsnn(emlxs_port_t *port);
  *
  */
 extern int
-emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
+emlxs_els_handle_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 {
 	emlxs_port_t *port = &PPORT;
 	IOCB *iocb;
@@ -99,21 +100,21 @@ emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_els_completion_msg,
 		    "iocbq=%p cmd=0x%x iotag=0x%x status=0x%x perr=0x%x",
-		    iocbq, (uint32_t)iocb->ulpCommand,
-		    (uint32_t)iocb->ulpIoTag, iocb->ulpStatus,
+		    iocbq, (uint32_t)iocb->ULPCOMMAND,
+		    (uint32_t)iocb->ULPIOTAG, iocb->ULPSTATUS,
 		    iocb->un.ulpWord[4]);
 
 		return (1);
 	}
 
-	if (rp->ringno != FC_ELS_RING) {
+	if (cp->channelno != hba->channel_els) {
 		HBASTATS.ElsStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_els_completion_msg,
-		    "Not ELS ring: ring=%d iocbq=%p cmd=0x%x iotag=0x%x "
-		    "status=0x%x perr=0x%x", rp->ringno, iocbq,
-		    (uint32_t)iocb->ulpCommand, (uint32_t)iocb->ulpIoTag,
-		    iocb->ulpStatus, iocb->un.ulpWord[4]);
+		    "Not ELS channel: channel=%d iocbq=%p cmd=0x%x iotag=0x%x "
+		    "status=0x%x perr=0x%x", cp->channelno, iocbq,
+		    (uint32_t)iocb->ULPCOMMAND, (uint32_t)iocb->ULPIOTAG,
+		    iocb->ULPSTATUS, iocb->un.ulpWord[4]);
 
 		return (1);
 	}
@@ -122,15 +123,15 @@ emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 	pkt = PRIV2PKT(sbp);
 	lp0 = (uint32_t *)pkt->pkt_cmd;
 	command = *lp0 & ELS_CMD_MASK;
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	/* Check if a response buffer was provided */
 	if (pkt->pkt_rsplen) {
-		emlxs_mpdata_sync(pkt->pkt_resp_dma, 0, pkt->pkt_rsplen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_resp_dma, 0, pkt->pkt_rsplen,
 		    DDI_DMA_SYNC_FORKERNEL);
 	}
 
-	switch (iocb->ulpCommand) {
+	switch (iocb->ULPCOMMAND) {
 		/*
 		 * ELS Reply completion
 		 */
@@ -168,7 +169,7 @@ emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		pkt->pkt_resp_fhdr.d_id = pkt->pkt_cmd_fhdr.s_id;
 		pkt->pkt_resp_fhdr.s_id = pkt->pkt_cmd_fhdr.d_id;
 
-		if ((iocb->ulpStatus == 0) && (els->elsCode == 0x02)) {
+		if ((iocb->ULPSTATUS == 0) && (els->elsCode == 0x02)) {
 			HBASTATS.ElsCmdGood++;
 
 			if (!(sbp->pkt_flags & PACKET_ALLOCATED)) {
@@ -224,7 +225,7 @@ emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 			HBASTATS.ElsCmdError++;
 
 			/* Look for LS_REJECT */
-			if (iocb->ulpStatus == IOSTAT_LS_RJT) {
+			if (iocb->ULPSTATUS == IOSTAT_LS_RJT) {
 				pkt->pkt_state = FC_PKT_LS_RJT;
 				pkt->pkt_action = FC_ACTION_RETRYABLE;
 				pkt->pkt_reason = iocb->un.grsp.perr.statRsn;
@@ -246,7 +247,7 @@ emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				    "%s Rejected: did=%x rsn=%x exp=%x",
 				    emlxs_elscmd_xlate(command), did,
 				    pkt->pkt_reason, pkt->pkt_expln);
-			} else if (iocb->ulpStatus == IOSTAT_LOCAL_REJECT) {
+			} else if (iocb->ULPSTATUS == IOSTAT_LOCAL_REJECT) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_bad_els_completion_msg,
 				    "%s: did=%x Local Reject. %s",
@@ -258,7 +259,7 @@ emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				    &emlxs_bad_els_completion_msg,
 				    "%s: did=%x %s (%02x%02x%02x%02x)",
 				    emlxs_elscmd_xlate(command), did,
-				    emlxs_state_xlate(iocb->ulpStatus),
+				    emlxs_state_xlate(iocb->ULPSTATUS),
 				    iocb->un.grsp.perr.statAction,
 				    iocb->un.grsp.perr.statRsn,
 				    iocb->un.grsp.perr.statBaExp,
@@ -272,9 +273,9 @@ emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				if (ndlp && ndlp->nlp_active) {
 					/* Open the node again */
 					emlxs_node_open(port, ndlp,
-					    FC_FCP_RING);
+					    hba->channel_fcp);
 					emlxs_node_open(port, ndlp,
-					    FC_IP_RING);
+					    hba->channel_ip);
 #ifdef DHCHAP_SUPPORT
 					if (pkt->pkt_state == FC_PKT_LS_RJT) {
 						emlxs_dhc_state(port, ndlp,
@@ -294,7 +295,7 @@ emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				if (ndlp && ndlp->nlp_active) {
 					/* Open the node again */
 					emlxs_node_open(port, ndlp,
-					    FC_FCP_RING);
+					    hba->channel_fcp);
 				}
 
 				break;
@@ -324,7 +325,7 @@ emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				break;
 			}
 
-			emlxs_pkt_complete(sbp, iocb->ulpStatus,
+			emlxs_pkt_complete(sbp, iocb->ULPSTATUS,
 			    iocb->un.grsp.perr.statLocalError, 1);
 
 		}
@@ -337,21 +338,21 @@ emlxs_els_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		HBASTATS.ElsStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_invalid_els_msg,
-		    "Invalid iocb: cmd=0x%x", iocb->ulpCommand);
+		    "Invalid iocb: cmd=0x%x", iocb->ULPCOMMAND);
 
-		emlxs_pkt_complete(sbp, iocb->ulpStatus,
+		emlxs_pkt_complete(sbp, iocb->ULPSTATUS,
 		    iocb->un.grsp.perr.statLocalError, 1);
 
 		break;
-	}	/* switch(iocb->ulpCommand) */
+	}	/* switch(iocb->ULPCOMMAND) */
 
 	return (0);
 
-}  /* emlxs_els_handle_event() */
+} /* emlxs_els_handle_event() */
 
 
 extern int
-emlxs_els_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_els_handle_unsol_req(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
 	emlxs_hba_t *hba = HBA;
@@ -361,56 +362,67 @@ emlxs_els_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 
 	cmd_code = *((uint32_t *)mp->virt) & ELS_CMD_MASK;
 
+	if (!(port->flag & EMLXS_PORT_BOUND)) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_invalid_els_msg,
+		    "ELS rcvd (0x%x): sid=%x Port not bound: Rejecting.",
+		    cmd_code, iocbq->iocb.un.elsreq.remoteID);
+
+		(void) emlxs_els_reply(port, iocbq, ELS_CMD_LS_RJT,
+		    ELS_CMD_RSCN, LSRJT_LOGICAL_BSY, LSEXP_OUT_OF_RESOURCE);
+
+		return (0);
+	}
+
 	switch (cmd_code) {
 	case ELS_CMD_RSCN:
 		HBASTATS.ElsRscnReceived++;
-		emlxs_handle_unsol_rscn(port, rp, iocbq, mp, size);
+		emlxs_handle_unsol_rscn(port, cp, iocbq, mp, size);
 		break;
 
 	case ELS_CMD_FLOGI:
 		HBASTATS.ElsFlogiReceived++;
-		emlxs_handle_unsol_flogi(port, rp, iocbq, mp, size);
+		emlxs_handle_unsol_flogi(port, cp, iocbq, mp, size);
 		break;
 
 	case ELS_CMD_PLOGI:
 		HBASTATS.ElsPlogiReceived++;
-		emlxs_handle_unsol_plogi(port, rp, iocbq, mp, size);
+		emlxs_handle_unsol_plogi(port, cp, iocbq, mp, size);
 		break;
 
 	case ELS_CMD_PRLI:
 		HBASTATS.ElsPrliReceived++;
-		emlxs_handle_unsol_prli(port, rp, iocbq, mp, size);
+		emlxs_handle_unsol_prli(port, cp, iocbq, mp, size);
 		break;
 
 	case ELS_CMD_PRLO:
 		HBASTATS.ElsPrloReceived++;
-		emlxs_handle_unsol_prlo(port, rp, iocbq, mp, size);
+		emlxs_handle_unsol_prlo(port, cp, iocbq, mp, size);
 		break;
 
 	case ELS_CMD_LOGO:
 		HBASTATS.ElsLogoReceived++;
-		emlxs_handle_unsol_logo(port, rp, iocbq, mp, size);
+		emlxs_handle_unsol_logo(port, cp, iocbq, mp, size);
 		break;
 
 	case ELS_CMD_ADISC:
 		HBASTATS.ElsAdiscReceived++;
-		emlxs_handle_unsol_adisc(port, rp, iocbq, mp, size);
+		emlxs_handle_unsol_adisc(port, cp, iocbq, mp, size);
 		break;
 
 	case ELS_CMD_AUTH:
 		HBASTATS.ElsAuthReceived++;
-		emlxs_handle_unsol_auth(port, rp, iocbq, mp, size);
+		emlxs_handle_unsol_auth(port, cp, iocbq, mp, size);
 		break;
 
 	default:
 		HBASTATS.ElsGenReceived++;
-		emlxs_handle_unsol_gen_cmd(port, rp, iocbq, mp, size);
+		emlxs_handle_unsol_gen_cmd(port, cp, iocbq, mp, size);
 		break;
 	}
 
 	return (0);
 
-}  /* emlxs_els_handle_unsol_req() */
+} /* emlxs_els_handle_unsol_req() */
 
 
 static void
@@ -427,10 +439,11 @@ emlxs_handle_sol_flogi(emlxs_port_t *port, emlxs_buf_t *sbp)
 	IOCB *iocb;
 	char buffer[64];
 	uint32_t i;
+	int rc;
 
 	pkt = PRIV2PKT(sbp);
 	sp = (SERV_PARM *)((caddr_t)pkt->pkt_resp + sizeof (uint32_t));
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 	iocbq = &sbp->iocbq;
 	iocb = &iocbq->iocb;
 
@@ -442,20 +455,20 @@ emlxs_handle_sol_flogi(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		/* Save our new port ID */
 		port->did = iocb->un.elsreq.myID;
-		pkt->pkt_resp_fhdr.s_id = SWAP_DATA24_LO(Fabric_DID);
-		pkt->pkt_resp_fhdr.d_id = SWAP_DATA24_LO(port->did);
+		pkt->pkt_resp_fhdr.s_id = LE_SWAP24_LO(FABRIC_DID);
+		pkt->pkt_resp_fhdr.d_id = LE_SWAP24_LO(port->did);
 
 		/* Save E_D_TOV ticks in nanoseconds */
 		if (sp->cmn.edtovResolution) {
 			hba->fc_edtov =
-			    (SWAP_DATA32(sp->cmn.e_d_tov) + 999999) / 1000000;
+			    (LE_SWAP32(sp->cmn.e_d_tov) + 999999) / 1000000;
 		} else {
-			hba->fc_edtov = SWAP_DATA32(sp->cmn.e_d_tov);
+			hba->fc_edtov = LE_SWAP32(sp->cmn.e_d_tov);
 		}
 
 		/* Save R_A_TOV ticks */
 		hba->fc_ratov =
-		    (SWAP_DATA32(sp->cmn.w2.r_a_tov) + 999) / 1000;
+		    (LE_SWAP32(sp->cmn.w2.r_a_tov) + 999) / 1000;
 
 		if (hba->topology != TOPOLOGY_LOOP) {
 			/*
@@ -476,7 +489,7 @@ emlxs_handle_sol_flogi(emlxs_port_t *port, emlxs_buf_t *sbp)
 				vport->sparam.cmn.altBbCredit = 1;
 			}
 		}
-#ifdef NPIV_SUPPORT
+
 		if (sp->cmn.rspMultipleNPort) {
 			hba->flag |= FC_NPIV_SUPPORTED;
 
@@ -503,13 +516,6 @@ emlxs_handle_sol_flogi(emlxs_port_t *port, emlxs_buf_t *sbp)
 		} else {
 			(void) strcpy(buffer, "npiv:Unsupported ");
 		}
-#else
-		buffer[0] = 0;
-#endif /* NPIV_SUPPORT */
-
-		/* Save the fabric service parameters */
-		bcopy((void *)sp, (void *)&port->fabric_sparam,
-		    sizeof (SERV_PARM));
 
 #ifdef DHCHAP_SUPPORT
 		if (!sp->cmn.fcsp_support) {
@@ -528,22 +534,128 @@ emlxs_handle_sol_flogi(emlxs_port_t *port, emlxs_buf_t *sbp)
 		    "FLOGI: did=%x sid=%x %s", did, port->did, buffer);
 
 		/* Update our service parms */
-		if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
-		    MEM_MBOX | MEM_PRI))) {
-			emlxs_mb_config_link(hba, (MAILBOX *)mbox);
+		if (!(mbox = (MAILBOXQ *)emlxs_mem_get(hba,
+		    MEM_MBOX, 1))) {
+			emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
+			    IOERR_NO_RESOURCES, 1);
+			return;
 
-			if (emlxs_sli_issue_mbox_cmd(hba, (MAILBOX *)mbox,
-			    MBX_NOWAIT, 0) != MBX_BUSY) {
+		}
+
+		/* For SLI4 we replace CONFIG_LINK and REG_LOGIN of */
+		/* Fabric with a REG_VFI mailbox command. */
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			emlxs_port_t *vpip = sbp->port;
+			VFIobj_t *vfip;
+			FCFIobj_t *fcfp;
+			uint32_t regvfi;
+
+			vfip = vpip->VFIp;
+			fcfp = vfip->FCFIp;
+			regvfi = vfip->state & RESOURCE_VFI_REG;
+
+			/* Save the FCF service parameters */
+			bcopy((void *)sp, (void *)&fcfp->fcf_sparam,
+			    sizeof (SERV_PARM));
+
+			if (emlxs_mb_check_sparm(hba, sp)) {
+				EMLXS_MSGF(EMLXS_CONTEXT,
+				    &emlxs_node_create_failed_msg,
+				    "Invalid Fabric parameters. did=%06x",
+				    port->did);
 				(void) emlxs_mem_put(hba, MEM_MBOX,
 				    (uint8_t *)mbox);
+				emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
+				    IOERR_NO_RESOURCES, 1);
+				return;
 			}
 
+			if (!regvfi) {
+				if (emlxs_mb_reg_vfi(hba, mbox, vfip, vpip) ==
+				    0) {
+					EMLXS_MSGF(EMLXS_CONTEXT,
+					    &emlxs_sli_detail_msg,
+					    "Cannot REG_VFI for FCF: sid=%x",
+					    port->did);
+
+					(void) emlxs_mem_put(hba, MEM_MBOX,
+					    (uint8_t *)mbox);
+					emlxs_pkt_complete(sbp,
+					    IOSTAT_LOCAL_REJECT,
+					    IOERR_NO_RESOURCES, 1);
+					return;
+				}
+				mbox->sbp = (uint8_t *)sbp;
+
+				rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox,
+				    MBX_NOWAIT, 0);
+				if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
+					EMLXS_MSGF(EMLXS_CONTEXT,
+					    &emlxs_sli_detail_msg,
+					    "Cannot REG_VFI for FCF: sid=%x",
+					    port->did);
+
+					(void) emlxs_mem_put(hba, MEM_MBOX,
+					    (uint8_t *)mbox);
+					emlxs_pkt_complete(sbp,
+					    IOSTAT_LOCAL_REJECT,
+					    IOERR_NO_RESOURCES, 1);
+					return;
+				}
+				/* Preset the state for the REG_VFI cmpl */
+				emlxs_set_pkt_state(sbp, IOSTAT_SUCCESS, 0, 1);
+
+				/* Deferred completion of this pkt until */
+				/* REG_VFI is complete */
+				return;
+			}
+			/* VFI is already Registered */
+
+			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbox);
+			emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
+
+			EMLXS_STATE_CHANGE_LOCKED(hba, FC_READY);
+			if (regvfi) {
+				/*
+				 * If NPIV Fabric support has just been
+				 * established on the physical port, then
+				 * notify the vports of the link up.
+				 */
+				if ((hba->flag & FC_NPIV_ENABLED) &&
+				    (hba->flag & FC_NPIV_SUPPORTED)) {
+					/* Skip the physical port */
+					for (i = 1; i < MAX_VPORTS; i++) {
+						vport = &VPORT(i);
+
+						if (!(vport->flag &
+						    EMLXS_PORT_BOUND) ||
+						    !(vport->flag &
+						    EMLXS_PORT_ENABLE)) {
+							continue;
+						}
+
+						emlxs_port_online(vport);
+					}
+				}
+			}
+			return;
+		}
+
+		/* Save the fabric service parameters */
+		bcopy((void *)sp, (void *)&port->fabric_sparam,
+		    sizeof (SERV_PARM));
+
+		emlxs_mb_config_link(hba, mbox);
+
+		rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox, MBX_NOWAIT, 0);
+		if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
+			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbox);
 		}
 
 		/* Preset the state for the reg_did */
 		emlxs_set_pkt_state(sbp, IOSTAT_SUCCESS, 0, 1);
 
-		if (emlxs_mb_reg_did(port, Fabric_DID, &port->fabric_sparam,
+		if (emlxs_mb_reg_did(port, FABRIC_DID, &port->fabric_sparam,
 		    sbp, NULL, NULL) == 0) {
 			/* Deferred completion of this pkt until */
 			/* login is complete */
@@ -563,21 +675,19 @@ emlxs_handle_sol_flogi(emlxs_port_t *port, emlxs_buf_t *sbp)
 		/* Save E_D_TOV ticks in nanoseconds */
 		if (sp->cmn.edtovResolution) {
 			hba->fc_edtov =
-			    (SWAP_DATA32(sp->cmn.e_d_tov) + 999999) / 1000000;
+			    (LE_SWAP32(sp->cmn.e_d_tov) + 999999) / 1000000;
 		} else {
-			hba->fc_edtov = SWAP_DATA32(sp->cmn.e_d_tov);
+			hba->fc_edtov = LE_SWAP32(sp->cmn.e_d_tov);
 		}
 
 		/* Save R_A_TOV ticks */
 		hba->fc_ratov =
-		    (SWAP_DATA32(sp->cmn.w2.r_a_tov) + 999) / 1000;
+		    (LE_SWAP32(sp->cmn.w2.r_a_tov) + 999) / 1000;
 
-#ifdef NPIV_SUPPORT
 		hba->flag &= ~FC_NPIV_SUPPORTED;
 		(void) strcpy(buffer, "npiv:Disabled. P2P");
-#else
-		(void) strcpy(buffer, "P2P");
-#endif /* NPIV_SUPPORT */
+
+		port->rdid = did;
 
 		/* Clear the fabric service parameters */
 		bzero((void *)&port->fabric_sparam, sizeof (SERV_PARM));
@@ -592,7 +702,7 @@ emlxs_handle_sol_flogi(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	return;
 
-}  /* emlxs_handle_sol_flogi() */
+} /* emlxs_handle_sol_flogi() */
 
 
 static void
@@ -607,10 +717,11 @@ emlxs_handle_sol_fdisk(emlxs_port_t *port, emlxs_buf_t *sbp)
 	IOCBQ *iocbq;
 	IOCB *iocb;
 	char buffer[64];
+	int rc;
 
 	pkt = PRIV2PKT(sbp);
 	sp = (SERV_PARM *)((caddr_t)pkt->pkt_resp + sizeof (uint32_t));
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 	iocbq = &sbp->iocbq;
 	iocb = &iocbq->iocb;
 
@@ -618,7 +729,7 @@ emlxs_handle_sol_fdisk(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	/* Save our new port ID */
 	port->did = iocb->un.elsreq.myID;
-	pkt->pkt_resp_fhdr.d_id = SWAP_DATA24_LO(port->did);
+	pkt->pkt_resp_fhdr.d_id = LE_SWAP24_LO(port->did);
 
 	/* Save the fabric service parameters */
 	bcopy((void *)sp, (void *)&port->fabric_sparam, sizeof (SERV_PARM));
@@ -640,21 +751,50 @@ emlxs_handle_sol_fdisk(emlxs_port_t *port, emlxs_buf_t *sbp)
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_completion_msg,
 	    "FDISK: did=%x sid=%x %s", did, port->did, buffer);
 
-	/* Update our service parms */
-	if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX | MEM_PRI))) {
-		emlxs_mb_config_link(hba, (MAILBOX *)mbox);
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		emlxs_port_t *pport = &PPORT;
 
-		if (emlxs_sli_issue_mbox_cmd(hba, (MAILBOX *)mbox, MBX_NOWAIT,
-		    0) != MBX_BUSY) {
-			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbox);
+		port->VFIp = pport->VFIp;
+
+		if (emlxs_mb_check_sparm(hba, sp)) {
+			EMLXS_MSGF(EMLXS_CONTEXT,
+			    &emlxs_node_create_failed_msg,
+			    "Invalid Fabric parameters. did=%06x",
+			    port->did);
+			emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
+			    IOERR_NO_RESOURCES, 1);
+			return;
 		}
 
+		/* Preset the state for the REG_VFI cmpl */
+		emlxs_set_pkt_state(sbp, IOSTAT_SUCCESS, 0, 1);
+
+		if (port->flag & EMLXS_PORT_REG_VPI_CMPL) {
+			emlxs_pkt_complete(sbp, -1, 0, 1);
+		} else {
+			/* Deferred completion of this pkt until */
+			/* REG_VPI is complete */
+			(void) emlxs_mb_reg_vpi(port, sbp);
+		}
+
+		return;
+	}
+
+	/* Update our service parms */
+	if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+		emlxs_mb_config_link(hba, mbox);
+
+		rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox,
+		    MBX_NOWAIT, 0);
+		if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
+			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbox);
+		}
 	}
 
 	/* Preset the state for the reg_did */
 	emlxs_set_pkt_state(sbp, IOSTAT_SUCCESS, 0, 1);
 
-	if (emlxs_mb_reg_did(port, Fabric_DID, &port->fabric_sparam, sbp,
+	if (emlxs_mb_reg_did(port, FABRIC_DID, &port->fabric_sparam, sbp,
 	    NULL, NULL) == 0) {
 		/*
 		 * Deferred completion of this pkt until login is complete
@@ -667,7 +807,7 @@ emlxs_handle_sol_fdisk(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	return;
 
-}  /* emlxs_handle_sol_fdisk() */
+} /* emlxs_handle_sol_fdisk() */
 
 
 static void
@@ -684,8 +824,8 @@ emlxs_handle_sol_plogi(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	pkt = PRIV2PKT(sbp);
 	sp = (SERV_PARM *)((caddr_t)pkt->pkt_resp + sizeof (uint32_t));
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
-	sid = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.s_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
+	sid = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.s_id);
 
 	buffer[0] = 0;
 
@@ -720,26 +860,28 @@ emlxs_handle_sol_plogi(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	if (ndlp && ndlp->nlp_active) {
 		/* Open the node again */
-		emlxs_node_open(port, ndlp, FC_FCP_RING);
-		emlxs_node_open(port, ndlp, FC_IP_RING);
+		emlxs_node_open(port, ndlp, hba->channel_fcp);
+		emlxs_node_open(port, ndlp, hba->channel_ip);
 	}
 
 	emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT, IOERR_NO_RESOURCES, 1);
 
 	return;
 
-}  /* emlxs_handle_sol_plogi() */
+} /* emlxs_handle_sol_plogi() */
 
 
 static void
 emlxs_handle_sol_adisc(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
+	emlxs_hba_t *hba = HBA;
 	fc_packet_t *pkt;
 	uint32_t did;
 	NODELIST *ndlp;
+	RPIobj_t *rp;
 
 	pkt = PRIV2PKT(sbp);
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_completion_msg, "ADISC: did=%x",
 	    did);
@@ -748,15 +890,29 @@ emlxs_handle_sol_adisc(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	if (ndlp && ndlp->nlp_active) {
 		/* Open the node again */
-		emlxs_node_open(port, ndlp, FC_FCP_RING);
-		emlxs_node_open(port, ndlp, FC_IP_RING);
+		emlxs_node_open(port, ndlp, hba->channel_fcp);
+		emlxs_node_open(port, ndlp, hba->channel_ip);
+
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			rp = emlxs_sli4_find_rpi(hba, ndlp->nlp_Rpi);
+			if (rp && (rp->state & RESOURCE_RPI_PAUSED)) {
+				(void) emlxs_mb_resume_rpi(hba, sbp,
+				    ndlp->nlp_Rpi);
+				rp->state &= ~RESOURCE_RPI_PAUSED;
+				/*
+				 * Delay ADISC cmpl to ULP till
+				 * after RESUME_RPI
+				 */
+				return;
+			}
+		}
 	}
 
 	emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
 
 	return;
 
-}  /* emlxs_handle_sol_adisc() */
+} /* emlxs_handle_sol_adisc() */
 
 
 static void
@@ -772,7 +928,7 @@ emlxs_handle_sol_prli(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	pkt = PRIV2PKT(sbp);
 	npr = (PRLI *)((caddr_t)pkt->pkt_resp + sizeof (uint32_t));
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	ndlp = emlxs_node_find_did(port, did);
 
@@ -812,7 +968,7 @@ emlxs_handle_sol_prli(emlxs_port_t *port, emlxs_buf_t *sbp)
 		}
 
 		/* Open the node again */
-		emlxs_node_open(port, ndlp, FC_FCP_RING);
+		emlxs_node_open(port, ndlp, hba->channel_fcp);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_completion_msg,
 		    "PRLI: did=%x info=%02x", did, ndlp->nlp_fcp_info);
@@ -832,21 +988,21 @@ emlxs_handle_sol_prli(emlxs_port_t *port, emlxs_buf_t *sbp)
 		emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
 		    IOERR_INVALID_RPI, 1);
 	}
-
 	return;
 
-}  /* emlxs_handle_sol_prli() */
+} /* emlxs_handle_sol_prli() */
 
 
 static void
 emlxs_handle_sol_logo(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
+	emlxs_hba_t *hba = HBA;
 	fc_packet_t *pkt;
 	uint32_t did;
 	NODELIST *ndlp;
 
 	pkt = PRIV2PKT(sbp);
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_completion_msg, "LOGO: did=%x",
 	    did);
@@ -855,8 +1011,8 @@ emlxs_handle_sol_logo(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	if (ndlp && ndlp->nlp_active) {
 		/* Close the node for any further normal IO */
-		emlxs_node_close(port, ndlp, FC_FCP_RING, 60);
-		emlxs_node_close(port, ndlp, FC_IP_RING, 60);
+		emlxs_node_close(port, ndlp, hba->channel_fcp, 60);
+		emlxs_node_close(port, ndlp, hba->channel_ip, 60);
 
 		/* Flush tx queues */
 		(void) emlxs_tx_node_flush(port, ndlp, 0, 0, 0);
@@ -869,12 +1025,12 @@ emlxs_handle_sol_logo(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	return;
 
-}  /* emlxs_handle_sol_logo() */
+} /* emlxs_handle_sol_logo() */
 
 
 /* ARGSUSED */
 static void
-emlxs_handle_unsol_rscn(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_handle_unsol_rscn(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
 	uint32_t *lp;
@@ -905,8 +1061,8 @@ emlxs_handle_unsol_rscn(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	if (ubp == NULL) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_no_unsol_buf_msg,
 		    "RSCN rcvd: sid=%x  %d page(s): %08X, %08X. Rejecting.",
-		    sid, count, SWAP_DATA32(*lp),
-		    ((count > 1) ? SWAP_DATA32(*(lp + 1)) : 0));
+		    sid, count, LE_SWAP32(*lp),
+		    ((count > 1) ? LE_SWAP32(*(lp + 1)) : 0));
 
 		(void) emlxs_els_reply(port, iocbq, ELS_CMD_LS_RJT,
 		    ELS_CMD_RSCN, LSRJT_LOGICAL_BSY, LSEXP_OUT_OF_RESOURCE);
@@ -923,16 +1079,16 @@ emlxs_handle_unsol_rscn(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	 */
 	ubp->ub_frame.r_ctl = FC_ELS_REQ;
 	ubp->ub_frame.type = FC_ELS_DATA;
-	ubp->ub_frame.s_id = SWAP_DATA24_LO(iocb->un.elsreq.remoteID);
-	ubp->ub_frame.d_id = SWAP_DATA24_LO(iocb->un.elsreq.myID);
+	ubp->ub_frame.s_id = LE_SWAP24_LO(iocb->un.elsreq.remoteID);
+	ubp->ub_frame.d_id = LE_SWAP24_LO(iocb->un.elsreq.myID);
 	ubp->ub_frame.ox_id = ub_priv->token;
-	ubp->ub_frame.rx_id = iocb->ulpContext;
+	ubp->ub_frame.rx_id = iocb->ULPCONTEXT;
 	ubp->ub_class = FC_TRAN_CLASS3;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
 	    "RSCN: sid=%x  %d page(s): %08X, %08X  buffer=%p token=%x.", sid,
-	    count, SWAP_DATA32(*lp),
-	    ((count > 1) ? SWAP_DATA32(*(lp + 1)) : 0), ubp, ub_priv->token);
+	    count, LE_SWAP32(*lp),
+	    ((count > 1) ? LE_SWAP32(*(lp + 1)) : 0), ubp, ub_priv->token);
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 	emlxs_swap_els_ub(ubp);
@@ -944,7 +1100,7 @@ drop_it:
 
 	return;
 
-}  /* emlxs_handle_unsol_rscn() */
+} /* emlxs_handle_unsol_rscn() */
 
 
 /* This is shared by FCT driver */
@@ -985,22 +1141,20 @@ emlxs_process_unsol_flogi(emlxs_port_t *port, IOCBQ *iocbq, MATCHMAP *mp,
 	/* Save E_D_TOV ticks in nanoseconds */
 	if (sp->cmn.edtovResolution) {
 		hba->fc_edtov =
-		    (SWAP_DATA32(sp->cmn.e_d_tov) + 999999) / 1000000;
+		    (LE_SWAP32(sp->cmn.e_d_tov) + 999999) / 1000000;
 	} else {
-		hba->fc_edtov = SWAP_DATA32(sp->cmn.e_d_tov);
+		hba->fc_edtov = LE_SWAP32(sp->cmn.e_d_tov);
 	}
 
 	/* Save R_A_TOV ticks */
-	hba->fc_ratov = (SWAP_DATA32(sp->cmn.w2.r_a_tov) + 999) / 1000;
+	hba->fc_ratov = (LE_SWAP32(sp->cmn.w2.r_a_tov) + 999) / 1000;
 
 	buffer[0] = 0;
 
-#ifdef NPIV_SUPPORT
 	hba->flag &= ~FC_NPIV_SUPPORTED;
 	(void) strcpy(buffer, "npiv:Disabled. P2P ");
-#else
-	(void) strcpy(buffer, "P2P ");
-#endif /* NPIV_SUPPORT */
+
+	port->rdid = sid;
 
 #ifdef DHCHAP_SUPPORT
 	if (!sp->cmn.fcsp_support) {
@@ -1020,12 +1174,12 @@ emlxs_process_unsol_flogi(emlxs_port_t *port, IOCBQ *iocbq, MATCHMAP *mp,
 
 	return (0);
 
-}  /* emlxs_process_unsol_flogi() */
+} /* emlxs_process_unsol_flogi() */
 
 
 /* ARGSUSED */
 static void
-emlxs_handle_unsol_flogi(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_handle_unsol_flogi(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
 	uint8_t *bp;
@@ -1071,10 +1225,10 @@ emlxs_handle_unsol_flogi(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	 */
 	ubp->ub_frame.r_ctl = FC_ELS_REQ;
 	ubp->ub_frame.type = FC_ELS_DATA;
-	ubp->ub_frame.s_id = SWAP_DATA24_LO(iocb->un.elsreq.remoteID);
-	ubp->ub_frame.d_id = SWAP_DATA24_LO(iocb->un.elsreq.myID);
+	ubp->ub_frame.s_id = LE_SWAP24_LO(iocb->un.elsreq.remoteID);
+	ubp->ub_frame.d_id = LE_SWAP24_LO(iocb->un.elsreq.myID);
 	ubp->ub_frame.ox_id = ub_priv->token;
-	ubp->ub_frame.rx_id = iocb->ulpContext;
+	ubp->ub_frame.rx_id = iocb->ULPCONTEXT;
 	ubp->ub_class = FC_TRAN_CLASS3;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
@@ -1091,7 +1245,7 @@ drop_it:
 
 	return;
 
-}  /* emlxs_handle_unsol_flogi() */
+} /* emlxs_handle_unsol_flogi() */
 
 
 
@@ -1108,6 +1262,7 @@ emlxs_process_unsol_plogi(emlxs_port_t *port, IOCBQ *iocbq, MATCHMAP *mp,
 	SERV_PARM *sp;
 	MAILBOXQ *mbox;
 	emlxs_vvl_fmt_t vvl;
+	int rc;
 
 	iocb = &iocbq->iocb;
 	sid = iocb->un.elsreq.remoteID;
@@ -1126,16 +1281,14 @@ emlxs_process_unsol_plogi(emlxs_port_t *port, IOCBQ *iocbq, MATCHMAP *mp,
 	bp = mp->virt;
 	sp = (SERV_PARM *)(bp + sizeof (uint32_t));
 
-#ifdef NPIV_SUPPORT
-
 	bzero((char *)&vvl, sizeof (emlxs_vvl_fmt_t));
 
-	if (sp->valid_vendor_version) {
+	if (sp->VALID_VENDOR_VERSION) {
 
 		bcopy((caddr_t *)&sp->vendorVersion[0],
 		    (caddr_t *)&vvl, sizeof (emlxs_vvl_fmt_t));
-		vvl.un0.word0 = SWAP_DATA32(vvl.un0.word0);
-		vvl.un1.word1 = SWAP_DATA32(vvl.un1.word1);
+		vvl.un0.word0 = LE_SWAP32(vvl.un0.word0);
+		vvl.un1.word1 = LE_SWAP32(vvl.un1.word1);
 	}
 
 	if (port->flag & EMLXS_PORT_RESTRICTED) {
@@ -1148,8 +1301,8 @@ emlxs_process_unsol_plogi(emlxs_port_t *port, IOCBQ *iocbq, MATCHMAP *mp,
 
 		/* If we are a virtual port and the remote device */
 		/* is not a switch, then reject it */
-		else if (port->vpi && ((sid & Fabric_DID_MASK) !=
-		    Fabric_DID_MASK)) {
+		else if (port->vpi && ((sid & FABRIC_DID_MASK) !=
+		    FABRIC_DID_MASK)) {
 			reject_it = 1;
 		}
 
@@ -1172,7 +1325,6 @@ emlxs_process_unsol_plogi(emlxs_port_t *port, IOCBQ *iocbq, MATCHMAP *mp,
 			return (1);
 		}
 	}
-#endif /* NPIV_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 	if (emlxs_dhc_verify_login(port, sid, sp)) {
@@ -1205,24 +1357,25 @@ emlxs_process_unsol_plogi(emlxs_port_t *port, IOCBQ *iocbq, MATCHMAP *mp,
 		/* Save E_D_TOV ticks in nanoseconds */
 		if (sp->cmn.edtovResolution) {
 			hba->fc_edtov =
-			    (SWAP_DATA32(sp->cmn.e_d_tov) + 999999) / 1000000;
+			    (LE_SWAP32(sp->cmn.e_d_tov) + 999999) / 1000000;
 		} else {
-			hba->fc_edtov = SWAP_DATA32(sp->cmn.e_d_tov);
+			hba->fc_edtov = LE_SWAP32(sp->cmn.e_d_tov);
 		}
 
 		/* Save R_A_TOV ticks */
 		hba->fc_ratov =
-		    (SWAP_DATA32(sp->cmn.w2.r_a_tov) + 999) / 1000;
+		    (LE_SWAP32(sp->cmn.w2.r_a_tov) + 999) / 1000;
 
 		mutex_exit(&EMLXS_PORT_LOCK);
 
 		/* Update our service parms */
 		if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
-		    MEM_MBOX | MEM_PRI))) {
-			emlxs_mb_config_link(hba, (MAILBOX *)mbox);
+		    MEM_MBOX, 1))) {
+			emlxs_mb_config_link(hba, mbox);
 
-			if (emlxs_sli_issue_mbox_cmd(hba, (MAILBOX *)mbox,
-			    MBX_NOWAIT, 0) != MBX_BUSY) {
+			rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox,
+			    MBX_NOWAIT, 0);
+			if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
 				(void) emlxs_mem_put(hba, MEM_MBOX,
 				    (uint8_t *)mbox);
 			}
@@ -1232,12 +1385,12 @@ emlxs_process_unsol_plogi(emlxs_port_t *port, IOCBQ *iocbq, MATCHMAP *mp,
 
 	return (0);
 
-}  /* emlxs_process_unsol_plogi() */
+} /* emlxs_process_unsol_plogi() */
 
 
 /* ARGSUSED */
 static void
-emlxs_handle_unsol_plogi(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_handle_unsol_plogi(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
 	fc_unsol_buf_t *ubp;
@@ -1292,10 +1445,10 @@ emlxs_handle_unsol_plogi(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	 */
 	ubp->ub_frame.r_ctl = FC_ELS_REQ;
 	ubp->ub_frame.type = FC_ELS_DATA;
-	ubp->ub_frame.s_id = SWAP_DATA24_LO(iocb->un.elsreq.remoteID);
-	ubp->ub_frame.d_id = SWAP_DATA24_LO(iocb->un.elsreq.myID);
+	ubp->ub_frame.s_id = LE_SWAP24_LO(iocb->un.elsreq.remoteID);
+	ubp->ub_frame.d_id = LE_SWAP24_LO(iocb->un.elsreq.myID);
 	ubp->ub_frame.ox_id = ub_priv->token;
-	ubp->ub_frame.rx_id = iocb->ulpContext;
+	ubp->ub_frame.rx_id = iocb->ULPCONTEXT;
 	ubp->ub_class = FC_TRAN_CLASS3;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
@@ -1320,23 +1473,22 @@ drop_it:
 
 	return;
 
-}  /* emlxs_handle_unsol_plogi() */
+} /* emlxs_handle_unsol_plogi() */
 
 
 /* ARGSUSED */
 static void
-emlxs_handle_unsol_prli(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_handle_unsol_prli(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
+	emlxs_hba_t	*hba = HBA;
+	emlxs_config_t	*cfg = &CFG;
 	IOCB *iocb;
 	uint32_t sid;
 	NODELIST *ndlp;
 	PRLI *npr;
-
-#ifndef ULP_PATCH3
 	fc_unsol_buf_t *ubp;
 	emlxs_ub_priv_t *ub_priv;
-#endif
 
 	iocb = &iocbq->iocb;
 	sid = iocb->un.elsreq.remoteID;
@@ -1379,15 +1531,18 @@ emlxs_handle_unsol_prli(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 			ndlp->nlp_fcp_info &= ~NLP_FCP_2_DEVICE;
 		}
 	}
+
 #ifdef ULP_PATCH3
+	if (cfg[CFG_ENABLE_PATCH].current & ULP_PATCH3) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+		    "PRLI: sid=%x. Accepting.", sid);
 
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-	    "PRLI: sid=%x. Accepting.", sid);
-
-	/* Auto reply to PRLI's */
-	(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC, ELS_CMD_PRLI, 0, 0);
-
-#else
+		/* Auto reply to PRLI's */
+		(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC,
+		    ELS_CMD_PRLI, 0, 0);
+		goto drop_it;
+	}
+#endif /* ULP_PATCH3 */
 
 	/* Tell ULP about it */
 	ubp = (fc_unsol_buf_t *)emlxs_ub_get(port, size, FC_ELS_DATA, 0);
@@ -1414,10 +1569,10 @@ emlxs_handle_unsol_prli(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	 */
 	ubp->ub_frame.r_ctl = FC_ELS_REQ;
 	ubp->ub_frame.type = FC_ELS_DATA;
-	ubp->ub_frame.s_id = SWAP_DATA24_LO(iocb->un.elsreq.remoteID);
-	ubp->ub_frame.d_id = SWAP_DATA24_LO(iocb->un.elsreq.myID);
+	ubp->ub_frame.s_id = LE_SWAP24_LO(iocb->un.elsreq.remoteID);
+	ubp->ub_frame.d_id = LE_SWAP24_LO(iocb->un.elsreq.myID);
 	ubp->ub_frame.ox_id = ub_priv->token;
-	ubp->ub_frame.rx_id = iocb->ulpContext;
+	ubp->ub_frame.rx_id = iocb->ULPCONTEXT;
 	ubp->ub_class = FC_TRAN_CLASS3;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
@@ -1430,18 +1585,16 @@ emlxs_handle_unsol_prli(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 
 	emlxs_ub_callback(port, ubp);
 
-#endif /* ULP_PATCH3 */
-
 drop_it:
 
 	return;
 
-}  /* emlxs_handle_unsol_prli() */
+} /* emlxs_handle_unsol_prli() */
 
 
 /* ARGSUSED */
 static void
-emlxs_handle_unsol_auth(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_handle_unsol_auth(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
 	IOCB *iocb;
@@ -1467,7 +1620,7 @@ emlxs_handle_unsol_auth(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg, "AUTH: sid=%x", sid);
 
-	(void) emlxs_dhchap_state_machine(port, rp, iocbq, mp, ndlp,
+	(void) emlxs_dhchap_state_machine(port, cp, iocbq, mp, ndlp,
 	    NODE_EVENT_RCV_AUTH_MSG);
 #else
 
@@ -1482,12 +1635,12 @@ drop_it:
 
 	return;
 
-}  /* emlxs_handle_unsol_auth() */
+} /* emlxs_handle_unsol_auth() */
 
 
 /* ARGSUSED */
 static void
-emlxs_handle_unsol_adisc(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_handle_unsol_adisc(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
 	IOCB		*iocb;
@@ -1515,26 +1668,20 @@ emlxs_handle_unsol_adisc(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 
 	return;
 
-}  /* emlxs_handle_unsol_adisc() */
+} /* emlxs_handle_unsol_adisc() */
 
 
 /* ARGSUSED */
 static void
-emlxs_handle_unsol_prlo(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_handle_unsol_prlo(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
-#ifdef ULP_PATCH4
-#ifdef ULP_PATCH6
-	emlxs_hba_t *hba = HBA;
-#endif /* ULP_PATCH6 */
-#endif /* ULP_PATCH4 */
+	emlxs_hba_t	*hba = HBA;
+	emlxs_config_t	*cfg = &CFG;
 	IOCB *iocb;
 	uint32_t sid;
-#ifndef ULP_PATCH4
 	fc_unsol_buf_t *ubp;
 	emlxs_ub_priv_t *ub_priv;
-#endif
-
 	NODELIST *ndlp;
 
 	iocb = &iocbq->iocb;
@@ -1550,61 +1697,68 @@ emlxs_handle_unsol_prlo(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 #endif
 
 #ifdef ULP_PATCH4
+	if (cfg[CFG_ENABLE_PATCH].current & ULP_PATCH4) {
 #ifdef ULP_PATCH6
+		if (cfg[CFG_ENABLE_PATCH].current & ULP_PATCH6) {
+			/* Check if this is a SCSI target */
+			if (ndlp && (ndlp->nlp_fcp_info & NLP_FCP_TGT_DEVICE)) {
+				/* This is a SCSI target */
 
-	/* Check if this is a SCSI target */
-	if (ndlp && (ndlp->nlp_fcp_info & NLP_FCP_TGT_DEVICE)) {
-		/* This is a SCSI target */
+				/* If only one node is present, then we can */
+				/* conclude that we are direct attached */
+				/* to a target */
+				if (port->node_count == 1) {
+					EMLXS_MSGF(EMLXS_CONTEXT,
+					    &emlxs_unsol_els_msg,
+					    "PRLO: sid=%x. Accepting and " \
+					    "reseting link.",
+					    sid);
 
-		/* If only one node is present, then we can */
-		/* conclude that we are direct attached to a target */
-		if (port->node_count == 1) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-			    "PRLO: sid=%x. Accepting and reseting link.",
-			    sid);
+					/* Send Acc */
+					(void) emlxs_els_reply(port, iocbq,
+					    ELS_CMD_ACC, ELS_CMD_PRLO, 0, 0);
 
-			/* Send Acc */
-			(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC,
-			    ELS_CMD_PRLO, 0, 0);
+					/* Spawn a thread to reset the link */
+					emlxs_thread_spawn(hba,
+					    emlxs_reset_link_thread,
+					    NULL, NULL);
 
-			/* Spawn a thread to reset the link */
-			emlxs_thread_spawn(hba, emlxs_reset_link_thread,
-			    NULL, NULL);
+					goto drop_it;
 
-			goto drop_it;
+				}
+				/* Check if fabric is present */
+				else if (hba->flag & FC_FABRIC_ATTACHED) {
+					/* Auto reply to PRLO */
+					EMLXS_MSGF(EMLXS_CONTEXT,
+					    &emlxs_unsol_els_msg,
+					    "PRLO: sid=%x. Accepting and " \
+					    "generating RSCN.",
+					    sid);
 
+					/* Send Acc */
+					(void) emlxs_els_reply(port, iocbq,
+					    ELS_CMD_ACC, ELS_CMD_PRLO, 0, 0);
+
+					/* Generate an RSCN to wakeup ULP */
+					(void) emlxs_generate_rscn(port, sid);
+
+					goto drop_it;
+				}
+			}
 		}
-		/* Check if fabric is present */
-		else if (hba->flag & FC_FABRIC_ATTACHED) {
-			/* Auto reply to PRLO */
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-			    "PRLO: sid=%x. Accepting and generating RSCN.",
-			    sid);
-
-			/* Send Acc */
-			(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC,
-			    ELS_CMD_PRLO, 0, 0);
-
-			/* Generate an RSCN to wakeup ULP */
-			(void) emlxs_generate_rscn(port, sid);
-
-			goto drop_it;
-		}
-
-	}
-	/* SCSI target */
 #endif /* ULP_PATCH6 */
 
-	/* Auto reply to PRLO */
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-	    "PRLO: sid=%x. Accepting.", sid);
+		/* Auto reply to PRLO */
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+		    "PRLO: sid=%x. Accepting.", sid);
 
-	/* Send Acc */
-	(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC, ELS_CMD_PRLO, 0, 0);
+		/* Send Acc */
+		(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC,
+		    ELS_CMD_PRLO, 0, 0);
 
-	goto drop_it;
-
-#else /* !ULP_PATCH4 */
+		goto drop_it;
+	}
+#endif /* ULP_PATCH4 */
 
 	/* Tell ULP about it */
 
@@ -1632,10 +1786,10 @@ emlxs_handle_unsol_prlo(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	 */
 	ubp->ub_frame.r_ctl = FC_ELS_REQ;
 	ubp->ub_frame.type = FC_ELS_DATA;
-	ubp->ub_frame.s_id = SWAP_DATA24_LO(iocb->un.elsreq.remoteID);
-	ubp->ub_frame.d_id = SWAP_DATA24_LO(iocb->un.elsreq.myID);
+	ubp->ub_frame.s_id = LE_SWAP24_LO(iocb->un.elsreq.remoteID);
+	ubp->ub_frame.d_id = LE_SWAP24_LO(iocb->un.elsreq.myID);
 	ubp->ub_frame.ox_id = ub_priv->token;
-	ubp->ub_frame.rx_id = iocb->ulpContext;
+	ubp->ub_frame.rx_id = iocb->ULPCONTEXT;
 	ubp->ub_class = FC_TRAN_CLASS3;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
@@ -1647,21 +1801,20 @@ emlxs_handle_unsol_prlo(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 
 	emlxs_ub_callback(port, ubp);
 
-#endif /* ULP_PATCH4 */
-
 drop_it:
 
 	return;
 
-}  /* emlxs_handle_unsol_prlo() */
+} /* emlxs_handle_unsol_prlo() */
 
 
 /* ARGSUSED */
 static void
-emlxs_handle_unsol_logo(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_handle_unsol_logo(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
 	emlxs_hba_t *hba = HBA;
+	emlxs_config_t	*cfg = &CFG;
 	fc_unsol_buf_t *ubp;
 	IOCB *iocb;
 	uint32_t sid;
@@ -1683,49 +1836,49 @@ emlxs_handle_unsol_logo(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 #endif
 
 #ifdef ULP_PATCH6
+	if (cfg[CFG_ENABLE_PATCH].current & ULP_PATCH6) {
+		/* Check if this is a SCSI target */
+		if (ndlp && (ndlp->nlp_fcp_info & NLP_FCP_TGT_DEVICE)) {
+			/* This is a SCSI target */
 
-	/* Check if this is a SCSI target */
-	if (ndlp && (ndlp->nlp_fcp_info & NLP_FCP_TGT_DEVICE)) {
-		/* This is a SCSI target */
+			/* If only one node is present, then we can */
+			/* conclude that we are direct attached to a target */
+			if (port->node_count == 1) {
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+				    "LOGO: sid=%x. Accepting and "\
+				    "reseting link.", sid);
 
-		/* If only one node is present, then we can */
-		/* conclude that we are direct attached to a target */
-		if (port->node_count == 1) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-			    "LOGO: sid=%x. Accepting and reseting link.",
-			    sid);
+				(void) emlxs_els_reply(port, iocbq,
+				    ELS_CMD_ACC, ELS_CMD_LOGO, 0, 0);
 
-			(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC,
-			    ELS_CMD_LOGO, 0, 0);
+				/* Spawn a thread to reset the link */
+				emlxs_thread_spawn(hba, emlxs_reset_link_thread,
+				    NULL, NULL);
 
-			/* Spawn a thread to reset the link */
-			emlxs_thread_spawn(hba, emlxs_reset_link_thread,
-			    NULL, NULL);
-
-			goto drop_it;
-		}
-		/* Check if fabric node is present */
-		else if (hba->flag & FC_FABRIC_ATTACHED) {
-			/* Send reply ourselves */
-			/* We will block all attempts */
-			/* for ULP to reply to a LOGO */
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-			    "LOGO: sid=%x. Accepting and generating RSCN.",
-			    sid);
-
-			(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC,
-			    ELS_CMD_LOGO, 0, 0);
-
-			/* Generate an RSCN to wakeup ULP */
-			if (emlxs_generate_rscn(port, sid) == FC_SUCCESS) {
 				goto drop_it;
 			}
+			/* Check if fabric node is present */
+			else if (hba->flag & FC_FABRIC_ATTACHED) {
+				/* Send reply ourselves */
+				/* We will block all attempts */
+				/* for ULP to reply to a LOGO */
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+				    "LOGO: sid=%x. Accepting and " \
+				    "generating RSCN.", sid);
 
-			reply_sent = 1;
+				(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC,
+				    ELS_CMD_LOGO, 0, 0);
+
+				/* Generate an RSCN to wakeup ULP */
+				if (emlxs_generate_rscn(port, sid)
+				    == FC_SUCCESS) {
+					goto drop_it;
+				}
+
+				reply_sent = 1;
+			}
 		}
-
 	}
-	/* SCSI target */
 #endif /* ULP_PATCH6 */
 
 	ubp = (fc_unsol_buf_t *)emlxs_ub_get(port, size, FC_ELS_DATA, 1);
@@ -1752,44 +1905,44 @@ emlxs_handle_unsol_logo(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	/* Setup frame header */
 	ubp->ub_frame.r_ctl = FC_ELS_REQ;
 	ubp->ub_frame.type = FC_ELS_DATA;
-	ubp->ub_frame.s_id = SWAP_DATA24_LO(iocb->un.elsreq.remoteID);
-	ubp->ub_frame.d_id = SWAP_DATA24_LO(iocb->un.elsreq.myID);
+	ubp->ub_frame.s_id = LE_SWAP24_LO(iocb->un.elsreq.remoteID);
+	ubp->ub_frame.d_id = LE_SWAP24_LO(iocb->un.elsreq.myID);
 	ubp->ub_frame.ox_id = ub_priv->token;
-	ubp->ub_frame.rx_id = iocb->ulpContext;
+	ubp->ub_frame.rx_id = iocb->ULPCONTEXT;
 	ubp->ub_class = FC_TRAN_CLASS3;
 
 #ifdef ULP_PATCH2
+	if (cfg[CFG_ENABLE_PATCH].current & ULP_PATCH2) {
+		if (!reply_sent) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
+			    "LOGO: sid=%x buffer=%p token=%x. Accepting.",
+			    sid, ubp, ub_priv->token);
 
-	if (!reply_sent) {
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
-		    "LOGO: sid=%x buffer=%p token=%x. Accepting.", sid, ubp,
-		    ub_priv->token);
+			ub_priv->flags |= EMLXS_UB_REPLY;
 
-		ub_priv->flags |= EMLXS_UB_REPLY;
-
-		/* Send Acc */
-		/* Send reply ourselves because ULP */
-		/* doesn't always reply to these */
-		/* We will block all attempts for ULP to reply to a LOGO */
-		(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC,
-		    ELS_CMD_LOGO, 0, 0);
-		reply_sent = 1;
+			/* Send Acc */
+			/* Send reply ourselves because ULP */
+			/* doesn't always reply to these */
+			/* We ll block attempts for ULP to reply to a LOGO */
+			(void) emlxs_els_reply(port, iocbq, ELS_CMD_ACC,
+			    ELS_CMD_LOGO, 0, 0);
+			reply_sent = 1;
+		}
 	}
-#else /* !ULP_PATCH2 */
+#endif /* ULP_PATCH2 */
 
 	if (!reply_sent) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
 		    "LOGO: sid=%x buffer=%p token=%x.", sid, ubp,
 		    ub_priv->token);
 	}
-#endif /* ULP_PATCH2 */
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 	emlxs_swap_els_ub(ubp);
 #endif /* EMLXS_MODREV2X */
 
 	/* Clear the RPI */
-	if ((sid & Fabric_DID_MASK) == Fabric_DID_MASK) {
+	if ((sid & FABRIC_DID_MASK) == FABRIC_DID_MASK) {
 		if (emlxs_mb_unreg_did(port, sid, NULL, ubp, NULL) == 0) {
 			/*
 			 * Deferred completion of this ubp
@@ -1806,13 +1959,13 @@ drop_it:
 
 	return;
 
-}  /* emlxs_handle_unsol_logo() */
+} /* emlxs_handle_unsol_logo() */
 
 
 
 /* ARGSUSED */
 static void
-emlxs_handle_unsol_gen_cmd(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_handle_unsol_gen_cmd(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
 	uint8_t *bp;
@@ -1850,10 +2003,10 @@ emlxs_handle_unsol_gen_cmd(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	/* Setup frame header */
 	ubp->ub_frame.r_ctl = FC_ELS_REQ;
 	ubp->ub_frame.type = FC_ELS_DATA;
-	ubp->ub_frame.s_id = SWAP_DATA24_LO(iocb->un.elsreq.remoteID);
-	ubp->ub_frame.d_id = SWAP_DATA24_LO(iocb->un.elsreq.myID);
+	ubp->ub_frame.s_id = LE_SWAP24_LO(iocb->un.elsreq.remoteID);
+	ubp->ub_frame.d_id = LE_SWAP24_LO(iocb->un.elsreq.myID);
 	ubp->ub_frame.ox_id = ub_priv->token;
-	ubp->ub_frame.rx_id = iocb->ulpContext;
+	ubp->ub_frame.rx_id = iocb->ULPCONTEXT;
 	ubp->ub_class = FC_TRAN_CLASS3;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
@@ -1870,7 +2023,7 @@ drop_it:
 
 	return;
 
-}  /* emlxs_handle_unsol_gen_cmd() */
+} /* emlxs_handle_unsol_gen_cmd() */
 
 
 /* This handles the reply completions to unsolicited cmds */
@@ -1879,6 +2032,7 @@ static void
 emlxs_handle_acc(emlxs_port_t *port, emlxs_buf_t *sbp, IOCBQ *iocbq,
     uint32_t flag)
 {
+	emlxs_hba_t *hba = HBA;
 	fc_packet_t *pkt;
 	IOCB *iocb;
 	uint32_t did;
@@ -1889,14 +2043,14 @@ emlxs_handle_acc(emlxs_port_t *port, emlxs_buf_t *sbp, IOCBQ *iocbq,
 
 	iocb = &iocbq->iocb;
 	pkt = PRIV2PKT(sbp);
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 	ucmd = pkt->pkt_cmd_fhdr.ox_id << ELS_CMD_SHIFT;
 	lp = (uint32_t *)pkt->pkt_cmd;
 	cmd = *lp & ELS_CMD_MASK;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_completion_msg,
 	    "%s %s: did=%x %s %s", emlxs_elscmd_xlate(ucmd),
-	    emlxs_elscmd_xlate(cmd), did, emlxs_state_xlate(iocb->ulpStatus),
+	    emlxs_elscmd_xlate(cmd), did, emlxs_state_xlate(iocb->ULPSTATUS),
 	    emlxs_error_xlate(iocb->un.grsp.perr.statLocalError));
 
 	switch (ucmd) {
@@ -1907,8 +2061,8 @@ emlxs_handle_acc(emlxs_port_t *port, emlxs_buf_t *sbp, IOCBQ *iocbq,
 
 		if (ndlp && ndlp->nlp_active) {
 			/* Open the node again */
-			emlxs_node_open(port, ndlp, FC_FCP_RING);
-			emlxs_node_open(port, ndlp, FC_IP_RING);
+			emlxs_node_open(port, ndlp, hba->channel_fcp);
+			emlxs_node_open(port, ndlp, hba->channel_ip);
 		}
 
 		break;
@@ -1919,18 +2073,18 @@ emlxs_handle_acc(emlxs_port_t *port, emlxs_buf_t *sbp, IOCBQ *iocbq,
 
 		if (ndlp && ndlp->nlp_active) {
 			/* Open the node again */
-			emlxs_node_open(port, ndlp, FC_FCP_RING);
+			emlxs_node_open(port, ndlp, hba->channel_fcp);
 		}
 
 		break;
 	}
 
-	emlxs_pkt_complete(sbp, iocb->ulpStatus,
+	emlxs_pkt_complete(sbp, iocb->ULPSTATUS,
 	    iocb->un.grsp.perr.statLocalError, 1);
 
 	return;
 
-}  /* emlxs_handle_acc() */
+} /* emlxs_handle_acc() */
 
 
 /* This handles the reply completions to unsolicited cmds */
@@ -1939,6 +2093,7 @@ static void
 emlxs_handle_reject(emlxs_port_t *port, emlxs_buf_t *sbp, IOCBQ *iocbq,
     uint32_t flag)
 {
+	emlxs_hba_t *hba = HBA;
 	fc_packet_t	*pkt;
 	NODELIST	*ndlp;
 	IOCB		*iocb;
@@ -1949,7 +2104,7 @@ emlxs_handle_reject(emlxs_port_t *port, emlxs_buf_t *sbp, IOCBQ *iocbq,
 
 	iocb = &iocbq->iocb;
 	pkt = PRIV2PKT(sbp);
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 	ucmd = pkt->pkt_cmd_fhdr.ox_id << ELS_CMD_SHIFT;
 	lp = (uint32_t *)pkt->pkt_cmd;
 	cmd = *lp & ELS_CMD_MASK;
@@ -1958,7 +2113,7 @@ emlxs_handle_reject(emlxs_port_t *port, emlxs_buf_t *sbp, IOCBQ *iocbq,
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_completion_msg,
 	    "%s %s: did=%x %s %s", emlxs_elscmd_xlate(ucmd),
-	    emlxs_elscmd_xlate(cmd), did, emlxs_state_xlate(iocb->ulpStatus),
+	    emlxs_elscmd_xlate(cmd), did, emlxs_state_xlate(iocb->ULPSTATUS),
 	    emlxs_error_xlate(iocb->un.grsp.perr.statLocalError));
 
 	switch (ucmd) {
@@ -1966,8 +2121,8 @@ emlxs_handle_reject(emlxs_port_t *port, emlxs_buf_t *sbp, IOCBQ *iocbq,
 
 		if (ndlp && ndlp->nlp_active) {
 			/* Open the node again */
-			emlxs_node_open(port, ndlp, FC_FCP_RING);
-			emlxs_node_open(port, ndlp, FC_IP_RING);
+			emlxs_node_open(port, ndlp, hba->channel_fcp);
+			emlxs_node_open(port, ndlp, hba->channel_ip);
 		}
 
 		break;
@@ -1976,18 +2131,18 @@ emlxs_handle_reject(emlxs_port_t *port, emlxs_buf_t *sbp, IOCBQ *iocbq,
 
 		if (ndlp && ndlp->nlp_active) {
 			/* Open the node again */
-			emlxs_node_open(port, ndlp, FC_FCP_RING);
+			emlxs_node_open(port, ndlp, hba->channel_fcp);
 		}
 
 		break;
 	}
 
-	emlxs_pkt_complete(sbp, iocb->ulpStatus,
+	emlxs_pkt_complete(sbp, iocb->ULPSTATUS,
 	    iocb->un.grsp.perr.statLocalError, 1);
 
 	return;
 
-}  /* emlxs_handle_reject() */
+} /* emlxs_handle_reject() */
 
 
 /* ARGSUSED */
@@ -2054,17 +2209,17 @@ emlxs_els_reply(emlxs_port_t *port, IOCBQ *iocbq, uint32_t type,
 		pkt->pkt_tran_type = FC_PKT_OUTBOUND;
 		pkt->pkt_timeout = (2 * hba->fc_ratov);
 
-		if ((uint32_t)iocb->ulpClass == CLASS2) {
+		if ((uint32_t)iocb->ULPCLASS == CLASS2) {
 			pkt->pkt_tran_flags &= ~FC_TRAN_CLASS3;
 			pkt->pkt_tran_flags |= FC_TRAN_CLASS2;
 		}
 
 		/* Build the fc header */
 		pkt->pkt_cmd_fhdr.d_id =
-		    SWAP_DATA24_LO(iocb->un.elsreq.remoteID);
+		    LE_SWAP24_LO(iocb->un.elsreq.remoteID);
 		pkt->pkt_cmd_fhdr.r_ctl =
 		    R_CTL_EXTENDED_SVC | R_CTL_SOLICITED_CONTROL;
-		pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(iocb->un.elsreq.myID);
+		pkt->pkt_cmd_fhdr.s_id = LE_SWAP24_LO(iocb->un.elsreq.myID);
 		pkt->pkt_cmd_fhdr.type = FC_TYPE_EXTENDED_LS;
 		pkt->pkt_cmd_fhdr.f_ctl =
 		    F_CTL_XCHG_CONTEXT | F_CTL_LAST_SEQ | F_CTL_END_SEQ;
@@ -2072,7 +2227,7 @@ emlxs_els_reply(emlxs_port_t *port, IOCBQ *iocbq, uint32_t type,
 		pkt->pkt_cmd_fhdr.df_ctl = 0;
 		pkt->pkt_cmd_fhdr.seq_cnt = 0;
 		pkt->pkt_cmd_fhdr.ox_id = (type2 >> ELS_CMD_SHIFT) & 0xff;
-		pkt->pkt_cmd_fhdr.rx_id = iocb->ulpContext;
+		pkt->pkt_cmd_fhdr.rx_id = iocb->ULPCONTEXT;
 		pkt->pkt_cmd_fhdr.ro = 0;
 
 		/*
@@ -2095,7 +2250,7 @@ emlxs_els_reply(emlxs_port_t *port, IOCBQ *iocbq, uint32_t type,
 			    sizeof (NAME_TYPE));
 			bcopy(&port->wwpn, &els->un.adisc.portName,
 			    sizeof (NAME_TYPE));
-			els->un.adisc.DID = SWAP_DATA24_LO(port->did);
+			els->un.adisc.DID = LE_SWAP24_LO(port->did);
 
 			break;
 
@@ -2156,17 +2311,17 @@ emlxs_els_reply(emlxs_port_t *port, IOCBQ *iocbq, uint32_t type,
 		pkt->pkt_tran_type = FC_PKT_OUTBOUND;
 		pkt->pkt_timeout = (2 * hba->fc_ratov);
 
-		if ((uint32_t)iocb->ulpClass == CLASS2) {
+		if ((uint32_t)iocb->ULPCLASS == CLASS2) {
 			pkt->pkt_tran_flags &= ~FC_TRAN_CLASS3;
 			pkt->pkt_tran_flags |= FC_TRAN_CLASS2;
 		}
 
 		/* Build the fc header */
 		pkt->pkt_cmd_fhdr.d_id =
-		    SWAP_DATA24_LO(iocb->un.elsreq.remoteID);
+		    LE_SWAP24_LO(iocb->un.elsreq.remoteID);
 		pkt->pkt_cmd_fhdr.r_ctl =
 		    R_CTL_EXTENDED_SVC | R_CTL_SOLICITED_CONTROL;
-		pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(iocb->un.elsreq.myID);
+		pkt->pkt_cmd_fhdr.s_id = LE_SWAP24_LO(iocb->un.elsreq.myID);
 		pkt->pkt_cmd_fhdr.type = FC_TYPE_EXTENDED_LS;
 		pkt->pkt_cmd_fhdr.f_ctl =
 		    F_CTL_XCHG_CONTEXT | F_CTL_LAST_SEQ | F_CTL_END_SEQ;
@@ -2174,7 +2329,7 @@ emlxs_els_reply(emlxs_port_t *port, IOCBQ *iocbq, uint32_t type,
 		pkt->pkt_cmd_fhdr.df_ctl = 0;
 		pkt->pkt_cmd_fhdr.seq_cnt = 0;
 		pkt->pkt_cmd_fhdr.ox_id = (type2 >> ELS_CMD_SHIFT) & 0xff;
-		pkt->pkt_cmd_fhdr.rx_id = iocb->ulpContext;
+		pkt->pkt_cmd_fhdr.rx_id = iocb->ULPCONTEXT;
 		pkt->pkt_cmd_fhdr.ro = 0;
 
 		/*
@@ -2201,7 +2356,7 @@ emlxs_els_reply(emlxs_port_t *port, IOCBQ *iocbq, uint32_t type,
 
 	return (rval);
 
-}  /* emlxs_els_reply() */
+} /* emlxs_els_reply() */
 
 
 #ifdef ULP_PATCH6
@@ -2235,8 +2390,8 @@ emlxs_generate_rscn(emlxs_port_t *port, uint32_t d_id)
 
 #ifdef EMLXS_I386
 	/* Put payload in BE format */
-	rscn->rscn_payload_len = SWAP_DATA16(rscn->rscn_payload_len);
-	*page = SWAP_DATA32(d_id);
+	rscn->rscn_payload_len = LE_SWAP16(rscn->rscn_payload_len);
+	*page = LE_SWAP32(d_id);
 #endif /* EMLXS_I386 */
 
 	ub_priv = ubp->ub_fca_private;
@@ -2246,7 +2401,7 @@ emlxs_generate_rscn(emlxs_port_t *port, uint32_t d_id)
 	ubp->ub_frame.r_ctl = FC_ELS_REQ;
 	ubp->ub_frame.type = FC_ELS_DATA;
 	ubp->ub_frame.s_id = 0xfffffd;
-	ubp->ub_frame.d_id = SWAP_DATA24_LO(port->did);
+	ubp->ub_frame.d_id = LE_SWAP24_LO(port->did);
 	ubp->ub_frame.ox_id = ub_priv->token;
 	ubp->ub_frame.rx_id = 0xffff;
 	ubp->ub_class = FC_TRAN_CLASS3;
@@ -2263,14 +2418,14 @@ emlxs_generate_rscn(emlxs_port_t *port, uint32_t d_id)
 
 	return (FC_SUCCESS);
 
-}  /* emlxs_generate_rscn() */
+} /* emlxs_generate_rscn() */
 
 #endif /* ULP_PATCH6 */
 
 
 #ifdef MENLO_SUPPORT
 extern int
-emlxs_menlo_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
+emlxs_menlo_handle_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 {
 	emlxs_port_t *port = &PPORT;
 	IOCB *iocb;
@@ -2295,18 +2450,18 @@ emlxs_menlo_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_ct_completion_msg,
 		    "iocbq=%p cmd=0x%x iotag=0x%x status=0x%x perr=0x%x",
-		    iocbq, (uint32_t)iocb->ulpCommand,
-		    (uint32_t)iocb->ulpIoTag, iocb->ulpStatus,
+		    iocbq, (uint32_t)iocb->ULPCOMMAND,
+		    (uint32_t)iocb->ULPIOTAG, iocb->ULPSTATUS,
 		    iocb->un.ulpWord[4]);
 
 		return (1);
 	}
 
-	if (rp->ringno != FC_CT_RING) {
+	if (cp->channelno != hba->channel_ct) {
 		HBASTATS.CtStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_ct_completion_msg,
-		    "Invalid ring: ring=%d iocbq=%p", rp->ringno, iocbq);
+		    "Invalid IO channel:%d iocbq=%p", cp->channelno, iocbq);
 
 		return (1);
 	}
@@ -2315,15 +2470,15 @@ emlxs_menlo_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 	pkt = PRIV2PKT(sbp);
 
 	cmd = (menlo_cmd_t *)pkt->pkt_cmd;
-	cmd_code = SWAP_LONG(cmd->code);
+	cmd_code = BE_SWAP32(cmd->code);
 
 	/* Check if a response buffer was provided */
 	if (pkt->pkt_rsplen) {
-		emlxs_mpdata_sync(pkt->pkt_resp_dma, 0, pkt->pkt_rsplen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_resp_dma, 0, pkt->pkt_rsplen,
 		    DDI_DMA_SYNC_FORKERNEL);
 	}
 
-	switch (iocb->ulpCommand) {
+	switch (iocb->ULPCOMMAND) {
 	/*
 	 * MENLO Command completion
 	 */
@@ -2336,30 +2491,28 @@ emlxs_menlo_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		rsp = (uint32_t *)pkt->pkt_resp;
 		rsp_code = *rsp;
-		rsp_code = SWAP_LONG(rsp_code);
+		rsp_code = BE_SWAP32(rsp_code);
 
-#ifdef SLI3_SUPPORT
-		if (hba->sli_mode >= 3) {
+		if (hba->sli_mode == EMLXS_HBA_SLI3_MODE) {
 			pkt->pkt_resp_resid =
 			    pkt->pkt_rsplen - iocb->unsli3.ext_iocb.rsplen;
 		} else
-#endif /* SLI3_SUPPORT  */
 		{
 			pkt->pkt_resp_resid =
 			    pkt->pkt_rsplen - iocb->un.genreq64.bdl.bdeSize;
 		}
 
 		pkt->pkt_data_resid = pkt->pkt_datalen;
-		pkt->pkt_cmd_fhdr.rx_id = iocb->ulpContext;
+		pkt->pkt_cmd_fhdr.rx_id = iocb->ULPCONTEXT;
 
-		if ((iocb->ulpStatus == 0) && (rsp_code == MENLO_RSP_SUCCESS)) {
+		if ((iocb->ULPSTATUS == 0) && (rsp_code == MENLO_RSP_SUCCESS)) {
 			HBASTATS.CtCmdGood++;
 
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_completion_msg,
 			    "%s: %s rxid=0x%x",
 			    emlxs_menlo_cmd_xlate(cmd_code),
 			    emlxs_menlo_rsp_xlate(rsp_code),
-			    iocb->ulpContext);
+			    iocb->ULPCONTEXT);
 
 		} else {
 			HBASTATS.CtCmdError++;
@@ -2368,12 +2521,12 @@ emlxs_menlo_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 			    "%s: %s %s %s rxid=0x%x",
 			    emlxs_menlo_cmd_xlate(cmd_code),
 			    emlxs_menlo_rsp_xlate(rsp_code),
-			    emlxs_state_xlate(iocb->ulpStatus),
+			    emlxs_state_xlate(iocb->ULPSTATUS),
 			    emlxs_error_xlate(iocb->un.grsp.perr.
-			    statLocalError), iocb->ulpContext);
+			    statLocalError), iocb->ULPCONTEXT);
 		}
 
-		emlxs_pkt_complete(sbp, iocb->ulpStatus,
+		emlxs_pkt_complete(sbp, iocb->ULPSTATUS,
 		    iocb->un.grsp.perr.statLocalError, 1);
 
 		break;
@@ -2383,24 +2536,24 @@ emlxs_menlo_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		HBASTATS.CtStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_invalid_ct_msg,
-		    "Invalid iocb: cmd=0x%x", iocb->ulpCommand);
+		    "Invalid iocb: cmd=0x%x", iocb->ULPCOMMAND);
 
-		emlxs_pkt_complete(sbp, iocb->ulpStatus,
+		emlxs_pkt_complete(sbp, iocb->ULPSTATUS,
 		    iocb->un.grsp.perr.statLocalError, 1);
 
 		break;
 
-	}	/* switch(iocb->ulpCommand) */
+	}	/* switch(iocb->ULPCOMMAND) */
 
 	return (0);
 
-}  /* emlxs_menlo_handle_event() */
+} /* emlxs_menlo_handle_event() */
 
 #endif /* MENLO_SUPPORT */
 
 
 extern int
-emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
+emlxs_ct_handle_event(emlxs_hba_t *hba, CHANNEL *cp, IOCBQ *iocbq)
 {
 	emlxs_port_t *port = &PPORT;
 	IOCB *iocb;
@@ -2426,18 +2579,19 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_ct_completion_msg,
 		    "iocbq=%p cmd=0x%x iotag=0x%x status=0x%x perr=0x%x",
-		    iocbq, (uint32_t)iocb->ulpCommand,
-		    (uint32_t)iocb->ulpIoTag, iocb->ulpStatus,
+		    iocbq, (uint32_t)iocb->ULPCOMMAND,
+		    (uint32_t)iocb->ULPIOTAG, iocb->ULPSTATUS,
 		    iocb->un.ulpWord[4]);
 
 		return (1);
 	}
 
-	if (rp->ringno != FC_CT_RING) {
+	if (cp->channelno != hba->channel_ct) {
 		HBASTATS.CtStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_stray_ct_completion_msg,
-		    "Invalid ring: ring=%d iocbq=%p", rp->ringno, iocbq);
+		    "Invalid channel: channel=%d iocbq=%p", cp->channelno,
+		    iocbq);
 
 		return (1);
 	}
@@ -2445,22 +2599,20 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 	pkt = PRIV2PKT(sbp);
 	port = sbp->iocbq.port;
 	CtCmd = (SLI_CT_REQUEST *)pkt->pkt_cmd;
-	cmd_code = SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp);
+	cmd_code = LE_SWAP16(CtCmd->CommandResponse.bits.CmdRsp);
 
-#ifdef DFC_SUPPORT
 	if (cmd_code == SLI_CT_LOOPBACK) {
 		HBASTATS.CtEvent--;
-		return (emlxs_dfc_handle_event(hba, rp, iocbq));
+		return (emlxs_dfc_handle_event(hba, cp, iocbq));
 	}
-#endif /* DFC_SUPPORT */
 
 	/* Check if a response buffer was provided */
 	if (pkt->pkt_rsplen) {
-		emlxs_mpdata_sync(pkt->pkt_resp_dma, 0, pkt->pkt_rsplen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_resp_dma, 0, pkt->pkt_rsplen,
 		    DDI_DMA_SYNC_FORKERNEL);
 	}
 
-	switch (iocb->ulpCommand) {
+	switch (iocb->ULPCOMMAND) {
 		/*
 		 * CT Reply completion
 		 */
@@ -2473,7 +2625,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		case 0xFC:	/* Name server */
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_completion_msg,
 			    "%s: %s %s", emlxs_ctcmd_xlate(cmd_code),
-			    emlxs_state_xlate(iocb->ulpStatus),
+			    emlxs_state_xlate(iocb->ULPSTATUS),
 			    emlxs_error_xlate(iocb->un.grsp.perr.
 			    statLocalError));
 			break;
@@ -2481,7 +2633,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		case 0xFA:	/* Managment server */
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_completion_msg,
 			    "%s: %s %s", emlxs_mscmd_xlate(cmd_code),
-			    emlxs_state_xlate(iocb->ulpStatus),
+			    emlxs_state_xlate(iocb->ULPSTATUS),
 			    emlxs_error_xlate(iocb->un.grsp.perr.
 			    statLocalError));
 			break;
@@ -2489,7 +2641,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		case 0x0A:	/* Emulex Remote server */
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_completion_msg,
 			    "%s: %s %s", emlxs_rmcmd_xlate(cmd_code),
-			    emlxs_state_xlate(iocb->ulpStatus),
+			    emlxs_state_xlate(iocb->ULPSTATUS),
 			    emlxs_error_xlate(iocb->un.grsp.perr.
 			    statLocalError));
 			break;
@@ -2497,12 +2649,12 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		default:
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_completion_msg,
 			    "%s: %s %s", emlxs_ctcmd_xlate(cmd_code),
-			    emlxs_state_xlate(iocb->ulpStatus),
+			    emlxs_state_xlate(iocb->ULPSTATUS),
 			    emlxs_error_xlate(iocb->un.grsp.perr.
 			    statLocalError));
 		}
 
-		emlxs_pkt_complete(sbp, iocb->ulpStatus,
+		emlxs_pkt_complete(sbp, iocb->ULPSTATUS,
 		    iocb->un.grsp.perr.statLocalError, 1);
 
 		break;
@@ -2519,14 +2671,12 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 
 		rsp = (uint32_t *)pkt->pkt_resp;
 		CtRsp = (SLI_CT_REQUEST *)pkt->pkt_resp;
-		rsp_code = SWAP_DATA16(CtRsp->CommandResponse.bits.CmdRsp);
+		rsp_code = LE_SWAP16(CtRsp->CommandResponse.bits.CmdRsp);
 
-#ifdef SLI3_SUPPORT
-		if (hba->sli_mode >= 3) {
+		if (hba->sli_mode >= EMLXS_HBA_SLI3_MODE) {
 			pkt->pkt_resp_resid =
 			    pkt->pkt_rsplen - iocb->unsli3.ext_iocb.rsplen;
 		} else
-#endif /* SLI3_SUPPORT  */
 		{
 			pkt->pkt_resp_resid =
 			    pkt->pkt_rsplen - iocb->un.genreq64.bdl.bdeSize;
@@ -2541,7 +2691,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		 * iocb->un.genreq64.bdl.bdeFlags);
 		 */
 
-		if ((iocb->ulpStatus == 0) &&
+		if ((iocb->ULPSTATUS == 0) &&
 		    (rsp_code == SLI_CT_RESPONSE_FS_ACC)) {
 			HBASTATS.CtCmdGood++;
 
@@ -2559,7 +2709,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				    emlxs_ctcmd_xlate(cmd_code),
 				    emlxs_ctcmd_xlate(rsp_code),
 				    CtRsp->ReasonCode, CtRsp->Explanation,
-				    SWAP_DATA32(rsp[4]), SWAP_DATA32(rsp[5]));
+				    LE_SWAP32(rsp[4]), LE_SWAP32(rsp[5]));
 
 #if (EMLXS_MODREV < EMLXS_MODREV4)
 				if (cmd_code == SLI_CTNS_RNN_ID) {
@@ -2576,7 +2726,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				    emlxs_mscmd_xlate(cmd_code),
 				    emlxs_mscmd_xlate(rsp_code),
 				    CtRsp->ReasonCode, CtRsp->Explanation,
-				    SWAP_DATA32(rsp[4]), SWAP_DATA32(rsp[5]));
+				    LE_SWAP32(rsp[4]), LE_SWAP32(rsp[5]));
 				break;
 
 			case 0x0A:	/* Emulex Remote server */
@@ -2586,7 +2736,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				    emlxs_rmcmd_xlate(cmd_code),
 				    emlxs_rmcmd_xlate(rsp_code),
 				    CtRsp->ReasonCode, CtRsp->Explanation,
-				    SWAP_DATA32(rsp[4]), SWAP_DATA32(rsp[5]));
+				    LE_SWAP32(rsp[4]), LE_SWAP32(rsp[5]));
 				break;
 
 			default:
@@ -2596,7 +2746,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				    emlxs_ctcmd_xlate(cmd_code),
 				    emlxs_ctcmd_xlate(rsp_code),
 				    CtRsp->ReasonCode, CtRsp->Explanation,
-				    SWAP_DATA32(rsp[4]), SWAP_DATA32(rsp[5]));
+				    LE_SWAP32(rsp[4]), LE_SWAP32(rsp[5]));
 			}
 		} else {
 			HBASTATS.CtCmdError++;
@@ -2613,7 +2763,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 				    "%s: Rejected. rsn=%x exp=%x",
 				    emlxs_ctcmd_xlate(cmd_code),
 				    pkt->pkt_reason, pkt->pkt_expln);
-			} else if (iocb->ulpStatus == IOSTAT_LOCAL_REJECT) {
+			} else if (iocb->ULPSTATUS == IOSTAT_LOCAL_REJECT) {
 				switch (CtCmd->FsType) {
 				case 0xFC:	/* Name server */
 					EMLXS_MSGF(EMLXS_CONTEXT,
@@ -2621,7 +2771,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					    "%s: %s %s",
 					    emlxs_ctcmd_xlate(cmd_code),
 					    emlxs_state_xlate(iocb->
-					    ulpStatus),
+					    ULPSTATUS),
 					    emlxs_error_xlate(iocb->un.grsp.
 					    perr.statLocalError));
 					break;
@@ -2632,7 +2782,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					    "%s: %s %s",
 					    emlxs_mscmd_xlate(cmd_code),
 					    emlxs_state_xlate(iocb->
-					    ulpStatus),
+					    ULPSTATUS),
 					    emlxs_error_xlate(iocb->un.grsp.
 					    perr.statLocalError));
 					break;
@@ -2643,7 +2793,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					    "%s: %s %s",
 					    emlxs_rmcmd_xlate(cmd_code),
 					    emlxs_state_xlate(iocb->
-					    ulpStatus),
+					    ULPSTATUS),
 					    emlxs_error_xlate(iocb->un.grsp.
 					    perr.statLocalError));
 					break;
@@ -2654,7 +2804,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					    "%s: %s %s",
 					    emlxs_ctcmd_xlate(cmd_code),
 					    emlxs_state_xlate(iocb->
-					    ulpStatus),
+					    ULPSTATUS),
 					    emlxs_error_xlate(iocb->un.grsp.
 					    perr.statLocalError));
 				}
@@ -2666,7 +2816,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					    "%s: %s (%02x%02x%02x%02x)",
 					    emlxs_ctcmd_xlate(cmd_code),
 					    emlxs_state_xlate(iocb->
-					    ulpStatus),
+					    ULPSTATUS),
 					    iocb->un.grsp.perr.statAction,
 					    iocb->un.grsp.perr.statRsn,
 					    iocb->un.grsp.perr.statBaExp,
@@ -2680,7 +2830,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					    "%s: %s (%02x%02x%02x%02x)",
 					    emlxs_mscmd_xlate(cmd_code),
 					    emlxs_state_xlate(iocb->
-					    ulpStatus),
+					    ULPSTATUS),
 					    iocb->un.grsp.perr.statAction,
 					    iocb->un.grsp.perr.statRsn,
 					    iocb->un.grsp.perr.statBaExp,
@@ -2694,7 +2844,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					    "%s: %s (%02x%02x%02x%02x)",
 					    emlxs_rmcmd_xlate(cmd_code),
 					    emlxs_state_xlate(iocb->
-					    ulpStatus),
+					    ULPSTATUS),
 					    iocb->un.grsp.perr.statAction,
 					    iocb->un.grsp.perr.statRsn,
 					    iocb->un.grsp.perr.statBaExp,
@@ -2708,7 +2858,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 					    "%s: %s (%02x%02x%02x%02x)",
 					    emlxs_ctcmd_xlate(cmd_code),
 					    emlxs_state_xlate(iocb->
-					    ulpStatus),
+					    ULPSTATUS),
 					    iocb->un.grsp.perr.statAction,
 					    iocb->un.grsp.perr.statRsn,
 					    iocb->un.grsp.perr.statBaExp,
@@ -2718,7 +2868,7 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 			}
 		}
 
-		emlxs_pkt_complete(sbp, iocb->ulpStatus,
+		emlxs_pkt_complete(sbp, iocb->ULPSTATUS,
 		    iocb->un.grsp.perr.statLocalError, 1);
 
 		break;
@@ -2728,21 +2878,21 @@ emlxs_ct_handle_event(emlxs_hba_t *hba, RING *rp, IOCBQ *iocbq)
 		HBASTATS.CtStray++;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_invalid_ct_msg,
-		    "Invalid iocb: cmd=0x%x", iocb->ulpCommand);
+		    "Invalid iocb: cmd=0x%x", iocb->ULPCOMMAND);
 
-		emlxs_pkt_complete(sbp, iocb->ulpStatus,
+		emlxs_pkt_complete(sbp, iocb->ULPSTATUS,
 		    iocb->un.grsp.perr.statLocalError, 1);
 
 		break;
-	}	/* switch(iocb->ulpCommand) */
+	}	/* switch(iocb->ULPCOMMAND) */
 
 	return (0);
 
-}  /* emlxs_ct_handle_event() */
+} /* emlxs_ct_handle_event() */
 
 
 extern int
-emlxs_ct_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
+emlxs_ct_handle_unsol_req(emlxs_port_t *port, CHANNEL *cp, IOCBQ *iocbq,
     MATCHMAP *mp, uint32_t size)
 {
 	emlxs_hba_t *hba = HBA;
@@ -2753,17 +2903,15 @@ emlxs_ct_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	iocb = &iocbq->iocb;
 
 	CtCmd = (SLI_CT_REQUEST *)mp->virt;
-	cmd_code = SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp);
+	cmd_code = LE_SWAP16(CtCmd->CommandResponse.bits.CmdRsp);
 
-#ifdef DFC_SUPPORT
 	if (cmd_code == SLI_CT_LOOPBACK) {
 		int rval;
 
-		rval = emlxs_dfc_handle_unsol_req(port, rp, iocbq, mp, size);
+		rval = emlxs_dfc_handle_unsol_req(port, cp, iocbq, mp, size);
 
 		return (rval);
 	}
-#endif /* DFC_SUPPORT */
 
 	HBASTATS.CtCmdReceived++;
 
@@ -2771,36 +2919,36 @@ emlxs_ct_handle_unsol_req(emlxs_port_t *port, RING *rp, IOCBQ *iocbq,
 	case 0xFC:	/* Name server */
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ct_msg,
 		    "%s: pl=%p size=%d rxid=%x", emlxs_ctcmd_xlate(cmd_code),
-		    CtCmd, size, iocb->ulpContext);
+		    CtCmd, size, iocb->ULPCONTEXT);
 		break;
 
 	case 0xFA:	/* Managment server */
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ct_msg,
 		    "%s: pl=%p size=%d rxid=%x", emlxs_mscmd_xlate(cmd_code),
-		    CtCmd, size, iocb->ulpContext);
+		    CtCmd, size, iocb->ULPCONTEXT);
 		break;
 
 	case 0x0A:	/* Emulex Remote server */
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ct_msg,
 		    "%s: pl=%p size=%d rxid=%x", emlxs_rmcmd_xlate(cmd_code),
-		    CtCmd, size, iocb->ulpContext);
+		    CtCmd, size, iocb->ULPCONTEXT);
 		break;
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_ct_msg,
 		    "%s: pl=%p size=%d rxid=%x", emlxs_ctcmd_xlate(cmd_code),
-		    CtCmd, size, iocb->ulpContext);
+		    CtCmd, size, iocb->ULPCONTEXT);
 	}
 
 	if (emlxs_log_ct_event(port, (uint8_t *)mp->virt, size,
-	    iocb->ulpContext)) {
+	    iocb->ULPCONTEXT)) {
 		/* Abort the exchange */
-		emlxs_abort_ct_exchange(hba, port, iocb->ulpContext);
+		emlxs_abort_ct_exchange(hba, port, iocb->ULPCONTEXT);
 	}
 
 	return (0);
 
-}  /* emlxs_ct_handle_unsol_req() */
+} /* emlxs_ct_handle_unsol_req() */
 
 
 static void
@@ -2819,9 +2967,9 @@ emlxs_send_rsnn(emlxs_port_t *port)
 	pkt->pkt_timeout = (2 * hba->fc_ratov);
 
 	/* Build the fc header */
-	pkt->pkt_cmd_fhdr.d_id = SWAP_DATA24_LO(NameServer_DID);
+	pkt->pkt_cmd_fhdr.d_id = LE_SWAP24_LO(NAMESERVER_DID);
 	pkt->pkt_cmd_fhdr.r_ctl = R_CTL_UNSOL_CONTROL;
-	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
+	pkt->pkt_cmd_fhdr.s_id = LE_SWAP24_LO(port->did);
 	pkt->pkt_cmd_fhdr.type = FC_TYPE_FC_SERVICES;
 	pkt->pkt_cmd_fhdr.f_ctl =
 	    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;
@@ -2842,7 +2990,7 @@ emlxs_send_rsnn(emlxs_port_t *port)
 	ct->FsSubType = SLI_CT_DIRECTORY_NAME_SERVER;
 
 	ct->CommandResponse.bits.Size = 0;
-	ct->CommandResponse.bits.CmdRsp = SWAP_DATA16(SLI_CTNS_RSNN_NN);
+	ct->CommandResponse.bits.CmdRsp = LE_SWAP16(SLI_CTNS_RSNN_NN);
 
 	bcopy((uint8_t *)&hba->wwnn, (char *)ct->un.rsnn.wwnn, 8);
 
@@ -2860,7 +3008,7 @@ emlxs_send_rsnn(emlxs_port_t *port)
 
 	return;
 
-}  /* emlxs_send_rsnn() */
+} /* emlxs_send_rsnn() */
 
 
 extern uint32_t
@@ -2918,7 +3066,7 @@ emlxs_ub_send_login_acc(emlxs_port_t *port, fc_unsol_buf_t *ubp)
 
 	return (rval);
 
-}  /* emlxs_ub_send_login_acc */
+} /* emlxs_ub_send_login_acc */
 
 
 extern void
@@ -2942,10 +3090,10 @@ emlxs_send_logo(emlxs_port_t *port, uint32_t d_id)
 	pkt->pkt_timeout = (2 * hba->fc_ratov);
 
 	/* Build the fc header */
-	pkt->pkt_cmd_fhdr.d_id = SWAP_DATA24_LO(d_id);
+	pkt->pkt_cmd_fhdr.d_id = LE_SWAP24_LO(d_id);
 	pkt->pkt_cmd_fhdr.r_ctl =
 	    R_CTL_EXTENDED_SVC | R_CTL_SOLICITED_CONTROL;
-	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
+	pkt->pkt_cmd_fhdr.s_id = LE_SWAP24_LO(port->did);
 	pkt->pkt_cmd_fhdr.type = FC_TYPE_EXTENDED_LS;
 	pkt->pkt_cmd_fhdr.f_ctl =
 	    F_CTL_FIRST_SEQ | F_CTL_END_SEQ | F_CTL_SEQ_INITIATIVE;

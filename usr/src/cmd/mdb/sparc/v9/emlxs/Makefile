@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -36,4 +36,3 @@ include ../../Makefile.sparcv9
 include ../../../Makefile.module
 
 CPPFLAGS += -I$(EMLXSBASE)
-LINTFLAGS64 += -erroff=E_SEC_SPRINTF_UNBOUNDED_COPY

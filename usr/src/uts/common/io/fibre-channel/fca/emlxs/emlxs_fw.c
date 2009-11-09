@@ -21,8 +21,9 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #define	EMLXS_FW_TABLE_DEF
 
@@ -31,11 +32,14 @@
 #include <emlxs_version.h>
 #include <emlxs_fw.h>
 
-char emlxs_fw_name[] = EMLXS_FW_NAME;
+emlxs_firmware_t emlxs_fw_mod_table[] = EMLXS_FW_TABLE;
+int emlxs_fw_mod_count = sizeof (emlxs_fw_mod_table) /
+    sizeof (emlxs_firmware_t);
+char emlxs_fw_mod_name[] = EMLXS_FW_NAME;
 
 static struct modlmisc emlxs_modlmisc = {
 	&mod_miscops,
-	emlxs_fw_name
+	emlxs_fw_mod_name
 };
 
 static struct modlinkage emlxs_modlinkage = {
@@ -53,7 +57,7 @@ _init(void)
 
 	return (rval);
 
-}  /* _init() */
+} /* _init() */
 
 int
 _fini()
@@ -64,7 +68,7 @@ _fini()
 
 	return (rval);
 
-}  /* _fini() */
+} /* _fini() */
 
 int
 _info(struct modinfo *modinfop)
@@ -75,7 +79,7 @@ _info(struct modinfo *modinfop)
 
 	return (rval);
 
-}  /* _fini() */
+} /* _fini() */
 
 int
 emlxs_fw_get(emlxs_firmware_t *fw)
@@ -84,8 +88,8 @@ emlxs_fw_get(emlxs_firmware_t *fw)
 	emlxs_firmware_t *fw_table;
 
 	/* Find matching firmware table entry */
-	fw_table = emlxs_fw_table;
-	for (i = 0; i < EMLXS_FW_COUNT; i++, fw_table++) {
+	fw_table = emlxs_fw_mod_table;
+	for (i = 0; i < emlxs_fw_mod_count; i++, fw_table++) {
 		/* Validate requested fw image */
 		if ((fw_table->id == fw->id) &&
 		    (fw_table->kern == fw->kern) &&
@@ -107,4 +111,4 @@ emlxs_fw_get(emlxs_firmware_t *fw)
 
 	return (1);
 
-}  /* emlxs_fw_get() */
+} /* emlxs_fw_get() */

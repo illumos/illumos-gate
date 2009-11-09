@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_DFCLIB_H
 #define	_EMLXS_DFCLIB_H
@@ -35,15 +34,10 @@ extern "C" {
 #define	MAX_DFC_EVENTS			16
 #define	MAX_EMLXS_BRDS			128
 #define	MAX_CFG_PARAM 			64
-#define	MAX_NODES 			4096
-
+#define	MAX_NODES 				4096
 
 #ifndef MAX_VPORTS
-#ifdef NPIV_SUPPORT
 #define	MAX_VPORTS			256
-#else
-#define	MAX_VPORTS			1
-#endif	/* NPIV_SUPPORT */
 #endif  /* MAX_VPORTS */
 
 #ifdef EMLXS_SPARC
@@ -90,7 +84,7 @@ typedef struct dfc_brdinfo
 	uint32_t a_pci;		/* PCI identifier (device / vendor id) */
 	uint32_t a_busid;	/* identifier of PCI bus adapter is on */
 	uint32_t a_devid;	/* identifier of PCI device number */
-	uint8_t  a_rsvd;	/* reserved for word alignment */
+	uint8_t  a_pciFunc;	/* identifier of PCI function number */
 	uint8_t  a_siglvl;	/* signal handler used by library */
 	uint16_t a_ddi;		/* identifier device driver instance number */
 	uint32_t a_onmask;	/* mask of ONDI primatives supported */
@@ -101,9 +95,9 @@ typedef struct dfc_brdinfo
 } dfc_brdinfo_t;
 
 
-#define	putPaddrLow(addr)	((uint32_t)(((uint64_t)(addr)) & 0xffffffff))
-#define	putPaddrHigh(addr)	((uint32_t)(((uint64_t)(addr)) >> 32))
-#define	getPaddr(high, low)	((uint64_t)((((uint64_t)(high)) << 32) \
+#define	PADDR_LO(addr)	((uint32_t)(((uint64_t)(addr)) & 0xffffffff))
+#define	PADDR_HI(addr)	((uint32_t)(((uint64_t)(addr)) >> 32))
+#define	PADDR(high, low)	((uint64_t)((((uint64_t)(high)) << 32) \
 					| (((uint64_t)(low)) & 0xffffffff)))
 
 typedef struct ulp_bde
@@ -153,6 +147,69 @@ typedef struct ulp_bde64
 	uint32_t	addrHigh;
 } ulp_bde64_t;
 
+
+/* ==== Mailbox Commands ==== */
+#define	MBX_SHUTDOWN		0x00
+#define	MBX_LOAD_SM		0x01
+#define	MBX_READ_NV		0x02
+#define	MBX_WRITE_NV		0x03
+#define	MBX_RUN_BIU_DIAG	0x04
+#define	MBX_INIT_LINK		0x05
+#define	MBX_DOWN_LINK		0x06
+#define	MBX_CONFIG_LINK		0x07
+#define	MBX_PART_SLIM		0x08
+#define	MBX_CONFIG_RING		0x09
+#define	MBX_RESET_RING		0x0A
+#define	MBX_READ_CONFIG		0x0B
+#define	MBX_READ_RCONFIG	0x0C
+#define	MBX_READ_SPARM		0x0D
+#define	MBX_READ_STATUS		0x0E
+#define	MBX_READ_RPI		0x0F
+#define	MBX_READ_XRI		0x10
+#define	MBX_READ_REV		0x11
+#define	MBX_READ_LNK_STAT	0x12
+#define	MBX_REG_LOGIN		0x13
+#define	MBX_UNREG_LOGIN		0x14
+#define	MBX_READ_LA		0x15
+#define	MBX_CLEAR_LA		0x16
+#define	MBX_DUMP_MEMORY		0x17
+#define	MBX_DUMP_CONTEXT	0x18
+#define	MBX_RUN_DIAGS		0x19
+#define	MBX_RESTART		0x1A
+#define	MBX_UPDATE_CFG		0x1B
+#define	MBX_DOWN_LOAD		0x1C
+#define	MBX_DEL_LD_ENTRY	0x1D
+#define	MBX_RUN_PROGRAM		0x1E
+#define	MBX_SET_MASK		0x20
+#define	MBX_SET_SLIM		0x21
+#define	MBX_UNREG_D_ID		0x23
+#define	MBX_KILL_BOARD		0x24
+#define	MBX_CONFIG_FARP		0x25
+#define	MBX_WRITE_VPARMS	0x32
+#define	MBX_LOAD_AREA		0x81
+#define	MBX_RUN_BIU_DIAG64	0x84
+#define	MBX_CONFIG_PORT		0x88
+#define	MBX_READ_SPARM64	0x8D
+#define	MBX_READ_RPI64		0x8F
+#define	MBX_CONFIG_MSI		0x90
+#define	MBX_REG_LOGIN64		0x93
+#define	MBX_READ_LA64		0x95
+#define	MBX_FLASH_WR_ULA	0x98
+#define	MBX_SET_DEBUG		0x99
+#define	MBX_LOAD_EXP_ROM	0x9C
+#define	MBX_REQUEST_FEATURES	0x9D
+#define	MBX_RESUME_RPI		0x9E
+#define	MBX_REG_VFI		0x9F
+#define	MBX_REG_FCFI		0xA0
+#define	MBX_UNREG_VFI		0xA1
+#define	MBX_UNREG_FCFI		0xA2
+#define	MBX_INIT_VFI		0xA3
+#define	MBX_INIT_VPI		0xA4
+#define	MBX_ACCESS_VDATA	0xA5
+#define	MBX_MAX_CMDS		0xA6
+#define	MBX_SLI2_CMD_MASK	0x80
+
+
 typedef struct read_sparm_var
 {
 	uint32_t	rsvd1;
@@ -163,6 +220,7 @@ typedef struct read_sparm_var
 		ulp_bde64_t	sp64;
 	} un;
 } read_sparm_var_t;
+
 
 typedef struct read_rev_var
 {
@@ -255,6 +313,70 @@ typedef struct dump_var
 	uint32_t	word_cnt;
 	uint32_t	resp_offset;
 } dump_var_t;
+
+
+typedef struct dump4_var
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	link:8;
+	uint32_t	rsvd:20;
+	uint32_t	type:4;
+
+	uint32_t	entry_index:16;
+	uint32_t	region_id:16;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	type:4;
+	uint32_t	rsvd:20;
+	uint32_t	link:8;
+
+	uint32_t	region_id:16;
+	uint32_t	entry_index:16;
+#endif
+	uint32_t	available_cnt;
+	uint32_t	addrLow;
+	uint32_t	addrHigh;
+	uint32_t	rsp_cnt;
+} dump4_var_t;
+
+
+typedef struct update_cfg
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	rsvd2:16;
+	uint32_t	proc_type:8;
+	uint32_t	rsvd1:1;
+	uint32_t	Abit:1;
+	uint32_t	DIbit:1;
+	uint32_t	Vbit:1;
+	uint32_t	req_type:4;
+#define	INIT_REGION	1
+#define	UPDATE_DATA	2
+#define	CLEAN_UP_CFG	3
+	uint32_t	entry_len:16;
+	uint32_t	region_id:16;
+#endif
+
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	req_type:4;
+#define	INIT_REGION	1
+#define	UPDATE_DATA	2
+#define	CLEAN_UP_CFG	3
+	uint32_t	Vbit:1;
+	uint32_t	DIbit:1;
+	uint32_t	Abit:1;
+	uint32_t	rsvd1:1;
+	uint32_t	proc_type:8;
+	uint32_t	rsvd2:16;
+
+	uint32_t	region_id:16;
+	uint32_t	entry_len:16;
+#endif
+
+	uint32_t	rsp_info;
+	uint32_t	byte_len;
+	uint32_t	cfg_data;
+} update_cfg_var_t;
 
 
 typedef struct read_cfg_var
@@ -429,6 +551,100 @@ typedef struct dfc_mailbox
 } dfc_mailbox_t;
 
 
+typedef struct dfc_mailbox4
+{
+#ifdef EMLXS_BIG_ENDIAN
+	uint16_t	mbxStatus;
+	uint8_t		mbxCommand;
+	uint8_t		mbxReserved:6;
+	uint8_t		mbxHc:1;
+	uint8_t		mbxOwner:1;	/* Low order bit first word */
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint8_t		mbxOwner:1;	/* Low order bit first word */
+	uint8_t		mbxHc:1;
+	uint8_t		mbxReserved:6;
+	uint8_t		mbxCommand;
+	uint16_t	mbxStatus;
+#endif
+
+	union
+	{
+		uint32_t		varWords[63];
+		dump4_var_t		varDmp;
+		update_cfg_var_t	varUpdateCfg;
+	} un;
+} dfc_mailbox4_t;
+
+
+/* Config Region 23 Records */
+
+typedef struct tlv_fcoe {
+	uint8_t		type;
+	uint8_t		length;
+	uint8_t		version;
+#define	TLV_FCOE_VER	1
+
+	uint8_t		fip_flags;
+#define	TLV_FCOE_FIP	0x40
+#define	TLV_FCOE_VLAN	0x01
+
+	uint8_t		FCMap[3];
+	uint8_t		reserved;
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	rsvd:20;
+	uint32_t	VLanId:12;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	VLanId:12;
+	uint32_t	rsvd:20;
+#endif
+} tlv_fcoe_t;
+
+
+typedef struct tlv_fcfconnectentry {
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	rsvd1:4;
+	uint32_t	VLanId:12;
+	uint32_t	rsvd2:7;
+	uint32_t	AddrMode:1;
+	uint32_t	AddrModePreferred:1;
+	uint32_t	AddrModeValid:1;
+	uint32_t	VLanValid:1;
+	uint32_t	SwitchNameValid:1;
+	uint32_t	FabricNameValid:1;
+	uint32_t	Primary:1;
+	uint32_t	Boot:1;
+	uint32_t	Valid:1;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	Valid:1;
+	uint32_t	Boot:1;
+	uint32_t	Primary:1;
+	uint32_t	FabricNameValid:1;
+	uint32_t	SwitchNameValid:1;
+	uint32_t	VLanValid:1;
+	uint32_t	AddrModeValid:1;
+	uint32_t	AddrModePreferred:1;
+	uint32_t	AddrMode:1;
+	uint32_t	rsvd2:7;
+	uint32_t	VLanId:12;
+	uint32_t	rsvd1:4;
+#endif
+	uint8_t		FabricName[8];
+	uint8_t		SwitchName[8];
+} tlv_fcfconnectentry_t;
+
+
+#define	MAX_FCFCONNECTLIST_ENTRIES	16
+typedef struct tlv_fcfconnectlist {
+	uint8_t			type;
+	uint8_t			length;
+	uint16_t		rsvd;
+	tlv_fcfconnectentry_t	entry[MAX_FCFCONNECTLIST_ENTRIES];
+} tlv_fcfconnectlist_t;
+
+
 typedef struct dfc_ioinfo
 {
 	uint32_t a_mboxCmd;	/* mailbox commands issued */
@@ -489,6 +705,7 @@ typedef struct dfc_linkinfo
 #define	LNK_DISCOVERY		0x4
 #define	LNK_REDISCOVERY		0x5
 #define	LNK_READY		0x6
+#define	LNK_DOWN_PERSIST	0x7
 
 
 typedef struct dfc_traceinfo
@@ -510,6 +727,8 @@ typedef struct dfc_cfgparam
 	uint16_t	a_flag;
 #define	CFG_EXPORT		0x1	/* Export this parameter to end user */
 #define	CFG_IGNORE		0x2	/* Ignore this parameter */
+#define	CFG_APPLICABLE		0x4	/* Applicable to this HBA */
+#define	CFG_COMMON		0x8	/* Common to all HBAs */
 
 	uint16_t	a_changestate;
 #define	CFG_REBOOT		0x0	/* Changes effective after system */
@@ -595,12 +814,7 @@ typedef struct dfc_drvinfo
 #define	DFC_DRVINFO_VERSION2		0x02
 #define	DFC_DRVINFO_VERSION3		0x03 /* NPIV    */
 #define	DFC_DRVINFO_VERSION4		0x04 /* DHCHAP */
-#define	DFC_DRVINFO_VERSION		DFC_DRVINFO_VERSION2
-
-#ifdef NPIV_SUPPORT
-#undef  DFC_DRVINFO_VERSION
 #define	DFC_DRVINFO_VERSION		DFC_DRVINFO_VERSION3
-#endif	/* NPIV_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 #undef  DFC_DRVINFO_VERSION
@@ -653,7 +867,10 @@ typedef struct dfc_drvinfo
 #define	DFC_DRVINFO_FEATURE_RESET_WWN		0x00000020
 #define	DFC_DRVINFO_FEATURE_VOLATILE_WWN	0x00000040
 #define	DFC_DRVINFO_FEATURE_E2E_AUTH		0x00000080
-#define	DFC_DRVINFO_FEATURE_TARGET_MODE		0x00000100
+#define	DFC_DRVINFO_FEATURE_SAN_DIAG		0x00000100
+#define	DFC_DRVINFO_FEATURE_FCOE		0x00000200
+#define	DFC_DRVINFO_FEATURE_PERSISTLINK		0x00000400
+#define	DFC_DRVINFO_FEATURE_TARGET_MODE		0x00000800
 
 #endif /* >= DFC_DRVINFO_VERSION4 */
 } dfc_drvinfo_t;
@@ -1010,9 +1227,6 @@ typedef struct dfc_ct_request
 #define	CT_OP_SABS	0x0187	/* Set Adapter Beacon State */
 #define	CT_OP_RPR	0x0188	/* Read Adapter PCI Registers */
 
-
-#ifdef NPIV_SUPPORT
-
 /* NPIV return codes */
 #define	DFC_NPIV_SUCCESS			0
 #define	DFC_NPIV_GENERAL_ERROR			1
@@ -1103,7 +1317,8 @@ typedef struct dfc_vport_attrs
 
 	uint8_t		state;		/* VPORT state */
 	uint8_t		restrictLogin;
-	uint8_t		reserved2[2];
+	uint8_t		flags;
+	uint8_t		reserved2;
 	uint64_t	buf;		/* Used for VPI */
 
 	uint8_t		fabric_wwn[8];	/* Fabric WWN (WWNN) */
@@ -1193,8 +1408,6 @@ typedef struct dfc_vlinkinfo
 	uint32_t	rpi_max;
 	uint32_t	rpi_inuse;
 } dfc_vlinkinfo_t;
-
-#endif	/* NPIV_SUPPORT */
 
 
 #ifdef DHCHAP_SUPPORT
@@ -1492,6 +1705,75 @@ typedef struct dfc_send_scsi_fcp_cmd_info
 #define	FC_RSP_CNT(x)		x.cnt2
 #define	DFC_SEND_SCSI_FCP_V1	1
 #define	DFC_SEND_SCSI_FCP_V2	2
+
+typedef struct DFC_FCoEParam
+{
+	uint8_t		version;
+#define	DFC_FCoE_PARAM_VERSION	1
+
+	uint8_t		Reserved[3];
+	uint8_t		FCMap[3];
+	uint8_t		VLanValid;
+#define	VLAN_ID_INVALID	0x0
+#define	VLAN_ID_VALID	0x1
+
+	uint16_t	VLanId;
+} DFC_FCoEParam_t;
+
+typedef struct DFC_FCoEFCFConnectEntry
+{
+	uint32_t	flags;
+#define	FCFCNCT_RSVD		0x00000001
+#define	FCFCNCT_BOOT		0x00000002
+#define	FCFCNCT_PRIMARY		0x00000004
+#define	FCFCNCT_FBNM_VALID	0x00000008
+#define	FCFCNCT_SWNM_VALID	0x00000010
+#define	FCFCNCT_VLAN_VALID	0x00000020
+#define	FCFCNCT_MASK		0xFFFFFF00
+
+	uint16_t	vlan_id;
+	uint8_t		fabric_name[8];
+	uint8_t		switch_name[8];
+	uint8_t		reserved[2];
+} DFC_FCoEFCFConnectEntry_t;
+
+typedef struct DFC_FCoEFCFConnectList
+{
+	uint8_t				version;
+#define	DFC_FCoE_FCFCONNECTLIST_VERSION	1
+
+	uint8_t				reserved;
+	uint8_t				numberOfEntries;
+	uint8_t				maxNumOfEntries;
+	DFC_FCoEFCFConnectEntry_t	entries[1];
+} DFC_FCoEFCFConnectList_t;
+
+typedef struct DFC_FCoEFCFInfo
+{
+	uint8_t		FabricName[8];
+	uint8_t		SwitchName[8];
+	uint8_t		Mac[6];
+	uint16_t	State;
+#define	FCF_AVAILABLE_STATE	0x1
+
+	uint8_t		VLanBitMap[512];
+	uint8_t		FC_Map[3];
+	uint8_t		reserved1;
+	uint32_t	LKA_Period;
+	uint32_t	reserved2;
+	uint32_t	Priority;
+} DFC_FCoEFCFInfo_t;
+
+typedef struct DFC_FCoEFCFList
+{
+	uint8_t		version;
+#define	DFC_FCoE_FCFLIST_VERSION	1
+
+	uint8_t			reserved[3];
+	uint16_t		numberOfEntries;
+	uint16_t		nActiveFCFs;
+	DFC_FCoEFCFInfo_t	entries[1];
+} DFC_FCoEFCFList_t;
 
 #ifdef	__cplusplus
 }

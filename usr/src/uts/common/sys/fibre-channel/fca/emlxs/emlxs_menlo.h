@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_MENLO_H
 #define	_EMLXS_MENLO_H
@@ -1055,12 +1054,6 @@ typedef struct fcf_info
 	uint32_t lka_period; /* Periodic LKA */
 
 	uint16_t state; /* FCF state */
-
-/* FCF State Definitions */
-#define	FCF_CREATE_STATE	1 /* FCF is discovered but path not qualified */
-#define	FCF_READY_STATE		2 /* FCF is ready for LOGI */
-#define	FCF_AVAILABLE_STATE	4 /* FCF is available for FLOGI & FDISC */
-#define	FCF_OFFLINE		0x8000 /* Error or Set Offline */
 
 	uint16_t ctrl_flags; /* FIP header flags */
 	uint16_t sup_addr_mode; /* FCoE addressing mode capability */

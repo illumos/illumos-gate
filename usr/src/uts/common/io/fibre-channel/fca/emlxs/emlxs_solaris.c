@@ -21,13 +21,15 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #define	DEF_ICFG	1
 
 #include <emlxs.h>
 #include <emlxs_version.h>
+
 
 char emlxs_revision[] = EMLXS_REVISION;
 char emlxs_version[] = EMLXS_VERSION;
@@ -65,9 +67,8 @@ static uint32_t	emlxs_integrity_check(emlxs_hba_t *hba);
 static uint32_t	emlxs_test(emlxs_hba_t *hba, uint32_t test_code,
 		    uint32_t args, uint32_t *arg);
 
-#ifdef SLI3_SUPPORT
 static void	emlxs_read_vport_prop(emlxs_hba_t *hba);
-#endif	/* SLI3_SUPPORT */
+
 
 
 /*
@@ -716,8 +717,7 @@ emlxs_table_t emlxs_state_table[] = {
 	{IOSTAT_LS_RJT, "LS reject."},
 	{IOSTAT_CMD_REJECT,		"Cmd reject."},
 	{IOSTAT_FCP_TGT_LENCHK, "TGT length check."},
-	{IOSTAT_NEED_BUF_ENTRY, "Need buffer entry."},
-	{IOSTAT_ILLEGAL_FRAME_RCVD, "Illegal frame."},
+	{IOSTAT_NEED_BUFF_ENTRY, "Need buffer entry."},
 	{IOSTAT_DATA_UNDERRUN, "Data underrun."},
 	{IOSTAT_DATA_OVERRUN,  "Data overrun."},
 
@@ -985,7 +985,7 @@ emlxs_table_t emlxs_elscmd_table[] = {
 #ifdef MODSYM_SUPPORT
 static void emlxs_fca_modclose();
 static int  emlxs_fca_modopen();
-emlxs_modsym_t emlxs_modsym;
+emlxs_modsym_t emlxs_modsym;	/* uses emlxs_device.lock */
 
 static int
 emlxs_fca_modopen()
@@ -993,7 +993,7 @@ emlxs_fca_modopen()
 	int err;
 
 	if (emlxs_modsym.mod_fctl) {
-		return (EEXIST);
+		return (0);
 	}
 
 	/* Leadville (fctl) */
@@ -1046,7 +1046,7 @@ failed:
 
 	emlxs_fca_modclose();
 
-	return (ENODEV);
+	return (1);
 
 
 } /* emlxs_fca_modopen() */
@@ -1117,10 +1117,6 @@ _init(void)
 #ifdef MODSYM_SUPPORT
 	/* Open SFS */
 	(void) emlxs_fca_modopen();
-#ifdef SFCT_SUPPORT
-	/* Open FCT */
-	(void) emlxs_fct_modopen();
-#endif /* SFCT_SUPPORT */
 #endif /* MODSYM_SUPPORT */
 
 	/* Setup devops for SFS */
@@ -1131,10 +1127,6 @@ _init(void)
 #ifdef MODSYM_SUPPORT
 		/* Close SFS */
 		emlxs_fca_modclose();
-#ifdef SFCT_SUPPORT
-		/* Close FCT */
-		emlxs_fct_modclose();
-#endif /* SFCT_SUPPORT */
 #endif /* MODSYM_SUPPORT */
 
 		return (ret);
@@ -1164,10 +1156,6 @@ _fini(void)
 #ifdef MODSYM_SUPPORT
 	/* Close SFS */
 	emlxs_fca_modclose();
-#ifdef SFCT_SUPPORT
-	/* Close FCT */
-	emlxs_fct_modclose();
-#endif /* SFCT_SUPPORT */
 #endif /* MODSYM_SUPPORT */
 
 	/*
@@ -1292,7 +1280,29 @@ emlxs_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+#ifdef SFCT_SUPPORT
+	if (port->tgt_mode && ((port->fct_flags & FCT_STATE_PORT_ONLINE) ||
+	    (port->fct_flags & FCT_STATE_NOT_ACKED))) {
+		mutex_exit(&EMLXS_PORT_LOCK);
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_detach_failed_msg,
+		    "emlxs_detach: Driver busy. Target mode active.");
+
+		return (DDI_FAILURE);
+	}
+#endif /* SFCT_SUPPORT */
+
+	if (port->ini_mode && (port->flag & EMLXS_PORT_BOUND)) {
+		mutex_exit(&EMLXS_PORT_LOCK);
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_detach_failed_msg,
+		    "emlxs_detach: Driver busy. Initiator mode active.");
+
+		return (DDI_FAILURE);
+	}
+
 	hba->flag &= ~FC_DUMP_SAFE;
+
 	mutex_exit(&EMLXS_PORT_LOCK);
 
 	switch (cmd) {
@@ -1733,7 +1743,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	port_info->pi_attrs.vendor_specific_id =
 	    ((hba->model_info.device_id << 16) | PCI_VENDOR_ID_EMULEX);
 
-	port_info->pi_attrs.supported_cos = SWAP_DATA32(FC_NS_CLASS3);
+	port_info->pi_attrs.supported_cos = LE_SWAP32(FC_NS_CLASS3);
 
 	port_info->pi_attrs.max_frame_size = FF_FRAME_SIZE;
 
@@ -1819,7 +1829,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	dptr[6] = buffer[6];
 	dptr[7] = buffer[7];
 	port_info->pi_attrs.hba_fru_details.high =
-	    SWAP_DATA64(port_info->pi_attrs.hba_fru_details.high);
+	    LE_SWAP64(port_info->pi_attrs.hba_fru_details.high);
 
 	dptr = (char *)&port_info->pi_attrs.hba_fru_details.low;
 	dptr[0] = buffer[8];
@@ -1831,7 +1841,7 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	dptr[6] = buffer[14];
 	dptr[7] = buffer[15];
 	port_info->pi_attrs.hba_fru_details.low =
-	    SWAP_DATA64(port_info->pi_attrs.hba_fru_details.low);
+	    LE_SWAP64(port_info->pi_attrs.hba_fru_details.low);
 
 #endif /* >= EMLXS_MODREV3 */
 
@@ -2003,42 +2013,19 @@ emlxs_unbind_port(opaque_t fca_port_handle)
 {
 	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
 	emlxs_hba_t *hba = HBA;
-	uint32_t count;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 	    "fca_unbind_port: port=%p", port);
 
-	/* Check ub buffer pools */
-	if (port->ub_pool) {
-		mutex_enter(&EMLXS_UB_LOCK);
-
-		/* Wait up to 10 seconds for all ub pools to be freed */
-		count = 10 * 2;
-		while (port->ub_pool && count) {
-			mutex_exit(&EMLXS_UB_LOCK);
-			delay(drv_usectohz(500000));	/* half second wait */
-			count--;
-			mutex_enter(&EMLXS_UB_LOCK);
-		}
-
-		if (port->ub_pool) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-			    "fca_unbind_port: Unsolicited buffers still "
-			    "active. port=%p. Destroying...", port);
-
-			/* Destroy all pools */
-			while (port->ub_pool) {
-				emlxs_ub_destroy(port, port->ub_pool);
-			}
-		}
-
-		mutex_exit(&EMLXS_UB_LOCK);
-	}
-
 	/* Destroy & flush all port nodes, if they exist */
 	if (port->node_count) {
-		(void) emlxs_mb_unreg_rpi(port, 0xffff, 0, 0, 0);
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			(void) emlxs_sli4_unreg_all_rpi_by_port(port);
+		} else {
+			(void) emlxs_mb_unreg_rpi(port, 0xffff, 0, 0, 0);
+		}
 	}
+
 #if (EMLXS_MODREV >= EMLXS_MODREV5)
 	if ((hba->flag & FC_NPIV_ENABLED) &&
 	    (port->flag & (EMLXS_PORT_CONFIG | EMLXS_PORT_ENABLE))) {
@@ -2079,12 +2066,11 @@ emlxs_pkt_init(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 	if (!sbp) {
 		return (FC_FAILURE);
 	}
-
 	bzero((void *)sbp, sizeof (emlxs_buf_t));
 
 	mutex_init(&sbp->mtx, NULL, MUTEX_DRIVER, (void *)hba->intr_arg);
 	sbp->pkt_flags =
-	    PACKET_VALID | PACKET_RETURNED;
+	    PACKET_VALID | PACKET_ULP_OWNED;
 	sbp->port = port;
 	sbp->pkt = pkt;
 	sbp->iocbq.sbp = sbp;
@@ -2122,8 +2108,8 @@ emlxs_initialize_pkt(emlxs_port_t *port, emlxs_buf_t *sbp)
 		sbp->did   = 0;
 		sbp->lun   = 0;
 		sbp->class = 0;
-		sbp->ring  = NULL;
 		sbp->class = 0;
+		sbp->channel  = NULL;
 	}
 
 	bzero((void *)&sbp->iocbq, sizeof (IOCBQ));
@@ -2187,7 +2173,6 @@ emlxs_pkt_uninit(opaque_t fca_port_handle, fc_packet_t *pkt)
 	if (!(sbp->pkt_flags & PACKET_VALID)) {
 		return (FC_FAILURE);
 	}
-
 	sbp->pkt_flags &= ~PACKET_VALID;
 	mutex_destroy(&sbp->mtx);
 
@@ -2318,7 +2303,7 @@ emlxs_get_device(opaque_t fca_port_handle, fc_portid_t d_id)
 	emlxs_port_t *port = (emlxs_port_t *)fca_port_handle;
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
-	    "fca_get_device: did=%x", d_id);
+	    "fca_get_device: did=%x", d_id.port_id);
 
 	return (NULL);
 
@@ -2427,7 +2412,7 @@ emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 		return (FC_BADPACKET);
 	}
 
-	if (!(sbp->pkt_flags & (PACKET_VALID | PACKET_RETURNED))) {
+	if (!(sbp->pkt_flags & (PACKET_VALID | PACKET_ULP_OWNED))) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_error_msg,
 		    "Invalid packet flags. sbp=%p port=%p flags=%x", sbp,
 		    sbp->port, sbp->pkt_flags);
@@ -2523,7 +2508,7 @@ emlxs_transport(opaque_t fca_port_handle, fc_packet_t *pkt)
 	if (rval != FC_SUCCESS) {
 		/* Return packet to ULP */
 		mutex_enter(&sbp->mtx);
-		sbp->pkt_flags |= PACKET_RETURNED;
+		sbp->pkt_flags |= PACKET_ULP_OWNED;
 		mutex_exit(&sbp->mtx);
 
 		return (rval);
@@ -2551,13 +2536,15 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 	clock_t		timeout;
 	clock_t		time;
 	uint32_t	att_bit;
-	emlxs_ring_t	*rp;
+	CHANNEL	*cp;
 
 	mutex_enter(&EMLXS_PORT_LOCK);
 	hba->io_poll_count++;
 	mutex_exit(&EMLXS_PORT_LOCK);
 
 	/* Check for panic situation */
+	cp = (CHANNEL *)sbp->channel;
+
 	if (ddi_in_panic()) {
 		/*
 		 * In panic situations there will be one thread with
@@ -2568,23 +2555,24 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		 * We must manually poll everything in this thread
 		 * to keep the driver going.
 		 */
-		rp = (emlxs_ring_t *)sbp->ring;
-		switch (rp->ringno) {
-		case FC_FCP_RING:
-			att_bit = HA_R0ATT;
-			break;
+		if (hba->sli_mode == EMLXS_HBA_SLI3_MODE) {
+			switch (cp->channelno) {
+			case FC_FCP_RING:
+				att_bit = HA_R0ATT;
+				break;
 
-		case FC_IP_RING:
-			att_bit = HA_R1ATT;
-			break;
+			case FC_IP_RING:
+				att_bit = HA_R1ATT;
+				break;
 
-		case FC_ELS_RING:
-			att_bit = HA_R2ATT;
-			break;
+			case FC_ELS_RING:
+				att_bit = HA_R2ATT;
+				break;
 
-		case FC_CT_RING:
-			att_bit = HA_R3ATT;
-			break;
+			case FC_CT_RING:
+				att_bit = HA_R3ATT;
+				break;
+			}
 		}
 
 		/* Keep polling the chip until our IO is completed */
@@ -2593,7 +2581,11 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		(void) drv_getparm(LBOLT, &time);
 		timeout = time + drv_usectohz(1000000);
 		while (!(sbp->pkt_flags & PACKET_COMPLETED)) {
-			emlxs_sli_poll_intr(hba, att_bit);
+			if (hba->sli_mode == EMLXS_HBA_SLI3_MODE) {
+				EMLXS_SLI_POLL_INTR(hba, att_bit);
+			} else {
+				EMLXS_SLI_POLL_INTR(hba, 0);
+			}
 			(void) drv_getparm(LBOLT, &time);
 
 			/* Trigger timer checks periodically */
@@ -2618,7 +2610,8 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		if (sbp->pkt_flags & PACKET_FCP_TGT_RESET) {
 			/* Flush the IO's on the chipq */
 			(void) emlxs_chipq_node_flush(port,
-			    &hba->ring[FC_FCP_RING], sbp->node, sbp);
+			    &hba->chan[hba->channel_fcp],
+			    sbp->node, sbp);
 		} else {
 			/* Flush the IO's on the chipq for this lun */
 			(void) emlxs_chipq_lun_flush(port,
@@ -2626,7 +2619,7 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		}
 
 		if (sbp->flush_count == 0) {
-			emlxs_node_open(port, sbp->node, FC_FCP_RING);
+			emlxs_node_open(port, sbp->node, hba->channel_fcp);
 			goto done;
 		}
 
@@ -2639,7 +2632,7 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		}
 
 		if (sbp->flush_count == 0) {
-			emlxs_node_open(port, sbp->node, FC_FCP_RING);
+			emlxs_node_open(port, sbp->node, hba->channel_fcp);
 			goto done;
 		}
 
@@ -2652,7 +2645,8 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		if (sbp->pkt_flags & PACKET_FCP_TGT_RESET) {
 			/* Flush the IO's on the chipq */
 			(void) emlxs_chipq_node_flush(port,
-			    &hba->ring[FC_FCP_RING], sbp->node, sbp);
+			    &hba->chan[hba->channel_fcp],
+			    sbp->node, sbp);
 		} else {
 			/* Flush the IO's on the chipq for this lun */
 			(void) emlxs_chipq_lun_flush(port,
@@ -2668,7 +2662,7 @@ emlxs_poll(emlxs_port_t *port, emlxs_buf_t *sbp)
 		}
 
 		if (sbp->flush_count == 0) {
-			emlxs_node_open(port, sbp->node, FC_FCP_RING);
+			emlxs_node_open(port, sbp->node, hba->channel_fcp);
 			goto done;
 		}
 
@@ -2707,7 +2701,7 @@ done:
 #endif	/* EMLXS_MODREV2X */
 
 	mutex_enter(&sbp->mtx);
-	sbp->pkt_flags |= PACKET_RETURNED;
+	sbp->pkt_flags |= PACKET_ULP_OWNED;
 	mutex_exit(&sbp->mtx);
 
 	mutex_enter(&EMLXS_PORT_LOCK);
@@ -2716,6 +2710,7 @@ done:
 
 	/* Make ULP completion callback if required */
 	if (pkt->pkt_comp) {
+		cp->ulpCmplCmd++;
 		(*pkt->pkt_comp) (pkt);
 	}
 
@@ -2741,6 +2736,7 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 	emlxs_config_t		*cfg = &CFG;
 	fc_unsol_buf_t		*ubp;
 	emlxs_ub_priv_t		*ub_priv;
+	int			rc;
 
 	if (port->tgt_mode) {
 		if (tokens && count) {
@@ -2854,12 +2850,10 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 		pool = pool->pool_next;
 	}
 
+	mutex_exit(&EMLXS_UB_LOCK);
+
 	new_pool = (emlxs_unsol_buf_t *)kmem_zalloc(sizeof (emlxs_unsol_buf_t),
 	    KM_SLEEP);
-	if (new_pool == NULL) {
-		result = FC_FAILURE;
-		goto fail;
-	}
 
 	new_pool->pool_next = NULL;
 	new_pool->pool_type = type;
@@ -2870,12 +2864,6 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 	new_pool->pool_free_resv = free_resv;
 	new_pool->fc_ubufs =
 	    kmem_zalloc((sizeof (fc_unsol_buf_t) * (*count)), KM_SLEEP);
-
-	if (new_pool->fc_ubufs == NULL) {
-		kmem_free(new_pool, sizeof (emlxs_unsol_buf_t));
-		result = FC_FAILURE;
-		goto fail;
-	}
 
 	new_pool->pool_first_token = port->ub_count;
 	new_pool->pool_last_token = port->ub_count + new_pool->pool_nentries;
@@ -2890,15 +2878,6 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 		ubp->ub_fca_private =
 		    (emlxs_ub_priv_t *)kmem_zalloc(sizeof (emlxs_ub_priv_t),
 		    KM_SLEEP);
-
-		if (ubp->ub_fca_private == NULL) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
-			    "ub_alloc failed: Unable to allocate fca_private "
-			    "object.");
-
-			result = FC_FAILURE;
-			goto fail;
-		}
 
 		/*
 		 * Initialize emlxs_ub_priv_t
@@ -2917,19 +2896,6 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 		/* Allocate the actual buffer */
 		ubp->ub_buffer = (caddr_t)kmem_zalloc(size, KM_SLEEP);
 
-		/* Check if we were not successful */
-		if (ubp->ub_buffer == NULL) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg,
-			    "ub_alloc failed: Unable to allocate buffer.");
-
-			/* Free the private area of the current object */
-			kmem_free(ubp->ub_fca_private,
-			    sizeof (emlxs_ub_priv_t));
-
-			result = FC_FAILURE;
-			goto fail;
-		}
-
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_detail_msg,
 		    "ub_alloc: buffer=%p token=%x size=%x type=%x ", ubp,
 		    ub_priv->token, ubp->ub_bufsize, type);
@@ -2937,6 +2903,8 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 		tokens[i] = (uint64_t)((unsigned long)ubp);
 		port->ub_count++;
 	}
+
+	mutex_enter(&EMLXS_UB_LOCK);
 
 	/* Add the pool to the top of the pool list */
 	new_pool->pool_prev = NULL;
@@ -2951,22 +2919,23 @@ emlxs_ub_alloc(opaque_t fca_port_handle, uint64_t tokens[], uint32_t size,
 	if (type == FC_TYPE_IS8802_SNAP) {
 		MAILBOXQ	*mbox;
 
-		port->ub_post[FC_IP_RING] += new_pool->pool_nentries;
+		port->ub_post[hba->channel_ip] += new_pool->pool_nentries;
 
 		if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
-		    MEM_MBOX | MEM_PRI))) {
-			emlxs_mb_config_farp(hba, (MAILBOX *)mbox);
-			if (emlxs_sli_issue_mbox_cmd(hba, (MAILBOX *)mbox,
-			    MBX_NOWAIT, 0) != MBX_BUSY) {
+		    MEM_MBOX, 1))) {
+			emlxs_mb_config_farp(hba, mbox);
+			rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba,
+			    mbox, MBX_NOWAIT, 0);
+			if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
 				(void) emlxs_mem_put(hba, MEM_MBOX,
 				    (uint8_t *)mbox);
 			}
 		}
 		port->flag |= EMLXS_PORT_IP_UP;
 	} else if (type == FC_TYPE_EXTENDED_LS) {
-		port->ub_post[FC_ELS_RING] += new_pool->pool_nentries;
+		port->ub_post[hba->channel_els] += new_pool->pool_nentries;
 	} else if (type == FC_TYPE_FC_SERVICES) {
-		port->ub_post[FC_CT_RING] += new_pool->pool_nentries;
+		port->ub_post[hba->channel_ct] += new_pool->pool_nentries;
 	}
 
 	mutex_exit(&EMLXS_UB_LOCK);
@@ -3033,7 +3002,7 @@ emlxs_ub_els_reject(emlxs_port_t *port, fc_unsol_buf_t *ubp)
 		return;
 	}
 
-	sid = SWAP_DATA24_LO(ubp->ub_frame.s_id);
+	sid = LE_SWAP24_LO(ubp->ub_frame.s_id);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_unsol_els_msg,
 	    "%s dropped: sid=%x. Rejecting.",
@@ -3051,7 +3020,7 @@ emlxs_ub_els_reject(emlxs_port_t *port, fc_unsol_buf_t *ubp)
 	pkt->pkt_cmd_fhdr.d_id = ubp->ub_frame.s_id;
 	pkt->pkt_cmd_fhdr.r_ctl =
 	    R_CTL_EXTENDED_SVC | R_CTL_SOLICITED_CONTROL;
-	pkt->pkt_cmd_fhdr.s_id = SWAP_DATA24_LO(port->did);
+	pkt->pkt_cmd_fhdr.s_id = LE_SWAP24_LO(port->did);
 	pkt->pkt_cmd_fhdr.type = FC_TYPE_EXTENDED_LS;
 	pkt->pkt_cmd_fhdr.f_ctl =
 	    F_CTL_XCHG_CONTEXT | F_CTL_LAST_SEQ | F_CTL_END_SEQ;
@@ -3287,6 +3256,7 @@ emlxs_ub_free(opaque_t fca_port_handle, uint32_t count, uint64_t tokens[])
 extern void
 emlxs_ub_destroy(emlxs_port_t *port, emlxs_unsol_buf_t *pool)
 {
+	emlxs_hba_t		*hba = HBA;
 	emlxs_unsol_buf_t	*next;
 	emlxs_unsol_buf_t	*prev;
 	fc_unsol_buf_t		*ubp;
@@ -3314,15 +3284,15 @@ emlxs_ub_destroy(emlxs_port_t *port, emlxs_unsol_buf_t *pool)
 	/* Clear the post counts */
 	switch (pool->pool_type) {
 	case FC_TYPE_IS8802_SNAP:
-		port->ub_post[FC_IP_RING] -= pool->pool_nentries;
+		port->ub_post[hba->channel_ip] -= pool->pool_nentries;
 		break;
 
 	case FC_TYPE_EXTENDED_LS:
-		port->ub_post[FC_ELS_RING] -= pool->pool_nentries;
+		port->ub_post[hba->channel_els] -= pool->pool_nentries;
 		break;
 
 	case FC_TYPE_FC_SERVICES:
-		port->ub_post[FC_CT_RING] -= pool->pool_nentries;
+		port->ub_post[hba->channel_ct] -= pool->pool_nentries;
 		break;
 	}
 
@@ -3361,12 +3331,13 @@ emlxs_pkt_abort(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 {
 	emlxs_port_t	*port = (emlxs_port_t *)fca_port_handle;
 	emlxs_hba_t	*hba = HBA;
+	emlxs_config_t	*cfg = &CFG;
 
 	emlxs_buf_t	*sbp;
 	NODELIST	*nlp;
 	NODELIST	*prev_nlp;
-	uint8_t		ringno;
-	RING		*rp;
+	uint8_t		channelno;
+	CHANNEL	*cp;
 	clock_t		timeout;
 	clock_t		time;
 	int32_t		pkt_ret;
@@ -3380,8 +3351,8 @@ emlxs_pkt_abort(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 	sbp = (emlxs_buf_t *)pkt->pkt_fca_private;
 	iocbq = &sbp->iocbq;
 	nlp = (NODELIST *)sbp->node;
-	rp = (RING *)sbp->ring;
-	ringno = (rp) ? rp->ringno : 0;
+	cp = (CHANNEL *)sbp->channel;
+	channelno = (cp) ? cp->channelno : 0;
 
 	if (!(port->flag & EMLXS_PORT_BOUND)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_abort_failed_msg,
@@ -3402,7 +3373,7 @@ emlxs_pkt_abort(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 
 	/* Check if pkt is no good */
 	if (!(sbp->pkt_flags & PACKET_VALID) ||
-	    (sbp->pkt_flags & PACKET_RETURNED)) {
+	    (sbp->pkt_flags & PACKET_ULP_OWNED)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_abort_failed_msg,
 		    "Bad sbp. flags=%x", sbp->pkt_flags);
 		return (FC_FAILURE);
@@ -3414,7 +3385,7 @@ emlxs_pkt_abort(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 
 	/* Check again if we still own this */
 	if (!(sbp->pkt_flags & PACKET_VALID) ||
-	    (sbp->pkt_flags & PACKET_RETURNED)) {
+	    (sbp->pkt_flags & PACKET_ULP_OWNED)) {
 		mutex_exit(&sbp->mtx);
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_abort_failed_msg,
 		    "Bad sbp. flags=%x", sbp->pkt_flags);
@@ -3448,7 +3419,7 @@ emlxs_pkt_abort(opaque_t fca_port_handle, fc_packet_t *pkt, int32_t sleep)
 begin:
 	pass++;
 
-	mutex_enter(&EMLXS_RINGTX_LOCK);
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
 	if (sbp->pkt_flags & PACKET_IN_TXQ) {
 		/* Find it on the queue */
@@ -3456,7 +3427,7 @@ begin:
 		if (iocbq->flag & IOCB_PRIORITY) {
 			/* Search the priority queue */
 			prev = NULL;
-			next = (IOCBQ *) nlp->nlp_ptx[ringno].q_first;
+			next = (IOCBQ *) nlp->nlp_ptx[channelno].q_first;
 
 			while (next) {
 				if (next == iocbq) {
@@ -3465,19 +3436,20 @@ begin:
 						prev->next = iocbq->next;
 					}
 
-					if (nlp->nlp_ptx[ringno].q_last ==
+					if (nlp->nlp_ptx[channelno].q_last ==
 					    (void *)iocbq) {
-						nlp->nlp_ptx[ringno].q_last =
+						nlp->nlp_ptx[channelno].q_last =
 						    (void *)prev;
 					}
 
-					if (nlp->nlp_ptx[ringno].q_first ==
+					if (nlp->nlp_ptx[channelno].q_first ==
 					    (void *)iocbq) {
-						nlp->nlp_ptx[ringno].q_first =
+						nlp->nlp_ptx[channelno].
+						    q_first =
 						    (void *)iocbq->next;
 					}
 
-					nlp->nlp_ptx[ringno].q_cnt--;
+					nlp->nlp_ptx[channelno].q_cnt--;
 					iocbq->next = NULL;
 					found = 1;
 					break;
@@ -3489,7 +3461,7 @@ begin:
 		} else {
 			/* Search the normal queue */
 			prev = NULL;
-			next = (IOCBQ *) nlp->nlp_tx[ringno].q_first;
+			next = (IOCBQ *) nlp->nlp_tx[channelno].q_first;
 
 			while (next) {
 				if (next == iocbq) {
@@ -3498,19 +3470,19 @@ begin:
 						prev->next = iocbq->next;
 					}
 
-					if (nlp->nlp_tx[ringno].q_last ==
+					if (nlp->nlp_tx[channelno].q_last ==
 					    (void *)iocbq) {
-						nlp->nlp_tx[ringno].q_last =
+						nlp->nlp_tx[channelno].q_last =
 						    (void *)prev;
 					}
 
-					if (nlp->nlp_tx[ringno].q_first ==
+					if (nlp->nlp_tx[channelno].q_first ==
 					    (void *)iocbq) {
-						nlp->nlp_tx[ringno].q_first =
+						nlp->nlp_tx[channelno].q_first =
 						    (void *)iocbq->next;
 					}
 
-					nlp->nlp_tx[ringno].q_cnt--;
+					nlp->nlp_tx[channelno].q_cnt--;
 					iocbq->next = NULL;
 					found = 1;
 					break;
@@ -3522,7 +3494,7 @@ begin:
 		}
 
 		if (!found) {
-			mutex_exit(&EMLXS_RINGTX_LOCK);
+			mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_abort_failed_msg,
 			    "I/O not found in driver. sbp=%p flags=%x", sbp,
 			    sbp->pkt_flags);
@@ -3530,9 +3502,9 @@ begin:
 		}
 
 		/* Check if node still needs servicing */
-		if ((nlp->nlp_ptx[ringno].q_first) ||
-		    (nlp->nlp_tx[ringno].q_first &&
-		    !(nlp->nlp_flag[ringno] & NLP_CLOSED))) {
+		if ((nlp->nlp_ptx[channelno].q_first) ||
+		    (nlp->nlp_tx[channelno].q_first &&
+		    !(nlp->nlp_flag[channelno] & NLP_CLOSED))) {
 
 			/*
 			 * If this is the base node,
@@ -3540,62 +3512,60 @@ begin:
 			 */
 			/* We want to drain the base node before moving on */
 			if (!nlp->nlp_base) {
-				/* Just shift ring queue */
+				/* Just shift channel queue */
 				/* pointers to next node */
-				rp->nodeq.q_last = (void *) nlp;
-				rp->nodeq.q_first = nlp->nlp_next[ringno];
+				cp->nodeq.q_last = (void *) nlp;
+				cp->nodeq.q_first = nlp->nlp_next[channelno];
 			}
 		} else {
-			/* Remove node from ring queue */
+			/* Remove node from channel queue */
 
 			/* If this is the only node on list */
-			if (rp->nodeq.q_first == (void *)nlp &&
-			    rp->nodeq.q_last == (void *)nlp) {
-				rp->nodeq.q_last = NULL;
-				rp->nodeq.q_first = NULL;
-				rp->nodeq.q_cnt = 0;
-			} else if (rp->nodeq.q_first == (void *)nlp) {
-				rp->nodeq.q_first = nlp->nlp_next[ringno];
-				((NODELIST *) rp->nodeq.q_last)->
-				    nlp_next[ringno] = rp->nodeq.q_first;
-				rp->nodeq.q_cnt--;
+			if (cp->nodeq.q_first == (void *)nlp &&
+			    cp->nodeq.q_last == (void *)nlp) {
+				cp->nodeq.q_last = NULL;
+				cp->nodeq.q_first = NULL;
+				cp->nodeq.q_cnt = 0;
+			} else if (cp->nodeq.q_first == (void *)nlp) {
+				cp->nodeq.q_first = nlp->nlp_next[channelno];
+				((NODELIST *) cp->nodeq.q_last)->
+				    nlp_next[channelno] = cp->nodeq.q_first;
+				cp->nodeq.q_cnt--;
 			} else {
 				/*
 				 * This is a little more difficult find the
-				 * previous node in the circular ring queue
+				 * previous node in the circular channel queue
 				 */
 				prev_nlp = nlp;
-				while (prev_nlp->nlp_next[ringno] != nlp) {
-					prev_nlp = prev_nlp->nlp_next[ringno];
+				while (prev_nlp->nlp_next[channelno] != nlp) {
+					prev_nlp = prev_nlp->
+					    nlp_next[channelno];
 				}
 
-				prev_nlp->nlp_next[ringno] =
-				    nlp->nlp_next[ringno];
+				prev_nlp->nlp_next[channelno] =
+				    nlp->nlp_next[channelno];
 
-				if (rp->nodeq.q_last == (void *)nlp) {
-					rp->nodeq.q_last = (void *)prev_nlp;
+				if (cp->nodeq.q_last == (void *)nlp) {
+					cp->nodeq.q_last = (void *)prev_nlp;
 				}
-				rp->nodeq.q_cnt--;
+				cp->nodeq.q_cnt--;
 
 			}
 
 			/* Clear node */
-			nlp->nlp_next[ringno] = NULL;
+			nlp->nlp_next[channelno] = NULL;
 		}
 
-		mutex_enter(&sbp->mtx);
-
-		if (sbp->pkt_flags & PACKET_IN_TXQ) {
-			sbp->pkt_flags &= ~PACKET_IN_TXQ;
-			hba->ring_tx_count[ringno]--;
+		/* Free the ULPIOTAG and the bmp */
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			hba->fc_table[sbp->iotag] = NULL;
+			emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+		} else {
+			(void) emlxs_unregister_pkt(cp, sbp->iotag, 1);
 		}
 
-		mutex_exit(&sbp->mtx);
 
-		/* Free the ulpIoTag and the bmp */
-		(void) emlxs_unregister_pkt(rp, sbp->iotag, 0);
-
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 		emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
 		    IOERR_ABORT_REQUESTED, 1);
@@ -3603,21 +3573,21 @@ begin:
 		goto done;
 	}
 
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 
 	/* Check the chip queue */
-	mutex_enter(&EMLXS_FCTAB_LOCK(ringno));
+	mutex_enter(&EMLXS_FCTAB_LOCK);
 
 	if ((sbp->pkt_flags & PACKET_IN_CHIPQ) &&
 	    !(sbp->pkt_flags & PACKET_XRI_CLOSED) &&
-	    (sbp == rp->fc_table[sbp->iotag])) {
+	    (sbp == hba->fc_table[sbp->iotag])) {
 
 		/* Create the abort IOCB */
 		if (hba->state >= FC_LINK_UP) {
 			iocbq =
 			    emlxs_create_abort_xri_cn(port, sbp->node,
-			    sbp->iotag, rp, sbp->class, ABORT_TYPE_ABTS);
+			    sbp->iotag, cp, sbp->class, ABORT_TYPE_ABTS);
 
 			mutex_enter(&sbp->mtx);
 			sbp->pkt_flags |= PACKET_XRI_CLOSED;
@@ -3628,7 +3598,7 @@ begin:
 		} else {
 			iocbq =
 			    emlxs_create_close_xri_cn(port, sbp->node,
-			    sbp->iotag, rp);
+			    sbp->iotag, cp);
 
 			mutex_enter(&sbp->mtx);
 			sbp->pkt_flags |= PACKET_XRI_CLOSED;
@@ -3637,27 +3607,31 @@ begin:
 			mutex_exit(&sbp->mtx);
 		}
 
-		mutex_exit(&EMLXS_FCTAB_LOCK(ringno));
+		mutex_exit(&EMLXS_FCTAB_LOCK);
 
 		/* Send this iocbq */
 		if (iocbq) {
-			emlxs_sli_issue_iocb_cmd(hba, rp, iocbq);
+			EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 			iocbq = NULL;
 		}
 
 		goto done;
 	}
 
-	mutex_exit(&EMLXS_FCTAB_LOCK(ringno));
+	mutex_exit(&EMLXS_FCTAB_LOCK);
 
 	/* Pkt was not on any queues */
 
 	/* Check again if we still own this */
 	if (!(sbp->pkt_flags & PACKET_VALID) ||
 	    (sbp->pkt_flags &
-	    (PACKET_RETURNED | PACKET_IN_COMPLETION |
+	    (PACKET_ULP_OWNED | PACKET_IN_COMPLETION |
 	    PACKET_IN_FLUSH | PACKET_IN_TIMEOUT))) {
 		goto done;
+	}
+
+	if (!sleep) {
+		return (FC_FAILURE);
 	}
 
 	/* Apparently the pkt was not found.  Let's delay and try again */
@@ -3667,7 +3641,7 @@ begin:
 		/* Check again if we still own this */
 		if (!(sbp->pkt_flags & PACKET_VALID) ||
 		    (sbp->pkt_flags &
-		    (PACKET_RETURNED | PACKET_IN_COMPLETION |
+		    (PACKET_ULP_OWNED | PACKET_IN_COMPLETION |
 		    PACKET_IN_FLUSH | PACKET_IN_TIMEOUT))) {
 			goto done;
 		}
@@ -3678,9 +3652,8 @@ begin:
 force_it:
 
 	/* Force the completion now */
-
-	/* Unregister the pkt */
-	(void) emlxs_unregister_pkt(rp, sbp->iotag, 1);
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+	    "Abort: Completing an IO thats not outstanding: %x", sbp->iotag);
 
 	/* Now complete it */
 	emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT, IOERR_ABORT_REQUESTED,
@@ -3706,8 +3679,8 @@ done:
 			 * to keep the driver going.
 			 */
 
-			rp = (emlxs_ring_t *)sbp->ring;
-			switch (rp->ringno) {
+			cp = (CHANNEL *)sbp->channel;
+			switch (cp->channelno) {
 			case FC_FCP_RING:
 				att_bit = HA_R0ATT;
 				break;
@@ -3729,7 +3702,7 @@ done:
 			(void) drv_getparm(LBOLT, &time);
 			while ((time < timeout) &&
 			    !(sbp->pkt_flags & PACKET_COMPLETED)) {
-				emlxs_sli_poll_intr(hba, att_bit);
+				EMLXS_SLI_POLL_INTR(hba, att_bit);
 				(void) drv_getparm(LBOLT, &time);
 			}
 		} else {
@@ -3758,24 +3731,64 @@ done:
 
 	/* Check again if we still own this */
 	if ((sbp->pkt_flags & PACKET_VALID) &&
-	    !(sbp->pkt_flags & PACKET_RETURNED)) {
+	    !(sbp->pkt_flags & PACKET_ULP_OWNED)) {
 		mutex_enter(&sbp->mtx);
 		if ((sbp->pkt_flags & PACKET_VALID) &&
-		    !(sbp->pkt_flags & PACKET_RETURNED)) {
-			sbp->pkt_flags |= PACKET_RETURNED;
+		    !(sbp->pkt_flags & PACKET_ULP_OWNED)) {
+			sbp->pkt_flags |= PACKET_ULP_OWNED;
 		}
 		mutex_exit(&sbp->mtx);
 	}
-#ifdef ULP_PATCH5
-	return (FC_FAILURE);
 
-#else
+#ifdef ULP_PATCH5
+	if (cfg[CFG_ENABLE_PATCH].current & ULP_PATCH5) {
+		return (FC_FAILURE);
+	}
+#endif /* ULP_PATCH5 */
+
 	return (FC_SUCCESS);
 
-#endif	/* ULP_PATCH5 */
-
-
 } /* emlxs_pkt_abort() */
+
+
+static void
+emlxs_abort_all(emlxs_hba_t *hba, uint32_t *tx, uint32_t *chip)
+{
+	emlxs_port_t   *port = &PPORT;
+	fc_packet_t *pkt;
+	emlxs_buf_t *sbp;
+	uint32_t i;
+	uint32_t flg;
+	uint32_t rc;
+	uint32_t txcnt;
+	uint32_t chipcnt;
+
+	txcnt = 0;
+	chipcnt = 0;
+
+	mutex_enter(&EMLXS_FCTAB_LOCK);
+	for (i = 0; i < hba->max_iotag; i++) {
+		sbp = hba->fc_table[i];
+		if (sbp == NULL || sbp == STALE_PACKET) {
+			continue;
+		}
+		flg =  (sbp->pkt_flags & PACKET_IN_CHIPQ);
+		pkt = PRIV2PKT(sbp);
+		mutex_exit(&EMLXS_FCTAB_LOCK);
+		rc = emlxs_pkt_abort(port, pkt, 0);
+		if (rc == FC_SUCCESS) {
+			if (flg) {
+				chipcnt++;
+			} else {
+				txcnt++;
+			}
+		}
+		mutex_enter(&EMLXS_FCTAB_LOCK);
+	}
+	mutex_exit(&EMLXS_FCTAB_LOCK);
+	*tx = txcnt;
+	*chip = chipcnt;
+} /* emlxs_abort_all() */
 
 
 extern int32_t
@@ -3809,7 +3822,7 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 		hba->linkup_wait_flag = TRUE;
 		mutex_exit(&EMLXS_LINKUP_LOCK);
 
-		if (emlxs_reset_link(hba, 1)) {
+		if (emlxs_reset_link(hba, 1, 1)) {
 			mutex_enter(&EMLXS_LINKUP_LOCK);
 			hba->linkup_wait_flag = FALSE;
 			mutex_exit(&EMLXS_LINKUP_LOCK);
@@ -3880,10 +3893,6 @@ emlxs_reset(opaque_t fca_port_handle, uint32_t cmd)
 } /* emlxs_reset() */
 
 
-extern uint32_t	emlxs_core_dump(emlxs_hba_t *hba, char *buffer,
-			uint32_t size);
-extern uint32_t emlxs_core_size(emlxs_hba_t *hba);
-
 extern int
 emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 {
@@ -3915,7 +3924,7 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 
 		(void) sprintf(buffer, "%s %s", hba->model_info.model,
 		    vpd->fw_version);
-			bzero(pm->pm_data_buf, pm->pm_data_len);
+		bzero(pm->pm_data_buf, pm->pm_data_len);
 
 		if (pm->pm_data_len < strlen(buffer) + 1) {
 			ret = FC_NOMEM;
@@ -4082,13 +4091,13 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 	case FC_PORT_ERR_STATS:
 	case FC_PORT_RLS:
 	{
+		MAILBOXQ	*mbq;
 		MAILBOX		*mb;
 		fc_rls_acc_t	*bp;
 
 		if (!(hba->flag & FC_ONLINE_MODE)) {
 			return (FC_OFFLINE);
 		}
-
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_RLS / FC_PORT_ERR_STATS");
 
@@ -4097,14 +4106,15 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			break;
 		}
 
-		if ((mb = (MAILBOX *)emlxs_mem_get(hba,
-		    MEM_MBOX | MEM_PRI)) == 0) {
+		if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba,
+		    MEM_MBOX, 1)) == 0) {
 			ret = FC_NOMEM;
 			break;
 		}
+		mb = (MAILBOX *)mbq;
 
-		emlxs_mb_read_lnk_stat(hba, mb);
-		if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_WAIT, 0)
+		emlxs_mb_read_lnk_stat(hba, mbq);
+		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0)
 		    != MBX_SUCCESS) {
 			ret = FC_PBUSY;
 		} else {
@@ -4119,7 +4129,7 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			bp->rls_invalid_crc = mb->un.varRdLnk.crcCnt;
 		}
 
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mb);
+		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
 		break;
 	}
 
@@ -4127,7 +4137,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		if (!(hba->flag & FC_ONLINE_MODE)) {
 			return (FC_OFFLINE);
 		}
-
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_DOWNLOAD_FW");
 		ret = emlxs_fw_download(hba, pm->pm_data_buf,
@@ -4138,7 +4147,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		if (!(hba->flag & FC_ONLINE_MODE)) {
 			return (FC_OFFLINE);
 		}
-
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_DOWNLOAD_FCODE");
 		ret = emlxs_fw_download(hba, pm->pm_data_buf,
@@ -4157,7 +4165,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			if (!(hba->flag & FC_ONLINE_MODE)) {
 				return (FC_OFFLINE);
 			}
-
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 			    "fca_port_manage: EMLXS_DIAG_BIU");
 
@@ -4179,7 +4186,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			if (!(hba->flag & FC_ONLINE_MODE)) {
 				return (FC_OFFLINE);
 			}
-
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 			    "fca_port_manage: EMLXS_DIAG_POST");
 
@@ -4197,7 +4203,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			if (!(hba->flag & FC_ONLINE_MODE)) {
 				return (FC_OFFLINE);
 			}
-
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 			    "fca_port_manage: EMLXS_DIAG_ECHO");
 
@@ -4227,7 +4232,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			emlxs_config_t	*cfg;
 			uint32_t	i;
 			uint32_t	count;
-
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 			    "fca_port_manage: EMLXS_PARM_GET_NUM");
 
@@ -4434,7 +4438,7 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			len = sizeof (emlxs_log_resp_t) +
 			    (req->count * MAX_LOG_MSG_LENGTH);
 
-			/* Check the response buffer length */
+					/* Check the response buffer length */
 			if (pm->pm_stat_len < len) {
 				ret = FC_BADCMD;
 				break;
@@ -4471,7 +4475,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			if (!(hba->flag & FC_ONLINE_MODE)) {
 				return (FC_OFFLINE);
 			}
-
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 			    "fca_port_manage: EMLXS_DOWNLOAD_BOOT");
 
@@ -4584,7 +4587,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			if (!(hba->flag & FC_ONLINE_MODE)) {
 				return (FC_OFFLINE);
 			}
-
 			if (pm->pm_cmd_len < sizeof (uint32_t)) {
 				EMLXS_MSGF(EMLXS_CONTEXT,
 				    &emlxs_sfs_debug_msg,
@@ -4618,7 +4620,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			if (!(hba->flag & FC_ONLINE_MODE)) {
 				return (FC_OFFLINE);
 			}
-
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 			    "fca_port_manage: EMLXS_GET_BOOT_STATE");
 
@@ -4684,6 +4685,153 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 			break;
 		}
 
+		case EMLXS_BAR_IO:
+		{
+			uint32_t *cmd;
+			uint32_t *datap;
+			uint32_t offset;
+			caddr_t  addr;
+			uint32_t i;
+			uint32_t tx_cnt;
+			uint32_t chip_cnt;
+
+			cmd = (uint32_t *)pm->pm_cmd_buf;
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_port_manage: EMLXS_BAR_IO %x %x %x",
+			    cmd[0], cmd[1], cmd[2]);
+
+			offset = cmd[1];
+
+			ret = FC_SUCCESS;
+
+			switch (cmd[0]) {
+			case 2: /* bar1read */
+				if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
+					return (FC_BADCMD);
+				}
+
+				/* Registers in this range are invalid */
+				if ((offset >= 0x4C00) && (offset < 0x5000)) {
+					return (FC_BADCMD);
+				}
+				if ((offset >= 0x5800) || (offset & 0x3)) {
+					return (FC_BADCMD);
+				}
+				datap = (uint32_t *)pm->pm_stat_buf;
+
+				for (i = 0; i < pm->pm_stat_len;
+				    i += sizeof (uint32_t)) {
+					if ((offset >= 0x4C00) &&
+					    (offset < 0x5000)) {
+						pm->pm_stat_len = i;
+						break;
+					}
+					if (offset >= 0x5800) {
+						pm->pm_stat_len = i;
+						break;
+					}
+					addr = hba->sli.sli4.bar1_addr + offset;
+					*datap = READ_BAR1_REG(hba, addr);
+					datap++;
+					offset += sizeof (uint32_t);
+				}
+#ifdef FMA_SUPPORT
+				/* Access handle validation */
+				EMLXS_CHK_ACC_HANDLE(hba,
+				    hba->sli.sli4.bar1_acc_handle);
+#endif  /* FMA_SUPPORT */
+				break;
+			case 3: /* bar2read */
+				if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
+					return (FC_BADCMD);
+				}
+				if ((offset >= 0x1000) || (offset & 0x3)) {
+					return (FC_BADCMD);
+				}
+				datap = (uint32_t *)pm->pm_stat_buf;
+
+				for (i = 0; i < pm->pm_stat_len;
+				    i += sizeof (uint32_t)) {
+					*datap = READ_BAR2_REG(hba,
+					    hba->sli.sli4.bar2_addr + offset);
+					datap++;
+					offset += sizeof (uint32_t);
+				}
+#ifdef FMA_SUPPORT
+				/* Access handle validation */
+				EMLXS_CHK_ACC_HANDLE(hba,
+				    hba->sli.sli4.bar2_acc_handle);
+#endif  /* FMA_SUPPORT */
+				break;
+			case 4: /* bar1write */
+				if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
+					return (FC_BADCMD);
+				}
+				WRITE_BAR1_REG(hba, hba->sli.sli4.bar1_addr +
+				    offset, cmd[2]);
+#ifdef FMA_SUPPORT
+				/* Access handle validation */
+				EMLXS_CHK_ACC_HANDLE(hba,
+				    hba->sli.sli4.bar1_acc_handle);
+#endif  /* FMA_SUPPORT */
+				break;
+			case 5: /* bar2write */
+				if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
+					return (FC_BADCMD);
+				}
+				WRITE_BAR2_REG(hba, hba->sli.sli4.bar2_addr +
+				    offset, cmd[2]);
+#ifdef FMA_SUPPORT
+				/* Access handle validation */
+				EMLXS_CHK_ACC_HANDLE(hba,
+				    hba->sli.sli4.bar2_acc_handle);
+#endif  /* FMA_SUPPORT */
+				break;
+			case 6: /* dumpbsmbox */
+				if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
+					return (FC_BADCMD);
+				}
+				if (offset != 0) {
+					return (FC_BADCMD);
+				}
+
+				bcopy((caddr_t)hba->sli.sli4.bootstrapmb.virt,
+				    (caddr_t)pm->pm_stat_buf, 256);
+				break;
+			case 7: /* pciread */
+				if ((offset >= 0x200) || (offset & 0x3)) {
+					return (FC_BADCMD);
+				}
+				datap = (uint32_t *)pm->pm_stat_buf;
+				for (i = 0; i < pm->pm_stat_len;
+				    i += sizeof (uint32_t)) {
+					*datap = ddi_get32(hba->pci_acc_handle,
+					    (uint32_t *)(hba->pci_addr +
+					    offset));
+					datap++;
+					offset += sizeof (uint32_t);
+				}
+#ifdef FMA_SUPPORT
+				/* Access handle validation */
+				EMLXS_CHK_ACC_HANDLE(hba, hba->pci_acc_handle);
+#endif  /* FMA_SUPPORT */
+				break;
+			case 8: /* abortall */
+				if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
+					return (FC_BADCMD);
+				}
+				emlxs_abort_all(hba, &tx_cnt, &chip_cnt);
+				datap = (uint32_t *)pm->pm_stat_buf;
+				*datap++ = tx_cnt;
+				*datap = chip_cnt;
+				break;
+			default:
+				ret = FC_BADCMD;
+				break;
+			}
+			break;
+		}
+
 		default:
 
 			ret = FC_INVALID_REQUEST;
@@ -4698,7 +4846,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		if (!(hba->flag & FC_ONLINE_MODE)) {
 			return (FC_OFFLINE);
 		}
-
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_INITIALIZE");
 		break;
@@ -4707,7 +4854,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		if (!(hba->flag & FC_ONLINE_MODE)) {
 			return (FC_OFFLINE);
 		}
-
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_LOOPBACK");
 		break;
@@ -4716,7 +4862,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		if (!(hba->flag & FC_ONLINE_MODE)) {
 			return (FC_OFFLINE);
 		}
-
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_BYPASS");
 		ret = FC_INVALID_REQUEST;
@@ -4726,7 +4871,6 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		if (!(hba->flag & FC_ONLINE_MODE)) {
 			return (FC_OFFLINE);
 		}
-
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
 		    "fca_port_manage: FC_PORT_UNBYPASS");
 		ret = FC_INVALID_REQUEST;
@@ -4818,6 +4962,57 @@ emlxs_port_manage(opaque_t fca_port_handle, fc_fca_pm_t *pm)
 		ret = FC_SUCCESS;
 		break;
 	}
+
+#ifdef S11
+	case FC_PORT_GET_P2P_INFO:
+	{
+		fc_fca_p2p_info_t	*p2p_info;
+		NODELIST		*ndlp;
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+		    "fca_port_manage: FC_PORT_GET_P2P_INFO");
+
+		bzero(pm->pm_data_buf, pm->pm_data_len);
+
+		if (pm->pm_data_len < sizeof (fc_fca_p2p_info_t)) {
+			ret = FC_NOMEM;
+			break;
+		}
+
+		p2p_info = (fc_fca_p2p_info_t *)pm->pm_data_buf;
+
+		if (hba->state >= FC_LINK_UP) {
+			if ((hba->topology == TOPOLOGY_PT_PT) &&
+			    (hba->flag & FC_PT_TO_PT)) {
+				p2p_info->fca_d_id = port->did;
+				p2p_info->d_id = port->rdid;
+
+				ndlp = emlxs_node_find_did(port,
+				    port->rdid);
+
+				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+				    "FC_PORT_GET_P2P_INFO: fca_d_id: 0x%x, "
+				    "d_id: 0x%x, ndlp: 0x%p", port->did,
+				    port->rdid, ndlp);
+				if (ndlp) {
+					bcopy(&ndlp->nlp_portname,
+					    (caddr_t)&p2p_info->pwwn,
+					    sizeof (la_wwn_t));
+					bcopy(&ndlp->nlp_nodename,
+					    (caddr_t)&p2p_info->nwwn,
+					    sizeof (la_wwn_t));
+
+					ret = FC_SUCCESS;
+					break;
+
+				}
+			}
+		}
+
+		ret = FC_FAILURE;
+		break;
+	}
+#endif
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
@@ -5006,7 +5201,7 @@ emlxs_power(dev_info_t *dip, int32_t comp, int32_t level)
  * with preemption disabled. Therefore, this function must not be blocked.
  *
  * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
- * DDI_FAILURE indicates an eerror condition and should almost never happen.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
  */
 static int
 emlxs_quiesce(dev_info_t *dip)
@@ -5024,7 +5219,8 @@ emlxs_quiesce(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
-	if (emlxs_sli_hba_reset(hba, 1, 1) == 0) {
+	/* The fourth arg 1 indicates the call is from quiesce */
+	if (EMLXS_SLI_HBA_RESET(hba, 1, 1, 1) == 0) {
 		return (rval);
 	} else {
 		return (DDI_FAILURE);
@@ -5163,11 +5359,9 @@ emlxs_ioctl(dev_t dev, int32_t cmd, intptr_t arg, int32_t mode,
 #endif	/* IDLE_TIMER */
 
 	switch (cmd) {
-#ifdef DFC_SUPPORT
 	case EMLXS_DFC_COMMAND:
 		rval = emlxs_dfc_manage(hba, (void *)arg, mode);
 		break;
-#endif	/* DFC_SUPPORT */
 
 	default:
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ioctl_detail_msg,
@@ -5299,7 +5493,7 @@ emlxs_lock_init(emlxs_hba_t *hba)
 	cv_init(&EMLXS_LINKUP_CV, buf, CV_DRIVER, NULL);
 
 	(void) sprintf(buf, "%s%d_ring_tx_lock mutex", DRIVER_NAME, ddiinst);
-	mutex_init(&EMLXS_RINGTX_LOCK, buf, MUTEX_DRIVER,
+	mutex_init(&EMLXS_TX_CHANNEL_LOCK, buf, MUTEX_DRIVER,
 	    (void *)hba->intr_arg);
 
 	for (i = 0; i < MAX_RINGS; i++) {
@@ -5307,12 +5501,11 @@ emlxs_lock_init(emlxs_hba_t *hba)
 		    ddiinst, i);
 		mutex_init(&EMLXS_CMD_RING_LOCK(i), buf, MUTEX_DRIVER,
 		    (void *)hba->intr_arg);
-
-		(void) sprintf(buf, "%s%d_fctab%d_lock mutex", DRIVER_NAME,
-		    ddiinst, i);
-		mutex_init(&EMLXS_FCTAB_LOCK(i), buf, MUTEX_DRIVER,
-		    (void *)hba->intr_arg);
 	}
+
+	(void) sprintf(buf, "%s%d_fctab_lock mutex", DRIVER_NAME, ddiinst);
+	mutex_init(&EMLXS_FCTAB_LOCK, buf, MUTEX_DRIVER,
+	    (void *)hba->intr_arg);
 
 	(void) sprintf(buf, "%s%d_memget_lock mutex", DRIVER_NAME, ddiinst);
 	mutex_init(&EMLXS_MEMGET_LOCK, buf, MUTEX_DRIVER,
@@ -5392,13 +5585,13 @@ emlxs_lock_destroy(emlxs_hba_t *hba)
 	mutex_destroy(&EMLXS_LINKUP_LOCK);
 	mutex_destroy(&EMLXS_MBOX_LOCK);
 
-	mutex_destroy(&EMLXS_RINGTX_LOCK);
+	mutex_destroy(&EMLXS_TX_CHANNEL_LOCK);
 
 	for (i = 0; i < MAX_RINGS; i++) {
 		mutex_destroy(&EMLXS_CMD_RING_LOCK(i));
-		mutex_destroy(&EMLXS_FCTAB_LOCK(i));
 	}
 
+	mutex_destroy(&EMLXS_FCTAB_LOCK);
 	mutex_destroy(&EMLXS_MEMGET_LOCK);
 	mutex_destroy(&EMLXS_MEMPUT_LOCK);
 	mutex_destroy(&EMLXS_IOCTL_LOCK);
@@ -5442,6 +5635,7 @@ emlxs_lock_destroy(emlxs_hba_t *hba)
 #define	ATTACH_FM		0x00010000
 #define	ATTACH_MAP_SLI		0x00020000
 #define	ATTACH_SPAWN		0x00040000
+#define	ATTACH_EVENTS		0x00080000
 
 static void
 emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
@@ -5468,6 +5662,7 @@ emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 #ifdef SFCT_SUPPORT
 		if (init_flag & ATTACH_FCT) {
 			emlxs_fct_detach(hba);
+			emlxs_fct_modclose();
 		}
 #endif /* SFCT_SUPPORT */
 
@@ -5510,7 +5705,7 @@ emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 		}
 
 		if (init_flag & ATTACH_MAP_SLI) {
-			emlxs_sli_unmap_hdw(hba);
+			EMLXS_SLI_UNMAP_HDW(hba);
 		}
 
 #ifdef FMA_SUPPORT
@@ -5518,6 +5713,10 @@ emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 			emlxs_fm_fini(hba);
 		}
 #endif	/* FMA_SUPPORT */
+
+		if (init_flag & ATTACH_EVENTS) {
+			(void) emlxs_event_queue_destroy(hba);
+		}
 
 		if (init_flag & ATTACH_LOG) {
 			(void) emlxs_msg_log_destroy(hba);
@@ -5533,7 +5732,6 @@ emlxs_driver_remove(dev_info_t *dip, uint32_t init_flag, uint32_t failed)
 			emlxs_device.log[hba->emlxinst] = 0;
 			emlxs_device.hba[hba->emlxinst] =
 			    (emlxs_hba_t *)((unsigned long)((failed) ? -1 : 0));
-
 #ifdef DUMP_SUPPORT
 			emlxs_device.dump_txtfile[hba->emlxinst] = 0;
 			emlxs_device.dump_dmpfile[hba->emlxinst] = 0;
@@ -5564,7 +5762,6 @@ emlxs_fca_init(emlxs_hba_t *hba)
 	if (!hba->ini_mode) {
 		return;
 	}
-
 	/* Check if SFS present */
 	if (((void *)MODSYM(fc_fca_init) == NULL) ||
 	    ((void *)MODSYM(fc_fca_attach) == NULL)) {
@@ -5616,6 +5813,12 @@ emlxs_set_mode(emlxs_hba_t *hba)
 
 	cfg = &hba->config[CFG_TARGET_MODE];
 	tgt_mode = cfg->current;
+
+	if (tgt_mode) {
+		if (emlxs_fct_modopen() != 0) {
+			tgt_mode = 0;
+		}
+	}
 
 	port->fct_flags = 0;
 #endif /* SFCT_SUPPORT */
@@ -5719,6 +5922,7 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 {
 	emlxs_port_t	*port = &PPORT;
 	uint32_t	i;
+	char		sli_mode[16];
 	char		msi_mode[16];
 	char		npiv_mode[16];
 	emlxs_vpd_t	*vpd = &VPD;
@@ -5753,6 +5957,13 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 
 #endif	/* EMLXS_I386 */
 
+	if (hba->sli_mode > 3) {
+		(void) sprintf(sli_mode, "SLI:%d(%s)", hba->sli_mode,
+		    ((hba->flag & FC_FIP_SUPPORTED) ? "FIP" : "nonFIP"));
+	} else {
+		(void) sprintf(sli_mode, "SLI:%d", hba->sli_mode);
+	}
+
 	(void) strcpy(msi_mode, " INTX:1");
 
 #ifdef MSI_SUPPORT
@@ -5775,17 +5986,14 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 
 	(void) strcpy(npiv_mode, "");
 
-#ifdef SLI3_SUPPORT
 	if (hba->flag & FC_NPIV_ENABLED) {
-		(void) sprintf(npiv_mode, " NPIV:%d", hba->vpi_max);
+		(void) sprintf(npiv_mode, " NPIV:%d", hba->vpi_max+1);
 	} else {
 		(void) strcpy(npiv_mode, " NPIV:0");
 	}
-#endif	/* SLI3_SUPPORT */
 
-
-	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg, "SLI:%d%s%s%s%s",
-	    hba->sli_mode, msi_mode, npiv_mode,
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_msg, "%s%s%s%s%s",
+	    sli_mode, msi_mode, npiv_mode,
 	    ((hba->ini_mode)? " FCA":""), ((hba->tgt_mode)? " FCT":""));
 
 	wwpn = (uint8_t *)&hba->wwpn;
@@ -5797,7 +6005,6 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 	    wwpn[7], wwnn[0], wwnn[1], wwnn[2], wwnn[3], wwnn[4], wwnn[5],
 	    wwnn[6], wwnn[7]);
 
-#ifdef SLI3_SUPPORT
 	for (i = 0; i < MAX_VPORTS; i++) {
 		port = &VPORT(i);
 
@@ -5817,7 +6024,6 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 	}
 	port = &PPORT;
 
-#ifdef NPIV_SUPPORT
 	/*
 	 * No dependency for Restricted login parameter.
 	 */
@@ -5826,9 +6032,6 @@ emlxs_drv_banner(emlxs_hba_t *hba)
 	} else {
 		port->flag &= ~EMLXS_PORT_RESTRICTED;
 	}
-#endif /* NPIV_SUPPORT */
-
-#endif /* SLI3_SUPPORT */
 
 	/*
 	 * Announce the device: ddi_report_dev() prints a banner at boot time,
@@ -5941,7 +6144,6 @@ emlxs_hba_attach(dev_info_t *dip)
 	hba->ddiinst = ddiinst;
 	hba->ini_mode = 0;
 	hba->tgt_mode = 0;
-	hba->mem_bpl_size = MEM_BPL_SIZE;
 
 	init_flag |= ATTACH_HBA;
 
@@ -5953,7 +6155,7 @@ emlxs_hba_attach(dev_info_t *dip)
 
 	/* Allocate a transport structure */
 	hba->fca_tran =
-	    (fc_fca_tran_t *)kmem_zalloc(sizeof (fc_fca_tran_t), KM_SLEEP);
+	    (fc_fca_tran_t *)kmem_zalloc(sizeof (fc_fca_tran_t), KM_NOSLEEP);
 	if (hba->fca_tran == NULL) {
 		cmn_err(CE_WARN,
 		    "?%s%d: fca_hba_attach failed. Unable to allocate fca_tran "
@@ -6000,6 +6202,16 @@ emlxs_hba_attach(dev_info_t *dip)
 
 	/* We can begin to use EMLXS_MSGF from this point on */
 
+	/* Create the event queue */
+	if (emlxs_event_queue_create(hba) == 0) {
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
+		    "Unable to create event queue");
+
+		goto failed;
+
+	}
+	init_flag |= ATTACH_EVENTS;
+
 	/*
 	 * Find the I/O bus type If it is not a SBUS card,
 	 * then it is a PCI card. Default is PCI_FC (0).
@@ -6015,25 +6227,6 @@ emlxs_hba_attach(dev_info_t *dip)
 
 		(void) ddi_prop_free((void *)prop_str);
 	}
-#ifdef EMLXS_I386
-	/* Update BPL size based on max_xfer_size */
-	i = cfg[CFG_MAX_XFER_SIZE].current;
-	if (i > 688128) {
-		/* 688128 = (((2048 / 12) - 2) * 4096) */
-		hba->mem_bpl_size = 4096;
-	} else if (i > 339968) {
-		/* 339968 = (((1024 / 12) - 2) * 4096) */
-		hba->mem_bpl_size = 2048;
-	} else {
-		hba->mem_bpl_size = 1024;
-	}
-
-	/* Update dma_attr_sgllen based on BPL size */
-	i = BPL_TO_SGLLEN(hba->mem_bpl_size);
-	emlxs_dma_attr.dma_attr_sgllen = i;
-	emlxs_dma_attr_ro.dma_attr_sgllen = i;
-	emlxs_dma_attr_fcip_rsp.dma_attr_sgllen = i;
-#endif /* EMLXS_I386 */
 
 	/*
 	 * Copy DDS from the config method and update configuration parameters
@@ -6076,8 +6269,48 @@ emlxs_hba_attach(dev_info_t *dip)
 		    hba->model_info.ssdid, hba->model_info.model);
 		goto failed;
 	}
+	if (hba->model_info.sli_mask & EMLXS_SLI4_MASK) {
+		hba->sli.sli4.mem_sgl_size = MEM_SGL_SIZE;
+#ifdef EMLXS_I386
+		i = cfg[CFG_MAX_XFER_SIZE].current;
+		/* Update SGL size based on max_xfer_size */
+		if (i > 516096) {
+			/* 516096 = (((2048 / 16) - 2) * 4096) */
+			hba->sli.sli4.mem_sgl_size = 4096;
+		} else if (i > 253953) {
+			/* 253953 = (((1024 / 16) - 2) * 4096) */
+			hba->sli.sli4.mem_sgl_size = 2048;
+		} else {
+			hba->sli.sli4.mem_sgl_size = 1024;
+		}
+		i = SGL_TO_SGLLEN(hba->sli.sli4.mem_sgl_size);
+#endif /* EMLXS_I386 */
+	} else {
+		hba->sli.sli3.mem_bpl_size = MEM_BPL_SIZE;
+#ifdef EMLXS_I386
+		i = cfg[CFG_MAX_XFER_SIZE].current;
+		/* Update BPL size based on max_xfer_size */
+		if (i > 688128) {
+			/* 688128 = (((2048 / 12) - 2) * 4096) */
+			hba->sli.sli3.mem_bpl_size = 4096;
+		} else if (i > 339968) {
+			/* 339968 = (((1024 / 12) - 2) * 4096) */
+			hba->sli.sli3.mem_bpl_size = 2048;
+		} else {
+			hba->sli.sli3.mem_bpl_size = 1024;
+		}
+		i = BPL_TO_SGLLEN(hba->sli.sli3.mem_bpl_size);
+#endif /* EMLXS_I386 */
+	}
 
-	if (emlxs_sli_map_hdw(hba)) {
+#ifdef EMLXS_I386
+	/* Update dma_attr_sgllen based on BPL size */
+	emlxs_dma_attr.dma_attr_sgllen = i;
+	emlxs_dma_attr_ro.dma_attr_sgllen = i;
+	emlxs_dma_attr_fcip_rsp.dma_attr_sgllen = i;
+#endif /* EMLXS_I386 */
+
+	if (EMLXS_SLI_MAP_HDW(hba)) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_attach_failed_msg,
 		    "Unable to map memory");
 		goto failed;
@@ -6137,6 +6370,7 @@ emlxs_hba_attach(dev_info_t *dip)
 	init_flag |= ATTACH_SPAWN;
 
 	emlxs_thread_create(hba, &hba->iodone_thread);
+
 	init_flag |= ATTACH_THREAD;
 
 	/* Setup initiator / target ports */
@@ -6256,6 +6490,7 @@ emlxs_hba_detach(dev_info_t *dip)
 	emlxs_hba_t	*hba;
 	emlxs_port_t	*port;
 	int		ddiinst;
+	int		count;
 	uint32_t	init_flag = (uint32_t)-1;
 
 	ddiinst = ddi_get_instance(dip);
@@ -6296,6 +6531,32 @@ emlxs_hba_detach(dev_info_t *dip)
 		(void) emlxs_pm_raise_power(dip);
 
 		return (DDI_FAILURE);
+	}
+	/* Check ub buffer pools */
+	if (port->ub_pool) {
+		mutex_enter(&EMLXS_UB_LOCK);
+
+		/* Wait up to 10 seconds for all ub pools to be freed */
+		count = 10 * 2;
+		while (port->ub_pool && count) {
+			mutex_exit(&EMLXS_UB_LOCK);
+			delay(drv_usectohz(500000));	/* half second wait */
+			count--;
+			mutex_enter(&EMLXS_UB_LOCK);
+		}
+
+		if (port->ub_pool) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sfs_debug_msg,
+			    "fca_unbind_port: Unsolicited buffers still "
+			    "active. port=%p. Destroying...", port);
+
+			/* Destroy all pools */
+			while (port->ub_pool) {
+				emlxs_ub_destroy(port, port->ub_pool);
+			}
+		}
+
+		mutex_exit(&EMLXS_UB_LOCK);
 	}
 	init_flag &= ~ATTACH_ONLINE;
 
@@ -6473,7 +6734,6 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 
 	/* Perform additional checks */
 	switch (index) {
-#ifdef NPIV_SUPPORT
 	case CFG_NPIV_ENABLE:
 		if (hba->tgt_mode) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_msg,
@@ -6483,7 +6743,6 @@ emlxs_check_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 			new_value = 0;
 		}
 		break;
-#endif /* NPIV_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 	case CFG_AUTH_ENABLE:
@@ -6740,12 +6999,12 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 
 	/* React to change if needed */
 	switch (index) {
+
 	case CFG_PCI_MAX_READ:
 		/* Update MXR */
 		emlxs_pcix_mxr_update(hba, 1);
 		break;
 
-#ifdef SLI3_SUPPORT
 	case CFG_SLI_MODE:
 		/* Check SLI mode */
 		if ((hba->sli_mode == 3) && (new_value == 2)) {
@@ -6770,7 +7029,6 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 		}
 		break;
 
-#ifdef NPIV_SUPPORT
 	case CFG_NPIV_ENABLE:
 		/* Check if NPIV is being disabled */
 		if ((old_value == 1) && (new_value == 0)) {
@@ -6820,8 +7078,6 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 		}
 
 		break;
-#endif	/* NPIV_SUPPORT */
-#endif	/* SLI3_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 	case CFG_AUTH_ENABLE:
@@ -6881,7 +7137,7 @@ emlxs_set_parm(emlxs_hba_t *hba, uint32_t index, uint32_t new_value)
 	case CFG_AUTH_INTERVAL:
 		hba->auth_cfg.reauthenticate_time_interval = cfg->current;
 		break;
-#endif /* DHCAHP_SUPPORT */
+#endif /* DHCHAP_SUPPORT */
 
 	}
 
@@ -6924,45 +7180,24 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 	dev_attr = emlxs_data_acc_attr;
 
 	if (buf_info->flags & FC_MBUF_SNGLSG) {
-		buf_info->flags &= ~FC_MBUF_SNGLSG;
 		dma_attr.dma_attr_sgllen = 1;
 	}
 
 	if (buf_info->flags & FC_MBUF_DMA32) {
-		buf_info->flags &= ~FC_MBUF_DMA32;
 		dma_attr.dma_attr_addr_hi = (uint64_t)0xffffffff;
 	}
 
-	buf_info->flags &= ~(FC_MBUF_UNLOCK | FC_MBUF_IOCTL);
+	if (buf_info->flags & FC_MBUF_PHYSONLY) {
 
-	switch (buf_info->flags) {
-	case 0:	/* allocate host memory */
-
-		buf_info->virt =
-		    (uint32_t *)kmem_zalloc((size_t)buf_info->size,
-		    KM_SLEEP);
-		buf_info->phys = 0;
-		buf_info->data_handle = 0;
-		buf_info->dma_handle = 0;
-
-		if (buf_info->virt == (uint32_t *)0) {
-			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
-			    "size=%x align=%x flags=%x", buf_info->size,
-			    buf_info->align, buf_info->flags);
+		if (buf_info->virt == 0) {
+			goto done;
 		}
-		break;
-
-	case FC_MBUF_PHYSONLY:
-	case FC_MBUF_DMA | FC_MBUF_PHYSONLY:	/* fill in physical address */
-
-		if (buf_info->virt == 0)
-			break;
 
 		/*
 		 * Allocate the DMA handle for this DMA object
 		 */
 		status = ddi_dma_alloc_handle((void *)hba->dip,
-		    &dma_attr, DDI_DMA_SLEEP,
+		    &dma_attr, DDI_DMA_DONTWAIT,
 		    NULL, (ddi_dma_handle_t *)&buf_info->dma_handle);
 		if (status != DDI_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
@@ -6972,7 +7207,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 
 			buf_info->phys = 0;
 			buf_info->dma_handle = 0;
-			break;
+			goto done;
 		}
 
 		switch (buf_info->align) {
@@ -6991,7 +7226,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		status = ddi_dma_addr_bind_handle(
 		    (ddi_dma_handle_t)buf_info->dma_handle, NULL,
 		    (caddr_t)buf_info->virt, (size_t)buf_info->size,
-		    dma_flag, DDI_DMA_SLEEP, NULL, &dma_cookie,
+		    dma_flag, DDI_DMA_DONTWAIT, NULL, &dma_cookie,
 		    &cookie_count);
 
 		if (status != DDI_DMA_MAPPED || (cookie_count > 1)) {
@@ -7004,7 +7239,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			    (ddi_dma_handle_t *)&buf_info->dma_handle);
 			buf_info->phys = 0;
 			buf_info->dma_handle = 0;
-			break;
+			goto done;
 		}
 
 		if (hba->bus_type == SBUS_FC) {
@@ -7028,12 +7263,10 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		/*
 		 * Just to be sure, let's add this
 		 */
-		emlxs_mpdata_sync((ddi_dma_handle_t)buf_info->dma_handle,
+		EMLXS_MPDATA_SYNC((ddi_dma_handle_t)buf_info->dma_handle,
 		    (off_t)0, (size_t)buf_info->size, DDI_DMA_SYNC_FORDEV);
 
-		break;
-
-	case FC_MBUF_DMA:	/* allocate and map DMA mem */
+	} else if (buf_info->flags & (FC_MBUF_DMA|FC_MBUF_DMA32)) {
 
 		dma_attr.dma_attr_align = buf_info->align;
 
@@ -7041,7 +7274,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		 * Allocate the DMA handle for this DMA object
 		 */
 		status = ddi_dma_alloc_handle((void *)hba->dip, &dma_attr,
-		    DDI_DMA_SLEEP, NULL,
+		    DDI_DMA_DONTWAIT, NULL,
 		    (ddi_dma_handle_t *)&buf_info->dma_handle);
 		if (status != DDI_SUCCESS) {
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
@@ -7053,13 +7286,13 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			buf_info->phys = 0;
 			buf_info->data_handle = 0;
 			buf_info->dma_handle = 0;
-			break;
+			goto done;
 		}
 
 		status = ddi_dma_mem_alloc(
 		    (ddi_dma_handle_t)buf_info->dma_handle,
 		    (size_t)buf_info->size, &dev_attr, DDI_DMA_CONSISTENT,
-		    DDI_DMA_SLEEP, NULL, (caddr_t *)&buf_info->virt,
+		    DDI_DMA_DONTWAIT, NULL, (caddr_t *)&buf_info->virt,
 		    &dma_reallen, (ddi_acc_handle_t *)&buf_info->data_handle);
 
 		if ((status != DDI_SUCCESS) || (buf_info->size > dma_reallen)) {
@@ -7075,14 +7308,14 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			buf_info->phys = 0;
 			buf_info->data_handle = 0;
 			buf_info->dma_handle = 0;
-			break;
+			goto done;
 		}
 
 		/* Map this page of memory */
 		status = ddi_dma_addr_bind_handle(
 		    (ddi_dma_handle_t)buf_info->dma_handle, NULL,
 		    (caddr_t)buf_info->virt, (size_t)buf_info->size,
-		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
+		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
 		    &dma_cookie, &cookie_count);
 
 		if (status != DDI_DMA_MAPPED || (cookie_count > 1)) {
@@ -7101,7 +7334,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			buf_info->phys = 0;
 			buf_info->dma_handle = 0;
 			buf_info->data_handle = 0;
-			break;
+			goto done;
 		}
 
 		if (hba->bus_type == SBUS_FC) {
@@ -7123,11 +7356,27 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 		buf_info->phys = dma_cookie.dmac_laddress;
 
 		/* Just to be sure, let's add this */
-		emlxs_mpdata_sync((ddi_dma_handle_t)buf_info->dma_handle,
+		EMLXS_MPDATA_SYNC((ddi_dma_handle_t)buf_info->dma_handle,
 		    (off_t)0, (size_t)buf_info->size, DDI_DMA_SYNC_FORDEV);
 
-		break;
-	}	/* End of switch */
+	} else {	/* allocate virtual memory */
+
+		buf_info->virt =
+		    (uint32_t *)kmem_zalloc((size_t)buf_info->size,
+		    KM_NOSLEEP);
+		buf_info->phys = 0;
+		buf_info->data_handle = 0;
+		buf_info->dma_handle = 0;
+
+		if (buf_info->virt == (uint32_t *)0) {
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_mem_alloc_failed_msg,
+			    "size=%x flags=%x", buf_info->size,
+			    buf_info->flags);
+		}
+
+	}
+
+done:
 
 	return ((uint8_t *)buf_info->virt);
 
@@ -7154,20 +7403,7 @@ emlxs_mem_alloc(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 extern void
 emlxs_mem_free(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 {
-	buf_info->flags &= ~(FC_MBUF_UNLOCK | FC_MBUF_IOCTL);
-
-	switch (buf_info->flags) {
-	case 0:	/* free host memory */
-
-		if (buf_info->virt) {
-			kmem_free(buf_info->virt, (size_t)buf_info->size);
-			buf_info->virt = NULL;
-		}
-
-		break;
-
-	case FC_MBUF_PHYSONLY:
-	case FC_MBUF_DMA | FC_MBUF_PHYSONLY:	/* nothing to do */
+	if (buf_info->flags & FC_MBUF_PHYSONLY) {
 
 		if (buf_info->dma_handle) {
 			(void) ddi_dma_unbind_handle(buf_info->dma_handle);
@@ -7176,10 +7412,7 @@ emlxs_mem_free(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			buf_info->dma_handle = NULL;
 		}
 
-		break;
-
-	case FC_MBUF_DMA:	/* unmap free DMA-able memory */
-
+	} else if (buf_info->flags & (FC_MBUF_DMA|FC_MBUF_DMA32)) {
 
 		if (buf_info->dma_handle) {
 			(void) ddi_dma_unbind_handle(buf_info->dma_handle);
@@ -7191,30 +7424,162 @@ emlxs_mem_free(emlxs_hba_t *hba, MBUF_INFO *buf_info)
 			buf_info->data_handle = NULL;
 		}
 
-		break;
+	} else {	/* allocate virtual memory */
+
+		if (buf_info->virt) {
+			kmem_free(buf_info->virt, (size_t)buf_info->size);
+			buf_info->virt = NULL;
+		}
 	}
 
 } /* emlxs_mem_free() */
 
+
+/*
+ * A channel has a association with a msi id.
+ * One msi id could be associated with multiple channels.
+ */
+static int
+emlxs_next_chan(emlxs_hba_t *hba, int msi_id)
+{
+	emlxs_config_t *cfg = &CFG;
+	EQ_DESC_t *eqp;
+	int chan;
+	int num_wq;
+
+	if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+		/* For SLI4 round robin all WQs associated with the msi_id */
+		eqp = &hba->sli.sli4.eq[msi_id];
+		num_wq = cfg[CFG_NUM_WQ].current;
+
+		mutex_enter(&eqp->lastwq_lock);
+		chan = eqp->lastwq;
+		eqp->lastwq++;
+		if (eqp->lastwq >= ((msi_id + 1) * num_wq)) {
+			eqp->lastwq -= num_wq;
+		}
+		mutex_exit(&eqp->lastwq_lock);
+
+	} else {
+		chan = hba->channel_fcp;
+	}
+	return (chan);
+}
+
+
+static int
+emlxs_select_fcp_channel(emlxs_hba_t *hba, NODELIST *ndlp, int reset)
+{
+	int		channel;
+
+
+	/* IO to FCP2 device or a device reset always use fcp channel */
+	if ((ndlp->nlp_fcp_info & NLP_FCP_2_DEVICE) || reset) {
+		return (hba->channel_fcp);
+	}
+
+	channel = emlxs_next_chan(hba, 0);
+
+
+	/* If channel is closed, then try fcp channel */
+	if (ndlp->nlp_flag[channel] & NLP_CLOSED) {
+		channel = hba->channel_fcp;
+	}
+	return (channel);
+
+}
+
+static int32_t
+emlxs_fast_target_reset(emlxs_port_t *port, emlxs_buf_t *sbp, NODELIST *ndlp)
+{
+	emlxs_hba_t	*hba = HBA;
+	fc_packet_t	*pkt;
+	emlxs_config_t	*cfg;
+	MAILBOXQ	*mbq;
+	MAILBOX		*mb;
+	uint32_t	rc;
+
+	/*
+	 * This routine provides a alternative target reset provessing
+	 * method. Instead of sending an actual target reset to the
+	 * NPort, we will first unreg the login to that NPort. This
+	 * will cause all the outstanding IOs the quickly complete with
+	 * a NO RPI local error. Next we will force the ULP to relogin
+	 * to the NPort by sending an RSCN (for that NPort) to the
+	 * upper layer. This method should result in a fast target
+	 * reset, as far as IOs completing; however, since an actual
+	 * target reset is not sent to the NPort, it is not 100%
+	 * compatable. Things like reservations will not be broken.
+	 * By default this option is DISABLED, and its only enabled thru
+	 * a hidden configuration parameter (fast-tgt-reset).
+	 */
+	rc = FC_TRAN_BUSY;
+	pkt = PRIV2PKT(sbp);
+	cfg = &CFG;
+
+	if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
+		/* issue the mbox cmd to the sli */
+		mb = (MAILBOX *) mbq->mbox;
+		bzero((void *) mb, MAILBOX_CMD_BSIZE);
+		mb->un.varUnregLogin.rpi = (uint16_t)ndlp->nlp_Rpi;
+#ifdef SLI3_SUPPORT
+		mb->un.varUnregLogin.vpi = port->vpi;
+#endif	/* SLI3_SUPPORT */
+		mb->mbxCommand = MBX_UNREG_LOGIN;
+		mb->mbxOwner = OWN_HOST;
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
+		    "Fast Target Reset: unreg rpi=x%x tmr %d", ndlp->nlp_Rpi,
+		    cfg[CFG_FAST_TGT_RESET_TMR].current);
+
+		if (EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_WAIT, 0)
+		    == MBX_SUCCESS) {
+
+			ndlp->nlp_Rpi = 0;
+
+			mutex_enter(&sbp->mtx);
+			sbp->node = (void *)ndlp;
+			sbp->did = ndlp->nlp_DID;
+			mutex_exit(&sbp->mtx);
+
+			if (pkt->pkt_rsplen) {
+				bzero((uint8_t *)pkt->pkt_resp,
+				    pkt->pkt_rsplen);
+			}
+			if (cfg[CFG_FAST_TGT_RESET_TMR].current) {
+				ndlp->nlp_force_rscn = hba->timer_tics +
+				    cfg[CFG_FAST_TGT_RESET_TMR].current;
+			}
+
+			emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 0);
+		}
+
+		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
+		rc = FC_SUCCESS;
+	}
+	return (rc);
+}
 
 static int32_t
 emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
 	emlxs_hba_t	*hba = HBA;
 	fc_packet_t	*pkt;
+	emlxs_config_t	*cfg;
 	IOCBQ		*iocbq;
 	IOCB		*iocb;
-	RING		*rp;
+	CHANNEL		*cp;
 	NODELIST	*ndlp;
 	char		*cmd;
 	uint16_t	lun;
 	FCP_CMND	*fcp_cmd;
 	uint32_t	did;
+	uint32_t	reset = 0;
+	int		channel;
+	int32_t		rval;
 
 	pkt = PRIV2PKT(sbp);
-	fcp_cmd = (FCP_CMND *)pkt->pkt_cmd;
-	rp = &hba->ring[FC_FCP_RING];
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	/* Find target node object */
 	ndlp = emlxs_node_find_did(port, did);
@@ -7226,10 +7591,111 @@ emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 		return (FC_BADPACKET);
 	}
 
-	/* If gate is closed */
-	if (ndlp->nlp_flag[FC_FCP_RING] & NLP_CLOSED) {
+	/* When the fcp channel is closed we stop accepting any FCP cmd */
+	if (ndlp->nlp_flag[hba->channel_fcp] & NLP_CLOSED) {
 		return (FC_TRAN_BUSY);
 	}
+
+	/* Snoop for target or lun reset first */
+	/* We always use FCP channel to send out target/lun reset fcp cmds */
+	/* interrupt affinity only applies to non tgt lun reset fcp cmd */
+
+	cmd = (char *)pkt->pkt_cmd;
+	lun = *((uint16_t *)cmd);
+	lun = LE_SWAP16(lun);
+
+	iocbq = &sbp->iocbq;
+	iocb = &iocbq->iocb;
+	iocbq->node = (void *) ndlp;
+
+	/* Check for target reset */
+	if (cmd[10] & 0x20) {
+		/* prepare iocb */
+		if ((rval = EMLXS_SLI_PREP_FCP_IOCB(port, sbp,
+		    hba->channel_fcp)) != FC_SUCCESS) {
+
+			if (rval == 0xff) {
+				emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
+				    0, 1);
+				rval = FC_SUCCESS;
+			}
+
+			return (rval);
+		}
+
+		mutex_enter(&sbp->mtx);
+		sbp->pkt_flags |= PACKET_FCP_TGT_RESET;
+		sbp->pkt_flags |= PACKET_POLLED;
+		mutex_exit(&sbp->mtx);
+
+#ifdef SAN_DIAG_SUPPORT
+		emlxs_log_sd_scsi_event(port, SD_SCSI_SUBCATEGORY_TGTRESET,
+		    (HBA_WWN *)&ndlp->nlp_portname, -1);
+#endif	/* SAN_DIAG_SUPPORT */
+
+		iocbq->flag |= IOCB_PRIORITY;
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
+		    "Target Reset: did=%x", did);
+
+		cfg = &CFG;
+		if (cfg[CFG_FAST_TGT_RESET].current) {
+			if (emlxs_fast_target_reset(port, sbp, ndlp) ==
+			    FC_SUCCESS) {
+				return (FC_SUCCESS);
+			}
+		}
+
+		/* Close the node for any further normal IO */
+		emlxs_node_close(port, ndlp, hba->channel_fcp,
+		    pkt->pkt_timeout);
+
+		/* Flush the IO's on the tx queues */
+		(void) emlxs_tx_node_flush(port, ndlp,
+		    &hba->chan[hba->channel_fcp], 0, sbp);
+
+		/* This is the target reset fcp cmd */
+		reset = 1;
+	}
+
+	/* Check for lun reset */
+	else if (cmd[10] & 0x10) {
+		/* prepare iocb */
+		if ((rval = EMLXS_SLI_PREP_FCP_IOCB(port, sbp,
+		    hba->channel_fcp)) != FC_SUCCESS) {
+
+			if (rval == 0xff) {
+				emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
+				    0, 1);
+				rval = FC_SUCCESS;
+			}
+
+			return (rval);
+		}
+
+		mutex_enter(&sbp->mtx);
+		sbp->pkt_flags |= PACKET_FCP_LUN_RESET;
+		sbp->pkt_flags |= PACKET_POLLED;
+		mutex_exit(&sbp->mtx);
+
+#ifdef SAN_DIAG_SUPPORT
+		emlxs_log_sd_scsi_event(port, SD_SCSI_SUBCATEGORY_LUNRESET,
+		    (HBA_WWN *)&ndlp->nlp_portname, lun);
+#endif	/* SAN_DIAG_SUPPORT */
+
+		iocbq->flag |= IOCB_PRIORITY;
+
+		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
+		    "LUN Reset: did=%x LUN=%02x02x", did, cmd[0], cmd[1]);
+
+		/* Flush the IO's on the tx queues for this lun */
+		(void) emlxs_tx_lun_flush(port, ndlp, lun, sbp);
+
+		/* This is the lun reset fcp cmd */
+		reset = 1;
+	}
+
+	channel = emlxs_select_fcp_channel(hba, ndlp, reset);
 
 #ifdef SAN_DIAG_SUPPORT
 	sbp->sd_start_time = gethrtime();
@@ -7239,67 +7705,32 @@ emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 	emlxs_swap_fcp_pkt(sbp);
 #endif	/* EMLXS_MODREV2X */
 
+	fcp_cmd = (FCP_CMND *) pkt->pkt_cmd;
+
 	if (fcp_cmd->fcpCntl1 == FCP_QTYPE_UNTAGGED) {
 		fcp_cmd->fcpCntl1 = FCP_QTYPE_SIMPLE;
 	}
 
-	iocbq = &sbp->iocbq;
-	iocb = &iocbq->iocb;
+	if (reset == 0) {
+		/*
+		 * tgt lun reset fcp cmd has been prepared
+		 * separately in the beginning
+		 */
+		if ((rval = EMLXS_SLI_PREP_FCP_IOCB(port, sbp,
+		    channel)) != FC_SUCCESS) {
 
-	iocbq->node = (void *)ndlp;
-	if (emlxs_sli_prep_fcp_iocb(port, sbp) != FC_SUCCESS) {
-		return (FC_TRAN_BUSY);
+			if (rval == 0xff) {
+				emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT,
+				    0, 1);
+				rval = FC_SUCCESS;
+			}
+
+			return (rval);
+		}
 	}
 
-	/* Snoop for target or lun resets */
-	cmd = (char *)pkt->pkt_cmd;
-	lun = *((uint16_t *)cmd);
-	lun = SWAP_DATA16(lun);
-
-	/* Check for target reset */
-	if (cmd[10] & 0x20) {
-		mutex_enter(&sbp->mtx);
-		sbp->pkt_flags |= PACKET_FCP_TGT_RESET;
-		sbp->pkt_flags |= PACKET_POLLED;
-		mutex_exit(&sbp->mtx);
-
-#ifdef SAN_DIAG_SUPPORT
-		emlxs_log_sd_scsi_event(port, SD_SCSI_SUBCATEGORY_TGTRESET,
-		    (HBA_WWN *)&ndlp->nlp_portname, -1);
-#endif
-
-		iocbq->flag |= IOCB_PRIORITY;
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "Target Reset: did=%x", did);
-
-		/* Close the node for any further normal IO */
-		emlxs_node_close(port, ndlp, FC_FCP_RING, pkt->pkt_timeout);
-
-		/* Flush the IO's on the tx queues */
-		(void) emlxs_tx_node_flush(port, ndlp, rp, 0, sbp);
-	}
-
-	/* Check for lun reset */
-	else if (cmd[10] & 0x10) {
-		mutex_enter(&sbp->mtx);
-		sbp->pkt_flags |= PACKET_FCP_LUN_RESET;
-		sbp->pkt_flags |= PACKET_POLLED;
-		mutex_exit(&sbp->mtx);
-
-#ifdef SAN_DIAG_SUPPORT
-		emlxs_log_sd_scsi_event(port, SD_SCSI_SUBCATEGORY_LUNRESET,
-		    (HBA_WWN *)&ndlp->nlp_portname, lun);
-#endif
-
-		iocbq->flag |= IOCB_PRIORITY;
-
-		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
-		    "LUN Reset: did=%x LUN=%02x02x", did, cmd[0], cmd[1]);
-
-		/* Flush the IO's on the tx queues for this lun */
-		(void) emlxs_tx_lun_flush(port, ndlp, lun, sbp);
-	}
+	cp = &hba->chan[channel];
+	cp->ulpSendCmd++;
 
 	/* Initalize sbp */
 	mutex_enter(&sbp->mtx);
@@ -7307,27 +7738,28 @@ emlxs_send_fcp_cmd(emlxs_port_t *port, emlxs_buf_t *sbp)
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
 	sbp->node = (void *)ndlp;
 	sbp->lun = lun;
-	sbp->class = iocb->ulpClass;
+	sbp->class = iocb->ULPCLASS;
 	sbp->did = ndlp->nlp_DID;
 	mutex_exit(&sbp->mtx);
 
 	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
 
 	if (pkt->pkt_datalen && pkt->pkt_tran_type == FC_PKT_FCP_WRITE) {
-		emlxs_mpdata_sync(pkt->pkt_data_dma, 0, pkt->pkt_datalen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_data_dma, 0, pkt->pkt_datalen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
 
 	HBASTATS.FcpIssued++;
 
-	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_FCP_RING], iocbq);
-
+	EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 	return (FC_SUCCESS);
 
 } /* emlxs_send_fcp_cmd() */
+
+
 
 
 #ifdef SFCT_SUPPORT
@@ -7339,6 +7771,7 @@ emlxs_send_fct_status(emlxs_port_t *port, emlxs_buf_t *sbp)
 	IOCBQ			*iocbq;
 	IOCB			*iocb;
 	NODELIST		*ndlp;
+	CHANNEL			*cp;
 	uint16_t		iotag;
 	uint32_t		did;
 	ddi_dma_cookie_t	*cp_cmd;
@@ -7360,12 +7793,12 @@ emlxs_send_fct_status(emlxs_port_t *port, emlxs_buf_t *sbp)
 	}
 
 	/* If gate is closed */
-	if (ndlp->nlp_flag[FC_FCP_RING] & NLP_CLOSED) {
+	if (ndlp->nlp_flag[hba->channel_fcp] & NLP_CLOSED) {
 		return (FC_TRAN_BUSY);
 	}
 
 	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(sbp->ring, sbp);
+	iotag = emlxs_register_pkt(sbp->channel, sbp);
 
 	if (!iotag) {
 		/* No more command slots available, retry later */
@@ -7377,57 +7810,60 @@ emlxs_send_fct_status(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	/* Point of no return */
 
+	cp = sbp->channel;
+	cp->ulpSendCmd++;
+
 #if (EMLXS_MODREV >= EMLXS_MODREV3)
 	cp_cmd = pkt->pkt_cmd_cookie;
 #else
 	cp_cmd  = &pkt->pkt_cmd_cookie;
 #endif	/* >= EMLXS_MODREV3 */
 
-	iocb->un.fcpt64.bdl.addrHigh = putPaddrHigh(cp_cmd->dmac_laddress);
-	iocb->un.fcpt64.bdl.addrLow = putPaddrLow(cp_cmd->dmac_laddress);
+	iocb->un.fcpt64.bdl.addrHigh = PADDR_HI(cp_cmd->dmac_laddress);
+	iocb->un.fcpt64.bdl.addrLow = PADDR_LO(cp_cmd->dmac_laddress);
 	iocb->un.fcpt64.bdl.bdeSize = pkt->pkt_cmdlen;
 	iocb->un.fcpt64.bdl.bdeFlags = 0;
 
 	if (hba->sli_mode < 3) {
-		iocb->ulpBdeCount = 1;
-		iocb->ulpLe = 1;
+		iocb->ULPBDECOUNT = 1;
+		iocb->ULPLE = 1;
 	} else {	/* SLI3 */
 
-		iocb->ulpBdeCount = 0;
-		iocb->ulpLe = 0;
+		iocb->ULPBDECOUNT = 0;
+		iocb->ULPLE = 0;
 		iocb->unsli3.ext_iocb.ebde_count = 0;
 	}
 
 	/* Initalize iocbq */
 	iocbq->port = (void *)port;
 	iocbq->node = (void *)ndlp;
-	iocbq->ring = (void *)sbp->ring;
+	iocbq->channel = (void *)cp;
 
 	/* Initalize iocb */
-	iocb->ulpContext = (uint16_t)pkt->pkt_cmd_fhdr.rx_id;
-	iocb->ulpIoTag = iotag;
-	iocb->ulpRsvdByte =
+	iocb->ULPCONTEXT = (uint16_t)pkt->pkt_cmd_fhdr.rx_id;
+	iocb->ULPIOTAG = iotag;
+	iocb->ULPRSVDBYTE =
 	    ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
-	iocb->ulpOwner = OWN_CHIP;
-	iocb->ulpClass = sbp->class;
-	iocb->ulpCommand = CMD_FCP_TRSP64_CX;
+	iocb->ULPOWNER = OWN_CHIP;
+	iocb->ULPCLASS = sbp->class;
+	iocb->ULPCOMMAND = CMD_FCP_TRSP64_CX;
 
 	/* Set the pkt timer */
 	sbp->ticks = hba->timer_tics + pkt->pkt_timeout +
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
 
 	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
 
 	HBASTATS.FcpIssued++;
 
-	emlxs_sli_issue_iocb_cmd(hba, sbp->ring, iocbq);
+	EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 
 	return (FC_SUCCESS);
 
-}  /* emlxs_send_fct_status() */
+} /* emlxs_send_fct_status() */
 
 
 static int32_t
@@ -7459,12 +7895,12 @@ emlxs_send_fct_abort(emlxs_port_t *port, emlxs_buf_t *sbp)
 	}
 
 	/* If gate is closed */
-	if (ndlp->nlp_flag[FC_FCP_RING] & NLP_CLOSED) {
+	if (ndlp->nlp_flag[hba->channel_fcp] & NLP_CLOSED) {
 		return (FC_TRAN_BUSY);
 	}
 
 	/* Get the iotag by registering the packet */
-	iotag = emlxs_register_pkt(sbp->ring, sbp);
+	iotag = emlxs_register_pkt(sbp->channel, sbp);
 
 	if (!iotag) {
 		/* No more command slots available, retry later */
@@ -7477,41 +7913,43 @@ emlxs_send_fct_abort(emlxs_port_t *port, emlxs_buf_t *sbp)
 	/* Point of no return */
 	iocbq->port = (void *)port;
 	iocbq->node = (void *)ndlp;
-	iocbq->ring = (void *)sbp->ring;
+	iocbq->channel = (void *)sbp->channel;
+	((CHANNEL *)sbp->channel)->ulpSendCmd++;
+
 	/*
 	 * Don't give the abort priority, we want the IOCB
 	 * we are aborting to be processed first.
 	 */
 	iocbq->flag |= IOCB_SPECIAL;
 
-	iocb->ulpContext = pkt->pkt_cmd_fhdr.rx_id;
-	iocb->ulpIoTag = iotag;
-	iocb->ulpLe = 1;
-	iocb->ulpClass = sbp->class;
-	iocb->ulpOwner = OWN_CHIP;
+	iocb->ULPCONTEXT = pkt->pkt_cmd_fhdr.rx_id;
+	iocb->ULPIOTAG = iotag;
+	iocb->ULPLE = 1;
+	iocb->ULPCLASS = sbp->class;
+	iocb->ULPOWNER = OWN_CHIP;
 
 	if (hba->state >= FC_LINK_UP) {
 		/* Create the abort IOCB */
 		iocb->un.acxri.abortType = ABORT_TYPE_ABTS;
-		iocb->ulpCommand = CMD_ABORT_XRI_CX;
+		iocb->ULPCOMMAND = CMD_ABORT_XRI_CX;
 
 	} else {
 		/* Create the close IOCB */
-		iocb->ulpCommand = CMD_CLOSE_XRI_CX;
+		iocb->ULPCOMMAND = CMD_CLOSE_XRI_CX;
 
 	}
 
-	iocb->ulpRsvdByte =
+	iocb->ULPRSVDBYTE =
 	    ((pkt->pkt_timeout > 0xff) ? 0 : pkt->pkt_timeout);
 	/* Set the pkt timer */
 	sbp->ticks = hba->timer_tics + pkt->pkt_timeout +
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
 
-	emlxs_sli_issue_iocb_cmd(hba, sbp->ring, iocbq);
+	EMLXS_SLI_ISSUE_IOCB_CMD(hba, sbp->channel, iocbq);
 
 	return (FC_SUCCESS);
 
-}  /* emlxs_send_fct_abort() */
+} /* emlxs_send_fct_abort() */
 
 #endif /* SFCT_SUPPORT */
 
@@ -7523,14 +7961,15 @@ emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp)
 	fc_packet_t	*pkt;
 	IOCBQ		*iocbq;
 	IOCB		*iocb;
-	RING		*rp;
+	CHANNEL		*cp;
 	uint32_t	i;
 	NODELIST	*ndlp;
 	uint32_t	did;
+	int32_t 	rval;
 
 	pkt = PRIV2PKT(sbp);
-	rp = &hba->ring[FC_IP_RING];
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	cp = &hba->chan[hba->channel_ip];
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	/* Check if node exists */
 	/* Broadcast did is always a success */
@@ -7544,14 +7983,14 @@ emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp)
 	}
 
 	/* Check if gate is temporarily closed */
-	if (ndlp->nlp_flag[FC_IP_RING] & NLP_CLOSED) {
+	if (ndlp->nlp_flag[hba->channel_ip] & NLP_CLOSED) {
 		return (FC_TRAN_BUSY);
 	}
 
 	/* Check if an exchange has been created */
-	if ((ndlp->nlp_Xri == 0) && (did != Bcast_DID)) {
+	if ((ndlp->nlp_Xri == 0) && (did != BCAST_DID)) {
 		/* No exchange.  Try creating one */
-		(void) emlxs_create_xri(port, rp, ndlp);
+		(void) emlxs_create_xri(port, cp, ndlp);
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
 		    "Adapter Busy. Exchange not found. did=0x%x", did);
@@ -7577,9 +8016,17 @@ emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp)
 	iocb = &iocbq->iocb;
 
 	iocbq->node = (void *)ndlp;
-	if (emlxs_sli_prep_ip_iocb(port, sbp) != FC_SUCCESS) {
-		return (FC_TRAN_BUSY);
+	if ((rval = EMLXS_SLI_PREP_IP_IOCB(port, sbp)) != FC_SUCCESS) {
+
+		if (rval == 0xff) {
+			emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT, 0, 1);
+			rval = FC_SUCCESS;
+		}
+
+		return (rval);
 	}
+
+	cp->ulpSendCmd++;
 
 	/* Initalize sbp */
 	mutex_enter(&sbp->mtx);
@@ -7587,16 +8034,16 @@ emlxs_send_ip(emlxs_port_t *port, emlxs_buf_t *sbp)
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
 	sbp->node = (void *)ndlp;
 	sbp->lun = 0;
-	sbp->class = iocb->ulpClass;
+	sbp->class = iocb->ULPCLASS;
 	sbp->did = did;
 	mutex_exit(&sbp->mtx);
 
 	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
 
-	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_IP_RING], iocbq);
+	EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 
 	return (FC_SUCCESS);
 
@@ -7610,21 +8057,22 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 	emlxs_port_t	*vport;
 	fc_packet_t	*pkt;
 	IOCBQ		*iocbq;
-	IOCB		*iocb;
+	CHANNEL		*cp;
 	uint32_t	cmd;
 	int		i;
 	ELS_PKT		*els_pkt;
 	NODELIST	*ndlp;
 	uint32_t	did;
 	char		fcsp_msg[32];
+	int		rc;
+	int32_t 	rval;
 
 	fcsp_msg[0] = 0;
 	pkt = PRIV2PKT(sbp);
 	els_pkt = (ELS_PKT *)pkt->pkt_cmd;
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	iocbq = &sbp->iocbq;
-	iocb = &iocbq->iocb;
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 	emlxs_swap_els_pkt(sbp);
@@ -7633,12 +8081,31 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 	cmd = *((uint32_t *)pkt->pkt_cmd);
 	cmd &= ELS_CMD_MASK;
 
+	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_sli_detail_msg,
+	    "Send ELS cmd: %x", cmd);
+
 	/* Point of no return, except for ADISC & PLOGI */
 
 	/* Check node */
 	switch (cmd) {
 	case ELS_CMD_FLOGI:
 		if (port->vpi > 0) {
+			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+				if (!(port->flag & EMLXS_PORT_INIT_VPI_CMPL)) {
+					(void) emlxs_mb_init_vpi(port);
+					if (!(port->flag &
+					    EMLXS_PORT_INIT_VPI_CMPL)) {
+						pkt->pkt_state =
+						    FC_PKT_LOCAL_RJT;
+
+#if (EMLXS_MODREVX == EMLXS_MODREV2X)
+						emlxs_unswap_pkt(sbp);
+#endif  /* EMLXS_MODREV2X */
+
+						return (FC_FAILURE);
+					}
+				}
+			}
 			cmd = ELS_CMD_FDISC;
 			*((uint32_t *)pkt->pkt_cmd) = cmd;
 		}
@@ -7690,17 +8157,17 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 			}
 
 			mutex_enter(&EMLXS_PORT_LOCK);
-			port->did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.s_id);
+			port->did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.s_id);
 			mutex_exit(&EMLXS_PORT_LOCK);
 
 			/* Update our service parms */
 			if ((mbox = (MAILBOXQ *)emlxs_mem_get(hba,
-			    MEM_MBOX | MEM_PRI))) {
-				emlxs_mb_config_link(hba, (MAILBOX *) mbox);
+			    MEM_MBOX, 1))) {
+				emlxs_mb_config_link(hba, mbox);
 
-				if (emlxs_sli_issue_mbox_cmd(hba,
-				    (MAILBOX *)mbox, MBX_NOWAIT, 0)
-				    != MBX_BUSY) {
+				rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba,
+				    mbox, MBX_NOWAIT, 0);
+				if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
 					(void) emlxs_mem_put(hba, MEM_MBOX,
 					    (uint8_t *)mbox);
 				}
@@ -7731,6 +8198,16 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_pkt_trans_msg,
 			    "ADISC Rejected. Node not found. did=0x%x", did);
 
+			if (sbp->channel == NULL) {
+				if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+					sbp->channel =
+					    &hba->chan[hba->channel_els];
+				} else {
+					sbp->channel =
+					    &hba->chan[FC_ELS_RING];
+				}
+			}
+
 			/* Return this as rejected by the target */
 			emlxs_pkt_complete(sbp, IOSTAT_LS_RJT, 0, 1);
 
@@ -7738,15 +8215,24 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 		}
 	}
 
-	/* DID == Bcast_DID is special case to indicate that */
+	/* DID == BCAST_DID is special case to indicate that */
 	/* RPI is being passed in seq_id field */
 	/* This is used by emlxs_send_logo() for target mode */
 
 	/* Initalize iocbq */
 	iocbq->node = (void *)ndlp;
-	if (emlxs_sli_prep_els_iocb(port, sbp) != FC_SUCCESS) {
-		return (FC_TRAN_BUSY);
+	if ((rval = EMLXS_SLI_PREP_ELS_IOCB(port, sbp)) != FC_SUCCESS) {
+
+		if (rval == 0xff) {
+			emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT, 0, 1);
+			rval = FC_SUCCESS;
+		}
+
+		return (rval);
 	}
+
+	cp = &hba->chan[hba->channel_els];
+	cp->ulpSendCmd++;
 
 	/* Check cmd */
 	switch (cmd) {
@@ -7781,26 +8267,24 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 	case ELS_CMD_PLOGI:
 	case ELS_CMD_PDISC:
 		{
-			/* Copy latest service parameters to payload */
-			bcopy((void *) &port->sparam,
-			    (void *)&els_pkt->un.logi, sizeof (SERV_PARM));
+		/* Copy latest service parameters to payload */
+		bcopy((void *) &port->sparam,
+		    (void *)&els_pkt->un.logi, sizeof (SERV_PARM));
 
-#ifdef NPIV_SUPPORT
-			if ((hba->flag & FC_NPIV_ENABLED) &&
-			    (hba->flag & FC_NPIV_SUPPORTED) &&
-			    (cmd == ELS_CMD_PLOGI)) {
+		if ((hba->flag & FC_NPIV_ENABLED) &&
+		    (hba->flag & FC_NPIV_SUPPORTED) &&
+		    (cmd == ELS_CMD_PLOGI)) {
 				SERV_PARM	*sp;
 				emlxs_vvl_fmt_t	*vvl;
 
 				sp = (SERV_PARM *)&els_pkt->un.logi;
-				sp->valid_vendor_version = 1;
+				sp->VALID_VENDOR_VERSION = 1;
 				vvl = (emlxs_vvl_fmt_t *)&sp->vendorVersion[0];
 				vvl->un0.w0.oui = 0x0000C9;
-				vvl->un0.word0 = SWAP_DATA32(vvl->un0.word0);
+				vvl->un0.word0 = LE_SWAP32(vvl->un0.word0);
 				vvl->un1.w1.vport =  (port->vpi > 0) ? 1 : 0;
-				vvl->un1.word1 = SWAP_DATA32(vvl->un1.word1);
+				vvl->un1.word1 = LE_SWAP32(vvl->un1.word1);
 			}
-#endif /* NPIV_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 			emlxs_dhc_init_sp(port, did,
@@ -7818,7 +8302,6 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
 	sbp->node = (void *)ndlp;
 	sbp->lun = 0;
-	sbp->class = iocb->ulpClass;
 	sbp->did = did;
 	mutex_exit(&sbp->mtx);
 
@@ -7826,7 +8309,7 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 	    emlxs_elscmd_xlate(cmd), port->did, did, fcsp_msg);
 
 	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
 
@@ -7838,11 +8321,13 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 			/* It should already have been destroyed at link down */
 			/* Unregister the fabric did and attempt a deferred */
 			/* iocb send */
-			if (emlxs_mb_unreg_did(port, Fabric_DID, NULL, NULL,
-			    iocbq) == 0) {
-				/* Deferring iocb tx until */
-				/* completion of unreg */
-				return (FC_SUCCESS);
+			if (hba->sli_mode != EMLXS_HBA_SLI4_MODE) {
+				if (emlxs_mb_unreg_did(port, FABRIC_DID, NULL,
+				    NULL, iocbq) == 0) {
+					/* Deferring iocb tx until */
+					/* completion of unreg */
+					return (FC_SUCCESS);
+				}
 			}
 		}
 		break;
@@ -7853,9 +8338,9 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 		if (ndlp && ndlp->nlp_active) {
 			/* Close the node for any further normal IO */
-			emlxs_node_close(port, ndlp, FC_FCP_RING,
+			emlxs_node_close(port, ndlp, hba->channel_fcp,
 			    pkt->pkt_timeout + 10);
-			emlxs_node_close(port, ndlp, FC_IP_RING,
+			emlxs_node_close(port, ndlp, hba->channel_ip,
 			    pkt->pkt_timeout + 10);
 
 			/* Flush tx queues */
@@ -7872,17 +8357,23 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 		ndlp = emlxs_node_find_did(port, did);
 
 		if (ndlp && ndlp->nlp_active) {
-			/* Close the node for any further FCP IO */
-			emlxs_node_close(port, ndlp, FC_FCP_RING,
+			/*
+			 * Close the node for any further FCP IO;
+			 * Flush all outstanding I/O only if
+			 * "Establish Image Pair" bit is set.
+			 */
+			emlxs_node_close(port, ndlp, hba->channel_fcp,
 			    pkt->pkt_timeout + 10);
 
-			/* Flush tx queues */
-			(void) emlxs_tx_node_flush(port, ndlp,
-			    &hba->ring[FC_FCP_RING], 0, 0);
+			if (els_pkt->un.prli.estabImagePair) {
+				/* Flush tx queues */
+				(void) emlxs_tx_node_flush(port, ndlp,
+				    &hba->chan[hba->channel_fcp], 0, 0);
 
-			/* Flush chip queues */
-			(void) emlxs_chipq_node_flush(port,
-			    &hba->ring[FC_FCP_RING], ndlp, 0);
+				/* Flush chip queues */
+				(void) emlxs_chipq_node_flush(port,
+				    &hba->chan[hba->channel_fcp], ndlp, 0);
+			}
 		}
 
 		break;
@@ -7891,7 +8382,7 @@ emlxs_send_els(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	HBASTATS.ElsCmdIssued++;
 
-	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_ELS_RING], iocbq);
+	EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 
 	return (FC_SUCCESS);
 
@@ -7904,10 +8395,12 @@ static int32_t
 emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
 	emlxs_hba_t	*hba = HBA;
+	emlxs_config_t  *cfg = &CFG;
 	fc_packet_t	*pkt;
 	IOCBQ		*iocbq;
 	IOCB		*iocb;
 	NODELIST	*ndlp;
+	CHANNEL		*cp;
 	int		i;
 	uint32_t	cmd;
 	uint32_t	ucmd;
@@ -7917,11 +8410,12 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 	uint32_t	did;
 	char		fcsp_msg[32];
 	uint8_t		*ub_buffer;
+	int32_t		rval;
 
 	fcsp_msg[0] = 0;
 	pkt = PRIV2PKT(sbp);
 	els_pkt = (ELS_PKT *)pkt->pkt_cmd;
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	iocbq = &sbp->iocbq;
 	iocb = &iocbq->iocb;
@@ -7966,148 +8460,161 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 	/* Save the result */
 	sbp->ucmd = ucmd;
 
+	if (sbp->channel == NULL) {
+		if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+			sbp->channel = &hba->chan[hba->channel_els];
+		} else {
+			sbp->channel = &hba->chan[FC_ELS_RING];
+		}
+	}
+
 	/* Check for interceptions */
 	switch (ucmd) {
 
 #ifdef ULP_PATCH2
 	case ELS_CMD_LOGO:
-		{
-			/* Check if this was generated by ULP and not us */
-			if (!(sbp->pkt_flags & PACKET_ALLOCATED)) {
-
-				/*
-				 * Since we replied to this already,
-				 * we won't need to send this now
-				 */
-				emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
-
-				return (FC_SUCCESS);
-			}
-
+		if (!(cfg[CFG_ENABLE_PATCH].current & ULP_PATCH2)) {
 			break;
 		}
-#endif
+
+		/* Check if this was generated by ULP and not us */
+		if (!(sbp->pkt_flags & PACKET_ALLOCATED)) {
+
+			/*
+			 * Since we replied to this already,
+			 * we won't need to send this now
+			 */
+			emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
+
+			return (FC_SUCCESS);
+		}
+
+		break;
+#endif /* ULP_PATCH2 */
 
 #ifdef ULP_PATCH3
 	case ELS_CMD_PRLI:
-		{
-			/* Check if this was generated by ULP and not us */
-			if (!(sbp->pkt_flags & PACKET_ALLOCATED)) {
-
-				/*
-				 * Since we replied to this already,
-				 * we won't need to send this now
-				 */
-				emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
-
-				return (FC_SUCCESS);
-			}
-
+		if (!(cfg[CFG_ENABLE_PATCH].current & ULP_PATCH3)) {
 			break;
 		}
-#endif
+
+		/* Check if this was generated by ULP and not us */
+		if (!(sbp->pkt_flags & PACKET_ALLOCATED)) {
+
+			/*
+			 * Since we replied to this already,
+			 * we won't need to send this now
+			 */
+			emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
+
+			return (FC_SUCCESS);
+		}
+
+		break;
+#endif /* ULP_PATCH3 */
 
 
 #ifdef ULP_PATCH4
 	case ELS_CMD_PRLO:
-		{
-			/* Check if this was generated by ULP and not us */
-			if (!(sbp->pkt_flags & PACKET_ALLOCATED)) {
-				/*
-				 * Since we replied to this already,
-				 * we won't need to send this now
-				 */
-				emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
-
-				return (FC_SUCCESS);
-			}
-
+		if (!(cfg[CFG_ENABLE_PATCH].current & ULP_PATCH4)) {
 			break;
 		}
-#endif
+
+		/* Check if this was generated by ULP and not us */
+		if (!(sbp->pkt_flags & PACKET_ALLOCATED)) {
+			/*
+			 * Since we replied to this already,
+			 * we won't need to send this now
+			 */
+			emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
+
+			return (FC_SUCCESS);
+		}
+
+		break;
+#endif /* ULP_PATCH4 */
 
 #ifdef ULP_PATCH6
 	case ELS_CMD_RSCN:
-		{
-			/* Check if this RSCN was generated by us */
-			if (ub_priv && (ub_priv->flags & EMLXS_UB_INTERCEPT)) {
-				cmd = *((uint32_t *)pkt->pkt_cmd);
-				cmd = SWAP_DATA32(cmd);
-				cmd &= ELS_CMD_MASK;
-
-				/*
-				 * If ULP is accepting this,
-				 * then close affected node
-				 */
-				if (port->ini_mode && ub_buffer && cmd
-				    == ELS_CMD_ACC) {
-					fc_rscn_t	*rscn;
-					uint32_t	count;
-					uint32_t	*lp;
-
-					/*
-					 * Only the Leadville code path will
-					 * come thru here. The RSCN data is NOT
-					 * swapped properly for the Comstar code
-					 * path.
-					 */
-					lp = (uint32_t *)ub_buffer;
-					rscn = (fc_rscn_t *)lp++;
-					count =
-					    ((rscn->rscn_payload_len - 4) / 4);
-
-					/* Close affected ports */
-					for (i = 0; i < count; i++, lp++) {
-						(void) emlxs_port_offline(port,
-						    *lp);
-					}
-				}
-
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_reply_msg,
-				    "RSCN %s: did=%x oxid=%x rxid=%x. "
-				    "Intercepted.", emlxs_elscmd_xlate(cmd),
-				    did, pkt->pkt_cmd_fhdr.ox_id,
-				    pkt->pkt_cmd_fhdr.rx_id);
-
-				/*
-				 * Since we generated this RSCN,
-				 * we won't need to send this reply
-				 */
-				emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
-
-				return (FC_SUCCESS);
-			}
-
+		if (!(cfg[CFG_ENABLE_PATCH].current & ULP_PATCH6)) {
 			break;
 		}
-#endif
+
+		/* Check if this RSCN was generated by us */
+		if (ub_priv && (ub_priv->flags & EMLXS_UB_INTERCEPT)) {
+			cmd = *((uint32_t *)pkt->pkt_cmd);
+			cmd = LE_SWAP32(cmd);
+			cmd &= ELS_CMD_MASK;
+
+			/*
+			 * If ULP is accepting this,
+			 * then close affected node
+			 */
+			if (port->ini_mode && ub_buffer && cmd
+			    == ELS_CMD_ACC) {
+				fc_rscn_t	*rscn;
+				uint32_t	count;
+				uint32_t	*lp;
+
+				/*
+				 * Only the Leadville code path will
+				 * come thru here. The RSCN data is NOT
+				 * swapped properly for the Comstar code
+				 * path.
+				 */
+				lp = (uint32_t *)ub_buffer;
+				rscn = (fc_rscn_t *)lp++;
+				count =
+				    ((rscn->rscn_payload_len - 4) / 4);
+
+				/* Close affected ports */
+				for (i = 0; i < count; i++, lp++) {
+					(void) emlxs_port_offline(port,
+					    *lp);
+				}
+			}
+
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_reply_msg,
+			    "RSCN %s: did=%x oxid=%x rxid=%x. "
+			    "Intercepted.", emlxs_elscmd_xlate(cmd),
+			    did, pkt->pkt_cmd_fhdr.ox_id,
+			    pkt->pkt_cmd_fhdr.rx_id);
+
+			/*
+			 * Since we generated this RSCN,
+			 * we won't need to send this reply
+			 */
+			emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
+
+			return (FC_SUCCESS);
+		}
+
+		break;
+#endif /* ULP_PATCH6 */
 
 	case ELS_CMD_PLOGI:
-		{
-			/* Check if this PLOGI was generated by us */
-			if (ub_priv && (ub_priv->flags & EMLXS_UB_INTERCEPT)) {
-				cmd = *((uint32_t *)pkt->pkt_cmd);
-				cmd = SWAP_DATA32(cmd);
-				cmd &= ELS_CMD_MASK;
+		/* Check if this PLOGI was generated by us */
+		if (ub_priv && (ub_priv->flags & EMLXS_UB_INTERCEPT)) {
+			cmd = *((uint32_t *)pkt->pkt_cmd);
+			cmd = LE_SWAP32(cmd);
+			cmd &= ELS_CMD_MASK;
 
-				EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_reply_msg,
-				    "PLOGI %s: did=%x oxid=%x rxid=%x. "
-				    "Intercepted.", emlxs_elscmd_xlate(cmd),
-				    did, pkt->pkt_cmd_fhdr.ox_id,
-				    pkt->pkt_cmd_fhdr.rx_id);
+			EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_els_reply_msg,
+			    "PLOGI %s: did=%x oxid=%x rxid=%x. "
+			    "Intercepted.", emlxs_elscmd_xlate(cmd),
+			    did, pkt->pkt_cmd_fhdr.ox_id,
+			    pkt->pkt_cmd_fhdr.rx_id);
 
-				/*
-				 * Since we generated this PLOGI,
-				 * we won't need to send this reply
-				 */
-				emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
+			/*
+			 * Since we generated this PLOGI,
+			 * we won't need to send this reply
+			 */
+			emlxs_pkt_complete(sbp, IOSTAT_SUCCESS, 0, 1);
 
-				return (FC_SUCCESS);
-			}
-
-			break;
+			return (FC_SUCCESS);
 		}
 
+		break;
 	}
 
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
@@ -8170,9 +8677,18 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 	/* Initalize iocbq */
 	iocbq->node = (void *)NULL;
-	if (emlxs_sli_prep_els_iocb(port, sbp) != FC_SUCCESS) {
-		return (FC_TRAN_BUSY);
+	if ((rval = EMLXS_SLI_PREP_ELS_IOCB(port, sbp)) != FC_SUCCESS) {
+
+		if (rval == 0xff) {
+			emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT, 0, 1);
+			rval = FC_SUCCESS;
+		}
+
+		return (rval);
 	}
+
+	cp = &hba->chan[hba->channel_els];
+	cp->ulpSendCmd++;
 
 	/* Initalize sbp */
 	mutex_enter(&sbp->mtx);
@@ -8180,7 +8696,7 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
 	sbp->node = (void *) NULL;
 	sbp->lun = 0;
-	sbp->class = iocb->ulpClass;
+	sbp->class = iocb->ULPCLASS;
 	sbp->did = did;
 	mutex_exit(&sbp->mtx);
 
@@ -8193,25 +8709,25 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 	switch (ucmd) {
 	case ELS_CMD_RSCN:
 		{
-			if (port->ini_mode && ub_buffer && cmd == ELS_CMD_ACC) {
-				fc_rscn_t	*rscn;
-				uint32_t	count;
-				uint32_t	*lp = NULL;
+		if (port->ini_mode && ub_buffer && cmd == ELS_CMD_ACC) {
+			fc_rscn_t	*rscn;
+			uint32_t	count;
+			uint32_t	*lp = NULL;
 
-				/*
-				 * Only the Leadville code path will come thru
-				 * here. The RSCN data is NOT swapped properly
-				 * for the Comstar code path.
-				 */
-				lp = (uint32_t *)ub_buffer;
-				rscn = (fc_rscn_t *)lp++;
-				count = ((rscn->rscn_payload_len - 4) / 4);
+			/*
+			 * Only the Leadville code path will come thru
+			 * here. The RSCN data is NOT swapped properly
+			 * for the Comstar code path.
+			 */
+			lp = (uint32_t *)ub_buffer;
+			rscn = (fc_rscn_t *)lp++;
+			count = ((rscn->rscn_payload_len - 4) / 4);
 
-				/* Close affected ports */
-				for (i = 0; i < count; i++, lp++) {
-					(void) emlxs_port_offline(port, *lp);
-				}
+			/* Close affected ports */
+			for (i = 0; i < count; i++, lp++) {
+				(void) emlxs_port_offline(port, *lp);
 			}
+		}
 			break;
 		}
 	case ELS_CMD_PLOGI:
@@ -8221,9 +8737,9 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 			if (ndlp && ndlp->nlp_active) {
 				/* Close the node for any further normal IO */
-				emlxs_node_close(port, ndlp, FC_FCP_RING,
+				emlxs_node_close(port, ndlp, hba->channel_fcp,
 				    pkt->pkt_timeout + 10);
-				emlxs_node_close(port, ndlp, FC_IP_RING,
+				emlxs_node_close(port, ndlp, hba->channel_ip,
 				    pkt->pkt_timeout + 10);
 
 				/* Flush tx queue */
@@ -8243,16 +8759,16 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 			if (ndlp && ndlp->nlp_active) {
 				/* Close the node for any further normal IO */
-				emlxs_node_close(port, ndlp, FC_FCP_RING,
+				emlxs_node_close(port, ndlp, hba->channel_fcp,
 				    pkt->pkt_timeout + 10);
 
 				/* Flush tx queues */
 				(void) emlxs_tx_node_flush(port, ndlp,
-				    &hba->ring[FC_FCP_RING], 0, 0);
+				    &hba->chan[hba->channel_fcp], 0, 0);
 
 				/* Flush chip queues */
 				(void) emlxs_chipq_node_flush(port,
-				    &hba->ring[FC_FCP_RING], ndlp, 0);
+				    &hba->chan[hba->channel_fcp], ndlp, 0);
 			}
 		}
 
@@ -8265,15 +8781,16 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 			if (ndlp && ndlp->nlp_active) {
 				/* Close the node for any further normal IO */
-				emlxs_node_close(port, ndlp, FC_FCP_RING, 60);
+				emlxs_node_close(port, ndlp,
+				    hba->channel_fcp, 60);
 
 				/* Flush tx queues */
 				(void) emlxs_tx_node_flush(port, ndlp,
-				    &hba->ring[FC_FCP_RING], 0, 0);
+				    &hba->chan[hba->channel_fcp], 0, 0);
 
 				/* Flush chip queues */
 				(void) emlxs_chipq_node_flush(port,
-				    &hba->ring[FC_FCP_RING], ndlp, 0);
+				    &hba->chan[hba->channel_fcp], ndlp, 0);
 			}
 		}
 
@@ -8286,8 +8803,10 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 
 			if (ndlp && ndlp->nlp_active) {
 				/* Close the node for any further normal IO */
-				emlxs_node_close(port, ndlp, FC_FCP_RING, 60);
-				emlxs_node_close(port, ndlp, FC_IP_RING, 60);
+				emlxs_node_close(port, ndlp,
+				    hba->channel_fcp, 60);
+				emlxs_node_close(port, ndlp,
+				    hba->channel_ip, 60);
 
 				/* Flush tx queues */
 				(void) emlxs_tx_node_flush(port, ndlp, 0, 0, 0);
@@ -8301,13 +8820,13 @@ emlxs_send_els_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 	}
 
 	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
 
 	HBASTATS.ElsRspIssued++;
 
-	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_ELS_RING], iocbq);
+	EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 
 	return (FC_SUCCESS);
 
@@ -8322,9 +8841,11 @@ emlxs_send_menlo(emlxs_port_t *port, emlxs_buf_t *sbp)
 	fc_packet_t	*pkt;
 	IOCBQ		*iocbq;
 	IOCB		*iocb;
+	CHANNEL		*cp;
 	NODELIST	*ndlp;
 	uint32_t	did;
 	uint32_t	*lp;
+	int32_t		rval;
 
 	pkt = PRIV2PKT(sbp);
 	did = EMLXS_MENLO_DID;
@@ -8343,32 +8864,41 @@ emlxs_send_menlo(emlxs_port_t *port, emlxs_buf_t *sbp)
 	}
 
 	iocbq->node = (void *) ndlp;
-	if (emlxs_sli_prep_ct_iocb(port, sbp) != FC_SUCCESS) {
-		return (FC_TRAN_BUSY);
+	if ((rval = EMLXS_SLI_PREP_CT_IOCB(port, sbp)) != FC_SUCCESS) {
+
+		if (rval == 0xff) {
+			emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT, 0, 1);
+			rval = FC_SUCCESS;
+		}
+
+		return (rval);
 	}
+
+	cp = &hba->chan[hba->channel_ct];
+	cp->ulpSendCmd++;
 
 	if (pkt->pkt_tran_type == FC_PKT_EXCHANGE) {
 		/* Cmd phase */
 
 		/* Initalize iocb */
 		iocb->un.genreq64.param = pkt->pkt_cmd_fhdr.d_id;
-		iocb->ulpContext = 0;
-		iocb->ulpPU = 3;
+		iocb->ULPCONTEXT = 0;
+		iocb->ULPPU = 3;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_send_msg,
 		    "%s: [%08x,%08x,%08x,%08x]",
-		    emlxs_menlo_cmd_xlate(SWAP_LONG(lp[0])), SWAP_LONG(lp[1]),
-		    SWAP_LONG(lp[2]), SWAP_LONG(lp[3]), SWAP_LONG(lp[4]));
+		    emlxs_menlo_cmd_xlate(BE_SWAP32(lp[0])), BE_SWAP32(lp[1]),
+		    BE_SWAP32(lp[2]), BE_SWAP32(lp[3]), BE_SWAP32(lp[4]));
 
 	} else {	/* FC_PKT_OUTBOUND */
 
 		/* MENLO_CMD_FW_DOWNLOAD Data Phase */
-		iocb->ulpCommand = CMD_GEN_REQUEST64_CX;
+		iocb->ULPCOMMAND = CMD_GEN_REQUEST64_CX;
 
 		/* Initalize iocb */
 		iocb->un.genreq64.param = 0;
-		iocb->ulpContext = pkt->pkt_cmd_fhdr.rx_id;
-		iocb->ulpPU = 1;
+		iocb->ULPCONTEXT = pkt->pkt_cmd_fhdr.rx_id;
+		iocb->ULPPU = 1;
 
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_send_msg,
 		    "%s: Data: rxid=0x%x size=%d",
@@ -8382,16 +8912,16 @@ emlxs_send_menlo(emlxs_port_t *port, emlxs_buf_t *sbp)
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
 	sbp->node = (void *) ndlp;
 	sbp->lun = 0;
-	sbp->class = iocb->ulpClass;
+	sbp->class = iocb->ULPCLASS;
 	sbp->did = did;
 	mutex_exit(&sbp->mtx);
 
-	emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+	EMLXS_MPDATA_SYNC(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 	    DDI_DMA_SYNC_FORDEV);
 
 	HBASTATS.CtCmdIssued++;
 
-	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_CT_RING], iocbq);
+	EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 
 	return (FC_SUCCESS);
 
@@ -8408,9 +8938,11 @@ emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp)
 	IOCB		*iocb;
 	NODELIST	*ndlp;
 	uint32_t	did;
+	CHANNEL		*cp;
+	int32_t 	rval;
 
 	pkt = PRIV2PKT(sbp);
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 
 	iocbq = &sbp->iocbq;
 	iocb = &iocbq->iocb;
@@ -8429,9 +8961,18 @@ emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp)
 #endif	/* EMLXS_MODREV2X */
 
 	iocbq->node = (void *)ndlp;
-	if (emlxs_sli_prep_ct_iocb(port, sbp) != FC_SUCCESS) {
-		return (FC_TRAN_BUSY);
+	if ((rval = EMLXS_SLI_PREP_CT_IOCB(port, sbp)) != FC_SUCCESS) {
+
+		if (rval == 0xff) {
+			emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT, 0, 1);
+			rval = FC_SUCCESS;
+		}
+
+		return (rval);
 	}
+
+	cp = &hba->chan[hba->channel_ct];
+	cp->ulpSendCmd++;
 
 	/* Initalize sbp */
 	mutex_enter(&sbp->mtx);
@@ -8439,11 +8980,11 @@ emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp)
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
 	sbp->node = (void *)ndlp;
 	sbp->lun = 0;
-	sbp->class = iocb->ulpClass;
+	sbp->class = iocb->ULPCLASS;
 	sbp->did = did;
 	mutex_exit(&sbp->mtx);
 
-	if (did == NameServer_DID) {
+	if (did == NAMESERVER_DID) {
 		SLI_CT_REQUEST	*CtCmd;
 		uint32_t	*lp0;
 
@@ -8453,8 +8994,8 @@ emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_send_msg,
 		    "%s: did=%x [%08x,%08x]",
 		    emlxs_ctcmd_xlate(
-		    SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp)),
-		    did, SWAP_DATA32(lp0[4]), SWAP_DATA32(lp0[5]));
+		    LE_SWAP16(CtCmd->CommandResponse.bits.CmdRsp)),
+		    did, LE_SWAP32(lp0[4]), LE_SWAP32(lp0[5]));
 
 		if (hba->flag & FC_NPIV_DELAY_REQUIRED) {
 			sbp->pkt_flags |= PACKET_DELAY_REQUIRED;
@@ -8470,8 +9011,8 @@ emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_send_msg,
 		    "%s: did=%x [%08x,%08x]",
 		    emlxs_mscmd_xlate(
-		    SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp)),
-		    did, SWAP_DATA32(lp0[4]), SWAP_DATA32(lp0[5]));
+		    LE_SWAP16(CtCmd->CommandResponse.bits.CmdRsp)),
+		    did, LE_SWAP32(lp0[4]), LE_SWAP32(lp0[5]));
 	} else {
 		SLI_CT_REQUEST	*CtCmd;
 		uint32_t	*lp0;
@@ -8482,18 +9023,18 @@ emlxs_send_ct(emlxs_port_t *port, emlxs_buf_t *sbp)
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_send_msg,
 		    "%s: did=%x [%08x,%08x]",
 		    emlxs_rmcmd_xlate(
-		    SWAP_DATA16(CtCmd->CommandResponse.bits.CmdRsp)),
-		    did, SWAP_DATA32(lp0[4]), SWAP_DATA32(lp0[5]));
+		    LE_SWAP16(CtCmd->CommandResponse.bits.CmdRsp)),
+		    did, LE_SWAP32(lp0[4]), LE_SWAP32(lp0[5]));
 	}
 
 	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
 
 	HBASTATS.CtCmdIssued++;
 
-	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_CT_RING], iocbq);
+	EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 
 	return (FC_SUCCESS);
 
@@ -8505,14 +9046,14 @@ emlxs_send_ct_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 {
 	emlxs_hba_t	*hba = HBA;
 	fc_packet_t	*pkt;
+	CHANNEL		*cp;
 	IOCBQ		*iocbq;
 	IOCB		*iocb;
-	uint32_t	did;
 	uint32_t	*cmd;
 	SLI_CT_REQUEST	*CtCmd;
+	int32_t 	rval;
 
 	pkt = PRIV2PKT(sbp);
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
 	CtCmd = (SLI_CT_REQUEST *)pkt->pkt_cmd;
 	cmd = (uint32_t *)pkt->pkt_cmd;
 
@@ -8523,10 +9064,18 @@ emlxs_send_ct_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 	emlxs_swap_ct_pkt(sbp);
 #endif	/* EMLXS_MODREV2X */
 
-	iocbq->node = (void *)NULL;
-	if (emlxs_sli_prep_ct_iocb(port, sbp) != FC_SUCCESS) {
-		return (FC_TRAN_BUSY);
+	if ((rval = EMLXS_SLI_PREP_CT_IOCB(port, sbp)) != FC_SUCCESS) {
+
+		if (rval == 0xff) {
+			emlxs_pkt_complete(sbp, IOSTAT_LOCAL_REJECT, 0, 1);
+			rval = FC_SUCCESS;
+		}
+
+		return (rval);
 	}
+
+	cp = &hba->chan[hba->channel_ct];
+	cp->ulpSendCmd++;
 
 	/* Initalize sbp */
 	mutex_enter(&sbp->mtx);
@@ -8534,26 +9083,25 @@ emlxs_send_ct_rsp(emlxs_port_t *port, emlxs_buf_t *sbp)
 	    ((pkt->pkt_timeout > 0xff) ? 0 : 10);
 	sbp->node = NULL;
 	sbp->lun = 0;
-	sbp->class = iocb->ulpClass;
-	sbp->did = did;
+	sbp->class = iocb->ULPCLASS;
 	mutex_exit(&sbp->mtx);
 
 	EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_ct_reply_msg,
 	    "%s: Rsn=%x Exp=%x [%08x,%08x] rxid=%x ",
-	    emlxs_rmcmd_xlate(SWAP_DATA16(
+	    emlxs_rmcmd_xlate(LE_SWAP16(
 	    CtCmd->CommandResponse.bits.CmdRsp)),
 	    CtCmd->ReasonCode, CtCmd->Explanation,
-	    SWAP_DATA32(cmd[4]), SWAP_DATA32(cmd[5]),
+	    LE_SWAP32(cmd[4]), LE_SWAP32(cmd[5]),
 	    pkt->pkt_cmd_fhdr.rx_id);
 
 	if (pkt->pkt_cmdlen) {
-		emlxs_mpdata_sync(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
+		EMLXS_MPDATA_SYNC(pkt->pkt_cmd_dma, 0, pkt->pkt_cmdlen,
 		    DDI_DMA_SYNC_FORDEV);
 	}
 
 	HBASTATS.CtRspIssued++;
 
-	emlxs_sli_issue_iocb_cmd(hba, &hba->ring[FC_CT_RING], iocbq);
+	EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, iocbq);
 
 	return (FC_SUCCESS);
 
@@ -8645,10 +9193,10 @@ emlxs_pkt_complete(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 	mutex_enter(&sbp->mtx);
 
 	/* Check for error conditions */
-	if (sbp->pkt_flags & (PACKET_RETURNED | PACKET_COMPLETED |
+	if (sbp->pkt_flags & (PACKET_ULP_OWNED | PACKET_COMPLETED |
 	    PACKET_IN_DONEQ | PACKET_IN_COMPLETION |
 	    PACKET_IN_TXQ | PACKET_IN_CHIPQ)) {
-		if (sbp->pkt_flags & PACKET_RETURNED) {
+		if (sbp->pkt_flags & PACKET_ULP_OWNED) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
 			    &emlxs_pkt_completion_error_msg,
 			    "Packet already returned. sbp=%p flags=%x", sbp,
@@ -8711,7 +9259,7 @@ emlxs_pkt_complete(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 		 * fpkt's mutex if possible
 		 */
 
-		if (!(fpkt->pkt_flags & PACKET_RETURNED)) {
+		if (!(fpkt->pkt_flags & PACKET_ULP_OWNED)) {
 			mutex_enter(&fpkt->mtx);
 			if (fpkt->flush_count) {
 				fpkt->flush_count--;
@@ -8726,7 +9274,7 @@ emlxs_pkt_complete(emlxs_buf_t *sbp, uint32_t iostat, uint8_t localstat,
 
 	/* If pkt is polled, then wake up sleeping thread */
 	if (sbp->pkt_flags & PACKET_POLLED) {
-		/* Don't set the PACKET_RETURNED flag here */
+		/* Don't set the PACKET_ULP_OWNED flag here */
 		/* because the polling thread will do it */
 		sbp->pkt_flags |= PACKET_COMPLETED;
 		mutex_exit(&sbp->mtx);
@@ -8800,7 +9348,7 @@ emlxs_update_sd_bucket(emlxs_buf_t *sbp)
 	t = gethrtime();
 	delta_time = t - sbp->sd_start_time;
 	pkt = PRIV2PKT(sbp);
-	did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+	did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 	ndlp = emlxs_node_find_did(vport, did);
 
 	if (ndlp) {
@@ -8867,22 +9415,26 @@ static void
 emlxs_iodone(emlxs_buf_t *sbp)
 {
 	fc_packet_t	*pkt;
+	CHANNEL		*cp;
 
 	pkt = PRIV2PKT(sbp);
 
 	/* Check one more time that the  pkt has not already been returned */
-	if (sbp->pkt_flags & PACKET_RETURNED) {
+	if (sbp->pkt_flags & PACKET_ULP_OWNED) {
 		return;
 	}
+	cp = (CHANNEL *)sbp->channel;
+
 #if (EMLXS_MODREVX == EMLXS_MODREV2X)
 	emlxs_unswap_pkt(sbp);
 #endif	/* EMLXS_MODREV2X */
 
 	mutex_enter(&sbp->mtx);
-	sbp->pkt_flags |= (PACKET_COMPLETED | PACKET_RETURNED);
+	sbp->pkt_flags |= (PACKET_COMPLETED | PACKET_ULP_OWNED);
 	mutex_exit(&sbp->mtx);
 
 	if (pkt->pkt_comp) {
+		cp->ulpCmplCmd++;
 		(*pkt->pkt_comp) (pkt);
 	}
 
@@ -9148,32 +9700,32 @@ emlxs_swap_service_params(SERV_PARM *sp)
 	size = (sizeof (CSP) - 4) / 2;
 	p = (uint16_t *)&sp->cmn;
 	for (i = 0; i < size; i++) {
-		p[i] = SWAP_DATA16(p[i]);
+		p[i] = LE_SWAP16(p[i]);
 	}
-	sp->cmn.e_d_tov = SWAP_DATA32(sp->cmn.e_d_tov);
+	sp->cmn.e_d_tov = LE_SWAP32(sp->cmn.e_d_tov);
 
 	size = sizeof (CLASS_PARMS) / 2;
 	p = (uint16_t *)&sp->cls1;
 	for (i = 0; i < size; i++, p++) {
-		*p = SWAP_DATA16(*p);
+		*p = LE_SWAP16(*p);
 	}
 
 	size = sizeof (CLASS_PARMS) / 2;
 	p = (uint16_t *)&sp->cls2;
 	for (i = 0; i < size; i++, p++) {
-		*p = SWAP_DATA16(*p);
+		*p = LE_SWAP16(*p);
 	}
 
 	size = sizeof (CLASS_PARMS) / 2;
 	p = (uint16_t *)&sp->cls3;
 	for (i = 0; i < size; i++, p++) {
-		*p = SWAP_DATA16(*p);
+		*p = LE_SWAP16(*p);
 	}
 
 	size = sizeof (CLASS_PARMS) / 2;
 	p = (uint16_t *)&sp->cls4;
 	for (i = 0; i < size; i++, p++) {
-		*p = SWAP_DATA16(*p);
+		*p = LE_SWAP16(*p);
 	}
 
 	return;
@@ -9230,20 +9782,20 @@ emlxs_swap_fcp_pkt(emlxs_buf_t *sbp)
 	    (fcp_rsp_t *)pkt->pkt_resp : NULL;
 
 	/* The size of data buffer needs to be swapped. */
-	cmd->fcpDl = SWAP_DATA32(cmd->fcpDl);
+	cmd->fcpDl = LE_SWAP32(cmd->fcpDl);
 
 	/*
 	 * Swap first 2 words of FCP CMND payload.
 	 */
 	lunp = (uint16_t *)&cmd->fcpLunMsl;
 	for (i = 0; i < 4; i++) {
-		lunp[i] = SWAP_DATA16(lunp[i]);
+		lunp[i] = LE_SWAP16(lunp[i]);
 	}
 
 	if (rsp) {
-		rsp->fcp_resid = SWAP_DATA32(rsp->fcp_resid);
-		rsp->fcp_sense_len = SWAP_DATA32(rsp->fcp_sense_len);
-		rsp->fcp_response_len = SWAP_DATA32(rsp->fcp_response_len);
+		rsp->fcp_resid = LE_SWAP32(rsp->fcp_resid);
+		rsp->fcp_sense_len = LE_SWAP32(rsp->fcp_sense_len);
+		rsp->fcp_response_len = LE_SWAP32(rsp->fcp_response_len);
 	}
 
 	return;
@@ -9287,25 +9839,25 @@ emlxs_swap_els_pkt(emlxs_buf_t *sbp)
 	    (uint32_t *)pkt->pkt_resp : NULL;
 
 	if (!swapped) {
-		cmd[0] = SWAP_DATA32(cmd[0]);
+		cmd[0] = LE_SWAP32(cmd[0]);
 		command = cmd[0] & ELS_CMD_MASK;
 	} else {
 		command = cmd[0] & ELS_CMD_MASK;
-		cmd[0] = SWAP_DATA32(cmd[0]);
+		cmd[0] = LE_SWAP32(cmd[0]);
 	}
 
 	if (rsp) {
-		rsp[0] = SWAP_DATA32(rsp[0]);
+		rsp[0] = LE_SWAP32(rsp[0]);
 	}
 
 	switch (command) {
 	case ELS_CMD_ACC:
 		if (sbp->ucmd == ELS_CMD_ADISC) {
 			/* Hard address of originator */
-			cmd[1] = SWAP_DATA32(cmd[1]);
+			cmd[1] = LE_SWAP32(cmd[1]);
 
 			/* N_Port ID of originator */
-			cmd[6] = SWAP_DATA32(cmd[6]);
+			cmd[6] = LE_SWAP32(cmd[6]);
 		}
 		break;
 
@@ -9318,38 +9870,38 @@ emlxs_swap_els_pkt(emlxs_buf_t *sbp)
 		break;
 
 	case ELS_CMD_RLS:
-		cmd[1] = SWAP_DATA32(cmd[1]);
+		cmd[1] = LE_SWAP32(cmd[1]);
 
 		if (rsp) {
 			for (i = 0; i < 6; i++) {
-				rsp[1 + i] = SWAP_DATA32(rsp[1 + i]);
+				rsp[1 + i] = LE_SWAP32(rsp[1 + i]);
 			}
 		}
 		break;
 
 	case ELS_CMD_ADISC:
-		cmd[1] = SWAP_DATA32(cmd[1]);	/* Hard address of originator */
-		cmd[6] = SWAP_DATA32(cmd[6]);	/* N_Port ID of originator */
+		cmd[1] = LE_SWAP32(cmd[1]);	/* Hard address of originator */
+		cmd[6] = LE_SWAP32(cmd[6]);	/* N_Port ID of originator */
 		break;
 
 	case ELS_CMD_PRLI:
 		c = (uint16_t *)&cmd[1];
-		c[1] = SWAP_DATA16(c[1]);
+		c[1] = LE_SWAP16(c[1]);
 
-		cmd[4] = SWAP_DATA32(cmd[4]);
+		cmd[4] = LE_SWAP32(cmd[4]);
 
 		if (rsp) {
-			rsp[4] = SWAP_DATA32(rsp[4]);
+			rsp[4] = LE_SWAP32(rsp[4]);
 		}
 		break;
 
 	case ELS_CMD_SCR:
-		cmd[1] = SWAP_DATA32(cmd[1]);
+		cmd[1] = LE_SWAP32(cmd[1]);
 		break;
 
 	case ELS_CMD_LINIT:
 		if (rsp) {
-			rsp[1] = SWAP_DATA32(rsp[1]);
+			rsp[1] = LE_SWAP32(rsp[1]);
 		}
 		break;
 
@@ -9401,10 +9953,10 @@ emlxs_swap_ct_pkt(emlxs_buf_t *sbp)
 		command = cmd[2];
 	}
 
-	cmd[0] = SWAP_DATA32(cmd[0]);
-	cmd[1] = SWAP_DATA32(cmd[1]);
-	cmd[2] = SWAP_DATA32(cmd[2]);
-	cmd[3] = SWAP_DATA32(cmd[3]);
+	cmd[0] = LE_SWAP32(cmd[0]);
+	cmd[1] = LE_SWAP32(cmd[1]);
+	cmd[2] = LE_SWAP32(cmd[2]);
+	cmd[3] = LE_SWAP32(cmd[3]);
 
 	if (swapped) {
 		command = cmd[2];
@@ -9412,28 +9964,29 @@ emlxs_swap_ct_pkt(emlxs_buf_t *sbp)
 
 	switch ((command >> 16)) {
 	case SLI_CTNS_GA_NXT:
-		cmd[4] = SWAP_DATA32(cmd[4]);
+		cmd[4] = LE_SWAP32(cmd[4]);
 		break;
 
 	case SLI_CTNS_GPN_ID:
 	case SLI_CTNS_GNN_ID:
 	case SLI_CTNS_RPN_ID:
 	case SLI_CTNS_RNN_ID:
-		cmd[4] = SWAP_DATA32(cmd[4]);
+	case SLI_CTNS_RSPN_ID:
+		cmd[4] = LE_SWAP32(cmd[4]);
 		break;
 
 	case SLI_CTNS_RCS_ID:
 	case SLI_CTNS_RPT_ID:
-		cmd[4] = SWAP_DATA32(cmd[4]);
-		cmd[5] = SWAP_DATA32(cmd[5]);
+		cmd[4] = LE_SWAP32(cmd[4]);
+		cmd[5] = LE_SWAP32(cmd[5]);
 		break;
 
 	case SLI_CTNS_RFT_ID:
-		cmd[4] = SWAP_DATA32(cmd[4]);
+		cmd[4] = LE_SWAP32(cmd[4]);
 
 		/* Swap FC4 types */
 		for (i = 0; i < 8; i++) {
-			cmd[5 + i] = SWAP_DATA32(cmd[5 + i]);
+			cmd[5 + i] = LE_SWAP32(cmd[5 + i]);
 		}
 		break;
 
@@ -9441,7 +9994,7 @@ emlxs_swap_ct_pkt(emlxs_buf_t *sbp)
 		if (rsp) {
 			/* Swap FC4 types */
 			for (i = 0; i < 8; i++) {
-				rsp[4 + i] = SWAP_DATA32(rsp[4 + i]);
+				rsp[4 + i] = LE_SWAP32(rsp[4 + i]);
 			}
 		}
 		break;
@@ -9459,7 +10012,6 @@ emlxs_swap_ct_pkt(emlxs_buf_t *sbp)
 	case SLI_CTNS_GID_FT:
 	case SLI_CTNS_GID_PT:
 	case SLI_CTNS_GID_PN:
-	case SLI_CTNS_RSPN_ID:
 	case SLI_CTNS_RIP_NN:
 	case SLI_CTNS_RIPA_NN:
 	case SLI_CTNS_RSNN_NN:
@@ -9491,12 +10043,12 @@ emlxs_swap_els_ub(fc_unsol_buf_t *ubp)
 	case ELS_CMD_RSCN:
 		rscn = (fc_rscn_t *)ubp->ub_buffer;
 
-		rscn->rscn_payload_len = SWAP_DATA16(rscn->rscn_payload_len);
+		rscn->rscn_payload_len = LE_SWAP16(rscn->rscn_payload_len);
 
 		count = ((rscn->rscn_payload_len - 4) / 4);
 		lp = (uint32_t *)ubp->ub_buffer + 1;
 		for (i = 0; i < count; i++, lp++) {
-			*lp = SWAP_DATA32(*lp);
+			*lp = LE_SWAP32(*lp);
 		}
 
 		break;
@@ -9879,7 +10431,6 @@ emlxs_pm_idle_timer(emlxs_hba_t *hba)
 #endif	/* IDLE_TIMER */
 
 
-#ifdef SLI3_SUPPORT
 static void
 emlxs_read_vport_prop(emlxs_hba_t *hba)
 {
@@ -10106,7 +10657,7 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 		}
 
 		/* Set the highest configured vpi */
-		if (vpi >= hba->vpi_high) {
+		if (vpi > hba->vpi_high) {
 			hba->vpi_high = vpi;
 		}
 
@@ -10129,11 +10680,9 @@ emlxs_read_vport_prop(emlxs_hba_t *hba)
 		hba->port[vpi].flag |=
 		    (EMLXS_PORT_CONFIG | EMLXS_PORT_ENABLE);
 
-#ifdef NPIV_SUPPORT
 		if (cfg[CFG_VPORT_RESTRICTED].current) {
 			hba->port[vpi].flag |= EMLXS_PORT_RESTRICTED;
 		}
-#endif /* NPIV_SUPPORT */
 	}
 
 out:
@@ -10142,9 +10691,6 @@ out:
 	return;
 
 } /* emlxs_read_vport_prop() */
-
-#endif	/* SLI3_SUPPORT */
-
 
 
 extern char *
@@ -10196,7 +10742,7 @@ emlxs_ub_flush(emlxs_port_t *port)
 
 		ub_priv = next;
 
-	}	/* while() */
+	}	/* while () */
 
 	return;
 
@@ -10352,7 +10898,6 @@ emlxs_integrity_check(emlxs_hba_t *hba)
 
 		errors++;
 	}
-#ifdef SLI3_SUPPORT
 	size = SLI3_IOCB_CMD_SIZE;
 	if (sizeof (IOCB) != size) {
 		cmn_err(CE_WARN, "?%s%d: IOCB size incorrect.  %d != %d",
@@ -10361,16 +10906,6 @@ emlxs_integrity_check(emlxs_hba_t *hba)
 
 		errors++;
 	}
-#else
-	size = SLI2_IOCB_CMD_SIZE;
-	if (sizeof (IOCB) != size) {
-		cmn_err(CE_WARN, "?%s%d: IOCB size incorrect.  %d != %d",
-		    DRIVER_NAME, ddiinst, (int)sizeof (IOCB),
-		    SLI2_IOCB_CMD_SIZE);
-
-		errors++;
-	}
-#endif	/* SLI3_SUPPORT */
 
 	size = SLI_SLIM2_SIZE;
 	if (sizeof (SLIM2) != size) {
@@ -10431,7 +10966,7 @@ emlxs_fm_init(emlxs_hba_t *hba)
 		    (void *)hba);
 	}
 
-}  /* emlxs_fm_init() */
+} /* emlxs_fm_init() */
 
 
 extern void
@@ -10452,7 +10987,7 @@ emlxs_fm_fini(emlxs_hba_t *hba)
 
 	(void) ddi_fm_fini(hba->dip);
 
-}  /* emlxs_fm_fini() */
+} /* emlxs_fm_fini() */
 
 
 extern int
@@ -10479,7 +11014,7 @@ emlxs_fm_check_acc_handle(emlxs_hba_t *hba, ddi_acc_handle_t handle)
 
 	return (err.fme_status);
 
-}  /* emlxs_fm_check_acc_handle() */
+} /* emlxs_fm_check_acc_handle() */
 
 
 extern int
@@ -10496,7 +11031,7 @@ emlxs_fm_check_dma_handle(emlxs_hba_t *hba, ddi_dma_handle_t handle)
 
 	return (err.fme_status);
 
-}  /* emlxs_fm_check_dma_handle() */
+} /* emlxs_fm_check_dma_handle() */
 
 
 extern void
@@ -10519,7 +11054,7 @@ emlxs_fm_ereport(emlxs_hba_t *hba, char *detail)
 	ddi_fm_ereport_post(hba->dip, buf, ena, DDI_NOSLEEP,
 	    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
 
-}  /* emlxs_fm_ereport() */
+} /* emlxs_fm_ereport() */
 
 
 extern void
@@ -10533,9 +11068,14 @@ emlxs_fm_service_impact(emlxs_hba_t *hba, int impact)
 		return;
 	}
 
+	if ((hba->pm_state & EMLXS_PM_IN_DETACH) &&
+	    (impact == DDI_SERVICE_DEGRADED)) {
+		impact = DDI_SERVICE_UNAFFECTED;
+	}
+
 	ddi_fm_service_impact(hba->dip, impact);
 
-}
+} /* emlxs_fm_service_impact() */
 
 
 /*
@@ -10554,5 +11094,47 @@ emlxs_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err,
 	pci_ereport_post(dip, err, NULL);
 	return (err->fme_status);
 
-}  /* emlxs_fm_error_cb() */
+} /* emlxs_fm_error_cb() */
 #endif	/* FMA_SUPPORT */
+
+
+extern void
+emlxs_swap32_buffer(uint8_t *buffer, uint32_t size)
+{
+	uint32_t word;
+	uint32_t *wptr;
+	uint32_t i;
+
+	wptr = (uint32_t *)buffer;
+
+	size += (size%4)? (4-(size%4)):0;
+	for (i = 0; i < size / 4; i++) {
+		word = *wptr;
+		*wptr++ = SWAP32(word);
+	}
+
+	return;
+
+}  /* emlxs_swap32_buffer() */
+
+
+extern void
+emlxs_swap32_bcopy(uint8_t *src, uint8_t *dst, uint32_t size)
+{
+	uint32_t word;
+	uint32_t *sptr;
+	uint32_t *dptr;
+	uint32_t i;
+
+	sptr = (uint32_t *)src;
+	dptr = (uint32_t *)dst;
+
+	size += (size%4)? (4-(size%4)):0;
+	for (i = 0; i < size / 4; i++) {
+		word = *sptr++;
+		*dptr++ = SWAP32(word);
+	}
+
+	return;
+
+}  /* emlxs_swap32_buffer() */

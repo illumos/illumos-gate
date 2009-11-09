@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_MESSAGES_H
 #define	_EMLXS_MESSAGES_H
@@ -81,7 +80,6 @@ extern "C" {
  * FIRMWARE		1500
  * CT			1600
  * FCSP			1700
- * EVENTS		2000
  *
  */
 
@@ -162,30 +160,12 @@ emlxs_msg_group_t msg_group[] =
 						/* (very verbose) */
 #define	MSG_ALWAYS		0xffffffff	/* Always on */
 
-/* DFC Events */
-#define	EVT_LINK		0x00000001	/* FC_REG_LINK_EVENT */
-#define	EVT_RSCN		0x00000002	/* FC_REG_RSCN_EVENT */
-#define	EVT_CT			0x00000004	/* FC_REG_CT_EVENT   */
-#define	EVT_MPULSE		0x00000008	/* FC_REG_MULTIPULSE_EVENT */
-#define	EVT_DUMP		0x00000010	/* FC_REG_DUMP_EVENT */
-#define	EVT_TEMP		0x00000020	/* FC_REG_TEMP_EVENT */
-#define	EVT_VPORTRSCN		0x00000040	/* FC_REG_VPORTRSCN_EVENT */
-#define	EVT_ASYNC		0x00000080	/* FC_REG_ASYNC_EVENT */
-#ifdef SAN_DIAG_SUPPORT
-#define	EVT_SD_ELS		0x00001000
-#define	EVT_SD_FABRIC		0x00002000
-#define	EVT_SD_SCSI		0x00004000
-#define	EVT_SD_BOARD		0x00008000
-#endif /* SAN_DIAG_SUPPORT */
-#define	EVT_FCOE		0x80000000	/* FC_REG_FCOE_EVENT */
-
 /* Msg Levels */
 #define	EMLXS_DEBUG	1
 #define	EMLXS_NOTICE	2
 #define	EMLXS_WARNING	3
 #define	EMLXS_ERROR	4
 #define	EMLXS_PANIC	5
-#define	EMLXS_EVENT	6
 
 
 typedef struct emlxs_msg
@@ -293,16 +273,35 @@ emlxs_msg_t emlxs_message[] =
 		NULL, \
 		0)
 
-	DEFINE_MSG(6, \
-		emlxs_event_msg, \
-		"", \
-		EMLXS_EVENT, \
+	DEFINE_MSG(10, \
+		emlxs_event_debug_msg, \
+		"Event.", \
+		EMLXS_DEBUG, \
 		MSG_MISC, \
-		"This is a general purpose event message.", \
-		ACTION_REP, \
+		"This is debug information about a driver event.", \
+		ACTION_NONE, \
 		NULL, \
 		0)
 
+	DEFINE_MSG(11, \
+		emlxs_event_queued_msg, \
+		"Event queued.", \
+		EMLXS_DEBUG, \
+		MSG_MISC, \
+		"This indicates a driver event is being queued.", \
+		ACTION_NONE, \
+		NULL, \
+		0)
+
+	DEFINE_MSG(12, \
+		emlxs_event_dequeued_msg, \
+		"Event dequeued.", \
+		EMLXS_DEBUG, \
+		MSG_MISC, \
+		"This indicates a driver event is being dequeued.", \
+		ACTION_NONE, \
+		NULL, \
+		0)
 
 	/* GROUP:  DRIVER	100 - 199 */
 
@@ -552,6 +551,17 @@ emlxs_msg_t emlxs_message[] =
 		"configure more resources for that pool. If this does " \
 		"not solve the problem, report these errors to customer " \
 		"service.", \
+		NULL, \
+		0)
+
+	DEFINE_MSG(312, \
+		emlxs_pool_detail_msg, \
+		"Memory pool detail.", \
+		EMLXS_DEBUG, \
+		MSG_MEM, \
+		"This provides detailed information about memory buffer" \
+		"pool management.", \
+		ACTION_NONE, \
 		NULL, \
 		0)
 
@@ -827,6 +837,16 @@ emlxs_msg_t emlxs_message[] =
 		EMLXS_DEBUG, \
 		MSG_SLI_DETAIL, \
 		"This provides detailed information about an SLI event.", \
+		ACTION_NONE, \
+		NULL, \
+		0)
+
+	DEFINE_MSG(461, \
+		emlxs_sli_err_msg, \
+		"SLI ERROR.", \
+		EMLXS_ERROR, \
+		MSG_SLI, \
+		"This provides error information about an SLI event.", \
 		ACTION_NONE, \
 		NULL, \
 		0)
@@ -1195,12 +1215,12 @@ emlxs_msg_t emlxs_message[] =
 		0)
 
 	DEFINE_MSG(911, \
-		emlxs_ring_watchdog_msg, \
-		"Ring watchdog.", \
+		emlxs_chan_watchdog_msg, \
+		"CHANNEL watchdog.", \
 		EMLXS_DEBUG, \
 		MSG_PKT, \
 		"This indicates that IO(s) are getting stale waiting on a " \
-		"ring tx queue.", \
+		"IO channel tx queue.", \
 		ACTION_NONE, \
 		NULL, \
 		0)
@@ -1625,7 +1645,6 @@ emlxs_msg_t emlxs_message[] =
 		NULL, \
 		0)
 
-
 	DEFINE_MSG(1502, \
 		emlxs_image_library_msg, \
 		"Firmware Library", \
@@ -1689,6 +1708,18 @@ emlxs_msg_t emlxs_message[] =
 		"This indicates that an attempt to download a firmware image " \
 		"was failed.", \
 		ACTION_CHK_HCFG, \
+		NULL, \
+		0)
+
+	DEFINE_MSG(1523, \
+		emlxs_fw_updated_msg, \
+		"Firmware updated.", \
+		EMLXS_WARNING, \
+		MSG_FIRMWARE, \
+		"This indicates that new firmware has been updated on the " \
+		"adapter.", \
+		"A reboot or adapter power cycle will be required to " \
+		"activate the new firmware.", \
 		NULL, \
 		0)
 
@@ -1883,124 +1914,6 @@ emlxs_msg_t emlxs_message[] =
 		NULL, \
 		0)
 #endif	/* DHCHAP_SUPPORT */
-
-
-	/* GROUP:  EVENT	2000 - 2099 */
-
-	DEFINE_MSG(2000, \
-		emlxs_link_event, \
-		"Link.", \
-		EMLXS_EVENT, \
-		EVT_LINK, \
-		"This indicates that a link event has occurred.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-
-	DEFINE_MSG(2010, \
-		emlxs_rscn_event, \
-		"RSCN.", \
-		EMLXS_EVENT, \
-		EVT_RSCN, \
-		"This indicates that an unsolicited RSCN command was " \
-		"received.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-
-	DEFINE_MSG(2020, \
-		emlxs_ct_event, \
-		"CT.", \
-		EMLXS_EVENT, \
-		EVT_CT, \
-		"This indicates that an unsolicited CT command was received.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-
-	DEFINE_MSG(2030, \
-		emlxs_dump_event, \
-		"DUMP", \
-		EMLXS_EVENT, \
-		EVT_DUMP, \
-		"This indicates that an HBA core dump has occurred.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-
-	DEFINE_MSG(2040, \
-		emlxs_temp_event, \
-		"TEMP", \
-		EMLXS_EVENT, \
-		EVT_TEMP, \
-		"This indicates that an adapter temperature event has " \
-		"occurred.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-
-	DEFINE_MSG(2050, \
-		emlxs_fcoe_event, \
-		"FCOE", \
-		EMLXS_EVENT, \
-		EVT_FCOE, \
-		"This indicates that an adapter FCOE event has occurred.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-
-	DEFINE_MSG(2060, \
-		emlxs_async_event, \
-		"ASYNC", \
-		EMLXS_EVENT, \
-		EVT_ASYNC, \
-		"This indicates that an adapter ASYNC event has occurred.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-
-	DEFINE_MSG(2070, \
-		emlxs_vportrscn_event, \
-		"VPORTRSCN", \
-		EMLXS_EVENT, \
-		EVT_VPORTRSCN, \
-		"This indicates that an unsolicited RSCN event was " \
-		"received.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-
-#ifdef SAN_DIAG_SUPPORT
-	DEFINE_MSG(2200, \
-		emlxs_sd_els_event, \
-		"SD_ELS", \
-		EMLXS_EVENT, \
-		EVT_SD_ELS, \
-		"This indicates that an SD ELS event has occurred.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-
-	DEFINE_MSG(2210, \
-		emlxs_sd_fabric_event, \
-		"SD_FC", \
-		EMLXS_EVENT, \
-		EVT_SD_FABRIC, \
-		"This indicates that an SD FABRIC event has occurred.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-
-	DEFINE_MSG(2220, \
-		emlxs_sd_scsi_event, \
-		"SD_SCSI", \
-		EMLXS_EVENT, \
-		EVT_SD_SCSI, \
-		"This indicates that an SD SCSI event has occurred.", \
-		ACTION_NONE, \
-		NULL, \
-		0)
-#endif /* SAN_DIAG_SUPPORT */
 
 #ifdef DEF_MSG_REPORT
 };	/* emlxs_message[] */

@@ -21,8 +21,9 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
+
 
 #include <emlxs.h>
 
@@ -34,9 +35,7 @@
 EMLXS_MSG_DEF(EMLXS_CLOCK_C);
 
 
-#ifdef DFC_SUPPORT
 static void emlxs_timer_check_loopback(emlxs_hba_t *hba);
-#endif /* DFC_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 static void emlxs_timer_check_dhchap(emlxs_port_t *port);
@@ -49,7 +48,7 @@ static void	emlxs_timer_check_nodes(emlxs_port_t *port, uint8_t *flag);
 static void	emlxs_timer_check_linkup(emlxs_hba_t *hba);
 static void	emlxs_timer_check_discovery(emlxs_port_t *port);
 static void	emlxs_timer_check_ub(emlxs_port_t *port);
-static void	emlxs_timer_check_rings(emlxs_hba_t *hba, uint8_t *flag);
+static void	emlxs_timer_check_channels(emlxs_hba_t *hba, uint8_t *flag);
 static uint32_t	emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp,
 			Q *abortq, uint8_t *flag);
 
@@ -73,7 +72,7 @@ emlxs_timeout(emlxs_hba_t *hba, uint32_t timeout)
 
 	return (time);
 
-}  /* emlxs_timeout() */
+} /* emlxs_timeout() */
 
 
 static void
@@ -86,6 +85,8 @@ emlxs_timer(void *arg)
 	}
 
 	mutex_enter(&EMLXS_TIMER_LOCK);
+
+	EMLXS_SLI_POLL_ERRATT(hba);
 
 	/* Only one timer thread is allowed */
 	if (hba->timer_flags & EMLXS_TIMER_BUSY) {
@@ -129,14 +130,14 @@ emlxs_timer(void *arg)
 
 	return;
 
-}  /* emlxs_timer() */
+} /* emlxs_timer() */
 
 
 extern void
 emlxs_timer_checks(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
-	uint8_t flag[MAX_RINGS];
+	uint8_t flag[MAX_CHANNEL];
 	uint32_t i;
 	uint32_t rc;
 
@@ -145,10 +146,21 @@ emlxs_timer_checks(emlxs_hba_t *hba)
 		return;
 	}
 
+	/* DEBUG - re-examine this path for SLI4 later */
+	if (hba->model_info.sli_mask & EMLXS_SLI4_MASK) {
+		/* Check for linkup timeout */
+		emlxs_timer_check_linkup(hba);
+
+		return;
+	}
+
 	bzero((void *)flag, sizeof (flag));
 
-	/* Check for mailbox timeout */
-	emlxs_timer_check_mbox(hba);
+	/* Check SLI level timeouts */
+	EMLXS_SLI_TIMER(hba);
+
+	/* Check event queue */
+	emlxs_timer_check_events(hba);
 
 	/* Check heartbeat timer */
 	emlxs_timer_check_heartbeat(hba);
@@ -157,10 +169,8 @@ emlxs_timer_checks(emlxs_hba_t *hba)
 	emlxs_pm_idle_timer(hba);
 #endif /* IDLE_TIMER */
 
-#ifdef DFC_SUPPORT
 	/* Check for loopback timeouts */
 	emlxs_timer_check_loopback(hba);
-#endif /* DFC_SUPPORT */
 
 	/* Check for packet timeouts */
 	rc = emlxs_timer_check_pkts(hba, flag);
@@ -197,13 +207,13 @@ emlxs_timer_checks(emlxs_hba_t *hba)
 
 	}
 
-	/* Check for ring service timeouts */
+	/* Check for IO channel service timeouts */
 	/* Always do this last */
-	emlxs_timer_check_rings(hba, flag);
+	emlxs_timer_check_channels(hba, flag);
 
 	return;
 
-}  /* emlxs_timer_checks() */
+} /* emlxs_timer_checks() */
 
 
 extern void
@@ -222,7 +232,7 @@ emlxs_timer_start(emlxs_hba_t *hba)
 	}
 	mutex_exit(&EMLXS_TIMER_LOCK);
 
-}  /* emlxs_timer_start() */
+} /* emlxs_timer_start() */
 
 
 extern void
@@ -244,7 +254,7 @@ emlxs_timer_stop(emlxs_hba_t *hba)
 
 	return;
 
-}  /* emlxs_timer_stop() */
+} /* emlxs_timer_stop() */
 
 
 static uint32_t
@@ -253,8 +263,8 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 	emlxs_port_t *port = &PPORT;
 	emlxs_config_t *cfg = &CFG;
 	Q tmo;
-	int32_t ringno;
-	RING *rp;
+	int32_t channelno;
+	CHANNEL *cp;
 	NODELIST *nlp;
 	IOCBQ *prev;
 	IOCBQ *next;
@@ -284,20 +294,20 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 	 * will be removed out from under us
 	 */
 
-	mutex_enter(&EMLXS_RINGTX_LOCK);
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
-	for (ringno = 0; ringno < hba->ring_count; ringno++) {
-		rp = &hba->ring[ringno];
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		cp = &hba->chan[channelno];
 
-		/* Scan the tx queues for each active node on the ring */
+		/* Scan the tx queues for each active node on the channel */
 
 		/* Get the first node */
-		nlp = (NODELIST *)rp->nodeq.q_first;
+		nlp = (NODELIST *)cp->nodeq.q_first;
 
 		while (nlp) {
 			/* Scan the node's priority tx queue */
 			prev = NULL;
-			iocbq = (IOCBQ *)nlp->nlp_ptx[ringno].q_first;
+			iocbq = (IOCBQ *)nlp->nlp_ptx[channelno].q_first;
 
 			while (iocbq) {
 				next = (IOCBQ *)iocbq->next;
@@ -308,25 +318,25 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 				if (sbp && hba->timer_tics >= sbp->ticks) {
 					/* iocb timed out, now deque it */
 					if (next == NULL) {
-						nlp->nlp_ptx[ringno].q_last =
+						nlp->nlp_ptx[channelno].q_last =
 						    (uint8_t *)prev;
 					}
 
 					if (prev == NULL) {
-						nlp->nlp_ptx[ringno].q_first =
-						    (uint8_t *)next;
+						nlp->nlp_ptx[channelno].
+						    q_first = (uint8_t *)next;
 					} else {
 						prev->next = next;
 					}
 
 					iocbq->next = NULL;
-					nlp->nlp_ptx[ringno].q_cnt--;
+					nlp->nlp_ptx[channelno].q_cnt--;
 
 					/* Add this iocb to our local */
 					/* timout queue */
 
 					/*
-					 * This way we don't hold the RINGTX
+					 * This way we don't hold the TX_CHANNEL
 					 * lock too long
 					 */
 
@@ -356,7 +366,7 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 
 			/* Scan the node's tx queue */
 			prev = NULL;
-			iocbq = (IOCBQ *)nlp->nlp_tx[ringno].q_first;
+			iocbq = (IOCBQ *)nlp->nlp_tx[channelno].q_first;
 
 			while (iocbq) {
 				next = (IOCBQ *)iocbq->next;
@@ -367,25 +377,25 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 				if (sbp && hba->timer_tics >= sbp->ticks) {
 					/* iocb timed out, now deque it */
 					if (next == NULL) {
-						nlp->nlp_tx[ringno].q_last =
+						nlp->nlp_tx[channelno].q_last =
 						    (uint8_t *)prev;
 					}
 
 					if (prev == NULL) {
-						nlp->nlp_tx[ringno].q_first =
+						nlp->nlp_tx[channelno].q_first =
 						    (uint8_t *)next;
 					} else {
 						prev->next = next;
 					}
 
 					iocbq->next = NULL;
-					nlp->nlp_tx[ringno].q_cnt--;
+					nlp->nlp_tx[channelno].q_cnt--;
 
 					/* Add this iocb to our local */
 					/* timout queue */
 
 					/*
-					 * This way we don't hold the RINGTX
+					 * This way we don't hold the TX_CHANNEL
 					 * lock too long
 					 */
 
@@ -412,13 +422,13 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 
 			}	/* while (iocbq) */
 
-			if (nlp == (NODELIST *)rp->nodeq.q_last) {
+			if (nlp == (NODELIST *)cp->nodeq.q_last) {
 				nlp = NULL;
 			} else {
-				nlp = nlp->nlp_next[ringno];
+				nlp = nlp->nlp_next[channelno];
 			}
 
-		}	/* while(nlp) */
+		}	/* while (nlp) */
 
 	}	/* end of for */
 
@@ -427,15 +437,19 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 	while (iocbq) {
 		/* Free the IoTag and the bmp */
 		iocb = &iocbq->iocb;
-		sbp = emlxs_unregister_pkt(iocbq->ring, iocb->ulpIoTag, 0);
-		ringno = ((RING *)iocbq->ring)->ringno;
-
+		channelno = ((CHANNEL *)iocbq->channel)->channelno;
+		sbp = iocbq->sbp;
 		if (sbp && (sbp != STALE_PACKET)) {
-			mutex_enter(&sbp->mtx);
-			if (sbp->pkt_flags & PACKET_IN_TXQ) {
-				sbp->pkt_flags &= ~PACKET_IN_TXQ;
-				hba->ring_tx_count[ringno]--;
+			if (hba->sli_mode == EMLXS_HBA_SLI4_MODE) {
+				hba->fc_table[sbp->iotag] = NULL;
+				emlxs_sli4_free_xri(hba, sbp, sbp->xp);
+			} else {
+				(void) emlxs_unregister_pkt(
+				    (CHANNEL *)iocbq->channel,
+				    iocb->ULPIOTAG, 0);
 			}
+
+			mutex_enter(&sbp->mtx);
 			sbp->pkt_flags |= PACKET_IN_TIMEOUT;
 			mutex_exit(&sbp->mtx);
 		}
@@ -444,7 +458,7 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 
 	}	/* end of while */
 
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	/* Now complete the transmit timeouts outside the locks */
 	iocbq = (IOCBQ *)tmo.q_first;
@@ -486,31 +500,25 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 	/* Now check the chip */
 	bzero((void *)&abort, sizeof (Q));
 
-	/* Check the rings */
+	/* Check the HBA for outstanding IOs */
 	rc = 0;
-	for (ringno = 0; ringno < hba->ring_count; ringno++) {
-		rp = &hba->ring[ringno];
+	mutex_enter(&EMLXS_FCTAB_LOCK);
+	for (iotag = 1; iotag < hba->max_iotag; iotag++) {
+		sbp = hba->fc_table[iotag];
+		if (sbp && (sbp != STALE_PACKET) &&
+		    (sbp->pkt_flags & PACKET_IN_CHIPQ) &&
+		    !(sbp->pkt_flags & (PACKET_IN_FLUSH |
+		    PACKET_XRI_CLOSED)) &&
+		    (hba->timer_tics >= sbp->ticks)) {
+			rc = emlxs_pkt_chip_timeout(sbp->iocbq.port,
+			    sbp, &abort, flag);
 
-		mutex_enter(&EMLXS_FCTAB_LOCK(ringno));
-		for (iotag = 1; iotag < rp->max_iotag; iotag++) {
-			sbp = rp->fc_table[iotag];
-			if (sbp && (sbp != STALE_PACKET) &&
-			    (sbp->pkt_flags & PACKET_IN_CHIPQ) &&
-			    (hba->timer_tics >= sbp->ticks)) {
-				rc = emlxs_pkt_chip_timeout(sbp->iocbq.port,
-				    sbp, &abort, flag);
-
-				if (rc) {
-					break;
-				}
+			if (rc) {
+				break;
 			}
 		}
-		mutex_exit(&EMLXS_FCTAB_LOCK(ringno));
-
-		if (rc) {
-			break;
-		}
 	}
+	mutex_exit(&EMLXS_FCTAB_LOCK);
 
 	/* Now put the iocb's on the tx queue */
 	iocbq = (IOCBQ *)abort.q_first;
@@ -527,6 +535,16 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 		iocbq = next;
 	}
 
+	/* Now trigger IO channel service to send these abort iocbq */
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		if (!flag[channelno]) {
+			continue;
+		}
+		cp = &hba->chan[channelno];
+
+		EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, 0);
+	}
+
 	if (rc == 1) {
 		/* Spawn a thread to reset the link */
 		emlxs_thread_spawn(hba, emlxs_reset_link_thread, NULL, NULL);
@@ -537,66 +555,66 @@ emlxs_timer_check_pkts(emlxs_hba_t *hba, uint8_t *flag)
 
 	return (rc);
 
-}  /* emlxs_timer_check_pkts() */
-
+} /* emlxs_timer_check_pkts() */
 
 
 static void
-emlxs_timer_check_rings(emlxs_hba_t *hba, uint8_t *flag)
+emlxs_timer_check_channels(emlxs_hba_t *hba, uint8_t *flag)
 {
 	emlxs_port_t *port = &PPORT;
 	emlxs_config_t *cfg = &CFG;
-	int32_t ringno;
-	RING *rp;
-	uint32_t logit = 0;
+	int32_t channelno;
+	CHANNEL *cp;
+	uint32_t logit;
 
 	if (!cfg[CFG_TIMEOUT_ENABLE].current) {
 		return;
 	}
 
-	for (ringno = 0; ringno < hba->ring_count; ringno++) {
-		rp = &hba->ring[ringno];
+	for (channelno = 0; channelno < hba->chan_count; channelno++) {
+		cp = &hba->chan[channelno];
 
-		/* Check for ring timeout now */
-		mutex_enter(&EMLXS_RINGTX_LOCK);
-		if (rp->timeout && (hba->timer_tics >= rp->timeout)) {
-			/* Check if there is still work to do on the ring and */
+		logit = 0;
+
+		/* Check for channel timeout now */
+		mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
+		if (cp->timeout && (hba->timer_tics >= cp->timeout)) {
+			/* Check if there is work to do on channel and */
 			/* the link is still up */
-			if (rp->nodeq.q_first) {
-				flag[ringno] = 1;
-				rp->timeout = hba->timer_tics + 10;
+			if (cp->nodeq.q_first) {
+				flag[channelno] = 1;
+				cp->timeout = hba->timer_tics + 10;
 
 				if (hba->state >= FC_LINK_UP) {
 					logit = 1;
 				}
 			} else {
-				rp->timeout = 0;
+				cp->timeout = 0;
 			}
 		}
-		mutex_exit(&EMLXS_RINGTX_LOCK);
+		mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 		if (logit) {
 			EMLXS_MSGF(EMLXS_CONTEXT,
-			    &emlxs_ring_watchdog_msg,
-			    "%s host=%d port=%d cnt=%d,%d",
-			    emlxs_ring_xlate(ringno),
-			    rp->fc_cmdidx, rp->fc_port_cmdidx,
-			    hba->ring_tx_count[ringno],
-			    hba->io_count[ringno]);
+			    &emlxs_chan_watchdog_msg,
+			    "IO Channel %d cnt=%d,%d",
+			    channelno,
+			    hba->channel_tx_count,
+			    hba->io_count);
 		}
 
 		/*
-		 * If ring flag is set, request iocb servicing here to send any
-		 * iocb's that may still be queued
+		 * If IO channel flag is set, request iocb servicing
+		 * here to send any iocb's that may still be queued
 		 */
-		if (flag[ringno]) {
-			emlxs_sli_issue_iocb_cmd(hba, rp, 0);
+		if (flag[channelno]) {
+			EMLXS_SLI_ISSUE_IOCB_CMD(hba, cp, 0);
 		}
 	}
 
 	return;
 
-}  /* emlxs_timer_check_rings() */
+} /* emlxs_timer_check_channels() */
 
 
 static void
@@ -606,7 +624,7 @@ emlxs_timer_check_nodes(emlxs_port_t *port, uint8_t *flag)
 	uint32_t found;
 	uint32_t i;
 	NODELIST *nlp;
-	int32_t ringno;
+	int32_t channelno;
 
 	for (;;) {
 		/* Check node gate flag for expiration */
@@ -620,19 +638,31 @@ emlxs_timer_check_nodes(emlxs_port_t *port, uint8_t *flag)
 		for (i = 0; i < EMLXS_NUM_HASH_QUES; i++) {
 			nlp = port->node_table[i];
 			while (nlp != NULL) {
-				for (ringno = 0; ringno < hba->ring_count;
-				    ringno++) {
+				for (channelno = 0;
+				    channelno < hba->chan_count;
+				    channelno++) {
 					/* Check if the node timer is active */
 					/* and if timer has expired */
-					if (nlp->nlp_tics[ringno] &&
+					if (nlp->nlp_tics[channelno] &&
 					    (hba->timer_tics >=
-					    nlp->nlp_tics[ringno])) {
+					    nlp->nlp_tics[channelno])) {
 						/* If so, set the flag and */
 						/* break out */
 						found = 1;
-						flag[ringno] = 1;
+						flag[channelno] = 1;
 						break;
 					}
+				}
+
+				if (nlp->nlp_force_rscn &&
+				    (hba->timer_tics >= nlp->nlp_force_rscn)) {
+					nlp->nlp_force_rscn = 0;
+					/*
+					 * Generate an RSCN to
+					 * wakeup ULP
+					 */
+					(void) emlxs_generate_rscn(port,
+					    nlp->nlp_DID);
 				}
 
 				if (found) {
@@ -653,13 +683,12 @@ emlxs_timer_check_nodes(emlxs_port_t *port, uint8_t *flag)
 			break;
 		}
 
-		emlxs_node_timeout(port, nlp, ringno);
+		emlxs_node_timeout(port, nlp, channelno);
 	}
 
-}  /* emlxs_timer_check_nodes() */
+} /* emlxs_timer_check_nodes() */
 
 
-#ifdef DFC_SUPPORT
 static void
 emlxs_timer_check_loopback(emlxs_hba_t *hba)
 {
@@ -695,8 +724,7 @@ emlxs_timer_check_loopback(emlxs_hba_t *hba)
 
 	return;
 
-}  /* emlxs_timer_check_loopback() */
-#endif /* DFC_SUPPORT  */
+} /* emlxs_timer_check_loopback() */
 
 
 static void
@@ -704,6 +732,16 @@ emlxs_timer_check_linkup(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
 	uint32_t linkup;
+
+	/* Check if all mbox commands from previous activity are processed */
+	if (hba->model_info.sli_mask & EMLXS_SLI4_MASK) {
+		mutex_enter(&EMLXS_MBOX_LOCK);
+		if (hba->mbox_queue.q_first) {
+			mutex_exit(&EMLXS_MBOX_LOCK);
+			return;
+		}
+		mutex_exit(&EMLXS_MBOX_LOCK);
+	}
 
 	/* Check the linkup timer for expiration */
 	mutex_enter(&EMLXS_PORT_LOCK);
@@ -722,18 +760,18 @@ emlxs_timer_check_linkup(emlxs_hba_t *hba)
 	if (linkup) {
 		emlxs_port_online(port);
 	}
-
 	return;
 
-}  /* emlxs_timer_check_linkup() */
+} /* emlxs_timer_check_linkup() */
 
 
 static void
 emlxs_timer_check_heartbeat(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
-	MAILBOX *mb;
+	MAILBOXQ *mbq;
 	emlxs_config_t *cfg = &CFG;
+	int rc;
 
 	if (!cfg[CFG_HEARTBEAT_ENABLE].current) {
 		return;
@@ -763,22 +801,23 @@ emlxs_timer_check_heartbeat(emlxs_hba_t *hba)
 		return;
 	}
 
-	if ((mb = (MAILBOX *)emlxs_mem_get(hba, MEM_MBOX | MEM_PRI)) == 0) {
+	if ((mbq = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1)) == 0) {
 		EMLXS_MSGF(EMLXS_CONTEXT, &emlxs_init_debug_msg,
 		    "Unable to allocate heartbeat mailbox.");
 		return;
 	}
 
-	emlxs_mb_heartbeat(hba, mb);
+	emlxs_mb_heartbeat(hba, mbq);
 	hba->heartbeat_active = 1;
 
-	if (emlxs_sli_issue_mbox_cmd(hba, mb, MBX_NOWAIT, 0) != MBX_BUSY) {
-		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mb);
+	rc =  EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbq, MBX_NOWAIT, 0);
+	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
+		(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbq);
 	}
 
 	return;
 
-}  /* emlxs_timer_check_heartbeat() */
+} /* emlxs_timer_check_heartbeat() */
 
 
 static void
@@ -791,6 +830,7 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 	uint32_t i;
 	NODELIST *nlp;
 	MAILBOXQ *mbox;
+	int rc;
 
 	if (!cfg[CFG_TIMEOUT_ENABLE].current) {
 		return;
@@ -811,7 +851,8 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 			nlp = port->node_table[i];
 			while (nlp != NULL) {
 				if ((nlp->nlp_fcp_info & NLP_FCP_2_DEVICE) &&
-				    (nlp->nlp_flag[FC_FCP_RING] & NLP_CLOSED)) {
+				    (nlp->nlp_flag[hba->channel_fcp] &
+				    NLP_CLOSED)) {
 					found = 1;
 					break;
 
@@ -844,7 +885,7 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 
 	/* Try to send clear link attention, if needed */
 	if ((send_clear_la == 1) &&
-	    (mbox = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX | MEM_PRI))) {
+	    (mbox = (MAILBOXQ *)emlxs_mem_get(hba, MEM_MBOX, 1))) {
 		mutex_enter(&EMLXS_PORT_LOCK);
 
 		/*
@@ -856,17 +897,17 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 			(void) emlxs_mem_put(hba, MEM_MBOX, (uint8_t *)mbox);
 		} else {
 			/* Change state and clear discovery timer */
-			emlxs_ffstate_change_locked(hba, FC_CLEAR_LA);
+			EMLXS_STATE_CHANGE_LOCKED(hba, FC_CLEAR_LA);
 
 			hba->discovery_timer = 0;
 
 			mutex_exit(&EMLXS_PORT_LOCK);
 
 			/* Prepare and send the CLEAR_LA command */
-			emlxs_mb_clear_la(hba, (MAILBOX *)mbox);
+			emlxs_mb_clear_la(hba, mbox);
 
-			if (emlxs_sli_issue_mbox_cmd(hba, (MAILBOX *)mbox,
-			    MBX_NOWAIT, 0) != MBX_BUSY) {
+			rc = EMLXS_SLI_ISSUE_MBOX_CMD(hba, mbox, MBX_NOWAIT, 0);
+			if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
 				(void) emlxs_mem_put(hba, MEM_MBOX,
 				    (uint8_t *)mbox);
 			}
@@ -875,7 +916,7 @@ emlxs_timer_check_discovery(emlxs_port_t *port)
 
 	return;
 
-}  /* emlxs_timer_check_discovery()  */
+} /* emlxs_timer_check_discovery()  */
 
 
 static void
@@ -947,7 +988,7 @@ emlxs_timer_check_ub(emlxs_port_t *port)
 
 	return;
 
-}  /* emlxs_timer_check_ub()  */
+} /* emlxs_timer_check_ub()  */
 
 
 /* EMLXS_FCTAB_LOCK must be held to call this */
@@ -956,7 +997,7 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
     uint8_t *flag)
 {
 	emlxs_hba_t *hba = HBA;
-	RING *rp = (RING *)sbp->ring;
+	CHANNEL *cp = (CHANNEL *)sbp->channel;
 	IOCBQ *iocbq = NULL;
 	fc_packet_t *pkt;
 	uint32_t rc = 0;
@@ -978,7 +1019,7 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 
 			iocbq =
 			    emlxs_create_abort_xri_cn(port, sbp->node,
-			    sbp->iotag, rp, sbp->class, ABORT_TYPE_ABTS);
+			    sbp->iotag, cp, sbp->class, ABORT_TYPE_ABTS);
 
 			/* The adapter will make 2 attempts to send ABTS */
 			/* with 2*ratov timeout each time */
@@ -992,7 +1033,7 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 
 			iocbq =
 			    emlxs_create_close_xri_cn(port, sbp->node,
-			    sbp->iotag, rp);
+			    sbp->iotag, cp);
 
 			sbp->ticks = hba->timer_tics + 30;
 		}
@@ -1000,7 +1041,7 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 		/* set the flags */
 		sbp->pkt_flags |= (PACKET_IN_TIMEOUT | PACKET_XRI_CLOSED);
 
-		flag[rp->ringno] = 1;
+		flag[cp->channelno] = 1;
 		rc = 0;
 
 		break;
@@ -1012,11 +1053,11 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 
 		iocbq =
 		    emlxs_create_close_xri_cn(port, sbp->node, sbp->iotag,
-		    rp);
+		    cp);
 
 		sbp->ticks = hba->timer_tics + 30;
 
-		flag[rp->ringno] = 1;
+		flag[cp->channelno] = 1;
 		rc = 0;
 
 		break;
@@ -1062,7 +1103,7 @@ emlxs_pkt_chip_timeout(emlxs_port_t *port, emlxs_buf_t *sbp, Q *abortq,
 
 	return (rc);
 
-}  /* emlxs_pkt_chip_timeout() */
+} /* emlxs_pkt_chip_timeout() */
 
 
 #ifdef TX_WATCHDOG
@@ -1072,8 +1113,8 @@ emlxs_tx_watchdog(emlxs_hba_t *hba)
 {
 	emlxs_port_t *port = &PPORT;
 	NODELIST *nlp;
-	uint32_t ringno;
-	RING *rp;
+	uint32_t channelno;
+	CHANNEL *cp;
 	IOCBQ *next;
 	IOCBQ *iocbq;
 	IOCB *iocb;
@@ -1088,72 +1129,69 @@ emlxs_tx_watchdog(emlxs_hba_t *hba)
 
 	bzero((void *)&abort, sizeof (Q));
 
-	mutex_enter(&EMLXS_RINGTX_LOCK);
+	mutex_enter(&EMLXS_TX_CHANNEL_LOCK);
 
-	for (ringno = 0; ringno < hba->ring_count; ringno++) {
-		rp = &hba->ring[ringno];
+	mutex_enter(&EMLXS_FCTAB_LOCK);
+	for (iotag = 1; iotag < hba->max_iotag; iotag++) {
+		sbp = hba->fc_table[iotag];
+		if (sbp && (sbp != STALE_PACKET) &&
+		    (sbp->pkt_flags & PACKET_IN_TXQ)) {
+			nlp = sbp->node;
+			iocbq = &sbp->iocbq;
 
-		mutex_enter(&EMLXS_FCTAB_LOCK(ringno));
-		for (iotag = 1; iotag < rp->max_iotag; iotag++) {
-			sbp = rp->fc_table[iotag];
-			if (sbp && (sbp != STALE_PACKET) &&
-			    (sbp->pkt_flags & PACKET_IN_TXQ)) {
-				nlp = sbp->node;
-				iocbq = &sbp->iocbq;
+			channelno = (CHANNEL *)(sbp->channel)->channelno;
+			if (iocbq->flag & IOCB_PRIORITY) {
+				iocbq =
+				    (IOCBQ *)nlp->nlp_ptx[channelno].
+				    q_first;
+			} else {
+				iocbq =
+				    (IOCBQ *)nlp->nlp_tx[channelno].
+				    q_first;
+			}
 
-				if (iocbq->flag & IOCB_PRIORITY) {
-					iocbq =
-					    (IOCBQ *)nlp->nlp_ptx[ringno].
-					    q_first;
+			/* Find a matching entry */
+			found = 0;
+			while (iocbq) {
+				if (iocbq == &sbp->iocbq) {
+					found = 1;
+					break;
+				}
+
+				iocbq = (IOCBQ *)iocbq->next;
+			}
+
+			if (!found) {
+				if (!(sbp->pkt_flags & PACKET_STALE)) {
+					mutex_enter(&sbp->mtx);
+					sbp->pkt_flags |=
+					    PACKET_STALE;
+					mutex_exit(&sbp->mtx);
 				} else {
-					iocbq =
-					    (IOCBQ *)nlp->nlp_tx[ringno].
-					    q_first;
-				}
-
-				/* Find a matching entry */
-				found = 0;
-				while (iocbq) {
-					if (iocbq == &sbp->iocbq) {
-						found = 1;
-						break;
-					}
-
-					iocbq = (IOCBQ *)iocbq->next;
-				}
-
-				if (!found) {
-					if (!(sbp->pkt_flags & PACKET_STALE)) {
-						mutex_enter(&sbp->mtx);
-						sbp->pkt_flags |=
-						    PACKET_STALE;
-						mutex_exit(&sbp->mtx);
+					if (abort.q_first == 0) {
+						abort.q_first =
+						    &sbp->iocbq;
 					} else {
-						if (abort.q_first == 0) {
-							abort.q_first =
-							    &sbp->iocbq;
-						} else {
-							((IOCBQ *)abort.
-							    q_last)->next =
-							    &sbp->iocbq;
-						}
-
-						abort.q_last = &sbp->iocbq;
-						abort.q_cnt++;
+						((IOCBQ *)abort.
+						    q_last)->next =
+						    &sbp->iocbq;
 					}
 
-				} else {
-					if ((sbp->pkt_flags & PACKET_STALE)) {
-						mutex_enter(&sbp->mtx);
-						sbp->pkt_flags &=
-						    ~PACKET_STALE;
-						mutex_exit(&sbp->mtx);
-					}
+					abort.q_last = &sbp->iocbq;
+					abort.q_cnt++;
+				}
+
+			} else {
+				if ((sbp->pkt_flags & PACKET_STALE)) {
+					mutex_enter(&sbp->mtx);
+					sbp->pkt_flags &=
+					    ~PACKET_STALE;
+					mutex_exit(&sbp->mtx);
 				}
 			}
 		}
-		mutex_exit(&EMLXS_FCTAB_LOCK(ringno));
 	}
+	mutex_exit(&EMLXS_FCTAB_LOCK);
 
 	iocbq = (IOCBQ *)abort.q_first;
 	while (iocbq) {
@@ -1163,9 +1201,9 @@ emlxs_tx_watchdog(emlxs_hba_t *hba)
 
 		pkt = PRIV2PKT(sbp);
 		if (pkt) {
-			did = SWAP_DATA24_LO(pkt->pkt_cmd_fhdr.d_id);
+			did = LE_SWAP24_LO(pkt->pkt_cmd_fhdr.d_id);
 			cmd = *((uint32_t *)pkt->pkt_cmd);
-			cmd = SWAP_DATA32(cmd);
+			cmd = LE_SWAP32(cmd);
 		}
 
 
@@ -1175,11 +1213,11 @@ emlxs_tx_watchdog(emlxs_hba_t *hba)
 
 	}	/* end of while */
 
-	mutex_exit(&EMLXS_RINGTX_LOCK);
+	mutex_exit(&EMLXS_TX_CHANNEL_LOCK);
 
 	return;
 
-}  /* emlxs_tx_watchdog() */
+} /* emlxs_tx_watchdog() */
 
 #endif /* TX_WATCHDOG */
 
@@ -1216,6 +1254,6 @@ emlxs_timer_check_dhchap(emlxs_port_t *port)
 	}
 	return;
 
-}  /* emlxs_timer_check_dhchap */
+} /* emlxs_timer_check_dhchap */
 
 #endif /* DHCHAP_SUPPORT */

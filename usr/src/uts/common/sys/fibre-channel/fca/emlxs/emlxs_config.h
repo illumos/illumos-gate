@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_CONFIG_H
 #define	_EMLXS_CONFIG_H
@@ -53,12 +52,10 @@ typedef enum emlxs_cfg_parm
 	CFG_CONSOLE_WARNINGS,	/* console-warnings */
 	CFG_CONSOLE_ERRORS,	/* console-errors */
 	CFG_CONSOLE_DEBUGS,	/* console-debugs (hidden) */
-	CFG_CONSOLE_EVENTS,	/* console-events (hidden) */
 	CFG_LOG_NOTICES,	/* log-notices */
 	CFG_LOG_WARNINGS,	/* log-warnings */
 	CFG_LOG_ERRORS,		/* log-errors */
 	CFG_LOG_DEBUGS,		/* log-debugs (hidden) */
-	CFG_LOG_EVENTS,		/* log-events (hidden) */
 	CFG_NUM_IOCBS,		/* num-iocbs */
 	CFG_MAX_XFER_SIZE,	/* max-xfer-size */
 	CFG_UB_BUFS,		/* ub-bufs */
@@ -87,25 +84,22 @@ typedef enum emlxs_cfg_parm
 	CFG_NUM_IOTAGS,		/* num-iotags (hidden) */
 
 #ifdef FMA_SUPPORT
-	CFG_FM_CAPS,		/* fm-cap, fma capabilities (hidden) */
+	CFG_FM_CAPS,		/* fm-capable (hidden) */
 #endif	/* FMA_SUPPORT */
 
-#ifdef MAX_RRDY_PATCH
+
+#ifdef MAX_RRDY_SUPPORT
 	CFG_MAX_RRDY,		/* max-rrdy (hidden) */
-#endif	/* MAX_RRDY_PATCH */
+#endif	/* MAX_RRDY_SUPPORT */
 
 #ifdef MSI_SUPPORT
 	CFG_MSI_MODE,		/* msi-mode (hidden) */
 #endif	/* MSI_SUPPORT */
 
-#ifdef SLI3_SUPPORT
 	CFG_SLI_MODE,		/* sli-mode (hidden) */
-#ifdef NPIV_SUPPORT
 	CFG_NPIV_ENABLE,	/* enable-npiv */
 	CFG_VPORT_RESTRICTED,	/* vport-restrict-login */
 	CFG_NPIV_DELAY,		/* enable-npiv-delay */
-#endif	/* NPIV_SUPPORT */
-#endif	/* SLI3_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 	CFG_AUTH_ENABLE, 	/* enable-auth */
@@ -123,6 +117,11 @@ typedef enum emlxs_cfg_parm
 #ifdef SFCT_SUPPORT
 	CFG_TARGET_MODE,	/* target-mode */
 #endif /* SFCT_SUPPORT */
+	CFG_NUM_WQ,		/* num-wq (hidden) */
+	CFG_PERSIST_LINKDOWN,	/* persist-linkdown */
+	CFG_ENABLE_PATCH,	/* enable-patch (hidden) */
+	CFG_FAST_TGT_RESET,	/* fast-tgt-reset (hidden) */
+	CFG_FAST_TGT_RESET_TMR,	/* fast-tgt-reset-timer (hidden) */
 
 	NUM_CFG_PARAM
 
@@ -163,12 +162,6 @@ emlxs_config_t  emlxs_cfg[] = {
 		PARM_DYNAMIC | PARM_HEX | PARM_HIDDEN,
 	"Verbose mask for debugging messages to the console."},
 
-	/* CFG_CONSOLE_EVENTS */
-	{"console-events",
-		0, 0xffffffff, 0, 0,
-		PARM_DYNAMIC | PARM_HEX | PARM_HIDDEN,
-	"Verbose mask for event messages to the console."},
-
 	/* CFG_LOG_NOTICES */
 	{"log-notices",
 		0, 0xffffffff, 0xffffffff, 0,
@@ -193,11 +186,6 @@ emlxs_config_t  emlxs_cfg[] = {
 		PARM_DYNAMIC | PARM_HEX | PARM_HIDDEN,
 	"Verbose mask for debugging messages to the messages file."},
 
-	/* CFG_LOG_EVENTS */
-	{"log-events",
-		0, 0xffffffff, 0, 0,
-		PARM_DYNAMIC | PARM_HEX | PARM_HIDDEN,
-	"Verbose mask for event messages to the messages file."},
 
 	/* CFG_NUM_IOCBS */
 	{"num-iocbs",
@@ -367,25 +355,27 @@ emlxs_config_t  emlxs_cfg[] = {
 
 	/* CFG_NUM_IOTAGS */
 	{"num-iotags",
-		512, 32768, 4096, 0,
+		0, 4096, 0, 0,
 		PARM_DYNAMIC_RESET | PARM_HIDDEN,
-	"Sets maximum number of FCP IO's the driver can manage."},
+	"Sets number of outstanding IO's. "
+		"[0=max determined by type of HBA]"},
 
 #ifdef FMA_SUPPORT
 	/* CFG_FM_CAPS */
 	{"fm-capable",
 		0, 0xF, 0xF, 0,
-		PARM_HEX,
+		PARM_HEX | PARM_HIDDEN,
 	"Sets FMA capabilities. [bit 3:errcb, 2:dmachk, 1:accchk, 0:ereport]"},
 #endif	/* FMA_SUPPORT */
 
-#ifdef MAX_RRDY_PATCH
+
+#ifdef MAX_RRDY_SUPPORT
 	/* CFG_MAX_RRDY */
 	{"max-rrdy",
 		0, 255, 2, 0,
 		PARM_DYNAMIC_RESET | PARM_HIDDEN,
 	"Sets maximum number RRDY's for the adapter on private loop."},
-#endif	/* MAX_RRDY_PATCH */
+#endif	/* MAX_RRDY_SUPPORT */
 
 #ifdef MSI_SUPPORT
 	/* CFG_MSI_MODE */
@@ -396,15 +386,13 @@ emlxs_config_t  emlxs_cfg[] = {
 		"[0=Off 1=Single-MSI 2=Multi-MSI 3=Auto]"},
 #endif	/* MSI_SUPPORT */
 
-#ifdef SLI3_SUPPORT
 	/* CFG_SLI_MODE */
 	{"sli-mode",
-		0, 3, 0, 0,
+		0, 4, 0, 0,
 		PARM_DYNAMIC_RESET | PARM_HIDDEN,
 	"Sets default SLI mode. "
-		"[0=Auto, 2=SLI2-remove all vports first, 3=SLI3]"},
+		"[0=Auto, 2=SLI2-remove all vports first, 3=SLI3, 4=SLI4]"},
 
-#ifdef NPIV_SUPPORT
 	/* CFG_NPIV_ENABLE */
 	{"enable-npiv",
 		0, 1, 0, 0,
@@ -425,9 +413,6 @@ emlxs_config_t  emlxs_cfg[] = {
 		PARM_DYNAMIC | PARM_HIDDEN,
 	"Enable FDISC/NS command delay from vports to switch. "
 		"[0=Disabled, 1=Enabled]"},
-#endif	/* NPIV_SUPPORT */
-
-#endif	/* SLI3_SUPPORT */
 
 #ifdef DHCHAP_SUPPORT
 	/* CFG_AUTH_ENABLE */
@@ -505,6 +490,38 @@ emlxs_config_t  emlxs_cfg[] = {
 		PARM_BOOLEAN,
 	"Enables target mode support in driver. [0=Disabled, 1=Enabled]"},
 #endif /* SFCT_SUPPORT */
+
+	/* CFG_NUM_WQ */
+	{"num-wq",
+		1, 4, 1, 0,
+		PARM_DYNAMIC_RESET | PARM_HIDDEN,
+	"Defines number of Work Queues (WQs) per EQ."},
+
+	/* CFG_PERSIST_LINKDOWN */
+	{"persist-linkdown",
+		0, 1, 0, 0,
+		PARM_DYNAMIC_RESET | PARM_BOOLEAN,
+	"Set link persistently down [0=Disabled, 1=Enabled]."},
+
+	/* CFG_ENABLE_PATCH */
+	{"enable-patch",
+		0, 0xFFFFFFFF, DEFAULT_PATCHES, 0,
+		PARM_DYNAMIC | PARM_HEX | PARM_HIDDEN,
+	"Enables patches in driver."},
+
+	/* CFG_FAST_TGT_RESET */
+	{"fast-tgt-reset",
+		0, 1, 0, 0,
+		PARM_DYNAMIC_RESET | PARM_BOOLEAN | PARM_HIDDEN,
+	"Enables alternative target reset processing. "
+		"[0=Disabled 1=Enabled]"},
+
+	/* CFG_FAST_TGT_RESET_TMR */
+	{"fast-tgt-reset-timer",
+		0, 60, 10, 0,
+		PARM_DYNAMIC_RESET | PARM_BOOLEAN | PARM_HIDDEN,
+	"RSCN notification timer for fast target reset. "
+		"[0=Disabled 1-60=seconds]"},
 
 };
 

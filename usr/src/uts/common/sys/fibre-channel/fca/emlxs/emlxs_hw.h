@@ -21,9 +21,8 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
-
 
 #ifndef _EMLXS_HW_H
 #define	_EMLXS_HW_H
@@ -32,16 +31,9 @@
 extern "C" {
 #endif
 
-#ifdef NPIV_SUPPORT
 #define	MAX_VPORTS			256	/* Max virtual ports per HBA */
 						/* (includes physical port) */
 #define	MAX_VPORTS_LIMITED		101
-#else
-#define	MAX_VPORTS			1	/* Max virtual ports per HBA */
-						/* (includes physical port) */
-#define	MAX_VPORTS_LIMITED		1
-#endif	/* NPIV_SUPPORT */
-
 
 #define	FC_MAX_TRANSFER			0x40000	/* Max transfer size per */
 						/* operation */
@@ -49,27 +41,16 @@ extern "C" {
 #define	MAX_RINGS_AVAILABLE		4	/* # rings available */
 #define	MAX_RINGS			4	/* Max # rings used */
 
-
 #define	PCB_SIZE			128
-#define	MBOX_SIZE			256
-#define	MBOX_EXTENSION_OFFSET		MBOX_SIZE
-
-
-#ifdef MBOX_EXT_SUPPORT
-#define	MBOX_EXTENSION_SIZE		1024
-#else
-#define	MBOX_EXTENSION_SIZE		0
-#endif /* MBOX_EXT_SUPPORT */
-
 
 #define	SLIM_IOCB_CMD_R0_ENTRIES	128	/* SLI FCP cmd ring entries  */
 #define	SLIM_IOCB_RSP_R0_ENTRIES	128	/* SLI FCP rsp ring entries */
-#define	SLIM_IOCB_CMD_R1_ENTRIES	32	/* SLI IP cmd ring entries   */
-#define	SLIM_IOCB_RSP_R1_ENTRIES	32	/* SLI IP rsp ring entries  */
-#define	SLIM_IOCB_CMD_R2_ENTRIES	16	/* SLI ELS cmd ring entries  */
-#define	SLIM_IOCB_RSP_R2_ENTRIES	16	/* SLI ELS rspe ring entries */
-#define	SLIM_IOCB_CMD_R3_ENTRIES	8	/* SLI CT cmd ring entries   */
-#define	SLIM_IOCB_RSP_R3_ENTRIES	8	/* SLI CT rsp ring entries  */
+#define	SLIM_IOCB_CMD_R1_ENTRIES	128	/* SLI IP cmd ring entries   */
+#define	SLIM_IOCB_RSP_R1_ENTRIES	128	/* SLI IP rsp ring entries  */
+#define	SLIM_IOCB_CMD_R2_ENTRIES	128	/* SLI ELS cmd ring entries  */
+#define	SLIM_IOCB_RSP_R2_ENTRIES	128	/* SLI ELS rspe ring entries */
+#define	SLIM_IOCB_CMD_R3_ENTRIES	128	/* SLI CT cmd ring entries   */
+#define	SLIM_IOCB_RSP_R3_ENTRIES	128	/* SLI CT rsp ring entries  */
 
 /*
  * Total: 184 Cmd's + 184 Rsp's = 368
@@ -116,16 +97,18 @@ extern "C" {
 #define	SLI3_SLIM2_SIZE			(MBOX_SIZE + MBOX_EXTENSION_SIZE + \
 					PCB_SIZE + SLI3_IOCB_MAX_SIZE)
 
-
-#ifdef SLI3_SUPPORT
 #define	SLI_SLIM2_SIZE			SLI3_SLIM2_SIZE
 #define	SLI_IOCB_MAX_SIZE		SLI3_IOCB_MAX_SIZE
-#else	/* SLI2_SUPPORT */
-#define	SLI_SLIM2_SIZE			SLI2_SLIM2_SIZE
-#define	SLI_IOCB_MAX_SIZE		SLI2_IOCB_MAX_SIZE
-#endif	/* SLI3_SUPPORT */
 
 
+/* These two are defined to indicate FCP cmd or non FCP cmd */
+#define	FC_FCP_CMD		0
+#define	FC_FCT_CMD		0
+#define	FC_IP_CMD		1
+#define	FC_ELS_CMD		2
+#define	FC_CT_CMD		3
+
+#define	FC_NFCP_CMD		1	/* could be a bit mask */
 
 #define	FC_MAXRETRY		3	/* max retries for ELS commands */
 #define	FC_FCP_RING		0	/* use ring 0 for FCP initiator cmds */
@@ -149,25 +132,20 @@ extern "C" {
  */
 /* HBA Mgmt */
 #define	FDMI_DID		((uint32_t)0xfffffa)
-#define	NameServer_DID		((uint32_t)0xfffffc)
+#define	NAMESERVER_DID		((uint32_t)0xfffffc)
 #define	SCR_DID			((uint32_t)0xfffffd)
-#define	Fabric_DID		((uint32_t)0xfffffe)
-#define	Bcast_DID		((uint32_t)0xffffff)
-#define	Mask_DID		((uint32_t)0xffffff)
+#define	FABRIC_DID		((uint32_t)0xfffffe)
+#define	BCAST_DID		((uint32_t)0xffffff)
+#define	MASK_DID		((uint32_t)0xffffff)
 #define	CT_DID_MASK		((uint32_t)0xffff00)
-#define	Fabric_DID_MASK		((uint32_t)0xfff000)
+#define	FABRIC_DID_MASK		((uint32_t)0xfff000)
 #define	WELL_KNOWN_DID_MASK	((uint32_t)0xfffff0)
 
 #define	EMLXS_MENLO_DID		((uint32_t)0x00fc0e)
 
-
-#define	PT2PT_LocalID	((uint32_t)1)
-#define	PT2PT_RemoteID	((uint32_t)2)
-
 #define	OWN_CHIP	1	/* IOCB / Mailbox is owned by FireFly */
 #define	OWN_HOST	0	/* IOCB / Mailbox is owned by Host */
 #define	END_OF_CHAIN	0
-
 
 
 /* defines for type field in fc header */
@@ -176,7 +154,6 @@ extern "C" {
 #define	FC_FCP_DATA		0x08
 #define	FC_CT_TYPE		0x20
 #define	EMLXS_MENLO_TYPE	0xFE
-
 
 /* defines for rctl field in fc header */
 #define	FC_DEV_DATA	0x0
@@ -401,7 +378,6 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 #define	MS_DPAB		0x0395
 #define	MS_DPALL	0x039F
 
-
 /*
  * Name Server Command Codes
  */
@@ -611,6 +587,7 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 
 #ifdef MSI_SUPPORT
 
+
 /* Host attention interrupt map */
 #define	EMLXS_MSI_MAP8	{0, HA_R0ATT, HA_R1ATT, HA_R2ATT, \
 	HA_R3ATT, HA_LATT, HA_MBATT, HA_ERATT}
@@ -663,7 +640,6 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 #define	CA_R3ATT	0x00008000	/* Bit 15 */
 #define	CA_MBATT	0x40000000	/* Bit 30 */
 
-
 /* Host Status Register */
 
 #define	HS_REG_OFFSET	2	/* Word offset from register base address */
@@ -703,10 +679,92 @@ typedef SliCtRequest_t SLI_CT_REQUEST;
 #define	BC_BSE		0x00000001	/* Bit 0 */
 #define	BC_BSE_SWAP	0x01000000	/* Bit 0 - swapped */
 
-
 /*
  * End FireFly Register definitions
  */
+
+/*
+ * Start SLI 4 section.
+ */
+
+/* PCI Config Register offsets */
+#define	PCICFG_UE_STATUS_LO_OFFSET	0xA0	/* Error Indication - low */
+#define	PCICFG_UE_STATUS_HI_OFFSET	0xA4	/* Error Indication - high */
+#define	PCICFG_UE_STATUS_ONLINE1	0xB0	/* Error status1 */
+#define	PCICFG_UE_STATUS_ONLINE2	0xB4	/* Error status2 */
+
+/* BAR1 and BAR2 register offsets */
+
+/* BAR1 offsets for principal registers */
+#define	CSR_ISR0_OFFSET		0x0C18	/* CSR for EQ interrupt indications */
+#define	CSR_IMR0_OFFSET		0x0C48	/* CSR for EQ interrupt masking */
+#define	CSR_ISCR0_OFFSET	0x0C78	/* CSR for EQ interrupt clearing */
+
+#define	ISR0_EQ0_INDC	0x00000001	/* Indication bit for EQ0 */
+#define	ISR0_EQ1_INDC	0x00000002	/* Indication bit for EQ1 */
+#define	ISR0_EQ2_INDC	0x00000004	/* Indication bit for EQ2 */
+#define	ISR0_EQ3_INDC	0x00000008	/* Indication bit for EQ3 */
+#define	ISR0_EQ4_INDC	0x00000010	/* Indication bit for EQ4 */
+#define	ISR0_EQ5_INDC	0x00000020	/* Indication bit for EQ5 */
+#define	ISR0_EQ6_INDC	0x00000040	/* Indication bit for EQ6 */
+#define	ISR0_EQ7_INDC	0x00000080	/* Indication bit for EQ7 */
+
+/* MPU EP Semaphore register (ARM POST) */
+#define	CSR_MPU_EP_SEMAPHORE_OFFSET	0x00AC
+
+/* POST Stages of interest */
+#define	ARM_POST_FATAL	0x80000000
+#define	ARM_POST_READY	0xc000
+#define	ARM_POST_MASK	0xffff
+
+#define	MPU_EP_DL	0x04000000	/* Driverloadedbitmask */
+#define	MPU_EP_ORI	0x08000000	/* OptionROMinstalledbitmask */
+#define	MPU_EP_IPC	0x10000000	/* IPaddressconflictmask */
+#define	MPU_EP_NIP	0x20000000	/* NoIPaddressmask */
+#define	MPU_EP_BFW	0x40000000	/* BackupFWinusemask */
+#define	MPU_EP_ERR	0x80000000	/* POSTfatalerrormask */
+
+/* BAR2 offsets for principal doorbell registers */
+
+#define	PD_RQ_DB_OFFSET	0x00A0	/* Doorbell notify of posted RQEs */
+
+#define	PD_WQ_DB_OFFSET	0x0040	/* Doorbell notify of posted WQEs */
+
+#define	PD_CQ_DB_OFFSET	0x0120	/* Doorbell notify of processed CQEs or EQEs */
+
+#define	PD_MQ_DB_OFFSET	0x0140	/* Doorbell notify of posted MQEs */
+
+#define	PD_MB_DB_OFFSET	0x0160	/* Doorbell Bootstrap Mailbox */
+
+/* Doorbell definitions */
+
+/* Defines for MQ doorbell */
+#define	MQ_DB_POP_SHIFT 16		/* shift for entries popped */
+#define	MQ_DB_POP_MASK  0x1FFF0000	/* Mask for number of entries popped */
+
+/* Defines for CQ doorbell */
+#define	CQ_DB_POP_SHIFT 16		/* shift for entries popped */
+#define	CQ_DB_POP_MASK  0x1FFF0000	/* Mask for number of entries popped */
+#define	CQ_DB_REARM	0x20000000	/* Bit 29, rearm */
+
+/* Defines for EQ doorbell */
+#define	EQ_DB_CLEAR	0x00000200	/* Bit 9, designates clear EQ ISR */
+#define	EQ_DB_EVENT	0x00000400	/* Bit 10, designates EQ */
+#define	EQ_DB_POP_SHIFT 16		/* shift for entries popped */
+#define	EQ_DB_POP_MASK  0x1FFF0000	/* Mask for number of entries popped */
+#define	EQ_DB_REARM	0x20000000	/* Bit 29, rearm */
+
+/* bootstrap mailbox doorbell defines */
+#define	BMBX_READY	0x00000001	/* Mask for Port Ready bit */
+#define	BMBX_ADDR_HI	0x00000002	/* Mask for Addr Hi bit */
+#define	BMBX_ADDR	0xFFFFFFFA	/* Mask for Addr bits */
+
+/* Sizeof bootstrap mailbox */
+#define	EMLXS_BOOTSTRAP_MB_SIZE	256
+
+#define	MQE_SPECIAL_WORD0	0xFF1234FF	/* Initialize bootstrap wd 0 */
+#define	MQE_SPECIAL_WORD1	0xFF5678FF	/* Initialize bootstrap wd 1 */
+
 
 /* ===================================================================== */
 
@@ -742,12 +800,12 @@ typedef struct emlxs_fcp_rsp
 
 	uint32_t	rspResId;	/* Residual xfer if RESID_xxxx set */
 					/* in fcpStatus2. */
-	/* Received in Big Endian format */
+					/* Received in Big Endian format */
 	uint32_t	rspSnsLen;	/* Length of sense data in fcpSnsInfo */
-	/* Received in Big Endian format */
+					/* Received in Big Endian format */
 	uint32_t	rspRspLen;	/* Length of FCP response data */
 					/* in fcpRspInfo */
-	/* Received in Big Endian format */
+					/* Received in Big Endian format */
 
 	uint8_t		rspInfo0;	/* FCP_RSP_INFO byte 0 (reserved) */
 	uint8_t		rspInfo1;	/* FCP_RSP_INFO byte 1 (reserved) */
@@ -816,12 +874,6 @@ typedef struct emlxs_fcp_cmd
 	uint32_t	fcpDl;	/* Total transfer length */
 } emlxs_fcp_cmd_t;
 typedef emlxs_fcp_cmd_t FCP_CMND;
-
-
-
-
-
-
 
 
 
@@ -954,198 +1006,6 @@ typedef emlxs_read_capacity_data_t READ_CAPACITY_DATA_DEF;
 #define	FF_FRAME_SIZE	2048
 
 
-/* ==== Mailbox Commands ==== */
-#define	MBX_SHUTDOWN			0x00	/* terminate testing */
-#define	MBX_LOAD_SM			0x01
-#define	MBX_READ_NV			0x02
-#define	MBX_WRITE_NV			0x03
-#define	MBX_RUN_BIU_DIAG		0x04
-#define	MBX_INIT_LINK			0x05
-#define	MBX_DOWN_LINK			0x06
-#define	MBX_CONFIG_LINK			0x07
-#define	MBX_PART_SLIM			0x08
-#define	MBX_CONFIG_RING			0x09
-#define	MBX_RESET_RING			0x0A
-#define	MBX_READ_CONFIG			0x0B
-#define	MBX_READ_RCONFIG		0x0C
-#define	MBX_READ_SPARM			0x0D
-#define	MBX_READ_STATUS			0x0E
-#define	MBX_READ_RPI			0x0F
-#define	MBX_READ_XRI			0x10
-#define	MBX_READ_REV			0x11
-#define	MBX_READ_LNK_STAT		0x12
-#define	MBX_REG_LOGIN			0x13
-#define	MBX_UNREG_LOGIN			0x14
-#define	MBX_READ_LA			0x15
-#define	MBX_CLEAR_LA			0x16
-#define	MBX_DUMP_MEMORY			0x17
-#define	MBX_DUMP_CONTEXT		0x18
-#define	MBX_RUN_DIAGS			0x19
-#define	MBX_RESTART			0x1A
-#define	MBX_UPDATE_CFG			0x1B
-#define	MBX_DOWN_LOAD			0x1C
-#define	MBX_DEL_LD_ENTRY		0x1D
-#define	MBX_RUN_PROGRAM			0x1E
-#define	MBX_SET_MASK			0x20
-#define	MBX_SET_VARIABLE		0x21
-#define	MBX_UNREG_D_ID			0x23
-#define	MBX_KILL_BOARD			0x24
-#define	MBX_CONFIG_FARP			0x25
-#define	MBX_BEACON			0x2A
-#define	MBX_CONFIG_MSIX			0x30
-#define	MBX_HEARTBEAT			0x31
-#define	MBX_WRITE_VPARMS		0x32
-#define	MBX_ASYNC_EVENT			0x33
-
-#define	MBX_READ_EVENT_LOG_STATUS	0x37
-#define	MBX_READ_EVENT_LOG		0x38
-#define	MBX_WRITE_EVENT_LOG		0x39
-#define	MBX_NV_LOG			0x3A
-#define	MBX_PORT_CAPABILITIES		0x3B
-#define	MBX_IOV_CONTROL			0x3C
-#define	MBX_IOV_MBX			0x3D
-
-
-#define	MBX_CONFIG_HBQ			0x7C	/* SLI3 */
-#define	MBX_LOAD_AREA			0x81
-#define	MBX_RUN_BIU_DIAG64		0x84
-#define	MBX_GET_DEBUG			0x86
-#define	MBX_CONFIG_PORT			0x88
-#define	MBX_READ_SPARM64		0x8D
-#define	MBX_READ_RPI64			0x8F
-#define	MBX_CONFIG_MSI			0x90
-#define	MBX_REG_LOGIN64			0x93
-#define	MBX_READ_LA64			0x95
-#define	MBX_REG_VPI			0x96	/* NPIV */
-#define	MBX_UNREG_VPI			0x97	/* NPIV */
-#define	MBX_FLASH_WR_ULA		0x98
-#define	MBX_SET_DEBUG			0x99
-#define	MBX_LOAD_EXP_ROM		0x9C
-#define	MBX_MAX_CMDS			0x9D
-#define	MBX_SLI2_CMD_MASK		0x80
-
-
-/* ==== IOCB Commands ==== */
-
-#define	CMD_RCV_SEQUENCE_CX	0x01
-#define	CMD_XMIT_SEQUENCE_CR	0x02
-#define	CMD_XMIT_SEQUENCE_CX	0x03
-#define	CMD_XMIT_BCAST_CN	0x04
-#define	CMD_XMIT_BCAST_CX	0x05
-#define	CMD_QUE_RING_BUF_CN	0x06
-#define	CMD_QUE_XRI_BUF_CX	0x07
-#define	CMD_IOCB_CONTINUE_CN	0x08
-#define	CMD_RET_XRI_BUF_CX	0x09
-#define	CMD_ELS_REQUEST_CR	0x0A
-#define	CMD_ELS_REQUEST_CX	0x0B
-#define	CMD_RCV_ELS_REQ_CX	0x0D
-#define	CMD_ABORT_XRI_CN	0x0E
-#define	CMD_ABORT_XRI_CX	0x0F
-#define	CMD_CLOSE_XRI_CN	0x10
-#define	CMD_CLOSE_XRI_CX	0x11
-#define	CMD_CREATE_XRI_CR	0x12
-#define	CMD_CREATE_XRI_CX	0x13
-#define	CMD_GET_RPI_CN		0x14
-#define	CMD_XMIT_ELS_RSP_CX	0x15
-#define	CMD_GET_RPI_CR		0x16
-#define	CMD_XRI_ABORTED_CX	0x17
-#define	CMD_FCP_IWRITE_CR	0x18
-#define	CMD_FCP_IWRITE_CX	0x19
-#define	CMD_FCP_IREAD_CR	0x1A
-#define	CMD_FCP_IREAD_CX	0x1B
-#define	CMD_FCP_ICMND_CR	0x1C
-#define	CMD_FCP_ICMND_CX	0x1D
-#define	CMD_FCP_TSEND_CX	0x1F	/* FCP_TARGET_MODE */
-#define	CMD_ADAPTER_MSG		0x20
-#define	CMD_FCP_TRECEIVE_CX	0x21	/* FCP_TARGET_MODE */
-#define	CMD_ADAPTER_DUMP	0x22
-#define	CMD_FCP_TRSP_CX		0x23	/* FCP_TARGET_MODE */
-#define	CMD_FCP_AUTO_TRSP_CX	0x29	/* FCP_TARGET_MODE */
-
-/* LP3000 gasket IOCB Command Set */
-
-#define	CMD_BPL_IWRITE_CR	0x48
-#define	CMD_BPL_IWRITE_CX	0x49
-#define	CMD_BPL_IREAD_CR	0x4A
-#define	CMD_BPL_IREAD_CX	0x4B
-#define	CMD_BPL_ICMND_CR	0x4C
-#define	CMD_BPL_ICMND_CX	0x4D
-
-#define	CMD_ASYNC_STATUS	0x7C
-
-/* SLI_2 IOCB Command Set */
-#define	CMD_RCV_SEQUENCE64_CX	0x81
-#define	CMD_XMIT_SEQUENCE64_CR	0x82
-#define	CMD_XMIT_SEQUENCE64_CX	0x83
-#define	CMD_XMIT_BCAST64_CN	0x84
-#define	CMD_XMIT_BCAST64_CX	0x85
-#define	CMD_QUE_RING_BUF64_CN	0x86
-#define	CMD_QUE_XRI_BUF64_CX	0x87
-#define	CMD_IOCB_CONTINUE64_CN	0x88
-#define	CMD_RET_XRI_BUF64_CX	0x89
-#define	CMD_ELS_REQUEST64_CR	0x8A
-#define	CMD_ELS_REQUEST64_CX	0x8B
-#define	CMD_RCV_ELS_REQ64_CX	0x8D
-#define	CMD_XMIT_ELS_RSP64_CX	0x95
-#define	CMD_FCP_IWRITE64_CR	0x98
-#define	CMD_FCP_IWRITE64_CX	0x99
-#define	CMD_FCP_IREAD64_CR	0x9A
-#define	CMD_FCP_IREAD64_CX	0x9B
-#define	CMD_FCP_ICMND64_CR	0x9C
-#define	CMD_FCP_ICMND64_CX	0x9D
-#define	CMD_FCP_TSEND64_CX	0x9F	/* FCP_TARGET_MODE */
-#define	CMD_FCP_TRECEIVE64_CX	0xA1	/* FCP_TARGET_MODE */
-#define	CMD_FCP_TRSP64_CX	0xA3	/* FCP_TARGET_MODE */
-#define	CMD_RCV_SEQ64_CX	0xB5	/* SLI3 */
-#define	CMD_RCV_ELS64_CX	0xB7	/* SLI3 */
-#define	CMD_RCV_CONT64_CX	0xBB	/* SLI3 */
-#define	CMD_RCV_SEQ_LIST64_CX	0xC1
-#define	CMD_GEN_REQUEST64_CR	0xC2
-#define	CMD_GEN_REQUEST64_CX	0xC3
-#define	CMD_QUE_RING_LIST64_CN	0xC6
-
-/*
- * Define Status
- */
-#define	MBX_SUCCESS			0x0
-#define	MBX_FAILURE			0x1
-#define	MBXERR_NUM_IOCBS		0x2
-#define	MBXERR_IOCBS_EXCEEDED		0x3
-#define	MBXERR_BAD_RING_NUMBER		0x4
-#define	MBXERR_MASK_ENTRIES_RANGE	0x5
-#define	MBXERR_MASKS_EXCEEDED		0x6
-#define	MBXERR_BAD_PROFILE		0x7
-#define	MBXERR_BAD_DEF_CLASS		0x8
-#define	MBXERR_BAD_MAX_RESPONDER	0x9
-#define	MBXERR_BAD_MAX_ORIGINATOR	0xA
-#define	MBXERR_RPI_REGISTERED		0xB
-#define	MBXERR_RPI_FULL			0xC
-#define	MBXERR_NO_RESOURCES		0xD
-#define	MBXERR_BAD_RCV_LENGTH		0xE
-#define	MBXERR_DMA_ERROR		0xF
-#define	MBXERR_NOT_SUPPORTED		0x10
-#define	MBXERR_UNSUPPORTED_FEATURE	0x11
-#define	MBXERR_UNKNOWN_COMMAND		0x12
-
-/* Driver special codes */
-#define	MBX_OVERTEMP_ERROR		0xFA
-#define	MBX_HARDWARE_ERROR		0xFB
-#define	MBX_DRVR_ERROR			0xFC
-#define	MBX_BUSY			0xFD
-#define	MBX_TIMEOUT			0xFE
-#define	MBX_NOT_FINISHED		0xFF
-
-
-/*
- * flags for emlxs_mb_issue_cmd()
- */
-#define	MBX_POLL	0x01	/* poll mailbox till command done, */
-				/* then return */
-#define	MBX_SLEEP	0x02	/* sleep till mailbox intr cmpl */
-				/* wakes thread up */
-#define	MBX_WAIT	0x03	/* wait for comand done, then return */
-#define	MBX_NOWAIT	0x04	/* issue command then return immediately */
-
 typedef struct emlxs_rings
 {
 #ifdef EMLXS_BIG_ENDIAN
@@ -1184,7 +1044,6 @@ typedef struct emlxs_ring_def
 #endif
 } emlxs_ring_def_t;
 typedef emlxs_ring_def_t RING_DEF;
-
 
 /*
  * The following F.C. frame stuctures are defined in Big Endian format.
@@ -1404,7 +1263,7 @@ typedef struct
 	uint8_t		rsvd2[8];
 } emlxs_vvl_fmt_t;
 
-#define	valid_vendor_version	cmn.rspMultipleNPort
+#define	VALID_VENDOR_VERSION	cmn.rspMultipleNPort
 
 
 
@@ -1856,73 +1715,6 @@ typedef struct _ELS_PKT
 } ELS_PKT;
 
 
-/*
- * Begin Structure Definitions for Mailbox Commands
- */
-
-typedef struct revcompat
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	ldflag:1;	/* Set in SRAM descriptor */
-	uint32_t	ldcount:7;	/* For use by program load */
-	uint32_t	kernel:4;	/* Kernel ID */
-	uint32_t	kver:4;	/* Kernel compatibility version */
-	uint32_t	SMver:4;	/* Sequence Manager version */
-					/* 0 if none */
-	uint32_t	ENDECver:4;	/* ENDEC+ version, 0 if none */
-	uint32_t	BIUtype:4;	/* PCI = 0 */
-	uint32_t	BIUver:4;	/* BIU version, 0 if none */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	BIUver:4;	/* BIU version, 0 if none */
-	uint32_t	BIUtype:4;	/* PCI = 0 */
-	uint32_t	ENDECver:4;	/* ENDEC+ version, 0 if none */
-	uint32_t	SMver:4;	/* Sequence Manager version */
-					/* 0 if none */
-	uint32_t	kver:4;	/* Kernel compatibility version */
-	uint32_t	kernel:4;	/* Kernel ID */
-	uint32_t	ldcount:7;	/* For use by program load */
-	uint32_t	ldflag:1;	/* Set in SRAM descriptor */
-#endif
-} REVCOMPAT;
-
-typedef struct id_word
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint8_t		Type;
-	uint8_t		Id;
-	uint8_t		Ver;
-	uint8_t		Rev;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint8_t		Rev;
-	uint8_t		Ver;
-	uint8_t		Id;
-	uint8_t		Type;
-#endif
-	union
-	{
-		REVCOMPAT	cp;
-		uint32_t	revcomp;
-	} un;
-} PROG_ID;
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint8_t		tval;
-	uint8_t		tmask;
-	uint8_t		rval;
-	uint8_t		rmask;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint8_t		rmask;
-	uint8_t		rval;
-	uint8_t		tmask;
-	uint8_t		tval;
-#endif
-} RR_REG;
-
 typedef struct
 {
 	uint32_t	bdeAddress;
@@ -2000,2554 +1792,49 @@ typedef struct ULP_BDL
 	uint32_t	ulpIoTag32;	/* Can be used for 32 bit I/O Tag */
 } ULP_BDL;
 
+typedef struct ULP_SGE_64
+{ /* SLI-4 */
+	uint32_t	addrHigh;	/* Address 32:63 */
+	uint32_t	addrLow;	/* Address 0:31 */
+#ifdef EMLXS_BIG_ENDIAN
+	uint32_t	last:1;		/* Last entry in SGL */
+	uint32_t	reserved:11;
+	uint32_t	offset:20;
+#endif
+#ifdef EMLXS_LITTLE_ENDIAN
+	uint32_t	offset:20;
+	uint32_t	reserved:11;
+	uint32_t	last:1;		/* Last entry in SGL */
+#endif
+	uint32_t	length;
+#define	EMLXS_MAX_SGE_SIZE	0x10000	/* 64K max length */
+} ULP_SGE64;
+
+
+typedef	struct _BE_PHYS_ADDR
+{
+	uint32_t	addrLow;
+	uint32_t	addrHigh;
+} BE_PHYS_ADDR;
+
+
 typedef struct
 {
 	uint8_t		*fc_mptr;
+	struct emlxs_memseg *segment;	/* Parent segment */
+
 	uint8_t		*virt;		/* virtual address ptr */
 	uint64_t	phys;		/* mapped address */
 	uint32_t	size;
+
 	void		*data_handle;
 	void		*dma_handle;
 	uint32_t	tag;
 	uint32_t	flag;
-
 #define	MAP_POOL_ALLOCATED	0x00000001
 #define	MAP_BUF_ALLOCATED	0x00000002
 #define	MAP_TABLE_ALLOCATED	0x00000004
 } MATCHMAP;
-
-/* Structure used for a HBQ entry */
-typedef struct
-{
-	ULP_BDE64	bde;
-	union UN_TAG
-	{
-		uint32_t	w;
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	HBQ_tag:4;
-			uint32_t	HBQE_tag:28;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	HBQE_tag:28;
-			uint32_t	HBQ_tag:4;
-#endif
-		} ext;
-	} unt;
-} HBQE_t;
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint8_t		tmatch;
-	uint8_t		tmask;
-	uint8_t		rctlmatch;
-	uint8_t		rctlmask;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint8_t		rctlmask;
-	uint8_t		rctlmatch;
-	uint8_t		tmask;
-	uint8_t		tmatch;
-#endif
-} HBQ_MASK;
-
-#define	EMLXS_MAX_HBQ_BUFFERS	4096
-
-typedef struct
-{
-	uint32_t	HBQ_num_mask;		/* number of mask entries in */
-						/* port array */
-	uint32_t	HBQ_recvNotify;		/* Rcv buffer notification */
-	uint32_t	HBQ_numEntries;		/* # of entries in HBQ */
-	uint32_t	HBQ_headerLen;		/* 0 if not profile 4 or 5 */
-	uint32_t	HBQ_logEntry;		/* Set to 1 if this HBQ used */
-						/* for LogEntry */
-	uint32_t	HBQ_profile;		/* Selection profile 0=all, */
-						/* 7=logentry */
-	uint32_t	HBQ_ringMask;		/* Binds HBQ to a ring e.g. */
-						/* Ring0=b0001, ring2=b0100 */
-	uint32_t	HBQ_id;			/* index of this hbq in ring */
-						/* of HBQs[] */
-	uint32_t	HBQ_PutIdx_next;	/* Index to next HBQ slot to */
-						/* use */
-	uint32_t	HBQ_PutIdx;		/* HBQ slot to use */
-	uint32_t	HBQ_GetIdx;		/* Local copy of Get index */
-						/* from Port */
-	uint16_t	HBQ_PostBufCnt;		/* Current number of entries */
-						/* in list */
-	MATCHMAP	*HBQ_PostBufs[EMLXS_MAX_HBQ_BUFFERS];
-	MATCHMAP	HBQ_host_buf;		/* HBQ host buffer for HBQEs */
-	HBQ_MASK	HBQ_Masks[6];
-
-	union
-	{
-		uint32_t	allprofiles[12];
-
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	seqlenoff:16;
-			uint32_t	maxlen:16;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	maxlen:16;
-			uint32_t	seqlenoff:16;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	rsvd1:28;
-			uint32_t	seqlenbcnt:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	seqlenbcnt:4;
-			uint32_t	rsvd1:28;
-#endif
-			uint32_t	rsvd[10];
-		} profile2;
-
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	seqlenoff:16;
-			uint32_t	maxlen:16;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	maxlen:16;
-			uint32_t	seqlenoff:16;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	cmdcodeoff:28;
-			uint32_t	rsvd1:12;
-			uint32_t	seqlenbcnt:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	seqlenbcnt:4;
-			uint32_t	rsvd1:12;
-			uint32_t	cmdcodeoff:28;
-#endif
-			uint32_t	cmdmatch[8];
-
-			uint32_t	rsvd[2];
-		} profile3;
-
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	seqlenoff:16;
-			uint32_t	maxlen:16;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	maxlen:16;
-			uint32_t	seqlenoff:16;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	cmdcodeoff:28;
-			uint32_t	rsvd1:12;
-			uint32_t	seqlenbcnt:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	seqlenbcnt:4;
-			uint32_t	rsvd1:12;
-			uint32_t	cmdcodeoff:28;
-#endif
-			uint32_t	cmdmatch[8];
-
-			uint32_t	rsvd[2];
-		} profile5;
-	} profiles;
-} HBQ_INIT_t;
-
-
-
-/* Structure for MB Command LOAD_SM and DOWN_LOAD */
-
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd2:25;
-	uint32_t	acknowledgment:1;
-	uint32_t	version:1;
-	uint32_t	erase_or_prog:1;
-	uint32_t	update_flash:1;
-	uint32_t	update_ram:1;
-	uint32_t	method:1;
-	uint32_t	load_cmplt:1;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	load_cmplt:1;
-	uint32_t	method:1;
-	uint32_t	update_ram:1;
-	uint32_t	update_flash:1;
-	uint32_t	erase_or_prog:1;
-	uint32_t	version:1;
-	uint32_t	acknowledgment:1;
-	uint32_t	rsvd2:25;
-#endif
-
-#define	DL_FROM_BDE	0	/* method */
-#define	DL_FROM_SLIM	1
-
-#define	PROGRAM_FLASH	0	/* erase_or_prog */
-#define	ERASE_FLASH	1
-
-	uint32_t	dl_to_adr;
-	uint32_t	dl_len;
-	union
-	{
-		uint32_t	dl_from_slim_offset;
-		ULP_BDE		dl_from_bde;
-		ULP_BDE64	dl_from_bde64;
-		PROG_ID		prog_id;
-	} un;
-} LOAD_SM_VAR;
-
-
-/* Structure for MB Command READ_NVPARM (02) */
-
-typedef struct
-{
-	uint32_t	rsvd1[3];	/* Read as all one's */
-	uint32_t	rsvd2;		/* Read as all zero's */
-	uint32_t	portname[2];	/* N_PORT name */
-	uint32_t	nodename[2];	/* NODE name */
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	pref_DID:24;
-	uint32_t	hardAL_PA:8;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	hardAL_PA:8;
-	uint32_t	pref_DID:24;
-#endif
-	uint32_t	rsvd3[21];	/* Read as all one's */
-} READ_NV_VAR;
-
-
-/* Structure for MB Command WRITE_NVPARMS (03) */
-
-typedef struct
-{
-	uint32_t	rsvd1[3];	/* Must be all one's */
-	uint32_t	rsvd2;		/* Must be all zero's */
-	uint32_t	portname[2];	/* N_PORT name */
-	uint32_t	nodename[2];	/* NODE name */
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	pref_DID:24;
-	uint32_t	hardAL_PA:8;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	hardAL_PA:8;
-	uint32_t	pref_DID:24;
-#endif
-	uint32_t	rsvd3[21];	/* Must be all one's */
-} WRITE_NV_VAR;
-
-
-/* Structure for MB Command RUN_BIU_DIAG (04) */
-/* Structure for MB Command RUN_BIU_DIAG64 (0x84) */
-
-typedef struct
-{
-	uint32_t	rsvd1;
-	union
-	{
-		struct
-		{
-			ULP_BDE		xmit_bde;
-			ULP_BDE		rcv_bde;
-		} s1;
-		struct
-		{
-			ULP_BDE64	xmit_bde64;
-			ULP_BDE64	rcv_bde64;
-		} s2;
-	} un;
-} BIU_DIAG_VAR;
-
-
-/* Structure for MB Command INIT_LINK (05) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd1:24;
-	uint32_t	lipsr_AL_PA:8;	/* AL_PA to issue Lip Selective */
-					/* Reset to */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	lipsr_AL_PA:8;	/* AL_PA to issue Lip Selective */
-					/* Reset to */
-	uint32_t	rsvd1:24;
-#endif
-
-#ifdef EMLXS_BIG_ENDIAN
-	uint8_t		fabric_AL_PA;	/* If using a Fabric Assigned AL_PA */
-	uint8_t		rsvd2;
-	uint16_t	link_flags;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	link_flags;
-	uint8_t		rsvd2;
-	uint8_t		fabric_AL_PA;	/* If using a Fabric Assigned AL_PA */
-#endif
-#define	FLAGS_LOCAL_LB			0x01	/* link_flags (=1) */
-						/* ENDEC loopback */
-#define	FLAGS_TOPOLOGY_MODE_LOOP_PT	0x00	/* Attempt loop then pt-pt */
-#define	FLAGS_TOPOLOGY_MODE_PT_PT	0x02	/* Attempt pt-pt only */
-#define	FLAGS_TOPOLOGY_MODE_LOOP	0x04	/* Attempt loop only */
-#define	FLAGS_TOPOLOGY_MODE_PT_LOOP	0x06	/* Attempt pt-pt then loop */
-#define	FLAGS_LIRP_LILP			0x80	/* LIRP / LILP is disabled */
-
-#define	FLAGS_TOPOLOGY_FAILOVER		0x0400	/* Bit 10 */
-#define	FLAGS_LINK_SPEED		0x0800	/* Bit 11 */
-#define	FLAGS_PREABORT_RETURN		0x4000	/* Bit 14 */
-
-	uint32_t	link_speed;	/* NEW_FEATURE */
-#define	LINK_SPEED_AUTO			0	/* Auto selection */
-#define	LINK_SPEED_1G			1	/* 1 Gigabaud */
-#define	LINK_SPEED_2G			2	/* 2 Gigabaud */
-} INIT_LINK_VAR;
-
-
-/* Structure for MB Command DOWN_LINK (06) */
-
-typedef struct
-{
-	uint32_t	rsvd1;
-} DOWN_LINK_VAR;
-
-
-/* Structure for MB Command CONFIG_LINK (07) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	cr:1;
-	uint32_t	ci:1;
-	uint32_t	cr_delay:6;
-	uint32_t	cr_count:8;
-	uint32_t	rsvd1:8;
-	uint32_t	MaxBBC:8;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	MaxBBC:8;
-	uint32_t	rsvd1:8;
-	uint32_t	cr_count:8;
-	uint32_t	cr_delay:6;
-	uint32_t	ci:1;
-	uint32_t	cr:1;
-#endif
-	uint32_t	myId;
-	uint32_t	rsvd2;
-	uint32_t	edtov;
-	uint32_t	arbtov;
-	uint32_t	ratov;
-	uint32_t	rttov;
-	uint32_t	altov;
-	uint32_t	crtov;
-	uint32_t	citov;
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rrq_enable:1;
-	uint32_t	rrq_immed:1;
-	uint32_t	rsvd4:29;
-	uint32_t	ack0_enable:1;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	ack0_enable:1;
-	uint32_t	rsvd4:29;
-	uint32_t	rrq_immed:1;
-	uint32_t	rrq_enable:1;
-#endif
-} CONFIG_LINK;
-
-
-/* Structure for MB Command PART_SLIM (08) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t		unused1:24;
-	uint32_t		numRing:8;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t		numRing:8;
-	uint32_t		unused1:24;
-#endif
-	emlxs_ring_def_t	ringdef[4];
-	uint32_t		hbainit;
-} PART_SLIM_VAR;
-
-
-/* Structure for MB Command CONFIG_RING (09) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	unused2:6;
-	uint32_t	recvSeq:1;
-	uint32_t	recvNotify:1;
-	uint32_t	numMask:8;
-	uint32_t	profile:8;
-	uint32_t	unused1:4;
-	uint32_t	ring:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	ring:4;
-	uint32_t	unused1:4;
-	uint32_t	profile:8;
-	uint32_t	numMask:8;
-	uint32_t	recvNotify:1;
-	uint32_t	recvSeq:1;
-	uint32_t	unused2:6;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	maxRespXchg;
-	uint16_t	maxOrigXchg;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	maxOrigXchg;
-	uint16_t	maxRespXchg;
-#endif
-	RR_REG		rrRegs[6];
-} CONFIG_RING_VAR;
-
-
-/* Structure for MB Command RESET_RING (10) */
-
-typedef struct
-{
-	uint32_t	ring_no;
-} RESET_RING_VAR;
-
-
-/* Structure for MB Command READ_CONFIG (11) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	cr:1;
-	uint32_t	ci:1;
-	uint32_t	cr_delay:6;
-	uint32_t	cr_count:8;
-	uint32_t	InitBBC:8;
-	uint32_t	MaxBBC:8;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	MaxBBC:8;
-	uint32_t	InitBBC:8;
-	uint32_t	cr_count:8;
-	uint32_t	cr_delay:6;
-	uint32_t	ci:1;
-	uint32_t	cr:1;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	topology:8;
-	uint32_t	myDid:24;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	myDid:24;
-	uint32_t	topology:8;
-#endif
-	/* Defines for topology (defined previously) */
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	AR:1;
-	uint32_t	IR:1;
-	uint32_t	rsvd1:29;
-	uint32_t	ack0:1;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	ack0:1;
-	uint32_t	rsvd1:29;
-	uint32_t	IR:1;
-	uint32_t	AR:1;
-#endif
-	uint32_t	edtov;
-	uint32_t	arbtov;
-	uint32_t	ratov;
-	uint32_t	rttov;
-	uint32_t	altov;
-	uint32_t	lmt;
-
-#define	LMT_1GB_CAPABLE		0x0004
-#define	LMT_2GB_CAPABLE		0x0008
-#define	LMT_4GB_CAPABLE		0x0040
-#define	LMT_8GB_CAPABLE		0x0080
-#define	LMT_10GB_CAPABLE	0x0100
-/* E2E supported on adapters >= 8GB */
-#define	LMT_E2E_CAPABLE		(LMT_8GB_CAPABLE|LMT_10GB_CAPABLE)
-
-	uint32_t	rsvd2;
-	uint32_t	rsvd3;
-	uint32_t	max_xri;
-	uint32_t	max_iocb;
-	uint32_t	max_rpi;
-	uint32_t	avail_xri;
-	uint32_t	avail_iocb;
-	uint32_t	avail_rpi;
-
-#ifdef SLI3_SUPPORT
-	uint32_t	max_vpi;
-	uint32_t	max_alpa;
-	uint32_t	rsvd4;
-	uint32_t	avail_vpi;
-#else
-	uint32_t	default_rpi;
-#endif	/* SLI3_SUPPORT */
-} READ_CONFIG_VAR;
-
-
-/* Structure for MB Command READ_RCONFIG (12) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd2:7;
-	uint32_t	recvNotify:1;
-	uint32_t	numMask:8;
-	uint32_t	profile:8;
-	uint32_t	rsvd1:4;
-	uint32_t	ring:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	ring:4;
-	uint32_t	rsvd1:4;
-	uint32_t	profile:8;
-	uint32_t	numMask:8;
-	uint32_t	recvNotify:1;
-	uint32_t	rsvd2:7;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	maxResp;
-	uint16_t	maxOrig;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	maxOrig;
-	uint16_t	maxResp;
-#endif
-	RR_REG		rrRegs[6];
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	cmdRingOffset;
-	uint16_t	cmdEntryCnt;
-	uint16_t	rspRingOffset;
-	uint16_t	rspEntryCnt;
-	uint16_t	nextCmdOffset;
-	uint16_t	rsvd3;
-	uint16_t	nextRspOffset;
-	uint16_t	rsvd4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	cmdEntryCnt;
-	uint16_t	cmdRingOffset;
-	uint16_t	rspEntryCnt;
-	uint16_t	rspRingOffset;
-	uint16_t	rsvd3;
-	uint16_t	nextCmdOffset;
-	uint16_t	rsvd4;
-	uint16_t	nextRspOffset;
-#endif
-} READ_RCONF_VAR;
-
-
-/* Structure for MB Command READ_SPARM (13) */
-/* Structure for MB Command READ_SPARM64 (0x8D) */
-
-typedef struct
-{
-	uint32_t	rsvd1;
-	uint32_t	rsvd2;
-	union
-	{
-		ULP_BDE		sp;	/* This BDE points to SERV_PARM */
-					/* structure */
-		ULP_BDE64	sp64;
-	} un;
-} READ_SPARM_VAR;
-
-
-/* Structure for MB Command READ_STATUS (14) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd1:31;
-	uint32_t	clrCounters:1;
-	uint16_t	activeXriCnt;
-	uint16_t	activeRpiCnt;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	clrCounters:1;
-	uint32_t	rsvd1:31;
-	uint16_t	activeRpiCnt;
-	uint16_t	activeXriCnt;
-#endif
-	uint32_t	xmitByteCnt;
-	uint32_t	rcvByteCnt;
-	uint32_t	xmitFrameCnt;
-	uint32_t	rcvFrameCnt;
-	uint32_t	xmitSeqCnt;
-	uint32_t	rcvSeqCnt;
-	uint32_t	totalOrigExchanges;
-	uint32_t	totalRespExchanges;
-	uint32_t	rcvPbsyCnt;
-	uint32_t	rcvFbsyCnt;
-} READ_STATUS_VAR;
-
-
-/* Structure for MB Command READ_RPI (15) */
-/* Structure for MB Command READ_RPI64 (0x8F) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	nextRpi;
-	uint16_t	reqRpi;
-	uint32_t	rsvd2:8;
-	uint32_t	DID:24;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	reqRpi;
-	uint16_t	nextRpi;
-	uint32_t	DID:24;
-	uint32_t	rsvd2:8;
-#endif
-	union
-	{
-		ULP_BDE		sp;
-		ULP_BDE64	sp64;
-	} un;
-} READ_RPI_VAR;
-
-
-/* Structure for MB Command READ_XRI (16) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	nextXri;
-	uint16_t	reqXri;
-	uint16_t	rsvd1;
-	uint16_t	rpi;
-	uint32_t	rsvd2:8;
-	uint32_t	DID:24;
-	uint32_t	rsvd3:8;
-	uint32_t	SID:24;
-	uint32_t	rsvd4;
-	uint8_t		seqId;
-	uint8_t		rsvd5;
-	uint16_t	seqCount;
-	uint16_t	oxId;
-	uint16_t	rxId;
-	uint32_t	rsvd6:30;
-	uint32_t	si:1;
-	uint32_t	exchOrig:1;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	reqXri;
-	uint16_t	nextXri;
-	uint16_t	rpi;
-	uint16_t	rsvd1;
-	uint32_t	DID:24;
-	uint32_t	rsvd2:8;
-	uint32_t	SID:24;
-	uint32_t	rsvd3:8;
-	uint32_t	rsvd4;
-	uint16_t	seqCount;
-	uint8_t		rsvd5;
-	uint8_t		seqId;
-	uint16_t	rxId;
-	uint16_t	oxId;
-	uint32_t	exchOrig:1;
-	uint32_t	si:1;
-	uint32_t	rsvd6:30;
-#endif
-} READ_XRI_VAR;
-
-
-/* Structure for MB Command READ_REV (17) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	cv:1;
-	uint32_t	rr:1;
-	uint32_t	co:1;
-	uint32_t	rp:1;
-	uint32_t	cv3:1;
-	uint32_t	rf3:1;
-	uint32_t	rsvd1:10;
-	uint32_t	offset:14;
-	uint32_t	rv:2;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	rv:2;
-	uint32_t	offset:14;
-	uint32_t	rsvd1:10;
-	uint32_t	rf3:1;
-	uint32_t	cv3:1;
-	uint32_t	rp:1;
-	uint32_t	co:1;
-	uint32_t	rr:1;
-	uint32_t	cv:1;
-#endif
-	uint32_t	biuRev;
-	uint32_t	smRev;
-	union
-	{
-		uint32_t	smFwRev;
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint8_t		ProgType;
-			uint8_t		ProgId;
-			uint16_t	ProgVer:4;
-			uint16_t	ProgRev:4;
-			uint16_t	ProgFixLvl:2;
-			uint16_t	ProgDistType:2;
-			uint16_t	DistCnt:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint16_t	DistCnt:4;
-			uint16_t	ProgDistType:2;
-			uint16_t	ProgFixLvl:2;
-			uint16_t	ProgRev:4;
-			uint16_t	ProgVer:4;
-			uint8_t		ProgId;
-			uint8_t		ProgType;
-#endif
-		} b;
-	} un;
-	uint32_t	endecRev;
-#ifdef EMLXS_BIG_ENDIAN
-	uint8_t		feaLevelHigh;
-	uint8_t		feaLevelLow;
-	uint8_t		fcphHigh;
-	uint8_t		fcphLow;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint8_t		fcphLow;
-	uint8_t		fcphHigh;
-	uint8_t		feaLevelLow;
-	uint8_t		feaLevelHigh;
-#endif
-	uint32_t	postKernRev;
-	uint32_t	opFwRev;
-	uint8_t		opFwName[16];
-
-	uint32_t	sliFwRev1;
-	uint8_t		sliFwName1[16];
-	uint32_t	sliFwRev2;
-	uint8_t		sliFwName2[16];
-} READ_REV_VAR;
-
-#define	rxSeqRev postKernRev
-#define	txSeqRev opFwRev
-
-/* Structure for MB Command READ_LINK_STAT (18) */
-
-typedef struct
-{
-	uint32_t	rsvd1;
-	uint32_t	linkFailureCnt;
-	uint32_t	lossSyncCnt;
-
-	uint32_t	lossSignalCnt;
-	uint32_t	primSeqErrCnt;
-	uint32_t	invalidXmitWord;
-	uint32_t	crcCnt;
-	uint32_t	primSeqTimeout;
-	uint32_t	elasticOverrun;
-	uint32_t	arbTimeout;
-
-	uint32_t	rxBufCredit;
-	uint32_t	rxBufCreditCur;
-
-	uint32_t	txBufCredit;
-	uint32_t	txBufCreditCur;
-
-	uint32_t	EOFaCnt;
-	uint32_t	EOFdtiCnt;
-	uint32_t	EOFniCnt;
-	uint32_t	SOFfCnt;
-} READ_LNK_VAR;
-
-
-/* Structure for MB Command REG_LOGIN (19) */
-/* Structure for MB Command REG_LOGIN64 (0x93) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	rsvd1;
-	uint16_t	rpi;
-	uint32_t	rsvd2:8;
-	uint32_t	did:24;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	rpi;
-	uint16_t	rsvd1;
-	uint32_t	did:24;
-	uint32_t	rsvd2:8;
-#endif
-	union
-	{
-		ULP_BDE		sp;
-		ULP_BDE64	sp64;
-	} un;
-
-#ifdef SLI3_SUPPORT
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	rsvd6;
-	uint16_t	vpi;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	vpi;
-	uint16_t	rsvd6;
-#endif
-#endif	/* SLI3_SUPPORT */
-} REG_LOGIN_VAR;
-
-/* Word 30 contents for REG_LOGIN */
-typedef union
-{
-	struct
-	{
-#ifdef EMLXS_BIG_ENDIAN
-		uint16_t	rsvd1:12;
-		uint16_t	class:4;
-		uint16_t	xri;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-		uint16_t	xri;
-		uint16_t	class:4;
-		uint16_t	rsvd1:12;
-#endif
-	} f;
-	uint32_t	word;
-} REG_WD30;
-
-
-/* Structure for MB Command UNREG_LOGIN (20) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	rsvd1;
-	uint16_t	rpi;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	rpi;
-	uint16_t	rsvd1;
-#endif
-
-#ifdef SLI3_SUPPORT
-	uint32_t	rsvd2;
-	uint32_t	rsvd3;
-	uint32_t	rsvd4;
-	uint32_t	rsvd5;
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	rsvd6;
-	uint16_t	vpi;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	vpi;
-	uint16_t	rsvd6;
-#endif
-#endif	/* SLI3_SUPPORT */
-} UNREG_LOGIN_VAR;
-
-
-/* Structure for MB Command UNREG_D_ID (0x23) */
-
-typedef struct
-{
-	uint32_t	did;
-
-#ifdef SLI3_SUPPORT
-	uint32_t	rsvd2;
-	uint32_t	rsvd3;
-	uint32_t	rsvd4;
-	uint32_t	rsvd5;
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	rsvd6;
-	uint16_t	vpi;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	vpi;
-	uint16_t	rsvd6;
-#endif
-#endif	/* SLI3_SUPPORT */
-} UNREG_D_ID_VAR;
-
-
-/* Structure for MB Command READ_LA (21) */
-/* Structure for MB Command READ_LA64 (0x95) */
-
-typedef struct
-{
-	uint32_t	eventTag;	/* Event tag */
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd2:19;
-	uint32_t	fa:1;
-	uint32_t	mm:1;
-	uint32_t	tc:1;
-	uint32_t	pb:1;
-	uint32_t	il:1;
-	uint32_t	attType:8;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	attType:8;
-	uint32_t	il:1;
-	uint32_t	pb:1;
-	uint32_t	tc:1;
-	uint32_t	mm:1;
-	uint32_t	fa:1;
-	uint32_t	rsvd2:19;
-#endif
-#define	AT_RESERVED	0x00	/* Reserved - attType */
-#define	AT_LINK_UP	0x01	/* Link is up */
-#define	AT_LINK_DOWN	0x02	/* Link is down */
-#ifdef EMLXS_BIG_ENDIAN
-	uint8_t		granted_AL_PA;
-	uint8_t		lipAlPs;
-	uint8_t		lipType;
-	uint8_t		topology;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint8_t		topology;
-	uint8_t		lipType;
-	uint8_t		lipAlPs;
-	uint8_t		granted_AL_PA;
-#endif
-
-	/* lipType */
-#define	LT_PORT_INIT	0x00	/* An L_PORT initing (F7, AL_PS) - lipType */
-#define	LT_PORT_ERR	0x01	/* Err @L_PORT rcv'er (F8, AL_PS) */
-#define	LT_RESET_APORT	0x02	/* Lip Reset of some other port */
-#define	LT_RESET_MYPORT	0x03	/* Lip Reset of my port */
-
-	/* topology */
-#define	TOPOLOGY_PT_PT	0x01	/* Topology is pt-pt / pt-fabric */
-#define	TOPOLOGY_LOOP	0x02	/* Topology is FC-AL (private) */
-
-	union
-	{
-		ULP_BDE		lilpBde;	/* This BDE points to a */
-						/* 128 byte buffer to store */
-						/* the LILP AL_PA position */
-						/* map into */
-		ULP_BDE64	lilpBde64;
-	} un;
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	Dlu:1;
-	uint32_t	Dtf:1;
-	uint32_t	Drsvd2:14;
-	uint32_t	DlnkSpeed:8;
-	uint32_t	DnlPort:4;
-	uint32_t	Dtx:2;
-	uint32_t	Drx:2;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	Drx:2;
-	uint32_t	Dtx:2;
-	uint32_t	DnlPort:4;
-	uint32_t	DlnkSpeed:8;
-	uint32_t	Drsvd2:14;
-	uint32_t	Dtf:1;
-	uint32_t	Dlu:1;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	Ulu:1;
-	uint32_t	Utf:1;
-	uint32_t	Ursvd2:14;
-	uint32_t	UlnkSpeed:8;
-	uint32_t	UnlPort:4;
-	uint32_t	Utx:2;
-	uint32_t	Urx:2;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	Urx:2;
-	uint32_t	Utx:2;
-	uint32_t	UnlPort:4;
-	uint32_t	UlnkSpeed:8;
-	uint32_t	Ursvd2:14;
-	uint32_t	Utf:1;
-	uint32_t	Ulu:1;
-#endif
-
-#define	LA_1GHZ_LINK   0x04	/* lnkSpeed */
-#define	LA_2GHZ_LINK   0x08	/* lnkSpeed */
-#define	LA_4GHZ_LINK   0x10	/* lnkSpeed */
-#define	LA_8GHZ_LINK   0x20	/* lnkSpeed */
-#define	LA_10GHZ_LINK  0x40	/* lnkSpeed */
-} READ_LA_VAR;
-
-
-/* Structure for MB Command CLEAR_LA (22) */
-
-typedef struct
-{
-	uint32_t	eventTag;	/* Event tag */
-	uint32_t	rsvd1;
-} CLEAR_LA_VAR;
-
-/* Structure for MB Command DUMP */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd:25;
-	uint32_t	ra:1;
-	uint32_t	co:1;
-	uint32_t	cv:1;
-	uint32_t	type:4;
-
-	uint32_t	entry_index:16;
-	uint32_t	region_id:16;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	type:4;
-	uint32_t	cv:1;
-	uint32_t	co:1;
-	uint32_t	ra:1;
-	uint32_t	rsvd:25;
-
-	uint32_t	region_id:16;
-	uint32_t	entry_index:16;
-#endif
-	uint32_t	base_adr;
-	uint32_t	word_cnt;
-	uint32_t	resp_offset;
-} DUMP_VAR;
-
-/*
- * Dump type
- */
-#define	DMP_MEM_REG	0x1
-#define	DMP_NV_PARAMS	0x2
-
-/*
- * Dump region ID
- */
-#define	NODE_CFG_A_REGION_ID	0
-#define	NODE_CFG_B_REGION_ID	1
-#define	NODE_CFG_C_REGION_ID	2
-#define	NODE_CFG_D_REGION_ID	3
-#define	WAKE_UP_PARMS_REGION_ID	4
-#define	DEF_PCI_CFG_REGION_ID	5
-#define	PCI_CFG_1_REGION_ID	6
-#define	PCI_CFG_2_REGION_ID	7
-#define	RSVD1_REGION_ID		8
-#define	RSVD2_REGION_ID		9
-#define	RSVD3_REGION_ID		10
-#define	RSVD4_REGION_ID		11
-#define	RSVD5_REGION_ID		12
-#define	RSVD6_REGION_ID		13
-#define	RSVD7_REGION_ID		14
-#define	DIAG_TRACE_REGION_ID	15
-#define	WWN_REGION_ID		16
-
-#define	DMP_VPD_REGION		14
-#define	DMP_VPD_SIZE		1024
-#define	DMP_VPD_DUMP_WCOUNT	24
-
-
-
-/* Structure for MB Command UPDATE_CFG */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd2:16;
-	uint32_t	proc_type:8;
-	uint32_t	rsvd1:1;
-	uint32_t	Abit:1;
-	uint32_t	Obit:1;
-	uint32_t	Vbit:1;
-	uint32_t	req_type:4;
-#define	INIT_REGION	1
-#define	UPDATE_DATA	2
-#define	CLEAN_UP_CFG	3
-	uint32_t	entry_len:16;
-	uint32_t	region_id:16;
-#endif
-
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	req_type:4;
-#define	INIT_REGION	1
-#define	UPDATE_DATA	2
-#define	CLEAN_UP_CFG	3
-	uint32_t	Vbit:1;
-	uint32_t	Obit:1;
-	uint32_t	Abit:1;
-	uint32_t	rsvd1:1;
-	uint32_t	proc_type:8;
-	uint32_t	rsvd2:16;
-
-	uint32_t	region_id:16;
-	uint32_t	entry_len:16;
-#endif
-
-	uint32_t	rsp_info;
-	uint32_t	byte_len;
-	uint32_t	cfg_data;
-} UPDATE_CFG_VAR;
-
-/* Structure for MB Command DEL_LD_ENTRY (29) */
-
-typedef struct
-{
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	list_req:2;
-	uint32_t	list_rsp:2;
-	uint32_t	rsvd:28;
-#else
-	uint32_t	rsvd:28;
-	uint32_t	list_rsp:2;
-	uint32_t	list_req:2;
-#endif
-
-#define	FLASH_LOAD_LIST	1
-#define	RAM_LOAD_LIST	2
-#define	BOTH_LISTS	3
-
-	PROG_ID		prog_id;
-} DEL_LD_ENTRY_VAR;
-
-/* Structure for MB Command LOAD_AREA (81) */
-typedef struct
-{
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	load_cmplt:1;
-	uint32_t	method:1;
-	uint32_t	rsvd1:1;
-	uint32_t	update_flash:1;
-	uint32_t	erase_or_prog:1;
-	uint32_t	version:1;
-	uint32_t	rsvd2:2;
-	uint32_t	progress:8;
-	uint32_t	step:8;
-	uint32_t	area_id:8;
-#else
-	uint32_t	area_id:8;
-	uint32_t	step:8;
-	uint32_t	progress:8;
-	uint32_t	rsvd2:2;
-	uint32_t	version:1;
-	uint32_t	erase_or_prog:1;
-	uint32_t	update_flash:1;
-	uint32_t	rsvd1:1;
-	uint32_t	method:1;
-	uint32_t	load_cmplt:1;
-#endif
-	uint32_t	dl_to_adr;
-	uint32_t	dl_len;
-	union
-	{
-		uint32_t	dl_from_slim_offset;
-		ULP_BDE		dl_from_bde;
-		ULP_BDE64	dl_from_bde64;
-		PROG_ID		prog_id;
-	} un;
-} LOAD_AREA_VAR;
-
-/* Structure for MB Command LOAD_EXP_ROM (9C) */
-typedef struct
-{
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	rsvd1:8;
-	uint32_t	progress:8;
-	uint32_t	step:8;
-	uint32_t	rsvd2:8;
-#else
-	uint32_t	rsvd2:8;
-	uint32_t	step:8;
-	uint32_t	progress:8;
-	uint32_t	rsvd1:8;
-#endif
-	uint32_t	dl_to_adr;
-	uint32_t	rsvd3;
-	union
-	{
-		uint32_t	word[2];
-		PROG_ID		prog_id;
-	} un;
-} LOAD_EXP_ROM_VAR;
-
-
-/* Structure for MB Command CONFIG_HBQ (7C) */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd1:7;
-	uint32_t	recvNotify:1;	/* Receive Notification */
-	uint32_t	numMask:8;	/* # Mask Entries */
-	uint32_t	profile:8;	/* Selection Profile */
-	uint32_t	rsvd2:8;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	rsvd2:8;
-	uint32_t	profile:8;	/* Selection Profile */
-	uint32_t	numMask:8;	/* # Mask Entries */
-	uint32_t	recvNotify:1;	/* Receive Notification */
-	uint32_t	rsvd1:7;
-#endif
-
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	hbqId:16;
-	uint32_t	rsvd3:12;
-	uint32_t	ringMask:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	ringMask:4;
-	uint32_t	rsvd3:12;
-	uint32_t	hbqId:16;
-#endif
-
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	numEntries:16;
-	uint32_t	rsvd4:8;
-	uint32_t	headerLen:8;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	headerLen:8;
-	uint32_t	rsvd4:8;
-	uint32_t	numEntries:16;
-#endif
-
-	uint32_t	hbqaddrLow;
-	uint32_t	hbqaddrHigh;
-
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd5:31;
-	uint32_t	logEntry:1;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	logEntry:1;
-	uint32_t	rsvd5:31;
-#endif
-
-	uint32_t	rsvd6;	/* w7 */
-	uint32_t	rsvd7;	/* w8 */
-	uint32_t	rsvd8;	/* w9 */
-
-	HBQ_MASK	hbqMasks[6];
-
-	union
-	{
-		uint32_t	allprofiles[12];
-
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	seqlenoff:16;
-			uint32_t	maxlen:16;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	maxlen:16;
-			uint32_t	seqlenoff:16;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	rsvd1:28;
-			uint32_t	seqlenbcnt:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	seqlenbcnt:4;
-			uint32_t	rsvd1:28;
-#endif
-			uint32_t	rsvd[10];
-		} profile2;
-
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	seqlenoff:16;
-			uint32_t	maxlen:16;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	maxlen:16;
-			uint32_t	seqlenoff:16;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	cmdcodeoff:28;
-			uint32_t	rsvd1:12;
-			uint32_t	seqlenbcnt:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	seqlenbcnt:4;
-			uint32_t	rsvd1:12;
-			uint32_t	cmdcodeoff:28;
-#endif
-			uint32_t	cmdmatch[8];
-
-			uint32_t	rsvd[2];
-		} profile3;
-
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	seqlenoff:16;
-			uint32_t	maxlen:16;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	maxlen:16;
-			uint32_t	seqlenoff:16;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	cmdcodeoff:28;
-			uint32_t	rsvd1:12;
-			uint32_t	seqlenbcnt:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	seqlenbcnt:4;
-			uint32_t	rsvd1:12;
-			uint32_t	cmdcodeoff:28;
-#endif
-			uint32_t	cmdmatch[8];
-
-			uint32_t	rsvd[2];
-		} profile5;
-	} profiles;
-} CONFIG_HBQ_VAR;
-
-
-/* Structure for MB Command REG_VPI(0x96) */
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd1;
-	uint32_t	rsvd2:8;
-	uint32_t	sid:24;
-	uint32_t	rsvd3;
-	uint32_t	rsvd4;
-	uint32_t	rsvd5;
-	uint16_t	rsvd6;
-	uint16_t	vpi;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	rsvd1;
-	uint32_t	sid:24;
-	uint32_t	rsvd2:8;
-	uint32_t	rsvd3;
-	uint32_t	rsvd4;
-	uint32_t	rsvd5;
-	uint16_t	vpi;
-	uint16_t	rsvd6;
-#endif
-} REG_VPI_VAR;
-
-/* Structure for MB Command UNREG_VPI (0x97) */
-typedef struct
-{
-	uint32_t	rsvd1;
-	uint32_t	rsvd2;
-	uint32_t	rsvd3;
-	uint32_t	rsvd4;
-	uint32_t	rsvd5;
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	rsvd6;
-	uint16_t	vpi;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	vpi;
-	uint16_t	rsvd6;
-#endif
-} UNREG_VPI_VAR;
-
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	read_log:1;
-	uint32_t	clear_log:1;
-	uint32_t	mbox_rsp:1;
-	uint32_t	resv:28;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	resv:28;
-	uint32_t	mbox_rsp:1;
-	uint32_t	clear_log:1;
-	uint32_t	read_log:1;
-#endif
-
-	uint32_t	offset;
-
-	union
-	{
-		ULP_BDE		sp;
-		ULP_BDE64	sp64;
-	} un;
-} READ_EVT_LOG_VAR;
-
-typedef struct
-{
-
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	split_log_next;
-	uint16_t	log_next;
-
-	uint32_t	size;
-
-	uint32_t	format:8;
-	uint32_t	resv2:22;
-	uint32_t	log_level:1;
-	uint32_t	split_log:1;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	log_next;
-	uint16_t	split_log_next;
-
-	uint32_t	size;
-
-	uint32_t	split_log:1;
-	uint32_t	log_level:1;
-	uint32_t	resv2:22;
-	uint32_t	format:8;
-#endif
-
-	uint32_t	offset;
-} LOG_STATUS_VAR;
-
-/* Structure for MB Command CONFIG_PORT (0x88) */
-
-
-#ifdef SLI3_SUPPORT
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	cBE:1;
-	uint32_t	cET:1;
-	uint32_t	cHpcb:1;
-	uint32_t	rMA:1;
-	uint32_t	sli_mode:4;
-	uint32_t	pcbLen:24;	/* bit 23:0 of memory based port */
-					/* config block */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	pcbLen:24;	/* bit 23:0 of memory based port */
-					/* config block */
-	uint32_t	sli_mode:4;
-	uint32_t	rMA:1;
-	uint32_t	cHpcb:1;
-	uint32_t	cET:1;
-	uint32_t	cBE:1;
-#endif
-
-	uint32_t	pcbLow;		/* bit 31:0 of memory based port */
-					/* config block */
-	uint32_t	pcbHigh; 	/* bit 63:32 of memory based port */
-					/* config block */
-	uint32_t	hbainit[5];
-
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	hps:1; /* Host pointers in SLIM */
-	uint32_t	rsvd:31;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	rsvd:31;
-	uint32_t	hps:1; /* Host pointers in SLIM */
-#endif
-
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd1:24;
-	uint32_t	cmv:1;		/* Configure Max VPIs */
-	uint32_t	ccrp:1;		/* Config Command Ring Polling */
-	uint32_t	csah:1;		/* Configure Synchronous Abort */
-					/* Handling */
-	uint32_t	chbs:1;		/* Cofigure Host Backing store */
-	uint32_t	cinb:1;		/* Enable Interrupt Notification */
-					/* Block */
-	uint32_t	cerbm:1;	/* Configure Enhanced Receive */
-					/* Buffer Management */
-	uint32_t	cmx:1;		/* Configure Max XRIs */
-	uint32_t	cmr:1;		/* Configure Max RPIs */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	cmr:1;		/* Configure Max RPIs */
-	uint32_t	cmx:1;		/* Configure Max XRIs */
-	uint32_t	cerbm:1;	/* Configure Enhanced Receive */
-					/* Buffer Management */
-	uint32_t	cinb:1;		/* Enable Interrupt Notification */
-					/* Block */
-	uint32_t	chbs:1;		/* Cofigure Host Backing store */
-	uint32_t	csah:1;		/* Configure Synchronous Abort */
-					/* Handling */
-	uint32_t	ccrp:1;		/* Config Command Ring Polling */
-	uint32_t	cmv:1;		/* Configure Max VPIs */
-	uint32_t	rsvd1:24;
-#endif
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd2:24;
-	uint32_t	gmv:1;		/* Grant Max VPIs */
-	uint32_t	gcrp:1;		/* Grant Command Ring Polling */
-	uint32_t	gsah:1;		/* Grant Synchronous Abort Handling */
-	uint32_t	ghbs:1;		/* Grant Host Backing Store */
-	uint32_t	ginb:1;		/* Grant Interrupt Notification Block */
-	uint32_t	gerbm:1;	/* Grant ERBM Request */
-	uint32_t	gmx:1;		/* Grant Max XRIs */
-	uint32_t	gmr:1;		/* Grant Max RPIs */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	gmr:1;		/* Grant Max RPIs */
-	uint32_t	gmx:1;		/* Grant Max XRIs */
-	uint32_t	gerbm:1;	/* Grant ERBM Request */
-	uint32_t	ginb:1;		/* Grant Interrupt Notification Block */
-	uint32_t	ghbs:1;		/* Grant Host Backing Store */
-	uint32_t	gsah:1;		/* Grant Synchronous Abort Handling */
-	uint32_t	gcrp:1;		/* Grant Command Ring Polling */
-	uint32_t	gmv:1;		/* Grant Max VPIs */
-	uint32_t	rsvd2:24;
-#endif
-
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	max_rpi:16;	/* Max RPIs Port should configure */
-	uint32_t	max_xri:16;	/* Max XRIs Port should configure */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	max_xri:16;	/* Max XRIs Port should configure */
-	uint32_t	max_rpi:16;	/* Max RPIs Port should configure */
-#endif
-
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	max_hbq:16;	/* Max HBQs Host expect to configure */
-	uint32_t	rsvd3:16;	/* Max HBQs Host expect to configure */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	rsvd3:16;	/* Max HBQs Host expect to configure */
-	uint32_t	max_hbq:16;	/* Max HBQs Host expect to configure */
-#endif
-
-	uint32_t	rsvd4;	/* Reserved */
-
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd5:16;	/* Reserved */
-	uint32_t	vpi_max:16;	/* Max number of virt N-Ports */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	vpi_max:16;	/* Max number of virt N-Ports */
-	uint32_t	rsvd5:16;	/* Reserved */
-#endif
-} CONFIG_PORT_VAR;
-
-#else	/* !SLI3_SUPPORT */
-
-typedef struct
-{
-	uint32_t	pcbLen;
-	uint32_t	pcbLow;		/* bit 31:0  of memory based port */
-					/* config block */
-	uint32_t	pcbHigh;	/* bit 63:32 of memory based port */
-					/* config block */
-	uint32_t	hbainit;
-} CONFIG_PORT_VAR;
-
-#endif	/* SLI3_SUPPORT */
-
-
-
-/* SLI-2 Port Control Block */
-
-/* SLIM POINTER */
-#define	SLIMOFF	0x30	/* WORD */
-
-typedef struct _SLI2_RDSC
-{
-	uint32_t	cmdEntries;
-	uint32_t	cmdAddrLow;
-	uint32_t	cmdAddrHigh;
-
-	uint32_t	rspEntries;
-	uint32_t	rspAddrLow;
-	uint32_t	rspAddrHigh;
-} SLI2_RDSC;
-
-typedef struct _PCB
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	type:8;
-#define	TYPE_NATIVE_SLI2	0x01;
-	uint32_t	feature:8;
-#define	FEATURE_INITIAL_SLI2	0x01;
-	uint32_t	rsvd:12;
-	uint32_t	maxRing:4;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	maxRing:4;
-	uint32_t	rsvd:12;
-	uint32_t	feature:8;
-#define	FEATURE_INITIAL_SLI2	0x01;
-	uint32_t	type:8;
-#define	TYPE_NATIVE_SLI2	0x01;
-#endif
-
-	uint32_t	mailBoxSize;
-	uint32_t	mbAddrLow;
-	uint32_t	mbAddrHigh;
-
-	uint32_t	hgpAddrLow;
-	uint32_t	hgpAddrHigh;
-
-	uint32_t	pgpAddrLow;
-	uint32_t	pgpAddrHigh;
-	SLI2_RDSC	rdsc[MAX_RINGS_AVAILABLE];
-} PCB;
-
-/* NEW_FEATURE */
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd0:27;
-	uint32_t	discardFarp:1;
-	uint32_t	IPEnable:1;
-	uint32_t	nodeName:1;
-	uint32_t	portName:1;
-	uint32_t	filterEnable:1;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	filterEnable:1;
-	uint32_t	portName:1;
-	uint32_t	nodeName:1;
-	uint32_t	IPEnable:1;
-	uint32_t	discardFarp:1;
-	uint32_t	rsvd:27;
-#endif
-	NAME_TYPE	portname;
-	NAME_TYPE	nodename;
-	uint32_t	rsvd1;
-	uint32_t	rsvd2;
-	uint32_t	rsvd3;
-	uint32_t	IPAddress;
-} CONFIG_FARP_VAR;
-
-
-/* NEW_FEATURE */
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	defaultMessageNumber:16;
-	uint32_t	rsvd1:3;
-	uint32_t	nid:5;
-	uint32_t	rsvd2:5;
-	uint32_t	defaultPresent:1;
-	uint32_t	addAssociations:1;
-	uint32_t	reportAssociations:1;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	reportAssociations:1;
-	uint32_t	addAssociations:1;
-	uint32_t	defaultPresent:1;
-	uint32_t	rsvd2:5;
-	uint32_t	nid:5;
-	uint32_t	rsvd1:3;
-	uint32_t	defaultMessageNumber:16;
-#endif
-	uint32_t	attConditions;
-	uint8_t		attentionId[16];
-	uint16_t	messageNumberByHA[32];
-	uint16_t	messageNumberByID[16];
-	uint32_t	rsvd3;
-} CONFIG_MSI_VAR;
-
-
-/* NEW_FEATURE */
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	defaultMessageNumber:8;
-	uint32_t	rsvd1:11;
-	uint32_t	nid:5;
-	uint32_t	rsvd2:5;
-	uint32_t	defaultPresent:1;
-	uint32_t	addAssociations:1;
-	uint32_t	reportAssociations:1;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	reportAssociations:1;
-	uint32_t	addAssociations:1;
-	uint32_t	defaultPresent:1;
-	uint32_t	rsvd2:5;
-	uint32_t	nid:5;
-	uint32_t	rsvd1:11;
-	uint32_t	defaultMessageNumber:8;
-#endif
-	uint32_t	attConditions1;
-	uint32_t	attConditions2;
-	uint8_t		attentionId[16];
-	uint8_t		messageNumberByHA[64];
-	uint8_t		messageNumberByID[16];
-	uint32_t	autoClearByHA1;
-	uint32_t	autoClearByHA2;
-	uint32_t	autoClearByID;
-	uint32_t	resv3;
-} CONFIG_MSIX_VAR;
-
-
-/* Union of all Mailbox Command types */
-
-typedef union
-{
-	uint32_t		varWords[31];
-	LOAD_SM_VAR		varLdSM;	/* cmd =  1 (LOAD_SM) */
-	READ_NV_VAR		varRDnvp;	/* cmd =  2 (READ_NVPARMS) */
-	WRITE_NV_VAR		varWTnvp;	/* cmd =  3 (WRITE_NVPARMS) */
-	BIU_DIAG_VAR		varBIUdiag;	/* cmd =  4 (RUN_BIU_DIAG) */
-	INIT_LINK_VAR		varInitLnk;	/* cmd =  5 (INIT_LINK) */
-	DOWN_LINK_VAR		varDwnLnk;	/* cmd =  6 (DOWN_LINK) */
-	CONFIG_LINK		varCfgLnk;	/* cmd =  7 (CONFIG_LINK) */
-	PART_SLIM_VAR		varSlim;	/* cmd =  8 (PART_SLIM) */
-	CONFIG_RING_VAR		varCfgRing;	/* cmd =  9 (CONFIG_RING) */
-	RESET_RING_VAR		varRstRing;	/* cmd = 10 (RESET_RING) */
-	READ_CONFIG_VAR		varRdConfig;	/* cmd = 11 (READ_CONFIG) */
-	READ_RCONF_VAR		varRdRConfig;	/* cmd = 12 (READ_RCONFIG) */
-	READ_SPARM_VAR		varRdSparm;	/* cmd = 13 (READ_SPARM(64)) */
-	READ_STATUS_VAR		varRdStatus;	/* cmd = 14 (READ_STATUS) */
-	READ_RPI_VAR		varRdRPI;	/* cmd = 15 (READ_RPI(64)) */
-	READ_XRI_VAR		varRdXRI;	/* cmd = 16 (READ_XRI) */
-	READ_REV_VAR		varRdRev;	/* cmd = 17 (READ_REV) */
-	READ_LNK_VAR		varRdLnk;	/* cmd = 18 (READ_LNK_STAT) */
-	REG_LOGIN_VAR		varRegLogin;	/* cmd = 19 (REG_LOGIN(64)) */
-	UNREG_LOGIN_VAR		varUnregLogin;	/* cmd = 20 (UNREG_LOGIN) */
-	READ_LA_VAR		varReadLA;	/* cmd = 21 (READ_LA(64)) */
-	CLEAR_LA_VAR		varClearLA;	/* cmd = 22 (CLEAR_LA) */
-	DUMP_VAR		varDmp;		/* Warm Start DUMP mbx cmd */
-	UPDATE_CFG_VAR		varUpdateCfg;	/* cmd = 0x1b Warm Start */
-						/* UPDATE_CFG cmd */
-	DEL_LD_ENTRY_VAR	varDelLdEntry;	/* cmd = 0x1d (DEL_LD_ENTRY) */
-	UNREG_D_ID_VAR		varUnregDID;	/* cmd = 0x23 (UNREG_D_ID) */
-	CONFIG_FARP_VAR		varCfgFarp;	/* cmd = 0x25 (CONFIG_FARP) */
-	CONFIG_MSI_VAR		varCfgMSI;	/* cmd = 0x90 (CONFIG_MSI) */
-	CONFIG_MSIX_VAR		varCfgMSIX;	/* cmd = 0x30 (CONFIG_MSIX) */
-	CONFIG_HBQ_VAR		varCfgHbq;	/* cmd = 0x7C (CONFIG_HBQ) */
-	LOAD_AREA_VAR		varLdArea;	/* cmd = 0x81 (LOAD_AREA) */
-	CONFIG_PORT_VAR		varCfgPort;	/* cmd = 0x88 (CONFIG_PORT) */
-	LOAD_EXP_ROM_VAR	varLdExpRom;	/* cmd = 0x9C (LOAD_XP_ROM) */
-	REG_VPI_VAR		varRegVpi;	/* cmd = 0x96 (REG_VPI) */
-	UNREG_VPI_VAR		varUnregVpi;	/* cmd = 0x97 (UNREG_VPI) */
-	READ_EVT_LOG_VAR	varRdEvtLog;	/* cmd = 0x38 (READ_EVT_LOG) */
-	LOG_STATUS_VAR		varLogStat;	/* cmd = 0x37 */
-
-} MAILVARIANTS;
-
-#define	MAILBOX_CMD_BSIZE	128
-#define	MAILBOX_CMD_WSIZE	32
-
-
-/*
- * SLI-2 specific structures
- */
-
-typedef struct _SLI1_DESC
-{
-	emlxs_rings_t	mbxCring[4];
-	uint32_t	mbxUnused[24];
-} SLI1_DESC; /* 128 bytes */
-
-typedef struct
-{
-	uint32_t	cmdPutInx;
-	uint32_t	rspGetInx;
-} HGP;
-
-typedef struct
-{
-	uint32_t	cmdGetInx;
-	uint32_t	rspPutInx;
-} PGP;
-
-#ifdef SLI3_SUPPORT
-typedef struct _SLI2_DESC
-{
-	HGP		host[4];
-	PGP		port[4];
-	uint32_t	HBQ_PortGetIdx[16];
-} SLI2_DESC; /* 128 bytes */
-#else
-typedef struct _SLI2_DESC
-{
-	HGP		host[4];	/* 8 words */
-	uint32_t	unused[16];
-	PGP		port[4];	/* 8 words */
-} SLI2_DESC; /* 128 bytes */
-#endif	/* SLI3_SUPPORT */
-
-typedef union
-{
-	SLI1_DESC	s1;	/* 32 words, 128 bytes */
-	SLI2_DESC	s2;	/* 32 words, 128 bytes */
-} SLI_VAR;
-
-typedef volatile struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	mbxStatus;
-	uint8_t		mbxCommand;
-	uint8_t		mbxReserved:6;
-	uint8_t		mbxHc:1;
-	uint8_t		mbxOwner:1;	/* Low order bit first word */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint8_t		mbxOwner:1;	/* Low order bit first word */
-	uint8_t		mbxHc:1;
-	uint8_t		mbxReserved:6;
-	uint8_t		mbxCommand;
-	uint16_t	mbxStatus;
-#endif
-	MAILVARIANTS	un;		/* 124 bytes */
-	SLI_VAR		us;		/* 128 bytes */
-} MAILBOX;				/* 256 bytes */
-
-/*
- * End Structure Definitions for Mailbox Commands
- */
-
-
-/*
- * Begin Structure Definitions for IOCB Commands
- */
-
-typedef struct
-{
-#ifdef EMLXS_BIG_ENDIAN
-	uint8_t		statAction;
-	uint8_t		statRsn;
-	uint8_t		statBaExp;
-	uint8_t		statLocalError;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint8_t		statLocalError;
-	uint8_t		statBaExp;
-	uint8_t		statRsn;
-	uint8_t		statAction;
-#endif
-	/* statAction  FBSY reason codes */
-#define	FBSY_RSN_MASK	0xF0	/* Rsn stored in upper nibble */
-#define	FBSY_FABRIC_BSY	0x10	/* F_bsy due to Fabric BSY */
-#define	FBSY_NPORT_BSY	0x30	/* F_bsy due to N_port BSY */
-
-	/* statAction  PBSY action codes */
-#define	PBSY_ACTION1	0x01	/* Sequence terminated - retry */
-#define	PBSY_ACTION2	0x02	/* Sequence active - retry */
-
-	/* statAction  P/FRJT action codes */
-#define	RJT_RETRYABLE	0x01	/* Retryable class of error */
-#define	RJT_NO_RETRY	0x02	/* Non-Retryable class of error */
-
-	/* statRsn  LS_RJT reason codes defined in LS_RJT structure */
-
-	/* statRsn  P_BSY reason codes */
-#define	PBSY_NPORT_BSY	0x01	/* Physical N_port BSY */
-#define	PBSY_RESRCE_BSY	0x03	/* N_port resource BSY */
-#define	PBSY_VU_BSY	0xFF	/* See VU field for rsn */
-
-	/* statRsn  P/F_RJT reason codes */
-#define	RJT_BAD_D_ID		0x01	/* Invalid D_ID field */
-#define	RJT_BAD_S_ID		0x02	/* Invalid S_ID field */
-#define	RJT_UNAVAIL_TEMP	0x03	/* N_Port unavailable temp. */
-#define	RJT_UNAVAIL_PERM	0x04	/* N_Port unavailable perm. */
-#define	RJT_UNSUP_CLASS		0x05	/* Class not supported */
-#define	RJT_DELIM_ERR		0x06	/* Delimiter usage error */
-#define	RJT_UNSUP_TYPE		0x07	/* Type not supported */
-#define	RJT_BAD_CONTROL		0x08	/* Invalid link conrtol */
-#define	RJT_BAD_RCTL		0x09	/* R_CTL invalid */
-#define	RJT_BAD_FCTL		0x0A	/* F_CTL invalid */
-#define	RJT_BAD_OXID		0x0B	/* OX_ID invalid */
-#define	RJT_BAD_RXID		0x0C	/* RX_ID invalid */
-#define	RJT_BAD_SEQID		0x0D	/* SEQ_ID invalid */
-#define	RJT_BAD_DFCTL		0x0E	/* DF_CTL invalid */
-#define	RJT_BAD_SEQCNT		0x0F	/* SEQ_CNT invalid */
-#define	RJT_BAD_PARM		0x10	/* Param. field invalid */
-#define	RJT_XCHG_ERR		0x11	/* Exchange error */
-#define	RJT_PROT_ERR		0x12	/* Protocol error */
-#define	RJT_BAD_LENGTH		0x13	/* Invalid Length */
-#define	RJT_UNEXPECTED_ACK	0x14	/* Unexpected ACK */
-#define	RJT_LOGIN_REQUIRED	0x16	/* Login required */
-#define	RJT_TOO_MANY_SEQ	0x17	/* Excessive sequences */
-#define	RJT_XCHG_NOT_STRT	0x18	/* Exchange not started */
-#define	RJT_UNSUP_SEC_HDR	0x19	/* Security hdr not supported */
-#define	RJT_UNAVAIL_PATH	0x1A	/* Fabric Path not available */
-#define	RJT_VENDOR_UNIQUE	0xFF	/* Vendor unique error */
-
-	/* statRsn  BA_RJT reason codes */
-#define	BARJT_BAD_CMD_CODE	0x01	/* Invalid command code */
-#define	BARJT_LOGICAL_ERR	0x03	/* Logical error */
-#define	BARJT_LOGICAL_BSY	0x05	/* Logical busy */
-#define	BARJT_PROTOCOL_ERR	0x07	/* Protocol error */
-#define	BARJT_VU_ERR		0xFF	/* Vendor unique error */
-
-	/* LS_RJT reason explanation defined in LS_RJT structure */
-
-	/* BA_RJT reason explanation */
-#define	BARJT_EXP_INVALID_ID	0x01	/* Invalid OX_ID/RX_ID */
-#define	BARJT_EXP_ABORT_SEQ	0x05	/* Abort SEQ, no more info */
-
-	/* Local Reject errors */
-#define	IOERR_SUCCESS			0x00
-#define	IOERR_MISSING_CONTINUE		0x01
-#define	IOERR_SEQUENCE_TIMEOUT		0x02
-#define	IOERR_INTERNAL_ERROR		0x03
-#define	IOERR_INVALID_RPI		0x04
-#define	IOERR_NO_XRI			0x05
-#define	IOERR_ILLEGAL_COMMAND		0x06
-#define	IOERR_XCHG_DROPPED		0x07
-#define	IOERR_ILLEGAL_FIELD		0x08
-/* RESERVED 0x09 */
-/* RESERVED 0x0A */
-#define	IOERR_RCV_BUFFER_WAITING	0x0B
-/* RESERVED 0x0C */
-#define	IOERR_TX_DMA_FAILED		0x0D
-#define	IOERR_RX_DMA_FAILED		0x0E
-#define	IOERR_ILLEGAL_FRAME		0x0F
-
-/* RESERVED 0x10 */
-#define	IOERR_NO_RESOURCES		0x11
-/* RESERVED 0x12 */
-#define	IOERR_ILLEGAL_LENGTH		0x13
-#define	IOERR_UNSUPPORTED_FEATURE	0x14
-#define	IOERR_ABORT_IN_PROGRESS		0x15
-#define	IOERR_ABORT_REQUESTED		0x16
-#define	IOERR_RCV_BUFFER_TIMEOUT	0x17
-#define	IOERR_LOOP_OPEN_FAILURE		0x18
-#define	IOERR_RING_RESET		0x19
-#define	IOERR_LINK_DOWN			0x1A
-#define	IOERR_CORRUPTED_DATA		0x1B
-#define	IOERR_CORRUPTED_RPI		0x1C
-#define	IOERR_OUT_OF_ORDER_DATA		0x1D
-#define	IOERR_OUT_OF_ORDER_ACK		0x1E
-#define	IOERR_DUP_FRAME			0x1F
-
-#define	IOERR_LINK_CONTROL_FRAME	0x20	/* ACK_N received */
-#define	IOERR_BAD_HOST_ADDRESS		0x21
-#define	IOERR_RCV_HDRBUF_WAITING	0x22
-#define	IOERR_MISSING_HDR_BUFFER	0x23
-#define	IOERR_MSEQ_CHAIN_CORRUPTED	0x24
-#define	IOERR_ABORTMULT_REQUESTED	0x25
-/* RESERVED 0x26 */
-/* RESERVED 0x27 */
-#define	IOERR_BUFFER_SHORTAGE		0x28
-#define	IOERR_XRIBUF_WAITING		0x29
-/* RESERVED 0x2A */
-#define	IOERR_MISSING_HBQ_ENTRY		0x2B
-#define	IOERR_ABORT_EXT_REQ		0x2C
-#define	IOERR_CLOSE_EXT_REQ		0x2D
-/* RESERVED 0x2E */
-/* RESERVED 0x2F */
-
-#define	IOERR_XRIBUF_MISSING		0x30
-#define	IOERR_ASSI_RSP_SUPPRESSED	0x31
-/* RESERVED 0x32 - 0x3F */
-
-#define	IOERR_ROFFSET_INVAL		0x40
-#define	IOERR_ROFFSET_MISSING		0x41
-#define	IOERR_INSUF_BUFFER		0x42
-#define	IOERR_MISSING_SI		0x43
-#define	IOERR_MISSING_ES		0x44
-#define	IOERR_INCOMP_XFER		0x45
-/* RESERVED 0x46 - 0xFF */
-
-	/* Driver defined */
-#define	IOERR_ABORT_TIMEOUT		0xF0
-} PARM_ERR;
-
-typedef union
-{
-	struct
-	{
-#ifdef EMLXS_BIG_ENDIAN
-		uint8_t		Rctl;	/* R_CTL field */
-		uint8_t		Type;	/* TYPE field */
-		uint8_t		Dfctl;	/* DF_CTL field */
-		uint8_t		Fctl;	/* Bits 0-7 of IOCB word 5 */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-		uint8_t		Fctl;	/* Bits 0-7 of IOCB word 5 */
-		uint8_t		Dfctl;	/* DF_CTL field */
-		uint8_t		Type;	/* TYPE field */
-		uint8_t		Rctl;	/* R_CTL field */
-#endif
-#define	FCP_RTYPE	0x08	/* FCP_TARGET_MODE Type - Rctl */
-
-#define	BC		0x02	/* Broadcast Received  - Fctl */
-#define	SI		0x04	/* Sequence Initiative */
-#define	LA		0x08	/* Ignore Link Attention state */
-#define	FSEQ		0x40	/* First Sequence */
-#define	LSEQ		0x80	/* Last Sequence */
-	} hcsw;
-	uint32_t	reserved;
-} WORD5;
-
-
-/* IOCB Command template for a generic response */
-typedef struct
-{
-	uint32_t	reserved[4];
-	PARM_ERR	perr;
-} GENERIC_RSP;
-
-
-/* IOCB Command template for XMIT / XMIT_BCAST / RCV_SEQUENCE / XMIT_ELS */
-typedef struct
-{
-	ULP_BDE		xrsqbde[2];
-	uint32_t	xrsqRo;		/* Starting Relative Offset */
-	WORD5		w5;		/* Header control/status word */
-} XR_SEQ_FIELDS;
-
-/* IOCB Command template for ELS_REQUEST */
-typedef struct
-{
-	ULP_BDE		elsReq;
-	ULP_BDE		elsRsp;
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	word4Rsvd:7;
-	uint32_t	fl:1;
-	uint32_t	myID:24;
-	uint32_t	word5Rsvd:8;
-	uint32_t	remoteID:24;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	myID:24;
-	uint32_t	fl:1;
-	uint32_t	word4Rsvd:7;
-	uint32_t	remoteID:24;
-	uint32_t	word5Rsvd:8;
-#endif
-} ELS_REQUEST;
-
-/* IOCB Command template for RCV_ELS_REQ */
-typedef struct
-{
-	ULP_BDE		elsReq[2];
-	uint32_t	parmRo;
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	word5Rsvd:8;
-	uint32_t	remoteID:24;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	remoteID:24;
-	uint32_t	word5Rsvd:8;
-#endif
-} RCV_ELS_REQ;
-
-/* IOCB Command template for ABORT / CLOSE_XRI */
-typedef struct
-{
-	uint32_t	rsvd[3];
-	uint32_t	abortType;
-#define	ABORT_TYPE_ABTX		0x00000000
-#define	ABORT_TYPE_ABTS		0x00000001
-	uint32_t	parm;
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	abortContextTag;	/* ulpContext from command to */
-						/* abort/close */
-	uint16_t	abortIoTag;		/* ulpIoTag from command to */
-						/* abort/close */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	abortIoTag;		/* ulpIoTag from command to */
-						/* abort/close */
-	uint16_t	abortContextTag;	/* ulpContext from command to */
-						/* abort/close */
-#endif
-} AC_XRI;
-
-/* IOCB Command template for GET_RPI */
-typedef struct
-{
-	uint32_t	rsvd[4];
-	uint32_t	parmRo;
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	word5Rsvd:8;
-	uint32_t	remoteID:24;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	remoteID:24;
-	uint32_t	word5Rsvd:8;
-#endif
-} GET_RPI;
-
-/* IOCB Command template for all FCP Initiator commands */
-typedef struct
-{
-	ULP_BDE		fcpi_cmnd;	/* FCP_CMND payload descriptor */
-	ULP_BDE		fcpi_rsp;	/* Rcv buffer */
-	uint32_t	fcpi_parm;
-	uint32_t	fcpi_XRdy;	/* transfer ready for IWRITE */
-} FCPI_FIELDS;
-
-/* IOCB Command template for all FCP Target commands */
-typedef struct
-{
-	ULP_BDE		fcpt_Buffer[2];	/* FCP_CMND payload descriptor */
-	uint32_t	fcpt_Offset;
-	uint32_t	fcpt_Length;	/* transfer ready for IWRITE */
-} FCPT_FIELDS;
-
-/* SLI-2 IOCB structure definitions */
-
-/* IOCB Command template for 64 bit XMIT / XMIT_BCAST / XMIT_ELS */
-typedef struct
-{
-	ULP_BDL		bdl;
-	uint32_t	xrsqRo;	/* Starting Relative Offset */
-	WORD5		w5;	/* Header control/status word */
-} XMT_SEQ_FIELDS64;
-
-
-/* IOCB Command template for 64 bit RCV_SEQUENCE64 */
-typedef struct
-{
-	ULP_BDE64	rcvBde;
-	uint32_t	rsvd1;
-	uint32_t	xrsqRo;	/* Starting Relative Offset */
-	WORD5		w5;	/* Header control/status word */
-} RCV_SEQ_FIELDS64;
-
-/* IOCB Command template for ELS_REQUEST64 */
-typedef struct
-{
-	ULP_BDL		bdl;
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	word4Rsvd:7;
-	uint32_t	fl:1;
-	uint32_t	myID:24;
-
-	uint32_t	word5Rsvd:8;
-	uint32_t	remoteID:24;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	myID:24;
-	uint32_t	fl:1;
-	uint32_t	word4Rsvd:7;
-
-	uint32_t	remoteID:24;
-	uint32_t	word5Rsvd:8;
-#endif
-} ELS_REQUEST64;
-
-
-/* IOCB Command template for ASYNC_STATUS */
-typedef struct
-{
-	ULP_BDL		resv;
-	uint32_t	parameter;
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	EventCode;
-	uint16_t	SubContext;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	SubContext;
-	uint16_t	EventCode;
-#endif
-} ASYNC_STATUS;
-
-
-/* IOCB Command template for QUE_RING_LIST64 */
-typedef struct
-{
-	ULP_BDL		bdl;
-	uint32_t	rsvd1;
-	uint32_t	rsvd2;
-} QUE_RING_LIST64;
-
-
-/* IOCB Command template for GEN_REQUEST64 */
-typedef struct
-{
-	ULP_BDL		bdl;
-	uint32_t	param;	/* Starting Relative Offset */
-	WORD5		w5;	/* Header control/status word */
-} GEN_REQUEST64;
-
-/* IOCB Command template for RCV_ELS_REQ64 */
-typedef struct
-{
-	ULP_BDE64	elsReq;
-	uint32_t	rcvd1;
-	uint32_t	parmRo;
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	word5Rsvd:8;
-	uint32_t	remoteID:24;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	remoteID:24;
-	uint32_t	word5Rsvd:8;
-#endif
-} RCV_ELS_REQ64;
-
-/* IOCB Command template for all 64 bit FCP Initiator commands */
-typedef struct
-{
-	ULP_BDL		bdl;
-	uint32_t	fcpi_parm;
-	uint32_t	fcpi_XRdy;	/* transfer ready for IWRITE */
-} FCPI_FIELDS64;
-
-/* IOCB Command template for all 64 bit FCP Target commands */
-typedef struct
-{
-	ULP_BDL		bdl;
-	uint32_t	fcpt_Offset;
-	uint32_t	fcpt_Length;	/* transfer ready for IWRITE */
-} FCPT_FIELDS64;
-
-/* IOCB Command template for all 64 bit FCP Target commands */
-typedef struct
-{
-	uint32_t	rsp_length;
-	uint32_t	rsvd1;
-	uint32_t	rsvd2;
-	uint32_t	iotag32;
-	uint32_t	status;
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	rsvd:30;
-	uint32_t	lnk:1;
-#endif /* EMLXS_BIG_ENDIAN */
-
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	lnk:1;
-	uint32_t	rsvd:30;
-#endif /* EMLXS_LITTLE_ENDIAN */
-} AUTO_TRSP;
-
-
-typedef struct
-{
-	uint32_t	io_tag64_low;	/* Word 8 */
-	uint32_t	io_tag64_high;	/* Word 9 */
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	cs_ctl:8;	/* Word 10, bit 31:24 */
-	uint32_t	cs_en:1;	/* Word 10, bit 23 */
-	uint32_t	rsv:15;		/* Word 10, bit 22:8 */
-	uint32_t	ebde_count:8;	/* Word 10, bit 7:0 */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	ebde_count:8;	/* Word 10, bit 7:0 */
-	uint32_t	rsv:15;		/* Word 10, bit 22:8 */
-	uint32_t	cs_en:1;	/* Word 10, bit 23 */
-	uint32_t	cs_ctl:8;	/* Word 10, bit 31:24 */
-#endif
-	uint32_t	rsplen;		/* Word 11 */
-	ULP_BDE64	ebde1;		/* Word 12:14 */
-	ULP_BDE64	ebde2;		/* Word 15:17 */
-	ULP_BDE64	ebde3;		/* Word 18:20 */
-	ULP_BDE64	ebde4;		/* Word 21:23 */
-	ULP_BDE64	ebde5;		/* Word 24:26 */
-	ULP_BDE64	ebde6;		/* Word 27:29 */
-} GENERIC_EXT_IOCB;
-
-/*
- * IOCB Command Extension template for
- * CMD_RCV_ELS64_CX (0xB7) or CMD_RCV_SEQ64_CX (0xB5)
- */
-
-typedef struct
-{
-	uint32_t	hdr3;		/* word 8 */
-#ifdef EMLXS_BIG_ENDIAN
-	uint16_t	vpi;		/* word 9 */
-	uint16_t	buddy_xri;
-
-	uint32_t	ccp:8;		/* word 10 */
-	uint32_t	ccpe:1;
-	uint32_t	rsvd:23;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint16_t	buddy_xri;	/* word 9 */
-	uint16_t	vpi;
-
-	uint32_t	rsvd:23;	/* word 10 */
-	uint32_t	ccpe:1;
-	uint32_t	ccp:8;
-#endif
-	uint32_t	seq_len;	/* received sequence length */
-	ULP_BDL		bde2;		/* total 4 words */
-} RCV_SEQ_ELS_64_SLI3_EXT;
-
-
-
-typedef volatile struct emlxs_iocb
-{ /* IOCB structure */
-	union
-	{
-		GENERIC_RSP		grsp;		/* Generic response */
-		XR_SEQ_FIELDS		xrseq;		/* XMIT/BCAST/RCV_SEQ */
-		ULP_BDE			cont[3];	/* up to 3 cont BDEs */
-		ELS_REQUEST		elsreq;		/* ELS_REQ template */
-		RCV_ELS_REQ		rcvels;		/* RCV_ELS_REQ */
-							/* template */
-		AC_XRI			acxri;		/* ABORT/CLOSE_XRI */
-							/* template */
-		GET_RPI			getrpi;		/* GET_RPI template */
-		FCPI_FIELDS		fcpi;		/* FCP Initiator */
-							/* template */
-		FCPT_FIELDS		fcpt;		/* FCP target */
-							/* template */
-
-		/* SLI-2 structures */
-
-		ULP_BDE64		cont64[2];	/* up to 2 64 bit */
-							/* cont BDE_64s */
-		ELS_REQUEST64		elsreq64;	/* ELS_REQ64 template */
-		QUE_RING_LIST64		qringlist64;	/* QUE RING LIST64 */
-							/* template */
-		GEN_REQUEST64		genreq64;	/* GEN_REQUEST64 */
-							/* template */
-		RCV_ELS_REQ64		rcvels64;	/* RCV_ELS_REQ */
-							/* template */
-		XMT_SEQ_FIELDS64	xseq64;		/* XMIT / BCAST cmd */
-		FCPI_FIELDS64		fcpi64;		/* FCP 64 bit */
-							/* Initiator template */
-		FCPT_FIELDS64		fcpt64;		/* FCP 64 bit target */
-							/* template */
-		AUTO_TRSP		atrsp;		/* FCP 64 bit target */
-							/* template */
-
-		RCV_SEQ_FIELDS64	rcvseq64;
-		ASYNC_STATUS		astat;
-
-		uint32_t		ulpWord[6];	/* generic 6 'words' */
-	} un;
-	union
-	{
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint16_t	ulpContext;	/* High order bits */
-							/* word6 */
-			uint16_t	ulpIoTag;	/* Low order bits */
-							/* word6 */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint16_t	ulpIoTag;	/* Low order bits */
-							/* word6 */
-			uint16_t	ulpContext;	/* High order bits */
-							/* word6 */
-#endif
-		} t1;
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint16_t	ulpContext;	/* High order bits */
-							/* word6 */
-			uint16_t	ulpIoTag1:2;	/* Low order bits */
-							/* word6 */
-			uint16_t	ulpIoTag0:14;	/* Low order bits */
-							/* word6 */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint16_t	ulpIoTag0:14;	/* Low order bits */
-							/* word6 */
-			uint16_t	ulpIoTag1:2;	/* Low order bits */
-							/* word6 */
-			uint16_t	ulpContext;	/* High order bits */
-							/* word6 */
-#endif
-		} t2;
-	} un1;
-#define	ulpContext	un1.t1.ulpContext
-#define	ulpIoTag	un1.t1.ulpIoTag
-#define	ulpIoTag0	un1.t2.ulpIoTag0
-#define	ulpDelayXmit	un1.t2.ulpIoTag1
-
-#define	IOCB_DELAYXMIT_MSK 0x3000
-
-
-	union
-	{
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	ulpRsvdByte:8;
-			uint32_t	ulpXS:1;
-			uint32_t	ulpFCP2Rcvy:1;
-			uint32_t	ulpPU:2;
-			uint32_t	ulpIr:1;
-			uint32_t	ulpClass:3;
-			uint32_t	ulpCommand:8;
-			uint32_t	ulpStatus:4;
-			uint32_t	ulpBdeCount:2;
-			uint32_t	ulpLe:1;
-			uint32_t	ulpOwner:1;	/* Low order bit */
-							/* word 7 */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	ulpOwner:1;	/* Low order bit */
-							/* word 7 */
-			uint32_t	ulpLe:1;
-			uint32_t	ulpBdeCount:2;
-			uint32_t	ulpStatus:4;
-			uint32_t	ulpCommand:8;
-			uint32_t	ulpClass:3;
-			uint32_t	ulpIr:1;
-			uint32_t	ulpPU:2;
-			uint32_t	ulpFCP2Rcvy:1;
-			uint32_t	ulpXS:1;
-			uint32_t	ulpRsvdByte:8;
-#endif
-		} t1;
-
-		struct
-		{
-#ifdef EMLXS_BIG_ENDIAN
-			uint32_t	ulpRsvdByte:8;
-			uint32_t	ulpCT:2;
-			uint32_t	ulpPU:2;
-			uint32_t	ulpIr:1;
-			uint32_t	ulpClass:3;
-			uint32_t	ulpCommand:8;
-			uint32_t	ulpStatus:4;
-			uint32_t	ulpBdeCount:2;
-			uint32_t	ulpLe:1;
-			uint32_t	ulpOwner:1;	/* Low order bit */
-							/* word 7 */
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-			uint32_t	ulpOwner:1;	/* Low order bit */
-							/* word 7 */
-			uint32_t	ulpLe:1;
-			uint32_t	ulpBdeCount:2;
-			uint32_t	ulpStatus:4;
-			uint32_t	ulpCommand:8;
-			uint32_t	ulpClass:3;
-			uint32_t	ulpIr:1;
-			uint32_t	ulpPU:2;
-			uint32_t	ulpCT:2;
-			uint32_t	ulpRsvdByte:8;
-#endif
-		} t2;
-	} un2;
-
-#define	ulpCT		un2.t2.ulpCT
-#define	ulpRsvdByte	un2.t1.ulpRsvdByte
-#define	ulpXS		un2.t1.ulpXS
-#define	ulpFCP2Rcvy	un2.t1.ulpFCP2Rcvy
-#define	ulpPU		un2.t1.ulpPU
-#define	ulpIr		un2.t1.ulpIr
-#define	ulpClass	un2.t1.ulpClass
-#define	ulpCommand	un2.t1.ulpCommand
-#define	ulpStatus	un2.t1.ulpStatus
-#define	ulpBdeCount	un2.t1.ulpBdeCount
-#define	ulpLe		un2.t1.ulpLe
-#define	ulpOwner	un2.t1.ulpOwner
-	/* 32 bytes at this point */
-
-#ifdef SLI3_SUPPORT
-	union
-	{
-		GENERIC_EXT_IOCB	ext_iocb;
-		RCV_SEQ_ELS_64_SLI3_EXT	ext_rcv;
-		uint32_t		sli3Words[24];	/* 96 extra bytes */
-							/* for SLI-3 */
-	} unsli3;
-	/* 128 bytes at this point */
-#endif	/* SLI3_SUPPORT */
-
-#define	IOCB_FCP		1	/* IOCB is used for */
-					/* FCP ELS cmds - ulpRsvByte */
-#define	IOCB_IP			2	/* IOCB is used for IP ELS cmds */
-#define	PARM_UNUSED		0	/* PU field (Word 4) not used */
-#define	PARM_REL_OFF		1	/* PU field (Word 4) = R. O. */
-#define	PARM_READ_CHECK		2	/* PU field (Word 4) = Data Xfer Len */
-#define	CLASS1			0	/* Class 1 */
-#define	CLASS2			1	/* Class 2 */
-#define	CLASS3			2	/* Class 3 */
-#define	CLASS_FCP_INTERMIX	7	/* FCP Data->Cls 1, all else->Cls 2 */
-
-#define	IOSTAT_SUCCESS			0x0	/* ulpStatus */
-#define	IOSTAT_FCP_RSP_ERROR		0x1
-#define	IOSTAT_REMOTE_STOP		0x2
-#define	IOSTAT_LOCAL_REJECT		0x3
-#define	IOSTAT_NPORT_RJT		0x4
-#define	IOSTAT_FABRIC_RJT		0x5
-#define	IOSTAT_NPORT_BSY		0x6
-#define	IOSTAT_FABRIC_BSY		0x7
-#define	IOSTAT_INTERMED_RSP		0x8
-#define	IOSTAT_LS_RJT			0x9
-#define	IOSTAT_RESERVED_A		0xA
-#define	IOSTAT_CMD_REJECT		0xB
-#define	IOSTAT_FCP_TGT_LENCHK		0xC
-#define	IOSTAT_NEED_BUF_ENTRY		0xD
-#define	IOSTAT_RESERVED_E		0xE
-#define	IOSTAT_ILLEGAL_FRAME_RCVD	0xF
-
-/* Special error codes */
-#define	IOSTAT_DATA_OVERRUN		0x10	/* Added for resid handling */
-#define	IOSTAT_DATA_UNDERRUN		0x11	/* Added for resid handling */
-} emlxs_iocb_t;
-typedef emlxs_iocb_t IOCB;
-
-
-typedef struct emlxs_iocbq
-{
-	emlxs_iocb_t		iocb;
-	struct emlxs_iocbq	*next;
-
-	uint8_t			*bp;	/* ptr to data buffer structure */
-	void			*port;	/* Board info pointer */
-	void			*ring;	/* Ring pointer */
-	void			*node;	/* Node pointer */
-	void			*sbp;	/* Pkt pointer */
-	uint32_t		flag;
-
-#define	IOCB_POOL_ALLOCATED	0x00000001
-#define	IOCB_PRIORITY		0x00000002
-#define	IOCB_SPECIAL		0x00000004
-} emlxs_iocbq_t;
-typedef emlxs_iocbq_t IOCBQ;
-
-
-typedef struct emlxs_mbq
-{
-	volatile uint32_t	mbox[MAILBOX_CMD_WSIZE];
-	struct emlxs_mbq	*next;
-
-	/* Defferred handling pointers */
-	uint8_t			*bp;		/* ptr to data buffer */
-						/* structure */
-	uint8_t			*sbp;		/* ptr to emlxs_buf_t */
-						/* structure */
-	uint8_t			*ubp;		/* ptr to fc_unsol_buf_t */
-						/* structure */
-	uint8_t			*iocbq;		/* ptr to IOCBQ structure */
-	uint32_t		flag;
-
-#define	MBQ_POOL_ALLOCATED	0x00000001
-#define	MBQ_PASSTHRU		0x00000002
-#define	MBQ_COMPLETED		0x00010000	/* Used for MBX_SLEEP */
-#define	MBQ_INIT_MASK		0x0000ffff
-
-#ifdef MBOX_EXT_SUPPORT
-	uint8_t			*extbuf;	/* ptr to mailbox ext buffer */
-	uint32_t		extsize;	/* size of mailbox ext buffer */
-#endif /* MBOX_EXT_SUPPORT */
-} emlxs_mbq_t;
-typedef emlxs_mbq_t MAILBOXQ;
-
-
-/* We currently do not support IOCBs in SLI1 mode */
-typedef struct
-{
-	MAILBOX		mbx;
-#ifdef MBOX_EXT_SUPPORT
-	uint8_t		mbxExt[MBOX_EXTENSION_SIZE];
-#endif /* MBOX_EXT_SUPPORT */
-	uint8_t		pad[(SLI_SLIM1_SIZE -
-				(sizeof (MAILBOX) + MBOX_EXTENSION_SIZE))];
-} SLIM1;
-
-
-typedef struct
-{
-	MAILBOX		mbx;
-#ifdef MBOX_EXT_SUPPORT
-	uint8_t		mbxExt[MBOX_EXTENSION_SIZE];
-#endif /* MBOX_EXT_SUPPORT */
-	PCB		pcb;
-	uint8_t		IOCBs[SLI_IOCB_MAX_SIZE];
-} SLIM2;
-
 
 
 /*
@@ -4571,7 +1858,7 @@ typedef struct
 /*
  * Management Service Subtypes
  */
-#define	SLI_CT_FDMI_Subtypes	0x10
+#define	SLI_CT_FDMI_SUBTYPES	0x10
 
 
 /*
@@ -4775,7 +2062,7 @@ enum emlxs_prog_type
 	SEQUENCER_CODE,	/* 5 */
 	SLI1_OVERLAY,	/* 6 */
 	SLI2_OVERLAY,	/* 7 */
-	GASKET,	/* 8 */
+	GASKET,		/* 8 */
 	HARDWARE_IMAGE,	/* 9 */
 	SBUS_FCODE,	/* A */
 	SLI3_OVERLAY,	/* B */
@@ -4802,7 +2089,6 @@ typedef struct emlxs_fw_image
 	emlxs_fw_file_t dwc;
 	emlxs_fw_file_t prog[MAX_PROG_TYPES];
 } emlxs_fw_image_t;
-
 
 
 
@@ -4860,153 +2146,129 @@ typedef struct emlxs_fw_image
 #define	SLI_IMAGE_START		0x20080
 #define	SLI_VERSION_LOC		0x270
 
-/* def for new 2MB Flash (Pegasus ...) */
-#define	MBX_LOAD_AREA		0x81
-#define	MBX_LOAD_EXP_ROM	0x9C
-
-#define	FILE_TYPE_AWC		0xE1A01001
-#define	FILE_TYPE_DWC		0xE1A02002
-#define	FILE_TYPE_BWC		0xE1A03003
-
-#define	AREA_ID_MASK		0xFFFFFF0F
-#define	AREA_ID_AWC		0x00000001
-#define	AREA_ID_DWC		0x00000002
-#define	AREA_ID_BWC		0x00000003
-
-#define	CMD_START_ERASE		1
-#define	CMD_CONTINUE_ERASE	2
-#define	CMD_DOWNLOAD		3
-#define	CMD_END_DOWNLOAD	4
-
-#define	RSP_ERASE_STARTED	1
-#define	RSP_ERASE_COMPLETE	2
-#define	RSP_DOWNLOAD_MORE	3
-#define	RSP_DOWNLOAD_DONE	4
-
-#define	EROM_CMD_FIND_IMAGE	8
-#define	EROM_CMD_CONTINUE_ERASE	9
-#define	EROM_CMD_COPY		10
-
-#define	EROM_RSP_ERASE_STARTED	8
-#define	EROM_RSP_ERASE_COMPLETE	9
-#define	EROM_RSP_COPY_MORE	10
-#define	EROM_RSP_COPY_DONE	11
-
-#define	ALLext			1
-#define	DWCext			2
-#define	BWCext			3
-
-#define	NO_ALL			0
-#define	ALL_WITHOUT_BWC		1
-#define	ALL_WITH_BWC		2
-
-#define	KERNEL_START_ADDRESS	0x000000
-#define	DOWNLOAD_START_ADDRESS	0x040000
-#define	EXP_ROM_START_ADDRESS	0x180000
-#define	SCRATCH_START_ADDRESS	0x1C0000
-#define	CONFIG_START_ADDRESS	0x1E0000
-
-
-typedef struct SliAifHdr
-{
-	uint32_t	CompressBr;
-	uint32_t	RelocBr;
-	uint32_t	ZinitBr;
-	uint32_t	EntryBr;
-	uint32_t	Area_ID;
-	uint32_t	RoSize;
-	uint32_t	RwSize;
-	uint32_t	DbgSize;
-	uint32_t	ZinitSize;
-	uint32_t	DbgType;
-	uint32_t	ImageBase;
-	uint32_t	Area_Size;
-	uint32_t	AddressMode;
-	uint32_t	DataBase;
-	uint32_t	AVersion;
-	uint32_t	Spare2;
-	uint32_t	DebugSwi;
-	uint32_t	ZinitCode[15];
-} AIF_HDR, *PAIF_HDR;
-
-typedef struct ImageHdr
-{
-	uint32_t	BlockSize;
-	PROG_ID		Id;
-	uint32_t	Flags;
-	uint32_t	EntryAdr;
-	uint32_t	InitAdr;
-	uint32_t	ExitAdr;
-	uint32_t	ImageBase;
-	uint32_t	ImageSize;
-	uint32_t	ZinitSize;
-	uint32_t	RelocSize;
-	uint32_t	HdrCks;
-} IMAGE_HDR, *PIMAGE_HDR;
-
-
-
-typedef struct
-{
-	PROG_ID		prog_id;
-#ifdef EMLXS_BIG_ENDIAN
-	uint32_t	pci_cfg_rsvd:27;
-	uint32_t	use_hdw_def:1;
-	uint32_t	pci_cfg_sel:3;
-	uint32_t	pci_cfg_lookup_sel:1;
-#endif
-#ifdef EMLXS_LITTLE_ENDIAN
-	uint32_t	pci_cfg_lookup_sel:1;
-	uint32_t	pci_cfg_sel:3;
-	uint32_t	use_hdw_def:1;
-	uint32_t	pci_cfg_rsvd:27;
-#endif
-	union
-	{
-		PROG_ID		boot_bios_id;
-		uint32_t	boot_bios_wd[2];
-	} u0;
-	PROG_ID		sli1_prog_id;
-	PROG_ID		sli2_prog_id;
-	PROG_ID		sli3_prog_id;
-	PROG_ID		sli4_prog_id;
-	union
-	{
-		PROG_ID		EROM_prog_id;
-		uint32_t	EROM_prog_wd[2];
-	} u1;
-} WAKE_UP_PARMS, *PWAKE_UP_PARMS;
-
-
-#define	PROG_DESCR_STR_LEN	24
-#define	MAX_LOAD_ENTRY		10
-
-typedef struct
-{
-	uint32_t	next;
-	uint32_t	prev;
-	uint32_t	start_adr;
-	uint32_t	len;
-	union
-	{
-		PROG_ID		id;
-		uint32_t	wd[2];
-	} un;
-	uint8_t		prog_descr[PROG_DESCR_STR_LEN];
-} LOAD_ENTRY;
-
-typedef struct
-{
-	uint32_t	head;
-	uint32_t	tail;
-	uint32_t	entry_cnt;
-	LOAD_ENTRY	load_entry[MAX_LOAD_ENTRY];
-} LOAD_LIST;
-
-
 
 #define	SLI_HW_REVISION_CHECK(x, y)	((x & 0xf0) == y)
 #define	SLI_FCODE_REVISION_CHECK(x, y)	(x == y)
+
+
+/* ************ Tigershark ************** */
+#define	BE_SIGNATURE_SIZE	32
+#define	BE_BUILD_SIZE		24
+#define	BE_SIGNATURE		"ServerEngines Corp"
+#define	BE_DIR_SIGNATURE	"*** SE FLAS"
+#define	BE_VERSION_SIZE		32
+#define	BE_COOKIE_SIZE		32
+#define	BE_CONTROLLER_SIZE	8
+#define	BE_FLASH_ENTRIES	32
+#define	BE_MAX_XFER_SIZE	32768 /* 4K aligned */
+
+typedef struct emlxs_sli4_ufi_controller
+{
+	uint32_t vendor_id;
+	uint32_t device_id;
+	uint32_t sub_vendor_id;
+	uint32_t sub_device_id;
+
+} emlxs_sli4_ufi_controller_t;
+
+typedef struct emlxs_sli4_ufi_header /* 96 bytes */
+{
+	char signature[BE_SIGNATURE_SIZE];
+	uint32_t checksum;
+	uint32_t antidote;
+	emlxs_sli4_ufi_controller_t  controller;
+	uint32_t file_length;
+	uint32_t chunk_num;
+	uint32_t chunk_cnt;
+	uint32_t image_cnt;
+	char build[BE_BUILD_SIZE];
+
+} emlxs_sli4_ufi_header_t;
+
+typedef struct emlxs_sli4_flash_header
+{
+	uint32_t format_rev;
+	uint32_t checksum;
+	uint32_t antidote;
+	uint32_t build_num;
+	emlxs_sli4_ufi_controller_t  controller[BE_CONTROLLER_SIZE];
+	uint32_t active_entry_mask;
+	uint32_t valid_entry_mask;
+	uint32_t orig_content_mask;
+	uint32_t resv0;
+	uint32_t resv1;
+	uint32_t resv2;
+	uint32_t resv3;
+	uint32_t resv4;
+
+} emlxs_sli4_flash_header_t;
+
+typedef struct emlxs_sli4_flash_entry
+{
+	uint32_t type;
+	uint32_t offset;
+	uint32_t pad_size;
+	uint32_t image_size;
+	uint32_t checksum;
+	uint32_t entry_point;
+	uint32_t resv0;
+	uint32_t resv1;
+	char version[BE_VERSION_SIZE];
+
+} emlxs_sli4_flash_entry_t;
+
+typedef struct emlxs_sli4_flash_dir
+{
+	char cookie[BE_COOKIE_SIZE];
+	emlxs_sli4_flash_header_t header;
+	emlxs_sli4_flash_entry_t entry[BE_FLASH_ENTRIES];
+
+} emlxs_sli4_flash_dir_t;
+
+
+/* FLASH ENTRY TYPES */
+#define	BE_FLASHTYPE_PXE_BIOS		0x20
+#define	BE_FLASHTYPE_FCOE_BIOS		0x21
+#define	BE_FLASHTYPE_ISCSI_BIOS		0x22
+#define	BE_FLASHTYPE_ISCSI_FIRMWARE	0xA0
+#define	BE_FLASHTYPE_ISCSI_BACKUP	0xB0
+#define	BE_FLASHTYPE_FCOE_FIRMWARE	0xA2
+#define	BE_FLASHTYPE_FCOE_BACKUP	0xB2
+#define	BE_FLASHTYPE_REDBOOT		0xE0
+
+/* Flash types in download order */
+typedef enum emlxs_be_flashtypes
+{
+	ISCSI_FIRMWARE_FLASHTYPE,
+	ISCSI_BACKUP_FLASHTYPE,
+	FCOE_FIRMWARE_FLASHTYPE,
+	FCOE_BACKUP_FLASHTYPE,
+	ISCSI_BIOS_FLASHTYPE,
+	FCOE_BIOS_FLASHTYPE,
+	PXE_BIOS_FLASHTYPE,
+	REDBOOT_FLASHTYPE,
+	BE_MAX_FLASHTYPES
+
+} emlxs_be_flashtypes_t;
+
+/* Driver level constructs */
+typedef struct emlxs_be_fw_file
+{
+	uint32_t	type;
+	uint32_t	image_offset;
+	uint32_t	image_size;
+	uint32_t	block_size;
+	uint32_t	block_crc;
+	char		label[BE_VERSION_SIZE];
+} emlxs_be_fw_file_t;
+
+typedef struct emlxs_be_fw_image
+{
+	uint32_t version;
+	char label[BE_VERSION_SIZE];
+
+	emlxs_be_fw_file_t file[BE_MAX_FLASHTYPES];
+} emlxs_be_fw_image_t;
 
 
 #ifdef	__cplusplus

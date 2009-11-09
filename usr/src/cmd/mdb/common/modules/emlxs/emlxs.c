@@ -21,7 +21,7 @@
 
 /*
  * Copyright 2009 Emulex.  All rights reserved.
- * Use is subject to License terms.
+ * Use is subject to license terms.
  */
 
 #define	DUMP_SUPPORT
@@ -88,8 +88,8 @@ int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
 	uint32_t i;
 	char *level;
 	emlxs_msg_t msg;
-	uint32_t secs;
-	uint32_t hsecs;
+	char	merge[1024];
+
 	emlxs_msg_entry_t entry;
 	char buffer[256];
 	char buffer2[256];
@@ -213,9 +213,6 @@ int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
 			return (DCMD_ERR);
 		}
 
-		hsecs = (entry.time%100);
-		secs  = entry.time/100;
-
 		switch (msg.level) {
 		case EMLXS_DEBUG:
 			level = "  DEBUG";
@@ -237,10 +234,6 @@ int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
 			level = "  PANIC";
 			break;
 
-		case EMLXS_EVENT:
-			level = "  EVENT";
-			break;
-
 		default:
 			level = "UNKNOWN";
 			break;
@@ -257,37 +250,57 @@ int emlxs_msgbuf(uintptr_t base_addr, uint_t flags, int argc,
 		/* Generate the message string */
 		if (msg.buffer[0] != 0) {
 			if (entry.buffer[0] != 0) {
-				mdb_snprintf(buffer, sizeof (buffer),
-				    "%8d.%02d: "
+				mdb_snprintf(merge, sizeof (merge),
+				    "[%Y:%03d:%03d:%03d] "
 				    "%6d:[%1X.%04X]%s:%7s:%4d: %s\n(%s)\n",
-				    secs, hsecs, entry.id, entry.fileno,
+				    entry.id_time.tv_sec,
+				    (int)entry.id_time.tv_nsec/1000000,
+				    (int)(entry.id_time.tv_nsec/1000)%1000,
+				    (int)entry.id_time.tv_nsec%1000,
+				    entry.id, entry.fileno,
 				    entry.line, driver, level, msg.id,
 				    msg.buffer, entry.buffer);
 
 			} else {
-				mdb_snprintf(buffer, sizeof (buffer),
-				    "%8d.%02d: %6d:[%1X.%04X]%s:%7s:%4d: %s\n",
-				    secs, hsecs, entry.id, entry.fileno,
+				mdb_snprintf(merge, sizeof (merge),
+				    "[%Y:%03d:%03d:%03d] "
+				    "%6d:[%1X.%04X]%s:%7s:%4d: %s\n",
+				    entry.id_time.tv_sec,
+				    (int)entry.id_time.tv_nsec/1000000,
+				    (int)(entry.id_time.tv_nsec/1000)%1000,
+				    (int)entry.id_time.tv_nsec%1000,
+				    entry.id, entry.fileno,
 				    entry.line, driver, level, msg.id,
 				    msg.buffer);
 			}
 		} else {
 			if (entry.buffer[0] != 0) {
-				mdb_snprintf(buffer, sizeof (buffer),
-				    "%8d.%02d: "
+				mdb_snprintf(merge, sizeof (merge),
+				    "[%Y:%03d:%03d:%03d] "
 				    "%6d:[%1X.%04X]%s:%7s:%4d:\n(%s)\n",
-				    secs, hsecs, entry.id, entry.fileno,
+				    entry.id_time.tv_sec,
+				    (int)entry.id_time.tv_nsec/1000000,
+				    (int)(entry.id_time.tv_nsec/1000)%1000,
+				    (int)entry.id_time.tv_nsec%1000,
+				    entry.id, entry.fileno,
 				    entry.line, driver, level, msg.id,
 				    entry.buffer);
+
 			} else {
-				mdb_snprintf(buffer, sizeof (buffer),
-				    "%8d.%02d: %6d:[%1X.%04X]%s:%7s:%4d:\n",
-				    secs, hsecs, entry.id, entry.fileno,
-				    entry.line, driver, level, msg.id);
+				mdb_snprintf(merge, sizeof (merge),
+				    "[%Y:%03d:%03d:%03d] "
+				    "%6d:[%1X.%04X]%s:%7s:%4d: %s\n",
+				    entry.id_time.tv_sec,
+				    (int)entry.id_time.tv_nsec/1000000,
+				    (int)(entry.id_time.tv_nsec/1000)%1000,
+				    (int)entry.id_time.tv_nsec%1000,
+				    entry.id, entry.fileno,
+				    entry.line, driver, level, msg.id,
+				    msg.buffer);
 			}
 		}
 
-		mdb_printf("%s", buffer);
+		mdb_printf("%s", merge);
 
 		/* Increment index */
 		if (++idx >= log.size) {

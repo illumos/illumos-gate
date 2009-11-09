@@ -910,10 +910,11 @@ PMCS_OBJS += pmcs_attach.o pmcs_intr.o pmcs_nvram.o pmcs_sata.o \
 ST_OBJS +=	st.o	st_conf.o
 
 EMLXS_OBJS +=	emlxs_clock.o emlxs_dfc.o emlxs_dhchap.o emlxs_diag.o \
-		emlxs_download.o emlxs_dump.o emlxs_els.o emlxs_fcp.o \
-		emlxs_fct.o emlxs_hba.o emlxs_ip.o emlxs_mbox.o emlxs_mem.o \
-		emlxs_msg.o emlxs_node.o emlxs_pkt.o emlxs_sli.o \
-		emlxs_solaris.o emlxs_thread.o
+		emlxs_download.o emlxs_dump.o emlxs_els.o emlxs_event.o \
+		emlxs_fcp.o emlxs_fct.o emlxs_hba.o emlxs_ip.o \
+		emlxs_mbox.o emlxs_mem.o emlxs_msg.o emlxs_node.o \
+		emlxs_pkt.o emlxs_sli3.o emlxs_sli4.o emlxs_solaris.o \
+		emlxs_thread.o
 
 EMLXS_FW_OBJS +=	emlxs_fw.o
 
