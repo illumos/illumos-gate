@@ -22969,6 +22969,10 @@ skip_ready_valid:
 		 * Get the current write cache state
 		 */
 		if ((err = sd_get_write_cache_enabled(ssc, &cur_wce)) != 0) {
+			mutex_enter(SD_MUTEX(un));
+			un->un_f_wcc_inprog = 0;
+			cv_broadcast(&un->un_wcc_cv);
+			mutex_exit(SD_MUTEX(un));
 			break;
 		}
 
