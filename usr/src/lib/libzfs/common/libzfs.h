@@ -118,6 +118,8 @@ enum {
 	EZFS_REFTAG_RELE,	/* snapshot release: tag not found */
 	EZFS_REFTAG_HOLD,	/* snapshot hold: tag already exists */
 	EZFS_TAGTOOLONG,	/* snapshot hold/rele: tag too long */
+	EZFS_PIPEFAILED,	/* pipe create failed */
+	EZFS_THREADCREATEFAILED, /* thread create failed */
 	EZFS_UNKNOWN
 };
 
@@ -470,8 +472,29 @@ extern int zfs_clone(zfs_handle_t *, const char *, nvlist_t *);
 extern int zfs_snapshot(libzfs_handle_t *, const char *, boolean_t, nvlist_t *);
 extern int zfs_rollback(zfs_handle_t *, zfs_handle_t *, boolean_t);
 extern int zfs_rename(zfs_handle_t *, const char *, boolean_t);
+
+typedef struct sendflags {
+	/* print informational messages (ie, -v was specified) */
+	int verbose : 1;
+
+	/* recursive send  (i.e., -R) */
+	int replicate : 1;
+
+	/* for incrementals, do all intermediate snapshots */
+	int doall : 1; /* (i.e., -I) */
+
+	/* if dataset is a clone, do incremental from its origin */
+	int fromorigin : 1;
+
+	/* do deduplication */
+	int dedup : 1;
+} sendflags_t;
+
+typedef boolean_t (snapfilter_cb_t)(zfs_handle_t *, void *);
+
 extern int zfs_send(zfs_handle_t *, const char *, const char *,
-    boolean_t, boolean_t, boolean_t, boolean_t, int);
+    sendflags_t, int, snapfilter_cb_t, void *);
+
 extern int zfs_promote(zfs_handle_t *);
 extern int zfs_hold(zfs_handle_t *, const char *, const char *, boolean_t,
     boolean_t);

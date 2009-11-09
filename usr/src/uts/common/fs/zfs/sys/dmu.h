@@ -679,11 +679,12 @@ typedef struct dmu_recv_cookie {
 	struct dsl_dataset *drc_real_ds;
 	struct drr_begin *drc_drrb;
 	char *drc_tosnap;
+	char *drc_top_ds;
 	boolean_t drc_newfs;
 	boolean_t drc_force;
 } dmu_recv_cookie_t;
 
-int dmu_recv_begin(char *tofs, char *tosnap, struct drr_begin *,
+int dmu_recv_begin(char *tofs, char *tosnap, char *topds, struct drr_begin *,
     boolean_t force, objset_t *origin, dmu_recv_cookie_t *);
 int dmu_recv_stream(dmu_recv_cookie_t *drc, struct vnode *vp, offset_t *voffp);
 int dmu_recv_end(dmu_recv_cookie_t *drc);

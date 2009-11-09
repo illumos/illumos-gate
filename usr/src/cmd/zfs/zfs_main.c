@@ -232,7 +232,7 @@ get_usage(zfs_help_t idx)
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
 	case HELP_SEND:
-		return (gettext("\tsend [-R] [-[iI] snapshot] <snapshot>\n"));
+		return (gettext("\tsend [-RD] [-[iI] snapshot] <snapshot>\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> "
 		    "<filesystem|volume|snapshot> ...\n"));
@@ -2488,8 +2488,8 @@ usage:
 }
 
 /*
- * zfs send [-v] -R [-i|-I <@snap>] <fs@snap>
- * zfs send [-v] [-i|-I <@snap>] <fs@snap>
+ * zfs send [-vD] -R [-i|-I <@snap>] <fs@snap>
+ * zfs send [-vD] [-i|-I <@snap>] <fs@snap>
  *
  * Send a backup stream to stdout.
  */
@@ -2500,14 +2500,11 @@ zfs_do_send(int argc, char **argv)
 	char *toname = NULL;
 	char *cp;
 	zfs_handle_t *zhp;
-	boolean_t doall = B_FALSE;
-	boolean_t replicate = B_FALSE;
-	boolean_t fromorigin = B_FALSE;
-	boolean_t verbose = B_FALSE;
+	sendflags_t flags = { 0 };
 	int c, err;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":i:I:Rv")) != -1) {
+	while ((c = getopt(argc, argv, ":i:I:RDv")) != -1) {
 		switch (c) {
 		case 'i':
 			if (fromname)
@@ -2518,13 +2515,16 @@ zfs_do_send(int argc, char **argv)
 			if (fromname)
 				usage(B_FALSE);
 			fromname = optarg;
-			doall = B_TRUE;
+			flags.doall = B_TRUE;
 			break;
 		case 'R':
-			replicate = B_TRUE;
+			flags.replicate = B_TRUE;
 			break;
 		case 'v':
-			verbose = B_TRUE;
+			flags.verbose = B_TRUE;
+			break;
+		case 'D':
+			flags.dedup = B_TRUE;
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "
@@ -2584,7 +2584,7 @@ zfs_do_send(int argc, char **argv)
 
 		if (strcmp(origin, fromname) == 0) {
 			fromname = NULL;
-			fromorigin = B_TRUE;
+			flags.fromorigin = B_TRUE;
 		} else {
 			*cp = '\0';
 			if (cp != fromname && strcmp(argv[0], fromname)) {
@@ -2602,11 +2602,10 @@ zfs_do_send(int argc, char **argv)
 		}
 	}
 
-	if (replicate && fromname == NULL)
-		doall = B_TRUE;
+	if (flags.replicate && fromname == NULL)
+		flags.doall = B_TRUE;
 
-	err = zfs_send(zhp, fromname, toname, replicate, doall, fromorigin,
-	    verbose, STDOUT_FILENO);
+	err = zfs_send(zhp, fromname, toname, flags, STDOUT_FILENO, NULL, 0);
 	zfs_close(zhp);
 
 	return (err != 0);

@@ -30,6 +30,7 @@
 #include <sys/dmu.h>
 #include <sys/zio.h>
 #include <sys/dsl_deleg.h>
+#include <sys/spa.h>
 
 #ifdef _KERNEL
 #include <sys/nvpair.h>
@@ -45,8 +46,56 @@ extern "C" {
 #define	ZFS_SNAPDIR_HIDDEN		0
 #define	ZFS_SNAPDIR_VISIBLE		1
 
-#define	DMU_BACKUP_STREAM_VERSION (1ULL)
-#define	DMU_BACKUP_HEADER_VERSION (2ULL)
+/*
+ * Field manipulation macros for the drr_versioninfo field of the
+ * send stream header.
+ */
+
+/*
+ * Header types for zfs send streams.
+ */
+typedef enum drr_headertype {
+	DMU_SUBSTREAM = 0x1,
+	DMU_COMPOUNDSTREAM = 0x2
+} drr_headertype_t;
+
+#define	DMU_GET_STREAM_HDRTYPE(vi)	BF64_GET((vi), 0, 2)
+#define	DMU_SET_STREAM_HDRTYPE(vi, x)	BF64_SET((vi), 0, 2, x)
+
+#define	DMU_GET_FEATUREFLAGS(vi)	BF64_GET((vi), 2, 30)
+#define	DMU_SET_FEATUREFLAGS(vi, x)	BF64_SET((vi), 2, 30, x)
+
+/*
+ * Feature flags for zfs send streams (flags in drr_versioninfo)
+ */
+
+#define	DMU_BACKUP_FEATURE_DEDUP	(0x1)
+
+/*
+ * Mask of all supported backup features
+ */
+#define	DMU_BACKUP_FEATURE_MASK	(DMU_BACKUP_FEATURE_DEDUP)
+
+/* Are all features in the given flag word currently supported? */
+#define	DMU_STREAM_SUPPORTED(x)	(!((x) & ~DMU_BACKUP_FEATURE_MASK))
+
+/*
+ * The drr_versioninfo field of the dmu_replay_record has the
+ * following layout:
+ *
+ *	64	56	48	40	32	24	16	8	0
+ *	+-------+-------+-------+-------+-------+-------+-------+-------+
+ *  	|		reserved	|        feature-flags	    |C|S|
+ *	+-------+-------+-------+-------+-------+-------+-------+-------+
+ *
+ * The low order two bits indicate the header type: SUBSTREAM (0x1)
+ * or COMPOUNDSTREAM (0x2).  Using two bits for this is historical:
+ * this field used to be a version number, where the two version types
+ * were 1 and 2.  Using two bits for this allows earlier versions of
+ * the code to be able to recognize send streams that don't use any
+ * of the features indicated by feature flags.
+ */
+
 #define	DMU_BACKUP_MAGIC 0x2F5bacbacULL
 
 #define	DRR_FLAG_CLONE		(1<<0)
@@ -58,13 +107,14 @@ extern "C" {
 typedef struct dmu_replay_record {
 	enum {
 		DRR_BEGIN, DRR_OBJECT, DRR_FREEOBJECTS,
-		DRR_WRITE, DRR_FREE, DRR_END, DRR_NUMTYPES
+		DRR_WRITE, DRR_FREE, DRR_END, DRR_WRITE_BYREF,
+		DRR_NUMTYPES
 	} drr_type;
 	uint32_t drr_payloadlen;
 	union {
 		struct drr_begin {
 			uint64_t drr_magic;
-			uint64_t drr_version;
+			uint64_t drr_versioninfo; /* was drr_version */
 			uint64_t drr_creation_time;
 			dmu_objset_type_t drr_type;
 			uint32_t drr_flags;
@@ -74,6 +124,7 @@ typedef struct dmu_replay_record {
 		} drr_begin;
 		struct drr_end {
 			zio_cksum_t drr_checksum;
+			uint64_t drr_toguid;
 		} drr_end;
 		struct drr_object {
 			uint64_t drr_object;
@@ -81,14 +132,16 @@ typedef struct dmu_replay_record {
 			dmu_object_type_t drr_bonustype;
 			uint32_t drr_blksz;
 			uint32_t drr_bonuslen;
-			uint8_t drr_checksum;
+			uint8_t drr_checksumtype;
 			uint8_t drr_compress;
 			uint8_t drr_pad[6];
+			uint64_t drr_toguid;
 			/* bonus content follows */
 		} drr_object;
 		struct drr_freeobjects {
 			uint64_t drr_firstobj;
 			uint64_t drr_numobjs;
+			uint64_t drr_toguid;
 		} drr_freeobjects;
 		struct drr_write {
 			uint64_t drr_object;
@@ -96,13 +149,32 @@ typedef struct dmu_replay_record {
 			uint32_t drr_pad;
 			uint64_t drr_offset;
 			uint64_t drr_length;
+			uint64_t drr_toguid;
+			uint8_t drr_checksumtype;
+			uint8_t drr_pad2[7];
+			zio_cksum_t drr_blkcksum;
 			/* content follows */
 		} drr_write;
 		struct drr_free {
 			uint64_t drr_object;
 			uint64_t drr_offset;
 			uint64_t drr_length;
+			uint64_t drr_toguid;
 		} drr_free;
+		struct drr_write_byref {
+			/* where to put the data */
+			uint64_t drr_object;
+			uint64_t drr_offset;
+			uint64_t drr_length;
+			uint64_t drr_toguid;
+			/* where to find the prior copy of the data */
+			uint64_t drr_refguid;
+			uint64_t drr_refobject;
+			uint64_t drr_refoffset;
+			uint8_t drr_checksumtype;
+			uint8_t drr_pad[7];
+			zio_cksum_t drr_blkcksum;
+		} drr_write_byref;
 	} drr_u;
 } dmu_replay_record_t;
 
@@ -150,6 +222,7 @@ typedef struct zfs_cmd {
 	char		zc_name[MAXPATHLEN];
 	char		zc_value[MAXPATHLEN * 2];
 	char		zc_string[MAXNAMELEN];
+	char		zc_top_ds[MAXPATHLEN];
 	uint64_t	zc_guid;
 	uint64_t	zc_nvlist_conf;		/* really (char *) */
 	uint64_t	zc_nvlist_conf_size;

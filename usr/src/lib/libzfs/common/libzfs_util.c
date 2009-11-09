@@ -216,6 +216,10 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		    "dataset"));
 	case EZFS_TAGTOOLONG:
 		return (dgettext(TEXT_DOMAIN, "tag too long"));
+	case EZFS_PIPEFAILED:
+		return (dgettext(TEXT_DOMAIN, "pipe create failed"));
+	case EZFS_THREADCREATEFAILED:
+		return (dgettext(TEXT_DOMAIN, "thread create failed"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

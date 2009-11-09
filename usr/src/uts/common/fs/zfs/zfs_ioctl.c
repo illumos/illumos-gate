@@ -2922,8 +2922,8 @@ zfs_ioc_recv(zfs_cmd_t *zc)
 			goto out;
 	}
 
-	error = dmu_recv_begin(tofs, tosnap, &zc->zc_begin_record,
-	    force, origin, &drc);
+	error = dmu_recv_begin(tofs, tosnap, zc->zc_top_ds,
+	    &zc->zc_begin_record, force, origin, &drc);
 	if (origin)
 		dmu_objset_rele(origin, FTAG);
 	if (error)
