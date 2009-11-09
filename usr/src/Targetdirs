@@ -1265,6 +1265,10 @@ $(ROOT)/usr/lib/$(MACH64)/libzfs.so:= \
 	REALPATH=../../../lib/$(MACH64)/libzfs.so.1
 $(ROOT)/usr/lib/$(MACH64)/libzfs.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libzfs.so.1
+$(ROOT)/usr/lib/$(MACH64)/libfdisk.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libfdisk.so.1
+$(ROOT)/usr/lib/$(MACH64)/libfdisk.so:= \
+	REALPATH=../../../lib/$(MACH64)/libfdisk.so.1
 $(ROOT)/usr/lib/$(MACH64)/llib-ladm.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ladm.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-laio.ln:= \
@@ -1363,6 +1367,8 @@ $(ROOT)/usr/lib/$(MACH64)/llib-lxnet.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lxnet.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lzfs.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lzfs.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lfdisk.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lfdisk.ln
 $(ROOT)/usr/lib/$(MACH64)/nss_compat.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_compat.so.1
 $(ROOT)/usr/lib/$(MACH64)/nss_dns.so.1:= \
@@ -1624,7 +1630,11 @@ SYM.USRLIB= \
 
 sparcv9_SYM.USRLIB64= 
 
-amd64_SYM.USRLIB64=
+amd64_SYM.USRLIB64=	\
+	/usr/lib/amd64/libfdisk.so	\
+	/usr/lib/amd64/libfdisk.so.1	\
+	/usr/lib/amd64/llib-lfdisk.ln
+
 
 SYM.USRLIB64= \
 	$($(MACH64)_SYM.USRLIB64)		\

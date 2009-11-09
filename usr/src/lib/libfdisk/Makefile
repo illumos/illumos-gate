@@ -26,12 +26,12 @@
 
 include		../Makefile.lib
 
-LIBRARY= libfdisk.a
-VERS= .1
-
 HDRS=		libfdisk.h
 
-HDRDIR=		$(MACH)
+HDRDIR=		common
+
+SUBDIRS=	$(MACH) 
+$(BUILD64)SUBDIRS += $(MACH64)
 
 all:=		TARGET= all
 install:=	TARGET= install
@@ -42,10 +42,7 @@ _msg:=		TARGET= _msg
 
 .KEEP_STATE:
 
-SUBDIRS=	$(MACH) 
-
 all install clean clobber lint: $(SUBDIRS)
-
 
 # install rule for install_h target
 
