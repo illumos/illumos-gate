@@ -195,9 +195,8 @@ FP hardware exhibits Pentium floating point divide problem\n");
 	 */
 #if !defined(SAS) && !defined(MPSAS)
 	/*
-	 * Check for disabled drivers and initialize root node.
+	 * Initialize root node.
 	 */
-	check_driver_disable();
 	i_ddi_init_root();
 
 	/* reprogram devices not set up by firmware (BIOS) */
@@ -2561,6 +2560,11 @@ impl_setup_ddi(void)
 
 	/* not framebuffer should be enumerated, if present */
 	get_vga_properties();
+
+	/*
+	 * Check for administratively disabled drivers.
+	 */
+	check_driver_disable();
 
 #if !defined(__xpv)
 	if (!post_fastreboot)
