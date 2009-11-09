@@ -2973,17 +2973,19 @@ vfs_mono_time(timespec_t *ts)
 	hrtime_t	newhrt, oldhrt;		/* For effecting the CAS. */
 	timespec_t	newts;
 
+	/*
+	 * Try gethrestime() first, but be prepared to fabricate a sensible
+	 * answer at the first sign of any trouble.
+	 */
 	gethrestime(&newts);
 	newhrt = ts2hrt(&newts);
-	do {
+	for (;;) {
 		oldhrt = hrt;
-		if (newhrt <= hrt) {
-			/* Have another go. */
-			gethrestime(&newts);
-			newhrt = ts2hrt(&newts);
-			continue;
-		}
-	} while (cas64((uint64_t *)&hrt, oldhrt, newhrt) != oldhrt);
+		if (newhrt <= hrt)
+			newhrt = hrt + 1;
+		if (cas64((uint64_t *)&hrt, oldhrt, newhrt) == oldhrt)
+			break;
+	}
 	hrt2ts(newhrt, ts);
 }
 
@@ -2994,11 +2996,21 @@ vfs_mono_time(timespec_t *ts)
 void
 vfs_mnttab_modtimeupd()
 {
+	hrtime_t oldhrt, newhrt;
+
 	ASSERT(RW_WRITE_HELD(&vfslist));
-	vfs_mono_time(&vfs_mnttab_mtime);
-	/* If this is our first visit then let this be the creation time. */
-	if (vfs_mnttab_ctime.tv_sec == 0 && vfs_mnttab_ctime.tv_nsec == 0)
+	oldhrt = ts2hrt(&vfs_mnttab_mtime);
+	gethrestime(&vfs_mnttab_mtime);
+	newhrt = ts2hrt(&vfs_mnttab_mtime);
+	if (oldhrt == (hrtime_t)0)
 		vfs_mnttab_ctime = vfs_mnttab_mtime;
+	/*
+	 * Attempt to provide unique mtime (like uniqtime but not).
+	 */
+	if (newhrt == oldhrt) {
+		newhrt++;
+		hrt2ts(newhrt, &vfs_mnttab_mtime);
+	}
 	pollwakeup(&vfs_pollhd, (short)POLLRDBAND);
 	vfs_mnttab_writeop();
 }
