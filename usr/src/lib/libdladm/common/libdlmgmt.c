@@ -277,8 +277,11 @@ dladm_walk_datalink_id(int (*fn)(dladm_handle_t, datalink_id_t, void *),
 		    sizeof (getnext), &retval, sizeof (retval))) !=
 		    DLADM_STATUS_OK) {
 			/*
-			 * done with walking
+			 * Done with walking. If no next datalink is found,
+			 * return success.
 			 */
+			if (status == DLADM_STATUS_NOTFOUND)
+				status = DLADM_STATUS_OK;
 			break;
 		}
 
