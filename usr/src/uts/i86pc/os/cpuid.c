@@ -591,7 +591,7 @@ cpuid_intel_getids(cpu_t *cpu, uint_t feature)
 static void
 cpuid_amd_getids(cpu_t *cpu)
 {
-	int first_half, mnc, coreidsz;
+	int i, first_half, coreidsz;
 	uint32_t nb_caps_reg;
 	uint_t node2_1;
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
@@ -626,22 +626,25 @@ cpuid_amd_getids(cpu_t *cpu)
 		 */
 		cpi->cpi_ncore_per_chip =
 		    BITX((cpi)->cpi_extd[8].cp_ecx, 7, 0) + 1;
-		if (coreidsz == 0)
+		if (coreidsz == 0) {
 			/* Use legacy method */
-			mnc = cpi->cpi_ncore_per_chip;
-		else
-			mnc = (1 << coreidsz);
+			for (i = 1; i < cpi->cpi_ncore_per_chip; i <<= 1)
+				coreidsz++;
+			if (coreidsz == 0)
+				coreidsz = 1;
+		}
 	} else {
 		/* Assume single-core part */
-		cpi->cpi_ncore_per_chip = mnc = 1;
+		cpi->cpi_ncore_per_chip = 1;
 	}
 
-	cpi->cpi_clogid = cpi->cpi_pkgcoreid = cpi->cpi_apicid & (mnc - 1);
+	cpi->cpi_clogid = cpi->cpi_pkgcoreid =
+	    cpi->cpi_apicid & ((1<<coreidsz) - 1);
 	cpi->cpi_ncpu_per_chip = cpi->cpi_ncore_per_chip;
 
 	/* Get nodeID */
 	if (cpi->cpi_family == 0xf) {
-		cpi->cpi_procnodeid = BITX(cpi->cpi_apicid, 3, mnc-1);
+		cpi->cpi_procnodeid = (cpi->cpi_apicid >> coreidsz) & 7;
 		cpi->cpi_chipid = cpi->cpi_procnodeid;
 	} else if (cpi->cpi_family == 0x10) {
 		/*
@@ -651,7 +654,8 @@ cpuid_amd_getids(cpu_t *cpu)
 		nb_caps_reg =  pci_getl_func(0, 24, 3, 0xe8);
 		if ((cpi->cpi_model < 8) || BITX(nb_caps_reg, 29, 29) == 0) {
 			/* Single-node */
-			cpi->cpi_procnodeid = BITX(cpi->cpi_apicid, 5, 3);
+			cpi->cpi_procnodeid = BITX(cpi->cpi_apicid, 5,
+			    coreidsz);
 			cpi->cpi_chipid = cpi->cpi_procnodeid;
 		} else {
 

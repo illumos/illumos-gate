@@ -36,8 +36,8 @@ typedef struct cmi_hdl_impl {
 	uint_t cmih_procnodeid;			/* Nodeid of cpu resource */
 	uint_t cmih_coreid;			/* Core within die */
 	uint_t cmih_strandid;			/* Thread within core */
-	boolean_t cmih_mstrand;			/* cores are multithreaded */
 	uint_t cmih_procnodes_per_pkg;		/* Nodes in a processor */
+	boolean_t cmih_mstrand;			/* cores are multithreaded */
 	volatile uint32_t *cmih_refcntp;	/* Reference count pointer */
 	uint64_t cmih_msrsrc;			/* MSR data source flags */
 	void *cmih_hdlpriv;			/* cmi_hw.c private data */
