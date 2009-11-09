@@ -1422,6 +1422,7 @@ f none usr/share/lib/zoneinfo/Asia/Makassar 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Manila 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Muscat 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Nicosia 644 root bin
+f none usr/share/lib/zoneinfo/Asia/Novokuznetsk 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Novosibirsk 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Omsk 644 root bin
 f none usr/share/lib/zoneinfo/Asia/Oral 644 root bin
