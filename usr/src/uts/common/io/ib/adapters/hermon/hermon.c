@@ -2956,7 +2956,7 @@ hermon_inithca_set(hermon_state_t *state, hermon_hw_initqueryhca_t *inithca)
 			inithca->context.rdmardc_baseaddr_l =
 			    (icm[i].icm_baseaddr & 0xFFFFFFFF) >> 5;
 			inithca->context.log_num_rdmardc =
-			    icm[i].log_num_entries;
+			    cfg->cp_log_num_rdb - cfg->cp_log_num_qp;
 			break;
 
 		case HERMON_MCG:
