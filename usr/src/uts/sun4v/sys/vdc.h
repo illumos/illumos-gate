@@ -84,6 +84,16 @@ extern "C" {
 #define	VDC_SEQ_NUM_TODO		1	/* Request needs processing */
 
 /*
+ * Flags for virtual disk operations.
+ */
+#define	VDC_OP_STATE_RUNNING	0x01	/* do operation in running state */
+#define	VDC_OP_ERRCHK_BACKEND	0x02	/* check backend on error */
+#define	VDC_OP_ERRCHK_CONFLICT	0x04	/* check resv conflict on error */
+
+#define	VDC_OP_ERRCHK	(VDC_OP_ERRCHK_BACKEND | VDC_OP_ERRCHK_CONFLICT)
+#define	VDC_OP_NORMAL	(VDC_OP_STATE_RUNNING | VDC_OP_ERRCHK)
+
+/*
  * Macros to get UNIT and PART number
  */
 #define	VDCUNIT_SHIFT	3
@@ -171,10 +181,24 @@ typedef enum vdc_state {
 	VDC_STATE_INIT_WAITING,		/* waiting for ldc connection */
 	VDC_STATE_NEGOTIATE,		/* doing handshake negotiation */
 	VDC_STATE_HANDLE_PENDING,	/* handle requests in backup dring */
+	VDC_STATE_FAULTED,		/* multipath backend is inaccessible */
+	VDC_STATE_FAILED,		/* device is not usable */
 	VDC_STATE_RUNNING,		/* running and accepting requests */
 	VDC_STATE_DETACH,		/* detaching */
 	VDC_STATE_RESETTING		/* resetting connection with vds */
 } vdc_state_t;
+
+/*
+ * States of the service provided by a vds server
+ */
+typedef enum vdc_service_state {
+	VDC_SERVICE_NONE = -1, 		/* no state define */
+	VDC_SERVICE_OFFLINE,		/* no connection with the service */
+	VDC_SERVICE_CONNECTED,		/* connection established */
+	VDC_SERVICE_ONLINE,		/* connection and backend available */
+	VDC_SERVICE_FAILED,		/* connection failed */
+	VDC_SERVICE_FAULTED		/* connection but backend unavailable */
+} vdc_service_state_t;
 
 /*
  * The states that the vdc instance can be in.
@@ -198,11 +222,6 @@ typedef enum {
 	VIO_both_dir		/* transfer both in and out in same buffer */
 } vio_desc_direction_t;
 
-typedef enum {
-	CB_STRATEGY,		/* non-blocking strategy call */
-	CB_SYNC			/* synchronous operation */
-} vio_cb_type_t;
-
 typedef struct vdc_local_desc {
 	boolean_t		is_free;	/* local state - inuse or not */
 
@@ -211,9 +230,9 @@ typedef struct vdc_local_desc {
 	int			slice;
 	diskaddr_t		offset;		/* disk offset */
 	size_t			nbytes;
-	vio_cb_type_t		cb_type;	/* operation type blk/nonblk */
-	void			*cb_arg;	/* buf passed to strategy() */
+	struct buf		*buf;		/* buf of operation */
 	vio_desc_direction_t	dir;		/* direction of transfer */
+	int			flags;		/* flags of operation */
 
 	caddr_t			align_addr;	/* used if addr non-aligned */
 	ldc_mem_handle_t	desc_mhdl;	/* Mem handle of buf */
@@ -222,11 +241,11 @@ typedef struct vdc_local_desc {
 } vdc_local_desc_t;
 
 /*
- * I/O queue used by failfast
+ * I/O queue used for checking backend or failfast
  */
 typedef struct vdc_io {
 	struct vdc_io	*vio_next;	/* next pending I/O in the queue */
-	struct buf	*vio_buf;	/* buf for CB_STRATEGY I/O */
+	int		vio_index;	/* descriptor index */
 	clock_t		vio_qtime;	/* time the I/O was queued */
 } vdc_io_t;
 
@@ -246,6 +265,8 @@ typedef struct vdc_server {
 	struct vdc		*vdcp;			/* Ptr to vdc struct */
 	uint64_t		id;			/* Server port id */
 	uint64_t		state;			/* Server state */
+	vdc_service_state_t	svc_state;		/* Service state */
+	vdc_service_state_t	log_state;		/* Last state logged */
 	uint64_t		ldc_id;			/* Server LDC id */
 	ldc_handle_t		ldc_handle;		/* Server LDC handle */
 	ldc_status_t		ldc_state;		/* Server LDC state */
@@ -262,7 +283,9 @@ typedef struct vdc {
 	kcondvar_t	initwait_cv;	/* signal when ldc conn is up */
 	kcondvar_t	dring_free_cv;	/* signal when desc is avail */
 	kcondvar_t	membind_cv;	/* signal when mem can be bound */
-	boolean_t	self_reset;
+	boolean_t	self_reset;	/* self initiated reset */
+	kcondvar_t	io_pending_cv;	/* signal on pending I/O */
+	boolean_t	io_pending;	/* pending I/O */
 
 	int		initialized;	/* keeps track of what's init'ed */
 	vdc_lc_state_t	lifecycle;	/* Current state of the vdc instance */
@@ -285,10 +308,7 @@ typedef struct vdc {
 	vdc_rd_state_t	read_state;	/* current read state */
 
 	uint32_t	sync_op_cnt;	/* num of active sync operations */
-	boolean_t	sync_op_pending; /* sync operation is pending */
 	boolean_t	sync_op_blocked; /* blocked waiting to do sync op */
-	uint32_t	sync_op_status;	/* status of sync operation */
-	kcondvar_t	sync_pending_cv; /* cv wait for sync op to finish */
 	kcondvar_t	sync_blocked_cv; /* cv wait for other syncs to finish */
 
 	uint64_t	session_id;	/* common ID sent with all messages */
@@ -326,13 +346,12 @@ typedef struct vdc {
 	kcondvar_t	ownership_cv;		/* cv for ownership update */
 
 	/*
-	 * The failfast fields are protected by the lock mutex.
+	 * The eio and failfast fields are protected by the lock mutex.
 	 */
-	kthread_t	*failfast_thread;	/* failfast thread */
+	kthread_t	*eio_thread;		/* error io thread */
+	kcondvar_t	eio_cv;			/* cv for eio thread update */
+	vdc_io_t	*eio_queue;		/* error io queue */
 	clock_t		failfast_interval;	/* interval in microsecs */
-	kcondvar_t	failfast_cv;		/* cv for failfast update */
-	kcondvar_t	failfast_io_cv;		/* cv wait for I/O to finish */
-	vdc_io_t	*failfast_io_queue;	/* failfast io queue */
 
 	/*
 	 * kstats used to store I/O statistics consumed by iostat(1M).
