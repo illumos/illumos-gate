@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -249,7 +249,8 @@ krb5_sname_to_principal(krb5_context context, const char *hostname, const char *
 				      realm, sname, remote_host,
 				      (char *)0);
 
-	krb5_princ_type(context, *ret_princ) = type;
+	if (retval == 0)
+		krb5_princ_type(context, *ret_princ) = type;
 
 #ifdef DEBUG_REFERRALS
 	printf("krb5_sname_to_principal returning\n");
