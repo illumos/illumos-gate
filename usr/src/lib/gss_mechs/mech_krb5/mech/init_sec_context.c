@@ -1399,7 +1399,7 @@ load_root_cred_using_keytab(
 	}
 
 	/* Solaris Kerberos */
-	if (krb5_is_referral_realm(&me->realm)) {
+	if (code == 0 && krb5_is_referral_realm(&me->realm)) {
 		krb5_data realm;
 		code = krb5_kt_find_realm(context, keytab, me, &realm);
 		if (code == 0) {
