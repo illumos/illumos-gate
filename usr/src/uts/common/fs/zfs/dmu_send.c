@@ -740,7 +740,6 @@ find_ds_by_guid(char *name, void *arg)
 	dsl_dataset_t *ds, *snapds;
 	avl_tree_t *guid_map = arg;
 	guid_map_entry_t *gmep;
-	guid_map_entry_t gmesrch;
 	dsl_pool_t	*dp;
 	int err;
 	uint64_t lastobj, firstobj;
@@ -767,7 +766,6 @@ find_ds_by_guid(char *name, void *arg)
 			return (0);
 		}
 
-		gmesrch.guid = snapds->ds_phys->ds_guid;
 		gmep = kmem_alloc(sizeof (guid_map_entry_t), KM_SLEEP);
 		gmep->guid = snapds->ds_phys->ds_guid;
 		gmep->gme_ds = snapds;
