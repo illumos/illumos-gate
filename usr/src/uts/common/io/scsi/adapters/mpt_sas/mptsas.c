@@ -490,10 +490,7 @@ static struct dev_ops mptsas_ops = {
 };
 
 
-#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.18"
-#define	CDATE "MPTSAS was compiled on "__DATE__
-/* LINTED E_STATIC_UNUSED */
-static char *MPTWASCOMPILEDON = CDATE;
+#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.19"
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module. This one is a driver */
@@ -5740,6 +5737,12 @@ mptsas_handle_topo_change(mptsas_topo_change_list_t *topo_node,
 
 		if (ptgt == NULL) {
 			/*
+			 * If a Phys Disk was deleted, RAID info needs to be
+			 * updated to reflect the new topology.
+			 */
+			(void) mptsas_get_raid_info(mpt);
+
+			/*
 			 * Get sas device page 0 by DevHandle to make sure if
 			 * SSP/SATA end device exist.
 			 */
@@ -6116,7 +6119,7 @@ mptsas_handle_event_sync(void *args)
 		uint8_t				num_entries, expstatus, phy;
 		uint8_t				phystatus, physport, state, i;
 		uint8_t				start_phy_num, link_rate;
-		uint16_t			dev_handle;
+		uint16_t			dev_handle, reason_code;
 		uint16_t			enc_handle, expd_handle;
 		char				string[80], curr[80], prev[80];
 		mptsas_topo_change_list_t	*topo_head = NULL;
@@ -6219,13 +6222,22 @@ mptsas_handle_event_sync(void *args)
 			    &sas_topo_change_list->PHY[i].PhyStatus);
 			dev_handle = ddi_get16(mpt->m_acc_reply_frame_hdl,
 			    &sas_topo_change_list->PHY[i].AttachedDevHandle);
-			if (phystatus & MPI2_EVENT_SAS_TOPO_PHYSTATUS_VACANT) {
+			reason_code = phystatus & MPI2_EVENT_SAS_TOPO_RC_MASK;
+			/*
+			 * Filter out processing of Phy Vacant Status unless
+			 * the reason code is "Not Responding".  Process all
+			 * other combinations of Phy Status and Reason Codes.
+			 */
+			if ((phystatus &
+			    MPI2_EVENT_SAS_TOPO_PHYSTATUS_VACANT) &&
+			    (reason_code !=
+			    MPI2_EVENT_SAS_TOPO_RC_TARG_NOT_RESPONDING)) {
 				continue;
 			}
 			curr[0] = 0;
 			prev[0] = 0;
 			string[0] = 0;
-			switch (phystatus & MPI2_EVENT_SAS_TOPO_RC_MASK) {
+			switch (reason_code) {
 			case MPI2_EVENT_SAS_TOPO_RC_TARG_ADDED:
 			{
 				NDBG20(("mptsas%d phy %d physical_port %d "
