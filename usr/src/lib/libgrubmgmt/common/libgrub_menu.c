@@ -398,11 +398,11 @@ grub_menu_init(const char *path, grub_menu_t **menup)
 		}
 
 		/* remove white space at the end of line */
-		for (; isspace(cp[n - 1]); --n)
+		for (; n != 0 && isspace(cp[n - 1]); --n)
 			;
 		cp[n] = '\0';
 
-		if (cp[n - 1] == '\\') {
+		if (n > 0 && cp[n - 1] == '\\') {
 			len -= n - 1;
 			assert(len >= 2);
 			cp += n - 1;
