@@ -1394,7 +1394,7 @@ mac_client_close(mac_client_handle_t mch, uint16_t flags)
 }
 
 /*
- * Enable bypass for the specified MAC client.
+ * Set the rx bypass receive callback.
  */
 boolean_t
 mac_rx_bypass_set(mac_client_handle_t mch, mac_direct_rx_t rx_fn, void *arg1)
@@ -1418,8 +1418,22 @@ mac_rx_bypass_set(mac_client_handle_t mch, mac_direct_rx_t rx_fn, void *arg1)
 	 */
 	mcip->mci_direct_rx_fn = rx_fn;
 	mcip->mci_direct_rx_arg = arg1;
-	mcip->mci_state_flags |= MCIS_CLIENT_POLL_CAPABLE;
 	return (B_TRUE);
+}
+
+/*
+ * Enable/Disable rx bypass. By default, bypass is assumed to be enabled.
+ */
+void
+mac_rx_bypass_enable(mac_client_handle_t mch)
+{
+	((mac_client_impl_t *)mch)->mci_state_flags &= ~MCIS_RX_BYPASS_DISABLE;
+}
+
+void
+mac_rx_bypass_disable(mac_client_handle_t mch)
+{
+	((mac_client_impl_t *)mch)->mci_state_flags |= MCIS_RX_BYPASS_DISABLE;
 }
 
 /*
@@ -3141,9 +3155,6 @@ mac_resource_set_common(mac_client_handle_t mch, mac_resource_add_t add,
 	mcip->mci_resource_restart = restart;
 	mcip->mci_resource_bind = bind;
 	mcip->mci_resource_arg = arg;
-
-	if (arg == NULL)
-		mcip->mci_state_flags &= ~MCIS_CLIENT_POLL_CAPABLE;
 }
 
 void
@@ -3168,6 +3179,7 @@ mac_client_poll_enable(mac_client_handle_t mch)
 	flent = mcip->mci_flent;
 	ASSERT(flent != NULL);
 
+	mcip->mci_state_flags |= MCIS_CLIENT_POLL_CAPABLE;
 	for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
 		mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
 		ASSERT(mac_srs->srs_mcip == mcip);
@@ -3190,6 +3202,7 @@ mac_client_poll_disable(mac_client_handle_t mch)
 	flent = mcip->mci_flent;
 	ASSERT(flent != NULL);
 
+	mcip->mci_state_flags &= ~MCIS_CLIENT_POLL_CAPABLE;
 	for (i = 0; i < flent->fe_rx_srs_cnt; i++) {
 		mac_srs = (mac_soft_ring_set_t *)flent->fe_rx_srs[i];
 		ASSERT(mac_srs->srs_mcip == mcip);

@@ -50,6 +50,8 @@ extern "C" {
 
 extern boolean_t mac_rx_bypass_set(mac_client_handle_t, mac_direct_rx_t,
     void *);
+extern void mac_rx_bypass_enable(mac_client_handle_t);
+extern void mac_rx_bypass_disable(mac_client_handle_t);
 
 extern const mac_info_t *mac_info(mac_handle_t);
 extern boolean_t mac_info_get(const char *, mac_info_t *);

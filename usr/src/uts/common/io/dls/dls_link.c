@@ -603,6 +603,7 @@ i_dls_link_destroy(dls_link_t *dlp)
 	dlp->dl_mch = NULL;
 	dlp->dl_mip = NULL;
 	dlp->dl_unknowns = 0;
+	dlp->dl_nonip_cnt = 0;
 	kmem_cache_free(i_dls_link_cachep, dlp);
 }
 

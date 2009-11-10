@@ -292,6 +292,7 @@ extern	int	mac_tx_percpu_cnt;
 #define	MCIS_USE_DATALINK_NAME		0x0400
 #define	MCIS_UNICAST_HW			0x0800
 #define	MCIS_REQ_HWRINGS		0x1000
+#define	MCIS_RX_BYPASS_DISABLE		0x2000
 
 /* in mac_client.c */
 extern void mac_promisc_client_dispatch(mac_client_impl_t *, mblk_t *);

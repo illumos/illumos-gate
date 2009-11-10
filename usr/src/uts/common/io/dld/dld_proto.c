@@ -45,6 +45,7 @@ static proto_reqfunc_t proto_info_req, proto_attach_req, proto_detach_req,
 
 static void proto_capability_advertise(dld_str_t *, mblk_t *);
 static int dld_capab_poll_disable(dld_str_t *, dld_capab_poll_t *);
+static boolean_t check_mod_above(queue_t *, const char *);
 
 #define	DL_ACK_PENDING(state) \
 	((state) == DL_ATTACH_PENDING || \
@@ -446,6 +447,9 @@ proto_bind_req(dld_str_t *dsp, mblk_t *mp)
 	 * Bind the channel such that it can receive packets.
 	 */
 	sap = dlp->dl_sap;
+	dsp->ds_nonip = !check_mod_above(dsp->ds_rq, "ip") &&
+	    !check_mod_above(dsp->ds_rq, "arp");
+
 	err = dls_bind(dsp, sap);
 	if (err != 0) {
 		switch (err) {
@@ -993,14 +997,14 @@ failed:
 }
 
 static boolean_t
-check_ip_above(queue_t *q)
+check_mod_above(queue_t *q, const char *mod)
 {
 	queue_t		*next_q;
 	boolean_t	ret = B_TRUE;
 
 	claimstr(q);
 	next_q = q->q_next;
-	if (strcmp(next_q->q_qinfo->qi_minfo->mi_idname, "ip") != 0)
+	if (strcmp(next_q->q_qinfo->qi_minfo->mi_idname, mod) != 0)
 		ret = B_FALSE;
 	releasestr(q);
 	return (ret);
@@ -1506,7 +1510,8 @@ dld_capab(dld_str_t *dsp, uint_t type, void *data, uint_t flags)
 	 * completes. So we limit the check to DLD_ENABLE case.
 	 */
 	if ((flags == DLD_ENABLE && type != DLD_CAPAB_PERIM) &&
-	    (dsp->ds_sap != ETHERTYPE_IP || !check_ip_above(dsp->ds_rq))) {
+	    (dsp->ds_sap != ETHERTYPE_IP ||
+	    !check_mod_above(dsp->ds_rq, "ip"))) {
 		return (ENOTSUP);
 	}
 
@@ -1593,7 +1598,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * Direct capability negotiation interface between IP and DLD
 	 */
-	if (dsp->ds_sap == ETHERTYPE_IP && check_ip_above(dsp->ds_rq)) {
+	if (dsp->ds_sap == ETHERTYPE_IP && check_mod_above(dsp->ds_rq, "ip")) {
 		dld_capable = B_TRUE;
 		subsize += sizeof (dl_capability_sub_t) +
 		    sizeof (dl_capab_dld_t);

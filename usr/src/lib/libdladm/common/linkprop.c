@@ -1211,8 +1211,9 @@ static int
 i_dladm_init_one_prop(dladm_handle_t handle, datalink_id_t linkid,
     const char *prop_name, void *arg)
 {
-	char	*buf, **propvals;
-	uint_t	i, valcnt = DLADM_MAX_PROP_VALCNT;
+	char		*buf, **propvals;
+	uint_t		i, valcnt = DLADM_MAX_PROP_VALCNT;
+	dladm_status_t	status, *retval = arg;
 
 	if ((buf = malloc((sizeof (char *) + DLADM_PROP_VAL_MAX) *
 	    DLADM_MAX_PROP_VALCNT)) == NULL) {
@@ -1231,8 +1232,10 @@ i_dladm_init_one_prop(dladm_handle_t handle, datalink_id_t linkid,
 		goto done;
 	}
 
-	(void) dladm_set_linkprop(handle, linkid, prop_name, propvals, valcnt,
-	    DLADM_OPT_ACTIVE);
+	status = dladm_set_linkprop(handle, linkid, prop_name, propvals,
+	    valcnt, DLADM_OPT_ACTIVE);
+	if (status != DLADM_STATUS_OK)
+		*retval = status;
 
 done:
 	if (buf != NULL)
@@ -1263,6 +1266,7 @@ dladm_status_t
 dladm_init_linkprop(dladm_handle_t handle, datalink_id_t linkid,
     boolean_t any_media)
 {
+	dladm_status_t		status = DLADM_STATUS_OK;
 	datalink_media_t	dmedia;
 	uint32_t		media;
 
@@ -1275,10 +1279,10 @@ dladm_init_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 	    ((dladm_datalink_id2info(handle, linkid, NULL, NULL, &media, NULL,
 	    0) == DLADM_STATUS_OK) &&
 	    DATALINK_MEDIA_ACCEPTED(dmedia, media))) {
-		(void) dladm_walk_linkprop(handle, linkid, NULL,
+		(void) dladm_walk_linkprop(handle, linkid, &status,
 		    i_dladm_init_one_prop);
 	}
-	return (DLADM_STATUS_OK);
+	return (status);
 }
 
 /* ARGSUSED */

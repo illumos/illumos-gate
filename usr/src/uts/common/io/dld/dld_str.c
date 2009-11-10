@@ -681,6 +681,7 @@ dld_str_destroy(dld_str_t *dsp)
 	dsp->ds_passivestate = DLD_UNINITIALIZED;
 	dsp->ds_mode = DLD_UNITDATA;
 	dsp->ds_native = B_FALSE;
+	dsp->ds_nonip = B_FALSE;
 
 	ASSERT(dsp->ds_datathr_cnt == 0);
 	ASSERT(dsp->ds_pending_head == NULL);

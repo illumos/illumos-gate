@@ -188,6 +188,11 @@ dls_bind(dld_str_t *dsp, uint32_t sap)
 		err = mac_promisc_add(dsp->ds_mch,
 		    MAC_CLIENT_PROMISC_ALL, dls_rx_vlan_promisc, dsp,
 		    &dsp->ds_vlan_mph, MAC_PROMISC_FLAGS_NO_PHYS);
+
+		if (err == 0 && dsp->ds_nonip &&
+		    dsp->ds_dlp->dl_nonip_cnt++ == 0)
+			mac_rx_bypass_disable(dsp->ds_mch);
+
 		return (err);
 	}
 
@@ -196,6 +201,9 @@ dls_bind(dld_str_t *dsp, uint32_t sap)
 	 * dls_link_t.
 	 */
 	dls_link_add(dsp->ds_dlp, dls_sap, dsp);
+	if (dsp->ds_nonip && dsp->ds_dlp->dl_nonip_cnt++ == 0)
+		mac_rx_bypass_disable(dsp->ds_mch);
+
 	return (0);
 }
 
@@ -203,6 +211,9 @@ void
 dls_unbind(dld_str_t *dsp)
 {
 	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
+
+	if (dsp->ds_nonip && --dsp->ds_dlp->dl_nonip_cnt == 0)
+		mac_rx_bypass_enable(dsp->ds_mch);
 
 	/*
 	 * For VLAN SAP, there was a promisc handle registered when dls_bind.

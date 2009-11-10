@@ -1053,8 +1053,18 @@ dlmgmt_upcall_linkprop_init(void *argp, void *retp, zoneid_t zoneid,
 		err = dlmgmt_checkprivs(linkp->ll_class, cred);
 	dlmgmt_table_unlock();
 
-	if (err == 0)
-		err = dladm_init_linkprop(dld_handle, lip->ld_linkid, B_TRUE);
+	if (err == 0) {
+		dladm_status_t	s;
+		char		buf[DLADM_STRSIZE];
+
+		s = dladm_init_linkprop(dld_handle, lip->ld_linkid, B_TRUE);
+		if (s != DLADM_STATUS_OK) {
+			dlmgmt_log(LOG_WARNING,
+			    "linkprop initialization failed on link %d: %s",
+			    lip->ld_linkid, dladm_status2str(s, buf));
+			err = EINVAL;
+		}
+	}
 	retvalp->lr_err = err;
 }
 

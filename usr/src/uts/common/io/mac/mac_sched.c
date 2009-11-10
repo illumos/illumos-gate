@@ -550,9 +550,11 @@ mac_rx_srs_proto_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 	/*
 	 * Special clients (eg. VLAN, non ether, etc) need DLS
 	 * processing in the Rx path. SRST_DLS_BYPASS will be clear for
-	 * such SRSs.
+	 * such SRSs. Another way of disabling bypass is to set the
+	 * MCIS_RX_BYPASS_DISABLE flag.
 	 */
-	dls_bypass = ((mac_srs->srs_type & SRST_DLS_BYPASS) != 0);
+	dls_bypass = ((mac_srs->srs_type & SRST_DLS_BYPASS) != 0) &&
+	    ((mcip->mci_state_flags & MCIS_RX_BYPASS_DISABLE) == 0);
 
 	bzero(headmp, MAX_SR_TYPES * sizeof (mblk_t *));
 	bzero(tailmp, MAX_SR_TYPES * sizeof (mblk_t *));
@@ -933,9 +935,11 @@ mac_rx_srs_fanout(mac_soft_ring_set_t *mac_srs, mblk_t *head)
 	/*
 	 * Special clients (eg. VLAN, non ether, etc) need DLS
 	 * processing in the Rx path. SRST_DLS_BYPASS will be clear for
-	 * such SRSs.
+	 * such SRSs. Another way of disabling bypass is to set the
+	 * MCIS_RX_BYPASS_DISABLE flag.
 	 */
-	dls_bypass = ((mac_srs->srs_type & SRST_DLS_BYPASS) != 0);
+	dls_bypass = ((mac_srs->srs_type & SRST_DLS_BYPASS) != 0) &&
+	    ((mcip->mci_state_flags & MCIS_RX_BYPASS_DISABLE) == 0);
 
 	/*
 	 * Since the softrings are never destroyed and we always
