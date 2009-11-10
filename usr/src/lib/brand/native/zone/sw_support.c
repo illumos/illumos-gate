@@ -143,6 +143,9 @@ static char *locale;
 static char *zonename;
 static char *zonepath;
 
+/* List of pkgs that should be only on GZ */
+static char **gz_only_pkgs_list = NULL;
+
 /* used in attach_func() and signal handler */
 static volatile boolean_t attach_interupted;
 
@@ -1286,6 +1289,97 @@ pkg_avl_delete(uu_avl_t *pavl)
 	}
 }
 
+/* Memory allocation failure, free up allocated memory */
+static void
+destroy_gz_only_list()
+{
+	int i;
+
+	if (gz_only_pkgs_list != NULL) {
+		for (i = 0; gz_only_pkgs_list[i] != NULL; i++)
+			free(gz_only_pkgs_list[i]);
+		free(gz_only_pkgs_list);
+		gz_only_pkgs_list = NULL;
+	}
+}
+
+/*
+ * If a package is GZ only, it should not be installed in NGZ. This routine
+ * builds the list of GZ only packages
+ */
+static int
+load_gz_only_pkg_list()
+{
+	FILE *fp = NULL;
+	char buf[80];
+	int cnt = 0;
+
+	/* If file exists, do the open */
+	if ((fp = fopen("/var/sadm/install/gz-only-packages", "r")) == NULL)
+		return (ENOENT);
+
+	if ((gz_only_pkgs_list =
+	    (char **)malloc(sizeof (char *))) == NULL) {
+		(void) fclose(fp);
+		return (Z_NOMEM);
+	}
+
+	while (fgets(buf, 80, fp) != NULL) {
+		char **p = NULL;
+
+		/* Take care to skip comments lines */
+		if (buf[0] == '#' || buf[0] == '\n')
+			continue;
+
+		buf[strlen(buf) - 1] = '\0';
+
+		/*
+		 * Allocate memory for each entry in gz_only_pkgs_list.
+		 * If unable to get memory, return Z_NOMEM to indicate
+		 * allocation failure
+		 */
+		if ((gz_only_pkgs_list[cnt] = strdup(buf)) == NULL) {
+			destroy_gz_only_list();
+			(void) fclose(fp);
+			return (Z_NOMEM);
+		}
+		cnt++;
+
+		/* Allocate memory for the next pkg to be excluded */
+		if ((p = (char **)realloc(gz_only_pkgs_list,
+		    ((cnt + 1) * sizeof (char *)))) == NULL) {
+			free(gz_only_pkgs_list[cnt-1]);
+			gz_only_pkgs_list[cnt-1] = NULL;
+			destroy_gz_only_list();
+			(void) fclose(fp);
+			return (Z_NOMEM);
+		}
+		gz_only_pkgs_list = p;
+	}
+	gz_only_pkgs_list[cnt] = NULL;
+
+	(void) fclose(fp);
+
+	return (Z_OK);
+}
+
+/*
+ * Check if the package we are trying to install into a NGZ is a GZ only pkg.
+ * If so, skip it's installation in the NGZ
+ */
+static boolean_t
+is_gz_only_pkg(char *pkg)
+{
+	int i;
+
+	for (i = 0; gz_only_pkgs_list[i] != NULL; i++) {
+		if (strcmp(pkg, gz_only_pkgs_list[i]) == 0)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+
 /*
  * Take a software inventory of the global zone.  We need to get the set of
  * packages and patches that are on the global zone that the specified
@@ -1315,6 +1409,7 @@ sw_inventory(zone_dochandle_t handle)
 {
 	char		pkginfo[MAXPATHLEN];
 	int		res;
+	int		gz_pkgs_loaded;
 	struct dirent	*dp;
 	DIR		*dirp;
 	struct stat	buf;
@@ -1326,6 +1421,16 @@ sw_inventory(zone_dochandle_t handle)
 	uu_list_pool_t 	*list_pool = NULL;
 	uu_avl_t	*saw_pkgs = NULL;
 	uu_avl_t 	*obs_patches = NULL;
+
+	/*
+	 * Get the list of GZ only packages from file gz-only-packages
+	 * into memory
+	 */
+	if ((gz_pkgs_loaded = load_gz_only_pkg_list())
+	    == Z_NOMEM) {
+		res = Z_NOMEM;
+		goto done;
+	}
 
 	if ((pkgs_pool = uu_avl_pool_create("pkgs_pool",
 	    sizeof (zone_pkg_entry_t), offsetof(zone_pkg_entry_t, zpe_entry),
@@ -1378,6 +1483,16 @@ sw_inventory(zone_dochandle_t handle)
 		    strcmp(dp->d_name, "..") == 0)
 			continue;
 
+		/*
+		 * If only gz-only-packages file exists and read
+		 * into memory, check for a possible match
+		 * If there is a match, skip over. Such a package is
+		 * meant for GZ only installation.
+		 */
+		if ((gz_pkgs_loaded == Z_OK) &&
+		    (is_gz_only_pkg(dp->d_name) == B_TRUE))
+			continue;
+
 		(void) snprintf(pkginfo, sizeof (pkginfo), "%s/%s/pkginfo",
 		    PKG_PATH, dp->d_name);
 
@@ -1418,6 +1533,11 @@ sw_inventory(zone_dochandle_t handle)
 	(void) closedir(dirp);
 
 done:
+	/*
+	 * Free up the heap memory that has been allocated for
+	 * gz-only-packages
+	 */
+	destroy_gz_only_list();
 	pkg_avl_delete(saw_pkgs);
 	patch_avl_delete(obs_patches);
 	if (pkgs_pool != NULL)
