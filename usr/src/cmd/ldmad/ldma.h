@@ -27,13 +27,13 @@
 #ifndef _LDMA_H
 #define	_LDMA_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <libds.h>
 #include <sys/sysmacros.h>
 #include <sys/types.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * The following definitions are part of the LDoms Agent specification.

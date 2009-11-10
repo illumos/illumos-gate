@@ -140,7 +140,7 @@ ldma_dev_validate_path(ds_ver_t *ver, ldma_message_header_t *request,
 
 	reply->msg_info |= LDMA_DEVPATH_EXIST;
 
-	LDMA_DBG("VALIDATE_PATH(%s): file mode = 0x%x", path, st.st_mode);
+	LDMA_DBG("VALIDATE_PATH(%s): file mode = 0x%lx", path, st.st_mode);
 
 	switch (st.st_mode & S_IFMT) {
 

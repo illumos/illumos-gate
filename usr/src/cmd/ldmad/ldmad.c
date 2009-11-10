@@ -88,7 +88,7 @@ static ldma_agent_info_t *ldma_agent_infos[] = {
 };
 
 static char *cmdname;
-static pid_t daemon_pid;
+static pid_t daemon_pid = 0;
 
 /*
  * Allocate a new message with the specified message number (msg_num),
@@ -377,8 +377,14 @@ ldma_register_agents()
 static void
 ldma_sigusr_handler(int sig, siginfo_t *sinfo, void *ucontext)
 {
-	if (daemon_pid <= 0 || sig != SIGUSR1 || sinfo->si_code != SI_USER ||
-	    sinfo->si_pid != daemon_pid)
+	/*
+	 * The child process can send the signal before the fork()
+	 * call has returned in the parent process. So daemon_pid
+	 * may not be set yet, and we don't check the pid in that
+	 * case.
+	 */
+	if (sig != SIGUSR1 || sinfo->si_code != SI_USER ||
+	    (daemon_pid > 0 && sinfo->si_pid != daemon_pid))
 		return;
 
 	/*
@@ -499,7 +505,7 @@ ldma_start(boolean_t standalone)
 	 */
 	if (ldma_register_agents() == 0) {
 		/* no agent registered */
-		LDMA_ERR("Unable to register any agent", cmdname);
+		LDMA_ERR("Unable to register any agent");
 		exit(1);
 	}
 
