@@ -1,5 +1,4 @@
 #
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -19,14 +18,8 @@
 #
 # CDDL HEADER END
 #
-
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -38,23 +31,17 @@
 #!default <mode> <owner> <group>	# default used if not specified on entry
 #!<param>=<value>			# puts parameter in pkg environment
 
-# packaging files
-i pkginfo
-i copyright
-i depend
+#
+# Include ISA independent files (prototype_com)
+#
+!include prototype_com
+#
+#
+#
+# List files which are I386 specific here
 #
 # source locations relative to the prototype file
 #
-# SUNWpapi-lp-cmds
 #
-d none usr 755 root sys
-d none usr/bin 755 root bin
-s none usr/bin/cancel=../sbin/print-service
-s none usr/bin/disable=../sbin/print-service
-s none usr/bin/enable=../sbin/print-service
-s none usr/bin/lp=../sbin/print-service
-s none usr/bin/lpstat=../sbin/print-service
-d none usr/sbin 755 root bin
-s none usr/sbin/accept=./print-service
-s none usr/sbin/lpmove=./print-service
-s none usr/sbin/reject=./print-service
+# SUNWppmr
+#

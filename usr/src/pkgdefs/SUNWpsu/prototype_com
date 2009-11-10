@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -246,3 +245,15 @@ l none usr/share/lib/terminfo/a/att583ibm-80=../../../../../usr/share/lib/termin
 l none usr/share/lib/terminfo/a/att593eps=../../../../../usr/share/lib/terminfo/5/593eps
 l none usr/share/lib/terminfo/a/att593hp=../../../../../usr/share/lib/terminfo/5/593hp
 l none usr/share/lib/terminfo/a/att593ibm=../../../../../usr/share/lib/terminfo/5/593ibm
+#	Solaris Print - Client (usr)
+d none usr/bin 0755 root bin
+f none usr/bin/lpget 0511 root lp
+f none usr/bin/lpset 4511 root lp
+f none usr/bin/lptest 555 root lp
+f none usr/lib/libprint.so.2 0755 root bin
+s none usr/lib/libprint.so=./libprint.so.2
+f none usr/lib/print/Makefile.yp 0444 root lp
+f none usr/lib/print/in.lpd 0555 root bin
+f none usr/lib/print/conv_fix 0555 root lp
+f none usr/lib/print/conv_lp 0555 root lp
+f none usr/lib/print/conv_lpd 0555 root lp

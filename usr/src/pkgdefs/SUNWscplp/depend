@@ -49,5 +49,5 @@ P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
 P SUNWcslr	Core Solaris Libraries (Root)
-P SUNWpcr	Solaris Print - Client, (root)
+P SUNWpsr	Solaris Print - LP Server, (root)
 P SUNWpcu	Solaris Print - Client, (Usr)

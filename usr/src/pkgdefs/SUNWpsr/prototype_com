@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #
 # This required package information file contains a list of package contents.
@@ -59,8 +57,6 @@ d none var/svc/manifest 755 root sys
 d none var/svc/manifest/application 755 root sys
 d none var/svc/manifest/application/print 755 root sys
 f manifest var/svc/manifest/application/print/server.xml 0444 root sys
-#	Manifest for updating the ppdcache
-f manifest var/svc/manifest/application/print/ppd-cache-update.xml 0444 root sys
 #	LP configuation
 d none etc 755 root sys
 d none etc/lp 775 lp lp
@@ -68,9 +64,9 @@ d none etc/lp/classes 775 lp lp
 d none etc/lp/forms 775 lp lp
 d none etc/lp/interfaces 775 lp lp
 s none etc/lp/logs=../../var/lp/logs
+d none etc/lp/ppd 775 lp lp
 d none etc/lp/printers 775 lp lp
 d none etc/lp/pwheels 775 lp lp
-d none etc/lp/ppd 775 lp lp
 #	filter descriptions
 d none etc/lp/fd 755 root lp
 f none etc/lp/fd/download.fd 644 root lp
@@ -108,6 +104,8 @@ d none lib 0755 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin
 f none lib/svc/method/print-svc 0555 root bin
-#
-#	Method for updating the ppdcache
-f none lib/svc/method/ppd-cache-update 0555 root bin
+
+#	Solaris Print - Client (root)
+e preserve etc/printers.conf 0644 root sys
+f manifest var/svc/manifest/application/print/rfc1179.xml 0444 root sys
+d none var/spool/print 0755 root lp

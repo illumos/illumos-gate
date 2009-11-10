@@ -333,8 +333,6 @@ COMMON_SUBDIRS= \
 	SUNWllc \
 	SUNWllcr\
 	SUNWlldap \
-	SUNWlp-cmds \
-	SUNWlpr-cmds \
 	SUNWkey  \
 	SUNWloc  \
 	SUNWluxop \
@@ -386,7 +384,6 @@ COMMON_SUBDIRS= \
 	SUNWpcmci  \
 	SUNWpcmcu  \
 	SUNWpcmem \
-	SUNWpcr	\
 	SUNWpcser \
 	SUNWpcu	\
 	SUNWpcwl \
@@ -404,6 +401,7 @@ COMMON_SUBDIRS= \
 	SUNWpoolr \
 	SUNWpowertop \
 	SUNWppm \
+	SUNWppmr \
 	SUNWpppd \
 	SUNWpppdu \
 	SUNWpppdr \

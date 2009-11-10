@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -19,15 +18,19 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-# Remove ppdmgr created cache files
-/bin/rm -f $BASEDIR/var/lp/ppd/caches/*
-/bin/rm -f $BASEDIR/var/lp/ppd/ppdcache
+include ../Makefile.com
 
-exit 0
+DATAFILES += i.manifest r.manifest
+
+.KEEP_STATE:
+
+all: $(FILES)
+install: all pkg
+
+include ../Makefile.targ
+include ../Makefile.prtarg

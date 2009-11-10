@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 if [ "$UPDATE" = "yes" ]; then
@@ -30,15 +29,10 @@ if [ "$UPDATE" = "yes" ]; then
 
 	MANIFESTDIR="$BASEDIR/var/svc/manifest/application/print"
 	LPFILENAME=`echo sunwpsr_lpsched"$BASEPREFIX" | cut -c 1-256`
-	PPDFILENAME=`echo sunwpsr_ppd_cache_update"$BASEPREFIX" | cut -c 1-256`
 	LPTMPFILE=/tmp/$LPFILENAME
-	PPDTMPFILE=/tmp/$PPDFILENAME
 
 	if [ -f $LPTMPFILE ] ; then
 		rm $LPTMPFILE
-	fi
-	if [ -f $PPDTMPFILE ] ; then
-		rm $PPDTMPFILE
 	fi
 
 	#
@@ -54,11 +48,4 @@ if [ "$UPDATE" = "yes" ]; then
 		fi
 	fi
 
-	#
-	# If we are upgrading a system with ppd-cache-update service already
-	# installed, then don't take any action in postinstall script.
-	#
-	if [ ! -f $MANIFESTDIR/ppd-cache-update.xml ] ; then
-		touch $PPDTMPFILE
-	fi
 fi

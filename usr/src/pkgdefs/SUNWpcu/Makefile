@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
@@ -30,10 +29,8 @@ include ../Makefile.com
 TMPLFILES += preremove
 DATAFILES += depend
 
-ACTION=grep SUNWpcr depend > /dev/null || \
+ACTION=grep SUNWlpu depend > /dev/null || \
 	( chmod 666 depend; \
-	echo "P SUNWpcr       Solaris Print - Client, (root)" >> depend; \
-	echo "P SUNWpapi      Free Standards Group Open Printing API" >> depend; \
 	echo "P SUNWperl584core SUNWperl584core Perl 5.8.4 (core)" >> depend; \
 	echo "I SUNWlpu       LP Print Service, (usr)" >> depend; \
 	chmod 444 depend );

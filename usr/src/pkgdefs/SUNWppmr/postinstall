@@ -28,12 +28,35 @@
 # If appropriate, enable this service.
 #
 BASEPREFIX=`echo $BASEDIR | sed "s/\//_/g"`
-LPFILENAME=`echo sunwpsr_lpsched"$BASEPREFIX" | cut -c 1-256`
-LPTMPFILE=/tmp/$LPFILENAME
-if [ -f $LPTMPFILE ]; then
-	echo "/usr/sbin/svcadm enable application/print/server" >> \
+
+PPDFILENAME=`echo sunwppmr_ppd_cache_update"$BASEPREFIX" | cut -c 1-256`
+PPDTMPFILE=/tmp/$PPDFILENAME
+if [ -f $PPDTMPFILE ] ; then
+
+	# Enable the ppd-cache-update service.
+	echo "/usr/sbin/svcadm enable application/print/ppd-cache-update" >> \
 	    $BASEDIR/var/svc/profile/upgrade
-	rm $LPTMPFILE
+
+	# Ensure pre-existing printer configuration files with an
+	# old system PPD file delivery location are updated to
+	# reflect the newest location of PPD files.
+	NEW_PATH=/usr/share/ppd
+	if [ -d $NEW_PATH ] ; then
+		OLD_PATH=/usr/lib/lp/model/ppd/system
+		PNTRS=$BASEDIR/etc/lp/printers
+		for f in `/bin/find $PNTRS -name configuration 2>/dev/null` ; do
+		    /bin/grep ${OLD_PATH} ${f} >/dev/null 2>&1
+			if [ $? -eq 0 ] ; then
+				/bin/sed \
+		    -e "s;${OLD_PATH}/foomatic;${NEW_PATH}/SUNWfoomatic;g" \
+		    -e "s;${OLD_PATH}/gimp;${NEW_PATH}/SUNWgimp;g" \
+                    -e "s;${OLD_PATH}/hpijs;${NEW_PATH}/SUNWhpijs;g" \
+		    ${f} >/tmp/lp.$$
+				/bin/mv -f /tmp/lp.$$ ${f}
+			fi
+		done
+		rm $PPDTMPFILE
+	fi
 fi
 
 exit 0

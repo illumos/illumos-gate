@@ -30,7 +30,7 @@
 	file.
 -->
 
-<service_bundle type='manifest' name='SUNWpcr:rfc1179'>
+<service_bundle type='manifest' name='SUNWpsr:rfc1179'>
 
 <service
     name='application/print/rfc1179'

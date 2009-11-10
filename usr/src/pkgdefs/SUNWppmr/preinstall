@@ -19,31 +19,27 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.com
+if [ "$UPDATE" = "yes" ]; then
+	BASEPREFIX=`echo $BASEDIR | sed "s/\//_/g"`
 
-DATAFILES += depend
-CLEANFILES += action
+	MANIFESTDIR="$BASEDIR/var/svc/manifest/application/print"
+	PPDFILENAME=`echo sunwppmr_ppd_cache_update"$BASEPREFIX" | cut -c 1-256`
+	PPDTMPFILE=/tmp/$PPDFILENAME
 
-ACTION=grep SUNWpapi depend > /dev/null || \
-	( chmod 666 depend; \
-	echo "P SUNWpapi      Free Standards Group Open Printing API" >> depend; \
-	chmod 444 depend );
+	if [ -f $PPDTMPFILE ] ; then
+		rm $PPDTMPFILE
+	fi
 
-.KEEP_STATE:
-
-all: $(FILES) action
-install: all pkg
-
-# action is a pseudotarget denoting completed work on the depend file
-action: depend
-	$(ACTION)
-	touch $@
-
-include ../Makefile.targ
-include ../Makefile.prtarg
+	#
+	# If we are upgrading a system with ppd-cache-update service already
+	# installed, then don't take any action in postinstall script.
+	#
+	if [ ! -f $MANIFESTDIR/ppd-cache-update.xml ] ; then
+		touch $PPDTMPFILE
+	fi
+fi

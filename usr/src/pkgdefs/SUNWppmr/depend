@@ -49,3 +49,5 @@ P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
 P SUNWcslr	Core Solaris Libraries (Root)
 I SUNWlpr	LP Print Service, (root)
+P SUNWppm	Solaris Print Manager
+P SUNWpsr	Solaris Print - LP Server, (root)
