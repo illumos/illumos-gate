@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -38,29 +39,21 @@
 #
 #
 #
-# List files which are SPARC specific here
+# List files which are I386 specific here
 #
 # source locations relative to the prototype file
 #
 #
 # SUNWfruid
 #
-d none usr/sbin 755 root bin
-f none usr/sbin/prtfru 755 root bin
-f none usr/lib/libfrupicl.so.1 755 root bin
-s none usr/lib/libfrupicl.so=./libfrupicl.so.1 755 root bin
-f none usr/lib/libfrupicltree.so.1 755 root bin
-s none usr/lib/libfrupicltree.so=./libfrupicltree.so.1 755 root bin
-d none usr/lib/sparcv9 755 root bin
-f none usr/lib/sparcv9/libfru.so.1 755 root bin
-s none usr/lib/sparcv9/libfru.so=./libfru.so.1 755 root bin
-f none usr/lib/sparcv9/libfrupicl.so.1 755 root bin
-s none usr/lib/sparcv9/libfrupicl.so=./libfrupicl.so.1 755 root bin
-f none usr/lib/sparcv9/libfrureg.so.1 755 root bin
-s none usr/lib/sparcv9/libfrureg.so=./libfrureg.so.1 755 root bin
-f none usr/lib/sparcv9/libfruutils.so.1 755 root bin
-s none usr/lib/sparcv9/libfruutils.so=./libfruutils.so.1 755 root bin
-f none usr/lib/sparcv9/libfruraw.so.1 755 root bin
-s none usr/lib/sparcv9/libfruraw.so=./libfruraw.so.1 755 root bin
-f none usr/lib/sparcv9/libnvfru.so.1 755 root bin
-s none usr/lib/sparcv9/libnvfru.so=./libnvfru.so.1 755 root bin
+d none usr/lib/amd64 755 root bin
+f none usr/lib/amd64/libfru.so.1 755 root bin
+s none usr/lib/amd64/libfru.so=./libfru.so.1 755 root bin
+f none usr/lib/amd64/libfrureg.so.1 755 root bin
+s none usr/lib/amd64/libfrureg.so=./libfrureg.so.1 755 root bin
+f none usr/lib/amd64/libfruutils.so.1 755 root bin
+s none usr/lib/amd64/libfruutils.so=./libfruutils.so.1 755 root bin
+f none usr/lib/amd64/libfruraw.so.1 755 root bin
+s none usr/lib/amd64/libfruraw.so=./libfruraw.so.1 755 root bin
+f none usr/lib/amd64/libnvfru.so.1 755 root bin
+s none usr/lib/amd64/libnvfru.so=./libnvfru.so.1 755 root bin

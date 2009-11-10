@@ -196,6 +196,7 @@ NOSYMSORT	ld\.so\.1					# libc_pic.a user
 NOSYMSORT	lib/libsun_fc\.so\.1				# C++
 NOSYMSORT	lib/amd64/libsun_fc\.so\.1			# C++
 NOSYMSORT	lib/sparcv9/libsun_fc\.so\.1 			# C++
+NOSYMSORT	usr/lib/amd64/libfru\.so\.1			# C++
 
 
 # The libprtdiag_psr.so.1 objects built under usr/src/lib/libprtdiag_psr

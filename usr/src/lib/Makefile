@@ -264,6 +264,8 @@ SUBDIRS += \
 	librstp		\
 	libreparse	\
 	libhotplug	\
+	libfruutils	.WAIT	\
+	libfru		\
 	$($(MACH)_SUBDIRS)
 
 i386_SUBDIRS=		\
@@ -280,8 +282,6 @@ sparc_SUBDIRS= .WAIT	\
 	libprtdiag_psr	\
 	libpri		\
 	librsc		\
-	libfruutils	.WAIT	\
-	libfru		\
 	storage		\
 	libpcp		\
 	libtsalarm

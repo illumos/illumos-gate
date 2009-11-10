@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LIBFRU_H
 #define	_LIBFRU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -107,6 +105,26 @@ typedef struct {
 	char **strs;
 } fru_strlist_t;
 
+#if defined(_LITTLE_ENDIAN)
+typedef union
+{
+	uint32_t raw_data;
+	struct
+	{
+		unsigned repair_perm : 3;
+		unsigned engineering_perm : 3;
+		unsigned operations_perm : 3;
+		unsigned domain_perm : 3;
+		unsigned field_perm : 3;
+		unsigned unused : 13;
+		unsigned fixed : 1;
+		unsigned opaque : 1;
+		unsigned ignore_checksum : 1;
+		unsigned encrypted : 1;
+
+	} field;
+} fru_segdesc_t;
+#else
 typedef union
 {
 	uint32_t raw_data;
@@ -124,6 +142,7 @@ typedef union
 		unsigned repair_perm : 3;
 	} field;
 } fru_segdesc_t;
+#endif
 
 #define	FRU_SEGDESC_PERM_DELETE_MASK (1<<0)
 #define	FRU_SEGDESC_PERM_WRITE_MASK (1<<1)
@@ -145,6 +164,21 @@ typedef union
 #define	SEGMENT_WRITE	2
 #define	SEGMENT_DELETE	1
 
+#if defined(_LITTLE_ENDIAN)
+typedef union
+{
+	uint32_t all_bits;
+	struct
+	{
+		unsigned : 8;
+		unsigned : 8;
+		unsigned : 8;
+		unsigned : 7;
+		uint32_t read_only : 1;
+
+	} field;
+} fru_seg_hwdesc_t;
+#else
 typedef union
 {
 	uint32_t all_bits;
@@ -157,6 +191,7 @@ typedef union
 		unsigned : 8;
 	} field;
 } fru_seg_hwdesc_t;
+#endif
 
 #define	FRU_SEGNAMELEN 2
 typedef struct {

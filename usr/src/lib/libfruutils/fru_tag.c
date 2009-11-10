@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 
@@ -156,6 +154,50 @@ mk_tag(fru_tagtype_t type, uint32_t dense, size_t pl_len,
 	return (get_tag_size(type));
 }
 
+#if defined(_LITTLE_ENDIAN)
+fru_tagtype_t
+get_tag_type(fru_tag_t *tag)
+{
+	uint64_t tmp64;
+	uint32_t tmp32;
+	fru_tag_t tmp;
+
+	if (tag->a.type == FRU_A_ID)
+		return (FRU_A);
+
+	tmp.raw_data = (tag->byte[0] << 8) | tag->byte[1];
+	if (tmp.b.type == FRU_B_ID)
+		return (FRU_B);
+	if (tmp.c.type == FRU_C_ID)
+		return (FRU_C);
+
+	tmp32 = (tag->byte[0] << 16) | (tag->byte[1] << 8) | tag->byte[2];
+	tmp.raw_data = tmp32;
+	if (tmp.d.type == FRU_D_ID)
+		return (FRU_D);
+	if (tmp.e.type == FRU_E_ID)
+		return (FRU_E);
+
+	tmp32 = (tag->byte[0] << 24) | (tag->byte[1] << 16) |
+	    (tag->byte[2] << 8) | tag->byte[3];
+	tmp.raw_data = tmp32;
+	if (tmp.f.type == FRU_F_ID)
+		return (FRU_F);
+
+	tmp64 = ((uint64_t)tag->byte[0] << 40) |
+	    ((uint64_t)tag->byte[1] << 32) |
+	    ((uint64_t)tag->byte[2] << 24) |
+	    ((uint64_t)tag->byte[3] << 16) |
+	    ((uint64_t)tag->byte[4] << 8) |
+	    (uint64_t)tag->byte[5];
+	tmp.raw_data = tmp64;
+	if (tmp.g.type == FRU_G_ID)
+		return (FRU_G);
+
+	errno = EINVAL;
+	return (-1);
+}
+#else
 fru_tagtype_t
 get_tag_type(fru_tag_t *tag)
 {
@@ -177,7 +219,56 @@ get_tag_type(fru_tag_t *tag)
 		errno = EINVAL;
 		return (-1);
 }
+#endif  /* _LITTLE_ENDIAN */
 
+#if defined(_LITTLE_ENDIAN)
+uint32_t
+get_tag_dense(fru_tag_t *tag)
+{
+	uint64_t tmp64;
+	uint32_t tmp32;
+	fru_tag_t tmp;
+
+	tmp = *tag;
+	switch (get_tag_type(tag)) {
+		case FRU_A:
+			return (tag->a.dense);
+		case FRU_B:
+			tmp.raw_data = (tag->byte[0] << 8) | tag->byte[1];
+			return (tmp.b.dense);
+		case FRU_C:
+			tmp.raw_data = (tag->byte[0] << 8) | tag->byte[1];
+			return (tmp.c.dense);
+		case FRU_D:
+			tmp32 = (tag->byte[0] << 16) | (tag->byte[1] << 8) |
+			    tag->byte[2];
+			tmp.raw_data = tmp32;
+			return (tmp.d.dense);
+		case FRU_E:
+			tmp32 = (tag->byte[0] << 16) | (tag->byte[1] << 8) |
+			    tag->byte[2];
+			tmp.raw_data = tmp32;
+			return (tmp.e.dense);
+		case FRU_F:
+			tmp32 = (tag->byte[0] << 24) | (tag->byte[1] << 16) |
+			    (tag->byte[2] << 8) | tag->byte[3];
+			tmp.raw_data = tmp32;
+			return (tmp.f.dense);
+		case FRU_G:
+			tmp64 = ((uint64_t)tag->byte[0] << 40) |
+			    ((uint64_t)tag->byte[1] << 32) |
+			    ((uint64_t)tag->byte[2] << 24) |
+			    ((uint64_t)tag->byte[3] << 16) |
+			    ((uint64_t)tag->byte[4] << 8) |
+			    (uint64_t)tag->byte[5];
+			tmp.raw_data = tmp64;
+			return (tmp.g.dense);
+		default:
+			errno = EINVAL;
+			return ((uint32_t)-1);
+	}
+}
+#else
 uint32_t
 get_tag_dense(fru_tag_t *tag)
 {
@@ -201,7 +292,56 @@ get_tag_dense(fru_tag_t *tag)
 			return ((uint32_t)-1);
 	}
 }
+#endif  /* _LITTLE_ENDIAN */
 
+#if defined(_LITTLE_ENDIAN)
+size_t
+get_payload_length(fru_tag_t *tag)
+{
+	uint64_t tmp64;
+	uint32_t tmp32;
+	fru_tag_t tmp;
+
+	tmp = *tag;
+	switch (get_tag_type(tag)) {
+		case FRU_A:
+			return (tag->a.pl_len);
+		case FRU_B:
+			tmp.raw_data = (tag->byte[0] << 8) | tag->byte[1];
+			return (tmp.b.pl_len);
+		case FRU_C:
+			tmp.raw_data = (tag->byte[0] << 8) | tag->byte[1];
+			return (tmp.c.pl_len);
+		case FRU_D:
+			tmp32 = (tag->byte[0] << 16) | (tag->byte[1] << 8) |
+			    tag->byte[2];
+			tmp.raw_data = tmp32;
+			return (tmp.d.pl_len);
+		case FRU_E:
+			tmp32 = (tag->byte[0] << 16) | (tag->byte[1] << 8) |
+			    tag->byte[2];
+			tmp.raw_data = tmp32;
+			return (tmp.e.pl_len);
+		case FRU_F:
+			tmp32 = (tag->byte[0] << 24) | (tag->byte[1] << 16) |
+			    (tag->byte[2] << 8) | tag->byte[3];
+			tmp.raw_data = tmp32;
+			return (tmp.f.pl_len);
+		case FRU_G:
+			tmp64 = ((uint64_t)tag->byte[0] << 40) |
+			    ((uint64_t)tag->byte[1] << 32) |
+			    ((uint64_t)tag->byte[2] << 24) |
+			    ((uint64_t)tag->byte[3] << 16) |
+			    ((uint64_t)tag->byte[4] << 8) |
+			    (uint64_t)tag->byte[5];
+			tmp.raw_data = tmp64;
+			return (tmp.g.pl_len);
+		default:
+			errno = EINVAL;
+			return ((uint32_t)-1);
+	}
+}
+#else
 size_t
 get_payload_length(fru_tag_t *tag)
 {
@@ -225,11 +365,12 @@ get_payload_length(fru_tag_t *tag)
 			return ((uint32_t)-1);
 	}
 }
+#endif  /* _LITTLE_ENDIAN */
 
 int
 tags_equal(fru_tag_t t1, fru_tag_t t2)
 {
 	return ((get_tag_type(&t1) == get_tag_type(&t2)) &&
-		(get_tag_dense(&t1) == get_tag_dense(&t2)) &&
-		(get_payload_length(&t1) == get_payload_length(&t2)));
+	    (get_tag_dense(&t1) == get_tag_dense(&t2)) &&
+	    (get_payload_length(&t1) == get_payload_length(&t2)));
 }

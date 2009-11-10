@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,21 +18,65 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 
 #ifndef	_FRU_TAG_H
 #define	_FRU_TAG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#if defined(_LITTLE_ENDIAN)
+
+typedef union {
+	uint64_t raw_data;
+	unsigned char byte[8];
+	struct {
+		unsigned pl_len : 3;
+		unsigned dense : 4;
+		unsigned type : 1;
+	} a;
+	struct {
+		unsigned pl_len : 3;
+		unsigned dense : 11;
+		unsigned type : 2;
+	} b;
+	struct {
+		unsigned pl_len : 5;
+		unsigned dense : 8;
+		unsigned type : 3;
+	} c;
+	struct {
+		unsigned pl_len : 3;
+		unsigned dense : 17;
+		unsigned type : 4;
+	} d;
+	struct {
+		unsigned pl_len : 7;
+		unsigned dense : 12;
+		unsigned type : 5;
+	} e;
+	struct {
+		unsigned pl_len : 12;
+		unsigned dense : 14;
+		unsigned type : 6;
+	} f;
+	struct {
+		unsigned pl_len : 32;
+		unsigned dense : 9;
+		unsigned type : 7;
+	} g;
+} fru_tag_t;
+
+#else
 
 typedef union {
 	uint64_t raw_data;
@@ -74,6 +117,8 @@ typedef union {
 		unsigned pl_len : 32;
 	} g;
 } fru_tag_t;
+
+#endif  /* LITTLE_ENDIAN */
 
 #define	FRU_ID_MASK 0xFF
 #define	FRU_A_ID 0x00

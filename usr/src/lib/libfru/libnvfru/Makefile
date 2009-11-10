@@ -22,21 +22,12 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# lib/libfru/Makefile
 #
 
 include	$(SRC)/lib/Makefile.lib
 
-SUBDIRS_i386 = libfrureg $(MACH)
-$(BUILD64)SUBDIRS_i386 += $(MACH64)
-SUBDIRS_sparc = libfrureg $(MACH)
-$(BUILD64)SUBDIRS_sparc += $(MACH64)
-SUBDIRS_i386 += .WAIT libnvfru libfruraw conf
-SUBDIRS_sparc += .WAIT libfrupicl libfrupicltree libnvfru libfruraw
-
-SUBDIRS = $(SUBDIRS_$(MACH))
-
-
+SUBDIRS = $(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 # conditional assignments
 all :=      	TARGET= all
@@ -46,33 +37,31 @@ clobber :=      TARGET= clobber
 lint :=         TARGET= lint
 _msg :=         TARGET= _msg
 
-POFILE=		libfru.po
+sparc_HDRS=
+sparcv9_HDRS=
+i386_HDRS=
+HDRS=	$($(MACH)_HDRS)
+ROOTHDRDIR=     $(ROOT)/usr/include
+ROOTHDRS=       $(HDRS:%=$(ROOTHDRDIR)/%)
+CHECKHDRS=      $(HDRS:%.h=%.check)
 
 .KEEP_STATE:
 
 all install clean clobber lint: $(SUBDIRS)
 
-_msg:	$(MSGDOMAIN) $(POFILE)
-	$(RM) $(MSGDOMAIN)/$(POFILE)
-	$(CP) $(POFILE) $(MSGDOMAIN)
+_msg:	$(MACH) $(MACH64)
 
-$(POFILE):
-	$(RM) $@ messages.po
-	$(XGETTEXT) $(XGETFLAGS) *.[ch]* */*.[ch]*
-	$(SED) -e '/^# msg/d' -e '/^domain/d' messages.po > $@
-	$(RM) messages.po
 
-$(MSGDOMAIN):
+$(ROOTHDRDIR)/%: %
+	$(INS.file)
+
+$(ROOTHDRDIR):
 	$(INS.dir)
-
-clobber:  po_clean
-
-po_clean:
-	$(RM) $(POFILE)
 
 check: $(CHECKHDRS)
 
-$(SUBDIRS): FRC
+$(MACH) $(MACH64): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+

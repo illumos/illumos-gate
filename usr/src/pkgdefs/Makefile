@@ -52,7 +52,6 @@ sparc_SUBDIRS= \
 	SUNWefc.u \
 	SUNWefck \
 	SUNWerid \
-	SUNWfruid \
 	SUNWfruip.u \
 	SUNWfsr \
 	SUNWfsu \
@@ -128,6 +127,7 @@ i386_SUBDIRS= \
 	SUNWgrubS \
 	SUNWdcopy \
 	SUNWfipe \
+	SUNWfruip.i \
 	SUNWipw \
 	SUNWiwh	\
 	SUNWiwi \
@@ -265,6 +265,7 @@ COMMON_SUBDIRS= \
 	SUNWfilebench \
 	SUNWfmd  \
 	SUNWfmdr  \
+	SUNWfruid \
 	SUNWfss \
 	SUNWftdur \
 	SUNWftduu \
