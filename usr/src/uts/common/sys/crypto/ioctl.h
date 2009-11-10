@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -271,6 +271,7 @@ typedef struct crypto_encrypt_update {
 	caddr_t			eu_databuf;
 	size_t			eu_encrlen;
 	caddr_t			eu_encrbuf;
+	uint_t			eu_flags;
 } crypto_encrypt_update_t;
 
 typedef struct crypto_encrypt_final {
@@ -304,6 +305,7 @@ typedef struct crypto_decrypt_update {
 	caddr_t			du_encrbuf;
 	size_t			du_datalen;
 	caddr_t			du_databuf;
+	uint_t			du_flags;
 } crypto_decrypt_update_t;
 
 typedef struct crypto_decrypt_final {
@@ -541,6 +543,7 @@ typedef struct crypto_encrypt_update32 {
 	caddr32_t		eu_databuf;
 	size32_t		eu_encrlen;
 	caddr32_t		eu_encrbuf;
+	uint_t			eu_flags;
 } crypto_encrypt_update32_t;
 
 typedef struct crypto_encrypt_final32 {
@@ -582,6 +585,7 @@ typedef struct crypto_decrypt_update32 {
 	caddr32_t		du_encrbuf;
 	size32_t		du_datalen;
 	caddr32_t		du_databuf;
+	uint_t			du_flags;
 } crypto_decrypt_update32_t;
 
 typedef struct crypto_decrypt_final32 {

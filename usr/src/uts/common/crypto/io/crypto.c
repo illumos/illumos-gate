@@ -2806,11 +2806,12 @@ cipher(dev_t dev, caddr_t arg, int mode,
 	ctxpp = (single == crypto_encrypt_single) ?
 	    &sp->sd_encr_ctx : &sp->sd_decr_ctx;
 
-	/* in-place is specified by setting output NULL */
 	if (do_inplace)
+		/* specify in-place buffers with output = NULL */
 		rv = (single)(*ctxpp, &encr, NULL, NULL);
 	else
 		rv = (single)(*ctxpp, &data, &encr, NULL);
+
 	if (KCF_CONTEXT_DONE(rv))
 		*ctxpp = NULL;
 
@@ -2886,6 +2887,7 @@ cipher_update(dev_t dev, caddr_t arg, int mode,
 	crypto_ctx_t **ctxpp;
 	crypto_data_t data, encr;
 	size_t datalen, encrlen, need = 0;
+	boolean_t do_inplace;
 	char *encrbuf;
 	int error = 0;
 	int rv;
@@ -2933,7 +2935,9 @@ cipher_update(dev_t dev, caddr_t arg, int mode,
 		goto out;
 	}
 
-	need = datalen + encrlen;
+	do_inplace = (STRUCT_FGET(encrypt_update, eu_flags) &
+	    CRYPTO_INPLACE_OPERATION) != 0;
+	need = do_inplace ? datalen : datalen + encrlen;
 
 	if ((rv = CRYPTO_BUFFER_CHECK(sp, need, rctl_chk)) !=
 	    CRYPTO_SUCCESS) {
@@ -2950,12 +2954,21 @@ cipher_update(dev_t dev, caddr_t arg, int mode,
 		goto out;
 	}
 
-	INIT_RAW_CRYPTO_DATA(encr, encrlen);
+	if (do_inplace) {
+		/* specify in-place buffers with output = input */
+		encr = data;
+	} else {
+		INIT_RAW_CRYPTO_DATA(encr, encrlen);
+	}
 
 	ctxpp = (update == crypto_encrypt_update) ?
 	    &sp->sd_encr_ctx : &sp->sd_decr_ctx;
 
-	rv = (update)(*ctxpp, &data, &encr, NULL);
+	if (do_inplace)
+		/* specify in-place buffers with output = NULL */
+		rv = (update)(*ctxpp, &encr, NULL, NULL);
+	else
+		rv = (update)(*ctxpp, &data, &encr, NULL);
 
 	if (rv == CRYPTO_SUCCESS || rv == CRYPTO_BUFFER_TOO_SMALL) {
 		if (rv == CRYPTO_SUCCESS) {
@@ -2987,7 +3000,7 @@ out:
 	if (data.cd_raw.iov_base != NULL)
 		kmem_free(data.cd_raw.iov_base, datalen);
 
-	if (encr.cd_raw.iov_base != NULL)
+	if (!do_inplace && (encr.cd_raw.iov_base != NULL))
 		kmem_free(encr.cd_raw.iov_base, encrlen);
 
 	if (error != 0)

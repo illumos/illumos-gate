@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _KERNELSESSION_H
 #define	_KERNELSESSION_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,6 +68,7 @@ typedef struct digest_buf {
 #define	CRYPTO_EMULATE_USING_SW	0x00000008 /* ... use software */
 #define	CRYPTO_EMULATE_UPDATE_DONE 0x00000010 /* did at least one update */
 #define	CRYPTO_EMULATE_INIT_DONE 0x00000020 /* did init */
+#define	CRYPTO_OPERATION_INPLACE_OK 0x00000040 /* INPLACE_MECHANISM is true */
 
 typedef struct session {
 	CK_ULONG	magic_marker;	/* magic # be validated for integrity */

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -99,7 +97,13 @@ kernel_decrypt_init(kernel_session_t *session_p, kernel_object_t *key_p,
 
 	decrypt_init.di_session = session_p->k_session;
 	session_p->decrypt.mech = *pMechanism;
+
+	/* Cache this capability value for efficiency */
+	if (INPLACE_MECHANISM(session_p->decrypt.mech.mechanism)) {
+		session_p->decrypt.flags |= CRYPTO_OPERATION_INPLACE_OK;
+	}
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
+
 	ses_lock_held = B_FALSE;
 	decrypt_init.di_mech.cm_type = k_mech_type;
 	decrypt_init.di_mech.cm_param = pMechanism->pParameter;
@@ -223,7 +227,8 @@ kernel_decrypt(kernel_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 	 * some applications use a plaintext buffer that is larger
 	 * than it needs to be. We fix that here.
 	 */
-	inplace = INPLACE_MECHANISM(session_p->decrypt.mech.mechanism);
+	inplace = (session_p->decrypt.flags & CRYPTO_OPERATION_INPLACE_OK) != 0;
+
 	if (ulEncryptedData < *pulDataLen && inplace) {
 		decrypt.cd_datalen = ulEncryptedData;
 	} else {
@@ -235,8 +240,9 @@ kernel_decrypt(kernel_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 	decrypt.cd_databuf = (char *)pData;
 	decrypt.cd_encrlen = ulEncryptedData;
 	decrypt.cd_encrbuf = (char *)pEncryptedData;
-	decrypt.cd_flags = inplace && pData != NULL &&
-	    decrypt.cd_datalen == decrypt.cd_encrlen ?
+	decrypt.cd_flags = 
+	    ((inplace && (pData != NULL)) || (pData == pEncryptedData)) &&
+	    (decrypt.cd_datalen == decrypt.cd_encrlen) ?
 	    CRYPTO_INPLACE_OPERATION : 0;
 
 	while ((r = ioctl(kernel_fd, CRYPTO_DECRYPT, &decrypt)) < 0) {
@@ -324,6 +330,7 @@ C_DecryptUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pEncryptedPart,
 	CK_RV rv;
 	kernel_session_t *session_p;
 	boolean_t ses_lock_held = B_FALSE;
+	boolean_t inplace;
 	crypto_decrypt_update_t decrypt_update;
 	int r;
 
@@ -373,6 +380,12 @@ C_DecryptUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pEncryptedPart,
 	decrypt_update.du_databuf = (char *)pPart;
 	decrypt_update.du_encrlen = ulEncryptedPartLen;
 	decrypt_update.du_encrbuf = (char *)pEncryptedPart;
+
+	inplace = (session_p->decrypt.flags & CRYPTO_OPERATION_INPLACE_OK) != 0;
+	decrypt_update.du_flags =
+	    ((inplace && (pPart != NULL)) || (pPart == pEncryptedPart)) &&
+	    (decrypt_update.du_datalen == decrypt_update.du_encrlen) ?
+	    CRYPTO_INPLACE_OPERATION : 0;
 
 	while ((r = ioctl(kernel_fd, CRYPTO_DECRYPT_UPDATE,
 	    &decrypt_update)) < 0) {

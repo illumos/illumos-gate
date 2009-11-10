@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 #include <stdlib.h>
@@ -118,7 +116,13 @@ C_EncryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 
 	encrypt_init.ei_session = session_p->k_session;
 	session_p->encrypt.mech = *pMechanism;
+
+	/* Cache this capability value for efficiency */
+	if (INPLACE_MECHANISM(session_p->encrypt.mech.mechanism)) {
+		session_p->encrypt.flags |= CRYPTO_OPERATION_INPLACE_OK;
+	}
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
+
 	ses_lock_held = B_FALSE;
 	encrypt_init.ei_mech.cm_type = k_mech_type;
 	encrypt_init.ei_mech.cm_param = pMechanism->pParameter;
@@ -228,7 +232,7 @@ C_Encrypt(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	 * some applications use a ciphertext buffer that is larger
 	 * than it needs to be. We fix that here.
 	 */
-	inplace = INPLACE_MECHANISM(session_p->encrypt.mech.mechanism);
+	inplace = (session_p->encrypt.flags & CRYPTO_OPERATION_INPLACE_OK) != 0;
 	if (ulDataLen < *pulEncryptedDataLen && inplace) {
 		encrypt.ce_encrlen = ulDataLen;
 	} else {
@@ -240,8 +244,10 @@ C_Encrypt(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	encrypt.ce_datalen = ulDataLen;
 	encrypt.ce_databuf = (char *)pData;
 	encrypt.ce_encrbuf = (char *)pEncryptedData;
-	encrypt.ce_flags = inplace && pEncryptedData != NULL &&
-	    encrypt.ce_encrlen == encrypt.ce_datalen ?
+	encrypt.ce_flags =
+	    ((inplace && (pEncryptedData != NULL)) ||
+	    (pData == pEncryptedData)) &&
+	    (encrypt.ce_encrlen == encrypt.ce_datalen) ?
 	    CRYPTO_INPLACE_OPERATION : 0;
 
 	while ((r = ioctl(kernel_fd, CRYPTO_ENCRYPT, &encrypt)) < 0) {
@@ -293,6 +299,7 @@ C_EncryptUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 	CK_RV rv;
 	kernel_session_t *session_p;
 	boolean_t ses_lock_held = B_FALSE;
+	boolean_t inplace;
 	crypto_encrypt_update_t encrypt_update;
 	int r;
 
@@ -342,6 +349,13 @@ C_EncryptUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 	encrypt_update.eu_databuf = (char *)pPart;
 	encrypt_update.eu_encrlen = *pulEncryptedPartLen;
 	encrypt_update.eu_encrbuf = (char *)pEncryptedPart;
+
+	inplace = (session_p->encrypt.flags & CRYPTO_OPERATION_INPLACE_OK) != 0;
+	encrypt_update.eu_flags =
+	    ((inplace && (pEncryptedPart != NULL)) ||
+	    (pPart == pEncryptedPart)) &&
+	    (encrypt_update.eu_encrlen == encrypt_update.eu_datalen) ?
+	    CRYPTO_INPLACE_OPERATION : 0;
 
 	while ((r = ioctl(kernel_fd, CRYPTO_ENCRYPT_UPDATE,
 	    &encrypt_update)) < 0) {
