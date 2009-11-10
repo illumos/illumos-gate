@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,7 @@ krb5_get_credentials_core(krb5_context context, krb5_flags options,
 	if ((ret = krb5_timeofday(context, &mcreds->times.endtime)) != 0)
 		return (ret);
 
-    ret = krb5_copy_keyblock_data(context, &in_creds->keyblock,
+    ret = krb5_copy_keyblock_contents(context, &in_creds->keyblock,
 		&mcreds->keyblock);
     if (ret)
 	return (ret);
@@ -107,8 +107,10 @@ krb5_get_credentials_core(krb5_context context, krb5_flags options,
 	if (ktypes[i] == 0)
 	    ret = KRB5_CC_NOT_KTYPE;
 	free (ktypes);
-	if (ret)
+	if (ret) {
+	    krb5_free_keyblock_contents(context, &mcreds->keyblock);
 	    return ret;
+	}
     }
     if (options & KRB5_GC_USER_USER) {
 	/* also match on identical 2nd tkt and tkt encrypted in a
@@ -116,8 +118,10 @@ krb5_get_credentials_core(krb5_context context, krb5_flags options,
 	*fields |= KRB5_TC_MATCH_2ND_TKT|KRB5_TC_MATCH_IS_SKEY;
 	mcreds->is_skey = TRUE;
 	mcreds->second_ticket = in_creds->second_ticket;
-	if (!in_creds->second_ticket.length)
+	if (!in_creds->second_ticket.length) {
+	    krb5_free_keyblock_contents(context, &mcreds->keyblock);
 	    return KRB5_NO_2ND_TKT;
+	}
     }
 
     return 0;
@@ -141,8 +145,10 @@ krb5_get_credentials(krb5_context context, krb5_flags options,
 
     if (retval) return retval;
 
-    if ((ncreds = (krb5_creds *)malloc(sizeof(krb5_creds))) == NULL)
+    if ((ncreds = (krb5_creds *)malloc(sizeof(krb5_creds))) == NULL) {
+	krb5_free_keyblock_contents(context, &mcreds.keyblock);
 	return ENOMEM;
+    }
 
     memset((char *)ncreds, 0, sizeof(krb5_creds));
     ncreds->magic = KV5M_CREDS;
@@ -158,8 +164,10 @@ krb5_get_credentials(krb5_context context, krb5_flags options,
     }
 
     if ((retval != KRB5_CC_NOTFOUND && retval != KRB5_CC_NOT_KTYPE)
-	|| options & KRB5_GC_CACHED)
+	|| options & KRB5_GC_CACHED) {
+	krb5_free_keyblock_contents(context, &mcreds.keyblock);
 	return retval;
+    }
 
     if (retval == KRB5_CC_NOT_KTYPE)
 	not_ktype = 1;
@@ -205,6 +213,8 @@ krb5_get_credentials(krb5_context context, krb5_flags options,
 	/* Solaris Kerberos */
 	retval = krb5_cc_store_cred(context, ccache, *out_creds);
     }
+
+    krb5_free_keyblock_contents(context, &mcreds.keyblock);
     return retval;
 }
 
