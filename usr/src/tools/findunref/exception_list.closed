@@ -58,3 +58,9 @@
 #
 # ISUSED - let checkpaths know that the next entry is good.
 ./usr/closed/deleted_files
+
+#
+# Ignore some files originally shared by Broadcom as part of bnxe driver
+#
+./usr/closed/uts/common/io/bnxe/577xx
+./usr/closed/uts/common/io/bnxe/src/bnxe_debug.h
