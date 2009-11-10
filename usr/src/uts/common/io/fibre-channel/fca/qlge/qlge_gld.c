@@ -107,7 +107,7 @@ ql_m_start(void *arg)
 	mutex_exit(&qlge->gen_mutex);
 
 	mutex_enter(&qlge->mbx_mutex);
-	ql_get_firmware_version(qlge, NULL);
+	(void) ql_get_firmware_version(qlge, NULL);
 	mutex_exit(&qlge->mbx_mutex);
 
 	return (0);
@@ -342,7 +342,7 @@ ql_m_getstat(void *arg, uint_t stat, uint64_t *valp)
 		    DDI_SUCCESS) {
 			break;
 		}
-		ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_JABBER_PKTS,
+		(void) ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_JABBER_PKTS,
 		    &val32);
 		val = val32;
 		ql_sem_unlock(qlge, qlge->xgmac_sem_mask);
@@ -363,18 +363,18 @@ ql_m_getstat(void *arg, uint_t stat, uint64_t *valp)
 		    DDI_SUCCESS) {
 			break;
 		}
-		ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_ALIGN_ERR,
+		(void) ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_ALIGN_ERR,
 		    &val32);
 		val += val32;
-		ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_FCS_ERR, &val32);
+		(void) ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_FCS_ERR, &val32);
 		val += val32;
-		ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_JABBER_PKTS,
+		(void) ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_JABBER_PKTS,
 		    &val32);
 		val += val32;
-		ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_SYM_ERR,
+		(void) ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_SYM_ERR,
 		    &val32);
 		val += val32;
-		ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_INT_ERR,
+		(void) ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_INT_ERR,
 		    &val32);
 		val += val32;
 		ql_sem_unlock(qlge, qlge->xgmac_sem_mask);

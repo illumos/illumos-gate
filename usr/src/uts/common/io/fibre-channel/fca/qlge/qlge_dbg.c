@@ -1502,7 +1502,7 @@ qlge_set_loop_mode(qlge_t *qlge, uint32_t mode)
 	 */
 	qlge->loop_back_mode = mode;
 	mutex_enter(&qlge->mbx_mutex);
-	ql_set_port_cfg(qlge);
+	(void) ql_set_port_cfg(qlge);
 	mutex_exit(&qlge->mbx_mutex);
 	return (IOC_REPLY);
 }

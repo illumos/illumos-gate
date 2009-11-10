@@ -1183,7 +1183,7 @@ ql_write_flash(qlge_t *qlge, uint32_t addr, uint32_t data)
 	uint8_t flash_status;
 
 	ql_write_reg(qlge, REG_FLASH_DATA, data);
-	ql_read_reg(qlge, REG_FLASH_DATA);
+	(void) ql_read_reg(qlge, REG_FLASH_DATA);
 	ql_write_reg(qlge, REG_FLASH_ADDRESS, addr);
 
 	if ((rval = ql_wait_flash_reg_ready(qlge, FLASH_RDY_FLAG))
@@ -1364,7 +1364,8 @@ ql_write_flash_test2(qlge_t *qlge, uint32_t test_addr)
 	data = 0x12345678;
 
 	QL_PRINT(DBG_FLASH, ("write new test value %x\n", data));
-	qlge_load_flash(qlge, (uint8_t *)&data, sizeof (data), test_addr);
+	(void) qlge_load_flash(qlge, (uint8_t *)&data, sizeof (data),
+	    test_addr);
 	(void) qlge_dump_fcode(qlge, (uint8_t *)&data, sizeof (data),
 	    test_addr);
 	if (data != 0x12345678) {
@@ -1373,7 +1374,7 @@ ql_write_flash_test2(qlge_t *qlge, uint32_t test_addr)
 		    data);
 	}
 	/* write old value to it and read back to restore */
-	qlge_load_flash(qlge, (uint8_t *)&old_data, sizeof (old_data),
+	(void) qlge_load_flash(qlge, (uint8_t *)&old_data, sizeof (old_data),
 	    test_addr);
 	(void) qlge_dump_fcode(qlge, (uint8_t *)&data, sizeof (data),
 	    test_addr);

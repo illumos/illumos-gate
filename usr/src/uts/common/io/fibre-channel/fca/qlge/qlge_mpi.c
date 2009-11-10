@@ -1141,7 +1141,7 @@ ql_reset_mpi_risc(qlge_t *qlge)
 	ql_write_reg(qlge, REG_HOST_CMD_STATUS, HOST_CMD_SET_RISC_RESET);
 	if (ql_wait_reg_bit(qlge, REG_HOST_CMD_STATUS, RISC_RESET,
 	    BIT_SET, 0) != DDI_SUCCESS) {
-		ql_read_reg(qlge, REG_HOST_CMD_STATUS);
+		(void) ql_read_reg(qlge, REG_HOST_CMD_STATUS);
 		goto out;
 	}
 	ql_write_reg(qlge, REG_HOST_CMD_STATUS, HOST_CMD_CLEAR_RISC_RESET);
