@@ -322,7 +322,10 @@ zio_handle_ignored_writes(zio_t *zio)
 			else
 				handler->zi_record.zi_timer = zio->io_txg;
 		}
-		zio->io_pipeline &= ~ZIO_VDEV_IO_STAGES;
+
+		/* Have a "problem" writing 60% of the time */
+		if (spa_get_random(100) < 60)
+			zio->io_pipeline &= ~ZIO_VDEV_IO_STAGES;
 		break;
 	}
 

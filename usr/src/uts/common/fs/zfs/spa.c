@@ -1245,6 +1245,8 @@ spa_load_verify(spa_t *spa)
 		verify_ok = B_TRUE;
 		spa->spa_load_txg = spa->spa_uberblock.ub_txg;
 		spa->spa_load_txg_ts = spa->spa_uberblock.ub_timestamp;
+	} else {
+		spa->spa_load_max_txg = spa->spa_uberblock.ub_txg;
 	}
 
 	if (error) {
@@ -1822,10 +1824,12 @@ spa_load_best(spa_t *spa, spa_load_state_t state, int mosconfig,
 	uint64_t safe_rollback_txg;
 	uint64_t min_txg;
 
-	if (spa->spa_load_txg && state == SPA_LOAD_RECOVER)
+	if (spa->spa_load_txg && state == SPA_LOAD_RECOVER) {
 		spa->spa_load_max_txg = spa->spa_load_txg;
-	else
+		spa->spa_log_state = SPA_LOG_CLEAR;
+	} else {
 		spa->spa_load_max_txg = max_request;
+	}
 
 	load_error = rewind_error = spa_load(spa, state, mosconfig);
 	if (load_error == 0)
@@ -1977,16 +1981,16 @@ spa_open_common(const char *pool, spa_t **spapp, void *tag, nvlist_t *nvpolicy,
 
 	spa_open_ref(spa, tag);
 
-	spa->spa_last_open_failed = 0;
 
 	if (config != NULL)
 		*config = spa_config_generate(spa, NULL, -1ULL, B_TRUE);
 
-	spa->spa_last_ubsync_txg = 0;
-	spa->spa_load_txg = 0;
-
-	if (locked)
+	if (locked) {
+		spa->spa_last_open_failed = 0;
+		spa->spa_last_ubsync_txg = 0;
+		spa->spa_load_txg = 0;
 		mutex_exit(&spa_namespace_lock);
+	}
 
 	*spapp = spa;
 

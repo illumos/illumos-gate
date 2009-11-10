@@ -196,7 +196,12 @@ metaslab_group_destroy(metaslab_group_t *mg)
 {
 	ASSERT(mg->mg_prev == NULL);
 	ASSERT(mg->mg_next == NULL);
-	ASSERT(mg->mg_activation_count + mg->mg_vd->vdev_removing == 0);
+	/*
+	 * We may have gone below zero with the activation count
+	 * either because we never activated in the first place or
+	 * because we're done, and possibly removing the vdev.
+	 */
+	ASSERT(mg->mg_activation_count <= 0);
 
 	avl_destroy(&mg->mg_metaslab_tree);
 	mutex_destroy(&mg->mg_lock);

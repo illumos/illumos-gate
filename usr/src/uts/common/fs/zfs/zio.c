@@ -1008,10 +1008,6 @@ zio_free_bp_init(zio_t *zio)
 			arc_free(zio->io_spa, bp);
 	}
 
-	if (zio_injection_enabled &&
-	    zio->io_spa->spa_syncing_txg == zio->io_txg)
-		zio_handle_ignored_writes(zio);
-
 	return (ZIO_PIPELINE_CONTINUE);
 }
 
@@ -2572,6 +2568,10 @@ zio_ready(zio_t *zio)
 			zio->io_pipeline &= ~ZIO_VDEV_IO_STAGES;
 		}
 	}
+
+	if (zio_injection_enabled &&
+	    zio->io_spa->spa_syncing_txg == zio->io_txg)
+		zio_handle_ignored_writes(zio);
 
 	return (ZIO_PIPELINE_CONTINUE);
 }

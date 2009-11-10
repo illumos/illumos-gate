@@ -1355,8 +1355,8 @@ zpool_explain_recover(libzfs_handle_t *hdl, const char *name, int reason,
 		}
 	}
 	(void) printf(dgettext(TEXT_DOMAIN,
-	    "Recovery can be\n\tattempted by executing "
-	    "'zpool %s -F %s'.  "), reason >= 0 ? "clear" : "import", name);
+	    "Recovery can be attempted\n\tby executing 'zpool %s -F %s'.  "),
+	    reason >= 0 ? "clear" : "import", name);
 
 	(void) printf(dgettext(TEXT_DOMAIN,
 	    "A scrub of the pool\n"
