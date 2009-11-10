@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.143 v3-1-3_2009-8-20
+ * IntelVersion: 1.151 v3-1-10-1_2009-9-18_Release14-6
  */
 #include "e1000_api.h"
 
@@ -81,11 +81,13 @@ e1000_init_phy_ops_generic(struct e1000_hw *hw)
 	phy->ops.get_cable_length = e1000_null_ops_generic;
 	phy->ops.get_info = e1000_null_ops_generic;
 	phy->ops.read_reg = e1000_null_read_reg;
+	phy->ops.read_reg_locked = e1000_null_read_reg;
 	phy->ops.release = e1000_null_phy_generic;
 	phy->ops.reset = e1000_null_ops_generic;
 	phy->ops.set_d0_lplu_state = e1000_null_lplu_state;
 	phy->ops.set_d3_lplu_state = e1000_null_lplu_state;
 	phy->ops.write_reg = e1000_null_write_reg;
+	phy->ops.write_reg_locked = e1000_null_write_reg;
 	phy->ops.power_up = e1000_null_phy_generic;
 	phy->ops.power_down = e1000_null_phy_generic;
 	phy->ops.cfg_on_link_up = e1000_null_ops_generic;
@@ -197,21 +199,30 @@ e1000_get_phy_id(struct e1000_hw *hw)
 			goto out;
 
 		/*
-		 * If the PHY ID is still unknown, we may have an 82577 without
-		 * link. We will try again after setting Slow MDIC mode. No
-		 * harm in trying again in this case since the PHY ID is
-		 * unknown at this point anyway
+		 * If the PHY ID is still unknown, we may have an 82577
+		 * without link.  We will try again after setting Slow MDIC
+		 * mode. No harm in trying again in this case since the PHY
+		 * ID is unknown at this point anyway.
 		 */
+		ret_val = phy->ops.acquire(hw);
+		if (ret_val)
+			goto out;
 		ret_val = e1000_set_mdio_slow_mode_hv(hw, true);
 		if (ret_val)
 			goto out;
+		phy->ops.release(hw);
 
 		retry_count++;
 	}
 out:
 	/* Revert to MDIO fast mode, if applicable */
-	if (retry_count)
+	if (retry_count) {
+		ret_val = phy->ops.acquire(hw);
+		if (ret_val)
+			return (ret_val);
 		ret_val = e1000_set_mdio_slow_mode_hv(hw, false);
+		phy->ops.release(hw);
+	}
 
 	return (ret_val);
 }
@@ -425,39 +436,117 @@ out:
  * @hw: pointer to the HW structure
  * @offset: register offset to be read
  * @data: pointer to the read data
+ * @locked: semaphore has already been acquired or not
  *
  * Acquires semaphore, if necessary, then reads the PHY register at offset
- * and storing the retrieved information in data.  Release any acquired
+ * and stores the retrieved information in data.  Release any acquired
  * semaphores before exiting.
+ */
+static s32
+__e1000_read_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 *data,
+    bool locked)
+{
+	s32 ret_val = E1000_SUCCESS;
+
+	DEBUGFUNC("__e1000_read_phy_reg_igp");
+
+	if (!locked) {
+		if (!(hw->phy.ops.acquire))
+			goto out;
+
+		ret_val = hw->phy.ops.acquire(hw);
+		if (ret_val)
+			goto out;
+	}
+
+	if (offset > MAX_PHY_MULTI_PAGE_REG) {
+		ret_val = e1000_write_phy_reg_mdic(hw,
+		    IGP01E1000_PHY_PAGE_SELECT, (u16)offset);
+		if (ret_val)
+			goto release;
+	}
+
+	ret_val = e1000_read_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & offset,
+	    data);
+
+release:
+	if (!locked)
+		hw->phy.ops.release(hw);
+out:
+	return (ret_val);
+}
+
+/*
+ * e1000_read_phy_reg_igp - Read igp PHY register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to be read
+ * @data: pointer to the read data
+ *
+ * Acquires semaphore then reads the PHY register at offset and stores the
+ * retrieved information in data.
+ * Release the acquired semaphore before exiting.
  */
 s32
 e1000_read_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 *data)
 {
+	return (__e1000_read_phy_reg_igp(hw, offset, data, false));
+}
+
+/*
+ * e1000_read_phy_reg_igp_locked - Read igp PHY register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to be read
+ * @data: pointer to the read data
+ *
+ * Reads the PHY register at offset and stores the retrieved information
+ * in data.  Assumes semaphore already acquired.
+ */
+s32
+e1000_read_phy_reg_igp_locked(struct e1000_hw *hw, u32 offset, u16 *data)
+{
+	return (__e1000_read_phy_reg_igp(hw, offset, data, true));
+}
+
+/*
+ * e1000_write_phy_reg_igp - Write igp PHY register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to write to
+ * @data: data to write at register offset
+ * @locked: semaphore has already been acquired or not
+ *
+ * Acquires semaphore, if necessary, then writes the data to PHY register
+ * at the offset.  Release any acquired semaphores before exiting.
+ */
+static s32
+__e1000_write_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 data,
+    bool locked)
+{
 	s32 ret_val = E1000_SUCCESS;
 
-	DEBUGFUNC("e1000_read_phy_reg_igp");
+	DEBUGFUNC("e1000_write_phy_reg_igp");
 
-	if (!(hw->phy.ops.acquire))
-		goto out;
+	if (!locked) {
+		if (!(hw->phy.ops.acquire))
+			goto out;
 
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		goto out;
+		ret_val = hw->phy.ops.acquire(hw);
+		if (ret_val)
+			goto out;
+	}
 
 	if (offset > MAX_PHY_MULTI_PAGE_REG) {
 		ret_val = e1000_write_phy_reg_mdic(hw,
-		    IGP01E1000_PHY_PAGE_SELECT,
-		    (u16)offset);
-		if (ret_val) {
-			hw->phy.ops.release(hw);
-			goto out;
-		}
+		    IGP01E1000_PHY_PAGE_SELECT, (u16)offset);
+		if (ret_val)
+			goto release;
 	}
-	ret_val = e1000_read_phy_reg_mdic(hw,
-	    MAX_PHY_REG_ADDRESS & offset,
+
+	ret_val = e1000_write_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & offset,
 	    data);
 
-	hw->phy.ops.release(hw);
+release:
+	if (!locked)
+		hw->phy.ops.release(hw);
 
 out:
 	return (ret_val);
@@ -469,67 +558,57 @@ out:
  * @offset: register offset to write to
  * @data: data to write at register offset
  *
- * Acquires semaphore, if necessary, then writes the data to PHY register
+ * Acquires semaphore then writes the data to PHY register
  * at the offset.  Release any acquired semaphores before exiting.
  */
 s32
 e1000_write_phy_reg_igp(struct e1000_hw *hw, u32 offset, u16 data)
 {
-	s32 ret_val = E1000_SUCCESS;
-
-	DEBUGFUNC("e1000_write_phy_reg_igp");
-
-	if (!(hw->phy.ops.acquire))
-		goto out;
-
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		goto out;
-
-	if (offset > MAX_PHY_MULTI_PAGE_REG) {
-		ret_val = e1000_write_phy_reg_mdic(hw,
-		    IGP01E1000_PHY_PAGE_SELECT,
-		    (u16)offset);
-		if (ret_val) {
-			hw->phy.ops.release(hw);
-			goto out;
-		}
-	}
-
-	ret_val = e1000_write_phy_reg_mdic(hw,
-	    MAX_PHY_REG_ADDRESS & offset,
-	    data);
-
-	hw->phy.ops.release(hw);
-
-out:
-	return (ret_val);
+	return (__e1000_write_phy_reg_igp(hw, offset, data, false));
 }
 
 /*
- * e1000_read_kmrn_reg_generic - Read kumeran register
+ * e1000_write_phy_reg_igp_locked - Write igp PHY register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to write to
+ * @data: data to write at register offset
+ *
+ * Writes the data to PHY register at the offset.
+ * Assumes semaphore already acquired.
+ */
+s32
+e1000_write_phy_reg_igp_locked(struct e1000_hw *hw, u32 offset, u16 data)
+{
+	return (__e1000_write_phy_reg_igp(hw, offset, data, true));
+}
+
+/*
+ * __e1000_read_kmrn_reg - Read kumeran register
  * @hw: pointer to the HW structure
  * @offset: register offset to be read
  * @data: pointer to the read data
+ * @locked: semaphore has already been acquired or not
  *
- * Acquires semaphore, if necessary.  Then reads the PHY register at offset
- * using the kumeran interface.  The information retrieved is stored in data.
+ * Acquires semaphore, if necessary. Then reads the PHY register at offset
+ * using the kumeran interface. The information retrieved is stored in data.
  * Release any acquired semaphores before exiting.
  */
-s32
-e1000_read_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 *data)
+static s32
+__e1000_read_kmrn_reg(struct e1000_hw *hw, u32 offset, u16 *data, bool locked)
 {
 	u32 kmrnctrlsta;
 	s32 ret_val = E1000_SUCCESS;
 
-	DEBUGFUNC("e1000_read_kmrn_reg_generic");
+	DEBUGFUNC("__e1000_read_kmrn_reg");
 
-	if (!(hw->phy.ops.acquire))
-		goto out;
+	if (!locked) {
+		if (!(hw->phy.ops.acquire))
+			goto out;
 
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		goto out;
+		ret_val = hw->phy.ops.acquire(hw);
+		if (ret_val)
+			goto out;
+	}
 
 	kmrnctrlsta = ((offset << E1000_KMRNCTRLSTA_OFFSET_SHIFT) &
 	    E1000_KMRNCTRLSTA_OFFSET) | E1000_KMRNCTRLSTA_REN;
@@ -540,46 +619,114 @@ e1000_read_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 *data)
 	kmrnctrlsta = E1000_READ_REG(hw, E1000_KMRNCTRLSTA);
 	*data = (u16)kmrnctrlsta;
 
-	hw->phy.ops.release(hw);
+	if (!locked)
+		hw->phy.ops.release(hw);
 
 out:
 	return (ret_val);
 }
 
 /*
- * e1000_write_kmrn_reg_generic - Write kumeran register
+ * e1000_read_kmrn_reg_generic -  Read kumeran register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to be read
+ * @data: pointer to the read data
+ *
+ * Acquires semaphore then reads the PHY register at offset using the
+ * kumeran interface.  The information retrieved is stored in data.
+ * Release the acquired semaphore before exiting.
+ */
+s32
+e1000_read_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 *data)
+{
+	return (__e1000_read_kmrn_reg(hw, offset, data, false));
+}
+
+/*
+ * e1000_read_kmrn_reg_locked -  Read kumeran register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to be read
+ * @data: pointer to the read data
+ *
+ * Reads the PHY register at offset using the kumeran interface.  The
+ * information retrieved is stored in data.
+ * Assumes semaphore already acquired.
+ */
+s32
+e1000_read_kmrn_reg_locked(struct e1000_hw *hw, u32 offset, u16 *data)
+{
+	return (__e1000_read_kmrn_reg(hw, offset, data, true));
+}
+
+/*
+ * __e1000_write_kmrn_reg - Write kumeran register
  * @hw: pointer to the HW structure
  * @offset: register offset to write to
  * @data: data to write at register offset
+ * @locked: semaphore has already been acquired or not
  *
  * Acquires semaphore, if necessary.  Then write the data to PHY register
  * at the offset using the kumeran interface.  Release any acquired semaphores
  * before exiting.
  */
-s32
-e1000_write_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 data)
+static s32
+__e1000_write_kmrn_reg(struct e1000_hw *hw, u32 offset, u16 data, bool locked)
 {
 	u32 kmrnctrlsta;
 	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_write_kmrn_reg_generic");
 
-	if (!(hw->phy.ops.acquire))
-		goto out;
+	if (!locked) {
+		if (!(hw->phy.ops.acquire))
+			goto out;
 
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		goto out;
+		ret_val = hw->phy.ops.acquire(hw);
+		if (ret_val)
+			goto out;
+	}
 
 	kmrnctrlsta = ((offset << E1000_KMRNCTRLSTA_OFFSET_SHIFT) &
 	    E1000_KMRNCTRLSTA_OFFSET) | data;
 	E1000_WRITE_REG(hw, E1000_KMRNCTRLSTA, kmrnctrlsta);
 
 	usec_delay(2);
-	hw->phy.ops.release(hw);
+
+	if (!locked)
+		hw->phy.ops.release(hw);
 
 out:
 	return (ret_val);
+}
+
+/*
+ * e1000_write_kmrn_reg_generic -  Write kumeran register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to write to
+ * @data: data to write at register offset
+ *
+ * Acquires semaphore then writes the data to the PHY register at the offset
+ * using the kumeran interface.  Release the acquired semaphore before exiting.
+ */
+s32
+e1000_write_kmrn_reg_generic(struct e1000_hw *hw, u32 offset, u16 data)
+{
+	return (__e1000_write_kmrn_reg(hw, offset, data, false));
+}
+
+/*
+ * e1000_write_kmrn_reg_locked -  Write kumeran register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to write to
+ * @data: data to write at register offset
+ *
+ * Write the data to PHY register at the offset using the kumeran interface.
+ * Assumes semaphore already acquired.
+ */
+s32
+e1000_write_kmrn_reg_locked(struct e1000_hw *hw, u32 offset, u16 data)
+{
+	return (__e1000_write_kmrn_reg(hw, offset, data, true));
 }
 
 /*
@@ -1863,8 +2010,7 @@ e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
 			 */
 			usec_delay(usec_interval);
 		}
-		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS,
-		    &phy_status);
+		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &phy_status);
 		if (ret_val)
 			break;
 		if (phy_status & MII_SR_LINK_STATUS)
@@ -2460,15 +2606,16 @@ e1000_write_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 data)
 
 	DEBUGFUNC("e1000_write_phy_reg_bm");
 
+	ret_val = hw->phy.ops.acquire(hw);
+	if (ret_val)
+		goto out;
+
 	/* Page 800 works differently than the rest so it has its own func */
 	if (page == BM_WUC_PAGE) {
 		ret_val = e1000_access_phy_wakeup_reg_bm(hw,
 		    offset, &data, false);
 		goto out;
 	}
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		goto out;
 
 	hw->phy.addr = e1000_get_phy_addr_for_bm_page(page, offset);
 
@@ -2489,19 +2636,16 @@ e1000_write_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 data)
 		/* Page is shifted left, PHY expects (page x 32) */
 		ret_val = e1000_write_phy_reg_mdic(hw, page_select,
 		    (page << page_shift));
-		if (ret_val) {
-			hw->phy.ops.release(hw);
+		if (ret_val)
 			goto out;
-		}
 	}
 
 	ret_val = e1000_write_phy_reg_mdic(hw,
 	    MAX_PHY_REG_ADDRESS & offset,
 	    data);
 
-	hw->phy.ops.release(hw);
-
 out:
+	hw->phy.ops.release(hw);
 	return (ret_val);
 }
 
@@ -2525,15 +2669,16 @@ e1000_read_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data)
 
 	DEBUGFUNC("e1000_read_phy_reg_bm");
 
+	ret_val = hw->phy.ops.acquire(hw);
+	if (ret_val)
+		goto out;
+
 	/* Page 800 works differently than the rest so it has its own func */
 	if (page == BM_WUC_PAGE) {
 		ret_val = e1000_access_phy_wakeup_reg_bm(hw,
 		    offset, data, true);
 		goto out;
 	}
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		goto out;
 
 	hw->phy.addr = e1000_get_phy_addr_for_bm_page(page, offset);
 
@@ -2554,18 +2699,16 @@ e1000_read_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data)
 		/* Page is shifted left, PHY expects (page x 32) */
 		ret_val = e1000_write_phy_reg_mdic(hw, page_select,
 		    (page << page_shift));
-		if (ret_val) {
-			hw->phy.ops.release(hw);
+		if (ret_val)
 			goto out;
-		}
 	}
 
 	ret_val = e1000_read_phy_reg_mdic(hw,
 	    MAX_PHY_REG_ADDRESS & offset,
 	    data);
-	hw->phy.ops.release(hw);
 
 out:
+	hw->phy.ops.release(hw);
 	return (ret_val);
 }
 
@@ -2587,16 +2730,16 @@ e1000_read_phy_reg_bm2(struct e1000_hw *hw, u32 offset, u16 *data)
 
 	DEBUGFUNC("e1000_write_phy_reg_bm2");
 
+	ret_val = hw->phy.ops.acquire(hw);
+	if (ret_val)
+		goto out;
+
 	/* Page 800 works differently than the rest so it has its own func */
 	if (page == BM_WUC_PAGE) {
 		ret_val = e1000_access_phy_wakeup_reg_bm(hw, offset, data,
 		    true);
 		goto out;
 	}
-
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		goto out;
 
 	hw->phy.addr = 1;
 
@@ -2606,17 +2749,15 @@ e1000_read_phy_reg_bm2(struct e1000_hw *hw, u32 offset, u16 *data)
 		ret_val = e1000_write_phy_reg_mdic(hw, BM_PHY_PAGE_SELECT,
 		    page);
 
-		if (ret_val) {
-			hw->phy.ops.release(hw);
+		if (ret_val)
 			goto out;
-		}
 	}
 
 	ret_val = e1000_read_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & offset,
 	    data);
-	hw->phy.ops.release(hw);
 
 out:
+	hw->phy.ops.release(hw);
 	return (ret_val);
 }
 
@@ -2637,16 +2778,16 @@ e1000_write_phy_reg_bm2(struct e1000_hw *hw, u32 offset, u16 data)
 
 	DEBUGFUNC("e1000_write_phy_reg_bm2");
 
+	ret_val = hw->phy.ops.acquire(hw);
+	if (ret_val)
+		goto out;
+
 	/* Page 800 works differently than the rest so it has its own func */
 	if (page == BM_WUC_PAGE) {
 		ret_val = e1000_access_phy_wakeup_reg_bm(hw, offset, &data,
 		    false);
 		goto out;
 	}
-
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		goto out;
 
 	hw->phy.addr = 1;
 
@@ -2655,18 +2796,15 @@ e1000_write_phy_reg_bm2(struct e1000_hw *hw, u32 offset, u16 data)
 		ret_val = e1000_write_phy_reg_mdic(hw, BM_PHY_PAGE_SELECT,
 		    page);
 
-		if (ret_val) {
-			hw->phy.ops.release(hw);
+		if (ret_val)
 			goto out;
-		}
 	}
 
 	ret_val = e1000_write_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & offset,
 	    data);
 
-	hw->phy.ops.release(hw);
-
 out:
+	hw->phy.ops.release(hw);
 	return (ret_val);
 }
 
@@ -2686,6 +2824,8 @@ out:
  * 3) Write the address using the address opcode (0x11)
  * 4) Read or write the data using the data opcode (0x12)
  * 5) Restore 769_17.2 to its original value
+ *
+ * Assumes semaphore already acquired.
  */
 static s32
 e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw,
@@ -2694,7 +2834,6 @@ e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw,
 	s32 ret_val;
 	u16 reg = BM_PHY_REG_NUM(offset);
 	u16 phy_reg = 0;
-	u8 phy_acquired = 1;
 
 	DEBUGFUNC("e1000_access_phy_wakeup_reg_bm");
 
@@ -2703,13 +2842,6 @@ e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw,
 	    (!(E1000_READ_REG(hw, E1000_PHY_CTRL) &
 	    E1000_PHY_CTRL_GBE_DISABLE)))
 		DEBUGOUT("Attempting to access page 800 while gig enabled.\n");
-
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val) {
-		DEBUGOUT("Could not acquire PHY\n");
-		phy_acquired = 0;
-		goto out;
-	}
 
 	/* All operations in this function are phy address 1 */
 	hw->phy.addr = 1;
@@ -2781,8 +2913,6 @@ e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw,
 	}
 
 out:
-	if (phy_acquired == 1)
-		hw->phy.ops.release(hw);
 	return (ret_val);
 }
 
@@ -2825,15 +2955,18 @@ e1000_power_down_phy_copper(struct e1000_hw *hw)
 	msec_delay(1);
 }
 
+/*
+ * e1000_set_mdio_slow_mode_hv - Set slow MDIO access mode
+ * @hw: pointer to the HW structure
+ * @slow: true for slow mode, false for normal mode
+ *
+ * Assumes semaphore already acquired.
+ */
 s32
 e1000_set_mdio_slow_mode_hv(struct e1000_hw *hw, bool slow)
 {
 	s32 ret_val = E1000_SUCCESS;
 	u16 data = 0;
-
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		return (ret_val);
 
 	/* Set MDIO mode - page 769, register 16: 0x2580==slow, 0x2180==fast */
 	hw->phy.addr = 1;
@@ -2853,7 +2986,85 @@ e1000_set_mdio_slow_mode_hv(struct e1000_hw *hw, bool slow)
 		ret_val = e1000_read_phy_reg_mdic(hw, BM_CS_CTRL1, &data);
 
 out:
-	hw->phy.ops.release(hw);
+	return (ret_val);
+}
+
+/*
+ * __e1000_read_phy_reg_hv -  Read HV PHY register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to be read
+ * @data: pointer to the read data
+ * @locked: semaphore has already been acquired or not
+ *
+ * Acquires semaphore, if necessary, then reads the PHY register at offset
+ * and stores the retrieved information in data.  Release any acquired
+ * semaphore before exiting.
+ */
+static s32
+__e1000_read_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 *data,
+    bool locked)
+{
+	s32 ret_val;
+	u16 page = BM_PHY_REG_PAGE(offset);
+	u16 reg = BM_PHY_REG_NUM(offset);
+	bool in_slow_mode = false;
+
+	DEBUGFUNC("e1000_read_phy_reg_hv");
+
+	if (!locked) {
+		ret_val = hw->phy.ops.acquire(hw);
+		if (ret_val)
+			return (ret_val);
+	}
+
+	/* Workaround failure in MDIO access while cable is disconnected */
+	if ((hw->phy.type == e1000_phy_82577) &&
+	    !(E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU)) {
+		ret_val = e1000_set_mdio_slow_mode_hv(hw, true);
+		if (ret_val)
+			goto out;
+
+		in_slow_mode = true;
+	}
+
+	/* Page 800 works differently than the rest so it has its own func */
+	if (page == BM_WUC_PAGE) {
+		ret_val = e1000_access_phy_wakeup_reg_bm(hw, offset,
+		    data, true);
+		goto out;
+	}
+
+	if (page > 0 && page < HV_INTC_FC_PAGE_START) {
+		ret_val = e1000_access_phy_debug_regs_hv(hw, offset,
+		    data, true);
+		goto out;
+	}
+
+	hw->phy.addr = e1000_get_phy_addr_for_hv_page(page);
+
+	if (page == HV_INTC_FC_PAGE_START)
+		page = 0;
+
+	if (reg > MAX_PHY_MULTI_PAGE_REG) {
+		u32 phy_addr = hw->phy.addr;
+
+		hw->phy.addr = 1;
+
+		/* Page is shifted left, PHY expects (page x 32) */
+		ret_val = e1000_write_phy_reg_mdic(hw,
+		    IGP01E1000_PHY_PAGE_SELECT, (page << IGP_PAGE_SHIFT));
+		hw->phy.addr = phy_addr;
+	}
+
+	ret_val = e1000_read_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & reg, data);
+out:
+	/* Revert to MDIO fast mode, if applicable */
+	if ((hw->phy.type == e1000_phy_82577) && in_slow_mode)
+		ret_val = e1000_set_mdio_slow_mode_hv(hw, false);
+
+	if (!locked)
+		hw->phy.ops.release(hw);
+
 	return (ret_val);
 }
 
@@ -2863,98 +3074,58 @@ out:
  * @offset: register offset to be read
  * @data: pointer to the read data
  *
- * Acquires semaphore, if necessary, then reads the PHY register at offset
- * and storing the retrieved information in data.  Release any acquired
- * semaphore before exiting.
+ * Acquires semaphore then reads the PHY register at offset and stores
+ * the retrieved information in data.  Release the acquired semaphore
+ * before exiting.
  */
 s32
 e1000_read_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 *data)
 {
-	s32 ret_val;
-	u16 page = BM_PHY_REG_PAGE(offset);
-	u16 reg = BM_PHY_REG_NUM(offset);
-	bool in_slow_mode = false;
-
-	DEBUGFUNC("e1000_read_phy_reg_hv");
-
-	/* Workaround failure in MDIO access while cable is disconnected */
-	if ((hw->phy.type == e1000_phy_82577) &&
-	    !(E1000_READ_REG(hw, E1000_STATUS) & E1000_STATUS_LU)) {
-		ret_val = e1000_set_mdio_slow_mode_hv(hw, true);
-		if (ret_val)
-			goto out;
-
-		in_slow_mode = true;
-	}
-
-	/* Page 800 works differently than the rest so it has its own func */
-	if (page == BM_WUC_PAGE) {
-		ret_val = e1000_access_phy_wakeup_reg_bm(hw, offset,
-		    data, true);
-		goto out;
-	}
-
-	if (page > 0 && page < HV_INTC_FC_PAGE_START) {
-		ret_val = e1000_access_phy_debug_regs_hv(hw, offset,
-		    data, true);
-		goto out;
-	}
-
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		goto out;
-
-	hw->phy.addr = e1000_get_phy_addr_for_hv_page(page);
-
-	if (page == HV_INTC_FC_PAGE_START)
-		page = 0;
-
-	if (reg > MAX_PHY_MULTI_PAGE_REG) {
-		u32 phy_addr = hw->phy.addr;
-		hw->phy.addr = 1;
-
-		/* Page is shifted left, PHY expects (page x 32) */
-		ret_val = e1000_write_phy_reg_mdic(hw,
-		    IGP01E1000_PHY_PAGE_SELECT,
-		    (page << IGP_PAGE_SHIFT));
-		hw->phy.addr = phy_addr;
-
-		if (ret_val) {
-			hw->phy.ops.release(hw);
-			goto out;
-		}
-	}
-
-	ret_val = e1000_read_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & reg,
-	    data);
-	hw->phy.ops.release(hw);
-
-out:
-	/* Revert to MDIO fast mode, if applicable */
-	if ((hw->phy.type == e1000_phy_82577) && in_slow_mode)
-		ret_val = e1000_set_mdio_slow_mode_hv(hw, false);
-
-	return (ret_val);
+	return (__e1000_read_phy_reg_hv(hw, offset, data, false));
 }
 
 /*
- * e1000_write_phy_reg_hv - Write HV PHY register
+ * e1000_read_phy_reg_hv_locked -  Read HV PHY register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to be read
+ * @data: pointer to the read data
+ *
+ * Reads the PHY register at offset and stores the retrieved information
+ * in data.  Assumes semaphore already acquired.
+ */
+s32
+e1000_read_phy_reg_hv_locked(struct e1000_hw *hw, u32 offset, u16 *data)
+{
+	return (__e1000_read_phy_reg_hv(hw, offset, data, true));
+}
+
+/*
+ * __e1000_write_phy_reg_hv - Write HV PHY register
  * @hw: pointer to the HW structure
  * @offset: register offset to write to
  * @data: data to write at register offset
+ * @locked: semaphore has already been acquired or not
  *
  * Acquires semaphore, if necessary, then writes the data to PHY register
  * at the offset.  Release any acquired semaphores before exiting.
  */
-s32
-e1000_write_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 data)
+static s32
+__e1000_write_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 data,
+    bool locked)
 {
 	s32 ret_val;
 	u16 page = BM_PHY_REG_PAGE(offset);
 	u16 reg = BM_PHY_REG_NUM(offset);
 	bool in_slow_mode = false;
+	struct e1000_dev_spec_ich8lan *dev_spec = &hw->dev_spec.ich8lan;
 
 	DEBUGFUNC("e1000_write_phy_reg_hv");
+
+	if (!locked) {
+		ret_val = hw->phy.ops.acquire(hw);
+		if (ret_val)
+			return (ret_val);
+	}
 
 	/* Workaround failure in MDIO access while cable is disconnected */
 	if ((hw->phy.type == e1000_phy_82577) &&
@@ -2979,11 +3150,9 @@ e1000_write_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 data)
 		goto out;
 	}
 
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val)
-		goto out;
-
-	hw->phy.addr = e1000_get_phy_addr_for_hv_page(page);
+	/* The LCD Config workaround provides the phy address to use */
+	if (dev_spec->nvm_lcd_config_enabled == false)
+		hw->phy.addr = e1000_get_phy_addr_for_hv_page(page);
 
 	if (page == HV_INTC_FC_PAGE_START)
 		page = 0;
@@ -2998,43 +3167,65 @@ e1000_write_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 data)
 	    ((MAX_PHY_REG_ADDRESS & reg) == 0) &&
 	    (data & (1 << 11))) {
 		u16 data2 = 0x7EFF;
-		hw->phy.ops.release(hw);
 		ret_val = e1000_access_phy_debug_regs_hv(hw, (1 << 6) | 0x3,
 		    &data2, false);
-		if (ret_val)
-			goto out;
-
-		ret_val = hw->phy.ops.acquire(hw);
 		if (ret_val)
 			goto out;
 	}
 
 	if (reg > MAX_PHY_MULTI_PAGE_REG) {
 		u32 phy_addr = hw->phy.addr;
+
 		hw->phy.addr = 1;
 
 		/* Page is shifted left, PHY expects (page x 32) */
 		ret_val = e1000_write_phy_reg_mdic(hw,
-		    IGP01E1000_PHY_PAGE_SELECT,
-		    (page << IGP_PAGE_SHIFT));
+		    IGP01E1000_PHY_PAGE_SELECT, (page << IGP_PAGE_SHIFT));
 		hw->phy.addr = phy_addr;
-
-		if (ret_val) {
-			hw->phy.ops.release(hw);
-			goto out;
-		}
 	}
 
 	ret_val = e1000_write_phy_reg_mdic(hw, MAX_PHY_REG_ADDRESS & reg,
 	    data);
-	hw->phy.ops.release(hw);
 
 out:
 	/* Revert to MDIO fast mode, if applicable */
 	if ((hw->phy.type == e1000_phy_82577) && in_slow_mode)
 		ret_val = e1000_set_mdio_slow_mode_hv(hw, false);
 
+	if (!locked)
+		hw->phy.ops.release(hw);
+
 	return (ret_val);
+}
+
+/*
+ * e1000_write_phy_reg_hv - Write HV PHY register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to write to
+ * @data: data to write at register offset
+ *
+ * Acquires semaphore then writes the data to PHY register at the offset.
+ * Release the acquired semaphores before exiting.
+ */
+s32
+e1000_write_phy_reg_hv(struct e1000_hw *hw, u32 offset, u16 data)
+{
+	return (__e1000_write_phy_reg_hv(hw, offset, data, false));
+}
+
+/*
+ * e1000_write_phy_reg_hv_locked - Write HV PHY register
+ * @hw: pointer to the HW structure
+ * @offset: register offset to write to
+ * @data: data to write at register offset
+ *
+ * Writes the data to PHY register at the offset.  Assumes semaphore
+ * already acquired.
+ */
+s32
+e1000_write_phy_reg_hv_locked(struct e1000_hw *hw, u32 offset, u16 data)
+{
+	return (__e1000_write_phy_reg_hv(hw, offset, data, true));
 }
 
 /*
@@ -3059,10 +3250,9 @@ e1000_get_phy_addr_for_hv_page(u32 page)
  * @data: pointer to the data to be read or written
  * @read: determines if operation is read or written
  *
- * Acquires semaphore, if necessary, then reads the PHY register at offset
- * and storing the retreived information in data.  Release any acquired
- * semaphores before exiting.  Note that the procedure to read these regs
- * uses the address port and data port to read/write.
+ * Reads the PHY register at offset and stores the retreived information
+ * in data.  Assumes semaphore already acquired.  Note that the procedure
+ * to read these regs uses the address port and data port to read/write.
  */
 static s32
 e1000_access_phy_debug_regs_hv(struct e1000_hw *hw, u32 offset,
@@ -3071,7 +3261,6 @@ e1000_access_phy_debug_regs_hv(struct e1000_hw *hw, u32 offset,
 	s32 ret_val;
 	u32 addr_reg = 0;
 	u32 data_reg = 0;
-	u8  phy_acquired = 1;
 
 	DEBUGFUNC("e1000_access_phy_debug_regs_hv");
 
@@ -3079,13 +3268,6 @@ e1000_access_phy_debug_regs_hv(struct e1000_hw *hw, u32 offset,
 	addr_reg = (hw->phy.type == e1000_phy_82578) ?
 	    I82578_ADDR_REG : I82577_ADDR_REG;
 	data_reg = addr_reg + 1;
-
-	ret_val = hw->phy.ops.acquire(hw);
-	if (ret_val) {
-		DEBUGOUT("Could not acquire PHY\n");
-		phy_acquired = 0;
-		goto out;
-	}
 
 	/* All operations in this function are phy address 2 */
 	hw->phy.addr = 2;
@@ -3109,8 +3291,6 @@ e1000_access_phy_debug_regs_hv(struct e1000_hw *hw, u32 offset,
 	}
 
 out:
-	if (phy_acquired == 1)
-		hw->phy.ops.release(hw);
 	return (ret_val);
 }
 

@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.432 v3-1-3_2009-8-20
+ * IntelVersion: 1.439 v3-1-10-1_2009-9-18_Release14-6
  */
 #ifndef _E1000_HW_H_
 #define	_E1000_HW_H_
@@ -603,11 +603,13 @@ struct e1000_phy_operations {
 	s32 (*get_cable_length)(struct e1000_hw *);
 	s32 (*get_info)(struct e1000_hw *);
 	s32 (*read_reg)(struct e1000_hw *, u32, u16 *);
+	s32 (*read_reg_locked)(struct e1000_hw *, u32, u16 *);
 	void (*release)(struct e1000_hw *);
 	s32 (*reset)(struct e1000_hw *);
 	s32 (*set_d0_lplu_state)(struct e1000_hw *, bool);
 	s32 (*set_d3_lplu_state)(struct e1000_hw *, bool);
 	s32 (*write_reg)(struct e1000_hw *, u32, u16);
+	s32 (*write_reg_locked)(struct e1000_hw *, u32, u16);
 	void (*power_up)(struct e1000_hw *);
 	void (*power_down)(struct e1000_hw *);
 };
@@ -774,6 +776,8 @@ struct e1000_dev_spec_ich8lan {
 	struct e1000_shadow_ram shadow_ram[E1000_SHADOW_RAM_WORDS];
 	E1000_MUTEX nvm_mutex;
 	E1000_MUTEX swflag_mutex;
+	bool nvm_k1_enabled;
+	bool nvm_lcd_config_enabled;
 };
 
 struct e1000_hw {

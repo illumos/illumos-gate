@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.86 v3-1-3_2009-8-20
+ * IntelVersion: 1.86 v3-1-10-1_2009-9-18_Release14-6
  */
 /*
  * 80003ES2LAN Gigabit Ethernet Controller (Copper)

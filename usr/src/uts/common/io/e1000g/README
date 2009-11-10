@@ -714,3 +714,8 @@ Notes on packaging:
    6881588 e1000g functions should return when e1000g_check_dma_handle() fails
    6888320 e1000g emits scary mutex message on the console
 
+5.3.17
+======
+  This version has the following fixes:
+   6893285 e1000g 'pciex8086,105e' with PHY type igp I/O devices have been retired
+   6895459 e1000g share code update v3-1-10-1

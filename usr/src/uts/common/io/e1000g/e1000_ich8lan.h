@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.37 v3-1-3_2009-8-20
+ * IntelVersion: 1.41 v3-1-10-1_2009-9-18_Release14-6
  */
 #ifndef _E1000_ICH8LAN_H_
 #define	_E1000_ICH8LAN_H_
@@ -140,6 +140,28 @@ extern "C" {
 
 /* PCH Flow Control Refresh Timer Value */
 #define	E1000_FCRTV_PCH		0x05F40
+
+#define	E1000_NVM_K1_CONFIG	0x1B	/* NVM K1 Config Word */
+#define	E1000_NVM_K1_ENABLE	0x1	/* NVM Enable K1 bit */
+
+/* SMBus Address Phy Register */
+#define	HV_SMB_ADDR	PHY_REG(768, 26)
+#define	HV_SMB_ADDR_PEC_EN	0x0200
+#define	HV_SMB_ADDR_VALID	0x0080
+
+/* Strapping Option Register - RO */
+#define	E1000_STRAP	0x0000C
+#define	E1000_STRAP_SMBUS_ADDRESS_MASK	0x00FE0000
+#define	E1000_STRAP_SMBUS_ADDRESS_SHIFT	17
+
+/* OEM Bits Phy Register */
+#define	HV_OEM_BITS	PHY_REG(768, 25)
+#define	HV_OEM_BITS_LPLU	0x0004	/* Low Power Link Up */
+#define	HV_OEM_BITS_GBE_DIS	0x0040	/* Gigabit Disable */
+#define	HV_OEM_BITS_RESTART_AN	0x0400	/* Restart Auto-negotiation */
+/* Phy address bit from LCD Config word */
+#define	LCD_CFG_PHY_ADDR_BIT	0x0020
+
 /* SW Semaphore flag timeout in milliseconds */
 #define	SW_FLAG_TIMEOUT		400
 
@@ -172,6 +194,8 @@ void e1000_set_kmrn_lock_loss_workaround_ich8lan(struct e1000_hw *hw,
 void e1000_igp3_phy_powerdown_workaround_ich8lan(struct e1000_hw *hw);
 void e1000_gig_downshift_workaround_ich8lan(struct e1000_hw *hw);
 void e1000_disable_gig_wol_ich8lan(struct e1000_hw *hw);
+s32 e1000_configure_k1_ich8lan(struct e1000_hw *hw, bool k1_enable);
+s32 e1000_oem_bits_config_ich8lan(struct e1000_hw *hw, bool d0_config);
 
 #ifdef __cplusplus
 }

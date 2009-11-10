@@ -24,7 +24,7 @@
  */
 
 /*
- * IntelVersion: 1.108 v3-1-3_2009-8-20
+ * IntelVersion: 1.108 v3-1-10-1_2009-9-18_Release14-6
  */
 #include "e1000_api.h"
 
@@ -2184,7 +2184,7 @@ e1000_update_adaptive_generic(struct e1000_hw *hw)
  * Verify that when not using auto-negotiation that MDI/MDIx is correctly
  * set, which is forced to MDI mode only.
  */
-s32
+static s32
 e1000_validate_mdi_setting_generic(struct e1000_hw *hw)
 {
 	s32 ret_val = E1000_SUCCESS;
