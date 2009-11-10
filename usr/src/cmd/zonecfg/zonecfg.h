@@ -219,6 +219,8 @@ extern void free_outer_list(list_property_ptr_t list);
 extern void usage(boolean_t verbose, uint_t flags);
 
 extern FILE *yyin;
+extern char *res_types[];
+extern char *prop_types[];
 
 #ifdef __cplusplus
 }

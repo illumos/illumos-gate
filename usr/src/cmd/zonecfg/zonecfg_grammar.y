@@ -26,6 +26,7 @@
  */
 
 #include <stdio.h>
+#include <strings.h>
 
 #include "zonecfg.h"
 
@@ -41,6 +42,72 @@ extern int num_prop_vals;		/* # of property values */
 /* yacc externals */
 extern int yydebug;
 extern void yyerror(char *s);
+
+/*
+ * This function is used by the simple_prop_val reduction rules to set up
+ * a list_property_ptr_t and adjust the above global variables appropriately.
+ * Note that this function duplicates the specified string and makes
+ * the new list's lp_simple field point to the duplicate.  This function does
+ * not free the original string.
+ *
+ * This function returns a pointer to the duplicated string or NULL if an error
+ * occurred.  The simple_prop_val reduction rules that invoke this function
+ * should set $$ to the returned pointer.
+ */
+static char *
+simple_prop_val_func(const char *str)
+{
+	char *retstr;
+
+	if ((new_list = alloc_list()) == NULL)
+		return (NULL);
+	if ((retstr = strdup(str)) == NULL) {
+		free_list(new_list);
+		return (NULL);
+	}
+	new_list->lp_simple = retstr;
+	new_list->lp_complex = NULL;
+	new_list->lp_next = NULL;
+	if (list[num_prop_vals] == NULL) {
+		list[num_prop_vals] = new_list;
+	} else {
+		for (tmp_list = list[num_prop_vals]; tmp_list != NULL;
+		    tmp_list = tmp_list->lp_next)
+			last = tmp_list;
+		last->lp_next = new_list;
+	}
+	return (retstr);
+}
+
+/*
+ * This function is used by the complex_piece reduction rules to set up a
+ * complex_property_prt_t and adjust the above global variables appropriately.
+ * Note that this function duplicates the specified string and makes the new
+ * complex_property_ptr_t's cp_value field point to the duplicate.  It also sets
+ * the complex_property_ptr_t's cp_type field to cp_type and its cp_next field
+ * to cp_next.  This function does not free the original string.
+ *
+ * This function returns a pointer to the complex_property_t created for the
+ * complex_piece or NULL if an error occurred.  The complex_piece reduction
+ * rules that invoke this function should set $$ to the returned pointer.
+ */
+static complex_property_ptr_t
+complex_piece_func(int cp_type, const char *str, complex_property_ptr_t cp_next)
+{
+	complex_property_ptr_t retval;
+
+	if ((retval = alloc_complex()) == NULL)
+		return (NULL);
+	if ((retval->cp_value = strdup(str)) == NULL) {
+		free_complex(retval);
+		return (NULL);
+	}
+	retval->cp_type = cp_type;
+	retval->cp_next = cp_next;
+	complex = retval;
+	return (retval);
+}
+
 
 %}
 
@@ -946,23 +1013,28 @@ property_value: simple_prop_val
  * below, and freed by recursive functions which are ultimately called
  * by free_cmd(), which is called from the top-most "commands" part of
  * the grammar.
+ *
+ * NOTE: simple_prop_val and complex_piece need reduction rules for
+ * property_name and resource_type so that the parser will accept property names
+ * and resource type names as property values.
  */
 
 simple_prop_val: TOKEN
 	{
-		if ((new_list = alloc_list()) == NULL)
+		$$ = simple_prop_val_func($1);
+		free($1);
+		if ($$ == NULL)
 			YYERROR;
-		new_list->lp_simple = $1;
-		new_list->lp_complex = NULL;
-		new_list->lp_next = NULL;
-		if (list[num_prop_vals] == NULL) {
-			list[num_prop_vals] = new_list;
-		} else {
-			for (tmp_list = list[num_prop_vals]; tmp_list != NULL;
-			    tmp_list = tmp_list->lp_next)
-				last = tmp_list;
-			last->lp_next = new_list;
-		}
+	}
+	| resource_type
+	{
+		if (($$ = simple_prop_val_func(res_types[$1])) == NULL)
+			YYERROR;
+	}
+	| property_name
+	{
+		if (($$ = simple_prop_val_func(prop_types[$1])) == NULL)
+			YYERROR;
 	}
 
 complex_prop_val: OPEN_PAREN complex_piece CLOSE_PAREN
@@ -984,21 +1056,39 @@ complex_prop_val: OPEN_PAREN complex_piece CLOSE_PAREN
 
 complex_piece: property_name EQUAL TOKEN
 	{
-		if (($$ = alloc_complex()) == NULL)
+		$$ = complex_piece_func($1, $3, NULL);
+		free($3);
+		if ($$ == NULL)
 			YYERROR;
-		$$->cp_type = $1;
-		$$->cp_value = $3;
-		$$->cp_next = NULL;
-		complex = $$;
+	}
+	| property_name EQUAL resource_type
+	{
+		if (($$ = complex_piece_func($1, res_types[$3], NULL)) == NULL)
+			YYERROR;
+	}
+	| property_name EQUAL property_name
+	{
+		if (($$ = complex_piece_func($1, prop_types[$3], NULL)) == NULL)
+			YYERROR;
 	}
 	| property_name EQUAL TOKEN COMMA complex_piece 
 	{
-		if (($$ = alloc_complex()) == NULL)
+		$$ = complex_piece_func($1, $3, complex);
+		free($3);
+		if ($$ == NULL)
 			YYERROR;
-		$$->cp_type = $1;
-		$$->cp_value = $3;
-		$$->cp_next = complex;
-		complex = $$;
+	}
+	| property_name EQUAL resource_type COMMA complex_piece 
+	{
+		if (($$ = complex_piece_func($1, res_types[$3], complex)) ==
+		    NULL)
+			YYERROR;
+	}
+	| property_name EQUAL property_name COMMA complex_piece 
+	{
+		if (($$ = complex_piece_func($1, prop_types[$3], complex)) ==
+		    NULL)
+			YYERROR;
 	}
 
 list_piece: simple_prop_val

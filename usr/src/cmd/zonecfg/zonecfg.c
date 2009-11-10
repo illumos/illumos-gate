@@ -154,7 +154,7 @@ static struct help helptab[] = {
 #define	MAX_RT_STRLEN	16
 
 /* These *must* match the order of the RT_ define's from zonecfg.h */
-static char *res_types[] = {
+char *res_types[] = {
 	"unknown",
 	"zonename",
 	"zonepath",
@@ -186,7 +186,7 @@ static char *res_types[] = {
 };
 
 /* These *must* match the order of the PT_ define's from zonecfg.h */
-static char *prop_types[] = {
+char *prop_types[] = {
 	"unknown",
 	"zonename",
 	"zonepath",
