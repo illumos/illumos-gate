@@ -250,7 +250,7 @@ ql_issue_mailbox_cmd_and_poll_rsp(qlge_t *qlge, mbx_cmd_t *mbx_cmd,
 		    == DDI_SUCCESS) {
 			QL_PRINT(DBG_MBX, ("%s(%d) PI Intr received",
 			    __func__, qlge->instance));
-			ql_read_mailbox_cmd(qlge, p_results, 0);
+			(void) ql_read_mailbox_cmd(qlge, p_results, 0);
 			/*
 			 * Sometimes, the incoming messages is not what we are
 			 * waiting for, ie. async events, then, continue to
@@ -381,7 +381,7 @@ ql_async_event_parser(qlge_t *qlge, mbx_data_t *mbx_cmds)
 		    "Firmware Ver# %x",
 		    __func__, qlge->instance, mbx_cmds->mb[1],
 		    mbx_cmds->mb[2], mbx_cmds->mb[3]);
-		ql_8xxx_binary_core_dump(qlge, &qlge->ql_mpi_coredump);
+		(void) ql_8xxx_binary_core_dump(qlge, &qlge->ql_mpi_coredump);
 		break;
 	case MBA_LINK_UP /* 8011h */:
 		QL_PRINT(DBG_MBX, ("%s(%d): MBA_LINK_UP received\n",
@@ -664,7 +664,8 @@ ql_do_mpi_intr(qlge_t *qlge)
 	 */
 	mutex_enter(&qlge->mbx_mutex);
 
-	ql_read_mailbox_cmd(qlge, &qlge->received_mbx_cmds, qlge->max_read_mbx);
+	(void) ql_read_mailbox_cmd(qlge, &qlge->received_mbx_cmds,
+	    qlge->max_read_mbx);
 
 	/*
 	 * process PI interrupt as async events, if not done,
@@ -719,7 +720,7 @@ ql_mbx_test(qlge_t *qlge)
 	    == DDI_SUCCESS) {
 		QL_PRINT(DBG_MBX, ("%s(%d) PI Intr received",
 		    __func__, qlge->instance));
-		ql_read_mailbox_cmd(qlge, &mbx_results, 0);
+		(void) ql_read_mailbox_cmd(qlge, &mbx_results, 0);
 
 		ql_write_reg(qlge, REG_HOST_CMD_STATUS,
 		    HOST_CMD_CLEAR_RISC_TO_HOST_INTR);

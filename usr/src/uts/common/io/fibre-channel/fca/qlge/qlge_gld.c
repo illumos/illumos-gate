@@ -95,7 +95,7 @@ ql_m_start(void *arg)
 	 * Write default ethernet address to chip register Mac
 	 * Address slot 0 and Enable Primary Mac Function.
 	 */
-	ql_unicst_set(qlge,
+	(void) ql_unicst_set(qlge,
 	    (uint8_t *)qlge->unicst_addr[0].addr.ether_addr_octet, 0);
 	qlge->stats.rpackets = 0;
 	qlge->stats.rbytes = 0;
@@ -103,7 +103,7 @@ ql_m_start(void *arg)
 	qlge->stats.obytes = 0;
 	mutex_exit(&qlge->hw_mutex);
 
-	ql_do_start(qlge);
+	(void) ql_do_start(qlge);
 	mutex_exit(&qlge->gen_mutex);
 
 	mutex_enter(&qlge->mbx_mutex);
@@ -126,7 +126,7 @@ ql_m_stop(void *arg)
 		mutex_exit(&qlge->gen_mutex);
 		return;
 	}
-	ql_do_stop(qlge);
+	(void) ql_do_stop(qlge);
 	mutex_exit(&qlge->gen_mutex);
 	qlge->mac_flags = QL_MAC_STOPPED;
 }

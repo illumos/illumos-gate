@@ -563,7 +563,7 @@ void
 ql_sem_unlock(qlge_t *qlge, uint32_t sem_mask)
 {
 	ql_write_reg(qlge, REG_SEMAPHORE, sem_mask);
-	ql_read_reg(qlge, REG_SEMAPHORE);	/* flush */
+	(void) ql_read_reg(qlge, REG_SEMAPHORE);	/* flush */
 }
 
 /*
@@ -2561,7 +2561,7 @@ ql_mpi_reset_work(caddr_t arg1, caddr_t arg2)
 {
 	qlge_t *qlge = (qlge_t *)((void *)arg1);
 
-	ql_reset_mpi_risc(qlge);
+	(void) ql_reset_mpi_risc(qlge);
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -2698,7 +2698,8 @@ ql_isr(caddr_t arg1, caddr_t arg2)
 				ql_disable_completion_interrupt(qlge,
 				    rx_ring->irq);
 				if (rx_ring->type == TX_Q) {
-					ql_clean_outbound_rx_ring(rx_ring);
+					(void) ql_clean_outbound_rx_ring(
+					    rx_ring);
 					ql_enable_completion_interrupt(
 					    rx_ring->qlge, rx_ring->irq);
 				} else {
@@ -2738,7 +2739,7 @@ ql_msix_tx_isr(caddr_t arg1, caddr_t arg2)
 	_NOTE(ARGUNUSED(arg2));
 
 	++qlge->rx_interrupts[rx_ring->cq_id];
-	ql_clean_outbound_rx_ring(rx_ring);
+	(void) ql_clean_outbound_rx_ring(rx_ring);
 	ql_enable_completion_interrupt(rx_ring->qlge, rx_ring->irq);
 
 	return (DDI_INTR_CLAIMED);
@@ -3993,7 +3994,7 @@ ql_free_resources(dev_info_t *dip, qlge_t *qlge)
 	ql_stop_timer(qlge);
 
 	if (qlge->sequence & INIT_MAC_REGISTERED) {
-		mac_unregister(qlge->mh);
+		(void) mac_unregister(qlge->mh);
 		qlge->sequence &= ~INIT_MAC_REGISTERED;
 	}
 
@@ -4079,10 +4080,10 @@ void
 ql_set_promiscuous(qlge_t *qlge, int mode)
 {
 	if (mode) {
-		ql_set_routing_reg(qlge, RT_IDX_PROMISCUOUS_SLOT,
+		(void) ql_set_routing_reg(qlge, RT_IDX_PROMISCUOUS_SLOT,
 		    RT_IDX_VALID, 1);
 	} else {
-		ql_set_routing_reg(qlge, RT_IDX_PROMISCUOUS_SLOT,
+		(void) ql_set_routing_reg(qlge, RT_IDX_PROMISCUOUS_SLOT,
 		    RT_IDX_VALID, 0);
 	}
 }
@@ -4212,7 +4213,7 @@ ql_add_to_multicast_list(qlge_t *qlge, uint8_t *ep)
 		bcopy(ep, qlge->multicast_list[index].addr.ether_addr_octet,
 		    ETHERADDRL);
 		/* increment the total number of addresses in multicast list */
-		ql_add_multicast_address(qlge, index);
+		(void) ql_add_multicast_address(qlge, index);
 		qlge->multicast_list_count++;
 		QL_PRINT(DBG_GLD,
 		    ("%s(%d): added to index of multicast list= 0x%x, "
@@ -4276,10 +4277,10 @@ ql_remove_from_multicast_list(qlge_t *qlge, uint8_t *ep)
 			 */
 			for (i = rmv_index; i < qlge->multicast_list_count;
 			    i++) {
-				ql_add_multicast_address(qlge, i);
+				(void) ql_add_multicast_address(qlge, i);
 			}
 			/* and disable the last one */
-			ql_remove_multicast_address(qlge, i);
+			(void) ql_remove_multicast_address(qlge, i);
 
 			/* disable multicast promiscuous mode */
 			if (qlge->multicast_promisc) {
@@ -5034,7 +5035,7 @@ ql_do_start(qlge_t *qlge)
 	mutex_enter(&qlge->hw_mutex);
 
 	/* Reset adapter */
-	ql_asic_reset(qlge);
+	(void) ql_asic_reset(qlge);
 
 	lbq_buf_size = (uint16_t)
 	    ((qlge->mtu == ETHERMTU)? NORMAL_FRAME_SIZE : JUMBO_FRAME_SIZE);
@@ -5077,8 +5078,8 @@ ql_do_start(qlge_t *qlge)
 			for (i = 0; i < qlge->rx_ring_count; i++) {
 				rx_ring = &qlge->rx_ring[i];
 				if (rx_ring->type != TX_Q) {
-					ql_alloc_sbufs(qlge, rx_ring);
-					ql_alloc_lbufs(qlge, rx_ring);
+					(void) ql_alloc_sbufs(qlge, rx_ring);
+					(void) ql_alloc_lbufs(qlge, rx_ring);
 				}
 			}
 		}
@@ -5488,16 +5489,16 @@ ql_kstats_get_reg_and_dev_stats(kstat_t *ksp, int flag)
 	if (ql_sem_spinlock(qlge, qlge->xgmac_sem_mask)) {
 		return (0);
 	}
-	ql_read_xgmac_reg(qlge, REG_XGMAC_FLOW_CONTROL, &val32);
+	(void) ql_read_xgmac_reg(qlge, REG_XGMAC_FLOW_CONTROL, &val32);
 	(knp++)->value.ui32 = val32;
 
-	ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_TX_PAUSE_PKTS, &val32);
+	(void) ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_TX_PAUSE_PKTS, &val32);
 	(knp++)->value.ui32 = val32;
 
-	ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_PAUSE_PKTS, &val32);
+	(void) ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_PAUSE_PKTS, &val32);
 	(knp++)->value.ui32 = val32;
 
-	ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_FIFO_DROPS, &val32);
+	(void) ql_read_xgmac_reg(qlge, REG_XGMAC_MAC_RX_FIFO_DROPS, &val32);
 	(knp++)->value.ui32 = val32;
 
 	ql_sem_unlock(qlge, qlge->xgmac_sem_mask);
@@ -6344,7 +6345,7 @@ ql_device_initialize(qlge_t *qlge)
 
 		/* if need to update port configuration */
 		if (update_port_config)
-			ql_set_port_cfg(qlge);
+			(void) ql_set_port_cfg(qlge);
 	} else
 		cmn_err(CE_WARN, "ql_get_port_cfg failed");
 
@@ -6570,7 +6571,7 @@ ql_bringup_adapter(qlge_t *qlge)
 	return (DDI_SUCCESS);
 
 err_bringup:
-	ql_asic_reset(qlge);
+	(void) ql_asic_reset(qlge);
 	return (DDI_FAILURE);
 }
 
@@ -6763,7 +6764,7 @@ ql_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    ADAPTER_NAME, instance));
 
 		/* Initialize mutex, need the interrupt priority */
-		ql_init_rx_tx_locks(qlge);
+		(void) ql_init_rx_tx_locks(qlge);
 
 		qlge->sequence |= INIT_LOCKS_CREATED;
 
@@ -7052,7 +7053,7 @@ ql_bringdown_adapter(qlge_t *qlge)
 		status = ql_sem_spinlock(qlge, SEM_RT_IDX_MASK);
 		if (status)
 			return (status);
-		ql_stop_routing(qlge);
+		(void) ql_stop_routing(qlge);
 		ql_sem_unlock(qlge, SEM_RT_IDX_MASK);
 		/*
 		 * Set the flag for receive and transmit
@@ -7089,7 +7090,7 @@ ql_bringdown_adapter(qlge_t *qlge)
 
 		mutex_enter(&qlge->hw_mutex);
 		/* Reset adapter */
-		ql_asic_reset(qlge);
+		(void) ql_asic_reset(qlge);
 		/*
 		 * Unbind all tx dma handles to prevent pending tx descriptors'
 		 * dma handles from being re-used.
@@ -7146,7 +7147,7 @@ ql_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_enter(&qlge->gen_mutex);
 		if ((qlge->mac_flags == QL_MAC_ATTACHED) ||
 		    (qlge->mac_flags == QL_MAC_STARTED)) {
-			ql_do_stop(qlge);
+			(void) ql_do_stop(qlge);
 		}
 		qlge->mac_flags = QL_MAC_SUSPENDED;
 		mutex_exit(&qlge->gen_mutex);
@@ -7180,8 +7181,8 @@ ql_quiesce(dev_info_t *dip)
 
 	if (CFG_IST(qlge, CFG_CHIP_8100)) {
 		/* stop forwarding external packets to driver */
-		ql_sem_spinlock(qlge, SEM_RT_IDX_MASK);
-		ql_stop_routing(qlge);
+		(void) ql_sem_spinlock(qlge, SEM_RT_IDX_MASK);
+		(void) ql_stop_routing(qlge);
 		ql_sem_unlock(qlge, SEM_RT_IDX_MASK);
 		/* Stop all the request queues */
 		for (i = 0; i < qlge->tx_ring_count; i++) {
@@ -7207,7 +7208,7 @@ ql_quiesce(dev_info_t *dip)
 		qlge_delay(QL_ONE_SEC_DELAY/4);
 		qlge->mac_flags = QL_MAC_STOPPED;
 		/* Reset adapter */
-		ql_asic_reset(qlge);
+		(void) ql_asic_reset(qlge);
 		qlge_delay(100);
 	}
 

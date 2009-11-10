@@ -248,7 +248,7 @@ qlge_load_flash(qlge_t *qlge, uint8_t *dp, uint32_t len, uint32_t faddr)
 		return (DDI_FAILURE);
 	}
 
-	ql_unprotect_flash(qlge);
+	(void) ql_unprotect_flash(qlge);
 
 	get_sector_number(qlge, faddr, &start_block);
 	get_sector_number(qlge, faddr + len - 1, &end_block);
@@ -284,7 +284,7 @@ qlge_load_flash(qlge_t *qlge, uint8_t *dp, uint32_t len, uint32_t faddr)
 	}
 	rval = DDI_SUCCESS;
 out:
-	ql_protect_flash(qlge);
+	(void) ql_protect_flash(qlge);
 	kmem_free(temp, sector_size);
 
 	ql_sem_unlock(qlge, QL_FLASH_SEM_MASK);
@@ -928,8 +928,8 @@ ql_get_flash_params(qlge_t *qlge)
 				    ISP_8100_NIC_PARAM1_ADDR;
 		}
 	}
-	ql_flash_desc(qlge);
-	ql_flash_nic_config(qlge);
+	(void) ql_flash_desc(qlge);
+	(void) ql_flash_nic_config(qlge);
 
 out:
 	ql_sem_unlock(qlge, QL_FLASH_SEM_MASK);
@@ -980,8 +980,8 @@ ql_setup_flash(qlge_t *qlge)
 			    (qlge->flash_nic_config_table_addr == 0)) {
 				rval = ql_flash_flt(qlge);
 				if (rval == DDI_SUCCESS) {
-					ql_flash_desc(qlge);
-					ql_flash_nic_config(qlge);
+					(void) ql_flash_desc(qlge);
+					(void) ql_flash_nic_config(qlge);
 				} else {
 					rval = DDI_FAILURE;
 					goto out;
@@ -1114,7 +1114,7 @@ ql_flash_write_enable(qlge_t *qlge)
 	if ((rtn_val = ql_wait_flash_reg_ready(qlge, FLASH_RDY_FLAG))
 	    == DDI_SUCCESS) {
 		do {
-			ql_read_flash_status(qlge, &reg_status);
+			(void) ql_read_flash_status(qlge, &reg_status);
 			if (reg_status & BIT_1)
 				break;
 			drv_usecwait(10);
@@ -1153,7 +1153,7 @@ ql_flash_erase_sector(qlge_t *qlge, uint32_t sectorAddr)
 	    == DDI_SUCCESS) {
 		/* wait Write In Progress (WIP) bit to reset */
 		do {
-			ql_read_flash_status(qlge, &flash_status);
+			(void) ql_read_flash_status(qlge, &flash_status);
 			if ((flash_status & BIT_0 /* WIP */) == 0)
 				break;
 			drv_usecwait(10);
@@ -1191,7 +1191,8 @@ ql_write_flash(qlge_t *qlge, uint32_t addr, uint32_t data)
 		if ((addr & FLASH_ADDR_MASK) == FLASH_CONF_ADDR) {
 			/* wait Write In Progress (WIP) bit to reset */
 			do {
-				ql_read_flash_status(qlge, &flash_status);
+				(void) ql_read_flash_status(qlge,
+				    &flash_status);
 				if ((flash_status & BIT_0 /* WIP */) == 0)
 					break;
 				drv_usecwait(10);
@@ -1313,39 +1314,39 @@ ql_write_flash_test(qlge_t *qlge, uint32_t test_addr)
 	uint32_t addr = 0;
 
 	addr = (test_addr / 4);
-	ql_read_flash(qlge, addr, &old_data);
+	(void) ql_read_flash(qlge, addr, &old_data);
 	QL_PRINT(DBG_FLASH, ("read addr %x old value %x\n", test_addr,
 	    old_data));
 
 	/* enable writing to flash */
-	ql_unprotect_flash(qlge);
+	(void) ql_unprotect_flash(qlge);
 
 	/* erase the sector */
-	ql_flash_erase_sector(qlge, test_addr);
-	ql_read_flash(qlge, addr, &data);
+	(void) ql_flash_erase_sector(qlge, test_addr);
+	(void) ql_read_flash(qlge, addr, &data);
 	QL_PRINT(DBG_FLASH, ("after sector erase, addr %x value %x\n",
 	    test_addr, data));
 
 	/* write new value to it and read back to confirm */
 	data = 0x33445566;
-	ql_write_flash(qlge, addr, data);
+	(void) ql_write_flash(qlge, addr, data);
 	QL_PRINT(DBG_FLASH, ("new value written to addr %x value %x\n",
 	    test_addr, data));
-	ql_read_flash(qlge, addr, &data);
+	(void) ql_read_flash(qlge, addr, &data);
 	if (data != 0x33445566) {
 		cmn_err(CE_WARN, "flash write test failed, get data %x"
 		    " after writing", data);
 	}
 
 	/* write old value to it and read back to restore */
-	ql_flash_erase_sector(qlge, test_addr);
-	ql_write_flash(qlge, addr, old_data);
-	ql_read_flash(qlge, addr, &data);
+	(void) ql_flash_erase_sector(qlge, test_addr);
+	(void) ql_write_flash(qlge, addr, old_data);
+	(void) ql_read_flash(qlge, addr, &data);
 	QL_PRINT(DBG_FLASH, ("write back old value addr %x value %x\n",
 	    test_addr, data));
 
 	/* test done, protect the flash to forbid any more flash writting */
-	ql_protect_flash(qlge);
+	(void) ql_protect_flash(qlge);
 
 }
 
@@ -1355,7 +1356,7 @@ ql_write_flash_test2(qlge_t *qlge, uint32_t test_addr)
 {
 	uint32_t data, old_data;
 
-	qlge_dump_fcode(qlge, (uint8_t *)&old_data, sizeof (old_data),
+	(void) qlge_dump_fcode(qlge, (uint8_t *)&old_data, sizeof (old_data),
 	    test_addr);
 	QL_PRINT(DBG_FLASH, ("read addr %x old value %x\n",
 	    test_addr, old_data));
@@ -1364,7 +1365,8 @@ ql_write_flash_test2(qlge_t *qlge, uint32_t test_addr)
 
 	QL_PRINT(DBG_FLASH, ("write new test value %x\n", data));
 	qlge_load_flash(qlge, (uint8_t *)&data, sizeof (data), test_addr);
-	qlge_dump_fcode(qlge, (uint8_t *)&data, sizeof (data), test_addr);
+	(void) qlge_dump_fcode(qlge, (uint8_t *)&data, sizeof (data),
+	    test_addr);
 	if (data != 0x12345678) {
 		cmn_err(CE_WARN,
 		    "flash write test failed, get data %x after writing",
@@ -1373,7 +1375,7 @@ ql_write_flash_test2(qlge_t *qlge, uint32_t test_addr)
 	/* write old value to it and read back to restore */
 	qlge_load_flash(qlge, (uint8_t *)&old_data, sizeof (old_data),
 	    test_addr);
-	qlge_dump_fcode(qlge, (uint8_t *)&data, sizeof (data),
+	(void) qlge_dump_fcode(qlge, (uint8_t *)&data, sizeof (data),
 	    test_addr);
 	QL_PRINT(DBG_FLASH, ("write back old value addr %x value %x verified\n",
 	    test_addr, data));

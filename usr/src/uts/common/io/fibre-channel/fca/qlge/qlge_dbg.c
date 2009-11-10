@@ -1064,10 +1064,11 @@ ql_chip_ioctl(qlge_t *qlge, queue_t *q, mblk_t *mp)
 			prop_ptr =
 			    (struct qlnic_prop_info *)(void *)dmp->b_rptr;
 			/* get various properties */
-			ql_get_firmware_version(qlge,
+			(void) ql_get_firmware_version(qlge,
 			    &prop_ptr->mpi_version);
-			ql_get_fw_state(qlge, &prop_ptr->fw_state);
-			qlge_get_link_status(qlge, &prop_ptr->link_status);
+			(void) ql_get_fw_state(qlge, &prop_ptr->fw_state);
+			(void) qlge_get_link_status(qlge,
+			    &prop_ptr->link_status);
 			break;
 
 		case QLA_LIST_ADAPTER_INFO:
@@ -1164,12 +1165,12 @@ ql_chip_ioctl(qlge_t *qlge, queue_t *q, mblk_t *mp)
 			if (qlge->ioctl_transferred_bytes >=
 			    qlge->ioctl_total_length) {
 				region = pheader->option[0];
-				ql_get_flash_table_region_info(qlge, region,
-				    &addr, &size);
+				(void) ql_get_flash_table_region_info(qlge,
+				    region, &addr, &size);
 				QL_PRINT(DBG_GLD, ("write data to region 0x%x,"
 				    " addr 0x%x, max size %d bytes\n",
 				    region, addr, size));
-				qlge_load_flash(qlge,
+				(void) qlge_load_flash(qlge,
 				    (uint8_t *)qlge->ioctl_buf_ptr,
 				    qlge->ioctl_transferred_bytes /* size */,
 				    addr);
@@ -1230,7 +1231,7 @@ ql_chip_ioctl(qlge_t *qlge, queue_t *q, mblk_t *mp)
 			break;
 
 		case QLA_TRIGGER_SYS_ERROR_EVENT:
-			ql_trigger_system_error_event(qlge);
+			(void) ql_trigger_system_error_event(qlge);
 			break;
 
 		case QLA_READ_VPD:
@@ -1250,7 +1251,8 @@ ql_chip_ioctl(qlge_t *qlge, queue_t *q, mblk_t *mp)
 			len = (uint32_t)iocp->ioc_count;
 			QL_PRINT(DBG_GLD, (" 0x%x user buffer available \n",
 			    len));
-			ql_flash_vpd(qlge, (uint8_t *)qlge->ioctl_buf_ptr);
+			(void) ql_flash_vpd(qlge,
+			    (uint8_t *)qlge->ioctl_buf_ptr);
 			pheader = (ioctl_header_info_t *)(void *)dmp->b_rptr;
 			/* build initial ioctl packet header */
 			build_init_pkt_header(qlge, pheader,
@@ -1685,21 +1687,23 @@ ql_binary_core_dump(qlge_t *qlge, uint32_t requested_dumps, uint32_t *len_ptr)
 		/* if dumping all */
 		if ((requested_dumps & DUMP_REQUEST_ALL) != 0) {
 			ql_dump_header_ptr->num_dumps = 2;
-			ql_8xxx_binary_core_dump_with_header(qlge, bp, &size);
+			(void) ql_8xxx_binary_core_dump_with_header(qlge,
+			    bp, &size);
 			length += size;
 			bp = (caddr_t)qlge->ioctl_buf_ptr + length;
-			ql_8xxx_binary_register_dump_with_header(qlge,
+			(void) ql_8xxx_binary_register_dump_with_header(qlge,
 			    bp, &size);
 			length += size;
 			bp = (caddr_t)qlge->ioctl_buf_ptr + length;
 		} else if ((requested_dumps & DUMP_REQUEST_CORE) != 0) {
 			ql_dump_header_ptr->num_dumps = 1;
-			ql_8xxx_binary_core_dump_with_header(qlge, bp, &size);
+			(void) ql_8xxx_binary_core_dump_with_header(qlge,
+			    bp, &size);
 			length += size;
 			bp = (caddr_t)qlge->ioctl_buf_ptr + length;
 		} else if ((requested_dumps & DUMP_REQUEST_REGISTER) != 0) {
 			ql_dump_header_ptr->num_dumps = 1;
-			ql_8xxx_binary_register_dump_with_header(qlge,
+			(void) ql_8xxx_binary_register_dump_with_header(qlge,
 			    bp, &size);
 			length += size;
 			bp = (caddr_t)qlge->ioctl_buf_ptr + length;
@@ -2326,7 +2330,7 @@ ql_get_probe_dump(qlge_t *qlge, uint32_t *buf)
 	/*
 	 * First we have to enable the probe mux
 	 */
-	ql_write_processor_data(qlge, 0x100e, 0x18a20000);
+	(void) ql_write_processor_data(qlge, 0x100e, 0x18a20000);
 
 	buf = ql_get_probe(qlge, SYS_CLOCK, sys_clock_valid_modules, buf);
 
@@ -2642,10 +2646,11 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    (uint8_t *)"Core Registers");
 
 	/* first, read 127 core registers */
-	ql_get_mpi_regs(qlge, &mpi_coredump->mpi_core_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->mpi_core_regs[0],
 	    MPI_CORE_REGS_ADDR, MPI_CORE_REGS_CNT);
 	/* read the next 16 shadow registers */
-	ql_get_mpi_shadow_regs(qlge, &mpi_coredump->mpi_core_sh_regs[0]);
+	(void) ql_get_mpi_shadow_regs(qlge,
+	    &mpi_coredump->mpi_core_sh_regs[0]);
 
 	/* 2:MPI Test Logic Registers */
 	ql_build_coredump_seg_header(&mpi_coredump->test_logic_regs_seg_hdr,
@@ -2654,7 +2659,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump->test_logic_regs),
 	    (uint8_t *)"Test Logic Regs");
 
-	ql_get_mpi_regs(qlge, &mpi_coredump->test_logic_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->test_logic_regs[0],
 	    TEST_REGS_ADDR, TEST_REGS_CNT);
 
 	/* 3:RMII Registers */
@@ -2663,7 +2668,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->rmii_regs),
 	    (uint8_t *)"RMII Registers");
-	ql_get_mpi_regs(qlge, &mpi_coredump->rmii_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->rmii_regs[0],
 	    RMII_REGS_ADDR, RMII_REGS_CNT);
 
 	/* 4:FCMAC1 Registers */
@@ -2672,7 +2677,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->fcmac1_regs),
 	    (uint8_t *)"FCMAC1 Registers");
-	ql_get_mpi_regs(qlge, &mpi_coredump->fcmac1_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->fcmac1_regs[0],
 	    FCMAC1_REGS_ADDR, FCMAC_REGS_CNT);
 
 	/* 5:FCMAC2 Registers */
@@ -2681,7 +2686,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->fcmac2_regs),
 	    (uint8_t *)"FCMAC2 Registers");
-	ql_get_mpi_regs(qlge, &mpi_coredump->fcmac2_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->fcmac2_regs[0],
 	    FCMAC2_REGS_ADDR, FCMAC_REGS_CNT);
 
 	/* 6:FC1 Mailbox Registers */
@@ -2690,7 +2695,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->fc1_mbx_regs),
 	    (uint8_t *)"FC1 MBox Regs");
-	ql_get_mpi_regs(qlge, &mpi_coredump->fc1_mbx_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->fc1_mbx_regs[0],
 	    FC1_MBX_REGS_ADDR, FC_MBX_REGS_CNT);
 
 	/* 7:IDE Registers */
@@ -2699,7 +2704,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->ide_regs),
 	    (uint8_t *)"IDE Registers");
-	ql_get_mpi_regs(qlge, &mpi_coredump->ide_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->ide_regs[0],
 	    IDE_REGS_ADDR, IDE_REGS_CNT);
 
 	/* 8:Host1 Mailbox Registers */
@@ -2708,7 +2713,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->nic1_mbx_regs),
 	    (uint8_t *)"NIC1 MBox Regs");
-	ql_get_mpi_regs(qlge, &mpi_coredump->nic1_mbx_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->nic1_mbx_regs[0],
 	    NIC1_MBX_REGS_ADDR, NIC_MBX_REGS_CNT);
 
 	/* 9:SMBus Registers */
@@ -2717,7 +2722,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->smbus_regs),
 	    (uint8_t *)"SMBus Registers");
-	ql_get_mpi_regs(qlge, &mpi_coredump->smbus_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->smbus_regs[0],
 	    SMBUS_REGS_ADDR, SMBUS_REGS_CNT);
 
 	/* 10:FC2 Mailbox Registers */
@@ -2726,7 +2731,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->fc2_mbx_regs),
 	    (uint8_t *)"FC2 MBox Regs");
-	ql_get_mpi_regs(qlge, &mpi_coredump->fc2_mbx_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->fc2_mbx_regs[0],
 	    FC2_MBX_REGS_ADDR, FC_MBX_REGS_CNT);
 
 	/* 11:Host2 Mailbox Registers */
@@ -2735,7 +2740,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->nic2_mbx_regs),
 	    (uint8_t *)"NIC2 MBox Regs");
-	ql_get_mpi_regs(qlge, &mpi_coredump->nic2_mbx_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->nic2_mbx_regs[0],
 	    NIC2_MBX_REGS_ADDR, NIC_MBX_REGS_CNT);
 
 	/* 12:i2C Registers */
@@ -2744,7 +2749,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->i2c_regs),
 	    (uint8_t *)"I2C Registers");
-	ql_get_mpi_regs(qlge, &mpi_coredump->i2c_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->i2c_regs[0],
 	    I2C_REGS_ADDR, I2C_REGS_CNT);
 
 	/* 13:MEMC Registers */
@@ -2753,7 +2758,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->memc_regs),
 	    (uint8_t *)"MEMC Registers");
-	ql_get_mpi_regs(qlge, &mpi_coredump->memc_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->memc_regs[0],
 	    MEMC_REGS_ADDR, MEMC_REGS_CNT);
 
 	/* 14:PBus Registers */
@@ -2762,7 +2767,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->pbus_regs),
 	    (uint8_t *)"PBUS Registers");
-	ql_get_mpi_regs(qlge, &mpi_coredump->pbus_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->pbus_regs[0],
 	    PBUS_REGS_ADDR, PBUS_REGS_CNT);
 
 	/* 15:MDE Registers */
@@ -2771,7 +2776,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->mde_regs),
 	    (uint8_t *)"MDE Registers");
-	ql_get_mpi_regs(qlge, &mpi_coredump->mde_regs[0],
+	(void) ql_get_mpi_regs(qlge, &mpi_coredump->mde_regs[0],
 	    MDE_REGS_ADDR, MDE_REGS_CNT);
 
 	ql_build_coredump_seg_header(&mpi_coredump->xaui_an_hdr,
@@ -2822,7 +2827,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump->serdes_xfi_hss_pll),
 	    (uint8_t *)"XFI HSS PLL Registers");
 
-	ql_get_serdes_regs(qlge, mpi_coredump);
+	(void) ql_get_serdes_regs(qlge, mpi_coredump);
 
 	/* 16:NIC Ctrl Registers Port1 */
 	ql_build_coredump_seg_header(&mpi_coredump->nic_regs_seg_hdr,
@@ -2848,14 +2853,14 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->xgmac),
 	    (uint8_t *)"NIC XGMac Registers");
-	ql_get_xgmac_regs(qlge, &mpi_coredump->xgmac[0]);
+	(void) ql_get_xgmac_regs(qlge, &mpi_coredump->xgmac[0]);
 
 	ql_build_coredump_seg_header(&mpi_coredump->probe_dump_seg_hdr,
 	    PROBE_DUMP_SEG_NUM,
 	    sizeof (mpi_coredump_segment_header_t) +
 	    sizeof (mpi_coredump->probe_dump),
 	    (uint8_t *)"Probe Dump");
-	ql_get_probe_dump(qlge, &mpi_coredump->probe_dump[0]);
+	(void) ql_get_probe_dump(qlge, &mpi_coredump->probe_dump[0]);
 
 	ql_build_coredump_seg_header(&mpi_coredump->routing_reg_seg_hdr,
 	    ROUTING_INDEX_SEG_NUM,
@@ -2879,7 +2884,7 @@ ql_8xxx_binary_core_dump(qlge_t *qlge, ql_mpi_coredump_t *mpi_coredump)
 	    sizeof (mpi_coredump->ets),
 	    (uint8_t *)"ETS Registers");
 
-	ql_get_ets_regs(qlge, &mpi_coredump->ets[0]);
+	(void) ql_get_ets_regs(qlge, &mpi_coredump->ets[0]);
 
 	/* clear the pause */
 	if (ql_unpause_mpi_risc(qlge) != DDI_SUCCESS) {
