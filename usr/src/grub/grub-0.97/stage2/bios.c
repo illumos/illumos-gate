@@ -162,7 +162,7 @@ get_cdinfo (int drive, struct geometry *geometry)
           geometry->heads = 1;
           geometry->sectors = 15;
           geometry->sector_size = 2048;
-          geometry->total_sectors = MAXINT;
+          geometry->total_sectors = MAXUINT;
           return 1;
         }
       else
@@ -196,7 +196,7 @@ get_cdinfo (int drive, struct geometry *geometry)
       geometry->heads = 1;
       geometry->sectors = 15;
       geometry->sector_size = 2048;
-      geometry->total_sectors = MAXINT;
+      geometry->total_sectors = MAXUINT;
       return 1;
     }
   return 0;
