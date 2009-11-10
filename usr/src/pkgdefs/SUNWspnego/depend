@@ -51,3 +51,4 @@ P SUNWcslr	Core Solaris Libraries (Root)
 P SUNWgss	GSSAPI V2
 P SUNWrsg	RPCSEC_GSS
 P SUNWgssc	GSSAPI CONFIG V2
+P SUNWkrbu	Kerberos version 5 support (Usr)
