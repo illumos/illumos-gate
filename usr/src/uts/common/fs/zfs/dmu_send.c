@@ -33,6 +33,7 @@
 #include <sys/dmu_traverse.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_dir.h>
+#include <sys/dsl_prop.h>
 #include <sys/dsl_pool.h>
 #include <sys/dsl_synctask.h>
 #include <sys/zfs_ioctl.h>
@@ -514,8 +515,34 @@ recv_existing_check(void *arg1, void *arg2, dmu_tx_t *tx)
 		/* if incremental, most recent snapshot must match fromguid */
 		if (ds->ds_prev == NULL)
 			return (ENODEV);
-		if (ds->ds_prev->ds_phys->ds_guid != rbsa->fromguid)
-			return (ENODEV);
+
+		/*
+		 * most recent snapshot must match fromguid, or there are no
+		 * changes since the fromguid one
+		 */
+		if (ds->ds_prev->ds_phys->ds_guid != rbsa->fromguid) {
+			uint64_t birth = ds->ds_prev->ds_phys->ds_bp.blk_birth;
+			uint64_t obj = ds->ds_prev->ds_phys->ds_prev_snap_obj;
+			while (obj != 0) {
+				dsl_dataset_t *snap;
+				err = dsl_dataset_hold_obj(ds->ds_dir->dd_pool,
+				    obj, FTAG, &snap);
+				if (err)
+					return (ENODEV);
+				if (snap->ds_phys->ds_creation_txg < birth) {
+					dsl_dataset_rele(snap, FTAG);
+					return (ENODEV);
+				}
+				if (snap->ds_phys->ds_guid == rbsa->fromguid) {
+					dsl_dataset_rele(snap, FTAG);
+					break; /* it's ok */
+				}
+				obj = snap->ds_phys->ds_prev_snap_obj;
+				dsl_dataset_rele(snap, FTAG);
+			}
+			if (obj == 0)
+				return (ENODEV);
+		}
 	} else {
 		/* if full, most recent snapshot must be $ORIGIN */
 		if (ds->ds_phys->ds_prev_snap_txg >= TXG_INITIAL)
@@ -565,10 +592,6 @@ recv_existing_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		(void) dmu_objset_create_impl(dp->dp_spa,
 		    cds, dsl_dataset_get_blkptr(cds), rbsa->type, tx);
 	}
-
-	/* copy the refquota from the target fs to the clone */
-	if (ohds->ds_quota > 0)
-		dsl_dataset_set_quota_sync(cds, &ohds->ds_quota, cr, tx);
 
 	rbsa->ds = cds;
 

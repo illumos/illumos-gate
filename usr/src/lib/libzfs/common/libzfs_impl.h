@@ -92,6 +92,7 @@ struct zfs_handle {
 	dmu_objset_stats_t zfs_dmustats;
 	nvlist_t *zfs_props;
 	nvlist_t *zfs_user_props;
+	nvlist_t *zfs_recvd_props;
 	boolean_t zfs_mntcheck;
 	char *zfs_mntopts;
 	uint8_t *zfs_props_table;

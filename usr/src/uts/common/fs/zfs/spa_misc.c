@@ -43,7 +43,6 @@
 #include <sys/dsl_prop.h>
 #include <sys/fs/zfs.h>
 #include <sys/metaslab_impl.h>
-#include <sys/sunddi.h>
 #include <sys/arc.h>
 #include <sys/ddt.h>
 #include "zfs_prop.h"

@@ -815,8 +815,9 @@ ztest_dsl_prop_set_uint64(char *osname, zfs_prop_t prop, uint64_t value,
 	uint64_t curval;
 	int error;
 
-	error = dsl_prop_set(osname, propname, sizeof (value),
-	    inherit ? 0 : 1, &value);
+	error = dsl_prop_set(osname, propname,
+	    (inherit ? ZPROP_SRC_NONE : ZPROP_SRC_LOCAL),
+	    sizeof (value), 1, &value);
 
 	if (error == ENOSPC) {
 		ztest_record_enospc(FTAG);

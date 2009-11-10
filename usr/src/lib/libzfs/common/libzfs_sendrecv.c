@@ -46,6 +46,9 @@
 #include "libzfs_impl.h"
 #include <sha2.h>
 
+/* in libzfs_dataset.c */
+extern void zfs_setprop_error(libzfs_handle_t *, zfs_prop_t, int, char *);
+
 static int zfs_receive_impl(libzfs_handle_t *, const char *, recvflags_t,
     int, avl_tree_t *, char **);
 
@@ -510,6 +513,7 @@ typedef struct send_data {
 	nvlist_t *snapprops;
 	const char *fromsnap;
 	const char *tosnap;
+	boolean_t recursive;
 
 	/*
 	 * The header nvlist is of the following format:
@@ -597,18 +601,30 @@ send_iterate_prop(zfs_handle_t *zhp, nvlist_t *nv)
 		if (prop == ZFS_PROP_QUOTA || prop == ZFS_PROP_RESERVATION ||
 		    prop == ZFS_PROP_REFQUOTA ||
 		    prop == ZFS_PROP_REFRESERVATION) {
-			/* these guys are modifyable, but have no source */
+			char *source;
 			uint64_t value;
 			verify(nvlist_lookup_uint64(propnv,
 			    ZPROP_VALUE, &value) == 0);
 			if (zhp->zfs_type == ZFS_TYPE_SNAPSHOT)
 				continue;
+			/*
+			 * May have no source before SPA_VERSION_RECVD_PROPS,
+			 * but is still modifiable.
+			 */
+			if (nvlist_lookup_string(propnv,
+			    ZPROP_SOURCE, &source) == 0) {
+				if ((strcmp(source, zhp->zfs_name) != 0) &&
+				    (strcmp(source,
+				    ZPROP_SOURCE_VAL_RECVD) != 0))
+					continue;
+			}
 		} else {
 			char *source;
 			if (nvlist_lookup_string(propnv,
 			    ZPROP_SOURCE, &source) != 0)
 				continue;
-			if (strcmp(source, zhp->zfs_name) != 0)
+			if ((strcmp(source, zhp->zfs_name) != 0) &&
+			    (strcmp(source, ZPROP_SOURCE_VAL_RECVD) != 0))
 				continue;
 		}
 
@@ -637,7 +653,7 @@ send_iterate_fs(zfs_handle_t *zhp, void *arg)
 {
 	send_data_t *sd = arg;
 	nvlist_t *nvfs, *nv;
-	int rv;
+	int rv = 0;
 	uint64_t parent_fromsnap_guid_save = sd->parent_fromsnap_guid;
 	uint64_t guid = zhp->zfs_dmustats.dds_guid;
 	char guidstring[64];
@@ -679,7 +695,8 @@ send_iterate_fs(zfs_handle_t *zhp, void *arg)
 	nvlist_free(nvfs);
 
 	/* iterate over children */
-	rv = zfs_iter_filesystems(zhp, send_iterate_fs, sd);
+	if (sd->recursive)
+		rv = zfs_iter_filesystems(zhp, send_iterate_fs, sd);
 
 	sd->parent_fromsnap_guid = parent_fromsnap_guid_save;
 
@@ -689,7 +706,7 @@ send_iterate_fs(zfs_handle_t *zhp, void *arg)
 
 static int
 gather_nvlist(libzfs_handle_t *hdl, const char *fsname, const char *fromsnap,
-    const char *tosnap, nvlist_t **nvlp, avl_tree_t **avlp)
+    const char *tosnap, boolean_t recursive, nvlist_t **nvlp, avl_tree_t **avlp)
 {
 	zfs_handle_t *zhp;
 	send_data_t sd = { 0 };
@@ -702,6 +719,7 @@ gather_nvlist(libzfs_handle_t *hdl, const char *fsname, const char *fromsnap,
 	VERIFY(0 == nvlist_alloc(&sd.fss, NV_UNIQUE_NAME, 0));
 	sd.fromsnap = fromsnap;
 	sd.tosnap = tosnap;
+	sd.recursive = recursive;
 
 	if ((error = send_iterate_fs(zhp, &sd)) != 0) {
 		nvlist_free(sd.fss);
@@ -1045,12 +1063,12 @@ again:
 		origin_nv = fsavl_find(sdd->fsavl, origin_guid, NULL);
 		if (origin_nv &&
 		    nvlist_lookup_boolean(origin_nv, "sent") == ENOENT) {
-				/*
-				 * origin has not been sent yet;
-				 * skip this clone.
-				 */
-				needagain = B_TRUE;
-				continue;
+			/*
+			 * origin has not been sent yet;
+			 * skip this clone.
+			 */
+			needagain = B_TRUE;
+			continue;
 		}
 
 		zhp = zfs_open(rzhp->zfs_hdl, fsname, ZFS_TYPE_DATASET);
@@ -1084,7 +1102,7 @@ again:
  * uses a special header (with a hdrtype field of DMU_COMPOUNDSTREAM)
  * if "replicate" is set.  If "doall" is set, dump all the intermediate
  * snapshots. The DMU_COMPOUNDSTREAM header is used in the "doall"
- * case too.
+ * case too. If "props" is set, send properties.
  */
 int
 zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
@@ -1137,13 +1155,11 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 		}
 	}
 
-	if (flags.replicate || flags.doall) {
+	if (flags.replicate || flags.doall || flags.props) {
 		dmu_replay_record_t drr = { 0 };
 		char *packbuf = NULL;
 		size_t buflen = 0;
 		zio_cksum_t zc = { 0 };
-
-		assert(fromsnap || flags.doall);
 
 		if (holdsnaps) {
 			(void) snprintf(holdtag, sizeof (holdtag),
@@ -1155,8 +1171,7 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 				goto err_out;
 		}
 
-
-		if (flags.replicate) {
+		if (flags.replicate || flags.props) {
 			nvlist_t *hdrnv;
 
 			VERIFY(0 == nvlist_alloc(&hdrnv, NV_UNIQUE_NAME, 0));
@@ -1165,9 +1180,13 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 				    "fromsnap", fromsnap));
 			}
 			VERIFY(0 == nvlist_add_string(hdrnv, "tosnap", tosnap));
+			if (!flags.replicate) {
+				VERIFY(0 == nvlist_add_boolean(hdrnv,
+				    "not_recursive"));
+			}
 
 			err = gather_nvlist(zhp->zfs_hdl, zhp->zfs_name,
-			    fromsnap, tosnap, &fss, &fsavl);
+			    fromsnap, tosnap, flags.replicate, &fss, &fsavl);
 			if (err) {
 				if (holdsnaps) {
 					(void) zfs_release_range(zhp, fromsnap,
@@ -1204,7 +1223,7 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 		err = cksum_and_write(&drr, sizeof (drr), &zc, outfd);
 
 		/* write header nvlist */
-		if (err != -1 && flags.replicate) {
+		if (err != -1 && packbuf != NULL) {
 			err = cksum_and_write(packbuf, buflen, &zc, outfd);
 		}
 		free(packbuf);
@@ -1261,7 +1280,8 @@ zfs_send(zfs_handle_t *zhp, const char *fromsnap, const char *tosnap,
 		(void) close(pipefd[0]);
 		(void) pthread_join(tid, NULL);
 	}
-	if (flags.replicate || flags.doall) {
+
+	if (flags.replicate || flags.doall || flags.props) {
 		/*
 		 * write final end record.  NB: want to do this even if
 		 * there was some error, because it might not be totally
@@ -1471,12 +1491,13 @@ recv_destroy(libzfs_handle_t *hdl, const char *name, int baselen,
 	changelist_free(clp);
 
 	/*
-	 * Deferred destroy should always succeed. Since we can't tell
-	 * if it destroyed the dataset or just marked it for deferred
-	 * destroy, always do the rename just in case.
+	 * Deferred destroy might destroy the snapshot or only mark it to be
+	 * destroyed later, and it returns success in either case.
 	 */
-	if (err != 0 || defer)
+	if (err != 0 || (defer && zfs_dataset_exists(hdl, name,
+	    ZFS_TYPE_SNAPSHOT))) {
 		err = recv_rename(hdl, name, NULL, baselen, newname, flags);
+	}
 
 	return (err);
 }
@@ -1592,11 +1613,14 @@ recv_incremental_replication(libzfs_handle_t *hdl, const char *tofs,
 	char *tosnap, *fromsnap;
 	char newname[ZFS_MAXNAMELEN];
 	int error;
-	boolean_t needagain, progress;
+	boolean_t needagain, progress, recursive;
 	char *s1, *s2;
 
 	VERIFY(0 == nvlist_lookup_string(stream_nv, "fromsnap", &fromsnap));
 	VERIFY(0 == nvlist_lookup_string(stream_nv, "tosnap", &tosnap));
+
+	recursive = (nvlist_lookup_boolean(stream_nv, "not_recursive") ==
+	    ENOENT);
 
 	if (flags.dryrun)
 		return (0);
@@ -1605,7 +1629,7 @@ again:
 	needagain = progress = B_FALSE;
 
 	if ((error = gather_nvlist(hdl, tofs, fromsnap, NULL,
-	    &local_nv, &local_avl)) != 0)
+	    recursive, &local_nv, &local_avl)) != 0)
 		return (error);
 
 	/*
@@ -1728,7 +1752,7 @@ again:
 			    stream_snapname, &props)) {
 				zfs_cmd_t zc = { 0 };
 
-				zc.zc_cookie = B_TRUE; /* clear current props */
+				zc.zc_cookie = B_TRUE; /* received */
 				(void) snprintf(zc.zc_name, sizeof (zc.zc_name),
 				    "%s@%s", fsname, nvpair_name(snapelem));
 				if (zcmd_write_src_nvlist(hdl, &zc,
@@ -1877,18 +1901,23 @@ zfs_receive_package(libzfs_handle_t *hdl, int fd, const char *destname,
 	 * Read in the nvlist from the stream.
 	 */
 	if (drr->drr_payloadlen != 0) {
-		if (!flags.isprefix) {
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "must use -d to receive replication "
-			    "(send -R) stream"));
-			return (zfs_error(hdl, EZFS_BADSTREAM, errbuf));
-		}
+		boolean_t recursive;
 
 		error = recv_read_nvlist(hdl, fd, drr->drr_payloadlen,
 		    &stream_nv, flags.byteswap, zc);
 		if (error) {
 			error = zfs_error(hdl, EZFS_BADSTREAM, errbuf);
 			goto out;
+		}
+
+		recursive = (nvlist_lookup_boolean(stream_nv,
+		    "not_recursive") == ENOENT);
+
+		if (recursive && !flags.isprefix) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "must use -d to receive replication "
+			    "(send -R) stream"));
+			return (zfs_error(hdl, EZFS_BADSTREAM, errbuf));
 		}
 	}
 
@@ -1989,6 +2018,19 @@ out:
 	return (error);
 }
 
+static void
+trunc_prop_errs(int truncated)
+{
+	ASSERT(truncated != 0);
+
+	if (truncated == 1)
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "1 more property could not be set\n"));
+	else
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "%d more properties could not be set\n"), truncated);
+}
+
 static int
 recv_skip(libzfs_handle_t *hdl, int fd, boolean_t byteswap)
 {
@@ -2072,12 +2114,14 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	char *cp;
 	struct drr_begin *drrb = &drr->drr_u.drr_begin;
 	char errbuf[1024];
+	char prop_errbuf[1024];
 	char chopprefix[ZFS_MAXNAMELEN];
 	boolean_t newfs = B_FALSE;
 	boolean_t stream_wantsnewfs;
 	uint64_t parent_snapguid = 0;
 	prop_changelist_t *clp = NULL;
 	nvlist_t *snapprops_nvlist = NULL;
+	zprop_errflags_t prop_errflags;
 
 	begin_time = time(NULL);
 
@@ -2337,14 +2381,52 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		return (recv_skip(hdl, infd, flags.byteswap));
 	}
 
+	zc.zc_nvlist_dst = (uint64_t)(uintptr_t)prop_errbuf;
+	zc.zc_nvlist_dst_size = sizeof (prop_errbuf);
+
 	err = ioctl_err = zfs_ioctl(hdl, ZFS_IOC_RECV, &zc);
 	ioctl_errno = errno;
+	prop_errflags = (zprop_errflags_t)zc.zc_obj;
+
+	if (err == 0) {
+		nvlist_t *prop_errors;
+		VERIFY(0 == nvlist_unpack((void *)(uintptr_t)zc.zc_nvlist_dst,
+		    zc.zc_nvlist_dst_size, &prop_errors, 0));
+
+		nvpair_t *prop_err = NULL;
+
+		while ((prop_err = nvlist_next_nvpair(prop_errors,
+		    prop_err)) != NULL) {
+			char tbuf[1024];
+			zfs_prop_t prop;
+			int intval;
+
+			prop = zfs_name_to_prop(nvpair_name(prop_err));
+			(void) nvpair_value_int32(prop_err, &intval);
+			if (strcmp(nvpair_name(prop_err),
+			    ZPROP_N_MORE_ERRORS) == 0) {
+				trunc_prop_errs(intval);
+				break;
+			} else {
+				(void) snprintf(tbuf, sizeof (tbuf),
+				    dgettext(TEXT_DOMAIN,
+				    "cannot receive %s property on %s"),
+				    nvpair_name(prop_err), zc.zc_name);
+				zfs_setprop_error(hdl, prop, intval, tbuf);
+			}
+		}
+		nvlist_free(prop_errors);
+	}
+
+	zc.zc_nvlist_dst = 0;
+	zc.zc_nvlist_dst_size = 0;
 	zcmd_free_nvlists(&zc);
 
 	if (err == 0 && snapprops_nvlist) {
 		zfs_cmd_t zc2 = { 0 };
 
 		(void) strcpy(zc2.zc_name, zc.zc_value);
+		zc2.zc_cookie = B_TRUE; /* received */
 		if (zcmd_write_src_nvlist(hdl, &zc2, snapprops_nvlist) == 0) {
 			(void) zfs_ioctl(hdl, ZFS_IOC_SET_PROP, &zc2);
 			zcmd_free_nvlists(&zc2);
@@ -2367,7 +2449,7 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 		 * get a strange "does not exist" error message.
 		 */
 		*cp = '\0';
-		if (gather_nvlist(hdl, zc.zc_value, NULL, NULL,
+		if (gather_nvlist(hdl, zc.zc_value, NULL, NULL, B_FALSE,
 		    &local_nv, &local_avl) == 0) {
 			*cp = '@';
 			fs = fsavl_find(local_avl, drrb->drr_toguid, NULL);
@@ -2379,13 +2461,12 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 					(void) printf("snap %s already exists; "
 					    "ignoring\n", zc.zc_value);
 				}
-				ioctl_err = recv_skip(hdl, infd,
+				err = ioctl_err = recv_skip(hdl, infd,
 				    flags.byteswap);
 			}
 		}
 		*cp = '@';
 	}
-
 
 	if (ioctl_err != 0) {
 		switch (ioctl_errno) {
@@ -2461,6 +2542,19 @@ zfs_receive_one(libzfs_handle_t *hdl, int infd, const char *tosnap,
 	if (clp) {
 		err |= changelist_postfix(clp);
 		changelist_free(clp);
+	}
+
+	if (prop_errflags & ZPROP_ERR_NOCLEAR) {
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN, "Warning: "
+		    "failed to clear unreceived properties on %s"),
+		    zc.zc_name);
+		(void) fprintf(stderr, "\n");
+	}
+	if (prop_errflags & ZPROP_ERR_NORESTORE) {
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN, "Warning: "
+		    "failed to restore original properties on %s"),
+		    zc.zc_name);
+		(void) fprintf(stderr, "\n");
 	}
 
 	if (err || ioctl_err)

@@ -107,7 +107,8 @@ zfs_callback(zfs_handle_t *zhp, void *data)
 					zfs_prune_proplist(zhp,
 					    cb->cb_props_table);
 
-				if (zfs_expand_proplist(zhp, cb->cb_proplist)
+				if (zfs_expand_proplist(zhp, cb->cb_proplist,
+				    (cb->cb_flags & ZFS_ITER_RECVD_PROPS))
 				    != 0) {
 					free(node);
 					return (-1);

@@ -173,10 +173,27 @@ typedef enum {
 	ZPROP_SRC_DEFAULT = 0x2,
 	ZPROP_SRC_TEMPORARY = 0x4,
 	ZPROP_SRC_LOCAL = 0x8,
-	ZPROP_SRC_INHERITED = 0x10
+	ZPROP_SRC_INHERITED = 0x10,
+	ZPROP_SRC_RECEIVED = 0x20
 } zprop_source_t;
 
-#define	ZPROP_SRC_ALL	0x1f
+#define	ZPROP_SRC_ALL	0x3f
+
+#define	ZPROP_SOURCE_VAL_RECVD	"$recvd"
+#define	ZPROP_N_MORE_ERRORS	"N_MORE_ERRORS"
+/*
+ * Dataset flag implemented as a special entry in the props zap object
+ * indicating that the dataset has received properties on or after
+ * SPA_VERSION_RECVD_PROPS. The first such receive blows away local properties
+ * just as it did in earlier versions, and thereafter, local properties are
+ * preserved.
+ */
+#define	ZPROP_HAS_RECVD		"$hasrecvd"
+
+typedef enum {
+	ZPROP_ERR_NOCLEAR = 0x1, /* failure to clear existing props */
+	ZPROP_ERR_NORESTORE = 0x2 /* failure to restore props on error */
+} zprop_errflags_t;
 
 typedef int (*zprop_func)(int, void *);
 
@@ -198,7 +215,7 @@ boolean_t zfs_prop_setonce(zfs_prop_t);
 const char *zfs_prop_to_name(zfs_prop_t);
 zfs_prop_t zfs_name_to_prop(const char *);
 boolean_t zfs_prop_user(const char *);
-boolean_t zfs_prop_userquota(const char *name);
+boolean_t zfs_prop_userquota(const char *);
 int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
 int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
 uint64_t zfs_prop_random_value(zfs_prop_t, uint64_t seed);
@@ -306,14 +323,15 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_19			19ULL
 #define	SPA_VERSION_20			20ULL
 #define	SPA_VERSION_21			21ULL
+#define	SPA_VERSION_22			22ULL
 /*
  * When bumping up SPA_VERSION, make sure GRUB ZFS understands the on-disk
  * format change. Go to usr/src/grub/grub-0.97/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.  Also bump the version number in
  * usr/src/grub/capability.
  */
-#define	SPA_VERSION			SPA_VERSION_21
-#define	SPA_VERSION_STRING		"21"
+#define	SPA_VERSION			SPA_VERSION_22
+#define	SPA_VERSION_STRING		"22"
 
 /*
  * Symbolic names for the changes that caused a SPA_VERSION switch.
@@ -356,6 +374,7 @@ typedef enum zfs_cache_type {
 #define	SPA_VERSION_HOLES		SPA_VERSION_19
 #define	SPA_VERSION_ZLE_COMPRESSION	SPA_VERSION_20
 #define	SPA_VERSION_DEDUP		SPA_VERSION_21
+#define	SPA_VERSION_RECVD_PROPS		SPA_VERSION_22
 
 /*
  * ZPL version - rev'd whenever an incompatible on-disk format change
@@ -659,7 +678,8 @@ typedef enum zfs_ioc {
 	ZFS_IOC_USERSPACE_UPGRADE,
 	ZFS_IOC_HOLD,
 	ZFS_IOC_RELEASE,
-	ZFS_IOC_GET_HOLDS
+	ZFS_IOC_GET_HOLDS,
+	ZFS_IOC_OBJSET_RECVD_PROPS
 } zfs_ioc_t;
 
 /*

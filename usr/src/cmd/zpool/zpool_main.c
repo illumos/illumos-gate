@@ -3677,6 +3677,7 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 20  Compression using zle "
 		    "(zero-length encoding)\n"));
 		(void) printf(gettext(" 21  Deduplication\n"));
+		(void) printf(gettext(" 22  Received properties\n"));
 		(void) printf(gettext("\nFor more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"
@@ -3892,7 +3893,8 @@ get_callback(zpool_handle_t *zhp, void *data)
 			continue;
 
 		zprop_print_one_property(zpool_get_name(zhp), cbp,
-		    zpool_prop_to_name(pl->pl_prop), value, srctype, NULL);
+		    zpool_prop_to_name(pl->pl_prop), value, srctype, NULL,
+		    NULL);
 	}
 	return (0);
 }

@@ -706,13 +706,17 @@ zap_put_leaf_maybe_grow_ptrtbl(zap_name_t *zn, zap_leaf_t *l, dmu_tx_t *tx)
 	}
 }
 
-
 static int
-fzap_checksize(zap_name_t *zn, uint64_t integer_size, uint64_t num_integers)
+fzap_checkname(zap_name_t *zn)
 {
 	if (zn->zn_key_orig_len > ZAP_MAXNAMELEN)
-		return (E2BIG);
+		return (ENAMETOOLONG);
+	return (0);
+}
 
+static int
+fzap_checksize(uint64_t integer_size, uint64_t num_integers)
+{
 	/* Only integer sizes supported by C */
 	switch (integer_size) {
 	case 1:
@@ -730,6 +734,16 @@ fzap_checksize(zap_name_t *zn, uint64_t integer_size, uint64_t num_integers)
 	return (0);
 }
 
+static int
+fzap_check(zap_name_t *zn, uint64_t integer_size, uint64_t num_integers)
+{
+	int err;
+
+	if ((err = fzap_checkname(zn)) != 0)
+		return (err);
+	return (fzap_checksize(integer_size, num_integers));
+}
+
 /*
  * Routines for manipulating attributes.
  */
@@ -742,8 +756,7 @@ fzap_lookup(zap_name_t *zn,
 	int err;
 	zap_entry_handle_t zeh;
 
-	err = fzap_checksize(zn, integer_size, num_integers);
-	if (err != 0)
+	if ((err = fzap_checkname(zn)) != 0)
 		return (err);
 
 	err = zap_deref_leaf(zn->zn_zap, zn->zn_hash, NULL, RW_READER, &l);
@@ -751,6 +764,11 @@ fzap_lookup(zap_name_t *zn,
 		return (err);
 	err = zap_leaf_lookup(l, zn, &zeh);
 	if (err == 0) {
+		if ((err = fzap_checksize(integer_size, num_integers)) != 0) {
+			zap_put_leaf(l);
+			return (err);
+		}
+
 		err = zap_entry_read(&zeh, integer_size, num_integers, buf);
 		(void) zap_entry_read_name(zn->zn_zap, &zeh, rn_len, realname);
 		if (ncp) {
@@ -775,7 +793,7 @@ fzap_add_cd(zap_name_t *zn,
 
 	ASSERT(RW_LOCK_HELD(&zap->zap_rwlock));
 	ASSERT(!zap->zap_ismicro);
-	ASSERT(fzap_checksize(zn, integer_size, num_integers) == 0);
+	ASSERT(fzap_check(zn, integer_size, num_integers) == 0);
 
 	err = zap_deref_leaf(zap, zn->zn_hash, tx, RW_WRITER, &l);
 	if (err != 0)
@@ -812,7 +830,7 @@ fzap_add(zap_name_t *zn,
     uint64_t integer_size, uint64_t num_integers,
     const void *val, dmu_tx_t *tx)
 {
-	int err = fzap_checksize(zn, integer_size, num_integers);
+	int err = fzap_check(zn, integer_size, num_integers);
 	if (err != 0)
 		return (err);
 
@@ -830,7 +848,7 @@ fzap_update(zap_name_t *zn,
 	zap_t *zap = zn->zn_zap;
 
 	ASSERT(RW_LOCK_HELD(&zap->zap_rwlock));
-	err = fzap_checksize(zn, integer_size, num_integers);
+	err = fzap_check(zn, integer_size, num_integers);
 	if (err != 0)
 		return (err);
 
@@ -1018,8 +1036,6 @@ fzap_cursor_retrieve(zap_t *zap, zap_cursor_t *zc, zap_attribute_t *za)
 	zap_entry_handle_t zeh;
 	zap_leaf_t *l;
 
-	/* memset(za, 0xba, sizeof (zap_attribute_t)); */
-
 	/* retrieve the next entry at or after zc_hash/zc_cd */
 	/* if no entry, return ENOENT */
 
@@ -1117,7 +1133,7 @@ fzap_cursor_move_to_key(zap_cursor_t *zc, zap_name_t *zn)
 	zap_entry_handle_t zeh;
 
 	if (zn->zn_key_orig_len > ZAP_MAXNAMELEN)
-		return (E2BIG);
+		return (ENAMETOOLONG);
 
 	err = zap_deref_leaf(zc->zc_zap, zn->zn_hash, NULL, RW_READER, &l);
 	if (err != 0)

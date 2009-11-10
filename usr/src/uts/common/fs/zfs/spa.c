@@ -58,7 +58,6 @@
 #include <sys/arc.h>
 #include <sys/callb.h>
 #include <sys/systeminfo.h>
-#include <sys/sunddi.h>
 #include <sys/spa_boot.h>
 #include <sys/zfs_ioctl.h>
 

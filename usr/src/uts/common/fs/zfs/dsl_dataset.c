@@ -38,7 +38,6 @@
 #include <sys/zfs_ioctl.h>
 #include <sys/spa.h>
 #include <sys/zfs_znode.h>
-#include <sys/sunddi.h>
 #include <sys/zvol.h>
 
 static char *dsl_reaper = "the grim reaper";
@@ -1005,7 +1004,8 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 	objset_t *os;
 	dsl_dir_t *dd;
 	uint64_t obj;
-	struct dsl_ds_destroyarg dsda = {0};
+	struct dsl_ds_destroyarg dsda = { 0 };
+	dsl_dataset_t dummy_ds = { 0 };
 
 	dsda.ds = ds;
 
@@ -1029,6 +1029,8 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 	}
 
 	dd = ds->ds_dir;
+	dummy_ds.ds_dir = dd;
+	dummy_ds.ds_object = ds->ds_object;
 
 	/*
 	 * Check for errors and mark this ds as inconsistent, in
@@ -1123,7 +1125,7 @@ dsl_dataset_destroy(dsl_dataset_t *ds, void *tag, boolean_t defer)
 		dsl_sync_task_create(dstg, dsl_dataset_destroy_check,
 		    dsl_dataset_destroy_sync, &dsda, tag, 0);
 		dsl_sync_task_create(dstg, dsl_dir_destroy_check,
-		    dsl_dir_destroy_sync, dd, FTAG, 0);
+		    dsl_dir_destroy_sync, &dummy_ds, FTAG, 0);
 		err = dsl_sync_task_group_wait(dstg);
 		dsl_sync_task_group_destroy(dstg);
 
@@ -1524,8 +1526,15 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 
 	/* Remove our reservation */
 	if (ds->ds_reserved != 0) {
-		uint64_t val = 0;
-		dsl_dataset_set_reservation_sync(ds, &val, cr, tx);
+		dsl_prop_setarg_t psa;
+		uint64_t value = 0;
+
+		dsl_prop_setarg_init_uint64(&psa, "refreservation",
+		    (ZPROP_SRC_NONE | ZPROP_SRC_LOCAL | ZPROP_SRC_RECEIVED),
+		    &value);
+		psa.psa_effective_value = 0;	/* predict default value */
+
+		dsl_dataset_set_reservation_sync(ds, &psa, cr, tx);
 		ASSERT3U(ds->ds_reserved, ==, 0);
 	}
 
@@ -2019,7 +2028,8 @@ dsl_dataset_stats(dsl_dataset_t *ds, nvlist_t *nv)
 	    dsl_dataset_unique(ds));
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_OBJSETID,
 	    ds->ds_object);
-	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_USERREFS, ds->ds_userrefs);
+	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_USERREFS,
+	    ds->ds_userrefs);
 	dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_DEFER_DESTROY,
 	    DS_IS_DEFER_DESTROY(ds) ? 1 : 0);
 
@@ -3081,62 +3091,70 @@ static int
 dsl_dataset_set_quota_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
-	uint64_t *quotap = arg2;
-	uint64_t new_quota = *quotap;
+	dsl_prop_setarg_t *psa = arg2;
+	int err;
 
 	if (spa_version(ds->ds_dir->dd_pool->dp_spa) < SPA_VERSION_REFQUOTA)
 		return (ENOTSUP);
 
-	if (new_quota == 0)
+	if ((err = dsl_prop_predict_sync(ds->ds_dir, psa)) != 0)
+		return (err);
+
+	if (psa->psa_effective_value == 0)
 		return (0);
 
-	if (new_quota < ds->ds_phys->ds_used_bytes ||
-	    new_quota < ds->ds_reserved)
+	if (psa->psa_effective_value < ds->ds_phys->ds_used_bytes ||
+	    psa->psa_effective_value < ds->ds_reserved)
 		return (ENOSPC);
 
 	return (0);
 }
 
-/* ARGSUSED */
+extern void dsl_prop_set_sync(void *, void *, cred_t *, dmu_tx_t *);
+
 void
 dsl_dataset_set_quota_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
-	uint64_t *quotap = arg2;
-	uint64_t new_quota = *quotap;
+	dsl_prop_setarg_t *psa = arg2;
+	uint64_t effective_value = psa->psa_effective_value;
 
-	dmu_buf_will_dirty(ds->ds_dbuf, tx);
+	dsl_prop_set_sync(ds, psa, cr, tx);
+	DSL_PROP_CHECK_PREDICTION(ds->ds_dir, psa);
 
-	ds->ds_quota = new_quota;
+	if (ds->ds_quota != effective_value) {
+		dmu_buf_will_dirty(ds->ds_dbuf, tx);
+		ds->ds_quota = effective_value;
 
-	dsl_dir_prop_set_uint64_sync(ds->ds_dir, "refquota", new_quota, cr, tx);
-
-	spa_history_internal_log(LOG_DS_REFQUOTA, ds->ds_dir->dd_pool->dp_spa,
-	    tx, cr, "%lld dataset = %llu ",
-	    (longlong_t)new_quota, ds->ds_object);
+		spa_history_internal_log(LOG_DS_REFQUOTA,
+		    ds->ds_dir->dd_pool->dp_spa, tx, cr, "%lld dataset = %llu ",
+		    (longlong_t)ds->ds_quota, ds->ds_object);
+	}
 }
 
 int
-dsl_dataset_set_quota(const char *dsname, uint64_t quota)
+dsl_dataset_set_quota(const char *dsname, zprop_source_t source, uint64_t quota)
 {
 	dsl_dataset_t *ds;
+	dsl_prop_setarg_t psa;
 	int err;
+
+	dsl_prop_setarg_init_uint64(&psa, "refquota", source, &quota);
 
 	err = dsl_dataset_hold(dsname, FTAG, &ds);
 	if (err)
 		return (err);
 
-	if (quota != ds->ds_quota) {
-		/*
-		 * If someone removes a file, then tries to set the quota, we
-		 * want to make sure the file freeing takes effect.
-		 */
-		txg_wait_open(ds->ds_dir->dd_pool, 0);
+	/*
+	 * If someone removes a file, then tries to set the quota, we
+	 * want to make sure the file freeing takes effect.
+	 */
+	txg_wait_open(ds->ds_dir->dd_pool, 0);
 
-		err = dsl_sync_task_do(ds->ds_dir->dd_pool,
-		    dsl_dataset_set_quota_check, dsl_dataset_set_quota_sync,
-		    ds, &quota, 0);
-	}
+	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
+	    dsl_dataset_set_quota_check, dsl_dataset_set_quota_sync,
+	    ds, &psa, 0);
+
 	dsl_dataset_rele(ds, FTAG);
 	return (err);
 }
@@ -3145,9 +3163,10 @@ static int
 dsl_dataset_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
-	uint64_t *reservationp = arg2;
-	uint64_t new_reservation = *reservationp;
+	dsl_prop_setarg_t *psa = arg2;
+	uint64_t effective_value;
 	uint64_t unique;
+	int err;
 
 	if (spa_version(ds->ds_dir->dd_pool->dp_spa) <
 	    SPA_VERSION_REFRESERVATION)
@@ -3155,6 +3174,11 @@ dsl_dataset_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
 
 	if (dsl_dataset_is_snapshot(ds))
 		return (EINVAL);
+
+	if ((err = dsl_prop_predict_sync(ds->ds_dir, psa)) != 0)
+		return (err);
+
+	effective_value = psa->psa_effective_value;
 
 	/*
 	 * If we are doing the preliminary check in open context, the
@@ -3167,14 +3191,14 @@ dsl_dataset_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	unique = dsl_dataset_unique(ds);
 	mutex_exit(&ds->ds_lock);
 
-	if (MAX(unique, new_reservation) > MAX(unique, ds->ds_reserved)) {
-		uint64_t delta = MAX(unique, new_reservation) -
+	if (MAX(unique, effective_value) > MAX(unique, ds->ds_reserved)) {
+		uint64_t delta = MAX(unique, effective_value) -
 		    MAX(unique, ds->ds_reserved);
 
 		if (delta > dsl_dir_space_available(ds->ds_dir, NULL, 0, TRUE))
 			return (ENOSPC);
 		if (ds->ds_quota > 0 &&
-		    new_reservation > ds->ds_quota)
+		    effective_value > ds->ds_quota)
 			return (ENOSPC);
 	}
 
@@ -3187,36 +3211,42 @@ dsl_dataset_set_reservation_sync(void *arg1, void *arg2, cred_t *cr,
     dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
-	uint64_t *reservationp = arg2;
-	uint64_t new_reservation = *reservationp;
+	dsl_prop_setarg_t *psa = arg2;
+	uint64_t effective_value = psa->psa_effective_value;
 	uint64_t unique;
 	int64_t delta;
+
+	dsl_prop_set_sync(ds, psa, cr, tx);
+	DSL_PROP_CHECK_PREDICTION(ds->ds_dir, psa);
 
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 
 	mutex_enter(&ds->ds_dir->dd_lock);
 	mutex_enter(&ds->ds_lock);
 	unique = dsl_dataset_unique(ds);
-	delta = MAX(0, (int64_t)(new_reservation - unique)) -
+	delta = MAX(0, (int64_t)(effective_value - unique)) -
 	    MAX(0, (int64_t)(ds->ds_reserved - unique));
-	ds->ds_reserved = new_reservation;
+	ds->ds_reserved = effective_value;
 	mutex_exit(&ds->ds_lock);
 
 	dsl_dir_diduse_space(ds->ds_dir, DD_USED_REFRSRV, delta, 0, 0, tx);
 	mutex_exit(&ds->ds_dir->dd_lock);
-	dsl_dir_prop_set_uint64_sync(ds->ds_dir, "refreservation",
-	    new_reservation, cr, tx);
 
 	spa_history_internal_log(LOG_DS_REFRESERV,
 	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "%lld dataset = %llu",
-	    (longlong_t)new_reservation, ds->ds_object);
+	    (longlong_t)effective_value, ds->ds_object);
 }
 
 int
-dsl_dataset_set_reservation(const char *dsname, uint64_t reservation)
+dsl_dataset_set_reservation(const char *dsname, zprop_source_t source,
+    uint64_t reservation)
 {
 	dsl_dataset_t *ds;
+	dsl_prop_setarg_t psa;
 	int err;
+
+	dsl_prop_setarg_init_uint64(&psa, "refreservation", source,
+	    &reservation);
 
 	err = dsl_dataset_hold(dsname, FTAG, &ds);
 	if (err)
@@ -3224,7 +3254,8 @@ dsl_dataset_set_reservation(const char *dsname, uint64_t reservation)
 
 	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 	    dsl_dataset_set_reservation_check,
-	    dsl_dataset_set_reservation_sync, ds, &reservation, 0);
+	    dsl_dataset_set_reservation_sync, ds, &psa, 0);
+
 	dsl_dataset_rele(ds, FTAG);
 	return (err);
 }

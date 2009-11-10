@@ -1356,7 +1356,7 @@ zfs_mount_label_policy(vfs_t *vfsp, char *osname)
 
 		if (l_to_str_internal(mnt_sl, &str) == 0 &&
 		    dsl_prop_set(osname, zfs_prop_to_name(ZFS_PROP_MLSLABEL),
-		    1, strlen(str) + 1, str) == 0)
+		    ZPROP_SRC_LOCAL, 1, strlen(str) + 1, str) == 0)
 			retv = 0;
 		if (str != NULL)
 			kmem_free(str, strlen(str) + 1);

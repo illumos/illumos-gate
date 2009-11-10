@@ -102,6 +102,7 @@ SUNWprivate_1.1 {
 	zfs_prop_get;
 	zfs_prop_get_int;
 	zfs_prop_get_numeric;
+	zfs_prop_get_recvd;
 	zfs_prop_get_table;
 	zfs_prop_get_userquota_int;
 	zfs_prop_get_userquota;

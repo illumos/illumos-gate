@@ -126,8 +126,10 @@ void dsl_dir_diduse_space(dsl_dir_t *dd, dd_used_t type,
     int64_t used, int64_t compressed, int64_t uncompressed, dmu_tx_t *tx);
 void dsl_dir_transfer_space(dsl_dir_t *dd, int64_t delta,
     dd_used_t oldtype, dd_used_t newtype, dmu_tx_t *tx);
-int dsl_dir_set_quota(const char *ddname, uint64_t quota);
-int dsl_dir_set_reservation(const char *ddname, uint64_t reservation);
+int dsl_dir_set_quota(const char *ddname, zprop_source_t source,
+    uint64_t quota);
+int dsl_dir_set_reservation(const char *ddname, zprop_source_t source,
+    uint64_t reservation);
 int dsl_dir_rename(dsl_dir_t *dd, const char *newname);
 int dsl_dir_transfer_possible(dsl_dir_t *sdd, dsl_dir_t *tdd, uint64_t space);
 int dsl_dir_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx);

@@ -382,6 +382,8 @@ extern const char *zfs_prop_to_name(zfs_prop_t);
 extern int zfs_prop_set(zfs_handle_t *, const char *, const char *);
 extern int zfs_prop_get(zfs_handle_t *, zfs_prop_t, char *, size_t,
     zprop_source_t *, char *, size_t, boolean_t);
+extern int zfs_prop_get_recvd(zfs_handle_t *, const char *, char *, size_t,
+    boolean_t);
 extern int zfs_prop_get_numeric(zfs_handle_t *, zfs_prop_t, uint64_t *,
     zprop_source_t *, char *, size_t);
 extern int zfs_prop_get_userquota_int(zfs_handle_t *zhp, const char *propname,
@@ -389,10 +391,11 @@ extern int zfs_prop_get_userquota_int(zfs_handle_t *zhp, const char *propname,
 extern int zfs_prop_get_userquota(zfs_handle_t *zhp, const char *propname,
     char *propbuf, int proplen, boolean_t literal);
 extern uint64_t zfs_prop_get_int(zfs_handle_t *, zfs_prop_t);
-extern int zfs_prop_inherit(zfs_handle_t *, const char *);
+extern int zfs_prop_inherit(zfs_handle_t *, const char *, boolean_t);
 extern const char *zfs_prop_values(zfs_prop_t);
 extern int zfs_prop_is_string(zfs_prop_t prop);
 extern nvlist_t *zfs_get_user_props(zfs_handle_t *);
+extern nvlist_t *zfs_get_recvd_props(zfs_handle_t *);
 
 typedef struct zprop_list {
 	int		pl_prop;
@@ -400,10 +403,11 @@ typedef struct zprop_list {
 	struct zprop_list *pl_next;
 	boolean_t	pl_all;
 	size_t		pl_width;
+	size_t		pl_recvd_width;
 	boolean_t	pl_fixed;
 } zprop_list_t;
 
-extern int zfs_expand_proplist(zfs_handle_t *, zprop_list_t **);
+extern int zfs_expand_proplist(zfs_handle_t *, zprop_list_t **, boolean_t);
 extern void zfs_prune_proplist(zfs_handle_t *, uint8_t *);
 
 #define	ZFS_MOUNTPOINT_NONE	"none"
@@ -427,13 +431,24 @@ extern int zprop_get_list(libzfs_handle_t *, char *, zprop_list_t **,
     zfs_type_t);
 extern void zprop_free_list(zprop_list_t *);
 
+#define	ZFS_GET_NCOLS	5
+
+typedef enum {
+	GET_COL_NONE,
+	GET_COL_NAME,
+	GET_COL_PROPERTY,
+	GET_COL_VALUE,
+	GET_COL_RECVD,
+	GET_COL_SOURCE
+} zfs_get_column_t;
+
 /*
  * Functions for printing zfs or zpool properties
  */
 typedef struct zprop_get_cbdata {
 	int cb_sources;
-	int cb_columns[4];
-	int cb_colwidths[5];
+	zfs_get_column_t cb_columns[ZFS_GET_NCOLS];
+	int cb_colwidths[ZFS_GET_NCOLS + 1];
 	boolean_t cb_scripted;
 	boolean_t cb_literal;
 	boolean_t cb_first;
@@ -442,12 +457,8 @@ typedef struct zprop_get_cbdata {
 } zprop_get_cbdata_t;
 
 void zprop_print_one_property(const char *, zprop_get_cbdata_t *,
-    const char *, const char *, zprop_source_t, const char *);
-
-#define	GET_COL_NAME		1
-#define	GET_COL_PROPERTY	2
-#define	GET_COL_VALUE		3
-#define	GET_COL_SOURCE		4
+    const char *, const char *, zprop_source_t, const char *,
+    const char *);
 
 /*
  * Iterator functions.
@@ -477,17 +488,20 @@ typedef struct sendflags {
 	/* print informational messages (ie, -v was specified) */
 	int verbose : 1;
 
-	/* recursive send  (i.e., -R) */
+	/* recursive send  (ie, -R) */
 	int replicate : 1;
 
 	/* for incrementals, do all intermediate snapshots */
-	int doall : 1; /* (i.e., -I) */
+	int doall : 1; /* (ie, -I) */
 
 	/* if dataset is a clone, do incremental from its origin */
 	int fromorigin : 1;
 
 	/* do deduplication */
 	int dedup : 1;
+
+	/* send properties (ie, -p) */
+	int props : 1;
 } sendflags_t;
 
 typedef boolean_t (snapfilter_cb_t)(zfs_handle_t *, void *);

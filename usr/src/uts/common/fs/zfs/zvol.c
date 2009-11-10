@@ -130,8 +130,9 @@ typedef struct zvol_state {
  */
 int zvol_maxphys = DMU_MAX_ACCESS/2;
 
+extern int zfs_set_prop_nvlist(const char *, zprop_source_t,
+    nvlist_t *, nvlist_t **);
 static int zvol_remove_zv(zvol_state_t *);
-extern int zfs_set_prop_nvlist(const char *, nvlist_t *);
 static int zvol_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio);
 static int zvol_dumpify(zvol_state_t *zv);
 static int zvol_dump_fini(zvol_state_t *zv);
@@ -1659,7 +1660,8 @@ zvol_dump_init(zvol_state_t *zv, boolean_t resize)
 		    zfs_prop_to_name(ZFS_PROP_CHECKSUM),
 		    ZIO_CHECKSUM_OFF) == 0);
 
-		error = zfs_set_prop_nvlist(zv->zv_name, nv);
+		error = zfs_set_prop_nvlist(zv->zv_name, ZPROP_SRC_LOCAL,
+		    nv, NULL);
 		nvlist_free(nv);
 
 		if (error)
@@ -1766,7 +1768,8 @@ zvol_dump_fini(zvol_state_t *zv)
 	    zfs_prop_to_name(ZFS_PROP_COMPRESSION), compress);
 	(void) nvlist_add_uint64(nv,
 	    zfs_prop_to_name(ZFS_PROP_REFRESERVATION), refresrv);
-	(void) zfs_set_prop_nvlist(zv->zv_name, nv);
+	(void) zfs_set_prop_nvlist(zv->zv_name, ZPROP_SRC_LOCAL,
+	    nv, NULL);
 	nvlist_free(nv);
 
 	zvol_free_extents(zv);

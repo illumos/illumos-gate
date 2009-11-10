@@ -75,6 +75,7 @@ extern "C" {
 #include <sys/u8_textprep.h>
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/dev.h>
+#include <sys/sunddi.h>
 
 /*
  * Debugging

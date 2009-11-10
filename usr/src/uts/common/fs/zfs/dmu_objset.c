@@ -769,8 +769,12 @@ snapshot_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 
 	dsl_dataset_snapshot_sync(ds, sn->snapname, cr, tx);
 
-	if (sn->props)
-		dsl_props_set_sync(ds->ds_prev, sn->props, cr, tx);
+	if (sn->props) {
+		dsl_props_arg_t pa;
+		pa.pa_props = sn->props;
+		pa.pa_source = ZPROP_SRC_LOCAL;
+		dsl_props_set_sync(ds->ds_prev, &pa, cr, tx);
+	}
 }
 
 static int

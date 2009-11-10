@@ -40,7 +40,10 @@
 SUNW_1.3 {
     global:
 	nvlist_add_double;
+	nvlist_empty;
 	nvlist_lookup_double;
+	nvlist_prev_nvpair;
+	nvlist_remove_nvpair;
 	nvpair_value_double;
 } SUNW_1.2.2;
 

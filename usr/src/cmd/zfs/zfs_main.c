@@ -157,7 +157,7 @@ static zfs_command_t command_table[] = {
 	{ "list",	zfs_do_list,		HELP_LIST		},
 	{ NULL },
 	{ "set",	zfs_do_set,		HELP_SET		},
-	{ "get", 	zfs_do_get,		HELP_GET		},
+	{ "get",	zfs_do_get,		HELP_GET		},
 	{ "inherit",	zfs_do_inherit,		HELP_INHERIT		},
 	{ "upgrade",	zfs_do_upgrade,		HELP_UPGRADE		},
 	{ "userspace",	zfs_do_userspace,	HELP_USERSPACE		},
@@ -201,11 +201,11 @@ get_usage(zfs_help_t idx)
 		    "\tdestroy [-rRd] <snapshot>\n"));
 	case HELP_GET:
 		return (gettext("\tget [-rHp] [-d max] "
-		    "[-o field[,...]] [-s source[,...]]\n"
+		    "[-o \"all\" | field[,...]] [-s source[,...]]\n"
 		    "\t    <\"all\" | property[,...]> "
 		    "[filesystem|volume|snapshot] ...\n"));
 	case HELP_INHERIT:
-		return (gettext("\tinherit [-r] <property> "
+		return (gettext("\tinherit [-rS] <property> "
 		    "<filesystem|volume|snapshot> ...\n"));
 	case HELP_UPGRADE:
 		return (gettext("\tupgrade [-v]\n"
@@ -232,7 +232,7 @@ get_usage(zfs_help_t idx)
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
 	case HELP_SEND:
-		return (gettext("\tsend [-RD] [-[iI] snapshot] <snapshot>\n"));
+		return (gettext("\tsend [-RDp] [-[iI] snapshot] <snapshot>\n"));
 	case HELP_SET:
 		return (gettext("\tset <property=value> "
 		    "<filesystem|volume|snapshot> ...\n"));
@@ -787,9 +787,9 @@ badusage:
  * zfs destroy [-rRf] <fs, vol>
  * zfs destroy [-rRd] <snap>
  *
- * 	-r	Recursively destroy all children
- * 	-R	Recursively destroy all dependents, including clones
- * 	-f	Force unmounting of any dependents
+ *	-r	Recursively destroy all children
+ *	-R	Recursively destroy all dependents, including clones
+ *	-f	Force unmounting of any dependents
  *	-d	If we can't destroy now, mark for deferred destruction
  *
  * Destroys the given dataset.  By default, it will unmount any filesystems,
@@ -1068,18 +1068,32 @@ zfs_do_destroy(int argc, char **argv)
 	return (0);
 }
 
+static boolean_t
+is_recvd_column(zprop_get_cbdata_t *cbp)
+{
+	int i;
+	zfs_get_column_t col;
+
+	for (i = 0; i < ZFS_GET_NCOLS &&
+	    (col = cbp->cb_columns[i]) != GET_COL_NONE; i++)
+		if (col == GET_COL_RECVD)
+			return (B_TRUE);
+	return (B_FALSE);
+}
+
 /*
- * zfs get [-rHp] [-o field[,field]...] [-s source[,source]...]
- * 	< all | property[,property]... > < fs | snap | vol > ...
+ * zfs get [-rHp] [-o all | field[,field]...] [-s source[,source]...]
+ *	< all | property[,property]... > < fs | snap | vol > ...
  *
  *	-r	recurse over any child datasets
  *	-H	scripted mode.  Headers are stripped, and fields are separated
  *		by tabs instead of spaces.
- *	-o	Set of fields to display.  One of "name,property,value,source".
- *		Default is all four.
+ *	-o	Set of fields to display.  One of "name,property,value,
+ *		received,source". Default is "name,property,value,source".
+ *		"all" is an alias for all five.
  *	-s	Set of sources to allow.  One of
- *		"local,default,inherited,temporary,none".  Default is all
- *		five.
+ *		"local,default,inherited,received,temporary,none".  Default is
+ *		all six.
  *	-p	Display values in parsable (literal) format.
  *
  *  Prints properties for the given datasets.  The user can control which
@@ -1093,16 +1107,19 @@ static int
 get_callback(zfs_handle_t *zhp, void *data)
 {
 	char buf[ZFS_MAXPROPLEN];
+	char rbuf[ZFS_MAXPROPLEN];
 	zprop_source_t sourcetype;
 	char source[ZFS_MAXNAMELEN];
 	zprop_get_cbdata_t *cbp = data;
-	nvlist_t *userprop = zfs_get_user_props(zhp);
+	nvlist_t *user_props = zfs_get_user_props(zhp);
 	zprop_list_t *pl = cbp->cb_proplist;
 	nvlist_t *propval;
 	char *strval;
 	char *sourceval;
+	boolean_t received = is_recvd_column(cbp);
 
 	for (; pl != NULL; pl = pl->pl_next) {
+		char *recvdval = NULL;
 		/*
 		 * Skip the special fake placeholder.  This will also skip over
 		 * the name property when 'all' is specified.
@@ -1129,9 +1146,14 @@ get_callback(zfs_handle_t *zhp, void *data)
 				(void) strlcpy(buf, "-", sizeof (buf));
 			}
 
+			if (received && (zfs_prop_get_recvd(zhp,
+			    zfs_prop_to_name(pl->pl_prop), rbuf, sizeof (rbuf),
+			    cbp->cb_literal) == 0))
+				recvdval = rbuf;
+
 			zprop_print_one_property(zfs_get_name(zhp), cbp,
 			    zfs_prop_to_name(pl->pl_prop),
-			    buf, sourcetype, source);
+			    buf, sourcetype, source, recvdval);
 		} else if (zfs_prop_userquota(pl->pl_user_prop)) {
 			sourcetype = ZPROP_SRC_LOCAL;
 
@@ -1142,9 +1164,9 @@ get_callback(zfs_handle_t *zhp, void *data)
 			}
 
 			zprop_print_one_property(zfs_get_name(zhp), cbp,
-			    pl->pl_user_prop, buf, sourcetype, source);
+			    pl->pl_user_prop, buf, sourcetype, source, NULL);
 		} else {
-			if (nvlist_lookup_nvlist(userprop,
+			if (nvlist_lookup_nvlist(user_props,
 			    pl->pl_user_prop, &propval) != 0) {
 				if (pl->pl_all)
 					continue;
@@ -1159,6 +1181,9 @@ get_callback(zfs_handle_t *zhp, void *data)
 				if (strcmp(sourceval,
 				    zfs_get_name(zhp)) == 0) {
 					sourcetype = ZPROP_SRC_LOCAL;
+				} else if (strcmp(sourceval,
+				    ZPROP_SOURCE_VAL_RECVD) == 0) {
+					sourcetype = ZPROP_SRC_RECEIVED;
 				} else {
 					sourcetype = ZPROP_SRC_INHERITED;
 					(void) strlcpy(source,
@@ -1166,9 +1191,14 @@ get_callback(zfs_handle_t *zhp, void *data)
 				}
 			}
 
+			if (received && (zfs_prop_get_recvd(zhp,
+			    pl->pl_user_prop, rbuf, sizeof (rbuf),
+			    cbp->cb_literal) == 0))
+				recvdval = rbuf;
+
 			zprop_print_one_property(zfs_get_name(zhp), cbp,
 			    pl->pl_user_prop, strval, sourcetype,
-			    source);
+			    source, recvdval);
 		}
 	}
 
@@ -1224,10 +1254,10 @@ zfs_do_get(int argc, char **argv)
 			i = 0;
 			while (*optarg != '\0') {
 				static char *col_subopts[] =
-				    { "name", "property", "value", "source",
-				    NULL };
+				    { "name", "property", "value", "received",
+				    "source", "all", NULL };
 
-				if (i == 4) {
+				if (i == ZFS_GET_NCOLS) {
 					(void) fprintf(stderr, gettext("too "
 					    "many fields given to -o "
 					    "option\n"));
@@ -1246,7 +1276,27 @@ zfs_do_get(int argc, char **argv)
 					cb.cb_columns[i++] = GET_COL_VALUE;
 					break;
 				case 3:
+					cb.cb_columns[i++] = GET_COL_RECVD;
+					flags |= ZFS_ITER_RECVD_PROPS;
+					break;
+				case 4:
 					cb.cb_columns[i++] = GET_COL_SOURCE;
+					break;
+				case 5:
+					if (i > 0) {
+						(void) fprintf(stderr,
+						    gettext("\"all\" conflicts "
+						    "with specific fields "
+						    "given to -o option\n"));
+						usage(B_FALSE);
+					}
+					cb.cb_columns[0] = GET_COL_NAME;
+					cb.cb_columns[1] = GET_COL_PROPERTY;
+					cb.cb_columns[2] = GET_COL_VALUE;
+					cb.cb_columns[3] = GET_COL_RECVD;
+					cb.cb_columns[4] = GET_COL_SOURCE;
+					flags |= ZFS_ITER_RECVD_PROPS;
+					i = ZFS_GET_NCOLS;
 					break;
 				default:
 					(void) fprintf(stderr,
@@ -1262,7 +1312,8 @@ zfs_do_get(int argc, char **argv)
 			while (*optarg != '\0') {
 				static char *source_subopts[] = {
 					"local", "default", "inherited",
-					"temporary", "none", NULL };
+					"received", "temporary", "none",
+					NULL };
 
 				switch (getsubopt(&optarg, source_subopts,
 				    &value)) {
@@ -1276,9 +1327,12 @@ zfs_do_get(int argc, char **argv)
 					cb.cb_sources |= ZPROP_SRC_INHERITED;
 					break;
 				case 3:
-					cb.cb_sources |= ZPROP_SRC_TEMPORARY;
+					cb.cb_sources |= ZPROP_SRC_RECEIVED;
 					break;
 				case 4:
+					cb.cb_sources |= ZPROP_SRC_TEMPORARY;
+					break;
+				case 5:
 					cb.cb_sources |= ZPROP_SRC_NONE;
 					break;
 				default:
@@ -1345,9 +1399,10 @@ zfs_do_get(int argc, char **argv)
 }
 
 /*
- * inherit [-r] <property> <fs|vol> ...
+ * inherit [-rS] <property> <fs|vol> ...
  *
- * 	-r	Recurse over all children
+ *	-r	Recurse over all children
+ *	-S	Revert to received value, if any
  *
  * For each dataset specified on the command line, inherit the given property
  * from its parent.  Inheriting a property at the pool level will cause it to
@@ -1356,11 +1411,16 @@ zfs_do_get(int argc, char **argv)
  * local modifications for each dataset.
  */
 
+typedef struct inherit_cbdata {
+	const char *cb_propname;
+	boolean_t cb_received;
+} inherit_cbdata_t;
+
 static int
 inherit_recurse_cb(zfs_handle_t *zhp, void *data)
 {
-	char *propname = data;
-	zfs_prop_t prop = zfs_name_to_prop(propname);
+	inherit_cbdata_t *cb = data;
+	zfs_prop_t prop = zfs_name_to_prop(cb->cb_propname);
 
 	/*
 	 * If we're doing it recursively, then ignore properties that
@@ -1370,15 +1430,15 @@ inherit_recurse_cb(zfs_handle_t *zhp, void *data)
 	    !zfs_prop_valid_for_type(prop, zfs_get_type(zhp)))
 		return (0);
 
-	return (zfs_prop_inherit(zhp, propname) != 0);
+	return (zfs_prop_inherit(zhp, cb->cb_propname, cb->cb_received) != 0);
 }
 
 static int
 inherit_cb(zfs_handle_t *zhp, void *data)
 {
-	char *propname = data;
+	inherit_cbdata_t *cb = data;
 
-	return (zfs_prop_inherit(zhp, propname) != 0);
+	return (zfs_prop_inherit(zhp, cb->cb_propname, cb->cb_received) != 0);
 }
 
 static int
@@ -1386,15 +1446,20 @@ zfs_do_inherit(int argc, char **argv)
 {
 	int c;
 	zfs_prop_t prop;
+	inherit_cbdata_t cb = { 0 };
 	char *propname;
 	int ret;
 	int flags = 0;
+	boolean_t received = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "r")) != -1) {
+	while ((c = getopt(argc, argv, "rS")) != -1) {
 		switch (c) {
 		case 'r':
 			flags |= ZFS_ITER_RECURSE;
+			break;
+		case 'S':
+			received = B_TRUE;
 			break;
 		case '?':
 		default:
@@ -1428,7 +1493,7 @@ zfs_do_inherit(int argc, char **argv)
 			    propname);
 			return (1);
 		}
-		if (!zfs_prop_inheritable(prop)) {
+		if (!zfs_prop_inheritable(prop) && !received) {
 			(void) fprintf(stderr, gettext("'%s' property cannot "
 			    "be inherited\n"), propname);
 			if (prop == ZFS_PROP_QUOTA ||
@@ -1445,12 +1510,15 @@ zfs_do_inherit(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
+	cb.cb_propname = propname;
+	cb.cb_received = received;
+
 	if (flags & ZFS_ITER_RECURSE) {
 		ret = zfs_for_each(argc, argv, flags, ZFS_TYPE_DATASET,
-		    NULL, NULL, 0, inherit_recurse_cb, propname);
+		    NULL, NULL, 0, inherit_recurse_cb, &cb);
 	} else {
 		ret = zfs_for_each(argc, argv, flags, ZFS_TYPE_DATASET,
-		    NULL, NULL, 0, inherit_cb, propname);
+		    NULL, NULL, 0, inherit_cb, &cb);
 	}
 
 	return (ret);
@@ -1775,11 +1843,11 @@ zfs_do_userspace(int argc, char **argv)
  *      [-s property [-s property]...] [-S property [-S property]...]
  *      <dataset> ...
  *
- * 	-r	Recurse over all children
- * 	-d	Limit recursion by depth.
- * 	-H	Scripted mode; elide headers and separate columns by tabs
- * 	-o	Control which fields to display.
- * 	-t	Control which object types to display.
+ *	-r	Recurse over all children
+ *	-d	Limit recursion by depth.
+ *	-H	Scripted mode; elide headers and separate columns by tabs
+ *	-o	Control which fields to display.
+ *	-t	Control which object types to display.
  *	-s	Specify sort columns, descending order.
  *	-S	Specify sort columns, ascending order.
  *
@@ -2176,9 +2244,9 @@ zfs_do_promote(int argc, char **argv)
 /*
  * zfs rollback [-rRf] <snapshot>
  *
- * 	-r	Delete any intervening snapshots before doing rollback
- * 	-R	Delete any snapshots and their clones
- * 	-f	ignored for backwards compatability
+ *	-r	Delete any intervening snapshots before doing rollback
+ *	-R	Delete any snapshots and their clones
+ *	-f	ignored for backwards compatability
  *
  * Given a filesystem, rollback to a specific snapshot, discarding any changes
  * since then and making it the active dataset.  If more recent snapshots exist,
@@ -2488,8 +2556,8 @@ usage:
 }
 
 /*
- * zfs send [-vD] -R [-i|-I <@snap>] <fs@snap>
- * zfs send [-vD] [-i|-I <@snap>] <fs@snap>
+ * zfs send [-vDp] -R [-i|-I <@snap>] <fs@snap>
+ * zfs send [-vDp] [-i|-I <@snap>] <fs@snap>
  *
  * Send a backup stream to stdout.
  */
@@ -2504,7 +2572,7 @@ zfs_do_send(int argc, char **argv)
 	int c, err;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":i:I:RDv")) != -1) {
+	while ((c = getopt(argc, argv, ":i:I:RDpv")) != -1) {
 		switch (c) {
 		case 'i':
 			if (fromname)
@@ -2519,6 +2587,9 @@ zfs_do_send(int argc, char **argv)
 			break;
 		case 'R':
 			flags.replicate = B_TRUE;
+			break;
+		case 'p':
+			flags.props = B_TRUE;
 			break;
 		case 'v':
 			flags.verbose = B_TRUE;
@@ -2620,9 +2691,8 @@ static int
 zfs_do_receive(int argc, char **argv)
 {
 	int c, err;
-	recvflags_t flags;
+	recvflags_t flags = { 0 };
 
-	bzero(&flags, sizeof (recvflags_t));
 	/* check options */
 	while ((c = getopt(argc, argv, ":dnuvF")) != -1) {
 		switch (c) {
@@ -2762,7 +2832,7 @@ zfs_do_hold_rele_impl(int argc, char **argv, boolean_t holding)
 /*
  * zfs hold [-r] [-t] <tag> <snap> ...
  *
- * 	-r	Recursively hold
+ *	-r	Recursively hold
  *	-t	Temporary hold (hidden option)
  *
  * Apply a user-hold with the given tag to the list of snapshots.
@@ -2776,7 +2846,7 @@ zfs_do_hold(int argc, char **argv)
 /*
  * zfs release [-r] <tag> <snap> ...
  *
- * 	-r	Recursively release
+ *	-r	Recursively release
  *
  * Release a user-hold with the given tag from the list of snapshots.
  */

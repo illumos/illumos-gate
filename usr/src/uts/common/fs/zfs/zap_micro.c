@@ -816,6 +816,16 @@ zap_lookup_uint64(objset_t *os, uint64_t zapobj, const uint64_t *key,
 }
 
 int
+zap_contains(objset_t *os, uint64_t zapobj, const char *name)
+{
+	int err = (zap_lookup_norm(os, zapobj, name, 0,
+	    0, NULL, MT_EXACT, NULL, 0, NULL));
+	if (err == EOVERFLOW || err == EINVAL)
+		err = 0; /* found, but skipped reading the value */
+	return (err);
+}
+
+int
 zap_length(objset_t *os, uint64_t zapobj, const char *name,
     uint64_t *integer_size, uint64_t *num_integers)
 {

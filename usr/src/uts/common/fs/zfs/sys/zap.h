@@ -197,6 +197,7 @@ int zap_lookup_norm(objset_t *ds, uint64_t zapobj, const char *name,
     boolean_t *normalization_conflictp);
 int zap_lookup_uint64(objset_t *os, uint64_t zapobj, const uint64_t *key,
     int key_numints, uint64_t integer_size, uint64_t num_integers, void *buf);
+int zap_contains(objset_t *ds, uint64_t zapobj, const char *name);
 
 int zap_count_write(objset_t *os, uint64_t zapobj, const char *name,
     int add, uint64_t *towrite, uint64_t *tooverwrite);

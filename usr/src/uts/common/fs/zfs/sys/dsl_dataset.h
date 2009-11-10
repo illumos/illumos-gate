@@ -233,10 +233,12 @@ int dsl_dsobj_to_dsname(char *pname, uint64_t obj, char *buf);
 int dsl_dataset_check_quota(dsl_dataset_t *ds, boolean_t check_quota,
     uint64_t asize, uint64_t inflight, uint64_t *used,
     uint64_t *ref_rsrv);
-int dsl_dataset_set_quota(const char *dsname, uint64_t quota);
+int dsl_dataset_set_quota(const char *dsname, zprop_source_t source,
+    uint64_t quota);
 void dsl_dataset_set_quota_sync(void *arg1, void *arg2, cred_t *cr,
     dmu_tx_t *tx);
-int dsl_dataset_set_reservation(const char *dsname, uint64_t reservation);
+int dsl_dataset_set_reservation(const char *dsname, zprop_source_t source,
+    uint64_t reservation);
 
 int dsl_destroy_inconsistent(char *dsname, void *arg);
 
