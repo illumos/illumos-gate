@@ -72,6 +72,7 @@ typedef struct xnbo {
 } xnbo_t;
 
 static void xnbo_close_mac(xnb_t *);
+static void i_xnbo_close_mac(xnb_t *, boolean_t);
 
 /*
  * Packets from the peer come here.  We pass them to the mac device.
@@ -264,14 +265,14 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	if (mi->mi_media != DL_ETHER) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
 		    "device is not DL_ETHER (%d)", mi->mi_media);
-		xnbo_close_mac(xnbp);
+		i_xnbo_close_mac(xnbp, B_TRUE);
 		return (B_FALSE);
 	}
 	if (mi->mi_media != mi->mi_nativemedia) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
 		    "device media and native media mismatch (%d != %d)",
 		    mi->mi_media, mi->mi_nativemedia);
-		xnbo_close_mac(xnbp);
+		i_xnbo_close_mac(xnbp, B_TRUE);
 		return (B_FALSE);
 	}
 
@@ -279,7 +280,7 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	if (max_sdu > XNBMAXPKT) {
 		cmn_err(CE_WARN, "xnbo_open_mac: mac device SDU too big (%d)",
 		    max_sdu);
-		xnbo_close_mac(xnbp);
+		i_xnbo_close_mac(xnbp, B_TRUE);
 		return (B_FALSE);
 	}
 
@@ -297,7 +298,7 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	    MAC_OPEN_FLAGS_MULTI_PRIMARY) != 0) {
 		cmn_err(CE_WARN, "xnbo_open_mac: "
 		    "error (%d) opening mac client", err);
-		xnbo_close_mac(xnbp);
+		i_xnbo_close_mac(xnbp, B_TRUE);
 		return (B_FALSE);
 	}
 
@@ -312,7 +313,7 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	if (err != 0) {
 		cmn_err(CE_WARN, "xnbo_open_mac: failed to get the primary "
 		    "MAC address of %s: %d", mac, err);
-		xnbo_close_mac(xnbp);
+		i_xnbo_close_mac(xnbp, B_TRUE);
 		return (B_FALSE);
 	}
 	if (!xnbop->o_multicast_control) {
@@ -323,7 +324,7 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 			cmn_err(CE_WARN, "xnbo_open_mac: "
 			    "cannot enable promiscuous mode of %s: %d",
 			    mac, err);
-			xnbo_close_mac(xnbp);
+			i_xnbo_close_mac(xnbp, B_TRUE);
 			return (B_FALSE);
 		}
 		xnbop->o_promiscuous = B_TRUE;
@@ -353,8 +354,16 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 static void
 xnbo_close_mac(xnb_t *xnbp)
 {
+	i_xnbo_close_mac(xnbp, B_FALSE);
+}
+
+static void
+i_xnbo_close_mac(xnb_t *xnbp, boolean_t locked)
+{
 	xnbo_t *xnbop = xnbp->xnb_flavour_data;
 	xmca_t *loop;
+
+	ASSERT(!locked || MUTEX_HELD(&xnbp->xnb_state_lock));
 
 	if (xnbop->o_mh == NULL)
 		return;
@@ -362,10 +371,12 @@ xnbo_close_mac(xnb_t *xnbp)
 	if (xnbop->o_running)
 		xnbop->o_running = B_FALSE;
 
-	mutex_enter(&xnbp->xnb_state_lock);
+	if (!locked)
+		mutex_enter(&xnbp->xnb_state_lock);
 	loop = xnbop->o_mca;
 	xnbop->o_mca = NULL;
-	mutex_exit(&xnbp->xnb_state_lock);
+	if (!locked)
+		mutex_exit(&xnbp->xnb_state_lock);
 
 	while (loop != NULL) {
 		xmca_t *next = loop->next;
