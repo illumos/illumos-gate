@@ -2018,7 +2018,7 @@ grow30:
 		if (sblock.fs_ncg == 1)
 			cg_too_small = 1;
 		sblock.fs_ncg--;
-		sblock.fs_ncyl -= sblock.fs_ncyl % sblock.fs_cpg;
+		sblock.fs_ncyl = sblock.fs_ncg * sblock.fs_cpg;
 		sblock.fs_size = fssize_frag =
 		    (int64_t)sblock.fs_ncyl * (int64_t)sblock.fs_spc /
 		    (int64_t)NSPF(&sblock);
