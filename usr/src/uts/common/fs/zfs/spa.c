@@ -4062,23 +4062,21 @@ spa_vdev_resilver_done(spa_t *spa)
 }
 
 /*
- * Update the stored path or FRU for this vdev.  Dirty the vdev configuration,
- * relying on spa_vdev_enter/exit() to synchronize the labels and cache.
+ * Update the stored path or FRU for this vdev.
  */
 int
 spa_vdev_set_common(spa_t *spa, uint64_t guid, const char *value,
     boolean_t ispath)
 {
 	vdev_t *vd;
-	uint64_t txg;
 
-	txg = spa_vdev_enter(spa);
+	spa_vdev_state_enter(spa, SCL_ALL);
 
 	if ((vd = spa_lookup_by_guid(spa, guid, B_TRUE)) == NULL)
-		return (spa_vdev_exit(spa, NULL, txg, ENOENT));
+		return (spa_vdev_state_exit(spa, NULL, ENOENT));
 
 	if (!vd->vdev_ops->vdev_op_leaf)
-		return (spa_vdev_exit(spa, NULL, txg, ENOTSUP));
+		return (spa_vdev_state_exit(spa, NULL, ENOTSUP));
 
 	if (ispath) {
 		spa_strfree(vd->vdev_path);
@@ -4089,9 +4087,7 @@ spa_vdev_set_common(spa_t *spa, uint64_t guid, const char *value,
 		vd->vdev_fru = spa_strdup(value);
 	}
 
-	vdev_config_dirty(vd->vdev_top);
-
-	return (spa_vdev_exit(spa, NULL, txg, 0));
+	return (spa_vdev_state_exit(spa, vd, 0));
 }
 
 int

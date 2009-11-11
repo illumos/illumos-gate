@@ -2237,28 +2237,14 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 	 */
 	if (is_opened(lsp)) {
 		if (klip->li_force) {
-			/*
-			 * XXX: the section marked here should probably be
-			 * carefully incorporated into lofi_free_handle();
-			 * afterward just replace this section with:
-			 *	lofi_free_handle(dev, minor, lsp, credp);
-			 * and clean up lofi_unmap_file() a bit more
-			 */
-			lofi_free_crypto(lsp);
-
 			mutex_enter(&lsp->ls_vp_lock);
 			lsp->ls_vp_closereq = B_TRUE;
+			/* wake up any threads waiting on dkiocstate */
+			cv_broadcast(&lsp->ls_vp_cv);
 			while (lsp->ls_vp_iocount > 0)
 				cv_wait(&lsp->ls_vp_cv, &lsp->ls_vp_lock);
-			(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag, 1, 0,
-			    credp, NULL);
-			VN_RELE(lsp->ls_vp);
-			lsp->ls_vp = NULL;
-			cv_broadcast(&lsp->ls_vp_cv);
 			mutex_exit(&lsp->ls_vp_lock);
-			/*
-			 * XXX: to here
-			 */
+			lofi_free_handle(dev, minor, lsp, credp);
 
 			klip->li_minor = minor;
 			mutex_exit(&lofi_lock);
@@ -2425,9 +2411,13 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		}
 	}
 
+	mutex_enter(&lofi_lock);
 	lsp = ddi_get_soft_state(lofi_statep, minor);
-	if (lsp == NULL)
+	if (lsp == NULL || lsp->ls_vp_closereq) {
+		mutex_exit(&lofi_lock);
 		return (ENXIO);
+	}
+	mutex_exit(&lofi_lock);
 
 	/*
 	 * We explicitly allow DKIOCSTATE, but all other ioctls should fail with
@@ -2482,20 +2472,27 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 			return (EFAULT);
 
 		mutex_enter(&lsp->ls_vp_lock);
-		while ((dkstate == DKIO_INSERTED && lsp->ls_vp != NULL) ||
-		    (dkstate == DKIO_DEV_GONE && lsp->ls_vp == NULL)) {
+		lsp->ls_vp_iocount++;
+		while (((dkstate == DKIO_INSERTED && lsp->ls_vp != NULL) ||
+		    (dkstate == DKIO_DEV_GONE && lsp->ls_vp == NULL)) &&
+		    !lsp->ls_vp_closereq) {
 			/*
 			 * By virtue of having the device open, we know that
 			 * 'lsp' will remain valid when we return.
 			 */
 			if (!cv_wait_sig(&lsp->ls_vp_cv,
 			    &lsp->ls_vp_lock)) {
+				lsp->ls_vp_iocount--;
+				cv_broadcast(&lsp->ls_vp_cv);
 				mutex_exit(&lsp->ls_vp_lock);
 				return (EINTR);
 			}
 		}
 
-		dkstate = (lsp->ls_vp != NULL ? DKIO_INSERTED : DKIO_DEV_GONE);
+		dkstate = (!lsp->ls_vp_closereq && lsp->ls_vp != NULL ?
+		    DKIO_INSERTED : DKIO_DEV_GONE);
+		lsp->ls_vp_iocount--;
+		cv_broadcast(&lsp->ls_vp_cv);
 		mutex_exit(&lsp->ls_vp_lock);
 
 		if (ddi_copyout(&dkstate, (void *)arg,
