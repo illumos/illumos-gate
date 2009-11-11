@@ -649,6 +649,18 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 				serdvalp->v = (uintptr_t)stable(buf);
 				FREE(buf);
 			}
+			if (funcname == L_setserdsuffix &&
+			    serdvalp->t == UINT64) {
+				int len = snprintf(NULL, 0, "%lld",
+				    serdvalp->v);
+				char *buf = MALLOC(len + 1);
+
+				(void) snprintf(buf, len + 1, "%lld",
+				    serdvalp->v);
+				serdvalp->t = STRING;
+				serdvalp->v = (uintptr_t)stable(buf);
+				FREE(buf);
+			}
 
 			if (serdvalp->t == UINT64)
 				out(O_ALTFP|O_VERB2, " (%llu)", serdvalp->v);
