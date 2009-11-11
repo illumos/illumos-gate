@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8,8 +8,6 @@
  * Sun elects to license this software under the BSD license.
  * See README for more details.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,7 +41,7 @@ aes_wrap(uint8_t *kek, int n, uint8_t *plain, uint8_t *cipher)
 	(void) memset(a, 0xa6, 8);
 	(void) memcpy(r, plain, 8 * n);
 
-	AES_set_encrypt_key(kek, 128, &key);
+	(void) AES_set_encrypt_key(kek, 128, &key);
 
 	/*
 	 * 2) Calculate intermediate values.
@@ -92,7 +90,7 @@ aes_unwrap(uint8_t *kek, int n, uint8_t *cipher, uint8_t *plain)
 	r = plain;
 	(void) memcpy(r, cipher + 8, 8 * n);
 
-	AES_set_decrypt_key(kek, 128, &key);
+	(void) AES_set_decrypt_key(kek, 128, &key);
 
 	/*
 	 * 2) Compute intermediate values.
@@ -137,7 +135,7 @@ hmac_sha1(unsigned char *key, unsigned int key_len,
     unsigned char *data, unsigned int data_len, unsigned char *mac)
 {
 	unsigned int mac_len = 0;
-	HMAC(EVP_sha1(), key, key_len, data, data_len, mac, &mac_len);
+	(void) HMAC(EVP_sha1(), key, key_len, data, data_len, mac, &mac_len);
 }
 
 
@@ -207,8 +205,8 @@ void
 pbkdf2_sha1(char *passphrase, char *ssid, size_t ssid_len, int iterations,
     unsigned char *buf, size_t buflen)
 {
-	PKCS5_PBKDF2_HMAC_SHA1(passphrase, -1, (unsigned char *)ssid, ssid_len,
-	    iterations, buflen, buf);
+	(void) PKCS5_PBKDF2_HMAC_SHA1(passphrase, -1, (unsigned char *)ssid,
+	    ssid_len, iterations, buflen, buf);
 }
 
 void
@@ -268,5 +266,5 @@ hmac_md5(uint8_t *key, size_t key_len, uint8_t *data,
     size_t data_len, uint8_t *mac)
 {
 	unsigned int mac_len = 0;
-	HMAC(EVP_md5(), key, key_len, data, data_len, mac, &mac_len);
+	(void) HMAC(EVP_md5(), key, key_len, data, data_len, mac, &mac_len);
 }

@@ -49,4 +49,3 @@ P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsl	Core Solaris Libraries
 P SUNWcslr	Core Solaris Libraries (Root)
 P SUNWcsd	Core Solaris Devices
-R SUNWwpau      Wireless WPA Supplicant, (Usr)

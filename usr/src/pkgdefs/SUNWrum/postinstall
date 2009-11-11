@@ -21,14 +21,14 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 # Driver info
 DRV=rum
 DRVALIAS='"usb7d1,3c03" "usbb05,1723" "usb13b1,20" "usb7d1,3c04"
-          "usb15a9,4" "usb148f,2573"'
+          "usb15a9,4" "usb148f,2573" "usb1044,800a"'
 
 BASEDIR=${BASEDIR:-/}
 
