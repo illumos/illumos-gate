@@ -173,8 +173,8 @@ static int npe_initchild(dev_info_t *child);
 extern void	npe_query_acpi_mcfg(dev_info_t *dip);
 extern void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 extern int	npe_disable_empty_bridges_workaround(dev_info_t *child);
-extern void	npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl);
-extern void	npe_intel_error_mask(ddi_acc_handle_t cfg_hdl);
+extern void	npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl);
+extern void	npe_intel_error_workaround(ddi_acc_handle_t cfg_hdl);
 extern boolean_t npe_is_mmcfg_supported(dev_info_t *dip);
 extern void	npe_enable_htmsi_children(dev_info_t *dip);
 extern int	npe_save_htconfig_children(dev_info_t *dip);
@@ -934,8 +934,8 @@ npe_initchild(dev_info_t *child)
 
 	if (pci_config_setup(child, &cfg_hdl) == DDI_SUCCESS) {
 		npe_ck804_fix_aer_ptr(cfg_hdl);
-		npe_nvidia_error_mask(cfg_hdl);
-		npe_intel_error_mask(cfg_hdl);
+		npe_nvidia_error_workaround(cfg_hdl);
+		npe_intel_error_workaround(cfg_hdl);
 		pci_config_teardown(&cfg_hdl);
 	}
 

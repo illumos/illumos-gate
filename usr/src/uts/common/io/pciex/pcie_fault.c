@@ -268,6 +268,11 @@ done:
 	return (analyse_flag);
 }
 
+void
+pcie_force_fullscan() {
+	pcie_full_scan = B_TRUE;
+}
+
 /*
  * pf_dispatch walks the device tree and calls the pf_default_hdl if the device
  * falls in the error path.

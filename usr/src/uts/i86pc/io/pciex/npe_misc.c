@@ -46,8 +46,8 @@
 void	npe_query_acpi_mcfg(dev_info_t *dip);
 void	npe_ck804_fix_aer_ptr(ddi_acc_handle_t cfg_hdl);
 int	npe_disable_empty_bridges_workaround(dev_info_t *child);
-void	npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl);
-void	npe_intel_error_mask(ddi_acc_handle_t cfg_hdl);
+void	npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl);
+void	npe_intel_error_workaround(ddi_acc_handle_t cfg_hdl);
 boolean_t npe_is_child_pci(dev_info_t *dip);
 
 /*
@@ -55,8 +55,7 @@ boolean_t npe_is_child_pci(dev_info_t *dip);
  */
 int64_t npe_default_ecfga_base = 0xE0000000;
 
-extern uint32_t	npe_aer_uce_mask;
-extern boolean_t pcie_full_scan;
+extern uint32_t npe_aer_uce_mask;
 
 /* AMD's northbridges vendor-id and device-ids */
 #define	AMD_NTBRDIGE_VID		0x1022	/* AMD vendor-id */
@@ -201,7 +200,7 @@ npe_disable_empty_bridges_workaround(dev_info_t *child)
 }
 
 void
-npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl) {
+npe_nvidia_error_workaround(ddi_acc_handle_t cfg_hdl) {
 	uint32_t regs;
 	uint16_t vendor_id = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
 	uint16_t dev_id = pci_config_get16(cfg_hdl, PCI_CONF_DEVID);
@@ -216,14 +215,15 @@ npe_nvidia_error_mask(ddi_acc_handle_t cfg_hdl) {
 		 * Turn full scan on since the Error Source ID register may not
 		 * have the correct ID.
 		 */
-		pcie_full_scan = B_TRUE;
+		pcie_force_fullscan();
 	}
 }
 
 void
-npe_intel_error_mask(ddi_acc_handle_t cfg_hdl) {
+npe_intel_error_workaround(ddi_acc_handle_t cfg_hdl) {
 	uint32_t regs;
 	uint16_t vendor_id = pci_config_get16(cfg_hdl, PCI_CONF_VENID);
+	uint16_t dev_id = pci_config_get16(cfg_hdl, PCI_CONF_DEVID);
 
 	if (vendor_id == INTEL_VENDOR_ID) {
 		/*
@@ -240,6 +240,18 @@ npe_intel_error_mask(ddi_acc_handle_t cfg_hdl) {
 		 */
 		regs = pcie_get_aer_uce_mask() | PCIE_AER_UCE_ECRC;
 		pcie_set_aer_uce_mask(regs);
+
+		if (INTEL_NB5500_PCIE_DEV_ID(dev_id) ||
+		    INTEL_NB5520_PCIE_DEV_ID(dev_id)) {
+			/*
+			 * Turn full scan on since the Error Source ID register
+			 * may not have the correct ID. See Intel 5520 and
+			 * Intel 5500 Chipsets errata #34 and #54 in the August
+			 * 2009 specification update, document number
+			 * 321329-006.
+			 */
+			pcie_force_fullscan();
+		}
 	}
 }
 

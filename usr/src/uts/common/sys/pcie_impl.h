@@ -505,6 +505,7 @@ extern void pf_fini(dev_info_t *, ddi_detach_cmd_t);
 extern int pf_hdl_lookup(dev_info_t *, uint64_t, uint32_t, uint64_t,
     pcie_req_id_t);
 extern int pf_tlp_decode(pcie_bus_t *, pf_pcie_adv_err_regs_t *);
+extern void pcie_force_fullscan();
 
 #ifdef	DEBUG
 extern uint_t pcie_debug_flags;
