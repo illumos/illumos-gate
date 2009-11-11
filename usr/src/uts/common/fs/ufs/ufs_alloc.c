@@ -1985,9 +1985,12 @@ contigpref(ufsvfs_t *ufsvfsp, size_t nb, size_t minb)
 			/* find a free block */
 			for (; cgbno < cgblks; ++cgbno) {
 				if (isblock(fs, blksfree, cgbno)) {
-					if (startcg != -1)
+					if (startcg != -1) {
+						brelse(bp);
+						savecg = startcg;
+						savebno = cgbno;
 						goto done;
-					else
+					} else
 						break;
 				}
 			}
@@ -2011,11 +2014,6 @@ contigpref(ufsvfs_t *ufsvfsp, size_t nb, size_t minb)
 	}
 
 done:
-	if (startcg != -1) {
-		brelse(bp);
-		savecg = startcg;
-		savebno = cgbno;
-	}
 
 	/* convert block offset in cg to frag offset in cg */
 	savebno = blkstofrags(fs, savebno);
