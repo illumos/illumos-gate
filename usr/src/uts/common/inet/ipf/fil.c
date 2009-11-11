@@ -618,7 +618,6 @@ static INLINE int frpr_fragment6(fin)
 fr_info_t *fin;
 {
 	struct ip6_frag *frag;
-	int extoff = 0;
 
 	fin->fin_flx |= FI_FRAG;
 
@@ -627,43 +626,25 @@ fr_info_t *fin;
 	 * else after the fragment.
 	 */
 	if (frpr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT) == IPPROTO_NONE)
-		goto badv6frag;
-
-	if (frpr_pullup(fin, sizeof(*frag)) == -1)
-		goto badv6frag;
+		return IPPROTO_NONE;
 
 	frag = (struct ip6_frag *)((char *)fin->fin_dp - sizeof(*frag));
-	/*
-	 * Fragment but no fragmentation info set?  Bad packet...
-	 */
-	if (frag->ip6f_offlg == 0)
-		goto badv6frag;
-
-	fin->fin_id = frag->ip6f_ident;
-	fin->fin_dp = (char *)frag + sizeof(*frag);
-	fin->fin_dlen -= sizeof(*frag);
-	/* length of hdrs(after frag hdr) + data */
-	extoff = sizeof(*frag);
 
 	/*
-	 * If the frag is not the last one and the payload length
-	 * is not multiple of 8, it must be dropped.
+	 * If this fragment isn't the last then the packet length must
+	 * be a multiple of 8.
 	 */
-	if (((frag->ip6f_offlg & IP6F_MORE_FRAG) && (fin->fin_dlen & 7)) ||
-	    (frag->ip6f_offlg == 0)) {
-badv6frag:
-		fin->fin_dp = (char *)fin->fin_dp - extoff;
-		fin->fin_dlen += extoff;
-		fin->fin_flx |= FI_BAD;
-		return IPPROTO_NONE;
+	if ((frag->ip6f_offlg & IP6F_MORE_FRAG) != 0) {
+		fin->fin_flx |= FI_MOREFRAG;
+
+		if ((fin->fin_plen & 0x7) != 0)
+			fin->fin_flx |= FI_BAD;
 	}
 
+	fin->fin_id = frag->ip6f_ident;
 	fin->fin_off = ntohs(frag->ip6f_offlg & IP6F_OFF_MASK);
 	if (fin->fin_off != 0)
 		fin->fin_flx |= FI_FRAGBODY;
-
-	if (frag->ip6f_offlg & IP6F_MORE_FRAG)
-		fin->fin_flx |= FI_MOREFRAG;
 
 	return frag->ip6f_nxt;
 }
