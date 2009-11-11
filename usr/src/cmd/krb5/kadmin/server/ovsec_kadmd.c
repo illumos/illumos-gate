@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1002,38 +1002,27 @@ kterr:
 
 	/*
 	 * Solaris Kerberos:
-	 * Warn if the acl file doesn't contain an entry for a principal in the
-	 * default realm.
+	 * Warn if the acl file contains an entry for a principal matching the
+	 * default (unconfigured) acl rule.
 	 */
-	gssbuf.length = strlen("joe/admin@") + strlen(params.realm) + 1;
-	gssbuf.value = malloc(gssbuf.length);
-	if (gssbuf.value != NULL) {
-	/* Use any value as the first component - joe in this case */
-		(void) snprintf(gssbuf.value, gssbuf.length, "joe/admin@%s",
-		    params.realm);
-
-		if (gss_import_name(&minor_status, &gssbuf, GSS_C_NT_USER_NAME,
-		    &name) == GSS_S_COMPLETE) {
-		
-			if (kadm5int_acl_check(context, name, ACL_MODIFY, NULL,
-			    NULL) == 0) {
-				krb5_klog_syslog(LOG_WARNING,
-				    gettext("acls may not be properly "
-				    "configured: failed to find an acl "
-				    "matching the default realm \"%s\" in %s"),
-				    params.realm, params.acl_file);
-				(void) fprintf(stderr, gettext("%s: Warning: "
-				    "acls may not be properly configured: "
-				    "failed to find an acl matching the "
-				    "default realm \"%s\" in %s\n"),
-				    whoami, params.realm,
-				    params.acl_file);
-			}
-			(void) gss_release_name(&minor_status, &name);
+	gssbuf.length = strlen("x/admin@___default_realm___");
+	gssbuf.value = "x/admin@___default_realm___";
+	/* Use any value as the first component - 'x' in this case */
+	if (gss_import_name(&minor_status, &gssbuf, GSS_C_NT_USER_NAME, &name) 
+	    == GSS_S_COMPLETE) {
+		if (kadm5int_acl_check(context, name, ACL_MODIFY, NULL, NULL)) {
+			krb5_klog_syslog(LOG_WARNING,
+			    gettext("acls may not be properly configured: "
+			    "found an acl matching \"___default_realm___\" in "
+			    " %s"), params.acl_file);
+			(void) fprintf(stderr, gettext("%s: Warning: "
+			    "acls may not be properly configured: found an acl "
+			    "matching \"___default_realm___\" in %s\n"),
+			    whoami, params.acl_file);
 		}
-		free(gssbuf.value);
-		gssbuf.value = NULL;
+		(void) gss_release_name(&minor_status, &name);
 	}
+	gssbuf.value = NULL;
 	gssbuf.length = 0;
 
 	/*
