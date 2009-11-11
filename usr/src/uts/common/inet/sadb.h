@@ -37,14 +37,34 @@ extern "C" {
 
 #define	IPSA_MAX_ADDRLEN 4	/* Max address len. (in 32-bits) for an SA. */
 
+#define	MAXSALTSIZE 8
+
 /*
- * Return codes of IPsec processing functions.
+ * For combined mode ciphers, store the crypto_mechanism_t in the
+ * per-packet ipsec_in_t/ipsec_out_t structures. This is because the PARAMS
+ * and nonce values change for each packet. For non-combined mode
+ * ciphers, these values are constant for the life of the SA.
  */
-typedef enum {
-	IPSEC_STATUS_SUCCESS = 1,
-	IPSEC_STATUS_FAILED = 2,
-	IPSEC_STATUS_PENDING = 3
-} ipsec_status_t;
+typedef struct ipsa_cm_mech_s {
+	crypto_mechanism_t combined_mech;
+	union {
+		CK_AES_CCM_PARAMS paramu_ccm;
+		CK_AES_GCM_PARAMS paramu_gcm;
+	} paramu;
+	uint8_t nonce[MAXSALTSIZE + sizeof (uint64_t)];
+#define	param_ulMACSize paramu.paramu_ccm.ulMACSize
+#define	param_ulNonceSize paramu.paramu_ccm.ipsa_ulNonceSize
+#define	param_ulAuthDataSize paramu.paramu_ccm.ipsa_ulAuthDataSize
+#define	param_ulDataSize paramu.paramu_ccm.ipsa_ulDataSize
+#define	param_nonce paramu.paramu_ccm.nonce
+#define	param_authData paramu.paramu_ccm.authData
+#define	param_pIv paramu.paramu_gcm.ipsa_pIv
+#define	param_ulIvLen paramu.paramu_gcm.ulIvLen
+#define	param_ulIvBits paramu.paramu_gcm.ulIvBits
+#define	param_pAAD paramu.paramu_gcm.pAAD
+#define	param_ulAADLen paramu.paramu_gcm.ulAADLen
+#define	param_ulTagBits paramu.paramu_gcm.ulTagBits
+} ipsa_cm_mech_t;
 
 /*
  * The Initialization Vector (also known as IV or Nonce) used to
@@ -280,9 +300,13 @@ typedef struct ipsa_s {
 
 	/*
 	 * Input and output processing functions called from IP.
+	 * The mblk_t is the data; the IPsec information is in the attributes
+	 * Returns NULL if the mblk is consumed which it is if there was
+	 * a failure or if pending. If failure then
+	 * the ipIfInDiscards/OutDiscards counters are increased.
 	 */
-	ipsec_status_t (*ipsa_output_func)(mblk_t *);
-	ipsec_status_t (*ipsa_input_func)(mblk_t *, void *);
+	mblk_t *(*ipsa_output_func)(mblk_t *, ip_xmit_attr_t *);
+	mblk_t *(*ipsa_input_func)(mblk_t *, void *, ip_recv_attr_t *);
 
 	/*
 	 * Soft reference to paired SA
@@ -290,8 +314,8 @@ typedef struct ipsa_s {
 	uint32_t	ipsa_otherspi;
 	netstack_t	*ipsa_netstack;	/* Does not have a netstack_hold */
 
-	cred_t *ipsa_cred;			/* MLS: cred_t attributes */
-	cred_t *ipsa_ocred;			/* MLS: outer label */
+	ts_label_t *ipsa_tsl;			/* MLS: label attributes */
+	ts_label_t *ipsa_otsl;			/* MLS: outer label */
 	uint8_t	ipsa_mac_exempt;		/* MLS: mac exempt flag */
 	uchar_t	ipsa_opt_storage[IP_MAX_OPT_LENGTH];
 } ipsa_t;
@@ -382,7 +406,7 @@ typedef struct ipsa_s {
 #define	IPSA_F_EALG1	SADB_X_SAFLAGS_EALG1	/* Encrypt alg flag 1 */
 #define	IPSA_F_EALG2	SADB_X_SAFLAGS_EALG2	/* Encrypt alg flag 2 */
 
-#define	IPSA_F_HW	0x200000		/* hwaccel capable SA */
+#define	IPSA_F_ASYNC	0x200000		/* Call KCF asynchronously? */
 #define	IPSA_F_NATT_LOC	SADB_X_SAFLAGS_NATT_LOC
 #define	IPSA_F_NATT_REM	SADB_X_SAFLAGS_NATT_REM
 #define	IPSA_F_BEHIND_NAT SADB_X_SAFLAGS_NATTED
@@ -503,8 +527,8 @@ typedef struct ipsacq_s {
 	uint8_t	ipsacq_icmp_type;
 	uint8_t ipsacq_icmp_code;
 
-	/* credentials associated with triggering packet */
-	cred_t	*ipsacq_cred;
+	/* label associated with triggering packet */
+	ts_label_t	*ipsacq_tsl;
 } ipsacq_t;
 
 /*
@@ -529,7 +553,7 @@ typedef struct iacqf_s {
  * A (network protocol, ipsec protocol) specific SADB.
  * (i.e., one each for {ah, esp} and {v4, v6}.
  *
- * Keep outbound assocs about the same as ire_cache entries for now.
+ * Keep outbound assocs in a simple hash table for now.
  * One danger point, multiple SAs for a single dest will clog a bucket.
  * For the future, consider two-level hashing (2nd hash on IPC?), then probe.
  */
@@ -550,7 +574,6 @@ typedef struct sadb_s
 typedef struct sadbp_s
 {
 	uint32_t	s_satype;
-	queue_t		*s_ip_q;
 	uint32_t	*s_acquire_timeout;
 	void 		(*s_acqfn)(ipsacq_t *, mblk_t *, netstack_t *);
 	sadb_t		s_v4;
@@ -583,14 +606,16 @@ typedef struct templist_s
 #define	ALL_ZEROES_PTR	((uint32_t *)&ipv6_all_zeros)
 
 /*
- * Form unique id from ipsec_out_t
+ * Form unique id from ip_xmit_attr_t.
  */
-
-#define	SA_FORM_UNIQUE_ID(io)				\
-	SA_UNIQUE_ID((io)->ipsec_out_src_port, (io)->ipsec_out_dst_port, \
-		((io)->ipsec_out_tunnel ? ((io)->ipsec_out_inaf == AF_INET6 ? \
-		    IPPROTO_IPV6 : IPPROTO_ENCAP) : (io)->ipsec_out_proto), \
-		((io)->ipsec_out_tunnel ? (io)->ipsec_out_proto : 0))
+#define	SA_FORM_UNIQUE_ID(ixa)					\
+	SA_UNIQUE_ID((ixa)->ixa_ipsec_src_port, (ixa)->ixa_ipsec_dst_port, \
+	    (((ixa)->ixa_flags & IXAF_IPSEC_TUNNEL) ?			\
+	    ((ixa)->ixa_ipsec_inaf == AF_INET6 ? \
+	    IPPROTO_IPV6 : IPPROTO_ENCAP) :				\
+	    (ixa)->ixa_ipsec_proto),					\
+	    (((ixa)->ixa_flags & IXAF_IPSEC_TUNNEL) ? \
+	    (ixa)->ixa_ipsec_proto : 0))
 
 /*
  * This macro is used to generate unique ids (along with the addresses, both
@@ -698,8 +723,8 @@ boolean_t sadb_match_query(ipsa_query_t *q, ipsa_t *sa);
 /* SA retrieval (inbound and outbound) */
 ipsa_t *ipsec_getassocbyspi(isaf_t *, uint32_t, uint32_t *, uint32_t *,
     sa_family_t);
-ipsa_t *ipsec_getassocbyconn(isaf_t *, ipsec_out_t *, uint32_t *, uint32_t *,
-    sa_family_t, uint8_t, cred_t *);
+ipsa_t *ipsec_getassocbyconn(isaf_t *, ip_xmit_attr_t *, uint32_t *, uint32_t *,
+    sa_family_t, uint8_t, ts_label_t *);
 
 /* SA insertion. */
 int sadb_insertassoc(ipsa_t *, isaf_t *);
@@ -727,9 +752,9 @@ boolean_t sadb_addrfix(keysock_in_t *, queue_t *, mblk_t *, netstack_t *);
 int sadb_addrset(ire_t *);
 int sadb_delget_sa(mblk_t *, keysock_in_t *, sadbp_t *, int *, queue_t *,
     uint8_t);
-int sadb_purge_sa(mblk_t *, keysock_in_t *, sadb_t *, int *, queue_t *,
-    queue_t *);
-int sadb_common_add(queue_t *, queue_t *, mblk_t *, sadb_msg_t *,
+
+int sadb_purge_sa(mblk_t *, keysock_in_t *, sadb_t *, int *, queue_t *);
+int sadb_common_add(queue_t *, mblk_t *, sadb_msg_t *,
     keysock_in_t *, isaf_t *, isaf_t *, ipsa_t *, boolean_t, boolean_t, int *,
     netstack_t *, sadbp_t *);
 void sadb_set_usetime(ipsa_t *);
@@ -737,7 +762,7 @@ boolean_t sadb_age_bytes(queue_t *, ipsa_t *, uint64_t, boolean_t);
 int sadb_update_sa(mblk_t *, keysock_in_t *, mblk_t **, sadbp_t *,
     int *, queue_t *, int (*)(mblk_t *, keysock_in_t *, int *, netstack_t *),
     netstack_t *, uint8_t);
-void sadb_acquire(mblk_t *, ipsec_out_t *, boolean_t, boolean_t);
+void sadb_acquire(mblk_t *, ip_xmit_attr_t *, boolean_t, boolean_t);
 void gcm_params_init(ipsa_t *, uchar_t *, uint_t, uchar_t *, ipsa_cm_mech_t *,
     crypto_data_t *);
 void ccm_params_init(ipsa_t *, uchar_t *, uint_t, uchar_t *, ipsa_cm_mech_t *,
@@ -754,16 +779,17 @@ boolean_t sadb_replay_check(ipsa_t *, uint32_t);
 boolean_t sadb_replay_peek(ipsa_t *, uint32_t);
 int sadb_dump(queue_t *, mblk_t *, keysock_in_t *, sadb_t *);
 void sadb_replay_delete(ipsa_t *);
-void sadb_ager(sadb_t *, queue_t *, queue_t *, int, netstack_t *);
+void sadb_ager(sadb_t *, queue_t *, int, netstack_t *);
 
 timeout_id_t sadb_retimeout(hrtime_t, queue_t *, void (*)(void *), void *,
     uint_t *, uint_t, short);
 void sadb_sa_refrele(void *target);
-boolean_t sadb_set_lpkt(ipsa_t *, mblk_t *, netstack_t *);
+boolean_t sadb_set_lpkt(ipsa_t *, mblk_t *, ip_recv_attr_t *);
 mblk_t *sadb_clear_lpkt(ipsa_t *);
-void sadb_buf_pkt(ipsa_t *, mblk_t *, netstack_t *);
+void sadb_buf_pkt(ipsa_t *, mblk_t *, ip_recv_attr_t *);
 void sadb_clear_buf_pkt(void *ipkt);
 
+/* Note that buf_pkt is the product of ip_recv_attr_to_mblk() */
 #define	HANDLE_BUF_PKT(taskq, stack, dropper, buf_pkt)			\
 {									\
 	if (buf_pkt != NULL) {						\
@@ -774,8 +800,9 @@ void sadb_clear_buf_pkt(void *ipkt);
 			while (buf_pkt != NULL) {			\
 				tmp = buf_pkt->b_next;			\
 				buf_pkt->b_next = NULL;			\
+				buf_pkt = ip_recv_attr_free_mblk(buf_pkt); \
 				ip_drop_packet(buf_pkt, B_TRUE, NULL,	\
-				    NULL, DROPPER(stack,		\
+				    DROPPER(stack,			\
 				    ipds_sadb_inidle_timeout),		\
 				    &dropper);				\
 				buf_pkt = tmp;				\
@@ -785,24 +812,8 @@ void sadb_clear_buf_pkt(void *ipkt);
 }									\
 
 /*
- * Hw accel-related calls (downloading sadb to driver)
+ * Two IPsec rate-limiting routines.
  */
-void sadb_ill_download(ill_t *, uint_t);
-mblk_t *sadb_fmt_sa_req(uint_t, uint_t, ipsa_t *, boolean_t);
-/*
- * Sub-set of the IPsec hardware acceleration capabilities functions
- * implemented by ip_if.c
- */
-extern	boolean_t ipsec_capab_match(ill_t *, uint_t, boolean_t, ipsa_t *,
-    netstack_t *);
-extern	void	ill_ipsec_capab_send_all(uint_t, mblk_t *, ipsa_t *,
-    netstack_t *);
-
-
-/*
- * One IPsec -> IP linking routine, and two IPsec rate-limiting routines.
- */
-extern boolean_t sadb_t_bind_req(queue_t *, int);
 /*PRINTFLIKE6*/
 extern void ipsec_rl_strlog(netstack_t *, short, short, char,
     ushort_t, char *, ...)
@@ -818,7 +829,8 @@ extern void ipsec_assocfailure(short, short, char, ushort_t, char *, uint32_t,
 
 typedef enum ipsec_algtype {
 	IPSEC_ALG_AUTH = 0,
-	IPSEC_ALG_ENCR = 1
+	IPSEC_ALG_ENCR = 1,
+	IPSEC_ALG_ALL = 2
 } ipsec_algtype_t;
 
 /*
@@ -886,11 +898,10 @@ extern void ipsec_alg_fix_min_max(ipsec_alginfo_t *, ipsec_algtype_t,
 extern void alg_flag_check(ipsec_alginfo_t *);
 extern void ipsec_alg_free(ipsec_alginfo_t *);
 extern void ipsec_register_prov_update(void);
-extern void sadb_alg_update(ipsec_algtype_t, uint8_t, boolean_t,
-    netstack_t *);
+extern void sadb_alg_update(ipsec_algtype_t, uint8_t, boolean_t, netstack_t *);
 
-extern int sadb_sens_len_from_cred(cred_t *);
-extern void sadb_sens_from_cred(sadb_sens_t *, int, cred_t *, int);
+extern int sadb_sens_len_from_label(ts_label_t *);
+extern void sadb_sens_from_label(sadb_sens_t *, int, ts_label_t *, int);
 
 /*
  * Context templates management.

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -45,32 +43,6 @@
 #include "sctp_impl.h"
 #include "sctp_addr.h"
 
-/*
- * This will compute the checksum over the SCTP packet, so this
- * function should only be called after the whole packet has been
- * built.
- *
- * rptr should point to the IP / SCTP composite header.
- * len should be the length of the entire packet, including the IP
- *     header.
- */
-void
-sctp_add_hdr(sctp_t *sctp, uchar_t *rptr, size_t len)
-{
-	ipha_t *iphdr;
-	short iplen;
-
-	ASSERT(len >= sctp->sctp_hdr_len);
-
-	/* Copy the common header from the template */
-	bcopy(sctp->sctp_iphc, rptr, sctp->sctp_hdr_len);
-
-	/* Set the total length in the IP hdr */
-	iplen = (short)len;
-	iphdr = (ipha_t *)rptr;
-	U16_TO_ABE16(iplen, &iphdr->ipha_length);
-}
-
 /*ARGSUSED*/
 size_t
 sctp_supaddr_param_len(sctp_t *sctp)
@@ -83,17 +55,18 @@ sctp_supaddr_param(sctp_t *sctp, uchar_t *p)
 {
 	sctp_parm_hdr_t *sph;
 	uint16_t *addrtype;
+	conn_t		*connp = sctp->sctp_connp;
 
 	sph = (sctp_parm_hdr_t *)p;
 	sph->sph_type = htons(PARM_SUPP_ADDRS);
 	addrtype = (uint16_t *)(sph + 1);
-	switch (sctp->sctp_ipversion) {
-	case IPV4_VERSION:
+	switch (connp->conn_family) {
+	case AF_INET:
 		*addrtype++ = htons(PARM_ADDR4);
 		*addrtype = 0;
 		sph->sph_len = htons(sizeof (*sph) + sizeof (*addrtype));
 		break;
-	case IPV6_VERSION:
+	case AF_INET6:
 		*addrtype++ = htons(PARM_ADDR6);
 		if (!sctp->sctp_connp->conn_ipv6_v6only) {
 			*addrtype = htons(PARM_ADDR4);
@@ -167,7 +140,7 @@ sctp_adaptation_code_param(sctp_t *sctp, uchar_t *p)
 }
 
 mblk_t *
-sctp_init_mp(sctp_t *sctp)
+sctp_init_mp(sctp_t *sctp, sctp_faddr_t *fp)
 {
 	mblk_t			*mp;
 	uchar_t			*p;
@@ -176,12 +149,12 @@ sctp_init_mp(sctp_t *sctp)
 	sctp_chunk_hdr_t	*chp;
 	uint16_t		schlen;
 	int			supp_af;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	conn_t			*connp = sctp->sctp_connp;
 
-	if (sctp->sctp_family == AF_INET) {
+	if (connp->conn_family == AF_INET) {
 		supp_af = PARM_SUPP_V4;
 	} else {
-		/* Assume here that a v6 endpoint supports v4 address. */
 		if (sctp->sctp_connp->conn_ipv6_v6only)
 			supp_af = PARM_SUPP_V6;
 		else
@@ -203,8 +176,14 @@ sctp_init_mp(sctp_t *sctp)
 	sctp->sctp_sctph->sh_verf = 0;
 	sctp->sctp_sctph6->sh_verf = 0;
 
-	mp = sctp_make_mp(sctp, NULL, initlen);
+	mp = sctp_make_mp(sctp, fp, initlen);
 	if (mp == NULL) {
+		SCTP_KSTAT(sctps, sctp_send_init_failed);
+		return (NULL);
+	}
+	/* sctp_make_mp could have discovered we have no usable sources */
+	if (sctp->sctp_nsaddrs == 0) {
+		freemsg(mp);
 		SCTP_KSTAT(sctps, sctp_send_init_failed);
 		return (NULL);
 	}
@@ -242,7 +221,7 @@ sctp_init_mp(sctp_t *sctp)
 
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	sctp_set_iplen(sctp, mp);
+	sctp_set_iplen(sctp, mp, fp->ixa);
 
 	return (mp);
 }

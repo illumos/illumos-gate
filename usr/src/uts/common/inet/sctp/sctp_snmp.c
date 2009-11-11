@@ -78,9 +78,9 @@ sctp_kstat_update(kstat_t *kp, int rw)
 	 * individual set of statistics.
 	 */
 	SET_MIB(sctps->sctps_mib.sctpCurrEstab, 0);
-	sctp = sctps->sctps_gsctp;
 	sctp_prev = NULL;
 	mutex_enter(&sctps->sctps_g_lock);
+	sctp = list_head(&sctps->sctps_g_list);
 	while (sctp != NULL) {
 		mutex_enter(&sctp->sctp_reflock);
 		if (sctp->sctp_condemned) {
@@ -471,8 +471,8 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 	SET_MIB(sctps->sctps_mib.sctpCurrEstab, 0);
 
 	idx = 0;
-	sctp = sctps->sctps_gsctp;
 	mutex_enter(&sctps->sctps_g_lock);
+	sctp = list_head(&sctps->sctps_g_list);
 	while (sctp != NULL) {
 		mutex_enter(&sctp->sctp_reflock);
 		if (sctp->sctp_condemned) {
@@ -541,8 +541,8 @@ sctp_snmp_get_mib2(queue_t *q, mblk_t *mpctl, sctp_stack_t *sctps)
 		sctp->sctp_reassmsgs = 0;
 
 		sce.sctpAssocId = ntohl(sctp->sctp_lvtag);
-		sce.sctpAssocLocalPort = ntohs(sctp->sctp_lport);
-		sce.sctpAssocRemPort = ntohs(sctp->sctp_fport);
+		sce.sctpAssocLocalPort = ntohs(sctp->sctp_connp->conn_lport);
+		sce.sctpAssocRemPort = ntohs(sctp->sctp_connp->conn_fport);
 
 		RUN_SCTP(sctp);
 		if (sctp->sctp_primary != NULL) {
@@ -659,11 +659,10 @@ done:
 			needattr = B_TRUE;
 			break;
 		}
-		if (connp->conn_fully_bound &&
-		    connp->conn_effective_cred != NULL) {
+		if (sctp->sctp_connp->conn_ixa->ixa_tsl != NULL) {
 			ts_label_t *tsl;
 
-			tsl = crgetlabel(connp->conn_effective_cred);
+			tsl = sctp->sctp_connp->conn_ixa->ixa_tsl;
 			mlp.tme_flags |= MIB2_TMEF_IS_LABELED;
 			mlp.tme_doi = label2doi(tsl);
 			mlp.tme_label = *label2bslabel(tsl);

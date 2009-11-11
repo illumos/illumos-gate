@@ -56,6 +56,7 @@ static int
 sctp_select_port(sctp_t *sctp, in_port_t *requested_port, int *user_specified)
 {
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	conn_t		*connp = sctp->sctp_connp;
 
 	/*
 	 * Get a valid port (within the anonymous range and should not
@@ -68,7 +69,7 @@ sctp_select_port(sctp_t *sctp, in_port_t *requested_port, int *user_specified)
 	if (*requested_port == 0) {
 		*requested_port = sctp_update_next_port(
 		    sctps->sctps_next_port_to_try,
-		    crgetzone(sctp->sctp_credp), sctps);
+		    crgetzone(connp->conn_cred), sctps);
 		if (*requested_port == 0)
 			return (EACCES);
 		*user_specified = 0;
@@ -101,7 +102,7 @@ sctp_select_port(sctp_t *sctp, in_port_t *requested_port, int *user_specified)
 			 * sctp_bind() should take a cred_t argument so that
 			 * we can use it here.
 			 */
-			if (secpolicy_net_privaddr(sctp->sctp_credp,
+			if (secpolicy_net_privaddr(connp->conn_cred,
 			    *requested_port, IPPROTO_SCTP) != 0) {
 				dprint(1,
 				    ("sctp_bind(x): no prive for port %d",
@@ -120,6 +121,7 @@ sctp_listen(sctp_t *sctp)
 {
 	sctp_tf_t	*tf;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	conn_t		*connp = sctp->sctp_connp;
 
 	RUN_SCTP(sctp);
 	/*
@@ -138,7 +140,7 @@ sctp_listen(sctp_t *sctp)
 		int ret;
 
 		bzero(&ss, sizeof (ss));
-		ss.ss_family = sctp->sctp_family;
+		ss.ss_family = connp->conn_family;
 
 		WAKE_SCTP(sctp);
 		if ((ret = sctp_bind(sctp, (struct sockaddr *)&ss,
@@ -147,12 +149,18 @@ sctp_listen(sctp_t *sctp)
 		RUN_SCTP(sctp)
 	}
 
+	/* Cache things in the ixa without any refhold */
+	connp->conn_ixa->ixa_cred = connp->conn_cred;
+	connp->conn_ixa->ixa_cpid = connp->conn_cpid;
+	if (is_system_labeled())
+		connp->conn_ixa->ixa_tsl = crgetlabel(connp->conn_cred);
+
 	sctp->sctp_state = SCTPS_LISTEN;
 	(void) random_get_pseudo_bytes(sctp->sctp_secret, SCTP_SECRET_LEN);
 	sctp->sctp_last_secret_update = lbolt64;
 	bzero(sctp->sctp_old_secret, SCTP_SECRET_LEN);
 	tf = &sctps->sctps_listen_fanout[SCTP_LISTEN_HASH(
-	    ntohs(sctp->sctp_lport))];
+	    ntohs(connp->conn_lport))];
 	sctp_listen_hash_insert(tf, sctp);
 	WAKE_SCTP(sctp);
 	return (0);
@@ -170,6 +178,10 @@ sctp_bind(sctp_t *sctp, struct sockaddr *sa, socklen_t len)
 	in_port_t	requested_port;
 	in_port_t	allocated_port;
 	int		err = 0;
+	conn_t		*connp = sctp->sctp_connp;
+	uint_t		scope_id;
+	sin_t		*sin;
+	sin6_t		*sin6;
 
 	ASSERT(sctp != NULL);
 
@@ -188,25 +200,35 @@ sctp_bind(sctp_t *sctp, struct sockaddr *sa, socklen_t len)
 
 	switch (sa->sa_family) {
 	case AF_INET:
+		sin = (sin_t *)sa;
 		if (len < sizeof (struct sockaddr_in) ||
-		    sctp->sctp_family == AF_INET6) {
+		    connp->conn_family == AF_INET6) {
 			err = EINVAL;
 			goto done;
 		}
-		requested_port = ntohs(((struct sockaddr_in *)sa)->sin_port);
+		requested_port = ntohs(sin->sin_port);
 		break;
 	case AF_INET6:
+		sin6 = (sin6_t *)sa;
 		if (len < sizeof (struct sockaddr_in6) ||
-		    sctp->sctp_family == AF_INET) {
+		    connp->conn_family == AF_INET) {
 			err = EINVAL;
 			goto done;
 		}
-		requested_port = ntohs(((struct sockaddr_in6 *)sa)->sin6_port);
+		requested_port = ntohs(sin6->sin6_port);
 		/* Set the flowinfo. */
-		sctp->sctp_ip6h->ip6_vcf =
-		    (IPV6_DEFAULT_VERS_AND_FLOW & IPV6_VERS_AND_FLOW_MASK) |
-		    (((struct sockaddr_in6 *)sa)->sin6_flowinfo &
-		    ~IPV6_VERS_AND_FLOW_MASK);
+		connp->conn_flowinfo =
+		    sin6->sin6_flowinfo & ~IPV6_VERS_AND_FLOW_MASK;
+
+		scope_id = sin6->sin6_scope_id;
+		if (scope_id != 0 && IN6_IS_ADDR_LINKSCOPE(&sin6->sin6_addr)) {
+			connp->conn_ixa->ixa_flags |= IXAF_SCOPEID_SET;
+			connp->conn_ixa->ixa_scopeid = scope_id;
+			connp->conn_incoming_ifindex = scope_id;
+		} else {
+			connp->conn_ixa->ixa_flags &= ~IXAF_SCOPEID_SET;
+			connp->conn_incoming_ifindex = connp->conn_bound_if;
+		}
 		break;
 	default:
 		err = EAFNOSUPPORT;
@@ -247,7 +269,7 @@ sctp_bindx(sctp_t *sctp, const void *addrs, int addrcnt, int bindop)
 	switch (bindop) {
 	case SCTP_BINDX_ADD_ADDR:
 		return (sctp_bind_add(sctp, addrs, addrcnt, B_FALSE,
-		    sctp->sctp_lport));
+		    sctp->sctp_connp->conn_lport));
 	case SCTP_BINDX_REM_ADDR:
 		return (sctp_bind_del(sctp, addrs, addrcnt, B_FALSE));
 	default:
@@ -265,6 +287,7 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 	int		err = 0;
 	boolean_t	do_asconf = B_FALSE;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	conn_t		*connp = sctp->sctp_connp;
 
 	if (!caller_hold_lock)
 		RUN_SCTP(sctp);
@@ -329,7 +352,7 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 			return (err);
 		}
 		ASSERT(addrlist != NULL);
-		(*cl_sctp_check_addrs)(sctp->sctp_family, port, &addrlist,
+		(*cl_sctp_check_addrs)(connp->conn_family, port, &addrlist,
 		    size, &addrcnt, unspec == 1);
 		if (addrcnt == 0) {
 			/* We free the list */
@@ -345,8 +368,8 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 		err = sctp_valid_addr_list(sctp, addrlist, addrcnt, llist,
 		    lsize);
 		if (err == 0 && do_listen) {
-			(*cl_sctp_listen)(sctp->sctp_family, llist,
-			    addrcnt, sctp->sctp_lport);
+			(*cl_sctp_listen)(connp->conn_family, llist,
+			    addrcnt, connp->conn_lport);
 			/* list will be freed by the clustering module */
 		} else if (err != 0 && llist != NULL) {
 			kmem_free(llist, lsize);
@@ -373,8 +396,6 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 	}
 	if (!caller_hold_lock)
 		WAKE_SCTP(sctp);
-	if (do_asconf)
-		sctp_process_sendq(sctp);
 	return (0);
 }
 
@@ -390,6 +411,7 @@ sctp_bind_del(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 	uchar_t		*ulist = NULL;
 	size_t		usize = 0;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	conn_t		*connp = sctp->sctp_connp;
 
 	if (!caller_hold_lock)
 		RUN_SCTP(sctp);
@@ -439,14 +461,12 @@ sctp_bind_del(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 	/* ulist will be non-NULL only if cl_sctp_unlisten is non-NULL */
 	if (ulist != NULL) {
 		ASSERT(cl_sctp_unlisten != NULL);
-		(*cl_sctp_unlisten)(sctp->sctp_family, ulist, addrcnt,
-		    sctp->sctp_lport);
+		(*cl_sctp_unlisten)(connp->conn_family, ulist, addrcnt,
+		    connp->conn_lport);
 		/* ulist will be freed by the clustering module */
 	}
 	if (!caller_hold_lock)
 		WAKE_SCTP(sctp);
-	if (do_asconf)
-		sctp_process_sendq(sctp);
 	return (error);
 }
 
@@ -473,9 +493,10 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 	int count = 0;
 	/* maximum number of times to run around the loop */
 	int loopmax;
-	zoneid_t zoneid = sctp->sctp_zoneid;
-	zone_t *zone = crgetzone(sctp->sctp_credp);
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	conn_t		*connp = sctp->sctp_connp;
+	zone_t *zone = crgetzone(connp->conn_cred);
+	zoneid_t zoneid = connp->conn_zoneid;
 
 	/*
 	 * Lookup for free addresses is done in a loop and "loopmax"
@@ -523,8 +544,9 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 		mutex_enter(&tbf->tf_lock);
 		for (lsctp = tbf->tf_sctp; lsctp != NULL;
 		    lsctp = lsctp->sctp_bind_hash) {
+			conn_t *lconnp = lsctp->sctp_connp;
 
-			if (lport != lsctp->sctp_lport ||
+			if (lport != lconnp->conn_lport ||
 			    lsctp->sctp_state < SCTPS_BOUND)
 				continue;
 
@@ -534,14 +556,14 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 			 * privilege as being in all zones, as there's
 			 * otherwise no way to identify the right receiver.
 			 */
-			if (lsctp->sctp_zoneid != zoneid &&
-			    lsctp->sctp_mac_mode == CONN_MAC_DEFAULT &&
-			    sctp->sctp_mac_mode == CONN_MAC_DEFAULT)
+			if (lconnp->conn_zoneid != zoneid &&
+			    lconnp->conn_mac_mode == CONN_MAC_DEFAULT &&
+			    connp->conn_mac_mode == CONN_MAC_DEFAULT)
 				continue;
 
 			addrcmp = sctp_compare_saddrs(sctp, lsctp);
 			if (addrcmp != SCTP_ADDR_DISJOINT) {
-				if (!sctp->sctp_reuseaddr) {
+				if (!connp->conn_reuseaddr) {
 					/* in use */
 					break;
 				} else if (lsctp->sctp_state == SCTPS_BOUND ||
@@ -563,10 +585,9 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 			/* The port number is busy */
 			mutex_exit(&tbf->tf_lock);
 		} else {
-			conn_t *connp = sctp->sctp_connp;
-
 			if (is_system_labeled()) {
 				mlp_type_t addrtype, mlptype;
+				uint_t ipversion;
 
 				/*
 				 * On a labeled system we must check the type
@@ -575,11 +596,16 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 				 * and that the user's requested binding
 				 * is permitted.
 				 */
+				if (connp->conn_family == AF_INET)
+					ipversion = IPV4_VERSION;
+				else
+					ipversion = IPV6_VERSION;
+
 				addrtype = tsol_mlp_addr_type(
 				    connp->conn_allzones ? ALL_ZONES :
 				    zone->zone_id,
-				    sctp->sctp_ipversion,
-				    sctp->sctp_ipversion == IPV4_VERSION ?
+				    ipversion,
+				    connp->conn_family == AF_INET ?
 				    (void *)&sctp->sctp_ipha->ipha_src :
 				    (void *)&sctp->sctp_ip6h->ip6_src,
 				    sctps->sctps_netstack->netstack_ip);
@@ -631,8 +657,7 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 			 * number.
 			 */
 			sctp->sctp_state = SCTPS_BOUND;
-			sctp->sctp_lport = lport;
-			sctp->sctp_sctph->sh_sport = lport;
+			connp->conn_lport = lport;
 
 			ASSERT(&sctps->sctps_bind_fanout[
 			    SCTP_BIND_HASH(port)] == tbf);

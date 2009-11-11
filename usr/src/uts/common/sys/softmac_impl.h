@@ -301,7 +301,9 @@ typedef struct softmac_upper_s {
 
 	uint32_t		su_bound : 1,		/* SL */
 				su_active : 1,		/* SL */
-				su_direct : 1;		/* SL */
+				su_direct : 1,		/* SL */
+				su_is_arp : 1,
+				su_pad_to_32:28;
 
 	/*
 	 * Used for fastpath data path.

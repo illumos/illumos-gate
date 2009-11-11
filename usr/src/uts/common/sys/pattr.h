@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PATTR_H
 #define	_SYS_PATTR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -92,6 +90,9 @@ typedef struct pattr_hcksum_s {
 					/* check the attached h/w computed */
 					/* checksum value to determine if */
 					/* checksum was bad */
+
+#define	HCK_FLAGS		(HCK_IPV4_HDRCKSUM | HCK_PARTIALCKSUM |	\
+				HCK_FULLCKSUM | HCK_FULLCKSUM_OK)
 /*
  * Extended hardware offloading flags that also use hcksum_flags
  */

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _INET_SCTP_SCTP_ASCONF_H
 #define	_INET_SCTP_SCTP_ASCONF_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,7 +55,7 @@ extern int sctp_del_ip(sctp_t *, const void *, uint32_t, uchar_t *, size_t);
 extern void sctp_asconf_free_cxmit(sctp_t *, sctp_chunk_hdr_t *);
 extern void sctp_input_asconf(sctp_t *, sctp_chunk_hdr_t *, sctp_faddr_t *);
 extern void sctp_input_asconf_ack(sctp_t *, sctp_chunk_hdr_t *, sctp_faddr_t *);
-extern int sctp_set_peerprim(sctp_t *, const void *, uint_t);
+extern int sctp_set_peerprim(sctp_t *, const void *);
 extern void sctp_wput_asconf(sctp_t *, sctp_faddr_t *);
 
 #ifdef __cplusplus

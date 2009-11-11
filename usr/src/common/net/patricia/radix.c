@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1988, 1989, 1993
@@ -367,8 +367,9 @@ rn_match_args(v_arg, head, rn_leaf_fn, rn_leaf_arg)
 		 * is looking for some other criteria as well. Continue
 		 * looking as if the exact match failed.
 		 */
-		if (t->rn_parent->rn_flags & RNF_ROOT) {
-			/* hit the top. have to give up */
+		if (t->rn_dupedkey == NULL &&
+		    (t->rn_parent->rn_flags & RNF_ROOT)) {
+			/* no more dupedkeys and hit the top. have to give up */
 			return (NULL);
 		}
 		b = 0;
@@ -486,56 +487,70 @@ rn_insert(v_arg, head, dupentry, nodes)
 {
 	caddr_t v = v_arg;
 	struct radix_node *top = head->rnh_treetop;
+	struct radix_node *p, *x;
 	int head_off = top->rn_offset, vlen = (int)LEN(v);
 	struct radix_node *t = rn_search(v_arg, top);
 	caddr_t cp = v + head_off;
 	int b;
 	struct radix_node *tt;
+	caddr_t cp2 = t->rn_key + head_off;
+	int cmp_res;
+	caddr_t cplim = v + vlen;
 
 	/*
 	 * Find first bit at which v and t->rn_key differ
 	 */
-	{
-		caddr_t cp2 = t->rn_key + head_off;
-		int cmp_res;
-		caddr_t cplim = v + vlen;
-
-		while (cp < cplim)
-			if (*cp2++ != *cp++)
-				goto on1;
-		*dupentry = 1;
-		return (t);
+	while (cp < cplim)
+		if (*cp2++ != *cp++)
+			goto on1;
+	*dupentry = 1;
+	return (t);
 on1:
-		*dupentry = 0;
-		cmp_res = (cp[-1] ^ cp2[-1]) & 0xff;
-		for (b = (cp - v) << 3; cmp_res; b--)
-			cmp_res >>= 1;
-	}
-	{
-		struct radix_node *p, *x = top;
-		cp = v;
-		do {
-			p = x;
-			if (cp[x->rn_offset] & x->rn_bmask)
-				x = x->rn_right;
-			else
-				x = x->rn_left;
-		} while (b > (unsigned)x->rn_bit);
-				/* x->rn_bit < b && x->rn_bit >= 0 */
-		t = rn_newpair(v_arg, b, nodes);
-		tt = t->rn_left;
-		if ((cp[p->rn_offset] & p->rn_bmask) == 0)
-			p->rn_left = t;
+	*dupentry = 0;
+	cmp_res = (cp[-1] ^ cp2[-1]) & 0xff;
+	/*
+	 * (cp - v) is the number of bytes where the match is relevant.
+	 * Multiply by 8 to get number of bits. Then reduce this number
+	 * by the trailing bits in the last byte where we have a match
+	 * by looking at (cmp_res >> 1) in each iteration below.
+	 * Note that v starts at the beginning of the key, so, when key
+	 * is a sockaddr structure, the preliminary len/family/port bytes
+	 * are accounted for.
+	 */
+	for (b = (cp - v) << 3; cmp_res; b--)
+		cmp_res >>= 1;
+	cp = v;
+	x = top;
+	do {
+		p = x;
+		if (cp[x->rn_offset] & x->rn_bmask)
+			x = x->rn_right;
 		else
-			p->rn_right = t;
-		x->rn_parent = t;
-		t->rn_parent = p;
-		if ((cp[t->rn_offset] & t->rn_bmask) == 0) {
-			t->rn_right = x;
-		} else {
-			t->rn_right = tt;
-			t->rn_left = x;
-		}
+			x = x->rn_left;
+	} while (b > (unsigned)x->rn_bit);
+			/* x->rn_bit < b && x->rn_bit >= 0 */
+	/*
+	 * now the rightmost bit where v and rn_key differ (b) is <
+	 * x->rn_bit.
+	 *
+	 * We will add a new branch at p.  b cannot equal x->rn_bit
+	 * because we know we didn't find a duplicated key.
+	 * The tree will be re-adjusted so that t is inserted between p
+	 * and x.
+	 */
+	t = rn_newpair(v_arg, b, nodes);
+	tt = t->rn_left;
+	if ((cp[p->rn_offset] & p->rn_bmask) == 0)
+		p->rn_left = t;
+	else
+		p->rn_right = t;
+	x->rn_parent = t;
+	t->rn_parent = p;
+	if ((cp[t->rn_offset] & t->rn_bmask) == 0) {
+		t->rn_right = x;
+	} else {
+		t->rn_right = tt;
+		t->rn_left = x;
 	}
 	return (tt);
 }
@@ -718,6 +733,8 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 		 * find it among possible duplicate key entries
 		 * anyway, so the above test doesn't hurt.
 		 *
+		 * Insert treenodes before tt.
+		 *
 		 * We sort the masks for a duplicated key the same way as
 		 * in a masklist -- most specific to least specific.
 		 * This may require the unfortunate nuisance of relocating
@@ -758,22 +775,54 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 		tt->rn_bit = x->rn_bit;
 		tt->rn_flags |= x->rn_flags & RNF_NORMAL;
 	}
+	/* BEGIN CSTYLED */
+	/*
+	 * at this point the parent-child relationship for p, t, x, tt is
+	 * one of the following:
+	 *		p			p
+	 *		:  (left/right child)	:
+	 *		:			:
+	 *		t			t
+	 *	       / \		       / \
+	 *	      x   tt		      tt  x
+	 *
+	 *	tt == saved_tt returned by rn_insert().
+	 */
+	/* END CSTYLED */
 	t = saved_tt->rn_parent;
 	if (keyduplicated)
 		goto key_exists;
 	b_leaf = -1 - t->rn_bit;
+	/*
+	 * b_leaf is now normalized to be in the leaf rn_bit format
+	 * (it is the rn_bit value of a leaf corresponding to netmask
+	 * of t->rn_bit).
+	 */
 	if (t->rn_right == saved_tt)
 		x = t->rn_left;
 	else
 		x = t->rn_right;
-	/* Promote general routes from below */
+	/*
+	 * Promote general routes from below.
+	 * Identify the less specific netmasks and add them to t->rm_mklist
+	 */
 	if (x->rn_bit < 0) {
-	    for (mp = &t->rn_mklist; x; x = x->rn_dupedkey)
-		if (x->rn_mask && (x->rn_bit >= b_leaf) && x->rn_mklist == 0) {
-			*mp = m = rn_new_radix_mask(x, 0);
-			if (m)
-				mp = &m->rm_mklist;
-		}
+		/* x is the sibling node. it is a leaf node. */
+		for (mp = &t->rn_mklist; x; x = x->rn_dupedkey)
+			if (x->rn_mask && (x->rn_bit >= b_leaf) &&
+			    x->rn_mklist == 0) {
+				/*
+				 * x is the first node in the dupedkey chain
+				 * without a mklist, and with a shorter mask
+				 * than b_leaf. Create a radix_mask
+				 * corresponding to x's mask and add it to
+				 * t's rn_mklist. The mask list gets created
+				 * in decreasing order of mask length.
+				 */
+				*mp = m = rn_new_radix_mask(x, 0);
+				if (m)
+					mp = &m->rm_mklist;
+			}
 	} else if (x->rn_mklist) {
 		/*
 		 * Skip over masks whose index is > that of new node
@@ -788,6 +837,7 @@ key_exists:
 	if ((netmask == 0) || (b > t->rn_bit))
 		return (tt); /* can't lift at all */
 	b_leaf = tt->rn_bit;
+	/* b is the index of the netmask */
 	do {
 		x = t;
 		t = t->rn_parent;

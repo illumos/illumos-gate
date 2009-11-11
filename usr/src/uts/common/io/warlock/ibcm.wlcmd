@@ -66,11 +66,7 @@ root	ibt_get_src_ip
 root	ibt_ofuvcm_get_req_data
 root	ibt_ofuvcm_proceed
 
-root	ibcm_arp_timeout
 root	ibcm_arp_get_srcip_plist
-root	ibcm_arp_lrput
-root	ibcm_arp_lwsrv
-root	ibcm_arp_lrsrv
 root	ibcm_arp_get_ibd_insts_cb
 
 # callback entry points from ibmf

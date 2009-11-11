@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996-1998,2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -51,11 +48,11 @@
  */
 
 opdes_t keysock_opt_arr[] = {
-	{ SO_USELOOPBACK, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
+	{ SO_USELOOPBACK, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0,
 	    (t_uscalar_t)sizeof (int), 0 },
-	{ SO_SNDBUF, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
+	{ SO_SNDBUF, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0,
 	    (t_uscalar_t)sizeof (int), 0 },
-	{ SO_RCVBUF, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
+	{ SO_RCVBUF, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0,
 	    (t_uscalar_t)sizeof (int), 0 },
 };
 
@@ -88,7 +85,6 @@ optdb_obj_t keysock_opt_obj = {
 	NULL,			/* KEYSOCK default value function pointer */
 	keysock_opt_get,	/* KEYSOCK get function pointer */
 	keysock_opt_set,	/* KEYSOCK set function pointer */
-	B_TRUE,			/* KEYSOCK is tpi provider */
 	KEYSOCK_OPT_ARR_CNT,	/* KEYSOCK option database count of entries */
 	keysock_opt_arr,	/* KEYSOCK option database */
 	KEYSOCK_VALID_LEVELS_CNT, /* KEYSOCK valid level count of entries */

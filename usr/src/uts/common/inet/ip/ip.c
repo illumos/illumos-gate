@@ -38,6 +38,7 @@
 #include <sys/tihdr.h>
 #include <sys/xti_inet.h>
 #include <sys/ddi.h>
+#include <sys/suntpi.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/kobj.h>
@@ -94,10 +95,8 @@
 #include <inet/ipp_common.h>
 
 #include <net/pfkeyv2.h>
-#include <inet/ipsec_info.h>
 #include <inet/sadb.h>
 #include <inet/ipsec_impl.h>
-#include <sys/iphada.h>
 #include <inet/iptun/iptun_impl.h>
 #include <inet/ipdrop.h>
 #include <inet/ip_netinfo.h>
@@ -111,9 +110,7 @@
 #include <ipp/ipp_impl.h>
 #include <ipp/ipgpc/ipgpc.h>
 
-#include <sys/multidata.h>
 #include <sys/pattr.h>
-
 #include <inet/ipclassifier.h>
 #include <inet/sctp_ip.h>
 #include <inet/sctp/sctp_impl.h>
@@ -126,6 +123,7 @@
 
 #include <rpc/pmap_prot.h>
 #include <sys/squeue_impl.h>
+#include <inet/ip_arp.h>
 
 /*
  * Values for squeue switch:
@@ -133,10 +131,9 @@
  * IP_SQUEUE_ENTER: SQ_PROCESS
  * IP_SQUEUE_FILL: SQ_FILL
  */
-int ip_squeue_enter = 2;	/* Setable in /etc/system */
+int ip_squeue_enter = IP_SQUEUE_ENTER;	/* Setable in /etc/system */
 
 int ip_squeue_flag;
-#define	SET_BPREV_FLAG(x)	((mblk_t *)(uintptr_t)(x))
 
 /*
  * Setable in /etc/system
@@ -177,7 +174,8 @@ typedef struct iproutedata_s {
 	listptr_t	ird_attrs;	/* ipRouteAttributeTable */
 } iproutedata_t;
 
-#define	IRD_REPORT_TESTHIDDEN	0x01	/* include IRE_MARK_TESTHIDDEN routes */
+/* Include ire_testhidden and IRE_IF_CLONE routes */
+#define	IRD_REPORT_ALL	0x01
 
 /*
  * Cluster specific hooks. These should be NULL when booted as a non-cluster
@@ -233,29 +231,26 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * MT level protection given by STREAMS. IP uses a combination of its own
  * internal serialization mechanism and standard Solaris locking techniques.
  * The internal serialization is per phyint.  This is used to serialize
- * plumbing operations, certain multicast operations, most set ioctls,
- * igmp/mld timers etc.
+ * plumbing operations, IPMP operations, most set ioctls, etc.
  *
  * Plumbing is a long sequence of operations involving message
  * exchanges between IP, ARP and device drivers. Many set ioctls are typically
  * involved in plumbing operations. A natural model is to serialize these
  * ioctls one per ill. For example plumbing of hme0 and qfe0 can go on in
  * parallel without any interference. But various set ioctls on hme0 are best
- * serialized, along with multicast join/leave operations, igmp/mld timer
- * operations, and processing of DLPI control messages received from drivers
- * on a per phyint basis.  This serialization is provided by the ipsq_t and
- * primitives operating on this. Details can be found in ip_if.c above the
- * core primitives operating on ipsq_t.
+ * serialized, along with IPMP operations and processing of DLPI control
+ * messages received from drivers on a per phyint basis. This serialization is
+ * provided by the ipsq_t and primitives operating on this. Details can
+ * be found in ip_if.c above the core primitives operating on ipsq_t.
  *
  * Lookups of an ipif or ill by a thread return a refheld ipif / ill.
  * Simiarly lookup of an ire by a thread also returns a refheld ire.
  * In addition ipif's and ill's referenced by the ire are also indirectly
- * refheld. Thus no ipif or ill can vanish nor can critical parameters like
- * the ipif's address or netmask change as long as an ipif is refheld
+ * refheld. Thus no ipif or ill can vanish as long as an ipif is refheld
  * directly or indirectly. For example an SIOCSLIFADDR ioctl that changes the
  * address of an ipif has to go through the ipsq_t. This ensures that only
- * 1 such exclusive operation proceeds at any time on the ipif. It then
- * deletes all ires associated with this ipif, and waits for all refcnts
+ * one such exclusive operation proceeds at any time on the ipif. It then
+ * waits for all refcnts
  * associated with this ipif to come down to zero. The address is changed
  * only after the ipif has been quiesced. Then the ipif is brought up again.
  * More details are described above the comment in ip_sioctl_flags.
@@ -274,7 +269,7 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * - ire_lock to protect some of the fields of the ire, IRE tables
  *   (one lock per hash bucket). Refer to ip_ire.c for details.
  *
- * - ndp_g_lock and nce_lock for protecting NCEs.
+ * - ndp_g_lock and ncec_lock for protecting NCEs.
  *
  * - ill_lock protects fields of the ill and ipif. Details in ip.h
  *
@@ -311,12 +306,6 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * - ip_addr_avail_lock: This is used to ensure the uniqueness of IP addresses.
  *   This lock is held in ipif_up_done and the ipif is marked IPIF_UP and the
  *   uniqueness check also done atomically.
- *
- * - ipsec_capab_ills_lock: This readers/writer lock protects the global
- *   lists of IPsec capable ills (ipsec_capab_ills_{ah,esp}). It is taken
- *   as a writer when adding or deleting elements from these lists, and
- *   as a reader when walking these lists to send a SADB update to the
- *   IPsec capable ills.
  *
  * - ill_g_usesrc_lock: This readers/writer lock protects the usesrc
  *   group list linked by ill_usesrc_grp_next. It also protects the
@@ -357,20 +346,30 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  *
  * ill_g_lock -> conn_lock -> ill_lock -> ipsq_lock -> ipx_lock
  * ill_g_lock -> ill_lock(s) -> phyint_lock
- * ill_g_lock -> ndp_g_lock -> ill_lock -> nce_lock
+ * ill_g_lock -> ndp_g_lock -> ill_lock -> ncec_lock
  * ill_g_lock -> ip_addr_avail_lock
  * conn_lock -> irb_lock -> ill_lock -> ire_lock
  * ill_g_lock -> ip_g_nd_lock
+ * ill_g_lock -> ips_ipmp_lock -> ill_lock -> nce_lock
+ * ill_g_lock -> ndp_g_lock -> ill_lock -> ncec_lock -> nce_lock
+ * arl_lock -> ill_lock
+ * ips_ire_dep_lock -> irb_lock
  *
  * When more than 1 ill lock is needed to be held, all ill lock addresses
  * are sorted on address and locked starting from highest addressed lock
  * downward.
  *
+ * Multicast scenarios
+ * ips_ill_g_lock -> ill_mcast_lock
+ * conn_ilg_lock -> ips_ill_g_lock -> ill_lock
+ * ill_mcast_serializer -> ill_mcast_lock -> ips_ipmp_lock -> ill_lock
+ * ill_mcast_serializer -> ill_mcast_lock -> connf_lock -> conn_lock
+ * ill_mcast_serializer -> ill_mcast_lock -> conn_ilg_lock
+ * ill_mcast_serializer -> ill_mcast_lock -> ips_igmp_timer_lock
+ *
  * IPsec scenarios
  *
  * ipsa_lock -> ill_g_lock -> ill_lock
- * ipsec_capab_ills_lock -> ill_g_lock -> ill_lock
- * ipsec_capab_ills_lock -> ipsa_lock
  * ill_g_usesrc_lock -> ill_g_lock -> ill_lock
  *
  * Trusted Solaris scenarios
@@ -414,31 +413,30 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * Walker - Increment irb_refcnt before calling the walker callback. Hold the
  * global tree lock (read mode) for traversal.
  *
+ * IRE dependencies - In some cases we hold ips_ire_dep_lock across ire_refrele
+ * hence we will acquire irb_lock while holding ips_ire_dep_lock.
+ *
  * IPsec notes :
  *
- * IP interacts with the IPsec code (AH/ESP) by tagging a M_CTL message
- * in front of the actual packet. For outbound datagrams, the M_CTL
- * contains a ipsec_out_t (defined in ipsec_info.h), which has the
+ * IP interacts with the IPsec code (AH/ESP) by storing IPsec attributes
+ * in the ip_xmit_attr_t ip_recv_attr_t. For outbound datagrams, the
+ * ip_xmit_attr_t has the
  * information used by the IPsec code for applying the right level of
- * protection. The information initialized by IP in the ipsec_out_t
+ * protection. The information initialized by IP in the ip_xmit_attr_t
  * is determined by the per-socket policy or global policy in the system.
- * For inbound datagrams, the M_CTL contains a ipsec_in_t (defined in
- * ipsec_info.h) which starts out with nothing in it. It gets filled
+ * For inbound datagrams, the ip_recv_attr_t
+ * starts out with nothing in it. It gets filled
  * with the right information if it goes through the AH/ESP code, which
  * happens if the incoming packet is secure. The information initialized
- * by AH/ESP, is later used by IP(during fanouts to ULP) to see whether
+ * by AH/ESP, is later used by IP (during fanouts to ULP) to see whether
  * the policy requirements needed by per-socket policy or global policy
  * is met or not.
- *
- * If there is both per-socket policy (set using setsockopt) and there
- * is also global policy match for the 5 tuples of the socket,
- * ipsec_override_policy() makes the decision of which one to use.
  *
  * For fully connected sockets i.e dst, src [addr, port] is known,
  * conn_policy_cached is set indicating that policy has been cached.
  * conn_in_enforce_policy may or may not be set depending on whether
  * there is a global policy match or per-socket policy match.
- * Policy inheriting happpens in ip_bind during the ipa_conn_t bind.
+ * Policy inheriting happpens in ip_policy_set once the destination is known.
  * Once the right policy is set on the conn_t, policy cannot change for
  * this socket. This makes life simpler for TCP (UDP ?) where
  * re-transmissions go out with the same policy. For symmetry, policy
@@ -513,7 +511,8 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * idl_tx_list in ips_idl_tx_list[] array. Then conn_drain_insert() is
  * called passing idl_tx_list. The connp gets inserted in a drain list
  * pointed to by idl_tx_list. conn_drain_list() asserts flow control for
- * the sockets (non stream based) and sets QFULL condition for conn_wq.
+ * the sockets (non stream based) and sets QFULL condition on the conn_wq
+ * of streams sockets, or the su_txqfull for non-streams sockets.
  * connp->conn_direct_blocked will be set to indicate the blocked
  * condition.
  *
@@ -521,46 +520,37 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * A cookie is passed in the call to ill_flow_enable() that identifies the
  * blocked Tx ring. This cookie is used to get to the idl_tx_list that
  * contains the blocked connp's. conn_walk_drain() uses the idl_tx_list_t
- * and goes through each of the drain list (q)enabling the conn_wq of the
- * first conn in each of the drain list. This causes ip_wsrv to run for the
+ * and goes through each conn in the drain list and calls conn_idl_remove
+ * for the conn to clear the qfull condition for the conn, as well as to
+ * remove the conn from the idl list. In addition, streams based sockets
+ * will have the conn_wq enabled, causing ip_wsrv to run for the
  * conn. ip_wsrv drains the queued messages, and removes the conn from the
- * drain list, if all messages were drained. It also qenables the next conn
- * in the drain list to continue the drain process.
+ * drain list, if all messages were drained. It also notifies the
+ * conn_upcalls for the conn to signal that flow-control has opened up.
  *
  * In reality the drain list is not a single list, but a configurable number
- * of lists. conn_drain_walk() in the IP module, qenables the first conn in
- * each list. If the ip_wsrv of the next qenabled conn does not run, because
- * the stream closes, ip_close takes responsibility to qenable the next conn
- * in the drain list. conn_drain_insert and conn_drain_tail are the only
+ * of lists. conn_walk_drain() in the IP module, notifies the conn_upcalls for
+ * each conn in the list. conn_drain_insert and conn_drain_tail are the only
  * functions that manipulate this drain list. conn_drain_insert is called in
- * ip_wput context itself (as opposed to from ip_wsrv context for STREAMS
+ * from the protocol layer when conn_ip_output returns EWOULDBLOCK.
+ * (as opposed to from ip_wsrv context for STREAMS
  * case -- see below). The synchronization between drain insertion and flow
  * control wakeup is handled by using idl_txl->txl_lock.
  *
  * Flow control using STREAMS:
  * When ILL_DIRECT_CAPABLE() is not TRUE, STREAMS flow control mechanism
  * is used. On the send side, if the packet cannot be sent down to the
- * driver by IP, because of a canput failure, IP does a putq on the conn_wq.
- * This will cause ip_wsrv to run on the conn_wq. ip_wsrv in turn, inserts
- * the conn in a list of conn's that need to be drained when the flow
- * control condition subsides. The blocked connps are put in first member
- * of ips_idl_tx_list[] array. Ultimately STREAMS backenables the ip_wsrv
- * on the IP module. It calls conn_walk_drain() passing ips_idl_tx_list[0].
- * ips_idl_tx_list[0] contains the drain lists of blocked conns. The
- * conn_wq of the first conn in the drain lists is (q)enabled to run.
- * ip_wsrv on this conn drains the queued messages, and removes the conn
- * from the drain list, if all messages were drained. It also qenables the
- * next conn in the drain list to continue the drain process.
+ * driver by IP, because of a canput failure, ip_xmit drops the packet
+ * and returns EWOULDBLOCK to the caller, who may then invoke
+ * ixa_check_drain_insert to insert the conn on the 0'th drain list.
+ * When ip_wsrv runs on the ill_wq because flow control has been relieved, the
+ * blocked conns in the * 0'th drain list is drained as with the
+ * non-STREAMS case.
  *
- * If the ip_wsrv of the next qenabled conn does not run, because the
- * stream closes, ip_close takes responsibility to qenable the next conn in
- * the drain list. The directly called ip_wput path always does a putq, if
- * it cannot putnext. Thus synchronization problems are handled between
- * ip_wsrv and ip_close. conn_drain_insert and conn_drain_tail are the only
- * functions that manipulate this drain list. Furthermore conn_drain_insert
- * is called only from ip_wsrv for the STREAMS case, and there can be only 1
- * instance of ip_wsrv running on a queue at any time. conn_drain_tail can
- * be simultaneously called from both ip_wsrv and ip_close.
+ * In both the STREAMS and non-STREAMS case, the sockfs upcall to set
+ * qfull is done when the conn is inserted into the drain list
+ * (conn_drain_insert()) and cleared when the conn is removed from the drain
+ * list (conn_idl_remove()).
  *
  * IPQOS notes:
  *
@@ -579,14 +569,13 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * By default all the callout positions are enabled.
  *
  * Outbound (local_out)
- * Hooks are placed in ip_wput_ire and ipsec_out_process.
+ * Hooks are placed in ire_send_wire_v4 and ire_send_wire_v6.
  *
  * Inbound (local_in)
- * Hooks are placed in ip_proto_input, icmp_inbound, ip_fanout_proto and
- * TCP and UDP fanout routines.
+ * Hooks are placed in ip_fanout_v4 and ip_fanout_v6.
  *
  * Forwarding (in and out)
- * Hooks are placed in ip_rput_forward.
+ * Hooks are placed in ire_recv_forward_v4/v6.
  *
  * IP Policy Framework processing (IPPF processing)
  * Policy processing for a packet is initiated by ip_process, which ascertains
@@ -595,16 +584,6 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * packet is acted upon by one or more IPQoS modules (action instances), per
  * filters configured in ipgpc and resumes normal IP processing thereafter.
  * An action instance can drop a packet in course of its processing.
- *
- * A boolean variable, ip_policy, is used in all the fanout routines that can
- * invoke ip_process for a packet. This variable indicates if the packet should
- * to be sent for policy processing. The variable is set to B_TRUE by default,
- * i.e. when the routines are invoked in the normal ip procesing path for a
- * packet. The two exceptions being ip_wput_local and icmp_inbound_error_fanout;
- * ip_policy is set to B_FALSE for all the routines called in these two
- * functions because, in the former case,  we don't process loopback traffic
- * currently while in the latter, the packets have already been processed in
- * icmp_inbound.
  *
  * Zones notes:
  *
@@ -638,24 +617,18 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * IRE_LOCAL				Exclusive (x)
  * IRE_LOOPBACK				Exclusive
  * IRE_PREFIX (net routes)		Shared (*)
- * IRE_CACHE				Exclusive
  * IRE_IF_NORESOLVER (interface routes)	Exclusive
  * IRE_IF_RESOLVER (interface routes)	Exclusive
+ * IRE_IF_CLONE (interface routes)	Exclusive
  * IRE_HOST (host routes)		Shared (*)
  *
  * (*) A zone can only use a default or off-subnet route if the gateway is
  * directly reachable from the zone, that is, if the gateway's address matches
  * one of the zone's logical interfaces.
  *
- * (x) IRE_LOCAL are handled a bit differently, since for all other entries
- * in ire_ctable and IRE_INTERFACE, ire_src_addr is what can be used as source
- * when sending packets using the IRE. For IRE_LOCAL ire_src_addr is the IP
- * address of the zone itself (the destination). Since IRE_LOCAL is used
- * for communication between zones, ip_wput_ire has special logic to set
- * the right source address when sending using an IRE_LOCAL.
- *
- * Furthermore, when ip_restrict_interzone_loopback is set (the default),
- * ire_cache_lookup restricts loopback using an IRE_LOCAL
+ * (x) IRE_LOCAL are handled a bit differently.
+ * When ip_restrict_interzone_loopback is set (the default),
+ * ire_route_recursive restricts loopback using an IRE_LOCAL
  * between zone to the case when L2 would have conceptually looped the packet
  * back, i.e. the loopback which is required since neither Ethernet drivers
  * nor Ethernet hardware loops them back. This is the case when the normal
@@ -669,17 +642,11 @@ void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
  * since some zones may not be on the 10.16.72/24 network. To handle this, each
  * zone has its own set of IRE_BROADCAST entries; then, broadcast packets are
  * sent to every zone that has an IRE_BROADCAST entry for the destination
- * address on the input ill, see conn_wantpacket().
+ * address on the input ill, see ip_input_broadcast().
  *
  * Applications in different zones can join the same multicast group address.
- * For IPv4, group memberships are per-logical interface, so they're already
- * inherently part of a zone. For IPv6, group memberships are per-physical
- * interface, so we distinguish IPv6 group memberships based on group address,
- * interface and zoneid. In both cases, received multicast packets are sent to
- * every zone for which a group membership entry exists. On IPv6 we need to
- * check that the target zone still has an address on the receiving physical
- * interface; it could have been removed since the application issued the
- * IPV6_JOIN_GROUP.
+ * The same logic applies for multicast as for broadcast. ip_input_multicast
+ * dispatches packets to all zones that have members on the physical interface.
  */
 
 /*
@@ -694,62 +661,37 @@ boolean_t	ip_squeue_fanout = 0;
  */
 uint_t ip_max_frag_dups = 10;
 
-#define	IS_SIMPLE_IPH(ipha)						\
-	((ipha)->ipha_version_and_hdr_length == IP_SIMPLE_HDR_VERSION)
-
 /* RFC 1122 Conformance */
 #define	IP_FORWARD_DEFAULT	IP_FORWARD_NEVER
 
 #define	ILL_MAX_NAMELEN			LIFNAMSIZ
 
-static int	conn_set_held_ipif(conn_t *, ipif_t **, ipif_t *);
-
 static int	ip_open(queue_t *q, dev_t *devp, int flag, int sflag,
 		    cred_t *credp, boolean_t isv6);
-static mblk_t	*ip_wput_attach_llhdr(mblk_t *, ire_t *, ip_proc_t, uint32_t,
-		    ipha_t **);
+static mblk_t	*ip_xmit_attach_llhdr(mblk_t *, nce_t *);
 
-static void	icmp_frag_needed(queue_t *, mblk_t *, int, zoneid_t,
-		    ip_stack_t *);
-static void	icmp_inbound(queue_t *, mblk_t *, boolean_t, ill_t *, int,
-		    uint32_t, boolean_t, boolean_t, ill_t *, zoneid_t);
-static ipaddr_t	icmp_get_nexthop_addr(ipha_t *, ill_t *, zoneid_t, mblk_t *mp);
-static boolean_t icmp_inbound_too_big(icmph_t *, ipha_t *, ill_t *, zoneid_t,
-		    mblk_t *, int, ip_stack_t *);
-static void	icmp_inbound_error_fanout(queue_t *, ill_t *, mblk_t *,
-		    icmph_t *, ipha_t *, int, int, boolean_t, boolean_t,
-		    ill_t *, zoneid_t);
+static boolean_t icmp_inbound_verify_v4(mblk_t *, icmph_t *, ip_recv_attr_t *);
+static void	icmp_inbound_too_big_v4(icmph_t *, ip_recv_attr_t *);
+static void	icmp_inbound_error_fanout_v4(mblk_t *, icmph_t *,
+    ip_recv_attr_t *);
 static void	icmp_options_update(ipha_t *);
-static void	icmp_param_problem(queue_t *, mblk_t *, uint8_t, zoneid_t,
-		    ip_stack_t *);
-static void	icmp_pkt(queue_t *, mblk_t *, void *, size_t, boolean_t,
-		    zoneid_t zoneid, ip_stack_t *);
-static mblk_t	*icmp_pkt_err_ok(mblk_t *, ip_stack_t *);
-static void	icmp_redirect(ill_t *, mblk_t *);
-static void	icmp_send_redirect(queue_t *, mblk_t *, ipaddr_t,
-		    ip_stack_t *);
+static void	icmp_param_problem(mblk_t *, uint8_t,  ip_recv_attr_t *);
+static void	icmp_pkt(mblk_t *, void *, size_t, ip_recv_attr_t *);
+static mblk_t	*icmp_pkt_err_ok(mblk_t *, ip_recv_attr_t *);
+static void	icmp_redirect_v4(mblk_t *mp, ipha_t *, icmph_t *,
+    ip_recv_attr_t *);
+static void	icmp_send_redirect(mblk_t *, ipaddr_t, ip_recv_attr_t *);
+static void	icmp_send_reply_v4(mblk_t *, ipha_t *, icmph_t *,
+    ip_recv_attr_t *);
 
-static void	ip_arp_news(queue_t *, mblk_t *);
-static boolean_t ip_bind_get_ire_v4(mblk_t **, ire_t *, iulp_t *, ip_stack_t *);
 mblk_t		*ip_dlpi_alloc(size_t, t_uscalar_t);
 char		*ip_dot_addr(ipaddr_t, char *);
 mblk_t		*ip_carve_mp(mblk_t **, ssize_t);
 int		ip_close(queue_t *, int);
 static char	*ip_dot_saddr(uchar_t *, char *);
-static void	ip_fanout_proto(queue_t *, mblk_t *, ill_t *, ipha_t *, uint_t,
-		    boolean_t, boolean_t, ill_t *, zoneid_t);
-static void	ip_fanout_tcp(queue_t *, mblk_t *, ill_t *, ipha_t *, uint_t,
-		    boolean_t, boolean_t, zoneid_t);
-static void	ip_fanout_udp(queue_t *, mblk_t *, ill_t *, ipha_t *, uint32_t,
-		    boolean_t, uint_t, boolean_t, boolean_t, ill_t *, zoneid_t);
 static void	ip_lrput(queue_t *, mblk_t *);
 ipaddr_t	ip_net_mask(ipaddr_t);
-void		ip_newroute(queue_t *, mblk_t *, ipaddr_t, conn_t *, zoneid_t,
-		    ip_stack_t *);
-static void	ip_newroute_ipif(queue_t *, mblk_t *, ipif_t *, ipaddr_t,
-		    conn_t *, uint32_t, zoneid_t, ip_opt_info_t *);
 char		*ip_nv_lookup(nv_t *, int);
-static boolean_t	ip_check_for_ipsec_opt(queue_t *, mblk_t *);
 static int	ip_param_get(queue_t *, mblk_t *, caddr_t, cred_t *);
 static int	ip_param_generic_get(queue_t *, mblk_t *, caddr_t, cred_t *);
 static boolean_t	ip_param_register(IDP *ndp, ipparam_t *, size_t,
@@ -758,17 +700,6 @@ static int	ip_param_set(queue_t *, mblk_t *, char *, caddr_t, cred_t *);
 void	ip_rput(queue_t *, mblk_t *);
 static void	ip_rput_dlpi_writer(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp,
 		    void *dummy_arg);
-void	ip_rput_forward(ire_t *, ipha_t *, mblk_t *, ill_t *);
-static int	ip_rput_forward_options(mblk_t *, ipha_t *, ire_t *,
-    ip_stack_t *);
-static boolean_t	ip_rput_local_options(queue_t *, mblk_t *, ipha_t *,
-			    ire_t *, ip_stack_t *);
-static boolean_t	ip_rput_multimblk_ipoptions(queue_t *, ill_t *,
-			    mblk_t *, ipha_t **, ipaddr_t *, ip_stack_t *);
-static int	ip_rput_options(queue_t *, mblk_t *, ipha_t *, ipaddr_t *,
-    ip_stack_t *);
-static boolean_t ip_rput_fragment(ill_t *, ill_t *, mblk_t **, ipha_t *,
-    uint32_t *, uint16_t *);
 int		ip_snmp_get(queue_t *, mblk_t *, int);
 static mblk_t	*ip_snmp_get_mib2_ip(queue_t *, mblk_t *,
 		    mib2_ipIfStatsEntry_t *, ip_stack_t *);
@@ -801,49 +732,34 @@ static mblk_t	*ip_snmp_get_mib2_ip6_route_media(queue_t *, mblk_t *, int,
 		    ip_stack_t *ipst);
 static void	ip_snmp_get2_v4(ire_t *, iproutedata_t *);
 static void	ip_snmp_get2_v6_route(ire_t *, iproutedata_t *);
-static int	ip_snmp_get2_v6_media(nce_t *, iproutedata_t *);
+static int	ip_snmp_get2_v4_media(ncec_t *, iproutedata_t *);
+static int	ip_snmp_get2_v6_media(ncec_t *, iproutedata_t *);
 int		ip_snmp_set(queue_t *, int, int, uchar_t *, int);
-static boolean_t	ip_source_routed(ipha_t *, ip_stack_t *);
-static boolean_t	ip_source_route_included(ipha_t *);
-static void	ip_trash_ire_reclaim_stack(ip_stack_t *);
 
-static void	ip_wput_frag(ire_t *, mblk_t *, ip_pkt_t, uint32_t, uint32_t,
-		    zoneid_t, ip_stack_t *, conn_t *);
-static mblk_t	*ip_wput_frag_copyhdr(uchar_t *, int, int, ip_stack_t *,
+static mblk_t	*ip_fragment_copyhdr(uchar_t *, int, int, ip_stack_t *,
 		    mblk_t *);
-static void	ip_wput_local_options(ipha_t *, ip_stack_t *);
-static int	ip_wput_options(queue_t *, mblk_t *, ipha_t *, boolean_t,
-		    zoneid_t, ip_stack_t *);
 
 static void	conn_drain_init(ip_stack_t *);
 static void	conn_drain_fini(ip_stack_t *);
 static void	conn_drain_tail(conn_t *connp, boolean_t closing);
 
 static void	conn_walk_drain(ip_stack_t *, idl_tx_list_t *);
-static void	conn_setqfull(conn_t *);
-static void	conn_clrqfull(conn_t *);
+static void	conn_walk_sctp(pfv_t, void *, zoneid_t, netstack_t *);
 
 static void	*ip_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ip_stack_shutdown(netstackid_t stackid, void *arg);
 static void	ip_stack_fini(netstackid_t stackid, void *arg);
 
-static boolean_t	conn_wantpacket(conn_t *, ill_t *, ipha_t *, int,
-    zoneid_t);
-static void	ip_arp_done(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp,
-    void *dummy_arg);
-
 static int	ip_forward_set(queue_t *, mblk_t *, char *, caddr_t, cred_t *);
 
 static int	ip_multirt_apply_membership(int (*fn)(conn_t *, boolean_t,
-    ipaddr_t, ipaddr_t, uint_t *, mcast_record_t, ipaddr_t, mblk_t *), ire_t *,
-    conn_t *, boolean_t, ipaddr_t, mcast_record_t, ipaddr_t, mblk_t *);
-static void	ip_multirt_bad_mtu(ire_t *, uint32_t);
+    const in6_addr_t *, ipaddr_t, uint_t, mcast_record_t, const in6_addr_t *),
+    ire_t *, conn_t *, boolean_t, const in6_addr_t *,  mcast_record_t,
+    const in6_addr_t *);
 
 static int	ip_cgtp_filter_get(queue_t *, mblk_t *, caddr_t, cred_t *);
 static int	ip_cgtp_filter_set(queue_t *, mblk_t *, char *,
     caddr_t, cred_t *);
-extern int	ip_helper_stream_setup(queue_t *, dev_t *, int, int,
-    cred_t *, boolean_t);
 static int	ip_input_proc_set(queue_t *q, mblk_t *mp, char *value,
     caddr_t cp, cred_t *cr);
 static int	ip_int_set(queue_t *, mblk_t *, char *, caddr_t,
@@ -859,29 +775,14 @@ static int	icmp_kstat_update(kstat_t *kp, int rw);
 static void	*ip_kstat2_init(netstackid_t, ip_stat_t *);
 static void	ip_kstat2_fini(netstackid_t, kstat_t *);
 
-static mblk_t	*ip_tcp_input(mblk_t *, ipha_t *, ill_t *, boolean_t,
-    ire_t *, mblk_t *, uint_t, queue_t *, ill_rx_ring_t *);
+static void	ipobs_init(ip_stack_t *);
+static void	ipobs_fini(ip_stack_t *);
 
-static void	ip_rput_process_forward(queue_t *, mblk_t *, ire_t *,
-    ipha_t *, ill_t *, boolean_t, boolean_t);
-
-static void ipobs_init(ip_stack_t *);
-static void ipobs_fini(ip_stack_t *);
 ipaddr_t	ip_g_all_ones = IP_HOST_MASK;
 
 /* How long, in seconds, we allow frags to hang around. */
 #define	IP_FRAG_TIMEOUT		15
 #define	IPV6_FRAG_TIMEOUT	60
-
-/*
- * Threshold which determines whether MDT should be used when
- * generating IP fragments; payload size must be greater than
- * this threshold for MDT to take place.
- */
-#define	IP_WPUT_FRAG_MDT_MIN	32768
-
-/* Setable in /etc/system only */
-int	ip_wput_frag_mdt_min = IP_WPUT_FRAG_MDT_MIN;
 
 static long ip_rput_pullups;
 int	dohwcksum = 1;	/* use h/w cksum if supported by the hardware */
@@ -891,22 +792,10 @@ vmem_t *ip_minor_arena_la; /* for minor nos. from 2^^18 thru 2^^32-1 */
 
 int	ip_debug;
 
-#ifdef DEBUG
-uint32_t ipsechw_debug = 0;
-#endif
-
 /*
  * Multirouting/CGTP stuff
  */
 int	ip_cgtp_filter_rev = CGTP_FILTER_REV;	/* CGTP hooks version */
-
-/*
- * XXX following really should only be in a header. Would need more
- * header and .c clean up first.
- */
-extern optdb_obj_t	ip_opt_obj;
-
-ulong_t ip_squeue_enter_unbound = 0;
 
 /*
  * Named Dispatch Parameter Table.
@@ -922,18 +811,18 @@ static ipparam_t	lcl_param_arr[] = {
 	{  0,	1,	1,	"ip_send_redirects"},
 	{  0,	1,	0,	"ip_forward_directed_broadcasts"},
 	{  0,	10,	0,	"ip_mrtdebug"},
-	{  5000, 999999999,	60000, "ip_ire_timer_interval" },
-	{  60000, 999999999,	1200000, "ip_ire_arp_interval" },
-	{  60000, 999999999,	60000, "ip_ire_redirect_interval" },
+	{  1,	8,	3,	"ip_ire_reclaim_fraction" },
+	{  1,	8,	3,	"ip_nce_reclaim_fraction" },
+	{  1,	8,	3,	"ip_dce_reclaim_fraction" },
 	{  1,	255,	255,	"ip_def_ttl" },
 	{  0,	1,	0,	"ip_forward_src_routed"},
 	{  0,	256,	32,	"ip_wroff_extra" },
-	{  5000, 999999999, 600000, "ip_ire_pathmtu_interval" },
+	{  2, 999999999, 60*20, "ip_pathmtu_interval" },	/* In seconds */
 	{  8,	65536,  64,	"ip_icmp_return_data_bytes" },
 	{  0,	1,	1,	"ip_path_mtu_discovery" },
-	{  0,	240,	30,	"ip_ignore_delete_time" },
+	{ 68,	65535,	576,	"ip_pmtu_min" },
 	{  0,	1,	0,	"ip_ignore_redirect" },
-	{  0,	1,	1,	"ip_output_queue" },
+	{  0,	1,	0,	"ip_arp_icmp_error" },
 	{  1,	254,	1,	"ip_broadcast_ttl" },
 	{  0,	99999,	100,	"ip_icmp_err_interval" },
 	{  1,	99999,	10,	"ip_icmp_err_burst" },
@@ -955,7 +844,7 @@ static ipparam_t	lcl_param_arr[] = {
 	{  0,	1,	0,	"ip6_ignore_redirect" },
 	{  0,	1,	0,	"ip6_strict_dst_multihoming" },
 
-	{  1,	8,	3,	"ip_ire_reclaim_fraction" },
+	{  0,	2,	2,	"ip_src_check" },
 
 	{  0,	999999,	1000,	"ipsec_policy_log_interval" },
 
@@ -964,12 +853,16 @@ static ipparam_t	lcl_param_arr[] = {
 	{  1,	20,	3,	"ip_ndp_unsolicit_count" },
 	{  0,	1,	1,	"ip6_ignore_home_address_opt" },
 	{  0,	15,	0,	"ip_policy_mask" },
-	{  1000, 60000, 1000,	"ip_multirt_resolution_interval" },
+	{  0,	2,	2,	"ip_ecmp_behavior" },
 	{  0,	255,	1,	"ip_multirt_ttl" },
-	{  0,	1,	1,	"ip_multidata_outbound" },
-	{  0,	3600000, 300000, "ip_ndp_defense_interval" },
+	{  0,	3600,	60,	"ip_ire_badcnt_lifetime" },	/* In seconds */
 	{  0,	999999,	60*60*24, "ip_max_temp_idle" },
 	{  0,	1000,	1,	"ip_max_temp_defend" },
+	/*
+	 * when a conflict of an active address is detected,
+	 * defend up to ip_max_defend times, within any
+	 * ip_defend_interval span.
+	 */
 	{  0,	1000,	3,	"ip_max_defend" },
 	{  0,	999999,	30,	"ip_defend_interval" },
 	{  0,	3600000, 300000, "ip_dup_recovery" },
@@ -977,12 +870,45 @@ static ipparam_t	lcl_param_arr[] = {
 	{  0,	1,	1,	"ip_lso_outbound" },
 	{  IGMP_V1_ROUTER, IGMP_V3_ROUTER, IGMP_V3_ROUTER, "igmp_max_version" },
 	{  MLD_V1_ROUTER, MLD_V2_ROUTER, MLD_V2_ROUTER, "mld_max_version" },
-	{ 68,	65535,	576,	"ip_pmtu_min" },
 #ifdef DEBUG
 	{  0,	1,	0,	"ip6_drop_inbound_icmpv6" },
 #else
 	{  0,	0,	0,	"" },
 #endif
+	/* delay before sending first probe: */
+	{  0,	20000,	1000,	"arp_probe_delay" },
+	{  0,	20000,	100,	"arp_fastprobe_delay" },
+	/* interval at which DAD probes are sent: */
+	{ 10,	20000,	1500,	"arp_probe_interval" },
+	{ 10,	20000,	150,	"arp_fastprobe_interval" },
+	/* setting probe count to 0 will disable ARP probing for DAD. */
+	{  0,	20,	3,	"arp_probe_count" },
+	{  0,	20,	3,	"arp_fastprobe_count" },
+
+	{  0,	3600000, 15000,	"ipv4_dad_announce_interval"},
+	{  0,	3600000, 15000,	"ipv6_dad_announce_interval"},
+	/*
+	 * Rate limiting parameters for DAD defense used in
+	 * ill_defend_rate_limit():
+	 * defend_rate : pkts/hour permitted
+	 * defend_interval : time that can elapse before we send out a
+	 *			DAD defense.
+	 * defend_period: denominator for defend_rate (in seconds).
+	 */
+	{  0,	3600000, 300000,	"arp_defend_interval"},
+	{  0,	20000, 100,		"arp_defend_rate"},
+	{  0,	3600000, 300000,	"ndp_defend_interval"},
+	{  0,	20000, 100,		"ndp_defend_rate"},
+	{  5,	86400,	3600,		"arp_defend_period"},
+	{  5,	86400,	3600,		"ndp_defend_period"},
+	{  0,	1,	1,		"ipv4_icmp_return_pmtu" },
+	{  0,	1,	1,		"ipv6_icmp_return_pmtu" },
+	/*
+	 * publish count/interval values used to announce local addresses
+	 * for IPv4, IPv6.
+	 */
+	{  1,	20,	5,	"ip_arp_publish_count" },
+	{  1000, 20000,	2000,	"ip_arp_publish_interval" },
 };
 
 /*
@@ -1336,11 +1262,11 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 			ip_sioctl_get_lifsrcof, NULL },
 	/* 178 */ { SIOCGMSFILTER, sizeof (struct group_filter), IPI_GET_CMD,
 			MSFILT_CMD, ip_sioctl_msfilter, NULL },
-	/* 179 */ { SIOCSMSFILTER, sizeof (struct group_filter), IPI_WR,
+	/* 179 */ { SIOCSMSFILTER, sizeof (struct group_filter), 0,
 			MSFILT_CMD, ip_sioctl_msfilter, NULL },
 	/* 180 */ { SIOCGIPMSFILTER, sizeof (struct ip_msfilter), IPI_GET_CMD,
 			MSFILT_CMD, ip_sioctl_msfilter, NULL },
-	/* 181 */ { SIOCSIPMSFILTER, sizeof (struct ip_msfilter), IPI_WR,
+	/* 181 */ { SIOCSIPMSFILTER, sizeof (struct ip_msfilter), 0,
 			MSFILT_CMD, ip_sioctl_msfilter, NULL },
 	/* 182 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 	/* SIOCSENABLESDP is handled by SDP */
@@ -1355,12 +1281,12 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 int ip_ndx_ioctl_count = sizeof (ip_ndx_ioctl_table) / sizeof (ip_ioctl_cmd_t);
 
 ip_ioctl_cmd_t ip_misc_ioctl_table[] = {
-	{ I_LINK,	0, IPI_PRIV | IPI_WR | IPI_PASS_DOWN, 0, NULL, NULL },
-	{ I_UNLINK,	0, IPI_PRIV | IPI_WR | IPI_PASS_DOWN, 0, NULL, NULL },
-	{ I_PLINK,	0, IPI_PRIV | IPI_WR | IPI_PASS_DOWN, 0, NULL, NULL },
-	{ I_PUNLINK,	0, IPI_PRIV | IPI_WR | IPI_PASS_DOWN, 0, NULL, NULL },
-	{ ND_GET,	0, IPI_PASS_DOWN, 0, NULL, NULL },
-	{ ND_SET,	0, IPI_PRIV | IPI_WR | IPI_PASS_DOWN, 0, NULL, NULL },
+	{ I_LINK,	0, IPI_PRIV | IPI_WR, 0, NULL, NULL },
+	{ I_UNLINK,	0, IPI_PRIV | IPI_WR, 0, NULL, NULL },
+	{ I_PLINK,	0, IPI_PRIV | IPI_WR, 0, NULL, NULL },
+	{ I_PUNLINK,	0, IPI_PRIV | IPI_WR, 0, NULL, NULL },
+	{ ND_GET,	0, 0, 0, NULL, NULL },
+	{ ND_SET,	0, IPI_PRIV | IPI_WR, 0, NULL, NULL },
 	{ IP_IOCTL,	0, 0, 0, NULL, NULL },
 	{ SIOCGETVIFCNT, sizeof (struct sioc_vif_req), IPI_GET_CMD,
 		MISC_CMD, mrt_ioctl},
@@ -1384,12 +1310,14 @@ static nv_t	ire_nv_arr[] = {
 	{ IRE_BROADCAST, "BROADCAST" },
 	{ IRE_LOCAL, "LOCAL" },
 	{ IRE_LOOPBACK, "LOOPBACK" },
-	{ IRE_CACHE, "CACHE" },
 	{ IRE_DEFAULT, "DEFAULT" },
 	{ IRE_PREFIX, "PREFIX" },
 	{ IRE_IF_NORESOLVER, "IF_NORESOL" },
 	{ IRE_IF_RESOLVER, "IF_RESOLV" },
+	{ IRE_IF_CLONE, "IF_CLONE" },
 	{ IRE_HOST, "HOST" },
+	{ IRE_MULTICAST, "MULTICAST" },
+	{ IRE_NOROUTE, "NOROUTE" },
 	{ 0 }
 };
 
@@ -1412,7 +1340,6 @@ struct module_info ip_mod_info = {
 
 /*
  * Entry points for IP as a device and as a module.
- * FIXME: down the road we might want a separate module and driver qinit.
  * We have separate open functions for the /dev/ip and /dev/ip6 devices.
  */
 static struct qinit iprinitv4 = {
@@ -1425,13 +1352,8 @@ struct qinit iprinitv6 = {
 	&ip_mod_info
 };
 
-static struct qinit ipwinitv4 = {
-	(pfi_t)ip_wput, (pfi_t)ip_wsrv, NULL, NULL, NULL,
-	&ip_mod_info
-};
-
-struct qinit ipwinitv6 = {
-	(pfi_t)ip_wput_v6, (pfi_t)ip_wsrv, NULL, NULL, NULL,
+static struct qinit ipwinit = {
+	(pfi_t)ip_wput_nondata, (pfi_t)ip_wsrv, NULL, NULL, NULL,
 	&ip_mod_info
 };
 
@@ -1447,98 +1369,32 @@ static struct qinit iplwinit = {
 
 /* For AF_INET aka /dev/ip */
 struct streamtab ipinfov4 = {
-	&iprinitv4, &ipwinitv4, &iplrinit, &iplwinit
+	&iprinitv4, &ipwinit, &iplrinit, &iplwinit
 };
 
 /* For AF_INET6 aka /dev/ip6 */
 struct streamtab ipinfov6 = {
-	&iprinitv6, &ipwinitv6, &iplrinit, &iplwinit
+	&iprinitv6, &ipwinit, &iplrinit, &iplwinit
 };
 
 #ifdef	DEBUG
-static boolean_t skip_sctp_cksum = B_FALSE;
+boolean_t skip_sctp_cksum = B_FALSE;
 #endif
 
 /*
- * Prepend the zoneid using an ipsec_out_t for later use by functions like
- * ip_rput_v6(), ip_output(), etc.  If the message
- * block already has a M_CTL at the front of it, then simply set the zoneid
- * appropriately.
+ * Generate an ICMP fragmentation needed message.
+ * When called from ip_output side a minimal ip_recv_attr_t needs to be
+ * constructed by the caller.
  */
-mblk_t *
-ip_prepend_zoneid(mblk_t *mp, zoneid_t zoneid, ip_stack_t *ipst)
-{
-	mblk_t		*first_mp;
-	ipsec_out_t	*io;
-
-	ASSERT(zoneid != ALL_ZONES);
-	if (mp->b_datap->db_type == M_CTL) {
-		io = (ipsec_out_t *)mp->b_rptr;
-		ASSERT(io->ipsec_out_type == IPSEC_OUT);
-		io->ipsec_out_zoneid = zoneid;
-		return (mp);
-	}
-
-	first_mp = ipsec_alloc_ipsec_out(ipst->ips_netstack);
-	if (first_mp == NULL)
-		return (NULL);
-	io = (ipsec_out_t *)first_mp->b_rptr;
-	/* This is not a secure packet */
-	io->ipsec_out_secure = B_FALSE;
-	io->ipsec_out_zoneid = zoneid;
-	first_mp->b_cont = mp;
-	return (first_mp);
-}
-
-/*
- * Copy an M_CTL-tagged message, preserving reference counts appropriately.
- */
-mblk_t *
-ip_copymsg(mblk_t *mp)
-{
-	mblk_t *nmp;
-	ipsec_info_t *in;
-
-	if (mp->b_datap->db_type != M_CTL)
-		return (copymsg(mp));
-
-	in = (ipsec_info_t *)mp->b_rptr;
-
-	/*
-	 * Note that M_CTL is also used for delivering ICMP error messages
-	 * upstream to transport layers.
-	 */
-	if (in->ipsec_info_type != IPSEC_OUT &&
-	    in->ipsec_info_type != IPSEC_IN)
-		return (copymsg(mp));
-
-	nmp = copymsg(mp->b_cont);
-
-	if (in->ipsec_info_type == IPSEC_OUT) {
-		return (ipsec_out_tag(mp, nmp,
-		    ((ipsec_out_t *)in)->ipsec_out_ns));
-	} else {
-		return (ipsec_in_tag(mp, nmp,
-		    ((ipsec_in_t *)in)->ipsec_in_ns));
-	}
-}
-
-/* Generate an ICMP fragmentation needed message. */
-static void
-icmp_frag_needed(queue_t *q, mblk_t *mp, int mtu, zoneid_t zoneid,
-    ip_stack_t *ipst)
+void
+icmp_frag_needed(mblk_t *mp, int mtu, ip_recv_attr_t *ira)
 {
 	icmph_t	icmph;
-	mblk_t *first_mp;
-	boolean_t mctl_present;
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
 
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-
-	if (!(mp = icmp_pkt_err_ok(mp, ipst))) {
-		if (mctl_present)
-			freeb(first_mp);
+	mp = icmp_pkt_err_ok(mp, ira);
+	if (mp == NULL)
 		return;
-	}
 
 	bzero(&icmph, sizeof (icmph_t));
 	icmph.icmph_type = ICMP_DEST_UNREACHABLE;
@@ -1546,29 +1402,29 @@ icmp_frag_needed(queue_t *q, mblk_t *mp, int mtu, zoneid_t zoneid,
 	icmph.icmph_du_mtu = htons((uint16_t)mtu);
 	BUMP_MIB(&ipst->ips_icmp_mib, icmpOutFragNeeded);
 	BUMP_MIB(&ipst->ips_icmp_mib, icmpOutDestUnreachs);
-	icmp_pkt(q, first_mp, &icmph, sizeof (icmph_t), mctl_present, zoneid,
-	    ipst);
+
+	icmp_pkt(mp, &icmph, sizeof (icmph_t), ira);
 }
 
 /*
- * icmp_inbound deals with ICMP messages in the following ways.
+ * icmp_inbound_v4 deals with ICMP messages that are handled by IP.
+ * If the ICMP message is consumed by IP, i.e., it should not be delivered
+ * to any IPPROTO_ICMP raw sockets, then it returns NULL.
+ * Likewise, if the ICMP error is misformed (too short, etc), then it
+ * returns NULL. The caller uses this to determine whether or not to send
+ * to raw sockets.
  *
+ * All error messages are passed to the matching transport stream.
+ *
+ * The following cases are handled by icmp_inbound:
  * 1) It needs to send a reply back and possibly delivering it
  *    to the "interested" upper clients.
- * 2) It needs to send it to the upper clients only.
+ * 2) Return the mblk so that the caller can pass it to the RAW socket clients.
  * 3) It needs to change some values in IP only.
- * 4) It needs to change some values in IP and upper layers e.g TCP.
+ * 4) It needs to change some values in IP and upper layers e.g TCP
+ *    by delivering an error to the upper layers.
  *
- * We need to accomodate icmp messages coming in clear until we get
- * everything secure from the wire. If icmp_accept_clear_messages
- * is zero we check with the global policy and act accordingly. If
- * it is non-zero, we accept the message without any checks. But
- * *this does not mean* that this will be delivered to the upper
- * clients. By accepting we might send replies back, change our MTU
- * value etc. but delivery to the ULP/clients depends on their policy
- * dispositions.
- *
- * We handle the above 4 cases in the context of IPsec in the
+ * We handle the above three cases in the context of IPsec in the
  * following way :
  *
  * 1) Send the reply back in the same way as the request came in.
@@ -1610,13 +1466,13 @@ icmp_frag_needed(queue_t *q, mblk_t *mp, int mtu, zoneid_t zoneid,
  *	     come to a stop. This is solved by making similar decisions
  *	     at both levels. Currently, when we are unable to deliver
  *	     to the Upper Layer (due to policy failures) while IP has
- *	     adjusted ire_max_frag, the next outbound datagram would
+ *	     adjusted dce_pmtu, the next outbound datagram would
  *	     generate a local ICMP_FRAGMENTATION_NEEDED message - which
  *	     will be with the right level of protection. Thus the right
  *	     value will be communicated even if we are not able to
  *	     communicate when we get from the wire initially. But this
  *	     assumes there would be at least one outbound datagram after
- *	     IP has adjusted its ire_max_frag value. To make things
+ *	     IP has adjusted its dce_pmtu value. To make things
  *	     simpler, we accept in clear after the validation of
  *	     AH/ESP headers.
  *
@@ -1627,105 +1483,54 @@ icmp_frag_needed(queue_t *q, mblk_t *mp, int mtu, zoneid_t zoneid,
  *	     should be accepted in clear when the Upper layer expects secure.
  *	     Thus the communication may get aborted by some bad ICMP
  *	     packets.
- *
- * IPQoS Notes:
- * The only instance when a packet is sent for processing is when there
- * isn't an ICMP client and if we are interested in it.
- * If there is a client, IPPF processing will take place in the
- * ip_fanout_proto routine.
- *
- * Zones notes:
- * The packet is only processed in the context of the specified zone: typically
- * only this zone will reply to an echo request, and only interested clients in
- * this zone will receive a copy of the packet. This means that the caller must
- * call icmp_inbound() for each relevant zone.
  */
-static void
-icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
-    int sum_valid, uint32_t sum, boolean_t mctl_present, boolean_t ip_policy,
-    ill_t *recv_ill, zoneid_t zoneid)
+mblk_t *
+icmp_inbound_v4(mblk_t *mp, ip_recv_attr_t *ira)
 {
-	icmph_t	*icmph;
-	ipha_t	*ipha;
-	int	iph_hdr_length;
-	int	hdr_length;
+	icmph_t		*icmph;
+	ipha_t		*ipha;		/* Outer header */
+	int		ip_hdr_length;	/* Outer header length */
 	boolean_t	interested;
+	ipif_t		*ipif;
 	uint32_t	ts;
-	uchar_t	*wptr;
-	ipif_t	*ipif;
-	mblk_t *first_mp;
-	ipsec_in_t *ii;
-	timestruc_t now;
-	uint32_t ill_index;
-	ip_stack_t *ipst;
-
-	ASSERT(ill != NULL);
-	ipst = ill->ill_ipst;
-
-	first_mp = mp;
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		ASSERT(mp != NULL);
-	}
+	uint32_t	*tsp;
+	timestruc_t	now;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	zoneid_t	zoneid = ira->ira_zoneid;
+	int		len_needed;
+	mblk_t		*mp_ret = NULL;
 
 	ipha = (ipha_t *)mp->b_rptr;
-	if (ipst->ips_icmp_accept_clear_messages == 0) {
-		first_mp = ipsec_check_global_policy(first_mp, NULL,
-		    ipha, NULL, mctl_present, ipst->ips_netstack);
-		if (first_mp == NULL)
-			return;
-	}
-
-	/*
-	 * On a labeled system, we have to check whether the zone itself is
-	 * permitted to receive raw traffic.
-	 */
-	if (is_system_labeled()) {
-		if (zoneid == ALL_ZONES)
-			zoneid = tsol_packet_to_zoneid(mp);
-		if (!tsol_can_accept_raw(mp, B_FALSE)) {
-			ip1dbg(("icmp_inbound: zone %d can't receive raw",
-			    zoneid));
-			BUMP_MIB(&ipst->ips_icmp_mib, icmpInErrors);
-			freemsg(first_mp);
-			return;
-		}
-	}
-
-	/*
-	 * We have accepted the ICMP message. It means that we will
-	 * respond to the packet if needed. It may not be delivered
-	 * to the upper client depending on the policy constraints
-	 * and the disposition in ipsec_inbound_accept_clear.
-	 */
-
-	ASSERT(ill != NULL);
 
 	BUMP_MIB(&ipst->ips_icmp_mib, icmpInMsgs);
-	iph_hdr_length = IPH_HDR_LENGTH(ipha);
-	if ((mp->b_wptr - mp->b_rptr) < (iph_hdr_length + ICMPH_SIZE)) {
-		/* Last chance to get real. */
-		if (!pullupmsg(mp, iph_hdr_length + ICMPH_SIZE)) {
-			BUMP_MIB(&ipst->ips_icmp_mib, icmpInErrors);
-			freemsg(first_mp);
-			return;
+
+	ip_hdr_length = ira->ira_ip_hdr_length;
+	if ((mp->b_wptr - mp->b_rptr) < (ip_hdr_length + ICMPH_SIZE)) {
+		if (ira->ira_pktlen < (ip_hdr_length + ICMPH_SIZE)) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTruncatedPkts);
+			ip_drop_input("ipIfStatsInTruncatedPkts", mp, ill);
+			freemsg(mp);
+			return (NULL);
 		}
-		/* Refresh iph following the pullup. */
-		ipha = (ipha_t *)mp->b_rptr;
+		/* Last chance to get real. */
+		ipha = ip_pullup(mp, ip_hdr_length + ICMPH_SIZE, ira);
+		if (ipha == NULL) {
+			BUMP_MIB(&ipst->ips_icmp_mib, icmpInErrors);
+			freemsg(mp);
+			return (NULL);
+		}
 	}
-	/* ICMP header checksum, including checksum field, should be zero. */
-	if (sum_valid ? (sum != 0 && sum != 0xFFFF) :
-	    IP_CSUM(mp, iph_hdr_length, 0)) {
-		BUMP_MIB(&ipst->ips_icmp_mib, icmpInCksumErrs);
-		freemsg(first_mp);
-		return;
-	}
+
 	/* The IP header will always be a multiple of four bytes */
-	icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-	ip2dbg(("icmp_inbound: type %d code %d\n", icmph->icmph_type,
+	icmph = (icmph_t *)&mp->b_rptr[ip_hdr_length];
+	ip2dbg(("icmp_inbound_v4: type %d code %d\n", icmph->icmph_type,
 	    icmph->icmph_code));
-	wptr = (uchar_t *)icmph + ICMPH_SIZE;
-	/* We will set "interested" to "true" if we want a copy */
+
+	/*
+	 * We will set "interested" to "true" if we should pass a copy to
+	 * the transport or if we handle the packet locally.
+	 */
 	interested = B_FALSE;
 	switch (icmph->icmph_type) {
 	case ICMP_ECHO_REPLY:
@@ -1753,18 +1558,42 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 		 * (what isn't?).  We aim to please, you pick it.
 		 * Default is do it.
 		 */
-		if (!broadcast && !CLASSD(ipha->ipha_dst)) {
-			/* unicast: always respond */
-			interested = B_TRUE;
-		} else if (CLASSD(ipha->ipha_dst)) {
+		if (ira->ira_flags & IRAF_MULTICAST) {
 			/* multicast: respond based on tunable */
 			interested = ipst->ips_ip_g_resp_to_echo_mcast;
-		} else if (broadcast) {
+		} else if (ira->ira_flags & IRAF_BROADCAST) {
 			/* broadcast: respond based on tunable */
 			interested = ipst->ips_ip_g_resp_to_echo_bcast;
+		} else {
+			/* unicast: always respond */
+			interested = B_TRUE;
 		}
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpInEchos);
-		break;
+		if (!interested) {
+			/* We never pass these to RAW sockets */
+			freemsg(mp);
+			return (NULL);
+		}
+
+		/* Check db_ref to make sure we can modify the packet. */
+		if (mp->b_datap->db_ref > 1) {
+			mblk_t	*mp1;
+
+			mp1 = copymsg(mp);
+			freemsg(mp);
+			if (!mp1) {
+				BUMP_MIB(&ipst->ips_icmp_mib, icmpOutDrops);
+				return (NULL);
+			}
+			mp = mp1;
+			ipha = (ipha_t *)mp->b_rptr;
+			icmph = (icmph_t *)&mp->b_rptr[ip_hdr_length];
+		}
+		icmph->icmph_type = ICMP_ECHO_REPLY;
+		BUMP_MIB(&ipst->ips_icmp_mib, icmpOutEchoReps);
+		icmp_send_reply_v4(mp, ipha, icmph, ira);
+		return (NULL);
+
 	case ICMP_ROUTER_ADVERTISEMENT:
 	case ICMP_ROUTER_SOLICITATION:
 		break;
@@ -1778,134 +1607,52 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 		break;
 	case ICMP_TIME_STAMP_REQUEST:
 		/* Response to Time Stamp Requests is local policy. */
-		if (ipst->ips_ip_g_resp_to_timestamp &&
-		    /* So is whether to respond if it was an IP broadcast. */
-		    (!broadcast || ipst->ips_ip_g_resp_to_timestamp_bcast)) {
-			int tstamp_len = 3 * sizeof (uint32_t);
+		if (ipst->ips_ip_g_resp_to_timestamp) {
+			if (ira->ira_flags & IRAF_MULTIBROADCAST)
+				interested =
+				    ipst->ips_ip_g_resp_to_timestamp_bcast;
+			else
+				interested = B_TRUE;
+		}
+		if (!interested) {
+			/* We never pass these to RAW sockets */
+			freemsg(mp);
+			return (NULL);
+		}
 
-			if (wptr +  tstamp_len > mp->b_wptr) {
-				if (!pullupmsg(mp, wptr + tstamp_len -
-				    mp->b_rptr)) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(first_mp);
-					return;
-				}
-				/* Refresh ipha following the pullup. */
-				ipha = (ipha_t *)mp->b_rptr;
-				icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-				wptr = (uchar_t *)icmph + ICMPH_SIZE;
+		/* Make sure we have enough of the packet */
+		len_needed = ip_hdr_length + ICMPH_SIZE +
+		    3 * sizeof (uint32_t);
+
+		if (mp->b_wptr - mp->b_rptr < len_needed) {
+			ipha = ip_pullup(mp, len_needed, ira);
+			if (ipha == NULL) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				ip_drop_input("ipIfStatsInDiscards - ip_pullup",
+				    mp, ill);
+				freemsg(mp);
+				return (NULL);
 			}
-			interested = B_TRUE;
+			/* Refresh following the pullup. */
+			icmph = (icmph_t *)&mp->b_rptr[ip_hdr_length];
 		}
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpInTimestamps);
-		break;
-	case ICMP_TIME_STAMP_REPLY:
-		BUMP_MIB(&ipst->ips_icmp_mib, icmpInTimestampReps);
-		break;
-	case ICMP_INFO_REQUEST:
-		/* Per RFC 1122 3.2.2.7, ignore this. */
-	case ICMP_INFO_REPLY:
-		break;
-	case ICMP_ADDRESS_MASK_REQUEST:
-		if ((ipst->ips_ip_respond_to_address_mask_broadcast ||
-		    !broadcast) &&
-		    /* TODO m_pullup of complete header? */
-		    (mp->b_datap->db_lim - wptr) >= IP_ADDR_LEN) {
-			interested = B_TRUE;
-		}
-		BUMP_MIB(&ipst->ips_icmp_mib, icmpInAddrMasks);
-		break;
-	case ICMP_ADDRESS_MASK_REPLY:
-		BUMP_MIB(&ipst->ips_icmp_mib, icmpInAddrMaskReps);
-		break;
-	default:
-		interested = B_TRUE;	/* Pass up to transport */
-		BUMP_MIB(&ipst->ips_icmp_mib, icmpInUnknowns);
-		break;
-	}
-	/* See if there is an ICMP client. */
-	if (ipst->ips_ipcl_proto_fanout[IPPROTO_ICMP].connf_head != NULL) {
-		/* If there is an ICMP client and we want one too, copy it. */
-		mblk_t *first_mp1;
+		/* Check db_ref to make sure we can modify the packet. */
+		if (mp->b_datap->db_ref > 1) {
+			mblk_t	*mp1;
 
-		if (!interested) {
-			ip_fanout_proto(q, first_mp, ill, ipha, 0, mctl_present,
-			    ip_policy, recv_ill, zoneid);
-			return;
-		}
-		first_mp1 = ip_copymsg(first_mp);
-		if (first_mp1 != NULL) {
-			ip_fanout_proto(q, first_mp1, ill, ipha,
-			    0, mctl_present, ip_policy, recv_ill, zoneid);
-		}
-	} else if (!interested) {
-		freemsg(first_mp);
-		return;
-	} else {
-		/*
-		 * Initiate policy processing for this packet if ip_policy
-		 * is true.
-		 */
-		if (IPP_ENABLED(IPP_LOCAL_IN, ipst) && ip_policy) {
-			ill_index = ill->ill_phyint->phyint_ifindex;
-			ip_process(IPP_LOCAL_IN, &mp, ill_index);
-			if (mp == NULL) {
-				if (mctl_present) {
-					freeb(first_mp);
-				}
-				BUMP_MIB(&ipst->ips_icmp_mib, icmpInErrors);
-				return;
+			mp1 = copymsg(mp);
+			freemsg(mp);
+			if (!mp1) {
+				BUMP_MIB(&ipst->ips_icmp_mib, icmpOutDrops);
+				return (NULL);
 			}
+			mp = mp1;
+			ipha = (ipha_t *)mp->b_rptr;
+			icmph = (icmph_t *)&mp->b_rptr[ip_hdr_length];
 		}
-	}
-	/* We want to do something with it. */
-	/* Check db_ref to make sure we can modify the packet. */
-	if (mp->b_datap->db_ref > 1) {
-		mblk_t	*first_mp1;
-
-		first_mp1 = ip_copymsg(first_mp);
-		freemsg(first_mp);
-		if (!first_mp1) {
-			BUMP_MIB(&ipst->ips_icmp_mib, icmpOutDrops);
-			return;
-		}
-		first_mp = first_mp1;
-		if (mctl_present) {
-			mp = first_mp->b_cont;
-			ASSERT(mp != NULL);
-		} else {
-			mp = first_mp;
-		}
-		ipha = (ipha_t *)mp->b_rptr;
-		icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-		wptr = (uchar_t *)icmph + ICMPH_SIZE;
-	}
-	switch (icmph->icmph_type) {
-	case ICMP_ADDRESS_MASK_REQUEST:
-		ipif = ipif_lookup_remote(ill, ipha->ipha_src, zoneid);
-		if (ipif == NULL) {
-			freemsg(first_mp);
-			return;
-		}
-		/*
-		 * outging interface must be IPv4
-		 */
-		ASSERT(ipif != NULL && !ipif->ipif_isv6);
-		icmph->icmph_type = ICMP_ADDRESS_MASK_REPLY;
-		bcopy(&ipif->ipif_net_mask, wptr, IP_ADDR_LEN);
-		ipif_refrele(ipif);
-		BUMP_MIB(&ipst->ips_icmp_mib, icmpOutAddrMaskReps);
-		break;
-	case ICMP_ECHO_REQUEST:
-		icmph->icmph_type = ICMP_ECHO_REPLY;
-		BUMP_MIB(&ipst->ips_icmp_mib, icmpOutEchoReps);
-		break;
-	case ICMP_TIME_STAMP_REQUEST: {
-		uint32_t *tsp;
-
 		icmph->icmph_type = ICMP_TIME_STAMP_REPLY;
-		tsp = (uint32_t *)wptr;
+		tsp = (uint32_t *)&icmph[1];
 		tsp++;		/* Skip past 'originate time' */
 		/* Compute # of milliseconds since midnight */
 		gethrestime(&now);
@@ -1914,116 +1661,184 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 		*tsp++ = htonl(ts);	/* Lay in 'receive time' */
 		*tsp++ = htonl(ts);	/* Lay in 'send time' */
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpOutTimestampReps);
+		icmp_send_reply_v4(mp, ipha, icmph, ira);
+		return (NULL);
+
+	case ICMP_TIME_STAMP_REPLY:
+		BUMP_MIB(&ipst->ips_icmp_mib, icmpInTimestampReps);
+		break;
+	case ICMP_INFO_REQUEST:
+		/* Per RFC 1122 3.2.2.7, ignore this. */
+	case ICMP_INFO_REPLY:
+		break;
+	case ICMP_ADDRESS_MASK_REQUEST:
+		if (ira->ira_flags & IRAF_MULTIBROADCAST) {
+			interested =
+			    ipst->ips_ip_respond_to_address_mask_broadcast;
+		} else {
+			interested = B_TRUE;
+		}
+		if (!interested) {
+			/* We never pass these to RAW sockets */
+			freemsg(mp);
+			return (NULL);
+		}
+		len_needed = ip_hdr_length + ICMPH_SIZE + IP_ADDR_LEN;
+		if (mp->b_wptr - mp->b_rptr < len_needed) {
+			ipha = ip_pullup(mp, len_needed, ira);
+			if (ipha == NULL) {
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsInTruncatedPkts);
+				ip_drop_input("ipIfStatsInTruncatedPkts", mp,
+				    ill);
+				freemsg(mp);
+				return (NULL);
+			}
+			/* Refresh following the pullup. */
+			icmph = (icmph_t *)&mp->b_rptr[ip_hdr_length];
+		}
+		BUMP_MIB(&ipst->ips_icmp_mib, icmpInAddrMasks);
+		/* Check db_ref to make sure we can modify the packet. */
+		if (mp->b_datap->db_ref > 1) {
+			mblk_t	*mp1;
+
+			mp1 = copymsg(mp);
+			freemsg(mp);
+			if (!mp1) {
+				BUMP_MIB(&ipst->ips_icmp_mib, icmpOutDrops);
+				return (NULL);
+			}
+			mp = mp1;
+			ipha = (ipha_t *)mp->b_rptr;
+			icmph = (icmph_t *)&mp->b_rptr[ip_hdr_length];
+		}
+		/*
+		 * Need the ipif with the mask be the same as the source
+		 * address of the mask reply. For unicast we have a specific
+		 * ipif. For multicast/broadcast we only handle onlink
+		 * senders, and use the source address to pick an ipif.
+		 */
+		ipif = ipif_lookup_addr(ipha->ipha_dst, ill, zoneid, ipst);
+		if (ipif == NULL) {
+			/* Broadcast or multicast */
+			ipif = ipif_lookup_remote(ill, ipha->ipha_src, zoneid);
+			if (ipif == NULL) {
+				freemsg(mp);
+				return (NULL);
+			}
+		}
+		icmph->icmph_type = ICMP_ADDRESS_MASK_REPLY;
+		bcopy(&ipif->ipif_net_mask, &icmph[1], IP_ADDR_LEN);
+		ipif_refrele(ipif);
+		BUMP_MIB(&ipst->ips_icmp_mib, icmpOutAddrMaskReps);
+		icmp_send_reply_v4(mp, ipha, icmph, ira);
+		return (NULL);
+
+	case ICMP_ADDRESS_MASK_REPLY:
+		BUMP_MIB(&ipst->ips_icmp_mib, icmpInAddrMaskReps);
+		break;
+	default:
+		interested = B_TRUE;	/* Pass up to transport */
+		BUMP_MIB(&ipst->ips_icmp_mib, icmpInUnknowns);
 		break;
 	}
-	default:
-		ipha = (ipha_t *)&icmph[1];
-		if ((uchar_t *)&ipha[1] > mp->b_wptr) {
-			if (!pullupmsg(mp, (uchar_t *)&ipha[1] - mp->b_rptr)) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(first_mp);
-				return;
-			}
-			icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-			ipha = (ipha_t *)&icmph[1];
+	/*
+	 * See if there is an ICMP client to avoid an extra copymsg/freemsg
+	 * if there isn't one.
+	 */
+	if (ipst->ips_ipcl_proto_fanout_v4[IPPROTO_ICMP].connf_head != NULL) {
+		/* If there is an ICMP client and we want one too, copy it. */
+
+		if (!interested) {
+			/* Caller will deliver to RAW sockets */
+			return (mp);
 		}
-		if ((IPH_HDR_VERSION(ipha) != IPV4_VERSION)) {
+		mp_ret = copymsg(mp);
+		if (mp_ret == NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(first_mp);
-			return;
+			ip_drop_input("ipIfStatsInDiscards - copymsg", mp, ill);
 		}
-		hdr_length = IPH_HDR_LENGTH(ipha);
-		if (hdr_length < sizeof (ipha_t)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(first_mp);
-			return;
-		}
-		if ((uchar_t *)ipha + hdr_length > mp->b_wptr) {
-			if (!pullupmsg(mp,
-			    (uchar_t *)ipha + hdr_length - mp->b_rptr)) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(first_mp);
-				return;
-			}
-			icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-			ipha = (ipha_t *)&icmph[1];
-		}
-		switch (icmph->icmph_type) {
-		case ICMP_REDIRECT:
-			/*
-			 * As there is no upper client to deliver, we don't
-			 * need the first_mp any more.
-			 */
-			if (mctl_present) {
-				freeb(first_mp);
-			}
-			icmp_redirect(ill, mp);
-			return;
-		case ICMP_DEST_UNREACHABLE:
-			if (icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED) {
-				if (!icmp_inbound_too_big(icmph, ipha, ill,
-				    zoneid, mp, iph_hdr_length, ipst)) {
-					freemsg(first_mp);
-					return;
-				}
-				/*
-				 * icmp_inbound_too_big() may alter mp.
-				 * Resynch ipha and icmph accordingly.
-				 */
-				icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-				ipha = (ipha_t *)&icmph[1];
-			}
-			/* FALLTHRU */
-		default :
-			/*
-			 * IPQoS notes: Since we have already done IPQoS
-			 * processing we don't want to do it again in
-			 * the fanout routines called by
-			 * icmp_inbound_error_fanout, hence the last
-			 * argument, ip_policy, is B_FALSE.
-			 */
-			icmp_inbound_error_fanout(q, ill, first_mp, icmph,
-			    ipha, iph_hdr_length, hdr_length, mctl_present,
-			    B_FALSE, recv_ill, zoneid);
-		}
-		return;
+	} else if (!interested) {
+		/* Neither we nor raw sockets are interested. Drop packet now */
+		freemsg(mp);
+		return (NULL);
 	}
+
+	/*
+	 * ICMP error or redirect packet. Make sure we have enough of
+	 * the header and that db_ref == 1 since we might end up modifying
+	 * the packet.
+	 */
+	if (mp->b_cont != NULL) {
+		if (ip_pullup(mp, -1, ira) == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards - ip_pullup",
+			    mp, ill);
+			freemsg(mp);
+			return (mp_ret);
+		}
+	}
+
+	if (mp->b_datap->db_ref > 1) {
+		mblk_t	*mp1;
+
+		mp1 = copymsg(mp);
+		if (mp1 == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards - copymsg", mp, ill);
+			freemsg(mp);
+			return (mp_ret);
+		}
+		freemsg(mp);
+		mp = mp1;
+	}
+
+	/*
+	 * In case mp has changed, verify the message before any further
+	 * processes.
+	 */
+	ipha = (ipha_t *)mp->b_rptr;
+	icmph = (icmph_t *)&mp->b_rptr[ip_hdr_length];
+	if (!icmp_inbound_verify_v4(mp, icmph, ira)) {
+		freemsg(mp);
+		return (mp_ret);
+	}
+
+	switch (icmph->icmph_type) {
+	case ICMP_REDIRECT:
+		icmp_redirect_v4(mp, ipha, icmph, ira);
+		break;
+	case ICMP_DEST_UNREACHABLE:
+		if (icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED) {
+			/* Update DCE and adjust MTU is icmp header if needed */
+			icmp_inbound_too_big_v4(icmph, ira);
+		}
+		/* FALLTHRU */
+	default:
+		icmp_inbound_error_fanout_v4(mp, icmph, ira);
+		break;
+	}
+	return (mp_ret);
+}
+
+/*
+ * Send an ICMP echo, timestamp or address mask reply.
+ * The caller has already updated the payload part of the packet.
+ * We handle the ICMP checksum, IP source address selection and feed
+ * the packet into ip_output_simple.
+ */
+static void
+icmp_send_reply_v4(mblk_t *mp, ipha_t *ipha, icmph_t *icmph,
+    ip_recv_attr_t *ira)
+{
+	uint_t		ip_hdr_length = ira->ira_ip_hdr_length;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	ip_xmit_attr_t	ixas;
+
 	/* Send out an ICMP packet */
 	icmph->icmph_checksum = 0;
-	icmph->icmph_checksum = IP_CSUM(mp, iph_hdr_length, 0);
-	if (broadcast || CLASSD(ipha->ipha_dst)) {
-		ipif_t	*ipif_chosen;
-		/*
-		 * Make it look like it was directed to us, so we don't look
-		 * like a fool with a broadcast or multicast source address.
-		 */
-		ipif = ipif_lookup_remote(ill, ipha->ipha_src, zoneid);
-		/*
-		 * Make sure that we haven't grabbed an interface that's DOWN.
-		 */
-		if (ipif != NULL) {
-			ipif_chosen = ipif_select_source(ipif->ipif_ill,
-			    ipha->ipha_src, zoneid);
-			if (ipif_chosen != NULL) {
-				ipif_refrele(ipif);
-				ipif = ipif_chosen;
-			}
-		}
-		if (ipif == NULL) {
-			ip0dbg(("icmp_inbound: "
-			    "No source for broadcast/multicast:\n"
-			    "\tsrc 0x%x dst 0x%x ill %p "
-			    "ipif_lcl_addr 0x%x\n",
-			    ntohl(ipha->ipha_src), ntohl(ipha->ipha_dst),
-			    (void *)ill,
-			    ill->ill_ipif->ipif_lcl_addr));
-			freemsg(first_mp);
-			return;
-		}
-		ASSERT(ipif != NULL && !ipif->ipif_isv6);
-		ipha->ipha_dst = ipif->ipif_src_addr;
-		ipif_refrele(ipif);
-	}
+	icmph->icmph_checksum = IP_CSUM(mp, ip_hdr_length, 0);
 	/* Reset time to live. */
 	ipha->ipha_ttl = ipst->ips_ip_def_ttl;
 	{
@@ -2038,138 +1853,159 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 	if (!IS_SIMPLE_IPH(ipha))
 		icmp_options_update(ipha);
 
-	if (!mctl_present) {
+	bzero(&ixas, sizeof (ixas));
+	ixas.ixa_flags = IXAF_BASIC_SIMPLE_V4;
+	ixas.ixa_zoneid = ira->ira_zoneid;
+	ixas.ixa_cred = kcred;
+	ixas.ixa_cpid = NOPID;
+	ixas.ixa_tsl = ira->ira_tsl;	/* Behave as a multi-level responder */
+	ixas.ixa_ifindex = 0;
+	ixas.ixa_ipst = ipst;
+	ixas.ixa_multicast_ttl = IP_DEFAULT_MULTICAST_TTL;
+
+	if (!(ira->ira_flags & IRAF_IPSEC_SECURE)) {
 		/*
 		 * This packet should go out the same way as it
-		 * came in i.e in clear. To make sure that global
-		 * policy will not be applied to this in ip_wput_ire,
-		 * we attach a IPSEC_IN mp and clear ipsec_in_secure.
+		 * came in i.e in clear, independent of the IPsec policy
+		 * for transmitting packets.
 		 */
-		ASSERT(first_mp == mp);
-		first_mp = ipsec_in_alloc(B_TRUE, ipst->ips_netstack);
-		if (first_mp == NULL) {
+		ixas.ixa_flags |= IXAF_NO_IPSEC;
+	} else {
+		if (!ipsec_in_to_out(ira, &ixas, mp, ipha, NULL)) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(mp);
+			/* Note: mp already consumed and ip_drop_packet done */
 			return;
 		}
-		ii = (ipsec_in_t *)first_mp->b_rptr;
+	}
+	if (ira->ira_flags & IRAF_MULTIBROADCAST) {
+		/*
+		 * Not one or our addresses (IRE_LOCALs), thus we let
+		 * ip_output_simple pick the source.
+		 */
+		ipha->ipha_src = INADDR_ANY;
+		ixas.ixa_flags |= IXAF_SET_SOURCE;
+	}
+	/* Should we send with DF and use dce_pmtu? */
+	if (ipst->ips_ipv4_icmp_return_pmtu) {
+		ixas.ixa_flags |= IXAF_PMTU_DISCOVERY;
+		ipha->ipha_fragment_offset_and_flags |= IPH_DF_HTONS;
+	}
 
-		/* This is not a secure packet */
-		ii->ipsec_in_secure = B_FALSE;
-		first_mp->b_cont = mp;
-	} else {
-		ii = (ipsec_in_t *)first_mp->b_rptr;
-		ii->ipsec_in_ns = ipst->ips_netstack;	/* No netstack_hold */
-	}
-	if (!ipsec_in_to_out(first_mp, ipha, NULL, zoneid)) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-		return;
-	}
 	BUMP_MIB(&ipst->ips_icmp_mib, icmpOutMsgs);
-	put(WR(q), first_mp);
+
+	(void) ip_output_simple(mp, &ixas);
+	ixa_cleanup(&ixas);
 }
 
-static ipaddr_t
-icmp_get_nexthop_addr(ipha_t *ipha, ill_t *ill, zoneid_t zoneid, mblk_t *mp)
+/*
+ * Verify the ICMP messages for either for ICMP error or redirect packet.
+ * The caller should have fully pulled up the message. If it's a redirect
+ * packet, only basic checks on IP header will be done; otherwise, verify
+ * the packet by looking at the included ULP header.
+ *
+ * Called before icmp_inbound_error_fanout_v4 is called.
+ */
+static boolean_t
+icmp_inbound_verify_v4(mblk_t *mp, icmph_t *icmph, ip_recv_attr_t *ira)
 {
-	conn_t *connp;
-	connf_t *connfp;
-	ipaddr_t nexthop_addr = INADDR_ANY;
-	int hdr_length = IPH_HDR_LENGTH(ipha);
-	uint16_t *up;
-	uint32_t ports;
-	ip_stack_t *ipst = ill->ill_ipst;
+	ill_t		*ill = ira->ira_ill;
+	int		hdr_length;
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
+	conn_t		*connp;
+	ipha_t		*ipha;	/* Inner IP header */
 
-	up = (uint16_t *)((uchar_t *)ipha + hdr_length);
+	ipha = (ipha_t *)&icmph[1];
+	if ((uchar_t *)ipha + IP_SIMPLE_HDR_LENGTH > mp->b_wptr)
+		goto truncated;
+
+	hdr_length = IPH_HDR_LENGTH(ipha);
+
+	if ((IPH_HDR_VERSION(ipha) != IPV4_VERSION))
+		goto discard_pkt;
+
+	if (hdr_length < sizeof (ipha_t))
+		goto truncated;
+
+	if ((uchar_t *)ipha + hdr_length > mp->b_wptr)
+		goto truncated;
+
+	/*
+	 * Stop here for ICMP_REDIRECT.
+	 */
+	if (icmph->icmph_type == ICMP_REDIRECT)
+		return (B_TRUE);
+
+	/*
+	 * ICMP errors only.
+	 */
 	switch (ipha->ipha_protocol) {
-		case IPPROTO_TCP:
-		{
-			tcph_t *tcph;
+	case IPPROTO_UDP:
+		/*
+		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
+		 * transport header.
+		 */
+		if ((uchar_t *)ipha + hdr_length + ICMP_MIN_TP_HDR_LEN >
+		    mp->b_wptr)
+			goto truncated;
+		break;
+	case IPPROTO_TCP: {
+		tcpha_t		*tcpha;
 
-			/* do a reverse lookup */
-			tcph = (tcph_t *)((uchar_t *)ipha + hdr_length);
-			connp = ipcl_tcp_lookup_reversed_ipv4(ipha, tcph,
-			    TCPS_LISTEN, ipst);
-			break;
+		/*
+		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
+		 * transport header.
+		 */
+		if ((uchar_t *)ipha + hdr_length + ICMP_MIN_TP_HDR_LEN >
+		    mp->b_wptr)
+			goto truncated;
+
+		tcpha = (tcpha_t *)((uchar_t *)ipha + hdr_length);
+		connp = ipcl_tcp_lookup_reversed_ipv4(ipha, tcpha, TCPS_LISTEN,
+		    ipst);
+		if (connp == NULL)
+			goto discard_pkt;
+
+		if ((connp->conn_verifyicmp != NULL) &&
+		    !connp->conn_verifyicmp(connp, tcpha, icmph, NULL, ira)) {
+			CONN_DEC_REF(connp);
+			goto discard_pkt;
 		}
-		case IPPROTO_UDP:
-		{
-			uint32_t dstport, srcport;
-
-			((uint16_t *)&ports)[0] = up[1];
-			((uint16_t *)&ports)[1] = up[0];
-
-			/* Extract ports in net byte order */
-			dstport = htons(ntohl(ports) & 0xFFFF);
-			srcport = htons(ntohl(ports) >> 16);
-
-			connfp = &ipst->ips_ipcl_udp_fanout[
-			    IPCL_UDP_HASH(dstport, ipst)];
-			mutex_enter(&connfp->connf_lock);
-			connp = connfp->connf_head;
-
-			/* do a reverse lookup */
-			while ((connp != NULL) &&
-			    (!IPCL_UDP_MATCH(connp, dstport,
-			    ipha->ipha_src, srcport, ipha->ipha_dst) ||
-			    !IPCL_ZONE_MATCH(connp, zoneid))) {
-				connp = connp->conn_next;
-			}
-			if (connp != NULL)
-				CONN_INC_REF(connp);
-			mutex_exit(&connfp->connf_lock);
-			break;
-		}
-		case IPPROTO_SCTP:
-		{
-			in6_addr_t map_src, map_dst;
-
-			IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &map_src);
-			IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &map_dst);
-			((uint16_t *)&ports)[0] = up[1];
-			((uint16_t *)&ports)[1] = up[0];
-
-			connp = sctp_find_conn(&map_src, &map_dst, ports,
-			    zoneid, ipst->ips_netstack->netstack_sctp);
-			if (connp == NULL) {
-				connp = ipcl_classify_raw(mp, IPPROTO_SCTP,
-				    zoneid, ports, ipha, ipst);
-			} else {
-				CONN_INC_REF(connp);
-				SCTP_REFRELE(CONN2SCTP(connp));
-			}
-			break;
-		}
-		default:
-		{
-			ipha_t ripha;
-
-			ripha.ipha_src = ipha->ipha_dst;
-			ripha.ipha_dst = ipha->ipha_src;
-			ripha.ipha_protocol = ipha->ipha_protocol;
-
-			connfp = &ipst->ips_ipcl_proto_fanout[
-			    ipha->ipha_protocol];
-			mutex_enter(&connfp->connf_lock);
-			connp = connfp->connf_head;
-			for (connp = connfp->connf_head; connp != NULL;
-			    connp = connp->conn_next) {
-				if (IPCL_PROTO_MATCH(connp,
-				    ipha->ipha_protocol, &ripha, ill,
-				    0, zoneid)) {
-					CONN_INC_REF(connp);
-					break;
-				}
-			}
-			mutex_exit(&connfp->connf_lock);
-		}
-	}
-	if (connp != NULL) {
-		if (connp->conn_nexthop_set)
-			nexthop_addr = connp->conn_nexthop_v4;
 		CONN_DEC_REF(connp);
+		break;
 	}
-	return (nexthop_addr);
+	case IPPROTO_SCTP:
+		/*
+		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
+		 * transport header.
+		 */
+		if ((uchar_t *)ipha + hdr_length + ICMP_MIN_TP_HDR_LEN >
+		    mp->b_wptr)
+			goto truncated;
+		break;
+	case IPPROTO_ESP:
+	case IPPROTO_AH:
+		break;
+	case IPPROTO_ENCAP:
+		if ((uchar_t *)ipha + hdr_length + sizeof (ipha_t) >
+		    mp->b_wptr)
+			goto truncated;
+		break;
+	default:
+		break;
+	}
+
+	return (B_TRUE);
+
+discard_pkt:
+	/* Bogus ICMP error. */
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+	return (B_FALSE);
+
+truncated:
+	/* We pulled up everthing already. Must be truncated */
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTruncatedPkts);
+	ip_drop_input("ipIfStatsInTruncatedPkts", mp, ill);
+	return (B_FALSE);
 }
 
 /* Table from RFC 1191 */
@@ -2178,64 +2014,52 @@ static int icmp_frag_size_table[] =
 
 /*
  * Process received ICMP Packet too big.
- * After updating any IRE it does the fanout to any matching transport streams.
- * Assumes the message has been pulled up till the IP header that caused
- * the error.
+ * Just handles the DCE create/update, including using the above table of
+ * PMTU guesses. The caller is responsible for validating the packet before
+ * passing it in and also to fanout the ICMP error to any matching transport
+ * conns. Assumes the message has been fully pulled up and verified.
  *
- * Returns B_FALSE on failure and B_TRUE on success.
+ * Before getting here, the caller has called icmp_inbound_verify_v4()
+ * that should have verified with ULP to prevent undoing the changes we're
+ * going to make to DCE. For example, TCP might have verified that the packet
+ * which generated error is in the send window.
+ *
+ * In some cases modified this MTU in the ICMP header packet; the caller
+ * should pass to the matching ULP after this returns.
  */
-static boolean_t
-icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
-    zoneid_t zoneid, mblk_t *mp, int iph_hdr_length,
-    ip_stack_t *ipst)
+static void
+icmp_inbound_too_big_v4(icmph_t *icmph, ip_recv_attr_t *ira)
 {
-	ire_t	*ire, *first_ire;
-	int	mtu, orig_mtu;
-	int	hdr_length;
-	ipaddr_t nexthop_addr;
-	boolean_t disable_pmtud;
+	dce_t		*dce;
+	int		old_mtu;
+	int		mtu, orig_mtu;
+	ipaddr_t	dst;
+	boolean_t	disable_pmtud;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	uint_t		hdr_length;
+	ipha_t		*ipha;
 
+	/* Caller already pulled up everything. */
+	ipha = (ipha_t *)&icmph[1];
 	ASSERT(icmph->icmph_type == ICMP_DEST_UNREACHABLE &&
 	    icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED);
 	ASSERT(ill != NULL);
 
 	hdr_length = IPH_HDR_LENGTH(ipha);
 
-	/* Drop if the original packet contained a source route */
-	if (ip_source_route_included(ipha)) {
-		return (B_FALSE);
-	}
 	/*
-	 * Verify we have at least ICMP_MIN_TP_HDR_LENGTH bytes of transport
-	 * header.
+	 * We handle path MTU for source routed packets since the DCE
+	 * is looked up using the final destination.
 	 */
-	if ((uchar_t *)ipha + hdr_length + ICMP_MIN_TP_HDR_LEN >
-	    mp->b_wptr) {
-		if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
-		    ICMP_MIN_TP_HDR_LEN - mp->b_rptr)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			ip1dbg(("icmp_inbound_too_big: insufficient hdr\n"));
-			return (B_FALSE);
-		}
-		icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-		ipha = (ipha_t *)&icmph[1];
-	}
-	nexthop_addr = icmp_get_nexthop_addr(ipha, ill, zoneid, mp);
-	if (nexthop_addr != INADDR_ANY) {
-		/* nexthop set */
-		first_ire = ire_ctable_lookup(ipha->ipha_dst,
-		    nexthop_addr, 0, NULL, ALL_ZONES, msg_getlabel(mp),
-		    MATCH_IRE_MARK_PRIVATE_ADDR | MATCH_IRE_GW, ipst);
-	} else {
-		/* nexthop not set */
-		first_ire = ire_ctable_lookup(ipha->ipha_dst, 0, IRE_CACHE,
-		    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-	}
+	dst = ip_get_dst(ipha);
 
-	if (!first_ire) {
-		ip1dbg(("icmp_inbound_too_big: no route for 0x%x\n",
-		    ntohl(ipha->ipha_dst)));
-		return (B_FALSE);
+	dce = dce_lookup_and_add_v4(dst, ipst);
+	if (dce == NULL) {
+		/* Couldn't add a unique one - ENOMEM */
+		ip1dbg(("icmp_inbound_too_big_v4: no dce for 0x%x\n",
+		    ntohl(dst)));
+		return;
 	}
 
 	/* Check for MTU discovery advice as described in RFC 1191 */
@@ -2243,146 +2067,109 @@ icmp_inbound_too_big(icmph_t *icmph, ipha_t *ipha, ill_t *ill,
 	orig_mtu = mtu;
 	disable_pmtud = B_FALSE;
 
-	rw_enter(&first_ire->ire_bucket->irb_lock, RW_READER);
-	for (ire = first_ire; ire != NULL && ire->ire_addr == ipha->ipha_dst;
-	    ire = ire->ire_next) {
+	mutex_enter(&dce->dce_lock);
+	if (dce->dce_flags & DCEF_PMTU)
+		old_mtu = dce->dce_pmtu;
+	else
+		old_mtu = ill->ill_mtu;
+
+	if (icmph->icmph_du_zero != 0 || mtu < ipst->ips_ip_pmtu_min) {
+		uint32_t length;
+		int	i;
+
 		/*
-		 * Look for the connection to which this ICMP message is
-		 * directed. If it has the IP_NEXTHOP option set, then the
-		 * search is limited to IREs with the MATCH_IRE_PRIVATE
-		 * option. Else the search is limited to regular IREs.
+		 * Use the table from RFC 1191 to figure out
+		 * the next "plateau" based on the length in
+		 * the original IP packet.
 		 */
-		if (((ire->ire_marks & IRE_MARK_PRIVATE_ADDR) &&
-		    (nexthop_addr != ire->ire_gateway_addr)) ||
-		    (!(ire->ire_marks & IRE_MARK_PRIVATE_ADDR) &&
-		    (nexthop_addr != INADDR_ANY)))
-			continue;
-
-		mutex_enter(&ire->ire_lock);
-		if (icmph->icmph_du_zero != 0 || mtu < ipst->ips_ip_pmtu_min) {
-			uint32_t length;
-			int	i;
-
+		length = ntohs(ipha->ipha_length);
+		DTRACE_PROBE2(ip4__pmtu__guess, dce_t *, dce,
+		    uint32_t, length);
+		if (old_mtu <= length &&
+		    old_mtu >= length - hdr_length) {
 			/*
-			 * Use the table from RFC 1191 to figure out
-			 * the next "plateau" based on the length in
-			 * the original IP packet.
+			 * Handle broken BSD 4.2 systems that
+			 * return the wrong ipha_length in ICMP
+			 * errors.
 			 */
-			length = ntohs(ipha->ipha_length);
-			DTRACE_PROBE2(ip4__pmtu__guess, ire_t *, ire,
-			    uint32_t, length);
-			if (ire->ire_max_frag <= length &&
-			    ire->ire_max_frag >= length - hdr_length) {
-				/*
-				 * Handle broken BSD 4.2 systems that
-				 * return the wrong iph_length in ICMP
-				 * errors.
-				 */
-				length -= hdr_length;
-			}
-			for (i = 0; i < A_CNT(icmp_frag_size_table); i++) {
-				if (length > icmp_frag_size_table[i])
-					break;
-			}
-			if (i == A_CNT(icmp_frag_size_table)) {
-				/* Smaller than 68! */
-				disable_pmtud = B_TRUE;
+			ip1dbg(("Wrong mtu: sent %d, dce %d\n",
+			    length, old_mtu));
+			length -= hdr_length;
+		}
+		for (i = 0; i < A_CNT(icmp_frag_size_table); i++) {
+			if (length > icmp_frag_size_table[i])
+				break;
+		}
+		if (i == A_CNT(icmp_frag_size_table)) {
+			/* Smaller than IP_MIN_MTU! */
+			ip1dbg(("Too big for packet size %d\n",
+			    length));
+			disable_pmtud = B_TRUE;
+			mtu = ipst->ips_ip_pmtu_min;
+		} else {
+			mtu = icmp_frag_size_table[i];
+			ip1dbg(("Calculated mtu %d, packet size %d, "
+			    "before %d\n", mtu, length, old_mtu));
+			if (mtu < ipst->ips_ip_pmtu_min) {
 				mtu = ipst->ips_ip_pmtu_min;
-			} else {
-				mtu = icmp_frag_size_table[i];
-				if (mtu < ipst->ips_ip_pmtu_min) {
-					mtu = ipst->ips_ip_pmtu_min;
-					disable_pmtud = B_TRUE;
-				}
+				disable_pmtud = B_TRUE;
 			}
-			/* Fool the ULP into believing our guessed PMTU. */
-			icmph->icmph_du_zero = 0;
-			icmph->icmph_du_mtu = htons(mtu);
 		}
-		if (disable_pmtud)
-			ire->ire_frag_flag = 0;
-		/* Reduce the IRE max frag value as advised. */
-		ire->ire_max_frag = MIN(ire->ire_max_frag, mtu);
-		if (ire->ire_max_frag == mtu) {
-			/* Decreased it */
-			ire->ire_marks |= IRE_MARK_PMTU;
-		}
-		mutex_exit(&ire->ire_lock);
-		DTRACE_PROBE4(ip4__pmtu__change, icmph_t *, icmph, ire_t *,
-		    ire, int, orig_mtu, int, mtu);
 	}
-	rw_exit(&first_ire->ire_bucket->irb_lock);
-	ire_refrele(first_ire);
-	return (B_TRUE);
+	if (disable_pmtud)
+		dce->dce_flags |= DCEF_TOO_SMALL_PMTU;
+	else
+		dce->dce_flags &= ~DCEF_TOO_SMALL_PMTU;
+
+	dce->dce_pmtu = MIN(old_mtu, mtu);
+	/* Prepare to send the new max frag size for the ULP. */
+	icmph->icmph_du_zero = 0;
+	icmph->icmph_du_mtu =  htons((uint16_t)dce->dce_pmtu);
+	DTRACE_PROBE4(ip4__pmtu__change, icmph_t *, icmph, dce_t *,
+	    dce, int, orig_mtu, int, mtu);
+
+	/* We now have a PMTU for sure */
+	dce->dce_flags |= DCEF_PMTU;
+	dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+	mutex_exit(&dce->dce_lock);
+	/*
+	 * After dropping the lock the new value is visible to everyone.
+	 * Then we bump the generation number so any cached values reinspect
+	 * the dce_t.
+	 */
+	dce_increment_generation(dce);
+	dce_refrele(dce);
 }
 
 /*
- * If the packet in error is Self-Encapsulated, icmp_inbound_error_fanout
+ * If the packet in error is Self-Encapsulated, icmp_inbound_error_fanout_v4
  * calls this function.
  */
 static mblk_t *
-icmp_inbound_self_encap_error(mblk_t *mp, int iph_hdr_length, int hdr_length)
+icmp_inbound_self_encap_error_v4(mblk_t *mp, ipha_t *ipha, ipha_t *in_ipha)
 {
-	ipha_t *ipha;
-	icmph_t *icmph;
-	ipha_t *in_ipha;
 	int length;
 
 	ASSERT(mp->b_datap->db_type == M_DATA);
 
+	/* icmp_inbound_v4 has already pulled up the whole error packet */
+	ASSERT(mp->b_cont == NULL);
+
 	/*
-	 * For Self-encapsulated packets, we added an extra IP header
-	 * without the options. Inner IP header is the one from which
-	 * the outer IP header was formed. Thus, we need to remove the
-	 * outer IP header. To do this, we pullup the whole message
-	 * and overlay whatever follows the outer IP header over the
-	 * outer IP header.
+	 * The length that we want to overlay is the inner header
+	 * and what follows it.
 	 */
-
-	if (!pullupmsg(mp, -1))
-		return (NULL);
-
-	icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-	ipha = (ipha_t *)&icmph[1];
-	in_ipha = (ipha_t *)((uchar_t *)ipha + hdr_length);
+	length = msgdsize(mp) - ((uchar_t *)in_ipha - mp->b_rptr);
 
 	/*
-	 * The length that we want to overlay is following the inner
-	 * IP header. Subtracting the IP header + icmp header + outer
-	 * IP header's length should give us the length that we want to
-	 * overlay.
-	 */
-	length = msgdsize(mp) - iph_hdr_length - sizeof (icmph_t) -
-	    hdr_length;
-	/*
-	 * Overlay whatever follows the inner header over the
+	 * Overlay the inner header and whatever follows it over the
 	 * outer header.
 	 */
 	bcopy((uchar_t *)in_ipha, (uchar_t *)ipha, length);
 
-	/* Set the wptr to account for the outer header */
-	mp->b_wptr -= hdr_length;
+	/* Adjust for what we removed */
+	mp->b_wptr -= (uchar_t *)in_ipha - (uchar_t *)ipha;
 	return (mp);
-}
-
-/*
- * Fanout for ICMP errors containing IP-in-IPv4 packets.  Returns B_TRUE if a
- * tunnel consumed the message, and B_FALSE otherwise.
- */
-static boolean_t
-icmp_inbound_iptun_fanout(mblk_t *first_mp, ipha_t *ripha, ill_t *ill,
-    ip_stack_t *ipst)
-{
-	conn_t	*connp;
-
-	if ((connp = ipcl_iptun_classify_v4(&ripha->ipha_src, &ripha->ipha_dst,
-	    ipst)) == NULL)
-		return (B_FALSE);
-
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-	connp->conn_recv(connp, first_mp, NULL);
-	CONN_DEC_REF(connp);
-	return (B_TRUE);
 }
 
 /*
@@ -2400,25 +2187,22 @@ icmp_inbound_iptun_fanout(mblk_t *first_mp, ipha_t *ripha, ill_t *ill,
  *
  * IFN could have been generated locally or by some router.
  *
- * LOCAL : *ip_wput_ire -> icmp_frag_needed could have generated this.
+ * LOCAL : ire_send_wire (before calling ipsec_out_process) can call
+ * icmp_frag_needed/icmp_pkt2big_v6 to generated a local IFN.
  *	    This happens because IP adjusted its value of MTU on an
  *	    earlier IFN message and could not tell the upper layer,
  *	    the new adjusted value of MTU e.g. Packet was encrypted
  *	    or there was not enough information to fanout to upper
- *	    layers. Thus on the next outbound datagram, ip_wput_ire
+ *	    layers. Thus on the next outbound datagram, ire_send_wire
  *	    generates the IFN, where IPsec processing has *not* been
  *	    done.
  *
- *	   *ip_wput_ire_fragmentit -> ip_wput_frag -> icmp_frag_needed
- *	    could have generated this. This happens because ire_max_frag
- *	    value in IP was set to a new value, while the IPsec processing
- *	    was being done and after we made the fragmentation check in
- *	    ip_wput_ire. Thus on return from IPsec processing,
- *	    ip_wput_ipsec_out finds that the new length is > ire_max_frag
- *	    and generates the IFN. As IPsec processing is over, we fanout
- *	    to AH/ESP to remove the header.
+ *	    Note that we retain ixa_fragsize across IPsec thus once
+ *	    we have picking ixa_fragsize and entered ipsec_out_process we do
+ *	    no change the fragsize even if the path MTU changes before
+ *	    we reach ip_output_post_ipsec.
  *
- *	    In both these cases, ipsec_in_loopback will be set indicating
+ *	    In the local case, IRAF_LOOPBACK will be set indicating
  *	    that IFN was generated locally.
  *
  * ROUTER : IFN could be secure or non-secure.
@@ -2432,45 +2216,38 @@ icmp_inbound_iptun_fanout(mblk_t *first_mp, ipha_t *ripha, ill_t *ill,
  *	      If the packet in error does not have AH/ESP, we handle it
  *	      like any other case.
  *
- *	    * NON_SECURE : If the packet in error has AH/ESP headers,
- *	      we attach a dummy ipsec_in and send it up to AH/ESP
- *	      for validation. AH/ESP will verify whether there is a
+ *	    * NON_SECURE : If the packet in error has AH/ESP headers, we send it
+ *	      up to AH/ESP for validation. AH/ESP will verify whether there is a
  *	      valid SA or not and send it back. We will fanout again if
  *	      we have more data in the packet.
  *
  *	      If the packet in error does not have AH/ESP, we handle it
  *	      like any other case.
+ *
+ * The caller must have called icmp_inbound_verify_v4.
  */
 static void
-icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
-    icmph_t *icmph, ipha_t *ipha, int iph_hdr_length, int hdr_length,
-    boolean_t mctl_present, boolean_t ip_policy, ill_t *recv_ill,
-    zoneid_t zoneid)
+icmp_inbound_error_fanout_v4(mblk_t *mp, icmph_t *icmph, ip_recv_attr_t *ira)
 {
-	uint16_t *up;	/* Pointer to ports in ULP header */
-	uint32_t ports;	/* reversed ports for fanout */
-	ipha_t ripha;	/* With reversed addresses */
-	mblk_t *first_mp;
-	ipsec_in_t *ii;
-	tcph_t	*tcph;
-	conn_t	*connp;
-	ip_stack_t *ipst;
+	uint16_t	*up;	/* Pointer to ports in ULP header */
+	uint32_t	ports;	/* reversed ports for fanout */
+	ipha_t		ripha;	/* With reversed addresses */
+	ipha_t		*ipha;  /* Inner IP header */
+	uint_t		hdr_length; /* Inner IP header length */
+	tcpha_t		*tcpha;
+	conn_t		*connp;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	ill_t		*rill = ira->ira_rill;
 
-	ASSERT(ill != NULL);
+	/* Caller already pulled up everything. */
+	ipha = (ipha_t *)&icmph[1];
+	ASSERT((uchar_t *)&ipha[1] <= mp->b_wptr);
+	ASSERT(mp->b_cont == NULL);
 
-	ASSERT(recv_ill != NULL);
-	ipst = recv_ill->ill_ipst;
-
-	first_mp = mp;
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		ASSERT(mp != NULL);
-
-		ii = (ipsec_in_t *)first_mp->b_rptr;
-		ASSERT(ii->ipsec_in_type == IPSEC_IN);
-	} else {
-		ii = NULL;
-	}
+	hdr_length = IPH_HDR_LENGTH(ipha);
+	ira->ira_protocol = ipha->ipha_protocol;
 
 	/*
 	 * We need a separate IP header with the source and destination
@@ -2482,249 +2259,223 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 	ripha.ipha_protocol = ipha->ipha_protocol;
 	ripha.ipha_version_and_hdr_length = ipha->ipha_version_and_hdr_length;
 
-	ip2dbg(("icmp_inbound_error: proto %d %x to %x: %d/%d\n",
+	ip2dbg(("icmp_inbound_error_v4: proto %d %x to %x: %d/%d\n",
 	    ripha.ipha_protocol, ntohl(ipha->ipha_src),
 	    ntohl(ipha->ipha_dst),
 	    icmph->icmph_type, icmph->icmph_code));
 
 	switch (ipha->ipha_protocol) {
 	case IPPROTO_UDP:
-		/*
-		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
-		 * transport header.
-		 */
-		if ((uchar_t *)ipha + hdr_length + ICMP_MIN_TP_HDR_LEN >
-		    mp->b_wptr) {
-			if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
-			    ICMP_MIN_TP_HDR_LEN - mp->b_rptr)) {
-				goto discard_pkt;
-			}
-			icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-			ipha = (ipha_t *)&icmph[1];
-		}
 		up = (uint16_t *)((uchar_t *)ipha + hdr_length);
 
 		/* Attempt to find a client stream based on port. */
-		((uint16_t *)&ports)[0] = up[1];
-		((uint16_t *)&ports)[1] = up[0];
-		ip2dbg(("icmp_inbound_error: UDP ports %d to %d\n",
+		ip2dbg(("icmp_inbound_error_v4: UDP ports %d to %d\n",
 		    ntohs(up[0]), ntohs(up[1])));
 
-		/* Have to change db_type after any pullupmsg */
-		DB_TYPE(mp) = M_CTL;
-
-		ip_fanout_udp(q, first_mp, ill, &ripha, ports, B_FALSE, 0,
-		    mctl_present, ip_policy, recv_ill, zoneid);
+		/* Note that we send error to all matches. */
+		ira->ira_flags |= IRAF_ICMP_ERROR;
+		ip_fanout_udp_multi_v4(mp, &ripha, up[0], up[1], ira);
+		ira->ira_flags &= ~IRAF_ICMP_ERROR;
 		return;
 
 	case IPPROTO_TCP:
-		/*
-		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
-		 * transport header.
-		 */
-		if ((uchar_t *)ipha + hdr_length + ICMP_MIN_TP_HDR_LEN >
-		    mp->b_wptr) {
-			if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
-			    ICMP_MIN_TP_HDR_LEN - mp->b_rptr)) {
-				goto discard_pkt;
-			}
-			icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-			ipha = (ipha_t *)&icmph[1];
-		}
 		/*
 		 * Find a TCP client stream for this packet.
 		 * Note that we do a reverse lookup since the header is
 		 * in the form we sent it out.
 		 */
-		tcph = (tcph_t *)((uchar_t *)ipha + hdr_length);
-		connp = ipcl_tcp_lookup_reversed_ipv4(ipha, tcph, TCPS_LISTEN,
+		tcpha = (tcpha_t *)((uchar_t *)ipha + hdr_length);
+		connp = ipcl_tcp_lookup_reversed_ipv4(ipha, tcpha, TCPS_LISTEN,
 		    ipst);
 		if (connp == NULL)
 			goto discard_pkt;
 
-		/* Have to change db_type after any pullupmsg */
-		DB_TYPE(mp) = M_CTL;
-		SQUEUE_ENTER_ONE(connp->conn_sqp, first_mp, tcp_input, connp,
-		    SQ_FILL, SQTAG_TCP_INPUT_ICMP_ERR);
+		if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) ||
+		    (ira->ira_flags & IRAF_IPSEC_SECURE)) {
+			mp = ipsec_check_inbound_policy(mp, connp,
+			    ipha, NULL, ira);
+			if (mp == NULL) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				/* Note that mp is NULL */
+				ip_drop_input("ipIfStatsInDiscards", mp, ill);
+				CONN_DEC_REF(connp);
+				return;
+			}
+		}
+
+		ira->ira_flags |= IRAF_ICMP_ERROR;
+		ira->ira_ill = ira->ira_rill = NULL;
+		if (IPCL_IS_TCP(connp)) {
+			SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
+			    connp->conn_recvicmp, connp, ira, SQ_FILL,
+			    SQTAG_TCP_INPUT_ICMP_ERR);
+		} else {
+			/* Not TCP; must be SOCK_RAW, IPPROTO_TCP */
+			(connp->conn_recv)(connp, mp, NULL, ira);
+			CONN_DEC_REF(connp);
+		}
+		ira->ira_ill = ill;
+		ira->ira_rill = rill;
+		ira->ira_flags &= ~IRAF_ICMP_ERROR;
 		return;
 
 	case IPPROTO_SCTP:
-		/*
-		 * Verify we have at least ICMP_MIN_SCTP_HDR_LEN bytes of
-		 * transport header, in the first mp.
-		 */
-		if ((uchar_t *)ipha + hdr_length + ICMP_MIN_SCTP_HDR_LEN >
-		    mp->b_wptr) {
-			if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
-			    ICMP_MIN_SCTP_HDR_LEN - mp->b_rptr)) {
-				goto discard_pkt;
-			}
-			icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-			ipha = (ipha_t *)&icmph[1];
-		}
 		up = (uint16_t *)((uchar_t *)ipha + hdr_length);
 		/* Find a SCTP client stream for this packet. */
 		((uint16_t *)&ports)[0] = up[1];
 		((uint16_t *)&ports)[1] = up[0];
 
-		/* Have to change db_type after any pullupmsg */
-		DB_TYPE(mp) = M_CTL;
-		ip_fanout_sctp(first_mp, recv_ill, &ripha, ports, 0,
-		    mctl_present, ip_policy, zoneid);
+		ira->ira_flags |= IRAF_ICMP_ERROR;
+		ip_fanout_sctp(mp, &ripha, NULL, ports, ira);
+		ira->ira_flags &= ~IRAF_ICMP_ERROR;
 		return;
 
 	case IPPROTO_ESP:
-	case IPPROTO_AH: {
-		int ipsec_rc;
-		ipsec_stack_t *ipss = ipst->ips_netstack->netstack_ipsec;
-
-		/*
-		 * We need a IPSEC_IN in the front to fanout to AH/ESP.
-		 * We will re-use the IPSEC_IN if it is already present as
-		 * AH/ESP will not affect any fields in the IPSEC_IN for
-		 * ICMP errors. If there is no IPSEC_IN, allocate a new
-		 * one and attach it in the front.
-		 */
-		if (ii != NULL) {
-			/*
-			 * ip_fanout_proto_again converts the ICMP errors
-			 * that come back from AH/ESP to M_DATA so that
-			 * if it is non-AH/ESP and we do a pullupmsg in
-			 * this function, it would work. Convert it back
-			 * to M_CTL before we send up as this is a ICMP
-			 * error. This could have been generated locally or
-			 * by some router. Validate the inner IPsec
-			 * headers.
-			 *
-			 * NOTE : ill_index is used by ip_fanout_proto_again
-			 * to locate the ill.
-			 */
-			ASSERT(ill != NULL);
-			ii->ipsec_in_ill_index =
-			    ill->ill_phyint->phyint_ifindex;
-			ii->ipsec_in_rill_index =
-			    recv_ill->ill_phyint->phyint_ifindex;
-			DB_TYPE(first_mp->b_cont) = M_CTL;
-		} else {
-			/*
-			 * IPSEC_IN is not present. We attach a ipsec_in
-			 * message and send up to IPsec for validating
-			 * and removing the IPsec headers. Clear
-			 * ipsec_in_secure so that when we return
-			 * from IPsec, we don't mistakenly think that this
-			 * is a secure packet came from the network.
-			 *
-			 * NOTE : ill_index is used by ip_fanout_proto_again
-			 * to locate the ill.
-			 */
-			ASSERT(first_mp == mp);
-			first_mp = ipsec_in_alloc(B_TRUE, ipst->ips_netstack);
-			if (first_mp == NULL) {
-				freemsg(mp);
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				return;
-			}
-			ii = (ipsec_in_t *)first_mp->b_rptr;
-
-			/* This is not a secure packet */
-			ii->ipsec_in_secure = B_FALSE;
-			first_mp->b_cont = mp;
-			DB_TYPE(mp) = M_CTL;
-			ASSERT(ill != NULL);
-			ii->ipsec_in_ill_index =
-			    ill->ill_phyint->phyint_ifindex;
-			ii->ipsec_in_rill_index =
-			    recv_ill->ill_phyint->phyint_ifindex;
-		}
-
+	case IPPROTO_AH:
 		if (!ipsec_loaded(ipss)) {
-			ip_proto_not_sup(q, first_mp, 0, zoneid, ipst);
+			ip_proto_not_sup(mp, ira);
 			return;
 		}
 
 		if (ipha->ipha_protocol == IPPROTO_ESP)
-			ipsec_rc = ipsecesp_icmp_error(first_mp);
+			mp = ipsecesp_icmp_error(mp, ira);
 		else
-			ipsec_rc = ipsecah_icmp_error(first_mp);
-		if (ipsec_rc == IPSEC_STATUS_FAILED)
+			mp = ipsecah_icmp_error(mp, ira);
+		if (mp == NULL)
 			return;
 
-		ip_fanout_proto_again(first_mp, ill, recv_ill, NULL);
-		return;
-	}
-	case IPPROTO_ENCAP:
-	case IPPROTO_IPV6:
-		if (ipha->ipha_protocol == IPPROTO_ENCAP) {
-			ipha_t *in_ipha;
-
-			if ((uchar_t *)ipha + hdr_length + sizeof (ipha_t) >
-			    mp->b_wptr) {
-				if (!pullupmsg(mp, (uchar_t *)ipha +
-				    hdr_length + sizeof (ipha_t) -
-				    mp->b_rptr)) {
-					goto discard_pkt;
-				}
-				icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-				ipha = (ipha_t *)&icmph[1];
-			}
-			/*
-			 * Caller has verified that length has to be
-			 * at least the size of IP header.
-			 */
-			ASSERT(hdr_length >= sizeof (ipha_t));
-			/*
-			 * Check the sanity of the inner IP header like
-			 * we did for the outer header.
-			 */
-			in_ipha = (ipha_t *)((uchar_t *)ipha + hdr_length);
-			if ((IPH_HDR_VERSION(in_ipha) != IPV4_VERSION) ||
-			    IPH_HDR_LENGTH(in_ipha) < sizeof (ipha_t))
+		/* Just in case ipsec didn't preserve the NULL b_cont */
+		if (mp->b_cont != NULL) {
+			if (!pullupmsg(mp, -1))
 				goto discard_pkt;
-			/* Check for Self-encapsulated tunnels */
-			if (in_ipha->ipha_src == ipha->ipha_src &&
-			    in_ipha->ipha_dst == ipha->ipha_dst) {
-
-				mp = icmp_inbound_self_encap_error(mp,
-				    iph_hdr_length, hdr_length);
-				if (mp == NULL)
-					goto discard_pkt;
-				icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-				ipha = (ipha_t *)&icmph[1];
-				hdr_length = IPH_HDR_LENGTH(ipha);
-				/*
-				 * The packet in error is self-encapsualted.
-				 * And we are finding it further encapsulated
-				 * which we could not have possibly generated.
-				 */
-				if (ipha->ipha_protocol == IPPROTO_ENCAP) {
-					goto discard_pkt;
-				}
-				icmp_inbound_error_fanout(q, ill, first_mp,
-				    icmph, ipha, iph_hdr_length, hdr_length,
-				    mctl_present, ip_policy, recv_ill, zoneid);
-				return;
-			}
 		}
 
-		DB_TYPE(mp) = M_CTL;
-		if (icmp_inbound_iptun_fanout(first_mp, &ripha, ill, ipst))
+		/*
+		 * Note that ira_pktlen and ira_ip_hdr_length are no longer
+		 * correct, but we don't use them any more here.
+		 *
+		 * If succesful, the mp has been modified to not include
+		 * the ESP/AH header so we can fanout to the ULP's icmp
+		 * error handler.
+		 */
+		if (mp->b_wptr - mp->b_rptr < IP_SIMPLE_HDR_LENGTH)
+			goto truncated;
+
+		/* Verify the modified message before any further processes. */
+		ipha = (ipha_t *)mp->b_rptr;
+		hdr_length = IPH_HDR_LENGTH(ipha);
+		icmph = (icmph_t *)&mp->b_rptr[hdr_length];
+		if (!icmp_inbound_verify_v4(mp, icmph, ira)) {
+			freemsg(mp);
 			return;
+		}
+
+		icmp_inbound_error_fanout_v4(mp, icmph, ira);
+		return;
+
+	case IPPROTO_ENCAP: {
+		/* Look for self-encapsulated packets that caused an error */
+		ipha_t *in_ipha;
+
+		/*
+		 * Caller has verified that length has to be
+		 * at least the size of IP header.
+		 */
+		ASSERT(hdr_length >= sizeof (ipha_t));
+		/*
+		 * Check the sanity of the inner IP header like
+		 * we did for the outer header.
+		 */
+		in_ipha = (ipha_t *)((uchar_t *)ipha + hdr_length);
+		if ((IPH_HDR_VERSION(in_ipha) != IPV4_VERSION)) {
+			goto discard_pkt;
+		}
+		if (IPH_HDR_LENGTH(in_ipha) < sizeof (ipha_t)) {
+			goto discard_pkt;
+		}
+		/* Check for Self-encapsulated tunnels */
+		if (in_ipha->ipha_src == ipha->ipha_src &&
+		    in_ipha->ipha_dst == ipha->ipha_dst) {
+
+			mp = icmp_inbound_self_encap_error_v4(mp, ipha,
+			    in_ipha);
+			if (mp == NULL)
+				goto discard_pkt;
+
+			/*
+			 * Just in case self_encap didn't preserve the NULL
+			 * b_cont
+			 */
+			if (mp->b_cont != NULL) {
+				if (!pullupmsg(mp, -1))
+					goto discard_pkt;
+			}
+			/*
+			 * Note that ira_pktlen and ira_ip_hdr_length are no
+			 * longer correct, but we don't use them any more here.
+			 */
+			if (mp->b_wptr - mp->b_rptr < IP_SIMPLE_HDR_LENGTH)
+				goto truncated;
+
+			/*
+			 * Verify the modified message before any further
+			 * processes.
+			 */
+			ipha = (ipha_t *)mp->b_rptr;
+			hdr_length = IPH_HDR_LENGTH(ipha);
+			icmph = (icmph_t *)&mp->b_rptr[hdr_length];
+			if (!icmp_inbound_verify_v4(mp, icmph, ira)) {
+				freemsg(mp);
+				return;
+			}
+
+			/*
+			 * The packet in error is self-encapsualted.
+			 * And we are finding it further encapsulated
+			 * which we could not have possibly generated.
+			 */
+			if (ipha->ipha_protocol == IPPROTO_ENCAP) {
+				goto discard_pkt;
+			}
+			icmp_inbound_error_fanout_v4(mp, icmph, ira);
+			return;
+		}
+		/* No self-encapsulated */
+		/* FALLTHRU */
+	}
+	case IPPROTO_IPV6:
+		if ((connp = ipcl_iptun_classify_v4(&ripha.ipha_src,
+		    &ripha.ipha_dst, ipst)) != NULL) {
+			ira->ira_flags |= IRAF_ICMP_ERROR;
+			connp->conn_recvicmp(connp, mp, NULL, ira);
+			CONN_DEC_REF(connp);
+			ira->ira_flags &= ~IRAF_ICMP_ERROR;
+			return;
+		}
 		/*
 		 * No IP tunnel is interested, fallthrough and see
 		 * if a raw socket will want it.
 		 */
 		/* FALLTHRU */
 	default:
-		ip_fanout_proto(q, first_mp, ill, &ripha, 0, mctl_present,
-		    ip_policy, recv_ill, zoneid);
+		ira->ira_flags |= IRAF_ICMP_ERROR;
+		ip_fanout_proto_v4(mp, &ripha, ira);
+		ira->ira_flags &= ~IRAF_ICMP_ERROR;
 		return;
 	}
 	/* NOTREACHED */
 discard_pkt:
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-drop_pkt:;
-	ip1dbg(("icmp_inbound_error_fanout: drop pkt\n"));
-	freemsg(first_mp);
+	ip1dbg(("icmp_inbound_error_fanout_v4: drop pkt\n"));
+	ip_drop_input("ipIfStatsInDiscards", mp, ill);
+	freemsg(mp);
+	return;
+
+truncated:
+	/* We pulled up everthing already. Must be truncated */
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTruncatedPkts);
+	ip_drop_input("ipIfStatsInTruncatedPkts", mp, ill);
+	freemsg(mp);
 }
 
 /*
@@ -2742,6 +2493,16 @@ ipoptp_first(ipoptp_t *optp, ipha_t *ipha)
 	    (uint8_t)((IP_VERSION << 4) + IP_SIMPLE_HDR_LENGTH_IN_WORDS);
 	totallen <<= 2;
 	optp->ipoptp_next = (uint8_t *)(&ipha[1]);
+	optp->ipoptp_end = optp->ipoptp_next + totallen;
+	optp->ipoptp_flags = 0;
+	return (ipoptp_next(optp));
+}
+
+/* Like above but without an ipha_t */
+uint8_t
+ipoptp_first2(ipoptp_t *optp, uint32_t totallen, uint8_t *opt)
+{
+	optp->ipoptp_next = opt;
 	optp->ipoptp_end = optp->ipoptp_next + totallen;
 	optp->ipoptp_flags = 0;
 	return (ipoptp_next(optp));
@@ -2858,38 +2619,55 @@ ipoptp_next(ipoptp_t *optp)
 /*
  * Use the outgoing IP header to create an IP_OPTIONS option the way
  * it was passed down from the application.
+ *
+ * This is compatible with BSD in that it returns
+ * the reverse source route with the final destination
+ * as the last entry. The first 4 bytes of the option
+ * will contain the final destination.
  */
 int
-ip_opt_get_user(const ipha_t *ipha, uchar_t *buf)
+ip_opt_get_user(conn_t *connp, uchar_t *buf)
 {
 	ipoptp_t	opts;
-	const uchar_t	*opt;
+	uchar_t		*opt;
 	uint8_t		optval;
 	uint8_t		optlen;
 	uint32_t	len = 0;
-	uchar_t	*buf1 = buf;
+	uchar_t		*buf1 = buf;
+	uint32_t	totallen;
+	ipaddr_t	dst;
+	ip_pkt_t	*ipp = &connp->conn_xmit_ipp;
+
+	if (!(ipp->ipp_fields & IPPF_IPV4_OPTIONS))
+		return (0);
+
+	totallen = ipp->ipp_ipv4_options_len;
+	if (totallen & 0x3)
+		return (0);
 
 	buf += IP_ADDR_LEN;	/* Leave room for final destination */
 	len += IP_ADDR_LEN;
 	bzero(buf1, IP_ADDR_LEN);
 
-	/*
-	 * OK to cast away const here, as we don't store through the returned
-	 * opts.ipoptp_cur pointer.
-	 */
-	for (optval = ipoptp_first(&opts, (ipha_t *)ipha);
+	dst = connp->conn_faddr_v4;
+
+	for (optval = ipoptp_first2(&opts, totallen, ipp->ipp_ipv4_options);
 	    optval != IPOPT_EOL;
 	    optval = ipoptp_next(&opts)) {
 		int	off;
 
 		opt = opts.ipoptp_cur;
+		if ((opts.ipoptp_flags & IPOPTP_ERROR) != 0) {
+			break;
+		}
 		optlen = opts.ipoptp_len;
+
 		switch (optval) {
 		case IPOPT_SSRR:
 		case IPOPT_LSRR:
 
 			/*
-			 * Insert ipha_dst as the first entry in the source
+			 * Insert destination as the first entry in the source
 			 * route and move down the entries on step.
 			 * The last entry gets placed at buf1.
 			 */
@@ -2902,8 +2680,9 @@ ip_opt_get_user(const ipha_t *ipha, uchar_t *buf)
 				/* No entries in source route */
 				break;
 			}
-			/* Last entry in source route */
-			bcopy(opt + off, buf1, IP_ADDR_LEN);
+			/* Last entry in source route if not already set */
+			if (dst == INADDR_ANY)
+				bcopy(opt + off, buf1, IP_ADDR_LEN);
 			off -= IP_ADDR_LEN;
 
 			while (off > 0) {
@@ -2913,19 +2692,12 @@ ip_opt_get_user(const ipha_t *ipha, uchar_t *buf)
 				off -= IP_ADDR_LEN;
 			}
 			/* ipha_dst into first slot */
-			bcopy(&ipha->ipha_dst,
-			    buf + off + IP_ADDR_LEN,
+			bcopy(&dst, buf + off + IP_ADDR_LEN,
 			    IP_ADDR_LEN);
 			buf += optlen;
 			len += optlen;
 			break;
 
-		case IPOPT_COMSEC:
-		case IPOPT_SECURITY:
-			/* if passing up a label is not ok, then remove */
-			if (is_system_labeled())
-				break;
-			/* FALLTHROUGH */
 		default:
 			bcopy(opt, buf, optlen);
 			buf += optlen;
@@ -3007,57 +2779,46 @@ icmp_options_update(ipha_t *ipha)
 
 /*
  * Process received ICMP Redirect messages.
+ * Assumes the caller has verified that the headers are in the pulled up mblk.
+ * Consumes mp.
  */
 static void
-icmp_redirect(ill_t *ill, mblk_t *mp)
+icmp_redirect_v4(mblk_t *mp, ipha_t *ipha, icmph_t *icmph, ip_recv_attr_t *ira)
 {
-	ipha_t	*ipha;
-	int	iph_hdr_length;
-	icmph_t	*icmph;
-	ipha_t	*ipha_err;
-	ire_t	*ire;
-	ire_t	*prev_ire;
-	ire_t	*save_ire;
-	ipaddr_t  src, dst, gateway;
-	iulp_t	ulp_info = { 0 };
-	int	error;
-	ip_stack_t *ipst;
+	ire_t		*ire, *nire;
+	ire_t		*prev_ire;
+	ipaddr_t  	src, dst, gateway;
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
+	ipha_t		*inner_ipha;	/* Inner IP header */
 
-	ASSERT(ill != NULL);
-	ipst = ill->ill_ipst;
-
-	ipha = (ipha_t *)mp->b_rptr;
-	iph_hdr_length = IPH_HDR_LENGTH(ipha);
-	if (((mp->b_wptr - mp->b_rptr) - iph_hdr_length) <
-	    sizeof (icmph_t) + IP_SIMPLE_HDR_LENGTH) {
-		BUMP_MIB(&ipst->ips_icmp_mib, icmpInErrors);
-		freemsg(mp);
-		return;
-	}
-	icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-	ipha_err = (ipha_t *)&icmph[1];
+	/* Caller already pulled up everything. */
+	inner_ipha = (ipha_t *)&icmph[1];
 	src = ipha->ipha_src;
-	dst = ipha_err->ipha_dst;
+	dst = inner_ipha->ipha_dst;
 	gateway = icmph->icmph_rd_gateway;
 	/* Make sure the new gateway is reachable somehow. */
-	ire = ire_route_lookup(gateway, 0, 0, IRE_INTERFACE, NULL, NULL,
-	    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
+	ire = ire_ftable_lookup_v4(gateway, 0, 0, IRE_ONLINK, NULL,
+	    ALL_ZONES, NULL, MATCH_IRE_TYPE, 0, ipst, NULL);
 	/*
 	 * Make sure we had a route for the dest in question and that
 	 * that route was pointing to the old gateway (the source of the
 	 * redirect packet.)
+	 * Note: this merely says that there is some IRE which matches that
+	 * gateway; not that the longest match matches that gateway.
 	 */
-	prev_ire = ire_route_lookup(dst, 0, src, 0, NULL, NULL, ALL_ZONES,
-	    NULL, MATCH_IRE_GW, ipst);
+	prev_ire = ire_ftable_lookup_v4(dst, 0, src, 0, NULL, ALL_ZONES,
+	    NULL, MATCH_IRE_GW, 0, ipst, NULL);
 	/*
 	 * Check that
 	 *	the redirect was not from ourselves
 	 *	the new gateway and the old gateway are directly reachable
 	 */
-	if (!prev_ire ||
-	    !ire ||
-	    ire->ire_type == IRE_LOCAL) {
+	if (prev_ire == NULL || ire == NULL ||
+	    (prev_ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK)) ||
+	    (prev_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
+	    !(ire->ire_type & IRE_IF_ALL)) {
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpInBadRedirects);
+		ip_drop_input("icmpInBadRedirects - ire", mp, ira->ira_ill);
 		freemsg(mp);
 		if (ire != NULL)
 			ire_refrele(ire);
@@ -3066,49 +2827,9 @@ icmp_redirect(ill_t *ill, mblk_t *mp)
 		return;
 	}
 
-	/*
-	 * Should we use the old ULP info to create the new gateway?  From
-	 * a user's perspective, we should inherit the info so that it
-	 * is a "smooth" transition.  If we do not do that, then new
-	 * connections going thru the new gateway will have no route metrics,
-	 * which is counter-intuitive to user.  From a network point of
-	 * view, this may or may not make sense even though the new gateway
-	 * is still directly connected to us so the route metrics should not
-	 * change much.
-	 *
-	 * But if the old ire_uinfo is not initialized, we do another
-	 * recursive lookup on the dest using the new gateway.  There may
-	 * be a route to that.  If so, use it to initialize the redirect
-	 * route.
-	 */
-	if (prev_ire->ire_uinfo.iulp_set) {
-		bcopy(&prev_ire->ire_uinfo, &ulp_info, sizeof (iulp_t));
-	} else {
-		ire_t *tmp_ire;
-		ire_t *sire;
-
-		tmp_ire = ire_ftable_lookup(dst, 0, gateway, 0, NULL, &sire,
-		    ALL_ZONES, 0, NULL,
-		    (MATCH_IRE_RECURSIVE | MATCH_IRE_GW | MATCH_IRE_DEFAULT),
-		    ipst);
-		if (sire != NULL) {
-			bcopy(&sire->ire_uinfo, &ulp_info, sizeof (iulp_t));
-			/*
-			 * If sire != NULL, ire_ftable_lookup() should not
-			 * return a NULL value.
-			 */
-			ASSERT(tmp_ire != NULL);
-			ire_refrele(tmp_ire);
-			ire_refrele(sire);
-		} else if (tmp_ire != NULL) {
-			bcopy(&tmp_ire->ire_uinfo, &ulp_info,
-			    sizeof (iulp_t));
-			ire_refrele(tmp_ire);
-		}
-	}
-	if (prev_ire->ire_type == IRE_CACHE)
-		ire_delete(prev_ire);
 	ire_refrele(prev_ire);
+	ire_refrele(ire);
+
 	/*
 	 * TODO: more precise handling for cases 0, 2, 3, the latter two
 	 * require TOS routing
@@ -3121,47 +2842,42 @@ icmp_redirect(ill_t *ill, mblk_t *mp)
 	case 3:
 		break;
 	default:
-		freemsg(mp);
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpInBadRedirects);
-		ire_refrele(ire);
+		ip_drop_input("icmpInBadRedirects - code", mp, ira->ira_ill);
+		freemsg(mp);
 		return;
 	}
 	/*
 	 * Create a Route Association.  This will allow us to remember that
 	 * someone we believe told us to use the particular gateway.
 	 */
-	save_ire = ire;
 	ire = ire_create(
 	    (uchar_t *)&dst,			/* dest addr */
 	    (uchar_t *)&ip_g_all_ones,		/* mask */
-	    (uchar_t *)&save_ire->ire_src_addr,	/* source addr */
 	    (uchar_t *)&gateway,		/* gateway addr */
-	    &save_ire->ire_max_frag,		/* max frag */
-	    NULL,				/* no src nce */
-	    NULL,				/* no rfq */
-	    NULL,				/* no stq */
 	    IRE_HOST,
-	    NULL,				/* ipif */
-	    0,					/* cmask */
-	    0,					/* phandle */
-	    0,					/* ihandle */
+	    NULL,				/* ill */
+	    ALL_ZONES,
 	    (RTF_DYNAMIC | RTF_GATEWAY | RTF_HOST),
-	    &ulp_info,
 	    NULL,				/* tsol_gc_t */
-	    NULL,				/* gcgrp */
 	    ipst);
 
 	if (ire == NULL) {
 		freemsg(mp);
-		ire_refrele(save_ire);
 		return;
 	}
-	error = ire_add(&ire, NULL, NULL, NULL, B_FALSE);
-	ire_refrele(save_ire);
-	atomic_inc_32(&ipst->ips_ip_redirect_cnt);
+	nire = ire_add(ire);
+	/* Check if it was a duplicate entry */
+	if (nire != NULL && nire != ire) {
+		ASSERT(nire->ire_identical_ref > 1);
+		ire_delete(nire);
+		ire_refrele(nire);
+		nire = NULL;
+	}
+	ire = nire;
+	if (ire != NULL) {
+		ire_refrele(ire);		/* Held in ire_add */
 
-	if (error == 0) {
-		ire_refrele(ire);		/* Held in ire_add_v4 */
 		/* tell routing sockets that we received a redirect */
 		ip_rts_change(RTM_REDIRECT, dst, gateway, IP_HOST_MASK, 0, src,
 		    (RTF_DYNAMIC | RTF_GATEWAY | RTF_HOST), 0,
@@ -3173,8 +2889,8 @@ icmp_redirect(ill_t *ill, mblk_t *mp)
 	 * This together with the added IRE has the effect of
 	 * modifying an existing redirect.
 	 */
-	prev_ire = ire_ftable_lookup(dst, 0, src, IRE_HOST, NULL, NULL,
-	    ALL_ZONES, 0, NULL, (MATCH_IRE_GW | MATCH_IRE_TYPE), ipst);
+	prev_ire = ire_ftable_lookup_v4(dst, 0, src, IRE_HOST, NULL,
+	    ALL_ZONES, NULL, (MATCH_IRE_GW | MATCH_IRE_TYPE), 0, ipst, NULL);
 	if (prev_ire != NULL) {
 		if (prev_ire ->ire_flags & RTF_DYNAMIC)
 			ire_delete(prev_ire);
@@ -3186,29 +2902,24 @@ icmp_redirect(ill_t *ill, mblk_t *mp)
 
 /*
  * Generate an ICMP parameter problem message.
+ * When called from ip_output side a minimal ip_recv_attr_t needs to be
+ * constructed by the caller.
  */
 static void
-icmp_param_problem(queue_t *q, mblk_t *mp, uint8_t ptr, zoneid_t zoneid,
-	ip_stack_t *ipst)
+icmp_param_problem(mblk_t *mp, uint8_t ptr, ip_recv_attr_t *ira)
 {
 	icmph_t	icmph;
-	boolean_t mctl_present;
-	mblk_t *first_mp;
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
 
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-
-	if (!(mp = icmp_pkt_err_ok(mp, ipst))) {
-		if (mctl_present)
-			freeb(first_mp);
+	mp = icmp_pkt_err_ok(mp, ira);
+	if (mp == NULL)
 		return;
-	}
 
 	bzero(&icmph, sizeof (icmph_t));
 	icmph.icmph_type = ICMP_PARAM_PROBLEM;
 	icmph.icmph_pp_ptr = ptr;
 	BUMP_MIB(&ipst->ips_icmp_mib, icmpOutParmProbs);
-	icmp_pkt(q, first_mp, &icmph, sizeof (icmph_t), mctl_present, zoneid,
-	    ipst);
+	icmp_pkt(mp, &icmph, sizeof (icmph_t), ira);
 }
 
 /*
@@ -3217,15 +2928,11 @@ icmp_param_problem(queue_t *q, mblk_t *mp, uint8_t ptr, zoneid_t zoneid,
  * Note: assumes that icmp_pkt_err_ok has been called to verify that
  * an icmp error packet can be sent.
  * Assigns an appropriate source address to the packet. If ipha_dst is
- * one of our addresses use it for source. Otherwise pick a source based
- * on a route lookup back to ipha_src.
- * Note that ipha_src must be set here since the
- * packet is likely to arrive on an ill queue in ip_wput() which will
- * not set a source address.
+ * one of our addresses use it for source. Otherwise let ip_output_simple
+ * pick the source address.
  */
 static void
-icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
-    boolean_t mctl_present, zoneid_t zoneid, ip_stack_t *ipst)
+icmp_pkt(mblk_t *mp, void *stuff, size_t len, ip_recv_attr_t *ira)
 {
 	ipaddr_t dst;
 	icmph_t	*icmph;
@@ -3235,114 +2942,61 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	mblk_t	*mp1;
 	ipaddr_t src;
 	ire_t	*ire;
-	mblk_t *ipsec_mp;
-	ipsec_out_t	*io = NULL;
+	ip_xmit_attr_t ixas;
+	ip_stack_t *ipst = ira->ira_ill->ill_ipst;
 
-	if (mctl_present) {
+	ipha = (ipha_t *)mp->b_rptr;
+
+	bzero(&ixas, sizeof (ixas));
+	ixas.ixa_flags = IXAF_BASIC_SIMPLE_V4;
+	ixas.ixa_zoneid = ira->ira_zoneid;
+	ixas.ixa_ifindex = 0;
+	ixas.ixa_ipst = ipst;
+	ixas.ixa_cred = kcred;
+	ixas.ixa_cpid = NOPID;
+	ixas.ixa_tsl = ira->ira_tsl;	/* Behave as a multi-level responder */
+	ixas.ixa_multicast_ttl = IP_DEFAULT_MULTICAST_TTL;
+
+	if (ira->ira_flags & IRAF_IPSEC_SECURE) {
 		/*
-		 * If it is :
+		 * Apply IPsec based on how IPsec was applied to
+		 * the packet that had the error.
 		 *
-		 * 1) a IPSEC_OUT, then this is caused by outbound
-		 *    datagram originating on this host. IPsec processing
-		 *    may or may not have been done. Refer to comments above
-		 *    icmp_inbound_error_fanout for details.
-		 *
-		 * 2) a IPSEC_IN if we are generating a icmp_message
-		 *    for an incoming datagram destined for us i.e called
-		 *    from ip_fanout_send_icmp.
+		 * If it was an outbound packet that caused the ICMP
+		 * error, then the caller will have setup the IRA
+		 * appropriately.
 		 */
-		ipsec_info_t *in;
-		ipsec_mp = mp;
-		mp = ipsec_mp->b_cont;
-
-		in = (ipsec_info_t *)ipsec_mp->b_rptr;
-		ipha = (ipha_t *)mp->b_rptr;
-
-		ASSERT(in->ipsec_info_type == IPSEC_OUT ||
-		    in->ipsec_info_type == IPSEC_IN);
-
-		if (in->ipsec_info_type == IPSEC_IN) {
-			/*
-			 * Convert the IPSEC_IN to IPSEC_OUT.
-			 */
-			if (!ipsec_in_to_out(ipsec_mp, ipha, NULL, zoneid)) {
-				BUMP_MIB(&ipst->ips_ip_mib,
-				    ipIfStatsOutDiscards);
-				return;
-			}
-			io = (ipsec_out_t *)ipsec_mp->b_rptr;
-		} else {
-			ASSERT(in->ipsec_info_type == IPSEC_OUT);
-			io = (ipsec_out_t *)in;
-			/*
-			 * Clear out ipsec_out_proc_begin, so we do a fresh
-			 * ire lookup.
-			 */
-			io->ipsec_out_proc_begin = B_FALSE;
+		if (!ipsec_in_to_out(ira, &ixas, mp, ipha, NULL)) {
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
+			/* Note: mp already consumed and ip_drop_packet done */
+			return;
 		}
-		ASSERT(zoneid != ALL_ZONES);
-		/*
-		 * The IPSEC_IN (now an IPSEC_OUT) didn't have its zoneid
-		 * initialized.  We need to do that now.
-		 */
-		io->ipsec_out_zoneid = zoneid;
 	} else {
 		/*
 		 * This is in clear. The icmp message we are building
-		 * here should go out in clear.
-		 *
-		 * Pardon the convolution of it all, but it's easier to
-		 * allocate a "use cleartext" IPSEC_IN message and convert
-		 * it than it is to allocate a new one.
+		 * here should go out in clear, independent of our policy.
 		 */
-		ipsec_in_t *ii;
-		ASSERT(DB_TYPE(mp) == M_DATA);
-		ipsec_mp = ipsec_in_alloc(B_TRUE, ipst->ips_netstack);
-		if (ipsec_mp == NULL) {
-			freemsg(mp);
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-			return;
-		}
-		ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-
-		/* This is not a secure packet */
-		ii->ipsec_in_secure = B_FALSE;
-		ipsec_mp->b_cont = mp;
-		ipha = (ipha_t *)mp->b_rptr;
-		/*
-		 * Convert the IPSEC_IN to IPSEC_OUT.
-		 */
-		if (!ipsec_in_to_out(ipsec_mp, ipha, NULL, zoneid)) {
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-			return;
-		}
-		io = (ipsec_out_t *)ipsec_mp->b_rptr;
+		ixas.ixa_flags |= IXAF_NO_IPSEC;
 	}
 
 	/* Remember our eventual destination */
 	dst = ipha->ipha_src;
 
-	ire = ire_route_lookup(ipha->ipha_dst, 0, 0, (IRE_LOCAL|IRE_LOOPBACK),
-	    NULL, NULL, zoneid, NULL, MATCH_IRE_TYPE, ipst);
-	if (ire != NULL &&
-	    (ire->ire_zoneid == zoneid || ire->ire_zoneid == ALL_ZONES)) {
+	/*
+	 * If the packet was for one of our unicast addresses, make
+	 * sure we respond with that as the source. Otherwise
+	 * have ip_output_simple pick the source address.
+	 */
+	ire = ire_ftable_lookup_v4(ipha->ipha_dst, 0, 0,
+	    (IRE_LOCAL|IRE_LOOPBACK), NULL, ira->ira_zoneid, NULL,
+	    MATCH_IRE_TYPE|MATCH_IRE_ZONEONLY, 0, ipst, NULL);
+	if (ire != NULL) {
+		ire_refrele(ire);
 		src = ipha->ipha_dst;
 	} else {
-		if (ire != NULL)
-			ire_refrele(ire);
-		ire = ire_route_lookup(dst, 0, 0, 0, NULL, NULL, zoneid, NULL,
-		    (MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE|MATCH_IRE_ZONEONLY),
-		    ipst);
-		if (ire == NULL) {
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutNoRoutes);
-			freemsg(ipsec_mp);
-			return;
-		}
-		src = ire->ire_src_addr;
+		src = INADDR_ANY;
+		ixas.ixa_flags |= IXAF_SET_SOURCE;
 	}
-
-	if (ire != NULL)
-		ire_refrele(ire);
 
 	/*
 	 * Check if we can send back more then 8 bytes in addition to
@@ -3352,10 +3006,10 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	len_needed = IPH_HDR_LENGTH(ipha);
 	if (ipha->ipha_protocol == IPPROTO_ENCAP ||
 	    ipha->ipha_protocol == IPPROTO_IPV6) {
-
 		if (!pullupmsg(mp, -1)) {
 			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-			freemsg(ipsec_mp);
+			ip_drop_output("ipIfStatsOutDiscards", mp, NULL);
+			freemsg(mp);
 			return;
 		}
 		ipha = (ipha_t *)mp->b_rptr;
@@ -3376,28 +3030,23 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		(void) adjmsg(mp, len_needed - msg_len);
 		msg_len = len_needed;
 	}
-	/* Make sure we propagate the cred/label for TX */
-	mp1 = allocb_tmpl(sizeof (icmp_ipha) + len, mp);
+	mp1 = allocb(sizeof (icmp_ipha) + len, BPRI_MED);
 	if (mp1 == NULL) {
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpOutErrors);
-		freemsg(ipsec_mp);
+		freemsg(mp);
 		return;
 	}
 	mp1->b_cont = mp;
 	mp = mp1;
-	ASSERT(ipsec_mp->b_datap->db_type == M_CTL &&
-	    ipsec_mp->b_rptr == (uint8_t *)io &&
-	    io->ipsec_out_type == IPSEC_OUT);
-	ipsec_mp->b_cont = mp;
 
 	/*
-	 * Set ipsec_out_icmp_loopback so we can let the ICMP messages this
+	 * Set IXAF_TRUSTED_ICMP so we can let the ICMP messages this
 	 * node generates be accepted in peace by all on-host destinations.
 	 * If we do NOT assume that all on-host destinations trust
 	 * self-generated ICMP messages, then rework here, ip6.c, and spd.c.
-	 * (Look for ipsec_out_icmp_loopback).
+	 * (Look for IXAF_TRUSTED_ICMP).
 	 */
-	io->ipsec_out_icmp_loopback = B_TRUE;
+	ixas.ixa_flags |= IXAF_TRUSTED_ICMP;
 
 	ipha = (ipha_t *)mp->b_rptr;
 	mp1->b_wptr = (uchar_t *)ipha + (sizeof (icmp_ipha) + len);
@@ -3416,7 +3065,9 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	icmph->icmph_checksum = 0;
 	icmph->icmph_checksum = IP_CSUM(mp, (int32_t)sizeof (ipha_t), 0);
 	BUMP_MIB(&ipst->ips_icmp_mib, icmpOutMsgs);
-	put(q, ipsec_mp);
+
+	(void) ip_output_simple(mp, &ixas);
+	ixa_cleanup(&ixas);
 }
 
 /*
@@ -3480,37 +3131,30 @@ icmp_err_rate_limit(ip_stack_t *ipst)
  * ICMP error packet should be sent.
  */
 static mblk_t *
-icmp_pkt_err_ok(mblk_t *mp, ip_stack_t *ipst)
+icmp_pkt_err_ok(mblk_t *mp, ip_recv_attr_t *ira)
 {
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
 	icmph_t	*icmph;
 	ipha_t	*ipha;
 	uint_t	len_needed;
-	ire_t	*src_ire;
-	ire_t	*dst_ire;
 
 	if (!mp)
 		return (NULL);
 	ipha = (ipha_t *)mp->b_rptr;
 	if (ip_csum_hdr(ipha)) {
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInCksumErrs);
+		ip_drop_input("ipIfStatsInCksumErrs", mp, NULL);
 		freemsg(mp);
 		return (NULL);
 	}
-	src_ire = ire_ctable_lookup(ipha->ipha_dst, 0, IRE_BROADCAST,
-	    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-	dst_ire = ire_ctable_lookup(ipha->ipha_src, 0, IRE_BROADCAST,
-	    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-	if (src_ire != NULL || dst_ire != NULL ||
+	if (ip_type_v4(ipha->ipha_dst, ipst) == IRE_BROADCAST ||
+	    ip_type_v4(ipha->ipha_src, ipst) == IRE_BROADCAST ||
 	    CLASSD(ipha->ipha_dst) ||
 	    CLASSD(ipha->ipha_src) ||
 	    (ntohs(ipha->ipha_fragment_offset_and_flags) & IPH_OFFSET)) {
 		/* Note: only errors to the fragment with offset 0 */
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpOutDrops);
 		freemsg(mp);
-		if (src_ire != NULL)
-			ire_refrele(src_ire);
-		if (dst_ire != NULL)
-			ire_refrele(dst_ire);
 		return (NULL);
 	}
 	if (ipha->ipha_protocol == IPPROTO_ICMP) {
@@ -3546,7 +3190,7 @@ icmp_pkt_err_ok(mblk_t *mp, ip_stack_t *ipst)
 	 * If this is a labeled system, then check to see if we're allowed to
 	 * send a response to this particular sender.  If not, then just drop.
 	 */
-	if (is_system_labeled() && !tsol_can_reply_error(mp)) {
+	if (is_system_labeled() && !tsol_can_reply_error(mp, ira)) {
 		ip2dbg(("icmp_pkt_err_ok: can't respond to packet\n"));
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpOutDrops);
 		freemsg(mp);
@@ -3565,956 +3209,178 @@ icmp_pkt_err_ok(mblk_t *mp, ip_stack_t *ipst)
 }
 
 /*
+ * Called when a packet was sent out the same link that it arrived on.
+ * Check if it is ok to send a redirect and then send it.
+ */
+void
+ip_send_potential_redirect_v4(mblk_t *mp, ipha_t *ipha, ire_t *ire,
+    ip_recv_attr_t *ira)
+{
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
+	ipaddr_t	src, nhop;
+	mblk_t		*mp1;
+	ire_t		*nhop_ire;
+
+	/*
+	 * Check the source address to see if it originated
+	 * on the same logical subnet it is going back out on.
+	 * If so, we should be able to send it a redirect.
+	 * Avoid sending a redirect if the destination
+	 * is directly connected (i.e., we matched an IRE_ONLINK),
+	 * or if the packet was source routed out this interface.
+	 *
+	 * We avoid sending a redirect if the
+	 * destination is directly connected
+	 * because it is possible that multiple
+	 * IP subnets may have been configured on
+	 * the link, and the source may not
+	 * be on the same subnet as ip destination,
+	 * even though they are on the same
+	 * physical link.
+	 */
+	if ((ire->ire_type & IRE_ONLINK) ||
+	    ip_source_routed(ipha, ipst))
+		return;
+
+	nhop_ire = ire_nexthop(ire);
+	if (nhop_ire == NULL)
+		return;
+
+	nhop = nhop_ire->ire_addr;
+
+	if (nhop_ire->ire_type & IRE_IF_CLONE) {
+		ire_t	*ire2;
+
+		/* Follow ire_dep_parent to find non-clone IRE_INTERFACE */
+		mutex_enter(&nhop_ire->ire_lock);
+		ire2 = nhop_ire->ire_dep_parent;
+		if (ire2 != NULL)
+			ire_refhold(ire2);
+		mutex_exit(&nhop_ire->ire_lock);
+		ire_refrele(nhop_ire);
+		nhop_ire = ire2;
+	}
+	if (nhop_ire == NULL)
+		return;
+
+	ASSERT(!(nhop_ire->ire_type & IRE_IF_CLONE));
+
+	src = ipha->ipha_src;
+
+	/*
+	 * We look at the interface ire for the nexthop,
+	 * to see if ipha_src is in the same subnet
+	 * as the nexthop.
+	 */
+	if ((src & nhop_ire->ire_mask) == (nhop & nhop_ire->ire_mask)) {
+		/*
+		 * The source is directly connected.
+		 */
+		mp1 = copymsg(mp);
+		if (mp1 != NULL) {
+			icmp_send_redirect(mp1, nhop, ira);
+		}
+	}
+	ire_refrele(nhop_ire);
+}
+
+/*
  * Generate an ICMP redirect message.
  */
 static void
-icmp_send_redirect(queue_t *q, mblk_t *mp, ipaddr_t gateway, ip_stack_t *ipst)
+icmp_send_redirect(mblk_t *mp, ipaddr_t gateway, ip_recv_attr_t *ira)
 {
 	icmph_t	icmph;
+	ip_stack_t *ipst = ira->ira_ill->ill_ipst;
 
-	/*
-	 * We are called from ip_rput where we could
-	 * not have attached an IPSEC_IN.
-	 */
-	ASSERT(mp->b_datap->db_type == M_DATA);
-
-	if (!(mp = icmp_pkt_err_ok(mp, ipst))) {
+	mp = icmp_pkt_err_ok(mp, ira);
+	if (mp == NULL)
 		return;
-	}
 
 	bzero(&icmph, sizeof (icmph_t));
 	icmph.icmph_type = ICMP_REDIRECT;
 	icmph.icmph_code = 1;
 	icmph.icmph_rd_gateway = gateway;
 	BUMP_MIB(&ipst->ips_icmp_mib, icmpOutRedirects);
-	/* Redirects sent by router, and router is global zone */
-	icmp_pkt(q, mp, &icmph, sizeof (icmph_t), B_FALSE, GLOBAL_ZONEID, ipst);
+	icmp_pkt(mp, &icmph, sizeof (icmph_t), ira);
 }
 
 /*
  * Generate an ICMP time exceeded message.
  */
 void
-icmp_time_exceeded(queue_t *q, mblk_t *mp, uint8_t code, zoneid_t zoneid,
-    ip_stack_t *ipst)
+icmp_time_exceeded(mblk_t *mp, uint8_t code, ip_recv_attr_t *ira)
 {
 	icmph_t	icmph;
-	boolean_t mctl_present;
-	mblk_t *first_mp;
+	ip_stack_t *ipst = ira->ira_ill->ill_ipst;
 
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-
-	if (!(mp = icmp_pkt_err_ok(mp, ipst))) {
-		if (mctl_present)
-			freeb(first_mp);
+	mp = icmp_pkt_err_ok(mp, ira);
+	if (mp == NULL)
 		return;
-	}
 
 	bzero(&icmph, sizeof (icmph_t));
 	icmph.icmph_type = ICMP_TIME_EXCEEDED;
 	icmph.icmph_code = code;
 	BUMP_MIB(&ipst->ips_icmp_mib, icmpOutTimeExcds);
-	icmp_pkt(q, first_mp, &icmph, sizeof (icmph_t), mctl_present, zoneid,
-	    ipst);
+	icmp_pkt(mp, &icmph, sizeof (icmph_t), ira);
 }
 
 /*
  * Generate an ICMP unreachable message.
+ * When called from ip_output side a minimal ip_recv_attr_t needs to be
+ * constructed by the caller.
  */
 void
-icmp_unreachable(queue_t *q, mblk_t *mp, uint8_t code, zoneid_t zoneid,
-    ip_stack_t *ipst)
+icmp_unreachable(mblk_t *mp, uint8_t code, ip_recv_attr_t *ira)
 {
 	icmph_t	icmph;
-	mblk_t *first_mp;
-	boolean_t mctl_present;
+	ip_stack_t *ipst = ira->ira_ill->ill_ipst;
 
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-
-	if (!(mp = icmp_pkt_err_ok(mp, ipst))) {
-		if (mctl_present)
-			freeb(first_mp);
+	mp = icmp_pkt_err_ok(mp, ira);
+	if (mp == NULL)
 		return;
-	}
 
 	bzero(&icmph, sizeof (icmph_t));
 	icmph.icmph_type = ICMP_DEST_UNREACHABLE;
 	icmph.icmph_code = code;
 	BUMP_MIB(&ipst->ips_icmp_mib, icmpOutDestUnreachs);
-	ip2dbg(("send icmp destination unreachable code %d\n", code));
-	icmp_pkt(q, first_mp, (char *)&icmph, sizeof (icmph_t), mctl_present,
-	    zoneid, ipst);
+	icmp_pkt(mp, &icmph, sizeof (icmph_t), ira);
 }
 
 /*
- * Attempt to start recovery of an IPv4 interface that's been shut down as a
- * duplicate.  As long as someone else holds the address, the interface will
- * stay down.  When that conflict goes away, the interface is brought back up.
- * This is done so that accidental shutdowns of addresses aren't made
- * permanent.  Your server will recover from a failure.
- *
- * For DHCP, recovery is not done in the kernel.  Instead, it's handled by a
- * user space process (dhcpagent).
- *
- * Recovery completes if ARP reports that the address is now ours (via
- * AR_CN_READY).  In that case, we go to ip_arp_excl to finish the operation.
- *
- * This function is entered on a timer expiry; the ID is in ipif_recovery_id.
+ * Latch in the IPsec state for a stream based the policy in the listener
+ * and the actions in the ip_recv_attr_t.
+ * Called directly from TCP and SCTP.
  */
-static void
-ipif_dup_recovery(void *arg)
-{
-	ipif_t *ipif = arg;
-	ill_t *ill = ipif->ipif_ill;
-	mblk_t *arp_add_mp;
-	mblk_t *arp_del_mp;
-	ip_stack_t *ipst = ill->ill_ipst;
-
-	ipif->ipif_recovery_id = 0;
-
-	/*
-	 * No lock needed for moving or condemned check, as this is just an
-	 * optimization.
-	 */
-	if (ill->ill_arp_closing || !(ipif->ipif_flags & IPIF_DUPLICATE) ||
-	    (ipif->ipif_flags & IPIF_POINTOPOINT) ||
-	    (ipif->ipif_state_flags & (IPIF_CONDEMNED))) {
-		/* No reason to try to bring this address back. */
-		return;
-	}
-
-	/* ACE_F_UNVERIFIED restarts DAD */
-	if ((arp_add_mp = ipif_area_alloc(ipif, ACE_F_UNVERIFIED)) == NULL)
-		goto alloc_fail;
-
-	if (ipif->ipif_arp_del_mp == NULL) {
-		if ((arp_del_mp = ipif_ared_alloc(ipif)) == NULL)
-			goto alloc_fail;
-		ipif->ipif_arp_del_mp = arp_del_mp;
-	}
-
-	putnext(ill->ill_rq, arp_add_mp);
-	return;
-
-alloc_fail:
-	/*
-	 * On allocation failure, just restart the timer.  Note that the ipif
-	 * is down here, so no other thread could be trying to start a recovery
-	 * timer.  The ill_lock protects the condemned flag and the recovery
-	 * timer ID.
-	 */
-	freemsg(arp_add_mp);
-	mutex_enter(&ill->ill_lock);
-	if (ipst->ips_ip_dup_recovery > 0 && ipif->ipif_recovery_id == 0 &&
-	    !(ipif->ipif_state_flags & IPIF_CONDEMNED)) {
-		ipif->ipif_recovery_id = timeout(ipif_dup_recovery, ipif,
-		    MSEC_TO_TICK(ipst->ips_ip_dup_recovery));
-	}
-	mutex_exit(&ill->ill_lock);
-}
-
-/*
- * This is for exclusive changes due to ARP.  Either tear down an interface due
- * to AR_CN_FAILED and AR_CN_BOGON, or bring one up for successful recovery.
- */
-/* ARGSUSED */
-static void
-ip_arp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
-{
-	ill_t	*ill = rq->q_ptr;
-	arh_t *arh;
-	ipaddr_t src;
-	ipif_t	*ipif;
-	char ibuf[LIFNAMSIZ + 10];	/* 10 digits for logical i/f number */
-	char hbuf[MAC_STR_LEN];
-	char sbuf[INET_ADDRSTRLEN];
-	const char *failtype;
-	boolean_t bring_up;
-	ip_stack_t *ipst = ill->ill_ipst;
-
-	switch (((arcn_t *)mp->b_rptr)->arcn_code) {
-	case AR_CN_READY:
-		failtype = NULL;
-		bring_up = B_TRUE;
-		break;
-	case AR_CN_FAILED:
-		failtype = "in use";
-		bring_up = B_FALSE;
-		break;
-	default:
-		failtype = "claimed";
-		bring_up = B_FALSE;
-		break;
-	}
-
-	arh = (arh_t *)mp->b_cont->b_rptr;
-	bcopy((char *)&arh[1] + arh->arh_hlen, &src, IP_ADDR_LEN);
-
-	(void) mac_colon_addr((uint8_t *)(arh + 1), arh->arh_hlen, hbuf,
-	    sizeof (hbuf));
-	(void) ip_dot_addr(src, sbuf);
-	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
-
-		if ((ipif->ipif_flags & IPIF_POINTOPOINT) ||
-		    ipif->ipif_lcl_addr != src) {
-			continue;
-		}
-
-		/*
-		 * If we failed on a recovery probe, then restart the timer to
-		 * try again later.
-		 */
-		if (!bring_up && (ipif->ipif_flags & IPIF_DUPLICATE) &&
-		    !(ipif->ipif_flags & (IPIF_DHCPRUNNING|IPIF_TEMPORARY)) &&
-		    ill->ill_net_type == IRE_IF_RESOLVER &&
-		    !(ipif->ipif_state_flags & IPIF_CONDEMNED) &&
-		    ipst->ips_ip_dup_recovery > 0 &&
-		    ipif->ipif_recovery_id == 0) {
-			ipif->ipif_recovery_id = timeout(ipif_dup_recovery,
-			    ipif, MSEC_TO_TICK(ipst->ips_ip_dup_recovery));
-			continue;
-		}
-
-		/*
-		 * If what we're trying to do has already been done, then do
-		 * nothing.
-		 */
-		if (bring_up == ((ipif->ipif_flags & IPIF_UP) != 0))
-			continue;
-
-		ipif_get_name(ipif, ibuf, sizeof (ibuf));
-
-		if (failtype == NULL) {
-			cmn_err(CE_NOTE, "recovered address %s on %s", sbuf,
-			    ibuf);
-		} else {
-			cmn_err(CE_WARN, "%s has duplicate address %s (%s "
-			    "by %s); disabled", ibuf, sbuf, failtype, hbuf);
-		}
-
-		if (bring_up) {
-			ASSERT(ill->ill_dl_up);
-			/*
-			 * Free up the ARP delete message so we can allocate
-			 * a fresh one through the normal path.
-			 */
-			freemsg(ipif->ipif_arp_del_mp);
-			ipif->ipif_arp_del_mp = NULL;
-			if (ipif_resolver_up(ipif, Res_act_initial) !=
-			    EINPROGRESS) {
-				ipif->ipif_addr_ready = 1;
-				(void) ipif_up_done(ipif);
-				ASSERT(ill->ill_move_ipif == NULL);
-			}
-			continue;
-		}
-
-		mutex_enter(&ill->ill_lock);
-		ASSERT(!(ipif->ipif_flags & IPIF_DUPLICATE));
-		ipif->ipif_flags |= IPIF_DUPLICATE;
-		ill->ill_ipif_dup_count++;
-		mutex_exit(&ill->ill_lock);
-		/*
-		 * Already exclusive on the ill; no need to handle deferred
-		 * processing here.
-		 */
-		(void) ipif_down(ipif, NULL, NULL);
-		ipif_down_tail(ipif);
-		mutex_enter(&ill->ill_lock);
-		if (!(ipif->ipif_flags & (IPIF_DHCPRUNNING|IPIF_TEMPORARY)) &&
-		    ill->ill_net_type == IRE_IF_RESOLVER &&
-		    !(ipif->ipif_state_flags & IPIF_CONDEMNED) &&
-		    ipst->ips_ip_dup_recovery > 0) {
-			ASSERT(ipif->ipif_recovery_id == 0);
-			ipif->ipif_recovery_id = timeout(ipif_dup_recovery,
-			    ipif, MSEC_TO_TICK(ipst->ips_ip_dup_recovery));
-		}
-		mutex_exit(&ill->ill_lock);
-	}
-	freemsg(mp);
-}
-
-/* ARGSUSED */
-static void
-ip_arp_defend(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
-{
-	ill_t	*ill = rq->q_ptr;
-	arh_t *arh;
-	ipaddr_t src;
-	ipif_t	*ipif;
-
-	arh = (arh_t *)mp->b_cont->b_rptr;
-	bcopy((char *)&arh[1] + arh->arh_hlen, &src, IP_ADDR_LEN);
-	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
-		if ((ipif->ipif_flags & IPIF_UP) && ipif->ipif_lcl_addr == src)
-			(void) ipif_resolver_up(ipif, Res_act_defend);
-	}
-	freemsg(mp);
-}
-
-/*
- * News from ARP.  ARP sends notification of interesting events down
- * to its clients using M_CTL messages with the interesting ARP packet
- * attached via b_cont.
- * The interesting event from a device comes up the corresponding ARP-IP-DEV
- * queue as opposed to ARP sending the message to all the clients, i.e. all
- * its ARP-IP-DEV instances. Thus, for AR_CN_ANNOUNCE, we must walk the cache
- * table if a cache IRE is found to delete all the entries for the address in
- * the packet.
- */
-static void
-ip_arp_news(queue_t *q, mblk_t *mp)
-{
-	arcn_t		*arcn;
-	arh_t		*arh;
-	ire_t		*ire = NULL;
-	char		hbuf[MAC_STR_LEN];
-	char		sbuf[INET_ADDRSTRLEN];
-	ipaddr_t	src;
-	in6_addr_t	v6src;
-	boolean_t	isv6 = B_FALSE;
-	ipif_t		*ipif;
-	ill_t		*ill;
-	ip_stack_t	*ipst;
-
-	if (CONN_Q(q)) {
-		conn_t *connp = Q_TO_CONN(q);
-
-		ipst = connp->conn_netstack->netstack_ip;
-	} else {
-		ill_t *ill = (ill_t *)q->q_ptr;
-
-		ipst = ill->ill_ipst;
-	}
-
-	if ((mp->b_wptr - mp->b_rptr) < sizeof (arcn_t)	|| !mp->b_cont) {
-		if (q->q_next) {
-			putnext(q, mp);
-		} else
-			freemsg(mp);
-		return;
-	}
-	arh = (arh_t *)mp->b_cont->b_rptr;
-	/* Is it one we are interested in? */
-	if (BE16_TO_U16(arh->arh_proto) == ETHERTYPE_IPV6) {
-		isv6 = B_TRUE;
-		bcopy((char *)&arh[1] + (arh->arh_hlen & 0xFF), &v6src,
-		    IPV6_ADDR_LEN);
-	} else if (BE16_TO_U16(arh->arh_proto) == IP_ARP_PROTO_TYPE) {
-		bcopy((char *)&arh[1] + (arh->arh_hlen & 0xFF), &src,
-		    IP_ADDR_LEN);
-	} else {
-		freemsg(mp);
-		return;
-	}
-
-	ill = q->q_ptr;
-
-	arcn = (arcn_t *)mp->b_rptr;
-	switch (arcn->arcn_code) {
-	case AR_CN_BOGON:
-		/*
-		 * Someone is sending ARP packets with a source protocol
-		 * address that we have published and for which we believe our
-		 * entry is authoritative and (when ill_arp_extend is set)
-		 * verified to be unique on the network.
-		 *
-		 * The ARP module internally handles the cases where the sender
-		 * is just probing (for DAD) and where the hardware address of
-		 * a non-authoritative entry has changed.  Thus, these are the
-		 * real conflicts, and we have to do resolution.
-		 *
-		 * We back away quickly from the address if it's from DHCP or
-		 * otherwise temporary and hasn't been used recently (or at
-		 * all).  We'd like to include "deprecated" addresses here as
-		 * well (as there's no real reason to defend something we're
-		 * discarding), but IPMP "reuses" this flag to mean something
-		 * other than the standard meaning.
-		 *
-		 * If the ARP module above is not extended (meaning that it
-		 * doesn't know how to defend the address), then we just log
-		 * the problem as we always did and continue on.  It's not
-		 * right, but there's little else we can do, and those old ATM
-		 * users are going away anyway.
-		 */
-		(void) mac_colon_addr((uint8_t *)(arh + 1), arh->arh_hlen,
-		    hbuf, sizeof (hbuf));
-		(void) ip_dot_addr(src, sbuf);
-		if (isv6) {
-			ire = ire_cache_lookup_v6(&v6src, ALL_ZONES, NULL,
-			    ipst);
-		} else {
-			ire = ire_cache_lookup(src, ALL_ZONES, NULL, ipst);
-		}
-		if (ire != NULL	&& IRE_IS_LOCAL(ire)) {
-			uint32_t now;
-			uint32_t maxage;
-			clock_t lused;
-			uint_t maxdefense;
-			uint_t defs;
-
-			/*
-			 * First, figure out if this address hasn't been used
-			 * in a while.  If it hasn't, then it's a better
-			 * candidate for abandoning.
-			 */
-			ipif = ire->ire_ipif;
-			ASSERT(ipif != NULL);
-			now = gethrestime_sec();
-			maxage = now - ire->ire_create_time;
-			if (maxage > ipst->ips_ip_max_temp_idle)
-				maxage = ipst->ips_ip_max_temp_idle;
-			lused = drv_hztousec(ddi_get_lbolt() -
-			    ire->ire_last_used_time) / MICROSEC + 1;
-			if (lused >= maxage && (ipif->ipif_flags &
-			    (IPIF_DHCPRUNNING | IPIF_TEMPORARY)))
-				maxdefense = ipst->ips_ip_max_temp_defend;
-			else
-				maxdefense = ipst->ips_ip_max_defend;
-
-			/*
-			 * Now figure out how many times we've defended
-			 * ourselves.  Ignore defenses that happened long in
-			 * the past.
-			 */
-			mutex_enter(&ire->ire_lock);
-			if ((defs = ire->ire_defense_count) > 0 &&
-			    now - ire->ire_defense_time >
-			    ipst->ips_ip_defend_interval) {
-				ire->ire_defense_count = defs = 0;
-			}
-			ire->ire_defense_count++;
-			ire->ire_defense_time = now;
-			mutex_exit(&ire->ire_lock);
-			ill_refhold(ill);
-			ire_refrele(ire);
-
-			/*
-			 * If we've defended ourselves too many times already,
-			 * then give up and tear down the interface(s) using
-			 * this address.  Otherwise, defend by sending out a
-			 * gratuitous ARP.
-			 */
-			if (defs >= maxdefense && ill->ill_arp_extend) {
-				qwriter_ip(ill, q, mp, ip_arp_excl, NEW_OP,
-				    B_FALSE);
-			} else {
-				cmn_err(CE_WARN,
-				    "node %s is using our IP address %s on %s",
-				    hbuf, sbuf, ill->ill_name);
-				/*
-				 * If this is an old (ATM) ARP module, then
-				 * don't try to defend the address.  Remain
-				 * compatible with the old behavior.  Defend
-				 * only with new ARP.
-				 */
-				if (ill->ill_arp_extend) {
-					qwriter_ip(ill, q, mp, ip_arp_defend,
-					    NEW_OP, B_FALSE);
-				} else {
-					ill_refrele(ill);
-				}
-			}
-			return;
-		}
-		cmn_err(CE_WARN,
-		    "proxy ARP problem?  Node '%s' is using %s on %s",
-		    hbuf, sbuf, ill->ill_name);
-		if (ire != NULL)
-			ire_refrele(ire);
-		break;
-	case AR_CN_ANNOUNCE:
-		if (isv6) {
-			/*
-			 * For XRESOLV interfaces.
-			 * Delete the IRE cache entry and NCE for this
-			 * v6 address
-			 */
-			ip_ire_clookup_and_delete_v6(&v6src, ipst);
-			/*
-			 * If v6src is a non-zero, it's a router address
-			 * as below. Do the same sort of thing to clean
-			 * out off-net IRE_CACHE entries that go through
-			 * the router.
-			 */
-			if (!IN6_IS_ADDR_UNSPECIFIED(&v6src)) {
-				ire_walk_v6(ire_delete_cache_gw_v6,
-				    (char *)&v6src, ALL_ZONES, ipst);
-			}
-		} else {
-			nce_hw_map_t hwm;
-
-			/*
-			 * ARP gives us a copy of any packet where it thinks
-			 * the address has changed, so that we can update our
-			 * caches.  We're responsible for caching known answers
-			 * in the current design.  We check whether the
-			 * hardware address really has changed in all of our
-			 * entries that have cached this mapping, and if so, we
-			 * blow them away.  This way we will immediately pick
-			 * up the rare case of a host changing hardware
-			 * address.
-			 */
-			if (src == 0)
-				break;
-			hwm.hwm_addr = src;
-			hwm.hwm_hwlen = arh->arh_hlen;
-			hwm.hwm_hwaddr = (uchar_t *)(arh + 1);
-			NDP_HW_CHANGE_INCR(ipst->ips_ndp4);
-			ndp_walk_common(ipst->ips_ndp4, NULL,
-			    (pfi_t)nce_delete_hw_changed, &hwm, ALL_ZONES);
-			NDP_HW_CHANGE_DECR(ipst->ips_ndp4);
-		}
-		break;
-	case AR_CN_READY:
-		/* No external v6 resolver has a contract to use this */
-		if (isv6)
-			break;
-		/* If the link is down, we'll retry this later */
-		if (!(ill->ill_phyint->phyint_flags & PHYI_RUNNING))
-			break;
-		ipif = ipif_lookup_addr(src, ill, ALL_ZONES, NULL, NULL,
-		    NULL, NULL, ipst);
-		if (ipif != NULL) {
-			/*
-			 * If this is a duplicate recovery, then we now need to
-			 * go exclusive to bring this thing back up.
-			 */
-			if ((ipif->ipif_flags & (IPIF_UP|IPIF_DUPLICATE)) ==
-			    IPIF_DUPLICATE) {
-				ipif_refrele(ipif);
-				ill_refhold(ill);
-				qwriter_ip(ill, q, mp, ip_arp_excl, NEW_OP,
-				    B_FALSE);
-				return;
-			}
-			/*
-			 * If this is the first notice that this address is
-			 * ready, then let the user know now.
-			 */
-			if ((ipif->ipif_flags & IPIF_UP) &&
-			    !ipif->ipif_addr_ready) {
-				ipif_mask_reply(ipif);
-				ipif_up_notify(ipif);
-			}
-			ipif->ipif_addr_ready = 1;
-			ipif_refrele(ipif);
-		}
-		ire = ire_cache_lookup(src, ALL_ZONES, msg_getlabel(mp), ipst);
-		if (ire != NULL) {
-			ire->ire_defense_count = 0;
-			ire_refrele(ire);
-		}
-		break;
-	case AR_CN_FAILED:
-		/* No external v6 resolver has a contract to use this */
-		if (isv6)
-			break;
-		if (!ill->ill_arp_extend) {
-			(void) mac_colon_addr((uint8_t *)(arh + 1),
-			    arh->arh_hlen, hbuf, sizeof (hbuf));
-			(void) ip_dot_addr(src, sbuf);
-
-			cmn_err(CE_WARN,
-			    "node %s is using our IP address %s on %s",
-			    hbuf, sbuf, ill->ill_name);
-			break;
-		}
-		ill_refhold(ill);
-		qwriter_ip(ill, q, mp, ip_arp_excl, NEW_OP, B_FALSE);
-		return;
-	}
-	freemsg(mp);
-}
-
-/*
- * Create a mblk suitable for carrying the interface index and/or source link
- * address. This mblk is tagged as an M_CTL and is sent to ULP. This is used
- * when the IP_RECVIF and/or IP_RECVSLLA socket option is set by the user
- * application.
- */
-mblk_t *
-ip_add_info(mblk_t *data_mp, ill_t *ill, uint_t flags, zoneid_t zoneid,
-    ip_stack_t *ipst)
-{
-	mblk_t		*mp;
-	ip_pktinfo_t	*pinfo;
-	ipha_t 		*ipha;
-	struct ether_header *pether;
-	boolean_t	ipmp_ill_held = B_FALSE;
-
-	mp = allocb(sizeof (ip_pktinfo_t), BPRI_MED);
-	if (mp == NULL) {
-		ip1dbg(("ip_add_info: allocation failure.\n"));
-		return (data_mp);
-	}
-
-	ipha = (ipha_t *)data_mp->b_rptr;
-	pinfo = (ip_pktinfo_t *)mp->b_rptr;
-	bzero(pinfo, sizeof (ip_pktinfo_t));
-	pinfo->ip_pkt_flags = (uchar_t)flags;
-	pinfo->ip_pkt_ulp_type = IN_PKTINFO;	/* Tell ULP what type of info */
-
-	pether = (struct ether_header *)((char *)ipha
-	    - sizeof (struct ether_header));
-
-	/*
-	 * Make sure the interface is an ethernet type, since this option
-	 * is currently supported only on this type of interface. Also make
-	 * sure we are pointing correctly above db_base.
-	 */
-	if ((flags & IPF_RECVSLLA) &&
-	    ((uchar_t *)pether >= data_mp->b_datap->db_base) &&
-	    (ill->ill_type == IFT_ETHER) &&
-	    (ill->ill_net_type == IRE_IF_RESOLVER)) {
-		pinfo->ip_pkt_slla.sdl_type = IFT_ETHER;
-		bcopy(pether->ether_shost.ether_addr_octet,
-		    pinfo->ip_pkt_slla.sdl_data, ETHERADDRL);
-	} else {
-		/*
-		 * Clear the bit. Indicate to upper layer that IP is not
-		 * sending this ancillary info.
-		 */
-		pinfo->ip_pkt_flags = pinfo->ip_pkt_flags & ~IPF_RECVSLLA;
-	}
-
-	/*
-	 * If `ill' is in an IPMP group, use the IPMP ill to determine
-	 * IPF_RECVIF and IPF_RECVADDR.  (This currently assumes that
-	 * IPF_RECVADDR support on test addresses is not needed.)
-	 *
-	 * Note that `ill' may already be an IPMP ill if e.g. we're
-	 * processing a packet looped back to an IPMP data address
-	 * (since those IRE_LOCALs are tied to IPMP ills).
-	 */
-	if (IS_UNDER_IPMP(ill)) {
-		if ((ill = ipmp_ill_hold_ipmp_ill(ill)) == NULL) {
-			ip1dbg(("ip_add_info: cannot hold IPMP ill.\n"));
-			freemsg(mp);
-			return (data_mp);
-		}
-		ipmp_ill_held = B_TRUE;
-	}
-
-	if (flags & (IPF_RECVIF | IPF_RECVADDR))
-		pinfo->ip_pkt_ifindex = ill->ill_phyint->phyint_ifindex;
-	if (flags & IPF_RECVADDR) {
-		ipif_t	*ipif;
-		ire_t	*ire;
-
-		/*
-		 * Only valid for V4
-		 */
-		ASSERT((ipha->ipha_version_and_hdr_length & 0xf0) ==
-		    (IPV4_VERSION << 4));
-
-		ipif = ipif_get_next_ipif(NULL, ill);
-		if (ipif != NULL) {
-			/*
-			 * Since a decision has already been made to deliver the
-			 * packet, there is no need to test for SECATTR and
-			 * ZONEONLY.
-			 * When a multicast packet is transmitted
-			 * a cache entry is created for the multicast address.
-			 * When delivering a copy of the packet or when new
-			 * packets are received we do not want to match on the
-			 * cached entry so explicitly match on
-			 * IRE_LOCAL and IRE_LOOPBACK
-			 */
-			ire = ire_ctable_lookup(ipha->ipha_dst, 0,
-			    IRE_LOCAL | IRE_LOOPBACK,
-			    ipif, zoneid, NULL,
-			    MATCH_IRE_TYPE | MATCH_IRE_ILL, ipst);
-			if (ire == NULL) {
-				/*
-				 * packet must have come on a different
-				 * interface.
-				 * Since a decision has already been made to
-				 * deliver the packet, there is no need to test
-				 * for SECATTR and ZONEONLY.
-				 * Only match on local and broadcast ire's.
-				 * See detailed comment above.
-				 */
-				ire = ire_ctable_lookup(ipha->ipha_dst, 0,
-				    IRE_LOCAL | IRE_LOOPBACK, ipif, zoneid,
-				    NULL, MATCH_IRE_TYPE, ipst);
-			}
-
-			if (ire == NULL) {
-				/*
-				 * This is either a multicast packet or
-				 * the address has been removed since
-				 * the packet was received.
-				 * Return INADDR_ANY so that normal source
-				 * selection occurs for the response.
-				 */
-
-				pinfo->ip_pkt_match_addr.s_addr = INADDR_ANY;
-			} else {
-				pinfo->ip_pkt_match_addr.s_addr =
-				    ire->ire_src_addr;
-				ire_refrele(ire);
-			}
-			ipif_refrele(ipif);
-		} else {
-			pinfo->ip_pkt_match_addr.s_addr = INADDR_ANY;
-		}
-	}
-
-	if (ipmp_ill_held)
-		ill_refrele(ill);
-
-	mp->b_datap->db_type = M_CTL;
-	mp->b_wptr += sizeof (ip_pktinfo_t);
-	mp->b_cont = data_mp;
-
-	return (mp);
-}
-
-/*
- * Used to determine the most accurate cred_t to use for TX.
- * First priority is SCM_UCRED having set the label in the message,
- * which is used for MLP on UDP. Second priority is the open credentials
- * with the peer's label (aka conn_effective_cred), which is needed for
- * MLP on TCP/SCTP and for MAC-Exempt. Last priority is the open credentials.
- */
-cred_t *
-ip_best_cred(mblk_t *mp, conn_t *connp, pid_t *pidp)
-{
-	cred_t *cr;
-
-	cr = msg_getcred(mp, pidp);
-	if (cr != NULL && crgetlabel(cr) != NULL)
-		return (cr);
-	*pidp = NOPID;
-	return (CONN_CRED(connp));
-}
-
-/*
- * Latch in the IPsec state for a stream based on the ipsec_in_t passed in as
- * part of the bind request.
- */
-
 boolean_t
-ip_bind_ipsec_policy_set(conn_t *connp, mblk_t *policy_mp)
+ip_ipsec_policy_inherit(conn_t *connp, conn_t *lconnp, ip_recv_attr_t *ira)
 {
-	ipsec_in_t *ii;
+	ASSERT(lconnp->conn_policy != NULL);
+	ASSERT(connp->conn_policy == NULL);
 
-	ASSERT(policy_mp != NULL);
-	ASSERT(policy_mp->b_datap->db_type == IPSEC_POLICY_SET);
+	IPPH_REFHOLD(lconnp->conn_policy);
+	connp->conn_policy = lconnp->conn_policy;
 
-	ii = (ipsec_in_t *)policy_mp->b_rptr;
-	ASSERT(ii->ipsec_in_type == IPSEC_IN);
-
-	connp->conn_policy = ii->ipsec_in_policy;
-	ii->ipsec_in_policy = NULL;
-
-	if (ii->ipsec_in_action != NULL) {
+	if (ira->ira_ipsec_action != NULL) {
 		if (connp->conn_latch == NULL) {
 			connp->conn_latch = iplatch_create();
 			if (connp->conn_latch == NULL)
 				return (B_FALSE);
 		}
-		ipsec_latch_inbound(connp->conn_latch, ii);
+		ipsec_latch_inbound(connp, ira);
 	}
 	return (B_TRUE);
 }
 
 /*
- * Upper level protocols (ULP) pass through bind requests to IP for inspection
- * and to arrange for power-fanout assist.  The ULP is identified by
- * adding a single byte at the end of the original bind message.
- * A ULP other than UDP or TCP that wishes to be recognized passes
- * down a bind with a zero length address.
+ * Verify whether or not the IP address is a valid local address.
+ * Could be a unicast, including one for a down interface.
+ * If allow_mcbc then a multicast or broadcast address is also
+ * acceptable.
  *
- * The binding works as follows:
- * - A zero byte address means just bind to the protocol.
- * - A four byte address is treated as a request to validate
- *   that the address is a valid local address, appropriate for
- *   an application to bind to. This does not affect any fanout
- *   information in IP.
- * - A sizeof sin_t byte address is used to bind to only the local address
- *   and port.
- * - A sizeof ipa_conn_t byte address contains complete fanout information
- *   consisting of local and remote addresses and ports.  In
- *   this case, the addresses are both validated as appropriate
- *   for this operation, and, if so, the information is retained
- *   for use in the inbound fanout.
- *
- * The ULP (except in the zero-length bind) can append an
- * additional mblk of db_type IRE_DB_REQ_TYPE or IPSEC_POLICY_SET to the
- * T_BIND_REQ/O_T_BIND_REQ. IRE_DB_REQ_TYPE indicates that the ULP wants
- * a copy of the source or destination IRE (source for local bind;
- * destination for complete bind). IPSEC_POLICY_SET indicates that the
- * policy information contained should be copied on to the conn.
- *
- * NOTE : Only one of IRE_DB_REQ_TYPE or IPSEC_POLICY_SET can be present.
- */
-mblk_t *
-ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
-{
-	ssize_t		len;
-	struct T_bind_req	*tbr;
-	sin_t		*sin;
-	ipa_conn_t	*ac;
-	uchar_t		*ucp;
-	int		error = 0;
-	int		protocol;
-	ipa_conn_x_t	*acx;
-	cred_t		*cr;
-
-	/*
-	 * All Solaris components should pass a db_credp
-	 * for this TPI message, hence we ASSERT.
-	 * But in case there is some other M_PROTO that looks
-	 * like a TPI message sent by some other kernel
-	 * component, we check and return an error.
-	 */
-	cr = msg_getcred(mp, NULL);
-	ASSERT(cr != NULL);
-	if (cr == NULL) {
-		error = EINVAL;
-		goto bad_addr;
-	}
-
-	ASSERT(!connp->conn_af_isv6);
-	connp->conn_pkt_isv6 = B_FALSE;
-
-	len = MBLKL(mp);
-	if (len < (sizeof (*tbr) + 1)) {
-		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
-		    "ip_bind: bogus msg, len %ld", len);
-		/* XXX: Need to return something better */
-		goto bad_addr;
-	}
-	/* Back up and extract the protocol identifier. */
-	mp->b_wptr--;
-	protocol = *mp->b_wptr & 0xFF;
-	tbr = (struct T_bind_req *)mp->b_rptr;
-	/* Reset the message type in preparation for shipping it back. */
-	DB_TYPE(mp) = M_PCPROTO;
-
-	connp->conn_ulp = (uint8_t)protocol;
-
-	/*
-	 * Check for a zero length address.  This is from a protocol that
-	 * wants to register to receive all packets of its type.
-	 */
-	if (tbr->ADDR_length == 0) {
-		/*
-		 * These protocols are now intercepted in ip_bind_v6().
-		 * Reject protocol-level binds here for now.
-		 *
-		 * For SCTP raw socket, ICMP sends down a bind with sin_t
-		 * so that the protocol type cannot be SCTP.
-		 */
-		if (protocol == IPPROTO_TCP || protocol == IPPROTO_AH ||
-		    protocol == IPPROTO_ESP || protocol == IPPROTO_SCTP) {
-			goto bad_addr;
-		}
-
-		/*
-		 *
-		 * The udp module never sends down a zero-length address,
-		 * and allowing this on a labeled system will break MLP
-		 * functionality.
-		 */
-		if (is_system_labeled() && protocol == IPPROTO_UDP)
-			goto bad_addr;
-
-		if (connp->conn_mac_mode != CONN_MAC_DEFAULT)
-			goto bad_addr;
-
-		/* No hash here really.  The table is big enough. */
-		connp->conn_srcv6 = ipv6_all_zeros;
-
-		ipcl_proto_insert(connp, protocol);
-
-		tbr->PRIM_type = T_BIND_ACK;
-		return (mp);
-	}
-
-	/* Extract the address pointer from the message. */
-	ucp = (uchar_t *)mi_offset_param(mp, tbr->ADDR_offset,
-	    tbr->ADDR_length);
-	if (ucp == NULL) {
-		ip1dbg(("ip_bind: no address\n"));
-		goto bad_addr;
-	}
-	if (!OK_32PTR(ucp)) {
-		ip1dbg(("ip_bind: unaligned address\n"));
-		goto bad_addr;
-	}
-
-	switch (tbr->ADDR_length) {
-	default:
-		ip1dbg(("ip_bind: bad address length %d\n",
-		    (int)tbr->ADDR_length));
-		goto bad_addr;
-
-	case IP_ADDR_LEN:
-		/* Verification of local address only */
-		error = ip_bind_laddr_v4(connp, &mp->b_cont, protocol,
-		    *(ipaddr_t *)ucp, 0, B_FALSE);
-		break;
-
-	case sizeof (sin_t):
-		sin = (sin_t *)ucp;
-		error = ip_bind_laddr_v4(connp, &mp->b_cont, protocol,
-		    sin->sin_addr.s_addr, sin->sin_port, B_TRUE);
-		break;
-
-	case sizeof (ipa_conn_t):
-		ac = (ipa_conn_t *)ucp;
-		/* For raw socket, the local port is not set. */
-		if (ac->ac_lport == 0)
-			ac->ac_lport = connp->conn_lport;
-		/* Always verify destination reachability. */
-		error = ip_bind_connected_v4(connp, &mp->b_cont, protocol,
-		    &ac->ac_laddr, ac->ac_lport, ac->ac_faddr, ac->ac_fport,
-		    B_TRUE, B_TRUE, cr);
-		break;
-
-	case sizeof (ipa_conn_x_t):
-		acx = (ipa_conn_x_t *)ucp;
-		/*
-		 * Whether or not to verify destination reachability depends
-		 * on the setting of the ACX_VERIFY_DST flag in acx->acx_flags.
-		 */
-		error = ip_bind_connected_v4(connp, &mp->b_cont, protocol,
-		    &acx->acx_conn.ac_laddr, acx->acx_conn.ac_lport,
-		    acx->acx_conn.ac_faddr, acx->acx_conn.ac_fport,
-		    B_TRUE, (acx->acx_flags & ACX_VERIFY_DST) != 0, cr);
-		break;
-	}
-	ASSERT(error != EINPROGRESS);
-	if (error != 0)
-		goto bad_addr;
-
-	/* Send it home. */
-	mp->b_datap->db_type = M_PCPROTO;
-	tbr->PRIM_type = T_BIND_ACK;
-	return (mp);
-
-bad_addr:
-	/*
-	 * If error = -1 then we generate a TBADADDR - otherwise error is
-	 * a unix errno.
-	 */
-	if (error > 0)
-		mp = mi_tpi_err_ack_alloc(mp, TSYSERR, error);
-	else
-		mp = mi_tpi_err_ack_alloc(mp, TBADADDR, 0);
-	return (mp);
-}
-
-/*
- * Here address is verified to be a valid local address.
- * If the IRE_DB_REQ_TYPE mp is present, a broadcast/multicast
- * address is also considered a valid local address.
  * In the case of a broadcast/multicast address, however, the
  * upper protocol is expected to reset the src address
- * to 0 if it sees a IRE_BROADCAST type returned so that
+ * to zero when we return IPVL_MCAST/IPVL_BCAST so that
  * no packets are emitted with broadcast/multicast address as
  * source address (that violates hosts requirements RFC 1122)
  * The addresses valid for bind are:
@@ -4530,323 +3396,189 @@ bad_addr:
  *	application still has to issue an
  *	IP_ADD_MEMBERSHIP socket option.
  *
- * On error, return -1 for TBADADDR otherwise pass the
- * errno with TSYSERR reply.
- *
  * In all the above cases, the bound address must be valid in the current zone.
  * When the address is loopback, multicast or broadcast, there might be many
  * matching IREs so bind has to look up based on the zone.
- *
- * Note: lport is in network byte order.
- *
+ */
+ip_laddr_t
+ip_laddr_verify_v4(ipaddr_t src_addr, zoneid_t zoneid,
+    ip_stack_t *ipst, boolean_t allow_mcbc)
+{
+	ire_t *src_ire;
+
+	ASSERT(src_addr != INADDR_ANY);
+
+	src_ire = ire_ftable_lookup_v4(src_addr, 0, 0, 0,
+	    NULL, zoneid, NULL, MATCH_IRE_ZONEONLY, 0, ipst, NULL);
+
+	/*
+	 * If an address other than in6addr_any is requested,
+	 * we verify that it is a valid address for bind
+	 * Note: Following code is in if-else-if form for
+	 * readability compared to a condition check.
+	 */
+	if (src_ire != NULL && (src_ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK))) {
+		/*
+		 * (2) Bind to address of local UP interface
+		 */
+		ire_refrele(src_ire);
+		return (IPVL_UNICAST_UP);
+	} else if (src_ire != NULL && src_ire->ire_type & IRE_BROADCAST) {
+		/*
+		 * (4) Bind to broadcast address
+		 */
+		ire_refrele(src_ire);
+		if (allow_mcbc)
+			return (IPVL_BCAST);
+		else
+			return (IPVL_BAD);
+	} else if (CLASSD(src_addr)) {
+		/* (5) bind to multicast address. */
+		if (src_ire != NULL)
+			ire_refrele(src_ire);
+
+		if (allow_mcbc)
+			return (IPVL_MCAST);
+		else
+			return (IPVL_BAD);
+	} else {
+		ipif_t *ipif;
+
+		/*
+		 * (3) Bind to address of local DOWN interface?
+		 * (ipif_lookup_addr() looks up all interfaces
+		 * but we do not get here for UP interfaces
+		 * - case (2) above)
+		 */
+		if (src_ire != NULL)
+			ire_refrele(src_ire);
+
+		ipif = ipif_lookup_addr(src_addr, NULL, zoneid, ipst);
+		if (ipif == NULL)
+			return (IPVL_BAD);
+
+		/* Not a useful source? */
+		if (ipif->ipif_flags & (IPIF_NOLOCAL | IPIF_ANYCAST)) {
+			ipif_refrele(ipif);
+			return (IPVL_BAD);
+		}
+		ipif_refrele(ipif);
+		return (IPVL_UNICAST_DOWN);
+	}
+}
+
+/*
+ * Insert in the bind fanout for IPv4 and IPv6.
+ * The caller should already have used ip_laddr_verify_v*() before calling
+ * this.
  */
 int
-ip_bind_laddr_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
-    ipaddr_t src_addr, uint16_t lport, boolean_t fanout_insert)
+ip_laddr_fanout_insert(conn_t *connp)
 {
-	int		error = 0;
-	ire_t		*src_ire;
-	zoneid_t	zoneid;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-	mblk_t		*mp = NULL;
-	boolean_t	ire_requested = B_FALSE;
-	boolean_t	ipsec_policy_set = B_FALSE;
-
-	if (mpp)
-		mp = *mpp;
-
-	if (mp != NULL) {
-		ire_requested = (DB_TYPE(mp) == IRE_DB_REQ_TYPE);
-		ipsec_policy_set = (DB_TYPE(mp) == IPSEC_POLICY_SET);
-	}
+	int		error;
 
 	/*
-	 * If it was previously connected, conn_fully_bound would have
-	 * been set.
-	 */
-	connp->conn_fully_bound = B_FALSE;
-
-	src_ire = NULL;
-
-	zoneid = IPCL_ZONEID(connp);
-
-	if (src_addr) {
-		src_ire = ire_route_lookup(src_addr, 0, 0, 0,
-		    NULL, NULL, zoneid, NULL, MATCH_IRE_ZONEONLY, ipst);
-		/*
-		 * If an address other than 0.0.0.0 is requested,
-		 * we verify that it is a valid address for bind
-		 * Note: Following code is in if-else-if form for
-		 * readability compared to a condition check.
-		 */
-		/* LINTED - statement has no consequence */
-		if (IRE_IS_LOCAL(src_ire)) {
-			/*
-			 * (2) Bind to address of local UP interface
-			 */
-		} else if (src_ire && src_ire->ire_type == IRE_BROADCAST) {
-			/*
-			 * (4) Bind to broadcast address
-			 * Note: permitted only from transports that
-			 * request IRE
-			 */
-			if (!ire_requested)
-				error = EADDRNOTAVAIL;
-		} else {
-			/*
-			 * (3) Bind to address of local DOWN interface
-			 * (ipif_lookup_addr() looks up all interfaces
-			 * but we do not get here for UP interfaces
-			 * - case (2) above)
-			 */
-			/* LINTED - statement has no consequent */
-			if (ip_addr_exists(src_addr, zoneid, ipst)) {
-				/* The address exists */
-			} else if (CLASSD(src_addr)) {
-				error = 0;
-				if (src_ire != NULL)
-					ire_refrele(src_ire);
-				/*
-				 * (5) bind to multicast address.
-				 * Fake out the IRE returned to upper
-				 * layer to be a broadcast IRE.
-				 */
-				src_ire = ire_ctable_lookup(
-				    INADDR_BROADCAST, INADDR_ANY,
-				    IRE_BROADCAST, NULL, zoneid, NULL,
-				    (MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY),
-				    ipst);
-				if (src_ire == NULL || !ire_requested)
-					error = EADDRNOTAVAIL;
-			} else {
-				/*
-				 * Not a valid address for bind
-				 */
-				error = EADDRNOTAVAIL;
-			}
-		}
-		if (error) {
-			/* Red Alert!  Attempting to be a bogon! */
-			ip1dbg(("ip_bind_laddr_v4: bad src address 0x%x\n",
-			    ntohl(src_addr)));
-			goto bad_addr;
-		}
-	}
-
-	/*
-	 * Allow setting new policies. For example, disconnects come
-	 * down as ipa_t bind. As we would have set conn_policy_cached
+	 * Allow setting new policies. For example, disconnects result
+	 * in us being called. As we would have set conn_policy_cached
 	 * to B_TRUE before, we should set it to B_FALSE, so that policy
 	 * can change after the disconnect.
 	 */
 	connp->conn_policy_cached = B_FALSE;
 
-	/*
-	 * If not fanout_insert this was just an address verification
-	 */
-	if (fanout_insert) {
-		/*
-		 * The addresses have been verified. Time to insert in
-		 * the correct fanout list.
-		 */
-		IN6_IPADDR_TO_V4MAPPED(src_addr, &connp->conn_srcv6);
-		IN6_IPADDR_TO_V4MAPPED(INADDR_ANY, &connp->conn_remv6);
-		connp->conn_lport = lport;
-		connp->conn_fport = 0;
-		/*
-		 * Do we need to add a check to reject Multicast packets
-		 */
-		error = ipcl_bind_insert(connp, protocol, src_addr, lport);
-	}
-
-	if (error == 0) {
-		if (ire_requested) {
-			if (!ip_bind_get_ire_v4(mpp, src_ire, NULL, ipst)) {
-				error = -1;
-				/* Falls through to bad_addr */
-			}
-		} else if (ipsec_policy_set) {
-			if (!ip_bind_ipsec_policy_set(connp, mp)) {
-				error = -1;
-				/* Falls through to bad_addr */
-			}
-		}
-	}
-bad_addr:
+	error = ipcl_bind_insert(connp);
 	if (error != 0) {
 		if (connp->conn_anon_port) {
 			(void) tsol_mlp_anon(crgetzone(connp->conn_cred),
-			    connp->conn_mlp_type, connp->conn_ulp, ntohs(lport),
-			    B_FALSE);
+			    connp->conn_mlp_type, connp->conn_proto,
+			    ntohs(connp->conn_lport), B_FALSE);
 		}
 		connp->conn_mlp_type = mlptSingle;
 	}
-	if (src_ire != NULL)
-		IRE_REFRELE(src_ire);
-	return (error);
-}
-
-int
-ip_proto_bind_laddr_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
-    ipaddr_t src_addr, uint16_t lport, boolean_t fanout_insert)
-{
-	int error;
-
-	ASSERT(!connp->conn_af_isv6);
-	connp->conn_pkt_isv6 = B_FALSE;
-	connp->conn_ulp = protocol;
-
-	error = ip_bind_laddr_v4(connp, ire_mpp, protocol, src_addr, lport,
-	    fanout_insert);
-	if (error < 0)
-		error = -TBADADDR;
 	return (error);
 }
 
 /*
- * Verify that both the source and destination addresses
- * are valid.  If verify_dst is false, then the destination address may be
- * unreachable, i.e. have no route to it.  Protocols like TCP want to verify
- * destination reachability, while tunnels do not.
- * Note that we allow connect to broadcast and multicast
- * addresses when ire_requested is set. Thus the ULP
- * has to check for IRE_BROADCAST and multicast.
+ * Verify that both the source and destination addresses are valid. If
+ * IPDF_VERIFY_DST is not set, then the destination address may be unreachable,
+ * i.e. have no route to it.  Protocols like TCP want to verify destination
+ * reachability, while tunnels do not.
  *
- * Returns zero if ok.
- * On error: returns -1 to mean TBADADDR otherwise returns an errno
- * (for use with TSYSERR reply).
+ * Determine the route, the interface, and (optionally) the source address
+ * to use to reach a given destination.
+ * Note that we allow connect to broadcast and multicast addresses when
+ * IPDF_ALLOW_MCBC is set.
+ * first_hop and dst_addr are normally the same, but if source routing
+ * they will differ; in that case the first_hop is what we'll use for the
+ * routing lookup but the dce and label checks will be done on dst_addr,
  *
- * Note: lport and fport are in network byte order.
+ * If uinfo is set, then we fill in the best available information
+ * we have for the destination. This is based on (in priority order) any
+ * metrics and path MTU stored in a dce_t, route metrics, and finally the
+ * ill_mtu.
+ *
+ * Tsol note: If we have a source route then dst_addr != firsthop. But we
+ * always do the label check on dst_addr.
  */
 int
-ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
-    ipaddr_t *src_addrp, uint16_t lport, ipaddr_t dst_addr, uint16_t fport,
-    boolean_t fanout_insert, boolean_t verify_dst, cred_t *cr)
+ip_set_destination_v4(ipaddr_t *src_addrp, ipaddr_t dst_addr, ipaddr_t firsthop,
+    ip_xmit_attr_t *ixa, iulp_t *uinfo, uint32_t flags, uint_t mac_mode)
 {
-
-	ire_t		*src_ire;
-	ire_t		*dst_ire;
+	ire_t		*ire = NULL;
 	int		error = 0;
-	ire_t		*sire = NULL;
-	ire_t		*md_dst_ire = NULL;
-	ire_t		*lso_dst_ire = NULL;
+	ipaddr_t	setsrc;				/* RTF_SETSRC */
+	zoneid_t	zoneid = ixa->ixa_zoneid;	/* Honors SO_ALLZONES */
+	ip_stack_t	*ipst = ixa->ixa_ipst;
+	dce_t		*dce;
+	uint_t		pmtu;
+	uint_t		generation;
+	nce_t		*nce;
 	ill_t		*ill = NULL;
-	zoneid_t	zoneid;
-	ipaddr_t	src_addr = *src_addrp;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-	mblk_t		*mp = NULL;
-	boolean_t	ire_requested = B_FALSE;
-	boolean_t	ipsec_policy_set = B_FALSE;
-	ts_label_t	*tsl = NULL;
-	cred_t		*effective_cred = NULL;
+	boolean_t	multirt = B_FALSE;
 
-	if (mpp)
-		mp = *mpp;
-
-	if (mp != NULL) {
-		ire_requested = (DB_TYPE(mp) == IRE_DB_REQ_TYPE);
-		ipsec_policy_set = (DB_TYPE(mp) == IPSEC_POLICY_SET);
-	}
-
-	src_ire = dst_ire = NULL;
+	ASSERT(ixa->ixa_flags & IXAF_IS_IPV4);
 
 	/*
-	 * If we never got a disconnect before, clear it now.
+	 * We never send to zero; the ULPs map it to the loopback address.
+	 * We can't allow it since we use zero to mean unitialized in some
+	 * places.
 	 */
-	connp->conn_fully_bound = B_FALSE;
+	ASSERT(dst_addr != INADDR_ANY);
 
-	zoneid = IPCL_ZONEID(connp);
+	if (is_system_labeled()) {
+		ts_label_t *tsl = NULL;
 
+		error = tsol_check_dest(ixa->ixa_tsl, &dst_addr, IPV4_VERSION,
+		    mac_mode, (flags & IPDF_ZONE_IS_GLOBAL) != 0, &tsl);
+		if (error != 0)
+			return (error);
+		if (tsl != NULL) {
+			/* Update the label */
+			ip_xmit_attr_replace_tsl(ixa, tsl);
+		}
+	}
+
+	setsrc = INADDR_ANY;
 	/*
-	 * Check whether Trusted Solaris policy allows communication with this
-	 * host, and pretend that the destination is unreachable if not.
-	 *
-	 * This is never a problem for TCP, since that transport is known to
-	 * compute the label properly as part of the tcp_rput_other T_BIND_ACK
-	 * handling.  If the remote is unreachable, it will be detected at that
-	 * point, so there's no reason to check it here.
-	 *
-	 * Note that for sendto (and other datagram-oriented friends), this
-	 * check is done as part of the data path label computation instead.
-	 * The check here is just to make non-TCP connect() report the right
-	 * error.
+	 * Select a route; For IPMP interfaces, we would only select
+	 * a "hidden" route (i.e., going through a specific under_ill)
+	 * if ixa_ifindex has been specified.
 	 */
-	if (is_system_labeled() && !IPCL_IS_TCP(connp)) {
-		if ((error = tsol_check_dest(cr, &dst_addr, IPV4_VERSION,
-		    connp->conn_mac_mode, &effective_cred)) != 0) {
-			if (ip_debug > 2) {
-				pr_addr_dbg(
-				    "ip_bind_connected_v4:"
-				    " no label for dst %s\n",
-				    AF_INET, &dst_addr);
-			}
-			goto bad_addr;
-		}
+	ire = ip_select_route_v4(firsthop, ixa, &generation, &setsrc, &error,
+	    &multirt);
+	ASSERT(ire != NULL);	/* IRE_NOROUTE if none found */
+	if (error != 0)
+		goto bad_addr;
 
-		/*
-		 * tsol_check_dest() may have created a new cred with
-		 * a modified security label. Use that cred if it exists
-		 * for ire lookups.
-		 */
-		if (effective_cred == NULL) {
-			tsl = crgetlabel(cr);
-		} else {
-			tsl = crgetlabel(effective_cred);
-		}
-	}
-
-	if (CLASSD(dst_addr)) {
-		/* Pick up an IRE_BROADCAST */
-		dst_ire = ire_route_lookup(ip_g_all_ones, 0, 0, 0, NULL,
-		    NULL, zoneid, tsl,
-		    (MATCH_IRE_RECURSIVE |
-		    MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE |
-		    MATCH_IRE_SECATTR), ipst);
-	} else {
-		/*
-		 * If conn_dontroute is set or if conn_nexthop_set is set,
-		 * and onlink ipif is not found set ENETUNREACH error.
-		 */
-		if (connp->conn_dontroute || connp->conn_nexthop_set) {
-			ipif_t *ipif;
-
-			ipif = ipif_lookup_onlink_addr(connp->conn_dontroute ?
-			    dst_addr : connp->conn_nexthop_v4, zoneid, ipst);
-			if (ipif == NULL) {
-				error = ENETUNREACH;
-				goto bad_addr;
-			}
-			ipif_refrele(ipif);
-		}
-
-		if (connp->conn_nexthop_set) {
-			dst_ire = ire_route_lookup(connp->conn_nexthop_v4, 0,
-			    0, 0, NULL, NULL, zoneid, tsl,
-			    MATCH_IRE_SECATTR, ipst);
-		} else {
-			dst_ire = ire_route_lookup(dst_addr, 0, 0, 0, NULL,
-			    &sire, zoneid, tsl,
-			    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-			    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE |
-			    MATCH_IRE_SECATTR), ipst);
-		}
-	}
 	/*
-	 * dst_ire can't be a broadcast when not ire_requested.
-	 * We also prevent ire's with src address INADDR_ANY to
-	 * be used, which are created temporarily for
-	 * sending out packets from endpoints that have
-	 * conn_unspec_src set.  If verify_dst is true, the destination must be
-	 * reachable.  If verify_dst is false, the destination needn't be
-	 * reachable.
+	 * ire can't be a broadcast or multicast unless IPDF_ALLOW_MCBC is set.
+	 * If IPDF_VERIFY_DST is set, the destination must be reachable;
+	 * Otherwise the destination needn't be reachable.
 	 *
 	 * If we match on a reject or black hole, then we've got a
 	 * local failure.  May as well fail out the connect() attempt,
 	 * since it's never going to succeed.
 	 */
-	if (dst_ire == NULL || dst_ire->ire_src_addr == INADDR_ANY ||
-	    (dst_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
-	    ((dst_ire->ire_type & IRE_BROADCAST) && !ire_requested)) {
+	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
 		/*
 		 * If we're verifying destination reachability, we always want
 		 * to complain here.
@@ -4854,425 +3586,435 @@ ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 		 * If we're not verifying destination reachability but the
 		 * destination has a route, we still want to fail on the
 		 * temporary address and broadcast address tests.
+		 *
+		 * In both cases do we let the code continue so some reasonable
+		 * information is returned to the caller. That enables the
+		 * caller to use (and even cache) the IRE. conn_ip_ouput will
+		 * use the generation mismatch path to check for the unreachable
+		 * case thereby avoiding any specific check in the main path.
 		 */
-		if (verify_dst || (dst_ire != NULL)) {
-			if (ip_debug > 2) {
-				pr_addr_dbg("ip_bind_connected_v4:"
-				    "bad connected dst %s\n",
-				    AF_INET, &dst_addr);
-			}
-			if (dst_ire == NULL || !(dst_ire->ire_type & IRE_HOST))
+		ASSERT(generation == IRE_GENERATION_VERIFY);
+		if (flags & IPDF_VERIFY_DST) {
+			/*
+			 * Set errno but continue to set up ixa_ire to be
+			 * the RTF_REJECT|RTF_BLACKHOLE IRE.
+			 * That allows callers to use ip_output to get an
+			 * ICMP error back.
+			 */
+			if (!(ire->ire_type & IRE_HOST))
 				error = ENETUNREACH;
 			else
 				error = EHOSTUNREACH;
-			goto bad_addr;
 		}
 	}
+
+	if ((ire->ire_type & (IRE_BROADCAST|IRE_MULTICAST)) &&
+	    !(flags & IPDF_ALLOW_MCBC)) {
+		ire_refrele(ire);
+		ire = ire_reject(ipst, B_FALSE);
+		generation = IRE_GENERATION_VERIFY;
+		error = ENETUNREACH;
+	}
+
+	/* Cache things */
+	if (ixa->ixa_ire != NULL)
+		ire_refrele_notr(ixa->ixa_ire);
+#ifdef DEBUG
+	ire_refhold_notr(ire);
+	ire_refrele(ire);
+#endif
+	ixa->ixa_ire = ire;
+	ixa->ixa_ire_generation = generation;
 
 	/*
-	 * If the app does a connect(), it means that it will most likely
-	 * send more than 1 packet to the destination.  It makes sense
-	 * to clear the temporary flag.
+	 * For multicast with multirt we have a flag passed back from
+	 * ire_lookup_multi_ill_v4 since we don't have an IRE for each
+	 * possible multicast address.
+	 * We also need a flag for multicast since we can't check
+	 * whether RTF_MULTIRT is set in ixa_ire for multicast.
 	 */
-	if (dst_ire != NULL && dst_ire->ire_type == IRE_CACHE &&
-	    (dst_ire->ire_marks & IRE_MARK_TEMPORARY)) {
-		irb_t *irb = dst_ire->ire_bucket;
-
-		rw_enter(&irb->irb_lock, RW_WRITER);
-		/*
-		 * We need to recheck for IRE_MARK_TEMPORARY after acquiring
-		 * the lock to guarantee irb_tmp_ire_cnt.
-		 */
-		if (dst_ire->ire_marks & IRE_MARK_TEMPORARY) {
-			dst_ire->ire_marks &= ~IRE_MARK_TEMPORARY;
-			irb->irb_tmp_ire_cnt--;
-		}
-		rw_exit(&irb->irb_lock);
+	if (multirt) {
+		ixa->ixa_postfragfn = ip_postfrag_multirt_v4;
+		ixa->ixa_flags |= IXAF_MULTIRT_MULTICAST;
+	} else {
+		ixa->ixa_postfragfn = ire->ire_postfragfn;
+		ixa->ixa_flags &= ~IXAF_MULTIRT_MULTICAST;
 	}
-
-	/*
-	 * See if we should notify ULP about LSO/MDT; we do this whether or not
-	 * ire_requested is TRUE, in order to handle active connects; LSO/MDT
-	 * eligibility tests for passive connects are handled separately
-	 * through tcp_adapt_ire().  We do this before the source address
-	 * selection, because dst_ire may change after a call to
-	 * ipif_select_source().  This is a best-effort check, as the
-	 * packet for this connection may not actually go through
-	 * dst_ire->ire_stq, and the exact IRE can only be known after
-	 * calling ip_newroute().  This is why we further check on the
-	 * IRE during LSO/Multidata packet transmission in
-	 * tcp_lsosend()/tcp_multisend().
-	 */
-	if (!ipsec_policy_set && dst_ire != NULL &&
-	    !(dst_ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK | IRE_BROADCAST)) &&
-	    (ill = ire_to_ill(dst_ire), ill != NULL)) {
-		if (ipst->ips_ip_lso_outbound && ILL_LSO_CAPABLE(ill)) {
-			lso_dst_ire = dst_ire;
-			IRE_REFHOLD(lso_dst_ire);
-		} else if (ipst->ips_ip_multidata_outbound &&
-		    ILL_MDT_CAPABLE(ill)) {
-			md_dst_ire = dst_ire;
-			IRE_REFHOLD(md_dst_ire);
-		}
-	}
-
-	if (dst_ire != NULL && dst_ire->ire_type == IRE_LOCAL &&
-	    dst_ire->ire_zoneid != zoneid && dst_ire->ire_zoneid != ALL_ZONES) {
-		/*
-		 * If the IRE belongs to a different zone, look for a matching
-		 * route in the forwarding table and use the source address from
-		 * that route.
-		 */
-		src_ire = ire_ftable_lookup(dst_addr, 0, 0, 0, NULL, NULL,
-		    zoneid, 0, NULL,
-		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_RJ_BHOLE, ipst);
-		if (src_ire == NULL) {
-			error = EHOSTUNREACH;
-			goto bad_addr;
-		} else if (src_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
-			if (!(src_ire->ire_type & IRE_HOST))
-				error = ENETUNREACH;
-			else
-				error = EHOSTUNREACH;
-			goto bad_addr;
-		}
-		if (src_addr == INADDR_ANY)
-			src_addr = src_ire->ire_src_addr;
-		ire_refrele(src_ire);
-		src_ire = NULL;
-	} else if ((src_addr == INADDR_ANY) && (dst_ire != NULL)) {
-		if ((sire != NULL) && (sire->ire_flags & RTF_SETSRC)) {
-			src_addr = sire->ire_src_addr;
-			ire_refrele(dst_ire);
-			dst_ire = sire;
-			sire = NULL;
+	if (!(ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
+		/* Get an nce to cache. */
+		nce = ire_to_nce(ire, firsthop, NULL);
+		if (nce == NULL) {
+			/* Allocation failure? */
+			ixa->ixa_ire_generation = IRE_GENERATION_VERIFY;
 		} else {
-			/*
-			 * Pick a source address so that a proper inbound
-			 * load spreading would happen.
-			 */
-			ill_t *ire_ill = dst_ire->ire_ipif->ipif_ill;
-			ipif_t *src_ipif = NULL;
-			ire_t *ipif_ire;
-
-			/*
-			 * Supply a local source address such that inbound
-			 * load spreading happens.
-			 *
-			 * Determine the best source address on this ill for
-			 * the destination.
-			 *
-			 * 1) For broadcast, we should return a broadcast ire
-			 *    found above so that upper layers know that the
-			 *    destination address is a broadcast address.
-			 *
-			 * 2) If the ipif is DEPRECATED, select a better
-			 *    source address.  Similarly, if the ipif is on
-			 *    the IPMP meta-interface, pick a source address
-			 *    at random to improve inbound load spreading.
-			 *
-			 * 3) If the outgoing interface is part of a usesrc
-			 *    group, then try selecting a source address from
-			 *    the usesrc ILL.
-			 */
-			if ((dst_ire->ire_zoneid != zoneid &&
-			    dst_ire->ire_zoneid != ALL_ZONES) ||
-			    (!(dst_ire->ire_flags & RTF_SETSRC)) &&
-			    (!(dst_ire->ire_type & IRE_BROADCAST) &&
-			    (IS_IPMP(ire_ill) ||
-			    (dst_ire->ire_ipif->ipif_flags & IPIF_DEPRECATED) ||
-			    (ire_ill->ill_usesrc_ifindex != 0)))) {
-				/*
-				 * If the destination is reachable via a
-				 * given gateway, the selected source address
-				 * should be in the same subnet as the gateway.
-				 * Otherwise, the destination is not reachable.
-				 *
-				 * If there are no interfaces on the same subnet
-				 * as the destination, ipif_select_source gives
-				 * first non-deprecated interface which might be
-				 * on a different subnet than the gateway.
-				 * This is not desirable. Hence pass the dst_ire
-				 * source address to ipif_select_source.
-				 * It is sure that the destination is reachable
-				 * with the dst_ire source address subnet.
-				 * So passing dst_ire source address to
-				 * ipif_select_source will make sure that the
-				 * selected source will be on the same subnet
-				 * as dst_ire source address.
-				 */
-				ipaddr_t saddr =
-				    dst_ire->ire_ipif->ipif_src_addr;
-				src_ipif = ipif_select_source(ire_ill,
-				    saddr, zoneid);
-				if (src_ipif != NULL) {
-					if (IS_VNI(src_ipif->ipif_ill)) {
-						/*
-						 * For VNI there is no
-						 * interface route
-						 */
-						src_addr =
-						    src_ipif->ipif_src_addr;
-					} else {
-						ipif_ire =
-						    ipif_to_ire(src_ipif);
-						if (ipif_ire != NULL) {
-							IRE_REFRELE(dst_ire);
-							dst_ire = ipif_ire;
-						}
-						src_addr =
-						    dst_ire->ire_src_addr;
-					}
-					ipif_refrele(src_ipif);
-				} else {
-					src_addr = dst_ire->ire_src_addr;
-				}
-			} else {
-				src_addr = dst_ire->ire_src_addr;
-			}
+			if (ixa->ixa_nce != NULL)
+				nce_refrele(ixa->ixa_nce);
+			ixa->ixa_nce = nce;
 		}
 	}
 
 	/*
-	 * We do ire_route_lookup() here (and not
-	 * interface lookup as we assert that
-	 * src_addr should only come from an
-	 * UP interface for hard binding.
+	 * We use use ire_nexthop_ill to avoid the under ipmp
+	 * interface for source address selection. Note that for ipmp
+	 * probe packets, ixa_ifindex would have been specified, and
+	 * the ip_select_route() invocation would have picked an ire
+	 * will ire_ill pointing at an under interface.
 	 */
-	ASSERT(src_ire == NULL);
-	src_ire = ire_route_lookup(src_addr, 0, 0, 0, NULL,
-	    NULL, zoneid, NULL, MATCH_IRE_ZONEONLY, ipst);
-	/* src_ire must be a local|loopback */
-	if (!IRE_IS_LOCAL(src_ire)) {
-		if (ip_debug > 2) {
-			pr_addr_dbg("ip_bind_connected_v4: bad connected "
-			    "src %s\n", AF_INET, &src_addr);
-		}
-		error = EADDRNOTAVAIL;
-		goto bad_addr;
-	}
+	ill = ire_nexthop_ill(ire);
 
 	/*
 	 * If the source address is a loopback address, the
 	 * destination had best be local or multicast.
-	 * The transports that can't handle multicast will reject
-	 * those addresses.
+	 * If we are sending to an IRE_LOCAL using a loopback source then
+	 * it had better be the same zoneid.
 	 */
-	if (src_ire->ire_type == IRE_LOOPBACK &&
-	    !(IRE_IS_LOCAL(dst_ire) || CLASSD(dst_addr))) {
-		ip1dbg(("ip_bind_connected_v4: bad connected loopback\n"));
-		error = -1;
-		goto bad_addr;
-	}
-
-	/*
-	 * Allow setting new policies. For example, disconnects come
-	 * down as ipa_t bind. As we would have set conn_policy_cached
-	 * to B_TRUE before, we should set it to B_FALSE, so that policy
-	 * can change after the disconnect.
-	 */
-	connp->conn_policy_cached = B_FALSE;
-
-	/*
-	 * Set the conn addresses/ports immediately, so the IPsec policy calls
-	 * can handle their passed-in conn's.
-	 */
-
-	IN6_IPADDR_TO_V4MAPPED(src_addr, &connp->conn_srcv6);
-	IN6_IPADDR_TO_V4MAPPED(dst_addr, &connp->conn_remv6);
-	connp->conn_lport = lport;
-	connp->conn_fport = fport;
-	*src_addrp = src_addr;
-
-	ASSERT(!(ipsec_policy_set && ire_requested));
-	if (ire_requested) {
-		iulp_t *ulp_info = NULL;
-
-		/*
-		 * Note that sire will not be NULL if this is an off-link
-		 * connection and there is not cache for that dest yet.
-		 *
-		 * XXX Because of an existing bug, if there are multiple
-		 * default routes, the IRE returned now may not be the actual
-		 * default route used (default routes are chosen in a
-		 * round robin fashion).  So if the metrics for different
-		 * default routes are different, we may return the wrong
-		 * metrics.  This will not be a problem if the existing
-		 * bug is fixed.
-		 */
-		if (sire != NULL) {
-			ulp_info = &(sire->ire_uinfo);
-		}
-		if (!ip_bind_get_ire_v4(mpp, dst_ire, ulp_info, ipst)) {
-			error = -1;
+	if (*src_addrp == htonl(INADDR_LOOPBACK)) {
+		if ((ire->ire_type & IRE_LOCAL) && ire->ire_zoneid != zoneid) {
+			ire = NULL;	/* Stored in ixa_ire */
+			error = EADDRNOTAVAIL;
 			goto bad_addr;
 		}
-		mp = *mpp;
-	} else if (ipsec_policy_set) {
-		if (!ip_bind_ipsec_policy_set(connp, mp)) {
-			error = -1;
+		if (!(ire->ire_type & (IRE_LOOPBACK|IRE_LOCAL|IRE_MULTICAST))) {
+			ire = NULL;	/* Stored in ixa_ire */
+			error = EADDRNOTAVAIL;
 			goto bad_addr;
 		}
 	}
+	if (ire->ire_type & IRE_BROADCAST) {
+		/*
+		 * If the ULP didn't have a specified source, then we
+		 * make sure we reselect the source when sending
+		 * broadcasts out different interfaces.
+		 */
+		if (flags & IPDF_SELECT_SRC)
+			ixa->ixa_flags |= IXAF_SET_SOURCE;
+		else
+			ixa->ixa_flags &= ~IXAF_SET_SOURCE;
+	}
 
 	/*
-	 * Cache IPsec policy in this conn.  If we have per-socket policy,
-	 * we'll cache that.  If we don't, we'll inherit global policy.
-	 *
-	 * We can't insert until the conn reflects the policy. Note that
-	 * conn_policy_cached is set by ipsec_conn_cache_policy() even for
-	 * connections where we don't have a policy. This is to prevent
-	 * global policy lookups in the inbound path.
-	 *
-	 * If we insert before we set conn_policy_cached,
-	 * CONN_INBOUND_POLICY_PRESENT() check can still evaluate true
-	 * because global policy cound be non-empty. We normally call
-	 * ipsec_check_policy() for conn_policy_cached connections only if
-	 * ipc_in_enforce_policy is set. But in this case,
-	 * conn_policy_cached can get set anytime since we made the
-	 * CONN_INBOUND_POLICY_PRESENT() check and ipsec_check_policy() is
-	 * called, which will make the above assumption false.  Thus, we
-	 * need to insert after we set conn_policy_cached.
+	 * Does the caller want us to pick a source address?
 	 */
-	if ((error = ipsec_conn_cache_policy(connp, B_TRUE)) != 0)
-		goto bad_addr;
+	if (flags & IPDF_SELECT_SRC) {
+		ipaddr_t	src_addr;
 
-	if (fanout_insert) {
-		/*
-		 * The addresses have been verified. Time to insert in
-		 * the correct fanout list.
-		 */
-		error = ipcl_conn_insert(connp, protocol, src_addr,
-		    dst_addr, connp->conn_ports);
-	}
-
-	if (error == 0) {
-		connp->conn_fully_bound = B_TRUE;
-		/*
-		 * Our initial checks for LSO/MDT have passed; the IRE is not
-		 * LOCAL/LOOPBACK/BROADCAST, and the link layer seems to
-		 * be supporting LSO/MDT.  Pass the IRE, IPC and ILL into
-		 * ip_xxinfo_return(), which performs further checks
-		 * against them and upon success, returns the LSO/MDT info
-		 * mblk which we will attach to the bind acknowledgment.
-		 */
-		if (lso_dst_ire != NULL) {
-			mblk_t *lsoinfo_mp;
-
-			ASSERT(ill->ill_lso_capab != NULL);
-			if ((lsoinfo_mp = ip_lsoinfo_return(lso_dst_ire, connp,
-			    ill->ill_name, ill->ill_lso_capab)) != NULL) {
-				if (mp == NULL) {
-					*mpp = lsoinfo_mp;
-				} else {
-					linkb(mp, lsoinfo_mp);
-				}
-			}
-		} else if (md_dst_ire != NULL) {
-			mblk_t *mdinfo_mp;
-
-			ASSERT(ill->ill_mdt_capab != NULL);
-			if ((mdinfo_mp = ip_mdinfo_return(md_dst_ire, connp,
-			    ill->ill_name, ill->ill_mdt_capab)) != NULL) {
-				if (mp == NULL) {
-					*mpp = mdinfo_mp;
-				} else {
-					linkb(mp, mdinfo_mp);
-				}
+		/* If unreachable we have no ill but need some source */
+		if (ill == NULL) {
+			src_addr = htonl(INADDR_LOOPBACK);
+			/* Make sure we look for a better source address */
+			generation = SRC_GENERATION_VERIFY;
+		} else {
+			error = ip_select_source_v4(ill, setsrc, dst_addr,
+			    ixa->ixa_multicast_ifaddr, zoneid,
+			    ipst, &src_addr, &generation, NULL);
+			if (error != 0) {
+				ire = NULL;	/* Stored in ixa_ire */
+				goto bad_addr;
 			}
 		}
+
+		/*
+		 * We allow the source address to to down.
+		 * However, we check that we don't use the loopback address
+		 * as a source when sending out on the wire.
+		 */
+		if ((src_addr == htonl(INADDR_LOOPBACK)) &&
+		    !(ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK|IRE_MULTICAST)) &&
+		    !(ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
+			ire = NULL;	/* Stored in ixa_ire */
+			error = EADDRNOTAVAIL;
+			goto bad_addr;
+		}
+
+		*src_addrp = src_addr;
+		ixa->ixa_src_generation = generation;
 	}
+
+	if (flags & IPDF_UNIQUE_DCE) {
+		/* Fallback to the default dce if allocation fails */
+		dce = dce_lookup_and_add_v4(dst_addr, ipst);
+		if (dce != NULL)
+			generation = dce->dce_generation;
+		else
+			dce = dce_lookup_v4(dst_addr, ipst, &generation);
+	} else {
+		dce = dce_lookup_v4(dst_addr, ipst, &generation);
+	}
+	ASSERT(dce != NULL);
+	if (ixa->ixa_dce != NULL)
+		dce_refrele_notr(ixa->ixa_dce);
+#ifdef DEBUG
+	dce_refhold_notr(dce);
+	dce_refrele(dce);
+#endif
+	ixa->ixa_dce = dce;
+	ixa->ixa_dce_generation = generation;
+
+	/*
+	 * Make sure we don't leave an unreachable ixa_nce in place
+	 * since ip_select_route is used when we unplumb i.e., remove
+	 * references on ixa_ire, ixa_nce, and ixa_dce.
+	 */
+	nce = ixa->ixa_nce;
+	if (nce != NULL && nce->nce_is_condemned) {
+		nce_refrele(nce);
+		ixa->ixa_nce = NULL;
+		ixa->ixa_ire_generation = IRE_GENERATION_VERIFY;
+	}
+
+	/*
+	 * The caller has set IXAF_PMTU_DISCOVERY if path MTU is desired.
+	 * However, we can't do it for IPv4 multicast or broadcast.
+	 */
+	if (ire->ire_type & (IRE_BROADCAST|IRE_MULTICAST))
+		ixa->ixa_flags &= ~IXAF_PMTU_DISCOVERY;
+
+	/*
+	 * Set initial value for fragmentation limit. Either conn_ip_output
+	 * or ULP might updates it when there are routing changes.
+	 * Handles a NULL ixa_ire->ire_ill or a NULL ixa_nce for RTF_REJECT.
+	 */
+	pmtu = ip_get_pmtu(ixa);
+	ixa->ixa_fragsize = pmtu;
+	/* Make sure ixa_fragsize and ixa_pmtu remain identical */
+	if (ixa->ixa_flags & IXAF_VERIFY_PMTU)
+		ixa->ixa_pmtu = pmtu;
+
+	/*
+	 * Extract information useful for some transports.
+	 * First we look for DCE metrics. Then we take what we have in
+	 * the metrics in the route, where the offlink is used if we have
+	 * one.
+	 */
+	if (uinfo != NULL) {
+		bzero(uinfo, sizeof (*uinfo));
+
+		if (dce->dce_flags & DCEF_UINFO)
+			*uinfo = dce->dce_uinfo;
+
+		rts_merge_metrics(uinfo, &ire->ire_metrics);
+
+		/* Allow ire_metrics to decrease the path MTU from above */
+		if (uinfo->iulp_mtu == 0 || uinfo->iulp_mtu > pmtu)
+			uinfo->iulp_mtu = pmtu;
+
+		uinfo->iulp_localnet = (ire->ire_type & IRE_ONLINK) != 0;
+		uinfo->iulp_loopback = (ire->ire_type & IRE_LOOPBACK) != 0;
+		uinfo->iulp_local = (ire->ire_type & IRE_LOCAL) != 0;
+	}
+
+	if (ill != NULL)
+		ill_refrele(ill);
+
+	return (error);
+
 bad_addr:
-	if (ipsec_policy_set) {
-		ASSERT(mp != NULL);
-		freeb(mp);
-		/*
-		 * As of now assume that nothing else accompanies
-		 * IPSEC_POLICY_SET.
-		 */
-		*mpp = NULL;
+	if (ire != NULL)
+		ire_refrele(ire);
+
+	if (ill != NULL)
+		ill_refrele(ill);
+
+	/*
+	 * Make sure we don't leave an unreachable ixa_nce in place
+	 * since ip_select_route is used when we unplumb i.e., remove
+	 * references on ixa_ire, ixa_nce, and ixa_dce.
+	 */
+	nce = ixa->ixa_nce;
+	if (nce != NULL && nce->nce_is_condemned) {
+		nce_refrele(nce);
+		ixa->ixa_nce = NULL;
+		ixa->ixa_ire_generation = IRE_GENERATION_VERIFY;
 	}
-	if (src_ire != NULL)
-		IRE_REFRELE(src_ire);
-	if (dst_ire != NULL)
-		IRE_REFRELE(dst_ire);
-	if (sire != NULL)
-		IRE_REFRELE(sire);
-	if (md_dst_ire != NULL)
-		IRE_REFRELE(md_dst_ire);
-	if (lso_dst_ire != NULL)
-		IRE_REFRELE(lso_dst_ire);
-	if (effective_cred != NULL)
-		crfree(effective_cred);
+
 	return (error);
 }
 
-int
-ip_proto_bind_connected_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
-    ipaddr_t *src_addrp, uint16_t lport, ipaddr_t dst_addr, uint16_t fport,
-    boolean_t fanout_insert, boolean_t verify_dst, cred_t *cr)
+
+/*
+ * Get the base MTU for the case when path MTU discovery is not used.
+ * Takes the MTU of the IRE into account.
+ */
+uint_t
+ip_get_base_mtu(ill_t *ill, ire_t *ire)
 {
-	int error;
+	uint_t mtu = ill->ill_mtu;
+	uint_t iremtu = ire->ire_metrics.iulp_mtu;
 
-	ASSERT(!connp->conn_af_isv6);
-	connp->conn_pkt_isv6 = B_FALSE;
-	connp->conn_ulp = protocol;
+	if (iremtu != 0 && iremtu < mtu)
+		mtu = iremtu;
 
-	/* For raw socket, the local port is not set. */
-	if (lport == 0)
-		lport = connp->conn_lport;
-	error = ip_bind_connected_v4(connp, ire_mpp, protocol,
-	    src_addrp, lport, dst_addr, fport, fanout_insert, verify_dst, cr);
-	if (error < 0)
-		error = -TBADADDR;
-	return (error);
+	return (mtu);
 }
 
 /*
- * Get the ire in *mpp. Returns false if it fails (due to lack of space).
- * Prefers dst_ire over src_ire.
+ * Get the PMTU for the attributes. Handles both IPv4 and IPv6.
+ * Assumes that ixa_ire, dce, and nce have already been set up.
+ *
+ * The caller has set IXAF_PMTU_DISCOVERY if path MTU discovery is desired.
+ * We avoid path MTU discovery if it is disabled with ndd.
+ * Furtermore, if the path MTU is too small, then we don't set DF for IPv4.
+ *
+ * NOTE: We also used to turn it off for source routed packets. That
+ * is no longer required since the dce is per final destination.
  */
-static boolean_t
-ip_bind_get_ire_v4(mblk_t **mpp, ire_t *ire, iulp_t *ulp_info, ip_stack_t *ipst)
+uint_t
+ip_get_pmtu(ip_xmit_attr_t *ixa)
 {
-	mblk_t	*mp = *mpp;
-	ire_t	*ret_ire;
+	ip_stack_t	*ipst = ixa->ixa_ipst;
+	dce_t		*dce;
+	nce_t		*nce;
+	ire_t		*ire;
+	uint_t		pmtu;
 
-	ASSERT(mp != NULL);
+	ire = ixa->ixa_ire;
+	dce = ixa->ixa_dce;
+	nce = ixa->ixa_nce;
 
-	if (ire != NULL) {
-		/*
-		 * mp initialized above to IRE_DB_REQ_TYPE
-		 * appended mblk. Its <upper protocol>'s
-		 * job to make sure there is room.
-		 */
-		if ((mp->b_datap->db_lim - mp->b_rptr) < sizeof (ire_t))
-			return (B_FALSE);
+	/*
+	 * If path MTU discovery has been turned off by ndd, then we ignore
+	 * any dce_pmtu and for IPv4 we will not set DF.
+	 */
+	if (!ipst->ips_ip_path_mtu_discovery)
+		ixa->ixa_flags &= ~IXAF_PMTU_DISCOVERY;
 
-		mp->b_datap->db_type = IRE_DB_TYPE;
-		mp->b_wptr = mp->b_rptr + sizeof (ire_t);
-		bcopy(ire, mp->b_rptr, sizeof (ire_t));
-		ret_ire = (ire_t *)mp->b_rptr;
-		/*
-		 * Pass the latest setting of the ip_path_mtu_discovery and
-		 * copy the ulp info if any.
-		 */
-		ret_ire->ire_frag_flag |= (ipst->ips_ip_path_mtu_discovery) ?
-		    IPH_DF : 0;
-		if (ulp_info != NULL) {
-			bcopy(ulp_info, &(ret_ire->ire_uinfo),
-			    sizeof (iulp_t));
-		}
-		ret_ire->ire_mp = mp;
+	pmtu = IP_MAXPACKET;
+	/*
+	 * Decide whether whether IPv4 sets DF
+	 * For IPv6 "no DF" means to use the 1280 mtu
+	 */
+	if (ixa->ixa_flags & IXAF_PMTU_DISCOVERY) {
+		ixa->ixa_flags |= IXAF_PMTU_IPV4_DF;
 	} else {
-		/*
-		 * No IRE was found. Remove IRE mblk.
-		 */
-		*mpp = mp->b_cont;
-		freeb(mp);
+		ixa->ixa_flags &= ~IXAF_PMTU_IPV4_DF;
+		if (!(ixa->ixa_flags & IXAF_IS_IPV4))
+			pmtu = IPV6_MIN_MTU;
 	}
-	return (B_TRUE);
+
+	/* Check if the PMTU is to old before we use it */
+	if ((dce->dce_flags & DCEF_PMTU) &&
+	    TICK_TO_SEC(lbolt64) - dce->dce_last_change_time >
+	    ipst->ips_ip_pathmtu_interval) {
+		/*
+		 * Older than 20 minutes. Drop the path MTU information.
+		 */
+		mutex_enter(&dce->dce_lock);
+		dce->dce_flags &= ~(DCEF_PMTU|DCEF_TOO_SMALL_PMTU);
+		dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+		mutex_exit(&dce->dce_lock);
+		dce_increment_generation(dce);
+	}
+
+	/* The metrics on the route can lower the path MTU */
+	if (ire->ire_metrics.iulp_mtu != 0 &&
+	    ire->ire_metrics.iulp_mtu < pmtu)
+		pmtu = ire->ire_metrics.iulp_mtu;
+
+	/*
+	 * If the path MTU is smaller than some minimum, we still use dce_pmtu
+	 * above (would be 576 for IPv4 and 1280 for IPv6), but we clear
+	 * IXAF_PMTU_IPV4_DF so that we avoid setting DF for IPv4.
+	 */
+	if (ixa->ixa_flags & IXAF_PMTU_DISCOVERY) {
+		if (dce->dce_flags & DCEF_PMTU) {
+			if (dce->dce_pmtu < pmtu)
+				pmtu = dce->dce_pmtu;
+
+			if (dce->dce_flags & DCEF_TOO_SMALL_PMTU) {
+				ixa->ixa_flags |= IXAF_PMTU_TOO_SMALL;
+				ixa->ixa_flags &= ~IXAF_PMTU_IPV4_DF;
+			} else {
+				ixa->ixa_flags &= ~IXAF_PMTU_TOO_SMALL;
+				ixa->ixa_flags |= IXAF_PMTU_IPV4_DF;
+			}
+		} else {
+			ixa->ixa_flags &= ~IXAF_PMTU_TOO_SMALL;
+			ixa->ixa_flags |= IXAF_PMTU_IPV4_DF;
+		}
+	}
+
+	/*
+	 * If we have an IRE_LOCAL we use the loopback mtu instead of
+	 * the ill for going out the wire i.e., IRE_LOCAL gets the same
+	 * mtu as IRE_LOOPBACK.
+	 */
+	if (ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK)) {
+		uint_t loopback_mtu;
+
+		loopback_mtu = (ire->ire_ipversion == IPV6_VERSION) ?
+		    ip_loopback_mtu_v6plus : ip_loopback_mtuplus;
+
+		if (loopback_mtu < pmtu)
+			pmtu = loopback_mtu;
+	} else if (nce != NULL) {
+		/*
+		 * Make sure we don't exceed the interface MTU.
+		 * In the case of RTF_REJECT or RTF_BLACKHOLE we might not have
+		 * an ill. We'd use the above IP_MAXPACKET in that case just
+		 * to tell the transport something larger than zero.
+		 */
+		if (nce->nce_common->ncec_ill->ill_mtu < pmtu)
+			pmtu = nce->nce_common->ncec_ill->ill_mtu;
+		if (nce->nce_common->ncec_ill != nce->nce_ill &&
+		    nce->nce_ill->ill_mtu < pmtu) {
+			/*
+			 * for interfaces in an IPMP group, the mtu of
+			 * the nce_ill (under_ill) could be different
+			 * from the mtu of the ncec_ill, so we take the
+			 * min of the two.
+			 */
+			pmtu = nce->nce_ill->ill_mtu;
+		}
+	}
+
+	/*
+	 * Handle the IPV6_USE_MIN_MTU socket option or ancillary data.
+	 * Only applies to IPv6.
+	 */
+	if (!(ixa->ixa_flags & IXAF_IS_IPV4)) {
+		if (ixa->ixa_flags & IXAF_USE_MIN_MTU) {
+			switch (ixa->ixa_use_min_mtu) {
+			case IPV6_USE_MIN_MTU_MULTICAST:
+				if (ire->ire_type & IRE_MULTICAST)
+					pmtu = IPV6_MIN_MTU;
+				break;
+			case IPV6_USE_MIN_MTU_ALWAYS:
+				pmtu = IPV6_MIN_MTU;
+				break;
+			case IPV6_USE_MIN_MTU_NEVER:
+				break;
+			}
+		} else {
+			/* Default is IPV6_USE_MIN_MTU_MULTICAST */
+			if (ire->ire_type & IRE_MULTICAST)
+				pmtu = IPV6_MIN_MTU;
+		}
+	}
+
+	/*
+	 * After receiving an ICMPv6 "packet too big" message with a
+	 * MTU < 1280, and for multirouted IPv6 packets, the IP layer
+	 * will insert a 8-byte fragment header in every packet. We compensate
+	 * for those cases by returning a smaller path MTU to the ULP.
+	 *
+	 * In the case of CGTP then ip_output will add a fragment header.
+	 * Make sure there is room for it by telling a smaller number
+	 * to the transport.
+	 *
+	 * When IXAF_IPV6_ADDR_FRAGHDR we subtract the frag hdr here
+	 * so the ULPs consistently see a iulp_pmtu and ip_get_pmtu()
+	 * which is the size of the packets it can send.
+	 */
+	if (!(ixa->ixa_flags & IXAF_IS_IPV4)) {
+		if ((dce->dce_flags & DCEF_TOO_SMALL_PMTU) ||
+		    (ire->ire_flags & RTF_MULTIRT) ||
+		    (ixa->ixa_flags & IXAF_MULTIRT_MULTICAST)) {
+			pmtu -= sizeof (ip6_frag_t);
+			ixa->ixa_flags |= IXAF_IPV6_ADD_FRAGHDR;
+		}
+	}
+
+	return (pmtu);
 }
 
 /*
@@ -5386,6 +4128,7 @@ ip_modclose(ill_t *ill)
 	queue_t	*q = ill->ill_rq;
 	ip_stack_t	*ipst = ill->ill_ipst;
 	int	i;
+	arl_ill_common_t *ai = ill->ill_common;
 
 	/*
 	 * The punlink prior to this may have initiated a capability
@@ -5452,6 +4195,7 @@ ip_modclose(ill_t *ill)
 	mutex_enter(&ill->ill_lock);
 	while (!ill_is_freeable(ill))
 		cv_wait(&ill->ill_cv, &ill->ill_lock);
+
 	while (ill->ill_waiters)
 		cv_wait(&ill->ill_cv, &ill->ill_lock);
 
@@ -5466,12 +4210,16 @@ ip_modclose(ill_t *ill)
 
 	/* qprocsoff is done via ill_delete_tail */
 	ill_delete_tail(ill);
+	/*
+	 * synchronously wait for arp stream to unbind. After this, we
+	 * cannot get any data packets up from the driver.
+	 */
+	arp_unbind_complete(ill);
 	ASSERT(ill->ill_ipst == NULL);
 
 	/*
-	 * Walk through all upper (conn) streams and qenable
-	 * those that have queued data.
-	 * close synchronization needs this to
+	 * Walk through all conns and qenable those that have queued data.
+	 * Close synchronization needs this to
 	 * be done to ensure that all upper layers blocked
 	 * due to flow control to the closing device
 	 * get unblocked.
@@ -5479,6 +4227,25 @@ ip_modclose(ill_t *ill)
 	ip1dbg(("ip_wsrv: walking\n"));
 	for (i = 0; i < TX_FANOUT_SIZE; i++) {
 		conn_walk_drain(ipst, &ipst->ips_idl_tx_list[i]);
+	}
+
+	/*
+	 * ai can be null if this is an IPv6 ill, or if the IPv4
+	 * stream is being torn down before ARP was plumbed (e.g.,
+	 * /sbin/ifconfig plumbing a stream twice, and encountering
+	 * an error
+	 */
+	if (ai != NULL) {
+		ASSERT(!ill->ill_isv6);
+		mutex_enter(&ai->ai_lock);
+		ai->ai_ill = NULL;
+		if (ai->ai_arl == NULL) {
+			mutex_destroy(&ai->ai_lock);
+			kmem_free(ai, sizeof (*ai));
+		} else {
+			cv_signal(&ai->ai_ill_unplumb_done);
+			mutex_exit(&ai->ai_lock);
+		}
 	}
 
 	mutex_enter(&ipst->ips_ip_mi_lock);
@@ -5491,6 +4258,12 @@ ip_modclose(ill_t *ill)
 	 */
 	if (ill->ill_credp != NULL)
 		crfree(ill->ill_credp);
+
+	mutex_destroy(&ill->ill_saved_ire_lock);
+	mutex_destroy(&ill->ill_lock);
+	rw_destroy(&ill->ill_mcast_lock);
+	mutex_destroy(&ill->ill_mcast_serializer);
+	list_destroy(&ill->ill_nce);
 
 	/*
 	 * Now we are done with the module close pieces that
@@ -5525,11 +4298,8 @@ ip_quiesce_conn(conn_t *connp)
 	 * Mark the conn as closing, and this conn must not be
 	 * inserted in future into any list. Eg. conn_drain_insert(),
 	 * won't insert this conn into the conn_drain_list.
-	 * Similarly ill_pending_mp_add() will not add any mp to
-	 * the pending mp list, after this conn has started closing.
 	 *
-	 * conn_idl, conn_pending_ill, conn_down_pending_ill, conn_ilg
-	 * cannot get set henceforth.
+	 * conn_idl, and conn_ilg cannot get set henceforth.
 	 */
 	mutex_enter(&connp->conn_lock);
 	ASSERT(!(connp->conn_state_flags & CONN_QUIESCED));
@@ -5541,9 +4311,10 @@ ip_quiesce_conn(conn_t *connp)
 	if (connp->conn_dhcpinit_ill != NULL) {
 		ASSERT(connp->conn_dhcpinit_ill->ill_dhcpinit != 0);
 		atomic_dec_32(&connp->conn_dhcpinit_ill->ill_dhcpinit);
+		ill_set_inputfn(connp->conn_dhcpinit_ill);
 		connp->conn_dhcpinit_ill = NULL;
 	}
-	if (connp->conn_ilg_inuse != 0)
+	if (connp->conn_ilg != NULL)
 		ilg_cleanup_reqd = B_TRUE;
 	mutex_exit(&connp->conn_lock);
 
@@ -5552,7 +4323,7 @@ ip_quiesce_conn(conn_t *connp)
 
 	if (is_system_labeled() && connp->conn_anon_port) {
 		(void) tsol_mlp_anon(crgetzone(connp->conn_cred),
-		    connp->conn_mlp_type, connp->conn_ulp,
+		    connp->conn_mlp_type, connp->conn_proto,
 		    ntohs(connp->conn_lport), B_FALSE);
 		connp->conn_anon_port = 0;
 	}
@@ -5568,20 +4339,21 @@ ip_quiesce_conn(conn_t *connp)
 	/*
 	 * Remove this conn from the drain list, and do
 	 * any other cleanup that may be required.
-	 * (Only non-tcp streams may have a non-null conn_idl.
-	 * TCP streams are never flow controlled, and
+	 * (Only non-tcp conns may have a non-null conn_idl.
+	 * TCP conns are never flow controlled, and
 	 * conn_idl will be null)
 	 */
-	if (drain_cleanup_reqd)
+	if (drain_cleanup_reqd && connp->conn_idl != NULL) {
+		mutex_enter(&connp->conn_idl->idl_lock);
 		conn_drain_tail(connp, B_TRUE);
+		mutex_exit(&connp->conn_idl->idl_lock);
+	}
 
 	if (connp == ipst->ips_ip_g_mrouter)
-		(void) ip_mrouter_done(NULL, ipst);
+		(void) ip_mrouter_done(ipst);
 
 	if (ilg_cleanup_reqd)
 		ilg_delete_all(connp);
-
-	conn_delete_ire(connp, NULL);
 
 	/*
 	 * Now conn refcnt can increase only thru CONN_INC_REF_LOCKED.
@@ -5602,8 +4374,6 @@ int
 ip_close(queue_t *q, int flags)
 {
 	conn_t		*connp;
-
-	TRACE_1(TR_FAC_IP, TR_IP_CLOSE, "ip_close: q %p", q);
 
 	/*
 	 * Call the appropriate delete routine depending on whether this is
@@ -5646,11 +4416,19 @@ ip_close(queue_t *q, int flags)
  */
 /*ARGSUSED2*/
 static void
-ip_conn_input(void *arg1, mblk_t *mp, void *arg2)
+ip_conn_input(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 {
 	conn_t *connp = (conn_t *)arg1;
 
 	putnext(connp->conn_rq, mp);
+}
+
+/* Dummy in case ICMP error delivery is attempted to a /dev/ip instance */
+/* ARGSUSED */
+static void
+ip_conn_input_icmp(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
+{
+	freemsg(mp);
 }
 
 /*
@@ -5667,6 +4445,7 @@ ip_ddi_destroy(void)
 	sctp_ddi_g_destroy();
 	tcp_ddi_g_destroy();
 	ilb_ddi_g_destroy();
+	dce_g_destroy();
 	ipsec_policy_g_destroy();
 	ipcl_g_destroy();
 	ip_net_g_destroy();
@@ -5709,16 +4488,12 @@ ip_stack_shutdown(netstackid_t stackid, void *arg)
 	 */
 	ipv4_hook_shutdown(ipst);
 	ipv6_hook_shutdown(ipst);
+	arp_hook_shutdown(ipst);
 
 	mutex_enter(&ipst->ips_capab_taskq_lock);
 	ipst->ips_capab_taskq_quit = B_TRUE;
 	cv_signal(&ipst->ips_capab_taskq_cv);
 	mutex_exit(&ipst->ips_capab_taskq_lock);
-
-	mutex_enter(&ipst->ips_mrt_lock);
-	ipst->ips_mrt_flags |= IP_MRT_STOP;
-	cv_signal(&ipst->ips_mrt_cv);
-	mutex_exit(&ipst->ips_mrt_lock);
 }
 
 /*
@@ -5741,17 +4516,11 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	ipobs_fini(ipst);
 	ipv4_hook_destroy(ipst);
 	ipv6_hook_destroy(ipst);
+	arp_hook_destroy(ipst);
 	ip_net_destroy(ipst);
 
 	mutex_destroy(&ipst->ips_capab_taskq_lock);
 	cv_destroy(&ipst->ips_capab_taskq_cv);
-
-	mutex_enter(&ipst->ips_mrt_lock);
-	while (!(ipst->ips_mrt_flags & IP_MRT_DONE))
-		cv_wait(&ipst->ips_mrt_done_cv, &ipst->ips_mrt_lock);
-	mutex_destroy(&ipst->ips_mrt_lock);
-	cv_destroy(&ipst->ips_mrt_cv);
-	cv_destroy(&ipst->ips_mrt_done_cv);
 
 	ipmp_destroy(ipst);
 	rw_destroy(&ipst->ips_srcid_lock);
@@ -5773,10 +4542,10 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	kmem_free(ipst->ips_ndp_arr, sizeof (lcl_ndp_arr));
 	ipst->ips_ndp_arr = NULL;
 
+	dce_stack_destroy(ipst);
 	ip_mrouter_stack_destroy(ipst);
 
 	mutex_destroy(&ipst->ips_ip_mi_lock);
-	rw_destroy(&ipst->ips_ipsec_capab_ills_lock);
 	rw_destroy(&ipst->ips_ill_g_usesrc_lock);
 	rw_destroy(&ipst->ips_ip_g_nd_lock);
 
@@ -5807,13 +4576,6 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	} else {
 		ASSERT(ipst->ips_mld_slowtimeout_id != 0);
 		ipst->ips_mld_slowtimeout_id = 0;
-	}
-	ret = untimeout(ipst->ips_ip_ire_expire_id);
-	if (ret == -1) {
-		ASSERT(ipst->ips_ip_ire_expire_id == 0);
-	} else {
-		ASSERT(ipst->ips_ip_ire_expire_id != 0);
-		ipst->ips_ip_ire_expire_id = 0;
 	}
 
 	mutex_destroy(&ipst->ips_igmp_timer_lock);
@@ -5915,6 +4677,10 @@ ip_ddi_init(void)
 	list_create(&ip_thread_list, sizeof (th_hash_t),
 	    offsetof(th_hash_t, thh_link));
 #endif
+	ipsec_policy_g_init();
+	tcp_ddi_g_init();
+	sctp_ddi_g_init();
+	dce_g_init();
 
 	/*
 	 * We want to be informed each time a stack is created or
@@ -5923,10 +4689,6 @@ ip_ddi_init(void)
 	 */
 	netstack_register(NS_IP, ip_stack_init, ip_stack_shutdown,
 	    ip_stack_fini);
-
-	ipsec_policy_g_init();
-	tcp_ddi_g_init();
-	sctp_ddi_g_init();
 
 	tnet_init();
 
@@ -5973,7 +4735,6 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	mutex_init(&ipst->ips_ip_mi_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&ipst->ips_ip_addr_avail_lock, NULL, MUTEX_DEFAULT, NULL);
 	rw_init(&ipst->ips_ill_g_lock, NULL, RW_DEFAULT, NULL);
-	rw_init(&ipst->ips_ipsec_capab_ills_lock, NULL, RW_DEFAULT, NULL);
 	rw_init(&ipst->ips_ill_g_usesrc_lock, NULL, RW_DEFAULT, NULL);
 
 	ipcl_init(ipst);
@@ -5982,6 +4743,7 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	ipif_init(ipst);
 	conn_drain_init(ipst);
 	ip_mrouter_stack_init(ipst);
+	dce_stack_init(ipst);
 
 	ipst->ips_ip_g_frag_timeout = IP_FRAG_TIMEOUT;
 	ipst->ips_ip_g_frag_timo_ms = IP_FRAG_TIMEOUT * 1000;
@@ -6026,9 +4788,12 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	ipst->ips_ip_src_id = 1;
 	rw_init(&ipst->ips_srcid_lock, NULL, RW_DEFAULT, NULL);
 
+	ipst->ips_src_generation = SRC_GENERATION_INITIAL;
+
 	ip_net_init(ipst, ns);
 	ipv4_hook_init(ipst);
 	ipv6_hook_init(ipst);
+	arp_hook_init(ipst);
 	ipmp_init(ipst);
 	ipobs_init(ipst);
 
@@ -6039,15 +4804,6 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	    ill_taskq_dispatch, ipst, 0, &p0, TS_RUN, minclsyspri);
 	mutex_init(&ipst->ips_capab_taskq_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&ipst->ips_capab_taskq_cv, NULL, CV_DEFAULT, NULL);
-
-	/*
-	 * Create the mcast_restart_timers_thread() worker thread.
-	 */
-	mutex_init(&ipst->ips_mrt_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&ipst->ips_mrt_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&ipst->ips_mrt_done_cv, NULL, CV_DEFAULT, NULL);
-	ipst->ips_mrt_thread = thread_create(NULL, 0,
-	    mcast_restart_timers_thread, ipst, 0, &p0, TS_RUN, minclsyspri);
 
 	major = mod_name_to_major(INET_NAME);
 	(void) ldi_ident_from_major(major, &ipst->ips_ldi_ident);
@@ -6161,37 +4917,26 @@ mac_colon_addr(const uint8_t *addr, size_t alen, char *buf, size_t buflen)
 }
 
 /*
- * Send an ICMP error after patching up the packet appropriately.  Returns
- * non-zero if the appropriate MIB should be bumped; zero otherwise.
+ * Called when it is conceptually a ULP that would sent the packet
+ * e.g., port unreachable and protocol unreachable. Check that the packet
+ * would have passed the IPsec global policy before sending the error.
+ *
+ * Send an ICMP error after patching up the packet appropriately.
+ * Uses ip_drop_input and bumps the appropriate MIB.
  */
-static boolean_t
-ip_fanout_send_icmp(queue_t *q, mblk_t *mp, uint_t flags,
-    uint_t icmp_type, uint_t icmp_code, boolean_t mctl_present,
-    zoneid_t zoneid, ip_stack_t *ipst)
+void
+ip_fanout_send_icmp_v4(mblk_t *mp, uint_t icmp_type, uint_t icmp_code,
+    ip_recv_attr_t *ira)
 {
-	ipha_t *ipha;
-	mblk_t *first_mp;
-	boolean_t secure;
-	unsigned char db_type;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	ipha_t		*ipha;
+	boolean_t	secure;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	netstack_t	*ns = ipst->ips_netstack;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	first_mp = mp;
-	if (mctl_present) {
-		mp = mp->b_cont;
-		secure = ipsec_in_is_secure(first_mp);
-		ASSERT(mp != NULL);
-	} else {
-		/*
-		 * If this is an ICMP error being reported - which goes
-		 * up as M_CTLs, we need to convert them to M_DATA till
-		 * we finish checking with global policy because
-		 * ipsec_check_global_policy() assumes M_DATA as clear
-		 * and M_CTL as secure.
-		 */
-		db_type = DB_TYPE(mp);
-		DB_TYPE(mp) = M_DATA;
-		secure = B_FALSE;
-	}
+	secure = ira->ira_flags & IRAF_IPSEC_SECURE;
+
 	/*
 	 * We are generating an icmp error for some inbound packet.
 	 * Called from all ip_fanout_(udp, tcp, proto) functions.
@@ -6201,47 +4946,52 @@ ip_fanout_send_icmp(queue_t *q, mblk_t *mp, uint_t flags,
 	 */
 	ipha = (ipha_t *)mp->b_rptr;
 	if (secure || ipss->ipsec_inbound_v4_policy_present) {
-		first_mp = ipsec_check_global_policy(first_mp, NULL,
-		    ipha, NULL, mctl_present, ipst->ips_netstack);
-		if (first_mp == NULL)
-			return (B_FALSE);
+		mp = ipsec_check_global_policy(mp, NULL, ipha, NULL, ira, ns);
+		if (mp == NULL)
+			return;
 	}
 
-	if (!mctl_present)
-		DB_TYPE(mp) = db_type;
-
-	if (flags & IP_FF_SEND_ICMP) {
-		if (flags & IP_FF_HDR_COMPLETE) {
-			if (ip_hdr_complete(ipha, zoneid, ipst)) {
-				freemsg(first_mp);
-				return (B_TRUE);
-			}
-		}
-		if (flags & IP_FF_CKSUM) {
-			/*
-			 * Have to correct checksum since
-			 * the packet might have been
-			 * fragmented and the reassembly code in ip_rput
-			 * does not restore the IP checksum.
-			 */
-			ipha->ipha_hdr_checksum = 0;
-			ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
-		}
-		switch (icmp_type) {
-		case ICMP_DEST_UNREACHABLE:
-			icmp_unreachable(WR(q), first_mp, icmp_code, zoneid,
-			    ipst);
-			break;
-		default:
-			freemsg(first_mp);
-			break;
-		}
-	} else {
-		freemsg(first_mp);
-		return (B_FALSE);
+	/* We never send errors for protocols that we do implement */
+	if (ira->ira_protocol == IPPROTO_ICMP ||
+	    ira->ira_protocol == IPPROTO_IGMP) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ip_fanout_send_icmp_v4", mp, ill);
+		freemsg(mp);
+		return;
 	}
+	/*
+	 * Have to correct checksum since
+	 * the packet might have been
+	 * fragmented and the reassembly code in ip_rput
+	 * does not restore the IP checksum.
+	 */
+	ipha->ipha_hdr_checksum = 0;
+	ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
 
-	return (B_TRUE);
+	switch (icmp_type) {
+	case ICMP_DEST_UNREACHABLE:
+		switch (icmp_code) {
+		case ICMP_PROTOCOL_UNREACHABLE:
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInUnknownProtos);
+			ip_drop_input("ipIfStatsInUnknownProtos", mp, ill);
+			break;
+		case ICMP_PORT_UNREACHABLE:
+			BUMP_MIB(ill->ill_ip_mib, udpIfStatsNoPorts);
+			ip_drop_input("ipIfStatsNoPorts", mp, ill);
+			break;
+		}
+
+		icmp_unreachable(mp, icmp_code, ira);
+		break;
+	default:
+#ifdef DEBUG
+		panic("ip_fanout_send_icmp_v4: wrong type");
+		/*NOTREACHED*/
+#else
+		freemsg(mp);
+		break;
+#endif
+	}
 }
 
 /*
@@ -6250,66 +5000,86 @@ ip_fanout_send_icmp(queue_t *q, mblk_t *mp, uint_t flags,
  * is consumed by this function.
  */
 void
-ip_proto_not_sup(queue_t *q, mblk_t *ipsec_mp, uint_t flags, zoneid_t zoneid,
-    ip_stack_t *ipst)
+ip_proto_not_sup(mblk_t *mp, ip_recv_attr_t *ira)
 {
-	mblk_t *mp;
-	ipha_t *ipha;
-	ill_t *ill;
-	ipsec_in_t *ii;
+	ipha_t		*ipha;
 
-	ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-	ASSERT(ii->ipsec_in_type == IPSEC_IN);
-
-	mp = ipsec_mp->b_cont;
-	ipsec_mp->b_cont = NULL;
 	ipha = (ipha_t *)mp->b_rptr;
-	/* Get ill from index in ipsec_in_t. */
-	ill = ill_lookup_on_ifindex(ii->ipsec_in_ill_index,
-	    (IPH_HDR_VERSION(ipha) == IPV6_VERSION), NULL, NULL, NULL, NULL,
-	    ipst);
-	if (ill != NULL) {
-		if (IPH_HDR_VERSION(ipha) == IP_VERSION) {
-			if (ip_fanout_send_icmp(q, mp, flags,
-			    ICMP_DEST_UNREACHABLE,
-			    ICMP_PROTOCOL_UNREACHABLE, B_FALSE, zoneid, ipst)) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsInUnknownProtos);
-			}
-		} else {
-			if (ip_fanout_send_icmp_v6(q, mp, flags,
-			    ICMP6_PARAM_PROB, ICMP6_PARAMPROB_NEXTHEADER,
-			    0, B_FALSE, zoneid, ipst)) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsInUnknownProtos);
-			}
-		}
-		ill_refrele(ill);
-	} else { /* re-link for the freemsg() below. */
-		ipsec_mp->b_cont = mp;
+	if (ira->ira_flags & IRAF_IS_IPV4) {
+		ASSERT(IPH_HDR_VERSION(ipha) == IP_VERSION);
+		ip_fanout_send_icmp_v4(mp, ICMP_DEST_UNREACHABLE,
+		    ICMP_PROTOCOL_UNREACHABLE, ira);
+	} else {
+		ASSERT(IPH_HDR_VERSION(ipha) == IPV6_VERSION);
+		ip_fanout_send_icmp_v6(mp, ICMP6_PARAM_PROB,
+		    ICMP6_PARAMPROB_NEXTHEADER, ira);
 	}
-
-	/* If ICMP delivered, ipsec_mp will be a singleton (b_cont == NULL). */
-	freemsg(ipsec_mp);
 }
 
 /*
- * See if the inbound datagram has had IPsec processing applied to it.
+ * Deliver a rawip packet to the given conn, possibly applying ipsec policy.
+ * Handles IPv4 and IPv6.
+ * We are responsible for disposing of mp, such as by freemsg() or putnext()
+ * Caller is responsible for dropping references to the conn.
  */
-boolean_t
-ipsec_in_is_secure(mblk_t *ipsec_mp)
+void
+ip_fanout_proto_conn(conn_t *connp, mblk_t *mp, ipha_t *ipha, ip6_t *ip6h,
+    ip_recv_attr_t *ira)
 {
-	ipsec_in_t *ii;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	boolean_t	secure;
+	uint_t		protocol = ira->ira_protocol;
+	iaflags_t	iraflags = ira->ira_flags;
+	queue_t		*rq;
 
-	ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-	ASSERT(ii->ipsec_in_type == IPSEC_IN);
+	secure = iraflags & IRAF_IPSEC_SECURE;
 
-	if (ii->ipsec_in_loopback) {
-		return (ii->ipsec_in_secure);
+	rq = connp->conn_rq;
+	if (IPCL_IS_NONSTR(connp) ? connp->conn_flow_cntrld : !canputnext(rq)) {
+		switch (protocol) {
+		case IPPROTO_ICMPV6:
+			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInOverflows);
+			break;
+		case IPPROTO_ICMP:
+			BUMP_MIB(&ipst->ips_icmp_mib, icmpInOverflows);
+			break;
+		default:
+			BUMP_MIB(ill->ill_ip_mib, rawipIfStatsInOverflows);
+			break;
+		}
+		freemsg(mp);
+		return;
+	}
+
+	ASSERT(!(IPCL_IS_IPTUN(connp)));
+
+	if (((iraflags & IRAF_IS_IPV4) ?
+	    CONN_INBOUND_POLICY_PRESENT(connp, ipss) :
+	    CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss)) ||
+	    secure) {
+		mp = ipsec_check_inbound_policy(mp, connp, ipha,
+		    ip6h, ira);
+		if (mp == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			/* Note that mp is NULL */
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
+			return;
+		}
+	}
+
+	if (iraflags & IRAF_ICMP_ERROR) {
+		(connp->conn_recvicmp)(connp, mp, NULL, ira);
 	} else {
-		return (ii->ipsec_in_ah_sa != NULL ||
-		    ii->ipsec_in_esp_sa != NULL ||
-		    ii->ipsec_in_decaps);
+		ill_t *rill = ira->ira_rill;
+
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
+		ira->ira_ill = ira->ira_rill = NULL;
+		/* Send it upstream */
+		(connp->conn_recv)(connp, mp, NULL, ira);
+		ira->ira_ill = ill;
+		ira->ira_rill = rill;
 	}
 }
 
@@ -6336,65 +5106,33 @@ ipsec_in_is_secure(mblk_t *ipsec_mp)
  * is used to negotiate SAs as SAs will be added only after
  * verifying the policy.
  *
- * IPQoS Notes:
- * Once we have determined the client, invoke IPPF processing.
- * Policy processing takes place only if the callout_position, IPP_LOCAL_IN,
- * is enabled. If we get here from icmp_inbound_error_fanout or ip_wput_local
- * ip_policy will be false.
- *
  * Zones notes:
- * Currently only applications in the global zone can create raw sockets for
- * protocols other than ICMP. So unlike the broadcast / multicast case of
- * ip_fanout_udp(), we only send a copy of the packet to streams in the
- * specified zone. For ICMP, this is handled by the callers of icmp_inbound().
+ * Earlier in ip_input on a system with multiple shared-IP zones we
+ * duplicate the multicast and broadcast packets and send them up
+ * with each explicit zoneid that exists on that ill.
+ * This means that here we can match the zoneid with SO_ALLZONES being special.
  */
-static void
-ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
-    boolean_t mctl_present, boolean_t ip_policy, ill_t *recv_ill,
-    zoneid_t zoneid)
+void
+ip_fanout_proto_v4(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 {
-	queue_t	*rq;
-	mblk_t	*mp1, *first_mp1;
-	uint_t	protocol = ipha->ipha_protocol;
-	ipaddr_t dst;
-	mblk_t *first_mp = mp;
-	boolean_t secure;
-	uint32_t ill_index;
-	conn_t	*connp, *first_connp, *next_connp;
-	connf_t	*connfp;
-	boolean_t shared_addr;
-	mib2_ipIfStatsEntry_t *mibptr;
-	ip_stack_t *ipst = recv_ill->ill_ipst;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	mblk_t		*mp1;
+	ipaddr_t	laddr;
+	conn_t		*connp, *first_connp, *next_connp;
+	connf_t		*connfp;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	mibptr = (ill != NULL) ? ill->ill_ip_mib : &ipst->ips_ip_mib;
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		secure = ipsec_in_is_secure(first_mp);
-		ASSERT(mp != NULL);
-	} else {
-		secure = B_FALSE;
-	}
-	dst = ipha->ipha_dst;
-	shared_addr = (zoneid == ALL_ZONES);
-	if (shared_addr) {
-		/*
-		 * We don't allow multilevel ports for raw IP, so no need to
-		 * check for that here.
-		 */
-		zoneid = tsol_packet_to_zoneid(mp);
-	}
+	laddr = ipha->ipha_dst;
 
-	connfp = &ipst->ips_ipcl_proto_fanout[protocol];
+	connfp = &ipst->ips_ipcl_proto_fanout_v4[ira->ira_protocol];
 	mutex_enter(&connfp->connf_lock);
 	connp = connfp->connf_head;
 	for (connp = connfp->connf_head; connp != NULL;
 	    connp = connp->conn_next) {
-		if (IPCL_PROTO_MATCH(connp, protocol, ipha, ill, flags,
-		    zoneid) &&
-		    (!is_system_labeled() ||
-		    tsol_receive_local(mp, &dst, IPV4_VERSION, shared_addr,
-		    connp))) {
+		/* Note: IPCL_PROTO_MATCH includes conn_wantpacket */
+		if (IPCL_PROTO_MATCH(connp, ira, ipha) &&
+		    (!(ira->ira_flags & IRAF_SYSTEM_LABELED) ||
+		    tsol_receive_local(mp, &laddr, IPV4_VERSION, ira, connp))) {
 			break;
 		}
 	}
@@ -6406,40 +5144,12 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 		 * unclaimed datagrams?
 		 */
 		mutex_exit(&connfp->connf_lock);
-		/*
-		 * Check for IPPROTO_ENCAP...
-		 */
-		if (protocol == IPPROTO_ENCAP && ipst->ips_ip_g_mrouter) {
-			/*
-			 * If an IPsec mblk is here on a multicast
-			 * tunnel (using ip_mroute stuff), check policy here,
-			 * THEN ship off to ip_mroute_decap().
-			 *
-			 * BTW,  If I match a configured IP-in-IP
-			 * tunnel, this path will not be reached, and
-			 * ip_mroute_decap will never be called.
-			 */
-			first_mp = ipsec_check_global_policy(first_mp, connp,
-			    ipha, NULL, mctl_present, ipst->ips_netstack);
-			if (first_mp != NULL) {
-				if (mctl_present)
-					freeb(first_mp);
-				ip_mroute_decap(q, mp, ill);
-			} /* Else we already freed everything! */
-		} else {
-			/*
-			 * Otherwise send an ICMP protocol unreachable.
-			 */
-			if (ip_fanout_send_icmp(q, first_mp, flags,
-			    ICMP_DEST_UNREACHABLE, ICMP_PROTOCOL_UNREACHABLE,
-			    mctl_present, zoneid, ipst)) {
-				BUMP_MIB(mibptr, ipIfStatsInUnknownProtos);
-			}
-		}
+		ip_fanout_send_icmp_v4(mp, ICMP_DEST_UNREACHABLE,
+		    ICMP_PROTOCOL_UNREACHABLE, ira);
 		return;
 	}
 
-	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
+	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_rq != NULL);
 
 	CONN_INC_REF(connp);
 	first_connp = connp;
@@ -6447,111 +5157,35 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 
 	for (;;) {
 		while (connp != NULL) {
-			if (IPCL_PROTO_MATCH(connp, protocol, ipha, ill,
-			    flags, zoneid) &&
-			    (!is_system_labeled() ||
-			    tsol_receive_local(mp, &dst, IPV4_VERSION,
-			    shared_addr, connp)))
+			/* Note: IPCL_PROTO_MATCH includes conn_wantpacket */
+			if (IPCL_PROTO_MATCH(connp, ira, ipha) &&
+			    (!(ira->ira_flags & IRAF_SYSTEM_LABELED) ||
+			    tsol_receive_local(mp, &laddr, IPV4_VERSION,
+			    ira, connp)))
 				break;
 			connp = connp->conn_next;
 		}
 
-		/*
-		 * Copy the packet.
-		 */
-		if (connp == NULL ||
-		    (((first_mp1 = dupmsg(first_mp)) == NULL) &&
-		    ((first_mp1 = ip_copymsg(first_mp)) == NULL))) {
-			/*
-			 * No more interested clients or memory
-			 * allocation failed
-			 */
+		if (connp == NULL) {
+			/* No more interested clients */
 			connp = first_connp;
 			break;
 		}
-		ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_rq != NULL);
-		mp1 = mctl_present ? first_mp1->b_cont : first_mp1;
+		if (((mp1 = dupmsg(mp)) == NULL) &&
+		    ((mp1 = copymsg(mp)) == NULL)) {
+			/* Memory allocation failed */
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
+			connp = first_connp;
+			break;
+		}
+
 		CONN_INC_REF(connp);
 		mutex_exit(&connfp->connf_lock);
-		rq = connp->conn_rq;
 
-		/*
-		 * Check flow control
-		 */
-		if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
-		    (!IPCL_IS_NONSTR(connp) && !canputnext(rq))) {
-			if (flags & IP_FF_RAWIP) {
-				BUMP_MIB(mibptr, rawipIfStatsInOverflows);
-			} else {
-				BUMP_MIB(&ipst->ips_icmp_mib, icmpInOverflows);
-			}
+		ip_fanout_proto_conn(connp, mp1, (ipha_t *)mp1->b_rptr, NULL,
+		    ira);
 
-			freemsg(first_mp1);
-		} else {
-			/*
-			 * Enforce policy like any other conn_t.  Note that
-			 * IP-in-IP packets don't come through here, but
-			 * through ip_iptun_input() or
-			 * icmp_inbound_iptun_fanout().  IPsec policy for such
-			 * packets is enforced in the iptun module.
-			 */
-			if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) ||
-			    secure) {
-				first_mp1 = ipsec_check_inbound_policy
-				    (first_mp1, connp, ipha, NULL,
-				    mctl_present);
-			}
-			if (first_mp1 != NULL) {
-				int in_flags = 0;
-				/*
-				 * ip_fanout_proto also gets called from
-				 * icmp_inbound_error_fanout, in which case
-				 * the msg type is M_CTL.  Don't add info
-				 * in this case for the time being. In future
-				 * when there is a need for knowing the
-				 * inbound iface index for ICMP error msgs,
-				 * then this can be changed.
-				 */
-				if (connp->conn_recvif)
-					in_flags = IPF_RECVIF;
-				/*
-				 * The ULP may support IP_RECVPKTINFO for both
-				 * IP v4 and v6 so pass the appropriate argument
-				 * based on conn IP version.
-				 */
-				if (connp->conn_ip_recvpktinfo) {
-					if (connp->conn_af_isv6) {
-						/*
-						 * V6 only needs index
-						 */
-						in_flags |= IPF_RECVIF;
-					} else {
-						/*
-						 * V4 needs index +
-						 * matching address.
-						 */
-						in_flags |= IPF_RECVADDR;
-					}
-				}
-				if ((in_flags != 0) &&
-				    (mp->b_datap->db_type != M_CTL)) {
-					/*
-					 * the actual data will be
-					 * contained in b_cont upon
-					 * successful return of the
-					 * following call else
-					 * original mblk is returned
-					 */
-					ASSERT(recv_ill != NULL);
-					mp1 = ip_add_info(mp1, recv_ill,
-					    in_flags, IPCL_ZONEID(connp), ipst);
-				}
-				BUMP_MIB(mibptr, ipIfStatsHCInDelivers);
-				if (mctl_present)
-					freeb(first_mp1);
-				(connp->conn_recv)(connp, mp1, NULL);
-			}
-		}
 		mutex_enter(&connfp->connf_lock);
 		/* Follow the next pointer before releasing the conn. */
 		next_connp = connp->conn_next;
@@ -6562,363 +5196,27 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 	/* Last one.  Send it upstream. */
 	mutex_exit(&connfp->connf_lock);
 
-	/*
-	 * If this packet is coming from icmp_inbound_error_fanout ip_policy
-	 * will be set to false.
-	 */
-	if (IPP_ENABLED(IPP_LOCAL_IN, ipst) && ip_policy) {
-		ill_index = ill->ill_phyint->phyint_ifindex;
-		ip_process(IPP_LOCAL_IN, &mp, ill_index);
-		if (mp == NULL) {
-			CONN_DEC_REF(connp);
-			if (mctl_present) {
-				freeb(first_mp);
-			}
-			return;
-		}
-	}
+	ip_fanout_proto_conn(connp, mp, ipha, NULL, ira);
 
-	rq = connp->conn_rq;
-	/*
-	 * Check flow control
-	 */
-	if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
-	    (!IPCL_IS_NONSTR(connp) && !canputnext(rq))) {
-		if (flags & IP_FF_RAWIP) {
-			BUMP_MIB(mibptr, rawipIfStatsInOverflows);
-		} else {
-			BUMP_MIB(&ipst->ips_icmp_mib, icmpInOverflows);
-		}
-
-		freemsg(first_mp);
-	} else {
-		ASSERT(!IPCL_IS_IPTUN(connp));
-
-		if ((CONN_INBOUND_POLICY_PRESENT(connp, ipss) || secure)) {
-			first_mp = ipsec_check_inbound_policy(first_mp, connp,
-			    ipha, NULL, mctl_present);
-		}
-
-		if (first_mp != NULL) {
-			int in_flags = 0;
-
-			/*
-			 * ip_fanout_proto also gets called
-			 * from icmp_inbound_error_fanout, in
-			 * which case the msg type is M_CTL.
-			 * Don't add info in this case for time
-			 * being. In future when there is a
-			 * need for knowing the inbound iface
-			 * index for ICMP error msgs, then this
-			 * can be changed
-			 */
-			if (connp->conn_recvif)
-				in_flags = IPF_RECVIF;
-			if (connp->conn_ip_recvpktinfo) {
-				if (connp->conn_af_isv6) {
-					/*
-					 * V6 only needs index
-					 */
-					in_flags |= IPF_RECVIF;
-				} else {
-					/*
-					 * V4 needs index +
-					 * matching address.
-					 */
-					in_flags |= IPF_RECVADDR;
-				}
-			}
-			if ((in_flags != 0) &&
-			    (mp->b_datap->db_type != M_CTL)) {
-
-				/*
-				 * the actual data will be contained in
-				 * b_cont upon successful return
-				 * of the following call else original
-				 * mblk is returned
-				 */
-				ASSERT(recv_ill != NULL);
-				mp = ip_add_info(mp, recv_ill,
-				    in_flags, IPCL_ZONEID(connp), ipst);
-			}
-			BUMP_MIB(mibptr, ipIfStatsHCInDelivers);
-			(connp->conn_recv)(connp, mp, NULL);
-			if (mctl_present)
-				freeb(first_mp);
-		}
-	}
 	CONN_DEC_REF(connp);
 }
 
 /*
- * Serialize tcp resets by calling tcp_xmit_reset_serialize through
- * SQUEUE_ENTER_ONE(SQ_FILL). We do this to ensure the reset is handled on
- * the correct squeue, in this case the same squeue as a valid listener with
- * no current connection state for the packet we are processing. The function
- * is called for synchronizing both IPv4 and IPv6.
- */
-void
-ip_xmit_reset_serialize(mblk_t *mp, int hdrlen, zoneid_t zoneid,
-    tcp_stack_t *tcps, conn_t *connp)
-{
-	mblk_t *rst_mp;
-	tcp_xmit_reset_event_t *eventp;
-
-	rst_mp = allocb(sizeof (tcp_xmit_reset_event_t), BPRI_HI);
-
-	if (rst_mp == NULL) {
-		freemsg(mp);
-		return;
-	}
-
-	rst_mp->b_datap->db_type = M_PROTO;
-	rst_mp->b_wptr += sizeof (tcp_xmit_reset_event_t);
-
-	eventp = (tcp_xmit_reset_event_t *)rst_mp->b_rptr;
-	eventp->tcp_xre_event = TCP_XRE_EVENT_IP_FANOUT_TCP;
-	eventp->tcp_xre_iphdrlen = hdrlen;
-	eventp->tcp_xre_zoneid = zoneid;
-	eventp->tcp_xre_tcps = tcps;
-
-	rst_mp->b_cont = mp;
-	mp = rst_mp;
-
-	/*
-	 * Increment the connref, this ref will be released by the squeue
-	 * framework.
-	 */
-	CONN_INC_REF(connp);
-	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_xmit_reset, connp,
-	    SQ_FILL, SQTAG_XMIT_EARLY_RESET);
-}
-
-/*
- * Fanout for TCP packets
- * The caller puts <fport, lport> in the ports parameter.
- *
- * IPQoS Notes
- * Before sending it to the client, invoke IPPF processing.
- * Policy processing takes place only if the callout_position, IPP_LOCAL_IN,
- * is enabled. If we get here from icmp_inbound_error_fanout or ip_wput_local
- * ip_policy is false.
- */
-static void
-ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
-    uint_t flags, boolean_t mctl_present, boolean_t ip_policy, zoneid_t zoneid)
-{
-	mblk_t  *first_mp;
-	boolean_t secure;
-	uint32_t ill_index;
-	int	ip_hdr_len;
-	tcph_t	*tcph;
-	boolean_t syn_present = B_FALSE;
-	conn_t	*connp;
-	ip_stack_t	*ipst = recv_ill->ill_ipst;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
-
-	ASSERT(recv_ill != NULL);
-
-	first_mp = mp;
-	if (mctl_present) {
-		ASSERT(first_mp->b_datap->db_type == M_CTL);
-		mp = first_mp->b_cont;
-		secure = ipsec_in_is_secure(first_mp);
-		ASSERT(mp != NULL);
-	} else {
-		secure = B_FALSE;
-	}
-
-	ip_hdr_len = IPH_HDR_LENGTH(mp->b_rptr);
-
-	if ((connp = ipcl_classify_v4(mp, IPPROTO_TCP, ip_hdr_len,
-	    zoneid, ipst)) == NULL) {
-		/*
-		 * No connected connection or listener. Send a
-		 * TH_RST via tcp_xmit_listeners_reset.
-		 */
-
-		/* Initiate IPPf processing, if needed. */
-		if (IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
-			uint32_t ill_index;
-			ill_index = recv_ill->ill_phyint->phyint_ifindex;
-			ip_process(IPP_LOCAL_IN, &first_mp, ill_index);
-			if (first_mp == NULL)
-				return;
-		}
-		BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		ip2dbg(("ip_fanout_tcp: no listener; send reset to zone %d\n",
-		    zoneid));
-		tcp_xmit_listeners_reset(first_mp, ip_hdr_len, zoneid,
-		    ipst->ips_netstack->netstack_tcp, NULL);
-		return;
-	}
-
-	/*
-	 * Allocate the SYN for the TCP connection here itself
-	 */
-	tcph = (tcph_t *)&mp->b_rptr[ip_hdr_len];
-	if ((tcph->th_flags[0] & (TH_SYN|TH_ACK|TH_RST|TH_URG)) == TH_SYN) {
-		if (IPCL_IS_TCP(connp)) {
-			squeue_t *sqp;
-
-			/*
-			 * If the queue belongs to a conn, and fused tcp
-			 * loopback is enabled, assign the eager's squeue
-			 * to be that of the active connect's. Note that
-			 * we don't check for IP_FF_LOOPBACK here since this
-			 * routine gets called only for loopback (unlike the
-			 * IPv6 counterpart).
-			 */
-			if (do_tcp_fusion &&
-			    CONN_Q(q) && IPCL_IS_TCP(Q_TO_CONN(q)) &&
-			    !CONN_INBOUND_POLICY_PRESENT(connp, ipss) &&
-			    !secure &&
-			    !IPP_ENABLED(IPP_LOCAL_IN, ipst) && !ip_policy) {
-				ASSERT(Q_TO_CONN(q)->conn_sqp != NULL);
-				sqp = Q_TO_CONN(q)->conn_sqp;
-			} else {
-				sqp = IP_SQUEUE_GET(lbolt);
-			}
-
-			mp->b_datap->db_struioflag |= STRUIO_EAGER;
-			DB_CKSUMSTART(mp) = (intptr_t)sqp;
-			syn_present = B_TRUE;
-		}
-	}
-
-	if (IPCL_IS_TCP(connp) && IPCL_IS_BOUND(connp) && !syn_present) {
-		uint_t	flags = (unsigned int)tcph->th_flags[0] & 0xFF;
-		BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		if ((flags & TH_RST) || (flags & TH_URG)) {
-			CONN_DEC_REF(connp);
-			freemsg(first_mp);
-			return;
-		}
-		if (flags & TH_ACK) {
-			ip_xmit_reset_serialize(first_mp, ip_hdr_len, zoneid,
-			    ipst->ips_netstack->netstack_tcp, connp);
-			CONN_DEC_REF(connp);
-			return;
-		}
-
-		CONN_DEC_REF(connp);
-		freemsg(first_mp);
-		return;
-	}
-
-	if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || secure) {
-		first_mp = ipsec_check_inbound_policy(first_mp, connp, ipha,
-		    NULL, mctl_present);
-		if (first_mp == NULL) {
-			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
-			CONN_DEC_REF(connp);
-			return;
-		}
-		if (IPCL_IS_TCP(connp) && IPCL_IS_BOUND(connp)) {
-			ASSERT(syn_present);
-			if (mctl_present) {
-				ASSERT(first_mp != mp);
-				first_mp->b_datap->db_struioflag |=
-				    STRUIO_POLICY;
-			} else {
-				ASSERT(first_mp == mp);
-				mp->b_datap->db_struioflag &=
-				    ~STRUIO_EAGER;
-				mp->b_datap->db_struioflag |=
-				    STRUIO_POLICY;
-			}
-		} else {
-			/*
-			 * Discard first_mp early since we're dealing with a
-			 * fully-connected conn_t and tcp doesn't do policy in
-			 * this case.
-			 */
-			if (mctl_present) {
-				freeb(first_mp);
-				mctl_present = B_FALSE;
-			}
-			first_mp = mp;
-		}
-	}
-
-	/*
-	 * Initiate policy processing here if needed. If we get here from
-	 * icmp_inbound_error_fanout, ip_policy is false.
-	 */
-	if (IPP_ENABLED(IPP_LOCAL_IN, ipst) && ip_policy) {
-		ill_index = recv_ill->ill_phyint->phyint_ifindex;
-		ip_process(IPP_LOCAL_IN, &mp, ill_index);
-		if (mp == NULL) {
-			CONN_DEC_REF(connp);
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		} else if (mctl_present) {
-			ASSERT(first_mp != mp);
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
-		}
-	}
-
-	/* Handle socket options. */
-	if (!syn_present &&
-	    connp->conn_ip_recvpktinfo && (flags & IP_FF_IPINFO)) {
-		/* Add header */
-		ASSERT(recv_ill != NULL);
-		/*
-		 * Since tcp does not support IP_RECVPKTINFO for V4, only pass
-		 * IPF_RECVIF.
-		 */
-		mp = ip_add_info(mp, recv_ill, IPF_RECVIF, IPCL_ZONEID(connp),
-		    ipst);
-		if (mp == NULL) {
-			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
-			CONN_DEC_REF(connp);
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		} else if (mctl_present) {
-			/*
-			 * ip_add_info might return a new mp.
-			 */
-			ASSERT(first_mp != mp);
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
-		}
-	}
-	BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
-	if (IPCL_IS_TCP(connp)) {
-		/* do not drain, certain use cases can blow the stack */
-		SQUEUE_ENTER_ONE(connp->conn_sqp, first_mp, connp->conn_recv,
-		    connp, SQ_NODRAIN, SQTAG_IP_FANOUT_TCP);
-	} else {
-		/* Not TCP; must be SOCK_RAW, IPPROTO_TCP */
-		(connp->conn_recv)(connp, first_mp, NULL);
-		CONN_DEC_REF(connp);
-	}
-}
-
-/*
  * If we have a IPsec NAT-Traversal packet, strip the zero-SPI or
- * pass it along to ESP if the SPI is non-zero.  Returns TRUE if the mblk
+ * pass it along to ESP if the SPI is non-zero.  Returns the mblk if the mblk
  * is not consumed.
  *
- * One of four things can happen, all of which affect the passed-in mblk:
+ * One of three things can happen, all of which affect the passed-in mblk:
  *
- * 1.) ICMP messages that go through here just get returned TRUE.
+ * 1.) The packet is stock UDP and gets its zero-SPI stripped.  Return mblk..
  *
- * 2.) The packet is stock UDP and gets its zero-SPI stripped.  Return TRUE.
+ * 2.) The packet is ESP-in-UDP, gets transformed into an equivalent
+ *     ESP packet, and is passed along to ESP for consumption.  Return NULL.
  *
- * 3.) The packet is ESP-in-UDP, gets transformed into an equivalent
- *     ESP packet, and is passed along to ESP for consumption.  Return FALSE.
- *
- * 4.) The packet is an ESP-in-UDP Keepalive.  Drop it and return FALSE.
+ * 3.) The packet is an ESP-in-UDP Keepalive.  Drop it and return NULL.
  */
-static boolean_t
-zero_spi_check(queue_t *q, mblk_t *mp, ire_t *ire, ill_t *recv_ill,
-    ipsec_stack_t *ipss)
+mblk_t *
+zero_spi_check(mblk_t *mp, ip_recv_attr_t *ira)
 {
 	int shift, plen, iph_len;
 	ipha_t *ipha;
@@ -6926,28 +5224,12 @@ zero_spi_check(queue_t *q, mblk_t *mp, ire_t *ire, ill_t *recv_ill,
 	uint32_t *spi;
 	uint32_t esp_ports;
 	uint8_t *orptr;
-	boolean_t free_ire;
-
-	if (DB_TYPE(mp) == M_CTL) {
-		/*
-		 * ICMP message with UDP inside.  Don't bother stripping, just
-		 * send it up.
-		 *
-		 * NOTE: Any app with UDP_NAT_T_ENDPOINT set is probably going
-		 * to ignore errors set by ICMP anyway ('cause they might be
-		 * forged), but that's the app's decision, not ours.
-		 */
-
-		/* Bunch of reality checks for DEBUG kernels... */
-		ASSERT(IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION);
-		ASSERT(((ipha_t *)mp->b_rptr)->ipha_protocol == IPPROTO_ICMP);
-
-		return (B_TRUE);
-	}
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 
 	ipha = (ipha_t *)mp->b_rptr;
-	iph_len = IPH_HDR_LENGTH(ipha);
-	plen = ntohs(ipha->ipha_length);
+	iph_len = ira->ira_ip_hdr_length;
+	plen = ira->ira_pktlen;
 
 	if (plen - iph_len - sizeof (udpha_t) < sizeof (uint32_t)) {
 		/*
@@ -6958,18 +5240,18 @@ zero_spi_check(queue_t *q, mblk_t *mp, ire_t *ire, ill_t *recv_ill,
 		 * byte packets (keepalives are 1-byte), but we'll drop them
 		 * also.
 		 */
-		ip_drop_packet(mp, B_TRUE, recv_ill, NULL,
+		ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_esp_nat_t_ka), &ipss->ipsec_dropper);
-		return (B_FALSE);
+		return (NULL);
 	}
 
 	if (MBLKL(mp) < iph_len + sizeof (udpha_t) + sizeof (*spi)) {
 		/* might as well pull it all up - it might be ESP. */
 		if (!pullupmsg(mp, -1)) {
-			ip_drop_packet(mp, B_TRUE, recv_ill, NULL,
+			ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 			    DROPPER(ipss, ipds_esp_nomem),
 			    &ipss->ipsec_dropper);
-			return (B_FALSE);
+			return (NULL);
 		}
 
 		ipha = (ipha_t *)mp->b_rptr;
@@ -6985,7 +5267,8 @@ zero_spi_check(queue_t *q, mblk_t *mp, ire_t *ire, ill_t *recv_ill,
 	}
 
 	/* Fix IP header */
-	ipha->ipha_length = htons(plen - shift);
+	ira->ira_pktlen = (plen - shift);
+	ipha->ipha_length = htons(ira->ira_pktlen);
 	ipha->ipha_hdr_checksum = 0;
 
 	orptr = mp->b_rptr;
@@ -7005,388 +5288,185 @@ zero_spi_check(queue_t *q, mblk_t *mp, ire_t *ire, ill_t *recv_ill,
 	if (esp_ports != 0) /* Punt up for ESP processing. */ {
 		ipha = (ipha_t *)(orptr + shift);
 
-		free_ire = (ire == NULL);
-		if (free_ire) {
-			/* Re-acquire ire. */
-			ire = ire_cache_lookup(ipha->ipha_dst, ALL_ZONES, NULL,
-			    ipss->ipsec_netstack->netstack_ip);
-			if (ire == NULL || !(ire->ire_type & IRE_LOCAL)) {
-				if (ire != NULL)
-					ire_refrele(ire);
-				/*
-				 * Do a regular freemsg(), as this is an IP
-				 * error (no local route) not an IPsec one.
-				 */
-				freemsg(mp);
-			}
-		}
-
-		ip_proto_input(q, mp, ipha, ire, recv_ill, esp_ports);
-		if (free_ire)
-			ire_refrele(ire);
+		ira->ira_flags |= IRAF_ESP_UDP_PORTS;
+		ira->ira_esp_udp_ports = esp_ports;
+		ip_fanout_v4(mp, ipha, ira);
+		return (NULL);
 	}
-
-	return (esp_ports == 0);
+	return (mp);
 }
 
 /*
  * Deliver a udp packet to the given conn, possibly applying ipsec policy.
+ * Handles IPv4 and IPv6.
  * We are responsible for disposing of mp, such as by freemsg() or putnext()
- * Caller is responsible for dropping references to the conn, and freeing
- * first_mp.
- *
- * IPQoS Notes
- * Before sending it to the client, invoke IPPF processing. Policy processing
- * takes place only if the callout_position, IPP_LOCAL_IN, is enabled and
- * ip_policy is true. If we get here from icmp_inbound_error_fanout or
- * ip_wput_local, ip_policy is false.
+ * Caller is responsible for dropping references to the conn.
  */
-static void
-ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
-    boolean_t secure, ill_t *ill, ipha_t *ipha, uint_t flags, ill_t *recv_ill,
-    boolean_t ip_policy)
+void
+ip_fanout_udp_conn(conn_t *connp, mblk_t *mp, ipha_t *ipha, ip6_t *ip6h,
+    ip_recv_attr_t *ira)
 {
-	boolean_t	mctl_present = (first_mp != NULL);
-	uint32_t	in_flags = 0; /* set to IP_RECVSLLA and/or IP_RECVIF */
-	uint32_t	ill_index;
-	ip_stack_t	*ipst = recv_ill->ill_ipst;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	boolean_t	secure;
+	iaflags_t	iraflags = ira->ira_flags;
 
-	ASSERT(ill != NULL);
+	secure = iraflags & IRAF_IPSEC_SECURE;
 
-	if (mctl_present)
-		first_mp->b_cont = mp;
-	else
-		first_mp = mp;
-
-	if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
-	    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
+	if (IPCL_IS_NONSTR(connp) ? connp->conn_flow_cntrld :
+	    !canputnext(connp->conn_rq)) {
 		BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
-		freemsg(first_mp);
+		freemsg(mp);
 		return;
 	}
 
-	if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || secure) {
-		first_mp = ipsec_check_inbound_policy(first_mp, connp, ipha,
-		    NULL, mctl_present);
-		/* Freed by ipsec_check_inbound_policy(). */
-		if (first_mp == NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			return;
-		}
-	}
-	if (mctl_present)
-		freeb(first_mp);
-
-	/* Let's hope the compilers utter "branch, predict-not-taken..." ;) */
-	if (connp->conn_udp->udp_nat_t_endpoint) {
-		if (mctl_present) {
-			/* mctl_present *shouldn't* happen. */
-			ip_drop_packet(mp, B_TRUE, NULL, NULL,
-			    DROPPER(ipss, ipds_esp_nat_t_ipsec),
-			    &ipss->ipsec_dropper);
-			return;
-		}
-
-		if (!zero_spi_check(ill->ill_rq, mp, NULL, recv_ill, ipss))
-			return;
-	}
-
-	/* Handle options. */
-	if (connp->conn_recvif)
-		in_flags = IPF_RECVIF;
-	/*
-	 * UDP supports IP_RECVPKTINFO option for both v4 and v6 so the flag
-	 * passed to ip_add_info is based on IP version of connp.
-	 */
-	if (connp->conn_ip_recvpktinfo && (flags & IP_FF_IPINFO)) {
-		if (connp->conn_af_isv6) {
-			/*
-			 * V6 only needs index
-			 */
-			in_flags |= IPF_RECVIF;
-		} else {
-			/*
-			 * V4 needs index + matching address.
-			 */
-			in_flags |= IPF_RECVADDR;
-		}
-	}
-
-	if (connp->conn_recvslla && !(flags & IP_FF_SEND_SLLA))
-		in_flags |= IPF_RECVSLLA;
-
-	/*
-	 * Initiate IPPF processing here, if needed. Note first_mp won't be
-	 * freed if the packet is dropped. The caller will do so.
-	 */
-	if (IPP_ENABLED(IPP_LOCAL_IN, ipst) && ip_policy) {
-		ill_index = recv_ill->ill_phyint->phyint_ifindex;
-		ip_process(IPP_LOCAL_IN, &mp, ill_index);
+	if (((iraflags & IRAF_IS_IPV4) ?
+	    CONN_INBOUND_POLICY_PRESENT(connp, ipss) :
+	    CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss)) ||
+	    secure) {
+		mp = ipsec_check_inbound_policy(mp, connp, ipha,
+		    ip6h, ira);
 		if (mp == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			/* Note that mp is NULL */
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
 			return;
 		}
 	}
-	if ((in_flags != 0) &&
-	    (mp->b_datap->db_type != M_CTL)) {
-		/*
-		 * The actual data will be contained in b_cont
-		 * upon successful return of the following call
-		 * else original mblk is returned
-		 */
-		ASSERT(recv_ill != NULL);
-		mp = ip_add_info(mp, recv_ill, in_flags, IPCL_ZONEID(connp),
-		    ipst);
+
+	/*
+	 * Since this code is not used for UDP unicast we don't need a NAT_T
+	 * check. Only ip_fanout_v4 has that check.
+	 */
+	if (ira->ira_flags & IRAF_ICMP_ERROR) {
+		(connp->conn_recvicmp)(connp, mp, NULL, ira);
+	} else {
+		ill_t *rill = ira->ira_rill;
+
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
+		ira->ira_ill = ira->ira_rill = NULL;
+		/* Send it upstream */
+		(connp->conn_recv)(connp, mp, NULL, ira);
+		ira->ira_ill = ill;
+		ira->ira_rill = rill;
 	}
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-	/* Send it upstream */
-	(connp->conn_recv)(connp, mp, NULL);
 }
 
 /*
- * Fanout for UDP packets.
- * The caller puts <fport, lport> in the ports parameter.
+ * Fanout for UDP packets that are multicast or broadcast, and ICMP errors.
+ * (Unicast fanout is handled in ip_input_v4.)
  *
  * If SO_REUSEADDR is set all multicast and broadcast packets
- * will be delivered to all streams bound to the same port.
+ * will be delivered to all conns bound to the same port.
  *
- * Zones notes:
- * Multicast and broadcast packets will be distributed to streams in all zones.
+ * If there is at least one matching AF_INET receiver, then we will
+ * ignore any AF_INET6 receivers.
  * In the special case where an AF_INET socket binds to 0.0.0.0/<port> and an
  * AF_INET6 socket binds to ::/<port>, only the AF_INET socket receives the IPv4
- * packets. To maintain this behavior with multiple zones, the conns are grouped
- * by zone and the SO_REUSEADDR flag is checked for the first matching conn in
- * each zone. If unset, all the following conns in the same zone are skipped.
+ * packets.
+ *
+ * Zones notes:
+ * Earlier in ip_input on a system with multiple shared-IP zones we
+ * duplicate the multicast and broadcast packets and send them up
+ * with each explicit zoneid that exists on that ill.
+ * This means that here we can match the zoneid with SO_ALLZONES being special.
  */
-static void
-ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
-    uint32_t ports, boolean_t broadcast, uint_t flags, boolean_t mctl_present,
-    boolean_t ip_policy, ill_t *recv_ill, zoneid_t zoneid)
+void
+ip_fanout_udp_multi_v4(mblk_t *mp, ipha_t *ipha, uint16_t lport, uint16_t fport,
+    ip_recv_attr_t *ira)
 {
-	uint32_t	dstport, srcport;
-	ipaddr_t	dst;
-	mblk_t		*first_mp;
-	boolean_t	secure;
-	in6_addr_t	v6src;
+	ipaddr_t	laddr;
+	in6_addr_t	v6faddr;
 	conn_t		*connp;
 	connf_t		*connfp;
-	conn_t		*first_connp;
-	conn_t		*next_connp;
-	mblk_t		*mp1, *first_mp1;
-	ipaddr_t	src;
-	zoneid_t	last_zoneid;
-	boolean_t	reuseaddr;
-	boolean_t	shared_addr;
-	boolean_t	unlabeled;
-	ip_stack_t	*ipst;
+	ipaddr_t	faddr;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	ASSERT(recv_ill != NULL);
-	ipst = recv_ill->ill_ipst;
+	ASSERT(ira->ira_flags & (IRAF_MULTIBROADCAST|IRAF_ICMP_ERROR));
 
-	first_mp = mp;
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		first_mp->b_cont = NULL;
-		secure = ipsec_in_is_secure(first_mp);
-		ASSERT(mp != NULL);
-	} else {
-		first_mp = NULL;
-		secure = B_FALSE;
-	}
+	laddr = ipha->ipha_dst;
+	faddr = ipha->ipha_src;
 
-	/* Extract ports in net byte order */
-	dstport = htons(ntohl(ports) & 0xFFFF);
-	srcport = htons(ntohl(ports) >> 16);
-	dst = ipha->ipha_dst;
-	src = ipha->ipha_src;
-
-	unlabeled = B_FALSE;
-	if (is_system_labeled())
-		/* Cred cannot be null on IPv4 */
-		unlabeled = (msg_getlabel(mp)->tsl_flags &
-		    TSLF_UNLABELED) != 0;
-	shared_addr = (zoneid == ALL_ZONES);
-	if (shared_addr) {
-		/*
-		 * No need to handle exclusive-stack zones since ALL_ZONES
-		 * only applies to the shared stack.
-		 */
-		zoneid = tsol_mlp_findzone(IPPROTO_UDP, dstport);
-		/*
-		 * If no shared MLP is found, tsol_mlp_findzone returns
-		 * ALL_ZONES.  In that case, we assume it's SLP, and
-		 * search for the zone based on the packet label.
-		 *
-		 * If there is such a zone, we prefer to find a
-		 * connection in it.  Otherwise, we look for a
-		 * MAC-exempt connection in any zone whose label
-		 * dominates the default label on the packet.
-		 */
-		if (zoneid == ALL_ZONES)
-			zoneid = tsol_packet_to_zoneid(mp);
-		else
-			unlabeled = B_FALSE;
-	}
-
-	connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(dstport, ipst)];
+	connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(lport, ipst)];
 	mutex_enter(&connfp->connf_lock);
 	connp = connfp->connf_head;
-	if (!broadcast && !CLASSD(dst)) {
-		/*
-		 * Not broadcast or multicast. Send to the one (first)
-		 * client we find. No need to check conn_wantpacket()
-		 * since IP_BOUND_IF/conn_incoming_ill does not apply to
-		 * IPv4 unicast packets.
-		 */
-		while ((connp != NULL) &&
-		    (!IPCL_UDP_MATCH(connp, dstport, dst, srcport, src) ||
-		    (!IPCL_ZONE_MATCH(connp, zoneid) &&
-		    !(unlabeled && (connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
-		    shared_addr)))) {
-			/*
-			 * We keep searching since the conn did not match,
-			 * or its zone did not match and it is not either
-			 * an allzones conn or a mac exempt conn (if the
-			 * sender is unlabeled.)
-			 */
-			connp = connp->conn_next;
-		}
-
-		if (connp == NULL ||
-		    !IPCL_IS_NONSTR(connp) && connp->conn_upq == NULL)
-			goto notfound;
-
-		ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
-
-		if (is_system_labeled() &&
-		    !tsol_receive_local(mp, &dst, IPV4_VERSION, shared_addr,
-		    connp))
-			goto notfound;
-
-		CONN_INC_REF(connp);
-		mutex_exit(&connfp->connf_lock);
-		ip_fanout_udp_conn(connp, first_mp, mp, secure, ill, ipha,
-		    flags, recv_ill, ip_policy);
-		IP_STAT(ipst, ip_udp_fannorm);
-		CONN_DEC_REF(connp);
-		return;
-	}
 
 	/*
-	 * Broadcast and multicast case
-	 *
-	 * Need to check conn_wantpacket().
 	 * If SO_REUSEADDR has been set on the first we send the
 	 * packet to all clients that have joined the group and
 	 * match the port.
 	 */
-
 	while (connp != NULL) {
-		if ((IPCL_UDP_MATCH(connp, dstport, dst, srcport, src)) &&
-		    conn_wantpacket(connp, ill, ipha, flags, zoneid) &&
-		    (!is_system_labeled() ||
-		    tsol_receive_local(mp, &dst, IPV4_VERSION, shared_addr,
-		    connp)))
+		if ((IPCL_UDP_MATCH(connp, lport, laddr, fport, faddr)) &&
+		    conn_wantpacket(connp, ira, ipha) &&
+		    (!(ira->ira_flags & IRAF_SYSTEM_LABELED) ||
+		    tsol_receive_local(mp, &laddr, IPV4_VERSION, ira, connp)))
 			break;
 		connp = connp->conn_next;
 	}
 
-	if (connp == NULL ||
-	    !IPCL_IS_NONSTR(connp) && connp->conn_upq == NULL)
+	if (connp == NULL)
 		goto notfound;
 
-	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
-
-	first_connp = connp;
-	/*
-	 * When SO_REUSEADDR is not set, send the packet only to the first
-	 * matching connection in its zone by keeping track of the zoneid.
-	 */
-	reuseaddr = first_connp->conn_reuseaddr;
-	last_zoneid = first_connp->conn_zoneid;
-
 	CONN_INC_REF(connp);
-	connp = connp->conn_next;
-	for (;;) {
-		while (connp != NULL) {
-			if (IPCL_UDP_MATCH(connp, dstport, dst, srcport, src) &&
-			    (reuseaddr || connp->conn_zoneid != last_zoneid) &&
-			    conn_wantpacket(connp, ill, ipha, flags, zoneid) &&
-			    (!is_system_labeled() ||
-			    tsol_receive_local(mp, &dst, IPV4_VERSION,
-			    shared_addr, connp)))
-				break;
-			connp = connp->conn_next;
-		}
-		/*
-		 * Just copy the data part alone. The mctl part is
-		 * needed just for verifying policy and it is never
-		 * sent up.
-		 */
-		if (connp == NULL || (((mp1 = dupmsg(mp)) == NULL) &&
-		    ((mp1 = copymsg(mp)) == NULL))) {
-			/*
-			 * No more interested clients or memory
-			 * allocation failed
-			 */
-			connp = first_connp;
-			break;
-		}
-		if (connp->conn_zoneid != last_zoneid) {
-			/*
-			 * Update the zoneid so that the packet isn't sent to
-			 * any more conns in the same zone unless SO_REUSEADDR
-			 * is set.
-			 */
-			reuseaddr = connp->conn_reuseaddr;
-			last_zoneid = connp->conn_zoneid;
-		}
-		if (first_mp != NULL) {
-			ASSERT(((ipsec_info_t *)first_mp->b_rptr)->
-			    ipsec_info_type == IPSEC_IN);
-			first_mp1 = ipsec_in_tag(first_mp, NULL,
-			    ipst->ips_netstack);
-			if (first_mp1 == NULL) {
-				freemsg(mp1);
+
+	if (connp->conn_reuseaddr) {
+		conn_t		*first_connp = connp;
+		conn_t		*next_connp;
+		mblk_t		*mp1;
+
+		connp = connp->conn_next;
+		for (;;) {
+			while (connp != NULL) {
+				if (IPCL_UDP_MATCH(connp, lport, laddr,
+				    fport, faddr) &&
+				    conn_wantpacket(connp, ira, ipha) &&
+				    (!(ira->ira_flags & IRAF_SYSTEM_LABELED) ||
+				    tsol_receive_local(mp, &laddr, IPV4_VERSION,
+				    ira, connp)))
+					break;
+				connp = connp->conn_next;
+			}
+			if (connp == NULL) {
+				/* No more interested clients */
 				connp = first_connp;
 				break;
 			}
-		} else {
-			first_mp1 = NULL;
+			if (((mp1 = dupmsg(mp)) == NULL) &&
+			    ((mp1 = copymsg(mp)) == NULL)) {
+				/* Memory allocation failed */
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				ip_drop_input("ipIfStatsInDiscards", mp, ill);
+				connp = first_connp;
+				break;
+			}
+			CONN_INC_REF(connp);
+			mutex_exit(&connfp->connf_lock);
+
+			IP_STAT(ipst, ip_udp_fanmb);
+			ip_fanout_udp_conn(connp, mp1, (ipha_t *)mp1->b_rptr,
+			    NULL, ira);
+			mutex_enter(&connfp->connf_lock);
+			/* Follow the next pointer before releasing the conn */
+			next_connp = connp->conn_next;
+			CONN_DEC_REF(connp);
+			connp = next_connp;
 		}
-		CONN_INC_REF(connp);
-		mutex_exit(&connfp->connf_lock);
-		/*
-		 * IPQoS notes: We don't send the packet for policy
-		 * processing here, will do it for the last one (below).
-		 * i.e. we do it per-packet now, but if we do policy
-		 * processing per-conn, then we would need to do it
-		 * here too.
-		 */
-		ip_fanout_udp_conn(connp, first_mp1, mp1, secure, ill,
-		    ipha, flags, recv_ill, B_FALSE);
-		mutex_enter(&connfp->connf_lock);
-		/* Follow the next pointer before releasing the conn. */
-		next_connp = connp->conn_next;
-		IP_STAT(ipst, ip_udp_fanmb);
-		CONN_DEC_REF(connp);
-		connp = next_connp;
 	}
 
 	/* Last one.  Send it upstream. */
 	mutex_exit(&connfp->connf_lock);
-	ip_fanout_udp_conn(connp, first_mp, mp, secure, ill, ipha, flags,
-	    recv_ill, ip_policy);
 	IP_STAT(ipst, ip_udp_fanmb);
+	ip_fanout_udp_conn(connp, mp, ipha, NULL, ira);
 	CONN_DEC_REF(connp);
 	return;
 
 notfound:
-
 	mutex_exit(&connfp->connf_lock);
-	IP_STAT(ipst, ip_udp_fanothers);
 	/*
-	 * IPv6 endpoints bound to unicast or multicast IPv4-mapped addresses
+	 * IPv6 endpoints bound to multicast IPv4-mapped addresses
 	 * have already been matched above, since they live in the IPv4
 	 * fanout tables. This implies we only need to
 	 * check for IPv6 in6addr_any endpoints here.
@@ -7394,85 +5474,28 @@ notfound:
 	 * address, except for the multicast group membership lookup which
 	 * uses the IPv4 destination.
 	 */
-	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &v6src);
-	connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(dstport, ipst)];
+	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &v6faddr);
+	connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(lport, ipst)];
 	mutex_enter(&connfp->connf_lock);
 	connp = connfp->connf_head;
-	if (!broadcast && !CLASSD(dst)) {
-		while (connp != NULL) {
-			if (IPCL_UDP_MATCH_V6(connp, dstport, ipv6_all_zeros,
-			    srcport, v6src) && IPCL_ZONE_MATCH(connp, zoneid) &&
-			    conn_wantpacket(connp, ill, ipha, flags, zoneid) &&
-			    !connp->conn_ipv6_v6only)
-				break;
-			connp = connp->conn_next;
-		}
-
-		if (connp != NULL && is_system_labeled() &&
-		    !tsol_receive_local(mp, &dst, IPV4_VERSION, shared_addr,
-		    connp))
-			connp = NULL;
-
-		if (connp == NULL ||
-		    !IPCL_IS_NONSTR(connp) && connp->conn_upq == NULL) {
-			/*
-			 * No one bound to this port.  Is
-			 * there a client that wants all
-			 * unclaimed datagrams?
-			 */
-			mutex_exit(&connfp->connf_lock);
-
-			if (mctl_present)
-				first_mp->b_cont = mp;
-			else
-				first_mp = mp;
-			if (ipst->ips_ipcl_proto_fanout[IPPROTO_UDP].
-			    connf_head != NULL) {
-				ip_fanout_proto(q, first_mp, ill, ipha,
-				    flags | IP_FF_RAWIP, mctl_present,
-				    ip_policy, recv_ill, zoneid);
-			} else {
-				if (ip_fanout_send_icmp(q, first_mp, flags,
-				    ICMP_DEST_UNREACHABLE,
-				    ICMP_PORT_UNREACHABLE,
-				    mctl_present, zoneid, ipst)) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    udpIfStatsNoPorts);
-				}
-			}
-			return;
-		}
-		ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
-
-		CONN_INC_REF(connp);
-		mutex_exit(&connfp->connf_lock);
-		ip_fanout_udp_conn(connp, first_mp, mp, secure, ill, ipha,
-		    flags, recv_ill, ip_policy);
-		CONN_DEC_REF(connp);
-		return;
-	}
 	/*
 	 * IPv4 multicast packet being delivered to an AF_INET6
 	 * in6addr_any endpoint.
 	 * Need to check conn_wantpacket(). Note that we use conn_wantpacket()
 	 * and not conn_wantpacket_v6() since any multicast membership is
 	 * for an IPv4-mapped multicast address.
-	 * The packet is sent to all clients in all zones that have joined the
-	 * group and match the port.
 	 */
 	while (connp != NULL) {
-		if (IPCL_UDP_MATCH_V6(connp, dstport, ipv6_all_zeros,
-		    srcport, v6src) &&
-		    conn_wantpacket(connp, ill, ipha, flags, zoneid) &&
-		    (!is_system_labeled() ||
-		    tsol_receive_local(mp, &dst, IPV4_VERSION, shared_addr,
-		    connp)))
+		if (IPCL_UDP_MATCH_V6(connp, lport, ipv6_all_zeros,
+		    fport, v6faddr) &&
+		    conn_wantpacket(connp, ira, ipha) &&
+		    (!(ira->ira_flags & IRAF_SYSTEM_LABELED) ||
+		    tsol_receive_local(mp, &laddr, IPV4_VERSION, ira, connp)))
 			break;
 		connp = connp->conn_next;
 	}
 
-	if (connp == NULL ||
-	    !IPCL_IS_NONSTR(connp) && connp->conn_upq == NULL) {
+	if (connp == NULL) {
 		/*
 		 * No one bound to this port.  Is
 		 * there a client that wants all
@@ -7480,15 +5503,10 @@ notfound:
 		 */
 		mutex_exit(&connfp->connf_lock);
 
-		if (mctl_present)
-			first_mp->b_cont = mp;
-		else
-			first_mp = mp;
-		if (ipst->ips_ipcl_proto_fanout[IPPROTO_UDP].connf_head !=
+		if (ipst->ips_ipcl_proto_fanout_v4[IPPROTO_UDP].connf_head !=
 		    NULL) {
-			ip_fanout_proto(q, first_mp, ill, ipha,
-			    flags | IP_FF_RAWIP, mctl_present, ip_policy,
-			    recv_ill, zoneid);
+			ASSERT(ira->ira_protocol == IPPROTO_UDP);
+			ip_fanout_proto_v4(mp, ipha, ira);
 		} else {
 			/*
 			 * We used to attempt to send an icmp error here, but
@@ -7497,102 +5515,263 @@ notfound:
 			 * multicast, just drop the packet and give up sooner.
 			 */
 			BUMP_MIB(ill->ill_ip_mib, udpIfStatsNoPorts);
-			freemsg(first_mp);
+			freemsg(mp);
 		}
 		return;
 	}
-	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
+	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_rq != NULL);
 
-	first_connp = connp;
+	/*
+	 * If SO_REUSEADDR has been set on the first we send the
+	 * packet to all clients that have joined the group and
+	 * match the port.
+	 */
+	if (connp->conn_reuseaddr) {
+		conn_t		*first_connp = connp;
+		conn_t		*next_connp;
+		mblk_t		*mp1;
 
-	CONN_INC_REF(connp);
-	connp = connp->conn_next;
-	for (;;) {
-		while (connp != NULL) {
-			if (IPCL_UDP_MATCH_V6(connp, dstport,
-			    ipv6_all_zeros, srcport, v6src) &&
-			    conn_wantpacket(connp, ill, ipha, flags, zoneid) &&
-			    (!is_system_labeled() ||
-			    tsol_receive_local(mp, &dst, IPV4_VERSION,
-			    shared_addr, connp)))
-				break;
-			connp = connp->conn_next;
-		}
-		/*
-		 * Just copy the data part alone. The mctl part is
-		 * needed just for verifying policy and it is never
-		 * sent up.
-		 */
-		if (connp == NULL || (((mp1 = dupmsg(mp)) == NULL) &&
-		    ((mp1 = copymsg(mp)) == NULL))) {
-			/*
-			 * No more intested clients or memory
-			 * allocation failed
-			 */
-			connp = first_connp;
-			break;
-		}
-		if (first_mp != NULL) {
-			ASSERT(((ipsec_info_t *)first_mp->b_rptr)->
-			    ipsec_info_type == IPSEC_IN);
-			first_mp1 = ipsec_in_tag(first_mp, NULL,
-			    ipst->ips_netstack);
-			if (first_mp1 == NULL) {
-				freemsg(mp1);
+		CONN_INC_REF(connp);
+		connp = connp->conn_next;
+		for (;;) {
+			while (connp != NULL) {
+				if (IPCL_UDP_MATCH_V6(connp, lport,
+				    ipv6_all_zeros, fport, v6faddr) &&
+				    conn_wantpacket(connp, ira, ipha) &&
+				    (!(ira->ira_flags & IRAF_SYSTEM_LABELED) ||
+				    tsol_receive_local(mp, &laddr, IPV4_VERSION,
+				    ira, connp)))
+					break;
+				connp = connp->conn_next;
+			}
+			if (connp == NULL) {
+				/* No more interested clients */
 				connp = first_connp;
 				break;
 			}
-		} else {
-			first_mp1 = NULL;
+			if (((mp1 = dupmsg(mp)) == NULL) &&
+			    ((mp1 = copymsg(mp)) == NULL)) {
+				/* Memory allocation failed */
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				ip_drop_input("ipIfStatsInDiscards", mp, ill);
+				connp = first_connp;
+				break;
+			}
+			CONN_INC_REF(connp);
+			mutex_exit(&connfp->connf_lock);
+
+			IP_STAT(ipst, ip_udp_fanmb);
+			ip_fanout_udp_conn(connp, mp1, (ipha_t *)mp1->b_rptr,
+			    NULL, ira);
+			mutex_enter(&connfp->connf_lock);
+			/* Follow the next pointer before releasing the conn */
+			next_connp = connp->conn_next;
+			CONN_DEC_REF(connp);
+			connp = next_connp;
 		}
-		CONN_INC_REF(connp);
-		mutex_exit(&connfp->connf_lock);
-		/*
-		 * IPQoS notes: We don't send the packet for policy
-		 * processing here, will do it for the last one (below).
-		 * i.e. we do it per-packet now, but if we do policy
-		 * processing per-conn, then we would need to do it
-		 * here too.
-		 */
-		ip_fanout_udp_conn(connp, first_mp1, mp1, secure, ill,
-		    ipha, flags, recv_ill, B_FALSE);
-		mutex_enter(&connfp->connf_lock);
-		/* Follow the next pointer before releasing the conn. */
-		next_connp = connp->conn_next;
-		CONN_DEC_REF(connp);
-		connp = next_connp;
 	}
 
 	/* Last one.  Send it upstream. */
 	mutex_exit(&connfp->connf_lock);
-	ip_fanout_udp_conn(connp, first_mp, mp, secure, ill, ipha, flags,
-	    recv_ill, ip_policy);
+	IP_STAT(ipst, ip_udp_fanmb);
+	ip_fanout_udp_conn(connp, mp, ipha, NULL, ira);
 	CONN_DEC_REF(connp);
 }
 
 /*
- * Complete the ip_wput header so that it
- * is possible to generate ICMP
- * errors.
+ * Split an incoming packet's IPv4 options into the label and the other options.
+ * If 'allocate' is set it does memory allocation for the ip_pkt_t, including
+ * clearing out any leftover label or options.
+ * Otherwise it just makes ipp point into the packet.
+ *
+ * Returns zero if ok; ENOMEM if the buffer couldn't be allocated.
  */
 int
-ip_hdr_complete(ipha_t *ipha, zoneid_t zoneid, ip_stack_t *ipst)
+ip_find_hdr_v4(ipha_t *ipha, ip_pkt_t *ipp, boolean_t allocate)
+{
+	uchar_t		*opt;
+	uint32_t	totallen;
+	uint32_t	optval;
+	uint32_t	optlen;
+
+	ipp->ipp_fields |= IPPF_HOPLIMIT | IPPF_TCLASS | IPPF_ADDR;
+	ipp->ipp_hoplimit = ipha->ipha_ttl;
+	ipp->ipp_type_of_service = ipha->ipha_type_of_service;
+	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &ipp->ipp_addr);
+
+	/*
+	 * Get length (in 4 byte octets) of IP header options.
+	 */
+	totallen = ipha->ipha_version_and_hdr_length -
+	    (uint8_t)((IP_VERSION << 4) + IP_SIMPLE_HDR_LENGTH_IN_WORDS);
+
+	if (totallen == 0) {
+		if (!allocate)
+			return (0);
+
+		/* Clear out anything from a previous packet */
+		if (ipp->ipp_fields & IPPF_IPV4_OPTIONS) {
+			kmem_free(ipp->ipp_ipv4_options,
+			    ipp->ipp_ipv4_options_len);
+			ipp->ipp_ipv4_options = NULL;
+			ipp->ipp_ipv4_options_len = 0;
+			ipp->ipp_fields &= ~IPPF_IPV4_OPTIONS;
+		}
+		if (ipp->ipp_fields & IPPF_LABEL_V4) {
+			kmem_free(ipp->ipp_label_v4, ipp->ipp_label_len_v4);
+			ipp->ipp_label_v4 = NULL;
+			ipp->ipp_label_len_v4 = 0;
+			ipp->ipp_fields &= ~IPPF_LABEL_V4;
+		}
+		return (0);
+	}
+
+	totallen <<= 2;
+	opt = (uchar_t *)&ipha[1];
+	if (!is_system_labeled()) {
+
+	copyall:
+		if (!allocate) {
+			if (totallen != 0) {
+				ipp->ipp_ipv4_options = opt;
+				ipp->ipp_ipv4_options_len = totallen;
+				ipp->ipp_fields |= IPPF_IPV4_OPTIONS;
+			}
+			return (0);
+		}
+		/* Just copy all of options */
+		if (ipp->ipp_fields & IPPF_IPV4_OPTIONS) {
+			if (totallen == ipp->ipp_ipv4_options_len) {
+				bcopy(opt, ipp->ipp_ipv4_options, totallen);
+				return (0);
+			}
+			kmem_free(ipp->ipp_ipv4_options,
+			    ipp->ipp_ipv4_options_len);
+			ipp->ipp_ipv4_options = NULL;
+			ipp->ipp_ipv4_options_len = 0;
+			ipp->ipp_fields &= ~IPPF_IPV4_OPTIONS;
+		}
+		if (totallen == 0)
+			return (0);
+
+		ipp->ipp_ipv4_options = kmem_alloc(totallen, KM_NOSLEEP);
+		if (ipp->ipp_ipv4_options == NULL)
+			return (ENOMEM);
+		ipp->ipp_ipv4_options_len = totallen;
+		ipp->ipp_fields |= IPPF_IPV4_OPTIONS;
+		bcopy(opt, ipp->ipp_ipv4_options, totallen);
+		return (0);
+	}
+
+	if (allocate && (ipp->ipp_fields & IPPF_LABEL_V4)) {
+		kmem_free(ipp->ipp_label_v4, ipp->ipp_label_len_v4);
+		ipp->ipp_label_v4 = NULL;
+		ipp->ipp_label_len_v4 = 0;
+		ipp->ipp_fields &= ~IPPF_LABEL_V4;
+	}
+
+	/*
+	 * Search for CIPSO option.
+	 * We assume CIPSO is first in options if it is present.
+	 * If it isn't, then ipp_opt_ipv4_options will not include the options
+	 * prior to the CIPSO option.
+	 */
+	while (totallen != 0) {
+		switch (optval = opt[IPOPT_OPTVAL]) {
+		case IPOPT_EOL:
+			return (0);
+		case IPOPT_NOP:
+			optlen = 1;
+			break;
+		default:
+			if (totallen <= IPOPT_OLEN)
+				return (EINVAL);
+			optlen = opt[IPOPT_OLEN];
+			if (optlen < 2)
+				return (EINVAL);
+		}
+		if (optlen > totallen)
+			return (EINVAL);
+
+		switch (optval) {
+		case IPOPT_COMSEC:
+			if (!allocate) {
+				ipp->ipp_label_v4 = opt;
+				ipp->ipp_label_len_v4 = optlen;
+				ipp->ipp_fields |= IPPF_LABEL_V4;
+			} else {
+				ipp->ipp_label_v4 = kmem_alloc(optlen,
+				    KM_NOSLEEP);
+				if (ipp->ipp_label_v4 == NULL)
+					return (ENOMEM);
+				ipp->ipp_label_len_v4 = optlen;
+				ipp->ipp_fields |= IPPF_LABEL_V4;
+				bcopy(opt, ipp->ipp_label_v4, optlen);
+			}
+			totallen -= optlen;
+			opt += optlen;
+
+			/* Skip padding bytes until we get to a multiple of 4 */
+			while ((totallen & 3) != 0 && opt[0] == IPOPT_NOP) {
+				totallen--;
+				opt++;
+			}
+			/* Remaining as ipp_ipv4_options */
+			goto copyall;
+		}
+		totallen -= optlen;
+		opt += optlen;
+	}
+	/* No CIPSO found; return everything as ipp_ipv4_options */
+	totallen = ipha->ipha_version_and_hdr_length -
+	    (uint8_t)((IP_VERSION << 4) + IP_SIMPLE_HDR_LENGTH_IN_WORDS);
+	totallen <<= 2;
+	opt = (uchar_t *)&ipha[1];
+	goto copyall;
+}
+
+/*
+ * Efficient versions of lookup for an IRE when we only
+ * match the address.
+ * For RTF_REJECT or BLACKHOLE we return IRE_NOROUTE.
+ * Does not handle multicast addresses.
+ */
+uint_t
+ip_type_v4(ipaddr_t addr, ip_stack_t *ipst)
 {
 	ire_t *ire;
+	uint_t result;
 
-	if (ipha->ipha_src == INADDR_ANY) {
-		ire = ire_lookup_local(zoneid, ipst);
-		if (ire == NULL) {
-			ip1dbg(("ip_hdr_complete: no source IRE\n"));
-			return (1);
-		}
-		ipha->ipha_src = ire->ire_addr;
-		ire_refrele(ire);
-	}
-	ipha->ipha_ttl = ipst->ips_ip_def_ttl;
-	ipha->ipha_hdr_checksum = 0;
-	ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
-	return (0);
+	ire = ire_ftable_lookup_simple_v4(addr, 0, ipst, NULL);
+	ASSERT(ire != NULL);
+	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))
+		result = IRE_NOROUTE;
+	else
+		result = ire->ire_type;
+	ire_refrele(ire);
+	return (result);
+}
+
+/*
+ * Efficient versions of lookup for an IRE when we only
+ * match the address.
+ * For RTF_REJECT or BLACKHOLE we return IRE_NOROUTE.
+ * Does not handle multicast addresses.
+ */
+uint_t
+ip_type_v6(const in6_addr_t *addr, ip_stack_t *ipst)
+{
+	ire_t *ire;
+	uint_t result;
+
+	ire = ire_ftable_lookup_simple_v6(addr, 0, ipst, NULL);
+	ASSERT(ire != NULL);
+	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))
+		result = IRE_NOROUTE;
+	else
+		result = ire->ire_type;
+	ire_refrele(ire);
+	return (result);
 }
 
 /*
@@ -7602,8 +5781,6 @@ ip_hdr_complete(ipha_t *ipha, zoneid_t zoneid, ip_stack_t *ipst)
 static void
 ip_lrput(queue_t *q, mblk_t *mp)
 {
-	mblk_t *mp1;
-
 	switch (mp->b_datap->db_type) {
 	case M_FLUSH:
 		/* Turn around */
@@ -7614,9 +5791,6 @@ ip_lrput(queue_t *q, mblk_t *mp)
 		}
 		break;
 	}
-	/* Could receive messages that passed through ar_rput */
-	for (mp1 = mp; mp1; mp1 = mp1->b_cont)
-		mp1->b_prev = mp1->b_next = NULL;
 	freemsg(mp);
 }
 
@@ -7631,7 +5805,7 @@ ip_lwput(queue_t *q, mblk_t *mp)
 /*
  * Move the first hop in any source route to ipha_dst and remove that part of
  * the source route.  Called by other protocols.  Errors in option formatting
- * are ignored - will be handled by ip_wput_options Return the final
+ * are ignored - will be handled by ip_output_options. Return the final
  * destination (either ipha_dst or the last entry in a source route.)
  */
 ipaddr_t
@@ -7643,7 +5817,6 @@ ip_massage_options(ipha_t *ipha, netstack_t *ns)
 	uint8_t		optlen;
 	ipaddr_t	dst;
 	int		i;
-	ire_t		*ire;
 	ip_stack_t	*ipst = ns->netstack_ip;
 
 	ip2dbg(("ip_massage_options\n"));
@@ -7679,10 +5852,7 @@ ip_massage_options(ipha_t *ipha, netstack_t *ns)
 			 * XXX verify per-interface ip_forwarding
 			 * for source route?
 			 */
-			ire = ire_ctable_lookup(dst, 0, IRE_LOCAL, NULL,
-			    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-			if (ire != NULL) {
-				ire_refrele(ire);
+			if (ip_type_v4(dst, ipst) == IRE_LOCAL) {
 				off += IP_ADDR_LEN;
 				goto redo_srr;
 			}
@@ -7760,1832 +5930,6 @@ ip_net_mask(ipaddr_t addr)
 	return ((ipaddr_t)0);
 }
 
-/*
- * Helper ill lookup function used by IPsec.
- */
-ill_t *
-ip_grab_ill(mblk_t *first_mp, int ifindex, boolean_t isv6, ip_stack_t *ipst)
-{
-	ill_t *ret_ill;
-
-	ASSERT(ifindex != 0);
-
-	ret_ill = ill_lookup_on_ifindex(ifindex, isv6, NULL, NULL, NULL, NULL,
-	    ipst);
-	if (ret_ill == NULL) {
-		if (isv6) {
-			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutDiscards);
-			ip1dbg(("ip_grab_ill (IPv6): bad ifindex %d.\n",
-			    ifindex));
-		} else {
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-			ip1dbg(("ip_grab_ill (IPv4): bad ifindex %d.\n",
-			    ifindex));
-		}
-		freemsg(first_mp);
-		return (NULL);
-	}
-	return (ret_ill);
-}
-
-/*
- * IPv4 -
- * ip_newroute is called by ip_rput or ip_wput whenever we need to send
- * out a packet to a destination address for which we do not have specific
- * (or sufficient) routing information.
- *
- * NOTE : These are the scopes of some of the variables that point at IRE,
- *	  which needs to be followed while making any future modifications
- *	  to avoid memory leaks.
- *
- *	- ire and sire are the entries looked up initially by
- *	  ire_ftable_lookup.
- *	- ipif_ire is used to hold the interface ire associated with
- *	  the new cache ire. But it's scope is limited, so we always REFRELE
- *	  it before branching out to error paths.
- *	- save_ire is initialized before ire_create, so that ire returned
- *	  by ire_create will not over-write the ire. We REFRELE save_ire
- *	  before breaking out of the switch.
- *
- *	Thus on failures, we have to REFRELE only ire and sire, if they
- *	are not NULL.
- */
-void
-ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, conn_t *connp,
-    zoneid_t zoneid, ip_stack_t *ipst)
-{
-	areq_t	*areq;
-	ipaddr_t gw = 0;
-	ire_t	*ire = NULL;
-	mblk_t	*res_mp;
-	ipaddr_t *addrp;
-	ipaddr_t nexthop_addr;
-	ipif_t  *src_ipif = NULL;
-	ill_t	*dst_ill = NULL;
-	ipha_t  *ipha;
-	ire_t	*sire = NULL;
-	mblk_t	*first_mp;
-	ire_t	*save_ire;
-	ushort_t ire_marks = 0;
-	boolean_t mctl_present;
-	ipsec_out_t *io;
-	mblk_t	*saved_mp;
-	mblk_t	*copy_mp = NULL;
-	mblk_t	*xmit_mp = NULL;
-	ipaddr_t save_dst;
-	uint32_t multirt_flags =
-	    MULTIRT_CACHEGW | MULTIRT_USESTAMP | MULTIRT_SETSTAMP;
-	boolean_t multirt_is_resolvable;
-	boolean_t multirt_resolve_next;
-	boolean_t unspec_src;
-	boolean_t ip_nexthop = B_FALSE;
-	tsol_ire_gw_secattr_t *attrp = NULL;
-	tsol_gcgrp_t *gcgrp = NULL;
-	tsol_gcgrp_addr_t ga;
-	int multirt_res_failures = 0;
-	int multirt_res_attempts = 0;
-	int multirt_already_resolved = 0;
-	boolean_t multirt_no_icmp_error = B_FALSE;
-
-	if (ip_debug > 2) {
-		/* ip1dbg */
-		pr_addr_dbg("ip_newroute: dst %s\n", AF_INET, &dst);
-	}
-
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-	if (mctl_present) {
-		io = (ipsec_out_t *)first_mp->b_rptr;
-		ASSERT(io->ipsec_out_type == IPSEC_OUT);
-		ASSERT(zoneid == io->ipsec_out_zoneid);
-		ASSERT(zoneid != ALL_ZONES);
-	}
-
-	ipha = (ipha_t *)mp->b_rptr;
-
-	/* All multicast lookups come through ip_newroute_ipif() */
-	if (CLASSD(dst)) {
-		ip0dbg(("ip_newroute: CLASSD 0x%x (b_prev %p, b_next %p)\n",
-		    ntohl(dst), (void *)mp->b_prev, (void *)mp->b_next));
-		freemsg(first_mp);
-		return;
-	}
-
-	if (mctl_present && io->ipsec_out_ip_nexthop) {
-		ip_nexthop = B_TRUE;
-		nexthop_addr = io->ipsec_out_nexthop_addr;
-	}
-	/*
-	 * If this IRE is created for forwarding or it is not for
-	 * traffic for congestion controlled protocols, mark it as temporary.
-	 */
-	if (mp->b_prev != NULL || !IP_FLOW_CONTROLLED_ULP(ipha->ipha_protocol))
-		ire_marks |= IRE_MARK_TEMPORARY;
-
-	/*
-	 * Get what we can from ire_ftable_lookup which will follow an IRE
-	 * chain until it gets the most specific information available.
-	 * For example, we know that there is no IRE_CACHE for this dest,
-	 * but there may be an IRE_OFFSUBNET which specifies a gateway.
-	 * ire_ftable_lookup will look up the gateway, etc.
-	 * Otherwise, given ire_ftable_lookup algorithm, only one among routes
-	 * to the destination, of equal netmask length in the forward table,
-	 * will be recursively explored. If no information is available
-	 * for the final gateway of that route, we force the returned ire
-	 * to be equal to sire using MATCH_IRE_PARENT.
-	 * At least, in this case we have a starting point (in the buckets)
-	 * to look for other routes to the destination in the forward table.
-	 * This is actually used only for multirouting, where a list
-	 * of routes has to be processed in sequence.
-	 *
-	 * In the process of coming up with the most specific information,
-	 * ire_ftable_lookup may end up with an incomplete IRE_CACHE entry
-	 * for the gateway (i.e., one for which the ire_nce->nce_state is
-	 * not yet ND_REACHABLE, and is in the middle of arp resolution).
-	 * Two caveats when handling incomplete ire's in ip_newroute:
-	 * - we should be careful when accessing its ire_nce (specifically
-	 *   the nce_res_mp) ast it might change underneath our feet, and,
-	 * - not all legacy code path callers are prepared to handle
-	 *   incomplete ire's, so we should not create/add incomplete
-	 *   ire_cache entries here. (See discussion about temporary solution
-	 *   further below).
-	 *
-	 * In order to minimize packet dropping, and to preserve existing
-	 * behavior, we treat this case as if there were no IRE_CACHE for the
-	 * gateway, and instead use the IF_RESOLVER ire to send out
-	 * another request to ARP (this is achieved by passing the
-	 * MATCH_IRE_COMPLETE flag to ire_ftable_lookup). When the
-	 * arp response comes back in ip_wput_nondata, we will create
-	 * a per-dst ire_cache that has an ND_COMPLETE ire.
-	 *
-	 * Note that this is a temporary solution; the correct solution is
-	 * to create an incomplete  per-dst ire_cache entry, and send the
-	 * packet out when the gw's nce is resolved. In order to achieve this,
-	 * all packet processing must have been completed prior to calling
-	 * ire_add_then_send. Some legacy code paths (e.g. cgtp) would need
-	 * to be modified to accomodate this solution.
-	 */
-	if (ip_nexthop) {
-		/*
-		 * The first time we come here, we look for an IRE_INTERFACE
-		 * entry for the specified nexthop, set the dst to be the
-		 * nexthop address and create an IRE_CACHE entry for the
-		 * nexthop. The next time around, we are able to find an
-		 * IRE_CACHE entry for the nexthop, set the gateway to be the
-		 * nexthop address and create an IRE_CACHE entry for the
-		 * destination address via the specified nexthop.
-		 */
-		ire = ire_cache_lookup(nexthop_addr, zoneid,
-		    msg_getlabel(mp), ipst);
-		if (ire != NULL) {
-			gw = nexthop_addr;
-			ire_marks |= IRE_MARK_PRIVATE_ADDR;
-		} else {
-			ire = ire_ftable_lookup(nexthop_addr, 0, 0,
-			    IRE_INTERFACE, NULL, NULL, zoneid, 0,
-			    msg_getlabel(mp),
-			    MATCH_IRE_TYPE | MATCH_IRE_SECATTR,
-			    ipst);
-			if (ire != NULL) {
-				dst = nexthop_addr;
-			}
-		}
-	} else {
-		ire = ire_ftable_lookup(dst, 0, 0, 0,
-		    NULL, &sire, zoneid, 0, msg_getlabel(mp),
-		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_RJ_BHOLE | MATCH_IRE_PARENT |
-		    MATCH_IRE_SECATTR | MATCH_IRE_COMPLETE,
-		    ipst);
-	}
-
-	ip3dbg(("ip_newroute: ire_ftable_lookup() "
-	    "returned ire %p, sire %p\n", (void *)ire, (void *)sire));
-
-	/*
-	 * This loop is run only once in most cases.
-	 * We loop to resolve further routes only when the destination
-	 * can be reached through multiple RTF_MULTIRT-flagged ires.
-	 */
-	do {
-		/* Clear the previous iteration's values */
-		if (src_ipif != NULL) {
-			ipif_refrele(src_ipif);
-			src_ipif = NULL;
-		}
-		if (dst_ill != NULL) {
-			ill_refrele(dst_ill);
-			dst_ill = NULL;
-		}
-
-		multirt_resolve_next = B_FALSE;
-		/*
-		 * We check if packets have to be multirouted.
-		 * In this case, given the current <ire, sire> couple,
-		 * we look for the next suitable <ire, sire>.
-		 * This check is done in ire_multirt_lookup(),
-		 * which applies various criteria to find the next route
-		 * to resolve. ire_multirt_lookup() leaves <ire, sire>
-		 * unchanged if it detects it has not been tried yet.
-		 */
-		if ((sire != NULL) && (sire->ire_flags & RTF_MULTIRT)) {
-			ip3dbg(("ip_newroute: starting next_resolution "
-			    "with first_mp %p, tag %d\n",
-			    (void *)first_mp,
-			    MULTIRT_DEBUG_TAGGED(first_mp)));
-
-			ASSERT(sire != NULL);
-			multirt_is_resolvable =
-			    ire_multirt_lookup(&ire, &sire, multirt_flags,
-			    &multirt_already_resolved, msg_getlabel(mp), ipst);
-
-			ip3dbg(("ip_newroute: multirt_is_resolvable %d, "
-			    "multirt_already_resolved %d, "
-			    "multirt_res_attempts %d, multirt_res_failures %d, "
-			    "ire %p, sire %p\n", multirt_is_resolvable,
-			    multirt_already_resolved, multirt_res_attempts,
-			    multirt_res_failures, (void *)ire, (void *)sire));
-
-			if (!multirt_is_resolvable) {
-				/*
-				 * No more multirt route to resolve; give up
-				 * (all routes resolved or no more
-				 * resolvable routes).
-				 */
-				if (ire != NULL) {
-					ire_refrele(ire);
-					ire = NULL;
-				}
-				/*
-				 * Generate ICMP error only if all attempts to
-				 * resolve multirt route failed and there is no
-				 * already resolved one.  Don't generate ICMP
-				 * error when:
-				 *
-				 *  1) there was no attempt to resolve
-				 *  2) at least one attempt passed
-				 *  3) a multirt route is already resolved
-				 *
-				 *  Case 1) may occur due to multiple
-				 *    resolution attempts during single
-				 *    ip_multirt_resolution_interval.
-				 *
-				 *  Case 2-3) means that CGTP destination is
-				 *    reachable via one link so we don't want to
-				 *    generate ICMP host unreachable error.
-				 */
-				if (multirt_res_attempts == 0 ||
-				    multirt_res_failures <
-				    multirt_res_attempts ||
-				    multirt_already_resolved > 0)
-					multirt_no_icmp_error = B_TRUE;
-			} else {
-				ASSERT(sire != NULL);
-				ASSERT(ire != NULL);
-
-				multirt_res_attempts++;
-			}
-		}
-
-		if (ire == NULL) {
-			if (ip_debug > 3) {
-				/* ip2dbg */
-				pr_addr_dbg("ip_newroute: "
-				    "can't resolve %s\n", AF_INET, &dst);
-			}
-			ip3dbg(("ip_newroute: "
-			    "ire %p, sire %p, multirt_no_icmp_error %d\n",
-			    (void *)ire, (void *)sire,
-			    (int)multirt_no_icmp_error));
-
-			if (sire != NULL) {
-				ire_refrele(sire);
-				sire = NULL;
-			}
-
-			if (multirt_no_icmp_error) {
-				/* There is no need to report an ICMP error. */
-				MULTIRT_DEBUG_UNTAG(first_mp);
-				freemsg(first_mp);
-				return;
-			}
-			ip_rts_change(RTM_MISS, dst, 0, 0, 0, 0, 0, 0,
-			    RTA_DST, ipst);
-			goto icmp_err_ret;
-		}
-
-		/*
-		 * Verify that the returned IRE does not have either
-		 * the RTF_REJECT or RTF_BLACKHOLE flags set and that the IRE is
-		 * either an IRE_CACHE, IRE_IF_NORESOLVER or IRE_IF_RESOLVER.
-		 */
-		if ((ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE)) ||
-		    (ire->ire_type & (IRE_CACHE | IRE_INTERFACE)) == 0) {
-			goto icmp_err_ret;
-		}
-		/*
-		 * Increment the ire_ob_pkt_count field for ire if it is an
-		 * INTERFACE (IF_RESOLVER or IF_NORESOLVER) IRE type, and
-		 * increment the same for the parent IRE, sire, if it is some
-		 * sort of prefix IRE (which includes DEFAULT, PREFIX, and HOST)
-		 */
-		if ((ire->ire_type & IRE_INTERFACE) != 0) {
-			UPDATE_OB_PKT_COUNT(ire);
-			ire->ire_last_used_time = lbolt;
-		}
-
-		if (sire != NULL) {
-			gw = sire->ire_gateway_addr;
-			ASSERT((sire->ire_type & (IRE_CACHETABLE |
-			    IRE_INTERFACE)) == 0);
-			UPDATE_OB_PKT_COUNT(sire);
-			sire->ire_last_used_time = lbolt;
-		}
-		/*
-		 * We have a route to reach the destination.  Find the
-		 * appropriate ill, then get a source address using
-		 * ipif_select_source().
-		 *
-		 * If we are here trying to create an IRE_CACHE for an offlink
-		 * destination and have an IRE_CACHE entry for VNI, then use
-		 * ire_stq instead since VNI's queue is a black hole.
-		 */
-		if ((ire->ire_type == IRE_CACHE) &&
-		    IS_VNI(ire->ire_ipif->ipif_ill)) {
-			dst_ill = ire->ire_stq->q_ptr;
-			ill_refhold(dst_ill);
-		} else {
-			ill_t *ill = ire->ire_ipif->ipif_ill;
-
-			if (IS_IPMP(ill)) {
-				dst_ill =
-				    ipmp_illgrp_hold_next_ill(ill->ill_grp);
-			} else {
-				dst_ill = ill;
-				ill_refhold(dst_ill);
-			}
-		}
-
-		if (dst_ill == NULL) {
-			if (ip_debug > 2) {
-				pr_addr_dbg("ip_newroute: no dst "
-				    "ill for dst %s\n", AF_INET, &dst);
-			}
-			goto icmp_err_ret;
-		}
-		ip2dbg(("ip_newroute: dst_ill %s\n", dst_ill->ill_name));
-
-		/*
-		 * Pick the best source address from dst_ill.
-		 *
-		 * 1) Try to pick the source address from the destination
-		 *    route. Clustering assumes that when we have multiple
-		 *    prefixes hosted on an interface, the prefix of the
-		 *    source address matches the prefix of the destination
-		 *    route. We do this only if the address is not
-		 *    DEPRECATED.
-		 *
-		 * 2) If the conn is in a different zone than the ire, we
-		 *    need to pick a source address from the right zone.
-		 */
-		ASSERT(src_ipif == NULL);
-		if ((sire != NULL) && (sire->ire_flags & RTF_SETSRC)) {
-			/*
-			 * The RTF_SETSRC flag is set in the parent ire (sire).
-			 * Check that the ipif matching the requested source
-			 * address still exists.
-			 */
-			src_ipif = ipif_lookup_addr(sire->ire_src_addr, NULL,
-			    zoneid, NULL, NULL, NULL, NULL, ipst);
-		}
-
-		unspec_src = (connp != NULL && connp->conn_unspec_src);
-
-		if (src_ipif == NULL &&
-		    (!unspec_src || ipha->ipha_src != INADDR_ANY)) {
-			ire_marks |= IRE_MARK_USESRC_CHECK;
-			if (!IS_UNDER_IPMP(ire->ire_ipif->ipif_ill) &&
-			    IS_IPMP(ire->ire_ipif->ipif_ill) ||
-			    (ire->ire_ipif->ipif_flags & IPIF_DEPRECATED) ||
-			    (connp != NULL && ire->ire_zoneid != zoneid &&
-			    ire->ire_zoneid != ALL_ZONES) ||
-			    (dst_ill->ill_usesrc_ifindex != 0)) {
-				/*
-				 * If the destination is reachable via a
-				 * given gateway, the selected source address
-				 * should be in the same subnet as the gateway.
-				 * Otherwise, the destination is not reachable.
-				 *
-				 * If there are no interfaces on the same subnet
-				 * as the destination, ipif_select_source gives
-				 * first non-deprecated interface which might be
-				 * on a different subnet than the gateway.
-				 * This is not desirable. Hence pass the dst_ire
-				 * source address to ipif_select_source.
-				 * It is sure that the destination is reachable
-				 * with the dst_ire source address subnet.
-				 * So passing dst_ire source address to
-				 * ipif_select_source will make sure that the
-				 * selected source will be on the same subnet
-				 * as dst_ire source address.
-				 */
-				ipaddr_t saddr = ire->ire_ipif->ipif_src_addr;
-
-				src_ipif = ipif_select_source(dst_ill, saddr,
-				    zoneid);
-				if (src_ipif == NULL) {
-					/*
-					 * In the case of multirouting, it may
-					 * happen that ipif_select_source fails
-					 * as DAD may disallow use of the
-					 * particular source interface.  Anyway,
-					 * we need to continue and attempt to
-					 * resolve other multirt routes.
-					 */
-					if ((sire != NULL) &&
-					    (sire->ire_flags & RTF_MULTIRT)) {
-						ire_refrele(ire);
-						ire = NULL;
-						multirt_resolve_next = B_TRUE;
-						multirt_res_failures++;
-						continue;
-					}
-
-					if (ip_debug > 2) {
-						pr_addr_dbg("ip_newroute: "
-						    "no src for dst %s ",
-						    AF_INET, &dst);
-						printf("on interface %s\n",
-						    dst_ill->ill_name);
-					}
-					goto icmp_err_ret;
-				}
-			} else {
-				src_ipif = ire->ire_ipif;
-				ASSERT(src_ipif != NULL);
-				/* hold src_ipif for uniformity */
-				ipif_refhold(src_ipif);
-			}
-		}
-
-		/*
-		 * Assign a source address while we have the conn.
-		 * We can't have ip_wput_ire pick a source address when the
-		 * packet returns from arp since we need to look at
-		 * conn_unspec_src and conn_zoneid, and we lose the conn when
-		 * going through arp.
-		 *
-		 * NOTE : ip_newroute_v6 does not have this piece of code as
-		 *	  it uses ip6i to store this information.
-		 */
-		if (ipha->ipha_src == INADDR_ANY && !unspec_src)
-			ipha->ipha_src = src_ipif->ipif_src_addr;
-
-		if (ip_debug > 3) {
-			/* ip2dbg */
-			pr_addr_dbg("ip_newroute: first hop %s\n",
-			    AF_INET, &gw);
-		}
-		ip2dbg(("\tire type %s (%d)\n",
-		    ip_nv_lookup(ire_nv_tbl, ire->ire_type), ire->ire_type));
-
-		/*
-		 * The TTL of multirouted packets is bounded by the
-		 * ip_multirt_ttl ndd variable.
-		 */
-		if ((sire != NULL) && (sire->ire_flags & RTF_MULTIRT)) {
-			/* Force TTL of multirouted packets */
-			if ((ipst->ips_ip_multirt_ttl > 0) &&
-			    (ipha->ipha_ttl > ipst->ips_ip_multirt_ttl)) {
-				ip2dbg(("ip_newroute: forcing multirt TTL "
-				    "to %d (was %d), dst 0x%08x\n",
-				    ipst->ips_ip_multirt_ttl, ipha->ipha_ttl,
-				    ntohl(sire->ire_addr)));
-				ipha->ipha_ttl = ipst->ips_ip_multirt_ttl;
-			}
-		}
-		/*
-		 * At this point in ip_newroute(), ire is either the
-		 * IRE_CACHE of the next-hop gateway for an off-subnet
-		 * destination or an IRE_INTERFACE type that should be used
-		 * to resolve an on-subnet destination or an on-subnet
-		 * next-hop gateway.
-		 *
-		 * In the IRE_CACHE case, we have the following :
-		 *
-		 * 1) src_ipif - used for getting a source address.
-		 *
-		 * 2) dst_ill - from which we derive ire_stq/ire_rfq. This
-		 *    means packets using this IRE_CACHE will go out on
-		 *    dst_ill.
-		 *
-		 * 3) The IRE sire will point to the prefix that is the
-		 *    longest  matching route for the destination. These
-		 *    prefix types include IRE_DEFAULT, IRE_PREFIX, IRE_HOST.
-		 *
-		 *    The newly created IRE_CACHE entry for the off-subnet
-		 *    destination is tied to both the prefix route and the
-		 *    interface route used to resolve the next-hop gateway
-		 *    via the ire_phandle and ire_ihandle fields,
-		 *    respectively.
-		 *
-		 * In the IRE_INTERFACE case, we have the following :
-		 *
-		 * 1) src_ipif - used for getting a source address.
-		 *
-		 * 2) dst_ill - from which we derive ire_stq/ire_rfq. This
-		 *    means packets using the IRE_CACHE that we will build
-		 *    here will go out on dst_ill.
-		 *
-		 * 3) sire may or may not be NULL. But, the IRE_CACHE that is
-		 *    to be created will only be tied to the IRE_INTERFACE
-		 *    that was derived from the ire_ihandle field.
-		 *
-		 *    If sire is non-NULL, it means the destination is
-		 *    off-link and we will first create the IRE_CACHE for the
-		 *    gateway. Next time through ip_newroute, we will create
-		 *    the IRE_CACHE for the final destination as described
-		 *    above.
-		 *
-		 * In both cases, after the current resolution has been
-		 * completed (or possibly initialised, in the IRE_INTERFACE
-		 * case), the loop may be re-entered to attempt the resolution
-		 * of another RTF_MULTIRT route.
-		 *
-		 * When an IRE_CACHE entry for the off-subnet destination is
-		 * created, RTF_SETSRC and RTF_MULTIRT are inherited from sire,
-		 * for further processing in emission loops.
-		 */
-		save_ire = ire;
-		switch (ire->ire_type) {
-		case IRE_CACHE: {
-			ire_t	*ipif_ire;
-
-			ASSERT(save_ire->ire_nce->nce_state == ND_REACHABLE);
-			if (gw == 0)
-				gw = ire->ire_gateway_addr;
-			/*
-			 * We need 3 ire's to create a new cache ire for an
-			 * off-link destination from the cache ire of the
-			 * gateway.
-			 *
-			 *	1. The prefix ire 'sire' (Note that this does
-			 *	   not apply to the conn_nexthop_set case)
-			 *	2. The cache ire of the gateway 'ire'
-			 *	3. The interface ire 'ipif_ire'
-			 *
-			 * We have (1) and (2). We lookup (3) below.
-			 *
-			 * If there is no interface route to the gateway,
-			 * it is a race condition, where we found the cache
-			 * but the interface route has been deleted.
-			 */
-			if (ip_nexthop) {
-				ipif_ire = ire_ihandle_lookup_onlink(ire);
-			} else {
-				ipif_ire =
-				    ire_ihandle_lookup_offlink(ire, sire);
-			}
-			if (ipif_ire == NULL) {
-				ip1dbg(("ip_newroute: "
-				    "ire_ihandle_lookup_offlink failed\n"));
-				goto icmp_err_ret;
-			}
-
-			/*
-			 * Check cached gateway IRE for any security
-			 * attributes; if found, associate the gateway
-			 * credentials group to the destination IRE.
-			 */
-			if ((attrp = save_ire->ire_gw_secattr) != NULL) {
-				mutex_enter(&attrp->igsa_lock);
-				if ((gcgrp = attrp->igsa_gcgrp) != NULL)
-					GCGRP_REFHOLD(gcgrp);
-				mutex_exit(&attrp->igsa_lock);
-			}
-
-			/*
-			 * XXX For the source of the resolver mp,
-			 * we are using the same DL_UNITDATA_REQ
-			 * (from save_ire->ire_nce->nce_res_mp)
-			 * though the save_ire is not pointing at the same ill.
-			 * This is incorrect. We need to send it up to the
-			 * resolver to get the right res_mp. For ethernets
-			 * this may be okay (ill_type == DL_ETHER).
-			 */
-
-			ire = ire_create(
-			    (uchar_t *)&dst,		/* dest address */
-			    (uchar_t *)&ip_g_all_ones,	/* mask */
-			    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
-			    (uchar_t *)&gw,		/* gateway address */
-			    &save_ire->ire_max_frag,
-			    save_ire->ire_nce,		/* src nce */
-			    dst_ill->ill_rq,		/* recv-from queue */
-			    dst_ill->ill_wq,		/* send-to queue */
-			    IRE_CACHE,			/* IRE type */
-			    src_ipif,
-			    (sire != NULL) ?
-			    sire->ire_mask : 0, 	/* Parent mask */
-			    (sire != NULL) ?
-			    sire->ire_phandle : 0,	/* Parent handle */
-			    ipif_ire->ire_ihandle,	/* Interface handle */
-			    (sire != NULL) ? (sire->ire_flags &
-			    (RTF_SETSRC | RTF_MULTIRT)) : 0, /* flags */
-			    (sire != NULL) ?
-			    &(sire->ire_uinfo) : &(save_ire->ire_uinfo),
-			    NULL,
-			    gcgrp,
-			    ipst);
-
-			if (ire == NULL) {
-				if (gcgrp != NULL) {
-					GCGRP_REFRELE(gcgrp);
-					gcgrp = NULL;
-				}
-				ire_refrele(ipif_ire);
-				ire_refrele(save_ire);
-				break;
-			}
-
-			/* reference now held by IRE */
-			gcgrp = NULL;
-
-			ire->ire_marks |= ire_marks;
-
-			/*
-			 * Prevent sire and ipif_ire from getting deleted.
-			 * The newly created ire is tied to both of them via
-			 * the phandle and ihandle respectively.
-			 */
-			if (sire != NULL) {
-				IRB_REFHOLD(sire->ire_bucket);
-				/* Has it been removed already ? */
-				if (sire->ire_marks & IRE_MARK_CONDEMNED) {
-					IRB_REFRELE(sire->ire_bucket);
-					ire_refrele(ipif_ire);
-					ire_refrele(save_ire);
-					break;
-				}
-			}
-
-			IRB_REFHOLD(ipif_ire->ire_bucket);
-			/* Has it been removed already ? */
-			if (ipif_ire->ire_marks & IRE_MARK_CONDEMNED) {
-				IRB_REFRELE(ipif_ire->ire_bucket);
-				if (sire != NULL)
-					IRB_REFRELE(sire->ire_bucket);
-				ire_refrele(ipif_ire);
-				ire_refrele(save_ire);
-				break;
-			}
-
-			xmit_mp = first_mp;
-			/*
-			 * In the case of multirouting, a copy
-			 * of the packet is done before its sending.
-			 * The copy is used to attempt another
-			 * route resolution, in a next loop.
-			 */
-			if (ire->ire_flags & RTF_MULTIRT) {
-				copy_mp = copymsg(first_mp);
-				if (copy_mp != NULL) {
-					xmit_mp = copy_mp;
-					MULTIRT_DEBUG_TAG(first_mp);
-				}
-			}
-
-			ire_add_then_send(q, ire, xmit_mp);
-			ire_refrele(save_ire);
-
-			/* Assert that sire is not deleted yet. */
-			if (sire != NULL) {
-				ASSERT(sire->ire_ptpn != NULL);
-				IRB_REFRELE(sire->ire_bucket);
-			}
-
-			/* Assert that ipif_ire is not deleted yet. */
-			ASSERT(ipif_ire->ire_ptpn != NULL);
-			IRB_REFRELE(ipif_ire->ire_bucket);
-			ire_refrele(ipif_ire);
-
-			/*
-			 * If copy_mp is not NULL, multirouting was
-			 * requested. We loop to initiate a next
-			 * route resolution attempt, starting from sire.
-			 */
-			if (copy_mp != NULL) {
-				/*
-				 * Search for the next unresolved
-				 * multirt route.
-				 */
-				copy_mp = NULL;
-				ipif_ire = NULL;
-				ire = NULL;
-				multirt_resolve_next = B_TRUE;
-				continue;
-			}
-			if (sire != NULL)
-				ire_refrele(sire);
-			ipif_refrele(src_ipif);
-			ill_refrele(dst_ill);
-			return;
-		}
-		case IRE_IF_NORESOLVER: {
-			if (dst_ill->ill_resolver_mp == NULL) {
-				ip1dbg(("ip_newroute: dst_ill %p "
-				    "for IRE_IF_NORESOLVER ire %p has "
-				    "no ill_resolver_mp\n",
-				    (void *)dst_ill, (void *)ire));
-				break;
-			}
-
-			/*
-			 * TSol note: We are creating the ire cache for the
-			 * destination 'dst'. If 'dst' is offlink, going
-			 * through the first hop 'gw', the security attributes
-			 * of 'dst' must be set to point to the gateway
-			 * credentials of gateway 'gw'. If 'dst' is onlink, it
-			 * is possible that 'dst' is a potential gateway that is
-			 * referenced by some route that has some security
-			 * attributes. Thus in the former case, we need to do a
-			 * gcgrp_lookup of 'gw' while in the latter case we
-			 * need to do gcgrp_lookup of 'dst' itself.
-			 */
-			ga.ga_af = AF_INET;
-			IN6_IPADDR_TO_V4MAPPED(gw != INADDR_ANY ? gw : dst,
-			    &ga.ga_addr);
-			gcgrp = gcgrp_lookup(&ga, B_FALSE);
-
-			ire = ire_create(
-			    (uchar_t *)&dst,		/* dest address */
-			    (uchar_t *)&ip_g_all_ones,	/* mask */
-			    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
-			    (uchar_t *)&gw,		/* gateway address */
-			    &save_ire->ire_max_frag,
-			    NULL,			/* no src nce */
-			    dst_ill->ill_rq,		/* recv-from queue */
-			    dst_ill->ill_wq,		/* send-to queue */
-			    IRE_CACHE,
-			    src_ipif,
-			    save_ire->ire_mask,		/* Parent mask */
-			    (sire != NULL) ?		/* Parent handle */
-			    sire->ire_phandle : 0,
-			    save_ire->ire_ihandle,	/* Interface handle */
-			    (sire != NULL) ? sire->ire_flags &
-			    (RTF_SETSRC | RTF_MULTIRT) : 0, /* flags */
-			    &(save_ire->ire_uinfo),
-			    NULL,
-			    gcgrp,
-			    ipst);
-
-			if (ire == NULL) {
-				if (gcgrp != NULL) {
-					GCGRP_REFRELE(gcgrp);
-					gcgrp = NULL;
-				}
-				ire_refrele(save_ire);
-				break;
-			}
-
-			/* reference now held by IRE */
-			gcgrp = NULL;
-
-			ire->ire_marks |= ire_marks;
-
-			/* Prevent save_ire from getting deleted */
-			IRB_REFHOLD(save_ire->ire_bucket);
-			/* Has it been removed already ? */
-			if (save_ire->ire_marks & IRE_MARK_CONDEMNED) {
-				IRB_REFRELE(save_ire->ire_bucket);
-				ire_refrele(save_ire);
-				break;
-			}
-
-			/*
-			 * In the case of multirouting, a copy
-			 * of the packet is made before it is sent.
-			 * The copy is used in the next
-			 * loop to attempt another resolution.
-			 */
-			xmit_mp = first_mp;
-			if ((sire != NULL) &&
-			    (sire->ire_flags & RTF_MULTIRT)) {
-				copy_mp = copymsg(first_mp);
-				if (copy_mp != NULL) {
-					xmit_mp = copy_mp;
-					MULTIRT_DEBUG_TAG(first_mp);
-				}
-			}
-			ire_add_then_send(q, ire, xmit_mp);
-
-			/* Assert that it is not deleted yet. */
-			ASSERT(save_ire->ire_ptpn != NULL);
-			IRB_REFRELE(save_ire->ire_bucket);
-			ire_refrele(save_ire);
-
-			if (copy_mp != NULL) {
-				/*
-				 * If we found a (no)resolver, we ignore any
-				 * trailing top priority IRE_CACHE in further
-				 * loops. This ensures that we do not omit any
-				 * (no)resolver.
-				 * This IRE_CACHE, if any, will be processed
-				 * by another thread entering ip_newroute().
-				 * IRE_CACHE entries, if any, will be processed
-				 * by another thread entering ip_newroute(),
-				 * (upon resolver response, for instance).
-				 * This aims to force parallel multirt
-				 * resolutions as soon as a packet must be sent.
-				 * In the best case, after the tx of only one
-				 * packet, all reachable routes are resolved.
-				 * Otherwise, the resolution of all RTF_MULTIRT
-				 * routes would require several emissions.
-				 */
-				multirt_flags &= ~MULTIRT_CACHEGW;
-
-				/*
-				 * Search for the next unresolved multirt
-				 * route.
-				 */
-				copy_mp = NULL;
-				save_ire = NULL;
-				ire = NULL;
-				multirt_resolve_next = B_TRUE;
-				continue;
-			}
-
-			/*
-			 * Don't need sire anymore
-			 */
-			if (sire != NULL)
-				ire_refrele(sire);
-
-			ipif_refrele(src_ipif);
-			ill_refrele(dst_ill);
-			return;
-		}
-		case IRE_IF_RESOLVER:
-			/*
-			 * We can't build an IRE_CACHE yet, but at least we
-			 * found a resolver that can help.
-			 */
-			res_mp = dst_ill->ill_resolver_mp;
-			if (!OK_RESOLVER_MP(res_mp))
-				break;
-
-			/*
-			 * To be at this point in the code with a non-zero gw
-			 * means that dst is reachable through a gateway that
-			 * we have never resolved.  By changing dst to the gw
-			 * addr we resolve the gateway first.
-			 * When ire_add_then_send() tries to put the IP dg
-			 * to dst, it will reenter ip_newroute() at which
-			 * time we will find the IRE_CACHE for the gw and
-			 * create another IRE_CACHE in case IRE_CACHE above.
-			 */
-			if (gw != INADDR_ANY) {
-				/*
-				 * The source ipif that was determined above was
-				 * relative to the destination address, not the
-				 * gateway's. If src_ipif was not taken out of
-				 * the IRE_IF_RESOLVER entry, we'll need to call
-				 * ipif_select_source() again.
-				 */
-				if (src_ipif != ire->ire_ipif) {
-					ipif_refrele(src_ipif);
-					src_ipif = ipif_select_source(dst_ill,
-					    gw, zoneid);
-					/*
-					 * In the case of multirouting, it may
-					 * happen that ipif_select_source fails
-					 * as DAD may disallow use of the
-					 * particular source interface.  Anyway,
-					 * we need to continue and attempt to
-					 * resolve other multirt routes.
-					 */
-					if (src_ipif == NULL) {
-						if (sire != NULL &&
-						    (sire->ire_flags &
-						    RTF_MULTIRT)) {
-							ire_refrele(ire);
-							ire = NULL;
-							multirt_resolve_next =
-							    B_TRUE;
-							multirt_res_failures++;
-							continue;
-						}
-						if (ip_debug > 2) {
-							pr_addr_dbg(
-							    "ip_newroute: no "
-							    "src for gw %s ",
-							    AF_INET, &gw);
-							printf("on "
-							    "interface %s\n",
-							    dst_ill->ill_name);
-						}
-						goto icmp_err_ret;
-					}
-				}
-				save_dst = dst;
-				dst = gw;
-				gw = INADDR_ANY;
-			}
-
-			/*
-			 * We obtain a partial IRE_CACHE which we will pass
-			 * along with the resolver query.  When the response
-			 * comes back it will be there ready for us to add.
-			 * The ire_max_frag is atomically set under the
-			 * irebucket lock in ire_add_v[46].
-			 */
-
-			ire = ire_create_mp(
-			    (uchar_t *)&dst,		/* dest address */
-			    (uchar_t *)&ip_g_all_ones,	/* mask */
-			    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
-			    (uchar_t *)&gw,		/* gateway address */
-			    NULL,			/* ire_max_frag */
-			    NULL,			/* no src nce */
-			    dst_ill->ill_rq,		/* recv-from queue */
-			    dst_ill->ill_wq,		/* send-to queue */
-			    IRE_CACHE,
-			    src_ipif,			/* Interface ipif */
-			    save_ire->ire_mask,		/* Parent mask */
-			    0,
-			    save_ire->ire_ihandle,	/* Interface handle */
-			    0,				/* flags if any */
-			    &(save_ire->ire_uinfo),
-			    NULL,
-			    NULL,
-			    ipst);
-
-			if (ire == NULL) {
-				ire_refrele(save_ire);
-				break;
-			}
-
-			if ((sire != NULL) &&
-			    (sire->ire_flags & RTF_MULTIRT)) {
-				copy_mp = copymsg(first_mp);
-				if (copy_mp != NULL)
-					MULTIRT_DEBUG_TAG(copy_mp);
-			}
-
-			ire->ire_marks |= ire_marks;
-
-			/*
-			 * Construct message chain for the resolver
-			 * of the form:
-			 * 	ARP_REQ_MBLK-->IRE_MBLK-->Packet
-			 * Packet could contain a IPSEC_OUT mp.
-			 *
-			 * NOTE : ire will be added later when the response
-			 * comes back from ARP. If the response does not
-			 * come back, ARP frees the packet. For this reason,
-			 * we can't REFHOLD the bucket of save_ire to prevent
-			 * deletions. We may not be able to REFRELE the bucket
-			 * if the response never comes back. Thus, before
-			 * adding the ire, ire_add_v4 will make sure that the
-			 * interface route does not get deleted. This is the
-			 * only case unlike ip_newroute_v6, ip_newroute_ipif_v6
-			 * where we can always prevent deletions because of
-			 * the synchronous nature of adding IRES i.e
-			 * ire_add_then_send is called after creating the IRE.
-			 */
-			ASSERT(ire->ire_mp != NULL);
-			ire->ire_mp->b_cont = first_mp;
-			/* Have saved_mp handy, for cleanup if canput fails */
-			saved_mp = mp;
-			mp = copyb(res_mp);
-			if (mp == NULL) {
-				/* Prepare for cleanup */
-				mp = saved_mp; /* pkt */
-				ire_delete(ire); /* ire_mp */
-				ire = NULL;
-				ire_refrele(save_ire);
-				if (copy_mp != NULL) {
-					MULTIRT_DEBUG_UNTAG(copy_mp);
-					freemsg(copy_mp);
-					copy_mp = NULL;
-				}
-				break;
-			}
-			linkb(mp, ire->ire_mp);
-
-			/*
-			 * Fill in the source and dest addrs for the resolver.
-			 * NOTE: this depends on memory layouts imposed by
-			 * ill_init().
-			 */
-			areq = (areq_t *)mp->b_rptr;
-			addrp = (ipaddr_t *)((char *)areq +
-			    areq->areq_sender_addr_offset);
-			*addrp = save_ire->ire_src_addr;
-
-			ire_refrele(save_ire);
-			addrp = (ipaddr_t *)((char *)areq +
-			    areq->areq_target_addr_offset);
-			*addrp = dst;
-			/* Up to the resolver. */
-			if (canputnext(dst_ill->ill_rq) &&
-			    !(dst_ill->ill_arp_closing)) {
-				putnext(dst_ill->ill_rq, mp);
-				ire = NULL;
-				if (copy_mp != NULL) {
-					/*
-					 * If we found a resolver, we ignore
-					 * any trailing top priority IRE_CACHE
-					 * in the further loops. This ensures
-					 * that we do not omit any resolver.
-					 * IRE_CACHE entries, if any, will be
-					 * processed next time we enter
-					 * ip_newroute().
-					 */
-					multirt_flags &= ~MULTIRT_CACHEGW;
-					/*
-					 * Search for the next unresolved
-					 * multirt route.
-					 */
-					first_mp = copy_mp;
-					copy_mp = NULL;
-					/* Prepare the next resolution loop. */
-					mp = first_mp;
-					EXTRACT_PKT_MP(mp, first_mp,
-					    mctl_present);
-					if (mctl_present)
-						io = (ipsec_out_t *)
-						    first_mp->b_rptr;
-					ipha = (ipha_t *)mp->b_rptr;
-
-					ASSERT(sire != NULL);
-
-					dst = save_dst;
-					multirt_resolve_next = B_TRUE;
-					continue;
-				}
-
-				if (sire != NULL)
-					ire_refrele(sire);
-
-				/*
-				 * The response will come back in ip_wput
-				 * with db_type IRE_DB_TYPE.
-				 */
-				ipif_refrele(src_ipif);
-				ill_refrele(dst_ill);
-				return;
-			} else {
-				/* Prepare for cleanup */
-				DTRACE_PROBE1(ip__newroute__drop, mblk_t *,
-				    mp);
-				mp->b_cont = NULL;
-				freeb(mp); /* areq */
-				/*
-				 * this is an ire that is not added to the
-				 * cache. ire_freemblk will handle the release
-				 * of any resources associated with the ire.
-				 */
-				ire_delete(ire); /* ire_mp */
-				mp = saved_mp; /* pkt */
-				ire = NULL;
-				if (copy_mp != NULL) {
-					MULTIRT_DEBUG_UNTAG(copy_mp);
-					freemsg(copy_mp);
-					copy_mp = NULL;
-				}
-				break;
-			}
-		default:
-			break;
-		}
-	} while (multirt_resolve_next);
-
-	ip1dbg(("ip_newroute: dropped\n"));
-	/* Did this packet originate externally? */
-	if (mp->b_prev) {
-		mp->b_next = NULL;
-		mp->b_prev = NULL;
-		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
-	} else {
-		if (dst_ill != NULL) {
-			BUMP_MIB(dst_ill->ill_ip_mib, ipIfStatsOutDiscards);
-		} else {
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-		}
-	}
-	ASSERT(copy_mp == NULL);
-	MULTIRT_DEBUG_UNTAG(first_mp);
-	freemsg(first_mp);
-	if (ire != NULL)
-		ire_refrele(ire);
-	if (sire != NULL)
-		ire_refrele(sire);
-	if (src_ipif != NULL)
-		ipif_refrele(src_ipif);
-	if (dst_ill != NULL)
-		ill_refrele(dst_ill);
-	return;
-
-icmp_err_ret:
-	ip1dbg(("ip_newroute: no route\n"));
-	if (src_ipif != NULL)
-		ipif_refrele(src_ipif);
-	if (dst_ill != NULL)
-		ill_refrele(dst_ill);
-	if (sire != NULL)
-		ire_refrele(sire);
-	/* Did this packet originate externally? */
-	if (mp->b_prev) {
-		mp->b_next = NULL;
-		mp->b_prev = NULL;
-		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInNoRoutes);
-		q = WR(q);
-	} else {
-		/*
-		 * There is no outgoing ill, so just increment the
-		 * system MIB.
-		 */
-		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutNoRoutes);
-		/*
-		 * Since ip_wput() isn't close to finished, we fill
-		 * in enough of the header for credible error reporting.
-		 */
-		if (ip_hdr_complete(ipha, zoneid, ipst)) {
-			/* Failed */
-			MULTIRT_DEBUG_UNTAG(first_mp);
-			freemsg(first_mp);
-			if (ire != NULL)
-				ire_refrele(ire);
-			return;
-		}
-	}
-
-	/*
-	 * At this point we will have ire only if RTF_BLACKHOLE
-	 * or RTF_REJECT flags are set on the IRE. It will not
-	 * generate ICMP_HOST_UNREACHABLE if RTF_BLACKHOLE is set.
-	 */
-	if (ire != NULL) {
-		if (ire->ire_flags & RTF_BLACKHOLE) {
-			ire_refrele(ire);
-			MULTIRT_DEBUG_UNTAG(first_mp);
-			freemsg(first_mp);
-			return;
-		}
-		ire_refrele(ire);
-	}
-	if (ip_source_routed(ipha, ipst)) {
-		icmp_unreachable(q, first_mp, ICMP_SOURCE_ROUTE_FAILED,
-		    zoneid, ipst);
-		return;
-	}
-	icmp_unreachable(q, first_mp, ICMP_HOST_UNREACHABLE, zoneid, ipst);
-}
-
-ip_opt_info_t zero_info;
-
-/*
- * IPv4 -
- * ip_newroute_ipif is called by ip_wput_multicast and
- * ip_rput_forward_multicast whenever we need to send
- * out a packet to a destination address for which we do not have specific
- * routing information. It is used when the packet will be sent out
- * on a specific interface. It is also called by ip_wput() when IP_BOUND_IF
- * socket option is set or icmp error message wants to go out on a particular
- * interface for a unicast packet.
- *
- * In most cases, the destination address is resolved thanks to the ipif
- * intrinsic resolver. However, there are some cases where the call to
- * ip_newroute_ipif must take into account the potential presence of
- * RTF_SETSRC and/or RTF_MULITRT flags in an IRE_OFFSUBNET ire
- * that uses the interface. This is specified through flags,
- * which can be a combination of:
- * - RTF_SETSRC: if an IRE_OFFSUBNET ire exists that has the RTF_SETSRC
- *   flag, the resulting ire will inherit the IRE_OFFSUBNET source address
- *   and flags. Additionally, the packet source address has to be set to
- *   the specified address. The caller is thus expected to set this flag
- *   if the packet has no specific source address yet.
- * - RTF_MULTIRT: if an IRE_OFFSUBNET ire exists that has the RTF_MULTIRT
- *   flag, the resulting ire will inherit the flag. All unresolved routes
- *   to the destination must be explored in the same call to
- *   ip_newroute_ipif().
- */
-static void
-ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
-    conn_t *connp, uint32_t flags, zoneid_t zoneid, ip_opt_info_t *infop)
-{
-	areq_t	*areq;
-	ire_t	*ire = NULL;
-	mblk_t	*res_mp;
-	ipaddr_t *addrp;
-	mblk_t *first_mp;
-	ire_t	*save_ire = NULL;
-	ipif_t	*src_ipif = NULL;
-	ushort_t ire_marks = 0;
-	ill_t	*dst_ill = NULL;
-	ipha_t *ipha;
-	mblk_t	*saved_mp;
-	ire_t   *fire = NULL;
-	mblk_t  *copy_mp = NULL;
-	boolean_t multirt_resolve_next;
-	boolean_t unspec_src;
-	ipaddr_t ipha_dst;
-	ip_stack_t *ipst = ipif->ipif_ill->ill_ipst;
-
-	/*
-	 * CGTP goes in a loop which looks up a new ipif, do an ipif_refhold
-	 * here for uniformity
-	 */
-	ipif_refhold(ipif);
-
-	/*
-	 * This loop is run only once in most cases.
-	 * We loop to resolve further routes only when the destination
-	 * can be reached through multiple RTF_MULTIRT-flagged ires.
-	 */
-	do {
-		if (dst_ill != NULL) {
-			ill_refrele(dst_ill);
-			dst_ill = NULL;
-		}
-		if (src_ipif != NULL) {
-			ipif_refrele(src_ipif);
-			src_ipif = NULL;
-		}
-		multirt_resolve_next = B_FALSE;
-
-		ip1dbg(("ip_newroute_ipif: dst 0x%x, if %s\n", ntohl(dst),
-		    ipif->ipif_ill->ill_name));
-
-		first_mp = mp;
-		if (DB_TYPE(mp) == M_CTL)
-			mp = mp->b_cont;
-		ipha = (ipha_t *)mp->b_rptr;
-
-		/*
-		 * Save the packet destination address, we may need it after
-		 * the packet has been consumed.
-		 */
-		ipha_dst = ipha->ipha_dst;
-
-		/*
-		 * If the interface is a pt-pt interface we look for an
-		 * IRE_IF_RESOLVER or IRE_IF_NORESOLVER that matches both the
-		 * local_address and the pt-pt destination address. Otherwise
-		 * we just match the local address.
-		 * NOTE: dst could be different than ipha->ipha_dst in case
-		 * of sending igmp multicast packets over a point-to-point
-		 * connection.
-		 * Thus we must be careful enough to check ipha_dst to be a
-		 * multicast address, otherwise it will take xmit_if path for
-		 * multicast packets resulting into kernel stack overflow by
-		 * repeated calls to ip_newroute_ipif from ire_send().
-		 */
-		if (CLASSD(ipha_dst) &&
-		    !(ipif->ipif_ill->ill_flags & ILLF_MULTICAST)) {
-			goto err_ret;
-		}
-
-		/*
-		 * We check if an IRE_OFFSUBNET for the addr that goes through
-		 * ipif exists. We need it to determine if the RTF_SETSRC and/or
-		 * RTF_MULTIRT flags must be honored. This IRE_OFFSUBNET ire may
-		 * propagate its flags to the new ire.
-		 */
-		if (CLASSD(ipha_dst) && (flags & (RTF_MULTIRT | RTF_SETSRC))) {
-			fire = ipif_lookup_multi_ire(ipif, ipha_dst);
-			ip2dbg(("ip_newroute_ipif: "
-			    "ipif_lookup_multi_ire("
-			    "ipif %p, dst %08x) = fire %p\n",
-			    (void *)ipif, ntohl(dst), (void *)fire));
-		}
-
-		/*
-		 * Note: While we pick a dst_ill we are really only
-		 * interested in the ill for load spreading. The source
-		 * ipif is determined by source address selection below.
-		 */
-		if (IS_IPMP(ipif->ipif_ill)) {
-			ipmp_illgrp_t *illg = ipif->ipif_ill->ill_grp;
-
-			if (CLASSD(ipha_dst))
-				dst_ill = ipmp_illgrp_hold_cast_ill(illg);
-			else
-				dst_ill = ipmp_illgrp_hold_next_ill(illg);
-		} else {
-			dst_ill = ipif->ipif_ill;
-			ill_refhold(dst_ill);
-		}
-
-		if (dst_ill == NULL) {
-			if (ip_debug > 2) {
-				pr_addr_dbg("ip_newroute_ipif: no dst ill "
-				    "for dst %s\n", AF_INET, &dst);
-			}
-			goto err_ret;
-		}
-
-		/*
-		 * Pick a source address preferring non-deprecated ones.
-		 * Unlike ip_newroute, we don't do any source address
-		 * selection here since for multicast it really does not help
-		 * in inbound load spreading as in the unicast case.
-		 */
-		if ((flags & RTF_SETSRC) && (fire != NULL) &&
-		    (fire->ire_flags & RTF_SETSRC)) {
-			/*
-			 * As requested by flags, an IRE_OFFSUBNET was looked up
-			 * on that interface. This ire has RTF_SETSRC flag, so
-			 * the source address of the packet must be changed.
-			 * Check that the ipif matching the requested source
-			 * address still exists.
-			 */
-			src_ipif = ipif_lookup_addr(fire->ire_src_addr, NULL,
-			    zoneid, NULL, NULL, NULL, NULL, ipst);
-		}
-
-		unspec_src = (connp != NULL && connp->conn_unspec_src);
-
-		if (!IS_UNDER_IPMP(ipif->ipif_ill) &&
-		    (IS_IPMP(ipif->ipif_ill) ||
-		    (!ipif->ipif_isv6 && ipif->ipif_lcl_addr == INADDR_ANY) ||
-		    (ipif->ipif_flags & (IPIF_DEPRECATED|IPIF_UP)) != IPIF_UP ||
-		    (connp != NULL && ipif->ipif_zoneid != zoneid &&
-		    ipif->ipif_zoneid != ALL_ZONES)) &&
-		    (src_ipif == NULL) &&
-		    (!unspec_src || ipha->ipha_src != INADDR_ANY)) {
-			src_ipif = ipif_select_source(dst_ill, dst, zoneid);
-			if (src_ipif == NULL) {
-				if (ip_debug > 2) {
-					/* ip1dbg */
-					pr_addr_dbg("ip_newroute_ipif: "
-					    "no src for dst %s",
-					    AF_INET, &dst);
-				}
-				ip1dbg((" on interface %s\n",
-				    dst_ill->ill_name));
-				goto err_ret;
-			}
-			ipif_refrele(ipif);
-			ipif = src_ipif;
-			ipif_refhold(ipif);
-		}
-		if (src_ipif == NULL) {
-			src_ipif = ipif;
-			ipif_refhold(src_ipif);
-		}
-
-		/*
-		 * Assign a source address while we have the conn.
-		 * We can't have ip_wput_ire pick a source address when the
-		 * packet returns from arp since conn_unspec_src might be set
-		 * and we lose the conn when going through arp.
-		 */
-		if (ipha->ipha_src == INADDR_ANY && !unspec_src)
-			ipha->ipha_src = src_ipif->ipif_src_addr;
-
-		/*
-		 * In the case of IP_BOUND_IF and IP_PKTINFO, it is possible
-		 * that the outgoing interface does not have an interface ire.
-		 */
-		if (CLASSD(ipha_dst) && (connp == NULL ||
-		    connp->conn_outgoing_ill == NULL) &&
-		    infop->ip_opt_ill_index == 0) {
-			/* ipif_to_ire returns an held ire */
-			ire = ipif_to_ire(ipif);
-			if (ire == NULL)
-				goto err_ret;
-			if (ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE))
-				goto err_ret;
-			save_ire = ire;
-
-			ip2dbg(("ip_newroute_ipif: ire %p, ipif %p, "
-			    "flags %04x\n",
-			    (void *)ire, (void *)ipif, flags));
-			if ((flags & RTF_MULTIRT) && (fire != NULL) &&
-			    (fire->ire_flags & RTF_MULTIRT)) {
-				/*
-				 * As requested by flags, an IRE_OFFSUBNET was
-				 * looked up on that interface. This ire has
-				 * RTF_MULTIRT flag, so the resolution loop will
-				 * be re-entered to resolve additional routes on
-				 * other interfaces. For that purpose, a copy of
-				 * the packet is performed at this point.
-				 */
-				fire->ire_last_used_time = lbolt;
-				copy_mp = copymsg(first_mp);
-				if (copy_mp) {
-					MULTIRT_DEBUG_TAG(copy_mp);
-				}
-			}
-			if ((flags & RTF_SETSRC) && (fire != NULL) &&
-			    (fire->ire_flags & RTF_SETSRC)) {
-				/*
-				 * As requested by flags, an IRE_OFFSUBET was
-				 * looked up on that interface. This ire has
-				 * RTF_SETSRC flag, so the source address of the
-				 * packet must be changed.
-				 */
-				ipha->ipha_src = fire->ire_src_addr;
-			}
-		} else {
-			/*
-			 * The only ways we can come here are:
-			 * 1) IP_BOUND_IF socket option is set
-			 * 2) SO_DONTROUTE socket option is set
-			 * 3) IP_PKTINFO option is passed in as ancillary data.
-			 * In all cases, the new ire will not be added
-			 * into cache table.
-			 */
-			ASSERT(connp == NULL || connp->conn_dontroute ||
-			    connp->conn_outgoing_ill != NULL ||
-			    infop->ip_opt_ill_index != 0);
-			ire_marks |= IRE_MARK_NOADD;
-		}
-
-		switch (ipif->ipif_net_type) {
-		case IRE_IF_NORESOLVER: {
-			/* We have what we need to build an IRE_CACHE. */
-
-			if (dst_ill->ill_resolver_mp == NULL) {
-				ip1dbg(("ip_newroute_ipif: dst_ill %p "
-				    "for IRE_IF_NORESOLVER ire %p has "
-				    "no ill_resolver_mp\n",
-				    (void *)dst_ill, (void *)ire));
-				break;
-			}
-
-			/*
-			 * The new ire inherits the IRE_OFFSUBNET flags
-			 * and source address, if this was requested.
-			 */
-			ire = ire_create(
-			    (uchar_t *)&dst,		/* dest address */
-			    (uchar_t *)&ip_g_all_ones,	/* mask */
-			    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
-			    NULL,			/* gateway address */
-			    &ipif->ipif_mtu,
-			    NULL,			/* no src nce */
-			    dst_ill->ill_rq,		/* recv-from queue */
-			    dst_ill->ill_wq,		/* send-to queue */
-			    IRE_CACHE,
-			    src_ipif,
-			    (save_ire != NULL ? save_ire->ire_mask : 0),
-			    (fire != NULL) ?		/* Parent handle */
-			    fire->ire_phandle : 0,
-			    (save_ire != NULL) ?	/* Interface handle */
-			    save_ire->ire_ihandle : 0,
-			    (fire != NULL) ?
-			    (fire->ire_flags &
-			    (RTF_SETSRC | RTF_MULTIRT)) : 0,
-			    (save_ire == NULL ? &ire_uinfo_null :
-			    &save_ire->ire_uinfo),
-			    NULL,
-			    NULL,
-			    ipst);
-
-			if (ire == NULL) {
-				if (save_ire != NULL)
-					ire_refrele(save_ire);
-				break;
-			}
-
-			ire->ire_marks |= ire_marks;
-
-			/*
-			 * If IRE_MARK_NOADD is set then we need to convert
-			 * the max_fragp to a useable value now. This is
-			 * normally done in ire_add_v[46]. We also need to
-			 * associate the ire with an nce (normally would be
-			 * done in ip_wput_nondata()).
-			 *
-			 * Note that IRE_MARK_NOADD packets created here
-			 * do not have a non-null ire_mp pointer. The null
-			 * value of ire_bucket indicates that they were
-			 * never added.
-			 */
-			if (ire->ire_marks & IRE_MARK_NOADD) {
-				uint_t  max_frag;
-
-				max_frag = *ire->ire_max_fragp;
-				ire->ire_max_fragp = NULL;
-				ire->ire_max_frag = max_frag;
-
-				if ((ire->ire_nce = ndp_lookup_v4(
-				    ire_to_ill(ire),
-				    (ire->ire_gateway_addr != INADDR_ANY ?
-				    &ire->ire_gateway_addr : &ire->ire_addr),
-				    B_FALSE)) == NULL) {
-					if (save_ire != NULL)
-						ire_refrele(save_ire);
-					break;
-				}
-				ASSERT(ire->ire_nce->nce_state ==
-				    ND_REACHABLE);
-				NCE_REFHOLD_TO_REFHOLD_NOTR(ire->ire_nce);
-			}
-
-			/* Prevent save_ire from getting deleted */
-			if (save_ire != NULL) {
-				IRB_REFHOLD(save_ire->ire_bucket);
-				/* Has it been removed already ? */
-				if (save_ire->ire_marks & IRE_MARK_CONDEMNED) {
-					IRB_REFRELE(save_ire->ire_bucket);
-					ire_refrele(save_ire);
-					break;
-				}
-			}
-
-			ire_add_then_send(q, ire, first_mp);
-
-			/* Assert that save_ire is not deleted yet. */
-			if (save_ire != NULL) {
-				ASSERT(save_ire->ire_ptpn != NULL);
-				IRB_REFRELE(save_ire->ire_bucket);
-				ire_refrele(save_ire);
-				save_ire = NULL;
-			}
-			if (fire != NULL) {
-				ire_refrele(fire);
-				fire = NULL;
-			}
-
-			/*
-			 * the resolution loop is re-entered if this
-			 * was requested through flags and if we
-			 * actually are in a multirouting case.
-			 */
-			if ((flags & RTF_MULTIRT) && (copy_mp != NULL)) {
-				boolean_t need_resolve =
-				    ire_multirt_need_resolve(ipha_dst,
-				    msg_getlabel(copy_mp), ipst);
-				if (!need_resolve) {
-					MULTIRT_DEBUG_UNTAG(copy_mp);
-					freemsg(copy_mp);
-					copy_mp = NULL;
-				} else {
-					/*
-					 * ipif_lookup_group() calls
-					 * ire_lookup_multi() that uses
-					 * ire_ftable_lookup() to find
-					 * an IRE_INTERFACE for the group.
-					 * In the multirt case,
-					 * ire_lookup_multi() then invokes
-					 * ire_multirt_lookup() to find
-					 * the next resolvable ire.
-					 * As a result, we obtain an new
-					 * interface, derived from the
-					 * next ire.
-					 */
-					ipif_refrele(ipif);
-					ipif = ipif_lookup_group(ipha_dst,
-					    zoneid, ipst);
-					ip2dbg(("ip_newroute_ipif: "
-					    "multirt dst %08x, ipif %p\n",
-					    htonl(dst), (void *)ipif));
-					if (ipif != NULL) {
-						mp = copy_mp;
-						copy_mp = NULL;
-						multirt_resolve_next = B_TRUE;
-						continue;
-					} else {
-						freemsg(copy_mp);
-					}
-				}
-			}
-			if (ipif != NULL)
-				ipif_refrele(ipif);
-			ill_refrele(dst_ill);
-			ipif_refrele(src_ipif);
-			return;
-		}
-		case IRE_IF_RESOLVER:
-			/*
-			 * We can't build an IRE_CACHE yet, but at least
-			 * we found a resolver that can help.
-			 */
-			res_mp = dst_ill->ill_resolver_mp;
-			if (!OK_RESOLVER_MP(res_mp))
-				break;
-
-			/*
-			 * We obtain a partial IRE_CACHE which we will pass
-			 * along with the resolver query.  When the response
-			 * comes back it will be there ready for us to add.
-			 * The new ire inherits the IRE_OFFSUBNET flags
-			 * and source address, if this was requested.
-			 * The ire_max_frag is atomically set under the
-			 * irebucket lock in ire_add_v[46]. Only in the
-			 * case of IRE_MARK_NOADD, we set it here itself.
-			 */
-			ire = ire_create_mp(
-			    (uchar_t *)&dst,		/* dest address */
-			    (uchar_t *)&ip_g_all_ones,	/* mask */
-			    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
-			    NULL,			/* gateway address */
-			    (ire_marks & IRE_MARK_NOADD) ?
-			    ipif->ipif_mtu : 0,		/* max_frag */
-			    NULL,			/* no src nce */
-			    dst_ill->ill_rq,		/* recv-from queue */
-			    dst_ill->ill_wq,		/* send-to queue */
-			    IRE_CACHE,
-			    src_ipif,
-			    (save_ire != NULL ? save_ire->ire_mask : 0),
-			    (fire != NULL) ?		/* Parent handle */
-			    fire->ire_phandle : 0,
-			    (save_ire != NULL) ?	/* Interface handle */
-			    save_ire->ire_ihandle : 0,
-			    (fire != NULL) ?		/* flags if any */
-			    (fire->ire_flags &
-			    (RTF_SETSRC | RTF_MULTIRT)) : 0,
-			    (save_ire == NULL ? &ire_uinfo_null :
-			    &save_ire->ire_uinfo),
-			    NULL,
-			    NULL,
-			    ipst);
-
-			if (save_ire != NULL) {
-				ire_refrele(save_ire);
-				save_ire = NULL;
-			}
-			if (ire == NULL)
-				break;
-
-			ire->ire_marks |= ire_marks;
-			/*
-			 * Construct message chain for the resolver of the
-			 * form:
-			 *	ARP_REQ_MBLK-->IRE_MBLK-->Packet
-			 *
-			 * NOTE : ire will be added later when the response
-			 * comes back from ARP. If the response does not
-			 * come back, ARP frees the packet. For this reason,
-			 * we can't REFHOLD the bucket of save_ire to prevent
-			 * deletions. We may not be able to REFRELE the
-			 * bucket if the response never comes back.
-			 * Thus, before adding the ire, ire_add_v4 will make
-			 * sure that the interface route does not get deleted.
-			 * This is the only case unlike ip_newroute_v6,
-			 * ip_newroute_ipif_v6 where we can always prevent
-			 * deletions because ire_add_then_send is called after
-			 * creating the IRE.
-			 * If IRE_MARK_NOADD is set, then ire_add_then_send
-			 * does not add this IRE into the IRE CACHE.
-			 */
-			ASSERT(ire->ire_mp != NULL);
-			ire->ire_mp->b_cont = first_mp;
-			/* Have saved_mp handy, for cleanup if canput fails */
-			saved_mp = mp;
-			mp = copyb(res_mp);
-			if (mp == NULL) {
-				/* Prepare for cleanup */
-				mp = saved_mp; /* pkt */
-				ire_delete(ire); /* ire_mp */
-				ire = NULL;
-				if (copy_mp != NULL) {
-					MULTIRT_DEBUG_UNTAG(copy_mp);
-					freemsg(copy_mp);
-					copy_mp = NULL;
-				}
-				break;
-			}
-			linkb(mp, ire->ire_mp);
-
-			/*
-			 * Fill in the source and dest addrs for the resolver.
-			 * NOTE: this depends on memory layouts imposed by
-			 * ill_init().  There are corner cases above where we
-			 * might've created the IRE with an INADDR_ANY source
-			 * address (e.g., if the zeroth ipif on an underlying
-			 * ill in an IPMP group is 0.0.0.0, but another ipif
-			 * on the ill has a usable test address).  If so, tell
-			 * ARP to use ipha_src as its sender address.
-			 */
-			areq = (areq_t *)mp->b_rptr;
-			addrp = (ipaddr_t *)((char *)areq +
-			    areq->areq_sender_addr_offset);
-			if (ire->ire_src_addr != INADDR_ANY)
-				*addrp = ire->ire_src_addr;
-			else
-				*addrp = ipha->ipha_src;
-			addrp = (ipaddr_t *)((char *)areq +
-			    areq->areq_target_addr_offset);
-			*addrp = dst;
-			/* Up to the resolver. */
-			if (canputnext(dst_ill->ill_rq) &&
-			    !(dst_ill->ill_arp_closing)) {
-				putnext(dst_ill->ill_rq, mp);
-				/*
-				 * The response will come back in ip_wput
-				 * with db_type IRE_DB_TYPE.
-				 */
-			} else {
-				mp->b_cont = NULL;
-				freeb(mp); /* areq */
-				ire_delete(ire); /* ire_mp */
-				saved_mp->b_next = NULL;
-				saved_mp->b_prev = NULL;
-				freemsg(first_mp); /* pkt */
-				ip2dbg(("ip_newroute_ipif: dropped\n"));
-			}
-
-			if (fire != NULL) {
-				ire_refrele(fire);
-				fire = NULL;
-			}
-
-			/*
-			 * The resolution loop is re-entered if this was
-			 * requested through flags and we actually are
-			 * in a multirouting case.
-			 */
-			if ((flags & RTF_MULTIRT) && (copy_mp != NULL)) {
-				boolean_t need_resolve =
-				    ire_multirt_need_resolve(ipha_dst,
-				    msg_getlabel(copy_mp), ipst);
-				if (!need_resolve) {
-					MULTIRT_DEBUG_UNTAG(copy_mp);
-					freemsg(copy_mp);
-					copy_mp = NULL;
-				} else {
-					/*
-					 * ipif_lookup_group() calls
-					 * ire_lookup_multi() that uses
-					 * ire_ftable_lookup() to find
-					 * an IRE_INTERFACE for the group.
-					 * In the multirt case,
-					 * ire_lookup_multi() then invokes
-					 * ire_multirt_lookup() to find
-					 * the next resolvable ire.
-					 * As a result, we obtain an new
-					 * interface, derived from the
-					 * next ire.
-					 */
-					ipif_refrele(ipif);
-					ipif = ipif_lookup_group(ipha_dst,
-					    zoneid, ipst);
-					if (ipif != NULL) {
-						mp = copy_mp;
-						copy_mp = NULL;
-						multirt_resolve_next = B_TRUE;
-						continue;
-					} else {
-						freemsg(copy_mp);
-					}
-				}
-			}
-			if (ipif != NULL)
-				ipif_refrele(ipif);
-			ill_refrele(dst_ill);
-			ipif_refrele(src_ipif);
-			return;
-		default:
-			break;
-		}
-	} while (multirt_resolve_next);
-
-err_ret:
-	ip2dbg(("ip_newroute_ipif: dropped\n"));
-	if (fire != NULL)
-		ire_refrele(fire);
-	ipif_refrele(ipif);
-	/* Did this packet originate externally? */
-	if (dst_ill != NULL)
-		ill_refrele(dst_ill);
-	if (src_ipif != NULL)
-		ipif_refrele(src_ipif);
-	if (mp->b_prev || mp->b_next) {
-		mp->b_next = NULL;
-		mp->b_prev = NULL;
-	} else {
-		/*
-		 * Since ip_wput() isn't close to finished, we fill
-		 * in enough of the header for credible error reporting.
-		 */
-		if (ip_hdr_complete((ipha_t *)mp->b_rptr, zoneid, ipst)) {
-			/* Failed */
-			freemsg(first_mp);
-			if (ire != NULL)
-				ire_refrele(ire);
-			return;
-		}
-	}
-	/*
-	 * At this point we will have ire only if RTF_BLACKHOLE
-	 * or RTF_REJECT flags are set on the IRE. It will not
-	 * generate ICMP_HOST_UNREACHABLE if RTF_BLACKHOLE is set.
-	 */
-	if (ire != NULL) {
-		if (ire->ire_flags & RTF_BLACKHOLE) {
-			ire_refrele(ire);
-			freemsg(first_mp);
-			return;
-		}
-		ire_refrele(ire);
-	}
-	icmp_unreachable(q, first_mp, ICMP_HOST_UNREACHABLE, zoneid, ipst);
-}
-
 /* Name/Value Table Lookup Routine */
 char *
 ip_nv_lookup(nv_t *nv, int value)
@@ -9599,12 +5943,36 @@ ip_nv_lookup(nv_t *nv, int value)
 	return ("unknown");
 }
 
+static int
+ip_wait_for_info_ack(ill_t *ill)
+{
+	int err;
+
+	mutex_enter(&ill->ill_lock);
+	while (ill->ill_state_flags & ILL_LL_SUBNET_PENDING) {
+		/*
+		 * Return value of 0 indicates a pending signal.
+		 */
+		err = cv_wait_sig(&ill->ill_cv, &ill->ill_lock);
+		if (err == 0) {
+			mutex_exit(&ill->ill_lock);
+			return (EINTR);
+		}
+	}
+	mutex_exit(&ill->ill_lock);
+	/*
+	 * ip_rput_other could have set an error  in ill_error on
+	 * receipt of M_ERROR.
+	 */
+	return (ill->ill_error);
+}
+
 /*
  * This is a module open, i.e. this is a control stream for access
  * to a DLPI device.  We allocate an ill_t as the instance data in
  * this case.
  */
-int
+static int
 ip_modopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 {
 	ill_t	*ill;
@@ -9644,6 +6012,7 @@ ip_modopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 * down a DL_INFO_REQ after calling qprocson.
 	 */
 	err = ill_init(q, ill);
+
 	if (err != 0) {
 		mi_free(ill);
 		netstack_rele(ipst->ips_netstack);
@@ -9652,41 +6021,26 @@ ip_modopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		return (err);
 	}
 
-	/* ill_init initializes the ipsq marking this thread as writer */
-	ipsq_exit(ill->ill_phyint->phyint_ipsq);
-	/* Wait for the DL_INFO_ACK */
-	mutex_enter(&ill->ill_lock);
-	while (ill->ill_state_flags & ILL_LL_SUBNET_PENDING) {
-		/*
-		 * Return value of 0 indicates a pending signal.
-		 */
-		err = cv_wait_sig(&ill->ill_cv, &ill->ill_lock);
-		if (err == 0) {
-			mutex_exit(&ill->ill_lock);
-			(void) ip_close(q, 0);
-			return (EINTR);
-		}
-	}
-	mutex_exit(&ill->ill_lock);
-
 	/*
-	 * ip_rput_other could have set an error  in ill_error on
-	 * receipt of M_ERROR.
+	 * Wait for the DL_INFO_ACK if a DL_INFO_REQ was sent.
+	 *
+	 * ill_init initializes the ipsq marking this thread as
+	 * writer
 	 */
+	ipsq_exit(ill->ill_phyint->phyint_ipsq);
+	err = ip_wait_for_info_ack(ill);
+	if (err == 0)
+		ill->ill_credp = credp;
+	else
+		goto fail;
 
-	err = ill->ill_error;
-	if (err != 0) {
-		(void) ip_close(q, 0);
-		return (err);
-	}
-
-	ill->ill_credp = credp;
 	crhold(credp);
 
 	mutex_enter(&ipst->ips_ip_mi_lock);
-	err = mi_open_link(&ipst->ips_ip_g_head, (IDP)ill, devp, flag, sflag,
-	    credp);
+	err = mi_open_link(&ipst->ips_ip_g_head, (IDP)q->q_ptr, devp, flag,
+	    sflag, credp);
 	mutex_exit(&ipst->ips_ip_mi_lock);
+fail:
 	if (err) {
 		(void) ip_close(q, 0);
 		return (err);
@@ -9718,8 +6072,6 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	zoneid_t	zoneid;
 	netstack_t	*ns;
 	ip_stack_t	*ipst;
-
-	TRACE_1(TR_FAC_IP, TR_IP_OPEN, "ip_open: q %p", q);
 
 	/* Allow reopen. */
 	if (q->q_ptr != NULL)
@@ -9765,25 +6117,24 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	 */
 	netstack_rele(ipst->ips_netstack);
 
+	connp->conn_ixa->ixa_flags |= IXAF_MULTICAST_LOOP | IXAF_SET_ULP_CKSUM;
+	/* conn_allzones can not be set this early, hence no IPCL_ZONEID */
+	connp->conn_ixa->ixa_zoneid = zoneid;
 	connp->conn_zoneid = zoneid;
-	connp->conn_sqp = NULL;
-	connp->conn_initial_sqp = NULL;
-	connp->conn_final_sqp = NULL;
 
-	connp->conn_upq = q;
+	connp->conn_rq = q;
 	q->q_ptr = WR(q)->q_ptr = connp;
-
-	if (flag & SO_SOCKSTR)
-		connp->conn_flags |= IPCL_SOCKET;
 
 	/* Minor tells us which /dev entry was opened */
 	if (isv6) {
-		connp->conn_af_isv6 = B_TRUE;
-		ip_setpktversion(connp, isv6, B_FALSE, ipst);
-		connp->conn_src_preferences = IPV6_PREFER_SRC_DEFAULT;
+		connp->conn_family = AF_INET6;
+		connp->conn_ipversion = IPV6_VERSION;
+		connp->conn_ixa->ixa_flags &= ~IXAF_IS_IPV4;
+		connp->conn_ixa->ixa_src_preferences = IPV6_PREFER_SRC_DEFAULT;
 	} else {
-		connp->conn_af_isv6 = B_FALSE;
-		connp->conn_pkt_isv6 = B_FALSE;
+		connp->conn_family = AF_INET;
+		connp->conn_ipversion = IPV4_VERSION;
+		connp->conn_ixa->ixa_flags |= IXAF_IS_IPV4;
 	}
 
 	if ((ip_minor_arena_la != NULL) && (flag & SO_SOCKSTR) &&
@@ -9812,11 +6163,17 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	 * connp->conn_cred is crfree()ed in ipcl_conn_destroy()
 	 */
 	connp->conn_cred = credp;
+	/* Cache things in ixa without an extra refhold */
+	connp->conn_ixa->ixa_cred = connp->conn_cred;
+	connp->conn_ixa->ixa_cpid = connp->conn_cpid;
+	if (is_system_labeled())
+		connp->conn_ixa->ixa_tsl = crgetlabel(connp->conn_cred);
 
 	/*
-	 * Handle IP_RTS_REQUEST and other ioctls which use conn_recv
+	 * Handle IP_IOC_RTS_REQUEST and other ioctls which use conn_recv
 	 */
 	connp->conn_recv = ip_conn_input;
+	connp->conn_recvicmp = ip_conn_input_icmp;
 
 	crhold(connp->conn_cred);
 
@@ -9827,11 +6184,13 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
 		connp->conn_mac_mode = CONN_MAC_AWARE;
 
+	connp->conn_zone_is_global = (crgetzoneid(credp) == GLOBAL_ZONEID);
+
 	connp->conn_rq = q;
 	connp->conn_wq = WR(q);
 
 	/* Non-zero default values */
-	connp->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
+	connp->conn_ixa->ixa_flags |= IXAF_MULTICAST_LOOP;
 
 	/*
 	 * Make the conn globally visible to walkers
@@ -9844,210 +6203,6 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	qprocson(q);
 
 	return (0);
-}
-
-/*
- * Change the output format (IPv4 vs. IPv6) for a conn_t.
- * Note that there is no race since either ip_output function works - it
- * is just an optimization to enter the best ip_output routine directly.
- */
-void
-ip_setpktversion(conn_t *connp, boolean_t isv6, boolean_t bump_mib,
-    ip_stack_t *ipst)
-{
-	if (isv6)  {
-		if (bump_mib) {
-			BUMP_MIB(&ipst->ips_ip6_mib,
-			    ipIfStatsOutSwitchIPVersion);
-		}
-		connp->conn_send = ip_output_v6;
-		connp->conn_pkt_isv6 = B_TRUE;
-	} else {
-		if (bump_mib) {
-			BUMP_MIB(&ipst->ips_ip_mib,
-			    ipIfStatsOutSwitchIPVersion);
-		}
-		connp->conn_send = ip_output;
-		connp->conn_pkt_isv6 = B_FALSE;
-	}
-
-}
-
-/*
- * See if IPsec needs loading because of the options in mp.
- */
-static boolean_t
-ipsec_opt_present(mblk_t *mp)
-{
-	uint8_t *optcp, *next_optcp, *opt_endcp;
-	struct opthdr *opt;
-	struct T_opthdr *topt;
-	int opthdr_len;
-	t_uscalar_t optname, optlevel;
-	struct T_optmgmt_req *tor = (struct T_optmgmt_req *)mp->b_rptr;
-	ipsec_req_t *ipsr;
-
-	/*
-	 * Walk through the mess, and find IP_SEC_OPT.  If it's there,
-	 * return TRUE.
-	 */
-
-	optcp = mi_offset_param(mp, tor->OPT_offset, tor->OPT_length);
-	opt_endcp = optcp + tor->OPT_length;
-	if (tor->PRIM_type == T_OPTMGMT_REQ) {
-		opthdr_len = sizeof (struct T_opthdr);
-	} else {		/* O_OPTMGMT_REQ */
-		ASSERT(tor->PRIM_type == T_SVR4_OPTMGMT_REQ);
-		opthdr_len = sizeof (struct opthdr);
-	}
-	for (; optcp < opt_endcp; optcp = next_optcp) {
-		if (optcp + opthdr_len > opt_endcp)
-			return (B_FALSE);	/* Not enough option header. */
-		if (tor->PRIM_type == T_OPTMGMT_REQ) {
-			topt = (struct T_opthdr *)optcp;
-			optlevel = topt->level;
-			optname = topt->name;
-			next_optcp = optcp + _TPI_ALIGN_TOPT(topt->len);
-		} else {
-			opt = (struct opthdr *)optcp;
-			optlevel = opt->level;
-			optname = opt->name;
-			next_optcp = optcp + opthdr_len +
-			    _TPI_ALIGN_OPT(opt->len);
-		}
-		if ((next_optcp < optcp) || /* wraparound pointer space */
-		    ((next_optcp >= opt_endcp) && /* last option bad len */
-		    ((next_optcp - opt_endcp) >= __TPI_ALIGN_SIZE)))
-			return (B_FALSE); /* bad option buffer */
-		if ((optlevel == IPPROTO_IP && optname == IP_SEC_OPT) ||
-		    (optlevel == IPPROTO_IPV6 && optname == IPV6_SEC_OPT)) {
-			/*
-			 * Check to see if it's an all-bypass or all-zeroes
-			 * IPsec request.  Don't bother loading IPsec if
-			 * the socket doesn't want to use it.  (A good example
-			 * is a bypass request.)
-			 *
-			 * Basically, if any of the non-NEVER bits are set,
-			 * load IPsec.
-			 */
-			ipsr = (ipsec_req_t *)(optcp + opthdr_len);
-			if ((ipsr->ipsr_ah_req & ~IPSEC_PREF_NEVER) != 0 ||
-			    (ipsr->ipsr_esp_req & ~IPSEC_PREF_NEVER) != 0 ||
-			    (ipsr->ipsr_self_encap_req & ~IPSEC_PREF_NEVER)
-			    != 0)
-				return (B_TRUE);
-		}
-	}
-	return (B_FALSE);
-}
-
-/*
- * If conn is is waiting for ipsec to finish loading, kick it.
- */
-/* ARGSUSED */
-static void
-conn_restart_ipsec_waiter(conn_t *connp, void *arg)
-{
-	t_scalar_t	optreq_prim;
-	mblk_t		*mp;
-	cred_t		*cr;
-	int		err = 0;
-
-	/*
-	 * This function is called, after ipsec loading is complete.
-	 * Since IP checks exclusively and atomically (i.e it prevents
-	 * ipsec load from completing until ip_optcom_req completes)
-	 * whether ipsec load is complete, there cannot be a race with IP
-	 * trying to set the CONN_IPSEC_LOAD_WAIT flag on any conn now.
-	 */
-	mutex_enter(&connp->conn_lock);
-	if (connp->conn_state_flags & CONN_IPSEC_LOAD_WAIT) {
-		ASSERT(connp->conn_ipsec_opt_mp != NULL);
-		mp = connp->conn_ipsec_opt_mp;
-		connp->conn_ipsec_opt_mp = NULL;
-		connp->conn_state_flags  &= ~CONN_IPSEC_LOAD_WAIT;
-		mutex_exit(&connp->conn_lock);
-
-		/*
-		 * All Solaris components should pass a db_credp
-		 * for this TPI message, hence we ASSERT.
-		 * But in case there is some other M_PROTO that looks
-		 * like a TPI message sent by some other kernel
-		 * component, we check and return an error.
-		 */
-		cr = msg_getcred(mp, NULL);
-		ASSERT(cr != NULL);
-		if (cr == NULL) {
-			mp = mi_tpi_err_ack_alloc(mp, TSYSERR, EINVAL);
-			if (mp != NULL)
-				qreply(connp->conn_wq, mp);
-			return;
-		}
-
-		ASSERT(DB_TYPE(mp) == M_PROTO || DB_TYPE(mp) == M_PCPROTO);
-
-		optreq_prim = ((union T_primitives *)mp->b_rptr)->type;
-		if (optreq_prim == T_OPTMGMT_REQ) {
-			err = tpi_optcom_req(CONNP_TO_WQ(connp), mp, cr,
-			    &ip_opt_obj, B_FALSE);
-		} else {
-			ASSERT(optreq_prim == T_SVR4_OPTMGMT_REQ);
-			err = svr4_optcom_req(CONNP_TO_WQ(connp), mp, cr,
-			    &ip_opt_obj, B_FALSE);
-		}
-		if (err != EINPROGRESS)
-			CONN_OPER_PENDING_DONE(connp);
-		return;
-	}
-	mutex_exit(&connp->conn_lock);
-}
-
-/*
- * Called from the ipsec_loader thread, outside any perimeter, to tell
- * ip qenable any of the queues waiting for the ipsec loader to
- * complete.
- */
-void
-ip_ipsec_load_complete(ipsec_stack_t *ipss)
-{
-	netstack_t *ns = ipss->ipsec_netstack;
-
-	ipcl_walk(conn_restart_ipsec_waiter, NULL, ns->netstack_ip);
-}
-
-/*
- * Can't be used. Need to call svr4* -> optset directly. the leaf routine
- * determines the grp on which it has to become exclusive, queues the mp
- * and IPSQ draining restarts the optmgmt
- */
-static boolean_t
-ip_check_for_ipsec_opt(queue_t *q, mblk_t *mp)
-{
-	conn_t *connp = Q_TO_CONN(q);
-	ipsec_stack_t *ipss = connp->conn_netstack->netstack_ipsec;
-
-	/*
-	 * Take IPsec requests and treat them special.
-	 */
-	if (ipsec_opt_present(mp)) {
-		/* First check if IPsec is loaded. */
-		mutex_enter(&ipss->ipsec_loader_lock);
-		if (ipss->ipsec_loader_state != IPSEC_LOADER_WAIT) {
-			mutex_exit(&ipss->ipsec_loader_lock);
-			return (B_FALSE);
-		}
-		mutex_enter(&connp->conn_lock);
-		connp->conn_state_flags |= CONN_IPSEC_LOAD_WAIT;
-
-		ASSERT(connp->conn_ipsec_opt_mp == NULL);
-		connp->conn_ipsec_opt_mp = mp;
-		mutex_exit(&connp->conn_lock);
-		mutex_exit(&ipss->ipsec_loader_lock);
-
-		ipsec_loader_loadnow(ipss);
-		return (B_TRUE);
-	}
-	return (B_FALSE);
 }
 
 /*
@@ -10149,15 +6304,14 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 		}
 	}
 
-	mutex_enter(&connp->conn_lock);
+	ASSERT(MUTEX_HELD(&connp->conn_lock));
 
 	/*
-	 * If we have already cached policies in ip_bind_connected*(), don't
+	 * If we have already cached policies in conn_connect(), don't
 	 * let them change now. We cache policies for connections
 	 * whose src,dst [addr, port] is known.
 	 */
 	if (connp->conn_policy_cached) {
-		mutex_exit(&connp->conn_lock);
 		return (EINVAL);
 	}
 
@@ -10171,10 +6325,8 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 			IPPH_REFRELE(connp->conn_policy, ipst->ips_netstack);
 			connp->conn_policy = NULL;
 		}
-		connp->conn_flags &= ~IPCL_CHECK_POLICY;
 		connp->conn_in_enforce_policy = B_FALSE;
 		connp->conn_out_enforce_policy = B_FALSE;
-		mutex_exit(&connp->conn_lock);
 		return (0);
 	}
 
@@ -10203,7 +6355,7 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 	 * We're looking at a v6 socket, also insert the v6-specific
 	 * entries.
 	 */
-	if (connp->conn_af_isv6) {
+	if (connp->conn_family == AF_INET6) {
 		if (!ipsec_polhead_insert(ph, actp, nact, IPSEC_AF_V6,
 		    IPSEC_TYPE_INBOUND, ns))
 			goto enomem;
@@ -10217,10 +6369,10 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 	/*
 	 * If the requests need security, set enforce_policy.
 	 * If the requests are IPSEC_PREF_NEVER, one should
-	 * still set conn_out_enforce_policy so that an ipsec_out
-	 * gets attached in ip_wput. This is needed so that
-	 * for connections that we don't cache policy in ip_bind,
-	 * if global policy matches in ip_wput_attach_policy, we
+	 * still set conn_out_enforce_policy so that ip_set_destination
+	 * marks the ip_xmit_attr_t appropriatly. This is needed so that
+	 * for connections that we don't cache policy in at connect time,
+	 * if global policy matches in ip_output_attach_policy, we
 	 * don't wrongly inherit global policy. Similarly, we need
 	 * to set conn_in_enforce_policy also so that we don't verify
 	 * policy wrongly.
@@ -10230,10 +6382,8 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 	    (se_req & REQ_MASK) != 0) {
 		connp->conn_in_enforce_policy = B_TRUE;
 		connp->conn_out_enforce_policy = B_TRUE;
-		connp->conn_flags |= IPCL_CHECK_POLICY;
 	}
 
-	mutex_exit(&connp->conn_lock);
 	return (error);
 #undef REQ_MASK
 
@@ -10241,7 +6391,6 @@ ipsec_set_req(cred_t *cr, conn_t *connp, ipsec_req_t *req)
 	 * Common memory-allocation-failure exit path.
 	 */
 enomem:
-	mutex_exit(&connp->conn_lock);
 	if (actp != NULL)
 		ipsec_actvec_free(actp, nact);
 	if (is_pol_inserted)
@@ -10250,1250 +6399,283 @@ enomem:
 }
 
 /*
- * Only for options that pass in an IP addr. Currently only V4 options
- * pass in an ipif. V6 options always pass an ifindex specifying the ill.
- * So this function assumes level is IPPROTO_IP
+ * Set socket options for joining and leaving multicast groups.
+ * Common to IPv4 and IPv6; inet6 indicates the type of socket.
+ * The caller has already check that the option name is consistent with
+ * the address family of the socket.
  */
 int
-ip_opt_set_ipif(conn_t *connp, ipaddr_t addr, boolean_t checkonly, int option,
-    mblk_t *first_mp)
-{
-	ipif_t *ipif = NULL;
-	int error;
-	ill_t *ill;
-	int zoneid;
-	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
-
-	ip2dbg(("ip_opt_set_ipif: ipaddr %X\n", addr));
-
-	if (addr != INADDR_ANY || checkonly) {
-		ASSERT(connp != NULL);
-		zoneid = IPCL_ZONEID(connp);
-		if (option == IP_NEXTHOP) {
-			ipif = ipif_lookup_onlink_addr(addr,
-			    connp->conn_zoneid, ipst);
-		} else {
-			ipif = ipif_lookup_addr(addr, NULL, zoneid,
-			    CONNP_TO_WQ(connp), first_mp, ip_restart_optmgmt,
-			    &error, ipst);
-		}
-		if (ipif == NULL) {
-			if (error == EINPROGRESS)
-				return (error);
-			if ((option == IP_MULTICAST_IF) ||
-			    (option == IP_NEXTHOP))
-				return (EHOSTUNREACH);
-			else
-				return (EINVAL);
-		} else if (checkonly) {
-			if (option == IP_MULTICAST_IF) {
-				ill = ipif->ipif_ill;
-				/* not supported by the virtual network iface */
-				if (IS_VNI(ill)) {
-					ipif_refrele(ipif);
-					return (EINVAL);
-				}
-			}
-			ipif_refrele(ipif);
-			return (0);
-		}
-		ill = ipif->ipif_ill;
-		mutex_enter(&connp->conn_lock);
-		mutex_enter(&ill->ill_lock);
-		if ((ill->ill_state_flags & ILL_CONDEMNED) ||
-		    (ipif->ipif_state_flags & IPIF_CONDEMNED)) {
-			mutex_exit(&ill->ill_lock);
-			mutex_exit(&connp->conn_lock);
-			ipif_refrele(ipif);
-			return (option == IP_MULTICAST_IF ?
-			    EHOSTUNREACH : EINVAL);
-		}
-	} else {
-		mutex_enter(&connp->conn_lock);
-	}
-
-	/* None of the options below are supported on the VNI */
-	if (ipif != NULL && IS_VNI(ipif->ipif_ill)) {
-		mutex_exit(&ill->ill_lock);
-		mutex_exit(&connp->conn_lock);
-		ipif_refrele(ipif);
-		return (EINVAL);
-	}
-
-	switch (option) {
-	case IP_MULTICAST_IF:
-		connp->conn_multicast_ipif = ipif;
-		break;
-	case IP_NEXTHOP:
-		connp->conn_nexthop_v4 = addr;
-		connp->conn_nexthop_set = B_TRUE;
-		break;
-	}
-
-	if (ipif != NULL) {
-		mutex_exit(&ill->ill_lock);
-		mutex_exit(&connp->conn_lock);
-		ipif_refrele(ipif);
-		return (0);
-	}
-	mutex_exit(&connp->conn_lock);
-	/* We succeded in cleared the option */
-	return (0);
-}
-
-/*
- * For options that pass in an ifindex specifying the ill. V6 options always
- * pass in an ill. Some v4 options also pass in ifindex specifying the ill.
- */
-int
-ip_opt_set_ill(conn_t *connp, int ifindex, boolean_t isv6, boolean_t checkonly,
-    int level, int option, mblk_t *first_mp)
-{
-	ill_t *ill = NULL;
-	int error = 0;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	ip2dbg(("ip_opt_set_ill: ifindex %d\n", ifindex));
-	if (ifindex != 0) {
-		ASSERT(connp != NULL);
-		ill = ill_lookup_on_ifindex(ifindex, isv6, CONNP_TO_WQ(connp),
-		    first_mp, ip_restart_optmgmt, &error, ipst);
-		if (ill != NULL) {
-			if (checkonly) {
-				/* not supported by the virtual network iface */
-				if (IS_VNI(ill)) {
-					ill_refrele(ill);
-					return (EINVAL);
-				}
-				ill_refrele(ill);
-				return (0);
-			}
-			if (!ipif_lookup_zoneid(ill, connp->conn_zoneid,
-			    0, NULL)) {
-				ill_refrele(ill);
-				ill = NULL;
-				mutex_enter(&connp->conn_lock);
-				goto setit;
-			}
-			mutex_enter(&connp->conn_lock);
-			mutex_enter(&ill->ill_lock);
-			if (ill->ill_state_flags & ILL_CONDEMNED) {
-				mutex_exit(&ill->ill_lock);
-				mutex_exit(&connp->conn_lock);
-				ill_refrele(ill);
-				ill = NULL;
-				mutex_enter(&connp->conn_lock);
-			}
-			goto setit;
-		} else if (error == EINPROGRESS) {
-			return (error);
-		} else {
-			error = 0;
-		}
-	}
-	mutex_enter(&connp->conn_lock);
-setit:
-	ASSERT((level == IPPROTO_IP || level == IPPROTO_IPV6));
-
-	/*
-	 * The options below assume that the ILL (if any) transmits and/or
-	 * receives traffic. Neither of which is true for the virtual network
-	 * interface, so fail setting these on a VNI.
-	 */
-	if (IS_VNI(ill)) {
-		ASSERT(ill != NULL);
-		mutex_exit(&ill->ill_lock);
-		mutex_exit(&connp->conn_lock);
-		ill_refrele(ill);
-		return (EINVAL);
-	}
-
-	if (level == IPPROTO_IP) {
-		switch (option) {
-		case IP_BOUND_IF:
-			connp->conn_incoming_ill = ill;
-			connp->conn_outgoing_ill = ill;
-			break;
-
-		case IP_MULTICAST_IF:
-			/*
-			 * This option is an internal special. The socket
-			 * level IP_MULTICAST_IF specifies an 'ipaddr' and
-			 * is handled in ip_opt_set_ipif. IPV6_MULTICAST_IF
-			 * specifies an ifindex and we try first on V6 ill's.
-			 * If we don't find one, we they try using on v4 ill's
-			 * intenally and we come here.
-			 */
-			if (!checkonly && ill != NULL) {
-				ipif_t	*ipif;
-				ipif = ill->ill_ipif;
-
-				if (ipif->ipif_state_flags & IPIF_CONDEMNED) {
-					mutex_exit(&ill->ill_lock);
-					mutex_exit(&connp->conn_lock);
-					ill_refrele(ill);
-					ill = NULL;
-					mutex_enter(&connp->conn_lock);
-				} else {
-					connp->conn_multicast_ipif = ipif;
-				}
-			}
-			break;
-
-		case IP_DHCPINIT_IF:
-			if (connp->conn_dhcpinit_ill != NULL) {
-				/*
-				 * We've locked the conn so conn_cleanup_ill()
-				 * cannot clear conn_dhcpinit_ill -- so it's
-				 * safe to access the ill.
-				 */
-				ill_t *oill = connp->conn_dhcpinit_ill;
-
-				ASSERT(oill->ill_dhcpinit != 0);
-				atomic_dec_32(&oill->ill_dhcpinit);
-				connp->conn_dhcpinit_ill = NULL;
-			}
-
-			if (ill != NULL) {
-				connp->conn_dhcpinit_ill = ill;
-				atomic_inc_32(&ill->ill_dhcpinit);
-			}
-			break;
-		}
-	} else {
-		switch (option) {
-		case IPV6_BOUND_IF:
-			connp->conn_incoming_ill = ill;
-			connp->conn_outgoing_ill = ill;
-			break;
-
-		case IPV6_MULTICAST_IF:
-			/*
-			 * Set conn_multicast_ill to be the IPv6 ill.
-			 * Set conn_multicast_ipif to be an IPv4 ipif
-			 * for ifindex to make IPv4 mapped addresses
-			 * on PF_INET6 sockets honor IPV6_MULTICAST_IF.
-			 * Even if no IPv6 ill exists for the ifindex
-			 * we need to check for an IPv4 ifindex in order
-			 * for this to work with mapped addresses. In that
-			 * case only set conn_multicast_ipif.
-			 */
-			if (!checkonly) {
-				if (ifindex == 0) {
-					connp->conn_multicast_ill = NULL;
-					connp->conn_multicast_ipif = NULL;
-				} else if (ill != NULL) {
-					connp->conn_multicast_ill = ill;
-				}
-			}
-			break;
-		}
-	}
-
-	if (ill != NULL) {
-		mutex_exit(&ill->ill_lock);
-		mutex_exit(&connp->conn_lock);
-		ill_refrele(ill);
-		return (0);
-	}
-	mutex_exit(&connp->conn_lock);
-	/*
-	 * We succeeded in clearing the option (ifindex == 0) or failed to
-	 * locate the ill and could not set the option (ifindex != 0)
-	 */
-	return (ifindex == 0 ? 0 : EINVAL);
-}
-
-/* This routine sets socket options. */
-/* ARGSUSED */
-int
-ip_opt_set(queue_t *q, uint_t optset_context, int level, int name,
-    uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
-    void *dummy, cred_t *cr, mblk_t *first_mp)
+ip_opt_set_multicast_group(conn_t *connp, t_scalar_t name,
+    uchar_t *invalp, boolean_t inet6, boolean_t checkonly)
 {
 	int		*i1 = (int *)invalp;
-	conn_t		*connp = Q_TO_CONN(q);
 	int		error = 0;
-	boolean_t	checkonly;
-	ire_t		*ire;
-	boolean_t	found;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
+	struct ip_mreq	*v4_mreqp;
+	struct ipv6_mreq *v6_mreqp;
+	struct group_req *greqp;
+	ire_t *ire;
+	boolean_t done = B_FALSE;
+	ipaddr_t ifaddr;
+	in6_addr_t v6group;
+	uint_t ifindex;
+	boolean_t mcast_opt = B_TRUE;
+	mcast_record_t fmode;
+	int (*optfn)(conn_t *, boolean_t, const in6_addr_t *,
+	    ipaddr_t, uint_t, mcast_record_t, const in6_addr_t *);
 
-	switch (optset_context) {
-
-	case SETFN_OPTCOM_CHECKONLY:
-		checkonly = B_TRUE;
-		/*
-		 * Note: Implies T_CHECK semantics for T_OPTCOM_REQ
-		 * inlen != 0 implies value supplied and
-		 * 	we have to "pretend" to set it.
-		 * inlen == 0 implies that there is no
-		 * 	value part in T_CHECK request and just validation
-		 * done elsewhere should be enough, we just return here.
-		 */
-		if (inlen == 0) {
-			*outlenp = 0;
-			return (0);
-		}
+	switch (name) {
+	case IP_ADD_MEMBERSHIP:
+	case IPV6_JOIN_GROUP:
+		mcast_opt = B_FALSE;
+		/* FALLTHRU */
+	case MCAST_JOIN_GROUP:
+		fmode = MODE_IS_EXCLUDE;
+		optfn = ip_opt_add_group;
 		break;
-	case SETFN_OPTCOM_NEGOTIATE:
-	case SETFN_UD_NEGOTIATE:
-	case SETFN_CONN_NEGOTIATE:
-		checkonly = B_FALSE;
-		break;
-	default:
-		/*
-		 * We should never get here
-		 */
-		*outlenp = 0;
-		return (EINVAL);
-	}
 
-	ASSERT((optset_context != SETFN_OPTCOM_CHECKONLY) ||
-	    (optset_context == SETFN_OPTCOM_CHECKONLY && inlen != 0));
-
-	/*
-	 * For fixed length options, no sanity check
-	 * of passed in length is done. It is assumed *_optcom_req()
-	 * routines do the right thing.
-	 */
-
-	switch (level) {
-	case SOL_SOCKET:
-		/*
-		 * conn_lock protects the bitfields, and is used to
-		 * set the fields atomically.
-		 */
-		switch (name) {
-		case SO_BROADCAST:
-			if (!checkonly) {
-				/* TODO: use value someplace? */
-				mutex_enter(&connp->conn_lock);
-				connp->conn_broadcast = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case SO_USELOOPBACK:
-			if (!checkonly) {
-				/* TODO: use value someplace? */
-				mutex_enter(&connp->conn_lock);
-				connp->conn_loopback = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case SO_DONTROUTE:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_dontroute = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case SO_REUSEADDR:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_reuseaddr = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case SO_PROTOTYPE:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_proto = *i1;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case SO_ALLZONES:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				if (IPCL_IS_BOUND(connp)) {
-					mutex_exit(&connp->conn_lock);
-					return (EINVAL);
-				}
-				connp->conn_allzones = *i1 != 0 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case SO_ANON_MLP:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_anon_mlp = *i1 != 0 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case SO_MAC_EXEMPT:
-			if (secpolicy_net_mac_aware(cr) != 0 ||
-			    IPCL_IS_BOUND(connp))
-				return (EACCES);
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_mac_mode = *i1 != 0 ?
-				    CONN_MAC_AWARE : CONN_MAC_DEFAULT;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case SO_MAC_IMPLICIT:
-			if (secpolicy_net_mac_implicit(cr) != 0)
-				return (EACCES);
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_mac_mode = *i1 != 0 ?
-				    CONN_MAC_IMPLICIT : CONN_MAC_DEFAULT;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		default:
-			/*
-			 * "soft" error (negative)
-			 * option not handled at this level
-			 * Note: Do not modify *outlenp
-			 */
-			return (-EINVAL);
-		}
-		break;
-	case IPPROTO_IP:
-		switch (name) {
-		case IP_NEXTHOP:
-			if (secpolicy_ip_config(cr, B_FALSE) != 0)
-				return (EPERM);
-			/* FALLTHRU */
-		case IP_MULTICAST_IF: {
-			ipaddr_t addr = *i1;
-
-			error = ip_opt_set_ipif(connp, addr, checkonly, name,
-			    first_mp);
-			if (error != 0)
-				return (error);
-			break;	/* goto sizeof (int) option return */
-		}
-
-		case IP_MULTICAST_TTL:
-			/* Recorded in transport above IP */
-			*outvalp = *invalp;
-			*outlenp = sizeof (uchar_t);
-			return (0);
-		case IP_MULTICAST_LOOP:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_multicast_loop = *invalp ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			*outvalp = *invalp;
-			*outlenp = sizeof (uchar_t);
-			return (0);
-		case IP_ADD_MEMBERSHIP:
-		case MCAST_JOIN_GROUP:
-		case IP_DROP_MEMBERSHIP:
-		case MCAST_LEAVE_GROUP: {
-			struct ip_mreq *mreqp;
-			struct group_req *greqp;
-			ire_t *ire;
-			boolean_t done = B_FALSE;
-			ipaddr_t group, ifaddr;
-			struct sockaddr_in *sin;
-			uint32_t *ifindexp;
-			boolean_t mcast_opt = B_TRUE;
-			mcast_record_t fmode;
-			int (*optfn)(conn_t *, boolean_t, ipaddr_t, ipaddr_t,
-			    uint_t *, mcast_record_t, ipaddr_t, mblk_t *);
-
-			switch (name) {
-			case IP_ADD_MEMBERSHIP:
-				mcast_opt = B_FALSE;
-				/* FALLTHRU */
-			case MCAST_JOIN_GROUP:
-				fmode = MODE_IS_EXCLUDE;
-				optfn = ip_opt_add_group;
-				break;
-
-			case IP_DROP_MEMBERSHIP:
-				mcast_opt = B_FALSE;
-				/* FALLTHRU */
-			case MCAST_LEAVE_GROUP:
-				fmode = MODE_IS_INCLUDE;
-				optfn = ip_opt_delete_group;
-				break;
-			}
-
-			if (mcast_opt) {
-				greqp = (struct group_req *)i1;
-				sin = (struct sockaddr_in *)&greqp->gr_group;
-				if (sin->sin_family != AF_INET) {
-					*outlenp = 0;
-					return (ENOPROTOOPT);
-				}
-				group = (ipaddr_t)sin->sin_addr.s_addr;
-				ifaddr = INADDR_ANY;
-				ifindexp = &greqp->gr_interface;
-			} else {
-				mreqp = (struct ip_mreq *)i1;
-				group = (ipaddr_t)mreqp->imr_multiaddr.s_addr;
-				ifaddr = (ipaddr_t)mreqp->imr_interface.s_addr;
-				ifindexp = NULL;
-			}
-
-			/*
-			 * In the multirouting case, we need to replicate
-			 * the request on all interfaces that will take part
-			 * in replication.  We do so because multirouting is
-			 * reflective, thus we will probably receive multi-
-			 * casts on those interfaces.
-			 * The ip_multirt_apply_membership() succeeds if the
-			 * operation succeeds on at least one interface.
-			 */
-			ire = ire_ftable_lookup(group, IP_HOST_MASK, 0,
-			    IRE_HOST, NULL, NULL, ALL_ZONES, 0, NULL,
-			    MATCH_IRE_MASK | MATCH_IRE_TYPE, ipst);
-			if (ire != NULL) {
-				if (ire->ire_flags & RTF_MULTIRT) {
-					error = ip_multirt_apply_membership(
-					    optfn, ire, connp, checkonly, group,
-					    fmode, INADDR_ANY, first_mp);
-					done = B_TRUE;
-				}
-				ire_refrele(ire);
-			}
-			if (!done) {
-				error = optfn(connp, checkonly, group, ifaddr,
-				    ifindexp, fmode, INADDR_ANY, first_mp);
-			}
-			if (error) {
-				/*
-				 * EINPROGRESS is a soft error, needs retry
-				 * so don't make *outlenp zero.
-				 */
-				if (error != EINPROGRESS)
-					*outlenp = 0;
-				return (error);
-			}
-			/* OK return - copy input buffer into output buffer */
-			if (invalp != outvalp) {
-				/* don't trust bcopy for identical src/dst */
-				bcopy(invalp, outvalp, inlen);
-			}
-			*outlenp = inlen;
-			return (0);
-		}
-		case IP_BLOCK_SOURCE:
-		case IP_UNBLOCK_SOURCE:
-		case IP_ADD_SOURCE_MEMBERSHIP:
-		case IP_DROP_SOURCE_MEMBERSHIP:
-		case MCAST_BLOCK_SOURCE:
-		case MCAST_UNBLOCK_SOURCE:
-		case MCAST_JOIN_SOURCE_GROUP:
-		case MCAST_LEAVE_SOURCE_GROUP: {
-			struct ip_mreq_source *imreqp;
-			struct group_source_req *gsreqp;
-			in_addr_t grp, src, ifaddr = INADDR_ANY;
-			uint32_t ifindex = 0;
-			mcast_record_t fmode;
-			struct sockaddr_in *sin;
-			ire_t *ire;
-			boolean_t mcast_opt = B_TRUE, done = B_FALSE;
-			int (*optfn)(conn_t *, boolean_t, ipaddr_t, ipaddr_t,
-			    uint_t *, mcast_record_t, ipaddr_t, mblk_t *);
-
-			switch (name) {
-			case IP_BLOCK_SOURCE:
-				mcast_opt = B_FALSE;
-				/* FALLTHRU */
-			case MCAST_BLOCK_SOURCE:
-				fmode = MODE_IS_EXCLUDE;
-				optfn = ip_opt_add_group;
-				break;
-
-			case IP_UNBLOCK_SOURCE:
-				mcast_opt = B_FALSE;
-				/* FALLTHRU */
-			case MCAST_UNBLOCK_SOURCE:
-				fmode = MODE_IS_EXCLUDE;
-				optfn = ip_opt_delete_group;
-				break;
-
-			case IP_ADD_SOURCE_MEMBERSHIP:
-				mcast_opt = B_FALSE;
-				/* FALLTHRU */
-			case MCAST_JOIN_SOURCE_GROUP:
-				fmode = MODE_IS_INCLUDE;
-				optfn = ip_opt_add_group;
-				break;
-
-			case IP_DROP_SOURCE_MEMBERSHIP:
-				mcast_opt = B_FALSE;
-				/* FALLTHRU */
-			case MCAST_LEAVE_SOURCE_GROUP:
-				fmode = MODE_IS_INCLUDE;
-				optfn = ip_opt_delete_group;
-				break;
-			}
-
-			if (mcast_opt) {
-				gsreqp = (struct group_source_req *)i1;
-				if (gsreqp->gsr_group.ss_family != AF_INET) {
-					*outlenp = 0;
-					return (ENOPROTOOPT);
-				}
-				sin = (struct sockaddr_in *)&gsreqp->gsr_group;
-				grp = (ipaddr_t)sin->sin_addr.s_addr;
-				sin = (struct sockaddr_in *)&gsreqp->gsr_source;
-				src = (ipaddr_t)sin->sin_addr.s_addr;
-				ifindex = gsreqp->gsr_interface;
-			} else {
-				imreqp = (struct ip_mreq_source *)i1;
-				grp = (ipaddr_t)imreqp->imr_multiaddr.s_addr;
-				src = (ipaddr_t)imreqp->imr_sourceaddr.s_addr;
-				ifaddr = (ipaddr_t)imreqp->imr_interface.s_addr;
-			}
-
-			/*
-			 * In the multirouting case, we need to replicate
-			 * the request as noted in the mcast cases above.
-			 */
-			ire = ire_ftable_lookup(grp, IP_HOST_MASK, 0,
-			    IRE_HOST, NULL, NULL, ALL_ZONES, 0, NULL,
-			    MATCH_IRE_MASK | MATCH_IRE_TYPE, ipst);
-			if (ire != NULL) {
-				if (ire->ire_flags & RTF_MULTIRT) {
-					error = ip_multirt_apply_membership(
-					    optfn, ire, connp, checkonly, grp,
-					    fmode, src, first_mp);
-					done = B_TRUE;
-				}
-				ire_refrele(ire);
-			}
-			if (!done) {
-				error = optfn(connp, checkonly, grp, ifaddr,
-				    &ifindex, fmode, src, first_mp);
-			}
-			if (error != 0) {
-				/*
-				 * EINPROGRESS is a soft error, needs retry
-				 * so don't make *outlenp zero.
-				 */
-				if (error != EINPROGRESS)
-					*outlenp = 0;
-				return (error);
-			}
-			/* OK return - copy input buffer into output buffer */
-			if (invalp != outvalp) {
-				bcopy(invalp, outvalp, inlen);
-			}
-			*outlenp = inlen;
-			return (0);
-		}
-		case IP_SEC_OPT:
-			error = ipsec_set_req(cr, connp, (ipsec_req_t *)invalp);
-			if (error != 0) {
-				*outlenp = 0;
-				return (error);
-			}
-			break;
-		case IP_HDRINCL:
-		case IP_OPTIONS:
-		case T_IP_OPTIONS:
-		case IP_TOS:
-		case T_IP_TOS:
-		case IP_TTL:
-		case IP_RECVDSTADDR:
-		case IP_RECVOPTS:
-			/* OK return - copy input buffer into output buffer */
-			if (invalp != outvalp) {
-				/* don't trust bcopy for identical src/dst */
-				bcopy(invalp, outvalp, inlen);
-			}
-			*outlenp = inlen;
-			return (0);
-		case IP_RECVIF:
-			/* Retrieve the inbound interface index */
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_recvif = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case IP_RECVPKTINFO:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_ip_recvpktinfo = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case IP_RECVSLLA:
-			/* Retrieve the source link layer address */
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_recvslla = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case MRT_INIT:
-		case MRT_DONE:
-		case MRT_ADD_VIF:
-		case MRT_DEL_VIF:
-		case MRT_ADD_MFC:
-		case MRT_DEL_MFC:
-		case MRT_ASSERT:
-			if ((error = secpolicy_ip_config(cr, B_FALSE)) != 0) {
-				*outlenp = 0;
-				return (error);
-			}
-			error = ip_mrouter_set((int)name, q, checkonly,
-			    (uchar_t *)invalp, inlen, first_mp);
-			if (error) {
-				*outlenp = 0;
-				return (error);
-			}
-			/* OK return - copy input buffer into output buffer */
-			if (invalp != outvalp) {
-				/* don't trust bcopy for identical src/dst */
-				bcopy(invalp, outvalp, inlen);
-			}
-			*outlenp = inlen;
-			return (0);
-		case IP_BOUND_IF:
-		case IP_DHCPINIT_IF:
-			error = ip_opt_set_ill(connp, *i1, B_FALSE, checkonly,
-			    level, name, first_mp);
-			if (error != 0)
-				return (error);
-			break; 		/* goto sizeof (int) option return */
-
-		case IP_UNSPEC_SRC:
-			/* Allow sending with a zero source address */
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_unspec_src = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		default:
-			/*
-			 * "soft" error (negative)
-			 * option not handled at this level
-			 * Note: Do not modify *outlenp
-			 */
-			return (-EINVAL);
-		}
-		break;
-	case IPPROTO_IPV6:
-		switch (name) {
-		case IPV6_BOUND_IF:
-			error = ip_opt_set_ill(connp, *i1, B_TRUE, checkonly,
-			    level, name, first_mp);
-			if (error != 0)
-				return (error);
-			break; 		/* goto sizeof (int) option return */
-
-		case IPV6_MULTICAST_IF:
-			/*
-			 * The only possible errors are EINPROGRESS and
-			 * EINVAL. EINPROGRESS will be restarted and is not
-			 * a hard error. We call this option on both V4 and V6
-			 * If both return EINVAL, then this call returns
-			 * EINVAL. If at least one of them succeeds we
-			 * return success.
-			 */
-			found = B_FALSE;
-			error = ip_opt_set_ill(connp, *i1, B_TRUE, checkonly,
-			    level, name, first_mp);
-			if (error == EINPROGRESS)
-				return (error);
-			if (error == 0)
-				found = B_TRUE;
-			error = ip_opt_set_ill(connp, *i1, B_FALSE, checkonly,
-			    IPPROTO_IP, IP_MULTICAST_IF, first_mp);
-			if (error == 0)
-				found = B_TRUE;
-			if (!found)
-				return (error);
-			break; 		/* goto sizeof (int) option return */
-
-		case IPV6_MULTICAST_HOPS:
-			/* Recorded in transport above IP */
-			break;	/* goto sizeof (int) option return */
-		case IPV6_MULTICAST_LOOP:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_multicast_loop = *i1;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_JOIN_GROUP:
-		case MCAST_JOIN_GROUP:
-		case IPV6_LEAVE_GROUP:
-		case MCAST_LEAVE_GROUP: {
-			struct ipv6_mreq *ip_mreqp;
-			struct group_req *greqp;
-			ire_t *ire;
-			boolean_t done = B_FALSE;
-			in6_addr_t groupv6;
-			uint32_t ifindex;
-			boolean_t mcast_opt = B_TRUE;
-			mcast_record_t fmode;
-			int (*optfn)(conn_t *, boolean_t, const in6_addr_t *,
-			    int, mcast_record_t, const in6_addr_t *, mblk_t *);
-
-			switch (name) {
-			case IPV6_JOIN_GROUP:
-				mcast_opt = B_FALSE;
-				/* FALLTHRU */
-			case MCAST_JOIN_GROUP:
-				fmode = MODE_IS_EXCLUDE;
-				optfn = ip_opt_add_group_v6;
-				break;
-
-			case IPV6_LEAVE_GROUP:
-				mcast_opt = B_FALSE;
-				/* FALLTHRU */
-			case MCAST_LEAVE_GROUP:
-				fmode = MODE_IS_INCLUDE;
-				optfn = ip_opt_delete_group_v6;
-				break;
-			}
-
-			if (mcast_opt) {
-				struct sockaddr_in *sin;
-				struct sockaddr_in6 *sin6;
-				greqp = (struct group_req *)i1;
-				if (greqp->gr_group.ss_family == AF_INET) {
-					sin = (struct sockaddr_in *)
-					    &(greqp->gr_group);
-					IN6_INADDR_TO_V4MAPPED(&sin->sin_addr,
-					    &groupv6);
-				} else {
-					sin6 = (struct sockaddr_in6 *)
-					    &(greqp->gr_group);
-					groupv6 = sin6->sin6_addr;
-				}
-				ifindex = greqp->gr_interface;
-			} else {
-				ip_mreqp = (struct ipv6_mreq *)i1;
-				groupv6 = ip_mreqp->ipv6mr_multiaddr;
-				ifindex = ip_mreqp->ipv6mr_interface;
-			}
-			/*
-			 * In the multirouting case, we need to replicate
-			 * the request on all interfaces that will take part
-			 * in replication.  We do so because multirouting is
-			 * reflective, thus we will probably receive multi-
-			 * casts on those interfaces.
-			 * The ip_multirt_apply_membership_v6() succeeds if
-			 * the operation succeeds on at least one interface.
-			 */
-			ire = ire_ftable_lookup_v6(&groupv6, &ipv6_all_ones, 0,
-			    IRE_HOST, NULL, NULL, ALL_ZONES, 0, NULL,
-			    MATCH_IRE_MASK | MATCH_IRE_TYPE, ipst);
-			if (ire != NULL) {
-				if (ire->ire_flags & RTF_MULTIRT) {
-					error = ip_multirt_apply_membership_v6(
-					    optfn, ire, connp, checkonly,
-					    &groupv6, fmode, &ipv6_all_zeros,
-					    first_mp);
-					done = B_TRUE;
-				}
-				ire_refrele(ire);
-			}
-			if (!done) {
-				error = optfn(connp, checkonly, &groupv6,
-				    ifindex, fmode, &ipv6_all_zeros, first_mp);
-			}
-			if (error) {
-				/*
-				 * EINPROGRESS is a soft error, needs retry
-				 * so don't make *outlenp zero.
-				 */
-				if (error != EINPROGRESS)
-					*outlenp = 0;
-				return (error);
-			}
-			/* OK return - copy input buffer into output buffer */
-			if (invalp != outvalp) {
-				/* don't trust bcopy for identical src/dst */
-				bcopy(invalp, outvalp, inlen);
-			}
-			*outlenp = inlen;
-			return (0);
-		}
-		case MCAST_BLOCK_SOURCE:
-		case MCAST_UNBLOCK_SOURCE:
-		case MCAST_JOIN_SOURCE_GROUP:
-		case MCAST_LEAVE_SOURCE_GROUP: {
-			struct group_source_req *gsreqp;
-			in6_addr_t v6grp, v6src;
-			uint32_t ifindex;
-			mcast_record_t fmode;
-			ire_t *ire;
-			boolean_t done = B_FALSE;
-			int (*optfn)(conn_t *, boolean_t, const in6_addr_t *,
-			    int, mcast_record_t, const in6_addr_t *, mblk_t *);
-
-			switch (name) {
-			case MCAST_BLOCK_SOURCE:
-				fmode = MODE_IS_EXCLUDE;
-				optfn = ip_opt_add_group_v6;
-				break;
-			case MCAST_UNBLOCK_SOURCE:
-				fmode = MODE_IS_EXCLUDE;
-				optfn = ip_opt_delete_group_v6;
-				break;
-			case MCAST_JOIN_SOURCE_GROUP:
-				fmode = MODE_IS_INCLUDE;
-				optfn = ip_opt_add_group_v6;
-				break;
-			case MCAST_LEAVE_SOURCE_GROUP:
-				fmode = MODE_IS_INCLUDE;
-				optfn = ip_opt_delete_group_v6;
-				break;
-			}
-
-			gsreqp = (struct group_source_req *)i1;
-			ifindex = gsreqp->gsr_interface;
-			if (gsreqp->gsr_group.ss_family == AF_INET) {
-				struct sockaddr_in *s;
-				s = (struct sockaddr_in *)&gsreqp->gsr_group;
-				IN6_INADDR_TO_V4MAPPED(&s->sin_addr, &v6grp);
-				s = (struct sockaddr_in *)&gsreqp->gsr_source;
-				IN6_INADDR_TO_V4MAPPED(&s->sin_addr, &v6src);
-			} else {
-				struct sockaddr_in6 *s6;
-				s6 = (struct sockaddr_in6 *)&gsreqp->gsr_group;
-				v6grp = s6->sin6_addr;
-				s6 = (struct sockaddr_in6 *)&gsreqp->gsr_source;
-				v6src = s6->sin6_addr;
-			}
-
-			/*
-			 * In the multirouting case, we need to replicate
-			 * the request as noted in the mcast cases above.
-			 */
-			ire = ire_ftable_lookup_v6(&v6grp, &ipv6_all_ones, 0,
-			    IRE_HOST, NULL, NULL, ALL_ZONES, 0, NULL,
-			    MATCH_IRE_MASK | MATCH_IRE_TYPE, ipst);
-			if (ire != NULL) {
-				if (ire->ire_flags & RTF_MULTIRT) {
-					error = ip_multirt_apply_membership_v6(
-					    optfn, ire, connp, checkonly,
-					    &v6grp, fmode, &v6src, first_mp);
-					done = B_TRUE;
-				}
-				ire_refrele(ire);
-			}
-			if (!done) {
-				error = optfn(connp, checkonly, &v6grp,
-				    ifindex, fmode, &v6src, first_mp);
-			}
-			if (error != 0) {
-				/*
-				 * EINPROGRESS is a soft error, needs retry
-				 * so don't make *outlenp zero.
-				 */
-				if (error != EINPROGRESS)
-					*outlenp = 0;
-				return (error);
-			}
-			/* OK return - copy input buffer into output buffer */
-			if (invalp != outvalp) {
-				bcopy(invalp, outvalp, inlen);
-			}
-			*outlenp = inlen;
-			return (0);
-		}
-		case IPV6_UNICAST_HOPS:
-			/* Recorded in transport above IP */
-			break;	/* goto sizeof (int) option return */
-		case IPV6_UNSPEC_SRC:
-			/* Allow sending with a zero source address */
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_unspec_src = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVPKTINFO:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_ip_recvpktinfo = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVTCLASS:
-			if (!checkonly) {
-				if (*i1 < 0 || *i1 > 1) {
-					return (EINVAL);
-				}
-				mutex_enter(&connp->conn_lock);
-				connp->conn_ipv6_recvtclass = *i1;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;
-		case IPV6_RECVPATHMTU:
-			if (!checkonly) {
-				if (*i1 < 0 || *i1 > 1) {
-					return (EINVAL);
-				}
-				mutex_enter(&connp->conn_lock);
-				connp->conn_ipv6_recvpathmtu = *i1;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;
-		case IPV6_RECVHOPLIMIT:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_ipv6_recvhoplimit = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVHOPOPTS:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_ipv6_recvhopopts = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVDSTOPTS:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_ipv6_recvdstopts = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVRTHDR:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_ipv6_recvrthdr = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVRTHDRDSTOPTS:
-			if (!checkonly) {
-				mutex_enter(&connp->conn_lock);
-				connp->conn_ipv6_recvrtdstopts = *i1 ? 1 : 0;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_PKTINFO:
-			if (inlen == 0)
-				return (-EINVAL);	/* clearing option */
-			error = ip6_set_pktinfo(cr, connp,
-			    (struct in6_pktinfo *)invalp);
-			if (error != 0)
-				*outlenp = 0;
-			else
-				*outlenp = inlen;
-			return (error);
-		case IPV6_NEXTHOP: {
-			struct sockaddr_in6 *sin6;
-
-			/* Verify that the nexthop is reachable */
-			if (inlen == 0)
-				return (-EINVAL);	/* clearing option */
-
-			sin6 = (struct sockaddr_in6 *)invalp;
-			ire = ire_route_lookup_v6(&sin6->sin6_addr,
-			    0, 0, 0, NULL, NULL, connp->conn_zoneid,
-			    NULL, MATCH_IRE_DEFAULT, ipst);
-
-			if (ire == NULL) {
-				*outlenp = 0;
-				return (EHOSTUNREACH);
-			}
-			ire_refrele(ire);
-			return (-EINVAL);
-		}
-		case IPV6_SEC_OPT:
-			error = ipsec_set_req(cr, connp, (ipsec_req_t *)invalp);
-			if (error != 0) {
-				*outlenp = 0;
-				return (error);
-			}
-			break;
-		case IPV6_SRC_PREFERENCES: {
-			/*
-			 * This is implemented strictly in the ip module
-			 * (here and in tcp_opt_*() to accomodate tcp
-			 * sockets).  Modules above ip pass this option
-			 * down here since ip is the only one that needs to
-			 * be aware of source address preferences.
-			 *
-			 * This socket option only affects connected
-			 * sockets that haven't already bound to a specific
-			 * IPv6 address.  In other words, sockets that
-			 * don't call bind() with an address other than the
-			 * unspecified address and that call connect().
-			 * ip_bind_connected_v6() passes these preferences
-			 * to the ipif_select_source_v6() function.
-			 */
-			if (inlen != sizeof (uint32_t))
-				return (EINVAL);
-			error = ip6_set_src_preferences(connp,
-			    *(uint32_t *)invalp);
-			if (error != 0) {
-				*outlenp = 0;
-				return (error);
-			} else {
-				*outlenp = sizeof (uint32_t);
-			}
-			break;
-		}
-		case IPV6_V6ONLY:
-			if (*i1 < 0 || *i1 > 1) {
-				return (EINVAL);
-			}
-			mutex_enter(&connp->conn_lock);
-			connp->conn_ipv6_v6only = *i1;
-			mutex_exit(&connp->conn_lock);
-			break;
-		default:
-			return (-EINVAL);
-		}
+	case IP_DROP_MEMBERSHIP:
+	case IPV6_LEAVE_GROUP:
+		mcast_opt = B_FALSE;
+		/* FALLTHRU */
+	case MCAST_LEAVE_GROUP:
+		fmode = MODE_IS_INCLUDE;
+		optfn = ip_opt_delete_group;
 		break;
 	default:
-		/*
-		 * "soft" error (negative)
-		 * option not handled at this level
-		 * Note: Do not modify *outlenp
-		 */
-		return (-EINVAL);
+		ASSERT(0);
 	}
+
+	if (mcast_opt) {
+		struct sockaddr_in *sin;
+		struct sockaddr_in6 *sin6;
+
+		greqp = (struct group_req *)i1;
+		if (greqp->gr_group.ss_family == AF_INET) {
+			sin = (struct sockaddr_in *)&(greqp->gr_group);
+			IN6_INADDR_TO_V4MAPPED(&sin->sin_addr, &v6group);
+		} else {
+			if (!inet6)
+				return (EINVAL);	/* Not on INET socket */
+
+			sin6 = (struct sockaddr_in6 *)&(greqp->gr_group);
+			v6group = sin6->sin6_addr;
+		}
+		ifaddr = INADDR_ANY;
+		ifindex = greqp->gr_interface;
+	} else if (inet6) {
+		v6_mreqp = (struct ipv6_mreq *)i1;
+		v6group = v6_mreqp->ipv6mr_multiaddr;
+		ifaddr = INADDR_ANY;
+		ifindex = v6_mreqp->ipv6mr_interface;
+	} else {
+		v4_mreqp = (struct ip_mreq *)i1;
+		IN6_INADDR_TO_V4MAPPED(&v4_mreqp->imr_multiaddr, &v6group);
+		ifaddr = (ipaddr_t)v4_mreqp->imr_interface.s_addr;
+		ifindex = 0;
+	}
+
 	/*
-	 * Common case of return from an option that is sizeof (int)
+	 * In the multirouting case, we need to replicate
+	 * the request on all interfaces that will take part
+	 * in replication.  We do so because multirouting is
+	 * reflective, thus we will probably receive multi-
+	 * casts on those interfaces.
+	 * The ip_multirt_apply_membership() succeeds if
+	 * the operation succeeds on at least one interface.
 	 */
-	*(int *)outvalp = *i1;
-	*outlenp = sizeof (int);
-	return (0);
+	if (IN6_IS_ADDR_V4MAPPED(&v6group)) {
+		ipaddr_t group;
+
+		IN6_V4MAPPED_TO_IPADDR(&v6group, group);
+
+		ire = ire_ftable_lookup_v4(group, IP_HOST_MASK, 0,
+		    IRE_HOST | IRE_INTERFACE, NULL, ALL_ZONES, NULL,
+		    MATCH_IRE_MASK | MATCH_IRE_TYPE, 0, ipst, NULL);
+	} else {
+		ire = ire_ftable_lookup_v6(&v6group, &ipv6_all_ones, 0,
+		    IRE_HOST | IRE_INTERFACE, NULL, ALL_ZONES, NULL,
+		    MATCH_IRE_MASK | MATCH_IRE_TYPE, 0, ipst, NULL);
+	}
+	if (ire != NULL) {
+		if (ire->ire_flags & RTF_MULTIRT) {
+			error = ip_multirt_apply_membership(optfn, ire, connp,
+			    checkonly, &v6group, fmode, &ipv6_all_zeros);
+			done = B_TRUE;
+		}
+		ire_refrele(ire);
+	}
+
+	if (!done) {
+		error = optfn(connp, checkonly, &v6group, ifaddr, ifindex,
+		    fmode, &ipv6_all_zeros);
+	}
+	return (error);
 }
 
 /*
- * This routine gets default values of certain options whose default
- * values are maintained by protocol specific code
+ * Set socket options for joining and leaving multicast groups
+ * for specific sources.
+ * Common to IPv4 and IPv6; inet6 indicates the type of socket.
+ * The caller has already check that the option name is consistent with
+ * the address family of the socket.
  */
-/* ARGSUSED */
 int
-ip_opt_default(queue_t *q, int level, int name, uchar_t *ptr)
+ip_opt_set_multicast_sources(conn_t *connp, t_scalar_t name,
+    uchar_t *invalp, boolean_t inet6, boolean_t checkonly)
 {
-	int *i1 = (int *)ptr;
-	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
+	int		*i1 = (int *)invalp;
+	int		error = 0;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
+	struct ip_mreq_source *imreqp;
+	struct group_source_req *gsreqp;
+	in6_addr_t v6group, v6src;
+	uint32_t ifindex;
+	ipaddr_t ifaddr;
+	boolean_t mcast_opt = B_TRUE;
+	mcast_record_t fmode;
+	ire_t *ire;
+	boolean_t done = B_FALSE;
+	int (*optfn)(conn_t *, boolean_t, const in6_addr_t *,
+	    ipaddr_t, uint_t, mcast_record_t, const in6_addr_t *);
 
-	switch (level) {
-	case IPPROTO_IP:
-		switch (name) {
-		case IP_MULTICAST_TTL:
-			*ptr = (uchar_t)IP_DEFAULT_MULTICAST_TTL;
-			return (sizeof (uchar_t));
-		case IP_MULTICAST_LOOP:
-			*ptr = (uchar_t)IP_DEFAULT_MULTICAST_LOOP;
-			return (sizeof (uchar_t));
-		default:
-			return (-1);
-		}
-	case IPPROTO_IPV6:
-		switch (name) {
-		case IPV6_UNICAST_HOPS:
-			*i1 = ipst->ips_ipv6_def_hops;
-			return (sizeof (int));
-		case IPV6_MULTICAST_HOPS:
-			*i1 = IP_DEFAULT_MULTICAST_TTL;
-			return (sizeof (int));
-		case IPV6_MULTICAST_LOOP:
-			*i1 = IP_DEFAULT_MULTICAST_LOOP;
-			return (sizeof (int));
-		case IPV6_V6ONLY:
-			*i1 = 1;
-			return (sizeof (int));
-		default:
-			return (-1);
-		}
+	switch (name) {
+	case IP_BLOCK_SOURCE:
+		mcast_opt = B_FALSE;
+		/* FALLTHRU */
+	case MCAST_BLOCK_SOURCE:
+		fmode = MODE_IS_EXCLUDE;
+		optfn = ip_opt_add_group;
+		break;
+
+	case IP_UNBLOCK_SOURCE:
+		mcast_opt = B_FALSE;
+		/* FALLTHRU */
+	case MCAST_UNBLOCK_SOURCE:
+		fmode = MODE_IS_EXCLUDE;
+		optfn = ip_opt_delete_group;
+		break;
+
+	case IP_ADD_SOURCE_MEMBERSHIP:
+		mcast_opt = B_FALSE;
+		/* FALLTHRU */
+	case MCAST_JOIN_SOURCE_GROUP:
+		fmode = MODE_IS_INCLUDE;
+		optfn = ip_opt_add_group;
+		break;
+
+	case IP_DROP_SOURCE_MEMBERSHIP:
+		mcast_opt = B_FALSE;
+		/* FALLTHRU */
+	case MCAST_LEAVE_SOURCE_GROUP:
+		fmode = MODE_IS_INCLUDE;
+		optfn = ip_opt_delete_group;
+		break;
 	default:
-		return (-1);
+		ASSERT(0);
 	}
-	/* NOTREACHED */
+
+	if (mcast_opt) {
+		gsreqp = (struct group_source_req *)i1;
+		ifindex = gsreqp->gsr_interface;
+		if (gsreqp->gsr_group.ss_family == AF_INET) {
+			struct sockaddr_in *s;
+			s = (struct sockaddr_in *)&gsreqp->gsr_group;
+			IN6_INADDR_TO_V4MAPPED(&s->sin_addr, &v6group);
+			s = (struct sockaddr_in *)&gsreqp->gsr_source;
+			IN6_INADDR_TO_V4MAPPED(&s->sin_addr, &v6src);
+		} else {
+			struct sockaddr_in6 *s6;
+
+			if (!inet6)
+				return (EINVAL);	/* Not on INET socket */
+
+			s6 = (struct sockaddr_in6 *)&gsreqp->gsr_group;
+			v6group = s6->sin6_addr;
+			s6 = (struct sockaddr_in6 *)&gsreqp->gsr_source;
+			v6src = s6->sin6_addr;
+		}
+		ifaddr = INADDR_ANY;
+	} else {
+		imreqp = (struct ip_mreq_source *)i1;
+		IN6_INADDR_TO_V4MAPPED(&imreqp->imr_multiaddr, &v6group);
+		IN6_INADDR_TO_V4MAPPED(&imreqp->imr_sourceaddr, &v6src);
+		ifaddr = (ipaddr_t)imreqp->imr_interface.s_addr;
+		ifindex = 0;
+	}
+
+	/*
+	 * Handle src being mapped INADDR_ANY by changing it to unspecified.
+	 */
+	if (IN6_IS_ADDR_V4MAPPED_ANY(&v6src))
+		v6src = ipv6_all_zeros;
+
+	/*
+	 * In the multirouting case, we need to replicate
+	 * the request as noted in the mcast cases above.
+	 */
+	if (IN6_IS_ADDR_V4MAPPED(&v6group)) {
+		ipaddr_t group;
+
+		IN6_V4MAPPED_TO_IPADDR(&v6group, group);
+
+		ire = ire_ftable_lookup_v4(group, IP_HOST_MASK, 0,
+		    IRE_HOST | IRE_INTERFACE, NULL, ALL_ZONES, NULL,
+		    MATCH_IRE_MASK | MATCH_IRE_TYPE, 0, ipst, NULL);
+	} else {
+		ire = ire_ftable_lookup_v6(&v6group, &ipv6_all_ones, 0,
+		    IRE_HOST | IRE_INTERFACE, NULL, ALL_ZONES, NULL,
+		    MATCH_IRE_MASK | MATCH_IRE_TYPE, 0, ipst, NULL);
+	}
+	if (ire != NULL) {
+		if (ire->ire_flags & RTF_MULTIRT) {
+			error = ip_multirt_apply_membership(optfn, ire, connp,
+			    checkonly, &v6group, fmode, &v6src);
+			done = B_TRUE;
+		}
+		ire_refrele(ire);
+	}
+	if (!done) {
+		error = optfn(connp, checkonly, &v6group, ifaddr, ifindex,
+		    fmode, &v6src);
+	}
+	return (error);
 }
 
 /*
  * Given a destination address and a pointer to where to put the information
  * this routine fills in the mtuinfo.
+ * The socket must be connected.
+ * For sctp conn_faddr is the primary address.
  */
 int
-ip_fill_mtuinfo(struct in6_addr *in6, in_port_t port,
-    struct ip6_mtuinfo *mtuinfo, netstack_t *ns)
+ip_fill_mtuinfo(conn_t *connp, ip_xmit_attr_t *ixa, struct ip6_mtuinfo *mtuinfo)
 {
-	ire_t *ire;
-	ip_stack_t	*ipst = ns->netstack_ip;
+	uint32_t	pmtu = IP_MAXPACKET;
+	uint_t		scopeid;
 
-	if (IN6_IS_ADDR_UNSPECIFIED(in6))
+	if (IN6_IS_ADDR_UNSPECIFIED(&connp->conn_faddr_v6))
 		return (-1);
+
+	/* In case we never sent or called ip_set_destination_v4/v6 */
+	if (ixa->ixa_ire != NULL)
+		pmtu = ip_get_pmtu(ixa);
+
+	if (ixa->ixa_flags & IXAF_SCOPEID_SET)
+		scopeid = ixa->ixa_scopeid;
+	else
+		scopeid = 0;
 
 	bzero(mtuinfo, sizeof (*mtuinfo));
 	mtuinfo->ip6m_addr.sin6_family = AF_INET6;
-	mtuinfo->ip6m_addr.sin6_port = port;
-	mtuinfo->ip6m_addr.sin6_addr = *in6;
+	mtuinfo->ip6m_addr.sin6_port = connp->conn_fport;
+	mtuinfo->ip6m_addr.sin6_addr = connp->conn_faddr_v6;
+	mtuinfo->ip6m_addr.sin6_scope_id = scopeid;
+	mtuinfo->ip6m_mtu = pmtu;
 
-	ire = ire_cache_lookup_v6(in6, ALL_ZONES, NULL, ipst);
-	if (ire != NULL) {
-		mtuinfo->ip6m_mtu = ire->ire_max_frag;
-		ire_refrele(ire);
-	} else {
-		mtuinfo->ip6m_mtu = IPV6_MIN_MTU;
-	}
 	return (sizeof (struct ip6_mtuinfo));
 }
 
-/*
- * This routine gets socket options.  For MRT_VERSION and MRT_ASSERT, error
- * checking of cred and that ip_g_mrouter is set should be done and
- * isn't.  This doesn't matter as the error checking is done properly for the
- * other MRT options coming in through ip_opt_set.
- */
-int
-ip_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
-{
-	conn_t		*connp = Q_TO_CONN(q);
-	ipsec_req_t	*req = (ipsec_req_t *)ptr;
-
-	switch (level) {
-	case IPPROTO_IP:
-		switch (name) {
-		case MRT_VERSION:
-		case MRT_ASSERT:
-			(void) ip_mrouter_get(name, q, ptr);
-			return (sizeof (int));
-		case IP_SEC_OPT:
-			return (ipsec_req_from_conn(connp, req, IPSEC_AF_V4));
-		case IP_NEXTHOP:
-			if (connp->conn_nexthop_set) {
-				*(ipaddr_t *)ptr = connp->conn_nexthop_v4;
-				return (sizeof (ipaddr_t));
-			} else
-				return (0);
-		case IP_RECVPKTINFO:
-			*(int *)ptr = connp->conn_ip_recvpktinfo ? 1: 0;
-			return (sizeof (int));
-		default:
-			break;
-		}
-		break;
-	case IPPROTO_IPV6:
-		switch (name) {
-		case IPV6_SEC_OPT:
-			return (ipsec_req_from_conn(connp, req, IPSEC_AF_V6));
-		case IPV6_SRC_PREFERENCES: {
-			return (ip6_get_src_preferences(connp,
-			    (uint32_t *)ptr));
-		}
-		case IPV6_V6ONLY:
-			*(int *)ptr = connp->conn_ipv6_v6only ? 1 : 0;
-			return (sizeof (int));
-		case IPV6_PATHMTU:
-			return (ip_fill_mtuinfo(&connp->conn_remv6, 0,
-			    (struct ip6_mtuinfo *)ptr, connp->conn_netstack));
-		default:
-			break;
-		}
-		break;
-	default:
-		break;
-	}
-	return (-1);
-}
 /* Named Dispatch routine to get a current value out of our parameter table. */
 /* ARGSUSED */
 static int
@@ -11955,130 +7137,18 @@ ip_reassemble(mblk_t *mp, ipf_t *ipf, uint_t start, boolean_t more, ill_t *ill,
 }
 
 /*
- * ipsec processing for the fast path, used for input UDP Packets
- * Returns true if ready for passup to UDP.
- * Return false if packet is not passable to UDP (e.g. it failed IPsec policy,
- * was an ESP-in-UDP packet, etc.).
- */
-static boolean_t
-ip_udp_check(queue_t *q, conn_t *connp, ill_t *ill, ipha_t *ipha,
-    mblk_t **mpp, mblk_t **first_mpp, boolean_t mctl_present, ire_t *ire)
-{
-	uint32_t	ill_index;
-	uint_t		in_flags;	/* IPF_RECVSLLA and/or IPF_RECVIF */
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
-	udp_t		*udp = connp->conn_udp;
-
-	ASSERT(ipha->ipha_protocol == IPPROTO_UDP);
-	/* The ill_index of the incoming ILL */
-	ill_index = ((ill_t *)q->q_ptr)->ill_phyint->phyint_ifindex;
-
-	/* pass packet up to the transport */
-	if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || mctl_present) {
-		*first_mpp = ipsec_check_inbound_policy(*first_mpp, connp, ipha,
-		    NULL, mctl_present);
-		if (*first_mpp == NULL) {
-			return (B_FALSE);
-		}
-	}
-
-	/* Initiate IPPF processing for fastpath UDP */
-	if (IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
-		ip_process(IPP_LOCAL_IN, mpp, ill_index);
-		if (*mpp == NULL) {
-			ip2dbg(("ip_input_ipsec_process: UDP pkt "
-			    "deferred/dropped during IPPF processing\n"));
-			return (B_FALSE);
-		}
-	}
-	/*
-	 * Remove 0-spi if it's 0, or move everything behind
-	 * the UDP header over it and forward to ESP via
-	 * ip_proto_input().
-	 */
-	if (udp->udp_nat_t_endpoint) {
-		if (mctl_present) {
-			/* mctl_present *shouldn't* happen. */
-			ip_drop_packet(*first_mpp, B_TRUE, NULL,
-			    NULL, DROPPER(ipss, ipds_esp_nat_t_ipsec),
-			    &ipss->ipsec_dropper);
-			*first_mpp = NULL;
-			return (B_FALSE);
-		}
-
-		/* "ill" is "recv_ill" in actuality. */
-		if (!zero_spi_check(q, *mpp, ire, ill, ipss))
-			return (B_FALSE);
-
-		/* Else continue like a normal UDP packet. */
-	}
-
-	/*
-	 * We make the checks as below since we are in the fast path
-	 * and want to minimize the number of checks if the IP_RECVIF and/or
-	 * IP_RECVSLLA and/or IPV6_RECVPKTINFO options are not set
-	 */
-	if (connp->conn_recvif || connp->conn_recvslla ||
-	    connp->conn_ip_recvpktinfo) {
-		if (connp->conn_recvif) {
-			in_flags = IPF_RECVIF;
-		}
-		/*
-		 * UDP supports IP_RECVPKTINFO option for both v4 and v6
-		 * so the flag passed to ip_add_info is based on IP version
-		 * of connp.
-		 */
-		if (connp->conn_ip_recvpktinfo) {
-			if (connp->conn_af_isv6) {
-				/*
-				 * V6 only needs index
-				 */
-				in_flags |= IPF_RECVIF;
-			} else {
-				/*
-				 * V4 needs index + matching address.
-				 */
-				in_flags |= IPF_RECVADDR;
-			}
-		}
-		if (connp->conn_recvslla) {
-			in_flags |= IPF_RECVSLLA;
-		}
-		/*
-		 * since in_flags are being set ill will be
-		 * referenced in ip_add_info, so it better not
-		 * be NULL.
-		 */
-		/*
-		 * the actual data will be contained in b_cont
-		 * upon successful return of the following call.
-		 * If the call fails then the original mblk is
-		 * returned.
-		 */
-		*mpp = ip_add_info(*mpp, ill, in_flags, IPCL_ZONEID(connp),
-		    ipst);
-	}
-
-	return (B_TRUE);
-}
-
-/*
  * Fragmentation reassembly.  Each ILL has a hash table for
  * queuing packets undergoing reassembly for all IPIFs
  * associated with the ILL.  The hash is based on the packet
  * IP ident field.  The ILL frag hash table was allocated
  * as a timer block at the time the ILL was created.  Whenever
  * there is anything on the reassembly queue, the timer will
- * be running.  Returns B_TRUE if successful else B_FALSE;
- * frees mp on failure.
+ * be running.  Returns the reassembled packet if reassembly completes.
  */
-static boolean_t
-ip_rput_fragment(ill_t *ill, ill_t *recv_ill, mblk_t **mpp, ipha_t *ipha,
-    uint32_t *cksum_val, uint16_t *cksum_flags)
+mblk_t *
+ip_input_fragment(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 {
 	uint32_t	frag_offset_flags;
-	mblk_t		*mp = *mpp;
 	mblk_t		*t_mp;
 	ipaddr_t	dst;
 	uint8_t		proto = ipha->ipha_protocol;
@@ -12099,12 +7169,8 @@ ip_rput_fragment(ill_t *ill, ill_t *recv_ill, mblk_t **mpp, ipha_t *ipha,
 	uint8_t		ecn_info = 0;
 	uint32_t	packet_size;
 	boolean_t	pruned = B_FALSE;
-	ip_stack_t *ipst = ill->ill_ipst;
-
-	if (cksum_val != NULL)
-		*cksum_val = 0;
-	if (cksum_flags != NULL)
-		*cksum_flags = 0;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	/*
 	 * Drop the fragmented as early as possible, if
@@ -12112,13 +7178,13 @@ ip_rput_fragment(ill_t *ill, ill_t *recv_ill, mblk_t **mpp, ipha_t *ipha,
 	 */
 	if (ipst->ips_ip_reass_queue_bytes == 0) {
 		freemsg(mp);
-		return (B_FALSE);
+		return (NULL);
 	}
 
 	/* Check for fragmentation offset; return if there's none */
 	if ((frag_offset_flags = ntohs(ipha->ipha_fragment_offset_and_flags) &
 	    (IPH_MF | IPH_OFFSET)) == 0)
-		return (B_TRUE);
+		return (mp);
 
 	/*
 	 * We utilize hardware computed checksum info only for UDP since
@@ -12126,8 +7192,9 @@ ip_rput_fragment(ill_t *ill, ill_t *recv_ill, mblk_t **mpp, ipha_t *ipha,
 	 * addition, checksum offload support for IP fragments carrying
 	 * UDP payload is commonly implemented across network adapters.
 	 */
-	ASSERT(recv_ill != NULL);
-	if (proto == IPPROTO_UDP && dohwcksum && ILL_HCKSUM_CAPABLE(recv_ill) &&
+	ASSERT(ira->ira_rill != NULL);
+	if (proto == IPPROTO_UDP && dohwcksum &&
+	    ILL_HCKSUM_CAPABLE(ira->ira_rill) &&
 	    (DB_CKSUMFLAGS(mp) & (HCK_FULLCKSUM | HCK_PARTIALCKSUM))) {
 		mblk_t *mp1 = mp->b_cont;
 		int32_t len;
@@ -12178,7 +7245,7 @@ ip_rput_fragment(ill_t *ill, ill_t *recv_ill, mblk_t **mpp, ipha_t *ipha,
 	/* If end == 0 then we have a packet with no data, so just free it */
 	if (end == 0) {
 		freemsg(mp);
-		return (B_FALSE);
+		return (NULL);
 	}
 
 	/* Record the ECN field info. */
@@ -12192,16 +7259,25 @@ ip_rput_fragment(ill_t *ill, ill_t *recv_ill, mblk_t **mpp, ipha_t *ipha,
 		end += offset;
 	}
 
-	msg_len = MBLKSIZE(mp);
+	/* Handle vnic loopback of fragments */
+	if (mp->b_datap->db_ref > 2)
+		msg_len = 0;
+	else
+		msg_len = MBLKSIZE(mp);
+
 	tail_mp = mp;
 	while (tail_mp->b_cont != NULL) {
 		tail_mp = tail_mp->b_cont;
-		msg_len += MBLKSIZE(tail_mp);
+		if (tail_mp->b_datap->db_ref <= 2)
+			msg_len += MBLKSIZE(tail_mp);
 	}
 
 	/* If the reassembly list for this ILL will get too big, prune it */
 	if ((msg_len + sizeof (*ipf) + ill->ill_frag_count) >=
 	    ipst->ips_ip_reass_queue_bytes) {
+		DTRACE_PROBE3(ip_reass_queue_bytes, uint_t, msg_len,
+		    uint_t, ill->ill_frag_count,
+		    uint_t, ipst->ips_ip_reass_queue_bytes);
 		ill_frag_prune(ill,
 		    (ipst->ips_ip_reass_queue_bytes < msg_len) ? 0 :
 		    (ipst->ips_ip_reass_queue_bytes - msg_len));
@@ -12232,7 +7308,7 @@ ip_rput_fragment(ill_t *ill, ill_t *recv_ill, mblk_t **mpp, ipha_t *ipha,
 					ill_frag_free_pkts(ill, ipfb, ipf, 1);
 					freemsg(mp);
 					mutex_exit(&ipfb->ipfb_lock);
-					return (B_FALSE);
+					return (NULL);
 				}
 				/* Found it. */
 				break;
@@ -12254,7 +7330,7 @@ ip_rput_fragment(ill_t *ill, ill_t *recv_ill, mblk_t **mpp, ipha_t *ipha,
 		if (pruned && offset != 0) {
 			mutex_exit(&ipfb->ipfb_lock);
 			freemsg(mp);
-			return (B_FALSE);
+			return (NULL);
 		}
 
 		if (ipfb->ipfb_frag_pkts >= MAX_FRAG_PKTS(ipst))  {
@@ -12269,10 +7345,11 @@ ip_rput_fragment(ill_t *ill, ill_t *recv_ill, mblk_t **mpp, ipha_t *ipha,
 		mp1 = allocb(sizeof (*ipf), BPRI_MED);
 		if (mp1 == NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
 			freemsg(mp);
 reass_done:
 			mutex_exit(&ipfb->ipfb_lock);
-			return (B_FALSE);
+			return (NULL);
 		}
 
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsReasmReqds);
@@ -12478,19 +7555,22 @@ reass_done:
 	/* Restore original IP length in header. */
 	packet_size = (uint32_t)msgdsize(mp);
 	if (packet_size > IP_MAXPACKET) {
-		freemsg(mp);
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-		return (B_FALSE);
+		ip_drop_input("Reassembled packet too large", mp, ill);
+		freemsg(mp);
+		return (NULL);
 	}
 
 	if (DB_REF(mp) > 1) {
 		mblk_t *mp2 = copymsg(mp);
 
-		freemsg(mp);
 		if (mp2 == NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			return (B_FALSE);
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
+			freemsg(mp);
+			return (NULL);
 		}
+		freemsg(mp);
 		mp = mp2;
 	}
 	ipha = (ipha_t *)mp->b_rptr;
@@ -12501,1187 +7581,239 @@ reass_done:
 	/* Record the ECN info. */
 	ipha->ipha_type_of_service &= 0xFC;
 	ipha->ipha_type_of_service |= ecn_info;
-	*mpp = mp;
 
-	/* Reassembly is successful; return checksum information if needed */
-	if (cksum_val != NULL)
-		*cksum_val = sum_val;
-	if (cksum_flags != NULL)
-		*cksum_flags = sum_flags;
+	/* Update the receive attributes */
+	ira->ira_pktlen = packet_size;
+	ira->ira_ip_hdr_length = IPH_HDR_LENGTH(ipha);
 
-	return (B_TRUE);
+	/* Reassembly is successful; set checksum information in packet */
+	DB_CKSUM16(mp) = (uint16_t)sum_val;
+	DB_CKSUMFLAGS(mp) = sum_flags;
+	DB_CKSUMSTART(mp) = ira->ira_ip_hdr_length;
+
+	return (mp);
 }
 
 /*
- * Perform ip header check sum update local options.
- * return B_TRUE if all is well, else return B_FALSE and release
- * the mp. caller is responsible for decrementing ire ref cnt.
+ * Pullup function that should be used for IP input in order to
+ * ensure we do not loose the L2 source address; we need the l2 source
+ * address for IP_RECVSLLA and for ndp_input.
+ *
+ * We return either NULL or b_rptr.
  */
-static boolean_t
-ip_options_cksum(queue_t *q, ill_t *ill, mblk_t *mp, ipha_t *ipha, ire_t *ire,
-    ip_stack_t *ipst)
+void *
+ip_pullup(mblk_t *mp, ssize_t len, ip_recv_attr_t *ira)
 {
-	mblk_t		*first_mp;
-	boolean_t	mctl_present;
-	uint16_t	sum;
+	ill_t		*ill = ira->ira_ill;
 
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-	/*
-	 * Don't do the checksum if it has gone through AH/ESP
-	 * processing.
-	 */
-	if (!mctl_present) {
-		sum = ip_csum_hdr(ipha);
-		if (sum != 0) {
-			if (ill != NULL) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
-			} else {
-				BUMP_MIB(&ipst->ips_ip_mib,
-				    ipIfStatsInCksumErrs);
-			}
-			freemsg(first_mp);
-			return (B_FALSE);
-		}
+	if (ip_rput_pullups++ == 0) {
+		(void) mi_strlog(ill->ill_rq, 1, SL_ERROR|SL_TRACE,
+		    "ip_pullup: %s forced us to "
+		    " pullup pkt, hdr len %ld, hdr addr %p",
+		    ill->ill_name, len, (void *)mp->b_rptr);
 	}
-
-	if (!ip_rput_local_options(q, mp, ipha, ire, ipst)) {
-		if (mctl_present)
-			freeb(first_mp);
-		return (B_FALSE);
-	}
-
-	return (B_TRUE);
+	if (!(ira->ira_flags & IRAF_L2SRC_SET))
+		ip_setl2src(mp, ira, ira->ira_rill);
+	ASSERT(ira->ira_flags & IRAF_L2SRC_SET);
+	if (!pullupmsg(mp, len))
+		return (NULL);
+	else
+		return (mp->b_rptr);
 }
 
 /*
- * All udp packet are delivered to the local host via this routine.
+ * Make sure ira_l2src has an address. If we don't have one fill with zeros.
+ * When called from the ULP ira_rill will be NULL hence the caller has to
+ * pass in the ill.
  */
+/* ARGSUSED */
 void
-ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
-    ill_t *recv_ill)
+ip_setl2src(mblk_t *mp, ip_recv_attr_t *ira, ill_t *ill)
 {
-	uint32_t	sum;
-	uint32_t	u1;
-	boolean_t	mctl_present;
-	conn_t		*connp;
-	mblk_t		*first_mp;
-	uint16_t	*up;
-	ill_t		*ill = (ill_t *)q->q_ptr;
-	uint16_t	reass_hck_flags = 0;
-	ip_stack_t	*ipst;
+	const uchar_t *addr;
+	int alen;
 
-	ASSERT(recv_ill != NULL);
-	ipst = recv_ill->ill_ipst;
-
-#define	rptr    ((uchar_t *)ipha)
-
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-	ASSERT(!mctl_present || ipsec_in_is_secure(first_mp));
-	ASSERT(ipha->ipha_protocol == IPPROTO_UDP);
-	ASSERT(ill != NULL);
-
-	/*
-	 * FAST PATH for udp packets
-	 */
-
-	/* u1 is # words of IP options */
-	u1 = ipha->ipha_version_and_hdr_length - (uchar_t)((IP_VERSION << 4) +
-	    IP_SIMPLE_HDR_LENGTH_IN_WORDS);
-
-	/* IP options present */
-	if (u1 != 0)
-		goto ipoptions;
-
-	/* Check the IP header checksum.  */
-	if (IS_IP_HDR_HWCKSUM(mctl_present, mp, recv_ill)) {
-		/* Clear the IP header h/w cksum flag */
-		DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
-	} else if (!mctl_present) {
-		/*
-		 * Don't verify header checksum if this packet is coming
-		 * back from AH/ESP as we already did it.
-		 */
-#define	uph	((uint16_t *)ipha)
-		sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] + uph[5] +
-		    uph[6] + uph[7] + uph[8] + uph[9];
-#undef	uph
-		/* finish doing IP checksum */
-		sum = (sum & 0xFFFF) + (sum >> 16);
-		sum = ~(sum + (sum >> 16)) & 0xFFFF;
-		if (sum != 0 && sum != 0xFFFF) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
-			freemsg(first_mp);
-			return;
-		}
-	}
-
-	/*
-	 * Count for SNMP of inbound packets for ire.
-	 * if mctl is present this might be a secure packet and
-	 * has already been counted for in ip_proto_input().
-	 */
-	if (!mctl_present) {
-		UPDATE_IB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-	}
-
-	/* packet part of fragmented IP packet? */
-	u1 = ntohs(ipha->ipha_fragment_offset_and_flags);
-	if (u1 & (IPH_MF | IPH_OFFSET)) {
-		goto fragmented;
-	}
-
-	/* u1 = IP header length (20 bytes) */
-	u1 = IP_SIMPLE_HDR_LENGTH;
-
-	/* packet does not contain complete IP & UDP headers */
-	if ((mp->b_wptr - rptr) < (IP_SIMPLE_HDR_LENGTH + UDPH_SIZE))
-		goto udppullup;
-
-	/* up points to UDP header */
-	up = (uint16_t *)((uchar_t *)ipha + IP_SIMPLE_HDR_LENGTH);
-#define	iphs    ((uint16_t *)ipha)
-
-	/* if udp hdr cksum != 0, then need to checksum udp packet */
-	if (up[3] != 0) {
-		mblk_t *mp1 = mp->b_cont;
-		boolean_t cksum_err;
-		uint16_t hck_flags = 0;
-
-		/* Pseudo-header checksum */
-		u1 = IP_UDP_CSUM_COMP + iphs[6] + iphs[7] + iphs[8] +
-		    iphs[9] + up[2];
-
-		/*
-		 * Revert to software checksum calculation if the interface
-		 * isn't capable of checksum offload or if IPsec is present.
-		 */
-		if (ILL_HCKSUM_CAPABLE(recv_ill) && !mctl_present && dohwcksum)
-			hck_flags = DB_CKSUMFLAGS(mp);
-
-		if ((hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
-			IP_STAT(ipst, ip_in_sw_cksum);
-
-		IP_CKSUM_RECV(hck_flags, u1,
-		    (uchar_t *)(rptr + DB_CKSUMSTART(mp)),
-		    (int32_t)((uchar_t *)up - rptr),
-		    mp, mp1, cksum_err);
-
-		if (cksum_err) {
-			BUMP_MIB(ill->ill_ip_mib, udpIfStatsInCksumErrs);
-			if (hck_flags & HCK_FULLCKSUM)
-				IP_STAT(ipst, ip_udp_in_full_hw_cksum_err);
-			else if (hck_flags & HCK_PARTIALCKSUM)
-				IP_STAT(ipst, ip_udp_in_part_hw_cksum_err);
-			else
-				IP_STAT(ipst, ip_udp_in_sw_cksum_err);
-
-			freemsg(first_mp);
-			return;
-		}
-	}
-
-	/* Non-fragmented broadcast or multicast packet? */
-	if (ire->ire_type == IRE_BROADCAST)
-		goto udpslowpath;
-
-	if ((connp = ipcl_classify_v4(mp, IPPROTO_UDP, IP_SIMPLE_HDR_LENGTH,
-	    ire->ire_zoneid, ipst)) != NULL) {
-		ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
-		IP_STAT(ipst, ip_udp_fast_path);
-
-		if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
-		    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
-			freemsg(mp);
-			BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
-		} else {
-			if (!mctl_present) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsHCInDelivers);
-			}
-			/*
-			 * mp and first_mp can change.
-			 */
-			if (ip_udp_check(q, connp, recv_ill,
-			    ipha, &mp, &first_mp, mctl_present, ire)) {
-				/* Send it upstream */
-				(connp->conn_recv)(connp, mp, NULL);
-			}
-		}
-		/*
-		 * freeb() cannot deal with null mblk being passed
-		 * in and first_mp can be set to null in the call
-		 * ipsec_input_fast_proc()->ipsec_check_inbound_policy.
-		 */
-		if (mctl_present && first_mp != NULL) {
-			freeb(first_mp);
-		}
-		CONN_DEC_REF(connp);
+	if (ira->ira_flags & IRAF_L2SRC_SET)
 		return;
-	}
 
-	/*
-	 * if we got here we know the packet is not fragmented and
-	 * has no options. The classifier could not find a conn_t and
-	 * most likely its an icmp packet so send it through slow path.
-	 */
-
-	goto udpslowpath;
-
-ipoptions:
-	if (!ip_options_cksum(q, ill, mp, ipha, ire, ipst)) {
-		goto slow_done;
-	}
-
-	UPDATE_IB_PKT_COUNT(ire);
-	ire->ire_last_used_time = lbolt;
-	u1 = ntohs(ipha->ipha_fragment_offset_and_flags);
-	if (u1 & (IPH_MF | IPH_OFFSET)) {
-fragmented:
-		/*
-		 * "sum" and "reass_hck_flags" are non-zero if the
-		 * reassembled packet has a valid hardware computed
-		 * checksum information associated with it.
-		 */
-		if (!ip_rput_fragment(ill, recv_ill, &mp, ipha, &sum,
-		    &reass_hck_flags)) {
-			goto slow_done;
-		}
-
-		/*
-		 * Make sure that first_mp points back to mp as
-		 * the mp we came in with could have changed in
-		 * ip_rput_fragment().
-		 */
-		ASSERT(!mctl_present);
-		ipha = (ipha_t *)mp->b_rptr;
-		first_mp = mp;
-	}
-
-	/* Now we have a complete datagram, destined for this machine. */
-	u1 = IPH_HDR_LENGTH(ipha);
-	/* Pull up the UDP header, if necessary. */
-	if ((MBLKL(mp)) < (u1 + UDPH_SIZE)) {
-udppullup:
-		if (!pullupmsg(mp, u1 + UDPH_SIZE)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(first_mp);
-			goto slow_done;
-		}
-		ipha = (ipha_t *)mp->b_rptr;
-	}
-
-	/*
-	 * Validate the checksum for the reassembled packet; for the
-	 * pullup case we calculate the payload checksum in software.
-	 */
-	up = (uint16_t *)((uchar_t *)ipha + u1 + UDP_PORTS_OFFSET);
-	if (up[3] != 0) {
-		boolean_t cksum_err;
-
-		if ((reass_hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
-			IP_STAT(ipst, ip_in_sw_cksum);
-
-		IP_CKSUM_RECV_REASS(reass_hck_flags,
-		    (int32_t)((uchar_t *)up - (uchar_t *)ipha),
-		    IP_UDP_CSUM_COMP + iphs[6] + iphs[7] + iphs[8] +
-		    iphs[9] + up[2], sum, cksum_err);
-
-		if (cksum_err) {
-			BUMP_MIB(ill->ill_ip_mib, udpIfStatsInCksumErrs);
-
-			if (reass_hck_flags & HCK_FULLCKSUM)
-				IP_STAT(ipst, ip_udp_in_full_hw_cksum_err);
-			else if (reass_hck_flags & HCK_PARTIALCKSUM)
-				IP_STAT(ipst, ip_udp_in_part_hw_cksum_err);
-			else
-				IP_STAT(ipst, ip_udp_in_sw_cksum_err);
-
-			freemsg(first_mp);
-			goto slow_done;
-		}
-	}
-udpslowpath:
-
-	/* Clear hardware checksum flag to be safe */
-	DB_CKSUMFLAGS(mp) = 0;
-
-	ip_fanout_udp(q, first_mp, ill, ipha, *(uint32_t *)up,
-	    (ire->ire_type == IRE_BROADCAST),
-	    IP_FF_SEND_ICMP | IP_FF_CKSUM | IP_FF_IPINFO,
-	    mctl_present, B_TRUE, recv_ill, ire->ire_zoneid);
-
-slow_done:
-	IP_STAT(ipst, ip_udp_slow_path);
-	return;
-
-#undef  iphs
-#undef  rptr
-}
-
-static boolean_t
-ip_iptun_input(mblk_t *ipsec_mp, mblk_t *data_mp, ipha_t *ipha, ill_t *ill,
-    ire_t *ire, ip_stack_t *ipst)
-{
-	conn_t	*connp;
-
-	ASSERT(ipsec_mp == NULL || ipsec_mp->b_cont == data_mp);
-
-	if ((connp = ipcl_classify_v4(data_mp, ipha->ipha_protocol,
-	    IP_SIMPLE_HDR_LENGTH, ire->ire_zoneid, ipst)) != NULL) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		connp->conn_recv(connp, ipsec_mp != NULL ? ipsec_mp : data_mp,
-		    NULL);
-		CONN_DEC_REF(connp);
-		return (B_TRUE);
-	}
-	return (B_FALSE);
-}
-
-/* ARGSUSED */
-static mblk_t *
-ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
-    ire_t *ire, mblk_t *first_mp, uint_t flags, queue_t *q,
-    ill_rx_ring_t *ill_ring)
-{
-	conn_t		*connp;
-	uint32_t	sum;
-	uint32_t	u1;
-	uint16_t	*up;
-	int		offset;
-	ssize_t		len;
-	mblk_t		*mp1;
-	boolean_t	syn_present = B_FALSE;
-	tcph_t		*tcph;
-	uint_t		tcph_flags;
-	uint_t		ip_hdr_len;
-	ill_t		*ill = (ill_t *)q->q_ptr;
-	zoneid_t	zoneid = ire->ire_zoneid;
-	boolean_t	cksum_err;
-	uint16_t	hck_flags = 0;
-	ip_stack_t	*ipst = recv_ill->ill_ipst;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
-
-#define	rptr	((uchar_t *)ipha)
-
-	ASSERT(ipha->ipha_protocol == IPPROTO_TCP);
 	ASSERT(ill != NULL);
-
-	/*
-	 * FAST PATH for tcp packets
-	 */
-
-	/* u1 is # words of IP options */
-	u1 = ipha->ipha_version_and_hdr_length - (uchar_t)((IP_VERSION << 4)
-	    + IP_SIMPLE_HDR_LENGTH_IN_WORDS);
-
-	/* IP options present */
-	if (u1) {
-		goto ipoptions;
-	} else if (!mctl_present) {
-		/* Check the IP header checksum.  */
-		if (IS_IP_HDR_HWCKSUM(mctl_present, mp, recv_ill)) {
-			/* Clear the IP header h/w cksum flag */
-			DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
-		} else if (!mctl_present) {
-			/*
-			 * Don't verify header checksum if this packet
-			 * is coming back from AH/ESP as we already did it.
-			 */
-#define	uph	((uint16_t *)ipha)
-			sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
-			    uph[5] + uph[6] + uph[7] + uph[8] + uph[9];
-#undef	uph
-			/* finish doing IP checksum */
-			sum = (sum & 0xFFFF) + (sum >> 16);
-			sum = ~(sum + (sum >> 16)) & 0xFFFF;
-			if (sum != 0 && sum != 0xFFFF) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsInCksumErrs);
-				goto error;
-			}
-		}
-	}
-
-	if (!mctl_present) {
-		UPDATE_IB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-	}
-
-	/* packet part of fragmented IP packet? */
-	u1 = ntohs(ipha->ipha_fragment_offset_and_flags);
-	if (u1 & (IPH_MF | IPH_OFFSET)) {
-		goto fragmented;
-	}
-
-	/* u1 = IP header length (20 bytes) */
-	u1 = ip_hdr_len = IP_SIMPLE_HDR_LENGTH;
-
-	/* does packet contain IP+TCP headers? */
-	len = mp->b_wptr - rptr;
-	if (len < (IP_SIMPLE_HDR_LENGTH + TCP_MIN_HEADER_LENGTH)) {
-		IP_STAT(ipst, ip_tcppullup);
-		goto tcppullup;
-	}
-
-	/* TCP options present? */
-	offset = ((uchar_t *)ipha)[IP_SIMPLE_HDR_LENGTH + 12] >> 4;
-
-	/*
-	 * If options need to be pulled up, then goto tcpoptions.
-	 * otherwise we are still in the fast path
-	 */
-	if (len < (offset << 2) + IP_SIMPLE_HDR_LENGTH) {
-		IP_STAT(ipst, ip_tcpoptions);
-		goto tcpoptions;
-	}
-
-	/* multiple mblks of tcp data? */
-	if ((mp1 = mp->b_cont) != NULL) {
-		IP_STAT(ipst, ip_multipkttcp);
-		len += msgdsize(mp1);
-	}
-
-	up = (uint16_t *)(rptr + IP_SIMPLE_HDR_LENGTH + TCP_PORTS_OFFSET);
-
-	/* part of pseudo checksum */
-
-	/* TCP datagram length */
-	u1 = len - IP_SIMPLE_HDR_LENGTH;
-
-#define	iphs    ((uint16_t *)ipha)
-
-#ifdef	_BIG_ENDIAN
-	u1 += IPPROTO_TCP;
-#else
-	u1 = ((u1 >> 8) & 0xFF) + (((u1 & 0xFF) + IPPROTO_TCP) << 8);
-#endif
-	u1 += iphs[6] + iphs[7] + iphs[8] + iphs[9];
-
-	/*
-	 * Revert to software checksum calculation if the interface
-	 * isn't capable of checksum offload or if IPsec is present.
-	 */
-	if (ILL_HCKSUM_CAPABLE(recv_ill) && !mctl_present && dohwcksum)
-		hck_flags = DB_CKSUMFLAGS(mp);
-
-	if ((hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
-		IP_STAT(ipst, ip_in_sw_cksum);
-
-	IP_CKSUM_RECV(hck_flags, u1,
-	    (uchar_t *)(rptr + DB_CKSUMSTART(mp)),
-	    (int32_t)((uchar_t *)up - rptr),
-	    mp, mp1, cksum_err);
-
-	if (cksum_err) {
-		BUMP_MIB(ill->ill_ip_mib, tcpIfStatsInErrs);
-
-		if (hck_flags & HCK_FULLCKSUM)
-			IP_STAT(ipst, ip_tcp_in_full_hw_cksum_err);
-		else if (hck_flags & HCK_PARTIALCKSUM)
-			IP_STAT(ipst, ip_tcp_in_part_hw_cksum_err);
-		else
-			IP_STAT(ipst, ip_tcp_in_sw_cksum_err);
-
-		goto error;
-	}
-
-try_again:
-
-	if ((connp = ipcl_classify_v4(mp, IPPROTO_TCP, ip_hdr_len,
-	    zoneid, ipst)) == NULL) {
-		/* Send the TH_RST */
-		goto no_conn;
-	}
-
-	tcph = (tcph_t *)&mp->b_rptr[ip_hdr_len];
-	tcph_flags = tcph->th_flags[0] & (TH_SYN|TH_ACK|TH_RST|TH_URG);
-
-	/*
-	 * TCP FAST PATH for AF_INET socket.
-	 *
-	 * TCP fast path to avoid extra work. An AF_INET socket type
-	 * does not have facility to receive extra information via
-	 * ip_process or ip_add_info. Also, when the connection was
-	 * established, we made a check if this connection is impacted
-	 * by any global IPsec policy or per connection policy (a
-	 * policy that comes in effect later will not apply to this
-	 * connection). Since all this can be determined at the
-	 * connection establishment time, a quick check of flags
-	 * can avoid extra work.
-	 */
-	if (IPCL_IS_TCP4_CONNECTED_NO_POLICY(connp) && !mctl_present &&
-	    !IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
-		ASSERT(first_mp == mp);
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		if (tcph_flags != (TH_SYN | TH_ACK)) {
-			SET_SQUEUE(mp, tcp_rput_data, connp);
-			return (mp);
-		}
-		mp->b_datap->db_struioflag |= STRUIO_CONNECT;
-		DB_CKSUMSTART(mp) = (intptr_t)ip_squeue_get(ill_ring);
-		SET_SQUEUE(mp, tcp_input, connp);
-		return (mp);
-	}
-
-	if (tcph_flags == TH_SYN) {
-		if (IPCL_IS_TCP(connp)) {
-			mp->b_datap->db_struioflag |= STRUIO_EAGER;
-			DB_CKSUMSTART(mp) =
-			    (intptr_t)ip_squeue_get(ill_ring);
-			if (IPCL_IS_FULLY_BOUND(connp) && !mctl_present &&
-			    !CONN_INBOUND_POLICY_PRESENT(connp, ipss)) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsHCInDelivers);
-				SET_SQUEUE(mp, connp->conn_recv, connp);
-				return (mp);
-			} else if (IPCL_IS_BOUND(connp) && !mctl_present &&
-			    !CONN_INBOUND_POLICY_PRESENT(connp, ipss)) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsHCInDelivers);
-				ip_squeue_enter_unbound++;
-				SET_SQUEUE(mp, tcp_conn_request_unbound,
-				    connp);
-				return (mp);
-			}
-			syn_present = B_TRUE;
-		}
-	}
-
-	if (IPCL_IS_TCP(connp) && IPCL_IS_BOUND(connp) && !syn_present) {
-		uint_t	flags = (unsigned int)tcph->th_flags[0] & 0xFF;
-
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		/* No need to send this packet to TCP */
-		if ((flags & TH_RST) || (flags & TH_URG)) {
-			CONN_DEC_REF(connp);
-			freemsg(first_mp);
-			return (NULL);
-		}
-		if (flags & TH_ACK) {
-			ip_xmit_reset_serialize(first_mp, ip_hdr_len, zoneid,
-			    ipst->ips_netstack->netstack_tcp, connp);
-			CONN_DEC_REF(connp);
-			return (NULL);
-		}
-
-		CONN_DEC_REF(connp);
-		freemsg(first_mp);
-		return (NULL);
-	}
-
-	if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || mctl_present) {
-		first_mp = ipsec_check_inbound_policy(first_mp, connp,
-		    ipha, NULL, mctl_present);
-		if (first_mp == NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			CONN_DEC_REF(connp);
-			return (NULL);
-		}
-		if (IPCL_IS_TCP(connp) && IPCL_IS_BOUND(connp)) {
-			ASSERT(syn_present);
-			if (mctl_present) {
-				ASSERT(first_mp != mp);
-				first_mp->b_datap->db_struioflag |=
-				    STRUIO_POLICY;
-			} else {
-				ASSERT(first_mp == mp);
-				mp->b_datap->db_struioflag &= ~STRUIO_EAGER;
-				mp->b_datap->db_struioflag |= STRUIO_POLICY;
-			}
-		} else {
-			/*
-			 * Discard first_mp early since we're dealing with a
-			 * fully-connected conn_t and tcp doesn't do policy in
-			 * this case.
-			 */
-			if (mctl_present) {
-				freeb(first_mp);
-				mctl_present = B_FALSE;
-			}
-			first_mp = mp;
-		}
-	}
-
-	/* Initiate IPPF processing for fastpath */
-	if (IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
-		uint32_t	ill_index;
-
-		ill_index = recv_ill->ill_phyint->phyint_ifindex;
-		ip_process(IPP_LOCAL_IN, &mp, ill_index);
-		if (mp == NULL) {
-			ip2dbg(("ip_input_ipsec_process: TCP pkt "
-			    "deferred/dropped during IPPF processing\n"));
-			CONN_DEC_REF(connp);
-			if (mctl_present)
-				freeb(first_mp);
-			return (NULL);
-		} else if (mctl_present) {
-			/*
-			 * ip_process might return a new mp.
-			 */
-			ASSERT(first_mp != mp);
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
-		}
-
-	}
-
-	if (!syn_present && connp->conn_ip_recvpktinfo) {
-		/*
-		 * TCP does not support IP_RECVPKTINFO for v4 so lets
-		 * make sure IPF_RECVIF is passed to ip_add_info.
-		 */
-		mp = ip_add_info(mp, recv_ill, flags|IPF_RECVIF,
-		    IPCL_ZONEID(connp), ipst);
-		if (mp == NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			CONN_DEC_REF(connp);
-			if (mctl_present)
-				freeb(first_mp);
-			return (NULL);
-		} else if (mctl_present) {
-			/*
-			 * ip_add_info might return a new mp.
-			 */
-			ASSERT(first_mp != mp);
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
-		}
-	}
-
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-	if (IPCL_IS_TCP(connp)) {
-		SET_SQUEUE(first_mp, connp->conn_recv, connp);
-		return (first_mp);
+	alen = ill->ill_phys_addr_length;
+	ASSERT(alen <= sizeof (ira->ira_l2src));
+	if (ira->ira_mhip != NULL &&
+	    (addr = ira->ira_mhip->mhi_saddr) != NULL) {
+		bcopy(addr, ira->ira_l2src, alen);
+	} else if ((ira->ira_flags & IRAF_L2SRC_LOOPBACK) &&
+	    (addr = ill->ill_phys_addr) != NULL) {
+		bcopy(addr, ira->ira_l2src, alen);
 	} else {
-		/* SOCK_RAW, IPPROTO_TCP case */
-		(connp->conn_recv)(connp, first_mp, NULL);
-		CONN_DEC_REF(connp);
-		return (NULL);
+		bzero(ira->ira_l2src, alen);
 	}
-
-no_conn:
-	/* Initiate IPPf processing, if needed. */
-	if (IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
-		uint32_t ill_index;
-		ill_index = recv_ill->ill_phyint->phyint_ifindex;
-		ip_process(IPP_LOCAL_IN, &first_mp, ill_index);
-		if (first_mp == NULL) {
-			return (NULL);
-		}
-	}
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-
-	tcp_xmit_listeners_reset(first_mp, IPH_HDR_LENGTH(mp->b_rptr), zoneid,
-	    ipst->ips_netstack->netstack_tcp, NULL);
-	return (NULL);
-ipoptions:
-	if (!ip_options_cksum(q, ill, first_mp, ipha, ire, ipst)) {
-		goto slow_done;
-	}
-
-	UPDATE_IB_PKT_COUNT(ire);
-	ire->ire_last_used_time = lbolt;
-
-	u1 = ntohs(ipha->ipha_fragment_offset_and_flags);
-	if (u1 & (IPH_MF | IPH_OFFSET)) {
-fragmented:
-		if (!ip_rput_fragment(ill, recv_ill, &mp, ipha, NULL, NULL)) {
-			if (mctl_present)
-				freeb(first_mp);
-			goto slow_done;
-		}
-		/*
-		 * Make sure that first_mp points back to mp as
-		 * the mp we came in with could have changed in
-		 * ip_rput_fragment().
-		 */
-		ASSERT(!mctl_present);
-		ipha = (ipha_t *)mp->b_rptr;
-		first_mp = mp;
-	}
-
-	/* Now we have a complete datagram, destined for this machine. */
-	u1 = ip_hdr_len = IPH_HDR_LENGTH(ipha);
-
-	len = mp->b_wptr - mp->b_rptr;
-	/* Pull up a minimal TCP header, if necessary. */
-	if (len < (u1 + 20)) {
-tcppullup:
-		if (!pullupmsg(mp, u1 + 20)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			goto error;
-		}
-		ipha = (ipha_t *)mp->b_rptr;
-		len = mp->b_wptr - mp->b_rptr;
-	}
-
-	/*
-	 * Extract the offset field from the TCP header.  As usual, we
-	 * try to help the compiler more than the reader.
-	 */
-	offset = ((uchar_t *)ipha)[u1 + 12] >> 4;
-	if (offset != 5) {
-tcpoptions:
-		if (offset < 5) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			goto error;
-		}
-		/*
-		 * There must be TCP options.
-		 * Make sure we can grab them.
-		 */
-		offset <<= 2;
-		offset += u1;
-		if (len < offset) {
-			if (!pullupmsg(mp, offset)) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				goto error;
-			}
-			ipha = (ipha_t *)mp->b_rptr;
-			len = mp->b_wptr - rptr;
-		}
-	}
-
-	/* Get the total packet length in len, including headers. */
-	if (mp->b_cont)
-		len = msgdsize(mp);
-
-	/*
-	 * Check the TCP checksum by pulling together the pseudo-
-	 * header checksum, and passing it to ip_csum to be added in
-	 * with the TCP datagram.
-	 *
-	 * Since we are not using the hwcksum if available we must
-	 * clear the flag. We may come here via tcppullup or tcpoptions.
-	 * If either of these fails along the way the mblk is freed.
-	 * If this logic ever changes and mblk is reused to say send
-	 * ICMP's back, then this flag may need to be cleared in
-	 * other places as well.
-	 */
-	DB_CKSUMFLAGS(mp) = 0;
-
-	up = (uint16_t *)(rptr + u1 + TCP_PORTS_OFFSET);
-
-	u1 = (uint32_t)(len - u1);	/* TCP datagram length. */
-#ifdef	_BIG_ENDIAN
-	u1 += IPPROTO_TCP;
-#else
-	u1 = ((u1 >> 8) & 0xFF) + (((u1 & 0xFF) + IPPROTO_TCP) << 8);
-#endif
-	u1 += iphs[6] + iphs[7] + iphs[8] + iphs[9];
-	/*
-	 * Not M_DATA mblk or its a dup, so do the checksum now.
-	 */
-	IP_STAT(ipst, ip_in_sw_cksum);
-	if (IP_CSUM(mp, (int32_t)((uchar_t *)up - rptr), u1) != 0) {
-		BUMP_MIB(ill->ill_ip_mib, tcpIfStatsInErrs);
-		goto error;
-	}
-
-	IP_STAT(ipst, ip_tcp_slow_path);
-	goto try_again;
-#undef  iphs
-#undef  rptr
-
-error:
-	freemsg(first_mp);
-slow_done:
-	return (NULL);
-}
-
-/* ARGSUSED */
-static void
-ip_sctp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
-    ire_t *ire, mblk_t *first_mp, uint_t flags, queue_t *q, ipaddr_t dst)
-{
-	conn_t		*connp;
-	uint32_t	sum;
-	uint32_t	u1;
-	ssize_t		len;
-	sctp_hdr_t	*sctph;
-	zoneid_t	zoneid = ire->ire_zoneid;
-	uint32_t	pktsum;
-	uint32_t	calcsum;
-	uint32_t	ports;
-	in6_addr_t	map_src, map_dst;
-	ill_t		*ill = (ill_t *)q->q_ptr;
-	ip_stack_t	*ipst;
-	sctp_stack_t	*sctps;
-	boolean_t	sctp_csum_err = B_FALSE;
-
-	ASSERT(recv_ill != NULL);
-	ipst = recv_ill->ill_ipst;
-	sctps = ipst->ips_netstack->netstack_sctp;
-
-#define	rptr	((uchar_t *)ipha)
-
-	ASSERT(ipha->ipha_protocol == IPPROTO_SCTP);
-	ASSERT(ill != NULL);
-
-	/* u1 is # words of IP options */
-	u1 = ipha->ipha_version_and_hdr_length - (uchar_t)((IP_VERSION << 4)
-	    + IP_SIMPLE_HDR_LENGTH_IN_WORDS);
-
-	/* IP options present */
-	if (u1 > 0) {
-		goto ipoptions;
-	} else {
-		/* Check the IP header checksum.  */
-		if (!IS_IP_HDR_HWCKSUM(mctl_present, mp, recv_ill) &&
-		    !mctl_present) {
-#define	uph	((uint16_t *)ipha)
-			sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
-			    uph[5] + uph[6] + uph[7] + uph[8] + uph[9];
-#undef	uph
-			/* finish doing IP checksum */
-			sum = (sum & 0xFFFF) + (sum >> 16);
-			sum = ~(sum + (sum >> 16)) & 0xFFFF;
-			/*
-			 * Don't verify header checksum if this packet
-			 * is coming back from AH/ESP as we already did it.
-			 */
-			if (sum != 0 && sum != 0xFFFF) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
-				goto error;
-			}
-		}
-		/*
-		 * Since there is no SCTP h/w cksum support yet, just
-		 * clear the flag.
-		 */
-		DB_CKSUMFLAGS(mp) = 0;
-	}
-
-	/*
-	 * Don't verify header checksum if this packet is coming
-	 * back from AH/ESP as we already did it.
-	 */
-	if (!mctl_present) {
-		UPDATE_IB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-	}
-
-	/* packet part of fragmented IP packet? */
-	u1 = ntohs(ipha->ipha_fragment_offset_and_flags);
-	if (u1 & (IPH_MF | IPH_OFFSET))
-		goto fragmented;
-
-	/* u1 = IP header length (20 bytes) */
-	u1 = IP_SIMPLE_HDR_LENGTH;
-
-find_sctp_client:
-	/* Pullup if we don't have the sctp common header. */
-	len = MBLKL(mp);
-	if (len < (u1 + SCTP_COMMON_HDR_LENGTH)) {
-		if (mp->b_cont == NULL ||
-		    !pullupmsg(mp, u1 + SCTP_COMMON_HDR_LENGTH)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			goto error;
-		}
-		ipha = (ipha_t *)mp->b_rptr;
-		len = MBLKL(mp);
-	}
-
-	sctph = (sctp_hdr_t *)(rptr + u1);
-#ifdef	DEBUG
-	if (!skip_sctp_cksum) {
-#endif
-		pktsum = sctph->sh_chksum;
-		sctph->sh_chksum = 0;
-		calcsum = sctp_cksum(mp, u1);
-		sctph->sh_chksum = pktsum;
-		if (calcsum != pktsum)
-			sctp_csum_err = B_TRUE;
-#ifdef	DEBUG	/* skip_sctp_cksum */
-	}
-#endif
-	/* get the ports */
-	ports = *(uint32_t *)&sctph->sh_sport;
-
-	IRE_REFRELE(ire);
-	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &map_dst);
-	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &map_src);
-	if (sctp_csum_err) {
-		/*
-		 * No potential sctp checksum errors go to the Sun
-		 * sctp stack however they might be Adler-32 summed
-		 * packets a userland stack bound to a raw IP socket
-		 * could reasonably use. Note though that Adler-32 is
-		 * a long deprecated algorithm and customer sctp
-		 * networks should eventually migrate to CRC-32 at
-		 * which time this facility should be removed.
-		 */
-		flags |= IP_FF_SCTP_CSUM_ERR;
-		goto no_conn;
-	}
-	if ((connp = sctp_fanout(&map_src, &map_dst, ports, zoneid, mp,
-	    sctps)) == NULL) {
-		/* Check for raw socket or OOTB handling */
-		goto no_conn;
-	}
-
-	/* Found a client; up it goes */
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-	sctp_input(connp, ipha, mp, first_mp, recv_ill, B_TRUE, mctl_present);
-	return;
-
-no_conn:
-	ip_fanout_sctp_raw(first_mp, recv_ill, ipha, B_TRUE,
-	    ports, mctl_present, flags, B_TRUE, zoneid);
-	return;
-
-ipoptions:
-	DB_CKSUMFLAGS(mp) = 0;
-	if (!ip_options_cksum(q, ill, first_mp, ipha, ire, ipst))
-		goto slow_done;
-
-	UPDATE_IB_PKT_COUNT(ire);
-	ire->ire_last_used_time = lbolt;
-
-	u1 = ntohs(ipha->ipha_fragment_offset_and_flags);
-	if (u1 & (IPH_MF | IPH_OFFSET)) {
-fragmented:
-		if (!ip_rput_fragment(ill, recv_ill, &mp, ipha, NULL, NULL))
-			goto slow_done;
-		/*
-		 * Make sure that first_mp points back to mp as
-		 * the mp we came in with could have changed in
-		 * ip_rput_fragment().
-		 */
-		ASSERT(!mctl_present);
-		ipha = (ipha_t *)mp->b_rptr;
-		first_mp = mp;
-	}
-
-	/* Now we have a complete datagram, destined for this machine. */
-	u1 = IPH_HDR_LENGTH(ipha);
-	goto find_sctp_client;
-#undef  iphs
-#undef  rptr
-
-error:
-	freemsg(first_mp);
-slow_done:
-	IRE_REFRELE(ire);
-}
-
-#define	VER_BITS	0xF0
-#define	VERSION_6	0x60
-
-static boolean_t
-ip_rput_multimblk_ipoptions(queue_t *q, ill_t *ill, mblk_t *mp, ipha_t **iphapp,
-    ipaddr_t *dstp, ip_stack_t *ipst)
-{
-	uint_t	opt_len;
-	ipha_t *ipha;
-	ssize_t len;
-	uint_t	pkt_len;
-
-	ASSERT(ill != NULL);
-	IP_STAT(ipst, ip_ipoptions);
-	ipha = *iphapp;
-
-#define	rptr    ((uchar_t *)ipha)
-	/* Assume no IPv6 packets arrive over the IPv4 queue */
-	if (IPH_HDR_VERSION(ipha) == IPV6_VERSION) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInWrongIPVersion);
-		freemsg(mp);
-		return (B_FALSE);
-	}
-
-	/* multiple mblk or too short */
-	pkt_len = ntohs(ipha->ipha_length);
-
-	/* Get the number of words of IP options in the IP header. */
-	opt_len = ipha->ipha_version_and_hdr_length - IP_SIMPLE_HDR_VERSION;
-	if (opt_len) {
-		/* IP Options present!  Validate and process. */
-		if (opt_len > (15 - IP_SIMPLE_HDR_LENGTH_IN_WORDS)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-			goto done;
-		}
-		/*
-		 * Recompute complete header length and make sure we
-		 * have access to all of it.
-		 */
-		len = ((size_t)opt_len + IP_SIMPLE_HDR_LENGTH_IN_WORDS) << 2;
-		if (len > (mp->b_wptr - rptr)) {
-			if (len > pkt_len) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-				goto done;
-			}
-			if (!pullupmsg(mp, len)) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				goto done;
-			}
-			ipha = (ipha_t *)mp->b_rptr;
-		}
-		/*
-		 * Go off to ip_rput_options which returns the next hop
-		 * destination address, which may have been affected
-		 * by source routing.
-		 */
-		IP_STAT(ipst, ip_opt);
-		if (ip_rput_options(q, mp, ipha, dstp, ipst) == -1) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			return (B_FALSE);
-		}
-	}
-	*iphapp = ipha;
-	return (B_TRUE);
-done:
-	/* clear b_prev - used by ip_mroute_decap */
-	mp->b_prev = NULL;
-	freemsg(mp);
-	return (B_FALSE);
-#undef  rptr
-}
-
-/*
- * Deal with the fact that there is no ire for the destination.
- */
-static ire_t *
-ip_rput_noire(queue_t *q, mblk_t *mp, int ll_multicast, ipaddr_t dst)
-{
-	ipha_t	*ipha;
-	ill_t	*ill;
-	ire_t	*ire;
-	ip_stack_t *ipst;
-	enum	ire_forward_action ret_action;
-
-	ipha = (ipha_t *)mp->b_rptr;
-	ill = (ill_t *)q->q_ptr;
-
-	ASSERT(ill != NULL);
-	ipst = ill->ill_ipst;
-
-	/*
-	 * No IRE for this destination, so it can't be for us.
-	 * Unless we are forwarding, drop the packet.
-	 * We have to let source routed packets through
-	 * since we don't yet know if they are 'ping -l'
-	 * packets i.e. if they will go out over the
-	 * same interface as they came in on.
-	 */
-	if (ll_multicast) {
-		freemsg(mp);
-		return (NULL);
-	}
-	if (!(ill->ill_flags & ILLF_ROUTER) && !ip_source_routed(ipha, ipst)) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-		freemsg(mp);
-		return (NULL);
-	}
-
-	/*
-	 * Mark this packet as having originated externally.
-	 *
-	 * For non-forwarding code path, ire_send later double
-	 * checks this interface to see if it is still exists
-	 * post-ARP resolution.
-	 *
-	 * Also, IPQOS uses this to differentiate between
-	 * IPP_FWD_OUT and IPP_LOCAL_OUT for post-ARP
-	 * QOS packet processing in ip_wput_attach_llhdr().
-	 * The QoS module can mark the b_band for a fastpath message
-	 * or the dl_priority field in a unitdata_req header for
-	 * CoS marking. This info can only be found in
-	 * ip_wput_attach_llhdr().
-	 */
-	mp->b_prev = (mblk_t *)(uintptr_t)ill->ill_phyint->phyint_ifindex;
-	/*
-	 * Clear the indication that this may have a hardware checksum
-	 * as we are not using it
-	 */
-	DB_CKSUMFLAGS(mp) = 0;
-
-	ire = ire_forward(dst, &ret_action, NULL, NULL,
-	    msg_getlabel(mp), ipst);
-
-	if (ire == NULL && ret_action == Forward_check_multirt) {
-		/* Let ip_newroute handle CGTP  */
-		ip_newroute(q, mp, dst, NULL, GLOBAL_ZONEID, ipst);
-		return (NULL);
-	}
-
-	if (ire != NULL)
-		return (ire);
-
-	mp->b_prev = mp->b_next = 0;
-
-	if (ret_action == Forward_blackhole) {
-		freemsg(mp);
-		return (NULL);
-	}
-	/* send icmp unreachable */
-	q = WR(q);
-	/* Sent by forwarding path, and router is global zone */
-	if (ip_source_routed(ipha, ipst)) {
-		icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED,
-		    GLOBAL_ZONEID, ipst);
-	} else {
-		icmp_unreachable(q, mp, ICMP_HOST_UNREACHABLE, GLOBAL_ZONEID,
-		    ipst);
-	}
-
-	return (NULL);
-
+	ira->ira_flags |= IRAF_L2SRC_SET;
 }
 
 /*
  * check ip header length and align it.
  */
-static boolean_t
-ip_check_and_align_header(queue_t *q, mblk_t *mp, ip_stack_t *ipst)
+mblk_t *
+ip_check_and_align_header(mblk_t *mp, uint_t min_size, ip_recv_attr_t *ira)
 {
+	ill_t	*ill = ira->ira_ill;
 	ssize_t len;
-	ill_t *ill;
-	ipha_t	*ipha;
 
 	len = MBLKL(mp);
 
-	if (!OK_32PTR(mp->b_rptr) || len < IP_SIMPLE_HDR_LENGTH) {
-		ill = (ill_t *)q->q_ptr;
+	if (!OK_32PTR(mp->b_rptr))
+		IP_STAT(ill->ill_ipst, ip_notaligned);
+	else
+		IP_STAT(ill->ill_ipst, ip_recv_pullup);
 
-		if (!OK_32PTR(mp->b_rptr))
-			IP_STAT(ipst, ip_notaligned1);
-		else
-			IP_STAT(ipst, ip_notaligned2);
-		/* Guard against bogus device drivers */
-		if (len < 0) {
-			/* clear b_prev - used by ip_mroute_decap */
-			mp->b_prev = NULL;
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-			freemsg(mp);
-			return (B_FALSE);
-		}
-
-		if (ip_rput_pullups++ == 0) {
-			ipha = (ipha_t *)mp->b_rptr;
-			(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
-			    "ip_check_and_align_header: %s forced us to "
-			    " pullup pkt, hdr len %ld, hdr addr %p",
-			    ill->ill_name, len, (void *)ipha);
-		}
-		if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
-			/* clear b_prev - used by ip_mroute_decap */
-			mp->b_prev = NULL;
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(mp);
-			return (B_FALSE);
-		}
+	/* Guard against bogus device drivers */
+	if (len < 0) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
+		ip_drop_input("ipIfStatsInHdrErrors", mp, ill);
+		freemsg(mp);
+		return (NULL);
 	}
-	return (B_TRUE);
+
+	if (len == 0) {
+		/* GLD sometimes sends up mblk with b_rptr == b_wptr! */
+		mblk_t *mp1 = mp->b_cont;
+
+		if (!(ira->ira_flags & IRAF_L2SRC_SET))
+			ip_setl2src(mp, ira, ira->ira_rill);
+		ASSERT(ira->ira_flags & IRAF_L2SRC_SET);
+
+		freeb(mp);
+		mp = mp1;
+		if (mp == NULL)
+			return (NULL);
+
+		if (OK_32PTR(mp->b_rptr) && MBLKL(mp) >= min_size)
+			return (mp);
+	}
+	if (ip_pullup(mp, min_size, ira) == NULL) {
+		if (msgdsize(mp) < min_size) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
+			ip_drop_input("ipIfStatsInHdrErrors", mp, ill);
+		} else {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
+		}
+		freemsg(mp);
+		return (NULL);
+	}
+	return (mp);
 }
 
 /*
- * Handle the situation where a packet came in on `ill' but matched an IRE
- * whose ire_rfq doesn't match `ill'.  We return the IRE that should be used
- * for interface statistics.
+ * Common code for IPv4 and IPv6 to check and pullup multi-mblks
+ */
+mblk_t *
+ip_check_length(mblk_t *mp, uchar_t *rptr, ssize_t len,	uint_t pkt_len,
+    uint_t min_size, ip_recv_attr_t *ira)
+{
+	ill_t	*ill = ira->ira_ill;
+
+	/*
+	 * Make sure we have data length consistent
+	 * with the IP header.
+	 */
+	if (mp->b_cont == NULL) {
+		/* pkt_len is based on ipha_len, not the mblk length */
+		if (pkt_len < min_size) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
+			ip_drop_input("ipIfStatsInHdrErrors", mp, ill);
+			freemsg(mp);
+			return (NULL);
+		}
+		if (len < 0) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTruncatedPkts);
+			ip_drop_input("ipIfStatsInTruncatedPkts", mp, ill);
+			freemsg(mp);
+			return (NULL);
+		}
+		/* Drop any pad */
+		mp->b_wptr = rptr + pkt_len;
+	} else if ((len += msgdsize(mp->b_cont)) != 0) {
+		ASSERT(pkt_len >= min_size);
+		if (pkt_len < min_size) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
+			ip_drop_input("ipIfStatsInHdrErrors", mp, ill);
+			freemsg(mp);
+			return (NULL);
+		}
+		if (len < 0) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTruncatedPkts);
+			ip_drop_input("ipIfStatsInTruncatedPkts", mp, ill);
+			freemsg(mp);
+			return (NULL);
+		}
+		/* Drop any pad */
+		(void) adjmsg(mp, -len);
+		/*
+		 * adjmsg may have freed an mblk from the chain, hence
+		 * invalidate any hw checksum here. This will force IP to
+		 * calculate the checksum in sw, but only for this packet.
+		 */
+		DB_CKSUMFLAGS(mp) = 0;
+		IP_STAT(ill->ill_ipst, ip_multimblk);
+	}
+	return (mp);
+}
+
+/*
+ * Check that the IPv4 opt_len is consistent with the packet and pullup
+ * the options.
+ */
+mblk_t *
+ip_check_optlen(mblk_t *mp, ipha_t *ipha, uint_t opt_len, uint_t pkt_len,
+    ip_recv_attr_t *ira)
+{
+	ill_t	*ill = ira->ira_ill;
+	ssize_t len;
+
+	/* Assume no IPv6 packets arrive over the IPv4 queue */
+	if (IPH_HDR_VERSION(ipha) != IPV4_VERSION) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInWrongIPVersion);
+		ip_drop_input("IPvN packet on IPv4 ill", mp, ill);
+		freemsg(mp);
+		return (NULL);
+	}
+
+	if (opt_len > (15 - IP_SIMPLE_HDR_LENGTH_IN_WORDS)) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
+		ip_drop_input("ipIfStatsInHdrErrors", mp, ill);
+		freemsg(mp);
+		return (NULL);
+	}
+	/*
+	 * Recompute complete header length and make sure we
+	 * have access to all of it.
+	 */
+	len = ((size_t)opt_len + IP_SIMPLE_HDR_LENGTH_IN_WORDS) << 2;
+	if (len > (mp->b_wptr - mp->b_rptr)) {
+		if (len > pkt_len) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
+			ip_drop_input("ipIfStatsInHdrErrors", mp, ill);
+			freemsg(mp);
+			return (NULL);
+		}
+		if (ip_pullup(mp, len, ira) == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
+			freemsg(mp);
+			return (NULL);
+		}
+	}
+	return (mp);
+}
+
+/*
+ * Returns a new ire, or the same ire, or NULL.
+ * If a different IRE is returned, then it is held; the caller
+ * needs to release it.
+ * In no case is there any hold/release on the ire argument.
  */
 ire_t *
 ip_check_multihome(void *addr, ire_t *ire, ill_t *ill)
@@ -13697,10 +7829,9 @@ ip_check_multihome(void *addr, ire_t *ire, ill_t *ill)
 	 * issue (e.g. packet received on an underlying interface matched an
 	 * IRE_LOCAL on its associated group interface).
 	 */
-	if (ire->ire_rfq != NULL &&
-	    IS_IN_SAME_ILLGRP(ill, (ill_t *)ire->ire_rfq->q_ptr)) {
+	ASSERT(ire->ire_ill != NULL);
+	if (IS_IN_SAME_ILLGRP(ill, ire->ire_ill))
 		return (ire);
-	}
 
 	/*
 	 * Do another ire lookup here, using the ingress ill, to see if the
@@ -13711,25 +7842,24 @@ ip_check_multihome(void *addr, ire_t *ire, ill_t *ill)
 	 * ip*_strict_dst_multihoming switch is on.
 	 * We also need to check for IPIF_UNNUMBERED point2point interfaces
 	 * where the local address may not be unique. In this case we were
-	 * at the mercy of the initial ire cache lookup and the IRE_LOCAL it
+	 * at the mercy of the initial ire lookup and the IRE_LOCAL it
 	 * actually returned. The new lookup, which is more specific, should
 	 * only find the IRE_LOCAL associated with the ingress ill if one
 	 * exists.
 	 */
-
 	if (ire->ire_ipversion == IPV4_VERSION) {
 		if (ipst->ips_ip_strict_dst_multihoming)
 			strict_check = B_TRUE;
-		new_ire = ire_ctable_lookup(*((ipaddr_t *)addr), 0, IRE_LOCAL,
-		    ill->ill_ipif, ALL_ZONES, NULL,
-		    (MATCH_IRE_TYPE|MATCH_IRE_ILL), ipst);
+		new_ire = ire_ftable_lookup_v4(*((ipaddr_t *)addr), 0, 0,
+		    IRE_LOCAL, ill, ALL_ZONES, NULL,
+		    (MATCH_IRE_TYPE|MATCH_IRE_ILL), 0, ipst, NULL);
 	} else {
 		ASSERT(!IN6_IS_ADDR_MULTICAST((in6_addr_t *)addr));
 		if (ipst->ips_ipv6_strict_dst_multihoming)
 			strict_check = B_TRUE;
-		new_ire = ire_ctable_lookup_v6((in6_addr_t *)addr, NULL,
-		    IRE_LOCAL, ill->ill_ipif, ALL_ZONES, NULL,
-		    (MATCH_IRE_TYPE|MATCH_IRE_ILL), ipst);
+		new_ire = ire_ftable_lookup_v6((in6_addr_t *)addr, NULL, NULL,
+		    IRE_LOCAL, ill, ALL_ZONES, NULL,
+		    (MATCH_IRE_TYPE|MATCH_IRE_ILL), 0, ipst, NULL);
 	}
 	/*
 	 * If the same ire that was returned in ip_input() is found then this
@@ -13741,38 +7871,27 @@ ip_check_multihome(void *addr, ire_t *ire, ill_t *ill)
 	 * order to have accurate interface statistics.
 	 */
 	if (new_ire != NULL) {
-		if ((new_ire != ire) && (new_ire->ire_rfq != NULL)) {
-			ire_refrele(ire);
-			ire = new_ire;
-		} else {
-			ire_refrele(new_ire);
-		}
-		return (ire);
-	} else if ((ire->ire_rfq == NULL) &&
-	    (ire->ire_ipversion == IPV4_VERSION)) {
-		/*
-		 * The best match could have been the original ire which
-		 * was created against an IRE_LOCAL on lo0. In the IPv4 case
-		 * the strict multihoming checks are irrelevant as we consider
-		 * local addresses hosted on lo0 to be interface agnostic. We
-		 * only expect a null ire_rfq on IREs which are associated with
-		 * lo0 hence we can return now.
-		 */
+		/* Note: held in one case but not the other? Caller handles */
+		if (new_ire != ire)
+			return (new_ire);
+		/* Unchanged */
+		ire_refrele(new_ire);
 		return (ire);
 	}
 
 	/*
 	 * Chase pointers once and store locally.
 	 */
-	ire_ill = (ire->ire_rfq == NULL) ? NULL :
-	    (ill_t *)(ire->ire_rfq->q_ptr);
+	ASSERT(ire->ire_ill != NULL);
+	ire_ill = ire->ire_ill;
 	ifindex = ill->ill_usesrc_ifindex;
 
 	/*
 	 * Check if it's a legal address on the 'usesrc' interface.
+	 * For IPMP data addresses the IRE_LOCAL is the upper, hence we
+	 * can just check phyint_ifindex.
 	 */
-	if ((ifindex != 0) && (ire_ill != NULL) &&
-	    (ifindex == ire_ill->ill_phyint->phyint_ifindex)) {
+	if (ifindex != 0 && ifindex == ire_ill->ill_phyint->phyint_ifindex) {
 		return (ire);
 	}
 
@@ -13783,905 +7902,234 @@ ip_check_multihome(void *addr, ire_t *ire, ill_t *ill)
 	if (!(strict_check))
 		return (ire);
 
-	if ((ill->ill_flags & ire->ire_ipif->ipif_ill->ill_flags &
-	    ILLF_ROUTER) != 0) {
+	if ((ill->ill_flags & ire->ire_ill->ill_flags & ILLF_ROUTER) != 0) {
 		return (ire);
 	}
-
-	ire_refrele(ire);
 	return (NULL);
 }
 
 /*
+ * This function is used to construct a mac_header_info_s from a
+ * DL_UNITDATA_IND message.
+ * The address fields in the mhi structure points into the message,
+ * thus the caller can't use those fields after freeing the message.
  *
- * This is the fast forward path. If we are here, we dont need to
- * worry about RSVP, CGTP, or TSol. Furthermore the ftable lookup
- * needed to find the nexthop in this case is much simpler
- */
-ire_t *
-ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
-{
-	ipha_t	*ipha;
-	ire_t	*src_ire;
-	ill_t	*stq_ill;
-	uint_t	hlen;
-	uint_t	pkt_len;
-	uint32_t sum;
-	queue_t	*dev_q;
-	ip_stack_t *ipst = ill->ill_ipst;
-	mblk_t *fpmp;
-	enum	ire_forward_action ret_action;
-
-	ipha = (ipha_t *)mp->b_rptr;
-
-	if (ire != NULL &&
-	    ire->ire_zoneid != GLOBAL_ZONEID &&
-	    ire->ire_zoneid != ALL_ZONES) {
-		/*
-		 * Should only use IREs that are visible to the global
-		 * zone for forwarding.
-		 */
-		ire_refrele(ire);
-		ire = ire_cache_lookup(dst, GLOBAL_ZONEID, NULL, ipst);
-		/*
-		 * ire_cache_lookup() can return ire of IRE_LOCAL in
-		 * transient cases. In such case, just drop the packet
-		 */
-		if (ire != NULL && ire->ire_type != IRE_CACHE)
-			goto indiscard;
-	}
-
-	/*
-	 * Martian Address Filtering [RFC 1812, Section 5.3.7]
-	 * The loopback address check for both src and dst has already
-	 * been checked in ip_input
-	 */
-
-	if (dst == INADDR_ANY || CLASSD(ipha->ipha_src)) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-		goto drop;
-	}
-	src_ire = ire_ctable_lookup(ipha->ipha_src, 0, IRE_BROADCAST, NULL,
-	    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-
-	if (src_ire != NULL) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-		ire_refrele(src_ire);
-		goto drop;
-	}
-
-	/* No ire cache of nexthop. So first create one  */
-	if (ire == NULL) {
-
-		ire = ire_forward_simple(dst, &ret_action, ipst);
-
-		/*
-		 * We only come to ip_fast_forward if ip_cgtp_filter
-		 * is not set. So ire_forward() should not return with
-		 * Forward_check_multirt as the next action.
-		 */
-		ASSERT(ret_action != Forward_check_multirt);
-		if (ire == NULL) {
-			/* An attempt was made to forward the packet */
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInForwDatagrams);
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			mp->b_prev = mp->b_next = 0;
-			/* send icmp unreachable */
-			/* Sent by forwarding path, and router is global zone */
-			if (ret_action == Forward_ret_icmp_err) {
-				if (ip_source_routed(ipha, ipst)) {
-					icmp_unreachable(ill->ill_wq, mp,
-					    ICMP_SOURCE_ROUTE_FAILED,
-					    GLOBAL_ZONEID, ipst);
-				} else {
-					icmp_unreachable(ill->ill_wq, mp,
-					    ICMP_HOST_UNREACHABLE,
-					    GLOBAL_ZONEID, ipst);
-				}
-			} else {
-				freemsg(mp);
-			}
-			return (NULL);
-		}
-	}
-
-	/*
-	 * Forwarding fastpath exception case:
-	 * If any of the following are true, we take the slowpath:
-	 *	o forwarding is not enabled
-	 *	o incoming and outgoing interface are the same, or in the same
-	 *	  IPMP group.
-	 *	o corresponding ire is in incomplete state
-	 *	o packet needs fragmentation
-	 *	o ARP cache is not resolved
-	 *
-	 * The codeflow from here on is thus:
-	 *	ip_rput_process_forward->ip_rput_forward->ip_xmit_v4
-	 */
-	pkt_len = ntohs(ipha->ipha_length);
-	stq_ill = (ill_t *)ire->ire_stq->q_ptr;
-	if (!(stq_ill->ill_flags & ILLF_ROUTER) ||
-	    (ill == stq_ill) || IS_IN_SAME_ILLGRP(ill, stq_ill) ||
-	    (ire->ire_nce == NULL) ||
-	    (pkt_len > ire->ire_max_frag) ||
-	    ((fpmp = ire->ire_nce->nce_fp_mp) == NULL) ||
-	    ((hlen = MBLKL(fpmp)) > MBLKHEAD(mp)) ||
-	    ipha->ipha_ttl <= 1) {
-		ip_rput_process_forward(ill->ill_rq, mp, ire,
-		    ipha, ill, B_FALSE, B_TRUE);
-		return (ire);
-	}
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInForwDatagrams);
-
-	DTRACE_PROBE4(ip4__forwarding__start,
-	    ill_t *, ill, ill_t *, stq_ill, ipha_t *, ipha, mblk_t *, mp);
-
-	FW_HOOKS(ipst->ips_ip4_forwarding_event,
-	    ipst->ips_ipv4firewall_forwarding,
-	    ill, stq_ill, ipha, mp, mp, 0, ipst);
-
-	DTRACE_PROBE1(ip4__forwarding__end, mblk_t *, mp);
-
-	if (mp == NULL)
-		goto drop;
-
-	mp->b_datap->db_struioun.cksum.flags = 0;
-	/* Adjust the checksum to reflect the ttl decrement. */
-	sum = (int)ipha->ipha_hdr_checksum + IP_HDR_CSUM_TTL_ADJUST;
-	ipha->ipha_hdr_checksum = (uint16_t)(sum + (sum >> 16));
-	ipha->ipha_ttl--;
-
-	/*
-	 * Write the link layer header.  We can do this safely here,
-	 * because we have already tested to make sure that the IP
-	 * policy is not set, and that we have a fast path destination
-	 * header.
-	 */
-	mp->b_rptr -= hlen;
-	bcopy(fpmp->b_rptr, mp->b_rptr, hlen);
-
-	UPDATE_IB_PKT_COUNT(ire);
-	ire->ire_last_used_time = lbolt;
-	BUMP_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutForwDatagrams);
-	BUMP_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutTransmits);
-	UPDATE_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutOctets, pkt_len);
-
-	if (!ILL_DIRECT_CAPABLE(stq_ill) || DB_TYPE(mp) != M_DATA) {
-		dev_q = ire->ire_stq->q_next;
-		if (DEV_Q_FLOW_BLOCKED(dev_q))
-			goto indiscard;
-	}
-
-	DTRACE_PROBE4(ip4__physical__out__start,
-	    ill_t *, NULL, ill_t *, stq_ill, ipha_t *, ipha, mblk_t *, mp);
-	FW_HOOKS(ipst->ips_ip4_physical_out_event,
-	    ipst->ips_ipv4firewall_physical_out,
-	    NULL, stq_ill, ipha, mp, mp, 0, ipst);
-	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-	DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL, void_ip_t *,
-	    ipha, __dtrace_ipsr_ill_t *, stq_ill, ipha_t *, ipha,
-	    ip6_t *, NULL, int, 0);
-
-	if (mp != NULL) {
-		if (ipst->ips_ip4_observe.he_interested) {
-			zoneid_t szone;
-
-			/*
-			 * Both of these functions expect b_rptr to be
-			 * where the IP header starts, so advance past the
-			 * link layer header if present.
-			 */
-			mp->b_rptr += hlen;
-			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
-			    ipst, ALL_ZONES);
-			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
-			    ALL_ZONES, ill, ipst);
-			mp->b_rptr -= hlen;
-		}
-		ILL_SEND_TX(stq_ill, ire, dst, mp, IP_DROP_ON_NO_DESC, NULL);
-	}
-	return (ire);
-
-indiscard:
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-drop:
-	if (mp != NULL)
-		freemsg(mp);
-	return (ire);
-
-}
-
-/*
- * This function is called in the forwarding slowpath, when
- * either the ire lacks the link-layer address, or the packet needs
- * further processing(eg. fragmentation), before transmission.
- */
-
-static void
-ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
-    ill_t *ill, boolean_t ll_multicast, boolean_t from_ip_fast_forward)
-{
-	queue_t		*dev_q;
-	ire_t		*src_ire;
-	ip_stack_t	*ipst = ill->ill_ipst;
-	boolean_t	same_illgrp = B_FALSE;
-
-	ASSERT(ire->ire_stq != NULL);
-
-	mp->b_prev = NULL; /* ip_rput_noire sets incoming interface here */
-	mp->b_next = NULL; /* ip_rput_noire sets dst here */
-
-	/*
-	 * If the caller of this function is ip_fast_forward() skip the
-	 * next three checks as it does not apply.
-	 */
-	if (from_ip_fast_forward)
-		goto skip;
-
-	if (ll_multicast != 0) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-		goto drop_pkt;
-	}
-
-	/*
-	 * check if ipha_src is a broadcast address. Note that this
-	 * check is redundant when we get here from ip_fast_forward()
-	 * which has already done this check. However, since we can
-	 * also get here from ip_rput_process_broadcast() or, for
-	 * for the slow path through ip_fast_forward(), we perform
-	 * the check again for code-reusability
-	 */
-	src_ire = ire_ctable_lookup(ipha->ipha_src, 0, IRE_BROADCAST, NULL,
-	    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-	if (src_ire != NULL || ipha->ipha_dst == INADDR_ANY) {
-		if (src_ire != NULL)
-			ire_refrele(src_ire);
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-		ip2dbg(("ip_rput_process_forward: Received packet with"
-		    " bad src/dst address on %s\n", ill->ill_name));
-		goto drop_pkt;
-	}
-
-	/*
-	 * Check if we want to forward this one at this time.
-	 * We allow source routed packets on a host provided that
-	 * they go out the same ill or illgrp as they came in on.
-	 *
-	 * XXX To be quicker, we may wish to not chase pointers to
-	 * get the ILLF_ROUTER flag and instead store the
-	 * forwarding policy in the ire.  An unfortunate
-	 * side-effect of that would be requiring an ire flush
-	 * whenever the ILLF_ROUTER flag changes.
-	 */
-skip:
-	same_illgrp = IS_IN_SAME_ILLGRP(ill, (ill_t *)ire->ire_rfq->q_ptr);
-
-	if (((ill->ill_flags &
-	    ((ill_t *)ire->ire_stq->q_ptr)->ill_flags & ILLF_ROUTER) == 0) &&
-	    !(ip_source_routed(ipha, ipst) &&
-	    (ire->ire_rfq == q || same_illgrp))) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-		if (ip_source_routed(ipha, ipst)) {
-			q = WR(q);
-			/*
-			 * Clear the indication that this may have
-			 * hardware checksum as we are not using it.
-			 */
-			DB_CKSUMFLAGS(mp) = 0;
-			/* Sent by forwarding path, and router is global zone */
-			icmp_unreachable(q, mp,
-			    ICMP_SOURCE_ROUTE_FAILED, GLOBAL_ZONEID, ipst);
-			return;
-		}
-		goto drop_pkt;
-	}
-
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInForwDatagrams);
-
-	/* Packet is being forwarded. Turning off hwcksum flag. */
-	DB_CKSUMFLAGS(mp) = 0;
-	if (ipst->ips_ip_g_send_redirects) {
-		/*
-		 * Check whether the incoming interface and outgoing
-		 * interface is part of the same group. If so,
-		 * send redirects.
-		 *
-		 * Check the source address to see if it originated
-		 * on the same logical subnet it is going back out on.
-		 * If so, we should be able to send it a redirect.
-		 * Avoid sending a redirect if the destination
-		 * is directly connected (i.e., ipha_dst is the same
-		 * as ire_gateway_addr or the ire_addr of the
-		 * nexthop IRE_CACHE ), or if the packet was source
-		 * routed out this interface.
-		 */
-		ipaddr_t src, nhop;
-		mblk_t	*mp1;
-		ire_t	*nhop_ire = NULL;
-
-		/*
-		 * Check whether ire_rfq and q are from the same ill or illgrp.
-		 * If so, send redirects.
-		 */
-		if ((ire->ire_rfq == q || same_illgrp) &&
-		    !ip_source_routed(ipha, ipst)) {
-
-			nhop = (ire->ire_gateway_addr != 0 ?
-			    ire->ire_gateway_addr : ire->ire_addr);
-
-			if (ipha->ipha_dst == nhop) {
-				/*
-				 * We avoid sending a redirect if the
-				 * destination is directly connected
-				 * because it is possible that multiple
-				 * IP subnets may have been configured on
-				 * the link, and the source may not
-				 * be on the same subnet as ip destination,
-				 * even though they are on the same
-				 * physical link.
-				 */
-				goto sendit;
-			}
-
-			src = ipha->ipha_src;
-
-			/*
-			 * We look up the interface ire for the nexthop,
-			 * to see if ipha_src is in the same subnet
-			 * as the nexthop.
-			 *
-			 * Note that, if, in the future, IRE_CACHE entries
-			 * are obsoleted,  this lookup will not be needed,
-			 * as the ire passed to this function will be the
-			 * same as the nhop_ire computed below.
-			 */
-			nhop_ire = ire_ftable_lookup(nhop, 0, 0,
-			    IRE_INTERFACE, NULL, NULL, ALL_ZONES,
-			    0, NULL, MATCH_IRE_TYPE, ipst);
-
-			if (nhop_ire != NULL) {
-				if ((src & nhop_ire->ire_mask) ==
-				    (nhop & nhop_ire->ire_mask)) {
-					/*
-					 * The source is directly connected.
-					 * Just copy the ip header (which is
-					 * in the first mblk)
-					 */
-					mp1 = copyb(mp);
-					if (mp1 != NULL) {
-						icmp_send_redirect(WR(q), mp1,
-						    nhop, ipst);
-					}
-				}
-				ire_refrele(nhop_ire);
-			}
-		}
-	}
-sendit:
-	dev_q = ire->ire_stq->q_next;
-	if (DEV_Q_FLOW_BLOCKED(dev_q)) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-		freemsg(mp);
-		return;
-	}
-
-	ip_rput_forward(ire, ipha, mp, ill);
-	return;
-
-drop_pkt:
-	ip2dbg(("ip_rput_process_forward: drop pkt\n"));
-	freemsg(mp);
-}
-
-ire_t *
-ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
-    ill_t *ill, ipaddr_t dst, int cgtp_flt_pkt, int ll_multicast)
-{
-	queue_t		*q;
-	uint16_t	hcksumflags;
-	ip_stack_t	*ipst = ill->ill_ipst;
-
-	q = *qp;
-
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInBcastPkts);
-
-	/*
-	 * Clear the indication that this may have hardware
-	 * checksum as we are not using it for forwarding.
-	 */
-	hcksumflags = DB_CKSUMFLAGS(mp);
-	DB_CKSUMFLAGS(mp) = 0;
-
-	/*
-	 * Directed broadcast forwarding: if the packet came in over a
-	 * different interface then it is routed out over we can forward it.
-	 */
-	if (ipha->ipha_protocol == IPPROTO_TCP) {
-		ire_refrele(ire);
-		freemsg(mp);
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-		return (NULL);
-	}
-	/*
-	 * For multicast we have set dst to be INADDR_BROADCAST
-	 * for delivering to all STREAMS.
-	 */
-	if (!CLASSD(ipha->ipha_dst)) {
-		ire_t *new_ire;
-		ipif_t *ipif;
-
-		ipif = ipif_get_next_ipif(NULL, ill);
-		if (ipif == NULL) {
-discard:		ire_refrele(ire);
-			freemsg(mp);
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			return (NULL);
-		}
-		new_ire = ire_ctable_lookup(dst, 0, 0,
-		    ipif, ALL_ZONES, NULL, MATCH_IRE_ILL, ipst);
-		ipif_refrele(ipif);
-
-		if (new_ire != NULL) {
-			/*
-			 * If the matching IRE_BROADCAST is part of an IPMP
-			 * group, then drop the packet unless our ill has been
-			 * nominated to receive for the group.
-			 */
-			if (IS_IPMP(new_ire->ire_ipif->ipif_ill) &&
-			    new_ire->ire_rfq != q) {
-				ire_refrele(new_ire);
-				goto discard;
-			}
-
-			/*
-			 * In the special case of multirouted broadcast
-			 * packets, we unconditionally need to "gateway"
-			 * them to the appropriate interface here.
-			 * In the normal case, this cannot happen, because
-			 * there is no broadcast IRE tagged with the
-			 * RTF_MULTIRT flag.
-			 */
-			if (new_ire->ire_flags & RTF_MULTIRT) {
-				ire_refrele(new_ire);
-				if (ire->ire_rfq != NULL) {
-					q = ire->ire_rfq;
-					*qp = q;
-				}
-			} else {
-				ire_refrele(ire);
-				ire = new_ire;
-			}
-		} else if (cgtp_flt_pkt == CGTP_IP_PKT_NOT_CGTP) {
-			if (!ipst->ips_ip_g_forward_directed_bcast) {
-				/*
-				 * Free the message if
-				 * ip_g_forward_directed_bcast is turned
-				 * off for non-local broadcast.
-				 */
-				ire_refrele(ire);
-				freemsg(mp);
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				return (NULL);
-			}
-		} else {
-			/*
-			 * This CGTP packet successfully passed the
-			 * CGTP filter, but the related CGTP
-			 * broadcast IRE has not been found,
-			 * meaning that the redundant ipif is
-			 * probably down. However, if we discarded
-			 * this packet, its duplicate would be
-			 * filtered out by the CGTP filter so none
-			 * of them would get through. So we keep
-			 * going with this one.
-			 */
-			ASSERT(cgtp_flt_pkt == CGTP_IP_PKT_PREMIUM);
-			if (ire->ire_rfq != NULL) {
-				q = ire->ire_rfq;
-				*qp = q;
-			}
-		}
-	}
-	if (ipst->ips_ip_g_forward_directed_bcast && ll_multicast == 0) {
-		/*
-		 * Verify that there are not more then one
-		 * IRE_BROADCAST with this broadcast address which
-		 * has ire_stq set.
-		 * TODO: simplify, loop over all IRE's
-		 */
-		ire_t	*ire1;
-		int	num_stq = 0;
-		mblk_t	*mp1;
-
-		/* Find the first one with ire_stq set */
-		rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
-		for (ire1 = ire; ire1 &&
-		    !ire1->ire_stq && ire1->ire_addr == ire->ire_addr;
-		    ire1 = ire1->ire_next)
-			;
-		if (ire1) {
-			ire_refrele(ire);
-			ire = ire1;
-			IRE_REFHOLD(ire);
-		}
-
-		/* Check if there are additional ones with stq set */
-		for (ire1 = ire; ire1; ire1 = ire1->ire_next) {
-			if (ire->ire_addr != ire1->ire_addr)
-				break;
-			if (ire1->ire_stq) {
-				num_stq++;
-				break;
-			}
-		}
-		rw_exit(&ire->ire_bucket->irb_lock);
-		if (num_stq == 1 && ire->ire_stq != NULL) {
-			ip1dbg(("ip_rput_process_broadcast: directed "
-			    "broadcast to 0x%x\n",
-			    ntohl(ire->ire_addr)));
-			mp1 = copymsg(mp);
-			if (mp1) {
-				switch (ipha->ipha_protocol) {
-				case IPPROTO_UDP:
-					ip_udp_input(q, mp1, ipha, ire, ill);
-					break;
-				default:
-					ip_proto_input(q, mp1, ipha, ire, ill,
-					    0);
-					break;
-				}
-			}
-			/*
-			 * Adjust ttl to 2 (1+1 - the forward engine
-			 * will decrement it by one.
-			 */
-			if (ip_csum_hdr(ipha)) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
-				ip2dbg(("ip_rput_broadcast:drop pkt\n"));
-				freemsg(mp);
-				ire_refrele(ire);
-				return (NULL);
-			}
-			ipha->ipha_ttl = ipst->ips_ip_broadcast_ttl + 1;
-			ipha->ipha_hdr_checksum = 0;
-			ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
-			ip_rput_process_forward(q, mp, ire, ipha,
-			    ill, ll_multicast, B_FALSE);
-			ire_refrele(ire);
-			return (NULL);
-		}
-		ip1dbg(("ip_rput: NO directed broadcast to 0x%x\n",
-		    ntohl(ire->ire_addr)));
-	}
-
-	/* Restore any hardware checksum flags */
-	DB_CKSUMFLAGS(mp) = hcksumflags;
-	return (ire);
-}
-
-/* ARGSUSED */
-static boolean_t
-ip_rput_process_multicast(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
-    int *ll_multicast, ipaddr_t *dstp)
-{
-	ip_stack_t	*ipst = ill->ill_ipst;
-
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInMcastPkts);
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInMcastOctets,
-	    ntohs(ipha->ipha_length));
-
-	/*
-	 * So that we don't end up with dups, only one ill in an IPMP group is
-	 * nominated to receive multicast traffic.
-	 */
-	if (IS_UNDER_IPMP(ill) && !ill->ill_nom_cast)
-		goto drop_pkt;
-
-	/*
-	 * Forward packets only if we have joined the allmulti
-	 * group on this interface.
-	 */
-	if (ipst->ips_ip_g_mrouter && ill->ill_join_allmulti) {
-		int retval;
-
-		/*
-		 * Clear the indication that this may have hardware
-		 * checksum as we are not using it.
-		 */
-		DB_CKSUMFLAGS(mp) = 0;
-		retval = ip_mforward(ill, ipha, mp);
-		/* ip_mforward updates mib variables if needed */
-		/* clear b_prev - used by ip_mroute_decap */
-		mp->b_prev = NULL;
-
-		switch (retval) {
-		case 0:
-			/*
-			 * pkt is okay and arrived on phyint.
-			 *
-			 * If we are running as a multicast router
-			 * we need to see all IGMP and/or PIM packets.
-			 */
-			if ((ipha->ipha_protocol == IPPROTO_IGMP) ||
-			    (ipha->ipha_protocol == IPPROTO_PIM)) {
-				goto done;
-			}
-			break;
-		case -1:
-			/* pkt is mal-formed, toss it */
-			goto drop_pkt;
-		case 1:
-			/* pkt is okay and arrived on a tunnel */
-			/*
-			 * If we are running a multicast router
-			 *  we need to see all igmp packets.
-			 */
-			if (ipha->ipha_protocol == IPPROTO_IGMP) {
-				*dstp = INADDR_BROADCAST;
-				*ll_multicast = 1;
-				return (B_FALSE);
-			}
-
-			goto drop_pkt;
-		}
-	}
-
-	if (ilm_lookup_ill(ill, *dstp, ALL_ZONES) == NULL) {
-		/*
-		 * This might just be caused by the fact that
-		 * multiple IP Multicast addresses map to the same
-		 * link layer multicast - no need to increment counter!
-		 */
-		freemsg(mp);
-		return (B_TRUE);
-	}
-done:
-	ip2dbg(("ip_rput: multicast for us: 0x%x\n", ntohl(*dstp)));
-	/*
-	 * This assumes the we deliver to all streams for multicast
-	 * and broadcast packets.
-	 */
-	*dstp = INADDR_BROADCAST;
-	*ll_multicast = 1;
-	return (B_FALSE);
-drop_pkt:
-	ip2dbg(("ip_rput: drop pkt\n"));
-	freemsg(mp);
-	return (B_TRUE);
-}
-
-/*
- * This function is used to both return an indication of whether or not
- * the packet received is a non-unicast packet (by way of the DL_UNITDATA_IND)
+ * We determine whether the packet received is a non-unicast packet
  * and in doing so, determine whether or not it is broadcast vs multicast.
  * For it to be a broadcast packet, we must have the appropriate mblk_t
  * hanging off the ill_t.  If this is either not present or doesn't match
  * the destination mac address in the DL_UNITDATA_IND, the packet is deemed
  * to be multicast.  Thus NICs that have no broadcast address (or no
  * capability for one, such as point to point links) cannot return as
- * the packet being broadcast.  The use of HPE_BROADCAST/HPE_MULTICAST as
- * the return values simplifies the current use of the return value of this
- * function, which is to pass through the multicast/broadcast characteristic
- * to consumers of the netinfo/pfhooks API.  While this is not cast in stone,
- * changing the return value to some other symbol demands the appropriate
- * "translation" when hpe_flags is set prior to calling hook_run() for
- * packet events.
+ * the packet being broadcast.
  */
-int
-ip_get_dlpi_mbcast(ill_t *ill, mblk_t *mb)
+void
+ip_dlur_to_mhi(ill_t *ill, mblk_t *mb, struct mac_header_info_s *mhip)
 {
 	dl_unitdata_ind_t *ind = (dl_unitdata_ind_t *)mb->b_rptr;
 	mblk_t *bmp;
+	uint_t extra_offset;
 
-	if (ind->dl_group_address) {
-		if (ind->dl_dest_addr_offset > sizeof (*ind) &&
-		    ind->dl_dest_addr_offset + ind->dl_dest_addr_length <
-		    MBLKL(mb) &&
-		    (bmp = ill->ill_bcast_mp) != NULL) {
-			dl_unitdata_req_t *dlur;
-			uint8_t *bphys_addr;
+	bzero(mhip, sizeof (struct mac_header_info_s));
 
-			dlur = (dl_unitdata_req_t *)bmp->b_rptr;
-			if (ill->ill_sap_length < 0)
-				bphys_addr = (uchar_t *)dlur +
-				    dlur->dl_dest_addr_offset;
-			else
-				bphys_addr = (uchar_t *)dlur +
-				    dlur->dl_dest_addr_offset +
-				    ill->ill_sap_length;
+	mhip->mhi_dsttype = MAC_ADDRTYPE_UNICAST;
 
-			if (bcmp(mb->b_rptr + ind->dl_dest_addr_offset,
-			    bphys_addr, ind->dl_dest_addr_length) == 0) {
-				return (HPE_BROADCAST);
-			}
-			return (HPE_MULTICAST);
-		}
-		return (HPE_MULTICAST);
+	if (ill->ill_sap_length < 0)
+		extra_offset = 0;
+	else
+		extra_offset = ill->ill_sap_length;
+
+	mhip->mhi_daddr = (uchar_t *)ind + ind->dl_dest_addr_offset +
+	    extra_offset;
+	mhip->mhi_saddr = (uchar_t *)ind + ind->dl_src_addr_offset +
+	    extra_offset;
+
+	if (!ind->dl_group_address)
+		return;
+
+	/* Multicast or broadcast */
+	mhip->mhi_dsttype = MAC_ADDRTYPE_MULTICAST;
+
+	if (ind->dl_dest_addr_offset > sizeof (*ind) &&
+	    ind->dl_dest_addr_offset + ind->dl_dest_addr_length < MBLKL(mb) &&
+	    (bmp = ill->ill_bcast_mp) != NULL) {
+		dl_unitdata_req_t *dlur;
+		uint8_t *bphys_addr;
+
+		dlur = (dl_unitdata_req_t *)bmp->b_rptr;
+		bphys_addr = (uchar_t *)dlur + dlur->dl_dest_addr_offset +
+		    extra_offset;
+
+		if (bcmp(mhip->mhi_daddr, bphys_addr,
+		    ind->dl_dest_addr_length) == 0)
+			mhip->mhi_dsttype = MAC_ADDRTYPE_BROADCAST;
 	}
-	return (0);
 }
 
-static boolean_t
-ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
-    int *ll_multicast, mblk_t **mpp)
+/*
+ * This function is used to construct a mac_header_info_s from a
+ * M_DATA fastpath message from a DLPI driver.
+ * The address fields in the mhi structure points into the message,
+ * thus the caller can't use those fields after freeing the message.
+ *
+ * We determine whether the packet received is a non-unicast packet
+ * and in doing so, determine whether or not it is broadcast vs multicast.
+ * For it to be a broadcast packet, we must have the appropriate mblk_t
+ * hanging off the ill_t.  If this is either not present or doesn't match
+ * the destination mac address in the DL_UNITDATA_IND, the packet is deemed
+ * to be multicast.  Thus NICs that have no broadcast address (or no
+ * capability for one, such as point to point links) cannot return as
+ * the packet being broadcast.
+ */
+void
+ip_mdata_to_mhi(ill_t *ill, mblk_t *mp, struct mac_header_info_s *mhip)
 {
-	mblk_t *mp1, *from_mp, *to_mp, *mp, *first_mp;
-	boolean_t must_copy = B_FALSE;
+	mblk_t *bmp;
+	struct ether_header *pether;
+
+	bzero(mhip, sizeof (struct mac_header_info_s));
+
+	mhip->mhi_dsttype = MAC_ADDRTYPE_UNICAST;
+
+	pether = (struct ether_header *)((char *)mp->b_rptr
+	    - sizeof (struct ether_header));
+
+	/*
+	 * Make sure the interface is an ethernet type, since we don't
+	 * know the header format for anything but Ethernet. Also make
+	 * sure we are pointing correctly above db_base.
+	 */
+	if (ill->ill_type != IFT_ETHER)
+		return;
+
+retry:
+	if ((uchar_t *)pether < mp->b_datap->db_base)
+		return;
+
+	/* Is there a VLAN tag? */
+	if (ill->ill_isv6) {
+		if (pether->ether_type != htons(ETHERTYPE_IPV6)) {
+			pether = (struct ether_header *)((char *)pether - 4);
+			goto retry;
+		}
+	} else {
+		if (pether->ether_type != htons(ETHERTYPE_IP)) {
+			pether = (struct ether_header *)((char *)pether - 4);
+			goto retry;
+		}
+	}
+	mhip->mhi_daddr = (uchar_t *)&pether->ether_dhost;
+	mhip->mhi_saddr = (uchar_t *)&pether->ether_shost;
+
+	if (!(mhip->mhi_daddr[0] & 0x01))
+		return;
+
+	/* Multicast or broadcast */
+	mhip->mhi_dsttype = MAC_ADDRTYPE_MULTICAST;
+
+	if ((bmp = ill->ill_bcast_mp) != NULL) {
+		dl_unitdata_req_t *dlur;
+		uint8_t *bphys_addr;
+		uint_t	addrlen;
+
+		dlur = (dl_unitdata_req_t *)bmp->b_rptr;
+		addrlen = dlur->dl_dest_addr_length;
+		if (ill->ill_sap_length < 0) {
+			bphys_addr = (uchar_t *)dlur +
+			    dlur->dl_dest_addr_offset;
+			addrlen += ill->ill_sap_length;
+		} else {
+			bphys_addr = (uchar_t *)dlur +
+			    dlur->dl_dest_addr_offset +
+			    ill->ill_sap_length;
+			addrlen -= ill->ill_sap_length;
+		}
+		if (bcmp(mhip->mhi_daddr, bphys_addr, addrlen) == 0)
+			mhip->mhi_dsttype = MAC_ADDRTYPE_BROADCAST;
+	}
+}
+
+/*
+ * Handle anything but M_DATA messages
+ * We see the DL_UNITDATA_IND which are part
+ * of the data path, and also the other messages from the driver.
+ */
+void
+ip_rput_notdata(ill_t *ill, mblk_t *mp)
+{
+	mblk_t		*first_mp;
 	struct iocblk   *iocp;
-	ipha_t		*ipha;
-	ip_stack_t	*ipst = ill->ill_ipst;
+	struct mac_header_info_s mhi;
 
-#define	rptr    ((uchar_t *)ipha)
-
-	first_mp = *first_mpp;
-	mp = *mpp;
-
-	ASSERT(first_mp == mp);
-
-	/*
-	 * if db_ref > 1 then copymsg and free original. Packet may be
-	 * changed and do not want other entity who has a reference to this
-	 * message to trip over the changes. This is a blind change because
-	 * trying to catch all places that might change packet is too
-	 * difficult (since it may be a module above this one)
-	 *
-	 * This corresponds to the non-fast path case. We walk down the full
-	 * chain in this case, and check the db_ref count of all the dblks,
-	 * and do a copymsg if required. It is possible that the db_ref counts
-	 * of the data blocks in the mblk chain can be different.
-	 * For Example, we can get a DL_UNITDATA_IND(M_PROTO) with a db_ref
-	 * count of 1, followed by a M_DATA block with a ref count of 2, if
-	 * 'snoop' is running.
-	 */
-	for (mp1 = mp; mp1 != NULL; mp1 = mp1->b_cont) {
-		if (mp1->b_datap->db_ref > 1) {
-			must_copy = B_TRUE;
-			break;
-		}
-	}
-
-	if (must_copy) {
-		mp1 = copymsg(mp);
-		if (mp1 == NULL) {
-			for (mp1 = mp; mp1 != NULL;
-			    mp1 = mp1->b_cont) {
-				mp1->b_next = NULL;
-				mp1->b_prev = NULL;
-			}
-			freemsg(mp);
-			if (ill != NULL) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			} else {
-				BUMP_MIB(&ipst->ips_ip_mib,
-				    ipIfStatsInDiscards);
-			}
-			return (B_TRUE);
-		}
-		for (from_mp = mp, to_mp = mp1; from_mp != NULL;
-		    from_mp = from_mp->b_cont, to_mp = to_mp->b_cont) {
-			/* Copy b_prev - used by ip_mroute_decap */
-			to_mp->b_prev = from_mp->b_prev;
-			from_mp->b_prev = NULL;
-		}
-		*first_mpp = first_mp = mp1;
-		freemsg(mp);
-		mp = mp1;
-		*mpp = mp1;
-	}
-
-	ipha = (ipha_t *)mp->b_rptr;
-
-	/*
-	 * previous code has a case for M_DATA.
-	 * We want to check how that happens.
-	 */
-	ASSERT(first_mp->b_datap->db_type != M_DATA);
-	switch (first_mp->b_datap->db_type) {
+	switch (DB_TYPE(mp)) {
 	case M_PROTO:
-	case M_PCPROTO:
-		if (((dl_unitdata_ind_t *)rptr)->dl_primitive !=
+	case M_PCPROTO: {
+		if (((dl_unitdata_ind_t *)mp->b_rptr)->dl_primitive !=
 		    DL_UNITDATA_IND) {
 			/* Go handle anything other than data elsewhere. */
-			ip_rput_dlpi(q, mp);
-			return (B_TRUE);
+			ip_rput_dlpi(ill, mp);
+			return;
 		}
 
-		*ll_multicast = ip_get_dlpi_mbcast(ill, mp);
+		first_mp = mp;
+		mp = first_mp->b_cont;
+		first_mp->b_cont = NULL;
+
+		if (mp == NULL) {
+			freeb(first_mp);
+			return;
+		}
+		ip_dlur_to_mhi(ill, first_mp, &mhi);
+		if (ill->ill_isv6)
+			ip_input_v6(ill, NULL, mp, &mhi);
+		else
+			ip_input(ill, NULL, mp, &mhi);
+
 		/* Ditch the DLPI header. */
-		mp1 = mp->b_cont;
-		ASSERT(first_mp == mp);
-		*first_mpp = mp1;
-		freeb(mp);
-		*mpp = mp1;
-		return (B_FALSE);
+		freeb(first_mp);
+		return;
+	}
 	case M_IOCACK:
-		ip1dbg(("got iocack "));
 		iocp = (struct iocblk *)mp->b_rptr;
 		switch (iocp->ioc_cmd) {
 		case DL_IOC_HDR_INFO:
-			ill = (ill_t *)q->q_ptr;
 			ill_fastpath_ack(ill, mp);
-			return (B_TRUE);
+			return;
 		default:
-			putnext(q, mp);
-			return (B_TRUE);
+			putnext(ill->ill_rq, mp);
+			return;
 		}
 		/* FALLTHRU */
 	case M_ERROR:
 	case M_HANGUP:
-		/*
-		 * Since this is on the ill stream we unconditionally
-		 * bump up the refcount
-		 */
-		ill_refhold(ill);
-		qwriter_ip(ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
-		return (B_TRUE);
-	case M_CTL:
-		if ((MBLKL(first_mp) >= sizeof (da_ipsec_t)) &&
-		    (((da_ipsec_t *)first_mp->b_rptr)->da_type ==
-		    IPHADA_M_CTL)) {
-			/*
-			 * It's an IPsec accelerated packet.
-			 * Make sure that the ill from which we received the
-			 * packet has enabled IPsec hardware acceleration.
-			 */
-			if (!(ill->ill_capabilities &
-			    (ILL_CAPAB_AH|ILL_CAPAB_ESP))) {
-				/* IPsec kstats: bean counter */
-				freemsg(mp);
-				return (B_TRUE);
-			}
-
-			/*
-			 * Make mp point to the mblk following the M_CTL,
-			 * then process according to type of mp.
-			 * After this processing, first_mp will point to
-			 * the data-attributes and mp to the pkt following
-			 * the M_CTL.
-			 */
-			mp = first_mp->b_cont;
-			if (mp == NULL) {
-				freemsg(first_mp);
-				return (B_TRUE);
-			}
-			/*
-			 * A Hardware Accelerated packet can only be M_DATA
-			 * ESP or AH packet.
-			 */
-			if (mp->b_datap->db_type != M_DATA) {
-				/* non-M_DATA IPsec accelerated packet */
-				IPSECHW_DEBUG(IPSECHW_PKT,
-				    ("non-M_DATA IPsec accelerated pkt\n"));
-				freemsg(first_mp);
-				return (B_TRUE);
-			}
-			ipha = (ipha_t *)mp->b_rptr;
-			if (ipha->ipha_protocol != IPPROTO_AH &&
-			    ipha->ipha_protocol != IPPROTO_ESP) {
-				IPSECHW_DEBUG(IPSECHW_PKT,
-				    ("non-M_DATA IPsec accelerated pkt\n"));
-				freemsg(first_mp);
-				return (B_TRUE);
-			}
-			*mpp = mp;
-			return (B_FALSE);
+		mutex_enter(&ill->ill_lock);
+		if (ill->ill_state_flags & ILL_CONDEMNED) {
+			mutex_exit(&ill->ill_lock);
+			freemsg(mp);
+			return;
 		}
-		putnext(q, mp);
-		return (B_TRUE);
+		ill_refhold_locked(ill);
+		mutex_exit(&ill->ill_lock);
+		qwriter_ip(ill, ill->ill_rq, mp, ip_rput_other, CUR_OP,
+		    B_FALSE);
+		return;
+	case M_CTL:
+		putnext(ill->ill_rq, mp);
+		return;
 	case M_IOCNAK:
 		ip1dbg(("got iocnak "));
 		iocp = (struct iocblk *)mp->b_rptr;
 		switch (iocp->ioc_cmd) {
 		case DL_IOC_HDR_INFO:
-			ip_rput_other(NULL, q, mp, NULL);
-			return (B_TRUE);
+			ip_rput_other(NULL, ill->ill_rq, mp, NULL);
+			return;
 		default:
 			break;
 		}
 		/* FALLTHRU */
 	default:
-		putnext(q, mp);
-		return (B_TRUE);
+		putnext(ill->ill_rq, mp);
+		return;
 	}
 }
 
@@ -14691,8 +8139,6 @@ ip_rput(queue_t *q, mblk_t *mp)
 {
 	ill_t	*ill;
 	union DL_primitives *dl;
-
-	TRACE_1(TR_FAC_IP, TR_IP_RPUT_START, "ip_rput_start: q %p", q);
 
 	ill = (ill_t *)q->q_ptr;
 
@@ -14707,70 +8153,42 @@ ip_rput(queue_t *q, mblk_t *mp)
 		if (DB_TYPE(mp) != M_PCPROTO ||
 		    dl->dl_primitive == DL_UNITDATA_IND) {
 			inet_freemsg(mp);
-			TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
-			    "ip_rput_end: q %p (%S)", q, "uninit");
 			return;
 		}
 	}
+	if (DB_TYPE(mp) == M_DATA) {
+		struct mac_header_info_s mhi;
 
-	TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
-	    "ip_rput_end: q %p (%S)", q, "end");
-
-	ip_input(ill, NULL, mp, NULL);
+		ip_mdata_to_mhi(ill, mp, &mhi);
+		ip_input(ill, NULL, mp, &mhi);
+	} else {
+		ip_rput_notdata(ill, mp);
+	}
 }
 
-static mblk_t *
-ip_fix_dbref(ill_t *ill, mblk_t *mp)
+/*
+ * Move the information to a copy.
+ */
+mblk_t *
+ip_fix_dbref(mblk_t *mp, ip_recv_attr_t *ira)
 {
-	mblk_t *mp1;
-	boolean_t adjusted = B_FALSE;
-	ip_stack_t *ipst = ill->ill_ipst;
+	mblk_t		*mp1;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	IP_STAT(ipst, ip_db_ref);
-	/*
-	 * The IP_RECVSLLA option depends on having the
-	 * link layer header. First check that:
-	 * a> the underlying device is of type ether,
-	 * since this option is currently supported only
-	 * over ethernet.
-	 * b> there is enough room to copy over the link
-	 * layer header.
-	 *
-	 * Once the checks are done, adjust rptr so that
-	 * the link layer header will be copied via
-	 * copymsg. Note that, IFT_ETHER may be returned
-	 * by some non-ethernet drivers but in this case
-	 * the second check will fail.
-	 */
-	if (ill->ill_type == IFT_ETHER &&
-	    (mp->b_rptr - mp->b_datap->db_base) >=
-	    sizeof (struct ether_header)) {
-		mp->b_rptr -= sizeof (struct ether_header);
-		adjusted = B_TRUE;
-	}
-	mp1 = copymsg(mp);
 
+	/* Make sure we have ira_l2src before we loose the original mblk */
+	if (!(ira->ira_flags & IRAF_L2SRC_SET))
+		ip_setl2src(mp, ira, ira->ira_rill);
+
+	mp1 = copymsg(mp);
 	if (mp1 == NULL) {
-		mp->b_next = NULL;
-		/* clear b_prev - used by ip_mroute_decap */
-		mp->b_prev = NULL;
-		freemsg(mp);
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, ill);
+		freemsg(mp);
 		return (NULL);
 	}
-
-	if (adjusted) {
-		/*
-		 * Copy is done. Restore the pointer in
-		 * the _new_ mblk
-		 */
-		mp1->b_rptr += sizeof (struct ether_header);
-	}
-
-	/* Copy b_prev - used by ip_mroute_decap */
-	mp1->b_prev = mp->b_prev;
-	mp->b_prev = NULL;
-
 	/* preserve the hardware checksum flags and data, if present */
 	if (DB_CKSUMFLAGS(mp) != 0) {
 		DB_CKSUMFLAGS(mp1) = DB_CKSUMFLAGS(mp);
@@ -14779,886 +8197,8 @@ ip_fix_dbref(ill_t *ill, mblk_t *mp)
 		DB_CKSUMEND(mp1) = DB_CKSUMEND(mp);
 		DB_CKSUM16(mp1) = DB_CKSUM16(mp);
 	}
-
 	freemsg(mp);
 	return (mp1);
-}
-
-#define	ADD_TO_CHAIN(head, tail, cnt, mp) {    			\
-	if (tail != NULL)					\
-		tail->b_next = mp;				\
-	else							\
-		head = mp;					\
-	tail = mp;						\
-	cnt++;							\
-}
-
-/*
- * Direct read side procedure capable of dealing with chains. GLDv3 based
- * drivers call this function directly with mblk chains while STREAMS
- * read side procedure ip_rput() calls this for single packet with ip_ring
- * set to NULL to process one packet at a time.
- *
- * The ill will always be valid if this function is called directly from
- * the driver.
- *
- * If ip_input() is called from GLDv3:
- *
- *   - This must be a non-VLAN IP stream.
- *   - 'mp' is either an untagged or a special priority-tagged packet.
- *   - Any VLAN tag that was in the MAC header has been stripped.
- *
- * If the IP header in packet is not 32-bit aligned, every message in the
- * chain will be aligned before further operations. This is required on SPARC
- * platform.
- */
-/* ARGSUSED */
-void
-ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
-    struct mac_header_info_s *mhip)
-{
-	ipaddr_t		dst = NULL;
-	ipaddr_t		prev_dst;
-	ire_t			*ire = NULL;
-	ipha_t			*ipha;
-	uint_t			pkt_len;
-	ssize_t			len;
-	uint_t			opt_len;
-	int			ll_multicast;
-	int			cgtp_flt_pkt;
-	queue_t			*q = ill->ill_rq;
-	squeue_t		*curr_sqp = NULL;
-	mblk_t 			*head = NULL;
-	mblk_t			*tail = NULL;
-	mblk_t			*first_mp;
-	int			cnt = 0;
-	ip_stack_t		*ipst = ill->ill_ipst;
-	mblk_t			*mp;
-	mblk_t			*dmp;
-	uint8_t			tag;
-	ilb_stack_t		*ilbs;
-	ipaddr_t		lb_dst;
-
-	ASSERT(mp_chain != NULL);
-	ASSERT(ill != NULL);
-
-	TRACE_1(TR_FAC_IP, TR_IP_RPUT_START, "ip_input_start: q %p", q);
-
-	tag = (ip_ring != NULL) ? SQTAG_IP_INPUT_RX_RING : SQTAG_IP_INPUT;
-
-#define	rptr	((uchar_t *)ipha)
-
-	ilbs = ipst->ips_netstack->netstack_ilb;
-	while (mp_chain != NULL) {
-		mp = mp_chain;
-		mp_chain = mp_chain->b_next;
-		mp->b_next = NULL;
-		ll_multicast = 0;
-
-		/*
-		 * We do ire caching from one iteration to
-		 * another. In the event the packet chain contains
-		 * all packets from the same dst, this caching saves
-		 * an ire_cache_lookup for each of the succeeding
-		 * packets in a packet chain.
-		 */
-		prev_dst = dst;
-
-		/*
-		 * if db_ref > 1 then copymsg and free original. Packet
-		 * may be changed and we do not want the other entity
-		 * who has a reference to this message to trip over the
-		 * changes. This is a blind change because trying to
-		 * catch all places that might change the packet is too
-		 * difficult.
-		 *
-		 * This corresponds to the fast path case, where we have
-		 * a chain of M_DATA mblks.  We check the db_ref count
-		 * of only the 1st data block in the mblk chain. There
-		 * doesn't seem to be a reason why a device driver would
-		 * send up data with varying db_ref counts in the mblk
-		 * chain. In any case the Fast path is a private
-		 * interface, and our drivers don't do such a thing.
-		 * Given the above assumption, there is no need to walk
-		 * down the entire mblk chain (which could have a
-		 * potential performance problem)
-		 *
-		 * The "(DB_REF(mp) > 1)" check was moved from ip_rput()
-		 * to here because of exclusive ip stacks and vnics.
-		 * Packets transmitted from exclusive stack over vnic
-		 * can have db_ref > 1 and when it gets looped back to
-		 * another vnic in a different zone, you have ip_input()
-		 * getting dblks with db_ref > 1. So if someone
-		 * complains of TCP performance under this scenario,
-		 * take a serious look here on the impact of copymsg().
-		 */
-
-		if (DB_REF(mp) > 1) {
-			if ((mp = ip_fix_dbref(ill, mp)) == NULL)
-				continue;
-		}
-
-		/*
-		 * Check and align the IP header.
-		 */
-		first_mp = mp;
-		if (DB_TYPE(mp) == M_DATA) {
-			dmp = mp;
-		} else if (DB_TYPE(mp) == M_PROTO &&
-		    *(t_uscalar_t *)mp->b_rptr == DL_UNITDATA_IND) {
-			dmp = mp->b_cont;
-		} else {
-			dmp = NULL;
-		}
-		if (dmp != NULL) {
-			/*
-			 * IP header ptr not aligned?
-			 * OR IP header not complete in first mblk
-			 */
-			if (!OK_32PTR(dmp->b_rptr) ||
-			    MBLKL(dmp) < IP_SIMPLE_HDR_LENGTH) {
-				if (!ip_check_and_align_header(q, dmp, ipst))
-					continue;
-			}
-		}
-
-		/*
-		 * ip_input fast path
-		 */
-
-		/* mblk type is not M_DATA */
-		if (DB_TYPE(mp) != M_DATA) {
-			if (ip_rput_process_notdata(q, &first_mp, ill,
-			    &ll_multicast, &mp))
-				continue;
-
-			/*
-			 * The only way we can get here is if we had a
-			 * packet that was either a DL_UNITDATA_IND or
-			 * an M_CTL for an IPsec accelerated packet.
-			 *
-			 * In either case, the first_mp will point to
-			 * the leading M_PROTO or M_CTL.
-			 */
-			ASSERT(first_mp != NULL);
-		} else if (mhip != NULL) {
-			/*
-			 * ll_multicast is set here so that it is ready
-			 * for easy use with FW_HOOKS().  ip_get_dlpi_mbcast
-			 * manipulates ll_multicast in the same fashion when
-			 * called from ip_rput_process_notdata.
-			 */
-			switch (mhip->mhi_dsttype) {
-			case MAC_ADDRTYPE_MULTICAST :
-				ll_multicast = HPE_MULTICAST;
-				break;
-			case MAC_ADDRTYPE_BROADCAST :
-				ll_multicast = HPE_BROADCAST;
-				break;
-			default :
-				break;
-			}
-		}
-
-		/* Only M_DATA can come here and it is always aligned */
-		ASSERT(DB_TYPE(mp) == M_DATA);
-		ASSERT(DB_REF(mp) == 1 && OK_32PTR(mp->b_rptr));
-
-		ipha = (ipha_t *)mp->b_rptr;
-		len = mp->b_wptr - rptr;
-		pkt_len = ntohs(ipha->ipha_length);
-
-		/*
-		 * We must count all incoming packets, even if they end
-		 * up being dropped later on.
-		 */
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInReceives);
-		UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInOctets, pkt_len);
-
-		/* multiple mblk or too short */
-		len -= pkt_len;
-		if (len != 0) {
-			/*
-			 * Make sure we have data length consistent
-			 * with the IP header.
-			 */
-			if (mp->b_cont == NULL) {
-				if (len < 0 || pkt_len < IP_SIMPLE_HDR_LENGTH) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInHdrErrors);
-					ip2dbg(("ip_input: drop pkt\n"));
-					freemsg(mp);
-					continue;
-				}
-				mp->b_wptr = rptr + pkt_len;
-			} else if ((len += msgdsize(mp->b_cont)) != 0) {
-				if (len < 0 || pkt_len < IP_SIMPLE_HDR_LENGTH) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInHdrErrors);
-					ip2dbg(("ip_input: drop pkt\n"));
-					freemsg(mp);
-					continue;
-				}
-				(void) adjmsg(mp, -len);
-				/*
-				 * adjmsg may have freed an mblk from the chain,
-				 * hence invalidate any hw checksum here. This
-				 * will force IP to calculate the checksum in
-				 * sw, but only for this packet.
-				 */
-				DB_CKSUMFLAGS(mp) = 0;
-				IP_STAT(ipst, ip_multimblk3);
-			}
-		}
-
-		/* Obtain the dst of the current packet */
-		dst = ipha->ipha_dst;
-
-		DTRACE_IP7(receive, mblk_t *, first_mp, conn_t *, NULL,
-		    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, ill, ipha_t *,
-		    ipha, ip6_t *, NULL, int, 0);
-
-		/*
-		 * The following test for loopback is faster than
-		 * IP_LOOPBACK_ADDR(), because it avoids any bitwise
-		 * operations.
-		 * Note that these addresses are always in network byte order
-		 */
-		if (((*(uchar_t *)&ipha->ipha_dst) == 127) ||
-		    ((*(uchar_t *)&ipha->ipha_src) == 127)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInAddrErrors);
-			freemsg(mp);
-			continue;
-		}
-
-		/*
-		 * The event for packets being received from a 'physical'
-		 * interface is placed after validation of the source and/or
-		 * destination address as being local so that packets can be
-		 * redirected to loopback addresses using ipnat.
-		 */
-		DTRACE_PROBE4(ip4__physical__in__start,
-		    ill_t *, ill, ill_t *, NULL,
-		    ipha_t *, ipha, mblk_t *, first_mp);
-
-		FW_HOOKS(ipst->ips_ip4_physical_in_event,
-		    ipst->ips_ipv4firewall_physical_in,
-		    ill, NULL, ipha, first_mp, mp, ll_multicast, ipst);
-
-		DTRACE_PROBE1(ip4__physical__in__end, mblk_t *, first_mp);
-
-		if (first_mp == NULL) {
-			continue;
-		}
-		dst = ipha->ipha_dst;
-		/*
-		 * Attach any necessary label information to
-		 * this packet
-		 */
-		if (is_system_labeled() &&
-		    !tsol_get_pkt_label(mp, IPV4_VERSION)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(mp);
-			continue;
-		}
-
-		if (ipst->ips_ip4_observe.he_interested) {
-			zoneid_t dzone;
-
-			/*
-			 * On the inbound path the src zone will be unknown as
-			 * this packet has come from the wire.
-			 */
-			dzone = ip_get_zoneid_v4(dst, mp, ipst, ALL_ZONES);
-			ipobs_hook(mp, IPOBS_HOOK_INBOUND, ALL_ZONES, dzone,
-			    ill, ipst);
-		}
-
-		/*
-		 * Here we check to see if we machine is setup as
-		 * L3 loadbalancer and if the incoming packet is for a VIP
-		 *
-		 * Check the following:
-		 * - there is at least a rule
-		 * - protocol of the packet is supported
-		 */
-		if (ilb_has_rules(ilbs) && ILB_SUPP_L4(ipha->ipha_protocol)) {
-			int lb_ret;
-
-			/* For convenience, we pull up the mblk. */
-			if (mp->b_cont != NULL) {
-				if (pullupmsg(mp, -1) == 0) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(first_mp);
-					continue;
-				}
-				ipha = (ipha_t *)mp->b_rptr;
-			}
-
-			/*
-			 * We just drop all fragments going to any VIP, at
-			 * least for now....
-			 */
-			if (ntohs(ipha->ipha_fragment_offset_and_flags) &
-			    (IPH_MF | IPH_OFFSET)) {
-				if (!ilb_rule_match_vip_v4(ilbs,
-				    ipha->ipha_dst, NULL)) {
-					goto after_ilb;
-				}
-
-				ILB_KSTAT_UPDATE(ilbs, ip_frag_in, 1);
-				ILB_KSTAT_UPDATE(ilbs, ip_frag_dropped, 1);
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(first_mp);
-				continue;
-			}
-			lb_ret = ilb_check_v4(ilbs, ill, mp, ipha,
-			    ipha->ipha_protocol, (uint8_t *)ipha +
-			    IPH_HDR_LENGTH(ipha), &lb_dst);
-
-			if (lb_ret == ILB_DROPPED) {
-				/* Is this the right counter to increase? */
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(first_mp);
-				continue;
-			} else if (lb_ret == ILB_BALANCED) {
-				/* Set the dst to that of the chosen server */
-				dst = lb_dst;
-				DB_CKSUMFLAGS(mp) = 0;
-			}
-		}
-
-after_ilb:
-		/*
-		 * Reuse the cached ire only if the ipha_dst of the previous
-		 * packet is the same as the current packet AND it is not
-		 * INADDR_ANY.
-		 */
-		if (!(dst == prev_dst && dst != INADDR_ANY) &&
-		    (ire != NULL)) {
-			ire_refrele(ire);
-			ire = NULL;
-		}
-
-		opt_len = ipha->ipha_version_and_hdr_length -
-		    IP_SIMPLE_HDR_VERSION;
-
-		/*
-		 * Check to see if we can take the fastpath.
-		 * That is possible if the following conditions are met
-		 *	o Tsol disabled
-		 *	o CGTP disabled
-		 *	o ipp_action_count is 0
-		 *	o no options in the packet
-		 *	o not a RSVP packet
-		 * 	o not a multicast packet
-		 *	o ill not in IP_DHCPINIT_IF mode
-		 */
-		if (!is_system_labeled() &&
-		    !ipst->ips_ip_cgtp_filter && ipp_action_count == 0 &&
-		    opt_len == 0 && ipha->ipha_protocol != IPPROTO_RSVP &&
-		    !ll_multicast && !CLASSD(dst) && ill->ill_dhcpinit == 0) {
-			if (ire == NULL)
-				ire = ire_cache_lookup_simple(dst, ipst);
-			/*
-			 * Unless forwarding is enabled, dont call
-			 * ip_fast_forward(). Incoming packet is for forwarding
-			 */
-			if ((ill->ill_flags & ILLF_ROUTER) &&
-			    (ire == NULL || (ire->ire_type & IRE_CACHE))) {
-				ire = ip_fast_forward(ire, dst, ill, mp);
-				continue;
-			}
-			/* incoming packet is for local consumption */
-			if ((ire != NULL) && (ire->ire_type & IRE_LOCAL))
-				goto local;
-		}
-
-		/*
-		 * Disable ire caching for anything more complex
-		 * than the simple fast path case we checked for above.
-		 */
-		if (ire != NULL) {
-			ire_refrele(ire);
-			ire = NULL;
-		}
-
-		/*
-		 * Brutal hack for DHCPv4 unicast: RFC2131 allows a DHCP
-		 * server to unicast DHCP packets to a DHCP client using the
-		 * IP address it is offering to the client.  This can be
-		 * disabled through the "broadcast bit", but not all DHCP
-		 * servers honor that bit.  Therefore, to interoperate with as
-		 * many DHCP servers as possible, the DHCP client allows the
-		 * server to unicast, but we treat those packets as broadcast
-		 * here.  Note that we don't rewrite the packet itself since
-		 * (a) that would mess up the checksums and (b) the DHCP
-		 * client conn is bound to INADDR_ANY so ip_fanout_udp() will
-		 * hand it the packet regardless.
-		 */
-		if (ill->ill_dhcpinit != 0 &&
-		    IS_SIMPLE_IPH(ipha) && ipha->ipha_protocol == IPPROTO_UDP &&
-		    pullupmsg(mp, sizeof (ipha_t) + sizeof (udpha_t)) == 1) {
-			udpha_t *udpha;
-
-			/*
-			 * Reload ipha since pullupmsg() can change b_rptr.
-			 */
-			ipha = (ipha_t *)mp->b_rptr;
-			udpha = (udpha_t *)&ipha[1];
-
-			if (ntohs(udpha->uha_dst_port) == IPPORT_BOOTPC) {
-				DTRACE_PROBE2(ip4__dhcpinit__pkt, ill_t *, ill,
-				    mblk_t *, mp);
-				dst = INADDR_BROADCAST;
-			}
-		}
-
-		/* Full-blown slow path */
-		if (opt_len != 0) {
-			if (len != 0)
-				IP_STAT(ipst, ip_multimblk4);
-			else
-				IP_STAT(ipst, ip_ipoptions);
-			if (!ip_rput_multimblk_ipoptions(q, ill, mp, &ipha,
-			    &dst, ipst))
-				continue;
-		}
-
-		/*
-		 * Invoke the CGTP (multirouting) filtering module to process
-		 * the incoming packet. Packets identified as duplicates
-		 * must be discarded. Filtering is active only if the
-		 * the ip_cgtp_filter ndd variable is non-zero.
-		 */
-		cgtp_flt_pkt = CGTP_IP_PKT_NOT_CGTP;
-		if (ipst->ips_ip_cgtp_filter &&
-		    ipst->ips_ip_cgtp_filter_ops != NULL) {
-			netstackid_t stackid;
-
-			stackid = ipst->ips_netstack->netstack_stackid;
-			cgtp_flt_pkt =
-			    ipst->ips_ip_cgtp_filter_ops->cfo_filter(stackid,
-			    ill->ill_phyint->phyint_ifindex, mp);
-			if (cgtp_flt_pkt == CGTP_IP_PKT_DUPLICATE) {
-				freemsg(first_mp);
-				continue;
-			}
-		}
-
-		/*
-		 * If rsvpd is running, let RSVP daemon handle its processing
-		 * and forwarding of RSVP multicast/unicast packets.
-		 * If rsvpd is not running but mrouted is running, RSVP
-		 * multicast packets are forwarded as multicast traffic
-		 * and RSVP unicast packets are forwarded by unicast router.
-		 * If neither rsvpd nor mrouted is running, RSVP multicast
-		 * packets are not forwarded, but the unicast packets are
-		 * forwarded like unicast traffic.
-		 */
-		if (ipha->ipha_protocol == IPPROTO_RSVP &&
-		    ipst->ips_ipcl_proto_fanout[IPPROTO_RSVP].connf_head !=
-		    NULL) {
-			/* RSVP packet and rsvpd running. Treat as ours */
-			ip2dbg(("ip_input: RSVP for us: 0x%x\n", ntohl(dst)));
-			/*
-			 * This assumes that we deliver to all streams for
-			 * multicast and broadcast packets.
-			 * We have to force ll_multicast to 1 to handle the
-			 * M_DATA messages passed in from ip_mroute_decap.
-			 */
-			dst = INADDR_BROADCAST;
-			ll_multicast = 1;
-		} else if (CLASSD(dst)) {
-			/* packet is multicast */
-			mp->b_next = NULL;
-			if (ip_rput_process_multicast(q, mp, ill, ipha,
-			    &ll_multicast, &dst))
-				continue;
-		}
-
-		if (ire == NULL) {
-			ire = ire_cache_lookup(dst, ALL_ZONES,
-			    msg_getlabel(mp), ipst);
-		}
-
-		if (ire != NULL && ire->ire_stq != NULL &&
-		    ire->ire_zoneid != GLOBAL_ZONEID &&
-		    ire->ire_zoneid != ALL_ZONES) {
-			/*
-			 * Should only use IREs that are visible from the
-			 * global zone for forwarding.
-			 */
-			ire_refrele(ire);
-			ire = ire_cache_lookup(dst, GLOBAL_ZONEID,
-			    msg_getlabel(mp), ipst);
-		}
-
-		if (ire == NULL) {
-			/*
-			 * No IRE for this destination, so it can't be for us.
-			 * Unless we are forwarding, drop the packet.
-			 * We have to let source routed packets through
-			 * since we don't yet know if they are 'ping -l'
-			 * packets i.e. if they will go out over the
-			 * same interface as they came in on.
-			 */
-			ire = ip_rput_noire(q, mp, ll_multicast, dst);
-			if (ire == NULL)
-				continue;
-		}
-
-		/*
-		 * Broadcast IRE may indicate either broadcast or
-		 * multicast packet
-		 */
-		if (ire->ire_type == IRE_BROADCAST) {
-			/*
-			 * Skip broadcast checks if packet is UDP multicast;
-			 * we'd rather not enter ip_rput_process_broadcast()
-			 * unless the packet is broadcast for real, since
-			 * that routine is a no-op for multicast.
-			 */
-			if (ipha->ipha_protocol != IPPROTO_UDP ||
-			    !CLASSD(ipha->ipha_dst)) {
-				ire = ip_rput_process_broadcast(&q, mp,
-				    ire, ipha, ill, dst, cgtp_flt_pkt,
-				    ll_multicast);
-				if (ire == NULL)
-					continue;
-			}
-		} else if (ire->ire_stq != NULL) {
-			/* fowarding? */
-			ip_rput_process_forward(q, mp, ire, ipha, ill,
-			    ll_multicast, B_FALSE);
-			/* ip_rput_process_forward consumed the packet */
-			continue;
-		}
-
-local:
-		/*
-		 * If the queue in the ire is different to the ingress queue
-		 * then we need to check to see if we can accept the packet.
-		 * Note that for multicast packets and broadcast packets sent
-		 * to a broadcast address which is shared between multiple
-		 * interfaces we should not do this since we just got a random
-		 * broadcast ire.
-		 */
-		if ((ire->ire_rfq != q) && (ire->ire_type != IRE_BROADCAST)) {
-			ire = ip_check_multihome(&ipha->ipha_dst, ire, ill);
-			if (ire == NULL) {
-				/* Drop packet */
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsForwProhibits);
-				freemsg(mp);
-				continue;
-			}
-			if (ire->ire_rfq != NULL)
-				q = ire->ire_rfq;
-		}
-
-		switch (ipha->ipha_protocol) {
-		case IPPROTO_TCP:
-			ASSERT(first_mp == mp);
-			if ((mp = ip_tcp_input(mp, ipha, ill, B_FALSE, ire,
-			    mp, 0, q, ip_ring)) != NULL) {
-				if (curr_sqp == NULL) {
-					curr_sqp = GET_SQUEUE(mp);
-					ASSERT(cnt == 0);
-					cnt++;
-					head = tail = mp;
-				} else if (curr_sqp == GET_SQUEUE(mp)) {
-					ASSERT(tail != NULL);
-					cnt++;
-					tail->b_next = mp;
-					tail = mp;
-				} else {
-					/*
-					 * A different squeue. Send the
-					 * chain for the previous squeue on
-					 * its way. This shouldn't happen
-					 * often unless interrupt binding
-					 * changes.
-					 */
-					IP_STAT(ipst, ip_input_multi_squeue);
-					SQUEUE_ENTER(curr_sqp, head,
-					    tail, cnt, SQ_PROCESS, tag);
-					curr_sqp = GET_SQUEUE(mp);
-					head = mp;
-					tail = mp;
-					cnt = 1;
-				}
-			}
-			continue;
-		case IPPROTO_UDP:
-			ASSERT(first_mp == mp);
-			ip_udp_input(q, mp, ipha, ire, ill);
-			continue;
-		case IPPROTO_SCTP:
-			ASSERT(first_mp == mp);
-			ip_sctp_input(mp, ipha, ill, B_FALSE, ire, mp, 0,
-			    q, dst);
-			/* ire has been released by ip_sctp_input */
-			ire = NULL;
-			continue;
-		case IPPROTO_ENCAP:
-		case IPPROTO_IPV6:
-			ASSERT(first_mp == mp);
-			if (ip_iptun_input(NULL, mp, ipha, ill, ire, ipst))
-				break;
-			/*
-			 * If there was no IP tunnel data-link bound to
-			 * receive this packet, then we fall through to
-			 * allow potential raw sockets bound to either of
-			 * these protocols to pick it up.
-			 */
-		default:
-			ip_proto_input(q, first_mp, ipha, ire, ill, 0);
-			continue;
-		}
-	}
-
-	if (ire != NULL)
-		ire_refrele(ire);
-
-	if (head != NULL)
-		SQUEUE_ENTER(curr_sqp, head, tail, cnt, SQ_PROCESS, tag);
-
-	TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
-	    "ip_input_end: q %p (%S)", q, "end");
-#undef  rptr
-}
-
-/*
- * ip_accept_tcp() - This function is called by the squeue when it retrieves
- * a chain of packets in the poll mode. The packets have gone through the
- * data link processing but not IP processing. For performance and latency
- * reasons, the squeue wants to process the chain in line instead of feeding
- * it back via ip_input path.
- *
- * So this is a light weight function which checks to see if the packets
- * retrived are indeed TCP packets (TCP squeue always polls TCP soft ring
- * but we still do the paranoid check) meant for local machine and we don't
- * have labels etc enabled. Packets that meet the criterion are returned to
- * the squeue and processed inline while the rest go via ip_input path.
- */
-/*ARGSUSED*/
-mblk_t *
-ip_accept_tcp(ill_t *ill, ill_rx_ring_t *ip_ring, squeue_t *target_sqp,
-    mblk_t *mp_chain, mblk_t **last, uint_t *cnt)
-{
-	mblk_t 		*mp;
-	ipaddr_t	dst = NULL;
-	ipaddr_t	prev_dst;
-	ire_t		*ire = NULL;
-	ipha_t		*ipha;
-	uint_t		pkt_len;
-	ssize_t		len;
-	uint_t		opt_len;
-	queue_t		*q = ill->ill_rq;
-	squeue_t	*curr_sqp;
-	mblk_t 		*ahead = NULL;	/* Accepted head */
-	mblk_t		*atail = NULL;	/* Accepted tail */
-	uint_t		acnt = 0;	/* Accepted count */
-	mblk_t		*utail = NULL;	/* Unaccepted head */
-	mblk_t		*uhead = NULL;	/* Unaccepted tail */
-	uint_t		ucnt = 0;	/* Unaccepted cnt */
-	ip_stack_t	*ipst = ill->ill_ipst;
-	ilb_stack_t	*ilbs = ipst->ips_netstack->netstack_ilb;
-
-	*cnt = 0;
-
-	ASSERT(ill != NULL);
-	ASSERT(ip_ring != NULL);
-
-	TRACE_1(TR_FAC_IP, TR_IP_RPUT_START, "ip_accept_tcp: q %p", q);
-
-	/* If ILB is enabled, don't do fast processing. */
-	if (ilb_has_rules(ilbs)) {
-		uhead = mp_chain;
-		goto all_reject;
-	}
-
-#define	rptr	((uchar_t *)ipha)
-
-	while (mp_chain != NULL) {
-		mp = mp_chain;
-		mp_chain = mp_chain->b_next;
-		mp->b_next = NULL;
-
-		/*
-		 * We do ire caching from one iteration to
-		 * another. In the event the packet chain contains
-		 * all packets from the same dst, this caching saves
-		 * an ire_cache_lookup for each of the succeeding
-		 * packets in a packet chain.
-		 */
-		prev_dst = dst;
-
-		ipha = (ipha_t *)mp->b_rptr;
-		len = mp->b_wptr - rptr;
-
-		ASSERT(!MBLK_RX_FANOUT_SLOWPATH(mp, ipha));
-
-		/*
-		 * If it is a non TCP packet, or doesn't have H/W cksum,
-		 * or doesn't have min len, reject.
-		 */
-		if ((ipha->ipha_protocol != IPPROTO_TCP) || (len <
-		    (IP_SIMPLE_HDR_LENGTH + TCP_MIN_HEADER_LENGTH))) {
-			ADD_TO_CHAIN(uhead, utail, ucnt, mp);
-			continue;
-		}
-
-		pkt_len = ntohs(ipha->ipha_length);
-		if (len != pkt_len) {
-			if (len > pkt_len) {
-				mp->b_wptr = rptr + pkt_len;
-			} else {
-				ADD_TO_CHAIN(uhead, utail, ucnt, mp);
-				continue;
-			}
-		}
-
-		opt_len = ipha->ipha_version_and_hdr_length -
-		    IP_SIMPLE_HDR_VERSION;
-		dst = ipha->ipha_dst;
-
-		/* IP version bad or there are IP options */
-		if (opt_len && (!ip_rput_multimblk_ipoptions(q, ill,
-		    mp, &ipha, &dst, ipst)))
-			continue;
-
-		if (is_system_labeled() || (ill->ill_dhcpinit != 0) ||
-		    (ipst->ips_ip_cgtp_filter &&
-		    ipst->ips_ip_cgtp_filter_ops != NULL)) {
-			ADD_TO_CHAIN(uhead, utail, ucnt, mp);
-			continue;
-		}
-
-		/*
-		 * Reuse the cached ire only if the ipha_dst of the previous
-		 * packet is the same as the current packet AND it is not
-		 * INADDR_ANY.
-		 */
-		if (!(dst == prev_dst && dst != INADDR_ANY) &&
-		    (ire != NULL)) {
-			ire_refrele(ire);
-			ire = NULL;
-		}
-
-		if (ire == NULL)
-			ire = ire_cache_lookup_simple(dst, ipst);
-
-		/*
-		 * Unless forwarding is enabled, dont call
-		 * ip_fast_forward(). Incoming packet is for forwarding
-		 */
-		if ((ill->ill_flags & ILLF_ROUTER) &&
-		    (ire == NULL || (ire->ire_type & IRE_CACHE))) {
-
-			DTRACE_PROBE4(ip4__physical__in__start,
-			    ill_t *, ill, ill_t *, NULL,
-			    ipha_t *, ipha, mblk_t *, mp);
-
-			FW_HOOKS(ipst->ips_ip4_physical_in_event,
-			    ipst->ips_ipv4firewall_physical_in,
-			    ill, NULL, ipha, mp, mp, 0, ipst);
-
-			DTRACE_PROBE1(ip4__physical__in__end, mblk_t *, mp);
-
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInReceives);
-			UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInOctets,
-			    pkt_len);
-
-			if (mp != NULL)
-				ire = ip_fast_forward(ire, dst, ill, mp);
-			continue;
-		}
-
-		/* incoming packet is for local consumption */
-		if ((ire != NULL) && (ire->ire_type & IRE_LOCAL))
-			goto local_accept;
-
-		/*
-		 * Disable ire caching for anything more complex
-		 * than the simple fast path case we checked for above.
-		 */
-		if (ire != NULL) {
-			ire_refrele(ire);
-			ire = NULL;
-		}
-
-		ire = ire_cache_lookup(dst, ALL_ZONES, msg_getlabel(mp),
-		    ipst);
-		if (ire == NULL || ire->ire_type == IRE_BROADCAST ||
-		    ire->ire_stq != NULL) {
-			ADD_TO_CHAIN(uhead, utail, ucnt, mp);
-			if (ire != NULL) {
-				ire_refrele(ire);
-				ire = NULL;
-			}
-			continue;
-		}
-
-local_accept:
-
-		if (ire->ire_rfq != q) {
-			ADD_TO_CHAIN(uhead, utail, ucnt, mp);
-			if (ire != NULL) {
-				ire_refrele(ire);
-				ire = NULL;
-			}
-			continue;
-		}
-
-		/*
-		 * The event for packets being received from a 'physical'
-		 * interface is placed after validation of the source and/or
-		 * destination address as being local so that packets can be
-		 * redirected to loopback addresses using ipnat.
-		 */
-		DTRACE_PROBE4(ip4__physical__in__start,
-		    ill_t *, ill, ill_t *, NULL,
-		    ipha_t *, ipha, mblk_t *, mp);
-
-		FW_HOOKS(ipst->ips_ip4_physical_in_event,
-		    ipst->ips_ipv4firewall_physical_in,
-		    ill, NULL, ipha, mp, mp, 0, ipst);
-
-		DTRACE_PROBE1(ip4__physical__in__end, mblk_t *, mp);
-
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInReceives);
-		UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInOctets, pkt_len);
-
-		if (mp != NULL &&
-		    (mp = ip_tcp_input(mp, ipha, ill, B_FALSE, ire, mp,
-		    0, q, ip_ring)) != NULL) {
-			if ((curr_sqp = GET_SQUEUE(mp)) == target_sqp) {
-				ADD_TO_CHAIN(ahead, atail, acnt, mp);
-			} else {
-				SQUEUE_ENTER(curr_sqp, mp, mp, 1,
-				    SQ_FILL, SQTAG_IP_INPUT);
-			}
-		}
-	}
-
-	if (ire != NULL)
-		ire_refrele(ire);
-
-all_reject:
-	if (uhead != NULL)
-		ip_input(ill, ip_ring, uhead, NULL);
-
-	if (ahead != NULL) {
-		*last = atail;
-		*cnt = acnt;
-		return (ahead);
-	}
-
-	return (NULL);
-#undef  rptr
 }
 
 static void
@@ -15684,14 +8224,16 @@ ip_dlpi_error(ill_t *ill, t_uscalar_t prim, t_uscalar_t dl_err,
  * ill_refhold before that, since qwriter_ip does an ill_refrele.
  */
 void
-ip_rput_dlpi(queue_t *q, mblk_t *mp)
+ip_rput_dlpi(ill_t *ill, mblk_t *mp)
 {
 	dl_ok_ack_t	*dloa = (dl_ok_ack_t *)mp->b_rptr;
 	dl_error_ack_t	*dlea = (dl_error_ack_t *)dloa;
-	ill_t		*ill = q->q_ptr;
+	queue_t		*q = ill->ill_rq;
 	t_uscalar_t	prim = dloa->dl_primitive;
 	t_uscalar_t	reqprim = DL_PRIM_INVAL;
 
+	DTRACE_PROBE3(ill__dlpi, char *, "ip_rput_dlpi",
+	    char *, dl_primstr(prim), ill_t *, ill);
 	ip1dbg(("ip_rput_dlpi"));
 
 	/*
@@ -15720,9 +8262,6 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 		break;
 	case DL_NOTIFY_ACK:
 		reqprim = DL_NOTIFY_REQ;
-		break;
-	case DL_CONTROL_ACK:
-		reqprim = DL_CONTROL_REQ;
 		break;
 	case DL_CAPABILITY_ACK:
 		reqprim = DL_CAPABILITY_REQ;
@@ -15781,7 +8320,7 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 /*
  * Handling of DLPI messages that require exclusive access to the ipsq.
  *
- * Need to do ill_pending_mp_release on ioctl completion, which could
+ * Need to do ipsq_pending_mp_get on ioctl completion, which could
  * happen here. (along with mi_copy_done)
  */
 /* ARGSUSED */
@@ -15791,7 +8330,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	dl_ok_ack_t	*dloa = (dl_ok_ack_t *)mp->b_rptr;
 	dl_error_ack_t	*dlea = (dl_error_ack_t *)dloa;
 	int		err = 0;
-	ill_t		*ill;
+	ill_t		*ill = (ill_t *)q->q_ptr;
 	ipif_t		*ipif = NULL;
 	mblk_t		*mp1 = NULL;
 	conn_t		*connp = NULL;
@@ -15800,14 +8339,13 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	boolean_t	success;
 	boolean_t	ioctl_aborted = B_FALSE;
 	boolean_t	log = B_TRUE;
-	ip_stack_t		*ipst;
+
+	DTRACE_PROBE3(ill__dlpi, char *, "ip_rput_dlpi_writer",
+	    char *, dl_primstr(dloa->dl_primitive), ill_t *, ill);
 
 	ip1dbg(("ip_rput_dlpi_writer .."));
-	ill = (ill_t *)q->q_ptr;
 	ASSERT(ipsq->ipsq_xop == ill->ill_phyint->phyint_ipsq->ipsq_xop);
 	ASSERT(IAM_WRITER_ILL(ill));
-
-	ipst = ill->ill_ipst;
 
 	ipif = ipsq->ipsq_xop->ipx_pending_ipif;
 	/*
@@ -15822,6 +8360,10 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	case DL_ERROR_ACK:
 		ip1dbg(("ip_rput_dlpi_writer: got DL_ERROR_ACK for %s\n",
 		    dl_primstr(dlea->dl_error_primitive)));
+
+		DTRACE_PROBE3(ill__dlpi, char *, "ip_rput_dlpi_writer error",
+		    char *, dl_primstr(dlea->dl_error_primitive),
+		    ill_t *, ill);
 
 		switch (dlea->dl_error_primitive) {
 		case DL_DISABMULTI_REQ:
@@ -15916,7 +8458,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			if (ill->ill_dlpi_multicast_state == IDS_INPROGRESS)
 				ill->ill_dlpi_multicast_state = IDS_FAILED;
 			if (ill->ill_dlpi_multicast_state == IDS_FAILED) {
-				ipif_t *ipif;
 
 				printf("ip: joining multicasts failed (%d)"
 				    " on %s - will use link layer "
@@ -15924,31 +8465,17 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 				    dlea->dl_errno, ill->ill_name);
 
 				/*
-				 * Set up the multicast mapping alone.
+				 * Set up for multi_bcast; We are the
 				 * writer, so ok to access ill->ill_ipif
 				 * without any lock.
 				 */
-				ipif = ill->ill_ipif;
 				mutex_enter(&ill->ill_phyint->phyint_lock);
 				ill->ill_phyint->phyint_flags |=
 				    PHYI_MULTI_BCAST;
 				mutex_exit(&ill->ill_phyint->phyint_lock);
 
-				if (!ill->ill_isv6) {
-					(void) ipif_arp_setup_multicast(ipif,
-					    NULL);
-				} else {
-					(void) ipif_ndp_setup_multicast(ipif,
-					    NULL);
-				}
 			}
 			freemsg(mp);	/* Don't want to pass this up */
-			return;
-		case DL_CONTROL_REQ:
-			ip1dbg(("ip_rput_dlpi_writer: got DL_ERROR_ACK for "
-			    "DL_CONTROL_REQ\n"));
-			ill_dlpi_done(ill, dlea->dl_error_primitive);
-			freemsg(mp);
 			return;
 		case DL_CAPABILITY_REQ:
 			ip1dbg(("ip_rput_dlpi_writer: got DL_ERROR_ACK for "
@@ -16003,10 +8530,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		mp = NULL;
 		break;
 
-	case DL_CONTROL_ACK:
-		/* We treat all of these as "fire and forget" */
-		ill_dlpi_done(ill, DL_CONTROL_REQ);
-		break;
 	case DL_INFO_ACK:
 		/* Call a routine to handle this one. */
 		ill_dlpi_done(ill, DL_INFO_REQ);
@@ -16019,29 +8542,33 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 * sent by ill_dl_phys, in which case just return
 		 */
 		ill_dlpi_done(ill, DL_BIND_REQ);
-		if (ill->ill_ifname_pending)
+		if (ill->ill_ifname_pending) {
+			DTRACE_PROBE2(ip__rput__dlpi__ifname__pending,
+			    ill_t *, ill, mblk_t *, mp);
 			break;
-
+		}
 		if (!ioctl_aborted)
 			mp1 = ipsq_pending_mp_get(ipsq, &connp);
-		if (mp1 == NULL)
+		if (mp1 == NULL) {
+			DTRACE_PROBE1(ip__rput__dlpi__no__mblk, ill_t *, ill);
 			break;
+		}
 		/*
 		 * mp1 was added by ill_dl_up(). if that is a result of
 		 * a DL_NOTE_REPLUMB notification, connp could be NULL.
 		 */
 		if (connp != NULL)
 			q = CONNP_TO_WQ(connp);
-
 		/*
 		 * We are exclusive. So nothing can change even after
-		 * we get the pending mp. If need be we can put it back
-		 * and restart, as in calling ipif_arp_up()  below.
+		 * we get the pending mp.
 		 */
 		ip1dbg(("ip_rput_dlpi: bind_ack %s\n", ill->ill_name));
+		DTRACE_PROBE1(ip__rput__dlpi__bind__ack, ill_t *, ill);
 
 		mutex_enter(&ill->ill_lock);
 		ill->ill_dl_up = 1;
+		ill->ill_state_flags &= ~ILL_DOWN_IN_PROGRESS;
 		ill_nic_event_dispatch(ill, 0, NE_UP, NULL, 0);
 		mutex_exit(&ill->ill_lock);
 
@@ -16052,34 +8579,15 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		 * ill_dl_up(), which stopped ipif_up()'s processing.
 		 */
 		if (ill->ill_isv6) {
-			if (ill->ill_flags & ILLF_XRESOLV) {
-				if (connp != NULL)
-					mutex_enter(&connp->conn_lock);
-				mutex_enter(&ill->ill_lock);
-				success = ipsq_pending_mp_add(connp, ipif, q,
-				    mp1, 0);
-				mutex_exit(&ill->ill_lock);
-				if (connp != NULL)
-					mutex_exit(&connp->conn_lock);
-				if (success) {
-					err = ipif_resolver_up(ipif,
-					    Res_act_initial);
-					if (err == EINPROGRESS) {
-						freemsg(mp);
-						return;
-					}
-					ASSERT(err != 0);
-					mp1 = ipsq_pending_mp_get(ipsq, &connp);
-					ASSERT(mp1 != NULL);
-				} else {
-					/* conn has started closing */
-					err = EINTR;
-				}
-			} else { /* Non XRESOLV interface */
-				(void) ipif_resolver_up(ipif, Res_act_initial);
-				if ((err = ipif_ndp_up(ipif, B_TRUE)) == 0)
-					err = ipif_up_done_v6(ipif);
-			}
+			/*
+			 * v6 interfaces.
+			 * Unlike ARP which has to do another bind
+			 * and attach, once we get here we are
+			 * done with NDP
+			 */
+			(void) ipif_resolver_up(ipif, Res_act_initial);
+			if ((err = ipif_ndp_up(ipif, B_TRUE)) == 0)
+				err = ipif_up_done_v6(ipif);
 		} else if (ill->ill_net_type == IRE_IF_RESOLVER) {
 			/*
 			 * ARP and other v4 external resolvers.
@@ -16099,7 +8607,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 					freemsg(mp);
 					return;
 				}
-				ASSERT(err != 0);
+				ASSERT(arp_no_defense || err != 0);
 				mp1 = ipsq_pending_mp_get(ipsq, &connp);
 			} else {
 				/* The conn has started closing */
@@ -16144,10 +8652,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 	case DL_NOTIFY_IND: {
 		dl_notify_ind_t *notify = (dl_notify_ind_t *)mp->b_rptr;
-		ire_t *ire;
 		uint_t orig_mtu;
-		boolean_t need_ire_walk_v4 = B_FALSE;
-		boolean_t need_ire_walk_v6 = B_FALSE;
 
 		switch (notify->dl_notification) {
 		case DL_NOTE_PHYS_ADDR:
@@ -16164,95 +8669,52 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			return;
 
 		case DL_NOTE_FASTPATH_FLUSH:
-			ill_fastpath_flush(ill);
+			nce_flush(ill, B_FALSE);
 			break;
 
 		case DL_NOTE_SDU_SIZE:
 			/*
-			 * Change the MTU size of the interface, of all
-			 * attached ipif's, and of all relevant ire's.  The
-			 * new value's a uint32_t at notify->dl_data.
-			 * Mtu change Vs. new ire creation - protocol below.
+			 * The dce and fragmentation code can cope with
+			 * this changing while packets are being sent.
+			 * When packets are sent ip_output will discover
+			 * a change.
 			 *
-			 * a Mark the ipif as IPIF_CHANGING.
-			 * b Set the new mtu in the ipif.
-			 * c Change the ire_max_frag on all affected ires
-			 * d Unmark the IPIF_CHANGING
-			 *
-			 * To see how the protocol works, assume an interface
-			 * route is also being added simultaneously by
-			 * ip_rt_add and let 'ipif' be the ipif referenced by
-			 * the ire. If the ire is created before step a,
-			 * it will be cleaned up by step c. If the ire is
-			 * created after step d, it will see the new value of
-			 * ipif_mtu. Any attempt to create the ire between
-			 * steps a to d will fail because of the IPIF_CHANGING
-			 * flag. Note that ire_create() is passed a pointer to
-			 * the ipif_mtu, and not the value. During ire_add
-			 * under the bucket lock, the ire_max_frag of the
-			 * new ire being created is set from the ipif/ire from
-			 * which it is being derived.
+			 * Change the MTU size of the interface.
 			 */
 			mutex_enter(&ill->ill_lock);
+			ill->ill_current_frag = (uint_t)notify->dl_data;
+			if (ill->ill_current_frag > ill->ill_max_frag)
+				ill->ill_max_frag = ill->ill_current_frag;
 
-			orig_mtu = ill->ill_max_mtu;
-			ill->ill_max_frag = (uint_t)notify->dl_data;
-			ill->ill_max_mtu = (uint_t)notify->dl_data;
+			orig_mtu = ill->ill_mtu;
+			if (!(ill->ill_flags & ILLF_FIXEDMTU)) {
+				ill->ill_mtu = ill->ill_current_frag;
 
-			/*
-			 * If ill_user_mtu was set (via SIOCSLIFLNKINFO),
-			 * clamp ill_max_mtu at it.
-			 */
-			if (ill->ill_user_mtu != 0 &&
-			    ill->ill_user_mtu < ill->ill_max_mtu)
-				ill->ill_max_mtu = ill->ill_user_mtu;
-
-			/*
-			 * If the MTU is unchanged, we're done.
-			 */
-			if (orig_mtu == ill->ill_max_mtu) {
-				mutex_exit(&ill->ill_lock);
-				break;
-			}
-
-			if (ill->ill_isv6) {
-				if (ill->ill_max_mtu < IPV6_MIN_MTU)
-					ill->ill_max_mtu = IPV6_MIN_MTU;
-			} else {
-				if (ill->ill_max_mtu < IP_MIN_MTU)
-					ill->ill_max_mtu = IP_MIN_MTU;
-			}
-			for (ipif = ill->ill_ipif; ipif != NULL;
-			    ipif = ipif->ipif_next) {
 				/*
-				 * Don't override the mtu if the user
-				 * has explicitly set it.
+				 * If ill_user_mtu was set (via
+				 * SIOCSLIFLNKINFO), clamp ill_mtu at it.
 				 */
-				if (ipif->ipif_flags & IPIF_FIXEDMTU)
-					continue;
-				ipif->ipif_mtu = (uint_t)notify->dl_data;
-				if (ipif->ipif_isv6)
-					ire = ipif_to_ire_v6(ipif);
-				else
-					ire = ipif_to_ire(ipif);
-				if (ire != NULL) {
-					ire->ire_max_frag = ipif->ipif_mtu;
-					ire_refrele(ire);
-				}
-				if (ipif->ipif_flags & IPIF_UP) {
-					if (ill->ill_isv6)
-						need_ire_walk_v6 = B_TRUE;
-					else
-						need_ire_walk_v4 = B_TRUE;
+				if (ill->ill_user_mtu != 0 &&
+				    ill->ill_user_mtu < ill->ill_mtu)
+					ill->ill_mtu = ill->ill_user_mtu;
+
+				if (ill->ill_isv6) {
+					if (ill->ill_mtu < IPV6_MIN_MTU)
+						ill->ill_mtu = IPV6_MIN_MTU;
+				} else {
+					if (ill->ill_mtu < IP_MIN_MTU)
+						ill->ill_mtu = IP_MIN_MTU;
 				}
 			}
 			mutex_exit(&ill->ill_lock);
-			if (need_ire_walk_v4)
-				ire_walk_v4(ill_mtu_change, (char *)ill,
-				    ALL_ZONES, ipst);
-			if (need_ire_walk_v6)
-				ire_walk_v6(ill_mtu_change, (char *)ill,
-				    ALL_ZONES, ipst);
+			/*
+			 * Make sure all dce_generation checks find out
+			 * that ill_mtu has changed.
+			 */
+			if (orig_mtu != ill->ill_mtu) {
+				dce_increment_all_generations(ill->ill_isv6,
+				    ill->ill_ipst);
+			}
 
 			/*
 			 * Refresh IPMP meta-interface MTU if necessary.
@@ -16303,8 +8765,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		case DL_NOTE_PROMISC_ON_PHYS: {
 			phyint_t *phyint = ill->ill_phyint;
 
-			IPSECHW_DEBUG(IPSECHW_PKT, ("ip_rput_dlpi_writer: "
-			    "got a DL_NOTE_PROMISC_ON_PHYS\n"));
 			mutex_enter(&phyint->phyint_lock);
 			phyint->phyint_flags |= PHYI_PROMISC;
 			mutex_exit(&phyint->phyint_lock);
@@ -16313,8 +8773,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		case DL_NOTE_PROMISC_OFF_PHYS: {
 			phyint_t *phyint = ill->ill_phyint;
 
-			IPSECHW_DEBUG(IPSECHW_PKT, ("ip_rput_dlpi_writer: "
-			    "got a DL_NOTE_PROMISC_OFF_PHYS\n"));
 			mutex_enter(&phyint->phyint_lock);
 			phyint->phyint_flags &= ~PHYI_PROMISC;
 			mutex_exit(&phyint->phyint_lock);
@@ -16474,6 +8932,10 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		ip2dbg(("DL_OK_ACK %s (0x%x)\n",
 		    dl_primstr((int)dloa->dl_correct_primitive),
 		    dloa->dl_correct_primitive));
+		DTRACE_PROBE3(ill__dlpi, char *, "ip_rput_dlpi_writer ok",
+		    char *, dl_primstr(dloa->dl_correct_primitive),
+		    ill_t *, ill);
+
 		switch (dloa->dl_correct_primitive) {
 		case DL_ENABMULTI_REQ:
 		case DL_DISABMULTI_REQ:
@@ -16501,6 +8963,10 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 	 * the operation will be stuck forever inside the IPSQ.
 	 */
 	ASSERT(err != EINPROGRESS);
+
+	DTRACE_PROBE4(ipif__ioctl, char *, "ip_rput_dlpi_writer finish",
+	    int, ipsq->ipsq_xop->ipx_current_ioctl, ill_t *, ill,
+	    ipif_t *, NULL);
 
 	switch (ipsq->ipsq_xop->ipx_current_ioctl) {
 	case 0:
@@ -16595,7 +9061,10 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		if (ill->ill_dlpi_fastpath_state == IDS_INPROGRESS) {
 			ill->ill_dlpi_fastpath_state = IDS_FAILED;
 			mutex_exit(&ill->ill_lock);
-			ill_fastpath_nack(ill);
+			/*
+			 * don't flush the nce_t entries: we use them
+			 * as an index to the ncec itself.
+			 */
 			ip1dbg(("ip_rput: DLPI fastpath off on interface %s\n",
 			    ill->ill_name));
 		} else {
@@ -16611,235 +9080,24 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 }
 
 /*
- * NOTE : This function does not ire_refrele the ire argument passed in.
- *
- * IPQoS notes
- * IP policy is invoked twice for a forwarded packet, once on the read side
- * and again on the write side if both, IPP_FWD_IN and IPP_FWD_OUT are
- * enabled. An additional parameter, in_ill, has been added for this purpose.
- * Note that in_ill could be NULL when called from ip_rput_forward_multicast
- * because ip_mroute drops this information.
- *
+ * Update any source route, record route or timestamp options
+ * When it fails it has consumed the message and BUMPed the MIB.
  */
-void
-ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
-{
-	uint32_t	old_pkt_len;
-	uint32_t	pkt_len;
-	queue_t	*q;
-	uint32_t	sum;
-#define	rptr	((uchar_t *)ipha)
-	uint32_t	max_frag;
-	uint32_t	ill_index;
-	ill_t		*out_ill;
-	mib2_ipIfStatsEntry_t *mibptr;
-	ip_stack_t	*ipst = ((ill_t *)(ire->ire_stq->q_ptr))->ill_ipst;
-
-	/* Get the ill_index of the incoming ILL */
-	ill_index = (in_ill != NULL) ? in_ill->ill_phyint->phyint_ifindex : 0;
-	mibptr = (in_ill != NULL) ? in_ill->ill_ip_mib : &ipst->ips_ip_mib;
-
-	/* Initiate Read side IPPF processing */
-	if (IPP_ENABLED(IPP_FWD_IN, ipst)) {
-		ip_process(IPP_FWD_IN, &mp, ill_index);
-		if (mp == NULL) {
-			ip2dbg(("ip_rput_forward: pkt dropped/deferred "\
-			    "during IPPF processing\n"));
-			return;
-		}
-	}
-
-	/* Adjust the checksum to reflect the ttl decrement. */
-	sum = (int)ipha->ipha_hdr_checksum + IP_HDR_CSUM_TTL_ADJUST;
-	ipha->ipha_hdr_checksum = (uint16_t)(sum + (sum >> 16));
-
-	if (ipha->ipha_ttl-- <= 1) {
-		if (ip_csum_hdr(ipha)) {
-			BUMP_MIB(mibptr, ipIfStatsInCksumErrs);
-			goto drop_pkt;
-		}
-		/*
-		 * Note: ire_stq this will be NULL for multicast
-		 * datagrams using the long path through arp (the IRE
-		 * is not an IRE_CACHE). This should not cause
-		 * problems since we don't generate ICMP errors for
-		 * multicast packets.
-		 */
-		BUMP_MIB(mibptr, ipIfStatsForwProhibits);
-		q = ire->ire_stq;
-		if (q != NULL) {
-			/* Sent by forwarding path, and router is global zone */
-			icmp_time_exceeded(q, mp, ICMP_TTL_EXCEEDED,
-			    GLOBAL_ZONEID, ipst);
-		} else
-			freemsg(mp);
-		return;
-	}
-
-	/*
-	 * Don't forward if the interface is down
-	 */
-	if (ire->ire_ipif->ipif_ill->ill_ipif_up_count == 0) {
-		BUMP_MIB(mibptr, ipIfStatsInDiscards);
-		ip2dbg(("ip_rput_forward:interface is down\n"));
-		goto drop_pkt;
-	}
-
-	/* Get the ill_index of the outgoing ILL */
-	out_ill = ire_to_ill(ire);
-	ill_index = out_ill->ill_phyint->phyint_ifindex;
-
-	DTRACE_PROBE4(ip4__forwarding__start,
-	    ill_t *, in_ill, ill_t *, out_ill, ipha_t *, ipha, mblk_t *, mp);
-
-	FW_HOOKS(ipst->ips_ip4_forwarding_event,
-	    ipst->ips_ipv4firewall_forwarding,
-	    in_ill, out_ill, ipha, mp, mp, 0, ipst);
-
-	DTRACE_PROBE1(ip4__forwarding__end, mblk_t *, mp);
-
-	if (mp == NULL)
-		return;
-	old_pkt_len = pkt_len = ntohs(ipha->ipha_length);
-
-	if (is_system_labeled()) {
-		mblk_t *mp1;
-
-		if ((mp1 = tsol_ip_forward(ire, mp)) == NULL) {
-			BUMP_MIB(mibptr, ipIfStatsForwProhibits);
-			goto drop_pkt;
-		}
-		/* Size may have changed */
-		mp = mp1;
-		ipha = (ipha_t *)mp->b_rptr;
-		pkt_len = ntohs(ipha->ipha_length);
-	}
-
-	/* Check if there are options to update */
-	if (!IS_SIMPLE_IPH(ipha)) {
-		if (ip_csum_hdr(ipha)) {
-			BUMP_MIB(mibptr, ipIfStatsInCksumErrs);
-			goto drop_pkt;
-		}
-		if (ip_rput_forward_options(mp, ipha, ire, ipst)) {
-			BUMP_MIB(mibptr, ipIfStatsForwProhibits);
-			return;
-		}
-
-		ipha->ipha_hdr_checksum = 0;
-		ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
-	}
-	max_frag = ire->ire_max_frag;
-	if (pkt_len > max_frag) {
-		/*
-		 * It needs fragging on its way out.  We haven't
-		 * verified the header checksum yet.  Since we
-		 * are going to put a surely good checksum in the
-		 * outgoing header, we have to make sure that it
-		 * was good coming in.
-		 */
-		if (ip_csum_hdr(ipha)) {
-			BUMP_MIB(mibptr, ipIfStatsInCksumErrs);
-			goto drop_pkt;
-		}
-		/* Initiate Write side IPPF processing */
-		if (IPP_ENABLED(IPP_FWD_OUT, ipst)) {
-			ip_process(IPP_FWD_OUT, &mp, ill_index);
-			if (mp == NULL) {
-				ip2dbg(("ip_rput_forward: pkt dropped/deferred"\
-				    " during IPPF processing\n"));
-				return;
-			}
-		}
-		/*
-		 * Handle labeled packet resizing.
-		 *
-		 * If we have added a label, inform ip_wput_frag() of its
-		 * effect on the MTU for ICMP messages.
-		 */
-		if (pkt_len > old_pkt_len) {
-			uint32_t secopt_size;
-
-			secopt_size = pkt_len - old_pkt_len;
-			if (secopt_size < max_frag)
-				max_frag -= secopt_size;
-		}
-
-		ip_wput_frag(ire, mp, IB_PKT, max_frag, 0,
-		    GLOBAL_ZONEID, ipst, NULL);
-		ip2dbg(("ip_rput_forward:sent to ip_wput_frag\n"));
-		return;
-	}
-
-	DTRACE_PROBE4(ip4__physical__out__start, ill_t *, NULL,
-	    ill_t *, out_ill, ipha_t *, ipha, mblk_t *, mp);
-	FW_HOOKS(ipst->ips_ip4_physical_out_event,
-	    ipst->ips_ipv4firewall_physical_out,
-	    NULL, out_ill, ipha, mp, mp, 0, ipst);
-	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-	if (mp == NULL)
-		return;
-
-	mp->b_prev = (mblk_t *)IPP_FWD_OUT;
-	ip1dbg(("ip_rput_forward: Calling ip_xmit_v4\n"));
-	(void) ip_xmit_v4(mp, ire, NULL, B_FALSE, NULL);
-	/* ip_xmit_v4 always consumes the packet */
-	return;
-
-drop_pkt:;
-	ip1dbg(("ip_rput_forward: drop pkt\n"));
-	freemsg(mp);
-#undef	rptr
-}
-
-void
-ip_rput_forward_multicast(ipaddr_t dst, mblk_t *mp, ipif_t *ipif)
-{
-	ire_t	*ire;
-	ip_stack_t *ipst = ipif->ipif_ill->ill_ipst;
-
-	ASSERT(!ipif->ipif_isv6);
-	/*
-	 * Find an IRE which matches the destination and the outgoing
-	 * queue in the cache table. All we need is an IRE_CACHE which
-	 * is pointing at ipif->ipif_ill.
-	 */
-	if (ipif->ipif_flags & IPIF_POINTOPOINT)
-		dst = ipif->ipif_pp_dst_addr;
-
-	ire = ire_ctable_lookup(dst, 0, 0, ipif, ALL_ZONES, msg_getlabel(mp),
-	    MATCH_IRE_ILL | MATCH_IRE_SECATTR, ipst);
-	if (ire == NULL) {
-		/*
-		 * Mark this packet to make it be delivered to
-		 * ip_rput_forward after the new ire has been
-		 * created.
-		 */
-		mp->b_prev = NULL;
-		mp->b_next = mp;
-		ip_newroute_ipif(ipif->ipif_ill->ill_wq, mp, ipif, dst,
-		    NULL, 0, GLOBAL_ZONEID, &zero_info);
-	} else {
-		ip_rput_forward(ire, (ipha_t *)mp->b_rptr, mp, NULL);
-		IRE_REFRELE(ire);
-	}
-}
-
-/* Update any source route, record route or timestamp options */
-static int
-ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire, ip_stack_t *ipst)
+boolean_t
+ip_forward_options(mblk_t *mp, ipha_t *ipha, ill_t *dst_ill,
+    ip_recv_attr_t *ira)
 {
 	ipoptp_t	opts;
 	uchar_t		*opt;
 	uint8_t		optval;
 	uint8_t		optlen;
 	ipaddr_t	dst;
+	ipaddr_t	ifaddr;
 	uint32_t	ts;
-	ire_t		*dst_ire = NULL;
-	ire_t		*tmp_ire = NULL;
 	timestruc_t	now;
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
 
-	ip2dbg(("ip_rput_forward_options\n"));
+	ip2dbg(("ip_forward_options\n"));
 	dst = ipha->ipha_dst;
 	for (optval = ipoptp_first(&opts, ipha);
 	    optval != IPOPT_EOL;
@@ -16847,7 +9105,7 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire, ip_stack_t *ipst)
 		ASSERT((opts.ipoptp_flags & IPOPTP_ERROR) == 0);
 		opt = opts.ipoptp_cur;
 		optlen = opts.ipoptp_len;
-		ip2dbg(("ip_rput_forward_options: opt %d, len %d\n",
+		ip2dbg(("ip_forward_options: opt %d, len %d\n",
 		    optval, opts.ipoptp_len));
 		switch (optval) {
 			uint32_t off;
@@ -16855,27 +9113,17 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire, ip_stack_t *ipst)
 		case IPOPT_LSRR:
 			/* Check if adminstratively disabled */
 			if (!ipst->ips_ip_forward_src_routed) {
-				if (ire->ire_stq != NULL) {
-					/*
-					 * Sent by forwarding path, and router
-					 * is global zone
-					 */
-					icmp_unreachable(ire->ire_stq, mp,
-					    ICMP_SOURCE_ROUTE_FAILED,
-					    GLOBAL_ZONEID, ipst);
-				} else {
-					ip0dbg(("ip_rput_forward_options: "
-					    "unable to send unreach\n"));
-					freemsg(mp);
-				}
-				return (-1);
+				BUMP_MIB(dst_ill->ill_ip_mib,
+				    ipIfStatsForwProhibits);
+				ip_drop_input("ICMP_SOURCE_ROUTE_FAILED",
+				    mp, dst_ill);
+				icmp_unreachable(mp, ICMP_SOURCE_ROUTE_FAILED,
+				    ira);
+				return (B_FALSE);
 			}
-
-			dst_ire = ire_ctable_lookup(dst, 0, IRE_LOCAL,
-			    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-			if (dst_ire == NULL) {
+			if (ip_type_v4(dst, ipst) != IRE_LOCAL) {
 				/*
-				 * Must be partial since ip_rput_options
+				 * Must be partial since ip_input_options
 				 * checked for strict.
 				 */
 				break;
@@ -16887,31 +9135,33 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire, ip_stack_t *ipst)
 			    off > optlen - IP_ADDR_LEN) {
 				/* End of source route */
 				ip1dbg((
-				    "ip_rput_forward_options: end of SR\n"));
-				ire_refrele(dst_ire);
+				    "ip_forward_options: end of SR\n"));
 				break;
 			}
+			/* Pick a reasonable address on the outbound if */
+			ASSERT(dst_ill != NULL);
+			if (ip_select_source_v4(dst_ill, INADDR_ANY, dst,
+			    INADDR_ANY, ALL_ZONES, ipst, &ifaddr, NULL,
+			    NULL) != 0) {
+				/* No source! Shouldn't happen */
+				ifaddr = INADDR_ANY;
+			}
 			bcopy((char *)opt + off, &dst, IP_ADDR_LEN);
-			bcopy(&ire->ire_src_addr, (char *)opt + off,
-			    IP_ADDR_LEN);
-			ip1dbg(("ip_rput_forward_options: next hop 0x%x\n",
+			bcopy(&ifaddr, (char *)opt + off, IP_ADDR_LEN);
+			ip1dbg(("ip_forward_options: next hop 0x%x\n",
 			    ntohl(dst)));
 
 			/*
 			 * Check if our address is present more than
 			 * once as consecutive hops in source route.
 			 */
-			tmp_ire = ire_ctable_lookup(dst, 0, IRE_LOCAL,
-			    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-			if (tmp_ire != NULL) {
-				ire_refrele(tmp_ire);
+			if (ip_type_v4(dst, ipst) == IRE_LOCAL) {
 				off += IP_ADDR_LEN;
 				opt[IPOPT_OFFSET] += IP_ADDR_LEN;
 				goto redo_srr;
 			}
 			ipha->ipha_dst = dst;
 			opt[IPOPT_OFFSET] += IP_ADDR_LEN;
-			ire_refrele(dst_ire);
 			break;
 		case IPOPT_RR:
 			off = opt[IPOPT_OFFSET];
@@ -16920,11 +9170,18 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire, ip_stack_t *ipst)
 			    off > optlen - IP_ADDR_LEN) {
 				/* No more room - ignore */
 				ip1dbg((
-				    "ip_rput_forward_options: end of RR\n"));
+				    "ip_forward_options: end of RR\n"));
 				break;
 			}
-			bcopy(&ire->ire_src_addr, (char *)opt + off,
-			    IP_ADDR_LEN);
+			/* Pick a reasonable address on the outbound if */
+			ASSERT(dst_ill != NULL);
+			if (ip_select_source_v4(dst_ill, INADDR_ANY, dst,
+			    INADDR_ANY, ALL_ZONES, ipst, &ifaddr, NULL,
+			    NULL) != 0) {
+				/* No source! Shouldn't happen */
+				ifaddr = INADDR_ANY;
+			}
+			bcopy(&ifaddr, (char *)opt + off, IP_ADDR_LEN);
 			opt[IPOPT_OFFSET] += IP_ADDR_LEN;
 			break;
 		case IPOPT_TS:
@@ -16938,14 +9195,10 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire, ip_stack_t *ipst)
 				/* Verify that the address matched */
 				off = opt[IPOPT_OFFSET] - 1;
 				bcopy((char *)opt + off, &dst, IP_ADDR_LEN);
-				dst_ire = ire_ctable_lookup(dst, 0,
-				    IRE_LOCAL, NULL, ALL_ZONES, NULL,
-				    MATCH_IRE_TYPE, ipst);
-				if (dst_ire == NULL) {
+				if (ip_type_v4(dst, ipst) != IRE_LOCAL) {
 					/* Not for us */
 					break;
 				}
-				ire_refrele(dst_ire);
 				/* FALLTHRU */
 			case IPOPT_TS_TSANDADDR:
 				off = IP_ADDR_LEN + IPOPT_TS_TIMELEN;
@@ -16955,9 +9208,9 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire, ip_stack_t *ipst)
 				 * ip_*put_options should have already
 				 * dropped this packet.
 				 */
-				cmn_err(CE_PANIC, "ip_rput_forward_options: "
-				    "unknown IT - bug in ip_rput_options?\n");
-				return (0);	/* Keep "lint" happy */
+				cmn_err(CE_PANIC, "ip_forward_options: "
+				    "unknown IT - bug in ip_input_options?\n");
+				return (B_TRUE);	/* Keep "lint" happy */
 			}
 			if (opt[IPOPT_OFFSET] - 1 + off > optlen) {
 				/* Increase overflow counter */
@@ -16972,8 +9225,15 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire, ip_stack_t *ipst)
 			case IPOPT_TS_PRESPEC:
 			case IPOPT_TS_PRESPEC_RFC791:
 			case IPOPT_TS_TSANDADDR:
-				bcopy(&ire->ire_src_addr,
-				    (char *)opt + off, IP_ADDR_LEN);
+				/* Pick a reasonable addr on the outbound if */
+				ASSERT(dst_ill != NULL);
+				if (ip_select_source_v4(dst_ill, INADDR_ANY,
+				    dst, INADDR_ANY, ALL_ZONES, ipst, &ifaddr,
+				    NULL, NULL) != 0) {
+					/* No source! Shouldn't happen */
+					ifaddr = INADDR_ANY;
+				}
+				bcopy(&ifaddr, (char *)opt + off, IP_ADDR_LEN);
 				opt[IPOPT_OFFSET] += IP_ADDR_LEN;
 				/* FALLTHRU */
 			case IPOPT_TS_TSONLY:
@@ -16989,223 +9249,7 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire, ip_stack_t *ipst)
 			break;
 		}
 	}
-	return (0);
-}
-
-/*
- * This is called after processing at least one of AH/ESP headers.
- *
- * NOTE: the ill corresponding to ipsec_in_ill_index may not be
- * the actual, physical interface on which the packet was received,
- * but, when ip_strict_dst_multihoming is set to 1, could be the
- * interface which had the ipha_dst configured when the packet went
- * through ip_rput. The ill_index corresponding to the recv_ill
- * is saved in ipsec_in_rill_index
- *
- * NOTE2: The "ire" argument is only used in IPv4 cases.  This function
- * cannot assume "ire" points to valid data for any IPv6 cases.
- */
-void
-ip_fanout_proto_again(mblk_t *ipsec_mp, ill_t *ill, ill_t *recv_ill, ire_t *ire)
-{
-	mblk_t *mp;
-	ipaddr_t dst;
-	in6_addr_t *v6dstp;
-	ipha_t *ipha;
-	ip6_t *ip6h;
-	ipsec_in_t *ii;
-	boolean_t ill_need_rele = B_FALSE;
-	boolean_t rill_need_rele = B_FALSE;
-	boolean_t ire_need_rele = B_FALSE;
-	netstack_t	*ns;
-	ip_stack_t	*ipst;
-
-	ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-	ASSERT(ii->ipsec_in_ill_index != 0);
-	ns = ii->ipsec_in_ns;
-	ASSERT(ii->ipsec_in_ns != NULL);
-	ipst = ns->netstack_ip;
-
-	mp = ipsec_mp->b_cont;
-	ASSERT(mp != NULL);
-
-	if (ill == NULL) {
-		ASSERT(recv_ill == NULL);
-		/*
-		 * We need to get the original queue on which ip_rput_local
-		 * or ip_rput_data_v6 was called.
-		 */
-		ill = ill_lookup_on_ifindex(ii->ipsec_in_ill_index,
-		    !ii->ipsec_in_v4, NULL, NULL, NULL, NULL, ipst);
-		ill_need_rele = B_TRUE;
-
-		if (ii->ipsec_in_ill_index != ii->ipsec_in_rill_index) {
-			recv_ill = ill_lookup_on_ifindex(
-			    ii->ipsec_in_rill_index, !ii->ipsec_in_v4,
-			    NULL, NULL, NULL, NULL, ipst);
-			rill_need_rele = B_TRUE;
-		} else {
-			recv_ill = ill;
-		}
-
-		if ((ill == NULL) || (recv_ill == NULL)) {
-			ip0dbg(("ip_fanout_proto_again: interface "
-			    "disappeared\n"));
-			if (ill != NULL)
-				ill_refrele(ill);
-			if (recv_ill != NULL)
-				ill_refrele(recv_ill);
-			freemsg(ipsec_mp);
-			return;
-		}
-	}
-
-	ASSERT(ill != NULL && recv_ill != NULL);
-
-	if (mp->b_datap->db_type == M_CTL) {
-		/*
-		 * AH/ESP is returning the ICMP message after
-		 * removing their headers. Fanout again till
-		 * it gets to the right protocol.
-		 */
-		if (ii->ipsec_in_v4) {
-			icmph_t *icmph;
-			int iph_hdr_length;
-			int hdr_length;
-
-			ipha = (ipha_t *)mp->b_rptr;
-			iph_hdr_length = IPH_HDR_LENGTH(ipha);
-			icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
-			ipha = (ipha_t *)&icmph[1];
-			hdr_length = IPH_HDR_LENGTH(ipha);
-			/*
-			 * icmp_inbound_error_fanout may need to do pullupmsg.
-			 * Reset the type to M_DATA.
-			 */
-			mp->b_datap->db_type = M_DATA;
-			icmp_inbound_error_fanout(ill->ill_rq, ill, ipsec_mp,
-			    icmph, ipha, iph_hdr_length, hdr_length, B_TRUE,
-			    B_FALSE, ill, ii->ipsec_in_zoneid);
-		} else {
-			icmp6_t *icmp6;
-			int hdr_length;
-
-			ip6h = (ip6_t *)mp->b_rptr;
-			/* Don't call hdr_length_v6() unless you have to. */
-			if (ip6h->ip6_nxt != IPPROTO_ICMPV6)
-				hdr_length = ip_hdr_length_v6(mp, ip6h);
-			else
-				hdr_length = IPV6_HDR_LEN;
-
-			icmp6 = (icmp6_t *)(&mp->b_rptr[hdr_length]);
-			/*
-			 * icmp_inbound_error_fanout_v6 may need to do
-			 * pullupmsg.  Reset the type to M_DATA.
-			 */
-			mp->b_datap->db_type = M_DATA;
-			icmp_inbound_error_fanout_v6(ill->ill_rq, ipsec_mp,
-			    ip6h, icmp6, ill, recv_ill, B_TRUE,
-			    ii->ipsec_in_zoneid);
-		}
-		if (ill_need_rele)
-			ill_refrele(ill);
-		if (rill_need_rele)
-			ill_refrele(recv_ill);
-		return;
-	}
-
-	if (ii->ipsec_in_v4) {
-		ipha = (ipha_t *)mp->b_rptr;
-		dst = ipha->ipha_dst;
-		if (CLASSD(dst)) {
-			/*
-			 * Multicast has to be delivered to all streams.
-			 */
-			dst = INADDR_BROADCAST;
-		}
-
-		if (ire == NULL) {
-			ire = ire_cache_lookup(dst, ii->ipsec_in_zoneid,
-			    msg_getlabel(mp), ipst);
-			if (ire == NULL) {
-				if (ill_need_rele)
-					ill_refrele(ill);
-				if (rill_need_rele)
-					ill_refrele(recv_ill);
-				ip1dbg(("ip_fanout_proto_again: "
-				    "IRE not found"));
-				freemsg(ipsec_mp);
-				return;
-			}
-			ire_need_rele = B_TRUE;
-		}
-
-		switch (ipha->ipha_protocol) {
-		case IPPROTO_UDP:
-			ip_udp_input(ill->ill_rq, ipsec_mp, ipha, ire,
-			    recv_ill);
-			if (ire_need_rele)
-				ire_refrele(ire);
-			break;
-		case IPPROTO_TCP:
-			if (!ire_need_rele)
-				IRE_REFHOLD(ire);
-			mp = ip_tcp_input(mp, ipha, ill, B_TRUE,
-			    ire, ipsec_mp, 0, ill->ill_rq, NULL);
-			IRE_REFRELE(ire);
-			if (mp != NULL) {
-				SQUEUE_ENTER(GET_SQUEUE(mp), mp,
-				    mp, 1, SQ_PROCESS,
-				    SQTAG_IP_PROTO_AGAIN);
-			}
-			break;
-		case IPPROTO_SCTP:
-			if (!ire_need_rele)
-				IRE_REFHOLD(ire);
-			ip_sctp_input(mp, ipha, ill, B_TRUE, ire,
-			    ipsec_mp, 0, ill->ill_rq, dst);
-			break;
-		case IPPROTO_ENCAP:
-		case IPPROTO_IPV6:
-			if (ip_iptun_input(ipsec_mp, mp, ipha, ill, ire,
-			    ill->ill_ipst)) {
-				/*
-				 * If we made it here, we don't need to worry
-				 * about the raw-socket/protocol fanout.
-				 */
-				if (ire_need_rele)
-					ire_refrele(ire);
-				break;
-			}
-			/* else FALLTHRU */
-		default:
-			ip_proto_input(ill->ill_rq, ipsec_mp, ipha, ire,
-			    recv_ill, 0);
-			if (ire_need_rele)
-				ire_refrele(ire);
-			break;
-		}
-	} else {
-		uint32_t rput_flags = 0;
-
-		ip6h = (ip6_t *)mp->b_rptr;
-		v6dstp = &ip6h->ip6_dst;
-		/*
-		 * XXX Assumes ip_rput_v6 sets ll_multicast  only for multicast
-		 * address.
-		 *
-		 * Currently, we don't store that state in the IPSEC_IN
-		 * message, and we may need to.
-		 */
-		rput_flags |= (IN6_IS_ADDR_MULTICAST(v6dstp) ?
-		    IP6_IN_LLMCAST : 0);
-		ip_rput_data_v6(ill->ill_rq, ill, ipsec_mp, ip6h, rput_flags,
-		    NULL, NULL);
-	}
-	if (ill_need_rele)
-		ill_refrele(ill);
-	if (rill_need_rele)
-		ill_refrele(recv_ill);
+	return (B_TRUE);
 }
 
 /*
@@ -17290,609 +9334,25 @@ ill_frag_timer_start(ill_t *ill)
 }
 
 /*
- * This routine is needed for loopback when forwarding multicasts.
- *
- * IPQoS Notes:
- * IPPF processing is done in fanout routines.
- * Policy processing is done only if IPP_lOCAL_IN is enabled. Further,
- * processing for IPsec packets is done when it comes back in clear.
- * NOTE : The callers of this function need to do the ire_refrele for the
- *	  ire that is being passed in.
- */
-void
-ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
-    ill_t *recv_ill, uint32_t esp_udp_ports)
-{
-	boolean_t esp_in_udp_packet = (esp_udp_ports != 0);
-	ill_t	*ill = (ill_t *)q->q_ptr;
-	uint32_t	sum;
-	uint32_t	u1;
-	uint32_t	u2;
-	int		hdr_length;
-	boolean_t	mctl_present;
-	mblk_t		*first_mp = mp;
-	mblk_t		*hada_mp = NULL;
-	ipha_t		*inner_ipha;
-	ip_stack_t	*ipst;
-
-	ASSERT(recv_ill != NULL);
-	ipst = recv_ill->ill_ipst;
-
-	TRACE_1(TR_FAC_IP, TR_IP_RPUT_LOCL_START,
-	    "ip_rput_locl_start: q %p", q);
-
-	ASSERT(ire->ire_ipversion == IPV4_VERSION);
-	ASSERT(ill != NULL);
-
-#define	rptr	((uchar_t *)ipha)
-#define	iphs	((uint16_t *)ipha)
-
-	/*
-	 * no UDP or TCP packet should come here anymore.
-	 */
-	ASSERT(ipha->ipha_protocol != IPPROTO_TCP &&
-	    ipha->ipha_protocol != IPPROTO_UDP);
-
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-	if (mctl_present &&
-	    ((da_ipsec_t *)first_mp->b_rptr)->da_type == IPHADA_M_CTL) {
-		ASSERT(MBLKL(first_mp) >= sizeof (da_ipsec_t));
-
-		/*
-		 * It's an IPsec accelerated packet.
-		 * Keep a pointer to the data attributes around until
-		 * we allocate the ipsec_info_t.
-		 */
-		IPSECHW_DEBUG(IPSECHW_PKT,
-		    ("ip_rput_local: inbound HW accelerated IPsec pkt\n"));
-		hada_mp = first_mp;
-		hada_mp->b_cont = NULL;
-		/*
-		 * Since it is accelerated, it comes directly from
-		 * the ill and the data attributes is followed by
-		 * the packet data.
-		 */
-		ASSERT(mp->b_datap->db_type != M_CTL);
-		first_mp = mp;
-		mctl_present = B_FALSE;
-	}
-
-	/*
-	 * IF M_CTL is not present, then ipsec_in_is_secure
-	 * should return B_TRUE. There is a case where loopback
-	 * packets has an M_CTL in the front with all the
-	 * IPsec options set to IPSEC_PREF_NEVER - which means
-	 * ipsec_in_is_secure will return B_FALSE. As loopback
-	 * packets never comes here, it is safe to ASSERT the
-	 * following.
-	 */
-	ASSERT(!mctl_present || ipsec_in_is_secure(first_mp));
-
-	/*
-	 * Also, we should never have an mctl_present if this is an
-	 * ESP-in-UDP packet.
-	 */
-	ASSERT(!mctl_present || !esp_in_udp_packet);
-
-	/* u1 is # words of IP options */
-	u1 = ipha->ipha_version_and_hdr_length - (uchar_t)((IP_VERSION << 4) +
-	    IP_SIMPLE_HDR_LENGTH_IN_WORDS);
-
-	/*
-	 * Don't verify header checksum if we just removed UDP header or
-	 * packet is coming back from AH/ESP.
-	 */
-	if (!esp_in_udp_packet && !mctl_present) {
-		if (u1) {
-			if (!ip_options_cksum(q, ill, mp, ipha, ire, ipst)) {
-				if (hada_mp != NULL)
-					freemsg(hada_mp);
-				return;
-			}
-		} else {
-			/* Check the IP header checksum.  */
-#define	uph	((uint16_t *)ipha)
-			sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
-			    uph[5] + uph[6] + uph[7] + uph[8] + uph[9];
-#undef  uph
-			/* finish doing IP checksum */
-			sum = (sum & 0xFFFF) + (sum >> 16);
-			sum = ~(sum + (sum >> 16)) & 0xFFFF;
-			if (sum && sum != 0xFFFF) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInCksumErrs);
-				goto drop_pkt;
-			}
-		}
-	}
-
-	/*
-	 * Count for SNMP of inbound packets for ire. As ip_proto_input
-	 * might be called more than once for secure packets, count only
-	 * the first time.
-	 */
-	if (!mctl_present) {
-		UPDATE_IB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-	}
-
-	/* Check for fragmentation offset. */
-	u2 = ntohs(ipha->ipha_fragment_offset_and_flags);
-	u1 = u2 & (IPH_MF | IPH_OFFSET);
-	if (u1) {
-		/*
-		 * We re-assemble fragments before we do the AH/ESP
-		 * processing. Thus, M_CTL should not be present
-		 * while we are re-assembling.
-		 */
-		ASSERT(!mctl_present);
-		ASSERT(first_mp == mp);
-		if (!ip_rput_fragment(ill, recv_ill, &mp, ipha, NULL, NULL))
-			return;
-
-		/*
-		 * Make sure that first_mp points back to mp as
-		 * the mp we came in with could have changed in
-		 * ip_rput_fragment().
-		 */
-		ipha = (ipha_t *)mp->b_rptr;
-		first_mp = mp;
-	}
-
-	/*
-	 * Clear hardware checksumming flag as it is currently only
-	 * used by TCP and UDP.
-	 */
-	DB_CKSUMFLAGS(mp) = 0;
-
-	/* Now we have a complete datagram, destined for this machine. */
-	u1 = IPH_HDR_LENGTH(ipha);
-	switch (ipha->ipha_protocol) {
-	case IPPROTO_ICMP: {
-		ire_t		*ire_zone;
-		ilm_t		*ilm;
-		mblk_t		*mp1;
-		zoneid_t	last_zoneid;
-		ilm_walker_t	ilw;
-
-		if (CLASSD(ipha->ipha_dst) && !IS_LOOPBACK(recv_ill)) {
-			ASSERT(ire->ire_type == IRE_BROADCAST);
-
-			/*
-			 * In the multicast case, applications may have joined
-			 * the group from different zones, so we need to deliver
-			 * the packet to each of them. Loop through the
-			 * multicast memberships structures (ilm) on the receive
-			 * ill and send a copy of the packet up each matching
-			 * one. However, we don't do this for multicasts sent on
-			 * the loopback interface (PHYI_LOOPBACK flag set) as
-			 * they must stay in the sender's zone.
-			 *
-			 * ilm_add_v6() ensures that ilms in the same zone are
-			 * contiguous in the ill_ilm list. We use this property
-			 * to avoid sending duplicates needed when two
-			 * applications in the same zone join the same group on
-			 * different logical interfaces: we ignore the ilm if
-			 * its zoneid is the same as the last matching one.
-			 * In addition, the sending of the packet for
-			 * ire_zoneid is delayed until all of the other ilms
-			 * have been exhausted.
-			 */
-			last_zoneid = -1;
-			ilm = ilm_walker_start(&ilw, recv_ill);
-			for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
-				if (ipha->ipha_dst != ilm->ilm_addr ||
-				    ilm->ilm_zoneid == last_zoneid ||
-				    ilm->ilm_zoneid == ire->ire_zoneid ||
-				    ilm->ilm_zoneid == ALL_ZONES ||
-				    !(ilm->ilm_ipif->ipif_flags & IPIF_UP))
-					continue;
-				mp1 = ip_copymsg(first_mp);
-				if (mp1 == NULL)
-					continue;
-				icmp_inbound(q, mp1, B_TRUE, ilw.ilw_walk_ill,
-				    0, sum, mctl_present, B_TRUE,
-				    recv_ill, ilm->ilm_zoneid);
-				last_zoneid = ilm->ilm_zoneid;
-			}
-			ilm_walker_finish(&ilw);
-		} else if (ire->ire_type == IRE_BROADCAST) {
-			/*
-			 * In the broadcast case, there may be many zones
-			 * which need a copy of the packet delivered to them.
-			 * There is one IRE_BROADCAST per broadcast address
-			 * and per zone; we walk those using a helper function.
-			 * In addition, the sending of the packet for ire is
-			 * delayed until all of the other ires have been
-			 * processed.
-			 */
-			IRB_REFHOLD(ire->ire_bucket);
-			ire_zone = NULL;
-			while ((ire_zone = ire_get_next_bcast_ire(ire_zone,
-			    ire)) != NULL) {
-				mp1 = ip_copymsg(first_mp);
-				if (mp1 == NULL)
-					continue;
-
-				UPDATE_IB_PKT_COUNT(ire_zone);
-				ire_zone->ire_last_used_time = lbolt;
-				icmp_inbound(q, mp1, B_TRUE, ill,
-				    0, sum, mctl_present, B_TRUE,
-				    recv_ill, ire_zone->ire_zoneid);
-			}
-			IRB_REFRELE(ire->ire_bucket);
-		}
-		icmp_inbound(q, first_mp, (ire->ire_type == IRE_BROADCAST),
-		    ill, 0, sum, mctl_present, B_TRUE, recv_ill,
-		    ire->ire_zoneid);
-		TRACE_2(TR_FAC_IP, TR_IP_RPUT_LOCL_END,
-		    "ip_rput_locl_end: q %p (%S)", q, "icmp");
-		return;
-	}
-	case IPPROTO_IGMP:
-		/*
-		 * If we are not willing to accept IGMP packets in clear,
-		 * then check with global policy.
-		 */
-		if (ipst->ips_igmp_accept_clear_messages == 0) {
-			first_mp = ipsec_check_global_policy(first_mp, NULL,
-			    ipha, NULL, mctl_present, ipst->ips_netstack);
-			if (first_mp == NULL)
-				return;
-		}
-		if (is_system_labeled() && !tsol_can_accept_raw(mp, B_TRUE)) {
-			freemsg(first_mp);
-			ip1dbg(("ip_proto_input: zone all cannot accept raw"));
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			return;
-		}
-		if ((mp = igmp_input(q, mp, ill)) == NULL) {
-			/* Bad packet - discarded by igmp_input */
-			TRACE_2(TR_FAC_IP, TR_IP_RPUT_LOCL_END,
-			    "ip_rput_locl_end: q %p (%S)", q, "igmp");
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		}
-		/*
-		 * igmp_input() may have returned the pulled up message.
-		 * So first_mp and ipha need to be reinitialized.
-		 */
-		ipha = (ipha_t *)mp->b_rptr;
-		if (mctl_present)
-			first_mp->b_cont = mp;
-		else
-			first_mp = mp;
-		if (ipst->ips_ipcl_proto_fanout[ipha->ipha_protocol].
-		    connf_head != NULL) {
-			/* No user-level listener for IGMP packets */
-			goto drop_pkt;
-		}
-		/* deliver to local raw users */
-		break;
-	case IPPROTO_PIM:
-		/*
-		 * If we are not willing to accept PIM packets in clear,
-		 * then check with global policy.
-		 */
-		if (ipst->ips_pim_accept_clear_messages == 0) {
-			first_mp = ipsec_check_global_policy(first_mp, NULL,
-			    ipha, NULL, mctl_present, ipst->ips_netstack);
-			if (first_mp == NULL)
-				return;
-		}
-		if (is_system_labeled() && !tsol_can_accept_raw(mp, B_TRUE)) {
-			freemsg(first_mp);
-			ip1dbg(("ip_proto_input: zone all cannot accept PIM"));
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			return;
-		}
-		if (pim_input(q, mp, ill) != 0) {
-			/* Bad packet - discarded by pim_input */
-			TRACE_2(TR_FAC_IP, TR_IP_RPUT_LOCL_END,
-			    "ip_rput_locl_end: q %p (%S)", q, "pim");
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		}
-
-		/*
-		 * pim_input() may have pulled up the message so ipha needs to
-		 * be reinitialized.
-		 */
-		ipha = (ipha_t *)mp->b_rptr;
-		if (ipst->ips_ipcl_proto_fanout[ipha->ipha_protocol].
-		    connf_head != NULL) {
-			/* No user-level listener for PIM packets */
-			goto drop_pkt;
-		}
-		/* deliver to local raw users */
-		break;
-	case IPPROTO_ENCAP:
-		/*
-		 * Handle self-encapsulated packets (IP-in-IP where
-		 * the inner addresses == the outer addresses).
-		 */
-		hdr_length = IPH_HDR_LENGTH(ipha);
-		if ((uchar_t *)ipha + hdr_length + sizeof (ipha_t) >
-		    mp->b_wptr) {
-			if (!pullupmsg(mp, (uchar_t *)ipha + hdr_length +
-			    sizeof (ipha_t) - mp->b_rptr)) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(first_mp);
-				return;
-			}
-			ipha = (ipha_t *)mp->b_rptr;
-		}
-		inner_ipha = (ipha_t *)((uchar_t *)ipha + hdr_length);
-		/*
-		 * Check the sanity of the inner IP header.
-		 */
-		if ((IPH_HDR_VERSION(inner_ipha) != IPV4_VERSION)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(first_mp);
-			return;
-		}
-		if (IPH_HDR_LENGTH(inner_ipha) < sizeof (ipha_t)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(first_mp);
-			return;
-		}
-		if (inner_ipha->ipha_src == ipha->ipha_src &&
-		    inner_ipha->ipha_dst == ipha->ipha_dst) {
-			ipsec_in_t *ii;
-
-			/*
-			 * Self-encapsulated tunnel packet. Remove
-			 * the outer IP header and fanout again.
-			 * We also need to make sure that the inner
-			 * header is pulled up until options.
-			 */
-			mp->b_rptr = (uchar_t *)inner_ipha;
-			ipha = inner_ipha;
-			hdr_length = IPH_HDR_LENGTH(ipha);
-			if ((uchar_t *)ipha + hdr_length > mp->b_wptr) {
-				if (!pullupmsg(mp, (uchar_t *)ipha +
-				    + hdr_length - mp->b_rptr)) {
-					freemsg(first_mp);
-					return;
-				}
-				ipha = (ipha_t *)mp->b_rptr;
-			}
-			if (hdr_length > sizeof (ipha_t)) {
-				/* We got options on the inner packet. */
-				ipaddr_t dst = ipha->ipha_dst;
-
-				if (ip_rput_options(q, mp, ipha, &dst, ipst) ==
-				    -1) {
-					/* Bad options! */
-					return;
-				}
-				if (dst != ipha->ipha_dst) {
-					/*
-					 * Someone put a source-route in
-					 * the inside header of a self-
-					 * encapsulated packet.  Drop it
-					 * with extreme prejudice and let
-					 * the sender know.
-					 */
-					icmp_unreachable(q, first_mp,
-					    ICMP_SOURCE_ROUTE_FAILED,
-					    recv_ill->ill_zoneid, ipst);
-					return;
-				}
-			}
-			if (!mctl_present) {
-				ASSERT(first_mp == mp);
-				/*
-				 * This means that somebody is sending
-				 * Self-encapsualted packets without AH/ESP.
-				 * If AH/ESP was present, we would have already
-				 * allocated the first_mp.
-				 *
-				 * Send this packet to find a tunnel endpoint.
-				 * if I can't find one, an ICMP
-				 * PROTOCOL_UNREACHABLE will get sent.
-				 */
-				goto fanout;
-			}
-			/*
-			 * We generally store the ill_index if we need to
-			 * do IPsec processing as we lose the ill queue when
-			 * we come back. But in this case, we never should
-			 * have to store the ill_index here as it should have
-			 * been stored previously when we processed the
-			 * AH/ESP header in this routine or for non-ipsec
-			 * cases, we still have the queue. But for some bad
-			 * packets from the wire, we can get to IPsec after
-			 * this and we better store the index for that case.
-			 */
-			ill = (ill_t *)q->q_ptr;
-			ii = (ipsec_in_t *)first_mp->b_rptr;
-			ii->ipsec_in_ill_index =
-			    ill->ill_phyint->phyint_ifindex;
-			ii->ipsec_in_rill_index =
-			    recv_ill->ill_phyint->phyint_ifindex;
-			if (ii->ipsec_in_decaps) {
-				/*
-				 * This packet is self-encapsulated multiple
-				 * times. We don't want to recurse infinitely.
-				 * To keep it simple, drop the packet.
-				 */
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(first_mp);
-				return;
-			}
-			ii->ipsec_in_decaps = B_TRUE;
-			ip_fanout_proto_again(first_mp, recv_ill, recv_ill,
-			    ire);
-			return;
-		}
-		break;
-	case IPPROTO_AH:
-	case IPPROTO_ESP: {
-		ipsec_stack_t *ipss = ipst->ips_netstack->netstack_ipsec;
-
-		/*
-		 * Fast path for AH/ESP. If this is the first time
-		 * we are sending a datagram to AH/ESP, allocate
-		 * a IPSEC_IN message and prepend it. Otherwise,
-		 * just fanout.
-		 */
-
-		int ipsec_rc;
-		ipsec_in_t *ii;
-		netstack_t *ns = ipst->ips_netstack;
-
-		IP_STAT(ipst, ipsec_proto_ahesp);
-		if (!mctl_present) {
-			ASSERT(first_mp == mp);
-			first_mp = ipsec_in_alloc(B_TRUE, ns);
-			if (first_mp == NULL) {
-				ip1dbg(("ip_proto_input: IPSEC_IN "
-				    "allocation failure.\n"));
-				freemsg(hada_mp); /* okay ifnull */
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(mp);
-				return;
-			}
-			/*
-			 * Store the ill_index so that when we come back
-			 * from IPsec we ride on the same queue.
-			 */
-			ill = (ill_t *)q->q_ptr;
-			ii = (ipsec_in_t *)first_mp->b_rptr;
-			ii->ipsec_in_ill_index =
-			    ill->ill_phyint->phyint_ifindex;
-			ii->ipsec_in_rill_index =
-			    recv_ill->ill_phyint->phyint_ifindex;
-			first_mp->b_cont = mp;
-			/*
-			 * Cache hardware acceleration info.
-			 */
-			if (hada_mp != NULL) {
-				IPSECHW_DEBUG(IPSECHW_PKT,
-				    ("ip_rput_local: caching data attr.\n"));
-				ii->ipsec_in_accelerated = B_TRUE;
-				ii->ipsec_in_da = hada_mp;
-				hada_mp = NULL;
-			}
-		} else {
-			ii = (ipsec_in_t *)first_mp->b_rptr;
-		}
-
-		ii->ipsec_in_esp_udp_ports = esp_udp_ports;
-
-		if (!ipsec_loaded(ipss)) {
-			ip_proto_not_sup(q, first_mp, IP_FF_SEND_ICMP,
-			    ire->ire_zoneid, ipst);
-			return;
-		}
-
-		ns = ipst->ips_netstack;
-		/* select inbound SA and have IPsec process the pkt */
-		if (ipha->ipha_protocol == IPPROTO_ESP) {
-			esph_t *esph = ipsec_inbound_esp_sa(first_mp, ns);
-			boolean_t esp_in_udp_sa;
-			if (esph == NULL)
-				return;
-			ASSERT(ii->ipsec_in_esp_sa != NULL);
-			ASSERT(ii->ipsec_in_esp_sa->ipsa_input_func != NULL);
-			esp_in_udp_sa = ((ii->ipsec_in_esp_sa->ipsa_flags &
-			    IPSA_F_NATT) != 0);
-			/*
-			 * The following is a fancy, but quick, way of saying:
-			 * ESP-in-UDP SA and Raw ESP packet --> drop
-			 *    OR
-			 * ESP SA and ESP-in-UDP packet --> drop
-			 */
-			if (esp_in_udp_sa != esp_in_udp_packet) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				ip_drop_packet(first_mp, B_TRUE, ill, NULL,
-				    DROPPER(ns->netstack_ipsec, ipds_esp_no_sa),
-				    &ns->netstack_ipsec->ipsec_dropper);
-				return;
-			}
-			ipsec_rc = ii->ipsec_in_esp_sa->ipsa_input_func(
-			    first_mp, esph);
-		} else {
-			ah_t *ah = ipsec_inbound_ah_sa(first_mp, ns);
-			if (ah == NULL)
-				return;
-			ASSERT(ii->ipsec_in_ah_sa != NULL);
-			ASSERT(ii->ipsec_in_ah_sa->ipsa_input_func != NULL);
-			ipsec_rc = ii->ipsec_in_ah_sa->ipsa_input_func(
-			    first_mp, ah);
-		}
-
-		switch (ipsec_rc) {
-		case IPSEC_STATUS_SUCCESS:
-			break;
-		case IPSEC_STATUS_FAILED:
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			/* FALLTHRU */
-		case IPSEC_STATUS_PENDING:
-			return;
-		}
-		/* we're done with IPsec processing, send it up */
-		ip_fanout_proto_again(first_mp, ill, recv_ill, ire);
-		return;
-	}
-	default:
-		break;
-	}
-	if (is_system_labeled() && !tsol_can_accept_raw(mp, B_FALSE)) {
-		ip1dbg(("ip_proto_input: zone %d cannot accept raw IP",
-		    ire->ire_zoneid));
-		goto drop_pkt;
-	}
-	/*
-	 * Handle protocols with which IP is less intimate.  There
-	 * can be more than one stream bound to a particular
-	 * protocol.  When this is the case, each one gets a copy
-	 * of any incoming packets.
-	 */
-fanout:
-	ip_fanout_proto(q, first_mp, ill, ipha,
-	    IP_FF_SEND_ICMP | IP_FF_CKSUM | IP_FF_RAWIP, mctl_present,
-	    B_TRUE, recv_ill, ire->ire_zoneid);
-	TRACE_2(TR_FAC_IP, TR_IP_RPUT_LOCL_END,
-	    "ip_rput_locl_end: q %p (%S)", q, "ip_fanout_proto");
-	return;
-
-drop_pkt:
-	freemsg(first_mp);
-	if (hada_mp != NULL)
-		freeb(hada_mp);
-	TRACE_2(TR_FAC_IP, TR_IP_RPUT_LOCL_END,
-	    "ip_rput_locl_end: q %p (%S)", q, "droppkt");
-#undef	rptr
-#undef  iphs
-
-}
-
-/*
  * Update any source route, record route or timestamp options.
  * Check that we are at end of strict source route.
- * The options have already been checked for sanity in ip_rput_options().
+ * The options have already been checked for sanity in ip_input_options().
  */
-static boolean_t
-ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
-    ip_stack_t *ipst)
+boolean_t
+ip_input_local_options(mblk_t *mp, ipha_t *ipha, ip_recv_attr_t *ira)
 {
 	ipoptp_t	opts;
 	uchar_t		*opt;
 	uint8_t		optval;
 	uint8_t		optlen;
 	ipaddr_t	dst;
+	ipaddr_t	ifaddr;
 	uint32_t	ts;
-	ire_t		*dst_ire;
 	timestruc_t	now;
-	zoneid_t	zoneid;
-	ill_t		*ill;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	ASSERT(ire->ire_ipversion == IPV4_VERSION);
-
-	ip2dbg(("ip_rput_local_options\n"));
+	ip2dbg(("ip_input_local_options\n"));
 
 	for (optval = ipoptp_first(&opts, ipha);
 	    optval != IPOPT_EOL;
@@ -17900,7 +9360,7 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		ASSERT((opts.ipoptp_flags & IPOPTP_ERROR) == 0);
 		opt = opts.ipoptp_cur;
 		optlen = opts.ipoptp_len;
-		ip2dbg(("ip_rput_local_options: opt %d, len %d\n",
+		ip2dbg(("ip_input_local_options: opt %d, len %d\n",
 		    optval, optlen));
 		switch (optval) {
 			uint32_t off;
@@ -17911,7 +9371,7 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			if (optlen < IP_ADDR_LEN ||
 			    off > optlen - IP_ADDR_LEN) {
 				/* End of source route */
-				ip1dbg(("ip_rput_local_options: end of SR\n"));
+				ip1dbg(("ip_input_local_options: end of SR\n"));
 				break;
 			}
 			/*
@@ -17920,7 +9380,7 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			 * it is a packet with a loose source route which
 			 * reaches us before consuming the whole source route
 			 */
-			ip1dbg(("ip_rput_local_options: not end of SR\n"));
+			ip1dbg(("ip_input_local_options: not end of SR\n"));
 			if (optval == IPOPT_SSRR) {
 				goto bad_src_route;
 			}
@@ -17941,11 +9401,17 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			    off > optlen - IP_ADDR_LEN) {
 				/* No more room - ignore */
 				ip1dbg((
-				    "ip_rput_local_options: end of RR\n"));
+				    "ip_input_local_options: end of RR\n"));
 				break;
 			}
-			bcopy(&ire->ire_src_addr, (char *)opt + off,
-			    IP_ADDR_LEN);
+			/* Pick a reasonable address on the outbound if */
+			if (ip_select_source_v4(ill, INADDR_ANY, ipha->ipha_dst,
+			    INADDR_ANY, ALL_ZONES, ipst, &ifaddr, NULL,
+			    NULL) != 0) {
+				/* No source! Shouldn't happen */
+				ifaddr = INADDR_ANY;
+			}
+			bcopy(&ifaddr, (char *)opt + off, IP_ADDR_LEN);
 			opt[IPOPT_OFFSET] += IP_ADDR_LEN;
 			break;
 		case IPOPT_TS:
@@ -17959,14 +9425,10 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 				/* Verify that the address matched */
 				off = opt[IPOPT_OFFSET] - 1;
 				bcopy((char *)opt + off, &dst, IP_ADDR_LEN);
-				dst_ire = ire_ctable_lookup(dst, 0, IRE_LOCAL,
-				    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE,
-				    ipst);
-				if (dst_ire == NULL) {
+				if (ip_type_v4(dst, ipst) != IRE_LOCAL) {
 					/* Not for us */
 					break;
 				}
-				ire_refrele(dst_ire);
 				/* FALLTHRU */
 			case IPOPT_TS_TSANDADDR:
 				off = IP_ADDR_LEN + IPOPT_TS_TIMELEN;
@@ -17976,8 +9438,8 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 				 * ip_*put_options should have already
 				 * dropped this packet.
 				 */
-				cmn_err(CE_PANIC, "ip_rput_local_options: "
-				    "unknown IT - bug in ip_rput_options?\n");
+				cmn_err(CE_PANIC, "ip_input_local_options: "
+				    "unknown IT - bug in ip_input_options?\n");
 				return (B_TRUE);	/* Keep "lint" happy */
 			}
 			if (opt[IPOPT_OFFSET] - 1 + off > optlen) {
@@ -17993,8 +9455,14 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 			case IPOPT_TS_PRESPEC:
 			case IPOPT_TS_PRESPEC_RFC791:
 			case IPOPT_TS_TSANDADDR:
-				bcopy(&ire->ire_src_addr, (char *)opt + off,
-				    IP_ADDR_LEN);
+				/* Pick a reasonable addr on the outbound if */
+				if (ip_select_source_v4(ill, INADDR_ANY,
+				    ipha->ipha_dst, INADDR_ANY, ALL_ZONES, ipst,
+				    &ifaddr, NULL, NULL) != 0) {
+					/* No source! Shouldn't happen */
+					ifaddr = INADDR_ANY;
+				}
+				bcopy(&ifaddr, (char *)opt + off, IP_ADDR_LEN);
 				opt[IPOPT_OFFSET] += IP_ADDR_LEN;
 				/* FALLTHRU */
 			case IPOPT_TS_TSONLY:
@@ -18013,51 +9481,41 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	return (B_TRUE);
 
 bad_src_route:
-	q = WR(q);
-	if (q->q_next != NULL)
-		ill = q->q_ptr;
-	else
-		ill = NULL;
-
 	/* make sure we clear any indication of a hardware checksum */
 	DB_CKSUMFLAGS(mp) = 0;
-	zoneid = ipif_lookup_addr_zoneid(ipha->ipha_dst, ill, ipst);
-	if (zoneid == ALL_ZONES)
-		freemsg(mp);
-	else
-		icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED, zoneid, ipst);
+	ip_drop_input("ICMP_SOURCE_ROUTE_FAILED", mp, ill);
+	icmp_unreachable(mp, ICMP_SOURCE_ROUTE_FAILED, ira);
 	return (B_FALSE);
 
 }
 
 /*
- * Process IP options in an inbound packet.  If an option affects the
- * effective destination address, return the next hop address via dstp.
- * Returns -1 if something fails in which case an ICMP error has been sent
+ * Process IP options in an inbound packet.  Always returns the nexthop.
+ * Normally this is the passed in nexthop, but if there is an option
+ * that effects the nexthop (such as a source route) that will be returned.
+ * Sets *errorp if there is an error, in which case an ICMP error has been sent
  * and mp freed.
  */
-static int
-ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp,
-    ip_stack_t *ipst)
+ipaddr_t
+ip_input_options(ipha_t *ipha, ipaddr_t dst, mblk_t *mp,
+    ip_recv_attr_t *ira, int *errorp)
 {
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
 	ipoptp_t	opts;
 	uchar_t		*opt;
 	uint8_t		optval;
 	uint8_t		optlen;
-	ipaddr_t	dst;
 	intptr_t	code = 0;
-	ire_t		*ire = NULL;
-	zoneid_t	zoneid;
-	ill_t		*ill;
+	ire_t		*ire;
 
-	ip2dbg(("ip_rput_options\n"));
-	dst = ipha->ipha_dst;
+	ip2dbg(("ip_input_options\n"));
+	*errorp = 0;
 	for (optval = ipoptp_first(&opts, ipha);
 	    optval != IPOPT_EOL;
 	    optval = ipoptp_next(&opts)) {
 		opt = opts.ipoptp_cur;
 		optlen = opts.ipoptp_len;
-		ip2dbg(("ip_rput_options: opt %d, len %d\n",
+		ip2dbg(("ip_input_options: opt %d, len %d\n",
 		    optval, optlen));
 		/*
 		 * Note: we need to verify the checksum before we
@@ -18068,27 +9526,24 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp,
 			uint32_t off;
 		case IPOPT_SSRR:
 		case IPOPT_LSRR:
-			ire = ire_ctable_lookup(dst, 0, IRE_LOCAL, NULL,
-			    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-			if (ire == NULL) {
+			if (ip_type_v4(dst, ipst) != IRE_LOCAL) {
 				if (optval == IPOPT_SSRR) {
-					ip1dbg(("ip_rput_options: not next"
+					ip1dbg(("ip_input_options: not next"
 					    " strict source route 0x%x\n",
 					    ntohl(dst)));
 					code = (char *)&ipha->ipha_dst -
 					    (char *)ipha;
 					goto param_prob; /* RouterReq's */
 				}
-				ip2dbg(("ip_rput_options: "
+				ip2dbg(("ip_input_options: "
 				    "not next source route 0x%x\n",
 				    ntohl(dst)));
 				break;
 			}
-			ire_refrele(ire);
 
 			if ((opts.ipoptp_flags & IPOPTP_ERROR) != 0) {
 				ip1dbg((
-				    "ip_rput_options: bad option offset\n"));
+				    "ip_input_options: bad option offset\n"));
 				code = (char *)&opt[IPOPT_OLEN] -
 				    (char *)ipha;
 				goto param_prob;
@@ -18099,11 +9554,11 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp,
 			if (optlen < IP_ADDR_LEN ||
 			    off > optlen - IP_ADDR_LEN) {
 				/* End of source route */
-				ip1dbg(("ip_rput_options: end of SR\n"));
+				ip1dbg(("ip_input_options: end of SR\n"));
 				break;
 			}
 			bcopy((char *)opt + off, &dst, IP_ADDR_LEN);
-			ip1dbg(("ip_rput_options: next hop 0x%x\n",
+			ip1dbg(("ip_input_options: next hop 0x%x\n",
 			    ntohl(dst)));
 
 			/*
@@ -18112,17 +9567,13 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp,
 			 * XXX verify per-interface ip_forwarding
 			 * for source route?
 			 */
-			ire = ire_ctable_lookup(dst, 0, IRE_LOCAL, NULL,
-			    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-
-			if (ire != NULL) {
-				ire_refrele(ire);
+			if (ip_type_v4(dst, ipst) == IRE_LOCAL) {
 				off += IP_ADDR_LEN;
 				goto redo_srr;
 			}
 
 			if (dst == htonl(INADDR_LOOPBACK)) {
-				ip1dbg(("ip_rput_options: loopback addr in "
+				ip1dbg(("ip_input_options: loopback addr in "
 				    "source route!\n"));
 				goto bad_src_route;
 			}
@@ -18131,12 +9582,13 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp,
 			 * reachable.
 			 */
 			if (optval == IPOPT_SSRR) {
-				ire = ire_ftable_lookup(dst, 0, 0,
-				    IRE_INTERFACE, NULL, NULL, ALL_ZONES, 0,
-				    msg_getlabel(mp),
-				    MATCH_IRE_TYPE | MATCH_IRE_SECATTR, ipst);
+				ire = ire_ftable_lookup_v4(dst, 0, 0,
+				    IRE_IF_ALL, NULL, ALL_ZONES,
+				    ira->ira_tsl,
+				    MATCH_IRE_TYPE | MATCH_IRE_SECATTR, 0, ipst,
+				    NULL);
 				if (ire == NULL) {
-					ip1dbg(("ip_rput_options: SSRR not "
+					ip1dbg(("ip_input_options: SSRR not "
 					    "directly reachable: 0x%x\n",
 					    ntohl(dst)));
 					goto bad_src_route;
@@ -18151,7 +9603,7 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp,
 		case IPOPT_RR:
 			if ((opts.ipoptp_flags & IPOPTP_ERROR) != 0) {
 				ip1dbg((
-				    "ip_rput_options: bad option offset\n"));
+				    "ip_input_options: bad option offset\n"));
 				code = (char *)&opt[IPOPT_OLEN] -
 				    (char *)ipha;
 				goto param_prob;
@@ -18169,7 +9621,7 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp,
 			}
 			if ((opts.ipoptp_flags & IPOPTP_ERROR) != 0) {
 				ip1dbg((
-				    "ip_rput_options: bad option offset\n"));
+				    "ip_input_options: bad option offset\n"));
 				code = (char *)&opt[IPOPT_OFFSET] -
 				    (char *)ipha;
 				goto param_prob;
@@ -18201,45 +9653,27 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp,
 	}
 
 	if ((opts.ipoptp_flags & IPOPTP_ERROR) == 0) {
-		*dstp = dst;
-		return (0);
+		return (dst);
 	}
 
-	ip1dbg(("ip_rput_options: error processing IP options."));
+	ip1dbg(("ip_input_options: error processing IP options."));
 	code = (char *)&opt[IPOPT_OFFSET] - (char *)ipha;
 
 param_prob:
-	q = WR(q);
-	if (q->q_next != NULL)
-		ill = q->q_ptr;
-	else
-		ill = NULL;
-
 	/* make sure we clear any indication of a hardware checksum */
 	DB_CKSUMFLAGS(mp) = 0;
-	/* Don't know whether this is for non-global or global/forwarding */
-	zoneid = ipif_lookup_addr_zoneid(dst, ill, ipst);
-	if (zoneid == ALL_ZONES)
-		freemsg(mp);
-	else
-		icmp_param_problem(q, mp, (uint8_t)code, zoneid, ipst);
-	return (-1);
+	ip_drop_input("ICMP_PARAM_PROBLEM", mp, ira->ira_ill);
+	icmp_param_problem(mp, (uint8_t)code, ira);
+	*errorp = -1;
+	return (dst);
 
 bad_src_route:
-	q = WR(q);
-	if (q->q_next != NULL)
-		ill = q->q_ptr;
-	else
-		ill = NULL;
-
 	/* make sure we clear any indication of a hardware checksum */
 	DB_CKSUMFLAGS(mp) = 0;
-	zoneid = ipif_lookup_addr_zoneid(dst, ill, ipst);
-	if (zoneid == ALL_ZONES)
-		freemsg(mp);
-	else
-		icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED, zoneid, ipst);
-	return (-1);
+	ip_drop_input("ICMP_SOURCE_ROUTE_FAILED", mp, ira->ira_ill);
+	icmp_unreachable(mp, ICMP_SOURCE_ROUTE_FAILED, ira);
+	*errorp = -1;
+	return (dst);
 }
 
 /*
@@ -18248,7 +9682,7 @@ bad_src_route:
  *  - icmp fixed part (mib2_icmp_t)
  *  - ipAddrEntryTable (ip 20)		all IPv4 ipifs
  *  - ipRouteEntryTable (ip 21)		all IPv4 IREs
- *  - ipNetToMediaEntryTable (ip 22)	[filled in by the arp module]
+ *  - ipNetToMediaEntryTable (ip 22)	all IPv4 Neighbor Cache entries
  *  - ipRouteAttributeTable (ip 102)	labeled routes
  *  - ip multicast membership (ip_member_t)
  *  - ip multicast source filtering (ip_grpsrc_t)
@@ -18262,12 +9696,10 @@ bad_src_route:
  *					One per ill plus one generic
  *  - ipv6RouteEntry			all IPv6 IREs
  *  - ipv6RouteAttributeTable (ip6 102)	labeled routes
- *  - ipv6NetToMediaEntry		all Neighbor Cache entries
+ *  - ipv6NetToMediaEntry		all IPv6 Neighbor Cache entries
  *  - ipv6AddrEntry			all IPv6 ipifs
  *  - ipv6 multicast membership (ipv6_member_t)
  *  - ipv6 multicast source filtering (ipv6_grpsrc_t)
- *
- * MIB2_IP_MEDIA is filled in by the arp module with ARP cache entries.
  *
  * NOTE: original mpctl is copied for msg's 2..N, since its ctl part is
  * already filled in by the caller.
@@ -18387,6 +9819,9 @@ ip_snmp_get(queue_t *q, mblk_t *mpctl, int level)
 	if ((mpctl = sctp_snmp_get_mib2(q, mpctl, sctps)) == NULL) {
 		return (1);
 	}
+	if ((mpctl = ip_snmp_get_mib2_ip_dce(q, mpctl, ipst)) == NULL) {
+		return (1);
+	}
 	freemsg(mpctl);
 	return (1);
 }
@@ -18426,6 +9861,7 @@ ip_snmp_get_mib2_ip(queue_t *q, mblk_t *mpctl, mib2_ipIfStatsEntry_t *ipmib,
 	SET_MIB(old_ip_mib.ipRouteAttributeSize,
 	    sizeof (mib2_ipAttributeEntry_t));
 	SET_MIB(old_ip_mib.transportMLPSize, sizeof (mib2_transportMLPEntry_t));
+	SET_MIB(old_ip_mib.ipDestEntrySize, sizeof (dest_cache_entry_t));
 
 	/*
 	 * Grab the statistics from the new IP MIB
@@ -18681,9 +10117,14 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			if (ipif->ipif_zoneid != zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
 				continue;
+			/* Sum of count from dead IRE_LO* and our current */
 			mae.ipAdEntInfo.ae_ibcnt = ipif->ipif_ib_pkt_count;
-			mae.ipAdEntInfo.ae_obcnt = ipif->ipif_ob_pkt_count;
-			mae.ipAdEntInfo.ae_focnt = ipif->ipif_fo_pkt_count;
+			if (ipif->ipif_ire_local != NULL) {
+				mae.ipAdEntInfo.ae_ibcnt +=
+				    ipif->ipif_ire_local->ire_ib_pkt_count;
+			}
+			mae.ipAdEntInfo.ae_obcnt = 0;
+			mae.ipAdEntInfo.ae_focnt = 0;
 
 			ipif_get_name(ipif, mae.ipAdEntIfIndex.o_bytes,
 			    OCTET_LENGTH);
@@ -18694,7 +10135,7 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			mae.ipAdEntInfo.ae_subnet = ipif->ipif_subnet;
 			mae.ipAdEntInfo.ae_subnet_len =
 			    ip_mask_to_plen(ipif->ipif_net_mask);
-			mae.ipAdEntInfo.ae_src_addr = ipif->ipif_src_addr;
+			mae.ipAdEntInfo.ae_src_addr = ipif->ipif_lcl_addr;
 			for (bitval = 1;
 			    bitval &&
 			    !(bitval & ipif->ipif_brd_addr);
@@ -18702,7 +10143,7 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 				noop;
 			mae.ipAdEntBcastAddr = bitval;
 			mae.ipAdEntReasmMaxSize = IP_MAXPACKET;
-			mae.ipAdEntInfo.ae_mtu = ipif->ipif_mtu;
+			mae.ipAdEntInfo.ae_mtu = ipif->ipif_ill->ill_mtu;
 			mae.ipAdEntInfo.ae_metric  = ipif->ipif_metric;
 			mae.ipAdEntInfo.ae_broadcast_addr =
 			    ipif->ipif_brd_addr;
@@ -18710,7 +10151,8 @@ ip_snmp_get_mib2_ip_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			    ipif->ipif_pp_dst_addr;
 			mae.ipAdEntInfo.ae_flags = ipif->ipif_flags |
 			    ill->ill_flags | ill->ill_phyint->phyint_flags;
-			mae.ipAdEntRetransmitTime = AR_EQ_DEFAULT_XMIT_INTERVAL;
+			mae.ipAdEntRetransmitTime =
+			    ill->ill_reachable_retrans_time;
 
 			if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
 			    (char *)&mae, (int)sizeof (mib2_ipAddrEntry_t))) {
@@ -18762,9 +10204,14 @@ ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			if (ipif->ipif_zoneid != zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
 				continue;
+			/* Sum of count from dead IRE_LO* and our current */
 			mae6.ipv6AddrInfo.ae_ibcnt = ipif->ipif_ib_pkt_count;
-			mae6.ipv6AddrInfo.ae_obcnt = ipif->ipif_ob_pkt_count;
-			mae6.ipv6AddrInfo.ae_focnt = ipif->ipif_fo_pkt_count;
+			if (ipif->ipif_ire_local != NULL) {
+				mae6.ipv6AddrInfo.ae_ibcnt +=
+				    ipif->ipif_ire_local->ire_ib_pkt_count;
+			}
+			mae6.ipv6AddrInfo.ae_obcnt = 0;
+			mae6.ipv6AddrInfo.ae_focnt = 0;
 
 			ipif_get_name(ipif, mae6.ipv6AddrIfIndex.o_bytes,
 			    OCTET_LENGTH);
@@ -18776,7 +10223,7 @@ ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 			mae6.ipv6AddrInfo.ae_subnet = ipif->ipif_v6subnet;
 			mae6.ipv6AddrInfo.ae_subnet_len =
 			    mae6.ipv6AddrPfxLength;
-			mae6.ipv6AddrInfo.ae_src_addr = ipif->ipif_v6src_addr;
+			mae6.ipv6AddrInfo.ae_src_addr = ipif->ipif_v6lcl_addr;
 
 			/* Type: stateless(1), stateful(2), unknown(3) */
 			if (ipif->ipif_flags & IPIF_ADDRCONF)
@@ -18799,7 +10246,7 @@ ip_snmp_get_mib2_ip6_addr(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 				mae6.ipv6AddrStatus = 2;
 			else
 				mae6.ipv6AddrStatus = 1;
-			mae6.ipv6AddrInfo.ae_mtu = ipif->ipif_mtu;
+			mae6.ipv6AddrInfo.ae_mtu = ipif->ipif_ill->ill_mtu;
 			mae6.ipv6AddrInfo.ae_metric  = ipif->ipif_metric;
 			mae6.ipv6AddrInfo.ae_pp_dst_addr =
 			    ipif->ipif_v6pp_dst_addr;
@@ -18842,7 +10289,6 @@ ip_snmp_get_mib2_ip_group_mem(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	mblk_t			*mp_tail = NULL;
 	ill_walk_context_t	ctx;
 	zoneid_t		zoneid;
-	ilm_walker_t		ilw;
 
 	/*
 	 * make a copy of the original message
@@ -18859,36 +10305,49 @@ ip_snmp_get_mib2_ip_group_mem(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	ill = ILL_START_WALK_V4(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		if (IS_UNDER_IPMP(ill))
+		/* Make sure the ill isn't going away. */
+		if (!ill_check_and_refhold(ill))
 			continue;
+		rw_exit(&ipst->ips_ill_g_lock);
+		rw_enter(&ill->ill_mcast_lock, RW_READER);
+		for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
+			if (ilm->ilm_zoneid != zoneid &&
+			    ilm->ilm_zoneid != ALL_ZONES)
+				continue;
 
-		ilm = ilm_walker_start(&ilw, ill);
-		for (ipif = ill->ill_ipif; ipif != NULL;
-		    ipif = ipif->ipif_next) {
-			if (ipif->ipif_zoneid != zoneid &&
-			    ipif->ipif_zoneid != ALL_ZONES)
-				continue;	/* not this zone */
-			ipif_get_name(ipif, ipm.ipGroupMemberIfIndex.o_bytes,
-			    OCTET_LENGTH);
+			/* Is there an ipif for ilm_ifaddr? */
+			for (ipif = ill->ill_ipif; ipif != NULL;
+			    ipif = ipif->ipif_next) {
+				if (!IPIF_IS_CONDEMNED(ipif) &&
+				    ipif->ipif_lcl_addr == ilm->ilm_ifaddr &&
+				    ilm->ilm_ifaddr != INADDR_ANY)
+					break;
+			}
+			if (ipif != NULL) {
+				ipif_get_name(ipif,
+				    ipm.ipGroupMemberIfIndex.o_bytes,
+				    OCTET_LENGTH);
+			} else {
+				ill_get_name(ill,
+				    ipm.ipGroupMemberIfIndex.o_bytes,
+				    OCTET_LENGTH);
+			}
 			ipm.ipGroupMemberIfIndex.o_length =
 			    mi_strlen(ipm.ipGroupMemberIfIndex.o_bytes);
-			for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
-				ASSERT(ilm->ilm_ipif != NULL);
-				ASSERT(ilm->ilm_ill == NULL);
-				if (ilm->ilm_ipif != ipif)
-					continue;
-				ipm.ipGroupMemberAddress = ilm->ilm_addr;
-				ipm.ipGroupMemberRefCnt = ilm->ilm_refcnt;
-				ipm.ipGroupMemberFilterMode = ilm->ilm_fmode;
-				if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
-				    (char *)&ipm, (int)sizeof (ipm))) {
-					ip1dbg(("ip_snmp_get_mib2_ip_group: "
-					    "failed to allocate %u bytes\n",
-					    (uint_t)sizeof (ipm)));
-				}
+
+			ipm.ipGroupMemberAddress = ilm->ilm_addr;
+			ipm.ipGroupMemberRefCnt = ilm->ilm_refcnt;
+			ipm.ipGroupMemberFilterMode = ilm->ilm_fmode;
+			if (!snmp_append_data2(mpctl->b_cont, &mp_tail,
+			    (char *)&ipm, (int)sizeof (ipm))) {
+				ip1dbg(("ip_snmp_get_mib2_ip_group: "
+				    "failed to allocate %u bytes\n",
+				    (uint_t)sizeof (ipm)));
 			}
 		}
-		ilm_walker_finish(&ilw);
+		rw_exit(&ill->ill_mcast_lock);
+		ill_refrele(ill);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	}
 	rw_exit(&ipst->ips_ill_g_lock);
 	optp->len = (t_uscalar_t)msgdsize(mpctl->b_cont);
@@ -18910,7 +10369,6 @@ ip_snmp_get_mib2_ip6_group_mem(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	mblk_t			*mp_tail = NULL;
 	ill_walk_context_t	ctx;
 	zoneid_t		zoneid;
-	ilm_walker_t		ilw;
 
 	/*
 	 * make a copy of the original message
@@ -18926,15 +10384,19 @@ ip_snmp_get_mib2_ip6_group_mem(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	ill = ILL_START_WALK_V6(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		if (IS_UNDER_IPMP(ill))
+		/* Make sure the ill isn't going away. */
+		if (!ill_check_and_refhold(ill))
 			continue;
-
-		ilm = ilm_walker_start(&ilw, ill);
+		rw_exit(&ipst->ips_ill_g_lock);
+		/*
+		 * Normally we don't have any members on under IPMP interfaces.
+		 * We report them as a debugging aid.
+		 */
+		rw_enter(&ill->ill_mcast_lock, RW_READER);
 		ipm6.ipv6GroupMemberIfIndex = ill->ill_phyint->phyint_ifindex;
-		for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
-			ASSERT(ilm->ilm_ipif == NULL);
-			ASSERT(ilm->ilm_ill != NULL);
-			if (ilm->ilm_zoneid != zoneid)
+		for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
+			if (ilm->ilm_zoneid != zoneid &&
+			    ilm->ilm_zoneid != ALL_ZONES)
 				continue;	/* not this zone */
 			ipm6.ipv6GroupMemberAddress = ilm->ilm_v6addr;
 			ipm6.ipv6GroupMemberRefCnt = ilm->ilm_refcnt;
@@ -18947,7 +10409,9 @@ ip_snmp_get_mib2_ip6_group_mem(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 				    (uint_t)sizeof (ipm6)));
 			}
 		}
-		ilm_walker_finish(&ilw);
+		rw_exit(&ill->ill_mcast_lock);
+		ill_refrele(ill);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	}
 	rw_exit(&ipst->ips_ill_g_lock);
 
@@ -18973,7 +10437,6 @@ ip_snmp_get_mib2_ip_group_src(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	zoneid_t		zoneid;
 	int			i;
 	slist_t			*sl;
-	ilm_walker_t		ilw;
 
 	/*
 	 * make a copy of the original message
@@ -18990,43 +10453,56 @@ ip_snmp_get_mib2_ip_group_src(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	ill = ILL_START_WALK_V4(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		if (IS_UNDER_IPMP(ill))
+		/* Make sure the ill isn't going away. */
+		if (!ill_check_and_refhold(ill))
 			continue;
+		rw_exit(&ipst->ips_ill_g_lock);
+		rw_enter(&ill->ill_mcast_lock, RW_READER);
+		for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
+			sl = ilm->ilm_filter;
+			if (ilm->ilm_zoneid != zoneid &&
+			    ilm->ilm_zoneid != ALL_ZONES)
+				continue;
+			if (SLIST_IS_EMPTY(sl))
+				continue;
 
-		ilm = ilm_walker_start(&ilw, ill);
-		for (ipif = ill->ill_ipif; ipif != NULL;
-		    ipif = ipif->ipif_next) {
-			if (ipif->ipif_zoneid != zoneid)
-				continue;	/* not this zone */
-			ipif_get_name(ipif, ips.ipGroupSourceIfIndex.o_bytes,
-			    OCTET_LENGTH);
+			/* Is there an ipif for ilm_ifaddr? */
+			for (ipif = ill->ill_ipif; ipif != NULL;
+			    ipif = ipif->ipif_next) {
+				if (!IPIF_IS_CONDEMNED(ipif) &&
+				    ipif->ipif_lcl_addr == ilm->ilm_ifaddr &&
+				    ilm->ilm_ifaddr != INADDR_ANY)
+					break;
+			}
+			if (ipif != NULL) {
+				ipif_get_name(ipif,
+				    ips.ipGroupSourceIfIndex.o_bytes,
+				    OCTET_LENGTH);
+			} else {
+				ill_get_name(ill,
+				    ips.ipGroupSourceIfIndex.o_bytes,
+				    OCTET_LENGTH);
+			}
 			ips.ipGroupSourceIfIndex.o_length =
 			    mi_strlen(ips.ipGroupSourceIfIndex.o_bytes);
-			for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
-				ASSERT(ilm->ilm_ipif != NULL);
-				ASSERT(ilm->ilm_ill == NULL);
-				sl = ilm->ilm_filter;
-				if (ilm->ilm_ipif != ipif || SLIST_IS_EMPTY(sl))
+
+			ips.ipGroupSourceGroup = ilm->ilm_addr;
+			for (i = 0; i < sl->sl_numsrc; i++) {
+				if (!IN6_IS_ADDR_V4MAPPED(&sl->sl_addr[i]))
 					continue;
-				ips.ipGroupSourceGroup = ilm->ilm_addr;
-				for (i = 0; i < sl->sl_numsrc; i++) {
-					if (!IN6_IS_ADDR_V4MAPPED(
-					    &sl->sl_addr[i]))
-						continue;
-					IN6_V4MAPPED_TO_IPADDR(&sl->sl_addr[i],
-					    ips.ipGroupSourceAddress);
-					if (snmp_append_data2(mpctl->b_cont,
-					    &mp_tail, (char *)&ips,
-					    (int)sizeof (ips)) == 0) {
-						ip1dbg(("ip_snmp_get_mib2_"
-						    "ip_group_src: failed to "
-						    "allocate %u bytes\n",
-						    (uint_t)sizeof (ips)));
-					}
+				IN6_V4MAPPED_TO_IPADDR(&sl->sl_addr[i],
+				    ips.ipGroupSourceAddress);
+				if (snmp_append_data2(mpctl->b_cont, &mp_tail,
+				    (char *)&ips, (int)sizeof (ips)) == 0) {
+					ip1dbg(("ip_snmp_get_mib2_ip_group_src:"
+					    " failed to allocate %u bytes\n",
+					    (uint_t)sizeof (ips)));
 				}
 			}
 		}
-		ilm_walker_finish(&ilw);
+		rw_exit(&ill->ill_mcast_lock);
+		ill_refrele(ill);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	}
 	rw_exit(&ipst->ips_ill_g_lock);
 	optp->len = (t_uscalar_t)msgdsize(mpctl->b_cont);
@@ -19050,7 +10526,6 @@ ip_snmp_get_mib2_ip6_group_src(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	zoneid_t		zoneid;
 	int			i;
 	slist_t			*sl;
-	ilm_walker_t		ilw;
 
 	/*
 	 * make a copy of the original message
@@ -19066,16 +10541,22 @@ ip_snmp_get_mib2_ip6_group_src(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	ill = ILL_START_WALK_V6(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		if (IS_UNDER_IPMP(ill))
+		/* Make sure the ill isn't going away. */
+		if (!ill_check_and_refhold(ill))
 			continue;
-
-		ilm = ilm_walker_start(&ilw, ill);
+		rw_exit(&ipst->ips_ill_g_lock);
+		/*
+		 * Normally we don't have any members on under IPMP interfaces.
+		 * We report them as a debugging aid.
+		 */
+		rw_enter(&ill->ill_mcast_lock, RW_READER);
 		ips6.ipv6GroupSourceIfIndex = ill->ill_phyint->phyint_ifindex;
-		for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
-			ASSERT(ilm->ilm_ipif == NULL);
-			ASSERT(ilm->ilm_ill != NULL);
+		for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
 			sl = ilm->ilm_filter;
-			if (ilm->ilm_zoneid != zoneid || SLIST_IS_EMPTY(sl))
+			if (ilm->ilm_zoneid != zoneid &&
+			    ilm->ilm_zoneid != ALL_ZONES)
+				continue;
+			if (SLIST_IS_EMPTY(sl))
 				continue;
 			ips6.ipv6GroupSourceGroup = ilm->ilm_v6addr;
 			for (i = 0; i < sl->sl_numsrc; i++) {
@@ -19089,7 +10570,9 @@ ip_snmp_get_mib2_ip6_group_src(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 				}
 			}
 		}
-		ilm_walker_finish(&ilw);
+		rw_exit(&ill->ill_mcast_lock);
+		ill_refrele(ill);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	}
 	rw_exit(&ipst->ips_ill_g_lock);
 
@@ -19189,13 +10672,13 @@ ip_snmp_get_mib2_ip_route_media(queue_t *q, mblk_t *mpctl, int level,
 	ird.ird_netmedia.lp_head = mp3ctl->b_cont;
 	ird.ird_attrs.lp_head = mp4ctl->b_cont;
 	/*
-	 * If the level has been set the special EXPER_IP_AND_TESTHIDDEN
-	 * value, then also include IRE_MARK_TESTHIDDEN IREs.  This is
+	 * If the level has been set the special EXPER_IP_AND_ALL_IRES value,
+	 * then also include ire_testhidden IREs and IRE_IF_CLONE.  This is
 	 * intended a temporary solution until a proper MIB API is provided
 	 * that provides complete filtering/caller-opt-in.
 	 */
-	if (level == EXPER_IP_AND_TESTHIDDEN)
-		ird.ird_flags |= IRD_REPORT_TESTHIDDEN;
+	if (level == EXPER_IP_AND_ALL_IRES)
+		ird.ird_flags |= IRD_REPORT_ALL;
 
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
 	ire_walk_v4(ip_snmp_get2_v4, &ird, zoneid, ipst);
@@ -19210,6 +10693,8 @@ ip_snmp_get_mib2_ip_route_media(queue_t *q, mblk_t *mpctl, int level,
 	qreply(q, mpctl);
 
 	/* ipNetToMediaEntryTable in mp3ctl */
+	ncec_walk(NULL, ip_snmp_get2_v4_media, &ird, ipst);
+
 	optp = (struct opthdr *)&mp3ctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_IP;
 	optp->name = MIB2_IP_MEDIA;
@@ -19272,13 +10757,13 @@ ip_snmp_get_mib2_ip6_route_media(queue_t *q, mblk_t *mpctl, int level,
 	ird.ird_netmedia.lp_head = mp3ctl->b_cont;
 	ird.ird_attrs.lp_head = mp4ctl->b_cont;
 	/*
-	 * If the level has been set the special EXPER_IP_AND_TESTHIDDEN
-	 * value, then also include IRE_MARK_TESTHIDDEN IREs.  This is
+	 * If the level has been set the special EXPER_IP_AND_ALL_IRES value,
+	 * then also include ire_testhidden IREs and IRE_IF_CLONE.  This is
 	 * intended a temporary solution until a proper MIB API is provided
 	 * that provides complete filtering/caller-opt-in.
 	 */
-	if (level == EXPER_IP_AND_TESTHIDDEN)
-		ird.ird_flags |= IRD_REPORT_TESTHIDDEN;
+	if (level == EXPER_IP_AND_ALL_IRES)
+		ird.ird_flags |= IRD_REPORT_ALL;
 
 	zoneid = Q_TO_CONN(q)->conn_zoneid;
 	ire_walk_v6(ip_snmp_get2_v6_route, &ird, zoneid, ipst);
@@ -19292,7 +10777,7 @@ ip_snmp_get_mib2_ip6_route_media(queue_t *q, mblk_t *mpctl, int level,
 	qreply(q, mpctl);
 
 	/* ipv6NetToMediaEntryTable in mp3ctl */
-	ndp_walk(NULL, ip_snmp_get2_v6_media, &ird, ipst);
+	ncec_walk(NULL, ip_snmp_get2_v6_media, &ird, ipst);
 
 	optp = (struct opthdr *)&mp3ctl->b_rptr[sizeof (struct T_optmgmt_ack)];
 	optp->level = MIB2_IP6;
@@ -19487,21 +10972,20 @@ static void
 ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 {
 	ill_t				*ill;
-	ipif_t				*ipif;
 	mib2_ipRouteEntry_t		*re;
-	mib2_ipAttributeEntry_t		*iae, *iaeptr;
-	ipaddr_t			gw_addr;
+	mib2_ipAttributeEntry_t		iaes;
 	tsol_ire_gw_secattr_t		*attrp;
 	tsol_gc_t			*gc = NULL;
 	tsol_gcgrp_t			*gcgrp = NULL;
-	uint_t				sacnt = 0;
-	int				i;
+	ip_stack_t			*ipst = ire->ire_ipst;
 
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 
-	if (!(ird->ird_flags & IRD_REPORT_TESTHIDDEN) &&
-	    ire->ire_marks & IRE_MARK_TESTHIDDEN) {
-		return;
+	if (!(ird->ird_flags & IRD_REPORT_ALL)) {
+		if (ire->ire_testhidden)
+			return;
+		if (ire->ire_type & IRE_IF_CLONE)
+			return;
 	}
 
 	if ((re = kmem_zalloc(sizeof (*re), KM_NOSLEEP)) == NULL)
@@ -19513,52 +10997,17 @@ ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 			gcgrp = gc->gc_grp;
 			ASSERT(gcgrp != NULL);
 			rw_enter(&gcgrp->gcgrp_rwlock, RW_READER);
-			sacnt = 1;
-		} else if ((gcgrp = attrp->igsa_gcgrp) != NULL) {
-			rw_enter(&gcgrp->gcgrp_rwlock, RW_READER);
-			gc = gcgrp->gcgrp_head;
-			sacnt = gcgrp->gcgrp_count;
 		}
 		mutex_exit(&attrp->igsa_lock);
-
-		/* do nothing if there's no gc to report */
-		if (gc == NULL) {
-			ASSERT(sacnt == 0);
-			if (gcgrp != NULL) {
-				/* we might as well drop the lock now */
-				rw_exit(&gcgrp->gcgrp_rwlock);
-				gcgrp = NULL;
-			}
-			attrp = NULL;
-		}
-
-		ASSERT(gc == NULL || (gcgrp != NULL &&
-		    RW_LOCK_HELD(&gcgrp->gcgrp_rwlock)));
 	}
-	ASSERT(sacnt == 0 || gc != NULL);
-
-	if (sacnt != 0 &&
-	    (iae = kmem_alloc(sacnt * sizeof (*iae), KM_NOSLEEP)) == NULL) {
-		kmem_free(re, sizeof (*re));
-		rw_exit(&gcgrp->gcgrp_rwlock);
-		return;
-	}
-
 	/*
 	 * Return all IRE types for route table... let caller pick and choose
 	 */
 	re->ipRouteDest = ire->ire_addr;
-	ipif = ire->ire_ipif;
+	ill = ire->ire_ill;
 	re->ipRouteIfIndex.o_length = 0;
-	if (ire->ire_type == IRE_CACHE) {
-		ill = (ill_t *)ire->ire_stq->q_ptr;
-		re->ipRouteIfIndex.o_length =
-		    ill->ill_name_length == 0 ? 0 :
-		    MIN(OCTET_LENGTH, ill->ill_name_length - 1);
-		bcopy(ill->ill_name, re->ipRouteIfIndex.o_bytes,
-		    re->ipRouteIfIndex.o_length);
-	} else if (ipif != NULL) {
-		ipif_get_name(ipif, re->ipRouteIfIndex.o_bytes, OCTET_LENGTH);
+	if (ill != NULL) {
+		ill_get_name(ill, re->ipRouteIfIndex.o_bytes, OCTET_LENGTH);
 		re->ipRouteIfIndex.o_length =
 		    mi_strlen(re->ipRouteIfIndex.o_bytes);
 	}
@@ -19567,29 +11016,44 @@ ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 	re->ipRouteMetric3 = -1;
 	re->ipRouteMetric4 = -1;
 
-	gw_addr = ire->ire_gateway_addr;
-
-	if (ire->ire_type & (IRE_INTERFACE|IRE_LOOPBACK|IRE_BROADCAST))
-		re->ipRouteNextHop = ire->ire_src_addr;
-	else
-		re->ipRouteNextHop = gw_addr;
+	re->ipRouteNextHop = ire->ire_gateway_addr;
 	/* indirect(4), direct(3), or invalid(2) */
 	if (ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE))
 		re->ipRouteType = 2;
+	else if (ire->ire_type & IRE_ONLINK)
+		re->ipRouteType = 3;
 	else
-		re->ipRouteType = (gw_addr != 0) ? 4 : 3;
+		re->ipRouteType = 4;
+
 	re->ipRouteProto = -1;
 	re->ipRouteAge = gethrestime_sec() - ire->ire_create_time;
 	re->ipRouteMask = ire->ire_mask;
 	re->ipRouteMetric5 = -1;
-	re->ipRouteInfo.re_max_frag	= ire->ire_max_frag;
-	re->ipRouteInfo.re_frag_flag	= ire->ire_frag_flag;
-	re->ipRouteInfo.re_rtt		= ire->ire_uinfo.iulp_rtt;
+	re->ipRouteInfo.re_max_frag = ire->ire_metrics.iulp_mtu;
+	if (ire->ire_ill != NULL && re->ipRouteInfo.re_max_frag == 0)
+		re->ipRouteInfo.re_max_frag = ire->ire_ill->ill_mtu;
+
+	re->ipRouteInfo.re_frag_flag	= 0;
+	re->ipRouteInfo.re_rtt		= 0;
+	re->ipRouteInfo.re_src_addr	= 0;
 	re->ipRouteInfo.re_ref		= ire->ire_refcnt;
-	re->ipRouteInfo.re_src_addr	= ire->ire_src_addr;
 	re->ipRouteInfo.re_obpkt	= ire->ire_ob_pkt_count;
 	re->ipRouteInfo.re_ibpkt	= ire->ire_ib_pkt_count;
 	re->ipRouteInfo.re_flags	= ire->ire_flags;
+
+	/* Add the IRE_IF_CLONE's counters to their parent IRE_INTERFACE */
+	if (ire->ire_type & IRE_INTERFACE) {
+		ire_t *child;
+
+		rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
+		child = ire->ire_dep_children;
+		while (child != NULL) {
+			re->ipRouteInfo.re_obpkt += child->ire_ob_pkt_count;
+			re->ipRouteInfo.re_ibpkt += child->ire_ib_pkt_count;
+			child = child->ire_dep_sib_next;
+		}
+		rw_exit(&ipst->ips_ire_dep_lock);
+	}
 
 	if (ire->ire_flags & RTF_DYNAMIC) {
 		re->ipRouteInfo.re_ire_type	= IRE_HOST_REDIRECT;
@@ -19603,25 +11067,22 @@ ip_snmp_get2_v4(ire_t *ire, iproutedata_t *ird)
 		    (uint_t)sizeof (*re)));
 	}
 
-	for (iaeptr = iae, i = 0; i < sacnt; i++, iaeptr++, gc = gc->gc_next) {
-		iaeptr->iae_routeidx = ird->ird_idx;
-		iaeptr->iae_doi = gc->gc_db->gcdb_doi;
-		iaeptr->iae_slrange = gc->gc_db->gcdb_slrange;
-	}
+	if (gc != NULL) {
+		iaes.iae_routeidx = ird->ird_idx;
+		iaes.iae_doi = gc->gc_db->gcdb_doi;
+		iaes.iae_slrange = gc->gc_db->gcdb_slrange;
 
-	if (!snmp_append_data2(ird->ird_attrs.lp_head, &ird->ird_attrs.lp_tail,
-	    (char *)iae, sacnt * sizeof (*iae))) {
-		ip1dbg(("ip_snmp_get2_v4: failed to allocate %u bytes\n",
-		    (unsigned)(sacnt * sizeof (*iae))));
+		if (!snmp_append_data2(ird->ird_attrs.lp_head,
+		    &ird->ird_attrs.lp_tail, (char *)&iaes, sizeof (iaes))) {
+			ip1dbg(("ip_snmp_get2_v4: failed to allocate %u "
+			    "bytes\n", (uint_t)sizeof (iaes)));
+		}
 	}
 
 	/* bump route index for next pass */
 	ird->ird_idx++;
 
 	kmem_free(re, sizeof (*re));
-	if (sacnt != 0)
-		kmem_free(iae, sacnt * sizeof (*iae));
-
 	if (gcgrp != NULL)
 		rw_exit(&gcgrp->gcgrp_rwlock);
 }
@@ -19633,21 +11094,20 @@ static void
 ip_snmp_get2_v6_route(ire_t *ire, iproutedata_t *ird)
 {
 	ill_t				*ill;
-	ipif_t				*ipif;
 	mib2_ipv6RouteEntry_t		*re;
-	mib2_ipAttributeEntry_t		*iae, *iaeptr;
-	in6_addr_t			gw_addr_v6;
+	mib2_ipAttributeEntry_t		iaes;
 	tsol_ire_gw_secattr_t		*attrp;
 	tsol_gc_t			*gc = NULL;
 	tsol_gcgrp_t			*gcgrp = NULL;
-	uint_t				sacnt = 0;
-	int				i;
+	ip_stack_t			*ipst = ire->ire_ipst;
 
 	ASSERT(ire->ire_ipversion == IPV6_VERSION);
 
-	if (!(ird->ird_flags & IRD_REPORT_TESTHIDDEN) &&
-	    ire->ire_marks & IRE_MARK_TESTHIDDEN) {
-		return;
+	if (!(ird->ird_flags & IRD_REPORT_ALL)) {
+		if (ire->ire_testhidden)
+			return;
+		if (ire->ire_type & IRE_IF_CLONE)
+			return;
 	}
 
 	if ((re = kmem_zalloc(sizeof (*re), KM_NOSLEEP)) == NULL)
@@ -19659,37 +11119,9 @@ ip_snmp_get2_v6_route(ire_t *ire, iproutedata_t *ird)
 			gcgrp = gc->gc_grp;
 			ASSERT(gcgrp != NULL);
 			rw_enter(&gcgrp->gcgrp_rwlock, RW_READER);
-			sacnt = 1;
-		} else if ((gcgrp = attrp->igsa_gcgrp) != NULL) {
-			rw_enter(&gcgrp->gcgrp_rwlock, RW_READER);
-			gc = gcgrp->gcgrp_head;
-			sacnt = gcgrp->gcgrp_count;
 		}
 		mutex_exit(&attrp->igsa_lock);
-
-		/* do nothing if there's no gc to report */
-		if (gc == NULL) {
-			ASSERT(sacnt == 0);
-			if (gcgrp != NULL) {
-				/* we might as well drop the lock now */
-				rw_exit(&gcgrp->gcgrp_rwlock);
-				gcgrp = NULL;
-			}
-			attrp = NULL;
-		}
-
-		ASSERT(gc == NULL || (gcgrp != NULL &&
-		    RW_LOCK_HELD(&gcgrp->gcgrp_rwlock)));
 	}
-	ASSERT(sacnt == 0 || gc != NULL);
-
-	if (sacnt != 0 &&
-	    (iae = kmem_alloc(sacnt * sizeof (*iae), KM_NOSLEEP)) == NULL) {
-		kmem_free(re, sizeof (*re));
-		rw_exit(&gcgrp->gcgrp_rwlock);
-		return;
-	}
-
 	/*
 	 * Return all IRE types for route table... let caller pick and choose
 	 */
@@ -19697,16 +11129,9 @@ ip_snmp_get2_v6_route(ire_t *ire, iproutedata_t *ird)
 	re->ipv6RoutePfxLength = ip_mask_to_plen_v6(&ire->ire_mask_v6);
 	re->ipv6RouteIndex = 0;	/* Unique when multiple with same dest/plen */
 	re->ipv6RouteIfIndex.o_length = 0;
-	ipif = ire->ire_ipif;
-	if (ire->ire_type == IRE_CACHE) {
-		ill = (ill_t *)ire->ire_stq->q_ptr;
-		re->ipv6RouteIfIndex.o_length =
-		    ill->ill_name_length == 0 ? 0 :
-		    MIN(OCTET_LENGTH, ill->ill_name_length - 1);
-		bcopy(ill->ill_name, re->ipv6RouteIfIndex.o_bytes,
-		    re->ipv6RouteIfIndex.o_length);
-	} else if (ipif != NULL) {
-		ipif_get_name(ipif, re->ipv6RouteIfIndex.o_bytes, OCTET_LENGTH);
+	ill = ire->ire_ill;
+	if (ill != NULL) {
+		ill_get_name(ill, re->ipv6RouteIfIndex.o_bytes, OCTET_LENGTH);
 		re->ipv6RouteIfIndex.o_length =
 		    mi_strlen(re->ipv6RouteIfIndex.o_bytes);
 	}
@@ -19714,18 +11139,13 @@ ip_snmp_get2_v6_route(ire_t *ire, iproutedata_t *ird)
 	ASSERT(!(ire->ire_type & IRE_BROADCAST));
 
 	mutex_enter(&ire->ire_lock);
-	gw_addr_v6 = ire->ire_gateway_addr_v6;
+	re->ipv6RouteNextHop = ire->ire_gateway_addr_v6;
 	mutex_exit(&ire->ire_lock);
-
-	if (ire->ire_type & (IRE_INTERFACE|IRE_LOOPBACK))
-		re->ipv6RouteNextHop = ire->ire_src_addr_v6;
-	else
-		re->ipv6RouteNextHop = gw_addr_v6;
 
 	/* remote(4), local(3), or discard(2) */
 	if (ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE))
 		re->ipv6RouteType = 2;
-	else if (IN6_IS_ADDR_UNSPECIFIED(&gw_addr_v6))
+	else if (ire->ire_type & IRE_ONLINK)
 		re->ipv6RouteType = 3;
 	else
 		re->ipv6RouteType = 4;
@@ -19736,15 +11156,31 @@ ip_snmp_get2_v6_route(ire_t *ire, iproutedata_t *ird)
 	re->ipv6RouteNextHopRDI	= 0;
 	re->ipv6RouteWeight	= 0;
 	re->ipv6RouteMetric	= 0;
-	re->ipv6RouteInfo.re_max_frag	= ire->ire_max_frag;
-	re->ipv6RouteInfo.re_frag_flag	= ire->ire_frag_flag;
-	re->ipv6RouteInfo.re_rtt	= ire->ire_uinfo.iulp_rtt;
-	re->ipv6RouteInfo.re_src_addr	= ire->ire_src_addr_v6;
+	re->ipv6RouteInfo.re_max_frag = ire->ire_metrics.iulp_mtu;
+	if (ire->ire_ill != NULL && re->ipv6RouteInfo.re_max_frag == 0)
+		re->ipv6RouteInfo.re_max_frag = ire->ire_ill->ill_mtu;
+
+	re->ipv6RouteInfo.re_frag_flag	= 0;
+	re->ipv6RouteInfo.re_rtt	= 0;
+	re->ipv6RouteInfo.re_src_addr	= ipv6_all_zeros;
 	re->ipv6RouteInfo.re_obpkt	= ire->ire_ob_pkt_count;
 	re->ipv6RouteInfo.re_ibpkt	= ire->ire_ib_pkt_count;
 	re->ipv6RouteInfo.re_ref	= ire->ire_refcnt;
 	re->ipv6RouteInfo.re_flags	= ire->ire_flags;
 
+	/* Add the IRE_IF_CLONE's counters to their parent IRE_INTERFACE */
+	if (ire->ire_type & IRE_INTERFACE) {
+		ire_t *child;
+
+		rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
+		child = ire->ire_dep_children;
+		while (child != NULL) {
+			re->ipv6RouteInfo.re_obpkt += child->ire_ob_pkt_count;
+			re->ipv6RouteInfo.re_ibpkt += child->ire_ib_pkt_count;
+			child = child->ire_dep_sib_next;
+		}
+		rw_exit(&ipst->ips_ire_dep_lock);
+	}
 	if (ire->ire_flags & RTF_DYNAMIC) {
 		re->ipv6RouteInfo.re_ire_type	= IRE_HOST_REDIRECT;
 	} else {
@@ -19757,79 +11193,67 @@ ip_snmp_get2_v6_route(ire_t *ire, iproutedata_t *ird)
 		    (uint_t)sizeof (*re)));
 	}
 
-	for (iaeptr = iae, i = 0; i < sacnt; i++, iaeptr++, gc = gc->gc_next) {
-		iaeptr->iae_routeidx = ird->ird_idx;
-		iaeptr->iae_doi = gc->gc_db->gcdb_doi;
-		iaeptr->iae_slrange = gc->gc_db->gcdb_slrange;
-	}
+	if (gc != NULL) {
+		iaes.iae_routeidx = ird->ird_idx;
+		iaes.iae_doi = gc->gc_db->gcdb_doi;
+		iaes.iae_slrange = gc->gc_db->gcdb_slrange;
 
-	if (!snmp_append_data2(ird->ird_attrs.lp_head, &ird->ird_attrs.lp_tail,
-	    (char *)iae, sacnt * sizeof (*iae))) {
-		ip1dbg(("ip_snmp_get2_v6: failed to allocate %u bytes\n",
-		    (unsigned)(sacnt * sizeof (*iae))));
+		if (!snmp_append_data2(ird->ird_attrs.lp_head,
+		    &ird->ird_attrs.lp_tail, (char *)&iaes, sizeof (iaes))) {
+			ip1dbg(("ip_snmp_get2_v6: failed to allocate %u "
+			    "bytes\n", (uint_t)sizeof (iaes)));
+		}
 	}
 
 	/* bump route index for next pass */
 	ird->ird_idx++;
 
 	kmem_free(re, sizeof (*re));
-	if (sacnt != 0)
-		kmem_free(iae, sacnt * sizeof (*iae));
-
 	if (gcgrp != NULL)
 		rw_exit(&gcgrp->gcgrp_rwlock);
 }
 
 /*
- * ndp_walk routine to create ipv6NetToMediaEntryTable
+ * ncec_walk routine to create ipv6NetToMediaEntryTable
  */
 static int
-ip_snmp_get2_v6_media(nce_t *nce, iproutedata_t *ird)
+ip_snmp_get2_v6_media(ncec_t *ncec, iproutedata_t *ird)
 {
 	ill_t				*ill;
 	mib2_ipv6NetToMediaEntry_t	ntme;
-	dl_unitdata_req_t		*dl;
 
-	ill = nce->nce_ill;
-	if (ill->ill_isv6 == B_FALSE) /* skip arpce entry */
+	ill = ncec->ncec_ill;
+	/* skip arpce entries, and loopback ncec entries */
+	if (ill->ill_isv6 == B_FALSE || ill->ill_net_type == IRE_LOOPBACK)
 		return (0);
-
 	/*
 	 * Neighbor cache entry attached to IRE with on-link
 	 * destination.
+	 * We report all IPMP groups on ncec_ill which is normally the upper.
 	 */
 	ntme.ipv6NetToMediaIfIndex = ill->ill_phyint->phyint_ifindex;
-	ntme.ipv6NetToMediaNetAddress = nce->nce_addr;
-	if ((ill->ill_flags & ILLF_XRESOLV) &&
-	    (nce->nce_res_mp != NULL)) {
-		dl = (dl_unitdata_req_t *)(nce->nce_res_mp->b_rptr);
-		ntme.ipv6NetToMediaPhysAddress.o_length =
-		    dl->dl_dest_addr_length;
-	} else {
-		ntme.ipv6NetToMediaPhysAddress.o_length =
-		    ill->ill_phys_addr_length;
-	}
-	if (nce->nce_res_mp != NULL) {
-		bcopy((char *)nce->nce_res_mp->b_rptr +
-		    NCE_LL_ADDR_OFFSET(ill),
-		    ntme.ipv6NetToMediaPhysAddress.o_bytes,
+	ntme.ipv6NetToMediaNetAddress = ncec->ncec_addr;
+	ntme.ipv6NetToMediaPhysAddress.o_length = ill->ill_phys_addr_length;
+	if (ncec->ncec_lladdr != NULL) {
+		bcopy(ncec->ncec_lladdr, ntme.ipv6NetToMediaPhysAddress.o_bytes,
 		    ntme.ipv6NetToMediaPhysAddress.o_length);
-	} else {
-		bzero(ntme.ipv6NetToMediaPhysAddress.o_bytes,
-		    ill->ill_phys_addr_length);
 	}
 	/*
 	 * Note: Returns ND_* states. Should be:
 	 * reachable(1), stale(2), delay(3), probe(4),
 	 * invalid(5), unknown(6)
 	 */
-	ntme.ipv6NetToMediaState = nce->nce_state;
+	ntme.ipv6NetToMediaState = ncec->ncec_state;
 	ntme.ipv6NetToMediaLastUpdated = 0;
 
 	/* other(1), dynamic(2), static(3), local(4) */
-	if (IN6_IS_ADDR_LOOPBACK(&nce->nce_addr)) {
+	if (NCE_MYADDR(ncec)) {
 		ntme.ipv6NetToMediaType = 4;
-	} else if (IN6_IS_ADDR_MULTICAST(&nce->nce_addr)) {
+	} else if (ncec->ncec_flags & NCE_F_PUBLISH) {
+		ntme.ipv6NetToMediaType = 1; /* proxy */
+	} else if (ncec->ncec_flags & NCE_F_STATIC) {
+		ntme.ipv6NetToMediaType = 3;
+	} else if (ncec->ncec_flags & (NCE_F_MCAST|NCE_F_BCAST)) {
 		ntme.ipv6NetToMediaType = 1;
 	} else {
 		ntme.ipv6NetToMediaType = 2;
@@ -19838,6 +11262,93 @@ ip_snmp_get2_v6_media(nce_t *nce, iproutedata_t *ird)
 	if (!snmp_append_data2(ird->ird_netmedia.lp_head,
 	    &ird->ird_netmedia.lp_tail, (char *)&ntme, sizeof (ntme))) {
 		ip1dbg(("ip_snmp_get2_v6_media: failed to allocate %u bytes\n",
+		    (uint_t)sizeof (ntme)));
+	}
+	return (0);
+}
+
+int
+nce2ace(ncec_t *ncec)
+{
+	int flags = 0;
+
+	if (NCE_ISREACHABLE(ncec))
+		flags |= ACE_F_RESOLVED;
+	if (ncec->ncec_flags & NCE_F_AUTHORITY)
+		flags |= ACE_F_AUTHORITY;
+	if (ncec->ncec_flags & NCE_F_PUBLISH)
+		flags |= ACE_F_PUBLISH;
+	if ((ncec->ncec_flags & NCE_F_NONUD) != 0)
+		flags |= ACE_F_PERMANENT;
+	if (NCE_MYADDR(ncec))
+		flags |= (ACE_F_MYADDR | ACE_F_AUTHORITY);
+	if (ncec->ncec_flags & NCE_F_UNVERIFIED)
+		flags |= ACE_F_UNVERIFIED;
+	if (ncec->ncec_flags & NCE_F_AUTHORITY)
+		flags |= ACE_F_AUTHORITY;
+	if (ncec->ncec_flags & NCE_F_DELAYED)
+		flags |= ACE_F_DELAYED;
+	return (flags);
+}
+
+/*
+ * ncec_walk routine to create ipNetToMediaEntryTable
+ */
+static int
+ip_snmp_get2_v4_media(ncec_t *ncec, iproutedata_t *ird)
+{
+	ill_t				*ill;
+	mib2_ipNetToMediaEntry_t	ntme;
+	const char			*name = "unknown";
+	ipaddr_t			ncec_addr;
+
+	ill = ncec->ncec_ill;
+	if (ill->ill_isv6 || (ncec->ncec_flags & NCE_F_BCAST) ||
+	    ill->ill_net_type == IRE_LOOPBACK)
+		return (0);
+
+	/* We report all IPMP groups on ncec_ill which is normally the upper. */
+	name = ill->ill_name;
+	/* Based on RFC 4293: other(1), inval(2), dyn(3), stat(4) */
+	if (NCE_MYADDR(ncec)) {
+		ntme.ipNetToMediaType = 4;
+	} else if (ncec->ncec_flags & (NCE_F_MCAST|NCE_F_BCAST|NCE_F_PUBLISH)) {
+		ntme.ipNetToMediaType = 1;
+	} else {
+		ntme.ipNetToMediaType = 3;
+	}
+	ntme.ipNetToMediaIfIndex.o_length = MIN(OCTET_LENGTH, strlen(name));
+	bcopy(name, ntme.ipNetToMediaIfIndex.o_bytes,
+	    ntme.ipNetToMediaIfIndex.o_length);
+
+	IN6_V4MAPPED_TO_IPADDR(&ncec->ncec_addr, ncec_addr);
+	bcopy(&ncec_addr, &ntme.ipNetToMediaNetAddress, sizeof (ncec_addr));
+
+	ntme.ipNetToMediaInfo.ntm_mask.o_length = sizeof (ipaddr_t);
+	ncec_addr = INADDR_BROADCAST;
+	bcopy(&ncec_addr, ntme.ipNetToMediaInfo.ntm_mask.o_bytes,
+	    sizeof (ncec_addr));
+	/*
+	 * map all the flags to the ACE counterpart.
+	 */
+	ntme.ipNetToMediaInfo.ntm_flags = nce2ace(ncec);
+
+	ntme.ipNetToMediaPhysAddress.o_length =
+	    MIN(OCTET_LENGTH, ill->ill_phys_addr_length);
+
+	if (!NCE_ISREACHABLE(ncec))
+		ntme.ipNetToMediaPhysAddress.o_length = 0;
+	else {
+		if (ncec->ncec_lladdr != NULL) {
+			bcopy(ncec->ncec_lladdr,
+			    ntme.ipNetToMediaPhysAddress.o_bytes,
+			    ntme.ipNetToMediaPhysAddress.o_length);
+		}
+	}
+
+	if (!snmp_append_data2(ird->ird_netmedia.lp_head,
+	    &ird->ird_netmedia.lp_tail, (char *)&ntme, sizeof (ntme))) {
+		ip1dbg(("ip_snmp_get2_v4_media: failed to allocate %u bytes\n",
 		    (uint_t)sizeof (ntme)));
 	}
 	return (0);
@@ -19999,7 +11510,7 @@ ip_mib2_add_icmp6_stats(mib2_ipv6IfIcmpEntry_t *o1, mib2_ipv6IfIcmpEntry_t *o2)
  * This routine assumes that the options are well formed i.e. that they
  * have already been checked.
  */
-static boolean_t
+boolean_t
 ip_source_routed(ipha_t *ipha, ip_stack_t *ipst)
 {
 	ipoptp_t	opts;
@@ -20007,7 +11518,6 @@ ip_source_routed(ipha_t *ipha, ip_stack_t *ipst)
 	uint8_t		optval;
 	uint8_t		optlen;
 	ipaddr_t	dst;
-	ire_t		*ire;
 
 	if (IS_SIMPLE_IPH(ipha)) {
 		ip2dbg(("not source routed\n"));
@@ -20030,15 +11540,12 @@ ip_source_routed(ipha_t *ipha, ip_stack_t *ipst)
 			 * If dst is one of our addresses and there are some
 			 * entries left in the source route return (true).
 			 */
-			ire = ire_ctable_lookup(dst, 0, IRE_LOCAL, NULL,
-			    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-			if (ire == NULL) {
+			if (ip_type_v4(dst, ipst) != IRE_LOCAL) {
 				ip2dbg(("ip_source_routed: not next"
 				    " source route 0x%x\n",
 				    ntohl(dst)));
 				return (B_FALSE);
 			}
-			ire_refrele(ire);
 			off = opt[IPOPT_OFFSET];
 			off--;
 			if (optlen < IP_ADDR_LEN ||
@@ -20055,1756 +11562,24 @@ ip_source_routed(ipha_t *ipha, ip_stack_t *ipst)
 }
 
 /*
- * Check if the packet contains any source route.
- */
-static boolean_t
-ip_source_route_included(ipha_t *ipha)
-{
-	ipoptp_t	opts;
-	uint8_t		optval;
-
-	if (IS_SIMPLE_IPH(ipha))
-		return (B_FALSE);
-	for (optval = ipoptp_first(&opts, ipha);
-	    optval != IPOPT_EOL;
-	    optval = ipoptp_next(&opts)) {
-		switch (optval) {
-		case IPOPT_SSRR:
-		case IPOPT_LSRR:
-			return (B_TRUE);
-		}
-	}
-	return (B_FALSE);
-}
-
-/*
- * Called when the IRE expiration timer fires.
- */
-void
-ip_trash_timer_expire(void *args)
-{
-	int			flush_flag = 0;
-	ire_expire_arg_t	iea;
-	ip_stack_t		*ipst = (ip_stack_t *)args;
-
-	iea.iea_ipst = ipst;	/* No netstack_hold */
-
-	/*
-	 * ip_ire_expire_id is protected by ip_trash_timer_lock.
-	 * This lock makes sure that a new invocation of this function
-	 * that occurs due to an almost immediate timer firing will not
-	 * progress beyond this point until the current invocation is done
-	 */
-	mutex_enter(&ipst->ips_ip_trash_timer_lock);
-	ipst->ips_ip_ire_expire_id = 0;
-	mutex_exit(&ipst->ips_ip_trash_timer_lock);
-
-	/* Periodic timer */
-	if (ipst->ips_ip_ire_arp_time_elapsed >=
-	    ipst->ips_ip_ire_arp_interval) {
-		/*
-		 * Remove all IRE_CACHE entries since they might
-		 * contain arp information.
-		 */
-		flush_flag |= FLUSH_ARP_TIME;
-		ipst->ips_ip_ire_arp_time_elapsed = 0;
-		IP_STAT(ipst, ip_ire_arp_timer_expired);
-	}
-	if (ipst->ips_ip_ire_rd_time_elapsed >=
-	    ipst->ips_ip_ire_redir_interval) {
-		/* Remove all redirects */
-		flush_flag |= FLUSH_REDIRECT_TIME;
-		ipst->ips_ip_ire_rd_time_elapsed = 0;
-		IP_STAT(ipst, ip_ire_redirect_timer_expired);
-	}
-	if (ipst->ips_ip_ire_pmtu_time_elapsed >=
-	    ipst->ips_ip_ire_pathmtu_interval) {
-		/* Increase path mtu */
-		flush_flag |= FLUSH_MTU_TIME;
-		ipst->ips_ip_ire_pmtu_time_elapsed = 0;
-		IP_STAT(ipst, ip_ire_pmtu_timer_expired);
-	}
-
-	/*
-	 * Optimize for the case when there are no redirects in the
-	 * ftable, that is, no need to walk the ftable in that case.
-	 */
-	if (flush_flag & (FLUSH_MTU_TIME|FLUSH_ARP_TIME)) {
-		iea.iea_flush_flag = flush_flag;
-		ire_walk_ill_tables(MATCH_IRE_TYPE, IRE_CACHETABLE, ire_expire,
-		    (char *)(uintptr_t)&iea, IP_MASK_TABLE_SIZE, 0, NULL,
-		    ipst->ips_ip_cache_table_size, ipst->ips_ip_cache_table,
-		    NULL, ALL_ZONES, ipst);
-	}
-	if ((flush_flag & FLUSH_REDIRECT_TIME) &&
-	    ipst->ips_ip_redirect_cnt > 0) {
-		iea.iea_flush_flag = flush_flag;
-		ire_walk_ill_tables(MATCH_IRE_TYPE, IRE_FORWARDTABLE,
-		    ire_expire, (char *)(uintptr_t)&iea, IP_MASK_TABLE_SIZE,
-		    0, NULL, 0, NULL, NULL, ALL_ZONES, ipst);
-	}
-	if (flush_flag & FLUSH_MTU_TIME) {
-		/*
-		 * Walk all IPv6 IRE's and update them
-		 * Note that ARP and redirect timers are not
-		 * needed since NUD handles stale entries.
-		 */
-		flush_flag = FLUSH_MTU_TIME;
-		iea.iea_flush_flag = flush_flag;
-		ire_walk_v6(ire_expire, (char *)(uintptr_t)&iea,
-		    ALL_ZONES, ipst);
-	}
-
-	ipst->ips_ip_ire_arp_time_elapsed += ipst->ips_ip_timer_interval;
-	ipst->ips_ip_ire_rd_time_elapsed += ipst->ips_ip_timer_interval;
-	ipst->ips_ip_ire_pmtu_time_elapsed += ipst->ips_ip_timer_interval;
-
-	/*
-	 * Hold the lock to serialize timeout calls and prevent
-	 * stale values in ip_ire_expire_id. Otherwise it is possible
-	 * for the timer to fire and a new invocation of this function
-	 * to start before the return value of timeout has been stored
-	 * in ip_ire_expire_id by the current invocation.
-	 */
-	mutex_enter(&ipst->ips_ip_trash_timer_lock);
-	ipst->ips_ip_ire_expire_id = timeout(ip_trash_timer_expire,
-	    (void *)ipst, MSEC_TO_TICK(ipst->ips_ip_timer_interval));
-	mutex_exit(&ipst->ips_ip_trash_timer_lock);
-}
-
-/*
- * Called by the memory allocator subsystem directly, when the system
- * is running low on memory.
- */
-/* ARGSUSED */
-void
-ip_trash_ire_reclaim(void *args)
-{
-	netstack_handle_t nh;
-	netstack_t *ns;
-
-	netstack_next_init(&nh);
-	while ((ns = netstack_next(&nh)) != NULL) {
-		ip_trash_ire_reclaim_stack(ns->netstack_ip);
-		netstack_rele(ns);
-	}
-	netstack_next_fini(&nh);
-}
-
-static void
-ip_trash_ire_reclaim_stack(ip_stack_t *ipst)
-{
-	ire_cache_count_t icc;
-	ire_cache_reclaim_t icr;
-	ncc_cache_count_t ncc;
-	nce_cache_reclaim_t ncr;
-	uint_t delete_cnt;
-	/*
-	 * Memory reclaim call back.
-	 * Count unused, offlink, pmtu, and onlink IRE_CACHE entries.
-	 * Then, with a target of freeing 1/Nth of IRE_CACHE
-	 * entries, determine what fraction to free for
-	 * each category of IRE_CACHE entries giving absolute priority
-	 * in the order of onlink, pmtu, offlink, unused (e.g. no pmtu
-	 * entry will be freed unless all offlink entries are freed).
-	 */
-	icc.icc_total = 0;
-	icc.icc_unused = 0;
-	icc.icc_offlink = 0;
-	icc.icc_pmtu = 0;
-	icc.icc_onlink = 0;
-	ire_walk(ire_cache_count, (char *)&icc, ipst);
-
-	/*
-	 * Free NCEs for IPv6 like the onlink ires.
-	 */
-	ncc.ncc_total = 0;
-	ncc.ncc_host = 0;
-	ndp_walk(NULL, (pfi_t)ndp_cache_count, (uchar_t *)&ncc, ipst);
-
-	ASSERT(icc.icc_total == icc.icc_unused + icc.icc_offlink +
-	    icc.icc_pmtu + icc.icc_onlink);
-	delete_cnt = icc.icc_total/ipst->ips_ip_ire_reclaim_fraction;
-	IP_STAT(ipst, ip_trash_ire_reclaim_calls);
-	if (delete_cnt == 0)
-		return;
-	IP_STAT(ipst, ip_trash_ire_reclaim_success);
-	/* Always delete all unused offlink entries */
-	icr.icr_ipst = ipst;
-	icr.icr_unused = 1;
-	if (delete_cnt <= icc.icc_unused) {
-		/*
-		 * Only need to free unused entries.  In other words,
-		 * there are enough unused entries to free to meet our
-		 * target number of freed ire cache entries.
-		 */
-		icr.icr_offlink = icr.icr_pmtu = icr.icr_onlink = 0;
-		ncr.ncr_host = 0;
-	} else if (delete_cnt <= icc.icc_unused + icc.icc_offlink) {
-		/*
-		 * Only need to free unused entries, plus a fraction of offlink
-		 * entries.  It follows from the first if statement that
-		 * icc_offlink is non-zero, and that delete_cnt != icc_unused.
-		 */
-		delete_cnt -= icc.icc_unused;
-		/* Round up # deleted by truncating fraction */
-		icr.icr_offlink = icc.icc_offlink / delete_cnt;
-		icr.icr_pmtu = icr.icr_onlink = 0;
-		ncr.ncr_host = 0;
-	} else if (delete_cnt <=
-	    icc.icc_unused + icc.icc_offlink + icc.icc_pmtu) {
-		/*
-		 * Free all unused and offlink entries, plus a fraction of
-		 * pmtu entries.  It follows from the previous if statement
-		 * that icc_pmtu is non-zero, and that
-		 * delete_cnt != icc_unused + icc_offlink.
-		 */
-		icr.icr_offlink = 1;
-		delete_cnt -= icc.icc_unused + icc.icc_offlink;
-		/* Round up # deleted by truncating fraction */
-		icr.icr_pmtu = icc.icc_pmtu / delete_cnt;
-		icr.icr_onlink = 0;
-		ncr.ncr_host = 0;
-	} else {
-		/*
-		 * Free all unused, offlink, and pmtu entries, plus a fraction
-		 * of onlink entries.  If we're here, then we know that
-		 * icc_onlink is non-zero, and that
-		 * delete_cnt != icc_unused + icc_offlink + icc_pmtu.
-		 */
-		icr.icr_offlink = icr.icr_pmtu = 1;
-		delete_cnt -= icc.icc_unused + icc.icc_offlink +
-		    icc.icc_pmtu;
-		/* Round up # deleted by truncating fraction */
-		icr.icr_onlink = icc.icc_onlink / delete_cnt;
-		/* Using the same delete fraction as for onlink IREs */
-		ncr.ncr_host = ncc.ncc_host / delete_cnt;
-	}
-#ifdef DEBUG
-	ip1dbg(("IP reclaim: target %d out of %d current %d/%d/%d/%d "
-	    "fractions %d/%d/%d/%d\n",
-	    icc.icc_total/ipst->ips_ip_ire_reclaim_fraction, icc.icc_total,
-	    icc.icc_unused, icc.icc_offlink,
-	    icc.icc_pmtu, icc.icc_onlink,
-	    icr.icr_unused, icr.icr_offlink,
-	    icr.icr_pmtu, icr.icr_onlink));
-#endif
-	ire_walk(ire_cache_reclaim, (char *)&icr, ipst);
-	if (ncr.ncr_host != 0)
-		ndp_walk(NULL, (pfi_t)ndp_cache_reclaim,
-		    (uchar_t *)&ncr, ipst);
-#ifdef DEBUG
-	icc.icc_total = 0; icc.icc_unused = 0; icc.icc_offlink = 0;
-	icc.icc_pmtu = 0; icc.icc_onlink = 0;
-	ire_walk(ire_cache_count, (char *)&icc, ipst);
-	ip1dbg(("IP reclaim: result total %d %d/%d/%d/%d\n",
-	    icc.icc_total, icc.icc_unused, icc.icc_offlink,
-	    icc.icc_pmtu, icc.icc_onlink));
-#endif
-}
-
-/*
- * ip_unbind is called when a copy of an unbind request is received from the
- * upper level protocol.  We remove this conn from any fanout hash list it is
- * on, and zero out the bind information.  No reply is expected up above.
+ * ip_unbind is called by the transports to remove a conn from
+ * the fanout table.
  */
 void
 ip_unbind(conn_t *connp)
 {
+
 	ASSERT(!MUTEX_HELD(&connp->conn_lock));
 
 	if (is_system_labeled() && connp->conn_anon_port) {
 		(void) tsol_mlp_anon(crgetzone(connp->conn_cred),
-		    connp->conn_mlp_type, connp->conn_ulp,
+		    connp->conn_mlp_type, connp->conn_proto,
 		    ntohs(connp->conn_lport), B_FALSE);
 		connp->conn_anon_port = 0;
 	}
 	connp->conn_mlp_type = mlptSingle;
 
 	ipcl_hash_remove(connp);
-}
-
-/*
- * Write side put procedure.  Outbound data, IOCTLs, responses from
- * resolvers, etc, come down through here.
- *
- * arg2 is always a queue_t *.
- * When that queue is an ill_t (i.e. q_next != NULL), then arg must be
- * the zoneid.
- * When that queue is not an ill_t, then arg must be a conn_t pointer.
- */
-void
-ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
-{
-	ip_output_options(arg, mp, arg2, caller, &zero_info);
-}
-
-void
-ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
-    ip_opt_info_t *infop)
-{
-	conn_t		*connp = NULL;
-	queue_t		*q = (queue_t *)arg2;
-	ipha_t		*ipha;
-#define	rptr	((uchar_t *)ipha)
-	ire_t		*ire = NULL;
-	ire_t		*sctp_ire = NULL;
-	uint32_t	v_hlen_tos_len;
-	ipaddr_t	dst;
-	mblk_t		*first_mp = NULL;
-	boolean_t	mctl_present;
-	ipsec_out_t	*io;
-	int		match_flags;
-	ill_t		*xmit_ill = NULL;	/* IP_PKTINFO etc. */
-	ipif_t		*dst_ipif;
-	boolean_t	multirt_need_resolve = B_FALSE;
-	mblk_t		*copy_mp = NULL;
-	int		err = 0;
-	zoneid_t	zoneid;
-	boolean_t	need_decref = B_FALSE;
-	boolean_t	ignore_dontroute = B_FALSE;
-	boolean_t	ignore_nexthop = B_FALSE;
-	boolean_t	ip_nexthop = B_FALSE;
-	ipaddr_t	nexthop_addr;
-	ip_stack_t	*ipst;
-
-#ifdef	_BIG_ENDIAN
-#define	V_HLEN	(v_hlen_tos_len >> 24)
-#else
-#define	V_HLEN	(v_hlen_tos_len & 0xFF)
-#endif
-
-	TRACE_1(TR_FAC_IP, TR_IP_WPUT_START,
-	    "ip_wput_start: q %p", q);
-
-	/*
-	 * ip_wput fast path
-	 */
-
-	/* is packet from ARP ? */
-	if (q->q_next != NULL) {
-		zoneid = (zoneid_t)(uintptr_t)arg;
-		goto qnext;
-	}
-
-	connp = (conn_t *)arg;
-	ASSERT(connp != NULL);
-	zoneid = connp->conn_zoneid;
-	ipst = connp->conn_netstack->netstack_ip;
-	ASSERT(ipst != NULL);
-
-	/* is queue flow controlled? */
-	if ((q->q_first != NULL || connp->conn_draining) &&
-	    (caller == IP_WPUT)) {
-		ASSERT(!need_decref);
-		ASSERT(!IP_FLOW_CONTROLLED_ULP(connp->conn_ulp));
-		(void) putq(q, mp);
-		return;
-	}
-
-	/* Multidata transmit? */
-	if (DB_TYPE(mp) == M_MULTIDATA) {
-		/*
-		 * We should never get here, since all Multidata messages
-		 * originating from tcp should have been directed over to
-		 * tcp_multisend() in the first place.
-		 */
-		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-		freemsg(mp);
-		return;
-	} else if (DB_TYPE(mp) != M_DATA)
-		goto notdata;
-
-	if (mp->b_flag & MSGHASREF) {
-		ASSERT(connp->conn_ulp == IPPROTO_SCTP);
-		mp->b_flag &= ~MSGHASREF;
-		SCTP_EXTRACT_IPINFO(mp, sctp_ire);
-		need_decref = B_TRUE;
-	}
-	ipha = (ipha_t *)mp->b_rptr;
-
-	/* is IP header non-aligned or mblk smaller than basic IP header */
-#ifndef SAFETY_BEFORE_SPEED
-	if (!OK_32PTR(rptr) ||
-	    (mp->b_wptr - rptr) < IP_SIMPLE_HDR_LENGTH)
-		goto hdrtoosmall;
-#endif
-
-	ASSERT(OK_32PTR(ipha));
-
-	/*
-	 * This function assumes that mp points to an IPv4 packet.  If it's the
-	 * wrong version, we'll catch it again in ip_output_v6.
-	 *
-	 * Note that this is *only* locally-generated output here, and never
-	 * forwarded data, and that we need to deal only with transports that
-	 * don't know how to label.  (TCP, UDP, and ICMP/raw-IP all know how to
-	 * label.)
-	 */
-	if (is_system_labeled() &&
-	    (ipha->ipha_version_and_hdr_length & 0xf0) == (IPV4_VERSION << 4) &&
-	    !connp->conn_ulp_labeled) {
-		cred_t	*credp;
-		pid_t	pid;
-
-		credp = BEST_CRED(mp, connp, &pid);
-		err = tsol_check_label(credp, &mp,
-		    connp->conn_mac_mode, ipst, pid);
-		ipha = (ipha_t *)mp->b_rptr;
-		if (err != 0) {
-			first_mp = mp;
-			if (err == EINVAL)
-				goto icmp_parameter_problem;
-			ip2dbg(("ip_wput: label check failed (%d)\n", err));
-			goto discard_pkt;
-		}
-	}
-
-	ASSERT(infop != NULL);
-
-	if (infop->ip_opt_flags & IP_VERIFY_SRC) {
-		/*
-		 * IP_PKTINFO ancillary option is present.
-		 * IPCL_ZONEID is used to honor IP_ALLZONES option which
-		 * allows using address of any zone as the source address.
-		 */
-		ire = ire_ctable_lookup(ipha->ipha_src, 0,
-		    (IRE_LOCAL|IRE_LOOPBACK), NULL, IPCL_ZONEID(connp),
-		    NULL, MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY, ipst);
-		if (ire == NULL)
-			goto drop_pkt;
-		ire_refrele(ire);
-		ire = NULL;
-	}
-
-	/*
-	 * IP_BOUND_IF has precedence over the ill index passed in IP_PKTINFO.
-	 */
-	if (infop->ip_opt_ill_index != 0 && connp->conn_outgoing_ill == NULL) {
-		xmit_ill = ill_lookup_on_ifindex(infop->ip_opt_ill_index,
-		    B_FALSE, NULL, NULL, NULL, NULL, ipst);
-
-		if (xmit_ill == NULL || IS_VNI(xmit_ill))
-			goto drop_pkt;
-		/*
-		 * check that there is an ipif belonging
-		 * to our zone. IPCL_ZONEID is not used because
-		 * IP_ALLZONES option is valid only when the ill is
-		 * accessible from all zones i.e has a valid ipif in
-		 * all zones.
-		 */
-		if (!ipif_lookup_zoneid(xmit_ill, zoneid, 0, NULL)) {
-			goto drop_pkt;
-		}
-	}
-
-	/*
-	 * If there is a policy, try to attach an ipsec_out in
-	 * the front. At the end, first_mp either points to a
-	 * M_DATA message or IPSEC_OUT message linked to a
-	 * M_DATA message. We have to do it now as we might
-	 * lose the "conn" if we go through ip_newroute.
-	 */
-	if (connp->conn_out_enforce_policy || (connp->conn_latch != NULL)) {
-		if (((mp = ipsec_attach_ipsec_out(&mp, connp, NULL,
-		    ipha->ipha_protocol, ipst->ips_netstack)) == NULL)) {
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-			if (need_decref)
-				CONN_DEC_REF(connp);
-			return;
-		}
-		ASSERT(mp->b_datap->db_type == M_CTL);
-		first_mp = mp;
-		mp = mp->b_cont;
-		mctl_present = B_TRUE;
-	} else {
-		first_mp = mp;
-		mctl_present = B_FALSE;
-	}
-
-	v_hlen_tos_len = ((uint32_t *)ipha)[0];
-
-	/* is wrong version or IP options present */
-	if (V_HLEN != IP_SIMPLE_HDR_VERSION)
-		goto version_hdrlen_check;
-	dst = ipha->ipha_dst;
-
-	/* If IP_BOUND_IF has been set, use that ill. */
-	if (connp->conn_outgoing_ill != NULL) {
-		xmit_ill = conn_get_held_ill(connp,
-		    &connp->conn_outgoing_ill, &err);
-		if (err == ILL_LOOKUP_FAILED)
-			goto drop_pkt;
-
-		goto send_from_ill;
-	}
-
-	/* is packet multicast? */
-	if (CLASSD(dst))
-		goto multicast;
-
-	/*
-	 * If xmit_ill is set above due to index passed in ip_pkt_info. It
-	 * takes precedence over conn_dontroute and conn_nexthop_set
-	 */
-	if (xmit_ill != NULL)
-		goto send_from_ill;
-
-	if (connp->conn_dontroute || connp->conn_nexthop_set) {
-		/*
-		 * If the destination is a broadcast, local, or loopback
-		 * address, SO_DONTROUTE and IP_NEXTHOP go through the
-		 * standard path.
-		 */
-		ire = ire_cache_lookup(dst, zoneid, msg_getlabel(mp), ipst);
-		if ((ire == NULL) || (ire->ire_type &
-		    (IRE_BROADCAST | IRE_LOCAL | IRE_LOOPBACK)) == 0) {
-			if (ire != NULL) {
-				ire_refrele(ire);
-				/* No more access to ire */
-				ire = NULL;
-			}
-			/*
-			 * bypass routing checks and go directly to interface.
-			 */
-			if (connp->conn_dontroute)
-				goto dontroute;
-
-			ASSERT(connp->conn_nexthop_set);
-			ip_nexthop = B_TRUE;
-			nexthop_addr = connp->conn_nexthop_v4;
-			goto send_from_ill;
-		}
-
-		/* Must be a broadcast, a loopback or a local ire */
-		ire_refrele(ire);
-		/* No more access to ire */
-		ire = NULL;
-	}
-
-	/*
-	 * We cache IRE_CACHEs to avoid lookups. We don't do
-	 * this for the tcp global queue and listen end point
-	 * as it does not really have a real destination to
-	 * talk to.  This is also true for SCTP.
-	 */
-	if (IP_FLOW_CONTROLLED_ULP(connp->conn_ulp) &&
-	    !connp->conn_fully_bound) {
-		ire = ire_cache_lookup(dst, zoneid, msg_getlabel(mp), ipst);
-		if (ire == NULL)
-			goto noirefound;
-		TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-		    "ip_wput_end: q %p (%S)", q, "end");
-
-		/*
-		 * Check if the ire has the RTF_MULTIRT flag, inherited
-		 * from an IRE_OFFSUBNET ire entry in ip_newroute().
-		 */
-		if (ire->ire_flags & RTF_MULTIRT) {
-
-			/*
-			 * Force the TTL of multirouted packets if required.
-			 * The TTL of such packets is bounded by the
-			 * ip_multirt_ttl ndd variable.
-			 */
-			if ((ipst->ips_ip_multirt_ttl > 0) &&
-			    (ipha->ipha_ttl > ipst->ips_ip_multirt_ttl)) {
-				ip2dbg(("ip_wput: forcing multirt TTL to %d "
-				    "(was %d), dst 0x%08x\n",
-				    ipst->ips_ip_multirt_ttl, ipha->ipha_ttl,
-				    ntohl(ire->ire_addr)));
-				ipha->ipha_ttl = ipst->ips_ip_multirt_ttl;
-			}
-			/*
-			 * We look at this point if there are pending
-			 * unresolved routes. ire_multirt_resolvable()
-			 * checks in O(n) that all IRE_OFFSUBNET ire
-			 * entries for the packet's destination and
-			 * flagged RTF_MULTIRT are currently resolved.
-			 * If some remain unresolved, we make a copy
-			 * of the current message. It will be used
-			 * to initiate additional route resolutions.
-			 */
-			multirt_need_resolve =
-			    ire_multirt_need_resolve(ire->ire_addr,
-			    msg_getlabel(first_mp), ipst);
-			ip2dbg(("ip_wput[TCP]: ire %p, "
-			    "multirt_need_resolve %d, first_mp %p\n",
-			    (void *)ire, multirt_need_resolve,
-			    (void *)first_mp));
-			if (multirt_need_resolve) {
-				copy_mp = copymsg(first_mp);
-				if (copy_mp != NULL) {
-					MULTIRT_DEBUG_TAG(copy_mp);
-				}
-			}
-		}
-
-		ip_wput_ire(q, first_mp, ire, connp, caller, zoneid);
-
-		/*
-		 * Try to resolve another multiroute if
-		 * ire_multirt_need_resolve() deemed it necessary.
-		 */
-		if (copy_mp != NULL)
-			ip_newroute(q, copy_mp, dst, connp, zoneid, ipst);
-		if (need_decref)
-			CONN_DEC_REF(connp);
-		return;
-	}
-
-	/*
-	 * Access to conn_ire_cache. (protected by conn_lock)
-	 *
-	 * IRE_MARK_CONDEMNED is marked in ire_delete. We don't grab
-	 * the ire bucket lock here to check for CONDEMNED as it is okay to
-	 * send a packet or two with the IRE_CACHE that is going away.
-	 * Access to the ire requires an ire refhold on the ire prior to
-	 * its use since an interface unplumb thread may delete the cached
-	 * ire and release the refhold at any time.
-	 *
-	 * Caching an ire in the conn_ire_cache
-	 *
-	 * o Caching an ire pointer in the conn requires a strict check for
-	 * IRE_MARK_CONDEMNED. An interface unplumb thread deletes all relevant
-	 * ires  before cleaning up the conns. So the caching of an ire pointer
-	 * in the conn is done after making sure under the bucket lock that the
-	 * ire has not yet been marked CONDEMNED. Otherwise we will end up
-	 * caching an ire after the unplumb thread has cleaned up the conn.
-	 * If the conn does not send a packet subsequently the unplumb thread
-	 * will be hanging waiting for the ire count to drop to zero.
-	 *
-	 * o We also need to atomically test for a null conn_ire_cache and
-	 * set the conn_ire_cache under the the protection of the conn_lock
-	 * to avoid races among concurrent threads trying to simultaneously
-	 * cache an ire in the conn_ire_cache.
-	 */
-	mutex_enter(&connp->conn_lock);
-	ire = sctp_ire != NULL ? sctp_ire : connp->conn_ire_cache;
-
-	if (ire != NULL && ire->ire_addr == dst &&
-	    !(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-
-		IRE_REFHOLD(ire);
-		mutex_exit(&connp->conn_lock);
-
-	} else {
-		boolean_t cached = B_FALSE;
-		connp->conn_ire_cache = NULL;
-		mutex_exit(&connp->conn_lock);
-		/* Release the old ire */
-		if (ire != NULL && sctp_ire == NULL)
-			IRE_REFRELE_NOTR(ire);
-
-		ire = ire_cache_lookup(dst, zoneid, msg_getlabel(mp), ipst);
-		if (ire == NULL)
-			goto noirefound;
-		IRE_REFHOLD_NOTR(ire);
-
-		mutex_enter(&connp->conn_lock);
-		if (CONN_CACHE_IRE(connp) && connp->conn_ire_cache == NULL) {
-			rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
-			if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-				if (connp->conn_ulp == IPPROTO_TCP)
-					TCP_CHECK_IREINFO(connp->conn_tcp, ire);
-				connp->conn_ire_cache = ire;
-				cached = B_TRUE;
-			}
-			rw_exit(&ire->ire_bucket->irb_lock);
-		}
-		mutex_exit(&connp->conn_lock);
-
-		/*
-		 * We can continue to use the ire but since it was
-		 * not cached, we should drop the extra reference.
-		 */
-		if (!cached)
-			IRE_REFRELE_NOTR(ire);
-	}
-
-	TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-	    "ip_wput_end: q %p (%S)", q, "end");
-
-	/*
-	 * Check if the ire has the RTF_MULTIRT flag, inherited
-	 * from an IRE_OFFSUBNET ire entry in ip_newroute().
-	 */
-	if (ire->ire_flags & RTF_MULTIRT) {
-		/*
-		 * Force the TTL of multirouted packets if required.
-		 * The TTL of such packets is bounded by the
-		 * ip_multirt_ttl ndd variable.
-		 */
-		if ((ipst->ips_ip_multirt_ttl > 0) &&
-		    (ipha->ipha_ttl > ipst->ips_ip_multirt_ttl)) {
-			ip2dbg(("ip_wput: forcing multirt TTL to %d "
-			    "(was %d), dst 0x%08x\n",
-			    ipst->ips_ip_multirt_ttl, ipha->ipha_ttl,
-			    ntohl(ire->ire_addr)));
-			ipha->ipha_ttl = ipst->ips_ip_multirt_ttl;
-		}
-
-		/*
-		 * At this point, we check to see if there are any pending
-		 * unresolved routes. ire_multirt_resolvable()
-		 * checks in O(n) that all IRE_OFFSUBNET ire
-		 * entries for the packet's destination and
-		 * flagged RTF_MULTIRT are currently resolved.
-		 * If some remain unresolved, we make a copy
-		 * of the current message. It will be used
-		 * to initiate additional route resolutions.
-		 */
-		multirt_need_resolve = ire_multirt_need_resolve(ire->ire_addr,
-		    msg_getlabel(first_mp), ipst);
-		ip2dbg(("ip_wput[not TCP]: ire %p, "
-		    "multirt_need_resolve %d, first_mp %p\n",
-		    (void *)ire, multirt_need_resolve, (void *)first_mp));
-		if (multirt_need_resolve) {
-			copy_mp = copymsg(first_mp);
-			if (copy_mp != NULL) {
-				MULTIRT_DEBUG_TAG(copy_mp);
-			}
-		}
-	}
-
-	ip_wput_ire(q, first_mp, ire, connp, caller, zoneid);
-
-	/*
-	 * Try to resolve another multiroute if
-	 * ire_multirt_resolvable() deemed it necessary
-	 */
-	if (copy_mp != NULL)
-		ip_newroute(q, copy_mp, dst, connp, zoneid, ipst);
-	if (need_decref)
-		CONN_DEC_REF(connp);
-	return;
-
-qnext:
-	/*
-	 * Upper Level Protocols pass down complete IP datagrams
-	 * as M_DATA messages.	Everything else is a sideshow.
-	 *
-	 * 1) We could be re-entering ip_wput because of ip_neworute
-	 *    in which case we could have a IPSEC_OUT message. We
-	 *    need to pass through ip_wput like other datagrams and
-	 *    hence cannot branch to ip_wput_nondata.
-	 *
-	 * 2) ARP, AH, ESP, and other clients who are on the module
-	 *    instance of IP stream, give us something to deal with.
-	 *    We will handle AH and ESP here and rest in ip_wput_nondata.
-	 *
-	 * 3) ICMP replies also could come here.
-	 */
-	ipst = ILLQ_TO_IPST(q);
-
-	if (DB_TYPE(mp) != M_DATA) {
-notdata:
-		if (DB_TYPE(mp) == M_CTL) {
-			/*
-			 * M_CTL messages are used by ARP, AH and ESP to
-			 * communicate with IP. We deal with IPSEC_IN and
-			 * IPSEC_OUT here. ip_wput_nondata handles other
-			 * cases.
-			 */
-			ipsec_info_t *ii = (ipsec_info_t *)mp->b_rptr;
-			if (mp->b_cont && (mp->b_cont->b_flag & MSGHASREF)) {
-				first_mp = mp->b_cont;
-				first_mp->b_flag &= ~MSGHASREF;
-				ASSERT(connp->conn_ulp == IPPROTO_SCTP);
-				SCTP_EXTRACT_IPINFO(first_mp, sctp_ire);
-				CONN_DEC_REF(connp);
-				connp = NULL;
-			}
-			if (ii->ipsec_info_type == IPSEC_IN) {
-				/*
-				 * Either this message goes back to
-				 * IPsec for further processing or to
-				 * ULP after policy checks.
-				 */
-				ip_fanout_proto_again(mp, NULL, NULL, NULL);
-				return;
-			} else if (ii->ipsec_info_type == IPSEC_OUT) {
-				io = (ipsec_out_t *)ii;
-				if (io->ipsec_out_proc_begin) {
-					/*
-					 * IPsec processing has already started.
-					 * Complete it.
-					 * IPQoS notes: We don't care what is
-					 * in ipsec_out_ill_index since this
-					 * won't be processed for IPQoS policies
-					 * in ipsec_out_process.
-					 */
-					ipsec_out_process(q, mp, NULL,
-					    io->ipsec_out_ill_index);
-					return;
-				} else {
-					connp = (q->q_next != NULL) ?
-					    NULL : Q_TO_CONN(q);
-					first_mp = mp;
-					mp = mp->b_cont;
-					mctl_present = B_TRUE;
-				}
-				zoneid = io->ipsec_out_zoneid;
-				ASSERT(zoneid != ALL_ZONES);
-			} else if (ii->ipsec_info_type == IPSEC_CTL) {
-				/*
-				 * It's an IPsec control message requesting
-				 * an SADB update to be sent to the IPsec
-				 * hardware acceleration capable ills.
-				 */
-				ipsec_ctl_t *ipsec_ctl =
-				    (ipsec_ctl_t *)mp->b_rptr;
-				ipsa_t *sa = (ipsa_t *)ipsec_ctl->ipsec_ctl_sa;
-				uint_t satype = ipsec_ctl->ipsec_ctl_sa_type;
-				mblk_t *cmp = mp->b_cont;
-
-				ASSERT(MBLKL(mp) >= sizeof (ipsec_ctl_t));
-				ASSERT(cmp != NULL);
-
-				freeb(mp);
-				ill_ipsec_capab_send_all(satype, cmp, sa,
-				    ipst->ips_netstack);
-				return;
-			} else {
-				/*
-				 * This must be ARP or special TSOL signaling.
-				 */
-				ip_wput_nondata(NULL, q, mp, NULL);
-				TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-				    "ip_wput_end: q %p (%S)", q, "nondata");
-				return;
-			}
-		} else {
-			/*
-			 * This must be non-(ARP/AH/ESP) messages.
-			 */
-			ASSERT(!need_decref);
-			ip_wput_nondata(NULL, q, mp, NULL);
-			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-			    "ip_wput_end: q %p (%S)", q, "nondata");
-			return;
-		}
-	} else {
-		first_mp = mp;
-		mctl_present = B_FALSE;
-	}
-
-	ASSERT(first_mp != NULL);
-
-	if (mctl_present) {
-		io = (ipsec_out_t *)first_mp->b_rptr;
-		if (io->ipsec_out_ip_nexthop) {
-			/*
-			 * We may have lost the conn context if we are
-			 * coming here from ip_newroute(). Copy the
-			 * nexthop information.
-			 */
-			ip_nexthop = B_TRUE;
-			nexthop_addr = io->ipsec_out_nexthop_addr;
-
-			ipha = (ipha_t *)mp->b_rptr;
-			dst = ipha->ipha_dst;
-			goto send_from_ill;
-		}
-	}
-
-	ASSERT(xmit_ill == NULL);
-
-	/* We have a complete IP datagram heading outbound. */
-	ipha = (ipha_t *)mp->b_rptr;
-
-#ifndef SPEED_BEFORE_SAFETY
-	/*
-	 * Make sure we have a full-word aligned message and that at least
-	 * a simple IP header is accessible in the first message.  If not,
-	 * try a pullup.  For labeled systems we need to always take this
-	 * path as M_CTLs are "notdata" but have trailing data to process.
-	 */
-	if (!OK_32PTR(rptr) ||
-	    (mp->b_wptr - rptr) < IP_SIMPLE_HDR_LENGTH || is_system_labeled()) {
-hdrtoosmall:
-		if (!pullupmsg(mp, IP_SIMPLE_HDR_LENGTH)) {
-			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-			    "ip_wput_end: q %p (%S)", q, "pullupfailed");
-			if (first_mp == NULL)
-				first_mp = mp;
-			goto discard_pkt;
-		}
-
-		/* This function assumes that mp points to an IPv4 packet. */
-		if (is_system_labeled() &&
-		    (*mp->b_rptr & 0xf0) == (IPV4_VERSION << 4) &&
-		    (connp == NULL || !connp->conn_ulp_labeled)) {
-			cred_t	*credp;
-			pid_t	pid;
-
-			if (connp != NULL) {
-				credp = BEST_CRED(mp, connp, &pid);
-				err = tsol_check_label(credp, &mp,
-				    connp->conn_mac_mode, ipst, pid);
-			} else if ((credp = msg_getcred(mp, &pid)) != NULL) {
-				err = tsol_check_label(credp, &mp,
-				    CONN_MAC_DEFAULT, ipst, pid);
-			}
-			ipha = (ipha_t *)mp->b_rptr;
-			if (mctl_present)
-				first_mp->b_cont = mp;
-			else
-				first_mp = mp;
-			if (err != 0) {
-				if (err == EINVAL)
-					goto icmp_parameter_problem;
-				ip2dbg(("ip_wput: label check failed (%d)\n",
-				    err));
-				goto discard_pkt;
-			}
-		}
-
-		ipha = (ipha_t *)mp->b_rptr;
-		if (first_mp == NULL) {
-			ASSERT(xmit_ill == NULL);
-			/*
-			 * If we got here because of "goto hdrtoosmall"
-			 * We need to attach a IPSEC_OUT.
-			 */
-			if (connp->conn_out_enforce_policy) {
-				if (((mp = ipsec_attach_ipsec_out(&mp, connp,
-				    NULL, ipha->ipha_protocol,
-				    ipst->ips_netstack)) == NULL)) {
-					BUMP_MIB(&ipst->ips_ip_mib,
-					    ipIfStatsOutDiscards);
-					if (need_decref)
-						CONN_DEC_REF(connp);
-					return;
-				} else {
-					ASSERT(mp->b_datap->db_type == M_CTL);
-					first_mp = mp;
-					mp = mp->b_cont;
-					mctl_present = B_TRUE;
-				}
-			} else {
-				first_mp = mp;
-				mctl_present = B_FALSE;
-			}
-		}
-	}
-#endif
-
-	/* Most of the code below is written for speed, not readability */
-	v_hlen_tos_len = ((uint32_t *)ipha)[0];
-
-	/*
-	 * If ip_newroute() fails, we're going to need a full
-	 * header for the icmp wraparound.
-	 */
-	if (V_HLEN != IP_SIMPLE_HDR_VERSION) {
-		uint_t	v_hlen;
-version_hdrlen_check:
-		ASSERT(first_mp != NULL);
-		v_hlen = V_HLEN;
-		/*
-		 * siphon off IPv6 packets coming down from transport
-		 * layer modules here.
-		 * Note: high-order bit carries NUD reachability confirmation
-		 */
-		if (((v_hlen >> 4) & 0x7) == IPV6_VERSION) {
-			/*
-			 * FIXME: assume that callers of ip_output* call
-			 * the right version?
-			 */
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutWrongIPVersion);
-			ASSERT(xmit_ill == NULL);
-			if (need_decref)
-				mp->b_flag |= MSGHASREF;
-			(void) ip_output_v6(arg, first_mp, arg2, caller);
-			return;
-		}
-
-		if ((v_hlen >> 4) != IP_VERSION) {
-			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-			    "ip_wput_end: q %p (%S)", q, "badvers");
-			goto discard_pkt;
-		}
-		/*
-		 * Is the header length at least 20 bytes?
-		 *
-		 * Are there enough bytes accessible in the header?  If
-		 * not, try a pullup.
-		 */
-		v_hlen &= 0xF;
-		v_hlen <<= 2;
-		if (v_hlen < IP_SIMPLE_HDR_LENGTH) {
-			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-			    "ip_wput_end: q %p (%S)", q, "badlen");
-			goto discard_pkt;
-		}
-		if (v_hlen > (mp->b_wptr - rptr)) {
-			if (!pullupmsg(mp, v_hlen)) {
-				TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-				    "ip_wput_end: q %p (%S)", q, "badpullup2");
-				goto discard_pkt;
-			}
-			ipha = (ipha_t *)mp->b_rptr;
-		}
-		/*
-		 * Move first entry from any source route into ipha_dst and
-		 * verify the options
-		 */
-		if (ip_wput_options(q, first_mp, ipha, mctl_present,
-		    zoneid, ipst)) {
-			ASSERT(xmit_ill == NULL);
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-			    "ip_wput_end: q %p (%S)", q, "badopts");
-			if (need_decref)
-				CONN_DEC_REF(connp);
-			return;
-		}
-	}
-	dst = ipha->ipha_dst;
-
-	/*
-	 * Try to get an IRE_CACHE for the destination address.	 If we can't,
-	 * we have to run the packet through ip_newroute which will take
-	 * the appropriate action to arrange for an IRE_CACHE, such as querying
-	 * a resolver, or assigning a default gateway, etc.
-	 */
-	if (CLASSD(dst)) {
-		ipif_t	*ipif;
-		uint32_t setsrc = 0;
-
-multicast:
-		ASSERT(first_mp != NULL);
-		ip2dbg(("ip_wput: CLASSD\n"));
-		if (connp == NULL) {
-			/*
-			 * Use the first good ipif on the ill.
-			 * XXX Should this ever happen? (Appears
-			 * to show up with just ppp and no ethernet due
-			 * to in.rdisc.)
-			 * However, ire_send should be able to
-			 * call ip_wput_ire directly.
-			 *
-			 * XXX Also, this can happen for ICMP and other packets
-			 * with multicast source addresses.  Perhaps we should
-			 * fix things so that we drop the packet in question,
-			 * but for now, just run with it.
-			 */
-			ill_t *ill = (ill_t *)q->q_ptr;
-
-			ipif = ipif_select_source(ill, dst, GLOBAL_ZONEID);
-			if (ipif == NULL) {
-				if (need_decref)
-					CONN_DEC_REF(connp);
-				freemsg(first_mp);
-				return;
-			}
-			ip1dbg(("ip_wput: CLASSD no CONN: dst 0x%x on %s\n",
-			    ntohl(dst), ill->ill_name));
-		} else {
-			/*
-			 * The order of precedence is IP_BOUND_IF, IP_PKTINFO
-			 * and IP_MULTICAST_IF.  The block comment above this
-			 * function explains the locking mechanism used here.
-			 */
-			if (xmit_ill == NULL) {
-				xmit_ill = conn_get_held_ill(connp,
-				    &connp->conn_outgoing_ill, &err);
-				if (err == ILL_LOOKUP_FAILED) {
-					ip1dbg(("ip_wput: No ill for "
-					    "IP_BOUND_IF\n"));
-					BUMP_MIB(&ipst->ips_ip_mib,
-					    ipIfStatsOutNoRoutes);
-					goto drop_pkt;
-				}
-			}
-
-			if (xmit_ill == NULL) {
-				ipif = conn_get_held_ipif(connp,
-				    &connp->conn_multicast_ipif, &err);
-				if (err == IPIF_LOOKUP_FAILED) {
-					ip1dbg(("ip_wput: No ipif for "
-					    "multicast\n"));
-					BUMP_MIB(&ipst->ips_ip_mib,
-					    ipIfStatsOutNoRoutes);
-					goto drop_pkt;
-				}
-			}
-			if (xmit_ill != NULL) {
-				ipif = ipif_get_next_ipif(NULL, xmit_ill);
-				if (ipif == NULL) {
-					ip1dbg(("ip_wput: No ipif for "
-					    "xmit_ill\n"));
-					BUMP_MIB(&ipst->ips_ip_mib,
-					    ipIfStatsOutNoRoutes);
-					goto drop_pkt;
-				}
-			} else if (ipif == NULL || ipif->ipif_isv6) {
-				/*
-				 * We must do this ipif determination here
-				 * else we could pass through ip_newroute
-				 * and come back here without the conn context.
-				 *
-				 * Note: we do late binding i.e. we bind to
-				 * the interface when the first packet is sent.
-				 * For performance reasons we do not rebind on
-				 * each packet but keep the binding until the
-				 * next IP_MULTICAST_IF option.
-				 *
-				 * conn_multicast_{ipif,ill} are shared between
-				 * IPv4 and IPv6 and AF_INET6 sockets can
-				 * send both IPv4 and IPv6 packets. Hence
-				 * we have to check that "isv6" matches above.
-				 */
-				if (ipif != NULL)
-					ipif_refrele(ipif);
-				ipif = ipif_lookup_group(dst, zoneid, ipst);
-				if (ipif == NULL) {
-					ip1dbg(("ip_wput: No ipif for "
-					    "multicast\n"));
-					BUMP_MIB(&ipst->ips_ip_mib,
-					    ipIfStatsOutNoRoutes);
-					goto drop_pkt;
-				}
-				err = conn_set_held_ipif(connp,
-				    &connp->conn_multicast_ipif, ipif);
-				if (err == IPIF_LOOKUP_FAILED) {
-					ipif_refrele(ipif);
-					ip1dbg(("ip_wput: No ipif for "
-					    "multicast\n"));
-					BUMP_MIB(&ipst->ips_ip_mib,
-					    ipIfStatsOutNoRoutes);
-					goto drop_pkt;
-				}
-			}
-		}
-		ASSERT(!ipif->ipif_isv6);
-		/*
-		 * As we may lose the conn by the time we reach ip_wput_ire,
-		 * we copy conn_multicast_loop and conn_dontroute on to an
-		 * ipsec_out. In case if this datagram goes out secure,
-		 * we need the ill_index also. Copy that also into the
-		 * ipsec_out.
-		 */
-		if (mctl_present) {
-			io = (ipsec_out_t *)first_mp->b_rptr;
-			ASSERT(first_mp->b_datap->db_type == M_CTL);
-			ASSERT(io->ipsec_out_type == IPSEC_OUT);
-		} else {
-			ASSERT(mp == first_mp);
-			if ((first_mp = allocb(sizeof (ipsec_info_t),
-			    BPRI_HI)) == NULL) {
-				ipif_refrele(ipif);
-				first_mp = mp;
-				goto discard_pkt;
-			}
-			first_mp->b_datap->db_type = M_CTL;
-			first_mp->b_wptr += sizeof (ipsec_info_t);
-			/* ipsec_out_secure is B_FALSE now */
-			bzero(first_mp->b_rptr, sizeof (ipsec_info_t));
-			io = (ipsec_out_t *)first_mp->b_rptr;
-			io->ipsec_out_type = IPSEC_OUT;
-			io->ipsec_out_len = sizeof (ipsec_out_t);
-			io->ipsec_out_use_global_policy = B_TRUE;
-			io->ipsec_out_ns = ipst->ips_netstack;
-			first_mp->b_cont = mp;
-			mctl_present = B_TRUE;
-		}
-
-		match_flags = MATCH_IRE_ILL | MATCH_IRE_SECATTR;
-		io->ipsec_out_ill_index =
-		    ipif->ipif_ill->ill_phyint->phyint_ifindex;
-
-		if (connp != NULL) {
-			io->ipsec_out_multicast_loop =
-			    connp->conn_multicast_loop;
-			io->ipsec_out_dontroute = connp->conn_dontroute;
-			io->ipsec_out_zoneid = connp->conn_zoneid;
-		}
-		/*
-		 * If the application uses IP_MULTICAST_IF with
-		 * different logical addresses of the same ILL, we
-		 * need to make sure that the soruce address of
-		 * the packet matches the logical IP address used
-		 * in the option. We do it by initializing ipha_src
-		 * here. This should keep IPsec also happy as
-		 * when we return from IPsec processing, we don't
-		 * have to worry about getting the right address on
-		 * the packet. Thus it is sufficient to look for
-		 * IRE_CACHE using MATCH_IRE_ILL rathen than
-		 * MATCH_IRE_IPIF.
-		 *
-		 * NOTE : We need to do it for non-secure case also as
-		 * this might go out secure if there is a global policy
-		 * match in ip_wput_ire.
-		 *
-		 * As we do not have the ire yet, it is possible that
-		 * we set the source address here and then later discover
-		 * that the ire implies the source address to be assigned
-		 * through the RTF_SETSRC flag.
-		 * In that case, the setsrc variable will remind us
-		 * that overwritting the source address by the one
-		 * of the RTF_SETSRC-flagged ire is allowed.
-		 */
-		if (ipha->ipha_src == INADDR_ANY &&
-		    (connp == NULL || !connp->conn_unspec_src)) {
-			ipha->ipha_src = ipif->ipif_src_addr;
-			setsrc = RTF_SETSRC;
-		}
-		/*
-		 * Find an IRE which matches the destination and the outgoing
-		 * queue (i.e. the outgoing interface.)
-		 * For loopback use a unicast IP address for
-		 * the ire lookup.
-		 */
-		if (IS_LOOPBACK(ipif->ipif_ill))
-			dst = ipif->ipif_lcl_addr;
-
-		/*
-		 * If xmit_ill is set, we branch out to ip_newroute_ipif.
-		 * We don't need to lookup ire in ctable as the packet
-		 * needs to be sent to the destination through the specified
-		 * ill irrespective of ires in the cache table.
-		 */
-		ire = NULL;
-		if (xmit_ill == NULL) {
-			ire = ire_ctable_lookup(dst, 0, 0, ipif,
-			    zoneid, msg_getlabel(mp), match_flags, ipst);
-		}
-
-		if (ire == NULL) {
-			/*
-			 * Multicast loopback and multicast forwarding is
-			 * done in ip_wput_ire.
-			 *
-			 * Mark this packet to make it be delivered to
-			 * ip_wput_ire after the new ire has been
-			 * created.
-			 *
-			 * The call to ip_newroute_ipif takes into account
-			 * the setsrc reminder. In any case, we take care
-			 * of the RTF_MULTIRT flag.
-			 */
-			mp->b_prev = mp->b_next = NULL;
-			if (xmit_ill == NULL ||
-			    xmit_ill->ill_ipif_up_count > 0) {
-				ip_newroute_ipif(q, first_mp, ipif, dst, connp,
-				    setsrc | RTF_MULTIRT, zoneid, infop);
-				TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-				    "ip_wput_end: q %p (%S)", q, "noire");
-			} else {
-				freemsg(first_mp);
-			}
-			ipif_refrele(ipif);
-			if (xmit_ill != NULL)
-				ill_refrele(xmit_ill);
-			if (need_decref)
-				CONN_DEC_REF(connp);
-			return;
-		}
-
-		ipif_refrele(ipif);
-		ipif = NULL;
-		ASSERT(xmit_ill == NULL);
-
-		/*
-		 * Honor the RTF_SETSRC flag for multicast packets,
-		 * if allowed by the setsrc reminder.
-		 */
-		if ((ire->ire_flags & RTF_SETSRC) && setsrc) {
-			ipha->ipha_src = ire->ire_src_addr;
-		}
-
-		/*
-		 * Unconditionally force the TTL to 1 for
-		 * multirouted multicast packets:
-		 * multirouted multicast should not cross
-		 * multicast routers.
-		 */
-		if (ire->ire_flags & RTF_MULTIRT) {
-			if (ipha->ipha_ttl > 1) {
-				ip2dbg(("ip_wput: forcing multicast "
-				    "multirt TTL to 1 (was %d), dst 0x%08x\n",
-				    ipha->ipha_ttl, ntohl(ire->ire_addr)));
-				ipha->ipha_ttl = 1;
-			}
-		}
-	} else {
-		ire = ire_cache_lookup(dst, zoneid, msg_getlabel(mp), ipst);
-		if ((ire != NULL) && (ire->ire_type &
-		    (IRE_BROADCAST | IRE_LOCAL | IRE_LOOPBACK))) {
-			ignore_dontroute = B_TRUE;
-			ignore_nexthop = B_TRUE;
-		}
-		if (ire != NULL) {
-			ire_refrele(ire);
-			ire = NULL;
-		}
-		/*
-		 * Guard against coming in from arp in which case conn is NULL.
-		 * Also guard against non M_DATA with dontroute set but
-		 * destined to local, loopback or broadcast addresses.
-		 */
-		if (connp != NULL && connp->conn_dontroute &&
-		    !ignore_dontroute) {
-dontroute:
-			/*
-			 * Set TTL to 1 if SO_DONTROUTE is set to prevent
-			 * routing protocols from seeing false direct
-			 * connectivity.
-			 */
-			ipha->ipha_ttl = 1;
-			/* If suitable ipif not found, drop packet */
-			dst_ipif = ipif_lookup_onlink_addr(dst, zoneid, ipst);
-			if (dst_ipif == NULL) {
-noroute:
-				ip1dbg(("ip_wput: no route for dst using"
-				    " SO_DONTROUTE\n"));
-				BUMP_MIB(&ipst->ips_ip_mib,
-				    ipIfStatsOutNoRoutes);
-				mp->b_prev = mp->b_next = NULL;
-				if (first_mp == NULL)
-					first_mp = mp;
-				goto drop_pkt;
-			} else {
-				/*
-				 * If suitable ipif has been found, set
-				 * xmit_ill to the corresponding
-				 * ipif_ill because we'll be using the
-				 * send_from_ill logic below.
-				 */
-				ASSERT(xmit_ill == NULL);
-				xmit_ill = dst_ipif->ipif_ill;
-				mutex_enter(&xmit_ill->ill_lock);
-				if (!ILL_CAN_LOOKUP(xmit_ill)) {
-					mutex_exit(&xmit_ill->ill_lock);
-					xmit_ill = NULL;
-					ipif_refrele(dst_ipif);
-					goto noroute;
-				}
-				ill_refhold_locked(xmit_ill);
-				mutex_exit(&xmit_ill->ill_lock);
-				ipif_refrele(dst_ipif);
-			}
-		}
-
-send_from_ill:
-		if (xmit_ill != NULL) {
-			ipif_t *ipif;
-
-			/*
-			 * Mark this packet as originated locally
-			 */
-			mp->b_prev = mp->b_next = NULL;
-
-			/*
-			 * Could be SO_DONTROUTE case also.
-			 * Verify that at least one ipif is up on the ill.
-			 */
-			if (xmit_ill->ill_ipif_up_count == 0) {
-				ip1dbg(("ip_output: xmit_ill %s is down\n",
-				    xmit_ill->ill_name));
-				goto drop_pkt;
-			}
-
-			ipif = ipif_get_next_ipif(NULL, xmit_ill);
-			if (ipif == NULL) {
-				ip1dbg(("ip_output: xmit_ill %s NULL ipif\n",
-				    xmit_ill->ill_name));
-				goto drop_pkt;
-			}
-
-			match_flags = 0;
-			if (IS_UNDER_IPMP(xmit_ill))
-				match_flags |= MATCH_IRE_MARK_TESTHIDDEN;
-
-			/*
-			 * Look for a ire that is part of the group,
-			 * if found use it else call ip_newroute_ipif.
-			 * IPCL_ZONEID is not used for matching because
-			 * IP_ALLZONES option is valid only when the
-			 * ill is accessible from all zones i.e has a
-			 * valid ipif in all zones.
-			 */
-			match_flags |= MATCH_IRE_ILL | MATCH_IRE_SECATTR;
-			ire = ire_ctable_lookup(dst, 0, 0, ipif, zoneid,
-			    msg_getlabel(mp), match_flags, ipst);
-			/*
-			 * If an ire exists use it or else create
-			 * an ire but don't add it to the cache.
-			 * Adding an ire may cause issues with
-			 * asymmetric routing.
-			 * In case of multiroute always act as if
-			 * ire does not exist.
-			 */
-			if (ire == NULL || ire->ire_flags & RTF_MULTIRT) {
-				if (ire != NULL)
-					ire_refrele(ire);
-				ip_newroute_ipif(q, first_mp, ipif,
-				    dst, connp, 0, zoneid, infop);
-				ipif_refrele(ipif);
-				ip1dbg(("ip_output: xmit_ill via %s\n",
-				    xmit_ill->ill_name));
-				ill_refrele(xmit_ill);
-				if (need_decref)
-					CONN_DEC_REF(connp);
-				return;
-			}
-			ipif_refrele(ipif);
-		} else if (ip_nexthop || (connp != NULL &&
-		    (connp->conn_nexthop_set)) && !ignore_nexthop) {
-			if (!ip_nexthop) {
-				ip_nexthop = B_TRUE;
-				nexthop_addr = connp->conn_nexthop_v4;
-			}
-			match_flags = MATCH_IRE_MARK_PRIVATE_ADDR |
-			    MATCH_IRE_GW;
-			ire = ire_ctable_lookup(dst, nexthop_addr, 0,
-			    NULL, zoneid, msg_getlabel(mp), match_flags, ipst);
-		} else {
-			ire = ire_cache_lookup(dst, zoneid, msg_getlabel(mp),
-			    ipst);
-		}
-		if (!ire) {
-			if (ip_nexthop && !ignore_nexthop) {
-				if (mctl_present) {
-					io = (ipsec_out_t *)first_mp->b_rptr;
-					ASSERT(first_mp->b_datap->db_type ==
-					    M_CTL);
-					ASSERT(io->ipsec_out_type == IPSEC_OUT);
-				} else {
-					ASSERT(mp == first_mp);
-					first_mp = allocb(
-					    sizeof (ipsec_info_t), BPRI_HI);
-					if (first_mp == NULL) {
-						first_mp = mp;
-						goto discard_pkt;
-					}
-					first_mp->b_datap->db_type = M_CTL;
-					first_mp->b_wptr +=
-					    sizeof (ipsec_info_t);
-					/* ipsec_out_secure is B_FALSE now */
-					bzero(first_mp->b_rptr,
-					    sizeof (ipsec_info_t));
-					io = (ipsec_out_t *)first_mp->b_rptr;
-					io->ipsec_out_type = IPSEC_OUT;
-					io->ipsec_out_len =
-					    sizeof (ipsec_out_t);
-					io->ipsec_out_use_global_policy =
-					    B_TRUE;
-					io->ipsec_out_ns = ipst->ips_netstack;
-					first_mp->b_cont = mp;
-					mctl_present = B_TRUE;
-				}
-				io->ipsec_out_ip_nexthop = ip_nexthop;
-				io->ipsec_out_nexthop_addr = nexthop_addr;
-			}
-noirefound:
-			/*
-			 * Mark this packet as having originated on
-			 * this machine.  This will be noted in
-			 * ire_add_then_send, which needs to know
-			 * whether to run it back through ip_wput or
-			 * ip_rput following successful resolution.
-			 */
-			mp->b_prev = NULL;
-			mp->b_next = NULL;
-			ip_newroute(q, first_mp, dst, connp, zoneid, ipst);
-			TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-			    "ip_wput_end: q %p (%S)", q, "newroute");
-			if (xmit_ill != NULL)
-				ill_refrele(xmit_ill);
-			if (need_decref)
-				CONN_DEC_REF(connp);
-			return;
-		}
-	}
-
-	/* We now know where we are going with it. */
-
-	TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-	    "ip_wput_end: q %p (%S)", q, "end");
-
-	/*
-	 * Check if the ire has the RTF_MULTIRT flag, inherited
-	 * from an IRE_OFFSUBNET ire entry in ip_newroute.
-	 */
-	if (ire->ire_flags & RTF_MULTIRT) {
-		/*
-		 * Force the TTL of multirouted packets if required.
-		 * The TTL of such packets is bounded by the
-		 * ip_multirt_ttl ndd variable.
-		 */
-		if ((ipst->ips_ip_multirt_ttl > 0) &&
-		    (ipha->ipha_ttl > ipst->ips_ip_multirt_ttl)) {
-			ip2dbg(("ip_wput: forcing multirt TTL to %d "
-			    "(was %d), dst 0x%08x\n",
-			    ipst->ips_ip_multirt_ttl, ipha->ipha_ttl,
-			    ntohl(ire->ire_addr)));
-			ipha->ipha_ttl = ipst->ips_ip_multirt_ttl;
-		}
-		/*
-		 * At this point, we check to see if there are any pending
-		 * unresolved routes. ire_multirt_resolvable()
-		 * checks in O(n) that all IRE_OFFSUBNET ire
-		 * entries for the packet's destination and
-		 * flagged RTF_MULTIRT are currently resolved.
-		 * If some remain unresolved, we make a copy
-		 * of the current message. It will be used
-		 * to initiate additional route resolutions.
-		 */
-		multirt_need_resolve = ire_multirt_need_resolve(ire->ire_addr,
-		    msg_getlabel(first_mp), ipst);
-		ip2dbg(("ip_wput[noirefound]: ire %p, "
-		    "multirt_need_resolve %d, first_mp %p\n",
-		    (void *)ire, multirt_need_resolve, (void *)first_mp));
-		if (multirt_need_resolve) {
-			copy_mp = copymsg(first_mp);
-			if (copy_mp != NULL) {
-				MULTIRT_DEBUG_TAG(copy_mp);
-			}
-		}
-	}
-
-	ip_wput_ire(q, first_mp, ire, connp, caller, zoneid);
-	/*
-	 * Try to resolve another multiroute if
-	 * ire_multirt_resolvable() deemed it necessary.
-	 * At this point, we need to distinguish
-	 * multicasts from other packets. For multicasts,
-	 * we call ip_newroute_ipif() and request that both
-	 * multirouting and setsrc flags are checked.
-	 */
-	if (copy_mp != NULL) {
-		if (CLASSD(dst)) {
-			ipif_t *ipif = ipif_lookup_group(dst, zoneid, ipst);
-			if (ipif) {
-				ASSERT(infop->ip_opt_ill_index == 0);
-				ip_newroute_ipif(q, copy_mp, ipif, dst, connp,
-				    RTF_SETSRC | RTF_MULTIRT, zoneid, infop);
-				ipif_refrele(ipif);
-			} else {
-				MULTIRT_DEBUG_UNTAG(copy_mp);
-				freemsg(copy_mp);
-				copy_mp = NULL;
-			}
-		} else {
-			ip_newroute(q, copy_mp, dst, connp, zoneid, ipst);
-		}
-	}
-	if (xmit_ill != NULL)
-		ill_refrele(xmit_ill);
-	if (need_decref)
-		CONN_DEC_REF(connp);
-	return;
-
-icmp_parameter_problem:
-	/* could not have originated externally */
-	ASSERT(mp->b_prev == NULL);
-	if (ip_hdr_complete(ipha, zoneid, ipst) == 0) {
-		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutNoRoutes);
-		/* it's the IP header length that's in trouble */
-		icmp_param_problem(q, first_mp, 0, zoneid, ipst);
-		first_mp = NULL;
-	}
-
-discard_pkt:
-	BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-drop_pkt:
-	ip1dbg(("ip_wput: dropped packet\n"));
-	if (ire != NULL)
-		ire_refrele(ire);
-	if (need_decref)
-		CONN_DEC_REF(connp);
-	freemsg(first_mp);
-	if (xmit_ill != NULL)
-		ill_refrele(xmit_ill);
-	TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
-	    "ip_wput_end: q %p (%S)", q, "droppkt");
-}
-
-/*
- * If this is a conn_t queue, then we pass in the conn. This includes the
- * zoneid.
- * Otherwise, this is a message coming back from ARP or for an ill_t queue,
- * in which case we use the global zoneid since those are all part of
- * the global zone.
- */
-void
-ip_wput(queue_t *q, mblk_t *mp)
-{
-	if (CONN_Q(q))
-		ip_output(Q_TO_CONN(q), mp, q, IP_WPUT);
-	else
-		ip_output(GLOBAL_ZONEID, mp, q, IP_WPUT);
-}
-
-/*
- *
- * The following rules must be observed when accessing any ipif or ill
- * that has been cached in the conn. Typically conn_outgoing_ill,
- * conn_multicast_ipif and conn_multicast_ill.
- *
- * Access: The ipif or ill pointed to from the conn can be accessed under
- * the protection of the conn_lock or after it has been refheld under the
- * protection of the conn lock. In addition the IPIF_CAN_LOOKUP or
- * ILL_CAN_LOOKUP macros must be used before actually doing the refhold.
- * The reason for this is that a concurrent unplumb could actually be
- * cleaning up these cached pointers by walking the conns and might have
- * finished cleaning up the conn in question. The macros check that an
- * unplumb has not yet started on the ipif or ill.
- *
- * Caching: An ipif or ill pointer may be cached in the conn only after
- * making sure that an unplumb has not started. So the caching is done
- * while holding both the conn_lock and the ill_lock and after using the
- * ILL_CAN_LOOKUP/IPIF_CAN_LOOKUP macro. An unplumb will set the ILL_CONDEMNED
- * flag before starting the cleanup of conns.
- *
- * The list of ipifs hanging off the ill is protected by ill_g_lock and ill_lock
- * On the other hand to access ipif->ipif_ill, we need one of either ill_g_lock
- * or a reference to the ipif or a reference to an ire that references the
- * ipif. An ipif only changes its ill when migrating from an underlying ill
- * to an IPMP ill in ipif_up().
- */
-ipif_t *
-conn_get_held_ipif(conn_t *connp, ipif_t **ipifp, int *err)
-{
-	ipif_t	*ipif;
-	ill_t	*ill;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	*err = 0;
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-	mutex_enter(&connp->conn_lock);
-	ipif = *ipifp;
-	if (ipif != NULL) {
-		ill = ipif->ipif_ill;
-		mutex_enter(&ill->ill_lock);
-		if (IPIF_CAN_LOOKUP(ipif)) {
-			ipif_refhold_locked(ipif);
-			mutex_exit(&ill->ill_lock);
-			mutex_exit(&connp->conn_lock);
-			rw_exit(&ipst->ips_ill_g_lock);
-			return (ipif);
-		} else {
-			*err = IPIF_LOOKUP_FAILED;
-		}
-		mutex_exit(&ill->ill_lock);
-	}
-	mutex_exit(&connp->conn_lock);
-	rw_exit(&ipst->ips_ill_g_lock);
-	return (NULL);
-}
-
-ill_t *
-conn_get_held_ill(conn_t *connp, ill_t **illp, int *err)
-{
-	ill_t	*ill;
-
-	*err = 0;
-	mutex_enter(&connp->conn_lock);
-	ill = *illp;
-	if (ill != NULL) {
-		mutex_enter(&ill->ill_lock);
-		if (ILL_CAN_LOOKUP(ill)) {
-			ill_refhold_locked(ill);
-			mutex_exit(&ill->ill_lock);
-			mutex_exit(&connp->conn_lock);
-			return (ill);
-		} else {
-			*err = ILL_LOOKUP_FAILED;
-		}
-		mutex_exit(&ill->ill_lock);
-	}
-	mutex_exit(&connp->conn_lock);
-	return (NULL);
-}
-
-static int
-conn_set_held_ipif(conn_t *connp, ipif_t **ipifp, ipif_t *ipif)
-{
-	ill_t	*ill;
-
-	ill = ipif->ipif_ill;
-	mutex_enter(&connp->conn_lock);
-	mutex_enter(&ill->ill_lock);
-	if (IPIF_CAN_LOOKUP(ipif)) {
-		*ipifp = ipif;
-		mutex_exit(&ill->ill_lock);
-		mutex_exit(&connp->conn_lock);
-		return (0);
-	}
-	mutex_exit(&ill->ill_lock);
-	mutex_exit(&connp->conn_lock);
-	return (IPIF_LOOKUP_FAILED);
-}
-
-/*
- * This is called if the outbound datagram needs fragmentation.
- *
- * NOTE : This function does not ire_refrele the ire argument passed in.
- */
-static void
-ip_wput_ire_fragmentit(mblk_t *ipsec_mp, ire_t *ire, zoneid_t zoneid,
-    ip_stack_t *ipst, conn_t *connp)
-{
-	ipha_t		*ipha;
-	mblk_t		*mp;
-	uint32_t	v_hlen_tos_len;
-	uint32_t	max_frag;
-	uint32_t	frag_flag;
-	boolean_t	dont_use;
-
-	if (ipsec_mp->b_datap->db_type == M_CTL) {
-		mp = ipsec_mp->b_cont;
-	} else {
-		mp = ipsec_mp;
-	}
-
-	ipha = (ipha_t *)mp->b_rptr;
-	v_hlen_tos_len = ((uint32_t *)ipha)[0];
-
-#ifdef	_BIG_ENDIAN
-#define	V_HLEN	(v_hlen_tos_len >> 24)
-#define	LENGTH	(v_hlen_tos_len & 0xFFFF)
-#else
-#define	V_HLEN	(v_hlen_tos_len & 0xFF)
-#define	LENGTH	((v_hlen_tos_len >> 24) | ((v_hlen_tos_len >> 8) & 0xFF00))
-#endif
-
-#ifndef SPEED_BEFORE_SAFETY
-	/*
-	 * Check that ipha_length is consistent with
-	 * the mblk length
-	 */
-	if (LENGTH != (mp->b_cont ? msgdsize(mp) : mp->b_wptr - rptr)) {
-		ip0dbg(("Packet length mismatch: %d, %ld\n",
-		    LENGTH, msgdsize(mp)));
-		freemsg(ipsec_mp);
-		TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
-		    "ip_wput_ire_fragmentit: mp %p (%S)", mp,
-		    "packet length mismatch");
-		return;
-	}
-#endif
-	/*
-	 * Don't use frag_flag if pre-built packet or source
-	 * routed or if multicast (since multicast packets do not solicit
-	 * ICMP "packet too big" messages). Get the values of
-	 * max_frag and frag_flag atomically by acquiring the
-	 * ire_lock.
-	 */
-	mutex_enter(&ire->ire_lock);
-	max_frag = ire->ire_max_frag;
-	frag_flag = ire->ire_frag_flag;
-	mutex_exit(&ire->ire_lock);
-
-	dont_use = ((ipha->ipha_ident == IP_HDR_INCLUDED) ||
-	    (V_HLEN != IP_SIMPLE_HDR_VERSION &&
-	    ip_source_route_included(ipha)) || CLASSD(ipha->ipha_dst));
-
-	ip_wput_frag(ire, ipsec_mp, OB_PKT, max_frag,
-	    (dont_use ? 0 : frag_flag), zoneid, ipst, connp);
 }
 
 /*
@@ -21820,10 +11595,10 @@ conn_ipsec_length(conn_t *connp)
 	if (ipl == NULL)
 		return (0);
 
-	if (ipl->ipl_out_policy == NULL)
+	if (connp->conn_ixa->ixa_ipsec_policy == NULL)
 		return (0);
 
-	return (ipl->ipl_out_policy->ipsp_act->ipa_ovhd);
+	return (connp->conn_ixa->ixa_ipsec_policy->ipsp_act->ipa_ovhd);
 }
 
 /*
@@ -21831,40 +11606,21 @@ conn_ipsec_length(conn_t *connp)
  * we don't want to call into IPsec to get the exact size.
  */
 int
-ipsec_out_extra_length(mblk_t *ipsec_mp)
+ipsec_out_extra_length(ip_xmit_attr_t *ixa)
 {
-	ipsec_out_t *io = (ipsec_out_t *)ipsec_mp->b_rptr;
 	ipsec_action_t *a;
 
-	ASSERT(io->ipsec_out_type == IPSEC_OUT);
-	if (!io->ipsec_out_secure)
+	if (!(ixa->ixa_flags & IXAF_IPSEC_SECURE))
 		return (0);
 
-	a = io->ipsec_out_act;
-
+	a = ixa->ixa_ipsec_action;
 	if (a == NULL) {
-		ASSERT(io->ipsec_out_policy != NULL);
-		a = io->ipsec_out_policy->ipsp_act;
+		ASSERT(ixa->ixa_ipsec_policy != NULL);
+		a = ixa->ixa_ipsec_policy->ipsp_act;
 	}
 	ASSERT(a != NULL);
 
 	return (a->ipa_ovhd);
-}
-
-/*
- * Returns an estimate of the IPsec headers size. This is used if
- * we don't want to call into IPsec to get the exact size.
- */
-int
-ipsec_in_extra_length(mblk_t *ipsec_mp)
-{
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-	ipsec_action_t *a;
-
-	ASSERT(ii->ipsec_in_type == IPSEC_IN);
-
-	a = ii->ipsec_in_action;
-	return (a == NULL ? 0 : a->ipa_ovhd);
 }
 
 /*
@@ -21914,2257 +11670,70 @@ ip_get_dst(ipha_t *ipha)
 	return (dst);
 }
 
-mblk_t *
-ip_wput_ire_parse_ipsec_out(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
-    conn_t *connp, boolean_t unspec_src, zoneid_t zoneid)
-{
-	ipsec_out_t	*io;
-	mblk_t		*first_mp;
-	boolean_t policy_present;
-	ip_stack_t	*ipst;
-	ipsec_stack_t	*ipss;
-
-	ASSERT(ire != NULL);
-	ipst = ire->ire_ipst;
-	ipss = ipst->ips_netstack->netstack_ipsec;
-
-	first_mp = mp;
-	if (mp->b_datap->db_type == M_CTL) {
-		io = (ipsec_out_t *)first_mp->b_rptr;
-		/*
-		 * ip_wput[_v6] attaches an IPSEC_OUT in two cases.
-		 *
-		 * 1) There is per-socket policy (including cached global
-		 *    policy) or a policy on the IP-in-IP tunnel.
-		 * 2) There is no per-socket policy, but it is
-		 *    a multicast packet that needs to go out
-		 *    on a specific interface. This is the case
-		 *    where (ip_wput and ip_wput_multicast) attaches
-		 *    an IPSEC_OUT and sets ipsec_out_secure B_FALSE.
-		 *
-		 * In case (2) we check with global policy to
-		 * see if there is a match and set the ill_index
-		 * appropriately so that we can lookup the ire
-		 * properly in ip_wput_ipsec_out.
-		 */
-
-		/*
-		 * ipsec_out_use_global_policy is set to B_FALSE
-		 * in ipsec_in_to_out(). Refer to that function for
-		 * details.
-		 */
-		if ((io->ipsec_out_latch == NULL) &&
-		    (io->ipsec_out_use_global_policy)) {
-			return (ip_wput_attach_policy(first_mp, ipha, ip6h,
-			    ire, connp, unspec_src, zoneid));
-		}
-		if (!io->ipsec_out_secure) {
-			/*
-			 * If this is not a secure packet, drop
-			 * the IPSEC_OUT mp and treat it as a clear
-			 * packet. This happens when we are sending
-			 * a ICMP reply back to a clear packet. See
-			 * ipsec_in_to_out() for details.
-			 */
-			mp = first_mp->b_cont;
-			freeb(first_mp);
-		}
-		return (mp);
-	}
-	/*
-	 * See whether we need to attach a global policy here. We
-	 * don't depend on the conn (as it could be null) for deciding
-	 * what policy this datagram should go through because it
-	 * should have happened in ip_wput if there was some
-	 * policy. This normally happens for connections which are not
-	 * fully bound preventing us from caching policies in
-	 * ip_bind. Packets coming from the TCP listener/global queue
-	 * - which are non-hard_bound - could also be affected by
-	 * applying policy here.
-	 *
-	 * If this packet is coming from tcp global queue or listener,
-	 * we will be applying policy here.  This may not be *right*
-	 * if these packets are coming from the detached connection as
-	 * it could have gone in clear before. This happens only if a
-	 * TCP connection started when there is no policy and somebody
-	 * added policy before it became detached. Thus packets of the
-	 * detached connection could go out secure and the other end
-	 * would drop it because it will be expecting in clear. The
-	 * converse is not true i.e if somebody starts a TCP
-	 * connection and deletes the policy, all the packets will
-	 * still go out with the policy that existed before deleting
-	 * because ip_unbind sends up policy information which is used
-	 * by TCP on subsequent ip_wputs. The right solution is to fix
-	 * TCP to attach a dummy IPSEC_OUT and set
-	 * ipsec_out_use_global_policy to B_FALSE. As this might
-	 * affect performance for normal cases, we are not doing it.
-	 * Thus, set policy before starting any TCP connections.
-	 *
-	 * NOTE - We might apply policy even for a hard bound connection
-	 * - for which we cached policy in ip_bind - if somebody added
-	 * global policy after we inherited the policy in ip_bind.
-	 * This means that the packets that were going out in clear
-	 * previously would start going secure and hence get dropped
-	 * on the other side. To fix this, TCP attaches a dummy
-	 * ipsec_out and make sure that we don't apply global policy.
-	 */
-	if (ipha != NULL)
-		policy_present = ipss->ipsec_outbound_v4_policy_present;
-	else
-		policy_present = ipss->ipsec_outbound_v6_policy_present;
-	if (!policy_present)
-		return (mp);
-
-	return (ip_wput_attach_policy(mp, ipha, ip6h, ire, connp, unspec_src,
-	    zoneid));
-}
-
-/*
- * This function does the ire_refrele of the ire passed in as the
- * argument. As this function looks up more ires i.e broadcast ires,
- * it needs to REFRELE them. Currently, for simplicity we don't
- * differentiate the one passed in and looked up here. We always
- * REFRELE.
- * IPQoS Notes:
- * IP policy is invoked if IPP_LOCAL_OUT is enabled. Processing for
- * IPsec packets are done in ipsec_out_process.
- */
-void
-ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller,
-    zoneid_t zoneid)
-{
-	ipha_t		*ipha;
-#define	rptr	((uchar_t *)ipha)
-	queue_t		*stq;
-#define	Q_TO_INDEX(stq)	(((ill_t *)stq->q_ptr)->ill_phyint->phyint_ifindex)
-	uint32_t	v_hlen_tos_len;
-	uint32_t	ttl_protocol;
-	ipaddr_t	src;
-	ipaddr_t	dst;
-	uint32_t	cksum;
-	ipaddr_t	orig_src;
-	ire_t		*ire1;
-	mblk_t		*next_mp;
-	uint_t		hlen;
-	uint16_t	*up;
-	uint32_t	max_frag = ire->ire_max_frag;
-	ill_t		*ill = ire_to_ill(ire);
-	int		clusterwide;
-	uint16_t	ip_hdr_included; /* IP header included by ULP? */
-	int		ipsec_len;
-	mblk_t		*first_mp;
-	ipsec_out_t	*io;
-	boolean_t	conn_dontroute;		/* conn value for multicast */
-	boolean_t	conn_multicast_loop;	/* conn value for multicast */
-	boolean_t	multicast_forward;	/* Should we forward ? */
-	boolean_t	unspec_src;
-	ill_t		*conn_outgoing_ill = NULL;
-	ill_t		*ire_ill;
-	ill_t		*ire1_ill;
-	ill_t		*out_ill;
-	uint32_t 	ill_index = 0;
-	boolean_t	multirt_send = B_FALSE;
-	int		err;
-	ipxmit_state_t	pktxmit_state;
-	ip_stack_t	*ipst = ire->ire_ipst;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
-
-	TRACE_1(TR_FAC_IP, TR_IP_WPUT_IRE_START,
-	    "ip_wput_ire_start: q %p", q);
-
-	multicast_forward = B_FALSE;
-	unspec_src = (connp != NULL && connp->conn_unspec_src);
-
-	if (ire->ire_flags & RTF_MULTIRT) {
-		/*
-		 * Multirouting case. The bucket where ire is stored
-		 * probably holds other RTF_MULTIRT flagged ire
-		 * to the destination. In this call to ip_wput_ire,
-		 * we attempt to send the packet through all
-		 * those ires. Thus, we first ensure that ire is the
-		 * first RTF_MULTIRT ire in the bucket,
-		 * before walking the ire list.
-		 */
-		ire_t *first_ire;
-		irb_t *irb = ire->ire_bucket;
-		ASSERT(irb != NULL);
-
-		/* Make sure we do not omit any multiroute ire. */
-		IRB_REFHOLD(irb);
-		for (first_ire = irb->irb_ire;
-		    first_ire != NULL;
-		    first_ire = first_ire->ire_next) {
-			if ((first_ire->ire_flags & RTF_MULTIRT) &&
-			    (first_ire->ire_addr == ire->ire_addr) &&
-			    !(first_ire->ire_marks &
-			    (IRE_MARK_CONDEMNED | IRE_MARK_TESTHIDDEN)))
-				break;
-		}
-
-		if ((first_ire != NULL) && (first_ire != ire)) {
-			IRE_REFHOLD(first_ire);
-			ire_refrele(ire);
-			ire = first_ire;
-			ill = ire_to_ill(ire);
-		}
-		IRB_REFRELE(irb);
-	}
-
-	/*
-	 * conn_outgoing_ill variable is used only in the broadcast loop.
-	 * for performance we don't grab the mutexs in the fastpath
-	 */
-	if (ire->ire_type == IRE_BROADCAST && connp != NULL &&
-	    connp->conn_outgoing_ill != NULL) {
-		conn_outgoing_ill = conn_get_held_ill(connp,
-		    &connp->conn_outgoing_ill, &err);
-		if (err == ILL_LOOKUP_FAILED) {
-			ire_refrele(ire);
-			freemsg(mp);
-			return;
-		}
-	}
-
-	if (mp->b_datap->db_type != M_CTL) {
-		ipha = (ipha_t *)mp->b_rptr;
-	} else {
-		io = (ipsec_out_t *)mp->b_rptr;
-		ASSERT(io->ipsec_out_type == IPSEC_OUT);
-		ASSERT(zoneid == io->ipsec_out_zoneid);
-		ASSERT(zoneid != ALL_ZONES);
-		ipha = (ipha_t *)mp->b_cont->b_rptr;
-		dst = ipha->ipha_dst;
-		/*
-		 * For the multicast case, ipsec_out carries conn_dontroute and
-		 * conn_multicast_loop as conn may not be available here. We
-		 * need this for multicast loopback and forwarding which is done
-		 * later in the code.
-		 */
-		if (CLASSD(dst)) {
-			conn_dontroute = io->ipsec_out_dontroute;
-			conn_multicast_loop = io->ipsec_out_multicast_loop;
-			/*
-			 * If conn_dontroute is not set or conn_multicast_loop
-			 * is set, we need to do forwarding/loopback. For
-			 * datagrams from ip_wput_multicast, conn_dontroute is
-			 * set to B_TRUE and conn_multicast_loop is set to
-			 * B_FALSE so that we neither do forwarding nor
-			 * loopback.
-			 */
-			if (!conn_dontroute || conn_multicast_loop)
-				multicast_forward = B_TRUE;
-		}
-	}
-
-	if (ire->ire_type == IRE_LOCAL && ire->ire_zoneid != zoneid &&
-	    ire->ire_zoneid != ALL_ZONES) {
-		/*
-		 * When a zone sends a packet to another zone, we try to deliver
-		 * the packet under the same conditions as if the destination
-		 * was a real node on the network. To do so, we look for a
-		 * matching route in the forwarding table.
-		 * RTF_REJECT and RTF_BLACKHOLE are handled just like
-		 * ip_newroute() does.
-		 * Note that IRE_LOCAL are special, since they are used
-		 * when the zoneid doesn't match in some cases. This means that
-		 * we need to handle ipha_src differently since ire_src_addr
-		 * belongs to the receiving zone instead of the sending zone.
-		 * When ip_restrict_interzone_loopback is set, then
-		 * ire_cache_lookup() ensures that IRE_LOCAL are only used
-		 * for loopback between zones when the logical "Ethernet" would
-		 * have looped them back.
-		 */
-		ire_t *src_ire;
-
-		src_ire = ire_ftable_lookup(ipha->ipha_dst, 0, 0, 0,
-		    NULL, NULL, zoneid, 0, NULL, (MATCH_IRE_RECURSIVE |
-		    MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE), ipst);
-		if (src_ire != NULL &&
-		    !(src_ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE)) &&
-		    (!ipst->ips_ip_restrict_interzone_loopback ||
-		    ire_local_same_lan(ire, src_ire))) {
-			if (ipha->ipha_src == INADDR_ANY && !unspec_src)
-				ipha->ipha_src = src_ire->ire_src_addr;
-			ire_refrele(src_ire);
-		} else {
-			ire_refrele(ire);
-			if (conn_outgoing_ill != NULL)
-				ill_refrele(conn_outgoing_ill);
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutNoRoutes);
-			if (src_ire != NULL) {
-				if (src_ire->ire_flags & RTF_BLACKHOLE) {
-					ire_refrele(src_ire);
-					freemsg(mp);
-					return;
-				}
-				ire_refrele(src_ire);
-			}
-			if (ip_hdr_complete(ipha, zoneid, ipst)) {
-				/* Failed */
-				freemsg(mp);
-				return;
-			}
-			icmp_unreachable(q, mp, ICMP_HOST_UNREACHABLE, zoneid,
-			    ipst);
-			return;
-		}
-	}
-
-	if (mp->b_datap->db_type == M_CTL ||
-	    ipss->ipsec_outbound_v4_policy_present) {
-		mp = ip_wput_ire_parse_ipsec_out(mp, ipha, NULL, ire, connp,
-		    unspec_src, zoneid);
-		if (mp == NULL) {
-			ire_refrele(ire);
-			if (conn_outgoing_ill != NULL)
-				ill_refrele(conn_outgoing_ill);
-			return;
-		}
-		/*
-		 * Trusted Extensions supports all-zones interfaces, so
-		 * zoneid == ALL_ZONES is valid, but IPsec maps ALL_ZONES to
-		 * the global zone.
-		 */
-		if (zoneid == ALL_ZONES && mp->b_datap->db_type == M_CTL) {
-			io = (ipsec_out_t *)mp->b_rptr;
-			ASSERT(io->ipsec_out_type == IPSEC_OUT);
-			zoneid = io->ipsec_out_zoneid;
-		}
-	}
-
-	first_mp = mp;
-	ipsec_len = 0;
-
-	if (first_mp->b_datap->db_type == M_CTL) {
-		io = (ipsec_out_t *)first_mp->b_rptr;
-		ASSERT(io->ipsec_out_type == IPSEC_OUT);
-		mp = first_mp->b_cont;
-		ipsec_len = ipsec_out_extra_length(first_mp);
-		ASSERT(ipsec_len >= 0);
-		if (zoneid == ALL_ZONES)
-			zoneid = GLOBAL_ZONEID;
-		/* We already picked up the zoneid from the M_CTL above */
-		ASSERT(zoneid == io->ipsec_out_zoneid);
-
-		/*
-		 * Drop M_CTL here if IPsec processing is not needed.
-		 * (Non-IPsec use of M_CTL extracted any information it
-		 * needed above).
-		 */
-		if (ipsec_len == 0) {
-			freeb(first_mp);
-			first_mp = mp;
-		}
-	}
-
-	/*
-	 * Fast path for ip_wput_ire
-	 */
-
-	ipha = (ipha_t *)mp->b_rptr;
-	v_hlen_tos_len = ((uint32_t *)ipha)[0];
-	dst = ipha->ipha_dst;
-
-	/*
-	 * ICMP(RAWIP) module should set the ipha_ident to IP_HDR_INCLUDED
-	 * if the socket is a SOCK_RAW type. The transport checksum should
-	 * be provided in the pre-built packet, so we don't need to compute it.
-	 * Also, other application set flags, like DF, should not be altered.
-	 * Other transport MUST pass down zero.
-	 */
-	ip_hdr_included = ipha->ipha_ident;
-	ASSERT(ipha->ipha_ident == 0 || ipha->ipha_ident == IP_HDR_INCLUDED);
-
-	if (CLASSD(dst)) {
-		ip1dbg(("ip_wput_ire: to 0x%x ire %s addr 0x%x\n",
-		    ntohl(dst),
-		    ip_nv_lookup(ire_nv_tbl, ire->ire_type),
-		    ntohl(ire->ire_addr)));
-	}
-
-/* Macros to extract header fields from data already in registers */
-#ifdef	_BIG_ENDIAN
-#define	V_HLEN	(v_hlen_tos_len >> 24)
-#define	LENGTH	(v_hlen_tos_len & 0xFFFF)
-#define	PROTO	(ttl_protocol & 0xFF)
-#else
-#define	V_HLEN	(v_hlen_tos_len & 0xFF)
-#define	LENGTH	((v_hlen_tos_len >> 24) | ((v_hlen_tos_len >> 8) & 0xFF00))
-#define	PROTO	(ttl_protocol >> 8)
-#endif
-
-	orig_src = src = ipha->ipha_src;
-	/* (The loop back to "another" is explained down below.) */
-another:;
-	/*
-	 * Assign an ident value for this packet.  We assign idents on
-	 * a per destination basis out of the IRE.  There could be
-	 * other threads targeting the same destination, so we have to
-	 * arrange for a atomic increment.  Note that we use a 32-bit
-	 * atomic add because it has better performance than its
-	 * 16-bit sibling.
-	 *
-	 * If running in cluster mode and if the source address
-	 * belongs to a replicated service then vector through
-	 * cl_inet_ipident vector to allocate ip identifier
-	 * NOTE: This is a contract private interface with the
-	 * clustering group.
-	 */
-	clusterwide = 0;
-	if (cl_inet_ipident) {
-		ASSERT(cl_inet_isclusterwide);
-		netstackid_t stack_id = ipst->ips_netstack->netstack_stackid;
-
-		if ((*cl_inet_isclusterwide)(stack_id, IPPROTO_IP,
-		    AF_INET, (uint8_t *)(uintptr_t)src, NULL)) {
-			ipha->ipha_ident = (*cl_inet_ipident)(stack_id,
-			    IPPROTO_IP, AF_INET, (uint8_t *)(uintptr_t)src,
-			    (uint8_t *)(uintptr_t)dst, NULL);
-			clusterwide = 1;
-		}
-	}
-	if (!clusterwide) {
-		ipha->ipha_ident =
-		    (uint16_t)atomic_add_32_nv(&ire->ire_ident, 1);
-	}
-
-#ifndef _BIG_ENDIAN
-	ipha->ipha_ident = (ipha->ipha_ident << 8) | (ipha->ipha_ident >> 8);
-#endif
-
-	/*
-	 * Set source address unless sent on an ill or conn_unspec_src is set.
-	 * This is needed to obey conn_unspec_src when packets go through
-	 * ip_newroute + arp.
-	 * Assumes ip_newroute{,_multi} sets the source address as well.
-	 */
-	if (src == INADDR_ANY && !unspec_src) {
-		/*
-		 * Assign the appropriate source address from the IRE if none
-		 * was specified.
-		 */
-		ASSERT(ire->ire_ipversion == IPV4_VERSION);
-
-		src = ire->ire_src_addr;
-		if (connp == NULL) {
-			ip1dbg(("ip_wput_ire: no connp and no src "
-			    "address for dst 0x%x, using src 0x%x\n",
-			    ntohl(dst),
-			    ntohl(src)));
-		}
-		ipha->ipha_src = src;
-	}
-	stq = ire->ire_stq;
-
-	/*
-	 * We only allow ire chains for broadcasts since there will
-	 * be multiple IRE_CACHE entries for the same multicast
-	 * address (one per ipif).
-	 */
-	next_mp = NULL;
-
-	/* broadcast packet */
-	if (ire->ire_type == IRE_BROADCAST)
-		goto broadcast;
-
-	/* loopback ? */
-	if (stq == NULL)
-		goto nullstq;
-
-	/* The ill_index for outbound ILL */
-	ill_index = Q_TO_INDEX(stq);
-
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests);
-	ttl_protocol = ((uint16_t *)ipha)[4];
-
-	/* pseudo checksum (do it in parts for IP header checksum) */
-	cksum = (dst >> 16) + (dst & 0xFFFF) + (src >> 16) + (src & 0xFFFF);
-
-	if (!IP_FLOW_CONTROLLED_ULP(PROTO)) {
-		queue_t *dev_q = stq->q_next;
-
-		/*
-		 * For DIRECT_CAPABLE, we do flow control at
-		 * the time of sending the packet. See
-		 * ILL_SEND_TX().
-		 */
-		if (!ILL_DIRECT_CAPABLE((ill_t *)stq->q_ptr) &&
-		    (DEV_Q_FLOW_BLOCKED(dev_q)))
-			goto blocked;
-
-		if ((PROTO == IPPROTO_UDP) &&
-		    (ip_hdr_included != IP_HDR_INCLUDED)) {
-			hlen = (V_HLEN & 0xF) << 2;
-			up = IPH_UDPH_CHECKSUMP(ipha, hlen);
-			if (*up != 0) {
-				IP_CKSUM_XMIT(ill, ire, mp, ipha, up, PROTO,
-				    hlen, LENGTH, max_frag, ipsec_len, cksum);
-				/* Software checksum? */
-				if (DB_CKSUMFLAGS(mp) == 0) {
-					IP_STAT(ipst, ip_out_sw_cksum);
-					IP_STAT_UPDATE(ipst,
-					    ip_udp_out_sw_cksum_bytes,
-					    LENGTH - hlen);
-				}
-			}
-		}
-	} else if (ip_hdr_included != IP_HDR_INCLUDED) {
-		hlen = (V_HLEN & 0xF) << 2;
-		if (PROTO == IPPROTO_TCP) {
-			up = IPH_TCPH_CHECKSUMP(ipha, hlen);
-			/*
-			 * The packet header is processed once and for all, even
-			 * in the multirouting case. We disable hardware
-			 * checksum if the packet is multirouted, as it will be
-			 * replicated via several interfaces, and not all of
-			 * them may have this capability.
-			 */
-			IP_CKSUM_XMIT(ill, ire, mp, ipha, up, PROTO, hlen,
-			    LENGTH, max_frag, ipsec_len, cksum);
-			/* Software checksum? */
-			if (DB_CKSUMFLAGS(mp) == 0) {
-				IP_STAT(ipst, ip_out_sw_cksum);
-				IP_STAT_UPDATE(ipst, ip_tcp_out_sw_cksum_bytes,
-				    LENGTH - hlen);
-			}
-		} else {
-			sctp_hdr_t	*sctph;
-
-			ASSERT(PROTO == IPPROTO_SCTP);
-			ASSERT(MBLKL(mp) >= (hlen + sizeof (*sctph)));
-			sctph = (sctp_hdr_t *)(mp->b_rptr + hlen);
-			/*
-			 * Zero out the checksum field to ensure proper
-			 * checksum calculation.
-			 */
-			sctph->sh_chksum = 0;
-#ifdef	DEBUG
-			if (!skip_sctp_cksum)
-#endif
-				sctph->sh_chksum = sctp_cksum(mp, hlen);
-		}
-	}
-
-	/*
-	 * If this is a multicast packet and originated from ip_wput
-	 * we need to do loopback and forwarding checks. If it comes
-	 * from ip_wput_multicast, we SHOULD not do this.
-	 */
-	if (CLASSD(ipha->ipha_dst) && multicast_forward) goto multi_loopback;
-
-	/* checksum */
-	cksum += ttl_protocol;
-
-	/* fragment the packet */
-	if (max_frag < (uint_t)(LENGTH + ipsec_len))
-		goto fragmentit;
-	/*
-	 * Don't use frag_flag if packet is pre-built or source
-	 * routed or if multicast (since multicast packets do
-	 * not solicit ICMP "packet too big" messages).
-	 */
-	if ((ip_hdr_included != IP_HDR_INCLUDED) &&
-	    (V_HLEN == IP_SIMPLE_HDR_VERSION ||
-	    !ip_source_route_included(ipha)) &&
-	    !CLASSD(ipha->ipha_dst))
-		ipha->ipha_fragment_offset_and_flags |=
-		    htons(ire->ire_frag_flag);
-
-	if (!(DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM)) {
-		/* calculate IP header checksum */
-		cksum += ipha->ipha_ident;
-		cksum += (v_hlen_tos_len >> 16)+(v_hlen_tos_len & 0xFFFF);
-		cksum += ipha->ipha_fragment_offset_and_flags;
-
-		/* IP options present */
-		hlen = (V_HLEN & 0xF) - IP_SIMPLE_HDR_LENGTH_IN_WORDS;
-		if (hlen)
-			goto checksumoptions;
-
-		/* calculate hdr checksum */
-		cksum = ((cksum & 0xFFFF) + (cksum >> 16));
-		cksum = ~(cksum + (cksum >> 16));
-		ipha->ipha_hdr_checksum = (uint16_t)cksum;
-	}
-	if (ipsec_len != 0) {
-		/*
-		 * We will do the rest of the processing after
-		 * we come back from IPsec in ip_wput_ipsec_out().
-		 */
-		ASSERT(MBLKL(first_mp) >= sizeof (ipsec_out_t));
-
-		io = (ipsec_out_t *)first_mp->b_rptr;
-		io->ipsec_out_ill_index =
-		    ire->ire_ipif->ipif_ill->ill_phyint->phyint_ifindex;
-		ipsec_out_process(q, first_mp, ire, 0);
-		ire_refrele(ire);
-		if (conn_outgoing_ill != NULL)
-			ill_refrele(conn_outgoing_ill);
-		return;
-	}
-
-	/*
-	 * In most cases, the emission loop below is entered only
-	 * once. Only in the case where the ire holds the
-	 * RTF_MULTIRT flag, do we loop to process all RTF_MULTIRT
-	 * flagged ires in the bucket, and send the packet
-	 * through all crossed RTF_MULTIRT routes.
-	 */
-	if (ire->ire_flags & RTF_MULTIRT) {
-		multirt_send = B_TRUE;
-	}
-	do {
-		if (multirt_send) {
-			irb_t *irb;
-			/*
-			 * We are in a multiple send case, need to get
-			 * the next ire and make a duplicate of the packet.
-			 * ire1 holds here the next ire to process in the
-			 * bucket. If multirouting is expected,
-			 * any non-RTF_MULTIRT ire that has the
-			 * right destination address is ignored.
-			 */
-			irb = ire->ire_bucket;
-			ASSERT(irb != NULL);
-
-			IRB_REFHOLD(irb);
-			for (ire1 = ire->ire_next;
-			    ire1 != NULL;
-			    ire1 = ire1->ire_next) {
-				if ((ire1->ire_flags & RTF_MULTIRT) == 0)
-					continue;
-				if (ire1->ire_addr != ire->ire_addr)
-					continue;
-				if (ire1->ire_marks &
-				    (IRE_MARK_CONDEMNED | IRE_MARK_TESTHIDDEN))
-					continue;
-
-				/* Got one */
-				IRE_REFHOLD(ire1);
-				break;
-			}
-			IRB_REFRELE(irb);
-
-			if (ire1 != NULL) {
-				next_mp = copyb(mp);
-				if ((next_mp == NULL) ||
-				    ((mp->b_cont != NULL) &&
-				    ((next_mp->b_cont =
-				    dupmsg(mp->b_cont)) == NULL))) {
-					freemsg(next_mp);
-					next_mp = NULL;
-					ire_refrele(ire1);
-					ire1 = NULL;
-				}
-			}
-
-			/* Last multiroute ire; don't loop anymore. */
-			if (ire1 == NULL) {
-				multirt_send = B_FALSE;
-			}
-		}
-
-		DTRACE_PROBE4(ip4__physical__out__start, ill_t *, NULL,
-		    ill_t *, ire->ire_ipif->ipif_ill, ipha_t *, ipha,
-		    mblk_t *, mp);
-		FW_HOOKS(ipst->ips_ip4_physical_out_event,
-		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, ire->ire_ipif->ipif_ill, ipha, mp, mp, 0, ipst);
-		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-
-		if (mp == NULL)
-			goto release_ire_and_ill;
-
-		if (ipst->ips_ip4_observe.he_interested) {
-			zoneid_t szone;
-
-			/*
-			 * On the outbound path the destination zone will be
-			 * unknown as we're sending this packet out on the
-			 * wire.
-			 */
-			szone = ip_get_zoneid_v4(ipha->ipha_src, mp, ipst,
-			    ALL_ZONES);
-			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone, ALL_ZONES,
-			    ire->ire_ipif->ipif_ill, ipst);
-		}
-		mp->b_prev = SET_BPREV_FLAG(IPP_LOCAL_OUT);
-		DTRACE_PROBE2(ip__xmit__1, mblk_t *, mp, ire_t *, ire);
-
-		pktxmit_state = ip_xmit_v4(mp, ire, NULL, B_TRUE, connp);
-
-		if ((pktxmit_state == SEND_FAILED) ||
-		    (pktxmit_state == LLHDR_RESLV_FAILED)) {
-			ip2dbg(("ip_wput_ire: ip_xmit_v4 failed"
-			    "- packet dropped\n"));
-release_ire_and_ill:
-			ire_refrele(ire);
-			if (next_mp != NULL) {
-				freemsg(next_mp);
-				ire_refrele(ire1);
-			}
-			if (conn_outgoing_ill != NULL)
-				ill_refrele(conn_outgoing_ill);
-			return;
-		}
-
-		if (CLASSD(dst)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutMcastPkts);
-			UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutMcastOctets,
-			    LENGTH);
-		}
-
-		TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
-		    "ip_wput_ire_end: q %p (%S)",
-		    q, "last copy out");
-		IRE_REFRELE(ire);
-
-		if (multirt_send) {
-			ASSERT(ire1);
-			/*
-			 * Proceed with the next RTF_MULTIRT ire,
-			 * Also set up the send-to queue accordingly.
-			 */
-			ire = ire1;
-			ire1 = NULL;
-			stq = ire->ire_stq;
-			mp = next_mp;
-			next_mp = NULL;
-			ipha = (ipha_t *)mp->b_rptr;
-			ill_index = Q_TO_INDEX(stq);
-			ill = (ill_t *)stq->q_ptr;
-		}
-	} while (multirt_send);
-	if (conn_outgoing_ill != NULL)
-		ill_refrele(conn_outgoing_ill);
-	return;
-
-	/*
-	 * ire->ire_type == IRE_BROADCAST (minimize diffs)
-	 */
-broadcast:
-	{
-		/*
-		 * To avoid broadcast storms, we usually set the TTL to 1 for
-		 * broadcasts.  However, if SO_DONTROUTE isn't set, this value
-		 * can be overridden stack-wide through the ip_broadcast_ttl
-		 * ndd tunable, or on a per-connection basis through the
-		 * IP_BROADCAST_TTL socket option.
-		 *
-		 * In the event that we are replying to incoming ICMP packets,
-		 * connp could be NULL.
-		 */
-		ipha->ipha_ttl = ipst->ips_ip_broadcast_ttl;
-		if (connp != NULL) {
-			if (connp->conn_dontroute)
-				ipha->ipha_ttl = 1;
-			else if (connp->conn_broadcast_ttl != 0)
-				ipha->ipha_ttl = connp->conn_broadcast_ttl;
-		}
-
-		/*
-		 * Note that we are not doing a IRB_REFHOLD here.
-		 * Actually we don't care if the list changes i.e
-		 * if somebody deletes an IRE from the list while
-		 * we drop the lock, the next time we come around
-		 * ire_next will be NULL and hence we won't send
-		 * out multiple copies which is fine.
-		 */
-		rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
-		ire1 = ire->ire_next;
-		if (conn_outgoing_ill != NULL) {
-			while (ire->ire_ipif->ipif_ill != conn_outgoing_ill) {
-				ASSERT(ire1 == ire->ire_next);
-				if (ire1 != NULL && ire1->ire_addr == dst) {
-					ire_refrele(ire);
-					ire = ire1;
-					IRE_REFHOLD(ire);
-					ire1 = ire->ire_next;
-					continue;
-				}
-				rw_exit(&ire->ire_bucket->irb_lock);
-				/* Did not find a matching ill */
-				ip1dbg(("ip_wput_ire: broadcast with no "
-				    "matching IP_BOUND_IF ill %s dst %x\n",
-				    conn_outgoing_ill->ill_name, dst));
-				freemsg(first_mp);
-				if (ire != NULL)
-					ire_refrele(ire);
-				ill_refrele(conn_outgoing_ill);
-				return;
-			}
-		} else if (ire1 != NULL && ire1->ire_addr == dst) {
-			/*
-			 * If the next IRE has the same address and is not one
-			 * of the two copies that we need to send, try to see
-			 * whether this copy should be sent at all. This
-			 * assumes that we insert loopbacks first and then
-			 * non-loopbacks. This is acheived by inserting the
-			 * loopback always before non-loopback.
-			 * This is used to send a single copy of a broadcast
-			 * packet out all physical interfaces that have an
-			 * matching IRE_BROADCAST while also looping
-			 * back one copy (to ip_wput_local) for each
-			 * matching physical interface. However, we avoid
-			 * sending packets out different logical that match by
-			 * having ipif_up/ipif_down supress duplicate
-			 * IRE_BROADCASTS.
-			 *
-			 * This feature is currently used to get broadcasts
-			 * sent to multiple interfaces, when the broadcast
-			 * address being used applies to multiple interfaces.
-			 * For example, a whole net broadcast will be
-			 * replicated on every connected subnet of
-			 * the target net.
-			 *
-			 * Each zone has its own set of IRE_BROADCASTs, so that
-			 * we're able to distribute inbound packets to multiple
-			 * zones who share a broadcast address. We avoid looping
-			 * back outbound packets in different zones but on the
-			 * same ill, as the application would see duplicates.
-			 *
-			 * This logic assumes that ire_add_v4() groups the
-			 * IRE_BROADCAST entries so that those with the same
-			 * ire_addr are kept together.
-			 */
-			ire_ill = ire->ire_ipif->ipif_ill;
-			if (ire->ire_stq != NULL || ire1->ire_stq == NULL) {
-				while (ire1 != NULL && ire1->ire_addr == dst) {
-					ire1_ill = ire1->ire_ipif->ipif_ill;
-					if (ire1_ill != ire_ill)
-						break;
-					ire1 = ire1->ire_next;
-				}
-			}
-		}
-		ASSERT(multirt_send == B_FALSE);
-		if (ire1 != NULL && ire1->ire_addr == dst) {
-			if ((ire->ire_flags & RTF_MULTIRT) &&
-			    (ire1->ire_flags & RTF_MULTIRT)) {
-				/*
-				 * We are in the multirouting case.
-				 * The message must be sent at least
-				 * on both ires. These ires have been
-				 * inserted AFTER the standard ones
-				 * in ip_rt_add(). There are thus no
-				 * other ire entries for the destination
-				 * address in the rest of the bucket
-				 * that do not have the RTF_MULTIRT
-				 * flag. We don't process a copy
-				 * of the message here. This will be
-				 * done in the final sending loop.
-				 */
-				multirt_send = B_TRUE;
-			} else {
-				next_mp = ip_copymsg(first_mp);
-				if (next_mp != NULL)
-					IRE_REFHOLD(ire1);
-			}
-		}
-		rw_exit(&ire->ire_bucket->irb_lock);
-	}
-
-	if (stq) {
-		/*
-		 * A non-NULL send-to queue means this packet is going
-		 * out of this machine.
-		 */
-		out_ill = (ill_t *)stq->q_ptr;
-
-		BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsHCOutRequests);
-		ttl_protocol = ((uint16_t *)ipha)[4];
-		/*
-		 * We accumulate the pseudo header checksum in cksum.
-		 * This is pretty hairy code, so watch close.  One
-		 * thing to keep in mind is that UDP and TCP have
-		 * stored their respective datagram lengths in their
-		 * checksum fields.  This lines things up real nice.
-		 */
-		cksum = (dst >> 16) + (dst & 0xFFFF) +
-		    (src >> 16) + (src & 0xFFFF);
-		/*
-		 * We assume the udp checksum field contains the
-		 * length, so to compute the pseudo header checksum,
-		 * all we need is the protocol number and src/dst.
-		 */
-		/* Provide the checksums for UDP and TCP. */
-		if ((PROTO == IPPROTO_TCP) &&
-		    (ip_hdr_included != IP_HDR_INCLUDED)) {
-			/* hlen gets the number of uchar_ts in the IP header */
-			hlen = (V_HLEN & 0xF) << 2;
-			up = IPH_TCPH_CHECKSUMP(ipha, hlen);
-			IP_STAT(ipst, ip_out_sw_cksum);
-			IP_STAT_UPDATE(ipst, ip_tcp_out_sw_cksum_bytes,
-			    LENGTH - hlen);
-			*up = IP_CSUM(mp, hlen, cksum + IP_TCP_CSUM_COMP);
-		} else if (PROTO == IPPROTO_SCTP &&
-		    (ip_hdr_included != IP_HDR_INCLUDED)) {
-			sctp_hdr_t	*sctph;
-
-			hlen = (V_HLEN & 0xF) << 2;
-			ASSERT(MBLKL(mp) >= (hlen + sizeof (*sctph)));
-			sctph = (sctp_hdr_t *)(mp->b_rptr + hlen);
-			sctph->sh_chksum = 0;
-#ifdef	DEBUG
-			if (!skip_sctp_cksum)
-#endif
-				sctph->sh_chksum = sctp_cksum(mp, hlen);
-		} else {
-			queue_t	*dev_q = stq->q_next;
-
-			if (!ILL_DIRECT_CAPABLE((ill_t *)stq->q_ptr) &&
-			    (DEV_Q_FLOW_BLOCKED(dev_q))) {
-blocked:
-				ipha->ipha_ident = ip_hdr_included;
-				/*
-				 * If we don't have a conn to apply
-				 * backpressure, free the message.
-				 * In the ire_send path, we don't know
-				 * the position to requeue the packet. Rather
-				 * than reorder packets, we just drop this
-				 * packet.
-				 */
-				if (ipst->ips_ip_output_queue &&
-				    connp != NULL &&
-				    caller != IRE_SEND) {
-					if (caller == IP_WSRV) {
-						idl_tx_list_t *idl_txl;
-
-						idl_txl =
-						    &ipst->ips_idl_tx_list[0];
-						connp->conn_did_putbq = 1;
-						(void) putbq(connp->conn_wq,
-						    first_mp);
-						conn_drain_insert(connp,
-						    idl_txl);
-						/*
-						 * This is the service thread,
-						 * and the queue is already
-						 * noenabled. The check for
-						 * canput and the putbq is not
-						 * atomic. So we need to check
-						 * again.
-						 */
-						if (canput(stq->q_next))
-							connp->conn_did_putbq
-							    = 0;
-						IP_STAT(ipst, ip_conn_flputbq);
-					} else {
-						/*
-						 * We are not the service proc.
-						 * ip_wsrv will be scheduled or
-						 * is already running.
-						 */
-
-						(void) putq(connp->conn_wq,
-						    first_mp);
-					}
-				} else {
-					out_ill = (ill_t *)stq->q_ptr;
-					BUMP_MIB(out_ill->ill_ip_mib,
-					    ipIfStatsOutDiscards);
-					freemsg(first_mp);
-					TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
-					    "ip_wput_ire_end: q %p (%S)",
-					    q, "discard");
-				}
-				ire_refrele(ire);
-				if (next_mp) {
-					ire_refrele(ire1);
-					freemsg(next_mp);
-				}
-				if (conn_outgoing_ill != NULL)
-					ill_refrele(conn_outgoing_ill);
-				return;
-			}
-			if ((PROTO == IPPROTO_UDP) &&
-			    (ip_hdr_included != IP_HDR_INCLUDED)) {
-				/*
-				 * hlen gets the number of uchar_ts in the
-				 * IP header
-				 */
-				hlen = (V_HLEN & 0xF) << 2;
-				up = IPH_UDPH_CHECKSUMP(ipha, hlen);
-				max_frag = ire->ire_max_frag;
-				if (*up != 0) {
-					IP_CKSUM_XMIT(out_ill, ire, mp, ipha,
-					    up, PROTO, hlen, LENGTH, max_frag,
-					    ipsec_len, cksum);
-					/* Software checksum? */
-					if (DB_CKSUMFLAGS(mp) == 0) {
-						IP_STAT(ipst, ip_out_sw_cksum);
-						IP_STAT_UPDATE(ipst,
-						    ip_udp_out_sw_cksum_bytes,
-						    LENGTH - hlen);
-					}
-				}
-			}
-		}
-		/*
-		 * Need to do this even when fragmenting. The local
-		 * loopback can be done without computing checksums
-		 * but forwarding out other interface must be done
-		 * after the IP checksum (and ULP checksums) have been
-		 * computed.
-		 *
-		 * NOTE : multicast_forward is set only if this packet
-		 * originated from ip_wput. For packets originating from
-		 * ip_wput_multicast, it is not set.
-		 */
-		if (CLASSD(ipha->ipha_dst) && multicast_forward) {
-multi_loopback:
-			ip2dbg(("ip_wput: multicast, loop %d\n",
-			    conn_multicast_loop));
-
-			/*  Forget header checksum offload */
-			DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
-
-			/*
-			 * Local loopback of multicasts?  Check the
-			 * ill.
-			 *
-			 * Note that the loopback function will not come
-			 * in through ip_rput - it will only do the
-			 * client fanout thus we need to do an mforward
-			 * as well.  The is different from the BSD
-			 * logic.
-			 */
-			if (ill != NULL) {
-				if (ilm_lookup_ill(ill, ipha->ipha_dst,
-				    ALL_ZONES) != NULL) {
-					/*
-					 * Pass along the virtual output q.
-					 * ip_wput_local() will distribute the
-					 * packet to all the matching zones,
-					 * except the sending zone when
-					 * IP_MULTICAST_LOOP is false.
-					 */
-					ip_multicast_loopback(q, ill, first_mp,
-					    conn_multicast_loop ? 0 :
-					    IP_FF_NO_MCAST_LOOP, zoneid);
-				}
-			}
-			if (ipha->ipha_ttl == 0) {
-				/*
-				 * 0 => only to this host i.e. we are
-				 * done. We are also done if this was the
-				 * loopback interface since it is sufficient
-				 * to loopback one copy of a multicast packet.
-				 */
-				freemsg(first_mp);
-				TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
-				    "ip_wput_ire_end: q %p (%S)",
-				    q, "loopback");
-				ire_refrele(ire);
-				if (conn_outgoing_ill != NULL)
-					ill_refrele(conn_outgoing_ill);
-				return;
-			}
-			/*
-			 * ILLF_MULTICAST is checked in ip_newroute
-			 * i.e. we don't need to check it here since
-			 * all IRE_CACHEs come from ip_newroute.
-			 * For multicast traffic, SO_DONTROUTE is interpreted
-			 * to mean only send the packet out the interface
-			 * (optionally specified with IP_MULTICAST_IF)
-			 * and do not forward it out additional interfaces.
-			 * RSVP and the rsvp daemon is an example of a
-			 * protocol and user level process that
-			 * handles it's own routing. Hence, it uses the
-			 * SO_DONTROUTE option to accomplish this.
-			 */
-
-			if (ipst->ips_ip_g_mrouter && !conn_dontroute &&
-			    ill != NULL) {
-				/* Unconditionally redo the checksum */
-				ipha->ipha_hdr_checksum = 0;
-				ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
-
-				/*
-				 * If this needs to go out secure, we need
-				 * to wait till we finish the IPsec
-				 * processing.
-				 */
-				if (ipsec_len == 0 &&
-				    ip_mforward(ill, ipha, mp)) {
-					freemsg(first_mp);
-					ip1dbg(("ip_wput: mforward failed\n"));
-					TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
-					    "ip_wput_ire_end: q %p (%S)",
-					    q, "mforward failed");
-					ire_refrele(ire);
-					if (conn_outgoing_ill != NULL)
-						ill_refrele(conn_outgoing_ill);
-					return;
-				}
-			}
-		}
-		max_frag = ire->ire_max_frag;
-		cksum += ttl_protocol;
-		if (max_frag >= (uint_t)(LENGTH + ipsec_len)) {
-			/* No fragmentation required for this one. */
-			/*
-			 * Don't use frag_flag if packet is pre-built or source
-			 * routed or if multicast (since multicast packets do
-			 * not solicit ICMP "packet too big" messages).
-			 */
-			if ((ip_hdr_included != IP_HDR_INCLUDED) &&
-			    (V_HLEN == IP_SIMPLE_HDR_VERSION ||
-			    !ip_source_route_included(ipha)) &&
-			    !CLASSD(ipha->ipha_dst))
-				ipha->ipha_fragment_offset_and_flags |=
-				    htons(ire->ire_frag_flag);
-
-			if (!(DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM)) {
-				/* Complete the IP header checksum. */
-				cksum += ipha->ipha_ident;
-				cksum += (v_hlen_tos_len >> 16)+
-				    (v_hlen_tos_len & 0xFFFF);
-				cksum += ipha->ipha_fragment_offset_and_flags;
-				hlen = (V_HLEN & 0xF) -
-				    IP_SIMPLE_HDR_LENGTH_IN_WORDS;
-				if (hlen) {
-checksumoptions:
-					/*
-					 * Account for the IP Options in the IP
-					 * header checksum.
-					 */
-					up = (uint16_t *)(rptr+
-					    IP_SIMPLE_HDR_LENGTH);
-					do {
-						cksum += up[0];
-						cksum += up[1];
-						up += 2;
-					} while (--hlen);
-				}
-				cksum = ((cksum & 0xFFFF) + (cksum >> 16));
-				cksum = ~(cksum + (cksum >> 16));
-				ipha->ipha_hdr_checksum = (uint16_t)cksum;
-			}
-			if (ipsec_len != 0) {
-				ipsec_out_process(q, first_mp, ire, ill_index);
-				if (!next_mp) {
-					ire_refrele(ire);
-					if (conn_outgoing_ill != NULL)
-						ill_refrele(conn_outgoing_ill);
-					return;
-				}
-				goto next;
-			}
-
-			/*
-			 * multirt_send has already been handled
-			 * for broadcast, but not yet for multicast
-			 * or IP options.
-			 */
-			if (next_mp == NULL) {
-				if (ire->ire_flags & RTF_MULTIRT) {
-					multirt_send = B_TRUE;
-				}
-			}
-
-			/*
-			 * In most cases, the emission loop below is
-			 * entered only once. Only in the case where
-			 * the ire holds the RTF_MULTIRT flag, do we loop
-			 * to process all RTF_MULTIRT ires in the bucket,
-			 * and send the packet through all crossed
-			 * RTF_MULTIRT routes.
-			 */
-			do {
-				if (multirt_send) {
-					irb_t *irb;
-
-					irb = ire->ire_bucket;
-					ASSERT(irb != NULL);
-					/*
-					 * We are in a multiple send case,
-					 * need to get the next IRE and make
-					 * a duplicate of the packet.
-					 */
-					IRB_REFHOLD(irb);
-					for (ire1 = ire->ire_next;
-					    ire1 != NULL;
-					    ire1 = ire1->ire_next) {
-						if (!(ire1->ire_flags &
-						    RTF_MULTIRT))
-							continue;
-
-						if (ire1->ire_addr !=
-						    ire->ire_addr)
-							continue;
-
-						if (ire1->ire_marks &
-						    (IRE_MARK_CONDEMNED |
-						    IRE_MARK_TESTHIDDEN))
-							continue;
-
-						/* Got one */
-						IRE_REFHOLD(ire1);
-						break;
-					}
-					IRB_REFRELE(irb);
-
-					if (ire1 != NULL) {
-						next_mp = copyb(mp);
-						if ((next_mp == NULL) ||
-						    ((mp->b_cont != NULL) &&
-						    ((next_mp->b_cont =
-						    dupmsg(mp->b_cont))
-						    == NULL))) {
-							freemsg(next_mp);
-							next_mp = NULL;
-							ire_refrele(ire1);
-							ire1 = NULL;
-						}
-					}
-
-					/*
-					 * Last multiroute ire; don't loop
-					 * anymore. The emission is over
-					 * and next_mp is NULL.
-					 */
-					if (ire1 == NULL) {
-						multirt_send = B_FALSE;
-					}
-				}
-
-				out_ill = ire_to_ill(ire);
-				DTRACE_PROBE4(ip4__physical__out__start,
-				    ill_t *, NULL,
-				    ill_t *, out_ill,
-				    ipha_t *, ipha, mblk_t *, mp);
-				FW_HOOKS(ipst->ips_ip4_physical_out_event,
-				    ipst->ips_ipv4firewall_physical_out,
-				    NULL, out_ill, ipha, mp, mp, 0, ipst);
-				DTRACE_PROBE1(ip4__physical__out__end,
-				    mblk_t *, mp);
-				if (mp == NULL)
-					goto release_ire_and_ill_2;
-
-				ASSERT(ipsec_len == 0);
-				mp->b_prev =
-				    SET_BPREV_FLAG(IPP_LOCAL_OUT);
-				DTRACE_PROBE2(ip__xmit__2,
-				    mblk_t *, mp, ire_t *, ire);
-				pktxmit_state = ip_xmit_v4(mp, ire,
-				    NULL, B_TRUE, connp);
-				if ((pktxmit_state == SEND_FAILED) ||
-				    (pktxmit_state == LLHDR_RESLV_FAILED)) {
-release_ire_and_ill_2:
-					if (next_mp) {
-						freemsg(next_mp);
-						ire_refrele(ire1);
-					}
-					ire_refrele(ire);
-					TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
-					    "ip_wput_ire_end: q %p (%S)",
-					    q, "discard MDATA");
-					if (conn_outgoing_ill != NULL)
-						ill_refrele(conn_outgoing_ill);
-					return;
-				}
-
-				if (CLASSD(dst)) {
-					BUMP_MIB(out_ill->ill_ip_mib,
-					    ipIfStatsHCOutMcastPkts);
-					UPDATE_MIB(out_ill->ill_ip_mib,
-					    ipIfStatsHCOutMcastOctets,
-					    LENGTH);
-				} else if (ire->ire_type == IRE_BROADCAST) {
-					BUMP_MIB(out_ill->ill_ip_mib,
-					    ipIfStatsHCOutBcastPkts);
-				}
-
-				if (multirt_send) {
-					/*
-					 * We are in a multiple send case,
-					 * need to re-enter the sending loop
-					 * using the next ire.
-					 */
-					ire_refrele(ire);
-					ire = ire1;
-					stq = ire->ire_stq;
-					mp = next_mp;
-					next_mp = NULL;
-					ipha = (ipha_t *)mp->b_rptr;
-					ill_index = Q_TO_INDEX(stq);
-				}
-			} while (multirt_send);
-
-			if (!next_mp) {
-				/*
-				 * Last copy going out (the ultra-common
-				 * case).  Note that we intentionally replicate
-				 * the putnext rather than calling it before
-				 * the next_mp check in hopes of a little
-				 * tail-call action out of the compiler.
-				 */
-				TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
-				    "ip_wput_ire_end: q %p (%S)",
-				    q, "last copy out(1)");
-				ire_refrele(ire);
-				if (conn_outgoing_ill != NULL)
-					ill_refrele(conn_outgoing_ill);
-				return;
-			}
-			/* More copies going out below. */
-		} else {
-			int offset;
-fragmentit:
-			offset = ntohs(ipha->ipha_fragment_offset_and_flags);
-			/*
-			 * If this would generate a icmp_frag_needed message,
-			 * we need to handle it before we do the IPsec
-			 * processing. Otherwise, we need to strip the IPsec
-			 * headers before we send up the message to the ULPs
-			 * which becomes messy and difficult.
-			 */
-			if (ipsec_len != 0) {
-				if ((max_frag < (unsigned int)(LENGTH +
-				    ipsec_len)) && (offset & IPH_DF)) {
-					out_ill = (ill_t *)stq->q_ptr;
-					BUMP_MIB(out_ill->ill_ip_mib,
-					    ipIfStatsOutFragFails);
-					BUMP_MIB(out_ill->ill_ip_mib,
-					    ipIfStatsOutFragReqds);
-					ipha->ipha_hdr_checksum = 0;
-					ipha->ipha_hdr_checksum =
-					    (uint16_t)ip_csum_hdr(ipha);
-					icmp_frag_needed(ire->ire_stq, first_mp,
-					    max_frag, zoneid, ipst);
-					if (!next_mp) {
-						ire_refrele(ire);
-						if (conn_outgoing_ill != NULL) {
-							ill_refrele(
-							    conn_outgoing_ill);
-						}
-						return;
-					}
-				} else {
-					/*
-					 * This won't cause a icmp_frag_needed
-					 * message. to be generated. Send it on
-					 * the wire. Note that this could still
-					 * cause fragmentation and all we
-					 * do is the generation of the message
-					 * to the ULP if needed before IPsec.
-					 */
-					if (!next_mp) {
-						ipsec_out_process(q, first_mp,
-						    ire, ill_index);
-						TRACE_2(TR_FAC_IP,
-						    TR_IP_WPUT_IRE_END,
-						    "ip_wput_ire_end: q %p "
-						    "(%S)", q,
-						    "last ipsec_out_process");
-						ire_refrele(ire);
-						if (conn_outgoing_ill != NULL) {
-							ill_refrele(
-							    conn_outgoing_ill);
-						}
-						return;
-					}
-					ipsec_out_process(q, first_mp,
-					    ire, ill_index);
-				}
-			} else {
-				/*
-				 * Initiate IPPF processing. For
-				 * fragmentable packets we finish
-				 * all QOS packet processing before
-				 * calling:
-				 * ip_wput_ire_fragmentit->ip_wput_frag
-				 */
-
-				if (IPP_ENABLED(IPP_LOCAL_OUT, ipst)) {
-					ip_process(IPP_LOCAL_OUT, &mp,
-					    ill_index);
-					if (mp == NULL) {
-						out_ill = (ill_t *)stq->q_ptr;
-						BUMP_MIB(out_ill->ill_ip_mib,
-						    ipIfStatsOutDiscards);
-						if (next_mp != NULL) {
-							freemsg(next_mp);
-							ire_refrele(ire1);
-						}
-						ire_refrele(ire);
-						TRACE_2(TR_FAC_IP,
-						    TR_IP_WPUT_IRE_END,
-						    "ip_wput_ire: q %p (%S)",
-						    q, "discard MDATA");
-						if (conn_outgoing_ill != NULL) {
-							ill_refrele(
-							    conn_outgoing_ill);
-						}
-						return;
-					}
-				}
-				if (!next_mp) {
-					TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
-					    "ip_wput_ire_end: q %p (%S)",
-					    q, "last fragmentation");
-					ip_wput_ire_fragmentit(mp, ire,
-					    zoneid, ipst, connp);
-					ire_refrele(ire);
-					if (conn_outgoing_ill != NULL)
-						ill_refrele(conn_outgoing_ill);
-					return;
-				}
-				ip_wput_ire_fragmentit(mp, ire,
-				    zoneid, ipst, connp);
-			}
-		}
-	} else {
-nullstq:
-		/* A NULL stq means the destination address is local. */
-		UPDATE_OB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-		ASSERT(ire->ire_ipif != NULL);
-		if (!next_mp) {
-			/*
-			 * Is there an "in" and "out" for traffic local
-			 * to a host (loopback)?  The code in Solaris doesn't
-			 * explicitly draw a line in its code for in vs out,
-			 * so we've had to draw a line in the sand: ip_wput_ire
-			 * is considered to be the "output" side and
-			 * ip_wput_local to be the "input" side.
-			 */
-			out_ill = ire_to_ill(ire);
-
-			/*
-			 * DTrace this as ip:::send.  A blocked packet will
-			 * fire the send probe, but not the receive probe.
-			 */
-			DTRACE_IP7(send, mblk_t *, first_mp, conn_t *, NULL,
-			    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, out_ill,
-			    ipha_t *, ipha, ip6_t *, NULL, int, 1);
-
-			DTRACE_PROBE4(ip4__loopback__out__start,
-			    ill_t *, NULL, ill_t *, out_ill,
-			    ipha_t *, ipha, mblk_t *, first_mp);
-
-			FW_HOOKS(ipst->ips_ip4_loopback_out_event,
-			    ipst->ips_ipv4firewall_loopback_out,
-			    NULL, out_ill, ipha, first_mp, mp, 0, ipst);
-
-			DTRACE_PROBE1(ip4__loopback__out_end,
-			    mblk_t *, first_mp);
-
-			TRACE_2(TR_FAC_IP, TR_IP_WPUT_IRE_END,
-			    "ip_wput_ire_end: q %p (%S)",
-			    q, "local address");
-
-			if (first_mp != NULL)
-				ip_wput_local(q, out_ill, ipha,
-				    first_mp, ire, 0, ire->ire_zoneid);
-			ire_refrele(ire);
-			if (conn_outgoing_ill != NULL)
-				ill_refrele(conn_outgoing_ill);
-			return;
-		}
-
-		out_ill = ire_to_ill(ire);
-
-		/*
-		 * DTrace this as ip:::send.  A blocked packet will fire the
-		 * send probe, but not the receive probe.
-		 */
-		DTRACE_IP7(send, mblk_t *, first_mp, conn_t *, NULL,
-		    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, out_ill,
-		    ipha_t *, ipha, ip6_t *, NULL, int, 1);
-
-		DTRACE_PROBE4(ip4__loopback__out__start,
-		    ill_t *, NULL, ill_t *, out_ill,
-		    ipha_t *, ipha, mblk_t *, first_mp);
-
-		FW_HOOKS(ipst->ips_ip4_loopback_out_event,
-		    ipst->ips_ipv4firewall_loopback_out,
-		    NULL, out_ill, ipha, first_mp, mp, 0, ipst);
-
-		DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, first_mp);
-
-		if (first_mp != NULL)
-			ip_wput_local(q, out_ill, ipha,
-			    first_mp, ire, 0, ire->ire_zoneid);
-	}
-next:
-	/*
-	 * More copies going out to additional interfaces.
-	 * ire1 has already been held. We don't need the
-	 * "ire" anymore.
-	 */
-	ire_refrele(ire);
-	ire = ire1;
-	ASSERT(ire != NULL && ire->ire_refcnt >= 1 && next_mp != NULL);
-	mp = next_mp;
-	ASSERT(ire->ire_ipversion == IPV4_VERSION);
-	ill = ire_to_ill(ire);
-	first_mp = mp;
-	if (ipsec_len != 0) {
-		ASSERT(first_mp->b_datap->db_type == M_CTL);
-		mp = mp->b_cont;
-	}
-	dst = ire->ire_addr;
-	ipha = (ipha_t *)mp->b_rptr;
-	/*
-	 * Restore src so that we will pick up ire->ire_src_addr if src was 0.
-	 * Restore ipha_ident "no checksum" flag.
-	 */
-	src = orig_src;
-	ipha->ipha_ident = ip_hdr_included;
-	goto another;
-
-#undef	rptr
-#undef	Q_TO_INDEX
-}
-
-/*
- * Routine to allocate a message that is used to notify the ULP about MDT.
- * The caller may provide a pointer to the link-layer MDT capabilities,
- * or NULL if MDT is to be disabled on the stream.
- */
-mblk_t *
-ip_mdinfo_alloc(ill_mdt_capab_t *isrc)
-{
-	mblk_t *mp;
-	ip_mdt_info_t *mdti;
-	ill_mdt_capab_t *idst;
-
-	if ((mp = allocb(sizeof (*mdti), BPRI_HI)) != NULL) {
-		DB_TYPE(mp) = M_CTL;
-		mp->b_wptr = mp->b_rptr + sizeof (*mdti);
-		mdti = (ip_mdt_info_t *)mp->b_rptr;
-		mdti->mdt_info_id = MDT_IOC_INFO_UPDATE;
-		idst = &(mdti->mdt_capab);
-
-		/*
-		 * If the caller provides us with the capability, copy
-		 * it over into our notification message; otherwise
-		 * we zero out the capability portion.
-		 */
-		if (isrc != NULL)
-			bcopy((caddr_t)isrc, (caddr_t)idst, sizeof (*idst));
-		else
-			bzero((caddr_t)idst, sizeof (*idst));
-	}
-	return (mp);
-}
-
-/*
- * Routine which determines whether MDT can be enabled on the destination
- * IRE and IPC combination, and if so, allocates and returns the MDT
- * notification mblk that may be used by ULP.  We also check if we need to
- * turn MDT back to 'on' when certain restrictions prohibiting us to allow
- * MDT usage in the past have been lifted.  This gets called during IP
- * and ULP binding.
- */
-mblk_t *
-ip_mdinfo_return(ire_t *dst_ire, conn_t *connp, char *ill_name,
-    ill_mdt_capab_t *mdt_cap)
-{
-	mblk_t *mp;
-	boolean_t rc = B_FALSE;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	ASSERT(dst_ire != NULL);
-	ASSERT(connp != NULL);
-	ASSERT(mdt_cap != NULL);
-
-	/*
-	 * Currently, we only support simple TCP/{IPv4,IPv6} with
-	 * Multidata, which is handled in tcp_multisend().  This
-	 * is the reason why we do all these checks here, to ensure
-	 * that we don't enable Multidata for the cases which we
-	 * can't handle at the moment.
-	 */
-	do {
-		/* Only do TCP at the moment */
-		if (connp->conn_ulp != IPPROTO_TCP)
-			break;
-
-		/*
-		 * IPsec outbound policy present?  Note that we get here
-		 * after calling ipsec_conn_cache_policy() where the global
-		 * policy checking is performed.  conn_latch will be
-		 * non-NULL as long as there's a policy defined,
-		 * i.e. conn_out_enforce_policy may be NULL in such case
-		 * when the connection is non-secure, and hence we check
-		 * further if the latch refers to an outbound policy.
-		 */
-		if (CONN_IPSEC_OUT_ENCAPSULATED(connp))
-			break;
-
-		/* CGTP (multiroute) is enabled? */
-		if (dst_ire->ire_flags & RTF_MULTIRT)
-			break;
-
-		/* Outbound IPQoS enabled? */
-		if (IPP_ENABLED(IPP_LOCAL_OUT, ipst)) {
-			/*
-			 * In this case, we disable MDT for this and all
-			 * future connections going over the interface.
-			 */
-			mdt_cap->ill_mdt_on = 0;
-			break;
-		}
-
-		/* socket option(s) present? */
-		if (!CONN_IS_LSO_MD_FASTPATH(connp))
-			break;
-
-		rc = B_TRUE;
-	/* CONSTCOND */
-	} while (0);
-
-	/* Remember the result */
-	connp->conn_mdt_ok = rc;
-
-	if (!rc)
-		return (NULL);
-	else if (!mdt_cap->ill_mdt_on) {
-		/*
-		 * If MDT has been previously turned off in the past, and we
-		 * currently can do MDT (due to IPQoS policy removal, etc.)
-		 * then enable it for this interface.
-		 */
-		mdt_cap->ill_mdt_on = 1;
-		ip1dbg(("ip_mdinfo_return: reenabling MDT for "
-		    "interface %s\n", ill_name));
-	}
-
-	/* Allocate the MDT info mblk */
-	if ((mp = ip_mdinfo_alloc(mdt_cap)) == NULL) {
-		ip0dbg(("ip_mdinfo_return: can't enable Multidata for "
-		    "conn %p on %s (ENOMEM)\n", (void *)connp, ill_name));
-		return (NULL);
-	}
-	return (mp);
-}
-
-/*
- * Routine to allocate a message that is used to notify the ULP about LSO.
- * The caller may provide a pointer to the link-layer LSO capabilities,
- * or NULL if LSO is to be disabled on the stream.
- */
-mblk_t *
-ip_lsoinfo_alloc(ill_lso_capab_t *isrc)
-{
-	mblk_t *mp;
-	ip_lso_info_t *lsoi;
-	ill_lso_capab_t *idst;
-
-	if ((mp = allocb(sizeof (*lsoi), BPRI_HI)) != NULL) {
-		DB_TYPE(mp) = M_CTL;
-		mp->b_wptr = mp->b_rptr + sizeof (*lsoi);
-		lsoi = (ip_lso_info_t *)mp->b_rptr;
-		lsoi->lso_info_id = LSO_IOC_INFO_UPDATE;
-		idst = &(lsoi->lso_capab);
-
-		/*
-		 * If the caller provides us with the capability, copy
-		 * it over into our notification message; otherwise
-		 * we zero out the capability portion.
-		 */
-		if (isrc != NULL)
-			bcopy((caddr_t)isrc, (caddr_t)idst, sizeof (*idst));
-		else
-			bzero((caddr_t)idst, sizeof (*idst));
-	}
-	return (mp);
-}
-
-/*
- * Routine which determines whether LSO can be enabled on the destination
- * IRE and IPC combination, and if so, allocates and returns the LSO
- * notification mblk that may be used by ULP.  We also check if we need to
- * turn LSO back to 'on' when certain restrictions prohibiting us to allow
- * LSO usage in the past have been lifted.  This gets called during IP
- * and ULP binding.
- */
-mblk_t *
-ip_lsoinfo_return(ire_t *dst_ire, conn_t *connp, char *ill_name,
-    ill_lso_capab_t *lso_cap)
-{
-	mblk_t *mp;
-	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
-
-	ASSERT(dst_ire != NULL);
-	ASSERT(connp != NULL);
-	ASSERT(lso_cap != NULL);
-
-	connp->conn_lso_ok = B_TRUE;
-
-	if ((connp->conn_ulp != IPPROTO_TCP) ||
-	    CONN_IPSEC_OUT_ENCAPSULATED(connp) ||
-	    (dst_ire->ire_flags & RTF_MULTIRT) ||
-	    !CONN_IS_LSO_MD_FASTPATH(connp) ||
-	    (IPP_ENABLED(IPP_LOCAL_OUT, ipst))) {
-		connp->conn_lso_ok = B_FALSE;
-		if (IPP_ENABLED(IPP_LOCAL_OUT, ipst)) {
-			/*
-			 * Disable LSO for this and all future connections going
-			 * over the interface.
-			 */
-			lso_cap->ill_lso_on = 0;
-		}
-	}
-
-	if (!connp->conn_lso_ok)
-		return (NULL);
-	else if (!lso_cap->ill_lso_on) {
-		/*
-		 * If LSO has been previously turned off in the past, and we
-		 * currently can do LSO (due to IPQoS policy removal, etc.)
-		 * then enable it for this interface.
-		 */
-		lso_cap->ill_lso_on = 1;
-		ip1dbg(("ip_mdinfo_return: reenabling LSO for interface %s\n",
-		    ill_name));
-	}
-
-	/* Allocate the LSO info mblk */
-	if ((mp = ip_lsoinfo_alloc(lso_cap)) == NULL)
-		ip0dbg(("ip_lsoinfo_return: can't enable LSO for "
-		    "conn %p on %s (ENOMEM)\n", (void *)connp, ill_name));
-
-	return (mp);
-}
-
-/*
- * Create destination address attribute, and fill it with the physical
- * destination address and SAP taken from the template DL_UNITDATA_REQ
- * message block.
- */
-boolean_t
-ip_md_addr_attr(multidata_t *mmd, pdesc_t *pd, const mblk_t *dlmp)
-{
-	dl_unitdata_req_t *dlurp;
-	pattr_t *pa;
-	pattrinfo_t pa_info;
-	pattr_addr_t **das = (pattr_addr_t **)&pa_info.buf;
-	uint_t das_len, das_off;
-
-	ASSERT(dlmp != NULL);
-
-	dlurp = (dl_unitdata_req_t *)dlmp->b_rptr;
-	das_len = dlurp->dl_dest_addr_length;
-	das_off = dlurp->dl_dest_addr_offset;
-
-	pa_info.type = PATTR_DSTADDRSAP;
-	pa_info.len = sizeof (**das) + das_len - 1;
-
-	/* create and associate the attribute */
-	pa = mmd_addpattr(mmd, pd, &pa_info, B_TRUE, KM_NOSLEEP);
-	if (pa != NULL) {
-		ASSERT(*das != NULL);
-		(*das)->addr_is_group = 0;
-		(*das)->addr_len = (uint8_t)das_len;
-		bcopy((caddr_t)dlurp + das_off, (*das)->addr, das_len);
-	}
-
-	return (pa != NULL);
-}
-
-/*
- * Create hardware checksum attribute and fill it with the values passed.
- */
-boolean_t
-ip_md_hcksum_attr(multidata_t *mmd, pdesc_t *pd, uint32_t start_offset,
-    uint32_t stuff_offset, uint32_t end_offset, uint32_t flags)
-{
-	pattr_t *pa;
-	pattrinfo_t pa_info;
-
-	ASSERT(mmd != NULL);
-
-	pa_info.type = PATTR_HCKSUM;
-	pa_info.len = sizeof (pattr_hcksum_t);
-
-	/* create and associate the attribute */
-	pa = mmd_addpattr(mmd, pd, &pa_info, B_TRUE, KM_NOSLEEP);
-	if (pa != NULL) {
-		pattr_hcksum_t *hck = (pattr_hcksum_t *)pa_info.buf;
-
-		hck->hcksum_start_offset = start_offset;
-		hck->hcksum_stuff_offset = stuff_offset;
-		hck->hcksum_end_offset = end_offset;
-		hck->hcksum_flags = flags;
-	}
-	return (pa != NULL);
-}
-
-/*
- * Create zerocopy attribute and fill it with the specified flags
- */
-boolean_t
-ip_md_zcopy_attr(multidata_t *mmd, pdesc_t *pd, uint_t flags)
-{
-	pattr_t *pa;
-	pattrinfo_t pa_info;
-
-	ASSERT(mmd != NULL);
-	pa_info.type = PATTR_ZCOPY;
-	pa_info.len = sizeof (pattr_zcopy_t);
-
-	/* create and associate the attribute */
-	pa = mmd_addpattr(mmd, pd, &pa_info, B_TRUE, KM_NOSLEEP);
-	if (pa != NULL) {
-		pattr_zcopy_t *zcopy = (pattr_zcopy_t *)pa_info.buf;
-
-		zcopy->zcopy_flags = flags;
-	}
-	return (pa != NULL);
-}
-
-/*
- * Check if ip_wput_frag_mdt() and ip_wput_frag_mdt_v6() can handle a message
- * block chain. We could rewrite to handle arbitrary message block chains but
- * that would make the code complicated and slow. Right now there three
- * restrictions:
- *
- *   1. The first message block must contain the complete IP header and
- *	at least 1 byte of payload data.
- *   2. At most MULTIDATA_MAX_PBUFS non-empty message blocks are allowed
- *	so that we can use a single Multidata message.
- *   3. No frag must be distributed over two or more message blocks so
- *	that we don't need more than two packet descriptors per frag.
- *
- * The above restrictions allow us to support userland applications (which
- * will send down a single message block) and NFS over UDP (which will
- * send down a chain of at most three message blocks).
- *
- * We also don't use MDT for payloads with less than or equal to
- * ip_wput_frag_mdt_min bytes because it would cause too much overhead.
- */
-boolean_t
-ip_can_frag_mdt(mblk_t *mp, ssize_t hdr_len, ssize_t len)
-{
-	int	blocks;
-	ssize_t	total, missing, size;
-
-	ASSERT(mp != NULL);
-	ASSERT(hdr_len > 0);
-
-	size = MBLKL(mp) - hdr_len;
-	if (size <= 0)
-		return (B_FALSE);
-
-	/* The first mblk contains the header and some payload. */
-	blocks = 1;
-	total = size;
-	size %= len;
-	missing = (size == 0) ? 0 : (len - size);
-	mp = mp->b_cont;
-
-	while (mp != NULL) {
-		/*
-		 * Give up if we encounter a zero length message block.
-		 * In practice, this should rarely happen and therefore
-		 * not worth the trouble of freeing and re-linking the
-		 * mblk from the chain to handle such case.
-		 */
-		if ((size = MBLKL(mp)) == 0)
-			return (B_FALSE);
-
-		/* Too many payload buffers for a single Multidata message? */
-		if (++blocks > MULTIDATA_MAX_PBUFS)
-			return (B_FALSE);
-
-		total += size;
-		/* Is a frag distributed over two or more message blocks? */
-		if (missing > size)
-			return (B_FALSE);
-		size -= missing;
-
-		size %= len;
-		missing = (size == 0) ? 0 : (len - size);
-
-		mp = mp->b_cont;
-	}
-
-	return (total > ip_wput_frag_mdt_min);
-}
-
-/*
- * Outbound IPv4 fragmentation routine using MDT.
- */
-static void
-ip_wput_frag_mdt(ire_t *ire, mblk_t *mp, ip_pkt_t pkt_type, int len,
-    uint32_t frag_flag, int offset)
-{
-	ipha_t		*ipha_orig;
-	int		i1, ip_data_end;
-	uint_t		pkts, wroff, hdr_chunk_len, pbuf_idx;
-	mblk_t		*hdr_mp, *md_mp = NULL;
-	unsigned char	*hdr_ptr, *pld_ptr;
-	multidata_t	*mmd;
-	ip_pdescinfo_t	pdi;
-	ill_t		*ill;
-	ip_stack_t	*ipst = ire->ire_ipst;
-
-	ASSERT(DB_TYPE(mp) == M_DATA);
-	ASSERT(MBLKL(mp) > sizeof (ipha_t));
-
-	ill = ire_to_ill(ire);
-	ASSERT(ill != NULL);
-
-	ipha_orig = (ipha_t *)mp->b_rptr;
-	mp->b_rptr += sizeof (ipha_t);
-
-	/* Calculate how many packets we will send out */
-	i1 = (mp->b_cont == NULL) ? MBLKL(mp) : msgsize(mp);
-	pkts = (i1 + len - 1) / len;
-	ASSERT(pkts > 1);
-
-	/* Allocate a message block which will hold all the IP Headers. */
-	wroff = ipst->ips_ip_wroff_extra;
-	hdr_chunk_len = wroff + IP_SIMPLE_HDR_LENGTH;
-
-	i1 = pkts * hdr_chunk_len;
-	/*
-	 * Create the header buffer, Multidata and destination address
-	 * and SAP attribute that should be associated with it.
-	 */
-	if ((hdr_mp = allocb(i1, BPRI_HI)) == NULL ||
-	    ((hdr_mp->b_wptr += i1),
-	    (mmd = mmd_alloc(hdr_mp, &md_mp, KM_NOSLEEP)) == NULL) ||
-	    !ip_md_addr_attr(mmd, NULL, ire->ire_nce->nce_res_mp)) {
-		freemsg(mp);
-		if (md_mp == NULL) {
-			freemsg(hdr_mp);
-		} else {
-free_mmd:		IP_STAT(ipst, ip_frag_mdt_discarded);
-			freemsg(md_mp);
-		}
-		IP_STAT(ipst, ip_frag_mdt_allocfail);
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
-		return;
-	}
-	IP_STAT(ipst, ip_frag_mdt_allocd);
-
-	/*
-	 * Add a payload buffer to the Multidata; this operation must not
-	 * fail, or otherwise our logic in this routine is broken.  There
-	 * is no memory allocation done by the routine, so any returned
-	 * failure simply tells us that we've done something wrong.
-	 *
-	 * A failure tells us that either we're adding the same payload
-	 * buffer more than once, or we're trying to add more buffers than
-	 * allowed.  None of the above cases should happen, and we panic
-	 * because either there's horrible heap corruption, and/or
-	 * programming mistake.
-	 */
-	if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0)
-		goto pbuf_panic;
-
-	hdr_ptr = hdr_mp->b_rptr;
-	pld_ptr = mp->b_rptr;
-
-	/* Establish the ending byte offset, based on the starting offset. */
-	offset <<= 3;
-	ip_data_end = offset + ntohs(ipha_orig->ipha_length) -
-	    IP_SIMPLE_HDR_LENGTH;
-
-	pdi.flags = PDESC_HBUF_REF | PDESC_PBUF_REF;
-
-	while (pld_ptr < mp->b_wptr) {
-		ipha_t		*ipha;
-		uint16_t	offset_and_flags;
-		uint16_t	ip_len;
-		int		error;
-
-		ASSERT((hdr_ptr + hdr_chunk_len) <= hdr_mp->b_wptr);
-		ipha = (ipha_t *)(hdr_ptr + wroff);
-		ASSERT(OK_32PTR(ipha));
-		*ipha = *ipha_orig;
-
-		if (ip_data_end - offset > len) {
-			offset_and_flags = IPH_MF;
-		} else {
-			/*
-			 * Last frag. Set len to the length of this last piece.
-			 */
-			len = ip_data_end - offset;
-			/* A frag of a frag might have IPH_MF non-zero */
-			offset_and_flags =
-			    ntohs(ipha->ipha_fragment_offset_and_flags) &
-			    IPH_MF;
-		}
-		offset_and_flags |= (uint16_t)(offset >> 3);
-		offset_and_flags |= (uint16_t)frag_flag;
-		/* Store the offset and flags in the IP header. */
-		ipha->ipha_fragment_offset_and_flags = htons(offset_and_flags);
-
-		/* Store the length in the IP header. */
-		ip_len = (uint16_t)(len + IP_SIMPLE_HDR_LENGTH);
-		ipha->ipha_length = htons(ip_len);
-
-		/*
-		 * Set the IP header checksum.  Note that mp is just
-		 * the header, so this is easy to pass to ip_csum.
-		 */
-		ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
-
-		DTRACE_IP7(send, mblk_t *, md_mp, conn_t *, NULL, void_ip_t *,
-		    ipha, __dtrace_ipsr_ill_t *, ill, ipha_t *, ipha, ip6_t *,
-		    NULL, int, 0);
-
-		/*
-		 * Record offset and size of header and data of the next packet
-		 * in the multidata message.
-		 */
-		PDESC_HDR_ADD(&pdi, hdr_ptr, wroff, IP_SIMPLE_HDR_LENGTH, 0);
-		PDESC_PLD_INIT(&pdi);
-		i1 = MIN(mp->b_wptr - pld_ptr, len);
-		ASSERT(i1 > 0);
-		PDESC_PLD_SPAN_ADD(&pdi, pbuf_idx, pld_ptr, i1);
-		if (i1 == len) {
-			pld_ptr += len;
-		} else {
-			i1 = len - i1;
-			mp = mp->b_cont;
-			ASSERT(mp != NULL);
-			ASSERT(MBLKL(mp) >= i1);
-			/*
-			 * Attach the next payload message block to the
-			 * multidata message.
-			 */
-			if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0)
-				goto pbuf_panic;
-			PDESC_PLD_SPAN_ADD(&pdi, pbuf_idx, mp->b_rptr, i1);
-			pld_ptr = mp->b_rptr + i1;
-		}
-
-		if ((mmd_addpdesc(mmd, (pdescinfo_t *)&pdi, &error,
-		    KM_NOSLEEP)) == NULL) {
-			/*
-			 * Any failure other than ENOMEM indicates that we
-			 * have passed in invalid pdesc info or parameters
-			 * to mmd_addpdesc, which must not happen.
-			 *
-			 * EINVAL is a result of failure on boundary checks
-			 * against the pdesc info contents.  It should not
-			 * happen, and we panic because either there's
-			 * horrible heap corruption, and/or programming
-			 * mistake.
-			 */
-			if (error != ENOMEM) {
-				cmn_err(CE_PANIC, "ip_wput_frag_mdt: "
-				    "pdesc logic error detected for "
-				    "mmd %p pinfo %p (%d)\n",
-				    (void *)mmd, (void *)&pdi, error);
-				/* NOTREACHED */
-			}
-			IP_STAT(ipst, ip_frag_mdt_addpdescfail);
-			/* Free unattached payload message blocks as well */
-			md_mp->b_cont = mp->b_cont;
-			goto free_mmd;
-		}
-
-		/* Advance fragment offset. */
-		offset += len;
-
-		/* Advance to location for next header in the buffer. */
-		hdr_ptr += hdr_chunk_len;
-
-		/* Did we reach the next payload message block? */
-		if (pld_ptr == mp->b_wptr && mp->b_cont != NULL) {
-			mp = mp->b_cont;
-			/*
-			 * Attach the next message block with payload
-			 * data to the multidata message.
-			 */
-			if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0)
-				goto pbuf_panic;
-			pld_ptr = mp->b_rptr;
-		}
-	}
-
-	ASSERT(hdr_mp->b_wptr == hdr_ptr);
-	ASSERT(mp->b_wptr == pld_ptr);
-
-	/* Update IP statistics */
-	IP_STAT_UPDATE(ipst, ip_frag_mdt_pkt_out, pkts);
-
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsOutFragCreates, pkts);
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragOKs);
-
-	len = ntohs(ipha_orig->ipha_length) + (pkts - 1) * IP_SIMPLE_HDR_LENGTH;
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits, pkts);
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets, len);
-
-	if (pkt_type == OB_PKT) {
-		ire->ire_ob_pkt_count += pkts;
-		if (ire->ire_ipif != NULL)
-			atomic_add_32(&ire->ire_ipif->ipif_ob_pkt_count, pkts);
-	} else {
-		/* The type is IB_PKT in the forwarding path. */
-		ire->ire_ib_pkt_count += pkts;
-		ASSERT(!IRE_IS_LOCAL(ire));
-		if (ire->ire_type & IRE_BROADCAST) {
-			atomic_add_32(&ire->ire_ipif->ipif_ib_pkt_count, pkts);
-		} else {
-			UPDATE_MIB(ill->ill_ip_mib,
-			    ipIfStatsHCOutForwDatagrams, pkts);
-			atomic_add_32(&ire->ire_ipif->ipif_fo_pkt_count, pkts);
-		}
-	}
-	ire->ire_last_used_time = lbolt;
-	/* Send it down */
-	putnext(ire->ire_stq, md_mp);
-	return;
-
-pbuf_panic:
-	cmn_err(CE_PANIC, "ip_wput_frag_mdt: payload buffer logic "
-	    "error for mmd %p pbuf %p (%d)", (void *)mmd, (void *)mp,
-	    pbuf_idx);
-	/* NOTREACHED */
-}
-
 /*
  * Outbound IP fragmentation routine.
- *
- * NOTE : This routine does not ire_refrele the ire that is passed in
- * as the argument.
+ * Assumes the caller has checked whether or not fragmentation should
+ * be allowed. Here we copy the DF bit from the header to all the generated
+ * fragments.
  */
-static void
-ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
-    uint32_t frag_flag, zoneid_t zoneid, ip_stack_t *ipst, conn_t *connp)
+int
+ip_fragment_v4(mblk_t *mp_orig, nce_t *nce, iaflags_t ixaflags,
+    uint_t pkt_len, uint32_t max_frag, uint32_t xmit_hint, zoneid_t szone,
+    zoneid_t nolzid, pfirepostfrag_t postfragfn, uintptr_t *ixa_cookie)
 {
 	int		i1;
-	mblk_t		*ll_hdr_mp;
-	int 		ll_hdr_len;
 	int		hdr_len;
 	mblk_t		*hdr_mp;
 	ipha_t		*ipha;
 	int		ip_data_end;
 	int		len;
-	mblk_t		*mp = mp_orig, *mp1;
+	mblk_t		*mp = mp_orig;
 	int		offset;
-	queue_t		*q;
-	uint32_t	v_hlen_tos_len;
-	mblk_t		*first_mp;
-	boolean_t	mctl_present;
-	ill_t		*ill;
-	ill_t		*out_ill;
-	mblk_t		*xmit_mp;
+	ill_t		*ill = nce->nce_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 	mblk_t		*carve_mp;
-	ire_t		*ire1 = NULL;
-	ire_t		*save_ire = NULL;
-	mblk_t  	*next_mp = NULL;
-	boolean_t	last_frag = B_FALSE;
-	boolean_t	multirt_send = B_FALSE;
-	ire_t		*first_ire = NULL;
-	irb_t		*irb = NULL;
-	mib2_ipIfStatsEntry_t *mibptr = NULL;
+	uint32_t	frag_flag;
+	uint_t		priority = mp->b_band;
+	int		error = 0;
 
-	ill = ire_to_ill(ire);
-	mibptr = (ill != NULL) ? ill->ill_ip_mib : &ipst->ips_ip_mib;
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragReqds);
 
-	BUMP_MIB(mibptr, ipIfStatsOutFragReqds);
+	if (pkt_len != msgdsize(mp)) {
+		ip0dbg(("Packet length mismatch: %d, %ld\n",
+		    pkt_len, msgdsize(mp)));
+		freemsg(mp);
+		return (EINVAL);
+	}
 
 	if (max_frag == 0) {
-		ip1dbg(("ip_wput_frag: ire frag size is 0"
-		    " -  dropping packet\n"));
-		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
+		ip1dbg(("ip_fragment_v4: max_frag is zero. Dropping packet\n"));
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+		ip_drop_output("FragFails: zero max_frag", mp, ill);
 		freemsg(mp);
-		return;
-	}
-
-	/*
-	 * IPsec does not allow hw accelerated packets to be fragmented
-	 * This check is made in ip_wput_ipsec_out prior to coming here
-	 * via ip_wput_ire_fragmentit.
-	 *
-	 * If at this point we have an ire whose ARP request has not
-	 * been sent out, we call ip_xmit_v4->ire_arpresolve to trigger
-	 * sending of ARP query and change ire's state to ND_INCOMPLETE.
-	 * This packet and all fragmentable packets for this ire will
-	 * continue to get dropped while ire_nce->nce_state remains in
-	 * ND_INCOMPLETE. Post-ARP resolution, after ire's nce_state changes to
-	 * ND_REACHABLE, all subsquent large packets for this ire will
-	 * get fragemented and sent out by this function.
-	 */
-	if (ire->ire_nce && ire->ire_nce->nce_state != ND_REACHABLE) {
-		/* If nce_state is ND_INITIAL, trigger ARP query */
-		(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE, NULL);
-		ip1dbg(("ip_wput_frag: mac address for ire is unresolved"
-		    " -  dropping packet\n"));
-		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
-		freemsg(mp);
-		return;
-	}
-
-	TRACE_0(TR_FAC_IP, TR_IP_WPUT_FRAG_START,
-	    "ip_wput_frag_start:");
-
-	if (mp->b_datap->db_type == M_CTL) {
-		first_mp = mp;
-		mp_orig = mp = mp->b_cont;
-		mctl_present = B_TRUE;
-	} else {
-		first_mp = mp;
-		mctl_present = B_FALSE;
+		return (EINVAL);
 	}
 
 	ASSERT(MBLKL(mp) >= sizeof (ipha_t));
 	ipha = (ipha_t *)mp->b_rptr;
+	ASSERT(ntohs(ipha->ipha_length) == pkt_len);
+	frag_flag = ntohs(ipha->ipha_fragment_offset_and_flags) & IPH_DF;
 
-	/*
-	 * If the Don't Fragment flag is on, generate an ICMP destination
-	 * unreachable, fragmentation needed.
-	 */
-	offset = ntohs(ipha->ipha_fragment_offset_and_flags);
-	if (offset & IPH_DF) {
-		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
-		if (is_system_labeled()) {
-			max_frag = tsol_pmtu_adjust(mp, ire->ire_max_frag,
-			    ire->ire_max_frag - max_frag, AF_INET);
-		}
-		/*
-		 * Need to compute hdr checksum if called from ip_wput_ire.
-		 * Note that ip_rput_forward verifies the checksum before
-		 * calling this routine so in that case this is a noop.
-		 */
-		ipha->ipha_hdr_checksum = 0;
-		ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
-		icmp_frag_needed(ire->ire_stq, first_mp, max_frag, zoneid,
-		    ipst);
-		TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
-		    "ip_wput_frag_end:(%S)",
-		    "don't fragment");
-		return;
-	}
-	/*
-	 * Labeled systems adjust max_frag if they add a label
-	 * to send the correct path mtu.  We need the real mtu since we
-	 * are fragmenting the packet after label adjustment.
-	 */
-	if (is_system_labeled())
-		max_frag = ire->ire_max_frag;
-	if (mctl_present)
-		freeb(first_mp);
 	/*
 	 * Establish the starting offset.  May not be zero if we are fragging
 	 * a fragment that is being forwarded.
 	 */
-	offset = offset & IPH_OFFSET;
+	offset = ntohs(ipha->ipha_fragment_offset_and_flags) & IPH_OFFSET;
 
 	/* TODO why is this test needed? */
-	v_hlen_tos_len = ((uint32_t *)ipha)[0];
-	if (((max_frag - LENGTH) & ~7) < 8) {
+	if (((max_frag - ntohs(ipha->ipha_length)) & ~7) < 8) {
 		/* TODO: notify ulp somehow */
-		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+		ip_drop_output("FragFails: bad starting offset", mp, ill);
 		freemsg(mp);
-		TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
-		    "ip_wput_frag_end:(%S)",
-		    "len < 8");
-		return;
+		return (EINVAL);
 	}
 
-	hdr_len = (V_HLEN & 0xF) << 2;
-
+	hdr_len = IPH_HDR_LENGTH(ipha);
 	ipha->ipha_hdr_checksum = 0;
 
 	/*
@@ -24173,40 +11742,14 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	 */
 	len = (max_frag - hdr_len) & ~7;
 
-	/* Check if we can use MDT to send out the frags. */
-	ASSERT(!IRE_IS_LOCAL(ire));
-	if (hdr_len == IP_SIMPLE_HDR_LENGTH &&
-	    ipst->ips_ip_multidata_outbound &&
-	    !(ire->ire_flags & RTF_MULTIRT) &&
-	    !IPP_ENABLED(IPP_LOCAL_OUT, ipst) &&
-	    ill != NULL && ILL_MDT_CAPABLE(ill) &&
-	    IP_CAN_FRAG_MDT(mp, IP_SIMPLE_HDR_LENGTH, len)) {
-		ASSERT(ill->ill_mdt_capab != NULL);
-		if (!ill->ill_mdt_capab->ill_mdt_on) {
-			/*
-			 * If MDT has been previously turned off in the past,
-			 * and we currently can do MDT (due to IPQoS policy
-			 * removal, etc.) then enable it for this interface.
-			 */
-			ill->ill_mdt_capab->ill_mdt_on = 1;
-			ip1dbg(("ip_wput_frag: enabled MDT for interface %s\n",
-			    ill->ill_name));
-		}
-		ip_wput_frag_mdt(ire, mp, pkt_type, len, frag_flag,
-		    offset);
-		return;
-	}
-
 	/* Get a copy of the header for the trailing frags */
-	hdr_mp = ip_wput_frag_copyhdr((uchar_t *)ipha, hdr_len, offset, ipst,
+	hdr_mp = ip_fragment_copyhdr((uchar_t *)ipha, hdr_len, offset, ipst,
 	    mp);
-	if (!hdr_mp) {
-		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
+	if (hdr_mp == NULL) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+		ip_drop_output("FragFails: no hdr_mp", mp, ill);
 		freemsg(mp);
-		TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
-		    "ip_wput_frag_end:(%S)",
-		    "couldn't copy hdr");
-		return;
+		return (ENOBUFS);
 	}
 
 	/* Store the starting offset, with the MoreFrags flag. */
@@ -24233,279 +11776,28 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	 * original IP header.
 	 */
 	if (!(mp = ip_carve_mp(&mp_orig, i1))) {
-		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+		ip_drop_output("FragFails: could not carve mp", mp_orig, ill);
 		freeb(hdr_mp);
 		freemsg(mp_orig);
-		TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
-		    "ip_wput_frag_end:(%S)",
-		    "couldn't carve first");
-		return;
+		return (ENOBUFS);
 	}
 
-	/*
-	 * Multirouting case. Each fragment is replicated
-	 * via all non-condemned RTF_MULTIRT routes
-	 * currently resolved.
-	 * We ensure that first_ire is the first RTF_MULTIRT
-	 * ire in the bucket.
-	 */
-	if (ire->ire_flags & RTF_MULTIRT) {
-		irb = ire->ire_bucket;
-		ASSERT(irb != NULL);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragCreates);
 
-		multirt_send = B_TRUE;
-
-		/* Make sure we do not omit any multiroute ire. */
-		IRB_REFHOLD(irb);
-		for (first_ire = irb->irb_ire;
-		    first_ire != NULL;
-		    first_ire = first_ire->ire_next) {
-			if ((first_ire->ire_flags & RTF_MULTIRT) &&
-			    (first_ire->ire_addr == ire->ire_addr) &&
-			    !(first_ire->ire_marks &
-			    (IRE_MARK_CONDEMNED | IRE_MARK_TESTHIDDEN)))
-				break;
-		}
-
-		if (first_ire != NULL) {
-			if (first_ire != ire) {
-				IRE_REFHOLD(first_ire);
-				/*
-				 * Do not release the ire passed in
-				 * as the argument.
-				 */
-				ire = first_ire;
-			} else {
-				first_ire = NULL;
-			}
-		}
-		IRB_REFRELE(irb);
-
-		/*
-		 * Save the first ire; we will need to restore it
-		 * for the trailing frags.
-		 * We REFHOLD save_ire, as each iterated ire will be
-		 * REFRELEd.
-		 */
-		save_ire = ire;
-		IRE_REFHOLD(save_ire);
+	error = postfragfn(mp, nce, ixaflags, i1, xmit_hint, szone, nolzid,
+	    ixa_cookie);
+	if (error != 0 && error != EWOULDBLOCK) {
+		/* No point in sending the other fragments */
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+		ip_drop_output("FragFails: postfragfn failed", mp_orig, ill);
+		freeb(hdr_mp);
+		freemsg(mp_orig);
+		return (error);
 	}
 
-	/*
-	 * First fragment emission loop.
-	 * In most cases, the emission loop below is entered only
-	 * once. Only in the case where the ire holds the RTF_MULTIRT
-	 * flag, do we loop to process all RTF_MULTIRT ires in the
-	 * bucket, and send the fragment through all crossed
-	 * RTF_MULTIRT routes.
-	 */
-	do {
-		if (ire->ire_flags & RTF_MULTIRT) {
-			/*
-			 * We are in a multiple send case, need to get
-			 * the next ire and make a copy of the packet.
-			 * ire1 holds here the next ire to process in the
-			 * bucket. If multirouting is expected,
-			 * any non-RTF_MULTIRT ire that has the
-			 * right destination address is ignored.
-			 *
-			 * We have to take into account the MTU of
-			 * each walked ire. max_frag is set by the
-			 * the caller and generally refers to
-			 * the primary ire entry. Here we ensure that
-			 * no route with a lower MTU will be used, as
-			 * fragments are carved once for all ires,
-			 * then replicated.
-			 */
-			ASSERT(irb != NULL);
-			IRB_REFHOLD(irb);
-			for (ire1 = ire->ire_next;
-			    ire1 != NULL;
-			    ire1 = ire1->ire_next) {
-				if ((ire1->ire_flags & RTF_MULTIRT) == 0)
-					continue;
-				if (ire1->ire_addr != ire->ire_addr)
-					continue;
-				if (ire1->ire_marks &
-				    (IRE_MARK_CONDEMNED | IRE_MARK_TESTHIDDEN))
-					continue;
-				/*
-				 * Ensure we do not exceed the MTU
-				 * of the next route.
-				 */
-				if (ire1->ire_max_frag < max_frag) {
-					ip_multirt_bad_mtu(ire1, max_frag);
-					continue;
-				}
-
-				/* Got one. */
-				IRE_REFHOLD(ire1);
-				break;
-			}
-			IRB_REFRELE(irb);
-
-			if (ire1 != NULL) {
-				next_mp = copyb(mp);
-				if ((next_mp == NULL) ||
-				    ((mp->b_cont != NULL) &&
-				    ((next_mp->b_cont =
-				    dupmsg(mp->b_cont)) == NULL))) {
-					freemsg(next_mp);
-					next_mp = NULL;
-					ire_refrele(ire1);
-					ire1 = NULL;
-				}
-			}
-
-			/* Last multiroute ire; don't loop anymore. */
-			if (ire1 == NULL) {
-				multirt_send = B_FALSE;
-			}
-		}
-
-		ll_hdr_len = 0;
-		LOCK_IRE_FP_MP(ire);
-		ll_hdr_mp = ire->ire_nce->nce_fp_mp;
-		if (ll_hdr_mp != NULL) {
-			ASSERT(ll_hdr_mp->b_datap->db_type == M_DATA);
-			ll_hdr_len = ll_hdr_mp->b_wptr - ll_hdr_mp->b_rptr;
-		} else {
-			ll_hdr_mp = ire->ire_nce->nce_res_mp;
-		}
-
-		/* If there is a transmit header, get a copy for this frag. */
-		/*
-		 * TODO: should check db_ref before calling ip_carve_mp since
-		 * it might give us a dup.
-		 */
-		if (!ll_hdr_mp) {
-			/* No xmit header. */
-			xmit_mp = mp;
-
-		/* We have a link-layer header that can fit in our mblk. */
-		} else if (mp->b_datap->db_ref == 1 &&
-		    ll_hdr_len != 0 &&
-		    ll_hdr_len <= mp->b_rptr - mp->b_datap->db_base) {
-			/* M_DATA fastpath */
-			mp->b_rptr -= ll_hdr_len;
-			bcopy(ll_hdr_mp->b_rptr, mp->b_rptr, ll_hdr_len);
-			xmit_mp = mp;
-
-		/* Corner case if copyb has failed */
-		} else if (!(xmit_mp = copyb(ll_hdr_mp))) {
-			UNLOCK_IRE_FP_MP(ire);
-			BUMP_MIB(mibptr, ipIfStatsOutFragFails);
-			freeb(hdr_mp);
-			freemsg(mp);
-			freemsg(mp_orig);
-			TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
-			    "ip_wput_frag_end:(%S)",
-			    "discard");
-
-			if (multirt_send) {
-				ASSERT(ire1);
-				ASSERT(next_mp);
-
-				freemsg(next_mp);
-				ire_refrele(ire1);
-			}
-			if (save_ire != NULL)
-				IRE_REFRELE(save_ire);
-
-			if (first_ire != NULL)
-				ire_refrele(first_ire);
-			return;
-
-		/*
-		 * Case of res_mp OR the fastpath mp can't fit
-		 * in the mblk
-		 */
-		} else {
-			xmit_mp->b_cont = mp;
-
-			/*
-			 * Get priority marking, if any.
-			 * We propagate the CoS marking from the
-			 * original packet that went to QoS processing
-			 * in ip_wput_ire to the newly carved mp.
-			 */
-			if (DB_TYPE(xmit_mp) == M_DATA)
-				xmit_mp->b_band = mp->b_band;
-		}
-		UNLOCK_IRE_FP_MP(ire);
-
-		q = ire->ire_stq;
-		out_ill = (ill_t *)q->q_ptr;
-
-		BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsOutFragCreates);
-
-		DTRACE_PROBE4(ip4__physical__out__start,
-		    ill_t *, NULL, ill_t *, out_ill,
-		    ipha_t *, ipha, mblk_t *, xmit_mp);
-
-		FW_HOOKS(ipst->ips_ip4_physical_out_event,
-		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, out_ill, ipha, xmit_mp, mp, 0, ipst);
-
-		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, xmit_mp);
-
-		if (xmit_mp != NULL) {
-			DTRACE_IP7(send, mblk_t *, xmit_mp, conn_t *, NULL,
-			    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, out_ill,
-			    ipha_t *, ipha, ip6_t *, NULL, int, 0);
-
-			ILL_SEND_TX(out_ill, ire, connp, xmit_mp, 0, connp);
-
-			BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsHCOutTransmits);
-			UPDATE_MIB(out_ill->ill_ip_mib,
-			    ipIfStatsHCOutOctets, i1);
-
-			if (pkt_type != OB_PKT) {
-				/*
-				 * Update the packet count and MIB stats
-				 * of trailing RTF_MULTIRT ires.
-				 */
-				UPDATE_OB_PKT_COUNT(ire);
-				BUMP_MIB(out_ill->ill_ip_mib,
-				    ipIfStatsOutFragReqds);
-			}
-		}
-
-		if (multirt_send) {
-			/*
-			 * We are in a multiple send case; look for
-			 * the next ire and re-enter the loop.
-			 */
-			ASSERT(ire1);
-			ASSERT(next_mp);
-			/* REFRELE the current ire before looping */
-			ire_refrele(ire);
-			ire = ire1;
-			ire1 = NULL;
-			mp = next_mp;
-			next_mp = NULL;
-		}
-	} while (multirt_send);
-
-	ASSERT(ire1 == NULL);
-
-	/* Restore the original ire; we need it for the trailing frags */
-	if (save_ire != NULL) {
-		/* REFRELE the last iterated ire */
-		ire_refrele(ire);
-		/* save_ire has been REFHOLDed */
-		ire = save_ire;
-		save_ire = NULL;
-		q = ire->ire_stq;
-	}
-
-	if (pkt_type == OB_PKT) {
-		UPDATE_OB_PKT_COUNT(ire);
-	} else {
-		out_ill = (ill_t *)q->q_ptr;
-		BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsHCOutForwDatagrams);
-		UPDATE_IB_PKT_COUNT(ire);
-	}
+	/* No need to redo state machine in loop */
+	ixaflags &= ~IXAF_REACH_CONF;
 
 	/* Advance the offset to the second frag starting point. */
 	offset += len;
@@ -24547,7 +11839,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 					break;
 				}
 				/* Get priority marking, if any. */
-				mp->b_band = carve_mp->b_band;
+				mp->b_band = priority;
 				mp->b_cont = carve_mp;
 			}
 			ipha = (ipha_t *)mp->b_rptr;
@@ -24581,7 +11873,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 			} else {
 				mp = hdr_mp;
 				/* Get priority marking, if any. */
-				mp->b_band = carve_mp->b_band;
+				mp->b_band = priority;
 				mp->b_cont = carve_mp;
 			}
 			ipha = (ipha_t *)mp->b_rptr;
@@ -24605,254 +11897,40 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		 */
 		ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
 
-		/* Attach a transmit header, if any, and ship it. */
-		if (pkt_type == OB_PKT) {
-			UPDATE_OB_PKT_COUNT(ire);
-		} else {
-			out_ill = (ill_t *)q->q_ptr;
-			BUMP_MIB(out_ill->ill_ip_mib,
-			    ipIfStatsHCOutForwDatagrams);
-			UPDATE_IB_PKT_COUNT(ire);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragCreates);
+
+		error = postfragfn(mp, nce, ixaflags, ip_len, xmit_hint, szone,
+		    nolzid, ixa_cookie);
+		/* All done if we just consumed the hdr_mp. */
+		if (mp == hdr_mp) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragOKs);
+			return (error);
+		}
+		if (error != 0 && error != EWOULDBLOCK) {
+			DTRACE_PROBE2(ip__xmit__frag__fail, ill_t *, ill,
+			    mblk_t *, hdr_mp);
+			/* No point in sending the other fragments */
+			break;
 		}
 
-		if (ire->ire_flags & RTF_MULTIRT) {
-			irb = ire->ire_bucket;
-			ASSERT(irb != NULL);
-
-			multirt_send = B_TRUE;
-
-			/*
-			 * Save the original ire; we will need to restore it
-			 * for the tailing frags.
-			 */
-			save_ire = ire;
-			IRE_REFHOLD(save_ire);
-		}
-		/*
-		 * Emission loop for this fragment, similar
-		 * to what is done for the first fragment.
-		 */
-		do {
-			if (multirt_send) {
-				/*
-				 * We are in a multiple send case, need to get
-				 * the next ire and make a copy of the packet.
-				 */
-				ASSERT(irb != NULL);
-				IRB_REFHOLD(irb);
-				for (ire1 = ire->ire_next;
-				    ire1 != NULL;
-				    ire1 = ire1->ire_next) {
-					if (!(ire1->ire_flags & RTF_MULTIRT))
-						continue;
-					if (ire1->ire_addr != ire->ire_addr)
-						continue;
-					if (ire1->ire_marks &
-					    (IRE_MARK_CONDEMNED |
-					    IRE_MARK_TESTHIDDEN))
-						continue;
-					/*
-					 * Ensure we do not exceed the MTU
-					 * of the next route.
-					 */
-					if (ire1->ire_max_frag < max_frag) {
-						ip_multirt_bad_mtu(ire1,
-						    max_frag);
-						continue;
-					}
-
-					/* Got one. */
-					IRE_REFHOLD(ire1);
-					break;
-				}
-				IRB_REFRELE(irb);
-
-				if (ire1 != NULL) {
-					next_mp = copyb(mp);
-					if ((next_mp == NULL) ||
-					    ((mp->b_cont != NULL) &&
-					    ((next_mp->b_cont =
-					    dupmsg(mp->b_cont)) == NULL))) {
-						freemsg(next_mp);
-						next_mp = NULL;
-						ire_refrele(ire1);
-						ire1 = NULL;
-					}
-				}
-
-				/* Last multiroute ire; don't loop anymore. */
-				if (ire1 == NULL) {
-					multirt_send = B_FALSE;
-				}
-			}
-
-			/* Update transmit header */
-			ll_hdr_len = 0;
-			LOCK_IRE_FP_MP(ire);
-			ll_hdr_mp = ire->ire_nce->nce_fp_mp;
-			if (ll_hdr_mp != NULL) {
-				ASSERT(ll_hdr_mp->b_datap->db_type == M_DATA);
-				ll_hdr_len = MBLKL(ll_hdr_mp);
-			} else {
-				ll_hdr_mp = ire->ire_nce->nce_res_mp;
-			}
-
-			if (!ll_hdr_mp) {
-				xmit_mp = mp;
-
-			/*
-			 * We have link-layer header that can fit in
-			 * our mblk.
-			 */
-			} else if (mp->b_datap->db_ref == 1 &&
-			    ll_hdr_len != 0 &&
-			    ll_hdr_len <= mp->b_rptr - mp->b_datap->db_base) {
-				/* M_DATA fastpath */
-				mp->b_rptr -= ll_hdr_len;
-				bcopy(ll_hdr_mp->b_rptr, mp->b_rptr,
-				    ll_hdr_len);
-				xmit_mp = mp;
-
-			/*
-			 * Case of res_mp OR the fastpath mp can't fit
-			 * in the mblk
-			 */
-			} else if ((xmit_mp = copyb(ll_hdr_mp)) != NULL) {
-				xmit_mp->b_cont = mp;
-				/* Get priority marking, if any. */
-				if (DB_TYPE(xmit_mp) == M_DATA)
-					xmit_mp->b_band = mp->b_band;
-
-			/* Corner case if copyb failed */
-			} else {
-				/*
-				 * Exit both the replication and
-				 * fragmentation loops.
-				 */
-				UNLOCK_IRE_FP_MP(ire);
-				goto drop_pkt;
-			}
-			UNLOCK_IRE_FP_MP(ire);
-
-			mp1 = mp;
-			out_ill = (ill_t *)q->q_ptr;
-
-			BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsOutFragCreates);
-
-			DTRACE_PROBE4(ip4__physical__out__start,
-			    ill_t *, NULL, ill_t *, out_ill,
-			    ipha_t *, ipha, mblk_t *, xmit_mp);
-
-			FW_HOOKS(ipst->ips_ip4_physical_out_event,
-			    ipst->ips_ipv4firewall_physical_out,
-			    NULL, out_ill, ipha, xmit_mp, mp, 0, ipst);
-
-			DTRACE_PROBE1(ip4__physical__out__end,
-			    mblk_t *, xmit_mp);
-
-			if (mp != mp1 && hdr_mp == mp1)
-				hdr_mp = mp;
-			if (mp != mp1 && mp_orig == mp1)
-				mp_orig = mp;
-
-			if (xmit_mp != NULL) {
-				DTRACE_IP7(send, mblk_t *, xmit_mp, conn_t *,
-				    NULL, void_ip_t *, ipha,
-				    __dtrace_ipsr_ill_t *, out_ill, ipha_t *,
-				    ipha, ip6_t *, NULL, int, 0);
-
-				ILL_SEND_TX(out_ill, ire, connp,
-				    xmit_mp, 0, connp);
-
-				BUMP_MIB(out_ill->ill_ip_mib,
-				    ipIfStatsHCOutTransmits);
-				UPDATE_MIB(out_ill->ill_ip_mib,
-				    ipIfStatsHCOutOctets, ip_len);
-
-				if (pkt_type != OB_PKT) {
-					/*
-					 * Update the packet count of trailing
-					 * RTF_MULTIRT ires.
-					 */
-					UPDATE_OB_PKT_COUNT(ire);
-				}
-			}
-
-			/* All done if we just consumed the hdr_mp. */
-			if (mp == hdr_mp) {
-				last_frag = B_TRUE;
-				BUMP_MIB(out_ill->ill_ip_mib,
-				    ipIfStatsOutFragOKs);
-			}
-
-			if (multirt_send) {
-				/*
-				 * We are in a multiple send case; look for
-				 * the next ire and re-enter the loop.
-				 */
-				ASSERT(ire1);
-				ASSERT(next_mp);
-				/* REFRELE the current ire before looping */
-				ire_refrele(ire);
-				ire = ire1;
-				ire1 = NULL;
-				q = ire->ire_stq;
-				mp = next_mp;
-				next_mp = NULL;
-			}
-		} while (multirt_send);
-		/*
-		 * Restore the original ire; we need it for the
-		 * trailing frags
-		 */
-		if (save_ire != NULL) {
-			ASSERT(ire1 == NULL);
-			/* REFRELE the last iterated ire */
-			ire_refrele(ire);
-			/* save_ire has been REFHOLDed */
-			ire = save_ire;
-			q = ire->ire_stq;
-			save_ire = NULL;
-		}
-
-		if (last_frag) {
-			TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
-			    "ip_wput_frag_end:(%S)",
-			    "consumed hdr_mp");
-
-			if (first_ire != NULL)
-				ire_refrele(first_ire);
-			return;
-		}
 		/* Otherwise, advance and loop. */
 		offset += len;
 	}
-
-drop_pkt:
 	/* Clean up following allocation failure. */
-	BUMP_MIB(mibptr, ipIfStatsOutFragFails);
-	freemsg(mp);
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+	ip_drop_output("FragFails: loop ended", NULL, ill);
 	if (mp != hdr_mp)
 		freeb(hdr_mp);
 	if (mp != mp_orig)
 		freemsg(mp_orig);
-
-	if (save_ire != NULL)
-		IRE_REFRELE(save_ire);
-	if (first_ire != NULL)
-		ire_refrele(first_ire);
-
-	TRACE_1(TR_FAC_IP, TR_IP_WPUT_FRAG_END,
-	    "ip_wput_frag_end:(%S)",
-	    "end--alloc failure");
+	return (error);
 }
 
 /*
  * Copy the header plus those options which have the copy bit set
- * src is the template to make sure we preserve the cred for TX purposes.
  */
 static mblk_t *
-ip_wput_frag_copyhdr(uchar_t *rptr, int hdr_len, int offset, ip_stack_t *ipst,
+ip_fragment_copyhdr(uchar_t *rptr, int hdr_len, int offset, ip_stack_t *ipst,
     mblk_t *src)
 {
 	mblk_t	*mp;
@@ -24908,310 +11986,13 @@ ip_wput_frag_copyhdr(uchar_t *rptr, int hdr_len, int offset, ip_stack_t *ipst,
 }
 
 /*
- * Delivery to local recipients including fanout to multiple recipients.
- * Does not do checksumming of UDP/TCP.
- * Note: q should be the read side queue for either the ill or conn.
- * Note: rq should be the read side q for the lower (ill) stream.
- * We don't send packets to IPPF processing, thus the last argument
- * to all the fanout calls are B_FALSE.
+ * Update any source route, record route, or timestamp options when
+ * sending a packet back to ourselves.
+ * Check that we are at end of strict source route.
+ * The options have been sanity checked by ip_output_options().
  */
 void
-ip_wput_local(queue_t *q, ill_t *ill, ipha_t *ipha, mblk_t *mp, ire_t *ire,
-    int fanout_flags, zoneid_t zoneid)
-{
-	uint32_t	protocol;
-	mblk_t		*first_mp;
-	boolean_t	mctl_present;
-	int		ire_type;
-#define	rptr	((uchar_t *)ipha)
-	ip_stack_t	*ipst = ill->ill_ipst;
-
-	TRACE_1(TR_FAC_IP, TR_IP_WPUT_LOCAL_START,
-	    "ip_wput_local_start: q %p", q);
-
-	if (ire != NULL) {
-		ire_type = ire->ire_type;
-	} else {
-		/*
-		 * Only ip_multicast_loopback() calls us with a NULL ire. If the
-		 * packet is not multicast, we can't tell the ire type.
-		 */
-		ASSERT(CLASSD(ipha->ipha_dst));
-		ire_type = IRE_BROADCAST;
-	}
-
-	first_mp = mp;
-	if (first_mp->b_datap->db_type == M_CTL) {
-		ipsec_out_t *io = (ipsec_out_t *)first_mp->b_rptr;
-		if (!io->ipsec_out_secure) {
-			/*
-			 * This ipsec_out_t was allocated in ip_wput
-			 * for multicast packets to store the ill_index.
-			 * As this is being delivered locally, we don't
-			 * need this anymore.
-			 */
-			mp = first_mp->b_cont;
-			freeb(first_mp);
-			first_mp = mp;
-			mctl_present = B_FALSE;
-		} else {
-			/*
-			 * Convert IPSEC_OUT to IPSEC_IN, preserving all
-			 * security properties for the looped-back packet.
-			 */
-			mctl_present = B_TRUE;
-			mp = first_mp->b_cont;
-			ASSERT(mp != NULL);
-			ipsec_out_to_in(first_mp);
-		}
-	} else {
-		mctl_present = B_FALSE;
-	}
-
-	DTRACE_PROBE4(ip4__loopback__in__start,
-	    ill_t *, ill, ill_t *, NULL,
-	    ipha_t *, ipha, mblk_t *, first_mp);
-
-	FW_HOOKS(ipst->ips_ip4_loopback_in_event,
-	    ipst->ips_ipv4firewall_loopback_in,
-	    ill, NULL, ipha, first_mp, mp, 0, ipst);
-
-	DTRACE_PROBE1(ip4__loopback__in__end, mblk_t *, first_mp);
-
-	if (first_mp == NULL)
-		return;
-
-	if (ipst->ips_ip4_observe.he_interested) {
-		zoneid_t szone, dzone, lookup_zoneid = ALL_ZONES;
-		zoneid_t stackzoneid = netstackid_to_zoneid(
-		    ipst->ips_netstack->netstack_stackid);
-
-		dzone = (stackzoneid == GLOBAL_ZONEID) ? zoneid : stackzoneid;
-		/*
-		 * 127.0.0.1 is special, as we cannot lookup its zoneid by
-		 * address.  Restrict the lookup below to the destination zone.
-		 */
-		if (ipha->ipha_src == ntohl(INADDR_LOOPBACK))
-			lookup_zoneid = zoneid;
-		szone = ip_get_zoneid_v4(ipha->ipha_src, mp, ipst,
-		    lookup_zoneid);
-		ipobs_hook(mp, IPOBS_HOOK_LOCAL, szone, dzone, ill, ipst);
-	}
-
-	DTRACE_IP7(receive, mblk_t *, first_mp, conn_t *, NULL, void_ip_t *,
-	    ipha, __dtrace_ipsr_ill_t *, ill, ipha_t *, ipha, ip6_t *, NULL,
-	    int, 1);
-
-	ipst->ips_loopback_packets++;
-
-	ip2dbg(("ip_wput_local: from 0x%x to 0x%x in zone %d\n",
-	    ntohl(ipha->ipha_src), ntohl(ipha->ipha_dst), zoneid));
-	if (!IS_SIMPLE_IPH(ipha)) {
-		ip_wput_local_options(ipha, ipst);
-	}
-
-	protocol = ipha->ipha_protocol;
-	switch (protocol) {
-	case IPPROTO_ICMP: {
-		ire_t		*ire_zone;
-		ilm_t		*ilm;
-		mblk_t		*mp1;
-		zoneid_t	last_zoneid;
-		ilm_walker_t	ilw;
-
-		if (CLASSD(ipha->ipha_dst) && !IS_LOOPBACK(ill)) {
-			ASSERT(ire_type == IRE_BROADCAST);
-			/*
-			 * In the multicast case, applications may have joined
-			 * the group from different zones, so we need to deliver
-			 * the packet to each of them. Loop through the
-			 * multicast memberships structures (ilm) on the receive
-			 * ill and send a copy of the packet up each matching
-			 * one. However, we don't do this for multicasts sent on
-			 * the loopback interface (PHYI_LOOPBACK flag set) as
-			 * they must stay in the sender's zone.
-			 *
-			 * ilm_add_v6() ensures that ilms in the same zone are
-			 * contiguous in the ill_ilm list. We use this property
-			 * to avoid sending duplicates needed when two
-			 * applications in the same zone join the same group on
-			 * different logical interfaces: we ignore the ilm if
-			 * it's zoneid is the same as the last matching one.
-			 * In addition, the sending of the packet for
-			 * ire_zoneid is delayed until all of the other ilms
-			 * have been exhausted.
-			 */
-			last_zoneid = -1;
-			ilm = ilm_walker_start(&ilw, ill);
-			for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
-				if (ipha->ipha_dst != ilm->ilm_addr ||
-				    ilm->ilm_zoneid == last_zoneid ||
-				    ilm->ilm_zoneid == zoneid ||
-				    !(ilm->ilm_ipif->ipif_flags & IPIF_UP))
-					continue;
-				mp1 = ip_copymsg(first_mp);
-				if (mp1 == NULL)
-					continue;
-				icmp_inbound(q, mp1, B_TRUE, ilw.ilw_walk_ill,
-				    0, 0, mctl_present, B_FALSE, ill,
-				    ilm->ilm_zoneid);
-				last_zoneid = ilm->ilm_zoneid;
-			}
-			ilm_walker_finish(&ilw);
-			/*
-			 * Loopback case: the sending endpoint has
-			 * IP_MULTICAST_LOOP disabled, therefore we don't
-			 * dispatch the multicast packet to the sending zone.
-			 */
-			if (fanout_flags & IP_FF_NO_MCAST_LOOP) {
-				freemsg(first_mp);
-				return;
-			}
-		} else if (ire_type == IRE_BROADCAST) {
-			/*
-			 * In the broadcast case, there may be many zones
-			 * which need a copy of the packet delivered to them.
-			 * There is one IRE_BROADCAST per broadcast address
-			 * and per zone; we walk those using a helper function.
-			 * In addition, the sending of the packet for zoneid is
-			 * delayed until all of the other ires have been
-			 * processed.
-			 */
-			IRB_REFHOLD(ire->ire_bucket);
-			ire_zone = NULL;
-			while ((ire_zone = ire_get_next_bcast_ire(ire_zone,
-			    ire)) != NULL) {
-				mp1 = ip_copymsg(first_mp);
-				if (mp1 == NULL)
-					continue;
-
-				UPDATE_IB_PKT_COUNT(ire_zone);
-				ire_zone->ire_last_used_time = lbolt;
-				icmp_inbound(q, mp1, B_TRUE, ill, 0, 0,
-				    mctl_present, B_FALSE, ill,
-				    ire_zone->ire_zoneid);
-			}
-			IRB_REFRELE(ire->ire_bucket);
-		}
-		icmp_inbound(q, first_mp, (ire_type == IRE_BROADCAST), ill, 0,
-		    0, mctl_present, B_FALSE, ill, zoneid);
-		TRACE_2(TR_FAC_IP, TR_IP_WPUT_LOCAL_END,
-		    "ip_wput_local_end: q %p (%S)",
-		    q, "icmp");
-		return;
-	}
-	case IPPROTO_IGMP:
-		if ((mp = igmp_input(q, mp, ill)) == NULL) {
-			/* Bad packet - discarded by igmp_input */
-			TRACE_2(TR_FAC_IP, TR_IP_WPUT_LOCAL_END,
-			    "ip_wput_local_end: q %p (%S)",
-			    q, "igmp_input--bad packet");
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		}
-		/*
-		 * igmp_input() may have returned the pulled up message.
-		 * So first_mp and ipha need to be reinitialized.
-		 */
-		ipha = (ipha_t *)mp->b_rptr;
-		if (mctl_present)
-			first_mp->b_cont = mp;
-		else
-			first_mp = mp;
-		/* deliver to local raw users */
-		break;
-	case IPPROTO_ENCAP:
-		/*
-		 * This case is covered by either ip_fanout_proto, or by
-		 * the above security processing for self-tunneled packets.
-		 */
-		break;
-	case IPPROTO_UDP: {
-		uint16_t	*up;
-		uint32_t	ports;
-
-		up = (uint16_t *)(rptr + IPH_HDR_LENGTH(ipha) +
-		    UDP_PORTS_OFFSET);
-		/* Force a 'valid' checksum. */
-		up[3] = 0;
-
-		ports = *(uint32_t *)up;
-		ip_fanout_udp(q, first_mp, ill, ipha, ports,
-		    (ire_type == IRE_BROADCAST),
-		    fanout_flags | IP_FF_SEND_ICMP | IP_FF_HDR_COMPLETE |
-		    IP_FF_SEND_SLLA | IP_FF_IPINFO, mctl_present, B_FALSE,
-		    ill, zoneid);
-		TRACE_2(TR_FAC_IP, TR_IP_WPUT_LOCAL_END,
-		    "ip_wput_local_end: q %p (%S)", q, "ip_fanout_udp");
-		return;
-	}
-	case IPPROTO_TCP: {
-
-		/*
-		 * For TCP, discard broadcast packets.
-		 */
-		if ((ushort_t)ire_type == IRE_BROADCAST) {
-			freemsg(first_mp);
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			ip2dbg(("ip_wput_local: discard broadcast\n"));
-			return;
-		}
-
-		if (mp->b_datap->db_type == M_DATA) {
-			/*
-			 * M_DATA mblk, so init mblk (chain) for no struio().
-			 */
-			mblk_t	*mp1 = mp;
-
-			do {
-				mp1->b_datap->db_struioflag = 0;
-			} while ((mp1 = mp1->b_cont) != NULL);
-		}
-		ASSERT((rptr + IPH_HDR_LENGTH(ipha) + TCP_PORTS_OFFSET + 4)
-		    <= mp->b_wptr);
-		ip_fanout_tcp(q, first_mp, ill, ipha,
-		    fanout_flags | IP_FF_SEND_ICMP | IP_FF_HDR_COMPLETE |
-		    IP_FF_SYN_ADDIRE | IP_FF_IPINFO,
-		    mctl_present, B_FALSE, zoneid);
-		TRACE_2(TR_FAC_IP, TR_IP_WPUT_LOCAL_END,
-		    "ip_wput_local_end: q %p (%S)", q, "ip_fanout_tcp");
-		return;
-	}
-	case IPPROTO_SCTP:
-	{
-		uint32_t	ports;
-
-		bcopy(rptr + IPH_HDR_LENGTH(ipha), &ports, sizeof (ports));
-		ip_fanout_sctp(first_mp, ill, ipha, ports,
-		    fanout_flags | IP_FF_SEND_ICMP | IP_FF_HDR_COMPLETE |
-		    IP_FF_IPINFO, mctl_present, B_FALSE, zoneid);
-		return;
-	}
-
-	default:
-		break;
-	}
-	/*
-	 * Find a client for some other protocol.  We give
-	 * copies to multiple clients, if more than one is
-	 * bound.
-	 */
-	ip_fanout_proto(q, first_mp, ill, ipha,
-	    fanout_flags | IP_FF_SEND_ICMP | IP_FF_HDR_COMPLETE | IP_FF_RAWIP,
-	    mctl_present, B_FALSE, ill, zoneid);
-	TRACE_2(TR_FAC_IP, TR_IP_WPUT_LOCAL_END,
-	    "ip_wput_local_end: q %p (%S)", q, "ip_fanout_proto");
-#undef	rptr
-}
-
-/*
- * Update any source route, record route, or timestamp options.
- * Check that we are at end of strict source route.
- * The options have been sanity checked by ip_wput_options().
- */
-static void
-ip_wput_local_options(ipha_t *ipha, ip_stack_t *ipst)
+ip_output_local_options(ipha_t *ipha, ip_stack_t *ipst)
 {
 	ipoptp_t	opts;
 	uchar_t		*opt;
@@ -25219,10 +12000,8 @@ ip_wput_local_options(ipha_t *ipha, ip_stack_t *ipst)
 	uint8_t		optlen;
 	ipaddr_t	dst;
 	uint32_t	ts;
-	ire_t		*ire;
 	timestruc_t	now;
 
-	ip2dbg(("ip_wput_local_options\n"));
 	for (optval = ipoptp_first(&opts, ipha);
 	    optval != IPOPT_EOL;
 	    optval = ipoptp_next(&opts)) {
@@ -25246,7 +12025,7 @@ ip_wput_local_options(ipha_t *ipha, ip_stack_t *ipst)
 			 * it is a packet with a loose source route which
 			 * reaches us before consuming the whole source route
 			 */
-			ip1dbg(("ip_wput_local_options: not end of SR\n"));
+
 			if (optval == IPOPT_SSRR) {
 				return;
 			}
@@ -25267,7 +12046,7 @@ ip_wput_local_options(ipha_t *ipha, ip_stack_t *ipst)
 			    off > optlen - IP_ADDR_LEN) {
 				/* No more room - ignore */
 				ip1dbg((
-				    "ip_wput_forward_options: end of RR\n"));
+				    "ip_output_local_options: end of RR\n"));
 				break;
 			}
 			dst = htonl(INADDR_LOOPBACK);
@@ -25285,14 +12064,10 @@ ip_wput_local_options(ipha_t *ipha, ip_stack_t *ipst)
 				/* Verify that the address matched */
 				off = opt[IPOPT_OFFSET] - 1;
 				bcopy((char *)opt + off, &dst, IP_ADDR_LEN);
-				ire = ire_ctable_lookup(dst, 0, IRE_LOCAL,
-				    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE,
-				    ipst);
-				if (ire == NULL) {
+				if (ip_type_v4(dst, ipst) != IRE_LOCAL) {
 					/* Not for us */
 					break;
 				}
-				ire_refrele(ire);
 				/* FALLTHRU */
 			case IPOPT_TS_TSANDADDR:
 				off = IP_ADDR_LEN + IPOPT_TS_TIMELEN;
@@ -25302,8 +12077,8 @@ ip_wput_local_options(ipha_t *ipha, ip_stack_t *ipst)
 				 * ip_*put_options should have already
 				 * dropped this packet.
 				 */
-				cmn_err(CE_PANIC, "ip_wput_local_options: "
-				    "unknown IT - bug in ip_wput_options?\n");
+				cmn_err(CE_PANIC, "ip_output_local_options: "
+				    "unknown IT - bug in ip_output_options?\n");
 				return;	/* Keep "lint" happy */
 			}
 			if (opt[IPOPT_OFFSET] - 1 + off > optlen) {
@@ -25339,1098 +12114,240 @@ ip_wput_local_options(ipha_t *ipha, ip_stack_t *ipst)
 }
 
 /*
- * Send out a multicast packet on interface ipif.
- * The sender does not have an conn.
- * Caller verifies that this isn't a PHYI_LOOPBACK.
- */
-void
-ip_wput_multicast(queue_t *q, mblk_t *mp, ipif_t *ipif, zoneid_t zoneid)
-{
-	ipha_t	*ipha;
-	ire_t	*ire;
-	ipaddr_t	dst;
-	mblk_t		*first_mp;
-	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
-
-	/* igmp_sendpkt always allocates a ipsec_out_t */
-	ASSERT(mp->b_datap->db_type == M_CTL);
-	ASSERT(!ipif->ipif_isv6);
-	ASSERT(!IS_LOOPBACK(ipif->ipif_ill));
-
-	first_mp = mp;
-	mp = first_mp->b_cont;
-	ASSERT(mp->b_datap->db_type == M_DATA);
-	ipha = (ipha_t *)mp->b_rptr;
-
-	/*
-	 * Find an IRE which matches the destination and the outgoing
-	 * queue (i.e. the outgoing interface.)
-	 */
-	if (ipif->ipif_flags & IPIF_POINTOPOINT)
-		dst = ipif->ipif_pp_dst_addr;
-	else
-		dst = ipha->ipha_dst;
-	/*
-	 * The source address has already been initialized by the
-	 * caller and hence matching on ILL (MATCH_IRE_ILL) would
-	 * be sufficient rather than MATCH_IRE_IPIF.
-	 *
-	 * This function is used for sending IGMP packets.  For IPMP,
-	 * we sidestep IGMP snooping issues by sending all multicast
-	 * traffic on a single interface in the IPMP group.
-	 */
-	ire = ire_ctable_lookup(dst, 0, 0, ipif, zoneid, NULL,
-	    MATCH_IRE_ILL, ipst);
-	if (!ire) {
-		/*
-		 * Mark this packet to make it be delivered to
-		 * ip_wput_ire after the new ire has been
-		 * created.
-		 */
-		mp->b_prev = NULL;
-		mp->b_next = NULL;
-		ip_newroute_ipif(q, first_mp, ipif, dst, NULL, RTF_SETSRC,
-		    zoneid, &zero_info);
-		return;
-	}
-
-	/*
-	 * Honor the RTF_SETSRC flag; this is the only case
-	 * where we force this addr whatever the current src addr is,
-	 * because this address is set by igmp_sendpkt(), and
-	 * cannot be specified by any user.
-	 */
-	if (ire->ire_flags & RTF_SETSRC) {
-		ipha->ipha_src = ire->ire_src_addr;
-	}
-
-	ip_wput_ire(q, first_mp, ire, NULL, B_FALSE, zoneid);
-}
-
-/*
- * NOTE : This function does not ire_refrele the ire argument passed in.
+ * Prepend an M_DATA fastpath header, and if none present prepend a
+ * DL_UNITDATA_REQ. Frees the mblk on failure.
  *
- * Copy the link layer header and do IPQoS if needed. Frees the mblk on
- * failure. The nce_fp_mp can vanish any time in the case of
- * IRE_BROADCAST due to DL_NOTE_FASTPATH_FLUSH. Hence we have to hold
- * the ire_lock to access the nce_fp_mp in this case.
- * IPQoS assumes that the first M_DATA contains the IP header. So, if we are
- * prepending a fastpath message IPQoS processing must precede it, we also set
- * the b_band of the fastpath message to that of the  mblk returned by IPQoS
- * (IPQoS might have set the b_band for CoS marking).
- * However, if we are prepending DL_UNITDATA_REQ message, IPQoS processing
- * must follow it so that IPQoS can mark the dl_priority field for CoS
- * marking, if needed.
+ * nce_dlur_mp and nce_fp_mp can not disappear once they have been set.
+ * If there is a change to them, the nce will be deleted (condemned) and
+ * a new nce_t will be created when packets are sent. Thus we need no locks
+ * to access those fields.
+ *
+ * We preserve b_band to support IPQoS. If a DL_UNITDATA_REQ is prepended
+ * we place b_band in dl_priority.dl_max.
  */
 static mblk_t *
-ip_wput_attach_llhdr(mblk_t *mp, ire_t *ire, ip_proc_t proc,
-    uint32_t ill_index, ipha_t **iphap)
+ip_xmit_attach_llhdr(mblk_t *mp, nce_t *nce)
 {
 	uint_t	hlen;
-	ipha_t *ipha;
 	mblk_t *mp1;
-	boolean_t qos_done = B_FALSE;
-	uchar_t	*ll_hdr;
-	ip_stack_t	*ipst = ire->ire_ipst;
+	uint_t	priority;
+	uchar_t *rptr;
 
-#define	rptr	((uchar_t *)ipha)
+	rptr = mp->b_rptr;
 
-	ipha = (ipha_t *)mp->b_rptr;
-	hlen = 0;
-	LOCK_IRE_FP_MP(ire);
-	if ((mp1 = ire->ire_nce->nce_fp_mp) != NULL) {
-		ASSERT(DB_TYPE(mp1) == M_DATA);
-		/* Initiate IPPF processing */
-		if ((proc != 0) && IPP_ENABLED(proc, ipst)) {
-			UNLOCK_IRE_FP_MP(ire);
-			ip_process(proc, &mp, ill_index);
-			if (mp == NULL)
-				return (NULL);
+	ASSERT(DB_TYPE(mp) == M_DATA);
+	priority = mp->b_band;
 
-			ipha = (ipha_t *)mp->b_rptr;
-			LOCK_IRE_FP_MP(ire);
-			if ((mp1 = ire->ire_nce->nce_fp_mp) == NULL) {
-				qos_done = B_TRUE;
-				goto no_fp_mp;
-			}
-			ASSERT(DB_TYPE(mp1) == M_DATA);
-		}
+	ASSERT(nce != NULL);
+	if ((mp1 = nce->nce_fp_mp) != NULL) {
 		hlen = MBLKL(mp1);
 		/*
 		 * Check if we have enough room to prepend fastpath
 		 * header
 		 */
 		if (hlen != 0 && (rptr - mp->b_datap->db_base) >= hlen) {
-			ll_hdr = rptr - hlen;
-			bcopy(mp1->b_rptr, ll_hdr, hlen);
+			rptr -= hlen;
+			bcopy(mp1->b_rptr, rptr, hlen);
 			/*
 			 * Set the b_rptr to the start of the link layer
 			 * header
 			 */
-			mp->b_rptr = ll_hdr;
-			mp1 = mp;
-		} else {
-			mp1 = copyb(mp1);
-			if (mp1 == NULL)
-				goto unlock_err;
-			mp1->b_band = mp->b_band;
-			mp1->b_cont = mp;
-			/*
-			 * XXX disable ICK_VALID and compute checksum
-			 * here; can happen if nce_fp_mp changes and
-			 * it can't be copied now due to insufficient
-			 * space. (unlikely, fp mp can change, but it
-			 * does not increase in length)
-			 */
+			mp->b_rptr = rptr;
+			return (mp);
 		}
-		UNLOCK_IRE_FP_MP(ire);
-	} else {
-no_fp_mp:
-		mp1 = copyb(ire->ire_nce->nce_res_mp);
+		mp1 = copyb(mp1);
 		if (mp1 == NULL) {
-unlock_err:
-			UNLOCK_IRE_FP_MP(ire);
+			ill_t *ill = nce->nce_ill;
+
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			ip_drop_output("ipIfStatsOutDiscards", mp, ill);
 			freemsg(mp);
 			return (NULL);
 		}
-		UNLOCK_IRE_FP_MP(ire);
+		mp1->b_band = priority;
 		mp1->b_cont = mp;
-		if (!qos_done && (proc != 0) && IPP_ENABLED(proc, ipst)) {
-			ip_process(proc, &mp1, ill_index);
-			if (mp1 == NULL)
-				return (NULL);
-
-			if (mp1->b_cont == NULL)
-				ipha = NULL;
-			else
-				ipha = (ipha_t *)mp1->b_cont->b_rptr;
-		}
+		DB_CKSUMSTART(mp1) = DB_CKSUMSTART(mp);
+		DB_CKSUMSTUFF(mp1) = DB_CKSUMSTUFF(mp);
+		DB_CKSUMEND(mp1) = DB_CKSUMEND(mp);
+		DB_CKSUMFLAGS(mp1) = DB_CKSUMFLAGS(mp);
+		DB_LSOMSS(mp1) = DB_LSOMSS(mp);
+		DTRACE_PROBE1(ip__xmit__copyb, (mblk_t *), mp1);
+		/*
+		 * XXX disable ICK_VALID and compute checksum
+		 * here; can happen if nce_fp_mp changes and
+		 * it can't be copied now due to insufficient
+		 * space. (unlikely, fp mp can change, but it
+		 * does not increase in length)
+		 */
+		return (mp1);
 	}
+	mp1 = copyb(nce->nce_dlur_mp);
 
-	*iphap = ipha;
+	if (mp1 == NULL) {
+		ill_t *ill = nce->nce_ill;
+
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		ip_drop_output("ipIfStatsOutDiscards", mp, ill);
+		freemsg(mp);
+		return (NULL);
+	}
+	mp1->b_cont = mp;
+	if (priority != 0) {
+		mp1->b_band = priority;
+		((dl_unitdata_req_t *)(mp1->b_rptr))->dl_priority.dl_max =
+		    priority;
+	}
 	return (mp1);
 #undef rptr
 }
 
 /*
- * Finish the outbound IPsec processing for an IPv6 packet. This function
- * is called from ipsec_out_process() if the IPsec packet was processed
- * synchronously, or from {ah,esp}_kcf_callback() if it was processed
- * asynchronously.
- */
-void
-ip_wput_ipsec_out_v6(queue_t *q, mblk_t *ipsec_mp, ip6_t *ip6h, ill_t *ill,
-    ire_t *ire_arg)
-{
-	in6_addr_t *v6dstp;
-	ire_t *ire;
-	mblk_t *mp;
-	ip6_t *ip6h1;
-	uint_t	ill_index;
-	ipsec_out_t *io;
-	boolean_t hwaccel;
-	uint32_t flags = IP6_NO_IPPOLICY;
-	int match_flags;
-	zoneid_t zoneid;
-	boolean_t ill_need_rele = B_FALSE;
-	boolean_t ire_need_rele = B_FALSE;
-	ip_stack_t	*ipst;
-
-	mp = ipsec_mp->b_cont;
-	ip6h1 = (ip6_t *)mp->b_rptr;
-	io = (ipsec_out_t *)ipsec_mp->b_rptr;
-	ASSERT(io->ipsec_out_ns != NULL);
-	ipst = io->ipsec_out_ns->netstack_ip;
-	ill_index = io->ipsec_out_ill_index;
-	if (io->ipsec_out_reachable) {
-		flags |= IPV6_REACHABILITY_CONFIRMATION;
-	}
-	hwaccel = io->ipsec_out_accelerated;
-	zoneid = io->ipsec_out_zoneid;
-	ASSERT(zoneid != ALL_ZONES);
-	ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
-	match_flags = MATCH_IRE_ILL | MATCH_IRE_SECATTR;
-	/* Multicast addresses should have non-zero ill_index. */
-	v6dstp = &ip6h->ip6_dst;
-	ASSERT(ip6h->ip6_nxt != IPPROTO_RAW);
-	ASSERT(!IN6_IS_ADDR_MULTICAST(v6dstp) || ill_index != 0);
-
-	if (ill == NULL && ill_index != 0) {
-		ill = ip_grab_ill(ipsec_mp, ill_index, B_TRUE, ipst);
-		/* Failure case frees things for us. */
-		if (ill == NULL)
-			return;
-
-		ill_need_rele = B_TRUE;
-	}
-	ASSERT(mp != NULL);
-
-	if (IN6_IS_ADDR_MULTICAST(v6dstp)) {
-		boolean_t unspec_src;
-		ipif_t	*ipif;
-
-		/*
-		 * Use the ill_index to get the right ill.
-		 */
-		unspec_src = io->ipsec_out_unspec_src;
-		(void) ipif_lookup_zoneid(ill, zoneid, 0, &ipif);
-		if (ipif == NULL) {
-			if (ill_need_rele)
-				ill_refrele(ill);
-			freemsg(ipsec_mp);
-			return;
-		}
-
-		if (ire_arg != NULL) {
-			ire = ire_arg;
-		} else {
-			ire = ire_ctable_lookup_v6(v6dstp, 0, 0, ipif,
-			    zoneid, msg_getlabel(mp), match_flags, ipst);
-			ire_need_rele = B_TRUE;
-		}
-		if (ire != NULL) {
-			ipif_refrele(ipif);
-			/*
-			 * XXX Do the multicast forwarding now, as the IPsec
-			 * processing has been done.
-			 */
-			goto send;
-		}
-
-		ip0dbg(("ip_wput_ipsec_out_v6: multicast: IRE disappeared\n"));
-		mp->b_prev = NULL;
-		mp->b_next = NULL;
-
-		/*
-		 * If the IPsec packet was processed asynchronously,
-		 * drop it now.
-		 */
-		if (q == NULL) {
-			if (ill_need_rele)
-				ill_refrele(ill);
-			freemsg(ipsec_mp);
-			ipif_refrele(ipif);
-			return;
-		}
-
-		ip_newroute_ipif_v6(q, ipsec_mp, ipif, v6dstp, &ip6h->ip6_src,
-		    unspec_src, zoneid);
-		ipif_refrele(ipif);
-	} else {
-		if (ire_arg != NULL) {
-			ire = ire_arg;
-		} else {
-			ire = ire_cache_lookup_v6(v6dstp, zoneid, NULL, ipst);
-			ire_need_rele = B_TRUE;
-		}
-		if (ire != NULL)
-			goto send;
-		/*
-		 * ire disappeared underneath.
-		 *
-		 * What we need to do here is the ip_newroute
-		 * logic to get the ire without doing the IPsec
-		 * processing. Follow the same old path. But this
-		 * time, ip_wput or ire_add_then_send will call us
-		 * directly as all the IPsec operations are done.
-		 */
-		ip1dbg(("ip_wput_ipsec_out_v6: IRE disappeared\n"));
-		mp->b_prev = NULL;
-		mp->b_next = NULL;
-
-		/*
-		 * If the IPsec packet was processed asynchronously,
-		 * drop it now.
-		 */
-		if (q == NULL) {
-			if (ill_need_rele)
-				ill_refrele(ill);
-			freemsg(ipsec_mp);
-			return;
-		}
-
-		ip_newroute_v6(q, ipsec_mp, v6dstp, &ip6h->ip6_src, ill,
-		    zoneid, ipst);
-	}
-	if (ill != NULL && ill_need_rele)
-		ill_refrele(ill);
-	return;
-send:
-	if (ill != NULL && ill_need_rele)
-		ill_refrele(ill);
-
-	/* Local delivery */
-	if (ire->ire_stq == NULL) {
-		ill_t	*out_ill;
-		ASSERT(q != NULL);
-
-		/* PFHooks: LOOPBACK_OUT */
-		out_ill = ire_to_ill(ire);
-
-		/*
-		 * DTrace this as ip:::send.  A blocked packet will fire the
-		 * send probe, but not the receive probe.
-		 */
-		DTRACE_IP7(send, mblk_t *, ipsec_mp, conn_t *, NULL,
-		    void_ip_t *, ip6h, __dtrace_ipsr_ill_t *, out_ill,
-		    ipha_t *, NULL, ip6_t *, ip6h, int, 1);
-
-		DTRACE_PROBE4(ip6__loopback__out__start,
-		    ill_t *, NULL, ill_t *, out_ill,
-		    ip6_t *, ip6h1, mblk_t *, ipsec_mp);
-
-		FW_HOOKS6(ipst->ips_ip6_loopback_out_event,
-		    ipst->ips_ipv6firewall_loopback_out,
-		    NULL, out_ill, ip6h1, ipsec_mp, mp, 0, ipst);
-
-		DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, ipsec_mp);
-
-		if (ipsec_mp != NULL) {
-			ip_wput_local_v6(RD(q), out_ill,
-			    ip6h, ipsec_mp, ire, 0, zoneid);
-		}
-		if (ire_need_rele)
-			ire_refrele(ire);
-		return;
-	}
-	/*
-	 * Everything is done. Send it out on the wire.
-	 * We force the insertion of a fragment header using the
-	 * IPH_FRAG_HDR flag in two cases:
-	 * - after reception of an ICMPv6 "packet too big" message
-	 *   with a MTU < 1280 (cf. RFC 2460 section 5)
-	 * - for multirouted IPv6 packets, so that the receiver can
-	 *   discard duplicates according to their fragment identifier
-	 */
-	/* XXX fix flow control problems. */
-	if (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN > ire->ire_max_frag ||
-	    (ire->ire_frag_flag & IPH_FRAG_HDR)) {
-		if (hwaccel) {
-			/*
-			 * hardware acceleration does not handle these
-			 * "slow path" cases.
-			 */
-			/* IPsec KSTATS: should bump bean counter here. */
-			if (ire_need_rele)
-				ire_refrele(ire);
-			freemsg(ipsec_mp);
-			return;
-		}
-		if (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN !=
-		    (mp->b_cont ? msgdsize(mp) :
-		    mp->b_wptr - (uchar_t *)ip6h)) {
-			/* IPsec KSTATS: should bump bean counter here. */
-			ip0dbg(("Packet length mismatch: %d, %ld\n",
-			    ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN,
-			    msgdsize(mp)));
-			if (ire_need_rele)
-				ire_refrele(ire);
-			freemsg(ipsec_mp);
-			return;
-		}
-		ASSERT(mp->b_prev == NULL);
-		ip2dbg(("Fragmenting Size = %d, mtu = %d\n",
-		    ntohs(ip6h->ip6_plen) +
-		    IPV6_HDR_LEN, ire->ire_max_frag));
-		ip_wput_frag_v6(mp, ire, flags, NULL, B_FALSE,
-		    ire->ire_max_frag);
-	} else {
-		UPDATE_OB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-		ip_xmit_v6(mp, ire, flags, NULL, B_FALSE, hwaccel ? io : NULL);
-	}
-	if (ire_need_rele)
-		ire_refrele(ire);
-	freeb(ipsec_mp);
-}
-
-void
-ipsec_hw_putnext(queue_t *q, mblk_t *mp)
-{
-	mblk_t *hada_mp;	/* attributes M_CTL mblk */
-	da_ipsec_t *hada;	/* data attributes */
-	ill_t *ill = (ill_t *)q->q_ptr;
-
-	IPSECHW_DEBUG(IPSECHW_PKT, ("ipsec_hw_putnext: accelerated packet\n"));
-
-	if ((ill->ill_capabilities & (ILL_CAPAB_AH | ILL_CAPAB_ESP)) == 0) {
-		/* IPsec KSTATS: Bump lose counter here! */
-		freemsg(mp);
-		return;
-	}
-
-	/*
-	 * It's an IPsec packet that must be
-	 * accelerated by the Provider, and the
-	 * outbound ill is IPsec acceleration capable.
-	 * Prepends the mblk with an IPHADA_M_CTL, and ship it
-	 * to the ill.
-	 * IPsec KSTATS: should bump packet counter here.
-	 */
-
-	hada_mp = allocb(sizeof (da_ipsec_t), BPRI_HI);
-	if (hada_mp == NULL) {
-		/* IPsec KSTATS: should bump packet counter here. */
-		freemsg(mp);
-		return;
-	}
-
-	hada_mp->b_datap->db_type = M_CTL;
-	hada_mp->b_wptr = hada_mp->b_rptr + sizeof (*hada);
-	hada_mp->b_cont = mp;
-
-	hada = (da_ipsec_t *)hada_mp->b_rptr;
-	bzero(hada, sizeof (da_ipsec_t));
-	hada->da_type = IPHADA_M_CTL;
-
-	putnext(q, hada_mp);
-}
-
-/*
  * Finish the outbound IPsec processing. This function is called from
  * ipsec_out_process() if the IPsec packet was processed
- * synchronously, or from {ah,esp}_kcf_callback() if it was processed
+ * synchronously, or from {ah,esp}_kcf_callback_outbound() if it was processed
  * asynchronously.
+ *
+ * This is common to IPv4 and IPv6.
  */
-void
-ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
-    ire_t *ire_arg)
+int
+ip_output_post_ipsec(mblk_t *mp, ip_xmit_attr_t *ixa)
 {
-	uint32_t v_hlen_tos_len;
-	ipaddr_t	dst;
-	ipif_t	*ipif = NULL;
-	ire_t *ire;
-	ire_t *ire1 = NULL;
-	mblk_t *next_mp = NULL;
-	uint32_t max_frag;
-	boolean_t multirt_send = B_FALSE;
-	mblk_t *mp;
-	ipha_t *ipha1;
-	uint_t	ill_index;
-	ipsec_out_t *io;
-	int match_flags;
-	irb_t *irb = NULL;
-	boolean_t ill_need_rele = B_FALSE, ire_need_rele = B_TRUE;
-	zoneid_t zoneid;
-	ipxmit_state_t	pktxmit_state;
-	ip_stack_t	*ipst;
+	iaflags_t	ixaflags = ixa->ixa_flags;
+	uint_t		pktlen;
 
-#ifdef	_BIG_ENDIAN
-#define	LENGTH	(v_hlen_tos_len & 0xFFFF)
-#else
-#define	LENGTH	((v_hlen_tos_len >> 24) | ((v_hlen_tos_len >> 8) & 0xFF00))
-#endif
 
-	mp = ipsec_mp->b_cont;
-	ipha1 = (ipha_t *)mp->b_rptr;
-	ASSERT(mp != NULL);
-	v_hlen_tos_len = ((uint32_t *)ipha)[0];
-	dst = ipha->ipha_dst;
+	/* AH/ESP don't update ixa_pktlen when they modify the packet */
+	if (ixaflags & IXAF_IS_IPV4) {
+		ipha_t		*ipha = (ipha_t *)mp->b_rptr;
 
-	io = (ipsec_out_t *)ipsec_mp->b_rptr;
-	ill_index = io->ipsec_out_ill_index;
-	zoneid = io->ipsec_out_zoneid;
-	ASSERT(zoneid != ALL_ZONES);
-	ipst = io->ipsec_out_ns->netstack_ip;
-	ASSERT(io->ipsec_out_ns != NULL);
-
-	match_flags = MATCH_IRE_ILL | MATCH_IRE_SECATTR;
-	if (ill == NULL && ill_index != 0) {
-		ill = ip_grab_ill(ipsec_mp, ill_index, B_FALSE, ipst);
-		/* Failure case frees things for us. */
-		if (ill == NULL)
-			return;
-
-		ill_need_rele = B_TRUE;
-	}
-
-	if (CLASSD(dst)) {
-		boolean_t conn_dontroute;
-		/*
-		 * Use the ill_index to get the right ipif.
-		 */
-		conn_dontroute = io->ipsec_out_dontroute;
-		if (ill_index == 0)
-			ipif = ipif_lookup_group(dst, zoneid, ipst);
-		else
-			(void) ipif_lookup_zoneid(ill, zoneid, 0, &ipif);
-		if (ipif == NULL) {
-			ip1dbg(("ip_wput_ipsec_out: No ipif for"
-			    " multicast\n"));
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutNoRoutes);
-			freemsg(ipsec_mp);
-			goto done;
-		}
-		/*
-		 * ipha_src has already been intialized with the
-		 * value of the ipif in ip_wput. All we need now is
-		 * an ire to send this downstream.
-		 */
-		ire = ire_ctable_lookup(dst, 0, 0, ipif, zoneid,
-		    msg_getlabel(mp), match_flags, ipst);
-		if (ire != NULL) {
-			ill_t *ill1;
-			/*
-			 * Do the multicast forwarding now, as the IPsec
-			 * processing has been done.
-			 */
-			if (ipst->ips_ip_g_mrouter && !conn_dontroute &&
-			    (ill1 = ire_to_ill(ire))) {
-				if (ip_mforward(ill1, ipha, mp)) {
-					freemsg(ipsec_mp);
-					ip1dbg(("ip_wput_ipsec_out: mforward "
-					    "failed\n"));
-					ire_refrele(ire);
-					goto done;
-				}
-			}
-			goto send;
-		}
-
-		ip0dbg(("ip_wput_ipsec_out: multicast: IRE disappeared\n"));
-		mp->b_prev = NULL;
-		mp->b_next = NULL;
-
-		/*
-		 * If the IPsec packet was processed asynchronously,
-		 * drop it now.
-		 */
-		if (q == NULL) {
-			freemsg(ipsec_mp);
-			goto done;
-		}
-
-		/*
-		 * We may be using a wrong ipif to create the ire.
-		 * But it is okay as the source address is assigned
-		 * for the packet already. Next outbound packet would
-		 * create the IRE with the right IPIF in ip_wput.
-		 *
-		 * Also handle RTF_MULTIRT routes.
-		 */
-		ip_newroute_ipif(q, ipsec_mp, ipif, dst, NULL, RTF_MULTIRT,
-		    zoneid, &zero_info);
+		ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
+		pktlen = ntohs(ipha->ipha_length);
 	} else {
-		if (ire_arg != NULL) {
-			ire = ire_arg;
-			ire_need_rele = B_FALSE;
-		} else {
-			ire = ire_cache_lookup(dst, zoneid,
-			    msg_getlabel(mp), ipst);
-		}
-		if (ire != NULL) {
-			goto send;
-		}
+		ip6_t		*ip6h = (ip6_t *)mp->b_rptr;
 
-		/*
-		 * ire disappeared underneath.
-		 *
-		 * What we need to do here is the ip_newroute
-		 * logic to get the ire without doing the IPsec
-		 * processing. Follow the same old path. But this
-		 * time, ip_wput or ire_add_then_put will call us
-		 * directly as all the IPsec operations are done.
-		 */
-		ip1dbg(("ip_wput_ipsec_out: IRE disappeared\n"));
-		mp->b_prev = NULL;
-		mp->b_next = NULL;
-
-		/*
-		 * If the IPsec packet was processed asynchronously,
-		 * drop it now.
-		 */
-		if (q == NULL) {
-			freemsg(ipsec_mp);
-			goto done;
-		}
-
-		/*
-		 * Since we're going through ip_newroute() again, we
-		 * need to make sure we don't:
-		 *
-		 *	1.) Trigger the ASSERT() with the ipha_ident
-		 *	    overloading.
-		 *	2.) Redo transport-layer checksumming, since we've
-		 *	    already done all that to get this far.
-		 *
-		 * The easiest way not do either of the above is to set
-		 * the ipha_ident field to IP_HDR_INCLUDED.
-		 */
-		ipha->ipha_ident = IP_HDR_INCLUDED;
-		ip_newroute(q, ipsec_mp, dst, (CONN_Q(q) ? Q_TO_CONN(q) : NULL),
-		    zoneid, ipst);
-	}
-	goto done;
-send:
-	if (ire->ire_stq == NULL) {
-		ill_t	*out_ill;
-		/*
-		 * Loopbacks go through ip_wput_local except for one case.
-		 * We come here if we generate a icmp_frag_needed message
-		 * after IPsec processing is over. When this function calls
-		 * ip_wput_ire_fragmentit, ip_wput_frag might end up calling
-		 * icmp_frag_needed. The message generated comes back here
-		 * through icmp_frag_needed -> icmp_pkt -> ip_wput ->
-		 * ipsec_out_process -> ip_wput_ipsec_out. We need to set the
-		 * source address as it is usually set in ip_wput_ire. As
-		 * ipsec_out_proc_begin is set, ip_wput calls ipsec_out_process
-		 * and we end up here. We can't enter ip_wput_ire once the
-		 * IPsec processing is over and hence we need to do it here.
-		 */
-		ASSERT(q != NULL);
-		UPDATE_OB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-		if (ipha->ipha_src == 0)
-			ipha->ipha_src = ire->ire_src_addr;
-
-		/* PFHooks: LOOPBACK_OUT */
-		out_ill = ire_to_ill(ire);
-
-		/*
-		 * DTrace this as ip:::send.  A blocked packet will fire the
-		 * send probe, but not the receive probe.
-		 */
-		DTRACE_IP7(send, mblk_t *, ipsec_mp, conn_t *, NULL,
-		    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, out_ill,
-		    ipha_t *, ipha, ip6_t *, NULL, int, 1);
-
-		DTRACE_PROBE4(ip4__loopback__out__start,
-		    ill_t *, NULL, ill_t *, out_ill,
-		    ipha_t *, ipha1, mblk_t *, ipsec_mp);
-
-		FW_HOOKS(ipst->ips_ip4_loopback_out_event,
-		    ipst->ips_ipv4firewall_loopback_out,
-		    NULL, out_ill, ipha1, ipsec_mp, mp, 0, ipst);
-
-		DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, ipsec_mp);
-
-		if (ipsec_mp != NULL)
-			ip_wput_local(RD(q), out_ill,
-			    ipha, ipsec_mp, ire, 0, zoneid);
-		if (ire_need_rele)
-			ire_refrele(ire);
-		goto done;
-	}
-
-	if (ire->ire_max_frag < (unsigned int)LENGTH) {
-		/*
-		 * We are through with IPsec processing.
-		 * Fragment this and send it on the wire.
-		 */
-		if (io->ipsec_out_accelerated) {
-			/*
-			 * The packet has been accelerated but must
-			 * be fragmented. This should not happen
-			 * since AH and ESP must not accelerate
-			 * packets that need fragmentation, however
-			 * the configuration could have changed
-			 * since the AH or ESP processing.
-			 * Drop packet.
-			 * IPsec KSTATS: bump bean counter here.
-			 */
-			IPSECHW_DEBUG(IPSECHW_PKT, ("ipsec_wput_ipsec_out: "
-			    "fragmented accelerated packet!\n"));
-			freemsg(ipsec_mp);
-		} else {
-			ip_wput_ire_fragmentit(ipsec_mp, ire,
-			    zoneid, ipst, NULL);
-		}
-		if (ire_need_rele)
-			ire_refrele(ire);
-		goto done;
-	}
-
-	ip2dbg(("ip_wput_ipsec_out: ipsec_mp %p, ire %p, ire_ipif %p, "
-	    "ipif %p\n", (void *)ipsec_mp, (void *)ire,
-	    (void *)ire->ire_ipif, (void *)ipif));
-
-	/*
-	 * Multiroute the secured packet.
-	 */
-	if (ire->ire_flags & RTF_MULTIRT) {
-		ire_t *first_ire;
-		irb = ire->ire_bucket;
-		ASSERT(irb != NULL);
-		/*
-		 * This ire has been looked up as the one that
-		 * goes through the given ipif;
-		 * make sure we do not omit any other multiroute ire
-		 * that may be present in the bucket before this one.
-		 */
-		IRB_REFHOLD(irb);
-		for (first_ire = irb->irb_ire;
-		    first_ire != NULL;
-		    first_ire = first_ire->ire_next) {
-			if ((first_ire->ire_flags & RTF_MULTIRT) &&
-			    (first_ire->ire_addr == ire->ire_addr) &&
-			    !(first_ire->ire_marks &
-			    (IRE_MARK_CONDEMNED | IRE_MARK_TESTHIDDEN)))
-				break;
-		}
-
-		if ((first_ire != NULL) && (first_ire != ire)) {
-			/*
-			 * Don't change the ire if the packet must
-			 * be fragmented if sent via this new one.
-			 */
-			if (first_ire->ire_max_frag >= (unsigned int)LENGTH) {
-				IRE_REFHOLD(first_ire);
-				if (ire_need_rele)
-					ire_refrele(ire);
-				else
-					ire_need_rele = B_TRUE;
-				ire = first_ire;
-			}
-		}
-		IRB_REFRELE(irb);
-
-		multirt_send = B_TRUE;
-		max_frag = ire->ire_max_frag;
+		ASSERT(IPH_HDR_VERSION(mp->b_rptr) == IPV6_VERSION);
+		pktlen = ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN;
 	}
 
 	/*
-	 * In most cases, the emission loop below is entered only once.
-	 * Only in the case where the ire holds the RTF_MULTIRT
-	 * flag, we loop to process all RTF_MULTIRT ires in the
-	 * bucket, and send the packet through all crossed
-	 * RTF_MULTIRT routes.
+	 * We release any hard reference on the SAs here to make
+	 * sure the SAs can be garbage collected. ipsr_sa has a soft reference
+	 * on the SAs.
+	 * If in the future we want the hard latching of the SAs in the
+	 * ip_xmit_attr_t then we should remove this.
 	 */
-	do {
-		if (multirt_send) {
+	if (ixa->ixa_ipsec_esp_sa != NULL) {
+		IPSA_REFRELE(ixa->ixa_ipsec_esp_sa);
+		ixa->ixa_ipsec_esp_sa = NULL;
+	}
+	if (ixa->ixa_ipsec_ah_sa != NULL) {
+		IPSA_REFRELE(ixa->ixa_ipsec_ah_sa);
+		ixa->ixa_ipsec_ah_sa = NULL;
+	}
+
+	/* Do we need to fragment? */
+	if ((ixa->ixa_flags & IXAF_IPV6_ADD_FRAGHDR) ||
+	    pktlen > ixa->ixa_fragsize) {
+		if (ixaflags & IXAF_IS_IPV4) {
+			ASSERT(!(ixa->ixa_flags & IXAF_IPV6_ADD_FRAGHDR));
 			/*
-			 * ire1 holds here the next ire to process in the
-			 * bucket. If multirouting is expected,
-			 * any non-RTF_MULTIRT ire that has the
-			 * right destination address is ignored.
+			 * We check for the DF case in ipsec_out_process
+			 * hence this only handles the non-DF case.
 			 */
-			ASSERT(irb != NULL);
-			IRB_REFHOLD(irb);
-			for (ire1 = ire->ire_next;
-			    ire1 != NULL;
-			    ire1 = ire1->ire_next) {
-				if ((ire1->ire_flags & RTF_MULTIRT) == 0)
-					continue;
-				if (ire1->ire_addr != ire->ire_addr)
-					continue;
-				if (ire1->ire_marks &
-				    (IRE_MARK_CONDEMNED | IRE_MARK_TESTHIDDEN))
-					continue;
-				/* No loopback here */
-				if (ire1->ire_stq == NULL)
-					continue;
-				/*
-				 * Ensure we do not exceed the MTU
-				 * of the next route.
-				 */
-				if (ire1->ire_max_frag < (unsigned int)LENGTH) {
-					ip_multirt_bad_mtu(ire1, max_frag);
-					continue;
-				}
-
-				IRE_REFHOLD(ire1);
-				break;
-			}
-			IRB_REFRELE(irb);
-			if (ire1 != NULL) {
-				/*
-				 * We are in a multiple send case, need to
-				 * make a copy of the packet.
-				 */
-				next_mp = copymsg(ipsec_mp);
-				if (next_mp == NULL) {
-					ire_refrele(ire1);
-					ire1 = NULL;
-				}
-			}
-		}
-		/*
-		 * Everything is done. Send it out on the wire
-		 *
-		 * ip_xmit_v4 will call ip_wput_attach_llhdr and then
-		 * either send it on the wire or, in the case of
-		 * HW acceleration, call ipsec_hw_putnext.
-		 */
-		if (ire->ire_nce &&
-		    ire->ire_nce->nce_state != ND_REACHABLE) {
-			DTRACE_PROBE2(ip__wput__ipsec__bail,
-			    (ire_t *), ire,  (mblk_t *), ipsec_mp);
-			/*
-			 * If ire's link-layer is unresolved (this
-			 * would only happen if the incomplete ire
-			 * was added to cachetable via forwarding path)
-			 * don't bother going to ip_xmit_v4. Just drop the
-			 * packet.
-			 * There is a slight risk here, in that, if we
-			 * have the forwarding path create an incomplete
-			 * IRE, then until the IRE is completed, any
-			 * transmitted IPsec packets will be dropped
-			 * instead of being queued waiting for resolution.
-			 *
-			 * But the likelihood of a forwarding packet and a wput
-			 * packet sending to the same dst at the same time
-			 * and there not yet be an ARP entry for it is small.
-			 * Furthermore, if this actually happens, it might
-			 * be likely that wput would generate multiple
-			 * packets (and forwarding would also have a train
-			 * of packets) for that destination. If this is
-			 * the case, some of them would have been dropped
-			 * anyway, since ARP only queues a few packets while
-			 * waiting for resolution
-			 *
-			 * NOTE: We should really call ip_xmit_v4,
-			 * and let it queue the packet and send the
-			 * ARP query and have ARP come back thus:
-			 * <ARP> ip_wput->ip_output->ip-wput_nondata->
-			 * ip_xmit_v4->ip_wput_attach_llhdr + ipsec
-			 * hw accel work. But it's too complex to get
-			 * the IPsec hw  acceleration approach to fit
-			 * well with ip_xmit_v4 doing ARP without
-			 * doing IPsec simplification. For now, we just
-			 * poke ip_xmit_v4 to trigger the arp resolve, so
-			 * that we can continue with the send on the next
-			 * attempt.
-			 *
-			 * XXX THis should be revisited, when
-			 * the IPsec/IP interaction is cleaned up
-			 */
-			ip1dbg(("ip_wput_ipsec_out: ire is incomplete"
-			    " - dropping packet\n"));
-			freemsg(ipsec_mp);
-			/*
-			 * Call ip_xmit_v4() to trigger ARP query
-			 * in case the nce_state is ND_INITIAL
-			 */
-			(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE, NULL);
-			goto drop_pkt;
-		}
-
-		DTRACE_PROBE4(ip4__physical__out__start, ill_t *, NULL,
-		    ill_t *, ire->ire_ipif->ipif_ill, ipha_t *, ipha1,
-		    mblk_t *, ipsec_mp);
-		FW_HOOKS(ipst->ips_ip4_physical_out_event,
-		    ipst->ips_ipv4firewall_physical_out, NULL,
-		    ire->ire_ipif->ipif_ill, ipha1, ipsec_mp, mp, 0, ipst);
-		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, ipsec_mp);
-		if (ipsec_mp == NULL)
-			goto drop_pkt;
-
-		ip1dbg(("ip_wput_ipsec_out: calling ip_xmit_v4\n"));
-		pktxmit_state = ip_xmit_v4(mp, ire,
-		    (io->ipsec_out_accelerated ? io : NULL), B_FALSE, NULL);
-
-		if ((pktxmit_state ==  SEND_FAILED) ||
-		    (pktxmit_state == LLHDR_RESLV_FAILED)) {
-
-			freeb(ipsec_mp); /* ip_xmit_v4 frees the mp */
-drop_pkt:
-			BUMP_MIB(((ill_t *)ire->ire_stq->q_ptr)->ill_ip_mib,
-			    ipIfStatsOutDiscards);
-			if (ire_need_rele)
-				ire_refrele(ire);
-			if (ire1 != NULL) {
-				ire_refrele(ire1);
-				freemsg(next_mp);
-			}
-			goto done;
-		}
-
-		freeb(ipsec_mp);
-		if (ire_need_rele)
-			ire_refrele(ire);
-
-		if (ire1 != NULL) {
-			ire = ire1;
-			ire_need_rele = B_TRUE;
-			ASSERT(next_mp);
-			ipsec_mp = next_mp;
-			mp = ipsec_mp->b_cont;
-			ire1 = NULL;
-			next_mp = NULL;
-			io = (ipsec_out_t *)ipsec_mp->b_rptr;
+			return (ip_fragment_v4(mp, ixa->ixa_nce, ixa->ixa_flags,
+			    pktlen, ixa->ixa_fragsize,
+			    ixa->ixa_xmit_hint, ixa->ixa_zoneid,
+			    ixa->ixa_no_loop_zoneid, ixa->ixa_postfragfn,
+			    &ixa->ixa_cookie));
 		} else {
-			multirt_send = B_FALSE;
+			mp = ip_fraghdr_add_v6(mp, ixa->ixa_ident, ixa);
+			if (mp == NULL) {
+				/* MIB and ip_drop_output already done */
+				return (ENOMEM);
+			}
+			pktlen += sizeof (ip6_frag_t);
+			if (pktlen > ixa->ixa_fragsize) {
+				return (ip_fragment_v6(mp, ixa->ixa_nce,
+				    ixa->ixa_flags, pktlen,
+				    ixa->ixa_fragsize, ixa->ixa_xmit_hint,
+				    ixa->ixa_zoneid, ixa->ixa_no_loop_zoneid,
+				    ixa->ixa_postfragfn, &ixa->ixa_cookie));
+			}
 		}
-	} while (multirt_send);
-done:
-	if (ill != NULL && ill_need_rele)
-		ill_refrele(ill);
-	if (ipif != NULL)
-		ipif_refrele(ipif);
+	}
+	return ((ixa->ixa_postfragfn)(mp, ixa->ixa_nce, ixa->ixa_flags,
+	    pktlen, ixa->ixa_xmit_hint, ixa->ixa_zoneid,
+	    ixa->ixa_no_loop_zoneid, NULL));
 }
 
 /*
- * Get the ill corresponding to the specified ire, and compare its
- * capabilities with the protocol and algorithms specified by the
- * the SA obtained from ipsec_out. If they match, annotate the
- * ipsec_out structure to indicate that the packet needs acceleration.
+ * Finish the inbound IPsec processing. This function is called from
+ * ipsec_out_process() if the IPsec packet was processed
+ * synchronously, or from {ah,esp}_kcf_callback_outbound() if it was processed
+ * asynchronously.
  *
- *
- * A packet is eligible for outbound hardware acceleration if the
- * following conditions are satisfied:
- *
- * 1. the packet will not be fragmented
- * 2. the provider supports the algorithm
- * 3. there is no pending control message being exchanged
- * 4. snoop is not attached
- * 5. the destination address is not a broadcast or multicast address.
- *
- * Rationale:
- *	- Hardware drivers do not support fragmentation with
- *	  the current interface.
- *	- snoop, multicast, and broadcast may result in exposure of
- *	  a cleartext datagram.
- * We check all five of these conditions here.
- *
- * XXX would like to nuke "ire_t *" parameter here; problem is that
- * IRE is only way to figure out if a v4 address is a broadcast and
- * thus ineligible for acceleration...
+ * This is common to IPv4 and IPv6.
  */
-static void
-ipsec_out_is_accelerated(mblk_t *ipsec_mp, ipsa_t *sa, ill_t *ill, ire_t *ire)
+void
+ip_input_post_ipsec(mblk_t *mp, ip_recv_attr_t *ira)
 {
-	ipsec_out_t *io;
-	mblk_t *data_mp;
-	uint_t plen, overhead;
-	ip_stack_t	*ipst;
-	phyint_t	*phyint;
+	iaflags_t	iraflags = ira->ira_flags;
 
-	if ((sa->ipsa_flags & IPSA_F_HW) == 0)
-		return;
+	/* Length might have changed */
+	if (iraflags & IRAF_IS_IPV4) {
+		ipha_t		*ipha = (ipha_t *)mp->b_rptr;
 
-	if (ill == NULL)
-		return;
-	ipst = ill->ill_ipst;
-	phyint = ill->ill_phyint;
+		ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
+		ira->ira_pktlen = ntohs(ipha->ipha_length);
+		ira->ira_ip_hdr_length = IPH_HDR_LENGTH(ipha);
+		ira->ira_protocol = ipha->ipha_protocol;
 
-	/*
-	 * Destination address is a broadcast or multicast.  Punt.
-	 */
-	if ((ire != NULL) && (ire->ire_type & (IRE_BROADCAST|IRE_LOOPBACK|
-	    IRE_LOCAL)))
-		return;
-
-	data_mp = ipsec_mp->b_cont;
-
-	if (ill->ill_isv6) {
-		ip6_t *ip6h = (ip6_t *)data_mp->b_rptr;
-
-		if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst))
-			return;
-
-		plen = ip6h->ip6_plen;
+		ip_fanout_v4(mp, ipha, ira);
 	} else {
-		ipha_t *ipha = (ipha_t *)data_mp->b_rptr;
+		ip6_t		*ip6h = (ip6_t *)mp->b_rptr;
+		uint8_t		*nexthdrp;
 
-		if (CLASSD(ipha->ipha_dst))
+		ASSERT(IPH_HDR_VERSION(mp->b_rptr) == IPV6_VERSION);
+		ira->ira_pktlen = ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN;
+		if (!ip_hdr_length_nexthdr_v6(mp, ip6h, &ira->ira_ip_hdr_length,
+		    &nexthdrp)) {
+			/* Malformed packet */
+			BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", mp, ira->ira_ill);
+			freemsg(mp);
 			return;
-
-		plen = ipha->ipha_length;
+		}
+		ira->ira_protocol = *nexthdrp;
+		ip_fanout_v6(mp, ip6h, ira);
 	}
-	/*
-	 * Is there a pending DLPI control message being exchanged
-	 * between IP/IPsec and the DLS Provider? If there is, it
-	 * could be a SADB update, and the state of the DLS Provider
-	 * SADB might not be in sync with the SADB maintained by
-	 * IPsec. To avoid dropping packets or using the wrong keying
-	 * material, we do not accelerate this packet.
-	 */
-	if (ill->ill_dlpi_pending != DL_PRIM_INVAL) {
-		IPSECHW_DEBUG(IPSECHW_PKT, ("ipsec_out_check_is_accelerated: "
-		    "ill_dlpi_pending! don't accelerate packet\n"));
-		return;
-	}
-
-	/*
-	 * Is the Provider in promiscous mode? If it does, we don't
-	 * accelerate the packet since it will bounce back up to the
-	 * listeners in the clear.
-	 */
-	if (phyint->phyint_flags & PHYI_PROMISC) {
-		IPSECHW_DEBUG(IPSECHW_PKT, ("ipsec_out_check_is_accelerated: "
-		    "ill in promiscous mode, don't accelerate packet\n"));
-		return;
-	}
-
-	/*
-	 * Will the packet require fragmentation?
-	 */
-
-	/*
-	 * IPsec ESP note: this is a pessimistic estimate, but the same
-	 * as is used elsewhere.
-	 * SPI + sequence + MAC + IV(blocksize) + padding(blocksize-1)
-	 *	+ 2-byte trailer
-	 */
-	overhead = (sa->ipsa_type == SADB_SATYPE_AH) ? IPSEC_MAX_AH_HDR_SIZE :
-	    IPSEC_BASE_ESP_HDR_SIZE(sa);
-
-	if ((plen + overhead) > ill->ill_max_mtu)
-		return;
-
-	io = (ipsec_out_t *)ipsec_mp->b_rptr;
-
-	/*
-	 * Can the ill accelerate this IPsec protocol and algorithm
-	 * specified by the SA?
-	 */
-	if (!ipsec_capab_match(ill, io->ipsec_out_capab_ill_index,
-	    ill->ill_isv6, sa, ipst->ips_netstack)) {
-		return;
-	}
-
-	/*
-	 * Tell AH or ESP that the outbound ill is capable of
-	 * accelerating this packet.
-	 */
-	io->ipsec_out_is_capab_ill = B_TRUE;
 }
 
 /*
  * Select which AH & ESP SA's to use (if any) for the outbound packet.
  *
  * If this function returns B_TRUE, the requested SA's have been filled
- * into the ipsec_out_*_sa pointers.
+ * into the ixa_ipsec_*_sa pointers.
  *
  * If the function returns B_FALSE, the packet has been "consumed", most
  * likely by an ACQUIRE sent up via PF_KEY to a key management daemon.
  *
  * The SA references created by the protocol-specific "select"
- * function will be released when the ipsec_mp is freed, thanks to the
- * ipsec_out_free destructor -- see spd.c.
+ * function will be released in ip_output_post_ipsec.
  */
 static boolean_t
-ipsec_out_select_sa(mblk_t *ipsec_mp)
+ipsec_out_select_sa(mblk_t *mp, ip_xmit_attr_t *ixa)
 {
 	boolean_t need_ah_acquire = B_FALSE, need_esp_acquire = B_FALSE;
-	ipsec_out_t *io;
 	ipsec_policy_t *pp;
 	ipsec_action_t *ap;
-	io = (ipsec_out_t *)ipsec_mp->b_rptr;
-	ASSERT(io->ipsec_out_type == IPSEC_OUT);
-	ASSERT(io->ipsec_out_len == sizeof (ipsec_out_t));
 
-	if (!io->ipsec_out_secure) {
-		/*
-		 * We came here by mistake.
-		 * Don't bother with ipsec processing
-		 * We should "discourage" this path in the future.
-		 */
-		ASSERT(io->ipsec_out_proc_begin == B_FALSE);
-		return (B_FALSE);
-	}
-	ASSERT(io->ipsec_out_need_policy == B_FALSE);
-	ASSERT((io->ipsec_out_policy != NULL) ||
-	    (io->ipsec_out_act != NULL));
+	ASSERT(ixa->ixa_flags & IXAF_IPSEC_SECURE);
+	ASSERT((ixa->ixa_ipsec_policy != NULL) ||
+	    (ixa->ixa_ipsec_action != NULL));
 
-	ASSERT(io->ipsec_out_failed == B_FALSE);
-
-	/*
-	 * IPsec processing has started.
-	 */
-	io->ipsec_out_proc_begin = B_TRUE;
-	ap = io->ipsec_out_act;
+	ap = ixa->ixa_ipsec_action;
 	if (ap == NULL) {
-		pp = io->ipsec_out_policy;
+		pp = ixa->ixa_ipsec_policy;
 		ASSERT(pp != NULL);
 		ap = pp->ipsp_act;
 		ASSERT(ap != NULL);
@@ -26438,22 +12355,23 @@ ipsec_out_select_sa(mblk_t *ipsec_mp)
 
 	/*
 	 * We have an action.  now, let's select SA's.
-	 * (In the future, we can cache this in the conn_t..)
+	 * A side effect of setting ixa_ipsec_*_sa is that it will
+	 * be cached in the conn_t.
 	 */
 	if (ap->ipa_want_esp) {
-		if (io->ipsec_out_esp_sa == NULL) {
-			need_esp_acquire = !ipsec_outbound_sa(ipsec_mp,
+		if (ixa->ixa_ipsec_esp_sa == NULL) {
+			need_esp_acquire = !ipsec_outbound_sa(mp, ixa,
 			    IPPROTO_ESP);
 		}
-		ASSERT(need_esp_acquire || io->ipsec_out_esp_sa != NULL);
+		ASSERT(need_esp_acquire || ixa->ixa_ipsec_esp_sa != NULL);
 	}
 
 	if (ap->ipa_want_ah) {
-		if (io->ipsec_out_ah_sa == NULL) {
-			need_ah_acquire = !ipsec_outbound_sa(ipsec_mp,
+		if (ixa->ixa_ipsec_ah_sa == NULL) {
+			need_ah_acquire = !ipsec_outbound_sa(mp, ixa,
 			    IPPROTO_AH);
 		}
-		ASSERT(need_ah_acquire || io->ipsec_out_ah_sa != NULL);
+		ASSERT(need_ah_acquire || ixa->ixa_ipsec_ah_sa != NULL);
 		/*
 		 * The ESP and AH processing order needs to be preserved
 		 * when both protocols are required (ESP should be applied
@@ -26471,16 +12389,16 @@ ipsec_out_select_sa(mblk_t *ipsec_mp)
 	 * acquire _all_ of the SAs we need.
 	 */
 	if (need_ah_acquire || need_esp_acquire) {
-		if (io->ipsec_out_ah_sa != NULL) {
-			IPSA_REFRELE(io->ipsec_out_ah_sa);
-			io->ipsec_out_ah_sa = NULL;
+		if (ixa->ixa_ipsec_ah_sa != NULL) {
+			IPSA_REFRELE(ixa->ixa_ipsec_ah_sa);
+			ixa->ixa_ipsec_ah_sa = NULL;
 		}
-		if (io->ipsec_out_esp_sa != NULL) {
-			IPSA_REFRELE(io->ipsec_out_esp_sa);
-			io->ipsec_out_esp_sa = NULL;
+		if (ixa->ixa_ipsec_esp_sa != NULL) {
+			IPSA_REFRELE(ixa->ixa_ipsec_esp_sa);
+			ixa->ixa_ipsec_esp_sa = NULL;
 		}
 
-		sadb_acquire(ipsec_mp, io, need_ah_acquire, need_esp_acquire);
+		sadb_acquire(mp, ixa, need_ah_acquire, need_esp_acquire);
 		return (B_FALSE);
 	}
 
@@ -26488,110 +12406,64 @@ ipsec_out_select_sa(mblk_t *ipsec_mp)
 }
 
 /*
- * Process an IPSEC_OUT message and see what you can
- * do with it.
- * IPQoS Notes:
- * We do IPPF processing if IPP_LOCAL_OUT is enabled before processing for
- * IPsec.
- * XXX would like to nuke ire_t.
- * XXX ill_index better be "real"
+ * Handle IPsec output processing.
+ * This function is only entered once for a given packet.
+ * We try to do things synchronously, but if we need to have user-level
+ * set up SAs, or ESP or AH uses asynchronous kEF, then the operation
+ * will be completed
+ *  - when the SAs are added in esp_add_sa_finish/ah_add_sa_finish
+ *  - when asynchronous ESP is done it will do AH
+ *
+ * In all cases we come back in ip_output_post_ipsec() to fragment and
+ * send out the packet.
  */
-void
-ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
+int
+ipsec_out_process(mblk_t *mp, ip_xmit_attr_t *ixa)
 {
-	ipsec_out_t *io;
-	ipsec_policy_t *pp;
-	ipsec_action_t *ap;
-	ipha_t *ipha;
-	ip6_t *ip6h;
-	mblk_t *mp;
-	ill_t *ill;
-	zoneid_t zoneid;
-	ipsec_status_t ipsec_rc;
-	boolean_t ill_need_rele = B_FALSE;
-	ip_stack_t	*ipst;
+	ill_t		*ill = ixa->ixa_nce->nce_ill;
+	ip_stack_t	*ipst = ixa->ixa_ipst;
 	ipsec_stack_t	*ipss;
+	ipsec_policy_t	*pp;
+	ipsec_action_t	*ap;
 
-	io = (ipsec_out_t *)ipsec_mp->b_rptr;
-	ASSERT(io->ipsec_out_type == IPSEC_OUT);
-	ASSERT(io->ipsec_out_len == sizeof (ipsec_out_t));
-	ipst = io->ipsec_out_ns->netstack_ip;
-	mp = ipsec_mp->b_cont;
+	ASSERT(ixa->ixa_flags & IXAF_IPSEC_SECURE);
 
-	/*
-	 * Initiate IPPF processing. We do it here to account for packets
-	 * coming here that don't have any policy (i.e. !io->ipsec_out_secure).
-	 * We can check for ipsec_out_proc_begin even for such packets, as
-	 * they will always be false (asserted below).
-	 */
-	if (IPP_ENABLED(IPP_LOCAL_OUT, ipst) && !io->ipsec_out_proc_begin) {
-		ip_process(IPP_LOCAL_OUT, &mp, io->ipsec_out_ill_index != 0 ?
-		    io->ipsec_out_ill_index : ill_index);
-		if (mp == NULL) {
-			ip2dbg(("ipsec_out_process: packet dropped "\
-			    "during IPPF processing\n"));
-			freeb(ipsec_mp);
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-			return;
-		}
-	}
-
-	if (!io->ipsec_out_secure) {
-		/*
-		 * We came here by mistake.
-		 * Don't bother with ipsec processing
-		 * Should "discourage" this path in the future.
-		 */
-		ASSERT(io->ipsec_out_proc_begin == B_FALSE);
-		goto done;
-	}
-	ASSERT(io->ipsec_out_need_policy == B_FALSE);
-	ASSERT((io->ipsec_out_policy != NULL) ||
-	    (io->ipsec_out_act != NULL));
-	ASSERT(io->ipsec_out_failed == B_FALSE);
+	ASSERT((ixa->ixa_ipsec_policy != NULL) ||
+	    (ixa->ixa_ipsec_action != NULL));
 
 	ipss = ipst->ips_netstack->netstack_ipsec;
 	if (!ipsec_loaded(ipss)) {
-		ipha = (ipha_t *)ipsec_mp->b_cont->b_rptr;
-		if (IPH_HDR_VERSION(ipha) == IP_VERSION) {
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
-		} else {
-			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutDiscards);
-		}
-		ip_drop_packet(ipsec_mp, B_FALSE, NULL, ire,
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		ip_drop_packet(mp, B_TRUE, ill,
 		    DROPPER(ipss, ipds_ip_ipsec_not_loaded),
 		    &ipss->ipsec_dropper);
-		return;
+		return (ENOTSUP);
 	}
 
-	/*
-	 * IPsec processing has started.
-	 */
-	io->ipsec_out_proc_begin = B_TRUE;
-	ap = io->ipsec_out_act;
+	ap = ixa->ixa_ipsec_action;
 	if (ap == NULL) {
-		pp = io->ipsec_out_policy;
+		pp = ixa->ixa_ipsec_policy;
 		ASSERT(pp != NULL);
 		ap = pp->ipsp_act;
 		ASSERT(ap != NULL);
 	}
 
-	/*
-	 * Save the outbound ill index. When the packet comes back
-	 * from IPsec, we make sure the ill hasn't changed or disappeared
-	 * before sending it the accelerated packet.
-	 */
-	if ((ire != NULL) && (io->ipsec_out_capab_ill_index == 0)) {
-		ill = ire_to_ill(ire);
-		io->ipsec_out_capab_ill_index = ill->ill_phyint->phyint_ifindex;
+	/* Handle explicit drop action and bypass. */
+	switch (ap->ipa_act.ipa_type) {
+	case IPSEC_ACT_DISCARD:
+	case IPSEC_ACT_REJECT:
+		ip_drop_packet(mp, B_FALSE, ill,
+		    DROPPER(ipss, ipds_spd_explicit), &ipss->ipsec_spd_dropper);
+		return (EHOSTUNREACH);	/* IPsec policy failure */
+	case IPSEC_ACT_BYPASS:
+		return (ip_output_post_ipsec(mp, ixa));
 	}
 
 	/*
 	 * The order of processing is first insert a IP header if needed.
 	 * Then insert the ESP header and then the AH header.
 	 */
-	if ((io->ipsec_out_se_done == B_FALSE) &&
-	    (ap->ipa_want_se)) {
+	if ((ixa->ixa_flags & IXAF_IS_IPV4) && ap->ipa_want_se) {
 		/*
 		 * First get the outer IP header before sending
 		 * it to ESP.
@@ -26600,19 +12472,16 @@ ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
 		mblk_t *outer_mp, *inner_mp;
 
 		if ((outer_mp = allocb(sizeof (ipha_t), BPRI_HI)) == NULL) {
-			(void) mi_strlog(q, 0, SL_ERROR|SL_TRACE|SL_CONSOLE,
+			(void) mi_strlog(ill->ill_rq, 0,
+			    SL_ERROR|SL_TRACE|SL_CONSOLE,
 			    "ipsec_out_process: "
 			    "Self-Encapsulation failed: Out of memory\n");
-			freemsg(ipsec_mp);
-			if (ill != NULL) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
-			} else {
-				BUMP_MIB(&ipst->ips_ip_mib,
-				    ipIfStatsOutDiscards);
-			}
-			return;
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			ip_drop_output("ipIfStatsOutDiscards", mp, ill);
+			freemsg(mp);
+			return (ENOBUFS);
 		}
-		inner_mp = ipsec_mp->b_cont;
+		inner_mp = mp;
 		ASSERT(inner_mp->b_datap->db_type == M_DATA);
 		oipha = (ipha_t *)outer_mp->b_rptr;
 		iipha = (ipha_t *)inner_mp->b_rptr;
@@ -26626,139 +12495,51 @@ ipsec_out_process(queue_t *q, mblk_t *ipsec_mp, ire_t *ire, uint_t ill_index)
 		oipha->ipha_hdr_checksum = 0;
 		oipha->ipha_hdr_checksum = ip_csum_hdr(oipha);
 		outer_mp->b_cont = inner_mp;
-		ipsec_mp->b_cont = outer_mp;
+		mp = outer_mp;
 
-		io->ipsec_out_se_done = B_TRUE;
-		io->ipsec_out_tunnel = B_TRUE;
+		ixa->ixa_flags |= IXAF_IPSEC_TUNNEL;
 	}
 
-	if (((ap->ipa_want_ah && (io->ipsec_out_ah_sa == NULL)) ||
-	    (ap->ipa_want_esp && (io->ipsec_out_esp_sa == NULL))) &&
-	    !ipsec_out_select_sa(ipsec_mp))
-		return;
+	/* If we need to wait for a SA then we can't return any errno */
+	if (((ap->ipa_want_ah && (ixa->ixa_ipsec_ah_sa == NULL)) ||
+	    (ap->ipa_want_esp && (ixa->ixa_ipsec_esp_sa == NULL))) &&
+	    !ipsec_out_select_sa(mp, ixa))
+		return (0);
 
 	/*
 	 * By now, we know what SA's to use.  Toss over to ESP & AH
 	 * to do the heavy lifting.
 	 */
-	zoneid = io->ipsec_out_zoneid;
-	ASSERT(zoneid != ALL_ZONES);
-	if ((io->ipsec_out_esp_done == B_FALSE) && (ap->ipa_want_esp)) {
-		ASSERT(io->ipsec_out_esp_sa != NULL);
-		io->ipsec_out_esp_done = B_TRUE;
-		/*
-		 * Note that since hw accel can only apply one transform,
-		 * not two, we skip hw accel for ESP if we also have AH
-		 * This is an design limitation of the interface
-		 * which should be revisited.
-		 */
-		ASSERT(ire != NULL);
-		if (io->ipsec_out_ah_sa == NULL) {
-			ill = (ill_t *)ire->ire_stq->q_ptr;
-			ipsec_out_is_accelerated(ipsec_mp,
-			    io->ipsec_out_esp_sa, ill, ire);
-		}
+	if (ap->ipa_want_esp) {
+		ASSERT(ixa->ixa_ipsec_esp_sa != NULL);
 
-		ipsec_rc = io->ipsec_out_esp_sa->ipsa_output_func(ipsec_mp);
-		switch (ipsec_rc) {
-		case IPSEC_STATUS_SUCCESS:
-			break;
-		case IPSEC_STATUS_FAILED:
-			if (ill != NULL) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
-			} else {
-				BUMP_MIB(&ipst->ips_ip_mib,
-				    ipIfStatsOutDiscards);
-			}
-			/* FALLTHRU */
-		case IPSEC_STATUS_PENDING:
-			return;
+		mp = ixa->ixa_ipsec_esp_sa->ipsa_output_func(mp, ixa);
+		if (mp == NULL) {
+			/*
+			 * Either it failed or is pending. In the former case
+			 * ipIfStatsInDiscards was increased.
+			 */
+			return (0);
 		}
 	}
 
-	if ((io->ipsec_out_ah_done == B_FALSE) && (ap->ipa_want_ah)) {
-		ASSERT(io->ipsec_out_ah_sa != NULL);
-		io->ipsec_out_ah_done = B_TRUE;
-		if (ire == NULL) {
-			int idx = io->ipsec_out_capab_ill_index;
-			ill = ill_lookup_on_ifindex(idx, B_FALSE,
-			    NULL, NULL, NULL, NULL, ipst);
-			ill_need_rele = B_TRUE;
-		} else {
-			ill = (ill_t *)ire->ire_stq->q_ptr;
-		}
-		ipsec_out_is_accelerated(ipsec_mp, io->ipsec_out_ah_sa, ill,
-		    ire);
+	if (ap->ipa_want_ah) {
+		ASSERT(ixa->ixa_ipsec_ah_sa != NULL);
 
-		ipsec_rc = io->ipsec_out_ah_sa->ipsa_output_func(ipsec_mp);
-		switch (ipsec_rc) {
-		case IPSEC_STATUS_SUCCESS:
-			break;
-		case IPSEC_STATUS_FAILED:
-			if (ill != NULL) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
-			} else {
-				BUMP_MIB(&ipst->ips_ip_mib,
-				    ipIfStatsOutDiscards);
-			}
-			/* FALLTHRU */
-		case IPSEC_STATUS_PENDING:
-			if (ill != NULL && ill_need_rele)
-				ill_refrele(ill);
-			return;
+		mp = ixa->ixa_ipsec_ah_sa->ipsa_output_func(mp, ixa);
+		if (mp == NULL) {
+			/*
+			 * Either it failed or is pending. In the former case
+			 * ipIfStatsInDiscards was increased.
+			 */
+			return (0);
 		}
 	}
 	/*
-	 * We are done with IPsec processing. Send it over the wire.
+	 * We are done with IPsec processing. Send it over
+	 * the wire.
 	 */
-done:
-	mp = ipsec_mp->b_cont;
-	ipha = (ipha_t *)mp->b_rptr;
-	if (IPH_HDR_VERSION(ipha) == IP_VERSION) {
-		ip_wput_ipsec_out(q, ipsec_mp, ipha, ire->ire_ipif->ipif_ill,
-		    ire);
-	} else {
-		ip6h = (ip6_t *)ipha;
-		ip_wput_ipsec_out_v6(q, ipsec_mp, ip6h, ire->ire_ipif->ipif_ill,
-		    ire);
-	}
-	if (ill != NULL && ill_need_rele)
-		ill_refrele(ill);
-}
-
-/* ARGSUSED */
-void
-ip_restart_optmgmt(ipsq_t *dummy_sq, queue_t *q, mblk_t *first_mp, void *dummy)
-{
-	opt_restart_t	*or;
-	int	err;
-	conn_t	*connp;
-	cred_t	*cr;
-
-	ASSERT(CONN_Q(q));
-	connp = Q_TO_CONN(q);
-
-	ASSERT(first_mp->b_datap->db_type == M_CTL);
-	or = (opt_restart_t *)first_mp->b_rptr;
-	/*
-	 * We checked for a db_credp the first time svr4_optcom_req
-	 * was called (from ip_wput_nondata). So we can just ASSERT here.
-	 */
-	cr = msg_getcred(first_mp, NULL);
-	ASSERT(cr != NULL);
-
-	if (or->or_type == T_SVR4_OPTMGMT_REQ) {
-		err = svr4_optcom_req(q, first_mp, cr,
-		    &ip_opt_obj, B_FALSE);
-	} else {
-		ASSERT(or->or_type == T_OPTMGMT_REQ);
-		err = tpi_optcom_req(q, first_mp, cr,
-		    &ip_opt_obj, B_FALSE);
-	}
-	if (err != EINPROGRESS) {
-		/* operation is done */
-		CONN_OPER_PENDING_DONE(connp);
-	}
+	return (ip_output_post_ipsec(mp, ixa));
 }
 
 /*
@@ -26810,6 +12591,11 @@ ip_reprocess_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 	err = (*ipip->ipi_func_restart)(ipsq->ipsq_xop->ipx_current_ipif, sin,
 	    q, mp, ipip, mp1->b_rptr);
+
+	DTRACE_PROBE4(ipif__ioctl, char *, "ip_reprocess_ioctl finish",
+	    int, ipip->ipi_cmd,
+	    ill_t *, ipsq->ipsq_xop->ipx_current_ipif->ipif_ill,
+	    ipif_t *, ipsq->ipsq_xop->ipx_current_ipif);
 
 	ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), ipsq);
 }
@@ -26865,12 +12651,16 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	 */
 	if (ipip->ipi_cmd == SIOCLIFADDIF) {
 		err = ip_sioctl_addif(NULL, NULL, q, mp, NULL, NULL);
+		DTRACE_PROBE4(ipif__ioctl, char *, "ip_process_ioctl finish",
+		    int, ipip->ipi_cmd, ill_t *, NULL, ipif_t *, NULL);
 		ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), NULL);
 		return;
 	}
 
 	ci.ci_ipif = NULL;
-	if (ipip->ipi_cmd_type == MISC_CMD) {
+	switch (ipip->ipi_cmd_type) {
+	case MISC_CMD:
+	case MSFILT_CMD:
 		/*
 		 * All MISC_CMD ioctls come in here -- e.g. SIOCGLIFCONF.
 		 */
@@ -26883,28 +12673,29 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 		ci.ci_sin = NULL;
 		ci.ci_sin6 = NULL;
 		ci.ci_lifr = NULL;
-	} else {
-		switch (ipip->ipi_cmd_type) {
-		case IF_CMD:
-		case LIF_CMD:
-			extract_funcp = ip_extract_lifreq;
-			break;
+		extract_funcp = NULL;
+		break;
 
-		case ARP_CMD:
-		case XARP_CMD:
-			extract_funcp = ip_extract_arpreq;
-			break;
+	case IF_CMD:
+	case LIF_CMD:
+		extract_funcp = ip_extract_lifreq;
+		break;
 
-		case MSFILT_CMD:
-			extract_funcp = ip_extract_msfilter;
-			break;
+	case ARP_CMD:
+	case XARP_CMD:
+		extract_funcp = ip_extract_arpreq;
+		break;
 
-		default:
-			ASSERT(0);
-		}
+	default:
+		ASSERT(0);
+	}
 
-		err = (*extract_funcp)(q, mp, ipip, &ci, ip_process_ioctl);
+	if (extract_funcp != NULL) {
+		err = (*extract_funcp)(q, mp, ipip, &ci);
 		if (err != 0) {
+			DTRACE_PROBE4(ipif__ioctl,
+			    char *, "ip_process_ioctl finish err",
+			    int, ipip->ipi_cmd, ill_t *, NULL, ipif_t *, NULL);
 			ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), NULL);
 			return;
 		}
@@ -26923,8 +12714,17 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 		 */
 		err = (*ipip->ipi_func)(ci.ci_ipif, ci.ci_sin, q, mp, ipip,
 		    ci.ci_lifr);
-		if (ci.ci_ipif != NULL)
+		if (ci.ci_ipif != NULL) {
+			DTRACE_PROBE4(ipif__ioctl,
+			    char *, "ip_process_ioctl finish RD",
+			    int, ipip->ipi_cmd, ill_t *, ci.ci_ipif->ipif_ill,
+			    ipif_t *, ci.ci_ipif);
 			ipif_refrele(ci.ci_ipif);
+		} else {
+			DTRACE_PROBE4(ipif__ioctl,
+			    char *, "ip_process_ioctl finish RD",
+			    int, ipip->ipi_cmd, ill_t *, NULL, ipif_t *, NULL);
+		}
 		ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), NULL);
 		return;
 	}
@@ -26932,7 +12732,7 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	ASSERT(ci.ci_ipif != NULL);
 
 	/*
-	 * If ipsq is non-NULL, we are already being called exclusively.
+	 * If ipsq is non-NULL, we are already being called exclusively
 	 */
 	ASSERT(ipsq == NULL || IAM_WRITER_IPSQ(ipsq));
 	if (ipsq == NULL) {
@@ -26944,7 +12744,6 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 		}
 		entered_ipsq = B_TRUE;
 	}
-
 	/*
 	 * Release the ipif so that ipif_down and friends that wait for
 	 * references to go away are not misled about the current ipif_refcnt
@@ -26962,6 +12761,10 @@ ip_process_ioctl(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
 	 */
 	err = (*ipip->ipi_func)(ci.ci_ipif, ci.ci_sin, q, mp, ipip, ci.ci_lifr);
 
+	DTRACE_PROBE4(ipif__ioctl, char *, "ip_process_ioctl finish WR",
+	    int, ipip->ipi_cmd,
+	    ill_t *, ci.ci_ipif == NULL ? NULL : ci.ci_ipif->ipif_ill,
+	    ipif_t *, ci.ci_ipif);
 	ip_ioctl_finish(q, mp, err, IPI2MODE(ipip), ipsq);
 
 	if (entered_ipsq)
@@ -27012,31 +12815,21 @@ ip_ioctl_finish(queue_t *q, mblk_t *mp, int err, int mode, ipsq_t *ipsq)
 		ipsq_current_finish(ipsq);
 }
 
-/* Called from ip_wput for all non data messages */
-/* ARGSUSED */
+/* Handles all non data messages */
 void
-ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
+ip_wput_nondata(queue_t *q, mblk_t *mp)
 {
 	mblk_t		*mp1;
-	ire_t		*ire, *fake_ire;
-	ill_t		*ill;
 	struct iocblk	*iocp;
 	ip_ioctl_cmd_t	*ipip;
-	cred_t		*cr;
 	conn_t		*connp;
-	int		err;
-	nce_t		*nce;
-	ipif_t		*ipif;
-	ip_stack_t	*ipst;
+	cred_t		*cr;
 	char		*proto_str;
 
-	if (CONN_Q(q)) {
+	if (CONN_Q(q))
 		connp = Q_TO_CONN(q);
-		ipst = connp->conn_netstack->netstack_ip;
-	} else {
+	else
 		connp = NULL;
-		ipst = ILLQ_TO_IPST(q);
-	}
 
 	switch (DB_TYPE(mp)) {
 	case M_IOCTL:
@@ -27064,17 +12857,10 @@ ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		}
 		if ((q->q_next != NULL) && !(ipip->ipi_flags & IPI_MODOK)) {
 			/*
-			 * the ioctl is one we recognise, but is not
-			 * consumed by IP as a module, pass M_IOCDATA
-			 * for processing downstream, but only for
-			 * common Streams ioctls.
+			 * The ioctl is one we recognise, but is not consumed
+			 * by IP as a module and we are a module, so we drop
 			 */
-			if (ipip->ipi_flags & IPI_PASS_DOWN) {
-				putnext(q, mp);
-				return;
-			} else {
-				goto nak;
-			}
+			goto nak;
 		}
 
 		/* IOCTL continuation following copyin or copyout. */
@@ -27110,8 +12896,8 @@ ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			/*
 			 * Refhold the conn, till the ioctl completes. This is
 			 * needed in case the ioctl ends up in the pending mp
-			 * list. Every mp in the ill_pending_mp list and
-			 * the ipx_pending_mp must have a refhold on the conn
+			 * list. Every mp in the ipx_pending_mp list
+			 * must have a refhold on the conn
 			 * to resume processing. The refhold is released when
 			 * the ioctl completes. (normally or abnormally)
 			 * In all cases ip_ioctl_finish is called to finish
@@ -27119,7 +12905,6 @@ ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 */
 			if (connp != NULL) {
 				/* This is not a reentry */
-				ASSERT(ipsq == NULL);
 				CONN_INC_REF(connp);
 			} else {
 				if (!(ipip->ipi_flags & IPI_MODOK)) {
@@ -27128,17 +12913,11 @@ ip_wput_nondata(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 				}
 			}
 
-			ip_process_ioctl(ipsq, q, mp, ipip);
+			ip_process_ioctl(NULL, q, mp, ipip);
 
 		} else {
 			mi_copyout(q, mp);
 		}
-		return;
-nak:
-		iocp->ioc_error = EINVAL;
-		mp->b_datap->db_type = M_IOCNAK;
-		iocp->ioc_count = 0;
-		qreply(q, mp);
 		return;
 
 	case M_IOCNAK:
@@ -27147,35 +12926,13 @@ nak:
 		 * an IOCTL we sent it.	 This shouldn't happen.
 		 */
 		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
-		    "ip_wput: unexpected M_IOCNAK, ioc_cmd 0x%x",
+		    "ip_wput_nondata: unexpected M_IOCNAK, ioc_cmd 0x%x",
 		    ((struct iocblk *)mp->b_rptr)->ioc_cmd);
 		freemsg(mp);
 		return;
 	case M_IOCACK:
 		/* /dev/ip shouldn't see this */
-		if (CONN_Q(q))
-			goto nak;
-
-		/*
-		 * Finish socket ioctls passed through to ARP.  We use the
-		 * ioc_cmd values we set in ip_sioctl_arp() to decide whether
-		 * we need to become writer before calling ip_sioctl_iocack().
-		 * Note that qwriter_ip() will release the refhold, and that a
-		 * refhold is OK without ILL_CAN_LOOKUP() since we're on the
-		 * ill stream.
-		 */
-		iocp = (struct iocblk *)mp->b_rptr;
-		if (iocp->ioc_cmd == AR_ENTRY_SQUERY) {
-			ip_sioctl_iocack(NULL, q, mp, NULL);
-			return;
-		}
-
-		ASSERT(iocp->ioc_cmd == AR_ENTRY_DELETE ||
-		    iocp->ioc_cmd == AR_ENTRY_ADD);
-		ill = q->q_ptr;
-		ill_refhold(ill);
-		qwriter_ip(ill, q, mp, ip_sioctl_iocack, CUR_OP, B_FALSE);
-		return;
+		goto nak;
 	case M_FLUSH:
 		if (*mp->b_rptr & FLUSHW)
 			flushq(q, FLUSHALL);
@@ -27190,117 +12947,17 @@ nak:
 		}
 		freemsg(mp);
 		return;
-	case IRE_DB_REQ_TYPE:
-		if (connp == NULL) {
-			proto_str = "IRE_DB_REQ_TYPE";
-			goto protonak;
-		}
-		/* An Upper Level Protocol wants a copy of an IRE. */
-		ip_ire_req(q, mp);
-		return;
 	case M_CTL:
-		if (mp->b_wptr - mp->b_rptr < sizeof (uint32_t))
-			break;
-
-		/* M_CTL messages are used by ARP to tell us things. */
-		if ((mp->b_wptr - mp->b_rptr) < sizeof (arc_t))
-			break;
-		switch (((arc_t *)mp->b_rptr)->arc_cmd) {
-		case AR_ENTRY_SQUERY:
-			putnext(q, mp);
-			return;
-		case AR_CLIENT_NOTIFY:
-			ip_arp_news(q, mp);
-			return;
-		case AR_DLPIOP_DONE:
-			ASSERT(q->q_next != NULL);
-			ill = (ill_t *)q->q_ptr;
-			/* qwriter_ip releases the refhold */
-			/* refhold on ill stream is ok without ILL_CAN_LOOKUP */
-			ill_refhold(ill);
-			qwriter_ip(ill, q, mp, ip_arp_done, CUR_OP, B_FALSE);
-			return;
-		case AR_ARP_CLOSING:
-			/*
-			 * ARP (above us) is closing. If no ARP bringup is
-			 * currently pending, ack the message so that ARP
-			 * can complete its close. Also mark ill_arp_closing
-			 * so that new ARP bringups will fail. If any
-			 * ARP bringup is currently in progress, we will
-			 * ack this when the current ARP bringup completes.
-			 */
-			ASSERT(q->q_next != NULL);
-			ill = (ill_t *)q->q_ptr;
-			mutex_enter(&ill->ill_lock);
-			ill->ill_arp_closing = 1;
-			if (!ill->ill_arp_bringup_pending) {
-				mutex_exit(&ill->ill_lock);
-				qreply(q, mp);
-			} else {
-				mutex_exit(&ill->ill_lock);
-				freemsg(mp);
-			}
-			return;
-		case AR_ARP_EXTEND:
-			/*
-			 * The ARP module above us is capable of duplicate
-			 * address detection.  Old ATM drivers will not send
-			 * this message.
-			 */
-			ASSERT(q->q_next != NULL);
-			ill = (ill_t *)q->q_ptr;
-			ill->ill_arp_extend = B_TRUE;
-			freemsg(mp);
-			return;
-		default:
-			break;
-		}
 		break;
 	case M_PROTO:
 	case M_PCPROTO:
 		/*
-		 * The only PROTO messages we expect are copies of option
-		 * negotiation acknowledgements, AH and ESP bind requests
-		 * are also expected.
+		 * The only PROTO messages we expect are SNMP-related.
 		 */
 		switch (((union T_primitives *)mp->b_rptr)->type) {
-		case O_T_BIND_REQ:
-		case T_BIND_REQ: {
-			/* Request can get queued in bind */
-			if (connp == NULL) {
-				proto_str = "O_T_BIND_REQ/T_BIND_REQ";
-				goto protonak;
-			}
-			/*
-			 * The transports except SCTP call ip_bind_{v4,v6}()
-			 * directly instead of a a putnext. SCTP doesn't
-			 * generate any T_BIND_REQ since it has its own
-			 * fanout data structures. However, ESP and AH
-			 * come in for regular binds; all other cases are
-			 * bind retries.
-			 */
-			ASSERT(!IPCL_IS_SCTP(connp));
-
-			/* Don't increment refcnt if this is a re-entry */
-			if (ipsq == NULL)
-				CONN_INC_REF(connp);
-
-			mp = connp->conn_af_isv6 ? ip_bind_v6(q, mp,
-			    connp, NULL) : ip_bind_v4(q, mp, connp);
-			ASSERT(mp != NULL);
-
-			ASSERT(!IPCL_IS_TCP(connp));
-			ASSERT(!IPCL_IS_UDP(connp));
-			ASSERT(!IPCL_IS_RAWIP(connp));
-			ASSERT(!IPCL_IS_IPTUN(connp));
-
-			/* The case of AH and ESP */
-			qreply(q, mp);
-			CONN_OPER_PENDING_DONE(connp);
-			return;
-		}
 		case T_SVR4_OPTMGMT_REQ:
-			ip2dbg(("ip_wput: T_SVR4_OPTMGMT_REQ flags %x\n",
+			ip2dbg(("ip_wput_nondata: T_SVR4_OPTMGMT_REQ "
+			    "flags %x\n",
 			    ((struct T_optmgmt_req *)mp->b_rptr)->MGMT_flags));
 
 			if (connp == NULL) {
@@ -27324,460 +12981,17 @@ nak:
 				return;
 			}
 
-			if (!snmpcom_req(q, mp, ip_snmp_set,
-			    ip_snmp_get, cr)) {
-				/*
-				 * Call svr4_optcom_req so that it can
-				 * generate the ack. We don't come here
-				 * if this operation is being restarted.
-				 * ip_restart_optmgmt will drop the conn ref.
-				 * In the case of ipsec option after the ipsec
-				 * load is complete conn_restart_ipsec_waiter
-				 * drops the conn ref.
-				 */
-				ASSERT(ipsq == NULL);
-				CONN_INC_REF(connp);
-				if (ip_check_for_ipsec_opt(q, mp))
-					return;
-				err = svr4_optcom_req(q, mp, cr, &ip_opt_obj,
-				    B_FALSE);
-				if (err != EINPROGRESS) {
-					/* Operation is done */
-					CONN_OPER_PENDING_DONE(connp);
-				}
-			}
-			return;
-		case T_OPTMGMT_REQ:
-			ip2dbg(("ip_wput: T_OPTMGMT_REQ\n"));
-			/*
-			 * Note: No snmpcom_req support through new
-			 * T_OPTMGMT_REQ.
-			 * Call tpi_optcom_req so that it can
-			 * generate the ack.
-			 */
-			if (connp == NULL) {
-				proto_str = "T_OPTMGMT_REQ";
+			if (!snmpcom_req(q, mp, ip_snmp_set, ip_snmp_get, cr)) {
+				proto_str = "Bad SNMPCOM request?";
 				goto protonak;
 			}
-
-			/*
-			 * All Solaris components should pass a db_credp
-			 * for this TPI message, hence we ASSERT.
-			 * But in case there is some other M_PROTO that looks
-			 * like a TPI message sent by some other kernel
-			 * component, we check and return an error.
-			 */
-			cr = msg_getcred(mp, NULL);
-			ASSERT(cr != NULL);
-			if (cr == NULL) {
-				mp = mi_tpi_err_ack_alloc(mp, TSYSERR, EINVAL);
-				if (mp != NULL)
-					qreply(q, mp);
-				return;
-			}
-			ASSERT(ipsq == NULL);
-			/*
-			 * We don't come here for restart. ip_restart_optmgmt
-			 * will drop the conn ref. In the case of ipsec option
-			 * after the ipsec load is complete
-			 * conn_restart_ipsec_waiter drops the conn ref.
-			 */
-			CONN_INC_REF(connp);
-			if (ip_check_for_ipsec_opt(q, mp))
-				return;
-			err = tpi_optcom_req(q, mp, cr, &ip_opt_obj, B_FALSE);
-			if (err != EINPROGRESS) {
-				/* Operation is done */
-				CONN_OPER_PENDING_DONE(connp);
-			}
-			return;
-		case T_UNBIND_REQ:
-			if (connp == NULL) {
-				proto_str = "T_UNBIND_REQ";
-				goto protonak;
-			}
-			ip_unbind(Q_TO_CONN(q));
-			mp = mi_tpi_ok_ack_alloc(mp);
-			qreply(q, mp);
 			return;
 		default:
-			/*
-			 * Have to drop any DLPI messages coming down from
-			 * arp (such as an info_req which would cause ip
-			 * to receive an extra info_ack if it was passed
-			 * through.
-			 */
-			ip1dbg(("ip_wput_nondata: dropping M_PROTO %d\n",
+			ip1dbg(("ip_wput_nondata: dropping M_PROTO prim %u\n",
 			    (int)*(uint_t *)mp->b_rptr));
 			freemsg(mp);
 			return;
 		}
-		/* NOTREACHED */
-	case IRE_DB_TYPE: {
-		nce_t		*nce;
-		ill_t		*ill;
-		in6_addr_t	gw_addr_v6;
-
-		/*
-		 * This is a response back from a resolver.  It
-		 * consists of a message chain containing:
-		 *	IRE_MBLK-->LL_HDR_MBLK->pkt
-		 * The IRE_MBLK is the one we allocated in ip_newroute.
-		 * The LL_HDR_MBLK is the DLPI header to use to get
-		 * the attached packet, and subsequent ones for the
-		 * same destination, transmitted.
-		 */
-		if ((mp->b_wptr - mp->b_rptr) != sizeof (ire_t))    /* ire */
-			break;
-		/*
-		 * First, check to make sure the resolution succeeded.
-		 * If it failed, the second mblk will be empty.
-		 * If it is, free the chain, dropping the packet.
-		 * (We must ire_delete the ire; that frees the ire mblk)
-		 * We're doing this now to support PVCs for ATM; it's
-		 * a partial xresolv implementation. When we fully implement
-		 * xresolv interfaces, instead of freeing everything here
-		 * we'll initiate neighbor discovery.
-		 *
-		 * For v4 (ARP and other external resolvers) the resolver
-		 * frees the message, so no check is needed. This check
-		 * is required, though, for a full xresolve implementation.
-		 * Including this code here now both shows how external
-		 * resolvers can NACK a resolution request using an
-		 * existing design that has no specific provisions for NACKs,
-		 * and also takes into account that the current non-ARP
-		 * external resolver has been coded to use this method of
-		 * NACKing for all IPv6 (xresolv) cases,
-		 * whether our xresolv implementation is complete or not.
-		 *
-		 */
-		ire = (ire_t *)mp->b_rptr;
-		ill = ire_to_ill(ire);
-		mp1 = mp->b_cont;		/* dl_unitdata_req */
-		if (mp1->b_rptr == mp1->b_wptr) {
-			if (ire->ire_ipversion == IPV6_VERSION) {
-				/*
-				 * XRESOLV interface.
-				 */
-				ASSERT(ill->ill_flags & ILLF_XRESOLV);
-				mutex_enter(&ire->ire_lock);
-				gw_addr_v6 = ire->ire_gateway_addr_v6;
-				mutex_exit(&ire->ire_lock);
-				if (IN6_IS_ADDR_UNSPECIFIED(&gw_addr_v6)) {
-					nce = ndp_lookup_v6(ill, B_FALSE,
-					    &ire->ire_addr_v6, B_FALSE);
-				} else {
-					nce = ndp_lookup_v6(ill, B_FALSE,
-					    &gw_addr_v6, B_FALSE);
-				}
-				if (nce != NULL) {
-					nce_resolv_failed(nce);
-					ndp_delete(nce);
-					NCE_REFRELE(nce);
-				}
-			}
-			mp->b_cont = NULL;
-			freemsg(mp1);		/* frees the pkt as well */
-			ASSERT(ire->ire_nce == NULL);
-			ire_delete((ire_t *)mp->b_rptr);
-			return;
-		}
-
-		/*
-		 * Split them into IRE_MBLK and pkt and feed it into
-		 * ire_add_then_send. Then in ire_add_then_send
-		 * the IRE will be added, and then the packet will be
-		 * run back through ip_wput. This time it will make
-		 * it to the wire.
-		 */
-		mp->b_cont = NULL;
-		mp = mp1->b_cont;		/* now, mp points to pkt */
-		mp1->b_cont = NULL;
-		ip1dbg(("ip_wput_nondata: reply from external resolver \n"));
-		if (ire->ire_ipversion == IPV6_VERSION) {
-			/*
-			 * XRESOLV interface. Find the nce and put a copy
-			 * of the dl_unitdata_req in nce_res_mp
-			 */
-			ASSERT(ill->ill_flags & ILLF_XRESOLV);
-			mutex_enter(&ire->ire_lock);
-			gw_addr_v6 = ire->ire_gateway_addr_v6;
-			mutex_exit(&ire->ire_lock);
-			if (IN6_IS_ADDR_UNSPECIFIED(&gw_addr_v6)) {
-				nce = ndp_lookup_v6(ill, B_FALSE,
-				    &ire->ire_addr_v6, B_FALSE);
-			} else {
-				nce = ndp_lookup_v6(ill, B_FALSE,
-				    &gw_addr_v6, B_FALSE);
-			}
-			if (nce != NULL) {
-				/*
-				 * We have to protect nce_res_mp here
-				 * from being accessed by other threads
-				 * while we change the mblk pointer.
-				 * Other functions will also lock the nce when
-				 * accessing nce_res_mp.
-				 *
-				 * The reason we change the mblk pointer
-				 * here rather than copying the resolved address
-				 * into the template is that, unlike with
-				 * ethernet, we have no guarantee that the
-				 * resolved address length will be
-				 * smaller than or equal to the lla length
-				 * with which the template was allocated,
-				 * (for ethernet, they're equal)
-				 * so we have to use the actual resolved
-				 * address mblk - which holds the real
-				 * dl_unitdata_req with the resolved address.
-				 *
-				 * Doing this is the same behavior as was
-				 * previously used in the v4 ARP case.
-				 */
-				mutex_enter(&nce->nce_lock);
-				if (nce->nce_res_mp != NULL)
-					freemsg(nce->nce_res_mp);
-				nce->nce_res_mp = mp1;
-				mutex_exit(&nce->nce_lock);
-				/*
-				 * We do a fastpath probe here because
-				 * we have resolved the address without
-				 * using Neighbor Discovery.
-				 * In the non-XRESOLV v6 case, the fastpath
-				 * probe is done right after neighbor
-				 * discovery completes.
-				 */
-				if (nce->nce_res_mp != NULL) {
-					int res;
-					nce_fastpath_list_add(nce);
-					res = ill_fastpath_probe(ill,
-					    nce->nce_res_mp);
-					if (res != 0 && res != EAGAIN)
-						nce_fastpath_list_delete(nce);
-				}
-
-				ire_add_then_send(q, ire, mp);
-				/*
-				 * Now we have to clean out any packets
-				 * that may have been queued on the nce
-				 * while it was waiting for address resolution
-				 * to complete.
-				 */
-				mutex_enter(&nce->nce_lock);
-				mp1 = nce->nce_qd_mp;
-				nce->nce_qd_mp = NULL;
-				mutex_exit(&nce->nce_lock);
-				while (mp1 != NULL) {
-					mblk_t *nxt_mp;
-					queue_t *fwdq = NULL;
-					ill_t   *inbound_ill;
-					uint_t ifindex;
-
-					nxt_mp = mp1->b_next;
-					mp1->b_next = NULL;
-					/*
-					 * Retrieve ifindex stored in
-					 * ip_rput_data_v6()
-					 */
-					ifindex =
-					    (uint_t)(uintptr_t)mp1->b_prev;
-					inbound_ill =
-					    ill_lookup_on_ifindex(ifindex,
-					    B_TRUE, NULL, NULL, NULL,
-					    NULL, ipst);
-					mp1->b_prev = NULL;
-					if (inbound_ill != NULL)
-						fwdq = inbound_ill->ill_rq;
-
-					if (fwdq != NULL) {
-						put(fwdq, mp1);
-						ill_refrele(inbound_ill);
-					} else
-						put(WR(ill->ill_rq), mp1);
-					mp1 = nxt_mp;
-				}
-				NCE_REFRELE(nce);
-			} else {	/* nce is NULL; clean up */
-				ire_delete(ire);
-				freemsg(mp);
-				freemsg(mp1);
-				return;
-			}
-		} else {
-			nce_t *arpce;
-			/*
-			 * Link layer resolution succeeded. Recompute the
-			 * ire_nce.
-			 */
-			ASSERT(ire->ire_type & (IRE_CACHE|IRE_BROADCAST));
-			if ((arpce = ndp_lookup_v4(ill,
-			    (ire->ire_gateway_addr != INADDR_ANY ?
-			    &ire->ire_gateway_addr : &ire->ire_addr),
-			    B_FALSE)) == NULL) {
-				freeb(ire->ire_mp);
-				freeb(mp1);
-				freemsg(mp);
-				return;
-			}
-			mutex_enter(&arpce->nce_lock);
-			arpce->nce_last = TICK_TO_MSEC(lbolt64);
-			if (arpce->nce_state == ND_REACHABLE) {
-				/*
-				 * Someone resolved this before us;
-				 * cleanup the res_mp. Since ire has
-				 * not been added yet, the call to ire_add_v4
-				 * from ire_add_then_send (when a dup is
-				 * detected) will clean up the ire.
-				 */
-				freeb(mp1);
-			} else {
-				ASSERT(arpce->nce_res_mp == NULL);
-				arpce->nce_res_mp = mp1;
-				arpce->nce_state = ND_REACHABLE;
-			}
-			mutex_exit(&arpce->nce_lock);
-			if (ire->ire_marks & IRE_MARK_NOADD) {
-				/*
-				 * this ire will not be added to the ire
-				 * cache table, so we can set the ire_nce
-				 * here, as there are no atomicity constraints.
-				 */
-				ire->ire_nce = arpce;
-				/*
-				 * We are associating this nce with the ire
-				 * so change the nce ref taken in
-				 * ndp_lookup_v4() from
-				 * NCE_REFHOLD to NCE_REFHOLD_NOTR
-				 */
-				NCE_REFHOLD_TO_REFHOLD_NOTR(ire->ire_nce);
-			} else {
-				NCE_REFRELE(arpce);
-			}
-			ire_add_then_send(q, ire, mp);
-		}
-		return;	/* All is well, the packet has been sent. */
-	}
-	case IRE_ARPRESOLVE_TYPE: {
-
-		if ((mp->b_wptr - mp->b_rptr) != sizeof (ire_t)) /* fake_ire */
-			break;
-		mp1 = mp->b_cont;		/* dl_unitdata_req */
-		mp->b_cont = NULL;
-		/*
-		 * First, check to make sure the resolution succeeded.
-		 * If it failed, the second mblk will be empty.
-		 */
-		if (mp1->b_rptr == mp1->b_wptr) {
-			/* cleanup  the incomplete ire, free queued packets */
-			freemsg(mp); /* fake ire */
-			freeb(mp1);  /* dl_unitdata response */
-			return;
-		}
-
-		/*
-		 * Update any incomplete nce_t found. We search the ctable
-		 * and find the nce from the ire->ire_nce because we need
-		 * to pass the ire to ip_xmit_v4 later, and can find both
-		 * ire and nce in one lookup.
-		 */
-		fake_ire = (ire_t *)mp->b_rptr;
-
-		/*
-		 * By the time we come back here from ARP the logical outgoing
-		 * interface of the incomplete ire we added in ire_forward()
-		 * could have disappeared, causing the incomplete ire to also
-		 * disappear.  So we need to retreive the proper ipif for the
-		 * ire before looking in ctable.  In the case of IPMP, the
-		 * ipif may be on the IPMP ill, so look it up based on the
-		 * ire_ipif_ifindex we stashed back in ire_init_common().
-		 * Then, we can verify that ire_ipif_seqid still exists.
-		 */
-		ill = ill_lookup_on_ifindex(fake_ire->ire_ipif_ifindex, B_FALSE,
-		    NULL, NULL, NULL, NULL, ipst);
-		if (ill == NULL) {
-			ip1dbg(("ill for incomplete ire vanished\n"));
-			freemsg(mp); /* fake ire */
-			freeb(mp1);  /* dl_unitdata response */
-			return;
-		}
-
-		/* Get the outgoing ipif */
-		mutex_enter(&ill->ill_lock);
-		ipif = ipif_lookup_seqid(ill, fake_ire->ire_ipif_seqid);
-		if (ipif == NULL) {
-			mutex_exit(&ill->ill_lock);
-			ill_refrele(ill);
-			ip1dbg(("logical intrf to incomplete ire vanished\n"));
-			freemsg(mp); /* fake_ire */
-			freeb(mp1);  /* dl_unitdata response */
-			return;
-		}
-
-		ipif_refhold_locked(ipif);
-		mutex_exit(&ill->ill_lock);
-		ill_refrele(ill);
-		ire = ire_arpresolve_lookup(fake_ire->ire_addr,
-		    fake_ire->ire_gateway_addr, ipif, fake_ire->ire_zoneid,
-		    ipst, ((ill_t *)q->q_ptr)->ill_wq);
-		ipif_refrele(ipif);
-		if (ire == NULL) {
-			/*
-			 * no ire was found; check if there is an nce
-			 * for this lookup; if it has no ire's pointing at it
-			 * cleanup.
-			 */
-			if ((nce = ndp_lookup_v4(q->q_ptr,
-			    (fake_ire->ire_gateway_addr != INADDR_ANY ?
-			    &fake_ire->ire_gateway_addr : &fake_ire->ire_addr),
-			    B_FALSE)) != NULL) {
-				/*
-				 * cleanup:
-				 * We check for refcnt 2 (one for the nce
-				 * hash list + 1 for the ref taken by
-				 * ndp_lookup_v4) to check that there are
-				 * no ire's pointing at the nce.
-				 */
-				if (nce->nce_refcnt == 2)
-					ndp_delete(nce);
-				NCE_REFRELE(nce);
-			}
-			freeb(mp1);  /* dl_unitdata response */
-			freemsg(mp); /* fake ire */
-			return;
-		}
-
-		nce = ire->ire_nce;
-		DTRACE_PROBE2(ire__arpresolve__type,
-		    ire_t *, ire, nce_t *, nce);
-		mutex_enter(&nce->nce_lock);
-		nce->nce_last = TICK_TO_MSEC(lbolt64);
-		if (nce->nce_state == ND_REACHABLE) {
-			/*
-			 * Someone resolved this before us;
-			 * our response is not needed any more.
-			 */
-			mutex_exit(&nce->nce_lock);
-			freeb(mp1);  /* dl_unitdata response */
-		} else {
-			ASSERT(nce->nce_res_mp == NULL);
-			nce->nce_res_mp = mp1;
-			nce->nce_state = ND_REACHABLE;
-			mutex_exit(&nce->nce_lock);
-			nce_fastpath(nce);
-		}
-		/*
-		 * The cached nce_t has been updated to be reachable;
-		 * Clear the IRE_MARK_UNCACHED flag and free the fake_ire.
-		 */
-		fake_ire->ire_marks &= ~IRE_MARK_UNCACHED;
-		freemsg(mp);
-		/*
-		 * send out queued packets.
-		 */
-		(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE, NULL);
-
-		IRE_REFRELE(ire);
-		return;
-	}
 	default:
 		break;
 	}
@@ -27787,6 +13001,13 @@ nak:
 		freemsg(mp);
 	return;
 
+nak:
+	iocp->ioc_error = EINVAL;
+	mp->b_datap->db_type = M_IOCNAK;
+	iocp->ioc_count = 0;
+	qreply(q, mp);
+	return;
+
 protonak:
 	cmn_err(CE_NOTE, "IP doesn't process %s as a module", proto_str);
 	if ((mp = mi_tpi_err_ack_alloc(mp, TPROTO, EINVAL)) != NULL)
@@ -27794,14 +13015,15 @@ protonak:
 }
 
 /*
- * Process IP options in an outbound packet.  Modify the destination if there
- * is a source route option.
+ * Process IP options in an outbound packet.  Verify that the nexthop in a
+ * strict source route is onlink.
  * Returns non-zero if something fails in which case an ICMP error has been
  * sent and mp freed.
+ *
+ * Assumes the ULP has called ip_massage_options to move nexthop into ipha_dst.
  */
-static int
-ip_wput_options(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha,
-    boolean_t mctl_present, zoneid_t zoneid, ip_stack_t *ipst)
+int
+ip_output_options(mblk_t *mp, ipha_t *ipha, ip_xmit_attr_t *ixa, ill_t *ill)
 {
 	ipoptp_t	opts;
 	uchar_t		*opt;
@@ -27809,14 +13031,11 @@ ip_wput_options(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha,
 	uint8_t		optlen;
 	ipaddr_t	dst;
 	intptr_t	code = 0;
-	mblk_t		*mp;
-	ire_t		*ire = NULL;
+	ire_t		*ire;
+	ip_stack_t	*ipst = ixa->ixa_ipst;
+	ip_recv_attr_t	iras;
 
-	ip2dbg(("ip_wput_options\n"));
-	mp = ipsec_mp;
-	if (mctl_present) {
-		mp = ipsec_mp->b_cont;
-	}
+	ip2dbg(("ip_output_options\n"));
 
 	dst = ipha->ipha_dst;
 	for (optval = ipoptp_first(&opts, ipha);
@@ -27824,7 +13043,7 @@ ip_wput_options(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha,
 	    optval = ipoptp_next(&opts)) {
 		opt = opts.ipoptp_cur;
 		optlen = opts.ipoptp_len;
-		ip2dbg(("ip_wput_options: opt %d, len %d\n",
+		ip2dbg(("ip_output_options: opt %d, len %d\n",
 		    optval, optlen));
 		switch (optval) {
 			uint32_t off;
@@ -27832,25 +13051,25 @@ ip_wput_options(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha,
 		case IPOPT_LSRR:
 			if ((opts.ipoptp_flags & IPOPTP_ERROR) != 0) {
 				ip1dbg((
-				    "ip_wput_options: bad option offset\n"));
+				    "ip_output_options: bad option offset\n"));
 				code = (char *)&opt[IPOPT_OLEN] -
 				    (char *)ipha;
 				goto param_prob;
 			}
 			off = opt[IPOPT_OFFSET];
-			ip1dbg(("ip_wput_options: next hop 0x%x\n",
+			ip1dbg(("ip_output_options: next hop 0x%x\n",
 			    ntohl(dst)));
 			/*
 			 * For strict: verify that dst is directly
 			 * reachable.
 			 */
 			if (optval == IPOPT_SSRR) {
-				ire = ire_ftable_lookup(dst, 0, 0,
-				    IRE_INTERFACE, NULL, NULL, ALL_ZONES, 0,
-				    msg_getlabel(mp),
-				    MATCH_IRE_TYPE | MATCH_IRE_SECATTR, ipst);
+				ire = ire_ftable_lookup_v4(dst, 0, 0,
+				    IRE_IF_ALL, NULL, ALL_ZONES, ixa->ixa_tsl,
+				    MATCH_IRE_TYPE | MATCH_IRE_SECATTR, 0, ipst,
+				    NULL);
 				if (ire == NULL) {
-					ip1dbg(("ip_wput_options: SSRR not"
+					ip1dbg(("ip_output_options: SSRR not"
 					    " directly reachable: 0x%x\n",
 					    ntohl(dst)));
 					goto bad_src_route;
@@ -27861,7 +13080,7 @@ ip_wput_options(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha,
 		case IPOPT_RR:
 			if ((opts.ipoptp_flags & IPOPTP_ERROR) != 0) {
 				ip1dbg((
-				    "ip_wput_options: bad option offset\n"));
+				    "ip_output_options: bad option offset\n"));
 				code = (char *)&opt[IPOPT_OLEN] -
 				    (char *)ipha;
 				goto param_prob;
@@ -27879,7 +13098,7 @@ ip_wput_options(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha,
 			}
 			if ((opts.ipoptp_flags & IPOPTP_ERROR) != 0) {
 				ip1dbg((
-				    "ip_wput_options: bad option offset\n"));
+				    "ip_output_options: bad option offset\n"));
 				code = (char *)&opt[IPOPT_OFFSET] -
 				    (char *)ipha;
 				goto param_prob;
@@ -27913,33 +13132,31 @@ ip_wput_options(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha,
 	if ((opts.ipoptp_flags & IPOPTP_ERROR) == 0)
 		return (0);
 
-	ip1dbg(("ip_wput_options: error processing IP options."));
+	ip1dbg(("ip_output_options: error processing IP options."));
 	code = (char *)&opt[IPOPT_OFFSET] - (char *)ipha;
 
 param_prob:
-	/*
-	 * Since ip_wput() isn't close to finished, we fill
-	 * in enough of the header for credible error reporting.
-	 */
-	if (ip_hdr_complete((ipha_t *)mp->b_rptr, zoneid, ipst)) {
-		/* Failed */
-		freemsg(ipsec_mp);
-		return (-1);
-	}
-	icmp_param_problem(q, ipsec_mp, (uint8_t)code, zoneid, ipst);
+	bzero(&iras, sizeof (iras));
+	iras.ira_ill = iras.ira_rill = ill;
+	iras.ira_ruifindex = ill->ill_phyint->phyint_ifindex;
+	iras.ira_rifindex = iras.ira_ruifindex;
+	iras.ira_flags = IRAF_IS_IPV4;
+
+	ip_drop_output("ip_output_options", mp, ill);
+	icmp_param_problem(mp, (uint8_t)code, &iras);
+	ASSERT(!(iras.ira_flags & IRAF_IPSEC_SECURE));
 	return (-1);
 
 bad_src_route:
-	/*
-	 * Since ip_wput() isn't close to finished, we fill
-	 * in enough of the header for credible error reporting.
-	 */
-	if (ip_hdr_complete((ipha_t *)mp->b_rptr, zoneid, ipst)) {
-		/* Failed */
-		freemsg(ipsec_mp);
-		return (-1);
-	}
-	icmp_unreachable(q, ipsec_mp, ICMP_SOURCE_ROUTE_FAILED, zoneid, ipst);
+	bzero(&iras, sizeof (iras));
+	iras.ira_ill = iras.ira_rill = ill;
+	iras.ira_ruifindex = ill->ill_phyint->phyint_ifindex;
+	iras.ira_rifindex = iras.ira_ruifindex;
+	iras.ira_flags = IRAF_IS_IPV4;
+
+	ip_drop_input("ICMP_SOURCE_ROUTE_FAILED", mp, ill);
+	icmp_unreachable(mp, ICMP_SOURCE_ROUTE_FAILED, &iras);
+	ASSERT(!(iras.ira_flags & IRAF_IPSEC_SECURE));
 	return (-1);
 }
 
@@ -28082,29 +13299,60 @@ conn_drain_insert(conn_t *connp, idl_tx_list_t *tx_list)
 	/*
 	 * For non streams based sockets assert flow control.
 	 */
-	if (IPCL_IS_NONSTR(connp)) {
-		DTRACE_PROBE1(su__txq__full, conn_t *, connp);
-		(*connp->conn_upcalls->su_txq_full)
-		    (connp->conn_upper_handle, B_TRUE);
-	} else {
-		conn_setqfull(connp);
-		noenable(connp->conn_wq);
-	}
+	conn_setqfull(connp, NULL);
 	mutex_exit(CONN_DRAIN_LIST_LOCK(connp));
+}
+
+static void
+conn_idl_remove(conn_t *connp)
+{
+	idl_t *idl = connp->conn_idl;
+
+	if (idl != NULL) {
+		/*
+		 * Remove ourself from the drain list, if we did not do
+		 * a putq, or if the conn is closing.
+		 * Note: It is possible that q->q_first is non-null. It means
+		 * that these messages landed after we did a enableok() in
+		 * ip_wsrv. Thus STREAMS will call ip_wsrv once again to
+		 * service them.
+		 */
+		if (connp->conn_drain_next == connp) {
+			/* Singleton in the list */
+			ASSERT(connp->conn_drain_prev == connp);
+			idl->idl_conn = NULL;
+		} else {
+			connp->conn_drain_prev->conn_drain_next =
+			    connp->conn_drain_next;
+			connp->conn_drain_next->conn_drain_prev =
+			    connp->conn_drain_prev;
+			if (idl->idl_conn == connp)
+				idl->idl_conn = connp->conn_drain_next;
+		}
+	}
+	connp->conn_drain_next = NULL;
+	connp->conn_drain_prev = NULL;
+
+	conn_clrqfull(connp, NULL);
+	/*
+	 * For streams based sockets open up flow control.
+	 */
+	if (!IPCL_IS_NONSTR(connp))
+		enableok(connp->conn_wq);
 }
 
 /*
  * This conn is closing, and we are called from ip_close. OR
- * This conn has been serviced by ip_wsrv, and we need to do the tail
- * processing.
- * If this conn is part of the drain list, we may need to sustain the drain
- * process by qenabling the next conn in the drain list. We may also need to
- * remove this conn from the list, if it is done.
+ * this conn is draining because flow-control on the ill has been relieved.
+ *
+ * We must also need to remove conn's on this idl from the list, and also
+ * inform the sockfs upcalls about the change in flow-control.
  */
 static void
 conn_drain_tail(conn_t *connp, boolean_t closing)
 {
 	idl_t *idl;
+	conn_t *next_connp;
 
 	/*
 	 * connp->conn_idl is stable at this point, and no lock is needed
@@ -28116,24 +13364,21 @@ conn_drain_tail(conn_t *connp, boolean_t closing)
 	 * instance of service trying to call conn_drain_insert on this conn
 	 * now.
 	 */
-	ASSERT(!closing || (connp->conn_idl != NULL));
+	ASSERT(!closing || connp == NULL || connp->conn_idl != NULL);
 
 	/*
 	 * If connp->conn_idl is null, the conn has not been inserted into any
 	 * drain list even once since creation of the conn. Just return.
 	 */
-	if (connp->conn_idl == NULL)
+	if (connp == NULL || connp->conn_idl == NULL)
 		return;
-
-	mutex_enter(CONN_DRAIN_LIST_LOCK(connp));
 
 	if (connp->conn_drain_prev == NULL) {
 		/* This conn is currently not in the drain list.  */
-		mutex_exit(CONN_DRAIN_LIST_LOCK(connp));
 		return;
 	}
 	idl = connp->conn_idl;
-	if (idl->idl_conn_draining == connp) {
+	if (!closing) {
 		/*
 		 * This conn is the current drainer. If this is the last conn
 		 * in the drain list, we need to do more checks, in the 'if'
@@ -28141,186 +13386,45 @@ conn_drain_tail(conn_t *connp, boolean_t closing)
 		 * to sustain the draining, and is handled in the 'else'
 		 * below.
 		 */
-		if (connp->conn_drain_next == idl->idl_conn) {
-			/*
-			 * This conn is the last in this list. This round
-			 * of draining is complete. If idl_repeat is set,
-			 * it means another flow enabling has happened from
-			 * the driver/streams and we need to another round
-			 * of draining.
-			 * If there are more than 2 conns in the drain list,
-			 * do a left rotate by 1, so that all conns except the
-			 * conn at the head move towards the head by 1, and the
-			 * the conn at the head goes to the tail. This attempts
-			 * a more even share for all queues that are being
-			 * drained.
-			 */
-			if ((connp->conn_drain_next != connp) &&
-			    (idl->idl_conn->conn_drain_next != connp)) {
-				idl->idl_conn = idl->idl_conn->conn_drain_next;
-			}
-			if (idl->idl_repeat) {
-				qenable(idl->idl_conn->conn_wq);
-				idl->idl_conn_draining = idl->idl_conn;
-				idl->idl_repeat = 0;
-			} else {
-				idl->idl_conn_draining = NULL;
-			}
-		} else {
-			/*
-			 * If the next queue that we are now qenable'ing,
-			 * is closing, it will remove itself from this list
-			 * and qenable the subsequent queue in ip_close().
-			 * Serialization is acheived thru idl_lock.
-			 */
-			qenable(connp->conn_drain_next->conn_wq);
-			idl->idl_conn_draining = connp->conn_drain_next;
+		next_connp = connp->conn_drain_next;
+		while (next_connp != connp) {
+			conn_t *delconnp = next_connp;
+
+			next_connp = next_connp->conn_drain_next;
+			conn_idl_remove(delconnp);
 		}
+		ASSERT(connp->conn_drain_next == idl->idl_conn);
 	}
-	if (!connp->conn_did_putbq || closing) {
-		/*
-		 * Remove ourself from the drain list, if we did not do
-		 * a putbq, or if the conn is closing.
-		 * Note: It is possible that q->q_first is non-null. It means
-		 * that these messages landed after we did a enableok() in
-		 * ip_wsrv. Thus STREAMS will call ip_wsrv once again to
-		 * service them.
-		 */
-		if (connp->conn_drain_next == connp) {
-			/* Singleton in the list */
-			ASSERT(connp->conn_drain_prev == connp);
-			idl->idl_conn = NULL;
-			idl->idl_conn_draining = NULL;
-		} else {
-			connp->conn_drain_prev->conn_drain_next =
-			    connp->conn_drain_next;
-			connp->conn_drain_next->conn_drain_prev =
-			    connp->conn_drain_prev;
-			if (idl->idl_conn == connp)
-				idl->idl_conn = connp->conn_drain_next;
-			ASSERT(idl->idl_conn_draining != connp);
+	conn_idl_remove(connp);
 
-		}
-		connp->conn_drain_next = NULL;
-		connp->conn_drain_prev = NULL;
-
-		/*
-		 * For non streams based sockets open up flow control.
-		 */
-		if (IPCL_IS_NONSTR(connp)) {
-			(*connp->conn_upcalls->su_txq_full)
-			    (connp->conn_upper_handle, B_FALSE);
-		} else {
-			conn_clrqfull(connp);
-			enableok(connp->conn_wq);
-		}
-	}
-
-	mutex_exit(CONN_DRAIN_LIST_LOCK(connp));
 }
 
 /*
  * Write service routine. Shared perimeter entry point.
- * ip_wsrv can be called in any of the following ways.
- * 1. The device queue's messages has fallen below the low water mark
- *    and STREAMS has backenabled the ill_wq. We walk thru all the
- *    the drain lists and backenable the first conn in each list.
- * 2. The above causes STREAMS to run ip_wsrv on the conn_wq of the
- *    qenabled non-tcp upper layers. We start dequeing messages and call
- *    ip_wput for each message.
+ * The device queue's messages has fallen below the low water mark and STREAMS
+ * has backenabled the ill_wq. Send sockfs notification about flow-control onx
+ * each waiting conn.
  */
-
 void
 ip_wsrv(queue_t *q)
 {
-	conn_t	*connp;
 	ill_t	*ill;
-	mblk_t	*mp;
 
-	if (q->q_next) {
-		ill = (ill_t *)q->q_ptr;
-		if (ill->ill_state_flags == 0) {
-			ip_stack_t *ipst = ill->ill_ipst;
+	ill = (ill_t *)q->q_ptr;
+	if (ill->ill_state_flags == 0) {
+		ip_stack_t *ipst = ill->ill_ipst;
 
-			/*
-			 * The device flow control has opened up.
-			 * Walk through conn drain lists and qenable the
-			 * first conn in each list. This makes sense only
-			 * if the stream is fully plumbed and setup.
-			 * Hence the if check above.
-			 */
-			ip1dbg(("ip_wsrv: walking\n"));
-			conn_walk_drain(ipst, &ipst->ips_idl_tx_list[0]);
-		}
-		return;
-	}
-
-	connp = Q_TO_CONN(q);
-	ip1dbg(("ip_wsrv: %p %p\n", (void *)q, (void *)connp));
-
-	/*
-	 * 1. Set conn_draining flag to signal that service is active.
-	 *
-	 * 2. ip_output determines whether it has been called from service,
-	 *    based on the last parameter. If it is IP_WSRV it concludes it
-	 *    has been called from service.
-	 *
-	 * 3. Message ordering is preserved by the following logic.
-	 *    i. A directly called ip_output (i.e. not thru service) will queue
-	 *    the message at the tail, if conn_draining is set (i.e. service
-	 *    is running) or if q->q_first is non-null.
-	 *
-	 *    ii. If ip_output is called from service, and if ip_output cannot
-	 *    putnext due to flow control, it does a putbq.
-	 *
-	 * 4. noenable the queue so that a putbq from ip_wsrv does not reenable
-	 *    (causing an infinite loop).
-	 */
-	ASSERT(!connp->conn_did_putbq);
-
-	while ((q->q_first != NULL) && !connp->conn_did_putbq) {
-		connp->conn_draining = 1;
-		noenable(q);
-		while ((mp = getq(q)) != NULL) {
-			ASSERT(CONN_Q(q));
-
-			DTRACE_PROBE1(ip__wsrv__ip__output, conn_t *, connp);
-			ip_output(Q_TO_CONN(q), mp, q, IP_WSRV);
-			if (connp->conn_did_putbq) {
-				/* ip_wput did a putbq */
-				break;
-			}
-		}
 		/*
-		 * At this point, a thread coming down from top, calling
-		 * ip_wput, may end up queueing the message. We have not yet
-		 * enabled the queue, so ip_wsrv won't be called again.
-		 * To avoid this race, check q->q_first again (in the loop)
-		 * If the other thread queued the message before we call
-		 * enableok(), we will catch it in the q->q_first check.
-		 * If the other thread queues the message after we call
-		 * enableok(), ip_wsrv will be called again by STREAMS.
+		 * The device flow control has opened up.
+		 * Walk through conn drain lists and qenable the
+		 * first conn in each list. This makes sense only
+		 * if the stream is fully plumbed and setup.
+		 * Hence the ill_state_flags check above.
 		 */
-		connp->conn_draining = 0;
-		enableok(q);
+		ip1dbg(("ip_wsrv: walking\n"));
+		conn_walk_drain(ipst, &ipst->ips_idl_tx_list[0]);
+		enableok(ill->ill_wq);
 	}
-
-	/* Enable the next conn for draining */
-	conn_drain_tail(connp, B_FALSE);
-
-	/*
-	 * conn_direct_blocked is used to indicate blocked
-	 * condition for direct path (ILL_DIRECT_CAPABLE()).
-	 * This is the only place where it is set without
-	 * checking for ILL_DIRECT_CAPABLE() and setting it
-	 * to 0 is ok even if it is not ILL_DIRECT_CAPABLE().
-	 */
-	if (!connp->conn_did_putbq && connp->conn_direct_blocked) {
-		DTRACE_PROBE1(ip__wsrv__direct__blocked, conn_t *, connp);
-		connp->conn_direct_blocked = B_FALSE;
-	}
-
-	connp->conn_did_putbq = 0;
 }
 
 /*
@@ -28369,21 +13473,7 @@ conn_walk_drain(ip_stack_t *ipst, idl_tx_list_t *tx_list)
 	for (i = 0; i < ipst->ips_conn_drain_list_cnt; i++) {
 		idl = &tx_list->txl_drain_list[i];
 		mutex_enter(&idl->idl_lock);
-		if (idl->idl_conn == NULL) {
-			mutex_exit(&idl->idl_lock);
-			continue;
-		}
-		/*
-		 * If this list is not being drained currently by
-		 * an ip_wsrv thread, start the process.
-		 */
-		if (idl->idl_conn_draining == NULL) {
-			ASSERT(idl->idl_repeat == 0);
-			qenable(idl->idl_conn->conn_wq);
-			idl->idl_conn_draining = idl->idl_conn;
-		} else {
-			idl->idl_repeat = 1;
-		}
+		conn_drain_tail(idl->idl_conn, B_FALSE);
 		mutex_exit(&idl->idl_lock);
 	}
 }
@@ -28393,240 +13483,190 @@ conn_walk_drain(ip_stack_t *ipst, idl_tx_list_t *tx_list)
  * "matches" the conn.
  */
 boolean_t
-conn_wantpacket(conn_t *connp, ill_t *ill, ipha_t *ipha, int fanout_flags,
-    zoneid_t zoneid)
+conn_wantpacket(conn_t *connp, ip_recv_attr_t *ira, ipha_t *ipha)
 {
-	ill_t *bound_ill;
-	boolean_t found;
-	ipif_t *ipif;
-	ire_t *ire;
-	ipaddr_t dst, src;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
+	ill_t		*ill = ira->ira_rill;
+	zoneid_t	zoneid = ira->ira_zoneid;
+	uint_t		in_ifindex;
+	ipaddr_t	dst, src;
 
 	dst = ipha->ipha_dst;
 	src = ipha->ipha_src;
 
 	/*
-	 * conn_incoming_ill is set by IP_BOUND_IF which limits
+	 * conn_incoming_ifindex is set by IP_BOUND_IF which limits
 	 * unicast, broadcast and multicast reception to
-	 * conn_incoming_ill. conn_wantpacket itself is called
-	 * only for BROADCAST and multicast.
+	 * conn_incoming_ifindex.
+	 * conn_wantpacket is called for unicast, broadcast and
+	 * multicast packets.
 	 */
-	bound_ill = connp->conn_incoming_ill;
-	if (bound_ill != NULL) {
-		if (IS_IPMP(bound_ill)) {
-			if (bound_ill->ill_grp != ill->ill_grp)
-				return (B_FALSE);
-		} else {
-			if (bound_ill != ill)
-				return (B_FALSE);
-		}
-	}
+	in_ifindex = connp->conn_incoming_ifindex;
 
-	if (!CLASSD(dst)) {
-		if (IPCL_ZONE_MATCH(connp, zoneid))
-			return (B_TRUE);
-		/*
-		 * The conn is in a different zone; we need to check that this
-		 * broadcast address is configured in the application's zone.
-		 */
-		ipif = ipif_get_next_ipif(NULL, ill);
-		if (ipif == NULL)
+	/* mpathd can bind to the under IPMP interface, which we allow */
+	if (in_ifindex != 0 && in_ifindex != ill->ill_phyint->phyint_ifindex) {
+		if (!IS_UNDER_IPMP(ill))
 			return (B_FALSE);
-		ire = ire_ctable_lookup(dst, 0, IRE_BROADCAST, ipif,
-		    connp->conn_zoneid, NULL,
-		    (MATCH_IRE_TYPE | MATCH_IRE_ILL), ipst);
-		ipif_refrele(ipif);
-		if (ire != NULL) {
-			ire_refrele(ire);
-			return (B_TRUE);
-		} else {
+
+		if (in_ifindex != ipmp_ill_get_ipmp_ifindex(ill))
 			return (B_FALSE);
-		}
 	}
 
-	if ((fanout_flags & IP_FF_NO_MCAST_LOOP) &&
-	    connp->conn_zoneid == zoneid) {
-		/*
-		 * Loopback case: the sending endpoint has IP_MULTICAST_LOOP
-		 * disabled, therefore we don't dispatch the multicast packet to
-		 * the sending zone.
-		 */
+	if (!IPCL_ZONE_MATCH(connp, zoneid))
 		return (B_FALSE);
-	}
 
-	if (IS_LOOPBACK(ill) && connp->conn_zoneid != zoneid) {
-		/*
-		 * Multicast packet on the loopback interface: we only match
-		 * conns who joined the group in the specified zone.
-		 */
-		return (B_FALSE);
-	}
+	if (!(ira->ira_flags & IRAF_MULTICAST))
+		return (B_TRUE);
 
 	if (connp->conn_multi_router) {
 		/* multicast packet and multicast router socket: send up */
 		return (B_TRUE);
 	}
 
-	mutex_enter(&connp->conn_lock);
-	found = (ilg_lookup_ill_withsrc(connp, dst, src, ill) != NULL);
-	mutex_exit(&connp->conn_lock);
-	return (found);
+	if (ipha->ipha_protocol == IPPROTO_PIM ||
+	    ipha->ipha_protocol == IPPROTO_RSVP)
+		return (B_TRUE);
+
+	return (conn_hasmembers_ill_withsrc_v4(connp, dst, src, ira->ira_ill));
 }
 
-static void
-conn_setqfull(conn_t *connp)
+void
+conn_setqfull(conn_t *connp, boolean_t *flow_stopped)
 {
-	queue_t *q = connp->conn_wq;
+	if (IPCL_IS_NONSTR(connp)) {
+		(*connp->conn_upcalls->su_txq_full)
+		    (connp->conn_upper_handle, B_TRUE);
+		if (flow_stopped != NULL)
+			*flow_stopped = B_TRUE;
+	} else {
+		queue_t *q = connp->conn_wq;
 
-	if (!(q->q_flag & QFULL)) {
-		mutex_enter(QLOCK(q));
+		ASSERT(q != NULL);
 		if (!(q->q_flag & QFULL)) {
-			/* still need to set QFULL */
-			q->q_flag |= QFULL;
-			mutex_exit(QLOCK(q));
-		} else {
-			mutex_exit(QLOCK(q));
+			mutex_enter(QLOCK(q));
+			if (!(q->q_flag & QFULL)) {
+				/* still need to set QFULL */
+				q->q_flag |= QFULL;
+				/* set flow_stopped to true under QLOCK */
+				if (flow_stopped != NULL)
+					*flow_stopped = B_TRUE;
+				mutex_exit(QLOCK(q));
+			} else {
+				/* flow_stopped is left unchanged */
+				mutex_exit(QLOCK(q));
+			}
 		}
 	}
 }
 
-static void
-conn_clrqfull(conn_t *connp)
+void
+conn_clrqfull(conn_t *connp, boolean_t *flow_stopped)
 {
-	queue_t *q = connp->conn_wq;
+	if (IPCL_IS_NONSTR(connp)) {
+		(*connp->conn_upcalls->su_txq_full)
+		    (connp->conn_upper_handle, B_FALSE);
+		if (flow_stopped != NULL)
+			*flow_stopped = B_FALSE;
+	} else {
+		queue_t *q = connp->conn_wq;
 
-	if (q->q_flag & QFULL) {
-		mutex_enter(QLOCK(q));
+		ASSERT(q != NULL);
 		if (q->q_flag & QFULL) {
-			q->q_flag &= ~QFULL;
-			mutex_exit(QLOCK(q));
-			if (q->q_flag & QWANTW)
-				qbackenable(q, 0);
-		} else {
-			mutex_exit(QLOCK(q));
+			mutex_enter(QLOCK(q));
+			if (q->q_flag & QFULL) {
+				q->q_flag &= ~QFULL;
+				/* set flow_stopped to false under QLOCK */
+				if (flow_stopped != NULL)
+					*flow_stopped = B_FALSE;
+				mutex_exit(QLOCK(q));
+				if (q->q_flag & QWANTW)
+					qbackenable(q, 0);
+			} else {
+				/* flow_stopped is left unchanged */
+				mutex_exit(QLOCK(q));
+			}
 		}
 	}
+	connp->conn_direct_blocked = B_FALSE;
 }
 
 /*
- * Finish processing of "arp_up" when AR_DLPIOP_DONE is received from arp.
+ * Return the length in bytes of the IPv4 headers (base header, label, and
+ * other IP options) that will be needed based on the
+ * ip_pkt_t structure passed by the caller.
+ *
+ * The returned length does not include the length of the upper level
+ * protocol (ULP) header.
+ * The caller needs to check that the length doesn't exceed the max for IPv4.
  */
-/* ARGSUSED */
-static void
-ip_arp_done(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp, void *dummy_arg)
+int
+ip_total_hdrs_len_v4(const ip_pkt_t *ipp)
 {
-	ill_t *ill = (ill_t *)q->q_ptr;
-	mblk_t	*mp1, *mp2;
-	ipif_t  *ipif;
-	int err = 0;
-	conn_t *connp = NULL;
-	ipsq_t	*ipsq;
-	arc_t	*arc;
+	int len;
 
-	ip1dbg(("ip_arp_done(%s)\n", ill->ill_name));
-
-	ASSERT((mp->b_wptr - mp->b_rptr) >= sizeof (arc_t));
-	ASSERT(((arc_t *)mp->b_rptr)->arc_cmd == AR_DLPIOP_DONE);
-
-	ASSERT(IAM_WRITER_ILL(ill));
-	mp2 = mp->b_cont;
-	mp->b_cont = NULL;
-
-	/*
-	 * We have now received the arp bringup completion message
-	 * from ARP. Mark the arp bringup as done. Also if the arp
-	 * stream has already started closing, send up the AR_ARP_CLOSING
-	 * ack now since ARP is waiting in close for this ack.
-	 */
-	mutex_enter(&ill->ill_lock);
-	ill->ill_arp_bringup_pending = 0;
-	if (ill->ill_arp_closing) {
-		mutex_exit(&ill->ill_lock);
-		/* Let's reuse the mp for sending the ack */
-		arc = (arc_t *)mp->b_rptr;
-		mp->b_wptr = mp->b_rptr + sizeof (arc_t);
-		arc->arc_cmd = AR_ARP_CLOSING;
-		qreply(q, mp);
-	} else {
-		mutex_exit(&ill->ill_lock);
-		freeb(mp);
+	len = IP_SIMPLE_HDR_LENGTH;
+	if (ipp->ipp_fields & IPPF_LABEL_V4) {
+		ASSERT(ipp->ipp_label_len_v4 != 0);
+		/* We need to round up here */
+		len += (ipp->ipp_label_len_v4 + 3) & ~3;
 	}
 
-	ipsq = ill->ill_phyint->phyint_ipsq;
-	ipif = ipsq->ipsq_xop->ipx_pending_ipif;
-	mp1 = ipsq_pending_mp_get(ipsq, &connp);
-	ASSERT(!((mp1 != NULL) ^ (ipif != NULL)));
-	if (mp1 == NULL) {
-		/* bringup was aborted by the user */
-		freemsg(mp2);
-		return;
+	if (ipp->ipp_fields & IPPF_IPV4_OPTIONS) {
+		ASSERT(ipp->ipp_ipv4_options_len != 0);
+		ASSERT((ipp->ipp_ipv4_options_len & 3) == 0);
+		len += ipp->ipp_ipv4_options_len;
 	}
+	return (len);
+}
 
-	/*
-	 * If an IOCTL is waiting on this (ipx_current_ioctl != 0), then we
-	 * must have an associated conn_t.  Otherwise, we're bringing this
-	 * interface back up as part of handling an asynchronous event (e.g.,
-	 * physical address change).
-	 */
-	if (ipsq->ipsq_xop->ipx_current_ioctl != 0) {
-		ASSERT(connp != NULL);
-		q = CONNP_TO_WQ(connp);
-	} else {
-		ASSERT(connp == NULL);
-		q = ill->ill_rq;
-	}
+/*
+ * All-purpose routine to build an IPv4 header with options based
+ * on the abstract ip_pkt_t.
+ *
+ * The caller has to set the source and destination address as well as
+ * ipha_length. The caller has to massage any source route and compensate
+ * for the ULP pseudo-header checksum due to the source route.
+ */
+void
+ip_build_hdrs_v4(uchar_t *buf, uint_t buf_len, const ip_pkt_t *ipp,
+    uint8_t protocol)
+{
+	ipha_t	*ipha = (ipha_t *)buf;
+	uint8_t *cp;
 
-	/*
-	 * If the DL_BIND_REQ fails, it is noted
-	 * in arc_name_offset.
-	 */
-	err = *((int *)mp2->b_rptr);
-	if (err == 0) {
-		if (ipif->ipif_isv6) {
-			if ((err = ipif_up_done_v6(ipif)) != 0)
-				ip0dbg(("ip_arp_done: init failed\n"));
-		} else {
-			if ((err = ipif_up_done(ipif)) != 0)
-				ip0dbg(("ip_arp_done: init failed\n"));
-		}
-	} else {
-		ip0dbg(("ip_arp_done: DL_BIND_REQ failed\n"));
-	}
+	/* Initialize IPv4 header */
+	ipha->ipha_type_of_service = ipp->ipp_type_of_service;
+	ipha->ipha_length = 0;	/* Caller will set later */
+	ipha->ipha_ident = 0;
+	ipha->ipha_fragment_offset_and_flags = 0;
+	ipha->ipha_ttl = ipp->ipp_unicast_hops;
+	ipha->ipha_protocol = protocol;
+	ipha->ipha_hdr_checksum = 0;
 
-	freemsg(mp2);
+	if ((ipp->ipp_fields & IPPF_ADDR) &&
+	    IN6_IS_ADDR_V4MAPPED(&ipp->ipp_addr))
+		ipha->ipha_src = ipp->ipp_addr_v4;
 
-	if ((err == 0) && (ill->ill_up_ipifs)) {
-		err = ill_up_ipifs(ill, q, mp1);
-		if (err == EINPROGRESS)
-			return;
-	}
-
-	/*
-	 * If we have a moved ipif to bring up, and everything has succeeded
-	 * to this point, bring it up on the IPMP ill.  Otherwise, leave it
-	 * down -- the admin can try to bring it up by hand if need be.
-	 */
-	if (ill->ill_move_ipif != NULL) {
-		ipif = ill->ill_move_ipif;
-		ill->ill_move_ipif = NULL;
-		if (err == 0) {
-			err = ipif_up(ipif, q, mp1);
-			if (err == EINPROGRESS)
-				return;
+	cp = (uint8_t *)&ipha[1];
+	if (ipp->ipp_fields & IPPF_LABEL_V4) {
+		ASSERT(ipp->ipp_label_len_v4 != 0);
+		bcopy(ipp->ipp_label_v4, cp, ipp->ipp_label_len_v4);
+		cp += ipp->ipp_label_len_v4;
+		/* We need to round up here */
+		while ((uintptr_t)cp & 0x3) {
+			*cp++ = IPOPT_NOP;
 		}
 	}
 
-	/*
-	 * The operation must complete without EINPROGRESS since
-	 * ipsq_pending_mp_get() has removed the mblk.  Otherwise, the
-	 * operation will be stuck forever in the ipsq.
-	 */
-	ASSERT(err != EINPROGRESS);
-	if (ipsq->ipsq_xop->ipx_current_ioctl != 0)
-		ip_ioctl_finish(q, mp1, err, NO_COPYOUT, ipsq);
-	else
-		ipsq_current_finish(ipsq);
+	if (ipp->ipp_fields & IPPF_IPV4_OPTIONS) {
+		ASSERT(ipp->ipp_ipv4_options_len != 0);
+		ASSERT((ipp->ipp_ipv4_options_len & 3) == 0);
+		bcopy(ipp->ipp_ipv4_options, cp, ipp->ipp_ipv4_options_len);
+		cp += ipp->ipp_ipv4_options_len;
+	}
+	ipha->ipha_version_and_hdr_length =
+	    (uint8_t)((IP_VERSION << 4) + buf_len / 4);
+
+	ASSERT((int)(cp - buf) == buf_len);
 }
 
 /* Allocate the private structure */
@@ -28659,47 +13699,43 @@ ip_priv_free(void *buf)
  * which holds the state information for this packet and invokes the
  * the classifier (via ipp_packet_process). The classification, depending on
  * configured filters, results in a list of actions for this packet. Invoking
- * an action may cause the packet to be dropped, in which case the resulting
- * mblk (*mpp) is NULL. proc indicates the callout position for
- * this packet and ill_index is the interface this packet on or will leave
+ * an action may cause the packet to be dropped, in which case we return NULL.
+ * proc indicates the callout position for
+ * this packet and ill is the interface this packet arrived on or will leave
  * on (inbound and outbound resp.).
+ *
+ * We do the processing on the rill (mapped to the upper if ipmp), but MIB
+ * on the ill corrsponding to the destination IP address.
  */
-void
-ip_process(ip_proc_t proc, mblk_t **mpp, uint32_t ill_index)
+mblk_t *
+ip_process(ip_proc_t proc, mblk_t *mp, ill_t *rill, ill_t *ill)
 {
-	mblk_t		*mp;
 	ip_priv_t	*priv;
 	ipp_action_id_t	aid;
 	int		rc = 0;
 	ipp_packet_t	*pp;
-#define	IP_CLASS	"ip"
 
 	/* If the classifier is not loaded, return  */
 	if ((aid = ipp_action_lookup(IPGPC_CLASSIFY)) == IPP_ACTION_INVAL) {
-		return;
+		return (mp);
 	}
 
-	mp = *mpp;
 	ASSERT(mp != NULL);
 
 	/* Allocate the packet structure */
-	rc = ipp_packet_alloc(&pp, IP_CLASS, aid);
-	if (rc != 0) {
-		*mpp = NULL;
-		freemsg(mp);
-		return;
-	}
+	rc = ipp_packet_alloc(&pp, "ip", aid);
+	if (rc != 0)
+		goto drop;
 
 	/* Allocate the private structure */
 	rc = ip_priv_alloc((void **)&priv);
 	if (rc != 0) {
-		*mpp = NULL;
-		freemsg(mp);
 		ipp_packet_free(pp);
-		return;
+		goto drop;
 	}
 	priv->proc = proc;
-	priv->ill_index = ill_index;
+	priv->ill_index = ill_get_upper_ifindex(rill);
+
 	ipp_packet_set_private(pp, priv, ip_priv_free);
 	ipp_packet_set_data(pp, mp);
 
@@ -28708,14 +13744,23 @@ ip_process(ip_proc_t proc, mblk_t **mpp, uint32_t ill_index)
 	if (pp != NULL) {
 		mp = ipp_packet_get_data(pp);
 		ipp_packet_free(pp);
-		if (rc != 0) {
-			freemsg(mp);
-			*mpp = NULL;
-		}
+		if (rc != 0)
+			goto drop;
+		return (mp);
 	} else {
-		*mpp = NULL;
+		/* No mp to trace in ip_drop_input/ip_drop_output  */
+		mp = NULL;
 	}
-#undef	IP_CLASS
+drop:
+	if (proc == IPP_LOCAL_IN || proc == IPP_FWD_IN) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ip_process", mp, ill);
+	} else {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		ip_drop_output("ip_process", mp, ill);
+	}
+	freemsg(mp);
+	return (NULL);
 }
 
 /*
@@ -28723,102 +13768,92 @@ ip_process(ip_proc_t proc, mblk_t **mpp, uint32_t ill_index)
  * all the interfaces crossed by the related multirt routes.
  * The call is considered successful if the operation succeeds
  * on at least one interface.
+ *
+ * This assumes that a set of IRE_HOST/RTF_MULTIRT has been created for the
+ * multicast addresses with the ire argument being the first one.
+ * We walk the bucket to find all the of those.
+ *
+ * Common to IPv4 and IPv6.
  */
 static int
-ip_multirt_apply_membership(int (*fn)(conn_t *, boolean_t, ipaddr_t, ipaddr_t,
-    uint_t *, mcast_record_t, ipaddr_t, mblk_t *), ire_t *ire, conn_t *connp,
-    boolean_t checkonly, ipaddr_t group, mcast_record_t fmode, ipaddr_t src,
-    mblk_t *first_mp)
+ip_multirt_apply_membership(int (*fn)(conn_t *, boolean_t,
+    const in6_addr_t *, ipaddr_t, uint_t, mcast_record_t, const in6_addr_t *),
+    ire_t *ire, conn_t *connp, boolean_t checkonly, const in6_addr_t *v6group,
+    mcast_record_t fmode, const in6_addr_t *v6src)
 {
 	ire_t		*ire_gw;
 	irb_t		*irb;
+	int		ifindex;
 	int		error = 0;
-	opt_restart_t	*or;
+	int		result;
 	ip_stack_t	*ipst = ire->ire_ipst;
+	ipaddr_t	group;
+	boolean_t	isv6;
+	int		match_flags;
+
+	if (IN6_IS_ADDR_V4MAPPED(v6group)) {
+		IN6_V4MAPPED_TO_IPADDR(v6group, group);
+		isv6 = B_FALSE;
+	} else {
+		isv6 = B_TRUE;
+	}
 
 	irb = ire->ire_bucket;
 	ASSERT(irb != NULL);
 
-	ASSERT(DB_TYPE(first_mp) == M_CTL);
-
-	or = (opt_restart_t *)first_mp->b_rptr;
-	IRB_REFHOLD(irb);
+	result = 0;
+	irb_refhold(irb);
 	for (; ire != NULL; ire = ire->ire_next) {
 		if ((ire->ire_flags & RTF_MULTIRT) == 0)
 			continue;
-		if (ire->ire_addr != group)
-			continue;
 
-		ire_gw = ire_ftable_lookup(ire->ire_gateway_addr, 0, 0,
-		    IRE_INTERFACE, NULL, NULL, ALL_ZONES, 0, NULL,
-		    MATCH_IRE_RECURSIVE | MATCH_IRE_TYPE, ipst);
-		/* No resolver exists for the gateway; skip this ire. */
+		/* We handle -ifp routes by matching on the ill if set */
+		match_flags = MATCH_IRE_TYPE;
+		if (ire->ire_ill != NULL)
+			match_flags |= MATCH_IRE_ILL;
+
+		if (isv6) {
+			if (!IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6, v6group))
+				continue;
+
+			ire_gw = ire_ftable_lookup_v6(&ire->ire_gateway_addr_v6,
+			    0, 0, IRE_INTERFACE, ire->ire_ill, ALL_ZONES, NULL,
+			    match_flags, 0, ipst, NULL);
+		} else {
+			if (ire->ire_addr != group)
+				continue;
+
+			ire_gw = ire_ftable_lookup_v4(ire->ire_gateway_addr,
+			    0, 0, IRE_INTERFACE, ire->ire_ill, ALL_ZONES, NULL,
+			    match_flags, 0, ipst, NULL);
+		}
+		/* No interface route exists for the gateway; skip this ire. */
 		if (ire_gw == NULL)
 			continue;
+		if (ire_gw->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+			ire_refrele(ire_gw);
+			continue;
+		}
+		ASSERT(ire_gw->ire_ill != NULL);	/* IRE_INTERFACE */
+		ifindex = ire_gw->ire_ill->ill_phyint->phyint_ifindex;
 
 		/*
-		 * This function can return EINPROGRESS. If so the operation
-		 * will be restarted from ip_restart_optmgmt which will
-		 * call ip_opt_set and option processing will restart for
-		 * this option. So we may end up calling 'fn' more than once.
-		 * This requires that 'fn' is idempotent except for the
-		 * return value. The operation is considered a success if
+		 * The operation is considered a success if
 		 * it succeeds at least once on any one interface.
 		 */
-		error = fn(connp, checkonly, group, ire_gw->ire_src_addr,
-		    NULL, fmode, src, first_mp);
+		error = fn(connp, checkonly, v6group, INADDR_ANY, ifindex,
+		    fmode, v6src);
 		if (error == 0)
-			or->or_private = CGTP_MCAST_SUCCESS;
-
-		if (ip_debug > 0) {
-			ulong_t	off;
-			char	*ksym;
-			ksym = kobj_getsymname((uintptr_t)fn, &off);
-			ip2dbg(("ip_multirt_apply_membership: "
-			    "called %s, multirt group 0x%08x via itf 0x%08x, "
-			    "error %d [success %u]\n",
-			    ksym ? ksym : "?",
-			    ntohl(group), ntohl(ire_gw->ire_src_addr),
-			    error, or->or_private));
-		}
+			result = CGTP_MCAST_SUCCESS;
 
 		ire_refrele(ire_gw);
-		if (error == EINPROGRESS) {
-			IRB_REFRELE(irb);
-			return (error);
-		}
 	}
-	IRB_REFRELE(irb);
+	irb_refrele(irb);
 	/*
 	 * Consider the call as successful if we succeeded on at least
 	 * one interface. Otherwise, return the last encountered error.
 	 */
-	return (or->or_private == CGTP_MCAST_SUCCESS ? 0 : error);
-}
-
-/*
- * Issue a warning regarding a route crossing an interface with an
- * incorrect MTU. Only one message every 'ip_multirt_log_interval'
- * amount of time is logged.
- */
-static void
-ip_multirt_bad_mtu(ire_t *ire, uint32_t max_frag)
-{
-	hrtime_t	current = gethrtime();
-	char		buf[INET_ADDRSTRLEN];
-	ip_stack_t	*ipst = ire->ire_ipst;
-
-	/* Convert interval in ms to hrtime in ns */
-	if (ipst->ips_multirt_bad_mtu_last_time +
-	    ((hrtime_t)ipst->ips_ip_multirt_log_interval * (hrtime_t)1000000) <=
-	    current) {
-		cmn_err(CE_WARN, "ip: ignoring multiroute "
-		    "to %s, incorrect MTU %u (expected %u)\n",
-		    ip_dot_addr(ire->ire_addr, buf),
-		    ire->ire_max_frag, max_frag);
-
-		ipst->ips_multirt_bad_mtu_last_time = current;
-	}
+	return (result == CGTP_MCAST_SUCCESS ? 0 : error);
 }
 
 /*
@@ -28882,6 +13917,7 @@ ip_cgtp_filter_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 
 	*ip_cgtp_filter_value = (boolean_t)new_value;
 
+	ill_set_inputfn_all(ipst);
 	return (0);
 }
 
@@ -28919,6 +13955,9 @@ ip_cgtp_filter_register(netstackid_t stackid, cgtp_filter_ops_t *ops)
 	}
 
 	ipst->ips_ip_cgtp_filter_ops = ops;
+
+	ill_set_inputfn_all(ipst);
+
 	netstack_rele(ns);
 	return (0);
 }
@@ -28950,6 +13989,9 @@ ip_cgtp_filter_unregister(netstackid_t stackid)
 		return (ENXIO);
 	}
 	ipst->ips_ip_cgtp_filter_ops = NULL;
+
+	ill_set_inputfn_all(ipst);
+
 	netstack_rele(ns);
 	return (0);
 }
@@ -28984,7 +14026,7 @@ ip_cgtp_filter_is_registered(netstackid_t stackid)
 static int
 ip_squeue_switch(int val)
 {
-	int rval = SQ_FILL;
+	int rval;
 
 	switch (val) {
 	case IP_SQUEUE_ENTER_NODRAIN:
@@ -28993,7 +14035,9 @@ ip_squeue_switch(int val)
 	case IP_SQUEUE_ENTER:
 		rval = SQ_PROCESS;
 		break;
+	case IP_SQUEUE_FILL:
 	default:
+		rval = SQ_FILL;
 		break;
 	}
 	return (rval);
@@ -29046,52 +14090,45 @@ ip_kstat2_init(netstackid_t stackid, ip_stat_t *ip_statisticsp)
 	kstat_t *ksp;
 
 	ip_stat_t template = {
-		{ "ipsec_fanout_proto", 	KSTAT_DATA_UINT64 },
 		{ "ip_udp_fannorm", 		KSTAT_DATA_UINT64 },
 		{ "ip_udp_fanmb", 		KSTAT_DATA_UINT64 },
-		{ "ip_udp_fanothers", 		KSTAT_DATA_UINT64 },
-		{ "ip_udp_fast_path", 		KSTAT_DATA_UINT64 },
-		{ "ip_udp_slow_path", 		KSTAT_DATA_UINT64 },
-		{ "ip_udp_input_err", 		KSTAT_DATA_UINT64 },
-		{ "ip_tcppullup", 		KSTAT_DATA_UINT64 },
-		{ "ip_tcpoptions", 		KSTAT_DATA_UINT64 },
-		{ "ip_multipkttcp", 		KSTAT_DATA_UINT64 },
-		{ "ip_tcp_fast_path",		KSTAT_DATA_UINT64 },
-		{ "ip_tcp_slow_path",		KSTAT_DATA_UINT64 },
-		{ "ip_tcp_input_error",		KSTAT_DATA_UINT64 },
+		{ "ip_recv_pullup", 		KSTAT_DATA_UINT64 },
 		{ "ip_db_ref",			KSTAT_DATA_UINT64 },
-		{ "ip_notaligned1",		KSTAT_DATA_UINT64 },
-		{ "ip_notaligned2",		KSTAT_DATA_UINT64 },
-		{ "ip_multimblk3",		KSTAT_DATA_UINT64 },
-		{ "ip_multimblk4",		KSTAT_DATA_UINT64 },
-		{ "ip_ipoptions",		KSTAT_DATA_UINT64 },
-		{ "ip_classify_fail",		KSTAT_DATA_UINT64 },
+		{ "ip_notaligned",		KSTAT_DATA_UINT64 },
+		{ "ip_multimblk",		KSTAT_DATA_UINT64 },
 		{ "ip_opt",			KSTAT_DATA_UINT64 },
-		{ "ip_udp_rput_local",		KSTAT_DATA_UINT64 },
 		{ "ipsec_proto_ahesp",		KSTAT_DATA_UINT64 },
 		{ "ip_conn_flputbq",		KSTAT_DATA_UINT64 },
 		{ "ip_conn_walk_drain",		KSTAT_DATA_UINT64 },
 		{ "ip_out_sw_cksum",		KSTAT_DATA_UINT64 },
+		{ "ip_out_sw_cksum_bytes",	KSTAT_DATA_UINT64 },
 		{ "ip_in_sw_cksum",		KSTAT_DATA_UINT64 },
-		{ "ip_trash_ire_reclaim_calls",	KSTAT_DATA_UINT64 },
-		{ "ip_trash_ire_reclaim_success",	KSTAT_DATA_UINT64 },
-		{ "ip_ire_arp_timer_expired",	KSTAT_DATA_UINT64 },
-		{ "ip_ire_redirect_timer_expired",	KSTAT_DATA_UINT64 },
-		{ "ip_ire_pmtu_timer_expired",	KSTAT_DATA_UINT64 },
-		{ "ip_input_multi_squeue",	KSTAT_DATA_UINT64 },
+		{ "ip_ire_reclaim_calls",	KSTAT_DATA_UINT64 },
+		{ "ip_ire_reclaim_deleted",	KSTAT_DATA_UINT64 },
+		{ "ip_nce_reclaim_calls",	KSTAT_DATA_UINT64 },
+		{ "ip_nce_reclaim_deleted",	KSTAT_DATA_UINT64 },
+		{ "ip_dce_reclaim_calls",	KSTAT_DATA_UINT64 },
+		{ "ip_dce_reclaim_deleted",	KSTAT_DATA_UINT64 },
 		{ "ip_tcp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
 		{ "ip_tcp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
 		{ "ip_tcp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
-		{ "ip_tcp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
 		{ "ip_udp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
 		{ "ip_udp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
-		{ "ip_udp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
-		{ "ip_udp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
-		{ "ip_frag_mdt_pkt_out",		KSTAT_DATA_UINT64 },
-		{ "ip_frag_mdt_discarded",		KSTAT_DATA_UINT64 },
-		{ "ip_frag_mdt_allocfail",		KSTAT_DATA_UINT64 },
-		{ "ip_frag_mdt_addpdescfail",		KSTAT_DATA_UINT64 },
-		{ "ip_frag_mdt_allocd",			KSTAT_DATA_UINT64 },
+		{ "ip_udp_in_sw_cksum_err",	KSTAT_DATA_UINT64 },
+		{ "conn_in_recvdstaddr",	KSTAT_DATA_UINT64 },
+		{ "conn_in_recvopts",		KSTAT_DATA_UINT64 },
+		{ "conn_in_recvif",		KSTAT_DATA_UINT64 },
+		{ "conn_in_recvslla",		KSTAT_DATA_UINT64 },
+		{ "conn_in_recvucred",		KSTAT_DATA_UINT64 },
+		{ "conn_in_recvttl",		KSTAT_DATA_UINT64 },
+		{ "conn_in_recvhopopts",	KSTAT_DATA_UINT64 },
+		{ "conn_in_recvhoplimit",	KSTAT_DATA_UINT64 },
+		{ "conn_in_recvdstopts",	KSTAT_DATA_UINT64 },
+		{ "conn_in_recvrthdrdstopts",	KSTAT_DATA_UINT64 },
+		{ "conn_in_recvrthdr",		KSTAT_DATA_UINT64 },
+		{ "conn_in_recvpktinfo",	KSTAT_DATA_UINT64 },
+		{ "conn_in_recvtclass",		KSTAT_DATA_UINT64 },
+		{ "conn_in_timestamp",		KSTAT_DATA_UINT64 },
 	};
 
 	ksp = kstat_create_netstack("ip", 0, "ipstat", "net",
@@ -29420,322 +14457,456 @@ icmp_kstat_update(kstat_t *kp, int rw)
  * a port.  This is assured in ipcl_sctp_hash_insert();
  */
 void
-ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
-    uint32_t ports, boolean_t mctl_present, uint_t flags, boolean_t ip_policy,
-    zoneid_t zoneid)
+ip_fanout_sctp_raw(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, uint32_t ports,
+    ip_recv_attr_t *ira)
 {
 	conn_t		*connp;
 	queue_t		*rq;
-	mblk_t		*first_mp;
 	boolean_t	secure;
-	ip6_t		*ip6h;
-	ip_stack_t	*ipst = recv_ill->ill_ipst;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 	sctp_stack_t	*sctps = ipst->ips_netstack->netstack_sctp;
-	boolean_t	sctp_csum_err = B_FALSE;
+	iaflags_t	iraflags = ira->ira_flags;
+	ill_t		*rill = ira->ira_rill;
 
-	if (flags & IP_FF_SCTP_CSUM_ERR) {
-		sctp_csum_err = B_TRUE;
-		flags &= ~IP_FF_SCTP_CSUM_ERR;
-	}
+	secure = iraflags & IRAF_IPSEC_SECURE;
 
-	first_mp = mp;
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		secure = ipsec_in_is_secure(first_mp);
-		ASSERT(mp != NULL);
-	} else {
-		secure = B_FALSE;
-	}
-	ip6h = (isv4) ? NULL : (ip6_t *)ipha;
-
-	connp = ipcl_classify_raw(mp, IPPROTO_SCTP, zoneid, ports, ipha, ipst);
+	connp = ipcl_classify_raw(mp, IPPROTO_SCTP, ports, ipha, ip6h,
+	    ira, ipst);
 	if (connp == NULL) {
 		/*
 		 * Although raw sctp is not summed, OOB chunks must be.
 		 * Drop the packet here if the sctp checksum failed.
 		 */
-		if (sctp_csum_err) {
+		if (iraflags & IRAF_SCTP_CSUM_ERR) {
 			BUMP_MIB(&sctps->sctps_mib, sctpChecksumError);
-			freemsg(first_mp);
+			freemsg(mp);
 			return;
 		}
-		sctp_ootb_input(first_mp, recv_ill, zoneid, mctl_present);
+		ira->ira_ill = ira->ira_rill = NULL;
+		sctp_ootb_input(mp, ira, ipst);
+		ira->ira_ill = ill;
+		ira->ira_rill = rill;
 		return;
 	}
 	rq = connp->conn_rq;
-	if (!canputnext(rq)) {
+	if (IPCL_IS_NONSTR(connp) ? connp->conn_flow_cntrld : !canputnext(rq)) {
 		CONN_DEC_REF(connp);
-		BUMP_MIB(recv_ill->ill_ip_mib, rawipIfStatsInOverflows);
-		freemsg(first_mp);
+		BUMP_MIB(ill->ill_ip_mib, rawipIfStatsInOverflows);
+		freemsg(mp);
 		return;
 	}
-	if ((isv4 ? CONN_INBOUND_POLICY_PRESENT(connp, ipss) :
-	    CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss)) || secure) {
-		first_mp = ipsec_check_inbound_policy(first_mp, connp,
-		    (isv4 ? ipha : NULL), ip6h, mctl_present);
-		if (first_mp == NULL) {
-			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
-			CONN_DEC_REF(connp);
-			return;
-		}
-	}
-	/*
-	 * We probably should not send M_CTL message up to
-	 * raw socket.
-	 */
-	if (mctl_present)
-		freeb(first_mp);
-
-	/* Initiate IPPF processing here if needed. */
-	if ((isv4 && IPP_ENABLED(IPP_LOCAL_IN, ipst) && ip_policy) ||
-	    (!isv4 && IP6_IN_IPP(flags, ipst))) {
-		ip_process(IPP_LOCAL_IN, &mp,
-		    recv_ill->ill_phyint->phyint_ifindex);
+	if (((iraflags & IRAF_IS_IPV4) ?
+	    CONN_INBOUND_POLICY_PRESENT(connp, ipss) :
+	    CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss)) ||
+	    secure) {
+		mp = ipsec_check_inbound_policy(mp, connp, ipha,
+		    ip6h, ira);
 		if (mp == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			/* Note that mp is NULL */
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
 			CONN_DEC_REF(connp);
 			return;
 		}
 	}
 
-	if (connp->conn_recvif || connp->conn_recvslla ||
-	    ((connp->conn_ip_recvpktinfo ||
-	    (!isv4 && IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_src))) &&
-	    (flags & IP_FF_IPINFO))) {
-		int in_flags = 0;
+	if (iraflags & IRAF_ICMP_ERROR) {
+		(connp->conn_recvicmp)(connp, mp, NULL, ira);
+	} else {
+		ill_t *rill = ira->ira_rill;
 
-		/*
-		 * Since sctp does not support IP_RECVPKTINFO for v4, only pass
-		 * IPF_RECVIF.
-		 */
-		if (connp->conn_recvif || connp->conn_ip_recvpktinfo) {
-			in_flags = IPF_RECVIF;
-		}
-		if (connp->conn_recvslla) {
-			in_flags |= IPF_RECVSLLA;
-		}
-		if (isv4) {
-			mp = ip_add_info(mp, recv_ill, in_flags,
-			    IPCL_ZONEID(connp), ipst);
-		} else {
-			mp = ip_add_info_v6(mp, recv_ill, &ip6h->ip6_dst);
-			if (mp == NULL) {
-				BUMP_MIB(recv_ill->ill_ip_mib,
-				    ipIfStatsInDiscards);
-				CONN_DEC_REF(connp);
-				return;
-			}
-		}
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
+		/* This is the SOCK_RAW, IPPROTO_SCTP case. */
+		ira->ira_ill = ira->ira_rill = NULL;
+		(connp->conn_recv)(connp, mp, NULL, ira);
+		ira->ira_ill = ill;
+		ira->ira_rill = rill;
 	}
-
-	BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
-	/*
-	 * We are sending the IPSEC_IN message also up. Refer
-	 * to comments above this function.
-	 * This is the SOCK_RAW, IPPROTO_SCTP case.
-	 */
-	(connp->conn_recv)(connp, mp, NULL);
 	CONN_DEC_REF(connp);
 }
 
-#define	UPDATE_IP_MIB_OB_COUNTERS(ill, len)				\
-{									\
-	BUMP_MIB((ill)->ill_ip_mib, ipIfStatsHCOutTransmits);		\
-	UPDATE_MIB((ill)->ill_ip_mib, ipIfStatsHCOutOctets, (len));	\
-}
 /*
- * This function should be called only if all packet processing
- * including fragmentation is complete. Callers of this function
- * must set mp->b_prev to one of these values:
- *	{0, IPP_FWD_OUT, IPP_LOCAL_OUT}
- * prior to handing over the mp as first argument to this function.
+ * Free a packet that has the link-layer dl_unitdata_req_t or fast-path
+ * header before the ip payload.
+ */
+static void
+ip_xmit_flowctl_drop(ill_t *ill, mblk_t *mp, boolean_t is_fp_mp, int fp_mp_len)
+{
+	int len = (mp->b_wptr - mp->b_rptr);
+	mblk_t *ip_mp;
+
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+	if (is_fp_mp || len != fp_mp_len) {
+		if (len > fp_mp_len) {
+			/*
+			 * fastpath header and ip header in the first mblk
+			 */
+			mp->b_rptr += fp_mp_len;
+		} else {
+			/*
+			 * ip_xmit_attach_llhdr had to prepend an mblk to
+			 * attach the fastpath header before ip header.
+			 */
+			ip_mp = mp->b_cont;
+			freeb(mp);
+			mp = ip_mp;
+			mp->b_rptr += (fp_mp_len - len);
+		}
+	} else {
+		ip_mp = mp->b_cont;
+		freeb(mp);
+		mp = ip_mp;
+	}
+	ip_drop_output("ipIfStatsOutDiscards - flow ctl", mp, ill);
+	freemsg(mp);
+}
+
+/*
+ * Normal post fragmentation function.
  *
- * If the ire passed by caller is incomplete, this function
+ * Send a packet using the passed in nce. This handles both IPv4 and IPv6
+ * using the same state machine.
+ *
+ * We return an error on failure. In particular we return EWOULDBLOCK
+ * when the driver flow controls. In that case this ensures that ip_wsrv runs
+ * (currently by canputnext failure resulting in backenabling from GLD.)
+ * This allows the callers of conn_ip_output() to use EWOULDBLOCK as an
+ * indication that they can flow control until ip_wsrv() tells then to restart.
+ *
+ * If the nce passed by caller is incomplete, this function
  * queues the packet and if necessary, sends ARP request and bails.
- * If the ire passed is fully resolved, we simply prepend
+ * If the Neighbor Cache passed is fully resolved, we simply prepend
  * the link-layer header to the packet, do ipsec hw acceleration
  * work if necessary, and send the packet out on the wire.
- *
- * NOTE: IPsec will only call this function with fully resolved
- * ires if hw acceleration is involved.
- * TODO list :
- * 	a Handle M_MULTIDATA so that
- *	  tcp_multisend->tcp_multisend_data can
- *	  call ip_xmit_v4 directly
- *	b Handle post-ARP work for fragments so that
- *	  ip_wput_frag can call this function.
  */
-ipxmit_state_t
-ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io,
-    boolean_t flow_ctl_enabled, conn_t *connp)
+/* ARGSUSED6 */
+int
+ip_xmit(mblk_t *mp, nce_t *nce, iaflags_t ixaflags, uint_t pkt_len,
+    uint32_t xmit_hint, zoneid_t szone, zoneid_t nolzid, uintptr_t *ixacookie)
 {
-	nce_t		*arpce;
-	ipha_t		*ipha;
-	queue_t		*q;
-	int		ill_index;
-	mblk_t		*nxt_mp, *first_mp;
-	boolean_t	xmit_drop = B_FALSE;
-	ip_proc_t	proc;
-	ill_t		*out_ill;
-	int		pkt_len;
+	queue_t		*wq;
+	ill_t		*ill = nce->nce_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	uint64_t	delta;
+	boolean_t	isv6 = ill->ill_isv6;
+	boolean_t	fp_mp;
+	ncec_t		*ncec = nce->nce_common;
 
-	arpce = ire->ire_nce;
-	ASSERT(arpce != NULL);
+	DTRACE_PROBE1(ip__xmit, nce_t *, nce);
 
-	DTRACE_PROBE2(ip__xmit__v4, ire_t *, ire,  nce_t *, arpce);
+	ASSERT(mp != NULL);
+	ASSERT(mp->b_datap->db_type == M_DATA);
+	ASSERT(pkt_len == msgdsize(mp));
 
-	mutex_enter(&arpce->nce_lock);
-	switch (arpce->nce_state) {
-	case ND_REACHABLE:
-		/* If there are other queued packets, queue this packet */
-		if (arpce->nce_qd_mp != NULL) {
-			if (mp != NULL)
-				nce_queue_mp_common(arpce, mp, B_FALSE);
-			mp = arpce->nce_qd_mp;
+	/*
+	 * If we have already been here and are coming back after ARP/ND.
+	 * the IXAF_NO_TRACE flag is set. We skip FW_HOOKS, DTRACE and ipobs
+	 * in that case since they have seen the packet when it came here
+	 * the first time.
+	 */
+	if (ixaflags & IXAF_NO_TRACE)
+		goto sendit;
+
+	if (ixaflags & IXAF_IS_IPV4) {
+		ipha_t *ipha = (ipha_t *)mp->b_rptr;
+
+		ASSERT(!isv6);
+		ASSERT(pkt_len == ntohs(((ipha_t *)mp->b_rptr)->ipha_length));
+		if (HOOKS4_INTERESTED_PHYSICAL_OUT(ipst) &&
+		    !(ixaflags & IXAF_NO_PFHOOK)) {
+			int	error;
+
+			FW_HOOKS(ipst->ips_ip4_physical_out_event,
+			    ipst->ips_ipv4firewall_physical_out,
+			    NULL, ill, ipha, mp, mp, 0, ipst, error);
+			DTRACE_PROBE1(ip4__physical__out__end,
+			    mblk_t *, mp);
+			if (mp == NULL)
+				return (error);
+
+			/* The length could have changed */
+			pkt_len = msgdsize(mp);
 		}
-		arpce->nce_qd_mp = NULL;
-		mutex_exit(&arpce->nce_lock);
+		if (ipst->ips_ip4_observe.he_interested) {
+			/*
+			 * Note that for TX the zoneid is the sending
+			 * zone, whether or not MLP is in play.
+			 * Since the szone argument is the IP zoneid (i.e.,
+			 * zero for exclusive-IP zones) and ipobs wants
+			 * the system zoneid, we map it here.
+			 */
+			szone = IP_REAL_ZONEID(szone, ipst);
+
+			/*
+			 * On the outbound path the destination zone will be
+			 * unknown as we're sending this packet out on the
+			 * wire.
+			 */
+			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone, ALL_ZONES,
+			    ill, ipst);
+		}
+		DTRACE_IP7(send, mblk_t *, mp,  conn_t *, NULL,
+		    void_ip_t *, ipha,  __dtrace_ipsr_ill_t *, ill,
+		    ipha_t *, ipha, ip6_t *, NULL, int, 0);
+	} else {
+		ip6_t *ip6h = (ip6_t *)mp->b_rptr;
+
+		ASSERT(isv6);
+		ASSERT(pkt_len ==
+		    ntohs(((ip6_t *)mp->b_rptr)->ip6_plen) + IPV6_HDR_LEN);
+		if (HOOKS6_INTERESTED_PHYSICAL_OUT(ipst) &&
+		    !(ixaflags & IXAF_NO_PFHOOK)) {
+			int	error;
+
+			FW_HOOKS6(ipst->ips_ip6_physical_out_event,
+			    ipst->ips_ipv6firewall_physical_out,
+			    NULL, ill, ip6h, mp, mp, 0, ipst, error);
+			DTRACE_PROBE1(ip6__physical__out__end,
+			    mblk_t *, mp);
+			if (mp == NULL)
+				return (error);
+
+			/* The length could have changed */
+			pkt_len = msgdsize(mp);
+		}
+		if (ipst->ips_ip6_observe.he_interested) {
+			/* See above */
+			szone = IP_REAL_ZONEID(szone, ipst);
+
+			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone, ALL_ZONES,
+			    ill, ipst);
+		}
+		DTRACE_IP7(send, mblk_t *, mp,  conn_t *, NULL,
+		    void_ip_t *, ip6h,  __dtrace_ipsr_ill_t *, ill,
+		    ipha_t *, NULL, ip6_t *, ip6h, int, 0);
+	}
+
+sendit:
+	/*
+	 * We check the state without a lock because the state can never
+	 * move "backwards" to initial or incomplete.
+	 */
+	switch (ncec->ncec_state) {
+	case ND_REACHABLE:
+	case ND_STALE:
+	case ND_DELAY:
+	case ND_PROBE:
+		mp = ip_xmit_attach_llhdr(mp, nce);
+		if (mp == NULL) {
+			/*
+			 * ip_xmit_attach_llhdr has increased
+			 * ipIfStatsOutDiscards and called ip_drop_output()
+			 */
+			return (ENOBUFS);
+		}
+		/*
+		 * check if nce_fastpath completed and we tagged on a
+		 * copy of nce_fp_mp in ip_xmit_attach_llhdr().
+		 */
+		fp_mp = (mp->b_datap->db_type == M_DATA);
+
+		if (fp_mp &&
+		    (ill->ill_capabilities & ILL_CAPAB_DLD_DIRECT)) {
+			ill_dld_direct_t *idd;
+
+			idd = &ill->ill_dld_capab->idc_direct;
+			/*
+			 * Send the packet directly to DLD, where it
+			 * may be queued depending on the availability
+			 * of transmit resources at the media layer.
+			 * Return value should be taken into
+			 * account and flow control the TCP.
+			 */
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits);
+			UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
+			    pkt_len);
+
+			if (ixaflags & IXAF_NO_DEV_FLOW_CTL) {
+				(void) idd->idd_tx_df(idd->idd_tx_dh, mp,
+				    (uintptr_t)xmit_hint, IP_DROP_ON_NO_DESC);
+			} else {
+				uintptr_t cookie;
+
+				if ((cookie = idd->idd_tx_df(idd->idd_tx_dh,
+				    mp, (uintptr_t)xmit_hint, 0)) != 0) {
+					if (ixacookie != NULL)
+						*ixacookie = cookie;
+					return (EWOULDBLOCK);
+				}
+			}
+		} else {
+			wq = ill->ill_wq;
+
+			if (!(ixaflags & IXAF_NO_DEV_FLOW_CTL) &&
+			    !canputnext(wq)) {
+				if (ixacookie != NULL)
+					*ixacookie = 0;
+				ip_xmit_flowctl_drop(ill, mp, fp_mp,
+				    nce->nce_fp_mp != NULL ?
+				    MBLKL(nce->nce_fp_mp) : 0);
+				return (EWOULDBLOCK);
+			}
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits);
+			UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
+			    pkt_len);
+			putnext(wq, mp);
+		}
 
 		/*
-		 * Flush the queue.  In the common case, where the
-		 * ARP is already resolved,  it will go through the
-		 * while loop only once.
+		 * The rest of this function implements Neighbor Unreachability
+		 * detection. Determine if the ncec is eligible for NUD.
 		 */
-		while (mp != NULL) {
+		if (ncec->ncec_flags & NCE_F_NONUD)
+			return (0);
 
-			nxt_mp = mp->b_next;
-			mp->b_next = NULL;
-			ASSERT(mp->b_datap->db_type != M_CTL);
-			pkt_len = ntohs(((ipha_t *)mp->b_rptr)->ipha_length);
+		ASSERT(ncec->ncec_state != ND_INCOMPLETE);
+
+		/*
+		 * Check for upper layer advice
+		 */
+		if (ixaflags & IXAF_REACH_CONF) {
+			timeout_id_t tid;
+
 			/*
-			 * This info is needed for IPQOS to do COS marking
-			 * in ip_wput_attach_llhdr->ip_process.
+			 * It should be o.k. to check the state without
+			 * a lock here, at most we lose an advice.
 			 */
-			proc = (ip_proc_t)(uintptr_t)mp->b_prev;
-			mp->b_prev = NULL;
-
-			/* set up ill index for outbound qos processing */
-			out_ill = ire_to_ill(ire);
-			ill_index = out_ill->ill_phyint->phyint_ifindex;
-			first_mp = ip_wput_attach_llhdr(mp, ire, proc,
-			    ill_index, &ipha);
-			if (first_mp == NULL) {
-				xmit_drop = B_TRUE;
-				BUMP_MIB(out_ill->ill_ip_mib,
-				    ipIfStatsOutDiscards);
-				goto next_mp;
+			ncec->ncec_last = TICK_TO_MSEC(lbolt64);
+			if (ncec->ncec_state != ND_REACHABLE) {
+				mutex_enter(&ncec->ncec_lock);
+				ncec->ncec_state = ND_REACHABLE;
+				tid = ncec->ncec_timeout_id;
+				ncec->ncec_timeout_id = 0;
+				mutex_exit(&ncec->ncec_lock);
+				(void) untimeout(tid);
+				if (ip_debug > 2) {
+					/* ip1dbg */
+					pr_addr_dbg("ip_xmit: state"
+					    " for %s changed to"
+					    " REACHABLE\n", AF_INET6,
+					    &ncec->ncec_addr);
+				}
 			}
+			return (0);
+		}
 
-			/* non-ipsec hw accel case */
-			if (io == NULL || !io->ipsec_out_accelerated) {
-				/* send it */
-				q = ire->ire_stq;
-				if (proc == IPP_FWD_OUT) {
-					UPDATE_IB_PKT_COUNT(ire);
-				} else {
-					UPDATE_OB_PKT_COUNT(ire);
-				}
-				ire->ire_last_used_time = lbolt;
-
-				if (flow_ctl_enabled || canputnext(q)) {
-					if (proc == IPP_FWD_OUT) {
-
-					BUMP_MIB(out_ill->ill_ip_mib,
-					    ipIfStatsHCOutForwDatagrams);
-
-					}
-					UPDATE_IP_MIB_OB_COUNTERS(out_ill,
-					    pkt_len);
-
-					DTRACE_IP7(send, mblk_t *, first_mp,
-					    conn_t *, NULL, void_ip_t *, ipha,
-					    __dtrace_ipsr_ill_t *, out_ill,
-					    ipha_t *, ipha, ip6_t *, NULL, int,
-					    0);
-
-					ILL_SEND_TX(out_ill,
-					    ire, connp, first_mp, 0, connp);
-				} else {
-					BUMP_MIB(out_ill->ill_ip_mib,
-					    ipIfStatsOutDiscards);
-					xmit_drop = B_TRUE;
-					freemsg(first_mp);
-				}
-			} else {
+		delta =  TICK_TO_MSEC(lbolt64) - ncec->ncec_last;
+		ip1dbg(("ip_xmit: delta = %" PRId64
+		    " ill_reachable_time = %d \n", delta,
+		    ill->ill_reachable_time));
+		if (delta > (uint64_t)ill->ill_reachable_time) {
+			mutex_enter(&ncec->ncec_lock);
+			switch (ncec->ncec_state) {
+			case ND_REACHABLE:
+				ASSERT((ncec->ncec_flags & NCE_F_NONUD) == 0);
+				/* FALLTHROUGH */
+			case ND_STALE:
 				/*
-				 * Safety Pup says: make sure this
-				 *  is going to the right interface!
+				 * ND_REACHABLE is identical to
+				 * ND_STALE in this specific case. If
+				 * reachable time has expired for this
+				 * neighbor (delta is greater than
+				 * reachable time), conceptually, the
+				 * neighbor cache is no longer in
+				 * REACHABLE state, but already in
+				 * STALE state.  So the correct
+				 * transition here is to ND_DELAY.
 				 */
-				ill_t *ill1 =
-				    (ill_t *)ire->ire_stq->q_ptr;
-				int ifindex =
-				    ill1->ill_phyint->phyint_ifindex;
-				if (ifindex !=
-				    io->ipsec_out_capab_ill_index) {
-					xmit_drop = B_TRUE;
-					freemsg(mp);
-				} else {
-					UPDATE_IP_MIB_OB_COUNTERS(ill1,
-					    pkt_len);
-
-					DTRACE_IP7(send, mblk_t *, first_mp,
-					    conn_t *, NULL, void_ip_t *, ipha,
-					    __dtrace_ipsr_ill_t *, ill1,
-					    ipha_t *, ipha, ip6_t *, NULL,
-					    int, 0);
-
-					ipsec_hw_putnext(ire->ire_stq, mp);
+				ncec->ncec_state = ND_DELAY;
+				mutex_exit(&ncec->ncec_lock);
+				nce_restart_timer(ncec,
+				    ipst->ips_delay_first_probe_time);
+				if (ip_debug > 3) {
+					/* ip2dbg */
+					pr_addr_dbg("ip_xmit: state"
+					    " for %s changed to"
+					    " DELAY\n", AF_INET6,
+					    &ncec->ncec_addr);
 				}
+				break;
+			case ND_DELAY:
+			case ND_PROBE:
+				mutex_exit(&ncec->ncec_lock);
+				/* Timers have already started */
+				break;
+			case ND_UNREACHABLE:
+				/*
+				 * nce_timer has detected that this ncec
+				 * is unreachable and initiated deleting
+				 * this ncec.
+				 * This is a harmless race where we found the
+				 * ncec before it was deleted and have
+				 * just sent out a packet using this
+				 * unreachable ncec.
+				 */
+				mutex_exit(&ncec->ncec_lock);
+				break;
+			default:
+				ASSERT(0);
+				mutex_exit(&ncec->ncec_lock);
 			}
-next_mp:
-			mp = nxt_mp;
-		} /* while (mp != NULL) */
-		if (xmit_drop)
-			return (SEND_FAILED);
-		else
-			return (SEND_PASSED);
+		}
+		return (0);
+
+	case ND_INCOMPLETE:
+		/*
+		 * the state could have changed since we didn't hold the lock.
+		 * Re-verify state under lock.
+		 */
+		mutex_enter(&ncec->ncec_lock);
+		if (NCE_ISREACHABLE(ncec)) {
+			mutex_exit(&ncec->ncec_lock);
+			goto sendit;
+		}
+		/* queue the packet */
+		nce_queue_mp(ncec, mp, ipmp_packet_is_probe(mp, nce->nce_ill));
+		mutex_exit(&ncec->ncec_lock);
+		DTRACE_PROBE2(ip__xmit__incomplete,
+		    (ncec_t *), ncec, (mblk_t *), mp);
+		return (0);
 
 	case ND_INITIAL:
-	case ND_INCOMPLETE:
-
 		/*
-		 * While we do send off packets to dests that
-		 * use fully-resolved CGTP routes, we do not
-		 * handle unresolved CGTP routes.
+		 * State could have changed since we didn't hold the lock, so
+		 * re-verify state.
 		 */
-		ASSERT(!(ire->ire_flags & RTF_MULTIRT));
-		ASSERT(io == NULL || !io->ipsec_out_accelerated);
-
-		if (mp != NULL) {
-			/* queue the packet */
-			nce_queue_mp_common(arpce, mp, B_FALSE);
+		mutex_enter(&ncec->ncec_lock);
+		if (NCE_ISREACHABLE(ncec))  {
+			mutex_exit(&ncec->ncec_lock);
+			goto sendit;
 		}
-
-		if (arpce->nce_state == ND_INCOMPLETE) {
-			mutex_exit(&arpce->nce_lock);
-			DTRACE_PROBE3(ip__xmit__incomplete,
-			    (ire_t *), ire, (mblk_t *), mp,
-			    (ipsec_out_t *), io);
-			return (LOOKUP_IN_PROGRESS);
+		nce_queue_mp(ncec, mp, ipmp_packet_is_probe(mp, nce->nce_ill));
+		if (ncec->ncec_state == ND_INITIAL) {
+			ncec->ncec_state = ND_INCOMPLETE;
+			mutex_exit(&ncec->ncec_lock);
+			/*
+			 * figure out the source we want to use
+			 * and resolve it.
+			 */
+			ip_ndp_resolve(ncec);
+		} else  {
+			mutex_exit(&ncec->ncec_lock);
 		}
+		return (0);
 
-		arpce->nce_state = ND_INCOMPLETE;
-		mutex_exit(&arpce->nce_lock);
+	case ND_UNREACHABLE:
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		ip_drop_output("ipIfStatsOutDiscards - ND_UNREACHABLE",
+		    mp, ill);
+		freemsg(mp);
+		return (0);
 
-		/*
-		 * Note that ire_add() (called from ire_forward())
-		 * holds a ref on the ire until ARP is completed.
-		 */
-		ire_arpresolve(ire);
-		return (LOOKUP_IN_PROGRESS);
 	default:
 		ASSERT(0);
-		mutex_exit(&arpce->nce_lock);
-		return (LLHDR_RESLV_FAILED);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		ip_drop_output("ipIfStatsOutDiscards - ND_other",
+		    mp, ill);
+		freemsg(mp);
+		return (ENETUNREACH);
 	}
 }
-
-#undef	UPDATE_IP_MIB_OB_COUNTERS
 
 /*
  * Return B_TRUE if the buffers differ in length or content.
@@ -29803,52 +14974,300 @@ ip_savebuf(void **dstp, uint_t *dstlenp, boolean_t src_valid,
 }
 
 /*
- * Free the storage pointed to by the members of an ip6_pkt_t.
+ * Free the storage pointed to by the members of an ip_pkt_t.
  */
 void
-ip6_pkt_free(ip6_pkt_t *ipp)
+ip_pkt_free(ip_pkt_t *ipp)
 {
-	ASSERT(ipp->ipp_pathmtu == NULL && !(ipp->ipp_fields & IPPF_PATHMTU));
+	uint_t	fields = ipp->ipp_fields;
 
-	if (ipp->ipp_fields & IPPF_HOPOPTS) {
+	if (fields & IPPF_HOPOPTS) {
 		kmem_free(ipp->ipp_hopopts, ipp->ipp_hopoptslen);
 		ipp->ipp_hopopts = NULL;
 		ipp->ipp_hopoptslen = 0;
 	}
-	if (ipp->ipp_fields & IPPF_RTDSTOPTS) {
-		kmem_free(ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen);
-		ipp->ipp_rtdstopts = NULL;
-		ipp->ipp_rtdstoptslen = 0;
+	if (fields & IPPF_RTHDRDSTOPTS) {
+		kmem_free(ipp->ipp_rthdrdstopts, ipp->ipp_rthdrdstoptslen);
+		ipp->ipp_rthdrdstopts = NULL;
+		ipp->ipp_rthdrdstoptslen = 0;
 	}
-	if (ipp->ipp_fields & IPPF_DSTOPTS) {
+	if (fields & IPPF_DSTOPTS) {
 		kmem_free(ipp->ipp_dstopts, ipp->ipp_dstoptslen);
 		ipp->ipp_dstopts = NULL;
 		ipp->ipp_dstoptslen = 0;
 	}
-	if (ipp->ipp_fields & IPPF_RTHDR) {
+	if (fields & IPPF_RTHDR) {
 		kmem_free(ipp->ipp_rthdr, ipp->ipp_rthdrlen);
 		ipp->ipp_rthdr = NULL;
 		ipp->ipp_rthdrlen = 0;
 	}
-	ipp->ipp_fields &= ~(IPPF_HOPOPTS | IPPF_RTDSTOPTS | IPPF_DSTOPTS |
-	    IPPF_RTHDR);
+	if (fields & IPPF_IPV4_OPTIONS) {
+		kmem_free(ipp->ipp_ipv4_options, ipp->ipp_ipv4_options_len);
+		ipp->ipp_ipv4_options = NULL;
+		ipp->ipp_ipv4_options_len = 0;
+	}
+	if (fields & IPPF_LABEL_V4) {
+		kmem_free(ipp->ipp_label_v4, ipp->ipp_label_len_v4);
+		ipp->ipp_label_v4 = NULL;
+		ipp->ipp_label_len_v4 = 0;
+	}
+	if (fields & IPPF_LABEL_V6) {
+		kmem_free(ipp->ipp_label_v6, ipp->ipp_label_len_v6);
+		ipp->ipp_label_v6 = NULL;
+		ipp->ipp_label_len_v6 = 0;
+	}
+	ipp->ipp_fields &= ~(IPPF_HOPOPTS | IPPF_RTHDRDSTOPTS | IPPF_DSTOPTS |
+	    IPPF_RTHDR | IPPF_IPV4_OPTIONS | IPPF_LABEL_V4 | IPPF_LABEL_V6);
+}
+
+/*
+ * Copy from src to dst and allocate as needed.
+ * Returns zero or ENOMEM.
+ *
+ * The caller must initialize dst to zero.
+ */
+int
+ip_pkt_copy(ip_pkt_t *src, ip_pkt_t *dst, int kmflag)
+{
+	uint_t	fields = src->ipp_fields;
+
+	/* Start with fields that don't require memory allocation */
+	dst->ipp_fields = fields &
+	    ~(IPPF_HOPOPTS | IPPF_RTHDRDSTOPTS | IPPF_DSTOPTS |
+	    IPPF_RTHDR | IPPF_IPV4_OPTIONS | IPPF_LABEL_V4 | IPPF_LABEL_V6);
+
+	dst->ipp_addr = src->ipp_addr;
+	dst->ipp_unicast_hops = src->ipp_unicast_hops;
+	dst->ipp_hoplimit = src->ipp_hoplimit;
+	dst->ipp_tclass = src->ipp_tclass;
+	dst->ipp_type_of_service = src->ipp_type_of_service;
+
+	if (fields & IPPF_HOPOPTS) {
+		dst->ipp_hopopts = kmem_alloc(src->ipp_hopoptslen, kmflag);
+		if (dst->ipp_hopopts == NULL) {
+			ip_pkt_free(dst);
+			return (ENOMEM);
+		}
+		dst->ipp_fields |= IPPF_HOPOPTS;
+		bcopy(src->ipp_hopopts, dst->ipp_hopopts,
+		    src->ipp_hopoptslen);
+		dst->ipp_hopoptslen = src->ipp_hopoptslen;
+	}
+	if (fields & IPPF_RTHDRDSTOPTS) {
+		dst->ipp_rthdrdstopts = kmem_alloc(src->ipp_rthdrdstoptslen,
+		    kmflag);
+		if (dst->ipp_rthdrdstopts == NULL) {
+			ip_pkt_free(dst);
+			return (ENOMEM);
+		}
+		dst->ipp_fields |= IPPF_RTHDRDSTOPTS;
+		bcopy(src->ipp_rthdrdstopts, dst->ipp_rthdrdstopts,
+		    src->ipp_rthdrdstoptslen);
+		dst->ipp_rthdrdstoptslen = src->ipp_rthdrdstoptslen;
+	}
+	if (fields & IPPF_DSTOPTS) {
+		dst->ipp_dstopts = kmem_alloc(src->ipp_dstoptslen, kmflag);
+		if (dst->ipp_dstopts == NULL) {
+			ip_pkt_free(dst);
+			return (ENOMEM);
+		}
+		dst->ipp_fields |= IPPF_DSTOPTS;
+		bcopy(src->ipp_dstopts, dst->ipp_dstopts,
+		    src->ipp_dstoptslen);
+		dst->ipp_dstoptslen = src->ipp_dstoptslen;
+	}
+	if (fields & IPPF_RTHDR) {
+		dst->ipp_rthdr = kmem_alloc(src->ipp_rthdrlen, kmflag);
+		if (dst->ipp_rthdr == NULL) {
+			ip_pkt_free(dst);
+			return (ENOMEM);
+		}
+		dst->ipp_fields |= IPPF_RTHDR;
+		bcopy(src->ipp_rthdr, dst->ipp_rthdr,
+		    src->ipp_rthdrlen);
+		dst->ipp_rthdrlen = src->ipp_rthdrlen;
+	}
+	if (fields & IPPF_IPV4_OPTIONS) {
+		dst->ipp_ipv4_options = kmem_alloc(src->ipp_ipv4_options_len,
+		    kmflag);
+		if (dst->ipp_ipv4_options == NULL) {
+			ip_pkt_free(dst);
+			return (ENOMEM);
+		}
+		dst->ipp_fields |= IPPF_IPV4_OPTIONS;
+		bcopy(src->ipp_ipv4_options, dst->ipp_ipv4_options,
+		    src->ipp_ipv4_options_len);
+		dst->ipp_ipv4_options_len = src->ipp_ipv4_options_len;
+	}
+	if (fields & IPPF_LABEL_V4) {
+		dst->ipp_label_v4 = kmem_alloc(src->ipp_label_len_v4, kmflag);
+		if (dst->ipp_label_v4 == NULL) {
+			ip_pkt_free(dst);
+			return (ENOMEM);
+		}
+		dst->ipp_fields |= IPPF_LABEL_V4;
+		bcopy(src->ipp_label_v4, dst->ipp_label_v4,
+		    src->ipp_label_len_v4);
+		dst->ipp_label_len_v4 = src->ipp_label_len_v4;
+	}
+	if (fields & IPPF_LABEL_V6) {
+		dst->ipp_label_v6 = kmem_alloc(src->ipp_label_len_v6, kmflag);
+		if (dst->ipp_label_v6 == NULL) {
+			ip_pkt_free(dst);
+			return (ENOMEM);
+		}
+		dst->ipp_fields |= IPPF_LABEL_V6;
+		bcopy(src->ipp_label_v6, dst->ipp_label_v6,
+		    src->ipp_label_len_v6);
+		dst->ipp_label_len_v6 = src->ipp_label_len_v6;
+	}
+	if (fields & IPPF_FRAGHDR) {
+		dst->ipp_fraghdr = kmem_alloc(src->ipp_fraghdrlen, kmflag);
+		if (dst->ipp_fraghdr == NULL) {
+			ip_pkt_free(dst);
+			return (ENOMEM);
+		}
+		dst->ipp_fields |= IPPF_FRAGHDR;
+		bcopy(src->ipp_fraghdr, dst->ipp_fraghdr,
+		    src->ipp_fraghdrlen);
+		dst->ipp_fraghdrlen = src->ipp_fraghdrlen;
+	}
+	return (0);
+}
+
+/*
+ * Returns INADDR_ANY if no source route
+ */
+ipaddr_t
+ip_pkt_source_route_v4(const ip_pkt_t *ipp)
+{
+	ipaddr_t	nexthop = INADDR_ANY;
+	ipoptp_t	opts;
+	uchar_t		*opt;
+	uint8_t		optval;
+	uint8_t		optlen;
+	uint32_t	totallen;
+
+	if (!(ipp->ipp_fields & IPPF_IPV4_OPTIONS))
+		return (INADDR_ANY);
+
+	totallen = ipp->ipp_ipv4_options_len;
+	if (totallen & 0x3)
+		return (INADDR_ANY);
+
+	for (optval = ipoptp_first2(&opts, totallen, ipp->ipp_ipv4_options);
+	    optval != IPOPT_EOL;
+	    optval = ipoptp_next(&opts)) {
+		opt = opts.ipoptp_cur;
+		switch (optval) {
+			uint8_t off;
+		case IPOPT_SSRR:
+		case IPOPT_LSRR:
+			if ((opts.ipoptp_flags & IPOPTP_ERROR) != 0) {
+				break;
+			}
+			optlen = opts.ipoptp_len;
+			off = opt[IPOPT_OFFSET];
+			off--;
+			if (optlen < IP_ADDR_LEN ||
+			    off > optlen - IP_ADDR_LEN) {
+				/* End of source route */
+				break;
+			}
+			bcopy((char *)opt + off, &nexthop, IP_ADDR_LEN);
+			if (nexthop == htonl(INADDR_LOOPBACK)) {
+				/* Ignore */
+				nexthop = INADDR_ANY;
+				break;
+			}
+			break;
+		}
+	}
+	return (nexthop);
+}
+
+/*
+ * Reverse a source route.
+ */
+void
+ip_pkt_source_route_reverse_v4(ip_pkt_t *ipp)
+{
+	ipaddr_t	tmp;
+	ipoptp_t	opts;
+	uchar_t		*opt;
+	uint8_t		optval;
+	uint32_t	totallen;
+
+	if (!(ipp->ipp_fields & IPPF_IPV4_OPTIONS))
+		return;
+
+	totallen = ipp->ipp_ipv4_options_len;
+	if (totallen & 0x3)
+		return;
+
+	for (optval = ipoptp_first2(&opts, totallen, ipp->ipp_ipv4_options);
+	    optval != IPOPT_EOL;
+	    optval = ipoptp_next(&opts)) {
+		uint8_t off1, off2;
+
+		opt = opts.ipoptp_cur;
+		switch (optval) {
+		case IPOPT_SSRR:
+		case IPOPT_LSRR:
+			if ((opts.ipoptp_flags & IPOPTP_ERROR) != 0) {
+				break;
+			}
+			off1 = IPOPT_MINOFF_SR - 1;
+			off2 = opt[IPOPT_OFFSET] - IP_ADDR_LEN - 1;
+			while (off2 > off1) {
+				bcopy(opt + off2, &tmp, IP_ADDR_LEN);
+				bcopy(opt + off1, opt + off2, IP_ADDR_LEN);
+				bcopy(&tmp, opt + off2, IP_ADDR_LEN);
+				off2 -= IP_ADDR_LEN;
+				off1 += IP_ADDR_LEN;
+			}
+			opt[IPOPT_OFFSET] = IPOPT_MINOFF_SR;
+			break;
+		}
+	}
+}
+
+/*
+ * Returns NULL if no routing header
+ */
+in6_addr_t *
+ip_pkt_source_route_v6(const ip_pkt_t *ipp)
+{
+	in6_addr_t	*nexthop = NULL;
+	ip6_rthdr0_t	*rthdr;
+
+	if (!(ipp->ipp_fields & IPPF_RTHDR))
+		return (NULL);
+
+	rthdr = (ip6_rthdr0_t *)ipp->ipp_rthdr;
+	if (rthdr->ip6r0_segleft == 0)
+		return (NULL);
+
+	nexthop = (in6_addr_t *)((char *)rthdr + sizeof (*rthdr));
+	return (nexthop);
 }
 
 zoneid_t
-ip_get_zoneid_v4(ipaddr_t addr, mblk_t *mp, ip_stack_t *ipst,
+ip_get_zoneid_v4(ipaddr_t addr, mblk_t *mp, ip_recv_attr_t *ira,
     zoneid_t lookup_zoneid)
 {
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
 	ire_t		*ire;
 	int		ire_flags = MATCH_IRE_TYPE;
 	zoneid_t	zoneid = ALL_ZONES;
 
-	if (is_system_labeled() && !tsol_can_accept_raw(mp, B_FALSE))
+	if (is_system_labeled() && !tsol_can_accept_raw(mp, ira, B_FALSE))
 		return (ALL_ZONES);
 
 	if (lookup_zoneid != ALL_ZONES)
 		ire_flags |= MATCH_IRE_ZONEONLY;
-	ire = ire_ctable_lookup(addr, NULL, IRE_LOCAL | IRE_LOOPBACK, NULL,
-	    lookup_zoneid, NULL, ire_flags, ipst);
+	ire = ire_ftable_lookup_v4(addr, NULL, NULL, IRE_LOCAL | IRE_LOOPBACK,
+	    NULL, lookup_zoneid, NULL, ire_flags, 0, ipst, NULL);
 	if (ire != NULL) {
 		zoneid = IP_REAL_ZONEID(ire->ire_zoneid, ipst);
 		ire_refrele(ire);
@@ -29858,24 +15277,23 @@ ip_get_zoneid_v4(ipaddr_t addr, mblk_t *mp, ip_stack_t *ipst,
 
 zoneid_t
 ip_get_zoneid_v6(in6_addr_t *addr, mblk_t *mp, const ill_t *ill,
-    ip_stack_t *ipst, zoneid_t lookup_zoneid)
+    ip_recv_attr_t *ira, zoneid_t lookup_zoneid)
 {
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
 	ire_t		*ire;
 	int		ire_flags = MATCH_IRE_TYPE;
 	zoneid_t	zoneid = ALL_ZONES;
-	ipif_t		*ipif_arg = NULL;
 
-	if (is_system_labeled() && !tsol_can_accept_raw(mp, B_FALSE))
+	if (is_system_labeled() && !tsol_can_accept_raw(mp, ira, B_FALSE))
 		return (ALL_ZONES);
 
-	if (IN6_IS_ADDR_LINKLOCAL(addr)) {
+	if (IN6_IS_ADDR_LINKLOCAL(addr))
 		ire_flags |= MATCH_IRE_ILL;
-		ipif_arg = ill->ill_ipif;
-	}
+
 	if (lookup_zoneid != ALL_ZONES)
 		ire_flags |= MATCH_IRE_ZONEONLY;
-	ire = ire_ctable_lookup_v6(addr, NULL, IRE_LOCAL | IRE_LOOPBACK,
-	    ipif_arg, lookup_zoneid, NULL, ire_flags, ipst);
+	ire = ire_ftable_lookup_v6(addr, NULL, NULL, IRE_LOCAL | IRE_LOOPBACK,
+	    ill, lookup_zoneid, NULL, ire_flags, 0, ipst, NULL);
 	if (ire != NULL) {
 		zoneid = IP_REAL_ZONEID(ire->ire_zoneid, ipst);
 		ire_refrele(ire);
@@ -29963,4 +15381,30 @@ ipobs_hook(mblk_t *mp, int htype, zoneid_t zsrc, zoneid_t zdst,
 
 	imp->b_cont = NULL;
 	freemsg(imp);
+}
+
+/*
+ * Utility routine that checks if `v4srcp' is a valid address on underlying
+ * interface `ill'.  If `ipifp' is non-NULL, it's set to a held ipif
+ * associated with `v4srcp' on success.  NOTE: if this is not called from
+ * inside the IPSQ (ill_g_lock is not held), `ill' may be removed from the
+ * group during or after this lookup.
+ */
+boolean_t
+ipif_lookup_testaddr_v4(ill_t *ill, const in_addr_t *v4srcp, ipif_t **ipifp)
+{
+	ipif_t *ipif;
+
+	ipif = ipif_lookup_addr_exact(*v4srcp, ill, ill->ill_ipst);
+	if (ipif != NULL) {
+		if (ipifp != NULL)
+			*ipifp = ipif;
+		else
+			ipif_refrele(ipif);
+		return (B_TRUE);
+	}
+
+	ip1dbg(("ipif_lookup_testaddr_v4: cannot find ipif for src %x\n",
+	    *v4srcp));
+	return (B_FALSE);
 }

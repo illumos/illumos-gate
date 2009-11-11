@@ -4770,8 +4770,6 @@ static const mdb_walker_t walkers[] = {
 		NULL, modchain_walk_step, NULL },
 
 	/* from net.c */
-	{ "ar", "walk ar_t structures using MI for all stacks",
-		mi_payload_walk_init, mi_payload_walk_step, NULL, &mi_ar_arg },
 	{ "icmp", "walk ICMP control structures using MI for all stacks",
 		mi_payload_walk_init, mi_payload_walk_step, NULL,
 		&mi_icmp_arg },
@@ -4779,8 +4777,6 @@ static const mdb_walker_t walkers[] = {
 		mi_walk_init, mi_walk_step, mi_walk_fini, NULL },
 	{ "sonode", "given a sonode, walk its children",
 		sonode_walk_init, sonode_walk_step, sonode_walk_fini, NULL },
-	{ "ar_stacks", "walk all the ar_stack_t",
-		ar_stacks_walk_init, ar_stacks_walk_step, NULL },
 	{ "icmp_stacks", "walk all the icmp_stack_t",
 		icmp_stacks_walk_init, icmp_stacks_walk_step, NULL },
 	{ "tcp_stacks", "walk all the tcp_stack_t",

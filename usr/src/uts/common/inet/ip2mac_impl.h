@@ -37,10 +37,10 @@ extern "C" {
 
 #ifdef _KERNEL
 
-extern void nce_cb_dispatch(nce_t *);
-extern void nce_ip2mac_response(ip2mac_t *, nce_t *);
-extern void nce_cb_refhold_locked(nce_t *);
-extern void nce_cb_refrele(nce_t *);
+extern void ncec_cb_dispatch(ncec_t *);
+extern void ncec_ip2mac_response(ip2mac_t *, ncec_t *);
+extern void ncec_cb_refhold_locked(ncec_t *);
+extern void ncec_cb_refrele(ncec_t *);
 
 #endif /* _KERNEL */
 

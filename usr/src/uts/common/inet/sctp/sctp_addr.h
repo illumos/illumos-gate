@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SCTP_ADDR_H
 #define	_SCTP_ADDR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/list.h>
 #include <sys/zone.h>
@@ -54,7 +52,6 @@ extern "C" {
 typedef struct sctp_ipif_s {
 	list_node_t		sctp_ipifs;	/* Used by the global list */
 	struct sctp_ill_s	*sctp_ipif_ill;
-	uint_t			sctp_ipif_mtu;
 	uint_t			sctp_ipif_id;
 	in6_addr_t		sctp_ipif_saddr;
 	int			sctp_ipif_state;

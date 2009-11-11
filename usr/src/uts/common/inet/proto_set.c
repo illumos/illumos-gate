@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -348,27 +348,21 @@ proto_opt_lookup(t_uscalar_t level, t_uscalar_t name, opdes_t *opt_arr,
 /*
  * Do a lookup of the options in the array and do permission and length checking
  * Returns zero if there is no error (note: for non-tpi-providers not being able
- * to find the option is not an error). TPI errors are returned as -ve.
+ * to find the option is not an error). TPI errors are returned as negative
+ * numbers and errnos as positive numbers.
+ * If max_len is set we update it based on the max length of the option.
  */
 int
 proto_opt_check(int level, int name, int len, t_uscalar_t *max_len,
-    opdes_t *opt_arr, uint_t opt_arr_cnt, boolean_t topmost_tpiprovider,
-    boolean_t negotiate, boolean_t check, cred_t *cr)
+    opdes_t *opt_arr, uint_t opt_arr_cnt, boolean_t negotiate, boolean_t check,
+    cred_t *cr)
 {
 	opdes_t *optd;
 
 	/* Find the option in the opt_arr. */
-	if ((optd = proto_opt_lookup(level, name, opt_arr, opt_arr_cnt)) ==
-	    NULL) {
-		/*
-		 * Not found, that is a bad thing if
-		 * the caller is a tpi provider
-		 */
-		if (topmost_tpiprovider)
-			return (-TBADOPT);
-		else
-			return (0); /* skip unmodified */
-	}
+	optd = proto_opt_lookup(level, name, opt_arr, opt_arr_cnt);
+	if (optd == NULL)
+		return (-TBADOPT);
 
 	/* Additional checks dependent on operation. */
 	if (negotiate) {
@@ -409,15 +403,12 @@ proto_opt_check(int level, int name, int len, t_uscalar_t *max_len,
 				return (-TBADOPT);
 		}
 		/*
-		 * XXX Change the comments.
-		 *
 		 * XXX Since T_CURRENT was not there in TLI and the
 		 * official TLI inspired TPI standard, getsockopt()
 		 * API uses T_CHECK (for T_CURRENT semantics)
-		 * The following fallthru makes sense because of its
-		 * historical use as semantic equivalent to T_CURRENT.
+		 * Thus T_CHECK includes the T_CURRENT semantics due to that
+		 * historical use.
 		 */
-		/* FALLTHRU */
 		if (!OA_READ_PERMISSION(optd, cr)) {
 			/* can't read option value */
 			if (!(OA_MATCHED_PRIV(optd, cr)) &&

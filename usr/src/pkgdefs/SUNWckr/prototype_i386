@@ -103,7 +103,6 @@ f none kernel/drv/ippctl 755 root sys
 f none kernel/drv/ipsecah 755 root sys
 f none kernel/drv/ipsecesp 755 root sys
 f none kernel/drv/iptun 755 root sys
-f none kernel/drv/iptunq 755 root sys
 f none kernel/drv/iwscn 755 root sys
 f none kernel/drv/kb8042 755 root sys
 f none kernel/drv/keysock 755 root sys
@@ -326,7 +325,6 @@ f none kernel/drv/amd64/ippctl 755 root sys
 f none kernel/drv/amd64/ipsecah 755 root sys
 f none kernel/drv/amd64/ipsecesp 755 root sys
 f none kernel/drv/amd64/iptun 755 root sys
-f none kernel/drv/amd64/iptunq 755 root sys
 f none kernel/drv/amd64/iwscn 755 root sys
 f none kernel/drv/amd64/kb8042 755 root sys
 f none kernel/drv/amd64/keysock 755 root sys

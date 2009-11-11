@@ -34,6 +34,7 @@ extern "C" {
 #if defined(_KERNEL) && defined(__STDC__)
 
 #include <inet/ipclassifier.h>
+
 /* Options Description Structure */
 typedef struct opdes_s {
 	t_uscalar_t	opdes_name;	/* option name */
@@ -138,20 +139,15 @@ typedef struct opdes_s {
 #define	OA_NO_PERMISSION(x, c)		(OA_MATCHED_PRIV((x), (c)) ? \
 		((x)->opdes_access_priv == 0) : ((x)->opdes_access_nopriv == 0))
 
-#define	PASS_OPT_TO_IP(connp)		\
-	if (IPCL_IS_NONSTR(connp))	\
-		return (-EINVAL)
-
 /*
  * Other properties set in opdes_props field.
  */
-#define	OP_PASSNEXT	0x1	/* to pass option to next module or not */
-#define	OP_VARLEN	0x2	/* option is varible length  */
-#define	OP_NOT_ABSREQ	0x4	/* option is not a "absolute requirement" */
+#define	OP_VARLEN	0x1	/* option is varible length  */
+#define	OP_NOT_ABSREQ	0x2	/* option is not a "absolute requirement" */
 				/* i.e. failure to negotiate does not */
 				/* abort primitive ("ignore" semantics ok) */
-#define	OP_NODEFAULT	0x8	/* no concept of "default value"  */
-#define	OP_DEF_FN	0x10	/* call a "default function" to get default */
+#define	OP_NODEFAULT	0x4	/* no concept of "default value"  */
+#define	OP_DEF_FN	0x8	/* call a "default function" to get default */
 				/* value, not from static table  */
 
 
@@ -165,13 +161,12 @@ typedef	t_uscalar_t optlevel_t;
 typedef int (*opt_def_fn)(queue_t *, int, int, uchar_t *);
 typedef int (*opt_get_fn)(queue_t *, int, int, uchar_t *);
 typedef int (*opt_set_fn)(queue_t *, uint_t, int, int, uint_t, uchar_t *,
-    uint_t *, uchar_t *, void *, cred_t *, mblk_t *);
+    uint_t *, uchar_t *, void *, cred_t *);
 
 typedef struct optdb_obj {
 	opt_def_fn	odb_deffn;	/* default value function */
 	opt_get_fn	odb_getfn;	/* get function */
 	opt_set_fn	odb_setfn;	/* set function */
-	boolean_t	odb_topmost_tpiprovider; /* whether topmost tpi */
 					/* provider or downstream */
 	uint_t		odb_opt_arr_cnt; /* count of number of options in db */
 	opdes_t		*odb_opt_des_arr; /* option descriptors in db */
@@ -181,22 +176,6 @@ typedef struct optdb_obj {
 					/* array of option levels supported */
 } optdb_obj_t;
 
-/*
- * This is used to restart option processing. This goes inside an M_CTL
- * which is prepended to the packet. IP may need to become exclusive on
- * an ill for setting some options. For dg. IP_ADD_MEMBERSHIP. Since
- * there can be more than 1 option packed in an option buffer, we need to
- * remember where to restart option processing after resuming from a wait
- * for exclusive condition in IP.
- */
-typedef struct opt_restart_s {
-	struct	opthdr	*or_start;		/* start of option buffer */
-	struct	opthdr	*or_end;		/* end of option buffer */
-	struct	opthdr	*or_ropt;		/* restart option here */
-	t_uscalar_t	or_worst_status;	/* Used by tpi_optcom_req */
-	t_uscalar_t	or_type;		/* svr4 or tpi optcom variant */
-	int		or_private;		/* currently used by CGTP */
-} opt_restart_t;
 /*
  * Values for "optset_context" parameter passed to
  * transport specific "setfn()" routines
@@ -210,16 +189,12 @@ typedef struct opt_restart_s {
  * Function prototypes
  */
 extern void optcom_err_ack(queue_t *, mblk_t *, t_scalar_t, int);
-extern int svr4_optcom_req(queue_t *, mblk_t *, cred_t *, optdb_obj_t *,
-    boolean_t);
-extern int tpi_optcom_req(queue_t *, mblk_t *, cred_t *, optdb_obj_t *,
-    boolean_t);
+extern void svr4_optcom_req(queue_t *, mblk_t *, cred_t *, optdb_obj_t *);
+extern void tpi_optcom_req(queue_t *, mblk_t *, cred_t *, optdb_obj_t *);
 extern int  tpi_optcom_buf(queue_t *, mblk_t *, t_scalar_t *, t_scalar_t,
     cred_t *, optdb_obj_t *, void *, int *);
 extern t_uscalar_t optcom_max_optsize(opdes_t *, uint_t);
-extern int optcom_pkt_set(uchar_t *, uint_t, boolean_t, uchar_t **, uint_t *,
-    uint_t);
-
+extern int optcom_pkt_set(uchar_t *, uint_t, uchar_t **, uint_t *);
 extern int process_auxiliary_options(conn_t *, void *, t_uscalar_t,
     void *, optdb_obj_t *, int (*)(conn_t *, uint_t, int, int, uint_t,
     uchar_t *, uint_t *, uchar_t *, void *, cred_t *), cred_t *);

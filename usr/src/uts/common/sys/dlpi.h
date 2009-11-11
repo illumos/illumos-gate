@@ -593,10 +593,6 @@ union	DL_qos_types {
 					/* dl_data is dl_capab_id_t */
 #define	DL_CAPAB_HCKSUM		0x01	/* Checksum offload */
 					/* dl_data is dl_capab_hcksum_t */
-#define	DL_CAPAB_IPSEC_AH	0x02	/* IPsec AH acceleration */
-					/* dl_data is dl_capab_ipsec_t */
-#define	DL_CAPAB_IPSEC_ESP	0x03	/* IPsec ESP acceleration */
-					/* dl_data is dl_capab_ipsec_t */
 #define	DL_CAPAB_MDT		0x04	/* Multidata Transmit capability */
 					/* dl_data is dl_capab_mdt_t */
 #define	DL_CAPAB_ZEROCOPY	0x05	/* Zero-copy capability */
@@ -611,45 +607,8 @@ typedef struct {
 } dl_capability_sub_t;
 
 /*
- * Definitions and structures needed for DL_CONTROL_REQ and DL_CONTROL_ACK
- * primitives.
- * Extensible message to send down control information to the DLS provider.
- * The response is a DL_CONTROL_ACK or DL_ERROR_ACK.
- *
- * Different types of control operations will define different format for the
- * key and data fields. ADD requires key and data fields; if the <type, key>
- * matches an already existing entry a DL_ERROR_ACK will be returned. DELETE
- * requires a key field; if the <type, key> does not exist, a DL_ERROR_ACK
- * will be returned. FLUSH requires neither a key nor data; it
- * unconditionally removes all entries for the specified type. GET requires a
- * key field; the get operation returns the data for the <type, key>. If
- * <type, key> doesn't exist a DL_ERROR_ACK is returned. UPDATE requires key
- * and data fields; if <type, key> doesn't exist a DL_ERROR_ACK is returned.
- */
-
-/*
- * Control operations
- */
-#define	DL_CO_ADD	0x01	/* Add new entry matching for <type,key> */
-#define	DL_CO_DELETE	0x02	/* Delete the entry matching <type,key> */
-#define	DL_CO_FLUSH	0x03	/* Purge all entries of <type> */
-#define	DL_CO_GET	0x04	/* Get the data for the <type,key> */
-#define	DL_CO_UPDATE	0x05	/* Update the data for <type,key> */
-#define	DL_CO_SET	0x06	/* Add or update as appropriate */
-
-/*
- * Control types (dl_type field of dl_control_req_t and dl_control_ack_t)
- */
-#define	DL_CT_IPSEC_AH	0x01	/* AH; key=spi,dest_addr; */
-				/* data=keying material */
-#define	DL_CT_IPSEC_ESP	0x02	/* ESP; key=spi,des_taddr; */
-				/* data=keying material */
-
-/*
  * Module ID token to be included in new sub-capability structures.
- * Existing sub-capabilities lacking an identification token, e.g. IPSEC
- * hardware acceleration, need to be encapsulated within the ID sub-
- * capability.  Access to this structure must be done through
+ * Access to this structure must be done through
  * dlcapab{set,check}qid().
  */
 typedef struct {

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_IPSECAH_H
 #define	_INET_IPSECAH_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <inet/ip.h>
 #include <inet/ipdrop.h>
@@ -62,9 +60,6 @@ typedef struct ah_kstats_s
 	kstat_named_t ah_stat_acquire_requests;
 	kstat_named_t ah_stat_bytes_expired;
 	kstat_named_t ah_stat_out_discards;
-	kstat_named_t ah_stat_in_accelerated;
-	kstat_named_t ah_stat_out_accelerated;
-	kstat_named_t ah_stat_noaccel;
 	kstat_named_t ah_stat_crypto_sync;
 	kstat_named_t ah_stat_crypto_async;
 	kstat_named_t ah_stat_crypto_failures;
@@ -116,8 +111,6 @@ struct ipsecah_stack {
 	 */
 	queue_t			*ah_pfkey_q;
 	timeout_id_t		ah_event;
-
-	mblk_t			*ah_ip_unbind;
 };
 typedef struct ipsecah_stack ipsecah_stack_t;
 

@@ -367,6 +367,7 @@ sosctp_assoc_createconn(struct sctp_sonode *ss, const struct sockaddr *name,
 	sctp_assoc_t id;
 	int error;
 	struct cmsghdr *cmsg;
+	pid_t pid = curproc->p_pid;
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
@@ -407,7 +408,8 @@ sosctp_assoc_createconn(struct sctp_sonode *ss, const struct sockaddr *name,
 	ssa->ssa_wroff = ss->ss_wroff;
 	ssa->ssa_wrsize = ss->ss_wrsize;
 	ssa->ssa_conn = sctp_create(ssa, (struct sctp_s *)so->so_proto_handle,
-	    so->so_family, SCTP_CAN_BLOCK, &sosctp_assoc_upcalls, &sbl, cr);
+	    so->so_family, so->so_type, SCTP_CAN_BLOCK, &sosctp_assoc_upcalls,
+	    &sbl, cr);
 
 	mutex_enter(&so->so_lock);
 	ss->ss_assocs[id].ssi_assoc = ssa;
@@ -435,7 +437,7 @@ sosctp_assoc_createconn(struct sctp_sonode *ss, const struct sockaddr *name,
 			goto ret_err;
 	}
 
-	if ((error = sctp_connect(ssa->ssa_conn, name, namelen)) != 0)
+	if ((error = sctp_connect(ssa->ssa_conn, name, namelen, cr, pid)) != 0)
 		goto ret_err;
 
 	mutex_enter(&so->so_lock);

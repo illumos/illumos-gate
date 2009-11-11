@@ -196,6 +196,7 @@ static void		ire_report(const mib_item_t *item);
 static void		tcp_report(const mib_item_t *item);
 static void		udp_report(const mib_item_t *item);
 static void		group_report(mib_item_t *item);
+static void		dce_report(mib_item_t *item);
 static void		print_ip_stats(mib2_ip_t *ip);
 static void		print_icmp_stats(mib2_icmp_t *icmp);
 static void		print_ip6_stats(mib2_ipv6IfStatsEntry_t *ip6);
@@ -236,7 +237,7 @@ static void 		fatal(int errcode, char *str1, ...);
 
 
 static	boolean_t	Aflag = B_FALSE;	/* All sockets/ifs/rtng-tbls */
-static	boolean_t	Dflag = B_FALSE;	/* Debug Info */
+static	boolean_t	Dflag = B_FALSE;	/* DCE info */
 static	boolean_t	Iflag = B_FALSE;	/* IP Traffic Interfaces */
 static	boolean_t	Mflag = B_FALSE;	/* STREAMS Memory Statistics */
 static	boolean_t	Nflag = B_FALSE;	/* Numeric Network Addresses */
@@ -248,6 +249,7 @@ static	boolean_t	Pflag = B_FALSE;	/* Net to Media Tables */
 static	boolean_t	Gflag = B_FALSE;	/* Multicast group membership */
 static	boolean_t	MMflag = B_FALSE;	/* Multicast routing table */
 static	boolean_t	DHCPflag = B_FALSE;	/* DHCP statistics */
+static	boolean_t	Xflag = B_FALSE;	/* Debug Info */
 
 static	int	v4compat = 0;	/* Compatible printing format for status */
 
@@ -276,6 +278,8 @@ static int ipv6NetToMediaEntrySize;
 static int ipv6MemberEntrySize;
 static int ipv6GroupSourceEntrySize;
 
+static int ipDestEntrySize;
+
 static int transportMLPSize;
 static int tcpConnEntrySize;
 static int tcp6ConnEntrySize;
@@ -298,7 +302,7 @@ static m_label_t *zone_security_label = NULL;
 
 /* Flags on routes */
 #define	FLF_A		0x00000001
-#define	FLF_B		0x00000002
+#define	FLF_b		0x00000002
 #define	FLF_D		0x00000004
 #define	FLF_G		0x00000008
 #define	FLF_H		0x00000010
@@ -306,7 +310,12 @@ static m_label_t *zone_security_label = NULL;
 #define	FLF_U		0x00000040
 #define	FLF_M		0x00000080
 #define	FLF_S		0x00000100
-static const char flag_list[] = "ABDGHLUMS";
+#define	FLF_C		0x00000200	/* IRE_IF_CLONE */
+#define	FLF_I		0x00000400	/* RTF_INDIRECT */
+#define	FLF_R		0x00000800	/* RTF_REJECT */
+#define	FLF_B		0x00001000	/* RTF_BLACKHOLE */
+
+static const char flag_list[] = "AbDGHLUMSCIRB";
 
 typedef struct filter_rule filter_t;
 
@@ -379,14 +388,15 @@ main(int argc, char **argv)
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "adimnrspMgvf:P:I:DRT:")) != -1) {
+	while ((c = getopt(argc, argv, "adimnrspMgvxf:P:I:DRT:")) != -1) {
 		switch ((char)c) {
 		case 'a':		/* all connections */
 			Aflag = B_TRUE;
 			break;
 
-		case 'd':		/* turn on debugging */
+		case 'd':		/* DCE info */
 			Dflag = B_TRUE;
+			IFLAGMOD(Iflag_only, 1, 0); /* see macro def'n */
 			break;
 
 		case 'i':		/* interface (ill/ipif report) */
@@ -436,6 +446,10 @@ main(int argc, char **argv)
 		case 'v':		/* verbose output format */
 			Vflag = B_TRUE;
 			IFLAGMOD(Iflag_only, 1, 0); /* see macro def'n */
+			break;
+
+		case 'x':		/* turn on debugging */
+			Xflag = B_TRUE;
 			break;
 
 		case 'f':
@@ -603,7 +617,7 @@ main(int argc, char **argv)
 				mib_item_destroy(&previtem);
 			}
 
-			if (!(Iflag || Rflag || Sflag || Mflag ||
+			if (!(Dflag || Iflag || Rflag || Sflag || Mflag ||
 			    MMflag || Pflag || Gflag || DHCPflag)) {
 				if (protocol_selected(IPPROTO_UDP))
 					udp_report(item);
@@ -634,12 +648,14 @@ main(int argc, char **argv)
 				if (family_selected(AF_INET6))
 					ndp_report(item);
 			}
+			if (Dflag)
+				dce_report(item);
 			mib_item_destroy(&curritem);
 		}
 
 		/* netstat: AF_UNIX behaviour */
 		if (family_selected(AF_UNIX) &&
-		    (!(Iflag || Rflag || Sflag || Mflag ||
+		    (!(Dflag || Iflag || Rflag || Sflag || Mflag ||
 		    MMflag || Pflag || Gflag)))
 			unixpr(kc);
 		(void) kstat_close(kc);
@@ -729,7 +745,7 @@ mibget(int sd)
 	 * us information concerning IRE_MARK_TESTHIDDEN routes.
 	 */
 	req = (struct opthdr *)&tor[1];
-	req->level = EXPER_IP_AND_TESTHIDDEN;
+	req->level = EXPER_IP_AND_ALL_IRES;
 	req->name  = 0;
 	req->len   = 0;
 
@@ -755,7 +771,7 @@ mibget(int sd)
 		getcode = getmsg(sd, &ctlbuf, (struct strbuf *)0, &flags);
 		if (getcode == -1) {
 			perror("mibget getmsg(ctl) failed");
-			if (Dflag) {
+			if (Xflag) {
 				(void) fputs("#   level   name    len\n",
 				    stderr);
 				i = 0;
@@ -774,7 +790,7 @@ mibget(int sd)
 		    toa->PRIM_type == T_OPTMGMT_ACK &&
 		    toa->MGMT_flags == T_SUCCESS &&
 		    req->len == 0) {
-			if (Dflag)
+			if (Xflag)
 				(void) printf("mibget getmsg() %d returned "
 				    "EOD (level %ld, name %ld)\n",
 				    j, req->level, req->name);
@@ -826,7 +842,7 @@ mibget(int sd)
 		last_item->valp = malloc((int)req->len);
 		if (last_item->valp == NULL)
 			goto error_exit;
-		if (Dflag)
+		if (Xflag)
 			(void) printf("msg %d: group = %4d   mib_id = %5d"
 			    "length = %d\n",
 			    j, last_item->group, last_item->mib_id,
@@ -1754,6 +1770,7 @@ mib_get_constants(mib_item_t *item)
 			ipGroupSourceEntrySize = ip->ipGroupSourceEntrySize;
 			ipRouteAttributeSize = ip->ipRouteAttributeSize;
 			transportMLPSize = ip->transportMLPSize;
+			ipDestEntrySize = ip->ipDestEntrySize;
 			assert(IS_P2ALIGNED(ipAddrEntrySize,
 			    sizeof (mib2_ipAddrEntry_t *)));
 			assert(IS_P2ALIGNED(ipRouteEntrySize,
@@ -1850,7 +1867,7 @@ mib_get_constants(mib_item_t *item)
 		}
 	} /* 'for' loop 1 ends */
 
-	if (Dflag) {
+	if (Xflag) {
 		(void) puts("mib_get_constants:");
 		(void) printf("\tipv6IfStatsEntrySize %d\n",
 		    ipv6IfStatsEntrySize);
@@ -1872,6 +1889,7 @@ mib_get_constants(mib_item_t *item)
 		    ipv6MemberEntrySize);
 		(void) printf("\tipv6IfIcmpEntrySize %d\n",
 		    ipv6IfIcmpEntrySize);
+		(void) printf("\tipDestEntrySize %d\n", ipDestEntrySize);
 		(void) printf("\ttransportMLPSize %d\n", transportMLPSize);
 		(void) printf("\ttcpConnEntrySize %d\n", tcpConnEntrySize);
 		(void) printf("\ttcp6ConnEntrySize %d\n", tcp6ConnEntrySize);
@@ -1895,7 +1913,7 @@ stat_report(mib_item_t *item)
 
 	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
-		if (Dflag) {
+		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
 			(void) printf("Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
@@ -2542,7 +2560,7 @@ mrt_stat_report(mib_item_t *curritem)
 	for (tempitem = curritem;
 	    tempitem;
 	    tempitem = tempitem->next_item) {
-		if (Dflag) {
+		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
 			(void) printf("Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
@@ -2603,7 +2621,7 @@ if_report(mib_item_t *item, char *matchname,
 
 	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
-		if (Dflag) {
+		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
 			(void) printf("Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
@@ -2632,7 +2650,7 @@ if_report(mib_item_t *item, char *matchname,
 				boolean_t	first = B_TRUE;
 				uint32_t	new_ifindex;
 
-				if (Dflag)
+				if (Xflag)
 					(void) printf("if_report: %d items\n",
 					    (item->length)
 					    / sizeof (mib2_ipAddrEntry_t));
@@ -2944,7 +2962,7 @@ if_report(mib_item_t *item, char *matchname,
 				boolean_t	first = B_TRUE;
 				uint32_t	new_ifindex;
 
-				if (Dflag)
+				if (Xflag)
 					(void) printf("if_report: %d items\n",
 					    (item->length)
 					    / sizeof (mib2_ipv6AddrEntry_t));
@@ -3287,10 +3305,10 @@ if_report_ip4(mib2_ipAddrEntry_t *ap,
 			(void) pr_netaddr(ap->ipAdEntAddr, ap->ipAdEntNetMask,
 			    abuf, sizeof (abuf));
 
-		(void) printf("%-13s %-14s %-6llu %-5s %-6llu "
+		(void) printf("%-13s %-14s %-6llu %-5s %-6s "
 		    "%-5s %-6s %-6llu\n", abuf,
 		    pr_addr(ap->ipAdEntAddr, dstbuf, sizeof (dstbuf)),
-		    statptr->ipackets, "N/A", statptr->opackets, "N/A", "N/A",
+		    statptr->ipackets, "N/A", "N/A", "N/A", "N/A",
 		    0LL);
 	}
 }
@@ -3337,11 +3355,10 @@ if_report_ip6(mib2_ipv6AddrEntry_t *ap6,
 		else
 			(void) pr_prefix6(&ap6->ipv6AddrAddress,
 			    ap6->ipv6AddrPfxLength, abuf, sizeof (abuf));
-		(void) printf("%-27s %-27s %-6llu %-5s %-6llu %-5s %-6s\n",
+		(void) printf("%-27s %-27s %-6llu %-5s %-6s %-5s %-6s\n",
 		    abuf, pr_addr6(&ap6->ipv6AddrAddress, dstbuf,
 		    sizeof (dstbuf)),
-		    statptr->ipackets, "N/A",
-		    statptr->opackets, "N/A", "N/A");
+		    statptr->ipackets, "N/A", "N/A", "N/A", "N/A");
 	}
 }
 
@@ -3490,7 +3507,7 @@ group_report(mib_item_t *item)
 
 	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
-		if (Dflag) {
+		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
 			(void) printf("Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
@@ -3501,12 +3518,12 @@ group_report(mib_item_t *item)
 			switch (item->mib_id) {
 			case EXPER_IP_GROUP_MEMBERSHIP:
 				v4grp = item;
-				if (Dflag)
+				if (Xflag)
 					(void) printf("item is v4grp info\n");
 				break;
 			case EXPER_IP_GROUP_SOURCES:
 				v4src = item;
-				if (Dflag)
+				if (Xflag)
 					(void) printf("item is v4src info\n");
 				break;
 			default:
@@ -3518,12 +3535,12 @@ group_report(mib_item_t *item)
 			switch (item->mib_id) {
 			case EXPER_IP6_GROUP_MEMBERSHIP:
 				v6grp = item;
-				if (Dflag)
+				if (Xflag)
 					(void) printf("item is v6grp info\n");
 				break;
 			case EXPER_IP6_GROUP_SOURCES:
 				v6src = item;
-				if (Dflag)
+				if (Xflag)
 					(void) printf("item is v6src info\n");
 				break;
 			default:
@@ -3533,7 +3550,7 @@ group_report(mib_item_t *item)
 	}
 
 	if (family_selected(AF_INET) && v4grp != NULL) {
-		if (Dflag)
+		if (Xflag)
 			(void) printf("%u records for ipGroupMember:\n",
 			    v4grp->length / sizeof (ip_member_t));
 
@@ -3564,7 +3581,7 @@ group_report(mib_item_t *item)
 			if (!Vflag || v4src == NULL)
 				continue;
 
-			if (Dflag)
+			if (Xflag)
 				(void) printf("scanning %u ipGroupSource "
 				    "records...\n",
 				    v4src->length/sizeof (ip_grpsrc_t));
@@ -3609,7 +3626,7 @@ group_report(mib_item_t *item)
 	}
 
 	if (family_selected(AF_INET6) && v6grp != NULL) {
-		if (Dflag)
+		if (Xflag)
 			(void) printf("%u records for ipv6GroupMember:\n",
 			    v6grp->length / sizeof (ipv6_member_t));
 
@@ -3638,7 +3655,7 @@ group_report(mib_item_t *item)
 			if (!Vflag || v6src == NULL)
 				continue;
 
-			if (Dflag)
+			if (Xflag)
 				(void) printf("scanning %u ipv6GroupSource "
 				    "records...\n",
 				    v6src->length/sizeof (ipv6_grpsrc_t));
@@ -3683,6 +3700,126 @@ group_report(mib_item_t *item)
 	(void) fflush(stdout);
 }
 
+/* --------------------- DCE_REPORT (netstat -d) ------------------------- */
+
+#define	FLBUFSIZE	8
+
+/* Assumes flbuf is at least 5 characters; callers use FLBUFSIZE */
+static char *
+dceflags2str(uint32_t flags, char *flbuf)
+{
+	char *str = flbuf;
+
+	if (flags & DCEF_DEFAULT)
+		*str++ = 'D';
+	if (flags & DCEF_PMTU)
+		*str++ = 'P';
+	if (flags & DCEF_UINFO)
+		*str++ = 'U';
+	if (flags & DCEF_TOO_SMALL_PMTU)
+		*str++ = 'S';
+	*str++ = '\0';
+	return (flbuf);
+}
+
+static void
+dce_report(mib_item_t *item)
+{
+	mib_item_t	*v4dce = NULL;
+	mib_item_t	*v6dce = NULL;
+	int		jtemp = 0;
+	char		ifname[LIFNAMSIZ + 1];
+	char		abuf[MAXHOSTNAMELEN + 1];
+	char		flbuf[FLBUFSIZE];
+	boolean_t	first;
+	dest_cache_entry_t *dce;
+
+	/* 'for' loop 1: */
+	for (; item; item = item->next_item) {
+		if (Xflag) {
+			(void) printf("\n--- Entry %d ---\n", ++jtemp);
+			(void) printf("Group = %d, mib_id = %d, "
+			    "length = %d, valp = 0x%p\n",
+			    item->group, item->mib_id, item->length,
+			    item->valp);
+		}
+		if (item->group == MIB2_IP && family_selected(AF_INET) &&
+		    item->mib_id == EXPER_IP_DCE) {
+			v4dce = item;
+			if (Xflag)
+				(void) printf("item is v4dce info\n");
+		}
+		if (item->group == MIB2_IP6 && family_selected(AF_INET6) &&
+		    item->mib_id == EXPER_IP_DCE) {
+			v6dce = item;
+			if (Xflag)
+				(void) printf("item is v6dce info\n");
+		}
+	}
+
+	if (family_selected(AF_INET) && v4dce != NULL) {
+		if (Xflag)
+			(void) printf("%u records for DestCacheEntry:\n",
+			    v4dce->length / ipDestEntrySize);
+
+		first = B_TRUE;
+		for (dce = (dest_cache_entry_t *)v4dce->valp;
+		    (char *)dce < (char *)v4dce->valp + v4dce->length;
+		    /* LINTED: (note 1) */
+		    dce = (dest_cache_entry_t *)((char *)dce +
+		    ipDestEntrySize)) {
+			if (first) {
+				(void) putchar('\n');
+				(void) puts("Destination Cache Entries: IPv4");
+				(void) puts(
+				    "Address               PMTU   Age  Flags");
+				(void) puts(
+				    "-------------------- ------ ----- -----");
+				first = B_FALSE;
+			}
+
+			(void) printf("%-20s %6u %5u %-5s\n",
+			    pr_addr(dce->DestIpv4Address, abuf, sizeof (abuf)),
+			    dce->DestPmtu, dce->DestAge,
+			    dceflags2str(dce->DestFlags, flbuf));
+		}
+	}
+
+	if (family_selected(AF_INET6) && v6dce != NULL) {
+		if (Xflag)
+			(void) printf("%u records for DestCacheEntry:\n",
+			    v6dce->length / ipDestEntrySize);
+
+		first = B_TRUE;
+		for (dce = (dest_cache_entry_t *)v6dce->valp;
+		    (char *)dce < (char *)v6dce->valp + v6dce->length;
+		    /* LINTED: (note 1) */
+		    dce = (dest_cache_entry_t *)((char *)dce +
+		    ipDestEntrySize)) {
+			if (first) {
+				(void) putchar('\n');
+				(void) puts("Destination Cache Entries: IPv6");
+				(void) puts(
+				    "Address                      PMTU  "
+				    " Age Flags If ");
+				(void) puts(
+				    "--------------------------- ------ "
+				    "----- ----- ---");
+				first = B_FALSE;
+			}
+
+			(void) printf("%-27s %6u %5u %-5s %s\n",
+			    pr_addr6(&dce->DestIpv6Address, abuf,
+			    sizeof (abuf)),
+			    dce->DestPmtu, dce->DestAge,
+			    dceflags2str(dce->DestFlags, flbuf),
+			    dce->DestIfindex == 0 ? "" :
+			    ifindex2str(dce->DestIfindex, ifname));
+		}
+	}
+	(void) fflush(stdout);
+}
+
 /* --------------------- ARP_REPORT (netstat -p) -------------------------- */
 
 static void
@@ -3703,7 +3840,7 @@ arp_report(mib_item_t *item)
 
 	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
-		if (Dflag) {
+		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
 			(void) printf("Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
@@ -3713,7 +3850,7 @@ arp_report(mib_item_t *item)
 		if (!(item->group == MIB2_IP && item->mib_id == MIB2_IP_MEDIA))
 			continue; /* 'for' loop 1 */
 
-		if (Dflag)
+		if (Xflag)
 			(void) printf("%u records for "
 			    "ipNetToMediaEntryTable:\n",
 			    item->length/sizeof (mib2_ipNetToMediaEntry_t));
@@ -3798,7 +3935,7 @@ ndp_report(mib_item_t *item)
 
 	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
-		if (Dflag) {
+		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
 			(void) printf("Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
@@ -3973,7 +4110,7 @@ ire_report(const mib_item_t *item)
 	v4a = v4_attrs;
 	v6a = v6_attrs;
 	for (; item != NULL; item = item->next_item) {
-		if (Dflag) {
+		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
 			(void) printf("Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
@@ -3991,7 +4128,7 @@ ire_report(const mib_item_t *item)
 		else if (item->group == MIB2_IP6 && !family_selected(AF_INET6))
 			continue; /* 'for' loop 1 */
 
-		if (Dflag) {
+		if (Xflag) {
 			if (item->group == MIB2_IP) {
 				(void) printf("%u records for "
 				    "ipRouteEntryTable:\n",
@@ -4161,29 +4298,29 @@ form_v4_route_flags(const mib2_ipRouteEntry_t *rp, char *flags)
 
 	flag_b = FLF_U;
 	(void) strcpy(flags, "U");
-	if (rp->ipRouteInfo.re_ire_type == IRE_DEFAULT ||
-	    rp->ipRouteInfo.re_ire_type == IRE_PREFIX ||
-	    rp->ipRouteInfo.re_ire_type == IRE_HOST ||
-	    rp->ipRouteInfo.re_ire_type == IRE_HOST_REDIRECT) {
+	/* RTF_INDIRECT wins over RTF_GATEWAY - don't display both */
+	if (rp->ipRouteInfo.re_flags & RTF_INDIRECT) {
+		(void) strcat(flags, "I");
+		flag_b |= FLF_I;
+	} else if (rp->ipRouteInfo.re_ire_type & IRE_OFFLINK) {
 		(void) strcat(flags, "G");
 		flag_b |= FLF_G;
 	}
-	if (rp->ipRouteMask == IP_HOST_MASK) {
+	/* IRE_IF_CLONE wins over RTF_HOST - don't display both */
+	if (rp->ipRouteInfo.re_ire_type & IRE_IF_CLONE) {
+		(void) strcat(flags, "C");
+		flag_b |= FLF_C;
+	} else if (rp->ipRouteMask == IP_HOST_MASK) {
 		(void) strcat(flags, "H");
 		flag_b |= FLF_H;
 	}
-	if (rp->ipRouteInfo.re_ire_type == IRE_HOST_REDIRECT) {
+	if (rp->ipRouteInfo.re_flags & RTF_DYNAMIC) {
 		(void) strcat(flags, "D");
 		flag_b |= FLF_D;
 	}
-	if (rp->ipRouteInfo.re_ire_type == IRE_CACHE) {
-		/* Address resolution */
-		(void) strcat(flags, "A");
-		flag_b |= FLF_A;
-	}
 	if (rp->ipRouteInfo.re_ire_type == IRE_BROADCAST) {	/* Broadcast */
-		(void) strcat(flags, "B");
-		flag_b |= FLF_B;
+		(void) strcat(flags, "b");
+		flag_b |= FLF_b;
 	}
 	if (rp->ipRouteInfo.re_ire_type == IRE_LOCAL) {		/* Local */
 		(void) strcat(flags, "L");
@@ -4197,6 +4334,14 @@ form_v4_route_flags(const mib2_ipRouteEntry_t *rp, char *flags)
 		(void) strcat(flags, "S");			/* Setsrc */
 		flag_b |= FLF_S;
 	}
+	if (rp->ipRouteInfo.re_flags & RTF_REJECT) {
+		(void) strcat(flags, "R");
+		flag_b |= FLF_R;
+	}
+	if (rp->ipRouteInfo.re_flags & RTF_BLACKHOLE) {
+		(void) strcat(flags, "B");
+		flag_b |= FLF_B;
+	}
 	return (flag_b);
 }
 
@@ -4205,9 +4350,9 @@ static const char ire_hdr_v4[] =
 static const char ire_hdr_v4_compat[] =
 "\n%s Table:\n";
 static const char ire_hdr_v4_verbose[] =
-"  Destination             Mask           Gateway          Device Mxfrg "
-"Rtt   Ref Flg  Out  In/Fwd %s\n"
-"-------------------- --------------- -------------------- ------ ----- "
+"  Destination             Mask           Gateway          Device "
+" MTU  Ref Flg  Out  In/Fwd %s\n"
+"-------------------- --------------- -------------------- ------ "
 "----- --- --- ----- ------ %s\n";
 
 static const char ire_hdr_v4_normal[] =
@@ -4226,8 +4371,10 @@ ire_report_item_v4(const mib2_ipRouteEntry_t *rp, boolean_t first,
 	char			flags[10];	/* RTF_ flags */
 	uint_t			flag_b;
 
-	if (!(Aflag || (rp->ipRouteInfo.re_ire_type != IRE_CACHE &&
+	if (!(Aflag || (rp->ipRouteInfo.re_ire_type != IRE_IF_CLONE &&
 	    rp->ipRouteInfo.re_ire_type != IRE_BROADCAST &&
+	    rp->ipRouteInfo.re_ire_type != IRE_MULTICAST &&
+	    rp->ipRouteInfo.re_ire_type != IRE_NOROUTE &&
 	    rp->ipRouteInfo.re_ire_type != IRE_LOCAL))) {
 		return (first);
 	}
@@ -4253,15 +4400,13 @@ ire_report_item_v4(const mib2_ipRouteEntry_t *rp, boolean_t first,
 		    dstbuf, sizeof (dstbuf));
 	}
 	if (Vflag) {
-		(void) printf("%-20s %-15s %-20s %-6s %5u%c %4u %3u "
+		(void) printf("%-20s %-15s %-20s %-6s %5u %3u "
 		    "%-4s%6u %6u %s\n",
 		    dstbuf,
 		    pr_mask(rp->ipRouteMask, maskbuf, sizeof (maskbuf)),
 		    pr_addrnz(rp->ipRouteNextHop, gwbuf, sizeof (gwbuf)),
 		    octetstr(&rp->ipRouteIfIndex, 'a', ifname, sizeof (ifname)),
 		    rp->ipRouteInfo.re_max_frag,
-		    rp->ipRouteInfo.re_frag_flag ? '*' : ' ',
-		    rp->ipRouteInfo.re_rtt,
 		    rp->ipRouteInfo.re_ref,
 		    flags,
 		    rp->ipRouteInfo.re_obpkt,
@@ -4391,12 +4536,68 @@ ire_filter_match_v6(const mib2_ipv6RouteEntry_t *rp6, uint_t flag_b)
 	return (B_TRUE);
 }
 
+/*
+ * Given an IPv6 MIB2 route entry, form the list of flags for the
+ * route.
+ */
+static uint_t
+form_v6_route_flags(const mib2_ipv6RouteEntry_t *rp6, char *flags)
+{
+	uint_t flag_b;
+
+	flag_b = FLF_U;
+	(void) strcpy(flags, "U");
+	/* RTF_INDIRECT wins over RTF_GATEWAY - don't display both */
+	if (rp6->ipv6RouteInfo.re_flags & RTF_INDIRECT) {
+		(void) strcat(flags, "I");
+		flag_b |= FLF_I;
+	} else if (rp6->ipv6RouteInfo.re_ire_type & IRE_OFFLINK) {
+		(void) strcat(flags, "G");
+		flag_b |= FLF_G;
+	}
+
+	/* IRE_IF_CLONE wins over RTF_HOST - don't display both */
+	if (rp6->ipv6RouteInfo.re_ire_type & IRE_IF_CLONE) {
+		(void) strcat(flags, "C");
+		flag_b |= FLF_C;
+	} else if (rp6->ipv6RoutePfxLength == IPV6_ABITS) {
+		(void) strcat(flags, "H");
+		flag_b |= FLF_H;
+	}
+
+	if (rp6->ipv6RouteInfo.re_flags & RTF_DYNAMIC) {
+		(void) strcat(flags, "D");
+		flag_b |= FLF_D;
+	}
+	if (rp6->ipv6RouteInfo.re_ire_type == IRE_LOCAL) {	/* Local */
+		(void) strcat(flags, "L");
+		flag_b |= FLF_L;
+	}
+	if (rp6->ipv6RouteInfo.re_flags & RTF_MULTIRT) {
+		(void) strcat(flags, "M");			/* Multiroute */
+		flag_b |= FLF_M;
+	}
+	if (rp6->ipv6RouteInfo.re_flags & RTF_SETSRC) {
+		(void) strcat(flags, "S");			/* Setsrc */
+		flag_b |= FLF_S;
+	}
+	if (rp6->ipv6RouteInfo.re_flags & RTF_REJECT) {
+		(void) strcat(flags, "R");
+		flag_b |= FLF_R;
+	}
+	if (rp6->ipv6RouteInfo.re_flags & RTF_BLACKHOLE) {
+		(void) strcat(flags, "B");
+		flag_b |= FLF_B;
+	}
+	return (flag_b);
+}
+
 static const char ire_hdr_v6[] =
 "\n%s Table: IPv6\n";
 static const char ire_hdr_v6_verbose[] =
-"  Destination/Mask            Gateway                    If    PMTU   Rtt  "
+"  Destination/Mask            Gateway                    If    MTU  "
 "Ref Flags  Out   In/Fwd %s\n"
-"--------------------------- --------------------------- ----- ------ ----- "
+"--------------------------- --------------------------- ----- ----- "
 "--- ----- ------ ------ %s\n";
 static const char ire_hdr_v6_normal[] =
 "  Destination/Mask            Gateway                   Flags Ref   Use  "
@@ -4414,47 +4615,14 @@ ire_report_item_v6(const mib2_ipv6RouteEntry_t *rp6, boolean_t first,
 	char			flags[10];	/* RTF_ flags */
 	uint_t			flag_b;
 
-	if (!(Aflag || (rp6->ipv6RouteInfo.re_ire_type != IRE_CACHE &&
+	if (!(Aflag || (rp6->ipv6RouteInfo.re_ire_type != IRE_IF_CLONE &&
+	    rp6->ipv6RouteInfo.re_ire_type != IRE_MULTICAST &&
+	    rp6->ipv6RouteInfo.re_ire_type != IRE_NOROUTE &&
 	    rp6->ipv6RouteInfo.re_ire_type != IRE_LOCAL))) {
 		return (first);
 	}
 
-	flag_b = FLF_U;
-	(void) strcpy(flags, "U");
-	if (rp6->ipv6RouteInfo.re_ire_type == IRE_DEFAULT ||
-	    rp6->ipv6RouteInfo.re_ire_type == IRE_PREFIX ||
-	    rp6->ipv6RouteInfo.re_ire_type == IRE_HOST ||
-	    rp6->ipv6RouteInfo.re_ire_type == IRE_HOST_REDIRECT) {
-		(void) strcat(flags, "G");
-		flag_b |= FLF_G;
-	}
-
-	if (rp6->ipv6RoutePfxLength == IPV6_ABITS) {
-		(void) strcat(flags, "H");
-		flag_b |= FLF_H;
-	}
-
-	if (rp6->ipv6RouteInfo.re_ire_type == IRE_HOST_REDIRECT) {
-		(void) strcat(flags, "D");
-		flag_b |= FLF_D;
-	}
-	if (rp6->ipv6RouteInfo.re_ire_type == IRE_CACHE) {
-		/* Address resolution */
-		(void) strcat(flags, "A");
-		flag_b |= FLF_A;
-	}
-	if (rp6->ipv6RouteInfo.re_ire_type == IRE_LOCAL) {	/* Local */
-		(void) strcat(flags, "L");
-		flag_b |= FLF_L;
-	}
-	if (rp6->ipv6RouteInfo.re_flags & RTF_MULTIRT) {
-		(void) strcat(flags, "M");			/* Multiroute */
-		flag_b |= FLF_M;
-	}
-	if (rp6->ipv6RouteInfo.re_flags & RTF_SETSRC) {
-		(void) strcat(flags, "S");			/* Setsrc */
-		flag_b |= FLF_S;
-	}
+	flag_b = form_v6_route_flags(rp6, flags);
 
 	if (!ire_filter_match_v6(rp6, flag_b))
 		return (first);
@@ -4468,7 +4636,7 @@ ire_report_item_v6(const mib2_ipv6RouteEntry_t *rp6, boolean_t first,
 	}
 
 	if (Vflag) {
-		(void) printf("%-27s %-27s %-5s %5u%c %5u %3u "
+		(void) printf("%-27s %-27s %-5s %5u %3u "
 		    "%-5s %6u %6u %s\n",
 		    pr_prefix6(&rp6->ipv6RouteDest,
 		    rp6->ipv6RoutePfxLength, dstbuf, sizeof (dstbuf)),
@@ -4478,8 +4646,6 @@ ire_report_item_v6(const mib2_ipv6RouteEntry_t *rp6, boolean_t first,
 		    octetstr(&rp6->ipv6RouteIfIndex, 'a',
 		    ifname, sizeof (ifname)),
 		    rp6->ipv6RouteInfo.re_max_frag,
-		    rp6->ipv6RouteInfo.re_frag_flag ? '*' : ' ',
-		    rp6->ipv6RouteInfo.re_rtt,
 		    rp6->ipv6RouteInfo.re_ref,
 		    flags,
 		    rp6->ipv6RouteInfo.re_obpkt,
@@ -4617,7 +4783,7 @@ tcp_report(const mib_item_t *item)
 	v4a = v4_attrs;
 	v6a = v6_attrs;
 	for (; item != NULL; item = item->next_item) {
-		if (Dflag) {
+		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
 			(void) printf("Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
@@ -4841,7 +5007,7 @@ udp_report(const mib_item_t *item)
 	v6a = v6_attrs;
 	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
-		if (Dflag) {
+		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
 			(void) printf("Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
@@ -4916,10 +5082,7 @@ udp_report_item_v4(const mib2_udpEntry_t *ude, boolean_t first,
 	    "",
 	    miudp_state(ude->udpEntryInfo.ue_state, attr));
 
-	/*
-	 * UDP sockets don't have remote attributes, so there's no need to
-	 * print them here.
-	 */
+	print_transport_label(attr);
 
 	return (first);
 }
@@ -4956,10 +5119,7 @@ udp_report_item_v6(const mib2_udp6Entry_t *ude6, boolean_t first,
 	    miudp_state(ude6->udp6EntryInfo.ue_state, attr),
 	    ifnamep == NULL ? "" : ifnamep);
 
-	/*
-	 * UDP sockets don't have remote attributes, so there's no need to
-	 * print them here.
-	 */
+	print_transport_label(attr);
 
 	return (first);
 }
@@ -5321,7 +5481,7 @@ mrt_report(mib_item_t *item)
 
 	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
-		if (Dflag) {
+		if (Xflag) {
 			(void) printf("\n--- Entry %d ---\n", ++jtemp);
 			(void) printf("Group = %d, mib_id = %d, "
 			    "length = %d, valp = 0x%p\n",
@@ -5334,7 +5494,7 @@ mrt_report(mib_item_t *item)
 		switch (item->mib_id) {
 
 		case EXPER_DVMRP_VIF:
-			if (Dflag)
+			if (Xflag)
 				(void) printf("%u records for ipVifTable:\n",
 				    item->length/sizeof (struct vifctl));
 			if (item->length/sizeof (struct vifctl) == 0) {
@@ -5377,7 +5537,7 @@ mrt_report(mib_item_t *item)
 			break;
 
 		case EXPER_DVMRP_MRT:
-			if (Dflag)
+			if (Xflag)
 				(void) printf("%u records for ipMfcTable:\n",
 				    item->length/sizeof (struct vifctl));
 			if (item->length/sizeof (struct vifctl) == 0) {

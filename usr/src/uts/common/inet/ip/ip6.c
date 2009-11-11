@@ -53,8 +53,8 @@
 #include <sys/vtrace.h>
 #include <sys/isa_defs.h>
 #include <sys/atomic.h>
-#include <sys/iphada.h>
 #include <sys/policy.h>
+#include <sys/mac.h>
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/route.h>
@@ -79,9 +79,7 @@
 #include <inet/tcp.h>
 #include <inet/tcp_impl.h>
 #include <inet/udp_impl.h>
-#include <inet/sctp/sctp_impl.h>
 #include <inet/ipp_common.h>
-#include <inet/ilb_ip.h>
 
 #include <inet/ip_multi.h>
 #include <inet/ip_if.h>
@@ -89,7 +87,6 @@
 #include <inet/ip_rts.h>
 #include <inet/ip_ndp.h>
 #include <net/pfkeyv2.h>
-#include <inet/ipsec_info.h>
 #include <inet/sadb.h>
 #include <inet/ipsec_impl.h>
 #include <inet/iptun/iptun_impl.h>
@@ -109,8 +106,6 @@
 
 /* Temporary; for CR 6451644 work-around */
 #include <sys/ethernet.h>
-
-extern int ip_squeue_flag;
 
 /*
  * Naming conventions:
@@ -179,154 +174,75 @@ const in6_addr_t ipv6_solicited_node_mcast =
 			{ 0x000002ffU, 0, 0x01000000U, 0x000000ffU };
 #endif /* _BIG_ENDIAN */
 
-/* Leave room for ip_newroute to tack on the src and target addresses */
-#define	OK_RESOLVER_MP_V6(mp)						\
-		((mp) && ((mp)->b_wptr - (mp)->b_rptr) >= (2 * IPV6_ADDR_LEN))
-
-#define	IP6_MBLK_OK		0
-#define	IP6_MBLK_HDR_ERR	1
-#define	IP6_MBLK_LEN_ERR	2
-
-static void	icmp_inbound_too_big_v6(queue_t *, mblk_t *, ill_t *, ill_t *,
-    boolean_t, zoneid_t);
-static void	icmp_pkt_v6(queue_t *, mblk_t *, void *, size_t,
-    const in6_addr_t *, boolean_t, zoneid_t, ip_stack_t *);
-static void	icmp_redirect_v6(queue_t *, mblk_t *, ill_t *ill);
-static int	ip_bind_connected_v6(conn_t *, mblk_t **, uint8_t, in6_addr_t *,
-    uint16_t, const in6_addr_t *, ip6_pkt_t *, uint16_t,
-    boolean_t, boolean_t, cred_t *);
-static boolean_t ip_bind_get_ire_v6(mblk_t **, ire_t *, const in6_addr_t *,
-    iulp_t *, ip_stack_t *);
-static int	ip_bind_laddr_v6(conn_t *, mblk_t **, uint8_t,
-    const in6_addr_t *, uint16_t, boolean_t);
-static void	ip_fanout_proto_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
-    ill_t *, uint8_t, uint_t, uint_t, boolean_t, zoneid_t);
-static void	ip_fanout_tcp_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
-    ill_t *, uint_t, uint_t, boolean_t, zoneid_t);
-static void	ip_fanout_udp_v6(queue_t *, mblk_t *, ip6_t *, uint32_t,
-    ill_t *, ill_t *, uint_t, boolean_t, zoneid_t);
-static int	ip_process_options_v6(queue_t *, mblk_t *, ip6_t *,
-    uint8_t *, uint_t, uint8_t, ip_stack_t *);
-static mblk_t	*ip_rput_frag_v6(ill_t *, ill_t *, mblk_t *, ip6_t *,
-    ip6_frag_t *, uint_t, uint_t *, uint32_t *, uint16_t *);
+static boolean_t icmp_inbound_verify_v6(mblk_t *, icmp6_t *, ip_recv_attr_t *);
+static void	icmp_inbound_too_big_v6(icmp6_t *, ip_recv_attr_t *);
+static void	icmp_pkt_v6(mblk_t *, void *, size_t, const in6_addr_t *,
+    ip_recv_attr_t *);
+static void	icmp_redirect_v6(mblk_t *, ip6_t *, nd_redirect_t *,
+    ip_recv_attr_t *);
+static void	icmp_send_redirect_v6(mblk_t *, in6_addr_t *,
+    in6_addr_t *, ip_recv_attr_t *);
+static void	icmp_send_reply_v6(mblk_t *, ip6_t *, icmp6_t *,
+    ip_recv_attr_t *);
 static boolean_t	ip_source_routed_v6(ip6_t *, mblk_t *, ip_stack_t *);
-static void	ip_wput_ire_v6(queue_t *, mblk_t *, ire_t *, int, int,
-    conn_t *, int, int, zoneid_t);
-static boolean_t ipif_lookup_testaddr_v6(ill_t *, const in6_addr_t *,
-    ipif_t **);
 
 /*
- * A template for an IPv6 AR_ENTRY_QUERY
- */
-static areq_t	ipv6_areq_template = {
-	AR_ENTRY_QUERY,				/* cmd */
-	sizeof (areq_t)+(2*IPV6_ADDR_LEN),	/* name offset */
-	sizeof (areq_t),	/* name len (filled by ill_arp_alloc) */
-	ETHERTYPE_IPV6,		/* protocol, from arps perspective */
-	sizeof (areq_t),	/* target addr offset */
-	IPV6_ADDR_LEN,		/* target addr_length */
-	0,			/* flags */
-	sizeof (areq_t) + IPV6_ADDR_LEN,	/* sender addr offset */
-	IPV6_ADDR_LEN,		/* sender addr length */
-	6,			/* xmit_count */
-	1000,			/* (re)xmit_interval in milliseconds */
-	4			/* max # of requests to buffer */
-	/* anything else filled in by the code */
-};
-
-/*
- * Handle IPv6 ICMP packets sent to us.  Consume the mblk passed in.
- * The message has already been checksummed and if needed,
- * a copy has been made to be sent any interested ICMP client (conn)
- * Note that this is different than icmp_inbound() which does the fanout
- * to conn's as well as local processing of the ICMP packets.
+ * icmp_inbound_v6 deals with ICMP messages that are handled by IP.
+ * If the ICMP message is consumed by IP, i.e., it should not be delivered
+ * to any IPPROTO_ICMP raw sockets, then it returns NULL.
+ * Likewise, if the ICMP error is misformed (too short, etc), then it
+ * returns NULL. The caller uses this to determine whether or not to send
+ * to raw sockets.
  *
  * All error messages are passed to the matching transport stream.
  *
- * Zones notes:
- * The packet is only processed in the context of the specified zone: typically
- * only this zone will reply to an echo request. This means that the caller must
- * call icmp_inbound_v6() for each relevant zone.
+ * See comment for icmp_inbound_v4() on how IPsec is handled.
  */
-static void
-icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, ill_t *inill,
-    uint_t hdr_length, boolean_t mctl_present, uint_t flags, zoneid_t zoneid,
-    mblk_t *dl_mp)
+mblk_t *
+icmp_inbound_v6(mblk_t *mp, ip_recv_attr_t *ira)
 {
 	icmp6_t		*icmp6;
-	ip6_t		*ip6h;
+	ip6_t		*ip6h;		/* Outer header */
+	int		ip_hdr_length;	/* Outer header length */
 	boolean_t	interested;
-	in6_addr_t	origsrc;
-	mblk_t		*first_mp;
-	ipsec_in_t	*ii;
+	ill_t		*ill = ira->ira_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
-
-	ASSERT(ill != NULL);
-	first_mp = mp;
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		ASSERT(mp != NULL);
-
-		ii = (ipsec_in_t *)first_mp->b_rptr;
-		ASSERT(ii->ipsec_in_type == IPSEC_IN);
-	}
+	mblk_t		*mp_ret = NULL;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 
 	BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInMsgs);
 
-	if ((mp->b_wptr - mp->b_rptr) < (hdr_length + ICMP6_MINLEN)) {
-		if (!pullupmsg(mp, hdr_length + ICMP6_MINLEN)) {
-			ip1dbg(("icmp_inbound_v6: pullupmsg failed\n"));
-			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInErrors);
-			freemsg(first_mp);
-			return;
-		}
-		ip6h = (ip6_t *)mp->b_rptr;
-	}
-	if (ipst->ips_icmp_accept_clear_messages == 0) {
-		first_mp = ipsec_check_global_policy(first_mp, NULL,
-		    NULL, ip6h, mctl_present, ipst->ips_netstack);
-		if (first_mp == NULL)
-			return;
-	}
+	/* Make sure ira_l2src is set for ndp_input */
+	if (!(ira->ira_flags & IRAF_L2SRC_SET))
+		ip_setl2src(mp, ira, ira->ira_rill);
 
-	/*
-	 * On a labeled system, we have to check whether the zone itself is
-	 * permitted to receive raw traffic.
-	 */
-	if (is_system_labeled()) {
-		if (zoneid == ALL_ZONES)
-			zoneid = tsol_packet_to_zoneid(mp);
-		if (!tsol_can_accept_raw(mp, B_FALSE)) {
-			ip1dbg(("icmp_inbound_v6: zone %d can't receive raw",
-			    zoneid));
+	ip_hdr_length = ira->ira_ip_hdr_length;
+	if ((mp->b_wptr - mp->b_rptr) < (ip_hdr_length + ICMP6_MINLEN)) {
+		if (ira->ira_pktlen < (ip_hdr_length + ICMP6_MINLEN)) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTruncatedPkts);
+			ip_drop_input("ipIfStatsInTruncatedPkts", mp, ill);
+			freemsg(mp);
+			return (NULL);
+		}
+		ip6h = ip_pullup(mp, ip_hdr_length + ICMP6_MINLEN, ira);
+		if (ip6h == NULL) {
 			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInErrors);
-			freemsg(first_mp);
-			return;
+			freemsg(mp);
+			return (NULL);
 		}
 	}
 
-	icmp6 = (icmp6_t *)(&mp->b_rptr[hdr_length]);
+	icmp6 = (icmp6_t *)(&mp->b_rptr[ip_hdr_length]);
+	DTRACE_PROBE2(icmp__inbound__v6, ip6_t *, ip6h, icmp6_t *, icmp6);
 	ip2dbg(("icmp_inbound_v6: type %d code %d\n", icmp6->icmp6_type,
 	    icmp6->icmp6_code));
+
+	/*
+	 * We will set "interested" to "true" if we should pass a copy to
+	 * the transport i.e., if it is an error message.
+	 */
 	interested = !(icmp6->icmp6_type & ICMP6_INFOMSG_MASK);
-
-	/* Initiate IPPF processing here */
-	if (IP6_IN_IPP(flags, ipst)) {
-
-		/*
-		 * If the ifindex changes due to SIOCSLIFINDEX
-		 * packet may return to IP on the wrong ill.
-		 */
-		ip_process(IPP_LOCAL_IN, &mp, ill->ill_phyint->phyint_ifindex);
-		if (mp == NULL) {
-			if (mctl_present) {
-				freeb(first_mp);
-			}
-			return;
-		}
-	}
 
 	switch (icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
@@ -344,9 +260,9 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, ill_t *inill,
 		break;
 
 	case ICMP6_PACKET_TOO_BIG:
-		icmp_inbound_too_big_v6(q, first_mp, ill, inill, mctl_present,
-		    zoneid);
-		return;
+		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInPktTooBigs);
+		break;
+
 	case ICMP6_ECHO_REQUEST:
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInEchos);
 		if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst) &&
@@ -362,93 +278,22 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, ill_t *inill,
 			mblk_t	*mp1;
 
 			mp1 = copymsg(mp);
-			freemsg(mp);
 			if (mp1 == NULL) {
-				BUMP_MIB(ill->ill_icmp6_mib,
-				    ipv6IfIcmpInErrors);
-				if (mctl_present)
-					freeb(first_mp);
-				return;
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				ip_drop_input("ipIfStatsInDiscards - copymsg",
+				    mp, ill);
+				freemsg(mp);
+				return (NULL);
 			}
+			freemsg(mp);
 			mp = mp1;
 			ip6h = (ip6_t *)mp->b_rptr;
-			icmp6 = (icmp6_t *)(&mp->b_rptr[hdr_length]);
-			if (mctl_present)
-				first_mp->b_cont = mp;
-			else
-				first_mp = mp;
+			icmp6 = (icmp6_t *)(&mp->b_rptr[ip_hdr_length]);
 		}
 
-		/*
-		 * Turn the echo into an echo reply.
-		 * Remove any extension headers (do not reverse a source route)
-		 * and clear the flow id (keep traffic class for now).
-		 */
-		if (hdr_length != IPV6_HDR_LEN) {
-			int	i;
-
-			for (i = 0; i < IPV6_HDR_LEN; i++)
-				mp->b_rptr[hdr_length - i - 1] =
-				    mp->b_rptr[IPV6_HDR_LEN - i - 1];
-			mp->b_rptr += (hdr_length - IPV6_HDR_LEN);
-			ip6h = (ip6_t *)mp->b_rptr;
-			ip6h->ip6_nxt = IPPROTO_ICMPV6;
-			hdr_length = IPV6_HDR_LEN;
-		}
-		ip6h->ip6_vcf &= ~IPV6_FLOWINFO_FLOWLABEL;
 		icmp6->icmp6_type = ICMP6_ECHO_REPLY;
-
-		ip6h->ip6_plen =
-		    htons((uint16_t)(msgdsize(mp) - IPV6_HDR_LEN));
-		origsrc = ip6h->ip6_src;
-		/*
-		 * Reverse the source and destination addresses.
-		 * If the return address is a multicast, zero out the source
-		 * (ip_wput_v6 will set an address).
-		 */
-		if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-			ip6h->ip6_src = ipv6_all_zeros;
-			ip6h->ip6_dst = origsrc;
-		} else {
-			ip6h->ip6_src = ip6h->ip6_dst;
-			ip6h->ip6_dst = origsrc;
-		}
-
-		/* set the hop limit */
-		ip6h->ip6_hops = ipst->ips_ipv6_def_hops;
-
-		/*
-		 * Prepare for checksum by putting icmp length in the icmp
-		 * checksum field. The checksum is calculated in ip_wput_v6.
-		 */
-		icmp6->icmp6_cksum = ip6h->ip6_plen;
-
-		if (!mctl_present) {
-			/*
-			 * This packet should go out the same way as it
-			 * came in i.e in clear. To make sure that global
-			 * policy will not be applied to this in ip_wput,
-			 * we attach a IPSEC_IN mp and clear ipsec_in_secure.
-			 */
-			ASSERT(first_mp == mp);
-			first_mp = ipsec_in_alloc(B_FALSE, ipst->ips_netstack);
-			if (first_mp == NULL) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(mp);
-				return;
-			}
-			ii = (ipsec_in_t *)first_mp->b_rptr;
-
-			/* This is not a secure packet */
-			ii->ipsec_in_secure = B_FALSE;
-			first_mp->b_cont = mp;
-		}
-		if (!ipsec_in_to_out(first_mp, NULL, ip6h, zoneid)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			return;
-		}
-		put(WR(q), first_mp);
-		return;
+		icmp_send_reply_v6(mp, ip6h, icmp6, ira);
+		return (NULL);
 
 	case ICMP6_ECHO_REPLY:
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInEchoReplies);
@@ -464,343 +309,478 @@ icmp_inbound_v6(queue_t *q, mblk_t *mp, ill_t *ill, ill_t *inill,
 
 	case ND_NEIGHBOR_SOLICIT:
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInNeighborSolicits);
-		if (mctl_present)
-			freeb(first_mp);
-		/* XXX may wish to pass first_mp up to ndp_input someday. */
-		ndp_input(inill, mp, dl_mp);
-		return;
+		ndp_input(mp, ira);
+		return (NULL);
 
 	case ND_NEIGHBOR_ADVERT:
 		BUMP_MIB(ill->ill_icmp6_mib,
 		    ipv6IfIcmpInNeighborAdvertisements);
-		if (mctl_present)
-			freeb(first_mp);
-		/* XXX may wish to pass first_mp up to ndp_input someday. */
-		ndp_input(inill, mp, dl_mp);
-		return;
+		ndp_input(mp, ira);
+		return (NULL);
 
-	case ND_REDIRECT: {
+	case ND_REDIRECT:
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInRedirects);
 
 		if (ipst->ips_ipv6_ignore_redirect)
 			break;
 
-		/*
-		 * As there is no upper client to deliver, we don't
-		 * need the first_mp any more.
-		 */
-		if (mctl_present)
-			freeb(first_mp);
-		if (!pullupmsg(mp, -1)) {
-			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
-			break;
-		}
-		icmp_redirect_v6(q, mp, ill);
-		return;
-	}
+		/* We now allow a RAW socket to receive this. */
+		interested = B_TRUE;
+		break;
 
 	/*
 	 * The next three icmp messages will be handled by MLD.
 	 * Pass all valid MLD packets up to any process(es)
-	 * listening on a raw ICMP socket. MLD messages are
-	 * freed by mld_input function.
+	 * listening on a raw ICMP socket.
 	 */
 	case MLD_LISTENER_QUERY:
 	case MLD_LISTENER_REPORT:
 	case MLD_LISTENER_REDUCTION:
-		if (mctl_present)
-			freeb(first_mp);
-		mld_input(q, mp, ill);
-		return;
+		mp = mld_input(mp, ira);
+		return (mp);
 	default:
 		break;
 	}
-	if (interested) {
-		icmp_inbound_error_fanout_v6(q, first_mp, ip6h, icmp6, ill,
-		    inill, mctl_present, zoneid);
-	} else {
-		freemsg(first_mp);
-	}
-}
-
-/*
- * Process received IPv6 ICMP Packet too big.
- * After updating any IRE it does the fanout to any matching transport streams.
- * Assumes the IPv6 plus ICMPv6 headers have been pulled up but nothing else.
- */
-/* ARGSUSED */
-static void
-icmp_inbound_too_big_v6(queue_t *q, mblk_t *mp, ill_t *ill, ill_t *inill,
-    boolean_t mctl_present, zoneid_t zoneid)
-{
-	ip6_t		*ip6h;
-	ip6_t		*inner_ip6h;
-	icmp6_t		*icmp6;
-	uint16_t	hdr_length;
-	uint32_t	mtu;
-	ire_t		*ire, *first_ire;
-	mblk_t		*first_mp;
-	ip_stack_t	*ipst = ill->ill_ipst;
-
-	first_mp = mp;
-	if (mctl_present)
-		mp = first_mp->b_cont;
 	/*
-	 * We must have exclusive use of the mblk to update the MTU
-	 * in the packet.
-	 * If not, we copy it.
-	 *
-	 * If there's an M_CTL present, we know that allocated first_mp
-	 * earlier in this function, so we know first_mp has refcnt of one.
+	 * See if there is an ICMP client to avoid an extra copymsg/freemsg
+	 * if there isn't one.
 	 */
-	ASSERT(!mctl_present || first_mp->b_datap->db_ref == 1);
+	if (ipst->ips_ipcl_proto_fanout_v6[IPPROTO_ICMPV6].connf_head != NULL) {
+		/* If there is an ICMP client and we want one too, copy it. */
+
+		if (!interested) {
+			/* Caller will deliver to RAW sockets */
+			return (mp);
+		}
+		mp_ret = copymsg(mp);
+		if (mp_ret == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards - copymsg", mp, ill);
+		}
+	} else if (!interested) {
+		/* Neither we nor raw sockets are interested. Drop packet now */
+		freemsg(mp);
+		return (NULL);
+	}
+
+	/*
+	 * ICMP error or redirect packet. Make sure we have enough of
+	 * the header and that db_ref == 1 since we might end up modifying
+	 * the packet.
+	 */
+	if (mp->b_cont != NULL) {
+		if (ip_pullup(mp, -1, ira) == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards - ip_pullup",
+			    mp, ill);
+			freemsg(mp);
+			return (mp_ret);
+		}
+	}
+
 	if (mp->b_datap->db_ref > 1) {
 		mblk_t	*mp1;
 
 		mp1 = copymsg(mp);
-		freemsg(mp);
 		if (mp1 == NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			if (mctl_present)
-				freeb(first_mp);
-			return;
+			ip_drop_input("ipIfStatsInDiscards - copymsg", mp, ill);
+			freemsg(mp);
+			return (mp_ret);
 		}
+		freemsg(mp);
 		mp = mp1;
-		if (mctl_present)
-			first_mp->b_cont = mp;
-		else
-			first_mp = mp;
-	}
-	ip6h = (ip6_t *)mp->b_rptr;
-	if (ip6h->ip6_nxt != IPPROTO_ICMPV6)
-		hdr_length = ip_hdr_length_v6(mp, ip6h);
-	else
-		hdr_length = IPV6_HDR_LEN;
-
-	icmp6 = (icmp6_t *)(&mp->b_rptr[hdr_length]);
-	ASSERT((size_t)(mp->b_wptr - mp->b_rptr) >= hdr_length + ICMP6_MINLEN);
-	inner_ip6h = (ip6_t *)&icmp6[1];	/* Packet in error */
-	if ((uchar_t *)&inner_ip6h[1] > mp->b_wptr) {
-		if (!pullupmsg(mp, (uchar_t *)&inner_ip6h[1] - mp->b_rptr)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(first_mp);
-			return;
-		}
-		ip6h = (ip6_t *)mp->b_rptr;
-		icmp6 = (icmp6_t *)&mp->b_rptr[hdr_length];
-		inner_ip6h = (ip6_t *)&icmp6[1];
 	}
 
 	/*
-	 * For link local destinations matching simply on IRE type is not
-	 * sufficient. Same link local addresses for different ILL's is
-	 * possible.
+	 * In case mp has changed, verify the message before any further
+	 * processes.
 	 */
-	if (IN6_IS_ADDR_LINKLOCAL(&inner_ip6h->ip6_dst)) {
-		first_ire = ire_ctable_lookup_v6(&inner_ip6h->ip6_dst, NULL,
-		    IRE_CACHE, ill->ill_ipif, ALL_ZONES, NULL,
-		    MATCH_IRE_TYPE | MATCH_IRE_ILL, ipst);
-
-		if (first_ire == NULL) {
-			if (ip_debug > 2) {
-				/* ip1dbg */
-				pr_addr_dbg("icmp_inbound_too_big_v6:"
-				    "no ire for dst %s\n", AF_INET6,
-				    &inner_ip6h->ip6_dst);
-			}
-			freemsg(first_mp);
-			return;
-		}
-
-		mtu = ntohl(icmp6->icmp6_mtu);
-		rw_enter(&first_ire->ire_bucket->irb_lock, RW_READER);
-		for (ire = first_ire; ire != NULL &&
-		    IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6, &inner_ip6h->ip6_dst);
-		    ire = ire->ire_next) {
-			mutex_enter(&ire->ire_lock);
-			if (mtu < IPV6_MIN_MTU) {
-				ip1dbg(("Received mtu less than IPv6 "
-				    "min mtu %d: %d\n", IPV6_MIN_MTU, mtu));
-				mtu = IPV6_MIN_MTU;
-				/*
-				 * If an mtu less than IPv6 min mtu is received,
-				 * we must include a fragment header in
-				 * subsequent packets.
-				 */
-				ire->ire_frag_flag |= IPH_FRAG_HDR;
-			}
-			ip1dbg(("Received mtu from router: %d\n", mtu));
-			ire->ire_max_frag = MIN(ire->ire_max_frag, mtu);
-			if (ire->ire_max_frag == mtu) {
-				/* Decreased it */
-				ire->ire_marks |= IRE_MARK_PMTU;
-			}
-			/* Record the new max frag size for the ULP. */
-			if (ire->ire_frag_flag & IPH_FRAG_HDR) {
-				/*
-				 * If we need a fragment header in every packet
-				 * (above case or multirouting), make sure the
-				 * ULP takes it into account when computing the
-				 * payload size.
-				 */
-				icmp6->icmp6_mtu = htonl(ire->ire_max_frag -
-				    sizeof (ip6_frag_t));
-			} else {
-				icmp6->icmp6_mtu = htonl(ire->ire_max_frag);
-			}
-			mutex_exit(&ire->ire_lock);
-		}
-		rw_exit(&first_ire->ire_bucket->irb_lock);
-		ire_refrele(first_ire);
-	} else {
-		irb_t	*irb = NULL;
-		/*
-		 * for non-link local destinations we match only on the IRE type
-		 */
-		ire = ire_ctable_lookup_v6(&inner_ip6h->ip6_dst, NULL,
-		    IRE_CACHE, ill->ill_ipif, ALL_ZONES, NULL, MATCH_IRE_TYPE,
-		    ipst);
-		if (ire == NULL) {
-			if (ip_debug > 2) {
-				/* ip1dbg */
-				pr_addr_dbg("icmp_inbound_too_big_v6:"
-				    "no ire for dst %s\n",
-				    AF_INET6, &inner_ip6h->ip6_dst);
-			}
-			freemsg(first_mp);
-			return;
-		}
-		irb = ire->ire_bucket;
-		ire_refrele(ire);
-		rw_enter(&irb->irb_lock, RW_READER);
-		for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
-			if (IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6,
-			    &inner_ip6h->ip6_dst)) {
-				mtu = ntohl(icmp6->icmp6_mtu);
-				mutex_enter(&ire->ire_lock);
-				if (mtu < IPV6_MIN_MTU) {
-					ip1dbg(("Received mtu less than IPv6"
-					    "min mtu %d: %d\n",
-					    IPV6_MIN_MTU, mtu));
-					mtu = IPV6_MIN_MTU;
-					/*
-					 * If an mtu less than IPv6 min mtu is
-					 * received, we must include a fragment
-					 * header in subsequent packets.
-					 */
-					ire->ire_frag_flag |= IPH_FRAG_HDR;
-				}
-
-				ip1dbg(("Received mtu from router: %d\n", mtu));
-				ire->ire_max_frag = MIN(ire->ire_max_frag, mtu);
-				if (ire->ire_max_frag == mtu) {
-					/* Decreased it */
-					ire->ire_marks |= IRE_MARK_PMTU;
-				}
-				/* Record the new max frag size for the ULP. */
-				if (ire->ire_frag_flag & IPH_FRAG_HDR) {
-					/*
-					 * If we need a fragment header in
-					 * every packet (above case or
-					 * multirouting), make sure the ULP
-					 * takes it into account when computing
-					 * the payload size.
-					 */
-					icmp6->icmp6_mtu =
-					    htonl(ire->ire_max_frag -
-					    sizeof (ip6_frag_t));
-				} else {
-					icmp6->icmp6_mtu =
-					    htonl(ire->ire_max_frag);
-				}
-				mutex_exit(&ire->ire_lock);
-			}
-		}
-		rw_exit(&irb->irb_lock);
+	ip6h = (ip6_t *)mp->b_rptr;
+	icmp6 = (icmp6_t *)(&mp->b_rptr[ip_hdr_length]);
+	if (!icmp_inbound_verify_v6(mp, icmp6, ira)) {
+		freemsg(mp);
+		return (mp_ret);
 	}
-	icmp_inbound_error_fanout_v6(q, first_mp, ip6h, icmp6, ill, inill,
-	    mctl_present, zoneid);
+
+	switch (icmp6->icmp6_type) {
+	case ND_REDIRECT:
+		icmp_redirect_v6(mp, ip6h, (nd_redirect_t *)icmp6, ira);
+		break;
+	case ICMP6_PACKET_TOO_BIG:
+		/* Update DCE and adjust MTU is icmp header if needed */
+		icmp_inbound_too_big_v6(icmp6, ira);
+		/* FALLTHRU */
+	default:
+		icmp_inbound_error_fanout_v6(mp, icmp6, ira);
+		break;
+	}
+
+	return (mp_ret);
 }
 
 /*
- * Fanout for ICMPv6 errors containing IP-in-IPv6 packets.  Returns B_TRUE if a
- * tunnel consumed the message, and B_FALSE otherwise.
+ * Send an ICMP echo reply.
+ * The caller has already updated the payload part of the packet.
+ * We handle the ICMP checksum, IP source address selection and feed
+ * the packet into ip_output_simple.
+ */
+static void
+icmp_send_reply_v6(mblk_t *mp, ip6_t *ip6h, icmp6_t *icmp6,
+    ip_recv_attr_t *ira)
+{
+	uint_t		ip_hdr_length = ira->ira_ip_hdr_length;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	ip_xmit_attr_t	ixas;
+	in6_addr_t	origsrc;
+
+	/*
+	 * Remove any extension headers (do not reverse a source route)
+	 * and clear the flow id (keep traffic class for now).
+	 */
+	if (ip_hdr_length != IPV6_HDR_LEN) {
+		int	i;
+
+		for (i = 0; i < IPV6_HDR_LEN; i++) {
+			mp->b_rptr[ip_hdr_length - i - 1] =
+			    mp->b_rptr[IPV6_HDR_LEN - i - 1];
+		}
+		mp->b_rptr += (ip_hdr_length - IPV6_HDR_LEN);
+		ip6h = (ip6_t *)mp->b_rptr;
+		ip6h->ip6_nxt = IPPROTO_ICMPV6;
+		i = ntohs(ip6h->ip6_plen);
+		i -= (ip_hdr_length - IPV6_HDR_LEN);
+		ip6h->ip6_plen = htons(i);
+		ip_hdr_length = IPV6_HDR_LEN;
+		ASSERT(ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN == msgdsize(mp));
+	}
+	ip6h->ip6_vcf &= ~IPV6_FLOWINFO_FLOWLABEL;
+
+	/* Reverse the source and destination addresses. */
+	origsrc = ip6h->ip6_src;
+	ip6h->ip6_src = ip6h->ip6_dst;
+	ip6h->ip6_dst = origsrc;
+
+	/* set the hop limit */
+	ip6h->ip6_hops = ipst->ips_ipv6_def_hops;
+
+	/*
+	 * Prepare for checksum by putting icmp length in the icmp
+	 * checksum field. The checksum is calculated in ip_output
+	 */
+	icmp6->icmp6_cksum = ip6h->ip6_plen;
+
+	bzero(&ixas, sizeof (ixas));
+	ixas.ixa_flags = IXAF_BASIC_SIMPLE_V6;
+	ixas.ixa_zoneid = ira->ira_zoneid;
+	ixas.ixa_cred = kcred;
+	ixas.ixa_cpid = NOPID;
+	ixas.ixa_tsl = ira->ira_tsl;	/* Behave as a multi-level responder */
+	ixas.ixa_ifindex = 0;
+	ixas.ixa_ipst = ipst;
+	ixas.ixa_multicast_ttl = IP_DEFAULT_MULTICAST_TTL;
+
+	if (!(ira->ira_flags & IRAF_IPSEC_SECURE)) {
+		/*
+		 * This packet should go out the same way as it
+		 * came in i.e in clear, independent of the IPsec
+		 * policy for transmitting packets.
+		 */
+		ixas.ixa_flags |= IXAF_NO_IPSEC;
+	} else {
+		if (!ipsec_in_to_out(ira, &ixas, mp, NULL, ip6h)) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			/* Note: mp already consumed and ip_drop_packet done */
+			return;
+		}
+	}
+
+	/* Was the destination (now source) link-local? Send out same group */
+	if (IN6_IS_ADDR_LINKSCOPE(&ip6h->ip6_src)) {
+		ixas.ixa_flags |= IXAF_SCOPEID_SET;
+		if (IS_UNDER_IPMP(ill))
+			ixas.ixa_scopeid = ill_get_upper_ifindex(ill);
+		else
+			ixas.ixa_scopeid = ill->ill_phyint->phyint_ifindex;
+	}
+
+	if (ira->ira_flags & IRAF_MULTIBROADCAST) {
+		/*
+		 * Not one or our addresses (IRE_LOCALs), thus we let
+		 * ip_output_simple pick the source.
+		 */
+		ip6h->ip6_src = ipv6_all_zeros;
+		ixas.ixa_flags |= IXAF_SET_SOURCE;
+	}
+
+	/* Should we send using dce_pmtu? */
+	if (ipst->ips_ipv6_icmp_return_pmtu)
+		ixas.ixa_flags |= IXAF_PMTU_DISCOVERY;
+
+	(void) ip_output_simple(mp, &ixas);
+	ixa_cleanup(&ixas);
+
+}
+
+/*
+ * Verify the ICMP messages for either for ICMP error or redirect packet.
+ * The caller should have fully pulled up the message. If it's a redirect
+ * packet, only basic checks on IP header will be done; otherwise, verify
+ * the packet by looking at the included ULP header.
+ *
+ * Called before icmp_inbound_error_fanout_v6 is called.
  */
 static boolean_t
-icmp_inbound_iptun_fanout_v6(mblk_t *first_mp, ip6_t *rip6h, ill_t *ill,
-    ip_stack_t *ipst)
+icmp_inbound_verify_v6(mblk_t *mp, icmp6_t *icmp6, ip_recv_attr_t *ira)
 {
-	conn_t	*connp;
+	ill_t		*ill = ira->ira_ill;
+	uint16_t	hdr_length;
+	uint8_t		*nexthdrp;
+	uint8_t		nexthdr;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	conn_t		*connp;
+	ip6_t		*ip6h;	/* Inner header */
 
-	if ((connp = ipcl_iptun_classify_v6(&rip6h->ip6_src, &rip6h->ip6_dst,
-	    ipst)) == NULL)
-		return (B_FALSE);
+	ip6h = (ip6_t *)&icmp6[1];
+	if ((uchar_t *)ip6h + IPV6_HDR_LEN > mp->b_wptr)
+		goto truncated;
 
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-	connp->conn_recv(connp, first_mp, NULL);
-	CONN_DEC_REF(connp);
+	if (icmp6->icmp6_type == ND_REDIRECT) {
+		hdr_length = sizeof (nd_redirect_t);
+	} else {
+		if ((IPH_HDR_VERSION(ip6h) != IPV6_VERSION))
+			goto discard_pkt;
+		hdr_length = IPV6_HDR_LEN;
+	}
+
+	if ((uchar_t *)ip6h + hdr_length > mp->b_wptr)
+		goto truncated;
+
+	/*
+	 * Stop here for ICMP_REDIRECT.
+	 */
+	if (icmp6->icmp6_type == ND_REDIRECT)
+		return (B_TRUE);
+
+	/*
+	 * ICMP errors only.
+	 */
+	if (!ip_hdr_length_nexthdr_v6(mp, ip6h, &hdr_length, &nexthdrp))
+		goto discard_pkt;
+	nexthdr = *nexthdrp;
+
+	/* Try to pass the ICMP message to clients who need it */
+	switch (nexthdr) {
+	case IPPROTO_UDP:
+		/*
+		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
+		 * transport header.
+		 */
+		if ((uchar_t *)ip6h + hdr_length + ICMP_MIN_TP_HDR_LEN >
+		    mp->b_wptr)
+			goto truncated;
+		break;
+	case IPPROTO_TCP: {
+		tcpha_t		*tcpha;
+
+		/*
+		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
+		 * transport header.
+		 */
+		if ((uchar_t *)ip6h + hdr_length + ICMP_MIN_TP_HDR_LEN >
+		    mp->b_wptr)
+			goto truncated;
+
+		tcpha = (tcpha_t *)((uchar_t *)ip6h + hdr_length);
+		/*
+		 * With IPMP we need to match across group, which we do
+		 * since we have the upper ill from ira_ill.
+		 */
+		connp = ipcl_tcp_lookup_reversed_ipv6(ip6h, tcpha, TCPS_LISTEN,
+		    ill->ill_phyint->phyint_ifindex, ipst);
+		if (connp == NULL)
+			goto discard_pkt;
+
+		if ((connp->conn_verifyicmp != NULL) &&
+		    !connp->conn_verifyicmp(connp, tcpha, NULL, icmp6, ira)) {
+			CONN_DEC_REF(connp);
+			goto discard_pkt;
+		}
+		CONN_DEC_REF(connp);
+		break;
+	}
+	case IPPROTO_SCTP:
+		/*
+		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
+		 * transport header.
+		 */
+		if ((uchar_t *)ip6h + hdr_length + ICMP_MIN_TP_HDR_LEN >
+		    mp->b_wptr)
+			goto truncated;
+		break;
+	case IPPROTO_ESP:
+	case IPPROTO_AH:
+		break;
+	case IPPROTO_ENCAP:
+	case IPPROTO_IPV6: {
+		/* Look for self-encapsulated packets that caused an error */
+		ip6_t *in_ip6h;
+
+		in_ip6h = (ip6_t *)((uint8_t *)ip6h + hdr_length);
+		if ((uint8_t *)in_ip6h + (nexthdr == IPPROTO_ENCAP ?
+		    sizeof (ipha_t) : sizeof (ip6_t)) > mp->b_wptr)
+			goto truncated;
+		break;
+	}
+	default:
+		break;
+	}
+
 	return (B_TRUE);
+
+discard_pkt:
+	/* Bogus ICMP error. */
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+	return (B_FALSE);
+
+truncated:
+	/* We pulled up everthing already. Must be truncated */
+	BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInErrors);
+	return (B_FALSE);
+}
+
+/*
+ * Process received IPv6 ICMP Packet too big.
+ * The caller is responsible for validating the packet before passing it in
+ * and also to fanout the ICMP error to any matching transport conns. Assumes
+ * the message has been fully pulled up.
+ *
+ * Before getting here, the caller has called icmp_inbound_verify_v6()
+ * that should have verified with ULP to prevent undoing the changes we're
+ * going to make to DCE. For example, TCP might have verified that the packet
+ * which generated error is in the send window.
+ *
+ * In some cases modified this MTU in the ICMP header packet; the caller
+ * should pass to the matching ULP after this returns.
+ */
+static void
+icmp_inbound_too_big_v6(icmp6_t *icmp6, ip_recv_attr_t *ira)
+{
+	uint32_t	mtu;
+	dce_t		*dce;
+	ill_t		*ill = ira->ira_ill;	/* Upper ill if IPMP */
+	ip_stack_t	*ipst = ill->ill_ipst;
+	int		old_max_frag;
+	in6_addr_t	final_dst;
+	ip6_t		*ip6h;	/* Inner IP header */
+
+	/* Caller has already pulled up everything. */
+	ip6h = (ip6_t *)&icmp6[1];
+	final_dst = ip_get_dst_v6(ip6h, NULL, NULL);
+
+	/*
+	 * For link local destinations matching simply on address is not
+	 * sufficient. Same link local addresses for different ILL's is
+	 * possible.
+	 */
+	if (IN6_IS_ADDR_LINKSCOPE(&final_dst)) {
+		dce = dce_lookup_and_add_v6(&final_dst,
+		    ill->ill_phyint->phyint_ifindex, ipst);
+	} else {
+		dce = dce_lookup_and_add_v6(&final_dst, 0, ipst);
+	}
+	if (dce == NULL) {
+		/* Couldn't add a unique one - ENOMEM */
+		if (ip_debug > 2) {
+			/* ip1dbg */
+			pr_addr_dbg("icmp_inbound_too_big_v6:"
+			    "no dce for dst %s\n", AF_INET6,
+			    &final_dst);
+		}
+		return;
+	}
+
+	mtu = ntohl(icmp6->icmp6_mtu);
+
+	mutex_enter(&dce->dce_lock);
+	if (dce->dce_flags & DCEF_PMTU)
+		old_max_frag = dce->dce_pmtu;
+	else
+		old_max_frag = ill->ill_mtu;
+
+	if (mtu < IPV6_MIN_MTU) {
+		ip1dbg(("Received mtu less than IPv6 "
+		    "min mtu %d: %d\n", IPV6_MIN_MTU, mtu));
+		mtu = IPV6_MIN_MTU;
+		/*
+		 * If an mtu less than IPv6 min mtu is received,
+		 * we must include a fragment header in
+		 * subsequent packets.
+		 */
+		dce->dce_flags |= DCEF_TOO_SMALL_PMTU;
+	} else {
+		dce->dce_flags &= ~DCEF_TOO_SMALL_PMTU;
+	}
+	ip1dbg(("Received mtu from router: %d\n", mtu));
+	dce->dce_pmtu = MIN(old_max_frag, mtu);
+
+	/* Prepare to send the new max frag size for the ULP. */
+	if (dce->dce_flags & DCEF_TOO_SMALL_PMTU) {
+		/*
+		 * If we need a fragment header in every packet
+		 * (above case or multirouting), make sure the
+		 * ULP takes it into account when computing the
+		 * payload size.
+		 */
+		icmp6->icmp6_mtu = htonl(dce->dce_pmtu - sizeof (ip6_frag_t));
+	} else {
+		icmp6->icmp6_mtu = htonl(dce->dce_pmtu);
+	}
+	/* We now have a PMTU for sure */
+	dce->dce_flags |= DCEF_PMTU;
+	dce->dce_last_change_time = TICK_TO_SEC(lbolt64);
+	mutex_exit(&dce->dce_lock);
+	/*
+	 * After dropping the lock the new value is visible to everyone.
+	 * Then we bump the generation number so any cached values reinspect
+	 * the dce_t.
+	 */
+	dce_increment_generation(dce);
+	dce_refrele(dce);
 }
 
 /*
  * Fanout received ICMPv6 error packets to the transports.
  * Assumes the IPv6 plus ICMPv6 headers have been pulled up but nothing else.
+ *
+ * The caller must have called icmp_inbound_verify_v6.
  */
 void
-icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
-    icmp6_t *icmp6, ill_t *ill, ill_t *inill, boolean_t mctl_present,
-    zoneid_t zoneid)
+icmp_inbound_error_fanout_v6(mblk_t *mp, icmp6_t *icmp6, ip_recv_attr_t *ira)
 {
-	uint16_t *up;	/* Pointer to ports in ULP header */
-	uint32_t ports;	/* reversed ports for fanout */
-	ip6_t rip6h;	/* With reversed addresses */
-	uint16_t	hdr_length;
+	uint16_t	*up;	/* Pointer to ports in ULP header */
+	uint32_t	ports;	/* reversed ports for fanout */
+	ip6_t		rip6h;	/* With reversed addresses */
+	ip6_t		*ip6h;	/* Inner IP header */
+	uint16_t	hdr_length; /* Inner IP header length */
 	uint8_t		*nexthdrp;
 	uint8_t		nexthdr;
-	mblk_t *first_mp;
-	ipsec_in_t *ii;
-	tcpha_t	*tcpha;
-	conn_t	*connp;
+	tcpha_t		*tcpha;
+	conn_t		*connp;
+	ill_t		*ill = ira->ira_ill;	/* Upper in the case of IPMP */
 	ip_stack_t	*ipst = ill->ill_ipst;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 
-	first_mp = mp;
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		ASSERT(mp != NULL);
-
-		ii = (ipsec_in_t *)first_mp->b_rptr;
-		ASSERT(ii->ipsec_in_type == IPSEC_IN);
-	} else {
-		ii = NULL;
-	}
-
-	hdr_length = (uint16_t)((uchar_t *)icmp6 - (uchar_t *)ip6h);
-	ASSERT((size_t)(mp->b_wptr - (uchar_t *)icmp6) >= ICMP6_MINLEN);
-
-	/*
-	 * Need to pullup everything in order to use
-	 * ip_hdr_length_nexthdr_v6()
-	 */
-	if (mp->b_cont != NULL) {
-		if (!pullupmsg(mp, -1)) {
-			ip1dbg(("icmp_inbound_error_fanout_v6: "
-			    "pullupmsg failed\n"));
-			goto drop_pkt;
-		}
-		ip6h = (ip6_t *)mp->b_rptr;
-		icmp6 = (icmp6_t *)(&mp->b_rptr[hdr_length]);
-	}
-
-	ip6h = (ip6_t *)&icmp6[1];	/* Packet in error */
-	if ((uchar_t *)&ip6h[1] > mp->b_wptr)
-		goto drop_pkt;
+	/* Caller has already pulled up everything. */
+	ip6h = (ip6_t *)&icmp6[1];
+	ASSERT(mp->b_cont == NULL);
+	ASSERT((uchar_t *)&ip6h[1] <= mp->b_wptr);
 
 	if (!ip_hdr_length_nexthdr_v6(mp, ip6h, &hdr_length, &nexthdrp))
 		goto drop_pkt;
 	nexthdr = *nexthdrp;
-
-	/* Set message type, must be done after pullups */
-	mp->b_datap->db_type = M_CTL;
+	ira->ira_protocol = nexthdr;
 
 	/*
 	 * We need a separate IP header with the source and destination
@@ -814,174 +794,128 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	/* Try to pass the ICMP message to clients who need it */
 	switch (nexthdr) {
 	case IPPROTO_UDP: {
-		/*
-		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
-		 * UDP header to get the port information.
-		 */
-		if ((uchar_t *)ip6h + hdr_length + ICMP_MIN_TP_HDR_LEN >
-		    mp->b_wptr) {
-			break;
-		}
 		/* Attempt to find a client stream based on port. */
 		up = (uint16_t *)((uchar_t *)ip6h + hdr_length);
-		((uint16_t *)&ports)[0] = up[1];
-		((uint16_t *)&ports)[1] = up[0];
 
-		ip_fanout_udp_v6(q, first_mp, &rip6h, ports, ill, inill,
-		    IP6_NO_IPPOLICY, mctl_present, zoneid);
+		/* Note that we send error to all matches. */
+		ira->ira_flags |= IRAF_ICMP_ERROR;
+		ip_fanout_udp_multi_v6(mp, &rip6h, up[0], up[1], ira);
+		ira->ira_flags &= ~IRAF_ICMP_ERROR;
 		return;
 	}
 	case IPPROTO_TCP: {
-		/*
-		 * Verify we have at least ICMP_MIN_TP_HDR_LEN bytes of
-		 * the TCP header to get the port information.
-		 */
-		if ((uchar_t *)ip6h + hdr_length + ICMP_MIN_TP_HDR_LEN >
-		    mp->b_wptr) {
-			break;
-		}
-
 		/*
 		 * Attempt to find a client stream based on port.
 		 * Note that we do a reverse lookup since the header is
 		 * in the form we sent it out.
 		 */
-		tcpha = (tcpha_t *)((char *)ip6h + hdr_length);
+		tcpha = (tcpha_t *)((uchar_t *)ip6h + hdr_length);
+		/*
+		 * With IPMP we need to match across group, which we do
+		 * since we have the upper ill from ira_ill.
+		 */
 		connp = ipcl_tcp_lookup_reversed_ipv6(ip6h, tcpha,
 		    TCPS_LISTEN, ill->ill_phyint->phyint_ifindex, ipst);
 		if (connp == NULL) {
 			goto drop_pkt;
 		}
 
-		SQUEUE_ENTER_ONE(connp->conn_sqp, first_mp, tcp_input, connp,
-		    SQ_FILL, SQTAG_TCP6_INPUT_ICMP_ERR);
+		if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) ||
+		    (ira->ira_flags & IRAF_IPSEC_SECURE)) {
+			mp = ipsec_check_inbound_policy(mp, connp,
+			    NULL, ip6h, ira);
+			if (mp == NULL) {
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				/* Note that mp is NULL */
+				ip_drop_input("ipIfStatsInDiscards", mp, ill);
+				CONN_DEC_REF(connp);
+				return;
+			}
+		}
+
+		ira->ira_flags |= IRAF_ICMP_ERROR;
+		if (IPCL_IS_TCP(connp)) {
+			SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
+			    connp->conn_recvicmp, connp, ira, SQ_FILL,
+			    SQTAG_TCP6_INPUT_ICMP_ERR);
+		} else {
+			/* Not TCP; must be SOCK_RAW, IPPROTO_TCP */
+			ill_t *rill = ira->ira_rill;
+
+			ira->ira_ill = ira->ira_rill = NULL;
+			(connp->conn_recv)(connp, mp, NULL, ira);
+			CONN_DEC_REF(connp);
+			ira->ira_ill = ill;
+			ira->ira_rill = rill;
+		}
+		ira->ira_flags &= ~IRAF_ICMP_ERROR;
 		return;
 
 	}
 	case IPPROTO_SCTP:
-		/*
-		 * Verify we have at least ICMP_MIN_SCTP_HDR_LEN bytes of
-		 * transport header to get the port information.
-		 */
-		if ((uchar_t *)ip6h + hdr_length + ICMP_MIN_SCTP_HDR_LEN >
-		    mp->b_wptr) {
-			if (!pullupmsg(mp, (uchar_t *)ip6h + hdr_length +
-			    ICMP_MIN_SCTP_HDR_LEN - mp->b_rptr)) {
-				goto drop_pkt;
-			}
-		}
-
 		up = (uint16_t *)((uchar_t *)ip6h + hdr_length);
+		/* Find a SCTP client stream for this packet. */
 		((uint16_t *)&ports)[0] = up[1];
 		((uint16_t *)&ports)[1] = up[0];
-		ip_fanout_sctp(first_mp, inill, (ipha_t *)ip6h, ports, 0,
-		    mctl_present, IP6_NO_IPPOLICY, zoneid);
+
+		ira->ira_flags |= IRAF_ICMP_ERROR;
+		ip_fanout_sctp(mp, NULL, &rip6h, ports, ira);
+		ira->ira_flags &= ~IRAF_ICMP_ERROR;
 		return;
+
 	case IPPROTO_ESP:
-	case IPPROTO_AH: {
-		int ipsec_rc;
-		ipsec_stack_t *ipss = ipst->ips_netstack->netstack_ipsec;
-
-		/*
-		 * We need a IPSEC_IN in the front to fanout to AH/ESP.
-		 * We will re-use the IPSEC_IN if it is already present as
-		 * AH/ESP will not affect any fields in the IPSEC_IN for
-		 * ICMP errors. If there is no IPSEC_IN, allocate a new
-		 * one and attach it in the front.
-		 */
-		if (ii != NULL) {
-			/*
-			 * ip_fanout_proto_again converts the ICMP errors
-			 * that come back from AH/ESP to M_DATA so that
-			 * if it is non-AH/ESP and we do a pullupmsg in
-			 * this function, it would work. Convert it back
-			 * to M_CTL before we send up as this is a ICMP
-			 * error. This could have been generated locally or
-			 * by some router. Validate the inner IPSEC
-			 * headers.
-			 *
-			 * NOTE : ill_index is used by ip_fanout_proto_again
-			 * to locate the ill.
-			 */
-			ASSERT(ill != NULL);
-			ii->ipsec_in_ill_index =
-			    ill->ill_phyint->phyint_ifindex;
-			ii->ipsec_in_rill_index =
-			    inill->ill_phyint->phyint_ifindex;
-			first_mp->b_cont->b_datap->db_type = M_CTL;
-		} else {
-			/*
-			 * IPSEC_IN is not present. We attach a ipsec_in
-			 * message and send up to IPSEC for validating
-			 * and removing the IPSEC headers. Clear
-			 * ipsec_in_secure so that when we return
-			 * from IPSEC, we don't mistakenly think that this
-			 * is a secure packet came from the network.
-			 *
-			 * NOTE : ill_index is used by ip_fanout_proto_again
-			 * to locate the ill.
-			 */
-			ASSERT(first_mp == mp);
-			first_mp = ipsec_in_alloc(B_FALSE, ipst->ips_netstack);
-			ASSERT(ill != NULL);
-			if (first_mp == NULL) {
-				freemsg(mp);
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				return;
-			}
-			ii = (ipsec_in_t *)first_mp->b_rptr;
-
-			/* This is not a secure packet */
-			ii->ipsec_in_secure = B_FALSE;
-			first_mp->b_cont = mp;
-			mp->b_datap->db_type = M_CTL;
-			ii->ipsec_in_ill_index =
-			    ill->ill_phyint->phyint_ifindex;
-			ii->ipsec_in_rill_index =
-			    inill->ill_phyint->phyint_ifindex;
-		}
-
+	case IPPROTO_AH:
 		if (!ipsec_loaded(ipss)) {
-			ip_proto_not_sup(q, first_mp, 0, zoneid, ipst);
+			ip_proto_not_sup(mp, ira);
 			return;
 		}
 
 		if (nexthdr == IPPROTO_ESP)
-			ipsec_rc = ipsecesp_icmp_error(first_mp);
+			mp = ipsecesp_icmp_error(mp, ira);
 		else
-			ipsec_rc = ipsecah_icmp_error(first_mp);
-		if (ipsec_rc == IPSEC_STATUS_FAILED)
+			mp = ipsecah_icmp_error(mp, ira);
+		if (mp == NULL)
 			return;
 
-		ip_fanout_proto_again(first_mp, ill, inill, NULL);
-		return;
-	}
-	case IPPROTO_ENCAP:
-	case IPPROTO_IPV6:
-		if ((uint8_t *)ip6h + hdr_length +
-		    (nexthdr == IPPROTO_ENCAP ? sizeof (ipha_t) :
-		    sizeof (ip6_t)) > mp->b_wptr) {
-			goto drop_pkt;
+		/* Just in case ipsec didn't preserve the NULL b_cont */
+		if (mp->b_cont != NULL) {
+			if (!pullupmsg(mp, -1))
+				goto drop_pkt;
 		}
 
-		if (nexthdr == IPPROTO_ENCAP ||
-		    !IN6_ARE_ADDR_EQUAL(
-		    &((ip6_t *)(((uint8_t *)ip6h) + hdr_length))->ip6_src,
-		    &ip6h->ip6_src) ||
-		    !IN6_ARE_ADDR_EQUAL(
-		    &((ip6_t *)(((uint8_t *)ip6h) + hdr_length))->ip6_dst,
-		    &ip6h->ip6_dst)) {
-			/*
-			 * For tunnels that have used IPsec protection,
-			 * we need to adjust the MTU to take into account
-			 * the IPsec overhead.
-			 */
-			if (ii != NULL) {
-				icmp6->icmp6_mtu = htonl(
-				    ntohl(icmp6->icmp6_mtu) -
-				    ipsec_in_extra_length(first_mp));
-			}
-		} else {
+		/*
+		 * If succesful, the mp has been modified to not include
+		 * the ESP/AH header so we can fanout to the ULP's icmp
+		 * error handler.
+		 */
+		if (mp->b_wptr - mp->b_rptr < IPV6_HDR_LEN)
+			goto drop_pkt;
+
+		ip6h = (ip6_t *)mp->b_rptr;
+		/* Don't call hdr_length_v6() unless you have to. */
+		if (ip6h->ip6_nxt != IPPROTO_ICMPV6)
+			hdr_length = ip_hdr_length_v6(mp, ip6h);
+		else
+			hdr_length = IPV6_HDR_LEN;
+
+		/* Verify the modified message before any further processes. */
+		icmp6 = (icmp6_t *)(&mp->b_rptr[hdr_length]);
+		if (!icmp_inbound_verify_v6(mp, icmp6, ira)) {
+			freemsg(mp);
+			return;
+		}
+
+		icmp_inbound_error_fanout_v6(mp, icmp6, ira);
+		return;
+
+	case IPPROTO_IPV6: {
+		/* Look for self-encapsulated packets that caused an error */
+		ip6_t *in_ip6h;
+
+		in_ip6h = (ip6_t *)((uint8_t *)ip6h + hdr_length);
+
+		if (IN6_ARE_ADDR_EQUAL(&in_ip6h->ip6_src, &ip6h->ip6_src) &&
+		    IN6_ARE_ADDR_EQUAL(&in_ip6h->ip6_dst, &ip6h->ip6_dst)) {
 			/*
 			 * Self-encapsulated case. As in the ipv4 case,
 			 * we need to strip the 2nd IP header. Since mp
@@ -989,126 +923,124 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			 * the 3rd header + data over the 2nd header.
 			 */
 			uint16_t unused_len;
-			ip6_t *inner_ip6h = (ip6_t *)
-			    ((uchar_t *)ip6h + hdr_length);
 
 			/*
 			 * Make sure we don't do recursion more than once.
 			 */
-			if (!ip_hdr_length_nexthdr_v6(mp, inner_ip6h,
+			if (!ip_hdr_length_nexthdr_v6(mp, in_ip6h,
 			    &unused_len, &nexthdrp) ||
 			    *nexthdrp == IPPROTO_IPV6) {
 				goto drop_pkt;
 			}
 
 			/*
-			 * We are about to modify the packet. Make a copy if
-			 * someone else has a reference to it.
-			 */
-			if (DB_REF(mp) > 1) {
-				mblk_t	*mp1;
-				uint16_t icmp6_offset;
-
-				mp1 = copymsg(mp);
-				if (mp1 == NULL) {
-					goto drop_pkt;
-				}
-				icmp6_offset = (uint16_t)
-				    ((uchar_t *)icmp6 - mp->b_rptr);
-				freemsg(mp);
-				mp = mp1;
-
-				icmp6 = (icmp6_t *)(mp->b_rptr + icmp6_offset);
-				ip6h = (ip6_t *)&icmp6[1];
-				inner_ip6h = (ip6_t *)
-				    ((uchar_t *)ip6h + hdr_length);
-
-				if (mctl_present)
-					first_mp->b_cont = mp;
-				else
-					first_mp = mp;
-			}
-
-			/*
-			 * Need to set db_type back to M_DATA before
-			 * refeeding mp into this function.
-			 */
-			DB_TYPE(mp) = M_DATA;
-
-			/*
 			 * Copy the 3rd header + remaining data on top
 			 * of the 2nd header.
 			 */
-			bcopy(inner_ip6h, ip6h,
-			    mp->b_wptr - (uchar_t *)inner_ip6h);
+			bcopy(in_ip6h, ip6h, mp->b_wptr - (uchar_t *)in_ip6h);
 
 			/*
 			 * Subtract length of the 2nd header.
 			 */
 			mp->b_wptr -= hdr_length;
 
+			ip6h = (ip6_t *)mp->b_rptr;
+			/* Don't call hdr_length_v6() unless you have to. */
+			if (ip6h->ip6_nxt != IPPROTO_ICMPV6)
+				hdr_length = ip_hdr_length_v6(mp, ip6h);
+			else
+				hdr_length = IPV6_HDR_LEN;
+
+			/*
+			 * Verify the modified message before any further
+			 * processes.
+			 */
+			icmp6 = (icmp6_t *)(&mp->b_rptr[hdr_length]);
+			if (!icmp_inbound_verify_v6(mp, icmp6, ira)) {
+				freemsg(mp);
+				return;
+			}
+
 			/*
 			 * Now recurse, and see what I _really_ should be
 			 * doing here.
 			 */
-			icmp_inbound_error_fanout_v6(q, first_mp,
-			    (ip6_t *)mp->b_rptr, icmp6, ill, inill,
-			    mctl_present, zoneid);
+			icmp_inbound_error_fanout_v6(mp, icmp6, ira);
 			return;
 		}
-		if (icmp_inbound_iptun_fanout_v6(first_mp, &rip6h, ill, ipst))
+		/* FALLTHRU */
+	}
+	case IPPROTO_ENCAP:
+		if ((connp = ipcl_iptun_classify_v6(&rip6h.ip6_src,
+		    &rip6h.ip6_dst, ipst)) != NULL) {
+			ira->ira_flags |= IRAF_ICMP_ERROR;
+			connp->conn_recvicmp(connp, mp, NULL, ira);
+			CONN_DEC_REF(connp);
+			ira->ira_flags &= ~IRAF_ICMP_ERROR;
 			return;
+		}
 		/*
-		 * No IP tunnel is associated with this error.  Perhaps a raw
-		 * socket will want it.
+		 * No IP tunnel is interested, fallthrough and see
+		 * if a raw socket will want it.
 		 */
 		/* FALLTHRU */
 	default:
-		ip_fanout_proto_v6(q, first_mp, &rip6h, ill, inill, nexthdr, 0,
-		    IP6_NO_IPPOLICY, mctl_present, zoneid);
+		ira->ira_flags |= IRAF_ICMP_ERROR;
+		ASSERT(ira->ira_protocol == nexthdr);
+		ip_fanout_proto_v6(mp, &rip6h, ira);
+		ira->ira_flags &= ~IRAF_ICMP_ERROR;
 		return;
 	}
 	/* NOTREACHED */
 drop_pkt:
 	BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInErrors);
 	ip1dbg(("icmp_inbound_error_fanout_v6: drop pkt\n"));
-	freemsg(first_mp);
+	freemsg(mp);
 }
 
 /*
  * Process received IPv6 ICMP Redirect messages.
+ * Assumes the caller has verified that the headers are in the pulled up mblk.
+ * Consumes mp.
  */
 /* ARGSUSED */
 static void
-icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
+icmp_redirect_v6(mblk_t *mp, ip6_t *ip6h, nd_redirect_t *rd,
+    ip_recv_attr_t *ira)
 {
-	ip6_t		*ip6h;
-	uint16_t	hdr_length;
-	nd_redirect_t	*rd;
-	ire_t		*ire;
-	ire_t		*prev_ire;
+	ire_t		*ire, *nire;
+	ire_t		*prev_ire = NULL;
 	ire_t		*redir_ire;
 	in6_addr_t	*src, *dst, *gateway;
 	nd_opt_hdr_t	*opt;
 	nce_t		*nce;
-	int		nce_flags = 0;
+	int		ncec_flags = 0;
 	int		err = 0;
 	boolean_t	redirect_to_router = B_FALSE;
 	int		len;
 	int		optlen;
-	iulp_t		ulp_info = { 0 };
-	ill_t		*prev_ire_ill;
-	ipif_t		*ipif;
+	ill_t		*ill = ira->ira_rill;
+	ill_t		*rill = ira->ira_rill;
 	ip_stack_t	*ipst = ill->ill_ipst;
 
-	ip6h = (ip6_t *)mp->b_rptr;
-	if (ip6h->ip6_nxt != IPPROTO_ICMPV6)
-		hdr_length = ip_hdr_length_v6(mp, ip6h);
-	else
-		hdr_length = IPV6_HDR_LEN;
+	/*
+	 * Since ira_ill is where the IRE_LOCAL was hosted we use ira_rill
+	 * and make it be the IPMP upper so avoid being confused by a packet
+	 * addressed to a unicast address on a different ill.
+	 */
+	if (IS_UNDER_IPMP(rill)) {
+		rill = ipmp_ill_hold_ipmp_ill(rill);
+		if (rill == NULL) {
+			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
+			ip_drop_input("ipv6IfIcmpInBadRedirects - IPMP ill",
+			    mp, ill);
+			freemsg(mp);
+			return;
+		}
+		ASSERT(rill != ira->ira_rill);
+	}
 
-	rd = (nd_redirect_t *)&mp->b_rptr[hdr_length];
-	len = mp->b_wptr - mp->b_rptr -  hdr_length;
+	len = mp->b_wptr - (uchar_t *)rd;
 	src = &ip6h->ip6_src;
 	dst = &rd->nd_rd_dst;
 	gateway = &rd->nd_rd_target;
@@ -1121,37 +1053,35 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 	    (IN6_IS_ADDR_V4MAPPED(dst)) ||
 	    (IN6_IS_ADDR_MULTICAST(dst))) {
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
-		freemsg(mp);
-		return;
+		ip_drop_input("ipv6IfIcmpInBadRedirects - addr/len", mp, ill);
+		goto fail_redirect;
 	}
 
 	if (!(IN6_IS_ADDR_LINKLOCAL(gateway) ||
 	    IN6_ARE_ADDR_EQUAL(gateway, dst))) {
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
-		freemsg(mp);
-		return;
+		ip_drop_input("ipv6IfIcmpInBadRedirects - bad gateway",
+		    mp, ill);
+		goto fail_redirect;
 	}
 
-	if (len > sizeof (nd_redirect_t)) {
-		if (!ndp_verify_optlen((nd_opt_hdr_t *)&rd[1],
-		    len - sizeof (nd_redirect_t))) {
+	optlen = len - sizeof (nd_redirect_t);
+	if (optlen != 0) {
+		if (!ndp_verify_optlen((nd_opt_hdr_t *)&rd[1], optlen)) {
 			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
-			freemsg(mp);
-			return;
+			ip_drop_input("ipv6IfIcmpInBadRedirects - options",
+			    mp, ill);
+			goto fail_redirect;
 		}
 	}
 
 	if (!IN6_ARE_ADDR_EQUAL(gateway, dst)) {
 		redirect_to_router = B_TRUE;
-		nce_flags |= NCE_F_ISROUTER;
+		ncec_flags |= NCE_F_ISROUTER;
+	} else {
+		gateway = dst;	/* Add nce for dst */
 	}
 
-	/* ipif will be refreleased afterwards */
-	ipif = ipif_get_next_ipif(NULL, ill);
-	if (ipif == NULL) {
-		freemsg(mp);
-		return;
-	}
 
 	/*
 	 * Verify that the IP source address of the redirect is
@@ -1160,10 +1090,11 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 	 * Also, Make sure we had a route for the dest in question and
 	 * that route was pointing to the old gateway (the source of the
 	 * redirect packet.)
+	 * Note: this merely says that there is some IRE which matches that
+	 * gateway; not that the longest match matches that gateway.
 	 */
-
-	prev_ire = ire_route_lookup_v6(dst, 0, src, 0, ipif, NULL, ALL_ZONES,
-	    NULL, MATCH_IRE_GW | MATCH_IRE_ILL | MATCH_IRE_DEFAULT, ipst);
+	prev_ire = ire_ftable_lookup_v6(dst, 0, src, 0, rill,
+	    ALL_ZONES, NULL, MATCH_IRE_GW | MATCH_IRE_ILL, 0, ipst, NULL);
 
 	/*
 	 * Check that
@@ -1171,92 +1102,44 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 	 *	old gateway is still directly reachable
 	 */
 	if (prev_ire == NULL ||
-	    prev_ire->ire_type == IRE_LOCAL) {
+	    (prev_ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK)) ||
+	    (prev_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
-		ipif_refrele(ipif);
+		ip_drop_input("ipv6IfIcmpInBadRedirects - ire", mp, ill);
 		goto fail_redirect;
 	}
-	prev_ire_ill = ire_to_ill(prev_ire);
-	ASSERT(prev_ire_ill != NULL);
-	if (prev_ire_ill->ill_flags & ILLF_NONUD)
-		nce_flags |= NCE_F_NONUD;
 
-	/*
-	 * Should we use the old ULP info to create the new gateway?  From
-	 * a user's perspective, we should inherit the info so that it
-	 * is a "smooth" transition.  If we do not do that, then new
-	 * connections going thru the new gateway will have no route metrics,
-	 * which is counter-intuitive to user.  From a network point of
-	 * view, this may or may not make sense even though the new gateway
-	 * is still directly connected to us so the route metrics should not
-	 * change much.
-	 *
-	 * But if the old ire_uinfo is not initialized, we do another
-	 * recursive lookup on the dest using the new gateway.  There may
-	 * be a route to that.  If so, use it to initialize the redirect
-	 * route.
-	 */
-	if (prev_ire->ire_uinfo.iulp_set) {
-		bcopy(&prev_ire->ire_uinfo, &ulp_info, sizeof (iulp_t));
-	} else if (redirect_to_router) {
-		/*
-		 * Only do the following if the redirection is really to
-		 * a router.
-		 */
-		ire_t *tmp_ire;
-		ire_t *sire;
+	ASSERT(prev_ire->ire_ill != NULL);
+	if (prev_ire->ire_ill->ill_flags & ILLF_NONUD)
+		ncec_flags |= NCE_F_NONUD;
 
-		tmp_ire = ire_ftable_lookup_v6(dst, 0, gateway, 0, NULL, &sire,
-		    ALL_ZONES, 0, NULL,
-		    (MATCH_IRE_RECURSIVE | MATCH_IRE_GW | MATCH_IRE_DEFAULT),
-		    ipst);
-		if (sire != NULL) {
-			bcopy(&sire->ire_uinfo, &ulp_info, sizeof (iulp_t));
-			ASSERT(tmp_ire != NULL);
-			ire_refrele(tmp_ire);
-			ire_refrele(sire);
-		} else if (tmp_ire != NULL) {
-			bcopy(&tmp_ire->ire_uinfo, &ulp_info,
-			    sizeof (iulp_t));
-			ire_refrele(tmp_ire);
-		}
-	}
-
-	optlen = mp->b_wptr - mp->b_rptr -  hdr_length - sizeof (nd_redirect_t);
 	opt = (nd_opt_hdr_t *)&rd[1];
 	opt = ndp_get_option(opt, optlen, ND_OPT_TARGET_LINKADDR);
 	if (opt != NULL) {
-		err = ndp_lookup_then_add_v6(ill,
-		    B_FALSE,			/* don't match across illgrp */
+		err = nce_lookup_then_add_v6(rill,
 		    (uchar_t *)&opt[1],		/* Link layer address */
-		    gateway,
-		    &ipv6_all_ones,		/* prefix mask */
-		    &ipv6_all_zeros,		/* Mapping mask */
-		    0,
-		    nce_flags,
-		    ND_STALE,
-		    &nce);
+		    rill->ill_phys_addr_length,
+		    gateway, ncec_flags, ND_STALE, &nce);
 		switch (err) {
 		case 0:
-			NCE_REFRELE(nce);
+			nce_refrele(nce);
 			break;
 		case EEXIST:
 			/*
 			 * Check to see if link layer address has changed and
-			 * process the nce_state accordingly.
+			 * process the ncec_state accordingly.
 			 */
-			ndp_process(nce, (uchar_t *)&opt[1], 0, B_FALSE);
-			NCE_REFRELE(nce);
+			nce_process(nce->nce_common,
+			    (uchar_t *)&opt[1], 0, B_FALSE);
+			nce_refrele(nce);
 			break;
 		default:
 			ip1dbg(("icmp_redirect_v6: NCE create failed %d\n",
 			    err));
-			ipif_refrele(ipif);
 			goto fail_redirect;
 		}
 	}
 	if (redirect_to_router) {
-		/* icmp_redirect_ok_v6() must  have already verified this  */
 		ASSERT(IN6_IS_ADDR_LINKLOCAL(gateway));
 
 		/*
@@ -1266,65 +1149,68 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		ire = ire_create_v6(
 		    dst,
 		    &ipv6_all_ones,		/* mask */
-		    &prev_ire->ire_src_addr_v6,	/* source addr */
 		    gateway,			/* gateway addr */
-		    &prev_ire->ire_max_frag,	/* max frag */
-		    NULL,			/* no src nce */
-		    NULL, 			/* no rfq */
-		    NULL,			/* no stq */
 		    IRE_HOST,
-		    prev_ire->ire_ipif,
-		    NULL,
-		    0,
-		    0,
+		    prev_ire->ire_ill,
+		    ALL_ZONES,
 		    (RTF_DYNAMIC | RTF_GATEWAY | RTF_HOST),
-		    &ulp_info,
-		    NULL,
 		    NULL,
 		    ipst);
 	} else {
-		queue_t *stq;
-
-		stq = (ipif->ipif_net_type == IRE_IF_RESOLVER)
-		    ? ipif->ipif_rq : ipif->ipif_wq;
+		ipif_t *ipif;
+		in6_addr_t gw;
 
 		/*
 		 * Just create an on link entry, i.e. interface route.
+		 * The gateway field is our link-local on the ill.
 		 */
+		mutex_enter(&rill->ill_lock);
+		for (ipif = rill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
+			if (!(ipif->ipif_state_flags & IPIF_CONDEMNED) &&
+			    IN6_IS_ADDR_LINKLOCAL(&ipif->ipif_v6lcl_addr))
+				break;
+		}
+		if (ipif == NULL) {
+			/* We have no link-local address! */
+			mutex_exit(&rill->ill_lock);
+			goto fail_redirect;
+		}
+		gw = ipif->ipif_v6lcl_addr;
+		mutex_exit(&rill->ill_lock);
+
 		ire = ire_create_v6(
 		    dst,				/* gateway == dst */
 		    &ipv6_all_ones,			/* mask */
-		    &prev_ire->ire_src_addr_v6,		/* source addr */
-		    &ipv6_all_zeros,			/* gateway addr */
-		    &prev_ire->ire_max_frag,		/* max frag */
-		    NULL,				/* no src nce */
-		    NULL,				/* ire rfq */
-		    stq,				/* ire stq */
-		    ipif->ipif_net_type,		/* IF_[NO]RESOLVER */
-		    prev_ire->ire_ipif,
-		    &ipv6_all_ones,
-		    0,
-		    0,
+		    &gw,				/* gateway addr */
+		    rill->ill_net_type,			/* IF_[NO]RESOLVER */
+		    prev_ire->ire_ill,
+		    ALL_ZONES,
 		    (RTF_DYNAMIC | RTF_HOST),
-		    &ulp_info,
-		    NULL,
 		    NULL,
 		    ipst);
 	}
 
-	/* Release reference from earlier ipif_get_next_ipif() */
-	ipif_refrele(ipif);
-
 	if (ire == NULL)
 		goto fail_redirect;
 
-	if (ire_add(&ire, NULL, NULL, NULL, B_FALSE) == 0) {
+	nire = ire_add(ire);
+	/* Check if it was a duplicate entry */
+	if (nire != NULL && nire != ire) {
+		ASSERT(nire->ire_identical_ref > 1);
+		ire_delete(nire);
+		ire_refrele(nire);
+		nire = NULL;
+	}
+	ire = nire;
+	if (ire != NULL) {
+		ire_refrele(ire);		/* Held in ire_add */
 
 		/* tell routing sockets that we received a redirect */
 		ip_rts_change_v6(RTM_REDIRECT,
 		    &rd->nd_rd_dst,
 		    &rd->nd_rd_target,
-		    &ipv6_all_ones, 0, &ire->ire_src_addr_v6,
+		    &ipv6_all_ones, 0, src,
 		    (RTF_DYNAMIC | RTF_GATEWAY | RTF_HOST), 0,
 		    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_AUTHOR), ipst);
 
@@ -1334,10 +1220,9 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		 * modifying an existing redirect.
 		 */
 		redir_ire = ire_ftable_lookup_v6(dst, 0, src, IRE_HOST,
-		    ire->ire_ipif, NULL, ALL_ZONES, 0, NULL,
-		    (MATCH_IRE_GW | MATCH_IRE_TYPE | MATCH_IRE_ILL), ipst);
-
-		ire_refrele(ire);		/* Held in ire_add_v6 */
+		    prev_ire->ire_ill, ALL_ZONES, NULL,
+		    (MATCH_IRE_GW | MATCH_IRE_TYPE | MATCH_IRE_ILL), 0, ipst,
+		    NULL);
 
 		if (redir_ire != NULL) {
 			if (redir_ire->ire_flags & RTF_DYNAMIC)
@@ -1346,8 +1231,6 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		}
 	}
 
-	if (prev_ire->ire_type == IRE_CACHE)
-		ire_delete(prev_ire);
 	ire_refrele(prev_ire);
 	prev_ire = NULL;
 
@@ -1355,101 +1238,8 @@ fail_redirect:
 	if (prev_ire != NULL)
 		ire_refrele(prev_ire);
 	freemsg(mp);
-}
-
-static ill_t *
-ip_queue_to_ill_v6(queue_t *q, ip_stack_t *ipst)
-{
-	ill_t *ill;
-
-	ASSERT(WR(q) == q);
-
-	if (q->q_next != NULL) {
-		ill = (ill_t *)q->q_ptr;
-		if (ILL_CAN_LOOKUP(ill))
-			ill_refhold(ill);
-		else
-			ill = NULL;
-	} else {
-		ill = ill_lookup_on_name(ipif_loopback_name, B_FALSE, B_TRUE,
-		    NULL, NULL, NULL, NULL, NULL, ipst);
-	}
-	if (ill == NULL)
-		ip0dbg(("ip_queue_to_ill_v6: no ill\n"));
-	return (ill);
-}
-
-/*
- * Assigns an appropriate source address to the packet.
- * If origdst is one of our IP addresses that use it as the source.
- * If the queue is an ill queue then select a source from that ill.
- * Otherwise pick a source based on a route lookup back to the origsrc.
- *
- * src is the return parameter. Returns a pointer to src or NULL if failure.
- */
-static in6_addr_t *
-icmp_pick_source_v6(queue_t *wq, in6_addr_t *origsrc, in6_addr_t *origdst,
-    in6_addr_t *src, zoneid_t zoneid, ip_stack_t *ipst)
-{
-	ill_t	*ill;
-	ire_t	*ire;
-	ipif_t	*ipif;
-
-	ASSERT(!(wq->q_flag & QREADR));
-	if (wq->q_next != NULL) {
-		ill = (ill_t *)wq->q_ptr;
-	} else {
-		ill = NULL;
-	}
-
-	ire = ire_route_lookup_v6(origdst, 0, 0, (IRE_LOCAL|IRE_LOOPBACK),
-	    NULL, NULL, zoneid, NULL, (MATCH_IRE_TYPE|MATCH_IRE_ZONEONLY),
-	    ipst);
-	if (ire != NULL) {
-		/* Destined to one of our addresses */
-		*src = *origdst;
-		ire_refrele(ire);
-		return (src);
-	}
-	if (ire != NULL) {
-		ire_refrele(ire);
-		ire = NULL;
-	}
-	if (ill == NULL) {
-		/* What is the route back to the original source? */
-		ire = ire_route_lookup_v6(origsrc, 0, 0, 0,
-		    NULL, NULL, zoneid, NULL,
-		    (MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE), ipst);
-		if (ire == NULL) {
-			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutNoRoutes);
-			return (NULL);
-		}
-		ASSERT(ire->ire_ipif != NULL);
-		ill = ire->ire_ipif->ipif_ill;
-		ire_refrele(ire);
-	}
-	ipif = ipif_select_source_v6(ill, origsrc, B_FALSE,
-	    IPV6_PREFER_SRC_DEFAULT, zoneid);
-	if (ipif != NULL) {
-		*src = ipif->ipif_v6src_addr;
-		ipif_refrele(ipif);
-		return (src);
-	}
-	/*
-	 * Unusual case - can't find a usable source address to reach the
-	 * original source. Use what in the route to the source.
-	 */
-	ire = ire_route_lookup_v6(origsrc, 0, 0, 0,
-	    NULL, NULL, zoneid, NULL,
-	    (MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE), ipst);
-	if (ire == NULL) {
-		BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutNoRoutes);
-		return (NULL);
-	}
-	ASSERT(ire != NULL);
-	*src = ire->ire_src_addr_v6;
-	ire_refrele(ire);
-	return (src);
+	if (rill != ira->ira_rill)
+		ill_refrele(rill);
 }
 
 /*
@@ -1459,17 +1249,12 @@ icmp_pick_source_v6(queue_t *wq, in6_addr_t *origsrc, in6_addr_t *origdst,
  * Note: assumes that icmp_pkt_err_ok_v6 has been called to
  * verify that an icmp error packet can be sent.
  *
- * If q is an ill write side queue (which is the case when packets
- * arrive from ip_rput) then ip_wput code will ensure that packets to
- * link-local destinations are sent out that ill.
- *
  * If v6src_ptr is set use it as a source. Otherwise select a reasonable
  * source address (see above function).
  */
 static void
-icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
-    const in6_addr_t *v6src_ptr, boolean_t mctl_present, zoneid_t zoneid,
-    ip_stack_t *ipst)
+icmp_pkt_v6(mblk_t *mp, void *stuff, size_t len,
+    const in6_addr_t *v6src_ptr, ip_recv_attr_t *ira)
 {
 	ip6_t		*ip6h;
 	in6_addr_t	v6dst;
@@ -1477,98 +1262,82 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	size_t		msg_len;
 	mblk_t		*mp1;
 	icmp6_t		*icmp6;
-	ill_t		*ill;
 	in6_addr_t	v6src;
-	mblk_t *ipsec_mp;
-	ipsec_out_t *io;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	ip_xmit_attr_t	ixas;
 
-	ill = ip_queue_to_ill_v6(q, ipst);
-	if (ill == NULL) {
-		freemsg(mp);
-		return;
+	ip6h = (ip6_t *)mp->b_rptr;
+
+	bzero(&ixas, sizeof (ixas));
+	ixas.ixa_flags = IXAF_BASIC_SIMPLE_V6;
+	ixas.ixa_zoneid = ira->ira_zoneid;
+	ixas.ixa_ifindex = 0;
+	ixas.ixa_ipst = ipst;
+	ixas.ixa_cred = kcred;
+	ixas.ixa_cpid = NOPID;
+	ixas.ixa_tsl = ira->ira_tsl;	/* Behave as a multi-level responder */
+	ixas.ixa_multicast_ttl = IP_DEFAULT_MULTICAST_TTL;
+
+	/*
+	 * If the source of the original packet was link-local, then
+	 * make sure we send on the same ill (group) as we received it on.
+	 */
+	if (IN6_IS_ADDR_LINKSCOPE(&ip6h->ip6_src)) {
+		ixas.ixa_flags |= IXAF_SCOPEID_SET;
+		if (IS_UNDER_IPMP(ill))
+			ixas.ixa_scopeid = ill_get_upper_ifindex(ill);
+		else
+			ixas.ixa_scopeid = ill->ill_phyint->phyint_ifindex;
 	}
 
-	if (mctl_present) {
+	if (ira->ira_flags & IRAF_IPSEC_SECURE) {
 		/*
-		 * If it is :
+		 * Apply IPsec based on how IPsec was applied to
+		 * the packet that had the error.
 		 *
-		 * 1) a IPSEC_OUT, then this is caused by outbound
-		 *    datagram originating on this host. IPSEC processing
-		 *    may or may not have been done. Refer to comments above
-		 *    icmp_inbound_error_fanout for details.
-		 *
-		 * 2) a IPSEC_IN if we are generating a icmp_message
-		 *    for an incoming datagram destined for us i.e called
-		 *    from ip_fanout_send_icmp.
+		 * If it was an outbound packet that caused the ICMP
+		 * error, then the caller will have setup the IRA
+		 * appropriately.
 		 */
-		ipsec_info_t *in;
-
-		ipsec_mp = mp;
-		mp = ipsec_mp->b_cont;
-
-		in = (ipsec_info_t *)ipsec_mp->b_rptr;
-		ip6h = (ip6_t *)mp->b_rptr;
-
-		ASSERT(in->ipsec_info_type == IPSEC_OUT ||
-		    in->ipsec_info_type == IPSEC_IN);
-
-		if (in->ipsec_info_type == IPSEC_IN) {
-			/*
-			 * Convert the IPSEC_IN to IPSEC_OUT.
-			 */
-			if (!ipsec_in_to_out(ipsec_mp, NULL, ip6h, zoneid)) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				ill_refrele(ill);
-				return;
-			}
-		} else {
-			ASSERT(in->ipsec_info_type == IPSEC_OUT);
-			io = (ipsec_out_t *)in;
-			/*
-			 * Clear out ipsec_out_proc_begin, so we do a fresh
-			 * ire lookup.
-			 */
-			io->ipsec_out_proc_begin = B_FALSE;
+		if (!ipsec_in_to_out(ira, &ixas, mp, NULL, ip6h)) {
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
+			/* Note: mp already consumed and ip_drop_packet done */
+			return;
 		}
 	} else {
 		/*
 		 * This is in clear. The icmp message we are building
-		 * here should go out in clear.
+		 * here should go out in clear, independent of our policy.
 		 */
-		ipsec_in_t *ii;
-		ASSERT(mp->b_datap->db_type == M_DATA);
-		ipsec_mp = ipsec_in_alloc(B_FALSE, ipst->ips_netstack);
-		if (ipsec_mp == NULL) {
-			freemsg(mp);
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			ill_refrele(ill);
-			return;
-		}
-		ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-
-		/* This is not a secure packet */
-		ii->ipsec_in_secure = B_FALSE;
-		ipsec_mp->b_cont = mp;
-		ip6h = (ip6_t *)mp->b_rptr;
-		/*
-		 * Convert the IPSEC_IN to IPSEC_OUT.
-		 */
-		if (!ipsec_in_to_out(ipsec_mp, NULL, ip6h, zoneid)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			ill_refrele(ill);
-			return;
-		}
+		ixas.ixa_flags |= IXAF_NO_IPSEC;
 	}
-	io = (ipsec_out_t *)ipsec_mp->b_rptr;
 
+	/*
+	 * If the caller specified the source we use that.
+	 * Otherwise, if the packet was for one of our unicast addresses, make
+	 * sure we respond with that as the source. Otherwise
+	 * have ip_output_simple pick the source address.
+	 */
 	if (v6src_ptr != NULL) {
 		v6src = *v6src_ptr;
 	} else {
-		if (icmp_pick_source_v6(q, &ip6h->ip6_src, &ip6h->ip6_dst,
-		    &v6src, zoneid, ipst) == NULL) {
-			freemsg(ipsec_mp);
-			ill_refrele(ill);
-			return;
+		ire_t *ire;
+		uint_t match_flags = MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY;
+
+		if (IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_src) ||
+		    IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_dst))
+			match_flags |= MATCH_IRE_ILL;
+
+		ire = ire_ftable_lookup_v6(&ip6h->ip6_dst, 0, 0,
+		    (IRE_LOCAL|IRE_LOOPBACK), ill, ira->ira_zoneid, NULL,
+		    match_flags, 0, ipst, NULL);
+		if (ire != NULL) {
+			v6src = ip6h->ip6_dst;
+			ire_refrele(ire);
+		} else {
+			v6src = ipv6_all_zeros;
+			ixas.ixa_flags |= IXAF_SET_SOURCE;
 		}
 	}
 	v6dst = ip6h->ip6_src;
@@ -1577,34 +1346,28 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	if (msg_len > len_needed) {
 		if (!adjmsg(mp, len_needed - msg_len)) {
 			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpOutErrors);
-			freemsg(ipsec_mp);
-			ill_refrele(ill);
+			freemsg(mp);
 			return;
 		}
 		msg_len = len_needed;
 	}
-	mp1 = allocb_tmpl(IPV6_HDR_LEN + len, mp);
+	mp1 = allocb(IPV6_HDR_LEN + len, BPRI_MED);
 	if (mp1 == NULL) {
 		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpOutErrors);
-		freemsg(ipsec_mp);
-		ill_refrele(ill);
+		freemsg(mp);
 		return;
 	}
-	ill_refrele(ill);
 	mp1->b_cont = mp;
 	mp = mp1;
-	ASSERT(ipsec_mp->b_datap->db_type == M_CTL &&
-	    io->ipsec_out_type == IPSEC_OUT);
-	ipsec_mp->b_cont = mp;
 
 	/*
-	 * Set ipsec_out_icmp_loopback so we can let the ICMP messages this
+	 * Set IXAF_TRUSTED_ICMP so we can let the ICMP messages this
 	 * node generates be accepted in peace by all on-host destinations.
 	 * If we do NOT assume that all on-host destinations trust
-	 * self-generated ICMP messages, then rework here, ip.c, and spd.c.
-	 * (Look for ipsec_out_icmp_loopback).
+	 * self-generated ICMP messages, then rework here, ip6.c, and spd.c.
+	 * (Look for IXAF_TRUSTED_ICMP).
 	 */
-	io->ipsec_out_icmp_loopback = B_TRUE;
+	ixas.ixa_flags |= IXAF_TRUSTED_ICMP;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 	mp1->b_wptr = (uchar_t *)ip6h + (IPV6_HDR_LEN + len);
@@ -1624,20 +1387,21 @@ icmp_pkt_v6(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	bcopy(stuff, (char *)icmp6, len);
 	/*
 	 * Prepare for checksum by putting icmp length in the icmp
-	 * checksum field. The checksum is calculated in ip_wput_v6.
+	 * checksum field. The checksum is calculated in ip_output_wire_v6.
 	 */
 	icmp6->icmp6_cksum = ip6h->ip6_plen;
 	if (icmp6->icmp6_type == ND_REDIRECT) {
 		ip6h->ip6_hops = IPV6_MAX_HOPS;
 	}
-	/* Send to V6 writeside put routine */
-	put(q, ipsec_mp);
+
+	(void) ip_output_simple(mp, &ixas);
+	ixa_cleanup(&ixas);
 }
 
 /*
  * Update the output mib when ICMPv6 packets are sent.
  */
-static void
+void
 icmp_update_out_mib_v6(ill_t *ill, icmp6_t *icmp6)
 {
 	BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpOutMsgs);
@@ -1712,14 +1476,19 @@ icmp_update_out_mib_v6(ill_t *ill, icmp6_t *icmp6)
  * ICMP error packet should be sent.
  */
 static mblk_t *
-icmp_pkt_err_ok_v6(queue_t *q, mblk_t *mp,
-    boolean_t llbcast, boolean_t mcast_ok, ip_stack_t *ipst)
+icmp_pkt_err_ok_v6(mblk_t *mp, boolean_t mcast_ok, ip_recv_attr_t *ira)
 {
-	ip6_t	*ip6h;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	boolean_t	llbcast;
+	ip6_t		*ip6h;
 
 	if (!mp)
 		return (NULL);
 
+	/* We view multicast and broadcast as the same.. */
+	llbcast = (ira->ira_flags &
+	    (IRAF_L2DST_MULTICAST|IRAF_L2DST_BROADCAST)) != 0;
 	ip6h = (ip6_t *)mp->b_rptr;
 
 	/* Check if source address uniquely identifies the host */
@@ -1737,17 +1506,8 @@ icmp_pkt_err_ok_v6(queue_t *q, mblk_t *mp,
 
 		if (mp->b_wptr - mp->b_rptr < len_needed) {
 			if (!pullupmsg(mp, len_needed)) {
-				ill_t	*ill;
-
-				ill = ip_queue_to_ill_v6(q, ipst);
-				if (ill == NULL) {
-					BUMP_MIB(&ipst->ips_icmp6_mib,
-					    ipv6IfIcmpInErrors);
-				} else {
-					BUMP_MIB(ill->ill_icmp6_mib,
-					    ipv6IfIcmpInErrors);
-					ill_refrele(ill);
-				}
+				BUMP_MIB(ill->ill_icmp6_mib,
+				    ipv6IfIcmpInErrors);
 				freemsg(mp);
 				return (NULL);
 			}
@@ -1771,6 +1531,16 @@ icmp_pkt_err_ok_v6(queue_t *q, mblk_t *mp,
 		freemsg(mp);
 		return (NULL);
 	}
+	/*
+	 * If this is a labeled system, then check to see if we're allowed to
+	 * send a response to this particular sender.  If not, then just drop.
+	 */
+	if (is_system_labeled() && !tsol_can_reply_error(mp, ira)) {
+		BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpOutErrors);
+		freemsg(mp);
+		return (NULL);
+	}
+
 	if (icmp_err_rate_limit(ipst)) {
 		/*
 		 * Only send ICMP error packets every so often.
@@ -1784,37 +1554,117 @@ icmp_pkt_err_ok_v6(queue_t *q, mblk_t *mp,
 }
 
 /*
+ * Called when a packet was sent out the same link that it arrived on.
+ * Check if it is ok to send a redirect and then send it.
+ */
+void
+ip_send_potential_redirect_v6(mblk_t *mp, ip6_t *ip6h, ire_t *ire,
+    ip_recv_attr_t *ira)
+{
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	in6_addr_t	*v6targ;
+	ire_t		*src_ire_v6 = NULL;
+	mblk_t		*mp1;
+	ire_t		*nhop_ire = NULL;
+
+	/*
+	 * Don't send a redirect when forwarding a source
+	 * routed packet.
+	 */
+	if (ip_source_routed_v6(ip6h, mp, ipst))
+		return;
+
+	if (ire->ire_type & IRE_ONLINK) {
+		/* Target is directly connected */
+		v6targ = &ip6h->ip6_dst;
+	} else {
+		/* Determine the most specific IRE used to send the packets */
+		nhop_ire = ire_nexthop(ire);
+		if (nhop_ire == NULL)
+			return;
+
+		/*
+		 * We won't send redirects to a router
+		 * that doesn't have a link local
+		 * address, but will forward.
+		 */
+		if (!IN6_IS_ADDR_LINKLOCAL(&nhop_ire->ire_addr_v6)) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInAddrErrors);
+			ip_drop_input("ipIfStatsInAddrErrors", mp, ill);
+			ire_refrele(nhop_ire);
+			return;
+		}
+		v6targ = &nhop_ire->ire_addr_v6;
+	}
+	src_ire_v6 = ire_ftable_lookup_v6(&ip6h->ip6_src,
+	    NULL, NULL, IRE_INTERFACE, ire->ire_ill, ALL_ZONES, NULL,
+	    MATCH_IRE_ILL | MATCH_IRE_TYPE, 0, ipst, NULL);
+
+	if (src_ire_v6 == NULL) {
+		if (nhop_ire != NULL)
+			ire_refrele(nhop_ire);
+		return;
+	}
+
+	/*
+	 * The source is directly connected.
+	 */
+	mp1 = copymsg(mp);
+	if (mp1 != NULL)
+		icmp_send_redirect_v6(mp1, v6targ, &ip6h->ip6_dst, ira);
+
+	if (nhop_ire != NULL)
+		ire_refrele(nhop_ire);
+	ire_refrele(src_ire_v6);
+}
+
+/*
  * Generate an ICMPv6 redirect message.
  * Include target link layer address option if it exits.
  * Always include redirect header.
  */
 static void
-icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
-    in6_addr_t *dest, ill_t *ill, boolean_t llbcast)
+icmp_send_redirect_v6(mblk_t *mp, in6_addr_t *targetp, in6_addr_t *dest,
+    ip_recv_attr_t *ira)
 {
 	nd_redirect_t	*rd;
 	nd_opt_rd_hdr_t	*rdh;
 	uchar_t		*buf;
-	nce_t		*nce = NULL;
+	ncec_t		*ncec = NULL;
 	nd_opt_hdr_t	*opt;
 	int		len;
 	int		ll_opt_len = 0;
 	int		max_redir_hdr_data_len;
 	int		pkt_len;
 	in6_addr_t	*srcp;
-	ip_stack_t	*ipst = ill->ill_ipst;
+	ill_t		*ill;
+	boolean_t	need_refrele;
+	ip_stack_t	*ipst = ira->ira_ill->ill_ipst;
 
-	/*
-	 * We are called from ip_rput where we could
-	 * not have attached an IPSEC_IN.
-	 */
-	ASSERT(mp->b_datap->db_type == M_DATA);
-
-	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, B_FALSE, ipst);
+	mp = icmp_pkt_err_ok_v6(mp, B_FALSE, ira);
 	if (mp == NULL)
 		return;
-	nce = ndp_lookup_v6(ill, B_TRUE, targetp, B_FALSE);
-	if (nce != NULL && nce->nce_state != ND_INCOMPLETE) {
+
+	if (IS_UNDER_IPMP(ira->ira_ill)) {
+		ill = ipmp_ill_hold_ipmp_ill(ira->ira_ill);
+		if (ill == NULL) {
+			ill = ira->ira_ill;
+			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInBadRedirects);
+			ip_drop_output("no IPMP ill for sending redirect",
+			    mp, ill);
+			freemsg(mp);
+			return;
+		}
+		need_refrele = B_TRUE;
+	} else {
+		ill = ira->ira_ill;
+		need_refrele = B_FALSE;
+	}
+
+	ncec = ncec_lookup_illgrp_v6(ill, targetp);
+	if (ncec != NULL && ncec->ncec_state != ND_INCOMPLETE &&
+	    ncec->ncec_lladdr != NULL) {
 		ll_opt_len = (sizeof (nd_opt_hdr_t) +
 		    ill->ill_phys_addr_length + 7)/8 * 8;
 	}
@@ -1822,8 +1672,10 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 	ASSERT(len % 4 == 0);
 	buf = kmem_alloc(len, KM_NOSLEEP);
 	if (buf == NULL) {
-		if (nce != NULL)
-			NCE_REFRELE(nce);
+		if (ncec != NULL)
+			ncec_refrele(ncec);
+		if (need_refrele)
+			ill_refrele(ill);
 		freemsg(mp);
 		return;
 	}
@@ -1836,15 +1688,14 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 	rd->nd_rd_dst = *dest;
 
 	opt = (nd_opt_hdr_t *)(buf + sizeof (nd_redirect_t));
-	if (nce != NULL && ll_opt_len != 0) {
+	if (ncec != NULL && ll_opt_len != 0) {
 		opt->nd_opt_type = ND_OPT_TARGET_LINKADDR;
 		opt->nd_opt_len = ll_opt_len/8;
-		bcopy((char *)nce->nce_res_mp->b_rptr +
-		    NCE_LL_ADDR_OFFSET(ill), &opt[1],
+		bcopy((char *)ncec->ncec_lladdr, &opt[1],
 		    ill->ill_phys_addr_length);
 	}
-	if (nce != NULL)
-		NCE_REFRELE(nce);
+	if (ncec != NULL)
+		ncec_refrele(ncec);
 	rdh = (nd_opt_rd_hdr_t *)(buf + sizeof (nd_redirect_t) + ll_opt_len);
 	rdh->nd_opt_rh_type = (uint8_t)ND_OPT_REDIRECTED_HEADER;
 	/* max_redir_hdr_data_len and nd_opt_rh_len must be multiple of 8 */
@@ -1862,321 +1713,136 @@ icmp_send_redirect_v6(queue_t *q, mblk_t *mp, in6_addr_t *targetp,
 	}
 	rdh->nd_opt_rh_reserved1 = 0;
 	rdh->nd_opt_rh_reserved2 = 0;
-	/* ipif_v6src_addr contains the link-local source address */
-	srcp = &ill->ill_ipif->ipif_v6src_addr;
+	/* ipif_v6lcl_addr contains the link-local source address */
+	srcp = &ill->ill_ipif->ipif_v6lcl_addr;
 
 	/* Redirects sent by router, and router is global zone */
-	icmp_pkt_v6(q, mp, buf, len, srcp, B_FALSE, GLOBAL_ZONEID, ipst);
+	ASSERT(ira->ira_zoneid == ALL_ZONES);
+	ira->ira_zoneid = GLOBAL_ZONEID;
+	icmp_pkt_v6(mp, buf, len, srcp, ira);
 	kmem_free(buf, len);
+	if (need_refrele)
+		ill_refrele(ill);
 }
 
 
 /* Generate an ICMP time exceeded message.  (May be called as writer.) */
 void
-icmp_time_exceeded_v6(queue_t *q, mblk_t *mp, uint8_t code,
-    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid,
-    ip_stack_t *ipst)
+icmp_time_exceeded_v6(mblk_t *mp, uint8_t code, boolean_t mcast_ok,
+    ip_recv_attr_t *ira)
 {
 	icmp6_t	icmp6;
-	boolean_t mctl_present;
-	mblk_t *first_mp;
 
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-
-	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok, ipst);
-	if (mp == NULL) {
-		if (mctl_present)
-			freeb(first_mp);
+	mp = icmp_pkt_err_ok_v6(mp, mcast_ok, ira);
+	if (mp == NULL)
 		return;
-	}
+
 	bzero(&icmp6, sizeof (icmp6_t));
 	icmp6.icmp6_type = ICMP6_TIME_EXCEEDED;
 	icmp6.icmp6_code = code;
-	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
-	    zoneid, ipst);
+	icmp_pkt_v6(mp, &icmp6, sizeof (icmp6_t), NULL, ira);
 }
 
 /*
  * Generate an ICMP unreachable message.
+ * When called from ip_output side a minimal ip_recv_attr_t needs to be
+ * constructed by the caller.
  */
 void
-icmp_unreachable_v6(queue_t *q, mblk_t *mp, uint8_t code,
-    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid,
-    ip_stack_t *ipst)
+icmp_unreachable_v6(mblk_t *mp, uint8_t code, boolean_t mcast_ok,
+    ip_recv_attr_t *ira)
 {
 	icmp6_t	icmp6;
-	boolean_t mctl_present;
-	mblk_t *first_mp;
 
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-
-	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok, ipst);
-	if (mp == NULL) {
-		if (mctl_present)
-			freeb(first_mp);
+	mp = icmp_pkt_err_ok_v6(mp, mcast_ok, ira);
+	if (mp == NULL)
 		return;
-	}
+
 	bzero(&icmp6, sizeof (icmp6_t));
 	icmp6.icmp6_type = ICMP6_DST_UNREACH;
 	icmp6.icmp6_code = code;
-	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
-	    zoneid, ipst);
+	icmp_pkt_v6(mp, &icmp6, sizeof (icmp6_t), NULL, ira);
 }
 
 /*
  * Generate an ICMP pkt too big message.
+ * When called from ip_output side a minimal ip_recv_attr_t needs to be
+ * constructed by the caller.
  */
-static void
-icmp_pkt2big_v6(queue_t *q, mblk_t *mp, uint32_t mtu,
-    boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid, ip_stack_t *ipst)
+void
+icmp_pkt2big_v6(mblk_t *mp, uint32_t mtu, boolean_t mcast_ok,
+    ip_recv_attr_t *ira)
 {
 	icmp6_t	icmp6;
-	mblk_t *first_mp;
-	boolean_t mctl_present;
 
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-
-	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok,  ipst);
-	if (mp == NULL) {
-		if (mctl_present)
-			freeb(first_mp);
+	mp = icmp_pkt_err_ok_v6(mp, mcast_ok, ira);
+	if (mp == NULL)
 		return;
-	}
+
 	bzero(&icmp6, sizeof (icmp6_t));
 	icmp6.icmp6_type = ICMP6_PACKET_TOO_BIG;
 	icmp6.icmp6_code = 0;
 	icmp6.icmp6_mtu = htonl(mtu);
 
-	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
-	    zoneid, ipst);
+	icmp_pkt_v6(mp, &icmp6, sizeof (icmp6_t), NULL, ira);
 }
 
 /*
  * Generate an ICMP parameter problem message. (May be called as writer.)
  * 'offset' is the offset from the beginning of the packet in error.
+ * When called from ip_output side a minimal ip_recv_attr_t needs to be
+ * constructed by the caller.
  */
 static void
-icmp_param_problem_v6(queue_t *q, mblk_t *mp, uint8_t code,
-    uint32_t offset, boolean_t llbcast, boolean_t mcast_ok, zoneid_t zoneid,
-    ip_stack_t *ipst)
+icmp_param_problem_v6(mblk_t *mp, uint8_t code, uint32_t offset,
+    boolean_t mcast_ok, ip_recv_attr_t *ira)
 {
 	icmp6_t	icmp6;
-	boolean_t mctl_present;
-	mblk_t *first_mp;
 
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-
-	mp = icmp_pkt_err_ok_v6(q, mp, llbcast, mcast_ok, ipst);
-	if (mp == NULL) {
-		if (mctl_present)
-			freeb(first_mp);
+	mp = icmp_pkt_err_ok_v6(mp, mcast_ok, ira);
+	if (mp == NULL)
 		return;
-	}
+
 	bzero((char *)&icmp6, sizeof (icmp6_t));
 	icmp6.icmp6_type = ICMP6_PARAM_PROB;
 	icmp6.icmp6_code = code;
 	icmp6.icmp6_pptr = htonl(offset);
-	icmp_pkt_v6(q, first_mp, &icmp6, sizeof (icmp6_t), NULL, mctl_present,
-	    zoneid, ipst);
+	icmp_pkt_v6(mp, &icmp6, sizeof (icmp6_t), NULL, ira);
 }
 
-/*
- * This code will need to take into account the possibility of binding
- * to a link local address on a multi-homed host, in which case the
- * outgoing interface (from the conn) will need to be used when getting
- * an ire for the dst. Going through proper outgoing interface and
- * choosing the source address corresponding to the outgoing interface
- * is necessary when the destination address is a link-local address and
- * IPV6_BOUND_IF or IPV6_PKTINFO or scope_id has been set.
- * This can happen when active connection is setup; thus ipp pointer
- * is passed here from tcp_connect_*() routines, in non-TCP cases NULL
- * pointer is passed as ipp pointer.
- */
-mblk_t *
-ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
+void
+icmp_param_problem_nexthdr_v6(mblk_t *mp, boolean_t mcast_ok,
+    ip_recv_attr_t *ira)
 {
-	ssize_t			len;
-	int			protocol;
-	struct T_bind_req	*tbr;
-	sin6_t			*sin6;
-	ipa6_conn_t		*ac6;
-	in6_addr_t		*v6srcp;
-	in6_addr_t		*v6dstp;
-	uint16_t		lport;
-	uint16_t		fport;
-	uchar_t			*ucp;
-	int			error = 0;
-	boolean_t		local_bind;
-	ipa6_conn_x_t		*acx6;
-	boolean_t		verify_dst;
-	ip_stack_t		*ipst = connp->conn_netstack->netstack_ip;
-	cred_t			*cr;
+	ip6_t		*ip6h = (ip6_t *)mp->b_rptr;
+	uint16_t	hdr_length;
+	uint8_t		*nexthdrp;
+	uint32_t	offset;
+	ill_t		*ill = ira->ira_ill;
 
-	/*
-	 * All Solaris components should pass a db_credp
-	 * for this TPI message, hence we ASSERT.
-	 * But in case there is some other M_PROTO that looks
-	 * like a TPI message sent by some other kernel
-	 * component, we check and return an error.
-	 */
-	cr = msg_getcred(mp, NULL);
-	ASSERT(cr != NULL);
-	if (cr == NULL) {
-		error = EINVAL;
-		goto bad_addr;
+	/* Determine the offset of the bad nexthdr value */
+	if (!ip_hdr_length_nexthdr_v6(mp, ip6h,	&hdr_length, &nexthdrp)) {
+		/* Malformed packet */
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, ill);
+		freemsg(mp);
+		return;
 	}
 
-	ASSERT(connp->conn_af_isv6);
-	len = mp->b_wptr - mp->b_rptr;
-	if (len < (sizeof (*tbr) + 1)) {
-		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
-		    "ip_bind_v6: bogus msg, len %ld", len);
-		goto bad_addr;
-	}
-	/* Back up and extract the protocol identifier. */
-	mp->b_wptr--;
-	tbr = (struct T_bind_req *)mp->b_rptr;
-	/* Reset the message type in preparation for shipping it back. */
-	mp->b_datap->db_type = M_PCPROTO;
-
-	protocol = *mp->b_wptr & 0xFF;
-	connp->conn_ulp = (uint8_t)protocol;
-
-	/*
-	 * Check for a zero length address.  This is from a protocol that
-	 * wants to register to receive all packets of its type.
-	 */
-	if (tbr->ADDR_length == 0) {
-		if ((protocol == IPPROTO_TCP || protocol == IPPROTO_SCTP ||
-		    protocol == IPPROTO_ESP || protocol == IPPROTO_AH) &&
-		    ipst->ips_ipcl_proto_fanout_v6[protocol].connf_head !=
-		    NULL) {
-			/*
-			 * TCP, SCTP, AH, and ESP have single protocol fanouts.
-			 * Do not allow others to bind to these.
-			 */
-			goto bad_addr;
-		}
-
-		/*
-		 *
-		 * The udp module never sends down a zero-length address,
-		 * and allowing this on a labeled system will break MLP
-		 * functionality.
-		 */
-		if (is_system_labeled() && protocol == IPPROTO_UDP)
-			goto bad_addr;
-
-		/* Allow ipsec plumbing */
-		if ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
-		    (protocol != IPPROTO_AH) && (protocol != IPPROTO_ESP))
-			goto bad_addr;
-
-		connp->conn_srcv6 = ipv6_all_zeros;
-		ipcl_proto_insert_v6(connp, protocol);
-
-		tbr->PRIM_type = T_BIND_ACK;
-		return (mp);
-	}
-
-	/* Extract the address pointer from the message. */
-	ucp = (uchar_t *)mi_offset_param(mp, tbr->ADDR_offset,
-	    tbr->ADDR_length);
-	if (ucp == NULL) {
-		ip1dbg(("ip_bind_v6: no address\n"));
-		goto bad_addr;
-	}
-	if (!OK_32PTR(ucp)) {
-		ip1dbg(("ip_bind_v6: unaligned address\n"));
-		goto bad_addr;
-	}
-
-	switch (tbr->ADDR_length) {
-	default:
-		ip1dbg(("ip_bind_v6: bad address length %d\n",
-		    (int)tbr->ADDR_length));
-		goto bad_addr;
-
-	case IPV6_ADDR_LEN:
-		/* Verification of local address only */
-		v6srcp = (in6_addr_t *)ucp;
-		lport = 0;
-		local_bind = B_TRUE;
-		break;
-
-	case sizeof (sin6_t):
-		sin6 = (sin6_t *)ucp;
-		v6srcp = &sin6->sin6_addr;
-		lport = sin6->sin6_port;
-		local_bind = B_TRUE;
-		break;
-
-	case sizeof (ipa6_conn_t):
-		/*
-		 * Verify that both the source and destination addresses
-		 * are valid.
-		 */
-		ac6 = (ipa6_conn_t *)ucp;
-		v6srcp = &ac6->ac6_laddr;
-		v6dstp = &ac6->ac6_faddr;
-		fport = ac6->ac6_fport;
-		/* For raw socket, the local port is not set. */
-		lport = ac6->ac6_lport != 0 ? ac6->ac6_lport :
-		    connp->conn_lport;
-		local_bind = B_FALSE;
-		/* Always verify destination reachability. */
-		verify_dst = B_TRUE;
-		break;
-
-	case sizeof (ipa6_conn_x_t):
-		/*
-		 * Verify that the source address is valid.
-		 */
-		acx6 = (ipa6_conn_x_t *)ucp;
-		ac6 = &acx6->ac6x_conn;
-		v6srcp = &ac6->ac6_laddr;
-		v6dstp = &ac6->ac6_faddr;
-		fport = ac6->ac6_fport;
-		lport = ac6->ac6_lport;
-		local_bind = B_FALSE;
-		/*
-		 * Client that passed ipa6_conn_x_t to us specifies whether to
-		 * verify destination reachability.
-		 */
-		verify_dst = (acx6->ac6x_flags & ACX_VERIFY_DST) != 0;
-		break;
-	}
-	if (local_bind) {
-		error = ip_proto_bind_laddr_v6(connp, &mp->b_cont, protocol,
-		    v6srcp, lport, tbr->ADDR_length != IPV6_ADDR_LEN);
-	} else {
-		error = ip_proto_bind_connected_v6(connp, &mp->b_cont, protocol,
-		    v6srcp, lport, v6dstp, ipp, fport, B_TRUE, verify_dst, cr);
-	}
-
-	if (error == 0) {
-		/* Send it home. */
-		mp->b_datap->db_type = M_PCPROTO;
-		tbr->PRIM_type = T_BIND_ACK;
-		return (mp);
-	}
-
-bad_addr:
-	ASSERT(error != EINPROGRESS);
-	if (error > 0)
-		mp = mi_tpi_err_ack_alloc(mp, TSYSERR, error);
-	else
-		mp = mi_tpi_err_ack_alloc(mp, TBADADDR, 0);
-	return (mp);
+	offset = nexthdrp - mp->b_rptr;
+	icmp_param_problem_v6(mp, ICMP6_PARAMPROB_NEXTHEADER, offset,
+	    mcast_ok, ira);
 }
 
 /*
- * Here address is verified to be a valid local address.
- * If the IRE_DB_REQ_TYPE mp is present, a multicast
- * address is also considered a valid local address.
+ * Verify whether or not the IP address is a valid local address.
+ * Could be a unicast, including one for a down interface.
+ * If allow_mcbc then a multicast or broadcast address is also
+ * acceptable.
+ *
  * In the case of a multicast address, however, the
  * upper protocol is expected to reset the src address
- * to 0 if it sees an ire with IN6_IS_ADDR_MULTICAST returned so that
+ * to zero when we return IPVL_MCAST so that
  * no packets are emitted with multicast address as
  * source address.
  * The addresses valid for bind are:
@@ -2193,855 +1859,418 @@ bad_addr:
  * When the address is loopback or multicast, there might be many matching IREs
  * so bind has to look up based on the zone.
  */
-/*
- * Verify the local IP address. Does not change the conn_t except
- * conn_fully_bound and conn_policy_cached.
- */
-static int
-ip_bind_laddr_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
-    const in6_addr_t *v6src, uint16_t lport, boolean_t fanout_insert)
-{
-	int		error = 0;
-	ire_t		*src_ire = NULL;
-	zoneid_t	zoneid;
-	mblk_t		*mp = NULL;
-	boolean_t	ire_requested;
-	boolean_t	ipsec_policy_set;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	if (mpp)
-		mp = *mpp;
-
-	ire_requested = (mp != NULL && DB_TYPE(mp) == IRE_DB_REQ_TYPE);
-	ipsec_policy_set = (mp != NULL && DB_TYPE(mp) == IPSEC_POLICY_SET);
-
-	/*
-	 * If it was previously connected, conn_fully_bound would have
-	 * been set.
-	 */
-	connp->conn_fully_bound = B_FALSE;
-
-	zoneid = IPCL_ZONEID(connp);
-
-	if (!IN6_IS_ADDR_UNSPECIFIED(v6src)) {
-		src_ire = ire_route_lookup_v6(v6src, 0, 0,
-		    0, NULL, NULL, zoneid, NULL, MATCH_IRE_ZONEONLY, ipst);
-		/*
-		 * If an address other than in6addr_any is requested,
-		 * we verify that it is a valid address for bind
-		 * Note: Following code is in if-else-if form for
-		 * readability compared to a condition check.
-		 */
-		ASSERT(src_ire == NULL || !(src_ire->ire_type & IRE_BROADCAST));
-		/* LINTED - statement has no consequent */
-		if (IRE_IS_LOCAL(src_ire)) {
-			/*
-			 * (2) Bind to address of local UP interface
-			 */
-		} else if (IN6_IS_ADDR_MULTICAST(v6src)) {
-			ipif_t	*multi_ipif = NULL;
-			ire_t	*save_ire;
-			/*
-			 * (4) bind to multicast address.
-			 * Fake out the IRE returned to upper
-			 * layer to be a broadcast IRE in
-			 * ip_bind_insert_ire_v6().
-			 * Pass other information that matches
-			 * the ipif (e.g. the source address).
-			 * conn_multicast_ill is only used for
-			 * IPv6 packets
-			 */
-			mutex_enter(&connp->conn_lock);
-			if (connp->conn_multicast_ill != NULL) {
-				(void) ipif_lookup_zoneid(
-				    connp->conn_multicast_ill, zoneid, 0,
-				    &multi_ipif);
-			} else {
-				/*
-				 * Look for default like
-				 * ip_wput_v6
-				 */
-				multi_ipif = ipif_lookup_group_v6(
-				    &ipv6_unspecified_group, zoneid, ipst);
-			}
-			mutex_exit(&connp->conn_lock);
-			save_ire = src_ire;
-			src_ire = NULL;
-			if (multi_ipif == NULL || !ire_requested ||
-			    (src_ire = ipif_to_ire_v6(multi_ipif)) == NULL) {
-				src_ire = save_ire;
-				error = EADDRNOTAVAIL;
-			} else {
-				ASSERT(src_ire != NULL);
-				if (save_ire != NULL)
-					ire_refrele(save_ire);
-			}
-			if (multi_ipif != NULL)
-				ipif_refrele(multi_ipif);
-		} else {
-			if (!ip_addr_exists_v6(v6src, zoneid, ipst)) {
-				/*
-				 * Not a valid address for bind
-				 */
-				error = EADDRNOTAVAIL;
-			}
-		}
-
-		if (error != 0) {
-			/* Red Alert!  Attempting to be a bogon! */
-			if (ip_debug > 2) {
-				/* ip1dbg */
-				pr_addr_dbg("ip_bind_laddr_v6: bad src"
-				    " address %s\n", AF_INET6, v6src);
-			}
-			goto bad_addr;
-		}
-	}
-
-	/*
-	 * Allow setting new policies. For example, disconnects come
-	 * down as ipa_t bind. As we would have set conn_policy_cached
-	 * to B_TRUE before, we should set it to B_FALSE, so that policy
-	 * can change after the disconnect.
-	 */
-	connp->conn_policy_cached = B_FALSE;
-
-	/* If not fanout_insert this was just an address verification */
-	if (fanout_insert) {
-		/*
-		 * The addresses have been verified. Time to insert in
-		 * the correct fanout list.
-		 */
-		connp->conn_srcv6 = *v6src;
-		connp->conn_remv6 = ipv6_all_zeros;
-		connp->conn_lport = lport;
-		connp->conn_fport = 0;
-		error = ipcl_bind_insert_v6(connp, protocol, v6src, lport);
-	}
-	if (error == 0) {
-		if (ire_requested) {
-			if (!ip_bind_get_ire_v6(mpp, src_ire, v6src, NULL,
-			    ipst)) {
-				error = -1;
-				goto bad_addr;
-			}
-			mp = *mpp;
-		} else if (ipsec_policy_set) {
-			if (!ip_bind_ipsec_policy_set(connp, mp)) {
-				error = -1;
-				goto bad_addr;
-			}
-		}
-	}
-bad_addr:
-	if (error != 0) {
-		if (connp->conn_anon_port) {
-			(void) tsol_mlp_anon(crgetzone(connp->conn_cred),
-			    connp->conn_mlp_type, connp->conn_ulp, ntohs(lport),
-			    B_FALSE);
-		}
-		connp->conn_mlp_type = mlptSingle;
-	}
-
-	if (src_ire != NULL)
-		ire_refrele(src_ire);
-
-	if (ipsec_policy_set) {
-		ASSERT(mp != NULL);
-		freeb(mp);
-		/*
-		 * As of now assume that nothing else accompanies
-		 * IPSEC_POLICY_SET.
-		 */
-		*mpp = NULL;
-	}
-
-	return (error);
-}
-int
-ip_proto_bind_laddr_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
-    const in6_addr_t *v6srcp, uint16_t lport, boolean_t fanout_insert)
-{
-	int		error;
-	boolean_t	orig_pkt_isv6 = connp->conn_pkt_isv6;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	ASSERT(connp->conn_af_isv6);
-	connp->conn_ulp = protocol;
-
-	if (IN6_IS_ADDR_V4MAPPED(v6srcp) && !connp->conn_ipv6_v6only) {
-		/* Bind to IPv4 address */
-		ipaddr_t v4src;
-
-		IN6_V4MAPPED_TO_IPADDR(v6srcp, v4src);
-
-		error = ip_bind_laddr_v4(connp, mpp, protocol, v4src, lport,
-		    fanout_insert);
-		if (error != 0)
-			goto bad_addr;
-		connp->conn_pkt_isv6 = B_FALSE;
-	} else {
-		if (IN6_IS_ADDR_V4MAPPED(v6srcp)) {
-			error = 0;
-			goto bad_addr;
-		}
-		error = ip_bind_laddr_v6(connp, mpp, protocol, v6srcp,
-		    lport, fanout_insert);
-		if (error != 0)
-			goto bad_addr;
-		connp->conn_pkt_isv6 = B_TRUE;
-	}
-
-	if (orig_pkt_isv6 != connp->conn_pkt_isv6)
-		ip_setpktversion(connp, connp->conn_pkt_isv6, B_TRUE, ipst);
-	return (0);
-
-bad_addr:
-	if (error < 0)
-		error = -TBADADDR;
-	return (error);
-}
-
-/*
- * Verify that both the source and destination addresses
- * are valid.  If verify_dst, then destination address must also be reachable,
- * i.e. have a route.  Protocols like TCP want this.  Tunnels do not.
- * It takes ip6_pkt_t * as one of the arguments to determine correct
- * source address when IPV6_PKTINFO or scope_id is set along with a link-local
- * destination address. Note that parameter ipp is only useful for TCP connect
- * when scope_id is set or IPV6_PKTINFO option is set with an ifindex. For all
- * non-TCP cases, it is NULL and for all other tcp cases it is not useful.
- *
- */
-int
-ip_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
-    in6_addr_t *v6src, uint16_t lport, const in6_addr_t *v6dst,
-    ip6_pkt_t *ipp, uint16_t fport, boolean_t fanout_insert,
-    boolean_t verify_dst, cred_t *cr)
+ip_laddr_t
+ip_laddr_verify_v6(const in6_addr_t *v6src, zoneid_t zoneid,
+    ip_stack_t *ipst, boolean_t allow_mcbc, uint_t scopeid)
 {
 	ire_t		*src_ire;
-	ire_t		*dst_ire;
-	int		error = 0;
-	ire_t		*sire = NULL;
-	ire_t		*md_dst_ire = NULL;
-	ill_t		*md_ill = NULL;
-	ill_t 		*dst_ill = NULL;
-	ipif_t		*src_ipif = NULL;
-	zoneid_t	zoneid;
-	boolean_t	ill_held = B_FALSE;
-	mblk_t		*mp = NULL;
-	boolean_t	ire_requested = B_FALSE;
-	boolean_t	ipsec_policy_set = B_FALSE;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-	ts_label_t	*tsl = NULL;
-	cred_t		*effective_cred = NULL;
+	uint_t		match_flags;
+	ill_t		*ill = NULL;
 
-	if (mpp)
-		mp = *mpp;
+	ASSERT(!IN6_IS_ADDR_V4MAPPED(v6src));
+	ASSERT(!IN6_IS_ADDR_UNSPECIFIED(v6src));
 
-	if (mp != NULL) {
-		ire_requested = (DB_TYPE(mp) == IRE_DB_REQ_TYPE);
-		ipsec_policy_set = (DB_TYPE(mp) == IPSEC_POLICY_SET);
+	match_flags = MATCH_IRE_ZONEONLY;
+	if (scopeid != 0) {
+		ill = ill_lookup_on_ifindex(scopeid, B_TRUE, ipst);
+		if (ill == NULL)
+			return (IPVL_BAD);
+		match_flags |= MATCH_IRE_ILL;
 	}
 
-	src_ire = dst_ire = NULL;
-	/*
-	 * If we never got a disconnect before, clear it now.
-	 */
-	connp->conn_fully_bound = B_FALSE;
-
-	zoneid = connp->conn_zoneid;
+	src_ire = ire_ftable_lookup_v6(v6src, NULL, NULL, 0,
+	    ill, zoneid, NULL, match_flags, 0, ipst, NULL);
+	if (ill != NULL)
+		ill_refrele(ill);
 
 	/*
-	 * Check whether Trusted Solaris policy allows communication with this
-	 * host, and pretend that the destination is unreachable if not.
-	 *
-	 * This is never a problem for TCP, since that transport is known to
-	 * compute the label properly as part of the tcp_rput_other T_BIND_ACK
-	 * handling.  If the remote is unreachable, it will be detected at that
-	 * point, so there's no reason to check it here.
-	 *
-	 * Note that for sendto (and other datagram-oriented friends), this
-	 * check is done as part of the data path label computation instead.
-	 * The check here is just to make non-TCP connect() report the right
-	 * error.
+	 * If an address other than in6addr_any is requested,
+	 * we verify that it is a valid address for bind
+	 * Note: Following code is in if-else-if form for
+	 * readability compared to a condition check.
 	 */
-	if (is_system_labeled() && !IPCL_IS_TCP(connp)) {
-		if ((error = tsol_check_dest(cr, v6dst, IPV6_VERSION,
-		    connp->conn_mac_mode, &effective_cred)) != 0) {
-			if (ip_debug > 2) {
-				pr_addr_dbg(
-				    "ip_bind_connected: no label for dst %s\n",
-				    AF_INET6, v6dst);
-			}
-			goto bad_addr;
-		}
+	if (src_ire != NULL && (src_ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK))) {
+		/*
+		 * (2) Bind to address of local UP interface
+		 */
+		ire_refrele(src_ire);
+		return (IPVL_UNICAST_UP);
+	} else if (IN6_IS_ADDR_MULTICAST(v6src)) {
+		/* (4) bind to multicast address. */
+		if (src_ire != NULL)
+			ire_refrele(src_ire);
 
 		/*
-		 * tsol_check_dest() may have created a new cred with
-		 * a modified security label. Use that cred if it exists
-		 * for ire lookups.
+		 * Note: caller should take IPV6_MULTICAST_IF
+		 * into account when selecting a real source address.
 		 */
-		if (effective_cred == NULL) {
-			tsl = crgetlabel(cr);
-		} else {
-			tsl = crgetlabel(effective_cred);
-		}
-	}
-
-	if (IN6_IS_ADDR_MULTICAST(v6dst)) {
+		if (allow_mcbc)
+			return (IPVL_MCAST);
+		else
+			return (IPVL_BAD);
+	} else {
 		ipif_t *ipif;
 
 		/*
-		 * Use an "emulated" IRE_BROADCAST to tell the transport it
-		 * is a multicast.
-		 * Pass other information that matches
-		 * the ipif (e.g. the source address).
-		 *
-		 * conn_multicast_ill is only used for IPv6 packets
+		 * (3) Bind to address of local DOWN interface?
+		 * (ipif_lookup_addr() looks up all interfaces
+		 * but we do not get here for UP interfaces
+		 * - case (2) above)
 		 */
-		mutex_enter(&connp->conn_lock);
-		if (connp->conn_multicast_ill != NULL) {
-			(void) ipif_lookup_zoneid(connp->conn_multicast_ill,
-			    zoneid, 0, &ipif);
-		} else {
-			/* Look for default like ip_wput_v6 */
-			ipif = ipif_lookup_group_v6(v6dst, zoneid, ipst);
-		}
-		mutex_exit(&connp->conn_lock);
-		if (ipif == NULL || ire_requested ||
-		    (dst_ire = ipif_to_ire_v6(ipif)) == NULL) {
-			if (ipif != NULL)
-				ipif_refrele(ipif);
-			if (ip_debug > 2) {
-				/* ip1dbg */
-				pr_addr_dbg("ip_bind_connected_v6: bad "
-				    "connected multicast %s\n", AF_INET6,
-				    v6dst);
-			}
-			error = ENETUNREACH;
-			goto bad_addr;
-		}
-		if (ipif != NULL)
+		if (src_ire != NULL)
+			ire_refrele(src_ire);
+
+		ipif = ipif_lookup_addr_v6(v6src, NULL, zoneid, ipst);
+		if (ipif == NULL)
+			return (IPVL_BAD);
+
+		/* Not a useful source? */
+		if (ipif->ipif_flags & (IPIF_NOLOCAL | IPIF_ANYCAST)) {
 			ipif_refrele(ipif);
-	} else {
-		dst_ire = ire_route_lookup_v6(v6dst, NULL, NULL, 0,
-		    NULL, &sire, zoneid, tsl,
-		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE | MATCH_IRE_SECATTR,
-		    ipst);
+			return (IPVL_BAD);
+		}
+		ipif_refrele(ipif);
+		return (IPVL_UNICAST_DOWN);
+	}
+}
+
+/*
+ * Verify that both the source and destination addresses are valid.  If
+ * IPDF_VERIFY_DST is not set, then the destination address may be unreachable,
+ * i.e. have no route to it.  Protocols like TCP want to verify destination
+ * reachability, while tunnels do not.
+ *
+ * Determine the route, the interface, and (optionally) the source address
+ * to use to reach a given destination.
+ * Note that we allow connect to broadcast and multicast addresses when
+ * IPDF_ALLOW_MCBC is set.
+ * first_hop and dst_addr are normally the same, but if source routing
+ * they will differ; in that case the first_hop is what we'll use for the
+ * routing lookup but the dce and label checks will be done on dst_addr,
+ *
+ * If uinfo is set, then we fill in the best available information
+ * we have for the destination. This is based on (in priority order) any
+ * metrics and path MTU stored in a dce_t, route metrics, and finally the
+ * ill_mtu.
+ *
+ * Tsol note: If we have a source route then dst_addr != firsthop. But we
+ * always do the label check on dst_addr.
+ *
+ * Assumes that the caller has set ixa_scopeid for link-local communication.
+ */
+int
+ip_set_destination_v6(in6_addr_t *src_addrp, const in6_addr_t *dst_addr,
+    const in6_addr_t *firsthop, ip_xmit_attr_t *ixa, iulp_t *uinfo,
+    uint32_t flags, uint_t mac_mode)
+{
+	ire_t		*ire;
+	int		error = 0;
+	in6_addr_t	setsrc;				/* RTF_SETSRC */
+	zoneid_t	zoneid = ixa->ixa_zoneid;	/* Honors SO_ALLZONES */
+	ip_stack_t	*ipst = ixa->ixa_ipst;
+	dce_t		*dce;
+	uint_t		pmtu;
+	uint_t		ifindex;
+	uint_t		generation;
+	nce_t		*nce;
+	ill_t		*ill = NULL;
+	boolean_t	multirt = B_FALSE;
+
+	ASSERT(!IN6_IS_ADDR_V4MAPPED(dst_addr));
+
+	ASSERT(!(ixa->ixa_flags & IXAF_IS_IPV4));
+
+	/*
+	 * We never send to zero; the ULPs map it to the loopback address.
+	 * We can't allow it since we use zero to mean unitialized in some
+	 * places.
+	 */
+	ASSERT(!IN6_IS_ADDR_UNSPECIFIED(dst_addr));
+
+	if (is_system_labeled()) {
+		ts_label_t *tsl = NULL;
+
+		error = tsol_check_dest(ixa->ixa_tsl, dst_addr, IPV6_VERSION,
+		    mac_mode, (flags & IPDF_ZONE_IS_GLOBAL) != 0, &tsl);
+		if (error != 0)
+			return (error);
+		if (tsl != NULL) {
+			/* Update the label */
+			ip_xmit_attr_replace_tsl(ixa, tsl);
+		}
+	}
+
+	setsrc = ipv6_all_zeros;
+	/*
+	 * Select a route; For IPMP interfaces, we would only select
+	 * a "hidden" route (i.e., going through a specific under_ill)
+	 * if ixa_ifindex has been specified.
+	 */
+	ire = ip_select_route_v6(firsthop, ixa, &generation, &setsrc, &error,
+	    &multirt);
+	ASSERT(ire != NULL);	/* IRE_NOROUTE if none found */
+	if (error != 0)
+		goto bad_addr;
+
+	/*
+	 * ire can't be a broadcast or multicast unless IPDF_ALLOW_MCBC is set.
+	 * If IPDF_VERIFY_DST is set, the destination must be reachable.
+	 * Otherwise the destination needn't be reachable.
+	 *
+	 * If we match on a reject or black hole, then we've got a
+	 * local failure.  May as well fail out the connect() attempt,
+	 * since it's never going to succeed.
+	 */
+	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
 		/*
-		 * We also prevent ire's with src address INADDR_ANY to
-		 * be used, which are created temporarily for
-		 * sending out packets from endpoints that have
-		 * conn_unspec_src set.
+		 * If we're verifying destination reachability, we always want
+		 * to complain here.
+		 *
+		 * If we're not verifying destination reachability but the
+		 * destination has a route, we still want to fail on the
+		 * temporary address and broadcast address tests.
+		 *
+		 * In both cases do we let the code continue so some reasonable
+		 * information is returned to the caller. That enables the
+		 * caller to use (and even cache) the IRE. conn_ip_ouput will
+		 * use the generation mismatch path to check for the unreachable
+		 * case thereby avoiding any specific check in the main path.
 		 */
-		if (dst_ire == NULL ||
-		    (dst_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
-		    IN6_IS_ADDR_UNSPECIFIED(&dst_ire->ire_src_addr_v6)) {
+		ASSERT(generation == IRE_GENERATION_VERIFY);
+		if (flags & IPDF_VERIFY_DST) {
 			/*
-			 * When verifying destination reachability, we always
-			 * complain.
-			 *
-			 * When not verifying destination reachability but we
-			 * found an IRE, i.e. the destination is reachable,
-			 * then the other tests still apply and we complain.
+			 * Set errno but continue to set up ixa_ire to be
+			 * the RTF_REJECT|RTF_BLACKHOLE IRE.
+			 * That allows callers to use ip_output to get an
+			 * ICMP error back.
 			 */
-			if (verify_dst || (dst_ire != NULL)) {
-				if (ip_debug > 2) {
-					/* ip1dbg */
-					pr_addr_dbg("ip_bind_connected_v6: bad"
-					    " connected dst %s\n", AF_INET6,
-					    v6dst);
-				}
-				if (dst_ire == NULL ||
-				    !(dst_ire->ire_type & IRE_HOST)) {
-					error = ENETUNREACH;
-				} else {
-					error = EHOSTUNREACH;
-				}
-				goto bad_addr;
-			}
-		}
-	}
-
-	/*
-	 * If the app does a connect(), it means that it will most likely
-	 * send more than 1 packet to the destination.  It makes sense
-	 * to clear the temporary flag.
-	 */
-	if (dst_ire != NULL && dst_ire->ire_type == IRE_CACHE &&
-	    (dst_ire->ire_marks & IRE_MARK_TEMPORARY)) {
-		irb_t *irb = dst_ire->ire_bucket;
-
-		rw_enter(&irb->irb_lock, RW_WRITER);
-		/*
-		 * We need to recheck for IRE_MARK_TEMPORARY after acquiring
-		 * the lock in order to guarantee irb_tmp_ire_cnt.
-		 */
-		if (dst_ire->ire_marks & IRE_MARK_TEMPORARY) {
-			dst_ire->ire_marks &= ~IRE_MARK_TEMPORARY;
-			irb->irb_tmp_ire_cnt--;
-		}
-		rw_exit(&irb->irb_lock);
-	}
-
-	ASSERT(dst_ire == NULL || dst_ire->ire_ipversion == IPV6_VERSION);
-
-	/*
-	 * See if we should notify ULP about MDT; we do this whether or not
-	 * ire_requested is TRUE, in order to handle active connects; MDT
-	 * eligibility tests for passive connects are handled separately
-	 * through tcp_adapt_ire().  We do this before the source address
-	 * selection, because dst_ire may change after a call to
-	 * ipif_select_source_v6().  This is a best-effort check, as the
-	 * packet for this connection may not actually go through
-	 * dst_ire->ire_stq, and the exact IRE can only be known after
-	 * calling ip_newroute_v6().  This is why we further check on the
-	 * IRE during Multidata packet transmission in tcp_multisend().
-	 */
-	if (ipst->ips_ip_multidata_outbound && !ipsec_policy_set &&
-	    dst_ire != NULL &&
-	    !(dst_ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK | IRE_BROADCAST)) &&
-	    (md_ill = ire_to_ill(dst_ire), md_ill != NULL) &&
-	    ILL_MDT_CAPABLE(md_ill)) {
-		md_dst_ire = dst_ire;
-		IRE_REFHOLD(md_dst_ire);
-	}
-
-	if (dst_ire != NULL &&
-	    dst_ire->ire_type == IRE_LOCAL &&
-	    dst_ire->ire_zoneid != zoneid &&
-	    dst_ire->ire_zoneid != ALL_ZONES) {
-		src_ire = ire_ftable_lookup_v6(v6dst, 0, 0, 0, NULL, NULL,
-		    zoneid, 0, NULL,
-		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_RJ_BHOLE, ipst);
-		if (src_ire == NULL) {
-			error = EHOSTUNREACH;
-			goto bad_addr;
-		} else if (src_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
-			if (!(src_ire->ire_type & IRE_HOST))
+			if (!(ire->ire_type & IRE_HOST))
 				error = ENETUNREACH;
 			else
 				error = EHOSTUNREACH;
-			goto bad_addr;
 		}
-		if (IN6_IS_ADDR_UNSPECIFIED(v6src)) {
-			src_ipif = src_ire->ire_ipif;
-			ipif_refhold(src_ipif);
-			*v6src = src_ipif->ipif_v6lcl_addr;
-		}
-		ire_refrele(src_ire);
-		src_ire = NULL;
-	} else if (IN6_IS_ADDR_UNSPECIFIED(v6src) && dst_ire != NULL) {
-		if ((sire != NULL) && (sire->ire_flags & RTF_SETSRC)) {
-			*v6src = sire->ire_src_addr_v6;
-			ire_refrele(dst_ire);
-			dst_ire = sire;
-			sire = NULL;
-		} else if (dst_ire->ire_type == IRE_CACHE &&
-		    (dst_ire->ire_flags & RTF_SETSRC)) {
-			ASSERT(dst_ire->ire_zoneid == zoneid ||
-			    dst_ire->ire_zoneid == ALL_ZONES);
-			*v6src = dst_ire->ire_src_addr_v6;
+	}
+
+	if ((ire->ire_type & (IRE_BROADCAST|IRE_MULTICAST)) &&
+	    !(flags & IPDF_ALLOW_MCBC)) {
+		ire_refrele(ire);
+		ire = ire_reject(ipst, B_FALSE);
+		generation = IRE_GENERATION_VERIFY;
+		error = ENETUNREACH;
+	}
+
+	/* Cache things */
+	if (ixa->ixa_ire != NULL)
+		ire_refrele_notr(ixa->ixa_ire);
+#ifdef DEBUG
+	ire_refhold_notr(ire);
+	ire_refrele(ire);
+#endif
+	ixa->ixa_ire = ire;
+	ixa->ixa_ire_generation = generation;
+
+	/*
+	 * For multicast with multirt we have a flag passed back from
+	 * ire_lookup_multi_ill_v6 since we don't have an IRE for each
+	 * possible multicast address.
+	 * We also need a flag for multicast since we can't check
+	 * whether RTF_MULTIRT is set in ixa_ire for multicast.
+	 */
+	if (multirt) {
+		ixa->ixa_postfragfn = ip_postfrag_multirt_v6;
+		ixa->ixa_flags |= IXAF_MULTIRT_MULTICAST;
+	} else {
+		ixa->ixa_postfragfn = ire->ire_postfragfn;
+		ixa->ixa_flags &= ~IXAF_MULTIRT_MULTICAST;
+	}
+	if (!(ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
+		/* Get an nce to cache. */
+		nce = ire_to_nce(ire, NULL, firsthop);
+		if (nce == NULL) {
+			/* Allocation failure? */
+			ixa->ixa_ire_generation = IRE_GENERATION_VERIFY;
 		} else {
-			/*
-			 * Pick a source address so that a proper inbound load
-			 * spreading would happen. Use dst_ill specified by the
-			 * app. when socket option or scopeid is set.
-			 */
-			int  err;
-
-			if (ipp != NULL && ipp->ipp_ifindex != 0) {
-				uint_t	if_index;
-
-				/*
-				 * Scope id or IPV6_PKTINFO
-				 */
-
-				if_index = ipp->ipp_ifindex;
-				dst_ill = ill_lookup_on_ifindex(
-				    if_index, B_TRUE, NULL, NULL, NULL, NULL,
-				    ipst);
-				if (dst_ill == NULL) {
-					ip1dbg(("ip_bind_connected_v6:"
-					    " bad ifindex %d\n", if_index));
-					error = EADDRNOTAVAIL;
-					goto bad_addr;
-				}
-				ill_held = B_TRUE;
-			} else if (connp->conn_outgoing_ill != NULL) {
-				/*
-				 * For IPV6_BOUND_IF socket option,
-				 * conn_outgoing_ill should be set
-				 * already in TCP or UDP/ICMP.
-				 */
-				dst_ill = conn_get_held_ill(connp,
-				    &connp->conn_outgoing_ill, &err);
-				if (err == ILL_LOOKUP_FAILED) {
-					ip1dbg(("ip_bind_connected_v6:"
-					    "no ill for bound_if\n"));
-					error = EADDRNOTAVAIL;
-					goto bad_addr;
-				}
-				ill_held = B_TRUE;
-			} else if (dst_ire->ire_stq != NULL) {
-				/* No need to hold ill here */
-				dst_ill = (ill_t *)dst_ire->ire_stq->q_ptr;
-			} else {
-				/* No need to hold ill here */
-				dst_ill = dst_ire->ire_ipif->ipif_ill;
-			}
-			if (ip6_asp_can_lookup(ipst)) {
-				src_ipif = ipif_select_source_v6(dst_ill,
-				    v6dst, B_FALSE, connp->conn_src_preferences,
-				    zoneid);
-				ip6_asp_table_refrele(ipst);
-				if (src_ipif == NULL) {
-					pr_addr_dbg("ip_bind_connected_v6: "
-					    "no usable source address for "
-					    "connection to %s\n",
-					    AF_INET6, v6dst);
-					error = EADDRNOTAVAIL;
-					goto bad_addr;
-				}
-				*v6src = src_ipif->ipif_v6lcl_addr;
-			} else {
-				error = EADDRNOTAVAIL;
-				goto bad_addr;
-			}
+			if (ixa->ixa_nce != NULL)
+				nce_refrele(ixa->ixa_nce);
+			ixa->ixa_nce = nce;
 		}
 	}
 
 	/*
-	 * We do ire_route_lookup_v6() here (and not an interface lookup)
-	 * as we assert that v6src should only come from an
-	 * UP interface for hard binding.
+	 * We use use ire_nexthop_ill to avoid the under ipmp
+	 * interface for source address selection. Note that for ipmp
+	 * probe packets, ixa_ifindex would have been specified, and
+	 * the ip_select_route() invocation would have picked an ire
+	 * will ire_ill pointing at an under interface.
 	 */
-	src_ire = ire_route_lookup_v6(v6src, 0, 0, 0, NULL,
-	    NULL, zoneid, NULL, MATCH_IRE_ZONEONLY, ipst);
-
-	/* src_ire must be a local|loopback */
-	if (!IRE_IS_LOCAL(src_ire)) {
-		if (ip_debug > 2) {
-			/* ip1dbg */
-			pr_addr_dbg("ip_bind_connected_v6: bad "
-			    "connected src %s\n", AF_INET6, v6src);
-		}
-		error = EADDRNOTAVAIL;
-		goto bad_addr;
-	}
+	ill = ire_nexthop_ill(ire);
 
 	/*
 	 * If the source address is a loopback address, the
 	 * destination had best be local or multicast.
-	 * The transports that can't handle multicast will reject
-	 * those addresses.
+	 * If we are sending to an IRE_LOCAL using a loopback source then
+	 * it had better be the same zoneid.
 	 */
-	if (src_ire->ire_type == IRE_LOOPBACK &&
-	    !(IRE_IS_LOCAL(dst_ire) || IN6_IS_ADDR_MULTICAST(v6dst) ||
-	    IN6_IS_ADDR_V4MAPPED_CLASSD(v6dst))) {
-		ip1dbg(("ip_bind_connected_v6: bad connected loopback\n"));
-		error = -1;
-		goto bad_addr;
-	}
-	/*
-	 * Allow setting new policies. For example, disconnects come
-	 * down as ipa_t bind. As we would have set conn_policy_cached
-	 * to B_TRUE before, we should set it to B_FALSE, so that policy
-	 * can change after the disconnect.
-	 */
-	connp->conn_policy_cached = B_FALSE;
-
-	/*
-	 * The addresses have been verified. Initialize the conn
-	 * before calling the policy as they expect the conns
-	 * initialized.
-	 */
-	connp->conn_srcv6 = *v6src;
-	connp->conn_remv6 = *v6dst;
-	connp->conn_lport = lport;
-	connp->conn_fport = fport;
-
-	ASSERT(!(ipsec_policy_set && ire_requested));
-	if (ire_requested) {
-		iulp_t *ulp_info = NULL;
-
-		/*
-		 * Note that sire will not be NULL if this is an off-link
-		 * connection and there is not cache for that dest yet.
-		 *
-		 * XXX Because of an existing bug, if there are multiple
-		 * default routes, the IRE returned now may not be the actual
-		 * default route used (default routes are chosen in a
-		 * round robin fashion).  So if the metrics for different
-		 * default routes are different, we may return the wrong
-		 * metrics.  This will not be a problem if the existing
-		 * bug is fixed.
-		 */
-		if (sire != NULL)
-			ulp_info = &(sire->ire_uinfo);
-
-		if (!ip_bind_get_ire_v6(mpp, dst_ire, v6dst, ulp_info,
-		    ipst)) {
-			error = -1;
+	if (IN6_IS_ADDR_LOOPBACK(src_addrp)) {
+		if ((ire->ire_type & IRE_LOCAL) && ire->ire_zoneid != zoneid) {
+			ire = NULL;	/* Stored in ixa_ire */
+			error = EADDRNOTAVAIL;
 			goto bad_addr;
 		}
-	} else if (ipsec_policy_set) {
-		if (!ip_bind_ipsec_policy_set(connp, mp)) {
-			error = -1;
+		if (!(ire->ire_type & (IRE_LOOPBACK|IRE_LOCAL|IRE_MULTICAST))) {
+			ire = NULL;	/* Stored in ixa_ire */
+			error = EADDRNOTAVAIL;
 			goto bad_addr;
 		}
 	}
 
 	/*
-	 * Cache IPsec policy in this conn.  If we have per-socket policy,
-	 * we'll cache that.  If we don't, we'll inherit global policy.
-	 *
-	 * We can't insert until the conn reflects the policy. Note that
-	 * conn_policy_cached is set by ipsec_conn_cache_policy() even for
-	 * connections where we don't have a policy. This is to prevent
-	 * global policy lookups in the inbound path.
-	 *
-	 * If we insert before we set conn_policy_cached,
-	 * CONN_INBOUND_POLICY_PRESENT_V6() check can still evaluate true
-	 * because global policy cound be non-empty. We normally call
-	 * ipsec_check_policy() for conn_policy_cached connections only if
-	 * conn_in_enforce_policy is set. But in this case,
-	 * conn_policy_cached can get set anytime since we made the
-	 * CONN_INBOUND_POLICY_PRESENT_V6() check and ipsec_check_policy()
-	 * is called, which will make the above assumption false.  Thus, we
-	 * need to insert after we set conn_policy_cached.
+	 * Does the caller want us to pick a source address?
 	 */
-	if ((error = ipsec_conn_cache_policy(connp, B_FALSE)) != 0)
-		goto bad_addr;
+	if (flags & IPDF_SELECT_SRC) {
+		in6_addr_t	src_addr;
 
-	/* If not fanout_insert this was just an address verification */
-	if (fanout_insert) {
-		/*
-		 * The addresses have been verified. Time to insert in
-		 * the correct fanout list.
-		 */
-		error = ipcl_conn_insert_v6(connp, protocol, v6src, v6dst,
-		    connp->conn_ports,
-		    IPCL_IS_TCP(connp) ? connp->conn_tcp->tcp_bound_if : 0);
-	}
-	if (error == 0) {
-		connp->conn_fully_bound = B_TRUE;
-		/*
-		 * Our initial checks for MDT have passed; the IRE is not
-		 * LOCAL/LOOPBACK/BROADCAST, and the link layer seems to
-		 * be supporting MDT.  Pass the IRE, IPC and ILL into
-		 * ip_mdinfo_return(), which performs further checks
-		 * against them and upon success, returns the MDT info
-		 * mblk which we will attach to the bind acknowledgment.
-		 */
-		if (md_dst_ire != NULL) {
-			mblk_t *mdinfo_mp;
-
-			ASSERT(md_ill != NULL);
-			ASSERT(md_ill->ill_mdt_capab != NULL);
-			if ((mdinfo_mp = ip_mdinfo_return(md_dst_ire, connp,
-			    md_ill->ill_name, md_ill->ill_mdt_capab)) != NULL) {
-				if (mp == NULL) {
-					*mpp = mdinfo_mp;
-				} else {
-					linkb(mp, mdinfo_mp);
-				}
+		/* If unreachable we have no ill but need some source */
+		if (ill == NULL) {
+			src_addr = ipv6_loopback;
+			/* Make sure we look for a better source address */
+			generation = SRC_GENERATION_VERIFY;
+		} else {
+			error = ip_select_source_v6(ill, &setsrc, dst_addr,
+			    zoneid, ipst, B_FALSE, ixa->ixa_src_preferences,
+			    &src_addr, &generation, NULL);
+			if (error != 0) {
+				ire = NULL;	/* Stored in ixa_ire */
+				goto bad_addr;
 			}
 		}
-	}
-bad_addr:
-	if (ipsec_policy_set) {
-		ASSERT(mp != NULL);
-		freeb(mp);
+
 		/*
-		 * As of now assume that nothing else accompanies
-		 * IPSEC_POLICY_SET.
+		 * We allow the source address to to down.
+		 * However, we check that we don't use the loopback address
+		 * as a source when sending out on the wire.
 		 */
-		*mpp = NULL;
+		if (IN6_IS_ADDR_LOOPBACK(&src_addr) &&
+		    !(ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK|IRE_MULTICAST)) &&
+		    !(ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
+			ire = NULL;	/* Stored in ixa_ire */
+			error = EADDRNOTAVAIL;
+			goto bad_addr;
+		}
+
+		*src_addrp = src_addr;
+		ixa->ixa_src_generation = generation;
 	}
-refrele_and_quit:
-	if (src_ire != NULL)
-		IRE_REFRELE(src_ire);
-	if (dst_ire != NULL)
-		IRE_REFRELE(dst_ire);
-	if (sire != NULL)
-		IRE_REFRELE(sire);
-	if (src_ipif != NULL)
-		ipif_refrele(src_ipif);
-	if (md_dst_ire != NULL)
-		IRE_REFRELE(md_dst_ire);
-	if (ill_held && dst_ill != NULL)
-		ill_refrele(dst_ill);
-	if (effective_cred != NULL)
-		crfree(effective_cred);
-	return (error);
-}
-
-/* ARGSUSED */
-int
-ip_proto_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
-    in6_addr_t *v6srcp, uint16_t lport, const in6_addr_t *v6dstp,
-    ip6_pkt_t *ipp, uint16_t fport, boolean_t fanout_insert,
-    boolean_t verify_dst, cred_t *cr)
-{
-	int error = 0;
-	boolean_t orig_pkt_isv6 = connp->conn_pkt_isv6;
-	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
-
-	ASSERT(connp->conn_af_isv6);
-	connp->conn_ulp = protocol;
-
-	/* For raw socket, the local port is not set. */
-	lport = lport != 0 ? lport : connp->conn_lport;
 
 	/*
-	 * Bind to local and remote address. Local might be
-	 * unspecified in which case it will be extracted from
-	 * ire_src_addr_v6
+	 * Make sure we don't leave an unreachable ixa_nce in place
+	 * since ip_select_route is used when we unplumb i.e., remove
+	 * references on ixa_ire, ixa_nce, and ixa_dce.
 	 */
-	if (IN6_IS_ADDR_V4MAPPED(v6dstp) && !connp->conn_ipv6_v6only) {
-		/* Connect to IPv4 address */
-		ipaddr_t v4src;
-		ipaddr_t v4dst;
-
-		/* Is the source unspecified or mapped? */
-		if (!IN6_IS_ADDR_V4MAPPED(v6srcp) &&
-		    !IN6_IS_ADDR_UNSPECIFIED(v6srcp)) {
-			ip1dbg(("ip_proto_bind_connected_v6: "
-			    "dst is mapped, but not the src\n"));
-			goto bad_addr;
-		}
-		IN6_V4MAPPED_TO_IPADDR(v6srcp, v4src);
-		IN6_V4MAPPED_TO_IPADDR(v6dstp, v4dst);
-
-		/* Always verify destination reachability. */
-		error = ip_bind_connected_v4(connp, mpp, protocol, &v4src,
-		    lport, v4dst, fport, B_TRUE, B_TRUE, cr);
-		if (error != 0)
-			goto bad_addr;
-		IN6_IPADDR_TO_V4MAPPED(v4src, v6srcp);
-		connp->conn_pkt_isv6 = B_FALSE;
-	} else if (IN6_IS_ADDR_V4MAPPED(v6srcp)) {
-		ip1dbg(("ip_proto_bind_connected_v6: "
-		    "src is mapped, but not the dst\n"));
-		goto bad_addr;
-	} else {
-		error = ip_bind_connected_v6(connp, mpp, protocol, v6srcp,
-		    lport, v6dstp, ipp, fport, B_TRUE, verify_dst, cr);
-		if (error != 0)
-			goto bad_addr;
-		connp->conn_pkt_isv6 = B_TRUE;
+	nce = ixa->ixa_nce;
+	if (nce != NULL && nce->nce_is_condemned) {
+		nce_refrele(nce);
+		ixa->ixa_nce = NULL;
+		ixa->ixa_ire_generation = IRE_GENERATION_VERIFY;
 	}
 
-	if (orig_pkt_isv6 != connp->conn_pkt_isv6)
-		ip_setpktversion(connp, connp->conn_pkt_isv6, B_TRUE, ipst);
 
-	/* Send it home. */
-	return (0);
+	ifindex = 0;
+	if (IN6_IS_ADDR_LINKSCOPE(dst_addr)) {
+		/* If we are creating a DCE we'd better have an ifindex */
+		if (ill != NULL)
+			ifindex = ill->ill_phyint->phyint_ifindex;
+		else
+			flags &= ~IPDF_UNIQUE_DCE;
+	}
+
+	if (flags & IPDF_UNIQUE_DCE) {
+		/* Fallback to the default dce if allocation fails */
+		dce = dce_lookup_and_add_v6(dst_addr, ifindex, ipst);
+		if (dce != NULL) {
+			generation = dce->dce_generation;
+		} else {
+			dce = dce_lookup_v6(dst_addr, ifindex, ipst,
+			    &generation);
+		}
+	} else {
+		dce = dce_lookup_v6(dst_addr, ifindex, ipst, &generation);
+	}
+	ASSERT(dce != NULL);
+	if (ixa->ixa_dce != NULL)
+		dce_refrele_notr(ixa->ixa_dce);
+#ifdef DEBUG
+	dce_refhold_notr(dce);
+	dce_refrele(dce);
+#endif
+	ixa->ixa_dce = dce;
+	ixa->ixa_dce_generation = generation;
+
+	/*
+	 * Note that IPv6 multicast supports PMTU discovery unlike IPv4
+	 * multicast. But pmtu discovery is only enabled for connected
+	 * sockets in general.
+	 */
+
+	/*
+	 * Set initial value for fragmentation limit.  Either conn_ip_output
+	 * or ULP might updates it when there are routing changes.
+	 * Handles a NULL ixa_ire->ire_ill or a NULL ixa_nce for RTF_REJECT.
+	 */
+	pmtu = ip_get_pmtu(ixa);
+	ixa->ixa_fragsize = pmtu;
+	/* Make sure ixa_fragsize and ixa_pmtu remain identical */
+	if (ixa->ixa_flags & IXAF_VERIFY_PMTU)
+		ixa->ixa_pmtu = pmtu;
+
+	/*
+	 * Extract information useful for some transports.
+	 * First we look for DCE metrics. Then we take what we have in
+	 * the metrics in the route, where the offlink is used if we have
+	 * one.
+	 */
+	if (uinfo != NULL) {
+		bzero(uinfo, sizeof (*uinfo));
+
+		if (dce->dce_flags & DCEF_UINFO)
+			*uinfo = dce->dce_uinfo;
+
+		rts_merge_metrics(uinfo, &ire->ire_metrics);
+
+		/* Allow ire_metrics to decrease the path MTU from above */
+		if (uinfo->iulp_mtu == 0 || uinfo->iulp_mtu > pmtu)
+			uinfo->iulp_mtu = pmtu;
+
+		uinfo->iulp_localnet = (ire->ire_type & IRE_ONLINK) != 0;
+		uinfo->iulp_loopback = (ire->ire_type & IRE_LOOPBACK) != 0;
+		uinfo->iulp_local = (ire->ire_type & IRE_LOCAL) != 0;
+	}
+
+	if (ill != NULL)
+		ill_refrele(ill);
+
+	return (error);
 
 bad_addr:
-	if (error == 0)
-		error = -TBADADDR;
+	if (ire != NULL)
+		ire_refrele(ire);
+
+	if (ill != NULL)
+		ill_refrele(ill);
+
+	/*
+	 * Make sure we don't leave an unreachable ixa_nce in place
+	 * since ip_select_route is used when we unplumb i.e., remove
+	 * references on ixa_ire, ixa_nce, and ixa_dce.
+	 */
+	nce = ixa->ixa_nce;
+	if (nce != NULL && nce->nce_is_condemned) {
+		nce_refrele(nce);
+		ixa->ixa_nce = NULL;
+		ixa->ixa_ire_generation = IRE_GENERATION_VERIFY;
+	}
+
 	return (error);
-}
-
-/*
- * Get the ire in *mpp. Returns false if it fails (due to lack of space).
- * Makes the IRE be IRE_BROADCAST if dst is a multicast address.
- */
-/* ARGSUSED4 */
-static boolean_t
-ip_bind_get_ire_v6(mblk_t **mpp, ire_t *ire, const in6_addr_t *dst,
-    iulp_t *ulp_info, ip_stack_t *ipst)
-{
-	mblk_t	*mp = *mpp;
-	ire_t	*ret_ire;
-
-	ASSERT(mp != NULL);
-
-	if (ire != NULL) {
-		/*
-		 * mp initialized above to IRE_DB_REQ_TYPE
-		 * appended mblk. Its <upper protocol>'s
-		 * job to make sure there is room.
-		 */
-		if ((mp->b_datap->db_lim - mp->b_rptr) < sizeof (ire_t))
-			return (B_FALSE);
-
-		mp->b_datap->db_type = IRE_DB_TYPE;
-		mp->b_wptr = mp->b_rptr + sizeof (ire_t);
-		bcopy(ire, mp->b_rptr, sizeof (ire_t));
-		ret_ire = (ire_t *)mp->b_rptr;
-		if (IN6_IS_ADDR_MULTICAST(dst) ||
-		    IN6_IS_ADDR_V4MAPPED_CLASSD(dst)) {
-			ret_ire->ire_type = IRE_BROADCAST;
-			ret_ire->ire_addr_v6 = *dst;
-		}
-		if (ulp_info != NULL) {
-			bcopy(ulp_info, &(ret_ire->ire_uinfo),
-			    sizeof (iulp_t));
-		}
-		ret_ire->ire_mp = mp;
-	} else {
-		/*
-		 * No IRE was found. Remove IRE mblk.
-		 */
-		*mpp = mp->b_cont;
-		freeb(mp);
-	}
-	return (B_TRUE);
-}
-
-/*
- * Add an ip6i_t header to the front of the mblk.
- * Inline if possible else allocate a separate mblk containing only the ip6i_t.
- * Returns NULL if allocation fails (and frees original message).
- * Used in outgoing path when going through ip_newroute_*v6().
- * Used in incoming path to pass ifindex to transports.
- */
-mblk_t *
-ip_add_info_v6(mblk_t *mp, ill_t *ill, const in6_addr_t *dst)
-{
-	mblk_t *mp1;
-	ip6i_t *ip6i;
-	ip6_t *ip6h;
-
-	ip6h = (ip6_t *)mp->b_rptr;
-	ip6i = (ip6i_t *)(mp->b_rptr - sizeof (ip6i_t));
-	if ((uchar_t *)ip6i < mp->b_datap->db_base ||
-	    mp->b_datap->db_ref > 1) {
-		mp1 = allocb(sizeof (ip6i_t), BPRI_MED);
-		if (mp1 == NULL) {
-			freemsg(mp);
-			return (NULL);
-		}
-		mp1->b_wptr = mp1->b_rptr = mp1->b_datap->db_lim;
-		mp1->b_cont = mp;
-		mp = mp1;
-		ip6i = (ip6i_t *)(mp->b_rptr - sizeof (ip6i_t));
-	}
-	mp->b_rptr = (uchar_t *)ip6i;
-	ip6i->ip6i_vcf = ip6h->ip6_vcf;
-	ip6i->ip6i_nxt = IPPROTO_RAW;
-	if (ill != NULL) {
-		ip6i->ip6i_flags = IP6I_IFINDEX;
-		/*
-		 * If `ill' is in an IPMP group, make sure we use the IPMP
-		 * interface index so that e.g. IPV6_RECVPKTINFO will get the
-		 * IPMP interface index and not an underlying interface index.
-		 */
-		if (IS_UNDER_IPMP(ill))
-			ip6i->ip6i_ifindex = ipmp_ill_get_ipmp_ifindex(ill);
-		else
-			ip6i->ip6i_ifindex = ill->ill_phyint->phyint_ifindex;
-	} else {
-		ip6i->ip6i_flags = 0;
-	}
-	ip6i->ip6i_nexthop = *dst;
-	return (mp);
 }
 
 /*
@@ -3051,53 +2280,29 @@ ip_add_info_v6(mblk_t *mp, ill_t *ill, const in6_addr_t *dst)
  * of any incoming packets.
  *
  * Zones notes:
- * Packets will be distributed to streams in all zones. This is really only
+ * Packets will be distributed to conns in all zones. This is really only
  * useful for ICMPv6 as only applications in the global zone can create raw
  * sockets for other protocols.
  */
-static void
-ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
-    ill_t *inill, uint8_t nexthdr, uint_t nexthdr_offset, uint_t flags,
-    boolean_t mctl_present, zoneid_t zoneid)
+void
+ip_fanout_proto_v6(mblk_t *mp, ip6_t *ip6h, ip_recv_attr_t *ira)
 {
-	queue_t	*rq;
-	mblk_t	*mp1, *first_mp1;
-	in6_addr_t dst = ip6h->ip6_dst;
-	in6_addr_t src = ip6h->ip6_src;
-	mblk_t *first_mp = mp;
-	boolean_t secure, shared_addr;
-	conn_t	*connp, *first_connp, *next_connp;
-	connf_t *connfp;
-	ip_stack_t	*ipst = inill->ill_ipst;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	mblk_t		*mp1;
+	in6_addr_t	laddr = ip6h->ip6_dst;
+	conn_t		*connp, *first_connp, *next_connp;
+	connf_t		*connfp;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		secure = ipsec_in_is_secure(first_mp);
-		ASSERT(mp != NULL);
-	} else {
-		secure = B_FALSE;
-	}
-
-	shared_addr = (zoneid == ALL_ZONES);
-	if (shared_addr) {
-		/*
-		 * We don't allow multilevel ports for raw IP, so no need to
-		 * check for that here.
-		 */
-		zoneid = tsol_packet_to_zoneid(mp);
-	}
-
-	connfp = &ipst->ips_ipcl_proto_fanout_v6[nexthdr];
+	connfp = &ipst->ips_ipcl_proto_fanout_v6[ira->ira_protocol];
 	mutex_enter(&connfp->connf_lock);
 	connp = connfp->connf_head;
 	for (connp = connfp->connf_head; connp != NULL;
 	    connp = connp->conn_next) {
-		if (IPCL_PROTO_MATCH_V6(connp, nexthdr, ip6h, ill, flags,
-		    zoneid) &&
-		    (!is_system_labeled() ||
-		    tsol_receive_local(mp, &dst, IPV6_VERSION, shared_addr,
-		    connp)))
+		/* Note: IPCL_PROTO_MATCH_V6 includes conn_wantpacket */
+		if (IPCL_PROTO_MATCH_V6(connp, ira, ip6h) &&
+		    (!(ira->ira_flags & IRAF_SYSTEM_LABELED) ||
+		    tsol_receive_local(mp, &laddr, IPV6_VERSION, ira, connp)))
 			break;
 	}
 
@@ -3108,96 +2313,52 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 		 * unclaimed datagrams?
 		 */
 		mutex_exit(&connfp->connf_lock);
-		if (ip_fanout_send_icmp_v6(q, first_mp, flags,
-		    ICMP6_PARAM_PROB, ICMP6_PARAMPROB_NEXTHEADER,
-		    nexthdr_offset, mctl_present, zoneid, ipst)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInUnknownProtos);
-		}
-
+		ip_fanout_send_icmp_v6(mp, ICMP6_PARAM_PROB,
+		    ICMP6_PARAMPROB_NEXTHEADER, ira);
 		return;
 	}
 
-	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
+	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_rq != NULL);
 
 	CONN_INC_REF(connp);
 	first_connp = connp;
 
 	/*
 	 * XXX: Fix the multiple protocol listeners case. We should not
-	 * be walking the conn->next list here.
+	 * be walking the conn->conn_next list here.
 	 */
 	connp = connp->conn_next;
 	for (;;) {
 		while (connp != NULL) {
-			if (IPCL_PROTO_MATCH_V6(connp, nexthdr, ip6h, ill,
-			    flags, zoneid) &&
-			    (!is_system_labeled() ||
-			    tsol_receive_local(mp, &dst, IPV6_VERSION,
-			    shared_addr, connp)))
+			/* Note: IPCL_PROTO_MATCH_V6 includes conn_wantpacket */
+			if (IPCL_PROTO_MATCH_V6(connp, ira, ip6h) &&
+			    (!(ira->ira_flags & IRAF_SYSTEM_LABELED) ||
+			    tsol_receive_local(mp, &laddr, IPV6_VERSION,
+			    ira, connp)))
 				break;
 			connp = connp->conn_next;
 		}
 
-		/*
-		 * Just copy the data part alone. The mctl part is
-		 * needed just for verifying policy and it is never
-		 * sent up.
-		 */
-		if (connp == NULL ||
-		    (((first_mp1 = dupmsg(first_mp)) == NULL) &&
-		    ((first_mp1 = ip_copymsg(first_mp)) == NULL))) {
-			/*
-			 * No more intested clients or memory
-			 * allocation failed
-			 */
+		if (connp == NULL) {
+			/* No more interested clients */
 			connp = first_connp;
 			break;
 		}
-		ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_rq != NULL);
-		mp1 = mctl_present ? first_mp1->b_cont : first_mp1;
+		if (((mp1 = dupmsg(mp)) == NULL) &&
+		    ((mp1 = copymsg(mp)) == NULL)) {
+			/* Memory allocation failed */
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
+			connp = first_connp;
+			break;
+		}
+
 		CONN_INC_REF(connp);
 		mutex_exit(&connfp->connf_lock);
-		rq = connp->conn_rq;
-		/*
-		 * For link-local always add ifindex so that transport can set
-		 * sin6_scope_id. Avoid it for ICMP error fanout.
-		 */
-		if ((connp->conn_ip_recvpktinfo ||
-		    IN6_IS_ADDR_LINKLOCAL(&src)) &&
-		    (flags & IP_FF_IPINFO)) {
-			/* Add header */
-			mp1 = ip_add_info_v6(mp1, inill, &dst);
-		}
-		if (mp1 == NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-		} else if (
-		    (IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
-		    (!IPCL_IS_NONSTR(connp) && !canputnext(rq))) {
-			if (flags & IP_FF_RAWIP) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    rawipIfStatsInOverflows);
-			} else {
-				BUMP_MIB(ill->ill_icmp6_mib,
-				    ipv6IfIcmpInOverflows);
-			}
 
-			freemsg(mp1);
-		} else {
-			ASSERT(!IPCL_IS_IPTUN(connp));
+		ip_fanout_proto_conn(connp, mp1, NULL, (ip6_t *)mp1->b_rptr,
+		    ira);
 
-			if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) ||
-			    secure) {
-				first_mp1 = ipsec_check_inbound_policy(
-				    first_mp1, connp, NULL, ip6h, mctl_present);
-			}
-			if (first_mp1 != NULL) {
-				if (mctl_present)
-					freeb(first_mp1);
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsHCInDelivers);
-				(connp->conn_recv)(connp, mp1, NULL);
-			}
-		}
 		mutex_enter(&connfp->connf_lock);
 		/* Follow the next pointer before releasing the conn. */
 		next_connp = connp->conn_next;
@@ -3208,105 +2369,33 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 	/* Last one.  Send it upstream. */
 	mutex_exit(&connfp->connf_lock);
 
-	/* Initiate IPPF processing */
-	if (IP6_IN_IPP(flags, ipst)) {
-		uint_t ifindex;
+	ip_fanout_proto_conn(connp, mp, NULL, ip6h, ira);
 
-		mutex_enter(&ill->ill_lock);
-		ifindex = ill->ill_phyint->phyint_ifindex;
-		mutex_exit(&ill->ill_lock);
-		ip_process(IPP_LOCAL_IN, &mp, ifindex);
-		if (mp == NULL) {
-			CONN_DEC_REF(connp);
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		}
-	}
-
-	/*
-	 * For link-local always add ifindex so that transport can set
-	 * sin6_scope_id. Avoid it for ICMP error fanout.
-	 */
-	if ((connp->conn_ip_recvpktinfo || IN6_IS_ADDR_LINKLOCAL(&src)) &&
-	    (flags & IP_FF_IPINFO)) {
-		/* Add header */
-		mp = ip_add_info_v6(mp, inill, &dst);
-		if (mp == NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			CONN_DEC_REF(connp);
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		} else if (mctl_present) {
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
-		}
-	}
-
-	rq = connp->conn_rq;
-	if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
-	    (!IPCL_IS_NONSTR(connp) && !canputnext(rq))) {
-
-		if (flags & IP_FF_RAWIP) {
-			BUMP_MIB(ill->ill_ip_mib, rawipIfStatsInOverflows);
-		} else {
-			BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInOverflows);
-		}
-
-		freemsg(first_mp);
-	} else {
-		ASSERT(!IPCL_IS_IPTUN(connp));
-
-		if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || secure) {
-			first_mp = ipsec_check_inbound_policy(first_mp, connp,
-			    NULL, ip6h, mctl_present);
-			if (first_mp == NULL) {
-				CONN_DEC_REF(connp);
-				return;
-			}
-		}
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		(connp->conn_recv)(connp, mp, NULL);
-		if (mctl_present)
-			freeb(first_mp);
-	}
 	CONN_DEC_REF(connp);
 }
 
 /*
- * Send an ICMP error after patching up the packet appropriately.  Returns
- * non-zero if the appropriate MIB should be bumped; zero otherwise.
+ * Called when it is conceptually a ULP that would sent the packet
+ * e.g., port unreachable and nexthdr unknown. Check that the packet
+ * would have passed the IPsec global policy before sending the error.
+ *
+ * Send an ICMP error after patching up the packet appropriately.
+ * Uses ip_drop_input and bumps the appropriate MIB.
+ * For ICMP6_PARAMPROB_NEXTHEADER we determine the offset to use.
  */
-int
-ip_fanout_send_icmp_v6(queue_t *q, mblk_t *mp, uint_t flags,
-    uint_t icmp_type, uint8_t icmp_code, uint_t nexthdr_offset,
-    boolean_t mctl_present, zoneid_t zoneid, ip_stack_t *ipst)
+void
+ip_fanout_send_icmp_v6(mblk_t *mp, uint_t icmp_type, uint8_t icmp_code,
+    ip_recv_attr_t *ira)
 {
-	ip6_t *ip6h;
-	mblk_t *first_mp;
-	boolean_t secure;
-	unsigned char db_type;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	ip6_t		*ip6h;
+	boolean_t	secure;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	netstack_t	*ns = ipst->ips_netstack;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	first_mp = mp;
-	if (mctl_present) {
-		mp = mp->b_cont;
-		secure = ipsec_in_is_secure(first_mp);
-		ASSERT(mp != NULL);
-	} else {
-		/*
-		 * If this is an ICMP error being reported - which goes
-		 * up as M_CTLs, we need to convert them to M_DATA till
-		 * we finish checking with global policy because
-		 * ipsec_check_global_policy() assumes M_DATA as clear
-		 * and M_CTL as secure.
-		 */
-		db_type = mp->b_datap->db_type;
-		mp->b_datap->db_type = M_DATA;
-		secure = B_FALSE;
-	}
+	secure = ira->ira_flags & IRAF_IPSEC_SECURE;
+
 	/*
 	 * We are generating an icmp error for some inbound packet.
 	 * Called from all ip_fanout_(udp, tcp, proto) functions.
@@ -3316,572 +2405,155 @@ ip_fanout_send_icmp_v6(queue_t *q, mblk_t *mp, uint_t flags,
 	 */
 	ip6h = (ip6_t *)mp->b_rptr;
 	if (secure || ipss->ipsec_inbound_v6_policy_present) {
-		first_mp = ipsec_check_global_policy(first_mp, NULL,
-		    NULL, ip6h, mctl_present, ipst->ips_netstack);
-		if (first_mp == NULL)
-			return (0);
+		mp = ipsec_check_global_policy(mp, NULL, NULL, ip6h, ira, ns);
+		if (mp == NULL)
+			return;
 	}
 
-	if (!mctl_present)
-		mp->b_datap->db_type = db_type;
+	/* We never send errors for protocols that we do implement */
+	if (ira->ira_protocol == IPPROTO_ICMPV6) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ip_fanout_send_icmp_v6", mp, ill);
+		freemsg(mp);
+		return;
+	}
 
-	if (flags & IP_FF_SEND_ICMP) {
-		if (flags & IP_FF_HDR_COMPLETE) {
-			if (ip_hdr_complete_v6(ip6h, zoneid, ipst)) {
-				freemsg(first_mp);
-				return (1);
-			}
-		}
-		switch (icmp_type) {
-		case ICMP6_DST_UNREACH:
-			icmp_unreachable_v6(WR(q), first_mp, icmp_code,
-			    B_FALSE, B_FALSE, zoneid, ipst);
-			break;
-		case ICMP6_PARAM_PROB:
-			icmp_param_problem_v6(WR(q), first_mp, icmp_code,
-			    nexthdr_offset, B_FALSE, B_FALSE, zoneid, ipst);
-			break;
-		default:
+	switch (icmp_type) {
+	case ICMP6_DST_UNREACH:
+		ASSERT(icmp_code == ICMP6_DST_UNREACH_NOPORT);
+
+		BUMP_MIB(ill->ill_ip_mib, udpIfStatsNoPorts);
+		ip_drop_input("ipIfStatsNoPorts", mp, ill);
+
+		icmp_unreachable_v6(mp, icmp_code, B_FALSE, ira);
+		break;
+	case ICMP6_PARAM_PROB:
+		ASSERT(icmp_code == ICMP6_PARAMPROB_NEXTHEADER);
+
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInUnknownProtos);
+		ip_drop_input("ipIfStatsInUnknownProtos", mp, ill);
+
+		/* Let the system determine the offset for this one */
+		icmp_param_problem_nexthdr_v6(mp, B_FALSE, ira);
+		break;
+	default:
 #ifdef DEBUG
-			panic("ip_fanout_send_icmp_v6: wrong type");
-			/*NOTREACHED*/
+		panic("ip_fanout_send_icmp_v6: wrong type");
+		/*NOTREACHED*/
 #else
-			freemsg(first_mp);
-			break;
+		freemsg(mp);
+		break;
 #endif
-		}
-	} else {
-		freemsg(first_mp);
-		return (0);
-	}
-
-	return (1);
-}
-
-/*
- * Fanout for TCP packets
- * The caller puts <fport, lport> in the ports parameter.
- */
-static void
-ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
-    uint_t flags, uint_t hdr_len, boolean_t mctl_present, zoneid_t zoneid)
-{
-	mblk_t  	*first_mp;
-	boolean_t 	secure;
-	conn_t		*connp;
-	tcph_t		*tcph;
-	boolean_t	syn_present = B_FALSE;
-	ip_stack_t	*ipst = inill->ill_ipst;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
-
-	first_mp = mp;
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		secure = ipsec_in_is_secure(first_mp);
-		ASSERT(mp != NULL);
-	} else {
-		secure = B_FALSE;
-	}
-
-	connp = ipcl_classify_v6(mp, IPPROTO_TCP, hdr_len, zoneid, ipst);
-
-	if (connp == NULL ||
-	    !conn_wantpacket_v6(connp, ill, ip6h, flags, zoneid)) {
-		/*
-		 * No hard-bound match. Send Reset.
-		 */
-		dblk_t *dp = mp->b_datap;
-		uint32_t ill_index;
-
-		ASSERT((dp->db_struioflag & STRUIO_IP) == 0);
-
-		/* Initiate IPPf processing, if needed. */
-		if (IPP_ENABLED(IPP_LOCAL_IN, ipst) &&
-		    (flags & IP6_NO_IPPOLICY)) {
-			ill_index = ill->ill_phyint->phyint_ifindex;
-			ip_process(IPP_LOCAL_IN, &first_mp, ill_index);
-			if (first_mp == NULL) {
-				if (connp != NULL)
-					CONN_DEC_REF(connp);
-				return;
-			}
-		}
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		if (connp != NULL) {
-			ip_xmit_reset_serialize(first_mp, hdr_len, zoneid,
-			    ipst->ips_netstack->netstack_tcp, connp);
-			CONN_DEC_REF(connp);
-		} else {
-			tcp_xmit_listeners_reset(first_mp, hdr_len, zoneid,
-			    ipst->ips_netstack->netstack_tcp, NULL);
-		}
-
-		return;
-	}
-
-	tcph = (tcph_t *)&mp->b_rptr[hdr_len];
-	if ((tcph->th_flags[0] & (TH_SYN|TH_ACK|TH_RST|TH_URG)) == TH_SYN) {
-		if (IPCL_IS_TCP(connp)) {
-			squeue_t *sqp;
-
-			/*
-			 * If the queue belongs to a conn, and fused tcp
-			 * loopback is enabled, assign the eager's squeue
-			 * to be that of the active connect's.
-			 */
-			if ((flags & IP_FF_LOOPBACK) && do_tcp_fusion &&
-			    CONN_Q(q) && IPCL_IS_TCP(Q_TO_CONN(q)) &&
-			    !CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) &&
-			    !secure &&
-			    !IP6_IN_IPP(flags, ipst)) {
-				ASSERT(Q_TO_CONN(q)->conn_sqp != NULL);
-				sqp = Q_TO_CONN(q)->conn_sqp;
-			} else {
-				sqp = IP_SQUEUE_GET(lbolt);
-			}
-
-			mp->b_datap->db_struioflag |= STRUIO_EAGER;
-			DB_CKSUMSTART(mp) = (intptr_t)sqp;
-
-			/*
-			 * db_cksumstuff is unused in the incoming
-			 * path; Thus store the ifindex here. It will
-			 * be cleared in tcp_conn_create_v6().
-			 */
-			DB_CKSUMSTUFF(mp) =
-			    (intptr_t)ill->ill_phyint->phyint_ifindex;
-			syn_present = B_TRUE;
-		}
-	}
-
-	if (IPCL_IS_TCP(connp) && IPCL_IS_BOUND(connp) && !syn_present) {
-		uint_t	flags = (unsigned int)tcph->th_flags[0] & 0xFF;
-		if ((flags & TH_RST) || (flags & TH_URG)) {
-			CONN_DEC_REF(connp);
-			freemsg(first_mp);
-			return;
-		}
-		if (flags & TH_ACK) {
-			ip_xmit_reset_serialize(first_mp, hdr_len, zoneid,
-			    ipst->ips_netstack->netstack_tcp, connp);
-			CONN_DEC_REF(connp);
-			return;
-		}
-
-		CONN_DEC_REF(connp);
-		freemsg(first_mp);
-		return;
-	}
-
-	if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) || secure) {
-		first_mp = ipsec_check_inbound_policy(first_mp, connp,
-		    NULL, ip6h, mctl_present);
-		if (first_mp == NULL) {
-			CONN_DEC_REF(connp);
-			return;
-		}
-		if (IPCL_IS_TCP(connp) && IPCL_IS_BOUND(connp)) {
-			ASSERT(syn_present);
-			if (mctl_present) {
-				ASSERT(first_mp != mp);
-				first_mp->b_datap->db_struioflag |=
-				    STRUIO_POLICY;
-			} else {
-				ASSERT(first_mp == mp);
-				mp->b_datap->db_struioflag &=
-				    ~STRUIO_EAGER;
-				mp->b_datap->db_struioflag |=
-				    STRUIO_POLICY;
-			}
-		} else {
-			/*
-			 * Discard first_mp early since we're dealing with a
-			 * fully-connected conn_t and tcp doesn't do policy in
-			 * this case. Also, if someone is bound to IPPROTO_TCP
-			 * over raw IP, they don't expect to see a M_CTL.
-			 */
-			if (mctl_present) {
-				freeb(first_mp);
-				mctl_present = B_FALSE;
-			}
-			first_mp = mp;
-		}
-	}
-
-	/* Initiate IPPF processing */
-	if (IP6_IN_IPP(flags, ipst)) {
-		uint_t	ifindex;
-
-		mutex_enter(&ill->ill_lock);
-		ifindex = ill->ill_phyint->phyint_ifindex;
-		mutex_exit(&ill->ill_lock);
-		ip_process(IPP_LOCAL_IN, &mp, ifindex);
-		if (mp == NULL) {
-			CONN_DEC_REF(connp);
-			if (mctl_present) {
-				freeb(first_mp);
-			}
-			return;
-		} else if (mctl_present) {
-			/*
-			 * ip_add_info_v6 might return a new mp.
-			 */
-			ASSERT(first_mp != mp);
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
-		}
-	}
-
-	/*
-	 * For link-local always add ifindex so that TCP can bind to that
-	 * interface. Avoid it for ICMP error fanout.
-	 */
-	if (!syn_present && ((connp->conn_ip_recvpktinfo ||
-	    IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_src)) &&
-	    (flags & IP_FF_IPINFO))) {
-		/* Add header */
-		mp = ip_add_info_v6(mp, inill, &ip6h->ip6_dst);
-		if (mp == NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			CONN_DEC_REF(connp);
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		} else if (mctl_present) {
-			ASSERT(first_mp != mp);
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
-		}
-	}
-
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-	if (IPCL_IS_TCP(connp)) {
-		SQUEUE_ENTER_ONE(connp->conn_sqp, first_mp, connp->conn_recv,
-		    connp, ip_squeue_flag, SQTAG_IP6_TCP_INPUT);
-	} else {
-		/* SOCK_RAW, IPPROTO_TCP case */
-		(connp->conn_recv)(connp, first_mp, NULL);
-		CONN_DEC_REF(connp);
 	}
 }
 
 /*
+ * Fanout for UDP packets that are multicast or ICMP errors.
+ * (Unicast fanout is handled in ip_input_v6.)
+ *
+ * If SO_REUSEADDR is set all multicast packets
+ * will be delivered to all conns bound to the same port.
+ *
  * Fanout for UDP packets.
  * The caller puts <fport, lport> in the ports parameter.
  * ire_type must be IRE_BROADCAST for multicast and broadcast packets.
  *
  * If SO_REUSEADDR is set all multicast and broadcast packets
- * will be delivered to all streams bound to the same port.
+ * will be delivered to all conns bound to the same port.
  *
  * Zones notes:
- * Multicast packets will be distributed to streams in all zones.
+ * Earlier in ip_input on a system with multiple shared-IP zones we
+ * duplicate the multicast and broadcast packets and send them up
+ * with each explicit zoneid that exists on that ill.
+ * This means that here we can match the zoneid with SO_ALLZONES being special.
  */
-static void
-ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
-    ill_t *ill, ill_t *inill, uint_t flags, boolean_t mctl_present,
-    zoneid_t zoneid)
+void
+ip_fanout_udp_multi_v6(mblk_t *mp, ip6_t *ip6h, uint16_t lport, uint16_t fport,
+    ip_recv_attr_t *ira)
 {
-	uint32_t	dstport, srcport;
-	in6_addr_t	dst;
-	mblk_t		*first_mp;
-	boolean_t	secure;
+	in6_addr_t	laddr;
 	conn_t		*connp;
 	connf_t		*connfp;
-	conn_t		*first_conn;
-	conn_t 		*next_conn;
-	mblk_t		*mp1, *first_mp1;
-	in6_addr_t	src;
-	boolean_t	shared_addr;
-	ip_stack_t	*ipst = inill->ill_ipst;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	in6_addr_t	faddr;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	first_mp = mp;
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		secure = ipsec_in_is_secure(first_mp);
-		ASSERT(mp != NULL);
-	} else {
-		secure = B_FALSE;
-	}
+	ASSERT(ira->ira_flags & (IRAF_MULTIBROADCAST|IRAF_ICMP_ERROR));
 
-	/* Extract ports in net byte order */
-	dstport = htons(ntohl(ports) & 0xFFFF);
-	srcport = htons(ntohl(ports) >> 16);
-	dst = ip6h->ip6_dst;
-	src = ip6h->ip6_src;
-
-	shared_addr = (zoneid == ALL_ZONES);
-	if (shared_addr) {
-		/*
-		 * No need to handle exclusive-stack zones since ALL_ZONES
-		 * only applies to the shared stack.
-		 */
-		zoneid = tsol_mlp_findzone(IPPROTO_UDP, dstport);
-		/*
-		 * If no shared MLP is found, tsol_mlp_findzone returns
-		 * ALL_ZONES.  In that case, we assume it's SLP, and
-		 * search for the zone based on the packet label.
-		 * That will also return ALL_ZONES on failure, but
-		 * we never allow conn_zoneid to be set to ALL_ZONES.
-		 */
-		if (zoneid == ALL_ZONES)
-			zoneid = tsol_packet_to_zoneid(mp);
-	}
+	laddr = ip6h->ip6_dst;
+	faddr = ip6h->ip6_src;
 
 	/* Attempt to find a client stream based on destination port. */
-	connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(dstport, ipst)];
+	connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(lport, ipst)];
 	mutex_enter(&connfp->connf_lock);
 	connp = connfp->connf_head;
-	if (!IN6_IS_ADDR_MULTICAST(&dst)) {
-		/*
-		 * Not multicast. Send to the one (first) client we find.
-		 */
-		while (connp != NULL) {
-			if (IPCL_UDP_MATCH_V6(connp, dstport, dst, srcport,
-			    src) && IPCL_ZONE_MATCH(connp, zoneid) &&
-			    conn_wantpacket_v6(connp, ill, ip6h,
-			    flags, zoneid)) {
-				break;
-			}
-			connp = connp->conn_next;
-		}
-		if (connp == NULL || connp->conn_upq == NULL)
-			goto notfound;
-
-		if (is_system_labeled() &&
-		    !tsol_receive_local(mp, &dst, IPV6_VERSION, shared_addr,
-		    connp))
-			goto notfound;
-
-		/* Found a client */
-		CONN_INC_REF(connp);
-		mutex_exit(&connfp->connf_lock);
-
-		if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
-		    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
-			freemsg(first_mp);
-			CONN_DEC_REF(connp);
-			return;
-		}
-		if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) || secure) {
-			first_mp = ipsec_check_inbound_policy(first_mp,
-			    connp, NULL, ip6h, mctl_present);
-			if (first_mp == NULL) {
-				CONN_DEC_REF(connp);
-				return;
-			}
-		}
-		/* Initiate IPPF processing */
-		if (IP6_IN_IPP(flags, ipst)) {
-			uint_t	ifindex;
-
-			mutex_enter(&ill->ill_lock);
-			ifindex = ill->ill_phyint->phyint_ifindex;
-			mutex_exit(&ill->ill_lock);
-			ip_process(IPP_LOCAL_IN, &mp, ifindex);
-			if (mp == NULL) {
-				CONN_DEC_REF(connp);
-				if (mctl_present)
-					freeb(first_mp);
-				return;
-			}
-		}
-		/*
-		 * For link-local always add ifindex so that
-		 * transport can set sin6_scope_id. Avoid it for
-		 * ICMP error fanout.
-		 */
-		if ((connp->conn_ip_recvpktinfo ||
-		    IN6_IS_ADDR_LINKLOCAL(&src)) &&
-		    (flags & IP_FF_IPINFO)) {
-				/* Add header */
-			mp = ip_add_info_v6(mp, inill, &dst);
-			if (mp == NULL) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				CONN_DEC_REF(connp);
-				if (mctl_present)
-					freeb(first_mp);
-				return;
-			} else if (mctl_present) {
-				first_mp->b_cont = mp;
-			} else {
-				first_mp = mp;
-			}
-		}
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-
-		/* Send it upstream */
-		(connp->conn_recv)(connp, mp, NULL);
-
-		IP6_STAT(ipst, ip6_udp_fannorm);
-		CONN_DEC_REF(connp);
-		if (mctl_present)
-			freeb(first_mp);
-		return;
-	}
-
 	while (connp != NULL) {
-		if ((IPCL_UDP_MATCH_V6(connp, dstport, dst, srcport, src)) &&
-		    conn_wantpacket_v6(connp, ill, ip6h, flags, zoneid) &&
-		    (!is_system_labeled() ||
-		    tsol_receive_local(mp, &dst, IPV6_VERSION, shared_addr,
-		    connp)))
+		if ((IPCL_UDP_MATCH_V6(connp, lport, laddr, fport, faddr)) &&
+		    conn_wantpacket_v6(connp, ira, ip6h) &&
+		    (!(ira->ira_flags & IRAF_SYSTEM_LABELED) ||
+		    tsol_receive_local(mp, &laddr, IPV6_VERSION, ira, connp)))
 			break;
 		connp = connp->conn_next;
 	}
 
-	if (connp == NULL || connp->conn_upq == NULL)
+	if (connp == NULL)
 		goto notfound;
 
-	first_conn = connp;
-
 	CONN_INC_REF(connp);
-	connp = connp->conn_next;
-	for (;;) {
-		while (connp != NULL) {
-			if (IPCL_UDP_MATCH_V6(connp, dstport, dst, srcport,
-			    src) && conn_wantpacket_v6(connp, ill, ip6h,
-			    flags, zoneid) &&
-			    (!is_system_labeled() ||
-			    tsol_receive_local(mp, &dst, IPV6_VERSION,
-			    shared_addr, connp)))
+
+	if (connp->conn_reuseaddr) {
+		conn_t		*first_connp = connp;
+		conn_t		*next_connp;
+		mblk_t		*mp1;
+
+		connp = connp->conn_next;
+		for (;;) {
+			while (connp != NULL) {
+				if (IPCL_UDP_MATCH_V6(connp, lport, laddr,
+				    fport, faddr) &&
+				    conn_wantpacket_v6(connp, ira, ip6h) &&
+				    (!(ira->ira_flags & IRAF_SYSTEM_LABELED) ||
+				    tsol_receive_local(mp, &laddr, IPV6_VERSION,
+				    ira, connp)))
+					break;
+				connp = connp->conn_next;
+			}
+			if (connp == NULL) {
+				/* No more interested clients */
+				connp = first_connp;
 				break;
-			connp = connp->conn_next;
-		}
-		/*
-		 * Just copy the data part alone. The mctl part is
-		 * needed just for verifying policy and it is never
-		 * sent up.
-		 */
-		if (connp == NULL ||
-		    (((first_mp1 = dupmsg(first_mp)) == NULL) &&
-		    ((first_mp1 = ip_copymsg(first_mp)) == NULL))) {
-			/*
-			 * No more interested clients or memory
-			 * allocation failed
-			 */
-			connp = first_conn;
-			break;
-		}
-		mp1 = mctl_present ? first_mp1->b_cont : first_mp1;
-		CONN_INC_REF(connp);
-		mutex_exit(&connfp->connf_lock);
-		/*
-		 * For link-local always add ifindex so that transport
-		 * can set sin6_scope_id. Avoid it for ICMP error
-		 * fanout.
-		 */
-		if ((connp->conn_ip_recvpktinfo ||
-		    IN6_IS_ADDR_LINKLOCAL(&src)) &&
-		    (flags & IP_FF_IPINFO)) {
-			/* Add header */
-			mp1 = ip_add_info_v6(mp1, inill, &dst);
-		}
-		/* mp1 could have changed */
-		if (mctl_present)
-			first_mp1->b_cont = mp1;
-		else
-			first_mp1 = mp1;
-		if (mp1 == NULL) {
-			if (mctl_present)
-				freeb(first_mp1);
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			goto next_one;
-		}
-		if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
-		    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
-			BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
-			freemsg(first_mp1);
-			goto next_one;
-		}
+			}
+			if (((mp1 = dupmsg(mp)) == NULL) &&
+			    ((mp1 = copymsg(mp)) == NULL)) {
+				/* Memory allocation failed */
+				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+				ip_drop_input("ipIfStatsInDiscards", mp, ill);
+				connp = first_connp;
+				break;
+			}
 
-		if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) || secure) {
-			first_mp1 = ipsec_check_inbound_policy
-			    (first_mp1, connp, NULL, ip6h,
-			    mctl_present);
-		}
-		if (first_mp1 != NULL) {
-			if (mctl_present)
-				freeb(first_mp1);
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
+			CONN_INC_REF(connp);
+			mutex_exit(&connfp->connf_lock);
 
-			/* Send it upstream */
-			(connp->conn_recv)(connp, mp1, NULL);
+			IP6_STAT(ipst, ip6_udp_fanmb);
+			ip_fanout_udp_conn(connp, mp1, NULL,
+			    (ip6_t *)mp1->b_rptr, ira);
+
+			mutex_enter(&connfp->connf_lock);
+			/* Follow the next pointer before releasing the conn. */
+			next_connp = connp->conn_next;
+			IP6_STAT(ipst, ip6_udp_fanmb);
+			CONN_DEC_REF(connp);
+			connp = next_connp;
 		}
-next_one:
-		mutex_enter(&connfp->connf_lock);
-		/* Follow the next pointer before releasing the conn. */
-		next_conn = connp->conn_next;
-		IP6_STAT(ipst, ip6_udp_fanmb);
-		CONN_DEC_REF(connp);
-		connp = next_conn;
 	}
 
 	/* Last one.  Send it upstream. */
 	mutex_exit(&connfp->connf_lock);
 
-	/* Initiate IPPF processing */
-	if (IP6_IN_IPP(flags, ipst)) {
-		uint_t	ifindex;
-
-		mutex_enter(&ill->ill_lock);
-		ifindex = ill->ill_phyint->phyint_ifindex;
-		mutex_exit(&ill->ill_lock);
-		ip_process(IPP_LOCAL_IN, &mp, ifindex);
-		if (mp == NULL) {
-			CONN_DEC_REF(connp);
-			if (mctl_present) {
-				freeb(first_mp);
-			}
-			return;
-		}
-	}
-
-	/*
-	 * For link-local always add ifindex so that transport can set
-	 * sin6_scope_id. Avoid it for ICMP error fanout.
-	 */
-	if ((connp->conn_ip_recvpktinfo ||
-	    IN6_IS_ADDR_LINKLOCAL(&src)) && (flags & IP_FF_IPINFO)) {
-		/* Add header */
-		mp = ip_add_info_v6(mp, inill, &dst);
-		if (mp == NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			CONN_DEC_REF(connp);
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		} else if (mctl_present) {
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
-		}
-	}
-	if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
-	    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
-		BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
-		freemsg(mp);
-	} else {
-		if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) || secure) {
-			first_mp = ipsec_check_inbound_policy(first_mp,
-			    connp, NULL, ip6h, mctl_present);
-			if (first_mp == NULL) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				CONN_DEC_REF(connp);
-				return;
-			}
-		}
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-
-		/* Send it upstream */
-		(connp->conn_recv)(connp, mp, NULL);
-	}
 	IP6_STAT(ipst, ip6_udp_fanmb);
+	ip_fanout_udp_conn(connp, mp, NULL, ip6h, ira);
 	CONN_DEC_REF(connp);
-	if (mctl_present)
-		freeb(first_mp);
 	return;
 
 notfound:
@@ -3892,28 +2564,26 @@ notfound:
 	 * unclaimed datagrams?
 	 */
 	if (ipst->ips_ipcl_proto_fanout_v6[IPPROTO_UDP].connf_head != NULL) {
-		ip_fanout_proto_v6(q, first_mp, ip6h, ill, inill, IPPROTO_UDP,
-		    0, flags | IP_FF_RAWIP | IP_FF_IPINFO, mctl_present,
-		    zoneid);
+		ASSERT(ira->ira_protocol == IPPROTO_UDP);
+		ip_fanout_proto_v6(mp, ip6h, ira);
 	} else {
-		if (ip_fanout_send_icmp_v6(q, first_mp, flags,
-		    ICMP6_DST_UNREACH, ICMP6_DST_UNREACH_NOPORT, 0,
-		    mctl_present, zoneid, ipst)) {
-			BUMP_MIB(ill->ill_ip_mib, udpIfStatsNoPorts);
-		}
+		ip_fanout_send_icmp_v6(mp, ICMP6_DST_UNREACH,
+		    ICMP6_DST_UNREACH_NOPORT, ira);
 	}
 }
 
 /*
  * int ip_find_hdr_v6()
  *
- * This routine is used by the upper layer protocols and the IP tunnel
- * module to:
+ * This routine is used by the upper layer protocols, iptun, and IPsec:
  * - Set extension header pointers to appropriate locations
  * - Determine IPv6 header length and return it
  * - Return a pointer to the last nexthdr value
  *
  * The caller must initialize ipp_fields.
+ * The upper layer protocols normally set label_separate which makes the
+ * routine put the TX label in ipp_label_v6. If this is not set then
+ * the hop-by-hop options including the label are placed in ipp_hopopts.
  *
  * NOTE: If multiple extension headers of the same type are present,
  * ip_find_hdr_v6() will set the respective extension header pointers
@@ -3923,7 +2593,8 @@ notfound:
  * malformed part.
  */
 int
-ip_find_hdr_v6(mblk_t *mp, ip6_t *ip6h, ip6_pkt_t *ipp, uint8_t *nexthdrp)
+ip_find_hdr_v6(mblk_t *mp, ip6_t *ip6h, boolean_t label_separate, ip_pkt_t *ipp,
+    uint8_t *nexthdrp)
 {
 	uint_t	length, ehdrlen;
 	uint8_t nexthdr;
@@ -3932,6 +2603,11 @@ ip_find_hdr_v6(mblk_t *mp, ip6_t *ip6h, ip6_pkt_t *ipp, uint8_t *nexthdrp)
 	ip6_rthdr_t *tmprthdr;
 	ip6_hbh_t *tmphopopts;
 	ip6_frag_t *tmpfraghdr;
+
+	ipp->ipp_fields |= IPPF_HOPLIMIT | IPPF_TCLASS | IPPF_ADDR;
+	ipp->ipp_hoplimit = ip6h->ip6_hops;
+	ipp->ipp_tclass = IPV6_FLOW_TCLASS(ip6h->ip6_flow);
+	ipp->ipp_addr = ip6h->ip6_dst;
 
 	length = IPV6_HDR_LEN;
 	whereptr = ((uint8_t *)&ip6h[1]); /* point to next hdr */
@@ -3944,19 +2620,48 @@ ip_find_hdr_v6(mblk_t *mp, ip6_t *ip6h, ip6_pkt_t *ipp, uint8_t *nexthdrp)
 			goto done;
 
 		switch (nexthdr) {
-		case IPPROTO_HOPOPTS:
+		case IPPROTO_HOPOPTS: {
+			/* We check for any CIPSO */
+			uchar_t *secopt;
+			boolean_t hbh_needed;
+			uchar_t *after_secopt;
+
 			tmphopopts = (ip6_hbh_t *)whereptr;
 			ehdrlen = 8 * (tmphopopts->ip6h_len + 1);
 			if ((uchar_t *)tmphopopts +  ehdrlen > endptr)
 				goto done;
 			nexthdr = tmphopopts->ip6h_nxt;
+
+			if (!label_separate) {
+				secopt = NULL;
+				after_secopt = whereptr;
+			} else {
+				/*
+				 * We have dropped packets with bad options in
+				 * ip6_input. No need to check return value
+				 * here.
+				 */
+				(void) tsol_find_secopt_v6(whereptr, ehdrlen,
+				    &secopt, &after_secopt, &hbh_needed);
+			}
+			if (secopt != NULL && after_secopt - whereptr > 0) {
+				ipp->ipp_fields |= IPPF_LABEL_V6;
+				ipp->ipp_label_v6 = secopt;
+				ipp->ipp_label_len_v6 = after_secopt - whereptr;
+			} else {
+				ipp->ipp_label_len_v6 = 0;
+				after_secopt = whereptr;
+				hbh_needed = B_TRUE;
+			}
 			/* return only 1st hbh */
-			if (!(ipp->ipp_fields & IPPF_HOPOPTS)) {
+			if (hbh_needed && !(ipp->ipp_fields & IPPF_HOPOPTS)) {
 				ipp->ipp_fields |= IPPF_HOPOPTS;
-				ipp->ipp_hopopts = tmphopopts;
-				ipp->ipp_hopoptslen = ehdrlen;
+				ipp->ipp_hopopts = (ip6_hbh_t *)after_secopt;
+				ipp->ipp_hopoptslen = ehdrlen -
+				    ipp->ipp_label_len_v6;
 			}
 			break;
+		}
 		case IPPROTO_DSTOPTS:
 			tmpdstopts = (ip6_dest_t *)whereptr;
 			ehdrlen = 8 * (tmpdstopts->ip6d_len + 1);
@@ -3993,10 +2698,10 @@ ip_find_hdr_v6(mblk_t *mp, ip6_t *ip6h, ip6_pkt_t *ipp, uint8_t *nexthdrp)
 			 */
 			if (ipp->ipp_fields & IPPF_DSTOPTS) {
 				ipp->ipp_fields &= ~IPPF_DSTOPTS;
-				ipp->ipp_fields |= IPPF_RTDSTOPTS;
-				ipp->ipp_rtdstopts = ipp->ipp_dstopts;
+				ipp->ipp_fields |= IPPF_RTHDRDSTOPTS;
+				ipp->ipp_rthdrdstopts = ipp->ipp_dstopts;
 				ipp->ipp_dstopts = NULL;
-				ipp->ipp_rtdstoptslen = ipp->ipp_dstoptslen;
+				ipp->ipp_rthdrdstoptslen = ipp->ipp_dstoptslen;
 				ipp->ipp_dstoptslen = 0;
 			}
 			break;
@@ -4025,25 +2730,6 @@ done:
 	return (length);
 }
 
-int
-ip_hdr_complete_v6(ip6_t *ip6h, zoneid_t zoneid, ip_stack_t *ipst)
-{
-	ire_t *ire;
-
-	if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src)) {
-		ire = ire_lookup_local_v6(zoneid, ipst);
-		if (ire == NULL) {
-			ip1dbg(("ip_hdr_complete_v6: no source IRE\n"));
-			return (1);
-		}
-		ip6h->ip6_src = ire->ire_addr_v6;
-		ire_refrele(ire);
-	}
-	ip6h->ip6_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
-	ip6h->ip6_hops = ipst->ips_ipv6_def_hops;
-	return (0);
-}
-
 /*
  * Try to determine where and what are the IPv6 header length and
  * pointer to nexthdr value for the upper layer protocol (or an
@@ -4066,7 +2752,7 @@ ip_hdr_length_nexthdr_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length_ptr,
 	ip6_rthdr_t *rthdr;
 	ip6_frag_t *fraghdr;
 
-	ASSERT((IPH_HDR_VERSION(ip6h) & ~IP_FORWARD_PROG_BIT) == IPV6_VERSION);
+	ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
 	length = IPV6_HDR_LEN;
 	whereptr = ((uint8_t *)&ip6h[1]); /* point to next hdr */
 	endptr = mp->b_wptr;
@@ -4151,1905 +2837,6 @@ ip_hdr_length_v6(mblk_t *mp, ip6_t *ip6h)
 }
 
 /*
- * IPv6 -
- * ip_newroute_v6 is called by ip_rput_data_v6 or ip_wput_v6 whenever we need
- * to send out a packet to a destination address for which we do not have
- * specific routing information.
- *
- * Handle non-multicast packets. If ill is non-NULL the match is done
- * for that ill.
- *
- * When a specific ill is specified (using IPV6_PKTINFO,
- * IPV6_MULTICAST_IF, or IPV6_BOUND_IF) we will only match
- * on routing entries (ftable and ctable) that have a matching
- * ire->ire_ipif->ipif_ill. Thus this can only be used
- * for destinations that are on-link for the specific ill
- * and that can appear on multiple links. Thus it is useful
- * for multicast destinations, link-local destinations, and
- * at some point perhaps for site-local destinations (if the
- * node sits at a site boundary).
- * We create the cache entries in the regular ctable since
- * it can not "confuse" things for other destinations.
- *
- * NOTE : These are the scopes of some of the variables that point at IRE,
- *	  which needs to be followed while making any future modifications
- *	  to avoid memory leaks.
- *
- *	- ire and sire are the entries looked up initially by
- *	  ire_ftable_lookup_v6.
- *	- ipif_ire is used to hold the interface ire associated with
- *	  the new cache ire. But it's scope is limited, so we always REFRELE
- *	  it before branching out to error paths.
- *	- save_ire is initialized before ire_create, so that ire returned
- *	  by ire_create will not over-write the ire. We REFRELE save_ire
- *	  before breaking out of the switch.
- *
- *	Thus on failures, we have to REFRELE only ire and sire, if they
- *	are not NULL.
- */
-/* ARGSUSED */
-void
-ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
-    const in6_addr_t *v6srcp, ill_t *ill, zoneid_t zoneid, ip_stack_t *ipst)
-{
-	in6_addr_t	v6gw;
-	in6_addr_t	dst;
-	ire_t		*ire = NULL;
-	ipif_t		*src_ipif = NULL;
-	ill_t		*dst_ill = NULL;
-	ire_t		*sire = NULL;
-	ire_t		*save_ire;
-	ip6_t		*ip6h;
-	int		err = 0;
-	mblk_t		*first_mp;
-	ipsec_out_t	*io;
-	ushort_t	ire_marks = 0;
-	int		match_flags;
-	ire_t		*first_sire = NULL;
-	mblk_t		*copy_mp = NULL;
-	mblk_t		*xmit_mp = NULL;
-	in6_addr_t	save_dst;
-	uint32_t	multirt_flags =
-	    MULTIRT_CACHEGW | MULTIRT_USESTAMP | MULTIRT_SETSTAMP;
-	boolean_t	multirt_is_resolvable;
-	boolean_t	multirt_resolve_next;
-	boolean_t	need_rele = B_FALSE;
-	boolean_t	ip6_asp_table_held = B_FALSE;
-	tsol_ire_gw_secattr_t *attrp = NULL;
-	tsol_gcgrp_t	*gcgrp = NULL;
-	tsol_gcgrp_addr_t ga;
-
-	ASSERT(!IN6_IS_ADDR_MULTICAST(v6dstp));
-
-	first_mp = mp;
-	if (mp->b_datap->db_type == M_CTL) {
-		mp = mp->b_cont;
-		io = (ipsec_out_t *)first_mp->b_rptr;
-		ASSERT(io->ipsec_out_type == IPSEC_OUT);
-	} else {
-		io = NULL;
-	}
-
-	ip6h = (ip6_t *)mp->b_rptr;
-
-	if (IN6_IS_ADDR_LOOPBACK(v6dstp)) {
-		ip1dbg(("ip_newroute_v6: dst with loopback addr\n"));
-		goto icmp_err_ret;
-	} else if (IN6_IS_ADDR_LOOPBACK(v6srcp)) {
-		ip1dbg(("ip_newroute_v6: src with loopback addr\n"));
-		goto icmp_err_ret;
-	}
-
-	/*
-	 * If this IRE is created for forwarding or it is not for
-	 * TCP traffic, mark it as temporary.
-	 *
-	 * Is it sufficient just to check the next header??
-	 */
-	if (mp->b_prev != NULL || !IP_FLOW_CONTROLLED_ULP(ip6h->ip6_nxt))
-		ire_marks |= IRE_MARK_TEMPORARY;
-
-	/*
-	 * Get what we can from ire_ftable_lookup_v6 which will follow an IRE
-	 * chain until it gets the most specific information available.
-	 * For example, we know that there is no IRE_CACHE for this dest,
-	 * but there may be an IRE_OFFSUBNET which specifies a gateway.
-	 * ire_ftable_lookup_v6 will look up the gateway, etc.
-	 */
-
-	if (ill == NULL) {
-		match_flags = MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE | MATCH_IRE_SECATTR;
-		ire = ire_ftable_lookup_v6(v6dstp, 0, 0, 0,
-		    NULL, &sire, zoneid, 0, msg_getlabel(mp),
-		    match_flags, ipst);
-	} else {
-		match_flags = MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_RJ_BHOLE | MATCH_IRE_ILL;
-		match_flags |= MATCH_IRE_PARENT | MATCH_IRE_SECATTR;
-
-		/*
-		 * Because nce_xmit() calls ip_output_v6() and NCEs are always
-		 * tied to an underlying interface, IS_UNDER_IPMP() may be
-		 * true even when building IREs that will be used for data
-		 * traffic.  As such, use the packet's source address to
-		 * determine whether the traffic is test traffic, and set
-		 * MATCH_IRE_MARK_TESTHIDDEN if so.
-		 */
-		if (IS_UNDER_IPMP(ill) && !IN6_IS_ADDR_UNSPECIFIED(v6srcp)) {
-			if (ipif_lookup_testaddr_v6(ill, v6srcp, NULL))
-				match_flags |= MATCH_IRE_MARK_TESTHIDDEN;
-		}
-
-		ire = ire_ftable_lookup_v6(v6dstp, NULL, NULL, 0, ill->ill_ipif,
-		    &sire, zoneid, 0, msg_getlabel(mp), match_flags, ipst);
-	}
-
-	ip3dbg(("ip_newroute_v6: ire_ftable_lookup_v6() "
-	    "returned ire %p, sire %p\n", (void *)ire, (void *)sire));
-
-	/*
-	 * We enter a loop that will be run only once in most cases.
-	 * The loop is re-entered in the case where the destination
-	 * can be reached through multiple RTF_MULTIRT-flagged routes.
-	 * The intention is to compute multiple routes to a single
-	 * destination in a single ip_newroute_v6 call.
-	 * The information is contained in sire->ire_flags.
-	 */
-	do {
-		multirt_resolve_next = B_FALSE;
-
-		if (dst_ill != NULL) {
-			ill_refrele(dst_ill);
-			dst_ill = NULL;
-		}
-		if (src_ipif != NULL) {
-			ipif_refrele(src_ipif);
-			src_ipif = NULL;
-		}
-		if ((sire != NULL) && sire->ire_flags & RTF_MULTIRT) {
-			ip3dbg(("ip_newroute_v6: starting new resolution "
-			    "with first_mp %p, tag %d\n",
-			    (void *)first_mp, MULTIRT_DEBUG_TAGGED(first_mp)));
-
-			/*
-			 * We check if there are trailing unresolved routes for
-			 * the destination contained in sire.
-			 */
-			multirt_is_resolvable = ire_multirt_lookup_v6(&ire,
-			    &sire, multirt_flags, msg_getlabel(mp), ipst);
-
-			ip3dbg(("ip_newroute_v6: multirt_is_resolvable %d, "
-			    "ire %p, sire %p\n",
-			    multirt_is_resolvable, (void *)ire, (void *)sire));
-
-			if (!multirt_is_resolvable) {
-				/*
-				 * No more multirt routes to resolve; give up
-				 * (all routes resolved or no more resolvable
-				 * routes).
-				 */
-				if (ire != NULL) {
-					ire_refrele(ire);
-					ire = NULL;
-				}
-			} else {
-				ASSERT(sire != NULL);
-				ASSERT(ire != NULL);
-				/*
-				 * We simply use first_sire as a flag that
-				 * indicates if a resolvable multirt route has
-				 * already been found during the preceding
-				 * loops. If it is not the case, we may have
-				 * to send an ICMP error to report that the
-				 * destination is unreachable. We do not
-				 * IRE_REFHOLD first_sire.
-				 */
-				if (first_sire == NULL) {
-					first_sire = sire;
-				}
-			}
-		}
-		if ((ire == NULL) || (ire == sire)) {
-			/*
-			 * either ire == NULL (the destination cannot be
-			 * resolved) or ire == sire (the gateway cannot be
-			 * resolved). At this point, there are no more routes
-			 * to resolve for the destination, thus we exit.
-			 */
-			if (ip_debug > 3) {
-				/* ip2dbg */
-				pr_addr_dbg("ip_newroute_v6: "
-				    "can't resolve %s\n", AF_INET6, v6dstp);
-			}
-			ip3dbg(("ip_newroute_v6: "
-			    "ire %p, sire %p, first_sire %p\n",
-			    (void *)ire, (void *)sire, (void *)first_sire));
-
-			if (sire != NULL) {
-				ire_refrele(sire);
-				sire = NULL;
-			}
-
-			if (first_sire != NULL) {
-				/*
-				 * At least one multirt route has been found
-				 * in the same ip_newroute() call; there is no
-				 * need to report an ICMP error.
-				 * first_sire was not IRE_REFHOLDed.
-				 */
-				MULTIRT_DEBUG_UNTAG(first_mp);
-				freemsg(first_mp);
-				return;
-			}
-			ip_rts_change_v6(RTM_MISS, v6dstp, 0, 0, 0, 0, 0, 0,
-			    RTA_DST, ipst);
-			goto icmp_err_ret;
-		}
-
-		ASSERT(ire->ire_ipversion == IPV6_VERSION);
-
-		/*
-		 * Verify that the returned IRE does not have either the
-		 * RTF_REJECT or RTF_BLACKHOLE flags set and that the IRE is
-		 * either an IRE_CACHE, IRE_IF_NORESOLVER or IRE_IF_RESOLVER.
-		 */
-		if ((ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE)) ||
-		    (ire->ire_type & (IRE_CACHE | IRE_INTERFACE)) == 0)
-			goto icmp_err_ret;
-
-		/*
-		 * Increment the ire_ob_pkt_count field for ire if it is an
-		 * INTERFACE (IF_RESOLVER or IF_NORESOLVER) IRE type, and
-		 * increment the same for the parent IRE, sire, if it is some
-		 * sort of prefix IRE (which includes DEFAULT, PREFIX, and HOST)
-		 */
-		if ((ire->ire_type & IRE_INTERFACE) != 0) {
-			UPDATE_OB_PKT_COUNT(ire);
-			ire->ire_last_used_time = lbolt;
-		}
-
-		if (sire != NULL) {
-			mutex_enter(&sire->ire_lock);
-			v6gw = sire->ire_gateway_addr_v6;
-			mutex_exit(&sire->ire_lock);
-			ASSERT((sire->ire_type & (IRE_CACHETABLE |
-			    IRE_INTERFACE)) == 0);
-			UPDATE_OB_PKT_COUNT(sire);
-			sire->ire_last_used_time = lbolt;
-		} else {
-			v6gw = ipv6_all_zeros;
-		}
-
-		/*
-		 * We have a route to reach the destination.  Find the
-		 * appropriate ill, then get a source address that matches the
-		 * right scope via ipif_select_source_v6().
-		 *
-		 * If we are here trying to create an IRE_CACHE for an offlink
-		 * destination and have an IRE_CACHE entry for VNI, then use
-		 * ire_stq instead since VNI's queue is a black hole.
-		 *
-		 * Note: While we pick a dst_ill we are really only interested
-		 * in the ill for load spreading.  The source ipif is
-		 * determined by source address selection below.
-		 */
-		if ((ire->ire_type == IRE_CACHE) &&
-		    IS_VNI(ire->ire_ipif->ipif_ill)) {
-			dst_ill = ire->ire_stq->q_ptr;
-			ill_refhold(dst_ill);
-		} else {
-			ill_t *ill = ire->ire_ipif->ipif_ill;
-
-			if (IS_IPMP(ill)) {
-				dst_ill =
-				    ipmp_illgrp_hold_next_ill(ill->ill_grp);
-			} else {
-				dst_ill = ill;
-				ill_refhold(dst_ill);
-			}
-		}
-
-		if (dst_ill == NULL) {
-			if (ip_debug > 2) {
-				pr_addr_dbg("ip_newroute_v6 : no dst "
-				    "ill for dst %s\n", AF_INET6, v6dstp);
-			}
-			goto icmp_err_ret;
-		}
-
-		if (ill != NULL && dst_ill != ill &&
-		    !IS_IN_SAME_ILLGRP(dst_ill, ill)) {
-			/*
-			 * We should have found a route matching "ill"
-			 * as we called ire_ftable_lookup_v6 with
-			 * MATCH_IRE_ILL.  Rather than asserting when
-			 * there is a mismatch, we just drop the packet.
-			 */
-			ip0dbg(("ip_newroute_v6: BOUND_IF failed: "
-			    "dst_ill %s ill %s\n", dst_ill->ill_name,
-			    ill->ill_name));
-			goto icmp_err_ret;
-		}
-
-		/*
-		 * Pick a source address which matches the scope of the
-		 * destination address.
-		 * For RTF_SETSRC routes, the source address is imposed by the
-		 * parent ire (sire).
-		 */
-		ASSERT(src_ipif == NULL);
-
-		/*
-		 * Because nce_xmit() calls ip_output_v6() and NCEs are always
-		 * tied to the underlying interface, IS_UNDER_IPMP() may be
-		 * true even when building IREs that will be used for data
-		 * traffic.  As such, see if the packet's source address is a
-		 * test address, and if so use that test address's ipif for
-		 * the IRE so that the logic that sets IRE_MARK_TESTHIDDEN in
-		 * ire_add_v6() can work properly.
-		 */
-		if (ill != NULL && IS_UNDER_IPMP(ill))
-			(void) ipif_lookup_testaddr_v6(ill, v6srcp, &src_ipif);
-
-		if (src_ipif == NULL && ire->ire_type == IRE_IF_RESOLVER &&
-		    !IN6_IS_ADDR_UNSPECIFIED(&v6gw) &&
-		    ip6_asp_can_lookup(ipst)) {
-			/*
-			 * The ire cache entry we're adding is for the
-			 * gateway itself.  The source address in this case
-			 * is relative to the gateway's address.
-			 */
-			ip6_asp_table_held = B_TRUE;
-			src_ipif = ipif_select_source_v6(dst_ill, &v6gw,
-			    B_TRUE, IPV6_PREFER_SRC_DEFAULT, zoneid);
-			if (src_ipif != NULL)
-				ire_marks |= IRE_MARK_USESRC_CHECK;
-		} else if (src_ipif == NULL) {
-			if ((sire != NULL) && (sire->ire_flags & RTF_SETSRC)) {
-				/*
-				 * Check that the ipif matching the requested
-				 * source address still exists.
-				 */
-				src_ipif = ipif_lookup_addr_v6(
-				    &sire->ire_src_addr_v6, NULL, zoneid,
-				    NULL, NULL, NULL, NULL, ipst);
-			}
-			if (src_ipif == NULL && ip6_asp_can_lookup(ipst)) {
-				ip6_asp_table_held = B_TRUE;
-				src_ipif = ipif_select_source_v6(dst_ill,
-				    v6dstp, B_FALSE,
-				    IPV6_PREFER_SRC_DEFAULT, zoneid);
-				if (src_ipif != NULL)
-					ire_marks |= IRE_MARK_USESRC_CHECK;
-			}
-		}
-
-		if (src_ipif == NULL) {
-			if (ip_debug > 2) {
-				/* ip1dbg */
-				pr_addr_dbg("ip_newroute_v6: no src for "
-				    "dst %s\n", AF_INET6, v6dstp);
-				printf("ip_newroute_v6: interface name %s\n",
-				    dst_ill->ill_name);
-			}
-			goto icmp_err_ret;
-		}
-
-		if (ip_debug > 3) {
-			/* ip2dbg */
-			pr_addr_dbg("ip_newroute_v6: first hop %s\n",
-			    AF_INET6, &v6gw);
-		}
-		ip2dbg(("\tire type %s (%d)\n",
-		    ip_nv_lookup(ire_nv_tbl, ire->ire_type), ire->ire_type));
-
-		/*
-		 * At this point in ip_newroute_v6(), ire is either the
-		 * IRE_CACHE of the next-hop gateway for an off-subnet
-		 * destination or an IRE_INTERFACE type that should be used
-		 * to resolve an on-subnet destination or an on-subnet
-		 * next-hop gateway.
-		 *
-		 * In the IRE_CACHE case, we have the following :
-		 *
-		 * 1) src_ipif - used for getting a source address.
-		 *
-		 * 2) dst_ill - from which we derive ire_stq/ire_rfq. This
-		 *    means packets using this IRE_CACHE will go out on dst_ill.
-		 *
-		 * 3) The IRE sire will point to the prefix that is the longest
-		 *    matching route for the destination. These prefix types
-		 *    include IRE_DEFAULT, IRE_PREFIX, IRE_HOST.
-		 *
-		 *    The newly created IRE_CACHE entry for the off-subnet
-		 *    destination is tied to both the prefix route and the
-		 *    interface route used to resolve the next-hop gateway
-		 *    via the ire_phandle and ire_ihandle fields, respectively.
-		 *
-		 * In the IRE_INTERFACE case, we have the following :
-		 *
-		 * 1) src_ipif - used for getting a source address.
-		 *
-		 * 2) dst_ill - from which we derive ire_stq/ire_rfq. This
-		 *    means packets using the IRE_CACHE that we will build
-		 *    here will go out on dst_ill.
-		 *
-		 * 3) sire may or may not be NULL. But, the IRE_CACHE that is
-		 *    to be created will only be tied to the IRE_INTERFACE that
-		 *    was derived from the ire_ihandle field.
-		 *
-		 *    If sire is non-NULL, it means the destination is off-link
-		 *    and we will first create the IRE_CACHE for the gateway.
-		 *    Next time through ip_newroute_v6, we will create the
-		 *    IRE_CACHE for the final destination as described above.
-		 */
-		save_ire = ire;
-		switch (ire->ire_type) {
-		case IRE_CACHE: {
-			ire_t	*ipif_ire;
-
-			ASSERT(sire != NULL);
-			if (IN6_IS_ADDR_UNSPECIFIED(&v6gw)) {
-				mutex_enter(&ire->ire_lock);
-				v6gw = ire->ire_gateway_addr_v6;
-				mutex_exit(&ire->ire_lock);
-			}
-			/*
-			 * We need 3 ire's to create a new cache ire for an
-			 * off-link destination from the cache ire of the
-			 * gateway.
-			 *
-			 *	1. The prefix ire 'sire'
-			 *	2. The cache ire of the gateway 'ire'
-			 *	3. The interface ire 'ipif_ire'
-			 *
-			 * We have (1) and (2). We lookup (3) below.
-			 *
-			 * If there is no interface route to the gateway,
-			 * it is a race condition, where we found the cache
-			 * but the inteface route has been deleted.
-			 */
-			ipif_ire = ire_ihandle_lookup_offlink_v6(ire, sire);
-			if (ipif_ire == NULL) {
-				ip1dbg(("ip_newroute_v6:"
-				    "ire_ihandle_lookup_offlink_v6 failed\n"));
-				goto icmp_err_ret;
-			}
-
-			/*
-			 * Note: the new ire inherits RTF_SETSRC
-			 * and RTF_MULTIRT to propagate these flags from prefix
-			 * to cache.
-			 */
-
-			/*
-			 * Check cached gateway IRE for any security
-			 * attributes; if found, associate the gateway
-			 * credentials group to the destination IRE.
-			 */
-			if ((attrp = save_ire->ire_gw_secattr) != NULL) {
-				mutex_enter(&attrp->igsa_lock);
-				if ((gcgrp = attrp->igsa_gcgrp) != NULL)
-					GCGRP_REFHOLD(gcgrp);
-				mutex_exit(&attrp->igsa_lock);
-			}
-
-			ire = ire_create_v6(
-			    v6dstp,			/* dest address */
-			    &ipv6_all_ones,		/* mask */
-			    &src_ipif->ipif_v6src_addr, /* source address */
-			    &v6gw,			/* gateway address */
-			    &save_ire->ire_max_frag,
-			    NULL,			/* src nce */
-			    dst_ill->ill_rq,		/* recv-from queue */
-			    dst_ill->ill_wq,		/* send-to queue */
-			    IRE_CACHE,
-			    src_ipif,
-			    &sire->ire_mask_v6,		/* Parent mask */
-			    sire->ire_phandle,		/* Parent handle */
-			    ipif_ire->ire_ihandle,	/* Interface handle */
-			    sire->ire_flags &		/* flags if any */
-			    (RTF_SETSRC | RTF_MULTIRT),
-			    &(sire->ire_uinfo),
-			    NULL,
-			    gcgrp,
-			    ipst);
-
-			if (ire == NULL) {
-				if (gcgrp != NULL) {
-					GCGRP_REFRELE(gcgrp);
-					gcgrp = NULL;
-				}
-				ire_refrele(save_ire);
-				ire_refrele(ipif_ire);
-				break;
-			}
-
-			/* reference now held by IRE */
-			gcgrp = NULL;
-
-			ire->ire_marks |= ire_marks;
-
-			/*
-			 * Prevent sire and ipif_ire from getting deleted. The
-			 * newly created ire is tied to both of them via the
-			 * phandle and ihandle respectively.
-			 */
-			IRB_REFHOLD(sire->ire_bucket);
-			/* Has it been removed already ? */
-			if (sire->ire_marks & IRE_MARK_CONDEMNED) {
-				IRB_REFRELE(sire->ire_bucket);
-				ire_refrele(ipif_ire);
-				ire_refrele(save_ire);
-				break;
-			}
-
-			IRB_REFHOLD(ipif_ire->ire_bucket);
-			/* Has it been removed already ? */
-			if (ipif_ire->ire_marks & IRE_MARK_CONDEMNED) {
-				IRB_REFRELE(ipif_ire->ire_bucket);
-				IRB_REFRELE(sire->ire_bucket);
-				ire_refrele(ipif_ire);
-				ire_refrele(save_ire);
-				break;
-			}
-
-			xmit_mp = first_mp;
-			if (ire->ire_flags & RTF_MULTIRT) {
-				copy_mp = copymsg(first_mp);
-				if (copy_mp != NULL) {
-					xmit_mp = copy_mp;
-					MULTIRT_DEBUG_TAG(first_mp);
-				}
-			}
-			ire_add_then_send(q, ire, xmit_mp);
-			if (ip6_asp_table_held) {
-				ip6_asp_table_refrele(ipst);
-				ip6_asp_table_held = B_FALSE;
-			}
-			ire_refrele(save_ire);
-
-			/* Assert that sire is not deleted yet. */
-			ASSERT(sire->ire_ptpn != NULL);
-			IRB_REFRELE(sire->ire_bucket);
-
-			/* Assert that ipif_ire is not deleted yet. */
-			ASSERT(ipif_ire->ire_ptpn != NULL);
-			IRB_REFRELE(ipif_ire->ire_bucket);
-			ire_refrele(ipif_ire);
-
-			if (copy_mp != NULL) {
-				/*
-				 * Search for the next unresolved
-				 * multirt route.
-				 */
-				copy_mp = NULL;
-				ipif_ire = NULL;
-				ire = NULL;
-				/* re-enter the loop */
-				multirt_resolve_next = B_TRUE;
-				continue;
-			}
-			ire_refrele(sire);
-			ill_refrele(dst_ill);
-			ipif_refrele(src_ipif);
-			return;
-		}
-		case IRE_IF_NORESOLVER:
-			/*
-			 * We have what we need to build an IRE_CACHE.
-			 *
-			 * handle the Gated case, where we create
-			 * a NORESOLVER route for loopback.
-			 */
-			if (dst_ill->ill_net_type != IRE_IF_NORESOLVER)
-				break;
-			/*
-			 * TSol note: We are creating the ire cache for the
-			 * destination 'dst'. If 'dst' is offlink, going
-			 * through the first hop 'gw', the security attributes
-			 * of 'dst' must be set to point to the gateway
-			 * credentials of gateway 'gw'. If 'dst' is onlink, it
-			 * is possible that 'dst' is a potential gateway that is
-			 * referenced by some route that has some security
-			 * attributes. Thus in the former case, we need to do a
-			 * gcgrp_lookup of 'gw' while in the latter case we
-			 * need to do gcgrp_lookup of 'dst' itself.
-			 */
-			ga.ga_af = AF_INET6;
-			if (!IN6_IS_ADDR_UNSPECIFIED(&v6gw))
-				ga.ga_addr = v6gw;
-			else
-				ga.ga_addr = *v6dstp;
-			gcgrp = gcgrp_lookup(&ga, B_FALSE);
-
-			/*
-			 * Note: the new ire inherits sire flags RTF_SETSRC
-			 * and RTF_MULTIRT to propagate those rules from prefix
-			 * to cache.
-			 */
-			ire = ire_create_v6(
-			    v6dstp,			/* dest address */
-			    &ipv6_all_ones,		/* mask */
-			    &src_ipif->ipif_v6src_addr, /* source address */
-			    &v6gw,			/* gateway address */
-			    &save_ire->ire_max_frag,
-			    NULL,			/* no src nce */
-			    dst_ill->ill_rq,		/* recv-from queue */
-			    dst_ill->ill_wq,		/* send-to queue */
-			    IRE_CACHE,
-			    src_ipif,
-			    &save_ire->ire_mask_v6,	/* Parent mask */
-			    (sire != NULL) ?		/* Parent handle */
-			    sire->ire_phandle : 0,
-			    save_ire->ire_ihandle,	/* Interface handle */
-			    (sire != NULL) ?		/* flags if any */
-			    sire->ire_flags &
-			    (RTF_SETSRC | RTF_MULTIRT) : 0,
-			    &(save_ire->ire_uinfo),
-			    NULL,
-			    gcgrp,
-			    ipst);
-
-			if (ire == NULL) {
-				if (gcgrp != NULL) {
-					GCGRP_REFRELE(gcgrp);
-					gcgrp = NULL;
-				}
-				ire_refrele(save_ire);
-				break;
-			}
-
-			/* reference now held by IRE */
-			gcgrp = NULL;
-
-			ire->ire_marks |= ire_marks;
-
-			if (!IN6_IS_ADDR_UNSPECIFIED(&v6gw))
-				dst = v6gw;
-			else
-				dst = *v6dstp;
-			err = ndp_noresolver(dst_ill, &dst);
-			if (err != 0) {
-				ire_refrele(save_ire);
-				break;
-			}
-
-			/* Prevent save_ire from getting deleted */
-			IRB_REFHOLD(save_ire->ire_bucket);
-			/* Has it been removed already ? */
-			if (save_ire->ire_marks & IRE_MARK_CONDEMNED) {
-				IRB_REFRELE(save_ire->ire_bucket);
-				ire_refrele(save_ire);
-				break;
-			}
-
-			xmit_mp = first_mp;
-			/*
-			 * In case of MULTIRT, a copy of the current packet
-			 * to send is made to further re-enter the
-			 * loop and attempt another route resolution
-			 */
-			if ((sire != NULL) && sire->ire_flags & RTF_MULTIRT) {
-				copy_mp = copymsg(first_mp);
-				if (copy_mp != NULL) {
-					xmit_mp = copy_mp;
-					MULTIRT_DEBUG_TAG(first_mp);
-				}
-			}
-			ire_add_then_send(q, ire, xmit_mp);
-			if (ip6_asp_table_held) {
-				ip6_asp_table_refrele(ipst);
-				ip6_asp_table_held = B_FALSE;
-			}
-
-			/* Assert that it is not deleted yet. */
-			ASSERT(save_ire->ire_ptpn != NULL);
-			IRB_REFRELE(save_ire->ire_bucket);
-			ire_refrele(save_ire);
-
-			if (copy_mp != NULL) {
-				/*
-				 * If we found a (no)resolver, we ignore any
-				 * trailing top priority IRE_CACHE in
-				 * further loops. This ensures that we do not
-				 * omit any (no)resolver despite the priority
-				 * in this call.
-				 * IRE_CACHE, if any, will be processed
-				 * by another thread entering ip_newroute(),
-				 * (on resolver response, for example).
-				 * We use this to force multiple parallel
-				 * resolution as soon as a packet needs to be
-				 * sent. The result is, after one packet
-				 * emission all reachable routes are generally
-				 * resolved.
-				 * Otherwise, complete resolution of MULTIRT
-				 * routes would require several emissions as
-				 * side effect.
-				 */
-				multirt_flags &= ~MULTIRT_CACHEGW;
-
-				/*
-				 * Search for the next unresolved multirt
-				 * route.
-				 */
-				copy_mp = NULL;
-				save_ire = NULL;
-				ire = NULL;
-				/* re-enter the loop */
-				multirt_resolve_next = B_TRUE;
-				continue;
-			}
-
-			/* Don't need sire anymore */
-			if (sire != NULL)
-				ire_refrele(sire);
-			ill_refrele(dst_ill);
-			ipif_refrele(src_ipif);
-			return;
-
-		case IRE_IF_RESOLVER:
-			/*
-			 * We can't build an IRE_CACHE yet, but at least we
-			 * found a resolver that can help.
-			 */
-			dst = *v6dstp;
-
-			/*
-			 * To be at this point in the code with a non-zero gw
-			 * means that dst is reachable through a gateway that
-			 * we have never resolved.  By changing dst to the gw
-			 * addr we resolve the gateway first.  When
-			 * ire_add_then_send() tries to put the IP dg to dst,
-			 * it will reenter ip_newroute() at which time we will
-			 * find the IRE_CACHE for the gw and create another
-			 * IRE_CACHE above (for dst itself).
-			 */
-			if (!IN6_IS_ADDR_UNSPECIFIED(&v6gw)) {
-				save_dst = dst;
-				dst = v6gw;
-				v6gw = ipv6_all_zeros;
-			}
-			if (dst_ill->ill_flags & ILLF_XRESOLV) {
-				/*
-				 * Ask the external resolver to do its thing.
-				 * Make an mblk chain in the following form:
-				 * ARQ_REQ_MBLK-->IRE_MBLK-->packet
-				 */
-				mblk_t		*ire_mp;
-				mblk_t		*areq_mp;
-				areq_t		*areq;
-				in6_addr_t	*addrp;
-
-				ip1dbg(("ip_newroute_v6:ILLF_XRESOLV\n"));
-				if (ip6_asp_table_held) {
-					ip6_asp_table_refrele(ipst);
-					ip6_asp_table_held = B_FALSE;
-				}
-				ire = ire_create_mp_v6(
-				    &dst,		/* dest address */
-				    &ipv6_all_ones,	/* mask */
-				    &src_ipif->ipif_v6src_addr,
-				    /* source address */
-				    &v6gw,		/* gateway address */
-				    NULL,		/* no src nce */
-				    dst_ill->ill_rq,	/* recv-from queue */
-				    dst_ill->ill_wq, 	/* send-to queue */
-				    IRE_CACHE,
-				    src_ipif,
-				    &save_ire->ire_mask_v6, /* Parent mask */
-				    0,
-				    save_ire->ire_ihandle,
-				    /* Interface handle */
-				    0,		/* flags if any */
-				    &(save_ire->ire_uinfo),
-				    NULL,
-				    NULL,
-				    ipst);
-
-				ire_refrele(save_ire);
-				if (ire == NULL) {
-					ip1dbg(("ip_newroute_v6:"
-					    "ire is NULL\n"));
-					break;
-				}
-
-				if ((sire != NULL) &&
-				    (sire->ire_flags & RTF_MULTIRT)) {
-					/*
-					 * processing a copy of the packet to
-					 * send for further resolution loops
-					 */
-					copy_mp = copymsg(first_mp);
-					if (copy_mp != NULL)
-						MULTIRT_DEBUG_TAG(copy_mp);
-				}
-				ire->ire_marks |= ire_marks;
-				ire_mp = ire->ire_mp;
-				/*
-				 * Now create or find an nce for this interface.
-				 * The hw addr will need to to be set from
-				 * the reply to the AR_ENTRY_QUERY that
-				 * we're about to send. This will be done in
-				 * ire_add_v6().
-				 */
-				err = ndp_resolver(dst_ill, &dst, mp, zoneid);
-				switch (err) {
-				case 0:
-					/*
-					 * New cache entry created.
-					 * Break, then ask the external
-					 * resolver.
-					 */
-					break;
-				case EINPROGRESS:
-					/*
-					 * Resolution in progress;
-					 * packet has been queued by
-					 * ndp_resolver().
-					 */
-					ire_delete(ire);
-					ire = NULL;
-					/*
-					 * Check if another multirt
-					 * route must be resolved.
-					 */
-					if (copy_mp != NULL) {
-						/*
-						 * If we found a resolver, we
-						 * ignore any trailing top
-						 * priority IRE_CACHE in
-						 * further loops. The reason is
-						 * the same as for noresolver.
-						 */
-						multirt_flags &=
-						    ~MULTIRT_CACHEGW;
-						/*
-						 * Search for the next
-						 * unresolved multirt route.
-						 */
-						first_mp = copy_mp;
-						copy_mp = NULL;
-						mp = first_mp;
-						if (mp->b_datap->db_type ==
-						    M_CTL) {
-							mp = mp->b_cont;
-						}
-						ASSERT(sire != NULL);
-						dst = save_dst;
-						/*
-						 * re-enter the loop
-						 */
-						multirt_resolve_next =
-						    B_TRUE;
-						continue;
-					}
-
-					if (sire != NULL)
-						ire_refrele(sire);
-					ill_refrele(dst_ill);
-					ipif_refrele(src_ipif);
-					return;
-				default:
-					/*
-					 * Transient error; packet will be
-					 * freed.
-					 */
-					ire_delete(ire);
-					ire = NULL;
-					break;
-				}
-				if (err != 0)
-					break;
-				/*
-				 * Now set up the AR_ENTRY_QUERY and send it.
-				 */
-				areq_mp = ill_arp_alloc(dst_ill,
-				    (uchar_t *)&ipv6_areq_template,
-				    (caddr_t)&dst);
-				if (areq_mp == NULL) {
-					ip1dbg(("ip_newroute_v6:"
-					    "areq_mp is NULL\n"));
-					freemsg(ire_mp);
-					break;
-				}
-				areq = (areq_t *)areq_mp->b_rptr;
-				addrp = (in6_addr_t *)((char *)areq +
-				    areq->areq_target_addr_offset);
-				*addrp = dst;
-				addrp = (in6_addr_t *)((char *)areq +
-				    areq->areq_sender_addr_offset);
-				*addrp = src_ipif->ipif_v6src_addr;
-				/*
-				 * link the chain, then send up to the resolver.
-				 */
-				linkb(areq_mp, ire_mp);
-				linkb(areq_mp, mp);
-				ip1dbg(("ip_newroute_v6:"
-				    "putnext to resolver\n"));
-				putnext(dst_ill->ill_rq, areq_mp);
-				/*
-				 * Check if another multirt route
-				 * must be resolved.
-				 */
-				ire = NULL;
-				if (copy_mp != NULL) {
-					/*
-					 * If we find a resolver, we ignore any
-					 * trailing top priority IRE_CACHE in
-					 * further loops. The reason is the
-					 * same as for noresolver.
-					 */
-					multirt_flags &= ~MULTIRT_CACHEGW;
-					/*
-					 * Search for the next unresolved
-					 * multirt route.
-					 */
-					first_mp = copy_mp;
-					copy_mp = NULL;
-					mp = first_mp;
-					if (mp->b_datap->db_type == M_CTL) {
-						mp = mp->b_cont;
-					}
-					ASSERT(sire != NULL);
-					dst = save_dst;
-					/*
-					 * re-enter the loop
-					 */
-					multirt_resolve_next = B_TRUE;
-					continue;
-				}
-
-				if (sire != NULL)
-					ire_refrele(sire);
-				ill_refrele(dst_ill);
-				ipif_refrele(src_ipif);
-				return;
-			}
-			/*
-			 * Non-external resolver case.
-			 *
-			 * TSol note: Please see the note above the
-			 * IRE_IF_NORESOLVER case.
-			 */
-			ga.ga_af = AF_INET6;
-			ga.ga_addr = dst;
-			gcgrp = gcgrp_lookup(&ga, B_FALSE);
-
-			ire = ire_create_v6(
-			    &dst,			/* dest address */
-			    &ipv6_all_ones,		/* mask */
-			    &src_ipif->ipif_v6src_addr, /* source address */
-			    &v6gw,			/* gateway address */
-			    &save_ire->ire_max_frag,
-			    NULL,			/* no src nce */
-			    dst_ill->ill_rq,		/* recv-from queue */
-			    dst_ill->ill_wq,		/* send-to queue */
-			    IRE_CACHE,
-			    src_ipif,
-			    &save_ire->ire_mask_v6,	/* Parent mask */
-			    0,
-			    save_ire->ire_ihandle,	/* Interface handle */
-			    0,				/* flags if any */
-			    &(save_ire->ire_uinfo),
-			    NULL,
-			    gcgrp,
-			    ipst);
-
-			if (ire == NULL) {
-				if (gcgrp != NULL) {
-					GCGRP_REFRELE(gcgrp);
-					gcgrp = NULL;
-				}
-				ire_refrele(save_ire);
-				break;
-			}
-
-			/* reference now held by IRE */
-			gcgrp = NULL;
-
-			if ((sire != NULL) &&
-			    (sire->ire_flags & RTF_MULTIRT)) {
-				copy_mp = copymsg(first_mp);
-				if (copy_mp != NULL)
-					MULTIRT_DEBUG_TAG(copy_mp);
-			}
-
-			ire->ire_marks |= ire_marks;
-			err = ndp_resolver(dst_ill, &dst, first_mp, zoneid);
-			switch (err) {
-			case 0:
-				/* Prevent save_ire from getting deleted */
-				IRB_REFHOLD(save_ire->ire_bucket);
-				/* Has it been removed already ? */
-				if (save_ire->ire_marks & IRE_MARK_CONDEMNED) {
-					IRB_REFRELE(save_ire->ire_bucket);
-					ire_refrele(save_ire);
-					break;
-				}
-
-				/*
-				 * We have a resolved cache entry,
-				 * add in the IRE.
-				 */
-				ire_add_then_send(q, ire, first_mp);
-				if (ip6_asp_table_held) {
-					ip6_asp_table_refrele(ipst);
-					ip6_asp_table_held = B_FALSE;
-				}
-
-				/* Assert that it is not deleted yet. */
-				ASSERT(save_ire->ire_ptpn != NULL);
-				IRB_REFRELE(save_ire->ire_bucket);
-				ire_refrele(save_ire);
-				/*
-				 * Check if another multirt route
-				 * must be resolved.
-				 */
-				ire = NULL;
-				if (copy_mp != NULL) {
-					/*
-					 * If we find a resolver, we ignore any
-					 * trailing top priority IRE_CACHE in
-					 * further loops. The reason is the
-					 * same as for noresolver.
-					 */
-					multirt_flags &= ~MULTIRT_CACHEGW;
-					/*
-					 * Search for the next unresolved
-					 * multirt route.
-					 */
-					first_mp = copy_mp;
-					copy_mp = NULL;
-					mp = first_mp;
-					if (mp->b_datap->db_type == M_CTL) {
-						mp = mp->b_cont;
-					}
-					ASSERT(sire != NULL);
-					dst = save_dst;
-					/*
-					 * re-enter the loop
-					 */
-					multirt_resolve_next = B_TRUE;
-					continue;
-				}
-
-				if (sire != NULL)
-					ire_refrele(sire);
-				ill_refrele(dst_ill);
-				ipif_refrele(src_ipif);
-				return;
-
-			case EINPROGRESS:
-				/*
-				 * mp was consumed - presumably queued.
-				 * No need for ire, presumably resolution is
-				 * in progress, and ire will be added when the
-				 * address is resolved.
-				 */
-				if (ip6_asp_table_held) {
-					ip6_asp_table_refrele(ipst);
-					ip6_asp_table_held = B_FALSE;
-				}
-				ASSERT(ire->ire_nce == NULL);
-				ire_delete(ire);
-				ire_refrele(save_ire);
-				/*
-				 * Check if another multirt route
-				 * must be resolved.
-				 */
-				ire = NULL;
-				if (copy_mp != NULL) {
-					/*
-					 * If we find a resolver, we ignore any
-					 * trailing top priority IRE_CACHE in
-					 * further loops. The reason is the
-					 * same as for noresolver.
-					 */
-					multirt_flags &= ~MULTIRT_CACHEGW;
-					/*
-					 * Search for the next unresolved
-					 * multirt route.
-					 */
-					first_mp = copy_mp;
-					copy_mp = NULL;
-					mp = first_mp;
-					if (mp->b_datap->db_type == M_CTL) {
-						mp = mp->b_cont;
-					}
-					ASSERT(sire != NULL);
-					dst = save_dst;
-					/*
-					 * re-enter the loop
-					 */
-					multirt_resolve_next = B_TRUE;
-					continue;
-				}
-				if (sire != NULL)
-					ire_refrele(sire);
-				ill_refrele(dst_ill);
-				ipif_refrele(src_ipif);
-				return;
-			default:
-				/* Some transient error */
-				ASSERT(ire->ire_nce == NULL);
-				ire_refrele(save_ire);
-				break;
-			}
-			break;
-		default:
-			break;
-		}
-		if (ip6_asp_table_held) {
-			ip6_asp_table_refrele(ipst);
-			ip6_asp_table_held = B_FALSE;
-		}
-	} while (multirt_resolve_next);
-
-err_ret:
-	ip1dbg(("ip_newroute_v6: dropped\n"));
-	if (src_ipif != NULL)
-		ipif_refrele(src_ipif);
-	if (dst_ill != NULL) {
-		need_rele = B_TRUE;
-		ill = dst_ill;
-	}
-	if (ill != NULL) {
-		if (mp->b_prev != NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-		} else {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
-		}
-
-		if (need_rele)
-			ill_refrele(ill);
-	} else {
-		if (mp->b_prev != NULL) {
-			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsInDiscards);
-		} else {
-			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutDiscards);
-		}
-	}
-	/* Did this packet originate externally? */
-	if (mp->b_prev) {
-		mp->b_next = NULL;
-		mp->b_prev = NULL;
-	}
-	if (copy_mp != NULL) {
-		MULTIRT_DEBUG_UNTAG(copy_mp);
-		freemsg(copy_mp);
-	}
-	MULTIRT_DEBUG_UNTAG(first_mp);
-	freemsg(first_mp);
-	if (ire != NULL)
-		ire_refrele(ire);
-	if (sire != NULL)
-		ire_refrele(sire);
-	return;
-
-icmp_err_ret:
-	if (ip6_asp_table_held)
-		ip6_asp_table_refrele(ipst);
-	if (src_ipif != NULL)
-		ipif_refrele(src_ipif);
-	if (dst_ill != NULL) {
-		need_rele = B_TRUE;
-		ill = dst_ill;
-	}
-	ip1dbg(("ip_newroute_v6: no route\n"));
-	if (sire != NULL)
-		ire_refrele(sire);
-	/*
-	 * We need to set sire to NULL to avoid double freeing if we
-	 * ever goto err_ret from below.
-	 */
-	sire = NULL;
-	ip6h = (ip6_t *)mp->b_rptr;
-	/* Skip ip6i_t header if present */
-	if (ip6h->ip6_nxt == IPPROTO_RAW) {
-		/* Make sure the IPv6 header is present */
-		if ((mp->b_wptr - (uchar_t *)ip6h) <
-		    sizeof (ip6i_t) + IPV6_HDR_LEN) {
-			if (!pullupmsg(mp, sizeof (ip6i_t) + IPV6_HDR_LEN)) {
-				ip1dbg(("ip_newroute_v6: pullupmsg failed\n"));
-				goto err_ret;
-			}
-		}
-		mp->b_rptr += sizeof (ip6i_t);
-		ip6h = (ip6_t *)mp->b_rptr;
-	}
-	/* Did this packet originate externally? */
-	if (mp->b_prev) {
-		if (ill != NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInNoRoutes);
-		} else {
-			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsInNoRoutes);
-		}
-		mp->b_next = NULL;
-		mp->b_prev = NULL;
-		q = WR(q);
-	} else {
-		if (ill != NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutNoRoutes);
-		} else {
-			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutNoRoutes);
-		}
-		if (ip_hdr_complete_v6(ip6h, zoneid, ipst)) {
-			/* Failed */
-			if (copy_mp != NULL) {
-				MULTIRT_DEBUG_UNTAG(copy_mp);
-				freemsg(copy_mp);
-			}
-			MULTIRT_DEBUG_UNTAG(first_mp);
-			freemsg(first_mp);
-			if (ire != NULL)
-				ire_refrele(ire);
-			if (need_rele)
-				ill_refrele(ill);
-			return;
-		}
-	}
-
-	if (need_rele)
-		ill_refrele(ill);
-
-	/*
-	 * At this point we will have ire only if RTF_BLACKHOLE
-	 * or RTF_REJECT flags are set on the IRE. It will not
-	 * generate ICMP6_DST_UNREACH_NOROUTE if RTF_BLACKHOLE is set.
-	 */
-	if (ire != NULL) {
-		if (ire->ire_flags & RTF_BLACKHOLE) {
-			ire_refrele(ire);
-			if (copy_mp != NULL) {
-				MULTIRT_DEBUG_UNTAG(copy_mp);
-				freemsg(copy_mp);
-			}
-			MULTIRT_DEBUG_UNTAG(first_mp);
-			freemsg(first_mp);
-			return;
-		}
-		ire_refrele(ire);
-	}
-	if (ip_debug > 3) {
-		/* ip2dbg */
-		pr_addr_dbg("ip_newroute_v6: no route to %s\n",
-		    AF_INET6, v6dstp);
-	}
-	icmp_unreachable_v6(WR(q), first_mp, ICMP6_DST_UNREACH_NOROUTE,
-	    B_FALSE, B_FALSE, zoneid, ipst);
-}
-
-/*
- * ip_newroute_ipif_v6 is called by ip_wput_v6 and ip_wput_ipsec_out_v6 whenever
- * we need to send out a packet to a destination address for which we do not
- * have specific routing information. It is only used for multicast packets.
- *
- * If unspec_src we allow creating an IRE with source address zero.
- * ire_send_v6() will delete it after the packet is sent.
- */
-void
-ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
-    const in6_addr_t *v6dstp, const in6_addr_t *v6srcp, int unspec_src,
-    zoneid_t zoneid)
-{
-	ire_t	*ire = NULL;
-	ipif_t	*src_ipif = NULL;
-	int	err = 0;
-	ill_t	*dst_ill = NULL;
-	ire_t	*save_ire;
-	ipsec_out_t *io;
-	ill_t *ill;
-	mblk_t *first_mp;
-	ire_t *fire = NULL;
-	mblk_t  *copy_mp = NULL;
-	const in6_addr_t *ire_v6srcp;
-	boolean_t probe = B_FALSE;
-	boolean_t multirt_resolve_next;
-	boolean_t ipif_held = B_FALSE;
-	boolean_t ill_held = B_FALSE;
-	boolean_t ip6_asp_table_held = B_FALSE;
-	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
-
-	/*
-	 * This loop is run only once in most cases.
-	 * We loop to resolve further routes only when the destination
-	 * can be reached through multiple RTF_MULTIRT-flagged ires.
-	 */
-	do {
-		multirt_resolve_next = B_FALSE;
-		if (dst_ill != NULL) {
-			ill_refrele(dst_ill);
-			dst_ill = NULL;
-		}
-
-		if (src_ipif != NULL) {
-			ipif_refrele(src_ipif);
-			src_ipif = NULL;
-		}
-		ASSERT(ipif != NULL);
-		ill = ipif->ipif_ill;
-
-		ASSERT(!IN6_IS_ADDR_V4MAPPED(v6dstp));
-		if (ip_debug > 2) {
-			/* ip1dbg */
-			pr_addr_dbg("ip_newroute_ipif_v6: v6dst %s\n",
-			    AF_INET6, v6dstp);
-			printf("ip_newroute_ipif_v6: if %s, v6 %d\n",
-			    ill->ill_name, ipif->ipif_isv6);
-		}
-
-		first_mp = mp;
-		if (mp->b_datap->db_type == M_CTL) {
-			mp = mp->b_cont;
-			io = (ipsec_out_t *)first_mp->b_rptr;
-			ASSERT(io->ipsec_out_type == IPSEC_OUT);
-		} else {
-			io = NULL;
-		}
-
-		/*
-		 * If the interface is a pt-pt interface we look for an
-		 * IRE_IF_RESOLVER or IRE_IF_NORESOLVER that matches both the
-		 * local_address and the pt-pt destination address.
-		 * Otherwise we just match the local address.
-		 */
-		if (!(ill->ill_flags & ILLF_MULTICAST)) {
-			goto err_ret;
-		}
-
-		/*
-		 * We check if an IRE_OFFSUBNET for the addr that goes through
-		 * ipif exists. We need it to determine if the RTF_SETSRC and/or
-		 * RTF_MULTIRT flags must be honored.
-		 */
-		fire = ipif_lookup_multi_ire_v6(ipif, v6dstp);
-		ip2dbg(("ip_newroute_ipif_v6: "
-		    "ipif_lookup_multi_ire_v6("
-		    "ipif %p, dst %08x) = fire %p\n",
-		    (void *)ipif, ntohl(V4_PART_OF_V6((*v6dstp))),
-		    (void *)fire));
-
-		ASSERT(src_ipif == NULL);
-
-		/*
-		 * Because nce_xmit() calls ip_output_v6() and NCEs are always
-		 * tied to the underlying interface, IS_UNDER_IPMP() may be
-		 * true even when building IREs that will be used for data
-		 * traffic.  As such, see if the packet's source address is a
-		 * test address, and if so use that test address's ipif for
-		 * the IRE so that the logic that sets IRE_MARK_TESTHIDDEN in
-		 * ire_add_v6() can work properly.
-		 */
-		if (IS_UNDER_IPMP(ill))
-			probe = ipif_lookup_testaddr_v6(ill, v6srcp, &src_ipif);
-
-		/*
-		 * Determine the outbound (destination) ill for this route.
-		 * If IPMP is not in use, that's the same as our ill.  If IPMP
-		 * is in-use and we're on the IPMP interface, or we're on an
-		 * underlying ill but sending data traffic, use a suitable
-		 * destination ill from the group.  The latter case covers a
-		 * subtle edge condition with multicast: when we bring up an
-		 * IPv6 data address, we will create an NCE on an underlying
-		 * interface, and send solitications to ff02::1, which would
-		 * take us through here, and cause us to create an IRE for
-		 * ff02::1.  To meet our defined semantics for multicast (and
-		 * ensure there aren't unexpected echoes), that IRE needs to
-		 * use the IPMP group's nominated multicast interface.
-		 *
-		 * Note: the source ipif is determined by source address
-		 * selection later.
-		 */
-		if (IS_IPMP(ill) || (IS_UNDER_IPMP(ill) && !probe)) {
-			ill_t *ipmp_ill;
-			ipmp_illgrp_t *illg;
-
-			if (IS_UNDER_IPMP(ill)) {
-				ipmp_ill = ipmp_ill_hold_ipmp_ill(ill);
-			} else {
-				ipmp_ill = ill;
-				ill_refhold(ipmp_ill);	/* for symmetry */
-			}
-
-			if (ipmp_ill == NULL)
-				goto err_ret;
-
-			illg = ipmp_ill->ill_grp;
-			if (IN6_IS_ADDR_MULTICAST(v6dstp))
-				dst_ill = ipmp_illgrp_hold_cast_ill(illg);
-			else
-				dst_ill = ipmp_illgrp_hold_next_ill(illg);
-
-			ill_refrele(ipmp_ill);
-		} else {
-			dst_ill = ill;
-			ill_refhold(dst_ill); 	/* for symmetry */
-		}
-
-		if (dst_ill == NULL) {
-			if (ip_debug > 2) {
-				pr_addr_dbg("ip_newroute_ipif_v6: "
-				    "no dst ill for dst %s\n",
-				    AF_INET6, v6dstp);
-			}
-			goto err_ret;
-		}
-
-		/*
-		 * Pick a source address which matches the scope of the
-		 * destination address.
-		 * For RTF_SETSRC routes, the source address is imposed by the
-		 * parent ire (fire).
-		 */
-
-		if (src_ipif == NULL && fire != NULL &&
-		    (fire->ire_flags & RTF_SETSRC)) {
-			/*
-			 * Check that the ipif matching the requested source
-			 * address still exists.
-			 */
-			src_ipif = ipif_lookup_addr_v6(&fire->ire_src_addr_v6,
-			    NULL, zoneid, NULL, NULL, NULL, NULL, ipst);
-		}
-
-		if (src_ipif == NULL && ip6_asp_can_lookup(ipst)) {
-			ip6_asp_table_held = B_TRUE;
-			src_ipif = ipif_select_source_v6(dst_ill, v6dstp,
-			    B_FALSE, IPV6_PREFER_SRC_DEFAULT, zoneid);
-		}
-
-		if (src_ipif == NULL) {
-			if (!unspec_src) {
-				if (ip_debug > 2) {
-					/* ip1dbg */
-					pr_addr_dbg("ip_newroute_ipif_v6: "
-					    "no src for dst %s\n",
-					    AF_INET6, v6dstp);
-					printf(" through interface %s\n",
-					    dst_ill->ill_name);
-				}
-				goto err_ret;
-			}
-			ire_v6srcp = &ipv6_all_zeros;
-			src_ipif = ipif;
-			ipif_refhold(src_ipif);
-		} else {
-			ire_v6srcp = &src_ipif->ipif_v6src_addr;
-		}
-
-		ire = ipif_to_ire_v6(ipif);
-		if (ire == NULL) {
-			if (ip_debug > 2) {
-				/* ip1dbg */
-				pr_addr_dbg("ip_newroute_ipif_v6: v6src %s\n",
-				    AF_INET6, &ipif->ipif_v6lcl_addr);
-				printf("ip_newroute_ipif_v6: "
-				    "if %s\n", dst_ill->ill_name);
-			}
-			goto err_ret;
-		}
-		if (ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE))
-			goto err_ret;
-
-		ASSERT(ire->ire_ipversion == IPV6_VERSION);
-
-		ip1dbg(("ip_newroute_ipif_v6: interface type %s (%d),",
-		    ip_nv_lookup(ire_nv_tbl, ire->ire_type), ire->ire_type));
-		if (ip_debug > 2) {
-			/* ip1dbg */
-			pr_addr_dbg(" address %s\n",
-			    AF_INET6, &ire->ire_src_addr_v6);
-		}
-		save_ire = ire;
-		ip2dbg(("ip_newroute_ipif: ire %p, ipif %p\n",
-		    (void *)ire, (void *)ipif));
-
-		if ((fire != NULL) && (fire->ire_flags & RTF_MULTIRT)) {
-			/*
-			 * an IRE_OFFSUBET was looked up
-			 * on that interface.
-			 * this ire has RTF_MULTIRT flag,
-			 * so the resolution loop
-			 * will be re-entered to resolve
-			 * additional routes on other
-			 * interfaces. For that purpose,
-			 * a copy of the packet is
-			 * made at this point.
-			 */
-			fire->ire_last_used_time = lbolt;
-			copy_mp = copymsg(first_mp);
-			if (copy_mp) {
-				MULTIRT_DEBUG_TAG(copy_mp);
-			}
-		}
-
-		switch (ire->ire_type) {
-		case IRE_IF_NORESOLVER: {
-			/*
-			 * We have what we need to build an IRE_CACHE.
-			 *
-			 * handle the Gated case, where we create
-			 * a NORESOLVER route for loopback.
-			 */
-			if (dst_ill->ill_net_type != IRE_IF_NORESOLVER)
-				break;
-			/*
-			 * The newly created ire will inherit the flags of the
-			 * parent ire, if any.
-			 */
-			ire = ire_create_v6(
-			    v6dstp,			/* dest address */
-			    &ipv6_all_ones,		/* mask */
-			    ire_v6srcp,			/* source address */
-			    NULL,			/* gateway address */
-			    &save_ire->ire_max_frag,
-			    NULL,			/* no src nce */
-			    dst_ill->ill_rq,		/* recv-from queue */
-			    dst_ill->ill_wq,		/* send-to queue */
-			    IRE_CACHE,
-			    src_ipif,
-			    NULL,
-			    (fire != NULL) ?		/* Parent handle */
-			    fire->ire_phandle : 0,
-			    save_ire->ire_ihandle,	/* Interface handle */
-			    (fire != NULL) ?
-			    (fire->ire_flags & (RTF_SETSRC | RTF_MULTIRT)) :
-			    0,
-			    &ire_uinfo_null,
-			    NULL,
-			    NULL,
-			    ipst);
-
-			if (ire == NULL) {
-				ire_refrele(save_ire);
-				break;
-			}
-
-			err = ndp_noresolver(dst_ill, v6dstp);
-			if (err != 0) {
-				ire_refrele(save_ire);
-				break;
-			}
-
-			/* Prevent save_ire from getting deleted */
-			IRB_REFHOLD(save_ire->ire_bucket);
-			/* Has it been removed already ? */
-			if (save_ire->ire_marks & IRE_MARK_CONDEMNED) {
-				IRB_REFRELE(save_ire->ire_bucket);
-				ire_refrele(save_ire);
-				break;
-			}
-
-			ire_add_then_send(q, ire, first_mp);
-			if (ip6_asp_table_held) {
-				ip6_asp_table_refrele(ipst);
-				ip6_asp_table_held = B_FALSE;
-			}
-
-			/* Assert that it is not deleted yet. */
-			ASSERT(save_ire->ire_ptpn != NULL);
-			IRB_REFRELE(save_ire->ire_bucket);
-			ire_refrele(save_ire);
-			if (fire != NULL) {
-				ire_refrele(fire);
-				fire = NULL;
-			}
-
-			/*
-			 * The resolution loop is re-entered if we
-			 * actually are in a multirouting case.
-			 */
-			if (copy_mp != NULL) {
-				boolean_t need_resolve =
-				    ire_multirt_need_resolve_v6(v6dstp,
-				    msg_getlabel(copy_mp), ipst);
-				if (!need_resolve) {
-					MULTIRT_DEBUG_UNTAG(copy_mp);
-					freemsg(copy_mp);
-					copy_mp = NULL;
-				} else {
-					/*
-					 * ipif_lookup_group_v6() calls
-					 * ire_lookup_multi_v6() that uses
-					 * ire_ftable_lookup_v6() to find
-					 * an IRE_INTERFACE for the group.
-					 * In the multirt case,
-					 * ire_lookup_multi_v6() then invokes
-					 * ire_multirt_lookup_v6() to find
-					 * the next resolvable ire.
-					 * As a result, we obtain a new
-					 * interface, derived from the
-					 * next ire.
-					 */
-					if (ipif_held) {
-						ipif_refrele(ipif);
-						ipif_held = B_FALSE;
-					}
-					ipif = ipif_lookup_group_v6(v6dstp,
-					    zoneid, ipst);
-					ip2dbg(("ip_newroute_ipif: "
-					    "multirt dst %08x, ipif %p\n",
-					    ntohl(V4_PART_OF_V6((*v6dstp))),
-					    (void *)ipif));
-					if (ipif != NULL) {
-						ipif_held = B_TRUE;
-						mp = copy_mp;
-						copy_mp = NULL;
-						multirt_resolve_next =
-						    B_TRUE;
-						continue;
-					} else {
-						freemsg(copy_mp);
-					}
-				}
-			}
-			ill_refrele(dst_ill);
-			if (ipif_held) {
-				ipif_refrele(ipif);
-				ipif_held = B_FALSE;
-			}
-			if (src_ipif != NULL)
-				ipif_refrele(src_ipif);
-			return;
-		}
-		case IRE_IF_RESOLVER: {
-
-			ASSERT(dst_ill->ill_isv6);
-
-			/*
-			 * We obtain a partial IRE_CACHE which we will pass
-			 * along with the resolver query.  When the response
-			 * comes back it will be there ready for us to add.
-			 */
-			/*
-			 * the newly created ire will inherit the flags of the
-			 * parent ire, if any.
-			 */
-			ire = ire_create_v6(
-			    v6dstp,			/* dest address */
-			    &ipv6_all_ones,		/* mask */
-			    ire_v6srcp,			/* source address */
-			    NULL,			/* gateway address */
-			    &save_ire->ire_max_frag,
-			    NULL,			/* src nce */
-			    dst_ill->ill_rq,		/* recv-from queue */
-			    dst_ill->ill_wq,		/* send-to queue */
-			    IRE_CACHE,
-			    src_ipif,
-			    NULL,
-			    (fire != NULL) ?		/* Parent handle */
-			    fire->ire_phandle : 0,
-			    save_ire->ire_ihandle,	/* Interface handle */
-			    (fire != NULL) ?
-			    (fire->ire_flags & (RTF_SETSRC | RTF_MULTIRT)) :
-			    0,
-			    &ire_uinfo_null,
-			    NULL,
-			    NULL,
-			    ipst);
-
-			if (ire == NULL) {
-				ire_refrele(save_ire);
-				break;
-			}
-
-			/* Resolve and add ire to the ctable */
-			err = ndp_resolver(dst_ill, v6dstp, first_mp, zoneid);
-			switch (err) {
-			case 0:
-				/* Prevent save_ire from getting deleted */
-				IRB_REFHOLD(save_ire->ire_bucket);
-				/* Has it been removed already ? */
-				if (save_ire->ire_marks & IRE_MARK_CONDEMNED) {
-					IRB_REFRELE(save_ire->ire_bucket);
-					ire_refrele(save_ire);
-					break;
-				}
-				/*
-				 * We have a resolved cache entry,
-				 * add in the IRE.
-				 */
-				ire_add_then_send(q, ire, first_mp);
-				if (ip6_asp_table_held) {
-					ip6_asp_table_refrele(ipst);
-					ip6_asp_table_held = B_FALSE;
-				}
-
-				/* Assert that it is not deleted yet. */
-				ASSERT(save_ire->ire_ptpn != NULL);
-				IRB_REFRELE(save_ire->ire_bucket);
-				ire_refrele(save_ire);
-				if (fire != NULL) {
-					ire_refrele(fire);
-					fire = NULL;
-				}
-
-				/*
-				 * The resolution loop is re-entered if we
-				 * actually are in a multirouting case.
-				 */
-				if (copy_mp != NULL) {
-					boolean_t need_resolve =
-					    ire_multirt_need_resolve_v6(v6dstp,
-					    msg_getlabel(copy_mp), ipst);
-					if (!need_resolve) {
-						MULTIRT_DEBUG_UNTAG(copy_mp);
-						freemsg(copy_mp);
-						copy_mp = NULL;
-					} else {
-						/*
-						 * ipif_lookup_group_v6() calls
-						 * ire_lookup_multi_v6() that
-						 * uses ire_ftable_lookup_v6()
-						 * to find an IRE_INTERFACE for
-						 * the group. In the multirt
-						 * case, ire_lookup_multi_v6()
-						 * then invokes
-						 * ire_multirt_lookup_v6() to
-						 * find the next resolvable ire.
-						 * As a result, we obtain a new
-						 * interface, derived from the
-						 * next ire.
-						 */
-						if (ipif_held) {
-							ipif_refrele(ipif);
-							ipif_held = B_FALSE;
-						}
-						ipif = ipif_lookup_group_v6(
-						    v6dstp, zoneid, ipst);
-						ip2dbg(("ip_newroute_ipif: "
-						    "multirt dst %08x, "
-						    "ipif %p\n",
-						    ntohl(V4_PART_OF_V6(
-						    (*v6dstp))),
-						    (void *)ipif));
-						if (ipif != NULL) {
-							ipif_held = B_TRUE;
-							mp = copy_mp;
-							copy_mp = NULL;
-							multirt_resolve_next =
-							    B_TRUE;
-							continue;
-						} else {
-							freemsg(copy_mp);
-						}
-					}
-				}
-				ill_refrele(dst_ill);
-				if (ipif_held) {
-					ipif_refrele(ipif);
-					ipif_held = B_FALSE;
-				}
-				if (src_ipif != NULL)
-					ipif_refrele(src_ipif);
-				return;
-
-			case EINPROGRESS:
-				/*
-				 * mp was consumed - presumably queued.
-				 * No need for ire, presumably resolution is
-				 * in progress, and ire will be added when the
-				 * address is resolved.
-				 */
-				if (ip6_asp_table_held) {
-					ip6_asp_table_refrele(ipst);
-					ip6_asp_table_held = B_FALSE;
-				}
-				ire_delete(ire);
-				ire_refrele(save_ire);
-				if (fire != NULL) {
-					ire_refrele(fire);
-					fire = NULL;
-				}
-
-				/*
-				 * The resolution loop is re-entered if we
-				 * actually are in a multirouting case.
-				 */
-				if (copy_mp != NULL) {
-					boolean_t need_resolve =
-					    ire_multirt_need_resolve_v6(v6dstp,
-					    msg_getlabel(copy_mp), ipst);
-					if (!need_resolve) {
-						MULTIRT_DEBUG_UNTAG(copy_mp);
-						freemsg(copy_mp);
-						copy_mp = NULL;
-					} else {
-						/*
-						 * ipif_lookup_group_v6() calls
-						 * ire_lookup_multi_v6() that
-						 * uses ire_ftable_lookup_v6()
-						 * to find an IRE_INTERFACE for
-						 * the group. In the multirt
-						 * case, ire_lookup_multi_v6()
-						 * then invokes
-						 * ire_multirt_lookup_v6() to
-						 * find the next resolvable ire.
-						 * As a result, we obtain a new
-						 * interface, derived from the
-						 * next ire.
-						 */
-						if (ipif_held) {
-							ipif_refrele(ipif);
-							ipif_held = B_FALSE;
-						}
-						ipif = ipif_lookup_group_v6(
-						    v6dstp, zoneid, ipst);
-						ip2dbg(("ip_newroute_ipif: "
-						    "multirt dst %08x, "
-						    "ipif %p\n",
-						    ntohl(V4_PART_OF_V6(
-						    (*v6dstp))),
-						    (void *)ipif));
-						if (ipif != NULL) {
-							ipif_held = B_TRUE;
-							mp = copy_mp;
-							copy_mp = NULL;
-							multirt_resolve_next =
-							    B_TRUE;
-							continue;
-						} else {
-							freemsg(copy_mp);
-						}
-					}
-				}
-				ill_refrele(dst_ill);
-				if (ipif_held) {
-					ipif_refrele(ipif);
-					ipif_held = B_FALSE;
-				}
-				if (src_ipif != NULL)
-					ipif_refrele(src_ipif);
-				return;
-			default:
-				/* Some transient error */
-				ire_refrele(save_ire);
-				break;
-			}
-			break;
-		}
-		default:
-			break;
-		}
-		if (ip6_asp_table_held) {
-			ip6_asp_table_refrele(ipst);
-			ip6_asp_table_held = B_FALSE;
-		}
-	} while (multirt_resolve_next);
-
-err_ret:
-	if (ip6_asp_table_held)
-		ip6_asp_table_refrele(ipst);
-	if (ire != NULL)
-		ire_refrele(ire);
-	if (fire != NULL)
-		ire_refrele(fire);
-	if (ipif != NULL && ipif_held)
-		ipif_refrele(ipif);
-	if (src_ipif != NULL)
-		ipif_refrele(src_ipif);
-
-	/* Multicast - no point in trying to generate ICMP error */
-	if (dst_ill != NULL) {
-		ill = dst_ill;
-		ill_held = B_TRUE;
-	}
-	if (mp->b_prev || mp->b_next) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-	} else {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
-	}
-	ip1dbg(("ip_newroute_ipif_v6: dropped\n"));
-	mp->b_next = NULL;
-	mp->b_prev = NULL;
-	freemsg(first_mp);
-	if (ill_held)
-		ill_refrele(ill);
-}
-
-/*
  * Parse and process any hop-by-hop or destination options.
  *
  * Assumes that q is an ill read queue so that ICMP errors for link-local
@@ -6067,23 +2854,16 @@ err_ret:
  * Current code checks for each opt_type (other than pads) if it is in
  * the expected  nexthdr (hbh or dest)
  */
-static int
-ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
-    uint8_t *optptr, uint_t optlen, uint8_t hdr_type, ip_stack_t *ipst)
+int
+ip_process_options_v6(mblk_t *mp, ip6_t *ip6h,
+    uint8_t *optptr, uint_t optlen, uint8_t hdr_type, ip_recv_attr_t *ira)
 {
 	uint8_t opt_type;
 	uint_t optused;
 	int ret = 0;
-	mblk_t *first_mp;
 	const char *errtype;
-	zoneid_t zoneid;
-	ill_t *ill = q->q_ptr;
-	ipif_t *ipif;
-
-	first_mp = mp;
-	if (mp->b_datap->db_type == M_CTL) {
-		mp = mp->b_cont;
-	}
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
 	while (optlen != 0) {
 		opt_type = *optptr;
@@ -6178,13 +2958,9 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 				 * around (i.e. before AH processing).
 				 * If we've done AH... stop now.
 				 */
-				if (first_mp != mp) {
-					ipsec_in_t *ii;
-
-					ii = (ipsec_in_t *)first_mp->b_rptr;
-					if (ii->ipsec_in_ah_sa != NULL)
-						break;
-				}
+				if ((ira->ira_flags & IRAF_IPSEC_SECURE) &&
+				    ira->ira_ipsec_ah_sa != NULL)
+					break;
 
 				oh = (struct ip6_opt_home_address *)optptr;
 				/* Check total length and alignment */
@@ -6217,8 +2993,6 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 				/* FALLTHROUGH */
 			opt_error:
 				/* Determine which zone should send error */
-				zoneid = ipif_lookup_addr_zoneid_v6(
-				    &ip6h->ip6_dst, ill, ipst);
 				switch (IP6OPT_TYPE(opt_type)) {
 				case IP6OPT_TYPE_SKIP:
 					optused = 2 + optptr[1];
@@ -6232,48 +3006,33 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 					ip1dbg(("ip_process_options_v6: %s "
 					    "opt 0x%x; packet dropped\n",
 					    errtype, opt_type));
-					freemsg(first_mp);
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsInHdrErrors);
+					ip_drop_input("ipIfStatsInHdrErrors",
+					    mp, ill);
+					freemsg(mp);
 					return (-1);
 				case IP6OPT_TYPE_ICMP:
-					if (zoneid == ALL_ZONES) {
-						freemsg(first_mp);
-						return (-1);
-					}
-					icmp_param_problem_v6(WR(q), first_mp,
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsInHdrErrors);
+					ip_drop_input("ipIfStatsInHdrErrors",
+					    mp, ill);
+					icmp_param_problem_v6(mp,
 					    ICMP6_PARAMPROB_OPTION,
 					    (uint32_t)(optptr -
 					    (uint8_t *)ip6h),
-					    B_FALSE, B_FALSE, zoneid, ipst);
+					    B_FALSE, ira);
 					return (-1);
 				case IP6OPT_TYPE_FORCEICMP:
-					/*
-					 * If we don't have a zone and the dst
-					 * addr is multicast, then pick a zone
-					 * based on the inbound interface.
-					 */
-					if (zoneid == ALL_ZONES &&
-					    IN6_IS_ADDR_MULTICAST(
-					    &ip6h->ip6_dst)) {
-						ipif = ipif_select_source_v6(
-						    ill, &ip6h->ip6_src,
-						    B_TRUE,
-						    IPV6_PREFER_SRC_DEFAULT,
-						    ALL_ZONES);
-						if (ipif != NULL) {
-							zoneid =
-							    ipif->ipif_zoneid;
-							ipif_refrele(ipif);
-						}
-					}
-					if (zoneid == ALL_ZONES) {
-						freemsg(first_mp);
-						return (-1);
-					}
-					icmp_param_problem_v6(WR(q), first_mp,
+					BUMP_MIB(ill->ill_ip_mib,
+					    ipIfStatsInHdrErrors);
+					ip_drop_input("ipIfStatsInHdrErrors",
+					    mp, ill);
+					icmp_param_problem_v6(mp,
 					    ICMP6_PARAMPROB_OPTION,
 					    (uint32_t)(optptr -
 					    (uint8_t *)ip6h),
-					    B_FALSE, B_TRUE, zoneid, ipst);
+					    B_TRUE, ira);
 					return (-1);
 				default:
 					ASSERT(0);
@@ -6287,14 +3046,10 @@ ip_process_options_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 
 bad_opt:
 	/* Determine which zone should send error */
-	zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill, ipst);
-	if (zoneid == ALL_ZONES) {
-		freemsg(first_mp);
-	} else {
-		icmp_param_problem_v6(WR(q), first_mp, ICMP6_PARAMPROB_OPTION,
-		    (uint32_t)(optptr - (uint8_t *)ip6h),
-		    B_FALSE, B_FALSE, zoneid, ipst);
-	}
+	ip_drop_input("ICMP_PARAM_PROBLEM", mp, ill);
+	icmp_param_problem_v6(mp, ICMP6_PARAMPROB_OPTION,
+	    (uint32_t)(optptr - (uint8_t *)ip6h),
+	    B_FALSE, ira);
 	return (-1);
 }
 
@@ -6302,10 +3057,11 @@ bad_opt:
  * Process a routing header that is not yet empty.
  * Because of RFC 5095, we now reject all route headers.
  */
-static void
-ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
-    ill_t *ill, mblk_t *hada_mp)
+void
+ip_process_rthdr(mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
+    ip_recv_attr_t *ira)
 {
+	ill_t		*ill = ira->ira_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(rth->ip6r_segleft != 0);
@@ -6314,19 +3070,15 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 		/* XXX Check for source routed out same interface? */
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInAddrErrors);
-		freemsg(hada_mp);
+		ip_drop_input("ipIfStatsInAddrErrors", mp, ill);
 		freemsg(mp);
 		return;
 	}
-	if (hada_mp != NULL) {
-		freemsg(hada_mp);
-		freemsg(mp);
-		return;
-	}
-	/* Sent by forwarding path, and router is global zone */
-	icmp_param_problem_v6(WR(q), mp, ICMP6_PARAMPROB_HEADER,
-	    (uint32_t)((uchar_t *)&rth->ip6r_type - (uchar_t *)ip6h), B_FALSE,
-	    B_FALSE, GLOBAL_ZONEID, ipst);
+
+	ip_drop_input("ICMP_PARAM_PROBLEM", mp, ill);
+	icmp_param_problem_v6(mp, ICMP6_PARAMPROB_HEADER,
+	    (uint32_t)((uchar_t *)&rth->ip6r_type - (uchar_t *)ip6h),
+	    B_FALSE, ira);
 }
 
 /*
@@ -6335,21 +3087,10 @@ ip_process_rthdr(queue_t *q, mblk_t *mp, ip6_t *ip6h, ip6_rthdr_t *rth,
 void
 ip_rput_v6(queue_t *q, mblk_t *mp)
 {
-	mblk_t		*first_mp;
-	mblk_t		*hada_mp = NULL;
-	ip6_t		*ip6h;
-	boolean_t	ll_multicast = B_FALSE;
-	boolean_t	mctl_present = B_FALSE;
 	ill_t		*ill;
-	struct iocblk	*iocp;
-	uint_t 		flags = 0;
-	mblk_t		*dl_mp;
-	ip_stack_t	*ipst;
-	int		check;
 
 	ill = (ill_t *)q->q_ptr;
-	ipst = ill->ill_ipst;
-	if (ill->ill_state_flags & ILL_CONDEMNED) {
+	if (ill->ill_state_flags & (ILL_CONDEMNED | ILL_LL_SUBNET_PENDING)) {
 		union DL_primitives *dl;
 
 		dl = (union DL_primitives *)mp->b_rptr;
@@ -6367,241 +3108,14 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 			return;
 		}
 	}
+	if (DB_TYPE(mp) == M_DATA) {
+		struct mac_header_info_s mhi;
 
-	dl_mp = NULL;
-	switch (mp->b_datap->db_type) {
-	case M_DATA: {
-		int hlen;
-		uchar_t *ucp;
-		struct ether_header *eh;
-		dl_unitdata_ind_t *dui;
-
-		/*
-		 * This is a work-around for CR 6451644, a bug in Nemo.  It
-		 * should be removed when that problem is fixed.
-		 */
-		if (ill->ill_mactype == DL_ETHER &&
-		    (hlen = MBLKHEAD(mp)) >= sizeof (struct ether_header) &&
-		    (ucp = mp->b_rptr)[-1] == (ETHERTYPE_IPV6 & 0xFF) &&
-		    ucp[-2] == (ETHERTYPE_IPV6 >> 8)) {
-			if (hlen >= sizeof (struct ether_vlan_header) &&
-			    ucp[-5] == 0 && ucp[-6] == 0x81)
-				ucp -= sizeof (struct ether_vlan_header);
-			else
-				ucp -= sizeof (struct ether_header);
-			/*
-			 * If it's a group address, then fabricate a
-			 * DL_UNITDATA_IND message.
-			 */
-			if ((ll_multicast = (ucp[0] & 1)) != 0 &&
-			    (dl_mp = allocb(DL_UNITDATA_IND_SIZE + 16,
-			    BPRI_HI)) != NULL) {
-				eh = (struct ether_header *)ucp;
-				dui = (dl_unitdata_ind_t *)dl_mp->b_rptr;
-				DB_TYPE(dl_mp) = M_PROTO;
-				dl_mp->b_wptr = (uchar_t *)(dui + 1) + 16;
-				dui->dl_primitive = DL_UNITDATA_IND;
-				dui->dl_dest_addr_length = 8;
-				dui->dl_dest_addr_offset = DL_UNITDATA_IND_SIZE;
-				dui->dl_src_addr_length = 8;
-				dui->dl_src_addr_offset = DL_UNITDATA_IND_SIZE +
-				    8;
-				dui->dl_group_address = 1;
-				ucp = (uchar_t *)(dui + 1);
-				if (ill->ill_sap_length > 0)
-					ucp += ill->ill_sap_length;
-				bcopy(&eh->ether_dhost, ucp, 6);
-				bcopy(&eh->ether_shost, ucp + 8, 6);
-				ucp = (uchar_t *)(dui + 1);
-				if (ill->ill_sap_length < 0)
-					ucp += 8 + ill->ill_sap_length;
-				bcopy(&eh->ether_type, ucp, 2);
-				bcopy(&eh->ether_type, ucp + 8, 2);
-			}
-		}
-		break;
-	}
-
-	case M_PROTO:
-	case M_PCPROTO:
-		if (((dl_unitdata_ind_t *)mp->b_rptr)->dl_primitive !=
-		    DL_UNITDATA_IND) {
-			/* Go handle anything other than data elsewhere. */
-			ip_rput_dlpi(q, mp);
-			return;
-		}
-		ll_multicast = ip_get_dlpi_mbcast(ill, mp);
-
-		/* Save the DLPI header. */
-		dl_mp = mp;
-		mp = mp->b_cont;
-		dl_mp->b_cont = NULL;
-		break;
-	case M_BREAK:
-		panic("ip_rput_v6: got an M_BREAK");
-		/*NOTREACHED*/
-	case M_IOCACK:
-		iocp = (struct iocblk *)mp->b_rptr;
-		switch (iocp->ioc_cmd) {
-		case DL_IOC_HDR_INFO:
-			ill = (ill_t *)q->q_ptr;
-			ill_fastpath_ack(ill, mp);
-			return;
-		default:
-			putnext(q, mp);
-			return;
-		}
-		/* FALLTHRU */
-	case M_ERROR:
-	case M_HANGUP:
-		mutex_enter(&ill->ill_lock);
-		if (ill->ill_state_flags & ILL_CONDEMNED) {
-			mutex_exit(&ill->ill_lock);
-			freemsg(mp);
-			return;
-		}
-		ill_refhold_locked(ill);
-		mutex_exit(&ill->ill_lock);
-		qwriter_ip(ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
-		return;
-	case M_CTL:
-		if ((MBLKL(mp) > sizeof (int)) &&
-		    ((da_ipsec_t *)mp->b_rptr)->da_type == IPHADA_M_CTL) {
-			ASSERT(MBLKL(mp) >= sizeof (da_ipsec_t));
-			mctl_present = B_TRUE;
-			break;
-		}
-		putnext(q, mp);
-		return;
-	case M_IOCNAK:
-		iocp = (struct iocblk *)mp->b_rptr;
-		switch (iocp->ioc_cmd) {
-		case DL_IOC_HDR_INFO:
-			ip_rput_other(NULL, q, mp, NULL);
-			return;
-		default:
-			break;
-		}
-		/* FALLTHRU */
-	default:
-		putnext(q, mp);
-		return;
-	}
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInReceives);
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInOctets,
-	    (mp->b_cont == NULL) ? MBLKL(mp) : msgdsize(mp));
-	/*
-	 * if db_ref > 1 then copymsg and free original. Packet may be
-	 * changed and do not want other entity who has a reference to this
-	 * message to trip over the changes. This is a blind change because
-	 * trying to catch all places that might change packet is too
-	 * difficult (since it may be a module above this one).
-	 */
-	if (mp->b_datap->db_ref > 1) {
-		mblk_t  *mp1;
-
-		mp1 = copymsg(mp);
-		freemsg(mp);
-		if (mp1 == NULL) {
-			first_mp = NULL;
-			goto discard;
-		}
-		mp = mp1;
-	}
-	first_mp = mp;
-	if (mctl_present) {
-		hada_mp = first_mp;
-		mp = first_mp->b_cont;
-	}
-
-	if ((check = ip_check_v6_mblk(mp, ill)) == IP6_MBLK_HDR_ERR) {
-		freemsg(mp);
-		return;
-	}
-
-	ip6h = (ip6_t *)mp->b_rptr;
-
-	/*
-	 * ip:::receive must see ipv6 packets with a full header,
-	 * and so is placed after the IP6_MBLK_HDR_ERR check.
-	 */
-	DTRACE_IP7(receive, mblk_t *, first_mp, conn_t *, NULL, void_ip_t *,
-	    ip6h, __dtrace_ipsr_ill_t *, ill, ipha_t *, NULL, ip6_t *, ip6h,
-	    int, 0);
-
-	if (check != IP6_MBLK_OK) {
-		freemsg(mp);
-		return;
-	}
-
-	DTRACE_PROBE4(ip6__physical__in__start,
-	    ill_t *, ill, ill_t *, NULL,
-	    ip6_t *, ip6h, mblk_t *, first_mp);
-
-	FW_HOOKS6(ipst->ips_ip6_physical_in_event,
-	    ipst->ips_ipv6firewall_physical_in,
-	    ill, NULL, ip6h, first_mp, mp, ll_multicast, ipst);
-
-	DTRACE_PROBE1(ip6__physical__in__end, mblk_t *, first_mp);
-
-	if (first_mp == NULL)
-		return;
-
-	/*
-	 * Attach any necessary label information to this packet.
-	 */
-	if (is_system_labeled() && !tsol_get_pkt_label(mp, IPV6_VERSION)) {
-		if (ip6opt_ls != 0)
-			ip0dbg(("tsol_get_pkt_label v6 failed\n"));
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-		goto discard;
-	}
-
-	/* IP observability hook. */
-	if (ipst->ips_ip6_observe.he_interested) {
-		zoneid_t dzone;
-
-		dzone = ip_get_zoneid_v6(&ip6h->ip6_dst, mp, ill, ipst,
-		    ALL_ZONES);
-		ipobs_hook(mp, IPOBS_HOOK_INBOUND, ALL_ZONES, dzone,
-		    ill, ipst);
-	}
-
-	if ((ip6h->ip6_vcf & IPV6_VERS_AND_FLOW_MASK) ==
-	    IPV6_DEFAULT_VERS_AND_FLOW) {
-		/*
-		 * It may be a bit too expensive to do this mapped address
-		 * check here, but in the interest of robustness, it seems
-		 * like the correct place.
-		 * TODO: Avoid this check for e.g. connected TCP sockets
-		 */
-		if (IN6_IS_ADDR_V4MAPPED(&ip6h->ip6_src)) {
-			ip1dbg(("ip_rput_v6: pkt with mapped src addr\n"));
-			goto discard;
-		}
-
-		if (IN6_IS_ADDR_LOOPBACK(&ip6h->ip6_src)) {
-			ip1dbg(("ip_rput_v6: pkt with loopback src"));
-			goto discard;
-		} else if (IN6_IS_ADDR_LOOPBACK(&ip6h->ip6_dst)) {
-			ip1dbg(("ip_rput_v6: pkt with loopback dst"));
-			goto discard;
-		}
-
-		flags |= (ll_multicast ? IP6_IN_LLMCAST : 0);
-		ip_rput_data_v6(q, ill, mp, ip6h, flags, hada_mp, dl_mp);
+		ip_mdata_to_mhi(ill, mp, &mhi);
+		ip_input_v6(ill, NULL, mp, &mhi);
 	} else {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInWrongIPVersion);
-		goto discard;
+		ip_rput_notdata(ill, mp);
 	}
-	freemsg(dl_mp);
-	return;
-
-discard:
-	if (dl_mp != NULL)
-		freeb(dl_mp);
-	freemsg(first_mp);
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 }
 
 /*
@@ -6703,1507 +3217,72 @@ ipsec_needs_processing_v6(mblk_t *mp, uint8_t *nexthdr)
 }
 
 /*
- * Path for AH if options are present. If this is the first time we are
- * sending a datagram to AH, allocate a IPSEC_IN message and prepend it.
- * Otherwise, just fanout.  Return value answers the boolean question:
- * "Did I consume the mblk you sent me?"
+ * Path for AH if options are present.
+ * Returns NULL if the mblk was consumed.
  *
  * Sometimes AH needs to be done before other IPv6 headers for security
  * reasons.  This function (and its ipsec_needs_processing_v6() above)
  * indicates if that is so, and fans out to the appropriate IPsec protocol
  * for the datagram passed in.
  */
-static boolean_t
-ipsec_early_ah_v6(queue_t *q, mblk_t *first_mp, boolean_t mctl_present,
-    ill_t *ill, ill_t *inill, mblk_t *hada_mp, zoneid_t zoneid)
+mblk_t *
+ipsec_early_ah_v6(mblk_t *mp, ip_recv_attr_t *ira)
 {
-	mblk_t *mp;
 	uint8_t nexthdr;
-	ipsec_in_t *ii = NULL;
 	ah_t *ah;
-	ipsec_status_t ipsec_rc;
+	ill_t		*ill = ira->ira_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
-	netstack_t	*ns = ipst->ips_netstack;
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 
-	ASSERT((hada_mp == NULL) || (!mctl_present));
-
-	switch (ipsec_needs_processing_v6(
-	    (mctl_present ? first_mp->b_cont : first_mp), &nexthdr)) {
+	switch (ipsec_needs_processing_v6(mp, &nexthdr)) {
 	case IPSEC_MEMORY_ERROR:
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-		freemsg(hada_mp);
-		freemsg(first_mp);
-		return (B_TRUE);
+		ip_drop_input("ipIfStatsInDiscards", mp, ill);
+		freemsg(mp);
+		return (NULL);
 	case IPSEC_HDR_DONT_PROCESS:
-		return (B_FALSE);
+		return (mp);
 	}
 
 	/* Default means send it to AH! */
 	ASSERT(nexthdr == IPPROTO_AH);
-	if (!mctl_present) {
-		mp = first_mp;
-		first_mp = ipsec_in_alloc(B_FALSE, ipst->ips_netstack);
-		if (first_mp == NULL) {
-			ip1dbg(("ipsec_early_ah_v6: IPSEC_IN "
-			    "allocation failure.\n"));
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(hada_mp);
-			freemsg(mp);
-			return (B_TRUE);
-		}
-		/*
-		 * Store the ill_index so that when we come back
-		 * from IPSEC we ride on the same queue.
-		 */
-		ii = (ipsec_in_t *)first_mp->b_rptr;
-		ii->ipsec_in_ill_index = ill->ill_phyint->phyint_ifindex;
-		ii->ipsec_in_rill_index = inill->ill_phyint->phyint_ifindex;
-		first_mp->b_cont = mp;
-	}
-	/*
-	 * Cache hardware acceleration info.
-	 */
-	if (hada_mp != NULL) {
-		ASSERT(ii != NULL);
-		IPSECHW_DEBUG(IPSECHW_PKT, ("ipsec_early_ah_v6: "
-		    "caching data attr.\n"));
-		ii->ipsec_in_accelerated = B_TRUE;
-		ii->ipsec_in_da = hada_mp;
-	}
 
 	if (!ipsec_loaded(ipss)) {
-		ip_proto_not_sup(q, first_mp, IP_FF_SEND_ICMP, zoneid, ipst);
-		return (B_TRUE);
+		ip_proto_not_sup(mp, ira);
+		return (NULL);
 	}
 
-	ah = ipsec_inbound_ah_sa(first_mp, ns);
-	if (ah == NULL)
-		return (B_TRUE);
-	ASSERT(ii->ipsec_in_ah_sa != NULL);
-	ASSERT(ii->ipsec_in_ah_sa->ipsa_input_func != NULL);
-	ipsec_rc = ii->ipsec_in_ah_sa->ipsa_input_func(first_mp, ah);
+	mp = ipsec_inbound_ah_sa(mp, ira, &ah);
+	if (mp == NULL)
+		return (NULL);
+	ASSERT(ah != NULL);
+	ASSERT(ira->ira_flags & IRAF_IPSEC_SECURE);
+	ASSERT(ira->ira_ipsec_ah_sa != NULL);
+	ASSERT(ira->ira_ipsec_ah_sa->ipsa_input_func != NULL);
+	mp = ira->ira_ipsec_ah_sa->ipsa_input_func(mp, ah, ira);
 
-	switch (ipsec_rc) {
-	case IPSEC_STATUS_SUCCESS:
-		/* we're done with IPsec processing, send it up */
-		ip_fanout_proto_again(first_mp, ill, inill, NULL);
-		break;
-	case IPSEC_STATUS_FAILED:
-		BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsInDiscards);
-		break;
-	case IPSEC_STATUS_PENDING:
-		/* no action needed */
-		break;
-	}
-	return (B_TRUE);
-}
-
-static boolean_t
-ip_iptun_input_v6(mblk_t *ipsec_mp, mblk_t *data_mp,
-    size_t hdr_len, uint8_t nexthdr, zoneid_t zoneid, ill_t *ill,
-    ip_stack_t *ipst)
-{
-	conn_t	*connp;
-
-	ASSERT(ipsec_mp == NULL || ipsec_mp->b_cont == data_mp);
-
-	connp = ipcl_classify_v6(data_mp, nexthdr, hdr_len, zoneid, ipst);
-	if (connp != NULL) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		connp->conn_recv(connp, ipsec_mp != NULL ? ipsec_mp : data_mp,
-		    NULL);
-		CONN_DEC_REF(connp);
-		return (B_TRUE);
-	}
-	return (B_FALSE);
-}
-
-/*
- * Validate the IPv6 mblk for alignment.
- */
-int
-ip_check_v6_mblk(mblk_t *mp, ill_t *ill)
-{
-	int pkt_len, ip6_len;
-	ip6_t *ip6h = (ip6_t *)mp->b_rptr;
-
-	/* check for alignment and full IPv6 header */
-	if (!OK_32PTR((uchar_t *)ip6h) ||
-	    (mp->b_wptr - (uchar_t *)ip6h) < IPV6_HDR_LEN) {
-		if (!pullupmsg(mp, IPV6_HDR_LEN)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			ip1dbg(("ip_rput_v6: pullupmsg failed\n"));
-			return (IP6_MBLK_HDR_ERR);
-		}
-		ip6h = (ip6_t *)mp->b_rptr;
-	}
-
-	ASSERT(OK_32PTR((uchar_t *)ip6h) &&
-	    (mp->b_wptr - (uchar_t *)ip6h) >= IPV6_HDR_LEN);
-
-	if (mp->b_cont == NULL)
-		pkt_len = mp->b_wptr - mp->b_rptr;
-	else
-		pkt_len = msgdsize(mp);
-	ip6_len = ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN;
-
-	/*
-	 * Check for bogus (too short packet) and packet which
-	 * was padded by the link layer.
-	 */
-	if (ip6_len != pkt_len) {
-		ssize_t diff;
-
-		if (ip6_len > pkt_len) {
-			ip1dbg(("ip_rput_data_v6: packet too short %d %d\n",
-			    ip6_len, pkt_len));
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTruncatedPkts);
-			return (IP6_MBLK_LEN_ERR);
-		}
-		diff = (ssize_t)(pkt_len - ip6_len);
-
-		if (!adjmsg(mp, -diff)) {
-			ip1dbg(("ip_rput_data_v6: adjmsg failed\n"));
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			return (IP6_MBLK_LEN_ERR);
-		}
-
+	if (mp == NULL) {
 		/*
-		 * adjmsg may have freed an mblk from the chain, hence
-		 * invalidate any hw checksum here. This will force IP to
-		 * calculate the checksum in sw, but only for this packet.
+		 * Either it failed or is pending. In the former case
+		 * ipIfStatsInDiscards was increased.
 		 */
-		DB_CKSUMFLAGS(mp) = 0;
-	}
-	return (IP6_MBLK_OK);
-}
-
-/*
- * ip_rput_data_v6 -- received IPv6 packets in M_DATA messages show up here.
- * ip_rput_v6 has already verified alignment, the min length, the version,
- * and db_ref = 1.
- *
- * The ill passed in (the arg named inill) is the ill that the packet
- * actually arrived on.  We need to remember this when saving the
- * input interface index into potential IPV6_PKTINFO data in
- * ip_add_info_v6().
- *
- * This routine doesn't free dl_mp; that's the caller's responsibility on
- * return.  (Note that the callers are complex enough that there's no tail
- * recursion here anyway.)
- */
-void
-ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
-    uint_t flags, mblk_t *hada_mp, mblk_t *dl_mp)
-{
-	ire_t		*ire = NULL;
-	ill_t		*ill = inill;
-	ill_t		*outill;
-	uint8_t		*whereptr;
-	uint8_t		nexthdr;
-	uint16_t	remlen;
-	uint_t		prev_nexthdr_offset;
-	uint_t		used;
-	size_t		old_pkt_len;
-	size_t		pkt_len;
-	uint16_t	ip6_len;
-	uint_t		hdr_len;
-	boolean_t	mctl_present;
-	mblk_t		*first_mp;
-	mblk_t		*first_mp1;
-	boolean_t	no_forward;
-	ip6_hbh_t	*hbhhdr;
-	boolean_t	ll_multicast = (flags & IP6_IN_LLMCAST);
-	conn_t		*connp;
-	uint32_t	ports;
-	zoneid_t	zoneid = GLOBAL_ZONEID;
-	uint16_t	hck_flags, reass_hck_flags;
-	uint32_t	reass_sum;
-	boolean_t	cksum_err;
-	mblk_t		*mp1;
-	ip_stack_t	*ipst = inill->ill_ipst;
-	ilb_stack_t	*ilbs = ipst->ips_netstack->netstack_ilb;
-	in6_addr_t	lb_dst;
-	int		lb_ret = ILB_PASSED;
-
-	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-
-	if (hada_mp != NULL) {
-		/*
-		 * It's an IPsec accelerated packet.
-		 * Keep a pointer to the data attributes around until
-		 * we allocate the ipsecinfo structure.
-		 */
-		IPSECHW_DEBUG(IPSECHW_PKT,
-		    ("ip_rput_data_v6: inbound HW accelerated IPsec pkt\n"));
-		hada_mp->b_cont = NULL;
-		/*
-		 * Since it is accelerated, it came directly from
-		 * the ill.
-		 */
-		ASSERT(mctl_present == B_FALSE);
-		ASSERT(mp->b_datap->db_type != M_CTL);
+		return (NULL);
 	}
 
-	ip6h = (ip6_t *)mp->b_rptr;
-	ip6_len = ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN;
-	old_pkt_len = pkt_len = ip6_len;
-
-	if (ILL_HCKSUM_CAPABLE(ill) && !mctl_present && dohwcksum)
-		hck_flags = DB_CKSUMFLAGS(mp);
-	else
-		hck_flags = 0;
-
-	/* Clear checksum flags in case we need to forward */
-	DB_CKSUMFLAGS(mp) = 0;
-	reass_sum = reass_hck_flags = 0;
-
-	nexthdr = ip6h->ip6_nxt;
-
-	prev_nexthdr_offset = (uint_t)((uchar_t *)&ip6h->ip6_nxt -
-	    (uchar_t *)ip6h);
-	whereptr = (uint8_t *)&ip6h[1];
-	remlen = pkt_len - IPV6_HDR_LEN;	/* Track how much is left */
-
-	/* Process hop by hop header options */
-	if (nexthdr == IPPROTO_HOPOPTS) {
-		uint_t ehdrlen;
-		uint8_t *optptr;
-
-		if (remlen < MIN_EHDR_LEN)
-			goto pkt_too_short;
-		if (mp->b_cont != NULL &&
-		    whereptr + MIN_EHDR_LEN > mp->b_wptr) {
-			if (!pullupmsg(mp, IPV6_HDR_LEN + MIN_EHDR_LEN)) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(hada_mp);
-				freemsg(first_mp);
-				return;
-			}
-			ip6h = (ip6_t *)mp->b_rptr;
-			whereptr = (uint8_t *)ip6h + pkt_len - remlen;
-		}
-		hbhhdr = (ip6_hbh_t *)whereptr;
-		nexthdr = hbhhdr->ip6h_nxt;
-		prev_nexthdr_offset = (uint_t)(whereptr - (uint8_t *)ip6h);
-		ehdrlen = 8 * (hbhhdr->ip6h_len + 1);
-
-		if (remlen < ehdrlen)
-			goto pkt_too_short;
-		if (mp->b_cont != NULL &&
-		    whereptr + ehdrlen > mp->b_wptr) {
-			if (!pullupmsg(mp, IPV6_HDR_LEN + ehdrlen)) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(hada_mp);
-				freemsg(first_mp);
-				return;
-			}
-			ip6h = (ip6_t *)mp->b_rptr;
-			whereptr = (uint8_t *)ip6h + pkt_len - remlen;
-			hbhhdr = (ip6_hbh_t *)whereptr;
-		}
-
-		optptr = whereptr + 2;
-		whereptr += ehdrlen;
-		remlen -= ehdrlen;
-		switch (ip_process_options_v6(q, first_mp, ip6h, optptr,
-		    ehdrlen - 2, IPPROTO_HOPOPTS, ipst)) {
-		case -1:
-			/*
-			 * Packet has been consumed and any
-			 * needed ICMP messages sent.
-			 */
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-			freemsg(hada_mp);
-			return;
-		case 0:
-			/* no action needed */
-			break;
-		case 1:
-			/* Known router alert */
-			goto ipv6forus;
-		}
-	}
-
-	/*
-	 * On incoming v6 multicast packets we will bypass the ire table,
-	 * and assume that the read queue corresponds to the targetted
-	 * interface.
-	 *
-	 * The effect of this is the same as the IPv4 original code, but is
-	 * much cleaner I think.  See ip_rput for how that was done.
-	 */
-	if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInMcastPkts);
-		UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInMcastOctets, pkt_len);
-
-		/*
-		 * So that we don't end up with dups, only one ill in an IPMP
-		 * group is nominated to receive multicast data traffic.
-		 * However, link-locals on any underlying interfaces will have
-		 * joined their solicited-node multicast addresses and we must
-		 * accept those packets.  (We don't attempt to precisely
-		 * filter out duplicate solicited-node multicast packets since
-		 * e.g. an IPMP interface and underlying interface may have
-		 * the same solicited-node multicast address.)  Note that we
-		 * won't generally have duplicates because we only issue a
-		 * DL_ENABMULTI_REQ on one interface in a group; the exception
-		 * is when PHYI_MULTI_BCAST is set.
-		 */
-		if (IS_UNDER_IPMP(ill) && !ill->ill_nom_cast &&
-		    !IN6_IS_ADDR_MC_SOLICITEDNODE(&ip6h->ip6_dst)) {
-			goto drop_pkt;
-		}
-
-		/*
-		 * XXX TODO Give to mrouted to for multicast forwarding.
-		 */
-		if (ilm_lookup_ill_v6(ill, &ip6h->ip6_dst, B_FALSE,
-		    ALL_ZONES) == NULL) {
-			if (ip_debug > 3) {
-				/* ip2dbg */
-				pr_addr_dbg("ip_rput_data_v6: got mcast packet"
-				    "  which is not for us: %s\n", AF_INET6,
-				    &ip6h->ip6_dst);
-			}
-drop_pkt:		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(hada_mp);
-			freemsg(first_mp);
-			return;
-		}
-		if (ip_debug > 3) {
-			/* ip2dbg */
-			pr_addr_dbg("ip_rput_data_v6: multicast for us: %s\n",
-			    AF_INET6, &ip6h->ip6_dst);
-		}
-		zoneid = GLOBAL_ZONEID;
-		goto ipv6forus;
-	}
-
-	/*
-	 * Find an ire that matches destination. For link-local addresses
-	 * we have to match the ill.
-	 * TBD for site local addresses.
-	 */
-	if (IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_dst)) {
-		ire = ire_ctable_lookup_v6(&ip6h->ip6_dst, NULL,
-		    IRE_CACHE|IRE_LOCAL, ill->ill_ipif, ALL_ZONES, NULL,
-		    MATCH_IRE_TYPE | MATCH_IRE_ILL, ipst);
-	} else {
-		if (ilb_has_rules(ilbs) && ILB_SUPP_L4(nexthdr)) {
-			/* For convenience, we just pull up the mblk. */
-			if (mp->b_cont != NULL) {
-				if (pullupmsg(mp, -1) == 0) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(hada_mp);
-					freemsg(first_mp);
-					return;
-				}
-				hdr_len = pkt_len - remlen;
-				ip6h = (ip6_t *)mp->b_rptr;
-				whereptr = (uint8_t *)ip6h + hdr_len;
-			}
-			lb_ret = ilb_check_v6(ilbs, ill, mp, ip6h, nexthdr,
-			    whereptr, &lb_dst);
-			if (lb_ret == ILB_DROPPED) {
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				freemsg(hada_mp);
-				freemsg(first_mp);
-				return;
-			}
-		}
-
-		ire = ire_cache_lookup_v6((lb_ret == ILB_BALANCED) ? &lb_dst :
-		    &ip6h->ip6_dst, ALL_ZONES, msg_getlabel(mp), ipst);
-
-		if (ire != NULL && ire->ire_stq != NULL &&
-		    ire->ire_zoneid != GLOBAL_ZONEID &&
-		    ire->ire_zoneid != ALL_ZONES) {
-			/*
-			 * Should only use IREs that are visible from the
-			 * global zone for forwarding.
-			 */
-			ire_refrele(ire);
-			ire = ire_cache_lookup_v6(&ip6h->ip6_dst,
-			    GLOBAL_ZONEID, msg_getlabel(mp), ipst);
-		}
-	}
-
-	if (ire == NULL) {
-		/*
-		 * No matching IRE found.  Mark this packet as having
-		 * originated externally.
-		 */
-		if (!(ill->ill_flags & ILLF_ROUTER) || ll_multicast) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-			if (!(ill->ill_flags & ILLF_ROUTER)) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsInAddrErrors);
-			}
-			freemsg(hada_mp);
-			freemsg(first_mp);
-			return;
-		}
-		if (ip6h->ip6_hops <= 1) {
-			if (hada_mp != NULL)
-				goto hada_drop;
-			/* Sent by forwarding path, and router is global zone */
-			icmp_time_exceeded_v6(WR(q), first_mp,
-			    ICMP6_TIME_EXCEED_TRANSIT, ll_multicast, B_FALSE,
-			    GLOBAL_ZONEID, ipst);
-			return;
-		}
-		/*
-		 * Per RFC 3513 section 2.5.2, we must not forward packets with
-		 * an unspecified source address.
-		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-			freemsg(hada_mp);
-			freemsg(first_mp);
-			return;
-		}
-		mp->b_prev = (mblk_t *)(uintptr_t)
-		    ill->ill_phyint->phyint_ifindex;
-		ip_newroute_v6(q, mp, (lb_ret == ILB_BALANCED) ? &lb_dst :
-		    &ip6h->ip6_dst, &ip6h->ip6_src,
-		    IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_dst) ? ill : NULL,
-		    GLOBAL_ZONEID, ipst);
-		return;
-	}
-	/* we have a matching IRE */
-	if (ire->ire_stq != NULL) {
-		/*
-		 * To be quicker, we may wish not to chase pointers
-		 * (ire->ire_ipif->ipif_ill...) and instead store the
-		 * forwarding policy in the ire.  An unfortunate side-
-		 * effect of this would be requiring an ire flush whenever
-		 * the ILLF_ROUTER flag changes.  For now, chase pointers
-		 * once and store in the boolean no_forward.
-		 *
-		 * This appears twice to keep it out of the non-forwarding,
-		 * yes-it's-for-us-on-the-right-interface case.
-		 */
-		no_forward = ((ill->ill_flags &
-		    ire->ire_ipif->ipif_ill->ill_flags & ILLF_ROUTER) == 0);
-
-		ASSERT(first_mp == mp);
-		/*
-		 * This ire has a send-to queue - forward the packet.
-		 */
-		if (no_forward || ll_multicast || (hada_mp != NULL)) {
-			freemsg(hada_mp);
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-			if (no_forward) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsInAddrErrors);
-			}
-			freemsg(mp);
-			ire_refrele(ire);
-			return;
-		}
-		/*
-		 * ipIfStatsHCInForwDatagrams should only be increment if there
-		 * will be an attempt to forward the packet, which is why we
-		 * increment after the above condition has been checked.
-		 */
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInForwDatagrams);
-		if (ip6h->ip6_hops <= 1) {
-			ip1dbg(("ip_rput_data_v6: hop limit expired.\n"));
-			/* Sent by forwarding path, and router is global zone */
-			icmp_time_exceeded_v6(WR(q), mp,
-			    ICMP6_TIME_EXCEED_TRANSIT, ll_multicast, B_FALSE,
-			    GLOBAL_ZONEID, ipst);
-			ire_refrele(ire);
-			return;
-		}
-		/*
-		 * Per RFC 3513 section 2.5.2, we must not forward packets with
-		 * an unspecified source address.
-		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src)) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-			freemsg(mp);
-			ire_refrele(ire);
-			return;
-		}
-
-		if (is_system_labeled()) {
-			mblk_t *mp1;
-
-			if ((mp1 = tsol_ip_forward(ire, mp)) == NULL) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsForwProhibits);
-				freemsg(mp);
-				ire_refrele(ire);
-				return;
-			}
-			/* Size may have changed */
-			mp = mp1;
-			ip6h = (ip6_t *)mp->b_rptr;
-			pkt_len = msgdsize(mp);
-		}
-
-		if (pkt_len > ire->ire_max_frag) {
-			int max_frag = ire->ire_max_frag;
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTooBigErrors);
-			/*
-			 * Handle labeled packet resizing.
-			 */
-			if (is_system_labeled()) {
-				max_frag = tsol_pmtu_adjust(mp, max_frag,
-				    pkt_len - old_pkt_len, AF_INET6);
-			}
-
-			/* Sent by forwarding path, and router is global zone */
-			icmp_pkt2big_v6(WR(q), mp, max_frag,
-			    ll_multicast, B_TRUE, GLOBAL_ZONEID, ipst);
-			ire_refrele(ire);
-			return;
-		}
-
-		/*
-		 * Check to see if we're forwarding the packet to a
-		 * different link from which it came.  If so, check the
-		 * source and destination addresses since routers must not
-		 * forward any packets with link-local source or
-		 * destination addresses to other links.  Otherwise (if
-		 * we're forwarding onto the same link), conditionally send
-		 * a redirect message.
-		 */
-		if (ire->ire_rfq != q &&
-		    !IS_IN_SAME_ILLGRP(ill, (ill_t *)ire->ire_rfq->q_ptr)) {
-			if (IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_dst) ||
-			    IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_src)) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsInAddrErrors);
-				freemsg(mp);
-				ire_refrele(ire);
-				return;
-			}
-			/* TBD add site-local check at site boundary? */
-		} else if (ipst->ips_ipv6_send_redirects) {
-			in6_addr_t	*v6targ;
-			in6_addr_t	gw_addr_v6;
-			ire_t		*src_ire_v6 = NULL;
-
-			/*
-			 * Don't send a redirect when forwarding a source
-			 * routed packet.
-			 */
-			if (ip_source_routed_v6(ip6h, mp, ipst))
-				goto forward;
-
-			mutex_enter(&ire->ire_lock);
-			gw_addr_v6 = ire->ire_gateway_addr_v6;
-			mutex_exit(&ire->ire_lock);
-			if (!IN6_IS_ADDR_UNSPECIFIED(&gw_addr_v6)) {
-				v6targ = &gw_addr_v6;
-				/*
-				 * We won't send redirects to a router
-				 * that doesn't have a link local
-				 * address, but will forward.
-				 */
-				if (!IN6_IS_ADDR_LINKLOCAL(v6targ)) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInAddrErrors);
-					goto forward;
-				}
-			} else {
-				v6targ = &ip6h->ip6_dst;
-			}
-
-			src_ire_v6 = ire_ftable_lookup_v6(&ip6h->ip6_src,
-			    NULL, NULL, IRE_INTERFACE, ire->ire_ipif, NULL,
-			    GLOBAL_ZONEID, 0, NULL,
-			    MATCH_IRE_IPIF | MATCH_IRE_TYPE,
-			    ipst);
-
-			if (src_ire_v6 != NULL) {
-				/*
-				 * The source is directly connected.
-				 */
-				mp1 = copymsg(mp);
-				if (mp1 != NULL) {
-					icmp_send_redirect_v6(WR(q),
-					    mp1, v6targ, &ip6h->ip6_dst,
-					    ill, B_FALSE);
-				}
-				ire_refrele(src_ire_v6);
-			}
-		}
-
-forward:
-		/* Hoplimit verified above */
-		ip6h->ip6_hops--;
-
-		outill = ire->ire_ipif->ipif_ill;
-
-		DTRACE_PROBE4(ip6__forwarding__start,
-		    ill_t *, inill, ill_t *, outill,
-		    ip6_t *, ip6h, mblk_t *, mp);
-
-		FW_HOOKS6(ipst->ips_ip6_forwarding_event,
-		    ipst->ips_ipv6firewall_forwarding,
-		    inill, outill, ip6h, mp, mp, 0, ipst);
-
-		DTRACE_PROBE1(ip6__forwarding__end, mblk_t *, mp);
-
-		if (mp != NULL) {
-			UPDATE_IB_PKT_COUNT(ire);
-			ire->ire_last_used_time = lbolt;
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutForwDatagrams);
-			ip_xmit_v6(mp, ire, 0, NULL, B_FALSE, NULL);
-		}
-		IRE_REFRELE(ire);
-		return;
-	}
-
-	/*
-	 * Need to put on correct queue for reassembly to find it.
-	 * No need to use put() since reassembly has its own locks.
-	 * Note: multicast packets and packets destined to addresses
-	 * assigned to loopback (ire_rfq is NULL) will be reassembled on
-	 * the arriving ill. Unlike the IPv4 case, enabling strict
-	 * destination multihoming will prevent accepting packets
-	 * addressed to an IRE_LOCAL on lo0.
-	 */
-	if (ire->ire_rfq != q) {
-		if ((ire = ip_check_multihome(&ip6h->ip6_dst, ire, ill))
-		    == NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-			freemsg(hada_mp);
-			freemsg(first_mp);
-			return;
-		}
-		if (ire->ire_rfq != NULL) {
-			q = ire->ire_rfq;
-			ill = (ill_t *)q->q_ptr;
-			ASSERT(ill != NULL);
-		}
-	}
-
-	zoneid = ire->ire_zoneid;
-	UPDATE_IB_PKT_COUNT(ire);
-	ire->ire_last_used_time = lbolt;
-	/* Don't use the ire after this point, we'll NULL it out to be sure. */
-	ire_refrele(ire);
-	ire = NULL;
-ipv6forus:
-	/*
-	 * Looks like this packet is for us one way or another.
-	 * This is where we'll process destination headers etc.
-	 */
-	for (; ; ) {
-		switch (nexthdr) {
-		case IPPROTO_TCP: {
-			uint16_t	*up;
-			uint32_t	sum;
-			int		offset;
-
-			hdr_len = pkt_len - remlen;
-
-			if (hada_mp != NULL) {
-				ip0dbg(("tcp hada drop\n"));
-				goto hada_drop;
-			}
-
-
-			/* TCP needs all of the TCP header */
-			if (remlen < TCP_MIN_HEADER_LENGTH)
-				goto pkt_too_short;
-			if (mp->b_cont != NULL &&
-			    whereptr + TCP_MIN_HEADER_LENGTH > mp->b_wptr) {
-				if (!pullupmsg(mp,
-				    hdr_len + TCP_MIN_HEADER_LENGTH)) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(first_mp);
-					return;
-				}
-				hck_flags = 0;
-				ip6h = (ip6_t *)mp->b_rptr;
-				whereptr = (uint8_t *)ip6h + hdr_len;
-			}
-			/*
-			 * Extract the offset field from the TCP header.
-			 */
-			offset = ((uchar_t *)ip6h)[hdr_len + 12] >> 4;
-			if (offset != 5) {
-				if (offset < 5) {
-					ip1dbg(("ip_rput_data_v6: short "
-					    "TCP data offset"));
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(first_mp);
-					return;
-				}
-				/*
-				 * There must be TCP options.
-				 * Make sure we can grab them.
-				 */
-				offset <<= 2;
-				if (remlen < offset)
-					goto pkt_too_short;
-				if (mp->b_cont != NULL &&
-				    whereptr + offset > mp->b_wptr) {
-					if (!pullupmsg(mp,
-					    hdr_len + offset)) {
-						BUMP_MIB(ill->ill_ip_mib,
-						    ipIfStatsInDiscards);
-						freemsg(first_mp);
-						return;
-					}
-					hck_flags = 0;
-					ip6h = (ip6_t *)mp->b_rptr;
-					whereptr = (uint8_t *)ip6h + hdr_len;
-				}
-			}
-
-			up = (uint16_t *)&ip6h->ip6_src;
-			/*
-			 * TCP checksum calculation.  First sum up the
-			 * pseudo-header fields:
-			 *  -	Source IPv6 address
-			 *  -	Destination IPv6 address
-			 *  -	TCP payload length
-			 *  -	TCP protocol ID
-			 */
-			sum = htons(IPPROTO_TCP + remlen) +
-			    up[0] + up[1] + up[2] + up[3] +
-			    up[4] + up[5] + up[6] + up[7] +
-			    up[8] + up[9] + up[10] + up[11] +
-			    up[12] + up[13] + up[14] + up[15];
-
-			/* Fold initial sum */
-			sum = (sum & 0xffff) + (sum >> 16);
-
-			mp1 = mp->b_cont;
-
-			if ((hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
-				IP6_STAT(ipst, ip6_in_sw_cksum);
-
-			IP_CKSUM_RECV(hck_flags, sum, (uchar_t *)
-			    ((uchar_t *)mp->b_rptr + DB_CKSUMSTART(mp)),
-			    (int32_t)(whereptr - (uchar_t *)mp->b_rptr),
-			    mp, mp1, cksum_err);
-
-			if (cksum_err) {
-				BUMP_MIB(ill->ill_ip_mib, tcpIfStatsInErrs);
-
-				if (hck_flags & HCK_FULLCKSUM) {
-					IP6_STAT(ipst,
-					    ip6_tcp_in_full_hw_cksum_err);
-				} else if (hck_flags & HCK_PARTIALCKSUM) {
-					IP6_STAT(ipst,
-					    ip6_tcp_in_part_hw_cksum_err);
-				} else {
-					IP6_STAT(ipst, ip6_tcp_in_sw_cksum_err);
-				}
-				freemsg(first_mp);
-				return;
-			}
-tcp_fanout:
-			ip_fanout_tcp_v6(q, first_mp, ip6h, ill, inill,
-			    (flags|IP_FF_SEND_ICMP|IP_FF_SYN_ADDIRE|
-			    IP_FF_IPINFO), hdr_len, mctl_present, zoneid);
-			return;
-		}
-		case IPPROTO_SCTP:
-		{
-			sctp_hdr_t *sctph;
-			uint32_t calcsum, pktsum;
-			uint_t hdr_len = pkt_len - remlen;
-			sctp_stack_t *sctps;
-
-			sctps = inill->ill_ipst->ips_netstack->netstack_sctp;
-
-			/* SCTP needs all of the SCTP header */
-			if (remlen < sizeof (*sctph)) {
-				goto pkt_too_short;
-			}
-			if (whereptr + sizeof (*sctph) > mp->b_wptr) {
-				ASSERT(mp->b_cont != NULL);
-				if (!pullupmsg(mp, hdr_len + sizeof (*sctph))) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(mp);
-					return;
-				}
-				ip6h = (ip6_t *)mp->b_rptr;
-				whereptr = (uint8_t *)ip6h + hdr_len;
-			}
-
-			sctph = (sctp_hdr_t *)(mp->b_rptr + hdr_len);
-			/* checksum */
-			pktsum = sctph->sh_chksum;
-			sctph->sh_chksum = 0;
-			calcsum = sctp_cksum(mp, hdr_len);
-			if (calcsum != pktsum) {
-				BUMP_MIB(&sctps->sctps_mib, sctpChecksumError);
-				freemsg(mp);
-				return;
-			}
-			sctph->sh_chksum = pktsum;
-			ports = *(uint32_t *)(mp->b_rptr + hdr_len);
-			if ((connp = sctp_fanout(&ip6h->ip6_src, &ip6h->ip6_dst,
-			    ports, zoneid, mp, sctps)) == NULL) {
-				ip_fanout_sctp_raw(first_mp, ill,
-				    (ipha_t *)ip6h, B_FALSE, ports,
-				    mctl_present,
-				    (flags|IP_FF_SEND_ICMP|IP_FF_IPINFO),
-				    B_TRUE, zoneid);
-				return;
-			}
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-			sctp_input(connp, (ipha_t *)ip6h, mp, first_mp, ill,
-			    B_FALSE, mctl_present);
-			return;
-		}
-		case IPPROTO_UDP: {
-			uint16_t	*up;
-			uint32_t	sum;
-
-			hdr_len = pkt_len - remlen;
-
-			if (hada_mp != NULL) {
-				ip0dbg(("udp hada drop\n"));
-				goto hada_drop;
-			}
-
-			/* Verify that at least the ports are present */
-			if (remlen < UDPH_SIZE)
-				goto pkt_too_short;
-			if (mp->b_cont != NULL &&
-			    whereptr + UDPH_SIZE > mp->b_wptr) {
-				if (!pullupmsg(mp, hdr_len + UDPH_SIZE)) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(first_mp);
-					return;
-				}
-				hck_flags = 0;
-				ip6h = (ip6_t *)mp->b_rptr;
-				whereptr = (uint8_t *)ip6h + hdr_len;
-			}
-
-			/*
-			 *  Before going through the regular checksum
-			 *  calculation, make sure the received checksum
-			 *  is non-zero. RFC 2460 says, a 0x0000 checksum
-			 *  in a UDP packet (within IPv6 packet) is invalid
-			 *  and should be replaced by 0xffff. This makes
-			 *  sense as regular checksum calculation will
-			 *  pass for both the cases i.e. 0x0000 and 0xffff.
-			 *  Removing one of the case makes error detection
-			 *  stronger.
-			 */
-
-			if (((udpha_t *)whereptr)->uha_checksum == 0) {
-				/* 0x0000 checksum is invalid */
-				ip1dbg(("ip_rput_data_v6: Invalid UDP "
-				    "checksum value 0x0000\n"));
-				BUMP_MIB(ill->ill_ip_mib,
-				    udpIfStatsInCksumErrs);
-				freemsg(first_mp);
-				return;
-			}
-
-			up = (uint16_t *)&ip6h->ip6_src;
-
-			/*
-			 * UDP checksum calculation.  First sum up the
-			 * pseudo-header fields:
-			 *  -	Source IPv6 address
-			 *  -	Destination IPv6 address
-			 *  -	UDP payload length
-			 *  -	UDP protocol ID
-			 */
-
-			sum = htons(IPPROTO_UDP + remlen) +
-			    up[0] + up[1] + up[2] + up[3] +
-			    up[4] + up[5] + up[6] + up[7] +
-			    up[8] + up[9] + up[10] + up[11] +
-			    up[12] + up[13] + up[14] + up[15];
-
-			/* Fold initial sum */
-			sum = (sum & 0xffff) + (sum >> 16);
-
-			if (reass_hck_flags != 0) {
-				hck_flags = reass_hck_flags;
-
-				IP_CKSUM_RECV_REASS(hck_flags,
-				    (int32_t)(whereptr - (uchar_t *)mp->b_rptr),
-				    sum, reass_sum, cksum_err);
-			} else {
-				mp1 = mp->b_cont;
-
-				IP_CKSUM_RECV(hck_flags, sum, (uchar_t *)
-				    ((uchar_t *)mp->b_rptr + DB_CKSUMSTART(mp)),
-				    (int32_t)(whereptr - (uchar_t *)mp->b_rptr),
-				    mp, mp1, cksum_err);
-			}
-
-			if ((hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
-				IP6_STAT(ipst, ip6_in_sw_cksum);
-
-			if (cksum_err) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    udpIfStatsInCksumErrs);
-
-				if (hck_flags & HCK_FULLCKSUM)
-					IP6_STAT(ipst,
-					    ip6_udp_in_full_hw_cksum_err);
-				else if (hck_flags & HCK_PARTIALCKSUM)
-					IP6_STAT(ipst,
-					    ip6_udp_in_part_hw_cksum_err);
-				else
-					IP6_STAT(ipst, ip6_udp_in_sw_cksum_err);
-
-				freemsg(first_mp);
-				return;
-			}
-			goto udp_fanout;
-		}
-		case IPPROTO_ICMPV6: {
-			uint16_t	*up;
-			uint32_t	sum;
-			uint_t		hdr_len = pkt_len - remlen;
-
-			if (hada_mp != NULL) {
-				ip0dbg(("icmp hada drop\n"));
-				goto hada_drop;
-			}
-
-			up = (uint16_t *)&ip6h->ip6_src;
-			sum = htons(IPPROTO_ICMPV6 + remlen) +
-			    up[0] + up[1] + up[2] + up[3] +
-			    up[4] + up[5] + up[6] + up[7] +
-			    up[8] + up[9] + up[10] + up[11] +
-			    up[12] + up[13] + up[14] + up[15];
-			sum = (sum & 0xffff) + (sum >> 16);
-			sum = IP_CSUM(mp, hdr_len, sum);
-			if (sum != 0) {
-				/* IPv6 ICMP checksum failed */
-				ip1dbg(("ip_rput_data_v6: ICMPv6 checksum "
-				    "failed %x\n",
-				    sum));
-				BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInMsgs);
-				BUMP_MIB(ill->ill_icmp6_mib,
-				    ipv6IfIcmpInErrors);
-				freemsg(first_mp);
-				return;
-			}
-
-		icmp_fanout:
-			/* Check variable for testing applications */
-			if (ipst->ips_ipv6_drop_inbound_icmpv6) {
-				freemsg(first_mp);
-				return;
-			}
-			/*
-			 * Assume that there is always at least one conn for
-			 * ICMPv6 (in.ndpd) i.e. don't optimize the case
-			 * where there is no conn.
-			 */
-			if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-				ilm_t *ilm;
-				ilm_walker_t ilw;
-
-				ASSERT(!IS_LOOPBACK(ill));
-				/*
-				 * In the multicast case, applications may have
-				 * joined the group from different zones, so we
-				 * need to deliver the packet to each of them.
-				 * Loop through the multicast memberships
-				 * structures (ilm) on the receive ill and send
-				 * a copy of the packet up each matching one.
-				 */
-				ilm = ilm_walker_start(&ilw, inill);
-				for (; ilm != NULL;
-				    ilm = ilm_walker_step(&ilw, ilm)) {
-					if (!IN6_ARE_ADDR_EQUAL(
-					    &ilm->ilm_v6addr, &ip6h->ip6_dst))
-						continue;
-					if (!ipif_lookup_zoneid(
-					    ilw.ilw_walk_ill, ilm->ilm_zoneid,
-					    IPIF_UP, NULL))
-						continue;
-
-					first_mp1 = ip_copymsg(first_mp);
-					if (first_mp1 == NULL)
-						continue;
-					icmp_inbound_v6(q, first_mp1,
-					    ilw.ilw_walk_ill, inill,
-					    hdr_len, mctl_present, 0,
-					    ilm->ilm_zoneid, dl_mp);
-				}
-				ilm_walker_finish(&ilw);
-			} else {
-				first_mp1 = ip_copymsg(first_mp);
-				if (first_mp1 != NULL)
-					icmp_inbound_v6(q, first_mp1, ill,
-					    inill, hdr_len, mctl_present, 0,
-					    zoneid, dl_mp);
-			}
-			goto proto_fanout;
-		}
-		case IPPROTO_ENCAP:
-		case IPPROTO_IPV6:
-			if (ip_iptun_input_v6(mctl_present ? first_mp : NULL,
-			    mp, pkt_len - remlen, nexthdr, zoneid, ill, ipst)) {
-				return;
-			}
-			/*
-			 * If there was no IP tunnel data-link bound to
-			 * receive this packet, then we fall through to
-			 * allow potential raw sockets bound to either of
-			 * these protocols to pick it up.
-			 */
-			/* FALLTHRU */
-proto_fanout:
-		default: {
-			/*
-			 * Handle protocols with which IPv6 is less intimate.
-			 */
-			uint_t proto_flags = IP_FF_RAWIP|IP_FF_IPINFO;
-
-			if (hada_mp != NULL) {
-				ip0dbg(("default hada drop\n"));
-				goto hada_drop;
-			}
-
-			/*
-			 * Enable sending ICMP for "Unknown" nexthdr
-			 * case. i.e. where we did not FALLTHRU from
-			 * IPPROTO_ICMPV6 processing case above.
-			 * If we did FALLTHRU, then the packet has already been
-			 * processed for IPPF, don't process it again in
-			 * ip_fanout_proto_v6; set IP6_NO_IPPOLICY in the
-			 * flags
-			 */
-			if (nexthdr != IPPROTO_ICMPV6)
-				proto_flags |= IP_FF_SEND_ICMP;
-			else
-				proto_flags |= IP6_NO_IPPOLICY;
-
-			ip_fanout_proto_v6(q, first_mp, ip6h, ill, inill,
-			    nexthdr, prev_nexthdr_offset, (flags|proto_flags),
-			    mctl_present, zoneid);
-			return;
-		}
-
-		case IPPROTO_DSTOPTS: {
-			uint_t ehdrlen;
-			uint8_t *optptr;
-			ip6_dest_t *desthdr;
-
-			/* If packet is too short, look no further */
-			if (remlen < MIN_EHDR_LEN)
-				goto pkt_too_short;
-
-			/* Check if AH is present. */
-			if (ipsec_early_ah_v6(q, first_mp, mctl_present, ill,
-			    inill, hada_mp, zoneid)) {
-				return;
-			}
-
-			/*
-			 * Reinitialize pointers, as ipsec_early_ah_v6() does
-			 * complete pullups.  We don't have to do more pullups
-			 * as a result.
-			 */
-			whereptr = (uint8_t *)((uintptr_t)mp->b_rptr +
-			    (uintptr_t)(whereptr - ((uint8_t *)ip6h)));
-			ip6h = (ip6_t *)mp->b_rptr;
-
-			desthdr = (ip6_dest_t *)whereptr;
-			nexthdr = desthdr->ip6d_nxt;
-			prev_nexthdr_offset = (uint_t)(whereptr -
-			    (uint8_t *)ip6h);
-			ehdrlen = 8 * (desthdr->ip6d_len + 1);
-			if (remlen < ehdrlen)
-				goto pkt_too_short;
-			optptr = whereptr + 2;
-			/*
-			 * Note: XXX This code does not seem to make
-			 * distinction between Destination Options Header
-			 * being before/after Routing Header which can
-			 * happen if we are at the end of source route.
-			 * This may become significant in future.
-			 * (No real significant Destination Options are
-			 * defined/implemented yet ).
-			 */
-			switch (ip_process_options_v6(q, first_mp, ip6h, optptr,
-			    ehdrlen - 2, IPPROTO_DSTOPTS, ipst)) {
-			case -1:
-				/*
-				 * Packet has been consumed and any needed
-				 * ICMP errors sent.
-				 */
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-				freemsg(hada_mp);
-				return;
-			case 0:
-				/* No action needed  continue */
-				break;
-			case 1:
-				/*
-				 * Unnexpected return value
-				 * (Router alert is a Hop-by-Hop option)
-				 */
-#ifdef DEBUG
-				panic("ip_rput_data_v6: router "
-				    "alert hbh opt indication in dest opt");
-				/*NOTREACHED*/
-#else
-				freemsg(hada_mp);
-				freemsg(first_mp);
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				return;
-#endif
-			}
-			used = ehdrlen;
-			break;
-		}
-		case IPPROTO_FRAGMENT: {
-			ip6_frag_t *fraghdr;
-			size_t no_frag_hdr_len;
-
-			if (hada_mp != NULL) {
-				ip0dbg(("frag hada drop\n"));
-				goto hada_drop;
-			}
-
-			ASSERT(first_mp == mp);
-			if (remlen < sizeof (ip6_frag_t))
-				goto pkt_too_short;
-
-			if (mp->b_cont != NULL &&
-			    whereptr + sizeof (ip6_frag_t) > mp->b_wptr) {
-				if (!pullupmsg(mp,
-				    pkt_len - remlen + sizeof (ip6_frag_t))) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(mp);
-					return;
-				}
-				hck_flags = 0;
-				ip6h = (ip6_t *)mp->b_rptr;
-				whereptr = (uint8_t *)ip6h + pkt_len - remlen;
-			}
-
-			fraghdr = (ip6_frag_t *)whereptr;
-			used = (uint_t)sizeof (ip6_frag_t);
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsReasmReqds);
-
-			/*
-			 * Invoke the CGTP (multirouting) filtering module to
-			 * process the incoming packet. Packets identified as
-			 * duplicates must be discarded. Filtering is active
-			 * only if the the ip_cgtp_filter ndd variable is
-			 * non-zero.
-			 */
-			if (ipst->ips_ip_cgtp_filter &&
-			    ipst->ips_ip_cgtp_filter_ops != NULL) {
-				int cgtp_flt_pkt;
-				netstackid_t stackid;
-
-				stackid = ipst->ips_netstack->netstack_stackid;
-
-				cgtp_flt_pkt =
-				    ipst->ips_ip_cgtp_filter_ops->cfo_filter_v6(
-				    stackid, inill->ill_phyint->phyint_ifindex,
-				    ip6h, fraghdr);
-				if (cgtp_flt_pkt == CGTP_IP_PKT_DUPLICATE) {
-					freemsg(mp);
-					return;
-				}
-			}
-
-			/* Restore the flags */
-			DB_CKSUMFLAGS(mp) = hck_flags;
-
-			mp = ip_rput_frag_v6(ill, inill, mp, ip6h, fraghdr,
-			    remlen - used, &prev_nexthdr_offset,
-			    &reass_sum, &reass_hck_flags);
-			if (mp == NULL) {
-				/* Reassembly is still pending */
-				return;
-			}
-			/* The first mblk are the headers before the frag hdr */
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsReasmOKs);
-
-			first_mp = mp;	/* mp has most likely changed! */
-			no_frag_hdr_len = mp->b_wptr - mp->b_rptr;
-			ip6h = (ip6_t *)mp->b_rptr;
-			nexthdr = ((char *)ip6h)[prev_nexthdr_offset];
-			whereptr = mp->b_rptr + no_frag_hdr_len;
-			remlen = ntohs(ip6h->ip6_plen)  +
-			    (uint16_t)(IPV6_HDR_LEN - no_frag_hdr_len);
-			pkt_len = msgdsize(mp);
-			used = 0;
-			break;
-		}
-		case IPPROTO_HOPOPTS: {
-			if (hada_mp != NULL) {
-				ip0dbg(("hop hada drop\n"));
-				goto hada_drop;
-			}
-			/*
-			 * Illegal header sequence.
-			 * (Hop-by-hop headers are processed above
-			 *  and required to immediately follow IPv6 header)
-			 */
-			icmp_param_problem_v6(WR(q), first_mp,
-			    ICMP6_PARAMPROB_NEXTHEADER,
-			    prev_nexthdr_offset,
-			    B_FALSE, B_FALSE, zoneid, ipst);
-			return;
-		}
-		case IPPROTO_ROUTING: {
-			uint_t ehdrlen;
-			ip6_rthdr_t *rthdr;
-
-			/* If packet is too short, look no further */
-			if (remlen < MIN_EHDR_LEN)
-				goto pkt_too_short;
-
-			/* Check if AH is present. */
-			if (ipsec_early_ah_v6(q, first_mp, mctl_present, ill,
-			    inill, hada_mp, zoneid)) {
-				return;
-			}
-
-			/*
-			 * Reinitialize pointers, as ipsec_early_ah_v6() does
-			 * complete pullups.  We don't have to do more pullups
-			 * as a result.
-			 */
-			whereptr = (uint8_t *)((uintptr_t)mp->b_rptr +
-			    (uintptr_t)(whereptr - ((uint8_t *)ip6h)));
-			ip6h = (ip6_t *)mp->b_rptr;
-
-			rthdr = (ip6_rthdr_t *)whereptr;
-			nexthdr = rthdr->ip6r_nxt;
-			prev_nexthdr_offset = (uint_t)(whereptr -
-			    (uint8_t *)ip6h);
-			ehdrlen = 8 * (rthdr->ip6r_len + 1);
-			if (remlen < ehdrlen)
-				goto pkt_too_short;
-			if (rthdr->ip6r_segleft != 0) {
-				/* Not end of source route */
-				if (ll_multicast) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsForwProhibits);
-					freemsg(hada_mp);
-					freemsg(mp);
-					return;
-				}
-				ip_process_rthdr(q, mp, ip6h, rthdr, ill,
-				    hada_mp);
-				return;
-			}
-			used = ehdrlen;
-			break;
-		}
-		case IPPROTO_AH:
-		case IPPROTO_ESP: {
-			/*
-			 * Fast path for AH/ESP. If this is the first time
-			 * we are sending a datagram to AH/ESP, allocate
-			 * a IPSEC_IN message and prepend it. Otherwise,
-			 * just fanout.
-			 */
-
-			ipsec_in_t *ii;
-			int ipsec_rc;
-			ipsec_stack_t *ipss;
-
-			ipss = ipst->ips_netstack->netstack_ipsec;
-			if (!mctl_present) {
-				ASSERT(first_mp == mp);
-				first_mp = ipsec_in_alloc(B_FALSE,
-				    ipst->ips_netstack);
-				if (first_mp == NULL) {
-					ip1dbg(("ip_rput_data_v6: IPSEC_IN "
-					    "allocation failure.\n"));
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(mp);
-					return;
-				}
-				/*
-				 * Store the ill_index so that when we come back
-				 * from IPSEC we ride on the same queue.
-				 */
-				ii = (ipsec_in_t *)first_mp->b_rptr;
-				ii->ipsec_in_ill_index =
-				    ill->ill_phyint->phyint_ifindex;
-				ii->ipsec_in_rill_index =
-				    inill->ill_phyint->phyint_ifindex;
-				first_mp->b_cont = mp;
-				/*
-				 * Cache hardware acceleration info.
-				 */
-				if (hada_mp != NULL) {
-					IPSECHW_DEBUG(IPSECHW_PKT,
-					    ("ip_rput_data_v6: "
-					    "caching data attr.\n"));
-					ii->ipsec_in_accelerated = B_TRUE;
-					ii->ipsec_in_da = hada_mp;
-					hada_mp = NULL;
-				}
-			} else {
-				ii = (ipsec_in_t *)first_mp->b_rptr;
-			}
-
-			if (!ipsec_loaded(ipss)) {
-				ip_proto_not_sup(q, first_mp, IP_FF_SEND_ICMP,
-				    zoneid, ipst);
-				return;
-			}
-
-			/* select inbound SA and have IPsec process the pkt */
-			if (nexthdr == IPPROTO_ESP) {
-				esph_t *esph = ipsec_inbound_esp_sa(first_mp,
-				    ipst->ips_netstack);
-				if (esph == NULL)
-					return;
-				ASSERT(ii->ipsec_in_esp_sa != NULL);
-				ASSERT(ii->ipsec_in_esp_sa->ipsa_input_func !=
-				    NULL);
-				ipsec_rc = ii->ipsec_in_esp_sa->ipsa_input_func(
-				    first_mp, esph);
-			} else {
-				ah_t *ah = ipsec_inbound_ah_sa(first_mp,
-				    ipst->ips_netstack);
-				if (ah == NULL)
-					return;
-				ASSERT(ii->ipsec_in_ah_sa != NULL);
-				ASSERT(ii->ipsec_in_ah_sa->ipsa_input_func !=
-				    NULL);
-				ipsec_rc = ii->ipsec_in_ah_sa->ipsa_input_func(
-				    first_mp, ah);
-			}
-
-			switch (ipsec_rc) {
-			case IPSEC_STATUS_SUCCESS:
-				break;
-			case IPSEC_STATUS_FAILED:
-				BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-				/* FALLTHRU */
-			case IPSEC_STATUS_PENDING:
-				return;
-			}
-			/* we're done with IPsec processing, send it up */
-			ip_fanout_proto_again(first_mp, ill, inill, NULL);
-			return;
-		}
-		case IPPROTO_NONE:
-			/* All processing is done. Count as "delivered". */
-			freemsg(hada_mp);
-			freemsg(first_mp);
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-			return;
-		}
-		whereptr += used;
-		ASSERT(remlen >= used);
-		remlen -= used;
-	}
-	/* NOTREACHED */
-
-pkt_too_short:
-	ip1dbg(("ip_rput_data_v6: packet too short %d %lu %d\n",
-	    ip6_len, pkt_len, remlen));
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTruncatedPkts);
-	freemsg(hada_mp);
-	freemsg(first_mp);
-	return;
-udp_fanout:
-	if (mctl_present || IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-		connp = NULL;
-	} else {
-		connp = ipcl_classify_v6(mp, IPPROTO_UDP, hdr_len, zoneid,
-		    ipst);
-		if ((connp != NULL) && (connp->conn_upq == NULL)) {
-			CONN_DEC_REF(connp);
-			connp = NULL;
-		}
-	}
-
-	if (connp == NULL) {
-		uint32_t	ports;
-
-		ports = *(uint32_t *)(mp->b_rptr + hdr_len +
-		    UDP_PORTS_OFFSET);
-		IP6_STAT(ipst, ip6_udp_slow_path);
-		ip_fanout_udp_v6(q, first_mp, ip6h, ports, ill, inill,
-		    (flags|IP_FF_SEND_ICMP|IP_FF_IPINFO), mctl_present,
-		    zoneid);
-		return;
-	}
-
-	if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
-	    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
-		freemsg(first_mp);
-		BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
-		CONN_DEC_REF(connp);
-		return;
-	}
-
-	/* Initiate IPPF processing */
-	if (IP6_IN_IPP(flags, ipst)) {
-		ip_process(IPP_LOCAL_IN, &mp, ill->ill_phyint->phyint_ifindex);
-		if (mp == NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			CONN_DEC_REF(connp);
-			return;
-		}
-	}
-
-	if (connp->conn_ip_recvpktinfo ||
-	    IN6_IS_ADDR_LINKLOCAL(&ip6h->ip6_src)) {
-		mp = ip_add_info_v6(mp, inill, &ip6h->ip6_dst);
-		if (mp == NULL) {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			CONN_DEC_REF(connp);
-			return;
-		}
-	}
-
-	IP6_STAT(ipst, ip6_udp_fast_path);
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-
-	/* Send it upstream */
-	(connp->conn_recv)(connp, mp, NULL);
-
-	CONN_DEC_REF(connp);
-	freemsg(hada_mp);
-	return;
-
-hada_drop:
-	ip1dbg(("ip_rput_data_v6: malformed accelerated packet\n"));
-	/* IPsec kstats: bump counter here */
-	freemsg(hada_mp);
-	freemsg(first_mp);
+	/* we're done with IPsec processing, send it up */
+	ip_input_post_ipsec(mp, ira);
+	return (NULL);
 }
 
 /*
  * Reassemble fragment.
  * When it returns a completed message the first mblk will only contain
- * the headers prior to the fragment header.
- *
- * prev_nexthdr_offset is an offset indication of where the nexthdr field is
- * of the preceding header.  This is needed to patch the previous header's
- * nexthdr field when reassembly completes.
+ * the headers prior to the fragment header, with the nexthdr value updated
+ * to be the header after the fragment header.
  */
-static mblk_t *
-ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
-    ip6_frag_t *fraghdr, uint_t remlen, uint_t *prev_nexthdr_offset,
-    uint32_t *cksum_val, uint16_t *cksum_flags)
+mblk_t *
+ip_input_fragment_v6(mblk_t *mp, ip6_t *ip6h,
+    ip6_frag_t *fraghdr, uint_t remlen, ip_recv_attr_t *ira)
 {
 	uint32_t	ident = ntohl(fraghdr->ip6f_ident);
 	uint16_t	offset;
@@ -8225,12 +3304,12 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	boolean_t	pruned = B_FALSE;
 	uint32_t	sum_val;
 	uint16_t	sum_flags;
+	ill_t		*ill = ira->ira_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
-
-	if (cksum_val != NULL)
-		*cksum_val = 0;
-	if (cksum_flags != NULL)
-		*cksum_flags = 0;
+	uint_t		prev_nexthdr_offset;
+	uint8_t		prev_nexthdr;
+	uint8_t		*ptr;
+	uint32_t	packet_size;
 
 	/*
 	 * We utilize hardware computed checksum info only for UDP since
@@ -8238,8 +3317,9 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	 * addition, checksum offload support for IP fragments carrying
 	 * UDP payload is commonly implemented across network adapters.
 	 */
-	ASSERT(inill != NULL);
-	if (nexthdr == IPPROTO_UDP && dohwcksum && ILL_HCKSUM_CAPABLE(inill) &&
+	ASSERT(ira->ira_rill != NULL);
+	if (nexthdr == IPPROTO_UDP && dohwcksum &&
+	    ILL_HCKSUM_CAPABLE(ira->ira_rill) &&
 	    (DB_CKSUMFLAGS(mp) & (HCK_FULLCKSUM | HCK_PARTIALCKSUM))) {
 		mblk_t *mp1 = mp->b_cont;
 		int32_t len;
@@ -8253,8 +3333,8 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 
 		if ((sum_flags & HCK_PARTIALCKSUM) &&
 		    (mp1 == NULL || mp1->b_cont == NULL) &&
-		    offset >= (uint16_t)DB_CKSUMSTART(mp) &&
-		    ((len = offset - (uint16_t)DB_CKSUMSTART(mp)) & 1) == 0) {
+		    offset >= DB_CKSUMSTART(mp) &&
+		    ((len = offset - DB_CKSUMSTART(mp)) & 1) == 0) {
 			uint32_t adj;
 			/*
 			 * Partial checksum has been calculated by hardware
@@ -8281,6 +3361,59 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	DB_CKSUMFLAGS(mp) = 0;
 
 	/*
+	 * Determine the offset (from the begining of the IP header)
+	 * of the nexthdr value which has IPPROTO_FRAGMENT. We use
+	 * this when removing the fragment header from the packet.
+	 * This packet consists of the IPv6 header, a potential
+	 * hop-by-hop options header, a potential pre-routing-header
+	 * destination options header, and a potential routing header.
+	 */
+	prev_nexthdr_offset = (uint8_t *)&ip6h->ip6_nxt - (uint8_t *)ip6h;
+	prev_nexthdr = ip6h->ip6_nxt;
+	ptr = (uint8_t *)&ip6h[1];
+
+	if (prev_nexthdr == IPPROTO_HOPOPTS) {
+		ip6_hbh_t	*hbh_hdr;
+		uint_t		hdr_len;
+
+		hbh_hdr = (ip6_hbh_t *)ptr;
+		hdr_len = 8 * (hbh_hdr->ip6h_len + 1);
+		prev_nexthdr = hbh_hdr->ip6h_nxt;
+		prev_nexthdr_offset = (uint8_t *)&hbh_hdr->ip6h_nxt
+		    - (uint8_t *)ip6h;
+		ptr += hdr_len;
+	}
+	if (prev_nexthdr == IPPROTO_DSTOPTS) {
+		ip6_dest_t	*dest_hdr;
+		uint_t		hdr_len;
+
+		dest_hdr = (ip6_dest_t *)ptr;
+		hdr_len = 8 * (dest_hdr->ip6d_len + 1);
+		prev_nexthdr = dest_hdr->ip6d_nxt;
+		prev_nexthdr_offset = (uint8_t *)&dest_hdr->ip6d_nxt
+		    - (uint8_t *)ip6h;
+		ptr += hdr_len;
+	}
+	if (prev_nexthdr == IPPROTO_ROUTING) {
+		ip6_rthdr_t	*rthdr;
+		uint_t		hdr_len;
+
+		rthdr = (ip6_rthdr_t *)ptr;
+		prev_nexthdr = rthdr->ip6r_nxt;
+		prev_nexthdr_offset = (uint8_t *)&rthdr->ip6r_nxt
+		    - (uint8_t *)ip6h;
+		hdr_len = 8 * (rthdr->ip6r_len + 1);
+		ptr += hdr_len;
+	}
+	if (prev_nexthdr != IPPROTO_FRAGMENT) {
+		/* Can't handle other headers before the fragment header */
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
+		ip_drop_input("ipIfStatsInHdrErrors", mp, ill);
+		freemsg(mp);
+		return (NULL);
+	}
+
+	/*
 	 * Note: Fragment offset in header is in 8-octet units.
 	 * Clearing least significant 3 bits not only extracts
 	 * it but also gets it in units of octets.
@@ -8293,17 +3426,10 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	 * of eight?
 	 */
 	if (more_frags && (ntohs(ip6h->ip6_plen) & 7)) {
-		zoneid_t zoneid;
-
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-		zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill, ipst);
-		if (zoneid == ALL_ZONES) {
-			freemsg(mp);
-			return (NULL);
-		}
-		icmp_param_problem_v6(ill->ill_wq, mp, ICMP6_PARAMPROB_HEADER,
+		ip_drop_input("ICMP_PARAM_PROBLEM", mp, ill);
+		icmp_param_problem_v6(mp, ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((char *)&ip6h->ip6_plen -
-		    (char *)ip6h), B_FALSE, B_FALSE, zoneid, ipst);
+		    (char *)ip6h), B_FALSE, ira);
 		return (NULL);
 	}
 
@@ -8319,17 +3445,11 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	 * greater than IP_MAXPACKET - the max payload size?
 	 */
 	if (end > IP_MAXPACKET) {
-		zoneid_t	zoneid;
-
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-		zoneid = ipif_lookup_addr_zoneid_v6(&ip6h->ip6_dst, ill, ipst);
-		if (zoneid == ALL_ZONES) {
-			freemsg(mp);
-			return (NULL);
-		}
-		icmp_param_problem_v6(ill->ill_wq, mp, ICMP6_PARAMPROB_HEADER,
+		ip_drop_input("Reassembled packet too large", mp, ill);
+		icmp_param_problem_v6(mp, ICMP6_PARAMPROB_HEADER,
 		    (uint32_t)((char *)&fraghdr->ip6f_offlg -
-		    (char *)ip6h), B_FALSE, B_FALSE, zoneid, ipst);
+		    (char *)ip6h), B_FALSE, ira);
 		return (NULL);
 	}
 
@@ -8368,11 +3488,17 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	 * there is anything on the reassembly queue, the timer will
 	 * be running.
 	 */
-	msg_len = MBLKSIZE(mp);
+	/* Handle vnic loopback of fragments */
+	if (mp->b_datap->db_ref > 2)
+		msg_len = 0;
+	else
+		msg_len = MBLKSIZE(mp);
+
 	tail_mp = mp;
 	while (tail_mp->b_cont != NULL) {
 		tail_mp = tail_mp->b_cont;
-		msg_len += MBLKSIZE(tail_mp);
+		if (tail_mp->b_datap->db_ref <= 2)
+			msg_len += MBLKSIZE(tail_mp);
 	}
 	/*
 	 * If the reassembly list for this ILL will get too big
@@ -8381,6 +3507,9 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 
 	if ((msg_len + sizeof (*ipf) + ill->ill_frag_count) >=
 	    ipst->ips_ip_reass_queue_bytes) {
+		DTRACE_PROBE3(ip_reass_queue_bytes, uint_t, msg_len,
+		    uint_t, ill->ill_frag_count,
+		    uint_t, ipst->ips_ip_reass_queue_bytes);
 		ill_frag_prune(ill,
 		    (ipst->ips_ip_reass_queue_bytes < msg_len) ? 0 :
 		    (ipst->ips_ip_reass_queue_bytes - msg_len));
@@ -8443,6 +3572,7 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 		mp1 = allocb(sizeof (*ipf), BPRI_MED);
 		if (!mp1) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
 			freemsg(mp);
 	partial_reass_done:
 			mutex_exit(&ipfb->ipfb_lock);
@@ -8512,7 +3642,7 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 			 */
 			ipf->ipf_end = end;
 			ipf->ipf_nf_hdr_len = hdr_length;
-			ipf->ipf_prev_nexthdr_offset = *prev_nexthdr_offset;
+			ipf->ipf_prev_nexthdr_offset = prev_nexthdr_offset;
 		} else {
 			/* Hard case, hole at the beginning. */
 			ipf->ipf_tail_mp = NULL;
@@ -8603,7 +3733,7 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 			if (ipf->ipf_prev_nexthdr_offset == 0) {
 				ipf->ipf_nf_hdr_len = hdr_length;
 				ipf->ipf_prev_nexthdr_offset =
-				    *prev_nexthdr_offset;
+				    prev_nexthdr_offset;
 			}
 		}
 		/* Save current byte count */
@@ -8654,7 +3784,7 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	 * header
 	 */
 	nexthdr = ipf->ipf_protocol;
-	*prev_nexthdr_offset = ipf->ipf_prev_nexthdr_offset;
+	prev_nexthdr_offset = ipf->ipf_prev_nexthdr_offset;
 	ipfp = ipf->ipf_ptphn;
 
 	/* We need to supply these to caller */
@@ -8685,7 +3815,8 @@ ip_rput_frag_v6(ill_t *ill, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 reass_done:
 	if (hdr_length < sizeof (ip6_frag_t)) {
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInHdrErrors);
-		ip1dbg(("ip_rput_frag_v6: bad packet\n"));
+		ip_drop_input("ipIfStatsInHdrErrors", mp, ill);
+		ip1dbg(("ip_input_fragment_v6: bad packet\n"));
 		freemsg(mp);
 		return (NULL);
 	}
@@ -8708,8 +3839,9 @@ reass_done:
 		mblk_t *nmp;
 
 		if (!(nmp = dupb(mp))) {
+			ip1dbg(("ip_input_fragment_v6: dupb failed\n"));
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			ip1dbg(("ip_rput_frag_v6: dupb failed\n"));
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
 			freemsg(mp);
 			return (NULL);
 		}
@@ -8720,19 +3852,24 @@ reass_done:
 	mp->b_wptr = mp->b_rptr + hdr_length - sizeof (ip6_frag_t);
 
 	ip6h = (ip6_t *)mp->b_rptr;
-	((char *)ip6h)[*prev_nexthdr_offset] = nexthdr;
+	((char *)ip6h)[prev_nexthdr_offset] = nexthdr;
 
 	/* Restore original IP length in header. */
-	ip6h->ip6_plen = htons((uint16_t)(msgdsize(mp) - IPV6_HDR_LEN));
+	packet_size = msgdsize(mp);
+	ip6h->ip6_plen = htons((uint16_t)(packet_size - IPV6_HDR_LEN));
 	/* Record the ECN info. */
 	ip6h->ip6_vcf &= htonl(0xFFCFFFFF);
 	ip6h->ip6_vcf |= htonl(ecn_info << 20);
 
-	/* Reassembly is successful; return checksum information if needed */
-	if (cksum_val != NULL)
-		*cksum_val = sum_val;
-	if (cksum_flags != NULL)
-		*cksum_flags = sum_flags;
+	/* Update the receive attributes */
+	ira->ira_pktlen = packet_size;
+	ira->ira_ip_hdr_length = hdr_length - sizeof (ip6_frag_t);
+	ira->ira_protocol = nexthdr;
+
+	/* Reassembly is successful; set checksum information in packet */
+	DB_CKSUM16(mp) = (uint16_t)sum_val;
+	DB_CKSUMFLAGS(mp) = sum_flags;
+	DB_CKSUMSTART(mp) = ira->ira_ip_hdr_length;
 
 	return (mp);
 }
@@ -8742,7 +3879,7 @@ reass_done:
  * header.
  */
 static in6_addr_t
-pluck_out_dst(mblk_t *mp, uint8_t *whereptr, in6_addr_t oldrv)
+pluck_out_dst(const mblk_t *mp, uint8_t *whereptr, in6_addr_t oldrv)
 {
 	ip6_rthdr0_t *rt0;
 	int segleft, numaddr;
@@ -8758,7 +3895,7 @@ pluck_out_dst(mblk_t *mp, uint8_t *whereptr, in6_addr_t oldrv)
 	numaddr = rt0->ip6r0_len / 2;
 
 	if ((rt0->ip6r0_len & 0x1) ||
-	    whereptr + (rt0->ip6r0_len + 1) * 8 > mp->b_wptr ||
+	    (mp != NULL && whereptr + (rt0->ip6r0_len + 1) * 8 > mp->b_wptr) ||
 	    (segleft > rt0->ip6r0_len / 2)) {
 		/*
 		 * Corrupt packet.  Either the routing header length is odd
@@ -8784,11 +3921,13 @@ pluck_out_dst(mblk_t *mp, uint8_t *whereptr, in6_addr_t oldrv)
  * Walk through the options to see if there is a routing header.
  * If present get the destination which is the last address of
  * the option.
+ * mp needs to be provided in cases when the extension headers might span
+ * b_cont; mp is never modified by this function.
  */
 in6_addr_t
-ip_get_dst_v6(ip6_t *ip6h, mblk_t *mp, boolean_t *is_fragment)
+ip_get_dst_v6(ip6_t *ip6h, const mblk_t *mp, boolean_t *is_fragment)
 {
-	mblk_t *current_mp = mp;
+	const mblk_t *current_mp = mp;
 	uint8_t nexthdr;
 	uint8_t *whereptr;
 	int ehdrlen;
@@ -8798,7 +3937,8 @@ ip_get_dst_v6(ip6_t *ip6h, mblk_t *mp, boolean_t *is_fragment)
 	ehdrlen = sizeof (ip6_t);
 
 	/* We assume at least the IPv6 base header is within one mblk. */
-	ASSERT(mp->b_rptr <= whereptr && mp->b_wptr >= whereptr + ehdrlen);
+	ASSERT(mp == NULL ||
+	    (mp->b_rptr <= whereptr && mp->b_wptr >= whereptr + ehdrlen));
 
 	rv = ip6h->ip6_dst;
 	nexthdr = ip6h->ip6_nxt;
@@ -8819,7 +3959,8 @@ ip_get_dst_v6(ip6_t *ip6h, mblk_t *mp, boolean_t *is_fragment)
 		 * All IPv6 extension headers have the next-header in byte
 		 * 0, and the (length - 8) in 8-byte-words.
 		 */
-		while (whereptr + ehdrlen >= current_mp->b_wptr) {
+		while (current_mp != NULL &&
+		    whereptr + ehdrlen >= current_mp->b_wptr) {
 			ehdrlen -= (current_mp->b_wptr - whereptr);
 			current_mp = current_mp->b_cont;
 			if (current_mp == NULL) {
@@ -8833,7 +3974,7 @@ ip_get_dst_v6(ip6_t *ip6h, mblk_t *mp, boolean_t *is_fragment)
 		whereptr += ehdrlen;
 
 		nexthdr = *whereptr;
-		ASSERT(whereptr + 1 < current_mp->b_wptr);
+		ASSERT(current_mp == NULL || whereptr + 1 < current_mp->b_wptr);
 		ehdrlen = (*(whereptr + 1) + 1) * 8;
 	}
 
@@ -8845,7 +3986,7 @@ done:
 
 /*
  * ip_source_routed_v6:
- * This function is called by redirect code in ip_rput_data_v6 to
+ * This function is called by redirect code (called from ip_input_v6) to
  * know whether this packet is source routed through this node i.e
  * whether this node (router) is part of the journey. This
  * function is called under two cases :
@@ -8922,22 +4063,14 @@ ip_source_routed_v6(ip6_t *ip6h, mblk_t *mp, ip_stack_t *ipst)
 		 */
 		if (rthdr->ip6r0_segleft > 0 ||
 		    rthdr->ip6r0_segleft == 0) {
-			ire_t 	*ire = NULL;
-
 			numaddr = rthdr->ip6r0_len / 2;
 			addrptr = (in6_addr_t *)((char *)rthdr +
 			    sizeof (*rthdr));
 			addrptr += (numaddr - (rthdr->ip6r0_segleft + 1));
 			if (addrptr != NULL) {
-				ire = ire_ctable_lookup_v6(addrptr, NULL,
-				    IRE_LOCAL, NULL, ALL_ZONES, NULL,
-				    MATCH_IRE_TYPE,
-				    ipst);
-				if (ire != NULL) {
-					ire_refrele(ire);
+				if (ip_type_v6(addrptr, ipst) == IRE_LOCAL)
 					return (B_TRUE);
-				}
-				ip1dbg(("ip_source_routed_v6: No ire found\n"));
+				ip1dbg(("ip_source_routed_v6: Not local\n"));
 			}
 		}
 	/* FALLTHRU */
@@ -8948,2387 +4081,19 @@ ip_source_routed_v6(ip6_t *ip6h, mblk_t *mp, ip_stack_t *ipst)
 }
 
 /*
- * ip_wput_v6 -- Packets sent down from transport modules show up here.
- * Assumes that the following set of headers appear in the first
- * mblk:
- *	ip6i_t (if present) CAN also appear as a separate mblk.
- *	ip6_t
- *	Any extension headers
- *	TCP/UDP/SCTP header (if present)
- * The routine can handle an ICMPv6 header that is not in the first mblk.
- *
- * The order to determine the outgoing interface is as follows:
- * 1. If an ip6i_t with IP6I_IFINDEX set then use that ill.
- * 2. If q is an ill queue and (link local or multicast destination) then
- *    use that ill.
- * 3. If IPV6_BOUND_IF has been set use that ill.
- * 4. For multicast: if IPV6_MULTICAST_IF has been set use it. Otherwise
- *    look for the best IRE match for the unspecified group to determine
- *    the ill.
- * 5. For unicast: Just do an IRE lookup for the best match.
- *
- * arg2 is always a queue_t *.
- * When that queue is an ill_t (i.e. q_next != NULL), then arg must be
- * the zoneid.
- * When that queue is not an ill_t, then arg must be a conn_t pointer.
- */
-void
-ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
-{
-	conn_t		*connp = NULL;
-	queue_t		*q = (queue_t *)arg2;
-	ire_t		*ire = NULL;
-	ire_t		*sctp_ire = NULL;
-	ip6_t		*ip6h;
-	in6_addr_t	*v6dstp;
-	ill_t		*ill = NULL;
-	ipif_t		*ipif;
-	ip6i_t		*ip6i;
-	int		cksum_request;	/* -1 => normal. */
-			/* 1 => Skip TCP/UDP/SCTP checksum */
-			/* Otherwise contains insert offset for checksum */
-	int		unspec_src;
-	boolean_t	do_outrequests;	/* Increment OutRequests? */
-	mib2_ipIfStatsEntry_t	*mibptr;
-	int 		match_flags = MATCH_IRE_ILL;
-	mblk_t		*first_mp;
-	boolean_t	mctl_present;
-	ipsec_out_t	*io;
-	boolean_t	multirt_need_resolve = B_FALSE;
-	mblk_t		*copy_mp = NULL;
-	int		err = 0;
-	int		ip6i_flags = 0;
-	zoneid_t	zoneid;
-	ill_t		*saved_ill = NULL;
-	boolean_t	conn_lock_held;
-	boolean_t	need_decref = B_FALSE;
-	ip_stack_t	*ipst;
-
-	if (q->q_next != NULL) {
-		ill = (ill_t *)q->q_ptr;
-		ipst = ill->ill_ipst;
-	} else {
-		connp = (conn_t *)arg;
-		ASSERT(connp != NULL);
-		ipst = connp->conn_netstack->netstack_ip;
-	}
-
-	/*
-	 * Highest bit in version field is Reachability Confirmation bit
-	 * used by NUD in ip_xmit_v6().
-	 */
-#ifdef	_BIG_ENDIAN
-#define	IPVER(ip6h)	((((uint32_t *)ip6h)[0] >> 28) & 0x7)
-#else
-#define	IPVER(ip6h)	((((uint32_t *)ip6h)[0] >> 4) & 0x7)
-#endif
-
-	/*
-	 * M_CTL comes from 5 places
-	 *
-	 * 1) TCP sends down IPSEC_OUT(M_CTL) for detached connections
-	 *    both V4 and V6 datagrams.
-	 *
-	 * 2) AH/ESP sends down M_CTL after doing their job with both
-	 *    V4 and V6 datagrams.
-	 *
-	 * 3) NDP callbacks when nce is resolved and IPSEC_OUT has been
-	 *    attached.
-	 *
-	 * 4) Notifications from an external resolver (for XRESOLV ifs)
-	 *
-	 * 5) AH/ESP send down IPSEC_CTL(M_CTL) to be relayed to hardware for
-	 *    IPsec hardware acceleration support.
-	 *
-	 * We need to handle (1)'s IPv6 case and (3) here.  For the
-	 * IPv4 case in (1), and (2), IPSEC processing has already
-	 * started. The code in ip_wput() already knows how to handle
-	 * continuing IPSEC processing (for IPv4 and IPv6).  All other
-	 * M_CTLs (including case (4)) are passed on to ip_wput_nondata()
-	 * for handling.
-	 */
-	first_mp = mp;
-	mctl_present = B_FALSE;
-	io = NULL;
-
-	/* Multidata transmit? */
-	if (DB_TYPE(mp) == M_MULTIDATA) {
-		/*
-		 * We should never get here, since all Multidata messages
-		 * originating from tcp should have been directed over to
-		 * tcp_multisend() in the first place.
-		 */
-		BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsOutDiscards);
-		freemsg(mp);
-		return;
-	} else if (DB_TYPE(mp) == M_CTL) {
-		uint32_t mctltype = 0;
-		uint32_t mlen = MBLKL(first_mp);
-
-		mp = mp->b_cont;
-		mctl_present = B_TRUE;
-		io = (ipsec_out_t *)first_mp->b_rptr;
-
-		/*
-		 * Validate this M_CTL message.  The only three types of
-		 * M_CTL messages we expect to see in this code path are
-		 * ipsec_out_t or ipsec_in_t structures (allocated as
-		 * ipsec_info_t unions), or ipsec_ctl_t structures.
-		 * The ipsec_out_type and ipsec_in_type overlap in the two
-		 * data structures, and they are either set to IPSEC_OUT
-		 * or IPSEC_IN depending on which data structure it is.
-		 * ipsec_ctl_t is an IPSEC_CTL.
-		 *
-		 * All other M_CTL messages are sent to ip_wput_nondata()
-		 * for handling.
-		 */
-		if (mlen >= sizeof (io->ipsec_out_type))
-			mctltype = io->ipsec_out_type;
-
-		if ((mlen == sizeof (ipsec_ctl_t)) &&
-		    (mctltype == IPSEC_CTL)) {
-			ip_output(arg, first_mp, arg2, caller);
-			return;
-		}
-
-		if ((mlen < sizeof (ipsec_info_t)) ||
-		    (mctltype != IPSEC_OUT && mctltype != IPSEC_IN) ||
-		    mp == NULL) {
-			ip_wput_nondata(NULL, q, first_mp, NULL);
-			return;
-		}
-		/* NDP callbacks have q_next non-NULL.  That's case #3. */
-		if (q->q_next == NULL) {
-			ip6h = (ip6_t *)mp->b_rptr;
-			/*
-			 * For a freshly-generated TCP dgram that needs IPV6
-			 * processing, don't call ip_wput immediately. We can
-			 * tell this by the ipsec_out_proc_begin. In-progress
-			 * IPSEC_OUT messages have proc_begin set to TRUE,
-			 * and we want to send all IPSEC_IN messages to
-			 * ip_wput() for IPsec processing or finishing.
-			 */
-			if (mctltype == IPSEC_IN ||
-			    IPVER(ip6h) != IPV6_VERSION ||
-			    io->ipsec_out_proc_begin) {
-				mibptr = &ipst->ips_ip6_mib;
-				goto notv6;
-			}
-		}
-	} else if (DB_TYPE(mp) != M_DATA) {
-		ip_wput_nondata(NULL, q, mp, NULL);
-		return;
-	}
-
-	ip6h = (ip6_t *)mp->b_rptr;
-
-	if (IPVER(ip6h) != IPV6_VERSION) {
-		mibptr = &ipst->ips_ip6_mib;
-		goto notv6;
-	}
-
-	if (is_system_labeled() && DB_TYPE(mp) == M_DATA &&
-	    (connp == NULL || !connp->conn_ulp_labeled)) {
-		cred_t		*cr;
-		pid_t		pid;
-
-		if (connp != NULL) {
-			ASSERT(CONN_CRED(connp) != NULL);
-			cr = BEST_CRED(mp, connp, &pid);
-			err = tsol_check_label_v6(cr, &mp,
-			    connp->conn_mac_mode, ipst, pid);
-		} else if ((cr = msg_getcred(mp, &pid)) != NULL) {
-			err = tsol_check_label_v6(cr, &mp, CONN_MAC_DEFAULT,
-			    ipst, pid);
-		}
-		if (mctl_present)
-			first_mp->b_cont = mp;
-		else
-			first_mp = mp;
-		if (err != 0) {
-			DTRACE_PROBE3(
-			    tsol_ip_log_drop_checklabel_ip6, char *,
-			    "conn(1), failed to check/update mp(2)",
-			    conn_t, connp, mblk_t, mp);
-			freemsg(first_mp);
-			return;
-		}
-		ip6h = (ip6_t *)mp->b_rptr;
-	}
-	if (q->q_next != NULL) {
-		/*
-		 * We don't know if this ill will be used for IPv6
-		 * until the ILLF_IPV6 flag is set via SIOCSLIFNAME.
-		 * ipif_set_values() sets the ill_isv6 flag to true if
-		 * ILLF_IPV6 is set.  If the ill_isv6 flag isn't true,
-		 * just drop the packet.
-		 */
-		if (!ill->ill_isv6) {
-			ip1dbg(("ip_wput_v6: Received an IPv6 packet before "
-			    "ILLF_IPV6 was set\n"));
-			freemsg(first_mp);
-			return;
-		}
-		/* For uniformity do a refhold */
-		mutex_enter(&ill->ill_lock);
-		if (!ILL_CAN_LOOKUP(ill)) {
-			mutex_exit(&ill->ill_lock);
-			freemsg(first_mp);
-			return;
-		}
-		ill_refhold_locked(ill);
-		mutex_exit(&ill->ill_lock);
-		mibptr = ill->ill_ip_mib;
-
-		ASSERT(mibptr != NULL);
-		unspec_src = 0;
-		BUMP_MIB(mibptr, ipIfStatsHCOutRequests);
-		do_outrequests = B_FALSE;
-		zoneid = (zoneid_t)(uintptr_t)arg;
-	} else {
-		ASSERT(connp != NULL);
-		zoneid = connp->conn_zoneid;
-
-		/* is queue flow controlled? */
-		if ((q->q_first || connp->conn_draining) &&
-		    (caller == IP_WPUT)) {
-			/*
-			 * 1) TCP sends down M_CTL for detached connections.
-			 * 2) AH/ESP sends down M_CTL.
-			 *
-			 * We don't flow control either of the above. Only
-			 * UDP and others are flow controlled for which we
-			 * can't have a M_CTL.
-			 */
-			ASSERT(first_mp == mp);
-			(void) putq(q, mp);
-			return;
-		}
-		mibptr = &ipst->ips_ip6_mib;
-		unspec_src = connp->conn_unspec_src;
-		do_outrequests = B_TRUE;
-		if (mp->b_flag & MSGHASREF) {
-			mp->b_flag &= ~MSGHASREF;
-			ASSERT(connp->conn_ulp == IPPROTO_SCTP);
-			SCTP_EXTRACT_IPINFO(mp, sctp_ire);
-			need_decref = B_TRUE;
-		}
-
-		/*
-		 * If there is a policy, try to attach an ipsec_out in
-		 * the front. At the end, first_mp either points to a
-		 * M_DATA message or IPSEC_OUT message linked to a
-		 * M_DATA message. We have to do it now as we might
-		 * lose the "conn" if we go through ip_newroute.
-		 */
-		if (!mctl_present &&
-		    (connp->conn_out_enforce_policy ||
-		    connp->conn_latch != NULL)) {
-			ASSERT(first_mp == mp);
-			/* XXX Any better way to get the protocol fast ? */
-			if (((mp = ipsec_attach_ipsec_out(&mp, connp, NULL,
-			    connp->conn_ulp, ipst->ips_netstack)) == NULL)) {
-				BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-				if (need_decref)
-					CONN_DEC_REF(connp);
-				return;
-			} else {
-				ASSERT(mp->b_datap->db_type == M_CTL);
-				first_mp = mp;
-				mp = mp->b_cont;
-				mctl_present = B_TRUE;
-				io = (ipsec_out_t *)first_mp->b_rptr;
-			}
-		}
-	}
-
-	/* check for alignment and full IPv6 header */
-	if (!OK_32PTR((uchar_t *)ip6h) ||
-	    (mp->b_wptr - (uchar_t *)ip6h) < IPV6_HDR_LEN) {
-		ip0dbg(("ip_wput_v6: bad alignment or length\n"));
-		if (do_outrequests)
-			BUMP_MIB(mibptr, ipIfStatsHCOutRequests);
-		BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-		freemsg(first_mp);
-		if (ill != NULL)
-			ill_refrele(ill);
-		if (need_decref)
-			CONN_DEC_REF(connp);
-		return;
-	}
-	v6dstp = &ip6h->ip6_dst;
-	cksum_request = -1;
-	ip6i = NULL;
-
-	/*
-	 * Once neighbor discovery has completed, ndp_process() will provide
-	 * locally generated packets for which processing can be reattempted.
-	 * In these cases, connp is NULL and the original zone is part of a
-	 * prepended ipsec_out_t.
-	 */
-	if (io != NULL) {
-		/*
-		 * When coming from icmp_input_v6, the zoneid might not match
-		 * for the loopback case, because inside icmp_input_v6 the
-		 * queue_t is a conn queue from the sending side.
-		 */
-		zoneid = io->ipsec_out_zoneid;
-		ASSERT(zoneid != ALL_ZONES);
-	}
-
-	if (ip6h->ip6_nxt == IPPROTO_RAW) {
-		/*
-		 * This is an ip6i_t header followed by an ip6_hdr.
-		 * Check which fields are set.
-		 *
-		 * When the packet comes from a transport we should have
-		 * all needed headers in the first mblk. However, when
-		 * going through ip_newroute*_v6 the ip6i might be in
-		 * a separate mblk when we return here. In that case
-		 * we pullup everything to ensure that extension and transport
-		 * headers "stay" in the first mblk.
-		 */
-		ip6i = (ip6i_t *)ip6h;
-		ip6i_flags = ip6i->ip6i_flags;
-
-		ASSERT((mp->b_wptr - (uchar_t *)ip6i) == sizeof (ip6i_t) ||
-		    ((mp->b_wptr - (uchar_t *)ip6i) >=
-		    sizeof (ip6i_t) + IPV6_HDR_LEN));
-
-		if ((mp->b_wptr - (uchar_t *)ip6i) == sizeof (ip6i_t)) {
-			if (!pullupmsg(mp, -1)) {
-				ip1dbg(("ip_wput_v6: pullupmsg failed\n"));
-				if (do_outrequests) {
-					BUMP_MIB(mibptr,
-					    ipIfStatsHCOutRequests);
-				}
-				BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-				freemsg(first_mp);
-				if (ill != NULL)
-					ill_refrele(ill);
-				if (need_decref)
-					CONN_DEC_REF(connp);
-				return;
-			}
-			ip6h = (ip6_t *)mp->b_rptr;
-			v6dstp = &ip6h->ip6_dst;
-			ip6i = (ip6i_t *)ip6h;
-		}
-		ip6h = (ip6_t *)&ip6i[1];
-
-		/*
-		 * Advance rptr past the ip6i_t to get ready for
-		 * transmitting the packet. However, if the packet gets
-		 * passed to ip_newroute*_v6 then rptr is moved back so
-		 * that the ip6i_t header can be inspected when the
-		 * packet comes back here after passing through
-		 * ire_add_then_send.
-		 */
-		mp->b_rptr = (uchar_t *)ip6h;
-
-		if (ip6i->ip6i_flags & IP6I_IFINDEX) {
-			ASSERT(ip6i->ip6i_ifindex != 0);
-			if (ill != NULL)
-				ill_refrele(ill);
-			ill = ill_lookup_on_ifindex(ip6i->ip6i_ifindex, 1,
-			    NULL, NULL, NULL, NULL, ipst);
-			if (ill == NULL) {
-				if (do_outrequests) {
-					BUMP_MIB(mibptr,
-					    ipIfStatsHCOutRequests);
-				}
-				BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-				ip1dbg(("ip_wput_v6: bad ifindex %d\n",
-				    ip6i->ip6i_ifindex));
-				if (need_decref)
-					CONN_DEC_REF(connp);
-				freemsg(first_mp);
-				return;
-			}
-			mibptr = ill->ill_ip_mib;
-			/*
-			 * Preserve the index so that when we return from
-			 * IPSEC processing, we know where to send the packet.
-			 */
-			if (mctl_present) {
-				ASSERT(io != NULL);
-				io->ipsec_out_ill_index = ip6i->ip6i_ifindex;
-			}
-		}
-		if (ip6i->ip6i_flags & IP6I_VERIFY_SRC) {
-			cred_t *cr = msg_getcred(mp, NULL);
-
-			/* rpcmod doesn't send down db_credp for UDP packets */
-			if (cr == NULL) {
-				if (connp != NULL)
-					cr = connp->conn_cred;
-				else
-					cr = ill->ill_credp;
-			}
-
-			ASSERT(!IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src));
-			if (secpolicy_net_rawaccess(cr) != 0) {
-				/*
-				 * Use IPCL_ZONEID to honor SO_ALLZONES.
-				 */
-				ire = ire_route_lookup_v6(&ip6h->ip6_src,
-				    0, 0, (IRE_LOCAL|IRE_LOOPBACK), NULL,
-				    NULL, connp != NULL ?
-				    IPCL_ZONEID(connp) : zoneid, NULL,
-				    MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY, ipst);
-				if (ire == NULL) {
-					if (do_outrequests)
-						BUMP_MIB(mibptr,
-						    ipIfStatsHCOutRequests);
-					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-					ip1dbg(("ip_wput_v6: bad source "
-					    "addr\n"));
-					freemsg(first_mp);
-					if (ill != NULL)
-						ill_refrele(ill);
-					if (need_decref)
-						CONN_DEC_REF(connp);
-					return;
-				}
-				ire_refrele(ire);
-			}
-			/* No need to verify again when using ip_newroute */
-			ip6i->ip6i_flags &= ~IP6I_VERIFY_SRC;
-		}
-		if (!(ip6i->ip6i_flags & IP6I_NEXTHOP)) {
-			/*
-			 * Make sure they match since ip_newroute*_v6 etc might
-			 * (unknown to them) inspect ip6i_nexthop when
-			 * they think they access ip6_dst.
-			 */
-			ip6i->ip6i_nexthop = ip6h->ip6_dst;
-		}
-		if (ip6i->ip6i_flags & IP6I_NO_ULP_CKSUM)
-			cksum_request = 1;
-		if (ip6i->ip6i_flags & IP6I_RAW_CHECKSUM)
-			cksum_request = ip6i->ip6i_checksum_off;
-		if (ip6i->ip6i_flags & IP6I_UNSPEC_SRC)
-			unspec_src = 1;
-
-		if (do_outrequests && ill != NULL) {
-			BUMP_MIB(mibptr, ipIfStatsHCOutRequests);
-			do_outrequests = B_FALSE;
-		}
-		/*
-		 * Store ip6i_t info that we need after we come back
-		 * from IPSEC processing.
-		 */
-		if (mctl_present) {
-			ASSERT(io != NULL);
-			io->ipsec_out_unspec_src = unspec_src;
-		}
-	}
-	if (connp != NULL && connp->conn_dontroute)
-		ip6h->ip6_hops = 1;
-
-	if (IN6_IS_ADDR_MULTICAST(v6dstp))
-		goto ipv6multicast;
-
-	/* 1. If an ip6i_t with IP6I_IFINDEX set then use that ill. */
-	if (ip6i != NULL && (ip6i->ip6i_flags & IP6I_IFINDEX)) {
-		ASSERT(ill != NULL);
-		goto send_from_ill;
-	}
-
-	/*
-	 * 2. If q is an ill queue and there's a link-local destination
-	 *    then use that ill.
-	 */
-	if (ill != NULL && IN6_IS_ADDR_LINKLOCAL(v6dstp))
-		goto send_from_ill;
-
-	/* 3. If IPV6_BOUND_IF has been set use that ill. */
-	if (connp != NULL && connp->conn_outgoing_ill != NULL) {
-		ill_t	*conn_outgoing_ill;
-
-		conn_outgoing_ill = conn_get_held_ill(connp,
-		    &connp->conn_outgoing_ill, &err);
-		if (err == ILL_LOOKUP_FAILED) {
-			if (ill != NULL)
-				ill_refrele(ill);
-			if (need_decref)
-				CONN_DEC_REF(connp);
-			freemsg(first_mp);
-			return;
-		}
-		if (ill != NULL)
-			ill_refrele(ill);
-		ill = conn_outgoing_ill;
-		mibptr = ill->ill_ip_mib;
-		goto send_from_ill;
-	}
-
-	/*
-	 * 4. For unicast: Just do an IRE lookup for the best match.
-	 * If we get here for a link-local address it is rather random
-	 * what interface we pick on a multihomed host.
-	 * *If* there is an IRE_CACHE (and the link-local address
-	 * isn't duplicated on multi links) this will find the IRE_CACHE.
-	 * Otherwise it will use one of the matching IRE_INTERFACE routes
-	 * for the link-local prefix. Hence, applications
-	 * *should* be encouraged to specify an outgoing interface when sending
-	 * to a link local address.
-	 */
-	if (connp == NULL || (IP_FLOW_CONTROLLED_ULP(connp->conn_ulp) &&
-	    !connp->conn_fully_bound)) {
-		/*
-		 * We cache IRE_CACHEs to avoid lookups. We don't do
-		 * this for the tcp global queue and listen end point
-		 * as it does not really have a real destination to
-		 * talk to.
-		 */
-		ire = ire_cache_lookup_v6(v6dstp, zoneid, msg_getlabel(mp),
-		    ipst);
-	} else {
-		/*
-		 * IRE_MARK_CONDEMNED is marked in ire_delete. We don't
-		 * grab a lock here to check for CONDEMNED as it is okay
-		 * to send a packet or two with the IRE_CACHE that is going
-		 * away.
-		 */
-		mutex_enter(&connp->conn_lock);
-		ire = sctp_ire != NULL ? sctp_ire : connp->conn_ire_cache;
-		if (ire != NULL &&
-		    IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6, v6dstp) &&
-		    !(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-
-			IRE_REFHOLD(ire);
-			mutex_exit(&connp->conn_lock);
-
-		} else {
-			boolean_t cached = B_FALSE;
-
-			connp->conn_ire_cache = NULL;
-			mutex_exit(&connp->conn_lock);
-			/* Release the old ire */
-			if (ire != NULL && sctp_ire == NULL)
-				IRE_REFRELE_NOTR(ire);
-
-			ire = ire_cache_lookup_v6(v6dstp, zoneid,
-			    msg_getlabel(mp), ipst);
-			if (ire != NULL) {
-				IRE_REFHOLD_NOTR(ire);
-
-				mutex_enter(&connp->conn_lock);
-				if (CONN_CACHE_IRE(connp) &&
-				    (connp->conn_ire_cache == NULL)) {
-					rw_enter(&ire->ire_bucket->irb_lock,
-					    RW_READER);
-					if (!(ire->ire_marks &
-					    IRE_MARK_CONDEMNED)) {
-						connp->conn_ire_cache = ire;
-						cached = B_TRUE;
-					}
-					rw_exit(&ire->ire_bucket->irb_lock);
-				}
-				mutex_exit(&connp->conn_lock);
-
-				/*
-				 * We can continue to use the ire but since it
-				 * was not cached, we should drop the extra
-				 * reference.
-				 */
-				if (!cached)
-					IRE_REFRELE_NOTR(ire);
-			}
-		}
-	}
-
-	if (ire != NULL) {
-		if (do_outrequests) {
-			/* Handle IRE_LOCAL's that might appear here */
-			if (ire->ire_type == IRE_CACHE) {
-				mibptr = ((ill_t *)ire->ire_stq->q_ptr)->
-				    ill_ip_mib;
-			} else {
-				mibptr = ire->ire_ipif->ipif_ill->ill_ip_mib;
-			}
-			BUMP_MIB(mibptr, ipIfStatsHCOutRequests);
-		}
-
-		/*
-		 * Check if the ire has the RTF_MULTIRT flag, inherited
-		 * from an IRE_OFFSUBNET ire entry in ip_newroute().
-		 */
-		if (ire->ire_flags & RTF_MULTIRT) {
-			/*
-			 * Force hop limit of multirouted packets if required.
-			 * The hop limit of such packets is bounded by the
-			 * ip_multirt_ttl ndd variable.
-			 * NDP packets must have a hop limit of 255; don't
-			 * change the hop limit in that case.
-			 */
-			if ((ipst->ips_ip_multirt_ttl > 0) &&
-			    (ip6h->ip6_hops > ipst->ips_ip_multirt_ttl) &&
-			    (ip6h->ip6_hops != IPV6_MAX_HOPS)) {
-				if (ip_debug > 3) {
-					ip2dbg(("ip_wput_v6: forcing multirt "
-					    "hop limit to %d (was %d) ",
-					    ipst->ips_ip_multirt_ttl,
-					    ip6h->ip6_hops));
-					pr_addr_dbg("v6dst %s\n", AF_INET6,
-					    &ire->ire_addr_v6);
-				}
-				ip6h->ip6_hops = ipst->ips_ip_multirt_ttl;
-			}
-
-			/*
-			 * We look at this point if there are pending
-			 * unresolved routes. ire_multirt_need_resolve_v6()
-			 * checks in O(n) that all IRE_OFFSUBNET ire
-			 * entries for the packet's destination and
-			 * flagged RTF_MULTIRT are currently resolved.
-			 * If some remain unresolved, we do a copy
-			 * of the current message. It will be used
-			 * to initiate additional route resolutions.
-			 */
-			multirt_need_resolve =
-			    ire_multirt_need_resolve_v6(&ire->ire_addr_v6,
-			    msg_getlabel(first_mp), ipst);
-			ip2dbg(("ip_wput_v6: ire %p, "
-			    "multirt_need_resolve %d, first_mp %p\n",
-			    (void *)ire, multirt_need_resolve,
-			    (void *)first_mp));
-			if (multirt_need_resolve) {
-				copy_mp = copymsg(first_mp);
-				if (copy_mp != NULL) {
-					MULTIRT_DEBUG_TAG(copy_mp);
-				}
-			}
-		}
-		ip_wput_ire_v6(q, first_mp, ire, unspec_src, cksum_request,
-		    connp, caller, ip6i_flags, zoneid);
-		if (need_decref) {
-			CONN_DEC_REF(connp);
-			connp = NULL;
-		}
-		IRE_REFRELE(ire);
-
-		/*
-		 * Try to resolve another multiroute if
-		 * ire_multirt_need_resolve_v6() deemed it necessary.
-		 * copy_mp will be consumed (sent or freed) by
-		 * ip_newroute_v6().
-		 */
-		if (copy_mp != NULL) {
-			if (mctl_present) {
-				ip6h = (ip6_t *)copy_mp->b_cont->b_rptr;
-			} else {
-				ip6h = (ip6_t *)copy_mp->b_rptr;
-			}
-			ip_newroute_v6(q, copy_mp, &ip6h->ip6_dst,
-			    &ip6h->ip6_src, NULL, zoneid, ipst);
-		}
-		if (ill != NULL)
-			ill_refrele(ill);
-		return;
-	}
-
-	/*
-	 * No full IRE for this destination.  Send it to
-	 * ip_newroute_v6 to see if anything else matches.
-	 * Mark this packet as having originated on this
-	 * machine.
-	 * Update rptr if there was an ip6i_t header.
-	 */
-	mp->b_prev = NULL;
-	mp->b_next = NULL;
-	if (ip6i != NULL)
-		mp->b_rptr -= sizeof (ip6i_t);
-
-	if (unspec_src) {
-		if (ip6i == NULL) {
-			/*
-			 * Add ip6i_t header to carry unspec_src
-			 * until the packet comes back in ip_wput_v6.
-			 */
-			mp = ip_add_info_v6(mp, NULL, v6dstp);
-			if (mp == NULL) {
-				if (do_outrequests)
-					BUMP_MIB(mibptr,
-					    ipIfStatsHCOutRequests);
-				BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-				if (mctl_present)
-					freeb(first_mp);
-				if (ill != NULL)
-					ill_refrele(ill);
-				if (need_decref)
-					CONN_DEC_REF(connp);
-				return;
-			}
-			ip6i = (ip6i_t *)mp->b_rptr;
-
-			if (mctl_present) {
-				ASSERT(first_mp != mp);
-				first_mp->b_cont = mp;
-			} else {
-				first_mp = mp;
-			}
-
-			if ((mp->b_wptr - (uchar_t *)ip6i) ==
-			    sizeof (ip6i_t)) {
-				/*
-				 * ndp_resolver called from ip_newroute_v6
-				 * expects pulled up message.
-				 */
-				if (!pullupmsg(mp, -1)) {
-					ip1dbg(("ip_wput_v6: pullupmsg"
-					    " failed\n"));
-					if (do_outrequests) {
-						BUMP_MIB(mibptr,
-						    ipIfStatsHCOutRequests);
-					}
-					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-					freemsg(first_mp);
-					if (ill != NULL)
-						ill_refrele(ill);
-					if (need_decref)
-						CONN_DEC_REF(connp);
-					return;
-				}
-				ip6i = (ip6i_t *)mp->b_rptr;
-			}
-			ip6h = (ip6_t *)&ip6i[1];
-			v6dstp = &ip6h->ip6_dst;
-		}
-		ip6i->ip6i_flags |= IP6I_UNSPEC_SRC;
-		if (mctl_present) {
-			ASSERT(io != NULL);
-			io->ipsec_out_unspec_src = unspec_src;
-		}
-	}
-	if (do_outrequests)
-		BUMP_MIB(mibptr, ipIfStatsHCOutRequests);
-	if (need_decref)
-		CONN_DEC_REF(connp);
-	ip_newroute_v6(q, first_mp, v6dstp, &ip6h->ip6_src, NULL, zoneid, ipst);
-	if (ill != NULL)
-		ill_refrele(ill);
-	return;
-
-
-	/*
-	 * Handle multicast packets with or without an conn.
-	 * Assumes that the transports set ip6_hops taking
-	 * IPV6_MULTICAST_HOPS (and the other ways to set the hoplimit)
-	 * into account.
-	 */
-ipv6multicast:
-	ip2dbg(("ip_wput_v6: multicast\n"));
-
-	/*
-	 * Hold the conn_lock till we refhold the ill of interest that is
-	 * pointed to from the conn. Since we cannot do an ill/ipif_refrele
-	 * while holding any locks, postpone the refrele until after the
-	 * conn_lock is dropped.
-	 */
-	if (connp != NULL) {
-		mutex_enter(&connp->conn_lock);
-		conn_lock_held = B_TRUE;
-	} else {
-		conn_lock_held = B_FALSE;
-	}
-	if (ip6i != NULL && (ip6i->ip6i_flags & IP6I_IFINDEX)) {
-		/* 1. If an ip6i_t with IP6I_IFINDEX set then use that ill. */
-		ASSERT(ill != NULL);
-	} else if (ill != NULL) {
-		/*
-		 * 2. If q is an ill queue and (link local or multicast
-		 * destination) then use that ill.
-		 * We don't need the ipif initialization here.
-		 * This useless assert below is just to prevent lint from
-		 * reporting a null body if statement.
-		 */
-		ASSERT(ill != NULL);
-	} else if (connp != NULL) {
-		/*
-		 * 3. If IPV6_BOUND_IF has been set use that ill.
-		 *
-		 * 4. For multicast: if IPV6_MULTICAST_IF has been set use it.
-		 * Otherwise look for the best IRE match for the unspecified
-		 * group to determine the ill.
-		 *
-		 * conn_multicast_ill is used for only IPv6 packets.
-		 * conn_multicast_ipif is used for only IPv4 packets.
-		 * Thus a PF_INET6 socket send both IPv4 and IPv6
-		 * multicast packets using different IP*_MULTICAST_IF
-		 * interfaces.
-		 */
-		if (connp->conn_outgoing_ill != NULL) {
-			err = ill_check_and_refhold(connp->conn_outgoing_ill);
-			if (err == ILL_LOOKUP_FAILED) {
-				ip1dbg(("ip_output_v6: multicast"
-				    " conn_outgoing_ill no ipif\n"));
-multicast_discard:
-				ASSERT(saved_ill == NULL);
-				if (conn_lock_held)
-					mutex_exit(&connp->conn_lock);
-				if (ill != NULL)
-					ill_refrele(ill);
-				freemsg(first_mp);
-				if (do_outrequests)
-					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-				if (need_decref)
-					CONN_DEC_REF(connp);
-				return;
-			}
-			ill = connp->conn_outgoing_ill;
-		} else if (connp->conn_multicast_ill != NULL) {
-			err = ill_check_and_refhold(connp->conn_multicast_ill);
-			if (err == ILL_LOOKUP_FAILED) {
-				ip1dbg(("ip_output_v6: multicast"
-				    " conn_multicast_ill no ipif\n"));
-				goto multicast_discard;
-			}
-			ill = connp->conn_multicast_ill;
-		} else {
-			mutex_exit(&connp->conn_lock);
-			conn_lock_held = B_FALSE;
-			ipif = ipif_lookup_group_v6(v6dstp, zoneid, ipst);
-			if (ipif == NULL) {
-				ip1dbg(("ip_output_v6: multicast no ipif\n"));
-				goto multicast_discard;
-			}
-			/*
-			 * We have a ref to this ipif, so we can safely
-			 * access ipif_ill.
-			 */
-			ill = ipif->ipif_ill;
-			mutex_enter(&ill->ill_lock);
-			if (!ILL_CAN_LOOKUP(ill)) {
-				mutex_exit(&ill->ill_lock);
-				ipif_refrele(ipif);
-				ill = NULL;
-				ip1dbg(("ip_output_v6: multicast no ipif\n"));
-				goto multicast_discard;
-			}
-			ill_refhold_locked(ill);
-			mutex_exit(&ill->ill_lock);
-			ipif_refrele(ipif);
-			/*
-			 * Save binding until IPV6_MULTICAST_IF
-			 * changes it
-			 */
-			mutex_enter(&connp->conn_lock);
-			connp->conn_multicast_ill = ill;
-			mutex_exit(&connp->conn_lock);
-		}
-	}
-	if (conn_lock_held)
-		mutex_exit(&connp->conn_lock);
-
-	if (saved_ill != NULL)
-		ill_refrele(saved_ill);
-
-	ASSERT(ill != NULL);
-	/*
-	 * For multicast loopback interfaces replace the multicast address
-	 * with a unicast address for the ire lookup.
-	 */
-	if (IS_LOOPBACK(ill))
-		v6dstp = &ill->ill_ipif->ipif_v6lcl_addr;
-
-	mibptr = ill->ill_ip_mib;
-	if (do_outrequests) {
-		BUMP_MIB(mibptr, ipIfStatsHCOutRequests);
-		do_outrequests = B_FALSE;
-	}
-	BUMP_MIB(mibptr, ipIfStatsHCOutMcastPkts);
-	UPDATE_MIB(mibptr, ipIfStatsHCOutMcastOctets,
-	    ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN);
-
-	/*
-	 * As we may lose the conn by the time we reach ip_wput_ire_v6
-	 * we copy conn_multicast_loop and conn_dontroute on to an
-	 * ipsec_out. In case if this datagram goes out secure,
-	 * we need the ill_index also. Copy that also into the
-	 * ipsec_out.
-	 */
-	if (mctl_present) {
-		io = (ipsec_out_t *)first_mp->b_rptr;
-		ASSERT(first_mp->b_datap->db_type == M_CTL);
-		ASSERT(io->ipsec_out_type == IPSEC_OUT);
-	} else {
-		ASSERT(mp == first_mp);
-		if ((first_mp = ipsec_alloc_ipsec_out(ipst->ips_netstack)) ==
-		    NULL) {
-			BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-			freemsg(mp);
-			if (ill != NULL)
-				ill_refrele(ill);
-			if (need_decref)
-				CONN_DEC_REF(connp);
-			return;
-		}
-		io = (ipsec_out_t *)first_mp->b_rptr;
-		/* This is not a secure packet */
-		io->ipsec_out_secure = B_FALSE;
-		io->ipsec_out_use_global_policy = B_TRUE;
-		io->ipsec_out_zoneid =
-		    (zoneid != ALL_ZONES ? zoneid : GLOBAL_ZONEID);
-		first_mp->b_cont = mp;
-		mctl_present = B_TRUE;
-	}
-	io->ipsec_out_ill_index = ill->ill_phyint->phyint_ifindex;
-	io->ipsec_out_unspec_src = unspec_src;
-	if (connp != NULL)
-		io->ipsec_out_dontroute = connp->conn_dontroute;
-
-send_from_ill:
-	ASSERT(ill != NULL);
-	ASSERT(mibptr == ill->ill_ip_mib);
-
-	if (do_outrequests) {
-		BUMP_MIB(mibptr, ipIfStatsHCOutRequests);
-		do_outrequests = B_FALSE;
-	}
-
-	/*
-	 * Because nce_xmit() calls ip_output_v6() and NCEs are always tied to
-	 * an underlying interface, IS_UNDER_IPMP() may be true even when
-	 * building IREs that will be used for data traffic.  As such, use the
-	 * packet's source address to determine whether the traffic is test
-	 * traffic, and set MATCH_IRE_MARK_TESTHIDDEN if so.
-	 *
-	 * Separately, we also need to mark probe packets so that ND can
-	 * process them specially; see the comments in nce_queue_mp_common().
-	 */
-	if (IS_UNDER_IPMP(ill) && !IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src) &&
-	    ipif_lookup_testaddr_v6(ill, &ip6h->ip6_src, NULL)) {
-		if (ip6i == NULL) {
-			if ((mp = ip_add_info_v6(mp, NULL, v6dstp)) == NULL) {
-				if (mctl_present)
-					freeb(first_mp);
-				goto discard;
-			}
-
-			if (mctl_present)
-				first_mp->b_cont = mp;
-			else
-				first_mp = mp;
-
-			/* ndp_resolver() expects a pulled-up message */
-			if (MBLKL(mp) == sizeof (ip6i_t) &&
-			    pullupmsg(mp, -1) == 0) {
-				ip1dbg(("ip_output_v6: pullupmsg failed\n"));
-discard:			BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-				ill_refrele(ill);
-				if (need_decref)
-					CONN_DEC_REF(connp);
-				return;
-			}
-			ip6i = (ip6i_t *)mp->b_rptr;
-			ip6h = (ip6_t *)&ip6i[1];
-			v6dstp = &ip6h->ip6_dst;
-			mp->b_rptr = (uchar_t *)ip6h;	/* rewound below */
-		}
-		ip6i->ip6i_flags |= IP6I_IPMP_PROBE;
-		match_flags |= MATCH_IRE_MARK_TESTHIDDEN;
-	}
-
-	if (io != NULL)
-		io->ipsec_out_ill_index = ill->ill_phyint->phyint_ifindex;
-
-	/*
-	 * When a specific ill is specified (using IPV6_PKTINFO,
-	 * IPV6_MULTICAST_IF, or IPV6_BOUND_IF) we will only match
-	 * on routing entries (ftable and ctable) that have a matching
-	 * ire->ire_ipif->ipif_ill. Thus this can only be used
-	 * for destinations that are on-link for the specific ill
-	 * and that can appear on multiple links. Thus it is useful
-	 * for multicast destinations, link-local destinations, and
-	 * at some point perhaps for site-local destinations (if the
-	 * node sits at a site boundary).
-	 * We create the cache entries in the regular ctable since
-	 * it can not "confuse" things for other destinations.
-	 * table.
-	 *
-	 * NOTE : conn_ire_cache is not used for caching ire_ctable_lookups.
-	 *	  It is used only when ire_cache_lookup is used above.
-	 */
-	ire = ire_ctable_lookup_v6(v6dstp, 0, 0, ill->ill_ipif,
-	    zoneid, msg_getlabel(mp), match_flags, ipst);
-	if (ire != NULL) {
-		/*
-		 * Check if the ire has the RTF_MULTIRT flag, inherited
-		 * from an IRE_OFFSUBNET ire entry in ip_newroute().
-		 */
-		if (ire->ire_flags & RTF_MULTIRT) {
-			/*
-			 * Force hop limit of multirouted packets if required.
-			 * The hop limit of such packets is bounded by the
-			 * ip_multirt_ttl ndd variable.
-			 * NDP packets must have a hop limit of 255; don't
-			 * change the hop limit in that case.
-			 */
-			if ((ipst->ips_ip_multirt_ttl > 0) &&
-			    (ip6h->ip6_hops > ipst->ips_ip_multirt_ttl) &&
-			    (ip6h->ip6_hops != IPV6_MAX_HOPS)) {
-				if (ip_debug > 3) {
-					ip2dbg(("ip_wput_v6: forcing multirt "
-					    "hop limit to %d (was %d) ",
-					    ipst->ips_ip_multirt_ttl,
-					    ip6h->ip6_hops));
-					pr_addr_dbg("v6dst %s\n", AF_INET6,
-					    &ire->ire_addr_v6);
-				}
-				ip6h->ip6_hops = ipst->ips_ip_multirt_ttl;
-			}
-
-			/*
-			 * We look at this point if there are pending
-			 * unresolved routes. ire_multirt_need_resolve_v6()
-			 * checks in O(n) that all IRE_OFFSUBNET ire
-			 * entries for the packet's destination and
-			 * flagged RTF_MULTIRT are currently resolved.
-			 * If some remain unresolved, we make a copy
-			 * of the current message. It will be used
-			 * to initiate additional route resolutions.
-			 */
-			multirt_need_resolve =
-			    ire_multirt_need_resolve_v6(&ire->ire_addr_v6,
-			    msg_getlabel(first_mp), ipst);
-			ip2dbg(("ip_wput_v6[send_from_ill]: ire %p, "
-			    "multirt_need_resolve %d, first_mp %p\n",
-			    (void *)ire, multirt_need_resolve,
-			    (void *)first_mp));
-			if (multirt_need_resolve) {
-				copy_mp = copymsg(first_mp);
-				if (copy_mp != NULL) {
-					MULTIRT_DEBUG_TAG(copy_mp);
-				}
-			}
-		}
-
-		ip1dbg(("ip_wput_v6: send on %s, ire = %p, ill index = %d\n",
-		    ill->ill_name, (void *)ire,
-		    ill->ill_phyint->phyint_ifindex));
-		ip_wput_ire_v6(q, first_mp, ire, unspec_src, cksum_request,
-		    connp, caller, ip6i_flags, zoneid);
-		ire_refrele(ire);
-		if (need_decref) {
-			CONN_DEC_REF(connp);
-			connp = NULL;
-		}
-
-		/*
-		 * Try to resolve another multiroute if
-		 * ire_multirt_need_resolve_v6() deemed it necessary.
-		 * copy_mp will be consumed (sent or freed) by
-		 * ip_newroute_[ipif_]v6().
-		 */
-		if (copy_mp != NULL) {
-			if (mctl_present) {
-				ip6h = (ip6_t *)copy_mp->b_cont->b_rptr;
-			} else {
-				ip6h = (ip6_t *)copy_mp->b_rptr;
-			}
-			if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-				ipif = ipif_lookup_group_v6(&ip6h->ip6_dst,
-				    zoneid, ipst);
-				if (ipif == NULL) {
-					ip1dbg(("ip_wput_v6: No ipif for "
-					    "multicast\n"));
-					MULTIRT_DEBUG_UNTAG(copy_mp);
-					freemsg(copy_mp);
-					return;
-				}
-				ip_newroute_ipif_v6(q, copy_mp, ipif,
-				    &ip6h->ip6_dst, &ip6h->ip6_src, unspec_src,
-				    zoneid);
-				ipif_refrele(ipif);
-			} else {
-				ip_newroute_v6(q, copy_mp, &ip6h->ip6_dst,
-				    &ip6h->ip6_src, ill, zoneid, ipst);
-			}
-		}
-		ill_refrele(ill);
-		return;
-	}
-	if (need_decref) {
-		CONN_DEC_REF(connp);
-		connp = NULL;
-	}
-
-	/* Update rptr if there was an ip6i_t header. */
-	if (ip6i != NULL)
-		mp->b_rptr -= sizeof (ip6i_t);
-	if (unspec_src) {
-		if (ip6i == NULL) {
-			/*
-			 * Add ip6i_t header to carry unspec_src
-			 * until the packet comes back in ip_wput_v6.
-			 */
-			if (mctl_present) {
-				first_mp->b_cont =
-				    ip_add_info_v6(mp, NULL, v6dstp);
-				mp = first_mp->b_cont;
-				if (mp == NULL)
-					freeb(first_mp);
-			} else {
-				first_mp = mp = ip_add_info_v6(mp, NULL,
-				    v6dstp);
-			}
-			if (mp == NULL) {
-				BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-				ill_refrele(ill);
-				return;
-			}
-			ip6i = (ip6i_t *)mp->b_rptr;
-			if ((mp->b_wptr - (uchar_t *)ip6i) ==
-			    sizeof (ip6i_t)) {
-				/*
-				 * ndp_resolver called from ip_newroute_v6
-				 * expects a pulled up message.
-				 */
-				if (!pullupmsg(mp, -1)) {
-					ip1dbg(("ip_wput_v6: pullupmsg"
-					    " failed\n"));
-					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-					freemsg(first_mp);
-					return;
-				}
-				ip6i = (ip6i_t *)mp->b_rptr;
-			}
-			ip6h = (ip6_t *)&ip6i[1];
-			v6dstp = &ip6h->ip6_dst;
-		}
-		ip6i->ip6i_flags |= IP6I_UNSPEC_SRC;
-		if (mctl_present) {
-			ASSERT(io != NULL);
-			io->ipsec_out_unspec_src = unspec_src;
-		}
-	}
-	if (IN6_IS_ADDR_MULTICAST(v6dstp)) {
-		ip_newroute_ipif_v6(q, first_mp, ill->ill_ipif, v6dstp,
-		    &ip6h->ip6_src, unspec_src, zoneid);
-	} else {
-		ip_newroute_v6(q, first_mp, v6dstp, &ip6h->ip6_src, ill,
-		    zoneid, ipst);
-	}
-	ill_refrele(ill);
-	return;
-
-notv6:
-	/* FIXME?: assume the caller calls the right version of ip_output? */
-	if (q->q_next == NULL) {
-		connp = Q_TO_CONN(q);
-
-		/*
-		 * We can change conn_send for all types of conn, even
-		 * though only TCP uses it right now.
-		 * FIXME: sctp could use conn_send but doesn't currently.
-		 */
-		ip_setpktversion(connp, B_FALSE, B_TRUE, ipst);
-	}
-	BUMP_MIB(mibptr, ipIfStatsOutWrongIPVersion);
-	(void) ip_output(arg, first_mp, arg2, caller);
-	if (ill != NULL)
-		ill_refrele(ill);
-}
-
-/*
- * If this is a conn_t queue, then we pass in the conn. This includes the
- * zoneid.
- * Otherwise, this is a message for an ill_t queue,
- * in which case we use the global zoneid since those are all part of
- * the global zone.
- */
-void
-ip_wput_v6(queue_t *q, mblk_t *mp)
-{
-	if (CONN_Q(q))
-		ip_output_v6(Q_TO_CONN(q), mp, q, IP_WPUT);
-	else
-		ip_output_v6(GLOBAL_ZONEID, mp, q, IP_WPUT);
-}
-
-/*
- * NULL send-to queue - packet is to be delivered locally.
- */
-void
-ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
-    ire_t *ire, int fanout_flags, zoneid_t zoneid)
-{
-	uint32_t	ports;
-	mblk_t		*mp = first_mp, *first_mp1;
-	boolean_t	mctl_present;
-	uint8_t		nexthdr;
-	uint16_t	hdr_length;
-	ipsec_out_t	*io;
-	mib2_ipIfStatsEntry_t	*mibptr;
-	ilm_t		*ilm;
-	uint_t	nexthdr_offset;
-	ip_stack_t	*ipst = ill->ill_ipst;
-
-	if (DB_TYPE(mp) == M_CTL) {
-		io = (ipsec_out_t *)mp->b_rptr;
-		if (!io->ipsec_out_secure) {
-			mp = mp->b_cont;
-			freeb(first_mp);
-			first_mp = mp;
-			mctl_present = B_FALSE;
-		} else {
-			mctl_present = B_TRUE;
-			mp = first_mp->b_cont;
-			ipsec_out_to_in(first_mp);
-		}
-	} else {
-		mctl_present = B_FALSE;
-	}
-
-	/*
-	 * Remove reachability confirmation bit from version field
-	 * before passing the packet on to any firewall hooks or
-	 * looping back the packet.
-	 */
-	if (ip6h->ip6_vcf & IP_FORWARD_PROG)
-		ip6h->ip6_vcf &= ~IP_FORWARD_PROG;
-
-	DTRACE_PROBE4(ip6__loopback__in__start,
-	    ill_t *, ill, ill_t *, NULL,
-	    ip6_t *, ip6h, mblk_t *, first_mp);
-
-	FW_HOOKS6(ipst->ips_ip6_loopback_in_event,
-	    ipst->ips_ipv6firewall_loopback_in,
-	    ill, NULL, ip6h, first_mp, mp, 0, ipst);
-
-	DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, first_mp);
-
-	if (first_mp == NULL)
-		return;
-
-	if (ipst->ips_ip6_observe.he_interested) {
-		zoneid_t szone, dzone, lookup_zoneid = ALL_ZONES;
-		zoneid_t stackzoneid = netstackid_to_zoneid(
-		    ipst->ips_netstack->netstack_stackid);
-
-		szone = (stackzoneid == GLOBAL_ZONEID) ? zoneid : stackzoneid;
-		/*
-		 * ::1 is special, as we cannot lookup its zoneid by
-		 * address.  For this case, restrict the lookup to the
-		 * source zone.
-		 */
-		if (IN6_IS_ADDR_LOOPBACK(&ip6h->ip6_dst))
-			lookup_zoneid = zoneid;
-		dzone = ip_get_zoneid_v6(&ip6h->ip6_dst, mp, ill, ipst,
-		    lookup_zoneid);
-		ipobs_hook(mp, IPOBS_HOOK_LOCAL, szone, dzone, ill, ipst);
-	}
-
-	DTRACE_IP7(receive, mblk_t *, first_mp, conn_t *, NULL, void_ip_t *,
-	    ip6h, __dtrace_ipsr_ill_t *, ill, ipha_t *, NULL, ip6_t *, ip6h,
-	    int, 1);
-
-	nexthdr = ip6h->ip6_nxt;
-	mibptr = ill->ill_ip_mib;
-
-	/* Fastpath */
-	switch (nexthdr) {
-	case IPPROTO_TCP:
-	case IPPROTO_UDP:
-	case IPPROTO_ICMPV6:
-	case IPPROTO_SCTP:
-		hdr_length = IPV6_HDR_LEN;
-		nexthdr_offset = (uint_t)((uchar_t *)&ip6h->ip6_nxt -
-		    (uchar_t *)ip6h);
-		break;
-	default: {
-		uint8_t	*nexthdrp;
-
-		if (!ip_hdr_length_nexthdr_v6(mp, ip6h,
-		    &hdr_length, &nexthdrp)) {
-			/* Malformed packet */
-			BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-			freemsg(first_mp);
-			return;
-		}
-		nexthdr = *nexthdrp;
-		nexthdr_offset = nexthdrp - (uint8_t *)ip6h;
-		break;
-	}
-	}
-
-	UPDATE_OB_PKT_COUNT(ire);
-	ire->ire_last_used_time = lbolt;
-
-	switch (nexthdr) {
-		case IPPROTO_TCP:
-			if (DB_TYPE(mp) == M_DATA) {
-				/*
-				 * M_DATA mblk, so init mblk (chain) for
-				 * no struio().
-				 */
-				mblk_t  *mp1 = mp;
-
-				do {
-					mp1->b_datap->db_struioflag = 0;
-				} while ((mp1 = mp1->b_cont) != NULL);
-			}
-			ports = *(uint32_t *)(mp->b_rptr + hdr_length +
-			    TCP_PORTS_OFFSET);
-			ip_fanout_tcp_v6(q, first_mp, ip6h, ill, ill,
-			    fanout_flags|IP_FF_SEND_ICMP|IP_FF_SYN_ADDIRE|
-			    IP_FF_IPINFO|IP6_NO_IPPOLICY|IP_FF_LOOPBACK,
-			    hdr_length, mctl_present, ire->ire_zoneid);
-			return;
-
-		case IPPROTO_UDP:
-			ports = *(uint32_t *)(mp->b_rptr + hdr_length +
-			    UDP_PORTS_OFFSET);
-			ip_fanout_udp_v6(q, first_mp, ip6h, ports, ill, ill,
-			    fanout_flags|IP_FF_SEND_ICMP|IP_FF_IPINFO|
-			    IP6_NO_IPPOLICY, mctl_present, ire->ire_zoneid);
-			return;
-
-		case IPPROTO_SCTP:
-		{
-			ports = *(uint32_t *)(mp->b_rptr + hdr_length);
-			ip_fanout_sctp(first_mp, ill, (ipha_t *)ip6h, ports,
-			    fanout_flags|IP_FF_SEND_ICMP|IP_FF_IPINFO,
-			    mctl_present, IP6_NO_IPPOLICY, ire->ire_zoneid);
-			return;
-		}
-		case IPPROTO_ICMPV6: {
-			icmp6_t *icmp6;
-
-			/* check for full IPv6+ICMPv6 header */
-			if ((mp->b_wptr - mp->b_rptr) <
-			    (hdr_length + ICMP6_MINLEN)) {
-				if (!pullupmsg(mp, hdr_length + ICMP6_MINLEN)) {
-					ip1dbg(("ip_wput_v6: ICMP hdr pullupmsg"
-					    " failed\n"));
-					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-					freemsg(first_mp);
-					return;
-				}
-				ip6h = (ip6_t *)mp->b_rptr;
-			}
-			icmp6 = (icmp6_t *)((uchar_t *)ip6h + hdr_length);
-
-			/* Update output mib stats */
-			icmp_update_out_mib_v6(ill, icmp6);
-
-			/* Check variable for testing applications */
-			if (ipst->ips_ipv6_drop_inbound_icmpv6) {
-				freemsg(first_mp);
-				return;
-			}
-			/*
-			 * Assume that there is always at least one conn for
-			 * ICMPv6 (in.ndpd) i.e. don't optimize the case
-			 * where there is no conn.
-			 */
-			if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst) &&
-			    !IS_LOOPBACK(ill)) {
-				ilm_walker_t ilw;
-
-				/*
-				 * In the multicast case, applications may have
-				 * joined the group from different zones, so we
-				 * need to deliver the packet to each of them.
-				 * Loop through the multicast memberships
-				 * structures (ilm) on the receive ill and send
-				 * a copy of the packet up each matching one.
-				 * However, we don't do this for multicasts sent
-				 * on the loopback interface (PHYI_LOOPBACK flag
-				 * set) as they must stay in the sender's zone.
-				 */
-				ilm = ilm_walker_start(&ilw, ill);
-				for (; ilm != NULL;
-				    ilm = ilm_walker_step(&ilw, ilm)) {
-					if (!IN6_ARE_ADDR_EQUAL(
-					    &ilm->ilm_v6addr, &ip6h->ip6_dst))
-						continue;
-					if ((fanout_flags &
-					    IP_FF_NO_MCAST_LOOP) &&
-					    ilm->ilm_zoneid == ire->ire_zoneid)
-						continue;
-					if (!ipif_lookup_zoneid(
-					    ilw.ilw_walk_ill, ilm->ilm_zoneid,
-					    IPIF_UP, NULL))
-						continue;
-
-					first_mp1 = ip_copymsg(first_mp);
-					if (first_mp1 == NULL)
-						continue;
-					icmp_inbound_v6(q, first_mp1,
-					    ilw.ilw_walk_ill, ill, hdr_length,
-					    mctl_present, IP6_NO_IPPOLICY,
-					    ilm->ilm_zoneid, NULL);
-				}
-				ilm_walker_finish(&ilw);
-			} else {
-				first_mp1 = ip_copymsg(first_mp);
-				if (first_mp1 != NULL)
-					icmp_inbound_v6(q, first_mp1, ill, ill,
-					    hdr_length, mctl_present,
-					    IP6_NO_IPPOLICY, ire->ire_zoneid,
-					    NULL);
-			}
-		}
-		/* FALLTHRU */
-		default: {
-			/*
-			 * Handle protocols with which IPv6 is less intimate.
-			 */
-			fanout_flags |= IP_FF_RAWIP|IP_FF_IPINFO;
-
-			/*
-			 * Enable sending ICMP for "Unknown" nexthdr
-			 * case. i.e. where we did not FALLTHRU from
-			 * IPPROTO_ICMPV6 processing case above.
-			 */
-			if (nexthdr != IPPROTO_ICMPV6)
-				fanout_flags |= IP_FF_SEND_ICMP;
-			/*
-			 * Note: There can be more than one stream bound
-			 * to a particular protocol. When this is the case,
-			 * each one gets a copy of any incoming packets.
-			 */
-			ip_fanout_proto_v6(q, first_mp, ip6h, ill, ill, nexthdr,
-			    nexthdr_offset, fanout_flags|IP6_NO_IPPOLICY,
-			    mctl_present, ire->ire_zoneid);
-			return;
-		}
-	}
-}
-
-/*
- * Send packet using IRE.
- * Checksumming is controlled by cksum_request:
- *	-1 => normal i.e. TCP/UDP/SCTP/ICMPv6 are checksummed and nothing else.
- *	1 => Skip TCP/UDP/SCTP checksum
- * 	Otherwise => checksum_request contains insert offset for checksum
- *
- * Assumes that the following set of headers appear in the first
- * mblk:
- *	ip6_t
- *	Any extension headers
- *	TCP/UDP/SCTP header (if present)
- * The routine can handle an ICMPv6 header that is not in the first mblk.
- *
- * NOTE : This function does not ire_refrele the ire passed in as the
- *	  argument unlike ip_wput_ire where the REFRELE is done.
- *	  Refer to ip_wput_ire for more on this.
- */
-static void
-ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
-    int cksum_request, conn_t *connp, int caller, int flags, zoneid_t zoneid)
-{
-	ip6_t		*ip6h;
-	uint8_t		nexthdr;
-	uint16_t	hdr_length;
-	uint_t		reachable = 0x0;
-	ill_t		*ill;
-	mib2_ipIfStatsEntry_t	*mibptr;
-	mblk_t		*first_mp;
-	boolean_t	mctl_present;
-	ipsec_out_t	*io;
-	boolean_t	conn_dontroute;	/* conn value for multicast */
-	boolean_t	conn_multicast_loop;	/* conn value for multicast */
-	boolean_t 	multicast_forward;	/* Should we forward ? */
-	int		max_frag;
-	ip_stack_t	*ipst = ire->ire_ipst;
-	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
-
-	ill = ire_to_ill(ire);
-	first_mp = mp;
-	multicast_forward = B_FALSE;
-
-	if (mp->b_datap->db_type != M_CTL) {
-		ip6h = (ip6_t *)first_mp->b_rptr;
-	} else {
-		io = (ipsec_out_t *)first_mp->b_rptr;
-		ASSERT(io->ipsec_out_type == IPSEC_OUT);
-		/*
-		 * Grab the zone id now because the M_CTL can be discarded by
-		 * ip_wput_ire_parse_ipsec_out() below.
-		 */
-		ASSERT(zoneid == io->ipsec_out_zoneid);
-		ASSERT(zoneid != ALL_ZONES);
-		ip6h = (ip6_t *)first_mp->b_cont->b_rptr;
-		/*
-		 * For the multicast case, ipsec_out carries conn_dontroute and
-		 * conn_multicast_loop as conn may not be available here. We
-		 * need this for multicast loopback and forwarding which is done
-		 * later in the code.
-		 */
-		if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-			conn_dontroute = io->ipsec_out_dontroute;
-			conn_multicast_loop = io->ipsec_out_multicast_loop;
-			/*
-			 * If conn_dontroute is not set or conn_multicast_loop
-			 * is set, we need to do forwarding/loopback. For
-			 * datagrams from ip_wput_multicast, conn_dontroute is
-			 * set to B_TRUE and conn_multicast_loop is set to
-			 * B_FALSE so that we neither do forwarding nor
-			 * loopback.
-			 */
-			if (!conn_dontroute || conn_multicast_loop)
-				multicast_forward = B_TRUE;
-		}
-	}
-
-	/*
-	 * If the sender didn't supply the hop limit and there is a default
-	 * unicast hop limit associated with the output interface, we use
-	 * that if the packet is unicast.  Interface specific unicast hop
-	 * limits as set via the SIOCSLIFLNKINFO ioctl.
-	 */
-	if (ill->ill_max_hops != 0 && !(flags & IP6I_HOPLIMIT) &&
-	    !(IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst))) {
-		ip6h->ip6_hops = ill->ill_max_hops;
-	}
-
-	if (ire->ire_type == IRE_LOCAL && ire->ire_zoneid != zoneid &&
-	    ire->ire_zoneid != ALL_ZONES) {
-		/*
-		 * When a zone sends a packet to another zone, we try to deliver
-		 * the packet under the same conditions as if the destination
-		 * was a real node on the network. To do so, we look for a
-		 * matching route in the forwarding table.
-		 * RTF_REJECT and RTF_BLACKHOLE are handled just like
-		 * ip_newroute_v6() does.
-		 * Note that IRE_LOCAL are special, since they are used
-		 * when the zoneid doesn't match in some cases. This means that
-		 * we need to handle ipha_src differently since ire_src_addr
-		 * belongs to the receiving zone instead of the sending zone.
-		 * When ip_restrict_interzone_loopback is set, then
-		 * ire_cache_lookup_v6() ensures that IRE_LOCAL are only used
-		 * for loopback between zones when the logical "Ethernet" would
-		 * have looped them back.
-		 */
-		ire_t *src_ire;
-
-		src_ire = ire_ftable_lookup_v6(&ip6h->ip6_dst, 0, 0, 0,
-		    NULL, NULL, zoneid, 0, NULL, (MATCH_IRE_RECURSIVE |
-		    MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE), ipst);
-		if (src_ire != NULL &&
-		    !(src_ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE)) &&
-		    (!ipst->ips_ip_restrict_interzone_loopback ||
-		    ire_local_same_lan(ire, src_ire))) {
-			if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src) &&
-			    !unspec_src) {
-				ip6h->ip6_src = src_ire->ire_src_addr_v6;
-			}
-			ire_refrele(src_ire);
-		} else {
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutNoRoutes);
-			if (src_ire != NULL) {
-				if (src_ire->ire_flags & RTF_BLACKHOLE) {
-					ire_refrele(src_ire);
-					freemsg(first_mp);
-					return;
-				}
-				ire_refrele(src_ire);
-			}
-			if (ip_hdr_complete_v6(ip6h, zoneid, ipst)) {
-				/* Failed */
-				freemsg(first_mp);
-				return;
-			}
-			icmp_unreachable_v6(q, first_mp,
-			    ICMP6_DST_UNREACH_NOROUTE, B_FALSE, B_FALSE,
-			    zoneid, ipst);
-			return;
-		}
-	}
-
-	if (mp->b_datap->db_type == M_CTL ||
-	    ipss->ipsec_outbound_v6_policy_present) {
-		mp = ip_wput_ire_parse_ipsec_out(first_mp, NULL, ip6h, ire,
-		    connp, unspec_src, zoneid);
-		if (mp == NULL) {
-			return;
-		}
-	}
-
-	first_mp = mp;
-	if (mp->b_datap->db_type == M_CTL) {
-		io = (ipsec_out_t *)mp->b_rptr;
-		ASSERT(io->ipsec_out_type == IPSEC_OUT);
-		mp = mp->b_cont;
-		mctl_present = B_TRUE;
-	} else {
-		mctl_present = B_FALSE;
-	}
-
-	ip6h = (ip6_t *)mp->b_rptr;
-	nexthdr = ip6h->ip6_nxt;
-	mibptr = ill->ill_ip_mib;
-
-	if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src) && !unspec_src) {
-		ipif_t *ipif;
-
-		/*
-		 * Select the source address using ipif_select_source_v6.
-		 */
-		ipif = ipif_select_source_v6(ill, &ip6h->ip6_dst, B_FALSE,
-		    IPV6_PREFER_SRC_DEFAULT, zoneid);
-		if (ipif == NULL) {
-			if (ip_debug > 2) {
-				/* ip1dbg */
-				pr_addr_dbg("ip_wput_ire_v6: no src for "
-				    "dst %s\n", AF_INET6, &ip6h->ip6_dst);
-				printf("through interface %s\n", ill->ill_name);
-			}
-			freemsg(first_mp);
-			return;
-		}
-		ip6h->ip6_src = ipif->ipif_v6src_addr;
-		ipif_refrele(ipif);
-	}
-	if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-		if ((connp != NULL && connp->conn_multicast_loop) ||
-		    !IS_LOOPBACK(ill)) {
-			if (ilm_lookup_ill_v6(ill, &ip6h->ip6_dst, B_FALSE,
-			    ALL_ZONES) != NULL) {
-				mblk_t *nmp;
-				int fanout_flags = 0;
-
-				if (connp != NULL &&
-				    !connp->conn_multicast_loop) {
-					fanout_flags |= IP_FF_NO_MCAST_LOOP;
-				}
-				ip1dbg(("ip_wput_ire_v6: "
-				    "Loopback multicast\n"));
-				nmp = ip_copymsg(first_mp);
-				if (nmp != NULL) {
-					ip6_t	*nip6h;
-					mblk_t	*mp_ip6h;
-
-					if (mctl_present) {
-						nip6h = (ip6_t *)
-						    nmp->b_cont->b_rptr;
-						mp_ip6h = nmp->b_cont;
-					} else {
-						nip6h = (ip6_t *)nmp->b_rptr;
-						mp_ip6h = nmp;
-					}
-
-					DTRACE_PROBE4(
-					    ip6__loopback__out__start,
-					    ill_t *, NULL,
-					    ill_t *, ill,
-					    ip6_t *, nip6h,
-					    mblk_t *, nmp);
-
-					FW_HOOKS6(
-					    ipst->ips_ip6_loopback_out_event,
-					    ipst->ips_ipv6firewall_loopback_out,
-					    NULL, ill, nip6h, nmp, mp_ip6h,
-					    0, ipst);
-
-					DTRACE_PROBE1(
-					    ip6__loopback__out__end,
-					    mblk_t *, nmp);
-
-					/*
-					 * DTrace this as ip:::send.  A blocked
-					 * packet will fire the send probe, but
-					 * not the receive probe.
-					 */
-					DTRACE_IP7(send, mblk_t *, nmp,
-					    conn_t *, NULL, void_ip_t *, nip6h,
-					    __dtrace_ipsr_ill_t *, ill,
-					    ipha_t *, NULL, ip6_t *, nip6h,
-					    int, 1);
-
-					if (nmp != NULL) {
-						/*
-						 * Deliver locally and to
-						 * every local zone, except
-						 * the sending zone when
-						 * IPV6_MULTICAST_LOOP is
-						 * disabled.
-						 */
-						ip_wput_local_v6(RD(q), ill,
-						    nip6h, nmp, ire,
-						    fanout_flags, zoneid);
-					}
-				} else {
-					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-					ip1dbg(("ip_wput_ire_v6: "
-					    "copymsg failed\n"));
-				}
-			}
-		}
-		if (ip6h->ip6_hops == 0 ||
-		    IN6_IS_ADDR_MC_NODELOCAL(&ip6h->ip6_dst) ||
-		    IS_LOOPBACK(ill)) {
-			/*
-			 * Local multicast or just loopback on loopback
-			 * interface.
-			 */
-			BUMP_MIB(mibptr, ipIfStatsHCOutMcastPkts);
-			UPDATE_MIB(mibptr, ipIfStatsHCOutMcastOctets,
-			    ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN);
-			ip1dbg(("ip_wput_ire_v6: local multicast only\n"));
-			freemsg(first_mp);
-			return;
-		}
-	}
-
-	if (ire->ire_stq != NULL) {
-		uint32_t	sum;
-		uint_t		ill_index =  ((ill_t *)ire->ire_stq->q_ptr)->
-		    ill_phyint->phyint_ifindex;
-		queue_t		*dev_q = ire->ire_stq->q_next;
-
-		/*
-		 * non-NULL send-to queue - packet is to be sent
-		 * out an interface.
-		 */
-
-		/* Driver is flow-controlling? */
-		if (!IP_FLOW_CONTROLLED_ULP(nexthdr) &&
-		    DEV_Q_FLOW_BLOCKED(dev_q)) {
-			/*
-			 * Queue packet if we have an conn to give back
-			 * pressure.  We can't queue packets intended for
-			 * hardware acceleration since we've tossed that
-			 * state already.  If the packet is being fed back
-			 * from ire_send_v6, we don't know the position in
-			 * the queue to enqueue the packet and we discard
-			 * the packet.
-			 */
-			if (ipst->ips_ip_output_queue && connp != NULL &&
-			    !mctl_present && caller != IRE_SEND) {
-				if (caller == IP_WSRV) {
-					idl_tx_list_t *idl_txl;
-
-					idl_txl = &ipst->ips_idl_tx_list[0];
-					connp->conn_did_putbq = 1;
-					(void) putbq(connp->conn_wq, mp);
-					conn_drain_insert(connp, idl_txl);
-					/*
-					 * caller == IP_WSRV implies we are
-					 * the service thread, and the
-					 * queue is already noenabled.
-					 * The check for canput and
-					 * the putbq is not atomic.
-					 * So we need to check again.
-					 */
-					if (canput(dev_q))
-						connp->conn_did_putbq = 0;
-				} else {
-					(void) putq(connp->conn_wq, mp);
-				}
-				return;
-			}
-			BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-			freemsg(first_mp);
-			return;
-		}
-
-		/*
-		 * Look for reachability confirmations from the transport.
-		 */
-		if (ip6h->ip6_vcf & IP_FORWARD_PROG) {
-			reachable |= IPV6_REACHABILITY_CONFIRMATION;
-			ip6h->ip6_vcf &= ~IP_FORWARD_PROG;
-			if (mctl_present)
-				io->ipsec_out_reachable = B_TRUE;
-		}
-		/* Fastpath */
-		switch (nexthdr) {
-		case IPPROTO_TCP:
-		case IPPROTO_UDP:
-		case IPPROTO_ICMPV6:
-		case IPPROTO_SCTP:
-			hdr_length = IPV6_HDR_LEN;
-			break;
-		default: {
-			uint8_t	*nexthdrp;
-
-			if (!ip_hdr_length_nexthdr_v6(mp, ip6h,
-			    &hdr_length, &nexthdrp)) {
-				/* Malformed packet */
-				BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-				freemsg(first_mp);
-				return;
-			}
-			nexthdr = *nexthdrp;
-			break;
-		}
-		}
-
-		if (cksum_request != -1 && nexthdr != IPPROTO_ICMPV6) {
-			uint16_t	*up;
-			uint16_t	*insp;
-
-			/*
-			 * The packet header is processed once for all, even
-			 * in the multirouting case. We disable hardware
-			 * checksum if the packet is multirouted, as it will be
-			 * replicated via several interfaces, and not all of
-			 * them may have this capability.
-			 */
-			if (cksum_request == 1 &&
-			    !(ire->ire_flags & RTF_MULTIRT)) {
-				/* Skip the transport checksum */
-				goto cksum_done;
-			}
-			/*
-			 * Do user-configured raw checksum.
-			 * Compute checksum and insert at offset "cksum_request"
-			 */
-
-			/* check for enough headers for checksum */
-			cksum_request += hdr_length;	/* offset from rptr */
-			if ((mp->b_wptr - mp->b_rptr) <
-			    (cksum_request + sizeof (int16_t))) {
-				if (!pullupmsg(mp,
-				    cksum_request + sizeof (int16_t))) {
-					ip1dbg(("ip_wput_v6: ICMP hdr pullupmsg"
-					    " failed\n"));
-					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-					freemsg(first_mp);
-					return;
-				}
-				ip6h = (ip6_t *)mp->b_rptr;
-			}
-			insp = (uint16_t *)((uchar_t *)ip6h + cksum_request);
-			ASSERT(((uintptr_t)insp & 0x1) == 0);
-			up = (uint16_t *)&ip6h->ip6_src;
-			/*
-			 * icmp has placed length and routing
-			 * header adjustment in *insp.
-			 */
-			sum = htons(nexthdr) +
-			    up[0] + up[1] + up[2] + up[3] +
-			    up[4] + up[5] + up[6] + up[7] +
-			    up[8] + up[9] + up[10] + up[11] +
-			    up[12] + up[13] + up[14] + up[15];
-			sum = (sum & 0xffff) + (sum >> 16);
-			*insp = IP_CSUM(mp, hdr_length, sum);
-		} else if (nexthdr == IPPROTO_TCP) {
-			uint16_t	*up;
-
-			/*
-			 * Check for full IPv6 header + enough TCP header
-			 * to get at the checksum field.
-			 */
-			if ((mp->b_wptr - mp->b_rptr) <
-			    (hdr_length + TCP_CHECKSUM_OFFSET +
-			    TCP_CHECKSUM_SIZE)) {
-				if (!pullupmsg(mp, hdr_length +
-				    TCP_CHECKSUM_OFFSET + TCP_CHECKSUM_SIZE)) {
-					ip1dbg(("ip_wput_v6: TCP hdr pullupmsg"
-					    " failed\n"));
-					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-					freemsg(first_mp);
-					return;
-				}
-				ip6h = (ip6_t *)mp->b_rptr;
-			}
-
-			up = (uint16_t *)&ip6h->ip6_src;
-			/*
-			 * Note: The TCP module has stored the length value
-			 * into the tcp checksum field, so we don't
-			 * need to explicitly sum it in here.
-			 */
-			sum = up[0] + up[1] + up[2] + up[3] +
-			    up[4] + up[5] + up[6] + up[7] +
-			    up[8] + up[9] + up[10] + up[11] +
-			    up[12] + up[13] + up[14] + up[15];
-
-			/* Fold the initial sum */
-			sum = (sum & 0xffff) + (sum >> 16);
-
-			up = (uint16_t *)(((uchar_t *)ip6h) +
-			    hdr_length + TCP_CHECKSUM_OFFSET);
-
-			IP_CKSUM_XMIT(ill, ire, mp, ip6h, up, IPPROTO_TCP,
-			    hdr_length, ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN,
-			    ire->ire_max_frag, mctl_present, sum);
-
-			/* Software checksum? */
-			if (DB_CKSUMFLAGS(mp) == 0) {
-				IP6_STAT(ipst, ip6_out_sw_cksum);
-				IP6_STAT_UPDATE(ipst,
-				    ip6_tcp_out_sw_cksum_bytes,
-				    (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN) -
-				    hdr_length);
-			}
-		} else if (nexthdr == IPPROTO_UDP) {
-			uint16_t	*up;
-
-			/*
-			 * check for full IPv6 header + enough UDP header
-			 * to get at the UDP checksum field
-			 */
-			if ((mp->b_wptr - mp->b_rptr) < (hdr_length +
-			    UDP_CHECKSUM_OFFSET + UDP_CHECKSUM_SIZE)) {
-				if (!pullupmsg(mp, hdr_length +
-				    UDP_CHECKSUM_OFFSET + UDP_CHECKSUM_SIZE)) {
-					ip1dbg(("ip_wput_v6: UDP hdr pullupmsg"
-					    " failed\n"));
-					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-					freemsg(first_mp);
-					return;
-				}
-				ip6h = (ip6_t *)mp->b_rptr;
-			}
-			up = (uint16_t *)&ip6h->ip6_src;
-			/*
-			 * Note: The UDP module has stored the length value
-			 * into the udp checksum field, so we don't
-			 * need to explicitly sum it in here.
-			 */
-			sum = up[0] + up[1] + up[2] + up[3] +
-			    up[4] + up[5] + up[6] + up[7] +
-			    up[8] + up[9] + up[10] + up[11] +
-			    up[12] + up[13] + up[14] + up[15];
-
-			/* Fold the initial sum */
-			sum = (sum & 0xffff) + (sum >> 16);
-
-			up = (uint16_t *)(((uchar_t *)ip6h) +
-			    hdr_length + UDP_CHECKSUM_OFFSET);
-
-			IP_CKSUM_XMIT(ill, ire, mp, ip6h, up, IPPROTO_UDP,
-			    hdr_length, ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN,
-			    ire->ire_max_frag, mctl_present, sum);
-
-			/* Software checksum? */
-			if (DB_CKSUMFLAGS(mp) == 0) {
-				IP6_STAT(ipst, ip6_out_sw_cksum);
-				IP6_STAT_UPDATE(ipst,
-				    ip6_udp_out_sw_cksum_bytes,
-				    (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN) -
-				    hdr_length);
-			}
-		} else if (nexthdr == IPPROTO_ICMPV6) {
-			uint16_t	*up;
-			icmp6_t *icmp6;
-
-			/* check for full IPv6+ICMPv6 header */
-			if ((mp->b_wptr - mp->b_rptr) <
-			    (hdr_length + ICMP6_MINLEN)) {
-				if (!pullupmsg(mp, hdr_length + ICMP6_MINLEN)) {
-					ip1dbg(("ip_wput_v6: ICMP hdr pullupmsg"
-					    " failed\n"));
-					BUMP_MIB(mibptr, ipIfStatsOutDiscards);
-					freemsg(first_mp);
-					return;
-				}
-				ip6h = (ip6_t *)mp->b_rptr;
-			}
-			icmp6 = (icmp6_t *)((uchar_t *)ip6h + hdr_length);
-			up = (uint16_t *)&ip6h->ip6_src;
-			/*
-			 * icmp has placed length and routing
-			 * header adjustment in icmp6_cksum.
-			 */
-			sum = htons(IPPROTO_ICMPV6) +
-			    up[0] + up[1] + up[2] + up[3] +
-			    up[4] + up[5] + up[6] + up[7] +
-			    up[8] + up[9] + up[10] + up[11] +
-			    up[12] + up[13] + up[14] + up[15];
-			sum = (sum & 0xffff) + (sum >> 16);
-			icmp6->icmp6_cksum = IP_CSUM(mp, hdr_length, sum);
-
-			/* Update output mib stats */
-			icmp_update_out_mib_v6(ill, icmp6);
-		} else if (nexthdr == IPPROTO_SCTP) {
-			sctp_hdr_t *sctph;
-
-			if (MBLKL(mp) < (hdr_length + sizeof (*sctph))) {
-				if (!pullupmsg(mp, hdr_length +
-				    sizeof (*sctph))) {
-					ip1dbg(("ip_wput_v6: SCTP hdr pullupmsg"
-					    " failed\n"));
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsOutDiscards);
-					freemsg(mp);
-					return;
-				}
-				ip6h = (ip6_t *)mp->b_rptr;
-			}
-			sctph = (sctp_hdr_t *)(mp->b_rptr + hdr_length);
-			sctph->sh_chksum = 0;
-			sctph->sh_chksum = sctp_cksum(mp, hdr_length);
-		}
-
-	cksum_done:
-		/*
-		 * We force the insertion of a fragment header using the
-		 * IPH_FRAG_HDR flag in two cases:
-		 * - after reception of an ICMPv6 "packet too big" message
-		 *   with a MTU < 1280 (cf. RFC 2460 section 5)
-		 * - for multirouted IPv6 packets, so that the receiver can
-		 *   discard duplicates according to their fragment identifier
-		 *
-		 * Two flags modifed from the API can modify this behavior.
-		 * The first is IPV6_USE_MIN_MTU.  With this API the user
-		 * can specify how to manage PMTUD for unicast and multicast.
-		 *
-		 * IPV6_DONTFRAG disallows fragmentation.
-		 */
-		max_frag = ire->ire_max_frag;
-		switch (IP6I_USE_MIN_MTU_API(flags)) {
-		case IPV6_USE_MIN_MTU_DEFAULT:
-		case IPV6_USE_MIN_MTU_UNICAST:
-			if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-				max_frag = IPV6_MIN_MTU;
-			}
-			break;
-
-		case IPV6_USE_MIN_MTU_NEVER:
-			max_frag = IPV6_MIN_MTU;
-			break;
-		}
-		if (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN > max_frag ||
-		    (ire->ire_frag_flag & IPH_FRAG_HDR)) {
-			if (connp != NULL && (flags & IP6I_DONTFRAG)) {
-				icmp_pkt2big_v6(ire->ire_stq, first_mp,
-				    max_frag, B_FALSE, B_TRUE, zoneid, ipst);
-				return;
-			}
-
-			if (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN !=
-			    (mp->b_cont ? msgdsize(mp) :
-			    mp->b_wptr - (uchar_t *)ip6h)) {
-				ip0dbg(("Packet length mismatch: %d, %ld\n",
-				    ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN,
-				    msgdsize(mp)));
-				freemsg(first_mp);
-				return;
-			}
-			/* Do IPSEC processing first */
-			if (mctl_present) {
-				ipsec_out_process(q, first_mp, ire, ill_index);
-				return;
-			}
-			ASSERT(mp->b_prev == NULL);
-			ip2dbg(("Fragmenting Size = %d, mtu = %d\n",
-			    ntohs(ip6h->ip6_plen) +
-			    IPV6_HDR_LEN, max_frag));
-			ASSERT(mp == first_mp);
-			/* Initiate IPPF processing */
-			if (IPP_ENABLED(IPP_LOCAL_OUT, ipst)) {
-				ip_process(IPP_LOCAL_OUT, &mp, ill_index);
-				if (mp == NULL) {
-					return;
-				}
-			}
-			ip_wput_frag_v6(mp, ire, reachable, connp,
-			    caller, max_frag);
-			return;
-		}
-		/* Do IPSEC processing first */
-		if (mctl_present) {
-			int extra_len = ipsec_out_extra_length(first_mp);
-
-			if (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN + extra_len >
-			    max_frag && connp != NULL &&
-			    (flags & IP6I_DONTFRAG)) {
-				/*
-				 * IPsec headers will push the packet over the
-				 * MTU limit.  Issue an ICMPv6 Packet Too Big
-				 * message for this packet if the upper-layer
-				 * that issued this packet will be able to
-				 * react to the icmp_pkt2big_v6() that we'll
-				 * generate.
-				 */
-				icmp_pkt2big_v6(ire->ire_stq, first_mp,
-				    max_frag, B_FALSE, B_TRUE, zoneid, ipst);
-				return;
-			}
-			ipsec_out_process(q, first_mp, ire, ill_index);
-			return;
-		}
-		/*
-		 * XXX multicast: add ip_mforward_v6() here.
-		 * Check conn_dontroute
-		 */
-#ifdef lint
-		/*
-		 * XXX The only purpose of this statement is to avoid lint
-		 * errors.  See the above "XXX multicast".  When that gets
-		 * fixed, remove this whole #ifdef lint section.
-		 */
-		ip3dbg(("multicast forward is %s.\n",
-		    (multicast_forward ? "TRUE" : "FALSE")));
-#endif
-
-		UPDATE_OB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-		ASSERT(mp == first_mp);
-		ip_xmit_v6(mp, ire, reachable, connp, caller, NULL);
-	} else {
-		/*
-		 * DTrace this as ip:::send.  A blocked packet will fire the
-		 * send probe, but not the receive probe.
-		 */
-		DTRACE_IP7(send, mblk_t *, first_mp, conn_t *, NULL,
-		    void_ip_t *, ip6h, __dtrace_ipsr_ill_t *, ill, ipha_t *,
-		    NULL, ip6_t *, ip6h, int, 1);
-		DTRACE_PROBE4(ip6__loopback__out__start,
-		    ill_t *, NULL, ill_t *, ill,
-		    ip6_t *, ip6h, mblk_t *, first_mp);
-		FW_HOOKS6(ipst->ips_ip6_loopback_out_event,
-		    ipst->ips_ipv6firewall_loopback_out,
-		    NULL, ill, ip6h, first_mp, mp, 0, ipst);
-		DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, first_mp);
-		if (first_mp != NULL) {
-			ip_wput_local_v6(RD(q), ill, ip6h, first_mp, ire, 0,
-			    zoneid);
-		}
-	}
-}
-
-/*
- * Outbound IPv6 fragmentation routine using MDT.
- */
-static void
-ip_wput_frag_mdt_v6(mblk_t *mp, ire_t *ire, size_t max_chunk,
-    size_t unfragmentable_len, uint8_t nexthdr, uint_t prev_nexthdr_offset)
-{
-	ip6_t		*ip6h = (ip6_t *)mp->b_rptr;
-	uint_t		pkts, wroff, hdr_chunk_len, pbuf_idx;
-	mblk_t		*hdr_mp, *md_mp = NULL;
-	int		i1;
-	multidata_t	*mmd;
-	unsigned char	*hdr_ptr, *pld_ptr;
-	ip_pdescinfo_t	pdi;
-	uint32_t	ident;
-	size_t		len;
-	uint16_t	offset;
-	queue_t		*stq = ire->ire_stq;
-	ill_t		*ill = (ill_t *)stq->q_ptr;
-	ip_stack_t	*ipst = ill->ill_ipst;
-
-	ASSERT(DB_TYPE(mp) == M_DATA);
-	ASSERT(MBLKL(mp) > unfragmentable_len);
-
-	/*
-	 * Move read ptr past unfragmentable portion, we don't want this part
-	 * of the data in our fragments.
-	 */
-	mp->b_rptr += unfragmentable_len;
-
-	/* Calculate how many packets we will send out  */
-	i1 = (mp->b_cont == NULL) ? MBLKL(mp) : msgsize(mp);
-	pkts = (i1 + max_chunk - 1) / max_chunk;
-	ASSERT(pkts > 1);
-
-	/* Allocate a message block which will hold all the IP Headers. */
-	wroff = ipst->ips_ip_wroff_extra;
-	hdr_chunk_len = wroff + unfragmentable_len + sizeof (ip6_frag_t);
-
-	i1 = pkts * hdr_chunk_len;
-	/*
-	 * Create the header buffer, Multidata and destination address
-	 * and SAP attribute that should be associated with it.
-	 */
-	if ((hdr_mp = allocb(i1, BPRI_HI)) == NULL ||
-	    ((hdr_mp->b_wptr += i1),
-	    (mmd = mmd_alloc(hdr_mp, &md_mp, KM_NOSLEEP)) == NULL) ||
-	    !ip_md_addr_attr(mmd, NULL, ire->ire_nce->nce_res_mp)) {
-		freemsg(mp);
-		if (md_mp == NULL) {
-			freemsg(hdr_mp);
-		} else {
-free_mmd:		IP6_STAT(ipst, ip6_frag_mdt_discarded);
-			freemsg(md_mp);
-		}
-		IP6_STAT(ipst, ip6_frag_mdt_allocfail);
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
-		return;
-	}
-	IP6_STAT(ipst, ip6_frag_mdt_allocd);
-
-	/*
-	 * Add a payload buffer to the Multidata; this operation must not
-	 * fail, or otherwise our logic in this routine is broken.  There
-	 * is no memory allocation done by the routine, so any returned
-	 * failure simply tells us that we've done something wrong.
-	 *
-	 * A failure tells us that either we're adding the same payload
-	 * buffer more than once, or we're trying to add more buffers than
-	 * allowed.  None of the above cases should happen, and we panic
-	 * because either there's horrible heap corruption, and/or
-	 * programming mistake.
-	 */
-	if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0) {
-		goto pbuf_panic;
-	}
-
-	hdr_ptr = hdr_mp->b_rptr;
-	pld_ptr = mp->b_rptr;
-
-	pdi.flags = PDESC_HBUF_REF | PDESC_PBUF_REF;
-
-	ident = htonl(atomic_add_32_nv(&ire->ire_ident, 1));
-
-	/*
-	 * len is the total length of the fragmentable data in this
-	 * datagram.  For each fragment sent, we will decrement len
-	 * by the amount of fragmentable data sent in that fragment
-	 * until len reaches zero.
-	 */
-	len = ntohs(ip6h->ip6_plen) - (unfragmentable_len - IPV6_HDR_LEN);
-
-	offset = 0;
-	prev_nexthdr_offset += wroff;
-
-	while (len != 0) {
-		size_t		mlen;
-		ip6_t		*fip6h;
-		ip6_frag_t	*fraghdr;
-		int		error;
-
-		ASSERT((hdr_ptr + hdr_chunk_len) <= hdr_mp->b_wptr);
-		mlen = MIN(len, max_chunk);
-		len -= mlen;
-
-		fip6h = (ip6_t *)(hdr_ptr + wroff);
-		ASSERT(OK_32PTR(fip6h));
-		bcopy(ip6h, fip6h, unfragmentable_len);
-		hdr_ptr[prev_nexthdr_offset] = IPPROTO_FRAGMENT;
-
-		fip6h->ip6_plen = htons((uint16_t)(mlen +
-		    unfragmentable_len - IPV6_HDR_LEN + sizeof (ip6_frag_t)));
-
-		fraghdr = (ip6_frag_t *)((unsigned char *)fip6h +
-		    unfragmentable_len);
-		fraghdr->ip6f_nxt = nexthdr;
-		fraghdr->ip6f_reserved = 0;
-		fraghdr->ip6f_offlg = htons(offset) |
-		    ((len != 0) ? IP6F_MORE_FRAG : 0);
-		fraghdr->ip6f_ident = ident;
-
-		/*
-		 * Record offset and size of header and data of the next packet
-		 * in the multidata message.
-		 */
-		PDESC_HDR_ADD(&pdi, hdr_ptr, wroff,
-		    unfragmentable_len + sizeof (ip6_frag_t), 0);
-		PDESC_PLD_INIT(&pdi);
-		i1 = MIN(mp->b_wptr - pld_ptr, mlen);
-		ASSERT(i1 > 0);
-		PDESC_PLD_SPAN_ADD(&pdi, pbuf_idx, pld_ptr, i1);
-		if (i1 == mlen) {
-			pld_ptr += mlen;
-		} else {
-			i1 = mlen - i1;
-			mp = mp->b_cont;
-			ASSERT(mp != NULL);
-			ASSERT(MBLKL(mp) >= i1);
-			/*
-			 * Attach the next payload message block to the
-			 * multidata message.
-			 */
-			if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0)
-				goto pbuf_panic;
-			PDESC_PLD_SPAN_ADD(&pdi, pbuf_idx, mp->b_rptr, i1);
-			pld_ptr = mp->b_rptr + i1;
-		}
-
-		if ((mmd_addpdesc(mmd, (pdescinfo_t *)&pdi, &error,
-		    KM_NOSLEEP)) == NULL) {
-			/*
-			 * Any failure other than ENOMEM indicates that we
-			 * have passed in invalid pdesc info or parameters
-			 * to mmd_addpdesc, which must not happen.
-			 *
-			 * EINVAL is a result of failure on boundary checks
-			 * against the pdesc info contents.  It should not
-			 * happen, and we panic because either there's
-			 * horrible heap corruption, and/or programming
-			 * mistake.
-			 */
-			if (error != ENOMEM) {
-				cmn_err(CE_PANIC, "ip_wput_frag_mdt_v6: "
-				    "pdesc logic error detected for "
-				    "mmd %p pinfo %p (%d)\n",
-				    (void *)mmd, (void *)&pdi, error);
-				/* NOTREACHED */
-			}
-			IP6_STAT(ipst, ip6_frag_mdt_addpdescfail);
-			/* Free unattached payload message blocks as well */
-			md_mp->b_cont = mp->b_cont;
-			goto free_mmd;
-		}
-
-		/* Advance fragment offset. */
-		offset += mlen;
-
-		/* Advance to location for next header in the buffer. */
-		hdr_ptr += hdr_chunk_len;
-
-		/* Did we reach the next payload message block? */
-		if (pld_ptr == mp->b_wptr && mp->b_cont != NULL) {
-			mp = mp->b_cont;
-			/*
-			 * Attach the next message block with payload
-			 * data to the multidata message.
-			 */
-			if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0)
-				goto pbuf_panic;
-			pld_ptr = mp->b_rptr;
-		}
-	}
-
-	ASSERT(hdr_mp->b_wptr == hdr_ptr);
-	ASSERT(mp->b_wptr == pld_ptr);
-
-	/* Update IP statistics */
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsOutFragCreates, pkts);
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragOKs);
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits, pkts);
-	/*
-	 * The ipv6 header len is accounted for in unfragmentable_len so
-	 * when calculating the fragmentation overhead just add the frag
-	 * header len.
-	 */
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
-	    (ntohs(ip6h->ip6_plen) - (unfragmentable_len - IPV6_HDR_LEN)) +
-	    pkts * (unfragmentable_len + sizeof (ip6_frag_t)));
-	IP6_STAT_UPDATE(ipst, ip6_frag_mdt_pkt_out, pkts);
-
-	ire->ire_ob_pkt_count += pkts;
-	if (ire->ire_ipif != NULL)
-		atomic_add_32(&ire->ire_ipif->ipif_ob_pkt_count, pkts);
-
-	ire->ire_last_used_time = lbolt;
-	/* Send it down */
-	putnext(stq, md_mp);
-	return;
-
-pbuf_panic:
-	cmn_err(CE_PANIC, "ip_wput_frag_mdt_v6: payload buffer logic "
-	    "error for mmd %p pbuf %p (%d)", (void *)mmd, (void *)mp,
-	    pbuf_idx);
-	/* NOTREACHED */
-}
-
-/*
  * IPv6 fragmentation.  Essentially the same as IPv4 fragmentation.
  * We have not optimized this in terms of number of mblks
  * allocated. For instance, for each fragment sent we always allocate a
  * mblk to hold the IPv6 header and fragment header.
  *
- * Assumes that all the extension headers are contained in the first mblk.
- *
- * The fragment header is inserted after an hop-by-hop options header
- * and after [an optional destinations header followed by] a routing header.
- *
- * NOTE : This function does not ire_refrele the ire passed in as
- * the argument.
+ * Assumes that all the extension headers are contained in the first mblk
+ * and that the fragment header has has already been added by calling
+ * ip_fraghdr_add_v6.
  */
-void
-ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
-    int caller, int max_frag)
+int
+ip_fragment_v6(mblk_t *mp, nce_t *nce, iaflags_t ixaflags, uint_t pkt_len,
+    uint32_t max_frag, uint32_t xmit_hint, zoneid_t szone, zoneid_t nolzid,
+    pfirepostfrag_t postfragfn, uintptr_t *ixa_cookie)
 {
 	ip6_t		*ip6h = (ip6_t *)mp->b_rptr;
 	ip6_t		*fip6h;
@@ -11337,27 +4102,220 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 	mblk_t		*dmp;
 	ip6_frag_t	*fraghdr;
 	size_t		unfragmentable_len;
-	size_t		len;
 	size_t		mlen;
 	size_t		max_chunk;
-	uint32_t	ident;
 	uint16_t	off_flags;
 	uint16_t	offset = 0;
-	ill_t		*ill;
+	ill_t		*ill = nce->nce_ill;
+	uint8_t		nexthdr;
+	uint8_t		*ptr;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	uint_t		priority = mp->b_band;
+	int		error = 0;
+
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragReqds);
+	if (max_frag == 0) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+		ip_drop_output("FragFails: zero max_frag", mp, ill);
+		freemsg(mp);
+		return (EINVAL);
+	}
+
+	/*
+	 * Caller should have added fraghdr_t to pkt_len, and also
+	 * updated ip6_plen.
+	 */
+	ASSERT(ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN == pkt_len);
+	ASSERT(msgdsize(mp) == pkt_len);
+
+	/*
+	 * Determine the length of the unfragmentable portion of this
+	 * datagram.  This consists of the IPv6 header, a potential
+	 * hop-by-hop options header, a potential pre-routing-header
+	 * destination options header, and a potential routing header.
+	 */
+	nexthdr = ip6h->ip6_nxt;
+	ptr = (uint8_t *)&ip6h[1];
+
+	if (nexthdr == IPPROTO_HOPOPTS) {
+		ip6_hbh_t	*hbh_hdr;
+		uint_t		hdr_len;
+
+		hbh_hdr = (ip6_hbh_t *)ptr;
+		hdr_len = 8 * (hbh_hdr->ip6h_len + 1);
+		nexthdr = hbh_hdr->ip6h_nxt;
+		ptr += hdr_len;
+	}
+	if (nexthdr == IPPROTO_DSTOPTS) {
+		ip6_dest_t	*dest_hdr;
+		uint_t		hdr_len;
+
+		dest_hdr = (ip6_dest_t *)ptr;
+		if (dest_hdr->ip6d_nxt == IPPROTO_ROUTING) {
+			hdr_len = 8 * (dest_hdr->ip6d_len + 1);
+			nexthdr = dest_hdr->ip6d_nxt;
+			ptr += hdr_len;
+		}
+	}
+	if (nexthdr == IPPROTO_ROUTING) {
+		ip6_rthdr_t	*rthdr;
+		uint_t		hdr_len;
+
+		rthdr = (ip6_rthdr_t *)ptr;
+		nexthdr = rthdr->ip6r_nxt;
+		hdr_len = 8 * (rthdr->ip6r_len + 1);
+		ptr += hdr_len;
+	}
+	if (nexthdr != IPPROTO_FRAGMENT) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+		ip_drop_output("FragFails: bad nexthdr", mp, ill);
+		freemsg(mp);
+		return (EINVAL);
+	}
+	unfragmentable_len = (uint_t)(ptr - (uint8_t *)ip6h);
+	unfragmentable_len += sizeof (ip6_frag_t);
+
+	max_chunk = (max_frag - unfragmentable_len) & ~7;
+
+	/*
+	 * Allocate an mblk with enough room for the link-layer
+	 * header and the unfragmentable part of the datagram, which includes
+	 * the fragment header.  This (or a copy) will be used as the
+	 * first mblk for each fragment we send.
+	 */
+	hmp = allocb_tmpl(unfragmentable_len + ipst->ips_ip_wroff_extra, mp);
+	if (hmp == NULL) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+		ip_drop_output("FragFails: no hmp", mp, ill);
+		freemsg(mp);
+		return (ENOBUFS);
+	}
+	hmp->b_rptr += ipst->ips_ip_wroff_extra;
+	hmp->b_wptr = hmp->b_rptr + unfragmentable_len;
+
+	fip6h = (ip6_t *)hmp->b_rptr;
+	bcopy(ip6h, fip6h, unfragmentable_len);
+
+	/*
+	 * pkt_len is set to the total length of the fragmentable data in this
+	 * datagram.  For each fragment sent, we will decrement pkt_len
+	 * by the amount of fragmentable data sent in that fragment
+	 * until len reaches zero.
+	 */
+	pkt_len -= unfragmentable_len;
+
+	/*
+	 * Move read ptr past unfragmentable portion, we don't want this part
+	 * of the data in our fragments.
+	 */
+	mp->b_rptr += unfragmentable_len;
+	if (mp->b_rptr == mp->b_wptr) {
+		mblk_t *mp1 = mp->b_cont;
+		freeb(mp);
+		mp = mp1;
+	}
+
+	while (pkt_len != 0) {
+		mlen = MIN(pkt_len, max_chunk);
+		pkt_len -= mlen;
+		if (pkt_len != 0) {
+			/* Not last */
+			hmp0 = copyb(hmp);
+			if (hmp0 == NULL) {
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsOutFragFails);
+				ip_drop_output("FragFails: copyb failed",
+				    mp, ill);
+				freeb(hmp);
+				freemsg(mp);
+				ip1dbg(("ip_fragment_v6: copyb failed\n"));
+				return (ENOBUFS);
+			}
+			off_flags = IP6F_MORE_FRAG;
+		} else {
+			/* Last fragment */
+			hmp0 = hmp;
+			hmp = NULL;
+			off_flags = 0;
+		}
+		fip6h = (ip6_t *)(hmp0->b_rptr);
+		fraghdr = (ip6_frag_t *)(hmp0->b_rptr + unfragmentable_len -
+		    sizeof (ip6_frag_t));
+
+		fip6h->ip6_plen = htons((uint16_t)(mlen +
+		    unfragmentable_len - IPV6_HDR_LEN));
+		/*
+		 * Note: Optimization alert.
+		 * In IPv6 (and IPv4) protocol header, Fragment Offset
+		 * ("offset") is 13 bits wide and in 8-octet units.
+		 * In IPv6 protocol header (unlike IPv4) in a 16 bit field,
+		 * it occupies the most significant 13 bits.
+		 * (least significant 13 bits in IPv4).
+		 * We do not do any shifts here. Not shifting is same effect
+		 * as taking offset value in octet units, dividing by 8 and
+		 * then shifting 3 bits left to line it up in place in proper
+		 * place protocol header.
+		 */
+		fraghdr->ip6f_offlg = htons(offset) | off_flags;
+
+		if (!(dmp = ip_carve_mp(&mp, mlen))) {
+			/* mp has already been freed by ip_carve_mp() */
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+			ip_drop_output("FragFails: could not carve mp",
+			    hmp0, ill);
+			if (hmp != NULL)
+				freeb(hmp);
+			freeb(hmp0);
+			ip1dbg(("ip_carve_mp: failed\n"));
+			return (ENOBUFS);
+		}
+		hmp0->b_cont = dmp;
+		/* Get the priority marking, if any */
+		hmp0->b_band = priority;
+
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragCreates);
+
+		error = postfragfn(hmp0, nce, ixaflags,
+		    mlen + unfragmentable_len, xmit_hint, szone, nolzid,
+		    ixa_cookie);
+		if (error != 0 && error != EWOULDBLOCK && hmp != NULL) {
+			/* No point in sending the other fragments */
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+			ip_drop_output("FragFails: postfragfn failed",
+			    hmp, ill);
+			freeb(hmp);
+			freemsg(mp);
+			return (error);
+		}
+		/* No need to redo state machine in loop */
+		ixaflags &= ~IXAF_REACH_CONF;
+
+		offset += mlen;
+	}
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragOKs);
+	return (error);
+}
+
+/*
+ * Add a fragment header to an IPv6 packet.
+ * Assumes that all the extension headers are contained in the first mblk.
+ *
+ * The fragment header is inserted after an hop-by-hop options header
+ * and after [an optional destinations header followed by] a routing header.
+ */
+mblk_t *
+ip_fraghdr_add_v6(mblk_t *mp, uint32_t ident, ip_xmit_attr_t *ixa)
+{
+	ip6_t		*ip6h = (ip6_t *)mp->b_rptr;
+	ip6_t		*fip6h;
+	mblk_t		*hmp;
+	ip6_frag_t	*fraghdr;
+	size_t		unfragmentable_len;
 	uint8_t		nexthdr;
 	uint_t		prev_nexthdr_offset;
 	uint8_t		*ptr;
-	ip_stack_t	*ipst = ire->ire_ipst;
-
-	ASSERT(ire->ire_type == IRE_CACHE);
-	ill = (ill_t *)ire->ire_stq->q_ptr;
-
-	if (max_frag <= 0) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
-		freemsg(mp);
-		return;
-	}
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragReqds);
+	uint_t		priority = mp->b_band;
+	ip_stack_t	*ipst = ixa->ixa_ipst;
 
 	/*
 	 * Determine the length of the unfragmentable portion of this
@@ -11406,31 +4364,20 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 	}
 	unfragmentable_len = (uint_t)(ptr - (uint8_t *)ip6h);
 
-	max_chunk = (min(max_frag, ire->ire_max_frag) - unfragmentable_len -
-	    sizeof (ip6_frag_t)) & ~7;
-
-	/* Check if we can use MDT to send out the frags. */
-	ASSERT(!IRE_IS_LOCAL(ire));
-	if (ipst->ips_ip_multidata_outbound && reachable == 0 &&
-	    !(ire->ire_flags & RTF_MULTIRT) && ILL_MDT_CAPABLE(ill) &&
-	    IP_CAN_FRAG_MDT(mp, unfragmentable_len, max_chunk)) {
-		ip_wput_frag_mdt_v6(mp, ire, max_chunk, unfragmentable_len,
-		    nexthdr, prev_nexthdr_offset);
-		return;
-	}
-
 	/*
 	 * Allocate an mblk with enough room for the link-layer
 	 * header, the unfragmentable part of the datagram, and the
-	 * fragment header.  This (or a copy) will be used as the
-	 * first mblk for each fragment we send.
+	 * fragment header.
 	 */
 	hmp = allocb_tmpl(unfragmentable_len + sizeof (ip6_frag_t) +
 	    ipst->ips_ip_wroff_extra, mp);
 	if (hmp == NULL) {
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+		ill_t *ill = ixa->ixa_nce->nce_ill;
+
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		ip_drop_output("ipIfStatsOutDiscards: allocb failure", mp, ill);
 		freemsg(mp);
-		return;
+		return (NULL);
 	}
 	hmp->b_rptr += ipst->ips_ip_wroff_extra;
 	hmp->b_wptr = hmp->b_rptr + unfragmentable_len + sizeof (ip6_frag_t);
@@ -11439,90 +4386,24 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 	fraghdr = (ip6_frag_t *)(hmp->b_rptr + unfragmentable_len);
 
 	bcopy(ip6h, fip6h, unfragmentable_len);
+	fip6h->ip6_plen = htons(ntohs(fip6h->ip6_plen) + sizeof (ip6_frag_t));
 	hmp->b_rptr[prev_nexthdr_offset] = IPPROTO_FRAGMENT;
-
-	ident = atomic_add_32_nv(&ire->ire_ident, 1);
 
 	fraghdr->ip6f_nxt = nexthdr;
 	fraghdr->ip6f_reserved = 0;
 	fraghdr->ip6f_offlg = 0;
 	fraghdr->ip6f_ident = htonl(ident);
 
-	/*
-	 * len is the total length of the fragmentable data in this
-	 * datagram.  For each fragment sent, we will decrement len
-	 * by the amount of fragmentable data sent in that fragment
-	 * until len reaches zero.
-	 */
-	len = ntohs(ip6h->ip6_plen) - (unfragmentable_len - IPV6_HDR_LEN);
+	/* Get the priority marking, if any */
+	hmp->b_band = priority;
 
 	/*
 	 * Move read ptr past unfragmentable portion, we don't want this part
 	 * of the data in our fragments.
 	 */
 	mp->b_rptr += unfragmentable_len;
-
-	while (len != 0) {
-		mlen = MIN(len, max_chunk);
-		len -= mlen;
-		if (len != 0) {
-			/* Not last */
-			hmp0 = copyb(hmp);
-			if (hmp0 == NULL) {
-				freeb(hmp);
-				freemsg(mp);
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsOutFragFails);
-				ip1dbg(("ip_wput_frag_v6: copyb failed\n"));
-				return;
-			}
-			off_flags = IP6F_MORE_FRAG;
-		} else {
-			/* Last fragment */
-			hmp0 = hmp;
-			hmp = NULL;
-			off_flags = 0;
-		}
-		fip6h = (ip6_t *)(hmp0->b_rptr);
-		fraghdr = (ip6_frag_t *)(hmp0->b_rptr + unfragmentable_len);
-
-		fip6h->ip6_plen = htons((uint16_t)(mlen +
-		    unfragmentable_len - IPV6_HDR_LEN + sizeof (ip6_frag_t)));
-		/*
-		 * Note: Optimization alert.
-		 * In IPv6 (and IPv4) protocol header, Fragment Offset
-		 * ("offset") is 13 bits wide and in 8-octet units.
-		 * In IPv6 protocol header (unlike IPv4) in a 16 bit field,
-		 * it occupies the most significant 13 bits.
-		 * (least significant 13 bits in IPv4).
-		 * We do not do any shifts here. Not shifting is same effect
-		 * as taking offset value in octet units, dividing by 8 and
-		 * then shifting 3 bits left to line it up in place in proper
-		 * place protocol header.
-		 */
-		fraghdr->ip6f_offlg = htons(offset) | off_flags;
-
-		if (!(dmp = ip_carve_mp(&mp, mlen))) {
-			/* mp has already been freed by ip_carve_mp() */
-			if (hmp != NULL)
-				freeb(hmp);
-			freeb(hmp0);
-			ip1dbg(("ip_carve_mp: failed\n"));
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
-			return;
-		}
-		hmp0->b_cont = dmp;
-		/* Get the priority marking, if any */
-		hmp0->b_band = dmp->b_band;
-		UPDATE_OB_PKT_COUNT(ire);
-		ire->ire_last_used_time = lbolt;
-		ip_xmit_v6(hmp0, ire, reachable | IP6_NO_IPPOLICY, connp,
-		    caller, NULL);
-		reachable = 0;	/* No need to redo state machine in loop */
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragCreates);
-		offset += mlen;
-	}
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragOKs);
+	hmp->b_cont = mp;
+	return (hmp);
 }
 
 /*
@@ -11530,628 +4411,46 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
  * "matches" the conn.
  */
 boolean_t
-conn_wantpacket_v6(conn_t *connp, ill_t *ill, ip6_t *ip6h, int fanout_flags,
-    zoneid_t zoneid)
+conn_wantpacket_v6(conn_t *connp, ip_recv_attr_t *ira, ip6_t *ip6h)
 {
-	ill_t *bound_ill;
-	boolean_t wantpacket;
-	in6_addr_t *v6dst_ptr = &ip6h->ip6_dst;
-	in6_addr_t *v6src_ptr = &ip6h->ip6_src;
+	ill_t		*ill = ira->ira_rill;
+	zoneid_t	zoneid = ira->ira_zoneid;
+	uint_t		in_ifindex;
+	in6_addr_t	*v6dst_ptr = &ip6h->ip6_dst;
+	in6_addr_t	*v6src_ptr = &ip6h->ip6_src;
 
 	/*
-	 * conn_incoming_ill is set by IPV6_BOUND_IF which limits
-	 * unicast and multicast reception to conn_incoming_ill.
+	 * conn_incoming_ifindex is set by IPV6_BOUND_IF and as link-local
+	 * scopeid. This is used to limit
+	 * unicast and multicast reception to conn_incoming_ifindex.
 	 * conn_wantpacket_v6 is called both for unicast and
-	 * multicast.
+	 * multicast packets.
 	 */
-	bound_ill = connp->conn_incoming_ill;
-	if (bound_ill != NULL) {
-		if (IS_IPMP(bound_ill)) {
-			if (bound_ill->ill_grp != ill->ill_grp)
-				return (B_FALSE);
-		} else {
-			if (bound_ill != ill)
-				return (B_FALSE);
-		}
+	in_ifindex = connp->conn_incoming_ifindex;
+
+	/* mpathd can bind to the under IPMP interface, which we allow */
+	if (in_ifindex != 0 && in_ifindex != ill->ill_phyint->phyint_ifindex) {
+		if (!IS_UNDER_IPMP(ill))
+			return (B_FALSE);
+
+		if (in_ifindex != ipmp_ill_get_ipmp_ifindex(ill))
+			return (B_FALSE);
 	}
+
+	if (!IPCL_ZONE_MATCH(connp, zoneid))
+		return (B_FALSE);
+
+	if (!(ira->ira_flags & IRAF_MULTICAST))
+		return (B_TRUE);
 
 	if (connp->conn_multi_router)
 		return (B_TRUE);
 
-	if (!IN6_IS_ADDR_MULTICAST(v6dst_ptr) &&
-	    !IN6_IS_ADDR_V4MAPPED_CLASSD(v6dst_ptr)) {
-		/*
-		 * Unicast case: we match the conn only if it's in the specified
-		 * zone.
-		 */
-		return (IPCL_ZONE_MATCH(connp, zoneid));
-	}
+	if (ira->ira_protocol == IPPROTO_RSVP)
+		return (B_TRUE);
 
-	if ((fanout_flags & IP_FF_NO_MCAST_LOOP) &&
-	    (connp->conn_zoneid == zoneid || zoneid == ALL_ZONES)) {
-		/*
-		 * Loopback case: the sending endpoint has IP_MULTICAST_LOOP
-		 * disabled, therefore we don't dispatch the multicast packet to
-		 * the sending zone.
-		 */
-		return (B_FALSE);
-	}
-
-	if (IS_LOOPBACK(ill) && connp->conn_zoneid != zoneid &&
-	    zoneid != ALL_ZONES) {
-		/*
-		 * Multicast packet on the loopback interface: we only match
-		 * conns who joined the group in the specified zone.
-		 */
-		return (B_FALSE);
-	}
-
-	mutex_enter(&connp->conn_lock);
-	wantpacket =
-	    ilg_lookup_ill_withsrc_v6(connp, v6dst_ptr, v6src_ptr, ill) != NULL;
-	mutex_exit(&connp->conn_lock);
-
-	return (wantpacket);
-}
-
-
-/*
- * Transmit a packet and update any NUD state based on the flags
- * XXX need to "recover" any ip6i_t when doing putq!
- *
- * NOTE : This function does not ire_refrele the ire passed in as the
- * argument.
- */
-void
-ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
-    int caller, ipsec_out_t *io)
-{
-	mblk_t		*mp1;
-	nce_t		*nce = ire->ire_nce;
-	ill_t		*ill;
-	ill_t		*out_ill;
-	uint64_t	delta;
-	ip6_t		*ip6h;
-	queue_t		*stq = ire->ire_stq;
-	ire_t		*ire1 = NULL;
-	ire_t		*save_ire = ire;
-	boolean_t	multirt_send = B_FALSE;
-	mblk_t		*next_mp = NULL;
-	ip_stack_t	*ipst = ire->ire_ipst;
-	boolean_t	fp_prepend = B_FALSE;
-	uint32_t	hlen;
-
-	ip6h = (ip6_t *)mp->b_rptr;
-	ASSERT(!IN6_IS_ADDR_V4MAPPED(&ire->ire_addr_v6));
-	ASSERT(ire->ire_ipversion == IPV6_VERSION);
-	ASSERT(nce != NULL);
-	ASSERT(mp->b_datap->db_type == M_DATA);
-	ASSERT(stq != NULL);
-
-	ill = ire_to_ill(ire);
-	if (!ill) {
-		ip0dbg(("ip_xmit_v6: ire_to_ill failed\n"));
-		freemsg(mp);
-		return;
-	}
-
-	/* Flow-control check has been done in ip_wput_ire_v6 */
-	if (IP_FLOW_CONTROLLED_ULP(ip6h->ip6_nxt) || caller == IP_WPUT ||
-	    caller == IP_WSRV || canput(stq->q_next)) {
-		uint32_t ill_index;
-
-		/*
-		 * In most cases, the emission loop below is entered only
-		 * once. Only in the case where the ire holds the
-		 * RTF_MULTIRT flag, do we loop to process all RTF_MULTIRT
-		 * flagged ires in the bucket, and send the packet
-		 * through all crossed RTF_MULTIRT routes.
-		 */
-		if (ire->ire_flags & RTF_MULTIRT) {
-			/*
-			 * Multirouting case. The bucket where ire is stored
-			 * probably holds other RTF_MULTIRT flagged ires
-			 * to the destination. In this call to ip_xmit_v6,
-			 * we attempt to send the packet through all
-			 * those ires. Thus, we first ensure that ire is the
-			 * first RTF_MULTIRT ire in the bucket,
-			 * before walking the ire list.
-			 */
-			ire_t *first_ire;
-			irb_t *irb = ire->ire_bucket;
-			ASSERT(irb != NULL);
-			multirt_send = B_TRUE;
-
-			/* Make sure we do not omit any multiroute ire. */
-			IRB_REFHOLD(irb);
-			for (first_ire = irb->irb_ire;
-			    first_ire != NULL;
-			    first_ire = first_ire->ire_next) {
-				if ((first_ire->ire_flags & RTF_MULTIRT) &&
-				    (IN6_ARE_ADDR_EQUAL(&first_ire->ire_addr_v6,
-				    &ire->ire_addr_v6)) &&
-				    !(first_ire->ire_marks &
-				    (IRE_MARK_CONDEMNED | IRE_MARK_TESTHIDDEN)))
-					break;
-			}
-
-			if ((first_ire != NULL) && (first_ire != ire)) {
-				IRE_REFHOLD(first_ire);
-				/* ire will be released by the caller */
-				ire = first_ire;
-				nce = ire->ire_nce;
-				stq = ire->ire_stq;
-				ill = ire_to_ill(ire);
-			}
-			IRB_REFRELE(irb);
-		} else if (connp != NULL && IPCL_IS_TCP(connp) &&
-		    connp->conn_mdt_ok && !connp->conn_tcp->tcp_mdt &&
-		    ILL_MDT_USABLE(ill)) {
-			/*
-			 * This tcp connection was marked as MDT-capable, but
-			 * it has been turned off due changes in the interface.
-			 * Now that the interface support is back, turn it on
-			 * by notifying tcp.  We don't directly modify tcp_mdt,
-			 * since we leave all the details to the tcp code that
-			 * knows better.
-			 */
-			mblk_t *mdimp = ip_mdinfo_alloc(ill->ill_mdt_capab);
-
-			if (mdimp == NULL) {
-				ip0dbg(("ip_xmit_v6: can't re-enable MDT for "
-				    "connp %p (ENOMEM)\n", (void *)connp));
-			} else {
-				CONN_INC_REF(connp);
-				SQUEUE_ENTER_ONE(connp->conn_sqp, mdimp,
-				    tcp_input, connp, SQ_FILL,
-				    SQTAG_TCP_INPUT_MCTL);
-			}
-		}
-
-		do {
-			mblk_t *mp_ip6h;
-
-			if (multirt_send) {
-				irb_t *irb;
-				/*
-				 * We are in a multiple send case, need to get
-				 * the next ire and make a duplicate of the
-				 * packet. ire1 holds here the next ire to
-				 * process in the bucket. If multirouting is
-				 * expected, any non-RTF_MULTIRT ire that has
-				 * the right destination address is ignored.
-				 */
-				irb = ire->ire_bucket;
-				ASSERT(irb != NULL);
-
-				IRB_REFHOLD(irb);
-				for (ire1 = ire->ire_next;
-				    ire1 != NULL;
-				    ire1 = ire1->ire_next) {
-					if (!(ire1->ire_flags & RTF_MULTIRT))
-						continue;
-					if (!IN6_ARE_ADDR_EQUAL(
-					    &ire1->ire_addr_v6,
-					    &ire->ire_addr_v6))
-						continue;
-					if (ire1->ire_marks &
-					    IRE_MARK_CONDEMNED)
-						continue;
-
-					/* Got one */
-					if (ire1 != save_ire) {
-						IRE_REFHOLD(ire1);
-					}
-					break;
-				}
-				IRB_REFRELE(irb);
-
-				if (ire1 != NULL) {
-					next_mp = copyb(mp);
-					if ((next_mp == NULL) ||
-					    ((mp->b_cont != NULL) &&
-					    ((next_mp->b_cont =
-					    dupmsg(mp->b_cont)) == NULL))) {
-						freemsg(next_mp);
-						next_mp = NULL;
-						ire_refrele(ire1);
-						ire1 = NULL;
-					}
-				}
-
-				/* Last multiroute ire; don't loop anymore. */
-				if (ire1 == NULL) {
-					multirt_send = B_FALSE;
-				}
-			}
-
-			ill_index =
-			    ((ill_t *)stq->q_ptr)->ill_phyint->phyint_ifindex;
-
-			/* Initiate IPPF processing */
-			if (IP6_OUT_IPP(flags, ipst)) {
-				ip_process(IPP_LOCAL_OUT, &mp, ill_index);
-				if (mp == NULL) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsOutDiscards);
-					if (next_mp != NULL)
-						freemsg(next_mp);
-					if (ire != save_ire) {
-						ire_refrele(ire);
-					}
-					return;
-				}
-				ip6h = (ip6_t *)mp->b_rptr;
-			}
-			mp_ip6h = mp;
-
-			/*
-			 * Check for fastpath, we need to hold nce_lock to
-			 * prevent fastpath update from chaining nce_fp_mp.
-			 */
-
-			ASSERT(nce->nce_ipversion != IPV4_VERSION);
-			mutex_enter(&nce->nce_lock);
-			if ((mp1 = nce->nce_fp_mp) != NULL) {
-				uchar_t	*rptr;
-
-				hlen = MBLKL(mp1);
-				rptr = mp->b_rptr - hlen;
-				/*
-				 * make sure there is room for the fastpath
-				 * datalink header
-				 */
-				if (rptr < mp->b_datap->db_base) {
-					mp1 = copyb(mp1);
-					mutex_exit(&nce->nce_lock);
-					if (mp1 == NULL) {
-						BUMP_MIB(ill->ill_ip_mib,
-						    ipIfStatsOutDiscards);
-						freemsg(mp);
-						if (next_mp != NULL)
-							freemsg(next_mp);
-						if (ire != save_ire) {
-							ire_refrele(ire);
-						}
-						return;
-					}
-					mp1->b_cont = mp;
-
-					/* Get the priority marking, if any */
-					mp1->b_band = mp->b_band;
-					mp = mp1;
-				} else {
-					mp->b_rptr = rptr;
-					/*
-					 * fastpath -  pre-pend datalink
-					 * header
-					 */
-					bcopy(mp1->b_rptr, rptr, hlen);
-					mutex_exit(&nce->nce_lock);
-					fp_prepend = B_TRUE;
-				}
-			} else {
-				/*
-				 * Get the DL_UNITDATA_REQ.
-				 */
-				mp1 = nce->nce_res_mp;
-				if (mp1 == NULL) {
-					mutex_exit(&nce->nce_lock);
-					ip1dbg(("ip_xmit_v6: No resolution "
-					    "block ire = %p\n", (void *)ire));
-					freemsg(mp);
-					if (next_mp != NULL)
-						freemsg(next_mp);
-					if (ire != save_ire) {
-						ire_refrele(ire);
-					}
-					return;
-				}
-				/*
-				 * Prepend the DL_UNITDATA_REQ.
-				 */
-				mp1 = copyb(mp1);
-				mutex_exit(&nce->nce_lock);
-				if (mp1 == NULL) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsOutDiscards);
-					freemsg(mp);
-					if (next_mp != NULL)
-						freemsg(next_mp);
-					if (ire != save_ire) {
-						ire_refrele(ire);
-					}
-					return;
-				}
-				mp1->b_cont = mp;
-
-				/* Get the priority marking, if any */
-				mp1->b_band = mp->b_band;
-				mp = mp1;
-			}
-
-			out_ill = (ill_t *)stq->q_ptr;
-
-			DTRACE_PROBE4(ip6__physical__out__start,
-			    ill_t *, NULL, ill_t *, out_ill,
-			    ip6_t *, ip6h, mblk_t *, mp);
-
-			FW_HOOKS6(ipst->ips_ip6_physical_out_event,
-			    ipst->ips_ipv6firewall_physical_out,
-			    NULL, out_ill, ip6h, mp, mp_ip6h, 0, ipst);
-
-			DTRACE_PROBE1(ip6__physical__out__end, mblk_t *, mp);
-
-			if (mp == NULL) {
-				if (multirt_send) {
-					ASSERT(ire1 != NULL);
-					if (ire != save_ire) {
-						ire_refrele(ire);
-					}
-					/*
-					 * Proceed with the next RTF_MULTIRT
-					 * ire, also set up the send-to queue
-					 * accordingly.
-					 */
-					ire = ire1;
-					ire1 = NULL;
-					stq = ire->ire_stq;
-					nce = ire->ire_nce;
-					ill = ire_to_ill(ire);
-					mp = next_mp;
-					next_mp = NULL;
-					continue;
-				} else {
-					ASSERT(next_mp == NULL);
-					ASSERT(ire1 == NULL);
-					break;
-				}
-			}
-
-			if (ipst->ips_ip6_observe.he_interested) {
-				zoneid_t	szone;
-
-				/*
-				 * Both of these functions expect b_rptr to
-				 * be where the IPv6 header starts, so advance
-				 * past the link layer header.
-				 */
-				if (fp_prepend)
-					mp_ip6h->b_rptr += hlen;
-				szone = ip_get_zoneid_v6(&ip6h->ip6_src,
-				    mp_ip6h, out_ill, ipst, ALL_ZONES);
-				ipobs_hook(mp_ip6h, IPOBS_HOOK_OUTBOUND, szone,
-				    ALL_ZONES, out_ill, ipst);
-				if (fp_prepend)
-					mp_ip6h->b_rptr -= hlen;
-			}
-
-			/*
-			 * Update ire and MIB counters; for save_ire, this has
-			 * been done by the caller.
-			 */
-			if (ire != save_ire) {
-				UPDATE_OB_PKT_COUNT(ire);
-				ire->ire_last_used_time = lbolt;
-
-				if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsHCOutMcastPkts);
-					UPDATE_MIB(ill->ill_ip_mib,
-					    ipIfStatsHCOutMcastOctets,
-					    ntohs(ip6h->ip6_plen) +
-					    IPV6_HDR_LEN);
-				}
-			}
-
-			/*
-			 * Send it down.  XXX Do we want to flow control AH/ESP
-			 * packets that carry TCP payloads?  We don't flow
-			 * control TCP packets, but we should also not
-			 * flow-control TCP packets that have been protected.
-			 * We don't have an easy way to find out if an AH/ESP
-			 * packet was originally TCP or not currently.
-			 */
-			if (io == NULL) {
-				BUMP_MIB(ill->ill_ip_mib,
-				    ipIfStatsHCOutTransmits);
-				UPDATE_MIB(ill->ill_ip_mib,
-				    ipIfStatsHCOutOctets,
-				    ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN);
-				DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,
-				    void_ip_t *, ip6h, __dtrace_ipsr_ill_t *,
-				    out_ill, ipha_t *, NULL, ip6_t *, ip6h,
-				    int, 0);
-
-				putnext(stq, mp);
-			} else {
-				/*
-				 * Safety Pup says: make sure this is
-				 * going to the right interface!
-				 */
-				if (io->ipsec_out_capab_ill_index !=
-				    ill_index) {
-					/* IPsec kstats: bump lose counter */
-					freemsg(mp1);
-				} else {
-					BUMP_MIB(ill->ill_ip_mib,
-					    ipIfStatsHCOutTransmits);
-					UPDATE_MIB(ill->ill_ip_mib,
-					    ipIfStatsHCOutOctets,
-					    ntohs(ip6h->ip6_plen) +
-					    IPV6_HDR_LEN);
-					DTRACE_IP7(send, mblk_t *, mp,
-					    conn_t *, NULL, void_ip_t *, ip6h,
-					    __dtrace_ipsr_ill_t *, out_ill,
-					    ipha_t *, NULL, ip6_t *, ip6h, int,
-					    0);
-					ipsec_hw_putnext(stq, mp);
-				}
-			}
-
-			if (nce->nce_flags & (NCE_F_NONUD|NCE_F_PERMANENT)) {
-				if (ire != save_ire) {
-					ire_refrele(ire);
-				}
-				if (multirt_send) {
-					ASSERT(ire1 != NULL);
-					/*
-					 * Proceed with the next RTF_MULTIRT
-					 * ire, also set up the send-to queue
-					 * accordingly.
-					 */
-					ire = ire1;
-					ire1 = NULL;
-					stq = ire->ire_stq;
-					nce = ire->ire_nce;
-					ill = ire_to_ill(ire);
-					mp = next_mp;
-					next_mp = NULL;
-					continue;
-				}
-				ASSERT(next_mp == NULL);
-				ASSERT(ire1 == NULL);
-				return;
-			}
-
-			ASSERT(nce->nce_state != ND_INCOMPLETE);
-
-			/*
-			 * Check for upper layer advice
-			 */
-			if (flags & IPV6_REACHABILITY_CONFIRMATION) {
-				/*
-				 * It should be o.k. to check the state without
-				 * a lock here, at most we lose an advice.
-				 */
-				nce->nce_last = TICK_TO_MSEC(lbolt64);
-				if (nce->nce_state != ND_REACHABLE) {
-
-					mutex_enter(&nce->nce_lock);
-					nce->nce_state = ND_REACHABLE;
-					nce->nce_pcnt = ND_MAX_UNICAST_SOLICIT;
-					mutex_exit(&nce->nce_lock);
-					(void) untimeout(nce->nce_timeout_id);
-					if (ip_debug > 2) {
-						/* ip1dbg */
-						pr_addr_dbg("ip_xmit_v6: state"
-						    " for %s changed to"
-						    " REACHABLE\n", AF_INET6,
-						    &ire->ire_addr_v6);
-					}
-				}
-				if (ire != save_ire) {
-					ire_refrele(ire);
-				}
-				if (multirt_send) {
-					ASSERT(ire1 != NULL);
-					/*
-					 * Proceed with the next RTF_MULTIRT
-					 * ire, also set up the send-to queue
-					 * accordingly.
-					 */
-					ire = ire1;
-					ire1 = NULL;
-					stq = ire->ire_stq;
-					nce = ire->ire_nce;
-					ill = ire_to_ill(ire);
-					mp = next_mp;
-					next_mp = NULL;
-					continue;
-				}
-				ASSERT(next_mp == NULL);
-				ASSERT(ire1 == NULL);
-				return;
-			}
-
-			delta =  TICK_TO_MSEC(lbolt64) - nce->nce_last;
-			ip1dbg(("ip_xmit_v6: delta = %" PRId64
-			    " ill_reachable_time = %d \n", delta,
-			    ill->ill_reachable_time));
-			if (delta > (uint64_t)ill->ill_reachable_time) {
-				nce = ire->ire_nce;
-				mutex_enter(&nce->nce_lock);
-				switch (nce->nce_state) {
-				case ND_REACHABLE:
-				case ND_STALE:
-					/*
-					 * ND_REACHABLE is identical to
-					 * ND_STALE in this specific case. If
-					 * reachable time has expired for this
-					 * neighbor (delta is greater than
-					 * reachable time), conceptually, the
-					 * neighbor cache is no longer in
-					 * REACHABLE state, but already in
-					 * STALE state.  So the correct
-					 * transition here is to ND_DELAY.
-					 */
-					nce->nce_state = ND_DELAY;
-					mutex_exit(&nce->nce_lock);
-					NDP_RESTART_TIMER(nce,
-					    ipst->ips_delay_first_probe_time);
-					if (ip_debug > 3) {
-						/* ip2dbg */
-						pr_addr_dbg("ip_xmit_v6: state"
-						    " for %s changed to"
-						    " DELAY\n", AF_INET6,
-						    &ire->ire_addr_v6);
-					}
-					break;
-				case ND_DELAY:
-				case ND_PROBE:
-					mutex_exit(&nce->nce_lock);
-					/* Timers have already started */
-					break;
-				case ND_UNREACHABLE:
-					/*
-					 * ndp timer has detected that this nce
-					 * is unreachable and initiated deleting
-					 * this nce and all its associated IREs.
-					 * This is a race where we found the
-					 * ire before it was deleted and have
-					 * just sent out a packet using this
-					 * unreachable nce.
-					 */
-					mutex_exit(&nce->nce_lock);
-					break;
-				default:
-					ASSERT(0);
-				}
-			}
-
-			if (multirt_send) {
-				ASSERT(ire1 != NULL);
-				/*
-				 * Proceed with the next RTF_MULTIRT ire,
-				 * Also set up the send-to queue accordingly.
-				 */
-				if (ire != save_ire) {
-					ire_refrele(ire);
-				}
-				ire = ire1;
-				ire1 = NULL;
-				stq = ire->ire_stq;
-				nce = ire->ire_nce;
-				ill = ire_to_ill(ire);
-				mp = next_mp;
-				next_mp = NULL;
-			}
-		} while (multirt_send);
-		/*
-		 * In the multirouting case, release the last ire used for
-		 * emission. save_ire will be released by the caller.
-		 */
-		if (ire != save_ire) {
-			ire_refrele(ire);
-		}
-	} else {
-		/*
-		 * Can't apply backpressure, just discard the packet.
-		 */
-		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
-		freemsg(mp);
-		return;
-	}
+	return (conn_hasmembers_ill_withsrc_v6(connp, v6dst_ptr, v6src_ptr,
+	    ira->ira_ill));
 }
 
 /*
@@ -12189,37 +4488,52 @@ pr_addr_dbg(char *fmt1, int af, const void *addr)
 
 
 /*
- * Return the length in bytes of the IPv6 headers (base header, ip6i_t
- * if needed and extension headers) that will be needed based on the
- * ip6_pkt_t structure passed by the caller.
+ * Return the length in bytes of the IPv6 headers (base header
+ * extension headers) that will be needed based on the
+ * ip_pkt_t structure passed by the caller.
  *
  * The returned length does not include the length of the upper level
  * protocol (ULP) header.
  */
 int
-ip_total_hdrs_len_v6(ip6_pkt_t *ipp)
+ip_total_hdrs_len_v6(const ip_pkt_t *ipp)
 {
 	int len;
 
 	len = IPV6_HDR_LEN;
-	if (ipp->ipp_fields & IPPF_HAS_IP6I)
-		len += sizeof (ip6i_t);
-	if (ipp->ipp_fields & IPPF_HOPOPTS) {
+
+	/*
+	 * If there's a security label here, then we ignore any hop-by-hop
+	 * options the user may try to set.
+	 */
+	if (ipp->ipp_fields & IPPF_LABEL_V6) {
+		uint_t hopoptslen;
+		/*
+		 * Note that ipp_label_len_v6 is just the option - not
+		 * the hopopts extension header. It also needs to be padded
+		 * to a multiple of 8 bytes.
+		 */
+		ASSERT(ipp->ipp_label_len_v6 != 0);
+		hopoptslen = ipp->ipp_label_len_v6 + sizeof (ip6_hbh_t);
+		hopoptslen = (hopoptslen + 7)/8 * 8;
+		len += hopoptslen;
+	} else if (ipp->ipp_fields & IPPF_HOPOPTS) {
 		ASSERT(ipp->ipp_hopoptslen != 0);
 		len += ipp->ipp_hopoptslen;
 	}
-	if (ipp->ipp_fields & IPPF_RTHDR) {
-		ASSERT(ipp->ipp_rthdrlen != 0);
-		len += ipp->ipp_rthdrlen;
-	}
+
 	/*
 	 * En-route destination options
 	 * Only do them if there's a routing header as well
 	 */
-	if ((ipp->ipp_fields & (IPPF_RTDSTOPTS|IPPF_RTHDR)) ==
-	    (IPPF_RTDSTOPTS|IPPF_RTHDR)) {
-		ASSERT(ipp->ipp_rtdstoptslen != 0);
-		len += ipp->ipp_rtdstoptslen;
+	if ((ipp->ipp_fields & (IPPF_RTHDRDSTOPTS|IPPF_RTHDR)) ==
+	    (IPPF_RTHDRDSTOPTS|IPPF_RTHDR)) {
+		ASSERT(ipp->ipp_rthdrdstoptslen != 0);
+		len += ipp->ipp_rthdrdstoptslen;
+	}
+	if (ipp->ipp_fields & IPPF_RTHDR) {
+		ASSERT(ipp->ipp_rthdrlen != 0);
+		len += ipp->ipp_rthdrlen;
 	}
 	if (ipp->ipp_fields & IPPF_DSTOPTS) {
 		ASSERT(ipp->ipp_dstoptslen != 0);
@@ -12230,80 +4544,40 @@ ip_total_hdrs_len_v6(ip6_pkt_t *ipp)
 
 /*
  * All-purpose routine to build a header chain of an IPv6 header
- * followed by any required extension headers and a proto header,
- * preceeded (where necessary) by an ip6i_t private header.
+ * followed by any required extension headers and a proto header.
  *
- * The fields of the IPv6 header that are derived from the ip6_pkt_t
- * will be filled in appropriately.
- * Thus the caller must fill in the rest of the IPv6 header, such as
- * traffic class/flowid, source address (if not set here), hoplimit (if not
- * set here) and destination address.
+ * The caller has to set the source and destination address as well as
+ * ip6_plen. The caller has to massage any routing header and compensate
+ * for the ULP pseudo-header checksum due to the source route.
  *
- * The extension headers and ip6i_t header will all be fully filled in.
+ * The extension headers will all be fully filled in.
  */
 void
-ip_build_hdrs_v6(uchar_t *ext_hdrs, uint_t ext_hdrs_len,
-    ip6_pkt_t *ipp, uint8_t protocol)
+ip_build_hdrs_v6(uchar_t *buf, uint_t buf_len, const ip_pkt_t *ipp,
+    uint8_t protocol, uint32_t flowinfo)
 {
 	uint8_t *nxthdr_ptr;
 	uint8_t *cp;
-	ip6i_t	*ip6i;
-	ip6_t	*ip6h = (ip6_t *)ext_hdrs;
+	ip6_t	*ip6h = (ip6_t *)buf;
 
-	/*
-	 * If sending private ip6i_t header down (checksum info, nexthop,
-	 * or ifindex), adjust ip header pointer and set ip6i_t header pointer,
-	 * then fill it in. (The checksum info will be filled in by icmp).
-	 */
-	if (ipp->ipp_fields & IPPF_HAS_IP6I) {
-		ip6i = (ip6i_t *)ip6h;
-		ip6h = (ip6_t *)&ip6i[1];
-
-		ip6i->ip6i_flags = 0;
-		ip6i->ip6i_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
-		if (ipp->ipp_fields & IPPF_IFINDEX ||
-		    ipp->ipp_fields & IPPF_SCOPE_ID) {
-			ASSERT(ipp->ipp_ifindex != 0);
-			ip6i->ip6i_flags |= IP6I_IFINDEX;
-			ip6i->ip6i_ifindex = ipp->ipp_ifindex;
-		}
-		if (ipp->ipp_fields & IPPF_ADDR) {
-			/*
-			 * Enable per-packet source address verification if
-			 * IPV6_PKTINFO specified the source address.
-			 * ip6_src is set in the transport's _wput function.
-			 */
-			ASSERT(!IN6_IS_ADDR_UNSPECIFIED(
-			    &ipp->ipp_addr));
-			ip6i->ip6i_flags |= IP6I_VERIFY_SRC;
-		}
-		if (ipp->ipp_fields & IPPF_UNICAST_HOPS) {
-			ip6h->ip6_hops = ipp->ipp_unicast_hops;
-			/*
-			 * We need to set this flag so that IP doesn't
-			 * rewrite the IPv6 header's hoplimit with the
-			 * current default value.
-			 */
-			ip6i->ip6i_flags |= IP6I_HOPLIMIT;
-		}
-		if (ipp->ipp_fields & IPPF_NEXTHOP) {
-			ASSERT(!IN6_IS_ADDR_UNSPECIFIED(
-			    &ipp->ipp_nexthop));
-			ip6i->ip6i_flags |= IP6I_NEXTHOP;
-			ip6i->ip6i_nexthop = ipp->ipp_nexthop;
-		}
-		/*
-		 * tell IP this is an ip6i_t private header
-		 */
-		ip6i->ip6i_nxt = IPPROTO_RAW;
-	}
 	/* Initialize IPv6 header */
-	ip6h->ip6_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
+	ip6h->ip6_vcf =
+	    (IPV6_DEFAULT_VERS_AND_FLOW & IPV6_VERS_AND_FLOW_MASK) |
+	    (flowinfo & ~IPV6_VERS_AND_FLOW_MASK);
+
 	if (ipp->ipp_fields & IPPF_TCLASS) {
-		ip6h->ip6_vcf = (ip6h->ip6_vcf & ~IPV6_FLOWINFO_TCLASS) |
-		    (ipp->ipp_tclass << 20);
+		/* Overrides the class part of flowinfo */
+		ip6h->ip6_vcf = IPV6_TCLASS_FLOW(ip6h->ip6_vcf,
+		    ipp->ipp_tclass);
 	}
-	if (ipp->ipp_fields & IPPF_ADDR)
+
+	if (ipp->ipp_fields & IPPF_HOPLIMIT)
+		ip6h->ip6_hops = ipp->ipp_hoplimit;
+	else
+		ip6h->ip6_hops = ipp->ipp_unicast_hops;
+
+	if ((ipp->ipp_fields & IPPF_ADDR) &&
+	    !IN6_IS_ADDR_V4MAPPED(&ipp->ipp_addr))
 		ip6h->ip6_src = ipp->ipp_addr;
 
 	nxthdr_ptr = (uint8_t *)&ip6h->ip6_nxt;
@@ -12313,7 +4587,47 @@ ip_build_hdrs_v6(uchar_t *ext_hdrs, uint_t ext_hdrs_len,
 	 * any extension headers in the right order:
 	 * Hop-by-hop, destination, routing, and final destination opts.
 	 */
-	if (ipp->ipp_fields & IPPF_HOPOPTS) {
+	/*
+	 * If there's a security label here, then we ignore any hop-by-hop
+	 * options the user may try to set.
+	 */
+	if (ipp->ipp_fields & IPPF_LABEL_V6) {
+		/*
+		 * Hop-by-hop options with the label.
+		 * Note that ipp_label_v6 is just the option - not
+		 * the hopopts extension header. It also needs to be padded
+		 * to a multiple of 8 bytes.
+		 */
+		ip6_hbh_t *hbh = (ip6_hbh_t *)cp;
+		uint_t hopoptslen;
+		uint_t padlen;
+
+		padlen = ipp->ipp_label_len_v6 + sizeof (ip6_hbh_t);
+		hopoptslen = (padlen + 7)/8 * 8;
+		padlen = hopoptslen - padlen;
+
+		*nxthdr_ptr = IPPROTO_HOPOPTS;
+		nxthdr_ptr = &hbh->ip6h_nxt;
+		hbh->ip6h_len = hopoptslen/8 - 1;
+		cp += sizeof (ip6_hbh_t);
+		bcopy(ipp->ipp_label_v6, cp, ipp->ipp_label_len_v6);
+		cp += ipp->ipp_label_len_v6;
+
+		ASSERT(padlen <= 7);
+		switch (padlen) {
+		case 0:
+			break;
+		case 1:
+			cp[0] = IP6OPT_PAD1;
+			break;
+		default:
+			cp[0] = IP6OPT_PADN;
+			cp[1] = padlen - 2;
+			bzero(&cp[2], padlen - 2);
+			break;
+		}
+		cp += padlen;
+	} else if (ipp->ipp_fields & IPPF_HOPOPTS) {
 		/* Hop-by-hop options */
 		ip6_hbh_t *hbh = (ip6_hbh_t *)cp;
 
@@ -12327,15 +4641,15 @@ ip_build_hdrs_v6(uchar_t *ext_hdrs, uint_t ext_hdrs_len,
 	 * En-route destination options
 	 * Only do them if there's a routing header as well
 	 */
-	if ((ipp->ipp_fields & (IPPF_RTDSTOPTS|IPPF_RTHDR)) ==
-	    (IPPF_RTDSTOPTS|IPPF_RTHDR)) {
+	if ((ipp->ipp_fields & (IPPF_RTHDRDSTOPTS|IPPF_RTHDR)) ==
+	    (IPPF_RTHDRDSTOPTS|IPPF_RTHDR)) {
 		ip6_dest_t *dst = (ip6_dest_t *)cp;
 
 		*nxthdr_ptr = IPPROTO_DSTOPTS;
 		nxthdr_ptr = &dst->ip6d_nxt;
 
-		bcopy(ipp->ipp_rtdstopts, cp, ipp->ipp_rtdstoptslen);
-		cp += ipp->ipp_rtdstoptslen;
+		bcopy(ipp->ipp_rthdrdstopts, cp, ipp->ipp_rthdrdstoptslen);
+		cp += ipp->ipp_rthdrdstoptslen;
 	}
 	/*
 	 * Routing header next
@@ -12365,7 +4679,7 @@ ip_build_hdrs_v6(uchar_t *ext_hdrs, uint_t ext_hdrs_len,
 	 * Now set the last header pointer to the proto passed in
 	 */
 	*nxthdr_ptr = protocol;
-	ASSERT((int)(cp - ext_hdrs) == ext_hdrs_len);
+	ASSERT((int)(cp - buf) == buf_len);
 }
 
 /*
@@ -12509,108 +4823,28 @@ ip_massage_options_v6(ip6_t *ip6h, ip6_rthdr_t *rth, netstack_t *ns)
 	return (cksm);
 }
 
-/*
- * Propagate a multicast group membership operation (join/leave) (*fn) on
- * all interfaces crossed by the related multirt routes.
- * The call is considered successful if the operation succeeds
- * on at least one interface.
- * The function is called if the destination address in the packet to send
- * is multirouted.
- */
-int
-ip_multirt_apply_membership_v6(int (*fn)(conn_t *, boolean_t,
-    const in6_addr_t *, int, mcast_record_t, const in6_addr_t *, mblk_t *),
-    ire_t *ire, conn_t *connp, boolean_t checkonly, const in6_addr_t *v6grp,
-    mcast_record_t fmode, const in6_addr_t *v6src, mblk_t *first_mp)
-{
-	ire_t		*ire_gw;
-	irb_t		*irb;
-	int		index, error = 0;
-	opt_restart_t	*or;
-	ip_stack_t	*ipst = ire->ire_ipst;
-
-	irb = ire->ire_bucket;
-	ASSERT(irb != NULL);
-
-	ASSERT(DB_TYPE(first_mp) == M_CTL);
-	or = (opt_restart_t *)first_mp->b_rptr;
-
-	IRB_REFHOLD(irb);
-	for (; ire != NULL; ire = ire->ire_next) {
-		if ((ire->ire_flags & RTF_MULTIRT) == 0)
-			continue;
-		if (!IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6, v6grp))
-			continue;
-
-		ire_gw = ire_ftable_lookup_v6(&ire->ire_gateway_addr_v6, 0, 0,
-		    IRE_INTERFACE, NULL, NULL, ALL_ZONES, 0, NULL,
-		    MATCH_IRE_RECURSIVE | MATCH_IRE_TYPE, ipst);
-		/* No resolver exists for the gateway; skip this ire. */
-		if (ire_gw == NULL)
-			continue;
-		index = ire_gw->ire_ipif->ipif_ill->ill_phyint->phyint_ifindex;
-		/*
-		 * A resolver exists: we can get the interface on which we have
-		 * to apply the operation.
-		 */
-		error = fn(connp, checkonly, v6grp, index, fmode, v6src,
-		    first_mp);
-		if (error == 0)
-			or->or_private = CGTP_MCAST_SUCCESS;
-
-		if (ip_debug > 0) {
-			ulong_t	off;
-			char	*ksym;
-
-			ksym = kobj_getsymname((uintptr_t)fn, &off);
-			ip2dbg(("ip_multirt_apply_membership_v6: "
-			    "called %s, multirt group 0x%08x via itf 0x%08x, "
-			    "error %d [success %u]\n",
-			    ksym ? ksym : "?",
-			    ntohl(V4_PART_OF_V6((*v6grp))),
-			    ntohl(V4_PART_OF_V6(ire_gw->ire_src_addr_v6)),
-			    error, or->or_private));
-		}
-
-		ire_refrele(ire_gw);
-		if (error == EINPROGRESS) {
-			IRB_REFRELE(irb);
-			return (error);
-		}
-	}
-	IRB_REFRELE(irb);
-	/*
-	 * Consider the call as successful if we succeeded on at least
-	 * one interface. Otherwise, return the last encountered error.
-	 */
-	return (or->or_private == CGTP_MCAST_SUCCESS ? 0 : error);
-}
-
 void
 *ip6_kstat_init(netstackid_t stackid, ip6_stat_t *ip6_statisticsp)
 {
 	kstat_t *ksp;
 
 	ip6_stat_t template = {
-		{ "ip6_udp_fast_path", 	KSTAT_DATA_UINT64 },
-		{ "ip6_udp_slow_path", 	KSTAT_DATA_UINT64 },
 		{ "ip6_udp_fannorm", 	KSTAT_DATA_UINT64 },
 		{ "ip6_udp_fanmb", 	KSTAT_DATA_UINT64 },
+		{ "ip6_recv_pullup", 		KSTAT_DATA_UINT64 },
+		{ "ip6_db_ref",			KSTAT_DATA_UINT64 },
+		{ "ip6_notaligned",		KSTAT_DATA_UINT64 },
+		{ "ip6_multimblk",		KSTAT_DATA_UINT64 },
+		{ "ipsec_proto_ahesp",		KSTAT_DATA_UINT64 },
 		{ "ip6_out_sw_cksum",			KSTAT_DATA_UINT64 },
+		{ "ip6_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
 		{ "ip6_in_sw_cksum",			KSTAT_DATA_UINT64 },
 		{ "ip6_tcp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
 		{ "ip6_tcp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
 		{ "ip6_tcp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
-		{ "ip6_tcp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
 		{ "ip6_udp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
 		{ "ip6_udp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
 		{ "ip6_udp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
-		{ "ip6_udp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
-		{ "ip6_frag_mdt_pkt_out",		KSTAT_DATA_UINT64 },
-		{ "ip6_frag_mdt_discarded",		KSTAT_DATA_UINT64 },
-		{ "ip6_frag_mdt_allocfail",		KSTAT_DATA_UINT64 },
-		{ "ip6_frag_mdt_addpdescfail",		KSTAT_DATA_UINT64 },
-		{ "ip6_frag_mdt_allocd",		KSTAT_DATA_UINT64 },
 	};
 	ksp = kstat_create_netstack("ip", 0, "ip6stat", "net",
 	    KSTAT_TYPE_NAMED, sizeof (template) / sizeof (kstat_named_t),
@@ -12641,7 +4875,7 @@ ip6_kstat_fini(netstackid_t stackid, kstat_t *ksp)
  * IPV6_SRC_PREFERENCES socket option.
  */
 int
-ip6_set_src_preferences(conn_t *connp, uint32_t prefs)
+ip6_set_src_preferences(ip_xmit_attr_t *ixa, uint32_t prefs)
 {
 	/*
 	 * We only support preferences that are covered by
@@ -12675,47 +4909,15 @@ ip6_set_src_preferences(conn_t *connp, uint32_t prefs)
 		return (EINVAL);
 	}
 
-	connp->conn_src_preferences = prefs;
+	ixa->ixa_src_preferences = prefs;
 	return (0);
 }
 
 size_t
-ip6_get_src_preferences(conn_t *connp, uint32_t *val)
+ip6_get_src_preferences(ip_xmit_attr_t *ixa, uint32_t *val)
 {
-	*val = connp->conn_src_preferences;
-	return (sizeof (connp->conn_src_preferences));
-}
-
-int
-ip6_set_pktinfo(cred_t *cr, conn_t *connp, struct in6_pktinfo *pkti)
-{
-	ire_t	*ire;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	/*
-	 * Verify the source address and ifindex. Privileged users can use
-	 * any source address.  For ancillary data the source address is
-	 * checked in ip_wput_v6.
-	 */
-	if (pkti->ipi6_ifindex != 0) {
-		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-		if (!phyint_exists(pkti->ipi6_ifindex, ipst)) {
-			rw_exit(&ipst->ips_ill_g_lock);
-			return (ENXIO);
-		}
-		rw_exit(&ipst->ips_ill_g_lock);
-	}
-	if (!IN6_IS_ADDR_UNSPECIFIED(&pkti->ipi6_addr) &&
-	    secpolicy_net_rawaccess(cr) != 0) {
-		ire = ire_route_lookup_v6(&pkti->ipi6_addr, 0, 0,
-		    (IRE_LOCAL|IRE_LOOPBACK), NULL, NULL,
-		    connp->conn_zoneid, NULL, MATCH_IRE_TYPE, ipst);
-		if (ire != NULL)
-			ire_refrele(ire);
-		else
-			return (ENXIO);
-	}
-	return (0);
+	*val = ixa->ixa_src_preferences;
+	return (sizeof (ixa->ixa_src_preferences));
 }
 
 /*
@@ -12743,7 +4945,7 @@ ipsec_ah_get_hdr_size_v6(mblk_t *mp, boolean_t till_ah)
 	whereptr = (uint8_t *)&ip6h[1];
 	for (;;) {
 		/* Assume IP has already stripped it */
-		ASSERT(nexthdr != IPPROTO_FRAGMENT && nexthdr != IPPROTO_RAW);
+		ASSERT(nexthdr != IPPROTO_FRAGMENT);
 		switch (nexthdr) {
 		case IPPROTO_HOPOPTS:
 			hbhhdr = (ip6_hbh_t *)whereptr;
@@ -12815,10 +5017,11 @@ ipsec_ah_get_hdr_size_v6(mblk_t *mp, boolean_t till_ah)
  * inside the IPSQ (ill_g_lock is not held), `ill' may be removed from the
  * group during or after this lookup.
  */
-static boolean_t
+boolean_t
 ipif_lookup_testaddr_v6(ill_t *ill, const in6_addr_t *v6srcp, ipif_t **ipifp)
 {
 	ipif_t *ipif;
+
 
 	ipif = ipif_lookup_addr_exact_v6(v6srcp, ill, ill->ill_ipst);
 	if (ipif != NULL) {

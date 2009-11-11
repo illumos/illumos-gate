@@ -3541,18 +3541,6 @@ ifplumb(const char *linkname, const char *ifname, boolean_t genppa, int af)
 		Perror2_exit("I_PUSH", IP_MOD_NAME);
 
 	/*
-	 * Push the ARP module onto the interface stream. IP uses
-	 * this to send resolution requests up to ARP. We need to
-	 * do this before the SLIFNAME ioctl is sent down because
-	 * the interface becomes publicly known as soon as the SLIFNAME
-	 * ioctl completes. Thus some other process trying to bring up
-	 * the interface after SLIFNAME but before we have pushed ARP
-	 * could hang. We pop the module again later if it is not needed.
-	 */
-	if (ioctl(ip_fd, I_PUSH, ARP_MOD_NAME) == -1)
-		Perror2_exit("I_PUSH", ARP_MOD_NAME);
-
-	/*
 	 * Prepare to set IFF_IPV4/IFF_IPV6 flags as part of SIOCSLIFNAME.
 	 * (At this point in time the kernel also allows an override of the
 	 * IFF_CANTCHANGE flags.)
@@ -3677,12 +3665,6 @@ ifplumb(const char *linkname, const char *ifname, boolean_t genppa, int af)
 		    lifr.lifr_name);
 		print_flags(lifr.lifr_flags);
 		(void) putchar('\n');
-	}
-
-	/* Check if arp is not actually needed */
-	if (lifr.lifr_flags & (IFF_NOARP|IFF_IPV6)) {
-		if (ioctl(ip_fd, I_POP, 0) == -1)
-			Perror2_exit("I_POP", ARP_MOD_NAME);
 	}
 
 	/*

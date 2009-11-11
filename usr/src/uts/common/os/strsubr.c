@@ -8474,9 +8474,7 @@ hcksum_retrieve(mblk_t *mp, multidata_t *mmd, pdesc_t *pd,
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_MULTIDATA);
 	if (mp->b_datap->db_type == M_DATA) {
 		if (flags != NULL) {
-			*flags = DB_CKSUMFLAGS(mp) & (HCK_IPV4_HDRCKSUM |
-			    HCK_PARTIALCKSUM | HCK_FULLCKSUM |
-			    HCK_FULLCKSUM_OK);
+			*flags = DB_CKSUMFLAGS(mp) & HCK_FLAGS;
 			if ((*flags & (HCK_PARTIALCKSUM |
 			    HCK_FULLCKSUM)) != 0) {
 				if (value != NULL)

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,7 +82,7 @@ sctp_hash_init(sctp_stack_t *sctps)
 	}
 	sctps->sctps_conn_fanout =
 	    (sctp_tf_t *)kmem_zalloc(sctps->sctps_conn_hash_size *
-	    sizeof (sctp_tf_t),	KM_SLEEP);
+	    sizeof (sctp_tf_t), KM_SLEEP);
 	for (i = 0; i < sctps->sctps_conn_hash_size; i++) {
 		mutex_init(&sctps->sctps_conn_fanout[i].tf_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
@@ -129,87 +129,6 @@ sctp_hash_destroy(sctp_stack_t *sctps)
 }
 
 /*
- * Walk the SCTP global list and refrele the ire for this ipif
- * This is called when an address goes down, so that we release any reference
- * to the ire associated with this address. Additionally, for any SCTP if
- * this was the only/last address in its source list, we don't kill the
- * assoc., if there is no address added subsequently, or if this does not
- * come up, then the assoc. will die a natural death (i.e. timeout).
- */
-void
-sctp_ire_cache_flush(ipif_t *ipif)
-{
-	sctp_t			*sctp;
-	sctp_t			*sctp_prev = NULL;
-	sctp_faddr_t		*fp;
-	conn_t			*connp;
-	ire_t			*ire;
-	sctp_stack_t		*sctps = ipif->ipif_ill->ill_ipst->
-	    ips_netstack->netstack_sctp;
-
-	sctp = sctps->sctps_gsctp;
-	mutex_enter(&sctps->sctps_g_lock);
-	while (sctp != NULL) {
-		mutex_enter(&sctp->sctp_reflock);
-		if (sctp->sctp_condemned) {
-			mutex_exit(&sctp->sctp_reflock);
-			sctp = list_next(&sctps->sctps_g_list, sctp);
-			continue;
-		}
-		sctp->sctp_refcnt++;
-		mutex_exit(&sctp->sctp_reflock);
-		mutex_exit(&sctps->sctps_g_lock);
-		if (sctp_prev != NULL)
-			SCTP_REFRELE(sctp_prev);
-
-		RUN_SCTP(sctp);
-		connp = sctp->sctp_connp;
-		mutex_enter(&connp->conn_lock);
-		ire = connp->conn_ire_cache;
-		if (ire != NULL && ire->ire_ipif == ipif) {
-			connp->conn_ire_cache = NULL;
-			mutex_exit(&connp->conn_lock);
-			IRE_REFRELE_NOTR(ire);
-		} else {
-			mutex_exit(&connp->conn_lock);
-		}
-		/* check for ires cached in faddr */
-		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-			/*
-			 * If this ipif is being used as the source address
-			 * we need to update it as well, else we will end
-			 * up using the dead source address.
-			 */
-			ire = fp->ire;
-			if (ire != NULL && ire->ire_ipif == ipif) {
-				fp->ire = NULL;
-				IRE_REFRELE_NOTR(ire);
-			}
-			/*
-			 * This may result in setting the fp as unreachable,
-			 * i.e. if all the source addresses are down. In
-			 * that case the assoc. would timeout.
-			 */
-			if (IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6lcl_addr,
-			    &fp->saddr)) {
-				sctp_set_saddr(sctp, fp);
-				if (fp == sctp->sctp_current &&
-				    fp->state != SCTP_FADDRS_UNREACH) {
-					sctp_set_faddr_current(sctp, fp);
-				}
-			}
-		}
-		WAKE_SCTP(sctp);
-		sctp_prev = sctp;
-		mutex_enter(&sctps->sctps_g_lock);
-		sctp = list_next(&sctps->sctps_g_list, sctp);
-	}
-	mutex_exit(&sctps->sctps_g_lock);
-	if (sctp_prev != NULL)
-		SCTP_REFRELE(sctp_prev);
-}
-
-/*
  * Exported routine for extracting active SCTP associations.
  * Like TCP, we terminate the walk if the callback returns non-zero.
  *
@@ -244,9 +163,9 @@ cl_sctp_walk_list_stack(int (*cl_callback)(cl_sctp_info_t *, void *),
 	uchar_t		*slist;
 	uchar_t		*flist;
 
-	sctp = sctps->sctps_gsctp;
 	sctp_prev = NULL;
 	mutex_enter(&sctps->sctps_g_lock);
+	sctp = list_head(&sctps->sctps_g_list);
 	while (sctp != NULL) {
 		size_t	ssize;
 		size_t	fsize;
@@ -282,11 +201,14 @@ cl_sctp_walk_list_stack(int (*cl_callback)(cl_sctp_info_t *, void *),
 		sctp_get_faddr_list(sctp, flist, fsize);
 		cl_sctpi.cl_sctpi_nladdr = sctp->sctp_nsaddrs;
 		cl_sctpi.cl_sctpi_nfaddr = sctp->sctp_nfaddrs;
-		cl_sctpi.cl_sctpi_family = sctp->sctp_family;
-		cl_sctpi.cl_sctpi_ipversion = sctp->sctp_ipversion;
+		cl_sctpi.cl_sctpi_family = sctp->sctp_connp->conn_family;
+		if (cl_sctpi.cl_sctpi_family == AF_INET)
+			cl_sctpi.cl_sctpi_ipversion = IPV4_VERSION;
+		else
+			cl_sctpi.cl_sctpi_ipversion = IPV6_VERSION;
 		cl_sctpi.cl_sctpi_state = sctp->sctp_state;
-		cl_sctpi.cl_sctpi_lport = sctp->sctp_lport;
-		cl_sctpi.cl_sctpi_fport = sctp->sctp_fport;
+		cl_sctpi.cl_sctpi_lport = sctp->sctp_connp->conn_lport;
+		cl_sctpi.cl_sctpi_fport = sctp->sctp_connp->conn_fport;
 		cl_sctpi.cl_sctpi_handle = (cl_sctp_handle_t)sctp;
 		WAKE_SCTP(sctp);
 		cl_sctpi.cl_sctpi_laddrp = slist;
@@ -310,20 +232,26 @@ cl_sctp_walk_list_stack(int (*cl_callback)(cl_sctp_info_t *, void *),
 
 sctp_t *
 sctp_conn_match(in6_addr_t *faddr, in6_addr_t *laddr, uint32_t ports,
-    zoneid_t zoneid, sctp_stack_t *sctps)
+    zoneid_t zoneid, iaflags_t iraflags, sctp_stack_t *sctps)
 {
 	sctp_tf_t		*tf;
 	sctp_t			*sctp;
 	sctp_faddr_t		*fp;
+	conn_t			*connp;
 
 	tf = &(sctps->sctps_conn_fanout[SCTP_CONN_HASH(sctps, ports)]);
 	mutex_enter(&tf->tf_lock);
 
 	for (sctp = tf->tf_sctp; sctp; sctp = sctp->sctp_conn_hash_next) {
-		if (ports != sctp->sctp_ports ||
-		    !IPCL_ZONE_MATCH(sctp->sctp_connp, zoneid)) {
+		connp = sctp->sctp_connp;
+		if (ports != connp->conn_ports)
 			continue;
-		}
+		if (!(connp->conn_zoneid == zoneid ||
+		    connp->conn_allzones ||
+		    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+		    (iraflags & IRAF_TX_MAC_EXEMPTABLE) &&
+		    (iraflags & IRAF_TX_SHARED_ADDR))))
+			continue;
 
 		/* check for faddr match */
 		for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
@@ -351,11 +279,12 @@ done:
 
 static sctp_t *
 listen_match(in6_addr_t *laddr, uint32_t ports, zoneid_t zoneid,
-    sctp_stack_t *sctps)
+    iaflags_t iraflags, sctp_stack_t *sctps)
 {
 	sctp_t			*sctp;
 	sctp_tf_t		*tf;
 	uint16_t		lport;
+	conn_t			*connp;
 
 	lport = ((uint16_t *)&ports)[1];
 
@@ -363,10 +292,16 @@ listen_match(in6_addr_t *laddr, uint32_t ports, zoneid_t zoneid,
 	mutex_enter(&tf->tf_lock);
 
 	for (sctp = tf->tf_sctp; sctp; sctp = sctp->sctp_listen_hash_next) {
-		if (lport != sctp->sctp_lport ||
-		    !IPCL_ZONE_MATCH(sctp->sctp_connp, zoneid)) {
+		connp = sctp->sctp_connp;
+		if (lport != connp->conn_lport)
 			continue;
-		}
+
+		if (!(connp->conn_zoneid == zoneid ||
+		    connp->conn_allzones ||
+		    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+		    (iraflags & IRAF_TX_MAC_EXEMPTABLE) &&
+		    (iraflags & IRAF_TX_SHARED_ADDR))))
+			continue;
 
 		if (sctp_saddr_lookup(sctp, laddr, 0) != NULL) {
 			SCTP_REFHOLD(sctp);
@@ -383,48 +318,36 @@ done:
 /* called by ipsec_sctp_pol */
 conn_t *
 sctp_find_conn(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
-    zoneid_t zoneid, sctp_stack_t *sctps)
+    zoneid_t zoneid, iaflags_t iraflags, sctp_stack_t *sctps)
 {
 	sctp_t *sctp;
 
-	if ((sctp = sctp_conn_match(src, dst, ports, zoneid, sctps)) == NULL) {
+	sctp = sctp_conn_match(src, dst, ports, zoneid, iraflags, sctps);
+	if (sctp == NULL) {
 		/* Not in conn fanout; check listen fanout */
-		if ((sctp = listen_match(dst, ports, zoneid, sctps)) == NULL)
+		sctp = listen_match(dst, ports, zoneid, iraflags, sctps);
+		if (sctp == NULL)
 			return (NULL);
 	}
 	return (sctp->sctp_connp);
 }
 
+/*
+ * Fanout to a sctp instance.
+ */
 conn_t *
 sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
-    zoneid_t zoneid, mblk_t *mp, sctp_stack_t *sctps)
-
+    ip_recv_attr_t *ira, mblk_t *mp, sctp_stack_t *sctps)
 {
+	zoneid_t zoneid = ira->ira_zoneid;
+	iaflags_t iraflags = ira->ira_flags;
 	sctp_t *sctp;
-	boolean_t shared_addr;
 
-	if ((sctp = sctp_conn_match(src, dst, ports, zoneid, sctps)) == NULL) {
-		shared_addr = (zoneid == ALL_ZONES);
-		if (shared_addr) {
-			/*
-			 * No need to handle exclusive-stack zones since
-			 * ALL_ZONES only applies to the shared stack.
-			 */
-			zoneid = tsol_mlp_findzone(IPPROTO_SCTP,
-			    htons(ntohl(ports) & 0xFFFF));
-			/*
-			 * If no shared MLP is found, tsol_mlp_findzone returns
-			 * ALL_ZONES.  In that case, we assume it's SLP, and
-			 * search for the zone based on the packet label.
-			 * That will also return ALL_ZONES on failure.
-			 */
-			if (zoneid == ALL_ZONES)
-				zoneid = tsol_packet_to_zoneid(mp);
-			if (zoneid == ALL_ZONES)
-				return (NULL);
-		}
+	sctp = sctp_conn_match(src, dst, ports, zoneid, iraflags, sctps);
+	if (sctp == NULL) {
 		/* Not in conn fanout; check listen fanout */
-		if ((sctp = listen_match(dst, ports, zoneid, sctps)) == NULL)
+		sctp = listen_match(dst, ports, zoneid, iraflags, sctps);
+		if (sctp == NULL)
 			return (NULL);
 		/*
 		 * On systems running trusted extensions, check if dst
@@ -432,9 +355,9 @@ sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
 		 * that dst is in 16 byte AF_INET6 format. IPv4-mapped
 		 * IPv6 addresses are supported.
 		 */
-		if (is_system_labeled() &&
-		    !tsol_receive_local(mp, dst, IPV6_VERSION,
-		    shared_addr, sctp->sctp_connp)) {
+		if ((iraflags & IRAF_SYSTEM_LABELED) &&
+		    !tsol_receive_local(mp, dst, IPV6_VERSION, ira,
+		    sctp->sctp_connp)) {
 			DTRACE_PROBE3(
 			    tx__ip__log__info__classify__sctp,
 			    char *,
@@ -444,145 +367,84 @@ sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
 			return (NULL);
 		}
 	}
+	/*
+	 * For labeled systems, there's no need to check the
+	 * label here.  It's known to be good as we checked
+	 * before allowing the connection to become bound.
+	 */
 	return (sctp->sctp_connp);
 }
 
 /*
- * Fanout for SCTP packets
+ * Fanout for ICMP errors for SCTP
  * The caller puts <fport, lport> in the ports parameter.
  */
-/* ARGSUSED */
 void
-ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
-    uint32_t ports, uint_t flags, boolean_t mctl_present, boolean_t ip_policy,
-    zoneid_t zoneid)
+ip_fanout_sctp(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h, uint32_t ports,
+    ip_recv_attr_t *ira)
 {
-	sctp_t *sctp;
-	boolean_t isv4;
-	conn_t *connp;
-	mblk_t *first_mp;
-	ip6_t *ip6h;
-	in6_addr_t map_src, map_dst;
-	in6_addr_t *src, *dst;
-	ip_stack_t	*ipst;
-	ipsec_stack_t	*ipss;
-	sctp_stack_t	*sctps;
+	sctp_t		*sctp;
+	conn_t		*connp;
+	in6_addr_t	map_src, map_dst;
+	in6_addr_t	*src, *dst;
+	boolean_t	secure;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	netstack_t	*ns = ipst->ips_netstack;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	sctp_stack_t	*sctps = ns->netstack_sctp;
+	iaflags_t	iraflags = ira->ira_flags;
+	ill_t		*rill = ira->ira_rill;
 
-	ASSERT(recv_ill != NULL);
-	ipst = recv_ill->ill_ipst;
-	sctps = ipst->ips_netstack->netstack_sctp;
-	ipss = ipst->ips_netstack->netstack_ipsec;
+	ASSERT(iraflags & IRAF_ICMP_ERROR);
 
-	first_mp = mp;
-	if (mctl_present) {
-		mp = first_mp->b_cont;
-		ASSERT(mp != NULL);
-	}
+	secure = iraflags & IRAF_IPSEC_SECURE;
 
 	/* Assume IP provides aligned packets - otherwise toss */
 	if (!OK_32PTR(mp->b_rptr)) {
-		BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
-		freemsg(first_mp);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, ill);
+		freemsg(mp);
 		return;
 	}
 
-	if (IPH_HDR_VERSION(ipha) == IPV6_VERSION) {
-		ip6h = (ip6_t *)ipha;
+	if (!(iraflags & IRAF_IS_IPV4)) {
 		src = &ip6h->ip6_src;
 		dst = &ip6h->ip6_dst;
-		isv4 = B_FALSE;
 	} else {
-		ip6h = NULL;
 		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &map_src);
 		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &map_dst);
 		src = &map_src;
 		dst = &map_dst;
-		isv4 = B_TRUE;
 	}
-	connp = sctp_fanout(src, dst, ports, zoneid, mp, sctps);
+	connp = sctp_fanout(src, dst, ports, ira, mp, sctps);
 	if (connp == NULL) {
-		ip_fanout_sctp_raw(first_mp, recv_ill, ipha, isv4,
-		    ports, mctl_present, flags, ip_policy, zoneid);
+		ip_fanout_sctp_raw(mp, ipha, ip6h, ports, ira);
 		return;
 	}
 	sctp = CONN2SCTP(connp);
-
-	/* Found a client; up it goes */
-	BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
 
 	/*
 	 * We check some fields in conn_t without holding a lock.
 	 * This should be fine.
 	 */
-	if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || mctl_present) {
-		first_mp = ipsec_check_inbound_policy(first_mp, connp,
-		    ipha, NULL, mctl_present);
-		if (first_mp == NULL) {
-			SCTP_REFRELE(sctp);
-			return;
-		}
-	}
-
-	/* Initiate IPPF processing for fastpath */
-	if (IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
-		ip_process(IPP_LOCAL_IN, &mp,
-		    recv_ill->ill_phyint->phyint_ifindex);
+	if (((iraflags & IRAF_IS_IPV4) ?
+	    CONN_INBOUND_POLICY_PRESENT(connp, ipss) :
+	    CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss)) ||
+	    secure) {
+		mp = ipsec_check_inbound_policy(mp, connp, ipha,
+		    ip6h, ira);
 		if (mp == NULL) {
 			SCTP_REFRELE(sctp);
-			if (mctl_present)
-				freeb(first_mp);
 			return;
-		} else if (mctl_present) {
-			/*
-			 * ip_process might return a new mp.
-			 */
-			ASSERT(first_mp != mp);
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
 		}
 	}
 
-	if (connp->conn_recvif || connp->conn_recvslla ||
-	    connp->conn_ip_recvpktinfo) {
-		int in_flags = 0;
-
-		if (connp->conn_recvif || connp->conn_ip_recvpktinfo) {
-			in_flags = IPF_RECVIF;
-		}
-		if (connp->conn_recvslla) {
-			in_flags |= IPF_RECVSLLA;
-		}
-		if (isv4) {
-			mp = ip_add_info(mp, recv_ill, in_flags,
-			    IPCL_ZONEID(connp), ipst);
-		} else {
-			mp = ip_add_info_v6(mp, recv_ill, &ip6h->ip6_dst);
-		}
-		if (mp == NULL) {
-			SCTP_REFRELE(sctp);
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		} else if (mctl_present) {
-			/*
-			 * ip_add_info might return a new mp.
-			 */
-			ASSERT(first_mp != mp);
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
-		}
-	}
+	ira->ira_ill = ira->ira_rill = NULL;
 
 	mutex_enter(&sctp->sctp_lock);
 	if (sctp->sctp_running) {
-		if (mctl_present)
-			mp->b_prev = first_mp;
-		if (!sctp_add_recvq(sctp, mp, B_FALSE)) {
-			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(first_mp);
-		}
+		sctp_add_recvq(sctp, mp, B_FALSE, ira);
 		mutex_exit(&sctp->sctp_lock);
 	} else {
 		sctp->sctp_running = B_TRUE;
@@ -590,24 +452,22 @@ ip_fanout_sctp(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 
 		mutex_enter(&sctp->sctp_recvq_lock);
 		if (sctp->sctp_recvq != NULL) {
-			if (mctl_present)
-				mp->b_prev = first_mp;
-			if (!sctp_add_recvq(sctp, mp, B_TRUE)) {
-				BUMP_MIB(recv_ill->ill_ip_mib,
-				    ipIfStatsInDiscards);
-				freemsg(first_mp);
-			}
+			sctp_add_recvq(sctp, mp, B_TRUE, ira);
 			mutex_exit(&sctp->sctp_recvq_lock);
 			WAKE_SCTP(sctp);
 		} else {
 			mutex_exit(&sctp->sctp_recvq_lock);
-			sctp_input_data(sctp, mp, (mctl_present ? first_mp :
-			    NULL));
+			if (ira->ira_flags & IRAF_ICMP_ERROR) {
+				sctp_icmp_error(sctp, mp);
+			} else {
+				sctp_input_data(sctp, mp, ira);
+			}
 			WAKE_SCTP(sctp);
-			sctp_process_sendq(sctp);
 		}
 	}
 	SCTP_REFRELE(sctp);
+	ira->ira_ill = ill;
+	ira->ira_rill = rill;
 }
 
 void
@@ -623,7 +483,7 @@ sctp_conn_hash_remove(sctp_t *sctp)
 	 * subsystem.
 	 */
 	if (cl_sctp_disconnect != NULL) {
-		(*cl_sctp_disconnect)(sctp->sctp_family,
+		(*cl_sctp_disconnect)(sctp->sctp_connp->conn_family,
 		    (cl_sctp_handle_t)sctp);
 	}
 
@@ -683,6 +543,7 @@ void
 sctp_listen_hash_remove(sctp_t *sctp)
 {
 	sctp_tf_t *tf = sctp->sctp_listen_tfp;
+	conn_t	*connp = sctp->sctp_connp;
 
 	if (!tf) {
 		return;
@@ -698,8 +559,8 @@ sctp_listen_hash_remove(sctp_t *sctp)
 		ssize = sizeof (in6_addr_t) * sctp->sctp_nsaddrs;
 		slist = kmem_alloc(ssize, KM_SLEEP);
 		sctp_get_saddr_list(sctp, slist, ssize);
-		(*cl_sctp_unlisten)(sctp->sctp_family, slist,
-		    sctp->sctp_nsaddrs, sctp->sctp_lport);
+		(*cl_sctp_unlisten)(connp->conn_family, slist,
+		    sctp->sctp_nsaddrs, connp->conn_lport);
 		/* list will be freed by the clustering module */
 	}
 
@@ -722,7 +583,10 @@ sctp_listen_hash_remove(sctp_t *sctp)
 		    sctp->sctp_listen_hash_next;
 
 		if (sctp->sctp_listen_hash_next != NULL) {
-			sctp->sctp_listen_hash_next->sctp_listen_hash_prev =
+			sctp_t *next = sctp->sctp_listen_hash_next;
+
+			ASSERT(next->sctp_listen_hash_prev == sctp);
+			next->sctp_listen_hash_prev =
 			    sctp->sctp_listen_hash_prev;
 		}
 	}
@@ -735,6 +599,8 @@ sctp_listen_hash_remove(sctp_t *sctp)
 void
 sctp_listen_hash_insert(sctp_tf_t *tf, sctp_t *sctp)
 {
+	conn_t	*connp = sctp->sctp_connp;
+
 	if (sctp->sctp_listen_tfp) {
 		sctp_listen_hash_remove(sctp);
 	}
@@ -759,8 +625,8 @@ sctp_listen_hash_insert(sctp_tf_t *tf, sctp_t *sctp)
 		ssize = sizeof (in6_addr_t) * sctp->sctp_nsaddrs;
 		slist = kmem_alloc(ssize, KM_SLEEP);
 		sctp_get_saddr_list(sctp, slist, ssize);
-		(*cl_sctp_listen)(sctp->sctp_family, slist,
-		    sctp->sctp_nsaddrs, sctp->sctp_lport);
+		(*cl_sctp_listen)(connp->conn_family, slist,
+		    sctp->sctp_nsaddrs, connp->conn_lport);
 		/* list will be freed by the clustering module */
 	}
 }
@@ -850,8 +716,8 @@ sctp_lookup(sctp_t *sctp1, in6_addr_t *faddr, sctp_tf_t *tf, uint32_t *ports,
 
 	for (sctp = tf->tf_sctp; sctp != NULL;
 	    sctp = sctp->sctp_conn_hash_next) {
-		if (*ports != sctp->sctp_ports || sctp->sctp_state <
-		    min_state) {
+		if (*ports != sctp->sctp_connp->conn_ports ||
+		    sctp->sctp_state < min_state) {
 			continue;
 		}
 
@@ -885,39 +751,4 @@ done:
 		SCTP_REFHOLD(sctp);
 	}
 	return (sctp);
-}
-
-boolean_t
-ip_fanout_sctp_raw_match(conn_t *connp, uint32_t ports, ipha_t *ipha)
-{
-	uint16_t lport;
-
-	if (connp->conn_fully_bound) {
-		return (IPCL_CONN_MATCH(connp, IPPROTO_SCTP, ipha->ipha_src,
-		    ipha->ipha_dst, ports));
-	} else {
-		lport = htons(ntohl(ports) & 0xFFFF);
-		return (IPCL_BIND_MATCH(connp, IPPROTO_SCTP, ipha->ipha_dst,
-		    lport));
-	}
-}
-
-boolean_t
-ip_fanout_sctp_raw_match_v6(conn_t *connp, uint32_t ports, ip6_t *ip6h,
-    boolean_t for_v4)
-{
-	uint16_t lport;
-	in6_addr_t	v6dst;
-
-	if (!for_v4 && connp->conn_fully_bound) {
-		return (IPCL_CONN_MATCH_V6(connp, IPPROTO_SCTP, ip6h->ip6_src,
-		    ip6h->ip6_dst, ports));
-	} else {
-		lport = htons(ntohl(ports) & 0xFFFF);
-		if (for_v4)
-			v6dst = ipv6_all_zeros;
-		else
-			v6dst = ip6h->ip6_dst;
-		return (IPCL_BIND_MATCH_V6(connp, IPPROTO_SCTP, v6dst, lport));
-	}
 }

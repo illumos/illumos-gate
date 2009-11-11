@@ -44,21 +44,19 @@ typedef struct squeue_s squeue_t;
 	(mp)->b_prev = (mblk_t *)(arg);				\
 }
 
-#define	GET_SQUEUE(mp)	((conn_t *)((mp)->b_prev))->conn_sqp
-
 #define	SQ_FILL		0x0001
 #define	SQ_NODRAIN	0x0002
 #define	SQ_PROCESS	0x0004
 
-#define	SQUEUE_ENTER(sqp, head, tail, cnt, flag, tag) {	\
-	sqp->sq_enter(sqp, head, tail, cnt, flag, tag);	\
+#define	SQUEUE_ENTER(sqp, head, tail, cnt, ira, flag, tag) {	\
+	sqp->sq_enter(sqp, head, tail, cnt, ira, flag, tag);	\
 }
 
-#define	SQUEUE_ENTER_ONE(sqp, mp, proc, arg, flag, tag) {	\
+#define	SQUEUE_ENTER_ONE(sqp, mp, proc, arg, ira, flag, tag) {	\
 	ASSERT(mp->b_next == NULL);				\
 	ASSERT(mp->b_prev == NULL);				\
 	SET_SQUEUE(mp, proc, arg);				\
-	SQUEUE_ENTER(sqp, mp, mp, 1, flag, tag);		\
+	SQUEUE_ENTER(sqp, mp, mp, 1, ira, flag, tag);		\
 }
 
 /*
@@ -77,12 +75,13 @@ typedef enum {
 	SQPRIVATE_MAX
 } sqprivate_t;
 
+struct ip_recv_attr_s;
 extern void squeue_init(void);
 extern squeue_t *squeue_create(clock_t, pri_t);
 extern void squeue_bind(squeue_t *, processorid_t);
 extern void squeue_unbind(squeue_t *);
 extern void squeue_enter(squeue_t *, mblk_t *, mblk_t *,
-    uint32_t, int, uint8_t);
+    uint32_t, struct ip_recv_attr_s *, int, uint8_t);
 extern uintptr_t *squeue_getprivate(squeue_t *, sqprivate_t);
 
 struct conn_s;

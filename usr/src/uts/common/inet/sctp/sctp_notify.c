@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@ sctp_notify(sctp_t *sctp, mblk_t *emp, size_t len)
 	sctp_faddr_t *fp;
 	int32_t rwnd = 0;
 	int error;
+	conn_t *connp = sctp->sctp_connp;
 
 	if ((mp = allocb(sizeof (*tudi) + sizeof (void *) +
 		sizeof (struct sockaddr_in6), BPRI_HI)) == NULL) {
@@ -82,7 +83,7 @@ sctp_notify(sctp_t *sctp, mblk_t *emp, size_t len)
 		tudi->SRC_length = sizeof (*sin4);
 		sin4 = (struct sockaddr_in *)(tudi + 1);
 		sin4->sin_family = AF_INET;
-		sin4->sin_port = sctp->sctp_fport;
+		sin4->sin_port = connp->conn_fport;
 		IN6_V4MAPPED_TO_IPADDR(&fp->faddr, sin4->sin_addr.s_addr);
 		mp->b_wptr = (uchar_t *)(sin4 + 1);
 	} else {
@@ -91,7 +92,7 @@ sctp_notify(sctp_t *sctp, mblk_t *emp, size_t len)
 		tudi->SRC_length = sizeof (*sin6);
 		sin6 = (struct sockaddr_in6 *)(tudi + 1);
 		sin6->sin6_family = AF_INET6;
-		sin6->sin6_port = sctp->sctp_fport;
+		sin6->sin6_port = connp->conn_fport;
 		sin6->sin6_addr = fp->faddr;
 		mp->b_wptr = (uchar_t *)(sin6 + 1);
 	}

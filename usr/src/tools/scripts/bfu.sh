@@ -8010,6 +8010,12 @@ mondo_loop() {
 	rm -f $root/kernel/strmod/sparcv9/tun
 	rm -f $root/kernel/strmod/amd64/tun
 
+	# Remove obsolete iptunq
+	rm -f $root/kernel/drv/iptunq
+	rm -f $root/kernel/drv/iptunq.conf
+	rm -f $root/kernel/drv/amd64/iptunq
+	rm -f $root/kernel/drv/sparcv9/iptunq
+
 	#
 	# Remove libtopo platform XML files that have been replaced by propmap
 	# files.

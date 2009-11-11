@@ -239,7 +239,7 @@ kssl_compute_record_mac(
 		 * context when called from strsock_kssl_input(). During the
 		 * SSL handshake, we are called for client_finished message
 		 * handling from a squeue worker thread that gets scheduled
-		 * by an squeue_fill() call. This thread is not in interrupt
+		 * by an SQ_FILL call. This thread is not in interrupt
 		 * context and so can block.
 		 */
 		rv = crypto_mac(&spec->hmac_mech, &dd, &spec->hmac_key,

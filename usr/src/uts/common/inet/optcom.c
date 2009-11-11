@@ -58,21 +58,21 @@
  * Function prototypes
  */
 static t_scalar_t process_topthdrs_first_pass(mblk_t *, cred_t *, optdb_obj_t *,
-    boolean_t *, size_t *);
+    size_t *);
 static t_scalar_t do_options_second_pass(queue_t *q, mblk_t *reqmp,
     mblk_t *ack_mp, cred_t *, optdb_obj_t *dbobjp,
-    mblk_t *first_mp, boolean_t is_restart, boolean_t *queued_statusp);
+    t_uscalar_t *worst_statusp);
 static t_uscalar_t get_worst_status(t_uscalar_t, t_uscalar_t);
 static int do_opt_default(queue_t *, struct T_opthdr *, uchar_t **,
     t_uscalar_t *, cred_t *, optdb_obj_t *);
 static void do_opt_current(queue_t *, struct T_opthdr *, uchar_t **,
     t_uscalar_t *, cred_t *cr, optdb_obj_t *);
-static int do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
+static void do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
     uint_t optset_context, uchar_t **resptrp, t_uscalar_t *worst_statusp,
-    cred_t *, optdb_obj_t *dbobjp, mblk_t *first_mp);
+    cred_t *, optdb_obj_t *dbobjp);
 static boolean_t opt_level_valid(t_uscalar_t, optlevel_t *, uint_t);
 static size_t opt_level_allopts_lengths(t_uscalar_t, opdes_t *, uint_t);
-static boolean_t opt_length_ok(opdes_t *, struct T_opthdr *);
+static boolean_t opt_length_ok(opdes_t *, t_uscalar_t optlen);
 static t_uscalar_t optcom_max_optbuf_len(opdes_t *, uint_t);
 static boolean_t opt_bloated_maxsize(opdes_t *);
 
@@ -176,35 +176,15 @@ optcom_err_ack(queue_t *q, mblk_t *mp, t_scalar_t t_error, int sys_error)
  * job requested.
  * XXX Code below needs some restructuring after we have some more
  * macros to support 'struct opthdr' in the headers.
- *
- * IP-MT notes: The option management framework functions svr4_optcom_req() and
- * tpi_optcom_req() allocate and prepend an M_CTL mblk to the actual
- * T_optmgmt_req mblk and pass the chain as an additional parameter to the
- * protocol set functions. If a protocol set function (such as ip_opt_set)
- * cannot process the option immediately it can return EINPROGRESS. ip_opt_set
- * enqueues the message in the appropriate sq and returns EINPROGRESS. Later
- * the sq framework arranges to restart this operation and passes control to
- * the restart function ip_restart_optmgmt() which in turn calls
- * svr4_optcom_req() or tpi_optcom_req() to restart the option processing.
- *
- * XXX Remove the asynchronous behavior of svr_optcom_req() and
- * tpi_optcom_req().
  */
-int
-svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
-    boolean_t pass_to_ip)
+void
+svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp)
 {
 	pfi_t	deffn = dbobjp->odb_deffn;
 	pfi_t	getfn = dbobjp->odb_getfn;
 	opt_set_fn setfn = dbobjp->odb_setfn;
 	opdes_t	*opt_arr = dbobjp->odb_opt_des_arr;
 	uint_t opt_arr_cnt = dbobjp->odb_opt_arr_cnt;
-	boolean_t topmost_tpiprovider = dbobjp->odb_topmost_tpiprovider;
-	opt_restart_t *or;
-	struct opthdr *restart_opt;
-	boolean_t is_restart = B_FALSE;
-	mblk_t	*first_mp;
-
 	t_uscalar_t max_optbuf_len;
 	int len;
 	mblk_t	*mp1 = NULL;
@@ -214,32 +194,9 @@ svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 	struct opthdr *opt_end;
 	struct opthdr *opt_start;
 	opdes_t	*optd;
-	boolean_t	pass_to_next = B_FALSE;
 	struct T_optmgmt_ack *toa;
 	struct T_optmgmt_req *tor;
 	int error;
-
-	/*
-	 * Allocate M_CTL and prepend to the packet for restarting this
-	 * option if needed. IP may need to queue and restart the option
-	 * if it cannot obtain exclusive conditions immediately. Please see
-	 * IP-MT notes before the start of svr4_optcom_req
-	 */
-	if (mp->b_datap->db_type == M_CTL) {
-		is_restart = B_TRUE;
-		first_mp = mp;
-		mp = mp->b_cont;
-		ASSERT(mp->b_wptr - mp->b_rptr >=
-		    sizeof (struct T_optmgmt_req));
-		tor = (struct T_optmgmt_req *)mp->b_rptr;
-		ASSERT(tor->MGMT_flags == T_NEGOTIATE);
-
-		or = (opt_restart_t *)first_mp->b_rptr;
-		opt_start = or->or_start;
-		opt_end = or->or_end;
-		restart_opt = or->or_ropt;
-		goto restart;
-	}
 
 	tor = (struct T_optmgmt_req *)mp->b_rptr;
 	/* Verify message integrity. */
@@ -255,7 +212,7 @@ svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 		break;
 	default:
 		optcom_err_ack(q, mp, TBADFLAG, 0);
-		return (0);
+		return;
 	}
 	if (tor->MGMT_flags == T_DEFAULT) {
 		/* Is it a request for default option settings? */
@@ -278,7 +235,6 @@ svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 		 * ----historical comment end -------
 		 */
 		/* T_DEFAULT not passed down */
-		ASSERT(topmost_tpiprovider == B_TRUE);
 		freemsg(mp);
 		max_optbuf_len = optcom_max_optbuf_len(opt_arr,
 		    opt_arr_cnt);
@@ -286,7 +242,7 @@ svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 		if (!mp) {
 no_mem:;
 			optcom_err_ack(q, mp, TSYSERR, ENOMEM);
-			return (0);
+			return;
 		}
 
 		/* Initialize the T_optmgmt_ack header. */
@@ -362,7 +318,7 @@ no_mem:;
 		mp->b_datap->db_type = M_PCPROTO;
 		/* Ship it back. */
 		qreply(q, mp);
-		return (0);
+		return;
 	}
 	/* T_DEFAULT processing complete - no more T_DEFAULT */
 
@@ -414,15 +370,15 @@ no_mem:;
 			goto bad_opt;
 
 		error = proto_opt_check(opt->level, opt->name, opt->len, NULL,
-		    opt_arr, opt_arr_cnt, topmost_tpiprovider,
+		    opt_arr, opt_arr_cnt,
 		    tor->MGMT_flags == T_NEGOTIATE, tor->MGMT_flags == T_CHECK,
 		    cr);
 		if (error < 0) {
 			optcom_err_ack(q, mp, -error, 0);
-			return (0);
+			return;
 		} else if (error > 0) {
 			optcom_err_ack(q, mp, TSYSERR, error);
-			return (0);
+			return;
 		}
 	} /* end for loop scanning option buffer */
 
@@ -491,24 +447,9 @@ no_mem:;
 		/* Ditch the input buffer. */
 		freemsg(mp);
 		mp = mp1;
-		/* Always let the next module look at the option. */
-		pass_to_next = B_TRUE;
 		break;
 
 	case T_NEGOTIATE:
-		first_mp = allocb(sizeof (opt_restart_t), BPRI_LO);
-		if (first_mp == NULL) {
-			optcom_err_ack(q, mp, TSYSERR, ENOMEM);
-			return (0);
-		}
-		first_mp->b_datap->db_type = M_CTL;
-		or = (opt_restart_t *)first_mp->b_rptr;
-		or->or_start = opt_start;
-		or->or_end =  opt_end;
-		or->or_type = T_SVR4_OPTMGMT_REQ;
-		or->or_private = 0;
-		first_mp->b_cont = mp;
-restart:
 		/*
 		 * Here we are expecting that the response buffer is exactly
 		 * the same size as the input buffer.  We pass each opthdr
@@ -523,22 +464,16 @@ restart:
 		 */
 		toa = (struct T_optmgmt_ack *)tor;
 
-		for (opt = is_restart ? restart_opt: opt_start; opt < opt_end;
-		    opt = next_opt) {
+		for (opt = opt_start; opt < opt_end; opt = next_opt) {
 			int error;
 
-			/*
-			 * Point to the current option in or, in case this
-			 * option has to be restarted later on
-			 */
-			or->or_ropt = opt;
 			next_opt = (struct opthdr *)((uchar_t *)&opt[1] +
 			    _TPI_ALIGN_OPT(opt->len));
 
 			error = (*setfn)(q, SETFN_OPTCOM_NEGOTIATE,
 			    opt->level, opt->name,
 			    opt->len, (uchar_t *)&opt[1],
-			    &opt->len, (uchar_t *)&opt[1], NULL, cr, first_mp);
+			    &opt->len, (uchar_t *)&opt[1], NULL, cr);
 			/*
 			 * Treat positive "errors" as real.
 			 * Note: negative errors are to be treated as
@@ -549,99 +484,48 @@ restart:
 			 * it is valid but was either handled upstream
 			 * or will be handled downstream.
 			 */
-			if (error == EINPROGRESS) {
-				/*
-				 * The message is queued and will be
-				 * reprocessed later. Typically ip queued
-				 * the message to get some exclusive conditions
-				 * and later on calls this func again.
-				 */
-				return (EINPROGRESS);
-			} else if (error > 0) {
+			if (error > 0) {
 				optcom_err_ack(q, mp, TSYSERR, error);
-				freeb(first_mp);
-				return (0);
+				return;
 			}
 			/*
 			 * error < 0 means option is not recognized.
-			 * But with OP_PASSNEXT the next module
-			 * might recognize it.
 			 */
 		}
-		/* Done with the restart control mp. */
-		freeb(first_mp);
-		pass_to_next = B_TRUE;
 		break;
 	default:
 		optcom_err_ack(q, mp, TBADFLAG, 0);
-		return (0);
+		return;
 	}
 
-	if (pass_to_next && (q->q_next != NULL || pass_to_ip)) {
-		/* Send it down to the next module and let it reply */
-		toa->PRIM_type = T_SVR4_OPTMGMT_REQ; /* Changed by IP to ACK */
-		if (q->q_next != NULL)
-			putnext(q, mp);
-		else
-			ip_output(Q_TO_CONN(q), mp, q, IP_WPUT);
-	} else {
-		/* Set common fields in the header. */
-		toa->MGMT_flags = T_SUCCESS;
-		mp->b_datap->db_type = M_PCPROTO;
-		toa->PRIM_type = T_OPTMGMT_ACK;
-		qreply(q, mp);
-	}
-	return (0);
+	/* Set common fields in the header. */
+	toa->MGMT_flags = T_SUCCESS;
+	mp->b_datap->db_type = M_PCPROTO;
+	toa->PRIM_type = T_OPTMGMT_ACK;
+	qreply(q, mp);
+	return;
 bad_opt:;
 	optcom_err_ack(q, mp, TBADOPT, 0);
-	return (0);
 }
 
 /*
  * New optcom_req inspired by TPI/XTI semantics
  */
-int
-tpi_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
-    boolean_t pass_to_ip)
+void
+tpi_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp)
 {
 	t_scalar_t t_error;
 	mblk_t *toa_mp;
-	boolean_t pass_to_next;
 	size_t toa_len;
 	struct T_optmgmt_ack *toa;
 	struct T_optmgmt_req *tor =
 	    (struct T_optmgmt_req *)mp->b_rptr;
-
-	opt_restart_t *or;
-	boolean_t is_restart = B_FALSE;
-	mblk_t	*first_mp = NULL;
 	t_uscalar_t worst_status;
-	boolean_t queued_status;
-
-	/*
-	 * Allocate M_CTL and prepend to the packet for restarting this
-	 * option if needed. IP may need to queue and restart the option
-	 * if it cannot obtain exclusive conditions immediately. Please see
-	 * IP-MT notes before the start of svr4_optcom_req
-	 */
-	if (mp->b_datap->db_type == M_CTL) {
-		is_restart = B_TRUE;
-		first_mp = mp;
-		toa_mp = mp->b_cont;
-		mp = toa_mp->b_cont;
-		ASSERT(mp->b_wptr - mp->b_rptr >=
-		    sizeof (struct T_optmgmt_req));
-		tor = (struct T_optmgmt_req *)mp->b_rptr;
-		ASSERT(tor->MGMT_flags == T_NEGOTIATE);
-
-		or = (opt_restart_t *)first_mp->b_rptr;
-		goto restart;
-	}
 
 	/* Verify message integrity. */
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (struct T_optmgmt_req)) {
 		optcom_err_ack(q, mp, TBADOPT, 0);
-		return (0);
+		return;
 	}
 
 	/* Verify MGMT_flags legal */
@@ -654,7 +538,7 @@ tpi_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 		break;
 	default:
 		optcom_err_ack(q, mp, TBADFLAG, 0);
-		return (0);
+		return;
 	}
 
 	/*
@@ -669,7 +553,6 @@ tpi_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 	 * T_ALLOPT mean that length can be different for output buffer).
 	 */
 
-	pass_to_next = B_FALSE;	/* initial value */
 	toa_len = 0;		/* initial value */
 
 	/*
@@ -677,13 +560,11 @@ tpi_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 	 *	- estimate cumulative length needed for results
 	 *	- set "status" field based on permissions, option header check
 	 *	  etc.
-	 *	- determine "pass_to_next" whether we need to send request to
-	 *	  downstream module/driver.
 	 */
 	if ((t_error = process_topthdrs_first_pass(mp, cr, dbobjp,
-	    &pass_to_next, &toa_len)) != 0) {
+	    &toa_len)) != 0) {
 		optcom_err_ack(q, mp, t_error, 0);
-		return (0);
+		return;
 	}
 
 	/*
@@ -697,26 +578,14 @@ tpi_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 	toa_mp = allocb_tmpl(toa_len, mp);
 	if (!toa_mp) {
 		optcom_err_ack(q, mp, TSYSERR, ENOMEM);
-		return (0);
+		return;
 	}
 
-	first_mp = allocb(sizeof (opt_restart_t), BPRI_LO);
-	if (first_mp == NULL) {
-		freeb(toa_mp);
-		optcom_err_ack(q, mp, TSYSERR, ENOMEM);
-		return (0);
-	}
-	first_mp->b_datap->db_type = M_CTL;
-	or = (opt_restart_t *)first_mp->b_rptr;
 	/*
 	 * Set initial values for generating output.
 	 */
-	or->or_worst_status = T_SUCCESS;
-	or->or_type = T_OPTMGMT_REQ;
-	or->or_private = 0;
-	/* remaining fields fileed in do_options_second_pass */
+	worst_status = T_SUCCESS; /* initial value */
 
-restart:
 	/*
 	 * This routine makes another pass through the option buffer this
 	 * time acting on the request based on "status" result in the
@@ -724,19 +593,11 @@ restart:
 	 * all options of a certain level and acts on each for this request.
 	 */
 	if ((t_error = do_options_second_pass(q, mp, toa_mp, cr, dbobjp,
-	    first_mp, is_restart, &queued_status)) != 0) {
+	    &worst_status)) != 0) {
 		freemsg(toa_mp);
 		optcom_err_ack(q, mp, t_error, 0);
-		return (0);
+		return;
 	}
-	if (queued_status) {
-		/* Option will be restarted */
-		return (EINPROGRESS);
-	}
-	worst_status = or->or_worst_status;
-	/* Done with the first mp */
-	freeb(first_mp);
-	toa_mp->b_cont = NULL;
 
 	/*
 	 * Following code relies on the coincidence that T_optmgmt_req
@@ -749,34 +610,12 @@ restart:
 
 	toa->MGMT_flags = tor->MGMT_flags;
 
-
 	freemsg(mp);		/* free input mblk */
 
-	/*
-	 * If there is atleast one option that requires a downstream
-	 * forwarding and if it is possible, we forward the message
-	 * downstream. Else we ack it.
-	 */
-	if (pass_to_next && (q->q_next != NULL || pass_to_ip)) {
-		/*
-		 * We pass it down as T_OPTMGMT_REQ. This code relies
-		 * on the happy coincidence that T_optmgmt_req and
-		 * T_optmgmt_ack are identical data structures
-		 * at the binary representation level.
-		 */
-		toa_mp->b_datap->db_type = M_PROTO;
-		toa->PRIM_type = T_OPTMGMT_REQ;
-		if (q->q_next != NULL)
-			putnext(q, toa_mp);
-		else
-			ip_output(Q_TO_CONN(q), toa_mp, q, IP_WPUT);
-	} else {
-		toa->PRIM_type = T_OPTMGMT_ACK;
-		toa_mp->b_datap->db_type = M_PCPROTO;
-		toa->MGMT_flags |= worst_status; /* XXX "worst" or "OR" TPI ? */
-		qreply(q, toa_mp);
-	}
-	return (0);
+	toa->PRIM_type = T_OPTMGMT_ACK;
+	toa_mp->b_datap->db_type = M_PCPROTO;
+	toa->MGMT_flags |= worst_status; /* XXX "worst" or "OR" TPI ? */
+	qreply(q, toa_mp);
 }
 
 
@@ -786,17 +625,14 @@ restart:
  *	- estimate cumulative length needed for results
  *	- set "status" field based on permissions, option header check
  *	  etc.
- *	- determine "pass_to_next" whether we need to send request to
- *	  downstream module/driver.
  */
 
 static t_scalar_t
 process_topthdrs_first_pass(mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
-    boolean_t *pass_to_nextp, size_t *toa_lenp)
+    size_t *toa_lenp)
 {
 	opdes_t	*opt_arr = dbobjp->odb_opt_des_arr;
 	uint_t opt_arr_cnt = dbobjp->odb_opt_arr_cnt;
-	boolean_t topmost_tpiprovider = dbobjp->odb_topmost_tpiprovider;
 	optlevel_t *valid_level_arr = dbobjp->odb_valid_levels_arr;
 	uint_t valid_level_arr_cnt = dbobjp->odb_valid_levels_arr_cnt;
 	struct T_opthdr *opt;
@@ -843,18 +679,14 @@ process_topthdrs_first_pass(mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 				 * unchanged if they do not understand an
 				 * option.
 				 */
-				if (topmost_tpiprovider) {
-					if (!opt_level_valid(opt->level,
-					    valid_level_arr,
-					    valid_level_arr_cnt))
-						return (TBADOPT);
-					/*
-					 * level is valid - initialize
-					 * option as not supported
-					 */
-					opt->status = T_NOTSUPPORT;
-				}
-
+				if (!opt_level_valid(opt->level,
+				    valid_level_arr, valid_level_arr_cnt))
+					return (TBADOPT);
+				/*
+				 * level is valid - initialize
+				 * option as not supported
+				 */
+				opt->status = T_NOTSUPPORT;
 				*toa_lenp += _TPI_ALIGN_TOPT(opt->len);
 				continue;
 			}
@@ -866,18 +698,12 @@ process_topthdrs_first_pass(mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 			 */
 			allopt_len = 0;
 			if (tor->MGMT_flags == T_CHECK ||
-			    !topmost_tpiprovider ||
 			    ((allopt_len = opt_level_allopts_lengths(opt->level,
 			    opt_arr, opt_arr_cnt)) == 0)) {
 				/*
 				 * This is confusing but correct !
 				 * It is not valid to to use T_ALLOPT with
 				 * T_CHECK flag.
-				 *
-				 * T_ALLOPT is assumed "expanded" at the
-				 * topmost_tpiprovider level so it should not
-				 * be there as an "option name" if this is not
-				 * a topmost_tpiprovider call and we fail it.
 				 *
 				 * opt_level_allopts_lengths() is used to verify
 				 * that "level" associated with the T_ALLOPT is
@@ -892,15 +718,8 @@ process_topthdrs_first_pass(mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 
 			*toa_lenp += allopt_len;
 			opt->status = T_SUCCESS;
-			/* XXX - always set T_ALLOPT 'pass_to_next' for now */
-			*pass_to_nextp = B_TRUE;
 			continue;
 		}
-		/*
-		 * Check if option wants to flow downstream
-		 */
-		if (optd->opdes_props & OP_PASSNEXT)
-			*pass_to_nextp = B_TRUE;
 
 		/* Additional checks dependent on operation. */
 		switch (tor->MGMT_flags) {
@@ -972,7 +791,9 @@ process_topthdrs_first_pass(mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 				 * Note: This can override anything about this
 				 * option request done at a higher level.
 				 */
-				if (!opt_length_ok(optd, opt)) {
+				if (opt->len < sizeof (struct T_opthdr) ||
+				    !opt_length_ok(optd,
+				    opt->len - sizeof (struct T_opthdr))) {
 					/* bad size */
 					*toa_lenp += _TPI_ALIGN_TOPT(opt->len);
 					opt->status = T_FAILURE;
@@ -1034,23 +855,14 @@ process_topthdrs_first_pass(mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
  */
 static t_scalar_t
 do_options_second_pass(queue_t *q, mblk_t *reqmp, mblk_t *ack_mp, cred_t *cr,
-    optdb_obj_t *dbobjp, mblk_t *first_mp, boolean_t is_restart,
-    boolean_t *queued_statusp)
+    optdb_obj_t *dbobjp, t_uscalar_t *worst_statusp)
 {
-	boolean_t topmost_tpiprovider = dbobjp->odb_topmost_tpiprovider;
 	int failed_option;
 	struct T_opthdr *opt;
-	struct T_opthdr *opt_start, *opt_end, *restart_opt;
+	struct T_opthdr *opt_start, *opt_end;
 	uchar_t *optr;
 	uint_t optset_context;
 	struct T_optmgmt_req *tor = (struct T_optmgmt_req *)reqmp->b_rptr;
-	opt_restart_t	*or;
-	t_uscalar_t	*worst_statusp;
-	int	err;
-
-	*queued_statusp = B_FALSE;
-	or = (opt_restart_t *)first_mp->b_rptr;
-	worst_statusp = &or->or_worst_status;
 
 	optr = (uchar_t *)ack_mp->b_rptr +
 	    sizeof (struct T_optmgmt_ack); /* assumed int32_t aligned */
@@ -1058,32 +870,16 @@ do_options_second_pass(queue_t *q, mblk_t *reqmp, mblk_t *ack_mp, cred_t *cr,
 	/*
 	 * Set initial values for scanning input
 	 */
-	if (is_restart) {
-		opt_start = (struct T_opthdr *)or->or_start;
-		opt_end = (struct T_opthdr *)or->or_end;
-		restart_opt = (struct T_opthdr *)or->or_ropt;
-	} else {
-		opt_start = (struct T_opthdr *)mi_offset_param(reqmp,
-		    tor->OPT_offset, tor->OPT_length);
-		if (opt_start == NULL)
-			return (TBADOPT);
-		opt_end = (struct T_opthdr *)((uchar_t *)opt_start +
-		    tor->OPT_length);
-		or->or_start = (struct opthdr *)opt_start;
-		or->or_end = (struct opthdr *)opt_end;
-		/*
-		 * construct the mp chain, in case the setfn needs to
-		 * queue this and restart option processing later on.
-		 */
-		first_mp->b_cont = ack_mp;
-		ack_mp->b_cont = reqmp;
-	}
+	opt_start = (struct T_opthdr *)mi_offset_param(reqmp,
+	    tor->OPT_offset, tor->OPT_length);
+	if (opt_start == NULL)
+		return (TBADOPT);
+	opt_end = (struct T_opthdr *)((uchar_t *)opt_start + tor->OPT_length);
 	ASSERT(__TPI_TOPT_ISALIGNED(opt_start)); /* verified in first pass */
 
-	for (opt = is_restart ? restart_opt : opt_start;
-	    opt && (opt < opt_end);
+	for (opt = opt_start; opt && (opt < opt_end);
 	    opt = _TPI_TOPT_NEXTHDR(opt_start, tor->OPT_length, opt)) {
-		or->or_ropt = (struct opthdr *)opt;
+
 		/* verified in first pass */
 		ASSERT(_TPI_TOPT_VALID(opt, opt_start, opt_end));
 
@@ -1144,9 +940,7 @@ do_options_second_pass(queue_t *q, mblk_t *reqmp, mblk_t *ack_mp, cred_t *cr,
 			 */
 			if (do_opt_default(q, opt, &optr, worst_statusp,
 			    cr, dbobjp) < 0) {
-				/* fail or pass transparently */
-				if (topmost_tpiprovider)
-					opt->status = T_FAILURE;
+				opt->status = T_FAILURE;
 				bcopy(opt, optr, opt->len);
 				optr += _TPI_ALIGN_TOPT(opt->len);
 				*worst_statusp = get_worst_status(opt->status,
@@ -1166,12 +960,8 @@ do_options_second_pass(queue_t *q, mblk_t *reqmp, mblk_t *ack_mp, cred_t *cr,
 				optset_context = SETFN_OPTCOM_CHECKONLY;
 			else	/* T_NEGOTIATE */
 				optset_context = SETFN_OPTCOM_NEGOTIATE;
-			err = do_opt_check_or_negotiate(q, opt, optset_context,
-			    &optr, worst_statusp, cr, dbobjp, first_mp);
-			if (err == EINPROGRESS) {
-				*queued_statusp = B_TRUE;
-				return (0);
-			}
+			do_opt_check_or_negotiate(q, opt, optset_context,
+			    &optr, worst_statusp, cr, dbobjp);
 			break;
 		default:
 			return (TBADFLAG);
@@ -1236,7 +1026,6 @@ do_opt_default(queue_t *q, struct T_opthdr *reqopt, uchar_t **resptrp,
 	pfi_t	deffn = dbobjp->odb_deffn;
 	opdes_t	*opt_arr = dbobjp->odb_opt_des_arr;
 	uint_t opt_arr_cnt = dbobjp->odb_opt_arr_cnt;
-	boolean_t topmost_tpiprovider = dbobjp->odb_topmost_tpiprovider;
 
 	struct T_opthdr *topth;
 	opdes_t *optd;
@@ -1248,15 +1037,8 @@ do_opt_default(queue_t *q, struct T_opthdr *reqopt, uchar_t **resptrp,
 		optd = proto_opt_lookup(reqopt->level, reqopt->name,
 		    opt_arr, opt_arr_cnt);
 
-		if (optd == NULL) {
-			/*
-			 * not found - fail this one. Should not happen
-			 * for topmost_tpiprovider as calling routine
-			 * should have verified it.
-			 */
-			ASSERT(!topmost_tpiprovider);
-			return (-1);
-		}
+		/* Calling routine should have verified it it exists */
+		ASSERT(optd != NULL);
 
 		topth = (struct T_opthdr *)(*resptrp);
 		topth->level = reqopt->level;
@@ -1333,10 +1115,7 @@ do_opt_default(queue_t *q, struct T_opthdr *reqopt, uchar_t **resptrp,
 	 *
 	 * lookup and stuff default values of all the options of the
 	 * level specified
-	 * Note: This expansion of T_ALLOPT should happen in
-	 * a topmost_tpiprovider.
 	 */
-	ASSERT(topmost_tpiprovider);
 	for (optd = opt_arr; optd < &opt_arr[opt_arr_cnt]; optd++) {
 		if (reqopt->level != optd->opdes_level)
 			continue;
@@ -1453,8 +1232,6 @@ do_opt_current(queue_t *q, struct T_opthdr *reqopt, uchar_t **resptrp,
 	pfi_t	getfn = dbobjp->odb_getfn;
 	opdes_t	*opt_arr = dbobjp->odb_opt_des_arr;
 	uint_t opt_arr_cnt = dbobjp->odb_opt_arr_cnt;
-	boolean_t topmost_tpiprovider = dbobjp->odb_topmost_tpiprovider;
-
 	struct T_opthdr *topth;
 	opdes_t *optd;
 	int optlen;
@@ -1484,7 +1261,6 @@ do_opt_current(queue_t *q, struct T_opthdr *reqopt, uchar_t **resptrp,
 			*resptrp -= sizeof (struct T_opthdr);
 		}
 	} else {		/* T_ALLOPT processing */
-		ASSERT(topmost_tpiprovider == B_TRUE);
 		/* scan and get all options */
 		for (optd = opt_arr; optd < &opt_arr[opt_arr_cnt]; optd++) {
 			/* skip other levels */
@@ -1530,14 +1306,9 @@ do_opt_current(queue_t *q, struct T_opthdr *reqopt, uchar_t **resptrp,
 	}
 	if (*resptrp == initptr) {
 		/*
-		 * getfn failed and does not want to handle this option. Maybe
-		 * something downstream will or something upstream did. (If
-		 * topmost_tpiprovider, initialize "status" to failure which
-		 * can possibly change downstream). Copy the input "as is" from
-		 * input option buffer if any to maintain transparency.
+		 * getfn failed and does not want to handle this option.
 		 */
-		if (topmost_tpiprovider)
-			reqopt->status = T_FAILURE;
+		reqopt->status = T_FAILURE;
 		bcopy(reqopt, *resptrp, reqopt->len);
 		*resptrp += _TPI_ALIGN_TOPT(reqopt->len);
 		*worst_statusp = get_worst_status(reqopt->status,
@@ -1545,18 +1316,15 @@ do_opt_current(queue_t *q, struct T_opthdr *reqopt, uchar_t **resptrp,
 	}
 }
 
-/* ARGSUSED */
-static int
+static void
 do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
     uint_t optset_context, uchar_t **resptrp, t_uscalar_t *worst_statusp,
-    cred_t *cr, optdb_obj_t *dbobjp, mblk_t *first_mp)
+    cred_t *cr, optdb_obj_t *dbobjp)
 {
 	pfi_t	deffn = dbobjp->odb_deffn;
 	opt_set_fn setfn = dbobjp->odb_setfn;
 	opdes_t	*opt_arr = dbobjp->odb_opt_des_arr;
 	uint_t opt_arr_cnt = dbobjp->odb_opt_arr_cnt;
-	boolean_t topmost_tpiprovider = dbobjp->odb_topmost_tpiprovider;
-
 	struct T_opthdr *topth;
 	opdes_t *optd;
 	int error;
@@ -1572,12 +1340,10 @@ do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
 		error = (*setfn)(q, optset_context, reqopt->level, reqopt->name,
 		    reqopt->len - sizeof (struct T_opthdr),
 		    _TPI_TOPT_DATA(reqopt), &optlen, _TPI_TOPT_DATA(topth),
-		    NULL, cr, first_mp);
+		    NULL, cr);
 		if (error) {
 			/* failed - reset "*resptrp" */
 			*resptrp -= sizeof (struct T_opthdr);
-			if (error == EINPROGRESS)
-				return (error);
 		} else {
 			/*
 			 * success - "value" already filled in setfn()
@@ -1594,7 +1360,6 @@ do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
 	} else {		/* T_ALLOPT processing */
 		/* only for T_NEGOTIATE case */
 		ASSERT(optset_context == SETFN_OPTCOM_NEGOTIATE);
-		ASSERT(topmost_tpiprovider == B_TRUE);
 
 		/* scan and set all options to default value */
 		for (optd = opt_arr; optd < &opt_arr[opt_arr_cnt]; optd++) {
@@ -1670,7 +1435,7 @@ do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
 			error = (*setfn)(q, SETFN_OPTCOM_NEGOTIATE,
 			    reqopt->level, optd->opdes_name, optsize,
 			    (uchar_t *)optd->opdes_defbuf, &optlen,
-			    _TPI_TOPT_DATA(topth), NULL, cr, NULL);
+			    _TPI_TOPT_DATA(topth), NULL, cr);
 			if (error) {
 				/*
 				 * failed, return as T_FAILURE and null value
@@ -1693,20 +1458,14 @@ do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
 
 	if (*resptrp == initptr) {
 		/*
-		 * setfn failed and does not want to handle this option. Maybe
-		 * something downstream will or something upstream
-		 * did. Copy the input as is from input option buffer if any to
-		 * maintain transparency (maybe something at a level above
-		 * did something.
+		 * setfn failed and does not want to handle this option.
 		 */
-		if (topmost_tpiprovider)
-			reqopt->status = T_FAILURE;
+		reqopt->status = T_FAILURE;
 		bcopy(reqopt, *resptrp, reqopt->len);
 		*resptrp += _TPI_ALIGN_TOPT(reqopt->len);
 		*worst_statusp = get_worst_status(reqopt->status,
 		    *worst_statusp);
 	}
-	return (0);
 }
 
 /*
@@ -1886,7 +1645,8 @@ tpi_optcom_buf(queue_t *q, mblk_t *mp, t_scalar_t *opt_lenp,
 		 */
 
 		/* verify length */
-		if (!opt_length_ok(optd, opt)) {
+		if (opt->len < (t_uscalar_t)sizeof (struct T_opthdr) ||
+		    !opt_length_ok(optd, opt->len - sizeof (struct T_opthdr))) {
 			/* bad size */
 			if ((optd->opdes_props & OP_NOT_ABSREQ) == 0) {
 				/* option is absolute requirement */
@@ -1914,7 +1674,7 @@ tpi_optcom_buf(queue_t *q, mblk_t *mp, t_scalar_t *opt_lenp,
 		error = (*setfn)(q, optset_context, opt->level, opt->name,
 		    opt->len - (t_uscalar_t)sizeof (struct T_opthdr),
 		    _TPI_TOPT_DATA(opt), &olen, _TPI_TOPT_DATA(opt),
-		    thisdg_attrs, cr, NULL);
+		    thisdg_attrs, cr);
 
 		if (olen > (int)(opt->len - sizeof (struct T_opthdr))) {
 			/*
@@ -2113,8 +1873,12 @@ opt_bloated_maxsize(opdes_t *optd)
 	return (B_FALSE);
 }
 
+/*
+ * optlen is the length of the option content
+ * Caller should check the optlen is at least sizeof (struct T_opthdr)
+ */
 static boolean_t
-opt_length_ok(opdes_t *optd, struct T_opthdr *opt)
+opt_length_ok(opdes_t *optd, t_uscalar_t optlen)
 {
 	/*
 	 * Verify length.
@@ -2122,95 +1886,60 @@ opt_length_ok(opdes_t *optd, struct T_opthdr *opt)
 	 * less than maxlen of variable length option.
 	 */
 	if (optd->opdes_props & OP_VARLEN) {
-		if (opt->len <= optd->opdes_size +
-		    (t_uscalar_t)sizeof (struct T_opthdr))
+		if (optlen <= optd->opdes_size)
 			return (B_TRUE);
 	} else {
 		/* fixed length option */
-		if (opt->len == optd->opdes_size +
-		    (t_uscalar_t)sizeof (struct T_opthdr))
+		if (optlen == optd->opdes_size)
 			return (B_TRUE);
 	}
 	return (B_FALSE);
 }
 
 /*
- * This routine appends a pssed in hop-by-hop option to the existing
- * option (in this case a cipso label encoded in HOPOPT option). The
- * passed in option is always padded. The 'reservelen' is the
- * length of reserved data (label). New memory will be allocated if
- * the current buffer is not large enough. Return failure if memory
+ * This routine manages the allocation and free of the space for
+ * an extension header or option. Returns failure if memory
  * can not be allocated.
  */
 int
-optcom_pkt_set(uchar_t *invalp, uint_t inlen, boolean_t sticky,
-    uchar_t **optbufp, uint_t *optlenp, uint_t reservelen)
+optcom_pkt_set(uchar_t *invalp, uint_t inlen,
+    uchar_t **optbufp, uint_t *optlenp)
 {
 	uchar_t *optbuf;
 	uchar_t	*optp;
 
-	if (!sticky) {
-		*optbufp = invalp;
-		*optlenp = inlen;
-		return (0);
-	}
-
-	if (inlen == *optlenp - reservelen) {
+	if (inlen == *optlenp) {
 		/* Unchanged length - no need to reallocate */
-		optp = *optbufp + reservelen;
+		optp = *optbufp;
 		bcopy(invalp, optp, inlen);
-		if (reservelen != 0) {
-			/*
-			 * Convert the NextHeader and Length of the
-			 * passed in hop-by-hop header to pads
-			 */
-			optp[0] = IP6OPT_PADN;
-			optp[1] = 0;
-		}
 		return (0);
 	}
-	if (inlen + reservelen > 0) {
+	if (inlen > 0) {
 		/* Allocate new buffer before free */
-		optbuf = kmem_alloc(inlen + reservelen, KM_NOSLEEP);
+		optbuf = kmem_alloc(inlen, KM_NOSLEEP);
 		if (optbuf == NULL)
 			return (ENOMEM);
 	} else {
 		optbuf = NULL;
 	}
 
-	/* Copy out old reserved data (label) */
-	if (reservelen > 0)
-		bcopy(*optbufp, optbuf, reservelen);
-
 	/* Free old buffer */
 	if (*optlenp != 0)
 		kmem_free(*optbufp, *optlenp);
 
 	if (inlen > 0)
-		bcopy(invalp, optbuf + reservelen, inlen);
+		bcopy(invalp, optbuf, inlen);
 
-	if (reservelen != 0) {
-		/*
-		 * Convert the NextHeader and Length of the
-		 * passed in hop-by-hop header to pads
-		 */
-		optbuf[reservelen] = IP6OPT_PADN;
-		optbuf[reservelen + 1] = 0;
-		/*
-		 * Set the Length of the hop-by-hop header, number of 8
-		 * byte-words following the 1st 8 bytes
-		 */
-		optbuf[1] = (reservelen + inlen - 1) >> 3;
-	}
 	*optbufp = optbuf;
-	*optlenp = inlen + reservelen;
+	*optlenp = inlen;
 	return (0);
 }
 
 int
 process_auxiliary_options(conn_t *connp, void *control, t_uscalar_t controllen,
-    void *optbuf, optdb_obj_t *dbobjp, int (*opt_set_fn)(conn_t *, uint_t, int,
-    int, uint_t, uchar_t *, uint_t *, uchar_t *, void *, cred_t *), cred_t *cr)
+    void *optbuf, optdb_obj_t *dbobjp, int (*opt_set_fn)(conn_t *,
+    uint_t, int, int, uint_t, uchar_t *, uint_t *, uchar_t *, void *, cred_t *),
+    cred_t *cr)
 {
 	struct cmsghdr *cmsg;
 	opdes_t *optd;
@@ -2254,7 +1983,7 @@ process_auxiliary_options(conn_t *connp, void *control, t_uscalar_t controllen,
 		}
 		error = opt_set_fn(connp, SETFN_UD_NEGOTIATE, optd->opdes_level,
 		    optd->opdes_name, len, (uchar_t *)CMSG_CONTENT(cmsg),
-		    &outlen, (uchar_t *)CMSG_CONTENT(cmsg), (void *)optbuf, cr);
+		    &outlen, (uchar_t *)CMSG_CONTENT(cmsg), optbuf, cr);
 		if (error > 0) {
 			return (error);
 		} else if (outlen > len) {

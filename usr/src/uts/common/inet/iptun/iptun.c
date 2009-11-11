@@ -76,6 +76,8 @@
 #include <inet/ip.h>
 #include <inet/ip_ire.h>
 #include <inet/ipsec_impl.h>
+#include <sys/tsol/label.h>
+#include <sys/tsol/tnet.h>
 #include <inet/iptun.h>
 #include "iptun_impl.h"
 
@@ -86,8 +88,6 @@
 	(iptun_type == IPTUN_TYPE_6TO4 && family == AF_INET))
 
 #define	IPTUN_HASH_KEY(key)	((mod_hash_key_t)(uintptr_t)(key))
-
-#define	IPTUNQ_DEV	"/dev/iptunq"
 
 #define	IPTUN_MIN_IPV4_MTU	576		/* ip.h still uses 68 (!) */
 #define	IPTUN_MIN_IPV6_MTU	IPV6_MIN_MTU
@@ -113,15 +113,18 @@ static iptun_encaplim_t	iptun_encaplim_init = {
 	0
 };
 
-/* Table containing per-iptun-type information. */
+/*
+ * Table containing per-iptun-type information.
+ * Since IPv6 can run over all of these we have the IPv6 min as the min MTU.
+ */
 static iptun_typeinfo_t	iptun_type_table[] = {
-	{ IPTUN_TYPE_IPV4, MAC_PLUGIN_IDENT_IPV4, IPV4_VERSION, ip_output,
-	    IPTUN_MIN_IPV4_MTU,	IPTUN_MAX_IPV4_MTU,	B_TRUE },
-	{ IPTUN_TYPE_IPV6, MAC_PLUGIN_IDENT_IPV6, IPV6_VERSION, ip_output_v6,
+	{ IPTUN_TYPE_IPV4, MAC_PLUGIN_IDENT_IPV4, IPV4_VERSION,
+	    IPTUN_MIN_IPV6_MTU,	IPTUN_MAX_IPV4_MTU,	B_TRUE },
+	{ IPTUN_TYPE_IPV6, MAC_PLUGIN_IDENT_IPV6, IPV6_VERSION,
 	    IPTUN_MIN_IPV6_MTU,	IPTUN_MAX_IPV6_MTU,	B_TRUE },
-	{ IPTUN_TYPE_6TO4, MAC_PLUGIN_IDENT_6TO4, IPV4_VERSION, ip_output,
-	    IPTUN_MIN_IPV4_MTU,	IPTUN_MAX_IPV4_MTU,	B_FALSE },
-	{ IPTUN_TYPE_UNKNOWN, NULL, 0, NULL, 0, 0, B_FALSE }
+	{ IPTUN_TYPE_6TO4, MAC_PLUGIN_IDENT_6TO4, IPV4_VERSION,
+	    IPTUN_MIN_IPV6_MTU,	IPTUN_MAX_IPV4_MTU,	B_FALSE },
+	{ IPTUN_TYPE_UNKNOWN, NULL, 0, 0, 0, B_FALSE }
 };
 
 /*
@@ -140,7 +143,6 @@ kmem_cache_t	*iptun_cache;
 ddi_taskq_t 	*iptun_taskq;
 
 typedef enum {
-	IPTUN_TASK_PMTU_UPDATE,	/* obtain new destination path-MTU */
 	IPTUN_TASK_MTU_UPDATE,	/* tell mac about new tunnel link MTU */
 	IPTUN_TASK_LADDR_UPDATE, /* tell mac about new local address */
 	IPTUN_TASK_RADDR_UPDATE, /* tell mac about new remote address */
@@ -158,12 +160,22 @@ static int iptun_enter(iptun_t *);
 static void iptun_exit(iptun_t *);
 static void iptun_headergen(iptun_t *, boolean_t);
 static void iptun_drop_pkt(mblk_t *, uint64_t *);
-static void iptun_input(void *, mblk_t *, void *);
+static void iptun_input(void *, mblk_t *, void *, ip_recv_attr_t *);
+static void iptun_input_icmp(void *, mblk_t *, void *, ip_recv_attr_t *);
 static void iptun_output(iptun_t *, mblk_t *);
-static uint32_t iptun_get_maxmtu(iptun_t *, uint32_t);
-static uint32_t iptun_update_mtu(iptun_t *, uint32_t);
-static uint32_t iptun_get_dst_pmtu(iptun_t *);
+static uint32_t iptun_get_maxmtu(iptun_t *, ip_xmit_attr_t *, uint32_t);
+static uint32_t iptun_update_mtu(iptun_t *, ip_xmit_attr_t *, uint32_t);
+static uint32_t iptun_get_dst_pmtu(iptun_t *, ip_xmit_attr_t *);
+static void iptun_update_dst_pmtu(iptun_t *, ip_xmit_attr_t *);
 static int iptun_setladdr(iptun_t *, const struct sockaddr_storage *);
+
+static void iptun_output_6to4(iptun_t *, mblk_t *);
+static void iptun_output_common(iptun_t *, ip_xmit_attr_t *, mblk_t *);
+static boolean_t iptun_verifyicmp(conn_t *, void *, icmph_t *, icmp6_t *,
+    ip_recv_attr_t *);
+
+static void iptun_notify(void *, ip_xmit_attr_t *, ixa_notify_type_t,
+    ixa_notify_arg_t);
 
 static mac_callbacks_t iptun_m_callbacks;
 
@@ -295,13 +307,6 @@ iptun_m_tx(void *arg, mblk_t *mpchain)
 		return (NULL);
 	}
 
-	/*
-	 * Request the destination's path MTU information regularly in case
-	 * path MTU has increased.
-	 */
-	if (IPTUN_PMTU_TOO_OLD(iptun))
-		iptun_task_dispatch(iptun, IPTUN_TASK_PMTU_UPDATE);
-
 	for (mp = mpchain; mp != NULL; mp = nmp) {
 		nmp = mp->b_next;
 		mp->b_next = NULL;
@@ -350,7 +355,7 @@ iptun_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		}
 		break;
 	case MAC_PROP_MTU: {
-		uint32_t maxmtu = iptun_get_maxmtu(iptun, 0);
+		uint32_t maxmtu = iptun_get_maxmtu(iptun, NULL, 0);
 
 		if (value < iptun->iptun_typeinfo->iti_minmtu ||
 		    value > maxmtu) {
@@ -434,7 +439,7 @@ iptun_m_getprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
 		}
 		break;
 	case MAC_PROP_MTU: {
-		uint32_t maxmtu = iptun_get_maxmtu(iptun, 0);
+		uint32_t maxmtu = iptun_get_maxmtu(iptun, NULL, 0);
 
 		if (is_possible) {
 			range.range_uint32[0].mpur_min =
@@ -516,20 +521,11 @@ iptun_enter_by_linkid(datalink_id_t linkid, iptun_t **iptun)
 }
 
 /*
- * Handle tasks that were deferred through the iptun_taskq.  These fall into
- * two categories:
+ * Handle tasks that were deferred through the iptun_taskq because they require
+ * calling up to the mac module, and we can't call up to the mac module while
+ * holding locks.
  *
- * 1. Tasks that were defered because we didn't want to spend time doing them
- * while in the data path.  Only IPTUN_TASK_PMTU_UPDATE falls into this
- * category.
- *
- * 2. Tasks that were defered because they require calling up to the mac
- * module, and we can't call up to the mac module while holding locks.
- *
- * Handling 1 is easy; we just lookup the iptun_t, perform the task, exit the
- * tunnel, and we're done.
- *
- * Handling 2 is tricky to get right without introducing race conditions and
+ * This is tricky to get right without introducing race conditions and
  * deadlocks with the mac module, as we cannot issue an upcall while in the
  * iptun_t.  The reason is that upcalls may try and enter the mac perimeter,
  * while iptun callbacks (such as iptun_m_setprop()) called from the mac
@@ -572,12 +568,6 @@ iptun_task_cb(void *arg)
 	 */
 	if (iptun_enter_by_linkid(linkid, &iptun) != 0)
 		return;
-
-	if (task == IPTUN_TASK_PMTU_UPDATE) {
-		(void) iptun_update_mtu(iptun, 0);
-		iptun_exit(iptun);
-		return;
-	}
 
 	iptun->iptun_flags |= IPTUN_UPCALL_PENDING;
 
@@ -742,53 +732,143 @@ iptun_canbind(iptun_t *iptun)
 	    !(iptun->iptun_typeinfo->iti_hasraddr)));
 }
 
+/*
+ * Verify that the local address is valid, and insert in the fanout
+ */
 static int
 iptun_bind(iptun_t *iptun)
 {
-	conn_t	*connp = iptun->iptun_connp;
-	int	err;
+	conn_t			*connp = iptun->iptun_connp;
+	int			error = 0;
+	ip_xmit_attr_t		*ixa;
+	iulp_t			uinfo;
+	ip_stack_t		*ipst = connp->conn_netstack->netstack_ip;
+
+	/* Get an exclusive ixa for this thread, and replace conn_ixa */
+	ixa = conn_get_ixa(connp, B_TRUE);
+	if (ixa == NULL)
+		return (ENOMEM);
+	ASSERT(ixa->ixa_refcnt >= 2);
+	ASSERT(ixa == connp->conn_ixa);
+
+	/* We create PMTU state including for 6to4 */
+	ixa->ixa_flags |= IXAF_PMTU_DISCOVERY;
 
 	ASSERT(iptun_canbind(iptun));
 
+	mutex_enter(&connp->conn_lock);
+	/*
+	 * Note that conn_proto can't be set since the upper protocol
+	 * can be both 41 and 4 when IPv6 and IPv4 are over the same tunnel.
+	 * ipcl_iptun_classify doesn't use conn_proto.
+	 */
+	connp->conn_ipversion = iptun->iptun_typeinfo->iti_ipvers;
+
 	switch (iptun->iptun_typeinfo->iti_type) {
 	case IPTUN_TYPE_IPV4:
-		/*
-		 * When we set a tunnel's destination address, we do not care
-		 * if the destination is reachable.  Transient routing issues
-		 * should not inhibit the creation of a tunnel interface, for
-		 * example.  For that reason, we pass in B_FALSE for the
-		 * verify_dst argument of ip_proto_bind_connected_v4() (and
-		 * similarly for IPv6 tunnels below).
-		 */
-		err = ip_proto_bind_connected_v4(connp, NULL, IPPROTO_ENCAP,
-		    &iptun->iptun_laddr4, 0, iptun->iptun_raddr4, 0, B_TRUE,
-		    B_FALSE, iptun->iptun_cred);
+		IN6_IPADDR_TO_V4MAPPED(iptun->iptun_laddr4,
+		    &connp->conn_laddr_v6);
+		IN6_IPADDR_TO_V4MAPPED(iptun->iptun_raddr4,
+		    &connp->conn_faddr_v6);
+		ixa->ixa_flags |= IXAF_IS_IPV4;
+		if (ip_laddr_verify_v4(iptun->iptun_laddr4, IPCL_ZONEID(connp),
+		    ipst, B_FALSE) != IPVL_UNICAST_UP) {
+			mutex_exit(&connp->conn_lock);
+			error = EADDRNOTAVAIL;
+			goto done;
+		}
 		break;
 	case IPTUN_TYPE_IPV6:
-		err = ip_proto_bind_connected_v6(connp, NULL, IPPROTO_IPV6,
-		    &iptun->iptun_laddr6, 0, &iptun->iptun_raddr6, NULL, 0,
-		    B_TRUE, B_FALSE, iptun->iptun_cred);
+		connp->conn_laddr_v6 = iptun->iptun_laddr6;
+		connp->conn_faddr_v6 = iptun->iptun_raddr6;
+		ixa->ixa_flags &= ~IXAF_IS_IPV4;
+		/* We use a zero scopeid for now */
+		if (ip_laddr_verify_v6(&iptun->iptun_laddr6, IPCL_ZONEID(connp),
+		    ipst, B_FALSE, 0) != IPVL_UNICAST_UP) {
+			mutex_exit(&connp->conn_lock);
+			error = EADDRNOTAVAIL;
+			goto done;
+		}
 		break;
 	case IPTUN_TYPE_6TO4:
-		err = ip_proto_bind_laddr_v4(connp, NULL, IPPROTO_IPV6,
-		    iptun->iptun_laddr4, 0, B_TRUE);
-		break;
+		IN6_IPADDR_TO_V4MAPPED(iptun->iptun_laddr4,
+		    &connp->conn_laddr_v6);
+		IN6_IPADDR_TO_V4MAPPED(INADDR_ANY, &connp->conn_faddr_v6);
+		ixa->ixa_flags |= IXAF_IS_IPV4;
+		mutex_exit(&connp->conn_lock);
+
+		switch (ip_laddr_verify_v4(iptun->iptun_laddr4,
+		    IPCL_ZONEID(connp), ipst, B_FALSE)) {
+		case IPVL_UNICAST_UP:
+		case IPVL_UNICAST_DOWN:
+			break;
+		default:
+			error = EADDRNOTAVAIL;
+			goto done;
+		}
+		goto insert;
 	}
 
-	if (err == 0) {
-		iptun->iptun_flags |= IPTUN_BOUND;
+	/* In case previous destination was multirt */
+	ip_attr_newdst(ixa);
 
-		/*
-		 * Now that we're bound with ip below us, this is a good time
-		 * to initialize the destination path MTU and to re-calculate
-		 * the tunnel's link MTU.
-		 */
-		(void) iptun_update_mtu(iptun, 0);
+	/*
+	 * When we set a tunnel's destination address, we do not
+	 * care if the destination is reachable.  Transient routing
+	 * issues should not inhibit the creation of a tunnel
+	 * interface, for example. Thus we pass B_FALSE here.
+	 */
+	connp->conn_saddr_v6 = connp->conn_laddr_v6;
+	mutex_exit(&connp->conn_lock);
 
-		if (IS_IPTUN_RUNNING(iptun))
-			iptun_task_dispatch(iptun, IPTUN_TASK_LINK_UPDATE);
-	}
-	return (err);
+	/* As long as the MTU is large we avoid fragmentation */
+	ixa->ixa_flags |= IXAF_DONTFRAG | IXAF_PMTU_IPV4_DF;
+
+	/* We handle IPsec in iptun_output_common */
+	error = ip_attr_connect(connp, ixa, &connp->conn_saddr_v6,
+	    &connp->conn_faddr_v6, &connp->conn_faddr_v6, 0,
+	    &connp->conn_saddr_v6, &uinfo, 0);
+
+	if (error != 0)
+		goto done;
+
+	/* saddr shouldn't change since it was already set */
+	ASSERT(IN6_ARE_ADDR_EQUAL(&connp->conn_laddr_v6,
+	    &connp->conn_saddr_v6));
+
+	/* We set IXAF_VERIFY_PMTU to catch PMTU increases */
+	ixa->ixa_flags |= IXAF_VERIFY_PMTU;
+	ASSERT(uinfo.iulp_mtu != 0);
+
+	/*
+	 * Allow setting new policies.
+	 * The addresses/ports are already set, thus the IPsec policy calls
+	 * can handle their passed-in conn's.
+	 */
+	connp->conn_policy_cached = B_FALSE;
+
+insert:
+	error = ipcl_conn_insert(connp);
+	if (error != 0)
+		goto done;
+
+	/* Record this as the "last" send even though we haven't sent any */
+	connp->conn_v6lastdst = connp->conn_faddr_v6;
+
+	iptun->iptun_flags |= IPTUN_BOUND;
+	/*
+	 * Now that we're bound with ip below us, this is a good
+	 * time to initialize the destination path MTU and to
+	 * re-calculate the tunnel's link MTU.
+	 */
+	(void) iptun_update_mtu(iptun, ixa, 0);
+
+	if (IS_IPTUN_RUNNING(iptun))
+		iptun_task_dispatch(iptun, IPTUN_TASK_LINK_UPDATE);
+
+done:
+	ixa_refrele(ixa);
+	return (error);
 }
 
 static void
@@ -986,7 +1066,7 @@ iptun_set_sec_simple(iptun_t *iptun, const ipsec_req_t *ipsr)
 		 * Adjust MTU and make sure the DL side knows what's up.
 		 */
 		itp->itp_flags = ITPF_P_ACTIVE;
-		(void) iptun_update_mtu(iptun, 0);
+		(void) iptun_update_mtu(iptun, NULL, 0);
 		old_policy = B_FALSE;	/* Blank out inactive - we succeeded */
 	} else {
 		rw_exit(&itp->itp_policy->iph_lock);
@@ -1170,8 +1250,16 @@ iptun_conn_create(iptun_t *iptun, netstack_t *ns, cred_t *credp)
 	connp->conn_flags |= IPCL_IPTUN;
 	connp->conn_iptun = iptun;
 	connp->conn_recv = iptun_input;
-	connp->conn_rq = ns->netstack_iptun->iptuns_g_q;
-	connp->conn_wq = WR(connp->conn_rq);
+	connp->conn_recvicmp = iptun_input_icmp;
+	connp->conn_verifyicmp = iptun_verifyicmp;
+
+	/*
+	 * Register iptun_notify to listen to capability changes detected by IP.
+	 * This upcall is made in the context of the call to conn_ip_output.
+	 */
+	connp->conn_ixa->ixa_notify = iptun_notify;
+	connp->conn_ixa->ixa_notify_cookie = iptun;
+
 	/*
 	 * For exclusive stacks we set conn_zoneid to GLOBAL_ZONEID as is done
 	 * for all other conn_t's.
@@ -1187,11 +1275,32 @@ iptun_conn_create(iptun_t *iptun, netstack_t *ns, cred_t *credp)
 	connp->conn_cred = credp;
 	/* crfree() is done in ipcl_conn_destroy(), called by CONN_DEC_REF() */
 	crhold(connp->conn_cred);
+	connp->conn_cpid = NOPID;
 
-	connp->conn_send = iptun->iptun_typeinfo->iti_txfunc;
-	connp->conn_af_isv6 = iptun->iptun_typeinfo->iti_ipvers == IPV6_VERSION;
+	/* conn_allzones can not be set this early, hence no IPCL_ZONEID */
+	connp->conn_ixa->ixa_zoneid = connp->conn_zoneid;
 	ASSERT(connp->conn_ref == 1);
 
+	/* Cache things in ixa without an extra refhold */
+	connp->conn_ixa->ixa_cred = connp->conn_cred;
+	connp->conn_ixa->ixa_cpid = connp->conn_cpid;
+	if (is_system_labeled())
+		connp->conn_ixa->ixa_tsl = crgetlabel(connp->conn_cred);
+
+	/*
+	 * Have conn_ip_output drop packets should our outer source
+	 * go invalid
+	 */
+	connp->conn_ixa->ixa_flags |= IXAF_VERIFY_SOURCE;
+
+	switch (iptun->iptun_typeinfo->iti_ipvers) {
+	case IPV4_VERSION:
+		connp->conn_family = AF_INET6;
+		break;
+	case IPV6_VERSION:
+		connp->conn_family = AF_INET;
+		break;
+	}
 	mutex_enter(&connp->conn_lock);
 	connp->conn_state_flags &= ~CONN_INCIPIENT;
 	mutex_exit(&connp->conn_lock);
@@ -1205,26 +1314,6 @@ iptun_conn_destroy(conn_t *connp)
 	connp->conn_iptun = NULL;
 	ASSERT(connp->conn_ref == 1);
 	CONN_DEC_REF(connp);
-}
-
-static int
-iptun_create_g_q(iptun_stack_t *iptuns, cred_t *credp)
-{
-	int	err;
-	conn_t	*connp;
-
-	ASSERT(iptuns->iptuns_g_q == NULL);
-	/*
-	 * The global queue for this stack is set when iptunq_open() calls
-	 * iptun_set_g_q().
-	 */
-	err = ldi_open_by_name(IPTUNQ_DEV, FWRITE|FREAD, credp,
-	    &iptuns->iptuns_g_q_lh, iptun_ldi_ident);
-	if (err == 0) {
-		connp = iptuns->iptuns_g_q->q_ptr;
-		connp->conn_recv = iptun_input;
-	}
-	return (err);
 }
 
 static iptun_t *
@@ -1289,11 +1378,6 @@ iptun_free(iptun_t *iptun)
 		iptun->iptun_connp = NULL;
 	}
 
-	netstack_rele(iptun->iptun_ns);
-	iptun->iptun_ns = NULL;
-	crfree(iptun->iptun_cred);
-	iptun->iptun_cred = NULL;
-
 	kmem_cache_free(iptun_cache, iptun);
 	atomic_dec_32(&iptun_tunnelcount);
 }
@@ -1340,19 +1424,6 @@ iptun_create(iptun_kparams_t *ik, cred_t *credp)
 	ns = netstack_find_by_cred(credp);
 	iptuns = ns->netstack_iptun;
 
-	/*
-	 * Before we create any tunnel, we need to ensure that the default
-	 * STREAMS queue (used to satisfy the ip module's requirement for one)
-	 * is created.  We only do this once per stack.  The stream is closed
-	 * when the stack is destroyed in iptun_stack_fni().
-	 */
-	mutex_enter(&iptuns->iptuns_lock);
-	if (iptuns->iptuns_g_q == NULL)
-		err = iptun_create_g_q(iptuns, zone_kcred());
-	mutex_exit(&iptuns->iptuns_lock);
-	if (err != 0)
-		goto done;
-
 	if ((iptun = iptun_alloc()) == NULL) {
 		err = ENOMEM;
 		goto done;
@@ -1360,8 +1431,6 @@ iptun_create(iptun_kparams_t *ik, cred_t *credp)
 
 	iptun->iptun_linkid = ik->iptun_kparam_linkid;
 	iptun->iptun_zoneid = zoneid;
-	crhold(credp);
-	iptun->iptun_cred = credp;
 	iptun->iptun_ns = ns;
 
 	iptun->iptun_typeinfo = iptun_gettypeinfo(ik->iptun_kparam_type);
@@ -1668,46 +1737,139 @@ iptun_set_policy(datalink_id_t linkid, ipsec_tun_pol_t *itp)
 		ITP_REFHOLD(itp);
 		iptun->iptun_itp = itp;
 		/* IPsec policy means IPsec overhead, which means lower MTU. */
-		(void) iptun_update_mtu(iptun, 0);
+		(void) iptun_update_mtu(iptun, NULL, 0);
 	}
 	iptun_exit(iptun);
 }
 
 /*
  * Obtain the path MTU to the tunnel destination.
+ * Can return zero in some cases.
  */
 static uint32_t
-iptun_get_dst_pmtu(iptun_t *iptun)
+iptun_get_dst_pmtu(iptun_t *iptun, ip_xmit_attr_t *ixa)
 {
-	ire_t		*ire = NULL;
-	ip_stack_t	*ipst = iptun->iptun_ns->netstack_ip;
 	uint32_t	pmtu = 0;
+	conn_t		*connp = iptun->iptun_connp;
+	boolean_t	need_rele = B_FALSE;
 
 	/*
-	 * We only obtain the destination IRE for tunnels that have a remote
-	 * tunnel address.
+	 * We only obtain the pmtu for tunnels that have a remote tunnel
+	 * address.
 	 */
 	if (!(iptun->iptun_flags & IPTUN_RADDR))
 		return (0);
 
-	switch (iptun->iptun_typeinfo->iti_ipvers) {
-	case IPV4_VERSION:
-		ire = ire_route_lookup(iptun->iptun_raddr4, INADDR_ANY,
-		    INADDR_ANY, 0, NULL, NULL, iptun->iptun_connp->conn_zoneid,
-		    NULL, (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT), ipst);
-		break;
-	case IPV6_VERSION:
-		ire = ire_route_lookup_v6(&iptun->iptun_raddr6, NULL, NULL, 0,
-		    NULL, NULL, iptun->iptun_connp->conn_zoneid, NULL,
-		    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT), ipst);
-		break;
+	if (ixa == NULL) {
+		ixa = conn_get_ixa(connp, B_FALSE);
+		if (ixa == NULL)
+			return (0);
+		need_rele = B_TRUE;
+	}
+	/*
+	 * Guard against ICMP errors before we have sent, as well as against
+	 * and a thread which held conn_ixa.
+	 */
+	if (ixa->ixa_ire != NULL) {
+		pmtu = ip_get_pmtu(ixa);
+
+		/*
+		 * For both IPv4 and IPv6 we can have indication that the outer
+		 * header needs fragmentation.
+		 */
+		if (ixa->ixa_flags & IXAF_PMTU_TOO_SMALL) {
+			/* Must allow fragmentation in ip_output */
+			ixa->ixa_flags &= ~IXAF_DONTFRAG;
+		} else if (iptun->iptun_typeinfo->iti_type != IPTUN_TYPE_6TO4) {
+			ixa->ixa_flags |= IXAF_DONTFRAG;
+		} else {
+			/* ip_get_pmtu might have set this - we don't want it */
+			ixa->ixa_flags &= ~IXAF_PMTU_IPV4_DF;
+		}
 	}
 
-	if (ire != NULL) {
-		pmtu = ire->ire_max_frag;
-		ire_refrele(ire);
-	}
+	if (need_rele)
+		ixa_refrele(ixa);
 	return (pmtu);
+}
+
+/*
+ * Update the ip_xmit_attr_t to capture the current lower path mtu as known
+ * by ip.
+ */
+static void
+iptun_update_dst_pmtu(iptun_t *iptun, ip_xmit_attr_t *ixa)
+{
+	uint32_t	pmtu;
+	conn_t		*connp = iptun->iptun_connp;
+	boolean_t	need_rele = B_FALSE;
+
+	/* IXAF_VERIFY_PMTU is not set if we don't have a fixed destination */
+	if (!(iptun->iptun_flags & IPTUN_RADDR))
+		return;
+
+	if (ixa == NULL) {
+		ixa = conn_get_ixa(connp, B_FALSE);
+		if (ixa == NULL)
+			return;
+		need_rele = B_TRUE;
+	}
+	/*
+	 * Guard against ICMP errors before we have sent, as well as against
+	 * and a thread which held conn_ixa.
+	 */
+	if (ixa->ixa_ire != NULL) {
+		pmtu = ip_get_pmtu(ixa);
+		/*
+		 * Update ixa_fragsize and ixa_pmtu.
+		 */
+		ixa->ixa_fragsize = ixa->ixa_pmtu = pmtu;
+
+		/*
+		 * For both IPv4 and IPv6 we can have indication that the outer
+		 * header needs fragmentation.
+		 */
+		if (ixa->ixa_flags & IXAF_PMTU_TOO_SMALL) {
+			/* Must allow fragmentation in ip_output */
+			ixa->ixa_flags &= ~IXAF_DONTFRAG;
+		} else if (iptun->iptun_typeinfo->iti_type != IPTUN_TYPE_6TO4) {
+			ixa->ixa_flags |= IXAF_DONTFRAG;
+		} else {
+			/* ip_get_pmtu might have set this - we don't want it */
+			ixa->ixa_flags &= ~IXAF_PMTU_IPV4_DF;
+		}
+	}
+
+	if (need_rele)
+		ixa_refrele(ixa);
+}
+
+/*
+ * There is nothing that iptun can verify in addition to IP having
+ * verified the IP addresses in the fanout.
+ */
+/* ARGSUSED */
+static boolean_t
+iptun_verifyicmp(conn_t *connp, void *arg2, icmph_t *icmph, icmp6_t *icmp6,
+    ip_recv_attr_t *ira)
+{
+	return (B_TRUE);
+}
+
+/*
+ * Notify function registered with ip_xmit_attr_t.
+ */
+static void
+iptun_notify(void *arg, ip_xmit_attr_t *ixa, ixa_notify_type_t ntype,
+    ixa_notify_arg_t narg)
+{
+	iptun_t		*iptun = (iptun_t *)arg;
+
+	switch (ntype) {
+	case IXAN_PMTU:
+		(void) iptun_update_mtu(iptun, ixa, narg);
+		break;
+	}
 }
 
 /*
@@ -1765,18 +1927,18 @@ iptun_get_ipsec_overhead(iptun_t *iptun)
 		/* Check for both IPv4 and IPv6. */
 		sel.ips_protocol = IPPROTO_ENCAP;
 		pol = ipsec_find_policy_head(NULL, iph, IPSEC_TYPE_OUTBOUND,
-		    &sel, ns);
+		    &sel);
 		if (pol != NULL) {
 			ipsec_ovhd = ipsec_act_ovhd(&pol->ipsp_act->ipa_act);
-			IPPOL_REFRELE(pol, ns);
+			IPPOL_REFRELE(pol);
 		}
 		sel.ips_protocol = IPPROTO_IPV6;
 		pol = ipsec_find_policy_head(NULL, iph, IPSEC_TYPE_OUTBOUND,
-		    &sel, ns);
+		    &sel);
 		if (pol != NULL) {
 			ipsec_ovhd = max(ipsec_ovhd,
 			    ipsec_act_ovhd(&pol->ipsp_act->ipa_act));
-			IPPOL_REFRELE(pol, ns);
+			IPPOL_REFRELE(pol);
 		}
 		IPPH_REFRELE(iph, ns);
 	} else {
@@ -1802,10 +1964,14 @@ iptun_get_ipsec_overhead(iptun_t *iptun)
 }
 
 /*
- * Calculate and return the maximum possible MTU for the given tunnel.
+ * Calculate and return the maximum possible upper MTU for the given tunnel.
+ *
+ * If new_pmtu is set then we also need to update the lower path MTU information
+ * in the ip_xmit_attr_t. That is needed since we set IXAF_VERIFY_PMTU so that
+ * we are notified by conn_ip_output() when the path MTU increases.
  */
 static uint32_t
-iptun_get_maxmtu(iptun_t *iptun, uint32_t new_pmtu)
+iptun_get_maxmtu(iptun_t *iptun, ip_xmit_attr_t *ixa, uint32_t new_pmtu)
 {
 	size_t		header_size, ipsec_overhead;
 	uint32_t	maxmtu, pmtu;
@@ -1816,13 +1982,11 @@ iptun_get_maxmtu(iptun_t *iptun, uint32_t new_pmtu)
 	 * iptun_get_dst_pmtu().
 	 */
 	if (new_pmtu != 0) {
-		if (iptun->iptun_flags & IPTUN_RADDR) {
+		if (iptun->iptun_flags & IPTUN_RADDR)
 			iptun->iptun_dpmtu = new_pmtu;
-			iptun->iptun_dpmtu_lastupdate = ddi_get_lbolt();
-		}
 		pmtu = new_pmtu;
 	} else if (iptun->iptun_flags & IPTUN_RADDR) {
-		if ((pmtu = iptun_get_dst_pmtu(iptun)) == 0) {
+		if ((pmtu = iptun_get_dst_pmtu(iptun, ixa)) == 0) {
 			/*
 			 * We weren't able to obtain the path-MTU of the
 			 * destination.  Use the previous value.
@@ -1830,7 +1994,6 @@ iptun_get_maxmtu(iptun_t *iptun, uint32_t new_pmtu)
 			pmtu = iptun->iptun_dpmtu;
 		} else {
 			iptun->iptun_dpmtu = pmtu;
-			iptun->iptun_dpmtu_lastupdate = ddi_get_lbolt();
 		}
 	} else {
 		/*
@@ -1866,18 +2029,22 @@ iptun_get_maxmtu(iptun_t *iptun, uint32_t new_pmtu)
 }
 
 /*
- * Re-calculate the tunnel's MTU and notify the MAC layer of any change in
- * MTU.  The new_pmtu argument is the new path MTU to the tunnel destination
- * to be used in the tunnel MTU calculation.  Passing in 0 for new_pmtu causes
- * the path MTU to be dynamically updated using iptun_update_pmtu().
+ * Re-calculate the tunnel's MTU as seen from above and notify the MAC layer
+ * of any change in MTU.  The new_pmtu argument is the new lower path MTU to
+ * the tunnel destination to be used in the tunnel MTU calculation.  Passing
+ * in 0 for new_pmtu causes the lower path MTU to be dynamically updated using
+ * ip_get_pmtu().
  *
  * If the calculated tunnel MTU is different than its previous value, then we
  * notify the MAC layer above us of this change using mac_maxsdu_update().
  */
 static uint32_t
-iptun_update_mtu(iptun_t *iptun, uint32_t new_pmtu)
+iptun_update_mtu(iptun_t *iptun, ip_xmit_attr_t *ixa, uint32_t new_pmtu)
 {
 	uint32_t newmtu;
+
+	/* We always update the ixa since we might have set IXAF_VERIFY_PMTU */
+	iptun_update_dst_pmtu(iptun, ixa);
 
 	/*
 	 * We return the current MTU without updating it if it was pegged to a
@@ -1887,8 +2054,7 @@ iptun_update_mtu(iptun_t *iptun, uint32_t new_pmtu)
 		return (iptun->iptun_mtu);
 
 	/* If the MTU isn't fixed, then use the maximum possible value. */
-	newmtu = iptun_get_maxmtu(iptun, new_pmtu);
-
+	newmtu = iptun_get_maxmtu(iptun, ixa, new_pmtu);
 	/*
 	 * We only dynamically adjust the tunnel MTU for tunnels with
 	 * destinations because dynamic MTU calculations are based on the
@@ -1929,7 +2095,7 @@ iptun_build_icmperr(size_t hdrs_size, mblk_t *orig_pkt)
 {
 	mblk_t *icmperr_mp;
 
-	if ((icmperr_mp = allocb_tmpl(hdrs_size, orig_pkt)) != NULL) {
+	if ((icmperr_mp = allocb(hdrs_size, BPRI_MED)) != NULL) {
 		icmperr_mp->b_wptr += hdrs_size;
 		/* tack on the offending packet */
 		icmperr_mp->b_cont = orig_pkt;
@@ -1942,12 +2108,15 @@ iptun_build_icmperr(size_t hdrs_size, mblk_t *orig_pkt)
  * the ICMP error.
  */
 static void
-iptun_sendicmp_v4(iptun_t *iptun, icmph_t *icmp, ipha_t *orig_ipha, mblk_t *mp)
+iptun_sendicmp_v4(iptun_t *iptun, icmph_t *icmp, ipha_t *orig_ipha, mblk_t *mp,
+    ts_label_t *tsl)
 {
 	size_t	orig_pktsize, hdrs_size;
 	mblk_t	*icmperr_mp;
 	ipha_t	*new_ipha;
 	icmph_t	*new_icmp;
+	ip_xmit_attr_t	ixas;
+	conn_t	*connp = iptun->iptun_connp;
 
 	orig_pktsize = msgdsize(mp);
 	hdrs_size = sizeof (ipha_t) + sizeof (icmph_t);
@@ -1974,17 +2143,35 @@ iptun_sendicmp_v4(iptun_t *iptun, icmph_t *icmp, ipha_t *orig_ipha, mblk_t *mp)
 	new_icmp->icmph_checksum = 0;
 	new_icmp->icmph_checksum = IP_CSUM(icmperr_mp, sizeof (ipha_t), 0);
 
-	ip_output(iptun->iptun_connp, icmperr_mp, iptun->iptun_connp->conn_wq,
-	    IP_WPUT);
+	bzero(&ixas, sizeof (ixas));
+	ixas.ixa_flags = IXAF_BASIC_SIMPLE_V4;
+	if (new_ipha->ipha_src == INADDR_ANY)
+		ixas.ixa_flags |= IXAF_SET_SOURCE;
+
+	ixas.ixa_zoneid = IPCL_ZONEID(connp);
+	ixas.ixa_ipst = connp->conn_netstack->netstack_ip;
+	ixas.ixa_cred = connp->conn_cred;
+	ixas.ixa_cpid = NOPID;
+	if (is_system_labeled())
+		ixas.ixa_tsl = tsl;
+
+	ixas.ixa_ifindex = 0;
+	ixas.ixa_multicast_ttl = IP_DEFAULT_MULTICAST_TTL;
+
+	(void) ip_output_simple(icmperr_mp, &ixas);
+	ixa_cleanup(&ixas);
 }
 
 static void
-iptun_sendicmp_v6(iptun_t *iptun, icmp6_t *icmp6, ip6_t *orig_ip6h, mblk_t *mp)
+iptun_sendicmp_v6(iptun_t *iptun, icmp6_t *icmp6, ip6_t *orig_ip6h, mblk_t *mp,
+    ts_label_t *tsl)
 {
 	size_t	orig_pktsize, hdrs_size;
 	mblk_t	*icmp6err_mp;
 	ip6_t	*new_ip6h;
 	icmp6_t	*new_icmp6;
+	ip_xmit_attr_t	ixas;
+	conn_t	*connp = iptun->iptun_connp;
 
 	orig_pktsize = msgdsize(mp);
 	hdrs_size = sizeof (ip6_t) + sizeof (icmp6_t);
@@ -2004,16 +2191,31 @@ iptun_sendicmp_v6(iptun_t *iptun, icmp6_t *icmp6, ip6_t *orig_ip6h, mblk_t *mp)
 	new_ip6h->ip6_dst = orig_ip6h->ip6_src;
 
 	*new_icmp6 = *icmp6;
-	/* The checksum is calculated in ip_wput_ire_v6(). */
+	/* The checksum is calculated in ip_output_simple and friends. */
 	new_icmp6->icmp6_cksum = new_ip6h->ip6_plen;
 
-	ip_output_v6(iptun->iptun_connp, icmp6err_mp,
-	    iptun->iptun_connp->conn_wq, IP_WPUT);
+	bzero(&ixas, sizeof (ixas));
+	ixas.ixa_flags = IXAF_BASIC_SIMPLE_V6;
+	if (IN6_IS_ADDR_UNSPECIFIED(&new_ip6h->ip6_src))
+		ixas.ixa_flags |= IXAF_SET_SOURCE;
+
+	ixas.ixa_zoneid = IPCL_ZONEID(connp);
+	ixas.ixa_ipst = connp->conn_netstack->netstack_ip;
+	ixas.ixa_cred = connp->conn_cred;
+	ixas.ixa_cpid = NOPID;
+	if (is_system_labeled())
+		ixas.ixa_tsl = tsl;
+
+	ixas.ixa_ifindex = 0;
+	ixas.ixa_multicast_ttl = IP_DEFAULT_MULTICAST_TTL;
+
+	(void) ip_output_simple(icmp6err_mp, &ixas);
+	ixa_cleanup(&ixas);
 }
 
 static void
 iptun_icmp_error_v4(iptun_t *iptun, ipha_t *orig_ipha, mblk_t *mp,
-    uint8_t type, uint8_t code)
+    uint8_t type, uint8_t code, ts_label_t *tsl)
 {
 	icmph_t icmp;
 
@@ -2021,12 +2223,12 @@ iptun_icmp_error_v4(iptun_t *iptun, ipha_t *orig_ipha, mblk_t *mp,
 	icmp.icmph_type = type;
 	icmp.icmph_code = code;
 
-	iptun_sendicmp_v4(iptun, &icmp, orig_ipha, mp);
+	iptun_sendicmp_v4(iptun, &icmp, orig_ipha, mp, tsl);
 }
 
 static void
 iptun_icmp_fragneeded_v4(iptun_t *iptun, uint32_t newmtu, ipha_t *orig_ipha,
-    mblk_t *mp)
+    mblk_t *mp, ts_label_t *tsl)
 {
 	icmph_t	icmp;
 
@@ -2035,12 +2237,12 @@ iptun_icmp_fragneeded_v4(iptun_t *iptun, uint32_t newmtu, ipha_t *orig_ipha,
 	icmp.icmph_du_zero = 0;
 	icmp.icmph_du_mtu = htons(newmtu);
 
-	iptun_sendicmp_v4(iptun, &icmp, orig_ipha, mp);
+	iptun_sendicmp_v4(iptun, &icmp, orig_ipha, mp, tsl);
 }
 
 static void
 iptun_icmp_error_v6(iptun_t *iptun, ip6_t *orig_ip6h, mblk_t *mp,
-    uint8_t type, uint8_t code, uint32_t offset)
+    uint8_t type, uint8_t code, uint32_t offset, ts_label_t *tsl)
 {
 	icmp6_t icmp6;
 
@@ -2050,12 +2252,12 @@ iptun_icmp_error_v6(iptun_t *iptun, ip6_t *orig_ip6h, mblk_t *mp,
 	if (type == ICMP6_PARAM_PROB)
 		icmp6.icmp6_pptr = htonl(offset);
 
-	iptun_sendicmp_v6(iptun, &icmp6, orig_ip6h, mp);
+	iptun_sendicmp_v6(iptun, &icmp6, orig_ip6h, mp, tsl);
 }
 
 static void
 iptun_icmp_toobig_v6(iptun_t *iptun, uint32_t newmtu, ip6_t *orig_ip6h,
-    mblk_t *mp)
+    mblk_t *mp, ts_label_t *tsl)
 {
 	icmp6_t icmp6;
 
@@ -2063,7 +2265,7 @@ iptun_icmp_toobig_v6(iptun_t *iptun, uint32_t newmtu, ip6_t *orig_ip6h,
 	icmp6.icmp6_code = 0;
 	icmp6.icmp6_mtu = htonl(newmtu);
 
-	iptun_sendicmp_v6(iptun, &icmp6, orig_ip6h, mp);
+	iptun_sendicmp_v6(iptun, &icmp6, orig_ip6h, mp, tsl);
 }
 
 /*
@@ -2105,13 +2307,15 @@ is_icmp_error(mblk_t *mp, ipha_t *ipha, ip6_t *ip6h)
 /*
  * Find inner and outer IP headers from a tunneled packet as setup for calls
  * into ipsec_tun_{in,out}bound().
+ * Note that we need to allow the outer header to be in a separate mblk from
+ * the inner header.
+ * If the caller knows the outer_hlen, the caller passes it in. Otherwise zero.
  */
 static size_t
-iptun_find_headers(mblk_t *mp, ipha_t **outer4, ipha_t **inner4, ip6_t **outer6,
-    ip6_t **inner6)
+iptun_find_headers(mblk_t *mp, size_t outer_hlen, ipha_t **outer4,
+    ipha_t **inner4, ip6_t **outer6, ip6_t **inner6)
 {
 	ipha_t	*ipha;
-	size_t	outer_hlen;
 	size_t	first_mblkl = MBLKL(mp);
 	mblk_t	*inner_mp;
 
@@ -2128,12 +2332,14 @@ iptun_find_headers(mblk_t *mp, ipha_t **outer4, ipha_t **inner4, ip6_t **outer6,
 	case IPV4_VERSION:
 		*outer4 = ipha;
 		*outer6 = NULL;
-		outer_hlen = IPH_HDR_LENGTH(ipha);
+		if (outer_hlen == 0)
+			outer_hlen = IPH_HDR_LENGTH(ipha);
 		break;
 	case IPV6_VERSION:
 		*outer4 = NULL;
 		*outer6 = (ip6_t *)ipha;
-		outer_hlen = ip_hdr_length_v6(mp, (ip6_t *)ipha);
+		if (outer_hlen == 0)
+			outer_hlen = ip_hdr_length_v6(mp, (ip6_t *)ipha);
 		break;
 	default:
 		return (0);
@@ -2192,20 +2398,14 @@ iptun_find_headers(mblk_t *mp, ipha_t **outer4, ipha_t **inner4, ip6_t **outer6,
  * whatever the very-inner packet is (IPv4(2) or IPv6).
  */
 static void
-iptun_input_icmp_v4(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp,
-    icmph_t *icmph)
+iptun_input_icmp_v4(iptun_t *iptun, mblk_t *data_mp, icmph_t *icmph,
+    ip_recv_attr_t *ira)
 {
 	uint8_t	*orig;
 	ipha_t	*outer4, *inner4;
 	ip6_t	*outer6, *inner6;
 	int	outer_hlen;
 	uint8_t	type, code;
-
-	/*
-	 * Change the db_type to M_DATA because subsequent operations assume
-	 * the ICMP packet is M_DATA again (i.e. calls to msgdsize()).
-	 */
-	data_mp->b_datap->db_type = M_DATA;
 
 	ASSERT(data_mp->b_cont == NULL);
 	/*
@@ -2220,13 +2420,12 @@ iptun_input_icmp_v4(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp,
 	 * here).
 	 */
 	ASSERT(MBLKL(data_mp) >= 0);
-	outer_hlen = iptun_find_headers(data_mp, &outer4, &inner4, &outer6,
+	outer_hlen = iptun_find_headers(data_mp, 0, &outer4, &inner4, &outer6,
 	    &inner6);
 	ASSERT(outer6 == NULL);
 	data_mp->b_rptr = orig;
 	if (outer_hlen == 0) {
-		iptun_drop_pkt((ipsec_mp != NULL ? ipsec_mp : data_mp),
-		    &iptun->iptun_ierrors);
+		iptun_drop_pkt(data_mp, &iptun->iptun_ierrors);
 		return;
 	}
 
@@ -2234,10 +2433,9 @@ iptun_input_icmp_v4(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp,
 	ASSERT(outer4->ipha_protocol == IPPROTO_ENCAP ||
 	    outer4->ipha_protocol == IPPROTO_IPV6);
 
-	/* ipsec_tun_inbound() always frees ipsec_mp. */
-	if (!ipsec_tun_inbound(ipsec_mp, &data_mp, iptun->iptun_itp,
-	    inner4, inner6, outer4, outer6, -outer_hlen,
-	    iptun->iptun_ns)) {
+	data_mp = ipsec_tun_inbound(ira, data_mp, iptun->iptun_itp,
+	    inner4, inner6, outer4, outer6, -outer_hlen, iptun->iptun_ns);
+	if (data_mp == NULL) {
 		/* Callee did all of the freeing. */
 		atomic_inc_64(&iptun->iptun_ierrors);
 		return;
@@ -2269,15 +2467,15 @@ iptun_input_icmp_v4(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp,
 			 * also have IPsec policy by letting iptun_update_mtu
 			 * take care of it.
 			 */
-			newmtu =
-			    iptun_update_mtu(iptun, ntohs(icmph->icmph_du_mtu));
+			newmtu = iptun_update_mtu(iptun, NULL,
+			    ntohs(icmph->icmph_du_mtu));
 
 			if (inner4 != NULL) {
 				iptun_icmp_fragneeded_v4(iptun, newmtu, inner4,
-				    data_mp);
+				    data_mp, ira->ira_tsl);
 			} else {
 				iptun_icmp_toobig_v6(iptun, newmtu, inner6,
-				    data_mp);
+				    data_mp, ira->ira_tsl);
 			}
 			return;
 		}
@@ -2310,10 +2508,13 @@ iptun_input_icmp_v4(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp,
 		return;
 	}
 
-	if (inner4 != NULL)
-		iptun_icmp_error_v4(iptun, inner4, data_mp, type, code);
-	else
-		iptun_icmp_error_v6(iptun, inner6, data_mp, type, code, 0);
+	if (inner4 != NULL) {
+		iptun_icmp_error_v4(iptun, inner4, data_mp, type, code,
+		    ira->ira_tsl);
+	} else {
+		iptun_icmp_error_v6(iptun, inner6, data_mp, type, code, 0,
+		    ira->ira_tsl);
+	}
 }
 
 /*
@@ -2324,17 +2525,17 @@ iptun_input_icmp_v4(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp,
 static boolean_t
 iptun_find_encaplimit(mblk_t *mp, ip6_t *ip6h, uint8_t **encaplim_ptr)
 {
-	ip6_pkt_t	pkt;
+	ip_pkt_t	pkt;
 	uint8_t		*endptr;
 	ip6_dest_t	*destp;
 	struct ip6_opt	*optp;
 
 	pkt.ipp_fields = 0; /* must be initialized */
-	(void) ip_find_hdr_v6(mp, ip6h, &pkt, NULL);
+	(void) ip_find_hdr_v6(mp, ip6h, B_FALSE, &pkt, NULL);
 	if ((pkt.ipp_fields & IPPF_DSTOPTS) != 0) {
 		destp = pkt.ipp_dstopts;
-	} else if ((pkt.ipp_fields & IPPF_RTDSTOPTS) != 0) {
-		destp = pkt.ipp_rtdstopts;
+	} else if ((pkt.ipp_fields & IPPF_RTHDRDSTOPTS) != 0) {
+		destp = pkt.ipp_rthdrdstopts;
 	} else {
 		return (B_FALSE);
 	}
@@ -2370,20 +2571,14 @@ iptun_find_encaplimit(mblk_t *mp, ip6_t *ip6h, uint8_t **encaplim_ptr)
  * whatever the very-inner packet is (IPv4 or IPv6(2)).
  */
 static void
-iptun_input_icmp_v6(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp,
-    icmp6_t *icmp6h)
+iptun_input_icmp_v6(iptun_t *iptun, mblk_t *data_mp, icmp6_t *icmp6h,
+    ip_recv_attr_t *ira)
 {
 	uint8_t	*orig;
 	ipha_t	*outer4, *inner4;
 	ip6_t	*outer6, *inner6;
 	int	outer_hlen;
 	uint8_t	type, code;
-
-	/*
-	 * Change the db_type to M_DATA because subsequent operations assume
-	 * the ICMP packet is M_DATA again (i.e. calls to msgdsize().)
-	 */
-	data_mp->b_datap->db_type = M_DATA;
 
 	ASSERT(data_mp->b_cont == NULL);
 
@@ -2399,19 +2594,18 @@ iptun_input_icmp_v6(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp,
 	 * here).
 	 */
 	ASSERT(MBLKL(data_mp) >= 0);
-	outer_hlen = iptun_find_headers(data_mp, &outer4, &inner4, &outer6,
+	outer_hlen = iptun_find_headers(data_mp, 0, &outer4, &inner4, &outer6,
 	    &inner6);
 	ASSERT(outer4 == NULL);
 	data_mp->b_rptr = orig;	/* Restore r_ptr */
 	if (outer_hlen == 0) {
-		iptun_drop_pkt((ipsec_mp != NULL ? ipsec_mp : data_mp),
-		    &iptun->iptun_ierrors);
+		iptun_drop_pkt(data_mp, &iptun->iptun_ierrors);
 		return;
 	}
 
-	if (!ipsec_tun_inbound(ipsec_mp, &data_mp, iptun->iptun_itp,
-	    inner4, inner6, outer4, outer6, -outer_hlen,
-	    iptun->iptun_ns)) {
+	data_mp = ipsec_tun_inbound(ira, data_mp, iptun->iptun_itp,
+	    inner4, inner6, outer4, outer6, -outer_hlen, iptun->iptun_ns);
+	if (data_mp == NULL) {
 		/* Callee did all of the freeing. */
 		atomic_inc_64(&iptun->iptun_ierrors);
 		return;
@@ -2466,13 +2660,15 @@ iptun_input_icmp_v6(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp,
 		 * have IPsec policy by letting iptun_update_mtu take care of
 		 * it.
 		 */
-		newmtu = iptun_update_mtu(iptun, ntohl(icmp6h->icmp6_mtu));
+		newmtu = iptun_update_mtu(iptun, NULL,
+		    ntohl(icmp6h->icmp6_mtu));
 
 		if (inner4 != NULL) {
 			iptun_icmp_fragneeded_v4(iptun, newmtu, inner4,
-			    data_mp);
+			    data_mp, ira->ira_tsl);
 		} else {
-			iptun_icmp_toobig_v6(iptun, newmtu, inner6, data_mp);
+			iptun_icmp_toobig_v6(iptun, newmtu, inner6, data_mp,
+			    ira->ira_tsl);
 		}
 		return;
 	}
@@ -2481,51 +2677,57 @@ iptun_input_icmp_v6(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp,
 		return;
 	}
 
-	if (inner4 != NULL)
-		iptun_icmp_error_v4(iptun, inner4, data_mp, type, code);
-	else
-		iptun_icmp_error_v6(iptun, inner6, data_mp, type, code, 0);
+	if (inner4 != NULL) {
+		iptun_icmp_error_v4(iptun, inner4, data_mp, type, code,
+		    ira->ira_tsl);
+	} else {
+		iptun_icmp_error_v6(iptun, inner6, data_mp, type, code, 0,
+		    ira->ira_tsl);
+	}
 }
 
+/*
+ * Called as conn_recvicmp from IP for ICMP errors.
+ */
+/* ARGSUSED2 */
 static void
-iptun_input_icmp(iptun_t *iptun, mblk_t *ipsec_mp, mblk_t *data_mp)
+iptun_input_icmp(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 {
-	mblk_t	*tmpmp;
-	size_t	hlen;
+	conn_t		*connp = arg;
+	iptun_t		*iptun = connp->conn_iptun;
+	mblk_t		*tmpmp;
+	size_t		hlen;
 
-	if (data_mp->b_cont != NULL) {
+	ASSERT(IPCL_IS_IPTUN(connp));
+
+	if (mp->b_cont != NULL) {
 		/*
 		 * Since ICMP error processing necessitates access to bits
 		 * that are within the ICMP error payload (the original packet
 		 * that caused the error), pull everything up into a single
 		 * block for convenience.
 		 */
-		data_mp->b_datap->db_type = M_DATA;
-		if ((tmpmp = msgpullup(data_mp, -1)) == NULL) {
-			iptun_drop_pkt((ipsec_mp != NULL ? ipsec_mp : data_mp),
-			    &iptun->iptun_norcvbuf);
+		if ((tmpmp = msgpullup(mp, -1)) == NULL) {
+			iptun_drop_pkt(mp, &iptun->iptun_norcvbuf);
 			return;
 		}
-		freemsg(data_mp);
-		data_mp = tmpmp;
-		if (ipsec_mp != NULL)
-			ipsec_mp->b_cont = data_mp;
+		freemsg(mp);
+		mp = tmpmp;
 	}
 
+	hlen = ira->ira_ip_hdr_length;
 	switch (iptun->iptun_typeinfo->iti_ipvers) {
 	case IPV4_VERSION:
 		/*
 		 * The outer IP header coming up from IP is always ipha_t
 		 * alligned (otherwise, we would have crashed in ip).
 		 */
-		hlen = IPH_HDR_LENGTH((ipha_t *)data_mp->b_rptr);
-		iptun_input_icmp_v4(iptun, ipsec_mp, data_mp,
-		    (icmph_t *)(data_mp->b_rptr + hlen));
+		iptun_input_icmp_v4(iptun, mp, (icmph_t *)(mp->b_rptr + hlen),
+		    ira);
 		break;
 	case IPV6_VERSION:
-		hlen = ip_hdr_length_v6(data_mp, (ip6_t *)data_mp->b_rptr);
-		iptun_input_icmp_v6(iptun, ipsec_mp, data_mp,
-		    (icmp6_t *)(data_mp->b_rptr + hlen));
+		iptun_input_icmp_v6(iptun, mp, (icmp6_t *)(mp->b_rptr + hlen),
+		    ira);
 		break;
 	}
 }
@@ -2578,63 +2780,24 @@ iptun_in_6to4_ok(iptun_t *iptun, ipha_t *outer4, ip6_t *inner6)
  * Input function for everything that comes up from the ip module below us.
  * This is called directly from the ip module via connp->conn_recv().
  *
- * There are two kinds of packets that can arrive here: (1) IP-in-IP tunneled
- * packets and (2) ICMP errors containing IP-in-IP packets transmitted by us.
- * They have the following structure:
- *
- * 1) M_DATA
- * 2) M_CTL[->M_DATA]
- *
- * (2) Is an M_CTL optionally followed by M_DATA, where the M_CTL block is the
- * start of the actual ICMP packet (it doesn't contain any special control
- * information).
- *
- * Either (1) or (2) can be IPsec-protected, in which case an M_CTL block
- * containing an ipsec_in_t will have been prepended to either (1) or (2),
- * making a total of four combinations of possible mblk chains:
- *
- * A) (1)
- * B) (2)
- * C) M_CTL(ipsec_in_t)->(1)
- * D) M_CTL(ipsec_in_t)->(2)
+ * We receive M_DATA messages with IP-in-IP tunneled packets.
  */
-/* ARGSUSED */
+/* ARGSUSED2 */
 static void
-iptun_input(void *arg, mblk_t *mp, void *arg2)
+iptun_input(void *arg, mblk_t *data_mp, void *arg2, ip_recv_attr_t *ira)
 {
 	conn_t	*connp = arg;
 	iptun_t	*iptun = connp->conn_iptun;
 	int	outer_hlen;
 	ipha_t	*outer4, *inner4;
 	ip6_t	*outer6, *inner6;
-	mblk_t	*data_mp = mp;
 
 	ASSERT(IPCL_IS_IPTUN(connp));
-	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_CTL);
+	ASSERT(DB_TYPE(data_mp) == M_DATA);
 
-	if (DB_TYPE(mp) == M_CTL) {
-		if (((ipsec_in_t *)(mp->b_rptr))->ipsec_in_type != IPSEC_IN) {
-			iptun_input_icmp(iptun, NULL, mp);
-			return;
-		}
-
-		data_mp = mp->b_cont;
-		if (DB_TYPE(data_mp) == M_CTL) {
-			/* Protected ICMP packet. */
-			iptun_input_icmp(iptun, mp, data_mp);
-			return;
-		}
-	}
-
-	/*
-	 * Request the destination's path MTU information regularly in case
-	 * path MTU has increased.
-	 */
-	if (IPTUN_PMTU_TOO_OLD(iptun))
-		iptun_task_dispatch(iptun, IPTUN_TASK_PMTU_UPDATE);
-
-	if ((outer_hlen = iptun_find_headers(data_mp, &outer4, &inner4, &outer6,
-	    &inner6)) == 0)
+	outer_hlen = iptun_find_headers(data_mp, ira->ira_ip_hdr_length,
+	    &outer4, &inner4, &outer6, &inner6);
+	if (outer_hlen == 0)
 		goto drop;
 
 	/*
@@ -2644,25 +2807,22 @@ iptun_input(void *arg, mblk_t *mp, void *arg2)
 	 * the more involved tsol_receive_local() since the tunnel link itself
 	 * cannot be assigned to shared-stack non-global zones.
 	 */
-	if (is_system_labeled()) {
-		cred_t *msg_cred;
-
-		if ((msg_cred = msg_getcred(data_mp, NULL)) == NULL)
+	if (ira->ira_flags & IRAF_SYSTEM_LABELED) {
+		if (ira->ira_tsl == NULL)
 			goto drop;
-		if (tsol_check_dest(msg_cred, (outer4 != NULL ?
+		if (tsol_check_dest(ira->ira_tsl, (outer4 != NULL ?
 		    (void *)&outer4->ipha_dst : (void *)&outer6->ip6_dst),
 		    (outer4 != NULL ? IPV4_VERSION : IPV6_VERSION),
-		    CONN_MAC_DEFAULT, NULL) != 0)
+		    CONN_MAC_DEFAULT, B_FALSE, NULL) != 0)
 			goto drop;
 	}
 
-	if (!ipsec_tun_inbound((mp == data_mp ? NULL : mp), &data_mp,
-	    iptun->iptun_itp, inner4, inner6, outer4, outer6, outer_hlen,
-	    iptun->iptun_ns)) {
+	data_mp = ipsec_tun_inbound(ira, data_mp, iptun->iptun_itp,
+	    inner4, inner6, outer4, outer6, outer_hlen, iptun->iptun_ns);
+	if (data_mp == NULL) {
 		/* Callee did all of the freeing. */
 		return;
 	}
-	mp = data_mp;
 
 	if (iptun->iptun_typeinfo->iti_type == IPTUN_TYPE_6TO4 &&
 	    !iptun_in_6to4_ok(iptun, outer4, inner6))
@@ -2673,6 +2833,8 @@ iptun_input(void *arg, mblk_t *mp, void *arg2)
 	 * we might as well split up any b_next chains here.
 	 */
 	do {
+		mblk_t	*mp;
+
 		mp = data_mp->b_next;
 		data_mp->b_next = NULL;
 
@@ -2684,7 +2846,7 @@ iptun_input(void *arg, mblk_t *mp, void *arg2)
 	} while (data_mp != NULL);
 	return;
 drop:
-	iptun_drop_pkt(mp, &iptun->iptun_ierrors);
+	iptun_drop_pkt(data_mp, &iptun->iptun_ierrors);
 }
 
 /*
@@ -2744,6 +2906,10 @@ iptun_out_process_6to4(iptun_t *iptun, ipha_t *outer4, ip6_t *inner6)
 		/* destination is a 6to4 router */
 		IN6_6TO4_TO_V4ADDR(&inner6->ip6_dst,
 		    (struct in_addr *)&outer4->ipha_dst);
+
+		/* Reject attempts to send to INADDR_ANY */
+		if (outer4->ipha_dst == INADDR_ANY)
+			return (B_FALSE);
 	} else {
 		/*
 		 * The destination is a native IPv6 address.  If output to a
@@ -2770,12 +2936,11 @@ iptun_out_process_6to4(iptun_t *iptun, ipha_t *outer4, ip6_t *inner6)
  */
 static mblk_t *
 iptun_out_process_ipv4(iptun_t *iptun, mblk_t *mp, ipha_t *outer4,
-    ipha_t *inner4, ip6_t *inner6)
+    ipha_t *inner4, ip6_t *inner6, ip_xmit_attr_t *ixa)
 {
 	uint8_t	*innerptr = (inner4 != NULL ?
 	    (uint8_t *)inner4 : (uint8_t *)inner6);
-	size_t	minmtu = (inner4 != NULL ?
-	    IPTUN_MIN_IPV4_MTU : IPTUN_MIN_IPV6_MTU);
+	size_t	minmtu = iptun->iptun_typeinfo->iti_minmtu;
 
 	if (inner4 != NULL) {
 		ASSERT(outer4->ipha_protocol == IPPROTO_ENCAP);
@@ -2791,13 +2956,11 @@ iptun_out_process_ipv4(iptun_t *iptun, mblk_t *mp, ipha_t *outer4,
 	} else {
 		ASSERT(outer4->ipha_protocol == IPPROTO_IPV6 &&
 		    inner6 != NULL);
-
-		if (iptun->iptun_typeinfo->iti_type == IPTUN_TYPE_6TO4 &&
-		    !iptun_out_process_6to4(iptun, outer4, inner6)) {
-			iptun_drop_pkt(mp, &iptun->iptun_oerrors);
-			return (NULL);
-		}
 	}
+	if (ixa->ixa_flags & IXAF_PMTU_IPV4_DF)
+		outer4->ipha_fragment_offset_and_flags |= IPH_DF_HTONS;
+	else
+		outer4->ipha_fragment_offset_and_flags &= ~IPH_DF_HTONS;
 
 	/*
 	 * As described in section 3.2.2 of RFC4213, if the packet payload is
@@ -2807,11 +2970,19 @@ iptun_out_process_ipv4(iptun_t *iptun, mblk_t *mp, ipha_t *outer4,
 	 * won't be allowed to drop its MTU as a result, since the packet was
 	 * already smaller than the smallest allowable MTU for that interface.
 	 */
-	if (mp->b_wptr - innerptr <= minmtu)
+	if (mp->b_wptr - innerptr <= minmtu) {
 		outer4->ipha_fragment_offset_and_flags = 0;
+		ixa->ixa_flags &= ~IXAF_DONTFRAG;
+	} else if (!(ixa->ixa_flags & IXAF_PMTU_TOO_SMALL) &&
+	    (iptun->iptun_typeinfo->iti_type != IPTUN_TYPE_6TO4)) {
+		ixa->ixa_flags |= IXAF_DONTFRAG;
+	}
 
-	outer4->ipha_length = htons(msgdsize(mp));
+	ixa->ixa_ip_hdr_length = IPH_HDR_LENGTH(outer4);
+	ixa->ixa_pktlen = msgdsize(mp);
+	ixa->ixa_protocol = outer4->ipha_protocol;
 
+	outer4->ipha_length = htons(ixa->ixa_pktlen);
 	return (mp);
 }
 
@@ -2830,7 +3001,7 @@ iptun_insert_encaplimit(iptun_t *iptun, mblk_t *mp, ip6_t *outer6,
 	ASSERT(mp->b_cont == NULL);
 
 	mp->b_rptr += sizeof (ip6_t);
-	newmp = allocb_tmpl(sizeof (iptun_ipv6hdrs_t) + MBLKL(mp), mp);
+	newmp = allocb(sizeof (iptun_ipv6hdrs_t) + MBLKL(mp), BPRI_MED);
 	if (newmp == NULL) {
 		iptun_drop_pkt(mp, &iptun->iptun_noxmtbuf);
 		return (NULL);
@@ -2861,8 +3032,12 @@ iptun_insert_encaplimit(iptun_t *iptun, mblk_t *mp, ip6_t *outer6,
  * on error.
  */
 static mblk_t *
-iptun_out_process_ipv6(iptun_t *iptun, mblk_t *mp, ip6_t *outer6, ip6_t *inner6)
+iptun_out_process_ipv6(iptun_t *iptun, mblk_t *mp, ip6_t *outer6,
+    ipha_t *inner4, ip6_t *inner6, ip_xmit_attr_t *ixa)
 {
+	uint8_t		*innerptr = (inner4 != NULL ?
+	    (uint8_t *)inner4 : (uint8_t *)inner6);
+	size_t		minmtu = iptun->iptun_typeinfo->iti_minmtu;
 	uint8_t		*limit, *configlimit;
 	uint32_t	offset;
 	iptun_ipv6hdrs_t *v6hdrs;
@@ -2887,7 +3062,7 @@ iptun_out_process_ipv6(iptun_t *iptun, mblk_t *mp, ip6_t *outer6, ip6_t *inner6)
 			mp->b_rptr = (uint8_t *)inner6;
 			offset = limit - mp->b_rptr;
 			iptun_icmp_error_v6(iptun, inner6, mp, ICMP6_PARAM_PROB,
-			    0, offset);
+			    0, offset, ixa->ixa_tsl);
 			atomic_inc_64(&iptun->iptun_noxmtbuf);
 			return (NULL);
 		}
@@ -2900,6 +3075,7 @@ iptun_out_process_ipv6(iptun_t *iptun, mblk_t *mp, ip6_t *outer6, ip6_t *inner6)
 			if ((mp = iptun_insert_encaplimit(iptun, mp, outer6,
 			    (*limit - 1))) == NULL)
 				return (NULL);
+			v6hdrs = (iptun_ipv6hdrs_t *)mp->b_rptr;
 		} else {
 			/*
 			 * There is an existing encapsulation limit option in
@@ -2914,9 +3090,23 @@ iptun_out_process_ipv6(iptun_t *iptun, mblk_t *mp, ip6_t *outer6, ip6_t *inner6)
 			if ((*limit - 1) < *configlimit)
 				*configlimit = (*limit - 1);
 		}
+		ixa->ixa_ip_hdr_length = sizeof (iptun_ipv6hdrs_t);
+		ixa->ixa_protocol = v6hdrs->it6h_encaplim.iel_destopt.ip6d_nxt;
+	} else {
+		ixa->ixa_ip_hdr_length = sizeof (ip6_t);
+		ixa->ixa_protocol = outer6->ip6_nxt;
 	}
+	/*
+	 * See iptun_output_process_ipv4() why we allow fragmentation for
+	 * small packets
+	 */
+	if (mp->b_wptr - innerptr <= minmtu)
+		ixa->ixa_flags &= ~IXAF_DONTFRAG;
+	else if (!(ixa->ixa_flags & IXAF_PMTU_TOO_SMALL))
+		ixa->ixa_flags |= IXAF_DONTFRAG;
 
-	outer6->ip6_plen = htons(msgdsize(mp) - sizeof (ip6_t));
+	ixa->ixa_pktlen = msgdsize(mp);
+	outer6->ip6_plen = htons(ixa->ixa_pktlen - sizeof (ip6_t));
 	return (mp);
 }
 
@@ -2929,11 +3119,9 @@ static void
 iptun_output(iptun_t *iptun, mblk_t *mp)
 {
 	conn_t	*connp = iptun->iptun_connp;
-	int	outer_hlen;
 	mblk_t	*newmp;
-	ipha_t	*outer4, *inner4;
-	ip6_t	*outer6, *inner6;
-	ipsec_tun_pol_t	*itp = iptun->iptun_itp;
+	int	error;
+	ip_xmit_attr_t	*ixa;
 
 	ASSERT(mp->b_datap->db_type == M_DATA);
 
@@ -2946,17 +3134,262 @@ iptun_output(iptun_t *iptun, mblk_t *mp)
 		mp = newmp;
 	}
 
-	outer_hlen = iptun_find_headers(mp, &outer4, &inner4, &outer6, &inner6);
+	if (iptun->iptun_typeinfo->iti_type == IPTUN_TYPE_6TO4) {
+		iptun_output_6to4(iptun, mp);
+		return;
+	}
+
+	if (is_system_labeled()) {
+		/*
+		 * Since the label can be different meaning a potentially
+		 * different IRE,we always use a unique ip_xmit_attr_t.
+		 */
+		ixa = conn_get_ixa_exclusive(connp);
+	} else {
+		/*
+		 * If no other thread is using conn_ixa this just gets a
+		 * reference to conn_ixa. Otherwise we get a safe copy of
+		 * conn_ixa.
+		 */
+		ixa = conn_get_ixa(connp, B_FALSE);
+	}
+	if (ixa == NULL) {
+		iptun_drop_pkt(mp, &iptun->iptun_oerrors);
+		return;
+	}
+
+	/*
+	 * In case we got a safe copy of conn_ixa, then we need
+	 * to fill in any pointers in it.
+	 */
+	if (ixa->ixa_ire == NULL) {
+		error = ip_attr_connect(connp, ixa, &connp->conn_saddr_v6,
+		    &connp->conn_faddr_v6, &connp->conn_faddr_v6, 0,
+		    NULL, NULL, 0);
+		if (error != 0) {
+			if (ixa->ixa_ire != NULL &&
+			    (error == EHOSTUNREACH || error == ENETUNREACH)) {
+				/*
+				 * Let conn_ip_output/ire_send_noroute return
+				 * the error and send any local ICMP error.
+				 */
+				error = 0;
+			} else {
+				ixa_refrele(ixa);
+				iptun_drop_pkt(mp, &iptun->iptun_oerrors);
+				return;
+			}
+		}
+	}
+
+	iptun_output_common(iptun, ixa, mp);
+	ixa_refrele(ixa);
+}
+
+/*
+ * We use an ixa based on the last destination.
+ */
+static void
+iptun_output_6to4(iptun_t *iptun, mblk_t *mp)
+{
+	conn_t		*connp = iptun->iptun_connp;
+	ipha_t		*outer4, *inner4;
+	ip6_t		*outer6, *inner6;
+	ip_xmit_attr_t	*ixa;
+	ip_xmit_attr_t	*oldixa;
+	int		error;
+	boolean_t	need_connect;
+	in6_addr_t	v6dst;
+
+	ASSERT(mp->b_cont == NULL);	/* Verified by iptun_output */
+
+	/* Make sure we set ipha_dst before we look at ipha_dst */
+
+	(void) iptun_find_headers(mp, 0, &outer4, &inner4, &outer6, &inner6);
+	ASSERT(outer4 != NULL);
+	if (!iptun_out_process_6to4(iptun, outer4, inner6)) {
+		iptun_drop_pkt(mp, &iptun->iptun_oerrors);
+		return;
+	}
+
+	if (is_system_labeled()) {
+		/*
+		 * Since the label can be different meaning a potentially
+		 * different IRE,we always use a unique ip_xmit_attr_t.
+		 */
+		ixa = conn_get_ixa_exclusive(connp);
+	} else {
+		/*
+		 * If no other thread is using conn_ixa this just gets a
+		 * reference to conn_ixa. Otherwise we get a safe copy of
+		 * conn_ixa.
+		 */
+		ixa = conn_get_ixa(connp, B_FALSE);
+	}
+	if (ixa == NULL) {
+		iptun_drop_pkt(mp, &iptun->iptun_oerrors);
+		return;
+	}
+
+	mutex_enter(&connp->conn_lock);
+	if (connp->conn_v4lastdst == outer4->ipha_dst) {
+		need_connect = (ixa->ixa_ire == NULL);
+	} else {
+		/* In case previous destination was multirt */
+		ip_attr_newdst(ixa);
+
+		/*
+		 * We later update conn_ixa when we update conn_v4lastdst
+		 * which enables subsequent packets to avoid redoing
+		 * ip_attr_connect
+		 */
+		need_connect = B_TRUE;
+	}
+	mutex_exit(&connp->conn_lock);
+
+	/*
+	 * In case we got a safe copy of conn_ixa, or otherwise we don't
+	 * have a current ixa_ire, then we need to fill in any pointers in
+	 * the ixa.
+	 */
+	if (need_connect) {
+		IN6_IPADDR_TO_V4MAPPED(outer4->ipha_dst, &v6dst);
+
+		/* We handle IPsec in iptun_output_common */
+		error = ip_attr_connect(connp, ixa, &connp->conn_saddr_v6,
+		    &v6dst, &v6dst, 0, NULL, NULL, 0);
+		if (error != 0) {
+			if (ixa->ixa_ire != NULL &&
+			    (error == EHOSTUNREACH || error == ENETUNREACH)) {
+				/*
+				 * Let conn_ip_output/ire_send_noroute return
+				 * the error and send any local ICMP error.
+				 */
+				error = 0;
+			} else {
+				ixa_refrele(ixa);
+				iptun_drop_pkt(mp, &iptun->iptun_oerrors);
+				return;
+			}
+		}
+	}
+
+	iptun_output_common(iptun, ixa, mp);
+
+	/* Atomically replace conn_ixa and conn_v4lastdst */
+	mutex_enter(&connp->conn_lock);
+	if (connp->conn_v4lastdst != outer4->ipha_dst) {
+		/* Remember the dst which corresponds to conn_ixa */
+		connp->conn_v6lastdst = v6dst;
+		oldixa = conn_replace_ixa(connp, ixa);
+	} else {
+		oldixa = NULL;
+	}
+	mutex_exit(&connp->conn_lock);
+	ixa_refrele(ixa);
+	if (oldixa != NULL)
+		ixa_refrele(oldixa);
+}
+
+/*
+ * Check the destination/label. Modifies *mpp by adding/removing CIPSO.
+ *
+ * We get the label from the message in order to honor the
+ * ULPs/IPs choice of label. This will be NULL for forwarded
+ * packets, neighbor discovery packets and some others.
+ */
+static int
+iptun_output_check_label(mblk_t **mpp, ip_xmit_attr_t *ixa)
+{
+	cred_t	*cr;
+	int	adjust;
+	int	iplen;
+	int	err;
+	ts_label_t *effective_tsl = NULL;
+
+
+	ASSERT(is_system_labeled());
+
+	cr = msg_getcred(*mpp, NULL);
+	if (cr == NULL)
+		return (0);
+
+	/*
+	 * We need to start with a label based on the IP/ULP above us
+	 */
+	ip_xmit_attr_restore_tsl(ixa, cr);
+
+	/*
+	 * Need to update packet with any CIPSO option since
+	 * conn_ip_output doesn't do that.
+	 */
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
+		ipha_t *ipha;
+
+		ipha = (ipha_t *)(*mpp)->b_rptr;
+		iplen = ntohs(ipha->ipha_length);
+		err = tsol_check_label_v4(ixa->ixa_tsl,
+		    ixa->ixa_zoneid, mpp, CONN_MAC_DEFAULT, B_FALSE,
+		    ixa->ixa_ipst, &effective_tsl);
+		if (err != 0)
+			return (err);
+
+		ipha = (ipha_t *)(*mpp)->b_rptr;
+		adjust = (int)ntohs(ipha->ipha_length) - iplen;
+	} else {
+		ip6_t *ip6h;
+
+		ip6h = (ip6_t *)(*mpp)->b_rptr;
+		iplen = ntohs(ip6h->ip6_plen);
+
+		err = tsol_check_label_v6(ixa->ixa_tsl,
+		    ixa->ixa_zoneid, mpp, CONN_MAC_DEFAULT, B_FALSE,
+		    ixa->ixa_ipst, &effective_tsl);
+		if (err != 0)
+			return (err);
+
+		ip6h = (ip6_t *)(*mpp)->b_rptr;
+		adjust = (int)ntohs(ip6h->ip6_plen) - iplen;
+	}
+
+	if (effective_tsl != NULL) {
+		/* Update the label */
+		ip_xmit_attr_replace_tsl(ixa, effective_tsl);
+	}
+	ixa->ixa_pktlen += adjust;
+	ixa->ixa_ip_hdr_length += adjust;
+	return (0);
+}
+
+
+static void
+iptun_output_common(iptun_t *iptun, ip_xmit_attr_t *ixa, mblk_t *mp)
+{
+	ipsec_tun_pol_t	*itp = iptun->iptun_itp;
+	int		outer_hlen;
+	mblk_t		*newmp;
+	ipha_t		*outer4, *inner4;
+	ip6_t		*outer6, *inner6;
+	int		error;
+	boolean_t	update_pktlen;
+
+	ASSERT(ixa->ixa_ire != NULL);
+
+	outer_hlen = iptun_find_headers(mp, 0, &outer4, &inner4, &outer6,
+	    &inner6);
 	if (outer_hlen == 0) {
 		iptun_drop_pkt(mp, &iptun->iptun_oerrors);
 		return;
 	}
 
 	/* Perform header processing. */
-	if (outer4 != NULL)
-		mp = iptun_out_process_ipv4(iptun, mp, outer4, inner4, inner6);
-	else
-		mp = iptun_out_process_ipv6(iptun, mp, outer6, inner6);
+	if (outer4 != NULL) {
+		mp = iptun_out_process_ipv4(iptun, mp, outer4, inner4, inner6,
+		    ixa);
+	} else {
+		mp = iptun_out_process_ipv6(iptun, mp, outer6, inner4, inner6,
+		    ixa);
+	}
 	if (mp == NULL)
 		return;
 
@@ -2964,27 +3397,57 @@ iptun_output(iptun_t *iptun, mblk_t *mp)
 	 * Let's hope the compiler optimizes this with "branch taken".
 	 */
 	if (itp != NULL && (itp->itp_flags & ITPF_P_ACTIVE)) {
-		if ((mp = ipsec_tun_outbound(mp, iptun, inner4, inner6, outer4,
-		    outer6, outer_hlen)) == NULL) {
-			/* ipsec_tun_outbound() frees mp on error. */
+		/* This updates the ip_xmit_attr_t */
+		mp = ipsec_tun_outbound(mp, iptun, inner4, inner6, outer4,
+		    outer6, outer_hlen, ixa);
+		if (mp == NULL) {
 			atomic_inc_64(&iptun->iptun_oerrors);
 			return;
 		}
+		if (is_system_labeled()) {
+			/*
+			 * Might change the packet by adding/removing CIPSO.
+			 * After this caller inner* and outer* and outer_hlen
+			 * might be invalid.
+			 */
+			error = iptun_output_check_label(&mp, ixa);
+			if (error != 0) {
+				ip2dbg(("label check failed (%d)\n", error));
+				iptun_drop_pkt(mp, &iptun->iptun_oerrors);
+				return;
+			}
+		}
+
 		/*
 		 * ipsec_tun_outbound() returns a chain of tunneled IP
 		 * fragments linked with b_next (or a single message if the
-		 * tunneled packet wasn't a fragment).  Each message in the
-		 * chain is prepended by an IPSEC_OUT M_CTL block with
+		 * tunneled packet wasn't a fragment).
+		 * If fragcache returned a list then we need to update
+		 * ixa_pktlen for all packets in the list.
+		 */
+		update_pktlen = (mp->b_next != NULL);
+
+		/*
+		 * Otherwise, we're good to go.  The ixa has been updated with
 		 * instructions for outbound IPsec processing.
 		 */
 		for (newmp = mp; newmp != NULL; newmp = mp) {
-			ASSERT(newmp->b_datap->db_type == M_CTL);
 			atomic_inc_64(&iptun->iptun_opackets);
-			atomic_add_64(&iptun->iptun_obytes,
-			    msgdsize(newmp->b_cont));
+			atomic_add_64(&iptun->iptun_obytes, ixa->ixa_pktlen);
 			mp = mp->b_next;
 			newmp->b_next = NULL;
-			connp->conn_send(connp, newmp, connp->conn_wq, IP_WPUT);
+
+			if (update_pktlen)
+				ixa->ixa_pktlen = msgdsize(mp);
+
+			atomic_inc_64(&iptun->iptun_opackets);
+			atomic_add_64(&iptun->iptun_obytes, ixa->ixa_pktlen);
+
+			error = conn_ip_output(newmp, ixa);
+			if (error == EMSGSIZE) {
+				/* IPsec policy might have changed */
+				(void) iptun_update_mtu(iptun, ixa, 0);
+			}
 		}
 	} else {
 		/*
@@ -2992,30 +3455,37 @@ iptun_output(iptun_t *iptun, mblk_t *mp)
 		 * packet in its output path if there's no active tunnel
 		 * policy.
 		 */
+		ASSERT(ixa->ixa_ipsec_policy == NULL);
+		mp = ip_output_attach_policy(mp, outer4, outer6, NULL, ixa);
+		if (mp == NULL) {
+			atomic_inc_64(&iptun->iptun_oerrors);
+			return;
+		}
+		if (is_system_labeled()) {
+			/*
+			 * Might change the packet by adding/removing CIPSO.
+			 * After this caller inner* and outer* and outer_hlen
+			 * might be invalid.
+			 */
+			error = iptun_output_check_label(&mp, ixa);
+			if (error != 0) {
+				ip2dbg(("label check failed (%d)\n", error));
+				iptun_drop_pkt(mp, &iptun->iptun_oerrors);
+				return;
+			}
+		}
+
 		atomic_inc_64(&iptun->iptun_opackets);
-		atomic_add_64(&iptun->iptun_obytes, msgdsize(mp));
-		connp->conn_send(connp, mp, connp->conn_wq, IP_WPUT);
+		atomic_add_64(&iptun->iptun_obytes, ixa->ixa_pktlen);
+
+		error = conn_ip_output(mp, ixa);
+		if (error == EMSGSIZE) {
+			/* IPsec policy might have changed */
+			(void) iptun_update_mtu(iptun, ixa, 0);
+		}
 	}
-}
-
-/*
- * Note that the setting or clearing iptun_{set,get}_g_q() is serialized via
- * iptuns_lock and iptunq_open(), so we must never be in a situation where
- * iptun_set_g_q() is called if the queue has already been set or vice versa
- * (hence the ASSERT()s.)
- */
-void
-iptun_set_g_q(netstack_t *ns, queue_t *q)
-{
-	ASSERT(ns->netstack_iptun->iptuns_g_q == NULL);
-	ns->netstack_iptun->iptuns_g_q = q;
-}
-
-void
-iptun_clear_g_q(netstack_t *ns)
-{
-	ASSERT(ns->netstack_iptun->iptuns_g_q != NULL);
-	ns->netstack_iptun->iptuns_g_q = NULL;
+	if (ixa->ixa_flags & IXAF_IPSEC_SECURE)
+		ipsec_out_release_refs(ixa);
 }
 
 static mac_callbacks_t iptun_m_callbacks = {

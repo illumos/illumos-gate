@@ -888,6 +888,7 @@ struct sockaddr_in6 {
  */
 #define	IP_PKTINFO		0x1a	/* specify src address and/or index */
 #define	IP_RECVPKTINFO		0x1a	/* recv dest/matched addr and index */
+#define	IP_DONTFRAG		0x1b	/* don't fragment packets */
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 /*

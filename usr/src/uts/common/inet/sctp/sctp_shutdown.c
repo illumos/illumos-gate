@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 
+#include <inet/ipsec_impl.h>
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
@@ -129,12 +130,12 @@ sctp_send_shutdown(sctp_t *sctp, int rexmit)
 
 	/* Link the shutdown chunk in after the IP/SCTP header */
 
-	sctp_set_iplen(sctp, sendmp);
-
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
 	/* Send the shutdown and restart the timer */
-	sctp_add_sendq(sctp, sendmp);
+	sctp_set_iplen(sctp, sendmp, fp->ixa);
+	(void) conn_ip_output(sendmp, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 
 done:
 	sctp->sctp_state = SCTPS_SHUTDOWN_SENT;
@@ -211,11 +212,11 @@ sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, boolean_t crwsd,
 		}
 	}
 
-	sctp_set_iplen(sctp, samp);
-
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	sctp_add_sendq(sctp, samp);
+	sctp_set_iplen(sctp, samp, fp->ixa);
+	(void) conn_ip_output(samp, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 
 dotimer:
 	sctp->sctp_state = SCTPS_SHUTDOWN_ACK_SENT;
@@ -232,7 +233,7 @@ sctp_shutdown_complete(sctp_t *sctp)
 	sctp_chunk_hdr_t *scch;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
-	scmp = sctp_make_mp(sctp, NULL, sizeof (*scch));
+	scmp = sctp_make_mp(sctp, sctp->sctp_current, sizeof (*scch));
 	if (scmp == NULL) {
 		/* XXX use timer approach */
 		SCTP_KSTAT(sctps, sctp_send_shutdown_comp_failed);
@@ -246,11 +247,11 @@ sctp_shutdown_complete(sctp_t *sctp)
 
 	scmp->b_wptr += sizeof (*scch);
 
-	sctp_set_iplen(sctp, scmp);
-
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	sctp_add_sendq(sctp, scmp);
+	sctp_set_iplen(sctp, scmp, sctp->sctp_current->ixa);
+	(void) conn_ip_output(scmp, sctp->sctp_current->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 }
 
 /*
@@ -259,91 +260,99 @@ sctp_shutdown_complete(sctp_t *sctp)
  * and instead must draw all necessary info from the incoming packet.
  */
 void
-sctp_ootb_shutdown_ack(sctp_t *gsctp, mblk_t *inmp, uint_t ip_hdr_len)
+sctp_ootb_shutdown_ack(mblk_t *mp, uint_t ip_hdr_len, ip_recv_attr_t *ira,
+    ip_stack_t *ipst)
 {
 	boolean_t		isv4;
-	ipha_t			*inip4h;
-	ip6_t			*inip6h;
+	ipha_t			*ipha = NULL;
+	ip6_t			*ip6h = NULL;
 	sctp_hdr_t		*insctph;
 	sctp_chunk_hdr_t	*scch;
 	int			i;
 	uint16_t		port;
 	mblk_t			*mp1;
-	sctp_stack_t	*sctps = gsctp->sctp_sctps;
+	netstack_t		*ns = ipst->ips_netstack;
+	sctp_stack_t		*sctps = ns->netstack_sctp;
+	ip_xmit_attr_t		ixas;
 
-	isv4 = (IPH_HDR_VERSION(inmp->b_rptr) == IPV4_VERSION);
+	bzero(&ixas, sizeof (ixas));
 
-	/*
-	 * The gsctp should contain the minimal IP header.  So the
-	 * incoming mblk should be able to hold the new SCTP packet.
-	 */
-	ASSERT(MBLKL(inmp) >= sizeof (*insctph) + sizeof (*scch) +
-	    (isv4 ? gsctp->sctp_ip_hdr_len : gsctp->sctp_ip_hdr6_len));
+	isv4 = (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION);
+
+	ASSERT(MBLKL(mp) >= sizeof (*insctph) + sizeof (*scch) +
+	    (isv4 ? sizeof (ipha_t) : sizeof (ip6_t)));
 
 	/*
 	 * Check to see if we can reuse the incoming mblk.  There should
-	 * not be other reference and the db_base of the mblk should be
-	 * properly aligned.  Since this packet comes from below,
+	 * not be other reference. Since this packet comes from below,
 	 * there should be enough header space to fill in what the lower
-	 * layers want to add.  And we will not stash anything there.
+	 * layers want to add.
 	 */
-	if (!IS_P2ALIGNED(DB_BASE(inmp), sizeof (ire_t *)) ||
-	    DB_REF(inmp) != 1) {
-		mp1 = allocb(MBLKL(inmp) + sctps->sctps_wroff_xtra, BPRI_MED);
+	if (DB_REF(mp) != 1) {
+		mp1 = allocb(MBLKL(mp) + sctps->sctps_wroff_xtra, BPRI_MED);
 		if (mp1 == NULL) {
-			freeb(inmp);
+			freeb(mp);
 			return;
 		}
 		mp1->b_rptr += sctps->sctps_wroff_xtra;
-		mp1->b_wptr = mp1->b_rptr + MBLKL(inmp);
-		bcopy(inmp->b_rptr, mp1->b_rptr, MBLKL(inmp));
-		freeb(inmp);
-		inmp = mp1;
+		mp1->b_wptr = mp1->b_rptr + MBLKL(mp);
+		bcopy(mp->b_rptr, mp1->b_rptr, MBLKL(mp));
+		freeb(mp);
+		mp = mp1;
 	} else {
-		ASSERT(DB_CKSUMFLAGS(inmp) == 0);
+		DB_CKSUMFLAGS(mp) = 0;
 	}
 
+	ixas.ixa_pktlen = ip_hdr_len + sizeof (*insctph) + sizeof (*scch);
+	ixas.ixa_ip_hdr_length = ip_hdr_len;
 	/*
 	 * We follow the logic in tcp_xmit_early_reset() in that we skip
-	 * reversing source route (i.e. relpace all IP options with EOL).
+	 * reversing source route (i.e. replace all IP options with EOL).
 	 */
 	if (isv4) {
 		ipaddr_t	v4addr;
 
-		inip4h = (ipha_t *)inmp->b_rptr;
+		ipha = (ipha_t *)mp->b_rptr;
 		for (i = IP_SIMPLE_HDR_LENGTH; i < (int)ip_hdr_len; i++)
-			inmp->b_rptr[i] = IPOPT_EOL;
+			mp->b_rptr[i] = IPOPT_EOL;
 		/* Swap addresses */
-		inip4h->ipha_length = htons(ip_hdr_len + sizeof (*insctph) +
-		    sizeof (*scch));
-		v4addr = inip4h->ipha_src;
-		inip4h->ipha_src = inip4h->ipha_dst;
-		inip4h->ipha_dst = v4addr;
-		inip4h->ipha_ident = 0;
-		inip4h->ipha_ttl = (uchar_t)sctps->sctps_ipv4_ttl;
+		ipha->ipha_length = htons(ixas.ixa_pktlen);
+		v4addr = ipha->ipha_src;
+		ipha->ipha_src = ipha->ipha_dst;
+		ipha->ipha_dst = v4addr;
+		ipha->ipha_ident = 0;
+		ipha->ipha_ttl = (uchar_t)sctps->sctps_ipv4_ttl;
+
+		ixas.ixa_flags = IXAF_BASIC_SIMPLE_V4;
 	} else {
 		in6_addr_t	v6addr;
 
-		inip6h = (ip6_t *)inmp->b_rptr;
+		ip6h = (ip6_t *)mp->b_rptr;
 		/* Remove any extension headers assuming partial overlay */
 		if (ip_hdr_len > IPV6_HDR_LEN) {
 			uint8_t	*to;
 
-			to = inmp->b_rptr + ip_hdr_len - IPV6_HDR_LEN;
-			ovbcopy(inip6h, to, IPV6_HDR_LEN);
-			inmp->b_rptr += ip_hdr_len - IPV6_HDR_LEN;
+			to = mp->b_rptr + ip_hdr_len - IPV6_HDR_LEN;
+			ovbcopy(ip6h, to, IPV6_HDR_LEN);
+			mp->b_rptr += ip_hdr_len - IPV6_HDR_LEN;
 			ip_hdr_len = IPV6_HDR_LEN;
-			inip6h = (ip6_t *)inmp->b_rptr;
-			inip6h->ip6_nxt = IPPROTO_SCTP;
+			ip6h = (ip6_t *)mp->b_rptr;
+			ip6h->ip6_nxt = IPPROTO_SCTP;
 		}
-		inip6h->ip6_plen = htons(ip_hdr_len + sizeof (*insctph) +
-		    sizeof (*scch) - IPV6_HDR_LEN);
-		v6addr = inip6h->ip6_src;
-		inip6h->ip6_src = inip6h->ip6_dst;
-		inip6h->ip6_dst = v6addr;
-		inip6h->ip6_hops = (uchar_t)sctps->sctps_ipv6_hoplimit;
+		ip6h->ip6_plen = htons(ixas.ixa_pktlen - IPV6_HDR_LEN);
+		v6addr = ip6h->ip6_src;
+		ip6h->ip6_src = ip6h->ip6_dst;
+		ip6h->ip6_dst = v6addr;
+		ip6h->ip6_hops = (uchar_t)sctps->sctps_ipv6_hoplimit;
+
+		ixas.ixa_flags = IXAF_BASIC_SIMPLE_V6;
+		if (IN6_IS_ADDR_LINKSCOPE(&ip6h->ip6_dst)) {
+			ixas.ixa_flags |= IXAF_SCOPEID_SET;
+			ixas.ixa_scopeid = ira->ira_ruifindex;
+		}
 	}
-	insctph = (sctp_hdr_t *)(inmp->b_rptr + ip_hdr_len);
+
+	insctph = (sctp_hdr_t *)(mp->b_rptr + ip_hdr_len);
 
 	/* Swap ports.  Verification tag is reused. */
 	port = insctph->sh_sport;
@@ -359,9 +368,29 @@ sctp_ootb_shutdown_ack(sctp_t *gsctp, mblk_t *inmp, uint_t ip_hdr_len)
 	/* Set the T-bit */
 	SCTP_SET_TBIT(scch);
 
-	BUMP_LOCAL(gsctp->sctp_obchunks);
-	/* Nothing to stash... */
-	SCTP_STASH_IPINFO(inmp, (ire_t *)NULL);
+	ixas.ixa_protocol = IPPROTO_SCTP;
+	ixas.ixa_zoneid = ira->ira_zoneid;
+	ixas.ixa_ipst = ipst;
+	ixas.ixa_ifindex = 0;
 
-	sctp_add_sendq(gsctp, inmp);
+	if (ira->ira_flags & IRAF_IPSEC_SECURE) {
+		/*
+		 * Apply IPsec based on how IPsec was applied to
+		 * the packet that was out of the blue.
+		 */
+		if (!ipsec_in_to_out(ira, &ixas, mp, ipha, ip6h)) {
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
+			/* Note: mp already consumed and ip_drop_packet done */
+			return;
+		}
+	} else {
+		/*
+		 * This is in clear. The message we are building
+		 * here should go out in clear, independent of our policy.
+		 */
+		ixas.ixa_flags |= IXAF_NO_IPSEC;
+	}
+
+	(void) ip_output_simple(mp, &ixas);
+	ixa_cleanup(&ixas);
 }

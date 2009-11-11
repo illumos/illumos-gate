@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,9 +29,9 @@
 #define	rds_max_buf 2097152
 opdes_t rds_opt_arr[] = {
 
-{ SO_TYPE,	SOL_SOCKET, OA_R, OA_R, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
-{ SO_SNDBUF,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
-{ SO_RCVBUF,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
+{ SO_TYPE,	SOL_SOCKET, OA_R, OA_R, OP_NP, 0, sizeof (int), 0 },
+{ SO_SNDBUF,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_RCVBUF,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 };
 
 /* ARGSUSED */
@@ -79,7 +79,7 @@ rds_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 int
 rds_opt_set(queue_t *q, uint_t optset_context, int level,
     int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
-    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
+    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr)
 {
 	int	*i1 = (int *)(uintptr_t)invalp;
 	boolean_t checkonly;
@@ -187,7 +187,6 @@ optdb_obj_t rds_opt_obj = {
 	rds_opt_default,	/* RDS default value function pointer */
 	rds_opt_get,		/* RDS get function pointer */
 	rds_opt_set,		/* RDS set function pointer */
-	B_TRUE,			/* RDS is tpi provider */
 	RDS_OPT_ARR_CNT,	/* RDS option database count of entries */
 	rds_opt_arr,		/* RDS option database */
 	RDS_VALID_LEVELS_CNT,	/* RDS valid level count of entries */

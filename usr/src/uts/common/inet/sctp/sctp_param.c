@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stream.h>
 #include <sys/socket.h>
@@ -72,11 +70,8 @@
 /*
  * sctp_wroff_xtra is the extra space in front of SCTP/IP header for link
  * layer header.  It has to be a multiple of 4.
- * Also there has to be enough space to stash in information passed between
- * IP and SCTP.
  */
-sctpparam_t lcl_sctp_wroff_xtra_param = { sizeof (conn_t *) + sizeof (ire_t *),
-					256, 32, "sctp_wroff_xtra" };
+sctpparam_t lcl_sctp_wroff_xtra_param = { 0, 256, 32, "sctp_wroff_xtra" };
 
 /*
  * All of these are alterable, within the min/max values given, at run time.
@@ -343,7 +338,7 @@ sctp_nd_init(sctp_stack_t *sctps)
 	bcopy(lcl_sctp_param_arr, pa, sizeof (lcl_sctp_param_arr));
 	sctps->sctps_params = pa;
 	return (sctp_param_register(&sctps->sctps_g_nd, pa,
-		    A_CNT(lcl_sctp_param_arr), sctps));
+	    A_CNT(lcl_sctp_param_arr), sctps));
 }
 
 int

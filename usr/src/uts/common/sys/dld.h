@@ -395,7 +395,8 @@ typedef struct dld_capab_poll_s {
 /*
  * Currently supported flags for LSO.
  */
-#define	DLD_LSO_TX_BASIC_TCP_IPV4	0x01	/* TCP LSO capability */
+#define	DLD_LSO_BASIC_TCP_IPV4	0x01	/* TCP LSO over IPv4 capability */
+#define	DLD_LSO_BASIC_TCP_IPV6	0x02	/* TCP LSO over IPv6 capability */
 
 typedef struct dld_capab_lso_s {
 	uint_t  lso_flags;	/* capability flags */

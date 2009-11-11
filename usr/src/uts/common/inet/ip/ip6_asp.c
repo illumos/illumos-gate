@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -41,6 +39,7 @@
 #include <inet/ip6.h>
 #include <inet/ip6_asp.h>
 #include <inet/ip_ire.h>
+#include <inet/ip_if.h>
 #include <inet/ipclassifier.h>
 
 #define	IN6ADDR_MASK128_INIT \
@@ -415,17 +414,12 @@ ip6_asp_replace(mblk_t *mp, ip6_asp_t *new_table, size_t new_size,
 	ipst->ips_ip6_asp_table = tmp_table;
 	ipst->ips_ip6_asp_table_count = count;
 
-	/*
-	 * The user has changed the address selection policy table.  IPv6
-	 * source address selection for existing IRE_CACHE and
-	 * RTF_DYNAMIC entries used the old table, so we need to
-	 * clear the cache.
-	 */
-	ire_walk_v6(ire_delete_cache_v6, NULL, ALL_ZONES, ipst);
-
 unlock_end:
 	ipst->ips_ip6_asp_uip = B_FALSE;
 	mutex_exit(&ipst->ips_ip6_asp_lock);
+
+	/* Let conn_ixa caching know that source address selection changed */
+	ip_update_source_selection(ipst);
 
 replace_end:
 	/* Reply to the ioctl */

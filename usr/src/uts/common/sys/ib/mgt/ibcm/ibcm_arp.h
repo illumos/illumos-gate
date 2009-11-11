@@ -31,24 +31,11 @@ extern "C" {
 #endif
 
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
-#include <sys/modhash.h>
 #include <sys/ib/clients/ibd/ibd.h>
-#include <sys/strsun.h>
-#include <sys/socket.h>
-#include <sys/stat.h>	/* for S_IFCHR */
 #include <inet/ip2mac.h>
 #include <inet/ip6.h>
 
-/*
- * IPoIB addr lookup completion function
- */
-typedef int (*ibcm_arp_pr_comp_func_t) (void *usr_arg, int status);
-
 #define	IBCM_ARP_MAX_IFNAME_LEN		24
-#define	IBCM_ARP_XMIT_COUNT		6
-#define	IBCM_ARP_XMIT_INTERVAL		1000	/* timeout in milliseconds */
-#define	IBCM_ARP_TIMEOUT \
-		((IBCM_ARP_XMIT_COUNT + 1) * IBCM_ARP_XMIT_INTERVAL)
 
 #define	IBCM_H2N_GID(gid) \
 { \
@@ -68,9 +55,7 @@ typedef int (*ibcm_arp_pr_comp_func_t) (void *usr_arg, int status);
  * Path record wait queue node definition
  */
 typedef struct ibcm_arp_prwqn {
-	ibcm_arp_pr_comp_func_t	func;	/* user callback function */
-	void			*arg;	/* callback function arg */
-	timeout_id_t		timeout_id;
+	struct ibcm_arp_streams_s *ib_str;
 	uint8_t			flags;
 	ibt_ip_addr_t		usrc_addr;	/* user supplied src address */
 	ibt_ip_addr_t		dst_addr;	/* user supplied dest address */
@@ -89,14 +74,10 @@ typedef struct ibcm_arp_prwqn {
 typedef struct ibcm_arp_streams_s {
 	kmutex_t		lock;
 	kcondvar_t		cv;
-	queue_t			*arpqueue;
-	vnode_t			*arp_vp;
 	int			status;
 	boolean_t		done;
 	ibcm_arp_prwqn_t	*wqnp;
 } ibcm_arp_streams_t;
-
-/* GID to IP-Addr and Ip-Addr to GID look-up functions. */
 
 #define	IBCM_ARP_IBD_INSTANCES		4
 

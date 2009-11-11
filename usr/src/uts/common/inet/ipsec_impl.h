@@ -410,24 +410,25 @@ struct ipsec_policy_s
 	uint32_t		ipsp_refs;
 	ipsec_sel_t		*ipsp_sel;	/* selector set (shared) */
 	ipsec_action_t		*ipsp_act; 	/* action (may be shared) */
+	netstack_t		*ipsp_netstack;	/* No netstack_hold */
 };
 
 #define	IPPOL_REFHOLD(ipp) {			\
 	atomic_add_32(&(ipp)->ipsp_refs, 1);	\
 	ASSERT((ipp)->ipsp_refs != 0);		\
 }
-#define	IPPOL_REFRELE(ipp, ns) {				\
+#define	IPPOL_REFRELE(ipp) {					\
 	ASSERT((ipp)->ipsp_refs != 0);				\
 	membar_exit();						\
 	if (atomic_add_32_nv(&(ipp)->ipsp_refs, -1) == 0)	\
-		ipsec_policy_free(ipp, ns);			\
+		ipsec_policy_free(ipp);				\
 	(ipp) = 0;						\
 }
 
-#define	IPPOL_UNCHAIN(php, ip, ns)					\
-	HASHLIST_UNCHAIN((ip), ipsp_hash);				\
-	avl_remove(&(php)->iph_rulebyid, (ip));				\
-	IPPOL_REFRELE(ip, ns);
+#define	IPPOL_UNCHAIN(php, ip)					\
+	HASHLIST_UNCHAIN((ip), ipsp_hash);			\
+	avl_remove(&(php)->iph_rulebyid, (ip));			\
+	IPPOL_REFRELE(ip);
 
 /*
  * Policy ruleset.  One per (protocol * direction) for system policy.
@@ -590,8 +591,6 @@ typedef struct ipsid_s
 	atomic_add_32(&(ipsid)->ipsid_refcnt, -1);		\
 }
 
-struct ipsec_out_s;
-
 /*
  * Following are the estimates of what the maximum AH and ESP header size
  * would be. This is used to tell the upper layer the right value of MSS
@@ -708,6 +707,17 @@ typedef struct ipsif_s
 	kmutex_t ipsif_lock;
 } ipsif_t;
 
+/*
+ * For call to the kernel crypto framework. State needed during
+ * the execution of a crypto request.
+ */
+typedef struct ipsec_crypto_s {
+	size_t		ic_skip_len;		/* len to skip for AH auth */
+	crypto_data_t	ic_crypto_data;		/* single op crypto data */
+	crypto_dual_data_t ic_crypto_dual_data; /* for dual ops */
+	crypto_data_t	ic_crypto_mac;		/* to store the MAC */
+	ipsa_cm_mech_t	ic_cmm;
+} ipsec_crypto_t;
 
 /*
  * IPsec stack instances
@@ -826,45 +836,40 @@ extern boolean_t ipsec_loaded(ipsec_stack_t *);
 extern boolean_t ipsec_failed(ipsec_stack_t *);
 
 /*
- * callback from ipsec_loader to ip
- */
-extern void ip_ipsec_load_complete(ipsec_stack_t *);
-
-/*
  * ipsec policy entrypoints (spd.c)
  */
 
 extern void ipsec_policy_g_destroy(void);
 extern void ipsec_policy_g_init(void);
 
+extern mblk_t	*ipsec_add_crypto_data(mblk_t *, ipsec_crypto_t **);
+extern mblk_t	*ipsec_remove_crypto_data(mblk_t *, ipsec_crypto_t **);
+extern mblk_t	*ipsec_free_crypto_data(mblk_t *);
 extern int ipsec_alloc_table(ipsec_policy_head_t *, int, int, boolean_t,
     netstack_t *);
 extern void ipsec_polhead_init(ipsec_policy_head_t *, int);
 extern void ipsec_polhead_destroy(ipsec_policy_head_t *);
 extern void ipsec_polhead_free_table(ipsec_policy_head_t *);
 extern mblk_t *ipsec_check_global_policy(mblk_t *, conn_t *, ipha_t *,
-		    ip6_t *, boolean_t, netstack_t *);
+    ip6_t *, ip_recv_attr_t *, netstack_t *ns);
 extern mblk_t *ipsec_check_inbound_policy(mblk_t *, conn_t *, ipha_t *, ip6_t *,
-    boolean_t);
+    ip_recv_attr_t *);
 
-extern boolean_t ipsec_in_to_out(mblk_t *, ipha_t *, ip6_t *, zoneid_t);
+extern boolean_t ipsec_in_to_out(ip_recv_attr_t *, ip_xmit_attr_t *,
+    mblk_t *, ipha_t *, ip6_t *);
+extern void ipsec_in_release_refs(ip_recv_attr_t *);
+extern void ipsec_out_release_refs(ip_xmit_attr_t *);
 extern void ipsec_log_policy_failure(int, char *, ipha_t *, ip6_t *, boolean_t,
-		    netstack_t *);
+    netstack_t *);
 extern boolean_t ipsec_inbound_accept_clear(mblk_t *, ipha_t *, ip6_t *);
 extern int ipsec_conn_cache_policy(conn_t *, boolean_t);
-extern mblk_t *ipsec_alloc_ipsec_out(netstack_t *);
-extern mblk_t	*ipsec_attach_ipsec_out(mblk_t **, conn_t *, ipsec_policy_t *,
-    uint8_t, netstack_t *);
-extern mblk_t	*ipsec_init_ipsec_out(mblk_t *, mblk_t **, conn_t *,
-    ipsec_policy_t *, uint8_t, netstack_t *);
-struct ipsec_in_s;
-extern ipsec_action_t *ipsec_in_to_out_action(struct ipsec_in_s *);
-extern boolean_t ipsec_check_ipsecin_latch(struct ipsec_in_s *, mblk_t *,
-    struct ipsec_latch_s *, ipha_t *, ip6_t *, const char **, kstat_named_t **,
-    conn_t *);
-extern void ipsec_latch_inbound(ipsec_latch_t *ipl, struct ipsec_in_s *ii);
+extern void ipsec_cache_outbound_policy(const conn_t *, const in6_addr_t *,
+    const in6_addr_t *, in_port_t, ip_xmit_attr_t *);
+extern boolean_t ipsec_outbound_policy_current(ip_xmit_attr_t *);
+extern ipsec_action_t *ipsec_in_to_out_action(ip_recv_attr_t *);
+extern void ipsec_latch_inbound(conn_t *connp, ip_recv_attr_t *ira);
 
-extern void ipsec_policy_free(ipsec_policy_t *, netstack_t *);
+extern void ipsec_policy_free(ipsec_policy_t *);
 extern void ipsec_action_free(ipsec_action_t *);
 extern void ipsec_polhead_free(ipsec_policy_head_t *, netstack_t *);
 extern ipsec_policy_head_t *ipsec_polhead_split(ipsec_policy_head_t *,
@@ -894,12 +899,8 @@ extern void ipsec_actvec_free(ipsec_act_t *, uint_t);
 extern int ipsec_req_from_head(ipsec_policy_head_t *, ipsec_req_t *, int);
 extern mblk_t *ipsec_construct_inverse_acquire(sadb_msg_t *, sadb_ext_t **,
     netstack_t *);
-extern mblk_t *ip_wput_attach_policy(mblk_t *, ipha_t *, ip6_t *, ire_t *,
-    conn_t *, boolean_t, zoneid_t);
-extern mblk_t	*ip_wput_ire_parse_ipsec_out(mblk_t *, ipha_t *, ip6_t *,
-    ire_t *, conn_t *, boolean_t, zoneid_t);
-extern ipsec_policy_t *ipsec_find_policy(int, conn_t *,
-    struct ipsec_out_s *, ipsec_selector_t *, netstack_t *);
+extern ipsec_policy_t *ipsec_find_policy(int, const conn_t *,
+    ipsec_selector_t *, netstack_t *);
 extern ipsid_t *ipsid_lookup(int, char *, netstack_t *);
 extern boolean_t ipsid_equal(ipsid_t *, ipsid_t *);
 extern void ipsid_gc(netstack_t *);
@@ -912,29 +913,29 @@ extern void ipsec_enter_policy(ipsec_policy_head_t *, ipsec_policy_t *, int,
     netstack_t *);
 extern boolean_t ipsec_check_action(ipsec_act_t *, int *, netstack_t *);
 
-extern mblk_t *ipsec_out_tag(mblk_t *, mblk_t *, netstack_t *);
-extern mblk_t *ipsec_in_tag(mblk_t *, mblk_t *, netstack_t *);
-extern mblk_t *ip_copymsg(mblk_t *mp);
-
-extern void iplatch_free(ipsec_latch_t *, netstack_t *);
+extern void iplatch_free(ipsec_latch_t *);
 extern ipsec_latch_t *iplatch_create(void);
 extern int ipsec_set_req(cred_t *, conn_t *, ipsec_req_t *);
 
 extern void ipsec_insert_always(avl_tree_t *tree, void *new_node);
 
 extern int32_t ipsec_act_ovhd(const ipsec_act_t *act);
-extern int sadb_whack_label(mblk_t **, ipsa_t *);
-extern int sadb_whack_label_v6(mblk_t **, ipsa_t *);
+extern mblk_t *sadb_whack_label(mblk_t *, ipsa_t *, ip_xmit_attr_t *,
+    kstat_named_t *, ipdropper_t *);
+extern mblk_t *sadb_whack_label_v4(mblk_t *, ipsa_t *, kstat_named_t *,
+    ipdropper_t *);
+extern mblk_t *sadb_whack_label_v6(mblk_t *, ipsa_t *, kstat_named_t *,
+    ipdropper_t *);
 extern boolean_t update_iv(uint8_t *, queue_t *, ipsa_t *, ipsecesp_stack_t *);
 
 /*
  * Tunnel-support SPD functions and variables.
  */
 struct iptun_s;	/* Defined in inet/iptun/iptun_impl.h. */
-extern boolean_t ipsec_tun_inbound(mblk_t *, mblk_t **,  ipsec_tun_pol_t *,
+extern mblk_t *ipsec_tun_inbound(ip_recv_attr_t *, mblk_t *,  ipsec_tun_pol_t *,
     ipha_t *, ip6_t *, ipha_t *, ip6_t *, int, netstack_t *);
 extern mblk_t *ipsec_tun_outbound(mblk_t *, struct iptun_s *, ipha_t *,
-    ip6_t *, ipha_t *, ip6_t *, int);
+    ip6_t *, ipha_t *, ip6_t *, int, ip_xmit_attr_t *);
 extern void itp_free(ipsec_tun_pol_t *, netstack_t *);
 extern ipsec_tun_pol_t *create_tunnel_policy(char *, int *, uint64_t *,
     netstack_t *);
@@ -951,9 +952,9 @@ extern ipsec_tun_pol_t *itp_get_byaddr(uint32_t *, uint32_t *, int,
  */
 
 extern void ipsecah_in_assocfailure(mblk_t *, char, ushort_t, char *,
-    uint32_t, void *, int, ipsecah_stack_t *);
+    uint32_t, void *, int, ip_recv_attr_t *ira);
 extern void ipsecesp_in_assocfailure(mblk_t *, char, ushort_t, char *,
-    uint32_t, void *, int, ipsecesp_stack_t *);
+    uint32_t, void *, int, ip_recv_attr_t *ira);
 extern void ipsecesp_send_keepalive(ipsa_t *);
 
 /*
@@ -987,13 +988,8 @@ extern void ipsecah_algs_changed(netstack_t *);
 extern void ipsecesp_algs_changed(netstack_t *);
 extern void ipsecesp_init_funcs(ipsa_t *);
 extern void ipsecah_init_funcs(ipsa_t *);
-extern ipsec_status_t ipsecah_icmp_error(mblk_t *);
-extern ipsec_status_t ipsecesp_icmp_error(mblk_t *);
-
-/*
- * Wrapper for putnext() to ipsec accelerated interface.
- */
-extern void ipsec_hw_putnext(queue_t *, mblk_t *);
+extern mblk_t *ipsecah_icmp_error(mblk_t *, ip_recv_attr_t *);
+extern mblk_t *ipsecesp_icmp_error(mblk_t *, ip_recv_attr_t *);
 
 /*
  * spdsock functions that are called directly by IP.
@@ -1003,11 +999,11 @@ extern void spdsock_update_pending_algs(netstack_t *);
 /*
  * IP functions that are called from AH and ESP.
  */
-extern boolean_t ipsec_outbound_sa(mblk_t *, uint_t);
-extern esph_t *ipsec_inbound_esp_sa(mblk_t *, netstack_t *);
-extern ah_t *ipsec_inbound_ah_sa(mblk_t *, netstack_t *);
+extern boolean_t ipsec_outbound_sa(mblk_t *, ip_xmit_attr_t *, uint_t);
+extern mblk_t *ipsec_inbound_esp_sa(mblk_t *, ip_recv_attr_t *, esph_t **);
+extern mblk_t *ipsec_inbound_ah_sa(mblk_t *, ip_recv_attr_t *, ah_t **);
 extern ipsec_policy_t *ipsec_find_policy_head(ipsec_policy_t *,
-    ipsec_policy_head_t *, int, ipsec_selector_t *, netstack_t *);
+    ipsec_policy_head_t *, int, ipsec_selector_t *);
 
 /*
  * IP dropper init/destroy.
@@ -1019,7 +1015,7 @@ void ip_drop_destroy(ipsec_stack_t *);
  * Common functions
  */
 extern boolean_t ip_addr_match(uint8_t *, int, in6_addr_t *);
-extern boolean_t ipsec_label_match(cred_t *, cred_t *);
+extern boolean_t ipsec_label_match(ts_label_t *, ts_label_t *);
 
 /*
  * AH and ESP counters types.

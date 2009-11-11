@@ -59,7 +59,6 @@
 #include <inet/ipsecesp.h>
 #include <sys/random.h>
 #include <sys/dlpi.h>
-#include <sys/iphada.h>
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <inet/ip_if.h>
@@ -77,15 +76,13 @@
 static mblk_t *sadb_extended_acquire(ipsec_selector_t *, ipsec_policy_t *,
     ipsec_action_t *, boolean_t, uint32_t, uint32_t, sadb_sens_t *,
     netstack_t *);
-static void sadb_ill_df(ill_t *, mblk_t *, isaf_t *, int, boolean_t);
-static ipsa_t *sadb_torch_assoc(isaf_t *, ipsa_t *, boolean_t, mblk_t **);
-static void sadb_drain_torchq(queue_t *, mblk_t *);
+static ipsa_t *sadb_torch_assoc(isaf_t *, ipsa_t *);
 static void sadb_destroy_acqlist(iacqf_t **, uint_t, boolean_t,
 			    netstack_t *);
 static void sadb_destroy(sadb_t *, netstack_t *);
 static mblk_t *sadb_sa2msg(ipsa_t *, sadb_msg_t *);
-static cred_t *sadb_cred_from_sens(sadb_sens_t *, uint64_t *);
-static sadb_sens_t *sadb_make_sens_ext(cred_t *cr, int *len);
+static ts_label_t *sadb_label_from_sens(sadb_sens_t *, uint64_t *);
+static sadb_sens_t *sadb_make_sens_ext(ts_label_t *tsl, int *len);
 
 static time_t sadb_add_time(time_t, uint64_t);
 static void lifetime_fuzz(ipsa_t *);
@@ -96,12 +93,6 @@ static void destroy_ipsa_pair(ipsap_t *);
 static int update_pairing(ipsap_t *, ipsa_query_t *, keysock_in_t *, int *);
 static void ipsa_set_replay(ipsa_t *ipsa, uint32_t offset);
 
-extern void (*cl_inet_getspi)(netstackid_t stack_id, uint8_t protocol,
-    uint8_t *ptr, size_t len, void *args);
-extern int (*cl_inet_checkspi)(netstackid_t stack_id, uint8_t protocol,
-    uint32_t spi, void *args);
-extern void (*cl_inet_deletespi)(netstackid_t stack_id, uint8_t protocol,
-    uint32_t spi, void *args);
 /*
  * ipsacq_maxpackets is defined here to make it tunable
  * from /etc/system.
@@ -269,6 +260,7 @@ static void
 sadb_freeassoc(ipsa_t *ipsa)
 {
 	ipsec_stack_t	*ipss = ipsa->ipsa_netstack->netstack_ipsec;
+	mblk_t		*asyncmp, *mp;
 
 	ASSERT(ipss != NULL);
 	ASSERT(MUTEX_NOT_HELD(&ipsa->ipsa_lock));
@@ -276,20 +268,24 @@ sadb_freeassoc(ipsa_t *ipsa)
 	ASSERT(ipsa->ipsa_next == NULL);
 	ASSERT(ipsa->ipsa_ptpn == NULL);
 
-	mutex_enter(&ipsa->ipsa_lock);
-	/* Don't call sadb_clear_lpkt() since we hold the ipsa_lock anyway. */
-	ip_drop_packet(ipsa->ipsa_lpkt, B_TRUE, NULL, NULL,
-	    DROPPER(ipss, ipds_sadb_inlarval_timeout),
-	    &ipss->ipsec_sadb_dropper);
 
-	if (ipsa->ipsa_cred != NULL) {
-		crfree(ipsa->ipsa_cred);
-		ipsa->ipsa_cred = NULL;
+	asyncmp = sadb_clear_lpkt(ipsa);
+	if (asyncmp != NULL) {
+		mp = ip_recv_attr_free_mblk(asyncmp);
+		ip_drop_packet(mp, B_TRUE, NULL,
+		    DROPPER(ipss, ipds_sadb_inlarval_timeout),
+		    &ipss->ipsec_sadb_dropper);
+	}
+	mutex_enter(&ipsa->ipsa_lock);
+
+	if (ipsa->ipsa_tsl != NULL) {
+		label_rele(ipsa->ipsa_tsl);
+		ipsa->ipsa_tsl = NULL;
 	}
 
-	if (ipsa->ipsa_ocred != NULL) {
-		crfree(ipsa->ipsa_ocred);
-		ipsa->ipsa_ocred = NULL;
+	if (ipsa->ipsa_otsl != NULL) {
+		label_rele(ipsa->ipsa_otsl);
+		ipsa->ipsa_otsl = NULL;
 	}
 
 	ipsec_destroy_ctx_tmpl(ipsa, IPSEC_ALG_AUTH);
@@ -712,336 +708,6 @@ sadb_walker(isaf_t *table, uint_t numentries,
 }
 
 /*
- * From the given SA, construct a dl_ct_ipsec_key and
- * a dl_ct_ipsec structures to be sent to the adapter as part
- * of a DL_CONTROL_REQ.
- *
- * ct_sa must point to the storage allocated for the key
- * structure and must be followed by storage allocated
- * for the SA information that must be sent to the driver
- * as part of the DL_CONTROL_REQ request.
- *
- * The is_inbound boolean indicates whether the specified
- * SA is part of an inbound SA table.
- *
- * Returns B_TRUE if the corresponding SA must be passed to
- * a provider, B_FALSE otherwise; frees *mp if it returns B_FALSE.
- */
-static boolean_t
-sadb_req_from_sa(ipsa_t *sa, mblk_t *mp, boolean_t is_inbound)
-{
-	dl_ct_ipsec_key_t *keyp;
-	dl_ct_ipsec_t *sap;
-	void *ct_sa = mp->b_wptr;
-
-	ASSERT(MUTEX_HELD(&sa->ipsa_lock));
-
-	keyp = (dl_ct_ipsec_key_t *)(ct_sa);
-	sap = (dl_ct_ipsec_t *)(keyp + 1);
-
-	IPSECHW_DEBUG(IPSECHW_CAPAB, ("sadb_req_from_sa: "
-	    "is_inbound = %d\n", is_inbound));
-
-	/* initialize flag */
-	sap->sadb_sa_flags = 0;
-	if (is_inbound) {
-		sap->sadb_sa_flags |= DL_CT_IPSEC_INBOUND;
-		/*
-		 * If an inbound SA has a peer, then mark it has being
-		 * an outbound SA as well.
-		 */
-		if (sa->ipsa_haspeer)
-			sap->sadb_sa_flags |= DL_CT_IPSEC_OUTBOUND;
-	} else {
-		/*
-		 * If an outbound SA has a peer, then don't send it,
-		 * since we will send the copy from the inbound table.
-		 */
-		if (sa->ipsa_haspeer) {
-			freemsg(mp);
-			return (B_FALSE);
-		}
-		sap->sadb_sa_flags |= DL_CT_IPSEC_OUTBOUND;
-	}
-
-	keyp->dl_key_spi = sa->ipsa_spi;
-	bcopy(sa->ipsa_dstaddr, keyp->dl_key_dest_addr,
-	    DL_CTL_IPSEC_ADDR_LEN);
-	keyp->dl_key_addr_family = sa->ipsa_addrfam;
-
-	sap->sadb_sa_auth = sa->ipsa_auth_alg;
-	sap->sadb_sa_encrypt = sa->ipsa_encr_alg;
-
-	sap->sadb_key_len_a = sa->ipsa_authkeylen;
-	sap->sadb_key_bits_a = sa->ipsa_authkeybits;
-	bcopy(sa->ipsa_authkey,
-	    sap->sadb_key_data_a, sap->sadb_key_len_a);
-
-	sap->sadb_key_len_e = sa->ipsa_encrkeylen;
-	sap->sadb_key_bits_e = sa->ipsa_encrkeybits;
-	bcopy(sa->ipsa_encrkey,
-	    sap->sadb_key_data_e, sap->sadb_key_len_e);
-
-	mp->b_wptr += sizeof (dl_ct_ipsec_t) + sizeof (dl_ct_ipsec_key_t);
-	return (B_TRUE);
-}
-
-/*
- * Called from AH or ESP to format a message which will be used to inform
- * IPsec-acceleration-capable ills of a SADB change.
- * (It is not possible to send the message to IP directly from this function
- * since the SA, if any, is locked during the call).
- *
- * dl_operation: DL_CONTROL_REQ operation (add, delete, update, etc)
- * sa_type: identifies whether the operation applies to AH or ESP
- *	(must be one of SADB_SATYPE_AH or SADB_SATYPE_ESP)
- * sa: Pointer to an SA.  Must be non-NULL and locked
- *	for ADD, DELETE, GET, and UPDATE operations.
- * This function returns an mblk chain that must be passed to IP
- * for forwarding to the IPsec capable providers.
- */
-mblk_t *
-sadb_fmt_sa_req(uint_t dl_operation, uint_t sa_type, ipsa_t *sa,
-    boolean_t is_inbound)
-{
-	mblk_t *mp;
-	dl_control_req_t *ctrl;
-	boolean_t need_key = B_FALSE;
-	mblk_t *ctl_mp = NULL;
-	ipsec_ctl_t *ctl;
-
-	/*
-	 * 1 allocate and initialize DL_CONTROL_REQ M_PROTO
-	 * 2 if a key is needed for the operation
-	 *    2.1 initialize key
-	 *    2.2 if a full SA is needed for the operation
-	 *	2.2.1 initialize full SA info
-	 * 3 return message; caller will call ill_ipsec_capab_send_all()
-	 * to send the resulting message to IPsec capable ills.
-	 */
-
-	ASSERT(sa_type == SADB_SATYPE_AH || sa_type == SADB_SATYPE_ESP);
-
-	/*
-	 * Allocate DL_CONTROL_REQ M_PROTO
-	 * We allocate room for the SA even if it's not needed
-	 * by some of the operations (for example flush)
-	 */
-	mp = allocb(sizeof (dl_control_req_t) +
-	    sizeof (dl_ct_ipsec_key_t) + sizeof (dl_ct_ipsec_t), BPRI_HI);
-	if (mp == NULL)
-		return (NULL);
-	mp->b_datap->db_type = M_PROTO;
-
-	/* initialize dl_control_req_t */
-	ctrl = (dl_control_req_t *)mp->b_wptr;
-	ctrl->dl_primitive = DL_CONTROL_REQ;
-	ctrl->dl_operation = dl_operation;
-	ctrl->dl_type = sa_type == SADB_SATYPE_AH ? DL_CT_IPSEC_AH :
-	    DL_CT_IPSEC_ESP;
-	ctrl->dl_key_offset = sizeof (dl_control_req_t);
-	ctrl->dl_key_length = sizeof (dl_ct_ipsec_key_t);
-	ctrl->dl_data_offset = sizeof (dl_control_req_t) +
-	    sizeof (dl_ct_ipsec_key_t);
-	ctrl->dl_data_length = sizeof (dl_ct_ipsec_t);
-	mp->b_wptr += sizeof (dl_control_req_t);
-
-	if ((dl_operation == DL_CO_SET) || (dl_operation == DL_CO_DELETE)) {
-		ASSERT(sa != NULL);
-		ASSERT(MUTEX_HELD(&sa->ipsa_lock));
-
-		need_key = B_TRUE;
-
-		/*
-		 * Initialize key and SA data. Note that for some
-		 * operations the SA data is ignored by the provider
-		 * (delete, etc.)
-		 */
-		if (!sadb_req_from_sa(sa, mp, is_inbound))
-			return (NULL);
-	}
-
-	/* construct control message */
-	ctl_mp = allocb(sizeof (ipsec_ctl_t), BPRI_HI);
-	if (ctl_mp == NULL) {
-		cmn_err(CE_WARN, "sadb_fmt_sa_req: allocb failed\n");
-		freemsg(mp);
-		return (NULL);
-	}
-
-	ctl_mp->b_datap->db_type = M_CTL;
-	ctl_mp->b_wptr += sizeof (ipsec_ctl_t);
-	ctl_mp->b_cont = mp;
-
-	ctl = (ipsec_ctl_t *)ctl_mp->b_rptr;
-	ctl->ipsec_ctl_type = IPSEC_CTL;
-	ctl->ipsec_ctl_len  = sizeof (ipsec_ctl_t);
-	ctl->ipsec_ctl_sa_type = sa_type;
-
-	if (need_key) {
-		/*
-		 * Keep an additional reference on SA, since it will be
-		 * needed by IP to send control messages corresponding
-		 * to that SA from its perimeter. IP will do a
-		 * IPSA_REFRELE when done with the request.
-		 */
-		ASSERT(MUTEX_HELD(&sa->ipsa_lock));
-		IPSA_REFHOLD(sa);
-		ctl->ipsec_ctl_sa = sa;
-	} else
-		ctl->ipsec_ctl_sa = NULL;
-
-	return (ctl_mp);
-}
-
-
-/*
- * Called by sadb_ill_download() to dump the entries for a specific
- * fanout table.  For each SA entry in the table passed as argument,
- * use mp as a template and constructs a full DL_CONTROL message, and
- * call ill_dlpi_send(), provided by IP, to send the resulting
- * messages to the ill.
- */
-static void
-sadb_ill_df(ill_t *ill, mblk_t *mp, isaf_t *fanout, int num_entries,
-    boolean_t is_inbound)
-{
-	ipsa_t *walker;
-	mblk_t *nmp, *salist;
-	int i, error = 0;
-	ip_stack_t	*ipst = ill->ill_ipst;
-	netstack_t	*ns = ipst->ips_netstack;
-
-	IPSECHW_DEBUG(IPSECHW_SADB, ("sadb_ill_df: fanout at 0x%p ne=%d\n",
-	    (void *)fanout, num_entries));
-	/*
-	 * For each IPSA hash bucket do:
-	 *	- Hold the mutex
-	 *	- Walk each entry, sending a corresponding request to IP
-	 *	  for it.
-	 */
-	ASSERT(mp->b_datap->db_type == M_PROTO);
-
-	for (i = 0; i < num_entries; i++) {
-		mutex_enter(&fanout[i].isaf_lock);
-		salist = NULL;
-
-		for (walker = fanout[i].isaf_ipsa; walker != NULL;
-		    walker = walker->ipsa_next) {
-			IPSECHW_DEBUG(IPSECHW_SADB,
-			    ("sadb_ill_df: sending SA to ill via IP \n"));
-			/*
-			 * Duplicate the template mp passed and
-			 * complete DL_CONTROL_REQ data.
-			 * To be more memory efficient, we could use
-			 * dupb() for the M_CTL and copyb() for the M_PROTO
-			 * as the M_CTL, since the M_CTL is the same for
-			 * every SA entry passed down to IP for the same ill.
-			 *
-			 * Note that copymsg/copyb ensure that the new mblk
-			 * is at least as large as the source mblk even if it's
-			 * not using all its storage -- therefore, nmp
-			 * has trailing space for sadb_req_from_sa to add
-			 * the SA-specific bits.
-			 */
-			mutex_enter(&walker->ipsa_lock);
-			if (ipsec_capab_match(ill,
-			    ill->ill_phyint->phyint_ifindex, ill->ill_isv6,
-			    walker, ns)) {
-				nmp = copymsg(mp);
-				if (nmp == NULL) {
-					IPSECHW_DEBUG(IPSECHW_SADB,
-					    ("sadb_ill_df: alloc error\n"));
-					error = ENOMEM;
-					mutex_exit(&walker->ipsa_lock);
-					break;
-				}
-				if (sadb_req_from_sa(walker, nmp, is_inbound)) {
-					nmp->b_next = salist;
-					salist = nmp;
-				}
-			}
-			mutex_exit(&walker->ipsa_lock);
-		}
-		mutex_exit(&fanout[i].isaf_lock);
-		while (salist != NULL) {
-			nmp = salist;
-			salist = nmp->b_next;
-			nmp->b_next = NULL;
-			ill_dlpi_send(ill, nmp);
-		}
-		if (error != 0)
-			break;	/* out of for loop. */
-	}
-}
-
-/*
- * Called by ill_ipsec_capab_add(). Sends a copy of the SADB of
- * the type specified by sa_type to the specified ill.
- *
- * We call for each fanout table defined by the SADB (one per
- * protocol). sadb_ill_df() finally calls ill_dlpi_send() for
- * each SADB entry in order to send a corresponding DL_CONTROL_REQ
- * message to the ill.
- */
-void
-sadb_ill_download(ill_t *ill, uint_t sa_type)
-{
-	mblk_t *protomp;	/* prototype message */
-	dl_control_req_t *ctrl;
-	sadbp_t *spp;
-	sadb_t *sp;
-	int dlt;
-	ip_stack_t	*ipst = ill->ill_ipst;
-	netstack_t	*ns = ipst->ips_netstack;
-
-	ASSERT(sa_type == SADB_SATYPE_AH || sa_type == SADB_SATYPE_ESP);
-
-	/*
-	 * Allocate and initialize prototype answer. A duplicate for
-	 * each SA is sent down to the interface.
-	 */
-
-	/* DL_CONTROL_REQ M_PROTO mblk_t */
-	protomp = allocb(sizeof (dl_control_req_t) +
-	    sizeof (dl_ct_ipsec_key_t) + sizeof (dl_ct_ipsec_t), BPRI_HI);
-	if (protomp == NULL)
-		return;
-	protomp->b_datap->db_type = M_PROTO;
-
-	dlt = (sa_type == SADB_SATYPE_AH) ? DL_CT_IPSEC_AH : DL_CT_IPSEC_ESP;
-	if (sa_type == SADB_SATYPE_ESP) {
-		ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
-
-		spp = &espstack->esp_sadb;
-	} else {
-		ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
-
-		spp = &ahstack->ah_sadb;
-	}
-
-	ctrl = (dl_control_req_t *)protomp->b_wptr;
-	ctrl->dl_primitive = DL_CONTROL_REQ;
-	ctrl->dl_operation = DL_CO_SET;
-	ctrl->dl_type = dlt;
-	ctrl->dl_key_offset = sizeof (dl_control_req_t);
-	ctrl->dl_key_length = sizeof (dl_ct_ipsec_key_t);
-	ctrl->dl_data_offset = sizeof (dl_control_req_t) +
-	    sizeof (dl_ct_ipsec_key_t);
-	ctrl->dl_data_length = sizeof (dl_ct_ipsec_t);
-	protomp->b_wptr += sizeof (dl_control_req_t);
-
-	/*
-	 * then for each SADB entry, we fill out the dl_ct_ipsec_key_t
-	 * and dl_ct_ipsec_t
-	 */
-	sp = ill->ill_isv6 ? &(spp->s_v6) : &(spp->s_v4);
-	sadb_ill_df(ill, protomp, sp->sdb_of, sp->sdb_hashsize, B_FALSE);
-	sadb_ill_df(ill, protomp, sp->sdb_if, sp->sdb_hashsize, B_TRUE);
-	freemsg(protomp);
-}
-
-/*
  * Call me to free up a security association fanout.  Use the forever
  * variable to indicate freeing up the SAs (forever == B_FALSE, e.g.
  * an SADB_FLUSH message), or destroying everything (forever == B_TRUE,
@@ -1119,30 +785,11 @@ sadb_destroy(sadb_t *sp, netstack_t *ns)
 	ASSERT(sp->sdb_acq == NULL);
 }
 
-static void
-sadb_send_flush_req(sadbp_t *spp)
-{
-	mblk_t *ctl_mp;
-
-	/*
-	 * we've been unplumbed, or never were plumbed; don't go there.
-	 */
-	if (spp->s_ip_q == NULL)
-		return;
-
-	/* have IP send a flush msg to the IPsec accelerators */
-	ctl_mp = sadb_fmt_sa_req(DL_CO_FLUSH, spp->s_satype, NULL, B_TRUE);
-	if (ctl_mp != NULL)
-		putnext(spp->s_ip_q, ctl_mp);
-}
-
 void
 sadbp_flush(sadbp_t *spp, netstack_t *ns)
 {
 	sadb_flush(&spp->s_v4, ns);
 	sadb_flush(&spp->s_v6, ns);
-
-	sadb_send_flush_req(spp);
 }
 
 void
@@ -1151,7 +798,6 @@ sadbp_destroy(sadbp_t *spp, netstack_t *ns)
 	sadb_destroy(&spp->s_v4, ns);
 	sadb_destroy(&spp->s_v6, ns);
 
-	sadb_send_flush_req(spp);
 	if (spp->s_satype == SADB_SATYPE_AH) {
 		ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
@@ -1259,11 +905,11 @@ sadb_cloneassoc(ipsa_t *ipsa)
 	/* bzero and initialize locks, in case *_init() allocates... */
 	mutex_init(&newbie->ipsa_lock, NULL, MUTEX_DEFAULT, NULL);
 
-	if (newbie->ipsa_cred != NULL)
-		crhold(newbie->ipsa_cred);
+	if (newbie->ipsa_tsl != NULL)
+		label_hold(newbie->ipsa_tsl);
 
-	if (newbie->ipsa_ocred != NULL)
-		crhold(newbie->ipsa_ocred);
+	if (newbie->ipsa_otsl != NULL)
+		label_hold(newbie->ipsa_otsl);
 
 	/*
 	 * While somewhat dain-bramaged, the most graceful way to
@@ -1554,14 +1200,14 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 		encr = B_FALSE;
 	}
 
-	if (ipsa->ipsa_cred != NULL) {
-		senslen = sadb_sens_len_from_cred(ipsa->ipsa_cred);
+	if (ipsa->ipsa_tsl != NULL) {
+		senslen = sadb_sens_len_from_label(ipsa->ipsa_tsl);
 		alloclen += senslen;
 		sensinteg = B_TRUE;
 	}
 
-	if (ipsa->ipsa_ocred != NULL) {
-		osenslen = sadb_sens_len_from_cred(ipsa->ipsa_ocred);
+	if (ipsa->ipsa_otsl != NULL) {
+		osenslen = sadb_sens_len_from_label(ipsa->ipsa_otsl);
 		alloclen += osenslen;
 		osensinteg = B_TRUE;
 	}
@@ -1792,8 +1438,8 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 
 	if (sensinteg) {
 		sens = (sadb_sens_t *)walker;
-		sadb_sens_from_cred(sens, SADB_EXT_SENSITIVITY,
-		    ipsa->ipsa_cred, senslen);
+		sadb_sens_from_label(sens, SADB_EXT_SENSITIVITY,
+		    ipsa->ipsa_tsl, senslen);
 
 		walker = (sadb_ext_t *)((uint64_t *)walker +
 		    walker->sadb_ext_len);
@@ -1802,8 +1448,8 @@ sadb_sa2msg(ipsa_t *ipsa, sadb_msg_t *samsg)
 	if (osensinteg) {
 		sens = (sadb_sens_t *)walker;
 
-		sadb_sens_from_cred(sens, SADB_X_EXT_OUTER_SENS,
-		    ipsa->ipsa_ocred, osenslen);
+		sadb_sens_from_label(sens, SADB_X_EXT_OUTER_SENS,
+		    ipsa->ipsa_otsl, osenslen);
 		if (ipsa->ipsa_mac_exempt)
 			sens->sadb_x_sens_flags = SADB_X_SENS_IMPLICIT;
 
@@ -2123,7 +1769,6 @@ sadb_addrcheck(queue_t *pfkey_q, mblk_t *mp, sadb_ext_t *ext, uint_t serial,
 	sadb_address_t *addr = (sadb_address_t *)ext;
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
-	ire_t *ire;
 	int diagnostic, type;
 	boolean_t normalized = B_FALSE;
 
@@ -2249,18 +1894,12 @@ bail:
 		/*
 		 * At this point, we're a unicast IPv6 address.
 		 *
-		 * A ctable lookup for local is sufficient here.  If we're
-		 * local, return KS_IN_ADDR_ME, otherwise KS_IN_ADDR_NOTME.
-		 *
 		 * XXX Zones alert -> me/notme decision needs to be tempered
 		 * by what zone we're in when we go to zone-aware IPsec.
 		 */
-		ire = ire_ctable_lookup_v6(&sin6->sin6_addr, NULL,
-		    IRE_LOCAL, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE,
-		    ns->netstack_ip);
-		if (ire != NULL) {
+		if (ip_type_v6(&sin6->sin6_addr, ns->netstack_ip) ==
+		    IRE_LOCAL) {
 			/* Hey hey, it's local. */
-			IRE_REFRELE(ire);
 			return (KS_IN_ADDR_ME);
 		}
 	} else {
@@ -2272,23 +1911,17 @@ bail:
 		/*
 		 * At this point we're a unicast or broadcast IPv4 address.
 		 *
-		 * Lookup on the ctable for IRE_BROADCAST or IRE_LOCAL.
-		 * A NULL return value is NOTME, otherwise, look at the
-		 * returned ire for broadcast or not and return accordingly.
+		 * Check if the address is IRE_BROADCAST or IRE_LOCAL.
 		 *
 		 * XXX Zones alert -> me/notme decision needs to be tempered
 		 * by what zone we're in when we go to zone-aware IPsec.
 		 */
-		ire = ire_ctable_lookup(sin->sin_addr.s_addr, 0,
-		    IRE_LOCAL | IRE_BROADCAST, NULL, ALL_ZONES, NULL,
-		    MATCH_IRE_TYPE, ns->netstack_ip);
-		if (ire != NULL) {
-			/* Check for local or broadcast */
-			type = ire->ire_type;
-			IRE_REFRELE(ire);
-			ASSERT(type == IRE_LOCAL || type == IRE_BROADCAST);
-			return ((type == IRE_LOCAL) ? KS_IN_ADDR_ME :
-			    KS_IN_ADDR_MBCAST);
+		type = ip_type_v4(sin->sin_addr.s_addr, ns->netstack_ip);
+		switch (type) {
+		case IRE_LOCAL:
+			return (KS_IN_ADDR_ME);
+		case IRE_BROADCAST:
+			return (KS_IN_ADDR_MBCAST);
 		}
 	}
 
@@ -2763,7 +2396,6 @@ struct sadb_purge_state
 	ipsa_query_t sq;
 	boolean_t inbnd;
 	uint8_t sadb_sa_state;
-	mblk_t *mq;
 };
 
 static void
@@ -2785,7 +2417,7 @@ sadb_purge_cb(isaf_t *head, ipsa_t *entry, void *cookie)
 		sadb_delete_cluster(entry);
 	}
 	entry->ipsa_state = IPSA_STATE_DEAD;
-	(void) sadb_torch_assoc(head, entry, ps->inbnd, &ps->mq);
+	(void) sadb_torch_assoc(head, entry);
 }
 
 /*
@@ -2794,14 +2426,12 @@ sadb_purge_cb(isaf_t *head, ipsa_t *entry, void *cookie)
  */
 int
 sadb_purge_sa(mblk_t *mp, keysock_in_t *ksi, sadb_t *sp,
-	int *diagnostic, queue_t *pfkey_q, queue_t *ip_q)
+	int *diagnostic, queue_t *pfkey_q)
 {
 	struct sadb_purge_state ps;
 	int error = sadb_form_query(ksi, 0,
 	    IPSA_Q_SRC|IPSA_Q_DST|IPSA_Q_SRCID|IPSA_Q_DSTID|IPSA_Q_KMC,
 	    &ps.sq, diagnostic);
-
-	ps.mq = NULL;
 
 	if (error != 0)
 		return (error);
@@ -2818,9 +2448,6 @@ sadb_purge_sa(mblk_t *mp, keysock_in_t *ksi, sadb_t *sp,
 	sadb_walker(sp->sdb_if, sp->sdb_hashsize, sadb_purge_cb, &ps);
 	ps.inbnd = B_FALSE;
 	sadb_walker(sp->sdb_of, sp->sdb_hashsize, sadb_purge_cb, &ps);
-
-	if (ps.mq != NULL)
-		sadb_drain_torchq(ip_q, ps.mq);
 
 	ASSERT(mp->b_cont != NULL);
 	sadb_pfkey_echo(pfkey_q, mp, (sadb_msg_t *)mp->b_cont->b_rptr, ksi,
@@ -2870,12 +2497,11 @@ sadb_delpair_state_one(isaf_t *head, ipsa_t *entry, void *cookie)
 	}
 
 	entry->ipsa_state = IPSA_STATE_DEAD;
-	(void) sadb_torch_assoc(head, entry, B_FALSE, &ps->mq);
+	(void) sadb_torch_assoc(head, entry);
 	if (peer_assoc != NULL) {
 		mutex_enter(&peer_assoc->ipsa_lock);
 		peer_assoc->ipsa_state = IPSA_STATE_DEAD;
-		(void) sadb_torch_assoc(inbound_bucket, peer_assoc,
-		    B_FALSE, &ps->mq);
+		(void) sadb_torch_assoc(inbound_bucket, peer_assoc);
 	}
 	mutex_exit(&inbound_bucket->isaf_lock);
 }
@@ -2889,7 +2515,6 @@ sadb_delpair_state(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 	int error;
 
 	ps.sq.spp = spp;		/* XXX param */
-	ps.mq = NULL;
 
 	error = sadb_form_query(ksi, IPSA_Q_DST|IPSA_Q_SRC,
 	    IPSA_Q_SRC|IPSA_Q_DST|IPSA_Q_SRCID|IPSA_Q_DSTID|IPSA_Q_KMC,
@@ -2901,9 +2526,6 @@ sadb_delpair_state(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 	ps.sadb_sa_state = assoc->sadb_sa_state;
 	sadb_walker(ps.sq.sp->sdb_of, ps.sq.sp->sdb_hashsize,
 	    sadb_delpair_state_one, &ps);
-
-	if (ps.mq != NULL)
-		sadb_drain_torchq(pfkey_q, ps.mq);
 
 	ASSERT(mp->b_cont != NULL);
 	sadb_pfkey_echo(pfkey_q, mp, (sadb_msg_t *)mp->b_cont->b_rptr,
@@ -2921,7 +2543,6 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 	ipsa_query_t sq;
 	ipsa_t *echo_target = NULL;
 	ipsap_t ipsapp;
-	mblk_t *torchq = NULL;
 	uint_t	error = 0;
 
 	if (sadb_msg_type == SADB_X_DELPAIR_STATE)
@@ -2965,7 +2586,7 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 			}
 			ipsapp.ipsap_sa_ptr->ipsa_state = IPSA_STATE_DEAD;
 			(void) sadb_torch_assoc(ipsapp.ipsap_bucket,
-			    ipsapp.ipsap_sa_ptr, B_FALSE, &torchq);
+			    ipsapp.ipsap_sa_ptr);
 			/*
 			 * sadb_torch_assoc() releases the ipsa_lock
 			 * and calls sadb_unlinkassoc() which does a
@@ -2984,7 +2605,7 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 				ipsapp.ipsap_psa_ptr->ipsa_state =
 				    IPSA_STATE_DEAD;
 				(void) sadb_torch_assoc(ipsapp.ipsap_pbucket,
-				    ipsapp.ipsap_psa_ptr, B_FALSE, &torchq);
+				    ipsapp.ipsap_psa_ptr);
 			} else {
 				/*
 				 * Only half of the "pair" has been deleted.
@@ -3003,9 +2624,6 @@ sadb_delget_sa(mblk_t *mp, keysock_in_t *ksi, sadbp_t *spp,
 		mutex_exit(&ipsapp.ipsap_bucket->isaf_lock);
 		mutex_exit(&ipsapp.ipsap_pbucket->isaf_lock);
 	}
-
-	if (torchq != NULL)
-		sadb_drain_torchq(spp->s_ip_q, torchq);
 
 	ASSERT(mp->b_cont != NULL);
 
@@ -3269,7 +2887,7 @@ sadb_nat_calculations(ipsa_t *newbie, sadb_address_t *natt_loc_ext,
  * case here.
  */
 int
-sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
+sadb_common_add(queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
     keysock_in_t *ksi, isaf_t *primary, isaf_t *secondary,
     ipsa_t *newbie, boolean_t clone, boolean_t is_inbound, int *diagnostic,
     netstack_t *ns, sadbp_t *spp)
@@ -3313,11 +2931,11 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	int error = 0;
 	boolean_t isupdate = (newbie != NULL);
 	uint32_t *src_addr_ptr, *dst_addr_ptr, *isrc_addr_ptr, *idst_addr_ptr;
-	mblk_t *ctl_mp = NULL;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 	ip_stack_t 	*ipst = ns->netstack_ip;
 	ipsec_alginfo_t *alg;
 	int		rcode;
+	boolean_t	async = B_FALSE;
 
 	init_ipsa_pair(&ipsapp);
 
@@ -3549,7 +3167,14 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	newbie->ipsa_authtmpl = NULL;
 	newbie->ipsa_encrtmpl = NULL;
 
+#ifdef IPSEC_LATENCY_TEST
+	if (akey != NULL && newbie->ipsa_auth_alg != SADB_AALG_NONE) {
+#else
 	if (akey != NULL) {
+#endif
+		async = (ipss->ipsec_algs_exec_mode[IPSEC_ALG_AUTH] ==
+		    IPSEC_ALGS_EXEC_ASYNC);
+
 		newbie->ipsa_authkeybits = akey->sadb_key_bits;
 		newbie->ipsa_authkeylen = SADB_1TO8(akey->sadb_key_bits);
 		/* In case we have to round up to the next byte... */
@@ -3604,6 +3229,8 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 
 	if (ekey != NULL) {
 		mutex_enter(&ipss->ipsec_alg_lock);
+		async = async || (ipss->ipsec_algs_exec_mode[IPSEC_ALG_ENCR] ==
+		    IPSEC_ALGS_EXEC_ASYNC);
 		alg = ipss->ipsec_alglists[IPSEC_ALG_ENCR]
 		    [newbie->ipsa_encr_alg];
 
@@ -3757,6 +3384,9 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		}
 	}
 
+	if (async)
+		newbie->ipsa_flags |= IPSA_F_ASYNC;
+
 	/*
 	 * Ptrs to processing functions.
 	 */
@@ -3812,7 +3442,7 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	if (sens != NULL) {
 		uint64_t *bitmap = (uint64_t *)(sens + 1);
 
-		newbie->ipsa_cred = sadb_cred_from_sens(sens, bitmap);
+		newbie->ipsa_tsl = sadb_label_from_sens(sens, bitmap);
 	}
 
 	/*
@@ -3820,41 +3450,55 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	 */
 	if (osens != NULL) {
 		uint64_t *bitmap = (uint64_t *)(osens + 1);
-		cred_t *cred, *effective_cred;
+		ts_label_t *tsl, *effective_tsl;
 		uint32_t *peer_addr_ptr;
+		zoneid_t zoneid = GLOBAL_ZONEID;
+		zone_t *zone;
 
 		peer_addr_ptr = is_inbound ? src_addr_ptr : dst_addr_ptr;
 
-		cred = sadb_cred_from_sens(osens, bitmap);
+		tsl = sadb_label_from_sens(osens, bitmap);
 		newbie->ipsa_mac_exempt = CONN_MAC_DEFAULT;
 
 		if (osens->sadb_x_sens_flags & SADB_X_SENS_IMPLICIT) {
 			newbie->ipsa_mac_exempt = CONN_MAC_IMPLICIT;
 		}
 
-		error = tsol_check_dest(cred, peer_addr_ptr,
+		error = tsol_check_dest(tsl, peer_addr_ptr,
 		    (af == AF_INET6)?IPV6_VERSION:IPV4_VERSION,
-		    newbie->ipsa_mac_exempt, &effective_cred);
+		    newbie->ipsa_mac_exempt, B_TRUE, &effective_tsl);
 		if (error != 0) {
-			crfree(cred);
+			label_rele(tsl);
 			mutex_exit(&newbie->ipsa_lock);
 			goto error;
 		}
 
-		if (effective_cred != NULL) {
-			crfree(cred);
-			cred = effective_cred;
+		if (effective_tsl != NULL) {
+			label_rele(tsl);
+			tsl = effective_tsl;
 		}
 
-		newbie->ipsa_ocred = cred;
+		newbie->ipsa_otsl = tsl;
+
+		zone = zone_find_by_label(tsl);
+		if (zone != NULL) {
+			zoneid = zone->zone_id;
+			zone_rele(zone);
+		}
+		/*
+		 * For exclusive stacks we set the zoneid to zero to operate
+		 * as if in the global zone for tsol_compute_label_v4/v6
+		 */
+		if (ipst->ips_netstack->netstack_stackid != GLOBAL_NETSTACKID)
+			zoneid = GLOBAL_ZONEID;
 
 		if (af == AF_INET6) {
-			error = tsol_compute_label_v6(cred,
+			error = tsol_compute_label_v6(tsl, zoneid,
 			    (in6_addr_t *)peer_addr_ptr,
 			    newbie->ipsa_opt_storage, ipst);
 		} else {
-			error = tsol_compute_label(cred, *peer_addr_ptr,
-			    newbie->ipsa_opt_storage, ipst);
+			error = tsol_compute_label_v4(tsl, zoneid,
+			    *peer_addr_ptr, newbie->ipsa_opt_storage, ipst);
 		}
 		if (error != 0) {
 			mutex_exit(&newbie->ipsa_lock);
@@ -3916,9 +3560,6 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 		mutex_enter(&primary->isaf_lock);
 	}
 
-	IPSECHW_DEBUG(IPSECHW_SADB, ("sadb_common_add: spi = 0x%x\n",
-	    newbie->ipsa_spi));
-
 	/*
 	 * sadb_insertassoc() doesn't increment the reference
 	 * count.  We therefore have to increment the
@@ -3938,10 +3579,6 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 
 	mutex_enter(&newbie->ipsa_lock);
 	error = sadb_insertassoc(newbie, primary);
-	if (error == 0) {
-		ctl_mp = sadb_fmt_sa_req(DL_CO_SET, newbie->ipsa_type, newbie,
-		    is_inbound);
-	}
 	mutex_exit(&newbie->ipsa_lock);
 
 	if (error != 0) {
@@ -3982,13 +3619,6 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	ASSERT(MUTEX_NOT_HELD(&newbie->ipsa_lock));
 	ASSERT(newbie_clone == NULL ||
 	    (MUTEX_NOT_HELD(&newbie_clone->ipsa_lock)));
-	/*
-	 * If hardware acceleration could happen, send it.
-	 */
-	if (ctl_mp != NULL) {
-		putnext(ip_q, ctl_mp);
-		ctl_mp = NULL;
-	}
 
 error_unlock:
 
@@ -4037,8 +3667,6 @@ error:
 	if (newbie_clone != NULL) {
 		IPSA_REFRELE(newbie_clone);
 	}
-	if (ctl_mp != NULL)
-		freemsg(ctl_mp);
 
 	if (error == 0) {
 		/*
@@ -4315,37 +3943,12 @@ sadb_age_bytes(queue_t *pfkey_q, ipsa_t *assoc, uint64_t bytes,
 }
 
 /*
- * Push one or more DL_CO_DELETE messages queued up by
- * sadb_torch_assoc down to the underlying driver now that it's a
- * convenient time for it (i.e., ipsa bucket locks not held).
- */
-static void
-sadb_drain_torchq(queue_t *q, mblk_t *mp)
-{
-	while (mp != NULL) {
-		mblk_t *next = mp->b_next;
-		mp->b_next = NULL;
-		if (q != NULL)
-			putnext(q, mp);
-		else
-			freemsg(mp);
-		mp = next;
-	}
-}
-
-/*
  * "Torch" an individual SA.  Returns NULL, so it can be tail-called from
  *     sadb_age_assoc().
- *
- * If SA is hardware-accelerated, and we can't allocate the mblk
- * containing the DL_CO_DELETE, just return; it will remain in the
- * table and be swept up by sadb_ager() in a subsequent pass.
  */
 static ipsa_t *
-sadb_torch_assoc(isaf_t *head, ipsa_t *sa, boolean_t inbnd, mblk_t **mq)
+sadb_torch_assoc(isaf_t *head, ipsa_t *sa)
 {
-	mblk_t *mp;
-
 	ASSERT(MUTEX_HELD(&head->isaf_lock));
 	ASSERT(MUTEX_HELD(&sa->ipsa_lock));
 	ASSERT(sa->ipsa_state == IPSA_STATE_DEAD);
@@ -4355,15 +3958,6 @@ sadb_torch_assoc(isaf_t *head, ipsa_t *sa, boolean_t inbnd, mblk_t **mq)
 	 */
 	head->isaf_gen++;
 
-	if (sa->ipsa_flags & IPSA_F_HW) {
-		mp = sadb_fmt_sa_req(DL_CO_DELETE, sa->ipsa_type, sa, inbnd);
-		if (mp == NULL) {
-			mutex_exit(&sa->ipsa_lock);
-			return (NULL);
-		}
-		mp->b_next = *mq;
-		*mq = mp;
-	}
 	mutex_exit(&sa->ipsa_lock);
 	sadb_unlinkassoc(sa);
 
@@ -4404,7 +3998,7 @@ sadb_idle_activities(ipsa_t *assoc, time_t delta, boolean_t inbound)
  */
 static ipsa_t *
 sadb_age_assoc(isaf_t *head, queue_t *pfkey_q, ipsa_t *assoc,
-    time_t current, int reap_delay, boolean_t inbound, mblk_t **mq)
+    time_t current, int reap_delay, boolean_t inbound)
 {
 	ipsa_t *retval = NULL;
 	boolean_t dropped_mutex = B_FALSE;
@@ -4419,7 +4013,7 @@ sadb_age_assoc(isaf_t *head, queue_t *pfkey_q, ipsa_t *assoc,
 	    (assoc->ipsa_hardexpiretime != 0))) &&
 	    (assoc->ipsa_hardexpiretime <= current)) {
 		assoc->ipsa_state = IPSA_STATE_DEAD;
-		return (sadb_torch_assoc(head, assoc, inbound, mq));
+		return (sadb_torch_assoc(head, assoc));
 	}
 
 	/*
@@ -4433,7 +4027,7 @@ sadb_age_assoc(isaf_t *head, queue_t *pfkey_q, ipsa_t *assoc,
 	if (assoc->ipsa_hardexpiretime != 0 &&
 	    assoc->ipsa_hardexpiretime <= current) {
 		if (assoc->ipsa_state == IPSA_STATE_DEAD)
-			return (sadb_torch_assoc(head, assoc, inbound, mq));
+			return (sadb_torch_assoc(head, assoc));
 
 		if (inbound) {
 			sadb_delete_cluster(assoc);
@@ -4516,8 +4110,7 @@ sadb_age_assoc(isaf_t *head, queue_t *pfkey_q, ipsa_t *assoc,
  * the second time sadb_ager() runs.
  */
 void
-sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay,
-    netstack_t *ns)
+sadb_ager(sadb_t *sp, queue_t *pfkey_q, int reap_delay, netstack_t *ns)
 {
 	int i;
 	isaf_t *bucket;
@@ -4527,7 +4120,6 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay,
 	templist_t *haspeerlist, *newbie;
 	/* Snapshot current time now. */
 	time_t current = gethrestime_sec();
-	mblk_t *mq = NULL;
 	haspeerlist = NULL;
 
 	/*
@@ -4559,7 +4151,7 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay,
 		    assoc = spare) {
 			spare = assoc->ipsa_next;
 			if (sadb_age_assoc(bucket, pfkey_q, assoc, current,
-			    reap_delay, B_TRUE, &mq) != NULL) {
+			    reap_delay, B_TRUE) != NULL) {
 				/*
 				 * Put SA's which have a peer or SA's which
 				 * are paired on a list for processing after
@@ -4585,10 +4177,6 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay,
 		mutex_exit(&bucket->isaf_lock);
 	}
 
-	if (mq != NULL) {
-		sadb_drain_torchq(ip_q, mq);
-		mq = NULL;
-	}
 	age_pair_peer_list(haspeerlist, sp, B_FALSE);
 	haspeerlist = NULL;
 
@@ -4600,7 +4188,7 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay,
 		    assoc = spare) {
 			spare = assoc->ipsa_next;
 			if (sadb_age_assoc(bucket, pfkey_q, assoc, current,
-			    reap_delay, B_FALSE, &mq) != NULL) {
+			    reap_delay, B_FALSE) != NULL) {
 				/*
 				 * sadb_age_assoc() increments the refcnt,
 				 * effectively doing an IPSA_REFHOLD().
@@ -4620,10 +4208,6 @@ sadb_ager(sadb_t *sp, queue_t *pfkey_q, queue_t *ip_q, int reap_delay,
 			}
 		}
 		mutex_exit(&bucket->isaf_lock);
-	}
-	if (mq != NULL) {
-		sadb_drain_torchq(ip_q, mq);
-		mq = NULL;
 	}
 
 	age_pair_peer_list(haspeerlist, sp, B_TRUE);
@@ -5227,7 +4811,7 @@ update_pairing(ipsap_t *ipsapp, ipsa_query_t *sq, keysock_in_t *ksi,
 static ipsacq_t *
 sadb_checkacquire(iacqf_t *bucket, ipsec_action_t *ap, ipsec_policy_t *pp,
     uint32_t *src, uint32_t *dst, uint32_t *isrc, uint32_t *idst,
-    uint64_t unique_id, cred_t *cr)
+    uint64_t unique_id, ts_label_t *tsl)
 {
 	ipsacq_t *walker;
 	sa_family_t fam;
@@ -5257,7 +4841,7 @@ sadb_checkacquire(iacqf_t *bucket, ipsec_action_t *ap, ipsec_policy_t *pp,
 		    (pp == walker->ipsacq_policy) &&
 		    /* XXX do deep compares of ap/pp? */
 		    (unique_id == walker->ipsacq_unique_id) &&
-		    (ipsec_label_match(cr, walker->ipsacq_cred)))
+		    (ipsec_label_match(tsl, walker->ipsacq_tsl)))
 			break;			/* everything matched */
 		mutex_exit(&walker->ipsacq_lock);
 	}
@@ -5272,31 +4856,32 @@ sadb_checkacquire(iacqf_t *bucket, ipsec_action_t *ap, ipsec_policy_t *pp,
  * send the acquire up..
  *
  * In cases where we need both AH and ESP, add the SA to the ESP ACQUIRE
- * list.  The ah_add_sa_finish() routines can look at the packet's ipsec_out_t
- * and handle this case specially.
+ * list.  The ah_add_sa_finish() routines can look at the packet's attached
+ * attributes and handle this case specially.
  */
 void
-sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
+sadb_acquire(mblk_t *datamp, ip_xmit_attr_t *ixa, boolean_t need_ah,
+    boolean_t need_esp)
 {
+	mblk_t	*asyncmp;
 	sadbp_t *spp;
 	sadb_t *sp;
 	ipsacq_t *newbie;
 	iacqf_t *bucket;
-	mblk_t *datamp = mp->b_cont;
 	mblk_t *extended;
 	ipha_t *ipha = (ipha_t *)datamp->b_rptr;
 	ip6_t *ip6h = (ip6_t *)datamp->b_rptr;
 	uint32_t *src, *dst, *isrc, *idst;
-	ipsec_policy_t *pp = io->ipsec_out_policy;
-	ipsec_action_t *ap = io->ipsec_out_act;
+	ipsec_policy_t *pp = ixa->ixa_ipsec_policy;
+	ipsec_action_t *ap = ixa->ixa_ipsec_action;
 	sa_family_t af;
 	int hashoffset;
 	uint32_t seq;
 	uint64_t unique_id = 0;
 	ipsec_selector_t sel;
-	boolean_t tunnel_mode = io->ipsec_out_tunnel;
-	cred_t 		*cr = NULL;
-	netstack_t	*ns = io->ipsec_out_ns;
+	boolean_t tunnel_mode = (ixa->ixa_flags & IXAF_IPSEC_TUNNEL) != 0;
+	ts_label_t 	*tsl = NULL;
+	netstack_t	*ns = ixa->ixa_ipst->ips_netstack;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 	sadb_sens_t 	*sens = NULL;
 	int 		sens_len;
@@ -5315,12 +4900,10 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 
 		spp = &ahstack->ah_sadb;
 	}
-	sp = io->ipsec_out_v4 ? &spp->s_v4 : &spp->s_v6;
-
-	ASSERT(mp->b_cont != NULL);
+	sp = (ixa->ixa_flags & IXAF_IS_IPV4) ? &spp->s_v4 : &spp->s_v6;
 
 	if (is_system_labeled())
-		cr = msg_getcred(mp->b_cont, NULL);
+		tsl = ixa->ixa_tsl;
 
 	if (ap == NULL)
 		ap = pp->ipsp_act;
@@ -5328,7 +4911,7 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 	ASSERT(ap != NULL);
 
 	if (ap->ipa_act.ipa_apply.ipp_use_unique || tunnel_mode)
-		unique_id = SA_FORM_UNIQUE_ID(io);
+		unique_id = SA_FORM_UNIQUE_ID(ixa);
 
 	/*
 	 * Set up an ACQUIRE record.
@@ -5345,14 +4928,14 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 		dst = (uint32_t *)&ipha->ipha_dst;
 		af = AF_INET;
 		hashoffset = OUTBOUND_HASH_V4(sp, ipha->ipha_dst);
-		ASSERT(io->ipsec_out_v4 == B_TRUE);
+		ASSERT(ixa->ixa_flags & IXAF_IS_IPV4);
 	} else {
 		ASSERT(IPH_HDR_VERSION(ipha) == IPV6_VERSION);
 		src = (uint32_t *)&ip6h->ip6_src;
 		dst = (uint32_t *)&ip6h->ip6_dst;
 		af = AF_INET6;
 		hashoffset = OUTBOUND_HASH_V6(sp, ip6h->ip6_dst);
-		ASSERT(io->ipsec_out_v4 == B_FALSE);
+		ASSERT(!(ixa->ixa_flags & IXAF_IS_IPV4));
 	}
 
 	if (tunnel_mode) {
@@ -5363,14 +4946,14 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 			 * with self-encapsulated protection.  Until we better
 			 * support this, drop the packet.
 			 */
-			ip_drop_packet(mp, B_FALSE, NULL, NULL,
+			ip_drop_packet(datamp, B_FALSE, NULL,
 			    DROPPER(ipss, ipds_spd_got_selfencap),
 			    &ipss->ipsec_spd_dropper);
 			return;
 		}
 		/* Snag inner addresses. */
-		isrc = io->ipsec_out_insrc;
-		idst = io->ipsec_out_indst;
+		isrc = ixa->ixa_ipsec_insrc;
+		idst = ixa->ixa_ipsec_indst;
 	} else {
 		isrc = idst = NULL;
 	}
@@ -5382,7 +4965,7 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 	bucket = &(sp->sdb_acq[hashoffset]);
 	mutex_enter(&bucket->iacqf_lock);
 	newbie = sadb_checkacquire(bucket, ap, pp, src, dst, isrc, idst,
-	    unique_id, cr);
+	    unique_id, tsl);
 
 	if (newbie == NULL) {
 		/*
@@ -5391,7 +4974,7 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 		newbie = kmem_zalloc(sizeof (*newbie), KM_NOSLEEP);
 		if (newbie == NULL) {
 			mutex_exit(&bucket->iacqf_lock);
-			ip_drop_packet(mp, B_FALSE, NULL, NULL,
+			ip_drop_packet(datamp, B_FALSE, NULL,
 			    DROPPER(ipss, ipds_sadb_acquire_nomem),
 			    &ipss->ipsec_sadb_dropper);
 			return;
@@ -5433,11 +5016,30 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 	 */
 	ASSERT(MUTEX_HELD(&newbie->ipsacq_lock));
 
-	mp->b_next = NULL;
+	/*
+	 * Make the ip_xmit_attr_t into something we can queue.
+	 * If no memory it frees datamp.
+	 */
+	asyncmp = ip_xmit_attr_to_mblk(ixa);
+	if (asyncmp != NULL)
+		linkb(asyncmp, datamp);
+
 	/* Queue up packet.  Use b_next. */
-	if (newbie->ipsacq_numpackets == 0) {
+
+	if (asyncmp == NULL) {
+		/* Statistics for allocation failure */
+		if (ixa->ixa_flags & IXAF_IS_IPV4) {
+			BUMP_MIB(&ixa->ixa_ipst->ips_ip_mib,
+			    ipIfStatsOutDiscards);
+		} else {
+			BUMP_MIB(&ixa->ixa_ipst->ips_ip6_mib,
+			    ipIfStatsOutDiscards);
+		}
+		ip_drop_output("No memory for asyncmp", datamp, NULL);
+		freemsg(datamp);
+	} else if (newbie->ipsacq_numpackets == 0) {
 		/* First one. */
-		newbie->ipsacq_mp = mp;
+		newbie->ipsacq_mp = asyncmp;
 		newbie->ipsacq_numpackets = 1;
 		newbie->ipsacq_expire = gethrestime_sec();
 		/*
@@ -5448,28 +5050,28 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 		newbie->ipsacq_seq = seq;
 		newbie->ipsacq_addrfam = af;
 
-		newbie->ipsacq_srcport = io->ipsec_out_src_port;
-		newbie->ipsacq_dstport = io->ipsec_out_dst_port;
-		newbie->ipsacq_icmp_type = io->ipsec_out_icmp_type;
-		newbie->ipsacq_icmp_code = io->ipsec_out_icmp_code;
+		newbie->ipsacq_srcport = ixa->ixa_ipsec_src_port;
+		newbie->ipsacq_dstport = ixa->ixa_ipsec_dst_port;
+		newbie->ipsacq_icmp_type = ixa->ixa_ipsec_icmp_type;
+		newbie->ipsacq_icmp_code = ixa->ixa_ipsec_icmp_code;
 		if (tunnel_mode) {
-			newbie->ipsacq_inneraddrfam = io->ipsec_out_inaf;
-			newbie->ipsacq_proto = io->ipsec_out_inaf == AF_INET6 ?
+			newbie->ipsacq_inneraddrfam = ixa->ixa_ipsec_inaf;
+			newbie->ipsacq_proto = ixa->ixa_ipsec_inaf == AF_INET6 ?
 			    IPPROTO_IPV6 : IPPROTO_ENCAP;
-			newbie->ipsacq_innersrcpfx = io->ipsec_out_insrcpfx;
-			newbie->ipsacq_innerdstpfx = io->ipsec_out_indstpfx;
+			newbie->ipsacq_innersrcpfx = ixa->ixa_ipsec_insrcpfx;
+			newbie->ipsacq_innerdstpfx = ixa->ixa_ipsec_indstpfx;
 			IPSA_COPY_ADDR(newbie->ipsacq_innersrc,
-			    io->ipsec_out_insrc, io->ipsec_out_inaf);
+			    ixa->ixa_ipsec_insrc, ixa->ixa_ipsec_inaf);
 			IPSA_COPY_ADDR(newbie->ipsacq_innerdst,
-			    io->ipsec_out_indst, io->ipsec_out_inaf);
+			    ixa->ixa_ipsec_indst, ixa->ixa_ipsec_inaf);
 		} else {
-			newbie->ipsacq_proto = io->ipsec_out_proto;
+			newbie->ipsacq_proto = ixa->ixa_ipsec_proto;
 		}
 		newbie->ipsacq_unique_id = unique_id;
 
-		if (cr != NULL) {
-			crhold(cr);
-			newbie->ipsacq_cred = cr;
+		if (ixa->ixa_tsl != NULL) {
+			label_hold(ixa->ixa_tsl);
+			newbie->ipsacq_tsl = ixa->ixa_tsl;
 		}
 	} else {
 		/* Scan to the end of the list & insert. */
@@ -5477,13 +5079,16 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 
 		while (lastone->b_next != NULL)
 			lastone = lastone->b_next;
-		lastone->b_next = mp;
+		lastone->b_next = asyncmp;
 		if (newbie->ipsacq_numpackets++ == ipsacq_maxpackets) {
 			newbie->ipsacq_numpackets = ipsacq_maxpackets;
 			lastone = newbie->ipsacq_mp;
 			newbie->ipsacq_mp = lastone->b_next;
 			lastone->b_next = NULL;
-			ip_drop_packet(lastone, B_FALSE, NULL, NULL,
+
+			/* Freeing the async message */
+			lastone = ip_xmit_attr_free_mblk(lastone);
+			ip_drop_packet(lastone, B_FALSE, NULL,
 			    DROPPER(ipss, ipds_sadb_acquire_toofull),
 			    &ipss->ipsec_sadb_dropper);
 		} else {
@@ -5518,17 +5123,17 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 	 * opportunities here in failure cases.
 	 */
 	(void) memset(&sel, 0, sizeof (sel));
-	sel.ips_isv4 = io->ipsec_out_v4;
+	sel.ips_isv4 = (ixa->ixa_flags & IXAF_IS_IPV4) != 0;
 	if (tunnel_mode) {
-		sel.ips_protocol = (io->ipsec_out_inaf == AF_INET) ?
+		sel.ips_protocol = (ixa->ixa_ipsec_inaf == AF_INET) ?
 		    IPPROTO_ENCAP : IPPROTO_IPV6;
 	} else {
-		sel.ips_protocol = io->ipsec_out_proto;
-		sel.ips_local_port = io->ipsec_out_src_port;
-		sel.ips_remote_port = io->ipsec_out_dst_port;
+		sel.ips_protocol = ixa->ixa_ipsec_proto;
+		sel.ips_local_port = ixa->ixa_ipsec_src_port;
+		sel.ips_remote_port = ixa->ixa_ipsec_dst_port;
 	}
-	sel.ips_icmp_type = io->ipsec_out_icmp_type;
-	sel.ips_icmp_code = io->ipsec_out_icmp_code;
+	sel.ips_icmp_type = ixa->ixa_ipsec_icmp_type;
+	sel.ips_icmp_code = ixa->ixa_ipsec_icmp_code;
 	sel.ips_is_icmp_inv_acq = 0;
 	if (af == AF_INET) {
 		sel.ips_local_addr_v4 = ipha->ipha_src;
@@ -5542,13 +5147,13 @@ sadb_acquire(mblk_t *mp, ipsec_out_t *io, boolean_t need_ah, boolean_t need_esp)
 	if (extended == NULL)
 		goto punt_extended;
 
-	if (cr != NULL) {
+	if (ixa->ixa_tsl != NULL) {
 		/*
 		 * XXX MLS correct condition here?
 		 * XXX MLS other credential attributes in acquire?
 		 * XXX malloc failure?  don't fall back to original?
 		 */
-		sens = sadb_make_sens_ext(cr, &sens_len);
+		sens = sadb_make_sens_ext(ixa->ixa_tsl, &sens_len);
 
 		if (sens == NULL) {
 			freeb(extended);
@@ -5585,13 +5190,13 @@ punt_extended:
 void
 sadb_destroy_acquire(ipsacq_t *acqrec, netstack_t *ns)
 {
-	mblk_t *mp;
+	mblk_t		*mp;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	ASSERT(MUTEX_HELD(acqrec->ipsacq_linklock));
 
 	if (acqrec->ipsacq_policy != NULL) {
-		IPPOL_REFRELE(acqrec->ipsacq_policy, ns);
+		IPPOL_REFRELE(acqrec->ipsacq_policy);
 	}
 	if (acqrec->ipsacq_act != NULL) {
 		IPACT_REFRELE(acqrec->ipsacq_act);
@@ -5602,9 +5207,9 @@ sadb_destroy_acquire(ipsacq_t *acqrec, netstack_t *ns)
 	if (acqrec->ipsacq_next != NULL)
 		acqrec->ipsacq_next->ipsacq_ptpn = acqrec->ipsacq_ptpn;
 
-	if (acqrec->ipsacq_cred) {
-		crfree(acqrec->ipsacq_cred);
-		acqrec->ipsacq_cred = NULL;
+	if (acqrec->ipsacq_tsl != NULL) {
+		label_rele(acqrec->ipsacq_tsl);
+		acqrec->ipsacq_tsl = NULL;
 	}
 
 	/*
@@ -5618,7 +5223,9 @@ sadb_destroy_acquire(ipsacq_t *acqrec, netstack_t *ns)
 		mp = acqrec->ipsacq_mp;
 		acqrec->ipsacq_mp = mp->b_next;
 		mp->b_next = NULL;
-		ip_drop_packet(mp, B_FALSE, NULL, NULL,
+		/* Freeing the async message */
+		mp = ip_xmit_attr_free_mblk(mp);
+		ip_drop_packet(mp, B_FALSE, NULL,
 		    DROPPER(ipss, ipds_sadb_acquire_timeout),
 		    &ipss->ipsec_sadb_dropper);
 	}
@@ -5795,24 +5402,23 @@ sadb_action_to_ecomb(uint8_t *start, uint8_t *limit, ipsec_action_t *act,
 
 /* ARGSUSED */
 int
-sadb_sens_len_from_cred(cred_t *cr)
+sadb_sens_len_from_label(ts_label_t *tsl)
 {
 	int baselen = sizeof (sadb_sens_t) + _C_LEN * 4;
 	return (roundup(baselen, sizeof (uint64_t)));
 }
 
 void
-sadb_sens_from_cred(sadb_sens_t *sens, int exttype, cred_t *cr, int senslen)
+sadb_sens_from_label(sadb_sens_t *sens, int exttype, ts_label_t *tsl,
+    int senslen)
 {
 	uint8_t *bitmap;
 	bslabel_t *sl;
-	ts_label_t *tsl;
 
 	/* LINTED */
 	ASSERT((_C_LEN & 1) == 0);
 	ASSERT((senslen & 7) == 0);
 
-	tsl = crgetlabel(cr);
 	sl = label2bslabel(tsl);
 
 	sens->sadb_sens_exttype = exttype;
@@ -5830,14 +5436,14 @@ sadb_sens_from_cred(sadb_sens_t *sens, int exttype, cred_t *cr, int senslen)
 }
 
 static sadb_sens_t *
-sadb_make_sens_ext(cred_t *cr, int *len)
+sadb_make_sens_ext(ts_label_t *tsl, int *len)
 {
 	/* XXX allocation failure? */
-	int sens_len = sadb_sens_len_from_cred(cr);
+	int sens_len = sadb_sens_len_from_label(tsl);
 
 	sadb_sens_t *sens = kmem_alloc(sens_len, KM_SLEEP);
 
-	sadb_sens_from_cred(sens, SADB_EXT_SENSITIVITY, cr, sens_len);
+	sadb_sens_from_label(sens, SADB_EXT_SENSITIVITY, tsl, sens_len);
 
 	*len = sens_len;
 
@@ -5849,12 +5455,12 @@ sadb_make_sens_ext(cred_t *cr, int *len)
  * With a special designated "not a label" cred_t ?
  */
 /* ARGSUSED */
-cred_t *
-sadb_cred_from_sens(sadb_sens_t *sens, uint64_t *bitmap)
+ts_label_t *
+sadb_label_from_sens(sadb_sens_t *sens, uint64_t *bitmap)
 {
 	int bitmap_len = SADB_64TO8(sens->sadb_sens_sens_len);
 	bslabel_t sl;
-	cred_t *cr;
+	ts_label_t *tsl;
 
 	if (sens->sadb_sens_integ_level != 0)
 		return (NULL);
@@ -5868,13 +5474,13 @@ sadb_cred_from_sens(sadb_sens_t *sens, uint64_t *bitmap)
 	bcopy(bitmap, &((_bslabel_impl_t *)&sl)->compartments,
 	    bitmap_len);
 
-	cr = newcred_from_bslabel(&sl, sens->sadb_sens_dpd, KM_NOSLEEP);
-	if (cr == NULL)
-		return (cr);
+	tsl = labelalloc(&sl, sens->sadb_sens_dpd, KM_NOSLEEP);
+	if (tsl == NULL)
+		return (NULL);
 
 	if (sens->sadb_x_sens_flags & SADB_X_SENS_UNLABELED)
-		crgetlabel(cr)->tsl_flags |= TSLF_UNLABELED;
-	return (cr);
+		tsl->tsl_flags |= TSLF_UNLABELED;
+	return (tsl);
 }
 
 /* End XXX label-library-leakage */
@@ -6359,12 +5965,13 @@ sadb_getspi(keysock_in_t *ksi, uint32_t master_spi, int *diagnostic,
  *
  * Caller frees the message, so we don't have to here.
  *
- * NOTE:	The ip_q parameter may be used in the future for ACQUIRE
+ * NOTE:	The pfkey_q parameter may be used in the future for ACQUIRE
  *		failures.
  */
 /* ARGSUSED */
 void
-sadb_in_acquire(sadb_msg_t *samsg, sadbp_t *sp, queue_t *ip_q, netstack_t *ns)
+sadb_in_acquire(sadb_msg_t *samsg, sadbp_t *sp, queue_t *pfkey_q,
+    netstack_t *ns)
 {
 	int i;
 	ipsacq_t *acqrec;
@@ -6624,36 +6231,6 @@ sadb_replay_delete(ipsa_t *assoc)
 }
 
 /*
- * Given a queue that presumably points to IP, send a T_BIND_REQ for _proto_
- * down.  The caller will handle the T_BIND_ACK locally.
- */
-boolean_t
-sadb_t_bind_req(queue_t *q, int proto)
-{
-	struct T_bind_req *tbr;
-	mblk_t *mp;
-
-	mp = allocb_cred(sizeof (struct T_bind_req) + 1, kcred, NOPID);
-	if (mp == NULL) {
-		/* cmn_err(CE_WARN, */
-		/* "sadb_t_bind_req(%d): couldn't allocate mblk\n", proto); */
-		return (B_FALSE);
-	}
-	mp->b_datap->db_type = M_PCPROTO;
-	tbr = (struct T_bind_req *)mp->b_rptr;
-	mp->b_wptr += sizeof (struct T_bind_req);
-	tbr->PRIM_type = T_BIND_REQ;
-	tbr->ADDR_length = 0;
-	tbr->ADDR_offset = 0;
-	tbr->CONIND_number = 0;
-	*mp->b_wptr = (uint8_t)proto;
-	mp->b_wptr++;
-
-	putnext(q, mp);
-	return (B_TRUE);
-}
-
-/*
  * Special front-end to ipsec_rl_strlog() dealing with SA failure.
  * this is designed to take only a format string with "* %x * %s *", so
  * that "spi" is printed first, then "addr" is converted using inet_pton().
@@ -6676,7 +6253,6 @@ ipsec_assocfailure(short mid, short sid, char level, ushort_t sl, char *fmt,
 
 /*
  * Fills in a reference to the policy, if any, from the conn, in *ppp
- * Releases a reference to the passed conn_t.
  */
 static void
 ipsec_conn_pol(ipsec_selector_t *sel, conn_t *connp, ipsec_policy_t **ppp)
@@ -6684,15 +6260,14 @@ ipsec_conn_pol(ipsec_selector_t *sel, conn_t *connp, ipsec_policy_t **ppp)
 	ipsec_policy_t	*pp;
 	ipsec_latch_t	*ipl = connp->conn_latch;
 
-	if ((ipl != NULL) && (ipl->ipl_out_policy != NULL)) {
-		pp = ipl->ipl_out_policy;
+	if ((ipl != NULL) && (connp->conn_ixa->ixa_ipsec_policy != NULL)) {
+		pp = connp->conn_ixa->ixa_ipsec_policy;
 		IPPOL_REFHOLD(pp);
 	} else {
-		pp = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, connp, NULL, sel,
+		pp = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, connp, sel,
 		    connp->conn_netstack);
 	}
 	*ppp = pp;
-	CONN_DEC_REF(connp);
 }
 
 /*
@@ -6753,6 +6328,7 @@ ipsec_udp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp, ip_stack_t *ipst)
 	mutex_exit(&connfp->connf_lock);
 
 	ipsec_conn_pol(sel, connp, ppp);
+	CONN_DEC_REF(connp);
 }
 
 static conn_t *
@@ -6866,6 +6442,7 @@ ipsec_tcp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp, ip_stack_t *ipst)
 	}
 
 	ipsec_conn_pol(sel, connp, ppp);
+	CONN_DEC_REF(connp);
 }
 
 static void
@@ -6895,21 +6472,27 @@ ipsec_sctp_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 	pptr[0] = sel->ips_remote_port;
 	pptr[1] = sel->ips_local_port;
 
+	/*
+	 * For labeled systems, there's no need to check the
+	 * label here.  It's known to be good as we checked
+	 * before allowing the connection to become bound.
+	 */
 	if (sel->ips_isv4) {
 		in6_addr_t	src, dst;
 
 		IN6_IPADDR_TO_V4MAPPED(sel->ips_remote_addr_v4, &dst);
 		IN6_IPADDR_TO_V4MAPPED(sel->ips_local_addr_v4, &src);
 		connp = sctp_find_conn(&dst, &src, ports, ALL_ZONES,
-		    ipst->ips_netstack->netstack_sctp);
+		    0, ipst->ips_netstack->netstack_sctp);
 	} else {
 		connp = sctp_find_conn(&sel->ips_remote_addr_v6,
 		    &sel->ips_local_addr_v6, ports, ALL_ZONES,
-		    ipst->ips_netstack->netstack_sctp);
+		    0, ipst->ips_netstack->netstack_sctp);
 	}
 	if (connp == NULL)
 		return;
 	ipsec_conn_pol(sel, connp, ppp);
+	CONN_DEC_REF(connp);
 }
 
 /*
@@ -6985,7 +6568,7 @@ ipsec_get_inverse_acquire_sel(ipsec_selector_t *sel, sadb_address_t *srcext,
 static int
 ipsec_tun_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
     sadb_address_t *innsrcext, sadb_address_t *inndstext, ipsec_tun_pol_t *itp,
-    int *diagnostic, netstack_t *ns)
+    int *diagnostic)
 {
 	int err;
 	ipsec_policy_head_t *polhead;
@@ -7045,8 +6628,7 @@ ipsec_tun_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 	polhead = itp->itp_policy;
 	ASSERT(polhead != NULL);
 	rw_enter(&polhead->iph_lock, RW_READER);
-	*ppp = ipsec_find_policy_head(NULL, polhead,
-	    IPSEC_TYPE_INBOUND, sel, ns);
+	*ppp = ipsec_find_policy_head(NULL, polhead, IPSEC_TYPE_INBOUND, sel);
 	rw_exit(&polhead->iph_lock);
 
 	/*
@@ -7059,6 +6641,10 @@ ipsec_tun_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 	return (0);
 }
 
+/*
+ * For sctp conn_faddr is the primary address, hence this is of limited
+ * use for sctp.
+ */
 static void
 ipsec_oth_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
     ip_stack_t *ipst)
@@ -7068,7 +6654,7 @@ ipsec_oth_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 	conn_t		*connp;
 
 	if (isv4) {
-		connfp = &ipst->ips_ipcl_proto_fanout[sel->ips_protocol];
+		connfp = &ipst->ips_ipcl_proto_fanout_v4[sel->ips_protocol];
 	} else {
 		connfp = &ipst->ips_ipcl_proto_fanout_v6[sel->ips_protocol];
 	}
@@ -7076,17 +6662,20 @@ ipsec_oth_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 	mutex_enter(&connfp->connf_lock);
 	for (connp = connfp->connf_head; connp != NULL;
 	    connp = connp->conn_next) {
-		if (!((isv4 && !((connp->conn_src == 0 ||
-		    connp->conn_src == sel->ips_local_addr_v4) &&
-		    (connp->conn_rem == 0 ||
-		    connp->conn_rem == sel->ips_remote_addr_v4))) ||
-		    (!isv4 && !((IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6) ||
-		    IN6_ARE_ADDR_EQUAL(&connp->conn_srcv6,
-		    &sel->ips_local_addr_v6)) &&
-		    (IN6_IS_ADDR_UNSPECIFIED(&connp->conn_remv6) ||
-		    IN6_ARE_ADDR_EQUAL(&connp->conn_remv6,
-		    &sel->ips_remote_addr_v6)))))) {
-			break;
+		if (isv4) {
+			if ((connp->conn_laddr_v4 == INADDR_ANY ||
+			    connp->conn_laddr_v4 == sel->ips_local_addr_v4) &&
+			    (connp->conn_faddr_v4 == INADDR_ANY ||
+			    connp->conn_faddr_v4 == sel->ips_remote_addr_v4))
+				break;
+		} else {
+			if ((IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6) ||
+			    IN6_ARE_ADDR_EQUAL(&connp->conn_laddr_v6,
+			    &sel->ips_local_addr_v6)) &&
+			    (IN6_IS_ADDR_UNSPECIFIED(&connp->conn_faddr_v6) ||
+			    IN6_ARE_ADDR_EQUAL(&connp->conn_faddr_v6,
+			    &sel->ips_remote_addr_v6)))
+				break;
 		}
 	}
 	if (connp == NULL) {
@@ -7098,6 +6687,7 @@ ipsec_oth_pol(ipsec_selector_t *sel, ipsec_policy_t **ppp,
 	mutex_exit(&connfp->connf_lock);
 
 	ipsec_conn_pol(sel, connp, ppp);
+	CONN_DEC_REF(connp);
 }
 
 /*
@@ -7245,7 +6835,7 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 			isel.ips_isv4 = (sel.ips_protocol == IPPROTO_ENCAP);
 		} /* Else isel is initialized by ipsec_tun_pol(). */
 		err = ipsec_tun_pol(&isel, &pp, innsrcext, inndstext, itp,
-		    &diagnostic, ns);
+		    &diagnostic);
 		/*
 		 * NOTE:  isel isn't used for now, but in RFC 430x IPsec, it
 		 * may be.
@@ -7263,8 +6853,7 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 	 * look in the global policy.
 	 */
 	if (pp == NULL) {
-		pp = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, NULL, NULL, &sel,
-		    ns);
+		pp = ipsec_find_policy(IPSEC_TYPE_OUTBOUND, NULL, &sel, ns);
 		if (pp == NULL) {
 			/* There's no global policy. */
 			err = ENOENT;
@@ -7282,7 +6871,7 @@ ipsec_construct_inverse_acquire(sadb_msg_t *samsg, sadb_ext_t *extv[],
 	    (itp != NULL && (itp->itp_flags & ITPF_P_TUNNEL)),
 	    samsg->sadb_msg_seq, samsg->sadb_msg_pid, sens, ns);
 	if (pp != NULL) {
-		IPPOL_REFRELE(pp, ns);
+		IPPOL_REFRELE(pp);
 	}
 	ASSERT(err == 0 && diagnostic == 0);
 	if (retmp == NULL)
@@ -7306,37 +6895,49 @@ bail:
 /*
  * sadb_set_lpkt: Return TRUE if we can swap in a value to ipsa->ipsa_lpkt and
  * freemsg the previous value.  Return FALSE if we lost the race and the SA is
- * in a non-LARVAL state.  free clue: ip_drop_packet(NULL) is safe.
+ * in a non-LARVAL state. We also return FALSE if we can't allocate the attrmp.
  */
 boolean_t
-sadb_set_lpkt(ipsa_t *ipsa, mblk_t *npkt, netstack_t *ns)
+sadb_set_lpkt(ipsa_t *ipsa, mblk_t *npkt, ip_recv_attr_t *ira)
 {
-	mblk_t *opkt;
+	mblk_t		*opkt;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 	boolean_t is_larval;
-
-	/*
-	 * Check the packet's netstack id in case we go asynch with a
-	 * taskq_dispatch.
-	 */
-	ASSERT(((ipsec_in_t *)npkt->b_rptr)->ipsec_in_type == IPSEC_IN);
-	ASSERT(((ipsec_in_t *)npkt->b_rptr)->ipsec_in_stackid ==
-	    ns->netstack_stackid);
 
 	mutex_enter(&ipsa->ipsa_lock);
 	is_larval = (ipsa->ipsa_state == IPSA_STATE_LARVAL);
 	if (is_larval) {
-		opkt = ipsa->ipsa_lpkt;
-		ipsa->ipsa_lpkt = npkt;
+		mblk_t	*attrmp;
+
+		attrmp = ip_recv_attr_to_mblk(ira);
+		if (attrmp == NULL) {
+			ill_t *ill = ira->ira_ill;
+
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", npkt, ill);
+			freemsg(npkt);
+			opkt = NULL;
+			is_larval = B_FALSE;
+		} else {
+			ASSERT(attrmp->b_cont == NULL);
+			attrmp->b_cont = npkt;
+			npkt = attrmp;
+			opkt = ipsa->ipsa_lpkt;
+			ipsa->ipsa_lpkt = npkt;
+		}
 	} else {
 		/* We lost the race. */
 		opkt = NULL;
 	}
 	mutex_exit(&ipsa->ipsa_lock);
 
-	ip_drop_packet(opkt, B_TRUE, NULL, NULL,
-	    DROPPER(ipss, ipds_sadb_inlarval_replace),
-	    &ipss->ipsec_sadb_dropper);
+	if (opkt != NULL) {
+		opkt = ip_recv_attr_free_mblk(opkt);
+		ip_drop_packet(opkt, B_TRUE, ira->ira_ill,
+		    DROPPER(ipss, ipds_sadb_inlarval_replace),
+		    &ipss->ipsec_sadb_dropper);
+	}
 	return (is_larval);
 }
 
@@ -7353,7 +6954,6 @@ sadb_clear_lpkt(ipsa_t *ipsa)
 	opkt = ipsa->ipsa_lpkt;
 	ipsa->ipsa_lpkt = NULL;
 	mutex_exit(&ipsa->ipsa_lock);
-
 	return (opkt);
 }
 
@@ -7361,18 +6961,18 @@ sadb_clear_lpkt(ipsa_t *ipsa)
  * Buffer a packet that's in IDLE state as set by Solaris Clustering.
  */
 void
-sadb_buf_pkt(ipsa_t *ipsa, mblk_t *bpkt, netstack_t *ns)
+sadb_buf_pkt(ipsa_t *ipsa, mblk_t *bpkt, ip_recv_attr_t *ira)
 {
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ipsec_stack_t   *ipss = ns->netstack_ipsec;
-	extern void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t,
-	    sa_family_t, in6_addr_t, in6_addr_t, void *);
 	in6_addr_t *srcaddr = (in6_addr_t *)(&ipsa->ipsa_srcaddr);
 	in6_addr_t *dstaddr = (in6_addr_t *)(&ipsa->ipsa_dstaddr);
+	mblk_t		*mp;
 
 	ASSERT(ipsa->ipsa_state == IPSA_STATE_IDLE);
 
 	if (cl_inet_idlesa == NULL) {
-		ip_drop_packet(bpkt, B_TRUE, NULL, NULL,
+		ip_drop_packet(bpkt, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_sadb_inidle_overflow),
 		    &ipss->ipsec_sadb_dropper);
 		return;
@@ -7382,13 +6982,14 @@ sadb_buf_pkt(ipsa_t *ipsa, mblk_t *bpkt, netstack_t *ns)
 	    (ipsa->ipsa_type == SADB_SATYPE_AH) ? IPPROTO_AH : IPPROTO_ESP,
 	    ipsa->ipsa_spi, ipsa->ipsa_addrfam, *srcaddr, *dstaddr, NULL);
 
-	/*
-	 * Check the packet's netstack id in case we go asynch with a
-	 * taskq_dispatch.
-	 */
-	ASSERT(((ipsec_in_t *)bpkt->b_rptr)->ipsec_in_type == IPSEC_IN);
-	ASSERT(((ipsec_in_t *)bpkt->b_rptr)->ipsec_in_stackid ==
-	    ns->netstack_stackid);
+	mp = ip_recv_attr_to_mblk(ira);
+	if (mp == NULL) {
+		ip_drop_packet(bpkt, B_TRUE, ira->ira_ill,
+		    DROPPER(ipss, ipds_sadb_inidle_overflow),
+		    &ipss->ipsec_sadb_dropper);
+		return;
+	}
+	linkb(mp, bpkt);
 
 	mutex_enter(&ipsa->ipsa_lock);
 	ipsa->ipsa_mblkcnt++;
@@ -7399,16 +7000,17 @@ sadb_buf_pkt(ipsa_t *ipsa, mblk_t *bpkt, netstack_t *ns)
 		ipsa->ipsa_bpkt_tail = bpkt;
 		if (ipsa->ipsa_mblkcnt > SADB_MAX_IDLEPKTS) {
 			mblk_t *tmp;
+
 			tmp = ipsa->ipsa_bpkt_head;
 			ipsa->ipsa_bpkt_head = ipsa->ipsa_bpkt_head->b_next;
-			ip_drop_packet(tmp, B_TRUE, NULL, NULL,
+			tmp = ip_recv_attr_free_mblk(tmp);
+			ip_drop_packet(tmp, B_TRUE, NULL,
 			    DROPPER(ipss, ipds_sadb_inidle_overflow),
 			    &ipss->ipsec_sadb_dropper);
 			ipsa->ipsa_mblkcnt --;
 		}
 	}
 	mutex_exit(&ipsa->ipsa_lock);
-
 }
 
 /*
@@ -7419,30 +7021,28 @@ void
 sadb_clear_buf_pkt(void *ipkt)
 {
 	mblk_t	*tmp, *buf_pkt;
-	netstack_t *ns;
-	ipsec_in_t *ii;
+	ip_recv_attr_t	iras;
 
 	buf_pkt = (mblk_t *)ipkt;
 
-	ii = (ipsec_in_t *)buf_pkt->b_rptr;
-	ASSERT(ii->ipsec_in_type == IPSEC_IN);
-	ns = netstack_find_by_stackid(ii->ipsec_in_stackid);
-	if (ns != NULL && ns != ii->ipsec_in_ns) {
-		netstack_rele(ns);
-		ns = NULL;  /* For while-loop below. */
-	}
-
 	while (buf_pkt != NULL) {
+		mblk_t *data_mp;
+
 		tmp = buf_pkt->b_next;
 		buf_pkt->b_next = NULL;
-		if (ns != NULL)
-			ip_fanout_proto_again(buf_pkt, NULL, NULL, NULL);
-		else
-			freemsg(buf_pkt);
+
+		data_mp = buf_pkt->b_cont;
+		buf_pkt->b_cont = NULL;
+		if (!ip_recv_attr_from_mblk(buf_pkt, &iras)) {
+			/* The ill or ip_stack_t disappeared on us. */
+			ip_drop_input("ip_recv_attr_from_mblk", data_mp, NULL);
+			freemsg(data_mp);
+		} else {
+			ip_input_post_ipsec(data_mp, &iras);
+		}
+		ira_cleanup(&iras, B_TRUE);
 		buf_pkt = tmp;
 	}
-	if (ns != NULL)
-		netstack_rele(ns);
 }
 /*
  * Walker callback used by sadb_alg_update() to free/create crypto
@@ -7454,6 +7054,8 @@ struct sadb_update_alg_state {
 	ipsec_algtype_t alg_type;
 	uint8_t alg_id;
 	boolean_t is_added;
+	boolean_t async_auth;
+	boolean_t async_encr;
 };
 
 static void
@@ -7469,6 +7071,15 @@ sadb_alg_update_cb(isaf_t *head, ipsa_t *entry, void *cookie)
 		return;
 
 	mutex_enter(&entry->ipsa_lock);
+
+	if ((entry->ipsa_encr_alg != SADB_EALG_NONE && entry->ipsa_encr_alg !=
+	    SADB_EALG_NULL && update_state->async_encr) ||
+	    (entry->ipsa_auth_alg != SADB_AALG_NONE &&
+	    update_state->async_auth)) {
+		entry->ipsa_flags |= IPSA_F_ASYNC;
+	} else {
+		entry->ipsa_flags &= ~IPSA_F_ASYNC;
+	}
 
 	switch (update_state->alg_type) {
 	case IPSEC_ALG_AUTH:
@@ -7511,8 +7122,11 @@ sadb_alg_update_cb(isaf_t *head, ipsa_t *entry, void *cookie)
 }
 
 /*
- * Invoked by IP when an software crypto provider has been updated.
- * The type and id of the corresponding algorithm is passed as argument.
+ * Invoked by IP when an software crypto provider has been updated, or if
+ * the crypto synchrony changes.  The type and id of the corresponding
+ * algorithm is passed as argument.  The type is set to ALL in the case of
+ * a synchrony change.
+ *
  * is_added is B_TRUE if the provider was added, B_FALSE if it was
  * removed. The function updates the SADB and free/creates the
  * context templates associated with SAs if needed.
@@ -7529,12 +7143,17 @@ sadb_alg_update(ipsec_algtype_t alg_type, uint8_t alg_id, boolean_t is_added,
 	struct sadb_update_alg_state update_state;
 	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
 	ipsecesp_stack_t	*espstack = ns->netstack_ipsecesp;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
 	update_state.alg_type = alg_type;
 	update_state.alg_id = alg_id;
 	update_state.is_added = is_added;
+	update_state.async_auth = ipss->ipsec_algs_exec_mode[IPSEC_ALG_AUTH] ==
+	    IPSEC_ALGS_EXEC_ASYNC;
+	update_state.async_encr = ipss->ipsec_algs_exec_mode[IPSEC_ALG_ENCR] ==
+	    IPSEC_ALGS_EXEC_ASYNC;
 
-	if (alg_type == IPSEC_ALG_AUTH) {
+	if (alg_type == IPSEC_ALG_AUTH || alg_type == IPSEC_ALG_ALL) {
 		/* walk the AH tables only for auth. algorithm changes */
 		SADB_ALG_UPDATE_WALK(ahstack->ah_sadb.s_v4, sdb_of);
 		SADB_ALG_UPDATE_WALK(ahstack->ah_sadb.s_v4, sdb_if);
@@ -7693,15 +7312,15 @@ ipsec_check_key(crypto_mech_type_t mech_type, sadb_key_t *sadb_key,
  *
  * This is inelegant and really could use refactoring.
  */
-int
-sadb_whack_label(mblk_t **mpp, ipsa_t *assoc)
+mblk_t *
+sadb_whack_label_v4(mblk_t *mp, ipsa_t *assoc, kstat_named_t *counter,
+    ipdropper_t *dropper)
 {
 	int delta;
 	int plen;
 	dblk_t *db;
 	int hlen;
 	uint8_t *opt_storage = assoc->ipsa_opt_storage;
-	mblk_t *mp = *mpp;
 	ipha_t *ipha = (ipha_t *)mp->b_rptr;
 
 	plen = ntohs(ipha->ipha_length);
@@ -7731,8 +7350,10 @@ sadb_whack_label(mblk_t **mpp, ipsa_t *assoc)
 		new_mp = allocb_tmpl(hlen + copylen +
 		    (mp->b_rptr - mp->b_datap->db_base), mp);
 
-		if (new_mp == NULL)
-			return (ENOMEM);
+		if (new_mp == NULL) {
+			ip_drop_packet(mp, B_FALSE, NULL, counter,  dropper);
+			return (NULL);
+		}
 
 		/* keep the bias */
 		new_mp->b_rptr += mp->b_rptr - mp->b_datap->db_base;
@@ -7743,7 +7364,7 @@ sadb_whack_label(mblk_t **mpp, ipsa_t *assoc)
 			new_mp->b_cont = mp->b_cont;
 			freeb(mp);
 		}
-		*mpp = mp = new_mp;
+		mp = new_mp;
 		ipha = (ipha_t *)mp->b_rptr;
 	}
 
@@ -7768,11 +7389,12 @@ sadb_whack_label(mblk_t **mpp, ipsa_t *assoc)
 
 	ipha->ipha_length = htons(plen);
 
-	return (0);
+	return (mp);
 }
 
-int
-sadb_whack_label_v6(mblk_t **mpp, ipsa_t *assoc)
+mblk_t *
+sadb_whack_label_v6(mblk_t *mp, ipsa_t *assoc, kstat_named_t *counter,
+    ipdropper_t *dropper)
 {
 	int delta;
 	int plen;
@@ -7780,7 +7402,6 @@ sadb_whack_label_v6(mblk_t **mpp, ipsa_t *assoc)
 	int hlen;
 	uint8_t *opt_storage = assoc->ipsa_opt_storage;
 	uint_t sec_opt_len; /* label option length not including type, len */
-	mblk_t *mp = *mpp;
 	ip6_t *ip6h = (ip6_t *)mp->b_rptr;
 
 	plen = ntohs(ip6h->ip6_plen);
@@ -7818,8 +7439,10 @@ sadb_whack_label_v6(mblk_t **mpp, ipsa_t *assoc)
 			copylen = hdr_len;
 		new_mp = allocb_tmpl(hlen + copylen +
 		    (mp->b_rptr - mp->b_datap->db_base), mp);
-		if (new_mp == NULL)
-			return (ENOMEM);
+		if (new_mp == NULL) {
+			ip_drop_packet(mp, B_FALSE, NULL, counter,  dropper);
+			return (NULL);
+		}
 
 		/* keep the bias */
 		new_mp->b_rptr += mp->b_rptr - mp->b_datap->db_base;
@@ -7830,7 +7453,7 @@ sadb_whack_label_v6(mblk_t **mpp, ipsa_t *assoc)
 			new_mp->b_cont = mp->b_cont;
 			freeb(mp);
 		}
-		*mpp = mp = new_mp;
+		mp = new_mp;
 		ip6h = (ip6_t *)mp->b_rptr;
 	}
 
@@ -7856,10 +7479,46 @@ sadb_whack_label_v6(mblk_t **mpp, ipsa_t *assoc)
 
 	ip6h->ip6_plen = htons(plen);
 
-	return (0);
+	return (mp);
 }
 
+/* Whack the labels and update ip_xmit_attr_t as needed */
+mblk_t *
+sadb_whack_label(mblk_t *mp, ipsa_t *assoc, ip_xmit_attr_t *ixa,
+    kstat_named_t *counter, ipdropper_t *dropper)
+{
+	int adjust;
+	int iplen;
 
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
+		ipha_t		*ipha = (ipha_t *)mp->b_rptr;
+
+		ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
+		iplen = ntohs(ipha->ipha_length);
+		mp = sadb_whack_label_v4(mp, assoc, counter, dropper);
+		if (mp == NULL)
+			return (NULL);
+
+		ipha = (ipha_t *)mp->b_rptr;
+		ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
+		adjust = (int)ntohs(ipha->ipha_length) - iplen;
+	} else {
+		ip6_t		*ip6h = (ip6_t *)mp->b_rptr;
+
+		ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
+		iplen = ntohs(ip6h->ip6_plen);
+		mp = sadb_whack_label_v6(mp, assoc, counter, dropper);
+		if (mp == NULL)
+			return (NULL);
+
+		ip6h = (ip6_t *)mp->b_rptr;
+		ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
+		adjust = (int)ntohs(ip6h->ip6_plen) - iplen;
+	}
+	ixa->ixa_pktlen += adjust;
+	ixa->ixa_ip_hdr_length += adjust;
+	return (mp);
+}
 
 /*
  * If this is an outgoing SA then add some fuzz to the
@@ -7969,7 +7628,7 @@ age_pair_peer_list(templist_t *haspeerlist, sadb_t *sp, boolean_t outbound)
 				    *((ipaddr_t *)&dying->
 				    ipsa_srcaddr));
 			}
-		bucket = &(sp->sdb_of[outhash]);
+			bucket = &(sp->sdb_of[outhash]);
 		}
 
 		mutex_enter(&bucket->isaf_lock);

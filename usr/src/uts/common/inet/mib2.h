@@ -66,8 +66,8 @@ extern "C" {
  * "get all" is supported, so all modules get a copy of the request to
  * return everything it knows.   In general, we use MIB2_IP.  There is
  * one exception: in general, IP will not report information related to
- * IRE_MARK_TESTHIDDEN routes (e.g., in the MIB2_IP_ROUTE table).
- * However, using the special value EXPER_IP_AND_TESTHIDDEN will cause
+ * ire_testhidden and IRE_IF_CLONE routes (e.g., in the MIB2_IP_ROUTE
+ * table). However, using the special value EXPER_IP_AND_ALL_IRES will cause
  * all information to be reported.  This special value should only be
  * used by IPMP-aware low-level utilities (e.g. in.mpathd).
  *
@@ -109,7 +109,7 @@ extern "C" {
 #define	EXPER_IGMP		(EXPER+1)
 #define	EXPER_DVMRP		(EXPER+2)
 #define	EXPER_RAWIP		(EXPER+3)
-#define	EXPER_IP_AND_TESTHIDDEN	(EXPER+4)
+#define	EXPER_IP_AND_ALL_IRES	(EXPER+4)
 
 /*
  * Define range of levels for experimental use
@@ -170,6 +170,7 @@ typedef uint32_t	DeviceIndex;	/* Interface index */
 #define	EXPER_IP_GROUP_SOURCES		102
 #define	EXPER_IP6_GROUP_SOURCES		103
 #define	EXPER_IP_RTATTR			104
+#define	EXPER_IP_DCE			105
 
 /*
  * There can be one of each of these tables per transport (MIB2_* above).
@@ -267,15 +268,13 @@ typedef struct mib2_ip {
 	int	ipMemberEntrySize;	/* Size of ip_member_t */
 	int	ipGroupSourceEntrySize;	/* Size of ip_grpsrc_t */
 
-		/* # of IPv6 packets received by IPv4 and dropped */
-	Counter ipInIPv6;
-		/* # of IPv6 packets transmitted by ip_wput */
-	Counter ipOutIPv6;
-		/* # of times ip_wput has switched to become ip_wput_v6 */
-	Counter ipOutSwitchIPv6;
+	Counter ipInIPv6; /* # of IPv6 packets received by IPv4 and dropped */
+	Counter ipOutIPv6;		/* No longer used */
+	Counter ipOutSwitchIPv6;	/* No longer used */
 
 	int	ipRouteAttributeSize;	/* Size of mib2_ipAttributeEntry_t */
 	int	transportMLPSize;	/* Size of mib2_transportMLPEntry_t */
+	int	ipDestEntrySize;	/* Size of dest_cache_entry_t */
 } mib2_ip_t;
 
 /*
@@ -503,14 +502,11 @@ typedef struct mib2_ipIfStatsEntry {
 	 */
 	Counter ipIfStatsInWrongIPVersion;
 	/*
-	 * Depending on the value of ipIfStatsIPVersion, this counter tracks
-	 * v4: # of IPv6 packets transmitted by ip_wput or,
-	 * v6: # of IPv4 packets transmitted by ip_wput_v6.
+	 * This counter is no longer used
 	 */
 	Counter ipIfStatsOutWrongIPVersion;
 	/*
-	 * Depending on the value of ipIfStatsIPVersion, this counter tracks
-	 * # of times ip_wput has switched to become ip_wput_v6, or vice versa.
+	 * This counter is no longer used
 	 */
 	Counter ipIfStatsOutSwitchIPVersion;
 
@@ -978,6 +974,21 @@ typedef struct ipv6_grpsrc {
 	/* IP Source address */
 	Ip6Address	ipv6GroupSourceAddress;
 } ipv6_grpsrc_t;
+
+
+/*
+ * List of destination cache entries
+ */
+typedef struct dest_cache_entry {
+	/* IP Multicast address */
+	IpAddress	DestIpv4Address;
+	Ip6Address	DestIpv6Address;
+	uint_t		DestFlags;	/* DCEF_* */
+	uint32_t	DestPmtu;	/* Path MTU if DCEF_PMTU */
+	uint32_t	DestIdent;	/* Per destination IP ident. */
+	DeviceIndex	DestIfindex;	/* For IPv6 link-locals */
+	uint32_t	DestAge;	/* Age of MTU info in seconds */
+} dest_cache_entry_t;
 
 
 /*

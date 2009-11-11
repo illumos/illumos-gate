@@ -43,6 +43,7 @@
 #include <inet/ip.h>
 #include <inet/ip_ire.h>
 #include <inet/ip_if.h>
+#include <inet/proto_set.h>
 #include <inet/ipclassifier.h>
 #include <inet/ipsec_impl.h>
 
@@ -60,68 +61,6 @@
 
 static int	sctp_getpeeraddrs(sctp_t *, void *, int *);
 
-/*
- * Copy the standard header into its new location,
- * lay in the new options and then update the relevant
- * fields in both sctp_t and the standard header.
- * Returns 0 on success, errno otherwise.
- */
-static int
-sctp_opt_set_header(sctp_t *sctp, const void *ptr, uint_t len)
-{
-	uint8_t *ip_optp;
-	sctp_hdr_t *new_sctph;
-
-	if ((len > SCTP_MAX_IP_OPTIONS_LENGTH) || (len & 0x3))
-		return (EINVAL);
-
-	if (len > IP_MAX_OPT_LENGTH - sctp->sctp_v4label_len)
-		return (EINVAL);
-
-	ip_optp = (uint8_t *)sctp->sctp_ipha + IP_SIMPLE_HDR_LENGTH;
-
-	if (sctp->sctp_v4label_len > 0) {
-		int padlen;
-		uint8_t opt;
-
-		/* convert list termination to no-ops as needed */
-		padlen = sctp->sctp_v4label_len - ip_optp[IPOPT_OLEN];
-		ip_optp += ip_optp[IPOPT_OLEN];
-		opt = len > 0 ? IPOPT_NOP : IPOPT_EOL;
-		while (--padlen >= 0)
-			*ip_optp++ = opt;
-		ASSERT(ip_optp == (uint8_t *)sctp->sctp_ipha +
-		    IP_SIMPLE_HDR_LENGTH + sctp->sctp_v4label_len);
-	}
-
-	/*
-	 * Move the existing SCTP header out where it belongs.
-	 */
-	new_sctph = (sctp_hdr_t *)(ip_optp + len);
-	ovbcopy(sctp->sctp_sctph, new_sctph, sizeof (sctp_hdr_t));
-	sctp->sctp_sctph = new_sctph;
-
-	/*
-	 * Insert the new user-supplied IP options.
-	 */
-	if (len > 0)
-		bcopy(ptr, ip_optp, len);
-
-	len += sctp->sctp_v4label_len;
-	sctp->sctp_ip_hdr_len = len;
-	sctp->sctp_ipha->ipha_version_and_hdr_length =
-	    (IP_VERSION << 4) | (len >> 2);
-	sctp->sctp_hdr_len = len + sizeof (sctp_hdr_t);
-
-	if (sctp->sctp_current) {
-		/*
-		 * Could be setting options before setting up connection.
-		 */
-		sctp_set_ulp_prop(sctp);
-	}
-	return (0);
-}
-
 static int
 sctp_get_status(sctp_t *sctp, void *ptr)
 {
@@ -132,6 +71,7 @@ sctp_get_status(sctp_t *sctp, void *ptr)
 	struct sctp_paddrinfo *sp;
 	mblk_t *meta, *mp;
 	int i;
+	conn_t	*connp = sctp->sctp_connp;
 
 	sstat->sstat_state = sctp->sctp_state;
 	sstat->sstat_rwnd = sctp->sctp_frwnd;
@@ -146,13 +86,13 @@ sctp_get_status(sctp_t *sctp, void *ptr)
 	if (fp->isv4) {
 		sin = (struct sockaddr_in *)&sp->spinfo_address;
 		sin->sin_family = AF_INET;
-		sin->sin_port = sctp->sctp_fport;
+		sin->sin_port = connp->conn_fport;
 		IN6_V4MAPPED_TO_INADDR(&fp->faddr, &sin->sin_addr);
 		sp->spinfo_mtu = sctp->sctp_hdr_len;
 	} else {
 		sin6 = (struct sockaddr_in6 *)&sp->spinfo_address;
 		sin6->sin6_family = AF_INET6;
-		sin6->sin6_port = sctp->sctp_fport;
+		sin6->sin6_port = connp->conn_fport;
 		sin6->sin6_addr = fp->faddr;
 		sp->spinfo_mtu = sctp->sctp_hdr6_len;
 	}
@@ -261,18 +201,16 @@ sctp_get_rtoinfo(sctp_t *sctp, void *ptr)
 }
 
 static int
-sctp_set_rtoinfo(sctp_t *sctp, const void *invalp, uint_t inlen)
+sctp_set_rtoinfo(sctp_t *sctp, const void *invalp)
 {
 	const struct sctp_rtoinfo *srto;
 	boolean_t ispriv;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	conn_t		*connp = sctp->sctp_connp;
 
-	if (inlen < sizeof (*srto)) {
-		return (EINVAL);
-	}
 	srto = invalp;
 
-	ispriv = secpolicy_ip_config(sctp->sctp_credp, B_TRUE) == 0;
+	ispriv = secpolicy_ip_config(connp->conn_cred, B_TRUE) == 0;
 
 	/*
 	 * Bounds checking.  Priviledged user can set the RTO initial
@@ -334,16 +272,12 @@ sctp_get_assocparams(sctp_t *sctp, void *ptr)
 }
 
 static int
-sctp_set_assocparams(sctp_t *sctp, const void *invalp, uint_t inlen)
+sctp_set_assocparams(sctp_t *sctp, const void *invalp)
 {
 	const struct sctp_assocparams *sap = invalp;
 	uint32_t sum = 0;
 	sctp_faddr_t *fp;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
-
-	if (inlen < sizeof (*sap)) {
-		return (EINVAL);
-	}
 
 	if (sap->sasoc_asocmaxrxt) {
 		if (sctp->sctp_faddrs) {
@@ -403,6 +337,7 @@ sctp_set_initmsg(sctp_t *sctp, const void *invalp, uint_t inlen)
 {
 	const struct sctp_initmsg *si = invalp;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	conn_t		*connp = sctp->sctp_connp;
 
 	if (sctp->sctp_state > SCTPS_LISTEN) {
 		return (EINVAL);
@@ -430,7 +365,7 @@ sctp_set_initmsg(sctp_t *sctp, const void *invalp, uint_t inlen)
 		return (EINVAL);
 	}
 	if (si->sinit_max_init_timeo != 0 &&
-	    (secpolicy_ip_config(sctp->sctp_credp, B_TRUE) != 0 &&
+	    (secpolicy_ip_config(connp->conn_cred, B_TRUE) != 0 &&
 	    (si->sinit_max_init_timeo < sctps->sctps_rto_maxg_low ||
 	    si->sinit_max_init_timeo > sctps->sctps_rto_maxg_high))) {
 		return (EINVAL);
@@ -506,7 +441,7 @@ sctp_get_peer_addr_params(sctp_t *sctp, void *ptr)
 }
 
 static int
-sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp, uint_t inlen)
+sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp)
 {
 	const struct sctp_paddrparams *spp = invalp;
 	sctp_faddr_t *fp, *fp2;
@@ -514,10 +449,6 @@ sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp, uint_t inlen)
 	uint32_t sum = 0;
 	int64_t now;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
-
-	if (inlen < sizeof (*spp)) {
-		return (EINVAL);
-	}
 
 	retval = sctp_find_peer_fp(sctp, &spp->spp_address, &fp);
 	if (retval != 0) {
@@ -620,13 +551,10 @@ sctp_get_def_send_params(sctp_t *sctp, void *ptr)
 }
 
 static int
-sctp_set_def_send_params(sctp_t *sctp, const void *invalp, uint_t inlen)
+sctp_set_def_send_params(sctp_t *sctp, const void *invalp)
 {
 	const struct sctp_sndrcvinfo *sinfo = invalp;
 
-	if (inlen < sizeof (*sinfo)) {
-		return (EINVAL);
-	}
 	if (sinfo->sinfo_stream >= sctp->sctp_num_ostr) {
 		return (EINVAL);
 	}
@@ -641,15 +569,11 @@ sctp_set_def_send_params(sctp_t *sctp, const void *invalp, uint_t inlen)
 }
 
 static int
-sctp_set_prim(sctp_t *sctp, const void *invalp, uint_t inlen)
+sctp_set_prim(sctp_t *sctp, const void *invalp)
 {
 	const struct	sctp_setpeerprim *pp = invalp;
 	int		retval;
 	sctp_faddr_t	*fp;
-
-	if (inlen < sizeof (*pp)) {
-		return (EINVAL);
-	}
 
 	retval = sctp_find_peer_fp(sctp, &pp->sspp_addr, &fp);
 	if (retval)
@@ -670,6 +594,183 @@ sctp_set_prim(sctp_t *sctp, const void *invalp, uint_t inlen)
 	return (0);
 }
 
+/*
+ * Table of all known options handled on a SCTP protocol stack.
+ *
+ * Note: This table contains options processed by both SCTP and IP levels
+ *       and is the superset of options that can be performed on a SCTP and IP
+ *       stack.
+ */
+opdes_t	sctp_opt_arr[] = {
+
+{ SO_LINGER,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (struct linger), 0 },
+
+{ SO_DEBUG,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_KEEPALIVE,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_DONTROUTE,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_USELOOPBACK, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0
+	},
+{ SO_BROADCAST,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_REUSEADDR, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_OOBINLINE, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_TYPE,	SOL_SOCKET, OA_R, OA_R, OP_NP, 0, sizeof (int), 0 },
+{ SO_SNDBUF,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_RCVBUF,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_DGRAM_ERRIND, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0
+	},
+{ SO_SND_COPYAVOID, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SO_ANON_MLP, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int),
+	0 },
+{ SO_MAC_EXEMPT, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int),
+	0 },
+{ SO_ALLZONES, SOL_SOCKET, OA_R, OA_RW, OP_CONFIG, 0, sizeof (int),
+	0 },
+{ SO_EXCLBIND, SOL_SOCKET, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+
+{ SO_DOMAIN,	SOL_SOCKET, OA_R, OA_R, OP_NP, 0, sizeof (int), 0 },
+
+{ SO_PROTOTYPE,	SOL_SOCKET, OA_R, OA_R, OP_NP, 0, sizeof (int), 0 },
+
+{ SCTP_ADAPTATION_LAYER, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (struct sctp_setadaptation), 0 },
+{ SCTP_ADD_ADDR, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, OP_VARLEN,
+	sizeof (int), 0 },
+{ SCTP_ASSOCINFO, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (struct sctp_assocparams), 0 },
+{ SCTP_AUTOCLOSE, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SCTP_DEFAULT_SEND_PARAM, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (struct sctp_sndrcvinfo), 0 },
+{ SCTP_DISABLE_FRAGMENTS, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ SCTP_EVENTS, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (struct sctp_event_subscribe), 0 },
+{ SCTP_GET_LADDRS, IPPROTO_SCTP, OA_R, OA_R, OP_NP, OP_VARLEN,
+	sizeof (int), 0 },
+{ SCTP_GET_NLADDRS, IPPROTO_SCTP, OA_R, OA_R, OP_NP, 0, sizeof (int), 0 },
+{ SCTP_GET_NPADDRS, IPPROTO_SCTP, OA_R, OA_R, OP_NP, 0, sizeof (int), 0 },
+{ SCTP_GET_PADDRS, IPPROTO_SCTP, OA_R, OA_R, OP_NP, OP_VARLEN,
+	sizeof (int), 0 },
+{ SCTP_GET_PEER_ADDR_INFO, IPPROTO_SCTP, OA_R, OA_R, OP_NP, 0,
+	sizeof (struct sctp_paddrinfo), 0 },
+{ SCTP_INITMSG, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (struct sctp_initmsg), 0 },
+{ SCTP_I_WANT_MAPPED_V4_ADDR, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ SCTP_MAXSEG, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SCTP_NODELAY, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SCTP_PEER_ADDR_PARAMS, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (struct sctp_paddrparams), 0 },
+{ SCTP_PRIMARY_ADDR, IPPROTO_SCTP, OA_W, OA_W, OP_NP, 0,
+	sizeof (struct sctp_setpeerprim), 0 },
+{ SCTP_PRSCTP, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ SCTP_GET_ASSOC_STATS, IPPROTO_SCTP, OA_R, OA_R, OP_NP, 0,
+	sizeof (sctp_assoc_stats_t), 0 },
+{ SCTP_REM_ADDR, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, OP_VARLEN,
+	sizeof (int), 0 },
+{ SCTP_RTOINFO, IPPROTO_SCTP, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (struct sctp_rtoinfo), 0 },
+{ SCTP_SET_PEER_PRIMARY_ADDR, IPPROTO_SCTP, OA_W, OA_W, OP_NP, 0,
+	sizeof (struct sctp_setprim), 0 },
+{ SCTP_STATUS, IPPROTO_SCTP, OA_R, OA_R, OP_NP, 0,
+	sizeof (struct sctp_status), 0 },
+{ SCTP_UC_SWAP, IPPROTO_SCTP, OA_W, OA_W, OP_NP, 0,
+	sizeof (struct sctp_uc_swap), 0 },
+
+{ IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
+	(OP_VARLEN|OP_NODEFAULT),
+	40, -1 /* not initialized */ },
+{ T_IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
+	(OP_VARLEN|OP_NODEFAULT),
+	40, -1 /* not initialized */ },
+
+{ IP_TOS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ T_IP_TOS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+{ IP_TTL,	IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_DEF_FN,
+	sizeof (int), -1 /* not initialized */ },
+
+{ IP_SEC_OPT, IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_NODEFAULT,
+	sizeof (ipsec_req_t), -1 /* not initialized */ },
+
+{ IP_BOUND_IF, IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int),	0 /* no ifindex */ },
+
+{ IP_UNSPEC_SRC, IPPROTO_IP, OA_R, OA_RW, OP_RAW, 0,
+	sizeof (int), 0 },
+
+{ IPV6_UNICAST_HOPS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, OP_DEF_FN,
+	sizeof (int), -1 /* not initialized */ },
+
+{ IPV6_BOUND_IF, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int),	0 /* no ifindex */ },
+
+{ IP_DONTFRAG, IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
+
+{ IP_NEXTHOP, IPPROTO_IP, OA_R, OA_RW, OP_CONFIG, 0,
+	sizeof (in_addr_t),	-1 /* not initialized  */ },
+
+{ IPV6_UNSPEC_SRC, IPPROTO_IPV6, OA_R, OA_RW, OP_RAW, 0,
+	sizeof (int), 0 },
+
+{ IPV6_PKTINFO, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP,
+	(OP_NODEFAULT|OP_VARLEN),
+	sizeof (struct in6_pktinfo), -1 /* not initialized */ },
+{ IPV6_NEXTHOP, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP,
+	OP_NODEFAULT,
+	sizeof (sin6_t), -1 /* not initialized */ },
+{ IPV6_HOPOPTS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP,
+	(OP_VARLEN|OP_NODEFAULT), 255*8,
+	-1 /* not initialized */ },
+{ IPV6_DSTOPTS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP,
+	(OP_VARLEN|OP_NODEFAULT), 255*8,
+	-1 /* not initialized */ },
+{ IPV6_RTHDRDSTOPTS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP,
+	(OP_VARLEN|OP_NODEFAULT), 255*8,
+	-1 /* not initialized */ },
+{ IPV6_RTHDR, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP,
+	(OP_VARLEN|OP_NODEFAULT), 255*8,
+	-1 /* not initialized */ },
+{ IPV6_TCLASS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP,
+	OP_NODEFAULT,
+	sizeof (int), -1 /* not initialized */ },
+{ IPV6_PATHMTU, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP,
+	OP_NODEFAULT,
+	sizeof (struct ip6_mtuinfo), -1 /* not initialized */ },
+{ IPV6_DONTFRAG, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ IPV6_USE_MIN_MTU, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ IPV6_V6ONLY, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+
+/* Enable receipt of ancillary data */
+{ IPV6_RECVPKTINFO, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ IPV6_RECVHOPLIMIT, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ IPV6_RECVTCLASS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ IPV6_RECVHOPOPTS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ _OLD_IPV6_RECVDSTOPTS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ IPV6_RECVDSTOPTS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ IPV6_RECVRTHDR, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ IPV6_RECVRTHDRDSTOPTS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+{ IPV6_RECVTCLASS, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (int), 0 },
+
+{ IPV6_SEC_OPT, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, OP_NODEFAULT,
+	sizeof (ipsec_req_t), -1 /* not initialized */ },
+{ IPV6_SRC_PREFERENCES, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, 0,
+	sizeof (uint32_t), IPV6_PREFER_SRC_DEFAULT },
+};
+
+uint_t sctp_opt_arr_size = A_CNT(sctp_opt_arr);
+
 /* Handy on off switch for socket option processing. */
 #define	ONOFF(x)	((x) == 0 ? 0 : 1)
 
@@ -682,8 +783,12 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 	int	*i1 = (int *)ptr;
 	int	retval = 0;
 	int	buflen = *optlen;
-	conn_t		*connp = sctp->sctp_connp;
-	ip6_pkt_t	*ipp = &sctp->sctp_sticky_ipp;
+	conn_t	*connp = sctp->sctp_connp;
+	conn_opt_arg_t	coas;
+
+	coas.coa_connp = connp;
+	coas.coa_ixa = connp->conn_ixa;
+	coas.coa_ipp = &connp->conn_xmit_ipp;
 
 	/* In most cases, the return buffer is just an int */
 	*optlen = sizeof (int32_t);
@@ -695,83 +800,30 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 		return (EINVAL);
 	}
 
+	/*
+	 * Check that the level and name are supported by SCTP, and that
+	 * the length and credentials are ok.
+	 */
+	retval = proto_opt_check(level, name, buflen, NULL, sctp_opt_arr,
+	    sctp_opt_arr_size, B_FALSE, B_TRUE, connp->conn_cred);
+	if (retval != 0) {
+		WAKE_SCTP(sctp);
+		if (retval < 0) {
+			retval = proto_tlitosyserr(-retval);
+		}
+		return (retval);
+	}
+
 	switch (level) {
-	case SOL_SOCKET:
-		switch (name) {
-		case SO_LINGER:	{
-			struct linger *lgr = (struct linger *)ptr;
-
-			lgr->l_onoff = sctp->sctp_linger ? SO_LINGER : 0;
-			lgr->l_linger = TICK_TO_MSEC(sctp->sctp_lingertime);
-			*optlen = sizeof (struct linger);
-			break;
-		}
-		case SO_DEBUG:
-			*i1 = sctp->sctp_debug ? SO_DEBUG : 0;
-			break;
-		case SO_DONTROUTE:
-			*i1 = connp->conn_dontroute ? SO_DONTROUTE : 0;
-			break;
-		case SO_USELOOPBACK:
-			*i1 = connp->conn_loopback ? SO_USELOOPBACK : 0;
-			break;
-		case SO_BROADCAST:
-			*i1 = connp->conn_broadcast ? SO_BROADCAST : 0;
-			break;
-		case SO_REUSEADDR:
-			*i1 = connp->conn_reuseaddr ? SO_REUSEADDR : 0;
-			break;
-		case SO_DGRAM_ERRIND:
-			*i1 = sctp->sctp_dgram_errind ? SO_DGRAM_ERRIND : 0;
-			break;
-		case SO_SNDBUF:
-			*i1 = sctp->sctp_xmit_hiwater;
-			break;
-		case SO_RCVBUF:
-			*i1 = sctp->sctp_rwnd;
-			break;
-		case SO_ALLZONES:
-			*i1 = connp->conn_allzones;
-			break;
-		case SO_MAC_EXEMPT:
-			*i1 = (connp->conn_mac_mode == CONN_MAC_AWARE);
-			break;
-		case SO_MAC_IMPLICIT:
-			*i1 = (connp->conn_mac_mode == CONN_MAC_IMPLICIT);
-			break;
-		case SO_PROTOTYPE:
-			*i1 = IPPROTO_SCTP;
-			break;
-		case SO_DOMAIN:
-			*i1 = sctp->sctp_family;
-			break;
-		default:
-			retval = ENOPROTOOPT;
-			break;
-		}
-		break;
-
 	case IPPROTO_SCTP:
 		switch (name) {
 		case SCTP_RTOINFO:
-			if (buflen < sizeof (struct sctp_rtoinfo)) {
-				retval = EINVAL;
-				break;
-			}
 			*optlen = sctp_get_rtoinfo(sctp, ptr);
 			break;
 		case SCTP_ASSOCINFO:
-			if (buflen < sizeof (struct sctp_assocparams)) {
-				retval = EINVAL;
-				break;
-			}
 			*optlen = sctp_get_assocparams(sctp, ptr);
 			break;
 		case SCTP_INITMSG:
-			if (buflen < sizeof (struct sctp_initmsg)) {
-				retval = EINVAL;
-				break;
-			}
 			*optlen = sctp_get_initmsg(sctp, ptr);
 			break;
 		case SCTP_NODELAY:
@@ -781,34 +833,18 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			*i1 = TICK_TO_SEC(sctp->sctp_autoclose);
 			break;
 		case SCTP_ADAPTATION_LAYER:
-			if (buflen < sizeof (struct sctp_setadaptation)) {
-				retval = EINVAL;
-				break;
-			}
 			((struct sctp_setadaptation *)ptr)->ssb_adaptation_ind =
 			    sctp->sctp_tx_adaptation_code;
 			break;
 		case SCTP_PEER_ADDR_PARAMS:
-			if (buflen < sizeof (struct sctp_paddrparams)) {
-				retval = EINVAL;
-				break;
-			}
 			*optlen = sctp_get_peer_addr_params(sctp, ptr);
 			break;
 		case SCTP_DEFAULT_SEND_PARAM:
-			if (buflen < sizeof (struct sctp_sndrcvinfo)) {
-				retval = EINVAL;
-				break;
-			}
 			*optlen = sctp_get_def_send_params(sctp, ptr);
 			break;
 		case SCTP_EVENTS: {
 			struct sctp_event_subscribe *ev;
 
-			if (buflen < sizeof (struct sctp_event_subscribe)) {
-				retval = EINVAL;
-				break;
-			}
 			ev = (struct sctp_event_subscribe *)ptr;
 			ev->sctp_data_io_event =
 			    ONOFF(sctp->sctp_recvsndrcvinfo);
@@ -830,17 +866,9 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			break;
 		}
 		case SCTP_STATUS:
-			if (buflen < sizeof (struct sctp_status)) {
-				retval = EINVAL;
-				break;
-			}
 			*optlen = sctp_get_status(sctp, ptr);
 			break;
 		case SCTP_GET_PEER_ADDR_INFO:
-			if (buflen < sizeof (struct sctp_paddrinfo)) {
-				retval = EINVAL;
-				break;
-			}
 			retval = sctp_get_paddrinfo(sctp, ptr, optlen);
 			break;
 		case SCTP_GET_NLADDRS:
@@ -850,7 +878,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			int addr_cnt;
 			int addr_size;
 
-			if (sctp->sctp_family == AF_INET)
+			if (connp->conn_family == AF_INET)
 				addr_size = sizeof (struct sockaddr_in);
 			else
 				addr_size = sizeof (struct sockaddr_in6);
@@ -874,7 +902,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			int addr_cnt;
 			int addr_size;
 
-			if (sctp->sctp_family == AF_INET)
+			if (connp->conn_family == AF_INET)
 				addr_size = sizeof (struct sockaddr_in);
 			else
 				addr_size = sizeof (struct sockaddr_in6);
@@ -890,11 +918,6 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 
 		case SCTP_GET_ASSOC_STATS: {
 			sctp_assoc_stats_t *sas;
-
-			if (buflen < sizeof (sctp_assoc_stats_t)) {
-				retval = EINVAL;
-				break;
-			}
 
 			sas = (sctp_assoc_stats_t *)ptr;
 
@@ -947,15 +970,15 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 		case SCTP_I_WANT_MAPPED_V4_ADDR:
 		case SCTP_MAXSEG:
 		case SCTP_DISABLE_FRAGMENTS:
-			/* Not yet supported. */
 		default:
+			/* Not yet supported. */
 			retval = ENOPROTOOPT;
 			break;
 		}
-		break;
-
+		WAKE_SCTP(sctp);
+		return (retval);
 	case IPPROTO_IP:
-		if (sctp->sctp_family != AF_INET) {
+		if (connp->conn_family != AF_INET) {
 			retval = EINVAL;
 			break;
 		}
@@ -972,231 +995,52 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			 * ip_opt_get_user() adds the final destination
 			 * at the start.
 			 */
-			char	*opt_ptr;
 			int	opt_len;
 			uchar_t	obuf[SCTP_MAX_IP_OPTIONS_LENGTH + IP_ADDR_LEN];
 
-			opt_ptr = (char *)sctp->sctp_ipha +
-			    IP_SIMPLE_HDR_LENGTH;
-			opt_len = (char *)sctp->sctp_sctph - opt_ptr;
-			/* Caller ensures enough space */
-			if (opt_len > 0) {
-				/*
-				 * TODO: Do we have to handle getsockopt on an
-				 * initiator as well?
-				 */
-				opt_len = ip_opt_get_user(sctp->sctp_ipha,
-				    obuf);
-				ASSERT(opt_len <= sizeof (obuf));
-			} else {
-				opt_len = 0;
-			}
+			opt_len = ip_opt_get_user(connp, obuf);
+			ASSERT(opt_len <= sizeof (obuf));
+
 			if (buflen < opt_len) {
 				/* Silently truncate */
 				opt_len = buflen;
 			}
 			*optlen = opt_len;
 			bcopy(obuf, ptr, opt_len);
-			break;
+			WAKE_SCTP(sctp);
+			return (0);
 		}
-		case IP_TOS:
-		case T_IP_TOS:
-			*i1 = (int)sctp->sctp_ipha->ipha_type_of_service;
-			break;
-		case IP_TTL:
-			*i1 = (int)sctp->sctp_ipha->ipha_ttl;
-			break;
-		case IP_NEXTHOP:
-			if (connp->conn_nexthop_set) {
-				*(ipaddr_t *)ptr = connp->conn_nexthop_v4;
-				*optlen = sizeof (ipaddr_t);
-			} else {
-				*optlen = 0;
-			}
-			break;
 		default:
-			retval = ENOPROTOOPT;
 			break;
 		}
-		break;
-	case IPPROTO_IPV6:
-		if (sctp->sctp_family != AF_INET6) {
-			retval = EINVAL;
-			break;
-		}
-		switch (name) {
-		case IPV6_UNICAST_HOPS:
-			*i1 = (unsigned int) sctp->sctp_ip6h->ip6_hops;
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVPKTINFO:
-			if (sctp->sctp_ipv6_recvancillary &
-			    SCTP_IPV6_RECVPKTINFO) {
-				*i1 = 1;
-			} else {
-				*i1 = 0;
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVHOPLIMIT:
-			if (sctp->sctp_ipv6_recvancillary &
-			    SCTP_IPV6_RECVHOPLIMIT) {
-				*i1 = 1;
-			} else {
-				*i1 = 0;
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVHOPOPTS:
-			if (sctp->sctp_ipv6_recvancillary &
-			    SCTP_IPV6_RECVHOPOPTS) {
-				*i1 = 1;
-			} else {
-				*i1 = 0;
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVDSTOPTS:
-			if (sctp->sctp_ipv6_recvancillary &
-			    SCTP_IPV6_RECVDSTOPTS) {
-				*i1 = 1;
-			} else {
-				*i1 = 0;
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVRTHDR:
-			if (sctp->sctp_ipv6_recvancillary &
-			    SCTP_IPV6_RECVRTHDR) {
-				*i1 = 1;
-			} else {
-				*i1 = 0;
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVRTHDRDSTOPTS:
-			if (sctp->sctp_ipv6_recvancillary &
-			    SCTP_IPV6_RECVRTDSTOPTS) {
-				*i1 = 1;
-			} else {
-				*i1 = 0;
-			}
-			break;	/* goto sizeof (int) option return */
-		case IPV6_PKTINFO: {
-			struct in6_pktinfo *pkti;
-
-			if (buflen < sizeof (struct in6_pktinfo)) {
-				retval = EINVAL;
-				break;
-			}
-			pkti = (struct in6_pktinfo *)ptr;
-			if (ipp->ipp_fields & IPPF_IFINDEX)
-				pkti->ipi6_ifindex = ipp->ipp_ifindex;
-			else
-				pkti->ipi6_ifindex = 0;
-			if (ipp->ipp_fields & IPPF_ADDR)
-				pkti->ipi6_addr = ipp->ipp_addr;
-			else
-				pkti->ipi6_addr = ipv6_all_zeros;
-			*optlen = sizeof (struct in6_pktinfo);
-			break;
-		}
-		case IPV6_NEXTHOP: {
-			sin6_t *sin6;
-
-			if (buflen < sizeof (sin6_t)) {
-				retval = EINVAL;
-				break;
-			}
-			sin6 = (sin6_t *)ptr;
-			if (!(ipp->ipp_fields & IPPF_NEXTHOP))
-				break;
-			*sin6 = sctp_sin6_null;
-			sin6->sin6_family = AF_INET6;
-			sin6->sin6_addr = ipp->ipp_nexthop;
-			*optlen = sizeof (sin6_t);
-			break;
-		}
-		case IPV6_HOPOPTS: {
-			int len;
-
-			if (!(ipp->ipp_fields & IPPF_HOPOPTS))
-				break;
-			len = ipp->ipp_hopoptslen - sctp->sctp_v6label_len;
-			if (len <= 0)
-				break;
-			if (buflen < len) {
-				retval = EINVAL;
-				break;
-			}
-			bcopy((char *)ipp->ipp_hopopts +
-			    sctp->sctp_v6label_len, ptr, len);
-			if (sctp->sctp_v6label_len > 0) {
-				char *cptr = ptr;
-
-				/*
-				 * If the label length is greater than zero,
-				 * then we need to hide the label from user.
-				 * Make it look as though a normal Hop-By-Hop
-				 * Options Header is present here.
-				 */
-				cptr[0] = ((char *)ipp->ipp_hopopts)[0];
-				cptr[1] = (len + 7) / 8 - 1;
-			}
-			*optlen = len;
-			break;
-		}
-		case IPV6_RTHDRDSTOPTS:
-			if (!(ipp->ipp_fields & IPPF_RTDSTOPTS))
-				break;
-			if (buflen < ipp->ipp_rtdstoptslen) {
-				retval = EINVAL;
-				break;
-			}
-			bcopy(ipp->ipp_rtdstopts, ptr, ipp->ipp_rtdstoptslen);
-			*optlen  = ipp->ipp_rtdstoptslen;
-			break;
-		case IPV6_RTHDR:
-			if (!(ipp->ipp_fields & IPPF_RTHDR))
-				break;
-			if (buflen < ipp->ipp_rthdrlen) {
-				retval = EINVAL;
-				break;
-			}
-			bcopy(ipp->ipp_rthdr, ptr, ipp->ipp_rthdrlen);
-			*optlen = ipp->ipp_rthdrlen;
-			break;
-		case IPV6_DSTOPTS:
-			if (!(ipp->ipp_fields & IPPF_DSTOPTS))
-				break;
-			if (buflen < ipp->ipp_dstoptslen) {
-				retval = EINVAL;
-				break;
-			}
-			bcopy(ipp->ipp_dstopts, ptr, ipp->ipp_dstoptslen);
-			*optlen  = ipp->ipp_dstoptslen;
-			break;
-		case IPV6_V6ONLY:
-			*i1 = sctp->sctp_connp->conn_ipv6_v6only;
-			break;
-		default:
-			retval = ENOPROTOOPT;
-			break;
-		}
-		break;
-
-	default:
-		retval = ENOPROTOOPT;
 		break;
 	}
+	mutex_enter(&connp->conn_lock);
+	retval = conn_opt_get(&coas, level, name, ptr);
+	mutex_exit(&connp->conn_lock);
 	WAKE_SCTP(sctp);
-	return (retval);
+	if (retval == -1)
+		return (EINVAL);
+	*optlen = retval;
+	return (0);
 }
 
 int
 sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
     socklen_t inlen)
 {
-	ip6_pkt_t	*ipp = &sctp->sctp_sticky_ipp;
 	int		*i1 = (int *)invalp;
 	boolean_t	onoff;
 	int		retval = 0, addrcnt;
 	conn_t		*connp = sctp->sctp_connp;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	conn_opt_arg_t	coas;
+
+	coas.coa_connp = connp;
+	coas.coa_ixa = connp->conn_ixa;
+	coas.coa_ipp = &connp->conn_xmit_ipp;
+	coas.coa_ancillary = B_FALSE;
+	coas.coa_changed = 0;
 
 	/* In all cases, the size of the option must be bigger than int */
 	if (inlen >= sizeof (int32_t)) {
@@ -1211,74 +1055,42 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 		return (EINVAL);
 	}
 
+	/*
+	 * Check that the level and name are supported by SCTP, and that
+	 * the length an credentials are ok.
+	 */
+	retval = proto_opt_check(level, name, inlen, NULL, sctp_opt_arr,
+	    sctp_opt_arr_size, B_TRUE, B_FALSE, connp->conn_cred);
+	if (retval != 0) {
+		if (retval < 0) {
+			retval = proto_tlitosyserr(-retval);
+		}
+		goto done;
+	}
+
+	/* Note: both SCTP and TCP interpret l_linger as being in seconds */
 	switch (level) {
 	case SOL_SOCKET:
-		if (inlen < sizeof (int32_t)) {
-			retval = EINVAL;
-			break;
-		}
 		switch (name) {
-		case SO_LINGER: {
-			struct linger *lgr;
-
-			if (inlen != sizeof (struct linger)) {
-				retval = EINVAL;
-				break;
-			}
-			lgr = (struct linger *)invalp;
-			if (lgr->l_onoff != 0) {
-				sctp->sctp_linger = 1;
-				sctp->sctp_lingertime = MSEC_TO_TICK(
-				    lgr->l_linger);
-			} else {
-				sctp->sctp_linger = 0;
-				sctp->sctp_lingertime = 0;
-			}
-			break;
-		}
-		case SO_DEBUG:
-			sctp->sctp_debug = onoff;
-			break;
-		case SO_KEEPALIVE:
-			break;
-		case SO_DONTROUTE:
-			/*
-			 * SO_DONTROUTE, SO_USELOOPBACK and SO_BROADCAST are
-			 * only of interest to IP.
-			 */
-			connp->conn_dontroute = onoff;
-			break;
-		case SO_USELOOPBACK:
-			connp->conn_loopback = onoff;
-			break;
-		case SO_BROADCAST:
-			connp->conn_broadcast = onoff;
-			break;
-		case SO_REUSEADDR:
-			connp->conn_reuseaddr = onoff;
-			break;
-		case SO_DGRAM_ERRIND:
-			sctp->sctp_dgram_errind = onoff;
-			break;
 		case SO_SNDBUF:
 			if (*i1 > sctps->sctps_max_buf) {
 				retval = ENOBUFS;
-				break;
+				goto done;
 			}
 			if (*i1 < 0) {
 				retval = EINVAL;
-				break;
+				goto done;
 			}
-			sctp->sctp_xmit_hiwater = *i1;
-			if (sctps->sctps_snd_lowat_fraction != 0)
-				sctp->sctp_xmit_lowater =
-				    sctp->sctp_xmit_hiwater /
+			connp->conn_sndbuf = *i1;
+			if (sctps->sctps_snd_lowat_fraction != 0) {
+				connp->conn_sndlowat = connp->conn_sndbuf /
 				    sctps->sctps_snd_lowat_fraction;
-			break;
+			}
+			goto done;
 		case SO_RCVBUF:
 			if (*i1 > sctps->sctps_max_buf) {
 				retval = ENOBUFS;
-				break;
+				goto done;
 			}
 			/* Silently ignore zero */
 			if (*i1 != 0) {
@@ -1294,12 +1106,16 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				*i1 = MAX(*i1,
 				    sctps->sctps_recv_hiwat_minmss *
 				    sctp->sctp_mss);
-				sctp->sctp_rwnd = *i1;
+				/*
+				 * Note that sctp_rwnd is modified by the
+				 * protocol and here we just whack it.
+				 */
+				connp->conn_rcvbuf = sctp->sctp_rwnd = *i1;
 				sctp->sctp_irwnd = sctp->sctp_rwnd;
 				sctp->sctp_pd_point = sctp->sctp_rwnd;
 
 				sopp.sopp_flags = SOCKOPT_RCVHIWAT;
-				sopp.sopp_rxhiwat = *i1;
+				sopp.sopp_rxhiwat = connp->conn_rcvbuf;
 				sctp->sctp_ulp_prop(sctp->sctp_ulpd, &sopp);
 
 			}
@@ -1307,60 +1123,29 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			 * XXX should we return the rwnd here
 			 * and sctp_opt_get ?
 			 */
-			break;
+			goto done;
 		case SO_ALLZONES:
-			if (secpolicy_ip(sctp->sctp_credp, OP_CONFIG,
-			    B_TRUE)) {
-				retval = EACCES;
-				break;
-			}
 			if (sctp->sctp_state >= SCTPS_BOUND) {
 				retval = EINVAL;
-				break;
+				goto done;
 			}
-			sctp->sctp_allzones = onoff;
 			break;
 		case SO_MAC_EXEMPT:
-			if (secpolicy_net_mac_aware(sctp->sctp_credp) != 0) {
-				retval = EACCES;
-				break;
-			}
 			if (sctp->sctp_state >= SCTPS_BOUND) {
 				retval = EINVAL;
-				break;
+				goto done;
 			}
-			connp->conn_mac_mode = onoff ?
-			    CONN_MAC_AWARE : CONN_MAC_DEFAULT;
-			break;
-		case SO_MAC_IMPLICIT:
-			if (secpolicy_net_mac_implicit(sctp->sctp_credp) != 0) {
-				retval = EACCES;
-				break;
-			}
-			if (sctp->sctp_state >= SCTPS_BOUND) {
-				retval = EINVAL;
-				break;
-			}
-			connp->conn_mac_mode = onoff ?
-			    CONN_MAC_AWARE : CONN_MAC_IMPLICIT;
-			break;
-		default:
-			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
 
 	case IPPROTO_SCTP:
-		if (inlen < sizeof (int32_t)) {
-			retval = EINVAL;
-			break;
-		}
 		switch (name) {
 		case SCTP_RTOINFO:
-			retval = sctp_set_rtoinfo(sctp, invalp, inlen);
+			retval = sctp_set_rtoinfo(sctp, invalp);
 			break;
 		case SCTP_ASSOCINFO:
-			retval = sctp_set_assocparams(sctp, invalp, inlen);
+			retval = sctp_set_assocparams(sctp, invalp);
 			break;
 		case SCTP_INITMSG:
 			retval = sctp_set_initmsg(sctp, invalp, inlen);
@@ -1378,37 +1163,28 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			sctp_heartbeat_timer(sctp);
 			break;
 		case SCTP_SET_PEER_PRIMARY_ADDR:
-			retval = sctp_set_peerprim(sctp, invalp, inlen);
+			retval = sctp_set_peerprim(sctp, invalp);
 			break;
 		case SCTP_PRIMARY_ADDR:
-			retval = sctp_set_prim(sctp, invalp, inlen);
+			retval = sctp_set_prim(sctp, invalp);
 			break;
 		case SCTP_ADAPTATION_LAYER: {
 			struct sctp_setadaptation *ssb;
 
-			if (inlen < sizeof (struct sctp_setadaptation)) {
-				retval = EINVAL;
-				break;
-			}
 			ssb = (struct sctp_setadaptation *)invalp;
 			sctp->sctp_send_adaptation = 1;
 			sctp->sctp_tx_adaptation_code = ssb->ssb_adaptation_ind;
 			break;
 		}
 		case SCTP_PEER_ADDR_PARAMS:
-			retval = sctp_set_peer_addr_params(sctp, invalp,
-			    inlen);
+			retval = sctp_set_peer_addr_params(sctp, invalp);
 			break;
 		case SCTP_DEFAULT_SEND_PARAM:
-			retval = sctp_set_def_send_params(sctp, invalp, inlen);
+			retval = sctp_set_def_send_params(sctp, invalp);
 			break;
 		case SCTP_EVENTS: {
 			struct sctp_event_subscribe *ev;
 
-			if (inlen < sizeof (struct sctp_event_subscribe)) {
-				retval = EINVAL;
-				break;
-			}
 			ev = (struct sctp_event_subscribe *)invalp;
 			sctp->sctp_recvsndrcvinfo =
 			    ONOFF(ev->sctp_data_io_event);
@@ -1438,15 +1214,15 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				retval = EINVAL;
 				break;
 			}
-			if (sctp->sctp_family == AF_INET) {
+			if (connp->conn_family == AF_INET) {
 				addrcnt = inlen / sizeof (struct sockaddr_in);
 			} else {
-				ASSERT(sctp->sctp_family == AF_INET6);
+				ASSERT(connp->conn_family == AF_INET6);
 				addrcnt = inlen / sizeof (struct sockaddr_in6);
 			}
 			if (name == SCTP_ADD_ADDR) {
 				retval = sctp_bind_add(sctp, invalp, addrcnt,
-				    B_TRUE, sctp->sctp_lport);
+				    B_TRUE, connp->conn_lport);
 			} else {
 				retval = sctp_bind_del(sctp, invalp, addrcnt,
 				    B_TRUE);
@@ -1458,10 +1234,6 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			/*
 			 * Change handle & upcalls.
 			 */
-			if (inlen < sizeof (*us)) {
-				retval = EINVAL;
-				break;
-			}
 			us = (struct sctp_uc_swap *)invalp;
 			sctp->sctp_ulpd = us->sus_handle;
 			sctp->sctp_upcalls = us->sus_upcalls;
@@ -1474,33 +1246,17 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 		case SCTP_MAXSEG:
 		case SCTP_DISABLE_FRAGMENTS:
 			/* Not yet supported. */
-		default:
 			retval = ENOPROTOOPT;
 			break;
 		}
-		break;
+		goto done;
 
 	case IPPROTO_IP:
-		if (sctp->sctp_family != AF_INET) {
+		if (connp->conn_family != AF_INET) {
 			retval = ENOPROTOOPT;
-			break;
-		}
-		if ((name != IP_OPTIONS) && (inlen < sizeof (int32_t))) {
-			retval = EINVAL;
-			break;
+			goto done;
 		}
 		switch (name) {
-		case IP_OPTIONS:
-		case T_IP_OPTIONS:
-			retval = sctp_opt_set_header(sctp, invalp, inlen);
-			break;
-		case IP_TOS:
-		case T_IP_TOS:
-			sctp->sctp_ipha->ipha_type_of_service = (uchar_t)*i1;
-			break;
-		case IP_TTL:
-			sctp->sctp_ipha->ipha_ttl = (uchar_t)*i1;
-			break;
 		case IP_SEC_OPT:
 			/*
 			 * We should not allow policy setting after
@@ -1508,319 +1264,30 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			 */
 			if (sctp->sctp_state >= SCTPS_LISTEN) {
 				retval = EINVAL;
-			} else {
-				retval = ipsec_set_req(sctp->sctp_credp,
-				    sctp->sctp_connp, (ipsec_req_t *)invalp);
+				goto done;
 			}
-			break;
-		/* IP level options */
-		case IP_UNSPEC_SRC:
-			connp->conn_unspec_src = onoff;
-			break;
-		case IP_NEXTHOP: {
-			ipaddr_t addr = *i1;
-			ipif_t *ipif = NULL;
-			ill_t *ill;
-			ip_stack_t *ipst = sctps->sctps_netstack->netstack_ip;
-
-			if (secpolicy_ip(sctp->sctp_credp, OP_CONFIG,
-			    B_TRUE) == 0) {
-				ipif = ipif_lookup_onlink_addr(addr,
-				    connp->conn_zoneid, ipst);
-				if (ipif == NULL) {
-					retval = EHOSTUNREACH;
-					break;
-				}
-				ill = ipif->ipif_ill;
-				mutex_enter(&ill->ill_lock);
-				if ((ill->ill_state_flags & ILL_CONDEMNED) ||
-				    (ipif->ipif_state_flags & IPIF_CONDEMNED)) {
-					mutex_exit(&ill->ill_lock);
-					ipif_refrele(ipif);
-					retval =  EHOSTUNREACH;
-					break;
-				}
-				mutex_exit(&ill->ill_lock);
-				ipif_refrele(ipif);
-				mutex_enter(&connp->conn_lock);
-				connp->conn_nexthop_v4 = addr;
-				connp->conn_nexthop_set = B_TRUE;
-				mutex_exit(&connp->conn_lock);
-			}
-			break;
-		}
-		default:
-			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
-	case IPPROTO_IPV6: {
-		if (sctp->sctp_family != AF_INET6) {
-			retval = ENOPROTOOPT;
-			break;
+	case IPPROTO_IPV6:
+		if (connp->conn_family != AF_INET6) {
+			retval = EINVAL;
+			goto done;
 		}
 
 		switch (name) {
-		case IPV6_UNICAST_HOPS:
-			if (inlen < sizeof (int32_t)) {
-				retval = EINVAL;
-				break;
-			}
-			if (*i1 < -1 || *i1 > IPV6_MAX_HOPS) {
-				retval = EINVAL;
-				break;
-			}
-			if (*i1 == -1) {
-				ipp->ipp_unicast_hops =
-				    sctps->sctps_ipv6_hoplimit;
-				ipp->ipp_fields &= ~IPPF_UNICAST_HOPS;
-			} else {
-				ipp->ipp_unicast_hops = (uint8_t)*i1;
-				ipp->ipp_fields |= IPPF_UNICAST_HOPS;
-			}
-			retval = sctp_build_hdrs(sctp);
-			break;
-		case IPV6_UNSPEC_SRC:
-			if (inlen < sizeof (int32_t)) {
-				retval = EINVAL;
-				break;
-			}
-			connp->conn_unspec_src = onoff;
-			break;
 		case IPV6_RECVPKTINFO:
-			if (inlen < sizeof (int32_t)) {
-				retval = EINVAL;
-				break;
-			}
-			if (onoff)
-				sctp->sctp_ipv6_recvancillary |=
-				    SCTP_IPV6_RECVPKTINFO;
-			else
-				sctp->sctp_ipv6_recvancillary &=
-				    ~SCTP_IPV6_RECVPKTINFO;
 			/* Send it with the next msg */
 			sctp->sctp_recvifindex = 0;
-			connp->conn_ip_recvpktinfo = onoff;
+			break;
+		case IPV6_RECVTCLASS:
+			/* Force it to be sent up with the next msg */
+			sctp->sctp_recvtclass = 0xffffffffU;
 			break;
 		case IPV6_RECVHOPLIMIT:
-			if (inlen < sizeof (int32_t)) {
-				retval = EINVAL;
-				break;
-			}
-			if (onoff)
-				sctp->sctp_ipv6_recvancillary |=
-				    SCTP_IPV6_RECVHOPLIMIT;
-			else
-				sctp->sctp_ipv6_recvancillary &=
-				    ~SCTP_IPV6_RECVHOPLIMIT;
+			/* Force it to be sent up with the next msg */
 			sctp->sctp_recvhops = 0xffffffffU;
-			connp->conn_ipv6_recvhoplimit = onoff;
 			break;
-		case IPV6_RECVHOPOPTS:
-			if (inlen < sizeof (int32_t)) {
-				retval = EINVAL;
-				break;
-			}
-			if (onoff)
-				sctp->sctp_ipv6_recvancillary |=
-				    SCTP_IPV6_RECVHOPOPTS;
-			else
-				sctp->sctp_ipv6_recvancillary &=
-				    ~SCTP_IPV6_RECVHOPOPTS;
-			connp->conn_ipv6_recvhopopts = onoff;
-			break;
-		case IPV6_RECVDSTOPTS:
-			if (inlen < sizeof (int32_t)) {
-				retval = EINVAL;
-				break;
-			}
-			if (onoff)
-				sctp->sctp_ipv6_recvancillary |=
-				    SCTP_IPV6_RECVDSTOPTS;
-			else
-				sctp->sctp_ipv6_recvancillary &=
-				    ~SCTP_IPV6_RECVDSTOPTS;
-			connp->conn_ipv6_recvdstopts = onoff;
-			break;
-		case IPV6_RECVRTHDR:
-			if (inlen < sizeof (int32_t)) {
-				retval = EINVAL;
-				break;
-			}
-			if (onoff)
-				sctp->sctp_ipv6_recvancillary |=
-				    SCTP_IPV6_RECVRTHDR;
-			else
-				sctp->sctp_ipv6_recvancillary &=
-				    ~SCTP_IPV6_RECVRTHDR;
-			connp->conn_ipv6_recvrthdr = onoff;
-			break;
-		case IPV6_RECVRTHDRDSTOPTS:
-			if (inlen < sizeof (int32_t)) {
-				retval = EINVAL;
-				break;
-			}
-			if (onoff)
-				sctp->sctp_ipv6_recvancillary |=
-				    SCTP_IPV6_RECVRTDSTOPTS;
-			else
-				sctp->sctp_ipv6_recvancillary &=
-				    ~SCTP_IPV6_RECVRTDSTOPTS;
-			connp->conn_ipv6_recvrtdstopts = onoff;
-			break;
-		case IPV6_PKTINFO:
-			if (inlen != 0 &&
-			    inlen != sizeof (struct in6_pktinfo)) {
-				retval = EINVAL;
-				break;
-			}
-
-			if (inlen == 0) {
-				ipp->ipp_fields &= ~(IPPF_IFINDEX |IPPF_ADDR);
-			} else  {
-				struct in6_pktinfo *pkti;
-
-				pkti = (struct in6_pktinfo *)invalp;
-				/* XXX Need to check if the index exists */
-				ipp->ipp_ifindex = pkti->ipi6_ifindex;
-				ipp->ipp_addr = pkti->ipi6_addr;
-				if (ipp->ipp_ifindex != 0)
-					ipp->ipp_fields |= IPPF_IFINDEX;
-				else
-					ipp->ipp_fields &= ~IPPF_IFINDEX;
-				if (!IN6_IS_ADDR_UNSPECIFIED(&ipp->ipp_addr))
-					ipp->ipp_fields |= IPPF_ADDR;
-				else
-					ipp->ipp_fields &= ~IPPF_ADDR;
-			}
-			retval = sctp_build_hdrs(sctp);
-			break;
-		case IPV6_NEXTHOP: {
-			struct sockaddr_in6 *sin6;
-			ip_stack_t *ipst = sctps->sctps_netstack->netstack_ip;
-
-			if (inlen != 0 && inlen != sizeof (sin6_t)) {
-				retval = EINVAL;
-				break;
-			}
-
-			if (inlen == 0) {
-				ipp->ipp_fields &= ~IPPF_NEXTHOP;
-			} else {
-				sin6 = (struct sockaddr_in6 *)invalp;
-				if (sin6->sin6_family != AF_INET6) {
-					retval = EAFNOSUPPORT;
-					break;
-				}
-				if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-					retval = EADDRNOTAVAIL;
-					break;
-				}
-				ipp->ipp_nexthop = sin6->sin6_addr;
-				if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
-					ipp->ipp_fields &= ~IPPF_NEXTHOP;
-				} else {
-					ire_t	*ire;
-
-					ire = ire_route_lookup_v6(
-					    &sin6->sin6_addr, NULL, NULL, 0,
-					    NULL, NULL, ALL_ZONES, NULL,
-					    MATCH_IRE_DEFAULT, ipst);
-					if (ire == NULL) {
-						retval = EHOSTUNREACH;
-						break;
-					}
-					ire_refrele(ire);
-					ipp->ipp_fields |= IPPF_NEXTHOP;
-				}
-			}
-			retval = sctp_build_hdrs(sctp);
-			break;
-		}
-		case IPV6_HOPOPTS: {
-			ip6_hbh_t *hopts = (ip6_hbh_t *)invalp;
-
-			if (inlen != 0 &&
-			    inlen != (8 * (hopts->ip6h_len + 1))) {
-				retval = EINVAL;
-				break;
-			}
-
-			retval = optcom_pkt_set((uchar_t *)invalp, inlen,
-			    B_TRUE, (uchar_t **)&ipp->ipp_hopopts,
-			    &ipp->ipp_hopoptslen, sctp->sctp_v6label_len);
-			if (retval != 0)
-				break;
-			if (ipp->ipp_hopoptslen == 0)
-				ipp->ipp_fields &= ~IPPF_HOPOPTS;
-			else
-				ipp->ipp_fields |= IPPF_HOPOPTS;
-			retval = sctp_build_hdrs(sctp);
-			break;
-		}
-		case IPV6_RTHDRDSTOPTS: {
-			ip6_dest_t *dopts = (ip6_dest_t *)invalp;
-
-			if (inlen != 0 &&
-			    inlen != (8 * (dopts->ip6d_len + 1))) {
-				retval = EINVAL;
-				break;
-			}
-
-			retval = optcom_pkt_set((uchar_t *)invalp, inlen,
-			    B_TRUE, (uchar_t **)&ipp->ipp_rtdstopts,
-			    &ipp->ipp_rtdstoptslen, 0);
-			if (retval != 0)
-				break;
-			if (ipp->ipp_rtdstoptslen == 0)
-				ipp->ipp_fields &= ~IPPF_RTDSTOPTS;
-			else
-				ipp->ipp_fields |= IPPF_RTDSTOPTS;
-			retval = sctp_build_hdrs(sctp);
-			break;
-		}
-		case IPV6_DSTOPTS: {
-			ip6_dest_t *dopts = (ip6_dest_t *)invalp;
-
-			if (inlen != 0 &&
-			    inlen != (8 * (dopts->ip6d_len + 1))) {
-				retval = EINVAL;
-				break;
-			}
-
-			retval = optcom_pkt_set((uchar_t *)invalp, inlen,
-			    B_TRUE, (uchar_t **)&ipp->ipp_dstopts,
-			    &ipp->ipp_dstoptslen, 0);
-			if (retval != 0)
-				break;
-			if (ipp->ipp_dstoptslen == 0)
-				ipp->ipp_fields &= ~IPPF_DSTOPTS;
-			else
-				ipp->ipp_fields |= IPPF_DSTOPTS;
-			retval = sctp_build_hdrs(sctp);
-			break;
-		}
-		case IPV6_RTHDR: {
-			ip6_rthdr_t *rt = (ip6_rthdr_t *)invalp;
-
-			if (inlen != 0 &&
-			    inlen != (8 * (rt->ip6r_len + 1))) {
-				retval = EINVAL;
-				break;
-			}
-
-			retval = optcom_pkt_set((uchar_t *)invalp, inlen,
-			    B_TRUE, (uchar_t **)&ipp->ipp_rthdr,
-			    &ipp->ipp_rthdrlen, 0);
-			if (retval != 0)
-				break;
-			if (ipp->ipp_rthdrlen == 0)
-				ipp->ipp_fields &= ~IPPF_RTHDR;
-			else
-				ipp->ipp_fields |= IPPF_RTHDR;
-			retval = sctp_build_hdrs(sctp);
-			break;
-		}
 		case IPV6_SEC_OPT:
 			/*
 			 * We should not allow policy setting after
@@ -1828,9 +1295,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			 */
 			if (sctp->sctp_state >= SCTPS_LISTEN) {
 				retval = EINVAL;
-			} else {
-				retval = ipsec_set_req(sctp->sctp_credp,
-				    sctp->sctp_connp, (ipsec_req_t *)invalp);
+				goto done;
 			}
 			break;
 		case IPV6_V6ONLY:
@@ -1840,21 +1305,44 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			 */
 			if (sctp->sctp_state >= SCTPS_BOUND) {
 				retval = EINVAL;
-			} else {
-				sctp->sctp_connp->conn_ipv6_v6only = onoff;
+				goto done;
 			}
-			break;
-		default:
-			retval = ENOPROTOOPT;
 			break;
 		}
 		break;
 	}
-	default:
-		retval = ENOPROTOOPT;
-		break;
-	}
 
+	retval = conn_opt_set(&coas, level, name, inlen, (uchar_t *)invalp,
+	    B_FALSE, connp->conn_cred);
+	if (retval != 0)
+		goto done;
+
+	if (coas.coa_changed & COA_ROUTE_CHANGED) {
+		sctp_faddr_t *fp;
+		/*
+		 * We recache the information which might pick a different
+		 * source and redo IPsec as a result.
+		 */
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next)
+			sctp_get_dest(sctp, fp);
+	}
+	if (coas.coa_changed & COA_HEADER_CHANGED) {
+		retval = sctp_build_hdrs(sctp, KM_NOSLEEP);
+		if (retval != 0)
+			goto done;
+	}
+	if (coas.coa_changed & COA_WROFF_CHANGED) {
+		connp->conn_wroff = connp->conn_ht_iphc_allocated +
+		    sctps->sctps_wroff_xtra;
+		if (sctp->sctp_current != NULL) {
+			/*
+			 * Could be setting options before setting up
+			 * connection.
+			 */
+			sctp_set_ulp_prop(sctp);
+		}
+	}
+done:
 	WAKE_SCTP(sctp);
 	return (retval);
 }
@@ -1871,18 +1359,19 @@ sctp_getsockname(sctp_t *sctp, struct sockaddr *addr, socklen_t *addrlen)
 	int	addrcnt = 1;
 	sin_t	*sin4;
 	sin6_t	*sin6;
+	conn_t	*connp = sctp->sctp_connp;
 
 	ASSERT(sctp != NULL);
 
 	RUN_SCTP(sctp);
-	addr->sa_family = sctp->sctp_family;
-	switch (sctp->sctp_family) {
+	addr->sa_family = connp->conn_family;
+	switch (connp->conn_family) {
 	case AF_INET:
 		sin4 = (sin_t *)addr;
 		if ((sctp->sctp_state <= SCTPS_LISTEN) &&
 		    sctp->sctp_bound_to_all) {
 			sin4->sin_addr.s_addr = INADDR_ANY;
-			sin4->sin_port = sctp->sctp_lport;
+			sin4->sin_port = connp->conn_lport;
 		} else {
 			err = sctp_getmyaddrs(sctp, sin4, &addrcnt);
 			if (err != 0) {
@@ -1897,7 +1386,7 @@ sctp_getsockname(sctp_t *sctp, struct sockaddr *addr, socklen_t *addrlen)
 		if ((sctp->sctp_state <= SCTPS_LISTEN) &&
 		    sctp->sctp_bound_to_all) {
 			bzero(&sin6->sin6_addr, sizeof (sin6->sin6_addr));
-			sin6->sin6_port = sctp->sctp_lport;
+			sin6->sin6_port = connp->conn_lport;
 		} else {
 			err = sctp_getmyaddrs(sctp, sin6, &addrcnt);
 			if (err != 0) {
@@ -1906,10 +1395,7 @@ sctp_getsockname(sctp_t *sctp, struct sockaddr *addr, socklen_t *addrlen)
 			}
 		}
 		*addrlen = sizeof (struct sockaddr_in6);
-		sin6->sin6_flowinfo = sctp->sctp_ip6h->ip6_vcf &
-		    ~IPV6_VERS_AND_FLOW_MASK;
-		sin6->sin6_scope_id = 0;
-		sin6->__sin6_src_id = 0;
+		/* Note that flowinfo is only returned for getpeername */
 		break;
 	}
 	WAKE_SCTP(sctp);
@@ -1927,12 +1413,13 @@ sctp_getpeername(sctp_t *sctp, struct sockaddr *addr, socklen_t *addrlen)
 	int	err = 0;
 	int	addrcnt = 1;
 	sin6_t	*sin6;
+	conn_t	*connp = sctp->sctp_connp;
 
 	ASSERT(sctp != NULL);
 
 	RUN_SCTP(sctp);
-	addr->sa_family = sctp->sctp_family;
-	switch (sctp->sctp_family) {
+	addr->sa_family = connp->conn_family;
+	switch (connp->conn_family) {
 	case AF_INET:
 		err = sctp_getpeeraddrs(sctp, addr, &addrcnt);
 		if (err != 0) {
@@ -1949,9 +1436,6 @@ sctp_getpeername(sctp_t *sctp, struct sockaddr *addr, socklen_t *addrlen)
 			break;
 		}
 		*addrlen = sizeof (struct sockaddr_in6);
-		sin6->sin6_flowinfo = 0;
-		sin6->sin6_scope_id = 0;
-		sin6->__sin6_src_id = 0;
 		break;
 	}
 	WAKE_SCTP(sctp);
@@ -1973,13 +1457,14 @@ sctp_getpeeraddrs(sctp_t *sctp, void *paddrs, int *addrcnt)
 	int			cnt;
 	sctp_faddr_t		*fp = sctp->sctp_faddrs;
 	in6_addr_t		addr;
+	conn_t			*connp = sctp->sctp_connp;
 
 	ASSERT(sctp != NULL);
 
 	if (sctp->sctp_faddrs == NULL)
 		return (ENOTCONN);
 
-	family = sctp->sctp_family;
+	family = connp->conn_family;
 	max = *addrcnt;
 
 	/* If we want only one, give the primary */
@@ -1989,15 +1474,26 @@ sctp_getpeeraddrs(sctp_t *sctp, void *paddrs, int *addrcnt)
 		case AF_INET:
 			sin4 = paddrs;
 			IN6_V4MAPPED_TO_INADDR(&addr, &sin4->sin_addr);
-			sin4->sin_port = sctp->sctp_fport;
+			sin4->sin_port = connp->conn_fport;
 			sin4->sin_family = AF_INET;
 			break;
 
 		case AF_INET6:
 			sin6 = paddrs;
 			sin6->sin6_addr = addr;
-			sin6->sin6_port = sctp->sctp_fport;
+			sin6->sin6_port = connp->conn_fport;
 			sin6->sin6_family = AF_INET6;
+			sin6->sin6_flowinfo = connp->conn_flowinfo;
+			if (IN6_IS_ADDR_LINKSCOPE(&addr) &&
+			    sctp->sctp_primary != NULL &&
+			    (sctp->sctp_primary->ixa->ixa_flags &
+			    IXAF_SCOPEID_SET)) {
+				sin6->sin6_scope_id =
+				    sctp->sctp_primary->ixa->ixa_scopeid;
+			} else {
+				sin6->sin6_scope_id = 0;
+			}
+			sin6->__sin6_src_id = 0;
 			break;
 		}
 		return (0);
@@ -2010,14 +1506,21 @@ sctp_getpeeraddrs(sctp_t *sctp, void *paddrs, int *addrcnt)
 			ASSERT(IN6_IS_ADDR_V4MAPPED(&addr));
 			sin4 = (struct sockaddr_in *)paddrs + cnt;
 			IN6_V4MAPPED_TO_INADDR(&addr, &sin4->sin_addr);
-			sin4->sin_port = sctp->sctp_fport;
+			sin4->sin_port = connp->conn_fport;
 			sin4->sin_family = AF_INET;
 			break;
 		case AF_INET6:
 			sin6 = (struct sockaddr_in6 *)paddrs + cnt;
 			sin6->sin6_addr = addr;
-			sin6->sin6_port = sctp->sctp_fport;
+			sin6->sin6_port = connp->conn_fport;
 			sin6->sin6_family = AF_INET6;
+			sin6->sin6_flowinfo = connp->conn_flowinfo;
+			if (IN6_IS_ADDR_LINKSCOPE(&addr) &&
+			    (fp->ixa->ixa_flags & IXAF_SCOPEID_SET))
+				sin6->sin6_scope_id = fp->ixa->ixa_scopeid;
+			else
+				sin6->sin6_scope_id = 0;
+			sin6->__sin6_src_id = 0;
 			break;
 		}
 	}

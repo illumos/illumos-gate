@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@ extern int	proto_tlitosyserr(int);
 extern int	proto_verify_ip_addr(int, const struct sockaddr *, socklen_t);
 
 extern int	proto_opt_check(int, int, int, t_uscalar_t *, opdes_t *,
-    uint_t, boolean_t, boolean_t, boolean_t, cred_t *);
+    uint_t, boolean_t, boolean_t, cred_t *);
 extern opdes_t *proto_opt_lookup(t_uscalar_t, t_uscalar_t, opdes_t *, uint_t);
 
 #ifdef	__cplusplus

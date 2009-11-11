@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,8 +44,6 @@
  *	@(#)route.c	8.6 (Berkeley) 4/28/95
  *	@(#)linkaddr.c	8.1 (Berkeley) 6/4/93
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/file.h>
@@ -175,6 +173,8 @@ static struct keytab {
 	{"show",	K_SHOW},
 #define	K_SECATTR	43
 	{"secattr",	K_SECATTR},
+#define	K_INDIRECT	44
+	{"indirect",	K_INDIRECT},
 	{0, 0}
 };
 
@@ -655,7 +655,7 @@ flushroutes(int argc, char *argv[])
 			    (char *)rp < (char *)item->valp + item->length;
 			    /* LINTED */
 			    rp = (mib2_ipRouteEntry_t *)
-				((char *)rp + ipRouteEntrySize)) {
+			    ((char *)rp + ipRouteEntrySize)) {
 				delRouteEntry(rp, NULL, seqno);
 				seqno++;
 			}
@@ -670,7 +670,7 @@ flushroutes(int argc, char *argv[])
 			if (item->group == MIB2_IP6) {
 				ipv6RouteEntrySize =
 				    ((mib2_ipv6IfStatsEntry_t *)item->valp)->
-					ipv6RouteEntrySize;
+				    ipv6RouteEntrySize;
 				assert(IS_P2ALIGNED(ipv6RouteEntrySize,
 				    sizeof (mib2_ipv6RouteEntry_t *)));
 				break;
@@ -692,7 +692,7 @@ flushroutes(int argc, char *argv[])
 			    (char *)rp6 < (char *)item->valp + item->length;
 			    /* LINTED */
 			    rp6 = (mib2_ipv6RouteEntry_t *)
-				((char *)rp6 + ipv6RouteEntrySize)) {
+			    ((char *)rp6 + ipv6RouteEntrySize)) {
 				delRouteEntry(NULL, rp6, seqno);
 				seqno++;
 			}
@@ -812,7 +812,7 @@ delRouteEntry(mib2_ipRouteEntry_t *rp, mib2_ipv6RouteEntry_t *rp6, int seqno)
 
 		(void) printf("%-20.20s ",
 		    rtm->rtm_flags & RTF_HOST ? routename(sa) :
-			netname(sa));
+		    netname(sa));
 		/* LINTED */
 		sa = (struct sockaddr *)(salen(sa) + (char *)sa);
 		(void) printf("%-20.20s ", routename(sa));
@@ -861,7 +861,7 @@ routename(const struct sockaddr *sa)
 			cp = "default";
 		if (cp == NULL && !nflag) {
 			hp = gethostbyaddr((char *)&in, sizeof (struct in_addr),
-				AF_INET);
+			    AF_INET);
 			if (hp != NULL) {
 				if (((cp = strchr(hp->h_name, '.')) != NULL) &&
 				    (strcmp(cp + 1, domain) == 0))
@@ -892,7 +892,7 @@ routename(const struct sockaddr *sa)
 			cp = "default";
 		if (cp == NULL && !nflag) {
 			hp = getipnodebyaddr((char *)&in6,
-				sizeof (struct in6_addr), AF_INET6, &error_num);
+			    sizeof (struct in6_addr), AF_INET6, &error_num);
 			if (hp != NULL) {
 				if (((cp = strchr(hp->h_name, '.')) != NULL) &&
 				    (strcmp(cp + 1, domain) == 0))
@@ -1120,8 +1120,8 @@ print_rtcmd_short(FILE *to, rtcmd_irep_t *rcip, boolean_t gw_good,
 			break;
 		case AF_INET6:
 			if (inet_ntop(AF_INET6,
-				&rcip->ri_gate.sin6.sin6_addr, obuf,
-				INET6_ADDRSTRLEN) != NULL) {
+			    &rcip->ri_gate.sin6.sin6_addr, obuf,
+			    INET6_ADDRSTRLEN) != NULL) {
 				if (nflag) {
 					(void) fprintf(to, ": gateway %s",
 					    obuf);
@@ -1405,6 +1405,9 @@ args_to_rtcmd(rtcmd_irep_t *rcip, char **argv, char *cmd_string)
 				return (B_FALSE);
 			}
 			break;
+		case K_INDIRECT:
+			rcip->ri_flags |= RTF_INDIRECT;
+			break;
 		default:
 			if (dash_keyword) {
 				syntax_bad_keyword(tok + 1);
@@ -1479,8 +1482,8 @@ args_to_rtcmd(rtcmd_irep_t *rcip, char **argv, char *cmd_string)
 			}
 			if (rcip->ri_af == AF_INET6 &&
 			    memcmp(&rcip->ri_mask.sin6.sin6_addr,
-				&in6_host_mask,
-				sizeof (struct in6_addr)) == 0) {
+			    &in6_host_mask,
+			    sizeof (struct in6_addr)) == 0) {
 				rcip->ri_flags |= RTF_HOST;
 			}
 		} else {
@@ -1853,8 +1856,8 @@ newroute(char **argv)
 				break;
 			case AF_INET6:
 				if (inet_ntop(AF_INET6,
-					(void *)&newrt->ri_dst.sin6.sin6_addr,
-					obuf, INET6_ADDRSTRLEN) != NULL) {
+				    (void *)&newrt->ri_dst.sin6.sin6_addr,
+				    obuf, INET6_ADDRSTRLEN) != NULL) {
 					(void) printf(" %s", obuf);
 					break;
 				}
@@ -2236,7 +2239,7 @@ in_getaddr(char *s, struct sockaddr_in *sin, int *plenp, int which,
 			    inet_lnaof(sin->sin_addr) == INADDR_ANY)) {
 				/* This looks like a network address. */
 				inet_makenetandmask(rcip, ntohl(val),
-					    sin);
+				    sin);
 			}
 		}
 		return (B_TRUE);
@@ -2562,7 +2565,7 @@ static char metricnames[] =
 static char routeflags[] =
 "\1UP\2GATEWAY\3HOST\4REJECT\5DYNAMIC\6MODIFIED\7DONE\010MASK_PRESENT"
 	"\011CLONING\012XRESOLVE\013LLINFO\014STATIC\015BLACKHOLE"
-	"\016PRIVATE\017PROTO2\020PROTO1\021MULTIRT\022SETSRC";
+	"\016PRIVATE\017PROTO2\020PROTO1\021MULTIRT\022SETSRC\023INDIRECT";
 static char ifnetflags[] =
 "\1UP\2BROADCAST\3DEBUG\4LOOPBACK\5PTP\6NOTRAILERS\7RUNNING\010NOARP"
 	"\011PPROMISC\012ALLMULTI\013INTELLIGENT\014MULTICAST"
@@ -2623,7 +2626,7 @@ print_rtmsg(struct rt_msghdr *rtm, int msglen)
 		break;
 	default:
 		(void) printf("pid: %ld, seq %d, errno %d, flags:",
-			rtm->rtm_pid, rtm->rtm_seq, rtm->rtm_errno);
+		    rtm->rtm_pid, rtm->rtm_seq, rtm->rtm_errno);
 		bprintf(stdout, rtm->rtm_flags, routeflags);
 		pmsg_common(rtm, msglen);
 		break;
@@ -2649,7 +2652,7 @@ print_getmsg(rtcmd_irep_t *req_rt, struct rt_msghdr *rtm, int msglen)
 	if (rtm->rtm_msglen > (ushort_t)msglen) {
 		(void) fprintf(stderr,
 		    gettext("message length mismatch, in packet %d, "
-			"returned %d\n"), rtm->rtm_msglen, msglen);
+		    "returned %d\n"), rtm->rtm_msglen, msglen);
 	}
 	if (rtm->rtm_errno)  {
 		(void) fprintf(stderr, "RTM_GET: %s (errno %d)\n",
@@ -2675,7 +2678,7 @@ print_getmsg(rtcmd_irep_t *req_rt, struct rt_msghdr *rtm, int msglen)
 				case RTA_IFP:
 					if (sa->sa_family == AF_LINK &&
 					    ((struct sockaddr_dl *)sa)->
-						sdl_nlen != 0)
+					    sdl_nlen != 0)
 						ifp = (struct sockaddr_dl *)sa;
 					break;
 				case RTA_SRC:
@@ -3122,8 +3125,8 @@ mibget(int sd)
 			(void) fprintf(stderr, gettext("mibget %d gives "
 			    "T_ERROR_ACK: TLI_error = 0x%lx, UNIX_error = "
 			    "0x%lx\n"), j, tea->TLI_error, tea->UNIX_error);
-			errno = (tea->TLI_error == TSYSERR)
-				? tea->UNIX_error : EPROTO;
+			errno = (tea->TLI_error == TSYSERR) ?
+			    tea->UNIX_error : EPROTO;
 			break;
 		}
 

@@ -242,6 +242,7 @@ d none usr/include/inet 755 root bin
 f none usr/include/inet/arp.h 644 root bin
 f none usr/include/inet/common.h 644 root bin
 f none usr/include/inet/ip.h 644 root bin
+f none usr/include/inet/ip_arp.h 644 root bin
 f none usr/include/inet/ip_if.h 644 root bin
 f none usr/include/inet/ip_ire.h 644 root bin
 f none usr/include/inet/ip_ftable.h 644 root bin

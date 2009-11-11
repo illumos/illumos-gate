@@ -674,9 +674,12 @@ softmac_wput_single_nondata(softmac_upper_t *sup, mblk_t *mp)
 	t_uscalar_t	prim;
 
 	dbtype = DB_TYPE(mp);
+	sup->su_is_arp = 0;
 	switch (dbtype) {
-	case M_IOCTL:
-	case M_CTL: {
+	case M_CTL:
+		sup->su_is_arp = 1;
+		/* FALLTHROUGH */
+	case M_IOCTL: {
 		uint32_t	expected_mode;
 
 		if (((struct iocblk *)(mp->b_rptr))->ioc_cmd != SIOCSLIFNAME)
@@ -1132,7 +1135,10 @@ softmac_datapath_switch(softmac_t *softmac, boolean_t disable, boolean_t admin)
 			break;
 
 		req->ssq_expected_mode = expected_mode;
-
+		if (sup->su_is_arp) {
+			list_insert_tail(&reqlist, req);
+			continue;
+		}
 		/*
 		 * Allocate the DL_NOTE_REPLUMB message.
 		 */
@@ -1174,18 +1180,19 @@ softmac_datapath_switch(softmac_t *softmac, boolean_t disable, boolean_t admin)
 	 */
 	for (sup = list_head(&softmac->smac_sup_list); sup != NULL;
 	    sup = list_next(&softmac->smac_sup_list, sup)) {
-		mp = head->b_next;
-		head->b_next = NULL;
-
+		if (!sup->su_is_arp) {
+			mp = head->b_next;
+			head->b_next = NULL;
+			softmac_wput_nondata(sup, head);
+			head = mp;
+		}
 		/*
-		 * Add the swtich request to the requests list of the stream.
+		 * Add the switch request to the requests list of the stream.
 		 */
 		req = list_head(&reqlist);
 		ASSERT(req != NULL);
 		list_remove(&reqlist, req);
 		list_insert_tail(&sup->su_req_list, req);
-		softmac_wput_nondata(sup, head);
-		head = mp;
 	}
 
 	mutex_exit(&softmac->smac_fp_mutex);

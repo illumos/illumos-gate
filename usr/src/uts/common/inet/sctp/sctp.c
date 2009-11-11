@@ -56,6 +56,8 @@
 
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/ip_if.h>
+#include <inet/ip_ire.h>
 #include <inet/ip6.h>
 #include <inet/mi.h>
 #include <inet/mib2.h>
@@ -74,12 +76,6 @@
 int sctpdebug;
 sin6_t	sctp_sin6_null;	/* Zero address for quick clears */
 
-/*
- * Have to ensure that sctp_g_q_close is not done by an
- * interrupt thread.
- */
-static taskq_t *sctp_taskq;
-
 static void	sctp_closei_local(sctp_t *sctp);
 static int	sctp_init_values(sctp_t *, sctp_t *, int);
 static void	sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp);
@@ -91,12 +87,10 @@ static void	sctp_conn_cache_fini();
 static int	sctp_conn_cache_constructor();
 static void	sctp_conn_cache_destructor();
 static void	sctp_conn_clear(conn_t *);
-void		sctp_g_q_setup(sctp_stack_t *);
-void		sctp_g_q_create(sctp_stack_t *);
-void		sctp_g_q_destroy(sctp_stack_t *);
+static void	sctp_notify(void *, ip_xmit_attr_t *, ixa_notify_type_t,
+    ixa_notify_arg_t);
 
 static void	*sctp_stack_init(netstackid_t stackid, netstack_t *ns);
-static void	sctp_stack_shutdown(netstackid_t stackid, void *arg);
 static void	sctp_stack_fini(netstackid_t stackid, void *arg);
 
 /*
@@ -178,16 +172,14 @@ sctp_create_eager(sctp_t *psctp)
 {
 	sctp_t	*sctp;
 	mblk_t	*ack_mp, *hb_mp;
-	conn_t	*connp, *pconnp;
-	cred_t *credp;
+	conn_t	*connp;
+	cred_t	*credp;
 	sctp_stack_t	*sctps = psctp->sctp_sctps;
 
 	if ((connp = ipcl_conn_create(IPCL_SCTPCONN, KM_NOSLEEP,
 	    sctps->sctps_netstack)) == NULL) {
 		return (NULL);
 	}
-
-	connp->conn_ulp_labeled = is_system_labeled();
 
 	sctp = CONN2SCTP(connp);
 	sctp->sctp_sctps = sctps;
@@ -200,7 +192,6 @@ sctp_create_eager(sctp_t *psctp)
 			freeb(ack_mp);
 		sctp_conn_clear(connp);
 		sctp->sctp_sctps = NULL;
-		SCTP_G_Q_REFRELE(sctps);
 		kmem_cache_free(sctp_conn_cache, connp);
 		return (NULL);
 	}
@@ -208,42 +199,19 @@ sctp_create_eager(sctp_t *psctp)
 	sctp->sctp_ack_mp = ack_mp;
 	sctp->sctp_heartbeat_mp = hb_mp;
 
-	/* Inherit information from the "parent" */
-	sctp->sctp_ipversion = psctp->sctp_ipversion;
-	sctp->sctp_family = psctp->sctp_family;
-	pconnp = psctp->sctp_connp;
-	connp->conn_af_isv6 = pconnp->conn_af_isv6;
-	connp->conn_pkt_isv6 = pconnp->conn_pkt_isv6;
-	connp->conn_ipv6_v6only = pconnp->conn_ipv6_v6only;
 	if (sctp_init_values(sctp, psctp, KM_NOSLEEP) != 0) {
 		freeb(ack_mp);
 		freeb(hb_mp);
 		sctp_conn_clear(connp);
 		sctp->sctp_sctps = NULL;
-		SCTP_G_Q_REFRELE(sctps);
 		kmem_cache_free(sctp_conn_cache, connp);
 		return (NULL);
 	}
 
-	/*
-	 * If the parent is multilevel, then we'll fix up the remote cred
-	 * when we do sctp_accept_comm.
-	 */
-	if ((credp = pconnp->conn_cred) != NULL) {
+	if ((credp = psctp->sctp_connp->conn_cred) != NULL) {
 		connp->conn_cred = credp;
 		crhold(credp);
-		/*
-		 * If the caller has the process-wide flag set, then default to
-		 * MAC exempt mode.  This allows read-down to unlabeled hosts.
-		 */
-		if (getpflags(NET_MAC_AWARE, credp) != 0)
-			connp->conn_mac_mode = CONN_MAC_AWARE;
 	}
-
-	connp->conn_allzones = pconnp->conn_allzones;
-	connp->conn_zoneid = pconnp->conn_zoneid;
-	sctp->sctp_cpid = psctp->sctp_cpid;
-	sctp->sctp_open_time = lbolt64;
 
 	sctp->sctp_mss = psctp->sctp_mss;
 	sctp->sctp_detached = B_TRUE;
@@ -263,11 +231,6 @@ void
 sctp_clean_death(sctp_t *sctp, int err)
 {
 	ASSERT(sctp != NULL);
-	ASSERT((sctp->sctp_family == AF_INET &&
-	    sctp->sctp_ipversion == IPV4_VERSION) ||
-	    (sctp->sctp_family == AF_INET6 &&
-	    (sctp->sctp_ipversion == IPV4_VERSION ||
-	    sctp->sctp_ipversion == IPV6_VERSION)));
 
 	dprint(3, ("sctp_clean_death %p, state %d\n", (void *)sctp,
 	    sctp->sctp_state));
@@ -328,7 +291,8 @@ sctp_clean_death(sctp_t *sctp, int err)
 int
 sctp_disconnect(sctp_t *sctp)
 {
-	int	error = 0;
+	int		error = 0;
+	conn_t		*connp = sctp->sctp_connp;
 
 	dprint(3, ("sctp_disconnect %p, state %d\n", (void *)sctp,
 	    sctp->sctp_state));
@@ -358,7 +322,7 @@ sctp_disconnect(sctp_t *sctp)
 		 * If SO_LINGER has set a zero linger time, terminate the
 		 * association and send an ABORT.
 		 */
-		if (sctp->sctp_linger && sctp->sctp_lingertime == 0) {
+		if (connp->conn_linger && connp->conn_lingertime == 0) {
 			sctp_user_abort(sctp, NULL);
 			WAKE_SCTP(sctp);
 			return (error);
@@ -382,7 +346,7 @@ sctp_disconnect(sctp_t *sctp)
 		sctp_send_shutdown(sctp, 0);
 
 		/* Pass gathered wisdom to IP for keeping */
-		sctp_update_ire(sctp);
+		sctp_update_dce(sctp);
 
 		/*
 		 * If lingering on close then wait until the shutdown
@@ -391,21 +355,15 @@ sctp_disconnect(sctp_t *sctp)
 		 * can be called more than once.  Make sure that only
 		 * one thread waits.
 		 */
-		if (sctp->sctp_linger && sctp->sctp_lingertime > 0 &&
+		if (connp->conn_linger && connp->conn_lingertime > 0 &&
 		    sctp->sctp_state >= SCTPS_ESTABLISHED &&
 		    !sctp->sctp_lingering) {
 			clock_t stoptime;	/* in ticks */
 			clock_t ret;
 
-			/*
-			 * Process the sendq to send the SHUTDOWN out
-			 * before waiting.
-			 */
-			sctp_process_sendq(sctp);
-
 			sctp->sctp_lingering = 1;
 			sctp->sctp_client_errno = 0;
-			stoptime = lbolt + sctp->sctp_lingertime;
+			stoptime = lbolt + connp->conn_lingertime * hz;
 
 			mutex_enter(&sctp->sctp_lock);
 			sctp->sctp_running = B_FALSE;
@@ -429,7 +387,6 @@ sctp_disconnect(sctp_t *sctp)
 		}
 
 		WAKE_SCTP(sctp);
-		sctp_process_sendq(sctp);
 		return (error);
 	}
 
@@ -493,7 +450,6 @@ static void
 sctp_closei_local(sctp_t *sctp)
 {
 	mblk_t	*mp;
-	ire_t	*ire = NULL;
 	conn_t	*connp = sctp->sctp_connp;
 
 	/* Sanity check, don't do the same thing twice.  */
@@ -516,11 +472,7 @@ sctp_closei_local(sctp_t *sctp)
 	/* Set the CONN_CLOSING flag so that IP will not cache IRE again. */
 	mutex_enter(&connp->conn_lock);
 	connp->conn_state_flags |= CONN_CLOSING;
-	ire = connp->conn_ire_cache;
-	connp->conn_ire_cache = NULL;
 	mutex_exit(&connp->conn_lock);
-	if (ire != NULL)
-		IRE_REFRELE_NOTR(ire);
 
 	/* Remove from all hashes. */
 	sctp_bind_hash_remove(sctp);
@@ -534,14 +486,12 @@ sctp_closei_local(sctp_t *sctp)
 	 */
 	mutex_enter(&sctp->sctp_recvq_lock);
 	while ((mp = sctp->sctp_recvq) != NULL) {
-		mblk_t *ipsec_mp;
-
 		sctp->sctp_recvq = mp->b_next;
 		mp->b_next = NULL;
-		if ((ipsec_mp = mp->b_prev) != NULL) {
-			freeb(ipsec_mp);
-			mp->b_prev = NULL;
-		}
+
+		if (ip_recv_attr_is_mblk(mp))
+			mp = ip_recv_attr_free_mblk(mp);
+
 		freemsg(mp);
 	}
 	mutex_exit(&sctp->sctp_recvq_lock);
@@ -668,7 +618,7 @@ sctp_free(conn_t *connp)
 	SCTP_UNLINK(sctp, sctps);
 
 	ASSERT(connp->conn_ref == 0);
-	ASSERT(connp->conn_ulp == IPPROTO_SCTP);
+	ASSERT(connp->conn_proto == IPPROTO_SCTP);
 	ASSERT(!MUTEX_HELD(&sctp->sctp_reflock));
 	ASSERT(sctp->sctp_refcnt == 0);
 
@@ -723,8 +673,6 @@ sctp_free(conn_t *connp)
 		list_destroy(&sctp->sctp_saddrs[cnt].sctp_ipif_list);
 	}
 
-	ip6_pkt_free(&sctp->sctp_sticky_ipp);
-
 	if (sctp->sctp_hopopts != NULL) {
 		mi_free(sctp->sctp_hopopts);
 		sctp->sctp_hopopts = NULL;
@@ -737,12 +685,12 @@ sctp_free(conn_t *connp)
 		sctp->sctp_dstoptslen = 0;
 	}
 	ASSERT(sctp->sctp_dstoptslen == 0);
-	if (sctp->sctp_rtdstopts != NULL) {
-		mi_free(sctp->sctp_rtdstopts);
-		sctp->sctp_rtdstopts = NULL;
-		sctp->sctp_rtdstoptslen = 0;
+	if (sctp->sctp_rthdrdstopts != NULL) {
+		mi_free(sctp->sctp_rthdrdstopts);
+		sctp->sctp_rthdrdstopts = NULL;
+		sctp->sctp_rthdrdstoptslen = 0;
 	}
-	ASSERT(sctp->sctp_rtdstoptslen == 0);
+	ASSERT(sctp->sctp_rthdrdstoptslen == 0);
 	if (sctp->sctp_rthdr != NULL) {
 		mi_free(sctp->sctp_rthdr);
 		sctp->sctp_rthdr = NULL;
@@ -806,9 +754,7 @@ sctp_free(conn_t *connp)
 	sctp->sctp_v6label_len = 0;
 	sctp->sctp_v4label_len = 0;
 
-	/* Every sctp_t holds one reference on the default queue */
 	sctp->sctp_sctps = NULL;
-	SCTP_G_Q_REFRELE(sctps);
 
 	sctp_conn_clear(connp);
 	kmem_cache_free(sctp_conn_cache, connp);
@@ -822,10 +768,12 @@ sctp_display(sctp_t *sctp, char *sup_buf)
 	char	buf1[30];
 	static char	priv_buf[INET6_ADDRSTRLEN * 2 + 80];
 	char	*cp;
+	conn_t	*connp;
 
 	if (sctp == NULL)
 		return ("NULL_SCTP");
 
+	connp = sctp->sctp_connp;
 	buf = (sup_buf != NULL) ? sup_buf : priv_buf;
 
 	switch (sctp->sctp_state) {
@@ -865,7 +813,7 @@ sctp_display(sctp_t *sctp, char *sup_buf)
 		break;
 	}
 	(void) mi_sprintf(buf, "[%u, %u] %s",
-	    ntohs(sctp->sctp_lport), ntohs(sctp->sctp_fport), cp);
+	    ntohs(connp->conn_lport), ntohs(connp->conn_fport), cp);
 
 	return (buf);
 }
@@ -880,13 +828,9 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 	int	err;
 	int	cnt;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
-	conn_t 	*connp, *pconnp;
+	conn_t 	*connp;
 
-	ASSERT((sctp->sctp_family == AF_INET &&
-	    sctp->sctp_ipversion == IPV4_VERSION) ||
-	    (sctp->sctp_family == AF_INET6 &&
-	    (sctp->sctp_ipversion == IPV4_VERSION ||
-	    sctp->sctp_ipversion == IPV6_VERSION)));
+	connp = sctp->sctp_connp;
 
 	sctp->sctp_nsaddrs = 0;
 	for (cnt = 0; cnt < SCTP_IPIF_HASH; cnt++) {
@@ -895,7 +839,7 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 		    sizeof (sctp_saddr_ipif_t), offsetof(sctp_saddr_ipif_t,
 		    saddr_ipif));
 	}
-	sctp->sctp_ports = 0;
+	connp->conn_ports = 0;
 	sctp->sctp_running = B_FALSE;
 	sctp->sctp_state = SCTPS_IDLE;
 
@@ -925,51 +869,16 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 	if (psctp != NULL) {
 		/*
 		 * Inherit from parent
+		 *
+		 * Start by inheriting from the conn_t, including conn_ixa and
+		 * conn_xmit_ipp.
 		 */
-		sctp->sctp_iphc = kmem_zalloc(psctp->sctp_iphc_len, sleep);
-		if (sctp->sctp_iphc == NULL) {
-			sctp->sctp_iphc_len = 0;
-			err = ENOMEM;
+		err = conn_inherit_parent(psctp->sctp_connp, connp);
+		if (err != 0)
 			goto failure;
-		}
-		sctp->sctp_iphc_len = psctp->sctp_iphc_len;
-		sctp->sctp_hdr_len = psctp->sctp_hdr_len;
-
-		sctp->sctp_iphc6 = kmem_zalloc(psctp->sctp_iphc6_len, sleep);
-		if (sctp->sctp_iphc6 == NULL) {
-			sctp->sctp_iphc6_len = 0;
-			err = ENOMEM;
-			goto failure;
-		}
-		sctp->sctp_iphc6_len = psctp->sctp_iphc6_len;
-		sctp->sctp_hdr6_len = psctp->sctp_hdr6_len;
-
-		sctp->sctp_ip_hdr_len = psctp->sctp_ip_hdr_len;
-		sctp->sctp_ip_hdr6_len = psctp->sctp_ip_hdr6_len;
-
-		/*
-		 * Copy the IP+SCTP header templates from listener
-		 */
-		bcopy(psctp->sctp_iphc, sctp->sctp_iphc,
-		    psctp->sctp_hdr_len);
-		sctp->sctp_ipha = (ipha_t *)sctp->sctp_iphc;
-		sctp->sctp_sctph = (sctp_hdr_t *)(sctp->sctp_iphc +
-		    sctp->sctp_ip_hdr_len);
-
-		bcopy(psctp->sctp_iphc6, sctp->sctp_iphc6,
-		    psctp->sctp_hdr6_len);
-		if (((ip6i_t *)(sctp->sctp_iphc6))->ip6i_nxt == IPPROTO_RAW) {
-			sctp->sctp_ip6h = (ip6_t *)(sctp->sctp_iphc6 +
-			    sizeof (ip6i_t));
-		} else {
-			sctp->sctp_ip6h = (ip6_t *)sctp->sctp_iphc6;
-		}
-		sctp->sctp_sctph6 = (sctp_hdr_t *)(sctp->sctp_iphc6 +
-		    sctp->sctp_ip_hdr6_len);
 
 		sctp->sctp_cookie_lifetime = psctp->sctp_cookie_lifetime;
-		sctp->sctp_xmit_lowater = psctp->sctp_xmit_lowater;
-		sctp->sctp_xmit_hiwater = psctp->sctp_xmit_hiwater;
+
 		sctp->sctp_cwnd_max = psctp->sctp_cwnd_max;
 		sctp->sctp_rwnd = psctp->sctp_rwnd;
 		sctp->sctp_irwnd = psctp->sctp_rwnd;
@@ -996,43 +905,23 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 		sctp->sctp_tx_adaptation_code = psctp->sctp_tx_adaptation_code;
 
 		/* xxx should be a better way to copy these flags xxx */
-		sctp->sctp_debug = psctp->sctp_debug;
 		sctp->sctp_bound_to_all = psctp->sctp_bound_to_all;
 		sctp->sctp_cansleep = psctp->sctp_cansleep;
 		sctp->sctp_send_adaptation = psctp->sctp_send_adaptation;
 		sctp->sctp_ndelay = psctp->sctp_ndelay;
 		sctp->sctp_events = psctp->sctp_events;
-		sctp->sctp_ipv6_recvancillary = psctp->sctp_ipv6_recvancillary;
-
-		/* Copy IP-layer options */
-		connp = sctp->sctp_connp;
-		pconnp = psctp->sctp_connp;
-
-		connp->conn_broadcast = pconnp->conn_broadcast;
-		connp->conn_loopback = pconnp->conn_loopback;
-		connp->conn_dontroute = pconnp->conn_dontroute;
-		connp->conn_reuseaddr = pconnp->conn_reuseaddr;
-
 	} else {
-		/*
-		 * Initialize the header template
-		 */
-		if ((err = sctp_header_init_ipv4(sctp, sleep)) != 0) {
-			goto failure;
-		}
-		if ((err = sctp_header_init_ipv6(sctp, sleep)) != 0) {
-			goto failure;
-		}
-
 		/*
 		 * Set to system defaults
 		 */
 		sctp->sctp_cookie_lifetime =
 		    MSEC_TO_TICK(sctps->sctps_cookie_life);
-		sctp->sctp_xmit_lowater = sctps->sctps_xmit_lowat;
-		sctp->sctp_xmit_hiwater = sctps->sctps_xmit_hiwat;
+		connp->conn_sndlowat = sctps->sctps_xmit_lowat;
+		connp->conn_sndbuf = sctps->sctps_xmit_hiwat;
+		connp->conn_rcvbuf = sctps->sctps_recv_hiwat;
+
 		sctp->sctp_cwnd_max = sctps->sctps_cwnd_max_;
-		sctp->sctp_rwnd = sctps->sctps_recv_hiwat;
+		sctp->sctp_rwnd = connp->conn_rcvbuf;
 		sctp->sctp_irwnd = sctp->sctp_rwnd;
 		sctp->sctp_pd_point = sctp->sctp_rwnd;
 		sctp->sctp_rto_max = MSEC_TO_TICK(sctps->sctps_rto_maxg);
@@ -1049,13 +938,28 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 
 		sctp->sctp_hb_interval =
 		    MSEC_TO_TICK(sctps->sctps_heartbeat_interval);
+
+		if (connp->conn_family == AF_INET)
+			connp->conn_default_ttl = sctps->sctps_ipv4_ttl;
+		else
+			connp->conn_default_ttl = sctps->sctps_ipv6_hoplimit;
+
+		connp->conn_xmit_ipp.ipp_unicast_hops =
+		    connp->conn_default_ttl;
+
+		/*
+		 * Initialize the header template
+		 */
+		if ((err = sctp_build_hdrs(sctp, sleep)) != 0) {
+			goto failure;
+		}
 	}
+
 	sctp->sctp_understands_asconf = B_TRUE;
 	sctp->sctp_understands_addip = B_TRUE;
 	sctp->sctp_prsctp_aware = B_FALSE;
 
 	sctp->sctp_connp->conn_ref = 1;
-	sctp->sctp_connp->conn_fully_bound = B_FALSE;
 
 	sctp->sctp_prsctpdrop = 0;
 	sctp->sctp_msgcount = 0;
@@ -1063,14 +967,7 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 	return (0);
 
 failure:
-	if (sctp->sctp_iphc != NULL) {
-		kmem_free(sctp->sctp_iphc, sctp->sctp_iphc_len);
-		sctp->sctp_iphc = NULL;
-	}
-	if (sctp->sctp_iphc6 != NULL) {
-		kmem_free(sctp->sctp_iphc6, sctp->sctp_iphc6_len);
-		sctp->sctp_iphc6 = NULL;
-	}
+	sctp_headers_free(sctp);
 	return (err);
 }
 
@@ -1102,8 +999,122 @@ sctp_icmp_verf(sctp_t *sctp, sctp_hdr_t *sh, mblk_t *mp)
 }
 
 /*
+ * Update the SCTP state according to change of PMTU.
+ *
+ * Path MTU might have changed by either increase or decrease, so need to
+ * adjust the MSS based on the value of ixa_pmtu.
+ */
+static void
+sctp_update_pmtu(sctp_t *sctp, sctp_faddr_t *fp, boolean_t decrease_only)
+{
+	uint32_t	pmtu;
+	int32_t		mss;
+	ip_xmit_attr_t	*ixa = fp->ixa;
+
+	if (sctp->sctp_state < SCTPS_ESTABLISHED)
+		return;
+
+	/*
+	 * Always call ip_get_pmtu() to make sure that IP has updated
+	 * ixa_flags properly.
+	 */
+	pmtu = ip_get_pmtu(ixa);
+
+	/*
+	 * Calculate the MSS by decreasing the PMTU by sctp_hdr_len and
+	 * IPsec overhead if applied. Make sure to use the most recent
+	 * IPsec information.
+	 */
+	mss = pmtu - conn_ipsec_length(sctp->sctp_connp);
+	if (ixa->ixa_flags & IXAF_IS_IPV4)
+		mss -= sctp->sctp_hdr_len;
+	else
+		mss -= sctp->sctp_hdr6_len;
+
+	/*
+	 * Nothing to change, so just return.
+	 */
+	if (mss == fp->sfa_pmss)
+		return;
+
+	/*
+	 * Currently, for ICMP errors, only PMTU decrease is handled.
+	 */
+	if (mss > fp->sfa_pmss && decrease_only)
+		return;
+
+#ifdef DEBUG
+	(void) printf("sctp_update_pmtu mss from %d to %d\n",
+	    fp->sfa_pmss, mss);
+#endif
+	DTRACE_PROBE2(sctp_update_pmtu, int32_t, fp->sfa_pmss, uint32_t, mss);
+
+	/*
+	 * Update ixa_fragsize and ixa_pmtu.
+	 */
+	ixa->ixa_fragsize = ixa->ixa_pmtu = pmtu;
+
+	/*
+	 * Make sure that sfa_pmss is a multiple of
+	 * SCTP_ALIGN.
+	 */
+	fp->sfa_pmss = mss & ~(SCTP_ALIGN - 1);
+	fp->pmtu_discovered = 1;
+
+#ifdef notyet
+	if (mss < sctp->sctp_sctps->sctps_mss_min)
+		ixa->ixa_flags |= IXAF_PMTU_TOO_SMALL;
+#endif
+	if (ixa->ixa_flags & IXAF_PMTU_TOO_SMALL)
+		ixa->ixa_flags &= ~(IXAF_DONTFRAG | IXAF_PMTU_IPV4_DF);
+
+	/*
+	 * If below the min size then ip_get_pmtu cleared IXAF_PMTU_IPV4_DF.
+	 * Make sure to clear IXAF_DONTFRAG, which is used by IP to decide
+	 * whether to fragment the packet.
+	 */
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
+		if (!(ixa->ixa_flags & IXAF_PMTU_IPV4_DF)) {
+			fp->df = B_FALSE;
+			if (fp == sctp->sctp_current) {
+				sctp->sctp_ipha->
+				    ipha_fragment_offset_and_flags = 0;
+			}
+		}
+	}
+}
+
+/*
+ * Notify function registered with ip_xmit_attr_t. It's called in the context
+ * of conn_ip_output so it's safe to update the SCTP state.
+ * Currently only used for pmtu changes.
+ */
+/* ARGSUSED1 */
+static void
+sctp_notify(void *arg, ip_xmit_attr_t *ixa, ixa_notify_type_t ntype,
+    ixa_notify_arg_t narg)
+{
+	sctp_t		*sctp = (sctp_t *)arg;
+	sctp_faddr_t	*fp;
+
+	switch (ntype) {
+	case IXAN_PMTU:
+		/* Find the faddr based on the ip_xmit_attr_t pointer */
+		for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+			if (fp->ixa == ixa)
+				break;
+		}
+		if (fp != NULL)
+			sctp_update_pmtu(sctp, fp, B_FALSE);
+		break;
+	default:
+		break;
+	}
+}
+
+/*
  * sctp_icmp_error is called by sctp_input() to process ICMP error messages
- * passed up by IP.  The queue is the default queue.  We need to find a sctp_t
+ * passed up by IP.  We need to find a sctp_t
  * that corresponds to the returned datagram.  Passes the message back in on
  * the correct queue once it has located the connection.
  * Assumes that IP has pulled up everything up to and including
@@ -1116,8 +1127,6 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 	ipha_t	*ipha;
 	int	iph_hdr_length;
 	sctp_hdr_t *sctph;
-	mblk_t *first_mp;
-	uint32_t new_mtu;
 	in6_addr_t dst;
 	sctp_faddr_t *fp;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
@@ -1125,12 +1134,10 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 	dprint(1, ("sctp_icmp_error: sctp=%p, mp=%p\n", (void *)sctp,
 	    (void *)mp));
 
-	first_mp = mp;
-
 	ipha = (ipha_t *)mp->b_rptr;
 	if (IPH_HDR_VERSION(ipha) != IPV4_VERSION) {
 		ASSERT(IPH_HDR_VERSION(ipha) == IPV6_VERSION);
-		sctp_icmp_error_ipv6(sctp, first_mp);
+		sctp_icmp_error_ipv6(sctp, mp);
 		return;
 	}
 
@@ -1144,7 +1151,7 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 	/* first_mp must expose the full sctp header. */
 	if ((uchar_t *)(sctph + 1) >= mp->b_wptr) {
 		/* not enough data for SCTP header */
-		freemsg(first_mp);
+		freemsg(mp);
 		return;
 	}
 
@@ -1175,19 +1182,7 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 			if (fp == NULL) {
 				break;
 			}
-
-			new_mtu = ntohs(icmph->icmph_du_mtu);
-
-			if (new_mtu - sctp->sctp_hdr_len >= fp->sfa_pmss)
-				break;
-
-			/*
-			 * Make sure that sfa_pmss is a multiple of
-			 * SCTP_ALIGN.
-			 */
-			fp->sfa_pmss = (new_mtu - sctp->sctp_hdr_len) &
-			    ~(SCTP_ALIGN - 1);
-			fp->pmtu_discovered = 1;
+			sctp_update_pmtu(sctp, fp, B_TRUE);
 			/*
 			 * It is possible, even likely that a fast retransmit
 			 * attempt has been dropped by ip as a result of this
@@ -1229,7 +1224,7 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 		break;
 	}
 	}
-	freemsg(first_mp);
+	freemsg(mp);
 }
 
 /*
@@ -1246,7 +1241,6 @@ sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp)
 	uint16_t	iph_hdr_length;
 	sctp_hdr_t *sctpha;
 	uint8_t	*nexthdrp;
-	uint32_t new_mtu;
 	sctp_faddr_t *fp;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
@@ -1294,16 +1288,16 @@ sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp)
 			break;
 		}
 
-		new_mtu = ntohs(icmp6->icmp6_mtu);
-
-		if (new_mtu - sctp->sctp_hdr6_len >= fp->sfa_pmss)
-			break;
-
-		/* Make sure that sfa_pmss is a multiple of SCTP_ALIGN. */
-		fp->sfa_pmss = (new_mtu - sctp->sctp_hdr6_len) &
-		    ~(SCTP_ALIGN - 1);
-		fp->pmtu_discovered = 1;
-
+		sctp_update_pmtu(sctp, fp, B_TRUE);
+		/*
+		 * It is possible, even likely that a fast retransmit
+		 * attempt has been dropped by ip as a result of this
+		 * error, retransmission bundles as much as possible.
+		 * A retransmit here prevents significant delays waiting
+		 * on the timer. Analogous to behaviour of TCP after
+		 * ICMP too big.
+		 */
+		sctp_rexmit(sctp, fp);
 		break;
 
 	case ICMP6_DST_UNREACH:
@@ -1366,12 +1360,12 @@ sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp)
  * If parent pointer is passed in, inherit settings from it.
  */
 sctp_t *
-sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
+sctp_create(void *ulpd, sctp_t *parent, int family, int type, int flags,
     sock_upcalls_t *upcalls, sctp_sockbuf_limits_t *sbl,
     cred_t *credp)
 {
 	sctp_t		*sctp, *psctp;
-	conn_t		*sctp_connp;
+	conn_t		*connp;
 	mblk_t		*ack_mp, *hb_mp;
 	int		sleep = flags & SCTP_CAN_BLOCK ? KM_SLEEP : KM_NOSLEEP;
 	zoneid_t	zoneid;
@@ -1403,18 +1397,8 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
 			zoneid = GLOBAL_ZONEID;
 		else
 			zoneid = crgetzoneid(credp);
-
-		/*
-		 * For stackid zero this is done from strplumb.c, but
-		 * non-zero stackids are handled here.
-		 */
-		if (sctps->sctps_g_q == NULL &&
-		    sctps->sctps_netstack->netstack_stackid !=
-		    GLOBAL_NETSTACKID) {
-			sctp_g_q_setup(sctps);
-		}
 	}
-	if ((sctp_connp = ipcl_conn_create(IPCL_SCTPCONN, sleep,
+	if ((connp = ipcl_conn_create(IPCL_SCTPCONN, sleep,
 	    sctps->sctps_netstack)) == NULL) {
 		netstack_rele(sctps->sctps_netstack);
 		SCTP_KSTAT(sctps, sctp_conn_create);
@@ -1425,49 +1409,38 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
 	 * done at top of sctp_create.
 	 */
 	netstack_rele(sctps->sctps_netstack);
-	sctp = CONN2SCTP(sctp_connp);
+	sctp = CONN2SCTP(connp);
 	sctp->sctp_sctps = sctps;
 
-	sctp_connp->conn_ulp_labeled = is_system_labeled();
 	if ((ack_mp = sctp_timer_alloc(sctp, sctp_ack_timer, sleep)) == NULL ||
 	    (hb_mp = sctp_timer_alloc(sctp, sctp_heartbeat_timer,
 	    sleep)) == NULL) {
 		if (ack_mp != NULL)
 			freeb(ack_mp);
-		sctp_conn_clear(sctp_connp);
+		sctp_conn_clear(connp);
 		sctp->sctp_sctps = NULL;
-		SCTP_G_Q_REFRELE(sctps);
-		kmem_cache_free(sctp_conn_cache, sctp_connp);
+		kmem_cache_free(sctp_conn_cache, connp);
 		return (NULL);
 	}
 
 	sctp->sctp_ack_mp = ack_mp;
 	sctp->sctp_heartbeat_mp = hb_mp;
 
-	switch (family) {
-	case AF_INET6:
-		sctp_connp->conn_af_isv6 = B_TRUE;
-		sctp->sctp_ipversion = IPV6_VERSION;
-		sctp->sctp_family = AF_INET6;
-		break;
+	/*
+	 * Have conn_ip_output drop packets should our outer source
+	 * go invalid, and tell us about mtu changes.
+	 */
+	connp->conn_ixa->ixa_flags |= IXAF_SET_ULP_CKSUM | IXAF_VERIFY_SOURCE |
+	    IXAF_VERIFY_PMTU;
+	connp->conn_family = family;
+	connp->conn_so_type = type;
 
-	case AF_INET:
-		sctp_connp->conn_af_isv6 = B_FALSE;
-		sctp_connp->conn_pkt_isv6 = B_FALSE;
-		sctp->sctp_ipversion = IPV4_VERSION;
-		sctp->sctp_family = AF_INET;
-		break;
-	default:
-		ASSERT(0);
-		break;
-	}
 	if (sctp_init_values(sctp, psctp, sleep) != 0) {
 		freeb(ack_mp);
 		freeb(hb_mp);
-		sctp_conn_clear(sctp_connp);
+		sctp_conn_clear(connp);
 		sctp->sctp_sctps = NULL;
-		SCTP_G_Q_REFRELE(sctps);
-		kmem_cache_free(sctp_conn_cache, sctp_connp);
+		kmem_cache_free(sctp_conn_cache, connp);
 		return (NULL);
 	}
 	sctp->sctp_cansleep = ((flags & SCTP_CAN_BLOCK) == SCTP_CAN_BLOCK);
@@ -1476,6 +1449,8 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
 	    sctp->sctp_hdr6_len : sctp->sctp_hdr_len);
 
 	if (psctp != NULL) {
+		conn_t	*pconnp = psctp->sctp_connp;
+
 		RUN_SCTP(psctp);
 		/*
 		 * Inherit local address list, local port. Parent is either
@@ -1488,10 +1463,9 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
 			freeb(ack_mp);
 			freeb(hb_mp);
 			sctp_headers_free(sctp);
-			sctp_conn_clear(sctp_connp);
+			sctp_conn_clear(connp);
 			sctp->sctp_sctps = NULL;
-			SCTP_G_Q_REFRELE(sctps);
-			kmem_cache_free(sctp_conn_cache, sctp_connp);
+			kmem_cache_free(sctp_conn_cache, connp);
 			return (NULL);
 		}
 
@@ -1500,28 +1474,32 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
 		 * followed by sctp_connect(). So don't add this guy to
 		 * bind hash.
 		 */
-		sctp->sctp_lport = psctp->sctp_lport;
+		connp->conn_lport = pconnp->conn_lport;
 		sctp->sctp_state = SCTPS_BOUND;
-		sctp->sctp_allzones = psctp->sctp_allzones;
-		sctp->sctp_zoneid = psctp->sctp_zoneid;
 		WAKE_SCTP(psctp);
 	} else {
-		sctp->sctp_zoneid = zoneid;
+		ASSERT(connp->conn_cred == NULL);
+		connp->conn_zoneid = zoneid;
+		/*
+		 * conn_allzones can not be set this early, hence
+		 * no IPCL_ZONEID
+		 */
+		connp->conn_ixa->ixa_zoneid = zoneid;
+		connp->conn_open_time = lbolt64;
+		connp->conn_cred = credp;
+		crhold(credp);
+		connp->conn_cpid = curproc->p_pid;
+
+		/*
+		 * If the caller has the process-wide flag set, then default to
+		 * MAC exempt mode.  This allows read-down to unlabeled hosts.
+		 */
+		if (getpflags(NET_MAC_AWARE, credp) != 0)
+			connp->conn_mac_mode = CONN_MAC_AWARE;
+
+		connp->conn_zone_is_global =
+		    (crgetzoneid(credp) == GLOBAL_ZONEID);
 	}
-
-	sctp->sctp_cpid = curproc->p_pid;
-	sctp->sctp_open_time = lbolt64;
-
-	ASSERT(sctp_connp->conn_cred == NULL);
-	sctp_connp->conn_cred = credp;
-	crhold(credp);
-
-	/*
-	 * If the caller has the process-wide flag set, then default to MAC
-	 * exempt mode.  This allows read-down to unlabeled hosts.
-	 */
-	if (getpflags(NET_MAC_AWARE, credp) != 0)
-		sctp_connp->conn_mac_mode = CONN_MAC_AWARE;
 
 	/* Initialize SCTP instance values,  our verf tag must never be 0 */
 	(void) random_get_pseudo_bytes((uint8_t *)&sctp->sctp_lvtag,
@@ -1536,251 +1514,22 @@ sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
 	sctp->sctp_adv_pap = sctp->sctp_lastack_rxd;
 
 	/* Information required by upper layer */
-	if (ulpd != NULL) {
-		sctp->sctp_ulpd = ulpd;
+	ASSERT(ulpd != NULL);
+	sctp->sctp_ulpd = ulpd;
 
-		ASSERT(upcalls != NULL);
-		sctp->sctp_upcalls = upcalls;
-		ASSERT(sbl != NULL);
-		/* Fill in the socket buffer limits for sctpsockfs */
-		sbl->sbl_txlowat = sctp->sctp_xmit_lowater;
-		sbl->sbl_txbuf = sctp->sctp_xmit_hiwater;
-		sbl->sbl_rxbuf = sctp->sctp_rwnd;
-		sbl->sbl_rxlowat = SCTP_RECV_LOWATER;
-	}
-	/* If no ulpd, must be creating the default sctp */
-	ASSERT(ulpd != NULL || sctps->sctps_gsctp == NULL);
+	ASSERT(upcalls != NULL);
+	sctp->sctp_upcalls = upcalls;
+	ASSERT(sbl != NULL);
+	/* Fill in the socket buffer limits for sctpsockfs */
+	sbl->sbl_txlowat = connp->conn_sndlowat;
+	sbl->sbl_txbuf = connp->conn_sndbuf;
+	sbl->sbl_rxbuf = sctp->sctp_rwnd;
+	sbl->sbl_rxlowat = SCTP_RECV_LOWATER;
 
 	/* Insert this in the global list. */
 	SCTP_LINK(sctp, sctps);
 
 	return (sctp);
-}
-
-/*
- * Make sure we wait until the default queue is setup, yet allow
- * sctp_g_q_create() to open a SCTP stream.
- * We need to allow sctp_g_q_create() do do an open
- * of sctp, hence we compare curhread.
- * All others have to wait until the sctps_g_q has been
- * setup.
- */
-void
-sctp_g_q_setup(sctp_stack_t *sctps)
-{
-	mutex_enter(&sctps->sctps_g_q_lock);
-	if (sctps->sctps_g_q != NULL) {
-		mutex_exit(&sctps->sctps_g_q_lock);
-		return;
-	}
-	if (sctps->sctps_g_q_creator == NULL) {
-		/* This thread will set it up */
-		sctps->sctps_g_q_creator = curthread;
-		mutex_exit(&sctps->sctps_g_q_lock);
-		sctp_g_q_create(sctps);
-		mutex_enter(&sctps->sctps_g_q_lock);
-		ASSERT(sctps->sctps_g_q_creator == curthread);
-		sctps->sctps_g_q_creator = NULL;
-		cv_signal(&sctps->sctps_g_q_cv);
-		ASSERT(sctps->sctps_g_q != NULL);
-		mutex_exit(&sctps->sctps_g_q_lock);
-		return;
-	}
-	/* Everybody but the creator has to wait */
-	if (sctps->sctps_g_q_creator != curthread) {
-		while (sctps->sctps_g_q == NULL)
-			cv_wait(&sctps->sctps_g_q_cv, &sctps->sctps_g_q_lock);
-	}
-	mutex_exit(&sctps->sctps_g_q_lock);
-}
-
-#define	IP	"ip"
-
-#define	SCTP6DEV		"/devices/pseudo/sctp6@0:sctp6"
-
-/*
- * Create a default sctp queue here instead of in strplumb
- */
-void
-sctp_g_q_create(sctp_stack_t *sctps)
-{
-	int error;
-	ldi_handle_t	lh = NULL;
-	ldi_ident_t	li = NULL;
-	int		rval;
-	cred_t		*cr;
-	major_t IP_MAJ;
-
-#ifdef NS_DEBUG
-	(void) printf("sctp_g_q_create()for stack %d\n",
-	    sctps->sctps_netstack->netstack_stackid);
-#endif
-
-	IP_MAJ = ddi_name_to_major(IP);
-
-	ASSERT(sctps->sctps_g_q_creator == curthread);
-
-	error = ldi_ident_from_major(IP_MAJ, &li);
-	if (error) {
-#ifdef DEBUG
-		printf("sctp_g_q_create: lyr ident get failed error %d\n",
-		    error);
-#endif
-		return;
-	}
-
-	cr = zone_get_kcred(netstackid_to_zoneid(
-	    sctps->sctps_netstack->netstack_stackid));
-	ASSERT(cr != NULL);
-	/*
-	 * We set the sctp default queue to IPv6 because IPv4 falls
-	 * back to IPv6 when it can't find a client, but
-	 * IPv6 does not fall back to IPv4.
-	 */
-	error = ldi_open_by_name(SCTP6DEV, FREAD|FWRITE, cr, &lh, li);
-	if (error) {
-#ifdef DEBUG
-		printf("sctp_g_q_create: open of SCTP6DEV failed error %d\n",
-		    error);
-#endif
-		goto out;
-	}
-
-	/*
-	 * This ioctl causes the sctp framework to cache a pointer to
-	 * this stream, so we don't want to close the stream after
-	 * this operation.
-	 * Use the kernel credentials that are for the zone we're in.
-	 */
-	error = ldi_ioctl(lh, SCTP_IOC_DEFAULT_Q,
-	    (intptr_t)0, FKIOCTL, cr, &rval);
-	if (error) {
-#ifdef DEBUG
-		printf("sctp_g_q_create: ioctl SCTP_IOC_DEFAULT_Q failed "
-		    "error %d\n", error);
-#endif
-		goto out;
-	}
-	sctps->sctps_g_q_lh = lh;	/* For sctp_g_q_inactive */
-	lh = NULL;
-out:
-	/* Close layered handles */
-	if (li)
-		ldi_ident_release(li);
-	/* Keep cred around until _inactive needs it */
-	sctps->sctps_g_q_cr = cr;
-}
-
-/*
- * Remove the sctp_default queue so that new connections will not find it.
- * SCTP uses sctp_g_q for all transmission, so all sctp'ts implicitly
- * refer to it. Hence have each one have a reference on sctp_g_q_ref!
- *
- * We decrement the refcnt added in sctp_g_q_create. Once all the
- * sctp_t's which use the default go away, sctp_g_q_close will be called
- * and close the sctp_g_q. Once sctp_g_q is closed, sctp_close() will drop the
- * last reference count on the stack by calling netstack_rele().
- */
-void
-sctp_g_q_destroy(sctp_stack_t *sctps)
-{
-	if (sctps->sctps_g_q == NULL) {
-		return;	/* Nothing to cleanup */
-	}
-	/*
-	 * Keep sctps_g_q and sctps_gsctp until the last reference has
-	 * dropped, since the output is always done using those.
-	 * Need to decrement twice to take sctp_g_q_create and
-	 * the gsctp reference into account so that sctp_g_q_inactive is called
-	 * when all but the default queue remains.
-	 */
-#ifdef NS_DEBUG
-	(void) printf("sctp_g_q_destroy: ref %d\n",
-	    sctps->sctps_g_q_ref);
-#endif
-	SCTP_G_Q_REFRELE(sctps);
-}
-
-/*
- * Called when last user (could be sctp_g_q_destroy) drops reference count
- * using SCTP_G_Q_REFRELE.
- * Run by sctp_q_q_inactive using a taskq.
- */
-static void
-sctp_g_q_close(void *arg)
-{
-	sctp_stack_t *sctps = arg;
-	int error;
-	ldi_handle_t	lh = NULL;
-	ldi_ident_t	li = NULL;
-	cred_t		*cr;
-	major_t IP_MAJ;
-
-	IP_MAJ = ddi_name_to_major(IP);
-
-	lh = sctps->sctps_g_q_lh;
-	if (lh == NULL)
-		return;	/* Nothing to cleanup */
-
-	error = ldi_ident_from_major(IP_MAJ, &li);
-	if (error) {
-#ifdef NS_DEBUG
-		printf("sctp_g_q_inactive: lyr ident get failed error %d\n",
-		    error);
-#endif
-		return;
-	}
-
-	cr = sctps->sctps_g_q_cr;
-	sctps->sctps_g_q_cr = NULL;
-	ASSERT(cr != NULL);
-
-	/*
-	 * Make sure we can break the recursion when sctp_close decrements
-	 * the reference count causing g_q_inactive to be called again.
-	 */
-	sctps->sctps_g_q_lh = NULL;
-
-	/* close the default queue */
-	(void) ldi_close(lh, FREAD|FWRITE, cr);
-
-	/* Close layered handles */
-	ldi_ident_release(li);
-	crfree(cr);
-
-	ASSERT(sctps->sctps_g_q != NULL);
-	sctps->sctps_g_q = NULL;
-	/*
-	 * Now free sctps_gsctp.
-	 */
-	ASSERT(sctps->sctps_gsctp != NULL);
-	sctp_closei_local(sctps->sctps_gsctp);
-	SCTP_CONDEMNED(sctps->sctps_gsctp);
-	SCTP_REFRELE(sctps->sctps_gsctp);
-	sctps->sctps_gsctp = NULL;
-}
-
-/*
- * Called when last sctp_t drops reference count using SCTP_G_Q_REFRELE.
- *
- * Have to ensure that the ldi routines are not used by an
- * interrupt thread by using a taskq.
- */
-void
-sctp_g_q_inactive(sctp_stack_t *sctps)
-{
-	if (sctps->sctps_g_q_lh == NULL)
-		return;	/* Nothing to cleanup */
-
-	ASSERT(sctps->sctps_g_q_ref == 0);
-	SCTP_G_Q_REFHOLD(sctps); /* Compensate for what g_q_destroy did */
-
-	if (servicing_interrupt()) {
-		(void) taskq_dispatch(sctp_taskq, sctp_g_q_close,
-		    (void *) sctps, TQ_SLEEP);
-	} else {
-		sctp_g_q_close(sctps);
-	}
 }
 
 /* Run at module load time */
@@ -1802,16 +1551,12 @@ sctp_ddi_g_init(void)
 	/* Initialize tables used for CRC calculation */
 	sctp_crc32_init();
 
-	sctp_taskq = taskq_create("sctp_taskq", 1, minclsyspri, 1, 1,
-	    TASKQ_PREPOPULATE);
-
 	/*
 	 * We want to be informed each time a stack is created or
 	 * destroyed in the kernel, so we can maintain the
 	 * set of sctp_stack_t's.
 	 */
-	netstack_register(NS_SCTP, sctp_stack_init, sctp_stack_shutdown,
-	    sctp_stack_fini);
+	netstack_register(NS_SCTP, sctp_stack_init, NULL, sctp_stack_fini);
 }
 
 static void *
@@ -1823,8 +1568,6 @@ sctp_stack_init(netstackid_t stackid, netstack_t *ns)
 	sctps->sctps_netstack = ns;
 
 	/* Initialize locks */
-	mutex_init(&sctps->sctps_g_q_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&sctps->sctps_g_q_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&sctps->sctps_g_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&sctps->sctps_epriv_port_lock, NULL, MUTEX_DEFAULT, NULL);
 	sctps->sctps_g_num_epriv_ports = SCTP_NUM_EPRIV_PORTS;
@@ -1875,19 +1618,6 @@ sctp_ddi_g_destroy(void)
 	sctp_ftsn_sets_fini();
 
 	netstack_unregister(NS_SCTP);
-	taskq_destroy(sctp_taskq);
-}
-
-/*
- * Shut down the SCTP stack instance.
- */
-/* ARGSUSED */
-static void
-sctp_stack_shutdown(netstackid_t stackid, void *arg)
-{
-	sctp_stack_t *sctps = (sctp_stack_t *)arg;
-
-	sctp_g_q_destroy(sctps);
 }
 
 /*
@@ -1922,8 +1652,6 @@ sctp_stack_fini(netstackid_t stackid, void *arg)
 
 	mutex_destroy(&sctps->sctps_g_lock);
 	mutex_destroy(&sctps->sctps_epriv_port_lock);
-	mutex_destroy(&sctps->sctps_g_q_lock);
-	cv_destroy(&sctps->sctps_g_q_cv);
 
 	kmem_free(sctps, sizeof (*sctps));
 }
@@ -1934,7 +1662,8 @@ sctp_display_all(sctp_stack_t *sctps)
 	sctp_t *sctp_walker;
 
 	mutex_enter(&sctps->sctps_g_lock);
-	for (sctp_walker = sctps->sctps_gsctp; sctp_walker != NULL;
+	for (sctp_walker = list_head(&sctps->sctps_g_list);
+	    sctp_walker != NULL;
 	    sctp_walker = (sctp_t *)list_next(&sctps->sctps_g_list,
 	    sctp_walker)) {
 		(void) sctp_display(sctp_walker, NULL);
@@ -2009,81 +1738,6 @@ sctp_inc_taskq(sctp_stack_t *sctps)
 }
 
 #ifdef DEBUG
-uint32_t sendq_loop_cnt = 0;
-uint32_t sendq_collision = 0;
-uint32_t sendq_empty = 0;
-#endif
-
-void
-sctp_add_sendq(sctp_t *sctp, mblk_t *mp)
-{
-	mutex_enter(&sctp->sctp_sendq_lock);
-	if (sctp->sctp_sendq == NULL) {
-		sctp->sctp_sendq = mp;
-		sctp->sctp_sendq_tail = mp;
-	} else {
-		sctp->sctp_sendq_tail->b_next = mp;
-		sctp->sctp_sendq_tail = mp;
-	}
-	mutex_exit(&sctp->sctp_sendq_lock);
-}
-
-void
-sctp_process_sendq(sctp_t *sctp)
-{
-	mblk_t *mp;
-#ifdef DEBUG
-	uint32_t loop_cnt = 0;
-#endif
-
-	mutex_enter(&sctp->sctp_sendq_lock);
-	if (sctp->sctp_sendq == NULL || sctp->sctp_sendq_sending) {
-#ifdef DEBUG
-		if (sctp->sctp_sendq == NULL)
-			sendq_empty++;
-		else
-			sendq_collision++;
-#endif
-		mutex_exit(&sctp->sctp_sendq_lock);
-		return;
-	}
-	sctp->sctp_sendq_sending = B_TRUE;
-
-	/*
-	 * Note that while we are in this loop, other thread can put
-	 * new packets in the receive queue.  We may be looping for
-	 * quite a while.  This is OK even for an interrupt thread.
-	 * The reason is that SCTP should only able to send a limited
-	 * number of packets out in a burst.  So the number of times
-	 * we go through this loop should not be many.
-	 */
-	while ((mp = sctp->sctp_sendq) != NULL) {
-		sctp->sctp_sendq = mp->b_next;
-		ASSERT(sctp->sctp_connp->conn_ref > 0);
-		mutex_exit(&sctp->sctp_sendq_lock);
-		mp->b_next = NULL;
-		CONN_INC_REF(sctp->sctp_connp);
-		mp->b_flag |= MSGHASREF;
-		/* If we don't have sctp_current, default to IPv4 */
-		IP_PUT(mp, sctp->sctp_connp, sctp->sctp_current == NULL ?
-		    B_TRUE : sctp->sctp_current->isv4);
-		BUMP_LOCAL(sctp->sctp_opkts);
-#ifdef DEBUG
-		loop_cnt++;
-#endif
-		mutex_enter(&sctp->sctp_sendq_lock);
-	}
-
-	sctp->sctp_sendq_tail = NULL;
-	sctp->sctp_sendq_sending = B_FALSE;
-#ifdef DEBUG
-	if (loop_cnt > sendq_loop_cnt)
-		sendq_loop_cnt = loop_cnt;
-#endif
-	mutex_exit(&sctp->sctp_sendq_lock);
-}
-
-#ifdef DEBUG
 uint32_t recvq_loop_cnt = 0;
 uint32_t recvq_call = 0;
 #endif
@@ -2144,10 +1798,19 @@ sctp_find_next_tq(sctp_t *sctp)
  * If the try_harder argument is B_TRUE, this routine sctp_find_next_tq()
  * will try very hard to dispatch the task.  Refer to the comment
  * for that routine on how it does that.
+ *
+ * On failure the message has been freed i.e., this routine always consumes the
+ * message. It bumps ipIfStatsInDiscards and and uses ip_drop_input to drop.
  */
-boolean_t
-sctp_add_recvq(sctp_t *sctp, mblk_t *mp, boolean_t caller_hold_lock)
+void
+sctp_add_recvq(sctp_t *sctp, mblk_t *mp, boolean_t caller_hold_lock,
+    ip_recv_attr_t *ira)
 {
+	mblk_t	*attrmp;
+	ip_stack_t	*ipst = sctp->sctp_sctps->sctps_netstack->netstack_ip;
+
+	ASSERT(ira->ira_ill == NULL);
+
 	if (!caller_hold_lock)
 		mutex_enter(&sctp->sctp_recvq_lock);
 
@@ -2157,11 +1820,27 @@ sctp_add_recvq(sctp_t *sctp, mblk_t *mp, boolean_t caller_hold_lock)
 		if (!sctp_find_next_tq(sctp)) {
 			if (!caller_hold_lock)
 				mutex_exit(&sctp->sctp_recvq_lock);
-			return (B_FALSE);
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", mp, NULL);
+			freemsg(mp);
+			return;
 		}
 		/* Make sure the sctp_t will not go away. */
 		SCTP_REFHOLD(sctp);
 	}
+
+	attrmp = ip_recv_attr_to_mblk(ira);
+	if (attrmp == NULL) {
+		if (!caller_hold_lock)
+			mutex_exit(&sctp->sctp_recvq_lock);
+		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, NULL);
+		freemsg(mp);
+		return;
+	}
+	ASSERT(attrmp->b_cont == NULL);
+	attrmp->b_cont = mp;
+	mp = attrmp;
 
 	if (sctp->sctp_recvq == NULL) {
 		sctp->sctp_recvq = mp;
@@ -2173,7 +1852,6 @@ sctp_add_recvq(sctp_t *sctp, mblk_t *mp, boolean_t caller_hold_lock)
 
 	if (!caller_hold_lock)
 		mutex_exit(&sctp->sctp_recvq_lock);
-	return (B_TRUE);
 }
 
 static void
@@ -2181,10 +1859,10 @@ sctp_process_recvq(void *arg)
 {
 	sctp_t		*sctp = (sctp_t *)arg;
 	mblk_t		*mp;
-	mblk_t		*ipsec_mp;
 #ifdef DEBUG
 	uint32_t	loop_cnt = 0;
 #endif
+	ip_recv_attr_t	iras;
 
 #ifdef	_BIG_ENDIAN
 #define	IPVER(ip6h)	((((uint32_t *)ip6h)[0] >> 28) & 0x7)
@@ -2204,16 +1882,31 @@ sctp_process_recvq(void *arg)
 	 * quite a while.
 	 */
 	while ((mp = sctp->sctp_recvq) != NULL) {
+		mblk_t *data_mp;
+
 		sctp->sctp_recvq = mp->b_next;
 		mutex_exit(&sctp->sctp_recvq_lock);
 		mp->b_next = NULL;
 #ifdef DEBUG
 		loop_cnt++;
 #endif
-		ipsec_mp = mp->b_prev;
 		mp->b_prev = NULL;
-		sctp_input_data(sctp, mp, ipsec_mp);
 
+		data_mp = mp->b_cont;
+		mp->b_cont = NULL;
+		if (!ip_recv_attr_from_mblk(mp, &iras)) {
+			ip_drop_input("ip_recv_attr_from_mblk", mp, NULL);
+			freemsg(mp);
+			ira_cleanup(&iras, B_TRUE);
+			continue;
+		}
+
+		if (iras.ira_flags & IRAF_ICMP_ERROR)
+			sctp_icmp_error(sctp, data_mp);
+		else
+			sctp_input_data(sctp, data_mp, &iras);
+
+		ira_cleanup(&iras, B_TRUE);
 		mutex_enter(&sctp->sctp_recvq_lock);
 	}
 
@@ -2224,8 +1917,6 @@ sctp_process_recvq(void *arg)
 
 	WAKE_SCTP(sctp);
 
-	/* We may have sent something when processing the receive queue. */
-	sctp_process_sendq(sctp);
 #ifdef DEBUG
 	if (loop_cnt > recvq_loop_cnt)
 		recvq_loop_cnt = loop_cnt;
@@ -2238,18 +1929,32 @@ sctp_process_recvq(void *arg)
 static int
 sctp_conn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 {
-	conn_t	*sctp_connp = (conn_t *)buf;
-	sctp_t	*sctp = (sctp_t *)&sctp_connp[1];
+	conn_t	*connp = (conn_t *)buf;
+	sctp_t	*sctp = (sctp_t *)&connp[1];
 
+	bzero(connp, sizeof (conn_t));
 	bzero(buf, (char *)&sctp[1] - (char *)buf);
 
-	sctp->sctp_connp = sctp_connp;
 	mutex_init(&sctp->sctp_reflock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&sctp->sctp_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&sctp->sctp_recvq_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&sctp->sctp_cv, NULL, CV_DEFAULT, NULL);
-	mutex_init(&sctp->sctp_sendq_lock, NULL, MUTEX_DEFAULT, NULL);
 
+	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
+	connp->conn_flags = IPCL_SCTPCONN;
+	connp->conn_proto = IPPROTO_SCTP;
+	connp->conn_sctp = sctp;
+	sctp->sctp_connp = connp;
+	rw_init(&connp->conn_ilg_lock, NULL, RW_DEFAULT, NULL);
+
+	connp->conn_ixa = kmem_zalloc(sizeof (ip_xmit_attr_t), kmflags);
+	if (connp->conn_ixa == NULL) {
+		return (ENOMEM);
+	}
+	connp->conn_ixa->ixa_refcnt = 1;
+	connp->conn_ixa->ixa_protocol = connp->conn_proto;
+	connp->conn_ixa->ixa_xmit_hint = CONN_TO_XMIT_HINT(connp);
 	return (0);
 }
 
@@ -2257,14 +1962,13 @@ sctp_conn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 static void
 sctp_conn_cache_destructor(void *buf, void *cdrarg)
 {
-	conn_t	*sctp_connp = (conn_t *)buf;
-	sctp_t	*sctp = (sctp_t *)&sctp_connp[1];
+	conn_t	*connp = (conn_t *)buf;
+	sctp_t	*sctp = (sctp_t *)&connp[1];
 
+	ASSERT(sctp->sctp_connp == connp);
 	ASSERT(!MUTEX_HELD(&sctp->sctp_lock));
 	ASSERT(!MUTEX_HELD(&sctp->sctp_reflock));
 	ASSERT(!MUTEX_HELD(&sctp->sctp_recvq_lock));
-	ASSERT(!MUTEX_HELD(&sctp->sctp_sendq_lock));
-	ASSERT(!MUTEX_HELD(&sctp->sctp_connp->conn_lock));
 
 	ASSERT(sctp->sctp_conn_hash_next == NULL);
 	ASSERT(sctp->sctp_conn_hash_prev == NULL);
@@ -2317,16 +2021,6 @@ sctp_conn_cache_destructor(void *buf, void *cdrarg)
 	ASSERT(sctp->sctp_recvq_tail == NULL);
 	ASSERT(sctp->sctp_recvq_tq == NULL);
 
-	ASSERT(sctp->sctp_sendq == NULL);
-	ASSERT(sctp->sctp_sendq_tail == NULL);
-	ASSERT(sctp->sctp_sendq_sending == B_FALSE);
-
-	ASSERT(sctp->sctp_ipp_hopopts == NULL);
-	ASSERT(sctp->sctp_ipp_rtdstopts == NULL);
-	ASSERT(sctp->sctp_ipp_rthdr == NULL);
-	ASSERT(sctp->sctp_ipp_dstopts == NULL);
-	ASSERT(sctp->sctp_ipp_pathmtu == NULL);
-
 	/*
 	 * sctp_pad_mp can be NULL if the memory allocation fails
 	 * in sctp_init_values() and the conn_t is freed.
@@ -2340,8 +2034,18 @@ sctp_conn_cache_destructor(void *buf, void *cdrarg)
 	mutex_destroy(&sctp->sctp_lock);
 	mutex_destroy(&sctp->sctp_recvq_lock);
 	cv_destroy(&sctp->sctp_cv);
-	mutex_destroy(&sctp->sctp_sendq_lock);
 
+	mutex_destroy(&connp->conn_lock);
+	cv_destroy(&connp->conn_cv);
+	rw_destroy(&connp->conn_ilg_lock);
+
+	/* Can be NULL if constructor failed */
+	if (connp->conn_ixa != NULL) {
+		ASSERT(connp->conn_ixa->ixa_refcnt == 1);
+		ASSERT(connp->conn_ixa->ixa_ire == NULL);
+		ASSERT(connp->conn_ixa->ixa_nce == NULL);
+		ixa_refrele(connp->conn_ixa);
+	}
 }
 
 static void
@@ -2361,31 +2065,53 @@ sctp_conn_cache_fini()
 void
 sctp_conn_init(conn_t *connp)
 {
-	connp->conn_flags = IPCL_SCTPCONN;
+	ASSERT(connp->conn_flags == IPCL_SCTPCONN);
 	connp->conn_rq = connp->conn_wq = NULL;
-	connp->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
-	connp->conn_ulp = IPPROTO_SCTP;
+	connp->conn_ixa->ixa_flags |= IXAF_SET_ULP_CKSUM | IXAF_VERIFY_SOURCE |
+	    IXAF_VERIFY_PMTU;
+
+	ASSERT(connp->conn_proto == IPPROTO_SCTP);
+	ASSERT(connp->conn_ixa->ixa_protocol == connp->conn_proto);
 	connp->conn_state_flags |= CONN_INCIPIENT;
-	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
+
+	ASSERT(connp->conn_sctp != NULL);
+
+	/*
+	 * Register sctp_notify to listen to capability changes detected by IP.
+	 * This upcall is made in the context of the call to conn_ip_output
+	 * thus it holds whatever locks sctp holds across conn_ip_output.
+	 */
+	connp->conn_ixa->ixa_notify = sctp_notify;
+	connp->conn_ixa->ixa_notify_cookie = connp->conn_sctp;
 }
 
 static void
 sctp_conn_clear(conn_t *connp)
 {
 	/* Clean up conn_t stuff */
-	if (connp->conn_latch != NULL)
-		IPLATCH_REFRELE(connp->conn_latch, connp->conn_netstack);
-	if (connp->conn_policy != NULL)
+	if (connp->conn_latch != NULL) {
+		IPLATCH_REFRELE(connp->conn_latch);
+		connp->conn_latch = NULL;
+	}
+	if (connp->conn_latch_in_policy != NULL) {
+		IPPOL_REFRELE(connp->conn_latch_in_policy);
+		connp->conn_latch_in_policy = NULL;
+	}
+	if (connp->conn_latch_in_action != NULL) {
+		IPACT_REFRELE(connp->conn_latch_in_action);
+		connp->conn_latch_in_action = NULL;
+	}
+	if (connp->conn_policy != NULL) {
 		IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
-	if (connp->conn_ipsec_opt_mp != NULL)
+		connp->conn_policy = NULL;
+	}
+	if (connp->conn_ipsec_opt_mp != NULL) {
 		freemsg(connp->conn_ipsec_opt_mp);
-	if (connp->conn_cred != NULL)
-		crfree(connp->conn_cred);
-	if (connp->conn_effective_cred != NULL)
-		crfree(connp->conn_effective_cred);
-	mutex_destroy(&connp->conn_lock);
-	cv_destroy(&connp->conn_cv);
+		connp->conn_ipsec_opt_mp = NULL;
+	}
 	netstack_rele(connp->conn_netstack);
-	bzero(connp, sizeof (struct conn_s));
+	connp->conn_netstack = NULL;
+
+	/* Leave conn_ixa and other constructed fields in place */
+	ipcl_conn_cleanup(connp);
 }

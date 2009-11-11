@@ -52,16 +52,12 @@
  * asynchronous and the reference protects the connection from being destroyed
  * before its processing is finished).
  *
- * send and receive functions are currently used for TCP only. The send function
- * determines the IP entry point for the packet once it leaves TCP to be sent to
- * the destination address. The receive function is used by IP when the packet
- * should be passed for TCP processing. When a new connection is created these
- * are set to ip_output() and tcp_input() respectively. During the lifetime of
- * the connection the send and receive functions may change depending on the
- * changes in the connection state. For example, Once the connection is bound to
- * an addresse, the receive function for this connection is set to
- * tcp_conn_request().  This allows incoming SYNs to go directly into the
- * listener SYN processing function without going to tcp_input() first.
+ * conn_recv is used to pass up packets to the ULP.
+ * For TCP conn_recv changes. It is tcp_input_listener_unbound initially for
+ * a listener, and changes to tcp_input_listener as the listener has picked a
+ * good squeue. For other cases it is set to tcp_input_data.
+ *
+ * conn_recvicmp is used to pass up ICMP errors to the ULP.
  *
  * Classifier uses several hash tables:
  *
@@ -91,8 +87,8 @@
  * Connection Lookup:
  * ------------------
  *
- * conn_t *ipcl_classify_v4(mp, protocol, hdr_len, zoneid, ip_stack)
- * conn_t *ipcl_classify_v6(mp, protocol, hdr_len, zoneid, ip_stack)
+ * conn_t *ipcl_classify_v4(mp, protocol, hdr_len, ira, ip_stack)
+ * conn_t *ipcl_classify_v6(mp, protocol, hdr_len, ira, ip_stack)
  *
  * Finds connection for an incoming IPv4 or IPv6 packet. Returns NULL if
  * it can't find any associated connection. If the connection is found, its
@@ -107,9 +103,12 @@
  *	hdr_len: The size of IP header. It is used to find TCP or UDP header in
  *		 the packet.
  *
- * 	zoneid: The zone in which the returned connection must be; the zoneid
- *		corresponding to the ire_zoneid on the IRE located for the
- *		packet's destination address.
+ * 	ira->ira_zoneid: The zone in which the returned connection must be; the
+ *		zoneid corresponding to the ire_zoneid on the IRE located for
+ *		the packet's destination address.
+ *
+ *	ira->ira_flags: Contains the IRAF_TX_MAC_EXEMPTABLE and
+ *		IRAF_TX_SHARED_ADDR flags
  *
  *	For TCP connections, the lookup order is as follows:
  *		5-tuple {src, dst, protocol, local port, remote port}
@@ -156,7 +155,7 @@
  * any.  In any event, the receiving socket must have SO_MAC_EXEMPT set and the
  * receiver's label must dominate the sender's default label.
  *
- * conn_t *ipcl_tcp_lookup_reversed_ipv4(ipha_t *, tcph_t *, int, ip_stack);
+ * conn_t *ipcl_tcp_lookup_reversed_ipv4(ipha_t *, tcpha_t *, int, ip_stack);
  * conn_t *ipcl_tcp_lookup_reversed_ipv6(ip6_t *, tcpha_t *, int, uint_t,
  *					 ip_stack);
  *
@@ -184,34 +183,26 @@
  * Table Updates
  * -------------
  *
- * int ipcl_conn_insert(connp, protocol, src, dst, ports)
- * int ipcl_conn_insert_v6(connp, protocol, src, dst, ports, ifindex)
+ * int ipcl_conn_insert(connp);
+ * int ipcl_conn_insert_v4(connp);
+ * int ipcl_conn_insert_v6(connp);
  *
  *	Insert 'connp' in the ipcl_conn_fanout.
  *	Arguements :
  *		connp		conn_t to be inserted
- *		protocol	connection protocol
- *		src		source address
- *		dst		destination address
- *		ports		local and remote port
- *		ifindex		interface index for IPv6 connections
  *
  *	Return value :
  *		0		if connp was inserted
  *		EADDRINUSE	if the connection with the same tuple
  *				already exists.
  *
- * int ipcl_bind_insert(connp, protocol, src, lport);
- * int ipcl_bind_insert_v6(connp, protocol, src, lport);
+ * int ipcl_bind_insert(connp);
+ * int ipcl_bind_insert_v4(connp);
+ * int ipcl_bind_insert_v6(connp);
  *
  * 	Insert 'connp' in ipcl_bind_fanout.
  * 	Arguements :
  * 		connp		conn_t to be inserted
- * 		protocol	connection protocol
- * 		src		source address connection wants
- * 				to bind to
- * 		lport		local port connection wants to
- * 				bind to
  *
  *
  * void ipcl_hash_remove(connp);
@@ -261,6 +252,8 @@
 #include <netinet/icmp6.h>
 
 #include <inet/ip.h>
+#include <inet/ip_if.h>
+#include <inet/ip_ire.h>
 #include <inet/ip6.h>
 #include <inet/ip_ndp.h>
 #include <inet/ip_impl.h>
@@ -280,19 +273,6 @@
 #include <sys/tsol/tnet.h>
 #include <sys/sockio.h>
 
-#ifdef DEBUG
-#define	IPCL_DEBUG
-#else
-#undef	IPCL_DEBUG
-#endif
-
-#ifdef	IPCL_DEBUG
-int	ipcl_debug_level = 0;
-#define	IPCL_DEBUG_LVL(level, args)	\
-	if (ipcl_debug_level  & level) { printf args; }
-#else
-#define	IPCL_DEBUG_LVL(level, args) {; }
-#endif
 /* Old value for compatibility. Setable in /etc/system */
 uint_t tcp_conn_hash_size = 0;
 
@@ -336,10 +316,8 @@ typedef union itc_s {
 
 struct kmem_cache  *tcp_conn_cache;
 struct kmem_cache  *ip_conn_cache;
-struct kmem_cache  *ip_helper_stream_cache;
 extern struct kmem_cache  *sctp_conn_cache;
 extern struct kmem_cache  *tcp_sack_info_cache;
-extern struct kmem_cache  *tcp_iphc_cache;
 struct kmem_cache  *udp_conn_cache;
 struct kmem_cache  *rawip_conn_cache;
 struct kmem_cache  *rts_conn_cache;
@@ -361,34 +339,6 @@ static void	rawip_conn_destructor(void *, void *);
 
 static int	rts_conn_constructor(void *, void *, int);
 static void	rts_conn_destructor(void *, void *);
-
-static int	ip_helper_stream_constructor(void *, void *, int);
-static void	ip_helper_stream_destructor(void *, void *);
-
-boolean_t	ip_use_helper_cache = B_TRUE;
-
-/*
- * Hook functions to enable cluster networking
- * On non-clustered systems these vectors must always be NULL.
- */
-extern void	(*cl_inet_listen)(netstackid_t, uint8_t, sa_family_t,
-		    uint8_t *, in_port_t, void *);
-extern void	(*cl_inet_unlisten)(netstackid_t, uint8_t, sa_family_t,
-		    uint8_t *, in_port_t, void *);
-
-#ifdef	IPCL_DEBUG
-#define	INET_NTOA_BUFSIZE	18
-
-static char *
-inet_ntoa_r(uint32_t in, char *b)
-{
-	unsigned char	*p;
-
-	p = (unsigned char *)&in;
-	(void) sprintf(b, "%d.%d.%d.%d", p[0], p[1], p[2], p[3]);
-	return (b);
-}
-#endif
 
 /*
  * Global (for all stack instances) init routine
@@ -420,15 +370,6 @@ ipcl_g_init(void)
 	    sizeof (itc_t) + sizeof (rts_t), CACHE_ALIGN_SIZE,
 	    rts_conn_constructor, rts_conn_destructor,
 	    NULL, NULL, NULL, 0);
-
-	if (ip_use_helper_cache) {
-		ip_helper_stream_cache = kmem_cache_create
-		    ("ip_helper_stream_cache", sizeof (ip_helper_stream_info_t),
-		    CACHE_ALIGN_SIZE, ip_helper_stream_constructor,
-		    ip_helper_stream_destructor, NULL, NULL, NULL, 0);
-	} else {
-		ip_helper_stream_cache = NULL;
-	}
 }
 
 /*
@@ -493,10 +434,10 @@ ipcl_init(ip_stack_t *ipst)
 		    MUTEX_DEFAULT, NULL);
 	}
 
-	ipst->ips_ipcl_proto_fanout = kmem_zalloc(IPPROTO_MAX *
+	ipst->ips_ipcl_proto_fanout_v4 = kmem_zalloc(IPPROTO_MAX *
 	    sizeof (connf_t), KM_SLEEP);
 	for (i = 0; i < IPPROTO_MAX; i++) {
-		mutex_init(&ipst->ips_ipcl_proto_fanout[i].connf_lock, NULL,
+		mutex_init(&ipst->ips_ipcl_proto_fanout_v4[i].connf_lock, NULL,
 		    MUTEX_DEFAULT, NULL);
 	}
 
@@ -576,11 +517,12 @@ ipcl_destroy(ip_stack_t *ipst)
 	ipst->ips_ipcl_bind_fanout = NULL;
 
 	for (i = 0; i < IPPROTO_MAX; i++) {
-		ASSERT(ipst->ips_ipcl_proto_fanout[i].connf_head == NULL);
-		mutex_destroy(&ipst->ips_ipcl_proto_fanout[i].connf_lock);
+		ASSERT(ipst->ips_ipcl_proto_fanout_v4[i].connf_head == NULL);
+		mutex_destroy(&ipst->ips_ipcl_proto_fanout_v4[i].connf_lock);
 	}
-	kmem_free(ipst->ips_ipcl_proto_fanout, IPPROTO_MAX * sizeof (connf_t));
-	ipst->ips_ipcl_proto_fanout = NULL;
+	kmem_free(ipst->ips_ipcl_proto_fanout_v4,
+	    IPPROTO_MAX * sizeof (connf_t));
+	ipst->ips_ipcl_proto_fanout_v4 = NULL;
 
 	for (i = 0; i < IPPROTO_MAX; i++) {
 		ASSERT(ipst->ips_ipcl_proto_fanout_v6[i].connf_head == NULL);
@@ -636,7 +578,6 @@ conn_t *
 ipcl_conn_create(uint32_t type, int sleep, netstack_t *ns)
 {
 	conn_t	*connp;
-	sctp_stack_t *sctps;
 	struct kmem_cache *conn_cache;
 
 	switch (type) {
@@ -644,10 +585,10 @@ ipcl_conn_create(uint32_t type, int sleep, netstack_t *ns)
 		if ((connp = kmem_cache_alloc(sctp_conn_cache, sleep)) == NULL)
 			return (NULL);
 		sctp_conn_init(connp);
-		sctps = ns->netstack_sctp;
-		SCTP_G_Q_REFHOLD(sctps);
 		netstack_hold(ns);
 		connp->conn_netstack = ns;
+		connp->conn_ixa->ixa_ipst = ns->netstack_ip;
+		ipcl_globalhash_insert(connp);
 		return (connp);
 
 	case IPCL_TCPCONN:
@@ -681,6 +622,7 @@ ipcl_conn_create(uint32_t type, int sleep, netstack_t *ns)
 	connp->conn_ref = 1;
 	netstack_hold(ns);
 	connp->conn_netstack = ns;
+	connp->conn_ixa->ixa_ipst = ns->netstack_ip;
 	ipcl_globalhash_insert(connp);
 	return (connp);
 }
@@ -693,61 +635,61 @@ ipcl_conn_destroy(conn_t *connp)
 
 	ASSERT(!MUTEX_HELD(&connp->conn_lock));
 	ASSERT(connp->conn_ref == 0);
-	ASSERT(connp->conn_ire_cache == NULL);
 
 	DTRACE_PROBE1(conn__destroy, conn_t *, connp);
-
-	if (connp->conn_effective_cred != NULL) {
-		crfree(connp->conn_effective_cred);
-		connp->conn_effective_cred = NULL;
-	}
 
 	if (connp->conn_cred != NULL) {
 		crfree(connp->conn_cred);
 		connp->conn_cred = NULL;
 	}
 
+	if (connp->conn_ht_iphc != NULL) {
+		kmem_free(connp->conn_ht_iphc, connp->conn_ht_iphc_allocated);
+		connp->conn_ht_iphc = NULL;
+		connp->conn_ht_iphc_allocated = 0;
+		connp->conn_ht_iphc_len = 0;
+		connp->conn_ht_ulp = NULL;
+		connp->conn_ht_ulp_len = 0;
+	}
+	ip_pkt_free(&connp->conn_xmit_ipp);
+
 	ipcl_globalhash_remove(connp);
 
-	/* FIXME: add separate tcp_conn_free()? */
-	if (connp->conn_flags & IPCL_TCPCONN) {
-		tcp_t	*tcp = connp->conn_tcp;
-		tcp_stack_t *tcps;
+	if (connp->conn_latch != NULL) {
+		IPLATCH_REFRELE(connp->conn_latch);
+		connp->conn_latch = NULL;
+	}
+	if (connp->conn_latch_in_policy != NULL) {
+		IPPOL_REFRELE(connp->conn_latch_in_policy);
+		connp->conn_latch_in_policy = NULL;
+	}
+	if (connp->conn_latch_in_action != NULL) {
+		IPACT_REFRELE(connp->conn_latch_in_action);
+		connp->conn_latch_in_action = NULL;
+	}
+	if (connp->conn_policy != NULL) {
+		IPPH_REFRELE(connp->conn_policy, ns);
+		connp->conn_policy = NULL;
+	}
 
-		ASSERT(tcp != NULL);
-		tcps = tcp->tcp_tcps;
-		if (tcps != NULL) {
-			if (connp->conn_latch != NULL) {
-				IPLATCH_REFRELE(connp->conn_latch, ns);
-				connp->conn_latch = NULL;
-			}
-			if (connp->conn_policy != NULL) {
-				IPPH_REFRELE(connp->conn_policy, ns);
-				connp->conn_policy = NULL;
-			}
-			tcp->tcp_tcps = NULL;
-			TCPS_REFRELE(tcps);
-		}
+	if (connp->conn_ipsec_opt_mp != NULL) {
+		freemsg(connp->conn_ipsec_opt_mp);
+		connp->conn_ipsec_opt_mp = NULL;
+	}
+
+	if (connp->conn_flags & IPCL_TCPCONN) {
+		tcp_t *tcp = connp->conn_tcp;
 
 		tcp_free(tcp);
 		mp = tcp->tcp_timercache;
-		tcp->tcp_cred = NULL;
+
+		tcp->tcp_tcps = NULL;
 
 		if (tcp->tcp_sack_info != NULL) {
 			bzero(tcp->tcp_sack_info, sizeof (tcp_sack_info_t));
 			kmem_cache_free(tcp_sack_info_cache,
 			    tcp->tcp_sack_info);
 		}
-		if (tcp->tcp_iphc != NULL) {
-			if (tcp->tcp_hdr_grown) {
-				kmem_free(tcp->tcp_iphc, tcp->tcp_iphc_len);
-			} else {
-				bzero(tcp->tcp_iphc, tcp->tcp_iphc_len);
-				kmem_cache_free(tcp_iphc_cache, tcp->tcp_iphc);
-			}
-			tcp->tcp_iphc_len = 0;
-		}
-		ASSERT(tcp->tcp_iphc_len == 0);
 
 		/*
 		 * tcp_rsrv_mp can be NULL if tcp_get_conn() fails to allocate
@@ -759,35 +701,21 @@ ipcl_conn_destroy(conn_t *connp)
 			mutex_destroy(&tcp->tcp_rsrv_mp_lock);
 		}
 
-		ASSERT(connp->conn_latch == NULL);
-		ASSERT(connp->conn_policy == NULL);
-
+		ipcl_conn_cleanup(connp);
+		connp->conn_flags = IPCL_TCPCONN;
 		if (ns != NULL) {
 			ASSERT(tcp->tcp_tcps == NULL);
 			connp->conn_netstack = NULL;
+			connp->conn_ixa->ixa_ipst = NULL;
 			netstack_rele(ns);
 		}
 
-		ipcl_conn_cleanup(connp);
-		connp->conn_flags = IPCL_TCPCONN;
 		bzero(tcp, sizeof (tcp_t));
 
 		tcp->tcp_timercache = mp;
 		tcp->tcp_connp = connp;
 		kmem_cache_free(tcp_conn_cache, connp);
 		return;
-	}
-	if (connp->conn_latch != NULL) {
-		IPLATCH_REFRELE(connp->conn_latch, connp->conn_netstack);
-		connp->conn_latch = NULL;
-	}
-	if (connp->conn_policy != NULL) {
-		IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
-		connp->conn_policy = NULL;
-	}
-	if (connp->conn_ipsec_opt_mp != NULL) {
-		freemsg(connp->conn_ipsec_opt_mp);
-		connp->conn_ipsec_opt_mp = NULL;
 	}
 
 	if (connp->conn_flags & IPCL_SCTPCONN) {
@@ -796,21 +724,21 @@ ipcl_conn_destroy(conn_t *connp)
 		return;
 	}
 
+	ipcl_conn_cleanup(connp);
 	if (ns != NULL) {
 		connp->conn_netstack = NULL;
+		connp->conn_ixa->ixa_ipst = NULL;
 		netstack_rele(ns);
 	}
-
-	ipcl_conn_cleanup(connp);
 
 	/* leave conn_priv aka conn_udp, conn_icmp, etc in place. */
 	if (connp->conn_flags & IPCL_UDPCONN) {
 		connp->conn_flags = IPCL_UDPCONN;
 		kmem_cache_free(udp_conn_cache, connp);
 	} else if (connp->conn_flags & IPCL_RAWIPCONN) {
-
 		connp->conn_flags = IPCL_RAWIPCONN;
-		connp->conn_ulp = IPPROTO_ICMP;
+		connp->conn_proto = IPPROTO_ICMP;
+		connp->conn_ixa->ixa_protocol = connp->conn_proto;
 		kmem_cache_free(rawip_conn_cache, connp);
 	} else if (connp->conn_flags & IPCL_RTSCONN) {
 		connp->conn_flags = IPCL_RTSCONN;
@@ -826,7 +754,6 @@ ipcl_conn_destroy(conn_t *connp)
 /*
  * Running in cluster mode - deregister listener information
  */
-
 static void
 ipcl_conn_unlisten(conn_t *connp)
 {
@@ -837,12 +764,12 @@ ipcl_conn_unlisten(conn_t *connp)
 		sa_family_t	addr_family;
 		uint8_t		*laddrp;
 
-		if (connp->conn_pkt_isv6) {
+		if (connp->conn_ipversion == IPV6_VERSION) {
 			addr_family = AF_INET6;
-			laddrp = (uint8_t *)&connp->conn_bound_source_v6;
+			laddrp = (uint8_t *)&connp->conn_bound_addr_v6;
 		} else {
 			addr_family = AF_INET;
-			laddrp = (uint8_t *)&connp->conn_bound_source;
+			laddrp = (uint8_t *)&connp->conn_bound_addr_v4;
 		}
 		(*cl_inet_unlisten)(connp->conn_netstack->netstack_stackid,
 		    IPPROTO_TCP, addr_family, laddrp, connp->conn_lport, NULL);
@@ -859,8 +786,6 @@ ipcl_conn_unlisten(conn_t *connp)
 	connf_t	*connfp = (connp)->conn_fanout;				\
 	ASSERT(!MUTEX_HELD(&((connp)->conn_lock)));			\
 	if (connfp != NULL) {						\
-		IPCL_DEBUG_LVL(4, ("IPCL_HASH_REMOVE: connp %p",	\
-		    (void *)(connp)));					\
 		mutex_enter(&connfp->connf_lock);			\
 		if ((connp)->conn_next != NULL)				\
 			(connp)->conn_next->conn_prev =			\
@@ -884,7 +809,11 @@ ipcl_conn_unlisten(conn_t *connp)
 void
 ipcl_hash_remove(conn_t *connp)
 {
+	uint8_t		protocol = connp->conn_proto;
+
 	IPCL_HASH_REMOVE(connp);
+	if (protocol == IPPROTO_RSVP)
+		ill_set_inputfn_all(connp->conn_netstack->netstack_ip);
 }
 
 /*
@@ -937,8 +866,6 @@ ipcl_hash_remove_locked(conn_t *connp, connf_t	*connfp)
 }
 
 #define	IPCL_HASH_INSERT_CONNECTED(connfp, connp) {			\
-	IPCL_DEBUG_LVL(8, ("IPCL_HASH_INSERT_CONNECTED: connfp %p "	\
-	    "connp %p", (void *)(connfp), (void *)(connp)));		\
 	IPCL_HASH_REMOVE((connp));					\
 	mutex_enter(&(connfp)->connf_lock);				\
 	IPCL_HASH_INSERT_CONNECTED_LOCKED(connfp, connp);		\
@@ -947,13 +874,11 @@ ipcl_hash_remove_locked(conn_t *connp, connf_t	*connfp)
 
 #define	IPCL_HASH_INSERT_BOUND(connfp, connp) {				\
 	conn_t *pconnp = NULL, *nconnp;					\
-	IPCL_DEBUG_LVL(32, ("IPCL_HASH_INSERT_BOUND: connfp %p "	\
-	    "connp %p", (void *)connfp, (void *)(connp)));		\
 	IPCL_HASH_REMOVE((connp));					\
 	mutex_enter(&(connfp)->connf_lock);				\
 	nconnp = (connfp)->connf_head;					\
 	while (nconnp != NULL &&					\
-	    !_IPCL_V4_MATCH_ANY(nconnp->conn_srcv6)) {			\
+	    !_IPCL_V4_MATCH_ANY(nconnp->conn_laddr_v6)) {		\
 		pconnp = nconnp;					\
 		nconnp = nconnp->conn_next;				\
 	}								\
@@ -977,16 +902,14 @@ ipcl_hash_remove_locked(conn_t *connp, connf_t	*connfp)
 #define	IPCL_HASH_INSERT_WILDCARD(connfp, connp) {			\
 	conn_t **list, *prev, *next;					\
 	boolean_t isv4mapped =						\
-	    IN6_IS_ADDR_V4MAPPED(&(connp)->conn_srcv6);			\
-	IPCL_DEBUG_LVL(32, ("IPCL_HASH_INSERT_WILDCARD: connfp %p "	\
-	    "connp %p", (void *)(connfp), (void *)(connp)));		\
+	    IN6_IS_ADDR_V4MAPPED(&(connp)->conn_laddr_v6);		\
 	IPCL_HASH_REMOVE((connp));					\
 	mutex_enter(&(connfp)->connf_lock);				\
 	list = &(connfp)->connf_head;					\
 	prev = NULL;							\
 	while ((next = *list) != NULL) {				\
 		if (isv4mapped &&					\
-		    IN6_IS_ADDR_UNSPECIFIED(&next->conn_srcv6) &&	\
+		    IN6_IS_ADDR_UNSPECIFIED(&next->conn_laddr_v6) &&	\
 		    connp->conn_zoneid == next->conn_zoneid) {		\
 			(connp)->conn_next = next;			\
 			if (prev != NULL)				\
@@ -1012,44 +935,13 @@ ipcl_hash_insert_wildcard(connf_t *connfp, conn_t *connp)
 	IPCL_HASH_INSERT_WILDCARD(connfp, connp);
 }
 
-void
-ipcl_proto_insert(conn_t *connp, uint8_t protocol)
-{
-	connf_t	*connfp;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	ASSERT(connp != NULL);
-	ASSERT((connp->conn_mac_mode == CONN_MAC_DEFAULT) ||
-	    protocol == IPPROTO_AH || protocol == IPPROTO_ESP);
-
-	connp->conn_ulp = protocol;
-
-	/* Insert it in the protocol hash */
-	connfp = &ipst->ips_ipcl_proto_fanout[protocol];
-	IPCL_HASH_INSERT_WILDCARD(connfp, connp);
-}
-
-void
-ipcl_proto_insert_v6(conn_t *connp, uint8_t protocol)
-{
-	connf_t	*connfp;
-	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	ASSERT(connp != NULL);
-	ASSERT((connp->conn_mac_mode == CONN_MAC_DEFAULT) ||
-	    protocol == IPPROTO_AH || protocol == IPPROTO_ESP);
-
-	connp->conn_ulp = protocol;
-
-	/* Insert it in the Bind Hash */
-	connfp = &ipst->ips_ipcl_proto_fanout_v6[protocol];
-	IPCL_HASH_INSERT_WILDCARD(connfp, connp);
-}
-
 /*
  * Because the classifier is used to classify inbound packets, the destination
  * address is meant to be our local tunnel address (tunnel source), and the
  * source the remote tunnel address (tunnel destination).
+ *
+ * Note that conn_proto can't be used for fanout since the upper protocol
+ * can be both 41 and 4 when IPv6 and IPv4 are over the same tunnel.
  */
 conn_t *
 ipcl_iptun_classify_v4(ipaddr_t *src, ipaddr_t *dst, ip_stack_t *ipst)
@@ -1128,13 +1020,13 @@ ipcl_sctp_hash_insert(conn_t *connp, in_port_t lport)
 	    oconnp = oconnp->conn_next) {
 		if (oconnp->conn_lport == lport &&
 		    oconnp->conn_zoneid == connp->conn_zoneid &&
-		    oconnp->conn_af_isv6 == connp->conn_af_isv6 &&
-		    ((IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6) ||
-		    IN6_IS_ADDR_UNSPECIFIED(&oconnp->conn_srcv6) ||
-		    IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_srcv6) ||
-		    IN6_IS_ADDR_V4MAPPED_ANY(&oconnp->conn_srcv6)) ||
-		    IN6_ARE_ADDR_EQUAL(&oconnp->conn_srcv6,
-		    &connp->conn_srcv6))) {
+		    oconnp->conn_family == connp->conn_family &&
+		    ((IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6) ||
+		    IN6_IS_ADDR_UNSPECIFIED(&oconnp->conn_laddr_v6) ||
+		    IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_laddr_v6) ||
+		    IN6_IS_ADDR_V4MAPPED_ANY(&oconnp->conn_laddr_v6)) ||
+		    IN6_ARE_ADDR_EQUAL(&oconnp->conn_laddr_v6,
+		    &connp->conn_laddr_v6))) {
 			break;
 		}
 	}
@@ -1142,10 +1034,10 @@ ipcl_sctp_hash_insert(conn_t *connp, in_port_t lport)
 	if (oconnp != NULL)
 		return (EADDRNOTAVAIL);
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&connp->conn_remv6) ||
-	    IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_remv6)) {
-		if (IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6) ||
-		    IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_srcv6)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(&connp->conn_faddr_v6) ||
+	    IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_faddr_v6)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6) ||
+		    IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_laddr_v6)) {
 			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
 		} else {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
@@ -1157,17 +1049,18 @@ ipcl_sctp_hash_insert(conn_t *connp, in_port_t lport)
 }
 
 static int
-ipcl_iptun_hash_insert(conn_t *connp, ipaddr_t src, ipaddr_t dst,
-    ip_stack_t *ipst)
+ipcl_iptun_hash_insert(conn_t *connp, ip_stack_t *ipst)
 {
 	connf_t	*connfp;
 	conn_t	*tconnp;
+	ipaddr_t laddr = connp->conn_laddr_v4;
+	ipaddr_t faddr = connp->conn_faddr_v4;
 
-	connfp = &ipst->ips_ipcl_iptun_fanout[IPCL_IPTUN_HASH(src, dst)];
+	connfp = &ipst->ips_ipcl_iptun_fanout[IPCL_IPTUN_HASH(laddr, faddr)];
 	mutex_enter(&connfp->connf_lock);
 	for (tconnp = connfp->connf_head; tconnp != NULL;
 	    tconnp = tconnp->conn_next) {
-		if (IPCL_IPTUN_MATCH(tconnp, src, dst)) {
+		if (IPCL_IPTUN_MATCH(tconnp, laddr, faddr)) {
 			/* A tunnel is already bound to these addresses. */
 			mutex_exit(&connfp->connf_lock);
 			return (EADDRINUSE);
@@ -1179,17 +1072,18 @@ ipcl_iptun_hash_insert(conn_t *connp, ipaddr_t src, ipaddr_t dst,
 }
 
 static int
-ipcl_iptun_hash_insert_v6(conn_t *connp, const in6_addr_t *src,
-    const in6_addr_t *dst, ip_stack_t *ipst)
+ipcl_iptun_hash_insert_v6(conn_t *connp, ip_stack_t *ipst)
 {
 	connf_t	*connfp;
 	conn_t	*tconnp;
+	in6_addr_t *laddr = &connp->conn_laddr_v6;
+	in6_addr_t *faddr = &connp->conn_faddr_v6;
 
-	connfp = &ipst->ips_ipcl_iptun_fanout[IPCL_IPTUN_HASH_V6(src, dst)];
+	connfp = &ipst->ips_ipcl_iptun_fanout[IPCL_IPTUN_HASH_V6(laddr, faddr)];
 	mutex_enter(&connfp->connf_lock);
 	for (tconnp = connfp->connf_head; tconnp != NULL;
 	    tconnp = tconnp->conn_next) {
-		if (IPCL_IPTUN_MATCH_V6(tconnp, src, dst)) {
+		if (IPCL_IPTUN_MATCH_V6(tconnp, laddr, faddr)) {
 			/* A tunnel is already bound to these addresses. */
 			mutex_exit(&connfp->connf_lock);
 			return (EADDRINUSE);
@@ -1213,12 +1107,12 @@ check_exempt_conflict_v4(conn_t *connp, ip_stack_t *ipst)
 	connf_t	*connfp;
 	conn_t *tconn;
 
-	connfp = &ipst->ips_ipcl_proto_fanout[connp->conn_ulp];
+	connfp = &ipst->ips_ipcl_proto_fanout_v4[connp->conn_proto];
 	mutex_enter(&connfp->connf_lock);
 	for (tconn = connfp->connf_head; tconn != NULL;
 	    tconn = tconn->conn_next) {
 		/* We don't allow v4 fallback for v6 raw socket */
-		if (connp->conn_af_isv6 != tconn->conn_af_isv6)
+		if (connp->conn_family != tconn->conn_family)
 			continue;
 		/* If neither is exempt, then there's no conflict */
 		if ((connp->conn_mac_mode == CONN_MAC_DEFAULT) &&
@@ -1228,9 +1122,9 @@ check_exempt_conflict_v4(conn_t *connp, ip_stack_t *ipst)
 		if (connp->conn_zoneid == tconn->conn_zoneid)
 			continue;
 		/* If both are bound to different specific addrs, ok */
-		if (connp->conn_src != INADDR_ANY &&
-		    tconn->conn_src != INADDR_ANY &&
-		    connp->conn_src != tconn->conn_src)
+		if (connp->conn_laddr_v4 != INADDR_ANY &&
+		    tconn->conn_laddr_v4 != INADDR_ANY &&
+		    connp->conn_laddr_v4 != tconn->conn_laddr_v4)
 			continue;
 		/* These two conflict; fail */
 		break;
@@ -1245,12 +1139,12 @@ check_exempt_conflict_v6(conn_t *connp, ip_stack_t *ipst)
 	connf_t	*connfp;
 	conn_t *tconn;
 
-	connfp = &ipst->ips_ipcl_proto_fanout[connp->conn_ulp];
+	connfp = &ipst->ips_ipcl_proto_fanout_v6[connp->conn_proto];
 	mutex_enter(&connfp->connf_lock);
 	for (tconn = connfp->connf_head; tconn != NULL;
 	    tconn = tconn->conn_next) {
 		/* We don't allow v4 fallback for v6 raw socket */
-		if (connp->conn_af_isv6 != tconn->conn_af_isv6)
+		if (connp->conn_family != tconn->conn_family)
 			continue;
 		/* If neither is exempt, then there's no conflict */
 		if ((connp->conn_mac_mode == CONN_MAC_DEFAULT) &&
@@ -1260,9 +1154,10 @@ check_exempt_conflict_v6(conn_t *connp, ip_stack_t *ipst)
 		if (connp->conn_zoneid == tconn->conn_zoneid)
 			continue;
 		/* If both are bound to different addrs, ok */
-		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6) &&
-		    !IN6_IS_ADDR_UNSPECIFIED(&tconn->conn_srcv6) &&
-		    !IN6_ARE_ADDR_EQUAL(&connp->conn_srcv6, &tconn->conn_srcv6))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6) &&
+		    !IN6_IS_ADDR_UNSPECIFIED(&tconn->conn_laddr_v6) &&
+		    !IN6_ARE_ADDR_EQUAL(&connp->conn_laddr_v6,
+		    &tconn->conn_laddr_v6))
 			continue;
 		/* These two conflict; fail */
 		break;
@@ -1273,28 +1168,29 @@ check_exempt_conflict_v6(conn_t *connp, ip_stack_t *ipst)
 
 /*
  * (v4, v6) bind hash insertion routines
+ * The caller has already setup the conn (conn_proto, conn_laddr_v6, conn_lport)
  */
+
 int
-ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
+ipcl_bind_insert(conn_t *connp)
+{
+	if (connp->conn_ipversion == IPV6_VERSION)
+		return (ipcl_bind_insert_v6(connp));
+	else
+		return (ipcl_bind_insert_v4(connp));
+}
+
+int
+ipcl_bind_insert_v4(conn_t *connp)
 {
 	connf_t	*connfp;
-#ifdef	IPCL_DEBUG
-	char	buf[INET_NTOA_BUFSIZE];
-#endif
 	int	ret = 0;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	ASSERT(connp);
-
-	IPCL_DEBUG_LVL(64, ("ipcl_bind_insert: connp %p, src = %s, "
-	    "port = %d\n", (void *)connp, inet_ntoa_r(src, buf), lport));
-
-	connp->conn_ulp = protocol;
-	IN6_IPADDR_TO_V4MAPPED(src, &connp->conn_srcv6);
-	connp->conn_lport = lport;
+	uint16_t	lport = connp->conn_lport;
+	uint8_t		protocol = connp->conn_proto;
 
 	if (IPCL_IS_IPTUN(connp))
-		return (ipcl_iptun_hash_insert(connp, src, INADDR_ANY, ipst));
+		return (ipcl_iptun_hash_insert(connp, ipst));
 
 	switch (protocol) {
 	default:
@@ -1304,45 +1200,40 @@ ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
 		/* FALLTHROUGH */
 	case IPPROTO_UDP:
 		if (protocol == IPPROTO_UDP) {
-			IPCL_DEBUG_LVL(64,
-			    ("ipcl_bind_insert: connp %p - udp\n",
-			    (void *)connp));
 			connfp = &ipst->ips_ipcl_udp_fanout[
 			    IPCL_UDP_HASH(lport, ipst)];
 		} else {
-			IPCL_DEBUG_LVL(64,
-			    ("ipcl_bind_insert: connp %p - protocol\n",
-			    (void *)connp));
-			connfp = &ipst->ips_ipcl_proto_fanout[protocol];
+			connfp = &ipst->ips_ipcl_proto_fanout_v4[protocol];
 		}
 
-		if (connp->conn_rem != INADDR_ANY) {
+		if (connp->conn_faddr_v4 != INADDR_ANY) {
 			IPCL_HASH_INSERT_CONNECTED(connfp, connp);
-		} else if (connp->conn_src != INADDR_ANY) {
+		} else if (connp->conn_laddr_v4 != INADDR_ANY) {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
 		} else {
 			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
 		}
+		if (protocol == IPPROTO_RSVP)
+			ill_set_inputfn_all(ipst);
 		break;
 
 	case IPPROTO_TCP:
-
 		/* Insert it in the Bind Hash */
 		ASSERT(connp->conn_zoneid != ALL_ZONES);
 		connfp = &ipst->ips_ipcl_bind_fanout[
 		    IPCL_BIND_HASH(lport, ipst)];
-		if (connp->conn_src != INADDR_ANY) {
+		if (connp->conn_laddr_v4 != INADDR_ANY) {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
 		} else {
 			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
 		}
 		if (cl_inet_listen != NULL) {
-			ASSERT(!connp->conn_pkt_isv6);
+			ASSERT(connp->conn_ipversion == IPV4_VERSION);
 			connp->conn_flags |= IPCL_CL_LISTENER;
 			(*cl_inet_listen)(
 			    connp->conn_netstack->netstack_stackid,
 			    IPPROTO_TCP, AF_INET,
-			    (uint8_t *)&connp->conn_bound_source, lport, NULL);
+			    (uint8_t *)&connp->conn_bound_addr_v4, lport, NULL);
 		}
 		break;
 
@@ -1355,20 +1246,16 @@ ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
 }
 
 int
-ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
-    uint16_t lport)
+ipcl_bind_insert_v6(conn_t *connp)
 {
 	connf_t		*connfp;
 	int		ret = 0;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	ASSERT(connp != NULL);	connp->conn_ulp = protocol;
-	connp->conn_srcv6 = *src;
-	connp->conn_lport = lport;
+	uint16_t	lport = connp->conn_lport;
+	uint8_t		protocol = connp->conn_proto;
 
 	if (IPCL_IS_IPTUN(connp)) {
-		return (ipcl_iptun_hash_insert_v6(connp, src, &ipv6_all_zeros,
-		    ipst));
+		return (ipcl_iptun_hash_insert_v6(connp, ipst));
 	}
 
 	switch (protocol) {
@@ -1379,21 +1266,15 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 		/* FALLTHROUGH */
 	case IPPROTO_UDP:
 		if (protocol == IPPROTO_UDP) {
-			IPCL_DEBUG_LVL(128,
-			    ("ipcl_bind_insert_v6: connp %p - udp\n",
-			    (void *)connp));
 			connfp = &ipst->ips_ipcl_udp_fanout[
 			    IPCL_UDP_HASH(lport, ipst)];
 		} else {
-			IPCL_DEBUG_LVL(128,
-			    ("ipcl_bind_insert_v6: connp %p - protocol\n",
-			    (void *)connp));
 			connfp = &ipst->ips_ipcl_proto_fanout_v6[protocol];
 		}
 
-		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_remv6)) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_faddr_v6)) {
 			IPCL_HASH_INSERT_CONNECTED(connfp, connp);
-		} else if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6)) {
+		} else if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6)) {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
 		} else {
 			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
@@ -1401,13 +1282,11 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 		break;
 
 	case IPPROTO_TCP:
-		/* XXX - Need a separate table for IN6_IS_ADDR_UNSPECIFIED? */
-
 		/* Insert it in the Bind Hash */
 		ASSERT(connp->conn_zoneid != ALL_ZONES);
 		connfp = &ipst->ips_ipcl_bind_fanout[
 		    IPCL_BIND_HASH(lport, ipst)];
-		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6)) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6)) {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
 		} else {
 			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
@@ -1416,13 +1295,13 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 			sa_family_t	addr_family;
 			uint8_t		*laddrp;
 
-			if (connp->conn_pkt_isv6) {
+			if (connp->conn_ipversion == IPV6_VERSION) {
 				addr_family = AF_INET6;
 				laddrp =
-				    (uint8_t *)&connp->conn_bound_source_v6;
+				    (uint8_t *)&connp->conn_bound_addr_v6;
 			} else {
 				addr_family = AF_INET;
-				laddrp = (uint8_t *)&connp->conn_bound_source;
+				laddrp = (uint8_t *)&connp->conn_bound_addr_v4;
 			}
 			connp->conn_flags |= IPCL_CL_LISTENER;
 			(*cl_inet_listen)(
@@ -1441,43 +1320,35 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 
 /*
  * ipcl_conn_hash insertion routines.
+ * The caller has already set conn_proto and the addresses/ports in the conn_t.
  */
+
 int
-ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
-    ipaddr_t rem, uint32_t ports)
+ipcl_conn_insert(conn_t *connp)
+{
+	if (connp->conn_ipversion == IPV6_VERSION)
+		return (ipcl_conn_insert_v6(connp));
+	else
+		return (ipcl_conn_insert_v4(connp));
+}
+
+int
+ipcl_conn_insert_v4(conn_t *connp)
 {
 	connf_t		*connfp;
-	uint16_t	*up;
 	conn_t		*tconnp;
-#ifdef	IPCL_DEBUG
-	char	sbuf[INET_NTOA_BUFSIZE], rbuf[INET_NTOA_BUFSIZE];
-#endif
-	in_port_t	lport;
 	int		ret = 0;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
-
-	IPCL_DEBUG_LVL(256, ("ipcl_conn_insert: connp %p, src = %s, "
-	    "dst = %s, ports = %x, protocol = %x", (void *)connp,
-	    inet_ntoa_r(src, sbuf), inet_ntoa_r(rem, rbuf),
-	    ports, protocol));
+	uint16_t	lport = connp->conn_lport;
+	uint8_t		protocol = connp->conn_proto;
 
 	if (IPCL_IS_IPTUN(connp))
-		return (ipcl_iptun_hash_insert(connp, src, rem, ipst));
+		return (ipcl_iptun_hash_insert(connp, ipst));
 
 	switch (protocol) {
 	case IPPROTO_TCP:
-		if (!(connp->conn_flags & IPCL_EAGER)) {
-			/*
-			 * for a eager connection, i.e connections which
-			 * have just been created, the initialization is
-			 * already done in ip at conn_creation time, so
-			 * we can skip the checks here.
-			 */
-			IPCL_CONN_INIT(connp, protocol, src, rem, ports);
-		}
-
 		/*
-		 * For tcp, we check whether the connection tuple already
+		 * For TCP, we check whether the connection tuple already
 		 * exists before allowing the connection to proceed.  We
 		 * also allow indexing on the zoneid. This is to allow
 		 * multiple shared stack zones to have the same tcp
@@ -1486,16 +1357,15 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 		 * doesn't have to be unique.
 		 */
 		connfp = &ipst->ips_ipcl_conn_fanout[
-		    IPCL_CONN_HASH(connp->conn_rem,
+		    IPCL_CONN_HASH(connp->conn_faddr_v4,
 		    connp->conn_ports, ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (tconnp = connfp->connf_head; tconnp != NULL;
 		    tconnp = tconnp->conn_next) {
-			if ((IPCL_CONN_MATCH(tconnp, connp->conn_ulp,
-			    connp->conn_rem, connp->conn_src,
-			    connp->conn_ports)) &&
-			    (IPCL_ZONE_MATCH(tconnp, connp->conn_zoneid))) {
-
+			if (IPCL_CONN_MATCH(tconnp, connp->conn_proto,
+			    connp->conn_faddr_v4, connp->conn_laddr_v4,
+			    connp->conn_ports) &&
+			    IPCL_ZONE_MATCH(tconnp, connp->conn_zoneid)) {
 				/* Already have a conn. bail out */
 				mutex_exit(&connfp->connf_lock);
 				return (EADDRINUSE);
@@ -1512,6 +1382,7 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 		}
 
 		ASSERT(connp->conn_recv != NULL);
+		ASSERT(connp->conn_recvicmp != NULL);
 
 		IPCL_HASH_INSERT_CONNECTED_LOCKED(connfp, connp);
 		mutex_exit(&connfp->connf_lock);
@@ -1523,7 +1394,6 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 		 * from the hash first.
 		 */
 		IPCL_HASH_REMOVE(connp);
-		lport = htons((uint16_t)(ntohl(ports) & 0xFFFF));
 		ret = ipcl_sctp_hash_insert(connp, lport);
 		break;
 
@@ -1540,18 +1410,16 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 		/* FALLTHROUGH */
 
 	case IPPROTO_UDP:
-		up = (uint16_t *)&ports;
-		IPCL_CONN_INIT(connp, protocol, src, rem, ports);
 		if (protocol == IPPROTO_UDP) {
 			connfp = &ipst->ips_ipcl_udp_fanout[
-			    IPCL_UDP_HASH(up[1], ipst)];
+			    IPCL_UDP_HASH(lport, ipst)];
 		} else {
-			connfp = &ipst->ips_ipcl_proto_fanout[protocol];
+			connfp = &ipst->ips_ipcl_proto_fanout_v4[protocol];
 		}
 
-		if (connp->conn_rem != INADDR_ANY) {
+		if (connp->conn_faddr_v4 != INADDR_ANY) {
 			IPCL_HASH_INSERT_CONNECTED(connfp, connp);
-		} else if (connp->conn_src != INADDR_ANY) {
+		} else if (connp->conn_laddr_v4 != INADDR_ANY) {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
 		} else {
 			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
@@ -1563,25 +1431,21 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 }
 
 int
-ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
-    const in6_addr_t *rem, uint32_t ports, uint_t ifindex)
+ipcl_conn_insert_v6(conn_t *connp)
 {
 	connf_t		*connfp;
-	uint16_t	*up;
 	conn_t		*tconnp;
-	in_port_t	lport;
 	int		ret = 0;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
+	uint16_t	lport = connp->conn_lport;
+	uint8_t		protocol = connp->conn_proto;
+	uint_t		ifindex = connp->conn_bound_if;
 
 	if (IPCL_IS_IPTUN(connp))
-		return (ipcl_iptun_hash_insert_v6(connp, src, rem, ipst));
+		return (ipcl_iptun_hash_insert_v6(connp, ipst));
 
 	switch (protocol) {
 	case IPPROTO_TCP:
-		/* Just need to insert a conn struct */
-		if (!(connp->conn_flags & IPCL_EAGER)) {
-			IPCL_CONN_INIT_V6(connp, protocol, *src, *rem, ports);
-		}
 
 		/*
 		 * For tcp, we check whether the connection tuple already
@@ -1593,17 +1457,18 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 		 * doesn't have to be unique.
 		 */
 		connfp = &ipst->ips_ipcl_conn_fanout[
-		    IPCL_CONN_HASH_V6(connp->conn_remv6, connp->conn_ports,
+		    IPCL_CONN_HASH_V6(connp->conn_faddr_v6, connp->conn_ports,
 		    ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (tconnp = connfp->connf_head; tconnp != NULL;
 		    tconnp = tconnp->conn_next) {
-			if (IPCL_CONN_MATCH_V6(tconnp, connp->conn_ulp,
-			    connp->conn_remv6, connp->conn_srcv6,
+			/* NOTE: need to match zoneid. Bug in onnv-gate */
+			if (IPCL_CONN_MATCH_V6(tconnp, connp->conn_proto,
+			    connp->conn_faddr_v6, connp->conn_laddr_v6,
 			    connp->conn_ports) &&
-			    (tconnp->conn_tcp->tcp_bound_if == 0 ||
-			    tconnp->conn_tcp->tcp_bound_if == ifindex) &&
-			    (IPCL_ZONE_MATCH(tconnp, connp->conn_zoneid))) {
+			    (tconnp->conn_bound_if == 0 ||
+			    tconnp->conn_bound_if == ifindex) &&
+			    IPCL_ZONE_MATCH(tconnp, connp->conn_zoneid)) {
 				/* Already have a conn. bail out */
 				mutex_exit(&connfp->connf_lock);
 				return (EADDRINUSE);
@@ -1624,7 +1489,6 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 
 	case IPPROTO_SCTP:
 		IPCL_HASH_REMOVE(connp);
-		lport = htons((uint16_t)(ntohl(ports) & 0xFFFF));
 		ret = ipcl_sctp_hash_insert(connp, lport);
 		break;
 
@@ -1634,18 +1498,16 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 			return (EADDRINUSE);
 		/* FALLTHROUGH */
 	case IPPROTO_UDP:
-		up = (uint16_t *)&ports;
-		IPCL_CONN_INIT_V6(connp, protocol, *src, *rem, ports);
 		if (protocol == IPPROTO_UDP) {
 			connfp = &ipst->ips_ipcl_udp_fanout[
-			    IPCL_UDP_HASH(up[1], ipst)];
+			    IPCL_UDP_HASH(lport, ipst)];
 		} else {
 			connfp = &ipst->ips_ipcl_proto_fanout_v6[protocol];
 		}
 
-		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_remv6)) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_faddr_v6)) {
 			IPCL_HASH_INSERT_CONNECTED(connfp, connp);
-		} else if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_srcv6)) {
+		} else if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6)) {
 			IPCL_HASH_INSERT_BOUND(connfp, connp);
 		} else {
 			IPCL_HASH_INSERT_WILDCARD(connfp, connp);
@@ -1667,8 +1529,8 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
  * zone, then label checks are omitted.
  */
 conn_t *
-ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
-    ip_stack_t *ipst)
+ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len,
+    ip_recv_attr_t *ira, ip_stack_t *ipst)
 {
 	ipha_t	*ipha;
 	connf_t	*connfp, *bind_connfp;
@@ -1677,8 +1539,7 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 	uint32_t ports;
 	conn_t	*connp;
 	uint16_t  *up;
-	boolean_t shared_addr;
-	boolean_t unlabeled;
+	zoneid_t	zoneid = ira->ira_zoneid;
 
 	ipha = (ipha_t *)mp->b_rptr;
 	up = (uint16_t *)((uchar_t *)ipha + hdr_len + TCP_PORTS_OFFSET);
@@ -1692,11 +1553,14 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		mutex_enter(&connfp->connf_lock);
 		for (connp = connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
-			if ((IPCL_CONN_MATCH(connp, protocol,
-			    ipha->ipha_src, ipha->ipha_dst, ports)) &&
-			    (IPCL_ZONE_MATCH(connp, zoneid))) {
+			if (IPCL_CONN_MATCH(connp, protocol,
+			    ipha->ipha_src, ipha->ipha_dst, ports) &&
+			    (connp->conn_zoneid == zoneid ||
+			    connp->conn_allzones ||
+			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+			    (ira->ira_flags & IRAF_TX_MAC_EXEMPTABLE) &&
+			    (ira->ira_flags & IRAF_TX_SHARED_ADDR))))
 				break;
-			}
 		}
 
 		if (connp != NULL) {
@@ -1713,48 +1577,19 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		}
 
 		mutex_exit(&connfp->connf_lock);
-
 		lport = up[1];
-		unlabeled = B_FALSE;
-		/* Cred cannot be null on IPv4 */
-		if (is_system_labeled()) {
-			cred_t *cr = msg_getcred(mp, NULL);
-			ASSERT(cr != NULL);
-			unlabeled = (crgetlabel(cr)->tsl_flags &
-			    TSLF_UNLABELED) != 0;
-		}
-		shared_addr = (zoneid == ALL_ZONES);
-		if (shared_addr) {
-			/*
-			 * No need to handle exclusive-stack zones since
-			 * ALL_ZONES only applies to the shared stack.
-			 */
-			zoneid = tsol_mlp_findzone(protocol, lport);
-			/*
-			 * If no shared MLP is found, tsol_mlp_findzone returns
-			 * ALL_ZONES.  In that case, we assume it's SLP, and
-			 * search for the zone based on the packet label.
-			 *
-			 * If there is such a zone, we prefer to find a
-			 * connection in it.  Otherwise, we look for a
-			 * MAC-exempt connection in any zone whose label
-			 * dominates the default label on the packet.
-			 */
-			if (zoneid == ALL_ZONES)
-				zoneid = tsol_packet_to_zoneid(mp);
-			else
-				unlabeled = B_FALSE;
-		}
-
 		bind_connfp =
 		    &ipst->ips_ipcl_bind_fanout[IPCL_BIND_HASH(lport, ipst)];
 		mutex_enter(&bind_connfp->connf_lock);
 		for (connp = bind_connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
 			if (IPCL_BIND_MATCH(connp, protocol, ipha->ipha_dst,
-			    lport) && (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && shared_addr &&
-			    (connp->conn_mac_mode != CONN_MAC_DEFAULT))))
+			    lport) &&
+			    (connp->conn_zoneid == zoneid ||
+			    connp->conn_allzones ||
+			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+			    (ira->ira_flags & IRAF_TX_MAC_EXEMPTABLE) &&
+			    (ira->ira_flags & IRAF_TX_SHARED_ADDR))))
 				break;
 		}
 
@@ -1762,16 +1597,17 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		 * If the matching connection is SLP on a private address, then
 		 * the label on the packet must match the local zone's label.
 		 * Otherwise, it must be in the label range defined by tnrh.
-		 * This is ensured by tsol_receive_label.
+		 * This is ensured by tsol_receive_local.
+		 *
+		 * Note that we don't check tsol_receive_local for
+		 * the connected case.
 		 */
-		if (connp != NULL && is_system_labeled() &&
+		if (connp != NULL && (ira->ira_flags & IRAF_SYSTEM_LABELED) &&
 		    !tsol_receive_local(mp, &ipha->ipha_dst, IPV4_VERSION,
-		    shared_addr, connp)) {
-				DTRACE_PROBE3(
-				    tx__ip__log__info__classify__tcp,
-				    char *,
-				    "connp(1) could not receive mp(2)",
-				    conn_t *, connp, mblk_t *, mp);
+		    ira, connp)) {
+			DTRACE_PROBE3(tx__ip__log__info__classify__tcp,
+			    char *, "connp(1) could not receive mp(2)",
+			    conn_t *, connp, mblk_t *, mp);
 			connp = NULL;
 		}
 
@@ -1783,61 +1619,27 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		}
 
 		mutex_exit(&bind_connfp->connf_lock);
-
-		IPCL_DEBUG_LVL(512,
-		    ("ipcl_classify: couldn't classify mp = %p\n",
-		    (void *)mp));
 		break;
 
 	case IPPROTO_UDP:
 		lport = up[1];
-		unlabeled = B_FALSE;
-		/* Cred cannot be null on IPv4 */
-		if (is_system_labeled()) {
-			cred_t *cr = msg_getcred(mp, NULL);
-			ASSERT(cr != NULL);
-			unlabeled = (crgetlabel(cr)->tsl_flags &
-			    TSLF_UNLABELED) != 0;
-		}
-		shared_addr = (zoneid == ALL_ZONES);
-		if (shared_addr) {
-			/*
-			 * No need to handle exclusive-stack zones since
-			 * ALL_ZONES only applies to the shared stack.
-			 */
-			zoneid = tsol_mlp_findzone(protocol, lport);
-			/*
-			 * If no shared MLP is found, tsol_mlp_findzone returns
-			 * ALL_ZONES.  In that case, we assume it's SLP, and
-			 * search for the zone based on the packet label.
-			 *
-			 * If there is such a zone, we prefer to find a
-			 * connection in it.  Otherwise, we look for a
-			 * MAC-exempt connection in any zone whose label
-			 * dominates the default label on the packet.
-			 */
-			if (zoneid == ALL_ZONES)
-				zoneid = tsol_packet_to_zoneid(mp);
-			else
-				unlabeled = B_FALSE;
-		}
 		fport = up[0];
-		IPCL_DEBUG_LVL(512, ("ipcl_udp_classify %x %x", lport, fport));
 		connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(lport, ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (connp = connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
 			if (IPCL_UDP_MATCH(connp, lport, ipha->ipha_dst,
 			    fport, ipha->ipha_src) &&
-			    (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && shared_addr &&
-			    (connp->conn_mac_mode != CONN_MAC_DEFAULT))))
+			    (connp->conn_zoneid == zoneid ||
+			    connp->conn_allzones ||
+			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+			    (ira->ira_flags & IRAF_TX_MAC_EXEMPTABLE))))
 				break;
 		}
 
-		if (connp != NULL && is_system_labeled() &&
+		if (connp != NULL && (ira->ira_flags & IRAF_SYSTEM_LABELED) &&
 		    !tsol_receive_local(mp, &ipha->ipha_dst, IPV4_VERSION,
-		    shared_addr, connp)) {
+		    ira, connp)) {
 			DTRACE_PROBE3(tx__ip__log__info__classify__udp,
 			    char *, "connp(1) could not receive mp(2)",
 			    conn_t *, connp, mblk_t *, mp);
@@ -1854,9 +1656,7 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		 * We shouldn't come here for multicast/broadcast packets
 		 */
 		mutex_exit(&connfp->connf_lock);
-		IPCL_DEBUG_LVL(512,
-		    ("ipcl_classify: cant find udp conn_t for ports : %x %x",
-		    lport, fport));
+
 		break;
 
 	case IPPROTO_ENCAP:
@@ -1869,26 +1669,25 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 }
 
 conn_t *
-ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
-    ip_stack_t *ipst)
+ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len,
+    ip_recv_attr_t *ira, ip_stack_t *ipst)
 {
 	ip6_t		*ip6h;
 	connf_t		*connfp, *bind_connfp;
 	uint16_t	lport;
 	uint16_t	fport;
-	tcph_t		*tcph;
+	tcpha_t		*tcpha;
 	uint32_t	ports;
 	conn_t		*connp;
 	uint16_t	*up;
-	boolean_t	shared_addr;
-	boolean_t	unlabeled;
+	zoneid_t	zoneid = ira->ira_zoneid;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 
 	switch (protocol) {
 	case IPPROTO_TCP:
-		tcph = (tcph_t *)&mp->b_rptr[hdr_len];
-		up = (uint16_t *)tcph->th_lport;
+		tcpha = (tcpha_t *)&mp->b_rptr[hdr_len];
+		up = &tcpha->tha_lport;
 		ports = *(uint32_t *)up;
 
 		connfp =
@@ -1897,11 +1696,14 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		mutex_enter(&connfp->connf_lock);
 		for (connp = connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
-			if ((IPCL_CONN_MATCH_V6(connp, protocol,
-			    ip6h->ip6_src, ip6h->ip6_dst, ports)) &&
-			    (IPCL_ZONE_MATCH(connp, zoneid))) {
+			if (IPCL_CONN_MATCH_V6(connp, protocol,
+			    ip6h->ip6_src, ip6h->ip6_dst, ports) &&
+			    (connp->conn_zoneid == zoneid ||
+			    connp->conn_allzones ||
+			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+			    (ira->ira_flags & IRAF_TX_MAC_EXEMPTABLE) &&
+			    (ira->ira_flags & IRAF_TX_SHARED_ADDR))))
 				break;
-			}
 		}
 
 		if (connp != NULL) {
@@ -1920,37 +1722,6 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		mutex_exit(&connfp->connf_lock);
 
 		lport = up[1];
-		unlabeled = B_FALSE;
-		/* Cred can be null on IPv6 */
-		if (is_system_labeled()) {
-			cred_t *cr = msg_getcred(mp, NULL);
-
-			unlabeled = (cr != NULL &&
-			    crgetlabel(cr)->tsl_flags & TSLF_UNLABELED) != 0;
-		}
-		shared_addr = (zoneid == ALL_ZONES);
-		if (shared_addr) {
-			/*
-			 * No need to handle exclusive-stack zones since
-			 * ALL_ZONES only applies to the shared stack.
-			 */
-			zoneid = tsol_mlp_findzone(protocol, lport);
-			/*
-			 * If no shared MLP is found, tsol_mlp_findzone returns
-			 * ALL_ZONES.  In that case, we assume it's SLP, and
-			 * search for the zone based on the packet label.
-			 *
-			 * If there is such a zone, we prefer to find a
-			 * connection in it.  Otherwise, we look for a
-			 * MAC-exempt connection in any zone whose label
-			 * dominates the default label on the packet.
-			 */
-			if (zoneid == ALL_ZONES)
-				zoneid = tsol_packet_to_zoneid(mp);
-			else
-				unlabeled = B_FALSE;
-		}
-
 		bind_connfp =
 		    &ipst->ips_ipcl_bind_fanout[IPCL_BIND_HASH(lport, ipst)];
 		mutex_enter(&bind_connfp->connf_lock);
@@ -1958,15 +1729,17 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		    connp = connp->conn_next) {
 			if (IPCL_BIND_MATCH_V6(connp, protocol,
 			    ip6h->ip6_dst, lport) &&
-			    (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && shared_addr &&
-			    (connp->conn_mac_mode != CONN_MAC_DEFAULT))))
+			    (connp->conn_zoneid == zoneid ||
+			    connp->conn_allzones ||
+			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+			    (ira->ira_flags & IRAF_TX_MAC_EXEMPTABLE) &&
+			    (ira->ira_flags & IRAF_TX_SHARED_ADDR))))
 				break;
 		}
 
-		if (connp != NULL && is_system_labeled() &&
+		if (connp != NULL && (ira->ira_flags & IRAF_SYSTEM_LABELED) &&
 		    !tsol_receive_local(mp, &ip6h->ip6_dst, IPV6_VERSION,
-		    shared_addr, connp)) {
+		    ira, connp)) {
 			DTRACE_PROBE3(tx__ip__log__info__classify__tcp6,
 			    char *, "connp(1) could not receive mp(2)",
 			    conn_t *, connp, mblk_t *, mp);
@@ -1977,72 +1750,33 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 			/* Have a listner at least */
 			CONN_INC_REF(connp);
 			mutex_exit(&bind_connfp->connf_lock);
-			IPCL_DEBUG_LVL(512,
-			    ("ipcl_classify_v6: found listner "
-			    "connp = %p\n", (void *)connp));
-
 			return (connp);
 		}
 
 		mutex_exit(&bind_connfp->connf_lock);
-
-		IPCL_DEBUG_LVL(512,
-		    ("ipcl_classify_v6: couldn't classify mp = %p\n",
-		    (void *)mp));
 		break;
 
 	case IPPROTO_UDP:
 		up = (uint16_t *)&mp->b_rptr[hdr_len];
 		lport = up[1];
-		unlabeled = B_FALSE;
-		/* Cred can be null on IPv6 */
-		if (is_system_labeled()) {
-			cred_t *cr = msg_getcred(mp, NULL);
-
-			unlabeled = (cr != NULL &&
-			    crgetlabel(cr)->tsl_flags & TSLF_UNLABELED) != 0;
-		}
-		shared_addr = (zoneid == ALL_ZONES);
-		if (shared_addr) {
-			/*
-			 * No need to handle exclusive-stack zones since
-			 * ALL_ZONES only applies to the shared stack.
-			 */
-			zoneid = tsol_mlp_findzone(protocol, lport);
-			/*
-			 * If no shared MLP is found, tsol_mlp_findzone returns
-			 * ALL_ZONES.  In that case, we assume it's SLP, and
-			 * search for the zone based on the packet label.
-			 *
-			 * If there is such a zone, we prefer to find a
-			 * connection in it.  Otherwise, we look for a
-			 * MAC-exempt connection in any zone whose label
-			 * dominates the default label on the packet.
-			 */
-			if (zoneid == ALL_ZONES)
-				zoneid = tsol_packet_to_zoneid(mp);
-			else
-				unlabeled = B_FALSE;
-		}
-
 		fport = up[0];
-		IPCL_DEBUG_LVL(512, ("ipcl_udp_classify_v6 %x %x", lport,
-		    fport));
 		connfp = &ipst->ips_ipcl_udp_fanout[IPCL_UDP_HASH(lport, ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (connp = connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
 			if (IPCL_UDP_MATCH_V6(connp, lport, ip6h->ip6_dst,
 			    fport, ip6h->ip6_src) &&
-			    (IPCL_ZONE_MATCH(connp, zoneid) ||
-			    (unlabeled && shared_addr &&
-			    (connp->conn_mac_mode != CONN_MAC_DEFAULT))))
+			    (connp->conn_zoneid == zoneid ||
+			    connp->conn_allzones ||
+			    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+			    (ira->ira_flags & IRAF_TX_MAC_EXEMPTABLE) &&
+			    (ira->ira_flags & IRAF_TX_SHARED_ADDR))))
 				break;
 		}
 
-		if (connp != NULL && is_system_labeled() &&
+		if (connp != NULL && (ira->ira_flags & IRAF_SYSTEM_LABELED) &&
 		    !tsol_receive_local(mp, &ip6h->ip6_dst, IPV6_VERSION,
-		    shared_addr, connp)) {
+		    ira, connp)) {
 			DTRACE_PROBE3(tx__ip__log__info__classify__udp6,
 			    char *, "connp(1) could not receive mp(2)",
 			    conn_t *, connp, mblk_t *, mp);
@@ -2059,9 +1793,6 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		 * We shouldn't come here for multicast/broadcast packets
 		 */
 		mutex_exit(&connfp->connf_lock);
-		IPCL_DEBUG_LVL(512,
-		    ("ipcl_classify_v6: cant find udp conn_t for ports : %x %x",
-		    lport, fport));
 		break;
 	case IPPROTO_ENCAP:
 	case IPPROTO_IPV6:
@@ -2076,125 +1807,80 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
  * wrapper around ipcl_classify_(v4,v6) routines.
  */
 conn_t *
-ipcl_classify(mblk_t *mp, zoneid_t zoneid, ip_stack_t *ipst)
+ipcl_classify(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst)
 {
-	uint16_t	hdr_len;
-	ipha_t		*ipha;
-	uint8_t		*nexthdrp;
-
-	if (MBLKL(mp) < sizeof (ipha_t))
-		return (NULL);
-
-	switch (IPH_HDR_VERSION(mp->b_rptr)) {
-	case IPV4_VERSION:
-		ipha = (ipha_t *)mp->b_rptr;
-		hdr_len = IPH_HDR_LENGTH(ipha);
-		return (ipcl_classify_v4(mp, ipha->ipha_protocol, hdr_len,
-		    zoneid, ipst));
-	case IPV6_VERSION:
-		if (!ip_hdr_length_nexthdr_v6(mp, (ip6_t *)mp->b_rptr,
-		    &hdr_len, &nexthdrp))
-			return (NULL);
-
-		return (ipcl_classify_v6(mp, *nexthdrp, hdr_len, zoneid, ipst));
+	if (ira->ira_flags & IRAF_IS_IPV4) {
+		return (ipcl_classify_v4(mp, ira->ira_protocol,
+		    ira->ira_ip_hdr_length, ira, ipst));
+	} else {
+		return (ipcl_classify_v6(mp, ira->ira_protocol,
+		    ira->ira_ip_hdr_length, ira, ipst));
 	}
-
-	return (NULL);
 }
 
+/*
+ * Only used to classify SCTP RAW sockets
+ */
 conn_t *
-ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
-    uint32_t ports, ipha_t *hdr, ip_stack_t *ipst)
+ipcl_classify_raw(mblk_t *mp, uint8_t protocol, uint32_t ports,
+    ipha_t *ipha, ip6_t *ip6h, ip_recv_attr_t *ira, ip_stack_t *ipst)
 {
 	connf_t		*connfp;
 	conn_t		*connp;
 	in_port_t	lport;
-	int		af;
-	boolean_t	shared_addr;
-	boolean_t	unlabeled;
+	int		ipversion;
 	const void	*dst;
+	zoneid_t	zoneid = ira->ira_zoneid;
 
 	lport = ((uint16_t *)&ports)[1];
-
-	unlabeled = B_FALSE;
-	/* Cred can be null on IPv6 */
-	if (is_system_labeled()) {
-		cred_t *cr = msg_getcred(mp, NULL);
-
-		unlabeled = (cr != NULL &&
-		    crgetlabel(cr)->tsl_flags & TSLF_UNLABELED) != 0;
-	}
-	shared_addr = (zoneid == ALL_ZONES);
-	if (shared_addr) {
-		/*
-		 * No need to handle exclusive-stack zones since ALL_ZONES
-		 * only applies to the shared stack.
-		 */
-		zoneid = tsol_mlp_findzone(protocol, lport);
-		/*
-		 * If no shared MLP is found, tsol_mlp_findzone returns
-		 * ALL_ZONES.  In that case, we assume it's SLP, and search for
-		 * the zone based on the packet label.
-		 *
-		 * If there is such a zone, we prefer to find a connection in
-		 * it.  Otherwise, we look for a MAC-exempt connection in any
-		 * zone whose label dominates the default label on the packet.
-		 */
-		if (zoneid == ALL_ZONES)
-			zoneid = tsol_packet_to_zoneid(mp);
-		else
-			unlabeled = B_FALSE;
+	if (ira->ira_flags & IRAF_IS_IPV4) {
+		dst = (const void *)&ipha->ipha_dst;
+		ipversion = IPV4_VERSION;
+	} else {
+		dst = (const void *)&ip6h->ip6_dst;
+		ipversion = IPV6_VERSION;
 	}
 
-	af = IPH_HDR_VERSION(hdr);
-	dst = af == IPV4_VERSION ? (const void *)&hdr->ipha_dst :
-	    (const void *)&((ip6_t *)hdr)->ip6_dst;
 	connfp = &ipst->ips_ipcl_raw_fanout[IPCL_RAW_HASH(ntohs(lport), ipst)];
-
 	mutex_enter(&connfp->connf_lock);
 	for (connp = connfp->connf_head; connp != NULL;
 	    connp = connp->conn_next) {
 		/* We don't allow v4 fallback for v6 raw socket. */
-		if (af == (connp->conn_af_isv6 ? IPV4_VERSION :
-		    IPV6_VERSION))
+		if (ipversion != connp->conn_ipversion)
 			continue;
-		if (connp->conn_fully_bound) {
-			if (af == IPV4_VERSION) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_faddr_v6) &&
+		    !IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_faddr_v6)) {
+			if (ipversion == IPV4_VERSION) {
 				if (!IPCL_CONN_MATCH(connp, protocol,
-				    hdr->ipha_src, hdr->ipha_dst, ports))
+				    ipha->ipha_src, ipha->ipha_dst, ports))
 					continue;
 			} else {
 				if (!IPCL_CONN_MATCH_V6(connp, protocol,
-				    ((ip6_t *)hdr)->ip6_src,
-				    ((ip6_t *)hdr)->ip6_dst, ports))
+				    ip6h->ip6_src, ip6h->ip6_dst, ports))
 					continue;
 			}
 		} else {
-			if (af == IPV4_VERSION) {
+			if (ipversion == IPV4_VERSION) {
 				if (!IPCL_BIND_MATCH(connp, protocol,
-				    hdr->ipha_dst, lport))
+				    ipha->ipha_dst, lport))
 					continue;
 			} else {
 				if (!IPCL_BIND_MATCH_V6(connp, protocol,
-				    ((ip6_t *)hdr)->ip6_dst, lport))
+				    ip6h->ip6_dst, lport))
 					continue;
 			}
 		}
 
-		if (IPCL_ZONE_MATCH(connp, zoneid) ||
-		    (unlabeled &&
-		    (connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
-		    shared_addr))
+		if (connp->conn_zoneid == zoneid ||
+		    connp->conn_allzones ||
+		    ((connp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+		    (ira->ira_flags & IRAF_TX_MAC_EXEMPTABLE) &&
+		    (ira->ira_flags & IRAF_TX_SHARED_ADDR)))
 			break;
 	}
-	/*
-	 * If the connection is fully-bound and connection-oriented (TCP or
-	 * SCTP), then we've already validated the remote system's label.
-	 * There's no need to do it again for every packet.
-	 */
-	if (connp != NULL && is_system_labeled() && (!connp->conn_fully_bound ||
-	    !(connp->conn_flags & (IPCL_TCP|IPCL_SCTPCONN))) &&
-	    !tsol_receive_local(mp, dst, af, shared_addr, connp)) {
+
+	if (connp != NULL && (ira->ira_flags & IRAF_SYSTEM_LABELED) &&
+	    !tsol_receive_local(mp, dst, ipversion, ira, connp)) {
 		DTRACE_PROBE3(tx__ip__log__info__classify__rawip,
 		    char *, "connp(1) could not receive mp(2)",
 		    conn_t *, connp, mblk_t *, mp);
@@ -2205,22 +1891,22 @@ ipcl_classify_raw(mblk_t *mp, uint8_t protocol, zoneid_t zoneid,
 		goto found;
 	mutex_exit(&connfp->connf_lock);
 
-	/* Try to look for a wildcard match. */
+	/* Try to look for a wildcard SCTP RAW socket match. */
 	connfp = &ipst->ips_ipcl_raw_fanout[IPCL_RAW_HASH(0, ipst)];
 	mutex_enter(&connfp->connf_lock);
 	for (connp = connfp->connf_head; connp != NULL;
 	    connp = connp->conn_next) {
 		/* We don't allow v4 fallback for v6 raw socket. */
-		if ((af == (connp->conn_af_isv6 ? IPV4_VERSION :
-		    IPV6_VERSION)) || !IPCL_ZONE_MATCH(connp, zoneid)) {
+		if (ipversion != connp->conn_ipversion)
 			continue;
-		}
-		if (af == IPV4_VERSION) {
-			if (IPCL_RAW_MATCH(connp, protocol, hdr->ipha_dst))
+		if (!IPCL_ZONE_MATCH(connp, zoneid))
+			continue;
+
+		if (ipversion == IPV4_VERSION) {
+			if (IPCL_RAW_MATCH(connp, protocol, ipha->ipha_dst))
 				break;
 		} else {
-			if (IPCL_RAW_MATCH_V6(connp, protocol,
-			    ((ip6_t *)hdr)->ip6_dst)) {
+			if (IPCL_RAW_MATCH_V6(connp, protocol, ip6h->ip6_dst)) {
 				break;
 			}
 		}
@@ -2253,11 +1939,23 @@ tcp_conn_constructor(void *buf, void *cdrarg, int kmflags)
 	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
 	cv_init(&connp->conn_sq_cv, NULL, CV_DEFAULT, NULL);
-	tcp->tcp_timercache = tcp_timermp_alloc(KM_NOSLEEP);
+	tcp->tcp_timercache = tcp_timermp_alloc(kmflags);
+	if (tcp->tcp_timercache == NULL)
+		return (ENOMEM);
 	connp->conn_tcp = tcp;
 	connp->conn_flags = IPCL_TCPCONN;
-	connp->conn_ulp = IPPROTO_TCP;
+	connp->conn_proto = IPPROTO_TCP;
 	tcp->tcp_connp = connp;
+	rw_init(&connp->conn_ilg_lock, NULL, RW_DEFAULT, NULL);
+
+	connp->conn_ixa = kmem_zalloc(sizeof (ip_xmit_attr_t), kmflags);
+	if (connp->conn_ixa == NULL) {
+		tcp_timermp_free(tcp);
+		return (ENOMEM);
+	}
+	connp->conn_ixa->ixa_refcnt = 1;
+	connp->conn_ixa->ixa_protocol = connp->conn_proto;
+	connp->conn_ixa->ixa_xmit_hint = CONN_TO_XMIT_HINT(connp);
 	return (0);
 }
 
@@ -2276,6 +1974,15 @@ tcp_conn_destructor(void *buf, void *cdrarg)
 	mutex_destroy(&connp->conn_lock);
 	cv_destroy(&connp->conn_cv);
 	cv_destroy(&connp->conn_sq_cv);
+	rw_destroy(&connp->conn_ilg_lock);
+
+	/* Can be NULL if constructor failed */
+	if (connp->conn_ixa != NULL) {
+		ASSERT(connp->conn_ixa->ixa_refcnt == 1);
+		ASSERT(connp->conn_ixa->ixa_ire == NULL);
+		ASSERT(connp->conn_ixa->ixa_nce == NULL);
+		ixa_refrele(connp->conn_ixa);
+	}
 }
 
 /* ARGSUSED */
@@ -2289,7 +1996,13 @@ ip_conn_constructor(void *buf, void *cdrarg, int kmflags)
 	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
 	connp->conn_flags = IPCL_IPCCONN;
+	rw_init(&connp->conn_ilg_lock, NULL, RW_DEFAULT, NULL);
 
+	connp->conn_ixa = kmem_zalloc(sizeof (ip_xmit_attr_t), kmflags);
+	if (connp->conn_ixa == NULL)
+		return (ENOMEM);
+	connp->conn_ixa->ixa_refcnt = 1;
+	connp->conn_ixa->ixa_xmit_hint = CONN_TO_XMIT_HINT(connp);
 	return (0);
 }
 
@@ -2304,6 +2017,15 @@ ip_conn_destructor(void *buf, void *cdrarg)
 	ASSERT(connp->conn_priv == NULL);
 	mutex_destroy(&connp->conn_lock);
 	cv_destroy(&connp->conn_cv);
+	rw_destroy(&connp->conn_ilg_lock);
+
+	/* Can be NULL if constructor failed */
+	if (connp->conn_ixa != NULL) {
+		ASSERT(connp->conn_ixa->ixa_refcnt == 1);
+		ASSERT(connp->conn_ixa->ixa_ire == NULL);
+		ASSERT(connp->conn_ixa->ixa_nce == NULL);
+		ixa_refrele(connp->conn_ixa);
+	}
 }
 
 /* ARGSUSED */
@@ -2321,8 +2043,15 @@ udp_conn_constructor(void *buf, void *cdrarg, int kmflags)
 	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
 	connp->conn_udp = udp;
 	connp->conn_flags = IPCL_UDPCONN;
-	connp->conn_ulp = IPPROTO_UDP;
+	connp->conn_proto = IPPROTO_UDP;
 	udp->udp_connp = connp;
+	rw_init(&connp->conn_ilg_lock, NULL, RW_DEFAULT, NULL);
+	connp->conn_ixa = kmem_zalloc(sizeof (ip_xmit_attr_t), kmflags);
+	if (connp->conn_ixa == NULL)
+		return (ENOMEM);
+	connp->conn_ixa->ixa_refcnt = 1;
+	connp->conn_ixa->ixa_protocol = connp->conn_proto;
+	connp->conn_ixa->ixa_xmit_hint = CONN_TO_XMIT_HINT(connp);
 	return (0);
 }
 
@@ -2339,6 +2068,15 @@ udp_conn_destructor(void *buf, void *cdrarg)
 	ASSERT(connp->conn_udp == udp);
 	mutex_destroy(&connp->conn_lock);
 	cv_destroy(&connp->conn_cv);
+	rw_destroy(&connp->conn_ilg_lock);
+
+	/* Can be NULL if constructor failed */
+	if (connp->conn_ixa != NULL) {
+		ASSERT(connp->conn_ixa->ixa_refcnt == 1);
+		ASSERT(connp->conn_ixa->ixa_ire == NULL);
+		ASSERT(connp->conn_ixa->ixa_nce == NULL);
+		ixa_refrele(connp->conn_ixa);
+	}
 }
 
 /* ARGSUSED */
@@ -2356,8 +2094,15 @@ rawip_conn_constructor(void *buf, void *cdrarg, int kmflags)
 	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
 	connp->conn_icmp = icmp;
 	connp->conn_flags = IPCL_RAWIPCONN;
-	connp->conn_ulp = IPPROTO_ICMP;
+	connp->conn_proto = IPPROTO_ICMP;
 	icmp->icmp_connp = connp;
+	rw_init(&connp->conn_ilg_lock, NULL, RW_DEFAULT, NULL);
+	connp->conn_ixa = kmem_zalloc(sizeof (ip_xmit_attr_t), kmflags);
+	if (connp->conn_ixa == NULL)
+		return (ENOMEM);
+	connp->conn_ixa->ixa_refcnt = 1;
+	connp->conn_ixa->ixa_protocol = connp->conn_proto;
+	connp->conn_ixa->ixa_xmit_hint = CONN_TO_XMIT_HINT(connp);
 	return (0);
 }
 
@@ -2374,6 +2119,15 @@ rawip_conn_destructor(void *buf, void *cdrarg)
 	ASSERT(connp->conn_icmp == icmp);
 	mutex_destroy(&connp->conn_lock);
 	cv_destroy(&connp->conn_cv);
+	rw_destroy(&connp->conn_ilg_lock);
+
+	/* Can be NULL if constructor failed */
+	if (connp->conn_ixa != NULL) {
+		ASSERT(connp->conn_ixa->ixa_refcnt == 1);
+		ASSERT(connp->conn_ixa->ixa_ire == NULL);
+		ASSERT(connp->conn_ixa->ixa_nce == NULL);
+		ixa_refrele(connp->conn_ixa);
+	}
 }
 
 /* ARGSUSED */
@@ -2392,6 +2146,12 @@ rts_conn_constructor(void *buf, void *cdrarg, int kmflags)
 	connp->conn_rts = rts;
 	connp->conn_flags = IPCL_RTSCONN;
 	rts->rts_connp = connp;
+	rw_init(&connp->conn_ilg_lock, NULL, RW_DEFAULT, NULL);
+	connp->conn_ixa = kmem_zalloc(sizeof (ip_xmit_attr_t), kmflags);
+	if (connp->conn_ixa == NULL)
+		return (ENOMEM);
+	connp->conn_ixa->ixa_refcnt = 1;
+	connp->conn_ixa->ixa_xmit_hint = CONN_TO_XMIT_HINT(connp);
 	return (0);
 }
 
@@ -2408,71 +2168,35 @@ rts_conn_destructor(void *buf, void *cdrarg)
 	ASSERT(connp->conn_rts == rts);
 	mutex_destroy(&connp->conn_lock);
 	cv_destroy(&connp->conn_cv);
-}
+	rw_destroy(&connp->conn_ilg_lock);
 
-/* ARGSUSED */
-int
-ip_helper_stream_constructor(void *buf, void *cdrarg, int kmflags)
-{
-	int error;
-	netstack_t	*ns;
-	int		ret;
-	tcp_stack_t	*tcps;
-	ip_helper_stream_info_t	*ip_helper_str;
-	ip_stack_t	*ipst;
-
-	ns = netstack_find_by_cred(kcred);
-	ASSERT(ns != NULL);
-	tcps = ns->netstack_tcp;
-	ipst = ns->netstack_ip;
-	ASSERT(tcps != NULL);
-	ip_helper_str = (ip_helper_stream_info_t *)buf;
-
-	do {
-		error = ldi_open_by_name(DEV_IP, IP_HELPER_STR, kcred,
-		    &ip_helper_str->iphs_handle, ipst->ips_ldi_ident);
-	} while (error == EINTR);
-
-	if (error == 0) {
-		do {
-			error = ldi_ioctl(
-			    ip_helper_str->iphs_handle, SIOCSQPTR,
-			    (intptr_t)buf, FKIOCTL, kcred, &ret);
-		} while (error == EINTR);
-
-		if (error != 0) {
-			(void) ldi_close(
-			    ip_helper_str->iphs_handle, 0, kcred);
-		}
+	/* Can be NULL if constructor failed */
+	if (connp->conn_ixa != NULL) {
+		ASSERT(connp->conn_ixa->ixa_refcnt == 1);
+		ASSERT(connp->conn_ixa->ixa_ire == NULL);
+		ASSERT(connp->conn_ixa->ixa_nce == NULL);
+		ixa_refrele(connp->conn_ixa);
 	}
-
-	netstack_rele(ipst->ips_netstack);
-
-	return (error);
 }
-
-/* ARGSUSED */
-static void
-ip_helper_stream_destructor(void *buf, void *cdrarg)
-{
-	ip_helper_stream_info_t *ip_helper_str = (ip_helper_stream_info_t *)buf;
-
-	ip_helper_str->iphs_rq->q_ptr =
-	    ip_helper_str->iphs_wq->q_ptr =
-	    ip_helper_str->iphs_minfo;
-	(void) ldi_close(ip_helper_str->iphs_handle, 0, kcred);
-}
-
 
 /*
  * Called as part of ipcl_conn_destroy to assert and clear any pointers
  * in the conn_t.
+ *
+ * Below we list all the pointers in the conn_t as a documentation aid.
+ * The ones that we can not ASSERT to be NULL are #ifdef'ed out.
+ * If you add any pointers to the conn_t please add an ASSERT here
+ * and #ifdef it out if it can't be actually asserted to be NULL.
+ * In any case, we bzero most of the conn_t at the end of the function.
  */
 void
 ipcl_conn_cleanup(conn_t *connp)
 {
-	ASSERT(connp->conn_ire_cache == NULL);
+	ip_xmit_attr_t	*ixa;
+
 	ASSERT(connp->conn_latch == NULL);
+	ASSERT(connp->conn_latch_in_policy == NULL);
+	ASSERT(connp->conn_latch_in_action == NULL);
 #ifdef notdef
 	ASSERT(connp->conn_rq == NULL);
 	ASSERT(connp->conn_wq == NULL);
@@ -2485,18 +2209,6 @@ ipcl_conn_cleanup(conn_t *connp)
 	ASSERT(connp->conn_fanout == NULL);
 	ASSERT(connp->conn_next == NULL);
 	ASSERT(connp->conn_prev == NULL);
-#ifdef notdef
-	/*
-	 * The ill and ipif pointers are not cleared before the conn_t
-	 * goes away since they do not hold a reference on the ill/ipif.
-	 * We should replace these pointers with ifindex/ipaddr_t to
-	 * make the code less complex.
-	 */
-	ASSERT(connp->conn_outgoing_ill == NULL);
-	ASSERT(connp->conn_incoming_ill == NULL);
-	ASSERT(connp->conn_multicast_ipif == NULL);
-	ASSERT(connp->conn_multicast_ill == NULL);
-#endif
 	ASSERT(connp->conn_oper_pending_ill == NULL);
 	ASSERT(connp->conn_ilg == NULL);
 	ASSERT(connp->conn_drain_next == NULL);
@@ -2506,10 +2218,19 @@ ipcl_conn_cleanup(conn_t *connp)
 	ASSERT(connp->conn_idl == NULL);
 #endif
 	ASSERT(connp->conn_ipsec_opt_mp == NULL);
-	ASSERT(connp->conn_effective_cred == NULL);
+#ifdef notdef
+	/* conn_netstack is cleared by the caller; needed by ixa_cleanup */
 	ASSERT(connp->conn_netstack == NULL);
+#endif
 
 	ASSERT(connp->conn_helper_info == NULL);
+	ASSERT(connp->conn_ixa != NULL);
+	ixa = connp->conn_ixa;
+	ASSERT(ixa->ixa_refcnt == 1);
+	/* Need to preserve ixa_protocol */
+	ixa_cleanup(ixa);
+	ixa->ixa_flags = 0;
+
 	/* Clear out the conn_t fields that are not preserved */
 	bzero(&connp->conn_start_clr,
 	    sizeof (conn_t) -
@@ -2602,10 +2323,11 @@ ipcl_globalhash_remove(conn_t *connp)
 
 /*
  * Walk the list of all conn_t's in the system, calling the function provided
- * with the specified argument for each.
+ * With the specified argument for each.
  * Applies to both IPv4 and IPv6.
  *
- * IPCs may hold pointers to ipif/ill. To guard against stale pointers
+ * CONNs may hold pointers to ills (conn_dhcpinit_ill and
+ * conn_oper_pending_ill). To guard against stale pointers
  * ipcl_walk() is called to cleanup the conn_t's, typically when an interface is
  * unplumbed or removed. New conn_t's that are created while we are walking
  * may be missed by this walk, because they are not necessarily inserted
@@ -2657,7 +2379,7 @@ ipcl_walk(pfv_t func, void *arg, ip_stack_t *ipst)
  * (peer tcp in ESTABLISHED state).
  */
 conn_t *
-ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcph_t *tcph,
+ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcpha_t *tcpha,
     ip_stack_t *ipst)
 {
 	uint32_t ports;
@@ -2675,8 +2397,8 @@ ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcph_t *tcph,
 	zone_chk = (ipha->ipha_src == htonl(INADDR_LOOPBACK) ||
 	    ipha->ipha_dst == htonl(INADDR_LOOPBACK));
 
-	bcopy(tcph->th_fport, &pports[0], sizeof (uint16_t));
-	bcopy(tcph->th_lport, &pports[1], sizeof (uint16_t));
+	pports[0] = tcpha->tha_fport;
+	pports[1] = tcpha->tha_lport;
 
 	connfp = &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH(ipha->ipha_dst,
 	    ports, ipst)];
@@ -2707,7 +2429,7 @@ ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *connp, ipha_t *ipha, tcph_t *tcph,
  * (peer tcp in ESTABLISHED state).
  */
 conn_t *
-ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcph_t *tcph,
+ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcpha_t *tcpha,
     ip_stack_t *ipst)
 {
 	uint32_t ports;
@@ -2728,8 +2450,8 @@ ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcph_t *tcph,
 	zone_chk = (IN6_IS_ADDR_LOOPBACK(&ip6h->ip6_src) ||
 	    IN6_IS_ADDR_LOOPBACK(&ip6h->ip6_dst));
 
-	bcopy(tcph->th_fport, &pports[0], sizeof (uint16_t));
-	bcopy(tcph->th_lport, &pports[1], sizeof (uint16_t));
+	pports[0] = tcpha->tha_fport;
+	pports[1] = tcpha->tha_lport;
 
 	connfp = &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH_V6(ip6h->ip6_dst,
 	    ports, ipst)];
@@ -2738,7 +2460,7 @@ ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcph_t *tcph,
 	for (tconnp = connfp->connf_head; tconnp != NULL;
 	    tconnp = tconnp->conn_next) {
 
-		/* We skip tcp_bound_if check here as this is loopback tcp */
+		/* We skip conn_bound_if check here as this is loopback tcp */
 		if (IPCL_CONN_MATCH_V6(tconnp, IPPROTO_TCP,
 		    ip6h->ip6_dst, ip6h->ip6_src, ports) &&
 		    tconnp->conn_tcp->tcp_state == TCPS_ESTABLISHED &&
@@ -2760,7 +2482,7 @@ ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *connp, ip6_t *ip6h, tcph_t *tcph,
  * Only checks for connected entries i.e. no INADDR_ANY checks.
  */
 conn_t *
-ipcl_tcp_lookup_reversed_ipv4(ipha_t *ipha, tcph_t *tcph, int min_state,
+ipcl_tcp_lookup_reversed_ipv4(ipha_t *ipha, tcpha_t *tcpha, int min_state,
     ip_stack_t *ipst)
 {
 	uint32_t ports;
@@ -2769,8 +2491,8 @@ ipcl_tcp_lookup_reversed_ipv4(ipha_t *ipha, tcph_t *tcph, int min_state,
 	conn_t	*tconnp;
 
 	pports = (uint16_t *)&ports;
-	bcopy(tcph->th_fport, &pports[0], sizeof (uint16_t));
-	bcopy(tcph->th_lport, &pports[1], sizeof (uint16_t));
+	pports[0] = tcpha->tha_fport;
+	pports[1] = tcpha->tha_lport;
 
 	connfp = &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH(ipha->ipha_dst,
 	    ports, ipst)];
@@ -2823,8 +2545,8 @@ ipcl_tcp_lookup_reversed_ipv6(ip6_t *ip6h, tcpha_t *tcpha, int min_state,
 		if (IPCL_CONN_MATCH_V6(tconnp, IPPROTO_TCP,
 		    ip6h->ip6_dst, ip6h->ip6_src, ports) &&
 		    tcp->tcp_state >= min_state &&
-		    (tcp->tcp_bound_if == 0 ||
-		    tcp->tcp_bound_if == ifindex)) {
+		    (tconnp->conn_bound_if == 0 ||
+		    tconnp->conn_bound_if == ifindex)) {
 
 			CONN_INC_REF(tconnp);
 			mutex_exit(&connfp->connf_lock);
@@ -2901,8 +2623,8 @@ ipcl_lookup_listener_v6(uint16_t lport, in6_addr_t *laddr, uint_t ifindex,
 		tcp = connp->conn_tcp;
 		if (IPCL_BIND_MATCH_V6(connp, IPPROTO_TCP, *laddr, lport) &&
 		    IPCL_ZONE_MATCH(connp, zoneid) &&
-		    (tcp->tcp_bound_if == 0 ||
-		    tcp->tcp_bound_if == ifindex) &&
+		    (connp->conn_bound_if == 0 ||
+		    connp->conn_bound_if == ifindex) &&
 		    tcp->tcp_listener == NULL) {
 			CONN_INC_REF(connp);
 			mutex_exit(&bind_connfp->connf_lock);

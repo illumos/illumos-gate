@@ -80,8 +80,8 @@ void
 rts_fill_msg_v6(int type, int rtm_addrs, const in6_addr_t *dst,
     const in6_addr_t *mask, const in6_addr_t *gateway,
     const in6_addr_t *src_addr, const in6_addr_t *brd_addr,
-    const in6_addr_t *author, const ipif_t *ipif, mblk_t *mp,
-    uint_t sacnt, const tsol_gc_t *gc)
+    const in6_addr_t *author, const in6_addr_t *ifaddr, const ill_t *ill,
+    mblk_t *mp, const tsol_gc_t *gc)
 {
 	rt_msghdr_t	*rtm;
 	sin6_t		*sin6;
@@ -90,7 +90,6 @@ rts_fill_msg_v6(int type, int rtm_addrs, const in6_addr_t *dst,
 	int		i;
 
 	ASSERT(mp != NULL);
-	ASSERT(sacnt == 0 || gc != NULL);
 	/*
 	 * First find the type of the message
 	 * and its length.
@@ -100,7 +99,7 @@ rts_fill_msg_v6(int type, int rtm_addrs, const in6_addr_t *dst,
 	 * Now find the size of the data
 	 * that follows the message header.
 	 */
-	data_size = rts_data_msg_size(rtm_addrs, AF_INET6, sacnt);
+	data_size = rts_data_msg_size(rtm_addrs, AF_INET6, gc != NULL ? 1 : 0);
 
 	rtm = (rt_msghdr_t *)mp->b_rptr;
 	mp->b_wptr = &mp->b_rptr[header_size];
@@ -125,13 +124,17 @@ rts_fill_msg_v6(int type, int rtm_addrs, const in6_addr_t *dst,
 			cp += sizeof (sin6_t);
 			break;
 		case RTA_IFA:
+			sin6->sin6_addr = *ifaddr;
+			sin6->sin6_family = AF_INET6;
+			cp += sizeof (sin6_t);
+			break;
 		case RTA_SRC:
 			sin6->sin6_addr = *src_addr;
 			sin6->sin6_family = AF_INET6;
 			cp += sizeof (sin6_t);
 			break;
 		case RTA_IFP:
-			cp += ill_dls_info((struct sockaddr_dl *)cp, ipif);
+			cp += ill_dls_info((struct sockaddr_dl *)cp, ill);
 			break;
 		case RTA_AUTHOR:
 			sin6->sin6_addr = *author;
@@ -154,24 +157,20 @@ rts_fill_msg_v6(int type, int rtm_addrs, const in6_addr_t *dst,
 		rtm_ext_t *rtm_ext;
 		struct rtsa_s *rp_dst;
 		tsol_rtsecattr_t *rsap;
-		int i;
 
 		ASSERT(gc->gc_grp != NULL);
 		ASSERT(RW_LOCK_HELD(&gc->gc_grp->gcgrp_rwlock));
-		ASSERT(sacnt > 0);
 
 		rtm_ext = (rtm_ext_t *)cp;
 		rtm_ext->rtmex_type = RTMEX_GATEWAY_SECATTR;
-		rtm_ext->rtmex_len = TSOL_RTSECATTR_SIZE(sacnt);
+		rtm_ext->rtmex_len = TSOL_RTSECATTR_SIZE(1);
 
 		rsap = (tsol_rtsecattr_t *)(rtm_ext + 1);
-		rsap->rtsa_cnt = sacnt;
+		rsap->rtsa_cnt = 1;
 		rp_dst = rsap->rtsa_attr;
 
-		for (i = 0; i < sacnt; i++, gc = gc->gc_next, rp_dst++) {
-			ASSERT(gc->gc_db != NULL);
-			bcopy(&gc->gc_db->gcdb_attr, rp_dst, sizeof (*rp_dst));
-		}
+		ASSERT(gc->gc_db != NULL);
+		bcopy(&gc->gc_db->gcdb_attr, rp_dst, sizeof (*rp_dst));
 		cp = (uchar_t *)rp_dst;
 	}
 
@@ -208,7 +207,7 @@ ip_rts_change_v6(int type, const in6_addr_t *dst_addr,
 	if (mp == NULL)
 		return;
 	rts_fill_msg_v6(type, rtm_addrs, dst_addr, net_mask, gw_addr, source,
-	    &ipv6_all_zeros, author, NULL, mp, 0, NULL);
+	    &ipv6_all_zeros, &ipv6_all_zeros, author, NULL, mp, NULL);
 	rtm = (rt_msghdr_t *)mp->b_rptr;
 	rtm->rtm_flags = flags;
 	rtm->rtm_errno = error;

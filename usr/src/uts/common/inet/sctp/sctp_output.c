@@ -38,6 +38,7 @@
 #include <inet/common.h>
 #include <inet/mi.h>
 #include <inet/ip.h>
+#include <inet/ip_ire.h>
 #include <inet/ip6.h>
 #include <inet/sctp_ip.h>
 #include <inet/ipclassifier.h>
@@ -140,6 +141,7 @@ sctp_sendmsg(sctp_t *sctp, mblk_t *mp, int flags)
 	sctp_msg_hdr_t	*sctp_msg_hdr;
 	uint32_t	msg_len = 0;
 	uint32_t	timetolive = sctp->sctp_def_timetolive;
+	conn_t		*connp = sctp->sctp_connp;
 
 	ASSERT(DB_TYPE(mproto) == M_PROTO);
 
@@ -228,7 +230,7 @@ sctp_sendmsg(sctp_t *sctp, mblk_t *mp, int flags)
 		RUN_SCTP(sctp);
 		sctp_user_abort(sctp, mp);
 		freemsg(mproto);
-		goto process_sendq;
+		goto done2;
 	}
 	if (mp == NULL)
 		goto done;
@@ -292,15 +294,14 @@ sctp_sendmsg(sctp_t *sctp, mblk_t *mp, int flags)
 	/*
 	 * Notify sockfs if the tx queue is full.
 	 */
-	if (SCTP_TXQ_LEN(sctp) >= sctp->sctp_xmit_hiwater) {
+	if (SCTP_TXQ_LEN(sctp) >= connp->conn_sndbuf) {
 		sctp->sctp_txq_full = 1;
 		sctp->sctp_ulp_xmitted(sctp->sctp_ulpd, B_TRUE);
 	}
 	if (sctp->sctp_state == SCTPS_ESTABLISHED)
 		sctp_output(sctp, UINT_MAX);
-process_sendq:
+done2:
 	WAKE_SCTP(sctp);
-	sctp_process_sendq(sctp);
 	return (0);
 unlock_done:
 	WAKE_SCTP(sctp);
@@ -569,7 +570,7 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
     int *error)
 {
 	int hdrlen;
-	char *hdr;
+	uchar_t *hdr;
 	int isv4 = fp->isv4;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
@@ -584,17 +585,19 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 		hdr = sctp->sctp_iphc6;
 	}
 	/*
-	 * A null fp->ire could mean that the address is 'down'. Similarly,
+	 * A reject|blackhole could mean that the address is 'down'. Similarly,
 	 * it is possible that the address went down, we tried to send an
 	 * heartbeat and ended up setting fp->saddr as unspec because we
 	 * didn't have any usable source address.  In either case
-	 * sctp_get_ire() will try find an IRE, if available, and set
+	 * sctp_get_dest() will try find an IRE, if available, and set
 	 * the source address, if needed.  If we still don't have any
 	 * usable source address, fp->state will be SCTP_FADDRS_UNREACH and
 	 * we return EHOSTUNREACH.
 	 */
-	if (fp->ire == NULL || SCTP_IS_ADDR_UNSPEC(fp->isv4, fp->saddr)) {
-		sctp_get_ire(sctp, fp);
+	ASSERT(fp->ixa->ixa_ire != NULL);
+	if ((fp->ixa->ixa_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
+	    SCTP_IS_ADDR_UNSPEC(fp->isv4, fp->saddr)) {
+		sctp_get_dest(sctp, fp);
 		if (fp->state == SCTP_FADDRS_UNREACH) {
 			if (error != NULL)
 				*error = EHOSTUNREACH;
@@ -603,8 +606,7 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 	}
 	/* Copy in IP header. */
 	if ((mp->b_rptr - mp->b_datap->db_base) <
-	    (sctps->sctps_wroff_xtra + hdrlen + sacklen) || DB_REF(mp) > 2 ||
-	    !IS_P2ALIGNED(DB_BASE(mp), sizeof (ire_t *))) {
+	    (sctps->sctps_wroff_xtra + hdrlen + sacklen) || DB_REF(mp) > 2) {
 		mblk_t *nmp;
 
 		/*
@@ -612,8 +614,8 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 		 * data was moved into chunks, or during retransmission,
 		 * or things like snoop is running.
 		 */
-		nmp = allocb_cred(sctps->sctps_wroff_xtra + hdrlen + sacklen,
-		    CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
+		nmp = allocb(sctps->sctps_wroff_xtra + hdrlen + sacklen,
+		    BPRI_MED);
 		if (nmp == NULL) {
 			if (error !=  NULL)
 				*error = ENOMEM;
@@ -625,7 +627,6 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 		mp = nmp;
 	} else {
 		mp->b_rptr -= (hdrlen + sacklen);
-		mblk_setcred(mp, CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
 	}
 	bcopy(hdr, mp->b_rptr, hdrlen);
 	if (sacklen) {
@@ -644,26 +645,16 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
 				iph->ipha_src = INADDR_ANY;
 			}
 		} else {
-			((ip6_t *)(mp->b_rptr))->ip6_dst = fp->faddr;
+			ip6_t *ip6h = (ip6_t *)mp->b_rptr;
+
+			ip6h->ip6_dst = fp->faddr;
 			if (!IN6_IS_ADDR_UNSPECIFIED(&fp->saddr)) {
-				((ip6_t *)(mp->b_rptr))->ip6_src = fp->saddr;
+				ip6h->ip6_src = fp->saddr;
 			} else if (sctp->sctp_bound_to_all) {
-				V6_SET_ZERO(((ip6_t *)(mp->b_rptr))->ip6_src);
+				ip6h->ip6_src = ipv6_all_zeros;
 			}
 		}
 	}
-	/*
-	 * IP will not free this IRE if it is condemned.  SCTP needs to
-	 * free it.
-	 */
-	if ((fp->ire != NULL) && (fp->ire->ire_marks & IRE_MARK_CONDEMNED)) {
-		IRE_REFRELE_NOTR(fp->ire);
-		fp->ire = NULL;
-	}
-
-	/* Stash the conn and ire ptr info for IP */
-	SCTP_STASH_IPINFO(mp, fp->ire);
-
 	return (mp);
 }
 
@@ -985,8 +976,9 @@ sctp_fast_rexmit(sctp_t *sctp)
 		iph->ipha_fragment_offset_and_flags = 0;
 	}
 
-	sctp_set_iplen(sctp, head);
-	sctp_add_sendq(sctp, head);
+	sctp_set_iplen(sctp, head, fp->ixa);
+	(void) conn_ip_output(head, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 	sctp->sctp_active = fp->lastactive = lbolt64;
 }
 
@@ -1280,8 +1272,9 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 		    seglen - xtralen, ntohl(sdc->sdh_tsn),
 		    ntohs(sdc->sdh_ssn), (void *)fp, sctp->sctp_frwnd,
 		    cansend, sctp->sctp_lastack_rxd));
-		sctp_set_iplen(sctp, head);
-		sctp_add_sendq(sctp, head);
+		sctp_set_iplen(sctp, head, fp->ixa);
+		(void) conn_ip_output(head, fp->ixa);
+		BUMP_LOCAL(sctp->sctp_opkts);
 		/* arm rto timer (if not set) */
 		if (!fp->timer_running)
 			SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
@@ -1415,8 +1408,7 @@ sctp_make_ftsn_chunk(sctp_t *sctp, sctp_faddr_t *fp, sctp_ftsn_set_t *sets,
 		xtralen = sctp->sctp_hdr_len + sctps->sctps_wroff_xtra;
 	else
 		xtralen = sctp->sctp_hdr6_len + sctps->sctps_wroff_xtra;
-	ftsn_mp = allocb_cred(xtralen + seglen, CONN_CRED(sctp->sctp_connp),
-	    sctp->sctp_cpid);
+	ftsn_mp = allocb(xtralen + seglen, BPRI_MED);
 	if (ftsn_mp == NULL)
 		return (NULL);
 	ftsn_mp->b_rptr += xtralen;
@@ -1804,8 +1796,9 @@ out:
 		pkt = sctp_rexmit_packet(sctp, &meta, &mp, fp, &pkt_len);
 		if (pkt != NULL) {
 			ASSERT(pkt_len <= fp->sfa_pmss);
-			sctp_set_iplen(sctp, pkt);
-			sctp_add_sendq(sctp, pkt);
+			sctp_set_iplen(sctp, pkt, fp->ixa);
+			(void) conn_ip_output(pkt, fp->ixa);
+			BUMP_LOCAL(sctp->sctp_opkts);
 		} else {
 			SCTP_KSTAT(sctps, sctp_ss_rexmit_failed);
 		}
@@ -2022,8 +2015,9 @@ done_bundle:
 	sctp->sctp_rexmitting = B_TRUE;
 	sctp->sctp_rxt_nxttsn = first_ua_tsn;
 	sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn - 1;
-	sctp_set_iplen(sctp, head);
-	sctp_add_sendq(sctp, head);
+	sctp_set_iplen(sctp, head, fp->ixa);
+	(void) conn_ip_output(head, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 
 	/*
 	 * Restart the oldfp timer with exponential backoff and
@@ -2305,8 +2299,9 @@ found_msg:
 		 */
 		iph->ipha_fragment_offset_and_flags = 0;
 	}
-	sctp_set_iplen(sctp, pkt);
-	sctp_add_sendq(sctp, pkt);
+	sctp_set_iplen(sctp, pkt, fp->ixa);
+	(void) conn_ip_output(pkt, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 
 	/* Check and see if there is more chunk to be retransmitted. */
 	if (tot_wnd <= pkt_len || tot_wnd - pkt_len < fp->sfa_pmss ||

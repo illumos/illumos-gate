@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1359,7 +1359,7 @@ mi_tpi_addr_and_opt(MBLKP mp, char *addr, t_scalar_t addr_length,
 	 * This code is used more than just for unitdata ind
 	 * (also for T_CONN_IND and T_CONN_CON) and
 	 * relies on correct functioning on the happy
-	 * coincidence that the the address and option buffers
+	 * coincidence that the address and option buffers
 	 * represented by length/offset in all these primitives
 	 * are isomorphic in terms of offset from start of data
 	 * structure

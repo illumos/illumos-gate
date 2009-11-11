@@ -397,7 +397,6 @@ stubs_base:
 	MODULE(ipsecah,drv);
 	WSTUB(ipsecah,	ipsec_construct_inverse_acquire,	nomod_zero);
 	WSTUB(ipsecah,	sadb_acquire,		nomod_zero);
-	WSTUB(ipsecah,	sadb_ill_download,	nomod_zero); 	
 	WSTUB(ipsecah,	ipsecah_algs_changed,	nomod_zero);
 	WSTUB(ipsecah,	sadb_alg_update,	nomod_zero);
 	WSTUB(ipsecah,	sadb_unlinkassoc,	nomod_zero);
@@ -1218,8 +1217,6 @@ stubs_base:
 	STUB(iptun, iptun_create, nomod_einval);
 	STUB(iptun, iptun_delete, nomod_einval);
 	STUB(iptun, iptun_set_policy, nomod_einval);
-	STUB(iptun, iptun_set_g_q, nomod_einval);
-	STUB(iptun, iptun_clear_g_q, nomod_void);
 	END_MODULE(iptun);
 #endif
 

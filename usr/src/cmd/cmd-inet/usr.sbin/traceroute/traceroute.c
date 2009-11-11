@@ -166,6 +166,7 @@ boolean_t useicmp = _B_FALSE;  	/* use icmp echo instead of udp packets */
 boolean_t docksum = _B_TRUE;	/* calculate checksums */
 static boolean_t collect_stat = _B_FALSE;	/* print statistics */
 boolean_t settos = _B_FALSE;   	/* set type-of-service field */
+int dontfrag = 0;		/* IP*_DONTFRAG */
 static int max_timeout = 5;	/* quit after this consecutive timeouts */
 static boolean_t probe_all = _B_FALSE;	/* probe all the IFs of the target */
 static boolean_t pick_src = _B_FALSE;	/* traceroute picks the src address */
@@ -315,6 +316,7 @@ main(int argc, char **argv)
 
 		case 'F':
 			off = IP_DF;
+			dontfrag = 1;
 			break;
 
 		case 'g':
@@ -1361,6 +1363,24 @@ setup_socket(struct pr_set *pr, int packet_len)
 			exit(EXIT_FAILURE);
 		}
 	}
+
+	/* We enable or disable to not depend on the kernel default */
+	if (pr->family == AF_INET) {
+		if (setsockopt(ssock, IPPROTO_IP, IP_DONTFRAG,
+		    (char *)&dontfrag, sizeof (dontfrag)) == -1) {
+			Fprintf(stderr, "%s: IP_DONTFRAG %s\n", prog,
+			    strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		if (setsockopt(ssock, IPPROTO_IPV6, IPV6_DONTFRAG,
+		    (char *)&dontfrag, sizeof (dontfrag)) == -1) {
+			Fprintf(stderr, "%s: IPV6_DONTFRAG %s\n", prog,
+			    strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+
 	if (pr->family == AF_INET) {
 		rcvsock4 = rsock;
 		sndsock4 = ssock;

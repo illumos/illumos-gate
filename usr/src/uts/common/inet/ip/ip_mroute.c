@@ -1,8 +1,4 @@
 /*
- * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-/*
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
@@ -23,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.
- * All rights reserved.  Use is subject to license terms.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -65,6 +61,7 @@
 #include <netinet/in.h>
 #include <net/if_dl.h>
 
+#include <inet/ipsec_impl.h>
 #include <inet/common.h>
 #include <inet/mi.h>
 #include <inet/nd.h>
@@ -79,6 +76,7 @@
 #include <netinet/ip_mroute.h>
 #include <inet/ip_multi.h>
 #include <inet/ip_ire.h>
+#include <inet/ip_ndp.h>
 #include <inet/ip_if.h>
 #include <inet/ipclassifier.h>
 
@@ -98,7 +96,7 @@
  * is when the vif is marked VIF_MARK_NOTINUSE but refcnt != 0. This indicates
  * that vif is being initalized.
  * Each structure is freed when the refcnt goes down to zero. If a delete comes
- * in when the the recfnt is > 1, the vif structure is marked VIF_MARK_CONDEMNED
+ * in when the recfnt is > 1, the vif structure is marked VIF_MARK_CONDEMNED
  * which prevents the struct from further use.  When the refcnt goes to zero
  * the struct is freed and is marked VIF_MARK_NOTINUSE.
  * vif struct stores a pointer to the ipif in v_ipif, to prevent ipif/ill
@@ -171,9 +169,9 @@
 
 /* Function declarations */
 static int	add_mfc(struct mfcctl *, ip_stack_t *);
-static int	add_vif(struct vifctl *, conn_t *, mblk_t *, ip_stack_t *);
+static int	add_vif(struct vifctl *, conn_t *, ip_stack_t *);
 static int	del_mfc(struct mfcctl *, ip_stack_t *);
-static int	del_vif(vifi_t *, conn_t *, mblk_t *, ip_stack_t *);
+static int	del_vif(vifi_t *, ip_stack_t *);
 static void	del_vifp(struct vif *);
 static void	encap_send(ipha_t *, mblk_t *, struct vif *, ipaddr_t);
 static void	expire_upcalls(void *);
@@ -188,7 +186,7 @@ static int	ip_mdq(mblk_t *, ipha_t *, ill_t *,
 		    ipaddr_t, struct mfc *);
 static int	ip_mrouter_init(conn_t *, uchar_t *, int, ip_stack_t *);
 static void	phyint_send(ipha_t *, mblk_t *, struct vif *, ipaddr_t);
-static int	register_mforward(queue_t *, mblk_t *, ill_t *);
+static int	register_mforward(mblk_t *, ip_recv_attr_t *);
 static void	register_send(ipha_t *, mblk_t *, struct vif *, ipaddr_t);
 static int	set_assert(int *, ip_stack_t *);
 
@@ -331,10 +329,9 @@ static ipha_t multicast_encap_iphdr = {
  * Handle MRT setsockopt commands to modify the multicast routing tables.
  */
 int
-ip_mrouter_set(int cmd, queue_t *q, int checkonly, uchar_t *data,
-    int datalen, mblk_t *first_mp)
+ip_mrouter_set(int cmd, conn_t *connp, int checkonly, uchar_t *data,
+    int datalen)
 {
-	conn_t		*connp = Q_TO_CONN(q);
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	mutex_enter(&ipst->ips_ip_g_mrouter_mutex);
@@ -376,11 +373,9 @@ ip_mrouter_set(int cmd, queue_t *q, int checkonly, uchar_t *data,
 
 	switch (cmd) {
 	case MRT_INIT:	return (ip_mrouter_init(connp, data, datalen, ipst));
-	case MRT_DONE:	return (ip_mrouter_done(first_mp, ipst));
-	case MRT_ADD_VIF:  return (add_vif((struct vifctl *)data, connp,
-			    first_mp, ipst));
-	case MRT_DEL_VIF:  return (del_vif((vifi_t *)data, connp, first_mp,
-			    ipst));
+	case MRT_DONE:	return (ip_mrouter_done(ipst));
+	case MRT_ADD_VIF:  return (add_vif((struct vifctl *)data, connp, ipst));
+	case MRT_DEL_VIF:  return (del_vif((vifi_t *)data, ipst));
 	case MRT_ADD_MFC:  return (add_mfc((struct mfcctl *)data, ipst));
 	case MRT_DEL_MFC:  return (del_mfc((struct mfcctl *)data, ipst));
 	case MRT_ASSERT:   return (set_assert((int *)data, ipst));
@@ -392,9 +387,8 @@ ip_mrouter_set(int cmd, queue_t *q, int checkonly, uchar_t *data,
  * Handle MRT getsockopt commands
  */
 int
-ip_mrouter_get(int cmd, queue_t *q, uchar_t *data)
+ip_mrouter_get(int cmd, conn_t *connp, uchar_t *data)
 {
-	conn_t		*connp = Q_TO_CONN(q);
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	if (connp != ipst->ips_ip_g_mrouter)
@@ -611,7 +605,7 @@ ip_mrouter_stack_init(ip_stack_t *ipst)
  * Didn't use global timeout_val (BSD version), instead check the mfctable.
  */
 int
-ip_mrouter_done(mblk_t *mp, ip_stack_t *ipst)
+ip_mrouter_done(ip_stack_t *ipst)
 {
 	conn_t		*mrouter;
 	vifi_t 		vifi;
@@ -665,47 +659,19 @@ ip_mrouter_done(mblk_t *mp, ip_stack_t *ipst)
 			/* Phyint only */
 			if (!(vifp->v_flags & (VIFF_TUNNEL | VIFF_REGISTER))) {
 				ipif_t *ipif = vifp->v_ipif;
-				ipsq_t  *ipsq;
-				boolean_t suc;
-				ill_t *ill;
+				ilm_t *ilm = vifp->v_ilm;
 
-				ill = ipif->ipif_ill;
-				suc = B_FALSE;
-				if (mp == NULL) {
-					/*
-					 * being called from ip_close,
-					 * lets do it synchronously.
-					 * Clear VIF_MARK_GOOD and
-					 * set VIF_MARK_CONDEMNED.
-					 */
-					vifp->v_marks &= ~VIF_MARK_GOOD;
-					vifp->v_marks |= VIF_MARK_CONDEMNED;
-					mutex_exit(&(vifp)->v_lock);
-					suc = ipsq_enter(ill, B_FALSE, NEW_OP);
-					ipsq = ill->ill_phyint->phyint_ipsq;
-				} else {
-					ipsq = ipsq_try_enter(ipif, NULL,
-					    mrouter->conn_wq, mp,
-					    ip_restart_optmgmt, NEW_OP, B_TRUE);
-					if (ipsq == NULL) {
-						mutex_exit(&(vifp)->v_lock);
-						ipif_refrele(ipif);
-						return (EINPROGRESS);
-					}
-					/*
-					 * Clear VIF_MARK_GOOD and
-					 * set VIF_MARK_CONDEMNED.
-					 */
-					vifp->v_marks &= ~VIF_MARK_GOOD;
-					vifp->v_marks |= VIF_MARK_CONDEMNED;
-					mutex_exit(&(vifp)->v_lock);
-					suc = B_TRUE;
-				}
+				vifp->v_ilm = NULL;
+				vifp->v_marks &= ~VIF_MARK_GOOD;
+				vifp->v_marks |= VIF_MARK_CONDEMNED;
 
-				if (suc) {
-					(void) ip_delmulti(INADDR_ANY, ipif,
-					    B_TRUE, B_TRUE);
-					ipsq_exit(ipsq);
+				mutex_exit(&(vifp)->v_lock);
+				if (ilm != NULL) {
+					ill_t *ill = ipif->ipif_ill;
+
+					(void) ip_delmulti(ilm);
+					ASSERT(ill->ill_mrouter_cnt > 0);
+					atomic_dec_32(&ill->ill_mrouter_cnt);
 				}
 				mutex_enter(&vifp->v_lock);
 			}
@@ -866,14 +832,15 @@ lock_good_vif(struct vif *vifp)
  * Add a vif to the vif table.
  */
 static int
-add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
+add_vif(struct vifctl *vifcp, conn_t *connp, ip_stack_t *ipst)
 {
 	struct vif	*vifp = ipst->ips_vifs + vifcp->vifc_vifi;
 	ipif_t		*ipif;
-	int		error;
+	int		error = 0;
 	struct tbf	*v_tbf = ipst->ips_tbfs + vifcp->vifc_vifi;
-	ipsq_t  	*ipsq;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
+	ilm_t		*ilm;
+	ill_t		*ill;
 
 	ASSERT(connp != NULL);
 
@@ -913,26 +880,10 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 	mutex_exit(&vifp->v_lock);
 	/* Find the interface with the local address */
 	ipif = ipif_lookup_addr((ipaddr_t)vifcp->vifc_lcl_addr.s_addr, NULL,
-	    connp->conn_zoneid, CONNP_TO_WQ(connp), first_mp,
-	    ip_restart_optmgmt, &error, ipst);
+	    IPCL_ZONEID(connp), ipst);
 	if (ipif == NULL) {
 		VIF_REFRELE(vifp);
-		if (error == EINPROGRESS)
-			return (error);
 		return (EADDRNOTAVAIL);
-	}
-
-	/*
-	 * We have to be exclusive as we have to call ip_addmulti()
-	 * This is the best position to try to be exclusive in case
-	 * we have to wait.
-	 */
-	ipsq = ipsq_try_enter(ipif, NULL, CONNP_TO_WQ(connp), first_mp,
-	    ip_restart_optmgmt, NEW_OP, B_TRUE);
-	if ((ipsq) == NULL) {
-		VIF_REFRELE(vifp);
-		ipif_refrele(ipif);
-		return (EINPROGRESS);
 	}
 
 	if (ipst->ips_ip_mrtdebug > 1) {
@@ -959,7 +910,6 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 			    "add_vif: source route tunnels not supported\n");
 			VIF_REFRELE_LOCKED(vifp);
 			ipif_refrele(ipif);
-			ipsq_exit(ipsq);
 			return (EOPNOTSUPP);
 		}
 		vifp->v_rmt_addr  = vifcp->vifc_rmt_addr;
@@ -981,7 +931,6 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 				mutex_exit(&ipst->ips_numvifs_mutex);
 				VIF_REFRELE_LOCKED(vifp);
 				ipif_refrele(ipif);
-				ipsq_exit(ipsq);
 				return (EADDRINUSE);
 			}
 		}
@@ -995,22 +944,39 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 				ipst->ips_reg_vif_num = ALL_VIFS;
 				mutex_exit(&ipst->ips_numvifs_mutex);
 			}
-			ipsq_exit(ipsq);
 			return (EOPNOTSUPP);
 		}
 		/* Enable promiscuous reception of all IP mcasts from the if */
 		mutex_exit(&vifp->v_lock);
-		error = ip_addmulti(INADDR_ANY, ipif, ILGSTAT_NONE,
-		    MODE_IS_EXCLUDE, NULL);
+
+		ill = ipif->ipif_ill;
+		if (IS_UNDER_IPMP(ill))
+			ill = ipmp_ill_hold_ipmp_ill(ill);
+
+		if (ill == NULL) {
+			ilm = NULL;
+		} else {
+			ilm = ip_addmulti(&ipv6_all_zeros, ill,
+			    ipif->ipif_zoneid, &error);
+			if (ilm != NULL)
+				atomic_inc_32(&ill->ill_mrouter_cnt);
+			if (IS_UNDER_IPMP(ipif->ipif_ill)) {
+				ill_refrele(ill);
+				ill = ipif->ipif_ill;
+			}
+		}
+
 		mutex_enter(&vifp->v_lock);
 		/*
 		 * since we released the lock lets make sure that
 		 * ip_mrouter_done() has not been called.
 		 */
-		if (error != 0 || is_mrouter_off(ipst)) {
-			if (error == 0)
-				(void) ip_delmulti(INADDR_ANY, ipif, B_TRUE,
-				    B_TRUE);
+		if (ilm == NULL || is_mrouter_off(ipst)) {
+			if (ilm != NULL) {
+				(void) ip_delmulti(ilm);
+				ASSERT(ill->ill_mrouter_cnt > 0);
+				atomic_dec_32(&ill->ill_mrouter_cnt);
+			}
 			if (vifcp->vifc_flags & VIFF_REGISTER) {
 				mutex_enter(&ipst->ips_numvifs_mutex);
 				ipst->ips_reg_vif_num = ALL_VIFS;
@@ -1018,9 +984,9 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 			}
 			VIF_REFRELE_LOCKED(vifp);
 			ipif_refrele(ipif);
-			ipsq_exit(ipsq);
 			return (error?error:EINVAL);
 		}
+		vifp->v_ilm = ilm;
 	}
 	/* Define parameters for the tbf structure */
 	vifp->v_tbf = v_tbf;
@@ -1063,7 +1029,6 @@ add_vif(struct vifctl *vifcp, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 
 	vifp->v_marks = VIF_MARK_GOOD;
 	mutex_exit(&vifp->v_lock);
-	ipsq_exit(ipsq);
 	return (0);
 }
 
@@ -1131,10 +1096,9 @@ del_vifp(struct vif *vifp)
 }
 
 static int
-del_vif(vifi_t *vifip, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
+del_vif(vifi_t *vifip, ip_stack_t *ipst)
 {
 	struct vif	*vifp = ipst->ips_vifs + *vifip;
-	ipsq_t  	*ipsq;
 
 	if (*vifip >= ipst->ips_numvifs)
 		return (EINVAL);
@@ -1151,41 +1115,6 @@ del_vif(vifi_t *vifip, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 		return (EADDRNOTAVAIL);
 	}
 
-	/*
-	 * This is an optimization, if first_mp == NULL
-	 * than we are being called from reset_mrt_vif_ipif()
-	 * so we already have exclusive access to the ipsq.
-	 * the ASSERT below is a check for this condition.
-	 */
-	if (first_mp != NULL &&
-	    !(vifp->v_flags & (VIFF_TUNNEL | VIFF_REGISTER))) {
-		ASSERT(connp != NULL);
-		/*
-		 * We have to be exclusive as we have to call ip_delmulti()
-		 * This is the best position to try to be exclusive in case
-		 * we have to wait.
-		 */
-		ipsq = ipsq_try_enter(vifp->v_ipif, NULL, CONNP_TO_WQ(connp),
-		    first_mp, ip_restart_optmgmt, NEW_OP, B_TRUE);
-		if ((ipsq) == NULL) {
-			mutex_exit(&vifp->v_lock);
-			return (EINPROGRESS);
-		}
-		/* recheck after being exclusive */
-		if (vifp->v_lcl_addr.s_addr == 0 ||
-		    !vifp->v_marks & VIF_MARK_GOOD) {
-			/*
-			 * someone beat us.
-			 */
-			mutex_exit(&vifp->v_lock);
-			ipsq_exit(ipsq);
-			return (EADDRNOTAVAIL);
-		}
-	}
-
-
-	ASSERT(IAM_WRITER_IPIF(vifp->v_ipif));
-
 	/* Clear VIF_MARK_GOOD and set VIF_MARK_CONDEMNED. */
 	vifp->v_marks &= ~VIF_MARK_GOOD;
 	vifp->v_marks |= VIF_MARK_CONDEMNED;
@@ -1193,16 +1122,28 @@ del_vif(vifi_t *vifip, conn_t *connp, mblk_t *first_mp, ip_stack_t *ipst)
 	/* Phyint only */
 	if (!(vifp->v_flags & (VIFF_TUNNEL | VIFF_REGISTER))) {
 		ipif_t *ipif = vifp->v_ipif;
+		ilm_t *ilm = vifp->v_ilm;
+
+		vifp->v_ilm = NULL;
+
 		ASSERT(ipif != NULL);
 		/*
 		 * should be OK to drop the lock as we
 		 * have marked this as CONDEMNED.
 		 */
 		mutex_exit(&(vifp)->v_lock);
-		(void) ip_delmulti(INADDR_ANY, ipif, B_TRUE, B_TRUE);
-		if (first_mp != NULL)
-			ipsq_exit(ipsq);
+		if (ilm != NULL) {
+			(void) ip_delmulti(ilm);
+			ASSERT(ipif->ipif_ill->ill_mrouter_cnt > 0);
+			atomic_dec_32(&ipif->ipif_ill->ill_mrouter_cnt);
+		}
 		mutex_enter(&(vifp)->v_lock);
+	}
+
+	if (vifp->v_flags & VIFF_REGISTER) {
+		mutex_enter(&ipst->ips_numvifs_mutex);
+		ipst->ips_reg_vif_num = ALL_VIFS;
+		mutex_exit(&ipst->ips_numvifs_mutex);
 	}
 
 	/*
@@ -1584,16 +1525,21 @@ del_mfc(struct mfcctl *mfccp, ip_stack_t *ipst)
  *                   1 - pkt came in on tunnel
  */
 int
-ip_mforward(ill_t *ill, ipha_t *ipha, mblk_t *mp)
+ip_mforward(mblk_t *mp, ip_recv_attr_t *ira)
 {
+	ipha_t		*ipha = (ipha_t *)mp->b_rptr;
+	ill_t		*ill = ira->ira_ill;
 	struct mfc 	*rt;
 	ipaddr_t	src, dst, tunnel_src = 0;
 	static int	srctun = 0;
 	vifi_t		vifi;
 	boolean_t	pim_reg_packet = B_FALSE;
-	struct mfcb *mfcbp;
+	struct mfcb	*mfcbp;
 	ip_stack_t	*ipst = ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
+	ill_t		*rill = ira->ira_rill;
+
+	ASSERT(ira->ira_pktlen == msgdsize(mp));
 
 	if (ipst->ips_ip_mrtdebug > 1) {
 		(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
@@ -1603,10 +1549,10 @@ ip_mforward(ill_t *ill, ipha_t *ipha, mblk_t *mp)
 	}
 
 	dst = ipha->ipha_dst;
-	if ((uint32_t)(uintptr_t)mp->b_prev == PIM_REGISTER_MARKER)
+	if (ira->ira_flags & IRAF_PIM_REGISTER)
 		pim_reg_packet = B_TRUE;
-	else
-		tunnel_src = (ipaddr_t)(uintptr_t)mp->b_prev;
+	else if (ira->ira_flags & IRAF_MROUTE_TUNNEL_SET)
+		tunnel_src = ira->ira_mroute_tunnel;
 
 	/*
 	 * Don't forward a packet with time-to-live of zero or one,
@@ -1620,7 +1566,6 @@ ip_mforward(ill_t *ill, ipha_t *ipha, mblk_t *mp)
 			    " dst 0x%x ill %s",
 			    ipha->ipha_ttl, ntohl(dst), ill->ill_name);
 		}
-		mp->b_prev = NULL;
 		if (tunnel_src != 0)
 			return (1);
 		else
@@ -1630,10 +1575,8 @@ ip_mforward(ill_t *ill, ipha_t *ipha, mblk_t *mp)
 	if ((tunnel_src != 0) || pim_reg_packet) {
 		/*
 		 * Packet arrived over an encapsulated tunnel or via a PIM
-		 * register message. Both ip_mroute_decap() and pim_input()
-		 * encode information in mp->b_prev.
+		 * register message.
 		 */
-		mp->b_prev = NULL;
 		if (ipst->ips_ip_mrtdebug > 1) {
 			if (tunnel_src != 0) {
 				(void) mi_strlog(mrouter->conn_rq, 1,
@@ -1926,10 +1869,16 @@ ip_mforward(ill_t *ill, ipha_t *ipha, mblk_t *mp)
 			mutex_exit(&mfc_rt->mfc_mutex);
 			mutex_exit(&(ipst->ips_mfcs[hash].mfcb_lock));
 			/* Pass to RAWIP */
-			(mrouter->conn_recv)(mrouter, mp_copy, NULL);
+			ira->ira_ill = ira->ira_rill = NULL;
+			(mrouter->conn_recv)(mrouter, mp_copy, NULL, ira);
+			ira->ira_ill = ill;
+			ira->ira_rill = rill;
 		} else {
 			mutex_exit(&mfc_rt->mfc_mutex);
 			mutex_exit(&(ipst->ips_mfcs[hash].mfcb_lock));
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ip_mforward - upcall already waiting",
+			    mp_copy, ill);
 			freemsg(mp_copy);
 		}
 
@@ -1945,8 +1894,11 @@ ip_mforward(ill_t *ill, ipha_t *ipha, mblk_t *mp)
 			mi_free((char *)mfc_rt);
 		if (rte != NULL)
 			mi_free((char *)rte);
-		if (mp_copy != NULL)
+		if (mp_copy != NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ip_mforward error", mp_copy, ill);
 			freemsg(mp_copy);
+		}
 		if (mp0 != NULL)
 			freemsg(mp0);
 		return (-1);
@@ -2023,7 +1975,6 @@ static int
 ip_mdq(mblk_t *mp, ipha_t *ipha, ill_t *ill, ipaddr_t tunnel_src,
     struct mfc *rt)
 {
-	ill_t *vill;
 	vifi_t vifi;
 	struct vif *vifp;
 	ipaddr_t dst = ipha->ipha_dst;
@@ -2031,6 +1982,7 @@ ip_mdq(mblk_t *mp, ipha_t *ipha, ill_t *ill, ipaddr_t tunnel_src,
 	vifi_t num_of_vifs;
 	ip_stack_t	*ipst = ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
+	ip_recv_attr_t	iras;
 
 	if (ipst->ips_ip_mrtdebug > 1) {
 		(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
@@ -2091,19 +2043,19 @@ ip_mdq(mblk_t *mp, ipha_t *ipha, ill_t *ill, ipaddr_t tunnel_src,
 	 * Don't forward if it didn't arrive from the parent vif for its
 	 * origin.
 	 */
-	vill = ipst->ips_vifs[vifi].v_ipif->ipif_ill;
-	if ((vill != ill && !IS_IN_SAME_ILLGRP(vill, ill)) ||
+	if ((ipst->ips_vifs[vifi].v_ipif->ipif_ill != ill) ||
 	    (ipst->ips_vifs[vifi].v_rmt_addr.s_addr != tunnel_src)) {
 		/* Came in the wrong interface */
 		ip1dbg(("ip_mdq: arrived wrong if, vifi %d "
 			"numvifs %d ill %s viftable ill %s\n",
 			(int)vifi, (int)ipst->ips_numvifs, ill->ill_name,
-			vill->ill_name));
+			ipst->ips_vifs[vifi].v_ipif->ipif_ill->ill_name));
 		if (ipst->ips_ip_mrtdebug > 1) {
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 			    "ip_mdq: arrived wrong if, vifi %d ill "
 			    "%s viftable ill %s\n",
-			    (int)vifi, ill->ill_name, vill->ill_name);
+			    (int)vifi, ill->ill_name,
+			    ipst->ips_vifs[vifi].v_ipif->ipif_ill->ill_name);
 		}
 		ipst->ips_mrtstat->mrts_wrong_if++;
 		rt->mfc_wrong_if++;
@@ -2137,7 +2089,14 @@ ip_mdq(mblk_t *mp, ipha_t *ipha, ill_t *ill, ipaddr_t tunnel_src,
 			im->im_mbz = 0;
 			im->im_vif = (ushort_t)vifi;
 			/* Pass to RAWIP */
-			(mrouter->conn_recv)(mrouter, mp_copy, NULL);
+
+			bzero(&iras, sizeof (iras));
+			iras.ira_flags = IRAF_IS_IPV4;
+			iras.ira_ip_hdr_length =
+			    IPH_HDR_LENGTH(mp_copy->b_rptr);
+			iras.ira_pktlen = msgdsize(mp_copy);
+			(mrouter->conn_recv)(mrouter, mp_copy, NULL, &iras);
+			ASSERT(!(iras.ira_flags & IRAF_IPSEC_SECURE));
 		}
 		unlock_good_vif(&ipst->ips_vifs[vifi]);
 		if (tunnel_src != 0)
@@ -2239,8 +2198,10 @@ register_send(ipha_t *ipha, mblk_t *mp, struct vif *vifp, ipaddr_t dst)
 	struct igmpmsg	*im;
 	mblk_t		*mp_copy;
 	ipha_t		*ipha_copy;
-	ip_stack_t	*ipst = vifp->v_ipif->ipif_ill->ill_ipst;
+	ill_t		*ill = vifp->v_ipif->ipif_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
+	ip_recv_attr_t	iras;
 
 	if (ipst->ips_ip_mrtdebug > 1) {
 		(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
@@ -2307,16 +2268,24 @@ register_send(ipha_t *ipha, mblk_t *mp, struct vif *vifp, ipaddr_t dst)
 	im->im_mbz = 0;
 
 	++ipst->ips_mrtstat->mrts_upcalls;
-	if (!canputnext(mrouter->conn_rq)) {
+	if (IPCL_IS_NONSTR(mrouter) ? mrouter->conn_flow_cntrld :
+	    !canputnext(mrouter->conn_rq)) {
 		++ipst->ips_mrtstat->mrts_pim_regsend_drops;
 		if (ipst->ips_ip_mrtdebug > 3) {
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 			    "register_send: register upcall failure.");
 		}
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("mrts_pim_regsend_drops", mp_copy, ill);
 		freemsg(mp_copy);
 	} else {
 		/* Pass to RAWIP */
-		(mrouter->conn_recv)(mrouter, mp_copy, NULL);
+		bzero(&iras, sizeof (iras));
+		iras.ira_flags = IRAF_IS_IPV4;
+		iras.ira_ip_hdr_length = sizeof (ipha_t);
+		iras.ira_pktlen = msgdsize(mp_copy);
+		(mrouter->conn_recv)(mrouter, mp_copy, NULL, &iras);
+		ASSERT(!(iras.ira_flags & IRAF_IPSEC_SECURE));
 	}
 }
 
@@ -2349,18 +2318,22 @@ pim_validate_cksum(mblk_t *mp, ipha_t *ip, struct pim *pimp)
 }
 
 /*
- * int
- * pim_input(queue_t *, mblk_t *, ill_t *ill) - Process PIM protocol packets.
- *	IP Protocol 103. Register messages are decapsulated and sent
- *	onto multicast forwarding.
+ * Process PIM protocol packets i.e. IP Protocol 103.
+ * Register messages are decapsulated and sent onto multicast forwarding.
+ *
+ * Return NULL for a bad packet that is discarded here.
+ * Return mp if the message is OK and should be handed to "raw" receivers.
+ * Callers of pim_input() may need to reinitialize variables that were copied
+ * from the mblk as this calls pullupmsg().
  */
-int
-pim_input(queue_t *q, mblk_t *mp, ill_t *ill)
+mblk_t *
+pim_input(mblk_t *mp, ip_recv_attr_t *ira)
 {
 	ipha_t		*eip, *ip;
 	int		iplen, pimlen, iphlen;
 	struct pim	*pimp;	/* pointer to a pim struct */
 	uint32_t	*reghdr;
+	ill_t		*ill = ira->ira_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
 
@@ -2369,8 +2342,10 @@ pim_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	 */
 	if (pullupmsg(mp, -1) == 0) {
 		++ipst->ips_mrtstat->mrts_pim_nomemory;
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("mrts_pim_nomemory", mp, ill);
 		freemsg(mp);
-		return (-1);
+		return (NULL);
 	}
 
 	ip = (ipha_t *)mp->b_rptr;
@@ -2387,8 +2362,10 @@ pim_input(queue_t *q, mblk_t *mp, ill_t *ill)
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 			    "pim_input: length not at least minlen");
 		}
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("mrts_pim_malformed", mp, ill);
 		freemsg(mp);
-		return (-1);
+		return (NULL);
 	}
 
 	/*
@@ -2405,8 +2382,10 @@ pim_input(queue_t *q, mblk_t *mp, ill_t *ill)
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 			    "pim_input: unknown version of PIM");
 		}
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("mrts_pim_badversion", mp, ill);
 		freemsg(mp);
-		return (-1);
+		return (NULL);
 	}
 
 	/*
@@ -2418,12 +2397,14 @@ pim_input(queue_t *q, mblk_t *mp, ill_t *ill)
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 			    "pim_input: invalid checksum");
 		}
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("pim_rcv_badcsum", mp, ill);
 		freemsg(mp);
-		return (-1);
+		return (NULL);
 	}
 
 	if (pimp->pim_type != PIM_REGISTER)
-		return (0);
+		return (mp);
 
 	reghdr = (uint32_t *)(pimp + 1);
 	eip = (ipha_t *)(reghdr + 1);
@@ -2437,8 +2418,10 @@ pim_input(queue_t *q, mblk_t *mp, ill_t *ill)
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 			    "pim_input: Inner pkt not mcast .. !");
 		}
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("mrts_pim_badregisters", mp, ill);
 		freemsg(mp);
-		return (-1);
+		return (NULL);
 	}
 	if (ipst->ips_ip_mrtdebug > 1) {
 		(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
@@ -2450,27 +2433,36 @@ pim_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	/*
 	 * If the null register bit is not set, decapsulate
 	 * the packet before forwarding it.
+	 * Avoid this in no register vif
 	 */
-	if (!(ntohl(*reghdr) & PIM_NULL_REGISTER)) {
+	if (!(ntohl(*reghdr) & PIM_NULL_REGISTER) &&
+	    ipst->ips_reg_vif_num != ALL_VIFS) {
 		mblk_t *mp_copy;
+		uint_t saved_pktlen;
 
 		/* Copy the message */
 		if ((mp_copy = copymsg(mp)) == NULL) {
 			++ipst->ips_mrtstat->mrts_pim_nomemory;
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("mrts_pim_nomemory", mp, ill);
 			freemsg(mp);
-			return (-1);
+			return (NULL);
 		}
 
 		/*
 		 * Decapsulate the packet and give it to
 		 * register_mforward.
 		 */
-		mp_copy->b_rptr += iphlen + sizeof (pim_t) +
-		    sizeof (*reghdr);
-		if (register_mforward(q, mp_copy, ill) != 0) {
+		mp_copy->b_rptr += iphlen + sizeof (pim_t) + sizeof (*reghdr);
+		saved_pktlen = ira->ira_pktlen;
+		ira->ira_pktlen -= iphlen + sizeof (pim_t) + sizeof (*reghdr);
+		if (register_mforward(mp_copy, ira) != 0) {
+			/* register_mforward already called ip_drop_input */
 			freemsg(mp);
-			return (-1);
+			ira->ira_pktlen = saved_pktlen;
+			return (NULL);
 		}
+		ira->ira_pktlen = saved_pktlen;
 	}
 
 	/*
@@ -2478,7 +2470,7 @@ pim_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	 * PIM socket. For Solaris it is done right after pim_input() is
 	 * called.
 	 */
-	return (0);
+	return (mp);
 }
 
 /*
@@ -2486,38 +2478,52 @@ pim_input(queue_t *q, mblk_t *mp, ill_t *ill)
  * the packet. Loop back the packet, as if we have received it.
  * In pim_input() we have to check if the destination is a multicast address.
  */
-/* ARGSUSED */
 static int
-register_mforward(queue_t *q, mblk_t *mp, ill_t *ill)
+register_mforward(mblk_t *mp, ip_recv_attr_t *ira)
 {
+	ire_t		*ire;
+	ipha_t		*ipha = (ipha_t *)mp->b_rptr;
+	ill_t		*ill = ira->ira_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
 
 	ASSERT(ipst->ips_reg_vif_num <= ipst->ips_numvifs);
 
 	if (ipst->ips_ip_mrtdebug > 3) {
-		ipha_t *ipha;
-
-		ipha = (ipha_t *)mp->b_rptr;
 		(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 		    "register_mforward: src %x, dst %x\n",
 		    ntohl(ipha->ipha_src), ntohl(ipha->ipha_dst));
 	}
 	/*
 	 * Need to pass in to ip_mforward() the information that the
-	 * packet has arrived on the register_vif. We use the solution that
-	 * ip_mroute_decap() employs: use mp->b_prev to pass some information
-	 * to ip_mforward(). Nonzero value means the packet has arrived on a
-	 * tunnel (ip_mroute_decap() puts the address of the other side of the
-	 * tunnel there.) This is safe since ip_rput() either frees the packet
-	 * or passes it to ip_mforward(). We use
-	 * PIM_REGISTER_MARKER = 0xffffffff to indicate the has arrived on the
-	 * register vif. If in the future we have more than one register vifs,
-	 * then this will need re-examination.
+	 * packet has arrived on the register_vif. We mark it with
+	 * the IRAF_PIM_REGISTER attribute.
+	 * pim_input verified that the (inner) destination is multicast,
+	 * hence we skip the generic code in ip_input.
 	 */
-	mp->b_prev = (mblk_t *)PIM_REGISTER_MARKER;
+	ira->ira_flags |= IRAF_PIM_REGISTER;
 	++ipst->ips_mrtstat->mrts_pim_regforwards;
-	ip_rput(q, mp);
+
+	if (!CLASSD(ipha->ipha_dst)) {
+		ire = ire_route_recursive_v4(ipha->ipha_dst, 0, NULL, ALL_ZONES,
+		    ira->ira_tsl, MATCH_IRE_SECATTR, B_TRUE, 0, ipst, NULL,
+		    NULL, NULL);
+	} else {
+		ire = ire_multicast(ill);
+	}
+	ASSERT(ire != NULL);
+	/* Normally this will return the IRE_MULTICAST */
+	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("mrts_pim RTF_REJECT", mp, ill);
+		freemsg(mp);
+		ire_refrele(ire);
+		return (-1);
+	}
+	ASSERT(ire->ire_type & IRE_MULTICAST);
+	(*ire->ire_recvfn)(ire, mp, ipha, ira);
+	ire_refrele(ire);
+
 	return (0);
 }
 
@@ -2575,6 +2581,8 @@ encap_send(ipha_t *ipha, mblk_t *mp, struct vif *vifp, ipaddr_t dst)
 	ipha->ipha_hdr_checksum = 0;
 	ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
 
+	ipha_copy->ipha_ttl = ipha->ipha_ttl;
+
 	if (ipst->ips_ip_mrtdebug > 1) {
 		(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 		    "encap_send: group 0x%x", ntohl(ipha->ipha_dst));
@@ -2587,20 +2595,52 @@ encap_send(ipha_t *ipha, mblk_t *mp, struct vif *vifp, ipaddr_t dst)
 }
 
 /*
- * De-encapsulate a packet and feed it back through IP input.
+ * De-encapsulate a packet and feed it back through IP input if it
+ * matches one of our multicast tunnels.
+ *
  * This routine is called whenever IP gets a packet with prototype
- * IPPROTO_ENCAP and a local destination address.
+ * IPPROTO_ENCAP and a local destination address and the packet didn't
+ * match one of our configured IP-in-IP tunnels.
  */
 void
-ip_mroute_decap(queue_t *q, mblk_t *mp, ill_t *ill)
+ip_mroute_decap(mblk_t *mp, ip_recv_attr_t *ira)
 {
 	ipha_t		*ipha = (ipha_t *)mp->b_rptr;
 	ipha_t		*ipha_encap;
 	int		hlen = IPH_HDR_LENGTH(ipha);
+	int		hlen_encap;
 	ipaddr_t	src;
 	struct vif	*vifp;
+	ire_t		*ire;
+	ill_t		*ill = ira->ira_ill;
 	ip_stack_t	*ipst = ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
+
+	/* Make sure we have all of the inner header */
+	ipha_encap = (ipha_t *)((char *)ipha + hlen);
+	if (mp->b_wptr - mp->b_rptr < hlen + IP_SIMPLE_HDR_LENGTH) {
+		ipha = ip_pullup(mp, hlen + IP_SIMPLE_HDR_LENGTH, ira);
+		if (ipha == NULL) {
+			ipst->ips_mrtstat->mrts_bad_tunnel++;
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ip_mroute_decap: too short", mp, ill);
+			freemsg(mp);
+			return;
+		}
+		ipha_encap = (ipha_t *)((char *)ipha + hlen);
+	}
+	hlen_encap = IPH_HDR_LENGTH(ipha_encap);
+	if (mp->b_wptr - mp->b_rptr < hlen + hlen_encap) {
+		ipha = ip_pullup(mp, hlen + hlen_encap, ira);
+		if (ipha == NULL) {
+			ipst->ips_mrtstat->mrts_bad_tunnel++;
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ip_mroute_decap: too short", mp, ill);
+			freemsg(mp);
+			return;
+		}
+		ipha_encap = (ipha_t *)((char *)ipha + hlen);
+	}
 
 	/*
 	 * Dump the packet if it's not to a multicast destination or if
@@ -2609,10 +2649,11 @@ ip_mroute_decap(queue_t *q, mblk_t *mp, ill_t *ill)
 	 * uniquely identifies the tunnel (i.e., that this site has
 	 * at most one tunnel with the remote site).
 	 */
-	ipha_encap = (ipha_t *)((char *)ipha + hlen);
 	if (!CLASSD(ipha_encap->ipha_dst)) {
 		ipst->ips_mrtstat->mrts_bad_tunnel++;
 		ip1dbg(("ip_mroute_decap: bad tunnel\n"));
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("mrts_bad_tunnel", mp, ill);
 		freemsg(mp);
 		return;
 	}
@@ -2648,6 +2689,8 @@ ip_mroute_decap(queue_t *q, mblk_t *mp, ill_t *ill)
 	if ((vifp = ipst->ips_last_encap_vif) == 0) {
 		mutex_exit(&ipst->ips_last_encap_lock);
 		ipst->ips_mrtstat->mrts_bad_tunnel++;
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("mrts_bad_tunnel", mp, ill);
 		freemsg(mp);
 		ip1dbg(("ip_mroute_decap: vif %ld no tunnel with %x\n",
 		    (ptrdiff_t)(vifp - ipst->ips_vifs), ntohl(src)));
@@ -2657,14 +2700,43 @@ ip_mroute_decap(queue_t *q, mblk_t *mp, ill_t *ill)
 
 	/*
 	 * Need to pass in the tunnel source to ip_mforward (so that it can
-	 * verify that the packet arrived over the correct vif.)  We use b_prev
-	 * to pass this information. This is safe since the ip_rput either
-	 * frees the packet or passes it to ip_mforward.
+	 * verify that the packet arrived over the correct vif.)
 	 */
-	mp->b_prev = (mblk_t *)(uintptr_t)src;
+	ira->ira_flags |= IRAF_MROUTE_TUNNEL_SET;
+	ira->ira_mroute_tunnel = src;
 	mp->b_rptr += hlen;
-	/* Feed back into ip_rput as an M_DATA. */
-	ip_rput(q, mp);
+	ira->ira_pktlen -= hlen;
+	ira->ira_ip_hdr_length = hlen_encap;
+
+	/*
+	 * We don't redo any of the filtering in ill_input_full_v4 and we
+	 * have checked that all of ipha_encap and any IP options are
+	 * pulled up. Hence we call ire_recv_multicast_v4 directly.
+	 * However, we have to check for RSVP as in ip_input_full_v4
+	 * and if so we pass it to ire_recv_broadcast_v4 for local delivery
+	 * to the rsvpd.
+	 */
+	if (ipha_encap->ipha_protocol == IPPROTO_RSVP &&
+	    ipst->ips_ipcl_proto_fanout_v4[IPPROTO_RSVP].connf_head != NULL) {
+		ire = ire_route_recursive_v4(INADDR_BROADCAST, 0, ill,
+		    ALL_ZONES, ira->ira_tsl, MATCH_IRE_ILL|MATCH_IRE_SECATTR,
+		    B_TRUE, 0, ipst, NULL, NULL, NULL);
+	} else {
+		ire = ire_multicast(ill);
+	}
+	ASSERT(ire != NULL);
+	/* Normally this will return the IRE_MULTICAST or IRE_BROADCAST */
+	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ip_mroute_decap: RTF_REJECT", mp, ill);
+		freemsg(mp);
+		ire_refrele(ire);
+		return;
+	}
+	ire->ire_ib_pkt_count++;
+	ASSERT(ire->ire_type & (IRE_MULTICAST|IRE_BROADCAST));
+	(*ire->ire_recvfn)(ire, mp, ipha_encap, ira);
+	ire_refrele(ire);
 }
 
 /*
@@ -2687,7 +2759,7 @@ reset_mrt_vif_ipif(ipif_t *ipif)
 	for (vifi = num_of_vifs; vifi != 0; vifi--) {
 		tmp_vifi = vifi - 1;
 		if (ipst->ips_vifs[tmp_vifi].v_ipif == ipif) {
-			(void) del_vif(&tmp_vifi, NULL, NULL, ipst);
+			(void) del_vif(&tmp_vifi, ipst);
 		}
 	}
 }
@@ -2696,11 +2768,12 @@ reset_mrt_vif_ipif(ipif_t *ipif)
 void
 reset_mrt_ill(ill_t *ill)
 {
-	struct mfc		*rt;
+	struct mfc	*rt;
 	struct rtdetq	*rte;
-	int			i;
+	int		i;
 	ip_stack_t	*ipst = ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
+	timeout_id_t	id;
 
 	for (i = 0; i < MFCTBLSIZ; i++) {
 		MFCB_REFHOLD(&ipst->ips_mfcs[i]);
@@ -2713,6 +2786,18 @@ reset_mrt_ill(ill_t *ill)
 			while (rt != NULL) {
 				mutex_enter(&rt->mfc_mutex);
 				while ((rte = rt->mfc_rte) != NULL) {
+					if (rte->ill == ill &&
+					    (id = rt->mfc_timeout_id) != 0) {
+						/*
+						 * Its ok to drop the lock,  the
+						 * struct cannot be freed since
+						 * we have a ref on the hash
+						 * bucket.
+						 */
+						mutex_exit(&rt->mfc_mutex);
+						(void) untimeout(id);
+						mutex_enter(&rt->mfc_mutex);
+					}
 					if (rte->ill == ill) {
 						if (ipst->ips_ip_mrtdebug > 1) {
 						(void) mi_strlog(
@@ -2744,12 +2829,15 @@ tbf_control(struct vif *vifp, mblk_t *mp, ipha_t *ipha)
 	size_t 	p_len =  msgdsize(mp);
 	struct tbf	*t    = vifp->v_tbf;
 	timeout_id_t id = 0;
-	ip_stack_t	*ipst = vifp->v_ipif->ipif_ill->ill_ipst;
+	ill_t		*ill = vifp->v_ipif->ipif_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
 
 	/* Drop if packet is too large */
 	if (p_len > MAX_BKT_SIZE) {
 		ipst->ips_mrtstat->mrts_pkt2large++;
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		ip_drop_output("tbf_control - too large", mp, ill);
 		freemsg(mp);
 		return;
 	}
@@ -2800,6 +2888,9 @@ tbf_control(struct vif *vifp, mblk_t *mp, ipha_t *ipha)
 
 		if ((mp->b_wptr - mp->b_rptr) < hdr_length) {
 			if (!pullupmsg(mp, hdr_length)) {
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsOutDiscards);
+				ip_drop_output("tbf_control - pullup", mp, ill);
 				freemsg(mp);
 				ip1dbg(("tbf_ctl: couldn't pullup udp hdr, "
 				    "vif %ld src 0x%x dst 0x%x\n",
@@ -2818,6 +2909,8 @@ tbf_control(struct vif *vifp, mblk_t *mp, ipha_t *ipha)
 		 */
 		if (!tbf_dq_sel(vifp, ipha)) {
 			ipst->ips_mrtstat->mrts_q_overflow++;
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			ip_drop_output("mrts_q_overflow", mp, ill);
 			freemsg(mp);
 		} else {
 			tbf_queue(vifp, mp);
@@ -2958,7 +3051,8 @@ tbf_dq_sel(struct vif *vifp, ipha_t *ipha)
 	struct tbf		*t = vifp->v_tbf;
 	mblk_t		**np;
 	mblk_t		*last, *mp;
-	ip_stack_t	*ipst = vifp->v_ipif->ipif_ill->ill_ipst;
+	ill_t		*ill = vifp->v_ipif->ipif_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
 
 	if (ipst->ips_ip_mrtdebug > 1) {
@@ -2979,6 +3073,8 @@ tbf_dq_sel(struct vif *vifp, ipha_t *ipha)
 			if (mp == t->tbf_t)
 				t->tbf_t = last;
 			mp->b_prev = mp->b_next = NULL;
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			ip_drop_output("tbf_dq_send", mp, ill);
 			freemsg(mp);
 			/*
 			 * It's impossible for the queue to be empty, but
@@ -3000,76 +3096,97 @@ tbf_dq_sel(struct vif *vifp, ipha_t *ipha)
 static void
 tbf_send_packet(struct vif *vifp, mblk_t *mp)
 {
-	ipif_t  *ipif;
-	ip_stack_t	*ipst = vifp->v_ipif->ipif_ill->ill_ipst;
+	ipif_t		*ipif = vifp->v_ipif;
+	ill_t		*ill = ipif->ipif_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 	conn_t		*mrouter = ipst->ips_ip_g_mrouter;
+	ipha_t		*ipha;
 
+	ipha = (ipha_t *)mp->b_rptr;
 	/* If encap tunnel options */
 	if (vifp->v_flags & VIFF_TUNNEL)  {
+		ip_xmit_attr_t	ixas;
+
 		if (ipst->ips_ip_mrtdebug > 1) {
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
-			    "tbf_send_pkt: ENCAP tunnel vif %ld",
+			    "tbf_send_packet: ENCAP tunnel vif %ld",
 			    (ptrdiff_t)(vifp - ipst->ips_vifs));
 		}
+		bzero(&ixas, sizeof (ixas));
+		ixas.ixa_flags = IXAF_IS_IPV4 | IXAF_NO_TTL_CHANGE;
+		ixas.ixa_ipst = ipst;
+		ixas.ixa_ifindex = 0;
+		ixas.ixa_cred = kcred;
+		ixas.ixa_cpid = NOPID;
+		ixas.ixa_tsl = NULL;
+		ixas.ixa_zoneid = GLOBAL_ZONEID; /* Multicast router in GZ */
+		ixas.ixa_pktlen = ntohs(ipha->ipha_length);
+		ixas.ixa_ip_hdr_length = IPH_HDR_LENGTH(ipha);
 
 		/*
-		 * Feed into ip_wput which will set the ident field and
-		 * checksum the encapsulating header.
+		 * Feed into ip_output_simple which will set the ident field
+		 * and checksum the encapsulating header.
 		 * BSD gets the cached route vifp->v_route from ip_output()
 		 * to speed up route table lookups. Not necessary in SunOS 5.x.
+		 * One could make multicast forwarding faster by putting an
+		 * ip_xmit_attr_t in each vif thereby caching the ire/nce.
 		 */
-		put(vifp->v_ipif->ipif_wq, mp);
+		(void) ip_output_simple(mp, &ixas);
+		ixa_cleanup(&ixas);
 		return;
 
 		/* phyint */
 	} else {
 		/* Need to loop back to members on the outgoing interface. */
-		ipha_t  *ipha;
-		ipaddr_t    dst;
-		ipha  = (ipha_t *)mp->b_rptr;
-		dst  = ipha->ipha_dst;
-		ipif = vifp->v_ipif;
+		ipaddr_t	dst;
+		ip_recv_attr_t	iras;
+		nce_t		*nce;
 
-		if (ilm_lookup_ipif(ipif, dst) != NULL) {
-			/*
-			 * The packet is not yet reassembled, thus we need to
-			 * pass it to ip_rput_local for checksum verification
-			 * and reassembly (and fanout the user stream).
-			 */
-			mblk_t 	*mp_loop;
-			ire_t	*ire;
+		bzero(&iras, sizeof (iras));
+		iras.ira_flags = IRAF_IS_IPV4;
+		iras.ira_ill = iras.ira_rill = ill;
+		iras.ira_ruifindex = ill->ill_phyint->phyint_ifindex;
+		iras.ira_zoneid = GLOBAL_ZONEID; /* Multicast router in GZ */
+		iras.ira_pktlen = ntohs(ipha->ipha_length);
+		iras.ira_ip_hdr_length = IPH_HDR_LENGTH(ipha);
 
-			if (ipst->ips_ip_mrtdebug > 1) {
-				(void) mi_strlog(mrouter->conn_rq, 1,
-				    SL_TRACE,
-				    "tbf_send_pkt: loopback vif %ld",
-				    (ptrdiff_t)(vifp - ipst->ips_vifs));
-			}
-			mp_loop = copymsg(mp);
-			ire = ire_ctable_lookup(~0, 0, IRE_BROADCAST, NULL,
-			    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-
-			if (mp_loop != NULL && ire != NULL) {
-				IP_RPUT_LOCAL(ipif->ipif_rq, mp_loop,
-				    ((ipha_t *)mp_loop->b_rptr),
-				    ire, (ill_t *)ipif->ipif_rq->q_ptr);
-			} else {
-				/* Either copymsg failed or no ire */
-				(void) mi_strlog(mrouter->conn_rq, 1,
-				    SL_TRACE,
-				    "tbf_send_pkt: mp_loop 0x%p, ire 0x%p "
-				    "vif %ld\n", (void *)mp_loop, (void *)ire,
-				    (ptrdiff_t)(vifp - ipst->ips_vifs));
-			}
-			if (ire != NULL)
-				ire_refrele(ire);
+		dst = ipha->ipha_dst;
+		if (ill_hasmembers_v4(ill, dst)) {
+			iras.ira_flags |= IRAF_LOOPBACK_COPY;
 		}
 		if (ipst->ips_ip_mrtdebug > 1) {
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 			    "tbf_send_pkt: phyint forward  vif %ld dst = 0x%x",
 			    (ptrdiff_t)(vifp - ipst->ips_vifs), ntohl(dst));
 		}
-		ip_rput_forward_multicast(dst, mp, ipif);
+		/*
+		 * Find an NCE which matches the nexthop.
+		 * For a pt-pt interface we use the other end of the pt-pt
+		 * link.
+		 */
+		if (ipif->ipif_flags & IPIF_POINTOPOINT) {
+			dst = ipif->ipif_pp_dst_addr;
+			nce = arp_nce_init(ill, dst, ill->ill_net_type);
+		} else {
+			nce = arp_nce_init(ill, dst, IRE_MULTICAST);
+		}
+		if (nce == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			ip_drop_output("tbf_send_packet - no nce", mp, ill);
+			freemsg(mp);
+			return;
+		}
+
+		/*
+		 * We don't remeber the incoming ill. Thus we
+		 * pretend the  packet arrived on the outbound ill. This means
+		 * statistics for input errors will be increased on the wrong
+		 * ill but that isn't a big deal.
+		 */
+		ip_forward_xmit_v4(nce, ill, mp, ipha, &iras, ill->ill_mtu, 0);
+		ASSERT(!(iras.ira_flags & IRAF_IPSEC_SECURE));
+
+		nce_refrele(nce);
 	}
 }
 

@@ -22,12 +22,12 @@
  * Use is subject to license terms.
  */
 
-#include <inet/arp.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/ip_if.h>
 #include <inet/ip_ire.h>
 #include <inet/ip_multi.h>
+#include <inet/ip_ndp.h>
 #include <inet/ip_rts.h>
 #include <inet/mi.h>
 #include <net/if_types.h>
@@ -52,20 +52,6 @@
 #define	IPMP_GRP_HASH_SIZE		64
 #define	IPMP_ILL_REFRESH_TIMEOUT	120	/* seconds */
 
-/*
- * Templates for IPMP ARP messages.
- */
-static const arie_t ipmp_aract_template = {
-	AR_IPMP_ACTIVATE,
-	sizeof (arie_t),		/* Name offset */
-	sizeof (arie_t)			/* Name length (set by ill_arp_alloc) */
-};
-
-static const arie_t ipmp_ardeact_template = {
-	AR_IPMP_DEACTIVATE,
-	sizeof (arie_t),		/* Name offset */
-	sizeof (arie_t)			/* Name length (set by ill_arp_alloc) */
-};
 
 /*
  * IPMP meta-interface kstats (based on those in PSARC/1997/198).
@@ -497,7 +483,7 @@ ipmp_grp_vet_ill(ipmp_grp_t *grp, ill_t *ill)
 	 * An ill must strictly be using ARP and/or ND for address
 	 * resolution for it to be allowed into a group.
 	 */
-	if (ill->ill_flags & (ILLF_NONUD | ILLF_NOARP | ILLF_XRESOLV))
+	if (ill->ill_flags & (ILLF_NONUD | ILLF_NOARP))
 		return (ENOTSUP);
 
 	/*
@@ -752,7 +738,7 @@ ipmp_illgrp_hold_next_ill(ipmp_illgrp_t *illg)
 		if (illg->ig_next_ill == NULL)
 			illg->ig_next_ill = list_head(&illg->ig_actif);
 
-		if (ill_check_and_refhold(ill) == 0) {
+		if (ill_check_and_refhold(ill)) {
 			rw_exit(&ipst->ips_ipmp_lock);
 			return (ill);
 		}
@@ -760,17 +746,6 @@ ipmp_illgrp_hold_next_ill(ipmp_illgrp_t *illg)
 	rw_exit(&ipst->ips_ipmp_lock);
 
 	return (NULL);
-}
-
-/*
- * Return a pointer to the nominated multicast ill in `illg', or NULL if one
- * doesn't exist.  Caller must be inside the IPSQ.
- */
-ill_t *
-ipmp_illgrp_cast_ill(ipmp_illgrp_t *illg)
-{
-	ASSERT(IAM_WRITER_ILL(illg->ig_ipmp_ill));
-	return (illg->ig_cast_ill);
 }
 
 /*
@@ -785,12 +760,26 @@ ipmp_illgrp_hold_cast_ill(ipmp_illgrp_t *illg)
 
 	rw_enter(&ipst->ips_ipmp_lock, RW_READER);
 	castill = illg->ig_cast_ill;
-	if (castill != NULL && ill_check_and_refhold(castill) == 0) {
+	if (castill != NULL && ill_check_and_refhold(castill)) {
 		rw_exit(&ipst->ips_ipmp_lock);
 		return (castill);
 	}
 	rw_exit(&ipst->ips_ipmp_lock);
 	return (NULL);
+}
+
+/*
+ * Callback routine for ncec_walk() that deletes `nce' if it is associated with
+ * the `(ill_t *)arg' and it is not one of the local addresses.  Caller must be
+ * inside the IPSQ.
+ */
+static void
+ipmp_ncec_delete_nonlocal(ncec_t *ncec, uchar_t *arg)
+{
+	if ((ncec != NULL) && !NCE_MYADDR(ncec) &&
+	    ncec->ncec_ill == (ill_t *)arg) {
+		ncec_delete(ncec);
+	}
 }
 
 /*
@@ -820,6 +809,14 @@ ipmp_illgrp_set_cast(ipmp_illgrp_t *illg, ill_t *castill)
 		 */
 		if (ipmp_ill->ill_dl_up)
 			ill_leave_multicast(ipmp_ill);
+
+		/*
+		 * Delete any NCEs tied to the old nomination.  We must do this
+		 * last since ill_leave_multicast() may trigger IREs to be
+		 * built using ig_cast_ill.
+		 */
+		ncec_walk(ocastill, (pfi_t)ipmp_ncec_delete_nonlocal, ocastill,
+		    ocastill->ill_ipst);
 	}
 
 	/*
@@ -828,16 +825,6 @@ ipmp_illgrp_set_cast(ipmp_illgrp_t *illg, ill_t *castill)
 	rw_enter(&ipst->ips_ipmp_lock, RW_WRITER);
 	illg->ig_cast_ill = castill;
 	rw_exit(&ipst->ips_ipmp_lock);
-
-	if (ocastill != NULL) {
-		/*
-		 * Delete any IREs tied to the old nomination.  We must do
-		 * this after the new castill is set and has reached global
-		 * visibility since the datapath has not been quiesced.
-		 */
-		ire_walk_ill(MATCH_IRE_ILL | MATCH_IRE_TYPE, IRE_CACHE,
-		    ill_stq_cache_delete, ocastill, ocastill);
-	}
 
 	/*
 	 * Enable new nominated ill (if any).
@@ -855,15 +842,6 @@ ipmp_illgrp_set_cast(ipmp_illgrp_t *illg, ill_t *castill)
 		if (ipmp_ill->ill_dl_up)
 			ill_recover_multicast(ipmp_ill);
 	}
-
-	/*
-	 * For IPv4, refresh our broadcast IREs.  This needs to be done even
-	 * if there's no new nomination since ill_refresh_bcast() still must
-	 * update the IPMP meta-interface's broadcast IREs to point back at
-	 * the IPMP meta-interface itself.
-	 */
-	if (!ipmp_ill->ill_isv6)
-		ill_refresh_bcast(ipmp_ill);
 }
 
 /*
@@ -872,33 +850,33 @@ ipmp_illgrp_set_cast(ipmp_illgrp_t *illg, ill_t *castill)
  * created IPMP ARP entry, or NULL on failure.
  */
 ipmp_arpent_t *
-ipmp_illgrp_create_arpent(ipmp_illgrp_t *illg, mblk_t *mp, boolean_t proxyarp)
+ipmp_illgrp_create_arpent(ipmp_illgrp_t *illg, boolean_t proxyarp,
+    ipaddr_t ipaddr, uchar_t *lladdr, size_t lladdr_len, uint16_t flags)
 {
-	uchar_t *addrp;
-	area_t *area = (area_t *)mp->b_rptr;
 	ipmp_arpent_t *entp, *oentp;
 
 	ASSERT(IAM_WRITER_ILL(illg->ig_ipmp_ill));
-	ASSERT(area->area_proto_addr_length == sizeof (ipaddr_t));
 
-	if ((entp = kmem_zalloc(sizeof (ipmp_arpent_t), KM_NOSLEEP)) == NULL)
+	if ((entp = kmem_alloc(sizeof (ipmp_arpent_t) + lladdr_len,
+	    KM_NOSLEEP)) == NULL)
 		return (NULL);
 
-	if ((mp = copyb(mp)) == NULL) {
-		kmem_free(entp, sizeof (ipmp_arpent_t));
-		return (NULL);
-	}
-
-	DB_TYPE(mp) = M_PROTO;
-	entp->ia_area_mp = mp;
-	entp->ia_proxyarp = proxyarp;
-	addrp = mi_offset_paramc(mp, area->area_proto_addr_offset,
-	    sizeof (ipaddr_t));
-	bcopy(addrp, &entp->ia_ipaddr, sizeof (ipaddr_t));
-
+	/*
+	 * Delete any existing ARP entry for this address.
+	 */
 	if ((oentp = ipmp_illgrp_lookup_arpent(illg, &entp->ia_ipaddr)) != NULL)
 		ipmp_illgrp_destroy_arpent(illg, oentp);
 
+	/*
+	 * Prepend the new entry.
+	 */
+	entp->ia_ipaddr = ipaddr;
+	entp->ia_flags = flags;
+	entp->ia_lladdr_len = lladdr_len;
+	entp->ia_lladdr = (uchar_t *)&entp[1];
+	bcopy(lladdr, entp->ia_lladdr, lladdr_len);
+	entp->ia_proxyarp = proxyarp;
+	entp->ia_notified = B_TRUE;
 	list_insert_head(&illg->ig_arpent, entp);
 	return (entp);
 }
@@ -912,8 +890,7 @@ ipmp_illgrp_destroy_arpent(ipmp_illgrp_t *illg, ipmp_arpent_t *entp)
 	ASSERT(IAM_WRITER_ILL(illg->ig_ipmp_ill));
 
 	list_remove(&illg->ig_arpent, entp);
-	freeb(entp->ia_area_mp);
-	kmem_free(entp, sizeof (ipmp_arpent_t));
+	kmem_free(entp, sizeof (ipmp_arpent_t) + entp->ia_lladdr_len);
 }
 
 /*
@@ -957,10 +934,9 @@ ipmp_illgrp_refresh_arpent(ipmp_illgrp_t *illg)
 {
 	ill_t *ill, *ipmp_ill = illg->ig_ipmp_ill;
 	uint_t paddrlen = ipmp_ill->ill_phys_addr_length;
-	area_t *area;
-	mblk_t *area_mp;
-	uchar_t *physaddr;
 	ipmp_arpent_t *entp;
+	ncec_t *ncec;
+	nce_t  *nce;
 
 	ASSERT(IAM_WRITER_ILL(ipmp_ill));
 	ASSERT(!ipmp_ill->ill_isv6);
@@ -973,11 +949,7 @@ ipmp_illgrp_refresh_arpent(ipmp_illgrp_t *illg)
 			continue;
 		}
 
-		area = (area_t *)entp->ia_area_mp->b_rptr;
 		ASSERT(paddrlen == ill->ill_phys_addr_length);
-		ASSERT(paddrlen == area->area_hw_addr_length);
-		physaddr = mi_offset_paramc(entp->ia_area_mp,
-		    area->area_hw_addr_offset, paddrlen);
 
 		/*
 		 * If this is a proxy ARP entry, we can skip notifying ARP if
@@ -985,18 +957,25 @@ ipmp_illgrp_refresh_arpent(ipmp_illgrp_t *illg)
 		 * update the entry's hardware address before notifying ARP.
 		 */
 		if (entp->ia_proxyarp) {
-			if (bcmp(ill->ill_phys_addr, physaddr, paddrlen) == 0 &&
-			    entp->ia_notified)
+			if (bcmp(ill->ill_phys_addr, entp->ia_lladdr,
+			    paddrlen) == 0 && entp->ia_notified)
 				continue;
-			bcopy(ill->ill_phys_addr, physaddr, paddrlen);
+			bcopy(ill->ill_phys_addr, entp->ia_lladdr, paddrlen);
 		}
 
-		if ((area_mp = copyb(entp->ia_area_mp)) == NULL) {
-			entp->ia_notified = B_FALSE;
+		(void) nce_lookup_then_add_v4(ipmp_ill, entp->ia_lladdr,
+		    paddrlen, &entp->ia_ipaddr, entp->ia_flags, ND_UNCHANGED,
+		    &nce);
+		if (nce == NULL || !entp->ia_proxyarp) {
+			if (nce != NULL)
+				nce_refrele(nce);
 			continue;
 		}
-
-		putnext(ipmp_ill->ill_rq, area_mp);
+		ncec = nce->nce_common;
+		mutex_enter(&ncec->ncec_lock);
+		nce_update(ncec, ND_UNCHANGED, ill->ill_phys_addr);
+		mutex_exit(&ncec->ncec_lock);
+		nce_refrele(nce);
 		ipmp_illgrp_mark_arpent(illg, entp);
 
 		if ((ill = list_next(&illg->ig_actif, ill)) == NULL)
@@ -1061,16 +1040,16 @@ ipmp_illgrp_refresh_mtu(ipmp_illgrp_t *illg)
 	ASSERT(IAM_WRITER_ILL(ipmp_ill));
 
 	/*
-	 * Since ill_max_mtu can only change under ill_lock, we hold ill_lock
+	 * Since ill_mtu can only change under ill_lock, we hold ill_lock
 	 * for each ill as we iterate through the list.  Any changes to the
-	 * ill_max_mtu will also trigger an update, so even if we missed it
+	 * ill_mtu will also trigger an update, so even if we missed it
 	 * this time around, the update will catch it.
 	 */
 	ill = list_head(&illg->ig_if);
 	for (; ill != NULL; ill = list_next(&illg->ig_if, ill)) {
 		mutex_enter(&ill->ill_lock);
-		if (mtu == 0 || ill->ill_max_mtu < mtu)
-			mtu = ill->ill_max_mtu;
+		if (mtu == 0 || ill->ill_mtu < mtu)
+			mtu = ill->ill_mtu;
 		mutex_exit(&ill->ill_lock);
 	}
 
@@ -1171,13 +1150,12 @@ ipmp_ill_join_illgrp(ill_t *ill, ipmp_illgrp_t *illg)
 	 * This may seem odd, but it's consistent with the application view
 	 * that `ill' no longer exists (e.g., due to ipmp_ill_rtsaddrmsg()).
 	 */
+	update_conn_ill(ill, ill->ill_ipst);
 	if (ill->ill_isv6) {
-		reset_conn_ill(ill);
 		reset_mrt_ill(ill);
 	} else {
 		ipif = ill->ill_ipif;
 		for (; ipif != NULL; ipif = ipif->ipif_next) {
-			reset_conn_ipif(ipif);
 			reset_mrt_vif_ipif(ipif);
 		}
 	}
@@ -1206,7 +1184,7 @@ ipmp_ill_join_illgrp(ill_t *ill, ipmp_illgrp_t *illg)
 			ipmp_ill->ill_flags |= ILLF_COS_ENABLED;
 			mutex_exit(&ipmp_ill->ill_lock);
 		}
-		ipmp_illgrp_set_mtu(illg, ill->ill_max_mtu);
+		ipmp_illgrp_set_mtu(illg, ill->ill_mtu);
 	} else {
 		ASSERT(ipmp_ill->ill_phys_addr_length ==
 		    ill->ill_phys_addr_length);
@@ -1217,8 +1195,8 @@ ipmp_ill_join_illgrp(ill_t *ill, ipmp_illgrp_t *illg)
 			ipmp_ill->ill_flags &= ~ILLF_COS_ENABLED;
 			mutex_exit(&ipmp_ill->ill_lock);
 		}
-		if (illg->ig_mtu > ill->ill_max_mtu)
-			ipmp_illgrp_set_mtu(illg, ill->ill_max_mtu);
+		if (illg->ig_mtu > ill->ill_mtu)
+			ipmp_illgrp_set_mtu(illg, ill->ill_mtu);
 	}
 
 	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
@@ -1231,12 +1209,6 @@ ipmp_ill_join_illgrp(ill_t *ill, ipmp_illgrp_t *illg)
 	 * sending data traffic.
 	 */
 	ire_walk_ill(MATCH_IRE_ILL, 0, ipmp_ill_ire_mark_testhidden, ill, ill);
-
-	/*
-	 * Merge any broadcast IREs, if need be.
-	 */
-	if (!ill->ill_isv6)
-		ill_refresh_bcast(ill);
 
 	ipmp_ill_refresh_active(ill);
 }
@@ -1299,12 +1271,6 @@ ipmp_ill_leave_illgrp(ill_t *ill)
 	list_remove(&illg->ig_if, ill);
 	ill->ill_grp = NULL;
 	rw_exit(&ipst->ips_ill_g_lock);
-
-	/*
-	 * Recreate any broadcast IREs that had been shared, if need be.
-	 */
-	if (!ill->ill_isv6)
-		ill_refresh_bcast(ill);
 
 	/*
 	 * Re-establish multicast memberships that were previously being
@@ -1456,10 +1422,8 @@ static boolean_t
 ipmp_ill_activate(ill_t *ill)
 {
 	ipif_t		*ipif;
-	mblk_t		*actmp = NULL, *deactmp = NULL;
 	mblk_t		*linkupmp = NULL, *linkdownmp = NULL;
 	ipmp_grp_t	*grp = ill->ill_phyint->phyint_grp;
-	const char	*grifname = grp->gr_ifname;
 	ipmp_illgrp_t	*illg = ill->ill_grp;
 	ill_t		*maxill;
 	ip_stack_t	*ipst = IPMP_ILLGRP_TO_IPST(illg);
@@ -1476,20 +1440,6 @@ ipmp_ill_activate(ill_t *ill)
 		linkdownmp = ip_dlnotify_alloc(DL_NOTE_LINK_DOWN, 0);
 		if (linkupmp == NULL || linkdownmp == NULL)
 			goto fail;
-	}
-
-	/*
-	 * For IPv4, allocate the activate/deactivate messages, and tell ARP.
-	 */
-	if (!ill->ill_isv6) {
-		actmp = ill_arie_alloc(ill, grifname, &ipmp_aract_template);
-		deactmp = ill_arie_alloc(ill, grifname, &ipmp_ardeact_template);
-		if (actmp == NULL || deactmp == NULL)
-			goto fail;
-
-		ASSERT(ill->ill_ardeact_mp == NULL);
-		ill->ill_ardeact_mp = deactmp;
-		putnext(illg->ig_ipmp_ill->ill_rq, actmp);
 	}
 
 	if (list_is_empty(&illg->ig_actif)) {
@@ -1524,12 +1474,6 @@ ipmp_ill_activate(ill_t *ill)
 			ipif = ipmp_ill_unbind_ipif(maxill, NULL, B_TRUE);
 			ipmp_ill_bind_ipif(ill, ipif, Res_act_rebind);
 		}
-
-		/*
-		 * TODO: explore whether it's advantageous to flush IRE_CACHE
-		 * bindings to force existing connections to be redistributed
-		 * to the new ill.
-		 */
 	}
 
 	/*
@@ -1542,7 +1486,7 @@ ipmp_ill_activate(ill_t *ill)
 	rw_exit(&ipst->ips_ipmp_lock);
 
 	/*
-	 * Refresh ARP entries to use `ill', if need be.
+	 * Refresh static/proxy ARP entries to use `ill', if need be.
 	 */
 	if (!ill->ill_isv6)
 		ipmp_illgrp_refresh_arpent(illg);
@@ -1557,8 +1501,6 @@ ipmp_ill_activate(ill_t *ill)
 	}
 	return (B_TRUE);
 fail:
-	freemsg(actmp);
-	freemsg(deactmp);
 	freemsg(linkupmp);
 	freemsg(linkdownmp);
 	return (B_FALSE);
@@ -1581,18 +1523,6 @@ ipmp_ill_deactivate(ill_t *ill)
 	ASSERT(IS_UNDER_IPMP(ill));
 
 	/*
-	 * Delete all IRE_CACHE entries for the group.  (We cannot restrict
-	 * ourselves to entries with ire_stq == ill since there may be other
-	 * IREs that are backed by ACEs that are tied to this ill -- and thus
-	 * when those ACEs are deleted, the IREs will be adrift without any
-	 * AR_CN_ANNOUNCE notification from ARP.)
-	 */
-	if (ill->ill_isv6)
-		ire_walk_v6(ill_grp_cache_delete, ill, ALL_ZONES, ipst);
-	else
-		ire_walk_v4(ill_grp_cache_delete, ill, ALL_ZONES, ipst);
-
-	/*
 	 * Pull the interface out of the active list.
 	 */
 	rw_enter(&ipst->ips_ipmp_lock, RW_WRITER);
@@ -1609,6 +1539,12 @@ ipmp_ill_deactivate(ill_t *ill)
 		ipmp_illgrp_set_cast(illg, list_head(&illg->ig_actif));
 
 	/*
+	 * Delete all nce_t entries using this ill, so that the next attempt
+	 * to send data traffic will revalidate cached nce's.
+	 */
+	nce_flush(ill, B_TRUE);
+
+	/*
 	 * Unbind all of the ipifs bound to this ill, and save 'em in a list;
 	 * we'll rebind them after we tell the resolver the ill is no longer
 	 * active.  We must do things in this order or the resolver could
@@ -1620,18 +1556,10 @@ ipmp_ill_deactivate(ill_t *ill)
 		ipif->ipif_bound_next = ubheadipif;
 		ubheadipif = ipif;
 	}
-
 	if (!ill->ill_isv6) {
-		/*
-		 * Tell ARP `ill' is no longer active in the group.
-		 */
-		mp = ill->ill_ardeact_mp;
-		ill->ill_ardeact_mp = NULL;
-		ASSERT(mp != NULL);
-		putnext(illg->ig_ipmp_ill->ill_rq, mp);
 
 		/*
-		 * Refresh any ARP entries that had been using `ill'.
+		 * Refresh static/proxy ARP entries that had been using `ill'.
 		 */
 		ipmp_illgrp_refresh_arpent(illg);
 	}
@@ -1648,6 +1576,20 @@ ipmp_ill_deactivate(ill_t *ill)
 		if ((minill = ipmp_illgrp_min_ill(illg)) != NULL)
 			ipmp_ill_bind_ipif(minill, ipif, Res_act_rebind);
 	}
+
+	if (list_is_empty(&illg->ig_actif)) {
+		ill_t *ipmp_ill = illg->ig_ipmp_ill;
+
+		ncec_walk(ipmp_ill, (pfi_t)ncec_delete_per_ill,
+		    (uchar_t *)ipmp_ill, ipmp_ill->ill_ipst);
+	}
+
+	/*
+	 * Remove any IRE_IF_CLONE for this ill since they might have
+	 * an ire_nce_cache/nce_common which refers to another ill in the group.
+	 */
+	ire_walk_ill(MATCH_IRE_TYPE, IRE_IF_CLONE, ill_downi_if_clone,
+	    ill, ill);
 
 	/*
 	 * Finally, mark the group link down, if necessary.
@@ -1725,7 +1667,7 @@ ipmp_ill_bind_ipif(ill_t *ill, ipif_t *ipif, enum ip_resolver_action act)
 
 	/*
 	 * If necessary, tell ARP/NDP about the new mapping.  Note that
-	 * ipif_resolver_up() cannot fail for non-XRESOLV IPv6 ills.
+	 * ipif_resolver_up() cannot fail for IPv6 ills.
 	 */
 	if (act != Res_act_none) {
 		if (ill->ill_isv6) {
@@ -1756,14 +1698,11 @@ ipmp_ill_bind_ipif(ill_t *ill, ipif_t *ipif, enum ip_resolver_action act)
 static ipif_t *
 ipmp_ill_unbind_ipif(ill_t *ill, ipif_t *ipif, boolean_t notifyres)
 {
-	ill_t *ipmp_ill;
 	ipif_t *previpif;
 	ip_stack_t *ipst = ill->ill_ipst;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 	ASSERT(IS_UNDER_IPMP(ill));
-
-	ipmp_ill = ill->ill_grp->ig_ipmp_ill;
 
 	/*
 	 * If necessary, find an ipif to unbind.
@@ -1803,13 +1742,10 @@ ipmp_ill_unbind_ipif(ill_t *ill, ipif_t *ipif, boolean_t notifyres)
 	 * If requested, notify the resolvers (provided we're bound).
 	 */
 	if (notifyres && ipif->ipif_bound) {
-		if (ill->ill_isv6) {
+		if (ill->ill_isv6)
 			ipif_ndp_down(ipif);
-		} else {
-			ASSERT(ipif->ipif_arp_del_mp != NULL);
-			putnext(ipmp_ill->ill_rq, ipif->ipif_arp_del_mp);
-			ipif->ipif_arp_del_mp = NULL;
-		}
+		else
+			(void) ipif_arp_down(ipif);
 	}
 	ipif->ipif_bound = B_FALSE;
 
@@ -1845,8 +1781,8 @@ ipmp_ill_is_active(ill_t *ill)
 }
 
 /*
- * IRE walker callback: set IRE_MARK_TESTHIDDEN on cache/interface/offsubnet
- * IREs with a source address on `ill_arg'.
+ * IRE walker callback: set ire_testhidden on IRE_HIDDEN_TYPE IREs associated
+ * with `ill_arg'.
  */
 static void
 ipmp_ill_ire_mark_testhidden(ire_t *ire, char *ill_arg)
@@ -1856,27 +1792,18 @@ ipmp_ill_ire_mark_testhidden(ire_t *ire, char *ill_arg)
 	ASSERT(IAM_WRITER_ILL(ill));
 	ASSERT(!IS_IPMP(ill));
 
-	if (ire->ire_ipif->ipif_ill != ill)
+	if (ire->ire_ill != ill)
 		return;
 
-	switch (ire->ire_type) {
-	case IRE_HOST:
-	case IRE_PREFIX:
-	case IRE_DEFAULT:
-	case IRE_CACHE:
-	case IRE_IF_RESOLVER:
-	case IRE_IF_NORESOLVER:
+	if (IRE_HIDDEN_TYPE(ire->ire_type)) {
 		DTRACE_PROBE1(ipmp__mark__testhidden, ire_t *, ire);
-		ire->ire_marks |= IRE_MARK_TESTHIDDEN;
-		break;
-	default:
-		break;
+		ire->ire_testhidden = B_TRUE;
 	}
 }
 
 /*
- * IRE walker callback: clear IRE_MARK_TESTHIDDEN if the IRE has a source
- * address on `ill_arg'.
+ * IRE walker callback: clear ire_testhidden if the IRE has a source address
+ * on `ill_arg'.
  */
 static void
 ipmp_ill_ire_clear_testhidden(ire_t *ire, char *ill_arg)
@@ -1886,9 +1813,9 @@ ipmp_ill_ire_clear_testhidden(ire_t *ire, char *ill_arg)
 	ASSERT(IAM_WRITER_ILL(ill));
 	ASSERT(!IS_IPMP(ill));
 
-	if (ire->ire_ipif->ipif_ill == ill) {
+	if (ire->ire_ill == ill) {
 		DTRACE_PROBE1(ipmp__clear__testhidden, ire_t *, ire);
-		ire->ire_marks &= ~IRE_MARK_TESTHIDDEN;
+		ire->ire_testhidden = B_FALSE;
 	}
 }
 
@@ -1909,7 +1836,7 @@ ipmp_ill_hold_ipmp_ill(ill_t *ill)
 
 	rw_enter(&ipst->ips_ipmp_lock, RW_READER);
 	illg = ill->ill_grp;
-	if (illg != NULL && ill_check_and_refhold(illg->ig_ipmp_ill) == 0) {
+	if (illg != NULL && ill_check_and_refhold(illg->ig_ipmp_ill)) {
 		rw_exit(&ipst->ips_ipmp_lock);
 		return (illg->ig_ipmp_ill);
 	}
@@ -2135,7 +2062,7 @@ ipmp_ipif_hold_bound_ill(const ipif_t *ipif)
 
 	rw_enter(&ipst->ips_ipmp_lock, RW_READER);
 	boundill = ipif->ipif_bound_ill;
-	if (boundill != NULL && ill_check_and_refhold(boundill) == 0) {
+	if (boundill != NULL && ill_check_and_refhold(boundill)) {
 		rw_exit(&ipst->ips_ipmp_lock);
 		return (boundill);
 	}
@@ -2191,4 +2118,183 @@ static boolean_t
 ipmp_ipif_is_up_dataaddr(const ipif_t *ipif)
 {
 	return (ipmp_ipif_is_dataaddr(ipif) && (ipif->ipif_flags & IPIF_UP));
+}
+
+/*
+ * Check if `mp' contains a probe packet by verifying if the IP source address
+ * is a test address on an underlying interface `ill'. Caller need not be inside
+ * the IPSQ.
+ */
+boolean_t
+ipmp_packet_is_probe(mblk_t *mp, ill_t *ill)
+{
+	ip6_t *ip6h = (ip6_t *)mp->b_rptr;
+	ipha_t *ipha = (ipha_t *)mp->b_rptr;
+
+	ASSERT(DB_TYPE(mp) != M_CTL);
+
+	if (!IS_UNDER_IPMP(ill))
+		return (B_FALSE);
+
+	if (ill->ill_isv6) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src) &&
+		    ipif_lookup_testaddr_v6(ill, &ip6h->ip6_src, NULL))
+			return (B_TRUE);
+	} else {
+		if ((ipha->ipha_src != INADDR_ANY) &&
+		    ipif_lookup_testaddr_v4(ill, &ipha->ipha_src, NULL))
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
+ * Pick out an appropriate underlying interface for packet transmit.  This
+ * function may be called from the data path, so we need to verify that the
+ * IPMP group associated with `ill' is non-null after holding the ill_g_lock.
+ * Caller need not be inside the IPSQ.
+ */
+ill_t *
+ipmp_ill_get_xmit_ill(ill_t *ill, boolean_t is_unicast)
+{
+	ill_t *xmit_ill;
+	ip_stack_t *ipst = ill->ill_ipst;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	if (ill->ill_grp == NULL) {
+		/*
+		 * The interface was taken out of the group. Return ill itself,
+		 * but take a ref so that callers will always be able to do
+		 * ill_refrele(ill);
+		 */
+		rw_exit(&ipst->ips_ill_g_lock);
+		ill_refhold(ill);
+		return (ill);
+	}
+	if (!is_unicast)
+		xmit_ill = ipmp_illgrp_hold_cast_ill(ill->ill_grp);
+	else
+		xmit_ill = ipmp_illgrp_hold_next_ill(ill->ill_grp);
+	rw_exit(&ipst->ips_ill_g_lock);
+	return (xmit_ill);
+}
+
+/*
+ * Flush out any nce that points at `ncec' from an underlying interface
+ */
+void
+ipmp_ncec_flush_nce(ncec_t *ncec)
+{
+	ill_t		*ncec_ill = ncec->ncec_ill;
+	ill_t		*ill;
+	ipmp_illgrp_t	*illg;
+	ip_stack_t	*ipst = ncec_ill->ill_ipst;
+	list_t		dead;
+	nce_t		*nce;
+
+	if (!IS_IPMP(ncec_ill))
+		return;
+
+	illg = ncec_ill->ill_grp;
+	list_create(&dead, sizeof (nce_t), offsetof(nce_t, nce_node));
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	ill = list_head(&illg->ig_if);
+	for (; ill != NULL; ill = list_next(&illg->ig_if, ill)) {
+		nce_fastpath_list_delete(ill, ncec, &dead);
+	}
+	rw_exit(&ipst->ips_ill_g_lock);
+
+	/*
+	 * we may now nce_refrele() all dead entries since all locks have been
+	 * dropped.
+	 */
+	while ((nce = list_head(&dead)) != NULL) {
+		list_remove(&dead, nce);
+		nce_refrele(nce);
+	}
+	ASSERT(list_is_empty(&dead));
+	list_destroy(&dead);
+}
+
+/*
+ * For each interface in the IPMP group, if there are nce_t entries for the IP
+ * address corresponding to `ncec', then their dl_unitdata_req_t and fastpath
+ * information must be updated to match the link-layer address information in
+ * `ncec'.
+ */
+void
+ipmp_ncec_fastpath(ncec_t *ncec, ill_t *ipmp_ill)
+{
+	ill_t		*ill;
+	ipmp_illgrp_t	*illg = ipmp_ill->ill_grp;
+	ip_stack_t	*ipst = ipmp_ill->ill_ipst;
+	nce_t		*nce, *nce_next;
+	list_t		replace;
+
+	ASSERT(IS_IPMP(ipmp_ill));
+
+	/*
+	 * if ncec itself is not reachable, there is no use in creating nce_t
+	 * entries on the underlying interfaces in the group.
+	 */
+	if (!NCE_ISREACHABLE(ncec))
+		return;
+
+	list_create(&replace, sizeof (nce_t), offsetof(nce_t, nce_node));
+	rw_enter(&ipst->ips_ipmp_lock, RW_READER);
+	ill = list_head(&illg->ig_actif);
+	for (; ill != NULL; ill = list_next(&illg->ig_actif, ill)) {
+		/*
+		 * For each underlying interface, we first check if there is an
+		 * nce_t for the address in ncec->ncec_addr. If one exists,
+		 * we should trigger nce_fastpath for that nce_t. However, the
+		 * catch is that we are holding the ips_ipmp_lock to prevent
+		 * changes to the IPMP group membership, so that we cannot
+		 * putnext() to the driver.  So we nce_delete the
+		 * list nce_t entries that need to be updated into the
+		 * `replace' list, and then process the `replace' list
+		 * after dropping the ips_ipmp_lock.
+		 */
+		mutex_enter(&ill->ill_lock);
+		for (nce = list_head(&ill->ill_nce); nce != NULL; ) {
+			nce_next = list_next(&ill->ill_nce, nce);
+			if (!IN6_ARE_ADDR_EQUAL(&nce->nce_addr,
+			    &ncec->ncec_addr)) {
+				nce = nce_next;
+				continue;
+			}
+			nce_refhold(nce);
+			nce_delete(nce);
+			list_insert_tail(&replace, nce);
+			nce = nce_next;
+		}
+		mutex_exit(&ill->ill_lock);
+	}
+	rw_exit(&ipst->ips_ipmp_lock);
+	/*
+	 * `replace' now has the list of nce's on which we should be triggering
+	 * nce_fastpath(). We now retrigger fastpath by setting up the nce
+	 * again. The code in nce_lookup_then_add_v* ensures that nce->nce_ill
+	 * is still in the group for ncec->ncec_ill
+	 */
+	while ((nce = list_head(&replace)) != NULL) {
+		list_remove(&replace, nce);
+		if (ncec->ncec_ill->ill_isv6) {
+			(void) nce_lookup_then_add_v6(nce->nce_ill,
+			    ncec->ncec_lladdr,  ncec->ncec_lladdr_length,
+			    &nce->nce_addr, ncec->ncec_flags, ND_UNCHANGED,
+			    NULL);
+		} else {
+			ipaddr_t ipaddr;
+
+			IN6_V4MAPPED_TO_IPADDR(&ncec->ncec_addr, ipaddr);
+			(void) nce_lookup_then_add_v4(nce->nce_ill,
+			    ncec->ncec_lladdr, ncec->ncec_lladdr_length,
+			    &ipaddr, ncec->ncec_flags, ND_UNCHANGED, NULL);
+		}
+		nce_refrele(nce);
+	}
+	ASSERT(list_is_empty(&replace));
+	list_destroy(&replace);
 }

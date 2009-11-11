@@ -38,6 +38,7 @@ extern "C" {
 #ifdef _KERNEL
 #include <sys/list.h>
 
+
 /*
  * IP statistics.
  */
@@ -46,52 +47,45 @@ extern "C" {
 		((ipst)->ips_ip_statistics.x.value.ui64 += (n))
 
 typedef struct ip_stat {
-	kstat_named_t	ipsec_fanout_proto;
 	kstat_named_t	ip_udp_fannorm;
 	kstat_named_t	ip_udp_fanmb;
-	kstat_named_t	ip_udp_fanothers;
-	kstat_named_t	ip_udp_fast_path;
-	kstat_named_t	ip_udp_slow_path;
-	kstat_named_t	ip_udp_input_err;
-	kstat_named_t	ip_tcppullup;
-	kstat_named_t	ip_tcpoptions;
-	kstat_named_t	ip_multipkttcp;
-	kstat_named_t	ip_tcp_fast_path;
-	kstat_named_t	ip_tcp_slow_path;
-	kstat_named_t	ip_tcp_input_error;
+	kstat_named_t	ip_recv_pullup;
 	kstat_named_t	ip_db_ref;
-	kstat_named_t	ip_notaligned1;
-	kstat_named_t	ip_notaligned2;
-	kstat_named_t	ip_multimblk3;
-	kstat_named_t	ip_multimblk4;
-	kstat_named_t	ip_ipoptions;
-	kstat_named_t	ip_classify_fail;
+	kstat_named_t	ip_notaligned;
+	kstat_named_t	ip_multimblk;
 	kstat_named_t	ip_opt;
-	kstat_named_t	ip_udp_rput_local;
 	kstat_named_t	ipsec_proto_ahesp;
 	kstat_named_t	ip_conn_flputbq;
 	kstat_named_t	ip_conn_walk_drain;
 	kstat_named_t   ip_out_sw_cksum;
+	kstat_named_t	ip_out_sw_cksum_bytes;
 	kstat_named_t   ip_in_sw_cksum;
-	kstat_named_t   ip_trash_ire_reclaim_calls;
-	kstat_named_t   ip_trash_ire_reclaim_success;
-	kstat_named_t   ip_ire_arp_timer_expired;
-	kstat_named_t   ip_ire_redirect_timer_expired;
-	kstat_named_t	ip_ire_pmtu_timer_expired;
-	kstat_named_t	ip_input_multi_squeue;
+	kstat_named_t   ip_ire_reclaim_calls;
+	kstat_named_t   ip_ire_reclaim_deleted;
+	kstat_named_t   ip_nce_reclaim_calls;
+	kstat_named_t   ip_nce_reclaim_deleted;
+	kstat_named_t   ip_dce_reclaim_calls;
+	kstat_named_t   ip_dce_reclaim_deleted;
 	kstat_named_t	ip_tcp_in_full_hw_cksum_err;
 	kstat_named_t	ip_tcp_in_part_hw_cksum_err;
 	kstat_named_t	ip_tcp_in_sw_cksum_err;
-	kstat_named_t	ip_tcp_out_sw_cksum_bytes;
 	kstat_named_t	ip_udp_in_full_hw_cksum_err;
 	kstat_named_t	ip_udp_in_part_hw_cksum_err;
 	kstat_named_t	ip_udp_in_sw_cksum_err;
-	kstat_named_t	ip_udp_out_sw_cksum_bytes;
-	kstat_named_t	ip_frag_mdt_pkt_out;
-	kstat_named_t	ip_frag_mdt_discarded;
-	kstat_named_t	ip_frag_mdt_allocfail;
-	kstat_named_t	ip_frag_mdt_addpdescfail;
-	kstat_named_t	ip_frag_mdt_allocd;
+	kstat_named_t	conn_in_recvdstaddr;
+	kstat_named_t	conn_in_recvopts;
+	kstat_named_t	conn_in_recvif;
+	kstat_named_t	conn_in_recvslla;
+	kstat_named_t	conn_in_recvucred;
+	kstat_named_t	conn_in_recvttl;
+	kstat_named_t	conn_in_recvhopopts;
+	kstat_named_t	conn_in_recvhoplimit;
+	kstat_named_t	conn_in_recvdstopts;
+	kstat_named_t	conn_in_recvrthdrdstopts;
+	kstat_named_t	conn_in_recvrthdr;
+	kstat_named_t	conn_in_recvpktinfo;
+	kstat_named_t	conn_in_recvtclass;
+	kstat_named_t	conn_in_timestamp;
 } ip_stat_t;
 
 
@@ -103,20 +97,22 @@ typedef struct ip_stat {
 	((ipst)->ips_ip6_statistics.x.value.ui64 += (n))
 
 typedef struct ip6_stat {
-	kstat_named_t	ip6_udp_fast_path;
-	kstat_named_t	ip6_udp_slow_path;
 	kstat_named_t	ip6_udp_fannorm;
 	kstat_named_t	ip6_udp_fanmb;
+	kstat_named_t	ip6_recv_pullup;
+	kstat_named_t	ip6_db_ref;
+	kstat_named_t	ip6_notaligned;
+	kstat_named_t	ip6_multimblk;
+	kstat_named_t	ipsec_proto_ahesp;
 	kstat_named_t   ip6_out_sw_cksum;
+	kstat_named_t	ip6_out_sw_cksum_bytes;
 	kstat_named_t   ip6_in_sw_cksum;
 	kstat_named_t	ip6_tcp_in_full_hw_cksum_err;
 	kstat_named_t	ip6_tcp_in_part_hw_cksum_err;
 	kstat_named_t	ip6_tcp_in_sw_cksum_err;
-	kstat_named_t	ip6_tcp_out_sw_cksum_bytes;
 	kstat_named_t	ip6_udp_in_full_hw_cksum_err;
 	kstat_named_t	ip6_udp_in_part_hw_cksum_err;
 	kstat_named_t	ip6_udp_in_sw_cksum_err;
-	kstat_named_t	ip6_udp_out_sw_cksum_bytes;
 	kstat_named_t	ip6_frag_mdt_pkt_out;
 	kstat_named_t	ip6_frag_mdt_discarded;
 	kstat_named_t	ip6_frag_mdt_allocfail;
@@ -150,6 +146,8 @@ typedef struct srcid_map {
 struct ip_stack {
 	netstack_t	*ips_netstack;	/* Common netstack */
 
+	uint_t			ips_src_generation;	/* Both IPv4 and IPv6 */
+
 	struct ipparam_s	*ips_param_arr; 	/* ndd variable table */
 	struct ipndp_s		*ips_ndp_arr;
 
@@ -178,10 +176,6 @@ struct ip_stack {
 	kmutex_t	ips_ip_mi_lock;
 	kmutex_t	ips_ip_addr_avail_lock;
 	krwlock_t	ips_ill_g_lock;
-	krwlock_t	ips_ipsec_capab_ills_lock;
-				/* protects the list of IPsec capable ills */
-	struct ipsec_capab_ill_s *ips_ipsec_capab_ills_ah;
-	struct ipsec_capab_ill_s *ips_ipsec_capab_ills_esp;
 
 	krwlock_t	ips_ill_g_usesrc_lock;
 
@@ -198,10 +192,10 @@ struct ip_stack {
 	struct connf_s	*ips_rts_clients;
 	struct connf_s	*ips_ipcl_conn_fanout;
 	struct connf_s	*ips_ipcl_bind_fanout;
-	struct connf_s	*ips_ipcl_proto_fanout;
+	struct connf_s	*ips_ipcl_proto_fanout_v4;
 	struct connf_s	*ips_ipcl_proto_fanout_v6;
 	struct connf_s	*ips_ipcl_udp_fanout;
-	struct connf_s	*ips_ipcl_raw_fanout;
+	struct connf_s	*ips_ipcl_raw_fanout;		/* RAW SCTP sockets */
 	struct connf_s	*ips_ipcl_iptun_fanout;
 	uint_t		ips_ipcl_conn_fanout_size;
 	uint_t		ips_ipcl_bind_fanout_size;
@@ -237,30 +231,46 @@ struct ip_stack {
 	/* IPv4 forwarding table */
 	struct radix_node_head *ips_ip_ftable;
 
-	/* This is dynamically allocated in ip_ire_init */
-	struct irb	 *ips_ip_cache_table;
-
 #define	IPV6_ABITS		128
 #define	IP6_MASK_TABLE_SIZE	(IPV6_ABITS + 1)	/* 129 ptrs */
-
 	struct irb	*ips_ip_forwarding_table_v6[IP6_MASK_TABLE_SIZE];
-	/* This is dynamically allocated in ip_ire_init */
-	struct irb	*ips_ip_cache_table_v6;
 
-	uint32_t	ips_ire_handle;
 	/*
 	 * ire_ft_init_lock is used while initializing ip_forwarding_table
 	 * dynamically in ire_add.
 	 */
 	kmutex_t	ips_ire_ft_init_lock;
-	kmutex_t	ips_ire_handle_lock;	/* Protects ire_handle */
 
-	uint32_t	ips_ip_cache_table_size;
-	uint32_t	ips_ip6_cache_table_size;
+	/*
+	 * This is the IPv6 counterpart of RADIX_NODE_HEAD_LOCK. It is used
+	 * to prevent adds and deletes while we are doing a ftable_lookup
+	 * and extracting the ire_generation.
+	 */
+	krwlock_t	ips_ip6_ire_head_lock;
+
 	uint32_t	ips_ip6_ftable_hash_size;
 
 	ire_stats_t 	ips_ire_stats_v4;	/* IPv4 ire statistics */
 	ire_stats_t 	ips_ire_stats_v6;	/* IPv6 ire statistics */
+
+	/* Count how many condemned objects for kmem_cache callbacks */
+	uint32_t	ips_num_ire_condemned;
+	uint32_t	ips_num_nce_condemned;
+	uint32_t	ips_num_dce_condemned;
+
+	struct ire_s	*ips_ire_reject_v4;	/* For unreachable dests */
+	struct ire_s	*ips_ire_reject_v6;	/* For unreachable dests */
+	struct ire_s	*ips_ire_blackhole_v4;	/* For temporary failures */
+	struct ire_s	*ips_ire_blackhole_v6;	/* For temporary failures */
+
+	/* ips_ire_dep_lock protects ire_dep_* relationship between IREs */
+	krwlock_t	ips_ire_dep_lock;
+
+	/* Destination Cache Entries */
+	struct dce_s	*ips_dce_default;
+	uint_t		ips_dce_hashsize;
+	struct dcb_s	*ips_dce_hash_v4;
+	struct dcb_s	*ips_dce_hash_v6;
 
 	/* pending binds */
 	mblk_t		*ips_ip6_asp_pending_ops;
@@ -293,9 +303,10 @@ struct ip_stack {
 	uint_t		ips_icmp_pkt_err_sent;
 
 	/* Protected by ip_mi_lock */
-	void		*ips_ip_g_head;		/* Instance Data List Head */
+	void		*ips_ip_g_head;	/* IP Instance Data List Head */
+	void		*ips_arp_g_head; /* ARP Instance Data List Head */
 
-	caddr_t		ips_ip_g_nd;		/* Named Dispatch List Head */
+	caddr_t		ips_ip_g_nd;	/* Named Dispatch List Head */
 
 	/* Multirouting stuff */
 	/* Interval (in ms) between consecutive 'bad MTU' warnings */
@@ -306,26 +317,10 @@ struct ip_stack {
 	struct cgtp_filter_ops *ips_ip_cgtp_filter_ops;	/* CGTP hooks */
 	boolean_t	ips_ip_cgtp_filter;	/* Enable/disable CGTP hooks */
 
-	kmutex_t	ips_ip_trash_timer_lock;
-	timeout_id_t	ips_ip_ire_expire_id;	/* IRE expiration timer. */
 	struct ipsq_s	*ips_ipsq_g_head;
 	uint_t		ips_ill_index;	/* Used to assign interface indicies */
 	/* When set search for unused index */
 	boolean_t	ips_ill_index_wrap;
-
-	clock_t		ips_ip_ire_arp_time_elapsed;
-			/* Time since IRE cache last flushed */
-	clock_t		ips_ip_ire_rd_time_elapsed;
-			/* ... redirect IREs last flushed */
-	clock_t		ips_ip_ire_pmtu_time_elapsed;
-			/* Time since path mtu increase */
-
-	uint_t		ips_ip_redirect_cnt;
-			/* Num of redirect routes in ftable */
-	uint_t		ips_ipv6_ire_default_count;
-			/* Number of IPv6 IRE_DEFAULT entries */
-	uint_t		ips_ipv6_ire_default_index;
-			/* Walking IPv6 index used to mod in */
 
 	uint_t		ips_loopback_packets;
 
@@ -379,15 +374,17 @@ struct ip_stack {
 	struct srcid_map *ips_srcid_head;
 	krwlock_t	ips_srcid_lock;
 
-	uint64_t	ips_ipif_g_seqid;
+	uint64_t	ips_ipif_g_seqid;	/* Used only for sctp_addr.c */
 	union phyint_list_u *ips_phyint_g_list;	/* start of phyint list */
 
-/* ip_neti.c */
+/* ip_netinfo.c */
 	hook_family_t	ips_ipv4root;
 	hook_family_t	ips_ipv6root;
+	hook_family_t	ips_arproot;
 
 	net_handle_t		ips_ipv4_net_data;
 	net_handle_t		ips_ipv6_net_data;
+	net_handle_t		ips_arp_net_data;
 
 	/*
 	 * Hooks for firewalling
@@ -397,17 +394,23 @@ struct ip_stack {
 	hook_event_t		ips_ip4_forwarding_event;
 	hook_event_t		ips_ip4_loopback_in_event;
 	hook_event_t		ips_ip4_loopback_out_event;
+
 	hook_event_t		ips_ip6_physical_in_event;
 	hook_event_t		ips_ip6_physical_out_event;
 	hook_event_t		ips_ip6_forwarding_event;
 	hook_event_t		ips_ip6_loopback_in_event;
 	hook_event_t		ips_ip6_loopback_out_event;
 
+	hook_event_t		ips_arp_physical_in_event;
+	hook_event_t		ips_arp_physical_out_event;
+	hook_event_t		ips_arp_nic_events;
+
 	hook_event_token_t	ips_ipv4firewall_physical_in;
 	hook_event_token_t	ips_ipv4firewall_physical_out;
 	hook_event_token_t	ips_ipv4firewall_forwarding;
 	hook_event_token_t	ips_ipv4firewall_loopback_in;
 	hook_event_token_t	ips_ipv4firewall_loopback_out;
+
 	hook_event_token_t	ips_ipv6firewall_physical_in;
 	hook_event_token_t	ips_ipv6firewall_physical_out;
 	hook_event_token_t	ips_ipv6firewall_forwarding;
@@ -418,6 +421,10 @@ struct ip_stack {
 	hook_event_t		ips_ip6_nic_events;
 	hook_event_token_t	ips_ipv4nicevents;
 	hook_event_token_t	ips_ipv6nicevents;
+
+	hook_event_token_t	ips_arp_physical_in;
+	hook_event_token_t	ips_arp_physical_out;
+	hook_event_token_t	ips_arpnicevents;
 
 	net_handle_t		ips_ip4_observe_pr;
 	net_handle_t		ips_ip6_observe_pr;
@@ -432,13 +439,6 @@ struct ip_stack {
 	krwlock_t		ips_ipmp_lock;
 	mod_hash_t		*ips_ipmp_grp_hash;
 
-/* igmp.c */
-	/* multicast restart timers thread logic */
-	kmutex_t		ips_mrt_lock;
-	uint_t			ips_mrt_flags;
-	kcondvar_t		ips_mrt_cv;
-	kcondvar_t		ips_mrt_done_cv;
-	kthread_t		*ips_mrt_thread;
 };
 typedef struct ip_stack ip_stack_t;
 

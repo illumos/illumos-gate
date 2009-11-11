@@ -654,11 +654,9 @@ rds_wput_other(queue_t *q, mblk_t *mp)
 			}
 			if (((union T_primitives *)(uintptr_t)rptr)->type ==
 			    T_SVR4_OPTMGMT_REQ) {
-				(void) svr4_optcom_req(q, mp, cr, &rds_opt_obj,
-				    B_FALSE);
+				svr4_optcom_req(q, mp, cr, &rds_opt_obj);
 			} else {
-				(void) tpi_optcom_req(q, mp, cr, &rds_opt_obj,
-				    B_FALSE);
+				tpi_optcom_req(q, mp, cr, &rds_opt_obj);
 			}
 			return;
 		case T_CONN_REQ:

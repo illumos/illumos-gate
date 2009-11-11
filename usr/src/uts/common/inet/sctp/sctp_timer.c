@@ -220,7 +220,6 @@ sctp_timer_fire(sctp_tb_t *sctp_tb)
 
 		sctp_timer_call(sctp, mp);
 		WAKE_SCTP(sctp);
-		sctp_process_sendq(sctp);
 	}
 	SCTP_REFRELE(sctp);
 }
@@ -429,7 +428,7 @@ sctp_heartbeat_timer(sctp_t *sctp)
 	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
 		/*
 		 * If the peer is unreachable because there is no available
-		 * source address, call sctp_get_ire() to see if it is
+		 * source address, call sctp_get_dest() to see if it is
 		 * reachable now.  If it is OK, the state will become
 		 * unconfirmed.  And the following code to handle unconfirmed
 		 * address will be executed.  If it is still not OK,
@@ -438,7 +437,7 @@ sctp_heartbeat_timer(sctp_t *sctp)
 		 * is disable, this retry may go on forever.
 		 */
 		if (fp->state == SCTP_FADDRS_UNREACH) {
-			sctp_get_ire(sctp, fp);
+			sctp_get_dest(sctp, fp);
 			if (fp->state == SCTP_FADDRS_UNREACH) {
 				if (fp->hb_enabled &&
 				    ++fp->strikes > fp->max_retr &&
@@ -642,15 +641,14 @@ rxmit_init:
 		 * address list won't be modified (it would have been done
 		 * the first time around).
 		 */
-		mp = sctp_init_mp(sctp);
+		mp = sctp_init_mp(sctp, fp);
 		if (mp != NULL) {
 			BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
-			sctp_add_sendq(sctp, mp);
+			(void) conn_ip_output(mp, fp->ixa);
+			BUMP_LOCAL(sctp->sctp_opkts);
 		}
 		break;
-	case SCTPS_COOKIE_ECHOED: {
-		ipha_t *iph;
-
+	case SCTPS_COOKIE_ECHOED:
 		BUMP_LOCAL(sctp->sctp_T1expire);
 		if (sctp->sctp_cookie_mp == NULL) {
 			sctp->sctp_state = SCTPS_COOKIE_WAIT;
@@ -659,14 +657,10 @@ rxmit_init:
 		mp = dupmsg(sctp->sctp_cookie_mp);
 		if (mp == NULL)
 			break;
-		iph = (ipha_t *)mp->b_rptr;
-		/* Reset the IP ident. */
-		if (IPH_HDR_VERSION(iph) == IPV4_VERSION)
-			iph->ipha_ident = 0;
-		sctp_add_sendq(sctp, mp);
+		(void) conn_ip_output(mp, fp->ixa);
+		BUMP_LOCAL(sctp->sctp_opkts);
 		BUMP_MIB(&sctps->sctps_mib, sctpTimRetrans);
 		break;
-	}
 	case SCTPS_SHUTDOWN_SENT:
 		BUMP_LOCAL(sctp->sctp_T2expire);
 		sctp_send_shutdown(sctp, 1);

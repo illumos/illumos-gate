@@ -36,7 +36,6 @@
 #include <inet/ip6.h>
 
 #include <net/pfkeyv2.h>
-#include <inet/ipsec_info.h>
 #include <inet/sadb.h>
 #include <inet/ipsec_impl.h>
 #include <inet/ipdrop.h>
@@ -57,35 +56,21 @@ ipsec_match_outbound_ids(ipsec_latch_t *ipl, ipsa_t *sa)
 	    ipsid_equal(ipl->ipl_remote_cid, sa->ipsa_dst_cid);
 }
 
-/* cr1 is packet cred; cr2 is SA credential */
+/* l1 is packet label; l2 is SA label */
 boolean_t
-ipsec_label_match(cred_t *cr1, cred_t *cr2)
+ipsec_label_match(ts_label_t *l1, ts_label_t *l2)
 {
-	ts_label_t *l1, *l2;
-
 	if (!is_system_labeled())
 		return (B_TRUE);
 
 	/*
-	 * Check for NULL creds.  Unlabeled SA always matches;
+	 * Check for NULL label.  Unlabeled SA (l2) always matches;
 	 * unlabeled user with labeled  SA always fails
 	 */
-	if (cr2 == NULL)
+	if (l2 == NULL)
 		return (B_TRUE);
 
-	if (cr1 == NULL)
-		return (B_FALSE);
-
-	/* If we reach here, we have two passed-in creds. */
-	ASSERT(cr2 != NULL && cr1 != NULL);
-
-	/* Check for NULL labels.  Two is good, one is bad, zero is good. */
-	l1 = crgetlabel(cr1);
-	l2 = crgetlabel(cr2);
 	if (l1 == NULL)
-		return (l2 == NULL);
-
-	if (l2 == NULL)
 		return (B_FALSE);
 
 	/* Simple IPsec MLS policy: labels must be equal */
@@ -109,32 +94,32 @@ ipsec_label_match(cred_t *cr1, cred_t *cr2)
  * The SA ptr I return will have its reference count incremented by one.
  */
 ipsa_t *
-ipsec_getassocbyconn(isaf_t *bucket, ipsec_out_t *io, uint32_t *src,
-    uint32_t *dst, sa_family_t af, uint8_t protocol, cred_t *cr)
+ipsec_getassocbyconn(isaf_t *bucket, ip_xmit_attr_t *ixa, uint32_t *src,
+    uint32_t *dst, sa_family_t af, uint8_t protocol, ts_label_t *tsl)
 {
 	ipsa_t *retval, *candidate;
 	ipsec_action_t *candact;
 	boolean_t need_unique;
-	boolean_t tunnel_mode = io->ipsec_out_tunnel;
+	boolean_t tunnel_mode = (ixa->ixa_flags & IXAF_IPSEC_TUNNEL);
 	uint64_t unique_id;
 	uint32_t old_flags, excludeflags;
-	ipsec_policy_t *pp = io->ipsec_out_policy;
-	ipsec_action_t *actlist = io->ipsec_out_act;
+	ipsec_policy_t *pp = ixa->ixa_ipsec_policy;
+	ipsec_action_t *actlist = ixa->ixa_ipsec_action;
 	ipsec_action_t *act;
-	ipsec_latch_t *ipl = io->ipsec_out_latch;
+	ipsec_latch_t *ipl = ixa->ixa_ipsec_latch;
 	ipsa_ref_t *ipr = NULL;
-	sa_family_t inaf = io->ipsec_out_inaf;
-	uint32_t *insrc = io->ipsec_out_insrc;
-	uint32_t *indst = io->ipsec_out_indst;
-	uint8_t insrcpfx = io->ipsec_out_insrcpfx;
-	uint8_t indstpfx = io->ipsec_out_indstpfx;
+	sa_family_t inaf = ixa->ixa_ipsec_inaf;
+	uint32_t *insrc = ixa->ixa_ipsec_insrc;
+	uint32_t *indst = ixa->ixa_ipsec_indst;
+	uint8_t insrcpfx = ixa->ixa_ipsec_insrcpfx;
+	uint8_t indstpfx = ixa->ixa_ipsec_indstpfx;
 
 	ASSERT(MUTEX_HELD(&bucket->isaf_lock));
 
 	/*
-	 * Caller must set ipsec_out_t structure such that we know
+	 * Caller must set ip_xmit_attr_t structure such that we know
 	 * whether this is tunnel mode or transport mode based on
-	 * io->ipsec_out_tunnel.  If this flag is set, we assume that
+	 * IXAF_IPSEC_TUNNEL.  If this flag is set, we assume that
 	 * there are valid inner src and destination addresses to compare.
 	 */
 
@@ -145,7 +130,7 @@ ipsec_getassocbyconn(isaf_t *bucket, ipsec_out_t *io, uint32_t *src,
 
 	if (ipl != NULL) {
 		ASSERT((protocol == IPPROTO_AH) || (protocol == IPPROTO_ESP));
-		ipr = &ipl->ipl_ref[protocol - IPPROTO_ESP];
+		ipr = &ixa->ixa_ipsec_ref[protocol - IPPROTO_ESP];
 
 		retval = ipr->ipsr_sa;
 
@@ -169,7 +154,7 @@ ipsec_getassocbyconn(isaf_t *bucket, ipsec_out_t *io, uint32_t *src,
 	ASSERT(actlist != NULL);
 
 	need_unique = actlist->ipa_want_unique;
-	unique_id = SA_FORM_UNIQUE_ID(io);
+	unique_id = SA_FORM_UNIQUE_ID(ixa);
 
 	/*
 	 * Precompute mask for SA flags comparison: If we need a
@@ -332,7 +317,7 @@ ipsec_getassocbyconn(isaf_t *bucket, ipsec_out_t *io, uint32_t *src,
 		/*
 		 * Do labels match?
 		 */
-		if (!ipsec_label_match(cr, retval->ipsa_cred))
+		if (!ipsec_label_match(tsl, retval->ipsa_tsl))
 			goto next_ipsa;
 
 		/*
@@ -451,10 +436,9 @@ next_ipsa:
 			ipsec_latch_ids(ipl,
 			    retval->ipsa_src_cid, retval->ipsa_dst_cid);
 		}
-		if (!ipl->ipl_out_action_latched) {
+		if (ixa->ixa_ipsec_action == NULL) {
 			IPACT_REFHOLD(act);
-			ipl->ipl_out_action = act;
-			ipl->ipl_out_action_latched = B_TRUE;
+			ixa->ixa_ipsec_action = act;
 		}
 	}
 
@@ -471,7 +455,7 @@ next_ipsa:
 			retval->ipsa_flags |= IPSA_F_UNIQUE;
 			retval->ipsa_unique_id = unique_id;
 			retval->ipsa_unique_mask = SA_UNIQUE_MASK(
-			    io->ipsec_out_src_port, io->ipsec_out_dst_port,
+			    ixa->ixa_ipsec_src_port, ixa->ixa_ipsec_dst_port,
 			    protocol, 0);
 		}
 
@@ -581,45 +565,41 @@ ipsec_getassocbyspi(isaf_t *bucket, uint32_t spi, uint32_t *src, uint32_t *dst,
 }
 
 boolean_t
-ipsec_outbound_sa(mblk_t *mp, uint_t proto)
+ipsec_outbound_sa(mblk_t *data_mp, ip_xmit_attr_t *ixa, uint_t proto)
 {
-	mblk_t *data_mp;
-	ipsec_out_t *io;
 	ipaddr_t dst;
 	uint32_t *dst_ptr, *src_ptr;
 	isaf_t *bucket;
 	ipsa_t *assoc;
-	ip6_pkt_t ipp;
+	ip_pkt_t ipp;
 	in6_addr_t dst6;
 	ipsa_t **sa;
 	sadbp_t *sadbp;
 	sadb_t *sp;
 	sa_family_t af;
-	cred_t *cr;
-	netstack_t	*ns;
+	ip_stack_t	*ipst = ixa->ixa_ipst;
+	netstack_t	*ns = ipst->ips_netstack;
 
-	data_mp = mp->b_cont;
-	io = (ipsec_out_t *)mp->b_rptr;
-	ns = io->ipsec_out_ns;
+	ASSERT(ixa->ixa_flags & IXAF_IPSEC_SECURE);
 
 	if (proto == IPPROTO_ESP) {
 		ipsecesp_stack_t	*espstack;
 
 		espstack = ns->netstack_ipsecesp;
-		sa = &io->ipsec_out_esp_sa;
+		sa = &ixa->ixa_ipsec_esp_sa;
 		sadbp = &espstack->esp_sadb;
 	} else {
 		ipsecah_stack_t	*ahstack;
 
 		ASSERT(proto == IPPROTO_AH);
 		ahstack = ns->netstack_ipsecah;
-		sa = &io->ipsec_out_ah_sa;
+		sa = &ixa->ixa_ipsec_ah_sa;
 		sadbp = &ahstack->ah_sadb;
 	}
 
 	ASSERT(*sa == NULL);
 
-	if (io->ipsec_out_v4) {
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
 		ipha_t *ipha = (ipha_t *)data_mp->b_rptr;
 
 		ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
@@ -651,11 +631,9 @@ ipsec_outbound_sa(mblk_t *mp, uint_t proto)
 		dst_ptr = (uint32_t *)&dst6;
 	}
 
-	cr = msg_getcred(data_mp, NULL);
-
 	mutex_enter(&bucket->isaf_lock);
-	assoc = ipsec_getassocbyconn(bucket, io, src_ptr, dst_ptr, af,
-	    proto, cr);
+	assoc = ipsec_getassocbyconn(bucket, ixa, src_ptr, dst_ptr, af,
+	    proto, ixa->ixa_tsl);
 	mutex_exit(&bucket->isaf_lock);
 
 	if (assoc == NULL)
@@ -674,17 +652,16 @@ ipsec_outbound_sa(mblk_t *mp, uint_t proto)
 
 /*
  * Inbound IPsec SA selection.
+ * Can return a pulled up mblk.
+ * When it returns non-NULL ahp is updated
  */
-
-ah_t *
-ipsec_inbound_ah_sa(mblk_t *mp, netstack_t *ns)
+mblk_t *
+ipsec_inbound_ah_sa(mblk_t *mp, ip_recv_attr_t *ira, ah_t **ahp)
 {
-	mblk_t *ipsec_in;
 	ipha_t *ipha;
 	ipsa_t 	*assoc;
 	ah_t *ah;
 	isaf_t *hptr;
-	ipsec_in_t *ii;
 	boolean_t isv6;
 	ip6_t *ip6h;
 	int ah_offset;
@@ -692,20 +669,13 @@ ipsec_inbound_ah_sa(mblk_t *mp, netstack_t *ns)
 	int pullup_len;
 	sadb_t *sp;
 	sa_family_t af;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
 
 	IP_AH_BUMP_STAT(ipss, in_requests);
 
-	ASSERT(mp->b_datap->db_type == M_CTL);
-
-	ipsec_in = mp;
-	ii = (ipsec_in_t *)ipsec_in->b_rptr;
-	mp = mp->b_cont;
-
-	ASSERT(mp->b_datap->db_type == M_DATA);
-
-	isv6 = !ii->ipsec_in_v4;
+	isv6 = !(ira->ira_flags & IRAF_IS_IPV4);
 	if (isv6) {
 		ip6h = (ip6_t *)mp->b_rptr;
 		ah_offset = ipsec_ah_get_hdr_size_v6(mp, B_TRUE);
@@ -729,7 +699,7 @@ ipsec_inbound_ah_sa(mblk_t *mp, netstack_t *ns)
 			    SL_WARN | SL_ERROR,
 			    "ipsec_inbound_ah_sa: Small AH header\n");
 			IP_AH_BUMP_STAT(ipss, in_discards);
-			ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL,
+			ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 			    DROPPER(ipss, ipds_ah_bad_length),
 			    &ipss->ipsec_dropper);
 			return (NULL);
@@ -763,11 +733,11 @@ ipsec_inbound_ah_sa(mblk_t *mp, netstack_t *ns)
 	    assoc->ipsa_state == IPSA_STATE_ACTIVE_ELSEWHERE) {
 		IP_AH_BUMP_STAT(ipss, lookup_failure);
 		IP_AH_BUMP_STAT(ipss, in_discards);
-		ipsecah_in_assocfailure(ipsec_in, 0,
+		ipsecah_in_assocfailure(mp, 0,
 		    SL_ERROR | SL_CONSOLE | SL_WARN,
 		    "ipsec_inbound_ah_sa: No association found for "
 		    "spi 0x%x, dst addr %s\n",
-		    ah->ah_spi, dst_ptr, af, ahstack);
+		    ah->ah_spi, dst_ptr, af, ira);
 		if (assoc != NULL) {
 			IPSA_REFRELE(assoc);
 		}
@@ -775,10 +745,17 @@ ipsec_inbound_ah_sa(mblk_t *mp, netstack_t *ns)
 	}
 
 	if (assoc->ipsa_state == IPSA_STATE_LARVAL &&
-	    sadb_set_lpkt(assoc, ipsec_in, ns)) {
+	    sadb_set_lpkt(assoc, mp, ira)) {
 		/* Not fully baked; swap the packet under a rock until then */
 		IPSA_REFRELE(assoc);
 		return (NULL);
+	}
+
+	/* Are the IPsec fields initialized at all? */
+	if (!(ira->ira_flags & IRAF_IPSEC_SECURE)) {
+		ira->ira_ipsec_action = NULL;
+		ira->ira_ipsec_ah_sa = NULL;
+		ira->ira_ipsec_esp_sa = NULL;
 	}
 
 	/*
@@ -787,21 +764,25 @@ ipsec_inbound_ah_sa(mblk_t *mp, netstack_t *ns)
 	 * already there (innermost SA "wins". The reference to
 	 * the SA will also be used later when doing the policy checks.
 	 */
-
-	if (ii->ipsec_in_ah_sa != NULL) {
-		IPSA_REFRELE(ii->ipsec_in_ah_sa);
+	if (ira->ira_ipsec_ah_sa != NULL) {
+		IPSA_REFRELE(ira->ira_ipsec_ah_sa);
 	}
-	ii->ipsec_in_ah_sa = assoc;
+	ira->ira_flags |= IRAF_IPSEC_SECURE;
+	ira->ira_ipsec_ah_sa = assoc;
 
-	return (ah);
+	*ahp = ah;
+	return (mp);
 }
 
-esph_t *
-ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
+/*
+ * Can return a pulled up mblk.
+ * When it returns non-NULL esphp is updated
+ */
+mblk_t *
+ipsec_inbound_esp_sa(mblk_t *data_mp, ip_recv_attr_t *ira, esph_t **esphp)
 {
-	mblk_t *data_mp, *placeholder;
+	mblk_t *placeholder;
 	uint32_t *src_ptr, *dst_ptr;
-	ipsec_in_t *ii;
 	ipha_t *ipha;
 	ip6_t *ip6h;
 	esph_t *esph;
@@ -811,19 +792,13 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
 	sa_family_t af;
 	boolean_t isv6;
 	sadb_t *sp;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 
 	IP_ESP_BUMP_STAT(ipss, in_requests);
-	ASSERT(ipsec_in_mp->b_datap->db_type == M_CTL);
 
-	/* We have IPSEC_IN already! */
-	ii = (ipsec_in_t *)ipsec_in_mp->b_rptr;
-	data_mp = ipsec_in_mp->b_cont;
-
-	ASSERT(ii->ipsec_in_type == IPSEC_IN);
-
-	isv6 = !ii->ipsec_in_v4;
+	isv6 = !(ira->ira_flags & IRAF_IS_IPV4);
 	if (isv6) {
 		ip6h = (ip6_t *)data_mp->b_rptr;
 	} else {
@@ -841,17 +816,11 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
 	 * actual packet length.
 	 */
 	if (data_mp->b_datap->db_ref > 1 ||
-	    (data_mp->b_wptr - data_mp->b_rptr) <
-	    (isv6 ? (ntohs(ip6h->ip6_plen) + sizeof (ip6_t))
-	    : ntohs(ipha->ipha_length))) {
+	    (data_mp->b_wptr - data_mp->b_rptr) < ira->ira_pktlen) {
 		placeholder = msgpullup(data_mp, -1);
 		if (placeholder == NULL) {
 			IP_ESP_BUMP_STAT(ipss, in_discards);
-			/*
-			 * TODO: Extract inbound interface from the IPSEC_IN
-			 * message's ii->ipsec_in_rill_index.
-			 */
-			ip_drop_packet(ipsec_in_mp, B_TRUE, NULL, NULL,
+			ip_drop_packet(data_mp, B_TRUE, ira->ira_ill,
 			    DROPPER(ipss, ipds_esp_nomem),
 			    &ipss->ipsec_dropper);
 			return (NULL);
@@ -859,7 +828,6 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
 			/* Reset packet with new pulled up mblk. */
 			freemsg(data_mp);
 			data_mp = placeholder;
-			ipsec_in_mp->b_cont = data_mp;
 		}
 	}
 
@@ -904,11 +872,11 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
 		/*  This is a loggable error!  AUDIT ME! */
 		IP_ESP_BUMP_STAT(ipss, lookup_failure);
 		IP_ESP_BUMP_STAT(ipss, in_discards);
-		ipsecesp_in_assocfailure(ipsec_in_mp, 0,
+		ipsecesp_in_assocfailure(data_mp, 0,
 		    SL_ERROR | SL_CONSOLE | SL_WARN,
 		    "ipsec_inbound_esp_sa: No association found for "
 		    "spi 0x%x, dst addr %s\n",
-		    esph->esph_spi, dst_ptr, af, espstack);
+		    esph->esph_spi, dst_ptr, af, ira);
 		if (ipsa != NULL) {
 			IPSA_REFRELE(ipsa);
 		}
@@ -916,10 +884,17 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
 	}
 
 	if (ipsa->ipsa_state == IPSA_STATE_LARVAL &&
-	    sadb_set_lpkt(ipsa, ipsec_in_mp, ns)) {
+	    sadb_set_lpkt(ipsa, data_mp, ira)) {
 		/* Not fully baked; swap the packet under a rock until then */
 		IPSA_REFRELE(ipsa);
 		return (NULL);
+	}
+
+	/* Are the IPsec fields initialized at all? */
+	if (!(ira->ira_flags & IRAF_IPSEC_SECURE)) {
+		ira->ira_ipsec_action = NULL;
+		ira->ira_ipsec_ah_sa = NULL;
+		ira->ira_ipsec_esp_sa = NULL;
 	}
 
 	/*
@@ -928,10 +903,12 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
 	 * already there (innermost SA "wins". The reference to
 	 * the SA will also be used later when doing the policy checks.
 	 */
-	if (ii->ipsec_in_esp_sa != NULL) {
-		IPSA_REFRELE(ii->ipsec_in_esp_sa);
+	if (ira->ira_ipsec_esp_sa != NULL) {
+		IPSA_REFRELE(ira->ira_ipsec_esp_sa);
 	}
-	ii->ipsec_in_esp_sa = ipsa;
+	ira->ira_flags |= IRAF_IPSEC_SECURE;
+	ira->ira_ipsec_esp_sa = ipsa;
 
-	return (esph);
+	*esphp = esph;
+	return (data_mp);
 }

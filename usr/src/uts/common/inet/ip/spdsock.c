@@ -58,7 +58,6 @@
 #include <inet/nd.h>
 #include <inet/ip_if.h>
 #include <inet/optcom.h>
-#include <inet/ipsec_info.h>
 #include <inet/ipsec_impl.h>
 #include <inet/spdsock.h>
 #include <inet/sadb.h>
@@ -1150,9 +1149,8 @@ spdsock_addrule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 
 fail:
 	rw_exit(&iph->iph_lock);
-	while ((--rulep) >= &rules[0]) {
-		IPPOL_REFRELE(rulep->pol, spds->spds_netstack);
-	}
+	while ((--rulep) >= &rules[0])
+		IPPOL_REFRELE(rulep->pol);
 	ipsec_actvec_free(actp, nact);
 fail2:
 	if (itp != NULL) {
@@ -2519,8 +2517,8 @@ error:
  * be invoked either once IPsec is loaded on a cached request, or
  * when a request is received while IPsec is loaded.
  */
-static void
-spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
+static int
+spdsock_do_updatealg(spd_ext_t *extv[], spd_stack_t *spds)
 {
 	struct spd_ext_actions *actp;
 	struct spd_attribute *attr, *endattr;
@@ -2529,17 +2527,15 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 	ipsec_algtype_t alg_type = 0;
 	boolean_t skip_alg = B_TRUE, doing_proto = B_FALSE;
 	uint_t i, cur_key, cur_block, algid;
+	int diag = -1;
 
-	*diag = -1;
 	ASSERT(MUTEX_HELD(&spds->spds_alg_lock));
 
 	/* parse the message, building the list of algorithms */
 
 	actp = (struct spd_ext_actions *)extv[SPD_EXT_ACTION];
-	if (actp == NULL) {
-		*diag = SPD_DIAGNOSTIC_NO_ACTION_EXT;
-		return;
-	}
+	if (actp == NULL)
+		return (SPD_DIAGNOSTIC_NO_ACTION_EXT);
 
 	start = (uint64_t *)actp;
 	end = (start + actp->spd_actions_len);
@@ -2583,7 +2579,7 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 				ss1dbg(spds, ("spdsock_do_updatealg: "
 				    "invalid alg id %d\n",
 				    attr->spd_attr_value));
-				*diag = SPD_DIAGNOSTIC_ALG_ID_RANGE;
+				diag = SPD_DIAGNOSTIC_ALG_ID_RANGE;
 				goto bail;
 			}
 			alg->alg_id = attr->spd_attr_value;
@@ -2623,7 +2619,7 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 			    cur_key >= alg->alg_nkey_sizes) {
 				ss1dbg(spds, ("spdsock_do_updatealg: "
 				    "too many key sizes\n"));
-				*diag = SPD_DIAGNOSTIC_ALG_NUM_KEY_SIZES;
+				diag = SPD_DIAGNOSTIC_ALG_NUM_KEY_SIZES;
 				goto bail;
 			}
 			alg->alg_key_sizes[cur_key++] = attr->spd_attr_value;
@@ -2659,7 +2655,7 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 			    cur_block >= alg->alg_nblock_sizes) {
 				ss1dbg(spds, ("spdsock_do_updatealg: "
 				    "too many block sizes\n"));
-				*diag = SPD_DIAGNOSTIC_ALG_NUM_BLOCK_SIZES;
+				diag = SPD_DIAGNOSTIC_ALG_NUM_BLOCK_SIZES;
 				goto bail;
 			}
 			alg->alg_block_sizes[cur_block++] =
@@ -2686,7 +2682,7 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 			    cur_block >= alg->alg_nparams) {
 				ss1dbg(spds, ("spdsock_do_updatealg: "
 				    "too many params\n"));
-				*diag = SPD_DIAGNOSTIC_ALG_NUM_BLOCK_SIZES;
+				diag = SPD_DIAGNOSTIC_ALG_NUM_BLOCK_SIZES;
 				goto bail;
 			}
 			/*
@@ -2703,7 +2699,7 @@ spdsock_do_updatealg(spd_ext_t *extv[], int *diag, spd_stack_t *spds)
 			if (attr->spd_attr_value > CRYPTO_MAX_MECH_NAME) {
 				ss1dbg(spds, ("spdsock_do_updatealg: "
 				    "mech name too long\n"));
-				*diag = SPD_DIAGNOSTIC_ALG_MECH_NAME_LEN;
+				diag = SPD_DIAGNOSTIC_ALG_MECH_NAME_LEN;
 				goto bail;
 			}
 			mech_name = (char *)(attr + 1);
@@ -2751,6 +2747,7 @@ bail:
 		for (algid = 0; algid < IPSEC_MAX_ALGS; algid++)
 		if (spds->spds_algs[alg_type][algid] != NULL)
 			ipsec_alg_free(spds->spds_algs[alg_type][algid]);
+	return (diag);
 }
 
 /*
@@ -2803,9 +2800,12 @@ spdsock_updatealg(queue_t *q, mblk_t *mp, spd_ext_t *extv[])
 		int diag;
 
 		mutex_enter(&spds->spds_alg_lock);
-		spdsock_do_updatealg(extv, &diag, spds);
-		mutex_exit(&spds->spds_alg_lock);
+		diag = spdsock_do_updatealg(extv, spds);
 		if (diag == -1) {
+			/* Keep the lock held while we walk the SA tables. */
+			sadb_alg_update(IPSEC_ALG_ALL, 0, 0,
+			    spds->spds_netstack);
+			mutex_exit(&spds->spds_alg_lock);
 			spd_echo(q, mp);
 			if (audit_active) {
 				cred_t *cr;
@@ -2817,6 +2817,7 @@ spdsock_updatealg(queue_t *q, mblk_t *mp, spd_ext_t *extv[])
 				    cpid);
 			}
 		} else {
+			mutex_exit(&spds->spds_alg_lock);
 			spdsock_diag(q, mp, diag);
 			if (audit_active) {
 				cred_t *cr;
@@ -3117,10 +3118,7 @@ spdsock_update_pending_algs(netstack_t *ns)
 
 	mutex_enter(&spds->spds_alg_lock);
 	if (spds->spds_algs_pending) {
-		int diag;
-
-		spdsock_do_updatealg(spds->spds_extv_algs, &diag,
-		    spds);
+		(void) spdsock_do_updatealg(spds->spds_extv_algs, spds);
 		spds->spds_algs_pending = B_FALSE;
 	}
 	mutex_exit(&spds->spds_alg_lock);
@@ -3265,7 +3263,7 @@ spdsock_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 int
 spdsock_opt_set(queue_t *q, uint_t mgmt_flags, int level, int name,
     uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
-    void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
+    void *thisdg_attrs, cred_t *cr)
 {
 	int *i1 = (int *)invalp;
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
@@ -3337,11 +3335,9 @@ spdsock_wput_other(queue_t *q, mblk_t *mp)
 			}
 			if (((union T_primitives *)mp->b_rptr)->type ==
 			    T_SVR4_OPTMGMT_REQ) {
-				(void) svr4_optcom_req(q, mp, cr,
-				    &spdsock_opt_obj, B_FALSE);
+				svr4_optcom_req(q, mp, cr, &spdsock_opt_obj);
 			} else {
-				(void) tpi_optcom_req(q, mp, cr,
-				    &spdsock_opt_obj, B_FALSE);
+				tpi_optcom_req(q, mp, cr, &spdsock_opt_obj);
 			}
 			break;
 		case T_DATA_REQ:

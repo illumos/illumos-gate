@@ -69,87 +69,25 @@ typedef struct icmp_stack icmp_stack_t;
 
 /* Internal icmp control structure, one per open stream */
 typedef	struct icmp_s {
-	krwlock_t	icmp_rwlock;	/* Protects most of icmp_t */
-	t_scalar_t	icmp_pending_op;	/* The current TPI operation */
 	/*
-	 * Following fields up to icmp_ipversion protected by conn_lock.
+	 * The addresses and ports in the conn_t and icmp_state are protected by
+	 * conn_lock. conn_lock also protects the content of icmp_t.
 	 */
 	uint_t		icmp_state;	/* TPI state */
-	in6_addr_t	icmp_v6src;	/* Source address of this stream */
-	in6_addr_t	icmp_bound_v6src; /* Explicitely bound to address */
-	sin6_t		icmp_v6dst;	/* Connected destination */
-	/*
-	 * IP format that packets transmitted from this struct should use.
-	 * Value can be IP4_VERSION or IPV6_VERSION.
-	 */
-	uchar_t		icmp_ipversion;
-
-	/* Written to only once at the time of opening the endpoint */
-	sa_family_t	icmp_family;	/* Family from socket() call */
-
-	/* Following protected by icmp_rwlock */
-	uint32_t 	icmp_max_hdr_len; /* For write offset in stream head */
-	uint_t		icmp_proto;
-	uint_t		icmp_ip_snd_options_len; /* Len of IPv4 options */
-	uint8_t		*icmp_ip_snd_options;	/* Ptr to IPv4 options */
-	uint8_t		icmp_multicast_ttl;	/* IP*_MULTICAST_TTL/HOPS */
-	ipaddr_t	icmp_multicast_if_addr; /* IP_MULTICAST_IF option */
-	uint_t		icmp_multicast_if_index; /* IPV6_MULTICAST_IF option */
-	int		icmp_bound_if;		/* IP*_BOUND_IF option */
 
 	/* Written to only once at the time of opening the endpoint */
 	conn_t		*icmp_connp;
 
-	/* Following protected by icmp_rwlock */
 	uint_t
-	    icmp_debug : 1,		/* SO_DEBUG "socket" option. */
-	    icmp_dontroute : 1,		/* SO_DONTROUTE "socket" option. */
-	    icmp_broadcast : 1,		/* SO_BROADCAST "socket" option. */
-	    icmp_reuseaddr : 1,		/* SO_REUSEADDR "socket" option. */
-
-	    icmp_useloopback : 1,	/* SO_USELOOPBACK "socket" option. */
 	    icmp_hdrincl : 1,		/* IP_HDRINCL option + RAW and IGMP */
-	    icmp_dgram_errind : 1,	/* SO_DGRAM_ERRIND option */
-	    icmp_unspec_source : 1,	/* IP*_UNSPEC_SRC option */
 
-	    icmp_raw_checksum : 1,	/* raw checksum per IPV6_CHECKSUM */
-	    icmp_no_tp_cksum : 1,	/* icmp_proto is UDP or TCP */
-	    icmp_ip_recvpktinfo : 1,	/* IPV[4,6]_RECVPKTINFO option  */
-	    icmp_ipv6_recvhoplimit : 1,	/* IPV6_RECVHOPLIMIT option */
+	    icmp_pad_to_bit_31: 31;
 
-	    icmp_ipv6_recvhopopts : 1,	/* IPV6_RECVHOPOPTS option */
-	    icmp_ipv6_recvdstopts : 1,	/* IPV6_RECVDSTOPTS option */
-	    icmp_ipv6_recvrthdr : 1,	/* IPV6_RECVRTHDR option */
-	    icmp_ipv6_recvpathmtu : 1,	/* IPV6_RECVPATHMTU option */
-
-	    icmp_recvif:1,		/* IP_RECVIF for raw sockets option */
-	    icmp_ipv6_recvtclass : 1,	/* IPV6_RECVTCLASS option */
-	    icmp_ipv6_recvrtdstopts : 1, /* Obsolete IPV6_RECVRTHDRDSTOPTS */
-	    icmp_old_ipv6_recvdstopts : 1, /* Old ver of IPV6_RECVDSTOPTS */
-
-	    icmp_timestamp : 1,  	/* SO_TIMESTAMP "socket" option */
-
-	    icmp_pad_to_bit_31: 11;
-
-	uint8_t		icmp_type_of_service;
-	uint8_t		icmp_ttl;		/* TTL or hoplimit */
-	uint32_t	icmp_checksum_off; /* user supplied checksum offset */
 	icmp6_filter_t	*icmp_filter;		/* ICMP6_FILTER option */
 
-	ip6_pkt_t	icmp_sticky_ipp;	/* Sticky options */
-	uint8_t		*icmp_sticky_hdrs;	/* Prebuilt IPv6 hdrs */
-	uint_t		icmp_sticky_hdrs_len;	/* Incl. ip6h and any ip6i */
-	zoneid_t	icmp_zoneid;		/* ID of owning zone */
-	uint_t		icmp_label_len;		/* length of security label */
-	uint_t		icmp_label_len_v6;	/* sec. part of sticky opt */
-	in6_addr_t 	icmp_v6lastdst;		/* most recent destination */
-	cred_t		*icmp_last_cred;	/* most recent credentials */
-	cred_t		*icmp_effective_cred;	/* cred with effective label */
+	/* Set at open time and never changed */
 	icmp_stack_t	*icmp_is;		/* Stack instance */
-	size_t		icmp_xmit_hiwat;
-	size_t		icmp_xmit_lowat;
-	size_t		icmp_recv_hiwat;
-	size_t		icmp_recv_lowat;
+
 	int		icmp_delayed_error;
 	kmutex_t	icmp_recv_lock;
 	mblk_t		*icmp_fallback_queue_head;
@@ -165,6 +103,10 @@ typedef	struct icmp_s {
 extern optdb_obj_t	icmp_opt_obj;
 extern uint_t		icmp_max_optsize;
 
+extern int	icmp_opt_default(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
+extern int	icmp_tpi_opt_get(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
+extern int	icmp_tpi_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,
+		    uint_t *, uchar_t *, void *, cred_t *);
 extern mblk_t	*icmp_snmp_get(queue_t *q, mblk_t *mpctl);
 
 extern void	icmp_ddi_g_init(void);

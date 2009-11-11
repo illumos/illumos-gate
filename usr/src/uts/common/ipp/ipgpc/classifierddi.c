@@ -445,10 +445,9 @@ ipgpc_invoke_action(ipp_action_id_t aid, ipp_packet_t *packet)
 	pkt.direction = callout_pos; /* set packet direction */
 
 	/* The ill_index could be 0 when called from forwarding (read) path */
-	if (ill_idx > 0) {
-		ill = ill_lookup_on_ifindex_global_instance(ill_idx, B_FALSE,
-		    NULL, NULL, NULL, NULL);
-	}
+	if (ill_idx > 0)
+		ill = ill_lookup_on_ifindex_global_instance(ill_idx, B_FALSE);
+
 	if (ill != NULL) {
 		/*
 		 * Since all IPP actions in an IPMP group are performed

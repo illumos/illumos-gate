@@ -30,7 +30,6 @@
 extern "C" {
 #endif
 
-extern struct mi_payload_walk_arg_s mi_ar_arg;
 extern struct mi_payload_walk_arg_s mi_icmp_arg;
 extern struct mi_payload_walk_arg_s mi_ill_arg;
 
@@ -42,8 +41,6 @@ extern int mi_walk_step(mdb_walk_state_t *);
 extern void mi_walk_fini(mdb_walk_state_t *);
 extern int mi_payload_walk_init(mdb_walk_state_t *);
 extern int mi_payload_walk_step(mdb_walk_state_t *);
-extern int ar_stacks_walk_init(mdb_walk_state_t *);
-extern int ar_stacks_walk_step(mdb_walk_state_t *);
 extern int icmp_stacks_walk_init(mdb_walk_state_t *);
 extern int icmp_stacks_walk_step(mdb_walk_state_t *);
 extern int tcp_stacks_walk_init(mdb_walk_state_t *);

@@ -172,7 +172,6 @@ static const struct str_flags mbf[] = {
 	{ SF(0x08),		"unused"				},
 	{ SF(MSGMARKNEXT), 	"Private: b_next's first byte marked"	},
 	{ SF(MSGNOTMARKNEXT),	"Private: ... not marked"		},
-	{ SF(MSGHASREF),	"Private: msg has reference to owner"	},
 	{ 0, NULL,		NULL					}
 };
 

@@ -35,39 +35,23 @@ extern "C" {
 #define	SCTP_COMMON_HDR_LENGTH	12	/* SCTP common header length */
 
 /* SCTP routines for IP to call. */
-extern void ip_fanout_sctp(mblk_t *, ill_t *, ipha_t *, uint32_t,
-    uint_t, boolean_t, boolean_t, zoneid_t);
+extern void ip_fanout_sctp(mblk_t *, ipha_t *, ip6_t *, uint32_t,
+    ip_recv_attr_t *);
 extern void sctp_ddi_g_init(void);
 extern void sctp_ddi_g_destroy(void);
 extern conn_t *sctp_find_conn(in6_addr_t *, in6_addr_t *, uint32_t,
-    zoneid_t, sctp_stack_t *);
+    zoneid_t, iaflags_t, sctp_stack_t *);
 extern conn_t *sctp_fanout(in6_addr_t *, in6_addr_t *, uint32_t,
-    zoneid_t, mblk_t *, sctp_stack_t *);
+    ip_recv_attr_t *, mblk_t *, sctp_stack_t *);
 
-extern void sctp_input(conn_t *, ipha_t *, mblk_t *, mblk_t *, ill_t *,
-    boolean_t, boolean_t);
+extern void sctp_input(conn_t *, ipha_t *, ip6_t *, mblk_t *, ip_recv_attr_t *);
 extern void sctp_wput(queue_t *, mblk_t *);
-extern void sctp_ootb_input(mblk_t *, ill_t *, zoneid_t, boolean_t);
+extern void sctp_ootb_input(mblk_t *, ip_recv_attr_t *, ip_stack_t *);
 extern void sctp_hash_init(sctp_stack_t *);
 extern void sctp_hash_destroy(sctp_stack_t *);
 extern uint32_t sctp_cksum(mblk_t *, int);
 extern mblk_t *sctp_snmp_get_mib2(queue_t *, mblk_t *, sctp_stack_t *);
 extern void sctp_free(conn_t *);
-
-#define	SCTP_STASH_IPINFO(mp, ire)			\
-{							\
-	unsigned char *stp;				\
-	stp = DB_BASE((mp));				\
-	ASSERT(stp + sizeof (ire_t *) < (mp)->b_rptr);	\
-	*(ire_t **)stp  = (ire);			\
-}
-
-#define	SCTP_EXTRACT_IPINFO(mp, ire)			\
-{							\
-	unsigned char *stp;				\
-	stp = (mp)->b_datap->db_base;			\
-	(ire) = *(ire_t **)stp;				\
-}
 
 /*
  * SCTP maintains a list of ILLs/IPIFs, these functions are provided by
@@ -87,16 +71,8 @@ extern void sctp_ill_reindex(ill_t *, uint_t);
 #define	SCTP_IPIF_UPDATE	6
 
 /* IP routines for SCTP to call. */
-extern void ip_fanout_sctp_raw(mblk_t *, ill_t *, ipha_t *, boolean_t,
-    uint32_t, boolean_t, uint_t, boolean_t, zoneid_t);
-extern void sctp_ire_cache_flush(ipif_t *);
-
-/*
- * Private (and possibly temporary) ioctls.  It is a large number
- * to avoid conflict with other ioctls, which are normally smaller
- * than 2^16.
- */
-#define	SCTP_IOC_DEFAULT_Q	(('S' << 16) | 1024)
+extern void ip_fanout_sctp_raw(mblk_t *, ipha_t *, ip6_t *, uint32_t,
+    ip_recv_attr_t *);
 
 #ifdef __cplusplus
 }

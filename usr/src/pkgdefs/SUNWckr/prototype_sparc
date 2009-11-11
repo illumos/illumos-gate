@@ -94,7 +94,6 @@ f none kernel/drv/sparcv9/ippctl 755 root sys
 f none kernel/drv/sparcv9/ipsecah 755 root sys
 f none kernel/drv/sparcv9/ipsecesp 755 root sys
 f none kernel/drv/sparcv9/iptun 755 root sys
-f none kernel/drv/sparcv9/iptunq 755 root sys
 f none kernel/drv/sparcv9/isp 755 root sys
 f none kernel/drv/sparcv9/iwscn 755 root sys
 f none kernel/drv/sparcv9/kb8042 755 root sys

@@ -80,7 +80,6 @@ typedef struct iptun_typeinfo {
 	iptun_type_t	iti_type;
 	const char	*iti_ident;	/* MAC-Type plugin identifier */
 	uint_t		iti_ipvers;	/* outer header IP version */
-	edesc_spf	iti_txfunc;	/* function used to transmit to ip */
 	uint32_t	iti_minmtu;	/* minimum possible tunnel MTU */
 	uint32_t	iti_maxmtu;	/* maximum possible tunnel MTU */
 	boolean_t	iti_hasraddr;	/* has a remote adress */
@@ -94,13 +93,6 @@ typedef struct iptun_typeinfo {
  * exceptions:
  *
  * The datapath reads certain fields without locks for performance reasons.
- *
- * - IPTUN_PMTU_TOO_OLD() is used without a lock to determine if the
- *   destination path-MTU should be queried.  This reads iptun_flags
- *   IPTUN_RADDR, IPTUN_FIXED_MTU, and iptun_dpmtu_lastupdate.  All of these
- *   can change without adversely affecting the tunnel, as the worst case
- *   scenario is that we launch a task that will ultimately either do nothing
- *   or needlessly query the destination path-MTU.
  *
  * - IPTUN_IS_RUNNING() is used (read access to iptun_flags IPTUN_BOUND and
  *   IPTUN_MAC_STARTED) to drop packets if they're sent while the tunnel is
@@ -119,12 +111,10 @@ typedef struct iptun_s {
 	conn_t		*iptun_connp;
 	zoneid_t	iptun_zoneid;
 	netstack_t	*iptun_ns;
-	cred_t		*iptun_cred;
 	struct ipsec_tun_pol_s	*iptun_itp;
 	iptun_typeinfo_t	*iptun_typeinfo;
 	uint32_t	iptun_mtu;
 	uint32_t	iptun_dpmtu;	/* destination path MTU */
-	clock_t		iptun_dpmtu_lastupdate;
 	uint8_t		iptun_hoplimit;
 	uint8_t		iptun_encaplimit;
 	iptun_addr_t	iptun_laddr;	/* local address */
@@ -172,37 +162,12 @@ typedef struct iptun_s {
 	    (IPTUN_BOUND | IPTUN_MAC_STARTED))
 
 /*
- * We request ire information for the tunnel destination in order to obtain
- * its path MTU information.  We use that to calculate the initial link MTU of
- * a tunnel.
- *
- * After that, if the path MTU of the tunnel destination becomes smaller
- * than the link MTU of the tunnel, then we will receive a packet too big
- * (aka fragmentation needed) ICMP error when we transmit a packet larger
- * than the path MTU, and we will adjust the tunne's MTU based on the ICMP
- * error's MTU information.
- *
- * In addition to that, we also need to request the ire information
- * periodically to make sure the link MTU of a tunnel doesn't become stale
- * if the path MTU of the tunnel destination becomes larger than the link
- * MTU of the tunnel.  The period for the requests is ten minutes in
- * accordance with rfc1191.
- */
-#define	IPTUN_PMTU_AGE		SEC_TO_TICK(600)
-#define	IPTUN_PMTU_TOO_OLD(ipt)						\
-	(((ipt)->iptun_flags & IPTUN_RADDR) &&				\
-	!((ipt)->iptun_flags & IPTUN_FIXED_MTU) &&			\
-	(ddi_get_lbolt() - (ipt)->iptun_dpmtu_lastupdate) > IPTUN_PMTU_AGE)
-
-/*
- * iptuns_lock protects iptuns_iptunlist and iptuns_g_q.
+ * iptuns_lock protects iptuns_iptunlist.
  */
 typedef struct iptun_stack {
 	netstack_t	*iptuns_netstack; /* Common netstack */
 	kmutex_t	iptuns_lock;
 	list_t		iptuns_iptunlist; /* list of tunnels in this stack. */
-	queue_t		*iptuns_g_q;	/* read-side IP queue */
-	ldi_handle_t	iptuns_g_q_lh;
 	ipaddr_t	iptuns_relay_rtr_addr;
 } iptun_stack_t;
 
@@ -222,8 +187,6 @@ extern int	iptun_info(iptun_kparams_t *, cred_t *);
 extern int	iptun_set_6to4relay(netstack_t *, ipaddr_t);
 extern void	iptun_get_6to4relay(netstack_t *, ipaddr_t *);
 extern void	iptun_set_policy(datalink_id_t, ipsec_tun_pol_t *);
-extern void	iptun_set_g_q(netstack_t *, queue_t *);
-extern void	iptun_clear_g_q(netstack_t *);
 
 #endif	/* _KERNEL */
 

@@ -44,6 +44,8 @@
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/ip_ire.h>
+#include <inet/ip_if.h>
+#include <inet/ip_ndp.h>
 #include <inet/mib2.h>
 #include <inet/nd.h>
 #include <inet/optcom.h>
@@ -57,7 +59,7 @@
 static struct kmem_cache *sctp_kmem_faddr_cache;
 static void sctp_init_faddr(sctp_t *, sctp_faddr_t *, in6_addr_t *, mblk_t *);
 
-/* Set the source address.  Refer to comments in sctp_get_ire(). */
+/* Set the source address.  Refer to comments in sctp_get_dest(). */
 void
 sctp_set_saddr(sctp_t *sctp, sctp_faddr_t *fp)
 {
@@ -68,7 +70,7 @@ sctp_set_saddr(sctp_t *sctp, sctp_faddr_t *fp)
 	/*
 	 * If there is no source address avaialble, mark this peer address
 	 * as unreachable for now.  When the heartbeat timer fires, it will
-	 * call sctp_get_ire() to re-check if there is any source address
+	 * call sctp_get_dest() to re-check if there is any source address
 	 * available.
 	 */
 	if (!addr_set)
@@ -76,25 +78,31 @@ sctp_set_saddr(sctp_t *sctp, sctp_faddr_t *fp)
 }
 
 /*
- * Call this function to update the cached IRE of a peer addr fp.
+ * Call this function to get information about a peer addr fp.
+ *
+ * Uses ip_attr_connect to avoid explicit use of ire and source address
+ * selection.
  */
 void
-sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
+sctp_get_dest(sctp_t *sctp, sctp_faddr_t *fp)
 {
-	ire_t		*ire;
-	ipaddr_t	addr4;
 	in6_addr_t	laddr;
+	in6_addr_t	nexthop;
 	sctp_saddr_ipif_t *sp;
 	int		hdrlen;
-	ts_label_t	*tsl;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
-	ip_stack_t	*ipst = sctps->sctps_netstack->netstack_ip;
+	conn_t		*connp = sctp->sctp_connp;
+	iulp_t		uinfo;
+	uint_t		pmtu;
+	int		error;
+	uint32_t	flags = IPDF_VERIFY_DST | IPDF_IPSEC |
+	    IPDF_SELECT_SRC | IPDF_UNIQUE_DCE;
 
-	/* Remove the previous cache IRE */
-	if ((ire = fp->ire) != NULL) {
-		IRE_REFRELE_NOTR(ire);
-		fp->ire = NULL;
-	}
+	/*
+	 * Tell sctp_make_mp it needs to call us again should we not
+	 * complete and set the saddr.
+	 */
+	fp->saddr = ipv6_all_zeros;
 
 	/*
 	 * If this addr is not reachable, mark it as unconfirmed for now, the
@@ -105,29 +113,28 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 		fp->state = SCTP_FADDRS_UNCONFIRMED;
 	}
 
-	tsl = crgetlabel(CONN_CRED(sctp->sctp_connp));
+	/*
+	 * Socket is connected - enable PMTU discovery.
+	 */
+	if (!sctps->sctps_ignore_path_mtu)
+		fp->ixa->ixa_flags |= IXAF_PMTU_DISCOVERY;
 
-	if (fp->isv4) {
-		IN6_V4MAPPED_TO_IPADDR(&fp->faddr, addr4);
-		ire = ire_cache_lookup(addr4, sctp->sctp_zoneid, tsl, ipst);
-		if (ire != NULL)
-			IN6_IPADDR_TO_V4MAPPED(ire->ire_src_addr, &laddr);
-	} else {
-		ire = ire_cache_lookup_v6(&fp->faddr, sctp->sctp_zoneid, tsl,
-		    ipst);
-		if (ire != NULL)
-			laddr = ire->ire_src_addr_v6;
-	}
+	ip_attr_nexthop(&connp->conn_xmit_ipp, fp->ixa, &fp->faddr,
+	    &nexthop);
 
-	if (ire == NULL) {
-		dprint(3, ("ire2faddr: no ire for %x:%x:%x:%x\n",
+	laddr = fp->saddr;
+	error = ip_attr_connect(connp, fp->ixa, &laddr, &fp->faddr, &nexthop,
+	    connp->conn_fport, &laddr, &uinfo, flags);
+
+	if (error != 0) {
+		dprint(3, ("sctp_get_dest: no ire for %x:%x:%x:%x\n",
 		    SCTP_PRINTADDR(fp->faddr)));
 		/*
 		 * It is tempting to just leave the src addr
 		 * unspecified and let IP figure it out, but we
 		 * *cannot* do this, since IP may choose a src addr
 		 * that is not part of this association... unless
-		 * this sctp has bound to all addrs.  So if the ire
+		 * this sctp has bound to all addrs.  So if the dest
 		 * lookup fails, try to find one in our src addr
 		 * list, unless the sctp has bound to all addrs, in
 		 * which case we change the src addr to unspec.
@@ -144,56 +151,44 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 			return;
 		goto check_current;
 	}
+	ASSERT(fp->ixa->ixa_ire != NULL);
+	ASSERT(!(fp->ixa->ixa_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)));
+
+	if (!sctp->sctp_loopback)
+		sctp->sctp_loopback = uinfo.iulp_loopback;
 
 	/* Make sure the laddr is part of this association */
-	if ((sp = sctp_saddr_lookup(sctp, &ire->ire_ipif->ipif_v6lcl_addr,
-	    0)) != NULL && !sp->saddr_ipif_dontsrc) {
+	if ((sp = sctp_saddr_lookup(sctp, &laddr, 0)) != NULL &&
+	    !sp->saddr_ipif_dontsrc) {
 		if (sp->saddr_ipif_unconfirmed == 1)
 			sp->saddr_ipif_unconfirmed = 0;
+		/* We did IPsec policy lookup for laddr already */
 		fp->saddr = laddr;
 	} else {
-		dprint(2, ("ire2faddr: src addr is not part of assc\n"));
+		dprint(2, ("sctp_get_dest: src addr is not part of assoc "
+		    "%x:%x:%x:%x\n", SCTP_PRINTADDR(laddr)));
 
 		/*
 		 * Set the src to the first saddr and hope for the best.
-		 * Note that we will still do the ire caching below.
-		 * Otherwise, whenever we send a packet, we need to do
-		 * the ire lookup again and still may not get the correct
-		 * source address.  Note that this case should very seldomly
+		 * Note that this case should very seldomly
 		 * happen.  One scenario this can happen is an app
 		 * explicitly bind() to an address.  But that address is
 		 * not the preferred source address to send to the peer.
 		 */
 		sctp_set_saddr(sctp, fp);
 		if (fp->state == SCTP_FADDRS_UNREACH) {
-			IRE_REFRELE(ire);
 			return;
 		}
 	}
 
 	/*
-	 * Note that ire_cache_lookup_*() returns an ire with the tracing
-	 * bits enabled.  This requires the thread holding the ire also
-	 * do the IRE_REFRELE().  Thus we need to do IRE_REFHOLD_NOTR()
-	 * and then IRE_REFRELE() the ire here to make the tracing bits
-	 * work.
-	 */
-	IRE_REFHOLD_NOTR(ire);
-	IRE_REFRELE(ire);
-
-	/* Cache the IRE */
-	fp->ire = ire;
-	if (fp->ire->ire_type == IRE_LOOPBACK && !sctp->sctp_loopback)
-		sctp->sctp_loopback = 1;
-
-	/*
 	 * Pull out RTO information for this faddr and use it if we don't
 	 * have any yet.
 	 */
-	if (fp->srtt == -1 && ire->ire_uinfo.iulp_rtt != 0) {
+	if (fp->srtt == -1 && uinfo.iulp_rtt != 0) {
 		/* The cached value is in ms. */
-		fp->srtt = MSEC_TO_TICK(ire->ire_uinfo.iulp_rtt);
-		fp->rttvar = MSEC_TO_TICK(ire->ire_uinfo.iulp_rtt_sd);
+		fp->srtt = MSEC_TO_TICK(uinfo.iulp_rtt);
+		fp->rttvar = MSEC_TO_TICK(uinfo.iulp_rtt_sd);
 		fp->rto = 3 * fp->srtt;
 
 		/* Bound the RTO by configured min and max values */
@@ -205,6 +200,7 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 		}
 		SCTP_MAX_RTO(sctp, fp);
 	}
+	pmtu = uinfo.iulp_mtu;
 
 	/*
 	 * Record the MTU for this faddr. If the MTU for this faddr has
@@ -215,9 +211,9 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 	} else {
 		hdrlen = sctp->sctp_hdr6_len;
 	}
-	if ((fp->sfa_pmss + hdrlen) != ire->ire_max_frag) {
+	if ((fp->sfa_pmss + hdrlen) != pmtu) {
 		/* Make sure that sfa_pmss is a multiple of SCTP_ALIGN. */
-		fp->sfa_pmss = (ire->ire_max_frag - hdrlen) & ~(SCTP_ALIGN - 1);
+		fp->sfa_pmss = (pmtu - hdrlen) & ~(SCTP_ALIGN - 1);
 		if (fp->cwnd < (fp->sfa_pmss * 2)) {
 			SET_CWND(fp, fp->sfa_pmss,
 			    sctps->sctps_slow_start_initial);
@@ -230,28 +226,16 @@ check_current:
 }
 
 void
-sctp_update_ire(sctp_t *sctp)
+sctp_update_dce(sctp_t *sctp)
 {
-	ire_t		*ire;
 	sctp_faddr_t	*fp;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	iulp_t		uinfo;
+	ip_stack_t	*ipst = sctps->sctps_netstack->netstack_ip;
+	uint_t		ifindex;
 
 	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-		if ((ire = fp->ire) == NULL)
-			continue;
-		mutex_enter(&ire->ire_lock);
-
-		/*
-		 * If the cached IRE is going away, there is no point to
-		 * update it.
-		 */
-		if (ire->ire_marks & IRE_MARK_CONDEMNED) {
-			mutex_exit(&ire->ire_lock);
-			IRE_REFRELE_NOTR(ire);
-			fp->ire = NULL;
-			continue;
-		}
-
+		bzero(&uinfo, sizeof (uinfo));
 		/*
 		 * Only record the PMTU for this faddr if we actually have
 		 * done discovery. This prevents initialized default from
@@ -259,70 +243,60 @@ sctp_update_ire(sctp_t *sctp)
 		 */
 		if (fp->pmtu_discovered) {
 			if (fp->isv4) {
-				ire->ire_max_frag = fp->sfa_pmss +
+				uinfo.iulp_mtu = fp->sfa_pmss +
 				    sctp->sctp_hdr_len;
 			} else {
-				ire->ire_max_frag = fp->sfa_pmss +
+				uinfo.iulp_mtu = fp->sfa_pmss +
 				    sctp->sctp_hdr6_len;
 			}
 		}
-
 		if (sctps->sctps_rtt_updates != 0 &&
 		    fp->rtt_updates >= sctps->sctps_rtt_updates) {
 			/*
-			 * If there is no old cached values, initialize them
-			 * conservatively.  Set them to be (1.5 * new value).
-			 * This code copied from ip_ire_advise().  The cached
-			 * value is in ms.
+			 * dce_update_uinfo() merges these values with the
+			 * old values.
 			 */
-			if (ire->ire_uinfo.iulp_rtt != 0) {
-				ire->ire_uinfo.iulp_rtt =
-				    (ire->ire_uinfo.iulp_rtt +
-				    TICK_TO_MSEC(fp->srtt)) >> 1;
-			} else {
-				ire->ire_uinfo.iulp_rtt =
-				    TICK_TO_MSEC(fp->srtt + (fp->srtt >> 1));
-			}
-			if (ire->ire_uinfo.iulp_rtt_sd != 0) {
-				ire->ire_uinfo.iulp_rtt_sd =
-				    (ire->ire_uinfo.iulp_rtt_sd +
-				    TICK_TO_MSEC(fp->rttvar)) >> 1;
-			} else {
-				ire->ire_uinfo.iulp_rtt_sd =
-				    TICK_TO_MSEC(fp->rttvar +
-				    (fp->rttvar >> 1));
-			}
+			uinfo.iulp_rtt = TICK_TO_MSEC(fp->srtt);
+			uinfo.iulp_rtt_sd = TICK_TO_MSEC(fp->rttvar);
 			fp->rtt_updates = 0;
 		}
-		mutex_exit(&ire->ire_lock);
+		ifindex = 0;
+		if (IN6_IS_ADDR_LINKSCOPE(&fp->faddr)) {
+			/*
+			 * If we are going to create a DCE we'd better have
+			 * an ifindex
+			 */
+			if (fp->ixa->ixa_nce != NULL) {
+				ifindex = fp->ixa->ixa_nce->nce_common->
+				    ncec_ill->ill_phyint->phyint_ifindex;
+			} else {
+				continue;
+			}
+		}
+
+		(void) dce_update_uinfo(&fp->faddr, ifindex, &uinfo, ipst);
 	}
 }
 
 /*
- * The sender must set the total length in the IP header.
- * If sendto == NULL, the current will be used.
+ * The sender must later set the total length in the IP header.
  */
 mblk_t *
-sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
+sctp_make_mp(sctp_t *sctp, sctp_faddr_t *fp, int trailer)
 {
 	mblk_t *mp;
 	size_t ipsctplen;
 	int isv4;
-	sctp_faddr_t *fp;
 	sctp_stack_t *sctps = sctp->sctp_sctps;
 	boolean_t src_changed = B_FALSE;
 
-	ASSERT(sctp->sctp_current != NULL || sendto != NULL);
-	if (sendto == NULL) {
-		fp = sctp->sctp_current;
-	} else {
-		fp = sendto;
-	}
+	ASSERT(fp != NULL);
 	isv4 = fp->isv4;
 
-	/* Try to look for another IRE again. */
-	if (fp->ire == NULL) {
-		sctp_get_ire(sctp, fp);
+	if (SCTP_IS_ADDR_UNSPEC(isv4, fp->saddr) ||
+	    (fp->ixa->ixa_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
+		/* Need to pick a source */
+		sctp_get_dest(sctp, fp);
 		/*
 		 * Although we still may not get an IRE, the source address
 		 * may be changed in sctp_get_ire().  Set src_changed to
@@ -334,7 +308,9 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
 	/* There is no suitable source address to use, return. */
 	if (fp->state == SCTP_FADDRS_UNREACH)
 		return (NULL);
-	ASSERT(!SCTP_IS_ADDR_UNSPEC(fp->isv4, fp->saddr));
+
+	ASSERT(fp->ixa->ixa_ire != NULL);
+	ASSERT(!SCTP_IS_ADDR_UNSPEC(isv4, fp->saddr));
 
 	if (isv4) {
 		ipsctplen = sctp->sctp_hdr_len;
@@ -342,8 +318,7 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
 		ipsctplen = sctp->sctp_hdr6_len;
 	}
 
-	mp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra + trailer,
-	    CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
+	mp = allocb(ipsctplen + sctps->sctps_wroff_xtra + trailer, BPRI_MED);
 	if (mp == NULL) {
 		ip1dbg(("sctp_make_mp: error making mp..\n"));
 		return (NULL);
@@ -377,18 +352,6 @@ sctp_make_mp(sctp_t *sctp, sctp_faddr_t *sendto, int trailer)
 		}
 	}
 	ASSERT(sctp->sctp_connp != NULL);
-
-	/*
-	 * IP will not free this IRE if it is condemned.  SCTP needs to
-	 * free it.
-	 */
-	if ((fp->ire != NULL) && (fp->ire->ire_marks & IRE_MARK_CONDEMNED)) {
-		IRE_REFRELE_NOTR(fp->ire);
-		fp->ire = NULL;
-	}
-	/* Stash the conn and ire ptr info. for IP */
-	SCTP_STASH_IPINFO(mp, fp->ire);
-
 	return (mp);
 }
 
@@ -410,17 +373,22 @@ sctp_set_ulp_prop(sctp_t *sctp)
 	}
 	ASSERT(sctp->sctp_ulpd);
 
+	sctp->sctp_connp->conn_wroff = sctps->sctps_wroff_xtra + hdrlen +
+	    sizeof (sctp_data_hdr_t);
+
 	ASSERT(sctp->sctp_current->sfa_pmss == sctp->sctp_mss);
 	bzero(&sopp, sizeof (sopp));
 	sopp.sopp_flags = SOCKOPT_MAXBLK|SOCKOPT_WROFF;
-	sopp.sopp_wroff = sctps->sctps_wroff_xtra + hdrlen +
-	    sizeof (sctp_data_hdr_t);
+	sopp.sopp_wroff = sctp->sctp_connp->conn_wroff;
 	sopp.sopp_maxblk = sctp->sctp_mss - sizeof (sctp_data_hdr_t);
 	sctp->sctp_ulp_prop(sctp->sctp_ulpd, &sopp);
 }
 
+/*
+ * Set the lengths in the packet and the transmit attributes.
+ */
 void
-sctp_set_iplen(sctp_t *sctp, mblk_t *mp)
+sctp_set_iplen(sctp_t *sctp, mblk_t *mp, ip_xmit_attr_t *ixa)
 {
 	uint16_t	sum = 0;
 	ipha_t		*iph;
@@ -432,19 +400,15 @@ sctp_set_iplen(sctp_t *sctp, mblk_t *mp)
 	for (; pmp; pmp = pmp->b_cont)
 		sum += pmp->b_wptr - pmp->b_rptr;
 
+	ixa->ixa_pktlen = sum;
 	if (isv4) {
 		iph = (ipha_t *)mp->b_rptr;
 		iph->ipha_length = htons(sum);
+		ixa->ixa_ip_hdr_length = sctp->sctp_ip_hdr_len;
 	} else {
 		ip6h = (ip6_t *)mp->b_rptr;
-		/*
-		 * If an ip6i_t is present, the real IPv6 header
-		 * immediately follows.
-		 */
-		if (ip6h->ip6_nxt == IPPROTO_RAW)
-			ip6h = (ip6_t *)&ip6h[1];
-		ip6h->ip6_plen = htons(sum - ((char *)&sctp->sctp_ip6h[1] -
-		    sctp->sctp_iphc6));
+		ip6h->ip6_plen = htons(sum - IPV6_HDR_LEN);
+		ixa->ixa_ip_hdr_length = sctp->sctp_ip_hdr6_len;
 	}
 }
 
@@ -501,21 +465,21 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep, boolean_t first)
 	sctp_faddr_t	*faddr;
 	mblk_t		*timer_mp;
 	int		err;
+	conn_t		*connp = sctp->sctp_connp;
 
 	if (is_system_labeled()) {
-		cred_t *effective_cred;
+		ip_xmit_attr_t	*ixa = connp->conn_ixa;
+		ts_label_t	*effective_tsl = NULL;
+
+		ASSERT(ixa->ixa_tsl != NULL);
 
 		/*
 		 * Verify the destination is allowed to receive packets
 		 * at the security label of the connection we are initiating.
 		 *
-		 * tsol_check_dest() will create a new effective cred for
+		 * tsol_check_dest() will create a new effective label for
 		 * this connection with a modified label or label flags only
-		 * if there are changes from the original cred.
-		 *
-		 * conn_effective_cred may be non-NULL if a previous
-		 * faddr was already added or if this is a server
-		 * accepting a connection on a multi-label port.
+		 * if there are changes from the original label.
 		 *
 		 * Accept whatever label we get if this is the first
 		 * destination address for this connection. The security
@@ -525,27 +489,28 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep, boolean_t first)
 		if (IN6_IS_ADDR_V4MAPPED(addr)) {
 			uint32_t dst;
 			IN6_V4MAPPED_TO_IPADDR(addr, dst);
-			err = tsol_check_dest(CONN_CRED(sctp->sctp_connp),
-			    &dst, IPV4_VERSION, sctp->sctp_mac_mode,
-			    &effective_cred);
+			err = tsol_check_dest(ixa->ixa_tsl,
+			    &dst, IPV4_VERSION, connp->conn_mac_mode,
+			    connp->conn_zone_is_global, &effective_tsl);
 		} else {
-			err = tsol_check_dest(CONN_CRED(sctp->sctp_connp),
-			    addr, IPV6_VERSION, sctp->sctp_mac_mode,
-			    &effective_cred);
+			err = tsol_check_dest(ixa->ixa_tsl,
+			    addr, IPV6_VERSION, connp->conn_mac_mode,
+			    connp->conn_zone_is_global, &effective_tsl);
 		}
 		if (err != 0)
 			return (err);
-		if (sctp->sctp_faddrs == NULL &&
-		    sctp->sctp_connp->conn_effective_cred == NULL) {
-			sctp->sctp_connp->conn_effective_cred = effective_cred;
-		} else if (effective_cred != NULL) {
-			crfree(effective_cred);
+
+		if (sctp->sctp_faddrs == NULL && effective_tsl != NULL) {
+			ip_xmit_attr_replace_tsl(ixa, effective_tsl);
+		} else if (effective_tsl != NULL) {
+			label_rele(effective_tsl);
 			return (EHOSTUNREACH);
 		}
 	}
 
 	if ((faddr = kmem_cache_alloc(sctp_kmem_faddr_cache, sleep)) == NULL)
 		return (ENOMEM);
+	bzero(faddr, sizeof (*faddr));
 	timer_mp = sctp_timer_alloc((sctp), sctp_rexmit_timer, sleep);
 	if (timer_mp == NULL) {
 		kmem_cache_free(sctp_kmem_faddr_cache, faddr);
@@ -553,16 +518,19 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep, boolean_t first)
 	}
 	((sctpt_t *)(timer_mp->b_rptr))->sctpt_faddr = faddr;
 
-	sctp_init_faddr(sctp, faddr, addr, timer_mp);
-
-	/* Check for subnet broadcast. */
-	if (faddr->ire != NULL && faddr->ire->ire_type & IRE_BROADCAST) {
-		IRE_REFRELE_NOTR(faddr->ire);
-		sctp_timer_free(timer_mp);
-		faddr->timer_mp = NULL;
+	/* Start with any options set on the conn */
+	faddr->ixa = conn_get_ixa_exclusive(connp);
+	if (faddr->ixa == NULL) {
+		freemsg(timer_mp);
 		kmem_cache_free(sctp_kmem_faddr_cache, faddr);
-		return (EADDRNOTAVAIL);
+		return (ENOMEM);
 	}
+	faddr->ixa->ixa_notify_cookie = connp->conn_sctp;
+
+	sctp_init_faddr(sctp, faddr, addr, timer_mp);
+	ASSERT(faddr->ixa->ixa_cred != NULL);
+
+	/* ip_attr_connect didn't allow broadcats/multicast dest */
 	ASSERT(faddr->next == NULL);
 
 	if (sctp->sctp_faddrs == NULL) {
@@ -644,7 +612,7 @@ sctp_redo_faddr_srcs(sctp_t *sctp)
 	sctp_faddr_t *fp;
 
 	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
-		sctp_get_ire(sctp, fp);
+		sctp_get_dest(sctp, fp);
 	}
 }
 
@@ -662,15 +630,17 @@ sctp_faddr_alive(sctp_t *sctp, sctp_faddr_t *fp)
 		fp->state = SCTP_FADDRS_ALIVE;
 		sctp_intf_event(sctp, fp->faddr, SCTP_ADDR_AVAILABLE, 0);
 		/* Should have a full IRE now */
-		sctp_get_ire(sctp, fp);
+		sctp_get_dest(sctp, fp);
 
 		/*
 		 * If this is the primary, switch back to it now.  And
 		 * we probably want to reset the source addr used to reach
 		 * it.
+		 * Note that if we didn't find a source in sctp_get_dest
+		 * then we'd be unreachable at this point in time.
 		 */
-		if (fp == sctp->sctp_primary) {
-			ASSERT(fp->state != SCTP_FADDRS_UNREACH);
+		if (fp == sctp->sctp_primary &&
+		    fp->state != SCTP_FADDRS_UNREACH) {
 			sctp_set_faddr_current(sctp, fp);
 			return;
 		}
@@ -816,9 +786,9 @@ sctp_unlink_faddr(sctp_t *sctp, sctp_faddr_t *fp)
 		fp->rc_timer_mp = NULL;
 		fp->rc_timer_running = 0;
 	}
-	if (fp->ire != NULL) {
-		IRE_REFRELE_NOTR(fp->ire);
-		fp->ire = NULL;
+	if (fp->ixa != NULL) {
+		ixa_refrele(fp->ixa);
+		fp->ixa = NULL;
 	}
 
 	if (fp == sctp->sctp_faddrs) {
@@ -837,7 +807,6 @@ gotit:
 		fpp->next = fp->next;
 	}
 	mutex_exit(&sctp->sctp_conn_tfp->tf_lock);
-	/* XXX faddr2ire? */
 	kmem_cache_free(sctp_kmem_faddr_cache, fp);
 	sctp->sctp_nfaddrs--;
 }
@@ -866,8 +835,10 @@ sctp_zap_faddrs(sctp_t *sctp, int caller_holds_lock)
 
 	for (fp = sctp->sctp_faddrs; fp; fp = fpn) {
 		fpn = fp->next;
-		if (fp->ire != NULL)
-			IRE_REFRELE_NOTR(fp->ire);
+		if (fp->ixa != NULL) {
+			ixa_refrele(fp->ixa);
+			fp->ixa = NULL;
+		}
 		kmem_cache_free(sctp_kmem_faddr_cache, fp);
 		sctp->sctp_nfaddrs--;
 	}
@@ -888,242 +859,177 @@ sctp_zap_addrs(sctp_t *sctp)
 }
 
 /*
- * Initialize the IPv4 header. Loses any record of any IP options.
+ * Build two SCTP header templates; one for IPv4 and one for IPv6.
+ * Store them in sctp_iphc and sctp_iphc6 respectively (and related fields).
+ * There are no IP addresses in the templates, but the port numbers and
+ * verifier are field in from the conn_t and sctp_t.
+ *
+ * Returns failure if can't allocate memory, or if there is a problem
+ * with a routing header/option.
+ *
+ * We allocate space for the minimum sctp header (sctp_hdr_t).
+ *
+ * We massage an routing option/header. There is no checksum implication
+ * for a routing header for sctp.
+ *
+ * Caller needs to update conn_wroff if desired.
+ *
+ * TSol notes: This assumes that a SCTP association has a single peer label
+ * since we only track a single pair of ipp_label_v4/v6 and not a separate one
+ * for each faddr.
  */
 int
-sctp_header_init_ipv4(sctp_t *sctp, int sleep)
+sctp_build_hdrs(sctp_t *sctp, int sleep)
 {
-	sctp_hdr_t	*sctph;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
-
-	/*
-	 * This is a simple initialization. If there's
-	 * already a template, it should never be too small,
-	 * so reuse it.  Otherwise, allocate space for the new one.
-	 */
-	if (sctp->sctp_iphc != NULL) {
-		ASSERT(sctp->sctp_iphc_len >= SCTP_MAX_COMBINED_HEADER_LENGTH);
-		bzero(sctp->sctp_iphc, sctp->sctp_iphc_len);
-	} else {
-		sctp->sctp_iphc_len = SCTP_MAX_COMBINED_HEADER_LENGTH;
-		sctp->sctp_iphc = kmem_zalloc(sctp->sctp_iphc_len, sleep);
-		if (sctp->sctp_iphc == NULL) {
-			sctp->sctp_iphc_len = 0;
-			return (ENOMEM);
-		}
-	}
-
-	sctp->sctp_ipha = (ipha_t *)sctp->sctp_iphc;
-
-	sctp->sctp_hdr_len = sizeof (ipha_t) + sizeof (sctp_hdr_t);
-	sctp->sctp_ip_hdr_len = sizeof (ipha_t);
-	sctp->sctp_ipha->ipha_length = htons(sizeof (ipha_t) +
-	    sizeof (sctp_hdr_t));
-	sctp->sctp_ipha->ipha_version_and_hdr_length =
-	    (IP_VERSION << 4) | IP_SIMPLE_HDR_LENGTH_IN_WORDS;
-
-	/*
-	 * These two fields should be zero, and are already set above.
-	 *
-	 * sctp->sctp_ipha->ipha_ident,
-	 * sctp->sctp_ipha->ipha_fragment_offset_and_flags.
-	 */
-
-	sctp->sctp_ipha->ipha_ttl = sctps->sctps_ipv4_ttl;
-	sctp->sctp_ipha->ipha_protocol = IPPROTO_SCTP;
-
-	sctph = (sctp_hdr_t *)(sctp->sctp_iphc + sizeof (ipha_t));
-	sctp->sctp_sctph = sctph;
-
-	return (0);
-}
-
-/*
- * Update sctp_sticky_hdrs based on sctp_sticky_ipp.
- * The headers include ip6i_t (if needed), ip6_t, any sticky extension
- * headers, and the maximum size sctp header (to avoid reallocation
- * on the fly for additional sctp options).
- * Returns failure if can't allocate memory.
- */
-int
-sctp_build_hdrs(sctp_t *sctp)
-{
-	char		*hdrs;
+	conn_t		*connp = sctp->sctp_connp;
+	ip_pkt_t	*ipp = &connp->conn_xmit_ipp;
+	uint_t		ip_hdr_length;
+	uchar_t		*hdrs;
 	uint_t		hdrs_len;
-	ip6i_t		*ip6i;
-	char		buf[SCTP_MAX_HDR_LENGTH];
-	ip6_pkt_t	*ipp = &sctp->sctp_sticky_ipp;
-	in6_addr_t	src;
-	in6_addr_t	dst;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	uint_t		ulp_hdr_length = sizeof (sctp_hdr_t);
+	ipha_t		*ipha;
+	ip6_t		*ip6h;
+	sctp_hdr_t	*sctph;
+	in6_addr_t	v6src, v6dst;
+	ipaddr_t	v4src, v4dst;
 
-	/*
-	 * save the existing sctp header and source/dest IP addresses
-	 */
-	bcopy(sctp->sctp_sctph6, buf, sizeof (sctp_hdr_t));
-	src = sctp->sctp_ip6h->ip6_src;
-	dst = sctp->sctp_ip6h->ip6_dst;
-	hdrs_len = ip_total_hdrs_len_v6(ipp) + SCTP_MAX_HDR_LENGTH;
+	v4src = connp->conn_saddr_v4;
+	v4dst = connp->conn_faddr_v4;
+	v6src = connp->conn_saddr_v6;
+	v6dst = connp->conn_faddr_v6;
+
+	/* First do IPv4 header */
+	ip_hdr_length = ip_total_hdrs_len_v4(ipp);
+
+	/* In case of TX label and IP options it can be too much */
+	if (ip_hdr_length > IP_MAX_HDR_LENGTH) {
+		/* Preserves existing TX errno for this */
+		return (EHOSTUNREACH);
+	}
+	hdrs_len = ip_hdr_length + ulp_hdr_length;
 	ASSERT(hdrs_len != 0);
-	if (hdrs_len > sctp->sctp_iphc6_len) {
-		/* Need to reallocate */
-		hdrs = kmem_zalloc(hdrs_len, KM_NOSLEEP);
+
+	if (hdrs_len != sctp->sctp_iphc_len) {
+		/* Allocate new before we free any old */
+		hdrs = kmem_alloc(hdrs_len, sleep);
 		if (hdrs == NULL)
 			return (ENOMEM);
 
-		if (sctp->sctp_iphc6_len != 0)
+		if (sctp->sctp_iphc != NULL)
+			kmem_free(sctp->sctp_iphc, sctp->sctp_iphc_len);
+		sctp->sctp_iphc = hdrs;
+		sctp->sctp_iphc_len = hdrs_len;
+	} else {
+		hdrs = sctp->sctp_iphc;
+	}
+	sctp->sctp_hdr_len = sctp->sctp_iphc_len;
+	sctp->sctp_ip_hdr_len = ip_hdr_length;
+
+	sctph = (sctp_hdr_t *)(hdrs + ip_hdr_length);
+	sctp->sctp_sctph = sctph;
+	sctph->sh_sport = connp->conn_lport;
+	sctph->sh_dport = connp->conn_fport;
+	sctph->sh_verf = sctp->sctp_fvtag;
+	sctph->sh_chksum = 0;
+
+	ipha = (ipha_t *)hdrs;
+	sctp->sctp_ipha = ipha;
+
+	ipha->ipha_src = v4src;
+	ipha->ipha_dst = v4dst;
+	ip_build_hdrs_v4(hdrs, ip_hdr_length, ipp, connp->conn_proto);
+	ipha->ipha_length = htons(hdrs_len);
+	ipha->ipha_fragment_offset_and_flags = 0;
+
+	if (ipp->ipp_fields & IPPF_IPV4_OPTIONS)
+		(void) ip_massage_options(ipha, connp->conn_netstack);
+
+	/* Now IPv6 */
+	ip_hdr_length = ip_total_hdrs_len_v6(ipp);
+	hdrs_len = ip_hdr_length + ulp_hdr_length;
+	ASSERT(hdrs_len != 0);
+
+	if (hdrs_len != sctp->sctp_iphc6_len) {
+		/* Allocate new before we free any old */
+		hdrs = kmem_alloc(hdrs_len, sleep);
+		if (hdrs == NULL)
+			return (ENOMEM);
+
+		if (sctp->sctp_iphc6 != NULL)
 			kmem_free(sctp->sctp_iphc6, sctp->sctp_iphc6_len);
 		sctp->sctp_iphc6 = hdrs;
 		sctp->sctp_iphc6_len = hdrs_len;
-	}
-	ip_build_hdrs_v6((uchar_t *)sctp->sctp_iphc6,
-	    hdrs_len - SCTP_MAX_HDR_LENGTH, ipp, IPPROTO_SCTP);
-
-	/* Set header fields not in ipp */
-	if (ipp->ipp_fields & IPPF_HAS_IP6I) {
-		ip6i = (ip6i_t *)sctp->sctp_iphc6;
-		sctp->sctp_ip6h = (ip6_t *)&ip6i[1];
 	} else {
-		sctp->sctp_ip6h = (ip6_t *)sctp->sctp_iphc6;
+		hdrs = sctp->sctp_iphc6;
 	}
-	/*
-	 * sctp->sctp_ip_hdr_len will include ip6i_t if there is one.
-	 */
-	sctp->sctp_ip_hdr6_len = hdrs_len - SCTP_MAX_HDR_LENGTH;
-	sctp->sctp_sctph6 = (sctp_hdr_t *)(sctp->sctp_iphc6 +
-	    sctp->sctp_ip_hdr6_len);
-	sctp->sctp_hdr6_len = sctp->sctp_ip_hdr6_len + sizeof (sctp_hdr_t);
+	sctp->sctp_hdr6_len = sctp->sctp_iphc6_len;
+	sctp->sctp_ip_hdr6_len = ip_hdr_length;
 
-	bcopy(buf, sctp->sctp_sctph6, sizeof (sctp_hdr_t));
-
-	sctp->sctp_ip6h->ip6_src = src;
-	sctp->sctp_ip6h->ip6_dst = dst;
-	/*
-	 * If the hoplimit was not set by ip_build_hdrs_v6(), we need to
-	 * set it to the default value for SCTP.
-	 */
-	if (!(ipp->ipp_fields & IPPF_UNICAST_HOPS))
-		sctp->sctp_ip6h->ip6_hops = sctps->sctps_ipv6_hoplimit;
-	/*
-	 * If we're setting extension headers after a connection
-	 * has been established, and if we have a routing header
-	 * among the extension headers, call ip_massage_options_v6 to
-	 * manipulate the routing header/ip6_dst set the checksum
-	 * difference in the sctp header template.
-	 * (This happens in sctp_connect_ipv6 if the routing header
-	 * is set prior to the connect.)
-	 */
-
-	if ((sctp->sctp_state >= SCTPS_COOKIE_WAIT) &&
-	    (sctp->sctp_sticky_ipp.ipp_fields & IPPF_RTHDR)) {
-		ip6_rthdr_t *rth;
-
-		rth = ip_find_rthdr_v6(sctp->sctp_ip6h,
-		    (uint8_t *)sctp->sctp_sctph6);
-		if (rth != NULL) {
-			(void) ip_massage_options_v6(sctp->sctp_ip6h, rth,
-			    sctps->sctps_netstack);
-		}
-	}
-	return (0);
-}
-
-/*
- * Initialize the IPv6 header. Loses any record of any IPv6 extension headers.
- */
-int
-sctp_header_init_ipv6(sctp_t *sctp, int sleep)
-{
-	sctp_hdr_t	*sctph;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
-
-	/*
-	 * This is a simple initialization. If there's
-	 * already a template, it should never be too small,
-	 * so reuse it. Otherwise, allocate space for the new one.
-	 * Ensure that there is enough space to "downgrade" the sctp_t
-	 * to an IPv4 sctp_t. This requires having space for a full load
-	 * of IPv4 options
-	 */
-	if (sctp->sctp_iphc6 != NULL) {
-		ASSERT(sctp->sctp_iphc6_len >=
-		    SCTP_MAX_COMBINED_HEADER_LENGTH);
-		bzero(sctp->sctp_iphc6, sctp->sctp_iphc6_len);
-	} else {
-		sctp->sctp_iphc6_len = SCTP_MAX_COMBINED_HEADER_LENGTH;
-		sctp->sctp_iphc6 = kmem_zalloc(sctp->sctp_iphc_len, sleep);
-		if (sctp->sctp_iphc6 == NULL) {
-			sctp->sctp_iphc6_len = 0;
-			return (ENOMEM);
-		}
-	}
-	sctp->sctp_hdr6_len = IPV6_HDR_LEN + sizeof (sctp_hdr_t);
-	sctp->sctp_ip_hdr6_len = IPV6_HDR_LEN;
-	sctp->sctp_ip6h = (ip6_t *)sctp->sctp_iphc6;
-
-	/* Initialize the header template */
-
-	sctp->sctp_ip6h->ip6_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
-	sctp->sctp_ip6h->ip6_plen = ntohs(sizeof (sctp_hdr_t));
-	sctp->sctp_ip6h->ip6_nxt = IPPROTO_SCTP;
-	sctp->sctp_ip6h->ip6_hops = sctps->sctps_ipv6_hoplimit;
-
-	sctph = (sctp_hdr_t *)(sctp->sctp_iphc6 + IPV6_HDR_LEN);
+	sctph = (sctp_hdr_t *)(hdrs + ip_hdr_length);
 	sctp->sctp_sctph6 = sctph;
+	sctph->sh_sport = connp->conn_lport;
+	sctph->sh_dport = connp->conn_fport;
+	sctph->sh_verf = sctp->sctp_fvtag;
+	sctph->sh_chksum = 0;
 
-	return (0);
-}
+	ip6h = (ip6_t *)hdrs;
+	sctp->sctp_ip6h = ip6h;
 
-static int
-sctp_v4_label(sctp_t *sctp)
-{
-	uchar_t optbuf[IP_MAX_OPT_LENGTH];
-	const cred_t *cr = CONN_CRED(sctp->sctp_connp);
-	int added;
+	ip6h->ip6_src = v6src;
+	ip6h->ip6_dst = v6dst;
+	ip_build_hdrs_v6(hdrs, ip_hdr_length, ipp, connp->conn_proto,
+	    connp->conn_flowinfo);
+	ip6h->ip6_plen = htons(hdrs_len - IPV6_HDR_LEN);
 
-	if (tsol_compute_label(cr, sctp->sctp_ipha->ipha_dst, optbuf,
-	    sctp->sctp_sctps->sctps_netstack->netstack_ip) != 0)
-		return (EACCES);
+	if (ipp->ipp_fields & IPPF_RTHDR) {
+		uint8_t		*end;
+		ip6_rthdr_t	*rth;
 
-	added = tsol_remove_secopt(sctp->sctp_ipha, sctp->sctp_hdr_len);
-	if (added == -1)
-		return (EACCES);
-	sctp->sctp_hdr_len += added;
-	sctp->sctp_sctph = (sctp_hdr_t *)((uchar_t *)sctp->sctp_sctph + added);
-	sctp->sctp_ip_hdr_len += added;
-	if ((sctp->sctp_v4label_len = optbuf[IPOPT_OLEN]) != 0) {
-		sctp->sctp_v4label_len = (sctp->sctp_v4label_len + 3) & ~3;
-		added = tsol_prepend_option(optbuf, sctp->sctp_ipha,
-		    sctp->sctp_hdr_len);
-		if (added == -1)
-			return (EACCES);
-		sctp->sctp_hdr_len += added;
-		sctp->sctp_sctph = (sctp_hdr_t *)((uchar_t *)sctp->sctp_sctph +
-		    added);
-		sctp->sctp_ip_hdr_len += added;
+		end = (uint8_t *)ip6h + ip_hdr_length;
+		rth = ip_find_rthdr_v6(ip6h, end);
+		if (rth != NULL) {
+			(void) ip_massage_options_v6(ip6h, rth,
+			    connp->conn_netstack);
+		}
+
+		/*
+		 * Verify that the first hop isn't a mapped address.
+		 * Routers along the path need to do this verification
+		 * for subsequent hops.
+		 */
+		if (IN6_IS_ADDR_V4MAPPED(&ip6h->ip6_dst))
+			return (EADDRNOTAVAIL);
 	}
 	return (0);
 }
 
 static int
-sctp_v6_label(sctp_t *sctp)
+sctp_v4_label(sctp_t *sctp, sctp_faddr_t *fp)
 {
-	uchar_t optbuf[TSOL_MAX_IPV6_OPTION];
-	const cred_t *cr = CONN_CRED(sctp->sctp_connp);
+	conn_t *connp = sctp->sctp_connp;
 
-	if (tsol_compute_label_v6(cr, &sctp->sctp_ip6h->ip6_dst, optbuf,
-	    sctp->sctp_sctps->sctps_netstack->netstack_ip) != 0)
-		return (EACCES);
-	if (tsol_update_sticky(&sctp->sctp_sticky_ipp, &sctp->sctp_v6label_len,
-	    optbuf) != 0)
-		return (EACCES);
-	if (sctp_build_hdrs(sctp) != 0)
-		return (EACCES);
-	return (0);
+	ASSERT(fp->ixa->ixa_flags & IXAF_IS_IPV4);
+	return (conn_update_label(connp, fp->ixa, &fp->faddr,
+	    &connp->conn_xmit_ipp));
+}
+
+static int
+sctp_v6_label(sctp_t *sctp, sctp_faddr_t *fp)
+{
+	conn_t *connp = sctp->sctp_connp;
+
+	ASSERT(!(fp->ixa->ixa_flags & IXAF_IS_IPV4));
+	return (conn_update_label(connp, fp->ixa, &fp->faddr,
+	    &connp->conn_xmit_ipp));
 }
 
 /*
  * XXX implement more sophisticated logic
+ *
+ * Tsol note: We have already verified the addresses using tsol_check_dest
+ * in sctp_add_faddr, thus no need to redo that here.
+ * We do setup ipp_label_v4 and ipp_label_v6 based on which addresses
+ * we have.
  */
 int
 sctp_set_hdraddrs(sctp_t *sctp)
@@ -1131,50 +1037,43 @@ sctp_set_hdraddrs(sctp_t *sctp)
 	sctp_faddr_t *fp;
 	int gotv4 = 0;
 	int gotv6 = 0;
+	conn_t *connp = sctp->sctp_connp;
 
 	ASSERT(sctp->sctp_faddrs != NULL);
 	ASSERT(sctp->sctp_nsaddrs > 0);
 
 	/* Set up using the primary first */
+	connp->conn_faddr_v6 = sctp->sctp_primary->faddr;
+	/* saddr may be unspec; make_mp() will handle this */
+	connp->conn_saddr_v6 = sctp->sctp_primary->saddr;
+	connp->conn_laddr_v6 = connp->conn_saddr_v6;
 	if (IN6_IS_ADDR_V4MAPPED(&sctp->sctp_primary->faddr)) {
-		IN6_V4MAPPED_TO_IPADDR(&sctp->sctp_primary->faddr,
-		    sctp->sctp_ipha->ipha_dst);
-		/* saddr may be unspec; make_mp() will handle this */
-		IN6_V4MAPPED_TO_IPADDR(&sctp->sctp_primary->saddr,
-		    sctp->sctp_ipha->ipha_src);
-		if (!is_system_labeled() || sctp_v4_label(sctp) == 0) {
+		if (!is_system_labeled() ||
+		    sctp_v4_label(sctp, sctp->sctp_primary) == 0) {
 			gotv4 = 1;
-			if (sctp->sctp_ipversion == IPV4_VERSION) {
-				goto copyports;
+			if (connp->conn_family == AF_INET) {
+				goto done;
 			}
 		}
 	} else {
-		sctp->sctp_ip6h->ip6_dst = sctp->sctp_primary->faddr;
-		/* saddr may be unspec; make_mp() will handle this */
-		sctp->sctp_ip6h->ip6_src = sctp->sctp_primary->saddr;
-		if (!is_system_labeled() || sctp_v6_label(sctp) == 0)
+		if (!is_system_labeled() ||
+		    sctp_v6_label(sctp, sctp->sctp_primary) == 0) {
 			gotv6 = 1;
+		}
 	}
 
 	for (fp = sctp->sctp_faddrs; fp; fp = fp->next) {
 		if (!gotv4 && IN6_IS_ADDR_V4MAPPED(&fp->faddr)) {
-			IN6_V4MAPPED_TO_IPADDR(&fp->faddr,
-			    sctp->sctp_ipha->ipha_dst);
-			/* copy in the faddr_t's saddr */
-			IN6_V4MAPPED_TO_IPADDR(&fp->saddr,
-			    sctp->sctp_ipha->ipha_src);
-			if (!is_system_labeled() || sctp_v4_label(sctp) == 0) {
+			if (!is_system_labeled() ||
+			    sctp_v4_label(sctp, fp) == 0) {
 				gotv4 = 1;
-				if (sctp->sctp_ipversion == IPV4_VERSION ||
-				    gotv6) {
+				if (connp->conn_family == AF_INET || gotv6) {
 					break;
 				}
 			}
 		} else if (!gotv6 && !IN6_IS_ADDR_V4MAPPED(&fp->faddr)) {
-			sctp->sctp_ip6h->ip6_dst = fp->faddr;
-			/* copy in the faddr_t's saddr */
-			sctp->sctp_ip6h->ip6_src = fp->saddr;
-			if (!is_system_labeled() || sctp_v6_label(sctp) == 0) {
+			if (!is_system_labeled() ||
+			    sctp_v6_label(sctp, fp) == 0) {
 				gotv6 = 1;
 				if (gotv4)
 					break;
@@ -1182,16 +1081,10 @@ sctp_set_hdraddrs(sctp_t *sctp)
 		}
 	}
 
-copyports:
+done:
 	if (!gotv4 && !gotv6)
 		return (EACCES);
 
-	/* copy in the ports for good measure */
-	sctp->sctp_sctph->sh_sport = sctp->sctp_lport;
-	sctp->sctp_sctph->sh_dport = sctp->sctp_fport;
-
-	sctp->sctp_sctph6->sh_sport = sctp->sctp_lport;
-	sctp->sctp_sctph6->sh_dport = sctp->sctp_fport;
 	return (0);
 }
 
@@ -1343,6 +1236,7 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 	boolean_t		check_saddr = B_TRUE;
 	in6_addr_t		curaddr;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	conn_t			*connp = sctp->sctp_connp;
 
 	if (sctp_options != NULL)
 		*sctp_options = 0;
@@ -1473,8 +1367,7 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 				if (ta == 0 ||
 				    ta == INADDR_BROADCAST ||
 				    ta == htonl(INADDR_LOOPBACK) ||
-				    CLASSD(ta) ||
-				    sctp->sctp_connp->conn_ipv6_v6only) {
+				    CLASSD(ta) || connp->conn_ipv6_v6only) {
 					goto next;
 				}
 				IN6_INADDR_TO_V4MAPPED((struct in_addr *)
@@ -1492,7 +1385,7 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 					goto next;
 			}
 		} else if (ph->sph_type == htons(PARM_ADDR6) &&
-		    sctp->sctp_family == AF_INET6) {
+		    connp->conn_family == AF_INET6) {
 			/* An v4 socket should not take v6 addresses. */
 			if (remaining >= PARM_ADDR6_LEN) {
 				in6_addr_t *addr6;
@@ -1567,7 +1460,7 @@ next:
 		}
 		bcopy(&curaddr, dlist, sizeof (curaddr));
 		sctp_get_faddr_list(sctp, alist, asize);
-		(*cl_sctp_assoc_change)(sctp->sctp_family, alist, asize,
+		(*cl_sctp_assoc_change)(connp->conn_family, alist, asize,
 		    sctp->sctp_nfaddrs, dlist, dsize, 1, SCTP_CL_PADDR,
 		    (cl_sctp_handle_t)sctp);
 		/* alist and dlist will be freed by the clustering module */
@@ -1581,7 +1474,7 @@ next:
  */
 int
 sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
-    int sleep, sctp_stack_t *sctps)
+    int sleep, sctp_stack_t *sctps, ip_recv_attr_t *ira)
 {
 	sctp_faddr_t *fp, *fphead = NULL;
 	sctp_parm_hdr_t *ph;
@@ -1696,7 +1589,7 @@ sctp_secure_restart_check(mblk_t *pkt, sctp_chunk_hdr_t *ich, uint32_t ports,
 	mutex_enter(&tf->tf_lock);
 
 	for (sctp = tf->tf_sctp; sctp; sctp = sctp->sctp_conn_hash_next) {
-		if (ports != sctp->sctp_ports) {
+		if (ports != sctp->sctp_connp->conn_ports) {
 			continue;
 		}
 		compres = sctp_compare_faddrsets(fphead, sctp->sctp_faddrs);
@@ -1776,7 +1669,8 @@ done:
 
 		/* Send off the abort */
 		sctp_send_abort(sctp, sctp_init2vtag(ich),
-		    SCTP_ERR_RESTART_NEW_ADDRS, dtail, dlen, pkt, 0, B_TRUE);
+		    SCTP_ERR_RESTART_NEW_ADDRS, dtail, dlen, pkt, 0, B_TRUE,
+		    ira);
 
 		kmem_free(dtail, PARM_ADDR6_LEN * nadded);
 	}
@@ -1787,6 +1681,10 @@ cleanup:
 		sctp_faddr_t *fpn;
 		for (fp = fphead; fp; fp = fpn) {
 			fpn = fp->next;
+			if (fp->ixa != NULL) {
+				ixa_refrele(fp->ixa);
+				fp->ixa = NULL;
+			}
 			kmem_cache_free(sctp_kmem_faddr_cache, fp);
 		}
 	}
@@ -1850,6 +1748,8 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 {
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
+	ASSERT(fp->ixa != NULL);
+
 	bcopy(addr, &fp->faddr, sizeof (*addr));
 	if (IN6_IS_ADDR_V4MAPPED(addr)) {
 		fp->isv4 = 1;
@@ -1857,11 +1757,13 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 		fp->sfa_pmss =
 		    (sctps->sctps_initial_mtu - sctp->sctp_hdr_len) &
 		    ~(SCTP_ALIGN - 1);
+		fp->ixa->ixa_flags |= IXAF_IS_IPV4;
 	} else {
 		fp->isv4 = 0;
 		fp->sfa_pmss =
 		    (sctps->sctps_initial_mtu - sctp->sctp_hdr6_len) &
 		    ~(SCTP_ALIGN - 1);
+		fp->ixa->ixa_flags &= ~IXAF_IS_IPV4;
 	}
 	fp->cwnd = sctps->sctps_slow_start_initial * fp->sfa_pmss;
 	fp->rto = MIN(sctp->sctp_rto_initial, sctp->sctp_init_rto_max);
@@ -1884,14 +1786,13 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 	fp->df = 1;
 	fp->pmtu_discovered = 0;
 	fp->next = NULL;
-	fp->ire = NULL;
 	fp->T3expire = 0;
 	(void) random_get_pseudo_bytes((uint8_t *)&fp->hb_secret,
 	    sizeof (fp->hb_secret));
 	fp->hb_expiry = lbolt64;
 	fp->rxt_unacked = 0;
 
-	sctp_get_ire(sctp, fp);
+	sctp_get_dest(sctp, fp);
 }
 
 /*ARGSUSED*/

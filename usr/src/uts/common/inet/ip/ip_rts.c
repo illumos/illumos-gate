@@ -81,24 +81,33 @@
 static size_t	rts_copyfromsockaddr(struct sockaddr *sa, in6_addr_t *addrp);
 static void	rts_fill_msg(int type, int rtm_addrs, ipaddr_t dst,
     ipaddr_t mask, ipaddr_t gateway, ipaddr_t src_addr, ipaddr_t brd_addr,
-    ipaddr_t author, const ipif_t *ipif, mblk_t *mp, uint_t, const tsol_gc_t *);
+    ipaddr_t author, ipaddr_t ifaddr, const ill_t *ill, mblk_t *mp,
+    const tsol_gc_t *);
 static int	rts_getaddrs(rt_msghdr_t *rtm, in6_addr_t *dst_addrp,
     in6_addr_t *gw_addrp, in6_addr_t *net_maskp, in6_addr_t *authorp,
     in6_addr_t *if_addrp, in6_addr_t *src_addrp, ushort_t *indexp,
     sa_family_t *afp, tsol_rtsecattr_t *rtsecattr, int *error);
 static void	rts_getifdata(if_data_t *if_data, const ipif_t *ipif);
 static int	rts_getmetrics(ire_t *ire, rt_metrics_t *metrics);
-static mblk_t	*rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *sire,
-    sa_family_t af);
+static mblk_t	*rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *ifire,
+    const in6_addr_t *setsrc, tsol_ire_gw_secattr_t *attrp, sa_family_t af);
 static void	rts_setmetrics(ire_t *ire, uint_t which, rt_metrics_t *metrics);
-static void	ip_rts_request_retry(ipsq_t *, queue_t *q, mblk_t *mp, void *);
+static ire_t	*ire_lookup_v4(ipaddr_t dst_addr, ipaddr_t net_mask,
+    ipaddr_t gw_addr, const ill_t *ill, zoneid_t zoneid,
+    const ts_label_t *tsl, int match_flags, ip_stack_t *ipst, ire_t **pifire,
+    ipaddr_t *v4setsrcp, tsol_ire_gw_secattr_t **gwattrp);
+static ire_t	*ire_lookup_v6(const in6_addr_t *dst_addr_v6,
+    const in6_addr_t *net_mask_v6, const in6_addr_t *gw_addr_v6,
+    const ill_t *ill, zoneid_t zoneid, const ts_label_t *tsl, int match_flags,
+    ip_stack_t *ipst, ire_t **pifire,
+    in6_addr_t *v6setsrcp, tsol_ire_gw_secattr_t **gwattrp);
 
 /*
  * Send `mp' to all eligible routing queues.  A queue is ineligible if:
  *
  *  1. SO_USELOOPBACK is off and it is not the originating queue.
- *  2. RTAW_UNDER_IPMP is on and RTSQ_UNDER_IPMP is clear in `flags'.
- *  3. RTAW_UNDER_IPMP is off and RTSQ_NORMAL is clear in `flags'.
+ *  2. RTA_UNDER_IPMP is on and RTSQ_UNDER_IPMP is not set in `flags'.
+ *  3. RTA_UNDER_IPMP is off and RTSQ_NORMAL is not set in `flags'.
  *  4. It is not the same address family as `af', and `af' isn't AF_UNSPEC.
  */
 void
@@ -110,7 +119,7 @@ rts_queue_input(mblk_t *mp, conn_t *o_connp, sa_family_t af, uint_t flags,
 
 	/*
 	 * Since we don't have an ill_t here, RTSQ_DEFAULT must already be
-	 * resolved to one or more of RTSQ_NORMAL|RTSQ_UNDER_IPMP by now.
+	 * resolved to one or more of RTSQ_NORMAL|RTSQ_UNDER_IPMP at this point.
 	 */
 	ASSERT(!(flags & RTSQ_DEFAULT));
 
@@ -119,7 +128,6 @@ rts_queue_input(mblk_t *mp, conn_t *o_connp, sa_family_t af, uint_t flags,
 
 	for (; connp != NULL; connp = next_connp) {
 		next_connp = connp->conn_next;
-
 		/*
 		 * If there was a family specified when this routing socket was
 		 * created and it doesn't match the family of the message to
@@ -139,28 +147,27 @@ rts_queue_input(mblk_t *mp, conn_t *o_connp, sa_family_t af, uint_t flags,
 			if (!(flags & RTSQ_NORMAL))
 				continue;
 		}
-
 		/*
 		 * For the originating queue, we only copy the message upstream
 		 * if loopback is set.  For others reading on the routing
 		 * socket, we check if there is room upstream for a copy of the
 		 * message.
 		 */
-		if ((o_connp == connp) && connp->conn_loopback == 0) {
+		if ((o_connp == connp) && connp->conn_useloopback == 0) {
 			connp = connp->conn_next;
 			continue;
 		}
 		CONN_INC_REF(connp);
 		mutex_exit(&ipst->ips_rts_clients->connf_lock);
 		/* Pass to rts_input */
-		if ((IPCL_IS_NONSTR(connp) && !PROTO_FLOW_CNTRLD(connp))||
-		    (!IPCL_IS_NONSTR(connp) &&
-		    canputnext(CONNP_TO_RQ(connp)))) {
+		if (IPCL_IS_NONSTR(connp) ? !connp->conn_flow_cntrld :
+		    canputnext(connp->conn_rq)) {
 			mp1 = dupmsg(mp);
 			if (mp1 == NULL)
 				mp1 = copymsg(mp);
+			/* Note that we pass a NULL ira to rts_input */
 			if (mp1 != NULL)
-				(connp->conn_recv)(connp, mp1, NULL);
+				(connp->conn_recv)(connp, mp1, NULL, NULL);
 		}
 
 		mutex_enter(&ipst->ips_rts_clients->connf_lock);
@@ -176,7 +183,7 @@ rts_queue_input(mblk_t *mp, conn_t *o_connp, sa_family_t af, uint_t flags,
  * Takes an ire and sends an ack to all the routing sockets. This
  * routine is used
  * - when a route is created/deleted through the ioctl interface.
- * - when ire_expire deletes a stale redirect
+ * - when a stale redirect is deleted
  */
 void
 ip_rts_rtmsg(int type, ire_t *ire, int error, ip_stack_t *ipst)
@@ -192,6 +199,8 @@ ip_rts_rtmsg(int type, ire_t *ire, int error, ip_stack_t *ipst)
 	ASSERT(ire->ire_ipversion == IPV4_VERSION ||
 	    ire->ire_ipversion == IPV6_VERSION);
 
+	ASSERT(!(ire->ire_type & IRE_IF_CLONE));
+
 	if (ire->ire_flags & RTF_SETSRC)
 		rtm_addrs |= RTA_SRC;
 
@@ -202,8 +211,8 @@ ip_rts_rtmsg(int type, ire_t *ire, int error, ip_stack_t *ipst)
 		if (mp == NULL)
 			return;
 		rts_fill_msg(type, rtm_addrs, ire->ire_addr, ire->ire_mask,
-		    ire->ire_gateway_addr, ire->ire_src_addr, 0, 0, NULL, mp,
-		    0, NULL);
+		    ire->ire_gateway_addr, ire->ire_setsrc_addr, 0, 0, 0, NULL,
+		    mp, NULL);
 		break;
 	case IPV6_VERSION:
 		af = AF_INET6;
@@ -215,8 +224,8 @@ ip_rts_rtmsg(int type, ire_t *ire, int error, ip_stack_t *ipst)
 		mutex_exit(&ire->ire_lock);
 		rts_fill_msg_v6(type, rtm_addrs, &ire->ire_addr_v6,
 		    &ire->ire_mask_v6, &gw_addr_v6,
-		    &ire->ire_src_addr_v6, &ipv6_all_zeros, &ipv6_all_zeros,
-		    NULL, mp, 0, NULL);
+		    &ire->ire_setsrc_addr_v6, &ipv6_all_zeros, &ipv6_all_zeros,
+		    &ipv6_all_zeros, NULL, mp, NULL);
 		break;
 	}
 	rtm = (rt_msghdr_t *)mp->b_rptr;
@@ -230,13 +239,6 @@ ip_rts_rtmsg(int type, ire_t *ire, int error, ip_stack_t *ipst)
 	rts_queue_input(mp, NULL, af, RTSQ_ALL, ipst);
 }
 
-/* ARGSUSED */
-static void
-ip_rts_request_retry(ipsq_t *dummy_sq, queue_t *q, mblk_t *mp, void *dummy)
-{
-	(void) ip_rts_request(q, mp, msg_getcred(mp, NULL));
-}
-
 /*
  * This is a call from the RTS module
  * indicating that this is a Routing Socket
@@ -248,7 +250,7 @@ ip_rts_register(conn_t *connp)
 {
 	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
 
-	connp->conn_loopback = 1;
+	connp->conn_useloopback = 1;
 	ipcl_hash_insert_wildcard(ipst->ips_rts_clients, connp);
 }
 
@@ -269,18 +271,9 @@ ip_rts_unregister(conn_t *connp)
  *
  * In general, this function does not consume the message supplied but rather
  * sends the message upstream with an appropriate UNIX errno.
- *
- * We may need to restart this operation if the ipif cannot be looked up
- * due to an exclusive operation that is currently in progress. The restart
- * entry point is ip_rts_request_retry. While the request is enqueud in the
- * ipsq the ioctl could be aborted and the conn close. To ensure that we don't
- * have stale conn pointers, ip_wput_ioctl does a conn refhold. This is
- * released at the completion of the rts ioctl at the end of this function
- * by calling CONN_OPER_PENDING_DONE or when the ioctl is aborted and
- * conn close occurs in conn_ioctl_cleanup.
  */
 int
-ip_rts_request_common(queue_t *q, mblk_t *mp, conn_t *connp, cred_t *ioc_cr)
+ip_rts_request_common(mblk_t *mp, conn_t *connp, cred_t *ioc_cr)
 {
 	rt_msghdr_t	*rtm = NULL;
 	in6_addr_t	dst_addr_v6;
@@ -289,9 +282,12 @@ ip_rts_request_common(queue_t *q, mblk_t *mp, conn_t *connp, cred_t *ioc_cr)
 	in6_addr_t	net_mask_v6;
 	in6_addr_t	author_v6;
 	in6_addr_t	if_addr_v6;
-	mblk_t		*mp1, *ioc_mp = mp;
+	mblk_t		*mp1;
 	ire_t		*ire = NULL;
-	ire_t		*sire = NULL;
+	ire_t		*ifire = NULL;
+	ipaddr_t	v4setsrc;
+	in6_addr_t	v6setsrc = ipv6_all_zeros;
+	tsol_ire_gw_secattr_t *gwattr = NULL;
 	int		error = 0;
 	int		match_flags = MATCH_IRE_DSTONLY;
 	int		match_flags_local = MATCH_IRE_TYPE | MATCH_IRE_GW;
@@ -302,9 +298,6 @@ ip_rts_request_common(queue_t *q, mblk_t *mp, conn_t *connp, cred_t *ioc_cr)
 	ipaddr_t	src_addr;
 	ipaddr_t	net_mask;
 	ushort_t	index;
-	ipif_t		*ipif = NULL;
-	ipif_t		*tmp_ipif = NULL;
-	IOCP		iocp = (IOCP)mp->b_rptr;
 	boolean_t	gcgrp_xtraref = B_FALSE;
 	tsol_gcgrp_addr_t ga;
 	tsol_rtsecattr_t rtsecattr;
@@ -314,41 +307,10 @@ ip_rts_request_common(queue_t *q, mblk_t *mp, conn_t *connp, cred_t *ioc_cr)
 	ts_label_t	*tsl = NULL;
 	zoneid_t	zoneid;
 	ip_stack_t	*ipst;
-
-	ip1dbg(("ip_rts_request: mp is %x\n", DB_TYPE(mp)));
+	ill_t   	*ill = NULL;
 
 	zoneid = connp->conn_zoneid;
 	ipst = connp->conn_netstack->netstack_ip;
-
-	ASSERT(mp->b_cont != NULL);
-	/* ioc_mp holds mp */
-	mp = mp->b_cont;
-
-	/*
-	 * The Routing Socket data starts on
-	 * next block. If there is no next block
-	 * this is an indication from routing module
-	 * that it is a routing socket stream queue.
-	 * We need to support that for compatibility with SDP since
-	 * it has a contract private interface to use IP_IOC_RTS_REQUEST.
-	 */
-	if (mp->b_cont == NULL) {
-		/*
-		 * This is a message from SDP
-		 * indicating that this is a Routing Socket
-		 * Stream. Insert this conn_t in routing
-		 * socket client list.
-		 */
-		connp->conn_loopback = 1;
-		ipcl_hash_insert_wildcard(ipst->ips_rts_clients, connp);
-		goto done;
-	}
-	mp1 = dupmsg(mp->b_cont);
-	if (mp1 == NULL) {
-		error  = ENOBUFS;
-		goto done;
-	}
-	mp = mp1;
 
 	if (mp->b_cont != NULL && !pullupmsg(mp, -1)) {
 		freemsg(mp);
@@ -446,20 +408,13 @@ ip_rts_request_common(queue_t *q, mblk_t *mp, conn_t *connp, cred_t *ioc_cr)
 	 */
 	ASSERT(af == AF_INET || af == AF_INET6);
 
+	/* Handle RTA_IFP */
 	if (index != 0) {
-		ill_t   *ill;
+		ipif_t		*ipif;
 lookup:
-		/*
-		 * IPC must be refheld somewhere in ip_wput_nondata or
-		 * ip_wput_ioctl etc... and cleaned up if ioctl is killed.
-		 * If ILL_CHANGING the request is queued in the ipsq.
-		 */
-		ill = ill_lookup_on_ifindex(index, af == AF_INET6,
-		    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry, &error,
-		    ipst);
+		ill = ill_lookup_on_ifindex(index, af == AF_INET6, ipst);
 		if (ill == NULL) {
-			if (error != EINPROGRESS)
-				error = EINVAL;
+			error = EINVAL;
 			goto done;
 		}
 
@@ -474,13 +429,13 @@ lookup:
 			switch (rtm->rtm_type) {
 			case RTM_CHANGE:
 			case RTM_DELETE:
-				ill_refrele(ill);
 				error = EINVAL;
 				goto done;
 			case RTM_ADD:
 				index = ipmp_ill_get_ipmp_ifindex(ill);
 				ill_refrele(ill);
 				if (index == 0) {
+					ill = NULL; /* already refrele'd */
 					error = EINVAL;
 					goto done;
 				}
@@ -488,9 +443,18 @@ lookup:
 			}
 		}
 
-		ipif = ipif_get_next_ipif(NULL, ill);
-		ill_refrele(ill);
 		match_flags |= MATCH_IRE_ILL;
+		/*
+		 * This provides the same zoneid as in Solaris 10
+		 * that -ifp picks the zoneid from the first ipif on the ill.
+		 * But it might not be useful since the first ipif will always
+		 * have the same zoneid as the ill.
+		 */
+		ipif = ipif_get_next_ipif(NULL, ill);
+		if (ipif != NULL) {
+			zoneid = ipif->ipif_zoneid;
+			ipif_refrele(ipif);
+		}
 	}
 
 	/*
@@ -545,6 +509,8 @@ lookup:
 		switch (af) {
 		case AF_INET:
 			if (src_addr != INADDR_ANY) {
+				uint_t type;
+
 				/*
 				 * The RTF_SETSRC flag is present, check that
 				 * the supplied src address is not the loopback
@@ -556,20 +522,11 @@ lookup:
 				}
 				/*
 				 * Also check that the supplied address is a
-				 * valid, local one.
+				 * valid, local one. Only allow IFF_UP ones
 				 */
-				tmp_ipif = ipif_lookup_addr(src_addr, NULL,
-				    ALL_ZONES, CONNP_TO_WQ(connp), ioc_mp,
-				    ip_rts_request_retry, &error, ipst);
-				if (tmp_ipif == NULL) {
-					if (error != EINPROGRESS)
-						error = EADDRNOTAVAIL;
-					goto done;
-				}
-				if (!(tmp_ipif->ipif_flags & IPIF_UP) ||
-				    (tmp_ipif->ipif_flags &
-				    (IPIF_NOLOCAL | IPIF_ANYCAST))) {
-					error = EINVAL;
+				type = ip_type_v4(src_addr, ipst);
+				if (!(type & (IRE_LOCAL|IRE_LOOPBACK))) {
+					error = EADDRNOTAVAIL;
 					goto done;
 				}
 			} else {
@@ -584,14 +541,15 @@ lookup:
 			}
 
 			error = ip_rt_add(dst_addr, net_mask, gw_addr, src_addr,
-			    rtm->rtm_flags, ipif, &ire, B_FALSE,
-			    WR(q), ioc_mp, ip_rts_request_retry,
-			    rtsap, ipst);
-			if (ipif != NULL)
-				ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
+			    rtm->rtm_flags, ill, &ire, B_FALSE,
+			    rtsap, ipst, zoneid);
+			if (ill != NULL)
+				ASSERT(!MUTEX_HELD(&ill->ill_lock));
 			break;
 		case AF_INET6:
 			if (!IN6_IS_ADDR_UNSPECIFIED(&src_addr_v6)) {
+				uint_t type;
+
 				/*
 				 * The RTF_SETSRC flag is present, check that
 				 * the supplied src address is not the loopback
@@ -603,28 +561,17 @@ lookup:
 				}
 				/*
 				 * Also check that the supplied address is a
-				 * valid, local one.
+				 * valid, local one. Only allow UP ones.
 				 */
-				tmp_ipif = ipif_lookup_addr_v6(&src_addr_v6,
-				    NULL, ALL_ZONES, CONNP_TO_WQ(connp), ioc_mp,
-				    ip_rts_request_retry, &error, ipst);
-				if (tmp_ipif == NULL) {
-					if (error != EINPROGRESS)
-						error = EADDRNOTAVAIL;
-					goto done;
-				}
-
-				if (!(tmp_ipif->ipif_flags & IPIF_UP) ||
-				    (tmp_ipif->ipif_flags &
-				    (IPIF_NOLOCAL | IPIF_ANYCAST))) {
-					error = EINVAL;
+				type = ip_type_v6(&src_addr_v6, ipst);
+				if (!(type & (IRE_LOCAL|IRE_LOOPBACK))) {
+					error = EADDRNOTAVAIL;
 					goto done;
 				}
 
 				error = ip_rt_add_v6(&dst_addr_v6, &net_mask_v6,
 				    &gw_addr_v6, &src_addr_v6, rtm->rtm_flags,
-				    ipif, &ire, WR(q), ioc_mp,
-				    ip_rts_request_retry, rtsap, ipst);
+				    ill, &ire, rtsap, ipst, zoneid);
 				break;
 			}
 			/*
@@ -637,10 +584,9 @@ lookup:
 			}
 			error = ip_rt_add_v6(&dst_addr_v6, &net_mask_v6,
 			    &gw_addr_v6, NULL, rtm->rtm_flags,
-			    ipif, &ire, WR(q), ioc_mp,
-			    ip_rts_request_retry, rtsap, ipst);
-			if (ipif != NULL)
-				ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
+			    ill, &ire, rtsap, ipst, zoneid);
+			if (ill != NULL)
+				ASSERT(!MUTEX_HELD(&ill->ill_lock));
 			break;
 		}
 		if (error != 0)
@@ -666,13 +612,13 @@ lookup:
 		switch (af) {
 		case AF_INET:
 			error = ip_rt_delete(dst_addr, net_mask, gw_addr,
-			    found_addrs, rtm->rtm_flags, ipif, B_FALSE,
-			    WR(q), ioc_mp, ip_rts_request_retry, ipst);
+			    found_addrs, rtm->rtm_flags, ill, B_FALSE,
+			    ipst, zoneid);
 			break;
 		case AF_INET6:
 			error = ip_rt_delete_v6(&dst_addr_v6, &net_mask_v6,
-			    &gw_addr_v6, found_addrs, rtm->rtm_flags, ipif,
-			    WR(q), ioc_mp, ip_rts_request_retry, ipst);
+			    &gw_addr_v6, found_addrs, rtm->rtm_flags, ill,
+			    ipst, zoneid);
 			break;
 		}
 		break;
@@ -680,8 +626,7 @@ lookup:
 	case RTM_CHANGE:
 		/*
 		 * In the case of RTM_GET, the forwarding table should be
-		 * searched recursively with default being matched if the
-		 * specific route doesn't exist.  Also, if a gateway was
+		 * searched recursively.  Also, if a gateway was
 		 * specified then the gateway address must also be matched.
 		 *
 		 * In the case of RTM_CHANGE, the gateway address (if supplied)
@@ -706,9 +651,7 @@ lookup:
 		}
 
 		if (rtm->rtm_type == RTM_GET) {
-			match_flags |=
-			    (MATCH_IRE_DEFAULT | MATCH_IRE_RECURSIVE |
-			    MATCH_IRE_SECATTR);
+			match_flags |= MATCH_IRE_SECATTR;
 			match_flags_local |= MATCH_IRE_SECATTR;
 			if ((found_addrs & RTA_GATEWAY) != 0)
 				match_flags |= MATCH_IRE_GW;
@@ -749,57 +692,34 @@ lookup:
 		 * IRE_LOCAL entry.
 		 *
 		 * If we didn't check for or find an IRE_LOOPBACK or IRE_LOCAL
-		 * entry, then look in the forwarding table.
+		 * entry, then look for any other type of IRE.
 		 */
 		switch (af) {
 		case AF_INET:
 			if (net_mask == IP_HOST_MASK) {
-				ire = ire_ctable_lookup(dst_addr, gw_addr,
+				ire = ire_ftable_lookup_v4(dst_addr, 0, gw_addr,
 				    IRE_LOCAL | IRE_LOOPBACK, NULL, zoneid,
-				    tsl, match_flags_local, ipst);
-				/*
-				 * If we found an IRE_LOCAL, make sure
-				 * it is one that would be used by this
-				 * zone to send packets.
-				 */
-				if (ire != NULL &&
-				    ire->ire_type == IRE_LOCAL &&
-				    ipst->ips_ip_restrict_interzone_loopback &&
-				    !ire_local_ok_across_zones(ire,
-				    zoneid, &dst_addr, tsl, ipst)) {
-					ire_refrele(ire);
-					ire = NULL;
-				}
+				    tsl, match_flags_local, 0, ipst, NULL);
 			}
 			if (ire == NULL) {
-				ire = ire_ftable_lookup(dst_addr, net_mask,
-				    gw_addr, 0, ipif, &sire, zoneid, 0,
-				    tsl, match_flags, ipst);
+				ire = ire_lookup_v4(dst_addr, net_mask,
+				    gw_addr, ill, zoneid, tsl, match_flags,
+				    ipst, &ifire, &v4setsrc, &gwattr);
+				IN6_IPADDR_TO_V4MAPPED(v4setsrc, &v6setsrc);
 			}
 			break;
 		case AF_INET6:
 			if (IN6_ARE_ADDR_EQUAL(&net_mask_v6, &ipv6_all_ones)) {
-				ire = ire_ctable_lookup_v6(&dst_addr_v6,
+				ire = ire_ftable_lookup_v6(&dst_addr_v6, NULL,
 				    &gw_addr_v6, IRE_LOCAL | IRE_LOOPBACK, NULL,
-				    zoneid, tsl, match_flags_local, ipst);
-				/*
-				 * If we found an IRE_LOCAL, make sure
-				 * it is one that would be used by this
-				 * zone to send packets.
-				 */
-				if (ire != NULL &&
-				    ire->ire_type == IRE_LOCAL &&
-				    ipst->ips_ip_restrict_interzone_loopback &&
-				    !ire_local_ok_across_zones(ire,
-				    zoneid, (void *)&dst_addr_v6, tsl, ipst)) {
-					ire_refrele(ire);
-					ire = NULL;
-				}
+				    zoneid, tsl, match_flags_local, 0, ipst,
+				    NULL);
 			}
 			if (ire == NULL) {
-				ire = ire_ftable_lookup_v6(&dst_addr_v6,
-				    &net_mask_v6, &gw_addr_v6, 0, ipif, &sire,
-				    zoneid, 0, tsl, match_flags, ipst);
+				ire = ire_lookup_v6(&dst_addr_v6,
+				    &net_mask_v6, &gw_addr_v6, ill, zoneid,
+				    tsl, match_flags, ipst, &ifire, &v6setsrc,
+				    &gwattr);
 			}
 			break;
 		}
@@ -810,10 +730,21 @@ lookup:
 			error = ESRCH;
 			goto done;
 		}
+		/*
+		 * Want to return failure if we get an IRE_NOROUTE from
+		 * ire_route_recursive
+		 */
+		if (ire->ire_type & IRE_NOROUTE) {
+			ire_refrele(ire);
+			ire = NULL;
+			error = ESRCH;
+			goto done;
+		}
+
 		/* we know the IRE before we come here */
 		switch (rtm->rtm_type) {
 		case RTM_GET:
-			mp1 = rts_rtmget(mp, ire, sire, af);
+			mp1 = rts_rtmget(mp, ire, ifire, &v6setsrc, gwattr, af);
 			if (mp1 == NULL) {
 				error = ENOBUFS;
 				goto done;
@@ -843,7 +774,6 @@ lookup:
 			 */
 			switch (af) {
 			case AF_INET:
-				ire_flush_cache_v4(ire, IRE_FLUSH_DELETE);
 				if ((found_addrs & RTA_GATEWAY) != 0 &&
 				    (ire->ire_gateway_addr != gw_addr)) {
 					ire->ire_gateway_addr = gw_addr;
@@ -863,9 +793,10 @@ lookup:
 
 				if ((found_addrs & RTA_SRC) != 0 &&
 				    (rtm->rtm_flags & RTF_SETSRC) != 0 &&
-				    (ire->ire_src_addr != src_addr)) {
-
+				    (ire->ire_setsrc_addr != src_addr)) {
 					if (src_addr != INADDR_ANY) {
+						uint_t type;
+
 						/*
 						 * The RTF_SETSRC flag is
 						 * present, check that the
@@ -880,50 +811,47 @@ lookup:
 							goto done;
 						}
 						/*
-						 * Also check that the the
+						 * Also check that the
 						 * supplied addr is a valid
 						 * local address.
 						 */
-						tmp_ipif = ipif_lookup_addr(
-						    src_addr, NULL, ALL_ZONES,
-						    WR(q), ioc_mp,
-						    ip_rts_request_retry,
-						    &error, ipst);
-						if (tmp_ipif == NULL) {
-							error = (error ==
-							    EINPROGRESS) ?
-							    error :
-							    EADDRNOTAVAIL;
-							goto done;
-						}
-
-						if (!(tmp_ipif->ipif_flags &
-						    IPIF_UP) ||
-						    (tmp_ipif->ipif_flags &
-						    (IPIF_NOLOCAL |
-						    IPIF_ANYCAST))) {
-							error = EINVAL;
+						type = ip_type_v4(src_addr,
+						    ipst);
+						if (!(type &
+						    (IRE_LOCAL|IRE_LOOPBACK))) {
+							error = EADDRNOTAVAIL;
 							goto done;
 						}
 						ire->ire_flags |= RTF_SETSRC;
+						ire->ire_setsrc_addr =
+						    src_addr;
 					} else {
 						ire->ire_flags &= ~RTF_SETSRC;
+						ire->ire_setsrc_addr =
+						    INADDR_ANY;
 					}
-					ire->ire_src_addr = src_addr;
+					/*
+					 * Let conn_ixa caching know that
+					 * source address selection changed
+					 */
+					ip_update_source_selection(ipst);
 				}
+				ire_flush_cache_v4(ire, IRE_FLUSH_GWCHANGE);
 				break;
 			case AF_INET6:
-				ire_flush_cache_v6(ire, IRE_FLUSH_DELETE);
 				mutex_enter(&ire->ire_lock);
 				if ((found_addrs & RTA_GATEWAY) != 0 &&
 				    !IN6_ARE_ADDR_EQUAL(
 				    &ire->ire_gateway_addr_v6, &gw_addr_v6)) {
 					ire->ire_gateway_addr_v6 = gw_addr_v6;
 				}
+				mutex_exit(&ire->ire_lock);
 
 				if (rtsap != NULL) {
 					ga.ga_af = AF_INET6;
+					mutex_enter(&ire->ire_lock);
 					ga.ga_addr = ire->ire_gateway_addr_v6;
+					mutex_exit(&ire->ire_lock);
 
 					gcgrp = gcgrp_lookup(&ga, B_TRUE);
 					if (gcgrp == NULL) {
@@ -935,10 +863,11 @@ lookup:
 				if ((found_addrs & RTA_SRC) != 0 &&
 				    (rtm->rtm_flags & RTF_SETSRC) != 0 &&
 				    !IN6_ARE_ADDR_EQUAL(
-				    &ire->ire_src_addr_v6, &src_addr_v6)) {
-
+				    &ire->ire_setsrc_addr_v6, &src_addr_v6)) {
 					if (!IN6_IS_ADDR_UNSPECIFIED(
 					    &src_addr_v6)) {
+						uint_t type;
+
 						/*
 						 * The RTF_SETSRC flag is
 						 * present, check that the
@@ -949,54 +878,44 @@ lookup:
 						 */
 						if (IN6_IS_ADDR_LOOPBACK(
 						    &src_addr_v6)) {
-							mutex_exit(
-							    &ire->ire_lock);
 							error = EINVAL;
 							goto done;
 						}
 						/*
-						 * Also check that the the
+						 * Also check that the
 						 * supplied addr is a valid
 						 * local address.
 						 */
-						tmp_ipif = ipif_lookup_addr_v6(
-						    &src_addr_v6, NULL,
-						    ALL_ZONES,
-						    CONNP_TO_WQ(connp), ioc_mp,
-						    ip_rts_request_retry,
-						    &error, ipst);
-						if (tmp_ipif == NULL) {
-							mutex_exit(
-							    &ire->ire_lock);
-							error = (error ==
-							    EINPROGRESS) ?
-							    error :
-							    EADDRNOTAVAIL;
+						type = ip_type_v6(&src_addr_v6,
+						    ipst);
+						if (!(type &
+						    (IRE_LOCAL|IRE_LOOPBACK))) {
+							error = EADDRNOTAVAIL;
 							goto done;
 						}
-						if (!(tmp_ipif->ipif_flags &
-						    IPIF_UP) ||
-						    (tmp_ipif->ipif_flags &
-						    (IPIF_NOLOCAL |
-						    IPIF_ANYCAST))) {
-							mutex_exit(
-							    &ire->ire_lock);
-							error = EINVAL;
-							goto done;
-						}
+						mutex_enter(&ire->ire_lock);
 						ire->ire_flags |= RTF_SETSRC;
+						ire->ire_setsrc_addr_v6 =
+						    src_addr_v6;
+						mutex_exit(&ire->ire_lock);
 					} else {
+						mutex_enter(&ire->ire_lock);
 						ire->ire_flags &= ~RTF_SETSRC;
+						ire->ire_setsrc_addr_v6 =
+						    ipv6_all_zeros;
+						mutex_exit(&ire->ire_lock);
 					}
-					ire->ire_src_addr_v6 = src_addr_v6;
+					/*
+					 * Let conn_ixa caching know that
+					 * source address selection changed
+					 */
+					ip_update_source_selection(ipst);
 				}
-				mutex_exit(&ire->ire_lock);
+				ire_flush_cache_v6(ire, IRE_FLUSH_GWCHANGE);
 				break;
 			}
 
 			if (rtsap != NULL) {
-				in_addr_t ga_addr4;
-
 				ASSERT(gcgrp != NULL);
 
 				/*
@@ -1010,7 +929,7 @@ lookup:
 				gc = gc_create(rtsap, gcgrp, &gcgrp_xtraref);
 				if (gc == NULL ||
 				    (error = tsol_ire_init_gwattr(ire,
-				    ire->ire_ipversion, gc, NULL)) != 0) {
+				    ire->ire_ipversion, gc)) != 0) {
 					if (gc != NULL) {
 						GC_REFRELE(gc);
 					} else {
@@ -1018,21 +937,6 @@ lookup:
 						error = ENOMEM;
 					}
 					goto done;
-				}
-
-				/*
-				 * Now delete any existing gateway IRE caches
-				 * as well as all caches using the gateway,
-				 * and allow them to be created on demand
-				 * through ip_newroute{_v6}.
-				 */
-				IN6_V4MAPPED_TO_IPADDR(&ga.ga_addr, ga_addr4);
-				if (af == AF_INET) {
-					ire_clookup_delete_cache_gw(
-					    ga_addr4, ALL_ZONES, ipst);
-				} else {
-					ire_clookup_delete_cache_gw_v6(
-					    &ga.ga_addr, ALL_ZONES, ipst);
 				}
 			}
 			rts_setmetrics(ire, rtm->rtm_inits, &rtm->rtm_rmx);
@@ -1046,21 +950,14 @@ lookup:
 done:
 	if (ire != NULL)
 		ire_refrele(ire);
-	if (sire != NULL)
-		ire_refrele(sire);
-	if (ipif != NULL)
-		ipif_refrele(ipif);
-	if (tmp_ipif != NULL)
-		ipif_refrele(tmp_ipif);
+	if (ifire != NULL)
+		ire_refrele(ifire);
+	if (ill != NULL)
+		ill_refrele(ill);
 
 	if (gcgrp_xtraref)
 		GCGRP_REFRELE(gcgrp);
 
-	if (error == EINPROGRESS) {
-		if (rtm != NULL)
-			freemsg(mp);
-		return (error);
-	}
 	if (rtm != NULL) {
 		ASSERT(mp->b_wptr <= mp->b_datap->db_lim);
 		if (error != 0) {
@@ -1074,23 +971,195 @@ done:
 		}
 		rts_queue_input(mp, connp, af, RTSQ_ALL, ipst);
 	}
+	return (error);
+}
 
+/*
+ * Helper function that can do recursive lookups including when
+ * MATCH_IRE_GW and/or MATCH_IRE_MASK is set.
+ */
+static ire_t *
+ire_lookup_v4(ipaddr_t dst_addr, ipaddr_t net_mask, ipaddr_t gw_addr,
+    const ill_t *ill, zoneid_t zoneid, const ts_label_t *tsl,
+    int match_flags, ip_stack_t *ipst, ire_t **pifire, ipaddr_t *v4setsrcp,
+    tsol_ire_gw_secattr_t **gwattrp)
+{
+	ire_t		*ire;
+	ire_t		*ifire = NULL;
+	uint_t		ire_type;
+
+	*pifire = NULL;
+	*v4setsrcp = INADDR_ANY;
+	*gwattrp = NULL;
+
+	/* Skip IRE_IF_CLONE */
+	match_flags |= MATCH_IRE_TYPE;
+	ire_type = (IRE_ONLINK|IRE_OFFLINK) & ~IRE_IF_CLONE;
+
+	/*
+	 * ire_route_recursive can't match gateway or mask thus if they are
+	 * set we have to do two steps of lookups
+	 */
+	if (match_flags & (MATCH_IRE_GW|MATCH_IRE_MASK)) {
+		ire = ire_ftable_lookup_v4(dst_addr, net_mask, gw_addr,
+		    ire_type, ill, zoneid, tsl, match_flags, 0, ipst, NULL);
+
+		if (ire == NULL ||(ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)))
+			return (ire);
+
+		if (ire->ire_type & IRE_ONLINK)
+			return (ire);
+
+		if (ire->ire_flags & RTF_SETSRC) {
+			ASSERT(ire->ire_setsrc_addr != INADDR_ANY);
+			*v4setsrcp = ire->ire_setsrc_addr;
+			v4setsrcp = NULL;
+		}
+
+		/* The first ire_gw_secattr is passed back */
+		if (ire->ire_gw_secattr != NULL) {
+			*gwattrp = ire->ire_gw_secattr;
+			gwattrp = NULL;
+		}
+
+		/* Look for an interface ire recursively based on the gateway */
+		dst_addr = ire->ire_gateway_addr;
+		match_flags &= ~(MATCH_IRE_GW|MATCH_IRE_MASK);
+		ifire = ire_route_recursive_v4(dst_addr, ire_type, ill, zoneid,
+		    tsl, match_flags, B_FALSE, 0, ipst, v4setsrcp, gwattrp,
+		    NULL);
+	} else {
+		ire = ire_route_recursive_v4(dst_addr, ire_type, ill, zoneid,
+		    tsl, match_flags, B_FALSE, 0, ipst, v4setsrcp, gwattrp,
+		    NULL);
+	}
+	*pifire = ifire;
+	return (ire);
+}
+
+static ire_t *
+ire_lookup_v6(const in6_addr_t *dst_addr_v6,
+    const in6_addr_t *net_mask_v6, const in6_addr_t *gw_addr_v6,
+    const ill_t *ill, zoneid_t zoneid, const ts_label_t *tsl, int match_flags,
+    ip_stack_t *ipst, ire_t **pifire,
+    in6_addr_t *v6setsrcp, tsol_ire_gw_secattr_t **gwattrp)
+{
+	ire_t		*ire;
+	ire_t		*ifire = NULL;
+	uint_t		ire_type;
+
+	*pifire = NULL;
+	*v6setsrcp = ipv6_all_zeros;
+	*gwattrp = NULL;
+
+	/* Skip IRE_IF_CLONE */
+	match_flags |= MATCH_IRE_TYPE;
+	ire_type = (IRE_ONLINK|IRE_OFFLINK) & ~IRE_IF_CLONE;
+
+	/*
+	 * ire_route_recursive can't match gateway or mask thus if they are
+	 * set we have to do two steps of lookups
+	 */
+	if (match_flags & (MATCH_IRE_GW|MATCH_IRE_MASK)) {
+		in6_addr_t dst;
+
+		ire = ire_ftable_lookup_v6(dst_addr_v6, net_mask_v6,
+		    gw_addr_v6, ire_type, ill, zoneid, tsl, match_flags, 0,
+		    ipst, NULL);
+
+		if (ire == NULL ||(ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)))
+			return (ire);
+
+		if (ire->ire_type & IRE_ONLINK)
+			return (ire);
+
+		if (ire->ire_flags & RTF_SETSRC) {
+			ASSERT(!IN6_IS_ADDR_UNSPECIFIED(
+			    &ire->ire_setsrc_addr_v6));
+			*v6setsrcp = ire->ire_setsrc_addr_v6;
+			v6setsrcp = NULL;
+		}
+
+		/* The first ire_gw_secattr is passed back */
+		if (ire->ire_gw_secattr != NULL) {
+			*gwattrp = ire->ire_gw_secattr;
+			gwattrp = NULL;
+		}
+
+		mutex_enter(&ire->ire_lock);
+		dst = ire->ire_gateway_addr_v6;
+		mutex_exit(&ire->ire_lock);
+		match_flags &= ~(MATCH_IRE_GW|MATCH_IRE_MASK);
+		ifire = ire_route_recursive_v6(&dst, ire_type, ill, zoneid, tsl,
+		    match_flags, B_FALSE, 0, ipst, v6setsrcp, gwattrp, NULL);
+	} else {
+		ire = ire_route_recursive_v6(dst_addr_v6, ire_type, ill, zoneid,
+		    tsl, match_flags, B_FALSE, 0, ipst, v6setsrcp, gwattrp,
+		    NULL);
+	}
+	*pifire = ifire;
+	return (ire);
+}
+
+
+/*
+ * Handle IP_IOC_RTS_REQUEST ioctls
+ */
+int
+ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
+{
+	conn_t	*connp = Q_TO_CONN(q);
+	IOCP	iocp = (IOCP)mp->b_rptr;
+	mblk_t	*mp1, *ioc_mp = mp;
+	int	error = 0;
+	ip_stack_t	*ipst;
+
+	ipst = connp->conn_netstack->netstack_ip;
+
+	ASSERT(mp->b_cont != NULL);
+	/* ioc_mp holds mp */
+	mp = mp->b_cont;
+
+	/*
+	 * The Routing Socket data starts on
+	 * next block. If there is no next block
+	 * this is an indication from routing module
+	 * that it is a routing socket stream queue.
+	 * We need to support that for compatibility with SDP since
+	 * it has a contract private interface to use IP_IOC_RTS_REQUEST.
+	 * Note: SDP no longer uses IP_IOC_RTS_REQUEST - we can remove this.
+	 */
+	if (mp->b_cont == NULL) {
+		/*
+		 * This is a message from SDP
+		 * indicating that this is a Routing Socket
+		 * Stream. Insert this conn_t in routing
+		 * socket client list.
+		 */
+		connp->conn_useloopback = 1;
+		ipcl_hash_insert_wildcard(ipst->ips_rts_clients, connp);
+		goto done;
+	}
+	mp1 = dupmsg(mp->b_cont);
+	if (mp1 == NULL) {
+		error  = ENOBUFS;
+		goto done;
+	}
+	mp = mp1;
+
+	error = ip_rts_request_common(mp, connp, ioc_cr);
+done:
 	iocp->ioc_error = error;
 	ioc_mp->b_datap->db_type = M_IOCACK;
 	if (iocp->ioc_error != 0)
 		iocp->ioc_count = 0;
-	(connp->conn_recv)(connp, ioc_mp, NULL);
+	/* Note that we pass a NULL ira to rts_input */
+	(connp->conn_recv)(connp, ioc_mp, NULL, NULL);
 
 	/* conn was refheld in ip_wput_ioctl. */
 	CONN_OPER_PENDING_DONE(connp);
 
 	return (error);
-}
-
-int
-ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
-{
-	return (ip_rts_request_common(q, mp, Q_TO_CONN(q), ioc_cr));
 }
 
 /*
@@ -1102,26 +1171,34 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
  * otherwise NULL is returned.
  */
 static mblk_t *
-rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *sire, sa_family_t af)
+rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *ifire, const in6_addr_t *setsrc,
+    tsol_ire_gw_secattr_t *attrp, sa_family_t af)
 {
 	rt_msghdr_t	*rtm;
 	rt_msghdr_t	*new_rtm;
 	mblk_t		*new_mp;
 	int		rtm_addrs;
 	int		rtm_flags;
-	in6_addr_t	gw_addr_v6;
-	tsol_ire_gw_secattr_t *attrp = NULL;
 	tsol_gc_t	*gc = NULL;
 	tsol_gcgrp_t	*gcgrp = NULL;
-	int		sacnt = 0;
+	ill_t		*ill;
+	ipif_t		*ipif = NULL;
+	ipaddr_t	brdaddr;	/* IFF_POINTOPOINT destination */
+	ipaddr_t	ifaddr;
+	in6_addr_t	brdaddr6;	/* IFF_POINTOPOINT destination */
+	in6_addr_t	ifaddr6;
+	ipaddr_t	v4setsrc;
 
-	ASSERT(ire->ire_ipif != NULL);
 	rtm = (rt_msghdr_t *)mp->b_rptr;
 
-	if (sire != NULL && sire->ire_gw_secattr != NULL)
-		attrp = sire->ire_gw_secattr;
-	else if (ire->ire_gw_secattr != NULL)
-		attrp = ire->ire_gw_secattr;
+	/*
+	 * Find the ill used to send packets. This will be NULL in case
+	 * of a reject or blackhole.
+	 */
+	if (ifire != NULL)
+		ill = ire_nexthop_ill(ifire);
+	else
+		ill = ire_nexthop_ill(ire);
 
 	if (attrp != NULL) {
 		mutex_enter(&attrp->igsa_lock);
@@ -1129,29 +1206,9 @@ rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *sire, sa_family_t af)
 			gcgrp = gc->gc_grp;
 			ASSERT(gcgrp != NULL);
 			rw_enter(&gcgrp->gcgrp_rwlock, RW_READER);
-			sacnt = 1;
-		} else if ((gcgrp = attrp->igsa_gcgrp) != NULL) {
-			rw_enter(&gcgrp->gcgrp_rwlock, RW_READER);
-			gc = gcgrp->gcgrp_head;
-			sacnt = gcgrp->gcgrp_count;
 		}
 		mutex_exit(&attrp->igsa_lock);
-
-		/* do nothing if there's no gc to report */
-		if (gc == NULL) {
-			ASSERT(sacnt == 0);
-			if (gcgrp != NULL) {
-				/* we might as well drop the lock now */
-				rw_exit(&gcgrp->gcgrp_rwlock);
-				gcgrp = NULL;
-			}
-			attrp = NULL;
-		}
-
-		ASSERT(gc == NULL || (gcgrp != NULL &&
-		    RW_LOCK_HELD(&gcgrp->gcgrp_rwlock)));
 	}
-	ASSERT(sacnt == 0 || gc != NULL);
 
 	/*
 	 * Always return RTA_DST, RTA_GATEWAY and RTA_NETMASK.
@@ -1162,16 +1219,36 @@ rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *sire, sa_family_t af)
 	 * point-to-point.
 	 */
 	rtm_addrs = (RTA_DST | RTA_GATEWAY | RTA_NETMASK);
-	if (rtm->rtm_addrs & (RTA_IFP | RTA_IFA)) {
+	if ((rtm->rtm_addrs & (RTA_IFP | RTA_IFA)) && ill != NULL) {
 		rtm_addrs |= (RTA_IFP | RTA_IFA);
-		if (ire->ire_ipif->ipif_flags & IPIF_POINTOPOINT)
-			rtm_addrs |= RTA_BRD;
+		/*
+		 * We associate an IRE with an ILL, hence we don't exactly
+		 * know what might make sense for RTA_IFA and RTA_BRD. We
+		 * pick the first ipif on the ill.
+		 */
+		ipif = ipif_get_next_ipif(NULL, ill);
+		if (ipif != NULL) {
+			if (ipif->ipif_isv6)
+				ifaddr6 = ipif->ipif_v6lcl_addr;
+			else
+				ifaddr = ipif->ipif_lcl_addr;
+			if (ipif->ipif_flags & IPIF_POINTOPOINT) {
+				rtm_addrs |= RTA_BRD;
+				if (ipif->ipif_isv6)
+					brdaddr6 = ipif->ipif_v6pp_dst_addr;
+				else
+					brdaddr = ipif->ipif_pp_dst_addr;
+			}
+			ipif_refrele(ipif);
+		}
 	}
 
-	new_mp = rts_alloc_msg(RTM_GET, rtm_addrs, af, sacnt);
+	new_mp = rts_alloc_msg(RTM_GET, rtm_addrs, af, gc != NULL ? 1 : 0);
 	if (new_mp == NULL) {
 		if (gcgrp != NULL)
 			rw_exit(&gcgrp->gcgrp_rwlock);
+		if (ill != NULL)
+			ill_refrele(ill);
 		return (NULL);
 	}
 
@@ -1187,49 +1264,24 @@ rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *sire, sa_family_t af)
 	ASSERT(af == AF_INET || af == AF_INET6);
 	switch (af) {
 	case AF_INET:
-		if (sire == NULL) {
-			rtm_flags = ire->ire_flags;
-			rts_fill_msg(RTM_GET, rtm_addrs, ire->ire_addr,
-			    ire->ire_mask, ire->ire_src_addr, ire->ire_src_addr,
-			    ire->ire_ipif->ipif_pp_dst_addr, 0, ire->ire_ipif,
-			    new_mp, sacnt, gc);
-		} else {
-			if (sire->ire_flags & RTF_SETSRC)
-				rtm_addrs |= RTA_SRC;
+		IN6_V4MAPPED_TO_IPADDR(setsrc, v4setsrc);
+		if (v4setsrc != INADDR_ANY)
+			rtm_addrs |= RTA_SRC;
 
-			rtm_flags = sire->ire_flags;
-			rts_fill_msg(RTM_GET, rtm_addrs, sire->ire_addr,
-			    sire->ire_mask, sire->ire_gateway_addr,
-			    (sire->ire_flags & RTF_SETSRC) ?
-			    sire->ire_src_addr : ire->ire_src_addr,
-			    ire->ire_ipif->ipif_pp_dst_addr,
-			    0, ire->ire_ipif, new_mp, sacnt, gc);
-		}
+		rtm_flags = ire->ire_flags;
+		rts_fill_msg(RTM_GET, rtm_addrs, ire->ire_addr,
+		    ire->ire_mask, ire->ire_gateway_addr, v4setsrc,
+		    brdaddr, 0, ifaddr, ill, new_mp, gc);
 		break;
 	case AF_INET6:
-		if (sire == NULL) {
-			rtm_flags = ire->ire_flags;
-			rts_fill_msg_v6(RTM_GET, rtm_addrs, &ire->ire_addr_v6,
-			    &ire->ire_mask_v6, &ire->ire_src_addr_v6,
-			    &ire->ire_src_addr_v6,
-			    &ire->ire_ipif->ipif_v6pp_dst_addr,
-			    &ipv6_all_zeros, ire->ire_ipif, new_mp,
-			    sacnt, gc);
-		} else {
-			if (sire->ire_flags & RTF_SETSRC)
-				rtm_addrs |= RTA_SRC;
+		if (!IN6_IS_ADDR_UNSPECIFIED(setsrc))
+			rtm_addrs |= RTA_SRC;
 
-			rtm_flags = sire->ire_flags;
-			mutex_enter(&sire->ire_lock);
-			gw_addr_v6 = sire->ire_gateway_addr_v6;
-			mutex_exit(&sire->ire_lock);
-			rts_fill_msg_v6(RTM_GET, rtm_addrs, &sire->ire_addr_v6,
-			    &sire->ire_mask_v6, &gw_addr_v6,
-			    (sire->ire_flags & RTF_SETSRC) ?
-			    &sire->ire_src_addr_v6 : &ire->ire_src_addr_v6,
-			    &ire->ire_ipif->ipif_v6pp_dst_addr, &ipv6_all_zeros,
-			    ire->ire_ipif, new_mp, sacnt, gc);
-		}
+		rtm_flags = ire->ire_flags;
+		rts_fill_msg_v6(RTM_GET, rtm_addrs, &ire->ire_addr_v6,
+		    &ire->ire_mask_v6, &ire->ire_gateway_addr_v6,
+		    setsrc, &brdaddr6, &ipv6_all_zeros,
+		    &ifaddr6, ill, new_mp, gc);
 		break;
 	}
 
@@ -1259,11 +1311,9 @@ rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *sire, sa_family_t af)
 	new_rtm->rtm_use = rtm->rtm_use;
 	new_rtm->rtm_addrs = rtm_addrs;
 	new_rtm->rtm_flags = rtm_flags;
-	if (sire == NULL)
-		new_rtm->rtm_inits = rts_getmetrics(ire, &new_rtm->rtm_rmx);
-	else
-		new_rtm->rtm_inits = rts_getmetrics(sire, &new_rtm->rtm_rmx);
-
+	new_rtm->rtm_inits = rts_getmetrics(ire, &new_rtm->rtm_rmx);
+	if (ill != NULL)
+		ill_refrele(ill);
 	return (new_mp);
 }
 
@@ -1273,10 +1323,11 @@ rts_rtmget(mblk_t *mp, ire_t *ire, ire_t *sire, sa_family_t af)
 static void
 rts_getifdata(if_data_t *if_data, const ipif_t *ipif)
 {
-	if_data->ifi_type = ipif->ipif_type;	/* ethernet, tokenring, etc */
+	if_data->ifi_type = ipif->ipif_ill->ill_type;
+						/* ethernet, tokenring, etc */
 	if_data->ifi_addrlen = 0;		/* media address length */
 	if_data->ifi_hdrlen = 0;		/* media header length */
-	if_data->ifi_mtu = ipif->ipif_mtu;	/* maximum transmission unit */
+	if_data->ifi_mtu = ipif->ipif_ill->ill_mtu;	/* mtu */
 	if_data->ifi_metric = ipif->ipif_metric; /* metric (external only) */
 	if_data->ifi_baudrate = 0;		/* linespeed */
 
@@ -1302,18 +1353,19 @@ rts_setmetrics(ire_t *ire, uint_t which, rt_metrics_t *metrics)
 {
 	clock_t		rtt;
 	clock_t		rtt_sd;
-	ipif_t		*ipif;
+	ill_t		*ill;
 	ifrt_t		*ifrt;
 	mblk_t		*mp;
 	in6_addr_t	gw_addr_v6;
 
+	/* Need to add back some metrics to the IRE? */
 	/*
-	 * Bypass obtaining the lock and searching ipif_saved_ire_mp in the
+	 * Bypass obtaining the lock and searching ill_saved_ire_mp in the
 	 * common case of no metrics.
 	 */
 	if (which == 0)
 		return;
-	ire->ire_uinfo.iulp_set = B_TRUE;
+	ire->ire_metrics.iulp_set = B_TRUE;
 
 	/*
 	 * iulp_rtt and iulp_rtt_sd are in milliseconds, but 4.4BSD-Lite2's
@@ -1330,42 +1382,41 @@ rts_setmetrics(ire_t *ire, uint_t which, rt_metrics_t *metrics)
 	 */
 	mutex_enter(&ire->ire_lock);
 	if (which & RTV_MTU)
-		ire->ire_max_frag = metrics->rmx_mtu;
+		ire->ire_metrics.iulp_mtu = metrics->rmx_mtu;
 	if (which & RTV_RTT)
-		ire->ire_uinfo.iulp_rtt = rtt;
+		ire->ire_metrics.iulp_rtt = rtt;
 	if (which & RTV_SSTHRESH)
-		ire->ire_uinfo.iulp_ssthresh = metrics->rmx_ssthresh;
+		ire->ire_metrics.iulp_ssthresh = metrics->rmx_ssthresh;
 	if (which & RTV_RTTVAR)
-		ire->ire_uinfo.iulp_rtt_sd = rtt_sd;
+		ire->ire_metrics.iulp_rtt_sd = rtt_sd;
 	if (which & RTV_SPIPE)
-		ire->ire_uinfo.iulp_spipe = metrics->rmx_sendpipe;
+		ire->ire_metrics.iulp_spipe = metrics->rmx_sendpipe;
 	if (which & RTV_RPIPE)
-		ire->ire_uinfo.iulp_rpipe = metrics->rmx_recvpipe;
+		ire->ire_metrics.iulp_rpipe = metrics->rmx_recvpipe;
 	mutex_exit(&ire->ire_lock);
 
 	/*
-	 * Search through the ifrt_t chain hanging off the IPIF in order to
+	 * Search through the ifrt_t chain hanging off the ILL in order to
 	 * reflect the metric change there.
 	 */
-	ipif = ire->ire_ipif;
-	if (ipif == NULL)
+	ill = ire->ire_ill;
+	if (ill == NULL)
 		return;
-	ASSERT((ipif->ipif_isv6 && ire->ire_ipversion == IPV6_VERSION) ||
-	    ((!ipif->ipif_isv6 && ire->ire_ipversion == IPV4_VERSION)));
-	if (ipif->ipif_isv6) {
+	ASSERT((ill->ill_isv6 && ire->ire_ipversion == IPV6_VERSION) ||
+	    ((!ill->ill_isv6 && ire->ire_ipversion == IPV4_VERSION)));
+	if (ill->ill_isv6) {
 		mutex_enter(&ire->ire_lock);
 		gw_addr_v6 = ire->ire_gateway_addr_v6;
 		mutex_exit(&ire->ire_lock);
 	}
-	mutex_enter(&ipif->ipif_saved_ire_lock);
-	for (mp = ipif->ipif_saved_ire_mp; mp != NULL; mp = mp->b_cont) {
+	mutex_enter(&ill->ill_saved_ire_lock);
+	for (mp = ill->ill_saved_ire_mp; mp != NULL; mp = mp->b_cont) {
 		/*
-		 * On a given ipif, the triple of address, gateway and mask is
-		 * unique for each saved IRE (in the case of ordinary interface
-		 * routes, the gateway address is all-zeroes).
+		 * On a given ill, the tuple of address, gateway, mask,
+		 * ire_type and zoneid unique for each saved IRE.
 		 */
 		ifrt = (ifrt_t *)mp->b_rptr;
-		if (ipif->ipif_isv6) {
+		if (ill->ill_isv6) {
 			if (!IN6_ARE_ADDR_EQUAL(&ifrt->ifrt_v6addr,
 			    &ire->ire_addr_v6) ||
 			    !IN6_ARE_ADDR_EQUAL(&ifrt->ifrt_v6gateway_addr,
@@ -1379,23 +1430,36 @@ rts_setmetrics(ire_t *ire, uint_t which, rt_metrics_t *metrics)
 			    ifrt->ifrt_mask != ire->ire_mask)
 				continue;
 		}
+		if (ifrt->ifrt_zoneid != ire->ire_zoneid ||
+		    ifrt->ifrt_type != ire->ire_type)
+			continue;
+
 		if (which & RTV_MTU)
-			ifrt->ifrt_max_frag = metrics->rmx_mtu;
+			ifrt->ifrt_metrics.iulp_mtu = metrics->rmx_mtu;
 		if (which & RTV_RTT)
-			ifrt->ifrt_iulp_info.iulp_rtt = rtt;
+			ifrt->ifrt_metrics.iulp_rtt = rtt;
 		if (which & RTV_SSTHRESH) {
-			ifrt->ifrt_iulp_info.iulp_ssthresh =
+			ifrt->ifrt_metrics.iulp_ssthresh =
 			    metrics->rmx_ssthresh;
 		}
 		if (which & RTV_RTTVAR)
-			ifrt->ifrt_iulp_info.iulp_rtt_sd = metrics->rmx_rttvar;
+			ifrt->ifrt_metrics.iulp_rtt_sd = metrics->rmx_rttvar;
 		if (which & RTV_SPIPE)
-			ifrt->ifrt_iulp_info.iulp_spipe = metrics->rmx_sendpipe;
+			ifrt->ifrt_metrics.iulp_spipe = metrics->rmx_sendpipe;
 		if (which & RTV_RPIPE)
-			ifrt->ifrt_iulp_info.iulp_rpipe = metrics->rmx_recvpipe;
+			ifrt->ifrt_metrics.iulp_rpipe = metrics->rmx_recvpipe;
 		break;
 	}
-	mutex_exit(&ipif->ipif_saved_ire_lock);
+	mutex_exit(&ill->ill_saved_ire_lock);
+
+	/*
+	 * Update any IRE_IF_CLONE hanging created from this IRE_IF so they
+	 * get any new iulp_mtu.
+	 * We do that by deleting them; ire_create_if_clone will pick
+	 * up the new metrics.
+	 */
+	if ((ire->ire_type & IRE_INTERFACE) && ire->ire_dep_children != 0)
+		ire_dep_delete_if_clone(ire);
 }
 
 /*
@@ -1407,25 +1471,67 @@ rts_getmetrics(ire_t *ire, rt_metrics_t *metrics)
 	int	metrics_set = 0;
 
 	bzero(metrics, sizeof (rt_metrics_t));
+
 	/*
 	 * iulp_rtt and iulp_rtt_sd are in milliseconds, but 4.4BSD-Lite2's
 	 * <net/route.h> says: rmx_rtt and rmx_rttvar are stored as
 	 * microseconds.
 	 */
-	metrics->rmx_rtt = ire->ire_uinfo.iulp_rtt * 1000;
+	metrics->rmx_rtt = ire->ire_metrics.iulp_rtt * 1000;
 	metrics_set |= RTV_RTT;
-	metrics->rmx_mtu = ire->ire_max_frag;
+	metrics->rmx_mtu = ire->ire_metrics.iulp_mtu;
 	metrics_set |= RTV_MTU;
-	metrics->rmx_ssthresh = ire->ire_uinfo.iulp_ssthresh;
+	metrics->rmx_ssthresh = ire->ire_metrics.iulp_ssthresh;
 	metrics_set |= RTV_SSTHRESH;
-	metrics->rmx_rttvar = ire->ire_uinfo.iulp_rtt_sd * 1000;
+	metrics->rmx_rttvar = ire->ire_metrics.iulp_rtt_sd * 1000;
 	metrics_set |= RTV_RTTVAR;
-	metrics->rmx_sendpipe = ire->ire_uinfo.iulp_spipe;
+	metrics->rmx_sendpipe = ire->ire_metrics.iulp_spipe;
 	metrics_set |= RTV_SPIPE;
-	metrics->rmx_recvpipe = ire->ire_uinfo.iulp_rpipe;
+	metrics->rmx_recvpipe = ire->ire_metrics.iulp_rpipe;
 	metrics_set |= RTV_RPIPE;
 	return (metrics_set);
 }
+
+/*
+ * Given two sets of metrics (src and dst), use the dst values if they are
+ * set. If a dst value is not set but the src value is set, then we use
+ * the src value.
+ * dst is updated with the new values.
+ * This is used to merge information from a dce_t and ire_metrics, where the
+ * dce values takes precedence.
+ */
+void
+rts_merge_metrics(iulp_t *dst, const iulp_t *src)
+{
+	if (!src->iulp_set)
+		return;
+
+	if (dst->iulp_ssthresh == 0)
+		dst->iulp_ssthresh = src->iulp_ssthresh;
+	if (dst->iulp_rtt == 0)
+		dst->iulp_rtt = src->iulp_rtt;
+	if (dst->iulp_rtt_sd == 0)
+		dst->iulp_rtt_sd = src->iulp_rtt_sd;
+	if (dst->iulp_spipe == 0)
+		dst->iulp_spipe = src->iulp_spipe;
+	if (dst->iulp_rpipe == 0)
+		dst->iulp_rpipe = src->iulp_rpipe;
+	if (dst->iulp_rtomax == 0)
+		dst->iulp_rtomax = src->iulp_rtomax;
+	if (dst->iulp_sack == 0)
+		dst->iulp_sack = src->iulp_sack;
+	if (dst->iulp_tstamp_ok == 0)
+		dst->iulp_tstamp_ok = src->iulp_tstamp_ok;
+	if (dst->iulp_wscale_ok == 0)
+		dst->iulp_wscale_ok = src->iulp_wscale_ok;
+	if (dst->iulp_ecn_ok == 0)
+		dst->iulp_ecn_ok = src->iulp_ecn_ok;
+	if (dst->iulp_pmtud_ok == 0)
+		dst->iulp_pmtud_ok = src->iulp_pmtud_ok;
+	if (dst->iulp_mtu == 0)
+		dst->iulp_mtu = src->iulp_mtu;
+}
+
 
 /*
  * Takes a pointer to a routing message and extracts necessary info by looking
@@ -1552,7 +1658,8 @@ rts_getaddrs(rt_msghdr_t *rtm, in6_addr_t *dst_addrp, in6_addr_t *gw_addrp,
 static void
 rts_fill_msg(int type, int rtm_addrs, ipaddr_t dst, ipaddr_t mask,
     ipaddr_t gateway, ipaddr_t src_addr, ipaddr_t brd_addr, ipaddr_t author,
-    const ipif_t *ipif, mblk_t *mp, uint_t sacnt, const tsol_gc_t *gc)
+    ipaddr_t ifaddr, const ill_t *ill, mblk_t *mp,
+    const tsol_gc_t *gc)
 {
 	rt_msghdr_t	*rtm;
 	sin_t		*sin;
@@ -1561,7 +1668,6 @@ rts_fill_msg(int type, int rtm_addrs, ipaddr_t dst, ipaddr_t mask,
 	int		i;
 
 	ASSERT(mp != NULL);
-	ASSERT(sacnt == 0 || gc != NULL);
 	/*
 	 * First find the type of the message
 	 * and its length.
@@ -1571,7 +1677,7 @@ rts_fill_msg(int type, int rtm_addrs, ipaddr_t dst, ipaddr_t mask,
 	 * Now find the size of the data
 	 * that follows the message header.
 	 */
-	data_size = rts_data_msg_size(rtm_addrs, AF_INET, sacnt);
+	data_size = rts_data_msg_size(rtm_addrs, AF_INET, gc != NULL ? 1 : 0);
 
 	rtm = (rt_msghdr_t *)mp->b_rptr;
 	mp->b_wptr = &mp->b_rptr[header_size];
@@ -1596,9 +1702,13 @@ rts_fill_msg(int type, int rtm_addrs, ipaddr_t dst, ipaddr_t mask,
 			cp += sizeof (sin_t);
 			break;
 		case RTA_IFP:
-			cp += ill_dls_info((struct sockaddr_dl *)cp, ipif);
+			cp += ill_dls_info((struct sockaddr_dl *)cp, ill);
 			break;
 		case RTA_IFA:
+			sin->sin_addr.s_addr = ifaddr;
+			sin->sin_family = AF_INET;
+			cp += sizeof (sin_t);
+			break;
 		case RTA_SRC:
 			sin->sin_addr.s_addr = src_addr;
 			sin->sin_family = AF_INET;
@@ -1625,24 +1735,20 @@ rts_fill_msg(int type, int rtm_addrs, ipaddr_t dst, ipaddr_t mask,
 		rtm_ext_t *rtm_ext;
 		struct rtsa_s *rp_dst;
 		tsol_rtsecattr_t *rsap;
-		int i;
 
 		ASSERT(gc->gc_grp != NULL);
 		ASSERT(RW_LOCK_HELD(&gc->gc_grp->gcgrp_rwlock));
-		ASSERT(sacnt > 0);
 
 		rtm_ext = (rtm_ext_t *)cp;
 		rtm_ext->rtmex_type = RTMEX_GATEWAY_SECATTR;
-		rtm_ext->rtmex_len = TSOL_RTSECATTR_SIZE(sacnt);
+		rtm_ext->rtmex_len = TSOL_RTSECATTR_SIZE(1);
 
 		rsap = (tsol_rtsecattr_t *)(rtm_ext + 1);
-		rsap->rtsa_cnt = sacnt;
+		rsap->rtsa_cnt = 1;
 		rp_dst = rsap->rtsa_attr;
 
-		for (i = 0; i < sacnt; i++, gc = gc->gc_next, rp_dst++) {
-			ASSERT(gc->gc_db != NULL);
-			bcopy(&gc->gc_db->gcdb_attr, rp_dst, sizeof (*rp_dst));
-		}
+		ASSERT(gc->gc_db != NULL);
+		bcopy(&gc->gc_db->gcdb_attr, rp_dst, sizeof (*rp_dst));
 		cp = (uchar_t *)rp_dst;
 	}
 
@@ -1659,6 +1765,7 @@ rts_fill_msg(int type, int rtm_addrs, ipaddr_t dst, ipaddr_t mask,
 
 /*
  * Allocates and initializes a routing socket message.
+ * Note that sacnt is either zero or one.
  */
 mblk_t *
 rts_alloc_msg(int type, int rtm_addrs, sa_family_t af, uint_t sacnt)
@@ -1755,7 +1862,7 @@ ip_rts_change(int type, ipaddr_t dst_addr, ipaddr_t gw_addr, ipaddr_t net_mask,
 	if (mp == NULL)
 		return;
 	rts_fill_msg(type, rtm_addrs, dst_addr, net_mask, gw_addr, source, 0,
-	    author, NULL, mp, 0, NULL);
+	    author, 0, NULL, mp, NULL);
 	rtm = (rt_msghdr_t *)mp->b_rptr;
 	rtm->rtm_flags = flags;
 	rtm->rtm_errno = error;
@@ -1784,12 +1891,12 @@ ip_rts_xifmsg(const ipif_t *ipif, uint64_t set, uint64_t clear, uint_t flags)
 	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	/*
-	 * This message should be generated only when the physical interface
-	 * is changing state.
+	 * This message should be generated only
+	 * when the physical device is changing
+	 * state.
 	 */
 	if (ipif->ipif_id != 0)
 		return;
-
 	if (ipif->ipif_isv6) {
 		af = AF_INET6;
 		mp = rts_alloc_msg(RTM_IFINFO, RTA_IFP, af, 0);
@@ -1797,14 +1904,15 @@ ip_rts_xifmsg(const ipif_t *ipif, uint64_t set, uint64_t clear, uint_t flags)
 			return;
 		rts_fill_msg_v6(RTM_IFINFO, RTA_IFP, &ipv6_all_zeros,
 		    &ipv6_all_zeros, &ipv6_all_zeros, &ipv6_all_zeros,
-		    &ipv6_all_zeros, &ipv6_all_zeros, ipif, mp, 0, NULL);
+		    &ipv6_all_zeros, &ipv6_all_zeros, &ipv6_all_zeros,
+		    ipif->ipif_ill, mp, NULL);
 	} else {
 		af = AF_INET;
 		mp = rts_alloc_msg(RTM_IFINFO, RTA_IFP, af, 0);
 		if (mp == NULL)
 			return;
-		rts_fill_msg(RTM_IFINFO, RTA_IFP, 0, 0, 0, 0, 0, 0, ipif, mp,
-		    0, NULL);
+		rts_fill_msg(RTM_IFINFO, RTA_IFP, 0, 0, 0, 0, 0, 0, 0,
+		    ipif->ipif_ill, mp, NULL);
 	}
 	ifm = (if_msghdr_t *)mp->b_rptr;
 	ifm->ifm_index = ipif->ipif_ill->ill_phyint->phyint_ifindex;
@@ -1843,6 +1951,12 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif, uint_t flags)
 	sa_family_t	af;
 	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
+	/*
+	 * Let conn_ixa caching know that source address selection
+	 * changed
+	 */
+	ip_update_source_selection(ipst);
+
 	if (ipif->ipif_isv6)
 		af = AF_INET6;
 	else
@@ -1875,15 +1989,17 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif, uint_t flags)
 			case AF_INET:
 				rts_fill_msg(ncmd, rtm_addrs, 0,
 				    ipif->ipif_net_mask, 0, ipif->ipif_lcl_addr,
-				    ipif->ipif_pp_dst_addr, 0, ipif, mp,
-				    0, NULL);
+				    ipif->ipif_pp_dst_addr, 0,
+				    ipif->ipif_lcl_addr, ipif->ipif_ill,
+				    mp, NULL);
 				break;
 			case AF_INET6:
 				rts_fill_msg_v6(ncmd, rtm_addrs,
 				    &ipv6_all_zeros, &ipif->ipif_v6net_mask,
 				    &ipv6_all_zeros, &ipif->ipif_v6lcl_addr,
 				    &ipif->ipif_v6pp_dst_addr, &ipv6_all_zeros,
-				    ipif, mp, 0, NULL);
+				    &ipif->ipif_v6lcl_addr, ipif->ipif_ill,
+				    mp, NULL);
 				break;
 			}
 			ifam = (ifa_msghdr_t *)mp->b_rptr;
@@ -1904,14 +2020,15 @@ ip_rts_newaddrmsg(int cmd, int error, const ipif_t *ipif, uint_t flags)
 			case AF_INET:
 				rts_fill_msg(cmd, rtm_addrs,
 				    ipif->ipif_lcl_addr, ipif->ipif_net_mask, 0,
-				    0, 0, 0, NULL, mp, 0, NULL);
+				    0, 0, 0, 0, NULL, mp, NULL);
 				break;
 			case AF_INET6:
 				rts_fill_msg_v6(cmd, rtm_addrs,
 				    &ipif->ipif_v6lcl_addr,
 				    &ipif->ipif_v6net_mask, &ipv6_all_zeros,
 				    &ipv6_all_zeros, &ipv6_all_zeros,
-				    &ipv6_all_zeros, NULL, mp, 0, NULL);
+				    &ipv6_all_zeros, &ipv6_all_zeros,
+				    NULL, mp, NULL);
 				break;
 			}
 			rtm = (rt_msghdr_t *)mp->b_rptr;

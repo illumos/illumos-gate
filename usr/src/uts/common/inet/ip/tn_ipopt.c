@@ -271,38 +271,40 @@ tsol_get_option_v6(mblk_t *mp, tsol_ip_label_t *label_type, uchar_t **buffer)
  * tsol_check_dest()
  *
  * This routine verifies if a destination is allowed to recieve messages
- * based on the message cred's security label. If any adjustments to
- * the cred are needed due to the connection's MAC mode or
- * the destination's ability to receive labels, an "effective cred"
- * will be returned.
+ * based on the security label. If any adjustments to the label are needed
+ * due to the connection's MAC mode or the destination's ability
+ * to receive labels, an "effective label" will be returned.
  *
- * On successful return, effective_cred will point to the new creds needed
- * or will be NULL if new creds aren't needed. On error, effective_cred
- * is NULL.
+ * zone_is_global is set if the actual zoneid is global. That is, it is
+ * not set for an exclusive-IP zone.
+ *
+ * On successful return, effective_tsl will point to the new label needed
+ * or will be NULL if a new label isn't needed. On error, effective_tsl will
+ * point to NULL.
  *
  * Returns:
- *	0		Have or constructed appropriate credentials
- *	EHOSTUNREACH	The credentials failed the remote host accreditation
+ *      0		Label (was|is now) correct
+ *	EHOSTUNREACH	The label failed the remote host accreditation
  *      ENOMEM		Memory allocation failure
  */
 int
-tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
-    uint_t mac_mode, cred_t **effective_cred)
+tsol_check_dest(const ts_label_t *tsl, const void *dst,
+    uchar_t version, uint_t mac_mode, boolean_t zone_is_global,
+    ts_label_t **effective_tsl)
 {
-	ts_label_t	*tsl, *newtsl = NULL;
+	ts_label_t	*newtsl = NULL;
 	tsol_tpc_t	*dst_rhtp;
-	zoneid_t	zoneid;
 
-	if (effective_cred != NULL)
-		*effective_cred = NULL;
+	if (effective_tsl != NULL)
+		*effective_tsl = NULL;
 	ASSERT(version == IPV4_VERSION ||
 	    (version == IPV6_VERSION &&
 	    !IN6_IS_ADDR_V4MAPPED((in6_addr_t *)dst)));
 
 	/* Always pass kernel level communication (NULL label) */
-	if ((tsl = crgetlabel(credp)) == NULL) {
+	if (tsl == NULL) {
 		DTRACE_PROBE2(tx__tnopt__log__info__labeling__mac__allownull,
-		    char *, "destination ip(1) with null cred was passed",
+		    char *, "destination ip(1) with null label was passed",
 		    ipaddr_t, dst);
 		return (0);
 	}
@@ -358,9 +360,8 @@ tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
 		}
 		if (!blequal(&dst_rhtp->tpc_tp.tp_def_label,
 		    &tsl->tsl_label)) {
-			zoneid = crgetzoneid(credp);
 			if (mac_mode != CONN_MAC_AWARE ||
-			    !(zoneid == GLOBAL_ZONEID ||
+			    !(zone_is_global ||
 			    bldominates(&tsl->tsl_label,
 			    &dst_rhtp->tpc_tp.tp_def_label))) {
 				DTRACE_PROBE4(
@@ -438,29 +439,25 @@ tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
 	}
 
 	/*
-	 * Generate a new cred if we modified the security label or
-	 * label flags.
+	 * Return the new label.
 	 */
 	if (newtsl != NULL) {
-		if (effective_cred != NULL) {
-			*effective_cred = copycred_from_tslabel(credp,
-			    newtsl, KM_NOSLEEP);
-		}
-		label_rele(newtsl);
-		if (effective_cred != NULL && *effective_cred == NULL) {
-			TPC_RELE(dst_rhtp);
-			return (ENOMEM);
-		}
+		if (effective_tsl != NULL)
+			*effective_tsl = newtsl;
+		else
+			label_rele(newtsl);
 	}
 	TPC_RELE(dst_rhtp);
 	return (0);
 }
 
 /*
- * tsol_compute_label()
+ * tsol_compute_label_v4()
  *
  * This routine computes the IP label that should be on a packet based on the
  * connection and destination information.
+ *
+ * The zoneid is the IP zoneid (i.e., GLOBAL_ZONEID for exlusive-IP zones).
  *
  * Returns:
  *      0		Fetched label
@@ -468,21 +465,17 @@ tsol_check_dest(const cred_t *credp, const void *dst, uchar_t version,
  *	EINVAL		Label cannot be computed
  */
 int
-tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
-    ip_stack_t *ipst)
+tsol_compute_label_v4(const ts_label_t *tsl, zoneid_t zoneid, ipaddr_t dst,
+    uchar_t *opt_storage, ip_stack_t *ipst)
 {
 	uint_t		sec_opt_len;
-	ts_label_t	*tsl;
-	ire_t		*ire, *sire = NULL;
-	tsol_ire_gw_secattr_t *attrp;
-	zoneid_t	zoneid, ip_zoneid;
-
-	ASSERT(credp != NULL);
+	ire_t		*ire;
+	tsol_ire_gw_secattr_t *attrp = NULL;
 
 	if (opt_storage != NULL)
 		opt_storage[IPOPT_OLEN] = 0;
 
-	if ((tsl = crgetlabel(credp)) == NULL)
+	if (tsl == NULL)
 		return (0);
 
 	/* always pass multicast */
@@ -493,67 +486,44 @@ tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
 		return (0);
 
 	if (tsl->tsl_flags & TSLF_UNLABELED) {
-
 		/*
 		 * The destination is unlabeled. Only add a label if the
 		 * destination is not a broadcast/local/loopback address,
 		 * the destination is not on the same subnet, and the
 		 * next-hop gateway is labeled.
-		 *
-		 * For exclusive stacks we set the zoneid to zero
-		 * to operate as if we are in the global zone for
-		 * IRE lookups.
 		 */
-		zoneid = crgetzoneid(credp);
-		if (ipst->ips_netstack->netstack_stackid != GLOBAL_NETSTACKID)
-			ip_zoneid = GLOBAL_ZONEID;
-		else
-			ip_zoneid = zoneid;
-
-		ire = ire_cache_lookup(dst, ip_zoneid, tsl, ipst);
-
-		if (ire != NULL && (ire->ire_type & (IRE_BROADCAST | IRE_LOCAL |
-		    IRE_LOOPBACK | IRE_INTERFACE)) != 0) {
-			IRE_REFRELE(ire);
-			return (0);
-		} else if (ire == NULL) {
-			ire = ire_ftable_lookup(dst, 0, 0, 0, NULL, &sire,
-			    ip_zoneid, 0, tsl, (MATCH_IRE_RECURSIVE |
-			    MATCH_IRE_DEFAULT | MATCH_IRE_SECATTR), ipst);
-		}
-
-		/* no route to destination */
-		if (ire == NULL) {
+		ire = ire_route_recursive_v4(dst, 0, NULL, zoneid, tsl,
+		    MATCH_IRE_SECATTR, B_TRUE, 0, ipst, NULL, &attrp, NULL);
+		ASSERT(ire != NULL);
+		if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+			/* no route to destination */
+			ire_refrele(ire);
 			DTRACE_PROBE3(
 			    tx__tnopt__log__info__labeling__routedst__v4,
 			    char *, "No route to unlabeled dest ip(1) with "
-			    "creds(2).", ipaddr_t, dst, cred_t *, credp);
+			    "with label(2).", ipaddr_t, dst, ts_label_t *, tsl);
 			return (EHOSTUNREACH);
+		}
+		if (ire->ire_type & (IRE_BROADCAST | IRE_LOCAL | IRE_LOOPBACK |
+		    IRE_INTERFACE)) {
+			ire_refrele(ire);
+			return (0);
 		}
 
 		/*
-		 * Prefix IRE from f-table lookup means that the destination
-		 * is not directly connected; check the next-hop attributes.
+		 * ire_route_recursive gives us the first attrp it finds
+		 * in the recursive lookup.
 		 */
-		if (sire != NULL) {
-			ASSERT(ire != NULL);
-			IRE_REFRELE(ire);
-			ire = sire;
-		}
-
 		/*
 		 * Return now if next hop gateway is unlabeled. There is
 		 * no need to generate a CIPSO option for this message.
 		 */
-		attrp = ire->ire_gw_secattr;
 		if (attrp == NULL || attrp->igsa_rhc == NULL ||
 		    attrp->igsa_rhc->rhc_tpc->tpc_tp.host_type == UNLABELED) {
-			IRE_REFRELE(ire);
+			ire_refrele(ire);
 			return (0);
 		}
-
-		IRE_REFRELE(ire);
-
+		ire_refrele(ire);
 	}
 
 	/* compute the CIPSO option */
@@ -562,8 +532,8 @@ tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
 
 	if (sec_opt_len == 0) {
 		DTRACE_PROBE3(tx__tnopt__log__error__labeling__lostops__v4,
-		    char *, "options lack length for dest ip(1) with creds(2).",
-		    ipaddr_t, dst, cred_t *, credp);
+		    char *, "options lack length for dest ip(1) with label(2).",
+		    ipaddr_t, dst, ts_label_t *, tsl);
 		return (EINVAL);
 	}
 
@@ -575,6 +545,9 @@ tsol_compute_label(const cred_t *credp, ipaddr_t dst, uchar_t *opt_storage,
  * header, move the 'buflen' bytes back to fill the gap, and return the number
  * of bytes removed (as zero or negative number).  Assumes that the headers are
  * sane.
+ *
+ * Note that tsol_remove_secopt does not adjust ipha_length but
+ * tsol_remove_secopt_v6 does adjust ip6_plen.
  */
 int
 tsol_remove_secopt(ipha_t *ipha, int buflen)
@@ -659,6 +632,9 @@ tsol_remove_secopt(ipha_t *ipha, int buflen)
  * option cannot be inserted.  (Note that negative return values are possible
  * when noops must be compressed, and that only -1 indicates error.  Successful
  * return value is always evenly divisible by 4, by definition.)
+ *
+ * Note that tsol_prepend_option does not adjust ipha_length but
+ * tsol_prepend_option_v6 does adjust ip6_plen.
  */
 int
 tsol_prepend_option(uchar_t *optbuf, ipha_t *ipha, int buflen)
@@ -810,28 +786,39 @@ tsol_prepend_option(uchar_t *optbuf, ipha_t *ipha, int buflen)
 }
 
 /*
- * tsol_check_label()
+ * tsol_check_label_v4()
  *
  * This routine computes the IP label that should be on the packet based on the
- * connection and destination information.  If the label is there, it returns
- * zero, so the caller knows that the label is syncronized, and further calls
- * are not required.  If the label isn't right, then the right one is inserted.
+ * connection and destination information.  It's called by the IP forwarding
+ * logic and by ip_output_simple. The ULPs generate the labels before calling
+ * conn_ip_output. If any adjustments to
+ * the label are needed due to the connection's MAC-exempt status or
+ * the destination's ability to receive labels, an "effective label"
+ * will be returned.
  *
  * The packet's header is clear before entering IPsec's engine.
  *
+ * The zoneid is the IP zoneid (i.e., GLOBAL_ZONEID for exlusive-IP zones).
+ * zone_is_global is set if the actual zoneid is global.
+ *
+ * On successful return, effective_tslp will point to the new label needed
+ * or will be NULL if a new label isn't needed. On error, effective_tsl will
+ * point to NULL.
+ *
  * Returns:
- *      0		Label on packet (was|is now) correct
+ *      0		Label on (was|is now) correct
  *      EACCES		The packet failed the remote host accreditation.
  *      ENOMEM		Memory allocation failure.
  *	EINVAL		Label cannot be computed
  */
 int
-tsol_check_label(const cred_t *credp, mblk_t **mpp, uint_t mac_mode,
-    ip_stack_t *ipst, pid_t pid)
+tsol_check_label_v4(const ts_label_t *tsl, zoneid_t zoneid, mblk_t **mpp,
+    uint_t mac_mode, boolean_t zone_is_global, ip_stack_t *ipst,
+    ts_label_t **effective_tslp)
 {
 	mblk_t *mp = *mpp;
 	ipha_t  *ipha;
-	cred_t *effective_cred = NULL;
+	ts_label_t *effective_tsl = NULL;
 	uchar_t opt_storage[IP_MAX_OPT_LENGTH];
 	uint_t hlen;
 	uint_t sec_opt_len;
@@ -839,19 +826,18 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, uint_t mac_mode,
 	int delta_remove = 0, delta_add, adjust;
 	int retv;
 
+	*effective_tslp = NULL;
 	opt_storage[IPOPT_OPTVAL] = 0;
 
 	ipha = (ipha_t *)mp->b_rptr;
 
 	/*
 	 * Verify the destination is allowed to receive packets at
-	 * the security label of the message data. check_dest()
-	 * may create a new effective cred with a modified label
-	 * or label flags. Apply any such cred to the message block
-	 * for use in future routing decisions.
+	 * the security label of the message data. tsol_check_dest()
+	 * may create a new effective label or label flags.
 	 */
-	retv = tsol_check_dest(credp, &ipha->ipha_dst, IPV4_VERSION,
-	    mac_mode, &effective_cred);
+	retv = tsol_check_dest(tsl, &ipha->ipha_dst, IPV4_VERSION,
+	    mac_mode, zone_is_global, &effective_tsl);
 	if (retv != 0)
 		return (retv);
 
@@ -859,16 +845,15 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, uint_t mac_mode,
 	 * Calculate the security label to be placed in the text
 	 * of the message (if any).
 	 */
-	if (effective_cred != NULL) {
-		if ((retv = tsol_compute_label(effective_cred,
+	if (effective_tsl != NULL) {
+		if ((retv = tsol_compute_label_v4(effective_tsl, zoneid,
 		    ipha->ipha_dst, opt_storage, ipst)) != 0) {
-			crfree(effective_cred);
+			label_rele(effective_tsl);
 			return (retv);
 		}
-		mblk_setcred(mp, effective_cred, pid);
-		crfree(effective_cred);
+		*effective_tslp = effective_tsl;
 	} else {
-		if ((retv = tsol_compute_label(credp,
+		if ((retv = tsol_compute_label_v4(tsl, zoneid,
 		    ipha->ipha_dst, opt_storage, ipst)) != 0) {
 			return (retv);
 		}
@@ -888,10 +873,6 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, uint_t mac_mode,
 		if (sec_opt_len != 0 &&
 		    bcmp(opt_storage, optr, sec_opt_len) == 0)
 			return (0);
-	}
-
-	if (msg_getcred(mp, NULL) == NULL) {
-		mblk_setcred(mp, (cred_t *)credp, NOPID);
 	}
 
 	/*
@@ -918,8 +899,13 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, uint_t mac_mode,
 			copylen = 256;
 		new_mp = allocb_tmpl(hlen + copylen +
 		    (mp->b_rptr - mp->b_datap->db_base), mp);
-		if (new_mp == NULL)
+		if (new_mp == NULL) {
+			if (effective_tsl != NULL) {
+				label_rele(effective_tsl);
+				*effective_tslp = NULL;
+			}
 			return (ENOMEM);
+		}
 
 		/* keep the bias */
 		new_mp->b_rptr += mp->b_rptr - mp->b_datap->db_base;
@@ -948,6 +934,10 @@ tsol_check_label(const cred_t *credp, mblk_t **mpp, uint_t mac_mode,
 	return (0);
 
 param_prob:
+	if (effective_tsl != NULL) {
+		label_rele(effective_tsl);
+		*effective_tslp = NULL;
+	}
 	return (EINVAL);
 }
 
@@ -972,19 +962,17 @@ param_prob:
  * i.e starting from the IP6OPT_LS but not including the pad at the end.
  * The user must prepend two octets (either padding or next header / length)
  * and append padding out to the next 8 octet boundary.
+ *
+ * The zoneid is the IP zoneid (i.e., GLOBAL_ZONEID for exlusive-IP zones).
  */
 int
-tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
-    uchar_t *opt_storage, ip_stack_t *ipst)
+tsol_compute_label_v6(const ts_label_t *tsl, zoneid_t zoneid,
+    const in6_addr_t *dst, uchar_t *opt_storage, ip_stack_t *ipst)
 {
-	ts_label_t	*tsl;
 	uint_t		sec_opt_len;
 	uint32_t	doi;
-	zoneid_t	zoneid, ip_zoneid;
-	ire_t		*ire, *sire;
-	tsol_ire_gw_secattr_t *attrp;
-
-	ASSERT(credp != NULL);
+	ire_t		*ire;
+	tsol_ire_gw_secattr_t *attrp = NULL;
 
 	if (ip6opt_ls == 0)
 		return (EINVAL);
@@ -992,14 +980,12 @@ tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
 	if (opt_storage != NULL)
 		opt_storage[IPOPT_OLEN] = 0;
 
-	if ((tsl = crgetlabel(credp)) == NULL)
+	if (tsl == NULL)
 		return (0);
 
 	/* Always pass multicast */
 	if (IN6_IS_ADDR_MULTICAST(dst))
 		return (0);
-
-	zoneid = crgetzoneid(credp);
 
 	/*
 	 * Fill in a V6 label.  If a new format is added here, make certain
@@ -1012,62 +998,41 @@ tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
 	if (tsl->tsl_flags & TSLF_UNLABELED) {
 		/*
 		 * The destination is unlabeled. Only add a label if the
-		 * destination is not broadcast/local/loopback address,
+		 * destination is not a broadcast/local/loopback address,
 		 * the destination is not on the same subnet, and the
 		 * next-hop gateway is labeled.
-		 *
-		 * For exclusive stacks we set the zoneid to zero to
-		 * operate as if we are in the global zone when
-		 * performing IRE lookups and conn_t comparisons.
 		 */
-		if (ipst->ips_netstack->netstack_stackid != GLOBAL_NETSTACKID)
-			ip_zoneid = GLOBAL_ZONEID;
-		else
-			ip_zoneid = zoneid;
-
-		sire = NULL;
-		ire = ire_cache_lookup_v6(dst, ip_zoneid, tsl, ipst);
-
-		if (ire != NULL && (ire->ire_type & (IRE_LOCAL |
-		    IRE_LOOPBACK | IRE_INTERFACE)) != 0) {
-			IRE_REFRELE(ire);
-			return (0);
-		} else if (ire == NULL) {
-			ire = ire_ftable_lookup_v6(dst, NULL, NULL, 0, NULL,
-			    &sire, ip_zoneid, 0, tsl, (MATCH_IRE_RECURSIVE |
-			    MATCH_IRE_DEFAULT | MATCH_IRE_SECATTR), ipst);
-		}
-
-		/* no route to destination */
-		if (ire == NULL) {
+		ire = ire_route_recursive_v6(dst, 0, NULL, zoneid, tsl,
+		    MATCH_IRE_SECATTR, B_TRUE, 0, ipst, NULL, &attrp, NULL);
+		ASSERT(ire != NULL);
+		if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+			/* no route to destination */
+			ire_refrele(ire);
 			DTRACE_PROBE3(
 			    tx__tnopt__log__info__labeling__routedst__v6,
 			    char *, "No route to unlabeled dest ip6(1) with "
-			    "creds(2).", in6_addr_t *, dst, cred_t *, credp);
+			    "label(2).", in6_addr_t *, dst, ts_label_t *, tsl);
 			return (EHOSTUNREACH);
 		}
-
-		/*
-		 * Prefix IRE from f-table lookup means that the destination
-		 * is not directly connected; check the next-hop attributes.
-		 */
-		if (sire != NULL) {
-			ASSERT(ire != NULL);
-			IRE_REFRELE(ire);
-			ire = sire;
+		if (ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK |
+		    IRE_INTERFACE)) {
+			ire_refrele(ire);
+			return (0);
 		}
-
+		/*
+		 * ire_route_recursive gives us the first attrp it finds
+		 * in the recursive lookup.
+		 */
 		/*
 		 * Return now if next hop gateway is unlabeled. There is
 		 * no need to generate a CIPSO option for this message.
 		 */
-		attrp = ire->ire_gw_secattr;
 		if (attrp == NULL || attrp->igsa_rhc == NULL ||
 		    attrp->igsa_rhc->rhc_tpc->tpc_tp.host_type == UNLABELED) {
-			IRE_REFRELE(ire);
+			ire_refrele(ire);
 			return (0);
 		}
-		IRE_REFRELE(ire);
+		ire_refrele(ire);
 	}
 
 	/* compute the CIPSO option */
@@ -1079,7 +1044,7 @@ tsol_compute_label_v6(const cred_t *credp, const in6_addr_t *dst,
 	if (sec_opt_len == 0) {
 		DTRACE_PROBE3(tx__tnopt__log__error__labeling__lostops__v6,
 		    char *, "options lack length for dest ip6(1) with "
-		    "creds(2).", in6_addr_t *, dst, cred_t *, credp);
+		    "label(2).", in6_addr_t *, dst, ts_label_t *, tsl);
 		return (EINVAL);
 	}
 
@@ -1188,6 +1153,9 @@ tsol_find_secopt_v6(
  * Header and data following the label option that is deleted are copied
  * (i.e. slid backward) to the right position, and returns the number
  * of bytes removed (as zero or negative number.)
+ *
+ * Note that tsol_remove_secopt does not adjust ipha_length but
+ * tsol_remove_secopt_v6 does adjust ip6_plen.
  */
 int
 tsol_remove_secopt_v6(ip6_t *ip6h, int buflen)
@@ -1286,6 +1254,9 @@ tsol_remove_secopt_v6(ip6_t *ip6h, int buflen)
  * extra option being added. Header and data following the position where
  * the label option is inserted are copied (i.e. slid forward) to the right
  * position.
+ *
+ * Note that tsol_prepend_option does not adjust ipha_length but
+ * tsol_prepend_option_v6 does adjust ip6_plen.
  */
 int
 tsol_prepend_option_v6(uchar_t *optbuf, ip6_t *ip6h, int buflen)
@@ -1368,22 +1339,36 @@ tsol_prepend_option_v6(uchar_t *optbuf, ip6_t *ip6h, int buflen)
  * tsol_check_label_v6()
  *
  * This routine computes the IP label that should be on the packet based on the
- * connection and destination information.  It's called only by the IP
- * forwarding logic, because all internal modules atop IP know how to generate
- * their own labels.
+ * connection and destination information.  It's called by the IP forwarding
+ * logic and by ip_output_simple. The ULPs generate the labels before calling
+ * conn_ip_output. If any adjustments to
+ * the label are needed due to the connection's MAC-exempt status or
+ * the destination's ability to receive labels, an "effective label"
+ * will be returned.
+ *
+ * The packet's header is clear before entering IPsec's engine.
+ *
+ * The zoneid is the IP zoneid (i.e., GLOBAL_ZONEID for exlusive-IP zones).
+ * zone_is_global is set if the actual zoneid is global.
+ *
+ * On successful return, effective_tslp will point to the new label needed
+ * or will be NULL if a new label isn't needed. On error, effective_tsl will
+ * point to NULL.
  *
  * Returns:
- *      0		Label on packet was already correct
+ *      0		Label on (was|is now) correct
  *      EACCES		The packet failed the remote host accreditation.
  *      ENOMEM		Memory allocation failure.
+ *	EINVAL		Label cannot be computed
  */
 int
-tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, uint_t mode,
-    ip_stack_t *ipst, pid_t pid)
+tsol_check_label_v6(const ts_label_t *tsl, zoneid_t zoneid, mblk_t **mpp,
+    uint_t mac_mode, boolean_t zone_is_global, ip_stack_t *ipst,
+    ts_label_t **effective_tslp)
 {
 	mblk_t *mp = *mpp;
 	ip6_t  *ip6h;
-	cred_t *effective_cred;
+	ts_label_t *effective_tsl = NULL;
 	/*
 	 * Label option length is limited to IP_MAX_OPT_LENGTH for
 	 * symmetry with IPv4. Can be relaxed if needed
@@ -1399,16 +1384,16 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, uint_t mode,
 	uint_t	hbhlen;
 	boolean_t hbh_needed;
 
+	*effective_tslp = NULL;
+
 	/*
 	 * Verify the destination is allowed to receive packets at
-	 * the security label of the message data. check_dest()
-	 * may create a new effective cred with a modified label
-	 * or label flags. Apply any such cred to the message block
-	 * for use in future routing decisions.
+	 * the security label of the message data. tsol_check_dest()
+	 * may create a new effective label or label flags.
 	 */
 	ip6h = (ip6_t *)mp->b_rptr;
-	retv = tsol_check_dest(credp, &ip6h->ip6_dst, IPV6_VERSION,
-	    mode, &effective_cred);
+	retv = tsol_check_dest(tsl, &ip6h->ip6_dst, IPV6_VERSION,
+	    mac_mode, zone_is_global, &effective_tsl);
 	if (retv != 0)
 		return (retv);
 
@@ -1416,16 +1401,15 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, uint_t mode,
 	 * Calculate the security label to be placed in the text
 	 * of the message (if any).
 	 */
-	if (effective_cred != NULL) {
-		if ((retv = tsol_compute_label_v6(effective_cred,
+	if (effective_tsl != NULL) {
+		if ((retv = tsol_compute_label_v6(effective_tsl, zoneid,
 		    &ip6h->ip6_dst, opt_storage, ipst)) != 0) {
-			crfree(effective_cred);
+			label_rele(effective_tsl);
 			return (retv);
 		}
-		mblk_setcred(mp, effective_cred, pid);
-		crfree(effective_cred);
+		*effective_tslp = effective_tsl;
 	} else {
-		if ((retv = tsol_compute_label_v6(credp,
+		if ((retv = tsol_compute_label_v6(tsl, zoneid,
 		    &ip6h->ip6_dst, opt_storage, ipst)) != 0)
 			return (retv);
 	}
@@ -1455,10 +1439,6 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, uint_t mode,
 		 * does not have one currently
 		 */
 		return (0);
-	}
-
-	if (msg_getcred(mp, NULL) == NULL) {
-		mblk_setcred(mp, (cred_t *)credp, NOPID);
 	}
 
 	if (secopt != NULL && sec_opt_len != 0 &&
@@ -1499,8 +1479,13 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, uint_t mode,
 			copylen = hdr_len;
 		new_mp = allocb_tmpl(hlen + copylen +
 		    (mp->b_rptr - mp->b_datap->db_base), mp);
-		if (new_mp == NULL)
+		if (new_mp == NULL) {
+			if (effective_tsl != NULL) {
+				label_rele(effective_tsl);
+				*effective_tslp = NULL;
+			}
 			return (ENOMEM);
+		}
 
 		/* keep the bias */
 		new_mp->b_rptr += mp->b_rptr - mp->b_datap->db_base;
@@ -1522,208 +1507,13 @@ tsol_check_label_v6(const cred_t *credp, mblk_t **mpp, uint_t mode,
 	ASSERT(mp->b_wptr + delta_add <= DB_LIM(mp));
 	mp->b_wptr += delta_add;
 
+	/* tsol_prepend_option_v6 has adjusted ip6_plen */
 	return (0);
 
 param_prob:
+	if (effective_tsl != NULL) {
+		label_rele(effective_tsl);
+		*effective_tslp = NULL;
+	}
 	return (EINVAL);
-}
-
-/*
- * Update the given IPv6 "sticky options" structure to contain the provided
- * label, which is encoded as an IPv6 option.  Existing label is removed if
- * necessary, and storage is allocated/freed/resized.
- *
- * Returns 0 on success, errno on failure.
- */
-int
-tsol_update_sticky(ip6_pkt_t *ipp, uint_t *labellen, const uchar_t *labelopt)
-{
-	int rawlen, optlen, newlen;
-	uchar_t *newopts;
-
-	/*
-	 * rawlen is the size of the IPv6 label to be inserted from labelopt.
-	 * optlen is the total length of that option, including any necessary
-	 * headers and padding.  newlen is the new size of the total hop-by-hop
-	 * options buffer, including user options.
-	 */
-	ASSERT(*labellen <= ipp->ipp_hopoptslen);
-	ASSERT((ipp->ipp_hopopts == NULL && ipp->ipp_hopoptslen == 0) ||
-	    (ipp->ipp_hopopts != NULL && ipp->ipp_hopoptslen != 0));
-
-	if ((rawlen = labelopt[1]) != 0) {
-		rawlen += 2;	/* add in header size */
-		optlen = (2 + rawlen + 7) & ~7;
-	} else {
-		optlen = 0;
-	}
-	newlen = ipp->ipp_hopoptslen + optlen - *labellen;
-	if (newlen == 0 && ipp->ipp_hopopts != NULL) {
-		/* Deleting all existing hop-by-hop options */
-		kmem_free(ipp->ipp_hopopts, ipp->ipp_hopoptslen);
-		ipp->ipp_hopopts = NULL;
-		ipp->ipp_fields &= ~IPPF_HOPOPTS;
-	} else if (optlen != *labellen) {
-		/* If the label not same size as last time, then reallocate */
-		if (newlen > IP6_MAX_OPT_LENGTH)
-			return (EHOSTUNREACH);
-		newopts = kmem_alloc(newlen, KM_NOSLEEP);
-		if (newopts == NULL)
-			return (ENOMEM);
-		/*
-		 * If the user has hop-by-hop stickyoptions set, then copy his
-		 * options in after the security label.
-		 */
-		if (ipp->ipp_hopoptslen > *labellen) {
-			bcopy(ipp->ipp_hopopts + *labellen, newopts + optlen,
-			    ipp->ipp_hopoptslen - *labellen);
-			/*
-			 * Stomp out any header gunk here - this was the
-			 * previous next-header and option length field.
-			 */
-			newopts[optlen] = IP6OPT_PADN;
-			newopts[optlen + 1] = 0;
-		}
-		if (ipp->ipp_hopopts != NULL)
-			kmem_free(ipp->ipp_hopopts, ipp->ipp_hopoptslen);
-		ipp->ipp_hopopts = (ip6_hbh_t *)newopts;
-	}
-	ipp->ipp_hopoptslen = newlen;
-	*labellen = optlen;
-
-	newopts = (uchar_t *)ipp->ipp_hopopts;
-
-	/* If there are any options, then fix up reported length */
-	if (newlen > 0) {
-		newopts[1] = (newlen + 7) / 8 - 1;
-		ipp->ipp_fields |= IPPF_HOPOPTS;
-	}
-
-	/* If there's a label, then insert it now */
-	if (optlen > 0) {
-		/* skip next-header and length fields */
-		newopts += 2;
-		bcopy(labelopt, newopts, rawlen);
-		newopts += rawlen;
-		/* make sure padding comes out right */
-		optlen -= 2 + rawlen;
-		if (optlen == 1) {
-			newopts[0] = IP6OPT_PAD1;
-		} else if (optlen > 1) {
-			newopts[0] = IP6OPT_PADN;
-			optlen -=  2;
-			newopts[1] = optlen;
-			if (optlen > 0)
-				bzero(newopts + 2, optlen);
-		}
-	}
-	return (0);
-}
-
-int
-tsol_update_options(uchar_t **opts, uint_t *totlen, uint_t *labellen,
-    const uchar_t *labelopt)
-{
-	int optlen, newlen;
-	uchar_t *newopts;
-
-	optlen = (labelopt[IPOPT_OLEN] + 3) & ~3;
-	newlen = *totlen + optlen - *labellen;
-	if (optlen > *labellen) {
-		if (newlen > IP_MAX_OPT_LENGTH)
-			return (EHOSTUNREACH);
-		newopts = (uchar_t *)mi_alloc(newlen, BPRI_HI);
-		if (newopts == NULL)
-			return (ENOMEM);
-		if (*totlen > *labellen) {
-			bcopy(*opts + *labellen, newopts + optlen,
-			    *totlen - *labellen);
-		}
-		if (*opts != NULL)
-			mi_free((char *)*opts);
-		*opts = newopts;
-	} else if (optlen < *labellen) {
-		if (newlen == 0 && *opts != NULL) {
-			mi_free((char *)*opts);
-			*opts = NULL;
-		}
-		if (*totlen > *labellen) {
-			ovbcopy(*opts + *labellen, *opts + optlen,
-			    *totlen - *labellen);
-		}
-	}
-	*totlen = newlen;
-	*labellen = optlen;
-	if (optlen > 0) {
-		newopts = *opts;
-		bcopy(labelopt, newopts, optlen);
-		/* check if there are user-supplied options that follow */
-		if (optlen < newlen) {
-			/* compute amount of embedded alignment needed */
-			optlen -= newopts[IPOPT_OLEN];
-			newopts += newopts[IPOPT_OLEN];
-			while (--optlen >= 0)
-				*newopts++ = IPOPT_NOP;
-		} else if (optlen != newopts[IPOPT_OLEN]) {
-			/*
-			 * The label option is the only option and it is
-			 * not a multiple of 4 bytes.
-			 */
-			optlen -= newopts[IPOPT_OLEN];
-			newopts += newopts[IPOPT_OLEN];
-			while (--optlen >= 0)
-				*newopts++ = IPOPT_EOL;
-		}
-	}
-	return (0);
-}
-
-/*
- * This does the bulk of the processing for setting IPPROTO_IP {T_,}IP_OPTIONS.
- */
-boolean_t
-tsol_option_set(uchar_t **opts, uint_t *optlen, uint_t labellen,
-    const uchar_t *useropts, uint_t userlen)
-{
-	int newlen;
-	uchar_t *newopts;
-
-	newlen = userlen + labellen;
-	if (newlen > *optlen) {
-		/* need more room */
-		newopts = (uchar_t *)mi_alloc(newlen, BPRI_HI);
-		if (newopts == NULL)
-			return (B_FALSE);
-		/*
-		 * The supplied *opts can't be NULL in this case,
-		 * since there's an existing label.
-		 */
-		if (labellen > 0)
-			bcopy(*opts, newopts, labellen);
-		if (*opts != NULL)
-			mi_free((char *)*opts);
-		*opts = newopts;
-	}
-
-	if (newlen == 0) {
-		/* special case -- no remaining IP options at all */
-		if (*opts != NULL) {
-			mi_free((char *)*opts);
-			*opts = NULL;
-		}
-	} else if (userlen > 0) {
-		/* merge in the user's options */
-		newopts = *opts;
-		if (labellen > 0) {
-			int extra = labellen - newopts[IPOPT_OLEN];
-
-			newopts += newopts[IPOPT_OLEN];
-			while (--extra >= 0)
-				*newopts++ = IPOPT_NOP;
-		}
-		bcopy(useropts, newopts, userlen);
-	}
-
-	*optlen = newlen;
-	return (B_TRUE);
 }

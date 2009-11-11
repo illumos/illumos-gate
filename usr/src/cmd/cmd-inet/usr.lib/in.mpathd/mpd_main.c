@@ -2875,7 +2875,7 @@ mibwalk(void (*proc)(mib_item_t *))
 	 * us information concerning IRE_MARK_TESTHIDDEN routes.
 	 */
 	req = (struct opthdr *)&tor[1];
-	req->level = EXPER_IP_AND_TESTHIDDEN;
+	req->level = EXPER_IP_AND_ALL_IRES;
 	req->name  = 0;
 	req->len   = 0;
 

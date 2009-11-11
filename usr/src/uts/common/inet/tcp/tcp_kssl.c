@@ -56,20 +56,21 @@
  * For the Kernel SSL proxy
  *
  * Routines in this file are called on tcp's incoming path,
- * tcp_rput_data() mainly, and right before the message is
+ * tcp_input_data() mainly, and right before the message is
  * to be putnext()'ed upstreams.
  */
 
 static void	tcp_kssl_input_callback(void *, mblk_t *, kssl_cmd_t);
-static void	tcp_kssl_input_asynch(void *, mblk_t *, void *);
+static void	tcp_kssl_input_asynch(void *, mblk_t *, void *,
+    ip_recv_attr_t *);
 
-extern void	tcp_output(void *, mblk_t *, void *);
+extern void	tcp_output(void *, mblk_t *, void *, ip_recv_attr_t *);
 extern void	tcp_send_conn_ind(void *, mblk_t *, void *);
 
 extern int tcp_squeue_flag;
 
 /*
- * tcp_rput_data() calls this routine for all packet destined to a
+ * tcp_input_data() calls this routine for all packet destined to a
  * connection to the SSL port, when the SSL kernel proxy is configured
  * to intercept and process those packets.
  * A packet may carry multiple SSL records, so the function
@@ -84,7 +85,7 @@ extern int tcp_squeue_flag;
  * which could decrement the conn/tcp reference before we get to increment it.
  */
 void
-tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
+tcp_kssl_input(tcp_t *tcp, mblk_t *mp, cred_t *cr)
 {
 	struct conn_s	*connp = tcp->tcp_connp;
 	tcp_t		*listener;
@@ -97,15 +98,26 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 	boolean_t	is_v4;
 	void		*addr;
 
+	if (is_system_labeled() && mp != NULL) {
+		ASSERT(cr != NULL || msg_getcred(mp, NULL) != NULL);
+		/*
+		 * Provide for protocols above TCP such as RPC. NOPID leaves
+		 * db_cpid unchanged.
+		 * The cred could have already been set.
+		 */
+		if (cr != NULL)
+			mblk_setcred(mp, cr, NOPID);
+	}
+
 	/* First time here, allocate the SSL context */
 	if (tcp->tcp_kssl_ctx == NULL) {
 		ASSERT(tcp->tcp_kssl_pending);
 
-		is_v4 = (tcp->tcp_ipversion == IPV4_VERSION);
+		is_v4 = (connp->conn_ipversion == IPV4_VERSION);
 		if (is_v4) {
-			addr = &tcp->tcp_ipha->ipha_dst;
+			addr = &connp->conn_faddr_v4;
 		} else {
-			addr = &tcp->tcp_ip6h->ip6_dst;
+			addr = &connp->conn_faddr_v6;
 		}
 
 		if (kssl_init_context(tcp->tcp_kssl_ent,
@@ -146,7 +158,7 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 			mutex_enter(&tcp->tcp_non_sq_lock);
 			tcp->tcp_squeue_bytes += msgdsize(outmp);
 			mutex_exit(&tcp->tcp_non_sq_lock);
-			tcp_output(connp, outmp, NULL);
+			tcp_output(connp, outmp, NULL, NULL);
 
 		/* FALLTHROUGH */
 		case KSSL_CMD_NONE:
@@ -194,7 +206,7 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 				tci->PRIM_type = T_SSL_PROXY_CONN_IND;
 
 				/*
-				 * The code below is copied from tcp_rput_data()
+				 * The code below is copied from tcp_input_data
 				 * delivering the T_CONN_IND on a TCPS_SYN_RCVD,
 				 * and all conn ref cnt comments apply.
 				 */
@@ -214,7 +226,7 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 					SQUEUE_ENTER_ONE(
 					    listener->tcp_connp->conn_sqp,
 					    ind_mp, tcp_send_conn_ind,
-					    listener->tcp_connp, SQ_FILL,
+					    listener->tcp_connp, NULL, SQ_FILL,
 					    SQTAG_TCP_CONN_IND);
 				}
 			}
@@ -240,11 +252,12 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 			if (tcp->tcp_listener != NULL) {
 				DTRACE_PROBE1(kssl_mblk__input_rcv_enqueue,
 				    mblk_t *, outmp);
-				tcp_rcv_enqueue(tcp, outmp, msgdsize(outmp));
+				tcp_rcv_enqueue(tcp, outmp, msgdsize(outmp),
+				    NULL);
 			} else {
 				DTRACE_PROBE1(kssl_mblk__input_putnext,
 				    mblk_t *, outmp);
-				putnext(tcp->tcp_rq, outmp);
+				putnext(connp->conn_rq, outmp);
 			}
 			/*
 			 * We're at a phase where records are sent upstreams,
@@ -283,7 +296,7 @@ no_can_do:
 				tci->PRIM_type = T_SSL_PROXY_CONN_IND;
 
 				/*
-				 * The code below is copied from tcp_rput_data()
+				 * The code below is copied from tcp_input_data
 				 * delivering the T_CONN_IND on a TCPS_SYN_RCVD,
 				 * and all conn ref cnt comments apply.
 				 */
@@ -303,12 +316,12 @@ no_can_do:
 					SQUEUE_ENTER_ONE(
 					    listener->tcp_connp->conn_sqp,
 					    ind_mp, tcp_send_conn_ind,
-					    listener->tcp_connp,
+					    listener->tcp_connp, NULL,
 					    SQ_FILL, SQTAG_TCP_CONN_IND);
 				}
 			}
 			if (mp != NULL)
-				tcp_rcv_enqueue(tcp, mp, msgdsize(mp));
+				tcp_rcv_enqueue(tcp, mp, msgdsize(mp), NULL);
 			break;
 		}
 		mp = NULL;
@@ -351,7 +364,7 @@ tcp_kssl_input_callback(void *arg, mblk_t *mp, kssl_cmd_t kssl_cmd)
 		}
 		CONN_INC_REF(connp);
 		SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_output, connp,
-		    tcp_squeue_flag, SQTAG_TCP_OUTPUT);
+		    NULL, tcp_squeue_flag, SQTAG_TCP_OUTPUT);
 
 	/* FALLTHROUGH */
 	case KSSL_CMD_NONE:
@@ -363,9 +376,9 @@ tcp_kssl_input_callback(void *arg, mblk_t *mp, kssl_cmd_t kssl_cmd)
 		 * Keep accumulating if not yet accepted.
 		 */
 		if (tcp->tcp_listener != NULL) {
-			tcp_rcv_enqueue(tcp, mp, msgdsize(mp));
+			tcp_rcv_enqueue(tcp, mp, msgdsize(mp), NULL);
 		} else {
-			putnext(tcp->tcp_rq, mp);
+			putnext(connp->conn_rq, mp);
 		}
 		break;
 
@@ -383,7 +396,7 @@ tcp_kssl_input_callback(void *arg, mblk_t *mp, kssl_cmd_t kssl_cmd)
 	if ((sqmp = allocb(1, BPRI_MED)) != NULL) {
 		CONN_INC_REF(connp);
 		SQUEUE_ENTER_ONE(connp->conn_sqp, sqmp, tcp_kssl_input_asynch,
-		    connp, SQ_FILL, SQTAG_TCP_KSSL_INPUT);
+		    connp, NULL, SQ_FILL, SQTAG_TCP_KSSL_INPUT);
 	} else {
 		DTRACE_PROBE(kssl_err__allocb_failed);
 	}
@@ -396,7 +409,7 @@ tcp_kssl_input_callback(void *arg, mblk_t *mp, kssl_cmd_t kssl_cmd)
  */
 /* ARGSUSED */
 void
-tcp_kssl_input_asynch(void *arg, mblk_t *mp, void *arg2)
+tcp_kssl_input_asynch(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t *tcp = connp->conn_tcp;
@@ -409,6 +422,6 @@ tcp_kssl_input_asynch(void *arg, mblk_t *mp, void *arg2)
 	 * while we're away
 	 */
 	if (tcp->tcp_kssl_ctx != NULL) {
-		tcp_kssl_input(tcp, NULL);
+		tcp_kssl_input(tcp, NULL, NULL);
 	}
 }

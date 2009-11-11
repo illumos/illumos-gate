@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -66,8 +64,14 @@ sctp_return_heartbeat(sctp_t *sctp, sctp_chunk_hdr_t *hbcp, mblk_t *mp)
 		addr = inip6h->ip6_src;
 	}
 	fp = sctp_lookup_faddr(sctp, &addr);
-	ASSERT(fp != NULL);
-
+	/* If the source address is bogus we silently drop the packet */
+	if (fp == NULL) {
+		dprint(1,
+		    ("sctp_return_heartbeat: %p bogus hb from %x:%x:%x:%x\n",
+		    (void *)sctp, SCTP_PRINTADDR(addr)));
+		SCTP_KSTAT(sctps, sctp_return_hb_failed);
+		return;
+	}
 	dprint(3, ("sctp_return_heartbeat: %p got hb from %x:%x:%x:%x\n",
 	    (void *)sctp, SCTP_PRINTADDR(addr)));
 
@@ -98,10 +102,11 @@ sctp_return_heartbeat(sctp_t *sctp, sctp_chunk_hdr_t *hbcp, mblk_t *mp)
 
 	smp->b_wptr += len;
 
-	sctp_set_iplen(sctp, smp);
-
 	BUMP_LOCAL(sctp->sctp_obchunks);
-	sctp_add_sendq(sctp, smp);
+
+	sctp_set_iplen(sctp, smp, fp->ixa);
+	(void) conn_ip_output(smp, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 }
 
 /*
@@ -126,10 +131,10 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 	    SCTP_PRINTADDR(fp->faddr), SCTP_PRINTADDR(fp->saddr)));
 
 	hblen = sizeof (*cp) +
-		sizeof (*hpp) +
-		sizeof (*t) +
-		sizeof (fp->hb_secret) +
-		sizeof (fp->faddr);
+	    sizeof (*hpp) +
+	    sizeof (*t) +
+	    sizeof (fp->hb_secret) +
+	    sizeof (fp->faddr);
 	hbmp = sctp_make_mp(sctp, fp, hblen);
 	if (hbmp == NULL) {
 		SCTP_KSTAT(sctps, sctp_send_hb_failed);
@@ -180,8 +185,6 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 
 	hbmp->b_wptr += hblen;
 
-	sctp_set_iplen(sctp, hbmp);
-
 	/* Update the faddr's info */
 	fp->lastactive = now;
 	fp->hb_pending = B_TRUE;
@@ -189,7 +192,9 @@ sctp_send_heartbeat(sctp_t *sctp, sctp_faddr_t *fp)
 	BUMP_LOCAL(sctp->sctp_obchunks);
 	BUMP_MIB(&sctps->sctps_mib, sctpTimHeartBeatProbe);
 
-	sctp_add_sendq(sctp, hbmp);
+	sctp_set_iplen(sctp, hbmp, fp->ixa);
+	(void) conn_ip_output(hbmp, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,9 +79,9 @@ typedef struct squeue_set_s {
 	processorid_t	sqs_cpuid;
 } squeue_set_t;
 
-typedef void (*sqproc_t)(void *, mblk_t *, void *);
+typedef void (*sqproc_t)(void *, mblk_t *, void *, struct ip_recv_attr_s *);
 typedef void (*sq_enter_proc_t)(squeue_t *, mblk_t *, mblk_t *, uint32_t,
-		int, uint8_t);
+	    struct ip_recv_attr_s *, int, uint8_t);
 typedef void (*sq_drain_proc_t)(squeue_t *, uint_t, hrtime_t);
 
 extern void squeue_worker_wakeup(squeue_t *);

@@ -1605,7 +1605,9 @@ pullupmsg(mblk_t *mp, ssize_t len)
 		ASSERT(bp->b_datap->db_ref > 0);
 		ASSERT(bp->b_wptr >= bp->b_rptr);
 		n = MIN(bp->b_wptr - bp->b_rptr, len);
-		bcopy(bp->b_rptr, mp->b_wptr, (size_t)n);
+		ASSERT(n >= 0);		/* allow zero-length mblk_t's */
+		if (n > 0)
+			bcopy(bp->b_rptr, mp->b_wptr, (size_t)n);
 		mp->b_wptr += n;
 		bp->b_rptr += n;
 		len -= n;

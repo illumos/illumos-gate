@@ -23,15 +23,6 @@
 # Use is subject to license terms.
 #
 
-ar_cmd_tbl
-ar_m_tbl
-arp_mod_info
-arp_no_defense
-arpinfo
-arprinit
-arpwinit
-arp_param_arr
-arp_netinfo
 cb_inet_devops
 fsw
 inet_dev_info

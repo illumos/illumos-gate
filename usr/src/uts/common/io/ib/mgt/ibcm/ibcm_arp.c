@@ -26,41 +26,28 @@
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#include <sys/stropts.h>
-#include <sys/stream.h>
-#include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <net/if_arp.h>
 #include <net/if_types.h>
-#include <sys/file.h>
 #include <sys/sockio.h>
 #include <sys/pathname.h>
-#include <inet/arp.h>
-#include <sys/modctl.h>
 
 #include <sys/ib/mgt/ibcm/ibcm_arp.h>
 
 #include <sys/kstr.h>
-#include <sys/tiuser.h>
 #include <sys/t_kuser.h>
 
 extern char cmlog[];
 
-extern int ibcm_arp_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
-    ibt_ip_addr_t *src_addr, ibcm_arp_pr_comp_func_t func);
-extern void ibcm_arp_pr_arp_ack(mblk_t *mp);
-extern void ibcm_arp_prwqn_delete(ibcm_arp_prwqn_t *wqnp);
+extern int ibcm_resolver_pr_lookup(ibcm_arp_streams_t *ib_s,
+    ibt_ip_addr_t *dst_addr, ibt_ip_addr_t *src_addr);
+extern void ibcm_arp_delete_prwqn(ibcm_arp_prwqn_t *wqnp);
 
-_NOTE(SCHEME_PROTECTS_DATA("Unshared data", datab))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", ibt_ip_addr_s))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", ibcm_arp_ip_t))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", ibcm_arp_ibd_insts_t))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", ibcm_arp_prwqn_t))
-_NOTE(SCHEME_PROTECTS_DATA("Unshared data", iocblk))
-_NOTE(SCHEME_PROTECTS_DATA("Unshared data", msgb))
-_NOTE(SCHEME_PROTECTS_DATA("Unshared data", queue))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", sockaddr_in))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", sockaddr_in6))
 
@@ -89,269 +76,6 @@ ibcm_ip_print(char *label, ibt_ip_addr_t *ipaddr)
 	}
 }
 
-/*
- * ibcm_arp_get_ibaddr_cb
- */
-static int
-ibcm_arp_get_ibaddr_cb(void *arg, int status)
-{
-	ibcm_arp_prwqn_t	*wqnp = (ibcm_arp_prwqn_t *)arg;
-	ibcm_arp_streams_t	*ib_s = (ibcm_arp_streams_t *)wqnp->arg;
-
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_get_ibaddr_cb(ib_s: %p wqnp: %p)",
-	    ib_s, wqnp);
-
-	mutex_enter(&ib_s->lock);
-	ib_s->status = status;
-	ib_s->done = B_TRUE;
-
-	IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr_cb: SGID %llX:%llX "
-	    "DGID: %llX:%llX", wqnp->sgid.gid_prefix, wqnp->sgid.gid_guid,
-	    wqnp->dgid.gid_prefix, wqnp->dgid.gid_guid);
-
-	/* lock is held by the caller. */
-	cv_signal(&ib_s->cv);
-	mutex_exit(&ib_s->lock);
-	return (0);
-}
-
-/*
- * Lower read service procedure (messages coming back from arp/ip).
- * Process messages based on queue type.
- */
-static int
-ibcm_arp_lrsrv(queue_t *q)
-{
-	mblk_t *mp;
-	ibcm_arp_streams_t *ib_s = q->q_ptr;
-
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_lrsrv(%p, ibd_s: 0x%p)", q, ib_s);
-
-	if (WR(q) == ib_s->arpqueue) {
-		while (mp = getq(q)) {
-			ibcm_arp_pr_arp_ack(mp);
-		}
-	}
-
-	return (0);
-}
-
-/*
- * Lower write service procedure.
- * Used when lower streams are flow controlled.
- */
-static int
-ibcm_arp_lwsrv(queue_t *q)
-{
-	mblk_t *mp;
-
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_lwsrv(%p)", q);
-
-	while (mp = getq(q)) {
-		if (canputnext(q)) {
-			putnext(q, mp);
-		} else {
-			(void) putbq(q, mp);
-			qenable(q);
-			break;
-		}
-	}
-
-	return (0);
-}
-
-/*
- * Lower read put procedure. Arp/ip messages come here.
- */
-static int
-ibcm_arp_lrput(queue_t *q, mblk_t *mp)
-{
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_lrput(0x%p, db_type: %d)",
-	    q, DB_TYPE(mp));
-
-	switch (DB_TYPE(mp)) {
-		case M_FLUSH:
-			/*
-			 * Turn around
-			 */
-			if (*mp->b_rptr & FLUSHW) {
-				*mp->b_rptr &= ~FLUSHR;
-				qreply(q, mp);
-				return (0);
-			}
-			freemsg(mp);
-			break;
-		case M_IOCACK:
-		case M_IOCNAK:
-		case M_DATA:
-			/*
-			 * This could be in interrupt context.
-			 * Some of the ibt calls cannot be called in
-			 * interrupt context, so
-			 * put it in the queue and the message will be
-			 * processed by service proccedure
-			 */
-			(void) putq(q, mp);
-			qenable(q);
-			break;
-		default:
-			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_lrput: "
-			    "got unknown msg <0x%x>\n", mp->b_datap->db_type);
-			ASSERT(0);
-			break;
-	}
-
-	return (0);
-}
-
-/*
- * Streams write queue module info
- */
-static struct module_info ibcm_arp_winfo = {
-	0,		/* module ID number */
-	"ibcm",		/* module name */
-	0,		/* min packet size */
-	INFPSZ,
-	49152,		/* STREAM queue high water mark -- 49152 */
-	12		/* STREAM queue low water mark -- 12 */
-};
-
-/*
- * Streams lower write queue, for ibcm/ip requests.
- */
-static struct qinit ibcm_arp_lwinit = {
-	NULL,		/* qi_putp */
-	ibcm_arp_lwsrv,	/* qi_srvp */
-	NULL,		/* qi_qopen */
-	NULL,		/* qi_qclose */
-	NULL,		/* qi_qadmin */
-	&ibcm_arp_winfo,	/* module info */
-	NULL,		/* module statistics struct */
-	NULL,
-	NULL,
-	STRUIOT_NONE	/* stream uio type is standard uiomove() */
-};
-
-/*
- * Streams lower read queue: read reply messages from ibcm/ip.
- */
-static struct qinit ibcm_arp_lrinit = {
-	ibcm_arp_lrput,	/* qi_putp */
-	ibcm_arp_lrsrv,	/* qi_srvp */
-	NULL,		/* qi_qopen */
-	NULL,		/* qi_qclose */
-	NULL,		/* qi_qadmin */
-	&ibcm_arp_winfo,	/* module info */
-	NULL,		/* module statistics struct */
-	NULL,
-	NULL,
-	STRUIOT_NONE /* stream uio type is standard uiomove() */
-};
-
-
-static int
-ibcm_arp_link_driver(ibcm_arp_streams_t *ib_s, char *path, queue_t **q,
-    vnode_t **dev_vp)
-{
-	struct stdata *dev_stp;
-	vnode_t *vp;
-	int error;
-	queue_t *rq;
-
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_link_driver: Enter: %s", path);
-
-	/* open the driver from inside the kernel */
-	error = vn_open(path, UIO_SYSSPACE, FREAD|FWRITE, 0, &vp,
-	    0, NULL);
-	if (error) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_link_driver: "
-		    "vn_open('%s') failed\n", path);
-		return (error);
-	}
-	*dev_vp = vp;
-
-	dev_stp = vp->v_stream;
-	*q = dev_stp->sd_wrq;
-
-	VN_HOLD(vp);
-
-	rq = RD(dev_stp->sd_wrq);
-	RD(rq)->q_ptr = WR(rq)->q_ptr = ib_s;
-	setq(rq, &ibcm_arp_lrinit, &ibcm_arp_lwinit, NULL, QMTSAFE,
-	    SQ_CI|SQ_CO, B_FALSE);
-
-	return (0);
-}
-
-extern struct qinit strdata;
-extern struct qinit stwdata;
-
-/*
- * Unlink ip, ibcm, icmp6 drivers
- */
-/* ARGSUSED */
-static int
-ibcm_arp_unlink_driver(queue_t **q, vnode_t **dev_vp)
-{
-	vnode_t *vp = *dev_vp;
-	struct stdata *dev_stp = vp->v_stream;
-	queue_t *wrq, *rq;
-	int	rc;
-
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_unlink_driver: Enter: 0x%p", q);
-
-	wrq = dev_stp->sd_wrq;
-	rq = RD(wrq);
-
-	disable_svc(rq);
-	wait_svc(rq);
-	flushq(rq, FLUSHALL);
-	flushq(WR(rq), FLUSHALL);
-
-	rq->q_ptr = wrq->q_ptr = dev_stp;
-
-	setq(rq, &strdata, &stwdata, NULL, QMTSAFE, SQ_CI|SQ_CO, B_TRUE);
-
-	if ((rc = VOP_CLOSE(vp, FREAD, 1, (offset_t)0, CRED(), NULL)) != 0) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_unlink_driver: VOP_CLOSE "
-		    "failed %d\n", rc);
-	}
-	VN_RELE(vp);
-
-	return (0);
-}
-
-static int
-ibcm_arp_unlink_drivers(ibcm_arp_streams_t *ib_s)
-{
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_unlink_drivers(%p)", ib_s);
-
-	if (ib_s->arpqueue) {
-		(void) ibcm_arp_unlink_driver(&ib_s->arpqueue, &ib_s->arp_vp);
-	}
-
-	return (0);
-}
-
-/*
- * Link ip, ibtl drivers below ibtl
- */
-static int
-ibcm_arp_link_drivers(ibcm_arp_streams_t *ib_s)
-{
-	int	rc;
-
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_link_drivers(%p)", ib_s);
-
-	if ((rc = ibcm_arp_link_driver(ib_s, "/dev/arp", &ib_s->arpqueue,
-	    &ib_s->arp_vp)) != 0) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_link_drivers: "
-		    "ibcm_arp_link_driver failed: %d\n", rc);
-		return (rc);
-	}
-
-	return (0);
-}
 
 ibt_status_t
 ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
@@ -370,21 +94,13 @@ ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
 	mutex_init(&ib_s->lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&ib_s->cv, NULL, CV_DRIVER, NULL);
 
-	ret = ibcm_arp_link_drivers(ib_s);
-	if (ret != 0) {
-		IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr: "
-		    "ibcm_arp_link_drivers failed %d", ret);
-		goto arp_ibaddr_error;
-	}
-
 	mutex_enter(&ib_s->lock);
 	ib_s->done = B_FALSE;
 	mutex_exit(&ib_s->lock);
 
-	ret = ibcm_arp_pr_lookup(ib_s, &destaddr, &srcaddr,
-	    ibcm_arp_get_ibaddr_cb);
+	ret = ibcm_resolver_pr_lookup(ib_s, &destaddr, &srcaddr);
 
-	IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr: ibcm_arp_pr_lookup "
+	IBTF_DPRINTF_L3(cmlog, "ibcm_arp_get_ibaddr: ibcm_resolver_pr_lookup "
 	    "returned: %d", ret);
 	if (ret == 0) {
 		mutex_enter(&ib_s->lock);
@@ -393,7 +109,6 @@ ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
 		mutex_exit(&ib_s->lock);
 	}
 
-	(void) ibcm_arp_unlink_drivers(ib_s);
 	mutex_enter(&ib_s->lock);
 	wqnp = ib_s->wqnp;
 	if (ib_s->status == 0) {
@@ -407,11 +122,11 @@ ibcm_arp_get_ibaddr(ibt_ip_addr_t srcaddr, ibt_ip_addr_t destaddr,
 		    ib_s->wqnp->sgid.gid_prefix, ib_s->wqnp->sgid.gid_guid,
 		    ib_s->wqnp->dgid.gid_prefix, ib_s->wqnp->dgid.gid_guid);
 
-		ibcm_arp_prwqn_delete(wqnp);
+		ibcm_arp_delete_prwqn(wqnp);
 	} else if (ret == 0) {
 		/*
 		 * We come here only when lookup has returned empty (failed)
-		 * via callback routine - ibcm_arp_get_ibaddr_cb
+		 * via callback routine.
 		 * i.e. ib_s->status is non-zero, while ret is zero.
 		 */
 		if (wqnp)
@@ -883,21 +598,4 @@ srcip_plist_end:
 		    sizeof (ibcm_arp_ip_t));
 
 	return (ret);
-}
-/* Routines for warlock */
-
-/* ARGSUSED */
-static int
-ibcm_arp_dummy_ibaddr_hdl(void *arg, int status)
-{
-	ibcm_arp_prwqn_t		dummy_wqn1;
-	ibcm_arp_prwqn_t		dummy_wqn2;
-
-	dummy_wqn1.func = ibcm_arp_get_ibaddr_cb;
-	dummy_wqn2.func = ibcm_arp_dummy_ibaddr_hdl;
-
-	IBTF_DPRINTF_L5(cmlog, "ibcm_arp_dummy_ibaddr_hdl: "
-	    "dummy_wqn1.func %p %p", dummy_wqn1.func, dummy_wqn2.func);
-
-	return (0);
 }

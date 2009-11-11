@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_KEYSOCK_H
 #define	_INET_KEYSOCK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -34,7 +32,7 @@ extern "C" {
 
 extern int keysock_opt_get(queue_t *, int, int, uchar_t *);
 extern int keysock_opt_set(queue_t *, uint_t, int, int, uint_t,
-    uchar_t *, uint_t *, uchar_t *, void *, cred_t *cr, mblk_t *mblk);
+    uchar_t *, uint_t *, uchar_t *, void *, cred_t *cr);
 
 /*
  * Object to represent database of options to search passed to

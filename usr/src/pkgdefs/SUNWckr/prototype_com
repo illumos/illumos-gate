@@ -92,7 +92,6 @@ f none kernel/drv/ippctl.conf 644 root sys
 f none kernel/drv/ipsecah.conf 644 root sys
 f none kernel/drv/ipsecesp.conf 644 root sys
 f none kernel/drv/iptun.conf 644 root sys
-f none kernel/drv/iptunq.conf 644 root sys
 f none kernel/drv/iwscn.conf 644 root sys
 f none kernel/drv/keysock.conf 644 root sys
 f none kernel/drv/kmdb.conf 644 root sys

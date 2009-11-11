@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,7 @@ extern uint_t		spdsock_max_optsize;
 
 extern int spdsock_opt_get(queue_t *, int, int, uchar_t *);
 extern int spdsock_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,
-    uint_t *, uchar_t *, void *, cred_t *, mblk_t *);
+    uint_t *, uchar_t *, void *, cred_t *);
 
 #ifdef	__cplusplus
 }

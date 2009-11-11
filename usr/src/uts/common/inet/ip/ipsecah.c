@@ -54,6 +54,8 @@
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/nd.h>
+#include <inet/ip_if.h>
+#include <inet/ip_ndp.h>
 #include <inet/ipsec_info.h>
 #include <inet/ipsec_impl.h>
 #include <inet/sadb.h>
@@ -62,7 +64,6 @@
 #include <inet/ipdrop.h>
 #include <sys/taskq.h>
 #include <sys/policy.h>
-#include <sys/iphada.h>
 #include <sys/strsun.h>
 
 #include <sys/crypto/common.h>
@@ -132,31 +133,26 @@ static	ipsecahparam_t	lcl_param_arr[] = {
 #define	AH_MSGSIZE(mp) ((mp)->b_cont != NULL ? msgdsize(mp) : MBLKL(mp))
 
 
-static ipsec_status_t ah_auth_out_done(mblk_t *);
-static ipsec_status_t ah_auth_in_done(mblk_t *);
+static mblk_t *ah_auth_out_done(mblk_t *, ip_xmit_attr_t *, ipsec_crypto_t *);
+static mblk_t *ah_auth_in_done(mblk_t *, ip_recv_attr_t *, ipsec_crypto_t *);
 static mblk_t *ah_process_ip_options_v4(mblk_t *, ipsa_t *, int *, uint_t,
     boolean_t, ipsecah_stack_t *);
 static mblk_t *ah_process_ip_options_v6(mblk_t *, ipsa_t *, int *, uint_t,
     boolean_t, ipsecah_stack_t *);
 static void ah_getspi(mblk_t *, keysock_in_t *, ipsecah_stack_t *);
-static ipsec_status_t ah_inbound_accelerated(mblk_t *, boolean_t, ipsa_t *,
-    uint32_t);
-static ipsec_status_t ah_outbound_accelerated_v4(mblk_t *, ipsa_t *);
-static ipsec_status_t ah_outbound_accelerated_v6(mblk_t *, ipsa_t *);
-static ipsec_status_t ah_outbound(mblk_t *);
+static void ah_inbound_restart(mblk_t *, ip_recv_attr_t *);
+
+static mblk_t *ah_outbound(mblk_t *, ip_xmit_attr_t *);
+static void ah_outbound_finish(mblk_t *, ip_xmit_attr_t *);
 
 static int ipsecah_open(queue_t *, dev_t *, int, int, cred_t *);
 static int ipsecah_close(queue_t *);
-static void ipsecah_rput(queue_t *, mblk_t *);
 static void ipsecah_wput(queue_t *, mblk_t *);
 static void ah_send_acquire(ipsacq_t *, mblk_t *, netstack_t *);
 static boolean_t ah_register_out(uint32_t, uint32_t, uint_t, ipsecah_stack_t *,
-    mblk_t *);
+    cred_t *);
 static void	*ipsecah_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ipsecah_stack_fini(netstackid_t stackid, void *arg);
-
-extern void (*cl_inet_getspi)(netstackid_t, uint8_t, uint8_t *, size_t,
-    void *);
 
 /* Setable in /etc/system */
 uint32_t ah_hash_size = IPSEC_DEFAULT_HASH_SIZE;
@@ -168,7 +164,7 @@ static struct module_info info = {
 };
 
 static struct qinit rinit = {
-	(pfi_t)ipsecah_rput, NULL, ipsecah_open, ipsecah_close, NULL, &info,
+	(pfi_t)putnext, NULL, ipsecah_open, ipsecah_close, NULL, &info,
 	NULL
 };
 
@@ -215,9 +211,6 @@ ah_kstat_init(ipsecah_stack_t *ahstack, netstackid_t stackid)
 	KI(acquire_requests);
 	KI(bytes_expired);
 	KI(out_discards);
-	KI(in_accelerated);
-	KI(out_accelerated);
-	KI(noaccel);
 	KI(crypto_sync);
 	KI(crypto_async);
 	KI(crypto_failures);
@@ -275,9 +268,9 @@ ah_ager(void *arg)
 	hrtime_t begin = gethrtime();
 
 	sadb_ager(&ahstack->ah_sadb.s_v4, ahstack->ah_pfkey_q,
-	    ahstack->ah_sadb.s_ip_q, ahstack->ipsecah_reap_delay, ns);
+	    ahstack->ipsecah_reap_delay, ns);
 	sadb_ager(&ahstack->ah_sadb.s_v6, ahstack->ah_pfkey_q,
-	    ahstack->ah_sadb.s_ip_q, ahstack->ipsecah_reap_delay, ns);
+	    ahstack->ipsecah_reap_delay, ns);
 
 	ahstack->ah_event = sadb_retimeout(begin, ahstack->ah_pfkey_q,
 	    ah_ager, ahstack,
@@ -474,7 +467,13 @@ ipsecah_stack_fini(netstackid_t stackid, void *arg)
 }
 
 /*
- * AH module open routine. The module should be opened by keysock.
+ * AH module open routine, which is here for keysock plumbing.
+ * Keysock is pushed over {AH,ESP} which is an artifact from the Bad Old
+ * Days of export control, and fears that ESP would not be allowed
+ * to be shipped at all by default.  Eventually, keysock should
+ * either access AH and ESP via modstubs or krtld dependencies, or
+ * perhaps be folded in with AH and ESP into a single IPsec/netsec
+ * module ("netsec" if PF_KEY provides more than AH/ESP keying tables).
  */
 /* ARGSUSED */
 static int
@@ -497,57 +496,10 @@ ipsecah_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	ahstack = ns->netstack_ipsecah;
 	ASSERT(ahstack != NULL);
 
-	/*
-	 * ASSUMPTIONS (because I'm MT_OCEXCL):
-	 *
-	 *	* I'm being pushed on top of IP for all my opens (incl. #1).
-	 *	* Only ipsecah_open() can write into ah_sadb.s_ip_q.
-	 *	* Because of this, I can check lazily for ah_sadb.s_ip_q.
-	 *
-	 *  If these assumptions are wrong, I'm in BIG trouble...
-	 */
-
 	q->q_ptr = ahstack;
 	WR(q)->q_ptr = q->q_ptr;
 
-	if (ahstack->ah_sadb.s_ip_q == NULL) {
-		struct T_unbind_req *tur;
-
-		ahstack->ah_sadb.s_ip_q = WR(q);
-		/* Allocate an unbind... */
-		ahstack->ah_ip_unbind = allocb(sizeof (struct T_unbind_req),
-		    BPRI_HI);
-
-		/*
-		 * Send down T_BIND_REQ to bind IPPROTO_AH.
-		 * Handle the ACK here in AH.
-		 */
-		qprocson(q);
-		if (ahstack->ah_ip_unbind == NULL ||
-		    !sadb_t_bind_req(ahstack->ah_sadb.s_ip_q, IPPROTO_AH)) {
-			if (ahstack->ah_ip_unbind != NULL) {
-				freeb(ahstack->ah_ip_unbind);
-				ahstack->ah_ip_unbind = NULL;
-			}
-			q->q_ptr = NULL;
-			qprocsoff(q);
-			netstack_rele(ahstack->ipsecah_netstack);
-			return (ENOMEM);
-		}
-
-		ahstack->ah_ip_unbind->b_datap->db_type = M_PROTO;
-		tur = (struct T_unbind_req *)ahstack->ah_ip_unbind->b_rptr;
-		tur->PRIM_type = T_UNBIND_REQ;
-	} else {
-		qprocson(q);
-	}
-
-	/*
-	 * For now, there's not much I can do.  I'll be getting a message
-	 * passed down to me from keysock (in my wput), and a T_BIND_ACK
-	 * up from IP (in my rput).
-	 */
-
+	qprocson(q);
 	return (0);
 }
 
@@ -558,17 +510,6 @@ static int
 ipsecah_close(queue_t *q)
 {
 	ipsecah_stack_t	*ahstack = (ipsecah_stack_t *)q->q_ptr;
-
-	/*
-	 * If ah_sadb.s_ip_q is attached to this instance, send a
-	 * T_UNBIND_REQ to IP for the instance before doing
-	 * a qprocsoff().
-	 */
-	if (WR(q) == ahstack->ah_sadb.s_ip_q &&
-	    ahstack->ah_ip_unbind != NULL) {
-		putnext(WR(q), ahstack->ah_ip_unbind);
-		ahstack->ah_ip_unbind = NULL;
-	}
 
 	/*
 	 * Clean up q_ptr, if needed.
@@ -585,90 +526,8 @@ ipsecah_close(queue_t *q)
 		(void) quntimeout(q, ahstack->ah_event);
 	}
 
-	if (WR(q) == ahstack->ah_sadb.s_ip_q) {
-		/*
-		 * If the ah_sadb.s_ip_q is attached to this instance, find
-		 * another.  The OCEXCL outer perimeter helps us here.
-		 */
-
-		ahstack->ah_sadb.s_ip_q = NULL;
-
-		/*
-		 * Find a replacement queue for ah_sadb.s_ip_q.
-		 */
-		if (ahstack->ah_pfkey_q != NULL &&
-		    ahstack->ah_pfkey_q != RD(q)) {
-			/*
-			 * See if we can use the pfkey_q.
-			 */
-			ahstack->ah_sadb.s_ip_q = WR(ahstack->ah_pfkey_q);
-		}
-
-		if (ahstack->ah_sadb.s_ip_q == NULL ||
-		    !sadb_t_bind_req(ahstack->ah_sadb.s_ip_q, IPPROTO_AH)) {
-			ah1dbg(ahstack,
-			    ("ipsecah: Can't reassign ah_sadb.s_ip_q.\n"));
-			ahstack->ah_sadb.s_ip_q = NULL;
-		} else {
-			ahstack->ah_ip_unbind =
-			    allocb(sizeof (struct T_unbind_req), BPRI_HI);
-
-			if (ahstack->ah_ip_unbind != NULL) {
-				struct T_unbind_req *tur;
-
-				ahstack->ah_ip_unbind->b_datap->db_type =
-				    M_PROTO;
-				tur = (struct T_unbind_req *)
-				    ahstack->ah_ip_unbind->b_rptr;
-				tur->PRIM_type = T_UNBIND_REQ;
-			}
-			/* If it's NULL, I can't do much here. */
-		}
-	}
-
 	netstack_rele(ahstack->ipsecah_netstack);
 	return (0);
-}
-
-/*
- * AH module read put routine.
- */
-/* ARGSUSED */
-static void
-ipsecah_rput(queue_t *q, mblk_t *mp)
-{
-	ipsecah_stack_t	*ahstack = (ipsecah_stack_t *)q->q_ptr;
-
-	ASSERT(mp->b_datap->db_type != M_CTL);	/* No more IRE_DB_REQ. */
-
-	switch (mp->b_datap->db_type) {
-	case M_PROTO:
-	case M_PCPROTO:
-		/* TPI message of some sort. */
-		switch (*((t_scalar_t *)mp->b_rptr)) {
-		case T_BIND_ACK:
-			/* We expect this. */
-			ah3dbg(ahstack,
-			    ("Thank you IP from AH for T_BIND_ACK\n"));
-			break;
-		case T_ERROR_ACK:
-			cmn_err(CE_WARN,
-			    "ipsecah:  AH received T_ERROR_ACK from IP.");
-			break;
-		case T_OK_ACK:
-			/* Probably from a (rarely sent) T_UNBIND_REQ. */
-			break;
-		default:
-			ah1dbg(ahstack, ("Unknown M_{,PC}PROTO message.\n"));
-		}
-		freemsg(mp);
-		break;
-	default:
-		/* For now, passthru message. */
-		ah2dbg(ahstack, ("AH got unknown mblk type %d.\n",
-		    mp->b_datap->db_type));
-		putnext(q, mp);
-	}
 }
 
 /*
@@ -676,7 +535,7 @@ ipsecah_rput(queue_t *q, mblk_t *mp)
  */
 static boolean_t
 ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
-    ipsecah_stack_t *ahstack, mblk_t *in_mp)
+    ipsecah_stack_t *ahstack, cred_t *cr)
 {
 	mblk_t *mp;
 	boolean_t rc = B_TRUE;
@@ -691,7 +550,7 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	sadb_sens_t *sens;
 	size_t sens_len = 0;
 	sadb_ext_t *nextext;
-	cred_t *sens_cr = NULL;
+	ts_label_t *sens_tsl = NULL;
 
 	/* Allocate the KEYSOCK_OUT. */
 	mp = sadb_keysock_out(serial);
@@ -700,11 +559,10 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 		return (B_FALSE);
 	}
 
-	if (is_system_labeled() && (in_mp != NULL)) {
-		sens_cr = msg_getcred(in_mp, NULL);
-
-		if (sens_cr != NULL) {
-			sens_len = sadb_sens_len_from_cred(sens_cr);
+	if (is_system_labeled() && (cr != NULL)) {
+		sens_tsl = crgetlabel(cr);
+		if (sens_tsl != NULL) {
+			sens_len = sadb_sens_len_from_label(sens_tsl);
 			allocsize += sens_len;
 		}
 	}
@@ -786,10 +644,10 @@ ah_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 
 	mutex_exit(&ipss->ipsec_alg_lock);
 
-	if (sens_cr != NULL) {
+	if (sens_tsl != NULL) {
 		sens = (sadb_sens_t *)nextext;
-		sadb_sens_from_cred(sens, SADB_EXT_SENSITIVITY,
-		    sens_cr, sens_len);
+		sadb_sens_from_label(sens, SADB_EXT_SENSITIVITY,
+		    sens_tsl, sens_len);
 
 		nextext = (sadb_ext_t *)(((uint8_t *)sens) + sens_len);
 	}
@@ -847,40 +705,61 @@ ipsecah_algs_changed(netstack_t *ns)
 
 /*
  * Stub function that taskq_dispatch() invokes to take the mblk (in arg)
- * and put() it into AH and STREAMS again.
+ * and send it into AH and IP again.
  */
 static void
 inbound_task(void *arg)
 {
-	ah_t *ah;
-	mblk_t *mp = (mblk_t *)arg;
-	ipsec_in_t *ii = (ipsec_in_t *)mp->b_rptr;
-	int ipsec_rc;
-	netstack_t *ns;
+	mblk_t		*mp = (mblk_t *)arg;
+	mblk_t		*async_mp;
+	ip_recv_attr_t	iras;
+
+	async_mp = mp;
+	mp = async_mp->b_cont;
+	async_mp->b_cont = NULL;
+	if (!ip_recv_attr_from_mblk(async_mp, &iras)) {
+		/* The ill or ip_stack_t disappeared on us */
+		ip_drop_input("ip_recv_attr_from_mblk", mp, NULL);
+		freemsg(mp);
+		goto done;
+	}
+
+	ah_inbound_restart(mp, &iras);
+done:
+	ira_cleanup(&iras, B_TRUE);
+}
+
+/*
+ * Restart ESP after the SA has been added.
+ */
+static void
+ah_inbound_restart(mblk_t *mp, ip_recv_attr_t *ira)
+{
+	ah_t		*ah;
+	netstack_t	*ns;
 	ipsecah_stack_t	*ahstack;
 
-	ns = netstack_find_by_stackid(ii->ipsec_in_stackid);
-	if (ns == NULL || ns != ii->ipsec_in_ns) {
-		/* Just freemsg(). */
-		if (ns != NULL)
-			netstack_rele(ns);
-		freemsg(mp);
-		return;
-	}
-
+	ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ahstack = ns->netstack_ipsecah;
 
-	ah2dbg(ahstack, ("in AH inbound_task"));
-
 	ASSERT(ahstack != NULL);
-	ah = ipsec_inbound_ah_sa(mp, ns);
-	if (ah != NULL) {
-		ASSERT(ii->ipsec_in_ah_sa != NULL);
-		ipsec_rc = ii->ipsec_in_ah_sa->ipsa_input_func(mp, ah);
-		if (ipsec_rc == IPSEC_STATUS_SUCCESS)
-			ip_fanout_proto_again(mp, NULL, NULL, NULL);
+	mp = ipsec_inbound_ah_sa(mp, ira, &ah);
+	if (mp == NULL)
+		return;
+
+	ASSERT(ah != NULL);
+	ASSERT(ira->ira_flags & IRAF_IPSEC_SECURE);
+	ASSERT(ira->ira_ipsec_ah_sa != NULL);
+
+	mp = ira->ira_ipsec_ah_sa->ipsa_input_func(mp, ah, ira);
+	if (mp == NULL) {
+		/*
+		 * Either it failed or is pending. In the former case
+		 * ipIfStatsInDiscards was increased.
+		 */
+		return;
 	}
-	netstack_rele(ns);
+	ip_input_post_ipsec(mp, ira);
 }
 
 /*
@@ -1051,60 +930,96 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	if (larval != NULL)
 		lpkt = sadb_clear_lpkt(larval);
 
-	rc = sadb_common_add(ahstack->ah_sadb.s_ip_q, ahstack->ah_pfkey_q, mp,
+	rc = sadb_common_add(ahstack->ah_pfkey_q, mp,
 	    samsg, ksi, primary, secondary, larval, clone, is_inbound,
 	    diagnostic, ns, &ahstack->ah_sadb);
 
-	/*
-	 * How much more stack will I create with all of these
-	 * ah_inbound_* and ah_outbound_*() calls?
-	 */
-
-	if (rc == 0 && lpkt != NULL)
-		rc = !taskq_dispatch(ah_taskq, inbound_task, lpkt, TQ_NOSLEEP);
-
-	if (rc != 0) {
-		ip_drop_packet(lpkt, B_TRUE, NULL, NULL,
-		    DROPPER(ipss, ipds_sadb_inlarval_timeout),
-		    &ahstack->ah_dropper);
+	if (lpkt != NULL) {
+		if (rc == 0) {
+			rc = !taskq_dispatch(ah_taskq, inbound_task, lpkt,
+			    TQ_NOSLEEP);
+		}
+		if (rc != 0) {
+			lpkt = ip_recv_attr_free_mblk(lpkt);
+			ip_drop_packet(lpkt, B_TRUE, NULL,
+			    DROPPER(ipss, ipds_sadb_inlarval_timeout),
+			    &ahstack->ah_dropper);
+		}
 	}
 
+	/*
+	 * How much more stack will I create with all of these
+	 * ah_outbound_*() calls?
+	 */
+
+	/* Handle the packets queued waiting for the SA */
 	while (acq_msgs != NULL) {
-		mblk_t *mp = acq_msgs;
+		mblk_t		*asyncmp;
+		mblk_t		*data_mp;
+		ip_xmit_attr_t	ixas;
+		ill_t		*ill;
 
+		asyncmp = acq_msgs;
 		acq_msgs = acq_msgs->b_next;
-		mp->b_next = NULL;
-		if (rc == 0) {
-			ipsec_out_t *io = (ipsec_out_t *)mp->b_rptr;
+		asyncmp->b_next = NULL;
 
-			ASSERT(ahstack->ah_sadb.s_ip_q != NULL);
-			if (ipsec_outbound_sa(mp, IPPROTO_AH)) {
-				io->ipsec_out_ah_done = B_TRUE;
-				if (ah_outbound(mp) == IPSEC_STATUS_SUCCESS) {
-					ipha_t *ipha = (ipha_t *)
-					    mp->b_cont->b_rptr;
-					if (sq.af == AF_INET) {
-						ip_wput_ipsec_out(NULL, mp,
-						    ipha, NULL, NULL);
-					} else {
-						ip6_t *ip6h = (ip6_t *)ipha;
-
-						ASSERT(sq.af == AF_INET6);
-
-						ip_wput_ipsec_out_v6(NULL,
-						    mp, ip6h, NULL, NULL);
-					}
-				}
-				continue;
-			}
+		/*
+		 * Extract the ip_xmit_attr_t from the first mblk.
+		 * Verifies that the netstack and ill is still around; could
+		 * have vanished while iked was doing its work.
+		 * On succesful return we have a nce_t and the ill/ipst can't
+		 * disappear until we do the nce_refrele in ixa_cleanup.
+		 */
+		data_mp = asyncmp->b_cont;
+		asyncmp->b_cont = NULL;
+		if (!ip_xmit_attr_from_mblk(asyncmp, &ixas)) {
+			AH_BUMP_STAT(ahstack, out_discards);
+			ip_drop_packet(data_mp, B_FALSE, NULL,
+			    DROPPER(ipss, ipds_sadb_acquire_timeout),
+			    &ahstack->ah_dropper);
+		} else if (rc != 0) {
+			ill = ixas.ixa_nce->nce_ill;
+			AH_BUMP_STAT(ahstack, out_discards);
+			ip_drop_packet(data_mp, B_FALSE, ill,
+			    DROPPER(ipss, ipds_sadb_acquire_timeout),
+			    &ahstack->ah_dropper);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		} else {
+			ah_outbound_finish(data_mp, &ixas);
 		}
-		AH_BUMP_STAT(ahstack, out_discards);
-		ip_drop_packet(mp, B_FALSE, NULL, NULL,
-		    DROPPER(ipss, ipds_sadb_acquire_timeout),
-		    &ahstack->ah_dropper);
+		ixa_cleanup(&ixas);
 	}
 
 	return (rc);
+}
+
+
+/*
+ * Process one of the queued messages (from ipsacq_mp) once the SA
+ * has been added.
+ */
+static void
+ah_outbound_finish(mblk_t *data_mp, ip_xmit_attr_t *ixa)
+{
+	netstack_t	*ns = ixa->ixa_ipst->ips_netstack;
+	ipsecah_stack_t *ahstack = ns->netstack_ipsecah;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ill_t		*ill = ixa->ixa_nce->nce_ill;
+
+	if (!ipsec_outbound_sa(data_mp, ixa, IPPROTO_AH)) {
+		AH_BUMP_STAT(ahstack, out_discards);
+		ip_drop_packet(data_mp, B_FALSE, ill,
+		    DROPPER(ipss, ipds_sadb_acquire_timeout),
+		    &ahstack->ah_dropper);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		return;
+	}
+
+	data_mp = ah_outbound(data_mp, ixa);
+	if (data_mp == NULL)
+		return;
+
+	(void) ip_output_post_ipsec(data_mp, ixa);
 }
 
 /*
@@ -1300,8 +1215,7 @@ ah_del_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 		}
 		return (sadb_purge_sa(mp, ksi,
 		    (sin->sin_family == AF_INET6) ? &ahstack->ah_sadb.s_v6 :
-		    &ahstack->ah_sadb.s_v4, diagnostic, ahstack->ah_pfkey_q,
-		    ahstack->ah_sadb.s_ip_q));
+		    &ahstack->ah_sadb.s_v4, diagnostic, ahstack->ah_pfkey_q));
 	}
 
 	return (sadb_delget_sa(mp, ksi, &ahstack->ah_sadb, diagnostic,
@@ -1449,7 +1363,7 @@ ah_parse_pfkey(mblk_t *mp, ipsecah_stack_t *ahstack)
 		 * Keysock takes care of the PF_KEY bookkeeping for this.
 		 */
 		if (ah_register_out(samsg->sadb_msg_seq, samsg->sadb_msg_pid,
-		    ksi->ks_in_serial, ahstack, mp)) {
+		    ksi->ks_in_serial, ahstack, msg_getcred(mp, NULL))) {
 			freemsg(mp);
 		} else {
 			/*
@@ -1534,8 +1448,7 @@ ah_keysock_no_socket(mblk_t *mp, ipsecah_stack_t *ahstack)
 		samsg->sadb_msg_errno = kse->ks_err_errno;
 		samsg->sadb_msg_len = SADB_8TO64(sizeof (*samsg));
 		/*
-		 * Use the write-side of the ah_pfkey_q, in case there is
-		 * no ahstack->ah_sadb.s_ip_q.
+		 * Use the write-side of the ah_pfkey_q
 		 */
 		sadb_in_acquire(samsg, &ahstack->ah_sadb,
 		    WR(ahstack->ah_pfkey_q), ahstack->ipsecah_netstack);
@@ -1825,22 +1738,15 @@ ah_age_bytes(ipsa_t *assoc, uint64_t bytes, boolean_t inbound)
  * Called while holding the algorithm lock.
  */
 static void
-ah_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs)
+ah_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs,
+    netstack_t *ns)
 {
 	sadb_comb_t *comb = (sadb_comb_t *)(prop + 1);
-	ipsec_out_t *io;
 	ipsec_action_t *ap;
 	ipsec_prot_t *prot;
-	ipsecah_stack_t	*ahstack;
-	netstack_t	*ns;
-	ipsec_stack_t	*ipss;
+	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	io = (ipsec_out_t *)acqrec->ipsacq_mp->b_rptr;
-	ASSERT(io->ipsec_out_type == IPSEC_OUT);
-
-	ns = io->ipsec_out_ns;
-	ipss = ns->netstack_ipsec;
-	ahstack = ns->netstack_ipsecah;
 	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
 
 	prop->sadb_prop_exttype = SADB_EXT_PROPOSAL;
@@ -1851,9 +1757,9 @@ ah_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs)
 
 	/*
 	 * Based upon algorithm properties, and what-not, prioritize a
-	 * proposal, based on the ordering of the ah algorithms in the
-	 * alternatives presented in the policy rule passed down
-	 * through the ipsec_out_t and attached to the acquire record.
+	 * proposal, based on the ordering of the AH algorithms in the
+	 * alternatives in the policy rule or socket that was placed
+	 * in the acquire record.
 	 */
 
 	for (ap = acqrec->ipsacq_act; ap != NULL;
@@ -1961,7 +1867,7 @@ ah_send_acquire(ipsacq_t *acqrec, mblk_t *extended, netstack_t *ns)
 	/* Insert proposal here. */
 
 	prop = (sadb_prop_t *)(((uint64_t *)samsg) + samsg->sadb_msg_len);
-	ah_insert_prop(prop, acqrec, combs);
+	ah_insert_prop(prop, acqrec, combs, ns);
 	samsg->sadb_msg_len += prop->sadb_prop_len;
 	msgmp->b_wptr += SADB_64TO8(samsg->sadb_msg_len);
 
@@ -2117,11 +2023,12 @@ ah_getspi(mblk_t *mp, keysock_in_t *ksi, ipsecah_stack_t *ahstack)
 /*
  * IPv6 sends up the ICMP errors for validation and the removal of the AH
  * header.
+ * If succesful, the mp has been modified to not include the AH header so
+ * that the caller can fanout to the ULP's icmp error handler.
  */
-static ipsec_status_t
-ah_icmp_error_v6(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
+static mblk_t *
+ah_icmp_error_v6(mblk_t *mp, ip_recv_attr_t *ira, ipsecah_stack_t *ahstack)
 {
-	mblk_t *mp;
 	ip6_t *ip6h, *oip6h;
 	uint16_t hdr_length, ah_length;
 	uint8_t *nexthdrp;
@@ -2131,14 +2038,6 @@ ah_icmp_error_v6(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 	ipsa_t *assoc;
 	uint8_t *post_ah_ptr;
 	ipsec_stack_t	*ipss = ahstack->ipsecah_netstack->netstack_ipsec;
-
-	mp = ipsec_mp->b_cont;
-	ASSERT(mp->b_datap->db_type == M_CTL);
-
-	/*
-	 * Change the type to M_DATA till we finish pullups.
-	 */
-	mp->b_datap->db_type = M_DATA;
 
 	/*
 	 * Eat the cost of a pullupmsg() for now.  It makes the rest of this
@@ -2150,10 +2049,10 @@ ah_icmp_error_v6(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 	    mp->b_rptr + hdr_length + sizeof (icmp6_t) + sizeof (ip6_t) +
 	    sizeof (ah_t) > mp->b_wptr) {
 		IP_AH_BUMP_STAT(ipss, in_discards);
-		ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
+		ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_ah_nomem),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		return (NULL);
 	}
 
 	oip6h = (ip6_t *)mp->b_rptr;
@@ -2161,10 +2060,10 @@ ah_icmp_error_v6(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 	ip6h = (ip6_t *)(icmp6 + 1);
 	if (!ip_hdr_length_nexthdr_v6(mp, ip6h, &hdr_length, &nexthdrp)) {
 		IP_AH_BUMP_STAT(ipss, in_discards);
-		ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
+		ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_ah_bad_v6_hdrs),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		return (NULL);
 	}
 	ah = (ah_t *)((uint8_t *)ip6h + hdr_length);
 
@@ -2186,10 +2085,10 @@ ah_icmp_error_v6(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 			    ah->ah_spi, &oip6h->ip6_src, AF_INET6,
 			    ahstack->ipsecah_netstack);
 		}
-		ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
+		ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_ah_no_sa),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		return (NULL);
 	}
 
 	IPSA_REFRELE(assoc);
@@ -2208,10 +2107,10 @@ ah_icmp_error_v6(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 
 	if (post_ah_ptr > mp->b_wptr) {
 		IP_AH_BUMP_STAT(ipss, in_discards);
-		ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
+		ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_ah_bad_length),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		return (NULL);
 	}
 
 	ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) - ah_length);
@@ -2219,20 +2118,19 @@ ah_icmp_error_v6(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 	ovbcopy(post_ah_ptr, ah,
 	    (size_t)((uintptr_t)mp->b_wptr - (uintptr_t)post_ah_ptr));
 	mp->b_wptr -= ah_length;
-	/* Rewhack to be an ICMP error. */
-	mp->b_datap->db_type = M_CTL;
 
-	return (IPSEC_STATUS_SUCCESS);
+	return (mp);
 }
 
 /*
  * IP sends up the ICMP errors for validation and the removal of
  * the AH header.
+ * If succesful, the mp has been modified to not include the AH header so
+ * that the caller can fanout to the ULP's icmp error handler.
  */
-static ipsec_status_t
-ah_icmp_error_v4(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
+static mblk_t *
+ah_icmp_error_v4(mblk_t *mp, ip_recv_attr_t *ira, ipsecah_stack_t *ahstack)
 {
-	mblk_t *mp;
 	mblk_t *mp1;
 	icmph_t *icmph;
 	int iph_hdr_length;
@@ -2247,14 +2145,6 @@ ah_icmp_error_v4(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 	int alloc_size;
 	uint8_t nexthdr;
 	ipsec_stack_t	*ipss = ahstack->ipsecah_netstack->netstack_ipsec;
-
-	mp = ipsec_mp->b_cont;
-	ASSERT(mp->b_datap->db_type == M_CTL);
-
-	/*
-	 * Change the type to M_DATA till we finish pullups.
-	 */
-	mp->b_datap->db_type = M_DATA;
 
 	oipha = ipha = (ipha_t *)mp->b_rptr;
 	iph_hdr_length = IPH_HDR_LENGTH(ipha);
@@ -2274,10 +2164,10 @@ ah_icmp_error_v4(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 			    SL_WARN | SL_ERROR,
 			    "ICMP error: Small AH header\n");
 			IP_AH_BUMP_STAT(ipss, in_discards);
-			ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
+			ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 			    DROPPER(ipss, ipds_ah_bad_length),
 			    &ahstack->ah_dropper);
-			return (IPSEC_STATUS_FAILED);
+			return (NULL);
 		}
 		icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 		ipha = (ipha_t *)&icmph[1];
@@ -2304,10 +2194,10 @@ ah_icmp_error_v4(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 			    ah->ah_spi, &oipha->ipha_src, AF_INET,
 			    ahstack->ipsecah_netstack);
 		}
-		ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
+		ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_ah_no_sa),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		return (NULL);
 	}
 
 	IPSA_REFRELE(assoc);
@@ -2343,10 +2233,10 @@ ah_icmp_error_v4(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 			 * We tried hard, give up now.
 			 */
 			IP_AH_BUMP_STAT(ipss, in_discards);
-			ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
+			ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 			    DROPPER(ipss, ipds_ah_nomem),
 			    &ahstack->ah_dropper);
-			return (IPSEC_STATUS_FAILED);
+			return (NULL);
 		}
 		icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 		ipha = (ipha_t *)&icmph[1];
@@ -2354,8 +2244,8 @@ ah_icmp_error_v4(mblk_t *ipsec_mp, ipsecah_stack_t *ahstack)
 done:
 	/*
 	 * Remove the AH header and change the protocol.
-	 * Don't update the spi fields in the ipsec_in
-	 * message as we are called just to validate the
+	 * Don't update the spi fields in the ip_recv_attr_t
+	 * as we are called just to validate the
 	 * message attached to the ICMP message.
 	 *
 	 * If we never pulled up since all of the message
@@ -2368,14 +2258,11 @@ done:
 
 	if ((mp1 = allocb(alloc_size, BPRI_LO)) == NULL) {
 		IP_AH_BUMP_STAT(ipss, in_discards);
-		ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
+		ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_ah_nomem),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		return (NULL);
 	}
-	/* ICMP errors are M_CTL messages */
-	mp1->b_datap->db_type = M_CTL;
-	ipsec_mp->b_cont = mp1;
 	bcopy(mp->b_rptr, mp1->b_rptr, alloc_size);
 	mp1->b_wptr += alloc_size;
 
@@ -2402,24 +2289,23 @@ done:
 	ipha->ipha_hdr_checksum = 0;
 	ipha->ipha_hdr_checksum = (uint16_t)ip_csum_hdr(ipha);
 
-	return (IPSEC_STATUS_SUCCESS);
+	return (mp1);
 }
 
 /*
  * IP calls this to validate the ICMP errors that
  * we got from the network.
  */
-ipsec_status_t
-ipsecah_icmp_error(mblk_t *mp)
+mblk_t *
+ipsecah_icmp_error(mblk_t *data_mp, ip_recv_attr_t *ira)
 {
-	ipsec_in_t *ii = (ipsec_in_t *)mp->b_rptr;
-	netstack_t	*ns = ii->ipsec_in_ns;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
 
-	if (ii->ipsec_in_v4)
-		return (ah_icmp_error_v4(mp, ahstack));
+	if (ira->ira_flags & IRAF_IS_IPV4)
+		return (ah_icmp_error_v4(data_mp, ira, ahstack));
 	else
-		return (ah_icmp_error_v6(mp, ahstack));
+		return (ah_icmp_error_v6(data_mp, ira, ahstack));
 }
 
 static int
@@ -2546,7 +2432,7 @@ ah_fix_phdr_v6(ip6_t *ip6h, ip6_t *oip6h, boolean_t outbound,
 	prev_nexthdr = (uint8_t *)&ip6h->ip6_nxt;
 	nexthdr = oip6h->ip6_nxt;
 	/* Assume IP has already stripped it */
-	ASSERT(nexthdr != IPPROTO_FRAGMENT && nexthdr != IPPROTO_RAW);
+	ASSERT(nexthdr != IPPROTO_FRAGMENT);
 	ah = NULL;
 	dsthdr = NULL;
 	for (;;) {
@@ -2741,19 +2627,19 @@ ah_finish_up(ah_t *phdr_ah, ah_t *inbound_ah, ipsa_t *assoc,
  * argument is freed.
  */
 static void
-ah_log_bad_auth(mblk_t *ipsec_in)
+ah_log_bad_auth(mblk_t *mp, ip_recv_attr_t *ira, ipsec_crypto_t *ic)
 {
-	mblk_t *mp = ipsec_in->b_cont->b_cont;
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_in->b_rptr;
-	boolean_t isv4 = ii->ipsec_in_v4;
-	ipsa_t *assoc = ii->ipsec_in_ah_sa;
-	int af;
-	void *addr;
-	netstack_t	*ns = ii->ipsec_in_ns;
+	boolean_t	isv4 = (ira->ira_flags & IRAF_IS_IPV4);
+	ipsa_t		*assoc = ira->ira_ipsec_ah_sa;
+	int		af;
+	void		*addr;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	mp->b_rptr -= ii->ipsec_in_skip_len;
+	ASSERT(mp->b_datap->db_type == M_DATA);
+
+	mp->b_rptr -= ic->ic_skip_len;
 
 	if (isv4) {
 		ipha_t *ipha = (ipha_t *)mp->b_rptr;
@@ -2776,110 +2662,163 @@ ah_log_bad_auth(mblk_t *ipsec_in)
 	    assoc->ipsa_spi, addr, af, ahstack->ipsecah_netstack);
 
 	IP_AH_BUMP_STAT(ipss, in_discards);
-	ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL,
+	ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 	    DROPPER(ipss, ipds_ah_bad_auth),
 	    &ahstack->ah_dropper);
 }
 
 /*
  * Kernel crypto framework callback invoked after completion of async
- * crypto requests.
+ * crypto requests for outbound packets.
  */
 static void
-ah_kcf_callback(void *arg, int status)
+ah_kcf_callback_outbound(void *arg, int status)
 {
-	mblk_t *ipsec_mp = (mblk_t *)arg;
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-	boolean_t is_inbound = (ii->ipsec_in_type == IPSEC_IN);
-	netstackid_t	stackid;
-	netstack_t	*ns, *ns_arg;
+	mblk_t		*mp = (mblk_t *)arg;
+	mblk_t		*async_mp;
+	netstack_t	*ns;
 	ipsec_stack_t	*ipss;
 	ipsecah_stack_t	*ahstack;
-	ipsec_out_t	*io = (ipsec_out_t *)ii;
+	mblk_t		*data_mp;
+	ip_xmit_attr_t	ixas;
+	ipsec_crypto_t	*ic;
+	ill_t		*ill;
 
-	ASSERT(ipsec_mp->b_cont != NULL);
-
-	if (is_inbound) {
-		stackid = ii->ipsec_in_stackid;
-		ns_arg = ii->ipsec_in_ns;
-	} else {
-		stackid = io->ipsec_out_stackid;
-		ns_arg = io->ipsec_out_ns;
-	}
 	/*
-	 * Verify that the netstack is still around; could have vanished
-	 * while kEf was doing its work.
+	 * First remove the ipsec_crypto_t mblk
+	 * Note that we need to ipsec_free_crypto_data(mp) once done with ic.
 	 */
-	ns = netstack_find_by_stackid(stackid);
-	if (ns == NULL || ns != ns_arg) {
-		/* Disappeared on us */
-		if (ns != NULL)
-			netstack_rele(ns);
-		freemsg(ipsec_mp);
-		return;
-	}
+	async_mp = ipsec_remove_crypto_data(mp, &ic);
+	ASSERT(async_mp != NULL);
 
+	/*
+	 * Extract the ip_xmit_attr_t from the first mblk.
+	 * Verifies that the netstack and ill is still around; could
+	 * have vanished while kEf was doing its work.
+	 * On succesful return we have a nce_t and the ill/ipst can't
+	 * disappear until we do the nce_refrele in ixa_cleanup.
+	 */
+	data_mp = async_mp->b_cont;
+	async_mp->b_cont = NULL;
+	if (!ip_xmit_attr_from_mblk(async_mp, &ixas)) {
+		/* Disappeared on us - no ill/ipst for MIB */
+		if (ixas.ixa_nce != NULL) {
+			ill = ixas.ixa_nce->nce_ill;
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			ip_drop_output("ipIfStatsOutDiscards", data_mp, ill);
+		}
+		freemsg(data_mp);
+		goto done;
+	}
+	ns = ixas.ixa_ipst->ips_netstack;
+	ahstack = ns->netstack_ipsecah;
+	ipss = ns->netstack_ipsec;
+	ill = ixas.ixa_nce->nce_ill;
+
+	if (status == CRYPTO_SUCCESS) {
+		data_mp = ah_auth_out_done(data_mp, &ixas, ic);
+		if (data_mp == NULL)
+			goto done;
+
+		(void) ip_output_post_ipsec(data_mp, &ixas);
+	} else {
+		/* Outbound shouldn't see invalid MAC */
+		ASSERT(status != CRYPTO_INVALID_MAC);
+
+		ah1dbg(ahstack,
+		    ("ah_kcf_callback_outbound: crypto failed with 0x%x\n",
+		    status));
+		AH_BUMP_STAT(ahstack, crypto_failures);
+		AH_BUMP_STAT(ahstack, out_discards);
+
+		ip_drop_packet(data_mp, B_FALSE, ill,
+		    DROPPER(ipss, ipds_ah_crypto_failed),
+		    &ahstack->ah_dropper);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+	}
+done:
+	ixa_cleanup(&ixas);
+	(void) ipsec_free_crypto_data(mp);
+}
+
+/*
+ * Kernel crypto framework callback invoked after completion of async
+ * crypto requests for inbound packets.
+ */
+static void
+ah_kcf_callback_inbound(void *arg, int status)
+{
+	mblk_t		*mp = (mblk_t *)arg;
+	mblk_t		*async_mp;
+	netstack_t	*ns;
+	ipsec_stack_t	*ipss;
+	ipsecah_stack_t	*ahstack;
+	mblk_t		*data_mp;
+	ip_recv_attr_t	iras;
+	ipsec_crypto_t	*ic;
+
+	/*
+	 * First remove the ipsec_crypto_t mblk
+	 * Note that we need to ipsec_free_crypto_data(mp) once done with ic.
+	 */
+	async_mp = ipsec_remove_crypto_data(mp, &ic);
+	ASSERT(async_mp != NULL);
+
+	/*
+	 * Extract the ip_xmit_attr_t from the first mblk.
+	 * Verifies that the netstack and ill is still around; could
+	 * have vanished while kEf was doing its work.
+	 */
+	data_mp = async_mp->b_cont;
+	async_mp->b_cont = NULL;
+	if (!ip_recv_attr_from_mblk(async_mp, &iras)) {
+		/* The ill or ip_stack_t disappeared on us */
+		ip_drop_input("ip_recv_attr_from_mblk", data_mp, NULL);
+		freemsg(data_mp);
+		goto done;
+	}
+	ns = iras.ira_ill->ill_ipst->ips_netstack;
 	ahstack = ns->netstack_ipsecah;
 	ipss = ns->netstack_ipsec;
 
 	if (status == CRYPTO_SUCCESS) {
-		if (is_inbound) {
-			if (ah_auth_in_done(ipsec_mp) != IPSEC_STATUS_SUCCESS) {
-				netstack_rele(ns);
-				return;
-			}
-			/* finish IPsec processing */
-			ip_fanout_proto_again(ipsec_mp, NULL, NULL, NULL);
-		} else {
-			ipha_t *ipha;
+		data_mp = ah_auth_in_done(data_mp, &iras, ic);
+		if (data_mp == NULL)
+			goto done;
 
-			if (ah_auth_out_done(ipsec_mp) !=
-			    IPSEC_STATUS_SUCCESS) {
-				netstack_rele(ns);
-				return;
-			}
-
-			/* finish IPsec processing */
-			ipha = (ipha_t *)ipsec_mp->b_cont->b_rptr;
-			if (IPH_HDR_VERSION(ipha) == IP_VERSION) {
-				ip_wput_ipsec_out(NULL, ipsec_mp, ipha, NULL,
-				    NULL);
-			} else {
-				ip6_t *ip6h = (ip6_t *)ipha;
-				ip_wput_ipsec_out_v6(NULL, ipsec_mp, ip6h,
-				    NULL, NULL);
-			}
-		}
+		/* finish IPsec processing */
+		ip_input_post_ipsec(data_mp, &iras);
 
 	} else if (status == CRYPTO_INVALID_MAC) {
-		ah_log_bad_auth(ipsec_mp);
+		ah_log_bad_auth(data_mp, &iras, ic);
 	} else {
-		ah1dbg(ahstack, ("ah_kcf_callback: crypto failed with 0x%x\n",
+		ah1dbg(ahstack,
+		    ("ah_kcf_callback_inbound: crypto failed with 0x%x\n",
 		    status));
 		AH_BUMP_STAT(ahstack, crypto_failures);
-		if (is_inbound)
-			IP_AH_BUMP_STAT(ipss, in_discards);
-		else
-			AH_BUMP_STAT(ahstack, out_discards);
-		ip_drop_packet(ipsec_mp, is_inbound, NULL, NULL,
+		IP_AH_BUMP_STAT(ipss, in_discards);
+		ip_drop_packet(data_mp, B_TRUE, iras.ira_ill,
 		    DROPPER(ipss, ipds_ah_crypto_failed),
 		    &ahstack->ah_dropper);
+		BUMP_MIB(iras.ira_ill->ill_ip_mib, ipIfStatsInDiscards);
 	}
-	netstack_rele(ns);
+done:
+	ira_cleanup(&iras, B_TRUE);
+	(void) ipsec_free_crypto_data(mp);
 }
 
 /*
  * Invoked on kernel crypto failure during inbound and outbound processing.
  */
 static void
-ah_crypto_failed(mblk_t *mp, boolean_t is_inbound, int kef_rc,
-    ipsecah_stack_t *ahstack)
+ah_crypto_failed(mblk_t *data_mp, boolean_t is_inbound, int kef_rc,
+    ill_t *ill, ipsecah_stack_t *ahstack)
 {
 	ipsec_stack_t	*ipss = ahstack->ipsecah_netstack->netstack_ipsec;
 
 	ah1dbg(ahstack, ("crypto failed for %s AH with 0x%x\n",
 	    is_inbound ? "inbound" : "outbound", kef_rc));
-	ip_drop_packet(mp, is_inbound, NULL, NULL,
+	ip_drop_packet(data_mp, is_inbound, ill,
 	    DROPPER(ipss, ipds_ah_crypto_failed),
 	    &ahstack->ah_dropper);
 	AH_BUMP_STAT(ahstack, crypto_failures);
@@ -2893,14 +2832,14 @@ ah_crypto_failed(mblk_t *mp, boolean_t is_inbound, int kef_rc,
  * Helper macros for the ah_submit_req_{inbound,outbound}() functions.
  */
 
-#define	AH_INIT_CALLREQ(_cr, _ipss) {					\
-	(_cr)->cr_flag = CRYPTO_SKIP_REQID|CRYPTO_RESTRICTED;		\
-	if ((_ipss)->ipsec_algs_exec_mode[IPSEC_ALG_AUTH] == 		\
-	    IPSEC_ALGS_EXEC_ASYNC)					\
-		(_cr)->cr_flag |= CRYPTO_ALWAYS_QUEUE;			\
-	(_cr)->cr_callback_arg = ipsec_mp;				\
-	(_cr)->cr_callback_func = ah_kcf_callback;			\
-}
+/*
+ * A statement-equivalent macro, _cr MUST point to a modifiable
+ * crypto_call_req_t.
+ */
+#define	AH_INIT_CALLREQ(_cr, _mp, _callback)		\
+	(_cr)->cr_flag = CRYPTO_SKIP_REQID|CRYPTO_ALWAYS_QUEUE;	\
+	(_cr)->cr_callback_arg = (_mp);				\
+	(_cr)->cr_callback_func = (_callback)
 
 #define	AH_INIT_CRYPTO_DATA(data, msglen, mblk) {			\
 	(data)->cd_format = CRYPTO_DATA_MBLK;				\
@@ -2920,124 +2859,185 @@ ah_crypto_failed(mblk_t *mp, boolean_t is_inbound, int kef_rc,
 /*
  * Submit an inbound packet for processing by the crypto framework.
  */
-static ipsec_status_t
-ah_submit_req_inbound(mblk_t *ipsec_mp, size_t skip_len, uint32_t ah_offset,
-    ipsa_t *assoc)
+static mblk_t *
+ah_submit_req_inbound(mblk_t *phdr_mp, ip_recv_attr_t *ira,
+    size_t skip_len, uint32_t ah_offset, ipsa_t *assoc)
 {
 	int kef_rc;
-	mblk_t *phdr_mp;
-	crypto_call_req_t call_req;
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_mp->b_rptr;
+	mblk_t *mp;
+	crypto_call_req_t call_req, *callrp;
 	uint_t icv_len = assoc->ipsa_mac_len;
 	crypto_ctx_template_t ctx_tmpl;
-	netstack_t	*ns = ii->ipsec_in_ns;
-	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsecah_stack_t	*ahstack;
+	ipsec_crypto_t	*ic, icstack;
+	boolean_t force = (assoc->ipsa_flags & IPSA_F_ASYNC);
 
-	phdr_mp = ipsec_mp->b_cont;
+	ahstack = ira->ira_ill->ill_ipst->ips_netstack->netstack_ipsecah;
+
 	ASSERT(phdr_mp != NULL);
-	ASSERT(ii->ipsec_in_type == IPSEC_IN);
+	ASSERT(phdr_mp->b_datap->db_type == M_DATA);
 
-	/*
-	 * In case kEF queues and calls back, make sure we have the
-	 * netstackid_t for verification that the IP instance is still around
-	 * in esp_kcf_callback().
-	 */
-	ASSERT(ii->ipsec_in_stackid == ns->netstack_stackid);
+	if (force) {
+		/* We are doing asynch; allocate mblks to hold state */
+		if ((mp = ip_recv_attr_to_mblk(ira)) == NULL ||
+		    (mp = ipsec_add_crypto_data(mp, &ic)) == NULL) {
+			BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", phdr_mp,
+			    ira->ira_ill);
+			freemsg(phdr_mp);
+			return (NULL);
+		}
+
+		linkb(mp, phdr_mp);
+		callrp = &call_req;
+		AH_INIT_CALLREQ(callrp, mp, ah_kcf_callback_inbound);
+	} else {
+		/*
+		 * If we know we are going to do sync then ipsec_crypto_t
+		 * should be on the stack.
+		 */
+		ic = &icstack;
+		bzero(ic, sizeof (*ic));
+		callrp = NULL;
+	}
 
 	/* init arguments for the crypto framework */
-	AH_INIT_CRYPTO_DATA(&ii->ipsec_in_crypto_data, AH_MSGSIZE(phdr_mp),
+	AH_INIT_CRYPTO_DATA(&ic->ic_crypto_data, AH_MSGSIZE(phdr_mp),
 	    phdr_mp);
 
-	AH_INIT_CRYPTO_MAC(&ii->ipsec_in_crypto_mac, icv_len,
+	AH_INIT_CRYPTO_MAC(&ic->ic_crypto_mac, icv_len,
 	    (char *)phdr_mp->b_cont->b_rptr - skip_len + ah_offset +
 	    sizeof (ah_t));
 
-	AH_INIT_CALLREQ(&call_req, ipss);
-
-	ii->ipsec_in_skip_len = skip_len;
+	ic->ic_skip_len = skip_len;
 
 	IPSEC_CTX_TMPL(assoc, ipsa_authtmpl, IPSEC_ALG_AUTH, ctx_tmpl);
 
 	/* call KEF to do the MAC operation */
 	kef_rc = crypto_mac_verify(&assoc->ipsa_amech,
-	    &ii->ipsec_in_crypto_data, &assoc->ipsa_kcfauthkey, ctx_tmpl,
-	    &ii->ipsec_in_crypto_mac, &call_req);
+	    &ic->ic_crypto_data, &assoc->ipsa_kcfauthkey, ctx_tmpl,
+	    &ic->ic_crypto_mac, callrp);
 
 	switch (kef_rc) {
 	case CRYPTO_SUCCESS:
 		AH_BUMP_STAT(ahstack, crypto_sync);
-		return (ah_auth_in_done(ipsec_mp));
+		phdr_mp = ah_auth_in_done(phdr_mp, ira, ic);
+		if (force) {
+			/* Free mp after we are done with ic */
+			mp = ipsec_free_crypto_data(mp);
+			(void) ip_recv_attr_free_mblk(mp);
+		}
+		return (phdr_mp);
 	case CRYPTO_QUEUED:
-		/* ah_kcf_callback() will be invoked on completion */
+		/* ah_kcf_callback_inbound() will be invoked on completion */
 		AH_BUMP_STAT(ahstack, crypto_async);
-		return (IPSEC_STATUS_PENDING);
+		return (NULL);
 	case CRYPTO_INVALID_MAC:
+		/* Free mp after we are done with ic */
 		AH_BUMP_STAT(ahstack, crypto_sync);
-		ah_log_bad_auth(ipsec_mp);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+		ah_log_bad_auth(phdr_mp, ira, ic);
+		/* phdr_mp was passed to ip_drop_packet */
+		if (force) {
+			mp = ipsec_free_crypto_data(mp);
+			(void) ip_recv_attr_free_mblk(mp);
+		}
+		return (NULL);
 	}
 
-	ah_crypto_failed(ipsec_mp, B_TRUE, kef_rc, ahstack);
-	return (IPSEC_STATUS_FAILED);
+	if (force) {
+		mp = ipsec_free_crypto_data(mp);
+		phdr_mp = ip_recv_attr_free_mblk(mp);
+	}
+	BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+	ah_crypto_failed(phdr_mp, B_TRUE, kef_rc, ira->ira_ill, ahstack);
+	/* phdr_mp was passed to ip_drop_packet */
+	return (NULL);
 }
 
 /*
  * Submit an outbound packet for processing by the crypto framework.
  */
-static ipsec_status_t
-ah_submit_req_outbound(mblk_t *ipsec_mp, size_t skip_len, ipsa_t *assoc)
+static mblk_t *
+ah_submit_req_outbound(mblk_t *phdr_mp, ip_xmit_attr_t *ixa,
+    size_t skip_len, ipsa_t *assoc)
 {
 	int kef_rc;
-	mblk_t *phdr_mp;
-	crypto_call_req_t call_req;
-	ipsec_out_t *io = (ipsec_out_t *)ipsec_mp->b_rptr;
+	mblk_t *mp;
+	crypto_call_req_t call_req, *callrp;
 	uint_t icv_len = assoc->ipsa_mac_len;
-	netstack_t	*ns = io->ipsec_out_ns;
-	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsecah_stack_t	*ahstack;
+	ipsec_crypto_t	*ic, icstack;
+	ill_t		*ill = ixa->ixa_nce->nce_ill;
+	boolean_t force = (assoc->ipsa_flags & IPSA_F_ASYNC);
 
-	phdr_mp = ipsec_mp->b_cont;
+	ahstack = ill->ill_ipst->ips_netstack->netstack_ipsecah;
+
 	ASSERT(phdr_mp != NULL);
-	ASSERT(io->ipsec_out_type == IPSEC_OUT);
+	ASSERT(phdr_mp->b_datap->db_type == M_DATA);
 
-	/*
-	 * In case kEF queues and calls back, keep netstackid_t for
-	 * verification that the IP instance is still around in
-	 * ah_kcf_callback().
-	 */
-	io->ipsec_out_stackid = ns->netstack_stackid;
+	if (force) {
+		/* We are doing asynch; allocate mblks to hold state */
+		if ((mp = ip_xmit_attr_to_mblk(ixa)) == NULL ||
+		    (mp = ipsec_add_crypto_data(mp, &ic)) == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			ip_drop_output("ipIfStatsOutDiscards", phdr_mp, ill);
+			freemsg(phdr_mp);
+			return (NULL);
+		}
+		linkb(mp, phdr_mp);
+		callrp = &call_req;
+		AH_INIT_CALLREQ(callrp, mp, ah_kcf_callback_outbound);
+	} else {
+		/*
+		 * If we know we are going to do sync then ipsec_crypto_t
+		 * should be on the stack.
+		 */
+		ic = &icstack;
+		bzero(ic, sizeof (*ic));
+		callrp = NULL;
+	}
 
 	/* init arguments for the crypto framework */
-	AH_INIT_CRYPTO_DATA(&io->ipsec_out_crypto_data, AH_MSGSIZE(phdr_mp),
+	AH_INIT_CRYPTO_DATA(&ic->ic_crypto_data, AH_MSGSIZE(phdr_mp),
 	    phdr_mp);
 
-	AH_INIT_CRYPTO_MAC(&io->ipsec_out_crypto_mac, icv_len,
+	AH_INIT_CRYPTO_MAC(&ic->ic_crypto_mac, icv_len,
 	    (char *)phdr_mp->b_wptr);
 
-	AH_INIT_CALLREQ(&call_req, ipss);
+	ic->ic_skip_len = skip_len;
 
-	io->ipsec_out_skip_len = skip_len;
-
-	ASSERT(io->ipsec_out_ah_sa != NULL);
+	ASSERT(ixa->ixa_ipsec_ah_sa != NULL);
 
 	/* call KEF to do the MAC operation */
-	kef_rc = crypto_mac(&assoc->ipsa_amech, &io->ipsec_out_crypto_data,
+	kef_rc = crypto_mac(&assoc->ipsa_amech, &ic->ic_crypto_data,
 	    &assoc->ipsa_kcfauthkey, assoc->ipsa_authtmpl,
-	    &io->ipsec_out_crypto_mac, &call_req);
+	    &ic->ic_crypto_mac, callrp);
 
 	switch (kef_rc) {
 	case CRYPTO_SUCCESS:
 		AH_BUMP_STAT(ahstack, crypto_sync);
-		return (ah_auth_out_done(ipsec_mp));
+		phdr_mp = ah_auth_out_done(phdr_mp, ixa, ic);
+		if (force) {
+			/* Free mp after we are done with ic */
+			mp = ipsec_free_crypto_data(mp);
+			(void) ip_xmit_attr_free_mblk(mp);
+		}
+		return (phdr_mp);
 	case CRYPTO_QUEUED:
-		/* ah_kcf_callback() will be invoked on completion */
+		/* ah_kcf_callback_outbound() will be invoked on completion */
 		AH_BUMP_STAT(ahstack, crypto_async);
-		return (IPSEC_STATUS_PENDING);
+		return (NULL);
 	}
 
-	ah_crypto_failed(ipsec_mp, B_FALSE, kef_rc, ahstack);
-	return (IPSEC_STATUS_FAILED);
+	if (force) {
+		mp = ipsec_free_crypto_data(mp);
+		phdr_mp = ip_xmit_attr_free_mblk(mp);
+	}
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+	ah_crypto_failed(phdr_mp, B_FALSE, kef_rc, NULL, ahstack);
+	/* phdr_mp was passed to ip_drop_packet */
+	return (NULL);
 }
 
 /*
@@ -3056,7 +3056,6 @@ ah_process_ip_options_v6(mblk_t *mp, ipsa_t *assoc, int *length_to_skip,
 	uint_t	ah_align_sz;
 	uint_t ah_offset;
 	int hdr_size;
-	ipsec_stack_t	*ipss = ahstack->ipsecah_netstack->netstack_ipsec;
 
 	/*
 	 * Allocate space for the authentication data also. It is
@@ -3135,9 +3134,6 @@ ah_process_ip_options_v6(mblk_t *mp, ipsa_t *assoc, int *length_to_skip,
 
 		ah_offset = ah_fix_phdr_v6(ip6h, oip6h, outbound, B_FALSE);
 		if (ah_offset == 0) {
-			ip_drop_packet(phdr_mp, !outbound, NULL, NULL,
-			    DROPPER(ipss, ipds_ah_bad_v6_hdrs),
-			    &ahstack->ah_dropper);
 			return (NULL);
 		}
 	}
@@ -3375,65 +3371,67 @@ ah_hdr:
 /*
  * Authenticate an outbound datagram. This function is called
  * whenever IP sends an outbound datagram that needs authentication.
+ * Returns a modified packet if done. Returns NULL if error or queued.
+ * If error return then ipIfStatsOutDiscards has been increased.
  */
-static ipsec_status_t
-ah_outbound(mblk_t *ipsec_out)
+static mblk_t *
+ah_outbound(mblk_t *data_mp, ip_xmit_attr_t *ixa)
 {
-	mblk_t *mp;
 	mblk_t *phdr_mp;
-	ipsec_out_t *oi;
 	ipsa_t *assoc;
 	int length_to_skip;
 	uint_t ah_align_sz;
 	uint_t age_bytes;
-	netstack_t	*ns;
-	ipsec_stack_t	*ipss;
-	ipsecah_stack_t	*ahstack;
+	netstack_t	*ns = ixa->ixa_ipst->ips_netstack;
+	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ill_t		*ill = ixa->ixa_nce->nce_ill;
+	boolean_t	need_refrele = B_FALSE;
 
 	/*
 	 * Construct the chain of mblks
 	 *
-	 * IPSEC_OUT->PSEUDO_HDR->DATA
+	 * PSEUDO_HDR->DATA
 	 *
 	 * one by one.
 	 */
 
-	ASSERT(ipsec_out->b_datap->db_type == M_CTL);
-
-	ASSERT(MBLKL(ipsec_out) >= sizeof (ipsec_info_t));
-
-	mp = ipsec_out->b_cont;
-	oi = (ipsec_out_t *)ipsec_out->b_rptr;
-	ns = oi->ipsec_out_ns;
-	ipss = ns->netstack_ipsec;
-	ahstack = ns->netstack_ipsecah;
-
 	AH_BUMP_STAT(ahstack, out_requests);
 
-	ASSERT(mp->b_datap->db_type == M_DATA);
+	ASSERT(data_mp->b_datap->db_type == M_DATA);
 
-	assoc = oi->ipsec_out_ah_sa;
+	assoc = ixa->ixa_ipsec_ah_sa;
 	ASSERT(assoc != NULL);
 
 
 	/*
 	 * Get the outer IP header in shape to escape this system..
 	 */
-	if (is_system_labeled() && (assoc->ipsa_ocred != NULL)) {
-		int whack;
-
-		mblk_setcred(mp, assoc->ipsa_ocred, NOPID);
-		if (oi->ipsec_out_v4)
-			whack = sadb_whack_label(&mp, assoc);
-		else
-			whack = sadb_whack_label_v6(&mp, assoc);
-		if (whack != 0) {
-			ip_drop_packet(ipsec_out, B_FALSE, NULL,
-			    NULL, DROPPER(ipss, ipds_ah_nomem),
+	if (is_system_labeled() && (assoc->ipsa_otsl != NULL)) {
+		/*
+		 * Need to update packet with any CIPSO option and update
+		 * ixa_tsl to capture the new label.
+		 * We allocate a separate ixa for that purpose.
+		 */
+		ixa = ip_xmit_attr_duplicate(ixa);
+		if (ixa == NULL) {
+			ip_drop_packet(data_mp, B_FALSE, ill,
+			    DROPPER(ipss, ipds_ah_nomem),
 			    &ahstack->ah_dropper);
-			return (IPSEC_STATUS_FAILED);
+			return (NULL);
 		}
-		ipsec_out->b_cont = mp;
+		need_refrele = B_TRUE;
+
+		label_hold(assoc->ipsa_otsl);
+		ip_xmit_attr_replace_tsl(ixa, assoc->ipsa_otsl);
+
+		data_mp = sadb_whack_label(data_mp, assoc, ixa,
+		    DROPPER(ipss, ipds_ah_nomem), &ahstack->ah_dropper);
+		if (data_mp == NULL) {
+			/* Packet dropped by sadb_whack_label */
+			ixa_refrele(ixa);
+			return (NULL);
+		}
 	}
 
 	/*
@@ -3441,14 +3439,14 @@ ah_outbound(mblk_t *ipsec_out)
 	 * adding the AH header, ICV, and padding to the packet.
 	 */
 
-	if (oi->ipsec_out_v4) {
-		ipha_t *ipha = (ipha_t *)mp->b_rptr;
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
+		ipha_t *ipha = (ipha_t *)data_mp->b_rptr;
 		ah_align_sz = P2ALIGN(assoc->ipsa_mac_len +
 		    IPV4_PADDING_ALIGN - 1, IPV4_PADDING_ALIGN);
 		age_bytes = ntohs(ipha->ipha_length) + sizeof (ah_t) +
 		    ah_align_sz;
 	} else {
-		ip6_t *ip6h = (ip6_t *)mp->b_rptr;
+		ip6_t *ip6h = (ip6_t *)data_mp->b_rptr;
 		ah_align_sz = P2ALIGN(assoc->ipsa_mac_len +
 		    IPV6_PADDING_ALIGN - 1, IPV6_PADDING_ALIGN);
 		age_bytes = sizeof (ip6_t) + ntohs(ip6h->ip6_plen) +
@@ -3461,8 +3459,12 @@ ah_outbound(mblk_t *ipsec_out)
 		    "AH association 0x%x, dst %s had bytes expire.\n",
 		    ntohl(assoc->ipsa_spi), assoc->ipsa_dstaddr, AF_INET,
 		    ahstack->ipsecah_netstack);
-		freemsg(ipsec_out);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		ip_drop_output("ipIfStatsOutDiscards", data_mp, ill);
+		freemsg(data_mp);
+		if (need_refrele)
+			ixa_refrele(ixa);
+		return (NULL);
 	}
 
 	/*
@@ -3470,64 +3472,59 @@ ah_outbound(mblk_t *ipsec_out)
 	 * (AH is computing the checksum over the outer label).
 	 */
 
-	if (oi->ipsec_out_is_capab_ill) {
-		ah3dbg(ahstack, ("ah_outbound: pkt can be accelerated\n"));
-		if (oi->ipsec_out_v4)
-			return (ah_outbound_accelerated_v4(ipsec_out, assoc));
-		else
-			return (ah_outbound_accelerated_v6(ipsec_out, assoc));
-	}
-	AH_BUMP_STAT(ahstack, noaccel);
-
 	/*
 	 * Insert pseudo header:
-	 * IPSEC_INFO -> [IP, ULP] => IPSEC_INFO -> [IP, AH, ICV] -> ULP
+	 * [IP, ULP] => [IP, AH, ICV] -> ULP
 	 */
 
-	if (oi->ipsec_out_v4) {
-		phdr_mp = ah_process_ip_options_v4(mp, assoc, &length_to_skip,
-		    assoc->ipsa_mac_len, B_TRUE, ahstack);
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
+		phdr_mp = ah_process_ip_options_v4(data_mp, assoc,
+		    &length_to_skip, assoc->ipsa_mac_len, B_TRUE, ahstack);
 	} else {
-		phdr_mp = ah_process_ip_options_v6(mp, assoc, &length_to_skip,
-		    assoc->ipsa_mac_len, B_TRUE, ahstack);
+		phdr_mp = ah_process_ip_options_v6(data_mp, assoc,
+		    &length_to_skip, assoc->ipsa_mac_len, B_TRUE, ahstack);
 	}
 
 	if (phdr_mp == NULL) {
 		AH_BUMP_STAT(ahstack, out_discards);
-		ip_drop_packet(ipsec_out, B_FALSE, NULL, NULL,
+		ip_drop_packet(data_mp, B_FALSE, ixa->ixa_nce->nce_ill,
 		    DROPPER(ipss, ipds_ah_bad_v4_opts),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		if (need_refrele)
+			ixa_refrele(ixa);
+		return (NULL);
 	}
 
-	ipsec_out->b_cont = phdr_mp;
-	phdr_mp->b_cont = mp;
-	mp->b_rptr += length_to_skip;
+	phdr_mp->b_cont = data_mp;
+	data_mp->b_rptr += length_to_skip;
+	data_mp = phdr_mp;
 
 	/*
-	 * At this point ipsec_out points to the IPSEC_OUT, new_mp
-	 * points to an mblk containing the pseudo header (IP header,
+	 * At this point data_mp points to
+	 * an mblk containing the pseudo header (IP header,
 	 * AH header, and ICV with mutable fields zero'ed out).
 	 * mp points to the mblk containing the ULP data. The original
-	 * IP header is kept before the ULP data in mp.
+	 * IP header is kept before the ULP data in data_mp.
 	 */
 
 	/* submit MAC request to KCF */
-	return (ah_submit_req_outbound(ipsec_out, length_to_skip, assoc));
+	data_mp = ah_submit_req_outbound(data_mp, ixa, length_to_skip, assoc);
+	if (need_refrele)
+		ixa_refrele(ixa);
+	return (data_mp);
 }
 
-static ipsec_status_t
-ah_inbound(mblk_t *ipsec_in_mp, void *arg)
+static mblk_t *
+ah_inbound(mblk_t *data_mp, void *arg, ip_recv_attr_t *ira)
 {
-	mblk_t *data_mp = ipsec_in_mp->b_cont;
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_in_mp->b_rptr;
-	ah_t *ah = (ah_t *)arg;
-	ipsa_t *assoc = ii->ipsec_in_ah_sa;
-	int length_to_skip;
-	int ah_length;
-	mblk_t *phdr_mp;
-	uint32_t ah_offset;
-	netstack_t	*ns = ii->ipsec_in_ns;
+	ah_t		*ah = (ah_t *)arg;
+	ipsa_t		*assoc = ira->ira_ipsec_ah_sa;
+	int		length_to_skip;
+	int		ah_length;
+	mblk_t		*phdr_mp;
+	uint32_t	ah_offset;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
@@ -3547,10 +3544,11 @@ ah_inbound(mblk_t *ipsec_in_mp, void *arg)
 	if (!sadb_replay_peek(assoc, ah->ah_replay)) {
 		AH_BUMP_STAT(ahstack, replay_early_failures);
 		IP_AH_BUMP_STAT(ipss, in_discards);
-		ip_drop_packet(ipsec_in_mp, B_TRUE, NULL, NULL,
+		ip_drop_packet(data_mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_ah_early_replay),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+		return (NULL);
 	}
 
 	/*
@@ -3559,19 +3557,6 @@ ah_inbound(mblk_t *ipsec_in_mp, void *arg)
 	 * by ipsec_inbound_ah_sa() during SA selection.
 	 */
 	ah_offset = (uchar_t *)ah - data_mp->b_rptr;
-
-	/*
-	 * Has this packet already been processed by a hardware
-	 * IPsec accelerator?
-	 */
-	if (ii->ipsec_in_accelerated) {
-		ah3dbg(ahstack,
-		    ("ah_inbound_v6: pkt processed by ill=%d isv6=%d\n",
-		    ii->ipsec_in_ill_index, !ii->ipsec_in_v4));
-		return (ah_inbound_accelerated(ipsec_in_mp, ii->ipsec_in_v4,
-		    assoc, ah_offset));
-	}
-	AH_BUMP_STAT(ahstack, noaccel);
 
 	/*
 	 * We need to pullup until the ICV before we call
@@ -3590,18 +3575,19 @@ ah_inbound(mblk_t *ipsec_in_mp, void *arg)
 			    SL_WARN | SL_ERROR,
 			    "ah_inbound: Small AH header\n");
 			IP_AH_BUMP_STAT(ipss, in_discards);
-			ip_drop_packet(ipsec_in_mp, B_TRUE, NULL, NULL,
+			ip_drop_packet(data_mp, B_TRUE, ira->ira_ill,
 			    DROPPER(ipss, ipds_ah_nomem),
 			    &ahstack->ah_dropper);
-			return (IPSEC_STATUS_FAILED);
+			BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+			return (NULL);
 		}
 	}
 
 	/*
 	 * Insert pseudo header:
-	 * IPSEC_INFO -> [IP, ULP] => IPSEC_INFO -> [IP, AH, ICV] -> ULP
+	 * [IP, ULP] => [IP, AH, ICV] -> ULP
 	 */
-	if (ii->ipsec_in_v4) {
+	if (ira->ira_flags & IRAF_IS_IPV4) {
 		phdr_mp = ah_process_ip_options_v4(data_mp, assoc,
 		    &length_to_skip, assoc->ipsa_mac_len, B_FALSE, ahstack);
 	} else {
@@ -3611,483 +3597,33 @@ ah_inbound(mblk_t *ipsec_in_mp, void *arg)
 
 	if (phdr_mp == NULL) {
 		IP_AH_BUMP_STAT(ipss, in_discards);
-		ip_drop_packet(ipsec_in_mp, B_TRUE, NULL, NULL,
-		    (ii->ipsec_in_v4 ?
+		ip_drop_packet(data_mp, B_TRUE, ira->ira_ill,
+		    ((ira->ira_flags & IRAF_IS_IPV4) ?
 		    DROPPER(ipss, ipds_ah_bad_v4_opts) :
 		    DROPPER(ipss, ipds_ah_bad_v6_hdrs)),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+		return (NULL);
 	}
 
-	ipsec_in_mp->b_cont = phdr_mp;
 	phdr_mp->b_cont = data_mp;
 	data_mp->b_rptr += length_to_skip;
+	data_mp = phdr_mp;
 
 	/* submit request to KCF */
-	return (ah_submit_req_inbound(ipsec_in_mp, length_to_skip, ah_offset,
+	return (ah_submit_req_inbound(data_mp, ira, length_to_skip, ah_offset,
 	    assoc));
-}
-
-/*
- * ah_inbound_accelerated:
- * Called from ah_inbound() to process IPsec packets that have been
- * accelerated by hardware.
- *
- * Basically does what ah_auth_in_done() with some changes since
- * no pseudo-headers are involved, i.e. the passed message is a
- * IPSEC_INFO->DATA.
- *
- * It is assumed that only packets that have been successfully
- * processed by the adapter come here.
- *
- * 1. get algorithm structure corresponding to association
- * 2. calculate pointers to authentication header and ICV
- * 3. compare ICV in AH header with ICV in data attributes
- *    3.1 if different:
- *	  3.1.1 generate error
- *        3.1.2 discard message
- *    3.2 if ICV matches:
- *	  3.2.1 check replay
- *        3.2.2 remove AH header
- *        3.2.3 age SA byte
- *        3.2.4 send to IP
- */
-ipsec_status_t
-ah_inbound_accelerated(mblk_t *ipsec_in, boolean_t isv4, ipsa_t *assoc,
-    uint32_t ah_offset)
-{
-	mblk_t *mp;
-	ipha_t *ipha;
-	ah_t *ah;
-	ipsec_in_t *ii;
-	uint32_t icv_len;
-	uint32_t align_len;
-	uint32_t age_bytes;
-	ip6_t *ip6h;
-	uint8_t *in_icv;
-	mblk_t *hada_mp;
-	uint32_t next_hdr;
-	da_ipsec_t *hada;
-	kstat_named_t *counter;
-	ipsecah_stack_t	*ahstack;
-	netstack_t	*ns;
-	ipsec_stack_t	*ipss;
-
-	ii = (ipsec_in_t *)ipsec_in->b_rptr;
-	ns = ii->ipsec_in_ns;
-	ahstack = ns->netstack_ipsecah;
-	ipss = ns->netstack_ipsec;
-
-	mp = ipsec_in->b_cont;
-	hada_mp = ii->ipsec_in_da;
-	ASSERT(hada_mp != NULL);
-	hada = (da_ipsec_t *)hada_mp->b_rptr;
-
-	AH_BUMP_STAT(ahstack, in_accelerated);
-
-	/*
-	 * We only support one level of decapsulation in hardware, so
-	 * nuke the pointer.
-	 */
-	ii->ipsec_in_da = NULL;
-	ii->ipsec_in_accelerated = B_FALSE;
-
-	/*
-	 * Extract ICV length from attributes M_CTL and sanity check
-	 * its value. We allow the mblk to be smaller than da_ipsec_t
-	 * for a small ICV, as long as the entire ICV fits within the mblk.
-	 * Also ensures that the ICV length computed by Provider
-	 * corresponds to the ICV length of the algorithm specified by the SA.
-	 */
-	icv_len = hada->da_icv_len;
-	if ((icv_len != assoc->ipsa_mac_len) ||
-	    (icv_len > DA_ICV_MAX_LEN) || (MBLKL(hada_mp) <
-	    (sizeof (da_ipsec_t) - DA_ICV_MAX_LEN + icv_len))) {
-		ah0dbg(("ah_inbound_accelerated: "
-		    "ICV len (%u) incorrect or mblk too small (%u)\n",
-		    icv_len, (uint32_t)(MBLKL(hada_mp))));
-		counter = DROPPER(ipss, ipds_ah_bad_length);
-		goto ah_in_discard;
-	}
-	ASSERT(icv_len != 0);
-
-	/* compute the padded AH ICV len */
-	if (isv4) {
-		ipha = (ipha_t *)mp->b_rptr;
-		align_len = (icv_len + IPV4_PADDING_ALIGN - 1) &
-		    -IPV4_PADDING_ALIGN;
-	} else {
-		ip6h = (ip6_t *)mp->b_rptr;
-		align_len = (icv_len + IPV6_PADDING_ALIGN - 1) &
-		    -IPV6_PADDING_ALIGN;
-	}
-
-	ah = (ah_t *)(mp->b_rptr + ah_offset);
-	in_icv = (uint8_t *)ah + sizeof (ah_t);
-
-	/* compare ICV in AH header vs ICV computed by adapter */
-	if (bcmp(hada->da_icv, in_icv, icv_len)) {
-		int af;
-		void *addr;
-
-		if (isv4) {
-			addr = &ipha->ipha_dst;
-			af = AF_INET;
-		} else {
-			addr = &ip6h->ip6_dst;
-			af = AF_INET6;
-		}
-
-		/*
-		 * Log the event. Don't print to the console, block
-		 * potential denial-of-service attack.
-		 */
-		AH_BUMP_STAT(ahstack, bad_auth);
-		ipsec_assocfailure(info.mi_idnum, 0, 0, SL_ERROR | SL_WARN,
-		    "AH Authentication failed spi %x, dst_addr %s",
-		    assoc->ipsa_spi, addr, af, ahstack->ipsecah_netstack);
-		counter = DROPPER(ipss, ipds_ah_bad_auth);
-		goto ah_in_discard;
-	}
-
-	ah3dbg(ahstack, ("AH succeeded, checking replay\n"));
-	AH_BUMP_STAT(ahstack, good_auth);
-
-	if (!sadb_replay_check(assoc, ah->ah_replay)) {
-		int af;
-		void *addr;
-
-		if (isv4) {
-			addr = &ipha->ipha_dst;
-			af = AF_INET;
-		} else {
-			addr = &ip6h->ip6_dst;
-			af = AF_INET6;
-		}
-
-		/*
-		 * Log the event. As of now we print out an event.
-		 * Do not print the replay failure number, or else
-		 * syslog cannot collate the error messages.  Printing
-		 * the replay number that failed (or printing to the
-		 * console) opens a denial-of-service attack.
-		 */
-		AH_BUMP_STAT(ahstack, replay_failures);
-		ipsec_assocfailure(info.mi_idnum, 0, 0,
-		    SL_ERROR | SL_WARN,
-		    "Replay failed for AH spi %x, dst_addr %s",
-		    assoc->ipsa_spi, addr, af, ahstack->ipsecah_netstack);
-		counter = DROPPER(ipss, ipds_ah_replay);
-		goto ah_in_discard;
-	}
-
-	/*
-	 * Remove AH header. We do this by copying everything before
-	 * the AH header onto the AH header+ICV.
-	 */
-	/* overwrite AH with what was preceeding it (IP header) */
-	next_hdr = ah->ah_nexthdr;
-	ovbcopy(mp->b_rptr, mp->b_rptr + sizeof (ah_t) + align_len,
-	    ah_offset);
-	mp->b_rptr += sizeof (ah_t) + align_len;
-	if (isv4) {
-		/* adjust IP header next protocol */
-		ipha = (ipha_t *)mp->b_rptr;
-		ipha->ipha_protocol = next_hdr;
-
-		age_bytes = ipha->ipha_length;
-
-		/* adjust length in IP header */
-		ipha->ipha_length -= (sizeof (ah_t) + align_len);
-
-		/* recalculate checksum */
-		ipha->ipha_hdr_checksum = 0;
-		ipha->ipha_hdr_checksum = (uint16_t)ip_csum_hdr(ipha);
-	} else {
-		/* adjust IP header next protocol */
-		ip6h = (ip6_t *)mp->b_rptr;
-		ip6h->ip6_nxt = next_hdr;
-
-		age_bytes = sizeof (ip6_t) + ntohs(ip6h->ip6_plen) +
-		    sizeof (ah_t);
-
-		/* adjust length in IP header */
-		ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) -
-		    (sizeof (ah_t) + align_len));
-	}
-
-	/* age SA */
-	if (!ah_age_bytes(assoc, age_bytes, B_TRUE)) {
-		/* The ipsa has hit hard expiration, LOG and AUDIT. */
-		ipsec_assocfailure(info.mi_idnum, 0, 0,
-		    SL_ERROR | SL_WARN,
-		    "AH Association 0x%x, dst %s had bytes expire.\n",
-		    assoc->ipsa_spi, assoc->ipsa_dstaddr,
-		    AF_INET, ahstack->ipsecah_netstack);
-		AH_BUMP_STAT(ahstack, bytes_expired);
-		counter = DROPPER(ipss, ipds_ah_bytes_expire);
-		goto ah_in_discard;
-	}
-
-	freeb(hada_mp);
-	return (IPSEC_STATUS_SUCCESS);
-
-ah_in_discard:
-	IP_AH_BUMP_STAT(ipss, in_discards);
-	freeb(hada_mp);
-	ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL, counter,
-	    &ahstack->ah_dropper);
-	return (IPSEC_STATUS_FAILED);
-}
-
-/*
- * ah_outbound_accelerated_v4:
- * Called from ah_outbound_v4() and once it is determined that the
- * packet is elligible for hardware acceleration.
- *
- * We proceed as follows:
- * 1. allocate and initialize attributes mblk
- * 2. mark IPSEC_OUT to indicate that pkt is accelerated
- * 3. insert AH header
- */
-static ipsec_status_t
-ah_outbound_accelerated_v4(mblk_t *ipsec_mp, ipsa_t *assoc)
-{
-	mblk_t *mp, *new_mp;
-	ipsec_out_t *oi;
-	uint_t ah_data_sz;	/* ICV length, algorithm dependent */
-	uint_t ah_align_sz;	/* ICV length + padding */
-	uint32_t v_hlen_tos_len; /* from original IP header */
-	ipha_t	*oipha;		/* original IP header */
-	ipha_t	*nipha;		/* new IP header */
-	uint_t option_length = 0;
-	uint_t new_hdr_len;	/* new header length */
-	uint_t iphdr_length;
-	ah_t *ah_hdr;		/* ptr to AH header */
-	netstack_t	*ns;
-	ipsec_stack_t	*ipss;
-	ipsecah_stack_t	*ahstack;
-
-	oi = (ipsec_out_t *)ipsec_mp->b_rptr;
-	ns = oi->ipsec_out_ns;
-	ipss = ns->netstack_ipsec;
-	ahstack = ns->netstack_ipsecah;
-
-	mp = ipsec_mp->b_cont;
-
-	AH_BUMP_STAT(ahstack, out_accelerated);
-
-	oipha = (ipha_t *)mp->b_rptr;
-	v_hlen_tos_len = ((uint32_t *)oipha)[0];
-
-	/* mark packet as being accelerated in IPSEC_OUT */
-	ASSERT(oi->ipsec_out_accelerated == B_FALSE);
-	oi->ipsec_out_accelerated = B_TRUE;
-
-	/* calculate authentication data length, i.e. ICV + padding */
-	ah_data_sz = assoc->ipsa_mac_len;
-	ah_align_sz = (ah_data_sz + IPV4_PADDING_ALIGN - 1) &
-	    -IPV4_PADDING_ALIGN;
-
-	/*
-	 * Insert pseudo header:
-	 * IPSEC_INFO -> [IP, ULP] => IPSEC_INFO -> [IP, AH, ICV] -> ULP
-	 */
-
-	/* IP + AH + authentication + padding data length */
-	new_hdr_len = IP_SIMPLE_HDR_LENGTH + sizeof (ah_t) + ah_align_sz;
-	if (V_HLEN != IP_SIMPLE_HDR_VERSION) {
-		option_length = oipha->ipha_version_and_hdr_length -
-		    (uint8_t)((IP_VERSION << 4) +
-		    IP_SIMPLE_HDR_LENGTH_IN_WORDS);
-		option_length <<= 2;
-		new_hdr_len += option_length;
-	}
-
-	/* allocate pseudo-header mblk */
-	if ((new_mp = allocb(new_hdr_len, BPRI_HI)) == NULL) {
-		/* IPsec kstats: bump bean counter here */
-		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
-		    DROPPER(ipss, ipds_ah_nomem),
-		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
-	}
-
-	new_mp->b_cont = mp;
-	ipsec_mp->b_cont = new_mp;
-	new_mp->b_wptr += new_hdr_len;
-
-	/* copy original IP header to new header */
-	bcopy(mp->b_rptr, new_mp->b_rptr, IP_SIMPLE_HDR_LENGTH +
-	    option_length);
-
-	/* update IP header */
-	nipha = (ipha_t *)new_mp->b_rptr;
-	nipha->ipha_protocol = IPPROTO_AH;
-	iphdr_length = ntohs(nipha->ipha_length);
-	iphdr_length += sizeof (ah_t) + ah_align_sz;
-	nipha->ipha_length = htons(iphdr_length);
-	nipha->ipha_hdr_checksum = 0;
-	nipha->ipha_hdr_checksum = (uint16_t)ip_csum_hdr(nipha);
-
-	/* skip original IP header in mp */
-	mp->b_rptr += IP_SIMPLE_HDR_LENGTH + option_length;
-
-	/* initialize AH header */
-	ah_hdr = (ah_t *)(new_mp->b_rptr + IP_SIMPLE_HDR_LENGTH +
-	    option_length);
-	ah_hdr->ah_nexthdr = oipha->ipha_protocol;
-	if (!ah_finish_up(ah_hdr, NULL, assoc, ah_data_sz, ah_align_sz,
-	    ahstack)) {
-		/* Only way this fails is if outbound replay counter wraps. */
-		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
-		    DROPPER(ipss, ipds_ah_replay),
-		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
-	}
-
-	return (IPSEC_STATUS_SUCCESS);
-}
-
-/*
- * ah_outbound_accelerated_v6:
- *
- * Called from ah_outbound_v6() once it is determined that the packet
- * is eligible for hardware acceleration.
- *
- * We proceed as follows:
- * 1. allocate and initialize attributes mblk
- * 2. mark IPSEC_OUT to indicate that pkt is accelerated
- * 3. insert AH header
- */
-static ipsec_status_t
-ah_outbound_accelerated_v6(mblk_t *ipsec_mp, ipsa_t *assoc)
-{
-	mblk_t *mp, *phdr_mp;
-	ipsec_out_t *oi;
-	uint_t ah_data_sz;	/* ICV length, algorithm dependent */
-	uint_t ah_align_sz;	/* ICV length + padding */
-	ip6_t	*oip6h;		/* original IP header */
-	ip6_t	*ip6h;		/* new IP header */
-	uint_t option_length = 0;
-	uint_t hdr_size;
-	uint_t ah_offset;
-	ah_t *ah_hdr;		/* ptr to AH header */
-	netstack_t	*ns;
-	ipsec_stack_t	*ipss;
-	ipsecah_stack_t	*ahstack;
-
-	oi = (ipsec_out_t *)ipsec_mp->b_rptr;
-	ns = oi->ipsec_out_ns;
-	ipss = ns->netstack_ipsec;
-	ahstack = ns->netstack_ipsecah;
-
-	mp = ipsec_mp->b_cont;
-
-	AH_BUMP_STAT(ahstack, out_accelerated);
-
-	oip6h = (ip6_t *)mp->b_rptr;
-
-	/* mark packet as being accelerated in IPSEC_OUT */
-	ASSERT(oi->ipsec_out_accelerated == B_FALSE);
-	oi->ipsec_out_accelerated = B_TRUE;
-
-	/* calculate authentication data length, i.e. ICV + padding */
-	ah_data_sz = assoc->ipsa_mac_len;
-	ah_align_sz = (ah_data_sz + IPV4_PADDING_ALIGN - 1) &
-	    -IPV4_PADDING_ALIGN;
-
-	ASSERT(ah_align_sz >= ah_data_sz);
-
-	hdr_size = ipsec_ah_get_hdr_size_v6(mp, B_FALSE);
-	option_length = hdr_size - IPV6_HDR_LEN;
-
-	/* This was not included in ipsec_ah_get_hdr_size_v6() */
-	hdr_size += (sizeof (ah_t) + ah_align_sz);
-
-	if ((phdr_mp = allocb(hdr_size, BPRI_HI)) == NULL) {
-		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
-		    DROPPER(ipss, ipds_ah_nomem),
-		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
-	}
-	phdr_mp->b_wptr += hdr_size;
-
-	/*
-	 * Form the basic IP header first.  We always assign every bit
-	 * of the v6 basic header, so a separate bzero is unneeded.
-	 */
-	ip6h = (ip6_t *)phdr_mp->b_rptr;
-	ip6h->ip6_vcf = oip6h->ip6_vcf;
-	ip6h->ip6_hlim = oip6h->ip6_hlim;
-	ip6h->ip6_src = oip6h->ip6_src;
-	ip6h->ip6_dst = oip6h->ip6_dst;
-	/*
-	 * Include the size of AH and authentication data.
-	 * This is how our recipient would compute the
-	 * authentication data. Look at what we do in the
-	 * inbound case below.
-	 */
-	ip6h->ip6_plen = htons(ntohs(oip6h->ip6_plen) + sizeof (ah_t) +
-	    ah_align_sz);
-
-	/*
-	 * Insert pseudo header:
-	 * IPSEC_INFO -> [IP6, LLH, ULP] =>
-	 *	IPSEC_INFO -> [IP, LLH, AH, ICV] -> ULP
-	 */
-
-	if (option_length == 0) {
-		/* Form the AH header */
-		ip6h->ip6_nxt = IPPROTO_AH;
-		((ah_t *)(ip6h + 1))->ah_nexthdr = oip6h->ip6_nxt;
-		ah_offset = IPV6_HDR_LEN;
-	} else {
-		ip6h->ip6_nxt = oip6h->ip6_nxt;
-		/* option_length does not include the AH header's size */
-		ah_offset = ah_fix_phdr_v6(ip6h, oip6h, B_TRUE, B_FALSE);
-		if (ah_offset == 0) {
-			freemsg(phdr_mp);
-			ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
-			    DROPPER(ipss, ipds_ah_bad_v6_hdrs),
-			    &ahstack->ah_dropper);
-			return (IPSEC_STATUS_FAILED);
-		}
-	}
-
-	phdr_mp->b_cont = mp;
-	ipsec_mp->b_cont = phdr_mp;
-
-	/* skip original IP header in mp */
-	mp->b_rptr += IPV6_HDR_LEN + option_length;
-
-	/* initialize AH header */
-	ah_hdr = (ah_t *)(phdr_mp->b_rptr + IPV6_HDR_LEN + option_length);
-	ah_hdr->ah_nexthdr = oip6h->ip6_nxt;
-
-	if (!ah_finish_up(((ah_t *)((uint8_t *)ip6h + ah_offset)), NULL,
-	    assoc, ah_data_sz, ah_align_sz, ahstack)) {
-		/* Only way this fails is if outbound replay counter wraps. */
-		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
-		    DROPPER(ipss, ipds_ah_replay),
-		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
-	}
-
-	return (IPSEC_STATUS_SUCCESS);
 }
 
 /*
  * Invoked after processing of an inbound packet by the
  * kernel crypto framework. Called by ah_submit_req() for a sync request,
  * or by the kcf callback for an async request.
- * Returns IPSEC_STATUS_SUCCESS on success, IPSEC_STATUS_FAILED on failure.
- * On failure, the mblk chain ipsec_in is freed by this function.
+ * Returns NULL if the mblk chain is consumed.
  */
-static ipsec_status_t
-ah_auth_in_done(mblk_t *ipsec_in)
+static mblk_t *
+ah_auth_in_done(mblk_t *phdr_mp, ip_recv_attr_t *ira, ipsec_crypto_t *ic)
 {
-	mblk_t *phdr_mp;
 	ipha_t *ipha;
 	uint_t ah_offset = 0;
 	mblk_t *mp;
@@ -4096,41 +3632,36 @@ ah_auth_in_done(mblk_t *ipsec_in)
 	uint32_t length;
 	uint32_t *dest32;
 	uint8_t *dest;
-	ipsec_in_t *ii;
 	boolean_t isv4;
 	ip6_t *ip6h;
 	uint_t icv_len;
 	ipsa_t *assoc;
 	kstat_named_t *counter;
-	netstack_t	*ns;
-	ipsecah_stack_t	*ahstack;
-	ipsec_stack_t	*ipss;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
+	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	ii = (ipsec_in_t *)ipsec_in->b_rptr;
-	ns = ii->ipsec_in_ns;
-	ahstack = ns->netstack_ipsecah;
-	ipss = ns->netstack_ipsec;
+	isv4 = (ira->ira_flags & IRAF_IS_IPV4);
+	assoc = ira->ira_ipsec_ah_sa;
+	icv_len = (uint_t)ic->ic_crypto_mac.cd_raw.iov_len;
 
-	isv4 = ii->ipsec_in_v4;
-	assoc = ii->ipsec_in_ah_sa;
-	icv_len = (uint_t)ii->ipsec_in_crypto_mac.cd_raw.iov_len;
-
-	phdr_mp = ipsec_in->b_cont;
 	if (phdr_mp == NULL) {
-		ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL,
+		ip_drop_packet(phdr_mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_ah_nomem),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+		return (NULL);
 	}
 
 	mp = phdr_mp->b_cont;
 	if (mp == NULL) {
-		ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL,
+		ip_drop_packet(phdr_mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_ah_nomem),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+		return (NULL);
 	}
-	mp->b_rptr -= ii->ipsec_in_skip_len;
+	mp->b_rptr -= ic->ic_skip_len;
 
 	ah_set_usetime(assoc, B_TRUE);
 
@@ -4256,8 +3787,7 @@ ah_auth_in_done(mblk_t *ipsec_in)
 		while (*nexthdr != IPPROTO_AH) {
 			whereptr += hdrlen;
 			/* Assume IP has already stripped it */
-			ASSERT(*nexthdr != IPPROTO_FRAGMENT &&
-			    *nexthdr != IPPROTO_RAW);
+			ASSERT(*nexthdr != IPPROTO_FRAGMENT);
 			switch (*nexthdr) {
 			case IPPROTO_HOPOPTS:
 				hbhhdr = (ip6_hbh_t *)whereptr;
@@ -4292,20 +3822,18 @@ ah_auth_in_done(mblk_t *ipsec_in)
 		while (--dest >= mp->b_rptr)
 			*dest = *(dest - newpos);
 	}
-	ipsec_in->b_cont = mp;
-	phdr_mp->b_cont = NULL;
-	/*
-	 * If a db_credp exists in phdr_mp, it must also exist in mp.
-	 */
-	ASSERT(DB_CRED(phdr_mp) == NULL ||
-	    msg_getcred(mp, NULL) != NULL);
 	freeb(phdr_mp);
 
 	/*
 	 * If SA is labelled, use its label, else inherit the label
 	 */
-	if (is_system_labeled() && (assoc->ipsa_cred != NULL)) {
-		mblk_setcred(mp, assoc->ipsa_cred, NOPID);
+	if (is_system_labeled() && (assoc->ipsa_tsl != NULL)) {
+		if (!ip_recv_attr_replace_label(ira, assoc->ipsa_tsl)) {
+			ip_drop_packet(mp, B_TRUE, ira->ira_ill,
+			    DROPPER(ipss, ipds_ah_nomem), &ahstack->ah_dropper);
+			BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+			return (NULL);
+		}
 	}
 
 	if (assoc->ipsa_state == IPSA_STATE_IDLE) {
@@ -4313,17 +3841,18 @@ ah_auth_in_done(mblk_t *ipsec_in)
 		 * Cluster buffering case.  Tell caller that we're
 		 * handling the packet.
 		 */
-		sadb_buf_pkt(assoc, ipsec_in, ns);
-		return (IPSEC_STATUS_PENDING);
+		sadb_buf_pkt(assoc, mp, ira);
+		return (NULL);
 	}
 
-	return (IPSEC_STATUS_SUCCESS);
+	return (mp);
 
 ah_in_discard:
 	IP_AH_BUMP_STAT(ipss, in_discards);
-	ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL, counter,
+	ip_drop_packet(phdr_mp, B_TRUE, ira->ira_ill, counter,
 	    &ahstack->ah_dropper);
-	return (IPSEC_STATUS_FAILED);
+	BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+	return (NULL);
 }
 
 /*
@@ -4332,49 +3861,37 @@ ah_in_discard:
  * executed syncrhonously, or by the KEF callback for a request
  * executed asynchronously.
  */
-static ipsec_status_t
-ah_auth_out_done(mblk_t *ipsec_out)
+static mblk_t *
+ah_auth_out_done(mblk_t *phdr_mp, ip_xmit_attr_t *ixa, ipsec_crypto_t *ic)
 {
-	mblk_t *phdr_mp;
 	mblk_t *mp;
 	int align_len;
 	uint32_t hdrs_length;
 	uchar_t *ptr;
 	uint32_t length;
 	boolean_t isv4;
-	ipsec_out_t *io;
 	size_t icv_len;
-	netstack_t	*ns;
-	ipsec_stack_t	*ipss;
-	ipsecah_stack_t	*ahstack;
+	netstack_t	*ns = ixa->ixa_ipst->ips_netstack;
+	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ill_t		*ill = ixa->ixa_nce->nce_ill;
 
-	io = (ipsec_out_t *)ipsec_out->b_rptr;
-	ns = io->ipsec_out_ns;
-	ipss = ns->netstack_ipsec;
-	ahstack = ns->netstack_ipsecah;
-
-	isv4 = io->ipsec_out_v4;
-	icv_len = io->ipsec_out_crypto_mac.cd_raw.iov_len;
-
-	phdr_mp = ipsec_out->b_cont;
-	if (phdr_mp == NULL) {
-		ip_drop_packet(ipsec_out, B_FALSE, NULL, NULL,
-		    DROPPER(ipss, ipds_ah_nomem),
-		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
-	}
+	isv4 = (ixa->ixa_flags & IXAF_IS_IPV4);
+	icv_len = ic->ic_crypto_mac.cd_raw.iov_len;
 
 	mp = phdr_mp->b_cont;
 	if (mp == NULL) {
-		ip_drop_packet(ipsec_out, B_FALSE, NULL, NULL,
+		ip_drop_packet(phdr_mp, B_FALSE, ill,
 		    DROPPER(ipss, ipds_ah_nomem),
 		    &ahstack->ah_dropper);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		return (NULL);
 	}
-	mp->b_rptr -= io->ipsec_out_skip_len;
+	mp->b_rptr -= ic->ic_skip_len;
 
-	ASSERT(io->ipsec_out_ah_sa != NULL);
-	ah_set_usetime(io->ipsec_out_ah_sa, B_FALSE);
+	ASSERT(ixa->ixa_flags & IXAF_IPSEC_SECURE);
+	ASSERT(ixa->ixa_ipsec_ah_sa != NULL);
+	ah_set_usetime(ixa->ixa_ipsec_ah_sa, B_FALSE);
 
 	if (isv4) {
 		ipha_t *ipha;
@@ -4454,7 +3971,7 @@ ah_auth_out_done(mblk_t *ipsec_out)
 		freeb(mp);
 	}
 
-	return (IPSEC_STATUS_SUCCESS);
+	return (phdr_mp);
 }
 
 /* Refactor me */
@@ -4464,16 +3981,18 @@ ah_auth_out_done(mblk_t *ipsec_out)
  */
 void
 ipsecah_in_assocfailure(mblk_t *mp, char level, ushort_t sl, char *fmt,
-    uint32_t spi, void *addr, int af, ipsecah_stack_t *ahstack)
+    uint32_t spi, void *addr, int af, ip_recv_attr_t *ira)
 {
-	ipsec_stack_t	*ipss = ahstack->ipsecah_netstack->netstack_ipsec;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
+	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	if (ahstack->ipsecah_log_unknown_spi) {
 		ipsec_assocfailure(info.mi_idnum, 0, level, sl, fmt, spi,
 		    addr, af, ahstack->ipsecah_netstack);
 	}
 
-	ip_drop_packet(mp, B_TRUE, NULL, NULL,
+	ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 	    DROPPER(ipss, ipds_ah_no_sa),
 	    &ahstack->ah_dropper);
 }

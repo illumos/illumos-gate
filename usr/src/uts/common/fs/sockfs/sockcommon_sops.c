@@ -470,8 +470,7 @@ so_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 			    so->so_proto_props.sopp_maxpsz,
 			    so->so_proto_props.sopp_wroff,
 			    so->so_proto_props.sopp_maxblk,
-			    so->so_proto_props.sopp_tail, &error,
-			    cr)) == NULL) {
+			    so->so_proto_props.sopp_tail, &error)) == NULL) {
 				break;
 			}
 			ASSERT(uiop->uio_resid >= 0);

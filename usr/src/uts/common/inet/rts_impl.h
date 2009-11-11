@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -71,13 +71,7 @@ typedef	struct rts_s {
 	uint_t	rts_state;		/* Provider interface state */
 	uint_t	rts_error;		/* Routing socket error code */
 	uint_t	rts_flag;		/* Pending I/O state */
-	uint_t	rts_proto;		/* SO_PROTOTYPE "socket" option. */
-	uint_t	rts_debug : 1,		/* SO_DEBUG "socket" option. */
-		rts_dontroute : 1,	/* SO_DONTROUTE "socket" option. */
-		rts_broadcast : 1,	/* SO_BROADCAST "socket" option. */
-		rts_reuseaddr : 1,	/* SO_REUSEADDR "socket" option. */
-		rts_useloopback : 1,	/* SO_USELOOPBACK "socket" option. */
-		rts_multicast_loop : 1,	/* IP_MULTICAST_LOOP option */
+	uint_t
 		rts_hdrincl : 1,	/* IP_HDRINCL option + RAW and IGMP */
 
 		: 0;
@@ -86,30 +80,16 @@ typedef	struct rts_s {
 	/* Written to only once at the time of opening the endpoint */
 	conn_t		*rts_connp;
 
-	/* Outbound flow control */
-	size_t		rts_xmit_hiwat;
-	size_t		rts_xmit_lowat;
-
-	/* Inbound flow control */
-	size_t		rts_recv_hiwat;
-	size_t		rts_recv_lowat;
-
-	kmutex_t	rts_send_mutex;
-	kmutex_t	rts_recv_mutex;
-	kcondvar_t	rts_send_cv;
-	kcondvar_t	rts_io_cv;
+	kmutex_t	rts_recv_mutex;	/* For recv flow control */
 } rts_t;
 
 #define	RTS_WPUT_PENDING	0x1	/* Waiting for write-side to complete */
-#define	RTS_REQ_PENDING		0x1	/* For direct sockets */
 #define	RTS_WRW_PENDING		0x2	/* Routing socket write in progress */
-#define	RTS_REQ_INPROG		0x2	/* For direct sockets */
 
 /*
  * Object to represent database of options to search passed to
  * {sock,tpi}optcom_req() interface routine to take care of option
  * management and associated methods.
- * XXX. These and other externs should really move to a rts header.
  */
 extern optdb_obj_t	rts_opt_obj;
 extern uint_t		rts_max_optsize;
@@ -119,7 +99,7 @@ extern void	rts_ddi_g_destroy(void);
 
 extern int	rts_tpi_opt_get(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
 extern int	rts_tpi_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,
-		    uint_t *, uchar_t *, void *, cred_t *, mblk_t *);
+		    uint_t *, uchar_t *, void *, cred_t *);
 extern int	rts_opt_default(queue_t *q, t_scalar_t level, t_scalar_t name,
 		    uchar_t *ptr);
 

@@ -53,17 +53,6 @@
 #include	<sys/esunddi.h>
 #include	<sys/promif.h>
 
-#include	<netinet/in.h>
-#include	<netinet/ip6.h>
-#include	<netinet/icmp6.h>
-#include	<netinet/sctp.h>
-#include	<inet/common.h>
-#include	<inet/ip.h>
-#include	<inet/ip6.h>
-#include	<inet/tcp.h>
-#include	<inet/sctp_ip.h>
-#include	<inet/udp_impl.h>
-
 #include	<sys/strlog.h>
 #include	<sys/log.h>
 #include	<sys/ethernet.h>
@@ -222,104 +211,6 @@ strplumb_init(void)
 	return (0);
 }
 
-static int
-strplumb_autopush(void)
-{
-	major_t		maj;
-	minor_t		min;
-	char		*mods[5];
-	uint_t		anchor = 1;
-	int		err;
-
-	min = (minor_t)-1;
-	mods[1] = NULL;
-
-	/*
-	 * ARP
-	 */
-	DBG0("setting up arp autopush\n");
-
-	mods[0] = ARP;
-
-	maj = ddi_name_to_major(ARP);
-	if ((err = kstr_autopush(SET_AUTOPUSH, &maj, &min, NULL, &anchor,
-	    mods)) != 0) {
-		printf("strplumb: kstr_autopush(SET/ARP) failed: %d\n", err);
-		return (err);
-	}
-
-	return (0);
-}
-
-static int
-strplumb_sctpq(ldi_ident_t li)
-{
-	ldi_handle_t	lh = NULL;
-	int		err;
-	int		rval;
-
-	DBG0("configuring SCTP default queue\n");
-
-	if ((err = ldi_open_by_name(SCTP6DEV, FREAD|FWRITE, CRED(), &lh,
-	    li)) != 0) {
-		printf("strplumb: open of SCTP6DEV failed: %d\n", err);
-		return (err);
-	}
-
-	if ((err = ldi_ioctl(lh, SCTP_IOC_DEFAULT_Q, (intptr_t)0, FKIOCTL,
-	    CRED(), &rval)) != 0) {
-		printf("strplumb: failed to set SCTP default queue: %d\n",
-		    err);
-		(void) ldi_close(lh, FREAD|FWRITE, CRED());
-		return (err);
-	}
-
-	return (0);
-}
-
-static int
-strplumb_tcpq(ldi_ident_t li)
-{
-	ldi_handle_t	lh = NULL;
-	ldi_handle_t	ip_lh = NULL;
-	int		err;
-	int		rval;
-
-	DBG0("configuring TCP default queue\n");
-
-	/*
-	 * We open IP6DEV here because we need to have it open to in
-	 * order to open TCP6DEV successfully.
-	 */
-	if ((err = ldi_open_by_name(IP6DEV, FREAD|FWRITE, CRED(), &ip_lh,
-	    li)) != 0) {
-		printf("strplumb: open of IP6DEV failed: %d\n", err);
-		return (err);
-	}
-
-	/*
-	 * We set the tcp default queue to IPv6 because IPv4 falls back to
-	 * IPv6 when it can't find a client, but IPv6 does not fall back to
-	 * IPv4.
-	 */
-	if ((err = ldi_open_by_name(TCP6DEV, FREAD|FWRITE, CRED(), &lh,
-	    li)) != 0) {
-		printf("strplumb: open of TCP6DEV failed: %d\n", err);
-		goto done;
-	}
-
-	if ((err = ldi_ioctl(lh, TCP_IOC_DEFAULT_Q, (intptr_t)0, FKIOCTL,
-	    CRED(), &rval)) != 0) {
-		printf("strplumb: failed to set TCP default queue: %d\n",
-		    err);
-		goto done;
-	}
-
-done:
-	(void) ldi_close(ip_lh, FREAD|FWRITE, CRED());
-	return (err);
-}
-
 /*
  * Can be set in /etc/system in the case of local booting. See comment below.
  */
@@ -447,11 +338,8 @@ strplumb_dev(ldi_ident_t li)
 
 	/*
 	 * Now set up the links. Ultimately, we should have two streams
-	 * permanently linked underneath UDP (which is actually IP with UDP
-	 * autopushed). One stream consists of the ARP-[ifname] combination,
-	 * while the other consists of ARP-IP-[ifname]. The second combination
-	 * seems a little weird, but is linked underneath UDP just to keep it
-	 * around.
+	 * permanently linked under UDP.  One stream consists of the
+	 * ARP-[ifname] combination, while the other consists of IP-[ifname].
 	 *
 	 * We pin underneath UDP here to match what is done in ifconfig(1m);
 	 * otherwise, ifconfig will be unable to unplumb the stream (the major
@@ -462,7 +350,7 @@ strplumb_dev(ldi_ident_t li)
 	 */
 
 	/*
-	 * Plumb UDP-ARP-IP-<dev>
+	 * Plumb UDP-IP-<dev>
 	 */
 
 	if ((err = ldi_open_by_name(rootfs.bo_devname, FREAD|FWRITE, CRED(),
@@ -494,12 +382,6 @@ strplumb_dev(ldi_ident_t li)
 		lifr.lifr_flags &= ~IFF_IPV4;
 		name = UDP6DEV;
 	}
-	if ((err = ldi_ioctl(lh, I_PUSH, (intptr_t)ARP, FKIOCTL, CRED(),
-	    &rval)) != 0) {
-		printf("strplumb: push ARP failed: %d\n", err);
-		goto done;
-	}
-
 	(void) strlcpy(lifr.lifr_name, rootfs.bo_ifname,
 	    sizeof (lifr.lifr_name));
 	lifr.lifr_ppa = rootfs.bo_ppa;
@@ -507,29 +389,17 @@ strplumb_dev(ldi_ident_t li)
 	if ((err = setifname(lh, &lifr)) != 0)
 		goto done;
 
-	/* Get the flags and check if ARP is needed */
+	/* get the flags and check if ARP is needed */
 	if ((err = getifflags(lh, &lifr)) != 0) {
 		printf("strplumb: getifflags %s IP failed, error %d\n",
 		    lifr.lifr_name, err);
 		goto done;
 	}
-
-	/* Pop out ARP if not needed */
-	if (lifr.lifr_flags & (IFF_NOARP | IFF_IPV6)) {
-		err = ldi_ioctl(lh, I_POP, (intptr_t)0, FKIOCTL, CRED(),
-		    &rval);
-		if (err != 0) {
-			printf("strplumb: pop ARP failed, error %d\n", err);
-			goto done;
-		}
-	}
-
 	if ((err = ldi_open_by_name(name, FREAD|FWRITE, CRED(), &mux_lh,
 	    li)) != 0) {
 		printf("strplumb: open of %s failed: %d\n", name, err);
 		goto done;
 	}
-
 	if ((err = ldi_ioctl(mux_lh, I_PLINK, (intptr_t)lh,
 	    FREAD|FWRITE|FNOCTTY|FKIOCTL, CRED(),
 	    &(ifr.ifr_ip_muxid))) != 0) {
@@ -538,9 +408,9 @@ strplumb_dev(ldi_ident_t li)
 		goto done;
 	}
 
-	if (af == AF_INET6) {
+	/* if ARP is not needed, we are done */
+	if (lifr.lifr_flags & (IFF_NOARP | IFF_IPV6))
 		goto done;
-	}
 
 	DBG2("UDP-ARP-IP-%s muxid: %d\n", rootfs.bo_ifname, ifr.ifr_ip_muxid);
 
@@ -610,21 +480,8 @@ strplumb(void)
 	if ((err = strplumb_init()) != 0)
 		return (err);
 
-	if ((err = strplumb_autopush()) != 0)
-		return (err);
-
 	if ((err = ldi_ident_from_mod(&modlinkage, &li)) != 0)
 		return (err);
-
-	/*
-	 * Setup the TCP and SCTP default queues for the global stack.
-	 * tcp/sctp_stack_init will do this for additional stack instances.
-	 */
-	if ((err = strplumb_sctpq(li)) != 0)
-		goto done;
-
-	if ((err = strplumb_tcpq(li)) != 0)
-		goto done;
 
 	if ((err = resolve_boot_path()) != 0)
 		goto done;

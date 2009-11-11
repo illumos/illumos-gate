@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,10 +41,13 @@ extern void ip_net_init(ip_stack_t *, netstack_t *);
 extern void ip_net_destroy(ip_stack_t *);
 extern void ipv4_hook_init(ip_stack_t *);
 extern void ipv6_hook_init(ip_stack_t *);
+extern void arp_hook_init(ip_stack_t *);
 extern void ipv4_hook_destroy(ip_stack_t *);
 extern void ipv6_hook_destroy(ip_stack_t *);
+extern void arp_hook_destroy(ip_stack_t *);
 extern void ipv4_hook_shutdown(ip_stack_t *);
 extern void ipv6_hook_shutdown(ip_stack_t *);
+extern void arp_hook_shutdown(ip_stack_t *);
 extern void ip_ne_queue_func(void *);
 
 #endif	/* _KERNEL */

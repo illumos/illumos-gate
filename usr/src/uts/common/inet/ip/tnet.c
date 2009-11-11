@@ -133,16 +133,7 @@ int tsol_strict_error;
  *	- A set of route-related attributes that only get set for prefix
  *	  IREs.  If this is non-NULL, the prefix IRE has been associated
  *	  with a set of gateway security attributes by way of route add/
- *	  change functionality.  This field stays NULL for IRE_CACHEs.
- *
- * igsa_gcgrp
- *
- *	- Group of gc's which only gets set for IRE_CACHEs.  Each of the gc
- *	  points to a gcdb record that contains the security attributes
- *	  used to perform the credential checks of the packet which uses
- *	  the IRE.  If the group is not empty, the list of gc's can be
- *	  traversed starting at gcgrp_head.  This field stays NULL for
- *	  prefix IREs.
+ *	  change functionality.
  */
 
 static kmem_cache_t *ire_gw_secattr_cache;
@@ -223,7 +214,6 @@ ire_gw_secattr_constructor(void *buf, void *cdrarg, int kmflags)
 
 	attrp->igsa_rhc = NULL;
 	attrp->igsa_gc = NULL;
-	attrp->igsa_gcgrp = NULL;
 
 	return (0);
 }
@@ -257,14 +247,9 @@ ire_gw_secattr_free(tsol_ire_gw_secattr_t *attrp)
 		GC_REFRELE(attrp->igsa_gc);
 		attrp->igsa_gc = NULL;
 	}
-	if (attrp->igsa_gcgrp != NULL) {
-		GCGRP_REFRELE(attrp->igsa_gcgrp);
-		attrp->igsa_gcgrp = NULL;
-	}
 
 	ASSERT(attrp->igsa_rhc == NULL);
 	ASSERT(attrp->igsa_gc == NULL);
-	ASSERT(attrp->igsa_gcgrp == NULL);
 
 	kmem_cache_free(ire_gw_secattr_cache, attrp);
 }
@@ -387,9 +372,6 @@ rtsa_validate(const struct rtsa_s *rp)
 /*
  * A brief explanation of the reference counting scheme:
  *
- * Prefix IREs have a non-NULL igsa_gc and a NULL igsa_gcgrp;
- * IRE_CACHEs have it vice-versa.
- *
  * Apart from dynamic references due to to reference holds done
  * actively by threads, we have the following references:
  *
@@ -402,8 +384,6 @@ rtsa_validate(const struct rtsa_s *rp)
  *	  to the gc_refcnt.
  *
  * gcgrp_refcnt:
- *	- An IRE_CACHE that points to an igsa_gcgrp contributes a reference
- *	  to the gcgrp_refcnt of the associated tsol_gcgrp_t.
  *	- Every tsol_gc_t in the chain headed by tsol_gcgrp_t contributes
  *	  a reference to the gcgrp_refcnt.
  */
@@ -613,7 +593,6 @@ gcgrp_inactive(tsol_gcgrp_t *gcgrp)
 	mod_hash_t *hashp;
 
 	ASSERT(MUTEX_HELD(&gcgrp_lock));
-	ASSERT(!RW_LOCK_HELD(&gcgrp->gcgrp_rwlock));
 	ASSERT(gcgrp != NULL && gcgrp->gcgrp_refcnt == 0);
 	ASSERT(gcgrp->gcgrp_head == NULL && gcgrp->gcgrp_count == 0);
 
@@ -686,21 +665,21 @@ cipso_to_sl(const uchar_t *option, bslabel_t *sl)
 }
 
 /*
- * If present, parse a CIPSO label in the incoming packet and
- * construct a ts_label_t that reflects the CIPSO label and attach it
- * to the dblk cred.  Later as the mblk flows up through the stack any
+ * If present, parse the CIPSO label in the incoming packet and
+ * construct a ts_label_t that reflects the CIPSO label and put it in
+ * the ip_recv_attr_t. Later as the packet flows up through the stack any
  * code that needs to examine the packet label can inspect the label
- * from the dblk cred. This function is called right in ip_rput for
- * all packets, i.e. locally destined and to be forwarded packets. The
- * forwarding path needs to examine the label to determine how to
- * forward the packet.
+ * from the ira_tsl. This function is
+ * called right in ip_input for all packets, i.e. locally destined and
+ * to be forwarded packets. The forwarding path needs to examine the label
+ * to determine how to forward the packet.
  *
  * This routine pulls all message text up into the first mblk.
  * For IPv4, only the first 20 bytes of the IP header are guaranteed
  * to exist. For IPv6, only the IPv6 header is guaranteed to exist.
  */
 boolean_t
-tsol_get_pkt_label(mblk_t *mp, int version)
+tsol_get_pkt_label(mblk_t *mp, int version, ip_recv_attr_t *ira)
 {
 	tsol_tpc_t	*src_rhtp = NULL;
 	uchar_t		*opt_ptr = NULL;
@@ -713,7 +692,6 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 	const void	*src;
 	const ip6_t	*ip6h;
 	cred_t		*credp;
-	pid_t		cpid;
 	int 		proto;
 
 	ASSERT(DB_TYPE(mp) == M_DATA);
@@ -846,28 +824,37 @@ tsol_get_pkt_label(mblk_t *mp, int version)
 		return (B_FALSE);
 	}
 
-	/* Make sure no other thread is messing with this mblk */
-	ASSERT(DB_REF(mp) == 1);
-	/* Preserve db_cpid */
-	credp = msg_extractcred(mp, &cpid);
-	if (credp == NULL) {
+	if (ira->ira_cred == NULL) {
 		credp = newcred_from_bslabel(&sl, doi, KM_NOSLEEP);
+		if (credp == NULL)
+			return (B_FALSE);
 	} else {
 		cred_t	*newcr;
 
-		newcr = copycred_from_bslabel(credp, &sl, doi,
+		newcr = copycred_from_bslabel(ira->ira_cred, &sl, doi,
 		    KM_NOSLEEP);
-		crfree(credp);
+		if (newcr == NULL)
+			return (B_FALSE);
+		if (ira->ira_free_flags & IRA_FREE_CRED) {
+			crfree(ira->ira_cred);
+			ira->ira_free_flags &= ~IRA_FREE_CRED;
+			ira->ira_cred = NULL;
+		}
 		credp = newcr;
 	}
-	if (credp == NULL)
-		return (B_FALSE);
 
-	crgetlabel(credp)->tsl_flags |= label_flags;
+	/*
+	 * Put the label in ira_tsl for convinience, while keeping
+	 * the cred in ira_cred for getpeerucred which is used to get
+	 * labels with TX.
+	 * Note: no explicit refcnt/free_flag for ira_tsl. The free_flag
+	 * for IRA_FREE_CRED is sufficient for both.
+	 */
+	ira->ira_tsl = crgetlabel(credp);
+	ira->ira_cred = credp;
+	ira->ira_free_flags |= IRA_FREE_CRED;
 
-	mblk_setcred(mp, credp, cpid);
-	crfree(credp);			/* mblk has ref on cred */
-
+	ira->ira_tsl->tsl_flags |= label_flags;
 	return (B_TRUE);
 }
 
@@ -878,25 +865,25 @@ tsol_get_pkt_label(mblk_t *mp, int version)
  */
 boolean_t
 tsol_receive_local(const mblk_t *mp, const void *addr, uchar_t version,
-    boolean_t shared_addr, const conn_t *connp)
+    ip_recv_attr_t *ira, const conn_t *connp)
 {
 	const cred_t *credp;
 	ts_label_t *plabel, *conn_plabel;
 	tsol_tpc_t *tp;
 	boolean_t retv;
 	const bslabel_t *label, *conn_label;
+	boolean_t shared_addr = (ira->ira_flags & IRAF_TX_SHARED_ADDR);
 
 	/*
-	 * The cases in which this can happen are:
-	 *	- IPv6 Router Alert, where ip_rput_data_v6 deliberately skips
-	 *	  over the label attachment process.
-	 *	- MLD output looped-back to ourselves.
-	 *	- IPv4 Router Discovery, where tsol_get_pkt_label intentionally
-	 *	  avoids the labeling process.
-	 * We trust that all valid paths in the code set the cred pointer when
-	 * needed.
+	 * tsol_get_pkt_label intentionally avoids the labeling process for:
+	 *	- IPv6 router and neighbor discovery as well as redirects.
+	 *	- MLD packets. (Anything between ICMPv6 code 130 and 138.)
+	 *	- IGMP packets.
+	 *	- IPv4 router discovery.
+	 * In those cases ire_cred is NULL.
 	 */
-	if ((credp = msg_getcred(mp, NULL)) == NULL)
+	credp = ira->ira_cred;
+	if (credp == NULL)
 		return (B_TRUE);
 
 	/*
@@ -904,17 +891,18 @@ tsol_receive_local(const mblk_t *mp, const void *addr, uchar_t version,
 	 * same zoneid as the selected destination, then no checks are
 	 * necessary.  Membership in the zone is enough proof.  This is
 	 * intended to be a hot path through this function.
+	 * Note: Using crgetzone here is ok since the peer is local.
 	 */
 	if (!crisremote(credp) &&
 	    crgetzone(credp) == crgetzone(connp->conn_cred))
 		return (B_TRUE);
 
-	plabel = crgetlabel(credp);
+	plabel = ira->ira_tsl;
 	conn_plabel = crgetlabel(connp->conn_cred);
 	ASSERT(plabel != NULL && conn_plabel != NULL);
 
 	label = label2bslabel(plabel);
-	conn_label = label2bslabel(crgetlabel(connp->conn_cred));
+	conn_label = label2bslabel(conn_plabel);
 
 
 	/*
@@ -954,12 +942,8 @@ tsol_receive_local(const mblk_t *mp, const void *addr, uchar_t version,
 		    blequal(label, conn_label))
 			return (B_TRUE);
 
-		/*
-		 * conn_zoneid is global for an exclusive stack, thus we use
-		 * conn_cred to get the zoneid
-		 */
 		if ((connp->conn_mac_mode == CONN_MAC_DEFAULT) ||
-		    (crgetzoneid(connp->conn_cred) != GLOBAL_ZONEID &&
+		    (!connp->conn_zone_is_global &&
 		    (plabel->tsl_doi != conn_plabel->tsl_doi ||
 		    !bldominates(conn_label, label)))) {
 			DTRACE_PROBE3(
@@ -1046,16 +1030,13 @@ tsol_receive_local(const mblk_t *mp, const void *addr, uchar_t version,
 }
 
 boolean_t
-tsol_can_accept_raw(mblk_t *mp, boolean_t check_host)
+tsol_can_accept_raw(mblk_t *mp, ip_recv_attr_t *ira, boolean_t check_host)
 {
 	ts_label_t	*plabel = NULL;
 	tsol_tpc_t	*src_rhtp, *dst_rhtp;
 	boolean_t	retv;
-	cred_t		*credp;
 
-	credp = msg_getcred(mp, NULL);
-	if (credp != NULL)
-		plabel = crgetlabel(credp);
+	plabel = ira->ira_tsl;
 
 	/* We are bootstrapping or the internal template was never deleted */
 	if (plabel == NULL)
@@ -1144,7 +1125,7 @@ tsol_can_accept_raw(mblk_t *mp, boolean_t check_host)
  * TSLF_UNLABELED flag is sufficient.
  */
 boolean_t
-tsol_can_reply_error(const mblk_t *mp)
+tsol_can_reply_error(const mblk_t *mp, ip_recv_attr_t *ira)
 {
 	ts_label_t	*plabel = NULL;
 	tsol_tpc_t	*rhtp;
@@ -1152,7 +1133,6 @@ tsol_can_reply_error(const mblk_t *mp)
 	const ip6_t	*ip6h;
 	boolean_t	retv;
 	bslabel_t	*pktbs;
-	cred_t		*credp;
 
 	/* Caller must pull up at least the IP header */
 	ASSERT(MBLKL(mp) >= (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION ?
@@ -1161,9 +1141,7 @@ tsol_can_reply_error(const mblk_t *mp)
 	if (!tsol_strict_error)
 		return (B_TRUE);
 
-	credp = msg_getcred(mp, NULL);
-	if (credp != NULL)
-		plabel = crgetlabel(credp);
+	plabel = ira->ira_tsl;
 
 	/* We are bootstrapping or the internal template was never deleted */
 	if (plabel == NULL)
@@ -1227,33 +1205,30 @@ tsol_can_reply_error(const mblk_t *mp)
 }
 
 /*
- * Finds the zone associated with the given packet.  Returns GLOBAL_ZONEID if
- * the zone cannot be located.
+ * Finds the zone associated with the receive attributes.  Returns GLOBAL_ZONEID
+ * if the zone cannot be located.
  *
  * This is used by the classifier when the packet matches an ALL_ZONES IRE, and
  * there's no MLP defined.
  *
  * Note that we assume that this is only invoked in the ALL_ZONES case.
- * Handling other cases would require handle exclusive stack zones where either
+ * Handling other cases would require handling exclusive IP zones where either
  * this routine or the callers would have to map from
  * the zoneid (zone->zone_id) to what IP uses in conn_zoneid etc.
  */
 zoneid_t
-tsol_packet_to_zoneid(const mblk_t *mp)
+tsol_attr_to_zoneid(const ip_recv_attr_t *ira)
 {
-	cred_t *cr = msg_getcred(mp, NULL);
 	zone_t *zone;
 	ts_label_t *label;
 
-	if (cr != NULL) {
-		if ((label = crgetlabel(cr)) != NULL) {
-			zone = zone_find_by_label(label);
-			if (zone != NULL) {
-				zoneid_t zoneid = zone->zone_id;
+	if ((label = ira->ira_tsl) != NULL) {
+		zone = zone_find_by_label(label);
+		if (zone != NULL) {
+			zoneid_t zoneid = zone->zone_id;
 
-				zone_rele(zone);
-				return (zoneid);
-			}
+			zone_rele(zone);
+			return (zoneid);
 		}
 	}
 	return (GLOBAL_ZONEID);
@@ -1273,7 +1248,7 @@ tsol_ire_match_gwattr(ire_t *ire, const ts_label_t *tsl)
 	/* Not in Trusted mode or IRE is local/loopback/broadcast/interface */
 	if (!is_system_labeled() ||
 	    (ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK | IRE_BROADCAST |
-	    IRE_INTERFACE)))
+	    IRE_IF_ALL | IRE_MULTICAST | IRE_NOROUTE)))
 		goto done;
 
 	/*
@@ -1304,29 +1279,16 @@ tsol_ire_match_gwattr(ire_t *ire, const ts_label_t *tsl)
 	mutex_enter(&attrp->igsa_lock);
 
 	/*
-	 * Depending on the IRE type (prefix vs. cache), we seek the group
+	 * We seek the group
 	 * structure which contains all security credentials of the gateway.
-	 * A prefix IRE is associated with at most one gateway credential,
-	 * while a cache IRE is associated with every credentials that the
-	 * gateway has.
+	 * An offline IRE is associated with at most one gateway credential.
 	 */
-	if ((gc = attrp->igsa_gc) != NULL) {			/* prefix */
+	if ((gc = attrp->igsa_gc) != NULL) {
 		gcgrp = gc->gc_grp;
 		ASSERT(gcgrp != NULL);
 		rw_enter(&gcgrp->gcgrp_rwlock, RW_READER);
-	} else if ((gcgrp = attrp->igsa_gcgrp) != NULL) {	/* cache */
-		rw_enter(&gcgrp->gcgrp_rwlock, RW_READER);
-		gc = gcgrp->gcgrp_head;
-		if (gc == NULL) {
-			/* gc group is empty, so the drop lock now */
-			ASSERT(gcgrp->gcgrp_count == 0);
-			rw_exit(&gcgrp->gcgrp_rwlock);
-			gcgrp = NULL;
-		}
-	}
-
-	if (gcgrp != NULL)
 		GCGRP_REFHOLD(gcgrp);
+	}
 
 	if ((gw_rhc = attrp->igsa_rhc) != NULL) {
 		/*
@@ -1354,12 +1316,11 @@ tsol_ire_match_gwattr(ire_t *ire, const ts_label_t *tsl)
 				ASSERT(ga->ga_af == AF_INET6);
 				paddr = &ga->ga_addr;
 			}
-		} else if (ire->ire_ipversion == IPV6_VERSION &&
-		    !IN6_IS_ADDR_UNSPECIFIED(&ire->ire_gateway_addr_v6)) {
-			paddr = &ire->ire_gateway_addr_v6;
-		} else if (ire->ire_ipversion == IPV4_VERSION &&
-		    ire->ire_gateway_addr != INADDR_ANY) {
-			paddr = &ire->ire_gateway_addr;
+		} else if (ire->ire_type & IRE_OFFLINK) {
+			if (ire->ire_ipversion == IPV6_VERSION)
+				paddr = &ire->ire_gateway_addr_v6;
+			else if (ire->ire_ipversion == IPV4_VERSION)
+				paddr = &ire->ire_gateway_addr;
 		}
 
 		/* We've found a gateway address to do the template lookup */
@@ -1408,6 +1369,7 @@ tsol_ire_match_gwattr(ire_t *ire, const ts_label_t *tsl)
 	}
 
 	if (gc != NULL) {
+
 		tsol_gcdb_t *gcdb;
 		/*
 		 * In the case of IRE_CACHE we've got one or more gateway
@@ -1418,18 +1380,9 @@ tsol_ire_match_gwattr(ire_t *ire, const ts_label_t *tsl)
 		 * just the route itself, so the loop is executed only once.
 		 */
 		ASSERT(gcgrp != NULL);
-		do {
-			gcdb = gc->gc_db;
-			if (tsl->tsl_doi == gcdb->gcdb_doi &&
-			    _blinrange(&tsl->tsl_label, &gcdb->gcdb_slrange))
-				break;
-			if (ire->ire_type == IRE_CACHE)
-				gc = gc->gc_next;
-			else
-				gc = NULL;
-		} while (gc != NULL);
-
-		if (gc == NULL) {
+		gcdb = gc->gc_db;
+		if (tsl->tsl_doi != gcdb->gcdb_doi ||
+		    !_blinrange(&tsl->tsl_label, &gcdb->gcdb_slrange)) {
 			DTRACE_PROBE3(
 			    tx__ip__log__drop__irematch__nogcmatched,
 			    char *, "ire(1), tsl(2): all gc failed match",
@@ -1493,12 +1446,13 @@ done:
 
 /*
  * Performs label accreditation checks for packet forwarding.
+ * Add or remove a CIPSO option as needed.
  *
  * Returns a pointer to the modified mblk if allowed for forwarding,
  * or NULL if the packet must be dropped.
  */
 mblk_t *
-tsol_ip_forward(ire_t *ire, mblk_t *mp)
+tsol_ip_forward(ire_t *ire, mblk_t *mp, const ip_recv_attr_t *ira)
 {
 	tsol_ire_gw_secattr_t *attrp = NULL;
 	ipha_t		*ipha;
@@ -1516,11 +1470,14 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 	boolean_t	need_tpc_rele = B_FALSE;
 	ipaddr_t	*gw;
 	ip_stack_t	*ipst = ire->ire_ipst;
-	cred_t		*credp;
-	pid_t		pid;
+	int		err;
+	ts_label_t	*effective_tsl = NULL;
 
 	ASSERT(ire != NULL && mp != NULL);
-	ASSERT(ire->ire_stq != NULL);
+	/*
+	 * Note that the ire is the first one found, i.e., an IRE_OFFLINK if
+	 * the destination is offlink.
+	 */
 
 	af = (ire->ire_ipversion == IPV4_VERSION) ? AF_INET : AF_INET6;
 
@@ -1530,16 +1487,6 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 		psrc = &ipha->ipha_src;
 		pdst = &ipha->ipha_dst;
 		proto = ipha->ipha_protocol;
-
-		/*
-		 * off_link is TRUE if destination not directly reachable.
-		 * Surya note: we avoid creation of per-dst IRE_CACHE entries
-		 * for forwarded packets, so we set off_link to be TRUE
-		 * if the packet dst is different from the ire_addr of
-		 * the ire for the nexthop.
-		 */
-		off_link = ((ipha->ipha_dst != ire->ire_addr) ||
-		    (ire->ire_gateway_addr != INADDR_ANY));
 		if (!tsol_get_option_v4(mp, &label_type, &opt_ptr))
 			return (NULL);
 	} else {
@@ -1561,14 +1508,15 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 			}
 			proto = *nexthdrp;
 		}
-
-		/* destination not directly reachable? */
-		off_link = !IN6_IS_ADDR_UNSPECIFIED(&ire->ire_gateway_addr_v6);
 		if (!tsol_get_option_v6(mp, &label_type, &opt_ptr))
 			return (NULL);
 	}
+	/*
+	 * off_link is TRUE if destination not directly reachable.
+	 */
+	off_link = (ire->ire_type & IRE_OFFLINK);
 
-	if ((tsl = msg_getlabel(mp)) == NULL)
+	if ((tsl = ira->ira_tsl) == NULL)
 		return (mp);
 
 	if (tsl->tsl_flags & TSLF_IMPLICIT_IN) {
@@ -1611,11 +1559,7 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 			attrp = ire->ire_gw_secattr;
 			gw_rhtp = attrp->igsa_rhc->rhc_tpc;
 		} else  {
-			/*
-			 * use the ire_addr if this is the IRE_CACHE of nexthop
-			 */
-			gw = (ire->ire_gateway_addr == NULL? &ire->ire_addr :
-			    &ire->ire_gateway_addr);
+			gw = &ire->ire_gateway_addr;
 			gw_rhtp = find_tpc(gw, ire->ire_ipversion, B_FALSE);
 			need_tpc_rele = B_TRUE;
 		}
@@ -1702,7 +1646,13 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 			/* adjust is negative */
 			ASSERT((mp->b_wptr + adjust) >= mp->b_rptr);
 			mp->b_wptr += adjust;
-
+			/*
+			 * Note that caller adjusts ira_pktlen and
+			 * ira_ip_hdr_length
+			 *
+			 * For AF_INET6 note that tsol_remove_secopt_v6
+			 * adjusted ip6_plen.
+			 */
 			if (af == AF_INET) {
 				ipha = (ipha_t *)mp->b_rptr;
 				iplen = ntohs(ipha->ipha_length) + adjust;
@@ -1729,16 +1679,33 @@ tsol_ip_forward(ire_t *ire, mblk_t *mp)
 	    (!off_link || gw_rhtp->tpc_tp.host_type == UNLABELED))
 		goto keep_label;
 
-
-	credp = msg_getcred(mp, &pid);
-	if ((af == AF_INET &&
-	    tsol_check_label(credp, &mp, CONN_MAC_DEFAULT, ipst, pid) != 0) ||
-	    (af == AF_INET6 &&
-	    tsol_check_label_v6(credp, &mp, CONN_MAC_DEFAULT, ipst,
-	    pid) != 0)) {
+	/*
+	 * Since we are forwarding packets we use GLOBAL_ZONEID for
+	 * the IRE lookup in tsol_check_label.
+	 * Since mac_exempt is false the zoneid isn't used for anything
+	 * but the IRE lookup, hence we set zone_is_global to false.
+	 */
+	if (af == AF_INET) {
+		err = tsol_check_label_v4(tsl, GLOBAL_ZONEID, &mp,
+		    CONN_MAC_DEFAULT, B_FALSE, ipst, &effective_tsl);
+	} else {
+		err = tsol_check_label_v6(tsl, GLOBAL_ZONEID, &mp,
+		    CONN_MAC_DEFAULT, B_FALSE, ipst, &effective_tsl);
+	}
+	if (err != 0) {
+		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
+		ip_drop_output("tsol_check_label", mp, NULL);
+		freemsg(mp);
 		mp = NULL;
 		goto keep_label;
 	}
+
+	/*
+	 * The effective_tsl must never affect the routing decision, hence
+	 * we ignore it here.
+	 */
+	if (effective_tsl != NULL)
+		label_rele(effective_tsl);
 
 	if (af == AF_INET) {
 		ipha = (ipha_t *)mp->b_rptr;
@@ -1885,13 +1852,13 @@ tsol_rtsa_init(rt_msghdr_t *rtm, tsol_rtsecattr_t *sp, caddr_t cp)
 }
 
 int
-tsol_ire_init_gwattr(ire_t *ire, uchar_t ipversion, tsol_gc_t *gc,
-    tsol_gcgrp_t *gcgrp)
+tsol_ire_init_gwattr(ire_t *ire, uchar_t ipversion, tsol_gc_t *gc)
 {
 	tsol_ire_gw_secattr_t *attrp;
 	boolean_t exists = B_FALSE;
 	in_addr_t ga_addr4;
 	void *paddr = NULL;
+	tsol_gcgrp_t *gcgrp = NULL;
 
 	ASSERT(ire != NULL);
 
@@ -1917,20 +1884,16 @@ tsol_ire_init_gwattr(ire_t *ire, uchar_t ipversion, tsol_gc_t *gc,
 
 		if (attrp->igsa_gc != NULL)
 			GC_REFRELE(attrp->igsa_gc);
-		if (attrp->igsa_gcgrp != NULL)
-			GCGRP_REFRELE(attrp->igsa_gcgrp);
 	}
 	ASSERT(!exists || MUTEX_HELD(&attrp->igsa_lock));
 
 	/*
 	 * References already held by caller and we keep them;
-	 * note that both gc and gcgrp may be set to NULL to
-	 * clear out igsa_gc and igsa_gcgrp, respectively.
+	 * note that gc may be set to NULL to clear out igsa_gc.
 	 */
 	attrp->igsa_gc = gc;
-	attrp->igsa_gcgrp = gcgrp;
 
-	if (gcgrp == NULL && gc != NULL) {
+	if (gc != NULL) {
 		gcgrp = gc->gc_grp;
 		ASSERT(gcgrp != NULL);
 	}
@@ -1955,12 +1918,11 @@ tsol_ire_init_gwattr(ire_t *ire, uchar_t ipversion, tsol_gc_t *gc,
 			ASSERT(ga->ga_af == AF_INET6);
 			paddr = &ga->ga_addr;
 		}
-	} else if (ipversion == IPV6_VERSION &&
-	    !IN6_IS_ADDR_UNSPECIFIED(&ire->ire_gateway_addr_v6)) {
-		paddr = &ire->ire_gateway_addr_v6;
-	} else if (ipversion == IPV4_VERSION &&
-	    ire->ire_gateway_addr != INADDR_ANY) {
-		paddr = &ire->ire_gateway_addr;
+	} else if (ire->ire_type & IRE_OFFLINK) {
+		if (ipversion == IPV6_VERSION)
+			paddr = &ire->ire_gateway_addr_v6;
+		else if (ipversion == IPV4_VERSION)
+			paddr = &ire->ire_gateway_addr;
 	}
 
 	/*
@@ -1990,7 +1952,7 @@ tsol_ire_init_gwattr(ire_t *ire, uchar_t ipversion, tsol_gc_t *gc,
  * If we can't figure out what it is, then return mlptSingle.  That's actually
  * an error case.
  *
- * The callers are assume to pass in zone->zone_id and not the zoneid that
+ * The callers are assumed to pass in zone->zone_id and not the zoneid that
  * is stored in a conn_t (since the latter will be GLOBAL_ZONEID in an
  * exclusive stack zone).
  */
@@ -2022,23 +1984,28 @@ tsol_mlp_addr_type(zoneid_t zoneid, uchar_t version, const void *addr,
 		version = IPV4_VERSION;
 	}
 
+	/* Check whether the IRE_LOCAL (or ipif) is ALL_ZONES */
 	if (version == IPV4_VERSION) {
 		in4 = *(const in_addr_t *)addr;
 		if ((in4 == INADDR_ANY) || CLASSD(in4)) {
 			return (mlptBoth);
 		}
-		ire = ire_cache_lookup(in4, ip_zoneid, NULL, ipst);
+		ire = ire_ftable_lookup_v4(in4, 0, 0, IRE_LOCAL|IRE_LOOPBACK,
+		    NULL, ip_zoneid, NULL, MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY,
+		    0, ipst, NULL);
 	} else {
 		if (IN6_IS_ADDR_UNSPECIFIED((const in6_addr_t *)addr) ||
 		    IN6_IS_ADDR_MULTICAST((const in6_addr_t *)addr)) {
 			return (mlptBoth);
 		}
-		ire = ire_cache_lookup_v6(addr, ip_zoneid, NULL, ipst);
+		ire = ire_ftable_lookup_v6(addr, 0, 0, IRE_LOCAL|IRE_LOOPBACK,
+		    NULL, ip_zoneid, NULL, MATCH_IRE_TYPE | MATCH_IRE_ZONEONLY,
+		    0, ipst, NULL);
 	}
 	/*
 	 * If we can't find the IRE, then we have to behave exactly like
-	 * ip_bind_laddr{,_v6}.  That means looking up the IPIF so that users
-	 * can bind to addresses on "down" interfaces.
+	 * ip_laddr_verify_{v4,v6}.  That means looking up the IPIF so that
+	 * users can bind to addresses on "down" interfaces.
 	 *
 	 * If we can't find that either, then the bind is going to fail, so
 	 * just give up.  Note that there's a miniscule chance that the address
@@ -2047,10 +2014,10 @@ tsol_mlp_addr_type(zoneid_t zoneid, uchar_t version, const void *addr,
 	if (ire == NULL) {
 		if (version == IPV4_VERSION)
 			ipif = ipif_lookup_addr(*(const in_addr_t *)addr, NULL,
-			    ip_zoneid, NULL, NULL, NULL, NULL, ipst);
+			    ip_zoneid, ipst);
 		else
 			ipif = ipif_lookup_addr_v6((const in6_addr_t *)addr,
-			    NULL, ip_zoneid, NULL, NULL, NULL, NULL, ipst);
+			    NULL, ip_zoneid, ipst);
 		if (ipif == NULL) {
 			return (mlptSingle);
 		}

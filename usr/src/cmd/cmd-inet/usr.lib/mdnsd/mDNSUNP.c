@@ -407,6 +407,15 @@ select_src_ifi_info_solaris(int sockfd, int numifs,
         if (ifflags & (IFF_NOXMIT | IFF_NOLOCAL | IFF_PRIVATE))
             continue;
 
+	/* A DHCP client will have IFF_UP set yet the address is zero. Ignore */
+        if (lifr->lifr_addr.ss_family == AF_INET) {
+		struct sockaddr_in *sinptr;
+
+		sinptr = (struct sockaddr_in *) &lifr->lifr_addr;
+		if (sinptr->sin_addr.s_addr == INADDR_ANY)
+			continue;
+	}
+
         if (*best_lifr != NULL) {
             /* 
              * Check if we found a better interface by checking

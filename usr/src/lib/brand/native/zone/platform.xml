@@ -106,7 +106,6 @@
 	<device match="ipsecesp" ip-type="exclusive" />
 	<device match="ipstate" ip-type="exclusive" />
 	<device match="ipsync" ip-type="exclusive" />
-	<device match="iptunq" ip-type="exclusive" />
 	<device match="keysock" ip-type="exclusive" />
 	<device match="rawip" ip-type="exclusive" />
 	<device match="rawip6" ip-type="exclusive" />
@@ -117,6 +116,7 @@
 	<device match="spdsock" ip-type="exclusive" />
 	<device match="sppp" ip-type="exclusive" />
 	<device match="sppptun" ip-type="exclusive" />
+	<device match="vni" ip-type="exclusive" />
 
 	<!-- Renamed devices to create under /dev -->
 	<device match="zcons/%z/zoneconsole" name="zconsole" />

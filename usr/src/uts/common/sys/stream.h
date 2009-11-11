@@ -404,9 +404,6 @@ typedef	struct	bcache {
 #define	STRUIO_IP	0x04	/* IP checksum stored in db_struioun */
 #define	STRUIO_ZC	0x08	/* mblk eligible for zero-copy */
 #define	STRUIO_ZCNOTIFY	0x10	/* notify stream head when mblk acked */
-#define	STRUIO_EAGER	0x20	/* new eager; db_cksumstart has squeue to use */
-#define	STRUIO_POLICY	0x40	/* new eager when IPsec is enabled */
-#define	STRUIO_CONNECT	0x80	/* conn did a connect */
 
 /*
  * Message flags.  These are interpreted by the stream head.
@@ -418,8 +415,7 @@ typedef	struct	bcache {
 /*	UNUSED		0x08	   was MSGNOGET (can be recycled) */
 #define	MSGMARKNEXT	0x10	/* Private: first byte of next msg marked */
 #define	MSGNOTMARKNEXT	0x20	/* Private: ... not marked */
-#define	MSGHASREF	0x40	/* Private: message has reference to owner */
-#define	MSGWAITSYNC	0x80	/* Private: waiting for sync squeue enter */
+#define	MSGWAITSYNC	0x40	/* Private: waiting for sync squeue enter */
 
 /*
  * Streams message types.

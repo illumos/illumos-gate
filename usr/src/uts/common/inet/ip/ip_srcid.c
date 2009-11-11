@@ -101,11 +101,7 @@
 #include <netinet/ip_mroute.h>
 #include <inet/ipclassifier.h>
 
-#include <net/pfkeyv2.h>
-#include <inet/ipsec_info.h>
-#include <inet/sadb.h>
 #include <sys/kmem.h>
-#include <inet/ipsec_impl.h>
 
 static uint_t		srcid_nextid(ip_stack_t *);
 static srcid_map_t	**srcid_lookup_addr(const in6_addr_t *addr,
@@ -239,7 +235,7 @@ ip_srcid_find_id(uint_t id, in6_addr_t *addr, zoneid_t zoneid,
 	rw_enter(&ipst->ips_srcid_lock, RW_READER);
 	smpp = srcid_lookup_id(id, ipst);
 	smp = *smpp;
-	if (smp == NULL || smp->sm_zoneid != zoneid) {
+	if (smp == NULL || (smp->sm_zoneid != zoneid && zoneid != ALL_ZONES)) {
 		/* Not preset */
 		ip1dbg(("ip_srcid_find_id: unknown %u or in wrong zone\n", id));
 		*addr = ipv6_all_zeros;
@@ -290,7 +286,7 @@ srcid_lookup_addr(const in6_addr_t *addr, zoneid_t zoneid, ip_stack_t *ipst)
 	smpp = &ipst->ips_srcid_head;
 	while (*smpp != NULL) {
 		if (IN6_ARE_ADDR_EQUAL(&(*smpp)->sm_addr, addr) &&
-		    zoneid == (*smpp)->sm_zoneid)
+		    (zoneid == (*smpp)->sm_zoneid || zoneid == ALL_ZONES))
 			return (smpp);
 		smpp = &(*smpp)->sm_next;
 	}

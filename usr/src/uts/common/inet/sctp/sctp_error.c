@@ -35,9 +35,11 @@
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 
+#include <inet/ipsec_impl.h>
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
+#include <inet/ipsec_impl.h>
 #include <inet/mib2.h>
 #include <inet/sctp_ip.h>
 #include <inet/ipclassifier.h>
@@ -99,6 +101,7 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data)
 	int len, hdrlen;
 	char *cause;
 	sctp_faddr_t *fp = sctp->sctp_current;
+	ip_xmit_attr_t	*ixa = fp->ixa;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	/*
@@ -147,14 +150,15 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data)
 		freemsg(mp);
 		return;
 	}
-	sctp_set_iplen(sctp, mp);
 	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_opkts);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	CONN_INC_REF(sctp->sctp_connp);
-	mp->b_flag |= MSGHASREF;
-	IP_PUT(mp, sctp->sctp_connp, fp->isv4);
+	sctp_set_iplen(sctp, mp, ixa);
+	ASSERT(ixa->ixa_ire != NULL);
+	ASSERT(ixa->ixa_cred != NULL);
+
+	(void) conn_ip_output(mp, ixa);
 
 	sctp_assoc_event(sctp, SCTP_COMM_LOST, 0, NULL);
 	sctp_clean_death(sctp, ECONNABORTED);
@@ -165,29 +169,24 @@ sctp_user_abort(sctp_t *sctp, mblk_t *data)
  */
 void
 sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
-    size_t len, mblk_t *inmp, int iserror, boolean_t tbit)
+    size_t len, mblk_t *inmp, int iserror, boolean_t tbit, ip_recv_attr_t *ira)
 {
 
 	mblk_t		*hmp;
 	uint32_t	ip_hdr_len;
 	ipha_t		*iniph;
-	ipha_t		*ahiph;
+	ipha_t		*ahiph = NULL;
 	ip6_t		*inip6h;
-	ip6_t		*ahip6h;
+	ip6_t		*ahip6h = NULL;
 	sctp_hdr_t	*sh;
 	sctp_hdr_t	*insh;
 	size_t		ahlen;
 	uchar_t		*p;
 	ssize_t		alen;
 	int		isv4;
-	ire_t		*ire;
-	irb_t		*irb;
-	ts_label_t	*tsl;
-	conn_t		*connp;
-	cred_t		*cr = NULL;
-	pid_t		pid;
+	conn_t		*connp = sctp->sctp_connp;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
-	ip_stack_t	*ipst;
+	ip_xmit_attr_t	*ixa;
 
 	isv4 = (IPH_HDR_VERSION(inmp->b_rptr) == IPV4_VERSION);
 	if (isv4) {
@@ -200,11 +199,10 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 	 * If this is a labeled system, then check to see if we're allowed to
 	 * send a response to this particular sender.  If not, then just drop.
 	 */
-	if (is_system_labeled() && !tsol_can_reply_error(inmp))
+	if (is_system_labeled() && !tsol_can_reply_error(inmp, ira))
 		return;
 
-	hmp = allocb_cred(sctps->sctps_wroff_xtra + ahlen,
-	    CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
+	hmp = allocb(sctps->sctps_wroff_xtra + ahlen, BPRI_MED);
 	if (hmp == NULL) {
 		/* XXX no resources */
 		return;
@@ -262,75 +260,209 @@ sctp_send_abort(sctp_t *sctp, uint32_t vtag, uint16_t serror, char *details,
 		return;
 	}
 
+	/*
+	 * Base the transmission on any routing-related socket options
+	 * that have been set on the listener/connection.
+	 */
+	ixa = conn_get_ixa_exclusive(connp);
+	if (ixa == NULL) {
+		freemsg(hmp);
+		return;
+	}
+	ixa->ixa_flags &= ~IXAF_VERIFY_PMTU;
+
+	ixa->ixa_pktlen = ahlen + alen;
 	if (isv4) {
-		ahiph->ipha_length = htons(ahlen + alen);
+		ixa->ixa_flags |= IXAF_IS_IPV4;
+		ahiph->ipha_length = htons(ixa->ixa_pktlen);
+		ixa->ixa_ip_hdr_length = sctp->sctp_ip_hdr_len;
 	} else {
-		ahip6h->ip6_plen = htons(alen + sizeof (*sh));
+		ixa->ixa_flags &= ~IXAF_IS_IPV4;
+		ahip6h->ip6_plen = htons(ixa->ixa_pktlen - IPV6_HDR_LEN);
+		ixa->ixa_ip_hdr_length = sctp->sctp_ip_hdr6_len;
 	}
 
 	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	ipst = sctps->sctps_netstack->netstack_ip;
-	connp = sctp->sctp_connp;
-	if (is_system_labeled() && (cr = msg_getcred(inmp, &pid)) != NULL &&
-	    crgetlabel(cr) != NULL) {
-		int err;
-		uint_t mode = connp->conn_mac_mode;
+	if (is_system_labeled() && ixa->ixa_tsl != NULL) {
+		ASSERT(ira->ira_tsl != NULL);
 
-		if (isv4)
-			err = tsol_check_label(cr, &hmp, mode, ipst, pid);
-		else
-			err = tsol_check_label_v6(cr, &hmp, mode, ipst, pid);
-		if (err != 0) {
-			freemsg(hmp);
+		ixa->ixa_tsl = ira->ira_tsl;	/* A multi-level responder */
+	}
+
+	if (ira->ira_flags & IRAF_IPSEC_SECURE) {
+		/*
+		 * Apply IPsec based on how IPsec was applied to
+		 * the packet that caused the abort.
+		 */
+		if (!ipsec_in_to_out(ira, ixa, hmp, ahiph, ahip6h)) {
+			ip_stack_t *ipst = sctps->sctps_netstack->netstack_ip;
+
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
+			/* Note: mp already consumed and ip_drop_packet done */
+			ixa_refrele(ixa);
 			return;
 		}
-	}
-
-	/* Stash the conn ptr info. for IP */
-	SCTP_STASH_IPINFO(hmp, NULL);
-
-	CONN_INC_REF(connp);
-	hmp->b_flag |= MSGHASREF;
-	IP_PUT(hmp, connp, sctp->sctp_current == NULL ? B_TRUE :
-	    sctp->sctp_current->isv4);
-	/*
-	 * Let's just mark the IRE for this destination as temporary
-	 * to prevent any DoS attack.
-	 */
-	tsl = cr == NULL ? NULL : crgetlabel(cr);
-	if (isv4) {
-		ire = ire_cache_lookup(iniph->ipha_src, sctp->sctp_zoneid, tsl,
-		    ipst);
 	} else {
-		ire = ire_cache_lookup_v6(&inip6h->ip6_src, sctp->sctp_zoneid,
-		    tsl, ipst);
+		ixa->ixa_flags |= IXAF_NO_IPSEC;
 	}
+
+	BUMP_LOCAL(sctp->sctp_opkts);
+	BUMP_LOCAL(sctp->sctp_obchunks);
+
+	(void) ip_output_simple(hmp, ixa);
+	ixa_refrele(ixa);
+}
+
+/*
+ * OOTB version of the above.
+ * If iserror == 0, sends an abort. If iserror != 0, sends an error.
+ */
+void
+sctp_ootb_send_abort(uint32_t vtag, uint16_t serror, char *details,
+    size_t len, const mblk_t *inmp, int iserror, boolean_t tbit,
+    ip_recv_attr_t *ira, ip_stack_t *ipst)
+{
+	uint32_t	ip_hdr_len;
+	size_t		ahlen;
+	ipha_t		*ipha = NULL;
+	ip6_t		*ip6h = NULL;
+	sctp_hdr_t	*insctph;
+	int		i;
+	uint16_t	port;
+	ssize_t		alen;
+	int		isv4;
+	mblk_t		*mp;
+	netstack_t	*ns = ipst->ips_netstack;
+	sctp_stack_t	*sctps = ns->netstack_sctp;
+	ip_xmit_attr_t	ixas;
+
+	bzero(&ixas, sizeof (ixas));
+
+	isv4 = (IPH_HDR_VERSION(inmp->b_rptr) == IPV4_VERSION);
+	ip_hdr_len = ira->ira_ip_hdr_length;
+	ahlen = ip_hdr_len + sizeof (sctp_hdr_t);
+
 	/*
-	 * In the normal case the ire would be non-null, however it could be
-	 * null, say, if IP needs to resolve the gateway for this address. We
-	 * only care about IRE_CACHE.
+	 * If this is a labeled system, then check to see if we're allowed to
+	 * send a response to this particular sender.  If not, then just drop.
 	 */
-	if (ire == NULL)
+	if (is_system_labeled() && !tsol_can_reply_error(inmp, ira))
 		return;
-	if (ire->ire_type != IRE_CACHE) {
-		ire_refrele(ire);
+
+	mp = allocb(ahlen + sctps->sctps_wroff_xtra, BPRI_MED);
+	if (mp == NULL) {
 		return;
 	}
-	irb = ire->ire_bucket;
-	/* ire_lock is not needed, as ire_marks is protected by irb_lock */
-	rw_enter(&irb->irb_lock, RW_WRITER);
+	mp->b_rptr += sctps->sctps_wroff_xtra;
+	mp->b_wptr = mp->b_rptr + ahlen;
+	bcopy(inmp->b_rptr, mp->b_rptr, ahlen);
+
 	/*
-	 * Only increment the temporary IRE count if the original
-	 * IRE is not already marked temporary.
+	 * We follow the logic in tcp_xmit_early_reset() in that we skip
+	 * reversing source route (i.e. replace all IP options with EOL).
 	 */
-	if (!(ire->ire_marks & IRE_MARK_TEMPORARY)) {
-		irb->irb_tmp_ire_cnt++;
-		ire->ire_marks |= IRE_MARK_TEMPORARY;
+	if (isv4) {
+		ipaddr_t	v4addr;
+
+		ipha = (ipha_t *)mp->b_rptr;
+		for (i = IP_SIMPLE_HDR_LENGTH; i < (int)ip_hdr_len; i++)
+			mp->b_rptr[i] = IPOPT_EOL;
+		/* Swap addresses */
+		ipha->ipha_length = htons(ahlen);
+		v4addr = ipha->ipha_src;
+		ipha->ipha_src = ipha->ipha_dst;
+		ipha->ipha_dst = v4addr;
+		ipha->ipha_ident = 0;
+		ipha->ipha_ttl = (uchar_t)sctps->sctps_ipv4_ttl;
+
+		ixas.ixa_flags = IXAF_BASIC_SIMPLE_V4;
+	} else {
+		in6_addr_t	v6addr;
+
+		ip6h = (ip6_t *)mp->b_rptr;
+		/* Remove any extension headers assuming partial overlay */
+		if (ip_hdr_len > IPV6_HDR_LEN) {
+			uint8_t	*to;
+
+			to = mp->b_rptr + ip_hdr_len - IPV6_HDR_LEN;
+			ovbcopy(ip6h, to, IPV6_HDR_LEN);
+			mp->b_rptr += ip_hdr_len - IPV6_HDR_LEN;
+			ip_hdr_len = IPV6_HDR_LEN;
+			ip6h = (ip6_t *)mp->b_rptr;
+			ip6h->ip6_nxt = IPPROTO_SCTP;
+			ahlen = ip_hdr_len + sizeof (sctp_hdr_t);
+		}
+		ip6h->ip6_plen = htons(ahlen - IPV6_HDR_LEN);
+		v6addr = ip6h->ip6_src;
+		ip6h->ip6_src = ip6h->ip6_dst;
+		ip6h->ip6_dst = v6addr;
+		ip6h->ip6_hops = (uchar_t)sctps->sctps_ipv6_hoplimit;
+
+		ixas.ixa_flags = IXAF_BASIC_SIMPLE_V6;
+		if (IN6_IS_ADDR_LINKSCOPE(&ip6h->ip6_dst)) {
+			ixas.ixa_flags |= IXAF_SCOPEID_SET;
+			ixas.ixa_scopeid = ira->ira_ruifindex;
+		}
 	}
-	rw_exit(&irb->irb_lock);
-	ire_refrele(ire);
+	insctph = (sctp_hdr_t *)(mp->b_rptr + ip_hdr_len);
+
+	/* Swap ports.  Verification tag is reused. */
+	port = insctph->sh_sport;
+	insctph->sh_sport = insctph->sh_dport;
+	insctph->sh_dport = port;
+	insctph->sh_verf = vtag;
+
+	/* Link in the abort chunk */
+	if ((alen = sctp_link_abort(mp, serror, details, len, iserror, tbit))
+	    < 0) {
+		freemsg(mp);
+		return;
+	}
+
+	ixas.ixa_pktlen = ahlen + alen;
+	ixas.ixa_ip_hdr_length = ip_hdr_len;
+
+	if (isv4) {
+		ipha->ipha_length = htons(ixas.ixa_pktlen);
+	} else {
+		ip6h->ip6_plen = htons(ixas.ixa_pktlen - IPV6_HDR_LEN);
+	}
+
+	ixas.ixa_protocol = IPPROTO_SCTP;
+	ixas.ixa_zoneid = ira->ira_zoneid;
+	ixas.ixa_ipst = ipst;
+	ixas.ixa_ifindex = 0;
+
+	BUMP_MIB(&sctps->sctps_mib, sctpAborted);
+
+	if (is_system_labeled()) {
+		ASSERT(ira->ira_tsl != NULL);
+
+		ixas.ixa_tsl = ira->ira_tsl;	/* A multi-level responder */
+	}
+
+	if (ira->ira_flags & IRAF_IPSEC_SECURE) {
+		/*
+		 * Apply IPsec based on how IPsec was applied to
+		 * the packet that was out of the blue.
+		 */
+		if (!ipsec_in_to_out(ira, &ixas, mp, ipha, ip6h)) {
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
+			/* Note: mp already consumed and ip_drop_packet done */
+			return;
+		}
+	} else {
+		/*
+		 * This is in clear. The abort message we are building
+		 * here should go out in clear, independent of our policy.
+		 */
+		ixas.ixa_flags |= IXAF_NO_IPSEC;
+	}
+
+	(void) ip_output_simple(mp, &ixas);
+	ixa_cleanup(&ixas);
 }
 
 /*ARGSUSED*/
@@ -418,8 +550,9 @@ sctp_add_err(sctp_t *sctp, uint16_t serror, void *details, size_t len,
 			return;
 		}
 		sendmp->b_cont = sctp->sctp_err_chunks;
-		sctp_set_iplen(sctp, sendmp);
-		sctp_add_sendq(sctp, sendmp);
+		sctp_set_iplen(sctp, sendmp, fp->ixa);
+		(void) conn_ip_output(sendmp, fp->ixa);
+		BUMP_LOCAL(sctp->sctp_opkts);
 
 		sctp->sctp_err_chunks = emp;
 		sctp->sctp_err_len = emp_len;
@@ -445,17 +578,20 @@ sctp_process_err(sctp_t *sctp)
 	sctp_stack_t *sctps = sctp->sctp_sctps;
 	mblk_t *errmp;
 	mblk_t *sendmp;
+	sctp_faddr_t *fp;
 
 	ASSERT(sctp->sctp_err_chunks != NULL);
 	errmp = sctp->sctp_err_chunks;
-	if ((sendmp = sctp_make_mp(sctp, SCTP_CHUNK_DEST(errmp), 0)) == NULL) {
+	fp = SCTP_CHUNK_DEST(errmp);
+	if ((sendmp = sctp_make_mp(sctp, fp, 0)) == NULL) {
 		SCTP_KSTAT(sctps, sctp_send_err_failed);
 		freemsg(errmp);
 		goto done;
 	}
 	sendmp->b_cont = errmp;
-	sctp_set_iplen(sctp, sendmp);
-	sctp_add_sendq(sctp, sendmp);
+	sctp_set_iplen(sctp, sendmp, fp->ixa);
+	(void) conn_ip_output(sendmp, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 done:
 	sctp->sctp_err_chunks = NULL;
 	sctp->sctp_err_len = 0;
@@ -467,7 +603,7 @@ done:
  */
 int
 sctp_handle_error(sctp_t *sctp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ch,
-    mblk_t *mp)
+    mblk_t *mp, ip_recv_attr_t *ira)
 {
 	sctp_parm_hdr_t *errh;
 	sctp_chunk_hdr_t *uch;
@@ -487,11 +623,13 @@ sctp_handle_error(sctp_t *sctp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ch,
 	 */
 	case SCTP_ERR_BAD_SID:
 		cmn_err(CE_WARN, "BUG! send to invalid SID");
-		sctp_send_abort(sctp, sctph->sh_verf, 0, NULL, 0, mp, 0, 0);
+		sctp_send_abort(sctp, sctph->sh_verf, 0, NULL, 0, mp, 0, 0,
+		    ira);
 		return (ECONNABORTED);
 	case SCTP_ERR_NO_USR_DATA:
 		cmn_err(CE_WARN, "BUG! no usr data");
-		sctp_send_abort(sctp, sctph->sh_verf, 0, NULL, 0, mp, 0, 0);
+		sctp_send_abort(sctp, sctph->sh_verf, 0, NULL, 0, mp, 0, 0,
+		    ira);
 		return (ECONNABORTED);
 	case SCTP_ERR_UNREC_CHUNK:
 		/* Pull out the unrecognized chunk type */

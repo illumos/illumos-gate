@@ -40,6 +40,7 @@
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
+#include <inet/ipsec_impl.h>
 #include <inet/sctp_ip.h>
 #include <inet/ipclassifier.h>
 #include "sctp_impl.h"
@@ -156,7 +157,7 @@ hmac_md5(uchar_t *text, size_t text_len, uchar_t *key, size_t key_len,
 static int
 validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
     sctp_init_chunk_t *init, mblk_t *inmp, sctp_parm_hdr_t **want_cookie,
-    mblk_t **errmp, int *supp_af, uint_t *sctp_options)
+    mblk_t **errmp, int *supp_af, uint_t *sctp_options, ip_recv_attr_t *ira)
 {
 	sctp_parm_hdr_t		*cph;
 	sctp_init_chunk_t	*ic;
@@ -168,6 +169,7 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 	boolean_t		got_errchunk = B_FALSE;
 	uint16_t		ptype;
 	sctp_mpc_t		mpc;
+	conn_t			*connp = sctp->sctp_connp;
 
 
 	ASSERT(errmp != NULL);
@@ -336,8 +338,8 @@ done:
 	 * is NULL.
 	 */
 	if (want_cookie == NULL &&
-	    ((sctp->sctp_family == AF_INET && !(*supp_af & PARM_SUPP_V4)) ||
-	    (sctp->sctp_family == AF_INET6 && !(*supp_af & PARM_SUPP_V6) &&
+	    ((connp->conn_family == AF_INET && !(*supp_af & PARM_SUPP_V4)) ||
+	    (connp->conn_family == AF_INET6 && !(*supp_af & PARM_SUPP_V6) &&
 	    sctp->sctp_connp->conn_ipv6_v6only))) {
 		dprint(1, ("sctp:validate_init_params: supp addr\n"));
 		serror = SCTP_ERR_BAD_ADDR;
@@ -353,7 +355,7 @@ cookie_abort:
 
 		dprint(1, ("validate_init_params: cookie absent\n"));
 		sctp_send_abort(sctp, sctp_init2vtag(ch), SCTP_ERR_MISSING_PARM,
-		    (char *)&mpc, sizeof (sctp_mpc_t), inmp, 0, B_FALSE);
+		    (char *)&mpc, sizeof (sctp_mpc_t), inmp, 0, B_FALSE, ira);
 		return (0);
 	}
 
@@ -365,7 +367,7 @@ abort:
 		return (0);
 
 	sctp_send_abort(sctp, sctp_init2vtag(ch), serror, details,
-	    errlen, inmp, 0, B_FALSE);
+	    errlen, inmp, 0, B_FALSE, ira);
 	return (0);
 }
 
@@ -453,14 +455,17 @@ cl_sctp_cookie_paddr(sctp_chunk_hdr_t *ch, in6_addr_t *addr)
 	sizeof (sctp_parm_hdr_t) +	/* param header */		\
 	16				/* MD5 hash */
 
+/*
+ * Note that sctp is the listener, hence we shouldn't modify it.
+ */
 void
 sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
-    mblk_t *initmp)
+    mblk_t *initmp, ip_recv_attr_t *ira)
 {
 	ipha_t			*initiph;
 	ip6_t			*initip6h;
-	ipha_t			*iackiph;
-	ip6_t			*iackip6h;
+	ipha_t			*iackiph = NULL;
+	ip6_t			*iackip6h = NULL;
 	sctp_chunk_hdr_t	*iack_ch;
 	sctp_init_chunk_t	*iack;
 	sctp_init_chunk_t	*init;
@@ -485,10 +490,10 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	mblk_t			*errmp = NULL;
 	boolean_t		initcollision = B_FALSE;
 	boolean_t		linklocal = B_FALSE;
-	cred_t			*cr;
-	pid_t			pid;
-	ts_label_t		*initlabel;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	conn_t			*connp = sctp->sctp_connp;
+	int			err;
+	ip_xmit_attr_t		*ixa = NULL;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 	isv4 = (IPH_HDR_VERSION(initmp->b_rptr) == IPV4_VERSION);
@@ -501,21 +506,24 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	} else {
 		initip6h = (ip6_t *)initmp->b_rptr;
 		ipsctplen = sctp->sctp_ip_hdr6_len;
-		if (IN6_IS_ADDR_LINKLOCAL(&initip6h->ip6_src))
+		if (IN6_IS_ADDR_LINKLOCAL(&initip6h->ip6_src) ||
+		    IN6_IS_ADDR_LINKLOCAL(&initip6h->ip6_dst))
 			linklocal = B_TRUE;
 		supp_af |= PARM_SUPP_V6;
+		if (!sctp->sctp_connp->conn_ipv6_v6only)
+			supp_af |= PARM_SUPP_V4;
 	}
 	ASSERT(OK_32PTR(initsh));
 	init = (sctp_init_chunk_t *)((char *)(initsh + 1) + sizeof (*iack_ch));
 
 	/* Make sure we like the peer's parameters */
 	if (validate_init_params(sctp, ch, init, initmp, NULL, &errmp,
-	    &supp_af, &sctp_options) == 0) {
+	    &supp_af, &sctp_options, ira) == 0) {
 		return;
 	}
 	if (errmp != NULL)
 		errlen = msgdsize(errmp);
-	if (sctp->sctp_family == AF_INET) {
+	if (connp->conn_family == AF_INET) {
 		/*
 		 * Irregardless of the supported address in the INIT, v4
 		 * must be supported.
@@ -580,43 +588,65 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	}
 
 	/*
-	 * If the listen socket is bound to a trusted extensions
-	 * multi-label port, attach a copy of the listener's cred
-	 * to the new INITACK mblk. Modify the cred to contain
+	 * Base the transmission on any routing-related socket options
+	 * that have been set on the listener.
+	 */
+	ixa = conn_get_ixa_exclusive(connp);
+	if (ixa == NULL) {
+		sctp_send_abort(sctp, sctp_init2vtag(ch),
+		    SCTP_ERR_NO_RESOURCES, NULL, 0, initmp, 0, B_FALSE, ira);
+		return;
+	}
+	ixa->ixa_flags &= ~IXAF_VERIFY_PMTU;
+
+	if (isv4)
+		ixa->ixa_flags |= IXAF_IS_IPV4;
+	else
+		ixa->ixa_flags &= ~IXAF_IS_IPV4;
+
+	/*
+	 * If the listen socket is bound to a trusted extensions multi-label
+	 * port, a MAC-Exempt connection with an unlabeled node, we use the
 	 * the security label of the received INIT packet.
 	 * If not a multi-label port, attach the unmodified
-	 * listener's cred directly.
+	 * listener's label directly.
 	 *
 	 * We expect Sun developed kernel modules to properly set
 	 * cred labels for sctp connections. We can't be so sure this
 	 * will be done correctly when 3rd party kernel modules
-	 * directly use sctp. The initlabel panic guard logic was
-	 * added to cover this possibility.
+	 * directly use sctp. We check for a NULL ira_tsl to cover this
+	 * possibility.
 	 */
-	if (sctp->sctp_connp->conn_mlp_type != mlptSingle) {
-		cr = msg_getcred(initmp, &pid);
-		if (cr == NULL || (initlabel = crgetlabel(cr)) == NULL) {
-			sctp_send_abort(sctp, sctp_init2vtag(ch),
-			    SCTP_ERR_UNKNOWN, NULL, 0, initmp, 0, B_FALSE);
-			return;
+	if (is_system_labeled()) {
+		/* Discard any old label */
+		if (ixa->ixa_free_flags & IXA_FREE_TSL) {
+			ASSERT(ixa->ixa_tsl != NULL);
+			label_rele(ixa->ixa_tsl);
+			ixa->ixa_free_flags &= ~IXA_FREE_TSL;
+			ixa->ixa_tsl = NULL;
 		}
-		cr = copycred_from_bslabel(CONN_CRED(sctp->sctp_connp),
-		    &initlabel->tsl_label, initlabel->tsl_doi, KM_NOSLEEP);
-		if (cr == NULL) {
-			sctp_send_abort(sctp, sctp_init2vtag(ch),
-			    SCTP_ERR_NO_RESOURCES, NULL, 0, initmp, 0, B_FALSE);
-			return;
+
+		if (connp->conn_mlp_type != mlptSingle ||
+		    connp->conn_mac_mode != CONN_MAC_DEFAULT) {
+			if (ira->ira_tsl == NULL) {
+				sctp_send_abort(sctp, sctp_init2vtag(ch),
+				    SCTP_ERR_UNKNOWN, NULL, 0, initmp, 0,
+				    B_FALSE, ira);
+				ixa_refrele(ixa);
+				return;
+			}
+			label_hold(ira->ira_tsl);
+			ip_xmit_attr_replace_tsl(ixa, ira->ira_tsl);
+		} else {
+			ixa->ixa_tsl = crgetlabel(connp->conn_cred);
 		}
-		iackmp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra,
-		    cr, pid);
-		crfree(cr);
-	} else {
-		iackmp = allocb_cred(ipsctplen + sctps->sctps_wroff_xtra,
-		    CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
 	}
+
+	iackmp = allocb(ipsctplen + sctps->sctps_wroff_xtra, BPRI_MED);
 	if (iackmp == NULL) {
 		sctp_send_abort(sctp, sctp_init2vtag(ch),
-		    SCTP_ERR_NO_RESOURCES, NULL, 0, initmp, 0, B_FALSE);
+		    SCTP_ERR_NO_RESOURCES, NULL, 0, initmp, 0, B_FALSE, ira);
+		ixa_refrele(ixa);
 		return;
 	}
 
@@ -632,6 +662,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 		iackiph->ipha_src = initiph->ipha_dst;
 		iackiph->ipha_length = htons(ipsctplen + errlen);
 		iacksh = (sctp_hdr_t *)(p + sctp->sctp_ip_hdr_len);
+		ixa->ixa_ip_hdr_length = sctp->sctp_ip_hdr_len;
 	} else {
 		bcopy(sctp->sctp_iphc6, p, sctp->sctp_hdr6_len);
 		iackip6h = (ip6_t *)p;
@@ -639,10 +670,12 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 		/* Copy the peer's IP addr */
 		iackip6h->ip6_dst = initip6h->ip6_src;
 		iackip6h->ip6_src = initip6h->ip6_dst;
-		iackip6h->ip6_plen = htons(ipsctplen - sizeof (*iackip6h) +
-		    errlen);
+		iackip6h->ip6_plen = htons(ipsctplen + errlen - IPV6_HDR_LEN);
 		iacksh = (sctp_hdr_t *)(p + sctp->sctp_ip_hdr6_len);
+		ixa->ixa_ip_hdr_length = sctp->sctp_ip_hdr6_len;
 	}
+	ixa->ixa_pktlen = ipsctplen + errlen;
+
 	ASSERT(OK_32PTR(iacksh));
 
 	/* Fill in the holes in the SCTP common header */
@@ -776,41 +809,58 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 
 	iackmp->b_cont = errmp;		/*  OK if NULL */
 
-	if (is_system_labeled() && (cr = msg_getcred(iackmp, &pid)) != NULL &&
-	    crgetlabel(cr) != NULL) {
-		conn_t *connp = sctp->sctp_connp;
-		int err;
+	if (is_system_labeled()) {
+		ts_label_t *effective_tsl = NULL;
 
-		if (isv4)
-			err = tsol_check_label(cr, &iackmp,
-			    connp->conn_mac_mode,
-			    sctps->sctps_netstack->netstack_ip, pid);
-		else
-			err = tsol_check_label_v6(cr, &iackmp,
-			    connp->conn_mac_mode,
-			    sctps->sctps_netstack->netstack_ip, pid);
+		ASSERT(ira->ira_tsl != NULL);
+
+		/* Discard any old label */
+		if (ixa->ixa_free_flags & IXA_FREE_TSL) {
+			ASSERT(ixa->ixa_tsl != NULL);
+			label_rele(ixa->ixa_tsl);
+			ixa->ixa_free_flags &= ~IXA_FREE_TSL;
+		}
+		ixa->ixa_tsl = ira->ira_tsl;	/* A multi-level responder */
+
+		/*
+		 * We need to check for label-related failures which implies
+		 * an extra call to tsol_check_dest (as ip_output_simple
+		 * also does a tsol_check_dest as part of computing the
+		 * label for the packet, but ip_output_simple doesn't return
+		 * a specific errno for that case so we can't rely on its
+		 * check.)
+		 */
+		if (isv4) {
+			err = tsol_check_dest(ixa->ixa_tsl, &iackiph->ipha_dst,
+			    IPV4_VERSION, connp->conn_mac_mode,
+			    connp->conn_zone_is_global, &effective_tsl);
+		} else {
+			err = tsol_check_dest(ixa->ixa_tsl, &iackip6h->ip6_dst,
+			    IPV6_VERSION, connp->conn_mac_mode,
+			    connp->conn_zone_is_global, &effective_tsl);
+		}
 		if (err != 0) {
 			sctp_send_abort(sctp, sctp_init2vtag(ch),
-			    SCTP_ERR_AUTH_ERR, NULL, 0, initmp, 0, B_FALSE);
+			    SCTP_ERR_AUTH_ERR, NULL, 0, initmp, 0, B_FALSE,
+			    ira);
+			ixa_refrele(ixa);
 			freemsg(iackmp);
 			return;
 		}
+		if (effective_tsl != NULL) {
+			/*
+			 * Since ip_output_simple will redo the
+			 * tsol_check_dest, we just drop the ref.
+			 */
+			label_rele(effective_tsl);
+		}
 	}
 
-	/*
-	 * Stash the conn ptr info. for IP only as e don't have any
-	 * cached IRE.
-	 */
-	SCTP_STASH_IPINFO(iackmp, (ire_t *)NULL);
-
-	/* XXX sctp == sctp_g_q, so using its obchunks is valid */
 	BUMP_LOCAL(sctp->sctp_opkts);
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	/* OK to call IP_PUT() here instead of sctp_add_sendq(). */
-	CONN_INC_REF(sctp->sctp_connp);
-	iackmp->b_flag |= MSGHASREF;
-	IP_PUT(iackmp, sctp->sctp_connp, isv4);
+	(void) ip_output_simple(iackmp, ixa);
+	ixa_refrele(ixa);
 }
 
 void
@@ -820,7 +870,7 @@ sctp_send_cookie_ack(sctp_t *sctp)
 	mblk_t *camp;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
-	camp = sctp_make_mp(sctp, NULL, sizeof (*cach));
+	camp = sctp_make_mp(sctp, sctp->sctp_current, sizeof (*cach));
 	if (camp == NULL) {
 		/* XXX should abort, but don't have the inmp anymore */
 		SCTP_KSTAT(sctps, sctp_send_cookie_ack_failed);
@@ -833,11 +883,11 @@ sctp_send_cookie_ack(sctp_t *sctp)
 	cach->sch_flags = 0;
 	cach->sch_len = htons(sizeof (*cach));
 
-	sctp_set_iplen(sctp, camp);
-
 	BUMP_LOCAL(sctp->sctp_obchunks);
 
-	sctp_add_sendq(sctp, camp);
+	sctp_set_iplen(sctp, camp, sctp->sctp_current->ixa);
+	(void) conn_ip_output(camp, sctp->sctp_current->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 }
 
 static int
@@ -859,7 +909,8 @@ sctp_find_al_ind(sctp_parm_hdr_t *sph, ssize_t len, uint32_t *adaptation_code)
 }
 
 void
-sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
+sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp,
+    ip_recv_attr_t *ira)
 {
 	mblk_t			*cemp;
 	mblk_t			*mp = NULL;
@@ -886,7 +937,7 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 
 	cph = NULL;
 	if (validate_init_params(sctp, iackch, iack, iackmp, &cph, &errmp,
-	    &pad, &sctp_options) == 0) { /* result in 'pad' ignored */
+	    &pad, &sctp_options, ira) == 0) { /* result in 'pad' ignored */
 		BUMP_MIB(&sctps->sctps_mib, sctpAborted);
 		sctp_assoc_event(sctp, SCTP_CANT_STR_ASSOC, 0, NULL);
 		sctp_clean_death(sctp, ECONNABORTED);
@@ -906,8 +957,8 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 	else
 		hdrlen = sctp->sctp_hdr6_len;
 
-	cemp = allocb_cred(sctps->sctps_wroff_xtra + hdrlen + ceclen + pad,
-	    CONN_CRED(sctp->sctp_connp), sctp->sctp_cpid);
+	cemp = allocb(sctps->sctps_wroff_xtra + hdrlen + ceclen + pad,
+	    BPRI_MED);
 	if (cemp == NULL) {
 		SCTP_FADDR_TIMER_RESTART(sctp, sctp->sctp_current,
 		    sctp->sctp_current->rto);
@@ -932,11 +983,13 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 	 * in sctp_connect().
 	 */
 	sctp->sctp_current->df = B_TRUE;
+	sctp->sctp_ipha->ipha_fragment_offset_and_flags |= IPH_DF_HTONS;
+
 	/*
 	 * Since IP uses this info during the fanout process, we need to hold
 	 * the lock for this hash line while performing this operation.
 	 */
-	/* XXX sctp_conn_fanout + SCTP_CONN_HASH(sctps, sctp->sctp_ports); */
+	/* XXX sctp_conn_fanout + SCTP_CONN_HASH(sctps, connp->conn_ports); */
 	ASSERT(sctp->sctp_conn_tfp != NULL);
 	tf = sctp->sctp_conn_tfp;
 	/* sctp isn't a listener so only need to hold conn fanout lock */
@@ -1139,14 +1192,15 @@ sendcookie:
 	sctp->sctp_state = SCTPS_COOKIE_ECHOED;
 	SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 
-	sctp_set_iplen(sctp, head);
-	sctp_add_sendq(sctp, head);
+	sctp_set_iplen(sctp, head, fp->ixa);
+	(void) conn_ip_output(head, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 }
 
 int
 sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
     sctp_init_chunk_t **iackpp, sctp_hdr_t *insctph, int *recv_adaptation,
-    in6_addr_t *peer_addr)
+    in6_addr_t *peer_addr, ip_recv_attr_t *ira)
 {
 	int32_t			clen;
 	size_t			initplen;
@@ -1163,6 +1217,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 	uint32_t		*fttag;
 	uint32_t		ports;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	conn_t			*connp = sctp->sctp_connp;
 
 	BUMP_LOCAL(sctp->sctp_ibchunks);
 	/* Verify the ICV */
@@ -1232,7 +1287,8 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 		staleness = TICK_TO_USEC(diff);
 		staleness = htonl(staleness);
 		sctp_send_abort(sctp, init->sic_inittag, SCTP_ERR_STALE_COOKIE,
-		    (char *)&staleness, sizeof (staleness), cmp, 1, B_FALSE);
+		    (char *)&staleness, sizeof (staleness), cmp, 1, B_FALSE,
+		    ira);
 
 		dprint(1, ("stale cookie %d\n", staleness));
 
@@ -1242,7 +1298,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 	/* Check for attack by adding addresses to a restart */
 	bcopy(insctph, &ports, sizeof (ports));
 	if (sctp_secure_restart_check(cmp, initch, ports, KM_NOSLEEP,
-	    sctps) != 1) {
+	    sctps, ira) != 1) {
 		return (-1);
 	}
 
@@ -1263,7 +1319,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 
 			dprint(1, ("duplicate cookie from %x:%x:%x:%x (%d)\n",
 			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
-			    (int)(sctp->sctp_fport)));
+			    (int)(connp->conn_fport)));
 			return (-1);
 		}
 
@@ -1292,7 +1348,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 
 			dprint(1, ("sctp peer %x:%x:%x:%x (%d) restarted\n",
 			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
-			    (int)(sctp->sctp_fport)));
+			    (int)(connp->conn_fport)));
 			/* reset parameters */
 			sctp_congest_reset(sctp);
 
@@ -1320,7 +1376,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 
 			dprint(1, ("init collision with %x:%x:%x:%x (%d)\n",
 			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
-			    (int)(sctp->sctp_fport)));
+			    (int)(connp->conn_fport)));
 
 			return (0);
 		} else if (iack->sic_inittag != sctp->sctp_lvtag &&
@@ -1330,7 +1386,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 			/* Section 5.2.4 case C: late COOKIE */
 			dprint(1, ("late cookie from %x:%x:%x:%x (%d)\n",
 			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
-			    (int)(sctp->sctp_fport)));
+			    (int)(connp->conn_fport)));
 			return (-1);
 		} else if (init->sic_inittag == sctp->sctp_fvtag &&
 		    iack->sic_inittag == sctp->sctp_lvtag) {
@@ -1341,7 +1397,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 			 */
 			dprint(1, ("cookie tags match from %x:%x:%x:%x (%d)\n",
 			    SCTP_PRINTADDR(sctp->sctp_current->faddr),
-			    (int)(sctp->sctp_fport)));
+			    (int)(connp->conn_fport)));
 			if (sctp->sctp_state < SCTPS_ESTABLISHED) {
 				if (!sctp_initialize_params(sctp, init, iack))
 					return (-1);	/* Drop? */
@@ -1412,13 +1468,17 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 		/*
 		 * params have been put in host byteorder by
 		 * sctp_check_input()
+		 *
+		 * For labeled systems, there's no need to check the
+		 * label here.  It's known to be good as we checked
+		 * before allowing the connection to become bound.
 		 */
 		if (ph->sph_type == PARM_ADDR4) {
 			IN6_INADDR_TO_V4MAPPED((struct in_addr *)(ph + 1),
 			    &src);
 
 			sctp = sctp_conn_match(&src, &dst, ports, zoneid,
-			    sctps);
+			    0, sctps);
 
 			dprint(1,
 			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",
@@ -1431,7 +1491,7 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 		} else if (ph->sph_type == PARM_ADDR6) {
 			src = *(in6_addr_t *)(ph + 1);
 			sctp = sctp_conn_match(&src, &dst, ports, zoneid,
-			    sctps);
+			    0, sctps);
 
 			dprint(1,
 			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",

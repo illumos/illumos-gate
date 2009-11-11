@@ -60,9 +60,6 @@
 #include <inet/ip_rts.h>
 #include <inet/nd.h>
 
-#include <net/pfkeyv2.h>
-#include <inet/ipsec_info.h>
-#include <inet/sadb.h>
 #include <inet/tcp.h>
 #include <inet/ipclassifier.h>
 #include <sys/zone.h>
@@ -73,6 +70,11 @@
 
 struct kmem_cache *rt_entry_cache;
 
+typedef struct nce_clookup_s {
+	ipaddr_t ncecl_addr;
+	boolean_t ncecl_found;
+} nce_clookup_t;
+
 /*
  * Synchronization notes:
  *
@@ -80,17 +82,17 @@ struct kmem_cache *rt_entry_cache;
  *
  * ire_next/ire_ptpn
  *
- *	- bucket lock of the respective tables (cache or forwarding tables).
+ *	- bucket lock of the forwarding table in which is ire stored.
  *
- * ire_mp, ire_rfq, ire_stq, ire_u *except* ire_gateway_addr[v6], ire_mask,
- * ire_type, ire_create_time, ire_masklen, ire_ipversion, ire_flags, ire_ipif,
- * ire_ihandle, ire_phandle, ire_nce, ire_bucket, ire_in_ill, ire_in_src_addr
+ * ire_ill, ire_u *except* ire_gateway_addr[v6], ire_mask,
+ * ire_type, ire_create_time, ire_masklen, ire_ipversion, ire_flags,
+ * ire_bucket
  *
  *	- Set in ire_create_v4/v6 and never changes after that. Thus,
  *	  we don't need a lock whenever these fields are accessed.
  *
  *	- ire_bucket and ire_masklen (also set in ire_create) is set in
- *        ire_add_v4/ire_add_v6 before inserting in the bucket and never
+ *        ire_add before inserting in the bucket and never
  *        changes after that. Thus we don't need a lock whenever these
  *	  fields are accessed.
  *
@@ -102,7 +104,7 @@ struct kmem_cache *rt_entry_cache;
  *	  does not use any locks. ire_gateway_addr_v6 updates are not atomic
  *	  and hence any access to it uses ire_lock to get/set the right value.
  *
- * ire_ident, ire_refcnt
+ * ire_refcnt, ire_identical_ref
  *
  *	- Updated atomically using atomic_add_32
  *
@@ -111,40 +113,33 @@ struct kmem_cache *rt_entry_cache;
  *	- Assumes that 32 bit writes are atomic. No locks. ire_lock is
  *	  used to serialize updates to ire_ssthresh, ire_rtt_sd, ire_rtt.
  *
- * ire_max_frag, ire_frag_flag
+ * ire_generation
+ *	- Under ire_lock
  *
- *	- ire_lock is used to set/read both of them together.
+ * ire_nce_cache
+ *	- Under ire_lock
  *
- * ire_tire_mark
+ * ire_dep_parent (To next IRE in recursive lookup chain)
+ *	- Under ips_ire_dep_lock. Write held when modifying. Read held when
+ *	  walking. We also hold ire_lock when modifying to allow the data path
+ *	  to only acquire ire_lock.
  *
- *	- Set in ire_create and updated in ire_expire, which is called
- *	  by only one function namely ip_trash_timer_expire. Thus only
- *	  one function updates and examines the value.
+ * ire_dep_parent_generation (Generation number from ire_dep_parent)
+ *	- Under ips_ire_dep_lock and/or ire_lock. (A read claim on the dep_lock
+ *	  and ire_lock held when modifying)
  *
- * ire_marks
- *	- bucket lock protects this.
- *
- * ire_ll_hdr_length
- *
- *	- Place holder for returning the information to the upper layers
- *	  when IRE_DB_REQ comes down.
- *
- *
- * ipv6_ire_default_count is protected by the bucket lock of
- * ip_forwarding_table_v6[0][0].
- *
- * ipv6_ire_default_index is not protected as it  is just a hint
- * at which default gateway to use. There is nothing
- * wrong in using the same gateway for two different connections.
+ * ire_dep_children (From parent to first child)
+ * ire_dep_sib_next (linked list of siblings)
+ * ire_dep_sib_ptpn (linked list of siblings)
+ *	- Under ips_ire_dep_lock. Write held when modifying. Read held when
+ *	  walking.
  *
  * As we always hold the bucket locks in all the places while accessing
  * the above values, it is natural to use them for protecting them.
  *
- * We have a separate cache table and forwarding table for IPv4 and IPv6.
- * Cache table (ip_cache_table/ip_cache_table_v6) is a pointer to an
- * array of irb_t structures. The IPv6 forwarding table
+ * We have a forwarding table for IPv4 and IPv6. The IPv6 forwarding table
  * (ip_forwarding_table_v6) is an array of pointers to arrays of irb_t
- *  structure. ip_forwarding_table_v6 is allocated dynamically in
+ * structures. ip_forwarding_table_v6 is allocated dynamically in
  * ire_add_v6. ire_ft_init_lock is used to serialize multiple threads
  * initializing the same bucket. Once a bucket is initialized, it is never
  * de-alloacted. This assumption enables us to access
@@ -158,39 +153,37 @@ struct kmem_cache *rt_entry_cache;
  * a bucket and the ires residing in the bucket have a back pointer to
  * the bucket structure. It also has a reference count for the number
  * of threads walking the bucket - irb_refcnt which is bumped up
- * using the macro IRB_REFHOLD macro. The flags irb_flags can be
- * set to IRE_MARK_CONDEMNED indicating that there are some ires
- * in this bucket that are marked with IRE_MARK_CONDEMNED and the
+ * using the irb_refhold function. The flags irb_marks can be
+ * set to IRB_MARK_CONDEMNED indicating that there are some ires
+ * in this bucket that are IRE_IS_CONDEMNED and the
  * last thread to leave the bucket should delete the ires. Usually
- * this is done by the IRB_REFRELE macro which is used to decrement
+ * this is done by the irb_refrele function which is used to decrement
  * the reference count on a bucket. See comments above irb_t structure
  * definition in ip.h for further details.
  *
- * IRE_REFHOLD/IRE_REFRELE macros operate on the ire which increments/
+ * The ire_refhold/ire_refrele functions operate on the ire which increments/
  * decrements the reference count, ire_refcnt, atomically on the ire.
- * ire_refcnt is modified only using this macro. Operations on the IRE
+ * ire_refcnt is modified only using those functions. Operations on the IRE
  * could be described as follows :
  *
  * CREATE an ire with reference count initialized to 1.
  *
  * ADDITION of an ire holds the bucket lock, checks for duplicates
- * and then adds the ire. ire_add_v4/ire_add_v6 returns the ire after
+ * and then adds the ire. ire_add returns the ire after
  * bumping up once more i.e the reference count is 2. This is to avoid
  * an extra lookup in the functions calling ire_add which wants to
  * work with the ire after adding.
  *
- * LOOKUP of an ire bumps up the reference count using IRE_REFHOLD
- * macro. It is valid to bump up the referece count of the IRE,
+ * LOOKUP of an ire bumps up the reference count using ire_refhold
+ * function. It is valid to bump up the referece count of the IRE,
  * after the lookup has returned an ire. Following are the lookup
  * functions that return an HELD ire :
  *
- * ire_lookup_local[_v6], ire_ctable_lookup[_v6], ire_ftable_lookup[_v6],
- * ire_cache_lookup[_v6], ire_lookup_multi[_v6], ire_route_lookup[_v6],
- * ipif_to_ire[_v6].
+ * ire_ftable_lookup[_v6], ire_lookup_multi_ill[_v6]
  *
  * DELETION of an ire holds the bucket lock, removes it from the list
  * and then decrements the reference count for having removed from the list
- * by using the IRE_REFRELE macro. If some other thread has looked up
+ * by using the ire_refrele function. If some other thread has looked up
  * the ire, the reference count would have been bumped up and hence
  * this ire will not be freed once deleted. It will be freed once the
  * reference count drops to zero.
@@ -198,27 +191,12 @@ struct kmem_cache *rt_entry_cache;
  * Add and Delete acquires the bucket lock as RW_WRITER, while all the
  * lookups acquire the bucket lock as RW_READER.
  *
- * NOTE : The only functions that does the IRE_REFRELE when an ire is
- *	  passed as an argument are :
- *
- *	  1) ip_wput_ire : This is because it IRE_REFHOLD/RELEs the
- *			   broadcast ires it looks up internally within
- *			   the function. Currently, for simplicity it does
- *			   not differentiate the one that is passed in and
- *			   the ones it looks up internally. It always
- *			   IRE_REFRELEs.
- *	  2) ire_send
- *	     ire_send_v6 : As ire_send calls ip_wput_ire and other functions
- *			   that take ire as an argument, it has to selectively
- *			   IRE_REFRELE the ire. To maintain symmetry,
- *			   ire_send_v6 does the same.
- *
- * Otherwise, the general rule is to do the IRE_REFRELE in the function
+ * The general rule is to do the ire_refrele in the function
  * that is passing the ire as an argument.
  *
  * In trying to locate ires the following points are to be noted.
  *
- * IRE_MARK_CONDEMNED signifies that the ire has been logically deleted and is
+ * IRE_IS_CONDEMNED signifies that the ire has been logically deleted and is
  * to be ignored when walking the ires using ire_next.
  *
  * Zones note:
@@ -230,14 +208,6 @@ struct kmem_cache *rt_entry_cache;
  */
 
 /*
- * The minimum size of IRE cache table.  It will be recalcuated in
- * ip_ire_init().
- * Setable in /etc/system
- */
-uint32_t ip_cache_table_size = IP_CACHE_TABLE_SIZE;
-uint32_t ip6_cache_table_size = IP6_CACHE_TABLE_SIZE;
-
-/*
  * The size of the forwarding table.  We will make sure that it is a
  * power of 2 in ip_ire_init().
  * Setable in /etc/system
@@ -245,121 +215,148 @@ uint32_t ip6_cache_table_size = IP6_CACHE_TABLE_SIZE;
 uint32_t ip6_ftable_hash_size = IP6_FTABLE_HASH_SIZE;
 
 struct	kmem_cache	*ire_cache;
+struct	kmem_cache	*ncec_cache;
+struct	kmem_cache	*nce_cache;
+
 static ire_t	ire_null;
 
-/*
- * The threshold number of IRE in a bucket when the IREs are
- * cleaned up.  This threshold is calculated later in ip_open()
- * based on the speed of CPU and available memory.  This default
- * value is the maximum.
- *
- * We have two kinds of cached IRE, temporary and
- * non-temporary.  Temporary IREs are marked with
- * IRE_MARK_TEMPORARY.  They are IREs created for non
- * TCP traffic and for forwarding purposes.  All others
- * are non-temporary IREs.  We don't mark IRE created for
- * TCP as temporary because TCP is stateful and there are
- * info stored in the IRE which can be shared by other TCP
- * connections to the same destination.  For connected
- * endpoint, we also don't want to mark the IRE used as
- * temporary because the same IRE will be used frequently,
- * otherwise, the app should not do a connect().  We change
- * the marking at ip_bind_connected_*() if necessary.
- *
- * We want to keep the cache IRE hash bucket length reasonably
- * short, otherwise IRE lookup functions will take "forever."
- * We use the "crude" function that the IRE bucket
- * length should be based on the CPU speed, which is 1 entry
- * per x MHz, depending on the shift factor ip_ire_cpu_ratio
- * (n).  This means that with a 750MHz CPU, the max bucket
- * length can be (750 >> n) entries.
- *
- * Note that this threshold is separate for temp and non-temp
- * IREs.  This means that the actual bucket length can be
- * twice as that.  And while we try to keep temporary IRE
- * length at most at the threshold value, we do not attempt to
- * make the length for non-temporary IREs fixed, for the
- * reason stated above.  Instead, we start trying to find
- * "unused" non-temporary IREs when the bucket length reaches
- * this threshold and clean them up.
- *
- * We also want to limit the amount of memory used by
- * IREs.  So if we are allowed to use ~3% of memory (M)
- * for those IREs, each bucket should not have more than
- *
- * 	M / num of cache bucket / sizeof (ire_t)
- *
- * Again the above memory uses are separate for temp and
- * non-temp cached IREs.
- *
- * We may also want the limit to be a function of the number
- * of interfaces and number of CPUs.  Doing the initialization
- * in ip_open() means that every time an interface is plumbed,
- * the max is re-calculated.  Right now, we don't do anything
- * different.  In future, when we have more experience, we
- * may want to change this behavior.
- */
-uint32_t ip_ire_max_bucket_cnt = 10;	/* Setable in /etc/system */
-uint32_t ip6_ire_max_bucket_cnt = 10;
-uint32_t ip_ire_cleanup_cnt = 2;
-
-/*
- * The minimum of the temporary IRE bucket count.  We do not want
- * the length of each bucket to be too short.  This may hurt
- * performance of some apps as the temporary IREs are removed too
- * often.
- */
-uint32_t ip_ire_min_bucket_cnt = 3;	/* /etc/system - not used */
-uint32_t ip6_ire_min_bucket_cnt = 3;
-
-/*
- * The ratio of memory consumed by IRE used for temporary to available
- * memory.  This is a shift factor, so 6 means the ratio 1 to 64.  This
- * value can be changed in /etc/system.  6 is a reasonable number.
- */
-uint32_t ip_ire_mem_ratio = 6;	/* /etc/system */
-/* The shift factor for CPU speed to calculate the max IRE bucket length. */
-uint32_t ip_ire_cpu_ratio = 7;	/* /etc/system */
-
-typedef struct nce_clookup_s {
-	ipaddr_t ncecl_addr;
-	boolean_t ncecl_found;
-} nce_clookup_t;
-
-/*
- * The maximum number of buckets in IRE cache table.  In future, we may
- * want to make it a dynamic hash table.  For the moment, we fix the
- * size and allocate the table in ip_ire_init() when IP is first loaded.
- * We take into account the amount of memory a system has.
- */
-#define	IP_MAX_CACHE_TABLE_SIZE	4096
-
-/* Setable in /etc/system */
-static uint32_t	ip_max_cache_table_size = IP_MAX_CACHE_TABLE_SIZE;
-static uint32_t	ip6_max_cache_table_size = IP_MAX_CACHE_TABLE_SIZE;
-
-/* Zero iulp_t for initialization. */
-const iulp_t	ire_uinfo_null = { 0 };
-
-static int	ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp,
-    ipsq_func_t func, boolean_t);
+static ire_t	*ire_add_v4(ire_t *ire);
 static void	ire_delete_v4(ire_t *ire);
+static void	ire_dep_invalidate_children(ire_t *child);
 static void	ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers,
     zoneid_t zoneid, ip_stack_t *);
 static void	ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type,
     pfv_t func, void *arg, uchar_t vers, ill_t *ill);
-static void	ire_cache_cleanup(irb_t *irb, uint32_t threshold,
-    ire_t *ref_ire);
-static	void	ip_nce_clookup_and_delete(nce_t *nce, void *arg);
-static	ire_t	*ip4_ctable_lookup_impl(ire_ctable_args_t *margs);
 #ifdef DEBUG
 static void	ire_trace_cleanup(const ire_t *);
 #endif
 
 /*
- * To avoid bloating the code, we call this function instead of
- * using the macro IRE_REFRELE. Use macro only in performance
- * critical paths.
+ * Following are the functions to increment/decrement the reference
+ * count of the IREs and IRBs (ire bucket).
+ *
+ * 1) We bump up the reference count of an IRE to make sure that
+ *    it does not get deleted and freed while we are using it.
+ *    Typically all the lookup functions hold the bucket lock,
+ *    and look for the IRE. If it finds an IRE, it bumps up the
+ *    reference count before dropping the lock. Sometimes we *may* want
+ *    to bump up the reference count after we *looked* up i.e without
+ *    holding the bucket lock. So, the ire_refhold function does not assert
+ *    on the bucket lock being held. Any thread trying to delete from
+ *    the hash bucket can still do so but cannot free the IRE if
+ *    ire_refcnt is not 0.
+ *
+ * 2) We bump up the reference count on the bucket where the IRE resides
+ *    (IRB), when we want to prevent the IREs getting deleted from a given
+ *    hash bucket. This makes life easier for ire_walk type functions which
+ *    wants to walk the IRE list, call a function, but needs to drop
+ *    the bucket lock to prevent recursive rw_enters. While the
+ *    lock is dropped, the list could be changed by other threads or
+ *    the same thread could end up deleting the ire or the ire pointed by
+ *    ire_next. ire_refholding the ire or ire_next is not sufficient as
+ *    a delete will still remove the ire from the bucket while we have
+ *    dropped the lock and hence the ire_next would be NULL. Thus, we
+ *    need a mechanism to prevent deletions from a given bucket.
+ *
+ *    To prevent deletions, we bump up the reference count on the
+ *    bucket. If the bucket is held, ire_delete just marks both
+ *    the ire and irb as CONDEMNED. When the
+ *    reference count on the bucket drops to zero, all the CONDEMNED ires
+ *    are deleted. We don't have to bump up the reference count on the
+ *    bucket if we are walking the bucket and never have to drop the bucket
+ *    lock. Note that irb_refhold does not prevent addition of new ires
+ *    in the list. It is okay because addition of new ires will not cause
+ *    ire_next to point to freed memory. We do irb_refhold only when
+ *    all of the 3 conditions are true :
+ *
+ *    1) The code needs to walk the IRE bucket from start to end.
+ *    2) It may have to drop the bucket lock sometimes while doing (1)
+ *    3) It does not want any ires to be deleted meanwhile.
+ */
+
+/*
+ * Bump up the reference count on the hash bucket - IRB to
+ * prevent ires from being deleted in this bucket.
+ */
+void
+irb_refhold(irb_t *irb)
+{
+	rw_enter(&irb->irb_lock, RW_WRITER);
+	irb->irb_refcnt++;
+	ASSERT(irb->irb_refcnt != 0);
+	rw_exit(&irb->irb_lock);
+}
+
+void
+irb_refhold_locked(irb_t *irb)
+{
+	ASSERT(RW_WRITE_HELD(&irb->irb_lock));
+	irb->irb_refcnt++;
+	ASSERT(irb->irb_refcnt != 0);
+}
+
+/*
+ * Note: when IRB_MARK_DYNAMIC is not set the irb_t
+ * is statically allocated, so that when the irb_refcnt goes to 0,
+ * we simply clean up the ire list and continue.
+ */
+void
+irb_refrele(irb_t *irb)
+{
+	if (irb->irb_marks & IRB_MARK_DYNAMIC) {
+		irb_refrele_ftable(irb);
+	} else {
+		rw_enter(&irb->irb_lock, RW_WRITER);
+		ASSERT(irb->irb_refcnt != 0);
+		if (--irb->irb_refcnt	== 0 &&
+		    (irb->irb_marks & IRB_MARK_CONDEMNED)) {
+			ire_t *ire_list;
+
+			ire_list = ire_unlink(irb);
+			rw_exit(&irb->irb_lock);
+			ASSERT(ire_list != NULL);
+			ire_cleanup(ire_list);
+		} else {
+			rw_exit(&irb->irb_lock);
+		}
+	}
+}
+
+
+/*
+ * Bump up the reference count on the IRE. We cannot assert that the
+ * bucket lock is being held as it is legal to bump up the reference
+ * count after the first lookup has returned the IRE without
+ * holding the lock.
+ */
+void
+ire_refhold(ire_t *ire)
+{
+	atomic_add_32(&(ire)->ire_refcnt, 1);
+	ASSERT((ire)->ire_refcnt != 0);
+#ifdef DEBUG
+	ire_trace_ref(ire);
+#endif
+}
+
+void
+ire_refhold_notr(ire_t *ire)
+{
+	atomic_add_32(&(ire)->ire_refcnt, 1);
+	ASSERT((ire)->ire_refcnt != 0);
+}
+
+void
+ire_refhold_locked(ire_t *ire)
+{
+#ifdef DEBUG
+	ire_trace_ref(ire);
+#endif
+	ire->ire_refcnt++;
+}
+
+/*
+ * Release a ref on an IRE.
  *
  * Must not be called while holding any locks. Otherwise if this is
  * the last reference to be released there is a chance of recursive mutex
@@ -367,191 +364,64 @@ static void	ire_trace_cleanup(const ire_t *);
  * to restart an ioctl. The one exception is when the caller is sure that
  * this is not the last reference to be released. Eg. if the caller is
  * sure that the ire has not been deleted and won't be deleted.
+ *
+ * In architectures e.g sun4u, where atomic_add_32_nv is just
+ * a cas, we need to maintain the right memory barrier semantics
+ * as that of mutex_exit i.e all the loads and stores should complete
+ * before the cas is executed. membar_exit() does that here.
  */
 void
 ire_refrele(ire_t *ire)
 {
-	IRE_REFRELE(ire);
+#ifdef DEBUG
+	ire_untrace_ref(ire);
+#endif
+	ASSERT((ire)->ire_refcnt != 0);
+	membar_exit();
+	if (atomic_add_32_nv(&(ire)->ire_refcnt, -1) == 0)
+		ire_inactive(ire);
 }
 
 void
 ire_refrele_notr(ire_t *ire)
 {
-	IRE_REFRELE_NOTR(ire);
-}
-
-/*
- * kmem_cache_alloc constructor for IRE in kma space.
- * Note that when ire_mp is set the IRE is stored in that mblk and
- * not in this cache.
- */
-/* ARGSUSED */
-static int
-ip_ire_constructor(void *buf, void *cdrarg, int kmflags)
-{
-	ire_t	*ire = buf;
-
-	ire->ire_nce = NULL;
-
-	return (0);
-}
-
-/* ARGSUSED1 */
-static void
-ip_ire_destructor(void *buf, void *cdrarg)
-{
-	ire_t	*ire = buf;
-
-	ASSERT(ire->ire_nce == NULL);
-}
-
-/*
- * This function is associated with the IP_IOC_IRE_ADVISE_NO_REPLY
- * IOCTL.  It is used by TCP (or other ULPs) to supply revised information
- * for an existing CACHED IRE.
- */
-/* ARGSUSED */
-int
-ip_ire_advise(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
-{
-	uchar_t	*addr_ucp;
-	ipic_t	*ipic;
-	ire_t	*ire;
-	ipaddr_t	addr;
-	in6_addr_t	v6addr;
-	irb_t	*irb;
-	zoneid_t	zoneid;
-	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
-
-	ASSERT(q->q_next == NULL);
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
-
-	/*
-	 * Check privilege using the ioctl credential; if it is NULL
-	 * then this is a kernel message and therefor privileged.
-	 */
-	if (ioc_cr != NULL && secpolicy_ip_config(ioc_cr, B_FALSE) != 0)
-		return (EPERM);
-
-	ipic = (ipic_t *)mp->b_rptr;
-	if (!(addr_ucp = mi_offset_param(mp, ipic->ipic_addr_offset,
-	    ipic->ipic_addr_length))) {
-		return (EINVAL);
-	}
-	if (!OK_32PTR(addr_ucp))
-		return (EINVAL);
-	switch (ipic->ipic_addr_length) {
-	case IP_ADDR_LEN: {
-		/* Extract the destination address. */
-		addr = *(ipaddr_t *)addr_ucp;
-		/* Find the corresponding IRE. */
-		ire = ire_cache_lookup(addr, zoneid, NULL, ipst);
-		break;
-	}
-	case IPV6_ADDR_LEN: {
-		/* Extract the destination address. */
-		v6addr = *(in6_addr_t *)addr_ucp;
-		/* Find the corresponding IRE. */
-		ire = ire_cache_lookup_v6(&v6addr, zoneid, NULL, ipst);
-		break;
-	}
-	default:
-		return (EINVAL);
-	}
-
-	if (ire == NULL)
-		return (ENOENT);
-	/*
-	 * Update the round trip time estimate and/or the max frag size
-	 * and/or the slow start threshold.
-	 *
-	 * We serialize multiple advises using ire_lock.
-	 */
-	mutex_enter(&ire->ire_lock);
-	if (ipic->ipic_rtt) {
-		/*
-		 * If there is no old cached values, initialize them
-		 * conservatively.  Set them to be (1.5 * new value).
-		 */
-		if (ire->ire_uinfo.iulp_rtt != 0) {
-			ire->ire_uinfo.iulp_rtt = (ire->ire_uinfo.iulp_rtt +
-			    ipic->ipic_rtt) >> 1;
-		} else {
-			ire->ire_uinfo.iulp_rtt = ipic->ipic_rtt +
-			    (ipic->ipic_rtt >> 1);
-		}
-		if (ire->ire_uinfo.iulp_rtt_sd != 0) {
-			ire->ire_uinfo.iulp_rtt_sd =
-			    (ire->ire_uinfo.iulp_rtt_sd +
-			    ipic->ipic_rtt_sd) >> 1;
-		} else {
-			ire->ire_uinfo.iulp_rtt_sd = ipic->ipic_rtt_sd +
-			    (ipic->ipic_rtt_sd >> 1);
-		}
-	}
-	if (ipic->ipic_max_frag)
-		ire->ire_max_frag = MIN(ipic->ipic_max_frag, IP_MAXPACKET);
-	if (ipic->ipic_ssthresh != 0) {
-		if (ire->ire_uinfo.iulp_ssthresh != 0)
-			ire->ire_uinfo.iulp_ssthresh =
-			    (ipic->ipic_ssthresh +
-			    ire->ire_uinfo.iulp_ssthresh) >> 1;
-		else
-			ire->ire_uinfo.iulp_ssthresh = ipic->ipic_ssthresh;
-	}
-	/*
-	 * Don't need the ire_lock below this. ire_type does not change
-	 * after initialization. ire_marks is protected by irb_lock.
-	 */
-	mutex_exit(&ire->ire_lock);
-
-	if (ipic->ipic_ire_marks != 0 && ire->ire_type == IRE_CACHE) {
-		/*
-		 * Only increment the temporary IRE count if the original
-		 * IRE is not already marked temporary.
-		 */
-		irb = ire->ire_bucket;
-		rw_enter(&irb->irb_lock, RW_WRITER);
-		if ((ipic->ipic_ire_marks & IRE_MARK_TEMPORARY) &&
-		    !(ire->ire_marks & IRE_MARK_TEMPORARY)) {
-			irb->irb_tmp_ire_cnt++;
-		}
-		ire->ire_marks |= ipic->ipic_ire_marks;
-		rw_exit(&irb->irb_lock);
-	}
-
-	ire_refrele(ire);
-	return (0);
+	ASSERT((ire)->ire_refcnt != 0);
+	membar_exit();
+	if (atomic_add_32_nv(&(ire)->ire_refcnt, -1) == 0)
+		ire_inactive(ire);
 }
 
 /*
  * This function is associated with the IP_IOC_IRE_DELETE[_NO_REPLY]
- * IOCTL[s].  The NO_REPLY form is used by TCP to delete a route IRE
- * for a host that is not responding.  This will force an attempt to
- * establish a new route, if available, and flush out the ARP entry so
- * it will re-resolve.  Management processes may want to use the
- * version that generates a reply.
+ * IOCTL[s].  The NO_REPLY form is used by TCP to tell IP that it is
+ * having problems reaching a particular destination.
+ * This will make IP consider alternate routes (e.g., when there are
+ * muliple default routes), and it will also make IP discard any (potentially)
+ * stale redirect.
+ * Management processes may want to use the version that generates a reply.
  *
- * This function does not support IPv6 since Neighbor Unreachability Detection
- * means that negative advise like this is useless.
+ * With the use of NUD like behavior for IPv4/ARP in addition to IPv6
+ * this function shouldn't be necessary for IP to recover from a bad redirect,
+ * a bad default router (when there are multiple default routers), or
+ * a stale ND/ARP entry. But we retain it in any case.
+ * For instance, this is helpful when TCP suspects a failure before NUD does.
  */
-/* ARGSUSED */
 int
 ip_ire_delete(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 {
 	uchar_t		*addr_ucp;
-	ipaddr_t	addr;
+	uint_t		ipversion;
+	sin_t		*sin;
+	sin6_t		*sin6;
+	ipaddr_t	v4addr;
+	in6_addr_t	v6addr;
 	ire_t		*ire;
 	ipid_t		*ipid;
-	boolean_t	routing_sock_info = B_FALSE;	/* Sent info? */
 	zoneid_t	zoneid;
-	ire_t		*gire = NULL;
-	ill_t		*ill;
-	mblk_t		*arp_mp;
 	ip_stack_t	*ipst;
 
 	ASSERT(q->q_next == NULL);
-	zoneid = Q_TO_CONN(q)->conn_zoneid;
+	zoneid = IPCL_ZONEID(Q_TO_CONN(q));
 	ipst = CONNQ_TO_IPST(q);
 
 	/*
@@ -563,948 +433,192 @@ ip_ire_delete(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 
 	ipid = (ipid_t *)mp->b_rptr;
 
-	/* Only actions on IRE_CACHEs are acceptable at present. */
-	if (ipid->ipid_ire_type != IRE_CACHE)
-		return (EINVAL);
-
 	addr_ucp = mi_offset_param(mp, ipid->ipid_addr_offset,
 	    ipid->ipid_addr_length);
 	if (addr_ucp == NULL || !OK_32PTR(addr_ucp))
 		return (EINVAL);
 	switch (ipid->ipid_addr_length) {
-	case IP_ADDR_LEN:
-		/* addr_ucp points at IP addr */
-		break;
-	case sizeof (sin_t): {
-		sin_t	*sin;
+	case sizeof (sin_t):
 		/*
 		 * got complete (sockaddr) address - increment addr_ucp to point
 		 * at the ip_addr field.
 		 */
 		sin = (sin_t *)addr_ucp;
 		addr_ucp = (uchar_t *)&sin->sin_addr.s_addr;
+		ipversion = IPV4_VERSION;
 		break;
-	}
+	case sizeof (sin6_t):
+		/*
+		 * got complete (sockaddr) address - increment addr_ucp to point
+		 * at the ip_addr field.
+		 */
+		sin6 = (sin6_t *)addr_ucp;
+		addr_ucp = (uchar_t *)&sin6->sin6_addr;
+		ipversion = IPV6_VERSION;
+		break;
 	default:
 		return (EINVAL);
 	}
-	/* Extract the destination address. */
-	bcopy(addr_ucp, &addr, IP_ADDR_LEN);
+	if (ipversion == IPV4_VERSION) {
+		/* Extract the destination address. */
+		bcopy(addr_ucp, &v4addr, IP_ADDR_LEN);
 
-	/* Try to find the CACHED IRE. */
-	ire = ire_cache_lookup(addr, zoneid, NULL, ipst);
+		ire = ire_ftable_lookup_v4(v4addr, 0, 0, 0, NULL,
+		    zoneid, NULL, MATCH_IRE_DSTONLY, 0, ipst, NULL);
+	} else {
+		/* Extract the destination address. */
+		bcopy(addr_ucp, &v6addr, IPV6_ADDR_LEN);
 
-	/* Nail it. */
-	if (ire) {
-		/* Allow delete only on CACHE entries */
-		if (ire->ire_type != IRE_CACHE) {
-			ire_refrele(ire);
-			return (EINVAL);
-		}
-
-		/*
-		 * Verify that the IRE has been around for a while.
-		 * This is to protect against transport protocols
-		 * that are too eager in sending delete messages.
-		 */
-		if (gethrestime_sec() <
-		    ire->ire_create_time + ipst->ips_ip_ignore_delete_time) {
-			ire_refrele(ire);
-			return (EINVAL);
-		}
-		/*
-		 * Now we have a potentially dead cache entry. We need
-		 * to remove it.
-		 * If this cache entry is generated from a
-		 * default route (i.e., ire_cmask == 0),
-		 * search the default list and mark it dead and some
-		 * background process will try to activate it.
-		 */
-		if ((ire->ire_gateway_addr != 0) && (ire->ire_cmask == 0)) {
-			/*
-			 * Make sure that we pick a different
-			 * IRE_DEFAULT next time.
-			 */
-			ire_t *gw_ire;
-			irb_t *irb = NULL;
-			uint_t match_flags;
-
-			match_flags = (MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE);
-
-			gire = ire_ftable_lookup(ire->ire_addr,
-			    ire->ire_cmask, 0, 0,
-			    ire->ire_ipif, NULL, zoneid, 0, NULL, match_flags,
-			    ipst);
-
-			ip3dbg(("ire_ftable_lookup() returned gire %p\n",
-			    (void *)gire));
-
-			if (gire != NULL) {
-				irb = gire->ire_bucket;
-
-				/*
-				 * We grab it as writer just to serialize
-				 * multiple threads trying to bump up
-				 * irb_rr_origin
-				 */
-				rw_enter(&irb->irb_lock, RW_WRITER);
-				if ((gw_ire = irb->irb_rr_origin) == NULL) {
-					rw_exit(&irb->irb_lock);
-					goto done;
-				}
-
-				DTRACE_PROBE1(ip__ire__del__origin,
-				    (ire_t *), gw_ire);
-
-				/* Skip past the potentially bad gateway */
-				if (ire->ire_gateway_addr ==
-				    gw_ire->ire_gateway_addr) {
-					ire_t *next = gw_ire->ire_next;
-
-					DTRACE_PROBE2(ip__ire__del,
-					    (ire_t *), gw_ire, (irb_t *), irb);
-					IRE_FIND_NEXT_ORIGIN(next);
-					irb->irb_rr_origin = next;
-				}
-				rw_exit(&irb->irb_lock);
-			}
-		}
-done:
-		if (gire != NULL)
-			IRE_REFRELE(gire);
-		/* report the bad route to routing sockets */
-		ip_rts_change(RTM_LOSING, ire->ire_addr, ire->ire_gateway_addr,
-		    ire->ire_mask, ire->ire_src_addr, 0, 0, 0,
-		    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA), ipst);
-		routing_sock_info = B_TRUE;
-
-		/*
-		 * TCP is really telling us to start over completely, and it
-		 * expects that we'll resend the ARP query.  Tell ARP to
-		 * discard the entry, if this is a local destination.
-		 *
-		 * But, if the ARP entry is permanent then it shouldn't be
-		 * deleted, so we set ARED_F_PRESERVE_PERM.
-		 */
-		ill = ire->ire_stq->q_ptr;
-		if (ire->ire_gateway_addr == 0 &&
-		    (arp_mp = ill_ared_alloc(ill, addr)) != NULL) {
-			ared_t *ared = (ared_t *)arp_mp->b_rptr;
-
-			ASSERT(ared->ared_cmd == AR_ENTRY_DELETE);
-			ared->ared_flags |= ARED_F_PRESERVE_PERM;
-			putnext(ill->ill_rq, arp_mp);
-		}
-
-		ire_delete(ire);
-		ire_refrele(ire);
+		ire = ire_ftable_lookup_v6(&v6addr, NULL, NULL, 0, NULL,
+		    zoneid, NULL, MATCH_IRE_DSTONLY, 0, ipst, NULL);
 	}
-	/*
-	 * Also look for an IRE_HOST type redirect ire and
-	 * remove it if present.
-	 */
-	ire = ire_route_lookup(addr, 0, 0, IRE_HOST, NULL, NULL,
-	    ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-
-	/* Nail it. */
 	if (ire != NULL) {
-		if (ire->ire_flags & RTF_DYNAMIC) {
-			if (!routing_sock_info) {
-				ip_rts_change(RTM_LOSING, ire->ire_addr,
-				    ire->ire_gateway_addr, ire->ire_mask,
-				    ire->ire_src_addr, 0, 0, 0,
-				    (RTA_DST | RTA_GATEWAY |
-				    RTA_NETMASK | RTA_IFA),
-				    ipst);
-			}
-			ire_delete(ire);
+		if (ipversion == IPV4_VERSION) {
+			ip_rts_change(RTM_LOSING, ire->ire_addr,
+			    ire->ire_gateway_addr, ire->ire_mask,
+			    (Q_TO_CONN(q))->conn_laddr_v4,  0, 0, 0,
+			    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA),
+			    ire->ire_ipst);
 		}
+		(void) ire_no_good(ire);
 		ire_refrele(ire);
 	}
 	return (0);
 }
 
 /*
- * ip_ire_req is called by ip_wput when an IRE_DB_REQ_TYPE message is handed
- * down from the Upper Level Protocol to request a copy of the IRE (to check
- * its type or to extract information like round-trip time estimates or the
- * MTU.)
- * The address is assumed to be in the ire_addr field. If no IRE is found
- * an IRE is returned with ire_type being zero.
- * Note that the upper lavel protocol has to check for broadcast
- * (IRE_BROADCAST) and multicast (CLASSD(addr)).
- * If there is a b_cont the resulting IRE_DB_TYPE mblk is placed at the
- * end of the returned message.
- *
- * TCP sends down a message of this type with a connection request packet
- * chained on. UDP and ICMP send it down to verify that a route exists for
- * the destination address when they get connected.
- */
-void
-ip_ire_req(queue_t *q, mblk_t *mp)
-{
-	ire_t	*inire;
-	ire_t	*ire;
-	mblk_t	*mp1;
-	ire_t	*sire = NULL;
-	zoneid_t zoneid = Q_TO_CONN(q)->conn_zoneid;
-	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
-
-	ASSERT(q->q_next == NULL);
-
-	if ((mp->b_wptr - mp->b_rptr) < sizeof (ire_t) ||
-	    !OK_32PTR(mp->b_rptr)) {
-		freemsg(mp);
-		return;
-	}
-	inire = (ire_t *)mp->b_rptr;
-	/*
-	 * Got it, now take our best shot at an IRE.
-	 */
-	if (inire->ire_ipversion == IPV6_VERSION) {
-		ire = ire_route_lookup_v6(&inire->ire_addr_v6, 0, 0, 0,
-		    NULL, &sire, zoneid, NULL,
-		    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT), ipst);
-	} else {
-		ASSERT(inire->ire_ipversion == IPV4_VERSION);
-		ire = ire_route_lookup(inire->ire_addr, 0, 0, 0,
-		    NULL, &sire, zoneid, NULL,
-		    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT), ipst);
-	}
-
-	/*
-	 * We prevent returning IRES with source address INADDR_ANY
-	 * as these were temporarily created for sending packets
-	 * from endpoints that have conn_unspec_src set.
-	 */
-	if (ire == NULL ||
-	    (ire->ire_ipversion == IPV4_VERSION &&
-	    ire->ire_src_addr == INADDR_ANY) ||
-	    (ire->ire_ipversion == IPV6_VERSION &&
-	    IN6_IS_ADDR_UNSPECIFIED(&ire->ire_src_addr_v6))) {
-		inire->ire_type = 0;
-	} else {
-		bcopy(ire, inire, sizeof (ire_t));
-		/* Copy the route metrics from the parent. */
-		if (sire != NULL) {
-			bcopy(&(sire->ire_uinfo), &(inire->ire_uinfo),
-			    sizeof (iulp_t));
-		}
-
-		/* Pass the latest setting of the ip_path_mtu_discovery */
-		inire->ire_frag_flag |=
-		    (ipst->ips_ip_path_mtu_discovery) ? IPH_DF : 0;
-	}
-	if (ire != NULL)
-		ire_refrele(ire);
-	if (sire != NULL)
-		ire_refrele(sire);
-	mp->b_wptr = &mp->b_rptr[sizeof (ire_t)];
-	mp->b_datap->db_type = IRE_DB_TYPE;
-
-	/* Put the IRE_DB_TYPE mblk last in the chain */
-	mp1 = mp->b_cont;
-	if (mp1 != NULL) {
-		mp->b_cont = NULL;
-		linkb(mp1, mp);
-		mp = mp1;
-	}
-	qreply(q, mp);
-}
-
-/*
- * Send a packet using the specified IRE.
- * If ire_src_addr_v6 is all zero then discard the IRE after
- * the packet has been sent.
- */
-static void
-ire_send(queue_t *q, mblk_t *pkt, ire_t *ire)
-{
-	mblk_t *ipsec_mp;
-	boolean_t is_secure;
-	uint_t ifindex;
-	ill_t	*ill;
-	zoneid_t zoneid = ire->ire_zoneid;
-	ip_stack_t	*ipst = ire->ire_ipst;
-
-	ASSERT(ire->ire_ipversion == IPV4_VERSION);
-	ASSERT(!(ire->ire_type & IRE_LOCAL)); /* Has different ire_zoneid */
-	ipsec_mp = pkt;
-	is_secure = (pkt->b_datap->db_type == M_CTL);
-	if (is_secure) {
-		ipsec_out_t *io;
-
-		pkt = pkt->b_cont;
-		io = (ipsec_out_t *)ipsec_mp->b_rptr;
-		if (io->ipsec_out_type == IPSEC_OUT)
-			zoneid = io->ipsec_out_zoneid;
-	}
-
-	/* If the packet originated externally then */
-	if (pkt->b_prev) {
-		ire_refrele(ire);
-		/*
-		 * Extract the ifindex from b_prev (set in ip_rput_noire).
-		 * Look up interface to see if it still exists (it could have
-		 * been unplumbed by the time the reply came back from ARP)
-		 */
-		ifindex = (uint_t)(uintptr_t)pkt->b_prev;
-		ill = ill_lookup_on_ifindex(ifindex, B_FALSE,
-		    NULL, NULL, NULL, NULL, ipst);
-		if (ill == NULL) {
-			pkt->b_prev = NULL;
-			pkt->b_next = NULL;
-			freemsg(ipsec_mp);
-			return;
-		}
-		q = ill->ill_rq;
-		pkt->b_prev = NULL;
-		/*
-		 * This packet has not gone through IPSEC processing
-		 * and hence we should not have any IPSEC message
-		 * prepended.
-		 */
-		ASSERT(ipsec_mp == pkt);
-		put(q, pkt);
-		ill_refrele(ill);
-	} else if (pkt->b_next) {
-		/* Packets from multicast router */
-		pkt->b_next = NULL;
-		/*
-		 * We never get the IPSEC_OUT while forwarding the
-		 * packet for multicast router.
-		 */
-		ASSERT(ipsec_mp == pkt);
-		ip_rput_forward(ire, (ipha_t *)pkt->b_rptr, ipsec_mp, NULL);
-		ire_refrele(ire);
-	} else {
-		/* Locally originated packets */
-		boolean_t delete_ire = B_FALSE;
-		ipha_t *ipha = (ipha_t *)pkt->b_rptr;
-
-		/*
-		 * If this IRE shouldn't be kept in the table (because its
-		 * source address is unspecified), hold a reference to it so
-		 * we can delete it even after e.g. ip_wput_ire() has dropped
-		 * its reference.
-		 */
-		if (!(ire->ire_marks & IRE_MARK_NOADD) &&
-		    ire->ire_src_addr == INADDR_ANY) {
-			delete_ire = B_TRUE;
-			IRE_REFHOLD(ire);
-		}
-
-		/*
-		 * If we were resolving a router we can not use the
-		 * routers IRE for sending the packet (since it would
-		 * violate the uniqness of the IP idents) thus we
-		 * make another pass through ip_wput to create the IRE_CACHE
-		 * for the destination.
-		 * When IRE_MARK_NOADD is set, ire_add() is not called.
-		 * Thus ip_wput() will never find a ire and result in an
-		 * infinite loop. Thus we check whether IRE_MARK_NOADD is
-		 * is set. This also implies that IRE_MARK_NOADD can only be
-		 * used to send packets to directly connected hosts.
-		 */
-		if (ipha->ipha_dst != ire->ire_addr &&
-		    !(ire->ire_marks & IRE_MARK_NOADD)) {
-			ire_refrele(ire);	/* Held in ire_add */
-			if (CONN_Q(q)) {
-				(void) ip_output(Q_TO_CONN(q), ipsec_mp, q,
-				    IRE_SEND);
-			} else {
-				(void) ip_output((void *)(uintptr_t)zoneid,
-				    ipsec_mp, q, IRE_SEND);
-			}
-		} else {
-			if (is_secure) {
-				ipsec_out_t *oi;
-				ipha_t *ipha;
-
-				oi = (ipsec_out_t *)ipsec_mp->b_rptr;
-				ipha = (ipha_t *)ipsec_mp->b_cont->b_rptr;
-				if (oi->ipsec_out_proc_begin) {
-					/*
-					 * This is the case where
-					 * ip_wput_ipsec_out could not find
-					 * the IRE and recreated a new one.
-					 * As ip_wput_ipsec_out does ire
-					 * lookups, ire_refrele for the extra
-					 * bump in ire_add.
-					 */
-					ire_refrele(ire);
-					ip_wput_ipsec_out(q, ipsec_mp, ipha,
-					    NULL, NULL);
-				} else {
-					/*
-					 * IRE_REFRELE will be done in
-					 * ip_wput_ire.
-					 */
-					ip_wput_ire(q, ipsec_mp, ire, NULL,
-					    IRE_SEND, zoneid);
-				}
-			} else {
-				/*
-				 * IRE_REFRELE will be done in ip_wput_ire.
-				 */
-				ip_wput_ire(q, ipsec_mp, ire, NULL,
-				    IRE_SEND, zoneid);
-			}
-		}
-		/*
-		 * Special code to support sending a single packet with
-		 * conn_unspec_src using an IRE which has no source address.
-		 * The IRE is deleted here after sending the packet to avoid
-		 * having other code trip on it. But before we delete the
-		 * ire, somebody could have looked up this ire.
-		 * We prevent returning/using this IRE by the upper layers
-		 * by making checks to NULL source address in other places
-		 * like e.g ip_ire_append, ip_ire_req and ip_bind_connected.
-		 * Though this does not completely prevent other threads
-		 * from using this ire, this should not cause any problems.
-		 */
-		if (delete_ire) {
-			ip1dbg(("ire_send: delete IRE\n"));
-			ire_delete(ire);
-			ire_refrele(ire);	/* Held above */
-		}
-	}
-}
-
-/*
- * Send a packet using the specified IRE.
- * If ire_src_addr_v6 is all zero then discard the IRE after
- * the packet has been sent.
- */
-static void
-ire_send_v6(queue_t *q, mblk_t *pkt, ire_t *ire)
-{
-	mblk_t *ipsec_mp;
-	boolean_t secure;
-	uint_t ifindex;
-	zoneid_t zoneid = ire->ire_zoneid;
-	ip_stack_t	*ipst = ire->ire_ipst;
-
-	ASSERT(ire->ire_ipversion == IPV6_VERSION);
-	ASSERT(!(ire->ire_type & IRE_LOCAL)); /* Has different ire_zoneid */
-	if (pkt->b_datap->db_type == M_CTL) {
-		ipsec_out_t *io;
-
-		ipsec_mp = pkt;
-		pkt = pkt->b_cont;
-		secure = B_TRUE;
-		io = (ipsec_out_t *)ipsec_mp->b_rptr;
-		if (io->ipsec_out_type == IPSEC_OUT)
-			zoneid = io->ipsec_out_zoneid;
-	} else {
-		ipsec_mp = pkt;
-		secure = B_FALSE;
-	}
-
-	/* If the packet originated externally then */
-	if (pkt->b_prev) {
-		ill_t	*ill;
-		/*
-		 * Extract the ifindex from b_prev (set in ip_rput_data_v6).
-		 * Look up interface to see if it still exists (it could have
-		 * been unplumbed by the time the reply came back from the
-		 * resolver).
-		 */
-		ifindex = (uint_t)(uintptr_t)pkt->b_prev;
-		ill = ill_lookup_on_ifindex(ifindex, B_TRUE,
-		    NULL, NULL, NULL, NULL, ipst);
-		if (ill == NULL) {
-			pkt->b_prev = NULL;
-			pkt->b_next = NULL;
-			freemsg(ipsec_mp);
-			ire_refrele(ire);	/* Held in ire_add */
-			return;
-		}
-		q = ill->ill_rq;
-		pkt->b_prev = NULL;
-		/*
-		 * This packet has not gone through IPSEC processing
-		 * and hence we should not have any IPSEC message
-		 * prepended.
-		 */
-		ASSERT(ipsec_mp == pkt);
-		put(q, pkt);
-		ill_refrele(ill);
-	} else if (pkt->b_next) {
-		/* Packets from multicast router */
-		pkt->b_next = NULL;
-		/*
-		 * We never get the IPSEC_OUT while forwarding the
-		 * packet for multicast router.
-		 */
-		ASSERT(ipsec_mp == pkt);
-		/*
-		 * XXX TODO IPv6.
-		 */
-		freemsg(pkt);
-#ifdef XXX
-		ip_rput_forward(ire, (ipha_t *)pkt->b_rptr, pkt, NULL);
-#endif
-	} else {
-		if (secure) {
-			ipsec_out_t *oi;
-			ip6_t *ip6h;
-
-			oi = (ipsec_out_t *)ipsec_mp->b_rptr;
-			ip6h = (ip6_t *)ipsec_mp->b_cont->b_rptr;
-			if (oi->ipsec_out_proc_begin) {
-				/*
-				 * This is the case where
-				 * ip_wput_ipsec_out could not find
-				 * the IRE and recreated a new one.
-				 */
-				ip_wput_ipsec_out_v6(q, ipsec_mp, ip6h,
-				    NULL, NULL);
-			} else {
-				if (CONN_Q(q)) {
-					(void) ip_output_v6(Q_TO_CONN(q),
-					    ipsec_mp, q, IRE_SEND);
-				} else {
-					(void) ip_output_v6(
-					    (void *)(uintptr_t)zoneid,
-					    ipsec_mp, q, IRE_SEND);
-				}
-			}
-		} else {
-			/*
-			 * Send packets through ip_output_v6 so that any
-			 * ip6_info header can be processed again.
-			 */
-			if (CONN_Q(q)) {
-				(void) ip_output_v6(Q_TO_CONN(q), ipsec_mp, q,
-				    IRE_SEND);
-			} else {
-				(void) ip_output_v6((void *)(uintptr_t)zoneid,
-				    ipsec_mp, q, IRE_SEND);
-			}
-		}
-		/*
-		 * Special code to support sending a single packet with
-		 * conn_unspec_src using an IRE which has no source address.
-		 * The IRE is deleted here after sending the packet to avoid
-		 * having other code trip on it. But before we delete the
-		 * ire, somebody could have looked up this ire.
-		 * We prevent returning/using this IRE by the upper layers
-		 * by making checks to NULL source address in other places
-		 * like e.g ip_ire_append_v6, ip_ire_req and
-		 * ip_bind_connected_v6. Though, this does not completely
-		 * prevent other threads from using this ire, this should
-		 * not cause any problems.
-		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&ire->ire_src_addr_v6)) {
-			ip1dbg(("ire_send_v6: delete IRE\n"));
-			ire_delete(ire);
-		}
-	}
-	ire_refrele(ire);	/* Held in ire_add */
-}
-
-/*
- * Make sure that IRE bucket does not get too long.
- * This can cause lock up because ire_cache_lookup()
- * may take "forever" to finish.
- *
- * We only remove a maximum of cnt IREs each time.  This
- * should keep the bucket length approximately constant,
- * depending on cnt.  This should be enough to defend
- * against DoS attack based on creating temporary IREs
- * (for forwarding and non-TCP traffic).
- *
- * We also pass in the address of the newly created IRE
- * as we do not want to remove this straight after adding
- * it. New IREs are normally added at the tail of the
- * bucket.  This means that we are removing the "oldest"
- * temporary IREs added.  Only if there are IREs with
- * the same ire_addr, do we not add it at the tail.  Refer
- * to ire_add_v*().  It should be OK for our purpose.
- *
- * For non-temporary cached IREs, we make sure that they
- * have not been used for some time (defined below), they
- * are non-local destinations, and there is no one using
- * them at the moment (refcnt == 1).
- *
- * The above means that the IRE bucket length may become
- * very long, consisting of mostly non-temporary IREs.
- * This can happen when the hash function does a bad job
- * so that most TCP connections cluster to a specific bucket.
- * This "hopefully" should never happen.  It can also
- * happen if most TCP connections have very long lives.
- * Even with the minimal hash table size of 256, there
- * has to be a lot of such connections to make the bucket
- * length unreasonably long.  This should probably not
- * happen either.  The third can when this can happen is
- * when the machine is under attack, such as SYN flooding.
- * TCP should already have the proper mechanism to protect
- * that.  So we should be safe.
- *
- * This function is called by ire_add_then_send() after
- * a new IRE is added and the packet is sent.
- *
- * The idle cutoff interval is set to 60s.  It can be
- * changed using /etc/system.
- */
-uint32_t ire_idle_cutoff_interval = 60000;
-
-static void
-ire_cache_cleanup(irb_t *irb, uint32_t threshold, ire_t *ref_ire)
-{
-	ire_t *ire;
-	clock_t cut_off = drv_usectohz(ire_idle_cutoff_interval * 1000);
-	int cnt = ip_ire_cleanup_cnt;
-
-	/*
-	 * Try to remove cnt temporary IREs first.
-	 */
-	for (ire = irb->irb_ire; cnt > 0 && ire != NULL; ire = ire->ire_next) {
-		if (ire == ref_ire)
-			continue;
-		if (ire->ire_marks & IRE_MARK_CONDEMNED)
-			continue;
-		if (ire->ire_marks & IRE_MARK_TEMPORARY) {
-			ASSERT(ire->ire_type == IRE_CACHE);
-			ire_delete(ire);
-			cnt--;
-		}
-	}
-	if (cnt == 0)
-		return;
-
-	/*
-	 * If we didn't satisfy our removal target from temporary IREs
-	 * we see how many non-temporary IREs are currently in the bucket.
-	 * If this quantity is above the threshold then we see if there are any
-	 * candidates for removal. We are still limited to removing a maximum
-	 * of cnt IREs.
-	 */
-	if ((irb->irb_ire_cnt - irb->irb_tmp_ire_cnt) > threshold) {
-		for (ire = irb->irb_ire; cnt > 0 && ire != NULL;
-		    ire = ire->ire_next) {
-			if (ire == ref_ire)
-				continue;
-			if (ire->ire_type != IRE_CACHE)
-				continue;
-			if (ire->ire_marks & IRE_MARK_CONDEMNED)
-				continue;
-			if ((ire->ire_refcnt == 1) &&
-			    (lbolt - ire->ire_last_used_time > cut_off)) {
-				ire_delete(ire);
-				cnt--;
-			}
-		}
-	}
-}
-
-/*
- * ire_add_then_send is called when a new IRE has been created in order to
- * route an outgoing packet.  Typically, it is called from ip_wput when
- * a response comes back down from a resolver.  We add the IRE, and then
- * possibly run the packet through ip_wput or ip_rput, as appropriate.
- * However, we do not add the newly created IRE in the cache when
- * IRE_MARK_NOADD is set in the IRE. IRE_MARK_NOADD is set at
- * ip_newroute_ipif(). The ires with IRE_MARK_NOADD are ire_refrele'd by
- * ip_wput_ire() and get deleted.
- * Multirouting support: the packet is silently discarded when the new IRE
- * holds the RTF_MULTIRT flag, but is not the first IRE to be added with the
- * RTF_MULTIRT flag for the same destination address.
- * In this case, we just want to register this additional ire without
- * sending the packet, as it has already been replicated through
- * existing multirt routes in ip_wput().
- */
-void
-ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
-{
-	irb_t *irb;
-	boolean_t drop = B_FALSE;
-	boolean_t mctl_present;
-	mblk_t *first_mp = NULL;
-	mblk_t *data_mp = NULL;
-	ire_t *dst_ire;
-	ipha_t *ipha;
-	ip6_t *ip6h;
-	ip_stack_t	*ipst = ire->ire_ipst;
-	int		ire_limit;
-
-	if (mp != NULL) {
-		/*
-		 * We first have to retrieve the destination address carried
-		 * by the packet.
-		 * We can't rely on ire as it can be related to a gateway.
-		 * The destination address will help in determining if
-		 * other RTF_MULTIRT ires are already registered.
-		 *
-		 * We first need to know where we are going : v4 or V6.
-		 * the ire version is enough, as there is no risk that
-		 * we resolve an IPv6 address with an IPv4 ire
-		 * or vice versa.
-		 */
-		EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-		data_mp = mp;
-		mp = first_mp;
-		if (ire->ire_ipversion == IPV4_VERSION) {
-			ipha = (ipha_t *)data_mp->b_rptr;
-			dst_ire = ire_cache_lookup(ipha->ipha_dst,
-			    ire->ire_zoneid, msg_getlabel(mp), ipst);
-		} else {
-			ASSERT(ire->ire_ipversion == IPV6_VERSION);
-			ip6h = (ip6_t *)data_mp->b_rptr;
-			dst_ire = ire_cache_lookup_v6(&ip6h->ip6_dst,
-			    ire->ire_zoneid, msg_getlabel(mp), ipst);
-		}
-		if (dst_ire != NULL) {
-			if (dst_ire->ire_flags & RTF_MULTIRT) {
-				/*
-				 * At least one resolved multirt route
-				 * already exists for the destination,
-				 * don't sent this packet: either drop it
-				 * or complete the pending resolution,
-				 * depending on the ire.
-				 */
-				drop = B_TRUE;
-			}
-			ip1dbg(("ire_add_then_send: dst_ire %p "
-			    "[dst %08x, gw %08x], drop %d\n",
-			    (void *)dst_ire,
-			    (dst_ire->ire_ipversion == IPV4_VERSION) ? \
-			    ntohl(dst_ire->ire_addr) : \
-			    ntohl(V4_PART_OF_V6(dst_ire->ire_addr_v6)),
-			    (dst_ire->ire_ipversion == IPV4_VERSION) ? \
-			    ntohl(dst_ire->ire_gateway_addr) : \
-			    ntohl(V4_PART_OF_V6(
-			    dst_ire->ire_gateway_addr_v6)),
-			    drop));
-			ire_refrele(dst_ire);
-		}
-	}
-
-	if (!(ire->ire_marks & IRE_MARK_NOADD)) {
-		/* Regular packets with cache bound ires are here. */
-		(void) ire_add(&ire, NULL, NULL, NULL, B_FALSE);
-
-		if (ire == NULL) {
-			mp->b_prev = NULL;
-			mp->b_next = NULL;
-			MULTIRT_DEBUG_UNTAG(mp);
-			freemsg(mp);
-			return;
-		}
-		if (mp == NULL) {
-			ire_refrele(ire);	/* Held in ire_add_v4/v6 */
-			return;
-		}
-	}
-	if (drop) {
-		/*
-		 * If we're adding an RTF_MULTIRT ire, the resolution
-		 * is over: we just drop the packet.
-		 */
-		if (ire->ire_flags & RTF_MULTIRT) {
-			data_mp->b_prev = NULL;
-			data_mp->b_next = NULL;
-			MULTIRT_DEBUG_UNTAG(mp);
-			freemsg(mp);
-		} else {
-			/*
-			 * Otherwise, we're adding the ire to a gateway
-			 * for a multirt route.
-			 * Invoke ip_newroute() to complete the resolution
-			 * of the route. We will then come back here and
-			 * finally drop this packet in the above code.
-			 */
-			if (ire->ire_ipversion == IPV4_VERSION) {
-				/*
-				 * TODO: in order for CGTP to work in non-global
-				 * zones, ip_newroute() must create the IRE
-				 * cache in the zone indicated by
-				 * ire->ire_zoneid.
-				 */
-				ip_newroute(q, mp, ipha->ipha_dst,
-				    (CONN_Q(q) ? Q_TO_CONN(q) : NULL),
-				    ire->ire_zoneid, ipst);
-			} else {
-				int minlen = sizeof (ip6i_t) + IPV6_HDR_LEN;
-
-				ASSERT(ire->ire_ipversion == IPV6_VERSION);
-
-				/*
-				 * If necessary, skip over the ip6i_t to find
-				 * the header with the actual source address.
-				 */
-				if (ip6h->ip6_nxt == IPPROTO_RAW) {
-					if (MBLKL(data_mp) < minlen &&
-					    pullupmsg(data_mp, -1) == 0) {
-						ip1dbg(("ire_add_then_send: "
-						    "cannot pullupmsg ip6i\n"));
-						if (mctl_present)
-							freeb(first_mp);
-						ire_refrele(ire);
-						return;
-					}
-					ASSERT(MBLKL(data_mp) >= IPV6_HDR_LEN);
-					ip6h = (ip6_t *)(data_mp->b_rptr +
-					    sizeof (ip6i_t));
-				}
-				ip_newroute_v6(q, mp, &ip6h->ip6_dst,
-				    &ip6h->ip6_src, NULL, ire->ire_zoneid,
-				    ipst);
-			}
-		}
-
-		ire_refrele(ire); /* As done by ire_send(). */
-		return;
-	}
-	/*
-	 * Need to remember ire_bucket here as ire_send*() may delete
-	 * the ire so we cannot reference it after that.
-	 */
-	irb = ire->ire_bucket;
-	if (ire->ire_ipversion == IPV4_VERSION) {
-		ire_send(q, mp, ire);
-		ire_limit = ip_ire_max_bucket_cnt;
-	} else {
-		ire_send_v6(q, mp, ire);
-		ire_limit = ip6_ire_max_bucket_cnt;
-	}
-
-	/*
-	 * irb is NULL if the IRE was not added to the hash. This happens
-	 * when IRE_MARK_NOADD is set and when IREs are returned from
-	 * ire_update_srcif_v4().
-	 */
-	if (irb != NULL) {
-		IRB_REFHOLD(irb);
-		if (irb->irb_ire_cnt > ire_limit)
-			ire_cache_cleanup(irb, ire_limit, ire);
-		IRB_REFRELE(irb);
-	}
-}
-
-/*
  * Initialize the ire that is specific to IPv4 part and call
  * ire_init_common to finish it.
+ * Returns zero or errno.
  */
-ire_t *
-ire_init(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *src_addr,
-    uchar_t *gateway, uint_t *max_fragp, nce_t *src_nce, queue_t *rfq,
-    queue_t *stq, ushort_t type, ipif_t *ipif, ipaddr_t cmask, uint32_t phandle,
-    uint32_t ihandle, uint32_t flags, const iulp_t *ulp_info, tsol_gc_t *gc,
-    tsol_gcgrp_t *gcgrp, ip_stack_t *ipst)
+int
+ire_init_v4(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *gateway,
+    ushort_t type, ill_t *ill, zoneid_t zoneid, uint_t flags,
+    tsol_gc_t *gc, ip_stack_t *ipst)
 {
-	ASSERT(type != IRE_CACHE || stq != NULL);
+	int error;
+
 	/*
 	 * Reject IRE security attribute creation/initialization
 	 * if system is not running in Trusted mode.
 	 */
-	if ((gc != NULL || gcgrp != NULL) && !is_system_labeled())
-		return (NULL);
+	if (gc != NULL && !is_system_labeled())
+		return (EINVAL);
 
 	BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_alloced);
 
 	if (addr != NULL)
 		bcopy(addr, &ire->ire_addr, IP_ADDR_LEN);
-	if (src_addr != NULL)
-		bcopy(src_addr, &ire->ire_src_addr, IP_ADDR_LEN);
-	if (mask != NULL) {
-		bcopy(mask, &ire->ire_mask, IP_ADDR_LEN);
-		ire->ire_masklen = ip_mask_to_plen(ire->ire_mask);
-	}
-	if (gateway != NULL) {
+	if (gateway != NULL)
 		bcopy(gateway, &ire->ire_gateway_addr, IP_ADDR_LEN);
+
+	/* Make sure we don't have stray values in some fields */
+	switch (type) {
+	case IRE_LOOPBACK:
+		bcopy(&ire->ire_addr, &ire->ire_gateway_addr, IP_ADDR_LEN);
+		/* FALLTHRU */
+	case IRE_HOST:
+	case IRE_BROADCAST:
+	case IRE_LOCAL:
+	case IRE_IF_CLONE:
+		ire->ire_mask = IP_HOST_MASK;
+		ire->ire_masklen = IPV4_ABITS;
+		break;
+	case IRE_PREFIX:
+	case IRE_DEFAULT:
+	case IRE_IF_RESOLVER:
+	case IRE_IF_NORESOLVER:
+		if (mask != NULL) {
+			bcopy(mask, &ire->ire_mask, IP_ADDR_LEN);
+			ire->ire_masklen = ip_mask_to_plen(ire->ire_mask);
+		}
+		break;
+	case IRE_MULTICAST:
+	case IRE_NOROUTE:
+		ASSERT(mask == NULL);
+		break;
+	default:
+		ASSERT(0);
+		return (EINVAL);
 	}
 
-	if (type == IRE_CACHE)
-		ire->ire_cmask = cmask;
+	error = ire_init_common(ire, type, ill, zoneid, flags, IPV4_VERSION,
+	    gc, ipst);
+	if (error != NULL)
+		return (error);
 
-	/* ire_init_common will free the mblks upon encountering any failure */
-	if (!ire_init_common(ire, max_fragp, src_nce, rfq, stq, type, ipif,
-	    phandle, ihandle, flags, IPV4_VERSION, ulp_info, gc, gcgrp, ipst))
-		return (NULL);
+	/* Determine which function pointers to use */
+	ire->ire_postfragfn = ip_xmit;		/* Common case */
 
-	return (ire);
+	switch (ire->ire_type) {
+	case IRE_LOCAL:
+		ire->ire_sendfn = ire_send_local_v4;
+		ire->ire_recvfn = ire_recv_local_v4;
+#ifdef SO_VRRP
+		ASSERT(ire->ire_ill != NULL);
+		if (ire->ire_ill->ill_flags & ILLF_NOACCEPT) {
+			ire->ire_noaccept = B_TRUE;
+			ire->ire_recvfn = ire_recv_noaccept_v6;
+		}
+#endif
+		break;
+	case IRE_LOOPBACK:
+		ire->ire_sendfn = ire_send_local_v4;
+		ire->ire_recvfn = ire_recv_loopback_v4;
+		break;
+	case IRE_BROADCAST:
+		ire->ire_postfragfn = ip_postfrag_loopcheck;
+		ire->ire_sendfn = ire_send_broadcast_v4;
+		ire->ire_recvfn = ire_recv_broadcast_v4;
+		break;
+	case IRE_MULTICAST:
+		ire->ire_postfragfn = ip_postfrag_loopcheck;
+		ire->ire_sendfn = ire_send_multicast_v4;
+		ire->ire_recvfn = ire_recv_multicast_v4;
+		break;
+	default:
+		/*
+		 * For IRE_IF_ALL and IRE_OFFLINK we forward received
+		 * packets by default.
+		 */
+		ire->ire_sendfn = ire_send_wire_v4;
+		ire->ire_recvfn = ire_recv_forward_v4;
+		break;
+	}
+	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+		ire->ire_sendfn = ire_send_noroute_v4;
+		ire->ire_recvfn = ire_recv_noroute_v4;
+	} else if (ire->ire_flags & RTF_MULTIRT) {
+		ire->ire_postfragfn = ip_postfrag_multirt_v4;
+		ire->ire_sendfn = ire_send_multirt_v4;
+		/* Multirt receive of broadcast uses ire_recv_broadcast_v4 */
+		if (ire->ire_type != IRE_BROADCAST)
+			ire->ire_recvfn = ire_recv_multirt_v4;
+	}
+	ire->ire_nce_capable = ire_determine_nce_capable(ire);
+	return (0);
 }
 
 /*
- * Similar to ire_create except that it is called only when
- * we want to allocate ire as an mblk e.g. we have an external
- * resolver ARP.
+ * Determine ire_nce_capable
  */
-ire_t *
-ire_create_mp(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
-    uint_t max_frag, nce_t *src_nce, queue_t *rfq, queue_t *stq, ushort_t type,
-    ipif_t *ipif, ipaddr_t cmask, uint32_t phandle, uint32_t ihandle,
-    uint32_t flags, const iulp_t *ulp_info, tsol_gc_t *gc, tsol_gcgrp_t *gcgrp,
-    ip_stack_t *ipst)
+boolean_t
+ire_determine_nce_capable(ire_t *ire)
 {
-	ire_t	*ire, *buf;
-	ire_t	*ret_ire;
-	mblk_t	*mp;
-	size_t	bufsize;
-	frtn_t	*frtnp;
-	ill_t	*ill;
+	int max_masklen;
 
-	bufsize = sizeof (ire_t) + sizeof (frtn_t);
-	buf = kmem_alloc(bufsize, KM_NOSLEEP);
-	if (buf == NULL) {
-		ip1dbg(("ire_create_mp: alloc failed\n"));
-		return (NULL);
-	}
-	frtnp = (frtn_t *)(buf + 1);
-	frtnp->free_arg = (caddr_t)buf;
-	frtnp->free_func = ire_freemblk;
+	if ((ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) ||
+	    (ire->ire_type & IRE_MULTICAST))
+		return (B_TRUE);
 
-	/*
-	 * Allocate the new IRE. The ire created will hold a ref on
-	 * an nce_t after ire_nce_init, and this ref must either be
-	 * (a)  transferred to the ire_cache entry created when ire_add_v4
-	 *	is called after successful arp resolution, or,
-	 * (b)  released, when arp resolution fails
-	 * Case (b) is handled in ire_freemblk() which will be called
-	 * when mp is freed as a result of failed arp.
-	 */
-	mp = esballoc((unsigned char *)buf, bufsize, BPRI_MED, frtnp);
-	if (mp == NULL) {
-		ip1dbg(("ire_create_mp: alloc failed\n"));
-		kmem_free(buf, bufsize);
-		return (NULL);
-	}
-	ire = (ire_t *)mp->b_rptr;
-	mp->b_wptr = (uchar_t *)&ire[1];
+	if (ire->ire_ipversion == IPV4_VERSION)
+		max_masklen = IPV4_ABITS;
+	else
+		max_masklen = IPV6_ABITS;
 
-	/* Start clean. */
-	*ire = ire_null;
-	ire->ire_mp = mp;
-	mp->b_datap->db_type = IRE_DB_TYPE;
-	ire->ire_marks |= IRE_MARK_UNCACHED;
-
-	ret_ire = ire_init(ire, addr, mask, src_addr, gateway, NULL, src_nce,
-	    rfq, stq, type, ipif, cmask, phandle, ihandle, flags, ulp_info, gc,
-	    gcgrp, ipst);
-
-	ill = (ill_t *)(stq->q_ptr);
-	if (ret_ire == NULL) {
-		/* ire_freemblk needs these set */
-		ire->ire_stq_ifindex = ill->ill_phyint->phyint_ifindex;
-		ire->ire_stackid = ipst->ips_netstack->netstack_stackid;
-		ire->ire_ipst = ipst;
-		freeb(ire->ire_mp);
-		return (NULL);
-	}
-	ret_ire->ire_stq_ifindex = ill->ill_phyint->phyint_ifindex;
-	ret_ire->ire_stackid = ipst->ips_netstack->netstack_stackid;
-	ASSERT(ret_ire == ire);
-	ASSERT(ret_ire->ire_ipst == ipst);
-	/*
-	 * ire_max_frag is normally zero here and is atomically set
-	 * under the irebucket lock in ire_add_v[46] except for the
-	 * case of IRE_MARK_NOADD. In that event the the ire_max_frag
-	 * is non-zero here.
-	 */
-	ire->ire_max_frag = max_frag;
-	return (ire);
+	if ((ire->ire_type & IRE_ONLINK) && ire->ire_masklen == max_masklen)
+		return (B_TRUE);
+	return (B_FALSE);
 }
 
 /*
@@ -1514,49 +628,43 @@ ire_create_mp(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
  * by this function.
  */
 ire_t *
-ire_create(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
-    uint_t *max_fragp, nce_t *src_nce, queue_t *rfq, queue_t *stq,
-    ushort_t type, ipif_t *ipif, ipaddr_t cmask, uint32_t phandle,
-    uint32_t ihandle, uint32_t flags, const iulp_t *ulp_info, tsol_gc_t *gc,
-    tsol_gcgrp_t *gcgrp, ip_stack_t *ipst)
+ire_create(uchar_t *addr, uchar_t *mask, uchar_t *gateway,
+    ushort_t type, ill_t *ill, zoneid_t zoneid, uint_t flags, tsol_gc_t *gc,
+    ip_stack_t *ipst)
 {
 	ire_t	*ire;
-	ire_t	*ret_ire;
+	int	error;
 
 	ire = kmem_cache_alloc(ire_cache, KM_NOSLEEP);
 	if (ire == NULL) {
-		ip1dbg(("ire_create: alloc failed\n"));
+		DTRACE_PROBE(kmem__cache__alloc);
 		return (NULL);
 	}
 	*ire = ire_null;
 
-	ret_ire = ire_init(ire, addr, mask, src_addr, gateway, max_fragp,
-	    src_nce, rfq, stq, type, ipif, cmask, phandle, ihandle, flags,
-	    ulp_info, gc, gcgrp, ipst);
-
-	if (ret_ire == NULL) {
+	error = ire_init_v4(ire, addr, mask, gateway, type, ill, zoneid, flags,
+	    gc, ipst);
+	if (error != 0) {
+		DTRACE_PROBE2(ire__init, ire_t *, ire, int, error);
 		kmem_cache_free(ire_cache, ire);
 		return (NULL);
 	}
-	ASSERT(ret_ire == ire);
 	return (ire);
 }
 
 /*
  * Common to IPv4 and IPv6
+ * Returns zero or errno.
  */
-boolean_t
-ire_init_common(ire_t *ire, uint_t *max_fragp, nce_t *src_nce, queue_t *rfq,
-    queue_t *stq, ushort_t type, ipif_t *ipif, uint32_t phandle,
-    uint32_t ihandle, uint32_t flags, uchar_t ipversion, const iulp_t *ulp_info,
-    tsol_gc_t *gc, tsol_gcgrp_t *gcgrp, ip_stack_t *ipst)
+int
+ire_init_common(ire_t *ire, ushort_t type, ill_t *ill, zoneid_t zoneid,
+    uint_t flags, uchar_t ipversion, tsol_gc_t *gc, ip_stack_t *ipst)
 {
-	ire->ire_max_fragp = max_fragp;
-	ire->ire_frag_flag |= (ipst->ips_ip_path_mtu_discovery) ? IPH_DF : 0;
+	int error;
 
 #ifdef DEBUG
-	if (ipif != NULL) {
-		if (ipif->ipif_isv6)
+	if (ill != NULL) {
+		if (ill->ill_isv6)
 			ASSERT(ipversion == IPV6_VERSION);
 		else
 			ASSERT(ipversion == IPV4_VERSION);
@@ -1565,223 +673,73 @@ ire_init_common(ire_t *ire, uint_t *max_fragp, nce_t *src_nce, queue_t *rfq,
 
 	/*
 	 * Create/initialize IRE security attribute only in Trusted mode;
-	 * if the passed in gc/gcgrp is non-NULL, we expect that the caller
+	 * if the passed in gc is non-NULL, we expect that the caller
 	 * has held a reference to it and will release it when this routine
 	 * returns a failure, otherwise we own the reference.  We do this
 	 * prior to initializing the rest IRE fields.
-	 *
-	 * Don't allocate ire_gw_secattr for the resolver case to prevent
-	 * memory leak (in case of external resolution failure). We'll
-	 * allocate it after a successful external resolution, in ire_add().
-	 * Note that ire->ire_mp != NULL here means this ire is headed
-	 * to an external resolver.
 	 */
 	if (is_system_labeled()) {
 		if ((type & (IRE_LOCAL | IRE_LOOPBACK | IRE_BROADCAST |
-		    IRE_INTERFACE)) != 0) {
+		    IRE_IF_ALL | IRE_MULTICAST | IRE_NOROUTE)) != 0) {
 			/* release references on behalf of caller */
 			if (gc != NULL)
 				GC_REFRELE(gc);
-			if (gcgrp != NULL)
-				GCGRP_REFRELE(gcgrp);
-		} else if ((ire->ire_mp == NULL) &&
-		    tsol_ire_init_gwattr(ire, ipversion, gc, gcgrp) != 0) {
-			return (B_FALSE);
+		} else {
+			error = tsol_ire_init_gwattr(ire, ipversion, gc);
+			if (error != 0)
+				return (error);
 		}
 	}
 
-	ire->ire_stq = stq;
-	ire->ire_rfq = rfq;
 	ire->ire_type = type;
 	ire->ire_flags = RTF_UP | flags;
-	ire->ire_ident = TICK_TO_MSEC(lbolt);
-	bcopy(ulp_info, &ire->ire_uinfo, sizeof (iulp_t));
-
-	ire->ire_tire_mark = ire->ire_ob_pkt_count + ire->ire_ib_pkt_count;
-	ire->ire_last_used_time = lbolt;
 	ire->ire_create_time = (uint32_t)gethrestime_sec();
+	ire->ire_generation = IRE_GENERATION_INITIAL;
 
 	/*
-	 * If this IRE is an IRE_CACHE, inherit the handles from the
-	 * parent IREs. For others in the forwarding table, assign appropriate
-	 * new ones.
+	 * The ill_ire_cnt isn't increased until
+	 * the IRE is added to ensure that a walker will find
+	 * all IREs that hold a reference on an ill.
 	 *
-	 * The mutex protecting ire_handle is because ire_create is not always
-	 * called as a writer.
+	 * Note that ill_ire_multicast doesn't hold a ref on the ill since
+	 * ire_add() is not called for the IRE_MULTICAST.
 	 */
-	if (ire->ire_type & IRE_OFFSUBNET) {
-		mutex_enter(&ipst->ips_ire_handle_lock);
-		ire->ire_phandle = (uint32_t)ipst->ips_ire_handle++;
-		mutex_exit(&ipst->ips_ire_handle_lock);
-	} else if (ire->ire_type & IRE_INTERFACE) {
-		mutex_enter(&ipst->ips_ire_handle_lock);
-		ire->ire_ihandle = (uint32_t)ipst->ips_ire_handle++;
-		mutex_exit(&ipst->ips_ire_handle_lock);
-	} else if (ire->ire_type == IRE_CACHE) {
-		ire->ire_phandle = phandle;
-		ire->ire_ihandle = ihandle;
-	}
-	ire->ire_ipif = ipif;
-	if (ipif != NULL) {
-		ire->ire_ipif_seqid = ipif->ipif_seqid;
-		ire->ire_ipif_ifindex =
-		    ipif->ipif_ill->ill_phyint->phyint_ifindex;
-		ire->ire_zoneid = ipif->ipif_zoneid;
-	} else {
-		ire->ire_zoneid = GLOBAL_ZONEID;
-	}
+	ire->ire_ill = ill;
+	ire->ire_zoneid = zoneid;
 	ire->ire_ipversion = ipversion;
+
 	mutex_init(&ire->ire_lock, NULL, MUTEX_DEFAULT, NULL);
-	if (ipversion == IPV4_VERSION) {
-		/*
-		 * IPv6 initializes the ire_nce in ire_add_v6, which expects
-		 * to find the ire_nce to be null when it is called.
-		 */
-		if (ire_nce_init(ire, src_nce) != 0) {
-			/* some failure occurred. propagate error back */
-			return (B_FALSE);
-		}
-	}
 	ire->ire_refcnt = 1;
+	ire->ire_identical_ref = 1;	/* Number of ire_delete's needed */
 	ire->ire_ipst = ipst;	/* No netstack_hold */
 	ire->ire_trace_disable = B_FALSE;
 
-	return (B_TRUE);
+	return (0);
 }
 
 /*
- * This routine is called repeatedly by ipif_up to create broadcast IREs.
- * It is passed a pointer to a slot in an IRE pointer array into which to
- * place the pointer to the new IRE, if indeed we create one.  If the
- * IRE corresponding to the address passed in would be a duplicate of an
- * existing one, we don't create the new one.  irep is incremented before
- * return only if we do create a new IRE.  (Always called as writer.)
+ * This creates an IRE_BROADCAST based on the arguments.
+ * A mirror is ire_lookup_bcast().
  *
- * Note that with the "match_flags" parameter, we can match on either
- * a particular logical interface (MATCH_IRE_IPIF) or for all logical
- * interfaces for a given physical interface (MATCH_IRE_ILL).  Currently,
- * we only create broadcast ire's on a per physical interface basis. If
- * someone is going to be mucking with logical interfaces, it is important
- * to call "ipif_check_bcast_ires()" to make sure that any change to a
- * logical interface will not cause critical broadcast IRE's to be deleted.
+ * Any supression of unneeded ones is done in ire_add_v4.
+ * We add one IRE_BROADCAST per address. ire_send_broadcast_v4()
+ * takes care of generating a loopback copy of the packet.
  */
 ire_t **
-ire_check_and_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep,
-    int match_flags)
+ire_create_bcast(ill_t *ill, ipaddr_t addr, zoneid_t zoneid, ire_t **irep)
 {
-	ire_t *ire;
-	uint64_t check_flags = IPIF_DEPRECATED | IPIF_NOLOCAL | IPIF_ANYCAST;
-	boolean_t prefer;
-	ill_t *ill = ipif->ipif_ill;
-	ip_stack_t *ipst = ill->ill_ipst;
+	ip_stack_t	*ipst = ill->ill_ipst;
 
-	/*
-	 * No broadcast IREs for the LOOPBACK interface
-	 * or others such as point to point and IPIF_NOXMIT.
-	 */
-	if (!(ipif->ipif_flags & IPIF_BROADCAST) ||
-	    (ipif->ipif_flags & IPIF_NOXMIT))
-		return (irep);
-
-	/*
-	 * If this new IRE would be a duplicate, only prefer it if one of
-	 * the following is true:
-	 *
-	 * 1. The existing one has IPIF_DEPRECATED|IPIF_LOCAL|IPIF_ANYCAST
-	 *    set and the new one has all of those clear.
-	 *
-	 * 2. The existing one corresponds to an underlying ILL in an IPMP
-	 *    group and the new one corresponds to an IPMP group interface.
-	 */
-	if ((ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST, ipif,
-	    ipif->ipif_zoneid, NULL, match_flags, ipst)) != NULL) {
-		prefer = ((ire->ire_ipif->ipif_flags & check_flags) &&
-		    !(ipif->ipif_flags & check_flags)) ||
-		    (IS_UNDER_IPMP(ire->ire_ipif->ipif_ill) && IS_IPMP(ill));
-		if (!prefer) {
-			ire_refrele(ire);
-			return (irep);
-		}
-
-		/*
-		 * Bcast ires exist in pairs. Both have to be deleted,
-		 * Since we are exclusive we can make the above assertion.
-		 * The 1st has to be refrele'd since it was ctable_lookup'd.
-		 */
-		ASSERT(IAM_WRITER_IPIF(ipif));
-		ASSERT(ire->ire_next->ire_addr == ire->ire_addr);
-		ire_delete(ire->ire_next);
-		ire_delete(ire);
-		ire_refrele(ire);
-	}
-	return (ire_create_bcast(ipif, addr, irep));
-}
-
-uint_t ip_loopback_mtu = IP_LOOPBACK_MTU;
-
-/*
- * This routine is called from ipif_check_bcast_ires and ire_check_bcast.
- * It leaves all the verifying and deleting to those routines. So it always
- * creates 2 bcast ires and chains them into the ire array passed in.
- */
-ire_t **
-ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
-{
-	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
-	ill_t		*ill = ipif->ipif_ill;
-
-	ASSERT(IAM_WRITER_IPIF(ipif));
-
-	if (IS_IPMP(ill)) {
-		/*
-		 * Broadcast IREs for the IPMP meta-interface use the
-		 * nominated broadcast interface to send and receive packets.
-		 * If there's no nominated interface, send the packets down to
-		 * the IPMP stub driver, which will discard them.  If the
-		 * nominated broadcast interface changes, ill_refresh_bcast()
-		 * will refresh the broadcast IREs.
-		 */
-		if ((ill = ipmp_illgrp_cast_ill(ill->ill_grp)) == NULL)
-			ill = ipif->ipif_ill;
-	}
+	ASSERT(IAM_WRITER_ILL(ill));
 
 	*irep++ = ire_create(
 	    (uchar_t *)&addr,			/* dest addr */
 	    (uchar_t *)&ip_g_all_ones,		/* mask */
-	    (uchar_t *)&ipif->ipif_src_addr,	/* source addr */
 	    NULL,				/* no gateway */
-	    &ipif->ipif_mtu,			/* max frag */
-	    NULL,				/* no src nce */
-	    ill->ill_rq,			/* recv-from queue */
-	    ill->ill_wq,			/* send-to queue */
 	    IRE_BROADCAST,
-	    ipif,
-	    0,
-	    0,
-	    0,
-	    0,
-	    &ire_uinfo_null,
-	    NULL,
-	    NULL,
-	    ipst);
-
-	*irep++ = ire_create(
-	    (uchar_t *)&addr,			/* dest address */
-	    (uchar_t *)&ip_g_all_ones,		/* mask */
-	    (uchar_t *)&ipif->ipif_src_addr,	/* source address */
-	    NULL,				/* no gateway */
-	    &ip_loopback_mtu,			/* max frag size */
-	    NULL,				/* no src_nce */
-	    ill->ill_rq,			/* recv-from queue */
-	    NULL,				/* no send-to queue */
-	    IRE_BROADCAST,			/* Needed for fanout in wput */
-	    ipif,
-	    0,
-	    0,
-	    0,
-	    0,
-	    &ire_uinfo_null,
-	    NULL,
+	    ill,
+	    zoneid,
+	    RTF_KERNEL,
 	    NULL,
 	    ipst);
 
@@ -1789,174 +747,34 @@ ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
 }
 
 /*
- * ire_walk routine to delete or update any IRE_CACHE that might contain
- * stale information.
- * The flags state which entries to delete or update.
- * Garbage collection is done separately using kmem alloc callbacks to
- * ip_trash_ire_reclaim.
- * Used for both IPv4 and IPv6. However, IPv6 only uses FLUSH_MTU_TIME
- * since other stale information is cleaned up using NUD.
- */
-void
-ire_expire(ire_t *ire, char *arg)
-{
-	ire_expire_arg_t	*ieap = (ire_expire_arg_t *)(uintptr_t)arg;
-	ill_t			*stq_ill;
-	int			flush_flags = ieap->iea_flush_flag;
-	ip_stack_t		*ipst = ieap->iea_ipst;
-
-	if ((flush_flags & FLUSH_REDIRECT_TIME) &&
-	    (ire->ire_flags & RTF_DYNAMIC)) {
-		/* Make sure we delete the corresponding IRE_CACHE */
-		ip1dbg(("ire_expire: all redirects\n"));
-		ip_rts_rtmsg(RTM_DELETE, ire, 0, ipst);
-		ire_delete(ire);
-		atomic_dec_32(&ipst->ips_ip_redirect_cnt);
-		return;
-	}
-	if (ire->ire_type != IRE_CACHE)
-		return;
-
-	if (flush_flags & FLUSH_ARP_TIME) {
-		/*
-		 * Remove all IRE_CACHE except IPv4 multicast ires. These
-		 * ires will be deleted by ip_trash_ire_reclaim_stack()
-		 * when system runs low in memory.
-		 * Verify that create time is more than ip_ire_arp_interval
-		 * milliseconds ago.
-		 */
-
-		if (!(ire->ire_ipversion == IPV4_VERSION &&
-		    CLASSD(ire->ire_addr)) && NCE_EXPIRED(ire->ire_nce, ipst)) {
-			ire_delete(ire);
-			return;
-		}
-	}
-
-	if (ipst->ips_ip_path_mtu_discovery && (flush_flags & FLUSH_MTU_TIME) &&
-	    (ire->ire_ipif != NULL)) {
-		/* Increase pmtu if it is less than the interface mtu */
-		mutex_enter(&ire->ire_lock);
-		/*
-		 * If the ipif is a vni (whose mtu is 0, since it's virtual)
-		 * get the mtu from the sending interfaces' ipif
-		 */
-		if (IS_VNI(ire->ire_ipif->ipif_ill)) {
-			stq_ill = ire->ire_stq->q_ptr;
-			ire->ire_max_frag = MIN(stq_ill->ill_ipif->ipif_mtu,
-			    IP_MAXPACKET);
-		} else {
-			ire->ire_max_frag = MIN(ire->ire_ipif->ipif_mtu,
-			    IP_MAXPACKET);
-		}
-		ire->ire_marks &= ~IRE_MARK_PMTU;
-		ire->ire_frag_flag |= IPH_DF;
-		mutex_exit(&ire->ire_lock);
-	}
-}
-
-/*
- * Return any local address.  We use this to target ourselves
- * when the src address was specified as 'default'.
- * Preference for IRE_LOCAL entries.
+ * This looks up an IRE_BROADCAST based on the arguments.
+ * Mirrors ire_create_bcast().
  */
 ire_t *
-ire_lookup_local(zoneid_t zoneid, ip_stack_t *ipst)
+ire_lookup_bcast(ill_t *ill, ipaddr_t addr, zoneid_t zoneid)
 {
-	ire_t	*ire;
-	irb_t	*irb;
-	ire_t	*maybe = NULL;
-	int i;
+	ire_t		*ire;
+	int		match_args;
 
-	for (i = 0; i < ipst->ips_ip_cache_table_size;  i++) {
-		irb = &ipst->ips_ip_cache_table[i];
-		if (irb->irb_ire == NULL)
-			continue;
-		rw_enter(&irb->irb_lock, RW_READER);
-		for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
-			if ((ire->ire_marks & IRE_MARK_CONDEMNED) ||
-			    (ire->ire_zoneid != zoneid &&
-			    ire->ire_zoneid != ALL_ZONES))
-				continue;
-			switch (ire->ire_type) {
-			case IRE_LOOPBACK:
-				if (maybe == NULL) {
-					IRE_REFHOLD(ire);
-					maybe = ire;
-				}
-				break;
-			case IRE_LOCAL:
-				if (maybe != NULL) {
-					ire_refrele(maybe);
-				}
-				IRE_REFHOLD(ire);
-				rw_exit(&irb->irb_lock);
-				return (ire);
-			}
-		}
-		rw_exit(&irb->irb_lock);
-	}
-	return (maybe);
-}
+	match_args = MATCH_IRE_TYPE | MATCH_IRE_ILL | MATCH_IRE_GW |
+	    MATCH_IRE_MASK | MATCH_IRE_ZONEONLY;
 
-/*
- * If the specified IRE is associated with a particular ILL, return
- * that ILL pointer (May be called as writer.).
- *
- * NOTE : This is not a generic function that can be used always.
- * This function always returns the ill of the outgoing packets
- * if this ire is used.
- */
-ill_t *
-ire_to_ill(const ire_t *ire)
-{
-	ill_t *ill = NULL;
+	if (IS_UNDER_IPMP(ill))
+		match_args |= MATCH_IRE_TESTHIDDEN;
 
-	/*
-	 * 1) For an IRE_CACHE, ire_ipif is the one where it obtained
-	 *    the source address from. ire_stq is the one where the
-	 *    packets will be sent out on. We return that here.
-	 *
-	 * 2) IRE_BROADCAST normally has a loopback and a non-loopback
-	 *    copy and they always exist next to each other with loopback
-	 *    copy being the first one. If we are called on the non-loopback
-	 *    copy, return the one pointed by ire_stq. If it was called on
-	 *    a loopback copy, we still return the one pointed by the next
-	 *    ire's ire_stq pointer i.e the one pointed by the non-loopback
-	 *    copy. We don't want use ire_ipif as it might represent the
-	 *    source address (if we borrow source addresses for
-	 *    IRE_BROADCASTS in the future).
-	 *    However if an interface is currently coming up, the above
-	 *    condition may not hold during that period since the ires
-	 *    are added one at a time. Thus one of the pair could have been
-	 *    added and the other not yet added.
-	 * 3) For many other IREs (e.g., IRE_LOCAL), ire_rfq indicates the ill.
-	 * 4) For all others return the ones pointed by ire_ipif->ipif_ill.
-	 *    That handles IRE_LOOPBACK.
-	 */
-
-	if (ire->ire_type == IRE_CACHE) {
-		ill = (ill_t *)ire->ire_stq->q_ptr;
-	} else if (ire->ire_type == IRE_BROADCAST) {
-		if (ire->ire_stq != NULL) {
-			ill = (ill_t *)ire->ire_stq->q_ptr;
-		} else {
-			ire_t  *ire_next;
-
-			ire_next = ire->ire_next;
-			if (ire_next != NULL &&
-			    ire_next->ire_type == IRE_BROADCAST &&
-			    ire_next->ire_addr == ire->ire_addr &&
-			    ire_next->ire_ipif == ire->ire_ipif) {
-				ill = (ill_t *)ire_next->ire_stq->q_ptr;
-			}
-		}
-	} else if (ire->ire_rfq != NULL) {
-		ill = ire->ire_rfq->q_ptr;
-	} else if (ire->ire_ipif != NULL) {
-		ill = ire->ire_ipif->ipif_ill;
-	}
-	return (ill);
+	ire = ire_ftable_lookup_v4(
+	    addr,				/* dest addr */
+	    ip_g_all_ones,			/* mask */
+	    0,					/* no gateway */
+	    IRE_BROADCAST,
+	    ill,
+	    zoneid,
+	    NULL,
+	    match_args,
+	    0,
+	    ill->ill_ipst,
+	    NULL);
+	return (ire);
 }
 
 /* Arrange to call the specified function for every IRE in the world. */
@@ -1992,15 +810,13 @@ ire_walk_ipvers(pfv_t func, void *arg, uchar_t vers, zoneid_t zoneid,
 		 */
 		ire_walk_ill_tables(0, 0, func, arg, IP_MASK_TABLE_SIZE,
 		    0, NULL,
-		    ipst->ips_ip_cache_table_size, ipst->ips_ip_cache_table,
 		    NULL, zoneid, ipst);
 	}
 	if (vers != IPV4_VERSION) {
 		ire_walk_ill_tables(0, 0, func, arg, IP6_MASK_TABLE_SIZE,
 		    ipst->ips_ip6_ftable_hash_size,
 		    ipst->ips_ip_forwarding_table_v6,
-		    ipst->ips_ip6_cache_table_size,
-		    ipst->ips_ip_cache_table_v6, NULL, zoneid, ipst);
+		    NULL, zoneid, ipst);
 	}
 }
 
@@ -2016,22 +832,6 @@ ire_walk_ill(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
 	ire_walk_ill_ipvers(match_flags, ire_type, func, arg, vers, ill);
 }
 
-void
-ire_walk_ill_v4(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
-    ill_t *ill)
-{
-	ire_walk_ill_ipvers(match_flags, ire_type, func, arg, IPV4_VERSION,
-	    ill);
-}
-
-void
-ire_walk_ill_v6(uint_t match_flags, uint_t ire_type, pfv_t func, void *arg,
-    ill_t *ill)
-{
-	ire_walk_ill_ipvers(match_flags, ire_type, func, arg, IPV6_VERSION,
-	    ill);
-}
-
 /*
  * Walk a particular ill and version.
  */
@@ -2043,137 +843,121 @@ ire_walk_ill_ipvers(uint_t match_flags, uint_t ire_type, pfv_t func,
 
 	if (vers == IPV4_VERSION) {
 		ire_walk_ill_tables(match_flags, ire_type, func, arg,
-		    IP_MASK_TABLE_SIZE, 0,
-		    NULL, ipst->ips_ip_cache_table_size,
-		    ipst->ips_ip_cache_table, ill, ALL_ZONES, ipst);
-	} else if (vers == IPV6_VERSION) {
+		    IP_MASK_TABLE_SIZE,
+		    0, NULL,
+		    ill, ALL_ZONES, ipst);
+	}
+	if (vers != IPV4_VERSION) {
 		ire_walk_ill_tables(match_flags, ire_type, func, arg,
 		    IP6_MASK_TABLE_SIZE, ipst->ips_ip6_ftable_hash_size,
 		    ipst->ips_ip_forwarding_table_v6,
-		    ipst->ips_ip6_cache_table_size,
-		    ipst->ips_ip_cache_table_v6, ill, ALL_ZONES, ipst);
+		    ill, ALL_ZONES, ipst);
 	}
 }
 
+/*
+ * Do the specific matching of IREs to shared-IP zones.
+ *
+ * We have the same logic as in ire_match_args but implemented slightly
+ * differently.
+ */
 boolean_t
 ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
     ill_t *ill, zoneid_t zoneid, ip_stack_t *ipst)
 {
-	ill_t *ire_stq_ill = NULL;
-	ill_t *ire_ipif_ill = NULL;
+	ill_t *dst_ill = NULL;
 
 	ASSERT(match_flags != 0 || zoneid != ALL_ZONES);
-	/*
-	 * MATCH_IRE_ILL: We match both on ill pointed by ire_stq and
-	 *    ire_ipif.  Only in the case of IRE_CACHEs can ire_stq and
-	 *    ire_ipif be pointing to different ills. But we want to keep
-	 *    this function generic enough for future use. So, we always
-	 *    try to match on both.  The only caller of this function
-	 *    ire_walk_ill_tables, will call "func" after we return from
-	 *    this function. We expect "func" to do the right filtering
-	 *    of ires in this case.
-	 */
 	if (match_flags & MATCH_IRE_ILL) {
-		if (ire->ire_stq != NULL)
-			ire_stq_ill = ire->ire_stq->q_ptr;
-		if (ire->ire_ipif != NULL)
-			ire_ipif_ill = ire->ire_ipif->ipif_ill;
+		dst_ill = ire->ire_ill;
 	}
 
-	if (zoneid != ALL_ZONES) {
+	if (zoneid != ALL_ZONES && zoneid != ire->ire_zoneid &&
+	    ire->ire_zoneid != ALL_ZONES) {
 		/*
 		 * We're walking the IREs for a specific zone. The only relevant
 		 * IREs are:
 		 * - all IREs with a matching ire_zoneid
-		 * - all IRE_OFFSUBNETs as they're shared across all zones
-		 * - IRE_INTERFACE IREs for interfaces with a usable source addr
+		 * - IRE_IF_ALL IREs for interfaces with a usable source addr
 		 *   with a matching zone
-		 * - IRE_DEFAULTs with a gateway reachable from the zone
-		 * We should really match on IRE_OFFSUBNETs and IRE_DEFAULTs
-		 * using the same rule; but the above rules are consistent with
-		 * the behavior of ire_ftable_lookup[_v6]() so that all the
-		 * routes that can be matched during lookup are also matched
-		 * here.
+		 * - IRE_OFFLINK with a gateway reachable from the zone
+		 * Note that ealier we only did the IRE_OFFLINK check for
+		 * IRE_DEFAULT (and only when we had multiple IRE_DEFAULTs).
 		 */
-		if (zoneid != ire->ire_zoneid && ire->ire_zoneid != ALL_ZONES) {
-			/*
-			 * Note, IRE_INTERFACE can have the stq as NULL. For
-			 * example, if the default multicast route is tied to
-			 * the loopback address.
-			 */
-			if ((ire->ire_type & IRE_INTERFACE) &&
-			    (ire->ire_stq != NULL)) {
-				ire_stq_ill = (ill_t *)ire->ire_stq->q_ptr;
-				if (ire->ire_ipversion == IPV4_VERSION) {
-					if (!ipif_usesrc_avail(ire_stq_ill,
-					    zoneid))
-						/* No usable src addr in zone */
-						return (B_FALSE);
-				} else if (ire_stq_ill->ill_usesrc_ifindex
-				    != 0) {
-					/*
-					 * For IPv6 use ipif_select_source_v6()
-					 * so the right scope selection is done
-					 */
-					ipif_t *src_ipif;
-					src_ipif =
-					    ipif_select_source_v6(ire_stq_ill,
-					    &ire->ire_addr_v6, B_FALSE,
-					    IPV6_PREFER_SRC_DEFAULT,
-					    zoneid);
-					if (src_ipif != NULL) {
-						ipif_refrele(src_ipif);
-					} else {
-						return (B_FALSE);
-					}
-				} else {
-					return (B_FALSE);
-				}
+		dst_ill = ire->ire_ill;
 
-			} else if (!(ire->ire_type & IRE_OFFSUBNET)) {
+		if (ire->ire_type & IRE_ONLINK) {
+			uint_t	ifindex;
+
+			/*
+			 * Note there is no IRE_INTERFACE on vniN thus
+			 * can't do an IRE lookup for a matching route.
+			 */
+			ifindex = dst_ill->ill_usesrc_ifindex;
+			if (ifindex == 0)
+				return (B_FALSE);
+
+			/*
+			 * If there is a usable source address in the
+			 * zone, then it's ok to return an
+			 * IRE_INTERFACE
+			 */
+			if (!ipif_zone_avail(ifindex, dst_ill->ill_isv6,
+			    zoneid, ipst)) {
+				return (B_FALSE);
+			}
+		}
+
+		if (dst_ill != NULL && (ire->ire_type & IRE_OFFLINK)) {
+			ipif_t	*tipif;
+
+			mutex_enter(&dst_ill->ill_lock);
+			for (tipif = dst_ill->ill_ipif;
+			    tipif != NULL; tipif = tipif->ipif_next) {
+				if (!IPIF_IS_CONDEMNED(tipif) &&
+				    (tipif->ipif_flags & IPIF_UP) &&
+				    (tipif->ipif_zoneid == zoneid ||
+				    tipif->ipif_zoneid == ALL_ZONES))
+					break;
+			}
+			mutex_exit(&dst_ill->ill_lock);
+			if (tipif == NULL) {
 				return (B_FALSE);
 			}
 		}
 
 		/*
-		 * Match all default routes from the global zone, irrespective
+		 * Match all offlink routes from the global zone, irrespective
 		 * of reachability. For a non-global zone only match those
-		 * where ire_gateway_addr has a IRE_INTERFACE for the zoneid.
+		 * where ire_gateway_addr has an IRE_INTERFACE for the zoneid.
 		 */
-		if (ire->ire_type == IRE_DEFAULT && zoneid != GLOBAL_ZONEID) {
-			int ire_match_flags = 0;
+		if ((ire->ire_type & IRE_OFFLINK) && zoneid != GLOBAL_ZONEID &&
+		    zoneid != ALL_ZONES) {
 			in6_addr_t gw_addr_v6;
-			ire_t *rire;
-
-			ire_match_flags |= MATCH_IRE_TYPE;
-			if (ire->ire_ipif != NULL)
-				ire_match_flags |= MATCH_IRE_ILL;
 
 			if (ire->ire_ipversion == IPV4_VERSION) {
-				rire = ire_route_lookup(ire->ire_gateway_addr,
-				    0, 0, IRE_INTERFACE, ire->ire_ipif, NULL,
-				    zoneid, NULL, ire_match_flags, ipst);
+				if (!ire_gateway_ok_zone_v4(
+				    ire->ire_gateway_addr, zoneid,
+				    dst_ill, NULL, ipst, B_FALSE))
+					return (B_FALSE);
 			} else {
 				ASSERT(ire->ire_ipversion == IPV6_VERSION);
 				mutex_enter(&ire->ire_lock);
 				gw_addr_v6 = ire->ire_gateway_addr_v6;
 				mutex_exit(&ire->ire_lock);
-				rire = ire_route_lookup_v6(&gw_addr_v6,
-				    NULL, NULL, IRE_INTERFACE, ire->ire_ipif,
-				    NULL, zoneid, NULL, ire_match_flags, ipst);
+
+				if (!ire_gateway_ok_zone_v6(&gw_addr_v6, zoneid,
+				    dst_ill, NULL, ipst, B_FALSE))
+					return (B_FALSE);
 			}
-			if (rire == NULL) {
-				return (B_FALSE);
-			}
-			ire_refrele(rire);
 		}
 	}
 
 	if (((!(match_flags & MATCH_IRE_TYPE)) ||
 	    (ire->ire_type & ire_type)) &&
 	    ((!(match_flags & MATCH_IRE_ILL)) ||
-	    (ire_stq_ill == ill || ire_ipif_ill == ill ||
-	    ire_ipif_ill != NULL && IS_IN_SAME_ILLGRP(ire_ipif_ill, ill)))) {
+	    (dst_ill == ill ||
+	    dst_ill != NULL && IS_IN_SAME_ILLGRP(dst_ill, ill)))) {
 		return (B_TRUE);
 	}
 	return (B_FALSE);
@@ -2197,8 +981,9 @@ rtfunc(struct radix_node *rn, void *arg)
 			ret = ire_walk_ill_match(rtf->rt_match_flags,
 			    rtf->rt_ire_type, ire,
 			    rtf->rt_ill, rtf->rt_zoneid, rtf->rt_ipst);
-		} else
+		} else {
 			ret = B_TRUE;
+		}
 		if (ret)
 			(*rtf->rt_func)(ire, rtf->rt_arg);
 	}
@@ -2206,12 +991,12 @@ rtfunc(struct radix_node *rn, void *arg)
 }
 
 /*
- * Walk the ftable and the ctable entries that match the ill.
+ * Walk the ftable entries that match the ill.
  */
 void
 ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
     void *arg, size_t ftbl_sz, size_t htbl_sz, irb_t **ipftbl,
-    size_t ctbl_sz, irb_t *ipctbl, ill_t *ill, zoneid_t zoneid,
+    ill_t *ill, zoneid_t zoneid,
     ip_stack_t *ipst)
 {
 	irb_t	*irb_ptr;
@@ -2223,85 +1008,50 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
 
 	ASSERT((!(match_flags & MATCH_IRE_ILL)) || (ill != NULL));
 	ASSERT(!(match_flags & MATCH_IRE_TYPE) || (ire_type != 0));
-	/*
-	 * Optimize by not looking at the forwarding table if there
-	 * is a MATCH_IRE_TYPE specified with no IRE_FORWARDTABLE
-	 * specified in ire_type.
-	 */
-	if (!(match_flags & MATCH_IRE_TYPE) ||
-	    ((ire_type & IRE_FORWARDTABLE) != 0)) {
-		/* knobs such that routine is called only for v6 case */
-		if (ipftbl == ipst->ips_ip_forwarding_table_v6) {
-			for (i = (ftbl_sz - 1);  i >= 0; i--) {
-				if ((irb_ptr = ipftbl[i]) == NULL)
-					continue;
-				for (j = 0; j < htbl_sz; j++) {
-					irb = &irb_ptr[j];
-					if (irb->irb_ire == NULL)
-						continue;
 
-					IRB_REFHOLD(irb);
-					for (ire = irb->irb_ire; ire != NULL;
-					    ire = ire->ire_next) {
-						if (match_flags == 0 &&
-						    zoneid == ALL_ZONES) {
-							ret = B_TRUE;
-						} else {
-							ret =
-							    ire_walk_ill_match(
-							    match_flags,
-							    ire_type, ire, ill,
-							    zoneid, ipst);
-						}
-						if (ret)
-							(*func)(ire, arg);
-					}
-					IRB_REFRELE(irb);
-				}
-			}
-		} else {
-			(void) memset(&rtfarg, 0, sizeof (rtfarg));
-			rtfarg.rt_func = func;
-			rtfarg.rt_arg = arg;
-			if (match_flags != 0) {
-				rtfarg.rt_match_flags = match_flags;
-			}
-			rtfarg.rt_ire_type = ire_type;
-			rtfarg.rt_ill = ill;
-			rtfarg.rt_zoneid = zoneid;
-			rtfarg.rt_ipst = ipst;	/* No netstack_hold */
-			(void) ipst->ips_ip_ftable->rnh_walktree_mt(
-			    ipst->ips_ip_ftable,
-			    rtfunc, &rtfarg, irb_refhold_rn, irb_refrele_rn);
-		}
-	}
-
-	/*
-	 * Optimize by not looking at the cache table if there
-	 * is a MATCH_IRE_TYPE specified with no IRE_CACHETABLE
-	 * specified in ire_type.
-	 */
-	if (!(match_flags & MATCH_IRE_TYPE) ||
-	    ((ire_type & IRE_CACHETABLE) != 0)) {
-		for (i = 0; i < ctbl_sz;  i++) {
-			irb = &ipctbl[i];
-			if (irb->irb_ire == NULL)
+	/* knobs such that routine is called only for v6 case */
+	if (ipftbl == ipst->ips_ip_forwarding_table_v6) {
+		for (i = (ftbl_sz - 1);  i >= 0; i--) {
+			if ((irb_ptr = ipftbl[i]) == NULL)
 				continue;
-			IRB_REFHOLD(irb);
-			for (ire = irb->irb_ire; ire != NULL;
-			    ire = ire->ire_next) {
-				if (match_flags == 0 && zoneid == ALL_ZONES) {
-					ret = B_TRUE;
-				} else {
-					ret = ire_walk_ill_match(
-					    match_flags, ire_type,
-					    ire, ill, zoneid, ipst);
+			for (j = 0; j < htbl_sz; j++) {
+				irb = &irb_ptr[j];
+				if (irb->irb_ire == NULL)
+					continue;
+
+				irb_refhold(irb);
+				for (ire = irb->irb_ire; ire != NULL;
+				    ire = ire->ire_next) {
+					if (match_flags == 0 &&
+					    zoneid == ALL_ZONES) {
+						ret = B_TRUE;
+					} else {
+						ret =
+						    ire_walk_ill_match(
+						    match_flags,
+						    ire_type, ire, ill,
+						    zoneid, ipst);
+					}
+					if (ret)
+						(*func)(ire, arg);
 				}
-				if (ret)
-					(*func)(ire, arg);
+				irb_refrele(irb);
 			}
-			IRB_REFRELE(irb);
 		}
+	} else {
+		(void) memset(&rtfarg, 0, sizeof (rtfarg));
+		rtfarg.rt_func = func;
+		rtfarg.rt_arg = arg;
+		if (match_flags != 0) {
+			rtfarg.rt_match_flags = match_flags;
+		}
+		rtfarg.rt_ire_type = ire_type;
+		rtfarg.rt_ill = ill;
+		rtfarg.rt_zoneid = zoneid;
+		rtfarg.rt_ipst = ipst;	/* No netstack_hold */
+		(void) ipst->ips_ip_ftable->rnh_walktree_mt(
+		    ipst->ips_ip_ftable,
+		    rtfunc, &rtfarg, irb_refhold_rn, irb_refrele_rn);
 	}
 }
 
@@ -2323,557 +1073,178 @@ ip_mask_to_plen(ipaddr_t mask)
 ipaddr_t
 ip_plen_to_mask(uint_t masklen)
 {
+	if (masklen == 0)
+		return (0);
+
 	return (htonl(IP_HOST_MASK << (IP_ABITS - masklen)));
 }
 
 void
 ire_atomic_end(irb_t *irb_ptr, ire_t *ire)
 {
-	ill_t *stq_ill, *ipif_ill;
-	ip_stack_t *ipst = ire->ire_ipst;
+	ill_t		*ill;
 
-	stq_ill = ire->ire_stq != NULL ? ire->ire_stq->q_ptr : NULL;
-	ipif_ill = ire->ire_ipif != NULL ? ire->ire_ipif->ipif_ill : NULL;
-	RELEASE_ILL_LOCKS(ipif_ill, stq_ill);
+	ill = ire->ire_ill;
+	if (ill != NULL)
+		mutex_exit(&ill->ill_lock);
 	rw_exit(&irb_ptr->irb_lock);
-	rw_exit(&ipst->ips_ill_g_usesrc_lock);
 }
 
 /*
- * ire_add_v[46] atomically make sure that the ipif or ill associated
- * with the new ire being added is stable and not IPIF_CHANGING or ILL_CHANGING
- * before adding the ire to the table. This ensures that we don't create
- * new IRE_CACHEs with stale values for parameters that are passed to
- * ire_create such as ire_max_frag. Note that ire_create() is passed a pointer
- * to the ipif_mtu, and not the value. The actual value is derived from the
- * parent ire or ipif under the bucket lock.
+ * ire_add_v[46] atomically make sure that the ill associated
+ * with the new ire is not going away i.e., we check ILL_CONDEMNED.
  */
 int
-ire_atomic_start(irb_t *irb_ptr, ire_t *ire, queue_t *q, mblk_t *mp,
-    ipsq_func_t func)
+ire_atomic_start(irb_t *irb_ptr, ire_t *ire)
 {
-	ill_t	*stq_ill;
-	ill_t	*ipif_ill;
-	int	error = 0;
-	ill_t	*ill = NULL;
-	ip_stack_t	*ipst = ire->ire_ipst;
+	ill_t		*ill;
 
-	stq_ill = ire->ire_stq != NULL ? ire->ire_stq->q_ptr : NULL;
-	ipif_ill = ire->ire_ipif != NULL ? ire->ire_ipif->ipif_ill : NULL;
+	ill = ire->ire_ill;
 
-	ASSERT((q != NULL && mp != NULL && func != NULL) ||
-	    (q == NULL && mp == NULL && func == NULL));
-	rw_enter(&ipst->ips_ill_g_usesrc_lock, RW_READER);
-	GRAB_CONN_LOCK(q);
 	rw_enter(&irb_ptr->irb_lock, RW_WRITER);
-	GRAB_ILL_LOCKS(ipif_ill, stq_ill);
-
-	/*
-	 * While the IRE is in the process of being added, a user may have
-	 * invoked the ifconfig usesrc option on the stq_ill to make it a
-	 * usesrc client ILL. Check for this possibility here, if it is true
-	 * then we fail adding the IRE_CACHE. Another check is to make sure
-	 * that an ipif_ill of an IRE_CACHE being added is not part of a usesrc
-	 * group. The ill_g_usesrc_lock is released in ire_atomic_end
-	 */
-	if ((ire->ire_type & IRE_CACHE) &&
-	    (ire->ire_marks & IRE_MARK_USESRC_CHECK)) {
-		if (stq_ill->ill_usesrc_ifindex != 0) {
-			ASSERT(stq_ill->ill_usesrc_grp_next != NULL);
-			if ((ipif_ill->ill_phyint->phyint_ifindex !=
-			    stq_ill->ill_usesrc_ifindex) ||
-			    (ipif_ill->ill_usesrc_grp_next == NULL) ||
-			    (ipif_ill->ill_usesrc_ifindex != 0)) {
-				error = EINVAL;
-				goto done;
-			}
-		} else if (ipif_ill->ill_usesrc_grp_next != NULL) {
-			error = EINVAL;
-			goto done;
-		}
-	}
-
-	/*
-	 * Don't allow IRE's to be created on changing ill's.  Also, since
-	 * IPMP flags can be set on an ill without quiescing it, if we're not
-	 * a writer on stq_ill, check that the flags still allow IRE creation.
-	 */
-	if ((stq_ill != NULL) && !IAM_WRITER_ILL(stq_ill)) {
-		if (stq_ill->ill_state_flags & ILL_CHANGING) {
-			ill = stq_ill;
-			error = EAGAIN;
-		} else if (IS_UNDER_IPMP(stq_ill)) {
-			mutex_enter(&stq_ill->ill_phyint->phyint_lock);
-			if (!ipmp_ill_is_active(stq_ill) &&
-			    !(ire->ire_marks & IRE_MARK_TESTHIDDEN)) {
-				error = EINVAL;
-			}
-			mutex_exit(&stq_ill->ill_phyint->phyint_lock);
-		}
-		if (error != 0)
-			goto done;
-	}
-
-	if ((ipif_ill != NULL) && !IAM_WRITER_ILL(ipif_ill) &&
-	    (ipif_ill->ill_state_flags & ILL_CHANGING)) {
-		ill = ipif_ill;
-		error = EAGAIN;
-		goto done;
-	}
-
-	if ((ire->ire_ipif != NULL) && !IAM_WRITER_IPIF(ire->ire_ipif) &&
-	    (ire->ire_ipif->ipif_state_flags & IPIF_CHANGING)) {
-		ill = ire->ire_ipif->ipif_ill;
-		ASSERT(ill != NULL);
-		error = EAGAIN;
-		goto done;
-	}
-
-done:
-	if (error == EAGAIN && ILL_CAN_WAIT(ill, q)) {
-		ipsq_t *ipsq = ill->ill_phyint->phyint_ipsq;
-		mutex_enter(&ipsq->ipsq_lock);
-		mutex_enter(&ipsq->ipsq_xop->ipx_lock);
-		ire_atomic_end(irb_ptr, ire);
-		ipsq_enq(ipsq, q, mp, func, NEW_OP, ill);
-		mutex_exit(&ipsq->ipsq_xop->ipx_lock);
-		mutex_exit(&ipsq->ipsq_lock);
-		error = EINPROGRESS;
-	} else if (error != 0) {
-		ire_atomic_end(irb_ptr, ire);
-	}
-
-	RELEASE_CONN_LOCK(q);
-	return (error);
-}
-
-/*
- * Add a fully initialized IRE to an appropriate table based on
- * ire_type.
- *
- * allow_unresolved == B_FALSE indicates a legacy code-path call
- * that has prohibited the addition of incomplete ire's. If this
- * parameter is set, and we find an nce that is in a state other
- * than ND_REACHABLE, we fail the add. Note that nce_state could be
- * something other than ND_REACHABLE if the nce had just expired and
- * the ire_create preceding the ire_add added a new ND_INITIAL nce.
- */
-int
-ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func,
-    boolean_t allow_unresolved)
-{
-	ire_t	*ire1;
-	ill_t	*stq_ill = NULL;
-	ill_t	*ill;
-	ipif_t	*ipif = NULL;
-	ill_walk_context_t ctx;
-	ire_t	*ire = *irep;
-	int	error;
-	boolean_t ire_is_mblk = B_FALSE;
-	tsol_gcgrp_t *gcgrp = NULL;
-	tsol_gcgrp_addr_t ga;
-	ip_stack_t	*ipst = ire->ire_ipst;
-
-	/* get ready for the day when original ire is not created as mblk */
-	if (ire->ire_mp != NULL) {
-		ire_is_mblk = B_TRUE;
-		/* Copy the ire to a kmem_alloc'ed area */
-		ire1 = kmem_cache_alloc(ire_cache, KM_NOSLEEP);
-		if (ire1 == NULL) {
-			ip1dbg(("ire_add: alloc failed\n"));
-			ire_delete(ire);
-			*irep = NULL;
-			return (ENOMEM);
-		}
-		ire->ire_marks &= ~IRE_MARK_UNCACHED;
-		*ire1 = *ire;
-		ire1->ire_mp = NULL;
-		ire1->ire_stq_ifindex = 0;
-		freeb(ire->ire_mp);
-		ire = ire1;
-	}
-	if (ire->ire_stq != NULL)
-		stq_ill = ire->ire_stq->q_ptr;
-
-	if (stq_ill != NULL && ire->ire_type == IRE_CACHE &&
-	    stq_ill->ill_net_type == IRE_IF_RESOLVER) {
-		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-		ill = ILL_START_WALK_ALL(&ctx, ipst);
-		for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-			mutex_enter(&ill->ill_lock);
-			if (ill->ill_state_flags & ILL_CONDEMNED) {
-				mutex_exit(&ill->ill_lock);
-				continue;
-			}
-			/*
-			 * We need to make sure that the ipif is a valid one
-			 * before adding the IRE_CACHE. This happens only
-			 * with IRE_CACHE when there is an external resolver.
-			 *
-			 * We can unplumb a logical interface while the
-			 * packet is waiting in ARP with the IRE. Then,
-			 * later on when we feed the IRE back, the ipif
-			 * has to be re-checked. This can't happen with
-			 * NDP currently, as we never queue the IRE with
-			 * the packet. We always try to recreate the IRE
-			 * when the resolution is completed. But, we do
-			 * it for IPv6 also here so that in future if
-			 * we have external resolvers, it will work without
-			 * any change.
-			 */
-			ipif = ipif_lookup_seqid(ill, ire->ire_ipif_seqid);
-			if (ipif != NULL) {
-				ipif_refhold_locked(ipif);
-				mutex_exit(&ill->ill_lock);
-				break;
-			}
-			mutex_exit(&ill->ill_lock);
-		}
-		rw_exit(&ipst->ips_ill_g_lock);
-		if (ipif == NULL ||
-		    (ipif->ipif_isv6 &&
-		    !IN6_IS_ADDR_UNSPECIFIED(&ire->ire_src_addr_v6) &&
-		    !IN6_ARE_ADDR_EQUAL(&ire->ire_src_addr_v6,
-		    &ipif->ipif_v6src_addr)) ||
-		    (!ipif->ipif_isv6 &&
-		    ire->ire_src_addr != ipif->ipif_src_addr) ||
-		    ire->ire_zoneid != ipif->ipif_zoneid) {
-			if (ipif != NULL)
-				ipif_refrele(ipif);
-			ire->ire_ipif = NULL;
-			ire_delete(ire);
-			*irep = NULL;
-			return (EINVAL);
-		}
-
-		ASSERT(ill != NULL);
+	if (ill != NULL) {
+		mutex_enter(&ill->ill_lock);
 
 		/*
-		 * Since we didn't attach label security attributes to the
-		 * ire for the resolver case, we need to add it now. (only
-		 * for v4 resolver and v6 xresolv case).
+		 * Don't allow IRE's to be created on dying ills.
 		 */
-		if (is_system_labeled() && ire_is_mblk) {
-			if (ire->ire_ipversion == IPV4_VERSION) {
-				ga.ga_af = AF_INET;
-				IN6_IPADDR_TO_V4MAPPED(ire->ire_gateway_addr !=
-				    INADDR_ANY ? ire->ire_gateway_addr :
-				    ire->ire_addr, &ga.ga_addr);
-			} else {
-				ga.ga_af = AF_INET6;
-				ga.ga_addr = IN6_IS_ADDR_UNSPECIFIED(
-				    &ire->ire_gateway_addr_v6) ?
-				    ire->ire_addr_v6 :
-				    ire->ire_gateway_addr_v6;
+		if (ill->ill_state_flags & ILL_CONDEMNED) {
+			ire_atomic_end(irb_ptr, ire);
+			return (ENXIO);
+		}
+
+		if (IS_UNDER_IPMP(ill)) {
+			int	error = 0;
+			mutex_enter(&ill->ill_phyint->phyint_lock);
+			if (!ipmp_ill_is_active(ill) &&
+			    IRE_HIDDEN_TYPE(ire->ire_type) &&
+			    !ire->ire_testhidden) {
+				error = EINVAL;
 			}
-			gcgrp = gcgrp_lookup(&ga, B_FALSE);
-			error = tsol_ire_init_gwattr(ire, ire->ire_ipversion,
-			    NULL, gcgrp);
+			mutex_exit(&ill->ill_phyint->phyint_lock);
 			if (error != 0) {
-				if (gcgrp != NULL) {
-					GCGRP_REFRELE(gcgrp);
-					gcgrp = NULL;
-				}
-				ipif_refrele(ipif);
-				ire->ire_ipif = NULL;
-				ire_delete(ire);
-				*irep = NULL;
+				ire_atomic_end(irb_ptr, ire);
 				return (error);
 			}
 		}
-	}
 
-	/*
-	 * In case ire was changed
-	 */
-	*irep = ire;
-	if (ire->ire_ipversion == IPV6_VERSION)
-		error = ire_add_v6(irep, q, mp, func);
-	else
-		error = ire_add_v4(irep, q, mp, func, allow_unresolved);
-	if (ipif != NULL)
-		ipif_refrele(ipif);
-	return (error);
+	}
+	return (0);
 }
 
 /*
- * Add an initialized IRE to an appropriate table based on ire_type.
- *
- * The forward table contains IRE_PREFIX/IRE_HOST and
- * IRE_IF_RESOLVER/IRE_IF_NORESOLVER and IRE_DEFAULT.
- *
- * The cache table contains IRE_BROADCAST/IRE_LOCAL/IRE_LOOPBACK
- * and IRE_CACHE.
- *
- * NOTE : This function is called as writer though not required
- * by this function.
+ * Add a fully initialized IRE to the forwarding table.
+ * This returns NULL on failure, or a held IRE on success.
+ * Normally the returned IRE is the same as the argument. But a different
+ * IRE will be returned if the added IRE is deemed identical to an existing
+ * one. In that case ire_identical_ref will be increased.
+ * The caller always needs to do an ire_refrele() on the returned IRE.
  */
-static int
-ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
-    boolean_t allow_unresolved)
+ire_t *
+ire_add(ire_t *ire)
+{
+	if (IRE_HIDDEN_TYPE(ire->ire_type) &&
+	    ire->ire_ill != NULL && IS_UNDER_IPMP(ire->ire_ill)) {
+		/*
+		 * IREs hosted on interfaces that are under IPMP
+		 * should be hidden so that applications don't
+		 * accidentally end up sending packets with test
+		 * addresses as their source addresses, or
+		 * sending out interfaces that are e.g. IFF_INACTIVE.
+		 * Hide them here.
+		 */
+		ire->ire_testhidden = B_TRUE;
+	}
+
+	if (ire->ire_ipversion == IPV6_VERSION)
+		return (ire_add_v6(ire));
+	else
+		return (ire_add_v4(ire));
+}
+
+/*
+ * Add a fully initialized IPv4 IRE to the forwarding table.
+ * This returns NULL on failure, or a held IRE on success.
+ * Normally the returned IRE is the same as the argument. But a different
+ * IRE will be returned if the added IRE is deemed identical to an existing
+ * one. In that case ire_identical_ref will be increased.
+ * The caller always needs to do an ire_refrele() on the returned IRE.
+ */
+static ire_t *
+ire_add_v4(ire_t *ire)
 {
 	ire_t	*ire1;
 	irb_t	*irb_ptr;
 	ire_t	**irep;
-	int	flags;
-	ire_t	*pire = NULL;
-	ill_t	*stq_ill;
-	ire_t	*ire = *ire_p;
+	int	match_flags;
 	int	error;
-	boolean_t need_refrele = B_FALSE;
-	nce_t	*nce;
 	ip_stack_t	*ipst = ire->ire_ipst;
-	uint_t	marks = 0;
 
-	/*
-	 * IREs with source addresses hosted on interfaces that are under IPMP
-	 * should be hidden so that applications don't accidentally end up
-	 * sending packets with test addresses as their source addresses, or
-	 * sending out interfaces that are e.g. IFF_INACTIVE.  Hide them here.
-	 */
-	if (ire->ire_ipif != NULL && IS_UNDER_IPMP(ire->ire_ipif->ipif_ill))
-		marks |= IRE_MARK_TESTHIDDEN;
-
-	if (ire->ire_ipif != NULL)
-		ASSERT(!MUTEX_HELD(&ire->ire_ipif->ipif_ill->ill_lock));
-	if (ire->ire_stq != NULL)
-		ASSERT(!MUTEX_HELD(
-		    &((ill_t *)(ire->ire_stq->q_ptr))->ill_lock));
+	if (ire->ire_ill != NULL)
+		ASSERT(!MUTEX_HELD(&ire->ire_ill->ill_lock));
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
-	ASSERT(ire->ire_mp == NULL); /* Calls should go through ire_add */
-
-	/* Find the appropriate list head. */
-	switch (ire->ire_type) {
-	case IRE_HOST:
-		ire->ire_mask = IP_HOST_MASK;
-		ire->ire_masklen = IP_ABITS;
-		ire->ire_marks |= marks;
-		if ((ire->ire_flags & RTF_SETSRC) == 0)
-			ire->ire_src_addr = 0;
-		break;
-	case IRE_CACHE:
-		ire->ire_mask = IP_HOST_MASK;
-		ire->ire_masklen = IP_ABITS;
-		ire->ire_marks |= marks;
-		break;
-	case IRE_BROADCAST:
-	case IRE_LOCAL:
-	case IRE_LOOPBACK:
-		ire->ire_mask = IP_HOST_MASK;
-		ire->ire_masklen = IP_ABITS;
-		break;
-	case IRE_PREFIX:
-	case IRE_DEFAULT:
-		ire->ire_marks |= marks;
-		if ((ire->ire_flags & RTF_SETSRC) == 0)
-			ire->ire_src_addr = 0;
-		break;
-	case IRE_IF_RESOLVER:
-	case IRE_IF_NORESOLVER:
-		ire->ire_marks |= marks;
-		break;
-	default:
-		ip0dbg(("ire_add_v4: ire %p has unrecognized IRE type (%d)\n",
-		    (void *)ire, ire->ire_type));
-		ire_delete(ire);
-		*ire_p = NULL;
-		return (EINVAL);
-	}
 
 	/* Make sure the address is properly masked. */
 	ire->ire_addr &= ire->ire_mask;
 
-	/*
-	 * ip_newroute/ip_newroute_multi are unable to prevent the deletion
-	 * of the interface route while adding an IRE_CACHE for an on-link
-	 * destination in the IRE_IF_RESOLVER case, since the ire has to
-	 * go to ARP and return. We can't do a REFHOLD on the
-	 * associated interface ire for fear of ARP freeing the message.
-	 * Here we look up the interface ire in the forwarding table and
-	 * make sure that the interface route has not been deleted.
-	 */
-	if (ire->ire_type == IRE_CACHE && ire->ire_gateway_addr == 0 &&
-	    ((ill_t *)ire->ire_stq->q_ptr)->ill_net_type == IRE_IF_RESOLVER) {
+	match_flags = (MATCH_IRE_MASK | MATCH_IRE_TYPE | MATCH_IRE_GW);
 
-		ASSERT(ire->ire_max_fragp == NULL);
-		if (CLASSD(ire->ire_addr) && !(ire->ire_flags & RTF_SETSRC)) {
-			/*
-			 * The ihandle that we used in ip_newroute_multi
-			 * comes from the interface route corresponding
-			 * to ire_ipif. Lookup here to see if it exists
-			 * still.
-			 * If the ire has a source address assigned using
-			 * RTF_SETSRC, ire_ipif is the logical interface holding
-			 * this source address, so we can't use it to check for
-			 * the existence of the interface route. Instead we rely
-			 * on the brute force ihandle search in
-			 * ire_ihandle_lookup_onlink() below.
-			 */
-			pire = ipif_to_ire(ire->ire_ipif);
-			if (pire == NULL) {
-				ire_delete(ire);
-				*ire_p = NULL;
-				return (EINVAL);
-			} else if (pire->ire_ihandle != ire->ire_ihandle) {
-				ire_refrele(pire);
-				ire_delete(ire);
-				*ire_p = NULL;
-				return (EINVAL);
-			}
-		} else {
-			pire = ire_ihandle_lookup_onlink(ire);
-			if (pire == NULL) {
-				ire_delete(ire);
-				*ire_p = NULL;
-				return (EINVAL);
-			}
-		}
-		/* Prevent pire from getting deleted */
-		IRB_REFHOLD(pire->ire_bucket);
-		/* Has it been removed already ? */
-		if (pire->ire_marks & IRE_MARK_CONDEMNED) {
-			IRB_REFRELE(pire->ire_bucket);
-			ire_refrele(pire);
-			ire_delete(ire);
-			*ire_p = NULL;
-			return (EINVAL);
-		}
-	} else {
-		ASSERT(ire->ire_max_fragp != NULL);
+	if (ire->ire_ill != NULL) {
+		match_flags |= MATCH_IRE_ILL;
 	}
-	flags = (MATCH_IRE_MASK | MATCH_IRE_TYPE | MATCH_IRE_GW);
-
-	if (ire->ire_ipif != NULL) {
-		/*
-		 * We use MATCH_IRE_IPIF while adding IRE_CACHES only
-		 * for historic reasons and to maintain symmetry with
-		 * IPv6 code path. Historically this was used by
-		 * multicast code to create multiple IRE_CACHES on
-		 * a single ill with different ipifs. This was used
-		 * so that multicast packets leaving the node had the
-		 * right source address. This is no longer needed as
-		 * ip_wput initializes the address correctly.
-		 */
-		flags |= MATCH_IRE_IPIF;
-		/*
-		 * If we are creating a hidden IRE, make sure we search for
-		 * hidden IREs when searching for duplicates below.
-		 * Otherwise, we might find an IRE on some other interface
-		 * that's not marked hidden.
-		 */
-		if (ire->ire_marks & IRE_MARK_TESTHIDDEN)
-			flags |= MATCH_IRE_MARK_TESTHIDDEN;
-	}
-	if ((ire->ire_type & IRE_CACHETABLE) == 0) {
-		irb_ptr = ire_get_bucket(ire);
-		need_refrele = B_TRUE;
-		if (irb_ptr == NULL) {
-			/*
-			 * This assumes that the ire has not added
-			 * a reference to the ipif.
-			 */
-			ire->ire_ipif = NULL;
-			ire_delete(ire);
-			if (pire != NULL) {
-				IRB_REFRELE(pire->ire_bucket);
-				ire_refrele(pire);
-			}
-			*ire_p = NULL;
-			return (EINVAL);
-		}
-	} else {
-		irb_ptr = &(ipst->ips_ip_cache_table[IRE_ADDR_HASH(
-		    ire->ire_addr, ipst->ips_ip_cache_table_size)]);
-	}
-
-	/*
-	 * Start the atomic add of the ire. Grab the ill locks,
-	 * ill_g_usesrc_lock and the bucket lock. Check for condemned
-	 *
-	 * If ipif or ill is changing ire_atomic_start() may queue the
-	 * request and return EINPROGRESS.
-	 * To avoid lock order problems, get the ndp4->ndp_g_lock.
-	 */
-	mutex_enter(&ipst->ips_ndp4->ndp_g_lock);
-	error = ire_atomic_start(irb_ptr, ire, q, mp, func);
-	if (error != 0) {
-		mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
-		/*
-		 * We don't know whether it is a valid ipif or not.
-		 * So, set it to NULL. This assumes that the ire has not added
-		 * a reference to the ipif.
-		 */
-		ire->ire_ipif = NULL;
+	irb_ptr = ire_get_bucket(ire);
+	if (irb_ptr == NULL) {
+		printf("no bucket for %p\n", (void *)ire);
 		ire_delete(ire);
-		if (pire != NULL) {
-			IRB_REFRELE(pire->ire_bucket);
-			ire_refrele(pire);
-		}
-		*ire_p = NULL;
-		if (need_refrele)
-			IRB_REFRELE(irb_ptr);
-		return (error);
+		return (NULL);
+	}
+
+	/*
+	 * Start the atomic add of the ire. Grab the ill lock,
+	 * the bucket lock. Check for condemned.
+	 */
+	error = ire_atomic_start(irb_ptr, ire);
+	if (error != 0) {
+		printf("no ire_atomic_start for %p\n", (void *)ire);
+		ire_delete(ire);
+		irb_refrele(irb_ptr);
+		return (NULL);
 	}
 	/*
-	 * To avoid creating ires having stale values for the ire_max_frag
-	 * we get the latest value atomically here. For more details
-	 * see the block comment in ip_sioctl_mtu and in DL_NOTE_SDU_CHANGE
-	 * in ip_rput_dlpi_writer
+	 * If we are creating a hidden IRE, make sure we search for
+	 * hidden IREs when searching for duplicates below.
+	 * Otherwise, we might find an IRE on some other interface
+	 * that's not marked hidden.
 	 */
-	if (ire->ire_max_fragp == NULL) {
-		if (CLASSD(ire->ire_addr))
-			ire->ire_max_frag = ire->ire_ipif->ipif_mtu;
-		else
-			ire->ire_max_frag = pire->ire_max_frag;
-	} else {
-		uint_t	max_frag;
+	if (ire->ire_testhidden)
+		match_flags |= MATCH_IRE_TESTHIDDEN;
 
-		max_frag = *ire->ire_max_fragp;
-		ire->ire_max_fragp = NULL;
-		ire->ire_max_frag = max_frag;
-	}
 	/*
 	 * Atomically check for duplicate and insert in the table.
 	 */
 	for (ire1 = irb_ptr->irb_ire; ire1 != NULL; ire1 = ire1->ire_next) {
-		if (ire1->ire_marks & IRE_MARK_CONDEMNED)
+		if (IRE_IS_CONDEMNED(ire1))
 			continue;
-		if (ire->ire_ipif != NULL) {
-			/*
-			 * We do MATCH_IRE_ILL implicitly here for IREs
-			 * with a non-null ire_ipif, including IRE_CACHEs.
-			 * As ire_ipif and ire_stq could point to two
-			 * different ills, we can't pass just ire_ipif to
-			 * ire_match_args and get a match on both ills.
-			 * This is just needed for duplicate checks here and
-			 * so we don't add an extra argument to
-			 * ire_match_args for this. Do it locally.
-			 *
-			 * NOTE : Currently there is no part of the code
-			 * that asks for both MATH_IRE_IPIF and MATCH_IRE_ILL
-			 * match for IRE_CACHEs. Thus we don't want to
-			 * extend the arguments to ire_match_args.
-			 */
-			if (ire1->ire_stq != ire->ire_stq)
-				continue;
-			/*
-			 * Multiroute IRE_CACHEs for a given destination can
-			 * have the same ire_ipif, typically if their source
-			 * address is forced using RTF_SETSRC, and the same
-			 * send-to queue. We differentiate them using the parent
-			 * handle.
-			 */
-			if (ire->ire_type == IRE_CACHE &&
-			    (ire1->ire_flags & RTF_MULTIRT) &&
-			    (ire->ire_flags & RTF_MULTIRT) &&
-			    (ire1->ire_phandle != ire->ire_phandle))
-				continue;
-		}
+		/*
+		 * Here we need an exact match on zoneid, i.e.,
+		 * ire_match_args doesn't fit.
+		 */
 		if (ire1->ire_zoneid != ire->ire_zoneid)
 			continue;
+
+		if (ire1->ire_type != ire->ire_type)
+			continue;
+
+		/*
+		 * Note: We do not allow multiple routes that differ only
+		 * in the gateway security attributes; such routes are
+		 * considered duplicates.
+		 * To change that we explicitly have to treat them as
+		 * different here.
+		 */
 		if (ire_match_args(ire1, ire->ire_addr, ire->ire_mask,
-		    ire->ire_gateway_addr, ire->ire_type, ire->ire_ipif,
-		    ire->ire_zoneid, 0, NULL, flags, NULL)) {
+		    ire->ire_gateway_addr, ire->ire_type, ire->ire_ill,
+		    ire->ire_zoneid, NULL, match_flags)) {
 			/*
 			 * Return the old ire after doing a REFHOLD.
 			 * As most of the callers continue to use the IRE
@@ -2881,149 +1252,36 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 			 * avoid a lookup in the caller again. If the callers
 			 * don't want to use it, they need to do a REFRELE.
 			 */
-			ip1dbg(("found dup ire existing %p new %p\n",
-			    (void *)ire1, (void *)ire));
-			IRE_REFHOLD(ire1);
+			atomic_add_32(&ire1->ire_identical_ref, 1);
+			DTRACE_PROBE2(ire__add__exist, ire_t *, ire1,
+			    ire_t *, ire);
+			ire_refhold(ire1);
 			ire_atomic_end(irb_ptr, ire);
-			mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 			ire_delete(ire);
-			if (pire != NULL) {
-				/*
-				 * Assert that it is not removed from the
-				 * list yet.
-				 */
-				ASSERT(pire->ire_ptpn != NULL);
-				IRB_REFRELE(pire->ire_bucket);
-				ire_refrele(pire);
-			}
-			*ire_p = ire1;
-			if (need_refrele)
-				IRB_REFRELE(irb_ptr);
-			return (0);
+			irb_refrele(irb_ptr);
+			return (ire1);
 		}
 	}
 
-	if (ire->ire_type & IRE_CACHE) {
-		ASSERT(ire->ire_stq != NULL);
-		nce = ndp_lookup_v4(ire_to_ill(ire),
-		    ((ire->ire_gateway_addr != INADDR_ANY) ?
-		    &ire->ire_gateway_addr : &ire->ire_addr),
-		    B_TRUE);
-		if (nce != NULL)
-			mutex_enter(&nce->nce_lock);
-		/*
-		 * if the nce is NCE_F_CONDEMNED, or if it is not ND_REACHABLE
-		 * and the caller has prohibited the addition of incomplete
-		 * ire's, we fail the add. Note that nce_state could be
-		 * something other than ND_REACHABLE if the nce had
-		 * just expired and the ire_create preceding the
-		 * ire_add added a new ND_INITIAL nce.
-		 */
-		if ((nce == NULL) ||
-		    (nce->nce_flags & NCE_F_CONDEMNED) ||
-		    (!allow_unresolved &&
-		    (nce->nce_state != ND_REACHABLE))) {
-			if (nce != NULL) {
-				DTRACE_PROBE1(ire__bad__nce, nce_t *, nce);
-				mutex_exit(&nce->nce_lock);
-			}
-			ire_atomic_end(irb_ptr, ire);
-			mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
-			if (nce != NULL)
-				NCE_REFRELE(nce);
-			DTRACE_PROBE1(ire__no__nce, ire_t *, ire);
-			ire_delete(ire);
-			if (pire != NULL) {
-				IRB_REFRELE(pire->ire_bucket);
-				ire_refrele(pire);
-			}
-			*ire_p = NULL;
-			if (need_refrele)
-				IRB_REFRELE(irb_ptr);
-			return (EINVAL);
-		} else {
-			ire->ire_nce = nce;
-			mutex_exit(&nce->nce_lock);
-			/*
-			 * We are associating this nce to the ire, so
-			 * change the nce ref taken in ndp_lookup_v4() from
-			 * NCE_REFHOLD to NCE_REFHOLD_NOTR
-			 */
-			NCE_REFHOLD_TO_REFHOLD_NOTR(ire->ire_nce);
-		}
-	}
 	/*
-	 * Make it easy for ip_wput_ire() to hit multiple broadcast ires by
-	 * grouping identical addresses together on the hash chain.  We do
-	 * this only for IRE_BROADCASTs as ip_wput_ire is currently interested
-	 * in such groupings only for broadcasts.
-	 *
-	 * Find the first entry that matches ire_addr. *irep will be null
-	 * if no match.
-	 *
-	 * Note: the loopback and non-loopback broadcast entries for an
-	 * interface MUST be added before any MULTIRT entries.
+	 * Normally we do head insertion since most things do not care about
+	 * the order of the IREs in the bucket. Note that ip_cgtp_bcast_add
+	 * assumes we at least do head insertion so that its IRE_BROADCAST
+	 * arrive ahead of existing IRE_HOST for the same address.
+	 * However, due to shared-IP zones (and restrict_interzone_loopback)
+	 * we can have an IRE_LOCAL as well as IRE_IF_CLONE for the same
+	 * address. For that reason we do tail insertion for IRE_IF_CLONE.
+	 * Due to the IRE_BROADCAST on cgtp0, which must be last in the bucket,
+	 * we do tail insertion of IRE_BROADCASTs that do not have RTF_MULTIRT
+	 * set.
 	 */
 	irep = (ire_t **)irb_ptr;
-	while ((ire1 = *irep) != NULL && ire->ire_addr != ire1->ire_addr)
-		irep = &ire1->ire_next;
-	if (ire->ire_type == IRE_BROADCAST && *irep != NULL) {
-		/*
-		 * We found some ire (i.e *irep) with a matching addr. We
-		 * want to group ires with same addr.
-		 */
-		for (;;) {
-			ire1 = *irep;
-			if ((ire1->ire_next == NULL) ||
-			    (ire1->ire_next->ire_addr != ire->ire_addr) ||
-			    (ire1->ire_type != IRE_BROADCAST) ||
-			    (ire1->ire_flags & RTF_MULTIRT) ||
-			    (ire1->ire_ipif->ipif_ill->ill_grp ==
-			    ire->ire_ipif->ipif_ill->ill_grp))
-				break;
+	if ((ire->ire_type & IRE_IF_CLONE) ||
+	    ((ire->ire_type & IRE_BROADCAST) &&
+	    !(ire->ire_flags & RTF_MULTIRT))) {
+		while ((ire1 = *irep) != NULL)
 			irep = &ire1->ire_next;
-		}
-		ASSERT(*irep != NULL);
-		/*
-		 * The ire will be added before *irep, so
-		 * if irep is a MULTIRT ire, just break to
-		 * ire insertion code.
-		 */
-		if (((*irep)->ire_flags & RTF_MULTIRT) != 0)
-			goto insert_ire;
-
-		irep = &((*irep)->ire_next);
-
-		/*
-		 * Either we have hit the end of the list or the address
-		 * did not match.
-		 */
-		while (*irep != NULL) {
-			ire1 = *irep;
-			if ((ire1->ire_addr != ire->ire_addr) ||
-			    (ire1->ire_type != IRE_BROADCAST))
-				break;
-			if (ire1->ire_ipif == ire->ire_ipif) {
-				irep = &ire1->ire_next;
-				break;
-			}
-			irep = &ire1->ire_next;
-		}
-	} else if (*irep != NULL) {
-		/*
-		 * Find the last ire which matches ire_addr.
-		 * Needed to do tail insertion among entries with the same
-		 * ire_addr.
-		 */
-		while (ire->ire_addr == ire1->ire_addr) {
-			irep = &ire1->ire_next;
-			ire1 = *irep;
-			if (ire1 == NULL)
-				break;
-		}
 	}
-
-insert_ire:
 	/* Insert at *irep */
 	ire1 = *irep;
 	if (ire1 != NULL)
@@ -3058,82 +1316,31 @@ insert_ire:
 	 * in the list for the first time and no one else can bump
 	 * up the reference count on this yet.
 	 */
-	IRE_REFHOLD_LOCKED(ire);
+	ire_refhold_locked(ire);
 	BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_inserted);
 
 	irb_ptr->irb_ire_cnt++;
-	if (irb_ptr->irb_marks & IRB_MARK_FTABLE)
+	if (irb_ptr->irb_marks & IRB_MARK_DYNAMIC)
 		irb_ptr->irb_nire++;
 
-	if (ire->ire_marks & IRE_MARK_TEMPORARY)
-		irb_ptr->irb_tmp_ire_cnt++;
-
-	if (ire->ire_ipif != NULL) {
-		DTRACE_PROBE3(ipif__incr__cnt, (ipif_t *), ire->ire_ipif,
-		    (char *), "ire", (void *), ire);
-		ire->ire_ipif->ipif_ire_cnt++;
-		if (ire->ire_stq != NULL) {
-			stq_ill = (ill_t *)ire->ire_stq->q_ptr;
-			DTRACE_PROBE3(ill__incr__cnt, (ill_t *), stq_ill,
-			    (char *), "ire", (void *), ire);
-			stq_ill->ill_ire_cnt++;
-		}
-	} else {
-		ASSERT(ire->ire_stq == NULL);
+	if (ire->ire_ill != NULL) {
+		ire->ire_ill->ill_ire_cnt++;
+		ASSERT(ire->ire_ill->ill_ire_cnt != 0);	/* Wraparound */
 	}
 
 	ire_atomic_end(irb_ptr, ire);
-	mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 
-	if (pire != NULL) {
-		/* Assert that it is not removed from the list yet */
-		ASSERT(pire->ire_ptpn != NULL);
-		IRB_REFRELE(pire->ire_bucket);
-		ire_refrele(pire);
-	}
+	/* Make any caching of the IREs be notified or updated */
+	ire_flush_cache_v4(ire, IRE_FLUSH_ADD);
 
-	if (ire->ire_type != IRE_CACHE) {
-		/*
-		 * For ire's with host mask see if there is an entry
-		 * in the cache. If there is one flush the whole cache as
-		 * there might be multiple entries due to RTF_MULTIRT (CGTP).
-		 * If no entry is found than there is no need to flush the
-		 * cache.
-		 */
-		if (ire->ire_mask == IP_HOST_MASK) {
-			ire_t *lire;
-			lire = ire_ctable_lookup(ire->ire_addr, NULL, IRE_CACHE,
-			    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-			if (lire != NULL) {
-				ire_refrele(lire);
-				ire_flush_cache_v4(ire, IRE_FLUSH_ADD);
-			}
-		} else {
-			ire_flush_cache_v4(ire, IRE_FLUSH_ADD);
-		}
-	}
-	/*
-	 * We had to delay the fast path probe until the ire is inserted
-	 * in the list. Otherwise the fast path ack won't find the ire in
-	 * the table.
-	 */
-	if (ire->ire_type == IRE_CACHE ||
-	    (ire->ire_type == IRE_BROADCAST && ire->ire_stq != NULL)) {
-		ASSERT(ire->ire_nce != NULL);
-		if (ire->ire_nce->nce_state == ND_REACHABLE)
-			nce_fastpath(ire->ire_nce);
-	}
-	if (ire->ire_ipif != NULL)
-		ASSERT(!MUTEX_HELD(&ire->ire_ipif->ipif_ill->ill_lock));
-	*ire_p = ire;
-	if (need_refrele) {
-		IRB_REFRELE(irb_ptr);
-	}
-	return (0);
+	if (ire->ire_ill != NULL)
+		ASSERT(!MUTEX_HELD(&ire->ire_ill->ill_lock));
+	irb_refrele(irb_ptr);
+	return (ire);
 }
 
 /*
- * IRB_REFRELE is the only caller of the function. ire_unlink calls to
+ * irb_refrele is the only caller of the function. ire_unlink calls to
  * do the final cleanup for this ire.
  */
 void
@@ -3162,13 +1369,13 @@ ire_cleanup(ire_t *ire)
 		 * so.
 		 */
 		ire->ire_next = NULL;
-		IRE_REFRELE_NOTR(ire);
+		ire_refrele_notr(ire);
 		ire = ire_next;
 	}
 }
 
 /*
- * IRB_REFRELE is the only caller of the function. It calls to unlink
+ * irb_refrele is the only caller of the function. It calls to unlink
  * all the CONDEMNED ires from this bucket.
  */
 ire_t *
@@ -3180,16 +1387,14 @@ ire_unlink(irb_t *irb)
 	ire_t *ire_list = NULL;
 
 	ASSERT(RW_WRITE_HELD(&irb->irb_lock));
-	ASSERT(((irb->irb_marks & IRB_MARK_FTABLE) && irb->irb_refcnt == 1) ||
+	ASSERT(((irb->irb_marks & IRB_MARK_DYNAMIC) && irb->irb_refcnt == 1) ||
 	    (irb->irb_refcnt == 0));
 	ASSERT(irb->irb_marks & IRB_MARK_CONDEMNED);
 	ASSERT(irb->irb_ire != NULL);
 
 	for (ire = irb->irb_ire; ire != NULL; ire = ire1) {
-		ip_stack_t	*ipst = ire->ire_ipst;
-
 		ire1 = ire->ire_next;
-		if (ire->ire_marks & IRE_MARK_CONDEMNED) {
+		if (IRE_IS_CONDEMNED(ire)) {
 			ptpn = ire->ire_ptpn;
 			ire1 = ire->ire_next;
 			if (ire1)
@@ -3197,22 +1402,10 @@ ire_unlink(irb_t *irb)
 			*ptpn = ire1;
 			ire->ire_ptpn = NULL;
 			ire->ire_next = NULL;
-			if (ire->ire_type == IRE_DEFAULT) {
-				/*
-				 * IRE is out of the list. We need to adjust
-				 * the accounting before the caller drops
-				 * the lock.
-				 */
-				if (ire->ire_ipversion == IPV6_VERSION) {
-					ASSERT(ipst->
-					    ips_ipv6_ire_default_count !=
-					    0);
-					ipst->ips_ipv6_ire_default_count--;
-				}
-			}
+
 			/*
-			 * We need to call ire_delete_v4 or ire_delete_v6
-			 * to clean up the cache or the redirects pointing at
+			 * We need to call ire_delete_v4 or ire_delete_v6 to
+			 * clean up dependents and the redirects pointing at
 			 * the default gateway. We need to drop the lock
 			 * as ire_flush_cache/ire_delete_host_redircts require
 			 * so. But we can't drop the lock, as ire_unlink needs
@@ -3230,76 +1423,7 @@ ire_unlink(irb_t *irb)
 }
 
 /*
- * Delete all the cache entries with this 'addr'.  When IP gets a gratuitous
- * ARP message on any of its interface queue, it scans the nce table and
- * deletes and calls ndp_delete() for the appropriate nce. This action
- * also deletes all the neighbor/ire cache entries for that address.
- * This function is called from ip_arp_news in ip.c and also for
- * ARP ioctl processing in ip_if.c. ip_ire_clookup_and_delete returns
- * true if it finds a nce entry which is used by ip_arp_news to determine if
- * it needs to do an ire_walk_v4. The return value is also  used for the
- * same purpose by ARP IOCTL processing * in ip_if.c when deleting
- * ARP entries. For SIOC*IFARP ioctls in addition to the address,
- * ip_if->ipif_ill also needs to be matched.
- */
-boolean_t
-ip_ire_clookup_and_delete(ipaddr_t addr, ipif_t *ipif, ip_stack_t *ipst)
-{
-	ill_t	*ill;
-	nce_t	*nce;
-
-	ill = (ipif ? ipif->ipif_ill : NULL);
-
-	if (ill != NULL) {
-		/*
-		 * clean up the nce (and any relevant ire's) that matches
-		 * on addr and ill.
-		 */
-		nce = ndp_lookup_v4(ill, &addr, B_FALSE);
-		if (nce != NULL) {
-			ndp_delete(nce);
-			return (B_TRUE);
-		}
-	} else {
-		/*
-		 * ill is wildcard. clean up all nce's and
-		 * ire's that match on addr
-		 */
-		nce_clookup_t cl;
-
-		cl.ncecl_addr = addr;
-		cl.ncecl_found = B_FALSE;
-
-		ndp_walk_common(ipst->ips_ndp4, NULL,
-		    (pfi_t)ip_nce_clookup_and_delete, (uchar_t *)&cl, B_TRUE);
-
-		/*
-		 *  ncecl_found would be set by ip_nce_clookup_and_delete if
-		 *  we found a matching nce.
-		 */
-		return (cl.ncecl_found);
-	}
-	return (B_FALSE);
-
-}
-
-/* Delete the supplied nce if its nce_addr matches the supplied address */
-static void
-ip_nce_clookup_and_delete(nce_t *nce, void *arg)
-{
-	nce_clookup_t *cl = (nce_clookup_t *)arg;
-	ipaddr_t nce_addr;
-
-	IN6_V4MAPPED_TO_IPADDR(&nce->nce_addr, nce_addr);
-	if (nce_addr == cl->ncecl_addr) {
-		cl->ncecl_found = B_TRUE;
-		/* clean up the nce (and any relevant ire's) */
-		ndp_delete(nce);
-	}
-}
-
-/*
- * Clean up the radix node for this ire. Must be called by IRB_REFRELE
+ * Clean up the radix node for this ire. Must be called by irb_refrele
  * when there are no ire's left in the bucket. Returns TRUE if the bucket
  * is deleted and freed.
  */
@@ -3335,40 +1459,55 @@ irb_inactive(irb_t *irb)
 
 /*
  * Delete the specified IRE.
+ * We assume that if ire_bucket is not set then ire_ill->ill_ire_cnt was
+ * not incremented i.e., that the insertion in the bucket and the increment
+ * of that counter is done atomically.
  */
 void
 ire_delete(ire_t *ire)
 {
 	ire_t	*ire1;
 	ire_t	**ptpn;
-	irb_t *irb;
+	irb_t	*irb;
+	nce_t	*nce;
 	ip_stack_t	*ipst = ire->ire_ipst;
+
+	/* We can clear ire_nce_cache under ire_lock even if the IRE is used */
+	mutex_enter(&ire->ire_lock);
+	nce = ire->ire_nce_cache;
+	ire->ire_nce_cache = NULL;
+	mutex_exit(&ire->ire_lock);
+	if (nce != NULL)
+		nce_refrele(nce);
 
 	if ((irb = ire->ire_bucket) == NULL) {
 		/*
 		 * It was never inserted in the list. Should call REFRELE
 		 * to free this IRE.
 		 */
-		IRE_REFRELE_NOTR(ire);
+		ire_refrele_notr(ire);
 		return;
 	}
 
-	rw_enter(&irb->irb_lock, RW_WRITER);
-
-	if (irb->irb_rr_origin == ire) {
-		irb->irb_rr_origin = NULL;
-	}
-
 	/*
-	 * In case of V4 we might still be waiting for fastpath ack.
+	 * Move the use counts from an IRE_IF_CLONE to its parent
+	 * IRE_INTERFACE.
+	 * We need to do this before acquiring irb_lock.
 	 */
-	if (ire->ire_ipversion == IPV4_VERSION &&
-	    (ire->ire_type == IRE_CACHE ||
-	    (ire->ire_type == IRE_BROADCAST && ire->ire_stq != NULL))) {
-		ASSERT(ire->ire_nce != NULL);
-		nce_fastpath_list_delete(ire->ire_nce);
+	if (ire->ire_type & IRE_IF_CLONE) {
+		ire_t *parent;
+
+		rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
+		if ((parent = ire->ire_dep_parent) != NULL) {
+			parent->ire_ob_pkt_count += ire->ire_ob_pkt_count;
+			parent->ire_ib_pkt_count += ire->ire_ib_pkt_count;
+			ire->ire_ob_pkt_count = 0;
+			ire->ire_ib_pkt_count = 0;
+		}
+		rw_exit(&ipst->ips_ire_dep_lock);
 	}
 
+	rw_enter(&irb->irb_lock, RW_WRITER);
 	if (ire->ire_ptpn == NULL) {
 		/*
 		 * Some other thread has removed us from the list.
@@ -3378,13 +1517,17 @@ ire_delete(ire_t *ire)
 		return;
 	}
 
-	if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-		irb->irb_ire_cnt--;
-		ire->ire_marks |= IRE_MARK_CONDEMNED;
-		if (ire->ire_marks & IRE_MARK_TEMPORARY) {
-			irb->irb_tmp_ire_cnt--;
-			ire->ire_marks &= ~IRE_MARK_TEMPORARY;
+	if (!IRE_IS_CONDEMNED(ire)) {
+		/* Is this an IRE representing multiple duplicate entries? */
+		ASSERT(ire->ire_identical_ref >= 1);
+		if (atomic_add_32_nv(&ire->ire_identical_ref, -1) != 0) {
+			/* Removed one of the identical parties */
+			rw_exit(&irb->irb_lock);
+			return;
 		}
+
+		irb->irb_ire_cnt--;
+		ire_make_condemned(ire);
 	}
 
 	if (irb->irb_refcnt != 0) {
@@ -3419,22 +1562,9 @@ ire_delete(ire_t *ire)
 	} else {
 		BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_deleted);
 	}
-	/*
-	 * ip_wput/ip_wput_v6 checks this flag to see whether
-	 * it should still use the cached ire or not.
-	 */
-	if (ire->ire_type == IRE_DEFAULT) {
-		/*
-		 * IRE is out of the list. We need to adjust the
-		 * accounting before we drop the lock.
-		 */
-		if (ire->ire_ipversion == IPV6_VERSION) {
-			ASSERT(ipst->ips_ipv6_ire_default_count != 0);
-			ipst->ips_ipv6_ire_default_count--;
-		}
-	}
 	rw_exit(&irb->irb_lock);
 
+	/* Cleanup dependents and related stuff */
 	if (ire->ire_ipversion == IPV6_VERSION) {
 		ire_delete_v6(ire);
 	} else {
@@ -3444,7 +1574,7 @@ ire_delete(ire_t *ire)
 	 * We removed it from the list. Decrement the
 	 * reference count.
 	 */
-	IRE_REFRELE_NOTR(ire);
+	ire_refrele_notr(ire);
 }
 
 /*
@@ -3463,8 +1593,7 @@ ire_delete_v4(ire_t *ire)
 	ASSERT(ire->ire_refcnt >= 1);
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 
-	if (ire->ire_type != IRE_CACHE)
-		ire_flush_cache_v4(ire, IRE_FLUSH_DELETE);
+	ire_flush_cache_v4(ire, IRE_FLUSH_DELETE);
 	if (ire->ire_type == IRE_DEFAULT) {
 		/*
 		 * when a default gateway is going away
@@ -3473,20 +1602,33 @@ ire_delete_v4(ire_t *ire)
 		 */
 		ire_delete_host_redirects(ire->ire_gateway_addr, ipst);
 	}
+
+	/*
+	 * If we are deleting an IRE_INTERFACE then we make sure we also
+	 * delete any IRE_IF_CLONE that has been created from it.
+	 * Those are always in ire_dep_children.
+	 */
+	if ((ire->ire_type & IRE_INTERFACE) && ire->ire_dep_children != NULL)
+		ire_dep_delete_if_clone(ire);
+
+	/* Remove from parent dependencies and child */
+	rw_enter(&ipst->ips_ire_dep_lock, RW_WRITER);
+	if (ire->ire_dep_parent != NULL)
+		ire_dep_remove(ire);
+
+	while (ire->ire_dep_children != NULL)
+		ire_dep_remove(ire->ire_dep_children);
+	rw_exit(&ipst->ips_ire_dep_lock);
 }
 
 /*
- * IRE_REFRELE/ire_refrele are the only caller of the function. It calls
+ * ire_refrele is the only caller of the function. It calls
  * to free the ire when the reference count goes to zero.
  */
 void
 ire_inactive(ire_t *ire)
 {
-	nce_t	*nce;
-	ill_t	*ill = NULL;
-	ill_t	*stq_ill = NULL;
-	ipif_t	*ipif;
-	boolean_t	need_wakeup = B_FALSE;
+	ill_t	*ill;
 	irb_t 	*irb;
 	ip_stack_t	*ipst = ire->ire_ipst;
 
@@ -3494,128 +1636,71 @@ ire_inactive(ire_t *ire)
 	ASSERT(ire->ire_ptpn == NULL);
 	ASSERT(ire->ire_next == NULL);
 
+	/* Count how many condemned ires for kmem_cache callback */
+	if (IRE_IS_CONDEMNED(ire))
+		atomic_add_32(&ipst->ips_num_ire_condemned, -1);
+
 	if (ire->ire_gw_secattr != NULL) {
 		ire_gw_secattr_free(ire->ire_gw_secattr);
 		ire->ire_gw_secattr = NULL;
 	}
 
-	if (ire->ire_mp != NULL) {
-		ASSERT(ire->ire_bucket == NULL);
-		mutex_destroy(&ire->ire_lock);
-		BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_freed);
-		if (ire->ire_nce != NULL)
-			NCE_REFRELE_NOTR(ire->ire_nce);
-		freeb(ire->ire_mp);
-		return;
-	}
-
-	if ((nce = ire->ire_nce) != NULL) {
-		NCE_REFRELE_NOTR(nce);
-		ire->ire_nce = NULL;
-	}
-
-	if (ire->ire_ipif == NULL)
-		goto end;
-
-	ipif = ire->ire_ipif;
-	ill = ipif->ipif_ill;
-
-	if (ire->ire_bucket == NULL) {
-		/* The ire was never inserted in the table. */
-		goto end;
-	}
+	/*
+	 * ire_nce_cache is cleared in ire_delete, and we make sure we don't
+	 * set it once the ire is marked condemned.
+	 */
+	ASSERT(ire->ire_nce_cache == NULL);
 
 	/*
-	 * ipif_ire_cnt on this ipif goes down by 1. If the ire_stq is
-	 * non-null ill_ire_count also goes down by 1.
-	 *
-	 * The ipif that is associated with an ire is ire->ire_ipif and
-	 * hence when the ire->ire_ipif->ipif_ire_cnt drops to zero we call
-	 * ipif_ill_refrele_tail. Usually stq_ill is null or the same as
-	 * ire->ire_ipif->ipif_ill. So nothing more needs to be done.
-	 * However, for VNI or IPMP IRE entries, stq_ill can be different.
-	 * If this is different from ire->ire_ipif->ipif_ill and if the
-	 * ill_ire_cnt on the stq_ill also has dropped to zero, we call
-	 * ipif_ill_refrele_tail on the stq_ill.
+	 * Since any parent would have a refhold on us they would already
+	 * have been removed.
 	 */
-	if (ire->ire_stq != NULL)
-		stq_ill = ire->ire_stq->q_ptr;
+	ASSERT(ire->ire_dep_parent == NULL);
+	ASSERT(ire->ire_dep_sib_next == NULL);
+	ASSERT(ire->ire_dep_sib_ptpn == NULL);
 
-	if (stq_ill == NULL || stq_ill == ill) {
-		/* Optimize the most common case */
+	/*
+	 * Since any children would have a refhold on us they should have
+	 * already been removed.
+	 */
+	ASSERT(ire->ire_dep_children == NULL);
+
+	/*
+	 * ill_ire_ref is increased when the IRE is inserted in the
+	 * bucket - not when the IRE is created.
+	 */
+	irb = ire->ire_bucket;
+	ill = ire->ire_ill;
+	if (irb != NULL && ill != NULL) {
 		mutex_enter(&ill->ill_lock);
-		ASSERT(ipif->ipif_ire_cnt != 0);
-		DTRACE_PROBE3(ipif__decr__cnt, (ipif_t *), ipif,
+		ASSERT(ill->ill_ire_cnt != 0);
+		DTRACE_PROBE3(ill__decr__cnt, (ill_t *), ill,
 		    (char *), "ire", (void *), ire);
-		ipif->ipif_ire_cnt--;
-		if (IPIF_DOWN_OK(ipif))
-			need_wakeup = B_TRUE;
-		if (stq_ill != NULL) {
-			ASSERT(stq_ill->ill_ire_cnt != 0);
-			DTRACE_PROBE3(ill__decr__cnt, (ill_t *), stq_ill,
-			    (char *), "ire", (void *), ire);
-			stq_ill->ill_ire_cnt--;
-			if (ILL_DOWN_OK(stq_ill))
-				need_wakeup = B_TRUE;
-		}
-		if (need_wakeup) {
+		ill->ill_ire_cnt--;
+		if (ILL_DOWN_OK(ill)) {
 			/* Drops the ill lock */
 			ipif_ill_refrele_tail(ill);
 		} else {
 			mutex_exit(&ill->ill_lock);
 		}
-	} else {
-		/*
-		 * We can't grab all the ill locks at the same time.
-		 * It can lead to recursive lock enter in the call to
-		 * ipif_ill_refrele_tail and later. Instead do it 1 at
-		 * a time.
-		 */
-		mutex_enter(&ill->ill_lock);
-		ASSERT(ipif->ipif_ire_cnt != 0);
-		DTRACE_PROBE3(ipif__decr__cnt, (ipif_t *), ipif,
-		    (char *), "ire", (void *), ire);
-		ipif->ipif_ire_cnt--;
-		if (IPIF_DOWN_OK(ipif)) {
-			/* Drops the lock */
-			ipif_ill_refrele_tail(ill);
-		} else {
-			mutex_exit(&ill->ill_lock);
-		}
-		if (stq_ill != NULL) {
-			mutex_enter(&stq_ill->ill_lock);
-			ASSERT(stq_ill->ill_ire_cnt != 0);
-			DTRACE_PROBE3(ill__decr__cnt, (ill_t *), stq_ill,
-			    (char *), "ire", (void *), ire);
-			stq_ill->ill_ire_cnt--;
-			if (ILL_DOWN_OK(stq_ill)) {
-				/* Drops the ill lock */
-				ipif_ill_refrele_tail(stq_ill);
-			} else {
-				mutex_exit(&stq_ill->ill_lock);
-			}
-		}
 	}
-end:
-	/* This should be true for both V4 and V6 */
+	ire->ire_ill = NULL;
 
-	if ((ire->ire_type & IRE_FORWARDTABLE) &&
-	    (ire->ire_ipversion == IPV4_VERSION) &&
-	    ((irb = ire->ire_bucket) != NULL)) {
+	/* This should be true for both V4 and V6 */
+	if (irb != NULL && (irb->irb_marks & IRB_MARK_DYNAMIC)) {
 		rw_enter(&irb->irb_lock, RW_WRITER);
 		irb->irb_nire--;
 		/*
 		 * Instead of examining the conditions for freeing
 		 * the radix node here, we do it by calling
-		 * IRB_REFRELE which is a single point in the code
+		 * irb_refrele which is a single point in the code
 		 * that embeds that logic. Bump up the refcnt to
-		 * be able to call IRB_REFRELE
+		 * be able to call irb_refrele
 		 */
-		IRB_REFHOLD_LOCKED(irb);
+		irb_refhold_locked(irb);
 		rw_exit(&irb->irb_lock);
-		IRB_REFRELE(irb);
+		irb_refrele(irb);
 	}
-	ire->ire_ipif = NULL;
 
 #ifdef DEBUG
 	ire_trace_cleanup(ire);
@@ -3626,333 +1711,276 @@ end:
 	} else {
 		BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_freed);
 	}
-	ASSERT(ire->ire_mp == NULL);
-	/* Has been allocated out of the cache */
 	kmem_cache_free(ire_cache, ire);
 }
 
 /*
- * ire_walk routine to delete all IRE_CACHE/IRE_HOST types redirect
- * entries that have a given gateway address.
+ * ire_update_generation is the callback function provided by
+ * ire_get_bucket() to update the generation number of any
+ * matching shorter route when a new route is added.
+ *
+ * This fucntion always returns a failure return (B_FALSE)
+ * to force the caller (rn_matchaddr_args)
+ * to back-track up the tree looking for shorter matches.
  */
-void
-ire_delete_cache_gw(ire_t *ire, char *cp)
+/* ARGSUSED */
+static boolean_t
+ire_update_generation(struct radix_node *rn, void *arg)
 {
-	ipaddr_t	gw_addr;
+	struct rt_entry *rt = (struct rt_entry *)rn;
 
-	if (!(ire->ire_type & IRE_CACHE) &&
-	    !(ire->ire_flags & RTF_DYNAMIC))
-		return;
-
-	bcopy(cp, &gw_addr, sizeof (gw_addr));
-	if (ire->ire_gateway_addr == gw_addr) {
-		ip1dbg(("ire_delete_cache_gw: deleted 0x%x type %d to 0x%x\n",
-		    (int)ntohl(ire->ire_addr), ire->ire_type,
-		    (int)ntohl(ire->ire_gateway_addr)));
-		ire_delete(ire);
-	}
+	/* We need to handle all in the same bucket */
+	irb_increment_generation(&rt->rt_irb);
+	return (B_FALSE);
 }
 
 /*
- * Remove all IRE_CACHE entries that match the ire specified.
+ * Take care of all the generation numbers in the bucket.
+ */
+void
+irb_increment_generation(irb_t *irb)
+{
+	ire_t *ire;
+
+	if (irb == NULL || irb->irb_ire_cnt == 0)
+		return;
+
+	irb_refhold(irb);
+	for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
+		if (!IRE_IS_CONDEMNED(ire))
+			ire_increment_generation(ire);	/* Ourselves */
+		ire_dep_incr_generation(ire);	/* Dependants */
+	}
+	irb_refrele(irb);
+}
+
+/*
+ * When an IRE is added or deleted this routine is called to make sure
+ * any caching of IRE information is notified or updated.
  *
  * The flag argument indicates if the flush request is due to addition
- * of new route (IRE_FLUSH_ADD) or deletion of old route (IRE_FLUSH_DELETE).
- *
- * This routine takes only the IREs from the forwarding table and flushes
- * the corresponding entries from the cache table.
- *
- * When flushing due to the deletion of an old route, it
- * just checks the cache handles (ire_phandle and ire_ihandle) and
- * deletes the ones that match.
- *
- * When flushing due to the creation of a new route, it checks
- * if a cache entry's address matches the one in the IRE and
- * that the cache entry's parent has a less specific mask than the
- * one in IRE. The destination of such a cache entry could be the
- * gateway for other cache entries, so we need to flush those as
- * well by looking for gateway addresses matching the IRE's address.
+ * of new route (IRE_FLUSH_ADD), deletion of old route (IRE_FLUSH_DELETE),
+ * or a change to ire_gateway_addr (IRE_FLUSH_GWCHANGE).
  */
 void
 ire_flush_cache_v4(ire_t *ire, int flag)
 {
-	int i;
-	ire_t *cire;
-	irb_t *irb;
-	ip_stack_t	*ipst = ire->ire_ipst;
+	irb_t *irb = ire->ire_bucket;
+	struct rt_entry *rt = IRB2RT(irb);
+	ip_stack_t *ipst = ire->ire_ipst;
 
-	if (ire->ire_type & IRE_CACHE)
+	/*
+	 * IRE_IF_CLONE ire's don't provide any new information
+	 * than the parent from which they are cloned, so don't
+	 * perturb the generation numbers.
+	 */
+	if (ire->ire_type & IRE_IF_CLONE)
 		return;
 
 	/*
-	 * If a default is just created, there is no point
-	 * in going through the cache, as there will not be any
-	 * cached ires.
+	 * Ensure that an ire_add during a lookup serializes the updates of the
+	 * generation numbers under the radix head lock so that the lookup gets
+	 * either the old ire and old generation number, or a new ire and new
+	 * generation number.
 	 */
-	if (ire->ire_type == IRE_DEFAULT && flag == IRE_FLUSH_ADD)
-		return;
+	RADIX_NODE_HEAD_WLOCK(ipst->ips_ip_ftable);
+
+	/*
+	 * If a route was just added, we need to notify everybody that
+	 * has cached an IRE_NOROUTE since there might now be a better
+	 * route for them.
+	 */
 	if (flag == IRE_FLUSH_ADD) {
-		/*
-		 * This selective flush is due to the addition of
-		 * new IRE.
-		 */
-		for (i = 0; i < ipst->ips_ip_cache_table_size; i++) {
-			irb = &ipst->ips_ip_cache_table[i];
-			if ((cire = irb->irb_ire) == NULL)
-				continue;
-			IRB_REFHOLD(irb);
-			for (cire = irb->irb_ire; cire != NULL;
-			    cire = cire->ire_next) {
-				if (cire->ire_type != IRE_CACHE)
-					continue;
-				/*
-				 * If 'cire' belongs to the same subnet
-				 * as the new ire being added, and 'cire'
-				 * is derived from a prefix that is less
-				 * specific than the new ire being added,
-				 * we need to flush 'cire'; for instance,
-				 * when a new interface comes up.
-				 */
-				if (((cire->ire_addr & ire->ire_mask) ==
-				    (ire->ire_addr & ire->ire_mask)) &&
-				    (ip_mask_to_plen(cire->ire_cmask) <=
-				    ire->ire_masklen)) {
-					ire_delete(cire);
-					continue;
-				}
-				/*
-				 * This is the case when the ire_gateway_addr
-				 * of 'cire' belongs to the same subnet as
-				 * the new ire being added.
-				 * Flushing such ires is sometimes required to
-				 * avoid misrouting: say we have a machine with
-				 * two interfaces (I1 and I2), a default router
-				 * R on the I1 subnet, and a host route to an
-				 * off-link destination D with a gateway G on
-				 * the I2 subnet.
-				 * Under normal operation, we will have an
-				 * on-link cache entry for G and an off-link
-				 * cache entry for D with G as ire_gateway_addr,
-				 * traffic to D will reach its destination
-				 * through gateway G.
-				 * If the administrator does 'ifconfig I2 down',
-				 * the cache entries for D and G will be
-				 * flushed. However, G will now be resolved as
-				 * an off-link destination using R (the default
-				 * router) as gateway. Then D will also be
-				 * resolved as an off-link destination using G
-				 * as gateway - this behavior is due to
-				 * compatibility reasons, see comment in
-				 * ire_ihandle_lookup_offlink(). Traffic to D
-				 * will go to the router R and probably won't
-				 * reach the destination.
-				 * The administrator then does 'ifconfig I2 up'.
-				 * Since G is on the I2 subnet, this routine
-				 * will flush its cache entry. It must also
-				 * flush the cache entry for D, otherwise
-				 * traffic will stay misrouted until the IRE
-				 * times out.
-				 */
-				if ((cire->ire_gateway_addr & ire->ire_mask) ==
-				    (ire->ire_addr & ire->ire_mask)) {
-					ire_delete(cire);
-					continue;
-				}
-			}
-			IRB_REFRELE(irb);
-		}
-	} else {
-		/*
-		 * delete the cache entries based on
-		 * handle in the IRE as this IRE is
-		 * being deleted/changed.
-		 */
-		for (i = 0; i < ipst->ips_ip_cache_table_size; i++) {
-			irb = &ipst->ips_ip_cache_table[i];
-			if ((cire = irb->irb_ire) == NULL)
-				continue;
-			IRB_REFHOLD(irb);
-			for (cire = irb->irb_ire; cire != NULL;
-			    cire = cire->ire_next) {
-				if (cire->ire_type != IRE_CACHE)
-					continue;
-				if ((cire->ire_phandle == 0 ||
-				    cire->ire_phandle != ire->ire_phandle) &&
-				    (cire->ire_ihandle == 0 ||
-				    cire->ire_ihandle != ire->ire_ihandle))
-					continue;
-				ire_delete(cire);
-			}
-			IRB_REFRELE(irb);
-		}
+		ire_increment_generation(ipst->ips_ire_reject_v4);
+		ire_increment_generation(ipst->ips_ire_blackhole_v4);
 	}
+
+	/* Adding a default can't otherwise provide a better route */
+	if (ire->ire_type == IRE_DEFAULT && flag == IRE_FLUSH_ADD) {
+		RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
+		return;
+	}
+
+	switch (flag) {
+	case IRE_FLUSH_DELETE:
+	case IRE_FLUSH_GWCHANGE:
+		/*
+		 * Update ire_generation for all ire_dep_children chains
+		 * starting with this IRE
+		 */
+		ire_dep_incr_generation(ire);
+		break;
+	case IRE_FLUSH_ADD:
+		/*
+		 * Update the generation numbers of all shorter matching routes.
+		 * ire_update_generation takes care of the dependants by
+		 * using ire_dep_incr_generation.
+		 */
+		(void) ipst->ips_ip_ftable->rnh_matchaddr_args(&rt->rt_dst,
+		    ipst->ips_ip_ftable, ire_update_generation, NULL);
+		break;
+	}
+	RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
 }
 
 /*
  * Matches the arguments passed with the values in the ire.
  *
- * Note: for match types that match using "ipif" passed in, ipif
+ * Note: for match types that match using "ill" passed in, ill
  * must be checked for non-NULL before calling this routine.
  */
 boolean_t
 ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
-    int type, const ipif_t *ipif, zoneid_t zoneid, uint32_t ihandle,
-    const ts_label_t *tsl, int match_flags, queue_t *wq)
+    int type, const ill_t *ill, zoneid_t zoneid,
+    const ts_label_t *tsl, int match_flags)
 {
 	ill_t *ire_ill = NULL, *dst_ill;
-	ill_t *ipif_ill = NULL;
+	ip_stack_t *ipst = ire->ire_ipst;
 
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 	ASSERT((ire->ire_addr & ~ire->ire_mask) == 0);
 	ASSERT((!(match_flags & MATCH_IRE_ILL)) ||
-	    (ipif != NULL && !ipif->ipif_isv6));
-	ASSERT(!(match_flags & MATCH_IRE_WQ) || wq != NULL);
+	    (ill != NULL && !ill->ill_isv6));
 
 	/*
-	 * If MATCH_IRE_MARK_TESTHIDDEN is set, then only return the IRE if it
-	 * is in fact hidden, to ensure the caller gets the right one.  One
-	 * exception: if the caller passed MATCH_IRE_IHANDLE, then they
-	 * already know the identity of the given IRE_INTERFACE entry and
-	 * there's no point trying to hide it from them.
+	 * If MATCH_IRE_TESTHIDDEN is set, then only return the IRE if it is
+	 * in fact hidden, to ensure the caller gets the right one.
 	 */
-	if (ire->ire_marks & IRE_MARK_TESTHIDDEN) {
-		if (match_flags & MATCH_IRE_IHANDLE)
-			match_flags |= MATCH_IRE_MARK_TESTHIDDEN;
-
-		if (!(match_flags & MATCH_IRE_MARK_TESTHIDDEN))
+	if (ire->ire_testhidden) {
+		if (!(match_flags & MATCH_IRE_TESTHIDDEN))
 			return (B_FALSE);
 	}
-
-	/*
-	 * MATCH_IRE_MARK_PRIVATE_ADDR is set when IP_NEXTHOP option
-	 * is used. In that case the routing table is bypassed and the
-	 * packets are sent directly to the specified nexthop. The
-	 * IRE_CACHE entry representing this route should be marked
-	 * with IRE_MARK_PRIVATE_ADDR.
-	 */
-
-	if (!(match_flags & MATCH_IRE_MARK_PRIVATE_ADDR) &&
-	    (ire->ire_marks & IRE_MARK_PRIVATE_ADDR))
-		return (B_FALSE);
 
 	if (zoneid != ALL_ZONES && zoneid != ire->ire_zoneid &&
 	    ire->ire_zoneid != ALL_ZONES) {
 		/*
-		 * If MATCH_IRE_ZONEONLY has been set and the supplied zoneid is
-		 * valid and does not match that of ire_zoneid, a failure to
+		 * If MATCH_IRE_ZONEONLY has been set and the supplied zoneid
+		 * does not match that of ire_zoneid, a failure to
 		 * match is reported at this point. Otherwise, since some IREs
 		 * that are available in the global zone can be used in local
 		 * zones, additional checks need to be performed:
 		 *
-		 *	IRE_BROADCAST, IRE_CACHE and IRE_LOOPBACK
+		 * IRE_LOOPBACK
 		 *	entries should never be matched in this situation.
+		 *	Each zone has its own IRE_LOOPBACK.
 		 *
-		 *	IRE entries that have an interface associated with them
-		 *	should in general not match unless they are an IRE_LOCAL
-		 *	or in the case when MATCH_IRE_DEFAULT has been set in
-		 *	the caller.  In the case of the former, checking of the
-		 *	other fields supplied should take place.
+		 * IRE_LOCAL
+		 *	We allow them for any zoneid. ire_route_recursive
+		 *	does additional checks when
+		 *	ip_restrict_interzone_loopback is set.
 		 *
-		 *	In the case where MATCH_IRE_DEFAULT has been set,
-		 *	all of the ipif's associated with the IRE's ill are
-		 *	checked to see if there is a matching zoneid.  If any
-		 *	one ipif has a matching zoneid, this IRE is a
-		 *	potential candidate so checking of the other fields
-		 *	takes place.
+		 * If ill_usesrc_ifindex is set
+		 *	Then we check if the zone has a valid source address
+		 *	on the usesrc ill.
 		 *
-		 *	In the case where the IRE_INTERFACE has a usable source
-		 *	address (indicated by ill_usesrc_ifindex) in the
-		 *	correct zone then it's permitted to return this IRE
+		 * If ire_ill is set, then check that the zone has an ipif
+		 *	on that ill.
+		 *
+		 * Outside of this function (in ire_round_robin) we check
+		 * that any IRE_OFFLINK has a gateway that reachable from the
+		 * zone when we have multiple choices (ECMP).
 		 */
 		if (match_flags & MATCH_IRE_ZONEONLY)
 			return (B_FALSE);
-		if (ire->ire_type & (IRE_BROADCAST | IRE_CACHE | IRE_LOOPBACK))
+		if (ire->ire_type & IRE_LOOPBACK)
 			return (B_FALSE);
+
+		if (ire->ire_type & IRE_LOCAL)
+			goto matchit;
+
 		/*
-		 * Note, IRE_INTERFACE can have the stq as NULL. For
-		 * example, if the default multicast route is tied to
-		 * the loopback address.
+		 * The normal case of IRE_ONLINK has a matching zoneid.
+		 * Here we handle the case when shared-IP zones have been
+		 * configured with IP addresses on vniN. In that case it
+		 * is ok for traffic from a zone to use IRE_ONLINK routes
+		 * if the ill has a usesrc pointing at vniN
 		 */
-		if ((ire->ire_type & IRE_INTERFACE) &&
-		    (ire->ire_stq != NULL)) {
-			dst_ill = (ill_t *)ire->ire_stq->q_ptr;
+		dst_ill = ire->ire_ill;
+		if (ire->ire_type & IRE_ONLINK) {
+			uint_t	ifindex;
+
+			/*
+			 * Note there is no IRE_INTERFACE on vniN thus
+			 * can't do an IRE lookup for a matching route.
+			 */
+			ifindex = dst_ill->ill_usesrc_ifindex;
+			if (ifindex == 0)
+				return (B_FALSE);
+
 			/*
 			 * If there is a usable source address in the
-			 * zone, then it's ok to return an
-			 * IRE_INTERFACE
+			 * zone, then it's ok to return this IRE_INTERFACE
 			 */
-			if (ipif_usesrc_avail(dst_ill, zoneid)) {
-				ip3dbg(("ire_match_args: dst_ill %p match %d\n",
-				    (void *)dst_ill,
-				    (ire->ire_addr == (addr & mask))));
-			} else {
-				ip3dbg(("ire_match_args: src_ipif NULL"
+			if (!ipif_zone_avail(ifindex, dst_ill->ill_isv6,
+			    zoneid, ipst)) {
+				ip3dbg(("ire_match_args: no usrsrc for zone"
 				    " dst_ill %p\n", (void *)dst_ill));
 				return (B_FALSE);
 			}
 		}
-		if (ire->ire_ipif != NULL && ire->ire_type != IRE_LOCAL &&
-		    !(ire->ire_type & IRE_INTERFACE)) {
+		/*
+		 * For exampe, with
+		 * route add 11.0.0.0 gw1 -ifp bge0
+		 * route add 11.0.0.0 gw2 -ifp bge1
+		 * this code would differentiate based on
+		 * where the sending zone has addresses.
+		 * Only if the zone has an address on bge0 can it use the first
+		 * route. It isn't clear if this behavior is documented
+		 * anywhere.
+		 */
+		if (dst_ill != NULL && (ire->ire_type & IRE_OFFLINK)) {
 			ipif_t	*tipif;
 
-			if ((match_flags & MATCH_IRE_DEFAULT) == 0) {
-				return (B_FALSE);
-			}
-			mutex_enter(&ire->ire_ipif->ipif_ill->ill_lock);
-			for (tipif = ire->ire_ipif->ipif_ill->ill_ipif;
+			mutex_enter(&dst_ill->ill_lock);
+			for (tipif = dst_ill->ill_ipif;
 			    tipif != NULL; tipif = tipif->ipif_next) {
-				if (IPIF_CAN_LOOKUP(tipif) &&
+				if (!IPIF_IS_CONDEMNED(tipif) &&
 				    (tipif->ipif_flags & IPIF_UP) &&
 				    (tipif->ipif_zoneid == zoneid ||
 				    tipif->ipif_zoneid == ALL_ZONES))
 					break;
 			}
-			mutex_exit(&ire->ire_ipif->ipif_ill->ill_lock);
+			mutex_exit(&dst_ill->ill_lock);
 			if (tipif == NULL) {
 				return (B_FALSE);
 			}
 		}
 	}
 
-	/*
-	 * For IRE_CACHE entries, MATCH_IRE_ILL means that somebody wants to
-	 * send out ire_stq (ire_ipif for IRE_CACHE entries is just the means
-	 * of getting a source address -- i.e., ire_src_addr ==
-	 * ire->ire_ipif->ipif_src_addr).  ire_to_ill() handles this.
-	 *
-	 * NOTE: For IPMP, MATCH_IRE_ILL usually matches any ill in the group.
-	 * However, if MATCH_IRE_MARK_TESTHIDDEN is set (i.e., the IRE is for
-	 * IPMP test traffic), then the ill must match exactly.
-	 */
+matchit:
 	if (match_flags & MATCH_IRE_ILL) {
-		ire_ill = ire_to_ill(ire);
-		ipif_ill = ipif->ipif_ill;
+		ire_ill = ire->ire_ill;
+
+		/*
+		 * If asked to match an ill, we *must* match
+		 * on the ire_ill for ipmp test addresses, or
+		 * any of the ill in the group for data addresses.
+		 * If we don't, we may as well fail.
+		 * However, we need an exception for IRE_LOCALs to ensure
+		 * we loopback packets even sent to test addresses on different
+		 * interfaces in the group.
+		 */
+		if ((match_flags & MATCH_IRE_TESTHIDDEN) &&
+		    !(ire->ire_type & IRE_LOCAL)) {
+			if (ire->ire_ill != ill)
+				return (B_FALSE);
+		} else  {
+			match_flags &= ~MATCH_IRE_TESTHIDDEN;
+			/*
+			 * We know that ill is not NULL, but ire_ill could be
+			 * NULL
+			 */
+			if (ire_ill == NULL || !IS_ON_SAME_LAN(ill, ire_ill))
+				return (B_FALSE);
+		}
 	}
 
 	if ((ire->ire_addr == (addr & mask)) &&
 	    ((!(match_flags & MATCH_IRE_GW)) ||
 	    (ire->ire_gateway_addr == gateway)) &&
-	    ((!(match_flags & MATCH_IRE_TYPE)) ||
-	    (ire->ire_type & type)) &&
-	    ((!(match_flags & MATCH_IRE_SRC)) ||
-	    (ire->ire_src_addr == ipif->ipif_src_addr)) &&
-	    ((!(match_flags & MATCH_IRE_IPIF)) ||
-	    (ire->ire_ipif == ipif)) &&
-	    ((!(match_flags & MATCH_IRE_MARK_TESTHIDDEN)) ||
-	    (ire->ire_marks & IRE_MARK_TESTHIDDEN)) &&
-	    ((!(match_flags & MATCH_IRE_MARK_PRIVATE_ADDR)) ||
-	    (ire->ire_type != IRE_CACHE ||
-	    ire->ire_marks & IRE_MARK_PRIVATE_ADDR)) &&
-	    ((!(match_flags & MATCH_IRE_WQ)) ||
-	    (ire->ire_stq == wq)) &&
-	    ((!(match_flags & MATCH_IRE_ILL)) ||
-	    (ire_ill == ipif_ill ||
-	    (!(match_flags & MATCH_IRE_MARK_TESTHIDDEN) &&
-	    ire_ill != NULL && IS_IN_SAME_ILLGRP(ipif_ill, ire_ill)))) &&
-	    ((!(match_flags & MATCH_IRE_IHANDLE)) ||
-	    (ire->ire_ihandle == ihandle)) &&
-	    ((!(match_flags & MATCH_IRE_MASK)) ||
-	    (ire->ire_mask == mask)) &&
+	    ((!(match_flags & MATCH_IRE_TYPE)) || (ire->ire_type & type)) &&
+	    ((!(match_flags & MATCH_IRE_TESTHIDDEN)) || ire->ire_testhidden) &&
+	    ((!(match_flags & MATCH_IRE_MASK)) || (ire->ire_mask == mask)) &&
 	    ((!(match_flags & MATCH_IRE_SECATTR)) ||
 	    (!is_system_labeled()) ||
 	    (tsol_ire_match_gwattr(ire, tsl) == 0))) {
@@ -3963,494 +1991,207 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 }
 
 /*
- * Lookup for a route in all the tables
- */
-ire_t *
-ire_route_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
-    int type, const ipif_t *ipif, ire_t **pire, zoneid_t zoneid,
-    const ts_label_t *tsl, int flags, ip_stack_t *ipst)
-{
-	ire_t *ire = NULL;
-
-	/*
-	 * ire_match_args() will dereference ipif MATCH_IRE_SRC or
-	 * MATCH_IRE_ILL is set.
-	 */
-	if ((flags & (MATCH_IRE_SRC | MATCH_IRE_ILL)) && (ipif == NULL))
-		return (NULL);
-
-	/*
-	 * might be asking for a cache lookup,
-	 * This is not best way to lookup cache,
-	 * user should call ire_cache_lookup directly.
-	 *
-	 * If MATCH_IRE_TYPE was set, first lookup in the cache table and then
-	 * in the forwarding table, if the applicable type flags were set.
-	 */
-	if ((flags & MATCH_IRE_TYPE) == 0 || (type & IRE_CACHETABLE) != 0) {
-		ire = ire_ctable_lookup(addr, gateway, type, ipif, zoneid,
-		    tsl, flags, ipst);
-		if (ire != NULL)
-			return (ire);
-	}
-	if ((flags & MATCH_IRE_TYPE) == 0 || (type & IRE_FORWARDTABLE) != 0) {
-		ire = ire_ftable_lookup(addr, mask, gateway, type, ipif, pire,
-		    zoneid, 0, tsl, flags, ipst);
-	}
-	return (ire);
-}
-
-/*
- * Delete the IRE cache for the gateway and all IRE caches whose
- * ire_gateway_addr points to this gateway, and allow them to
- * be created on demand by ip_newroute.
- */
-void
-ire_clookup_delete_cache_gw(ipaddr_t addr, zoneid_t zoneid, ip_stack_t *ipst)
-{
-	irb_t *irb;
-	ire_t *ire;
-
-	irb = &ipst->ips_ip_cache_table[IRE_ADDR_HASH(addr,
-	    ipst->ips_ip_cache_table_size)];
-	IRB_REFHOLD(irb);
-	for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
-		if (ire->ire_marks & IRE_MARK_CONDEMNED)
-			continue;
-
-		ASSERT(ire->ire_mask == IP_HOST_MASK);
-		if (ire_match_args(ire, addr, ire->ire_mask, 0, IRE_CACHE,
-		    NULL, zoneid, 0, NULL, MATCH_IRE_TYPE, NULL)) {
-			ire_delete(ire);
-		}
-	}
-	IRB_REFRELE(irb);
-
-	ire_walk_v4(ire_delete_cache_gw, &addr, zoneid, ipst);
-}
-
-/*
- * Looks up cache table for a route.
- * specific lookup can be indicated by
- * passing the MATCH_* flags and the
- * necessary parameters.
- */
-ire_t *
-ire_ctable_lookup(ipaddr_t addr, ipaddr_t gateway, int type, const ipif_t *ipif,
-    zoneid_t zoneid, const ts_label_t *tsl, int flags, ip_stack_t *ipst)
-{
-	ire_ctable_args_t	margs;
-
-	margs.ict_addr = &addr;
-	margs.ict_gateway = &gateway;
-	margs.ict_type = type;
-	margs.ict_ipif = ipif;
-	margs.ict_zoneid = zoneid;
-	margs.ict_tsl = tsl;
-	margs.ict_flags = flags;
-	margs.ict_ipst = ipst;
-	margs.ict_wq = NULL;
-
-	return (ip4_ctable_lookup_impl(&margs));
-}
-
-/*
- * Check whether the IRE_LOCAL and the IRE potentially used to transmit
- * (could be an IRE_CACHE, IRE_BROADCAST, or IRE_INTERFACE) are identical
- * or part of the same illgrp.  (In the IPMP case, usually the two IREs
- * will both belong to the IPMP ill, but exceptions are possible -- e.g.
- * if IPMP test addresses are on their own subnet.)
- */
-boolean_t
-ire_local_same_lan(ire_t *ire_local, ire_t *xmit_ire)
-{
-	ill_t *recv_ill, *xmit_ill;
-
-	ASSERT(ire_local->ire_type & (IRE_LOCAL|IRE_LOOPBACK));
-	ASSERT(xmit_ire->ire_type & (IRE_CACHETABLE|IRE_INTERFACE));
-
-	recv_ill = ire_to_ill(ire_local);
-	xmit_ill = ire_to_ill(xmit_ire);
-
-	ASSERT(recv_ill != NULL);
-	ASSERT(xmit_ill != NULL);
-
-	return (IS_ON_SAME_LAN(recv_ill, xmit_ill));
-}
-
-/*
  * Check if the IRE_LOCAL uses the same ill as another route would use.
  * If there is no alternate route, or the alternate is a REJECT or BLACKHOLE,
  * then we don't allow this IRE_LOCAL to be used.
+ * We always return an IRE; will be RTF_REJECT if no route available.
+ */
+ire_t *
+ire_alt_local(ire_t *ire, zoneid_t zoneid, const ts_label_t *tsl,
+    const ill_t *ill, uint_t *generationp)
+{
+	ip_stack_t	*ipst = ire->ire_ipst;
+	ire_t		*alt_ire;
+	uint_t		ire_type;
+	uint_t		generation;
+	uint_t		match_flags;
+
+	ASSERT(ire->ire_type & IRE_LOCAL);
+	ASSERT(ire->ire_ill != NULL);
+
+	/*
+	 * Need to match on everything but local.
+	 * This might result in the creation of a IRE_IF_CLONE for the
+	 * same address as the IRE_LOCAL when restrict_interzone_loopback is
+	 * set. ire_add_*() ensures that the IRE_IF_CLONE are tail inserted
+	 * to make sure the IRE_LOCAL is always found first.
+	 */
+	ire_type = (IRE_ONLINK | IRE_OFFLINK) & ~(IRE_LOCAL|IRE_LOOPBACK);
+	match_flags = MATCH_IRE_TYPE | MATCH_IRE_SECATTR;
+	if (ill != NULL)
+		match_flags |= MATCH_IRE_ILL;
+
+	if (ire->ire_ipversion == IPV4_VERSION) {
+		alt_ire = ire_route_recursive_v4(ire->ire_addr, ire_type,
+		    ill, zoneid, tsl, match_flags, B_TRUE, 0, ipst, NULL, NULL,
+		    &generation);
+	} else {
+		alt_ire = ire_route_recursive_v6(&ire->ire_addr_v6, ire_type,
+		    ill, zoneid, tsl, match_flags, B_TRUE, 0, ipst, NULL, NULL,
+		    &generation);
+	}
+	ASSERT(alt_ire != NULL);
+
+	if (alt_ire->ire_ill == ire->ire_ill) {
+		/* Going out the same ILL - ok to send to IRE_LOCAL */
+		ire_refrele(alt_ire);
+	} else {
+		/* Different ill - ignore IRE_LOCAL */
+		ire_refrele(ire);
+		ire = alt_ire;
+		if (generationp != NULL)
+			*generationp = generation;
+	}
+	return (ire);
+}
+
+boolean_t
+ire_find_zoneid(struct radix_node *rn, void *arg)
+{
+	struct rt_entry *rt = (struct rt_entry *)rn;
+	irb_t *irb;
+	ire_t *ire;
+	ire_ftable_args_t *margs = arg;
+
+	ASSERT(rt != NULL);
+
+	irb = &rt->rt_irb;
+
+	if (irb->irb_ire_cnt == 0)
+		return (B_FALSE);
+
+	rw_enter(&irb->irb_lock, RW_READER);
+	for (ire = irb->irb_ire; ire != NULL; ire = ire->ire_next) {
+		if (IRE_IS_CONDEMNED(ire))
+			continue;
+
+		if (ire->ire_zoneid != ALL_ZONES &&
+		    ire->ire_zoneid != margs->ift_zoneid)
+			continue;
+
+		if (margs->ift_ill != NULL && margs->ift_ill != ire->ire_ill)
+			continue;
+
+		if (is_system_labeled() &&
+		    tsol_ire_match_gwattr(ire, margs->ift_tsl) != 0)
+			continue;
+
+		rw_exit(&irb->irb_lock);
+		return (B_TRUE);
+	}
+	rw_exit(&irb->irb_lock);
+	return (B_FALSE);
+}
+
+/*
+ * Check if the zoneid (not ALL_ZONES) has an IRE_INTERFACE for the specified
+ * gateway address. If ill is non-NULL we also match on it.
+ * The caller must hold a read lock on RADIX_NODE_HEAD if lock_held is set.
  */
 boolean_t
-ire_local_ok_across_zones(ire_t *ire_local, zoneid_t zoneid, void *addr,
-    const ts_label_t *tsl, ip_stack_t *ipst)
+ire_gateway_ok_zone_v4(ipaddr_t gateway, zoneid_t zoneid, ill_t *ill,
+    const ts_label_t *tsl, ip_stack_t *ipst, boolean_t lock_held)
 {
-	ire_t		*alt_ire;
-	boolean_t	rval;
-	int		flags;
+	struct rt_sockaddr rdst;
+	struct rt_entry *rt;
+	ire_ftable_args_t margs;
 
-	flags = MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE;
-
-	if (ire_local->ire_ipversion == IPV4_VERSION) {
-		alt_ire = ire_ftable_lookup(*((ipaddr_t *)addr), 0, 0, 0, NULL,
-		    NULL, zoneid, 0, tsl, flags, ipst);
-	} else {
-		alt_ire = ire_ftable_lookup_v6(addr, NULL, NULL, 0, NULL,
-		    NULL, zoneid, 0, tsl, flags, ipst);
-	}
-
-	if (alt_ire == NULL)
-		return (B_FALSE);
-
-	if (alt_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
-		ire_refrele(alt_ire);
-		return (B_FALSE);
-	}
-	rval = ire_local_same_lan(ire_local, alt_ire);
-
-	ire_refrele(alt_ire);
-	return (rval);
-}
-
-/*
- * Lookup cache
- *
- * In general the zoneid has to match (where ALL_ZONES match all of them).
- * But for IRE_LOCAL we also need to handle the case where L2 should
- * conceptually loop back the packet. This is necessary since neither
- * Ethernet drivers nor Ethernet hardware loops back packets sent to their
- * own MAC address. This loopback is needed when the normal
- * routes (ignoring IREs with different zoneids) would send out the packet on
- * the same ill as the ill with which this IRE_LOCAL is associated.
- *
- * Earlier versions of this code always matched an IRE_LOCAL independently of
- * the zoneid. We preserve that earlier behavior when
- * ip_restrict_interzone_loopback is turned off.
- */
-ire_t *
-ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid, const ts_label_t *tsl,
-    ip_stack_t *ipst)
-{
-	irb_t *irb_ptr;
-	ire_t *ire;
-
-	irb_ptr = &ipst->ips_ip_cache_table[IRE_ADDR_HASH(addr,
-	    ipst->ips_ip_cache_table_size)];
-	rw_enter(&irb_ptr->irb_lock, RW_READER);
-	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
-		if (ire->ire_marks & (IRE_MARK_CONDEMNED |
-		    IRE_MARK_TESTHIDDEN | IRE_MARK_PRIVATE_ADDR)) {
-			continue;
-		}
-		if (ire->ire_addr == addr) {
-			/*
-			 * Finally, check if the security policy has any
-			 * restriction on using this route for the specified
-			 * message.
-			 */
-			if (tsl != NULL &&
-			    ire->ire_gw_secattr != NULL &&
-			    tsol_ire_match_gwattr(ire, tsl) != 0) {
-				continue;
-			}
-
-			if (zoneid == ALL_ZONES || ire->ire_zoneid == zoneid ||
-			    ire->ire_zoneid == ALL_ZONES) {
-				IRE_REFHOLD(ire);
-				rw_exit(&irb_ptr->irb_lock);
-				return (ire);
-			}
-
-			if (ire->ire_type == IRE_LOCAL) {
-				if (ipst->ips_ip_restrict_interzone_loopback &&
-				    !ire_local_ok_across_zones(ire, zoneid,
-				    &addr, tsl, ipst))
-					continue;
-
-				IRE_REFHOLD(ire);
-				rw_exit(&irb_ptr->irb_lock);
-				return (ire);
-			}
-		}
-	}
-	rw_exit(&irb_ptr->irb_lock);
-	return (NULL);
-}
-
-ire_t *
-ire_cache_lookup_simple(ipaddr_t dst, ip_stack_t *ipst)
-{
-	irb_t *irb_ptr;
-	ire_t *ire;
-
-	/*
-	 * Look for an ire in the cachetable whose
-	 * ire_addr matches the destination.
-	 * Since we are being called by forwarding fastpath
-	 * no need to check for Trusted Solaris label.
-	 */
-	irb_ptr = &ipst->ips_ip_cache_table[IRE_ADDR_HASH(
-	    dst, ipst->ips_ip_cache_table_size)];
-	rw_enter(&irb_ptr->irb_lock, RW_READER);
-	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
-		if (ire->ire_marks & (IRE_MARK_CONDEMNED | IRE_MARK_TESTHIDDEN |
-		    IRE_MARK_PRIVATE_ADDR)) {
-			continue;
-		}
-		if (ire->ire_addr == dst) {
-			IRE_REFHOLD(ire);
-			rw_exit(&irb_ptr->irb_lock);
-			return (ire);
-		}
-	}
-	rw_exit(&irb_ptr->irb_lock);
-	return (NULL);
-}
-
-/*
- * Locate the interface ire that is tied to the cache ire 'cire' via
- * cire->ire_ihandle.
- *
- * We are trying to create the cache ire for an offlink destn based
- * on the cache ire of the gateway in 'cire'. 'pire' is the prefix ire
- * as found by ip_newroute(). We are called from ip_newroute() in
- * the IRE_CACHE case.
- */
-ire_t *
-ire_ihandle_lookup_offlink(ire_t *cire, ire_t *pire)
-{
-	ire_t	*ire;
-	int	match_flags;
-	ipaddr_t gw_addr;
-	ipif_t	*gw_ipif;
-	ip_stack_t	*ipst = cire->ire_ipst;
-
-	ASSERT(cire != NULL && pire != NULL);
-
-	/*
-	 * We don't need to specify the zoneid to ire_ftable_lookup() below
-	 * because the ihandle refers to an ipif which can be in only one zone.
-	 */
-	match_flags =  MATCH_IRE_TYPE | MATCH_IRE_IHANDLE | MATCH_IRE_MASK;
-	if (pire->ire_ipif != NULL)
-		match_flags |= MATCH_IRE_ILL;
-	/*
-	 * We know that the mask of the interface ire equals cire->ire_cmask.
-	 * (When ip_newroute() created 'cire' for the gateway it set its
-	 * cmask from the interface ire's mask)
-	 */
-	ire = ire_ftable_lookup(cire->ire_addr, cire->ire_cmask, 0,
-	    IRE_INTERFACE, pire->ire_ipif, NULL, ALL_ZONES, cire->ire_ihandle,
-	    NULL, match_flags, ipst);
-	if (ire != NULL)
-		return (ire);
-	/*
-	 * If we didn't find an interface ire above, we can't declare failure.
-	 * For backwards compatibility, we need to support prefix routes
-	 * pointing to next hop gateways that are not on-link.
-	 *
-	 * Assume we are trying to ping some offlink destn, and we have the
-	 * routing table below.
-	 *
-	 * Eg.	default	- gw1		<--- pire	(line 1)
-	 *	gw1	- gw2				(line 2)
-	 *	gw2	- hme0				(line 3)
-	 *
-	 * If we already have a cache ire for gw1 in 'cire', the
-	 * ire_ftable_lookup above would have failed, since there is no
-	 * interface ire to reach gw1. We will fallthru below.
-	 *
-	 * Here we duplicate the steps that ire_ftable_lookup() did in
-	 * getting 'cire' from 'pire', in the MATCH_IRE_RECURSIVE case.
-	 * The differences are the following
-	 * i.   We want the interface ire only, so we call ire_ftable_lookup()
-	 *	instead of ire_route_lookup()
-	 * ii.  We look for only prefix routes in the 1st call below.
-	 * ii.  We want to match on the ihandle in the 2nd call below.
-	 */
-	match_flags =  MATCH_IRE_TYPE;
-	if (pire->ire_ipif != NULL)
-		match_flags |= MATCH_IRE_ILL;
-	ire = ire_ftable_lookup(pire->ire_gateway_addr, 0, 0, IRE_OFFSUBNET,
-	    pire->ire_ipif, NULL, ALL_ZONES, 0, NULL, match_flags, ipst);
-	if (ire == NULL)
-		return (NULL);
-	/*
-	 * At this point 'ire' corresponds to the entry shown in line 2.
-	 * gw_addr is 'gw2' in the example above.
-	 */
-	gw_addr = ire->ire_gateway_addr;
-	gw_ipif = ire->ire_ipif;
-	ire_refrele(ire);
-
-	match_flags |= MATCH_IRE_IHANDLE;
-	ire = ire_ftable_lookup(gw_addr, 0, 0, IRE_INTERFACE,
-	    gw_ipif, NULL, ALL_ZONES, cire->ire_ihandle, NULL, match_flags,
-	    ipst);
-	return (ire);
-}
-
-/*
- * Return the IRE_LOOPBACK, IRE_IF_RESOLVER or IRE_IF_NORESOLVER
- * ire associated with the specified ipif.
- *
- * This might occasionally be called when IPIF_UP is not set since
- * the IP_MULTICAST_IF as well as creating interface routes
- * allows specifying a down ipif (ipif_lookup* match ipifs that are down).
- *
- * Note that if IPIF_NOLOCAL, IPIF_NOXMIT, or IPIF_DEPRECATED is set on
- * the ipif, this routine might return NULL.
- */
-ire_t *
-ipif_to_ire(const ipif_t *ipif)
-{
-	ire_t	*ire;
-	ip_stack_t *ipst = ipif->ipif_ill->ill_ipst;
-	uint_t	match_flags = MATCH_IRE_TYPE | MATCH_IRE_IPIF | MATCH_IRE_MASK;
-
-	/*
-	 * IRE_INTERFACE entries for ills under IPMP are IRE_MARK_TESTHIDDEN
-	 * so that they aren't accidentally returned.  However, if the
-	 * caller's ipif is on an ill under IPMP, there's no need to hide 'em.
-	 */
-	if (IS_UNDER_IPMP(ipif->ipif_ill))
-		match_flags |= MATCH_IRE_MARK_TESTHIDDEN;
-
-	ASSERT(!ipif->ipif_isv6);
-	if (ipif->ipif_ire_type == IRE_LOOPBACK) {
-		ire = ire_ctable_lookup(ipif->ipif_lcl_addr, 0, IRE_LOOPBACK,
-		    ipif, ALL_ZONES, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF),
-		    ipst);
-	} else if (ipif->ipif_flags & IPIF_POINTOPOINT) {
-		/* In this case we need to lookup destination address. */
-		ire = ire_ftable_lookup(ipif->ipif_pp_dst_addr, IP_HOST_MASK, 0,
-		    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0, NULL, match_flags,
-		    ipst);
-	} else {
-		ire = ire_ftable_lookup(ipif->ipif_subnet,
-		    ipif->ipif_net_mask, 0, IRE_INTERFACE, ipif, NULL,
-		    ALL_ZONES, 0, NULL, match_flags, ipst);
-	}
-	return (ire);
-}
-
-/*
- * ire_walk function.
- * Count the number of IRE_CACHE entries in different categories.
- */
-void
-ire_cache_count(ire_t *ire, char *arg)
-{
-	ire_cache_count_t *icc = (ire_cache_count_t *)arg;
-
-	if (ire->ire_type != IRE_CACHE)
-		return;
-
-	icc->icc_total++;
-
-	if (ire->ire_ipversion == IPV6_VERSION) {
-		mutex_enter(&ire->ire_lock);
-		if (IN6_IS_ADDR_UNSPECIFIED(&ire->ire_gateway_addr_v6)) {
-			mutex_exit(&ire->ire_lock);
-			icc->icc_onlink++;
-			return;
-		}
-		mutex_exit(&ire->ire_lock);
-	} else {
-		if (ire->ire_gateway_addr == 0) {
-			icc->icc_onlink++;
-			return;
-		}
-	}
-
-	ASSERT(ire->ire_ipif != NULL);
-	if (ire->ire_max_frag < ire->ire_ipif->ipif_mtu)
-		icc->icc_pmtu++;
-	else if (ire->ire_tire_mark != ire->ire_ob_pkt_count +
-	    ire->ire_ib_pkt_count)
-		icc->icc_offlink++;
+	ASSERT(ill == NULL || !ill->ill_isv6);
+	if (lock_held)
+		ASSERT(RW_READ_HELD(&ipst->ips_ip_ftable->rnh_lock));
 	else
-		icc->icc_unused++;
+		RADIX_NODE_HEAD_RLOCK(ipst->ips_ip_ftable);
+
+	rdst.rt_sin_len = sizeof (rdst);
+	rdst.rt_sin_family = AF_INET;
+	rdst.rt_sin_addr.s_addr = gateway;
+
+	/*
+	 * We only use margs for ill, zoneid, and tsl matching in
+	 * ire_find_zoneid
+	 */
+	(void) memset(&margs, 0, sizeof (margs));
+	margs.ift_ill = ill;
+	margs.ift_zoneid = zoneid;
+	margs.ift_tsl = tsl;
+	rt = (struct rt_entry *)ipst->ips_ip_ftable->rnh_matchaddr_args(&rdst,
+	    ipst->ips_ip_ftable, ire_find_zoneid, (void *)&margs);
+
+	if (!lock_held)
+		RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
+
+	return (rt != NULL);
 }
 
 /*
- * ire_walk function called by ip_trash_ire_reclaim().
- * Free a fraction of the IRE_CACHE cache entries. The fractions are
- * different for different categories of IRE_CACHE entries.
- * A fraction of zero means to not free any in that category.
- * Use the hash bucket id plus lbolt as a random number. Thus if the fraction
- * is N then every Nth hash bucket chain will be freed.
+ * ire_walk routine to delete a fraction of redirect IREs and IRE_CLONE_IF IREs.
+ * The fraction argument tells us what fraction of the IREs to delete.
+ * Common for IPv4 and IPv6.
+ * Used when memory backpressure.
  */
-void
-ire_cache_reclaim(ire_t *ire, char *arg)
+static void
+ire_delete_reclaim(ire_t *ire, char *arg)
 {
-	ire_cache_reclaim_t *icr = (ire_cache_reclaim_t *)arg;
-	uint_t rand;
-	ip_stack_t	*ipst = icr->icr_ipst;
+	ip_stack_t	*ipst = ire->ire_ipst;
+	uint_t		fraction = *(uint_t *)arg;
+	uint_t		rand;
 
-	if (ire->ire_type != IRE_CACHE)
-		return;
+	if ((ire->ire_flags & RTF_DYNAMIC) ||
+	    (ire->ire_type & IRE_IF_CLONE)) {
 
-	if (ire->ire_ipversion == IPV6_VERSION) {
+		/* Pick a random number */
 		rand = (uint_t)lbolt +
-		    IRE_ADDR_HASH_V6(ire->ire_addr_v6,
-		    ipst->ips_ip6_cache_table_size);
-		mutex_enter(&ire->ire_lock);
-		if (IN6_IS_ADDR_UNSPECIFIED(&ire->ire_gateway_addr_v6)) {
-			mutex_exit(&ire->ire_lock);
-			if (icr->icr_onlink != 0 &&
-			    (rand/icr->icr_onlink)*icr->icr_onlink == rand) {
-				ire_delete(ire);
-				return;
-			}
-			goto done;
-		}
-		mutex_exit(&ire->ire_lock);
-	} else {
-		rand = (uint_t)lbolt +
-		    IRE_ADDR_HASH(ire->ire_addr, ipst->ips_ip_cache_table_size);
-		if (ire->ire_gateway_addr == 0) {
-			if (icr->icr_onlink != 0 &&
-			    (rand/icr->icr_onlink)*icr->icr_onlink == rand) {
-				ire_delete(ire);
-				return;
-			}
-			goto done;
+		    IRE_ADDR_HASH_V6(ire->ire_addr_v6, 256);
+
+		/* Use truncation */
+		if ((rand/fraction)*fraction == rand) {
+			IP_STAT(ipst, ip_ire_reclaim_deleted);
+			ire_delete(ire);
 		}
 	}
-	/* Not onlink IRE */
-	ASSERT(ire->ire_ipif != NULL);
-	if (ire->ire_max_frag < ire->ire_ipif->ipif_mtu) {
-		/* Use ptmu fraction */
-		if (icr->icr_pmtu != 0 &&
-		    (rand/icr->icr_pmtu)*icr->icr_pmtu == rand) {
-			ire_delete(ire);
-			return;
-		}
-	} else if (ire->ire_tire_mark != ire->ire_ob_pkt_count +
-	    ire->ire_ib_pkt_count) {
-		/* Use offlink fraction */
-		if (icr->icr_offlink != 0 &&
-		    (rand/icr->icr_offlink)*icr->icr_offlink == rand) {
-			ire_delete(ire);
-			return;
-		}
-	} else {
-		/* Use unused fraction */
-		if (icr->icr_unused != 0 &&
-		    (rand/icr->icr_unused)*icr->icr_unused == rand) {
-			ire_delete(ire);
-			return;
-		}
-	}
-done:
+
+}
+
+/*
+ * kmem_cache callback to free up memory.
+ *
+ * Free a fraction (ips_ip_ire_reclaim_fraction) of things IP added dynamically
+ * (RTF_DYNAMIC and IRE_IF_CLONE).
+ */
+static void
+ip_ire_reclaim_stack(ip_stack_t *ipst)
+{
+	uint_t	fraction = ipst->ips_ip_ire_reclaim_fraction;
+
+	IP_STAT(ipst, ip_ire_reclaim_calls);
+
+	ire_walk(ire_delete_reclaim, &fraction, ipst);
+
 	/*
-	 * Update tire_mark so that those that haven't been used since this
-	 * reclaim will be considered unused next time we reclaim.
+	 * Walk all CONNs that can have a reference on an ire, nce or dce.
+	 * Get them to update any stale references to drop any refholds they
+	 * have.
 	 */
-	ire->ire_tire_mark = ire->ire_ob_pkt_count + ire->ire_ib_pkt_count;
+	ipcl_walk(conn_ixa_cleanup, (void *)B_FALSE, ipst);
+}
+
+/*
+ * Called by the memory allocator subsystem directly, when the system
+ * is running low on memory.
+ */
+/* ARGSUSED */
+void
+ip_ire_reclaim(void *args)
+{
+	netstack_handle_t nh;
+	netstack_t *ns;
+
+	netstack_next_init(&nh);
+	while ((ns = netstack_next(&nh)) != NULL) {
+		ip_ire_reclaim_stack(ns->netstack_ip);
+		netstack_rele(ns);
+	}
+	netstack_next_fini(&nh);
 }
 
 static void
@@ -4470,14 +2211,21 @@ void
 ip_ire_g_init()
 {
 	/*
-	 * Create ire caches, ire_reclaim()
-	 * will give IRE_CACHE back to system when needed.
+	 * Create kmem_caches.  ip_ire_reclaim() and ip_nce_reclaim()
+	 * will give disposable IREs back to system when needed.
 	 * This needs to be done here before anything else, since
 	 * ire_add() expects the cache to be created.
 	 */
 	ire_cache = kmem_cache_create("ire_cache",
-	    sizeof (ire_t), 0, ip_ire_constructor,
-	    ip_ire_destructor, ip_trash_ire_reclaim, NULL, NULL, 0);
+	    sizeof (ire_t), 0, NULL, NULL,
+	    ip_ire_reclaim, NULL, NULL, 0);
+
+	ncec_cache = kmem_cache_create("ncec_cache",
+	    sizeof (ncec_t), 0, NULL, NULL,
+	    ip_nce_reclaim, NULL, NULL, 0);
+	nce_cache = kmem_cache_create("nce_cache",
+	    sizeof (nce_t), 0, NULL, NULL,
+	    NULL, NULL, NULL, 0);
 
 	rt_entry_cache = kmem_cache_create("rt_entry",
 	    sizeof (struct rt_entry), 0, NULL, NULL, NULL, NULL, NULL, 0);
@@ -4491,89 +2239,12 @@ ip_ire_g_init()
 void
 ip_ire_init(ip_stack_t *ipst)
 {
-	int i;
-	uint32_t mem_cnt;
-	uint32_t cpu_cnt;
-	uint32_t min_cnt;
-	pgcnt_t mem_avail;
-
-	/*
-	 * ip_ire_max_bucket_cnt is sized below based on the memory
-	 * size and the cpu speed of the machine. This is upper
-	 * bounded by the compile time value of ip_ire_max_bucket_cnt
-	 * and is lower bounded by the compile time value of
-	 * ip_ire_min_bucket_cnt.  Similar logic applies to
-	 * ip6_ire_max_bucket_cnt.
-	 *
-	 * We calculate this for each IP Instances in order to use
-	 * the kmem_avail and ip_ire_{min,max}_bucket_cnt that are
-	 * in effect when the zone is booted.
-	 */
-	mem_avail = kmem_avail();
-	mem_cnt = (mem_avail >> ip_ire_mem_ratio) /
-	    ip_cache_table_size / sizeof (ire_t);
-	cpu_cnt = CPU->cpu_type_info.pi_clock >> ip_ire_cpu_ratio;
-
-	min_cnt = MIN(cpu_cnt, mem_cnt);
-	if (min_cnt < ip_ire_min_bucket_cnt)
-		min_cnt = ip_ire_min_bucket_cnt;
-	if (ip_ire_max_bucket_cnt > min_cnt) {
-		ip_ire_max_bucket_cnt = min_cnt;
-	}
-
-	mem_cnt = (mem_avail >> ip_ire_mem_ratio) /
-	    ip6_cache_table_size / sizeof (ire_t);
-	min_cnt = MIN(cpu_cnt, mem_cnt);
-	if (min_cnt < ip6_ire_min_bucket_cnt)
-		min_cnt = ip6_ire_min_bucket_cnt;
-	if (ip6_ire_max_bucket_cnt > min_cnt) {
-		ip6_ire_max_bucket_cnt = min_cnt;
-	}
+	ire_t	*ire;
+	int	error;
 
 	mutex_init(&ipst->ips_ire_ft_init_lock, NULL, MUTEX_DEFAULT, 0);
-	mutex_init(&ipst->ips_ire_handle_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	(void) rn_inithead((void **)&ipst->ips_ip_ftable, 32);
-
-	/* Calculate the IPv4 cache table size. */
-	ipst->ips_ip_cache_table_size = MAX(ip_cache_table_size,
-	    ((mem_avail >> ip_ire_mem_ratio) / sizeof (ire_t) /
-	    ip_ire_max_bucket_cnt));
-	if (ipst->ips_ip_cache_table_size > ip_max_cache_table_size)
-		ipst->ips_ip_cache_table_size = ip_max_cache_table_size;
-	/*
-	 * Make sure that the table size is always a power of 2.  The
-	 * hash macro IRE_ADDR_HASH() depends on that.
-	 */
-	power2_roundup(&ipst->ips_ip_cache_table_size);
-
-	ipst->ips_ip_cache_table = kmem_zalloc(ipst->ips_ip_cache_table_size *
-	    sizeof (irb_t), KM_SLEEP);
-
-	for (i = 0; i < ipst->ips_ip_cache_table_size; i++) {
-		rw_init(&ipst->ips_ip_cache_table[i].irb_lock, NULL,
-		    RW_DEFAULT, NULL);
-	}
-
-	/* Calculate the IPv6 cache table size. */
-	ipst->ips_ip6_cache_table_size = MAX(ip6_cache_table_size,
-	    ((mem_avail >> ip_ire_mem_ratio) / sizeof (ire_t) /
-	    ip6_ire_max_bucket_cnt));
-	if (ipst->ips_ip6_cache_table_size > ip6_max_cache_table_size)
-		ipst->ips_ip6_cache_table_size = ip6_max_cache_table_size;
-	/*
-	 * Make sure that the table size is always a power of 2.  The
-	 * hash macro IRE_ADDR_HASH_V6() depends on that.
-	 */
-	power2_roundup(&ipst->ips_ip6_cache_table_size);
-
-	ipst->ips_ip_cache_table_v6 = kmem_zalloc(
-	    ipst->ips_ip6_cache_table_size * sizeof (irb_t), KM_SLEEP);
-
-	for (i = 0; i < ipst->ips_ip6_cache_table_size; i++) {
-		rw_init(&ipst->ips_ip_cache_table_v6[i].irb_lock, NULL,
-		    RW_DEFAULT, NULL);
-	}
 
 	/*
 	 * Make sure that the forwarding table size is a power of 2.
@@ -4582,13 +2253,51 @@ ip_ire_init(ip_stack_t *ipst)
 	ipst->ips_ip6_ftable_hash_size = ip6_ftable_hash_size;
 	power2_roundup(&ipst->ips_ip6_ftable_hash_size);
 
-	ipst->ips_ire_handle = 1;
+	/*
+	 * Allocate/initialize a pair of IRE_NOROUTEs for each of IPv4 and IPv6.
+	 * The ire_reject_v* has RTF_REJECT set, and the ire_blackhole_v* has
+	 * RTF_BLACKHOLE set. We use the latter for transient errors such
+	 * as memory allocation failures and tripping on IRE_IS_CONDEMNED
+	 * entries.
+	 */
+	ire = kmem_cache_alloc(ire_cache, KM_SLEEP);
+	*ire = ire_null;
+	error = ire_init_v4(ire, 0, 0, 0, IRE_NOROUTE, NULL, ALL_ZONES,
+	    RTF_REJECT|RTF_UP, NULL, ipst);
+	ASSERT(error == 0);
+	ipst->ips_ire_reject_v4 = ire;
+
+	ire = kmem_cache_alloc(ire_cache, KM_SLEEP);
+	*ire = ire_null;
+	error = ire_init_v6(ire, 0, 0, 0, IRE_NOROUTE, NULL, ALL_ZONES,
+	    RTF_REJECT|RTF_UP, NULL, ipst);
+	ASSERT(error == 0);
+	ipst->ips_ire_reject_v6 = ire;
+
+	ire = kmem_cache_alloc(ire_cache, KM_SLEEP);
+	*ire = ire_null;
+	error = ire_init_v4(ire, 0, 0, 0, IRE_NOROUTE, NULL, ALL_ZONES,
+	    RTF_BLACKHOLE|RTF_UP, NULL, ipst);
+	ASSERT(error == 0);
+	ipst->ips_ire_blackhole_v4 = ire;
+
+	ire = kmem_cache_alloc(ire_cache, KM_SLEEP);
+	*ire = ire_null;
+	error = ire_init_v6(ire, 0, 0, 0, IRE_NOROUTE, NULL, ALL_ZONES,
+	    RTF_BLACKHOLE|RTF_UP, NULL, ipst);
+	ASSERT(error == 0);
+	ipst->ips_ire_blackhole_v6 = ire;
+
+	rw_init(&ipst->ips_ip6_ire_head_lock, NULL, RW_DEFAULT, NULL);
+	rw_init(&ipst->ips_ire_dep_lock, NULL, RW_DEFAULT, NULL);
 }
 
 void
 ip_ire_g_fini(void)
 {
 	kmem_cache_destroy(ire_cache);
+	kmem_cache_destroy(ncec_cache);
+	kmem_cache_destroy(nce_cache);
 	kmem_cache_destroy(rt_entry_cache);
 
 	rn_fini();
@@ -4599,9 +2308,21 @@ ip_ire_fini(ip_stack_t *ipst)
 {
 	int i;
 
+	rw_destroy(&ipst->ips_ire_dep_lock);
+	rw_destroy(&ipst->ips_ip6_ire_head_lock);
+
+	ire_refrele_notr(ipst->ips_ire_reject_v6);
+	ipst->ips_ire_reject_v6 = NULL;
+	ire_refrele_notr(ipst->ips_ire_reject_v4);
+	ipst->ips_ire_reject_v4 = NULL;
+	ire_refrele_notr(ipst->ips_ire_blackhole_v6);
+	ipst->ips_ire_blackhole_v6 = NULL;
+	ire_refrele_notr(ipst->ips_ire_blackhole_v4);
+	ipst->ips_ire_blackhole_v4 = NULL;
+
 	/*
 	 * Delete all IREs - assumes that the ill/ipifs have
-	 * been removed so what remains are just the ftable and IRE_CACHE.
+	 * been removed so what remains are just the ftable to handle.
 	 */
 	ire_walk(ire_delete, NULL, ipst);
 
@@ -4609,23 +2330,6 @@ ip_ire_fini(ip_stack_t *ipst)
 	ipst->ips_ip_ftable = NULL;
 
 	mutex_destroy(&ipst->ips_ire_ft_init_lock);
-	mutex_destroy(&ipst->ips_ire_handle_lock);
-
-	for (i = 0; i < ipst->ips_ip_cache_table_size; i++) {
-		ASSERT(ipst->ips_ip_cache_table[i].irb_ire == NULL);
-		rw_destroy(&ipst->ips_ip_cache_table[i].irb_lock);
-	}
-	kmem_free(ipst->ips_ip_cache_table,
-	    ipst->ips_ip_cache_table_size * sizeof (irb_t));
-	ipst->ips_ip_cache_table = NULL;
-
-	for (i = 0; i < ipst->ips_ip6_cache_table_size; i++) {
-		ASSERT(ipst->ips_ip_cache_table_v6[i].irb_ire == NULL);
-		rw_destroy(&ipst->ips_ip_cache_table_v6[i].irb_lock);
-	}
-	kmem_free(ipst->ips_ip_cache_table_v6,
-	    ipst->ips_ip6_cache_table_size * sizeof (irb_t));
-	ipst->ips_ip_cache_table_v6 = NULL;
 
 	for (i = 0; i < IP6_MASK_TABLE_SIZE; i++) {
 		irb_t *ptr;
@@ -4641,629 +2345,6 @@ ip_ire_fini(ip_stack_t *ipst)
 		mi_free(ptr);
 		ipst->ips_ip_forwarding_table_v6[i] = NULL;
 	}
-}
-
-/*
- * Check if another multirt route resolution is needed.
- * B_TRUE is returned is there remain a resolvable route,
- * or if no route for that dst is resolved yet.
- * B_FALSE is returned if all routes for that dst are resolved
- * or if the remaining unresolved routes are actually not
- * resolvable.
- * This only works in the global zone.
- */
-boolean_t
-ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl, ip_stack_t *ipst)
-{
-	ire_t	*first_fire;
-	ire_t	*first_cire;
-	ire_t	*fire;
-	ire_t	*cire;
-	irb_t	*firb;
-	irb_t	*cirb;
-	int	unres_cnt = 0;
-	boolean_t resolvable = B_FALSE;
-
-	/* Retrieve the first IRE_HOST that matches the destination */
-	first_fire = ire_ftable_lookup(dst, IP_HOST_MASK, 0, IRE_HOST, NULL,
-	    NULL, ALL_ZONES, 0, tsl,
-	    MATCH_IRE_MASK | MATCH_IRE_TYPE | MATCH_IRE_SECATTR, ipst);
-
-	/* No route at all */
-	if (first_fire == NULL) {
-		return (B_TRUE);
-	}
-
-	firb = first_fire->ire_bucket;
-	ASSERT(firb != NULL);
-
-	/* Retrieve the first IRE_CACHE ire for that destination. */
-	first_cire = ire_cache_lookup(dst, GLOBAL_ZONEID, tsl, ipst);
-
-	/* No resolved route. */
-	if (first_cire == NULL) {
-		ire_refrele(first_fire);
-		return (B_TRUE);
-	}
-
-	/*
-	 * At least one route is resolved. Here we look through the forward
-	 * and cache tables, to compare the number of declared routes
-	 * with the number of resolved routes. The search for a resolvable
-	 * route is performed only if at least one route remains
-	 * unresolved.
-	 */
-	cirb = first_cire->ire_bucket;
-	ASSERT(cirb != NULL);
-
-	/* Count the number of routes to that dest that are declared. */
-	IRB_REFHOLD(firb);
-	for (fire = first_fire; fire != NULL; fire = fire->ire_next) {
-		if (!(fire->ire_flags & RTF_MULTIRT))
-			continue;
-		if (fire->ire_addr != dst)
-			continue;
-		unres_cnt++;
-	}
-	IRB_REFRELE(firb);
-
-	/* Then subtract the number of routes to that dst that are resolved */
-	IRB_REFHOLD(cirb);
-	for (cire = first_cire; cire != NULL; cire = cire->ire_next) {
-		if (!(cire->ire_flags & RTF_MULTIRT))
-			continue;
-		if (cire->ire_addr != dst)
-			continue;
-		if (cire->ire_marks & (IRE_MARK_CONDEMNED|IRE_MARK_TESTHIDDEN))
-			continue;
-		unres_cnt--;
-	}
-	IRB_REFRELE(cirb);
-
-	/* At least one route is unresolved; search for a resolvable route. */
-	if (unres_cnt > 0)
-		resolvable = ire_multirt_lookup(&first_cire, &first_fire,
-		    MULTIRT_USESTAMP | MULTIRT_CACHEGW, NULL, tsl, ipst);
-
-	if (first_fire != NULL)
-		ire_refrele(first_fire);
-
-	if (first_cire != NULL)
-		ire_refrele(first_cire);
-
-	return (resolvable);
-}
-
-/*
- * Explore a forward_table bucket, starting from fire_arg.
- * fire_arg MUST be an IRE_HOST entry.
- *
- * Return B_TRUE and update *ire_arg and *fire_arg
- * if at least one resolvable route is found. *ire_arg
- * is the IRE entry for *fire_arg's gateway.
- *
- * Return B_FALSE otherwise (all routes are resolved or
- * the remaining unresolved routes are all unresolvable).
- *
- * The IRE selection relies on a priority mechanism
- * driven by the flags passed in by the caller.
- * The caller, such as ip_newroute_ipif(), can get the most
- * relevant ire at each stage of a multiple route resolution.
- *
- * The rules are:
- *
- * - if MULTIRT_CACHEGW is specified in flags, IRE_CACHETABLE
- *   ires are preferred for the gateway. This gives the highest
- *   priority to routes that can be resolved without using
- *   a resolver.
- *
- * - if MULTIRT_CACHEGW is not specified, or if MULTIRT_CACHEGW
- *   is specified but no IRE_CACHETABLE ire entry for the gateway
- *   is found, the following rules apply.
- *
- * - if MULTIRT_USESTAMP is specified in flags, IRE_INTERFACE
- *   ires for the gateway, that have not been tried since
- *   a configurable amount of time, are preferred.
- *   This applies when a resolver must be invoked for
- *   a missing route, but we don't want to use the resolver
- *   upon each packet emission. If no such resolver is found,
- *   B_FALSE is returned.
- *   The MULTIRT_USESTAMP flag can be combined with
- *   MULTIRT_CACHEGW.
- *
- * - if MULTIRT_USESTAMP is not specified in flags, the first
- *   unresolved but resolvable route is selected.
- *
- * - Otherwise, there is no resolvable route, and
- *   B_FALSE is returned.
- *
- * At last, MULTIRT_SETSTAMP can be specified in flags to
- * request the timestamp of unresolvable routes to
- * be refreshed. This prevents the useless exploration
- * of those routes for a while, when MULTIRT_USESTAMP is used.
- *
- * The argument already_resolved_count is an output variable to track number
- * of already resolved multirt routes.
- *
- * This only works in the global zone.
- */
-boolean_t
-ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
-    int *already_resolved_count, const ts_label_t *tsl, ip_stack_t *ipst)
-{
-	clock_t	delta;
-	ire_t	*best_fire = NULL;
-	ire_t	*best_cire = NULL;
-	ire_t	*first_fire;
-	ire_t	*first_cire;
-	ire_t	*fire;
-	ire_t	*cire;
-	irb_t	*firb = NULL;
-	irb_t	*cirb = NULL;
-	ire_t	*gw_ire;
-	boolean_t	already_resolved;
-	boolean_t	res;
-	ipaddr_t	dst;
-	ipaddr_t	gw;
-
-	ip2dbg(("ire_multirt_lookup: *ire_arg %p, *fire_arg %p, flags %04x\n",
-	    (void *)*ire_arg, (void *)*fire_arg, flags));
-
-	ASSERT(ire_arg != NULL);
-	ASSERT(fire_arg != NULL);
-
-	/* Not an IRE_HOST ire; give up. */
-	if ((*fire_arg == NULL) || ((*fire_arg)->ire_type != IRE_HOST)) {
-		return (B_FALSE);
-	}
-
-	/* This is the first IRE_HOST ire for that destination. */
-	first_fire = *fire_arg;
-	firb = first_fire->ire_bucket;
-	ASSERT(firb != NULL);
-
-	dst = first_fire->ire_addr;
-
-	ip2dbg(("ire_multirt_lookup: dst %08x\n", ntohl(dst)));
-
-	/*
-	 * Retrieve the first IRE_CACHE ire for that destination;
-	 * if we don't find one, no route for that dest is
-	 * resolved yet.
-	 */
-	first_cire = ire_cache_lookup(dst, GLOBAL_ZONEID, tsl, ipst);
-	if (first_cire != NULL) {
-		cirb = first_cire->ire_bucket;
-	}
-
-	ip2dbg(("ire_multirt_lookup: first_cire %p\n", (void *)first_cire));
-
-	/*
-	 * Search for a resolvable route, giving the top priority
-	 * to routes that can be resolved without any call to the resolver.
-	 */
-	IRB_REFHOLD(firb);
-
-	if (!CLASSD(dst)) {
-		/*
-		 * For all multiroute IRE_HOST ires for that destination,
-		 * check if the route via the IRE_HOST's gateway is
-		 * resolved yet.
-		 */
-		for (fire = first_fire; fire != NULL; fire = fire->ire_next) {
-
-			if (!(fire->ire_flags & RTF_MULTIRT))
-				continue;
-			if (fire->ire_addr != dst)
-				continue;
-
-			if (fire->ire_gw_secattr != NULL &&
-			    tsol_ire_match_gwattr(fire, tsl) != 0) {
-				continue;
-			}
-
-			gw = fire->ire_gateway_addr;
-
-			ip2dbg(("ire_multirt_lookup: fire %p, "
-			    "ire_addr %08x, ire_gateway_addr %08x\n",
-			    (void *)fire, ntohl(fire->ire_addr), ntohl(gw)));
-
-			already_resolved = B_FALSE;
-
-			if (first_cire != NULL) {
-				ASSERT(cirb != NULL);
-
-				IRB_REFHOLD(cirb);
-				/*
-				 * For all IRE_CACHE ires for that
-				 * destination.
-				 */
-				for (cire = first_cire;
-				    cire != NULL;
-				    cire = cire->ire_next) {
-
-					if (!(cire->ire_flags & RTF_MULTIRT))
-						continue;
-					if (cire->ire_addr != dst)
-						continue;
-					if (cire->ire_marks &
-					    (IRE_MARK_CONDEMNED |
-					    IRE_MARK_TESTHIDDEN))
-						continue;
-
-					if (cire->ire_gw_secattr != NULL &&
-					    tsol_ire_match_gwattr(cire,
-					    tsl) != 0) {
-						continue;
-					}
-
-					/*
-					 * Check if the IRE_CACHE's gateway
-					 * matches the IRE_HOST's gateway.
-					 */
-					if (cire->ire_gateway_addr == gw) {
-						already_resolved = B_TRUE;
-						break;
-					}
-				}
-				IRB_REFRELE(cirb);
-			}
-
-			/*
-			 * This route is already resolved;
-			 * proceed with next one.
-			 */
-			if (already_resolved) {
-				ip2dbg(("ire_multirt_lookup: found cire %p, "
-				    "already resolved\n", (void *)cire));
-
-				if (already_resolved_count != NULL)
-					(*already_resolved_count)++;
-				continue;
-			}
-
-			/*
-			 * The route is unresolved; is it actually
-			 * resolvable, i.e. is there a cache or a resolver
-			 * for the gateway?
-			 */
-			gw_ire = ire_route_lookup(gw, 0, 0, 0, NULL, NULL,
-			    ALL_ZONES, tsl,
-			    MATCH_IRE_RECURSIVE | MATCH_IRE_SECATTR, ipst);
-
-			ip2dbg(("ire_multirt_lookup: looked up gw_ire %p\n",
-			    (void *)gw_ire));
-
-			/*
-			 * If gw_ire is typed IRE_CACHETABLE,
-			 * this route can be resolved without any call to the
-			 * resolver. If the MULTIRT_CACHEGW flag is set,
-			 * give the top priority to this ire and exit the
-			 * loop.
-			 * This is typically the case when an ARP reply
-			 * is processed through ip_wput_nondata().
-			 */
-			if ((flags & MULTIRT_CACHEGW) &&
-			    (gw_ire != NULL) &&
-			    (gw_ire->ire_type & IRE_CACHETABLE)) {
-				ASSERT(gw_ire->ire_nce == NULL ||
-				    gw_ire->ire_nce->nce_state == ND_REACHABLE);
-				/*
-				 * Release the resolver associated to the
-				 * previous candidate best ire, if any.
-				 */
-				if (best_cire != NULL) {
-					ire_refrele(best_cire);
-					ASSERT(best_fire != NULL);
-				}
-
-				best_fire = fire;
-				best_cire = gw_ire;
-
-				ip2dbg(("ire_multirt_lookup: found top prio "
-				    "best_fire %p, best_cire %p\n",
-				    (void *)best_fire, (void *)best_cire));
-				break;
-			}
-
-			/*
-			 * Compute the time elapsed since our preceding
-			 * attempt to  resolve that route.
-			 * If the MULTIRT_USESTAMP flag is set, we take that
-			 * route into account only if this time interval
-			 * exceeds ip_multirt_resolution_interval;
-			 * this prevents us from attempting to resolve a
-			 * broken route upon each sending of a packet.
-			 */
-			delta = lbolt - fire->ire_last_used_time;
-			delta = TICK_TO_MSEC(delta);
-
-			res = (boolean_t)((delta >
-			    ipst->ips_ip_multirt_resolution_interval) ||
-			    (!(flags & MULTIRT_USESTAMP)));
-
-			ip2dbg(("ire_multirt_lookup: fire %p, delta %lu, "
-			    "res %d\n",
-			    (void *)fire, delta, res));
-
-			if (res) {
-				/*
-				 * We are here if MULTIRT_USESTAMP flag is set
-				 * and the resolver for fire's gateway
-				 * has not been tried since
-				 * ip_multirt_resolution_interval, or if
-				 * MULTIRT_USESTAMP is not set but gw_ire did
-				 * not fill the conditions for MULTIRT_CACHEGW,
-				 * or if neither MULTIRT_USESTAMP nor
-				 * MULTIRT_CACHEGW are set.
-				 */
-				if (gw_ire != NULL) {
-					if (best_fire == NULL) {
-						ASSERT(best_cire == NULL);
-
-						best_fire = fire;
-						best_cire = gw_ire;
-
-						ip2dbg(("ire_multirt_lookup:"
-						    "found candidate "
-						    "best_fire %p, "
-						    "best_cire %p\n",
-						    (void *)best_fire,
-						    (void *)best_cire));
-
-						/*
-						 * If MULTIRT_CACHEGW is not
-						 * set, we ignore the top
-						 * priority ires that can
-						 * be resolved without any
-						 * call to the resolver;
-						 * In that case, there is
-						 * actually no need
-						 * to continue the loop.
-						 */
-						if (!(flags &
-						    MULTIRT_CACHEGW)) {
-							break;
-						}
-						continue;
-					}
-				} else {
-					/*
-					 * No resolver for the gateway: the
-					 * route is not resolvable.
-					 * If the MULTIRT_SETSTAMP flag is
-					 * set, we stamp the IRE_HOST ire,
-					 * so we will not select it again
-					 * during this resolution interval.
-					 */
-					if (flags & MULTIRT_SETSTAMP)
-						fire->ire_last_used_time =
-						    lbolt;
-				}
-			}
-
-			if (gw_ire != NULL)
-				ire_refrele(gw_ire);
-		}
-	} else { /* CLASSD(dst) */
-
-		for (fire = first_fire;
-		    fire != NULL;
-		    fire = fire->ire_next) {
-
-			if (!(fire->ire_flags & RTF_MULTIRT))
-				continue;
-			if (fire->ire_addr != dst)
-				continue;
-
-			if (fire->ire_gw_secattr != NULL &&
-			    tsol_ire_match_gwattr(fire, tsl) != 0) {
-				continue;
-			}
-
-			already_resolved = B_FALSE;
-
-			gw = fire->ire_gateway_addr;
-
-			gw_ire = ire_ftable_lookup(gw, 0, 0, IRE_INTERFACE,
-			    NULL, NULL, ALL_ZONES, 0, tsl,
-			    MATCH_IRE_RECURSIVE | MATCH_IRE_TYPE |
-			    MATCH_IRE_SECATTR, ipst);
-
-			/* No resolver for the gateway; we skip this ire. */
-			if (gw_ire == NULL) {
-				continue;
-			}
-			ASSERT(gw_ire->ire_nce == NULL ||
-			    gw_ire->ire_nce->nce_state == ND_REACHABLE);
-
-			if (first_cire != NULL) {
-
-				IRB_REFHOLD(cirb);
-				/*
-				 * For all IRE_CACHE ires for that
-				 * destination.
-				 */
-				for (cire = first_cire;
-				    cire != NULL;
-				    cire = cire->ire_next) {
-
-					if (!(cire->ire_flags & RTF_MULTIRT))
-						continue;
-					if (cire->ire_addr != dst)
-						continue;
-					if (cire->ire_marks &
-					    (IRE_MARK_CONDEMNED |
-					    IRE_MARK_TESTHIDDEN))
-						continue;
-
-					if (cire->ire_gw_secattr != NULL &&
-					    tsol_ire_match_gwattr(cire,
-					    tsl) != 0) {
-						continue;
-					}
-
-					/*
-					 * Cache entries are linked to the
-					 * parent routes using the parent handle
-					 * (ire_phandle). If no cache entry has
-					 * the same handle as fire, fire is
-					 * still unresolved.
-					 */
-					ASSERT(cire->ire_phandle != 0);
-					if (cire->ire_phandle ==
-					    fire->ire_phandle) {
-						already_resolved = B_TRUE;
-						break;
-					}
-				}
-				IRB_REFRELE(cirb);
-			}
-
-			/*
-			 * This route is already resolved; proceed with
-			 * next one.
-			 */
-			if (already_resolved) {
-				ire_refrele(gw_ire);
-				if (already_resolved_count != NULL)
-					(*already_resolved_count)++;
-				continue;
-			}
-
-			/*
-			 * Compute the time elapsed since our preceding
-			 * attempt to resolve that route.
-			 * If the MULTIRT_USESTAMP flag is set, we take
-			 * that route into account only if this time
-			 * interval exceeds ip_multirt_resolution_interval;
-			 * this prevents us from attempting to resolve a
-			 * broken route upon each sending of a packet.
-			 */
-			delta = lbolt - fire->ire_last_used_time;
-			delta = TICK_TO_MSEC(delta);
-
-			res = (boolean_t)((delta >
-			    ipst->ips_ip_multirt_resolution_interval) ||
-			    (!(flags & MULTIRT_USESTAMP)));
-
-			ip3dbg(("ire_multirt_lookup: fire %p, delta %lx, "
-			    "flags %04x, res %d\n",
-			    (void *)fire, delta, flags, res));
-
-			if (res) {
-				if (best_cire != NULL) {
-					/*
-					 * Release the resolver associated
-					 * to the preceding candidate best
-					 * ire, if any.
-					 */
-					ire_refrele(best_cire);
-					ASSERT(best_fire != NULL);
-				}
-				best_fire = fire;
-				best_cire = gw_ire;
-				continue;
-			}
-
-			ire_refrele(gw_ire);
-		}
-	}
-
-	if (best_fire != NULL) {
-		IRE_REFHOLD(best_fire);
-	}
-	IRB_REFRELE(firb);
-
-	/* Release the first IRE_CACHE we initially looked up, if any. */
-	if (first_cire != NULL)
-		ire_refrele(first_cire);
-
-	/* Found a resolvable route. */
-	if (best_fire != NULL) {
-		ASSERT(best_cire != NULL);
-
-		if (*fire_arg != NULL)
-			ire_refrele(*fire_arg);
-		if (*ire_arg != NULL)
-			ire_refrele(*ire_arg);
-
-		/*
-		 * Update the passed-in arguments with the
-		 * resolvable multirt route we found.
-		 */
-		*fire_arg = best_fire;
-		*ire_arg = best_cire;
-
-		ip2dbg(("ire_multirt_lookup: returning B_TRUE, "
-		    "*fire_arg %p, *ire_arg %p\n",
-		    (void *)best_fire, (void *)best_cire));
-
-		return (B_TRUE);
-	}
-
-	ASSERT(best_cire == NULL);
-
-	ip2dbg(("ire_multirt_lookup: returning B_FALSE, *fire_arg %p, "
-	    "*ire_arg %p\n",
-	    (void *)*fire_arg, (void *)*ire_arg));
-
-	/* No resolvable route. */
-	return (B_FALSE);
-}
-
-/*
- * IRE iterator for inbound and loopback broadcast processing.
- * Given an IRE_BROADCAST ire, walk the ires with the same destination
- * address, but skip over the passed-in ire. Returns the next ire without
- * a hold - assumes that the caller holds a reference on the IRE bucket.
- */
-ire_t *
-ire_get_next_bcast_ire(ire_t *curr, ire_t *ire)
-{
-	ill_t *ill;
-
-	if (curr == NULL) {
-		for (curr = ire->ire_bucket->irb_ire; curr != NULL;
-		    curr = curr->ire_next) {
-			if (curr->ire_addr == ire->ire_addr)
-				break;
-		}
-	} else {
-		curr = curr->ire_next;
-	}
-	ill = ire_to_ill(ire);
-	for (; curr != NULL; curr = curr->ire_next) {
-		if (curr->ire_addr != ire->ire_addr) {
-			/*
-			 * All the IREs to a given destination are contiguous;
-			 * break out once the address doesn't match.
-			 */
-			break;
-		}
-		if (curr == ire) {
-			/* skip over the passed-in ire */
-			continue;
-		}
-		if ((curr->ire_stq != NULL && ire->ire_stq == NULL) ||
-		    (curr->ire_stq == NULL && ire->ire_stq != NULL)) {
-			/*
-			 * If the passed-in ire is loopback, skip over
-			 * non-loopback ires and vice versa.
-			 */
-			continue;
-		}
-		if (ire_to_ill(curr) != ill) {
-			/* skip over IREs going through a different interface */
-			continue;
-		}
-		if (curr->ire_marks & IRE_MARK_CONDEMNED) {
-			/* skip over deleted IREs */
-			continue;
-		}
-		return (curr);
-	}
-	return (NULL);
 }
 
 #ifdef DEBUG
@@ -5302,457 +2383,1141 @@ ire_trace_cleanup(const ire_t *ire)
 #endif /* DEBUG */
 
 /*
- * Generate a message chain with an arp request to resolve the in_ire.
- * It is assumed that in_ire itself is currently in the ire cache table,
- * so we create a fake_ire filled with enough information about ire_addr etc.
- * to retrieve in_ire when the DL_UNITDATA response from the resolver
- * comes back. The fake_ire itself is created by calling esballoc with
- * the fr_rtnp (free routine) set to ire_freemblk. This routine will be
- * invoked when the mblk containing fake_ire is freed.
- */
-void
-ire_arpresolve(ire_t *in_ire)
-{
-	areq_t		*areq;
-	ipaddr_t	*addrp;
-	mblk_t 		*ire_mp, *areq_mp;
-	ire_t 		*ire, *buf;
-	size_t		bufsize;
-	frtn_t		*frtnp;
-	ill_t		*dst_ill;
-	ip_stack_t	*ipst;
-
-	ASSERT(in_ire->ire_nce != NULL);
-
-	dst_ill = ire_to_ill(in_ire);
-	ipst = dst_ill->ill_ipst;
-
-	/*
-	 * Construct message chain for the resolver
-	 * of the form:
-	 *	ARP_REQ_MBLK-->IRE_MBLK
-	 *
-	 * NOTE : If the response does not
-	 * come back, ARP frees the packet. For this reason,
-	 * we can't REFHOLD the bucket of save_ire to prevent
-	 * deletions. We may not be able to REFRELE the bucket
-	 * if the response never comes back. Thus, before
-	 * adding the ire, ire_add_v4 will make sure that the
-	 * interface route does not get deleted. This is the
-	 * only case unlike ip_newroute_v6, ip_newroute_ipif_v6
-	 * where we can always prevent deletions because of
-	 * the synchronous nature of adding IRES i.e
-	 * ire_add_then_send is called after creating the IRE.
-	 */
-
-	/*
-	 * We use esballoc to allocate the second part (IRE_MBLK)
-	 * of the message chain depicted above.  This mblk will be freed
-	 * by arp when there is a timeout, and otherwise passed to IP
-	 * and IP will free it after processing the ARP response.
-	 */
-
-	bufsize = sizeof (ire_t) + sizeof (frtn_t);
-	buf = kmem_alloc(bufsize, KM_NOSLEEP);
-	if (buf == NULL) {
-		ip1dbg(("ire_arpresolve: alloc buffer failed\n"));
-		return;
-	}
-	frtnp = (frtn_t *)(buf + 1);
-	frtnp->free_arg = (caddr_t)buf;
-	frtnp->free_func = ire_freemblk;
-
-	ire_mp = esballoc((unsigned char *)buf, bufsize, BPRI_MED, frtnp);
-	if (ire_mp == NULL) {
-		ip1dbg(("ire_arpresolve: esballoc failed\n"));
-		kmem_free(buf, bufsize);
-		return;
-	}
-
-	areq_mp = copyb(dst_ill->ill_resolver_mp);
-	if (areq_mp == NULL) {
-		freemsg(ire_mp);
-		return;
-	}
-
-	ire_mp->b_datap->db_type = IRE_ARPRESOLVE_TYPE;
-	ire = (ire_t *)buf;
-	/*
-	 * keep enough info in the fake ire so that we can pull up
-	 * the incomplete ire (in_ire) after result comes back from
-	 * arp and make it complete.
-	 */
-	*ire = ire_null;
-	ire->ire_u = in_ire->ire_u;
-	ire->ire_ipif_seqid = in_ire->ire_ipif_seqid;
-	ire->ire_ipif_ifindex = in_ire->ire_ipif_ifindex;
-	ire->ire_ipif = in_ire->ire_ipif;
-	ire->ire_stq = dst_ill->ill_wq;
-	ire->ire_stq_ifindex = dst_ill->ill_phyint->phyint_ifindex;
-	ire->ire_zoneid = in_ire->ire_zoneid;
-	ire->ire_stackid = ipst->ips_netstack->netstack_stackid;
-	ire->ire_ipst = ipst;
-
-	/*
-	 * ire_freemblk will be called when ire_mp is freed, both for
-	 * successful and failed arp resolution. IRE_MARK_UNCACHED will be set
-	 * when the arp resolution failed.
-	 */
-	ire->ire_marks |= IRE_MARK_UNCACHED;
-	ire->ire_mp = ire_mp;
-	ire_mp->b_wptr = (uchar_t *)&ire[1];
-	ire_mp->b_cont = NULL;
-	linkb(areq_mp, ire_mp);
-
-	/*
-	 * Fill in the source and dest addrs for the resolver.
-	 * NOTE: this depends on memory layouts imposed by
-	 * ill_init().
-	 */
-	areq = (areq_t *)areq_mp->b_rptr;
-	addrp = (ipaddr_t *)((char *)areq + areq->areq_sender_addr_offset);
-	*addrp = ire->ire_src_addr;
-
-	addrp = (ipaddr_t *)((char *)areq + areq->areq_target_addr_offset);
-	if (ire->ire_gateway_addr != INADDR_ANY) {
-		*addrp = ire->ire_gateway_addr;
-	} else {
-		*addrp = ire->ire_addr;
-	}
-
-	/* Up to the resolver. */
-	if (canputnext(dst_ill->ill_rq)) {
-		putnext(dst_ill->ill_rq, areq_mp);
-	} else {
-		freemsg(areq_mp);
-	}
-}
-
-/*
- * Esballoc free function for AR_ENTRY_QUERY request to clean up any
- * unresolved ire_t and/or nce_t structures when ARP resolution fails.
- *
- * This function can be called by ARP via free routine for ire_mp or
- * by IPv4(both host and forwarding path) via ire_delete
- * in case ARP resolution fails.
- * NOTE: Since IP is MT, ARP can call into IP but not vice versa
- * (for IP to talk to ARP, it still has to send AR* messages).
- *
- * Note that the ARP/IP merge should replace the functioanlity by providing
- * direct function calls to clean up unresolved entries in ire/nce lists.
- */
-void
-ire_freemblk(ire_t *ire_mp)
-{
-	nce_t		*nce = NULL;
-	ill_t		*ill;
-	ip_stack_t	*ipst;
-	netstack_t	*ns = NULL;
-
-	ASSERT(ire_mp != NULL);
-
-	if ((ire_mp->ire_addr == NULL) && (ire_mp->ire_gateway_addr == NULL)) {
-		ip1dbg(("ire_freemblk(0x%p) ire_addr is NULL\n",
-		    (void *)ire_mp));
-		goto cleanup;
-	}
-	if ((ire_mp->ire_marks & IRE_MARK_UNCACHED) == 0) {
-		goto cleanup; /* everything succeeded. just free and return */
-	}
-
-	/*
-	 * the arp information corresponding to this ire_mp was not
-	 * transferred to an ire_cache entry. Need
-	 * to clean up incomplete ire's and nce, if necessary.
-	 */
-	ASSERT(ire_mp->ire_stq != NULL);
-	ASSERT(ire_mp->ire_stq_ifindex != 0);
-	ASSERT(ire_mp->ire_ipst != NULL);
-
-	ns = netstack_find_by_stackid(ire_mp->ire_stackid);
-	ipst = (ns ? ns->netstack_ip : NULL);
-	if (ipst == NULL || ipst != ire_mp->ire_ipst) /* Disapeared on us */
-		goto  cleanup;
-
-	/*
-	 * Get any nce's corresponding to this ire_mp. We first have to
-	 * make sure that the ill is still around.
-	 */
-	ill = ill_lookup_on_ifindex(ire_mp->ire_stq_ifindex,
-	    B_FALSE, NULL, NULL, NULL, NULL, ipst);
-	if (ill == NULL || (ire_mp->ire_stq != ill->ill_wq) ||
-	    (ill->ill_state_flags & ILL_CONDEMNED)) {
-		/*
-		 * ill went away. no nce to clean up.
-		 * Note that the ill_state_flags could be set to
-		 * ILL_CONDEMNED after this point, but if we know
-		 * that it is CONDEMNED now, we just bail out quickly.
-		 */
-		if (ill != NULL)
-			ill_refrele(ill);
-		goto cleanup;
-	}
-	nce = ndp_lookup_v4(ill,
-	    ((ire_mp->ire_gateway_addr != INADDR_ANY) ?
-	    &ire_mp->ire_gateway_addr : &ire_mp->ire_addr),
-	    B_FALSE);
-	ill_refrele(ill);
-
-	if ((nce != NULL) && (nce->nce_state != ND_REACHABLE)) {
-		/*
-		 * some incomplete nce was found.
-		 */
-		DTRACE_PROBE2(ire__freemblk__arp__resolv__fail,
-		    nce_t *, nce, ire_t *, ire_mp);
-		/*
-		 * Send the icmp_unreachable messages for the queued mblks in
-		 * ire->ire_nce->nce_qd_mp, since ARP resolution failed
-		 * for this ire
-		 */
-		arp_resolv_failed(nce);
-		/*
-		 * Delete the nce and clean up all ire's pointing at this nce
-		 * in the cachetable
-		 */
-		ndp_delete(nce);
-	}
-	if (nce != NULL)
-		NCE_REFRELE(nce); /* release the ref taken by ndp_lookup_v4 */
-
-cleanup:
-	if (ns != NULL)
-		netstack_rele(ns);
-	/*
-	 * Get rid of the ire buffer
-	 * We call kmem_free here(instead of ire_delete()), since
-	 * this is the freeb's callback.
-	 */
-	kmem_free(ire_mp, sizeof (ire_t) + sizeof (frtn_t));
-}
-
-/*
- * find, or create if needed, a neighbor cache entry nce_t for IRE_CACHE and
- * non-loopback IRE_BROADCAST ire's.
+ * Find, or create if needed, the nce_t pointer to the neighbor cache
+ * entry ncec_t for an IPv4 address. The nce_t will be created on the ill_t
+ * in the non-IPMP case, or on the cast-ill in the IPMP bcast/mcast case, or
+ * on the next available under-ill (selected by the IPMP rotor) in the
+ * unicast IPMP case.
  *
  * If a neighbor-cache entry has to be created (i.e., one does not already
- * exist in the nce list) the nce_res_mp and nce_state of the neighbor cache
- * entry are initialized in ndp_add_v4(). These values are picked from
- * the src_nce, if one is passed in. Otherwise (if src_nce == NULL) the
- * ire->ire_type and the outgoing interface (ire_to_ill(ire)) values
- * determine the {nce_state, nce_res_mp} of the nce_t created. All
- * IRE_BROADCAST entries have nce_state = ND_REACHABLE, and the nce_res_mp
- * is set to the ill_bcast_mp of the outgoing inerface. For unicast ire
- * entries,
+ * exist in the nce list) the ncec_lladdr and ncec_state of the neighbor cache
+ * entry are initialized in nce_add_v4(). The broadcast, multicast, and
+ * link-layer type determine the contents of {ncec_state, ncec_lladdr} of
+ * the ncec_t created. The ncec_lladdr is non-null for all link types with
+ * non-zero ill_phys_addr_length, though the contents may be zero in cases
+ * where the link-layer type is not known at the time of creation
+ * (e.g., IRE_IFRESOLVER links)
+ *
+ * All IRE_BROADCAST entries have ncec_state = ND_REACHABLE, and the nce_lladr
+ * has the physical broadcast address of the outgoing interface.
+ * For unicast ire entries,
  *   - if the outgoing interface is of type IRE_IF_RESOLVER, a newly created
- *     nce_t will have a null nce_res_mp, and will be in the ND_INITIAL state.
+ *     ncec_t with 0 nce_lladr contents, and will be in the ND_INITIAL state.
  *   - if the outgoing interface is a IRE_IF_NORESOLVER interface, no link
- *     layer resolution is necessary, so that the nce_t will be in the
- *     ND_REACHABLE state and the nce_res_mp will have a copy of the
- *     ill_resolver_mp of the outgoing interface.
+ *     layer resolution is necessary, so that the ncec_t will be in the
+ *     ND_REACHABLE state
  *
  * The link layer information needed for broadcast addresses, and for
  * packets sent on IRE_IF_NORESOLVER interfaces is a constant mapping that
- * never needs re-verification for the lifetime of the nce_t. These are
- * therefore marked NCE_F_PERMANENT, and never allowed to expire via
- * NCE_EXPIRED.
+ * never needs re-verification for the lifetime of the ncec_t. These are
+ * therefore marked NCE_F_NONUD.
  *
- * IRE_CACHE ire's contain the information for  the nexthop (ire_gateway_addr)
- * in the case of indirect routes, and for the dst itself (ire_addr) in the
- * case of direct routes, with the nce_res_mp containing a template
- * DL_UNITDATA request.
- *
- * The actual association of the ire_nce to the nce created here is
- * typically done in ire_add_v4 for IRE_CACHE entries. Exceptions
- * to this rule are SO_DONTROUTE ire's (IRE_MARK_NO_ADD), for which
- * the ire_nce assignment is done in ire_add_then_send.
+ * The nce returned will be created such that the nce_ill == ill that
+ * is passed in. Note that the nce itself may not have ncec_ill == ill
+ * where IPMP links are involved.
  */
-int
-ire_nce_init(ire_t *ire, nce_t *src_nce)
+static nce_t *
+ire_nce_init(ill_t *ill, const void *addr, int ire_type)
 {
-	in_addr_t	addr4;
 	int		err;
 	nce_t		*nce = NULL;
-	ill_t		*ire_ill;
-	uint16_t	nce_flags = 0;
-	ip_stack_t	*ipst;
+	uint16_t	ncec_flags;
+	uchar_t		*hwaddr;
+	boolean_t	need_refrele = B_FALSE;
+	ill_t		*in_ill = ill;
+	boolean_t	is_unicast;
+	uint_t		hwaddr_len;
 
-	if (ire->ire_stq == NULL)
-		return (0); /* no need to create nce for local/loopback */
+	is_unicast = ((ire_type & (IRE_MULTICAST|IRE_BROADCAST)) == 0);
+	if (IS_IPMP(ill) ||
+	    ((ire_type & IRE_BROADCAST) && IS_UNDER_IPMP(ill))) {
+		if ((ill = ipmp_ill_get_xmit_ill(ill, is_unicast)) == NULL)
+			return (NULL);
+		need_refrele = B_TRUE;
+	}
+	ncec_flags = (ill->ill_flags & ILLF_NONUD) ? NCE_F_NONUD : 0;
 
-	switch (ire->ire_type) {
-	case IRE_CACHE:
-		if (ire->ire_gateway_addr != INADDR_ANY)
-			addr4 = ire->ire_gateway_addr; /* 'G' route */
-		else
-			addr4 = ire->ire_addr; /* direct route */
-		break;
+	switch (ire_type) {
 	case IRE_BROADCAST:
-		addr4 = ire->ire_addr;
-		nce_flags |= (NCE_F_PERMANENT|NCE_F_BCAST);
+		ASSERT(!ill->ill_isv6);
+		ncec_flags |= (NCE_F_BCAST|NCE_F_NONUD);
 		break;
-	default:
-		return (0);
+	case IRE_MULTICAST:
+		ncec_flags |= (NCE_F_MCAST|NCE_F_NONUD);
+		break;
 	}
 
-	/*
-	 * ire_ipif is picked based on RTF_SETSRC, usesrc etc.
-	 * rules in ire_forward_src_ipif. We want the dlureq_mp
-	 * for the outgoing interface, which we get from the ire_stq.
-	 */
-	ire_ill = ire_to_ill(ire);
-	ipst = ire_ill->ill_ipst;
-
-	/*
-	 * IRE_IF_NORESOLVER entries never need re-verification and
-	 * do not expire, so we mark them as NCE_F_PERMANENT.
-	 */
-	if (ire_ill->ill_net_type == IRE_IF_NORESOLVER)
-		nce_flags |= NCE_F_PERMANENT;
-
-retry_nce:
-	err = ndp_lookup_then_add_v4(ire_ill, &addr4, nce_flags,
-	    &nce, src_nce);
-
-	if (err == EEXIST && NCE_EXPIRED(nce, ipst)) {
-		/*
-		 * We looked up an expired nce.
-		 * Go back and try to create one again.
-		 */
-		ndp_delete(nce);
-		NCE_REFRELE(nce);
-		nce = NULL;
-		goto retry_nce;
+	if (ill->ill_net_type == IRE_IF_NORESOLVER && is_unicast) {
+		hwaddr = ill->ill_dest_addr;
+	} else {
+		hwaddr = NULL;
 	}
+	hwaddr_len = ill->ill_phys_addr_length;
 
-	ip1dbg(("ire 0x%p addr 0x%lx type 0x%x; found nce 0x%p err %d\n",
-	    (void *)ire, (ulong_t)addr4, ire->ire_type, (void *)nce, err));
+retry:
+	/* nce_state will be computed by nce_add_common() */
+	if (!ill->ill_isv6) {
+		err = nce_lookup_then_add_v4(ill, hwaddr, hwaddr_len, addr,
+		    ncec_flags, ND_UNCHANGED, &nce);
+	} else {
+		err = nce_lookup_then_add_v6(ill, hwaddr, hwaddr_len, addr,
+		    ncec_flags, ND_UNCHANGED, &nce);
+	}
 
 	switch (err) {
 	case 0:
+		break;
 	case EEXIST:
 		/*
-		 * return a pointer to a newly created or existing nce_t;
-		 * note that the ire-nce mapping is many-one, i.e.,
-		 * multiple ire's could point to the same nce_t.
+		 * When subnets change or partially overlap what was once
+		 * a broadcast address could now be a unicast, or vice versa.
 		 */
+		if (((ncec_flags ^ nce->nce_common->ncec_flags) &
+		    NCE_F_BCAST) != 0) {
+			ASSERT(!ill->ill_isv6);
+			ncec_delete(nce->nce_common);
+			nce_refrele(nce);
+			goto retry;
+		}
 		break;
 	default:
-		DTRACE_PROBE2(nce__init__fail, ill_t *, ire_ill, int, err);
-		return (EINVAL);
+		DTRACE_PROBE2(nce__init__fail, ill_t *, ill, int, err);
+		if (need_refrele)
+			ill_refrele(ill);
+		return (NULL);
 	}
 	/*
-	 * IRE_BROADCAST ire's must be linked to NCE_F_BCAST nce's and
-	 * vice-versa (IRE_CACHE <-> unicast nce entries). We may have found an
-	 * existing unicast (or bcast) nce when trying to add a BROADCAST (or
-	 * unicast) ire, e.g., when address/netmask modifications were in
-	 * progress, and the ipif_ndp_down() call to quiesce existing state
-	 * during the addr/mask modification may have skipped the ndp_delete()
-	 * because the ipif being affected was not the last one on the ill.  We
-	 * recover from the missed ndp_delete() now, by deleting the old nce and
-	 * adding a new one with the correct NCE_F_BCAST state.
+	 * If the ill was an under-ill of an IPMP group, we need to verify
+	 * that it is still active so that we select an active interface in
+	 * the group. However, since ipmp_ill_is_active ASSERTs for
+	 * IS_UNDER_IPMP(), we first need to verify that the ill is an
+	 * under-ill, and since this is being done in the data path, the
+	 * only way to ascertain this is by holding the ill_g_lock.
 	 */
-	if (ire->ire_type == IRE_BROADCAST) {
-		if ((nce->nce_flags & NCE_F_BCAST) == 0) {
-			/* IRE_BROADCAST needs NCE_F_BCAST */
-			ndp_delete(nce);
-			NCE_REFRELE(nce);
-			goto retry_nce;
-		}
+	rw_enter(&ill->ill_ipst->ips_ill_g_lock, RW_READER);
+	mutex_enter(&ill->ill_lock);
+	mutex_enter(&ill->ill_phyint->phyint_lock);
+	if (need_refrele && IS_UNDER_IPMP(ill) && !ipmp_ill_is_active(ill)) {
 		/*
-		 * Two bcast ires are created for each interface;
-		 * 1. loopback copy (which does not  have an
-		 *    ire_stq, and therefore has no ire_nce), and,
-		 * 2. the non-loopback copy, which has the nce_res_mp
-		 *    initialized to a copy of the ill_bcast_mp, and
-		 *    is marked as ND_REACHABLE at this point.
-		 *    This nce does not undergo any further state changes,
-		 *    and exists as long as the interface is plumbed.
-		 * Note: the assignment of ire_nce here is a historical
-		 * artifact of old code that used to inline ire_add().
+		 * need_refrele implies that the under ill was selected by
+		 * ipmp_ill_get_xmit_ill() because either the in_ill was an
+		 * ipmp_ill, or we are sending a non-unicast packet on
+		 * an under_ill. However, when we get here, the ill selected by
+		 * ipmp_ill_get_xmit_ill  was pulled out of the active set
+		 * (for unicast)  or cast_ill nomination (for
+		 * !unicast) after it was  picked as the outgoing ill.
+		 * We have to pick an active interface and/or cast_ill in the
+		 * group.
 		 */
-		ire->ire_nce = nce;
-		/*
-		 * We are associating this nce to the ire,
-		 * so change the nce ref taken in
-		 * ndp_lookup_then_add_v4() from
-		 * NCE_REFHOLD to NCE_REFHOLD_NOTR
-		 */
-		NCE_REFHOLD_TO_REFHOLD_NOTR(ire->ire_nce);
+		mutex_exit(&ill->ill_phyint->phyint_lock);
+		nce_delete(nce);
+		mutex_exit(&ill->ill_lock);
+		rw_exit(&ill->ill_ipst->ips_ill_g_lock);
+		nce_refrele(nce);
+		ill_refrele(ill);
+		if ((ill = ipmp_ill_get_xmit_ill(in_ill, is_unicast)) == NULL)
+			return (NULL);
+		goto retry;
 	} else {
-		if ((nce->nce_flags & NCE_F_BCAST) != 0) {
-			/* IRE_CACHE needs unicast nce */
-			ndp_delete(nce);
-			NCE_REFRELE(nce);
-			goto retry_nce;
+		mutex_exit(&ill->ill_phyint->phyint_lock);
+		mutex_exit(&ill->ill_lock);
+		rw_exit(&ill->ill_ipst->ips_ill_g_lock);
+	}
+done:
+	ASSERT(nce->nce_ill == ill);
+	if (need_refrele)
+		ill_refrele(ill);
+	return (nce);
+}
+
+nce_t *
+arp_nce_init(ill_t *ill, in_addr_t addr4, int ire_type)
+{
+	return (ire_nce_init(ill, &addr4, ire_type));
+}
+
+nce_t *
+ndp_nce_init(ill_t *ill, const in6_addr_t *addr6, int ire_type)
+{
+	ASSERT((ire_type & IRE_BROADCAST) == 0);
+	return (ire_nce_init(ill, addr6, ire_type));
+}
+
+/*
+ * The caller should hold irb_lock as a writer if the ire is in a bucket.
+ */
+void
+ire_make_condemned(ire_t *ire)
+{
+	ip_stack_t	*ipst = ire->ire_ipst;
+
+	mutex_enter(&ire->ire_lock);
+	ASSERT(ire->ire_bucket == NULL ||
+	    RW_WRITE_HELD(&ire->ire_bucket->irb_lock));
+	ASSERT(!IRE_IS_CONDEMNED(ire));
+	ire->ire_generation = IRE_GENERATION_CONDEMNED;
+	/* Count how many condemned ires for kmem_cache callback */
+	atomic_add_32(&ipst->ips_num_ire_condemned, 1);
+	mutex_exit(&ire->ire_lock);
+}
+
+/*
+ * Increment the generation avoiding the special condemned value
+ */
+void
+ire_increment_generation(ire_t *ire)
+{
+	uint_t generation;
+
+	mutex_enter(&ire->ire_lock);
+	/*
+	 * Even though the caller has a hold it can't prevent a concurrent
+	 * ire_delete marking the IRE condemned
+	 */
+	if (!IRE_IS_CONDEMNED(ire)) {
+		generation = ire->ire_generation + 1;
+		if (generation == IRE_GENERATION_CONDEMNED)
+			generation = IRE_GENERATION_INITIAL;
+		ASSERT(generation != IRE_GENERATION_VERIFY);
+		ire->ire_generation = generation;
+	}
+	mutex_exit(&ire->ire_lock);
+}
+
+/*
+ * Increment ire_generation on all the IRE_MULTICASTs
+ * Used when the default multicast interface (as determined by
+ * ill_lookup_multicast) might have changed.
+ *
+ * That includes the zoneid, IFF_ flags, the IPv6 scope of the address, and
+ * ill unplumb.
+ */
+void
+ire_increment_multicast_generation(ip_stack_t *ipst, boolean_t isv6)
+{
+	ill_t	*ill;
+	ill_walk_context_t ctx;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	if (isv6)
+		ill = ILL_START_WALK_V6(&ctx, ipst);
+	else
+		ill = ILL_START_WALK_V4(&ctx, ipst);
+	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
+		if (ILL_IS_CONDEMNED(ill))
+			continue;
+		if (ill->ill_ire_multicast != NULL)
+			ire_increment_generation(ill->ill_ire_multicast);
+	}
+	rw_exit(&ipst->ips_ill_g_lock);
+}
+
+/*
+ * Return a held IRE_NOROUTE with RTF_REJECT set
+ */
+ire_t *
+ire_reject(ip_stack_t *ipst, boolean_t isv6)
+{
+	ire_t *ire;
+
+	if (isv6)
+		ire = ipst->ips_ire_reject_v6;
+	else
+		ire = ipst->ips_ire_reject_v4;
+
+	ASSERT(ire->ire_generation != IRE_GENERATION_CONDEMNED);
+	ire_refhold(ire);
+	return (ire);
+}
+
+/*
+ * Return a held IRE_NOROUTE with RTF_BLACKHOLE set
+ */
+ire_t *
+ire_blackhole(ip_stack_t *ipst, boolean_t isv6)
+{
+	ire_t *ire;
+
+	if (isv6)
+		ire = ipst->ips_ire_blackhole_v6;
+	else
+		ire = ipst->ips_ire_blackhole_v4;
+
+	ASSERT(ire->ire_generation != IRE_GENERATION_CONDEMNED);
+	ire_refhold(ire);
+	return (ire);
+}
+
+/*
+ * Return a held IRE_MULTICAST.
+ */
+ire_t *
+ire_multicast(ill_t *ill)
+{
+	ire_t *ire = ill->ill_ire_multicast;
+
+	ASSERT(ire == NULL || ire->ire_generation != IRE_GENERATION_CONDEMNED);
+	if (ire == NULL)
+		ire = ire_blackhole(ill->ill_ipst, ill->ill_isv6);
+	else
+		ire_refhold(ire);
+	return (ire);
+}
+
+/*
+ * Given an IRE return its nexthop IRE. The nexthop IRE is an IRE_ONLINK
+ * that is an exact match (i.e., a /32 for IPv4 and /128 for IPv6).
+ * This can return an RTF_REJECT|RTF_BLACKHOLE.
+ * The returned IRE is held.
+ * The assumption is that ip_select_route() has been called and returned the
+ * IRE (thus ip_select_route would have set up the ire_dep* information.)
+ * If some IRE is deleteted then ire_dep_remove() will have been called and
+ * we might not find a nexthop IRE, in which case we return NULL.
+ */
+ire_t *
+ire_nexthop(ire_t *ire)
+{
+	ip_stack_t	*ipst = ire->ire_ipst;
+
+	/* Acquire lock to walk ire_dep_parent */
+	rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
+	while (ire != NULL) {
+		if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+			goto done;
 		}
 		/*
-		 * We are not using this nce_t just yet so release
-		 * the ref taken in ndp_lookup_then_add_v4()
+		 * If we find an IRE_ONLINK we are done. This includes
+		 * the case of IRE_MULTICAST.
+		 * Note that in order to send packets we need a host-specific
+		 * IRE_IF_ALL first in the ire_dep_parent chain. Normally this
+		 * is done by inserting an IRE_IF_CLONE if the IRE_INTERFACE
+		 * was not host specific.
+		 * However, ip_rts_request doesn't want to send packets
+		 * hence doesn't want to allocate an IRE_IF_CLONE. Yet
+		 * it needs an IRE_IF_ALL to get to the ill. Thus
+		 * we return IRE_IF_ALL that are not host specific here.
 		 */
-		NCE_REFRELE(nce);
+		if (ire->ire_type & IRE_ONLINK)
+			goto done;
+		ire = ire->ire_dep_parent;
 	}
+	rw_exit(&ipst->ips_ire_dep_lock);
+	return (NULL);
+
+done:
+	ire_refhold(ire);
+	rw_exit(&ipst->ips_ire_dep_lock);
+	return (ire);
+}
+
+/*
+ * Find the ill used to send packets. This will be NULL in case
+ * of a reject or blackhole.
+ * The returned ill is held; caller needs to do ill_refrele when done.
+ */
+ill_t *
+ire_nexthop_ill(ire_t *ire)
+{
+	ill_t		*ill;
+
+	ire = ire_nexthop(ire);
+	if (ire == NULL)
+		return (NULL);
+
+	/* ire_ill can not change for an existing ire */
+	ill = ire->ire_ill;
+	if (ill != NULL)
+		ill_refhold(ill);
+	ire_refrele(ire);
+	return (ill);
+}
+
+#ifdef DEBUG
+static boolean_t
+parent_has_child(ire_t *parent, ire_t *child)
+{
+	ire_t	*ire;
+	ire_t	*prev;
+
+	ire = parent->ire_dep_children;
+	prev = NULL;
+	while (ire != NULL) {
+		if (prev == NULL) {
+			ASSERT(ire->ire_dep_sib_ptpn ==
+			    &(parent->ire_dep_children));
+		} else {
+			ASSERT(ire->ire_dep_sib_ptpn ==
+			    &(prev->ire_dep_sib_next));
+		}
+		if (ire == child)
+			return (B_TRUE);
+		prev = ire;
+		ire = ire->ire_dep_sib_next;
+	}
+	return (B_FALSE);
+}
+
+static void
+ire_dep_verify(ire_t *ire)
+{
+	ire_t		*parent = ire->ire_dep_parent;
+	ire_t		*child = ire->ire_dep_children;
+
+	ASSERT(ire->ire_ipversion == IPV4_VERSION ||
+	    ire->ire_ipversion == IPV6_VERSION);
+	if (parent != NULL) {
+		ASSERT(parent->ire_ipversion == IPV4_VERSION ||
+		    parent->ire_ipversion == IPV6_VERSION);
+		ASSERT(parent->ire_refcnt >= 1);
+		ASSERT(parent_has_child(parent, ire));
+	}
+	if (child != NULL) {
+		ASSERT(child->ire_ipversion == IPV4_VERSION ||
+		    child->ire_ipversion == IPV6_VERSION);
+		ASSERT(child->ire_dep_parent == ire);
+		ASSERT(child->ire_dep_sib_ptpn != NULL);
+		ASSERT(parent_has_child(ire, child));
+	}
+}
+#endif /* DEBUG */
+
+/*
+ * Assumes ire_dep_parent is set. Remove this child from its parent's linkage.
+ */
+void
+ire_dep_remove(ire_t *ire)
+{
+	ip_stack_t	*ipst = ire->ire_ipst;
+	ire_t		*parent = ire->ire_dep_parent;
+	ire_t		*next;
+	nce_t		*nce;
+
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ire_dep_lock));
+	ASSERT(ire->ire_dep_parent != NULL);
+	ASSERT(ire->ire_dep_sib_ptpn != NULL);
+
+#ifdef DEBUG
+	ire_dep_verify(ire);
+	ire_dep_verify(parent);
+#endif
+
+	next = ire->ire_dep_sib_next;
+	if (next != NULL)
+		next->ire_dep_sib_ptpn = ire->ire_dep_sib_ptpn;
+
+	ASSERT(*(ire->ire_dep_sib_ptpn) == ire);
+	*(ire->ire_dep_sib_ptpn) = ire->ire_dep_sib_next;
+
+	ire->ire_dep_sib_ptpn = NULL;
+	ire->ire_dep_sib_next = NULL;
+
+	mutex_enter(&ire->ire_lock);
+	parent = ire->ire_dep_parent;
+	ire->ire_dep_parent = NULL;
+	mutex_exit(&ire->ire_lock);
+
+	/*
+	 * Make sure all our children, grandchildren, etc set
+	 * ire_dep_parent_generation to IRE_GENERATION_VERIFY since
+	 * we can no longer guarantee than the children have a current
+	 * ire_nce_cache and ire_nexthop_ill().
+	 */
+	if (ire->ire_dep_children != NULL)
+		ire_dep_invalidate_children(ire->ire_dep_children);
+
+	/*
+	 * Since the parent is gone we make sure we clear ire_nce_cache.
+	 * We can clear it under ire_lock even if the IRE is used
+	 */
+	mutex_enter(&ire->ire_lock);
+	nce = ire->ire_nce_cache;
+	ire->ire_nce_cache = NULL;
+	mutex_exit(&ire->ire_lock);
+	if (nce != NULL)
+		nce_refrele(nce);
+
+#ifdef DEBUG
+	ire_dep_verify(ire);
+	ire_dep_verify(parent);
+#endif
+
+	ire_refrele_notr(parent);
+	ire_refrele_notr(ire);
+}
+
+/*
+ * Insert the child in the linkage of the parent
+ */
+static void
+ire_dep_parent_insert(ire_t *child, ire_t *parent)
+{
+	ip_stack_t	*ipst = child->ire_ipst;
+	ire_t		*next;
+
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ire_dep_lock));
+	ASSERT(child->ire_dep_parent == NULL);
+
+#ifdef DEBUG
+	ire_dep_verify(child);
+	ire_dep_verify(parent);
+#endif
+	/* No parents => no siblings */
+	ASSERT(child->ire_dep_sib_ptpn == NULL);
+	ASSERT(child->ire_dep_sib_next == NULL);
+
+	ire_refhold_notr(parent);
+	ire_refhold_notr(child);
+
+	/* Head insertion */
+	next = parent->ire_dep_children;
+	if (next != NULL) {
+		ASSERT(next->ire_dep_sib_ptpn == &(parent->ire_dep_children));
+		child->ire_dep_sib_next = next;
+		next->ire_dep_sib_ptpn = &(child->ire_dep_sib_next);
+	}
+	parent->ire_dep_children = child;
+	child->ire_dep_sib_ptpn = &(parent->ire_dep_children);
+
+	mutex_enter(&child->ire_lock);
+	child->ire_dep_parent = parent;
+	mutex_exit(&child->ire_lock);
+
+#ifdef DEBUG
+	ire_dep_verify(child);
+	ire_dep_verify(parent);
+#endif
+}
+
+
+/*
+ * Given count worth of ires and generations, build ire_dep_* relationships
+ * from ires[0] to ires[count-1]. Record generations[i+1] in
+ * ire_dep_parent_generation for ires[i].
+ * We graft onto an existing parent chain by making sure that we don't
+ * touch ire_dep_parent for ires[count-1].
+ *
+ * We check for any condemned ire_generation count and return B_FALSE in
+ * that case so that the caller can tear it apart.
+ *
+ * Note that generations[0] is not used. Caller handles that.
+ */
+boolean_t
+ire_dep_build(ire_t *ires[], uint_t generations[], uint_t count)
+{
+	ire_t		*ire = ires[0];
+	ip_stack_t	*ipst;
+	uint_t		i;
+
+	ASSERT(count > 0);
+	if (count == 1) {
+		/* No work to do */
+		return (B_TRUE);
+	}
+	ipst = ire->ire_ipst;
+	rw_enter(&ipst->ips_ire_dep_lock, RW_WRITER);
+	/*
+	 * Do not remove the linkage for any existing parent chain i.e.,
+	 * ires[count-1] is left alone.
+	 */
+	for (i = 0; i < count-1; i++) {
+		/* Remove existing parent if we need to change it */
+		if (ires[i]->ire_dep_parent != NULL &&
+		    ires[i]->ire_dep_parent != ires[i+1])
+			ire_dep_remove(ires[i]);
+	}
+
+	for (i = 0; i < count - 1; i++) {
+		ASSERT(ires[i]->ire_ipversion == IPV4_VERSION ||
+		    ires[i]->ire_ipversion == IPV6_VERSION);
+		/* Does it need to change? */
+		if (ires[i]->ire_dep_parent != ires[i+1])
+			ire_dep_parent_insert(ires[i], ires[i+1]);
+
+		mutex_enter(&ires[i+1]->ire_lock);
+		if (IRE_IS_CONDEMNED(ires[i+1])) {
+			mutex_exit(&ires[i+1]->ire_lock);
+			rw_exit(&ipst->ips_ire_dep_lock);
+			return (B_FALSE);
+		}
+		mutex_exit(&ires[i+1]->ire_lock);
+
+		mutex_enter(&ires[i]->ire_lock);
+		ires[i]->ire_dep_parent_generation = generations[i+1];
+		mutex_exit(&ires[i]->ire_lock);
+	}
+	rw_exit(&ipst->ips_ire_dep_lock);
+	return (B_TRUE);
+}
+
+/*
+ * Given count worth of ires, unbuild ire_dep_* relationships
+ * from ires[0] to ires[count-1].
+ */
+void
+ire_dep_unbuild(ire_t *ires[], uint_t count)
+{
+	ip_stack_t	*ipst;
+	uint_t		i;
+
+	if (count == 0) {
+		/* No work to do */
+		return;
+	}
+	ipst = ires[0]->ire_ipst;
+	rw_enter(&ipst->ips_ire_dep_lock, RW_WRITER);
+	for (i = 0; i < count; i++) {
+		ASSERT(ires[i]->ire_ipversion == IPV4_VERSION ||
+		    ires[i]->ire_ipversion == IPV6_VERSION);
+		if (ires[i]->ire_dep_parent != NULL)
+			ire_dep_remove(ires[i]);
+		mutex_enter(&ires[i]->ire_lock);
+		ires[i]->ire_dep_parent_generation = IRE_GENERATION_VERIFY;
+		mutex_exit(&ires[i]->ire_lock);
+	}
+	rw_exit(&ipst->ips_ire_dep_lock);
+}
+
+/*
+ * Both the forwarding and the outbound code paths can trip on
+ * a condemned NCE, in which case we call this function.
+ * We have two different behaviors: if the NCE was UNREACHABLE
+ * it is an indication that something failed. In that case
+ * we see if we should look for a different IRE (for example,
+ * delete any matching redirect IRE, or try a different
+ * IRE_DEFAULT (ECMP)). We mark the ire as bad so a hopefully
+ * different IRE will be picked next time we send/forward.
+ *
+ * If we are called by the output path then fail_if_better is set
+ * and we return NULL if there could be a better IRE. This is because the
+ * output path retries the IRE lookup. (The input/forward path can not retry.)
+ *
+ * If the NCE was not unreachable then we pick/allocate a
+ * new (most likely ND_INITIAL) NCE and proceed with it.
+ *
+ * ipha/ip6h are needed for multicast packets; ipha needs to be
+ * set for IPv4 and ip6h needs to be set for IPv6 packets.
+ */
+nce_t *
+ire_handle_condemned_nce(nce_t *nce, ire_t *ire, ipha_t *ipha, ip6_t *ip6h,
+    boolean_t fail_if_better)
+{
+	if (nce->nce_common->ncec_state == ND_UNREACHABLE) {
+		if (ire_no_good(ire) && fail_if_better) {
+			/*
+			 * Did some changes, or ECMP likely to exist.
+			 * Make ip_output look for a different IRE
+			 */
+			return (NULL);
+		}
+	}
+	if (ire_revalidate_nce(ire) == ENETUNREACH) {
+		/* The ire_dep_parent chain went bad, or no memory? */
+		(void) ire_no_good(ire);
+		return (NULL);
+	}
+	if (ire->ire_ipversion == IPV4_VERSION) {
+		ASSERT(ipha != NULL);
+		nce = ire_to_nce(ire, ipha->ipha_dst, NULL);
+	} else {
+		ASSERT(ip6h != NULL);
+		nce = ire_to_nce(ire, INADDR_ANY, &ip6h->ip6_dst);
+	}
+
+	if (nce == NULL)
+		return (NULL);
+	if (nce->nce_is_condemned) {
+		nce_refrele(nce);
+		return (NULL);
+	}
+	return (nce);
+}
+
+/*
+ * The caller has found that the ire is bad, either due to a reference to an NCE
+ * in ND_UNREACHABLE state, or a MULTIRT route whose gateway can't be resolved.
+ * We update things so a subsequent attempt to send to the destination
+ * is likely to find different IRE, or that a new NCE would be created.
+ *
+ * Returns B_TRUE if it is likely that a subsequent ire_ftable_lookup would
+ * find a different route (either due to having deleted a redirect, or there
+ * being ECMP routes.)
+ *
+ * If we have a redirect (RTF_DYNAMIC) we delete it.
+ * Otherwise we increment ire_badcnt and increment the generation number so
+ * that a cached ixa_ire will redo the route selection. ire_badcnt is taken
+ * into account in the route selection when we have multiple choices (multiple
+ * default routes or ECMP in general).
+ * Any time ip_select_route find an ire with a condemned ire_nce_cache
+ * (e.g., if no equal cost route to the bad one) ip_select_route will make
+ * sure the NCE is revalidated to avoid getting stuck on a
+ * NCE_F_CONDMNED ncec that caused ire_no_good to be called.
+ */
+boolean_t
+ire_no_good(ire_t *ire)
+{
+	ip_stack_t	*ipst = ire->ire_ipst;
+	ire_t		*ire2;
+	nce_t		*nce;
+
+	if (ire->ire_flags & RTF_DYNAMIC) {
+		ire_delete(ire);
+		return (B_TRUE);
+	}
+	if (ire->ire_flags & RTF_INDIRECT) {
+		/* Check if next IRE is a redirect */
+		rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
+		if (ire->ire_dep_parent != NULL &&
+		    (ire->ire_dep_parent->ire_flags & RTF_DYNAMIC)) {
+			ire2 = ire->ire_dep_parent;
+			ire_refhold(ire2);
+		} else {
+			ire2 = NULL;
+		}
+		rw_exit(&ipst->ips_ire_dep_lock);
+		if (ire2 != NULL) {
+			ire_delete(ire2);
+			ire_refrele(ire2);
+			return (B_TRUE);
+		}
+	}
+	/*
+	 * No redirect involved. Increment badcnt so that if we have ECMP
+	 * routes we are likely to pick a different one for the next packet.
+	 *
+	 * If the NCE is unreachable and condemned we should drop the reference
+	 * to it so that a new NCE can be created.
+	 *
+	 * Finally we increment the generation number so that any ixa_ire
+	 * cache will be revalidated.
+	 */
+	mutex_enter(&ire->ire_lock);
+	ire->ire_badcnt++;
+	ire->ire_last_badcnt = TICK_TO_SEC(lbolt64);
+	nce = ire->ire_nce_cache;
+	if (nce != NULL && nce->nce_is_condemned &&
+	    nce->nce_common->ncec_state == ND_UNREACHABLE)
+		ire->ire_nce_cache = NULL;
+	else
+		nce = NULL;
+	mutex_exit(&ire->ire_lock);
+	if (nce != NULL)
+		nce_refrele(nce);
+
+	ire_increment_generation(ire);
+	ire_dep_incr_generation(ire);
+
+	return (ire->ire_bucket->irb_ire_cnt > 1);
+}
+
+/*
+ * Walk ire_dep_parent chain and validate that ire_dep_parent->ire_generation ==
+ * ire_dep_parent_generation.
+ * If they all match we just return ire_generation from the topmost IRE.
+ * Otherwise we propagate the mismatch by setting all ire_dep_parent_generation
+ * above the mismatch to IRE_GENERATION_VERIFY and also returning
+ * IRE_GENERATION_VERIFY.
+ */
+uint_t
+ire_dep_validate_generations(ire_t *ire)
+{
+	ip_stack_t	*ipst = ire->ire_ipst;
+	uint_t		generation;
+	ire_t		*ire1;
+
+	rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
+	generation = ire->ire_generation;	/* Assuming things match */
+	for (ire1 = ire; ire1 != NULL; ire1 = ire1->ire_dep_parent) {
+		ASSERT(ire1->ire_ipversion == IPV4_VERSION ||
+		    ire1->ire_ipversion == IPV6_VERSION);
+		if (ire1->ire_dep_parent == NULL)
+			break;
+		if (ire1->ire_dep_parent_generation !=
+		    ire1->ire_dep_parent->ire_generation)
+			goto mismatch;
+	}
+	rw_exit(&ipst->ips_ire_dep_lock);
+	return (generation);
+
+mismatch:
+	generation = IRE_GENERATION_VERIFY;
+	/* Fill from top down to the mismatch with _VERIFY */
+	while (ire != ire1) {
+		ASSERT(ire->ire_ipversion == IPV4_VERSION ||
+		    ire->ire_ipversion == IPV6_VERSION);
+		mutex_enter(&ire->ire_lock);
+		ire->ire_dep_parent_generation = IRE_GENERATION_VERIFY;
+		mutex_exit(&ire->ire_lock);
+		ire = ire->ire_dep_parent;
+	}
+	rw_exit(&ipst->ips_ire_dep_lock);
+	return (generation);
+}
+
+/*
+ * Used when we need to return an ire with ire_dep_parent, but we
+ * know the chain is invalid for instance we didn't create an IRE_IF_CLONE
+ * Using IRE_GENERATION_VERIFY means that next time we'll redo the
+ * recursive lookup.
+ */
+void
+ire_dep_invalidate_generations(ire_t *ire)
+{
+	ip_stack_t	*ipst = ire->ire_ipst;
+
+	rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
+	while (ire != NULL) {
+		ASSERT(ire->ire_ipversion == IPV4_VERSION ||
+		    ire->ire_ipversion == IPV6_VERSION);
+		mutex_enter(&ire->ire_lock);
+		ire->ire_dep_parent_generation = IRE_GENERATION_VERIFY;
+		mutex_exit(&ire->ire_lock);
+		ire = ire->ire_dep_parent;
+	}
+	rw_exit(&ipst->ips_ire_dep_lock);
+}
+
+/* Set _VERIFY ire_dep_parent_generation for all children recursively */
+static void
+ire_dep_invalidate_children(ire_t *child)
+{
+	ip_stack_t	*ipst = child->ire_ipst;
+
+	ASSERT(RW_WRITE_HELD(&ipst->ips_ire_dep_lock));
+	/* Depth first */
+	if (child->ire_dep_children != NULL)
+		ire_dep_invalidate_children(child->ire_dep_children);
+
+	while (child != NULL) {
+		mutex_enter(&child->ire_lock);
+		child->ire_dep_parent_generation = IRE_GENERATION_VERIFY;
+		mutex_exit(&child->ire_lock);
+		child = child->ire_dep_sib_next;
+	}
+}
+
+static void
+ire_dep_increment_children(ire_t *child)
+{
+	ip_stack_t	*ipst = child->ire_ipst;
+
+	ASSERT(RW_READ_HELD(&ipst->ips_ire_dep_lock));
+	/* Depth first */
+	if (child->ire_dep_children != NULL)
+		ire_dep_increment_children(child->ire_dep_children);
+
+	while (child != NULL) {
+		if (!IRE_IS_CONDEMNED(child))
+			ire_increment_generation(child);
+		child = child->ire_dep_sib_next;
+	}
+}
+
+/*
+ * Walk all the children of this ire recursively and increment their
+ * generation number.
+ */
+void
+ire_dep_incr_generation(ire_t *parent)
+{
+	ip_stack_t	*ipst = parent->ire_ipst;
+
+	rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
+	if (parent->ire_dep_children != NULL)
+		ire_dep_increment_children(parent->ire_dep_children);
+	rw_exit(&ipst->ips_ire_dep_lock);
+}
+
+/*
+ * Get a new ire_nce_cache for this IRE as well as its nexthop.
+ * Returns zero if it succeeds. Can fail due to lack of memory or when
+ * the route has become unreachable. Returns ENOMEM and ENETUNREACH in those
+ * cases.
+ *
+ * In the in.mpathd case, the ire will have ire_testhidden
+ * set; so we should create the ncec for the underlying ill.
+ *
+ * Note that the error returned by ire_revalidate_nce() is ignored by most
+ * callers except ire_handle_condemned_nce(), which handles the ENETUNREACH
+ * error to mark potentially bad ire's. For all the other callers, an
+ * error return could indicate a transient condition like ENOMEM, or could
+ * be the result of an interface that is going down/unplumbing. In the former
+ * case (transient error), we would leave the old stale ire/ire_nce_cache
+ * in place, and possibly use incorrect link-layer information to send packets
+ * but would eventually recover. In the latter case (ill down/replumb),
+ * ire_revalidate_nce() might return a condemned nce back, but we would then
+ * recover in the packet output path.
+ */
+int
+ire_revalidate_nce(ire_t *ire)
+{
+	nce_t		*nce, *old_nce;
+	ire_t		*nexthop;
+
+	/*
+	 * For multicast we conceptually have an NCE but we don't store it
+	 * in ire_nce_cache; when ire_to_nce is called we allocate the nce.
+	 */
+	if (ire->ire_type & IRE_MULTICAST)
+		return (0);
+
+	/* ire_testhidden should only be set on under-interfaces */
+	ASSERT(!ire->ire_testhidden || !IS_IPMP(ire->ire_ill));
+
+	nexthop = ire_nexthop(ire);
+	if (nexthop == NULL) {
+		/* The route is potentially bad */
+		(void) ire_no_good(ire);
+		return (ENETUNREACH);
+	}
+	if (ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK)) {
+		ASSERT(ire->ire_ill != NULL);
+
+		if (ire->ire_ipversion == IPV4_VERSION)
+			nce = nce_lookup_v4(ire->ire_ill, &ire->ire_addr);
+		else
+			nce = nce_lookup_v6(ire->ire_ill, &ire->ire_addr_v6);
+	} else {
+		ASSERT(nexthop->ire_type & IRE_ONLINK);
+		if (ire->ire_ipversion == IPV4_VERSION) {
+			nce = arp_nce_init(nexthop->ire_ill, nexthop->ire_addr,
+			    nexthop->ire_type);
+		} else {
+			nce = ndp_nce_init(nexthop->ire_ill,
+			    &nexthop->ire_addr_v6, nexthop->ire_type);
+		}
+	}
+	if (nce == NULL) {
+		/*
+		 * Leave the old stale one in place to avoid a NULL
+		 * ire_nce_cache.
+		 */
+		ire_refrele(nexthop);
+		return (ENOMEM);
+	}
+
+	if (nexthop != ire) {
+		/* Update the nexthop ire */
+		mutex_enter(&nexthop->ire_lock);
+		old_nce = nexthop->ire_nce_cache;
+		if (!IRE_IS_CONDEMNED(nexthop)) {
+			nce_refhold(nce);
+			nexthop->ire_nce_cache = nce;
+		} else {
+			nexthop->ire_nce_cache = NULL;
+		}
+		mutex_exit(&nexthop->ire_lock);
+		if (old_nce != NULL)
+			nce_refrele(old_nce);
+	}
+	ire_refrele(nexthop);
+
+	mutex_enter(&ire->ire_lock);
+	old_nce = ire->ire_nce_cache;
+	if (!IRE_IS_CONDEMNED(ire)) {
+		nce_refhold(nce);
+		ire->ire_nce_cache = nce;
+	} else {
+		ire->ire_nce_cache = NULL;
+	}
+	mutex_exit(&ire->ire_lock);
+	if (old_nce != NULL)
+		nce_refrele(old_nce);
+
+	nce_refrele(nce);
 	return (0);
 }
 
 /*
- * This is the implementation of the IPv4 IRE cache lookup procedure.
- * Separating the interface from the implementation allows additional
- * flexibility when specifying search criteria.
+ * Get a held nce for a given ire.
+ * In the common case this is just from ire_nce_cache.
+ * For IRE_MULTICAST this needs to do an explicit lookup since we do not
+ * have an IRE_MULTICAST per address.
+ * Note that this explicitly returns CONDEMNED NCEs. The caller needs those
+ * so they can check whether the NCE went unreachable (as opposed to was
+ * condemned for some other reason).
  */
-static ire_t *
-ip4_ctable_lookup_impl(ire_ctable_args_t *margs)
+nce_t *
+ire_to_nce(ire_t *ire, ipaddr_t v4nexthop, const in6_addr_t *v6nexthop)
 {
-	irb_t			*irb_ptr;
-	ire_t			*ire;
-	ip_stack_t		*ipst = margs->ict_ipst;
+	nce_t	*nce;
 
-	if ((margs->ict_flags & (MATCH_IRE_SRC | MATCH_IRE_ILL)) &&
-	    (margs->ict_ipif == NULL)) {
+	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))
 		return (NULL);
-	}
 
-	irb_ptr = &ipst->ips_ip_cache_table[IRE_ADDR_HASH(
-	    *((ipaddr_t *)margs->ict_addr), ipst->ips_ip_cache_table_size)];
-	rw_enter(&irb_ptr->irb_lock, RW_READER);
-	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
-		if (ire->ire_marks & IRE_MARK_CONDEMNED)
-			continue;
-		ASSERT(ire->ire_mask == IP_HOST_MASK);
-		if (ire_match_args(ire, *((ipaddr_t *)margs->ict_addr),
-		    ire->ire_mask, *((ipaddr_t *)margs->ict_gateway),
-		    margs->ict_type, margs->ict_ipif, margs->ict_zoneid, 0,
-		    margs->ict_tsl, margs->ict_flags, margs->ict_wq)) {
-			IRE_REFHOLD(ire);
-			rw_exit(&irb_ptr->irb_lock);
-			return (ire);
+	/* ire_testhidden should only be set on under-interfaces */
+	ASSERT(!ire->ire_testhidden || !IS_IPMP(ire->ire_ill));
+
+	mutex_enter(&ire->ire_lock);
+	nce = ire->ire_nce_cache;
+	if (nce != NULL) {
+		nce_refhold(nce);
+		mutex_exit(&ire->ire_lock);
+		return (nce);
+	}
+	mutex_exit(&ire->ire_lock);
+
+	if (ire->ire_type & IRE_MULTICAST) {
+		ASSERT(ire->ire_ill != NULL);
+
+		if (ire->ire_ipversion == IPV4_VERSION) {
+			ASSERT(v6nexthop == NULL);
+
+			nce = arp_nce_init(ire->ire_ill, v4nexthop,
+			    ire->ire_type);
+		} else {
+			ASSERT(v6nexthop != NULL);
+			ASSERT(v4nexthop == 0);
+			nce = ndp_nce_init(ire->ire_ill, v6nexthop,
+			    ire->ire_type);
 		}
+		return (nce);
 	}
-
-	rw_exit(&irb_ptr->irb_lock);
 	return (NULL);
 }
 
+nce_t *
+ire_to_nce_pkt(ire_t *ire, mblk_t *mp)
+{
+	ipha_t		*ipha;
+	ip6_t		*ip6h;
+
+	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
+		ipha = (ipha_t *)mp->b_rptr;
+		return (ire_to_nce(ire, ipha->ipha_dst, NULL));
+	} else {
+		ip6h = (ip6_t *)mp->b_rptr;
+		return (ire_to_nce(ire, INADDR_ANY, &ip6h->ip6_dst));
+	}
+}
+
 /*
- * This function locates IRE_CACHE entries which were added by the
- * ire_forward() path. We can fully specify the IRE we are looking for by
- * providing the ipif (MATCH_IRE_IPIF) *and* the stq (MATCH_IRE_WQ).
+ * Given an IRE_INTERFACE (that matches more than one address) create
+ * and return an IRE_IF_CLONE for the specific address.
+ * Return the generation number.
+ * Returns NULL is no memory for the IRE.
+ * Handles both IPv4 and IPv6.
  */
 ire_t *
-ire_arpresolve_lookup(ipaddr_t addr, ipaddr_t gw, ipif_t *ipif,
-    zoneid_t zoneid, ip_stack_t *ipst, queue_t *wq)
+ire_create_if_clone(ire_t *ire_if, const in6_addr_t *addr, uint_t *generationp)
 {
-	ire_ctable_args_t	margs;
+	ire_t		*ire;
+	ire_t		*nire;
 
-	margs.ict_addr = &addr;
-	margs.ict_gateway = &gw;
-	margs.ict_type = IRE_CACHE;
-	margs.ict_ipif = ipif;
-	margs.ict_zoneid = zoneid;
-	margs.ict_tsl = NULL;
-	margs.ict_flags = MATCH_IRE_GW | MATCH_IRE_IPIF | MATCH_IRE_ZONEONLY |
-	    MATCH_IRE_TYPE | MATCH_IRE_WQ;
-	margs.ict_ipst = ipst;
-	margs.ict_wq = wq;
+	if (ire_if->ire_ipversion == IPV4_VERSION) {
+		ipaddr_t	v4addr;
+		ipaddr_t	mask = IP_HOST_MASK;
 
-	return (ip4_ctable_lookup_impl(&margs));
+		ASSERT(IN6_IS_ADDR_V4MAPPED(addr));
+		IN6_V4MAPPED_TO_IPADDR(addr, v4addr);
+
+		ire = ire_create(
+		    (uchar_t *)&v4addr,			/* dest address */
+		    (uchar_t *)&mask,			/* mask */
+		    (uchar_t *)&ire_if->ire_gateway_addr,
+		    IRE_IF_CLONE,			/* IRE type */
+		    ire_if->ire_ill,
+		    ire_if->ire_zoneid,
+		    ire_if->ire_flags | RTF_HOST,
+		    NULL,		/* No security attr for IRE_IF_ALL */
+		    ire_if->ire_ipst);
+	} else {
+		ASSERT(!IN6_IS_ADDR_V4MAPPED(addr));
+		ire = ire_create_v6(
+		    addr,				/* dest address */
+		    &ipv6_all_ones,			/* mask */
+		    &ire_if->ire_gateway_addr_v6,	/* gateway addr */
+		    IRE_IF_CLONE,			/* IRE type */
+		    ire_if->ire_ill,
+		    ire_if->ire_zoneid,
+		    ire_if->ire_flags | RTF_HOST,
+		    NULL,		/* No security attr for IRE_IF_ALL */
+		    ire_if->ire_ipst);
+	}
+	if (ire == NULL)
+		return (NULL);
+
+	/* Take the metrics, in particular the mtu, from the IRE_IF */
+	ire->ire_metrics = ire_if->ire_metrics;
+
+	nire = ire_add(ire);
+	if (nire == NULL) /* Some failure */
+		return (NULL);
+
+	if (generationp != NULL)
+		*generationp = nire->ire_generation;
+
+	/*
+	 * Make sure races don't add a duplicate by
+	 * catching the case when an identical was returned.
+	 */
+	if (nire != ire) {
+		ASSERT(nire->ire_identical_ref > 1);
+		ire_delete(nire);
+	}
+	return (nire);
+}
+
+/*
+ * The argument is an IRE_INTERFACE. Delete all of IRE_IF_CLONE in the
+ * ire_dep_children (just walk the ire_dep_sib_next since they are all
+ * immediate children.)
+ * Since we hold a lock while we remove them we need to defer the actual
+ * calls to ire_delete() until we have dropped the lock. This makes things
+ * less efficient since we restart at the top after dropping the lock. But
+ * we only run when an IRE_INTERFACE is deleted which is infrquent.
+ *
+ * Note that ire_dep_children can be any mixture of offlink routes and
+ * IRE_IF_CLONE entries.
+ */
+void
+ire_dep_delete_if_clone(ire_t *parent)
+{
+	ip_stack_t	*ipst = parent->ire_ipst;
+	ire_t		*child, *next;
+
+restart:
+	rw_enter(&ipst->ips_ire_dep_lock, RW_READER);
+	if (parent->ire_dep_children == NULL) {
+		rw_exit(&ipst->ips_ire_dep_lock);
+		return;
+	}
+	child = parent->ire_dep_children;
+	while (child != NULL) {
+		next = child->ire_dep_sib_next;
+		if ((child->ire_type & IRE_IF_CLONE) &&
+		    !IRE_IS_CONDEMNED(child)) {
+			ire_refhold(child);
+			rw_exit(&ipst->ips_ire_dep_lock);
+			ire_delete(child);
+			ASSERT(IRE_IS_CONDEMNED(child));
+			ire_refrele(child);
+			goto restart;
+		}
+		child = next;
+	}
+	rw_exit(&ipst->ips_ire_dep_lock);
+}
+
+/*
+ * ire_pref() is used in recursive route-resolution for a destination to
+ * determine the preference of an ire, where "preference" is determined
+ * based on the level of indirection to the destination of the ire.
+ * A higher preference indicates that fewer lookups are needed to complete
+ * recursive route lookup. Thus
+ * ire_pref(RTF_INDIRECT) < ire_pref(IRE_IF_RESOLVER) < ire_pref(IRE_PREF_CLONE)
+ */
+int
+ire_pref(ire_t *ire)
+{
+	if (ire->ire_flags & RTF_INDIRECT)
+		return (1);
+	if (ire->ire_type & IRE_OFFLINK)
+		return (2);
+	if (ire->ire_type & (IRE_IF_RESOLVER|IRE_IF_NORESOLVER))
+		return (3);
+	if (ire->ire_type & IRE_IF_CLONE)
+		return (4);
+	if (ire->ire_type & (IRE_LOCAL|IRE_LOOPBACK|IRE_BROADCAST))
+		return (5);
+	return (-1); /* unknown ire_type */
 }

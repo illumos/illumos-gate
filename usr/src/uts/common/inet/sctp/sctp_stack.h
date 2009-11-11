@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_SCTP_SCTP_STACK_H
 #define	_INET_SCTP_SCTP_STACK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/netstack.h>
 #include <sys/taskq.h>
@@ -75,17 +73,6 @@ struct sctp_stack {
 	netstack_t	*sctps_netstack;	/* Common netstack */
 
 	mib2_sctp_t		sctps_mib;
-
-	/* Protected by sctps_g_q_lock */
-	queue_t		*sctps_g_q;
-	uint_t		sctps_g_q_ref; /* Number of sctp_t's that use it */
-	kmutex_t	sctps_g_q_lock;
-	kcondvar_t	sctps_g_q_cv;
-	kthread_t	*sctps_g_q_creator;
-	struct __ldi_handle *sctps_g_q_lh;
-	cred_t		*sctps_g_q_cr;    /* For _inactive close call */
-	/* The default sctp_t for responding out of the blue packets. */
-	struct sctp_s	*sctps_gsctp;
 
 	/* Protected by sctps_g_lock */
 	struct list	sctps_g_list;	/* SCTP instance data chain */

@@ -36,7 +36,6 @@ extern "C" {
 #include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/socket_proto.h>
-#include <sys/multidata.h>
 #include <sys/md5.h>
 #include <inet/common.h>
 #include <inet/ip.h>
@@ -46,12 +45,6 @@ extern "C" {
 #include <inet/tcp_stack.h>
 #include <inet/tcp_sack.h>
 #include <inet/kssl/ksslapi.h>
-
-/*
- * Private (and possibly temporary) ioctl used by configuration code
- * to lock in the "default" stream for detached closes.
- */
-#define	TCP_IOC_DEFAULT_Q	(('T' << 8) + 51)
 
 /* TCP states */
 #define	TCPS_CLOSED		-6
@@ -73,7 +66,7 @@ extern "C" {
 
 /*
  * Internal flags used in conjunction with the packet header flags.
- * Used in tcp_rput_data to keep track of what needs to be done.
+ * Used in tcp_input_data to keep track of what needs to be done.
  */
 #define	TH_LIMIT_XMIT		0x0400	/* Limited xmit is needed */
 #define	TH_XMIT_NEEDED		0x0800	/* Window opened - send queued data */
@@ -108,11 +101,12 @@ typedef	struct tcphdr_s {
 	uint8_t		th_urp[2];	/* Urgent pointer */
 } tcph_t;
 
-#define	TCP_HDR_LENGTH(tcph) (((tcph)->th_offset_and_rsrvd[0] >>2) &(0xF << 2))
+#define	TCP_HDR_LENGTH(tcph) \
+	((((tcph_t *)tcph)->th_offset_and_rsrvd[0] >>2) &(0xF << 2))
 #define	TCP_MAX_COMBINED_HEADER_LENGTH	(60 + 60) /* Maxed out ip + tcp */
 #define	TCP_MAX_IP_OPTIONS_LENGTH	(60 - IP_SIMPLE_HDR_LENGTH)
 #define	TCP_MAX_HDR_LENGTH		60
-#define	TCP_MAX_TCP_OPTIONS_LENGTH	(60 - sizeof (tcph_t))
+#define	TCP_MAX_TCP_OPTIONS_LENGTH	(60 - sizeof (tcpha_t))
 #define	TCP_MIN_HEADER_LENGTH		20
 #define	TCP_MAXWIN			65535
 #define	TCP_PORT_LEN			sizeof (in_port_t)
@@ -122,7 +116,7 @@ typedef	struct tcphdr_s {
 
 #define	TCPIP_HDR_LENGTH(mp, n)					\
 	(n) = IPH_HDR_LENGTH((mp)->b_rptr),			\
-	(n) += TCP_HDR_LENGTH((tcph_t *)&(mp)->b_rptr[(n)])
+	(n) += TCP_HDR_LENGTH((tcpha_t *)&(mp)->b_rptr[(n)])
 
 /* TCP Protocol header (used if the header is known to be 32-bit aligned) */
 typedef	struct tcphdra_s {
@@ -173,9 +167,6 @@ typedef struct tcp_s {
 	uint32_t tcp_rnxt;		/* Seq we expect to recv next */
 	uint32_t tcp_rwnd;
 
-	queue_t	*tcp_rq;		/* Our upstream neighbor (client) */
-	queue_t	*tcp_wq;		/* Our downstream neighbor */
-
 	/* Fields arranged in approximate access order along main paths */
 	mblk_t	*tcp_xmit_head;		/* Head of rexmit list */
 	mblk_t	*tcp_xmit_last;		/* last valid data seen by tcp_wput */
@@ -207,46 +198,16 @@ typedef struct tcp_s {
 	int64_t tcp_last_recv_time;	/* Last time we receive a segment. */
 	uint32_t tcp_init_cwnd;		/* Initial cwnd (start/restart) */
 
-	/*
-	 * Following socket options are set by sockfs outside the squeue
-	 * and we want to separate these bit fields from the other bit fields
-	 * set by TCP to avoid grabbing locks. sockfs ensures that only one
-	 * thread in sockfs can set a socket option at a time on a conn_t.
-	 * However TCP may read these options concurrently. The linger option
-	 * needs atomicity since tcp_lingertime also needs to be in sync.
-	 * However TCP uses it only during close, and by then no socket option
-	 * can come down. So we don't need any locks, instead just separating
-	 * the sockfs settable bit fields from the other bit fields is
-	 * sufficient.
-	 */
-	uint32_t
-		tcp_debug : 1,		/* SO_DEBUG "socket" option. */
-		tcp_dontroute : 1,	/* SO_DONTROUTE "socket" option. */
-		tcp_broadcast : 1,	/* SO_BROADCAST "socket" option. */
-		tcp_useloopback : 1,	/* SO_USELOOPBACK "socket" option. */
-
-		tcp_oobinline : 1,	/* SO_OOBINLINE "socket" option. */
-		tcp_dgram_errind : 1,	/* SO_DGRAM_ERRIND option */
-		tcp_linger : 1,		/* SO_LINGER turned on */
-		tcp_reuseaddr	: 1,	/* SO_REUSEADDR "socket" option. */
-
-		tcp_junk_to_bit_31 : 24;
-
 	/* Following manipulated by TCP under squeue protection */
 	uint32_t
 		tcp_urp_last_valid : 1,	/* Is tcp_urp_last valid? */
-		tcp_hard_binding : 1,	/* If we've started a full bind */
-		tcp_hard_bound : 1,	/* If we've done a full bind with IP */
+		tcp_hard_binding : 1,	/* TCP_DETACHED_NONEAGER */
 		tcp_fin_acked : 1,	/* Has our FIN been acked? */
-
 		tcp_fin_rcvd : 1,	/* Have we seen a FIN? */
+
 		tcp_fin_sent : 1,	/* Have we sent our FIN yet? */
 		tcp_ordrel_done : 1,	/* Have we sent the ord_rel upstream? */
 		tcp_detached : 1,	/* If we're detached from a stream */
-
-		tcp_bind_pending : 1,	/* Client is waiting for bind ack */
-		tcp_unbind_pending : 1, /* Client sent T_UNBIND_REQ */
-		tcp_ka_enabled: 1,	/* Connection KeepAlive Timer needed */
 		tcp_zero_win_probe: 1,	/* Zero win probing is in progress */
 
 		tcp_loopback: 1,	/* src and dst are the same machine */
@@ -258,44 +219,40 @@ typedef struct tcp_s {
 		tcp_active_open: 1,	/* This is a active open */
 		tcp_rexmit : 1,		/* TCP is retransmitting */
 		tcp_snd_sack_ok : 1,	/* Can use SACK for this connection */
-		tcp_empty_flag : 1,	/* Empty flag for future use */
-
-		tcp_recvdstaddr : 1,	/* return T_EXTCONN_IND with dst addr */
 		tcp_hwcksum : 1,	/* The NIC is capable of hwcksum */
-		tcp_ip_forward_progress : 1,
-		tcp_anon_priv_bind : 1,
 
+		tcp_ip_forward_progress : 1,
 		tcp_ecn_ok : 1,		/* Can use ECN for this connection */
 		tcp_ecn_echo_on : 1,	/* Need to do ECN echo */
 		tcp_ecn_cwr_sent : 1,	/* ECN_CWR has been sent */
+
 		tcp_cwr : 1,		/* Cwnd has reduced recently */
 
-		tcp_pad_to_bit31 : 4;
+		tcp_pad_to_bit31 : 11;
+
 	/* Following manipulated by TCP under squeue protection */
 	uint32_t
-		tcp_mdt : 1,		/* Lower layer is capable of MDT */
 		tcp_snd_ts_ok  : 1,
 		tcp_snd_ws_ok  : 1,
-		tcp_exclbind	: 1,	/* ``exclusive'' binding */
-
-		tcp_hdr_grown	: 1,
+		tcp_reserved_port : 1,
 		tcp_in_free_list : 1,
-		tcp_snd_zcopy_on : 1,	/* xmit zero-copy enabled */
 
+		tcp_snd_zcopy_on : 1,	/* xmit zero-copy enabled */
 		tcp_snd_zcopy_aware : 1, /* client is zero-copy aware */
 		tcp_xmit_zc_clean : 1,	/* the xmit list is free of zc-mblk */
 		tcp_wait_for_eagers : 1, /* Wait for eagers to disappear */
-		tcp_accept_error : 1,	/* Error during TLI accept */
 
+		tcp_accept_error : 1,	/* Error during TLI accept */
 		tcp_send_discon_ind : 1, /* TLI accept err, send discon ind */
 		tcp_cork : 1,		/* tcp_cork option */
 		tcp_tconnind_started : 1, /* conn_ind message is being sent */
-		tcp_lso :1,		/* Lower layer is capable of LSO */
-		tcp_refuse :1,		/* Connection needs refusing */
-		tcp_is_wnd_shrnk : 1, /* Window has shrunk */
-		tcp_pad_to_bit_31 : 15;
 
-	uint32_t	tcp_if_mtu;	/* Outgoing interface MTU. */
+		tcp_lso :1,		/* Lower layer is capable of LSO */
+		tcp_is_wnd_shrnk : 1, /* Window has shrunk */
+
+		tcp_pad_to_bit_31 : 18;
+
+	uint32_t	tcp_initial_pmtu; /* Initial outgoing Path MTU. */
 
 	mblk_t	*tcp_reass_head;	/* Out of order reassembly list head */
 	mblk_t	*tcp_reass_tail;	/* Out of order reassembly list tail */
@@ -340,11 +297,6 @@ typedef struct tcp_s {
 
 	struct tcp_s *tcp_listener;	/* Our listener */
 
-	size_t	tcp_xmit_hiwater;	/* Send buffer high water mark. */
-	size_t	tcp_xmit_lowater;	/* Send buffer low water mark. */
-	size_t	tcp_recv_hiwater;	/* Recv high water mark */
-	size_t	tcp_recv_lowater;	/* Recv low water mark */
-
 	uint32_t tcp_irs;		/* Initial recv seq num */
 	uint32_t tcp_fss;		/* Final/fin send seq num */
 	uint32_t tcp_urg;		/* Urgent data seq num */
@@ -353,8 +305,6 @@ typedef struct tcp_s {
 	clock_t	tcp_second_timer_threshold; /* When to give up completely */
 	clock_t	tcp_first_ctimer_threshold; /* 1st threshold while connecting */
 	clock_t tcp_second_ctimer_threshold; /* 2nd ... while connecting */
-
-	int	tcp_lingertime;		/* Close linger time (in seconds) */
 
 	uint32_t tcp_urp_last;		/* Last urp for which signal sent */
 	mblk_t	*tcp_urp_mp;		/* T_EXDATA_IND for urgent byte */
@@ -389,21 +339,14 @@ typedef struct tcp_s {
 
 	int32_t	tcp_client_errno;	/* How the client screwed up */
 
-	char	*tcp_iphc;		/* Buffer holding tcp/ip hdr template */
-	int	tcp_iphc_len;		/* actual allocated buffer size */
-	int32_t	tcp_hdr_len;		/* Byte len of combined TCP/IP hdr */
-	ipha_t	*tcp_ipha;		/* IPv4 header in the buffer */
-	ip6_t	*tcp_ip6h;		/* IPv6 header in the buffer */
-	int	tcp_ip_hdr_len;		/* Byte len of our current IPvx hdr */
-	tcph_t	*tcp_tcph;		/* tcp header within combined hdr */
-	int32_t	tcp_tcp_hdr_len;	/* tcp header len within combined */
-	/* Saved peer headers in the case of re-fusion */
-	ipha_t	tcp_saved_ipha;
-	ip6_t	tcp_saved_ip6h;
-	tcph_t	tcp_saved_tcph;
+	/*
+	 * The header template lives in conn_ht_iphc allocated by tcp_build_hdrs
+	 * We maintain three pointers into conn_ht_iphc.
+	 */
+	ipha_t	*tcp_ipha;		/* IPv4 header in conn_ht_iphc */
+	ip6_t	*tcp_ip6h;		/* IPv6 header in conn_ht_iphc */
+	tcpha_t	*tcp_tcpha;		/* TCP header in conn_ht_iphc */
 
-	uint32_t tcp_sum;		/* checksum to compensate for source */
-					/* routed packets. Host byte order */
 	uint16_t tcp_last_sent_len;	/* Record length for nagle */
 	uint16_t tcp_dupack_cnt;	/* # of consequtive duplicate acks */
 
@@ -413,75 +356,20 @@ typedef struct tcp_s {
 	t_uscalar_t	tcp_acceptor_id;	/* ACCEPTOR_id */
 
 	int		tcp_ipsec_overhead;
-	/*
-	 * Address family that app wishes returned addrsses to be in.
-	 * Currently taken from address family used in T_BIND_REQ, but
-	 * should really come from family used in original socket() call.
-	 * Value can be AF_INET or AF_INET6.
-	 */
-	uint_t	tcp_family;
-	/*
-	 * used for a quick test to determine if any ancillary bits are
-	 * set
-	 */
-	uint_t		tcp_ipv6_recvancillary;		/* Flags */
-#define	TCP_IPV6_RECVPKTINFO	0x01	/* IPV6_RECVPKTINFO option  */
-#define	TCP_IPV6_RECVHOPLIMIT	0x02	/* IPV6_RECVHOPLIMIT option */
-#define	TCP_IPV6_RECVHOPOPTS	0x04	/* IPV6_RECVHOPOPTS option */
-#define	TCP_IPV6_RECVDSTOPTS	0x08	/* IPV6_RECVDSTOPTS option */
-#define	TCP_IPV6_RECVRTHDR	0x10	/* IPV6_RECVRTHDR option */
-#define	TCP_IPV6_RECVRTDSTOPTS	0x20	/* IPV6_RECVRTHDRDSTOPTS option */
-#define	TCP_IPV6_RECVTCLASS	0x40	/* IPV6_RECVTCLASS option */
-#define	TCP_OLD_IPV6_RECVDSTOPTS 0x80	/* old IPV6_RECVDSTOPTS option */
 
 	uint_t		tcp_recvifindex; /* Last received IPV6_RCVPKTINFO */
 	uint_t		tcp_recvhops;	/* Last received IPV6_RECVHOPLIMIT */
 	uint_t		tcp_recvtclass;	/* Last received IPV6_RECVTCLASS */
 	ip6_hbh_t	*tcp_hopopts;	/* Last received IPV6_RECVHOPOPTS */
 	ip6_dest_t	*tcp_dstopts;	/* Last received IPV6_RECVDSTOPTS */
-	ip6_dest_t	*tcp_rtdstopts;	/* Last recvd IPV6_RECVRTHDRDSTOPTS */
+	ip6_dest_t	*tcp_rthdrdstopts; /* Last recv IPV6_RECVRTHDRDSTOPTS */
 	ip6_rthdr_t	*tcp_rthdr;	/* Last received IPV6_RECVRTHDR */
 	uint_t		tcp_hopoptslen;
 	uint_t		tcp_dstoptslen;
-	uint_t		tcp_rtdstoptslen;
+	uint_t		tcp_rthdrdstoptslen;
 	uint_t		tcp_rthdrlen;
 
 	mblk_t		*tcp_timercache;
-	cred_t		*tcp_cred;	/* Credentials when this was opened */
-	pid_t		tcp_cpid;	/* Process id when this was opened */
-	uint64_t	tcp_open_time;	/* time when this was opened */
-
-
-	union {
-		struct {
-			uchar_t	v4_ttl;
-				/* Dup of tcp_ipha.iph_type_of_service */
-			uchar_t	v4_tos; /* Dup of tcp_ipha.iph_ttl */
-		} v4_hdr_info;
-		struct {
-			uint_t	v6_vcf;		/* Dup of tcp_ip6h.ip6h_vcf */
-			uchar_t	v6_hops;	/* Dup of tcp_ip6h.ip6h_hops */
-		} v6_hdr_info;
-	} tcp_hdr_info;
-#define	tcp_ttl	tcp_hdr_info.v4_hdr_info.v4_ttl
-#define	tcp_tos	tcp_hdr_info.v4_hdr_info.v4_tos
-#define	tcp_ip6_vcf	tcp_hdr_info.v6_hdr_info.v6_vcf
-#define	tcp_ip6_hops	tcp_hdr_info.v6_hdr_info.v6_hops
-
-	ushort_t	tcp_ipversion;
-	uint_t		tcp_bound_if;	/* IPV6_BOUND_IF */
-
-#define	tcp_lport	tcp_connp->conn_lport
-#define	tcp_fport	tcp_connp->conn_fport
-#define	tcp_ports	tcp_connp->conn_ports
-
-#define	tcp_remote	tcp_connp->conn_rem
-#define	tcp_ip_src	tcp_connp->conn_src
-
-#define	tcp_remote_v6	tcp_connp->conn_remv6
-#define	tcp_ip_src_v6	tcp_connp->conn_srcv6
-#define	tcp_bound_source_v6	tcp_connp->conn_bound_source_v6
-#define	tcp_bound_source	tcp_connp->conn_bound_source
 
 	kmutex_t	tcp_closelock;
 	kcondvar_t	tcp_closecv;
@@ -497,36 +385,13 @@ typedef struct tcp_s {
 	struct tcp_s *tcp_bind_hash_port; /* tcp_t's bound to the same lport */
 	struct tcp_s **tcp_ptpbhn;
 
-	boolean_t	tcp_ire_ill_check_done;
-	uint_t		tcp_maxpsz;
-
-	/*
-	 * used for Multidata Transmit
-	 */
-	uint_t	tcp_mdt_hdr_head; /* leading header fragment extra space */
-	uint_t	tcp_mdt_hdr_tail; /* trailing header fragment extra space */
-	int	tcp_mdt_max_pld;  /* maximum payload buffers per Multidata */
+	uint_t		tcp_maxpsz_multiplier;
 
 	uint32_t	tcp_lso_max; /* maximum LSO payload */
 
 	uint32_t	tcp_ofo_fin_seq; /* Recv out of order FIN seq num */
 	uint32_t	tcp_cwr_snd_max;
-	uint_t		tcp_drop_opt_ack_cnt; /* # tcp generated optmgmt */
-	ip6_pkt_t	tcp_sticky_ipp;			/* Sticky options */
-#define	tcp_ipp_fields	tcp_sticky_ipp.ipp_fields	/* valid fields */
-#define	tcp_ipp_ifindex	tcp_sticky_ipp.ipp_ifindex	/* pktinfo ifindex */
-#define	tcp_ipp_addr	tcp_sticky_ipp.ipp_addr	/* pktinfo src/dst addr */
-#define	tcp_ipp_hoplimit	tcp_sticky_ipp.ipp_hoplimit
-#define	tcp_ipp_hopoptslen	tcp_sticky_ipp.ipp_hopoptslen
-#define	tcp_ipp_rtdstoptslen	tcp_sticky_ipp.ipp_rtdstoptslen
-#define	tcp_ipp_rthdrlen	tcp_sticky_ipp.ipp_rthdrlen
-#define	tcp_ipp_dstoptslen	tcp_sticky_ipp.ipp_dstoptslen
-#define	tcp_ipp_hopopts		tcp_sticky_ipp.ipp_hopopts
-#define	tcp_ipp_rtdstopts	tcp_sticky_ipp.ipp_rtdstopts
-#define	tcp_ipp_rthdr		tcp_sticky_ipp.ipp_rthdr
-#define	tcp_ipp_dstopts		tcp_sticky_ipp.ipp_dstopts
-#define	tcp_ipp_nexthop		tcp_sticky_ipp.ipp_nexthop
-#define	tcp_ipp_use_min_mtu	tcp_sticky_ipp.ipp_use_min_mtu
+
 	struct tcp_s *tcp_saved_listener;	/* saved value of listener */
 
 	uint32_t	tcp_in_ack_unsent;	/* ACK for unsent data cnt. */
@@ -562,7 +427,6 @@ typedef struct tcp_s {
 	boolean_t		tcp_kssl_inhandshake; /* during SSL handshake */
 	kssl_ent_t		tcp_kssl_ent;	/* SSL table entry */
 	kssl_ctx_t		tcp_kssl_ctx;	/* SSL session */
-	uint_t	tcp_label_len;	/* length of cached label */
 
 	/*
 	 * tcp_closemp_used is protected by listener's tcp_eager_lock
@@ -620,47 +484,17 @@ typedef struct tcp_s {
 #define	TCP_DEBUG_GETPCSTACK(buffer, depth)
 #endif
 
-/*
- * Track a reference count on the tcps in order to know when
- * the tcps_g_q can be removed. As long as there is any
- * tcp_t, other that the tcps_g_q itself, in the tcp_stack_t we
- * need to keep tcps_g_q around so that a closing connection can
- * switch to using tcps_g_q as part of it closing.
- */
-#define	TCPS_REFHOLD(tcps) {					\
-	atomic_add_32(&(tcps)->tcps_refcnt, 1);			\
-	ASSERT((tcps)->tcps_refcnt != 0);			\
-	DTRACE_PROBE1(tcps__refhold, tcp_stack_t, tcps);	\
-}
-
-/*
- * Decrement the reference count on the tcp_stack_t.
- * In architectures e.g sun4u, where atomic_add_32_nv is just
- * a cas, we need to maintain the right memory barrier semantics
- * as that of mutex_exit i.e all the loads and stores should complete
- * before the cas is executed. membar_exit() does that here.
- */
-#define	TCPS_REFRELE(tcps) {					\
-	ASSERT((tcps)->tcps_refcnt != 0);			\
-	membar_exit();						\
-	DTRACE_PROBE1(tcps__refrele, tcp_stack_t, tcps);	\
-	if (atomic_add_32_nv(&(tcps)->tcps_refcnt, -1) == 0 &&	\
-	    (tcps)->tcps_g_q != NULL) {				\
-		/* Only tcps_g_q left */			\
-		tcp_g_q_inactive(tcps);				\
-	}							\
-}
-
 extern void 	tcp_free(tcp_t *tcp);
 extern void	tcp_ddi_g_init(void);
 extern void	tcp_ddi_g_destroy(void);
-extern void	tcp_g_q_inactive(tcp_stack_t *);
-extern void	tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len,
-    zoneid_t zoneid, tcp_stack_t *, conn_t *connp);
-extern void	tcp_conn_request(void *arg, mblk_t *mp, void *arg2);
-extern void	tcp_conn_request_unbound(void *arg, mblk_t *mp, void *arg2);
-extern void 	tcp_input(void *arg, mblk_t *mp, void *arg2);
-extern void	tcp_rput_data(void *arg, mblk_t *mp, void *arg2);
+extern void	tcp_xmit_listeners_reset(mblk_t *, ip_recv_attr_t *,
+    ip_stack_t *, conn_t *);
+extern void	tcp_input_listener(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *);
+extern void	tcp_input_listener_unbound(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *);
+extern void	tcp_input_data(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *);
 extern void 	*tcp_get_conn(void *arg, tcp_stack_t *);
 extern void	tcp_time_wait_collector(void *arg);
 extern mblk_t	*tcp_snmp_get(queue_t *, mblk_t *);
@@ -668,7 +502,6 @@ extern int	tcp_snmp_set(queue_t *, int, int, uchar_t *, int len);
 extern mblk_t	*tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send,
 		    int32_t *offset, mblk_t **end_mp, uint32_t seq,
 		    boolean_t sendall, uint32_t *seg_len, boolean_t rexmit);
-extern void	tcp_xmit_reset(void *arg, mblk_t *mp, void *arg2);
 
 /*
  * The TCP Fanout structure.
@@ -706,6 +539,15 @@ typedef struct cl_tcp_info_s {
 } cl_tcp_info_t;
 
 /*
+ * Hook functions to enable cluster networking
+ * On non-clustered systems these vectors must always be NULL.
+ */
+extern void	(*cl_inet_listen)(netstackid_t, uint8_t, sa_family_t,
+		    uint8_t *, in_port_t, void *);
+extern void	(*cl_inet_unlisten)(netstackid_t, uint8_t, sa_family_t,
+		    uint8_t *, in_port_t, void *);
+
+/*
  * Contracted Consolidation Private ioctl for aborting TCP connections.
  * In order to keep the offsets and size of the structure the same between
  * a 32-bit application and a 64-bit amd64 kernel, we use a #pragma
@@ -727,25 +569,6 @@ typedef struct tcp_ioc_abort_conn_s {
 
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
-#endif
-
-#if (defined(_KERNEL) || defined(_KMEMUSER))
-extern void tcp_rput_other(tcp_t *tcp, mblk_t *mp);
-#endif
-
-#if (defined(_KERNEL))
-#define	TCP_XRE_EVENT_IP_FANOUT_TCP 1
-
-/*
- * This is a private structure used to pass data to an squeue function during
- * tcp's listener reset sending path.
- */
-typedef struct tcp_xmit_reset_event {
-	int		tcp_xre_event;
-	int		tcp_xre_iphdrlen;
-	zoneid_t	tcp_xre_zoneid;
-	tcp_stack_t	*tcp_xre_tcps;
-} tcp_xmit_reset_event_t;
 #endif
 
 #ifdef	__cplusplus

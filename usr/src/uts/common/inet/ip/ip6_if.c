@@ -76,12 +76,13 @@ static in6_addr_t	ipv6_ll_template =
 
 static ipif_t *
 ipif_lookup_interface_v6(const in6_addr_t *if_addr, const in6_addr_t *dst,
-    queue_t *q, mblk_t *mp, ipsq_func_t func, int *error, ip_stack_t *ipst);
+    ip_stack_t *ipst);
+
+static int	ipif_add_ires_v6(ipif_t *, boolean_t);
 
 /*
- * These two functions, ipif_lookup_group_v6() and ill_lookup_group_v6(),
- * are called when an application does not specify an interface to be
- * used for multicast traffic.  It calls ire_lookup_multi_v6() to look
+ * This function is called when an application does not specify an interface
+ * to be used for multicast traffic.  It calls ire_lookup_multi_v6() to look
  * for an interface route for the specified multicast group.  Doing
  * this allows the administrator to add prefix routes for multicast to
  * indicate which interface to be used for multicast traffic in the above
@@ -89,47 +90,21 @@ ipif_lookup_interface_v6(const in6_addr_t *if_addr, const in6_addr_t *dst,
  * multicast group (a /128 route) or anything in between.  If there is no
  * such multicast route, we just find any multicast capable interface and
  * return it.
+ *
+ * We support MULTIRT and RTF_SETSRC on the multicast routes added to the
+ * unicast table. This is used by CGTP.
  */
-ipif_t *
-ipif_lookup_group_v6(const in6_addr_t *group, zoneid_t zoneid, ip_stack_t *ipst)
-{
-	ire_t	*ire;
-	ipif_t	*ipif;
-
-	ire = ire_lookup_multi_v6(group, zoneid, ipst);
-	if (ire != NULL) {
-		ipif = ire->ire_ipif;
-		ipif_refhold(ipif);
-		ire_refrele(ire);
-		return (ipif);
-	}
-
-	return (ipif_lookup_multicast(ipst, zoneid, B_TRUE));
-}
-
 ill_t *
-ill_lookup_group_v6(const in6_addr_t *group, zoneid_t zoneid, ip_stack_t *ipst)
+ill_lookup_group_v6(const in6_addr_t *group, zoneid_t zoneid, ip_stack_t *ipst,
+    boolean_t *multirtp, in6_addr_t *setsrcp)
 {
-	ire_t	*ire;
 	ill_t	*ill;
-	ipif_t	*ipif;
 
-	ire = ire_lookup_multi_v6(group, zoneid, ipst);
-	if (ire != NULL) {
-		ill = ire->ire_ipif->ipif_ill;
-		ill_refhold(ill);
-		ire_refrele(ire);
+	ill = ire_lookup_multi_ill_v6(group, zoneid, ipst, multirtp, setsrcp);
+	if (ill != NULL)
 		return (ill);
-	}
 
-	ipif = ipif_lookup_multicast(ipst, zoneid, B_TRUE);
-	if (ipif == NULL)
-		return (NULL);
-
-	ill = ipif->ipif_ill;
-	ill_refhold(ill);
-	ipif_refrele(ipif);
-	return (ill);
+	return (ill_lookup_multicast(ipst, zoneid, B_TRUE));
 }
 
 /*
@@ -138,15 +113,11 @@ ill_lookup_group_v6(const in6_addr_t *group, zoneid_t zoneid, ip_stack_t *ipst)
  */
 static ipif_t *
 ipif_lookup_interface_v6(const in6_addr_t *if_addr, const in6_addr_t *dst,
-    queue_t *q, mblk_t *mp, ipsq_func_t func, int *error, ip_stack_t *ipst)
+    ip_stack_t *ipst)
 {
 	ipif_t	*ipif;
 	ill_t	*ill;
-	ipsq_t	*ipsq;
 	ill_walk_context_t ctx;
-
-	if (error != NULL)
-		*error = 0;
 
 	/*
 	 * First match all the point-to-point interfaces
@@ -157,7 +128,6 @@ ipif_lookup_interface_v6(const in6_addr_t *if_addr, const in6_addr_t *dst,
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	ill = ILL_START_WALK_V6(&ctx, ipst);
 	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		GRAB_CONN_LOCK(q);
 		mutex_enter(&ill->ill_lock);
 		for (ipif = ill->ill_ipif; ipif != NULL;
 		    ipif = ipif->ipif_next) {
@@ -167,36 +137,19 @@ ipif_lookup_interface_v6(const in6_addr_t *if_addr, const in6_addr_t *dst,
 			    if_addr)) &&
 			    (IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6pp_dst_addr,
 			    dst))) {
-				if (IPIF_CAN_LOOKUP(ipif)) {
+				if (!IPIF_IS_CONDEMNED(ipif)) {
 					ipif_refhold_locked(ipif);
 					mutex_exit(&ill->ill_lock);
-					RELEASE_CONN_LOCK(q);
 					rw_exit(&ipst->ips_ill_g_lock);
 					return (ipif);
-				} else if (IPIF_CAN_WAIT(ipif, q)) {
-					ipsq = ill->ill_phyint->phyint_ipsq;
-					mutex_enter(&ipsq->ipsq_lock);
-					mutex_enter(&ipsq->ipsq_xop->ipx_lock);
-					mutex_exit(&ill->ill_lock);
-					rw_exit(&ipst->ips_ill_g_lock);
-					ipsq_enq(ipsq, q, mp, func, NEW_OP,
-					    ill);
-					mutex_exit(&ipsq->ipsq_xop->ipx_lock);
-					mutex_exit(&ipsq->ipsq_lock);
-					RELEASE_CONN_LOCK(q);
-					if (error != NULL)
-						*error = EINPROGRESS;
-					return (NULL);
 				}
 			}
 		}
 		mutex_exit(&ill->ill_lock);
-		RELEASE_CONN_LOCK(q);
 	}
 	rw_exit(&ipst->ips_ill_g_lock);
 	/* lookup the ipif based on interface address */
-	ipif = ipif_lookup_addr_v6(if_addr, NULL, ALL_ZONES, q, mp, func,
-	    error, ipst);
+	ipif = ipif_lookup_addr_v6(if_addr, NULL, ALL_ZONES, ipst);
 	ASSERT(ipif == NULL || ipif->ipif_isv6);
 	return (ipif);
 }
@@ -206,17 +159,14 @@ ipif_lookup_interface_v6(const in6_addr_t *if_addr, const in6_addr_t *dst,
  */
 static ipif_t *
 ipif_lookup_addr_common_v6(const in6_addr_t *addr, ill_t *match_ill,
-    boolean_t match_illgrp, zoneid_t zoneid, queue_t *q, mblk_t *mp,
-    ipsq_func_t func, int *error, ip_stack_t *ipst)
+    uint32_t match_flags, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ipif_t	*ipif;
 	ill_t	*ill;
 	boolean_t  ptp = B_FALSE;
-	ipsq_t	*ipsq;
 	ill_walk_context_t ctx;
-
-	if (error != NULL)
-		*error = 0;
+	boolean_t match_illgrp = (match_flags & IPIF_MATCH_ILLGRP);
+	boolean_t no_duplicate = (match_flags & IPIF_MATCH_NONDUP);
 
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	/*
@@ -230,7 +180,6 @@ repeat:
 		    (!match_illgrp || !IS_IN_SAME_ILLGRP(ill, match_ill))) {
 			continue;
 		}
-		GRAB_CONN_LOCK(q);
 		mutex_enter(&ill->ill_lock);
 		for (ipif = ill->ill_ipif; ipif != NULL;
 		    ipif = ipif->ipif_next) {
@@ -238,6 +187,12 @@ repeat:
 			    ipif->ipif_zoneid != zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
 				continue;
+
+			if (no_duplicate &&
+			    !(ipif->ipif_flags & IPIF_UP)) {
+				continue;
+			}
+
 			/* Allow the ipif to be down */
 			if ((!ptp && (IN6_ARE_ADDR_EQUAL(
 			    &ipif->ipif_v6lcl_addr, addr) &&
@@ -245,80 +200,24 @@ repeat:
 			    (ptp && (ipif->ipif_flags & IPIF_POINTOPOINT) &&
 			    IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6pp_dst_addr,
 			    addr))) {
-				if (IPIF_CAN_LOOKUP(ipif)) {
+				if (!IPIF_IS_CONDEMNED(ipif)) {
 					ipif_refhold_locked(ipif);
 					mutex_exit(&ill->ill_lock);
-					RELEASE_CONN_LOCK(q);
 					rw_exit(&ipst->ips_ill_g_lock);
 					return (ipif);
-				} else if (IPIF_CAN_WAIT(ipif, q)) {
-					ipsq = ill->ill_phyint->phyint_ipsq;
-					mutex_enter(&ipsq->ipsq_lock);
-					mutex_enter(&ipsq->ipsq_xop->ipx_lock);
-					mutex_exit(&ill->ill_lock);
-					rw_exit(&ipst->ips_ill_g_lock);
-					ipsq_enq(ipsq, q, mp, func, NEW_OP,
-					    ill);
-					mutex_exit(&ipsq->ipsq_xop->ipx_lock);
-					mutex_exit(&ipsq->ipsq_lock);
-					RELEASE_CONN_LOCK(q);
-					if (error != NULL)
-						*error = EINPROGRESS;
-					return (NULL);
 				}
 			}
 		}
 		mutex_exit(&ill->ill_lock);
-		RELEASE_CONN_LOCK(q);
 	}
 
 	/* If we already did the ptp case, then we are done */
 	if (ptp) {
 		rw_exit(&ipst->ips_ill_g_lock);
-		if (error != NULL)
-			*error = ENXIO;
 		return (NULL);
 	}
 	ptp = B_TRUE;
 	goto repeat;
-}
-
-boolean_t
-ip_addr_exists_v6(const in6_addr_t *addr, zoneid_t zoneid,
-    ip_stack_t *ipst)
-{
-	ipif_t	*ipif;
-	ill_t	*ill;
-	ill_walk_context_t ctx;
-
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-
-	ill = ILL_START_WALK_V6(&ctx, ipst);
-	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
-		mutex_enter(&ill->ill_lock);
-		for (ipif = ill->ill_ipif; ipif != NULL;
-		    ipif = ipif->ipif_next) {
-			if (zoneid != ALL_ZONES &&
-			    ipif->ipif_zoneid != zoneid &&
-			    ipif->ipif_zoneid != ALL_ZONES)
-				continue;
-			/* Allow the ipif to be down */
-			if (((IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6lcl_addr,
-			    addr) &&
-			    (ipif->ipif_flags & IPIF_UNNUMBERED) == 0)) ||
-			    ((ipif->ipif_flags & IPIF_POINTOPOINT) &&
-			    IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6pp_dst_addr,
-			    addr))) {
-				mutex_exit(&ill->ill_lock);
-				rw_exit(&ipst->ips_ill_g_lock);
-				return (B_TRUE);
-			}
-		}
-		mutex_exit(&ill->ill_lock);
-	}
-
-	rw_exit(&ipst->ips_ill_g_lock);
-	return (B_FALSE);
 }
 
 /*
@@ -330,10 +229,24 @@ ip_addr_exists_v6(const in6_addr_t *addr, zoneid_t zoneid,
  */
 ipif_t *
 ipif_lookup_addr_v6(const in6_addr_t *addr, ill_t *match_ill, zoneid_t zoneid,
-    queue_t *q, mblk_t *mp, ipsq_func_t func, int *error, ip_stack_t *ipst)
+    ip_stack_t *ipst)
 {
-	return (ipif_lookup_addr_common_v6(addr, match_ill, B_TRUE, zoneid, q,
-	    mp, func, error, ipst));
+	return (ipif_lookup_addr_common_v6(addr, match_ill, IPIF_MATCH_ILLGRP,
+	    zoneid, ipst));
+}
+
+/*
+ * Lookup an ipif with the specified address. Similar to ipif_lookup_addr,
+ * except that we will only return an address if it is not marked as
+ * IPIF_DUPLICATE
+ */
+ipif_t *
+ipif_lookup_addr_nondup_v6(const in6_addr_t *addr, ill_t *match_ill,
+    zoneid_t zoneid, ip_stack_t *ipst)
+{
+	return (ipif_lookup_addr_common_v6(addr, match_ill,
+	    (IPIF_MATCH_ILLGRP | IPIF_MATCH_NONDUP), zoneid,
+	    ipst));
 }
 
 /*
@@ -346,8 +259,8 @@ ipif_lookup_addr_exact_v6(const in6_addr_t *addr, ill_t *match_ill,
     ip_stack_t *ipst)
 {
 	ASSERT(match_ill != NULL);
-	return (ipif_lookup_addr_common_v6(addr, match_ill, B_FALSE, ALL_ZONES,
-	    NULL, NULL, NULL, NULL, ipst));
+	return (ipif_lookup_addr_common_v6(addr, match_ill, 0, ALL_ZONES,
+	    ipst));
 }
 
 /*
@@ -473,23 +386,22 @@ ip_remote_addr_ok_v6(const in6_addr_t *addr, const in6_addr_t *subnet_mask)
 
 /*
  * ip_rt_add_v6 is called to add an IPv6 route to the forwarding table.
- * ipif_arg is passed in to associate it with the correct interface
+ * ill is passed in to associate it with the correct interface
  * (for link-local destinations and gateways).
+ * If ire_arg is set, then we return the held IRE in that location.
  */
 /* ARGSUSED1 */
 int
 ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
     const in6_addr_t *gw_addr, const in6_addr_t *src_addr, int flags,
-    ipif_t *ipif_arg, ire_t **ire_arg, queue_t *q, mblk_t *mp, ipsq_func_t func,
-    struct rtsa_s *sp, ip_stack_t *ipst)
+    ill_t *ill, ire_t **ire_arg, struct rtsa_s *sp, ip_stack_t *ipst,
+    zoneid_t zoneid)
 {
-	ire_t	*ire;
+	ire_t	*ire, *nire;
 	ire_t	*gw_ire = NULL;
 	ipif_t	*ipif;
-	boolean_t ipif_refheld = B_FALSE;
 	uint_t	type;
 	int	match_flags = MATCH_IRE_TYPE;
-	int	error;
 	tsol_gc_t *gc = NULL;
 	tsol_gcgrp_t *gcgrp = NULL;
 	boolean_t gcgrp_xtraref = B_FALSE;
@@ -514,14 +426,19 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 
 	/*
 	 * Get the ipif, if any, corresponding to the gw_addr
+	 * If -ifp was specified we restrict ourselves to the ill, otherwise
+	 * we match on the gatway and destination to handle unnumbered pt-pt
+	 * interfaces.
 	 */
-	ipif = ipif_lookup_interface_v6(gw_addr, dst_addr, q, mp, func,
-	    &error, ipst);
-	if (ipif != NULL)
-		ipif_refheld = B_TRUE;
-	else if (error == EINPROGRESS) {
-		ip1dbg(("ip_rt_add_v6: null and EINPROGRESS"));
-		return (error);
+	if (ill != NULL)
+		ipif = ipif_lookup_addr_v6(gw_addr, ill, ALL_ZONES, ipst);
+	else
+		ipif = ipif_lookup_interface_v6(gw_addr, dst_addr, ipst);
+	if (ipif != NULL) {
+		if (IS_VNI(ipif->ipif_ill)) {
+			ipif_refrele(ipif);
+			return (EINVAL);
+		}
 	}
 
 	/*
@@ -535,55 +452,72 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		if (IN6_ARE_ADDR_EQUAL(gw_addr, &ipv6_loopback) &&
 		    IN6_ARE_ADDR_EQUAL(dst_addr, &ipv6_loopback) &&
 		    IN6_ARE_ADDR_EQUAL(mask, &ipv6_all_ones)) {
-			ire = ire_ctable_lookup_v6(dst_addr, 0, IRE_LOOPBACK,
-			    ipif, ALL_ZONES, NULL, match_flags, ipst);
+			ire = ire_ftable_lookup_v6(dst_addr, 0, 0, IRE_LOOPBACK,
+			    NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, 0, ipst,
+			    NULL);
 			if (ire != NULL) {
 				ire_refrele(ire);
-				if (ipif_refheld)
-					ipif_refrele(ipif);
+				ipif_refrele(ipif);
 				return (EEXIST);
 			}
-			ip1dbg(("ipif_up_done: 0x%p creating IRE 0x%x"
+			ip1dbg(("ip_rt_add_v6: 0x%p creating IRE 0x%x"
 			    "for 0x%x\n", (void *)ipif,
 			    ipif->ipif_ire_type,
 			    ntohl(ipif->ipif_lcl_addr)));
 			ire = ire_create_v6(
 			    dst_addr,
 			    mask,
-			    &ipif->ipif_v6src_addr,
 			    NULL,
-			    &ipif->ipif_mtu,
-			    NULL,
-			    NULL,
-			    NULL,
-			    ipif->ipif_net_type,
-			    ipif,
-			    NULL,
-			    0,
-			    0,
-			    flags,
-			    &ire_uinfo_null,
-			    NULL,
+			    ipif->ipif_ire_type,	/* LOOPBACK */
+			    ipif->ipif_ill,
+			    zoneid,
+			    (ipif->ipif_flags & IPIF_PRIVATE) ? RTF_PRIVATE : 0,
 			    NULL,
 			    ipst);
+
 			if (ire == NULL) {
-				if (ipif_refheld)
-					ipif_refrele(ipif);
+				ipif_refrele(ipif);
 				return (ENOMEM);
 			}
-			error = ire_add(&ire, q, mp, func, B_FALSE);
-			if (error == 0)
-				goto save_ire;
-			/*
-			 * In the result of failure, ire_add() will have already
-			 * deleted the ire in question, so there is no need to
-			 * do that here.
-			 */
-			if (ipif_refheld)
+			/* src address assigned by the caller? */
+			if ((flags & RTF_SETSRC) &&
+			    !IN6_IS_ADDR_UNSPECIFIED(src_addr))
+				ire->ire_setsrc_addr_v6 = *src_addr;
+
+			nire = ire_add(ire);
+			if (nire == NULL) {
+				/*
+				 * In the result of failure, ire_add() will have
+				 * already deleted the ire in question, so there
+				 * is no need to do that here.
+				 */
 				ipif_refrele(ipif);
-			return (error);
+				return (ENOMEM);
+			}
+			/*
+			 * Check if it was a duplicate entry. This handles
+			 * the case of two racing route adds for the same route
+			 */
+			if (nire != ire) {
+				ASSERT(nire->ire_identical_ref > 1);
+				ire_delete(nire);
+				ire_refrele(nire);
+				ipif_refrele(ipif);
+				return (EEXIST);
+			}
+			ire = nire;
+			goto save_ire;
 		}
 	}
+
+	/*
+	 * The routes for multicast with CGTP are quite special in that
+	 * the gateway is the local interface address, yet RTF_GATEWAY
+	 * is set. We turn off RTF_GATEWAY to provide compatibility with
+	 * this undocumented and unusual use of multicast routes.
+	 */
+	if ((flags & RTF_MULTIRT) && ipif != NULL)
+		flags &= ~RTF_GATEWAY;
 
 	/*
 	 * Traditionally, interface routes are ones where RTF_GATEWAY isn't set
@@ -619,8 +553,8 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	 * logical interfaces
 	 *
 	 *	192.0.2.32	255.255.255.224	192.0.2.33	U	if0
-	 *	192.0.2.32	255.255.255.224	192.0.2.34	U	if0:1
-	 *	192.0.2.32	255.255.255.224	192.0.2.35	U	if0:2
+	 *	192.0.2.32	255.255.255.224	192.0.2.34	U	if0
+	 *	192.0.2.32	255.255.255.224	192.0.2.35	U	if0
 	 *
 	 * the ipif's corresponding to each of these interface routes can be
 	 * uniquely identified by the "gateway" (actually interface address).
@@ -635,90 +569,68 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 
 	/* RTF_GATEWAY not set */
 	if (!(flags & RTF_GATEWAY)) {
-		queue_t	*stq;
-
 		if (sp != NULL) {
 			ip2dbg(("ip_rt_add_v6: gateway security attributes "
 			    "cannot be set with interface route\n"));
-			if (ipif_refheld)
+			if (ipif != NULL)
 				ipif_refrele(ipif);
 			return (EINVAL);
 		}
 
 		/*
-		 * As the interface index specified with the RTA_IFP sockaddr is
-		 * the same for all ipif's off of an ill, the matching logic
-		 * below uses MATCH_IRE_ILL if such an index was specified.
-		 * This means that routes sharing the same prefix when added
-		 * using a RTA_IFP sockaddr must have distinct interface
-		 * indices (namely, they must be on distinct ill's).
-		 *
-		 * On the other hand, since the gateway address will usually be
-		 * different for each ipif on the system, the matching logic
-		 * uses MATCH_IRE_IPIF in the case of a traditional interface
-		 * route.  This means that interface routes for the same prefix
-		 * can be created if they belong to distinct ipif's and if a
-		 * RTA_IFP sockaddr is not present.
+		 * Whether or not ill (RTA_IFP) is set, we require that
+		 * the gateway is one of our local addresses.
 		 */
-		if (ipif_arg != NULL) {
-			if (ipif_refheld) {
-				ipif_refrele(ipif);
-				ipif_refheld = B_FALSE;
-			}
-			ipif = ipif_arg;
-			match_flags |= MATCH_IRE_ILL;
-		} else {
-			/*
-			 * Check the ipif corresponding to the gw_addr
-			 */
-			if (ipif == NULL)
-				return (ENETUNREACH);
-			match_flags |= MATCH_IRE_IPIF;
+		if (ipif == NULL)
+			return (ENETUNREACH);
+
+		/*
+		 * We use MATCH_IRE_ILL here. If the caller specified an
+		 * interface (from the RTA_IFP sockaddr) we use it, otherwise
+		 * we use the ill derived from the gateway address.
+		 * We can always match the gateway address since we record it
+		 * in ire_gateway_addr.
+		 * We don't allow RTA_IFP to specify a different ill than the
+		 * one matching the ipif to make sure we can delete the route.
+		 */
+		match_flags |= MATCH_IRE_GW | MATCH_IRE_ILL;
+		if (ill == NULL) {
+			ill = ipif->ipif_ill;
+		} else if (ill != ipif->ipif_ill) {
+			ipif_refrele(ipif);
+			return (EINVAL);
 		}
 
-		ASSERT(ipif != NULL);
 		/*
 		 * We check for an existing entry at this point.
 		 */
 		match_flags |= MATCH_IRE_MASK;
-		ire = ire_ftable_lookup_v6(dst_addr, mask, 0, IRE_INTERFACE,
-		    ipif, NULL, ALL_ZONES, 0, NULL, match_flags, ipst);
+		ire = ire_ftable_lookup_v6(dst_addr, mask, gw_addr,
+		    IRE_INTERFACE, ill, ALL_ZONES, NULL, match_flags, 0, ipst,
+		    NULL);
 		if (ire != NULL) {
 			ire_refrele(ire);
-			if (ipif_refheld)
-				ipif_refrele(ipif);
+			ipif_refrele(ipif);
 			return (EEXIST);
 		}
 
-		stq = (ipif->ipif_net_type == IRE_IF_RESOLVER)
-		    ? ipif->ipif_rq : ipif->ipif_wq;
-
 		/*
 		 * Create a copy of the IRE_LOOPBACK, IRE_IF_NORESOLVER or
-		 * IRE_IF_RESOLVER with the modified address and netmask.
+		 * IRE_IF_RESOLVER with the modified address, netmask, and
+		 * gateway.
 		 */
 		ire = ire_create_v6(
 		    dst_addr,
 		    mask,
-		    &ipif->ipif_v6src_addr,
-		    NULL,
-		    &ipif->ipif_mtu,
-		    NULL,
-		    NULL,
-		    stq,
-		    ipif->ipif_net_type,
-		    ipif,
-		    NULL,
-		    0,
-		    0,
+		    gw_addr,
+		    ill->ill_net_type,
+		    ill,
+		    zoneid,
 		    flags,
-		    &ire_uinfo_null,
-		    NULL,
 		    NULL,
 		    ipst);
 		if (ire == NULL) {
-			if (ipif_refheld)
-				ipif_refrele(ipif);
+			ipif_refrele(ipif);
 			return (ENOMEM);
 		}
 
@@ -731,32 +643,44 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		 * RTF_BLACKHOLE flag as these interface routes, by
 		 * definition, can only be that.
 		 *
-		 * If the IRE type (as defined by ipif->ipif_net_type) is
+		 * If the IRE type (as defined by ill->ill_net_type) is
 		 * IRE_LOOPBACK, then we map the request into a
 		 * IRE_IF_NORESOLVER.
 		 *
 		 * Needless to say, the real IRE_LOOPBACK is NOT created by this
 		 * routine, but rather using ire_create_v6() directly.
 		 */
-		if (ipif->ipif_net_type == IRE_LOOPBACK) {
+		if (ill->ill_net_type == IRE_LOOPBACK) {
 			ire->ire_type = IRE_IF_NORESOLVER;
 			ire->ire_flags |= RTF_BLACKHOLE;
 		}
-		error = ire_add(&ire, q, mp, func, B_FALSE);
-		if (error == 0)
-			goto save_ire;
-		/*
-		 * In the result of failure, ire_add() will have already
-		 * deleted the ire in question, so there is no need to
-		 * do that here.
-		 */
-		if (ipif_refheld)
+		/* src address assigned by the caller? */
+		if ((flags & RTF_SETSRC) && !IN6_IS_ADDR_UNSPECIFIED(src_addr))
+			ire->ire_setsrc_addr_v6 = *src_addr;
+
+		nire = ire_add(ire);
+		if (nire == NULL) {
+			/*
+			 * In the result of failure, ire_add() will have
+			 * already deleted the ire in question, so there
+			 * is no need to do that here.
+			 */
 			ipif_refrele(ipif);
-		return (error);
-	}
-	if (ipif_refheld) {
-		ipif_refrele(ipif);
-		ipif_refheld = B_FALSE;
+			return (ENOMEM);
+		}
+		/*
+		 * Check if it was a duplicate entry. This handles
+		 * the case of two racing route adds for the same route
+		 */
+		if (nire != ire) {
+			ASSERT(nire->ire_identical_ref > 1);
+			ire_delete(nire);
+			ire_refrele(nire);
+			ipif_refrele(ipif);
+			return (EEXIST);
+		}
+		ire = nire;
+		goto save_ire;
 	}
 
 	/*
@@ -764,14 +688,23 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	 * If we don't have an IRE_IF_NORESOLVER or IRE_IF_RESOLVER for the
 	 * gateway, it is currently unreachable and we fail the request
 	 * accordingly.
+	 * If RTA_IFP was specified we look on that particular ill.
 	 */
-	ipif = ipif_arg;
-	if (ipif_arg != NULL)
+	if (ill != NULL)
 		match_flags |= MATCH_IRE_ILL;
-	gw_ire = ire_ftable_lookup_v6(gw_addr, 0, 0, IRE_INTERFACE, ipif_arg,
-	    NULL, ALL_ZONES, 0, NULL, match_flags, ipst);
-	if (gw_ire == NULL)
+
+	/* Check whether the gateway is reachable. */
+	type = IRE_INTERFACE;
+	if (flags & RTF_INDIRECT)
+		type |= IRE_OFFLINK;
+
+	gw_ire = ire_ftable_lookup_v6(gw_addr, 0, 0, type, ill,
+	    ALL_ZONES, NULL, match_flags, 0, ipst, NULL);
+	if (gw_ire == NULL) {
+		if (ipif != NULL)
+			ipif_refrele(ipif);
 		return (ENETUNREACH);
+	}
 
 	/*
 	 * We create one of three types of IREs as a result of this request
@@ -789,10 +722,12 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		type = IRE_PREFIX;
 
 	/* check for a duplicate entry */
-	ire = ire_ftable_lookup_v6(dst_addr, mask, gw_addr, type, ipif_arg,
-	    NULL, ALL_ZONES, 0, NULL,
-	    match_flags | MATCH_IRE_MASK | MATCH_IRE_GW, ipst);
+	ire = ire_ftable_lookup_v6(dst_addr, mask, gw_addr, type, ill,
+	    ALL_ZONES, NULL,
+	    match_flags | MATCH_IRE_MASK | MATCH_IRE_GW, 0, ipst, NULL);
 	if (ire != NULL) {
+		if (ipif != NULL)
+			ipif_refrele(ipif);
 		ire_refrele(gw_ire);
 		ire_refrele(ire);
 		return (EEXIST);
@@ -809,6 +744,8 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		/* we hold reference to it upon success */
 		gcgrp = gcgrp_lookup(&ga, B_TRUE);
 		if (gcgrp == NULL) {
+			if (ipif != NULL)
+				ipif_refrele(ipif);
 			ire_refrele(gw_ire);
 			return (ENOMEM);
 		}
@@ -824,6 +761,8 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		if (gc == NULL) {
 			/* release reference held by gcgrp_lookup */
 			GCGRP_REFRELE(gcgrp);
+			if (ipif != NULL)
+				ipif_refrele(ipif);
 			ire_refrele(gw_ire);
 			return (ENOMEM);
 		}
@@ -833,23 +772,12 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	ire = ire_create_v6(
 	    dst_addr,				/* dest address */
 	    mask,				/* mask */
-	    /* src address assigned by the caller? */
-	    (((flags & RTF_SETSRC) && !IN6_IS_ADDR_UNSPECIFIED(src_addr)) ?
-	    src_addr : NULL),
 	    gw_addr,				/* gateway address */
-	    &gw_ire->ire_max_frag,
-	    NULL,				/* no src nce */
-	    NULL,				/* no recv-from queue */
-	    NULL,				/* no send-to queue */
 	    (ushort_t)type,			/* IRE type */
-	    ipif_arg,
-	    NULL,
-	    0,
-	    0,
+	    ill,
+	    zoneid,
 	    flags,
-	    &gw_ire->ire_uinfo,			/* Inherit ULP info from gw */
 	    gc,					/* security attribute */
-	    NULL,
 	    ipst);
 
 	/*
@@ -862,9 +790,15 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	if (ire == NULL) {
 		if (gc != NULL)
 			GC_REFRELE(gc);
+		if (ipif != NULL)
+			ipif_refrele(ipif);
 		ire_refrele(gw_ire);
 		return (ENOMEM);
 	}
+
+	/* src address assigned by the caller? */
+	if ((flags & RTF_SETSRC) && !IN6_IS_ADDR_UNSPECIFIED(src_addr))
+		ire->ire_setsrc_addr_v6 = *src_addr;
 
 	/*
 	 * POLICY: should we allow an RTF_HOST with address INADDR_ANY?
@@ -872,16 +806,32 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	 */
 
 	/* Add the new IRE. */
-	error = ire_add(&ire, q, mp, func, B_FALSE);
-	/*
-	 * In the result of failure, ire_add() will have already
-	 * deleted the ire in question, so there is no need to
-	 * do that here.
-	 */
-	if (error != 0) {
+	nire = ire_add(ire);
+	if (nire == NULL) {
+		/*
+		 * In the result of failure, ire_add() will have
+		 * already deleted the ire in question, so there
+		 * is no need to do that here.
+		 */
+		if (ipif != NULL)
+			ipif_refrele(ipif);
 		ire_refrele(gw_ire);
-		return (error);
+		return (ENOMEM);
 	}
+	/*
+	 * Check if it was a duplicate entry. This handles
+	 * the case of two racing route adds for the same route
+	 */
+	if (nire != ire) {
+		ASSERT(nire->ire_identical_ref > 1);
+		ire_delete(nire);
+		ire_refrele(nire);
+		if (ipif != NULL)
+			ipif_refrele(ipif);
+		ire_refrele(gw_ire);
+		return (EEXIST);
+	}
+	ire = nire;
 
 	if (flags & RTF_MULTIRT) {
 		/*
@@ -896,70 +846,51 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		if (ipst->ips_ip_cgtp_filter_ops != NULL &&
 		    !IN6_IS_ADDR_MULTICAST(&(ire->ire_addr_v6))) {
 			int res;
+			ipif_t *src_ipif;
 
-			res = ipst->ips_ip_cgtp_filter_ops->cfo_add_dest_v6(
-			    ipst->ips_netstack->netstack_stackid,
-			    &ire->ire_addr_v6,
-			    &ire->ire_gateway_addr_v6,
-			    &ire->ire_src_addr_v6,
-			    &gw_ire->ire_src_addr_v6);
+			/* Find the source address corresponding to gw_ire */
+			src_ipif = ipif_lookup_addr_v6(
+			    &gw_ire->ire_gateway_addr_v6, NULL, zoneid, ipst);
+			if (src_ipif != NULL) {
+				res = ipst->ips_ip_cgtp_filter_ops->
+				    cfo_add_dest_v6(
+				    ipst->ips_netstack->netstack_stackid,
+				    &ire->ire_addr_v6,
+				    &ire->ire_gateway_addr_v6,
+				    &ire->ire_setsrc_addr_v6,
+				    &src_ipif->ipif_v6lcl_addr);
+				ipif_refrele(src_ipif);
+			} else {
+				res = EADDRNOTAVAIL;
+			}
 			if (res != 0) {
+				if (ipif != NULL)
+					ipif_refrele(ipif);
 				ire_refrele(gw_ire);
 				ire_delete(ire);
+				ire_refrele(ire);	/* Held in ire_add */
 				return (res);
 			}
 		}
 	}
 
-	/*
-	 * Now that the prefix IRE entry has been created, delete any
-	 * existing gateway IRE cache entries as well as any IRE caches
-	 * using the gateway, and force them to be created through
-	 * ip_newroute_v6.
-	 */
-	if (gc != NULL) {
-		ASSERT(gcgrp != NULL);
-		ire_clookup_delete_cache_gw_v6(gw_addr, ALL_ZONES, ipst);
-	}
-
 save_ire:
 	if (gw_ire != NULL) {
 		ire_refrele(gw_ire);
+		gw_ire = NULL;
 	}
-	if (ipif != NULL) {
-		mblk_t	*save_mp;
-
+	if (ire->ire_ill != NULL) {
 		/*
 		 * Save enough information so that we can recreate the IRE if
-		 * the interface goes down and then up.  The metrics associated
+		 * the ILL goes down and then up.  The metrics associated
 		 * with the route will be saved as well when rts_setmetrics() is
 		 * called after the IRE has been created.  In the case where
 		 * memory cannot be allocated, none of this information will be
 		 * saved.
 		 */
-		save_mp = allocb(sizeof (ifrt_t), BPRI_MED);
-		if (save_mp != NULL) {
-			ifrt_t	*ifrt;
-
-			save_mp->b_wptr += sizeof (ifrt_t);
-			ifrt = (ifrt_t *)save_mp->b_rptr;
-			bzero(ifrt, sizeof (ifrt_t));
-			ifrt->ifrt_type = ire->ire_type;
-			ifrt->ifrt_v6addr = ire->ire_addr_v6;
-			mutex_enter(&ire->ire_lock);
-			ifrt->ifrt_v6gateway_addr = ire->ire_gateway_addr_v6;
-			ifrt->ifrt_v6src_addr = ire->ire_src_addr_v6;
-			mutex_exit(&ire->ire_lock);
-			ifrt->ifrt_v6mask = ire->ire_mask_v6;
-			ifrt->ifrt_flags = ire->ire_flags;
-			ifrt->ifrt_max_frag = ire->ire_max_frag;
-			mutex_enter(&ipif->ipif_saved_ire_lock);
-			save_mp->b_cont = ipif->ipif_saved_ire_mp;
-			ipif->ipif_saved_ire_mp = save_mp;
-			ipif->ipif_saved_ire_cnt++;
-			mutex_exit(&ipif->ipif_saved_ire_lock);
-		}
+		ill_save_ire(ire->ire_ill, ire);
 	}
+
 	if (ire_arg != NULL) {
 		/*
 		 * Store the ire that was successfully added into where ire_arg
@@ -971,28 +902,27 @@ save_ire:
 	} else {
 		ire_refrele(ire);		/* Held in ire_add */
 	}
-	if (ipif_refheld)
+	if (ipif != NULL)
 		ipif_refrele(ipif);
 	return (0);
 }
 
 /*
  * ip_rt_delete_v6 is called to delete an IPv6 route.
- * ipif_arg is passed in to associate it with the correct interface
+ * ill is passed in to associate it with the correct interface.
  * (for link-local destinations and gateways).
  */
 /* ARGSUSED4 */
 int
 ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
-    const in6_addr_t *gw_addr, uint_t rtm_addrs, int flags, ipif_t *ipif_arg,
-    queue_t *q, mblk_t *mp, ipsq_func_t func, ip_stack_t *ipst)
+    const in6_addr_t *gw_addr, uint_t rtm_addrs, int flags, ill_t *ill,
+    ip_stack_t *ipst, zoneid_t zoneid)
 {
 	ire_t	*ire = NULL;
 	ipif_t	*ipif;
 	uint_t	type;
 	uint_t	match_flags = MATCH_IRE_TYPE;
 	int	err = 0;
-	boolean_t	ipif_refheld = B_FALSE;
 
 	/*
 	 * If this is the case of RTF_HOST being set, then we set the netmask
@@ -1012,49 +942,49 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	 *
 	 * This makes it possible to delete an original
 	 * IRE_IF_NORESOLVER/IRE_IF_RESOLVER - consistent with SunOS 4.1.
+	 * However, we have RTF_KERNEL set on the ones created by ipif_up
+	 * and those can not be deleted here.
 	 *
-	 * As the interface index specified with the RTA_IFP sockaddr is the
-	 * same for all ipif's off of an ill, the matching logic below uses
-	 * MATCH_IRE_ILL if such an index was specified.  This means a route
-	 * sharing the same prefix and interface index as the the route
-	 * intended to be deleted might be deleted instead if a RTA_IFP sockaddr
-	 * is specified in the request.
-	 *
-	 * On the other hand, since the gateway address will usually be
-	 * different for each ipif on the system, the matching logic
-	 * uses MATCH_IRE_IPIF in the case of a traditional interface
-	 * route.  This means that interface routes for the same prefix can be
-	 * uniquely identified if they belong to distinct ipif's and if a
-	 * RTA_IFP sockaddr is not present.
+	 * We use MATCH_IRE_ILL if we know the interface. If the caller
+	 * specified an interface (from the RTA_IFP sockaddr) we use it,
+	 * otherwise we use the ill derived from the gateway address.
+	 * We can always match the gateway address since we record it
+	 * in ire_gateway_addr.
 	 *
 	 * For more detail on specifying routes by gateway address and by
 	 * interface index, see the comments in ip_rt_add_v6().
 	 */
-	ipif = ipif_lookup_interface_v6(gw_addr, dst_addr, q, mp, func, &err,
-	    ipst);
+	ipif = ipif_lookup_interface_v6(gw_addr, dst_addr, ipst);
 	if (ipif != NULL) {
-		ipif_refheld = B_TRUE;
-		if (ipif_arg != NULL) {
-			ipif_refrele(ipif);
-			ipif_refheld = B_FALSE;
-			ipif = ipif_arg;
-			match_flags |= MATCH_IRE_ILL;
-		} else {
-			match_flags |= MATCH_IRE_IPIF;
+		ill_t	*ill_match;
+
+		if (ill != NULL)
+			ill_match = ill;
+		else
+			ill_match = ipif->ipif_ill;
+
+		match_flags |= MATCH_IRE_ILL;
+		if (ipif->ipif_ire_type == IRE_LOOPBACK) {
+			ire = ire_ftable_lookup_v6(dst_addr, 0, 0, IRE_LOOPBACK,
+			    ill_match, ALL_ZONES, NULL, match_flags, 0, ipst,
+			    NULL);
+		}
+		if (ire == NULL) {
+			match_flags |= MATCH_IRE_GW;
+			ire = ire_ftable_lookup_v6(dst_addr, mask, gw_addr,
+			    IRE_INTERFACE, ill_match, ALL_ZONES, NULL,
+			    match_flags, 0, ipst, NULL);
+		}
+		/* Avoid deleting routes created by kernel from an ipif */
+		if (ire != NULL && (ire->ire_flags & RTF_KERNEL)) {
+			ire_refrele(ire);
+			ire = NULL;
 		}
 
-		if (ipif->ipif_ire_type == IRE_LOOPBACK)
-			ire = ire_ctable_lookup_v6(dst_addr, 0, IRE_LOOPBACK,
-			    ipif, ALL_ZONES, NULL, match_flags, ipst);
-		if (ire == NULL)
-			ire = ire_ftable_lookup_v6(dst_addr, mask, 0,
-			    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0, NULL,
-			    match_flags, ipst);
-	} else if (err == EINPROGRESS) {
-		return (err);
-	} else {
-		err = 0;
+		/* Restore in case we didn't find a match */
+		match_flags &= ~(MATCH_IRE_GW|MATCH_IRE_ILL);
 	}
+
 	if (ire == NULL) {
 		/*
 		 * At this point, the gateway address is not one of our own
@@ -1062,15 +992,11 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		 * set the IRE type to lookup based on whether
 		 * this is a host route, a default route or just a prefix.
 		 *
-		 * If an ipif_arg was passed in, then the lookup is based on an
+		 * If an ill was passed in, then the lookup is based on an
 		 * interface index so MATCH_IRE_ILL is added to match_flags.
-		 * In any case, MATCH_IRE_IPIF is cleared and MATCH_IRE_GW is
-		 * set as the route being looked up is not a traditional
-		 * interface route.
 		 */
-		match_flags &= ~MATCH_IRE_IPIF;
 		match_flags |= MATCH_IRE_GW;
-		if (ipif_arg != NULL)
+		if (ill != NULL)
 			match_flags |= MATCH_IRE_ILL;
 		if (IN6_ARE_ADDR_EQUAL(mask, &ipv6_all_ones))
 			type = IRE_HOST;
@@ -1079,12 +1005,12 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		else
 			type = IRE_PREFIX;
 		ire = ire_ftable_lookup_v6(dst_addr, mask, gw_addr, type,
-		    ipif_arg, NULL, ALL_ZONES, 0, NULL, match_flags, ipst);
+		    ill, ALL_ZONES, NULL, match_flags, 0, ipst, NULL);
 	}
 
-	if (ipif_refheld) {
+	if (ipif != NULL) {
 		ipif_refrele(ipif);
-		ipif_refheld = B_FALSE;
+		ipif = NULL;
 	}
 	if (ire == NULL)
 		return (ESRCH);
@@ -1103,42 +1029,9 @@ ip_rt_delete_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		}
 	}
 
-	ipif = ire->ire_ipif;
-	if (ipif != NULL) {
-		mblk_t		**mpp;
-		mblk_t		*mp;
-		ifrt_t		*ifrt;
-		in6_addr_t	gw_addr_v6;
-
-		/* Remove from ipif_saved_ire_mp list if it is there */
-		mutex_enter(&ire->ire_lock);
-		gw_addr_v6 = ire->ire_gateway_addr_v6;
-		mutex_exit(&ire->ire_lock);
-		mutex_enter(&ipif->ipif_saved_ire_lock);
-		for (mpp = &ipif->ipif_saved_ire_mp; *mpp != NULL;
-		    mpp = &(*mpp)->b_cont) {
-			/*
-			 * On a given ipif, the triple of address, gateway and
-			 * mask is unique for each saved IRE (in the case of
-			 * ordinary interface routes, the gateway address is
-			 * all-zeroes).
-			 */
-			mp = *mpp;
-			ifrt = (ifrt_t *)mp->b_rptr;
-			if (IN6_ARE_ADDR_EQUAL(&ifrt->ifrt_v6addr,
-			    &ire->ire_addr_v6) &&
-			    IN6_ARE_ADDR_EQUAL(&ifrt->ifrt_v6gateway_addr,
-			    &gw_addr_v6) &&
-			    IN6_ARE_ADDR_EQUAL(&ifrt->ifrt_v6mask,
-			    &ire->ire_mask_v6)) {
-				*mpp = mp->b_cont;
-				ipif->ipif_saved_ire_cnt--;
-				freeb(mp);
-				break;
-			}
-		}
-		mutex_exit(&ipif->ipif_saved_ire_lock);
-	}
+	ill = ire->ire_ill;
+	if (ill != NULL)
+		ill_remove_saved_ire(ill, ire);
 	ire_delete(ire);
 	ire_refrele(ire);
 	return (err);
@@ -1197,7 +1090,6 @@ ipif_set6to4addr(ipif_t *ipif)
 	(void) ip_plen_to_mask_v6(16, &ipif->ipif_v6net_mask);
 	bcopy(ill->ill_phys_addr, &v4phys, sizeof (struct in_addr));
 	IN6_V4ADDR_TO_6TO4(&v4phys, &ipif->ipif_v6lcl_addr);
-	ipif->ipif_v6src_addr = ipif->ipif_v6lcl_addr;
 	V6_MASK_COPY(ipif->ipif_v6lcl_addr, ipif->ipif_v6net_mask,
 	    ipif->ipif_v6subnet);
 }
@@ -1260,11 +1152,6 @@ ipif_setlinklocal(ipif_t *ipif)
 		    ipif->ipif_v6subnet);
 	}
 
-	if (ipif->ipif_flags & IPIF_NOLOCAL) {
-		ipif->ipif_v6src_addr = ipv6_all_zeros;
-	} else {
-		ipif->ipif_v6src_addr = ipif->ipif_v6lcl_addr;
-	}
 }
 
 /*
@@ -1280,120 +1167,12 @@ ipif_setdestlinklocal(ipif_t *ipif)
 	ASSERT(IAM_WRITER_ILL(ill));
 	if (IN6_IS_ADDR_UNSPECIFIED(&ill->ill_dest_token))
 		return;
+	/* Skip if we've already set the pp_dst_addr */
+	if (!IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6pp_dst_addr))
+		return;
+
 	ipif_get_linklocal(&ipif->ipif_v6pp_dst_addr, &ill->ill_dest_token);
 	ipif->ipif_v6subnet = ipif->ipif_v6pp_dst_addr;
-}
-
-/*
- * This function sets up the multicast mappings in NDP.
- * Unlike ARP, there are no mapping_mps here. We delete the
- * mapping nces and add a new one.
- *
- * Returns non-zero on error and 0 on success.
- */
-int
-ipif_ndp_setup_multicast(ipif_t *ipif, nce_t **ret_nce)
-{
-	ill_t		*ill = ipif->ipif_ill;
-	in6_addr_t	v6_mcast_addr = {(uint32_t)V6_MCAST, 0, 0, 0};
-	in6_addr_t	v6_mcast_mask = {(uint32_t)V6_MCAST, 0, 0, 0};
-	in6_addr_t	v6_extract_mask;
-	uchar_t		*phys_addr, *bphys_addr, *alloc_phys;
-	nce_t		*mnce = NULL;
-	int		err = 0;
-	phyint_t	*phyi = ill->ill_phyint;
-	uint32_t	hw_extract_start;
-	dl_unitdata_req_t *dlur;
-	ip_stack_t	*ipst = ill->ill_ipst;
-
-	if (ret_nce != NULL)
-		*ret_nce = NULL;
-
-	if (ipif->ipif_flags & IPIF_POINTOPOINT)
-		return (0);
-
-	/*
-	 * IPMP meta-interfaces don't have any inherent multicast mappings,
-	 * and instead use the ones on the underlying interfaces.
-	 */
-	if (IS_IPMP(ill))
-		return (0);
-
-	/*
-	 * Delete the mapping nce. Normally these should not exist
-	 * as a previous ipif_down -> ipif_ndp_down should have deleted
-	 * all the nces. But they can exist if ip_rput_dlpi_writer
-	 * calls this when PHYI_MULTI_BCAST is set.  Mappings are always
-	 * tied to the underlying ill, so don't match across the illgrp.
-	 */
-	mnce = ndp_lookup_v6(ill, B_FALSE, &v6_mcast_addr, B_FALSE);
-	if (mnce != NULL) {
-		ndp_delete(mnce);
-		NCE_REFRELE(mnce);
-		mnce = NULL;
-	}
-
-	/*
-	 * Get media specific v6 mapping information. Note that
-	 * nd_lla_len can be 0 for tunnels.
-	 */
-	alloc_phys = kmem_alloc(ill->ill_nd_lla_len, KM_NOSLEEP);
-	if ((alloc_phys == NULL) && (ill->ill_nd_lla_len != 0))
-		return (ENOMEM);
-	/*
-	 * Determine the broadcast address.
-	 */
-	dlur = (dl_unitdata_req_t *)ill->ill_bcast_mp->b_rptr;
-	if (ill->ill_sap_length < 0)
-		bphys_addr = (uchar_t *)dlur + dlur->dl_dest_addr_offset;
-	else
-		bphys_addr = (uchar_t *)dlur +
-		    dlur->dl_dest_addr_offset + ill->ill_sap_length;
-
-	/*
-	 * Check PHYI_MULTI_BCAST and possible length of physical
-	 * address to determine if we use the mapping or the
-	 * broadcast address.
-	 */
-	if ((phyi->phyint_flags & PHYI_MULTI_BCAST) ||
-	    (!MEDIA_V6MINFO(ill->ill_media, ill->ill_nd_lla_len,
-	    bphys_addr, alloc_phys, &hw_extract_start,
-	    &v6_extract_mask))) {
-		if (ill->ill_phys_addr_length > IP_MAX_HW_LEN) {
-			kmem_free(alloc_phys, ill->ill_nd_lla_len);
-			return (E2BIG);
-		}
-		/* Use the link-layer broadcast address for MULTI_BCAST */
-		phys_addr = bphys_addr;
-		bzero(&v6_extract_mask, sizeof (v6_extract_mask));
-		hw_extract_start = ill->ill_nd_lla_len;
-	} else {
-		phys_addr = alloc_phys;
-	}
-	if ((ipif->ipif_flags & IPIF_BROADCAST) ||
-	    (ill->ill_flags & ILLF_MULTICAST) ||
-	    (phyi->phyint_flags & PHYI_MULTI_BCAST)) {
-		mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
-		err = ndp_add_v6(ill,
-		    phys_addr,
-		    &v6_mcast_addr,	/* v6 address */
-		    &v6_mcast_mask,	/* v6 mask */
-		    &v6_extract_mask,
-		    hw_extract_start,
-		    NCE_F_MAPPING | NCE_F_PERMANENT | NCE_F_NONUD,
-		    ND_REACHABLE,
-		    &mnce);
-		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
-		if (err == 0) {
-			if (ret_nce != NULL) {
-				*ret_nce = mnce;
-			} else {
-				NCE_REFRELE(mnce);
-			}
-		}
-	}
-	kmem_free(alloc_phys, ill->ill_nd_lla_len);
-	return (err);
 }
 
 /*
@@ -1405,50 +1184,28 @@ ipif_ndp_up(ipif_t *ipif, boolean_t initial)
 	ill_t		*ill = ipif->ipif_ill;
 	int		err = 0;
 	nce_t		*nce = NULL;
-	nce_t		*mnce = NULL;
 	boolean_t	added_ipif = B_FALSE;
 
-	ASSERT(IAM_WRITER_ILL(ill));
+	DTRACE_PROBE3(ipif__downup, char *, "ipif_ndp_up",
+	    ill_t *, ill, ipif_t *, ipif);
 	ip1dbg(("ipif_ndp_up(%s:%u)\n", ill->ill_name, ipif->ipif_id));
 
-	/*
-	 * ND not supported on XRESOLV interfaces. If ND support (multicast)
-	 * added later, take out this check.
-	 */
-	if ((ill->ill_flags & ILLF_XRESOLV) ||
-	    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr) ||
+	if (IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr) ||
 	    (!(ill->ill_net_type & IRE_INTERFACE))) {
 		ipif->ipif_addr_ready = 1;
 		return (0);
 	}
 
-	/*
-	 * Need to setup multicast mapping only when the first
-	 * interface is coming UP.
-	 */
-	if (ill->ill_ipif_up_count == 0 &&
-	    (ill->ill_flags & ILLF_MULTICAST)) {
-		/*
-		 * We set the multicast before setting up the mapping for
-		 * local address because ipif_ndp_setup_multicast does
-		 * ndp_walk to delete nces which will delete the mapping
-		 * for local address also if we added the mapping for
-		 * local address first.
-		 */
-		err = ipif_ndp_setup_multicast(ipif, &mnce);
-		if (err != 0)
-			return (err);
-	}
-
 	if ((ipif->ipif_flags & (IPIF_UNNUMBERED|IPIF_NOLOCAL)) == 0) {
 		uint16_t	flags;
 		uint16_t	state;
-		uchar_t		*hw_addr = NULL;
+		uchar_t		*hw_addr;
 		ill_t		*bound_ill;
 		ipmp_illgrp_t	*illg = ill->ill_grp;
+		uint_t		hw_addr_len;
 
-		/* Permanent entries don't need NUD */
-		flags = NCE_F_PERMANENT | NCE_F_NONUD;
+		flags = NCE_F_MYADDR | NCE_F_NONUD | NCE_F_PUBLISH |
+		    NCE_F_AUTHORITY;
 		if (ill->ill_flags & ILLF_ROUTER)
 			flags |= NCE_F_ISROUTER;
 
@@ -1483,10 +1240,16 @@ ipif_ndp_up(ipif_t *ipif, boolean_t initial)
 				added_ipif = B_TRUE;
 			}
 			hw_addr = bound_ill->ill_nd_lla;
+			hw_addr_len = bound_ill->ill_phys_addr_length;
 		} else {
 			bound_ill = ill;
-			if (ill->ill_net_type == IRE_IF_RESOLVER)
+			if (ill->ill_net_type == IRE_IF_RESOLVER) {
 				hw_addr = ill->ill_nd_lla;
+				hw_addr_len = ill->ill_phys_addr_length;
+			} else {
+				hw_addr = NULL;
+				hw_addr_len = 0;
+			}
 		}
 
 		/*
@@ -1496,28 +1259,16 @@ ipif_ndp_up(ipif_t *ipif, boolean_t initial)
 		 * unsolicited advertisements to inform others.
 		 */
 		if (initial || !ipif->ipif_addr_ready) {
+			/* Causes Duplicate Address Detection to run */
 			state = ND_PROBE;
 		} else {
 			state = ND_REACHABLE;
 			flags |= NCE_F_UNSOL_ADV;
 		}
+
 retry:
-		/*
-		 * Create an nce for the local address. We pass a match_illgrp
-		 * of B_TRUE because the local address must be unique across
-		 * the illgrp, and the existence of an nce with nce_ill set
-		 * to any ill in the group is indicative of a duplicate address
-		 */
-		err = ndp_lookup_then_add_v6(bound_ill,
-		    B_TRUE,
-		    hw_addr,
-		    &ipif->ipif_v6lcl_addr,
-		    &ipv6_all_ones,
-		    &ipv6_all_zeros,
-		    0,
-		    flags,
-		    state,
-		    &nce);
+		err = nce_lookup_then_add_v6(ill, hw_addr, hw_addr_len,
+		    &ipif->ipif_v6lcl_addr, flags, state, &nce);
 		switch (err) {
 		case 0:
 			ip1dbg(("ipif_ndp_up: NCE created for %s\n",
@@ -1535,14 +1286,21 @@ retry:
 		case EEXIST:
 			ip1dbg(("ipif_ndp_up: NCE already exists for %s\n",
 			    ill->ill_name));
-			if (!(nce->nce_flags & NCE_F_PERMANENT)) {
-				ndp_delete(nce);
-				NCE_REFRELE(nce);
+			if (!NCE_MYADDR(nce->nce_common)) {
+				/*
+				 * A leftover nce from before this address
+				 * existed
+				 */
+				ncec_delete(nce->nce_common);
+				nce_refrele(nce);
 				nce = NULL;
 				goto retry;
 			}
 			if ((ipif->ipif_flags & IPIF_POINTOPOINT) == 0) {
-				NCE_REFRELE(nce);
+				nce_refrele(nce);
+				nce = NULL;
+				ip1dbg(("ipif_ndp_up: NCE already exists "
+				    "for %s\n", ill->ill_name));
 				goto fail;
 			}
 			/*
@@ -1557,6 +1315,7 @@ retry:
 			ipif->ipif_addr_ready = 1;
 			ipif->ipif_added_nce = 1;
 			nce->nce_ipif_cnt++;
+			err = 0;
 			break;
 		default:
 			ip1dbg(("ipif_ndp_up: NCE creation failed for %s\n",
@@ -1568,15 +1327,9 @@ retry:
 		ipif->ipif_addr_ready = 1;
 	}
 	if (nce != NULL)
-		NCE_REFRELE(nce);
-	if (mnce != NULL)
-		NCE_REFRELE(mnce);
+		nce_refrele(nce);
 	return (0);
 fail:
-	if (mnce != NULL) {
-		ndp_delete(mnce);
-		NCE_REFRELE(mnce);
-	}
 	if (added_ipif)
 		ipmp_illgrp_del_ipif(ill->ill_grp, ipif);
 
@@ -1587,181 +1340,7 @@ fail:
 void
 ipif_ndp_down(ipif_t *ipif)
 {
-	nce_t	*nce;
-	ill_t	*ill = ipif->ipif_ill;
-
-	ASSERT(IAM_WRITER_ILL(ill));
-
-	if (ipif->ipif_isv6) {
-		if (ipif->ipif_added_nce) {
-			/*
-			 * For IPMP, `ill' can be the IPMP ill but the NCE will
-			 * always be tied to an underlying IP interface, so we
-			 * match across the illgrp.  This is safe since we
-			 * ensure uniqueness across the group in ipif_ndp_up().
-			 */
-			nce = ndp_lookup_v6(ill, B_TRUE, &ipif->ipif_v6lcl_addr,
-			    B_FALSE);
-			if (nce != NULL) {
-				if (--nce->nce_ipif_cnt == 0)
-					ndp_delete(nce); /* last ipif for nce */
-				NCE_REFRELE(nce);
-			}
-			ipif->ipif_added_nce = 0;
-		}
-
-		/*
-		 * Make IPMP aware of the deleted data address.
-		 */
-		if (IS_IPMP(ill))
-			ipmp_illgrp_del_ipif(ill->ill_grp, ipif);
-	}
-
-	/*
-	 * Remove mapping and all other nces dependent on this ill
-	 * when the last ipif is going away.
-	 */
-	if (ill->ill_ipif_up_count == 0)
-		ndp_walk(ill, (pfi_t)ndp_delete_per_ill, ill, ill->ill_ipst);
-}
-
-/*
- * Used when an interface comes up to recreate any extra routes on this
- * interface.
- */
-static ire_t **
-ipif_recover_ire_v6(ipif_t *ipif)
-{
-	mblk_t	*mp;
-	ire_t   **ipif_saved_irep;
-	ire_t   **irep;
-	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
-
-	ip1dbg(("ipif_recover_ire_v6(%s:%u)", ipif->ipif_ill->ill_name,
-	    ipif->ipif_id));
-
-	ASSERT(ipif->ipif_isv6);
-
-	mutex_enter(&ipif->ipif_saved_ire_lock);
-	ipif_saved_irep = (ire_t **)kmem_zalloc(sizeof (ire_t *) *
-	    ipif->ipif_saved_ire_cnt, KM_NOSLEEP);
-	if (ipif_saved_irep == NULL) {
-		mutex_exit(&ipif->ipif_saved_ire_lock);
-		return (NULL);
-	}
-
-	irep = ipif_saved_irep;
-
-	for (mp = ipif->ipif_saved_ire_mp; mp != NULL; mp = mp->b_cont) {
-		ire_t		*ire;
-		queue_t		*rfq;
-		queue_t		*stq;
-		ifrt_t		*ifrt;
-		in6_addr_t	*src_addr;
-		in6_addr_t	*gateway_addr;
-		char		buf[INET6_ADDRSTRLEN];
-		ushort_t	type;
-
-		/*
-		 * When the ire was initially created and then added in
-		 * ip_rt_add_v6(), it was created either using
-		 * ipif->ipif_net_type in the case of a traditional interface
-		 * route, or as one of the IRE_OFFSUBNET types (with the
-		 * exception of IRE_HOST type redirect ire which is created by
-		 * icmp_redirect_v6() and which we don't need to save or
-		 * recover).  In the case where ipif->ipif_net_type was
-		 * IRE_LOOPBACK, ip_rt_add_v6() will update the ire_type to
-		 * IRE_IF_NORESOLVER before calling ire_add_v6() to satisfy
-		 * software like GateD and Sun Cluster which creates routes
-		 * using the the loopback interface's address as a gateway.
-		 *
-		 * As ifrt->ifrt_type reflects the already updated ire_type,
-		 * ire_create_v6() will be called in the same way here as in
-		 * ip_rt_add_v6(), namely using ipif->ipif_net_type when the
-		 * route looks like a traditional interface route (where
-		 * ifrt->ifrt_type & IRE_INTERFACE is true) and otherwise
-		 * using the saved ifrt->ifrt_type.  This means that in
-		 * the case where ipif->ipif_net_type is IRE_LOOPBACK,
-		 * the ire created by ire_create_v6() will be an IRE_LOOPBACK,
-		 * it will then be turned into an IRE_IF_NORESOLVER and then
-		 * added by ire_add_v6().
-		 */
-		ifrt = (ifrt_t *)mp->b_rptr;
-		if (ifrt->ifrt_type & IRE_INTERFACE) {
-			rfq = NULL;
-			stq = (ipif->ipif_net_type == IRE_IF_RESOLVER)
-			    ? ipif->ipif_rq : ipif->ipif_wq;
-			src_addr = (ifrt->ifrt_flags & RTF_SETSRC)
-			    ? &ifrt->ifrt_v6src_addr
-			    : &ipif->ipif_v6src_addr;
-			gateway_addr = NULL;
-			type = ipif->ipif_net_type;
-		} else {
-			rfq = NULL;
-			stq = NULL;
-			src_addr = (ifrt->ifrt_flags & RTF_SETSRC)
-			    ? &ifrt->ifrt_v6src_addr : NULL;
-			gateway_addr = &ifrt->ifrt_v6gateway_addr;
-			type = ifrt->ifrt_type;
-		}
-
-		/*
-		 * Create a copy of the IRE with the saved address and netmask.
-		 */
-		ip1dbg(("ipif_recover_ire_v6: creating IRE %s (%d) for %s/%d\n",
-		    ip_nv_lookup(ire_nv_tbl, ifrt->ifrt_type), ifrt->ifrt_type,
-		    inet_ntop(AF_INET6, &ifrt->ifrt_v6addr, buf, sizeof (buf)),
-		    ip_mask_to_plen_v6(&ifrt->ifrt_v6mask)));
-		ire = ire_create_v6(
-		    &ifrt->ifrt_v6addr,
-		    &ifrt->ifrt_v6mask,
-		    src_addr,
-		    gateway_addr,
-		    &ifrt->ifrt_max_frag,
-		    NULL,
-		    rfq,
-		    stq,
-		    type,
-		    ipif,
-		    NULL,
-		    0,
-		    0,
-		    ifrt->ifrt_flags,
-		    &ifrt->ifrt_iulp_info,
-		    NULL,
-		    NULL,
-		    ipst);
-		if (ire == NULL) {
-			mutex_exit(&ipif->ipif_saved_ire_lock);
-			kmem_free(ipif_saved_irep,
-			    ipif->ipif_saved_ire_cnt * sizeof (ire_t *));
-			return (NULL);
-		}
-
-		/*
-		 * Some software (for example, GateD and Sun Cluster) attempts
-		 * to create (what amount to) IRE_PREFIX routes with the
-		 * loopback address as the gateway.  This is primarily done to
-		 * set up prefixes with the RTF_REJECT flag set (for example,
-		 * when generating aggregate routes.)
-		 *
-		 * If the IRE type (as defined by ipif->ipif_net_type) is
-		 * IRE_LOOPBACK, then we map the request into a
-		 * IRE_IF_NORESOLVER.
-		 */
-		if (ipif->ipif_net_type == IRE_LOOPBACK)
-			ire->ire_type = IRE_IF_NORESOLVER;
-		/*
-		 * ire held by ire_add, will be refreled' in ipif_up_done
-		 * towards the end
-		 */
-		(void) ire_add(&ire, NULL, NULL, NULL, B_FALSE);
-		*irep = ire;
-		irep++;
-		ip1dbg(("ipif_recover_ire_v6: added ire %p\n", (void *)ire));
-	}
-	mutex_exit(&ipif->ipif_saved_ire_lock);
-	return (ipif_saved_irep);
+	ipif_nce_down(ipif);
 }
 
 /*
@@ -1826,8 +1405,7 @@ ip_common_prefix_v6(const in6_addr_t *a1, const in6_addr_t *a2)
 
 #define	IPIF_VALID_IPV6_SOURCE(ipif) \
 	(((ipif)->ipif_flags & IPIF_UP) && \
-	!((ipif)->ipif_flags & (IPIF_NOLOCAL|IPIF_ANYCAST)) && \
-	(ipif)->ipif_addr_ready)
+	!((ipif)->ipif_flags & (IPIF_NOLOCAL|IPIF_ANYCAST)))
 
 /* source address candidate */
 typedef struct candidate {
@@ -2195,13 +1773,6 @@ rule_addr_type(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo,
 static rule_res_t
 rule_prefix(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo, ip_stack_t *ipst)
 {
-	/*
-	 * For IPMP, we always want to choose a random source address from
-	 * among any equally usable addresses, so always report a tie.
-	 */
-	if (IS_IPMP(dstinfo->dst_ill))
-		return (CAND_TIE);
-
 	if (!bc->cand_common_pref_set) {
 		bc->cand_common_pref = ip_common_prefix_v6(&bc->cand_srcaddr,
 		    dstinfo->dst_addr);
@@ -2252,14 +1823,15 @@ rule_must_be_last(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo,
  *
  * src_prefs is the caller's set of source address preferences.  If source
  * address selection is being called to determine the source address of a
- * connected socket (from ip_bind_connected_v6()), then the preferences are
- * taken from conn_src_preferences.  These preferences can be set on a
+ * connected socket (from ip_set_destination_v6()), then the preferences are
+ * taken from conn_ixa->ixa_src_preferences.  These preferences can be set on a
  * per-socket basis using the IPV6_SRC_PREFERENCES socket option.  The only
  * preference currently implemented is for rfc3041 temporary addresses.
  */
 ipif_t *
 ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
-    boolean_t restrict_ill, uint32_t src_prefs, zoneid_t zoneid)
+    boolean_t restrict_ill, uint32_t src_prefs, zoneid_t zoneid,
+    boolean_t allow_usesrc, boolean_t *notreadyp)
 {
 	dstinfo_t	dstinfo;
 	char		dstr[INET6_ADDRSTRLEN];
@@ -2306,10 +1878,10 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 	 * usesrc ifindex. This has higher precedence since it is
 	 * finer grained (i.e per interface) v/s being system wide.
 	 */
-	if (dstill->ill_usesrc_ifindex != 0) {
+	if (dstill->ill_usesrc_ifindex != 0 && allow_usesrc) {
 		if ((usesrc_ill =
 		    ill_lookup_on_ifindex(dstill->ill_usesrc_ifindex, B_TRUE,
-		    NULL, NULL, NULL, NULL, ipst)) != NULL) {
+		    ipst)) != NULL) {
 			dstinfo.dst_ill = usesrc_ill;
 		} else {
 			return (NULL);
@@ -2412,6 +1984,12 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 			if (!IPIF_VALID_IPV6_SOURCE(ipif))
 				continue;
 
+			if (!ipif->ipif_addr_ready) {
+				if (notreadyp != NULL)
+					*notreadyp = B_TRUE;
+				continue;
+			}
+
 			if (zoneid != ALL_ZONES &&
 			    ipif->ipif_zoneid != zoneid &&
 			    ipif->ipif_zoneid != ALL_ZONES)
@@ -2505,7 +2083,7 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 		if (IS_IPMP(ill) && ipif != NULL) {
 			mutex_enter(&ipif->ipif_ill->ill_lock);
 			next_ipif = ipif->ipif_next;
-			if (next_ipif != NULL && IPIF_CAN_LOOKUP(next_ipif))
+			if (next_ipif != NULL && !IPIF_IS_CONDEMNED(next_ipif))
 				ill->ill_src_ipif = next_ipif;
 			else
 				ill->ill_src_ipif = NULL;
@@ -2541,7 +2119,7 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 	}
 
 	mutex_enter(&ipif->ipif_ill->ill_lock);
-	if (IPIF_CAN_LOOKUP(ipif)) {
+	if (!IPIF_IS_CONDEMNED(ipif)) {
 		ipif_refhold_locked(ipif);
 		mutex_exit(&ipif->ipif_ill->ill_lock);
 		rw_exit(&ipst->ips_ill_g_lock);
@@ -2556,187 +2134,72 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 }
 
 /*
- * If old_ipif is not NULL, see if ipif was derived from old
- * ipif and if so, recreate the interface route by re-doing
- * source address selection. This happens when ipif_down ->
- * ipif_update_other_ipifs calls us.
+ * Pick a source address based on the destination ill and an optional setsrc
+ * address.
+ * The result is stored in srcp. If generation is set, then put the source
+ * generation number there before we look for the source address (to avoid
+ * missing changes in the set of source addresses.
+ * If flagsp is set, then us it to pass back ipif_flags.
  *
- * If old_ipif is NULL, just redo the source address selection
- * if needed. This happens when ipif_up_done_v6 calls us.
- */
-void
-ipif_recreate_interface_routes_v6(ipif_t *old_ipif, ipif_t *ipif)
-{
-	ire_t *ire;
-	ire_t *ipif_ire;
-	queue_t *stq;
-	ill_t *ill;
-	ipif_t *nipif = NULL;
-	boolean_t nipif_refheld = B_FALSE;
-	boolean_t ip6_asp_table_held = B_FALSE;
-	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
-
-	ill = ipif->ipif_ill;
-
-	if (!(ipif->ipif_flags &
-	    (IPIF_NOLOCAL|IPIF_ANYCAST|IPIF_DEPRECATED))) {
-		/*
-		 * Can't possibly have borrowed the source
-		 * from old_ipif.
-		 */
-		return;
-	}
-
-	/*
-	 * Is there any work to be done? No work if the address
-	 * is INADDR_ANY, loopback or NOLOCAL or ANYCAST (
-	 * ipif_select_source_v6() does not borrow addresses from
-	 * NOLOCAL and ANYCAST interfaces).
-	 */
-	if ((old_ipif != NULL) &&
-	    ((IN6_IS_ADDR_UNSPECIFIED(&old_ipif->ipif_v6lcl_addr)) ||
-	    (old_ipif->ipif_ill->ill_wq == NULL) ||
-	    (old_ipif->ipif_flags &
-	    (IPIF_NOLOCAL|IPIF_ANYCAST)))) {
-		return;
-	}
-
-	/*
-	 * Perform the same checks as when creating the
-	 * IRE_INTERFACE in ipif_up_done_v6.
-	 */
-	if (!(ipif->ipif_flags & IPIF_UP))
-		return;
-
-	if ((ipif->ipif_flags & IPIF_NOXMIT))
-		return;
-
-	if (IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6subnet) &&
-	    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6net_mask))
-		return;
-
-	/*
-	 * We know that ipif uses some other source for its
-	 * IRE_INTERFACE. Is it using the source of this
-	 * old_ipif?
-	 */
-	ipif_ire = ipif_to_ire_v6(ipif);
-	if (ipif_ire == NULL)
-		return;
-
-	if (old_ipif != NULL &&
-	    !IN6_ARE_ADDR_EQUAL(&old_ipif->ipif_v6lcl_addr,
-	    &ipif_ire->ire_src_addr_v6)) {
-		ire_refrele(ipif_ire);
-		return;
-	}
-
-	if (ip_debug > 2) {
-		/* ip1dbg */
-		pr_addr_dbg("ipif_recreate_interface_routes_v6: deleting IRE"
-		    " for src %s\n", AF_INET6, &ipif_ire->ire_src_addr_v6);
-	}
-
-	stq = ipif_ire->ire_stq;
-
-	/*
-	 * Can't use our source address. Select a different source address
-	 * for the IRE_INTERFACE.  We restrict interface route source
-	 * address selection to ipif's assigned to the same link as the
-	 * interface.
-	 */
-	if (ip6_asp_can_lookup(ipst)) {
-		ip6_asp_table_held = B_TRUE;
-		nipif = ipif_select_source_v6(ill, &ipif->ipif_v6subnet,
-		    B_TRUE, IPV6_PREFER_SRC_DEFAULT, ipif->ipif_zoneid);
-	}
-	if (nipif == NULL) {
-		/* Last resort - all ipif's have IPIF_NOLOCAL */
-		nipif = ipif;
-	} else {
-		nipif_refheld = B_TRUE;
-	}
-
-	ire = ire_create_v6(
-	    &ipif->ipif_v6subnet,	/* dest pref */
-	    &ipif->ipif_v6net_mask,	/* mask */
-	    &nipif->ipif_v6src_addr,	/* src addr */
-	    NULL,			/* no gateway */
-	    &ipif->ipif_mtu,		/* max frag */
-	    NULL,			/* no src nce */
-	    NULL,			/* no recv from queue */
-	    stq,			/* send-to queue */
-	    ill->ill_net_type,		/* IF_[NO]RESOLVER */
-	    ipif,
-	    NULL,
-	    0,
-	    0,
-	    0,
-	    &ire_uinfo_null,
-	    NULL,
-	    NULL,
-	    ipst);
-
-	if (ire != NULL) {
-		ire_t *ret_ire;
-		int   error;
-
-		/*
-		 * We don't need ipif_ire anymore. We need to delete
-		 * before we add so that ire_add does not detect
-		 * duplicates.
-		 */
-		ire_delete(ipif_ire);
-		ret_ire = ire;
-		error = ire_add(&ret_ire, NULL, NULL, NULL, B_FALSE);
-		ASSERT(error == 0);
-		ASSERT(ret_ire == ire);
-		if (ret_ire != NULL) {
-			/* Held in ire_add */
-			ire_refrele(ret_ire);
-		}
-	}
-	/*
-	 * Either we are falling through from above or could not
-	 * allocate a replacement.
-	 */
-	ire_refrele(ipif_ire);
-	if (ip6_asp_table_held)
-		ip6_asp_table_refrele(ipst);
-	if (nipif_refheld)
-		ipif_refrele(nipif);
-}
-
-/*
- * This old_ipif is going away.
+ * If the caller wants to cache the returned source address and detect when
+ * that might be stale, the caller should pass in a generation argument,
+ * which the caller can later compare against ips_src_generation
  *
- * Determine if any other ipif's are using our address as
- * ipif_v6lcl_addr (due to those being IPIF_NOLOCAL, IPIF_ANYCAST, or
- * IPIF_DEPRECATED).
- * Find the IRE_INTERFACE for such ipif's and recreate them
- * to use an different source address following the rules in
- * ipif_up_done_v6.
+ * The precedence order for selecting an IPv6 source address is:
+ *  - RTF_SETSRC on the first ire in the recursive lookup always wins.
+ *  - If usrsrc is set, swap the ill to be the usesrc one.
+ *  - If IPMP is used on the ill, select a random address from the most
+ *    preferred ones below:
+ * That is followed by the long list of IPv6 source address selection rules
+ * starting with rule_isdst(), rule_scope(), etc.
+ *
+ * We have lower preference for ALL_ZONES IP addresses,
+ * as they pose problems with unlabeled destinations.
+ *
+ * Note that when multiple IP addresses match e.g., with rule_scope() we pick
+ * the first one if IPMP is not in use. With IPMP we randomize.
  */
-void
-ipif_update_other_ipifs_v6(ipif_t *old_ipif)
+int
+ip_select_source_v6(ill_t *ill, const in6_addr_t *setsrc, const in6_addr_t *dst,
+    zoneid_t zoneid, ip_stack_t *ipst, uint_t restrict_ill, uint32_t src_prefs,
+    in6_addr_t *srcp, uint32_t *generation, uint64_t *flagsp)
 {
-	ipif_t	*ipif;
-	ill_t	*ill;
-	char	buf[INET6_ADDRSTRLEN];
+	ipif_t *ipif;
+	boolean_t notready = B_FALSE;	/* Set if !ipif_addr_ready found */
 
-	ASSERT(IAM_WRITER_IPIF(old_ipif));
+	if (flagsp != NULL)
+		*flagsp = 0;
 
-	ill = old_ipif->ipif_ill;
-
-	ip1dbg(("ipif_update_other_ipifs_v6(%s, %s)\n",
-	    ill->ill_name,
-	    inet_ntop(AF_INET6, &old_ipif->ipif_v6lcl_addr,
-	    buf, sizeof (buf))));
-
-	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
-		if (ipif != old_ipif)
-			ipif_recreate_interface_routes_v6(old_ipif, ipif);
+	/*
+	 * Need to grab the generation number before we check to
+	 * avoid a race with a change to the set of local addresses.
+	 * No lock needed since the thread which updates the set of local
+	 * addresses use ipif/ill locks and exit those (hence a store memory
+	 * barrier) before doing the atomic increase of ips_src_generation.
+	 */
+	if (generation != NULL) {
+		*generation = ipst->ips_src_generation;
 	}
+
+	/* Was RTF_SETSRC set on the first IRE in the recursive lookup? */
+	if (setsrc != NULL && !IN6_IS_ADDR_UNSPECIFIED(setsrc)) {
+		*srcp = *setsrc;
+		return (0);
+	}
+
+	ipif = ipif_select_source_v6(ill, dst, restrict_ill, src_prefs, zoneid,
+	    B_TRUE, &notready);
+	if (ipif == NULL) {
+		if (notready)
+			return (ENETDOWN);
+		else
+			return (EADDRNOTAVAIL);
+	}
+	*srcp = ipif->ipif_v6lcl_addr;
+	if (flagsp != NULL)
+		*flagsp = ipif->ipif_flags;
+	ipif_refrele(ipif);
+	return (0);
 }
 
 /*
@@ -2744,11 +2207,10 @@ ipif_update_other_ipifs_v6(ipif_t *old_ipif)
  * the physical device.
  * q and mp represents an ioctl which will be queued waiting for
  * completion of the DLPI message exchange.
- * MUST be called on an ill queue. Can not set conn_pending_ill for that
- * reason thus the DL_PHYS_ADDR_ACK code does not assume ill_pending_q.
+ * MUST be called on an ill queue.
  *
- * Returns EINPROGRESS when mp has been consumed by queueing it on
- * ill_pending_mp and the ioctl will complete in ip_rput.
+ * Returns EINPROGRESS when mp has been consumed by queueing it.
+ * The ioctl will complete in ip_rput.
  */
 int
 ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
@@ -2888,6 +2350,7 @@ bad:
 	return (ENOMEM);
 }
 
+/* Add room for tcp+ip headers */
 uint_t ip_loopback_mtu_v6plus = IP_LOOPBACK_MTU + IPV6_HDR_LEN + 20;
 
 /*
@@ -2899,28 +2362,14 @@ uint_t ip_loopback_mtu_v6plus = IP_LOOPBACK_MTU + IPV6_HDR_LEN + 20;
 int
 ipif_up_done_v6(ipif_t *ipif)
 {
-	ire_t	*ire_array[20];
-	ire_t	**irep = ire_array;
-	ire_t	**irep1;
 	ill_t	*ill = ipif->ipif_ill;
-	queue_t	*stq;
-	in6_addr_t	v6addr;
-	in6_addr_t	route_mask;
-	ipif_t	 *src_ipif = NULL;
-	ipif_t   *tmp_ipif;
-	boolean_t	flush_ire_cache = B_TRUE;
 	int	err;
-	char	buf[INET6_ADDRSTRLEN];
-	ire_t	**ipif_saved_irep = NULL;
-	int ipif_saved_ire_cnt;
-	int cnt;
-	boolean_t src_ipif_held = B_FALSE;
 	boolean_t loopback = B_FALSE;
-	boolean_t ip6_asp_table_held = B_FALSE;
-	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ip1dbg(("ipif_up_done_v6(%s:%u)\n",
 	    ipif->ipif_ill->ill_name, ipif->ipif_id));
+	DTRACE_PROBE3(ipif__downup, char *, "ipif_up_done_v6",
+	    ill_t *, ill, ipif_t *, ipif);
 
 	/* Check if this is a loopback interface */
 	if (ipif->ipif_ill->ill_wq == NULL)
@@ -2929,46 +2378,10 @@ ipif_up_done_v6(ipif_t *ipif)
 	ASSERT(ipif->ipif_isv6);
 	ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
 
-	/*
-	 * If all other interfaces for this ill are down or DEPRECATED,
-	 * or otherwise unsuitable for source address selection, remove
-	 * any IRE_CACHE entries for this ill to make sure source
-	 * address selection gets to take this new ipif into account.
-	 * No need to hold ill_lock while traversing the ipif list since
-	 * we are writer
-	 */
-	for (tmp_ipif = ill->ill_ipif; tmp_ipif;
-	    tmp_ipif = tmp_ipif->ipif_next) {
-		if (((tmp_ipif->ipif_flags &
-		    (IPIF_NOXMIT|IPIF_ANYCAST|IPIF_NOLOCAL|IPIF_DEPRECATED)) ||
-		    !(tmp_ipif->ipif_flags & IPIF_UP)) ||
-		    (tmp_ipif == ipif))
-			continue;
-		/* first useable pre-existing interface */
-		flush_ire_cache = B_FALSE;
-		break;
-	}
-	if (flush_ire_cache)
-		ire_walk_ill_v6(MATCH_IRE_ILL | MATCH_IRE_TYPE,
-		    IRE_CACHE, ill_ipif_cache_delete, ill, ill);
+	if (IS_LOOPBACK(ill) || ill->ill_net_type == IRE_IF_NORESOLVER) {
+		nce_t *loop_nce = NULL;
+		uint16_t flags = (NCE_F_MYADDR | NCE_F_NONUD | NCE_F_AUTHORITY);
 
-	/*
-	 * Figure out which way the send-to queue should go.  Only
-	 * IRE_IF_RESOLVER or IRE_IF_NORESOLVER should show up here.
-	 */
-	switch (ill->ill_net_type) {
-	case IRE_IF_RESOLVER:
-		stq = ill->ill_rq;
-		break;
-	case IRE_IF_NORESOLVER:
-	case IRE_LOOPBACK:
-		stq = ill->ill_wq;
-		break;
-	default:
-		return (EINVAL);
-	}
-
-	if (IS_LOOPBACK(ill)) {
 		/*
 		 * lo0:1 and subsequent ipifs were marked IRE_LOCAL in
 		 * ipif_lookup_on_name(), but in the case of zones we can have
@@ -2979,28 +2392,98 @@ ipif_up_done_v6(ipif_t *ipif)
 			ipif->ipif_ire_type = IRE_LOOPBACK;
 		else
 			ipif->ipif_ire_type = IRE_LOCAL;
+		if (ill->ill_net_type != IRE_LOOPBACK)
+			flags |= NCE_F_PUBLISH;
+		err = nce_lookup_then_add_v6(ill, NULL,
+		    ill->ill_phys_addr_length,
+		    &ipif->ipif_v6lcl_addr, flags, ND_REACHABLE, &loop_nce);
+
+		/* A shared-IP zone sees EEXIST for lo0:N */
+		if (err == 0 || err == EEXIST) {
+			ipif->ipif_added_nce = 1;
+			loop_nce->nce_ipif_cnt++;
+			nce_refrele(loop_nce);
+			err = 0;
+		} else {
+			ASSERT(loop_nce == NULL);
+			return (err);
+		}
 	}
 
-	if (ipif->ipif_flags & (IPIF_NOLOCAL|IPIF_ANYCAST) ||
-	    ((ipif->ipif_flags & IPIF_DEPRECATED) &&
-	    !(ipif->ipif_flags & IPIF_NOFAILOVER))) {
+	err = ipif_add_ires_v6(ipif, loopback);
+	if (err != 0) {
 		/*
-		 * Can't use our source address. Select a different
-		 * source address for the IRE_INTERFACE and IRE_LOCAL
+		 * See comments about return value from
+		 * ipif_addr_availability_check() in ipif_add_ires_v6().
 		 */
-		if (ip6_asp_can_lookup(ipst)) {
-			ip6_asp_table_held = B_TRUE;
-			src_ipif = ipif_select_source_v6(ipif->ipif_ill,
-			    &ipif->ipif_v6subnet, B_FALSE,
-			    IPV6_PREFER_SRC_DEFAULT, ipif->ipif_zoneid);
+		if (err != EADDRINUSE) {
+			ipif_ndp_down(ipif);
+		} else {
+			/*
+			 * Make IPMP aware of the deleted ipif so that
+			 * the needed ipmp cleanup (e.g., of ipif_bound_ill)
+			 * can be completed. Note that we do not want to
+			 * destroy the nce that was created on the ipmp_ill
+			 * for the active copy of the duplicate address in
+			 * use.
+			 */
+			if (IS_IPMP(ill))
+				ipmp_illgrp_del_ipif(ill->ill_grp, ipif);
+			err = EADDRNOTAVAIL;
 		}
-		if (src_ipif == NULL)
-			src_ipif = ipif;	/* Last resort */
-		else
-			src_ipif_held = B_TRUE;
-	} else {
-		src_ipif = ipif;
+		return (err);
 	}
+
+	if (ill->ill_ipif_up_count == 1 && !loopback) {
+		/* Recover any additional IREs entries for this ill */
+		(void) ill_recover_saved_ire(ill);
+	}
+
+	if (ill->ill_need_recover_multicast) {
+		/*
+		 * Need to recover all multicast memberships in the driver.
+		 * This had to be deferred until we had attached.
+		 */
+		ill_recover_multicast(ill);
+	}
+
+	if (ill->ill_ipif_up_count == 1) {
+		/*
+		 * Since the interface is now up, it may now be active.
+		 */
+		if (IS_UNDER_IPMP(ill))
+			ipmp_ill_refresh_active(ill);
+	}
+
+	/* Join the allhosts multicast address and the solicited node MC */
+	ipif_multicast_up(ipif);
+
+	/* Perhaps ilgs should use this ill */
+	update_conn_ill(NULL, ill->ill_ipst);
+
+	if (ipif->ipif_addr_ready)
+		ipif_up_notify(ipif);
+
+	return (0);
+}
+
+/*
+ * Add the IREs associated with the ipif.
+ * Those MUST be explicitly removed in ipif_delete_ires_v6.
+ */
+static int
+ipif_add_ires_v6(ipif_t *ipif, boolean_t loopback)
+{
+	ill_t		*ill = ipif->ipif_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	ire_t		*ire_array[20];
+	ire_t		**irep = ire_array;
+	ire_t		**irep1;
+	in6_addr_t	v6addr;
+	in6_addr_t	route_mask;
+	int		err;
+	char		buf[INET6_ADDRSTRLEN];
+	ire_t		*ire_local = NULL;	/* LOCAL or LOOPBACK */
 
 	if (!IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6lcl_addr) &&
 	    !(ipif->ipif_flags & IPIF_NOLOCAL)) {
@@ -3024,45 +2507,38 @@ ipif_up_done_v6(ipif_t *ipif)
 		err = ip_srcid_insert(&ipif->ipif_v6lcl_addr,
 		    ipif->ipif_zoneid, ipst);
 		if (err != 0) {
-			ip0dbg(("ipif_up_done_v6: srcid_insert %d\n", err));
-			if (src_ipif_held)
-				ipif_refrele(src_ipif);
-			if (ip6_asp_table_held)
-				ip6_asp_table_refrele(ipst);
+			ip0dbg(("ipif_add_ires_v6: srcid_insert %d\n", err));
 			return (err);
 		}
 		/*
 		 * If the interface address is set, create the LOCAL
 		 * or LOOPBACK IRE.
 		 */
-		ip1dbg(("ipif_up_done_v6: creating IRE %d for %s\n",
+		ip1dbg(("ipif_add_ires_v6: creating IRE %d for %s\n",
 		    ipif->ipif_ire_type,
 		    inet_ntop(AF_INET6, &ipif->ipif_v6lcl_addr,
 		    buf, sizeof (buf))));
 
-		*irep++ = ire_create_v6(
+		ire_local = ire_create_v6(
 		    &ipif->ipif_v6lcl_addr,		/* dest address */
 		    &ipv6_all_ones,			/* mask */
-		    &src_ipif->ipif_v6src_addr,		/* source address */
 		    NULL,				/* no gateway */
-		    &ip_loopback_mtu_v6plus,		/* max frag size */
-		    NULL,
-		    ipif->ipif_rq,			/* recv-from queue */
-		    NULL,				/* no send-to queue */
 		    ipif->ipif_ire_type,		/* LOCAL or LOOPBACK */
-		    ipif,				/* interface */
-		    NULL,
-		    0,
-		    0,
-		    (ipif->ipif_flags & IPIF_PRIVATE) ? RTF_PRIVATE : 0,
-		    &ire_uinfo_null,
-		    NULL,
+		    ipif->ipif_ill,			/* interface */
+		    ipif->ipif_zoneid,
+		    ((ipif->ipif_flags & IPIF_PRIVATE) ?
+		    RTF_PRIVATE : 0) | RTF_KERNEL,
 		    NULL,
 		    ipst);
+		if (ire_local == NULL) {
+			ip1dbg(("ipif_up_done_v6: NULL ire_local\n"));
+			err = ENOMEM;
+			goto bad;
+		}
 	}
 
 	/* Set up the IRE_IF_RESOLVER or IRE_IF_NORESOLVER, as appropriate. */
-	if (stq != NULL && !(ipif->ipif_flags & IPIF_NOXMIT) &&
+	if (!loopback && !(ipif->ipif_flags & IPIF_NOXMIT) &&
 	    !(IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6subnet) &&
 	    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6net_mask))) {
 		/* ipif_v6subnet is ipif_v6pp_dst_addr for pt-pt */
@@ -3074,27 +2550,19 @@ ipif_up_done_v6(ipif_t *ipif)
 			route_mask = ipif->ipif_v6net_mask;
 		}
 
-		ip1dbg(("ipif_up_done_v6: creating if IRE %d for %s\n",
+		ip1dbg(("ipif_add_ires_v6: creating if IRE %d for %s\n",
 		    ill->ill_net_type,
 		    inet_ntop(AF_INET6, &v6addr, buf, sizeof (buf))));
 
 		*irep++ = ire_create_v6(
 		    &v6addr,			/* dest pref */
 		    &route_mask,		/* mask */
-		    &src_ipif->ipif_v6src_addr,	/* src addr */
-		    NULL,			/* no gateway */
-		    &ipif->ipif_mtu,		/* max frag */
-		    NULL,			/* no src nce */
-		    NULL,			/* no recv from queue */
-		    stq,			/* send-to queue */
+		    &ipif->ipif_v6lcl_addr,	/* gateway */
 		    ill->ill_net_type,		/* IF_[NO]RESOLVER */
-		    ipif,
-		    NULL,
-		    0,
-		    0,
-		    (ipif->ipif_flags & IPIF_PRIVATE) ? RTF_PRIVATE : 0,
-		    &ire_uinfo_null,
-		    NULL,
+		    ipif->ipif_ill,
+		    ipif->ipif_zoneid,
+		    ((ipif->ipif_flags & IPIF_PRIVATE) ?
+		    RTF_PRIVATE : 0) | RTF_KERNEL,
 		    NULL,
 		    ipst);
 	}
@@ -3103,14 +2571,12 @@ ipif_up_done_v6(ipif_t *ipif)
 	for (irep1 = irep; irep1 > ire_array; ) {
 		irep1--;
 		if (*irep1 == NULL) {
-			ip1dbg(("ipif_up_done_v6: NULL ire found in"
+			ip1dbg(("ipif_add_ires_v6: NULL ire found in"
 			    " ire_array\n"));
 			err = ENOMEM;
 			goto bad;
 		}
 	}
-
-	ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
 
 	/*
 	 * Need to atomically check for IP address availability under
@@ -3132,20 +2598,12 @@ ipif_up_done_v6(ipif_t *ipif)
 		 * the other ipif. So we don't want to delete it (otherwise the
 		 * other ipif would be unable to send packets).
 		 * ip_addr_availability_check() identifies this case for us and
-		 * returns EADDRINUSE; we need to turn it into EADDRNOTAVAIL
+		 * returns EADDRINUSE; Caller must  turn it into EADDRNOTAVAIL
 		 * which is the expected error code.
 		 *
-		 * Note that, for the non-XRESOLV case, ipif_ndp_down() will
-		 * only delete the nce in the case when the nce_ipif_cnt drops
-		 * to 0.
+		 * Note that ipif_ndp_down() will only delete the nce in the
+		 * case when the nce_ipif_cnt drops to 0.
 		 */
-		if (err == EADDRINUSE) {
-			if (ipif->ipif_ill->ill_flags & ILLF_XRESOLV) {
-				freemsg(ipif->ipif_arp_del_mp);
-				ipif->ipif_arp_del_mp = NULL;
-			}
-			err = EADDRNOTAVAIL;
-		}
 		ill->ill_ipif_up_count--;
 		ipif->ipif_flags &= ~IPIF_UP;
 		goto bad;
@@ -3153,91 +2611,42 @@ ipif_up_done_v6(ipif_t *ipif)
 
 	/*
 	 * Add in all newly created IREs.
-	 *
-	 * NOTE : We refrele the ire though we may branch to "bad"
-	 *	  later on where we do ire_delete. This is okay
-	 *	  because nobody can delete it as we are running
-	 *	  exclusively.
 	 */
+	if (ire_local != NULL) {
+		ire_local = ire_add(ire_local);
+#ifdef DEBUG
+		if (ire_local != NULL) {
+			ire_refhold_notr(ire_local);
+			ire_refrele(ire_local);
+		}
+#endif
+	}
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
+	if (ire_local != NULL)
+		ipif->ipif_ire_local = ire_local;
+	rw_exit(&ipst->ips_ill_g_lock);
+	ire_local = NULL;
+
 	for (irep1 = irep; irep1 > ire_array; ) {
 		irep1--;
 		/* Shouldn't be adding any bcast ire's */
 		ASSERT((*irep1)->ire_type != IRE_BROADCAST);
 		ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
-		/*
-		 * refheld by ire_add. refele towards the end of the func
-		 */
-		(void) ire_add(irep1, NULL, NULL, NULL, B_FALSE);
-	}
-	if (ip6_asp_table_held) {
-		ip6_asp_table_refrele(ipst);
-		ip6_asp_table_held = B_FALSE;
-	}
-
-	/* Recover any additional IRE_IF_[NO]RESOLVER entries for this ipif */
-	ipif_saved_ire_cnt = ipif->ipif_saved_ire_cnt;
-	ipif_saved_irep = ipif_recover_ire_v6(ipif);
-
-	if (ill->ill_need_recover_multicast) {
-		/*
-		 * Need to recover all multicast memberships in the driver.
-		 * This had to be deferred until we had attached.
-		 */
-		ill_recover_multicast(ill);
-	}
-
-	if (ill->ill_ipif_up_count == 1) {
-		/*
-		 * Since the interface is now up, it may now be active.
-		 */
-		if (IS_UNDER_IPMP(ill))
-			ipmp_ill_refresh_active(ill);
-	}
-
-	/* Join the allhosts multicast address and the solicited node MC */
-	ipif_multicast_up(ipif);
-
-	/*
-	 * See if anybody else would benefit from our new ipif.
-	 */
-	if (!loopback &&
-	    !(ipif->ipif_flags & (IPIF_NOLOCAL|IPIF_ANYCAST|IPIF_DEPRECATED))) {
-		ill_update_source_selection(ill);
-	}
-
-	for (irep1 = irep; irep1 > ire_array; ) {
-		irep1--;
+		/* refheld by ire_add */
+		*irep1 = ire_add(*irep1);
 		if (*irep1 != NULL) {
-			/* was held in ire_add */
 			ire_refrele(*irep1);
-		}
-	}
-
-	cnt = ipif_saved_ire_cnt;
-	for (irep1 = ipif_saved_irep; cnt > 0; irep1++, cnt--) {
-		if (*irep1 != NULL) {
-			/* was held in ire_add */
-			ire_refrele(*irep1);
+			*irep1 = NULL;
 		}
 	}
 
 	if (ipif->ipif_addr_ready)
 		ipif_up_notify(ipif);
-
-	if (ipif_saved_irep != NULL) {
-		kmem_free(ipif_saved_irep,
-		    ipif_saved_ire_cnt * sizeof (ire_t *));
-	}
-
-	if (src_ipif_held)
-		ipif_refrele(src_ipif);
-
 	return (0);
 
 bad:
-	if (ip6_asp_table_held)
-		ip6_asp_table_refrele(ipst);
-
+	if (ire_local != NULL)
+		ire_delete(ire_local);
 	while (irep > ire_array) {
 		irep--;
 		if (*irep != NULL)
@@ -3245,21 +2654,85 @@ bad:
 	}
 	(void) ip_srcid_remove(&ipif->ipif_v6lcl_addr, ipif->ipif_zoneid, ipst);
 
-	if (ipif_saved_irep != NULL) {
-		kmem_free(ipif_saved_irep,
-		    ipif_saved_ire_cnt * sizeof (ire_t *));
-	}
-	if (src_ipif_held)
-		ipif_refrele(src_ipif);
-
-	ipif_ndp_down(ipif);
-	ipif_resolver_down(ipif);
-
 	return (err);
 }
 
+/* Remove all the IREs created by ipif_add_ires_v6 */
+void
+ipif_delete_ires_v6(ipif_t *ipif)
+{
+	ill_t		*ill = ipif->ipif_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	in6_addr_t	v6addr;
+	in6_addr_t	route_mask;
+	ire_t		*ire;
+	int		match_args;
+	boolean_t	loopback;
+
+	/* Check if this is a loopback interface */
+	loopback = (ipif->ipif_ill->ill_wq == NULL);
+
+	match_args = MATCH_IRE_TYPE | MATCH_IRE_ILL | MATCH_IRE_MASK |
+	    MATCH_IRE_ZONEONLY;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
+	if ((ire = ipif->ipif_ire_local) != NULL) {
+		ipif->ipif_ire_local = NULL;
+		rw_exit(&ipst->ips_ill_g_lock);
+		/*
+		 * Move count to ipif so we don't loose the count due to
+		 * a down/up dance.
+		 */
+		atomic_add_32(&ipif->ipif_ib_pkt_count, ire->ire_ib_pkt_count);
+
+		ire_delete(ire);
+		ire_refrele_notr(ire);
+	} else {
+		rw_exit(&ipst->ips_ill_g_lock);
+	}
+
+	match_args |= MATCH_IRE_GW;
+
+	/*
+	 * Delete the IRE_IF_RESOLVER or IRE_IF_NORESOLVER, as appropriate.
+	 * Note that atun interfaces have an all-zero ipif_v6subnet.
+	 * Thus we allow a zero subnet as long as the mask is non-zero.
+	 */
+	if (IS_UNDER_IPMP(ill))
+		match_args |= MATCH_IRE_TESTHIDDEN;
+
+	if (!loopback && !(ipif->ipif_flags & IPIF_NOXMIT) &&
+	    !(IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6subnet) &&
+	    IN6_IS_ADDR_UNSPECIFIED(&ipif->ipif_v6net_mask))) {
+		/* ipif_v6subnet is ipif_v6pp_dst_addr for pt-pt */
+		v6addr = ipif->ipif_v6subnet;
+
+		if (ipif->ipif_flags & IPIF_POINTOPOINT) {
+			route_mask = ipv6_all_ones;
+		} else {
+			route_mask = ipif->ipif_v6net_mask;
+		}
+
+		ire = ire_ftable_lookup_v6(
+		    &v6addr,			/* dest pref */
+		    &route_mask,		/* mask */
+		    &ipif->ipif_v6lcl_addr,	/* gateway */
+		    ill->ill_net_type,		/* IF_[NO]RESOLVER */
+		    ipif->ipif_ill,
+		    ipif->ipif_zoneid,
+		    NULL,
+		    match_args,
+		    0,
+		    ipst,
+		    NULL);
+		ASSERT(ire != NULL);
+		ire_delete(ire);
+		ire_refrele(ire);
+	}
+}
+
 /*
- * Delete an ND entry and the corresponding IRE_CACHE entry if it exists.
+ * Delete an ND entry if it exists.
  */
 /* ARGSUSED */
 int
@@ -3267,11 +2740,10 @@ ip_siocdelndp_v6(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
     ip_ioctl_cmd_t *ipip, void *dummy_ifreq)
 {
 	sin6_t		*sin6;
-	nce_t		*nce;
 	struct lifreq	*lifr;
 	lif_nd_req_t	*lnr;
 	ill_t		*ill = ipif->ipif_ill;
-	ire_t		*ire;
+	nce_t		*nce;
 
 	lifr = (struct lifreq *)mp->b_cont->b_cont->b_rptr;
 	lnr = &lifr->lifr_nd;
@@ -3289,29 +2761,27 @@ ip_siocdelndp_v6(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 
 	/*
 	 * Since ND mappings must be consistent across an IPMP group, prohibit
-	 * deleting ND mappings on underlying interfaces.  Also, since ND
-	 * mappings for IPMP data addresses are owned by IP itself, prohibit
-	 * deleting them.
+	 * deleting ND mappings on underlying interfaces.
+	 * Don't allow deletion of mappings for local addresses.
 	 */
 	if (IS_UNDER_IPMP(ill))
 		return (EPERM);
 
-	if (IS_IPMP(ill)) {
-		ire = ire_ctable_lookup_v6(&sin6->sin6_addr, NULL, IRE_LOCAL,
-		    ipif, ALL_ZONES, NULL, MATCH_IRE_TYPE | MATCH_IRE_ILL,
-		    ill->ill_ipst);
-		if (ire != NULL) {
-			ire_refrele(ire);
-			return (EPERM);
-		}
-	}
-
-	/* See comment in ndp_query() regarding IS_IPMP(ill) usage */
-	nce = ndp_lookup_v6(ill, IS_IPMP(ill), &sin6->sin6_addr, B_FALSE);
+	nce = nce_lookup_v6(ill, &sin6->sin6_addr);
 	if (nce == NULL)
 		return (ESRCH);
-	ndp_delete(nce);
-	NCE_REFRELE(nce);
+
+	if (NCE_MYADDR(nce->nce_common)) {
+		nce_refrele(nce);
+		return (EPERM);
+	}
+
+	/*
+	 * delete the nce_common which will also delete the nces on any
+	 * under_ill in the case of ipmp.
+	 */
+	ncec_delete(nce->nce_common);
+	nce_refrele(nce);
 	return (0);
 }
 
@@ -3383,9 +2853,9 @@ ip_siocsetndp_v6(ipif_t *ipif, sin_t *dummy_sin, queue_t *q, mblk_t *mp,
 		return (EPERM);
 
 	if (IS_IPMP(ill)) {
-		ire = ire_ctable_lookup_v6(&sin6->sin6_addr, NULL, IRE_LOCAL,
-		    ipif, ALL_ZONES, NULL, MATCH_IRE_TYPE | MATCH_IRE_ILL,
-		    ill->ill_ipst);
+		ire = ire_ftable_lookup_v6(&sin6->sin6_addr, NULL, NULL,
+		    IRE_LOCAL, ill, ALL_ZONES, NULL,
+		    MATCH_IRE_TYPE | MATCH_IRE_ILL, 0, ill->ill_ipst, NULL);
 		if (ire != NULL) {
 			ire_refrele(ire);
 			return (EPERM);

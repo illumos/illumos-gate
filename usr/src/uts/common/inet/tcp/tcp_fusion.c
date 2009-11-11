@@ -69,50 +69,6 @@
 boolean_t do_tcp_fusion = B_TRUE;
 
 /*
- * Return true if this connection needs some IP functionality
- */
-static boolean_t
-tcp_loopback_needs_ip(tcp_t *tcp, netstack_t *ns)
-{
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
-
-	/*
-	 * If ire is not cached, do not use fusion
-	 */
-	if (tcp->tcp_connp->conn_ire_cache == NULL) {
-		/*
-		 * There is no need to hold conn_lock here because when called
-		 * from tcp_fuse() there can be no window where conn_ire_cache
-		 * can change. This is not true when called from
-		 * tcp_fuse_output() as conn_ire_cache can become null just
-		 * after the check. It will be necessary to recheck for a NULL
-		 * conn_ire_cache in tcp_fuse_output() to avoid passing a
-		 * stale ill pointer to FW_HOOKS.
-		 */
-		return (B_TRUE);
-	}
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		if (tcp->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH)
-			return (B_TRUE);
-		if (CONN_OUTBOUND_POLICY_PRESENT(tcp->tcp_connp, ipss))
-			return (B_TRUE);
-		if (CONN_INBOUND_POLICY_PRESENT(tcp->tcp_connp, ipss))
-			return (B_TRUE);
-	} else {
-		if (tcp->tcp_ip_hdr_len != IPV6_HDR_LEN)
-			return (B_TRUE);
-		if (CONN_OUTBOUND_POLICY_PRESENT_V6(tcp->tcp_connp, ipss))
-			return (B_TRUE);
-		if (CONN_INBOUND_POLICY_PRESENT_V6(tcp->tcp_connp, ipss))
-			return (B_TRUE);
-	}
-	if (!CONN_IS_LSO_MD_FASTPATH(tcp->tcp_connp))
-		return (B_TRUE);
-	return (B_FALSE);
-}
-
-
-/*
  * This routine gets called by the eager tcp upon changing state from
  * SYN_RCVD to ESTABLISHED.  It fuses a direct path between itself
  * and the active connect tcp such that the regular tcp processings
@@ -124,10 +80,10 @@ tcp_loopback_needs_ip(tcp_t *tcp, netstack_t *ns)
  * same squeue as the one given to the active connect tcp during open.
  */
 void
-tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
+tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcpha_t *tcpha)
 {
-	conn_t *peer_connp, *connp = tcp->tcp_connp;
-	tcp_t *peer_tcp;
+	conn_t		*peer_connp, *connp = tcp->tcp_connp;
+	tcp_t		*peer_tcp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	netstack_t	*ns;
 	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
@@ -136,20 +92,16 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	ASSERT(tcp->tcp_loopback);
 	ASSERT(tcp->tcp_loopback_peer == NULL);
 	/*
-	 * We need to inherit tcp_recv_hiwater of the listener tcp,
+	 * We need to inherit conn_rcvbuf of the listener tcp,
 	 * but we can't really use tcp_listener since we get here after
-	 * sending up T_CONN_IND and tcp_wput_accept() may be called
+	 * sending up T_CONN_IND and tcp_tli_accept() may be called
 	 * independently, at which point tcp_listener is cleared;
 	 * this is why we use tcp_saved_listener. The listener itself
 	 * is guaranteed to be around until tcp_accept_finish() is called
 	 * on this eager -- this won't happen until we're done since we're
 	 * inside the eager's perimeter now.
-	 *
-	 * We can also get called in the case were a connection needs
-	 * to be re-fused. In this case tcp_saved_listener will be
-	 * NULL but tcp_refuse will be true.
 	 */
-	ASSERT(tcp->tcp_saved_listener != NULL || tcp->tcp_refuse);
+	ASSERT(tcp->tcp_saved_listener != NULL);
 	/*
 	 * Lookup peer endpoint; search for the remote endpoint having
 	 * the reversed address-port quadruplet in ESTABLISHED state,
@@ -157,12 +109,12 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	 * is applied accordingly for loopback address, but not for
 	 * local address since we want fusion to happen across Zones.
 	 */
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
+	if (connp->conn_ipversion == IPV4_VERSION) {
 		peer_connp = ipcl_conn_tcp_lookup_reversed_ipv4(connp,
-		    (ipha_t *)iphdr, tcph, ipst);
+		    (ipha_t *)iphdr, tcpha, ipst);
 	} else {
 		peer_connp = ipcl_conn_tcp_lookup_reversed_ipv6(connp,
-		    (ip6_t *)iphdr, tcph, ipst);
+		    (ip6_t *)iphdr, tcpha, ipst);
 	}
 
 	/*
@@ -202,28 +154,20 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	/*
 	 * Fuse the endpoints; we perform further checks against both
 	 * tcp endpoints to ensure that a fusion is allowed to happen.
-	 * In particular we bail out for non-simple TCP/IP or if IPsec/
-	 * IPQoS policy/kernel SSL exists. We also need to check if
-	 * the connection is quiescent to cover the case when we are
-	 * trying to re-enable fusion after IPobservability is turned off.
+	 * In particular we bail out if kernel SSL exists.
 	 */
 	ns = tcps->tcps_netstack;
 	ipst = ns->netstack_ip;
 
 	if (!tcp->tcp_unfusable && !peer_tcp->tcp_unfusable &&
-	    !tcp_loopback_needs_ip(tcp, ns) &&
-	    !tcp_loopback_needs_ip(peer_tcp, ns) &&
-	    tcp->tcp_kssl_ent == NULL &&
-	    tcp->tcp_xmit_head == NULL && peer_tcp->tcp_xmit_head == NULL &&
-	    !IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN, ipst)) {
+	    (tcp->tcp_kssl_ent == NULL) && (tcp->tcp_xmit_head == NULL) &&
+	    (peer_tcp->tcp_xmit_head == NULL)) {
 		mblk_t *mp;
-		queue_t *peer_rq = peer_tcp->tcp_rq;
+		queue_t *peer_rq = peer_connp->conn_rq;
 
 		ASSERT(!TCP_IS_DETACHED(peer_tcp));
-		ASSERT(tcp->tcp_fused_sigurg_mp == NULL ||
-		    (!IPCL_IS_NONSTR(connp) && tcp->tcp_refuse));
-		ASSERT(peer_tcp->tcp_fused_sigurg_mp == NULL ||
-		    (!IPCL_IS_NONSTR(peer_connp) && peer_tcp->tcp_refuse));
+		ASSERT(tcp->tcp_fused_sigurg_mp == NULL);
+		ASSERT(peer_tcp->tcp_fused_sigurg_mp == NULL);
 		ASSERT(tcp->tcp_kssl_ctx == NULL);
 
 		/*
@@ -272,54 +216,40 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 		tcp_timers_stop(tcp);
 		tcp_timers_stop(peer_tcp);
 
-		if (!tcp->tcp_refuse) {
-			/*
-			 * Set receive buffer and max packet size for the
-			 * active open tcp.
-			 * eager's values will be set in tcp_accept_finish.
-			 */
+		/*
+		 * Set receive buffer and max packet size for the
+		 * active open tcp.
+		 * eager's values will be set in tcp_accept_finish.
+		 */
+		(void) tcp_rwnd_set(peer_tcp, peer_tcp->tcp_connp->conn_rcvbuf);
 
-			(void) tcp_rwnd_set(peer_tcp,
-			    peer_tcp->tcp_recv_hiwater);
+		/*
+		 * Set the write offset value to zero since we won't
+		 * be needing any room for TCP/IP headers.
+		 */
+		if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp)) {
+			struct stroptions *stropt;
 
-			/*
-			 * Set the write offset value to zero since we won't
-			 * be needing any room for TCP/IP headers.
-			 */
-			if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp)) {
-				struct stroptions *stropt;
+			DB_TYPE(mp) = M_SETOPTS;
+			mp->b_wptr += sizeof (*stropt);
 
-				DB_TYPE(mp) = M_SETOPTS;
-				mp->b_wptr += sizeof (*stropt);
+			stropt = (struct stroptions *)mp->b_rptr;
+			stropt->so_flags = SO_WROFF;
+			stropt->so_wroff = 0;
 
-				stropt = (struct stroptions *)mp->b_rptr;
-				stropt->so_flags = SO_WROFF;
-				stropt->so_wroff = 0;
-
-				/* Send the options up */
-				putnext(peer_rq, mp);
-			} else {
-				struct sock_proto_props sopp;
-
-				/* The peer is a non-STREAMS end point */
-				ASSERT(IPCL_IS_TCP(peer_connp));
-
-				sopp.sopp_flags = SOCKOPT_WROFF;
-				sopp.sopp_wroff = 0;
-				(*peer_connp->conn_upcalls->su_set_proto_props)
-				    (peer_connp->conn_upper_handle, &sopp);
-			}
+			/* Send the options up */
+			putnext(peer_rq, mp);
 		} else {
-			/*
-			 * Endpoints are being re-fused, so options will not
-			 * be sent up. In case of STREAMS, free the stroptions
-			 * mblk.
-			 */
-			if (!IPCL_IS_NONSTR(connp))
-				freemsg(mp);
+			struct sock_proto_props sopp;
+
+			/* The peer is a non-STREAMS end point */
+			ASSERT(IPCL_IS_TCP(peer_connp));
+
+			sopp.sopp_flags = SOCKOPT_WROFF;
+			sopp.sopp_wroff = 0;
+			(*peer_connp->conn_upcalls->su_set_proto_props)
+			    (peer_connp->conn_upper_handle, &sopp);
 		}
-		tcp->tcp_refuse = B_FALSE;
-		peer_tcp->tcp_refuse = B_FALSE;
 	} else {
 		TCP_STAT(tcps, tcp_fusion_unqualified);
 	}
@@ -374,12 +304,12 @@ tcp_unfuse(tcp_t *tcp)
 	 * when called from tcp_rcv_drain().
 	 */
 	if (!TCP_IS_DETACHED(tcp)) {
-		(void) tcp_fuse_rcv_drain(tcp->tcp_rq, tcp,
+		(void) tcp_fuse_rcv_drain(tcp->tcp_connp->conn_rq, tcp,
 		    &tcp->tcp_fused_sigurg_mp);
 	}
 	if (!TCP_IS_DETACHED(peer_tcp)) {
-		(void) tcp_fuse_rcv_drain(peer_tcp->tcp_rq, peer_tcp,
-		    &peer_tcp->tcp_fused_sigurg_mp);
+		(void) tcp_fuse_rcv_drain(peer_tcp->tcp_connp->conn_rq,
+		    peer_tcp,  &peer_tcp->tcp_fused_sigurg_mp);
 	}
 
 	/* Lift up any flow-control conditions */
@@ -398,12 +328,12 @@ tcp_unfuse(tcp_t *tcp)
 	mutex_exit(&peer_tcp->tcp_non_sq_lock);
 
 	/*
-	 * Update th_seq and th_ack in the header template
+	 * Update tha_seq and tha_ack in the header template
 	 */
-	U32_TO_ABE32(tcp->tcp_snxt, tcp->tcp_tcph->th_seq);
-	U32_TO_ABE32(tcp->tcp_rnxt, tcp->tcp_tcph->th_ack);
-	U32_TO_ABE32(peer_tcp->tcp_snxt, peer_tcp->tcp_tcph->th_seq);
-	U32_TO_ABE32(peer_tcp->tcp_rnxt, peer_tcp->tcp_tcph->th_ack);
+	tcp->tcp_tcpha->tha_seq = htonl(tcp->tcp_snxt);
+	tcp->tcp_tcpha->tha_ack = htonl(tcp->tcp_rnxt);
+	peer_tcp->tcp_tcpha->tha_seq = htonl(peer_tcp->tcp_snxt);
+	peer_tcp->tcp_tcpha->tha_ack = htonl(peer_tcp->tcp_rnxt);
 
 	/* Unfuse the endpoints */
 	peer_tcp->tcp_fused = tcp->tcp_fused = B_FALSE;
@@ -509,58 +439,27 @@ tcp_fuse_output_urg(tcp_t *tcp, mblk_t *mp)
 boolean_t
 tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 {
-	tcp_t *peer_tcp = tcp->tcp_loopback_peer;
-	boolean_t flow_stopped, peer_data_queued = B_FALSE;
-	boolean_t urgent = (DB_TYPE(mp) != M_DATA);
-	boolean_t push = B_TRUE;
-	mblk_t *mp1 = mp;
-	ill_t *ilp, *olp;
-	ipif_t *iifp, *oifp;
-	ipha_t *ipha;
-	ip6_t *ip6h;
-	tcph_t *tcph;
-	uint_t ip_hdr_len;
-	uint32_t seq;
-	uint32_t recv_size = send_size;
+	conn_t		*connp = tcp->tcp_connp;
+	tcp_t		*peer_tcp = tcp->tcp_loopback_peer;
+	conn_t		*peer_connp = peer_tcp->tcp_connp;
+	boolean_t	flow_stopped, peer_data_queued = B_FALSE;
+	boolean_t	urgent = (DB_TYPE(mp) != M_DATA);
+	boolean_t	push = B_TRUE;
+	mblk_t		*mp1 = mp;
+	uint_t		ip_hdr_len;
+	uint32_t	recv_size = send_size;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	netstack_t	*ns = tcps->tcps_netstack;
 	ip_stack_t	*ipst = ns->netstack_ip;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	iaflags_t	ixaflags = connp->conn_ixa->ixa_flags;
+	boolean_t	do_ipsec, hooks_out, hooks_in, ipobs_enabled;
 
 	ASSERT(tcp->tcp_fused);
 	ASSERT(peer_tcp != NULL && peer_tcp->tcp_loopback_peer == tcp);
-	ASSERT(tcp->tcp_connp->conn_sqp == peer_tcp->tcp_connp->conn_sqp);
+	ASSERT(connp->conn_sqp == peer_connp->conn_sqp);
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_PROTO ||
 	    DB_TYPE(mp) == M_PCPROTO);
-
-	/* If this connection requires IP, unfuse and use regular path */
-	if (tcp_loopback_needs_ip(tcp, ns) ||
-	    tcp_loopback_needs_ip(peer_tcp, ns) ||
-	    IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN, ipst) ||
-	    (tcp->tcp_ipversion == IPV4_VERSION &&
-	    ipst->ips_ip4_observe.he_interested) ||
-	    (tcp->tcp_ipversion == IPV6_VERSION &&
-	    ipst->ips_ip6_observe.he_interested)) {
-		TCP_STAT(tcps, tcp_fusion_aborted);
-		tcp->tcp_refuse = B_TRUE;
-		peer_tcp->tcp_refuse = B_TRUE;
-
-		bcopy(peer_tcp->tcp_tcph, &tcp->tcp_saved_tcph,
-		    sizeof (tcph_t));
-		bcopy(tcp->tcp_tcph, &peer_tcp->tcp_saved_tcph,
-		    sizeof (tcph_t));
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			bcopy(peer_tcp->tcp_ipha, &tcp->tcp_saved_ipha,
-			    sizeof (ipha_t));
-			bcopy(tcp->tcp_ipha, &peer_tcp->tcp_saved_ipha,
-			    sizeof (ipha_t));
-		} else {
-			bcopy(peer_tcp->tcp_ip6h, &tcp->tcp_saved_ip6h,
-			    sizeof (ip6_t));
-			bcopy(tcp->tcp_ip6h, &peer_tcp->tcp_saved_ip6h,
-			    sizeof (ip6_t));
-		}
-		goto unfuse;
-	}
 
 	if (send_size == 0) {
 		freemsg(mp);
@@ -578,123 +477,74 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		mp1 = mp->b_cont;
 	}
 
-	if (tcp->tcp_ipversion == IPV4_VERSION &&
-	    (HOOKS4_INTERESTED_LOOPBACK_IN(ipst) ||
-	    HOOKS4_INTERESTED_LOOPBACK_OUT(ipst)) ||
-	    tcp->tcp_ipversion == IPV6_VERSION &&
-	    (HOOKS6_INTERESTED_LOOPBACK_IN(ipst) ||
-	    HOOKS6_INTERESTED_LOOPBACK_OUT(ipst))) {
-		/*
-		 * Build ip and tcp header to satisfy FW_HOOKS.
-		 * We only build it when any hook is present.
-		 */
+	/*
+	 * Check that we are still using an IRE_LOCAL or IRE_LOOPBACK before
+	 * further processes.
+	 */
+	if (!ip_output_verify_local(connp->conn_ixa))
+		goto unfuse;
+
+	/*
+	 * Build IP and TCP header in case we have something that needs the
+	 * headers. Those cases are:
+	 * 1. IPsec
+	 * 2. IPobs
+	 * 3. FW_HOOKS
+	 *
+	 * If tcp_xmit_mp() fails to dupb() the message, unfuse the connection
+	 * and back to regular path.
+	 */
+	if (ixaflags & IXAF_IS_IPV4) {
+		do_ipsec = (ixaflags & IXAF_IPSEC_SECURE) ||
+		    CONN_INBOUND_POLICY_PRESENT(peer_connp, ipss);
+
+		hooks_out = HOOKS4_INTERESTED_LOOPBACK_OUT(ipst);
+		hooks_in = HOOKS4_INTERESTED_LOOPBACK_IN(ipst);
+		ipobs_enabled = (ipst->ips_ip4_observe.he_interested != 0);
+	} else {
+		do_ipsec = (ixaflags & IXAF_IPSEC_SECURE) ||
+		    CONN_INBOUND_POLICY_PRESENT_V6(peer_connp, ipss);
+
+		hooks_out = HOOKS6_INTERESTED_LOOPBACK_OUT(ipst);
+		hooks_in = HOOKS6_INTERESTED_LOOPBACK_IN(ipst);
+		ipobs_enabled = (ipst->ips_ip6_observe.he_interested != 0);
+	}
+
+	/* We do logical 'or' for efficiency */
+	if (ipobs_enabled | do_ipsec | hooks_in | hooks_out) {
 		if ((mp1 = tcp_xmit_mp(tcp, mp1, tcp->tcp_mss, NULL, NULL,
 		    tcp->tcp_snxt, B_TRUE, NULL, B_FALSE)) == NULL)
 			/* If tcp_xmit_mp fails, use regular path */
 			goto unfuse;
 
 		/*
-		 * The ipif and ill can be safely referenced under the
-		 * protection of conn_lock - see head of function comment for
-		 * conn_get_held_ipif(). It is necessary to check that both
-		 * the ipif and ill can be looked up (i.e. not condemned). If
-		 * not, bail out and unfuse this connection.
+		 * Leave all IP relevant processes to ip_output_process_local(),
+		 * which handles IPsec, IPobs, and FW_HOOKS.
 		 */
-		mutex_enter(&peer_tcp->tcp_connp->conn_lock);
-		if ((peer_tcp->tcp_connp->conn_ire_cache == NULL) ||
-		    (peer_tcp->tcp_connp->conn_ire_cache->ire_marks &
-		    IRE_MARK_CONDEMNED) ||
-		    ((oifp = peer_tcp->tcp_connp->conn_ire_cache->ire_ipif)
-		    == NULL) ||
-		    (!IPIF_CAN_LOOKUP(oifp)) ||
-		    ((olp = oifp->ipif_ill) == NULL) ||
-		    (ill_check_and_refhold(olp) != 0)) {
-			mutex_exit(&peer_tcp->tcp_connp->conn_lock);
-			goto unfuse;
-		}
-		mutex_exit(&peer_tcp->tcp_connp->conn_lock);
+		mp1 = ip_output_process_local(mp1, connp->conn_ixa, hooks_out,
+		    hooks_in, do_ipsec ? peer_connp : NULL);
 
-		/* PFHooks: LOOPBACK_OUT */
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			ipha = (ipha_t *)mp1->b_rptr;
-
-			DTRACE_PROBE4(ip4__loopback__out__start,
-			    ill_t *, NULL, ill_t *, olp,
-			    ipha_t *, ipha, mblk_t *, mp1);
-			FW_HOOKS(ipst->ips_ip4_loopback_out_event,
-			    ipst->ips_ipv4firewall_loopback_out,
-			    NULL, olp, ipha, mp1, mp1, 0, ipst);
-			DTRACE_PROBE1(ip4__loopback__out__end, mblk_t *, mp1);
-		} else {
-			ip6h = (ip6_t *)mp1->b_rptr;
-
-			DTRACE_PROBE4(ip6__loopback__out__start,
-			    ill_t *, NULL, ill_t *, olp,
-			    ip6_t *, ip6h, mblk_t *, mp1);
-			FW_HOOKS6(ipst->ips_ip6_loopback_out_event,
-			    ipst->ips_ipv6firewall_loopback_out,
-			    NULL, olp, ip6h, mp1, mp1, 0, ipst);
-			DTRACE_PROBE1(ip6__loopback__out__end, mblk_t *, mp1);
-		}
-		ill_refrele(olp);
-
+		/* If the message is dropped for any reason. */
 		if (mp1 == NULL)
 			goto unfuse;
 
 		/*
-		 * The ipif and ill can be safely referenced under the
-		 * protection of conn_lock - see head of function comment for
-		 * conn_get_held_ipif(). It is necessary to check that both
-		 * the ipif and ill can be looked up (i.e. not condemned). If
-		 * not, bail out and unfuse this connection.
+		 * Data length might have been changed by FW_HOOKS.
+		 * We assume that the first mblk contains the TCP/IP headers.
 		 */
-		mutex_enter(&tcp->tcp_connp->conn_lock);
-		if ((tcp->tcp_connp->conn_ire_cache == NULL) ||
-		    (tcp->tcp_connp->conn_ire_cache->ire_marks &
-		    IRE_MARK_CONDEMNED) ||
-		    ((iifp = tcp->tcp_connp->conn_ire_cache->ire_ipif)
-		    == NULL) ||
-		    (!IPIF_CAN_LOOKUP(iifp)) ||
-		    ((ilp = iifp->ipif_ill) == NULL) ||
-		    (ill_check_and_refhold(ilp) != 0)) {
-			mutex_exit(&tcp->tcp_connp->conn_lock);
-			goto unfuse;
+		if (hooks_in || hooks_out) {
+			tcpha_t *tcpha;
+
+			ip_hdr_len = (ixaflags & IXAF_IS_IPV4) ?
+			    IPH_HDR_LENGTH((ipha_t *)mp1->b_rptr) :
+			    ip_hdr_length_v6(mp1, (ip6_t *)mp1->b_rptr);
+
+			tcpha = (tcpha_t *)&mp1->b_rptr[ip_hdr_len];
+			ASSERT((uchar_t *)tcpha + sizeof (tcpha_t) <=
+			    mp1->b_wptr);
+			recv_size += htonl(tcpha->tha_seq) - tcp->tcp_snxt;
+
 		}
-		mutex_exit(&tcp->tcp_connp->conn_lock);
-
-		/* PFHooks: LOOPBACK_IN */
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			DTRACE_PROBE4(ip4__loopback__in__start,
-			    ill_t *, ilp, ill_t *, NULL,
-			    ipha_t *, ipha, mblk_t *, mp1);
-			FW_HOOKS(ipst->ips_ip4_loopback_in_event,
-			    ipst->ips_ipv4firewall_loopback_in,
-			    ilp, NULL, ipha, mp1, mp1, 0, ipst);
-			DTRACE_PROBE1(ip4__loopback__in__end, mblk_t *, mp1);
-			ill_refrele(ilp);
-			if (mp1 == NULL)
-				goto unfuse;
-
-			ip_hdr_len = IPH_HDR_LENGTH(ipha);
-		} else {
-			DTRACE_PROBE4(ip6__loopback__in__start,
-			    ill_t *, ilp, ill_t *, NULL,
-			    ip6_t *, ip6h, mblk_t *, mp1);
-			FW_HOOKS6(ipst->ips_ip6_loopback_in_event,
-			    ipst->ips_ipv6firewall_loopback_in,
-			    ilp, NULL, ip6h, mp1, mp1, 0, ipst);
-			DTRACE_PROBE1(ip6__loopback__in__end, mblk_t *, mp1);
-			ill_refrele(ilp);
-			if (mp1 == NULL)
-				goto unfuse;
-
-			ip_hdr_len = ip_hdr_length_v6(mp1, ip6h);
-		}
-
-		/* Data length might be changed by FW_HOOKS */
-		tcph = (tcph_t *)&mp1->b_rptr[ip_hdr_len];
-		seq = ABE32_TO_U32(tcph->th_seq);
-		recv_size += seq - tcp->tcp_snxt;
 
 		/*
 		 * The message duplicated by tcp_xmit_mp is freed.
@@ -712,7 +562,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	 * detached we use tcp_rcv_enqueue() instead. Queued data will be
 	 * drained when the accept completes (in tcp_accept_finish()).
 	 */
-	if (IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
+	if (IPCL_IS_NONSTR(peer_connp) &&
 	    !TCP_IS_DETACHED(peer_tcp)) {
 		int error;
 		int flags = 0;
@@ -720,18 +570,18 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		if ((tcp->tcp_valid_bits & TCP_URG_VALID) &&
 		    (tcp->tcp_urg == tcp->tcp_snxt)) {
 			flags = MSG_OOB;
-			(*peer_tcp->tcp_connp->conn_upcalls->su_signal_oob)
-			    (peer_tcp->tcp_connp->conn_upper_handle, 0);
+			(*peer_connp->conn_upcalls->su_signal_oob)
+			    (peer_connp->conn_upper_handle, 0);
 			tcp->tcp_valid_bits &= ~TCP_URG_VALID;
 		}
-		if ((*peer_tcp->tcp_connp->conn_upcalls->su_recv)(
-		    peer_tcp->tcp_connp->conn_upper_handle, mp, recv_size,
+		if ((*peer_connp->conn_upcalls->su_recv)(
+		    peer_connp->conn_upper_handle, mp, recv_size,
 		    flags, &error, &push) < 0) {
 			ASSERT(error != EOPNOTSUPP);
 			peer_data_queued = B_TRUE;
 		}
 	} else {
-		if (IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
+		if (IPCL_IS_NONSTR(peer_connp) &&
 		    (tcp->tcp_valid_bits & TCP_URG_VALID) &&
 		    (tcp->tcp_urg == tcp->tcp_snxt)) {
 			/*
@@ -744,7 +594,8 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			return (B_TRUE);
 		}
 
-		tcp_rcv_enqueue(peer_tcp, mp, recv_size);
+		tcp_rcv_enqueue(peer_tcp, mp, recv_size,
+		    tcp->tcp_connp->conn_cred);
 
 		/* In case it wrapped around and also to keep it constant */
 		peer_tcp->tcp_rwnd += recv_size;
@@ -764,22 +615,21 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	mutex_enter(&tcp->tcp_non_sq_lock);
 	flow_stopped = tcp->tcp_flow_stopped;
 	if ((TCP_IS_DETACHED(peer_tcp) &&
-	    (peer_tcp->tcp_rcv_cnt >= peer_tcp->tcp_recv_hiwater)) ||
+	    (peer_tcp->tcp_rcv_cnt >= peer_connp->conn_rcvbuf)) ||
 	    (!TCP_IS_DETACHED(peer_tcp) &&
-	    !IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
-	    !canputnext(peer_tcp->tcp_rq))) {
+	    !IPCL_IS_NONSTR(peer_connp) && !canputnext(peer_connp->conn_rq))) {
 		peer_data_queued = B_TRUE;
 	}
 
 	if (!flow_stopped && (peer_data_queued ||
-	    (TCP_UNSENT_BYTES(tcp) >= tcp->tcp_xmit_hiwater))) {
+	    (TCP_UNSENT_BYTES(tcp) >= connp->conn_sndbuf))) {
 		tcp_setqfull(tcp);
 		flow_stopped = B_TRUE;
 		TCP_STAT(tcps, tcp_fusion_flowctl);
 		DTRACE_PROBE3(tcp__fuse__output__flowctl, tcp_t *, tcp,
 		    uint_t, send_size, uint_t, peer_tcp->tcp_rcv_cnt);
 	} else if (flow_stopped && !peer_data_queued &&
-	    (TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater)) {
+	    (TCP_UNSENT_BYTES(tcp) <= connp->conn_sndlowat)) {
 		tcp_clrqfull(tcp);
 		TCP_STAT(tcps, tcp_fusion_backenabled);
 		flow_stopped = B_FALSE;
@@ -818,13 +668,14 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 			/*
 			 * For TLI-based streams, a thread in tcp_accept_swap()
 			 * can race with us.  That thread will ensure that the
-			 * correct peer_tcp->tcp_rq is globally visible before
-			 * peer_tcp->tcp_detached is visible as clear, but we
-			 * must also ensure that the load of tcp_rq cannot be
-			 * reordered to be before the tcp_detached check.
+			 * correct peer_connp->conn_rq is globally visible
+			 * before peer_tcp->tcp_detached is visible as clear,
+			 * but we must also ensure that the load of conn_rq
+			 * cannot be reordered to be before the tcp_detached
+			 * check.
 			 */
 			membar_consumer();
-			(void) tcp_fuse_rcv_drain(peer_tcp->tcp_rq, peer_tcp,
+			(void) tcp_fuse_rcv_drain(peer_connp->conn_rq, peer_tcp,
 			    NULL);
 		}
 	}
@@ -928,11 +779,11 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 	tcp->tcp_rcv_last_head = NULL;
 	tcp->tcp_rcv_last_tail = NULL;
 	tcp->tcp_rcv_cnt = 0;
-	tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
+	tcp->tcp_rwnd = tcp->tcp_connp->conn_rcvbuf;
 
 	mutex_enter(&peer_tcp->tcp_non_sq_lock);
 	if (peer_tcp->tcp_flow_stopped && (TCP_UNSENT_BYTES(peer_tcp) <=
-	    peer_tcp->tcp_xmit_lowater)) {
+	    peer_tcp->tcp_connp->conn_sndlowat)) {
 		tcp_clrqfull(peer_tcp);
 		TCP_STAT(tcps, tcp_fusion_backenabled);
 	}
@@ -964,8 +815,8 @@ tcp_fuse_set_rcv_hiwat(tcp_t *tcp, size_t rwnd)
 	 * Record high water mark, this is used for flow-control
 	 * purposes in tcp_fuse_output().
 	 */
-	tcp->tcp_recv_hiwater = rwnd;
-	tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
+	tcp->tcp_connp->conn_rcvbuf = rwnd;
+	tcp->tcp_rwnd = rwnd;
 	return (rwnd);
 }
 
@@ -976,12 +827,13 @@ int
 tcp_fuse_maxpsz(tcp_t *tcp)
 {
 	tcp_t *peer_tcp = tcp->tcp_loopback_peer;
-	uint_t sndbuf = tcp->tcp_xmit_hiwater;
+	conn_t *connp = tcp->tcp_connp;
+	uint_t sndbuf = connp->conn_sndbuf;
 	uint_t maxpsz = sndbuf;
 
 	ASSERT(tcp->tcp_fused);
 	ASSERT(peer_tcp != NULL);
-	ASSERT(peer_tcp->tcp_recv_hiwater != 0);
+	ASSERT(peer_tcp->tcp_connp->conn_rcvbuf != 0);
 	/*
 	 * In the fused loopback case, we want the stream head to split
 	 * up larger writes into smaller chunks for a more accurate flow-
@@ -990,8 +842,8 @@ tcp_fuse_maxpsz(tcp_t *tcp)
 	 * We round up the buffer to system page size due to the lack of
 	 * TCP MSS concept in Fusion.
 	 */
-	if (maxpsz > peer_tcp->tcp_recv_hiwater)
-		maxpsz = peer_tcp->tcp_recv_hiwater;
+	if (maxpsz > peer_tcp->tcp_connp->conn_rcvbuf)
+		maxpsz = peer_tcp->tcp_connp->conn_rcvbuf;
 	maxpsz = P2ROUNDUP_TYPED(maxpsz, PAGESIZE, uint_t) >> 1;
 
 	return (maxpsz);
@@ -1013,12 +865,12 @@ tcp_fuse_backenable(tcp_t *tcp)
 	    peer_tcp->tcp_connp->conn_sqp);
 
 	if (tcp->tcp_rcv_list != NULL)
-		(void) tcp_fuse_rcv_drain(tcp->tcp_rq, tcp, NULL);
+		(void) tcp_fuse_rcv_drain(tcp->tcp_connp->conn_rq, tcp, NULL);
 
 	mutex_enter(&peer_tcp->tcp_non_sq_lock);
 	if (peer_tcp->tcp_flow_stopped &&
 	    (TCP_UNSENT_BYTES(peer_tcp) <=
-	    peer_tcp->tcp_xmit_lowater)) {
+	    peer_tcp->tcp_connp->conn_sndlowat)) {
 		tcp_clrqfull(peer_tcp);
 	}
 	mutex_exit(&peer_tcp->tcp_non_sq_lock);

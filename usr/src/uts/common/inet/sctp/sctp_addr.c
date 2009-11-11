@@ -41,6 +41,7 @@
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
+#include <inet/ip_ire.h>
 #include <inet/ip_if.h>
 #include <inet/ipclassifier.h>
 #include <inet/sctp_ip.h>
@@ -236,6 +237,7 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 	int			error = 0;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
 	boolean_t		isv6;
+	conn_t			*connp = sctp->sctp_connp;
 
 	rw_enter(&sctps->sctps_g_ipifs_lock, RW_READER);
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
@@ -250,8 +252,8 @@ sctp_get_all_ipifs(sctp_t *sctp, int sleep)
 			    !SCTP_IPIF_ZONE_MATCH(sctp, sctp_ipif) ||
 			    SCTP_IS_ADDR_UNSPEC(!isv6,
 			    sctp_ipif->sctp_ipif_saddr) ||
-			    (sctp->sctp_ipversion == IPV4_VERSION && isv6) ||
-			    (sctp->sctp_connp->conn_ipv6_v6only && !isv6)) {
+			    (connp->conn_family == AF_INET && isv6) ||
+			    (connp->conn_ipv6_v6only && !isv6)) {
 				rw_exit(&sctp_ipif->sctp_ipif_lock);
 				sctp_ipif = list_next(
 				    &sctps->sctps_g_ipifs[i].sctp_ipif_list,
@@ -303,6 +305,7 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 	boolean_t		check_addrs = B_FALSE;
 	boolean_t		check_lport = B_FALSE;
 	uchar_t			*p = list;
+	conn_t			*connp = sctp->sctp_connp;
 
 	/*
 	 * Need to check for port and address depending on the state.
@@ -325,11 +328,11 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 		boolean_t	lookup_saddr = B_TRUE;
 		uint_t		ifindex = 0;
 
-		switch (sctp->sctp_family) {
+		switch (connp->conn_family) {
 		case AF_INET:
 			sin4 = (struct sockaddr_in *)addrs + cnt;
 			if (sin4->sin_family != AF_INET || (check_lport &&
-			    sin4->sin_port != sctp->sctp_lport)) {
+			    sin4->sin_port != connp->conn_lport)) {
 				err = EINVAL;
 				goto free_ret;
 			}
@@ -351,14 +354,14 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 		case AF_INET6:
 			sin6 = (struct sockaddr_in6 *)addrs + cnt;
 			if (sin6->sin6_family != AF_INET6 || (check_lport &&
-			    sin6->sin6_port != sctp->sctp_lport)) {
+			    sin6->sin6_port != connp->conn_lport)) {
 				err = EINVAL;
 				goto free_ret;
 			}
 			addr = sin6->sin6_addr;
 			/* Contains the interface index */
 			ifindex = sin6->sin6_scope_id;
-			if (sctp->sctp_connp->conn_ipv6_v6only &&
+			if (connp->conn_ipv6_v6only &&
 			    IN6_IS_ADDR_V4MAPPED(&addr)) {
 				err = EAFNOSUPPORT;
 				goto free_ret;
@@ -382,7 +385,7 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 		}
 		if (lookup_saddr) {
 			ipif = sctp_lookup_ipif_addr(&addr, B_TRUE,
-			    sctp->sctp_zoneid, !sctp->sctp_connp->conn_allzones,
+			    IPCL_ZONEID(connp), !connp->conn_allzones,
 			    ifindex, 0, B_TRUE, sctp->sctp_sctps);
 			if (ipif == NULL) {
 				/* Address not in the list */
@@ -495,6 +498,8 @@ sctp_ipif_hash_insert(sctp_t *sctp, sctp_ipif_t *ipif, int sleep,
 /*
  * Given a source address, walk through the peer address list to see
  * if the source address is being used.  If it is, reset that.
+ * A cleared saddr will then make sctp_make_mp lookup the destination again
+ * and as part of that look for a new source.
  */
 static void
 sctp_fix_saddr(sctp_t *sctp, in6_addr_t *saddr)
@@ -504,10 +509,6 @@ sctp_fix_saddr(sctp_t *sctp, in6_addr_t *saddr)
 	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
 		if (!IN6_ARE_ADDR_EQUAL(&fp->saddr, saddr))
 			continue;
-		if (fp->ire != NULL) {
-			IRE_REFRELE_NOTR(fp->ire);
-			fp->ire = NULL;
-		}
 		V6_SET_ZERO(fp->saddr);
 	}
 }
@@ -874,8 +875,8 @@ sctp_update_saddrs(sctp_ipif_t *oipif, sctp_ipif_t *nipif, int idx,
 	sctp_saddr_ipif_t	*sobj;
 	int			count;
 
-	sctp = sctps->sctps_gsctp;
 	mutex_enter(&sctps->sctps_g_lock);
+	sctp = list_head(&sctps->sctps_g_list);
 	while (sctp != NULL && oipif->sctp_ipif_refcnt > 0) {
 		mutex_enter(&sctp->sctp_reflock);
 		if (sctp->sctp_condemned ||
@@ -1202,7 +1203,6 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
 		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_UP;
-		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
 		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
 		rw_exit(&sctp_ipif->sctp_ipif_lock);
 		sctp_chk_and_updt_saddr(hindex, sctp_ipif,
@@ -1214,7 +1214,6 @@ sctp_update_ipif(ipif_t *ipif, int op)
 
 		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
-		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
 		sctp_ipif->sctp_ipif_zoneid = ipif->ipif_zoneid;
 		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
 		rw_exit(&sctp_ipif->sctp_ipif_lock);
@@ -1226,7 +1225,6 @@ sctp_update_ipif(ipif_t *ipif, int op)
 		rw_downgrade(&sctps->sctps_g_ipifs_lock);
 		rw_enter(&sctp_ipif->sctp_ipif_lock, RW_WRITER);
 		sctp_ipif->sctp_ipif_state = SCTP_IPIFS_DOWN;
-		sctp_ipif->sctp_ipif_mtu = ipif->ipif_mtu;
 		sctp_ipif->sctp_ipif_flags = ipif->ipif_flags;
 		rw_exit(&sctp_ipif->sctp_ipif_lock);
 
@@ -1277,6 +1275,7 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
 	in6_addr_t		addr;
 	sctp_ipif_t		*sctp_ipif;
 	int			ifindex = 0;
+	conn_t			*connp = sctp->sctp_connp;
 
 	ASSERT(sctp->sctp_nsaddrs >= addcnt);
 
@@ -1288,7 +1287,7 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
 	}
 
 	for (cnt = 0; cnt < addcnt; cnt++) {
-		switch (sctp->sctp_family) {
+		switch (connp->conn_family) {
 		case AF_INET:
 			sin4 = (struct sockaddr_in *)addrs + cnt;
 			IN6_INADDR_TO_V4MAPPED(&sin4->sin_addr, &addr);
@@ -1301,7 +1300,7 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
 			break;
 		}
 		sctp_ipif = sctp_lookup_ipif_addr(&addr, B_FALSE,
-		    sctp->sctp_zoneid, !sctp->sctp_connp->conn_allzones,
+		    IPCL_ZONEID(connp), !connp->conn_allzones,
 		    ifindex, 0, B_TRUE, sctp->sctp_sctps);
 		ASSERT(sctp_ipif != NULL);
 		sctp_ipif_hash_remove(sctp, sctp_ipif);
@@ -1356,10 +1355,10 @@ int
 sctp_saddr_add_addr(sctp_t *sctp, in6_addr_t *addr, uint_t ifindex)
 {
 	sctp_ipif_t		*sctp_ipif;
+	conn_t			*connp = sctp->sctp_connp;
 
-	sctp_ipif = sctp_lookup_ipif_addr(addr, B_TRUE, sctp->sctp_zoneid,
-	    !sctp->sctp_connp->conn_allzones, ifindex, 0, B_TRUE,
-	    sctp->sctp_sctps);
+	sctp_ipif = sctp_lookup_ipif_addr(addr, B_TRUE, IPCL_ZONEID(connp),
+	    !connp->conn_allzones, ifindex, 0, B_TRUE, sctp->sctp_sctps);
 	if (sctp_ipif == NULL)
 		return (EINVAL);
 
@@ -1386,6 +1385,7 @@ sctp_check_saddr(sctp_t *sctp, int supp_af, boolean_t delete,
 	int			scanned = 0;
 	int			naddr;
 	int			nsaddr;
+	conn_t			*connp = sctp->sctp_connp;
 
 	ASSERT(!sctp->sctp_loopback && !sctp->sctp_linklocal && supp_af != 0);
 
@@ -1393,7 +1393,7 @@ sctp_check_saddr(sctp_t *sctp, int supp_af, boolean_t delete,
 	 * Irregardless of the supported address in the INIT, v4
 	 * must be supported.
 	 */
-	if (sctp->sctp_family == AF_INET)
+	if (connp->conn_family == AF_INET)
 		supp_af = PARM_SUPP_V4;
 
 	nsaddr = sctp->sctp_nsaddrs;
@@ -1501,13 +1501,15 @@ sctp_getmyaddrs(void *conn, void *myaddrs, int *addrcnt)
 	int			l;
 	sctp_saddr_ipif_t	*obj;
 	sctp_t			*sctp = (sctp_t *)conn;
-	int			family = sctp->sctp_family;
+	conn_t			*connp = sctp->sctp_connp;
+	int			family = connp->conn_family;
 	int			max = *addrcnt;
 	size_t			added = 0;
 	struct sockaddr_in6	*sin6;
 	struct sockaddr_in	*sin4;
 	int			scanned = 0;
 	boolean_t		skip_lback = B_FALSE;
+	ip_xmit_attr_t		*ixa = connp->conn_ixa;
 
 	if (sctp->sctp_nsaddrs == 0)
 		return (EINVAL);
@@ -1543,15 +1545,27 @@ sctp_getmyaddrs(void *conn, void *myaddrs, int *addrcnt)
 			case AF_INET:
 				sin4 = (struct sockaddr_in *)myaddrs + added;
 				sin4->sin_family = AF_INET;
-				sin4->sin_port = sctp->sctp_lport;
+				sin4->sin_port = connp->conn_lport;
 				IN6_V4MAPPED_TO_INADDR(&addr, &sin4->sin_addr);
 				break;
 
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6 *)myaddrs + added;
 				sin6->sin6_family = AF_INET6;
-				sin6->sin6_port = sctp->sctp_lport;
+				sin6->sin6_port = connp->conn_lport;
 				sin6->sin6_addr = addr;
+				/*
+				 * Note that flowinfo is only returned for
+				 * getpeername just like for TCP and UDP.
+				 */
+				sin6->sin6_flowinfo = 0;
+
+				if (IN6_IS_ADDR_LINKSCOPE(&sin6->sin6_addr) &&
+				    (ixa->ixa_flags & IXAF_SCOPEID_SET))
+					sin6->sin6_scope_id = ixa->ixa_scopeid;
+				else
+					sin6->sin6_scope_id = 0;
+				sin6->__sin6_src_id = 0;
 				break;
 			}
 			added++;
@@ -1700,6 +1714,7 @@ sctp_get_addrlist(sctp_t *sctp, const void *addrs, uint32_t *addrcnt,
 	uchar_t			*p;
 	int			err = 0;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	conn_t			*connp = sctp->sctp_connp;
 
 	*addrlist = NULL;
 	*size = 0;
@@ -1707,7 +1722,7 @@ sctp_get_addrlist(sctp_t *sctp, const void *addrs, uint32_t *addrcnt,
 	/*
 	 * Create a list of sockaddr_in[6] structs using the input list.
 	 */
-	if (sctp->sctp_family == AF_INET) {
+	if (connp->conn_family == AF_INET) {
 		*size = sizeof (struct sockaddr_in) * *addrcnt;
 		*addrlist = kmem_zalloc(*size,  KM_SLEEP);
 		p = *addrlist;
@@ -1772,7 +1787,7 @@ get_all_addrs:
 	 * We allocate upfront so that the clustering module need to bother
 	 * re-sizing the list.
 	 */
-	if (sctp->sctp_family == AF_INET) {
+	if (connp->conn_family == AF_INET) {
 		*size = sizeof (struct sockaddr_in) *
 		    sctps->sctps_g_ipifs_count;
 	} else {
@@ -1805,7 +1820,7 @@ get_all_addrs:
 			    SCTP_IS_IPIF_LOOPBACK(sctp_ipif) ||
 			    SCTP_IS_IPIF_LINKLOCAL(sctp_ipif) ||
 			    !SCTP_IPIF_ZONE_MATCH(sctp, sctp_ipif) ||
-			    (sctp->sctp_ipversion == IPV4_VERSION &&
+			    (connp->conn_family == AF_INET &&
 			    sctp_ipif->sctp_ipif_isv6) ||
 			    (sctp->sctp_connp->conn_ipv6_v6only &&
 			    !sctp_ipif->sctp_ipif_isv6)) {
@@ -1816,7 +1831,7 @@ get_all_addrs:
 				continue;
 			}
 			rw_exit(&sctp_ipif->sctp_ipif_lock);
-			if (sctp->sctp_family == AF_INET) {
+			if (connp->conn_family == AF_INET) {
 				s4 = (struct sockaddr_in *)p;
 				IN6_V4MAPPED_TO_INADDR(&addr, &s4->sin_addr);
 				s4->sin_family = AF_INET;

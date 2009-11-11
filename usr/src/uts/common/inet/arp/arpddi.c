@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -27,10 +27,8 @@
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/modctl.h>
-#include <sys/ksynch.h>
 #include <inet/common.h>
 #include <inet/ip.h>
-#include <inet/arp_impl.h>
 
 #define	INET_NAME	"arp"
 #define	INET_MODDESC	"ARP STREAMS module"
@@ -39,28 +37,16 @@
 #define	INET_DEVSTRTAB	ipinfov4
 #define	INET_MODSTRTAB	arpinfo
 #define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since as a driver we're ip */
-#define	INET_MODMTFLAGS	(D_MP | D_MTPERMOD)
+#define	INET_MODMTFLAGS	D_MP
 
 #include "../inetddi.c"
-
-extern void arp_ddi_init(void);
-extern void arp_ddi_destroy(void);
 
 int
 _init(void)
 {
 	int	error;
 
-	/*
-	 * Note: After mod_install succeeds, another thread can enter
-	 * therefore all initialization is done before it and any
-	 * de-initialization needed done if it fails.
-	 */
-	arp_ddi_init();
 	error = mod_install(&modlinkage);
-	if (error != 0)
-		arp_ddi_destroy();
-
 	return (error);
 }
 
@@ -70,8 +56,6 @@ _fini(void)
 	int	error;
 
 	error = mod_remove(&modlinkage);
-	if (error == 0)
-		arp_ddi_destroy();
 	return (error);
 }
 

@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_IPSECESP_H
 #define	_INET_IPSECESP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <inet/ip.h>
 #include <inet/ipdrop.h>
@@ -70,10 +68,7 @@ struct ipsecesp_stack {
 	queue_t			*esp_pfkey_q;
 	timeout_id_t		esp_event;
 
-	mblk_t			*esp_ip_unbind;
-
 	sadbp_t			esp_sadb;
-
 };
 typedef struct ipsecesp_stack ipsecesp_stack_t;
 

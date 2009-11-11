@@ -354,7 +354,6 @@ usr/share/lib/locale/com/sun/dhcpmgr/cli/dhcpconfig/ResourceBundle.properties	sp
 usr/share/lib/locale/com/sun/dhcpmgr/cli/dhtadm/ResourceBundle.properties	sparc
 usr/share/lib/locale/com/sun/dhcpmgr/cli/pntadm/ResourceBundle.properties	sparc
 #
-usr/include/inet/arp_impl.h		sparc
 usr/include/inet/rawip_impl.h		sparc
 usr/include/inet/udp_impl.h		sparc
 usr/include/inet/tcp_impl.h		sparc

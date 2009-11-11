@@ -45,7 +45,6 @@
 #include <sys/socketvar.h>
 #include <sys/cred_impl.h>
 #include <inet/udp_impl.h>
-#include <inet/arp_impl.h>
 #include <inet/rawip_impl.h>
 #include <inet/mi.h>
 #include <fs/sockfs/socktpi_impl.h>
@@ -70,31 +69,6 @@ typedef struct netstat_cb_data_s {
 	conn_t	conn;
 	int	af;
 } netstat_cb_data_t;
-
-/* Walkers for various *_stack_t */
-int
-ar_stacks_walk_init(mdb_walk_state_t *wsp)
-{
-	if (mdb_layered_walk("netstack", wsp) == -1) {
-		mdb_warn("can't walk 'netstack'");
-		return (WALK_ERR);
-	}
-	return (WALK_NEXT);
-}
-
-int
-ar_stacks_walk_step(mdb_walk_state_t *wsp)
-{
-	uintptr_t kaddr;
-	netstack_t nss;
-
-	if (mdb_vread(&nss, sizeof (nss), wsp->walk_addr) == -1) {
-		mdb_warn("can't read netstack at %p", wsp->walk_addr);
-		return (WALK_ERR);
-	}
-	kaddr = (uintptr_t)nss.netstack_modules[NS_ARP];
-	return (wsp->walk_callback(kaddr, wsp->walk_layer, wsp->walk_cbdata));
-}
 
 int
 icmp_stacks_walk_init(mdb_walk_state_t *wsp)
@@ -201,15 +175,15 @@ net_tcp_active(const tcp_t *tcp)
 static int
 net_tcp_ipv4(const tcp_t *tcp)
 {
-	return ((tcp->tcp_ipversion == IPV4_VERSION) ||
-	    (IN6_IS_ADDR_UNSPECIFIED(&tcp->tcp_ip_src_v6) &&
+	return ((tcp->tcp_connp->conn_ipversion == IPV4_VERSION) ||
+	    (IN6_IS_ADDR_UNSPECIFIED(&tcp->tcp_connp->conn_laddr_v6) &&
 	    (tcp->tcp_state <= TCPS_LISTEN)));
 }
 
 static int
 net_tcp_ipv6(const tcp_t *tcp)
 {
-	return (tcp->tcp_ipversion == IPV6_VERSION);
+	return (tcp->tcp_connp->conn_ipversion == IPV6_VERSION);
 }
 
 static int
@@ -222,15 +196,15 @@ net_udp_active(const udp_t *udp)
 static int
 net_udp_ipv4(const udp_t *udp)
 {
-	return ((udp->udp_ipversion == IPV4_VERSION) ||
-	    (IN6_IS_ADDR_UNSPECIFIED(&udp->udp_v6src) &&
+	return ((udp->udp_connp->conn_ipversion == IPV4_VERSION) ||
+	    (IN6_IS_ADDR_UNSPECIFIED(&udp->udp_connp->conn_laddr_v6) &&
 	    (udp->udp_state <= TS_IDLE)));
 }
 
 static int
 net_udp_ipv6(const udp_t *udp)
 {
-	return (udp->udp_ipversion == IPV6_VERSION);
+	return (udp->udp_connp->conn_ipversion == IPV6_VERSION);
 }
 
 int
@@ -398,11 +372,6 @@ mi_payload_walk_step(mdb_walk_state_t *wsp)
 	}
 	return (WALK_NEXT);
 }
-
-const mi_payload_walk_arg_t mi_ar_arg = {
-	"ar_stacks", OFFSETOF(arp_stack_t, as_head), sizeof (ar_t),
-	MI_PAYLOAD_DEVICE | MI_PAYLOAD_MODULE
-};
 
 const mi_payload_walk_arg_t mi_icmp_arg = {
 	"icmp_stacks", OFFSETOF(icmp_stack_t, is_head), sizeof (icmp_t),
@@ -632,7 +601,7 @@ netstat_tcp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 
 	tcp_kaddr = (uintptr_t)connp->conn_tcp;
 	if (mdb_vread(&tcps, sizeof (tcp_t), tcp_kaddr) == -1) {
-		mdb_warn("failed to read tcp_t at %p", kaddr);
+		mdb_warn("failed to read tcp_t at %p", tcp_kaddr);
 		return (WALK_ERR);
 	}
 
@@ -648,13 +617,13 @@ netstat_tcp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 
 	mdb_printf("%0?p %2i ", tcp_kaddr, tcp->tcp_state);
 	if (af == AF_INET) {
-		net_ipv4addrport_pr(&tcp->tcp_ip_src_v6, tcp->tcp_lport);
+		net_ipv4addrport_pr(&connp->conn_laddr_v6, connp->conn_lport);
 		mdb_printf(" ");
-		net_ipv4addrport_pr(&tcp->tcp_remote_v6, tcp->tcp_fport);
+		net_ipv4addrport_pr(&connp->conn_faddr_v6, connp->conn_fport);
 	} else if (af == AF_INET6) {
-		net_ipv6addrport_pr(&tcp->tcp_ip_src_v6, tcp->tcp_lport);
+		net_ipv6addrport_pr(&connp->conn_laddr_v6, connp->conn_lport);
 		mdb_printf(" ");
-		net_ipv6addrport_pr(&tcp->tcp_remote_v6, tcp->tcp_fport);
+		net_ipv6addrport_pr(&connp->conn_faddr_v6, connp->conn_fport);
 	}
 	mdb_printf(" %5i", ns_to_stackid((uintptr_t)connp->conn_netstack));
 	mdb_printf(" %4i\n", connp->conn_zoneid);
@@ -687,6 +656,9 @@ netstat_udp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 		return (WALK_ERR);
 	}
 
+	connp->conn_udp = &udp;
+	udp.udp_connp = connp;
+
 	if (!((opts & NETSTAT_ALL) || net_udp_active(&udp)) ||
 	    (af == AF_INET && !net_udp_ipv4(&udp)) ||
 	    (af == AF_INET6 && !net_udp_ipv6(&udp))) {
@@ -704,13 +676,13 @@ netstat_udp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 
 	mdb_printf("%0?p %10s ", (uintptr_t)connp->conn_udp, state);
 	if (af == AF_INET) {
-		net_ipv4addrport_pr(&udp.udp_v6src, udp.udp_port);
+		net_ipv4addrport_pr(&connp->conn_laddr_v6, connp->conn_lport);
 		mdb_printf(" ");
-		net_ipv4addrport_pr(&udp.udp_v6dst, udp.udp_dstport);
+		net_ipv4addrport_pr(&connp->conn_faddr_v6, connp->conn_fport);
 	} else if (af == AF_INET6) {
-		net_ipv6addrport_pr(&udp.udp_v6src, udp.udp_port);
+		net_ipv6addrport_pr(&connp->conn_laddr_v6, connp->conn_lport);
 		mdb_printf(" ");
-		net_ipv6addrport_pr(&udp.udp_v6dst, udp.udp_dstport);
+		net_ipv6addrport_pr(&connp->conn_faddr_v6, connp->conn_fport);
 	}
 	mdb_printf(" %5i", ns_to_stackid((uintptr_t)connp->conn_netstack));
 	mdb_printf(" %4i\n", connp->conn_zoneid);
@@ -740,8 +712,11 @@ netstat_icmp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 		return (WALK_ERR);
 	}
 
-	if ((af == AF_INET && icmp.icmp_ipversion != IPV4_VERSION) ||
-	    (af == AF_INET6 && icmp.icmp_ipversion != IPV6_VERSION)) {
+	connp->conn_icmp = &icmp;
+	icmp.icmp_connp = connp;
+
+	if ((af == AF_INET && connp->conn_ipversion != IPV4_VERSION) ||
+	    (af == AF_INET6 && connp->conn_ipversion != IPV6_VERSION)) {
 		return (WALK_NEXT);
 	}
 
@@ -756,16 +731,16 @@ netstat_icmp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 
 	mdb_printf("%0?p %10s ", (uintptr_t)connp->conn_icmp, state);
 	if (af == AF_INET) {
-		mdb_printf("%*I ", ADDR_V4_WIDTH,
-		    V4_PART_OF_V6((icmp.icmp_v6src)));
-		mdb_printf("%*I ", ADDR_V4_WIDTH,
-		    V4_PART_OF_V6((icmp.icmp_v6dst.sin6_addr)));
+		net_ipv4addrport_pr(&connp->conn_laddr_v6, connp->conn_lport);
+		mdb_printf(" ");
+		net_ipv4addrport_pr(&connp->conn_faddr_v6, connp->conn_fport);
 	} else if (af == AF_INET6) {
-		mdb_printf("%*N ", ADDR_V6_WIDTH, &icmp.icmp_v6src);
-		mdb_printf("%*N ", ADDR_V6_WIDTH, &icmp.icmp_v6dst);
+		net_ipv6addrport_pr(&connp->conn_laddr_v6, connp->conn_lport);
+		mdb_printf(" ");
+		net_ipv6addrport_pr(&connp->conn_faddr_v6, connp->conn_fport);
 	}
 	mdb_printf(" %5i", ns_to_stackid((uintptr_t)connp->conn_netstack));
-	mdb_printf(" %4i\n", icmp.icmp_zoneid);
+	mdb_printf(" %4i\n", connp->conn_zoneid);
 
 	return (WALK_NEXT);
 }
@@ -881,57 +856,57 @@ get_ifname(const ire_t *ire, char *intf)
 	ill_t ill;
 
 	*intf = '\0';
-	if (ire->ire_type == IRE_CACHE) {
-		queue_t stq;
-
-		if (mdb_vread(&stq, sizeof (stq), (uintptr_t)ire->ire_stq) ==
-		    -1)
-			return;
-		if (mdb_vread(&ill, sizeof (ill), (uintptr_t)stq.q_ptr) == -1)
+	if (ire->ire_ill != NULL) {
+		if (mdb_vread(&ill, sizeof (ill),
+		    (uintptr_t)ire->ire_ill) == -1)
 			return;
 		(void) mdb_readstr(intf, MIN(LIFNAMSIZ, ill.ill_name_length),
 		    (uintptr_t)ill.ill_name);
-	} else if (ire->ire_ipif != NULL) {
-		ipif_t ipif;
-		char *cp;
-
-		if (mdb_vread(&ipif, sizeof (ipif),
-		    (uintptr_t)ire->ire_ipif) == -1)
-			return;
-		if (mdb_vread(&ill, sizeof (ill), (uintptr_t)ipif.ipif_ill) ==
-		    -1)
-			return;
-		(void) mdb_readstr(intf, MIN(LIFNAMSIZ, ill.ill_name_length),
-		    (uintptr_t)ill.ill_name);
-		if (ipif.ipif_id != 0) {
-			cp = intf + strlen(intf);
-			(void) mdb_snprintf(cp, LIFNAMSIZ + 1 - (cp - intf),
-			    ":%u", ipif.ipif_id);
-		}
 	}
 }
 
+const in6_addr_t ipv6_all_ones =
+	{ 0xffffffffU, 0xffffffffU, 0xffffffffU, 0xffffffffU };
+
 static void
-get_v4flags(const ire_t *ire, char *flags)
+get_ireflags(const ire_t *ire, char *flags)
 {
 	(void) strcpy(flags, "U");
-	if (ire->ire_type == IRE_DEFAULT || ire->ire_type == IRE_PREFIX ||
-	    ire->ire_type == IRE_HOST || ire->ire_type == IRE_HOST_REDIRECT)
+	/* RTF_INDIRECT wins over RTF_GATEWAY - don't display both */
+	if (ire->ire_flags & RTF_INDIRECT)
+		(void) strcat(flags, "I");
+	else if (ire->ire_type & IRE_OFFLINK)
 		(void) strcat(flags, "G");
-	if (ire->ire_mask == IP_HOST_MASK)
-		(void) strcat(flags, "H");
-	if (ire->ire_type == IRE_HOST_REDIRECT)
+
+	/* IRE_IF_CLONE wins over RTF_HOST - don't display both */
+	if (ire->ire_type & IRE_IF_CLONE)
+		(void) strcat(flags, "C");
+	else if (ire->ire_ipversion == IPV4_VERSION) {
+		if (ire->ire_mask == IP_HOST_MASK)
+			(void) strcat(flags, "H");
+	} else {
+		if (IN6_ARE_ADDR_EQUAL(&ire->ire_mask_v6, &ipv6_all_ones))
+			(void) strcat(flags, "H");
+	}
+
+	if (ire->ire_flags & RTF_DYNAMIC)
 		(void) strcat(flags, "D");
-	if (ire->ire_type == IRE_CACHE)
-		(void) strcat(flags, "A");
 	if (ire->ire_type == IRE_BROADCAST)
-		(void) strcat(flags, "B");
+		(void) strcat(flags, "b");
+	if (ire->ire_type == IRE_MULTICAST)
+		(void) strcat(flags, "m");
 	if (ire->ire_type == IRE_LOCAL)
 		(void) strcat(flags, "L");
+	if (ire->ire_type == IRE_NOROUTE)
+		(void) strcat(flags, "N");
 	if (ire->ire_flags & RTF_MULTIRT)
 		(void) strcat(flags, "M");
 	if (ire->ire_flags & RTF_SETSRC)
 		(void) strcat(flags, "S");
+	if (ire->ire_flags & RTF_REJECT)
+		(void) strcat(flags, "R");
+	if (ire->ire_flags & RTF_BLACKHOLE)
+		(void) strcat(flags, "B");
 }
 
 static int
@@ -945,8 +920,10 @@ netstat_irev4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 	if (ire->ire_ipversion != IPV4_VERSION)
 		return (WALK_NEXT);
 
-	if (!(*opts & NETSTAT_ALL) && (ire->ire_type == IRE_CACHE ||
-	    ire->ire_type == IRE_BROADCAST || ire->ire_type == IRE_LOCAL))
+	/* Skip certain IREs by default */
+	if (!(*opts & NETSTAT_ALL) &&
+	    (ire->ire_type &
+	    (IRE_BROADCAST|IRE_LOCAL|IRE_MULTICAST|IRE_NOROUTE|IRE_IF_CLONE)))
 		return (WALK_NEXT);
 
 	if (*opts & NETSTAT_FIRST) {
@@ -966,10 +943,9 @@ netstat_irev4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 		}
 	}
 
-	gate = (ire->ire_type & (IRE_INTERFACE|IRE_LOOPBACK|IRE_BROADCAST)) ?
-	    ire->ire_src_addr : ire->ire_gateway_addr;
+	gate = ire->ire_gateway_addr;
 
-	get_v4flags(ire, flags);
+	get_ireflags(ire, flags);
 
 	get_ifname(ire, intf);
 
@@ -977,8 +953,8 @@ netstat_irev4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 		mdb_printf("%?p %-*I %-*I %-*I %-6s %5u%c %4u %3u %-3s %5u "
 		    "%u\n", kaddr, ADDR_V4_WIDTH, ire->ire_addr, ADDR_V4_WIDTH,
 		    ire->ire_mask, ADDR_V4_WIDTH, gate, intf,
-		    ire->ire_max_frag, ire->ire_frag_flag ? '*' : ' ',
-		    ire->ire_uinfo.iulp_rtt, ire->ire_refcnt, flags,
+		    0, ' ',
+		    ire->ire_metrics.iulp_rtt, ire->ire_refcnt, flags,
 		    ire->ire_ob_pkt_count, ire->ire_ib_pkt_count);
 	} else {
 		mdb_printf("%?p %-*I %-*I %-5s %4u %5u %s\n", kaddr,
@@ -1025,7 +1001,10 @@ netstat_irev6_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 	if (ire->ire_ipversion != IPV6_VERSION)
 		return (WALK_NEXT);
 
-	if (!(*opts & NETSTAT_ALL) && ire->ire_type == IRE_CACHE)
+	/* Skip certain IREs by default */
+	if (!(*opts & NETSTAT_ALL) &&
+	    (ire->ire_type &
+	    (IRE_BROADCAST|IRE_LOCAL|IRE_MULTICAST|IRE_NOROUTE|IRE_IF_CLONE)))
 		return (WALK_NEXT);
 
 	if (*opts & NETSTAT_FIRST) {
@@ -1045,37 +1024,21 @@ netstat_irev6_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 		}
 	}
 
-	gatep = (ire->ire_type & (IRE_INTERFACE|IRE_LOOPBACK)) ?
-	    &ire->ire_src_addr_v6 : &ire->ire_gateway_addr_v6;
+	gatep = &ire->ire_gateway_addr_v6;
 
 	masklen = ip_mask_to_plen_v6(&ire->ire_mask_v6);
 	(void) mdb_snprintf(deststr, sizeof (deststr), "%N/%d",
 	    &ire->ire_addr_v6, masklen);
 
-	(void) strcpy(flags, "U");
-	if (ire->ire_type == IRE_DEFAULT || ire->ire_type == IRE_PREFIX ||
-	    ire->ire_type == IRE_HOST || ire->ire_type == IRE_HOST_REDIRECT)
-		(void) strcat(flags, "G");
-	if (masklen == IPV6_ABITS)
-		(void) strcat(flags, "H");
-	if (ire->ire_type == IRE_HOST_REDIRECT)
-		(void) strcat(flags, "D");
-	if (ire->ire_type == IRE_CACHE)
-		(void) strcat(flags, "A");
-	if (ire->ire_type == IRE_LOCAL)
-		(void) strcat(flags, "L");
-	if (ire->ire_flags & RTF_MULTIRT)
-		(void) strcat(flags, "M");
-	if (ire->ire_flags & RTF_SETSRC)
-		(void) strcat(flags, "S");
+	get_ireflags(ire, flags);
 
 	get_ifname(ire, intf);
 
 	if (*opts & NETSTAT_VERBOSE) {
 		mdb_printf("%?p %-*s %-*N %-5s %5u%c %5u %3u %-5s %6u %u\n",
 		    kaddr, ADDR_V6_WIDTH+4, deststr, ADDR_V6_WIDTH, gatep,
-		    intf, ire->ire_max_frag, ire->ire_frag_flag ? '*' : ' ',
-		    ire->ire_uinfo.iulp_rtt, ire->ire_refcnt,
+		    intf, 0, ' ',
+		    ire->ire_metrics.iulp_rtt, ire->ire_refcnt,
 		    flags, ire->ire_ob_pkt_count, ire->ire_ib_pkt_count);
 	} else {
 		mdb_printf("%?p %-*s %-*N %-5s %3u %6u %s\n", kaddr,

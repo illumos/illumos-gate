@@ -38,6 +38,7 @@
 #include <sys/cmn_err.h>
 
 #include <netinet/in.h>
+#include <inet/ipsec_impl.h>
 #include <inet/common.h>
 #include <inet/mib2.h>
 #include <inet/ip.h>
@@ -89,6 +90,20 @@ static phy_if_t 	ipv6_routeto(net_handle_t, struct sockaddr *,
 			    struct sockaddr *);
 static int 		ipv6_isvalidchecksum(net_handle_t, mblk_t *);
 
+static int 		net_no_getmtu(net_handle_t, phy_if_t, lif_if_t);
+static int 		net_no_getpmtuenabled(net_handle_t);
+static lif_if_t 	net_no_lifgetnext(net_handle_t, phy_if_t, lif_if_t);
+static int 		net_no_inject(net_handle_t, inject_t, net_inject_t *);
+static phy_if_t 	net_no_routeto(net_handle_t, struct sockaddr *,
+			    struct sockaddr *);
+static int 		net_no_ispartialchecksum(net_handle_t, mblk_t *);
+static int 		net_no_getlifaddr(net_handle_t, phy_if_t, lif_if_t,
+			    size_t, net_ifaddr_t [], void *);
+static int		net_no_getlifzone(net_handle_t, phy_if_t, lif_if_t,
+			    zoneid_t *);
+static int		net_no_getlifflags(net_handle_t, phy_if_t, lif_if_t,
+			    uint64_t *);
+
 /* Netinfo private functions */
 static	int		ip_getifname_impl(phy_if_t, char *,
 			    const size_t, boolean_t, ip_stack_t *);
@@ -110,7 +125,6 @@ static	int		ip_getlifaddr_impl(sa_family_t, phy_if_t, lif_if_t,
 static	void		ip_ni_queue_in_func(void *);
 static	void		ip_ni_queue_out_func(void *);
 static	void		ip_ni_queue_func_impl(injection_t *,  boolean_t);
-
 
 static net_protocol_t ipv4info = {
 	NETINFO_VERSION,
@@ -147,6 +161,24 @@ static net_protocol_t ipv6info = {
 	ipv6_routeto,
 	ip_ispartialchecksum,
 	ipv6_isvalidchecksum
+};
+
+static net_protocol_t arp_netinfo = {
+	NETINFO_VERSION,
+	NHF_ARP,
+	ip_getifname,
+	net_no_getmtu,
+	net_no_getpmtuenabled,
+	net_no_getlifaddr,
+	net_no_getlifzone,
+	net_no_getlifflags,
+	ip_phygetnext,
+	ip_phylookup,
+	net_no_lifgetnext,
+	net_no_inject,
+	net_no_routeto,
+	net_no_ispartialchecksum,
+	ip_isvalidchecksum
 };
 
 /*
@@ -230,6 +262,9 @@ ip_net_init(ip_stack_t *ipst, netstack_t *ns)
 
 	ipst->ips_ipv6_net_data = net_protocol_register(id, &ipv6info);
 	ASSERT(ipst->ips_ipv6_net_data != NULL);
+
+	ipst->ips_arp_net_data = net_protocol_register(id, &arp_netinfo);
+	ASSERT(ipst->ips_ipv6_net_data != NULL);
 }
 
 
@@ -247,6 +282,11 @@ ip_net_destroy(ip_stack_t *ipst)
 	if (ipst->ips_ipv6_net_data != NULL) {
 		if (net_protocol_unregister(ipst->ips_ipv6_net_data) == 0)
 			ipst->ips_ipv6_net_data = NULL;
+	}
+
+	if (ipst->ips_arp_net_data != NULL) {
+		if (net_protocol_unregister(ipst->ips_arp_net_data) == 0)
+			ipst->ips_arp_net_data = NULL;
 	}
 }
 
@@ -612,8 +652,7 @@ ip_getifname_impl(phy_if_t phy_ifdata,
 
 	ASSERT(buffer != NULL);
 
-	ill = ill_lookup_on_ifindex((uint_t)phy_ifdata, isv6, NULL, NULL,
-	    NULL, NULL, ipst);
+	ill = ill_lookup_on_ifindex((uint_t)phy_ifdata, isv6, ipst);
 	if (ill == NULL)
 		return (1);
 
@@ -667,17 +706,17 @@ ip_getmtu_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6,
 	if (ipif == NULL)
 		return (0);
 
-	mtu = ipif->ipif_mtu;
+	mtu = ipif->ipif_ill->ill_mtu;
 	ipif_refrele(ipif);
 
 	if (mtu == 0) {
 		ill_t *ill;
 
 		if ((ill = ill_lookup_on_ifindex((uint_t)phy_ifdata, isv6,
-		    NULL, NULL, NULL, NULL, ipst)) == NULL) {
+		    ipst)) == NULL) {
 			return (0);
 		}
-		mtu = ill->ill_max_frag;
+		mtu = ill->ill_mtu;
 		ill_refrele(ill);
 	}
 
@@ -760,8 +799,7 @@ ip_phylookup_impl(const char *name, boolean_t isv6, ip_stack_t *ipst)
 	phy_if_t phy;
 	ill_t *ill;
 
-	ill = ill_lookup_on_name((char *)name, B_FALSE, isv6, NULL, NULL,
-	    NULL, NULL, NULL, ipst);
+	ill = ill_lookup_on_name((char *)name, B_FALSE, isv6, NULL, ipst);
 	if (ill == NULL)
 		return (0);
 
@@ -813,8 +851,7 @@ ip_lifgetnext_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6,
 	ipif_t *ipif;
 	ill_t *ill;
 
-	ill = ill_lookup_on_ifindex(phy_ifdata, isv6, NULL, NULL,
-	    NULL, NULL, ipst);
+	ill = ill_lookup_on_ifindex(phy_ifdata, isv6, ipst);
 	if (ill == NULL)
 		return (0);
 
@@ -898,14 +935,10 @@ static int
 ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
     ip_stack_t *ipst)
 {
-	struct sockaddr_in6 *sin6;
 	ddi_taskq_t *tq = NULL;
 	void (* func)(void *);
 	injection_t *inject;
-	ip6_t *ip6h;
-	ire_t *ire;
 	mblk_t *mp;
-	zoneid_t zoneid;
 
 	ASSERT(packet != NULL);
 	ASSERT(packet->ni_packet != NULL);
@@ -941,130 +974,44 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
 		tq = eventq_queue_out;
 		break;
 
-	case NI_DIRECT_OUT:
-		/*
-		 * Note:
-		 * For IPv4, the code path below will be greatly simplified
-		 * with the delivery of surya - it will become a single
-		 * function call to X.  A follow on project is aimed to
-		 * provide similar functionality for IPv6.
-		 */
+	case NI_DIRECT_OUT: {
+		struct sockaddr *sock;
+
 		mp = packet->ni_packet;
-		zoneid =
-		    netstackid_to_zoneid(ipst->ips_netstack->netstack_stackid);
 
-		if (!isv6) {
-			struct sockaddr *sock;
-
-			sock = (struct sockaddr *)&packet->ni_addr;
-			/*
-			 * ipfil_sendpkt was provided by surya to ease the
-			 * problems associated with sending out a packet.
-			 * Currently this function only supports IPv4.
-			 */
-			switch (ipfil_sendpkt(sock, mp, packet->ni_physical,
-			    zoneid)) {
-			case 0 :
-			case EINPROGRESS:
-				return (0);
-			case ECOMM :
-			case ENONET :
-				return (1);
-			default :
-				return (1);
-			}
-			/* NOTREACHED */
-
-		}
-
-		ip6h = (ip6_t *)mp->b_rptr;
-		sin6 = (struct sockaddr_in6 *)&packet->ni_addr;
-		ASSERT(sin6->sin6_family == AF_INET6);
-
-		ire = ire_route_lookup_v6(&sin6->sin6_addr, 0, 0, 0,
-		    NULL, NULL, zoneid, NULL,
-		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE,
-		    ipst);
-
-		if (ire == NULL) {
-			ip2dbg(("ip_inject: ire_cache_lookup failed\n"));
-			freemsg(mp);
+		sock = (struct sockaddr *)&packet->ni_addr;
+		/*
+		 * ipfil_sendpkt was provided by surya to ease the
+		 * problems associated with sending out a packet.
+		 */
+		switch (ipfil_sendpkt(sock, mp, packet->ni_physical,
+		    netstackid_to_zoneid(
+		    ipst->ips_netstack->netstack_stackid))) {
+		case 0 :
+		case EINPROGRESS:
+			return (0);
+		case ECOMM :
+		case ENONET :
+			return (1);
+		default :
 			return (1);
 		}
-
-		if (ire->ire_stq == NULL) {
-			/* Send to loopback destination. */
-			if (ire->ire_rfq == NULL) {
-				ip2dbg(("ip_inject: bad nexthop\n"));
-				ire_refrele(ire);
-				freemsg(mp);
-				return (1);
-			}
-			DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,
-			    void_ip_t *, ip6h, __dtrace_ipsr_ill_t *,
-			    ire->ire_ipif->ipif_ill, ipha_t *, NULL, ip6_t *,
-			    ip6h, int, 1);
-			ip_wput_local_v6(ire->ire_rfq,
-			    ire->ire_ipif->ipif_ill, ip6h, mp, ire, 0, zoneid);
-			ire_refrele(ire);
-			return (0);
-		}
-
-		mp->b_queue = ire->ire_stq;
-
-		if (ire->ire_nce == NULL ||
-		    ire->ire_nce->nce_fp_mp == NULL &&
-		    ire->ire_nce->nce_res_mp == NULL) {
-			ip_newroute_v6(ire->ire_stq, mp, &sin6->sin6_addr,
-			    &ip6h->ip6_src, NULL, zoneid, ipst);
-
-			ire_refrele(ire);
-			return (0);
-		} else {
-			/* prepend L2 header for IPv6 packets. */
-			mblk_t *llmp;
-
-			/*
-			 * Lock IREs, see 6420438
-			 */
-			mutex_enter(&ire->ire_lock);
-			llmp = ire->ire_nce->nce_fp_mp ?
-			    ire->ire_nce->nce_fp_mp :
-			    ire->ire_nce->nce_res_mp;
-
-			if ((mp = dupb(llmp)) == NULL &&
-			    (mp = copyb(llmp)) == NULL) {
-				ip2dbg(("ip_inject: llhdr failed\n"));
-				mutex_exit(&ire->ire_lock);
-				ire_refrele(ire);
-				freemsg(mp);
-				return (1);
-			}
-			mutex_exit(&ire->ire_lock);
-			linkb(mp, packet->ni_packet);
-		}
-
-		mp->b_queue = ire->ire_stq;
-
-		break;
+		/* NOTREACHED */
+	}
 	default:
 		freemsg(packet->ni_packet);
 		return (1);
 	}
 
-	if (tq) {
-		inject->inj_ptr = ipst;
-		if (ddi_taskq_dispatch(tq, func, (void *)inject,
-		    DDI_SLEEP) == DDI_FAILURE) {
-			ip2dbg(("ip_inject:  ddi_taskq_dispatch failed\n"));
-			freemsg(packet->ni_packet);
-			return (1);
-		}
-	} else {
-		putnext(ire->ire_stq, mp);
-		ire_refrele(ire);
-	}
+	ASSERT(tq != NULL);
 
+	inject->inj_ptr = ipst;
+	if (ddi_taskq_dispatch(tq, func, (void *)inject,
+	    DDI_SLEEP) == DDI_FAILURE) {
+		ip2dbg(("ip_inject:  ddi_taskq_dispatch failed\n"));
+		freemsg(packet->ni_packet);
+		return (1);
+	}
 	return (0);
 }
 
@@ -1121,64 +1068,57 @@ ip_routeto_impl(struct sockaddr *address, struct sockaddr *nexthop,
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)address;
 	struct sockaddr_in *next = (struct sockaddr_in *)nexthop;
 	struct sockaddr_in *sin = (struct sockaddr_in *)address;
-	ire_t *sire = NULL;
 	ire_t *ire;
-	ill_t *ill;
+	ire_t *nexthop_ire;
 	phy_if_t phy_if;
 	zoneid_t zoneid;
 
 	zoneid = netstackid_to_zoneid(ipst->ips_netstack->netstack_stackid);
 
 	if (address->sa_family == AF_INET6) {
-		ire = ire_route_lookup_v6(&sin6->sin6_addr, NULL,
-		    0, 0, NULL, &sire, zoneid, NULL,
-		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE,
-		    ipst);
+		ire = ire_route_recursive_v6(&sin6->sin6_addr, 0, NULL,
+		    zoneid, NULL, MATCH_IRE_DSTONLY, B_TRUE, 0, ipst, NULL,
+		    NULL, NULL);
 	} else {
-		ire = ire_route_lookup(sin->sin_addr.s_addr, 0,
-		    0, 0, NULL, &sire, zoneid, NULL,
-		    MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE,
-		    ipst);
+		ire = ire_route_recursive_v4(sin->sin_addr.s_addr, 0, NULL,
+		    zoneid, NULL, MATCH_IRE_DSTONLY, B_TRUE, 0, ipst, NULL,
+		    NULL, NULL);
 	}
-
-	if (ire == NULL)
-		return (0);
-
+	ASSERT(ire != NULL);
 	/*
 	 * For some destinations, we have routes that are dead ends, so
 	 * return to indicate that no physical interface can be used to
 	 * reach the destination.
 	 */
-	if ((ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE)) != 0) {
-		if (sire != NULL)
-			ire_refrele(sire);
+	if (ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+		ire_refrele(ire);
+		return (NULL);
+	}
+
+	nexthop_ire = ire_nexthop(ire);
+	if (nexthop_ire == NULL) {
+		ire_refrele(ire);
+		return (0);
+	}
+	if (nexthop_ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
+		ire_refrele(nexthop_ire);
 		ire_refrele(ire);
 		return (0);
 	}
 
-	ill = ire_to_ill(ire);
-	if (ill == NULL) {
-		if (sire != NULL)
-			ire_refrele(sire);
-		ire_refrele(ire);
-		return (0);
-	}
+	ASSERT(nexthop_ire->ire_ill != NULL);
 
 	if (nexthop != NULL) {
 		if (address->sa_family == AF_INET6) {
-			next->sin_addr.s_addr = sire ? sire->ire_gateway_addr :
-			    sin->sin_addr.s_addr;
+			next6->sin6_addr = nexthop_ire->ire_addr_v6;
 		} else {
-			next6->sin6_addr = sire ? sire->ire_gateway_addr_v6 :
-			    sin6->sin6_addr;
+			next->sin_addr.s_addr = nexthop_ire->ire_addr;
 		}
 	}
 
-	ASSERT(ill != NULL);
-	phy_if = (phy_if_t)ill->ill_phyint->phyint_ifindex;
-	if (sire != NULL)
-		ire_refrele(sire);
+	phy_if = (phy_if_t)nexthop_ire->ire_ill->ill_phyint->phyint_ifindex;
 	ire_refrele(ire);
+	ire_refrele(nexthop_ire);
 
 	return (phy_if);
 }
@@ -1477,8 +1417,7 @@ ip_getlifflags_impl(sa_family_t family, phy_if_t phy_ifdata, lif_if_t ifdata,
 	ipif_t *ipif;
 	ill_t *ill;
 
-	ill = ill_lookup_on_ifindex(phy_ifdata,
-	    (family == AF_INET6), NULL, NULL, NULL, NULL, ipst);
+	ill = ill_lookup_on_ifindex(phy_ifdata, (family == AF_INET6), ipst);
 	if (ill == NULL)
 		return (-1);
 	phyi = ill->ill_phyint;
@@ -1538,59 +1477,43 @@ static void
 ip_ni_queue_func_impl(injection_t *inject,  boolean_t out)
 {
 	net_inject_t *packet;
-	conn_t *conn;
 	ill_t *ill;
 	ip_stack_t *ipst = (ip_stack_t *)inject->inj_ptr;
+	ip_xmit_attr_t	ixas;
 
 	ASSERT(inject != NULL);
 	packet = &inject->inj_data;
 	ASSERT(packet->ni_packet != NULL);
 
-	ill = ill_lookup_on_ifindex((uint_t)packet->ni_physical,
-	    B_FALSE, NULL, NULL, NULL, NULL, ipst);
-	if (ill == NULL) {
-		kmem_free(inject, sizeof (*inject));
-		return;
-	}
-
 	if (out == 0) {
+		ill = ill_lookup_on_ifindex((uint_t)packet->ni_physical,
+		    inject->inj_isv6, ipst);
+
+		if (ill == NULL) {
+			kmem_free(inject, sizeof (*inject));
+			return;
+		}
+
 		if (inject->inj_isv6) {
-			ip_rput_v6(ill->ill_rq, packet->ni_packet);
+			ip_input_v6(ill, NULL, packet->ni_packet, NULL);
 		} else {
 			ip_input(ill, NULL, packet->ni_packet, NULL);
 		}
-		kmem_free(inject, sizeof (*inject));
 		ill_refrele(ill);
-		return;
-	}
-
-	/*
-	 * Even though ipcl_conn_create requests that it be passed
-	 * a different value for "TCP", in this case there may not
-	 * be a TCP connection backing the packet and more than
-	 * likely, non-TCP packets will go here too.
-	 */
-	conn = ipcl_conn_create(IPCL_IPCCONN, KM_NOSLEEP, ipst->ips_netstack);
-	if (conn != NULL) {
+	} else {
+		bzero(&ixas, sizeof (ixas));
+		ixas.ixa_ifindex = packet->ni_physical;
+		ixas.ixa_ipst = ipst;
 		if (inject->inj_isv6) {
-			conn->conn_af_isv6 = B_TRUE;
-			conn->conn_src_preferences = IPV6_PREFER_SRC_DEFAULT;
-			conn->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
-			ip_output_v6(conn, packet->ni_packet, ill->ill_wq,
-			    IP_WPUT);
+			ixas.ixa_flags = IXAF_BASIC_SIMPLE_V6;
 		} else {
-			conn->conn_af_isv6 = B_FALSE;
-			conn->conn_pkt_isv6 = B_FALSE;
-			conn->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
-			ip_output(conn, packet->ni_packet, ill->ill_wq,
-			    IP_WPUT);
+			ixas.ixa_flags = IXAF_BASIC_SIMPLE_V4;
 		}
-
-		CONN_DEC_REF(conn);
+		(void) ip_output_simple(packet->ni_packet, &ixas);
+		ixa_cleanup(&ixas);
 	}
 
 	kmem_free(inject, sizeof (*inject));
-	ill_refrele(ill);
 }
 
 /*
@@ -1622,4 +1545,153 @@ done:
 		netstack_rele(ns);
 	kmem_free(info->hnei_event.hne_data, info->hnei_event.hne_datalen);
 	kmem_free(arg, sizeof (hook_nic_event_int_t));
+}
+
+/*
+ * Initialize ARP hook family and events
+ */
+void
+arp_hook_init(ip_stack_t *ipst)
+{
+	HOOK_FAMILY_INIT(&ipst->ips_arproot, Hn_ARP);
+	if (net_family_register(ipst->ips_arp_net_data, &ipst->ips_arproot)
+	    != 0) {
+		cmn_err(CE_NOTE, "arp_hook_init"
+		    "net_family_register failed for arp");
+	}
+
+	HOOK_EVENT_INIT(&ipst->ips_arp_physical_in_event, NH_PHYSICAL_IN);
+	ipst->ips_arp_physical_in = net_event_register(ipst->ips_arp_net_data,
+	    &ipst->ips_arp_physical_in_event);
+	if (ipst->ips_arp_physical_in == NULL) {
+		cmn_err(CE_NOTE, "arp_hook_init: "
+		    "net_event_register failed for arp/physical_in");
+	}
+
+	HOOK_EVENT_INIT(&ipst->ips_arp_physical_out_event, NH_PHYSICAL_OUT);
+	ipst->ips_arp_physical_out = net_event_register(ipst->ips_arp_net_data,
+	    &ipst->ips_arp_physical_out_event);
+	if (ipst->ips_arp_physical_out == NULL) {
+		cmn_err(CE_NOTE, "arp_hook_init: "
+		    "net_event_register failed for arp/physical_out");
+	}
+
+	HOOK_EVENT_INIT(&ipst->ips_arp_nic_events, NH_NIC_EVENTS);
+	ipst->ips_arpnicevents = net_event_register(ipst->ips_arp_net_data,
+	    &ipst->ips_arp_nic_events);
+	if (ipst->ips_arpnicevents == NULL) {
+		cmn_err(CE_NOTE, "arp_hook_init: "
+		    "net_event_register failed for arp/nic_events");
+	}
+}
+
+void
+arp_hook_destroy(ip_stack_t *ipst)
+{
+	if (ipst->ips_arpnicevents != NULL) {
+		if (net_event_unregister(ipst->ips_arp_net_data,
+		    &ipst->ips_arp_nic_events) == 0)
+			ipst->ips_arpnicevents = NULL;
+	}
+
+	if (ipst->ips_arp_physical_out != NULL) {
+		if (net_event_unregister(ipst->ips_arp_net_data,
+		    &ipst->ips_arp_physical_out_event) == 0)
+			ipst->ips_arp_physical_out = NULL;
+	}
+
+	if (ipst->ips_arp_physical_in != NULL) {
+		if (net_event_unregister(ipst->ips_arp_net_data,
+		    &ipst->ips_arp_physical_in_event) == 0)
+			ipst->ips_arp_physical_in = NULL;
+	}
+
+	(void) net_family_unregister(ipst->ips_arp_net_data,
+	    &ipst->ips_arproot);
+}
+
+void
+arp_hook_shutdown(ip_stack_t *ipst)
+{
+	if (ipst->ips_arp_physical_in != NULL) {
+		(void) net_event_shutdown(ipst->ips_arp_net_data,
+		    &ipst->ips_arp_physical_in_event);
+	}
+	if (ipst->ips_arp_physical_out != NULL) {
+		(void) net_event_shutdown(ipst->ips_arp_net_data,
+		    &ipst->ips_arp_physical_out_event);
+	}
+	if (ipst->ips_arpnicevents != NULL) {
+		(void) net_event_shutdown(ipst->ips_arp_net_data,
+		    &ipst->ips_arp_nic_events);
+	}
+}
+
+/* netinfo routines for the unsupported cases */
+
+/* ARGSUSED */
+int
+net_no_getmtu(net_handle_t handle, phy_if_t phy_ifdata, lif_if_t ifdata)
+{
+	return (-1);
+}
+
+/* ARGSUSED */
+static int
+net_no_getpmtuenabled(net_handle_t neti)
+{
+	return (-1);
+}
+
+/* ARGSUSED */
+static lif_if_t
+net_no_lifgetnext(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata)
+{
+	return (-1);
+}
+
+/* ARGSUSED */
+static int
+net_no_inject(net_handle_t neti, inject_t style, net_inject_t *packet)
+{
+	return (-1);
+}
+
+/* ARGSUSED */
+static phy_if_t
+net_no_routeto(net_handle_t neti, struct sockaddr *address,
+    struct sockaddr *next)
+{
+	return ((phy_if_t)-1);
+}
+
+/* ARGSUSED */
+static int
+net_no_ispartialchecksum(net_handle_t neti, mblk_t *mp)
+{
+	return (-1);
+}
+
+/* ARGSUSED */
+static int
+net_no_getlifaddr(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata,
+    size_t nelem, net_ifaddr_t type[], void *storage)
+{
+	return (-1);
+}
+
+/* ARGSUSED */
+static int
+net_no_getlifzone(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata,
+    zoneid_t *zoneid)
+{
+	return (-1);
+}
+
+/* ARGSUSED */
+static int
+net_no_getlifflags(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata,
+    uint64_t *flags)
+{
+	return (-1);
 }

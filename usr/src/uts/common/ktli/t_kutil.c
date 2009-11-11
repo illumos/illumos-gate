@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Contains the following utility functions:
@@ -230,7 +228,7 @@ t_kadvise(TIUSER *tiptr, uchar_t *addr, int addr_len)
 
 	bzero(ipid, sizeof (*ipid));
 	ipid->ipid_cmd = IP_IOC_IRE_DELETE_NO_REPLY;
-	ipid->ipid_ire_type = IRE_CACHE;
+	ipid->ipid_ire_type = 0;
 	ipid->ipid_addr_offset = sizeof (ipid_t);
 	ipid->ipid_addr_length = addr_len;
 

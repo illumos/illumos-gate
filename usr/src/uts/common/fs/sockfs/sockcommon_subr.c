@@ -471,7 +471,7 @@ socket_sendsig(struct sonode *so, int event)
 /* Copy userdata into a new mblk_t */
 mblk_t *
 socopyinuio(uio_t *uiop, ssize_t iosize, size_t wroff, ssize_t maxblk,
-    size_t tail_len, int *errorp, cred_t *cr)
+    size_t tail_len, int *errorp)
 {
 	mblk_t	*head = NULL, **tail = &head;
 
@@ -499,11 +499,7 @@ socopyinuio(uio_t *uiop, ssize_t iosize, size_t wroff, ssize_t maxblk,
 
 		blocksize = MIN(iosize, maxblk);
 		ASSERT(blocksize >= 0);
-		if (is_system_labeled())
-			mp = allocb_cred(wroff + blocksize + tail_len,
-			    cr, curproc->p_pid);
-		else
-			mp = allocb(wroff + blocksize + tail_len, BPRI_MED);
+		mp = allocb(wroff + blocksize + tail_len, BPRI_MED);
 		if (mp == NULL) {
 			*errorp = ENOMEM;
 			return (head);

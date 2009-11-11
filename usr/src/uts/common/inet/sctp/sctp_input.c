@@ -42,6 +42,7 @@
 
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/ip_if.h>
 #include <inet/ip6.h>
 #include <inet/mib2.h>
 #include <inet/ipclassifier.h>
@@ -318,7 +319,7 @@ sctp_next_chunk(sctp_chunk_hdr_t *ch, ssize_t *remaining)
  */
 static int
 sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
-    sctp_faddr_t *fp, ip6_pkt_t *ipp)
+    sctp_faddr_t *fp, ip_pkt_t *ipp, ip_recv_attr_t *ira)
 {
 	struct T_unitdata_ind	*tudi;
 	int			optlen;
@@ -329,57 +330,61 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 	struct sockaddr_in6	sin_buf[1];
 	struct sockaddr_in6	*sin6;
 	struct sockaddr_in	*sin4;
-	uint_t			addflag = 0;
+	crb_t			 addflag;	/* Which pieces to add */
+	conn_t			*connp = sctp->sctp_connp;
 
 	sin4 = NULL;
 	sin6 = NULL;
 
 	optlen = hdrlen = 0;
+	addflag.crb_all = 0;
 
 	/* Figure out address size */
-	if (sctp->sctp_ipversion == IPV4_VERSION) {
+	if (connp->conn_family == AF_INET) {
 		sin4 = (struct sockaddr_in *)sin_buf;
 		sin4->sin_family = AF_INET;
-		sin4->sin_port = sctp->sctp_fport;
+		sin4->sin_port = connp->conn_fport;
 		IN6_V4MAPPED_TO_IPADDR(&fp->faddr, sin4->sin_addr.s_addr);
 		hdrlen = sizeof (*tudi) + sizeof (*sin4);
 	} else {
 		sin6 = sin_buf;
 		sin6->sin6_family = AF_INET6;
-		sin6->sin6_port = sctp->sctp_fport;
+		sin6->sin6_port = connp->conn_fport;
 		sin6->sin6_addr = fp->faddr;
 		hdrlen = sizeof (*tudi) + sizeof (*sin6);
 	}
-
 	/* If app asked to receive send / recv info */
-	if (sctp->sctp_recvsndrcvinfo) {
+	if (sctp->sctp_recvsndrcvinfo)
 		optlen += sizeof (*cmsg) + sizeof (struct sctp_sndrcvinfo);
-		if (hdrlen == 0)
-			hdrlen = sizeof (struct T_optdata_ind);
-	}
 
-	if (sctp->sctp_ipv6_recvancillary == 0)
+	if (connp->conn_recv_ancillary.crb_all == 0)
 		goto noancillary;
 
-	if ((ipp->ipp_fields & IPPF_IFINDEX) &&
-	    ipp->ipp_ifindex != sctp->sctp_recvifindex &&
-	    (sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVPKTINFO)) {
+	if (connp->conn_recv_ancillary.crb_ip_recvpktinfo &&
+	    ira->ira_ruifindex != sctp->sctp_recvifindex) {
 		optlen += sizeof (*cmsg) + sizeof (struct in6_pktinfo);
 		if (hdrlen == 0)
 			hdrlen = sizeof (struct T_unitdata_ind);
-		addflag |= SCTP_IPV6_RECVPKTINFO;
+		addflag.crb_ip_recvpktinfo = 1;
 	}
 	/* If app asked for hoplimit and it has changed ... */
-	if ((ipp->ipp_fields & IPPF_HOPLIMIT) &&
-	    ipp->ipp_hoplimit != sctp->sctp_recvhops &&
-	    (sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVHOPLIMIT)) {
+	if (connp->conn_recv_ancillary.crb_ipv6_recvhoplimit &&
+	    ipp->ipp_hoplimit != sctp->sctp_recvhops) {
 		optlen += sizeof (*cmsg) + sizeof (uint_t);
 		if (hdrlen == 0)
 			hdrlen = sizeof (struct T_unitdata_ind);
-		addflag |= SCTP_IPV6_RECVHOPLIMIT;
+		addflag.crb_ipv6_recvhoplimit = 1;
+	}
+	/* If app asked for tclass and it has changed ... */
+	if (connp->conn_recv_ancillary.crb_ipv6_recvtclass &&
+	    ipp->ipp_tclass != sctp->sctp_recvtclass) {
+		optlen += sizeof (struct T_opthdr) + sizeof (uint_t);
+		if (hdrlen == 0)
+			hdrlen = sizeof (struct T_unitdata_ind);
+		addflag.crb_ipv6_recvtclass = 1;
 	}
 	/* If app asked for hopbyhop headers and it has changed ... */
-	if ((sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVHOPOPTS) &&
+	if (connp->conn_recv_ancillary.crb_ipv6_recvhopopts &&
 	    ip_cmpbuf(sctp->sctp_hopopts, sctp->sctp_hopoptslen,
 	    (ipp->ipp_fields & IPPF_HOPOPTS),
 	    ipp->ipp_hopopts, ipp->ipp_hopoptslen)) {
@@ -387,7 +392,7 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 		    sctp->sctp_v6label_len;
 		if (hdrlen == 0)
 			hdrlen = sizeof (struct T_unitdata_ind);
-		addflag |= SCTP_IPV6_RECVHOPOPTS;
+		addflag.crb_ipv6_recvhopopts = 1;
 		if (!ip_allocbuf((void **)&sctp->sctp_hopopts,
 		    &sctp->sctp_hopoptslen,
 		    (ipp->ipp_fields & IPPF_HOPOPTS),
@@ -395,45 +400,44 @@ sctp_input_add_ancillary(sctp_t *sctp, mblk_t **mp, sctp_data_hdr_t *dcp,
 			return (-1);
 	}
 	/* If app asked for dst headers before routing headers ... */
-	if ((sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVRTDSTOPTS) &&
-	    ip_cmpbuf(sctp->sctp_rtdstopts, sctp->sctp_rtdstoptslen,
-	    (ipp->ipp_fields & IPPF_RTDSTOPTS),
-	    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen)) {
-		optlen += sizeof (*cmsg) + ipp->ipp_rtdstoptslen;
+	if (connp->conn_recv_ancillary.crb_ipv6_recvrthdrdstopts &&
+	    ip_cmpbuf(sctp->sctp_rthdrdstopts, sctp->sctp_rthdrdstoptslen,
+	    (ipp->ipp_fields & IPPF_RTHDRDSTOPTS),
+	    ipp->ipp_rthdrdstopts, ipp->ipp_rthdrdstoptslen)) {
+		optlen += sizeof (*cmsg) + ipp->ipp_rthdrdstoptslen;
 		if (hdrlen == 0)
 			hdrlen = sizeof (struct T_unitdata_ind);
-		addflag |= SCTP_IPV6_RECVRTDSTOPTS;
-		if (!ip_allocbuf((void **)&sctp->sctp_rtdstopts,
-		    &sctp->sctp_rtdstoptslen,
-		    (ipp->ipp_fields & IPPF_RTDSTOPTS),
-		    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen))
+		addflag.crb_ipv6_recvrthdrdstopts = 1;
+		if (!ip_allocbuf((void **)&sctp->sctp_rthdrdstopts,
+		    &sctp->sctp_rthdrdstoptslen,
+		    (ipp->ipp_fields & IPPF_RTHDRDSTOPTS),
+		    ipp->ipp_rthdrdstopts, ipp->ipp_rthdrdstoptslen))
 			return (-1);
 	}
 	/* If app asked for routing headers and it has changed ... */
-	if (sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVRTHDR) {
-		if (ip_cmpbuf(sctp->sctp_rthdr, sctp->sctp_rthdrlen,
+	if (connp->conn_recv_ancillary.crb_ipv6_recvrthdr &&
+	    ip_cmpbuf(sctp->sctp_rthdr, sctp->sctp_rthdrlen,
+	    (ipp->ipp_fields & IPPF_RTHDR),
+	    ipp->ipp_rthdr, ipp->ipp_rthdrlen)) {
+		optlen += sizeof (*cmsg) + ipp->ipp_rthdrlen;
+		if (hdrlen == 0)
+			hdrlen = sizeof (struct T_unitdata_ind);
+		addflag.crb_ipv6_recvrthdr = 1;
+		if (!ip_allocbuf((void **)&sctp->sctp_rthdr,
+		    &sctp->sctp_rthdrlen,
 		    (ipp->ipp_fields & IPPF_RTHDR),
-		    ipp->ipp_rthdr, ipp->ipp_rthdrlen)) {
-			optlen += sizeof (*cmsg) + ipp->ipp_rthdrlen;
-			if (hdrlen == 0)
-				hdrlen = sizeof (struct T_unitdata_ind);
-			addflag |= SCTP_IPV6_RECVRTHDR;
-			if (!ip_allocbuf((void **)&sctp->sctp_rthdr,
-			    &sctp->sctp_rthdrlen,
-			    (ipp->ipp_fields & IPPF_RTHDR),
-			    ipp->ipp_rthdr, ipp->ipp_rthdrlen))
-				return (-1);
-		}
+		    ipp->ipp_rthdr, ipp->ipp_rthdrlen))
+			return (-1);
 	}
 	/* If app asked for dest headers and it has changed ... */
-	if ((sctp->sctp_ipv6_recvancillary & SCTP_IPV6_RECVDSTOPTS) &&
+	if (connp->conn_recv_ancillary.crb_ipv6_recvdstopts &&
 	    ip_cmpbuf(sctp->sctp_dstopts, sctp->sctp_dstoptslen,
 	    (ipp->ipp_fields & IPPF_DSTOPTS),
 	    ipp->ipp_dstopts, ipp->ipp_dstoptslen)) {
 		optlen += sizeof (*cmsg) + ipp->ipp_dstoptslen;
 		if (hdrlen == 0)
 			hdrlen = sizeof (struct T_unitdata_ind);
-		addflag |= SCTP_IPV6_RECVDSTOPTS;
+		addflag.crb_ipv6_recvdstopts = 1;
 		if (!ip_allocbuf((void **)&sctp->sctp_dstopts,
 		    &sctp->sctp_dstoptslen,
 		    (ipp->ipp_fields & IPPF_DSTOPTS),
@@ -499,9 +503,11 @@ noancillary:
 	 * If app asked for pktinfo and the index has changed ...
 	 * Note that the local address never changes for the connection.
 	 */
-	if (addflag & SCTP_IPV6_RECVPKTINFO) {
+	if (addflag.crb_ip_recvpktinfo) {
 		struct in6_pktinfo *pkti;
+		uint_t ifindex;
 
+		ifindex = ira->ira_ruifindex;
 		cmsg = (struct cmsghdr *)optptr;
 		cmsg->cmsg_level = IPPROTO_IPV6;
 		cmsg->cmsg_type = IPV6_PKTINFO;
@@ -509,19 +515,20 @@ noancillary:
 		optptr += sizeof (*cmsg);
 
 		pkti = (struct in6_pktinfo *)optptr;
-		if (sctp->sctp_ipversion == IPV6_VERSION)
+		if (connp->conn_family == AF_INET6)
 			pkti->ipi6_addr = sctp->sctp_ip6h->ip6_src;
 		else
 			IN6_IPADDR_TO_V4MAPPED(sctp->sctp_ipha->ipha_src,
 			    &pkti->ipi6_addr);
-		pkti->ipi6_ifindex = ipp->ipp_ifindex;
+
+		pkti->ipi6_ifindex = ifindex;
 		optptr += sizeof (*pkti);
 		ASSERT(OK_32PTR(optptr));
 		/* Save as "last" value */
-		sctp->sctp_recvifindex = ipp->ipp_ifindex;
+		sctp->sctp_recvifindex = ifindex;
 	}
 	/* If app asked for hoplimit and it has changed ... */
-	if (addflag & SCTP_IPV6_RECVHOPLIMIT) {
+	if (addflag.crb_ipv6_recvhoplimit) {
 		cmsg = (struct cmsghdr *)optptr;
 		cmsg->cmsg_level = IPPROTO_IPV6;
 		cmsg->cmsg_type = IPV6_HOPLIMIT;
@@ -534,7 +541,21 @@ noancillary:
 		/* Save as "last" value */
 		sctp->sctp_recvhops = ipp->ipp_hoplimit;
 	}
-	if (addflag & SCTP_IPV6_RECVHOPOPTS) {
+	/* If app asked for tclass and it has changed ... */
+	if (addflag.crb_ipv6_recvtclass) {
+		cmsg = (struct cmsghdr *)optptr;
+		cmsg->cmsg_level = IPPROTO_IPV6;
+		cmsg->cmsg_type = IPV6_TCLASS;
+		cmsg->cmsg_len = sizeof (*cmsg) + sizeof (uint_t);
+		optptr += sizeof (*cmsg);
+
+		*(uint_t *)optptr = ipp->ipp_tclass;
+		optptr += sizeof (uint_t);
+		ASSERT(OK_32PTR(optptr));
+		/* Save as "last" value */
+		sctp->sctp_recvtclass = ipp->ipp_tclass;
+	}
+	if (addflag.crb_ipv6_recvhopopts) {
 		cmsg = (struct cmsghdr *)optptr;
 		cmsg->cmsg_level = IPPROTO_IPV6;
 		cmsg->cmsg_type = IPV6_HOPOPTS;
@@ -550,23 +571,23 @@ noancillary:
 		    (ipp->ipp_fields & IPPF_HOPOPTS),
 		    ipp->ipp_hopopts, ipp->ipp_hopoptslen);
 	}
-	if (addflag & SCTP_IPV6_RECVRTDSTOPTS) {
+	if (addflag.crb_ipv6_recvrthdrdstopts) {
 		cmsg = (struct cmsghdr *)optptr;
 		cmsg->cmsg_level = IPPROTO_IPV6;
 		cmsg->cmsg_type = IPV6_RTHDRDSTOPTS;
-		cmsg->cmsg_len = sizeof (*cmsg) + ipp->ipp_rtdstoptslen;
+		cmsg->cmsg_len = sizeof (*cmsg) + ipp->ipp_rthdrdstoptslen;
 		optptr += sizeof (*cmsg);
 
-		bcopy(ipp->ipp_rtdstopts, optptr, ipp->ipp_rtdstoptslen);
-		optptr += ipp->ipp_rtdstoptslen;
+		bcopy(ipp->ipp_rthdrdstopts, optptr, ipp->ipp_rthdrdstoptslen);
+		optptr += ipp->ipp_rthdrdstoptslen;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
-		ip_savebuf((void **)&sctp->sctp_rtdstopts,
-		    &sctp->sctp_rtdstoptslen,
-		    (ipp->ipp_fields & IPPF_RTDSTOPTS),
-		    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen);
+		ip_savebuf((void **)&sctp->sctp_rthdrdstopts,
+		    &sctp->sctp_rthdrdstoptslen,
+		    (ipp->ipp_fields & IPPF_RTHDRDSTOPTS),
+		    ipp->ipp_rthdrdstopts, ipp->ipp_rthdrdstoptslen);
 	}
-	if (addflag & SCTP_IPV6_RECVRTHDR) {
+	if (addflag.crb_ipv6_recvrthdr) {
 		cmsg = (struct cmsghdr *)optptr;
 		cmsg->cmsg_level = IPPROTO_IPV6;
 		cmsg->cmsg_type = IPV6_RTHDR;
@@ -582,7 +603,7 @@ noancillary:
 		    (ipp->ipp_fields & IPPF_RTHDR),
 		    ipp->ipp_rthdr, ipp->ipp_rthdrlen);
 	}
-	if (addflag & SCTP_IPV6_RECVDSTOPTS) {
+	if (addflag.crb_ipv6_recvdstopts) {
 		cmsg = (struct cmsghdr *)optptr;
 		cmsg->cmsg_level = IPPROTO_IPV6;
 		cmsg->cmsg_type = IPV6_DSTOPTS;
@@ -778,7 +799,6 @@ static mblk_t *
 sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
     sctp_data_hdr_t **dc)
 {
-	mblk_t		*first_mp;
 	mblk_t		*mp;
 	mblk_t		*dmp;
 	mblk_t		*qmp;
@@ -791,8 +811,7 @@ sctp_try_partial_delivery(sctp_t *sctp, mblk_t *hmp, sctp_reass_t *srp,
 	dprint(4, ("trypartial: got=%d, needed=%d\n",
 	    (int)(srp->got), (int)(srp->needed)));
 
-	first_mp = hmp->b_cont;
-	mp = first_mp;
+	mp = hmp->b_cont;
 	qdc = (sctp_data_hdr_t *)mp->b_rptr;
 
 	ASSERT(SCTP_DATA_GET_BBIT(qdc) && srp->hasBchunk);
@@ -1175,7 +1194,7 @@ sctp_add_dup(uint32_t tsn, mblk_t **dups)
 
 static void
 sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
-    sctp_faddr_t *fp, ip6_pkt_t *ipp)
+    sctp_faddr_t *fp, ip_pkt_t *ipp, ip_recv_attr_t *ira)
 {
 	sctp_data_hdr_t *dc;
 	mblk_t *dmp, *pmp;
@@ -1419,7 +1438,8 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 	if (can_deliver) {
 
 		dmp->b_rptr = (uchar_t *)(dc + 1);
-		if (sctp_input_add_ancillary(sctp, &dmp, dc, fp, ipp) == 0) {
+		if (sctp_input_add_ancillary(sctp, &dmp, dc, fp,
+		    ipp, ira) == 0) {
 			dprint(1, ("sctp_data_chunk: delivering %lu bytes\n",
 			    msgdsize(dmp)));
 			sctp->sctp_rwnd -= dlen;
@@ -1507,7 +1527,7 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		if (can_deliver) {
 			dmp->b_rptr = (uchar_t *)(dc + 1);
 			if (sctp_input_add_ancillary(sctp, &dmp, dc, fp,
-			    ipp) == 0) {
+			    ipp, ira) == 0) {
 				dprint(1, ("sctp_data_chunk: delivering %lu "
 				    "bytes\n", msgdsize(dmp)));
 				sctp->sctp_rwnd -= dlen;
@@ -1646,6 +1666,8 @@ sctp_make_sack(sctp_t *sctp, sctp_faddr_t *sendto, mblk_t *dups)
 	uint32_t	dups_len;
 	sctp_faddr_t	*fp;
 
+	ASSERT(sendto != NULL);
+
 	if (sctp->sctp_force_sack) {
 		sctp->sctp_force_sack = 0;
 		goto checks_done;
@@ -1696,8 +1718,9 @@ checks_done:
 				return (NULL);
 			}
 			smp->b_cont = sctp->sctp_err_chunks;
-			sctp_set_iplen(sctp, smp);
-			sctp_add_sendq(sctp, smp);
+			sctp_set_iplen(sctp, smp, fp->ixa);
+			(void) conn_ip_output(smp, fp->ixa);
+			BUMP_LOCAL(sctp->sctp_opkts);
 			sctp->sctp_err_chunks = NULL;
 			sctp->sctp_err_len = 0;
 		}
@@ -1749,8 +1772,6 @@ sctp_sack(sctp_t *sctp, mblk_t *dups)
 			freeb(dups);
 		return (B_FALSE);
 	}
-	sctp_set_iplen(sctp, smp);
-
 	dprint(2, ("sctp_sack: sending to %p %x:%x:%x:%x\n",
 	    (void *)sctp->sctp_lastdata,
 	    SCTP_PRINTADDR(sctp->sctp_lastdata->faddr)));
@@ -1758,7 +1779,10 @@ sctp_sack(sctp_t *sctp, mblk_t *dups)
 	sctp->sctp_active = lbolt64;
 
 	BUMP_MIB(&sctps->sctps_mib, sctpOutAck);
-	sctp_add_sendq(sctp, smp);
+
+	sctp_set_iplen(sctp, smp, sctp->sctp_lastdata->ixa);
+	(void) conn_ip_output(smp, sctp->sctp_lastdata->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 	return (B_TRUE);
 }
 
@@ -1813,8 +1837,9 @@ sctp_check_abandoned_msg(sctp_t *sctp, mblk_t *meta)
 			return (ENOMEM);
 		}
 		SCTP_MSG_SET_ABANDONED(meta);
-		sctp_set_iplen(sctp, head);
-		sctp_add_sendq(sctp, head);
+		sctp_set_iplen(sctp, head, fp->ixa);
+		(void) conn_ip_output(head, fp->ixa);
+		BUMP_LOCAL(sctp->sctp_opkts);
 		if (!fp->timer_running)
 			SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 		mp1 = mp1->b_next;
@@ -2080,13 +2105,13 @@ sctp_ftsn_check_frag(sctp_t *sctp, uint16_t ssn, sctp_instr_t *sip)
  * messages, if any, from the instream queue (that were waiting for this
  * sid-ssn message to show up). Once we are done try to update the SACK
  * info. We could get a duplicate Forward TSN, in which case just send
- * a SACK. If any of the sid values in the the Forward TSN is invalid,
+ * a SACK. If any of the sid values in the Forward TSN is invalid,
  * send back an "Invalid Stream Identifier" error and continue processing
  * the rest.
  */
 static void
 sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
-    ip6_pkt_t *ipp)
+    ip_pkt_t *ipp, ip_recv_attr_t *ira)
 {
 	uint32_t	*ftsn = (uint32_t *)(ch + 1);
 	ftsn_entry_t	*ftsn_entry;
@@ -2171,7 +2196,7 @@ sctp_process_forward_tsn(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp,
 				dmp->b_next = NULL;
 				ASSERT(dmp->b_prev == NULL);
 				if (sctp_input_add_ancillary(sctp,
-				    &dmp, dc, fp, ipp) == 0) {
+				    &dmp, dc, fp, ipp, ira) == 0) {
 					sctp->sctp_rxqueued -= dlen;
 					sctp->sctp_rwnd -= dlen;
 					/*
@@ -2280,8 +2305,9 @@ sctp_check_abandoned_data(sctp_t *sctp, sctp_faddr_t *fp)
 				SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 			return;
 		}
-		sctp_set_iplen(sctp, nmp);
-		sctp_add_sendq(sctp, nmp);
+		sctp_set_iplen(sctp, nmp, fp->ixa);
+		(void) conn_ip_output(nmp, fp->ixa);
+		BUMP_LOCAL(sctp->sctp_opkts);
 		if (!fp->timer_running)
 			SCTP_FADDR_TIMER_RESTART(sctp, fp, fp->rto);
 	}
@@ -2604,8 +2630,9 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			sctp->sctp_zero_win_probe = B_FALSE;
 			sctp->sctp_rxt_nxttsn = sctp->sctp_ltsn;
 			sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn;
-			sctp_set_iplen(sctp, pkt);
-			sctp_add_sendq(sctp, pkt);
+			sctp_set_iplen(sctp, pkt, fp->ixa);
+			(void) conn_ip_output(pkt, fp->ixa);
+			BUMP_LOCAL(sctp->sctp_opkts);
 		}
 	} else {
 		if (sctp->sctp_zero_win_probe) {
@@ -3160,97 +3187,15 @@ sctp_check_input(sctp_t *sctp, sctp_chunk_hdr_t *ch, ssize_t len, int first)
 	return (1);
 }
 
-/* ARGSUSED */
-static sctp_hdr_t *
-find_sctp_hdrs(mblk_t *mp, in6_addr_t *src, in6_addr_t *dst,
-    uint_t *ifindex, uint_t *ip_hdr_len, ip6_pkt_t *ipp, ip_pktinfo_t *pinfo)
-{
-	uchar_t	*rptr;
-	ipha_t	*ip4h;
-	ip6_t	*ip6h;
-	mblk_t	*mp1;
-
-	rptr = mp->b_rptr;
-	if (IPH_HDR_VERSION(rptr) == IPV4_VERSION) {
-		*ip_hdr_len = IPH_HDR_LENGTH(rptr);
-		ip4h = (ipha_t *)rptr;
-		IN6_IPADDR_TO_V4MAPPED(ip4h->ipha_src, src);
-		IN6_IPADDR_TO_V4MAPPED(ip4h->ipha_dst, dst);
-
-		ipp->ipp_fields |= IPPF_HOPLIMIT;
-		ipp->ipp_hoplimit = ((ipha_t *)rptr)->ipha_ttl;
-		if (pinfo != NULL && (pinfo->ip_pkt_flags & IPF_RECVIF)) {
-			ipp->ipp_fields |= IPPF_IFINDEX;
-			ipp->ipp_ifindex = pinfo->ip_pkt_ifindex;
-		}
-	} else {
-		ASSERT(IPH_HDR_VERSION(rptr) == IPV6_VERSION);
-		ip6h = (ip6_t *)rptr;
-		ipp->ipp_fields = IPPF_HOPLIMIT;
-		ipp->ipp_hoplimit = ip6h->ip6_hops;
-
-		if (ip6h->ip6_nxt != IPPROTO_SCTP) {
-			/* Look for ifindex information */
-			if (ip6h->ip6_nxt == IPPROTO_RAW) {
-				ip6i_t *ip6i = (ip6i_t *)ip6h;
-
-				if (ip6i->ip6i_flags & IP6I_IFINDEX) {
-					ASSERT(ip6i->ip6i_ifindex != 0);
-					ipp->ipp_fields |= IPPF_IFINDEX;
-					ipp->ipp_ifindex = ip6i->ip6i_ifindex;
-				}
-				rptr = (uchar_t *)&ip6i[1];
-				mp->b_rptr = rptr;
-				if (rptr == mp->b_wptr) {
-					mp1 = mp->b_cont;
-					freeb(mp);
-					mp = mp1;
-					rptr = mp->b_rptr;
-				}
-				ASSERT(mp->b_wptr - rptr >=
-				    IPV6_HDR_LEN + sizeof (sctp_hdr_t));
-				ip6h = (ip6_t *)rptr;
-			}
-			/*
-			 * Find any potentially interesting extension headers
-			 * as well as the length of the IPv6 + extension
-			 * headers.
-			 */
-			*ip_hdr_len = ip_find_hdr_v6(mp, ip6h, ipp, NULL);
-		} else {
-			*ip_hdr_len = IPV6_HDR_LEN;
-		}
-		*src = ip6h->ip6_src;
-		*dst = ip6h->ip6_dst;
-	}
-	ASSERT((uintptr_t)(mp->b_wptr - rptr) <= (uintptr_t)INT_MAX);
-	return ((sctp_hdr_t *)&rptr[*ip_hdr_len]);
-#undef IPVER
-}
-
 static mblk_t *
-sctp_check_in_policy(mblk_t *mp, mblk_t *ipsec_mp)
+sctp_check_in_policy(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst)
 {
-	ipsec_in_t *ii;
-	boolean_t check = B_TRUE;
 	boolean_t policy_present;
 	ipha_t *ipha;
 	ip6_t *ip6h;
-	netstack_t	*ns;
-	ipsec_stack_t	*ipss;
+	netstack_t	*ns = ipst->ips_netstack;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-	ASSERT(ii->ipsec_in_type == IPSEC_IN);
-	ns = ii->ipsec_in_ns;
-	ipss = ns->netstack_ipsec;
-
-	if (ii->ipsec_in_dont_check) {
-		check = B_FALSE;
-		if (!ii->ipsec_in_secure) {
-			freeb(ipsec_mp);
-			ipsec_mp = NULL;
-		}
-	}
 	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
 		policy_present = ipss->ipsec_inbound_v4_policy_present;
 		ipha = (ipha_t *)mp->b_rptr;
@@ -3261,75 +3206,42 @@ sctp_check_in_policy(mblk_t *mp, mblk_t *ipsec_mp)
 		ip6h = (ip6_t *)mp->b_rptr;
 	}
 
-	if (check && policy_present) {
+	if (policy_present) {
 		/*
 		 * The conn_t parameter is NULL because we already know
 		 * nobody's home.
 		 */
-		ipsec_mp = ipsec_check_global_policy(ipsec_mp, (conn_t *)NULL,
-		    ipha, ip6h, B_TRUE, ns);
-		if (ipsec_mp == NULL)
+		mp = ipsec_check_global_policy(mp, (conn_t *)NULL,
+		    ipha, ip6h, ira, ns);
+		if (mp == NULL)
 			return (NULL);
 	}
-	if (ipsec_mp != NULL)
-		freeb(ipsec_mp);
 	return (mp);
 }
 
 /* Handle out-of-the-blue packets */
 void
-sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, zoneid_t zoneid,
-    boolean_t mctl_present)
+sctp_ootb_input(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst)
 {
 	sctp_t			*sctp;
 	sctp_chunk_hdr_t	*ch;
 	sctp_hdr_t		*sctph;
 	in6_addr_t		src, dst;
-	uint_t			ip_hdr_len;
-	uint_t			ifindex;
-	ip6_pkt_t		ipp;
+	uint_t			ip_hdr_len = ira->ira_ip_hdr_length;
 	ssize_t			mlen;
-	ip_pktinfo_t		*pinfo = NULL;
-	mblk_t			*first_mp;
 	sctp_stack_t		*sctps;
-	ip_stack_t		*ipst;
+	boolean_t		secure;
+	zoneid_t		zoneid = ira->ira_zoneid;
+	uchar_t			*rptr;
 
-	ASSERT(recv_ill != NULL);
-	ipst = recv_ill->ill_ipst;
+	ASSERT(ira->ira_ill == NULL);
+
+	secure = ira->ira_flags & IRAF_IPSEC_SECURE;
+
 	sctps = ipst->ips_netstack->netstack_sctp;
 
 	BUMP_MIB(&sctps->sctps_mib, sctpOutOfBlue);
 	BUMP_MIB(&sctps->sctps_mib, sctpInSCTPPkts);
-
-	if (sctps->sctps_gsctp == NULL) {
-		/*
-		 * For non-zero stackids the default queue isn't created
-		 * until the first open, thus there can be a need to send
-		 * an error before then. But we can't do that, hence we just
-		 * drop the packet. Later during boot, when the default queue
-		 * has been setup, a retransmitted packet from the peer
-		 * will result in a error.
-		 */
-		ASSERT(sctps->sctps_netstack->netstack_stackid !=
-		    GLOBAL_NETSTACKID);
-		freemsg(mp);
-		return;
-	}
-
-	first_mp = mp;
-	if (mctl_present)
-		mp = mp->b_cont;
-
-	/* Initiate IPPf processing, if needed. */
-	if (IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
-		ip_process(IPP_LOCAL_IN, &mp,
-		    recv_ill->ill_phyint->phyint_ifindex);
-		if (mp == NULL) {
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		}
-	}
 
 	if (mp->b_cont != NULL) {
 		/*
@@ -3337,33 +3249,45 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, zoneid_t zoneid,
 		 * assume a single contiguous chunk of data.
 		 */
 		if (pullupmsg(mp, -1) == 0) {
-			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(first_mp);
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", mp, NULL);
+			freemsg(mp);
 			return;
 		}
 	}
 
-	/*
-	 * We don't really need to call this function...  Need to
-	 * optimize later.
-	 */
-	sctph = find_sctp_hdrs(mp, &src, &dst, &ifindex, &ip_hdr_len,
-	    &ipp, pinfo);
+	rptr = mp->b_rptr;
+	sctph = ((sctp_hdr_t *)&rptr[ip_hdr_len]);
+	if (ira->ira_flags & IRAF_IS_IPV4) {
+		ipha_t *ipha;
+
+		ipha = (ipha_t *)rptr;
+		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &src);
+		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &dst);
+	} else {
+		ip6_t *ip6h;
+
+		ip6h = (ip6_t *)rptr;
+		src = ip6h->ip6_src;
+		dst = ip6h->ip6_dst;
+	}
+
 	mlen = mp->b_wptr - (uchar_t *)(sctph + 1);
 	if ((ch = sctp_first_chunk((uchar_t *)(sctph + 1), mlen)) == NULL) {
 		dprint(3, ("sctp_ootb_input: invalid packet\n"));
-		BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
-		freemsg(first_mp);
+		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, NULL);
+		freemsg(mp);
 		return;
 	}
 
 	switch (ch->sch_id) {
 	case CHUNK_INIT:
 		/* no listener; send abort  */
-		if (mctl_present && sctp_check_in_policy(mp, first_mp) == NULL)
+		if (secure && sctp_check_in_policy(mp, ira, ipst) == NULL)
 			return;
-		sctp_send_abort(sctps->sctps_gsctp, sctp_init2vtag(ch), 0,
-		    NULL, 0, mp, 0, B_TRUE);
+		sctp_ootb_send_abort(sctp_init2vtag(ch), 0,
+		    NULL, 0, mp, 0, B_TRUE, ira, ipst);
 		break;
 	case CHUNK_INIT_ACK:
 		/* check for changed src addr */
@@ -3372,11 +3296,7 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, zoneid_t zoneid,
 			/* success; proceed to normal path */
 			mutex_enter(&sctp->sctp_lock);
 			if (sctp->sctp_running) {
-				if (!sctp_add_recvq(sctp, mp, B_FALSE)) {
-					BUMP_MIB(recv_ill->ill_ip_mib,
-					    ipIfStatsInDiscards);
-					freemsg(mp);
-				}
+				sctp_add_recvq(sctp, mp, B_FALSE, ira);
 				mutex_exit(&sctp->sctp_lock);
 			} else {
 				/*
@@ -3387,152 +3307,101 @@ sctp_ootb_input(mblk_t *mp, ill_t *recv_ill, zoneid_t zoneid,
 				 */
 				sctp->sctp_running = B_TRUE;
 				mutex_exit(&sctp->sctp_lock);
-				sctp_input_data(sctp, mp, NULL);
+				sctp_input_data(sctp, mp, ira);
 				WAKE_SCTP(sctp);
-				sctp_process_sendq(sctp);
 			}
 			SCTP_REFRELE(sctp);
 			return;
 		}
-		if (mctl_present)
-			freeb(first_mp);
 		/* else bogus init ack; drop it */
 		break;
 	case CHUNK_SHUTDOWN_ACK:
-		if (mctl_present && sctp_check_in_policy(mp, first_mp) == NULL)
+		if (secure && sctp_check_in_policy(mp, ira, ipst) == NULL)
 			return;
-		sctp_ootb_shutdown_ack(sctps->sctps_gsctp, mp, ip_hdr_len);
-		sctp_process_sendq(sctps->sctps_gsctp);
+		sctp_ootb_shutdown_ack(mp, ip_hdr_len, ira, ipst);
 		return;
 	case CHUNK_ERROR:
 	case CHUNK_ABORT:
 	case CHUNK_COOKIE_ACK:
 	case CHUNK_SHUTDOWN_COMPLETE:
-		if (mctl_present)
-			freeb(first_mp);
 		break;
 	default:
-		if (mctl_present && sctp_check_in_policy(mp, first_mp) == NULL)
+		if (secure && sctp_check_in_policy(mp, ira, ipst) == NULL)
 			return;
-		sctp_send_abort(sctps->sctps_gsctp, sctph->sh_verf, 0,
-		    NULL, 0, mp, 0, B_TRUE);
+		sctp_ootb_send_abort(sctph->sh_verf, 0,
+		    NULL, 0, mp, 0, B_TRUE, ira, ipst);
 		break;
 	}
-	sctp_process_sendq(sctps->sctps_gsctp);
 	freemsg(mp);
 }
 
+/*
+ * Handle sctp packets.
+ * Note that we rele the sctp_t (the caller got a reference on it).
+ */
 void
-sctp_input(conn_t *connp, ipha_t *ipha, mblk_t *mp, mblk_t *first_mp,
-    ill_t *recv_ill, boolean_t isv4, boolean_t mctl_present)
+sctp_input(conn_t *connp, ipha_t *ipha, ip6_t *ip6h, mblk_t *mp,
+    ip_recv_attr_t *ira)
 {
-	sctp_t *sctp = CONN2SCTP(connp);
-	ip_stack_t	*ipst = recv_ill->ill_ipst;
+	sctp_t		*sctp = CONN2SCTP(connp);
+	boolean_t	secure;
+	ill_t		*ill = ira->ira_ill;
+	ip_stack_t	*ipst = ill->ill_ipst;
 	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+	iaflags_t	iraflags = ira->ira_flags;
+	ill_t		*rill = ira->ira_rill;
+
+	secure = iraflags & IRAF_IPSEC_SECURE;
 
 	/*
 	 * We check some fields in conn_t without holding a lock.
 	 * This should be fine.
 	 */
-	if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || mctl_present) {
-		first_mp = ipsec_check_inbound_policy(first_mp, connp,
-		    ipha, NULL, mctl_present);
-		if (first_mp == NULL) {
-			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
-			SCTP_REFRELE(sctp);
-			return;
-		}
-	}
-
-	/* Initiate IPPF processing for fastpath */
-	if (IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
-		ip_process(IPP_LOCAL_IN, &mp,
-		    recv_ill->ill_phyint->phyint_ifindex);
+	if (((iraflags & IRAF_IS_IPV4) ?
+	    CONN_INBOUND_POLICY_PRESENT(connp, ipss) :
+	    CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss)) ||
+	    secure) {
+		mp = ipsec_check_inbound_policy(mp, connp, ipha,
+		    ip6h, ira);
 		if (mp == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+			/* Note that mp is NULL */
+			ip_drop_input("ipIfStatsInDiscards", mp, ill);
 			SCTP_REFRELE(sctp);
-			if (mctl_present)
-				freeb(first_mp);
 			return;
-		} else if (mctl_present) {
-			/*
-			 * ip_process might return a new mp.
-			 */
-			ASSERT(first_mp != mp);
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
 		}
 	}
 
-	if (connp->conn_recvif || connp->conn_recvslla ||
-	    connp->conn_ip_recvpktinfo) {
-		int in_flags = 0;
-
-		if (connp->conn_recvif || connp->conn_ip_recvpktinfo) {
-			in_flags = IPF_RECVIF;
-		}
-		if (connp->conn_recvslla) {
-			in_flags |= IPF_RECVSLLA;
-		}
-		if (isv4) {
-			mp = ip_add_info(mp, recv_ill, in_flags,
-			    IPCL_ZONEID(connp), ipst);
-		} else {
-			mp = ip_add_info_v6(mp, recv_ill,
-			    &(((ip6_t *)ipha)->ip6_dst));
-		}
-		if (mp == NULL) {
-			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
-			SCTP_REFRELE(sctp);
-			if (mctl_present)
-				freeb(first_mp);
-			return;
-		} else if (mctl_present) {
-			/*
-			 * ip_add_info might return a new mp.
-			 */
-			ASSERT(first_mp != mp);
-			first_mp->b_cont = mp;
-		} else {
-			first_mp = mp;
-		}
-	}
+	ira->ira_ill = ira->ira_rill = NULL;
 
 	mutex_enter(&sctp->sctp_lock);
 	if (sctp->sctp_running) {
-		if (mctl_present)
-			mp->b_prev = first_mp;
-		if (!sctp_add_recvq(sctp, mp, B_FALSE)) {
-			BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsInDiscards);
-			freemsg(first_mp);
-		}
+		sctp_add_recvq(sctp, mp, B_FALSE, ira);
 		mutex_exit(&sctp->sctp_lock);
-		SCTP_REFRELE(sctp);
-		return;
+		goto done;
 	} else {
 		sctp->sctp_running = B_TRUE;
 		mutex_exit(&sctp->sctp_lock);
 
 		mutex_enter(&sctp->sctp_recvq_lock);
 		if (sctp->sctp_recvq != NULL) {
-			if (mctl_present)
-				mp->b_prev = first_mp;
-			if (!sctp_add_recvq(sctp, mp, B_TRUE)) {
-				BUMP_MIB(recv_ill->ill_ip_mib,
-				    ipIfStatsInDiscards);
-				freemsg(first_mp);
-			}
+			sctp_add_recvq(sctp, mp, B_TRUE, ira);
 			mutex_exit(&sctp->sctp_recvq_lock);
 			WAKE_SCTP(sctp);
-			SCTP_REFRELE(sctp);
-			return;
+			goto done;
 		}
 	}
 	mutex_exit(&sctp->sctp_recvq_lock);
-	sctp_input_data(sctp, mp, (mctl_present ? first_mp : NULL));
+	if (ira->ira_flags & IRAF_ICMP_ERROR)
+		sctp_icmp_error(sctp, mp);
+	else
+		sctp_input_data(sctp, mp, ira);
 	WAKE_SCTP(sctp);
-	sctp_process_sendq(sctp);
+
+done:
 	SCTP_REFRELE(sctp);
+	ira->ira_ill = ill;
+	ira->ira_rill = rill;
 }
 
 static void
@@ -3549,7 +3418,7 @@ sctp_process_abort(sctp_t *sctp, sctp_chunk_hdr_t *ch, int err)
 }
 
 void
-sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
+sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 {
 	sctp_chunk_hdr_t	*ch;
 	ssize_t			mlen;
@@ -3559,17 +3428,15 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 	sctp_init_chunk_t	*iack;
 	uint32_t		tsn;
 	sctp_data_hdr_t		*sdc;
-	ip6_pkt_t		ipp;
+	ip_pkt_t		ipp;
 	in6_addr_t		src;
 	in6_addr_t		dst;
 	uint_t			ifindex;
 	sctp_hdr_t		*sctph;
-	uint_t			ip_hdr_len;
+	uint_t			ip_hdr_len = ira->ira_ip_hdr_length;
 	mblk_t			*dups = NULL;
 	int			recv_adaptation;
 	boolean_t		wake_eager = B_FALSE;
-	mblk_t			*pinfo_mp;
-	ip_pktinfo_t		*pinfo = NULL;
 	in6_addr_t		peer_src;
 	int64_t			now;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
@@ -3577,23 +3444,11 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 	boolean_t		hb_already = B_FALSE;
 	cred_t			*cr;
 	pid_t			cpid;
+	uchar_t			*rptr;
+	conn_t			*connp = sctp->sctp_connp;
 
-	if (DB_TYPE(mp) != M_DATA) {
-		ASSERT(DB_TYPE(mp) == M_CTL);
-		if (MBLKL(mp) == sizeof (ip_pktinfo_t) &&
-		    ((ip_pktinfo_t *)mp->b_rptr)->ip_pkt_ulp_type ==
-		    IN_PKTINFO) {
-			pinfo = (ip_pktinfo_t *)mp->b_rptr;
-			pinfo_mp = mp;
-			mp = mp->b_cont;
-		} else {
-			if (ipsec_mp != NULL)
-				freeb(ipsec_mp);
-			sctp_icmp_error(sctp, mp);
-			return;
-		}
-	}
 	ASSERT(DB_TYPE(mp) == M_DATA);
+	ASSERT(ira->ira_ill == NULL);
 
 	if (mp->b_cont != NULL) {
 		/*
@@ -3602,32 +3457,72 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 		 */
 		if (pullupmsg(mp, -1) == 0) {
 			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
-			if (ipsec_mp != NULL)
-				freeb(ipsec_mp);
-			if (pinfo != NULL)
-				freeb(pinfo_mp);
+			ip_drop_input("ipIfStatsInDiscards", mp, NULL);
 			freemsg(mp);
 			return;
 		}
 	}
 
 	BUMP_LOCAL(sctp->sctp_ipkts);
-	sctph = find_sctp_hdrs(mp, &src, &dst, &ifindex, &ip_hdr_len,
-	    &ipp, pinfo);
-	if (pinfo != NULL)
-		freeb(pinfo_mp);
+	ifindex = ira->ira_ruifindex;
+
+	rptr = mp->b_rptr;
+
+	ipp.ipp_fields = 0;
+	if (connp->conn_recv_ancillary.crb_all != 0) {
+		/*
+		 * Record packet information in the ip_pkt_t
+		 */
+		if (ira->ira_flags & IRAF_IS_IPV4) {
+			(void) ip_find_hdr_v4((ipha_t *)rptr, &ipp,
+			    B_FALSE);
+		} else {
+			uint8_t nexthdrp;
+
+			/*
+			 * IPv6 packets can only be received by applications
+			 * that are prepared to receive IPv6 addresses.
+			 * The IP fanout must ensure this.
+			 */
+			ASSERT(connp->conn_family == AF_INET6);
+
+			(void) ip_find_hdr_v6(mp, (ip6_t *)rptr, B_TRUE, &ipp,
+			    &nexthdrp);
+			ASSERT(nexthdrp == IPPROTO_SCTP);
+
+			/* Could have caused a pullup? */
+			rptr = mp->b_rptr;
+		}
+	}
+
+	sctph = ((sctp_hdr_t *)&rptr[ip_hdr_len]);
+
+	if (ira->ira_flags & IRAF_IS_IPV4) {
+		ipha_t *ipha;
+
+		ipha = (ipha_t *)rptr;
+		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &src);
+		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &dst);
+	} else {
+		ip6_t *ip6h;
+
+		ip6h = (ip6_t *)rptr;
+		src = ip6h->ip6_src;
+		dst = ip6h->ip6_dst;
+	}
+
 	mlen = mp->b_wptr - (uchar_t *)(sctph + 1);
 	ch = sctp_first_chunk((uchar_t *)(sctph + 1), mlen);
 	if (ch == NULL) {
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
-		if (ipsec_mp != NULL)
-			freeb(ipsec_mp);
+		ip_drop_input("ipIfStatsInDiscards", mp, NULL);
 		freemsg(mp);
 		return;
 	}
 
 	if (!sctp_check_input(sctp, ch, mlen, 1)) {
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
+		ip_drop_input("ipIfStatsInDiscards", mp, NULL);
 		goto done;
 	}
 	/*
@@ -3661,9 +3556,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 		if (sctp->sctp_state > SCTPS_BOUND &&
 		    sctp->sctp_state < SCTPS_ESTABLISHED) {
 			/* treat as OOTB */
-			sctp_ootb_shutdown_ack(sctp, mp, ip_hdr_len);
-			if (ipsec_mp != NULL)
-				freeb(ipsec_mp);
+			sctp_ootb_shutdown_ack(mp, ip_hdr_len, ira, ipst);
 			return;
 		}
 		/* else fallthru */
@@ -3717,7 +3610,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 					tsn = sdc->sdh_tsn;
 					sctp_send_abort(sctp, sctp->sctp_fvtag,
 					    SCTP_ERR_NO_USR_DATA, (char *)&tsn,
-					    sizeof (tsn), mp, 0, B_FALSE);
+					    sizeof (tsn), mp, 0, B_FALSE, ira);
 					sctp_assoc_event(sctp, SCTP_COMM_LOST,
 					    0, NULL);
 					sctp_clean_death(sctp, ECONNABORTED);
@@ -3726,7 +3619,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 
 				ASSERT(fp != NULL);
 				sctp->sctp_lastdata = fp;
-				sctp_data_chunk(sctp, ch, mp, &dups, fp, &ipp);
+				sctp_data_chunk(sctp, ch, mp, &dups, fp,
+				    &ipp, ira);
 				gotdata = 1;
 				/* Restart shutdown timer if shutting down */
 				if (sctp->sctp_state == SCTPS_SHUTDOWN_SENT) {
@@ -3743,7 +3637,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 					    sctps->sctps_shutack_wait_bound) {
 						sctp_send_abort(sctp,
 						    sctp->sctp_fvtag, 0, NULL,
-						    0, mp, 0, B_FALSE);
+						    0, mp, 0, B_FALSE, ira);
 						sctp_assoc_event(sctp,
 						    SCTP_COMM_LOST, 0, NULL);
 						sctp_clean_death(sctp,
@@ -3764,7 +3658,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				trysend = sctp_got_sack(sctp, ch);
 				if (trysend < 0) {
 					sctp_send_abort(sctp, sctph->sh_verf,
-					    0, NULL, 0, mp, 0, B_FALSE);
+					    0, NULL, 0, mp, 0, B_FALSE, ira);
 					sctp_assoc_event(sctp,
 					    SCTP_COMM_LOST, 0, NULL);
 					sctp_clean_death(sctp,
@@ -3820,11 +3714,11 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				goto done;
 			}
 			case CHUNK_INIT:
-				sctp_send_initack(sctp, sctph, ch, mp);
+				sctp_send_initack(sctp, sctph, ch, mp, ira);
 				break;
 			case CHUNK_COOKIE:
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
-				    sctph, &recv_adaptation, NULL) != -1) {
+				    sctph, &recv_adaptation, NULL, ira) != -1) {
 					sctp_send_cookie_ack(sctp);
 					sctp_assoc_event(sctp, SCTP_RESTART,
 					    0, NULL);
@@ -3841,7 +3735,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				int error;
 
 				BUMP_LOCAL(sctp->sctp_ibchunks);
-				error = sctp_handle_error(sctp, sctph, ch, mp);
+				error = sctp_handle_error(sctp, sctph, ch, mp,
+				    ira);
 				if (error != 0) {
 					sctp_assoc_event(sctp, SCTP_COMM_LOST,
 					    0, NULL);
@@ -3864,7 +3759,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			case CHUNK_FORWARD_TSN:
 				ASSERT(fp != NULL);
 				sctp->sctp_lastdata = fp;
-				sctp_process_forward_tsn(sctp, ch, fp, &ipp);
+				sctp_process_forward_tsn(sctp, ch, fp,
+				    &ipp, ira);
 				gotdata = 1;
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				break;
@@ -3879,13 +3775,14 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 		case SCTPS_LISTEN:
 			switch (ch->sch_id) {
 			case CHUNK_INIT:
-				sctp_send_initack(sctp, sctph, ch, mp);
+				sctp_send_initack(sctp, sctph, ch, mp, ira);
 				break;
 			case CHUNK_COOKIE: {
 				sctp_t *eager;
 
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
-				    sctph, &recv_adaptation, &peer_src) == -1) {
+				    sctph, &recv_adaptation, &peer_src,
+				    ira) == -1) {
 					BUMP_MIB(&sctps->sctps_mib,
 					    sctpInInvalidCookie);
 					goto done;
@@ -3900,11 +3797,11 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 					goto done;
 
 				eager = sctp_conn_request(sctp, mp, ifindex,
-				    ip_hdr_len, iack, ipsec_mp);
+				    ip_hdr_len, iack, ira);
 				if (eager == NULL) {
 					sctp_send_abort(sctp, sctph->sh_verf,
 					    SCTP_ERR_NO_RESOURCES, NULL, 0, mp,
-					    0, B_FALSE);
+					    0, B_FALSE, ira);
 					goto done;
 				}
 
@@ -3933,9 +3830,6 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				BUMP_MIB(&sctps->sctps_mib, sctpPassiveEstab);
 				if (mlen > ntohs(ch->sch_len)) {
 					eager->sctp_cookie_mp = dupb(mp);
-					mblk_setcred(eager->sctp_cookie_mp,
-					    CONN_CRED(eager->sctp_connp),
-					    eager->sctp_cpid);
 					/*
 					 * If no mem, just let
 					 * the peer retransmit.
@@ -3986,7 +3880,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			default:
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				sctp_send_abort(sctp, sctph->sh_verf, 0, NULL,
-				    0, mp, 0, B_TRUE);
+				    0, mp, 0, B_TRUE, ira);
 				goto done;
 			}
 			break;
@@ -3996,20 +3890,21 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			case CHUNK_INIT_ACK:
 				sctp_stop_faddr_timers(sctp);
 				sctp_faddr_alive(sctp, sctp->sctp_current);
-				sctp_send_cookie_echo(sctp, ch, mp);
+				sctp_send_cookie_echo(sctp, ch, mp, ira);
 				BUMP_LOCAL(sctp->sctp_ibchunks);
 				break;
 			case CHUNK_ABORT:
 				sctp_process_abort(sctp, ch, ECONNREFUSED);
 				goto done;
 			case CHUNK_INIT:
-				sctp_send_initack(sctp, sctph, ch, mp);
+				sctp_send_initack(sctp, sctph, ch, mp, ira);
 				break;
 			case CHUNK_COOKIE:
-				cr = msg_getcred(mp, &cpid);
+				cr = ira->ira_cred;
+				cpid = ira->ira_cpid;
 
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
-				    sctph, &recv_adaptation, NULL) == -1) {
+				    sctph, &recv_adaptation, NULL, ira) == -1) {
 					BUMP_MIB(&sctps->sctps_mib,
 					    sctpInInvalidCookie);
 					break;
@@ -4053,7 +3948,8 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 		case SCTPS_COOKIE_ECHOED:
 			switch (ch->sch_id) {
 			case CHUNK_COOKIE_ACK:
-				cr = msg_getcred(mp, &cpid);
+				cr = ira->ira_cred;
+				cpid = ira->ira_cpid;
 
 				if (!SCTP_IS_DETACHED(sctp)) {
 					sctp->sctp_ulp_connected(
@@ -4084,10 +3980,11 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				sctp_process_abort(sctp, ch, ECONNREFUSED);
 				goto done;
 			case CHUNK_COOKIE:
-				cr = msg_getcred(mp, &cpid);
+				cr = ira->ira_cred;
+				cpid = ira->ira_cpid;
 
 				if (sctp_process_cookie(sctp, ch, mp, &iack,
-				    sctph, &recv_adaptation, NULL) == -1) {
+				    sctph, &recv_adaptation, NULL, ira) == -1) {
 					BUMP_MIB(&sctps->sctps_mib,
 					    sctpInInvalidCookie);
 					break;
@@ -4122,7 +4019,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				trysend = 1;
 				break;
 			case CHUNK_INIT:
-				sctp_send_initack(sctp, sctph, ch, mp);
+				sctp_send_initack(sctp, sctph, ch, mp, ira);
 				break;
 			case CHUNK_ERROR: {
 				sctp_parm_hdr_t *p;
@@ -4165,7 +4062,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 			switch (ch->sch_id) {
 			case CHUNK_ABORT:
 				/* Pass gathered wisdom to IP for keeping */
-				sctp_update_ire(sctp);
+				sctp_update_dce(sctp);
 				sctp_process_abort(sctp, ch, 0);
 				goto done;
 			case CHUNK_SHUTDOWN_COMPLETE:
@@ -4175,7 +4072,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				    NULL);
 
 				/* Pass gathered wisdom to IP for keeping */
-				sctp_update_ire(sctp);
+				sctp_update_dce(sctp);
 				sctp_clean_death(sctp, 0);
 				goto done;
 			case CHUNK_SHUTDOWN_ACK:
@@ -4215,7 +4112,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				trysend = sctp_got_sack(sctp, ch);
 				if (trysend < 0) {
 					sctp_send_abort(sctp, sctph->sh_verf,
-					    0, NULL, 0, mp, 0, B_FALSE);
+					    0, NULL, 0, mp, 0, B_FALSE, ira);
 					sctp_assoc_event(sctp,
 					    SCTP_COMM_LOST, 0, NULL);
 					sctp_clean_death(sctp,
@@ -4287,8 +4184,6 @@ nomorechunks:
 done:
 	if (dups != NULL)
 		freeb(dups);
-	if (ipsec_mp != NULL)
-		freeb(ipsec_mp);
 	freemsg(mp);
 
 	if (sctp->sctp_err_chunks != NULL)
@@ -4297,15 +4192,9 @@ done:
 	if (wake_eager) {
 		/*
 		 * sctp points to newly created control block, need to
-		 * release it before exiting.  Before releasing it and
-		 * processing the sendq, need to grab a hold on it.
-		 * Otherwise, another thread can close it while processing
-		 * the sendq.
+		 * release it before exiting.
 		 */
-		SCTP_REFHOLD(sctp);
 		WAKE_SCTP(sctp);
-		sctp_process_sendq(sctp);
-		SCTP_REFRELE(sctp);
 	}
 }
 
@@ -4340,12 +4229,6 @@ sctp_recvd(sctp_t *sctp, int len)
 		sctp->sctp_force_sack = 1;
 		BUMP_MIB(&sctps->sctps_mib, sctpOutWinUpdate);
 		(void) sctp_sack(sctp, NULL);
-		old = 1;
-	} else {
-		old = 0;
 	}
 	WAKE_SCTP(sctp);
-	if (old > 0) {
-		sctp_process_sendq(sctp);
-	}
 }

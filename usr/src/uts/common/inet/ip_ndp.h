@@ -35,7 +35,7 @@
 
 /*
  * Internal definitions for the kernel implementation of the IPv6
- * Neighbor Discovery Protocol (NDP).
+ * Neighbor Discovery Protocol (NDP) and Address Resolution Protocol (ARP).
  */
 
 #ifdef	__cplusplus
@@ -48,131 +48,149 @@ extern "C" {
  * callbacks set up with ip2mac interface, waiting for result
  * of neighbor resolution.
  */
-typedef struct nce_cb_s {
-	list_node_t		nce_cb_node;
-	void			*nce_cb_id;
-	uint32_t		nce_cb_flags;
-	ip2mac_callback_t	*nce_cb_func;
-	void			*nce_cb_arg;
-} nce_cb_t;
+typedef struct ncec_cb_s {
+	list_node_t		ncec_cb_node;	/* next entry in list */
+	void			*ncec_cb_id;
+	uint32_t		ncec_cb_flags;
+	ip2mac_callback_t	*ncec_cb_func;
+	void			*ncec_cb_arg;
+} ncec_cb_t;
 
 #define	NCE_CB_DISPATCHED	0x00000001
 
 /*
- * NDP Cache Entry
+ * Core information tracking Neighbor Reachability is tracked in the
+ * ncec_s/ncec_t. The information contained in the ncec_t does not contain
+ * any link-specific details other than the pointer to the ill_t itself.
+ * The link-specific information is tracked in the nce_t structure.
  */
-typedef struct nce_s {
-	struct	nce_s	*nce_next;	/* Hash chain next pointer */
-	struct	nce_s	**nce_ptpn;	/* Pointer to previous next */
-	struct 	ill_s	*nce_ill;	/* Associated ill */
-	uint16_t	nce_flags;	/* See below */
-	uint16_t	nce_state;	/* See reachability states in if.h */
-	int16_t		nce_pcnt;	/* Probe counter */
-	uint16_t	nce_rcnt;	/* Retransmit counter */
-	in6_addr_t	nce_addr;	/* address of the nighbor */
-	in6_addr_t	nce_mask;	/* If not all ones, mask allows an */
-	    /* entry  to respond to requests for a group of addresses, for */
-	    /* instantance multicast addresses				   */
-	in6_addr_t	nce_extract_mask; /* For mappings */
-	uint32_t	nce_ll_extract_start;	/* For mappings */
-#define	nce_first_mp_to_free	nce_fp_mp
-	mblk_t		*nce_fp_mp;	/* link layer fast path mp */
-	mblk_t		*nce_res_mp;	/* DL_UNITDATA_REQ */
-	mblk_t		*nce_qd_mp;	/* Head outgoing queued packets */
-#define	nce_last_mp_to_free	nce_qd_mp
-	mblk_t		*nce_timer_mp;	/* NDP timer mblk */
-	mblk_t		*nce_mp;	/* mblk we are in, last to be freed */
-	uint64_t	nce_last;	/* Time last reachable in msec */
-	uint32_t	nce_refcnt;	/* nce active usage count */
-	kmutex_t	nce_lock;	/* See comments on top for what */
+struct ncec_s {
+	struct	ncec_s	*ncec_next;	/* Hash chain next pointer */
+	struct	ncec_s	**ncec_ptpn;	/* Pointer to previous next */
+	struct 	ill_s	*ncec_ill;	/* Associated ill */
+	uint16_t	ncec_flags;	/* See below */
+	uint16_t	ncec_state;	/* See reachability states in if.h */
+	int16_t		ncec_pcnt;	/* Probe counter */
+	uint16_t	ncec_rcnt;	/* Retransmit counter */
+	in6_addr_t	ncec_addr;	/* address of the nighbor */
+	uchar_t		*ncec_lladdr;
+	mblk_t		*ncec_qd_mp;	/* Head outgoing queued packets */
+	uint64_t	ncec_last;	/* Time last reachable in msec */
+	uint32_t	ncec_refcnt;	/* ncec active usage count */
+	kmutex_t	ncec_lock;	/* See comments on top for what */
 					/* this field protects */
-	int		nce_unsolicit_count; /* Unsolicited Adv count */
-	struct nce_s	*nce_fastpath;	/* for fastpath list */
-	timeout_id_t	nce_timeout_id;
-	uchar_t		nce_ipversion;	/* IPv4(ARP)/IPv6(NDP) version */
-	uint_t		nce_defense_count;	/* number of NDP conflicts */
-	uint_t		nce_defense_time;	/* last time defended (secs) */
-	uint64_t	nce_init_time;  /* time when it was set to ND_INITIAL */
-	boolean_t	nce_trace_disable;	/* True when alloc fails */
-	list_t		nce_cb;
-	uint_t		nce_cb_walker_cnt;
+	int		ncec_unsolicit_count; /* Unsolicited Adv count */
+	timeout_id_t	ncec_timeout_id;
+	uchar_t		ncec_ipversion;	/* IPv4(ARP)/IPv6(NDP) version */
+	uint_t		ncec_defense_count;	/* number of NDP conflicts */
+	uint_t		ncec_last_time_defended; /* last time defended (secs) */
+	uint64_t	ncec_init_time; /* time when it was set to ND_INITIAL */
+	boolean_t	ncec_trace_disable;	/* True when alloc fails */
+	/*
+	 * interval to keep track of DAD probes.
+	 */
+	clock_t		ncec_xmit_interval;
+	ip_stack_t	*ncec_ipst;	/* Does not have a netstack_hold */
+	list_t		ncec_cb;	/* callbacks waiting for resolution */
+	uint_t		ncec_cb_walker_cnt;
+	uint_t		ncec_nprobes;
+	uint_t		ncec_lladdr_length;
+};
+
+/*
+ * The nce_t list hangs off the ill_s and tracks information that depends
+ * on the underlying physical link. Thus when the ill goes down,
+ * the nce_t list has to be flushed. This is  done as part of ill_delete()
+ *
+ * When the fastpath ack comes back in ill_fastpath_ack we call
+ * nce_fastpath_update to update the nce_t. We never actually
+ * flush the fastpath list, which is kept as an index into the
+ * ncec_t structures.
+ *
+ * when we ndp_delete, we remove the nce entries pointing
+ * at the dying ncec from the ill_fastpath_list chain.
+ *
+ */
+struct nce_s	{
+	list_node_t	nce_node;
+	ill_t		*nce_ill;
+	boolean_t	nce_is_condemned;
+	in6_addr_t	nce_addr;
+	/*
+	 * link-layer specific fields below
+	 */
+	mblk_t		*nce_dlur_mp;	/* DL_UNITDATA_REQ mp */
+	mblk_t		*nce_fp_mp;	/* fast path mp */
+	struct ncec_s	*nce_common;
+	kmutex_t	nce_lock;
+	uint32_t	nce_refcnt;
 	uint_t		nce_ipif_cnt;	/* number of ipifs with the nce_addr */
 					/* as their local address */
-} nce_t;
+};
 
 /*
  * The ndp_g_t structure contains protocol specific information needed
  * to synchronize and manage neighbor cache entries for IPv4 and IPv6.
  * There are 2 such structures, ips_ndp4 and ips_ndp6.
  * ips_ndp6 contains the data structures needed for IPv6 Neighbor Discovery.
- * ips_ndp4 has IPv4 link layer info in its nce_t structures
- * Note that the nce_t is not currently used as the arp cache itself;
- * it is used for the following purposes:
- *   - queue packets in nce_qd_mp while waiting for arp resolution to complete
- *   - nce_{res, fp}_mp are used to track DL_UNITDATA request/responses.
- *   - track state of ARP resolution in the nce_state;
+ * ips_ndp4 contains the data structures for IPv4 ARP.
  *
  * Locking notes:
  * ndp_g_lock protects neighbor cache tables access and
- * insertion/removal of cache entries into/from these tables.
- * nce_lock protects nce_pcnt, nce_rcnt, nce_qd_mp nce_state, nce_res_mp,
- * nce_refcnt, nce_last, and nce_cb_walker_cnt.
- * nce_refcnt is incremented for every ire pointing to this nce and
- * every time ndp_lookup() finds an nce.
- * Should there be a need to obtain nce_lock and ndp_g_lock, ndp_g_lock is
+ * insertion/removal of cache entries into/from these tables. The ncec_lock
+ * and nce_lock protect fields in the ncec_t and nce_t structures.
+ * Should there be a need to obtain nce[c]_lock and ndp_g_lock, ndp_g_lock is
  * acquired first.
- * To avoid becoming exclusive when deleting NCEs, ndp_walk() routine holds
- * the ndp_g_lock (i.e global lock) and marks NCEs to be deleted with
- * NCE_F_CONDEMNED.  When all active users of such NCEs are gone the walk
- * routine passes a list for deletion to nce_ire_delete_list().
- *
- * When the link-layer address of some onlink host changes, ARP will send
- * an AR_CN_ANNOUNCE message to ip so that stale neighbor-cache
- * information will not get used. This message is processed in ip_arp_news()
- * by walking the nce list, and updating as appropriate. The ndp_g_hw_change
- * flag is set by ip_arp_news() to notify nce_t users that ip_arp_news() is
- * in progress.
  */
 typedef	struct ndp_g_s {
 	kmutex_t	ndp_g_lock;	/* Lock protecting  cache hash table */
-	nce_t		*nce_mask_entries;	/* mask not all ones */
-	nce_t		*nce_hash_tbl[NCE_TABLE_SIZE];
+	ncec_t		*nce_hash_tbl[NCE_TABLE_SIZE];
 	int		ndp_g_walker; /* # of active thread walking hash list */
 	boolean_t	ndp_g_walker_cleanup; /* true implies defer deletion. */
-	int		ndp_g_hw_change; /* non-zero if nce flush in progress */
 } ndp_g_t;
 
-#define	NDP_HW_CHANGE_INCR(ndp) {		\
-	mutex_enter(&(ndp)->ndp_g_lock);	\
-	(ndp)->ndp_g_hw_change++;		\
-	mutex_exit(&(ndp)->ndp_g_lock);		\
-}
-
-#define	NDP_HW_CHANGE_DECR(ndp) {		\
-	mutex_enter(&(ndp)->ndp_g_lock);	\
-	(ndp)->ndp_g_hw_change--;		\
-	mutex_exit(&(ndp)->ndp_g_lock);		\
-}
-
-/* nce_flags  */
-#define	NCE_F_PERMANENT		0x1
-#define	NCE_F_MAPPING		0x2
+/* ncec_flags  */
+#define	NCE_F_MYADDR		0x1	/* ipif exists for the ncec_addr */
+#define	NCE_F_UNVERIFIED	0x2	/* DAD in progress. */
 #define	NCE_F_ISROUTER		0x4
-/*	unused			0x8 */
+#define	NCE_F_FAST		0x8
+
+/*
+ * NCE_F_NONUD is used to disable IPv6 Neighbor Unreachability Detection or
+ * IPv4 aging and maps to the ATF_PERM flag for arp(1m)
+ */
 #define	NCE_F_NONUD		0x10
+
 #define	NCE_F_ANYCAST		0x20
 #define	NCE_F_CONDEMNED		0x40
 #define	NCE_F_UNSOL_ADV		0x80
 #define	NCE_F_BCAST		0x100
+#define	NCE_F_MCAST		0x200
 
-#define	NCE_EXTERNAL_FLAGS_MASK \
-	(NCE_F_PERMANENT | NCE_F_MAPPING | NCE_F_ISROUTER | NCE_F_NONUD | \
-	NCE_F_ANYCAST | NCE_F_UNSOL_ADV)
+/*
+ * NCE_F_PUBLISH is set for all ARP/ND entries that we announce. This
+ * includes locally configured addresses as well as those that we proxy for.
+ */
+#define	NCE_F_PUBLISH		0x400
+
+/*
+ * NCE_F_AUTHORITY is set for any address that we have authoritatitve
+ * information for. This includes locally configured addresses as well
+ * as statically configured arp entries that are set up using the "permanent"
+ * option described in arp(1m). The NCE_F_AUTHORITY asserts that we would
+ * reject any updates for that nce's (host, link-layer-address) information
+ */
+#define	NCE_F_AUTHORITY		0x800
+
+#define	NCE_F_DELAYED		0x1000 /* rescheduled on dad_defend_rate */
+#define	NCE_F_STATIC		0x2000
 
 /* State REACHABLE, STALE, DELAY or PROBE */
-#define	NCE_ISREACHABLE(nce)			\
-	(((((nce)->nce_state) >= ND_REACHABLE) &&	\
-	((nce)->nce_state) <= ND_PROBE))
+#define	NCE_ISREACHABLE(ncec)			\
+	(((((ncec)->ncec_state) >= ND_REACHABLE) &&	\
+	((ncec)->ncec_state) <= ND_PROBE))
+
+#define	NCE_ISCONDEMNED(ncec)	((ncec)->ncec_flags & NCE_F_CONDEMNED)
 
 /* NDP flags set in SOL/ADV requests */
 #define	NDP_UNICAST		0x1
@@ -184,95 +202,14 @@ typedef	struct ndp_g_s {
 /* Number of packets queued in NDP for a neighbor */
 #define	ND_MAX_Q		4
 
-
-#ifdef DEBUG
-#define	NCE_TRACE_REF(nce)		nce_trace_ref(nce)
-#define	NCE_UNTRACE_REF(nce)		nce_untrace_ref(nce)
-#else
-#define	NCE_TRACE_REF(nce)
-#define	NCE_UNTRACE_REF(nce)
-#endif
-
-#define	NCE_REFHOLD(nce) {		\
-	mutex_enter(&(nce)->nce_lock);	\
-	(nce)->nce_refcnt++;		\
-	ASSERT((nce)->nce_refcnt != 0);	\
-	NCE_TRACE_REF(nce);		\
-	mutex_exit(&(nce)->nce_lock);	\
-}
-
-#define	NCE_REFHOLD_NOTR(nce) {		\
-	mutex_enter(&(nce)->nce_lock);	\
-	(nce)->nce_refcnt++;		\
-	ASSERT((nce)->nce_refcnt != 0);	\
-	mutex_exit(&(nce)->nce_lock);	\
-}
-
-#define	NCE_REFHOLD_LOCKED(nce) {		\
-	ASSERT(MUTEX_HELD(&(nce)->nce_lock));	\
-	(nce)->nce_refcnt++;			\
-	NCE_TRACE_REF(nce);			\
-}
-
-/* nce_inactive destroys the mutex thus no mutex_exit is needed */
-#define	NCE_REFRELE(nce) {		\
-	mutex_enter(&(nce)->nce_lock);	\
-	NCE_UNTRACE_REF(nce);		\
-	ASSERT((nce)->nce_refcnt != 0);	\
-	if (--(nce)->nce_refcnt == 0)	\
-		ndp_inactive(nce);	\
-	else {				\
-		mutex_exit(&(nce)->nce_lock);\
-	}				\
-}
-
-#define	NCE_REFRELE_NOTR(nce) {		\
-	mutex_enter(&(nce)->nce_lock);	\
-	ASSERT((nce)->nce_refcnt != 0);	\
-	if (--(nce)->nce_refcnt == 0)	\
-		ndp_inactive(nce);	\
-	else {				\
-		mutex_exit(&(nce)->nce_lock);\
-	}				\
-}
-
-#define	NDP_RESTART_TIMER(nce, ms) {	\
-	ASSERT(!MUTEX_HELD(&(nce)->nce_lock));				\
-	if ((nce)->nce_timeout_id != 0) {				\
-		/* Ok to untimeout bad id. we don't hold a lock. */	\
-		(void) untimeout((nce)->nce_timeout_id);		\
-	}								\
-	mutex_enter(&(nce)->nce_lock);					\
-	/* Don't start the timer if the nce has been deleted */		\
-	if (!((nce)->nce_flags & NCE_F_CONDEMNED)) 			\
-		nce->nce_timeout_id = timeout(ndp_timer, nce, 		\
-		    MSEC_TO_TICK(ms) == 0 ? 1 : MSEC_TO_TICK(ms));	\
-	mutex_exit(&(nce)->nce_lock);					\
-}
-
-/* Structure for ndp_cache_count() */
-typedef struct {
-	int	ncc_total;	/* Total number of NCEs */
-	int	ncc_host;	/* NCE entries without R bit set */
-} ncc_cache_count_t;
-
 /*
- * Structure of ndp_cache_reclaim().  Each field is a fraction i.e. 1 means
- * reclaim all, N means reclaim 1/Nth of all entries, 0 means reclaim none.
- */
-typedef struct {
-	int	ncr_host;	/* Fraction for host entries */
-} nce_cache_reclaim_t;
-
-/*
- * Structure for nce_delete_hw_changed; specifies an IPv4 address to link-layer
- * address mapping.  Any route that has a cached copy of a mapping for that
- * IPv4 address that doesn't match the given mapping must be purged.
+ * Structure for nce_update_hw_changed;
  */
 typedef struct {
 	ipaddr_t hwm_addr;	/* IPv4 address */
-	uint_t hwm_hwlen;	/* Length of hardware address (may be 0) */
+	uint_t	hwm_hwlen;	/* Length of hardware address (may be 0) */
 	uchar_t *hwm_hwaddr;	/* Pointer to new hardware address, if any */
+	int	hwm_flags;
 } nce_hw_map_t;
 
 /* When SAP is greater than zero address appears before SAP */
@@ -283,6 +220,15 @@ typedef struct {
 #define	NCE_LL_SAP_OFFSET(ill) (((ill)->ill_sap_length) < 0 ? \
 	((sizeof (dl_unitdata_req_t)) + ((ill)->ill_phys_addr_length)) : \
 	(sizeof (dl_unitdata_req_t)))
+
+#define	NCE_MYADDR(ncec)	(((ncec)->ncec_flags & NCE_F_MYADDR) != 0)
+
+/*
+ * NCE_PUBLISH() identifies the addresses that we are publishing. This
+ * includes locally configured address (NCE_MYADDR()) as well as those that
+ * we are proxying.
+ */
+#define	NCE_PUBLISH(ncec) ((ncec->ncec_flags & NCE_F_PUBLISH) != 0)
 
 #ifdef _BIG_ENDIAN
 #define	NCE_LL_SAP_COPY(ill, mp) \
@@ -327,55 +273,65 @@ typedef struct {
 /* NDP Cache Entry Hash Table */
 #define	NCE_TABLE_SIZE	256
 
-extern	void	ndp_cache_count(nce_t *, char *);
-extern	void	ndp_cache_reclaim(nce_t *, char *);
-extern	void	ndp_delete(nce_t *);
-extern	void	ndp_delete_per_ill(nce_t *, uchar_t *);
-extern	void	ndp_fastpath_flush(nce_t *, char  *);
-extern	boolean_t ndp_fastpath_update(nce_t *, void  *);
+extern	void	ip_nce_reclaim(void *);
+extern	void	ncec_delete(ncec_t *);
+extern	void	ncec_delete_per_ill(ncec_t *, uchar_t *);
+extern	void	nce_fastpath_update(ill_t *, mblk_t  *);
 extern	nd_opt_hdr_t *ndp_get_option(nd_opt_hdr_t *, int, int);
-extern	void	ndp_inactive(nce_t *);
-extern	void	ndp_input(ill_t *, mblk_t *, mblk_t *);
-extern	boolean_t ndp_lookup_ipaddr(in_addr_t, netstack_t *);
-extern	nce_t	*ndp_lookup_v6(ill_t *, boolean_t, const in6_addr_t *,
-    boolean_t);
-extern	nce_t	*ndp_lookup_v4(ill_t *, const in_addr_t *, boolean_t);
-extern	int	ndp_mcastreq(ill_t *, const in6_addr_t *, uint32_t, uint32_t,
+extern	void	ncec_inactive(ncec_t *);
+extern	void	ndp_input(mblk_t *, ip_recv_attr_t *);
+extern	ncec_t	*ncec_lookup_illgrp_v6(ill_t *, const in6_addr_t *);
+extern	ncec_t	*ncec_lookup_illgrp_v4(ill_t *, const in_addr_t *);
+extern	nce_t	*nce_lookup_v4(ill_t *, const in_addr_t *);
+extern	nce_t	*nce_lookup_v6(ill_t *, const in6_addr_t *);
+extern	void	nce_make_unreachable(ncec_t *);
+extern	mblk_t	*ndp_mcastreq(ill_t *, const in6_addr_t *, uint32_t, uint32_t,
     mblk_t *);
-extern	int	ndp_noresolver(ill_t *, const in6_addr_t *);
-extern	void	ndp_process(nce_t *, uchar_t *, uint32_t, boolean_t);
+extern  nce_t	*ndp_nce_init(ill_t *, const in6_addr_t *, int);
+extern  void	nce_process(ncec_t *, uchar_t *, uint32_t, boolean_t);
 extern	int	ndp_query(ill_t *, lif_nd_req_t *);
-extern	int	ndp_resolver(ill_t *, const in6_addr_t *, mblk_t *, zoneid_t);
 extern	int	ndp_sioc_update(ill_t *, lif_nd_req_t *);
 extern	boolean_t	ndp_verify_optlen(nd_opt_hdr_t *, int);
-extern	void	ndp_timer(void *);
-extern	void	ndp_walk(ill_t *, pfi_t, void *, ip_stack_t *);
-extern	void	ndp_walk_common(ndp_g_t *, ill_t *, pfi_t,
+extern	void	nce_timer(void *);
+extern	void	ncec_walk(ill_t *, pfi_t, void *, ip_stack_t *);
+extern	void	ncec_walk_common(ndp_g_t *, ill_t *, pfi_t,
     void *, boolean_t);
-extern	boolean_t	ndp_restart_dad(nce_t *);
-extern	void	ndp_do_recovery(ipif_t *);
-extern	void	nce_resolv_failed(nce_t *);
-extern	void	arp_resolv_failed(nce_t *);
-extern	void	nce_fastpath_list_add(nce_t *);
-extern	void	nce_fastpath_list_delete(nce_t *);
-extern	void	nce_fastpath_list_dispatch(ill_t *,
-    boolean_t (*)(nce_t *, void  *), void *);
-extern	void	nce_queue_mp_common(nce_t *, mblk_t *, boolean_t);
-extern	void	nce_delete_hw_changed(nce_t *, void *);
-extern	void	nce_fastpath(nce_t *);
-extern	int	ndp_add_v6(ill_t *, uchar_t *, const in6_addr_t *,
-    const in6_addr_t *, const in6_addr_t *, uint32_t, uint16_t, uint16_t,
-    nce_t **);
-extern	int	ndp_lookup_then_add_v6(ill_t *, boolean_t, uchar_t *,
-    const in6_addr_t *, const in6_addr_t *, const in6_addr_t *, uint32_t,
-    uint16_t, uint16_t, nce_t **);
-extern	int	ndp_lookup_then_add_v4(ill_t *,
-    const in_addr_t *, uint16_t, nce_t **, nce_t *);
-extern void	ip_ndp_resolve(nce_t *);
+extern	boolean_t	nce_restart_dad(ncec_t *);
+extern	void	ndp_resolv_failed(ncec_t *);
+extern	void	arp_resolv_failed(ncec_t *);
+extern	void	nce_fastpath_list_delete(ill_t *, ncec_t *, list_t *);
+extern	void	nce_queue_mp(ncec_t *, mblk_t *, boolean_t);
+extern	void	nce_update_hw_changed(ncec_t *, void *);
+extern	int	nce_lookup_then_add_v6(ill_t *, uchar_t *, uint_t,
+    const in6_addr_t *, uint16_t, uint16_t, nce_t **);
+extern	int	nce_lookup_then_add_v4(ill_t *, uchar_t *, uint_t,
+    const in_addr_t *, uint16_t, uint16_t, nce_t **);
+extern boolean_t nce_cmp_ll_addr(const ncec_t *, const uchar_t *, uint32_t);
+extern void	nce_update(ncec_t *, uint16_t, uchar_t *);
+extern nce_t   *nce_lookup_mapping(ill_t *, const in6_addr_t *);
+
+extern void	nce_restart_timer(ncec_t *, uint_t);
+extern void	ncec_refrele(ncec_t *);
+extern void	ncec_refhold(ncec_t *);
+extern void	ncec_refrele_notr(ncec_t *);
+extern void	ncec_refhold_notr(ncec_t *);
+extern void	nce_resolv_ok(ncec_t *);
+extern uint32_t	ndp_solicit(ncec_t *, in6_addr_t, ill_t *);
+extern boolean_t ip_nce_conflict(mblk_t *, ip_recv_attr_t *, ncec_t *);
+extern boolean_t ndp_announce(ncec_t *);
+extern void	ip_nce_lookup_and_update(ipaddr_t *, ipif_t *, ip_stack_t *,
+    uchar_t *, int, int);
+extern void	nce_refrele(nce_t *);
+extern void	nce_refhold(nce_t *);
+extern void	nce_delete(nce_t *);
+extern void	nce_flush(ill_t *, boolean_t);
+extern void	nce_walk(ill_t *, pfi_t, void *);
+extern void	ip_ndp_resolve(struct ncec_s *);
+extern void	ip_addr_recover(ipsq_t *, queue_t *, mblk_t *, void *);
 
 #ifdef DEBUG
-extern	void	nce_trace_ref(nce_t *);
-extern	void	nce_untrace_ref(nce_t *);
+extern	void	nce_trace_ref(ncec_t *);
+extern	void	nce_untrace_ref(ncec_t *);
 #endif
 
 #endif	/* _KERNEL */

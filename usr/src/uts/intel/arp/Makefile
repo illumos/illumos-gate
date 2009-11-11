@@ -21,10 +21,8 @@
 #
 # uts/intel/arp/Makefile
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the arp driver kernel module.
 #
@@ -68,7 +66,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 #
 #	depends on ip
 #
-LDFLAGS		+= -dy -Ndrv/ip -Ndrv/hook -Nmisc/neti
+LDFLAGS		+= -dy -Ndrv/ip
 
 #
 # For now, disable these lint checks; maintainers should endeavor

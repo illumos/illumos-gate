@@ -39,8 +39,8 @@
  * parallelization (on a per H/W execution pipeline basis) with at
  * most one queuing.
  *
- * The modules needing protection typically calls squeue_enter() or
- * squeue_enter_chain() routine as soon as a thread enter the module
+ * The modules needing protection typically calls SQUEUE_ENTER_ONE() or
+ * SQUEUE_ENTER() macro as soon as a thread enter the module
  * from either direction. For each packet, the processing function
  * and argument is stored in the mblk itself. When the packet is ready
  * to be processed, the squeue retrieves the stored function and calls
@@ -406,11 +406,15 @@ squeue_worker_wakeup(squeue_t *sqp)
  * and drain in the entering thread context. If process_flag is
  * SQ_FILL, then we just queue the mblk and return (after signaling
  * the worker thread if no one else is processing the squeue).
+ *
+ * The ira argument can be used when the count is one.
+ * For a chain the caller needs to prepend any needed mblks from
+ * ip_recv_attr_to_mblk().
  */
 /* ARGSUSED */
 void
 squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
-    int process_flag, uint8_t tag)
+    ip_recv_attr_t *ira, int process_flag, uint8_t tag)
 {
 	conn_t		*connp;
 	sqproc_t	proc;
@@ -421,6 +425,7 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 	ASSERT(tail != NULL);
 	ASSERT(cnt > 0);
 	ASSERT(MUTEX_NOT_HELD(&sqp->sq_lock));
+	ASSERT(ira == NULL || cnt == 1);
 
 	mutex_enter(&sqp->sq_lock);
 
@@ -467,7 +472,7 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 				connp->conn_on_sqp = B_TRUE;
 				DTRACE_PROBE3(squeue__proc__start, squeue_t *,
 				    sqp, mblk_t *, mp, conn_t *, connp);
-				(*proc)(connp, mp, sqp);
+				(*proc)(connp, mp, sqp, ira);
 				DTRACE_PROBE2(squeue__proc__end, squeue_t *,
 				    sqp, conn_t *, connp);
 				connp->conn_on_sqp = B_FALSE;
@@ -475,7 +480,7 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 				CONN_DEC_REF(connp);
 			} else {
 				SQUEUE_ENTER_ONE(connp->conn_sqp, mp, proc,
-				    connp, SQ_FILL, SQTAG_SQUEUE_CHANGE);
+				    connp, ira, SQ_FILL, SQTAG_SQUEUE_CHANGE);
 			}
 			ASSERT(MUTEX_NOT_HELD(&sqp->sq_lock));
 			mutex_enter(&sqp->sq_lock);
@@ -499,6 +504,33 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 				return;
 			}
 		} else {
+			if (ira != NULL) {
+				mblk_t	*attrmp;
+
+				ASSERT(cnt == 1);
+				attrmp = ip_recv_attr_to_mblk(ira);
+				if (attrmp == NULL) {
+					mutex_exit(&sqp->sq_lock);
+					ip_drop_input("squeue: "
+					    "ip_recv_attr_to_mblk",
+					    mp, NULL);
+					/* Caller already set b_prev/b_next */
+					mp->b_prev = mp->b_next = NULL;
+					freemsg(mp);
+					return;
+				}
+				ASSERT(attrmp->b_cont == NULL);
+				attrmp->b_cont = mp;
+				/* Move connp and func to new */
+				attrmp->b_queue = mp->b_queue;
+				mp->b_queue = NULL;
+				attrmp->b_prev = mp->b_prev;
+				mp->b_prev = NULL;
+
+				ASSERT(mp == tail);
+				tail = mp = attrmp;
+			}
+
 			ENQUEUE_CHAIN(sqp, mp, tail, cnt);
 #ifdef DEBUG
 			mp->b_tag = tag;
@@ -564,14 +596,14 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 				connp->conn_on_sqp = B_TRUE;
 				DTRACE_PROBE3(squeue__proc__start, squeue_t *,
 				    sqp, mblk_t *, mp, conn_t *, connp);
-				(*proc)(connp, mp, sqp);
+				(*proc)(connp, mp, sqp, ira);
 				DTRACE_PROBE2(squeue__proc__end, squeue_t *,
 				    sqp, conn_t *, connp);
 				connp->conn_on_sqp = B_FALSE;
 				CONN_DEC_REF(connp);
 			} else {
 				SQUEUE_ENTER_ONE(connp->conn_sqp, mp, proc,
-				    connp, SQ_FILL, SQTAG_SQUEUE_CHANGE);
+				    connp, ira, SQ_FILL, SQTAG_SQUEUE_CHANGE);
 			}
 
 			mutex_enter(&sqp->sq_lock);
@@ -589,7 +621,31 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, mblk_t *tail, uint32_t cnt,
 #ifdef DEBUG
 		mp->b_tag = tag;
 #endif
+		if (ira != NULL) {
+			mblk_t	*attrmp;
 
+			ASSERT(cnt == 1);
+			attrmp = ip_recv_attr_to_mblk(ira);
+			if (attrmp == NULL) {
+				mutex_exit(&sqp->sq_lock);
+				ip_drop_input("squeue: ip_recv_attr_to_mblk",
+				    mp, NULL);
+				/* Caller already set b_prev/b_next */
+				mp->b_prev = mp->b_next = NULL;
+				freemsg(mp);
+				return;
+			}
+			ASSERT(attrmp->b_cont == NULL);
+			attrmp->b_cont = mp;
+			/* Move connp and func to new */
+			attrmp->b_queue = mp->b_queue;
+			mp->b_queue = NULL;
+			attrmp->b_prev = mp->b_prev;
+			mp->b_prev = NULL;
+
+			ASSERT(mp == tail);
+			tail = mp = attrmp;
+		}
 		ENQUEUE_CHAIN(sqp, mp, tail, cnt);
 		if (!(sqp->sq_state & SQS_PROC)) {
 			squeue_worker_wakeup(sqp);
@@ -653,6 +709,7 @@ squeue_drain(squeue_t *sqp, uint_t proc_type, hrtime_t expire)
 	hrtime_t 	now;
 	boolean_t	did_wakeup = B_FALSE;
 	boolean_t	sq_poll_capable;
+	ip_recv_attr_t	*ira, iras;
 
 	sq_poll_capable = (sqp->sq_state & SQS_POLL_CAPAB) != 0;
 again:
@@ -697,6 +754,31 @@ again:
 		connp = (conn_t *)mp->b_prev;
 		mp->b_prev = NULL;
 
+		/* Is there an ip_recv_attr_t to handle? */
+		if (ip_recv_attr_is_mblk(mp)) {
+			mblk_t	*attrmp = mp;
+
+			ASSERT(attrmp->b_cont != NULL);
+
+			mp = attrmp->b_cont;
+			attrmp->b_cont = NULL;
+			ASSERT(mp->b_queue == NULL);
+			ASSERT(mp->b_prev == NULL);
+
+			if (!ip_recv_attr_from_mblk(attrmp, &iras)) {
+				/* The ill or ip_stack_t disappeared on us */
+				ip_drop_input("ip_recv_attr_from_mblk",
+				    mp, NULL);
+				ira_cleanup(&iras, B_TRUE);
+				CONN_DEC_REF(connp);
+				continue;
+			}
+			ira = &iras;
+		} else {
+			ira = NULL;
+		}
+
+
 		/*
 		 * Handle squeue switching. More details in the
 		 * block comment at the top of the file
@@ -707,15 +789,17 @@ again:
 			connp->conn_on_sqp = B_TRUE;
 			DTRACE_PROBE3(squeue__proc__start, squeue_t *,
 			    sqp, mblk_t *, mp, conn_t *, connp);
-			(*proc)(connp, mp, sqp);
+			(*proc)(connp, mp, sqp, ira);
 			DTRACE_PROBE2(squeue__proc__end, squeue_t *,
 			    sqp, conn_t *, connp);
 			connp->conn_on_sqp = B_FALSE;
 			CONN_DEC_REF(connp);
 		} else {
-			SQUEUE_ENTER_ONE(connp->conn_sqp, mp, proc, connp,
+			SQUEUE_ENTER_ONE(connp->conn_sqp, mp, proc, connp, ira,
 			    SQ_FILL, SQTAG_SQUEUE_CHANGE);
 		}
+		if (ira != NULL)
+			ira_cleanup(ira, B_TRUE);
 	}
 
 	SQUEUE_DBG_CLEAR(sqp);
@@ -991,9 +1075,13 @@ poll_again:
 			    &tail, &cnt);
 		}
 		mutex_enter(lock);
-		if (mp != NULL)
+		if (mp != NULL) {
+			/*
+			 * The ip_accept function has already added an
+			 * ip_recv_attr_t mblk if that is needed.
+			 */
 			ENQUEUE_CHAIN(sqp, mp, tail, cnt);
-
+		}
 		ASSERT((sqp->sq_state &
 		    (SQS_PROC|SQS_POLLING|SQS_GET_PKTS)) ==
 		    (SQS_PROC|SQS_POLLING|SQS_GET_PKTS));
@@ -1263,7 +1351,7 @@ squeue_getprivate(squeue_t *sqp, sqprivate_t p)
 
 /* ARGSUSED */
 void
-squeue_wakeup_conn(void *arg, mblk_t *mp, void *arg2)
+squeue_wakeup_conn(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	conn_t *connp = (conn_t *)arg;
 	squeue_t *sqp = connp->conn_sqp;

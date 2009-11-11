@@ -53,6 +53,8 @@
 #include <inet/ip.h>
 #include <inet/ip_impl.h>
 #include <inet/ip6.h>
+#include <inet/ip_if.h>
+#include <inet/ip_ndp.h>
 #include <inet/sadb.h>
 #include <inet/ipsec_info.h>
 #include <inet/ipsec_impl.h>
@@ -66,8 +68,6 @@
 #include <inet/udp_impl.h>
 #include <sys/taskq.h>
 #include <sys/note.h>
-
-#include <sys/iphada.h>
 
 #include <sys/tsol/tnet.h>
 
@@ -130,26 +130,23 @@ static	ipsecespparam_t	lcl_param_arr[] = {
 
 static int ipsecesp_open(queue_t *, dev_t *, int, int, cred_t *);
 static int ipsecesp_close(queue_t *);
-static void ipsecesp_rput(queue_t *, mblk_t *);
 static void ipsecesp_wput(queue_t *, mblk_t *);
 static void	*ipsecesp_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ipsecesp_stack_fini(netstackid_t stackid, void *arg);
 static void esp_send_acquire(ipsacq_t *, mblk_t *, netstack_t *);
 
 static void esp_prepare_udp(netstack_t *, mblk_t *, ipha_t *);
-static ipsec_status_t esp_outbound_accelerated(mblk_t *, uint_t);
-static ipsec_status_t esp_inbound_accelerated(mblk_t *, mblk_t *,
-    boolean_t, ipsa_t *);
+static void esp_outbound_finish(mblk_t *, ip_xmit_attr_t *);
+static void esp_inbound_restart(mblk_t *, ip_recv_attr_t *);
 
 static boolean_t esp_register_out(uint32_t, uint32_t, uint_t,
-    ipsecesp_stack_t *, mblk_t *);
+    ipsecesp_stack_t *, cred_t *);
 static boolean_t esp_strip_header(mblk_t *, boolean_t, uint32_t,
     kstat_named_t **, ipsecesp_stack_t *);
-static ipsec_status_t esp_submit_req_inbound(mblk_t *, ipsa_t *, uint_t);
-static ipsec_status_t esp_submit_req_outbound(mblk_t *, ipsa_t *, uchar_t *,
-    uint_t);
-extern void (*cl_inet_getspi)(netstackid_t, uint8_t, uint8_t *, size_t,
-    void *);
+static mblk_t *esp_submit_req_inbound(mblk_t *, ip_recv_attr_t *,
+    ipsa_t *, uint_t);
+static mblk_t *esp_submit_req_outbound(mblk_t *, ip_xmit_attr_t *,
+    ipsa_t *, uchar_t *, uint_t);
 
 /* Setable in /etc/system */
 uint32_t esp_hash_size = IPSEC_DEFAULT_HASH_SIZE;
@@ -159,7 +156,7 @@ static struct module_info info = {
 };
 
 static struct qinit rinit = {
-	(pfi_t)ipsecesp_rput, NULL, ipsecesp_open, ipsecesp_close, NULL, &info,
+	(pfi_t)putnext, NULL, ipsecesp_open, ipsecesp_close, NULL, &info,
 	NULL
 };
 
@@ -201,9 +198,6 @@ typedef struct esp_kstats_s {
 	kstat_named_t esp_stat_acquire_requests;
 	kstat_named_t esp_stat_bytes_expired;
 	kstat_named_t esp_stat_out_discards;
-	kstat_named_t esp_stat_in_accelerated;
-	kstat_named_t esp_stat_out_accelerated;
-	kstat_named_t esp_stat_noaccel;
 	kstat_named_t esp_stat_crypto_sync;
 	kstat_named_t esp_stat_crypto_async;
 	kstat_named_t esp_stat_crypto_failures;
@@ -266,9 +260,6 @@ esp_kstat_init(ipsecesp_stack_t *espstack, netstackid_t stackid)
 	KI(acquire_requests);
 	KI(bytes_expired);
 	KI(out_discards);
-	KI(in_accelerated);
-	KI(out_accelerated);
-	KI(noaccel);
 	KI(crypto_sync);
 	KI(crypto_async);
 	KI(crypto_failures);
@@ -384,9 +375,9 @@ esp_ager(void *arg)
 	hrtime_t begin = gethrtime();
 
 	sadb_ager(&espstack->esp_sadb.s_v4, espstack->esp_pfkey_q,
-	    espstack->esp_sadb.s_ip_q, espstack->ipsecesp_reap_delay, ns);
+	    espstack->ipsecesp_reap_delay, ns);
 	sadb_ager(&espstack->esp_sadb.s_v6, espstack->esp_pfkey_q,
-	    espstack->esp_sadb.s_ip_q, espstack->ipsecesp_reap_delay, ns);
+	    espstack->ipsecesp_reap_delay, ns);
 
 	espstack->esp_event = sadb_retimeout(begin, espstack->esp_pfkey_q,
 	    esp_ager, espstack,
@@ -583,7 +574,13 @@ ipsecesp_stack_fini(netstackid_t stackid, void *arg)
 }
 
 /*
- * ESP module open routine.
+ * ESP module open routine, which is here for keysock plumbing.
+ * Keysock is pushed over {AH,ESP} which is an artifact from the Bad Old
+ * Days of export control, and fears that ESP would not be allowed
+ * to be shipped at all by default.  Eventually, keysock should
+ * either access AH and ESP via modstubs or krtld dependencies, or
+ * perhaps be folded in with AH and ESP into a single IPsec/netsec
+ * module ("netsec" if PF_KEY provides more than AH/ESP keying tables).
  */
 /* ARGSUSED */
 static int
@@ -606,56 +603,10 @@ ipsecesp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	espstack = ns->netstack_ipsecesp;
 	ASSERT(espstack != NULL);
 
-	/*
-	 * ASSUMPTIONS (because I'm MT_OCEXCL):
-	 *
-	 *	* I'm being pushed on top of IP for all my opens (incl. #1).
-	 *	* Only ipsecesp_open() can write into esp_sadb.s_ip_q.
-	 *	* Because of this, I can check lazily for esp_sadb.s_ip_q.
-	 *
-	 *  If these assumptions are wrong, I'm in BIG trouble...
-	 */
-
 	q->q_ptr = espstack;
 	WR(q)->q_ptr = q->q_ptr;
 
-	if (espstack->esp_sadb.s_ip_q == NULL) {
-		struct T_unbind_req *tur;
-
-		espstack->esp_sadb.s_ip_q = WR(q);
-		/* Allocate an unbind... */
-		espstack->esp_ip_unbind = allocb(sizeof (struct T_unbind_req),
-		    BPRI_HI);
-
-		/*
-		 * Send down T_BIND_REQ to bind IPPROTO_ESP.
-		 * Handle the ACK here in ESP.
-		 */
-		qprocson(q);
-		if (espstack->esp_ip_unbind == NULL ||
-		    !sadb_t_bind_req(espstack->esp_sadb.s_ip_q, IPPROTO_ESP)) {
-			if (espstack->esp_ip_unbind != NULL) {
-				freeb(espstack->esp_ip_unbind);
-				espstack->esp_ip_unbind = NULL;
-			}
-			q->q_ptr = NULL;
-			netstack_rele(espstack->ipsecesp_netstack);
-			return (ENOMEM);
-		}
-
-		espstack->esp_ip_unbind->b_datap->db_type = M_PROTO;
-		tur = (struct T_unbind_req *)espstack->esp_ip_unbind->b_rptr;
-		tur->PRIM_type = T_UNBIND_REQ;
-	} else {
-		qprocson(q);
-	}
-
-	/*
-	 * For now, there's not much I can do.  I'll be getting a message
-	 * passed down to me from keysock (in my wput), and a T_BIND_ACK
-	 * up from IP (in my rput).
-	 */
-
+	qprocson(q);
 	return (0);
 }
 
@@ -666,17 +617,6 @@ static int
 ipsecesp_close(queue_t *q)
 {
 	ipsecesp_stack_t	*espstack = (ipsecesp_stack_t *)q->q_ptr;
-
-	/*
-	 * If esp_sadb.s_ip_q is attached to this instance, send a
-	 * T_UNBIND_REQ to IP for the instance before doing
-	 * a qprocsoff().
-	 */
-	if (WR(q) == espstack->esp_sadb.s_ip_q &&
-	    espstack->esp_ip_unbind != NULL) {
-		putnext(WR(q), espstack->esp_ip_unbind);
-		espstack->esp_ip_unbind = NULL;
-	}
 
 	/*
 	 * Clean up q_ptr, if needed.
@@ -691,45 +631,6 @@ ipsecesp_close(queue_t *q)
 		espstack->esp_pfkey_q = NULL;
 		/* Detach qtimeouts. */
 		(void) quntimeout(q, espstack->esp_event);
-	}
-
-	if (WR(q) == espstack->esp_sadb.s_ip_q) {
-		/*
-		 * If the esp_sadb.s_ip_q is attached to this instance, find
-		 * another.  The OCEXCL outer perimeter helps us here.
-		 */
-		espstack->esp_sadb.s_ip_q = NULL;
-
-		/*
-		 * Find a replacement queue for esp_sadb.s_ip_q.
-		 */
-		if (espstack->esp_pfkey_q != NULL &&
-		    espstack->esp_pfkey_q != RD(q)) {
-			/*
-			 * See if we can use the pfkey_q.
-			 */
-			espstack->esp_sadb.s_ip_q = WR(espstack->esp_pfkey_q);
-		}
-
-		if (espstack->esp_sadb.s_ip_q == NULL ||
-		    !sadb_t_bind_req(espstack->esp_sadb.s_ip_q, IPPROTO_ESP)) {
-			esp1dbg(espstack, ("ipsecesp: Can't reassign ip_q.\n"));
-			espstack->esp_sadb.s_ip_q = NULL;
-		} else {
-			espstack->esp_ip_unbind =
-			    allocb(sizeof (struct T_unbind_req), BPRI_HI);
-
-			if (espstack->esp_ip_unbind != NULL) {
-				struct T_unbind_req *tur;
-
-				espstack->esp_ip_unbind->b_datap->db_type =
-				    M_PROTO;
-				tur = (struct T_unbind_req *)
-				    espstack->esp_ip_unbind->b_rptr;
-				tur->PRIM_type = T_UNBIND_REQ;
-			}
-			/* If it's NULL, I can't do much here. */
-		}
 	}
 
 	netstack_rele(espstack->ipsecesp_netstack);
@@ -834,26 +735,27 @@ esp_age_bytes(ipsa_t *assoc, uint64_t bytes, boolean_t inbound)
 
 /*
  * Do incoming NAT-T manipulations for packet.
+ * Returns NULL if the mblk chain is consumed.
  */
-static ipsec_status_t
+static mblk_t *
 esp_fix_natt_checksums(mblk_t *data_mp, ipsa_t *assoc)
 {
 	ipha_t *ipha = (ipha_t *)data_mp->b_rptr;
-	tcpha_t *tcph;
+	tcpha_t *tcpha;
 	udpha_t *udpha;
 	/* Initialize to our inbound cksum adjustment... */
 	uint32_t sum = assoc->ipsa_inbound_cksum;
 
 	switch (ipha->ipha_protocol) {
 	case IPPROTO_TCP:
-		tcph = (tcpha_t *)(data_mp->b_rptr +
+		tcpha = (tcpha_t *)(data_mp->b_rptr +
 		    IPH_HDR_LENGTH(ipha));
 
 #define	DOWN_SUM(x) (x) = ((x) & 0xFFFF) +	 ((x) >> 16)
-		sum += ~ntohs(tcph->tha_sum) & 0xFFFF;
+		sum += ~ntohs(tcpha->tha_sum) & 0xFFFF;
 		DOWN_SUM(sum);
 		DOWN_SUM(sum);
-		tcph->tha_sum = ~htons(sum);
+		tcpha->tha_sum = ~htons(sum);
 		break;
 	case IPPROTO_UDP:
 		udpha = (udpha_t *)(data_mp->b_rptr + IPH_HDR_LENGTH(ipha));
@@ -876,7 +778,7 @@ esp_fix_natt_checksums(mblk_t *data_mp, ipsa_t *assoc)
 		 */
 		break;
 	}
-	return (IPSEC_STATUS_SUCCESS);
+	return (data_mp);
 }
 
 
@@ -968,10 +870,11 @@ esp_strip_header(mblk_t *data_mp, boolean_t isv4, uint32_t ivlen,
 		if (ip6h->ip6_nxt == IPPROTO_ESP) {
 			ip6h->ip6_nxt = nexthdr;
 		} else {
-			ip6_pkt_t ipp;
+			ip_pkt_t ipp;
 
 			bzero(&ipp, sizeof (ipp));
-			(void) ip_find_hdr_v6(data_mp, ip6h, &ipp, NULL);
+			(void) ip_find_hdr_v6(data_mp, ip6h, B_FALSE, &ipp,
+			    NULL);
 			if (ipp.ipp_dstopts != NULL) {
 				ipp.ipp_dstopts->ip6d_nxt = nexthdr;
 			} else if (ipp.ipp_rthdr != NULL) {
@@ -1227,16 +1130,14 @@ esp_set_usetime(ipsa_t *assoc, boolean_t inbound)
 /*
  * Handle ESP inbound data for IPv4 and IPv6.
  * On success returns B_TRUE, on failure returns B_FALSE and frees the
- * mblk chain ipsec_in_mp.
+ * mblk chain data_mp.
  */
-ipsec_status_t
-esp_inbound(mblk_t *ipsec_in_mp, void *arg)
+mblk_t *
+esp_inbound(mblk_t *data_mp, void *arg, ip_recv_attr_t *ira)
 {
-	mblk_t *data_mp = ipsec_in_mp->b_cont;
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_in_mp->b_rptr;
 	esph_t *esph = (esph_t *)arg;
-	ipsa_t *ipsa = ii->ipsec_in_esp_sa;
-	netstack_t	*ns = ii->ipsec_in_ns;
+	ipsa_t *ipsa = ira->ira_ipsec_esp_sa;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
@@ -1254,36 +1155,18 @@ esp_inbound(mblk_t *ipsec_in_mp, void *arg)
 	if (!sadb_replay_peek(ipsa, esph->esph_replay)) {
 		ESP_BUMP_STAT(espstack, replay_early_failures);
 		IP_ESP_BUMP_STAT(ipss, in_discards);
-		/*
-		 * TODO: Extract inbound interface from the IPSEC_IN
-		 * message's ii->ipsec_in_rill_index.
-		 */
-		ip_drop_packet(ipsec_in_mp, B_TRUE, NULL, NULL,
+		ip_drop_packet(data_mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_esp_early_replay),
 		    &espstack->esp_dropper);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+		return (NULL);
 	}
-
-	/*
-	 * Has this packet already been processed by a hardware
-	 * IPsec accelerator?
-	 */
-	if (ii->ipsec_in_accelerated) {
-		ipsec_status_t rv;
-		esp3dbg(espstack,
-		    ("esp_inbound: pkt processed by ill=%d isv6=%d\n",
-		    ii->ipsec_in_ill_index, !ii->ipsec_in_v4));
-		rv = esp_inbound_accelerated(ipsec_in_mp,
-		    data_mp, ii->ipsec_in_v4, ipsa);
-		return (rv);
-	}
-	ESP_BUMP_STAT(espstack, noaccel);
 
 	/*
 	 * Adjust the IP header's payload length to reflect the removal
 	 * of the ICV.
 	 */
-	if (!ii->ipsec_in_v4) {
+	if (!(ira->ira_flags & IRAF_IS_IPV4)) {
 		ip6_t *ip6h = (ip6_t *)data_mp->b_rptr;
 		ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) -
 		    ipsa->ipsa_mac_len);
@@ -1294,7 +1177,7 @@ esp_inbound(mblk_t *ipsec_in_mp, void *arg)
 	}
 
 	/* submit the request to the crypto framework */
-	return (esp_submit_req_inbound(ipsec_in_mp, ipsa,
+	return (esp_submit_req_inbound(data_mp, ira, ipsa,
 	    (uint8_t *)esph - data_mp->b_rptr));
 }
 
@@ -1303,21 +1186,15 @@ esp_inbound(mblk_t *ipsec_in_mp, void *arg)
  * Called while holding the algorithm lock.
  */
 static void
-esp_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs)
+esp_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs,
+    netstack_t *ns)
 {
 	sadb_comb_t *comb = (sadb_comb_t *)(prop + 1);
-	ipsec_out_t *io;
 	ipsec_action_t *ap;
 	ipsec_prot_t *prot;
-	netstack_t *ns;
-	ipsecesp_stack_t *espstack;
-	ipsec_stack_t *ipss;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	io = (ipsec_out_t *)acqrec->ipsacq_mp->b_rptr;
-	ASSERT(io->ipsec_out_type == IPSEC_OUT);
-	ns = io->ipsec_out_ns;
-	espstack = ns->netstack_ipsecesp;
-	ipss = ns->netstack_ipsec;
 	ASSERT(MUTEX_HELD(&ipss->ipsec_alg_lock));
 
 	prop->sadb_prop_exttype = SADB_EXT_PROPOSAL;
@@ -1327,9 +1204,10 @@ esp_insert_prop(sadb_prop_t *prop, ipsacq_t *acqrec, uint_t combs)
 	prop->sadb_prop_replay = espstack->ipsecesp_replay_size;
 
 	/*
-	 * Based upon algorithm properties, and what-not, prioritize
-	 * a proposal.  If the IPSEC_OUT message has an algorithm specified,
-	 * use it first and foremost.
+	 * Based upon algorithm properties, and what-not, prioritize a
+	 * proposal, based on the ordering of the ESP algorithms in the
+	 * alternatives in the policy rule or socket that was placed
+	 * in the acquire record.
 	 *
 	 * For each action in policy list
 	 *   Add combination.  If I've hit limit, return.
@@ -1456,7 +1334,7 @@ esp_send_acquire(ipsacq_t *acqrec, mblk_t *extended, netstack_t *ns)
 	/* Insert proposal here. */
 
 	prop = (sadb_prop_t *)(((uint64_t *)samsg) + samsg->sadb_msg_len);
-	esp_insert_prop(prop, acqrec, combs);
+	esp_insert_prop(prop, acqrec, combs, ns);
 	samsg->sadb_msg_len += prop->sadb_prop_len;
 	msgmp->b_wptr += SADB_64TO8(samsg->sadb_msg_len);
 
@@ -1756,13 +1634,11 @@ esp_port_freshness(uint32_t ports, ipsa_t *assoc)
  * If authentication was performed on the packet, this function is called
  * only if the authentication succeeded.
  * On success returns B_TRUE, on failure returns B_FALSE and frees the
- * mblk chain ipsec_in_mp.
+ * mblk chain data_mp.
  */
-static ipsec_status_t
-esp_in_done(mblk_t *ipsec_in_mp)
+static mblk_t *
+esp_in_done(mblk_t *data_mp, ip_recv_attr_t *ira, ipsec_crypto_t *ic)
 {
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_in_mp->b_rptr;
-	mblk_t *data_mp;
 	ipsa_t *assoc;
 	uint_t espstart;
 	uint32_t ivlen = 0;
@@ -1770,11 +1646,11 @@ esp_in_done(mblk_t *ipsec_in_mp)
 	esph_t *esph;
 	kstat_named_t *counter;
 	boolean_t is_natt;
-	netstack_t	*ns = ii->ipsec_in_ns;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
-	assoc = ii->ipsec_in_esp_sa;
+	assoc = ira->ira_ipsec_esp_sa;
 	ASSERT(assoc != NULL);
 
 	is_natt = ((assoc->ipsa_flags & IPSA_F_NATT) != 0);
@@ -1782,26 +1658,25 @@ esp_in_done(mblk_t *ipsec_in_mp)
 	/* get the pointer to the ESP header */
 	if (assoc->ipsa_encr_alg == SADB_EALG_NULL) {
 		/* authentication-only ESP */
-		espstart = ii->ipsec_in_crypto_data.cd_offset;
-		processed_len = ii->ipsec_in_crypto_data.cd_length;
+		espstart = ic->ic_crypto_data.cd_offset;
+		processed_len = ic->ic_crypto_data.cd_length;
 	} else {
 		/* encryption present */
 		ivlen = assoc->ipsa_iv_len;
 		if (assoc->ipsa_auth_alg == SADB_AALG_NONE) {
 			/* encryption-only ESP */
-			espstart = ii->ipsec_in_crypto_data.cd_offset -
+			espstart = ic->ic_crypto_data.cd_offset -
 			    sizeof (esph_t) - assoc->ipsa_iv_len;
-			processed_len = ii->ipsec_in_crypto_data.cd_length +
+			processed_len = ic->ic_crypto_data.cd_length +
 			    ivlen;
 		} else {
 			/* encryption with authentication */
-			espstart = ii->ipsec_in_crypto_dual_data.dd_offset1;
-			processed_len = ii->ipsec_in_crypto_dual_data.dd_len2 +
+			espstart = ic->ic_crypto_dual_data.dd_offset1;
+			processed_len = ic->ic_crypto_dual_data.dd_len2 +
 			    ivlen;
 		}
 	}
 
-	data_mp = ipsec_in_mp->b_cont;
 	esph = (esph_t *)(data_mp->b_rptr + espstart);
 
 	if (assoc->ipsa_auth_alg != IPSA_AALG_NONE ||
@@ -1840,8 +1715,11 @@ esp_in_done(mblk_t *ipsec_in_mp)
 			goto drop_and_bail;
 		}
 
-		if (is_natt)
-			esp_port_freshness(ii->ipsec_in_esp_udp_ports, assoc);
+		if (is_natt) {
+			ASSERT(ira->ira_flags & IRAF_ESP_UDP_PORTS);
+			ASSERT(ira->ira_esp_udp_ports != 0);
+			esp_port_freshness(ira->ira_esp_udp_ports, assoc);
+		}
 	}
 
 	esp_set_usetime(assoc, B_TRUE);
@@ -1863,44 +1741,41 @@ esp_in_done(mblk_t *ipsec_in_mp)
 	 * spews "branch, predict taken" code for this.
 	 */
 
-	if (esp_strip_header(data_mp, ii->ipsec_in_v4, ivlen, &counter,
-	    espstack)) {
+	if (esp_strip_header(data_mp, (ira->ira_flags & IRAF_IS_IPV4),
+	    ivlen, &counter, espstack)) {
 
-		if (is_system_labeled()) {
-			cred_t *cr = assoc->ipsa_cred;
-
-			if (cr != NULL) {
-				mblk_setcred(data_mp, cr, NOPID);
+		if (is_system_labeled() && assoc->ipsa_tsl != NULL) {
+			if (!ip_recv_attr_replace_label(ira, assoc->ipsa_tsl)) {
+				ip_drop_packet(data_mp, B_TRUE, ira->ira_ill,
+				    DROPPER(ipss, ipds_ah_nomem),
+				    &espstack->esp_dropper);
+				BUMP_MIB(ira->ira_ill->ill_ip_mib,
+				    ipIfStatsInDiscards);
+				return (NULL);
 			}
-
 		}
 		if (is_natt)
 			return (esp_fix_natt_checksums(data_mp, assoc));
-
-		ASSERT(!is_system_labeled() || (DB_CRED(data_mp) != NULL));
 
 		if (assoc->ipsa_state == IPSA_STATE_IDLE) {
 			/*
 			 * Cluster buffering case.  Tell caller that we're
 			 * handling the packet.
 			 */
-			sadb_buf_pkt(assoc, ipsec_in_mp, ns);
-			return (IPSEC_STATUS_PENDING);
+			sadb_buf_pkt(assoc, data_mp, ira);
+			return (NULL);
 		}
 
-		return (IPSEC_STATUS_SUCCESS);
+		return (data_mp);
 	}
 
 	esp1dbg(espstack, ("esp_in_done: esp_strip_header() failed\n"));
 drop_and_bail:
 	IP_ESP_BUMP_STAT(ipss, in_discards);
-	/*
-	 * TODO: Extract inbound interface from the IPSEC_IN message's
-	 * ii->ipsec_in_rill_index.
-	 */
-	ip_drop_packet(ipsec_in_mp, B_TRUE, NULL, NULL, counter,
+	ip_drop_packet(data_mp, B_TRUE, ira->ira_ill, counter,
 	    &espstack->esp_dropper);
-	return (IPSEC_STATUS_FAILED);
+	BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+	return (NULL);
 }
 
 /*
@@ -1908,11 +1783,10 @@ drop_and_bail:
  * argument is freed.
  */
 static void
-esp_log_bad_auth(mblk_t *ipsec_in)
+esp_log_bad_auth(mblk_t *mp, ip_recv_attr_t *ira)
 {
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_in->b_rptr;
-	ipsa_t *assoc = ii->ipsec_in_esp_sa;
-	netstack_t	*ns = ii->ipsec_in_ns;
+	ipsa_t		*assoc = ira->ira_ipsec_esp_sa;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
@@ -1928,11 +1802,7 @@ esp_log_bad_auth(mblk_t *ipsec_in)
 	    espstack->ipsecesp_netstack);
 
 	IP_ESP_BUMP_STAT(ipss, in_discards);
-	/*
-	 * TODO: Extract inbound interface from the IPSEC_IN
-	 * message's ii->ipsec_in_rill_index.
-	 */
-	ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL,
+	ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 	    DROPPER(ipss, ipds_esp_bad_auth),
 	    &espstack->esp_dropper);
 }
@@ -1944,148 +1814,205 @@ esp_log_bad_auth(mblk_t *ipsec_in)
  * Returns B_TRUE if the AH processing was not needed or if it was
  * performed successfully. Returns B_FALSE and consumes the passed mblk
  * if AH processing was required but could not be performed.
+ *
+ * Returns data_mp unless data_mp was consumed/queued.
  */
-static boolean_t
-esp_do_outbound_ah(mblk_t *ipsec_mp)
+static mblk_t *
+esp_do_outbound_ah(mblk_t *data_mp, ip_xmit_attr_t *ixa)
 {
-	ipsec_out_t *io = (ipsec_out_t *)ipsec_mp->b_rptr;
-	ipsec_status_t ipsec_rc;
 	ipsec_action_t *ap;
 
-	ap = io->ipsec_out_act;
+	ap = ixa->ixa_ipsec_action;
 	if (ap == NULL) {
-		ipsec_policy_t *pp = io->ipsec_out_policy;
+		ipsec_policy_t *pp = ixa->ixa_ipsec_policy;
 		ap = pp->ipsp_act;
 	}
 
 	if (!ap->ipa_want_ah)
-		return (B_TRUE);
+		return (data_mp);
 
-	ASSERT(io->ipsec_out_ah_done == B_FALSE);
-
-	if (io->ipsec_out_ah_sa == NULL) {
-		if (!ipsec_outbound_sa(ipsec_mp, IPPROTO_AH)) {
-			sadb_acquire(ipsec_mp, io, B_TRUE, B_FALSE);
-			return (B_FALSE);
+	/*
+	 * Normally the AH SA would have already been put in place
+	 * but it could have been flushed so we need to look for it.
+	 */
+	if (ixa->ixa_ipsec_ah_sa == NULL) {
+		if (!ipsec_outbound_sa(data_mp, ixa, IPPROTO_AH)) {
+			sadb_acquire(data_mp, ixa, B_TRUE, B_FALSE);
+			return (NULL);
 		}
 	}
-	ASSERT(io->ipsec_out_ah_sa != NULL);
+	ASSERT(ixa->ixa_ipsec_ah_sa != NULL);
 
-	io->ipsec_out_ah_done = B_TRUE;
-	ipsec_rc = io->ipsec_out_ah_sa->ipsa_output_func(ipsec_mp);
-	return (ipsec_rc == IPSEC_STATUS_SUCCESS);
+	data_mp = ixa->ixa_ipsec_ah_sa->ipsa_output_func(data_mp, ixa);
+	return (data_mp);
 }
 
 
 /*
  * Kernel crypto framework callback invoked after completion of async
- * crypto requests.
+ * crypto requests for outbound packets.
  */
 static void
-esp_kcf_callback(void *arg, int status)
+esp_kcf_callback_outbound(void *arg, int status)
 {
-	mblk_t *ipsec_mp = (mblk_t *)arg;
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-	ipsec_out_t *io = (ipsec_out_t *)ipsec_mp->b_rptr;
-	boolean_t is_inbound = (ii->ipsec_in_type == IPSEC_IN);
-	netstackid_t	stackid;
-	netstack_t	*ns, *ns_arg;
-	ipsecesp_stack_t *espstack;
+	mblk_t		*mp = (mblk_t *)arg;
+	mblk_t		*async_mp;
+	netstack_t	*ns;
 	ipsec_stack_t	*ipss;
-
-	ASSERT(ipsec_mp->b_cont != NULL);
-
-	if (is_inbound) {
-		stackid = ii->ipsec_in_stackid;
-		ns_arg = ii->ipsec_in_ns;
-	} else {
-		stackid = io->ipsec_out_stackid;
-		ns_arg = io->ipsec_out_ns;
-	}
+	ipsecesp_stack_t *espstack;
+	mblk_t		*data_mp;
+	ip_xmit_attr_t	ixas;
+	ipsec_crypto_t	*ic;
+	ill_t		*ill;
 
 	/*
-	 * Verify that the netstack is still around; could have vanished
-	 * while kEf was doing its work.
+	 * First remove the ipsec_crypto_t mblk
+	 * Note that we need to ipsec_free_crypto_data(mp) once done with ic.
 	 */
-	ns = netstack_find_by_stackid(stackid);
-	if (ns == NULL || ns != ns_arg) {
-		/* Disappeared on us */
-		if (ns != NULL)
-			netstack_rele(ns);
-		freemsg(ipsec_mp);
-		return;
+	async_mp = ipsec_remove_crypto_data(mp, &ic);
+	ASSERT(async_mp != NULL);
+
+	/*
+	 * Extract the ip_xmit_attr_t from the first mblk.
+	 * Verifies that the netstack and ill is still around; could
+	 * have vanished while kEf was doing its work.
+	 * On succesful return we have a nce_t and the ill/ipst can't
+	 * disappear until we do the nce_refrele in ixa_cleanup.
+	 */
+	data_mp = async_mp->b_cont;
+	async_mp->b_cont = NULL;
+	if (!ip_xmit_attr_from_mblk(async_mp, &ixas)) {
+		/* Disappeared on us - no ill/ipst for MIB */
+		/* We have nowhere to do stats since ixa_ipst could be NULL */
+		if (ixas.ixa_nce != NULL) {
+			ill = ixas.ixa_nce->nce_ill;
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			ip_drop_output("ipIfStatsOutDiscards", data_mp, ill);
+		}
+		freemsg(data_mp);
+		goto done;
+	}
+	ns = ixas.ixa_ipst->ips_netstack;
+	espstack = ns->netstack_ipsecesp;
+	ipss = ns->netstack_ipsec;
+	ill = ixas.ixa_nce->nce_ill;
+
+	if (status == CRYPTO_SUCCESS) {
+		/*
+		 * If a ICV was computed, it was stored by the
+		 * crypto framework at the end of the packet.
+		 */
+		ipha_t *ipha = (ipha_t *)data_mp->b_rptr;
+
+		esp_set_usetime(ixas.ixa_ipsec_esp_sa, B_FALSE);
+		/* NAT-T packet. */
+		if (IPH_HDR_VERSION(ipha) == IP_VERSION &&
+		    ipha->ipha_protocol == IPPROTO_UDP)
+			esp_prepare_udp(ns, data_mp, ipha);
+
+		/* do AH processing if needed */
+		data_mp = esp_do_outbound_ah(data_mp, &ixas);
+		if (data_mp == NULL)
+			goto done;
+
+		(void) ip_output_post_ipsec(data_mp, &ixas);
+	} else {
+		/* Outbound shouldn't see invalid MAC */
+		ASSERT(status != CRYPTO_INVALID_MAC);
+
+		esp1dbg(espstack,
+		    ("esp_kcf_callback_outbound: crypto failed with 0x%x\n",
+		    status));
+		ESP_BUMP_STAT(espstack, crypto_failures);
+		ESP_BUMP_STAT(espstack, out_discards);
+		ip_drop_packet(data_mp, B_FALSE, ill,
+		    DROPPER(ipss, ipds_esp_crypto_failed),
+		    &espstack->esp_dropper);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+	}
+done:
+	ixa_cleanup(&ixas);
+	(void) ipsec_free_crypto_data(mp);
+}
+
+/*
+ * Kernel crypto framework callback invoked after completion of async
+ * crypto requests for inbound packets.
+ */
+static void
+esp_kcf_callback_inbound(void *arg, int status)
+{
+	mblk_t		*mp = (mblk_t *)arg;
+	mblk_t		*async_mp;
+	netstack_t	*ns;
+	ipsecesp_stack_t *espstack;
+	ipsec_stack_t	*ipss;
+	mblk_t		*data_mp;
+	ip_recv_attr_t	iras;
+	ipsec_crypto_t	*ic;
+
+	/*
+	 * First remove the ipsec_crypto_t mblk
+	 * Note that we need to ipsec_free_crypto_data(mp) once done with ic.
+	 */
+	async_mp = ipsec_remove_crypto_data(mp, &ic);
+	ASSERT(async_mp != NULL);
+
+	/*
+	 * Extract the ip_recv_attr_t from the first mblk.
+	 * Verifies that the netstack and ill is still around; could
+	 * have vanished while kEf was doing its work.
+	 */
+	data_mp = async_mp->b_cont;
+	async_mp->b_cont = NULL;
+	if (!ip_recv_attr_from_mblk(async_mp, &iras)) {
+		/* The ill or ip_stack_t disappeared on us */
+		ip_drop_input("ip_recv_attr_from_mblk", data_mp, NULL);
+		freemsg(data_mp);
+		goto done;
 	}
 
+	ns = iras.ira_ill->ill_ipst->ips_netstack;
 	espstack = ns->netstack_ipsecesp;
 	ipss = ns->netstack_ipsec;
 
 	if (status == CRYPTO_SUCCESS) {
-		if (is_inbound) {
-			if (esp_in_done(ipsec_mp) != IPSEC_STATUS_SUCCESS) {
-				netstack_rele(ns);
-				return;
-			}
-			/* finish IPsec processing */
-			ip_fanout_proto_again(ipsec_mp, NULL, NULL, NULL);
-		} else {
-			/*
-			 * If a ICV was computed, it was stored by the
-			 * crypto framework at the end of the packet.
-			 */
-			ipha_t *ipha = (ipha_t *)ipsec_mp->b_cont->b_rptr;
+		data_mp = esp_in_done(data_mp, &iras, ic);
+		if (data_mp == NULL)
+			goto done;
 
-			esp_set_usetime(io->ipsec_out_esp_sa, B_FALSE);
-			/* NAT-T packet. */
-			if (ipha->ipha_protocol == IPPROTO_UDP)
-				esp_prepare_udp(ns, ipsec_mp->b_cont, ipha);
-
-			/* do AH processing if needed */
-			if (!esp_do_outbound_ah(ipsec_mp)) {
-				netstack_rele(ns);
-				return;
-			}
-			/* finish IPsec processing */
-			if (IPH_HDR_VERSION(ipha) == IP_VERSION) {
-				ip_wput_ipsec_out(NULL, ipsec_mp, ipha, NULL,
-				    NULL);
-			} else {
-				ip6_t *ip6h = (ip6_t *)ipha;
-				ip_wput_ipsec_out_v6(NULL, ipsec_mp, ip6h,
-				    NULL, NULL);
-			}
-		}
-
+		/* finish IPsec processing */
+		ip_input_post_ipsec(data_mp, &iras);
 	} else if (status == CRYPTO_INVALID_MAC) {
-		esp_log_bad_auth(ipsec_mp);
-
+		esp_log_bad_auth(data_mp, &iras);
 	} else {
 		esp1dbg(espstack,
 		    ("esp_kcf_callback: crypto failed with 0x%x\n",
 		    status));
 		ESP_BUMP_STAT(espstack, crypto_failures);
-		if (is_inbound)
-			IP_ESP_BUMP_STAT(ipss, in_discards);
-		else
-			ESP_BUMP_STAT(espstack, out_discards);
-		ip_drop_packet(ipsec_mp, is_inbound, NULL, NULL,
+		IP_ESP_BUMP_STAT(ipss, in_discards);
+		ip_drop_packet(data_mp, B_TRUE, iras.ira_ill,
 		    DROPPER(ipss, ipds_esp_crypto_failed),
 		    &espstack->esp_dropper);
+		BUMP_MIB(iras.ira_ill->ill_ip_mib, ipIfStatsInDiscards);
 	}
-	netstack_rele(ns);
+done:
+	ira_cleanup(&iras, B_TRUE);
+	(void) ipsec_free_crypto_data(mp);
 }
 
 /*
  * Invoked on crypto framework failure during inbound and outbound processing.
  */
 static void
-esp_crypto_failed(mblk_t *mp, boolean_t is_inbound, int kef_rc,
-    ipsecesp_stack_t *espstack)
+esp_crypto_failed(mblk_t *data_mp, boolean_t is_inbound, int kef_rc,
+    ill_t *ill, ipsecesp_stack_t *espstack)
 {
 	ipsec_stack_t	*ipss = espstack->ipsecesp_netstack->netstack_ipsec;
 
 	esp1dbg(espstack, ("crypto failed for %s ESP with 0x%x\n",
 	    is_inbound ? "inbound" : "outbound", kef_rc));
-	ip_drop_packet(mp, is_inbound, NULL, NULL,
+	ip_drop_packet(data_mp, is_inbound, ill,
 	    DROPPER(ipss, ipds_esp_crypto_failed),
 	    &espstack->esp_dropper);
 	ESP_BUMP_STAT(espstack, crypto_failures);
@@ -2095,11 +2022,14 @@ esp_crypto_failed(mblk_t *mp, boolean_t is_inbound, int kef_rc,
 		ESP_BUMP_STAT(espstack, out_discards);
 }
 
-#define	ESP_INIT_CALLREQ(_cr) {						\
-	(_cr)->cr_flag = CRYPTO_SKIP_REQID|CRYPTO_RESTRICTED;		\
-	(_cr)->cr_callback_arg = ipsec_mp;				\
-	(_cr)->cr_callback_func = esp_kcf_callback;			\
-}
+/*
+ * A statement-equivalent macro, _cr MUST point to a modifiable
+ * crypto_call_req_t.
+ */
+#define	ESP_INIT_CALLREQ(_cr, _mp, _callback)				\
+	(_cr)->cr_flag = CRYPTO_SKIP_REQID|CRYPTO_ALWAYS_QUEUE;	\
+	(_cr)->cr_callback_arg = (_mp);				\
+	(_cr)->cr_callback_func = (_callback)
 
 #define	ESP_INIT_CRYPTO_MAC(mac, icvlen, icvbuf) {			\
 	(mac)->cd_format = CRYPTO_DATA_RAW;				\
@@ -2132,44 +2062,45 @@ esp_crypto_failed(mblk_t *mp, boolean_t is_inbound, int kef_rc,
 	(data)->dd_offset2 = off2;					\
 }
 
-static ipsec_status_t
-esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
+/*
+ * Returns data_mp if successfully completed the request. Returns
+ * NULL if it failed (and increments InDiscards) or if it is pending.
+ */
+static mblk_t *
+esp_submit_req_inbound(mblk_t *esp_mp, ip_recv_attr_t *ira,
+    ipsa_t *assoc, uint_t esph_offset)
 {
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-	boolean_t do_auth;
 	uint_t auth_offset, msg_len, auth_len;
-	crypto_call_req_t call_req;
-	mblk_t *esp_mp;
+	crypto_call_req_t call_req, *callrp;
+	mblk_t *mp;
 	esph_t *esph_ptr;
-	int kef_rc = CRYPTO_FAILED;
+	int kef_rc;
 	uint_t icv_len = assoc->ipsa_mac_len;
 	crypto_ctx_template_t auth_ctx_tmpl;
-	boolean_t do_encr;
+	boolean_t do_auth, do_encr, force;
 	uint_t encr_offset, encr_len;
 	uint_t iv_len = assoc->ipsa_iv_len;
 	crypto_ctx_template_t encr_ctx_tmpl;
-	netstack_t	*ns = ii->ipsec_in_ns;
-	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ipsec_crypto_t	*ic, icstack;
 	uchar_t *iv_ptr;
-
-	ASSERT(ii->ipsec_in_type == IPSEC_IN);
-
-	/*
-	 * In case kEF queues and calls back, keep netstackid_t for
-	 * verification that the IP instance is still around in
-	 * esp_kcf_callback().
-	 */
-	ASSERT(ii->ipsec_in_stackid == ns->netstack_stackid);
+	netstack_t *ns = ira->ira_ill->ill_ipst->ips_netstack;
+	ipsec_stack_t *ipss = ns->netstack_ipsec;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 
 	do_auth = assoc->ipsa_auth_alg != SADB_AALG_NONE;
 	do_encr = assoc->ipsa_encr_alg != SADB_EALG_NULL;
+	force = (assoc->ipsa_flags & IPSA_F_ASYNC);
+
+#ifdef IPSEC_LATENCY_TEST
+	kef_rc = CRYPTO_SUCCESS;
+#else
+	kef_rc = CRYPTO_FAILED;
+#endif
 
 	/*
 	 * An inbound packet is of the form:
-	 * IPSEC_IN -> [IP,options,ESP,IV,data,ICV,pad]
+	 * [IP,options,ESP,IV,data,ICV,pad]
 	 */
-	esp_mp = ipsec_mp->b_cont;
 	esph_ptr = (esph_t *)(esp_mp->b_rptr + esph_offset);
 	iv_ptr = (uchar_t *)(esph_ptr + 1);
 	/* Packet length starting at IP header ending after ESP ICV. */
@@ -2178,8 +2109,6 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 	encr_offset = esph_offset + sizeof (esph_t) + iv_len;
 	encr_len = msg_len - encr_offset;
 
-	ESP_INIT_CALLREQ(&call_req);
-
 	/*
 	 * Counter mode algs need a nonce. This is setup in sadb_common_add().
 	 * If for some reason we are using a SA which does not have a nonce
@@ -2187,23 +2116,40 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 	 */
 	if ((assoc->ipsa_flags & IPSA_F_COUNTERMODE) &&
 	    (assoc->ipsa_nonce == NULL)) {
-		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
+		ip_drop_packet(esp_mp, B_TRUE, ira->ira_ill,
 		    DROPPER(ipss, ipds_esp_nomem), &espstack->esp_dropper);
-		return (IPSEC_STATUS_FAILED);
+		return (NULL);
+	}
+
+	if (force) {
+		/* We are doing asynch; allocate mblks to hold state */
+		if ((mp = ip_recv_attr_to_mblk(ira)) == NULL ||
+		    (mp = ipsec_add_crypto_data(mp, &ic)) == NULL) {
+			BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+			ip_drop_input("ipIfStatsInDiscards", esp_mp,
+			    ira->ira_ill);
+			return (NULL);
+		}
+		linkb(mp, esp_mp);
+		callrp = &call_req;
+		ESP_INIT_CALLREQ(callrp, mp, esp_kcf_callback_inbound);
+	} else {
+		/*
+		 * If we know we are going to do sync then ipsec_crypto_t
+		 * should be on the stack.
+		 */
+		ic = &icstack;
+		bzero(ic, sizeof (*ic));
+		callrp = NULL;
 	}
 
 	if (do_auth) {
-		/* force asynchronous processing? */
-		if (ipss->ipsec_algs_exec_mode[IPSEC_ALG_AUTH] ==
-		    IPSEC_ALGS_EXEC_ASYNC)
-			call_req.cr_flag |= CRYPTO_ALWAYS_QUEUE;
-
 		/* authentication context template */
 		IPSEC_CTX_TMPL(assoc, ipsa_authtmpl, IPSEC_ALG_AUTH,
 		    auth_ctx_tmpl);
 
 		/* ICV to be verified */
-		ESP_INIT_CRYPTO_MAC(&ii->ipsec_in_crypto_mac,
+		ESP_INIT_CRYPTO_MAC(&ic->ic_crypto_mac,
 		    icv_len, esp_mp->b_wptr - icv_len);
 
 		/* authentication starts at the ESP header */
@@ -2212,79 +2158,90 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 		if (!do_encr) {
 			/* authentication only */
 			/* initialize input data argument */
-			ESP_INIT_CRYPTO_DATA(&ii->ipsec_in_crypto_data,
+			ESP_INIT_CRYPTO_DATA(&ic->ic_crypto_data,
 			    esp_mp, auth_offset, auth_len);
 
 			/* call the crypto framework */
 			kef_rc = crypto_mac_verify(&assoc->ipsa_amech,
-			    &ii->ipsec_in_crypto_data,
+			    &ic->ic_crypto_data,
 			    &assoc->ipsa_kcfauthkey, auth_ctx_tmpl,
-			    &ii->ipsec_in_crypto_mac, &call_req);
+			    &ic->ic_crypto_mac, callrp);
 		}
 	}
 
 	if (do_encr) {
-		/* force asynchronous processing? */
-		if (ipss->ipsec_algs_exec_mode[IPSEC_ALG_ENCR] ==
-		    IPSEC_ALGS_EXEC_ASYNC)
-			call_req.cr_flag |= CRYPTO_ALWAYS_QUEUE;
-
 		/* encryption template */
 		IPSEC_CTX_TMPL(assoc, ipsa_encrtmpl, IPSEC_ALG_ENCR,
 		    encr_ctx_tmpl);
 
 		/* Call the nonce update function. Also passes in IV */
 		(assoc->ipsa_noncefunc)(assoc, (uchar_t *)esph_ptr, encr_len,
-		    iv_ptr, &ii->ipsec_in_cmm, &ii->ipsec_in_crypto_data);
+		    iv_ptr, &ic->ic_cmm, &ic->ic_crypto_data);
 
 		if (!do_auth) {
 			/* decryption only */
 			/* initialize input data argument */
-			ESP_INIT_CRYPTO_DATA(&ii->ipsec_in_crypto_data,
+			ESP_INIT_CRYPTO_DATA(&ic->ic_crypto_data,
 			    esp_mp, encr_offset, encr_len);
 
 			/* call the crypto framework */
 			kef_rc = crypto_decrypt((crypto_mechanism_t *)
-			    &ii->ipsec_in_cmm, &ii->ipsec_in_crypto_data,
+			    &ic->ic_cmm, &ic->ic_crypto_data,
 			    &assoc->ipsa_kcfencrkey, encr_ctx_tmpl,
-			    NULL, &call_req);
+			    NULL, callrp);
 		}
 	}
 
 	if (do_auth && do_encr) {
 		/* dual operation */
 		/* initialize input data argument */
-		ESP_INIT_CRYPTO_DUAL_DATA(&ii->ipsec_in_crypto_dual_data,
+		ESP_INIT_CRYPTO_DUAL_DATA(&ic->ic_crypto_dual_data,
 		    esp_mp, auth_offset, auth_len,
 		    encr_offset, encr_len - icv_len);
 
 		/* specify IV */
-		ii->ipsec_in_crypto_dual_data.dd_miscdata = (char *)iv_ptr;
+		ic->ic_crypto_dual_data.dd_miscdata = (char *)iv_ptr;
 
 		/* call the framework */
 		kef_rc = crypto_mac_verify_decrypt(&assoc->ipsa_amech,
-		    &assoc->ipsa_emech, &ii->ipsec_in_crypto_dual_data,
+		    &assoc->ipsa_emech, &ic->ic_crypto_dual_data,
 		    &assoc->ipsa_kcfauthkey, &assoc->ipsa_kcfencrkey,
-		    auth_ctx_tmpl, encr_ctx_tmpl, &ii->ipsec_in_crypto_mac,
-		    NULL, &call_req);
+		    auth_ctx_tmpl, encr_ctx_tmpl, &ic->ic_crypto_mac,
+		    NULL, callrp);
 	}
 
 	switch (kef_rc) {
 	case CRYPTO_SUCCESS:
 		ESP_BUMP_STAT(espstack, crypto_sync);
-		return (esp_in_done(ipsec_mp));
+		esp_mp = esp_in_done(esp_mp, ira, ic);
+		if (force) {
+			/* Free mp after we are done with ic */
+			mp = ipsec_free_crypto_data(mp);
+			(void) ip_recv_attr_free_mblk(mp);
+		}
+		return (esp_mp);
 	case CRYPTO_QUEUED:
-		/* esp_kcf_callback() will be invoked on completion */
+		/* esp_kcf_callback_inbound() will be invoked on completion */
 		ESP_BUMP_STAT(espstack, crypto_async);
-		return (IPSEC_STATUS_PENDING);
+		return (NULL);
 	case CRYPTO_INVALID_MAC:
+		if (force) {
+			mp = ipsec_free_crypto_data(mp);
+			esp_mp = ip_recv_attr_free_mblk(mp);
+		}
 		ESP_BUMP_STAT(espstack, crypto_sync);
-		esp_log_bad_auth(ipsec_mp);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+		esp_log_bad_auth(esp_mp, ira);
+		/* esp_mp was passed to ip_drop_packet */
+		return (NULL);
 	}
 
-	esp_crypto_failed(ipsec_mp, B_TRUE, kef_rc, espstack);
-	return (IPSEC_STATUS_FAILED);
+	mp = ipsec_free_crypto_data(mp);
+	esp_mp = ip_recv_attr_free_mblk(mp);
+	BUMP_MIB(ira->ira_ill->ill_ip_mib, ipIfStatsInDiscards);
+	esp_crypto_failed(esp_mp, B_TRUE, kef_rc, ira->ira_ill, espstack);
+	/* esp_mp was passed to ip_drop_packet */
+	return (NULL);
 }
 
 /*
@@ -2293,6 +2250,9 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
  * uses mblk-insertion to insert the UDP header.
  * TODO - If there is an easy way to prep a packet for HW checksums, make
  * it happen here.
+ * Note that this is used before both before calling ip_output_simple and
+ * in the esp datapath. The former could use IXAF_SET_ULP_CKSUM but not the
+ * latter.
  */
 static void
 esp_prepare_udp(netstack_t *ns, mblk_t *mp, ipha_t *ipha)
@@ -2313,7 +2273,7 @@ esp_prepare_udp(netstack_t *ns, mblk_t *mp, ipha_t *ipha)
 		/* arr points to the IP header. */
 		arr = (uint16_t *)ipha;
 		IP_STAT(ns->netstack_ip, ip_out_sw_cksum);
-		IP_STAT_UPDATE(ns->netstack_ip, ip_udp_out_sw_cksum_bytes,
+		IP_STAT_UPDATE(ns->netstack_ip, ip_out_sw_cksum_bytes,
 		    ntohs(htons(ipha->ipha_length) - hlen));
 		/* arr[6-9] are the IP addresses. */
 		cksum = IP_UDP_CSUM_COMP + arr[6] + arr[7] + arr[8] + arr[9] +
@@ -2336,41 +2296,45 @@ esp_prepare_udp(netstack_t *ns, mblk_t *mp, ipha_t *ipha)
 static void
 actually_send_keepalive(void *arg)
 {
-	mblk_t *ipsec_mp = (mblk_t *)arg;
-	ipsec_out_t *io = (ipsec_out_t *)ipsec_mp->b_rptr;
-	ipha_t *ipha;
-	netstack_t *ns;
+	mblk_t *mp = (mblk_t *)arg;
+	ip_xmit_attr_t ixas;
+	netstack_t	*ns;
+	netstackid_t	stackid;
 
-	ASSERT(DB_TYPE(ipsec_mp) == M_CTL);
-	ASSERT(io->ipsec_out_type == IPSEC_OUT);
-	ASSERT(ipsec_mp->b_cont != NULL);
-	ASSERT(DB_TYPE(ipsec_mp->b_cont) == M_DATA);
-
-	ns = netstack_find_by_stackid(io->ipsec_out_stackid);
-	if (ns == NULL || ns != io->ipsec_out_ns) {
-		/* Just freemsg(). */
-		if (ns != NULL)
-			netstack_rele(ns);
-		freemsg(ipsec_mp);
+	stackid = (netstackid_t)(uintptr_t)mp->b_prev;
+	mp->b_prev = NULL;
+	ns = netstack_find_by_stackid(stackid);
+	if (ns == NULL) {
+		/* Disappeared */
+		ip_drop_output("ipIfStatsOutDiscards", mp, NULL);
+		freemsg(mp);
 		return;
 	}
 
-	ipha = (ipha_t *)ipsec_mp->b_cont->b_rptr;
-	ip_wput_ipsec_out(NULL, ipsec_mp, ipha, NULL, NULL);
+	bzero(&ixas, sizeof (ixas));
+	ixas.ixa_zoneid = ALL_ZONES;
+	ixas.ixa_cred = kcred;
+	ixas.ixa_cpid = NOPID;
+	ixas.ixa_tsl = NULL;
+	ixas.ixa_ipst = ns->netstack_ip;
+	/* No ULP checksum; done by esp_prepare_udp */
+	ixas.ixa_flags = IXAF_IS_IPV4 | IXAF_NO_IPSEC;
+
+	(void) ip_output_simple(mp, &ixas);
+	ixa_cleanup(&ixas);
 	netstack_rele(ns);
 }
 
 /*
- * Send a one-byte UDP NAT-T keepalive.  Construct an IPSEC_OUT too that'll
- * get fed into esp_send_udp/ip_wput_ipsec_out.
+ * Send a one-byte UDP NAT-T keepalive.
  */
 void
 ipsecesp_send_keepalive(ipsa_t *assoc)
 {
-	mblk_t *mp = NULL, *ipsec_mp = NULL;
-	ipha_t *ipha;
-	udpha_t *udpha;
-	ipsec_out_t *io;
+	mblk_t		*mp;
+	ipha_t		*ipha;
+	udpha_t		*udpha;
+	netstack_t	*ns = assoc->ipsa_netstack;
 
 	ASSERT(MUTEX_NOT_HELD(&assoc->ipsa_lock));
 
@@ -2399,85 +2363,78 @@ ipsecesp_send_keepalive(ipsa_t *assoc)
 	mp->b_wptr = (uint8_t *)(udpha + 1);
 	*(mp->b_wptr++) = 0xFF;
 
-	ipsec_mp = ipsec_alloc_ipsec_out(assoc->ipsa_netstack);
-	if (ipsec_mp == NULL) {
-		freeb(mp);
-		return;
-	}
-	ipsec_mp->b_cont = mp;
-	io = (ipsec_out_t *)ipsec_mp->b_rptr;
-	io->ipsec_out_zoneid =
-	    netstackid_to_zoneid(assoc->ipsa_netstack->netstack_stackid);
-	io->ipsec_out_stackid = assoc->ipsa_netstack->netstack_stackid;
+	esp_prepare_udp(ns, mp, ipha);
 
-	esp_prepare_udp(assoc->ipsa_netstack, mp, ipha);
 	/*
 	 * We're holding an isaf_t bucket lock, so pawn off the actual
 	 * packet transmission to another thread.  Just in case syncq
 	 * processing causes a same-bucket packet to be processed.
 	 */
-	if (taskq_dispatch(esp_taskq, actually_send_keepalive, ipsec_mp,
+	mp->b_prev = (mblk_t *)(uintptr_t)ns->netstack_stackid;
+
+	if (taskq_dispatch(esp_taskq, actually_send_keepalive, mp,
 	    TQ_NOSLEEP) == 0) {
 		/* Assume no memory if taskq_dispatch() fails. */
-		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
-		    DROPPER(assoc->ipsa_netstack->netstack_ipsec,
-		    ipds_esp_nomem),
-		    &assoc->ipsa_netstack->netstack_ipsecesp->esp_dropper);
+		mp->b_prev = NULL;
+		ip_drop_packet(mp, B_FALSE, NULL,
+		    DROPPER(ns->netstack_ipsec, ipds_esp_nomem),
+		    &ns->netstack_ipsecesp->esp_dropper);
 	}
 }
 
-static ipsec_status_t
-esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
-    uint_t payload_len)
+/*
+ * Returns mp if successfully completed the request. Returns
+ * NULL if it failed (and increments InDiscards) or if it is pending.
+ */
+static mblk_t *
+esp_submit_req_outbound(mblk_t *data_mp, ip_xmit_attr_t *ixa, ipsa_t *assoc,
+    uchar_t *icv_buf, uint_t payload_len)
 {
-	ipsec_out_t *io = (ipsec_out_t *)ipsec_mp->b_rptr;
 	uint_t auth_len;
-	crypto_call_req_t call_req;
-	mblk_t *esp_mp, *data_mp, *ip_mp;
+	crypto_call_req_t call_req, *callrp;
+	mblk_t *esp_mp;
 	esph_t *esph_ptr;
+	mblk_t *mp;
 	int kef_rc = CRYPTO_FAILED;
 	uint_t icv_len = assoc->ipsa_mac_len;
 	crypto_ctx_template_t auth_ctx_tmpl;
-	boolean_t do_auth;
-	boolean_t do_encr;
+	boolean_t do_auth, do_encr, force;
 	uint_t iv_len = assoc->ipsa_iv_len;
 	crypto_ctx_template_t encr_ctx_tmpl;
 	boolean_t is_natt = ((assoc->ipsa_flags & IPSA_F_NATT) != 0);
 	size_t esph_offset = (is_natt ? UDPH_SIZE : 0);
-	netstack_t	*ns = io->ipsec_out_ns;
+	netstack_t	*ns = ixa->ixa_ipst->ips_netstack;
 	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
+	ipsec_crypto_t	*ic, icstack;
+	uchar_t		*iv_ptr;
+	crypto_data_t	*cd_ptr = NULL;
+	ill_t		*ill = ixa->ixa_nce->nce_ill;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
-	uchar_t *iv_ptr;
-	crypto_data_t *cd_ptr = NULL;
 
 	esp3dbg(espstack, ("esp_submit_req_outbound:%s",
 	    is_natt ? "natt" : "not natt"));
 
-	ASSERT(io->ipsec_out_type == IPSEC_OUT);
-
-	/*
-	 * In case kEF queues and calls back, keep netstackid_t for
-	 * verification that the IP instance is still around in
-	 * esp_kcf_callback().
-	 */
-	io->ipsec_out_stackid = ns->netstack_stackid;
-
 	do_encr = assoc->ipsa_encr_alg != SADB_EALG_NULL;
 	do_auth = assoc->ipsa_auth_alg != SADB_AALG_NONE;
+	force = (assoc->ipsa_flags & IPSA_F_ASYNC);
+
+#ifdef IPSEC_LATENCY_TEST
+	kef_rc = CRYPTO_SUCCESS;
+#else
+	kef_rc = CRYPTO_FAILED;
+#endif
 
 	/*
 	 * Outbound IPsec packets are of the form:
-	 * IPSEC_OUT -> [IP,options] -> [ESP,IV] -> [data] -> [pad,ICV]
+	 * [IP,options] -> [ESP,IV] -> [data] -> [pad,ICV]
 	 * unless it's NATT, then it's
-	 * IPSEC_OUT -> [IP,options] -> [udp][ESP,IV] -> [data] -> [pad,ICV]
+	 * [IP,options] -> [udp][ESP,IV] -> [data] -> [pad,ICV]
 	 * Get a pointer to the mblk containing the ESP header.
 	 */
-	ip_mp = ipsec_mp->b_cont;
-	esp_mp = ipsec_mp->b_cont->b_cont;
-	ASSERT(ip_mp != NULL && esp_mp != NULL);
+	ASSERT(data_mp->b_cont != NULL);
+	esp_mp = data_mp->b_cont;
 	esph_ptr = (esph_t *)(esp_mp->b_rptr + esph_offset);
 	iv_ptr = (uchar_t *)(esph_ptr + 1);
-	data_mp = ipsec_mp->b_cont->b_cont->b_cont;
 
 	/*
 	 * Combined mode algs need a nonce. This is setup in sadb_common_add().
@@ -2486,25 +2443,42 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 	 */
 	if ((assoc->ipsa_flags & IPSA_F_COUNTERMODE) &&
 	    (assoc->ipsa_nonce == NULL)) {
-		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
+		ip_drop_packet(data_mp, B_FALSE, NULL,
 		    DROPPER(ipss, ipds_esp_nomem), &espstack->esp_dropper);
-		return (IPSEC_STATUS_FAILED);
+		return (NULL);
 	}
 
-	ESP_INIT_CALLREQ(&call_req);
+	if (force) {
+		/* We are doing asynch; allocate mblks to hold state */
+		if ((mp = ip_xmit_attr_to_mblk(ixa)) == NULL ||
+		    (mp = ipsec_add_crypto_data(mp, &ic)) == NULL) {
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			ip_drop_output("ipIfStatsOutDiscards", data_mp, ill);
+			freemsg(data_mp);
+			return (NULL);
+		}
+
+		linkb(mp, data_mp);
+		callrp = &call_req;
+		ESP_INIT_CALLREQ(callrp, mp, esp_kcf_callback_outbound);
+	} else {
+		/*
+		 * If we know we are going to do sync then ipsec_crypto_t
+		 * should be on the stack.
+		 */
+		ic = &icstack;
+		bzero(ic, sizeof (*ic));
+		callrp = NULL;
+	}
+
 
 	if (do_auth) {
-		/* force asynchronous processing? */
-		if (ipss->ipsec_algs_exec_mode[IPSEC_ALG_AUTH] ==
-		    IPSEC_ALGS_EXEC_ASYNC)
-			call_req.cr_flag |= CRYPTO_ALWAYS_QUEUE;
-
 		/* authentication context template */
 		IPSEC_CTX_TMPL(assoc, ipsa_authtmpl, IPSEC_ALG_AUTH,
 		    auth_ctx_tmpl);
 
 		/* where to store the computed mac */
-		ESP_INIT_CRYPTO_MAC(&io->ipsec_out_crypto_mac,
+		ESP_INIT_CRYPTO_MAC(&ic->ic_crypto_mac,
 		    icv_len, icv_buf);
 
 		/* authentication starts at the ESP header */
@@ -2512,35 +2486,30 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 		if (!do_encr) {
 			/* authentication only */
 			/* initialize input data argument */
-			ESP_INIT_CRYPTO_DATA(&io->ipsec_out_crypto_data,
+			ESP_INIT_CRYPTO_DATA(&ic->ic_crypto_data,
 			    esp_mp, esph_offset, auth_len);
 
 			/* call the crypto framework */
 			kef_rc = crypto_mac(&assoc->ipsa_amech,
-			    &io->ipsec_out_crypto_data,
+			    &ic->ic_crypto_data,
 			    &assoc->ipsa_kcfauthkey, auth_ctx_tmpl,
-			    &io->ipsec_out_crypto_mac, &call_req);
+			    &ic->ic_crypto_mac, callrp);
 		}
 	}
 
 	if (do_encr) {
-		/* force asynchronous processing? */
-		if (ipss->ipsec_algs_exec_mode[IPSEC_ALG_ENCR] ==
-		    IPSEC_ALGS_EXEC_ASYNC)
-			call_req.cr_flag |= CRYPTO_ALWAYS_QUEUE;
-
 		/* encryption context template */
 		IPSEC_CTX_TMPL(assoc, ipsa_encrtmpl, IPSEC_ALG_ENCR,
 		    encr_ctx_tmpl);
 		/* Call the nonce update function. */
 		(assoc->ipsa_noncefunc)(assoc, (uchar_t *)esph_ptr, payload_len,
-		    iv_ptr, &io->ipsec_out_cmm, &io->ipsec_out_crypto_data);
+		    iv_ptr, &ic->ic_cmm, &ic->ic_crypto_data);
 
 		if (!do_auth) {
 			/* encryption only, skip mblk that contains ESP hdr */
 			/* initialize input data argument */
-			ESP_INIT_CRYPTO_DATA(&io->ipsec_out_crypto_data,
-			    data_mp, 0, payload_len);
+			ESP_INIT_CRYPTO_DATA(&ic->ic_crypto_data,
+			    esp_mp->b_cont, 0, payload_len);
 
 			/*
 			 * For combined mode ciphers, the ciphertext is the same
@@ -2556,20 +2525,19 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 			 * for the cipher to use.
 			 */
 			if (assoc->ipsa_flags & IPSA_F_COMBINED) {
-				bcopy(&io->ipsec_out_crypto_data,
-				    &io->ipsec_out_crypto_mac,
+				bcopy(&ic->ic_crypto_data,
+				    &ic->ic_crypto_mac,
 				    sizeof (crypto_data_t));
-				io->ipsec_out_crypto_mac.cd_length =
+				ic->ic_crypto_mac.cd_length =
 				    payload_len + icv_len;
-				cd_ptr = &io->ipsec_out_crypto_mac;
+				cd_ptr = &ic->ic_crypto_mac;
 			}
 
 			/* call the crypto framework */
 			kef_rc = crypto_encrypt((crypto_mechanism_t *)
-			    &io->ipsec_out_cmm,
-			    &io->ipsec_out_crypto_data,
+			    &ic->ic_cmm, &ic->ic_crypto_data,
 			    &assoc->ipsa_kcfencrkey, encr_ctx_tmpl,
-			    cd_ptr, &call_req);
+			    cd_ptr, callrp);
 
 		}
 	}
@@ -2584,49 +2552,58 @@ esp_submit_req_outbound(mblk_t *ipsec_mp, ipsa_t *assoc, uchar_t *icv_buf,
 		 * the authentication at the ESP header, i.e. use an
 		 * authentication offset of zero.
 		 */
-		ESP_INIT_CRYPTO_DUAL_DATA(&io->ipsec_out_crypto_dual_data,
+		ESP_INIT_CRYPTO_DUAL_DATA(&ic->ic_crypto_dual_data,
 		    esp_mp, MBLKL(esp_mp), payload_len, esph_offset, auth_len);
 
 		/* specify IV */
-		io->ipsec_out_crypto_dual_data.dd_miscdata = (char *)iv_ptr;
+		ic->ic_crypto_dual_data.dd_miscdata = (char *)iv_ptr;
 
 		/* call the framework */
 		kef_rc = crypto_encrypt_mac(&assoc->ipsa_emech,
 		    &assoc->ipsa_amech, NULL,
 		    &assoc->ipsa_kcfencrkey, &assoc->ipsa_kcfauthkey,
 		    encr_ctx_tmpl, auth_ctx_tmpl,
-		    &io->ipsec_out_crypto_dual_data,
-		    &io->ipsec_out_crypto_mac, &call_req);
+		    &ic->ic_crypto_dual_data,
+		    &ic->ic_crypto_mac, callrp);
 	}
 
 	switch (kef_rc) {
 	case CRYPTO_SUCCESS:
 		ESP_BUMP_STAT(espstack, crypto_sync);
 		esp_set_usetime(assoc, B_FALSE);
+		if (force) {
+			mp = ipsec_free_crypto_data(mp);
+			data_mp = ip_xmit_attr_free_mblk(mp);
+		}
 		if (is_natt)
-			esp_prepare_udp(ns, ipsec_mp->b_cont,
-			    (ipha_t *)ipsec_mp->b_cont->b_rptr);
-		return (IPSEC_STATUS_SUCCESS);
+			esp_prepare_udp(ns, data_mp, (ipha_t *)data_mp->b_rptr);
+		return (data_mp);
 	case CRYPTO_QUEUED:
-		/* esp_kcf_callback() will be invoked on completion */
+		/* esp_kcf_callback_outbound() will be invoked on completion */
 		ESP_BUMP_STAT(espstack, crypto_async);
-		return (IPSEC_STATUS_PENDING);
+		return (NULL);
 	}
 
-	esp_crypto_failed(ipsec_mp, B_FALSE, kef_rc, espstack);
-	return (IPSEC_STATUS_FAILED);
+	if (force) {
+		mp = ipsec_free_crypto_data(mp);
+		data_mp = ip_xmit_attr_free_mblk(mp);
+	}
+	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+	esp_crypto_failed(data_mp, B_FALSE, kef_rc, NULL, espstack);
+	/* data_mp was passed to ip_drop_packet */
+	return (NULL);
 }
 
 /*
  * Handle outbound IPsec processing for IPv4 and IPv6
- * On success returns B_TRUE, on failure returns B_FALSE and frees the
- * mblk chain ipsec_in_mp.
+ *
+ * Returns data_mp if successfully completed the request. Returns
+ * NULL if it failed (and increments InDiscards) or if it is pending.
  */
-static ipsec_status_t
-esp_outbound(mblk_t *mp)
+static mblk_t *
+esp_outbound(mblk_t *data_mp, ip_xmit_attr_t *ixa)
 {
-	mblk_t *ipsec_out_mp, *data_mp, *espmp, *tailmp;
-	ipsec_out_t *io;
+	mblk_t *espmp, *tailmp;
 	ipha_t *ipha;
 	ip6_t *ip6h;
 	esph_t *esph_ptr, *iv_ptr;
@@ -2640,17 +2617,11 @@ esp_outbound(mblk_t *mp)
 	uchar_t *icv_buf;
 	udpha_t *udpha;
 	boolean_t is_natt = B_FALSE;
-	netstack_t	*ns;
-	ipsecesp_stack_t *espstack;
-	ipsec_stack_t	*ipss;
-
-	ipsec_out_mp = mp;
-	data_mp = ipsec_out_mp->b_cont;
-
-	io = (ipsec_out_t *)ipsec_out_mp->b_rptr;
-	ns = io->ipsec_out_ns;
-	espstack = ns->netstack_ipsecesp;
-	ipss = ns->netstack_ipsec;
+	netstack_t	*ns = ixa->ixa_ipst->ips_netstack;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ill_t		*ill = ixa->ixa_nce->nce_ill;
+	boolean_t	need_refrele = B_FALSE;
 
 	ESP_BUMP_STAT(espstack, out_requests);
 
@@ -2662,65 +2633,73 @@ esp_outbound(mblk_t *mp)
 	 * we might as well make use of msgpullup() and get the mblk into one
 	 * contiguous piece!
 	 */
-	ipsec_out_mp->b_cont = msgpullup(data_mp, -1);
-	if (ipsec_out_mp->b_cont == NULL) {
+	tailmp = msgpullup(data_mp, -1);
+	if (tailmp == NULL) {
 		esp0dbg(("esp_outbound: msgpullup() failed, "
 		    "dropping packet.\n"));
-		ipsec_out_mp->b_cont = data_mp;
-		/*
-		 * TODO:  Find the outbound IRE for this packet and
-		 * pass it to ip_drop_packet().
-		 */
-		ip_drop_packet(ipsec_out_mp, B_FALSE, NULL, NULL,
+		ip_drop_packet(data_mp, B_FALSE, ill,
 		    DROPPER(ipss, ipds_esp_nomem),
 		    &espstack->esp_dropper);
-		return (IPSEC_STATUS_FAILED);
-	} else {
-		freemsg(data_mp);
-		data_mp = ipsec_out_mp->b_cont;
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		return (NULL);
 	}
+	freemsg(data_mp);
+	data_mp = tailmp;
 
-	assoc = io->ipsec_out_esp_sa;
+	assoc = ixa->ixa_ipsec_esp_sa;
 	ASSERT(assoc != NULL);
 
 	/*
 	 * Get the outer IP header in shape to escape this system..
 	 */
-	if (is_system_labeled() && (assoc->ipsa_ocred != NULL)) {
-		int whack;
-
-		mblk_setcred(data_mp, assoc->ipsa_ocred, NOPID);
-		if (io->ipsec_out_v4)
-			whack = sadb_whack_label(&data_mp, assoc);
-		else
-			whack = sadb_whack_label_v6(&data_mp, assoc);
-		if (whack != 0) {
-			ip_drop_packet(ipsec_out_mp, B_FALSE, NULL,
-			    NULL, DROPPER(ipss, ipds_esp_nomem),
+	if (is_system_labeled() && (assoc->ipsa_otsl != NULL)) {
+		/*
+		 * Need to update packet with any CIPSO option and update
+		 * ixa_tsl to capture the new label.
+		 * We allocate a separate ixa for that purpose.
+		 */
+		ixa = ip_xmit_attr_duplicate(ixa);
+		if (ixa == NULL) {
+			ip_drop_packet(data_mp, B_FALSE, ill,
+			    DROPPER(ipss, ipds_esp_nomem),
 			    &espstack->esp_dropper);
-			return (IPSEC_STATUS_FAILED);
+			return (NULL);
 		}
-		ipsec_out_mp->b_cont = data_mp;
-	}
+		need_refrele = B_TRUE;
 
+		label_hold(assoc->ipsa_otsl);
+		ip_xmit_attr_replace_tsl(ixa, assoc->ipsa_otsl);
+
+		data_mp = sadb_whack_label(data_mp, assoc, ixa,
+		    DROPPER(ipss, ipds_esp_nomem), &espstack->esp_dropper);
+		if (data_mp == NULL) {
+			/* Packet dropped by sadb_whack_label */
+			ixa_refrele(ixa);
+			return (NULL);
+		}
+	}
 
 	/*
 	 * Reality check....
 	 */
 	ipha = (ipha_t *)data_mp->b_rptr;  /* So we can call esp_acquire(). */
 
-	if (io->ipsec_out_v4) {
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
+		ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
+
 		af = AF_INET;
 		divpoint = IPH_HDR_LENGTH(ipha);
 		datalen = ntohs(ipha->ipha_length) - divpoint;
 		nhp = (uint8_t *)&ipha->ipha_protocol;
 	} else {
-		ip6_pkt_t ipp;
+		ip_pkt_t ipp;
+
+		ASSERT(IPH_HDR_VERSION(ipha) == IPV6_VERSION);
 
 		af = AF_INET6;
 		ip6h = (ip6_t *)ipha;
 		bzero(&ipp, sizeof (ipp));
-		divpoint = ip_find_hdr_v6(data_mp, ip6h, &ipp, NULL);
+		divpoint = ip_find_hdr_v6(data_mp, ip6h, B_FALSE, &ipp, NULL);
 		if (ipp.ipp_dstopts != NULL &&
 		    ipp.ipp_dstopts->ip6d_nxt != IPPROTO_ROUTING) {
 			/*
@@ -2795,28 +2774,26 @@ esp_outbound(mblk_t *mp)
 	 */
 
 	if (!esp_age_bytes(assoc, datalen + padlen + iv_len + 2, B_FALSE)) {
-		/*
-		 * TODO:  Find the outbound IRE for this packet and
-		 * pass it to ip_drop_packet().
-		 */
-		ip_drop_packet(mp, B_FALSE, NULL, NULL,
+		ip_drop_packet(data_mp, B_FALSE, ill,
 		    DROPPER(ipss, ipds_esp_bytes_expire),
 		    &espstack->esp_dropper);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		if (need_refrele)
+			ixa_refrele(ixa);
+		return (NULL);
 	}
 
 	espmp = allocb(esplen, BPRI_HI);
 	if (espmp == NULL) {
 		ESP_BUMP_STAT(espstack, out_discards);
 		esp1dbg(espstack, ("esp_outbound: can't allocate espmp.\n"));
-		/*
-		 * TODO:  Find the outbound IRE for this packet and
-		 * pass it to ip_drop_packet().
-		 */
-		ip_drop_packet(mp, B_FALSE, NULL, NULL,
+		ip_drop_packet(data_mp, B_FALSE, ill,
 		    DROPPER(ipss, ipds_esp_nomem),
 		    &espstack->esp_dropper);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		if (need_refrele)
+			ixa_refrele(ixa);
+		return (NULL);
 	}
 	espmp->b_wptr += esplen;
 	esph_ptr = (esph_t *)espmp->b_rptr;
@@ -2853,14 +2830,13 @@ esp_outbound(mblk_t *mp)
 
 		ESP_BUMP_STAT(espstack, out_discards);
 		sadb_replay_delete(assoc);
-		/*
-		 * TODO:  Find the outbound IRE for this packet and
-		 * pass it to ip_drop_packet().
-		 */
-		ip_drop_packet(mp, B_FALSE, NULL, NULL,
+		ip_drop_packet(data_mp, B_FALSE, ill,
 		    DROPPER(ipss, ipds_esp_replay),
 		    &espstack->esp_dropper);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		if (need_refrele)
+			ixa_refrele(ixa);
+		return (NULL);
 	}
 
 	iv_ptr = (esph_ptr + 1);
@@ -2887,9 +2863,11 @@ esp_outbound(mblk_t *mp)
 	 */
 	if (!update_iv((uint8_t *)iv_ptr, espstack->esp_pfkey_q, assoc,
 	    espstack)) {
-		ip_drop_packet(mp, B_FALSE, NULL, NULL,
+		ip_drop_packet(data_mp, B_FALSE, ill,
 		    DROPPER(ipss, ipds_esp_iv_wrap), &espstack->esp_dropper);
-		return (IPSEC_STATUS_FAILED);
+		if (need_refrele)
+			ixa_refrele(ixa);
+		return (NULL);
 	}
 
 	/* Fix the IP header. */
@@ -2898,7 +2876,7 @@ esp_outbound(mblk_t *mp)
 
 	protocol = *nhp;
 
-	if (io->ipsec_out_v4) {
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
 		ipha->ipha_length = htons(ntohs(ipha->ipha_length) + adj);
 		if (is_natt) {
 			*nhp = IPPROTO_UDP;
@@ -2922,15 +2900,14 @@ esp_outbound(mblk_t *mp)
 	if (!esp_insert_esp(data_mp, espmp, divpoint, espstack)) {
 		ESP_BUMP_STAT(espstack, out_discards);
 		/* NOTE:  esp_insert_esp() only fails if there's no memory. */
-		/*
-		 * TODO:  Find the outbound IRE for this packet and
-		 * pass it to ip_drop_packet().
-		 */
-		ip_drop_packet(mp, B_FALSE, NULL, NULL,
+		ip_drop_packet(data_mp, B_FALSE, ill,
 		    DROPPER(ipss, ipds_esp_nomem),
 		    &espstack->esp_dropper);
 		freeb(espmp);
-		return (IPSEC_STATUS_FAILED);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		if (need_refrele)
+			ixa_refrele(ixa);
+		return (NULL);
 	}
 
 	/* Append padding (and leave room for ICV). */
@@ -2941,14 +2918,13 @@ esp_outbound(mblk_t *mp)
 		if (tailmp->b_cont == NULL) {
 			ESP_BUMP_STAT(espstack, out_discards);
 			esp0dbg(("esp_outbound:  Can't allocate tailmp.\n"));
-			/*
-			 * TODO:  Find the outbound IRE for this packet and
-			 * pass it to ip_drop_packet().
-			 */
-			ip_drop_packet(mp, B_FALSE, NULL, NULL,
+			ip_drop_packet(data_mp, B_FALSE, ill,
 			    DROPPER(ipss, ipds_esp_nomem),
 			    &espstack->esp_dropper);
-			return (IPSEC_STATUS_FAILED);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+			if (need_refrele)
+				ixa_refrele(ixa);
+			return (NULL);
 		}
 		tailmp = tailmp->b_cont;
 	}
@@ -2968,29 +2944,6 @@ esp_outbound(mblk_t *mp)
 	esp2dbg(espstack, (dump_msg(data_mp)));
 
 	/*
-	 * The packet is eligible for hardware acceleration if the
-	 * following conditions are satisfied:
-	 *
-	 * 1. the packet will not be fragmented
-	 * 2. the provider supports the algorithms specified by SA
-	 * 3. there is no pending control message being exchanged
-	 * 4. snoop is not attached
-	 * 5. the destination address is not a multicast address
-	 *
-	 * All five of these conditions are checked by IP prior to
-	 * sending the packet to ESP.
-	 *
-	 * But We, and We Alone, can, nay MUST check if the packet
-	 * is over NATT, and then disqualify it from hardware
-	 * acceleration.
-	 */
-
-	if (io->ipsec_out_is_capab_ill && !(assoc->ipsa_flags & IPSA_F_NATT)) {
-		return (esp_outbound_accelerated(ipsec_out_mp, mac_len));
-	}
-	ESP_BUMP_STAT(espstack, noaccel);
-
-	/*
 	 * Okay.  I've set up the pre-encryption ESP.  Let's do it!
 	 */
 
@@ -3002,32 +2955,23 @@ esp_outbound(mblk_t *mp)
 		icv_buf = NULL;
 	}
 
-	return (esp_submit_req_outbound(ipsec_out_mp, assoc, icv_buf,
-	    datalen + padlen + 2));
+	data_mp = esp_submit_req_outbound(data_mp, ixa, assoc, icv_buf,
+	    datalen + padlen + 2);
+	if (need_refrele)
+		ixa_refrele(ixa);
+	return (data_mp);
 }
 
 /*
  * IP calls this to validate the ICMP errors that
  * we got from the network.
  */
-ipsec_status_t
-ipsecesp_icmp_error(mblk_t *ipsec_mp)
+mblk_t *
+ipsecesp_icmp_error(mblk_t *data_mp, ip_recv_attr_t *ira)
 {
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-	boolean_t is_inbound = (ii->ipsec_in_type == IPSEC_IN);
-	netstack_t	*ns;
-	ipsecesp_stack_t *espstack;
-	ipsec_stack_t	*ipss;
-
-	if (is_inbound) {
-		ns = ii->ipsec_in_ns;
-	} else {
-		ipsec_out_t *io = (ipsec_out_t *)ipsec_mp->b_rptr;
-
-		ns = io->ipsec_out_ns;
-	}
-	espstack = ns->netstack_ipsecesp;
-	ipss = ns->netstack_ipsec;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	/*
 	 * Unless we get an entire packet back, this function is useless.
@@ -3044,55 +2988,10 @@ ipsecesp_icmp_error(mblk_t *ipsec_mp)
 	 * very small, we discard here.
 	 */
 	IP_ESP_BUMP_STAT(ipss, in_discards);
-	ip_drop_packet(ipsec_mp, B_TRUE, NULL, NULL,
+	ip_drop_packet(data_mp, B_TRUE, ira->ira_ill,
 	    DROPPER(ipss, ipds_esp_icmp),
 	    &espstack->esp_dropper);
-	return (IPSEC_STATUS_FAILED);
-}
-
-/*
- * ESP module read put routine.
- */
-/* ARGSUSED */
-static void
-ipsecesp_rput(queue_t *q, mblk_t *mp)
-{
-	ipsecesp_stack_t	*espstack = (ipsecesp_stack_t *)q->q_ptr;
-
-	ASSERT(mp->b_datap->db_type != M_CTL);	/* No more IRE_DB_REQ. */
-
-	switch (mp->b_datap->db_type) {
-	case M_PROTO:
-	case M_PCPROTO:
-		/* TPI message of some sort. */
-		switch (*((t_scalar_t *)mp->b_rptr)) {
-		case T_BIND_ACK:
-			esp3dbg(espstack,
-			    ("Thank you IP from ESP for T_BIND_ACK\n"));
-			break;
-		case T_ERROR_ACK:
-			cmn_err(CE_WARN,
-			    "ipsecesp:  ESP received T_ERROR_ACK from IP.");
-			/*
-			 * Make esp_sadb.s_ip_q NULL, and in the
-			 * future, perhaps try again.
-			 */
-			espstack->esp_sadb.s_ip_q = NULL;
-			break;
-		case T_OK_ACK:
-			/* Probably from a (rarely sent) T_UNBIND_REQ. */
-			break;
-		default:
-			esp0dbg(("Unknown M_{,PC}PROTO message.\n"));
-		}
-		freemsg(mp);
-		break;
-	default:
-		/* For now, passthru message. */
-		esp2dbg(espstack, ("ESP got unknown mblk type %d.\n",
-		    mp->b_datap->db_type));
-		putnext(q, mp);
-	}
+	return (NULL);
 }
 
 /*
@@ -3102,7 +3001,7 @@ ipsecesp_rput(queue_t *q, mblk_t *mp)
  */
 static boolean_t
 esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
-    ipsecesp_stack_t *espstack, mblk_t *in_mp)
+    ipsecesp_stack_t *espstack, cred_t *cr)
 {
 	mblk_t *pfkey_msg_mp, *keysock_out_mp;
 	sadb_msg_t *samsg;
@@ -3121,7 +3020,7 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 	sadb_sens_t *sens;
 	size_t sens_len = 0;
 	sadb_ext_t *nextext;
-	cred_t *sens_cr = NULL;
+	ts_label_t *sens_tsl = NULL;
 
 	/* Allocate the KEYSOCK_OUT. */
 	keysock_out_mp = sadb_keysock_out(serial);
@@ -3130,11 +3029,10 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 		return (B_FALSE);
 	}
 
-	if (is_system_labeled() && (in_mp != NULL)) {
-		sens_cr = msg_getcred(in_mp, NULL);
-
-		if (sens_cr != NULL) {
-			sens_len = sadb_sens_len_from_cred(sens_cr);
+	if (is_system_labeled() && (cr != NULL)) {
+		sens_tsl = crgetlabel(cr);
+		if (sens_tsl != NULL) {
+			sens_len = sadb_sens_len_from_label(sens_tsl);
 			allocsize += sens_len;
 		}
 	}
@@ -3268,10 +3166,10 @@ esp_register_out(uint32_t sequence, uint32_t pid, uint_t serial,
 
 	mutex_exit(&ipss->ipsec_alg_lock);
 
-	if (sens_cr != NULL) {
+	if (sens_tsl != NULL) {
 		sens = (sadb_sens_t *)nextext;
-		sadb_sens_from_cred(sens, SADB_EXT_SENSITIVITY,
-		    sens_cr, sens_len);
+		sadb_sens_from_label(sens, SADB_EXT_SENSITIVITY,
+		    sens_tsl, sens_len);
 
 		nextext = (sadb_ext_t *)(((uint8_t *)sens) + sens_len);
 	}
@@ -3336,40 +3234,61 @@ ipsecesp_algs_changed(netstack_t *ns)
 
 /*
  * Stub function that taskq_dispatch() invokes to take the mblk (in arg)
- * and put() it into AH and STREAMS again.
+ * and send() it into ESP and IP again.
  */
 static void
 inbound_task(void *arg)
 {
-	esph_t *esph;
-	mblk_t *mp = (mblk_t *)arg;
-	ipsec_in_t *ii = (ipsec_in_t *)mp->b_rptr;
-	netstack_t *ns;
-	ipsecesp_stack_t *espstack;
-	int ipsec_rc;
+	mblk_t		*mp = (mblk_t *)arg;
+	mblk_t		*async_mp;
+	ip_recv_attr_t	iras;
 
-	ns = netstack_find_by_stackid(ii->ipsec_in_stackid);
-	if (ns == NULL || ns != ii->ipsec_in_ns) {
-		/* Just freemsg(). */
-		if (ns != NULL)
-			netstack_rele(ns);
+	async_mp = mp;
+	mp = async_mp->b_cont;
+	async_mp->b_cont = NULL;
+	if (!ip_recv_attr_from_mblk(async_mp, &iras)) {
+		/* The ill or ip_stack_t disappeared on us */
+		ip_drop_input("ip_recv_attr_from_mblk", mp, NULL);
 		freemsg(mp);
-		return;
+		goto done;
 	}
 
-	espstack = ns->netstack_ipsecesp;
+	esp_inbound_restart(mp, &iras);
+done:
+	ira_cleanup(&iras, B_TRUE);
+}
+
+/*
+ * Restart ESP after the SA has been added.
+ */
+static void
+esp_inbound_restart(mblk_t *mp, ip_recv_attr_t *ira)
+{
+	esph_t		*esph;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
 
 	esp2dbg(espstack, ("in ESP inbound_task"));
 	ASSERT(espstack != NULL);
 
-	esph = ipsec_inbound_esp_sa(mp, ns);
-	if (esph != NULL) {
-		ASSERT(ii->ipsec_in_esp_sa != NULL);
-		ipsec_rc = ii->ipsec_in_esp_sa->ipsa_input_func(mp, esph);
-		if (ipsec_rc == IPSEC_STATUS_SUCCESS)
-			ip_fanout_proto_again(mp, NULL, NULL, NULL);
+	mp = ipsec_inbound_esp_sa(mp, ira, &esph);
+	if (mp == NULL)
+		return;
+
+	ASSERT(esph != NULL);
+	ASSERT(ira->ira_flags & IRAF_IPSEC_SECURE);
+	ASSERT(ira->ira_ipsec_esp_sa != NULL);
+
+	mp = ira->ira_ipsec_esp_sa->ipsa_input_func(mp, esph, ira);
+	if (mp == NULL) {
+		/*
+		 * Either it failed or is pending. In the former case
+		 * ipIfStatsInDiscards was increased.
+		 */
+		return;
 	}
-	netstack_rele(ns);
+
+	ip_input_post_ipsec(mp, ira);
 }
 
 /*
@@ -3533,17 +3452,21 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	if (larval != NULL)
 		lpkt = sadb_clear_lpkt(larval);
 
-	rc = sadb_common_add(espstack->esp_sadb.s_ip_q, espstack->esp_pfkey_q,
+	rc = sadb_common_add(espstack->esp_pfkey_q,
 	    mp, samsg, ksi, primary, secondary, larval, clone, is_inbound,
 	    diagnostic, espstack->ipsecesp_netstack, &espstack->esp_sadb);
 
-	if (rc == 0 && lpkt != NULL)
-		rc = !taskq_dispatch(esp_taskq, inbound_task, lpkt, TQ_NOSLEEP);
-
-	if (rc != 0) {
-		ip_drop_packet(lpkt, B_TRUE, NULL, NULL,
-		    DROPPER(ipss, ipds_sadb_inlarval_timeout),
-		    &espstack->esp_dropper);
+	if (lpkt != NULL) {
+		if (rc == 0) {
+			rc = !taskq_dispatch(esp_taskq, inbound_task,
+			    lpkt, TQ_NOSLEEP);
+		}
+		if (rc != 0) {
+			lpkt = ip_recv_attr_free_mblk(lpkt);
+			ip_drop_packet(lpkt, B_TRUE, NULL,
+			    DROPPER(ipss, ipds_sadb_inlarval_timeout),
+			    &espstack->esp_dropper);
+		}
 	}
 
 	/*
@@ -3551,45 +3474,78 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	 * esp_outbound() calls?
 	 */
 
+	/* Handle the packets queued waiting for the SA */
 	while (acq_msgs != NULL) {
-		mblk_t *mp = acq_msgs;
+		mblk_t		*asyncmp;
+		mblk_t		*data_mp;
+		ip_xmit_attr_t	ixas;
+		ill_t		*ill;
 
+		asyncmp = acq_msgs;
 		acq_msgs = acq_msgs->b_next;
-		mp->b_next = NULL;
-		if (rc == 0) {
-			if (ipsec_outbound_sa(mp, IPPROTO_ESP)) {
-				((ipsec_out_t *)(mp->b_rptr))->
-				    ipsec_out_esp_done = B_TRUE;
-				if (esp_outbound(mp) == IPSEC_STATUS_SUCCESS) {
-					ipha_t *ipha;
+		asyncmp->b_next = NULL;
 
-					/* do AH processing if needed */
-					if (!esp_do_outbound_ah(mp))
-						continue;
-
-					ipha = (ipha_t *)mp->b_cont->b_rptr;
-
-					/* finish IPsec processing */
-					if (IPH_HDR_VERSION(ipha) ==
-					    IP_VERSION) {
-						ip_wput_ipsec_out(NULL, mp,
-						    ipha, NULL, NULL);
-					} else {
-						ip6_t *ip6h = (ip6_t *)ipha;
-						ip_wput_ipsec_out_v6(NULL,
-						    mp, ip6h, NULL, NULL);
-					}
-				}
-				continue;
-			}
+		/*
+		 * Extract the ip_xmit_attr_t from the first mblk.
+		 * Verifies that the netstack and ill is still around; could
+		 * have vanished while iked was doing its work.
+		 * On succesful return we have a nce_t and the ill/ipst can't
+		 * disappear until we do the nce_refrele in ixa_cleanup.
+		 */
+		data_mp = asyncmp->b_cont;
+		asyncmp->b_cont = NULL;
+		if (!ip_xmit_attr_from_mblk(asyncmp, &ixas)) {
+			ESP_BUMP_STAT(espstack, out_discards);
+			ip_drop_packet(data_mp, B_FALSE, NULL,
+			    DROPPER(ipss, ipds_sadb_acquire_timeout),
+			    &espstack->esp_dropper);
+		} else if (rc != 0) {
+			ill = ixas.ixa_nce->nce_ill;
+			ESP_BUMP_STAT(espstack, out_discards);
+			ip_drop_packet(data_mp, B_FALSE, ill,
+			    DROPPER(ipss, ipds_sadb_acquire_timeout),
+			    &espstack->esp_dropper);
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		} else {
+			esp_outbound_finish(data_mp, &ixas);
 		}
-		ESP_BUMP_STAT(espstack, out_discards);
-		ip_drop_packet(mp, B_FALSE, NULL, NULL,
-		    DROPPER(ipss, ipds_sadb_acquire_timeout),
-		    &espstack->esp_dropper);
+		ixa_cleanup(&ixas);
 	}
 
 	return (rc);
+}
+
+/*
+ * Process one of the queued messages (from ipsacq_mp) once the SA
+ * has been added.
+ */
+static void
+esp_outbound_finish(mblk_t *data_mp, ip_xmit_attr_t *ixa)
+{
+	netstack_t	*ns = ixa->ixa_ipst->ips_netstack;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	ill_t		*ill = ixa->ixa_nce->nce_ill;
+
+	if (!ipsec_outbound_sa(data_mp, ixa, IPPROTO_ESP)) {
+		ESP_BUMP_STAT(espstack, out_discards);
+		ip_drop_packet(data_mp, B_FALSE, ill,
+		    DROPPER(ipss, ipds_sadb_acquire_timeout),
+		    &espstack->esp_dropper);
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
+		return;
+	}
+
+	data_mp = esp_outbound(data_mp, ixa);
+	if (data_mp == NULL)
+		return;
+
+	/* do AH processing if needed */
+	data_mp = esp_do_outbound_ah(data_mp, ixa);
+	if (data_mp == NULL)
+		return;
+
+	(void) ip_output_post_ipsec(data_mp, ixa);
 }
 
 /*
@@ -3674,11 +3630,13 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 		return (EINVAL);
 	}
 
+#ifndef IPSEC_LATENCY_TEST
 	if (assoc->sadb_sa_encrypt == SADB_EALG_NULL &&
 	    assoc->sadb_sa_auth == SADB_AALG_NONE) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_AALG;
 		return (EINVAL);
 	}
+#endif
 
 	if (assoc->sadb_sa_flags & ~espstack->esp_sadb.s_addflags) {
 		*diagnostic = SADB_X_DIAGNOSTIC_BAD_SAFLAGS;
@@ -3734,7 +3692,11 @@ esp_add_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic, netstack_t *ns)
 	/*
 	 * First locate the authentication algorithm.
 	 */
+#ifdef IPSEC_LATENCY_TEST
+	if (akey != NULL && assoc->sadb_sa_auth != SADB_AALG_NONE) {
+#else
 	if (akey != NULL) {
+#endif
 		ipsec_alginfo_t *aalg;
 
 		aalg = ipss->ipsec_alglists[IPSEC_ALG_AUTH]
@@ -3883,7 +3845,7 @@ esp_del_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 		return (sadb_purge_sa(mp, ksi,
 		    (sin->sin_family == AF_INET6) ? &espstack->esp_sadb.s_v6 :
 		    &espstack->esp_sadb.s_v4, diagnostic,
-		    espstack->esp_pfkey_q, espstack->esp_sadb.s_ip_q));
+		    espstack->esp_pfkey_q));
 	}
 
 	return (sadb_delget_sa(mp, ksi, &espstack->esp_sadb, diagnostic,
@@ -4024,7 +3986,7 @@ esp_parse_pfkey(mblk_t *mp, ipsecesp_stack_t *espstack)
 		 * Keysock takes care of the PF_KEY bookkeeping for this.
 		 */
 		if (esp_register_out(samsg->sadb_msg_seq, samsg->sadb_msg_pid,
-		    ksi->ks_in_serial, espstack, mp)) {
+		    ksi->ks_in_serial, espstack, msg_getcred(mp, NULL))) {
 			freemsg(mp);
 		} else {
 			/*
@@ -4109,8 +4071,7 @@ esp_keysock_no_socket(mblk_t *mp, ipsecesp_stack_t *espstack)
 		samsg->sadb_msg_errno = kse->ks_err_errno;
 		samsg->sadb_msg_len = SADB_8TO64(sizeof (*samsg));
 		/*
-		 * Use the write-side of the esp_pfkey_q, in case there is
-		 * no esp_sadb.s_ip_q.
+		 * Use the write-side of the esp_pfkey_q
 		 */
 		sadb_in_acquire(samsg, &espstack->esp_sadb,
 		    WR(espstack->esp_pfkey_q), espstack->ipsecesp_netstack);
@@ -4197,236 +4158,23 @@ ipsecesp_wput(queue_t *q, mblk_t *mp)
 }
 
 /*
- * Process an outbound ESP packet that can be accelerated by a IPsec
- * hardware acceleration capable Provider.
- * The caller already inserted and initialized the ESP header.
- * This function allocates a tagging M_CTL, and adds room at the end
- * of the packet to hold the ICV if authentication is needed.
- *
- * On success returns B_TRUE, on failure returns B_FALSE and frees the
- * mblk chain ipsec_out.
- */
-static ipsec_status_t
-esp_outbound_accelerated(mblk_t *ipsec_out, uint_t icv_len)
-{
-	ipsec_out_t *io;
-	mblk_t *lastmp;
-	netstack_t	*ns;
-	ipsecesp_stack_t *espstack;
-	ipsec_stack_t	*ipss;
-
-	io = (ipsec_out_t *)ipsec_out->b_rptr;
-	ns = io->ipsec_out_ns;
-	espstack = ns->netstack_ipsecesp;
-	ipss = ns->netstack_ipsec;
-
-	ESP_BUMP_STAT(espstack, out_accelerated);
-
-	/* mark packet as being accelerated in IPSEC_OUT */
-	ASSERT(io->ipsec_out_accelerated == B_FALSE);
-	io->ipsec_out_accelerated = B_TRUE;
-
-	/*
-	 * add room at the end of the packet for the ICV if needed
-	 */
-	if (icv_len > 0) {
-		/* go to last mblk */
-		lastmp = ipsec_out;	/* For following while loop. */
-		do {
-			lastmp = lastmp->b_cont;
-		} while (lastmp->b_cont != NULL);
-
-		/* if not enough available room, allocate new mblk */
-		if ((lastmp->b_wptr + icv_len) > lastmp->b_datap->db_lim) {
-			lastmp->b_cont = allocb(icv_len, BPRI_HI);
-			if (lastmp->b_cont == NULL) {
-				ESP_BUMP_STAT(espstack, out_discards);
-				ip_drop_packet(ipsec_out, B_FALSE, NULL, NULL,
-				    DROPPER(ipss, ipds_esp_nomem),
-				    &espstack->esp_dropper);
-				return (IPSEC_STATUS_FAILED);
-			}
-			lastmp = lastmp->b_cont;
-		}
-		lastmp->b_wptr += icv_len;
-	}
-
-	return (IPSEC_STATUS_SUCCESS);
-}
-
-/*
- * Process an inbound accelerated ESP packet.
- * On success returns B_TRUE, on failure returns B_FALSE and frees the
- * mblk chain ipsec_in.
- */
-static ipsec_status_t
-esp_inbound_accelerated(mblk_t *ipsec_in, mblk_t *data_mp, boolean_t isv4,
-    ipsa_t *assoc)
-{
-	ipsec_in_t *ii = (ipsec_in_t *)ipsec_in->b_rptr;
-	mblk_t *hada_mp;
-	uint32_t icv_len = 0;
-	da_ipsec_t *hada;
-	ipha_t *ipha;
-	ip6_t *ip6h;
-	kstat_named_t *counter;
-	netstack_t	*ns = ii->ipsec_in_ns;
-	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
-	ipsec_stack_t	*ipss = ns->netstack_ipsec;
-
-	ESP_BUMP_STAT(espstack, in_accelerated);
-
-	hada_mp = ii->ipsec_in_da;
-	ASSERT(hada_mp != NULL);
-	hada = (da_ipsec_t *)hada_mp->b_rptr;
-
-	/*
-	 * We only support one level of decapsulation in hardware, so
-	 * nuke the pointer.
-	 */
-	ii->ipsec_in_da = NULL;
-	ii->ipsec_in_accelerated = B_FALSE;
-
-	if (assoc->ipsa_auth_alg != IPSA_AALG_NONE) {
-		/*
-		 * ESP with authentication. We expect the Provider to have
-		 * computed the ICV and placed it in the hardware acceleration
-		 * data attributes.
-		 *
-		 * Extract ICV length from attributes M_CTL and sanity check
-		 * its value. We allow the mblk to be smaller than da_ipsec_t
-		 * for a small ICV, as long as the entire ICV fits within the
-		 * mblk.
-		 *
-		 * Also ensures that the ICV length computed by Provider
-		 * corresponds to the ICV length of the agorithm specified by
-		 * the SA.
-		 */
-		icv_len = hada->da_icv_len;
-		if ((icv_len != assoc->ipsa_mac_len) ||
-		    (icv_len > DA_ICV_MAX_LEN) || (MBLKL(hada_mp) <
-		    (sizeof (da_ipsec_t) - DA_ICV_MAX_LEN + icv_len))) {
-			esp0dbg(("esp_inbound_accelerated: "
-			    "ICV len (%u) incorrect or mblk too small (%u)\n",
-			    icv_len, (uint32_t)(MBLKL(hada_mp))));
-			counter = DROPPER(ipss, ipds_esp_bad_auth);
-			goto esp_in_discard;
-		}
-	}
-
-	/* get pointers to IP header */
-	if (isv4) {
-		ipha = (ipha_t *)data_mp->b_rptr;
-	} else {
-		ip6h = (ip6_t *)data_mp->b_rptr;
-	}
-
-	/*
-	 * Compare ICV in ESP packet vs ICV computed by adapter.
-	 * We also remove the ICV from the end of the packet since
-	 * it will no longer be needed.
-	 *
-	 * Assume that esp_inbound() already ensured that the pkt
-	 * was in one mblk.
-	 */
-	ASSERT(data_mp->b_cont == NULL);
-	data_mp->b_wptr -= icv_len;
-	/* adjust IP header */
-	if (isv4)
-		ipha->ipha_length = htons(ntohs(ipha->ipha_length) - icv_len);
-	else
-		ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) - icv_len);
-	if (icv_len && bcmp(hada->da_icv, data_mp->b_wptr, icv_len)) {
-		int af;
-		void *addr;
-
-		if (isv4) {
-			addr = &ipha->ipha_dst;
-			af = AF_INET;
-		} else {
-			addr = &ip6h->ip6_dst;
-			af = AF_INET6;
-		}
-
-		/*
-		 * Log the event. Don't print to the console, block
-		 * potential denial-of-service attack.
-		 */
-		ESP_BUMP_STAT(espstack, bad_auth);
-		ipsec_assocfailure(info.mi_idnum, 0, 0, SL_ERROR | SL_WARN,
-		    "ESP Authentication failed spi %x, dst_addr %s",
-		    assoc->ipsa_spi, addr, af, espstack->ipsecesp_netstack);
-		counter = DROPPER(ipss, ipds_esp_bad_auth);
-		goto esp_in_discard;
-	}
-
-	esp3dbg(espstack, ("esp_inbound_accelerated: ESP authentication "
-	    "succeeded, checking replay\n"));
-
-	ipsec_in->b_cont = data_mp;
-
-	/*
-	 * Remove ESP header and padding from packet.
-	 */
-	if (!esp_strip_header(data_mp, ii->ipsec_in_v4, assoc->ipsa_iv_len,
-	    &counter, espstack)) {
-		esp1dbg(espstack, ("esp_inbound_accelerated: "
-		    "esp_strip_header() failed\n"));
-		goto esp_in_discard;
-	}
-
-	freeb(hada_mp);
-
-	if (is_system_labeled() && (assoc->ipsa_cred != NULL))
-		mblk_setcred(data_mp, assoc->ipsa_cred, NOPID);
-
-	/*
-	 * Account for usage..
-	 */
-	if (!esp_age_bytes(assoc, msgdsize(data_mp), B_TRUE)) {
-		/* The ipsa has hit hard expiration, LOG and AUDIT. */
-		ESP_BUMP_STAT(espstack, bytes_expired);
-		IP_ESP_BUMP_STAT(ipss, in_discards);
-		ipsec_assocfailure(info.mi_idnum, 0, 0, SL_ERROR | SL_WARN,
-		    "ESP association 0x%x, dst %s had bytes expire.\n",
-		    assoc->ipsa_spi, assoc->ipsa_dstaddr, assoc->ipsa_addrfam,
-		    espstack->ipsecesp_netstack);
-		ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL,
-		    DROPPER(ipss, ipds_esp_bytes_expire),
-		    &espstack->esp_dropper);
-		return (IPSEC_STATUS_FAILED);
-	}
-
-	/* done processing the packet */
-	return (IPSEC_STATUS_SUCCESS);
-
-esp_in_discard:
-	IP_ESP_BUMP_STAT(ipss, in_discards);
-	freeb(hada_mp);
-
-	ipsec_in->b_cont = data_mp;	/* For ip_drop_packet()'s sake... */
-	ip_drop_packet(ipsec_in, B_TRUE, NULL, NULL, counter,
-	    &espstack->esp_dropper);
-
-	return (IPSEC_STATUS_FAILED);
-}
-
-/*
  * Wrapper to allow IP to trigger an ESP association failure message
  * during inbound SA selection.
  */
 void
 ipsecesp_in_assocfailure(mblk_t *mp, char level, ushort_t sl, char *fmt,
-    uint32_t spi, void *addr, int af, ipsecesp_stack_t *espstack)
+    uint32_t spi, void *addr, int af, ip_recv_attr_t *ira)
 {
-	ipsec_stack_t	*ipss = espstack->ipsecesp_netstack->netstack_ipsec;
+	netstack_t	*ns = ira->ira_ill->ill_ipst->ips_netstack;
+	ipsecesp_stack_t *espstack = ns->netstack_ipsecesp;
+	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 
 	if (espstack->ipsecesp_log_unknown_spi) {
 		ipsec_assocfailure(info.mi_idnum, 0, level, sl, fmt, spi,
 		    addr, af, espstack->ipsecesp_netstack);
 	}
 
-	ip_drop_packet(mp, B_TRUE, NULL, NULL,
+	ip_drop_packet(mp, B_TRUE, ira->ira_ill,
 	    DROPPER(ipss, ipds_esp_no_sa),
 	    &espstack->esp_dropper);
 }

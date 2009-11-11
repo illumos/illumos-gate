@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_IPP_COMMON_H
 #define	_INET_IPP_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -49,14 +47,6 @@ extern uint32_t ipp_action_count;
 #define	IPP_ENABLED(proc, ipst)	((ipp_action_count != 0) && \
 	(~((ipst)->ips_ip_policy_mask) & (proc)))
 
-/* Apply IPQoS policies for inbound traffic? */
-#define	IP6_IN_IPP(flags, ipst) (IPP_ENABLED(IPP_LOCAL_IN, ipst) &&	\
-	(!((flags) & IP6_NO_IPPOLICY)))
-
-/* Apply IPQoS policies for oubound traffic? */
-#define	IP6_OUT_IPP(flags, ipst)	\
-	(IPP_ENABLED(IPP_LOCAL_OUT, ipst) && (!((flags) & IP6_NO_IPPOLICY)))
-
 /* Extracts 8 bit traffic class from IPV6 flow label field */
 #ifdef  _BIG_ENDIAN
 #define	__IPV6_TCLASS_FROM_FLOW(n)	(((n)>>20) & 0xff)
@@ -78,7 +68,9 @@ typedef	struct ip_priv {
 } ip_priv_t;
 
 /* The entry point for ip policy processing */
-extern void ip_process(ip_proc_t, mblk_t **, uint32_t);
+#ifdef	ILL_CONDEMNED
+extern mblk_t *ip_process(ip_proc_t, mblk_t *, ill_t *, ill_t *);
+#endif
 extern void ip_priv_free(void *);
 #endif /* _KERNEL */
 

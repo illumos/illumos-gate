@@ -116,7 +116,7 @@ extern void sosctp_assoc_isdisconnected(struct sctp_soassoc *ssa, int error);
 
 extern int sosctp_waitconnected(struct sonode *so, int fmode);
 extern int sosctp_uiomove(mblk_t *hdr_mp, ssize_t count, ssize_t blk_size,
-    int wroff, struct uio *uiop, int flags, cred_t *cr);
+    int wroff, struct uio *uiop, int flags);
 
 /*
  * Data structure types.

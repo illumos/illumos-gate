@@ -29,11 +29,11 @@
 #include <sys/sunddi.h>
 #include <sys/kstat.h>
 #include <sys/kmem.h>
+#include <sys/sdt.h>
 #include <net/pfkeyv2.h>
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
-#include <inet/ipsec_info.h>
 #include <inet/ipsec_impl.h>
 #include <inet/ipdrop.h>
 
@@ -246,16 +246,11 @@ ip_drop_unregister(ipdropper_t *ipd)
  * Actually drop a packet.  Many things could happen here, but at the least,
  * the packet will be freemsg()ed.
  */
-/* ARGSUSED */
 void
-ip_drop_packet(mblk_t *mp, boolean_t inbound, ill_t *arriving,
-    ire_t *outbound_ire, struct kstat_named *counter, ipdropper_t *who_called)
+ip_drop_packet(mblk_t *mp, boolean_t inbound, ill_t *ill,
+    struct kstat_named *counter, ipdropper_t *who_called)
 {
-	mblk_t *ipsec_mp = NULL;
-	ipsec_in_t *ii = NULL;
-	ipsec_out_t *io = NULL;
-	ipsec_info_t *in;
-	uint8_t vers;
+	char *str;
 
 	if (mp == NULL) {
 		/*
@@ -265,41 +260,7 @@ ip_drop_packet(mblk_t *mp, boolean_t inbound, ill_t *arriving,
 		return;
 	}
 
-	if (DB_TYPE(mp) == M_CTL) {
-		in = (ipsec_info_t *)mp->b_rptr;
-
-		if (in->ipsec_info_type == IPSEC_IN)
-			ii = (ipsec_in_t *)in;
-		else if (in->ipsec_info_type == IPSEC_OUT)
-			io = (ipsec_out_t *)in;
-
-		/* See if this is an ICMP packet (check for v4/v6). */
-		vers = (*mp->b_rptr) >> 4;
-		if (vers != IPV4_VERSION && vers != IPV6_VERSION) {
-			/*
-			 * If not, it's some other sort of M_CTL to be freed.
-			 * For now, treat it like an ordinary packet.
-			 */
-			ipsec_mp = mp;
-			mp = mp->b_cont;
-		}
-	}
-
-	/* Reality checks */
-	if (inbound && io != NULL)
-		cmn_err(CE_WARN,
-		    "ip_drop_packet: inbound packet with IPSEC_OUT");
-
-	if (outbound_ire != NULL && ii != NULL)
-		cmn_err(CE_WARN,
-		    "ip_drop_packet: outbound packet with IPSEC_IN");
-
-	/* At this point, mp always points to the data. */
-	/*
-	 * Can't make the assertion yet - It could be an inbound ICMP
-	 * message, which is M_CTL but with data in it.
-	 */
-	/* ASSERT(mp->b_datap->db_type == M_DATA); */
+	ASSERT(mp->b_datap->db_type == M_DATA);
 
 	/* Increment the bean counter, if available. */
 	if (counter != NULL) {
@@ -318,20 +279,73 @@ ip_drop_packet(mblk_t *mp, boolean_t inbound, ill_t *arriving,
 			break;
 		/* Other types we can't handle for now. */
 		}
-
-		/* TODO?  Copy out kstat name for use in logging. */
 	}
 
-	/* TODO: log the packet details if logging is called for. */
+	if (counter != NULL)
+		str = counter->name;
+	else if (who_called != NULL)
+		str = who_called->ipd_name;
+	else
+		str = "Unspecified IPsec drop";
+
+	if (inbound)
+		ip_drop_input(str, mp, ill);
+	else
+		ip_drop_output(str, mp, ill);
+
 	/* TODO: queue the packet onto a snoop-friendly queue. */
 
-	/* If I haven't queued the packet or some such nonsense, free it. */
-	if (ipsec_mp != NULL)
-		freeb(ipsec_mp);
 	/*
 	 * ASSERT this isn't a b_next linked mblk chain where a
 	 * chained dropper should be used instead
 	 */
 	ASSERT(mp->b_prev == NULL && mp->b_next == NULL);
 	freemsg(mp);
+}
+
+/*
+ * This is just a convinient place for dtrace to see dropped packets
+ */
+/*ARGSUSED*/
+void
+ip_drop_input(char *str, mblk_t *mp, ill_t *ill)
+{
+	if (mp == NULL)
+		return;
+
+	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
+		ipha_t *ipha = (ipha_t *)mp->b_rptr;
+
+		DTRACE_IP7(drop__in, mblk_t *, mp, conn_t *, NULL, void_ip_t *,
+		    ipha, __dtrace_ipsr_ill_t *, ill, ipha_t *, ipha,
+		    ip6_t *, NULL, int, 0);
+	} else {
+		ip6_t *ip6h = (ip6_t *)mp->b_rptr;
+
+		DTRACE_IP7(drop__in, mblk_t *, mp, conn_t *, NULL, void_ip_t *,
+		    ip6h, __dtrace_ipsr_ill_t *, ill, ipha_t *, NULL,
+		    ip6_t *, ip6h, int, 0);
+	}
+}
+
+/*ARGSUSED*/
+void
+ip_drop_output(char *str, mblk_t *mp, ill_t *ill)
+{
+	if (mp == NULL)
+		return;
+
+	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
+		ipha_t *ipha = (ipha_t *)mp->b_rptr;
+
+		DTRACE_IP7(drop__out, mblk_t *, mp, conn_t *, NULL, void_ip_t *,
+		    ipha, __dtrace_ipsr_ill_t *, ill, ipha_t *, ipha,
+		    ip6_t *, NULL, int, 0);
+	} else {
+		ip6_t *ip6h = (ip6_t *)mp->b_rptr;
+
+		DTRACE_IP7(drop__out, mblk_t *, mp, conn_t *, NULL, void_ip_t *,
+		    ip6h, __dtrace_ipsr_ill_t *, ill, ipha_t *, NULL,
+		    ip6_t *, ip6h, int, 0);
+	}
 }

@@ -852,7 +852,7 @@ keysock_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 int
 keysock_opt_set(queue_t *q, uint_t mgmt_flags, int level,
     int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
-    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
+    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr)
 {
 	int *i1 = (int *)invalp, errno = 0;
 	keysock_t *ks = (keysock_t *)q->q_ptr;
@@ -936,11 +936,9 @@ keysock_wput_other(queue_t *q, mblk_t *mp)
 			}
 			if (((union T_primitives *)mp->b_rptr)->type ==
 			    T_SVR4_OPTMGMT_REQ) {
-				(void) svr4_optcom_req(q, mp, cr,
-				    &keysock_opt_obj, B_FALSE);
+				svr4_optcom_req(q, mp, cr, &keysock_opt_obj);
 			} else {
-				(void) tpi_optcom_req(q, mp, cr,
-				    &keysock_opt_obj, B_FALSE);
+				tpi_optcom_req(q, mp, cr, &keysock_opt_obj);
 			}
 			break;
 		case T_DATA_REQ:

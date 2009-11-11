@@ -452,7 +452,7 @@ opdes_t	tl_opt_arr[] = {
 		OA_R,
 		OA_R,
 		OP_NP,
-		OP_PASSNEXT,
+		0,
 		sizeof (t_scalar_t),
 		0
 	},
@@ -462,7 +462,7 @@ opdes_t	tl_opt_arr[] = {
 		OA_RW,
 		OA_RW,
 		OP_NP,
-		OP_PASSNEXT,
+		0,
 		sizeof (int),
 		0
 	}
@@ -867,7 +867,7 @@ static void tl_fill_option(uchar_t *, cred_t *, pid_t, int, cred_t *);
 static int tl_default_opt(queue_t *, int, int, uchar_t *);
 static int tl_get_opt(queue_t *, int, int, uchar_t *);
 static int tl_set_opt(queue_t *, uint_t, int, int, uint_t, uchar_t *, uint_t *,
-    uchar_t *, void *, cred_t *, mblk_t *);
+    uchar_t *, void *, cred_t *);
 static void tl_memrecover(queue_t *, mblk_t *, size_t);
 static void tl_freetip(tl_endpt_t *, tl_icon_t *);
 static void tl_free(tl_endpt_t *);
@@ -904,7 +904,6 @@ optdb_obj_t tl_opt_obj = {
 	tl_default_opt,		/* TL default value function pointer */
 	tl_get_opt,		/* TL get function pointer */
 	tl_set_opt,		/* TL set function pointer */
-	B_TRUE,			/* TL is tpi provider */
 	TL_OPT_ARR_CNT,		/* TL option database count of entries */
 	tl_opt_arr,		/* TL option database */
 	TL_VALID_LEVELS_CNT,	/* TL valid level count of entries */
@@ -2789,12 +2788,10 @@ tl_optmgmt(queue_t *wq, mblk_t *mp)
 	 * call common option management routine from drv/ip
 	 */
 	if (prim->type == T_SVR4_OPTMGMT_REQ) {
-		(void) svr4_optcom_req(wq, mp, cr, &tl_opt_obj,
-		    B_FALSE);
+		svr4_optcom_req(wq, mp, cr, &tl_opt_obj);
 	} else {
 		ASSERT(prim->type == T_OPTMGMT_REQ);
-		(void) tpi_optcom_req(wq, mp, cr, &tl_opt_obj,
-		    B_FALSE);
+		tpi_optcom_req(wq, mp, cr, &tl_opt_obj);
 	}
 }
 
@@ -6066,8 +6063,7 @@ tl_set_opt(
 	uint_t		*outlenp,
 	uchar_t		*outvalp,
 	void		*thisdg_attrs,
-	cred_t		*cr,
-	mblk_t		*mblk)
+	cred_t		*cr)
 {
 	int error;
 	tl_endpt_t *tep;

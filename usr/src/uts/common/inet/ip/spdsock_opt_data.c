@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -53,9 +51,9 @@
  */
 
 opdes_t spdsock_opt_arr[] = {
-	{ SO_SNDBUF, SOL_SOCKET, OA_RW, OA_RW, OP_PASSNEXT,
+	{ SO_SNDBUF, SOL_SOCKET, OA_RW, OA_RW, 0,
 	    (t_uscalar_t)sizeof (int), 0 },
-	{ SO_RCVBUF, SOL_SOCKET, OA_RW, OA_RW, OP_PASSNEXT,
+	{ SO_RCVBUF, SOL_SOCKET, OA_RW, OA_RW, 0,
 	    (t_uscalar_t)sizeof (int), 0 },
 };
 
@@ -88,7 +86,6 @@ optdb_obj_t spdsock_opt_obj = {
 	NULL,			/* SPDSOCK default value function pointer */
 	spdsock_opt_get,	/* SPDSOCK get function pointer */
 	spdsock_opt_set,	/* SPDSOCK set function pointer */
-	B_TRUE,			/* SPDSOCK is tpi provider */
 	SPDSOCK_OPT_ARR_CNT,	/* SPDSOCK option database count of entries */
 	spdsock_opt_arr,	/* SPDSOCK option database */
 	SPDSOCK_VALID_LEVELS_CNT, /* SPDSOCK valid level count of entries */

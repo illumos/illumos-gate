@@ -207,7 +207,7 @@ sosctp_init(struct sonode *so, struct sonode *pso, struct cred *cr, int flags)
 		upcalls = &sosctp_assoc_upcalls;
 	}
 	so->so_proto_handle = (sock_lower_handle_t)sctp_create(so, NULL,
-	    so->so_family, SCTP_CAN_BLOCK, upcalls, &sbl, cr);
+	    so->so_family, so->so_type, SCTP_CAN_BLOCK, upcalls, &sbl, cr);
 	if (so->so_proto_handle == NULL)
 		return (ENOMEM);
 
@@ -350,6 +350,7 @@ sosctp_connect(struct sonode *so, const struct sockaddr *name,
     socklen_t namelen, int fflag, int flags, struct cred *cr)
 {
 	int error = 0;
+	pid_t pid = curproc->p_pid;
 
 	ASSERT(so->so_type == SOCK_STREAM);
 
@@ -404,7 +405,7 @@ sosctp_connect(struct sonode *so, const struct sockaddr *name,
 	mutex_exit(&so->so_lock);
 
 	error = sctp_connect((struct sctp_s *)so->so_proto_handle,
-	    name, namelen);
+	    name, namelen, cr, pid);
 
 	mutex_enter(&so->so_lock);
 	if (error == 0) {
@@ -662,7 +663,7 @@ done:
 
 int
 sosctp_uiomove(mblk_t *hdr_mp, ssize_t count, ssize_t blk_size, int wroff,
-    struct uio *uiop, int flags, cred_t *cr)
+    struct uio *uiop, int flags)
 {
 	ssize_t size;
 	int error;
@@ -683,8 +684,7 @@ sosctp_uiomove(mblk_t *hdr_mp, ssize_t count, ssize_t blk_size, int wroff,
 		 * packets, each mblk will have the extra space before
 		 * data to accommodate what SCTP wants to put in there.
 		 */
-		while ((mp = allocb_cred(size + wroff, cr,
-		    curproc->p_pid)) == NULL) {
+		while ((mp = allocb(size + wroff, BPRI_MED)) == NULL) {
 			if ((uiop->uio_fmode & (FNDELAY|FNONBLOCK)) ||
 			    (flags & MSG_DONTWAIT)) {
 				return (EAGAIN);
@@ -887,7 +887,7 @@ sosctp_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 
 	/* Copy in the message. */
 	if ((error = sosctp_uiomove(mctl, count, ss->ss_wrsize, ss->ss_wroff,
-	    uiop, flags, cr)) != 0) {
+	    uiop, flags)) != 0) {
 		goto error_ret;
 	}
 	error = sctp_sendmsg((struct sctp_s *)so->so_proto_handle, mctl, 0);
@@ -1091,7 +1091,7 @@ sosctp_seq_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 
 	/* Copy in the message. */
 	if ((error = sosctp_uiomove(mctl, count, ssa->ssa_wrsize,
-	    ssa->ssa_wroff, uiop, flags, cr)) != 0) {
+	    ssa->ssa_wroff, uiop, flags)) != 0) {
 		goto lock_rele;
 	}
 	error = sctp_sendmsg((struct sctp_s *)ssa->ssa_conn, mctl, 0);

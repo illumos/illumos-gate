@@ -130,7 +130,8 @@ struct rtentry {
 #define	RTF_PROTO1	0x8000		/* protocol specific routing flag */
 #define	RTF_MULTIRT	0x10000		/* multiroute */
 #define	RTF_SETSRC	0x20000		/* set default outgoing src address */
-
+#define	RTF_INDIRECT	0x40000		/* gateway not directly reachable */
+#define	RTF_KERNEL	0x80000		/* created by kernel; can't delete */
 
 /*
  * OLD statistics not used by the kernel. The kernel uses <inet/mib2.h>.

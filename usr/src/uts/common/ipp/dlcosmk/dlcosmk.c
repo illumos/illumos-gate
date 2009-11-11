@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -88,8 +86,8 @@ dlcosmk_process(mblk_t **mpp, dlcosmk_data_t *dlcosmk_data, uint32_t ill_index,
 	}
 
 	if ((ill_index == 0) ||
-	    ((ill = ill_lookup_on_ifindex_global_instance(ill_index, B_FALSE,
-		NULL, NULL, NULL, NULL)) == NULL)) {
+	    ((ill = ill_lookup_on_ifindex_global_instance(ill_index,
+	    B_FALSE)) == NULL)) {
 		dlcosmk2dbg(("dlcosmk_process:invalid ill index %u\n",
 		    ill_index));
 		atomic_add_64(&dlcosmk_data->ipackets, 1);

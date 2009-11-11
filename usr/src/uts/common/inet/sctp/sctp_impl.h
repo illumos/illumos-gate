@@ -191,7 +191,6 @@ typedef struct sctpparam_s {
 #define	SCTP_MAX_COMBINED_HEADER_LENGTH	(60 + 12) /* Maxed out ip + sctp */
 #define	SCTP_MAX_IP_OPTIONS_LENGTH	(60 - IP_SIMPLE_HDR_LENGTH)
 #define	SCTP_MAX_HDR_LENGTH		60
-#define	ICMP_MIN_SCTP_HDR_LEN	(ICMP_MIN_TP_HDR_LEN + sizeof (sctp_hdr_t))
 
 #define	SCTP_SECRET_LEN	16
 
@@ -211,27 +210,6 @@ typedef struct sctpparam_s {
 	} else {					\
 		mutex_exit(&(sctp)->sctp_reflock);	\
 	}						\
-}
-
-#define	SCTP_G_Q_REFHOLD(sctps) {					\
-	atomic_add_32(&(sctps)->sctps_g_q_ref, 1);			\
-	ASSERT((sctps)->sctps_g_q_ref != 0);				\
-	DTRACE_PROBE1(sctp__g__q__refhold, sctp_stack_t, sctps);	\
-}
-
-/*
- * Decrement the reference count on sctp_g_q
- * In architectures e.g sun4u, where atomic_add_32_nv is just
- * a cas, we need to maintain the right memory barrier semantics
- * as that of mutex_exit i.e all the loads and stores should complete
- * before the cas is executed. membar_exit() does that here.
- */
-#define	SCTP_G_Q_REFRELE(sctps) {					\
-	ASSERT((sctps)->sctps_g_q_ref != 0);				\
-	membar_exit();							\
-	DTRACE_PROBE1(sctp__g__q__refrele, sctp_stack_t, sctps);	\
-	if (atomic_add_32_nv(&(sctps)->sctps_g_q_ref, -1) == 0)		\
-		sctp_g_q_inactive(sctps);				\
 }
 
 #define	SCTP_PRINTADDR(a)	(a).s6_addr32[0], (a).s6_addr32[1],\
@@ -399,15 +377,6 @@ extern sin6_t	sctp_sin6_null;	/* Zero address for quick clears */
 
 #define	SCTP_IS_DETACHED(sctp)		((sctp)->sctp_detached)
 
-/*
- * Object to represent database of options to search passed to
- * {sock,tpi}optcom_req() interface routine to take care of option
- * management and associated methods.
- * XXX These and other externs should ideally move to a SCTP header
- */
-extern optdb_obj_t	sctp_opt_obj;
-extern uint_t		sctp_max_optbuf_len;
-
 /* Data structure used to track received TSNs */
 typedef struct sctp_set_s {
 	struct sctp_set_s *next;
@@ -528,7 +497,7 @@ typedef struct sctp_faddr_s {
 			hb_enabled : 1;
 
 	mblk_t		*rc_timer_mp;	/* reliable control chunk timer */
-	ire_t		*ire;		/* cached IRE */
+	ip_xmit_attr_t	*ixa;		/* Transmit attributes */
 	uint32_t	T3expire;	/* # of times T3 timer expired */
 
 	uint64_t	hb_secret;	/* per addr "secret" in heartbeat */
@@ -600,25 +569,6 @@ typedef struct sctp_s {
 	sctp_ipif_hash_t	sctp_saddrs[SCTP_IPIF_HASH];
 	int			sctp_nsaddrs;
 
-	/*
-	 * These fields contain the same information as sctp_sctph->th_*port.
-	 * However, the lookup functions can not use the header fields
-	 * since during IP option manipulation the sctp_sctph pointer
-	 * changes.
-	 */
-	union {
-		struct {
-			in_port_t	sctpu_fport;	/* Remote port */
-			in_port_t	sctpu_lport;	/* Local port */
-		} sctpu_ports1;
-		uint32_t		sctpu_ports2;	/* Rem port, */
-							/* local port */
-					/* Used for SCTP_MATCH performance */
-	} sctp_sctpu;
-#define	sctp_fport	sctp_sctpu.sctpu_ports1.sctpu_fport
-#define	sctp_lport	sctp_sctpu.sctpu_ports1.sctpu_lport
-#define	sctp_ports	sctp_sctpu.sctpu_ports2
-
 	kmutex_t	sctp_lock;
 	kcondvar_t	sctp_cv;
 	boolean_t	sctp_running;
@@ -637,12 +587,6 @@ typedef struct sctp_s {
 	int32_t		sctp_state;
 
 	conn_t		*sctp_connp;		/* conn_t stuff */
-#define	sctp_zoneid	sctp_connp->conn_zoneid
-#define	sctp_allzones	sctp_connp->conn_allzones
-#define	sctp_mac_mode	sctp_connp->conn_mac_mode
-#define	sctp_credp	sctp_connp->conn_cred
-#define	sctp_reuseaddr	sctp_connp->conn_reuseaddr
-
 	sctp_stack_t	*sctp_sctps;
 
 	/* Peer address tracking */
@@ -711,9 +655,6 @@ typedef struct sctp_s {
 	uint32_t	sctp_T3expire;		/* # of times T3timer expired */
 	uint32_t	sctp_assoc_start_time;	/* time when assoc was est. */
 
-	/* Outbound flow control */
-	int32_t		sctp_xmit_hiwater;	/* Send high water mark */
-	int32_t		sctp_xmit_lowater;	/* Send low water mark */
 	uint32_t	sctp_frwnd;		/* Peer RWND */
 	uint32_t	sctp_cwnd_max;
 
@@ -723,8 +664,8 @@ typedef struct sctp_s {
 	int32_t		sctp_rxqueued;		/* No. of bytes in RX q's */
 
 	/* Pre-initialized composite headers */
-	char		*sctp_iphc;	/* v4 sctp/ip hdr template buffer */
-	char		*sctp_iphc6;	/* v6 sctp/ip hdr template buffer */
+	uchar_t		*sctp_iphc;	/* v4 sctp/ip hdr template buffer */
+	uchar_t		*sctp_iphc6;	/* v6 sctp/ip hdr template buffer */
 
 	int32_t		sctp_iphc_len;	/* actual allocated v4 buffer size */
 	int32_t		sctp_iphc6_len;	/* actual allocated v6 buffer size */
@@ -754,17 +695,12 @@ typedef struct sctp_s {
 		uint32_t
 
 		sctp_understands_asconf : 1, /* Peer handles ASCONF chunks */
-		sctp_debug : 1,		/* SO_DEBUG "socket" option. */
 		sctp_cchunk_pend : 1,	/* Control chunk in flight. */
-		sctp_dgram_errind : 1,	/* SO_DGRAM_ERRIND option */
-
-		sctp_linger : 1,	/* SO_LINGER turned on */
 		sctp_lingering : 1,	/* Lingering in close */
 		sctp_loopback: 1,	/* src and dst are the same machine */
-		sctp_force_sack : 1,
 
+		sctp_force_sack : 1,
 		sctp_ack_timer_running: 1,	/* Delayed ACK timer running */
-		sctp_recvdstaddr : 1,	/* return T_EXTCONN_IND with dstaddr */
 		sctp_hwcksum : 1,	/* The NIC is capable of hwcksum */
 		sctp_understands_addip : 1,
 
@@ -802,15 +738,11 @@ typedef struct sctp_s {
 	} sctp_events;
 #define	sctp_priv_stream sctp_bits.sctp_priv_stream
 #define	sctp_understands_asconf sctp_bits.sctp_understands_asconf
-#define	sctp_debug sctp_bits.sctp_debug
 #define	sctp_cchunk_pend sctp_bits.sctp_cchunk_pend
-#define	sctp_dgram_errind sctp_bits.sctp_dgram_errind
-#define	sctp_linger sctp_bits.sctp_linger
 #define	sctp_lingering sctp_bits.sctp_lingering
 #define	sctp_loopback sctp_bits.sctp_loopback
 #define	sctp_force_sack sctp_bits.sctp_force_sack
 #define	sctp_ack_timer_running sctp_bits.sctp_ack_timer_running
-#define	sctp_recvdstaddr sctp_bits.sctp_recvdstaddr
 #define	sctp_hwcksum sctp_bits.sctp_hwcksum
 #define	sctp_understands_addip sctp_bits.sctp_understands_addip
 #define	sctp_bound_to_all sctp_bits.sctp_bound_to_all
@@ -853,15 +785,6 @@ typedef struct sctp_s {
 	uint8_t		sctp_old_secret[SCTP_SECRET_LEN];
 	uint32_t	sctp_cookie_lifetime;	/* cookie lifetime in tick */
 
-	/*
-	 * Address family that app wishes returned addrsses to be in.
-	 * Currently taken from address family used in T_BIND_REQ, but
-	 * should really come from family used in original socket() call.
-	 * Value can be AF_INET or AF_INET6.
-	 */
-	uint_t		sctp_family;
-	ushort_t	sctp_ipversion;
-
 	/* Bind hash tables */
 	kmutex_t	*sctp_bind_lockp;	/* Ptr to tf_lock */
 	struct sctp_s	*sctp_bind_hash;
@@ -870,13 +793,9 @@ typedef struct sctp_s {
 	/* Shutdown / cleanup */
 	sctp_faddr_t	*sctp_shutdown_faddr;	/* rotate faddr during shutd */
 	int32_t		sctp_client_errno;	/* How the client screwed up */
-	int		sctp_lingertime; /* Close linger time (in seconds) */
 	kmutex_t	sctp_reflock;	/* Protects sctp_refcnt & timer mp */
 	ushort_t	sctp_refcnt;	/* No. of pending upstream msg */
 	mblk_t		*sctp_timer_mp;	/* List of fired timers. */
-
-	/* Misc */
-	uint_t		sctp_bound_if;	/* IPV6_BOUND_IF */
 
 	mblk_t		*sctp_heartbeat_mp; /* Timer block for heartbeats */
 	uint32_t	sctp_hb_interval; /* Default hb_interval */
@@ -897,47 +816,19 @@ typedef struct sctp_s {
 	mblk_t		*sctp_recvq_tail;
 	taskq_t		*sctp_recvq_tq;
 
-	/* Send queue to IP */
-	kmutex_t	sctp_sendq_lock;
-	mblk_t		*sctp_sendq;
-	mblk_t		*sctp_sendq_tail;
-	boolean_t	sctp_sendq_sending;
-
 	/* IPv6 ancillary data */
-	uint_t		sctp_ipv6_recvancillary;	/* flags */
-#define	SCTP_IPV6_RECVPKTINFO	0x01		/* IPV6_RECVPKTINFO opt */
-#define	SCTP_IPV6_RECVHOPLIMIT	0x02		/* IPV6_RECVHOPLIMIT opt */
-#define	SCTP_IPV6_RECVHOPOPTS	0x04		/* IPV6_RECVHOPOPTS opt */
-#define	SCTP_IPV6_RECVDSTOPTS	0x08		/* IPV6_RECVDSTOPTS opt */
-#define	SCTP_IPV6_RECVRTHDR	0x10		/* IPV6_RECVRTHDR opt */
-#define	SCTP_IPV6_RECVRTDSTOPTS	0x20		/* IPV6_RECVRTHDRDSTOPTS opt */
-
 	uint_t		sctp_recvifindex;	/* last rcvd IPV6_RCVPKTINFO */
 	uint_t		sctp_recvhops;		/*  " IPV6_RECVHOPLIMIT */
+	uint_t		sctp_recvtclass;	/*  " IPV6_RECVTCLASS */
 	ip6_hbh_t	*sctp_hopopts;		/*  " IPV6_RECVHOPOPTS */
 	ip6_dest_t	*sctp_dstopts;		/*  " IPV6_RECVDSTOPTS */
-	ip6_dest_t	*sctp_rtdstopts;	/*  " IPV6_RECVRTHDRDSTOPTS */
+	ip6_dest_t	*sctp_rthdrdstopts;	/*  " IPV6_RECVRTHDRDSTOPTS */
 	ip6_rthdr_t	*sctp_rthdr;		/*  " IPV6_RECVRTHDR */
 	uint_t		sctp_hopoptslen;
 	uint_t		sctp_dstoptslen;
-	uint_t		sctp_rtdstoptslen;
+	uint_t		sctp_rthdrdstoptslen;
 	uint_t		sctp_rthdrlen;
 
-	ip6_pkt_t	sctp_sticky_ipp;	/* Sticky options */
-#define	sctp_ipp_fields		sctp_sticky_ipp.ipp_fields
-#define	sctp_ipp_ifindex	sctp_sticky_ipp.ipp_ifindex
-#define	sctp_ipp_addr		sctp_sticky_ipp.ipp_addr
-#define	sctp_ipp_hoplimit	sctp_sticky_ipp.ipp_hoplimit
-#define	sctp_ipp_hopoptslen	sctp_sticky_ipp.ipp_hopoptslen
-#define	sctp_ipp_rtdstoptslen	sctp_sticky_ipp.ipp_rtdstoptslen
-#define	sctp_ipp_rthdrlen	sctp_sticky_ipp.ipp_rthdrlen
-#define	sctp_ipp_dstoptslen	sctp_sticky_ipp.ipp_dstoptslen
-#define	sctp_ipp_hopopts	sctp_sticky_ipp.ipp_hopopts
-#define	sctp_ipp_rtdstopts	sctp_sticky_ipp.ipp_rtdstopts
-#define	sctp_ipp_rthdr		sctp_sticky_ipp.ipp_rthdr
-#define	sctp_ipp_dstopts	sctp_sticky_ipp.ipp_dstopts
-#define	sctp_ipp_pathmtu	sctp_sticky_ipp.ipp_pathmtu
-#define	sctp_ipp_nexthop	sctp_sticky_ipp.ipp_nexthop
 	/* Stats */
 	uint64_t	sctp_msgcount;
 	uint64_t	sctp_prsctpdrop;
@@ -950,9 +841,6 @@ typedef struct sctp_s {
 	int		sctp_pd_point;		/* Partial delivery point */
 	mblk_t		*sctp_err_chunks;	/* Error chunks */
 	uint32_t	sctp_err_len;		/* Total error chunks length */
-
-	pid_t		sctp_cpid;	/* Process id when this was opened */
-	uint64_t	sctp_open_time;	/* time when this was opened */
 
 	/* additional source data for per endpoint association statistics */
 	uint64_t	sctp_outseqtsns;	/* TSN rx > expected TSN */
@@ -988,7 +876,7 @@ typedef struct sctp_s {
 #define	SCTP_TXQ_LEN(sctp)	((sctp)->sctp_unsent + (sctp)->sctp_unacked)
 #define	SCTP_TXQ_UPDATE(sctp)					\
 	if ((sctp)->sctp_txq_full && SCTP_TXQ_LEN(sctp) <=	\
-	    (sctp)->sctp_xmit_lowater) {			\
+	    (sctp)->sctp_connp->conn_sndlowat) {		\
 		(sctp)->sctp_txq_full = 0;			\
 		(sctp)->sctp_ulp_xmitted((sctp)->sctp_ulpd,	\
 		    B_FALSE);					\
@@ -1004,8 +892,8 @@ extern void	sctp_add_err(sctp_t *, uint16_t, void *, size_t,
 extern int	sctp_add_faddr(sctp_t *, in6_addr_t *, int, boolean_t);
 extern boolean_t sctp_add_ftsn_set(sctp_ftsn_set_t **, sctp_faddr_t *, mblk_t *,
 		    uint_t *, uint32_t *);
-extern boolean_t sctp_add_recvq(sctp_t *, mblk_t *, boolean_t);
-extern void	sctp_add_sendq(sctp_t *, mblk_t *);
+extern void	sctp_add_recvq(sctp_t *, mblk_t *, boolean_t,
+		    ip_recv_attr_t *);
 extern void	sctp_add_unrec_parm(sctp_parm_hdr_t *, mblk_t **, boolean_t);
 extern size_t	sctp_addr_params(sctp_t *, int, uchar_t *, boolean_t);
 extern mblk_t	*sctp_add_proto_hdr(sctp_t *, sctp_faddr_t *, mblk_t *, int,
@@ -1013,7 +901,6 @@ extern mblk_t	*sctp_add_proto_hdr(sctp_t *, sctp_faddr_t *, mblk_t *, int,
 extern void	sctp_addr_req(sctp_t *, mblk_t *);
 extern sctp_t	*sctp_addrlist2sctp(mblk_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
 		    zoneid_t, sctp_stack_t *);
-extern void	sctp_add_hdr(sctp_t *, uchar_t *, size_t);
 extern void	sctp_check_adv_ack_pt(sctp_t *, mblk_t *, mblk_t *);
 extern void	sctp_assoc_event(sctp_t *, uint16_t, uint16_t,
 		    sctp_chunk_hdr_t *);
@@ -1024,7 +911,7 @@ extern int	sctp_bindi(sctp_t *, in_port_t, boolean_t, int, in_port_t *);
 extern int	sctp_bind_add(sctp_t *, const void *, uint32_t, boolean_t,
 		    in_port_t);
 extern int	sctp_bind_del(sctp_t *, const void *, uint32_t, boolean_t);
-extern int	sctp_build_hdrs(sctp_t *);
+extern int	sctp_build_hdrs(sctp_t *, int);
 
 extern int	sctp_check_abandoned_msg(sctp_t *, mblk_t *);
 extern void	sctp_clean_death(sctp_t *, int);
@@ -1035,11 +922,9 @@ extern void	sctp_conn_hash_insert(sctp_tf_t *, sctp_t *, int);
 extern void	sctp_conn_hash_remove(sctp_t *);
 extern void	sctp_conn_init(conn_t *);
 extern sctp_t	*sctp_conn_match(in6_addr_t *, in6_addr_t *, uint32_t,
-		    zoneid_t, sctp_stack_t *);
+		    zoneid_t, iaflags_t, sctp_stack_t *);
 extern sctp_t	*sctp_conn_request(sctp_t *, mblk_t *, uint_t, uint_t,
-		    sctp_init_chunk_t *, mblk_t *);
-extern int	sctp_conprim_opt_process(queue_t *, mblk_t *, int *, int *,
-		    int *);
+		    sctp_init_chunk_t *, ip_recv_attr_t *);
 extern uint32_t	sctp_cumack(sctp_t *, uint32_t, mblk_t **);
 extern sctp_t	*sctp_create_eager(sctp_t *);
 
@@ -1066,10 +951,9 @@ extern void	sctp_ftsn_sets_init(void);
 
 extern int	sctp_get_addrlist(sctp_t *, const void *, uint32_t *,
 		    uchar_t **, int *, size_t *);
-extern void	sctp_g_q_inactive(sctp_stack_t *);
 extern int	sctp_get_addrparams(sctp_t *, sctp_t *, mblk_t *,
 		    sctp_chunk_hdr_t *, uint_t *);
-extern void	sctp_get_ire(sctp_t *, sctp_faddr_t *);
+extern void	sctp_get_dest(sctp_t *, sctp_faddr_t *);
 extern void	sctp_get_faddr_list(sctp_t *, uchar_t *, size_t);
 extern mblk_t	*sctp_get_first_sent(sctp_t *);
 extern mblk_t	*sctp_get_msg_to_send(sctp_t *, mblk_t **, mblk_t *, int  *,
@@ -1077,22 +961,20 @@ extern mblk_t	*sctp_get_msg_to_send(sctp_t *, mblk_t **, mblk_t *, int  *,
 extern void	sctp_get_saddr_list(sctp_t *, uchar_t *, size_t);
 
 extern int	sctp_handle_error(sctp_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
-		    mblk_t *);
+		    mblk_t *, ip_recv_attr_t *);
 extern void	sctp_hash_destroy(sctp_stack_t *);
 extern void	sctp_hash_init(sctp_stack_t *);
-extern int	sctp_header_init_ipv4(sctp_t *, int);
-extern int	sctp_header_init_ipv6(sctp_t *, int);
 extern void	sctp_heartbeat_timer(sctp_t *);
 
 extern void	sctp_icmp_error(sctp_t *, mblk_t *);
 extern void	sctp_inc_taskq(sctp_stack_t *);
 extern void	sctp_info_req(sctp_t *, mblk_t *);
-extern mblk_t	*sctp_init_mp(sctp_t *);
+extern mblk_t	*sctp_init_mp(sctp_t *, sctp_faddr_t *);
 extern boolean_t sctp_initialize_params(sctp_t *, sctp_init_chunk_t *,
 		    sctp_init_chunk_t *);
 extern uint32_t	sctp_init2vtag(sctp_chunk_hdr_t *);
 extern void	sctp_intf_event(sctp_t *, in6_addr_t, int, int);
-extern void	sctp_input_data(sctp_t *, mblk_t *, mblk_t *);
+extern void	sctp_input_data(sctp_t *, mblk_t *, ip_recv_attr_t *);
 extern void	sctp_instream_cleanup(sctp_t *, boolean_t);
 extern int	sctp_is_a_faddr_clean(sctp_t *);
 
@@ -1124,7 +1006,8 @@ extern int	sctp_nd_getset(queue_t *, MBLKP);
 extern boolean_t sctp_nd_init(sctp_stack_t *);
 extern sctp_parm_hdr_t *sctp_next_parm(sctp_parm_hdr_t *, ssize_t *);
 
-extern void	sctp_ootb_shutdown_ack(sctp_t *, mblk_t *, uint_t);
+extern void	sctp_ootb_shutdown_ack(mblk_t *, uint_t, ip_recv_attr_t *,
+		    ip_stack_t *);
 extern size_t	sctp_options_param(const sctp_t *, void *, int);
 extern size_t	sctp_options_param_len(const sctp_t *, int);
 extern void	sctp_output(sctp_t *, uint_t);
@@ -1132,10 +1015,10 @@ extern void	sctp_output(sctp_t *, uint_t);
 extern boolean_t sctp_param_register(IDP *, sctpparam_t *, int, sctp_stack_t *);
 extern void	sctp_partial_delivery_event(sctp_t *);
 extern int	sctp_process_cookie(sctp_t *, sctp_chunk_hdr_t *, mblk_t *,
-		    sctp_init_chunk_t **, sctp_hdr_t *, int *, in6_addr_t *);
+		    sctp_init_chunk_t **, sctp_hdr_t *, int *, in6_addr_t *,
+		    ip_recv_attr_t *);
 extern void	sctp_process_err(sctp_t *);
 extern void	sctp_process_heartbeat(sctp_t *, sctp_chunk_hdr_t *);
-extern void	sctp_process_sendq(sctp_t *);
 extern void	sctp_process_timer(sctp_t *);
 
 extern void	sctp_redo_faddr_srcs(sctp_t *);
@@ -1149,13 +1032,17 @@ extern sctp_faddr_t *sctp_rotate_faddr(sctp_t *, sctp_faddr_t *);
 
 extern boolean_t sctp_sack(sctp_t *, mblk_t *);
 extern int	sctp_secure_restart_check(mblk_t *, sctp_chunk_hdr_t *,
-		    uint32_t, int, sctp_stack_t *);
+		    uint32_t, int, sctp_stack_t *, ip_recv_attr_t *);
 extern void	sctp_send_abort(sctp_t *, uint32_t, uint16_t, char *, size_t,
-		    mblk_t *, int, boolean_t);
+		    mblk_t *, int, boolean_t, ip_recv_attr_t *);
+extern void	sctp_ootb_send_abort(uint32_t, uint16_t, char *, size_t,
+		    const mblk_t *, int, boolean_t, ip_recv_attr_t *,
+		    ip_stack_t *);
 extern void	sctp_send_cookie_ack(sctp_t *);
-extern void	sctp_send_cookie_echo(sctp_t *, sctp_chunk_hdr_t *, mblk_t *);
+extern void	sctp_send_cookie_echo(sctp_t *, sctp_chunk_hdr_t *, mblk_t *,
+			ip_recv_attr_t *);
 extern void	sctp_send_initack(sctp_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
-		    mblk_t *);
+		    mblk_t *, ip_recv_attr_t *);
 extern void	sctp_send_shutdown(sctp_t *, int);
 extern void	sctp_send_heartbeat(sctp_t *, sctp_faddr_t *);
 extern void	sctp_sendfail_event(sctp_t *, mblk_t *, int, boolean_t);
@@ -1170,7 +1057,7 @@ extern int	sctp_shutdown_received(sctp_t *, sctp_chunk_hdr_t *, boolean_t,
 		    boolean_t, sctp_faddr_t *);
 extern void	sctp_shutdown_complete(sctp_t *);
 extern void	sctp_set_if_mtu(sctp_t *);
-extern void	sctp_set_iplen(sctp_t *, mblk_t *);
+extern void	sctp_set_iplen(sctp_t *, mblk_t *, ip_xmit_attr_t *);
 extern void	sctp_set_ulp_prop(sctp_t *);
 extern void	sctp_ss_rexmit(sctp_t *);
 extern size_t	sctp_supaddr_param_len(sctp_t *);
@@ -1183,7 +1070,7 @@ extern void	sctp_timer_free(mblk_t *);
 extern void	sctp_timer_stop(mblk_t *);
 extern void	sctp_unlink_faddr(sctp_t *, sctp_faddr_t *);
 
-extern void	sctp_update_ire(sctp_t *sctp);
+extern void	sctp_update_dce(sctp_t *sctp);
 extern in_port_t sctp_update_next_port(in_port_t, zone_t *zone, sctp_stack_t *);
 extern void	sctp_update_rtt(sctp_t *, sctp_faddr_t *, clock_t);
 extern void	sctp_user_abort(sctp_t *, mblk_t *);
@@ -1208,17 +1095,6 @@ extern void	(*cl_sctp_assoc_change)(sa_family_t, uchar_t *, size_t, uint_t,
 		    uchar_t *, size_t, uint_t, int, cl_sctp_handle_t);
 extern void	(*cl_sctp_check_addrs)(sa_family_t, in_port_t, uchar_t **,
 		    size_t, uint_t *, boolean_t);
-
-/* Send a mp to IP. */
-#define	IP_PUT(mp, conn, isv4)						\
-{									\
-	sctp_stack_t	*sctps = conn->conn_netstack->netstack_sctp;	\
-									\
-	if ((isv4))							\
-		ip_output((conn), (mp), WR(sctps->sctps_g_q), IP_WPUT);	\
-	else								\
-		ip_output_v6((conn), (mp), WR(sctps->sctps_g_q), IP_WPUT);\
-}
 
 #define	RUN_SCTP(sctp)						\
 {								\

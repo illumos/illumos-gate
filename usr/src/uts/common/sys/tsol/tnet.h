@@ -46,35 +46,30 @@ extern "C" {
 
 extern int tsol_tnrh_chk(tsol_tpent_t *, bslabel_t *, int);
 extern tsol_tnrhc_t *find_rhc(const void *, uchar_t, boolean_t);
-extern int tsol_check_dest(const cred_t *, const void *, uchar_t, uint_t,
-    cred_t **);
-extern int tsol_compute_label(const cred_t *, ipaddr_t, uchar_t *,
-    ip_stack_t *);
-extern int tsol_compute_label_v6(const cred_t *, const in6_addr_t *, uchar_t *,
-    ip_stack_t *);
-extern int tsol_check_label(const cred_t *, mblk_t **, uint_t,
-    ip_stack_t *, pid_t);
-extern int tsol_check_label_v6(const cred_t *, mblk_t **, uint_t,
-    ip_stack_t *, pid_t);
+extern int tsol_check_dest(const ts_label_t *, const void *, uchar_t,
+    uint_t, boolean_t, ts_label_t **);
+extern int tsol_compute_label_v4(const ts_label_t *, zoneid_t, ipaddr_t,
+    uchar_t *, ip_stack_t *);
+extern int tsol_compute_label_v6(const ts_label_t *, zoneid_t,
+    const in6_addr_t *, uchar_t *, ip_stack_t *);
+extern int tsol_check_label_v4(const ts_label_t *, zoneid_t, mblk_t **,
+    uint_t, boolean_t, ip_stack_t *, ts_label_t **);
+extern int tsol_check_label_v6(const ts_label_t *, zoneid_t, mblk_t **,
+    uint_t, boolean_t, ip_stack_t *, ts_label_t **);
 extern int tsol_prepend_option(uchar_t *, ipha_t *, int);
 extern int tsol_prepend_option_v6(uchar_t *, ip6_t *, int);
 extern int tsol_remove_secopt(ipha_t *, int);
 extern int tsol_remove_secopt_v6(ip6_t *, int);
-extern int tsol_update_sticky(ip6_pkt_t *, uint_t *, const uchar_t *);
-extern int tsol_update_options(uchar_t **, uint_t *, uint_t *,
-    const uchar_t *);
-extern boolean_t tsol_option_set(uchar_t **, uint_t *, uint_t, const uchar_t *,
-    uint_t);
 
 extern tsol_ire_gw_secattr_t *ire_gw_secattr_alloc(int);
 extern void ire_gw_secattr_free(tsol_ire_gw_secattr_t *);
 
-extern boolean_t tsol_can_reply_error(const mblk_t *);
+extern boolean_t tsol_can_reply_error(const mblk_t *, ip_recv_attr_t *);
 extern boolean_t tsol_receive_local(const mblk_t *, const void *, uchar_t,
-    boolean_t, const conn_t *);
-extern boolean_t tsol_can_accept_raw(mblk_t *, boolean_t);
-extern boolean_t tsol_get_pkt_label(mblk_t *, int);
-extern zoneid_t tsol_packet_to_zoneid(const mblk_t *);
+    ip_recv_attr_t *, const conn_t *);
+extern boolean_t tsol_can_accept_raw(mblk_t *, ip_recv_attr_t *, boolean_t);
+extern boolean_t tsol_get_pkt_label(mblk_t *, int, ip_recv_attr_t *);
+extern zoneid_t tsol_attr_to_zoneid(const ip_recv_attr_t *);
 
 extern boolean_t tsol_get_option_v4(mblk_t *, tsol_ip_label_t *, uint8_t **);
 extern boolean_t tsol_get_option_v6(mblk_t *, tsol_ip_label_t *, uint8_t **);
@@ -83,8 +78,8 @@ extern boolean_t tsol_find_secopt_v6(const uchar_t *, uint_t, uchar_t **,
 
 extern int tsol_ire_match_gwattr(ire_t *, const ts_label_t *);
 extern int tsol_rtsa_init(rt_msghdr_t *, tsol_rtsecattr_t *, caddr_t);
-extern int tsol_ire_init_gwattr(ire_t *, uchar_t, tsol_gc_t *, tsol_gcgrp_t *);
-extern mblk_t *tsol_ip_forward(ire_t *, mblk_t *);
+extern int tsol_ire_init_gwattr(ire_t *, uchar_t, tsol_gc_t *);
+extern mblk_t *tsol_ip_forward(ire_t *, mblk_t *, const ip_recv_attr_t *);
 extern uint32_t tsol_pmtu_adjust(mblk_t *, uint32_t, int, int);
 
 extern mlp_type_t tsol_mlp_addr_type(zoneid_t, uchar_t, const void *,

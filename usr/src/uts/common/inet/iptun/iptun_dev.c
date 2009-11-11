@@ -91,11 +91,9 @@ iptun_stack_shutdown(netstackid_t stackid, void *arg)
 	/* note that iptun_delete() removes iptun from the list */
 	while ((iptun = list_head(&iptuns->iptuns_iptunlist)) != NULL) {
 		linkid = iptun->iptun_linkid;
-		(void) iptun_delete(linkid, iptun->iptun_cred);
+		(void) iptun_delete(linkid, iptun->iptun_connp->conn_cred);
 		(void) dls_mgmt_destroy(linkid, B_FALSE);
 	}
-	if (iptuns->iptuns_g_q != NULL)
-		(void) ldi_close(iptuns->iptuns_g_q_lh, FWRITE|FREAD, CRED());
 }
 
 /*

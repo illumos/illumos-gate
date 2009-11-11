@@ -48,7 +48,8 @@ extern "C" {
 #ifdef _KERNEL
 
 extern	void	ip_rts_change(int, ipaddr_t, ipaddr_t,
-    ipaddr_t, ipaddr_t, ipaddr_t, int, int, int, ip_stack_t *);
+    ipaddr_t, ipaddr_t, ipaddr_t, int, int,
+    int, ip_stack_t *);
 
 extern	void	ip_rts_change_v6(int, const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, const in6_addr_t *, int, int, int,
@@ -74,15 +75,17 @@ extern	size_t	rts_data_msg_size(int, sa_family_t, uint_t);
 
 extern	void	rts_fill_msg_v6(int, int, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, const in6_addr_t *,
-    const in6_addr_t *, const in6_addr_t *, const ipif_t *, mblk_t *,
-    uint_t, const tsol_gc_t *);
+    const in6_addr_t *, const in6_addr_t *, const in6_addr_t *,
+    const ill_t *, mblk_t *, const tsol_gc_t *);
 
 extern	size_t	rts_header_msg_size(int);
+
+extern void	rts_merge_metrics(iulp_t *, const iulp_t *);
 
 extern	void	rts_queue_input(mblk_t *, conn_t *, sa_family_t, uint_t,
     ip_stack_t *);
 
-extern int ip_rts_request_common(queue_t *q, mblk_t *mp, conn_t *, cred_t *);
+extern int ip_rts_request_common(mblk_t *mp, conn_t *, cred_t *);
 
 #endif /* _KERNEL */
 

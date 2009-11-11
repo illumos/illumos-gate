@@ -46,8 +46,6 @@
 #include <sys/ethernet.h>
 #include <sys/cpuvar.h>
 #include <sys/dlpi.h>
-#include <sys/multidata.h>
-#include <sys/multidata_impl.h>
 #include <sys/pattr.h>
 #include <sys/policy.h>
 #include <sys/priv.h>
@@ -87,7 +85,6 @@
 #include <inet/tcp_impl.h>
 #include <inet/udp_impl.h>
 #include <net/pfkeyv2.h>
-#include <inet/ipsec_info.h>
 #include <inet/ipdrop.h>
 
 #include <inet/ipclassifier.h>
@@ -95,6 +92,7 @@
 #include <inet/ip_ftable.h>
 #include <inet/ip_if.h>
 #include <inet/ipp_common.h>
+#include <inet/ip_rts.h>
 #include <inet/ip_netinfo.h>
 #include <sys/squeue_impl.h>
 #include <sys/squeue.h>
@@ -111,7 +109,7 @@
  *
  * The entire tcp state is contained in tcp_t and conn_t structure
  * which are allocated in tandem using ipcl_conn_create() and passing
- * IPCL_CONNTCP as a flag. We use 'conn_ref' and 'conn_lock' to protect
+ * IPCL_TCPCONN as a flag. We use 'conn_ref' and 'conn_lock' to protect
  * the references on the tcp_t. The tcp_t structure is never compressed
  * and packets always land on the correct TCP perimeter from the time
  * eager is created till the time tcp_t dies (as such the old mentat
@@ -172,8 +170,8 @@
  *
  * This is a more interesting case because of various races involved in
  * establishing a eager in its own perimeter. Read the meta comment on
- * top of tcp_conn_request(). But briefly, the squeue is picked by
- * ip_tcp_input()/ip_fanout_tcp_v6() based on the interrupted CPU.
+ * top of tcp_input_listener(). But briefly, the squeue is picked by
+ * ip_fanout based on the ring or the sender (if loopback).
  *
  * Closing a connection:
  *
@@ -198,20 +196,13 @@
  *
  * Special provisions and fast paths:
  *
- * We make special provision for (AF_INET, SOCK_STREAM) sockets which
- * can't have 'ipv6_recvpktinfo' set and for these type of sockets, IP
- * will never send a M_CTL to TCP. As such, ip_tcp_input() which handles
- * all TCP packets from the wire makes a IPCL_IS_TCP4_CONNECTED_NO_POLICY
- * check to send packets directly to tcp_rput_data via squeue. Everyone
- * else comes through tcp_input() on the read side.
- *
- * We also make special provisions for sockfs by marking tcp_issocket
+ * We make special provisions for sockfs by marking tcp_issocket
  * whenever we have only sockfs on top of TCP. This allows us to skip
  * putting the tcp in acceptor hash since a sockfs listener can never
  * become acceptor and also avoid allocating a tcp_t for acceptor STREAM
  * since eager has already been allocated and the accept now happens
  * on acceptor STREAM. There is a big blob of comment on top of
- * tcp_conn_request explaining the new accept. When socket is POP'd,
+ * tcp_input_listener explaining the new accept. When socket is POP'd,
  * sockfs sends us an ioctl to mark the fact and we go back to old
  * behaviour. Once tcp_issocket is unset, its never set for the
  * life of that connection.
@@ -224,13 +215,6 @@
  * only exception is tcp_xmit_listeners_reset() which is called
  * directly from IP and needs to policy check to see if TH_RST
  * can be sent out.
- *
- * PFHooks notes :
- *
- * For mdt case, one meta buffer contains multiple packets. Mblks for every
- * packet are assembled and passed to the hooks. When packets are blocked,
- * or boundary of any packet is changed, the mdt processing is stopped, and
- * packets of the meta buffer are send to the IP path one by one.
  */
 
 /*
@@ -244,7 +228,7 @@ int tcp_squeue_flag;
 
 /*
  * This controls how tiny a write must be before we try to copy it
- * into the the mblk on the tail of the transmit queue.  Not much
+ * into the mblk on the tail of the transmit queue.  Not much
  * speedup is observed for values larger than sixteen.  Zero will
  * disable the optimisation.
  */
@@ -333,16 +317,6 @@ static uint_t tcp_clean_death_stat[TCP_MAX_CLEAN_DEATH_TAG];
 tcp_g_stat_t	tcp_g_statistics;
 kstat_t		*tcp_g_kstat;
 
-/*
- * Call either ip_output or ip_output_v6. This replaces putnext() calls on the
- * tcp write side.
- */
-#define	CALL_IP_WPUT(connp, q, mp) {					\
-	ASSERT(((q)->q_flag & QREADR) == 0);				\
-	TCP_DBGSTAT(connp->conn_netstack->netstack_tcp, tcp_ip_output);	\
-	connp->conn_send(connp, (mp), (q), IP_WPUT);			\
-}
-
 /* Macros for timestamp comparisons */
 #define	TSTMP_GEQ(a, b)	((int32_t)((a)-(b)) >= 0)
 #define	TSTMP_LT(a, b)	((int32_t)((a)-(b)) < 0)
@@ -354,7 +328,7 @@ kstat_t		*tcp_g_kstat;
  * nanoseconds (versus every 4 microseconds suggested by RFC 793, page 27);
  * a per-connection component which grows by 125000 for every new connection;
  * and an "extra" component that grows by a random amount centered
- * approximately on 64000.  This causes the the ISS generator to cycle every
+ * approximately on 64000.  This causes the ISS generator to cycle every
  * 4.89 hours if no TCP connections are made, and faster if connections are
  * made.
  *
@@ -381,8 +355,13 @@ static sin6_t	sin6_null;	/* Zero address for quick clears */
  */
 #define	TCP_OLD_URP_INTERPRETATION	1
 
+/*
+ * Since tcp_listener is not cleared atomically with tcp_detached
+ * being cleared we need this extra bit to tell a detached connection
+ * apart from one that is in the process of being accepted.
+ */
 #define	TCP_IS_DETACHED_NONEAGER(tcp)	\
-	(TCP_IS_DETACHED(tcp) && \
+	(TCP_IS_DETACHED(tcp) &&	\
 	    (!(tcp)->tcp_hard_binding))
 
 /*
@@ -495,7 +474,6 @@ typedef struct tcp_timer_s {
 
 static kmem_cache_t *tcp_timercache;
 kmem_cache_t	*tcp_sack_info_cache;
-kmem_cache_t	*tcp_iphc_cache;
 
 /*
  * For scalability, we must not run a timer for every TCP connection
@@ -592,17 +570,6 @@ typedef struct tcp_opt_s {
 } tcp_opt_t;
 
 /*
- * TCP option struct passing information b/w lisenter and eager.
- */
-struct tcp_options {
-	uint_t			to_flags;
-	ssize_t			to_boundif;	/* IPV6_BOUND_IF */
-};
-
-#define	TCPOPT_BOUNDIF		0x00000001	/* set IPV6_BOUND_IF */
-#define	TCPOPT_RECVPKTINFO	0x00000002	/* set IPV6_RECVPKTINFO */
-
-/*
  * RFC1323-recommended phrasing of TSTAMP option, for easier parsing
  */
 
@@ -673,43 +640,53 @@ typedef struct tcpt_s {
 /*
  * Functions called directly via squeue having a prototype of edesc_t.
  */
-void		tcp_conn_request(void *arg, mblk_t *mp, void *arg2);
-static void	tcp_wput_nondata(void *arg, mblk_t *mp, void *arg2);
-void		tcp_accept_finish(void *arg, mblk_t *mp, void *arg2);
-static void	tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2);
-static void	tcp_wput_proto(void *arg, mblk_t *mp, void *arg2);
-void 		tcp_input(void *arg, mblk_t *mp, void *arg2);
-void		tcp_rput_data(void *arg, mblk_t *mp, void *arg2);
-static void	tcp_close_output(void *arg, mblk_t *mp, void *arg2);
-void		tcp_output(void *arg, mblk_t *mp, void *arg2);
-void		tcp_output_urgent(void *arg, mblk_t *mp, void *arg2);
-static void	tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2);
-static void	tcp_timer_handler(void *arg, mblk_t *mp, void *arg2);
-static void	tcp_linger_interrupted(void *arg, mblk_t *mp, void *arg2);
+void		tcp_input_listener(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *ira);
+static void	tcp_wput_nondata(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
+void		tcp_accept_finish(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
+static void	tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
+static void	tcp_wput_proto(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
+void		tcp_input_data(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *ira);
+static void	tcp_close_output(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
+void		tcp_output(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
+void		tcp_output_urgent(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
+static void	tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
+static void	tcp_timer_handler(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
+static void	tcp_linger_interrupted(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
 
 
 /* Prototype for TCP functions */
 static void	tcp_random_init(void);
 int		tcp_random(void);
 static void	tcp_tli_accept(tcp_t *tcp, mblk_t *mp);
-static int	tcp_accept_swap(tcp_t *listener, tcp_t *acceptor,
+static void	tcp_accept_swap(tcp_t *listener, tcp_t *acceptor,
 		    tcp_t *eager);
-static int	tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp);
+static int	tcp_set_destination(tcp_t *tcp);
 static in_port_t tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
     int reuseaddr, boolean_t quick_connect, boolean_t bind_to_req_port_only,
     boolean_t user_specified);
 static void	tcp_closei_local(tcp_t *tcp);
 static void	tcp_close_detached(tcp_t *tcp);
-static boolean_t tcp_conn_con(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph,
-			mblk_t *idmp, mblk_t **defermp);
+static boolean_t tcp_conn_con(tcp_t *tcp, uchar_t *iphdr,
+		    mblk_t *idmp, mblk_t **defermp, ip_recv_attr_t *ira);
 static void	tcp_tpi_connect(tcp_t *tcp, mblk_t *mp);
 static int	tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp,
-		    in_port_t dstport, uint_t srcid, cred_t *cr, pid_t pid);
-static int 	tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp,
-		    in_port_t dstport, uint32_t flowinfo, uint_t srcid,
-		    uint32_t scope_id, cred_t *cr, pid_t pid);
+		    in_port_t dstport, uint_t srcid);
+static int	tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp,
+		    in_port_t dstport, uint32_t flowinfo,
+		    uint_t srcid, uint32_t scope_id);
 static int	tcp_clean_death(tcp_t *tcp, int err, uint8_t tag);
-static void	tcp_def_q_set(tcp_t *tcp, mblk_t *mp);
 static void	tcp_disconnect(tcp_t *tcp, mblk_t *mp);
 static char	*tcp_display(tcp_t *tcp, char *, char);
 static boolean_t tcp_eager_blowoff(tcp_t *listener, t_scalar_t seqnum);
@@ -735,34 +712,16 @@ static void	tcp_acceptor_hash_remove(tcp_t *tcp);
 static void	tcp_capability_req(tcp_t *tcp, mblk_t *mp);
 static void	tcp_info_req(tcp_t *tcp, mblk_t *mp);
 static void	tcp_addr_req(tcp_t *tcp, mblk_t *mp);
-static void	tcp_addr_req_ipv6(tcp_t *tcp, mblk_t *mp);
-void		tcp_g_q_setup(tcp_stack_t *);
-void		tcp_g_q_create(tcp_stack_t *);
-void		tcp_g_q_destroy(tcp_stack_t *);
-static int	tcp_header_init_ipv4(tcp_t *tcp);
-static int	tcp_header_init_ipv6(tcp_t *tcp);
-int		tcp_init(tcp_t *tcp, queue_t *q);
-static int	tcp_init_values(tcp_t *tcp);
-static mblk_t	*tcp_ip_advise_mblk(void *addr, int addr_len, ipic_t **ipic);
-static void	tcp_ip_ire_mark_advice(tcp_t *tcp);
+static void	tcp_init_values(tcp_t *tcp);
 static void	tcp_ip_notify(tcp_t *tcp);
-static mblk_t	*tcp_ire_mp(mblk_t **mpp);
 static void	tcp_iss_init(tcp_t *tcp);
 static void	tcp_keepalive_killer(void *arg);
-static int	tcp_parse_options(tcph_t *tcph, tcp_opt_t *tcpopt);
-static void	tcp_mss_set(tcp_t *tcp, uint32_t size, boolean_t do_ss);
+static int	tcp_parse_options(tcpha_t *tcpha, tcp_opt_t *tcpopt);
+static void	tcp_mss_set(tcp_t *tcp, uint32_t size);
 static int	tcp_conprim_opt_process(tcp_t *tcp, mblk_t *mp,
 		    int *do_disconnectp, int *t_errorp, int *sys_errorp);
 static boolean_t tcp_allow_connopt_set(int level, int name);
 int		tcp_opt_default(queue_t *q, int level, int name, uchar_t *ptr);
-int		tcp_tpi_opt_get(queue_t *q, int level, int name, uchar_t *ptr);
-int		tcp_tpi_opt_set(queue_t *q, uint_t optset_context, int level,
-		    int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
-		    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr,
-		    mblk_t *mblk);
-static void	tcp_opt_reverse(tcp_t *tcp, ipha_t *ipha);
-static int	tcp_opt_set_header(tcp_t *tcp, boolean_t checkonly,
-		    uchar_t *ptr, uint_t len);
 static int	tcp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
 static boolean_t tcp_param_register(IDP *ndp, tcpparam_t *tcppa, int cnt,
     tcp_stack_t *);
@@ -785,9 +744,9 @@ static uint_t	tcp_rcv_drain(tcp_t *tcp);
 static void	tcp_sack_rxmit(tcp_t *tcp, uint_t *flags);
 static boolean_t tcp_send_rst_chk(tcp_stack_t *);
 static void	tcp_ss_rexmit(tcp_t *tcp);
-static mblk_t	*tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp);
-static void	tcp_process_options(tcp_t *, tcph_t *);
-static void	tcp_rput_common(tcp_t *tcp, mblk_t *mp);
+static mblk_t	*tcp_input_add_ancillary(tcp_t *tcp, mblk_t *mp, ip_pkt_t *ipp,
+    ip_recv_attr_t *);
+static void	tcp_process_options(tcp_t *, tcpha_t *);
 static void	tcp_rsrv(queue_t *q);
 static int	tcp_snmp_state(tcp_t *tcp);
 static void	tcp_timer(void *arg);
@@ -801,16 +760,10 @@ void		tcp_tpi_accept(queue_t *q, mblk_t *mp);
 static void	tcp_wput_data(tcp_t *tcp, mblk_t *mp, boolean_t urgent);
 static void	tcp_wput_flush(tcp_t *tcp, mblk_t *mp);
 static void	tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp);
-static int	tcp_send(queue_t *q, tcp_t *tcp, const int mss,
-		    const int tcp_hdr_len, const int tcp_tcp_hdr_len,
+static int	tcp_send(tcp_t *tcp, const int mss,
+		    const int total_hdr_len, const int tcp_hdr_len,
 		    const int num_sack_blk, int *usable, uint_t *snxt,
-		    int *tail_unsent, mblk_t **xmit_tail, mblk_t *local_time,
-		    const int mdt_thres);
-static int	tcp_multisend(queue_t *q, tcp_t *tcp, const int mss,
-		    const int tcp_hdr_len, const int tcp_tcp_hdr_len,
-		    const int num_sack_blk, int *usable, uint_t *snxt,
-		    int *tail_unsent, mblk_t **xmit_tail, mblk_t *local_time,
-		    const int mdt_thres);
+		    int *tail_unsent, mblk_t **xmit_tail, mblk_t *local_time);
 static void	tcp_fill_header(tcp_t *tcp, uchar_t *rptr, clock_t now,
 		    int num_sack_blk);
 static void	tcp_wsrv(queue_t *q);
@@ -818,38 +771,36 @@ static int	tcp_xmit_end(tcp_t *tcp);
 static void	tcp_ack_timer(void *arg);
 static mblk_t	*tcp_ack_mp(tcp_t *tcp);
 static void	tcp_xmit_early_reset(char *str, mblk_t *mp,
-		    uint32_t seq, uint32_t ack, int ctl, uint_t ip_hdr_len,
-		    zoneid_t zoneid, tcp_stack_t *, conn_t *connp);
+		    uint32_t seq, uint32_t ack, int ctl, ip_recv_attr_t *,
+		    ip_stack_t *, conn_t *);
 static void	tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq,
 		    uint32_t ack, int ctl);
-static int	setmaxps(queue_t *q, int maxpsz);
 static void	tcp_set_rto(tcp_t *, time_t);
-static boolean_t tcp_check_policy(tcp_t *, mblk_t *, ipha_t *, ip6_t *,
-		    boolean_t, boolean_t);
-static void	tcp_icmp_error_ipv6(tcp_t *tcp, mblk_t *mp,
-		    boolean_t ipsec_mctl);
+static void	tcp_icmp_input(void *, mblk_t *, void *, ip_recv_attr_t *);
+static void	tcp_icmp_error_ipv6(tcp_t *, mblk_t *, ip_recv_attr_t *);
+static boolean_t tcp_verifyicmp(conn_t *, void *, icmph_t *, icmp6_t *,
+    ip_recv_attr_t *);
 static int	tcp_build_hdrs(tcp_t *);
 static void	tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp,
-		    uint32_t seg_seq, uint32_t seg_ack, int seg_len,
-		    tcph_t *tcph);
-boolean_t	tcp_paws_check(tcp_t *tcp, tcph_t *tcph, tcp_opt_t *tcpoptp);
-static mblk_t	*tcp_mdt_info_mp(mblk_t *);
-static void	tcp_mdt_update(tcp_t *, ill_mdt_capab_t *, boolean_t);
-static int	tcp_mdt_add_attrs(multidata_t *, const mblk_t *,
-		    const boolean_t, const uint32_t, const uint32_t,
-		    const uint32_t, const uint32_t, tcp_stack_t *);
-static void	tcp_multisend_data(tcp_t *, ire_t *, const ill_t *, mblk_t *,
-		    const uint_t, const uint_t, boolean_t *);
-static mblk_t	*tcp_lso_info_mp(mblk_t *);
-static void	tcp_lso_update(tcp_t *, ill_lso_capab_t *);
-static void	tcp_send_data(tcp_t *, queue_t *, mblk_t *);
+    uint32_t seg_seq, uint32_t seg_ack, int seg_len, tcpha_t *tcpha,
+    ip_recv_attr_t *ira);
+boolean_t	tcp_paws_check(tcp_t *tcp, tcpha_t *tcpha, tcp_opt_t *tcpoptp);
+static boolean_t tcp_zcopy_check(tcp_t *);
+static void	tcp_zcopy_notify(tcp_t *);
+static mblk_t	*tcp_zcopy_backoff(tcp_t *, mblk_t *, boolean_t);
+static void	tcp_update_lso(tcp_t *tcp, ip_xmit_attr_t *ixa);
+static void	tcp_update_pmtu(tcp_t *tcp, boolean_t decrease_only);
+static void	tcp_update_zcopy(tcp_t *tcp);
+static void	tcp_notify(void *, ip_xmit_attr_t *, ixa_notify_type_t,
+    ixa_notify_arg_t);
+static void	tcp_rexmit_after_error(tcp_t *tcp);
+static void	tcp_send_data(tcp_t *, mblk_t *);
 extern mblk_t	*tcp_timermp_alloc(int);
 extern void	tcp_timermp_free(tcp_t *);
 static void	tcp_timer_free(tcp_t *tcp, mblk_t *mp);
 static void	tcp_stop_lingering(tcp_t *tcp);
 static void	tcp_close_linger_timeout(void *arg);
 static void	*tcp_stack_init(netstackid_t stackid, netstack_t *ns);
-static void	tcp_stack_shutdown(netstackid_t stackid, void *arg);
 static void	tcp_stack_fini(netstackid_t stackid, void *arg);
 static void	*tcp_g_kstat_init(tcp_g_stat_t *);
 static void	tcp_g_kstat_fini(kstat_t *);
@@ -858,11 +809,10 @@ static void	tcp_kstat_fini(netstackid_t, kstat_t *);
 static void	*tcp_kstat2_init(netstackid_t, tcp_stat_t *);
 static void	tcp_kstat2_fini(netstackid_t, kstat_t *);
 static int	tcp_kstat_update(kstat_t *kp, int rw);
-void		tcp_reinput(conn_t *connp, mblk_t *mp, squeue_t *sqp);
-static int	tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
-			tcph_t *tcph, uint_t ipvers, mblk_t *idmp);
-static int	tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
-			tcph_t *tcph, mblk_t *idmp);
+static mblk_t	*tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
+    ip_recv_attr_t *ira);
+static mblk_t	*tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, mblk_t *mp,
+    ip_recv_attr_t *ira);
 static int	tcp_squeue_switch(int);
 
 static int	tcp_open(queue_t *, dev_t *, int, int, cred_t *, boolean_t);
@@ -872,21 +822,17 @@ static int	tcp_tpi_close(queue_t *, int);
 static int	tcp_tpi_close_accept(queue_t *);
 
 static void	tcp_squeue_add(squeue_t *);
-static boolean_t tcp_zcopy_check(tcp_t *);
-static void	tcp_zcopy_notify(tcp_t *);
-static mblk_t	*tcp_zcopy_disable(tcp_t *, mblk_t *);
-static mblk_t	*tcp_zcopy_backoff(tcp_t *, mblk_t *, int);
-static void	tcp_ire_ill_check(tcp_t *, ire_t *, ill_t *, boolean_t);
+static void	tcp_setcred_data(mblk_t *, ip_recv_attr_t *);
 
-extern void	tcp_kssl_input(tcp_t *, mblk_t *);
+extern void	tcp_kssl_input(tcp_t *, mblk_t *, cred_t *);
 
-void tcp_eager_kill(void *arg, mblk_t *mp, void *arg2);
-void tcp_clean_death_wrapper(void *arg, mblk_t *mp, void *arg2);
+void tcp_eager_kill(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy);
+void tcp_clean_death_wrapper(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
 
 static int tcp_accept(sock_lower_handle_t, sock_lower_handle_t,
 	    sock_upper_handle_t, cred_t *);
 static int tcp_listen(sock_lower_handle_t, int, cred_t *);
-static int tcp_post_ip_bind(tcp_t *, mblk_t *, int, cred_t *, pid_t);
 static int tcp_do_listen(conn_t *, struct sockaddr *, socklen_t, int, cred_t *,
     boolean_t);
 static int tcp_do_connect(conn_t *, const struct sockaddr *, socklen_t,
@@ -922,7 +868,8 @@ static void tcp_ulp_newconn(conn_t *, conn_t *, mblk_t *);
  */
 static mblk_t	*tcp_ioctl_abort_build_msg(tcp_ioc_abort_conn_t *, tcp_t *);
 static void	tcp_ioctl_abort_dump(tcp_ioc_abort_conn_t *);
-static void	tcp_ioctl_abort_handler(tcp_t *, mblk_t *);
+static void	tcp_ioctl_abort_handler(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy);
 static int	tcp_ioctl_abort(tcp_ioc_abort_conn_t *, tcp_stack_t *tcps);
 static void	tcp_ioctl_abort_conn(queue_t *, mblk_t *);
 static int	tcp_ioctl_abort_bucket(tcp_ioc_abort_conn_t *, int, int *,
@@ -988,12 +935,6 @@ struct streamtab tcpinfov6 = {
 
 sock_downcalls_t sock_tcp_downcalls;
 
-/*
- * Have to ensure that tcp_g_q_close is not done by an
- * interrupt thread.
- */
-static taskq_t *tcp_taskq;
-
 /* Setable only in /etc/system. Move to ndd? */
 boolean_t tcp_icmp_source_quench = B_FALSE;
 
@@ -1042,8 +983,8 @@ static struct T_info_ack tcp_g_t_info_ack_v6 = {
 #define	PARAM_MAX (~(uint32_t)0)
 
 /* Max size IP datagram is 64k - 1 */
-#define	TCP_MSS_MAX_IPV4 (IP_MAXPACKET - (sizeof (ipha_t) + sizeof (tcph_t)))
-#define	TCP_MSS_MAX_IPV6 (IP_MAXPACKET - (sizeof (ip6_t) + sizeof (tcph_t)))
+#define	TCP_MSS_MAX_IPV4 (IP_MAXPACKET - (sizeof (ipha_t) + sizeof (tcpha_t)))
+#define	TCP_MSS_MAX_IPV6 (IP_MAXPACKET - (sizeof (ip6_t) + sizeof (tcpha_t)))
 /* Max of the above */
 #define	TCP_MSS_MAX	TCP_MSS_MAX_IPV4
 
@@ -1128,28 +1069,9 @@ static tcpparam_t	lcl_tcp_param_arr[] = {
  { 0,		100*MS,		50*MS,		"tcp_push_timer_interval"},
  { 0,		1,		0,		"tcp_use_smss_as_mss_opt"},
  { 0,		PARAM_MAX,	8*MINUTES,	"tcp_keepalive_abort_interval"},
+ { 0,		1,		0,		"tcp_dev_flow_ctl"},
 };
 /* END CSTYLED */
-
-/*
- * tcp_mdt_hdr_{head,tail}_min are the leading and trailing spaces of
- * each header fragment in the header buffer.  Each parameter value has
- * to be a multiple of 4 (32-bit aligned).
- */
-static tcpparam_t lcl_tcp_mdt_head_param =
-	{ 32, 256, 32, "tcp_mdt_hdr_head_min" };
-static tcpparam_t lcl_tcp_mdt_tail_param =
-	{ 0,  256, 32, "tcp_mdt_hdr_tail_min" };
-#define	tcps_mdt_hdr_head_min	tcps_mdt_head_param->tcp_param_val
-#define	tcps_mdt_hdr_tail_min	tcps_mdt_tail_param->tcp_param_val
-
-/*
- * tcp_mdt_max_pbufs is the upper limit value that tcp uses to figure out
- * the maximum number of payload buffers associated per Multidata.
- */
-static tcpparam_t lcl_tcp_mdt_max_pbufs_param =
-	{ 1, MULTIDATA_MAX_PBUFS, MULTIDATA_MAX_PBUFS, "tcp_mdt_max_pbufs" };
-#define	tcps_mdt_max_pbufs	tcps_mdt_max_pbufs_param->tcp_param_val
 
 /* Round up the value to the nearest mss. */
 #define	MSS_ROUNDUP(value, mss)		((((value) - 1) / (mss) + 1) * (mss))
@@ -1162,7 +1084,7 @@ static tcpparam_t lcl_tcp_mdt_max_pbufs_param =
  * point ECT(0) for TCP as described in RFC 2481.
  */
 #define	SET_ECT(tcp, iph) \
-	if ((tcp)->tcp_ipversion == IPV4_VERSION) { \
+	if ((tcp)->tcp_connp->conn_ipversion == IPV4_VERSION) { \
 		/* We need to clear the code point first. */ \
 		((ipha_t *)(iph))->ipha_type_of_service &= 0xFC; \
 		((ipha_t *)(iph))->ipha_type_of_service |= IPH_ECN_ECT0; \
@@ -1183,23 +1105,12 @@ static tcpparam_t lcl_tcp_mdt_max_pbufs_param =
 #define	IS_VMLOANED_MBLK(mp) \
 	(((mp)->b_datap->db_struioflag & STRUIO_ZC) != 0)
 
-
-/* Enable or disable b_cont M_MULTIDATA chaining for MDT. */
-boolean_t tcp_mdt_chain = B_TRUE;
-
-/*
- * MDT threshold in the form of effective send MSS multiplier; we take
- * the MDT path if the amount of unsent data exceeds the threshold value
- * (default threshold is 1*SMSS).
- */
-uint_t tcp_mdt_smss_threshold = 1;
-
 uint32_t do_tcpzcopy = 1;		/* 0: disable, 1: enable, 2: force */
 
 /*
  * Forces all connections to obey the value of the tcps_maxpsz_multiplier
  * tunable settable via NDD.  Otherwise, the per-connection behavior is
- * determined dynamically during tcp_adapt_ire(), which is the default.
+ * determined dynamically during tcp_set_destination(), which is the default.
  */
 boolean_t tcp_static_maxpsz = B_FALSE;
 
@@ -1273,84 +1184,73 @@ int (*cl_inet_connect2)(netstackid_t stack_id, uint8_t protocol,
 			    uint8_t *laddrp, in_port_t lport,
 			    uint8_t *faddrp, in_port_t fport,
 			    void *args) = NULL;
-
 void (*cl_inet_disconnect)(netstackid_t stack_id, uint8_t protocol,
 			    sa_family_t addr_family, uint8_t *laddrp,
 			    in_port_t lport, uint8_t *faddrp,
 			    in_port_t fport, void *args) = NULL;
 
-/*
- * The following are defined in ip.c
- */
-extern int (*cl_inet_isclusterwide)(netstackid_t stack_id, uint8_t protocol,
-			    sa_family_t addr_family, uint8_t *laddrp,
-			    void *args);
-extern uint32_t (*cl_inet_ipident)(netstackid_t stack_id, uint8_t protocol,
-			    sa_family_t addr_family, uint8_t *laddrp,
-			    uint8_t *faddrp, void *args);
-
 
 /*
  * int CL_INET_CONNECT(conn_t *cp, tcp_t *tcp, boolean_t is_outgoing, int err)
  */
-#define	CL_INET_CONNECT(connp, tcp, is_outgoing, err) {		\
+#define	CL_INET_CONNECT(connp, is_outgoing, err) {		\
 	(err) = 0;						\
 	if (cl_inet_connect2 != NULL) {				\
 		/*						\
 		 * Running in cluster mode - register active connection	\
 		 * information						\
 		 */							\
-		if ((tcp)->tcp_ipversion == IPV4_VERSION) {		\
-			if ((tcp)->tcp_ipha->ipha_src != 0) {		\
+		if ((connp)->conn_ipversion == IPV4_VERSION) {		\
+			if ((connp)->conn_laddr_v4 != 0) {		\
 				(err) = (*cl_inet_connect2)(		\
 				    (connp)->conn_netstack->netstack_stackid,\
 				    IPPROTO_TCP, is_outgoing, AF_INET,	\
-				    (uint8_t *)(&((tcp)->tcp_ipha->ipha_src)),\
-				    (in_port_t)(tcp)->tcp_lport,	\
-				    (uint8_t *)(&((tcp)->tcp_ipha->ipha_dst)),\
-				    (in_port_t)(tcp)->tcp_fport, NULL);	\
+				    (uint8_t *)(&((connp)->conn_laddr_v4)),\
+				    (in_port_t)(connp)->conn_lport,	\
+				    (uint8_t *)(&((connp)->conn_faddr_v4)),\
+				    (in_port_t)(connp)->conn_fport, NULL); \
 			}						\
 		} else {						\
 			if (!IN6_IS_ADDR_UNSPECIFIED(			\
-			    &(tcp)->tcp_ip6h->ip6_src)) {		\
+			    &(connp)->conn_laddr_v6)) {			\
 				(err) = (*cl_inet_connect2)(		\
 				    (connp)->conn_netstack->netstack_stackid,\
 				    IPPROTO_TCP, is_outgoing, AF_INET6,	\
-				    (uint8_t *)(&((tcp)->tcp_ip6h->ip6_src)),\
-				    (in_port_t)(tcp)->tcp_lport,	\
-				    (uint8_t *)(&((tcp)->tcp_ip6h->ip6_dst)),\
-				    (in_port_t)(tcp)->tcp_fport, NULL);	\
+				    (uint8_t *)(&((connp)->conn_laddr_v6)),\
+				    (in_port_t)(connp)->conn_lport,	\
+				    (uint8_t *)(&((connp)->conn_faddr_v6)), \
+				    (in_port_t)(connp)->conn_fport, NULL); \
 			}						\
 		}							\
 	}								\
 }
 
-#define	CL_INET_DISCONNECT(connp, tcp)	{				\
+#define	CL_INET_DISCONNECT(connp)	{				\
 	if (cl_inet_disconnect != NULL) {				\
 		/*							\
 		 * Running in cluster mode - deregister active		\
 		 * connection information				\
 		 */							\
-		if ((tcp)->tcp_ipversion == IPV4_VERSION) {		\
-			if ((tcp)->tcp_ip_src != 0) {			\
+		if ((connp)->conn_ipversion == IPV4_VERSION) {		\
+			if ((connp)->conn_laddr_v4 != 0) {		\
 				(*cl_inet_disconnect)(			\
 				    (connp)->conn_netstack->netstack_stackid,\
 				    IPPROTO_TCP, AF_INET,		\
-				    (uint8_t *)(&((tcp)->tcp_ip_src)),	\
-				    (in_port_t)(tcp)->tcp_lport,	\
-				    (uint8_t *)(&((tcp)->tcp_ipha->ipha_dst)),\
-				    (in_port_t)(tcp)->tcp_fport, NULL);	\
+				    (uint8_t *)(&((connp)->conn_laddr_v4)),\
+				    (in_port_t)(connp)->conn_lport,	\
+				    (uint8_t *)(&((connp)->conn_faddr_v4)),\
+				    (in_port_t)(connp)->conn_fport, NULL); \
 			}						\
 		} else {						\
 			if (!IN6_IS_ADDR_UNSPECIFIED(			\
-			    &(tcp)->tcp_ip_src_v6)) {			\
+			    &(connp)->conn_laddr_v6)) {			\
 				(*cl_inet_disconnect)(			\
 				    (connp)->conn_netstack->netstack_stackid,\
 				    IPPROTO_TCP, AF_INET6,		\
-				    (uint8_t *)(&((tcp)->tcp_ip_src_v6)),\
-				    (in_port_t)(tcp)->tcp_lport,	\
-				    (uint8_t *)(&((tcp)->tcp_ip6h->ip6_dst)),\
-				    (in_port_t)(tcp)->tcp_fport, NULL);	\
+				    (uint8_t *)(&((connp)->conn_laddr_v6)),\
+				    (in_port_t)(connp)->conn_lport,	\
+				    (uint8_t *)(&((connp)->conn_faddr_v6)), \
+				    (in_port_t)(connp)->conn_fport, NULL); \
 			}						\
 		}							\
 	}								\
@@ -1366,11 +1266,6 @@ int cl_tcp_walk_list(netstackid_t stack_id,
 
 static int cl_tcp_walk_list_stack(int (*callback)(cl_tcp_info_t *, void *),
     void *arg, tcp_stack_t *tcps);
-
-#define	DTRACE_IP_FASTPATH(mp, iph, ill, ipha, ip6h) 			\
-	DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL, void_ip_t *,	\
-	    iph, __dtrace_ipsr_ill_t *, ill, ipha_t *, ipha,		\
-	    ip6_t *, ip6h, int, 0);
 
 static void
 tcp_set_recv_threshold(tcp_t *tcp, uint32_t new_rcvthresh)
@@ -1540,7 +1435,7 @@ tcp_time_wait_append(tcp_t *tcp)
 
 /* ARGSUSED */
 void
-tcp_timewait_output(void *arg, mblk_t *mp, void *arg2)
+tcp_timewait_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t	*tcp = connp->conn_tcp;
@@ -1551,11 +1446,11 @@ tcp_timewait_output(void *arg, mblk_t *mp, void *arg2)
 		return;
 	}
 
-	ASSERT((tcp->tcp_family == AF_INET &&
-	    tcp->tcp_ipversion == IPV4_VERSION) ||
-	    (tcp->tcp_family == AF_INET6 &&
-	    (tcp->tcp_ipversion == IPV4_VERSION ||
-	    tcp->tcp_ipversion == IPV6_VERSION)));
+	ASSERT((connp->conn_family == AF_INET &&
+	    connp->conn_ipversion == IPV4_VERSION) ||
+	    (connp->conn_family == AF_INET6 &&
+	    (connp->conn_ipversion == IPV4_VERSION ||
+	    connp->conn_ipversion == IPV6_VERSION)));
 	ASSERT(!tcp->tcp_listener);
 
 	TCP_STAT(tcps, tcp_time_wait_reap);
@@ -1579,9 +1474,16 @@ tcp_ipsec_cleanup(tcp_t *tcp)
 	ASSERT(connp->conn_flags & IPCL_TCPCONN);
 
 	if (connp->conn_latch != NULL) {
-		IPLATCH_REFRELE(connp->conn_latch,
-		    connp->conn_netstack);
+		IPLATCH_REFRELE(connp->conn_latch);
 		connp->conn_latch = NULL;
+	}
+	if (connp->conn_latch_in_policy != NULL) {
+		IPPOL_REFRELE(connp->conn_latch_in_policy);
+		connp->conn_latch_in_policy = NULL;
+	}
+	if (connp->conn_latch_in_action != NULL) {
+		IPACT_REFRELE(connp->conn_latch_in_action);
+		connp->conn_latch_in_action = NULL;
 	}
 	if (connp->conn_policy != NULL) {
 		IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
@@ -1598,9 +1500,6 @@ void
 tcp_cleanup(tcp_t *tcp)
 {
 	mblk_t		*mp;
-	char		*tcp_iphc;
-	int		tcp_iphc_len;
-	int		tcp_hdr_grown;
 	tcp_sack_info_t	*tcp_sack_info;
 	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
@@ -1611,6 +1510,22 @@ tcp_cleanup(tcp_t *tcp)
 
 	/* Cleanup that which needs the netstack first */
 	tcp_ipsec_cleanup(tcp);
+	ixa_cleanup(connp->conn_ixa);
+
+	if (connp->conn_ht_iphc != NULL) {
+		kmem_free(connp->conn_ht_iphc, connp->conn_ht_iphc_allocated);
+		connp->conn_ht_iphc = NULL;
+		connp->conn_ht_iphc_allocated = 0;
+		connp->conn_ht_iphc_len = 0;
+		connp->conn_ht_ulp = NULL;
+		connp->conn_ht_ulp_len = 0;
+		tcp->tcp_ipha = NULL;
+		tcp->tcp_ip6h = NULL;
+		tcp->tcp_tcpha = NULL;
+	}
+
+	/* We clear any IP_OPTIONS and extension headers */
+	ip_pkt_free(&connp->conn_xmit_ipp);
 
 	tcp_free(tcp);
 
@@ -1626,8 +1541,6 @@ tcp_cleanup(tcp_t *tcp)
 	}
 	tcp->tcp_kssl_pending = B_FALSE;
 
-	conn_delete_ire(connp, NULL);
-
 	/*
 	 * Since we will bzero the entire structure, we need to
 	 * remove it and reinsert it in global hash list. We
@@ -1639,46 +1552,36 @@ tcp_cleanup(tcp_t *tcp)
 	 */
 	ipcl_globalhash_remove(connp);
 
-	/*
-	 * Now it is safe to decrement the reference counts.
-	 * This might be the last reference on the netstack and TCPS
-	 * in which case it will cause the tcp_g_q_close and
-	 * the freeing of the IP Instance.
-	 */
-	connp->conn_netstack = NULL;
-	netstack_rele(ns);
-	ASSERT(tcps != NULL);
-	tcp->tcp_tcps = NULL;
-	TCPS_REFRELE(tcps);
-
 	/* Save some state */
 	mp = tcp->tcp_timercache;
 
 	tcp_sack_info = tcp->tcp_sack_info;
-	tcp_iphc = tcp->tcp_iphc;
-	tcp_iphc_len = tcp->tcp_iphc_len;
-	tcp_hdr_grown = tcp->tcp_hdr_grown;
 	tcp_rsrv_mp = tcp->tcp_rsrv_mp;
 
 	if (connp->conn_cred != NULL) {
 		crfree(connp->conn_cred);
 		connp->conn_cred = NULL;
 	}
-	if (connp->conn_effective_cred != NULL) {
-		crfree(connp->conn_effective_cred);
-		connp->conn_effective_cred = NULL;
-	}
 	ipcl_conn_cleanup(connp);
 	connp->conn_flags = IPCL_TCPCONN;
+
+	/*
+	 * Now it is safe to decrement the reference counts.
+	 * This might be the last reference on the netstack
+	 * in which case it will cause the freeing of the IP Instance.
+	 */
+	connp->conn_netstack = NULL;
+	connp->conn_ixa->ixa_ipst = NULL;
+	netstack_rele(ns);
+	ASSERT(tcps != NULL);
+	tcp->tcp_tcps = NULL;
+
 	bzero(tcp, sizeof (tcp_t));
 
 	/* restore the state */
 	tcp->tcp_timercache = mp;
 
 	tcp->tcp_sack_info = tcp_sack_info;
-	tcp->tcp_iphc = tcp_iphc;
-	tcp->tcp_iphc_len = tcp_iphc_len;
-	tcp->tcp_hdr_grown = tcp_hdr_grown;
 	tcp->tcp_rsrv_mp = tcp_rsrv_mp;
 
 	tcp->tcp_connp = connp;
@@ -1686,7 +1589,7 @@ tcp_cleanup(tcp_t *tcp)
 	ASSERT(connp->conn_tcp == tcp);
 	ASSERT(connp->conn_flags & IPCL_TCPCONN);
 	connp->conn_state_flags = CONN_INCIPIENT;
-	ASSERT(connp->conn_ulp == IPPROTO_TCP);
+	ASSERT(connp->conn_proto == IPPROTO_TCP);
 	ASSERT(connp->conn_ref == 1);
 }
 
@@ -1777,11 +1680,7 @@ tcp_time_wait_collector(void *arg)
 				/*
 				 * Set the CONDEMNED flag now itself so that
 				 * the refcnt cannot increase due to any
-				 * walker. But we have still not cleaned up
-				 * conn_ire_cache. This is still ok since
-				 * we are going to clean it up in tcp_cleanup
-				 * immediately and any interface unplumb
-				 * thread will wait till the ire is blown away
+				 * walker.
 				 */
 				connp->conn_state_flags |= CONN_CONDEMNED;
 				mutex_exit(lock);
@@ -1809,7 +1708,7 @@ tcp_time_wait_collector(void *arg)
 					mutex_exit(
 					    &tcp_time_wait->tcp_time_wait_lock);
 					tcp_bind_hash_remove(tcp);
-					conn_delete_ire(tcp->tcp_connp, NULL);
+					ixa_cleanup(tcp->tcp_connp->conn_ixa);
 					tcp_ipsec_cleanup(tcp);
 					CONN_DEC_REF(tcp->tcp_connp);
 				}
@@ -1839,7 +1738,7 @@ tcp_time_wait_collector(void *arg)
 				TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 				mp = &tcp->tcp_closemp;
 				SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
-				    tcp_timewait_output, connp,
+				    tcp_timewait_output, connp, NULL,
 				    SQ_FILL, SQTAG_TCP_TIMEWAIT);
 			}
 		} else {
@@ -1867,7 +1766,7 @@ tcp_time_wait_collector(void *arg)
 			TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 			mp = &tcp->tcp_closemp;
 			SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
-			    tcp_timewait_output, connp,
+			    tcp_timewait_output, connp, NULL,
 			    SQ_FILL, SQTAG_TCP_TIMEWAIT);
 		}
 		mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
@@ -1886,24 +1785,23 @@ tcp_time_wait_collector(void *arg)
 /*
  * Reply to a clients T_CONN_RES TPI message. This function
  * is used only for TLI/XTI listener. Sockfs sends T_CONN_RES
- * on the acceptor STREAM and processed in tcp_wput_accept().
- * Read the block comment on top of tcp_conn_request().
+ * on the acceptor STREAM and processed in tcp_accept_common().
+ * Read the block comment on top of tcp_input_listener().
  */
 static void
 tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 {
-	tcp_t	*acceptor;
-	tcp_t	*eager;
-	tcp_t   *tcp;
+	tcp_t		*acceptor;
+	tcp_t		*eager;
+	tcp_t   	*tcp;
 	struct T_conn_res	*tcr;
 	t_uscalar_t	acceptor_id;
 	t_scalar_t	seqnum;
-	mblk_t	*opt_mp = NULL;	/* T_OPTMGMT_REQ messages */
-	struct tcp_options *tcpopt;
-	mblk_t	*ok_mp;
-	mblk_t	*mp1;
+	mblk_t		*discon_mp = NULL;
+	mblk_t		*ok_mp;
+	mblk_t		*mp1;
 	tcp_stack_t	*tcps = listener->tcp_tcps;
-	int	error;
+	conn_t		*econnp;
 
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tcr)) {
 		tcp_err_ack(listener, mp, TPROTO, 0);
@@ -1922,8 +1820,8 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 	 * fanout hash lock is held.
 	 * This prevents any thread from entering the acceptor queue from
 	 * below (since it has not been hard bound yet i.e. any inbound
-	 * packets will arrive on the listener or default tcp queue and
-	 * go through tcp_lookup).
+	 * packets will arrive on the listener conn_t and
+	 * go through the classifier).
 	 * The CONN_INC_REF will prevent the acceptor from closing.
 	 *
 	 * XXX It is still possible for a tli application to send down data
@@ -1974,7 +1872,7 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 	} else {
 		acceptor = tcp_acceptor_hash_lookup(acceptor_id, tcps);
 		if (acceptor == NULL) {
-			if (listener->tcp_debug) {
+			if (listener->tcp_connp->conn_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1,
 				    SL_ERROR|SL_TRACE,
 				    "tcp_accept: did not find acceptor 0x%x\n",
@@ -2013,7 +1911,7 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 	 * Rendezvous with an eager connection request packet hanging off
 	 * 'tcp' that has the 'seqnum' tag.  We tagged the detached open
 	 * tcp structure when the connection packet arrived in
-	 * tcp_conn_request().
+	 * tcp_input_listener().
 	 */
 	seqnum = tcr->SEQ_number;
 	eager = listener;
@@ -2047,37 +1945,26 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 	 */
 	ASSERT(eager->tcp_connp->conn_ref >= 1);
 
-	/* Pre allocate the stroptions mblk also */
-	opt_mp = allocb(MAX(sizeof (struct tcp_options),
-	    sizeof (struct T_conn_res)), BPRI_HI);
-	if (opt_mp == NULL) {
+	/*
+	 * Pre allocate the discon_ind mblk also. tcp_accept_finish will
+	 * use it if something failed.
+	 */
+	discon_mp = allocb(MAX(sizeof (struct T_discon_ind),
+	    sizeof (struct stroptions)), BPRI_HI);
+	if (discon_mp == NULL) {
 		CONN_DEC_REF(acceptor->tcp_connp);
 		CONN_DEC_REF(eager->tcp_connp);
 		tcp_err_ack(listener, mp, TSYSERR, ENOMEM);
 		return;
 	}
-	DB_TYPE(opt_mp) = M_SETOPTS;
-	opt_mp->b_wptr += sizeof (struct tcp_options);
-	tcpopt = (struct tcp_options *)opt_mp->b_rptr;
-	tcpopt->to_flags = 0;
 
-	/*
-	 * Prepare for inheriting IPV6_BOUND_IF and IPV6_RECVPKTINFO
-	 * from listener to acceptor.
-	 */
-	if (listener->tcp_bound_if != 0) {
-		tcpopt->to_flags |= TCPOPT_BOUNDIF;
-		tcpopt->to_boundif = listener->tcp_bound_if;
-	}
-	if (listener->tcp_ipv6_recvancillary & TCP_IPV6_RECVPKTINFO) {
-		tcpopt->to_flags |= TCPOPT_RECVPKTINFO;
-	}
+	econnp = eager->tcp_connp;
 
-	/* Re-use mp1 to hold a copy of mp, in case reallocb fails */
+	/* Hold a copy of mp, in case reallocb fails */
 	if ((mp1 = copymsg(mp)) == NULL) {
 		CONN_DEC_REF(acceptor->tcp_connp);
 		CONN_DEC_REF(eager->tcp_connp);
-		freemsg(opt_mp);
+		freemsg(discon_mp);
 		tcp_err_ack(listener, mp, TSYSERR, ENOMEM);
 		return;
 	}
@@ -2093,7 +1980,7 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 	{
 		int extra;
 
-		extra = (eager->tcp_family == AF_INET) ?
+		extra = (econnp->conn_family == AF_INET) ?
 		    sizeof (sin_t) : sizeof (sin6_t);
 
 		/*
@@ -2104,7 +1991,7 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 		if ((ok_mp = mi_tpi_ok_ack_alloc_extra(mp, extra)) == NULL) {
 			CONN_DEC_REF(acceptor->tcp_connp);
 			CONN_DEC_REF(eager->tcp_connp);
-			freemsg(opt_mp);
+			freemsg(discon_mp);
 			/* Original mp has been freed by now, so use mp1 */
 			tcp_err_ack(listener, mp1, TSYSERR, ENOMEM);
 			return;
@@ -2114,38 +2001,32 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 
 		switch (extra) {
 		case sizeof (sin_t): {
-				sin_t *sin = (sin_t *)ok_mp->b_wptr;
+			sin_t *sin = (sin_t *)ok_mp->b_wptr;
 
-				ok_mp->b_wptr += extra;
-				sin->sin_family = AF_INET;
-				sin->sin_port = eager->tcp_lport;
-				sin->sin_addr.s_addr =
-				    eager->tcp_ipha->ipha_src;
-				break;
-			}
+			ok_mp->b_wptr += extra;
+			sin->sin_family = AF_INET;
+			sin->sin_port = econnp->conn_lport;
+			sin->sin_addr.s_addr = econnp->conn_laddr_v4;
+			break;
+		}
 		case sizeof (sin6_t): {
-				sin6_t *sin6 = (sin6_t *)ok_mp->b_wptr;
+			sin6_t *sin6 = (sin6_t *)ok_mp->b_wptr;
 
-				ok_mp->b_wptr += extra;
-				sin6->sin6_family = AF_INET6;
-				sin6->sin6_port = eager->tcp_lport;
-				if (eager->tcp_ipversion == IPV4_VERSION) {
-					sin6->sin6_flowinfo = 0;
-					IN6_IPADDR_TO_V4MAPPED(
-					    eager->tcp_ipha->ipha_src,
-					    &sin6->sin6_addr);
-				} else {
-					ASSERT(eager->tcp_ip6h != NULL);
-					sin6->sin6_flowinfo =
-					    eager->tcp_ip6h->ip6_vcf &
-					    ~IPV6_VERS_AND_FLOW_MASK;
-					sin6->sin6_addr =
-					    eager->tcp_ip6h->ip6_src;
-				}
+			ok_mp->b_wptr += extra;
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_port = econnp->conn_lport;
+			sin6->sin6_addr = econnp->conn_laddr_v6;
+			sin6->sin6_flowinfo = econnp->conn_flowinfo;
+			if (IN6_IS_ADDR_LINKSCOPE(&econnp->conn_laddr_v6) &&
+			    (econnp->conn_ixa->ixa_flags & IXAF_SCOPEID_SET)) {
+				sin6->sin6_scope_id =
+				    econnp->conn_ixa->ixa_scopeid;
+			} else {
 				sin6->sin6_scope_id = 0;
-				sin6->__sin6_src_id = 0;
-				break;
 			}
+			sin6->__sin6_src_id = 0;
+			break;
+		}
 		default:
 			break;
 		}
@@ -2158,15 +2039,7 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 	 * the tcp_accept_swap is done since it would be dangerous to
 	 * let the application start using the new fd prior to the swap.
 	 */
-	error = tcp_accept_swap(listener, acceptor, eager);
-	if (error != 0) {
-		CONN_DEC_REF(acceptor->tcp_connp);
-		CONN_DEC_REF(eager->tcp_connp);
-		freemsg(ok_mp);
-		/* Original mp has been freed by now, so use mp1 */
-		tcp_err_ack(listener, mp1, TSYSERR, error);
-		return;
-	}
+	tcp_accept_swap(listener, acceptor, eager);
 
 	/*
 	 * tcp_accept_swap unlinks eager from listener but does not drop
@@ -2244,7 +2117,7 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 	/* We no longer need mp1, since all options processing has passed */
 	freemsg(mp1);
 
-	putnext(listener->tcp_rq, ok_mp);
+	putnext(listener->tcp_connp->conn_rq, ok_mp);
 
 	mutex_enter(&listener->tcp_eager_lock);
 	if (listener->tcp_eager_prev_q0->tcp_conn_def_q0) {
@@ -2305,7 +2178,7 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 		listener->tcp_eager_last_q = tcp;
 		tcp->tcp_eager_next_q = NULL;
 		mutex_exit(&listener->tcp_eager_lock);
-		putnext(tcp->tcp_rq, conn_ind);
+		putnext(tcp->tcp_connp->conn_rq, conn_ind);
 	} else {
 		mutex_exit(&listener->tcp_eager_lock);
 	}
@@ -2318,26 +2191,20 @@ tcp_tli_accept(tcp_t *listener, mblk_t *mp)
 	 */
 finish:
 	ASSERT(acceptor->tcp_detached);
-	ASSERT(tcps->tcps_g_q != NULL);
+	acceptor->tcp_connp->conn_rq = NULL;
 	ASSERT(!IPCL_IS_NONSTR(acceptor->tcp_connp));
-	acceptor->tcp_rq = tcps->tcps_g_q;
-	acceptor->tcp_wq = WR(tcps->tcps_g_q);
+	acceptor->tcp_connp->conn_wq = NULL;
 	(void) tcp_clean_death(acceptor, 0, 2);
 	CONN_DEC_REF(acceptor->tcp_connp);
 
 	/*
-	 * In case we already received a FIN we have to make tcp_rput send
-	 * the ordrel_ind. This will also send up a window update if the window
+	 * We pass discon_mp to tcp_accept_finish to get on the right squeue.
+	 *
+	 * It will update the setting for sockfs/stream head and also take
+	 * care of any data that arrived before accept() wad called.
+	 * In case we already received a FIN then tcp_accept_finish will send up
+	 * the ordrel. It will also send up a window update if the window
 	 * has opened up.
-	 *
-	 * In the normal case of a successful connection acceptance
-	 * we give the O_T_BIND_REQ to the read side put procedure as an
-	 * indication that this was just accepted. This tells tcp_rput to
-	 * pass up any data queued in tcp_rcv_list.
-	 *
-	 * In the fringe case where options sent with T_CONN_RES failed and
-	 * we required, we would be indicating a T_DISCON_IND to blow
-	 * away this connection.
 	 */
 
 	/*
@@ -2346,7 +2213,7 @@ finish:
 	 * and is well know but nothing can be done short of major rewrite
 	 * to fix it. Now it is possible to take care of it by assigning TLI/XTI
 	 * eager same squeue as listener (we can distinguish non socket
-	 * listeners at the time of handling a SYN in tcp_conn_request)
+	 * listeners at the time of handling a SYN in tcp_input_listener)
 	 * and do most of the work that tcp_accept_finish does here itself
 	 * and then get behind the acceptor squeue to access the acceptor
 	 * queue.
@@ -2354,52 +2221,38 @@ finish:
 	/*
 	 * We already have a ref on tcp so no need to do one before squeue_enter
 	 */
-	SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, opt_mp, tcp_accept_finish,
-	    eager->tcp_connp, SQ_FILL, SQTAG_TCP_ACCEPT_FINISH);
+	SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, discon_mp,
+	    tcp_accept_finish, eager->tcp_connp, NULL, SQ_FILL,
+	    SQTAG_TCP_ACCEPT_FINISH);
 }
 
 /*
  * Swap information between the eager and acceptor for a TLI/XTI client.
  * The sockfs accept is done on the acceptor stream and control goes
- * through tcp_wput_accept() and tcp_accept()/tcp_accept_swap() is not
+ * through tcp_tli_accept() and tcp_accept()/tcp_accept_swap() is not
  * called. In either case, both the eager and listener are in their own
  * perimeter (squeue) and the code has to deal with potential race.
  *
- * See the block comment on top of tcp_accept() and tcp_wput_accept().
+ * See the block comment on top of tcp_accept() and tcp_tli_accept().
  */
-static int
+static void
 tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 {
 	conn_t	*econnp, *aconnp;
-	cred_t	*effective_cred = NULL;
 
-	ASSERT(eager->tcp_rq == listener->tcp_rq);
+	ASSERT(eager->tcp_connp->conn_rq == listener->tcp_connp->conn_rq);
 	ASSERT(eager->tcp_detached && !acceptor->tcp_detached);
-	ASSERT(!eager->tcp_hard_bound);
 	ASSERT(!TCP_IS_SOCKET(acceptor));
 	ASSERT(!TCP_IS_SOCKET(eager));
 	ASSERT(!TCP_IS_SOCKET(listener));
-
-	econnp = eager->tcp_connp;
-	aconnp = acceptor->tcp_connp;
 
 	/*
 	 * Trusted Extensions may need to use a security label that is
 	 * different from the acceptor's label on MLP and MAC-Exempt
 	 * sockets. If this is the case, the required security label
-	 * already exists in econnp->conn_effective_cred. Use this label
-	 * to generate a new effective cred for the acceptor.
-	 *
-	 * We allow for potential application level retry attempts by
-	 * checking for transient errors before modifying eager.
+	 * already exists in econnp->conn_ixa->ixa_tsl. Since we make the
+	 * acceptor stream refer to econnp we atomatically get that label.
 	 */
-	if (is_system_labeled() &&
-	    aconnp->conn_cred != NULL && econnp->conn_effective_cred != NULL) {
-		effective_cred = copycred_from_tslabel(aconnp->conn_cred,
-		    crgetlabel(econnp->conn_effective_cred), KM_NOSLEEP);
-		if (effective_cred == NULL)
-			return (ENOMEM);
-	}
 
 	acceptor->tcp_detached = B_TRUE;
 	/*
@@ -2416,18 +2269,20 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	ASSERT(eager->tcp_eager_next_q0 == NULL &&
 	    eager->tcp_eager_prev_q0 == NULL);
 	mutex_exit(&listener->tcp_eager_lock);
-	eager->tcp_rq = acceptor->tcp_rq;
-	eager->tcp_wq = acceptor->tcp_wq;
 
-	eager->tcp_rq->q_ptr = econnp;
-	eager->tcp_wq->q_ptr = econnp;
+	econnp = eager->tcp_connp;
+	aconnp = acceptor->tcp_connp;
+	econnp->conn_rq = aconnp->conn_rq;
+	econnp->conn_wq = aconnp->conn_wq;
+	econnp->conn_rq->q_ptr = econnp;
+	econnp->conn_wq->q_ptr = econnp;
 
 	/*
 	 * In the TLI/XTI loopback case, we are inside the listener's squeue,
 	 * which might be a different squeue from our peer TCP instance.
 	 * For TCP Fusion, the peer expects that whenever tcp_detached is
 	 * clear, our TCP queues point to the acceptor's queues.  Thus, use
-	 * membar_producer() to ensure that the assignments of tcp_rq/tcp_wq
+	 * membar_producer() to ensure that the assignments of conn_rq/conn_wq
 	 * above reach global visibility prior to the clearing of tcp_detached.
 	 */
 	membar_producer();
@@ -2439,419 +2294,187 @@ tcp_accept_swap(tcp_t *listener, tcp_t *acceptor, tcp_t *eager)
 	econnp->conn_minor_arena = aconnp->conn_minor_arena;
 
 	ASSERT(econnp->conn_minor_arena != NULL);
-	if (eager->tcp_cred != NULL)
-		crfree(eager->tcp_cred);
-	eager->tcp_cred = econnp->conn_cred = aconnp->conn_cred;
-	if (econnp->conn_effective_cred != NULL)
-		crfree(econnp->conn_effective_cred);
-	econnp->conn_effective_cred = effective_cred;
+	if (econnp->conn_cred != NULL)
+		crfree(econnp->conn_cred);
+	econnp->conn_cred = aconnp->conn_cred;
 	aconnp->conn_cred = NULL;
-	ASSERT(aconnp->conn_effective_cred == NULL);
-
+	econnp->conn_cpid = aconnp->conn_cpid;
 	ASSERT(econnp->conn_netstack == aconnp->conn_netstack);
 	ASSERT(eager->tcp_tcps == acceptor->tcp_tcps);
 
 	econnp->conn_zoneid = aconnp->conn_zoneid;
 	econnp->conn_allzones = aconnp->conn_allzones;
+	econnp->conn_ixa->ixa_zoneid = aconnp->conn_ixa->ixa_zoneid;
 
+	econnp->conn_mac_mode = aconnp->conn_mac_mode;
+	econnp->conn_zone_is_global = aconnp->conn_zone_is_global;
 	aconnp->conn_mac_mode = CONN_MAC_DEFAULT;
 
 	/* Do the IPC initialization */
 	CONN_INC_REF(econnp);
 
-	econnp->conn_multicast_loop = aconnp->conn_multicast_loop;
-	econnp->conn_af_isv6 = aconnp->conn_af_isv6;
-	econnp->conn_pkt_isv6 = aconnp->conn_pkt_isv6;
+	econnp->conn_family = aconnp->conn_family;
+	econnp->conn_ipversion = aconnp->conn_ipversion;
 
 	/* Done with old IPC. Drop its ref on its connp */
 	CONN_DEC_REF(aconnp);
-	return (0);
 }
 
 
 /*
  * Adapt to the information, such as rtt and rtt_sd, provided from the
- * ire cached in conn_cache_ire. If no ire cached, do a ire lookup.
+ * DCE and IRE maintained by IP.
  *
  * Checks for multicast and broadcast destination address.
- * Returns zero on failure; non-zero if ok.
+ * Returns zero if ok; an errno on failure.
  *
  * Note that the MSS calculation here is based on the info given in
- * the IRE.  We do not do any calculation based on TCP options.  They
- * will be handled in tcp_rput_other() and tcp_rput_data() when TCP
- * knows which options to use.
+ * the DCE and IRE.  We do not do any calculation based on TCP options.  They
+ * will be handled in tcp_input_data() when TCP knows which options to use.
  *
  * Note on how TCP gets its parameters for a connection.
  *
  * When a tcp_t structure is allocated, it gets all the default parameters.
- * In tcp_adapt_ire(), it gets those metric parameters, like rtt, rtt_sd,
+ * In tcp_set_destination(), it gets those metric parameters, like rtt, rtt_sd,
  * spipe, rpipe, ... from the route metrics.  Route metric overrides the
  * default.
  *
- * An incoming SYN with a multicast or broadcast destination address, is dropped
- * in 1 of 2 places.
- *
- * 1. If the packet was received over the wire it is dropped in
- * ip_rput_process_broadcast()
- *
- * 2. If the packet was received through internal IP loopback, i.e. the packet
- * was generated and received on the same machine, it is dropped in
- * ip_wput_local()
+ * An incoming SYN with a multicast or broadcast destination address is dropped
+ * in ip_fanout_v4/v6.
  *
  * An incoming SYN with a multicast or broadcast source address is always
- * dropped in tcp_adapt_ire. The same logic in tcp_adapt_ire also serves to
+ * dropped in tcp_set_destination, since IPDF_ALLOW_MCBC is not set in
+ * conn_connect.
+ * The same logic in tcp_set_destination also serves to
  * reject an attempt to connect to a broadcast or multicast (destination)
  * address.
  */
 static int
-tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
+tcp_set_destination(tcp_t *tcp)
 {
-	ire_t		*ire;
-	ire_t		*sire = NULL;
-	iulp_t		*ire_uinfo = NULL;
 	uint32_t	mss_max;
 	uint32_t	mss;
 	boolean_t	tcp_detached = TCP_IS_DETACHED(tcp);
 	conn_t		*connp = tcp->tcp_connp;
-	boolean_t	ire_cacheable = B_FALSE;
-	zoneid_t	zoneid = connp->conn_zoneid;
-	int		match_flags = MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-	    MATCH_IRE_SECATTR;
-	ts_label_t	*tsl = crgetlabel(CONN_CRED(connp));
-	ill_t		*ill = NULL;
-	boolean_t	incoming = (ire_mp == NULL);
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
+	iulp_t		uinfo;
+	int		error;
+	uint32_t	flags;
 
-	ASSERT(connp->conn_ire_cache == NULL);
+	flags = IPDF_LSO | IPDF_ZCOPY;
+	/*
+	 * Make sure we have a dce for the destination to avoid dce_ident
+	 * contention for connected sockets.
+	 */
+	flags |= IPDF_UNIQUE_DCE;
 
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
+	if (!tcps->tcps_ignore_path_mtu)
+		connp->conn_ixa->ixa_flags |= IXAF_PMTU_DISCOVERY;
 
-		if (CLASSD(tcp->tcp_connp->conn_rem)) {
-			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
-			return (0);
-		}
-		/*
-		 * If IP_NEXTHOP is set, then look for an IRE_CACHE
-		 * for the destination with the nexthop as gateway.
-		 * ire_ctable_lookup() is used because this particular
-		 * ire, if it exists, will be marked private.
-		 * If that is not available, use the interface ire
-		 * for the nexthop.
-		 *
-		 * TSol: tcp_update_label will detect label mismatches based
-		 * only on the destination's label, but that would not
-		 * detect label mismatches based on the security attributes
-		 * of routes or next hop gateway. Hence we need to pass the
-		 * label to ire_ftable_lookup below in order to locate the
-		 * right prefix (and/or) ire cache. Similarly we also need
-		 * pass the label to the ire_cache_lookup below to locate
-		 * the right ire that also matches on the label.
-		 */
-		if (tcp->tcp_connp->conn_nexthop_set) {
-			ire = ire_ctable_lookup(tcp->tcp_connp->conn_rem,
-			    tcp->tcp_connp->conn_nexthop_v4, 0, NULL, zoneid,
-			    tsl, MATCH_IRE_MARK_PRIVATE_ADDR | MATCH_IRE_GW,
-			    ipst);
-			if (ire == NULL) {
-				ire = ire_ftable_lookup(
-				    tcp->tcp_connp->conn_nexthop_v4,
-				    0, 0, IRE_INTERFACE, NULL, NULL, zoneid, 0,
-				    tsl, match_flags, ipst);
-				if (ire == NULL)
-					return (0);
-			} else {
-				ire_uinfo = &ire->ire_uinfo;
-			}
+	/* Use conn_lock to satify ASSERT; tcp is already serialized */
+	mutex_enter(&connp->conn_lock);
+	error = conn_connect(connp, &uinfo, flags);
+	mutex_exit(&connp->conn_lock);
+	if (error != 0)
+		return (error);
+
+	error = tcp_build_hdrs(tcp);
+	if (error != 0)
+		return (error);
+
+	tcp->tcp_localnet = uinfo.iulp_localnet;
+
+	if (uinfo.iulp_rtt != 0) {
+		clock_t	rto;
+
+		tcp->tcp_rtt_sa = uinfo.iulp_rtt;
+		tcp->tcp_rtt_sd = uinfo.iulp_rtt_sd;
+		rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
+		    tcps->tcps_rexmit_interval_extra +
+		    (tcp->tcp_rtt_sa >> 5);
+
+		if (rto > tcps->tcps_rexmit_interval_max) {
+			tcp->tcp_rto = tcps->tcps_rexmit_interval_max;
+		} else if (rto < tcps->tcps_rexmit_interval_min) {
+			tcp->tcp_rto = tcps->tcps_rexmit_interval_min;
 		} else {
-			ire = ire_cache_lookup(tcp->tcp_connp->conn_rem,
-			    zoneid, tsl, ipst);
-			if (ire != NULL) {
-				ire_cacheable = B_TRUE;
-				ire_uinfo = (ire_mp != NULL) ?
-				    &((ire_t *)ire_mp->b_rptr)->ire_uinfo:
-				    &ire->ire_uinfo;
-
-			} else {
-				if (ire_mp == NULL) {
-					ire = ire_ftable_lookup(
-					    tcp->tcp_connp->conn_rem,
-					    0, 0, 0, NULL, &sire, zoneid, 0,
-					    tsl, (MATCH_IRE_RECURSIVE |
-					    MATCH_IRE_DEFAULT), ipst);
-					if (ire == NULL)
-						return (0);
-					ire_uinfo = (sire != NULL) ?
-					    &sire->ire_uinfo :
-					    &ire->ire_uinfo;
-				} else {
-					ire = (ire_t *)ire_mp->b_rptr;
-					ire_uinfo =
-					    &((ire_t *)
-					    ire_mp->b_rptr)->ire_uinfo;
-				}
-			}
+			tcp->tcp_rto = rto;
 		}
-		ASSERT(ire != NULL);
-
-		if ((ire->ire_src_addr == INADDR_ANY) ||
-		    (ire->ire_type & IRE_BROADCAST)) {
-			/*
-			 * ire->ire_mp is non null when ire_mp passed in is used
-			 * ire->ire_mp is set in ip_bind_insert_ire[_v6]().
-			 */
-			if (ire->ire_mp == NULL)
-				ire_refrele(ire);
-			if (sire != NULL)
-				ire_refrele(sire);
-			return (0);
+	}
+	if (uinfo.iulp_ssthresh != 0)
+		tcp->tcp_cwnd_ssthresh = uinfo.iulp_ssthresh;
+	else
+		tcp->tcp_cwnd_ssthresh = TCP_MAX_LARGEWIN;
+	if (uinfo.iulp_spipe > 0) {
+		connp->conn_sndbuf = MIN(uinfo.iulp_spipe,
+		    tcps->tcps_max_buf);
+		if (tcps->tcps_snd_lowat_fraction != 0) {
+			connp->conn_sndlowat = connp->conn_sndbuf /
+			    tcps->tcps_snd_lowat_fraction;
 		}
+		(void) tcp_maxpsz_set(tcp, B_TRUE);
+	}
+	/*
+	 * Note that up till now, acceptor always inherits receive
+	 * window from the listener.  But if there is a metrics
+	 * associated with a host, we should use that instead of
+	 * inheriting it from listener. Thus we need to pass this
+	 * info back to the caller.
+	 */
+	if (uinfo.iulp_rpipe > 0) {
+		tcp->tcp_rwnd = MIN(uinfo.iulp_rpipe,
+		    tcps->tcps_max_buf);
+	}
 
-		if (tcp->tcp_ipha->ipha_src == INADDR_ANY) {
-			ipaddr_t src_addr;
+	if (uinfo.iulp_rtomax > 0) {
+		tcp->tcp_second_timer_threshold =
+		    uinfo.iulp_rtomax;
+	}
 
-			/*
-			 * ip_bind_connected() has stored the correct source
-			 * address in conn_src.
-			 */
-			src_addr = tcp->tcp_connp->conn_src;
-			tcp->tcp_ipha->ipha_src = src_addr;
-			/*
-			 * Copy of the src addr. in tcp_t is needed
-			 * for the lookup funcs.
-			 */
-			IN6_IPADDR_TO_V4MAPPED(src_addr, &tcp->tcp_ip_src_v6);
-		}
+	/*
+	 * Use the metric option settings, iulp_tstamp_ok and
+	 * iulp_wscale_ok, only for active open. What this means
+	 * is that if the other side uses timestamp or window
+	 * scale option, TCP will also use those options. That
+	 * is for passive open.  If the application sets a
+	 * large window, window scale is enabled regardless of
+	 * the value in iulp_wscale_ok.  This is the behavior
+	 * since 2.6.  So we keep it.
+	 * The only case left in passive open processing is the
+	 * check for SACK.
+	 * For ECN, it should probably be like SACK.  But the
+	 * current value is binary, so we treat it like the other
+	 * cases.  The metric only controls active open.For passive
+	 * open, the ndd param, tcp_ecn_permitted, controls the
+	 * behavior.
+	 */
+	if (!tcp_detached) {
 		/*
-		 * Set the fragment bit so that IP will tell us if the MTU
-		 * should change. IP tells us the latest setting of
-		 * ip_path_mtu_discovery through ire_frag_flag.
+		 * The if check means that the following can only
+		 * be turned on by the metrics only IRE, but not off.
 		 */
-		if (ipst->ips_ip_path_mtu_discovery) {
-			tcp->tcp_ipha->ipha_fragment_offset_and_flags =
-			    htons(IPH_DF);
-		}
-		/*
-		 * If ire_uinfo is NULL, this is the IRE_INTERFACE case
-		 * for IP_NEXTHOP. No cache ire has been found for the
-		 * destination and we are working with the nexthop's
-		 * interface ire. Since we need to forward all packets
-		 * to the nexthop first, we "blindly" set tcp_localnet
-		 * to false, eventhough the destination may also be
-		 * onlink.
-		 */
-		if (ire_uinfo == NULL)
-			tcp->tcp_localnet = 0;
-		else
-			tcp->tcp_localnet = (ire->ire_gateway_addr == 0);
+		if (uinfo.iulp_tstamp_ok)
+			tcp->tcp_snd_ts_ok = B_TRUE;
+		if (uinfo.iulp_wscale_ok)
+			tcp->tcp_snd_ws_ok = B_TRUE;
+		if (uinfo.iulp_sack == 2)
+			tcp->tcp_snd_sack_ok = B_TRUE;
+		if (uinfo.iulp_ecn_ok)
+			tcp->tcp_ecn_ok = B_TRUE;
 	} else {
 		/*
-		 * For incoming connection ire_mp = NULL
-		 * For outgoing connection ire_mp != NULL
-		 * Technically we should check conn_incoming_ill
-		 * when ire_mp is NULL and conn_outgoing_ill when
-		 * ire_mp is non-NULL. But this is performance
-		 * critical path and for IPV*_BOUND_IF, outgoing
-		 * and incoming ill are always set to the same value.
+		 * Passive open.
+		 *
+		 * As above, the if check means that SACK can only be
+		 * turned on by the metric only IRE.
 		 */
-		ill_t	*dst_ill = NULL;
-		ipif_t  *dst_ipif = NULL;
-
-		ASSERT(connp->conn_outgoing_ill == connp->conn_incoming_ill);
-
-		if (connp->conn_outgoing_ill != NULL) {
-			/* Outgoing or incoming path */
-			int   err;
-
-			dst_ill = conn_get_held_ill(connp,
-			    &connp->conn_outgoing_ill, &err);
-			if (err == ILL_LOOKUP_FAILED || dst_ill == NULL) {
-				ip1dbg(("tcp_adapt_ire: ill_lookup failed\n"));
-				return (0);
-			}
-			match_flags |= MATCH_IRE_ILL;
-			dst_ipif = dst_ill->ill_ipif;
+		if (uinfo.iulp_sack > 0) {
+			tcp->tcp_snd_sack_ok = B_TRUE;
 		}
-		ire = ire_ctable_lookup_v6(&tcp->tcp_connp->conn_remv6,
-		    0, 0, dst_ipif, zoneid, tsl, match_flags, ipst);
-
-		if (ire != NULL) {
-			ire_cacheable = B_TRUE;
-			ire_uinfo = (ire_mp != NULL) ?
-			    &((ire_t *)ire_mp->b_rptr)->ire_uinfo:
-			    &ire->ire_uinfo;
-		} else {
-			if (ire_mp == NULL) {
-				ire = ire_ftable_lookup_v6(
-				    &tcp->tcp_connp->conn_remv6,
-				    0, 0, 0, dst_ipif, &sire, zoneid,
-				    0, tsl, match_flags, ipst);
-				if (ire == NULL) {
-					if (dst_ill != NULL)
-						ill_refrele(dst_ill);
-					return (0);
-				}
-				ire_uinfo = (sire != NULL) ? &sire->ire_uinfo :
-				    &ire->ire_uinfo;
-			} else {
-				ire = (ire_t *)ire_mp->b_rptr;
-				ire_uinfo =
-				    &((ire_t *)ire_mp->b_rptr)->ire_uinfo;
-			}
-		}
-		if (dst_ill != NULL)
-			ill_refrele(dst_ill);
-
-		ASSERT(ire != NULL);
-		ASSERT(ire_uinfo != NULL);
-
-		if (IN6_IS_ADDR_UNSPECIFIED(&ire->ire_src_addr_v6) ||
-		    IN6_IS_ADDR_MULTICAST(&ire->ire_addr_v6)) {
-			/*
-			 * ire->ire_mp is non null when ire_mp passed in is used
-			 * ire->ire_mp is set in ip_bind_insert_ire[_v6]().
-			 */
-			if (ire->ire_mp == NULL)
-				ire_refrele(ire);
-			if (sire != NULL)
-				ire_refrele(sire);
-			return (0);
-		}
-
-		if (IN6_IS_ADDR_UNSPECIFIED(&tcp->tcp_ip6h->ip6_src)) {
-			in6_addr_t	src_addr;
-
-			/*
-			 * ip_bind_connected_v6() has stored the correct source
-			 * address per IPv6 addr. selection policy in
-			 * conn_src_v6.
-			 */
-			src_addr = tcp->tcp_connp->conn_srcv6;
-
-			tcp->tcp_ip6h->ip6_src = src_addr;
-			/*
-			 * Copy of the src addr. in tcp_t is needed
-			 * for the lookup funcs.
-			 */
-			tcp->tcp_ip_src_v6 = src_addr;
-			ASSERT(IN6_ARE_ADDR_EQUAL(&tcp->tcp_ip6h->ip6_src,
-			    &connp->conn_srcv6));
-		}
-		tcp->tcp_localnet =
-		    IN6_IS_ADDR_UNSPECIFIED(&ire->ire_gateway_addr_v6);
 	}
 
 	/*
-	 * This allows applications to fail quickly when connections are made
-	 * to dead hosts. Hosts can be labeled dead by adding a reject route
-	 * with both the RTF_REJECT and RTF_PRIVATE flags set.
-	 */
-	if ((ire->ire_flags & RTF_REJECT) &&
-	    (ire->ire_flags & RTF_PRIVATE))
-		goto error;
-
-	/*
-	 * Make use of the cached rtt and rtt_sd values to calculate the
-	 * initial RTO.  Note that they are already initialized in
-	 * tcp_init_values().
-	 * If ire_uinfo is NULL, i.e., we do not have a cache ire for
-	 * IP_NEXTHOP, but instead are using the interface ire for the
-	 * nexthop, then we do not use the ire_uinfo from that ire to
-	 * do any initializations.
-	 */
-	if (ire_uinfo != NULL) {
-		if (ire_uinfo->iulp_rtt != 0) {
-			clock_t	rto;
-
-			tcp->tcp_rtt_sa = ire_uinfo->iulp_rtt;
-			tcp->tcp_rtt_sd = ire_uinfo->iulp_rtt_sd;
-			rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
-			    tcps->tcps_rexmit_interval_extra +
-			    (tcp->tcp_rtt_sa >> 5);
-
-			if (rto > tcps->tcps_rexmit_interval_max) {
-				tcp->tcp_rto = tcps->tcps_rexmit_interval_max;
-			} else if (rto < tcps->tcps_rexmit_interval_min) {
-				tcp->tcp_rto = tcps->tcps_rexmit_interval_min;
-			} else {
-				tcp->tcp_rto = rto;
-			}
-		}
-		if (ire_uinfo->iulp_ssthresh != 0)
-			tcp->tcp_cwnd_ssthresh = ire_uinfo->iulp_ssthresh;
-		else
-			tcp->tcp_cwnd_ssthresh = TCP_MAX_LARGEWIN;
-		if (ire_uinfo->iulp_spipe > 0) {
-			tcp->tcp_xmit_hiwater = MIN(ire_uinfo->iulp_spipe,
-			    tcps->tcps_max_buf);
-			if (tcps->tcps_snd_lowat_fraction != 0)
-				tcp->tcp_xmit_lowater = tcp->tcp_xmit_hiwater /
-				    tcps->tcps_snd_lowat_fraction;
-			(void) tcp_maxpsz_set(tcp, B_TRUE);
-		}
-		/*
-		 * Note that up till now, acceptor always inherits receive
-		 * window from the listener.  But if there is a metrics
-		 * associated with a host, we should use that instead of
-		 * inheriting it from listener. Thus we need to pass this
-		 * info back to the caller.
-		 */
-		if (ire_uinfo->iulp_rpipe > 0) {
-			tcp->tcp_rwnd = MIN(ire_uinfo->iulp_rpipe,
-			    tcps->tcps_max_buf);
-		}
-
-		if (ire_uinfo->iulp_rtomax > 0) {
-			tcp->tcp_second_timer_threshold =
-			    ire_uinfo->iulp_rtomax;
-		}
-
-		/*
-		 * Use the metric option settings, iulp_tstamp_ok and
-		 * iulp_wscale_ok, only for active open. What this means
-		 * is that if the other side uses timestamp or window
-		 * scale option, TCP will also use those options. That
-		 * is for passive open.  If the application sets a
-		 * large window, window scale is enabled regardless of
-		 * the value in iulp_wscale_ok.  This is the behavior
-		 * since 2.6.  So we keep it.
-		 * The only case left in passive open processing is the
-		 * check for SACK.
-		 * For ECN, it should probably be like SACK.  But the
-		 * current value is binary, so we treat it like the other
-		 * cases.  The metric only controls active open.For passive
-		 * open, the ndd param, tcp_ecn_permitted, controls the
-		 * behavior.
-		 */
-		if (!tcp_detached) {
-			/*
-			 * The if check means that the following can only
-			 * be turned on by the metrics only IRE, but not off.
-			 */
-			if (ire_uinfo->iulp_tstamp_ok)
-				tcp->tcp_snd_ts_ok = B_TRUE;
-			if (ire_uinfo->iulp_wscale_ok)
-				tcp->tcp_snd_ws_ok = B_TRUE;
-			if (ire_uinfo->iulp_sack == 2)
-				tcp->tcp_snd_sack_ok = B_TRUE;
-			if (ire_uinfo->iulp_ecn_ok)
-				tcp->tcp_ecn_ok = B_TRUE;
-		} else {
-			/*
-			 * Passive open.
-			 *
-			 * As above, the if check means that SACK can only be
-			 * turned on by the metric only IRE.
-			 */
-			if (ire_uinfo->iulp_sack > 0) {
-				tcp->tcp_snd_sack_ok = B_TRUE;
-			}
-		}
-	}
-
-
-	/*
-	 * XXX: Note that currently, ire_max_frag can be as small as 68
+	 * XXX Note that currently, iulp_mtu can be as small as 68
 	 * because of PMTUd.  So tcp_mss may go to negative if combined
 	 * length of all those options exceeds 28 bytes.  But because
 	 * of the tcp_mss_min check below, we may not have a problem if
@@ -2864,30 +2487,14 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 	 * We do not deal with that now.  All those problems related to
 	 * PMTUd will be fixed later.
 	 */
-	ASSERT(ire->ire_max_frag != 0);
-	mss = tcp->tcp_if_mtu = ire->ire_max_frag;
-	if (tcp->tcp_ipp_fields & IPPF_USE_MIN_MTU) {
-		if (tcp->tcp_ipp_use_min_mtu == IPV6_USE_MIN_MTU_NEVER) {
-			mss = MIN(mss, IPV6_MIN_MTU);
-		}
-	}
+	ASSERT(uinfo.iulp_mtu != 0);
+	mss = tcp->tcp_initial_pmtu = uinfo.iulp_mtu;
 
 	/* Sanity check for MSS value. */
-	if (tcp->tcp_ipversion == IPV4_VERSION)
+	if (connp->conn_ipversion == IPV4_VERSION)
 		mss_max = tcps->tcps_mss_max_ipv4;
 	else
 		mss_max = tcps->tcps_mss_max_ipv6;
-
-	if (tcp->tcp_ipversion == IPV6_VERSION &&
-	    (ire->ire_frag_flag & IPH_FRAG_HDR)) {
-		/*
-		 * After receiving an ICMPv6 "packet too big" message with a
-		 * MTU < 1280, and for multirouted IPv6 packets, the IP layer
-		 * will insert a 8-byte fragment header in every packet; we
-		 * reduce the MSS by that amount here.
-		 */
-		mss -= sizeof (ip6_frag_t);
-	}
 
 	if (tcp->tcp_ipsec_overhead == 0)
 		tcp->tcp_ipsec_overhead = conn_ipsec_length(connp);
@@ -2903,71 +2510,28 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 	tcp->tcp_mss = mss;
 
 	/*
+	 * Update the tcp connection with LSO capability.
+	 */
+	tcp_update_lso(tcp, connp->conn_ixa);
+
+	/*
 	 * Initialize the ISS here now that we have the full connection ID.
 	 * The RFC 1948 method of initial sequence number generation requires
 	 * knowledge of the full connection ID before setting the ISS.
 	 */
-
 	tcp_iss_init(tcp);
 
-	if (ire->ire_type & (IRE_LOOPBACK | IRE_LOCAL))
-		tcp->tcp_loopback = B_TRUE;
+	tcp->tcp_loopback = (uinfo.iulp_loopback | uinfo.iulp_local);
 
-	if (sire != NULL)
-		IRE_REFRELE(sire);
-
-	/*
-	 * If we got an IRE_CACHE and an ILL, go through their properties;
-	 * otherwise, this is deferred until later when we have an IRE_CACHE.
-	 */
-	if (tcp->tcp_loopback ||
-	    (ire_cacheable && (ill = ire_to_ill(ire)) != NULL)) {
-		/*
-		 * For incoming, see if this tcp may be MDT-capable.  For
-		 * outgoing, this process has been taken care of through
-		 * tcp_rput_other.
-		 */
-		tcp_ire_ill_check(tcp, ire, ill, incoming);
-		tcp->tcp_ire_ill_check_done = B_TRUE;
-	}
-
-	mutex_enter(&connp->conn_lock);
 	/*
 	 * Make sure that conn is not marked incipient
 	 * for incoming connections. A blind
 	 * removal of incipient flag is cheaper than
 	 * check and removal.
 	 */
+	mutex_enter(&connp->conn_lock);
 	connp->conn_state_flags &= ~CONN_INCIPIENT;
-
-	/*
-	 * Must not cache forwarding table routes
-	 * or recache an IRE after the conn_t has
-	 * had conn_ire_cache cleared and is flagged
-	 * unusable, (see the CONN_CACHE_IRE() macro).
-	 */
-	if (ire_cacheable && CONN_CACHE_IRE(connp)) {
-		rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
-		if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-			connp->conn_ire_cache = ire;
-			IRE_UNTRACE_REF(ire);
-			rw_exit(&ire->ire_bucket->irb_lock);
-			mutex_exit(&connp->conn_lock);
-			return (1);
-		}
-		rw_exit(&ire->ire_bucket->irb_lock);
-	}
 	mutex_exit(&connp->conn_lock);
-
-	if (ire->ire_mp == NULL)
-		ire_refrele(ire);
-	return (1);
-
-error:
-	if (ire->ire_mp == NULL)
-		ire_refrele(ire);
-	if (sire != NULL)
-		ire_refrele(sire);
 	return (0);
 }
 
@@ -3001,7 +2565,7 @@ tcp_tpi_bind(tcp_t *tcp, mblk_t *mp)
 
 	ASSERT((uintptr_t)(mp->b_wptr - mp->b_rptr) <= (uintptr_t)INT_MAX);
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tbr)) {
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
 			    "tcp_tpi_bind: bad req, len %u",
 			    (uint_t)(mp->b_wptr - mp->b_rptr));
@@ -3010,7 +2574,7 @@ tcp_tpi_bind(tcp_t *tcp, mblk_t *mp)
 		return;
 	}
 	/* Make sure the largest address fits */
-	mp1 = reallocb(mp, sizeof (struct T_bind_ack) + sizeof (sin6_t) + 1, 1);
+	mp1 = reallocb(mp, sizeof (struct T_bind_ack) + sizeof (sin6_t), 1);
 	if (mp1 == NULL) {
 		tcp_err_ack(tcp, mp, TSYSERR, ENOMEM);
 		return;
@@ -3024,7 +2588,7 @@ tcp_tpi_bind(tcp_t *tcp, mblk_t *mp)
 	switch (len) {
 	case 0:		/* request for a generic port */
 		tbr->ADDR_offset = sizeof (struct T_bind_req);
-		if (tcp->tcp_family == AF_INET) {
+		if (connp->conn_family == AF_INET) {
 			tbr->ADDR_length = sizeof (sin_t);
 			sin = (sin_t *)&tbr[1];
 			*sin = sin_null;
@@ -3033,7 +2597,7 @@ tcp_tpi_bind(tcp_t *tcp, mblk_t *mp)
 			len = sizeof (sin_t);
 			mp->b_wptr = (uchar_t *)&sin[1];
 		} else {
-			ASSERT(tcp->tcp_family == AF_INET6);
+			ASSERT(connp->conn_family == AF_INET6);
 			tbr->ADDR_length = sizeof (sin6_t);
 			sin6 = (sin6_t *)&tbr[1];
 			*sin6 = sin6_null;
@@ -3055,7 +2619,7 @@ tcp_tpi_bind(tcp_t *tcp, mblk_t *mp)
 		break;
 
 	default:
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
 			    "tcp_tpi_bind: bad address length, %d",
 			    tbr->ADDR_length);
@@ -3080,16 +2644,16 @@ done:
 		/*
 		 * Update port information as sockfs/tpi needs it for checking
 		 */
-		if (tcp->tcp_family == AF_INET) {
+		if (connp->conn_family == AF_INET) {
 			sin = (sin_t *)sa;
-			sin->sin_port = tcp->tcp_lport;
+			sin->sin_port = connp->conn_lport;
 		} else {
 			sin6 = (sin6_t *)sa;
-			sin6->sin6_port = tcp->tcp_lport;
+			sin6->sin6_port = connp->conn_lport;
 		}
 		mp->b_datap->db_type = M_PCPROTO;
 		tbr->PRIM_type = T_BIND_ACK;
-		putnext(tcp->tcp_rq, mp);
+		putnext(connp->conn_rq, mp);
 	}
 }
 
@@ -3139,7 +2703,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		 * Set loopmax appropriately so that one does not look
 		 * forever in the case all of the anonymous ports are in use.
 		 */
-		if (tcp->tcp_anon_priv_bind) {
+		if (connp->conn_anon_priv_bind) {
 			/*
 			 * loopmax =
 			 * 	(IPPORT_RESERVED-1) - tcp_min_anonpriv_port + 1
@@ -3175,7 +2739,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 		mutex_enter(&tbf->tf_lock);
 		for (ltcp = tbf->tf_tcp; ltcp != NULL;
 		    ltcp = ltcp->tcp_bind_hash) {
-			if (lport == ltcp->tcp_lport)
+			if (lport == ltcp->tcp_connp->conn_lport)
 				break;
 		}
 
@@ -3191,7 +2755,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * privilege as being in all zones, as there's
 			 * otherwise no way to identify the right receiver.
 			 */
-			if (!IPCL_BIND_ZONE_MATCH(ltcp->tcp_connp, connp))
+			if (!IPCL_BIND_ZONE_MATCH(lconnp, connp))
 				continue;
 
 			/*
@@ -3227,7 +2791,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * added.
 			 *
 			 * if (ltcp->tcp_state == TCPS_LISTEN ||
-			 *	!reuseaddr || !ltcp->tcp_reuseaddr) {
+			 *	!reuseaddr || !lconnp->conn_reuseaddr) {
 			 *		...
 			 * }
 			 *
@@ -3243,17 +2807,18 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 */
 			not_socket = !(TCP_IS_SOCKET(ltcp) &&
 			    TCP_IS_SOCKET(tcp));
-			exclbind = ltcp->tcp_exclbind || tcp->tcp_exclbind;
+			exclbind = lconnp->conn_exclbind ||
+			    connp->conn_exclbind;
 
 			if ((lconnp->conn_mac_mode != CONN_MAC_DEFAULT) ||
 			    (connp->conn_mac_mode != CONN_MAC_DEFAULT) ||
 			    (exclbind && (not_socket ||
 			    ltcp->tcp_state <= TCPS_ESTABLISHED))) {
 				if (V6_OR_V4_INADDR_ANY(
-				    ltcp->tcp_bound_source_v6) ||
+				    lconnp->conn_bound_addr_v6) ||
 				    V6_OR_V4_INADDR_ANY(*laddr) ||
 				    IN6_ARE_ADDR_EQUAL(laddr,
-				    &ltcp->tcp_bound_source_v6)) {
+				    &lconnp->conn_bound_addr_v6)) {
 					break;
 				}
 				continue;
@@ -3266,7 +2831,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * specific port. We use the same autoassigned port
 			 * number space for IPv4 and IPv6 sockets.
 			 */
-			if (tcp->tcp_ipversion != ltcp->tcp_ipversion &&
+			if (connp->conn_ipversion != lconnp->conn_ipversion &&
 			    bind_to_req_port_only)
 				continue;
 
@@ -3281,9 +2846,9 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 */
 			if (quick_connect &&
 			    (ltcp->tcp_state > TCPS_LISTEN) &&
-			    ((tcp->tcp_fport != ltcp->tcp_fport) ||
-			    !IN6_ARE_ADDR_EQUAL(&tcp->tcp_remote_v6,
-			    &ltcp->tcp_remote_v6)))
+			    ((connp->conn_fport != lconnp->conn_fport) ||
+			    !IN6_ARE_ADDR_EQUAL(&connp->conn_faddr_v6,
+			    &lconnp->conn_faddr_v6)))
 				continue;
 
 			if (!reuseaddr) {
@@ -3299,9 +2864,9 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 				 */
 				if (!V6_OR_V4_INADDR_ANY(*laddr) &&
 				    !V6_OR_V4_INADDR_ANY(
-				    ltcp->tcp_bound_source_v6) &&
+				    lconnp->conn_bound_addr_v6) &&
 				    !IN6_ARE_ADDR_EQUAL(laddr,
-				    &ltcp->tcp_bound_source_v6))
+				    &lconnp->conn_bound_addr_v6))
 					continue;
 				if (ltcp->tcp_state >= TCPS_BOUND) {
 					/*
@@ -3327,7 +2892,7 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 				 * SO_REUSEADDR setting, so we break.
 				 */
 				if (IN6_ARE_ADDR_EQUAL(laddr,
-				    &ltcp->tcp_bound_source_v6) &&
+				    &lconnp->conn_bound_addr_v6) &&
 				    (ltcp->tcp_state == TCPS_LISTEN ||
 				    ltcp->tcp_state == TCPS_BOUND))
 					break;
@@ -3343,11 +2908,10 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * number.
 			 */
 			tcp->tcp_state = TCPS_BOUND;
-			tcp->tcp_lport = htons(port);
-			*(uint16_t *)tcp->tcp_tcph->th_lport = tcp->tcp_lport;
+			connp->conn_lport = htons(port);
 
 			ASSERT(&tcps->tcps_bind_fanout[TCP_BIND_HASH(
-			    tcp->tcp_lport)] == tbf);
+			    connp->conn_lport)] == tbf);
 			tcp_bind_hash_insert(tbf, tcp, 1);
 
 			mutex_exit(&tbf->tf_lock);
@@ -3364,12 +2928,12 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
 			 * is updated. After the update, it may or may not
 			 * be in the valid range.
 			 */
-			if (!tcp->tcp_anon_priv_bind)
+			if (!connp->conn_anon_priv_bind)
 				tcps->tcps_next_port_to_try = port + 1;
 			return (port);
 		}
 
-		if (tcp->tcp_anon_priv_bind) {
+		if (connp->conn_anon_priv_bind) {
 			port = tcp_get_next_priv_port(tcp);
 		} else {
 			if (count == 0 && user_specified) {
@@ -3402,12 +2966,13 @@ tcp_bindi(tcp_t *tcp, in_port_t port, const in6_addr_t *laddr,
  * tcp_clean_death / tcp_close_detached must not be called more than once
  * on a tcp. Thus every function that potentially calls tcp_clean_death
  * must check for the tcp state before calling tcp_clean_death.
- * Eg. tcp_input, tcp_rput_data, tcp_eager_kill, tcp_clean_death_wrapper,
+ * Eg. tcp_input_data, tcp_eager_kill, tcp_clean_death_wrapper,
  * tcp_timer_handler, all check for the tcp state.
  */
 /* ARGSUSED */
 void
-tcp_clean_death_wrapper(void *arg, mblk_t *mp, void *arg2)
+tcp_clean_death_wrapper(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy)
 {
 	tcp_t	*tcp = ((conn_t *)arg)->conn_tcp;
 
@@ -3449,11 +3014,11 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 	}
 
 	ASSERT(tcp != NULL);
-	ASSERT((tcp->tcp_family == AF_INET &&
-	    tcp->tcp_ipversion == IPV4_VERSION) ||
-	    (tcp->tcp_family == AF_INET6 &&
-	    (tcp->tcp_ipversion == IPV4_VERSION ||
-	    tcp->tcp_ipversion == IPV6_VERSION)));
+	ASSERT((connp->conn_family == AF_INET &&
+	    connp->conn_ipversion == IPV4_VERSION) ||
+	    (connp->conn_family == AF_INET6 &&
+	    (connp->conn_ipversion == IPV4_VERSION ||
+	    connp->conn_ipversion == IPV6_VERSION)));
 
 	if (TCP_IS_DETACHED(tcp)) {
 		if (tcp->tcp_hard_binding) {
@@ -3483,7 +3048,7 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 
 	TCP_STAT(tcps, tcp_clean_death_nondetached);
 
-	q = tcp->tcp_rq;
+	q = connp->conn_rq;
 
 	/* Trash all inbound data */
 	if (!IPCL_IS_NONSTR(connp)) {
@@ -3506,7 +3071,7 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 			 */
 			(void) putnextctl1(q, M_FLUSH, FLUSHR);
 		}
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE|SL_ERROR,
 			    "tcp_clean_death: discon err %d", err);
 		}
@@ -3519,7 +3084,7 @@ tcp_clean_death(tcp_t *tcp, int err, uint8_t tag)
 			if (mp != NULL) {
 				putnext(q, mp);
 			} else {
-				if (tcp->tcp_debug) {
+				if (connp->conn_debug) {
 					(void) strlog(TCP_MOD_ID, 0, 1,
 					    SL_ERROR|SL_TRACE,
 					    "tcp_clean_death, sending M_ERROR");
@@ -3552,6 +3117,7 @@ tcp_stop_lingering(tcp_t *tcp)
 {
 	clock_t	delta = 0;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
 	tcp->tcp_linger_tid = 0;
 	if (tcp->tcp_state > TCPS_LISTEN) {
@@ -3568,15 +3134,14 @@ tcp_stop_lingering(tcp_t *tcp)
 		}
 		/*
 		 * Need to cancel those timers which will not be used when
-		 * TCP is detached.  This has to be done before the tcp_wq
-		 * is set to the global queue.
+		 * TCP is detached.  This has to be done before the conn_wq
+		 * is cleared.
 		 */
 		tcp_timers_stop(tcp);
 
 		tcp->tcp_detached = B_TRUE;
-		ASSERT(tcps->tcps_g_q != NULL);
-		tcp->tcp_rq = tcps->tcps_g_q;
-		tcp->tcp_wq = WR(tcps->tcps_g_q);
+		connp->conn_rq = NULL;
+		connp->conn_wq = NULL;
 
 		if (tcp->tcp_state == TCPS_TIME_WAIT) {
 			tcp_time_wait_append(tcp);
@@ -3595,16 +3160,14 @@ tcp_stop_lingering(tcp_t *tcp)
 		}
 	} else {
 		tcp_closei_local(tcp);
-		CONN_DEC_REF(tcp->tcp_connp);
+		CONN_DEC_REF(connp);
 	}
 finish:
 	/* Signal closing thread that it can complete close */
 	mutex_enter(&tcp->tcp_closelock);
 	tcp->tcp_detached = B_TRUE;
-	ASSERT(tcps->tcps_g_q != NULL);
-
-	tcp->tcp_rq = tcps->tcps_g_q;
-	tcp->tcp_wq = WR(tcps->tcps_g_q);
+	connp->conn_rq = NULL;
+	connp->conn_wq = NULL;
 
 	tcp->tcp_closed = 1;
 	cv_signal(&tcp->tcp_closecv);
@@ -3636,9 +3199,9 @@ tcp_close_common(conn_t *connp, int flags)
 	ASSERT(connp->conn_ref >= 2);
 
 	/*
-	 * Mark the conn as closing. ill_pending_mp_add will not
+	 * Mark the conn as closing. ipsq_pending_mp_add will not
 	 * add any mp to the pending mp list, after this conn has
-	 * started closing. Same for sq_pending_mp_add
+	 * started closing.
 	 */
 	mutex_enter(&connp->conn_lock);
 	connp->conn_state_flags |= CONN_CLOSING;
@@ -3664,7 +3227,7 @@ tcp_close_common(conn_t *connp, int flags)
 	TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 
 	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_close_output, connp,
-	    tcp_squeue_flag, SQTAG_IP_TCP_CLOSE);
+	    NULL, tcp_squeue_flag, SQTAG_IP_TCP_CLOSE);
 
 	mutex_enter(&tcp->tcp_closelock);
 	while (!tcp->tcp_closed) {
@@ -3684,13 +3247,13 @@ tcp_close_common(conn_t *connp, int flags)
 			 * thread is higher priority than the squeue worker
 			 * thread and is bound to the same cpu.
 			 */
-			if (tcp->tcp_linger && tcp->tcp_lingertime > 0) {
+			if (connp->conn_linger && connp->conn_lingertime > 0) {
 				mutex_exit(&tcp->tcp_closelock);
 				/* Entering squeue, bump ref count. */
 				CONN_INC_REF(connp);
 				bp = allocb_wait(0, BPRI_HI, STR_NOSIG, NULL);
 				SQUEUE_ENTER_ONE(connp->conn_sqp, bp,
-				    tcp_linger_interrupted, connp,
+				    tcp_linger_interrupted, connp, NULL,
 				    tcp_squeue_flag, SQTAG_IP_TCP_CLOSE);
 				mutex_enter(&tcp->tcp_closelock);
 			}
@@ -3703,8 +3266,8 @@ tcp_close_common(conn_t *connp, int flags)
 
 	/*
 	 * In the case of listener streams that have eagers in the q or q0
-	 * we wait for the eagers to drop their reference to us. tcp_rq and
-	 * tcp_wq of the eagers point to our queues. By waiting for the
+	 * we wait for the eagers to drop their reference to us. conn_rq and
+	 * conn_wq of the eagers point to our queues. By waiting for the
 	 * refcnt to drop to 1, we are sure that the eagers have cleaned
 	 * up their queue pointers and also dropped their references to us.
 	 */
@@ -3716,13 +3279,12 @@ tcp_close_common(conn_t *connp, int flags)
 		mutex_exit(&connp->conn_lock);
 	}
 	/*
-	 * ioctl cleanup. The mp is queued in the
-	 * ill_pending_mp or in the sq_pending_mp.
+	 * ioctl cleanup. The mp is queued in the ipx_pending_mp.
 	 */
 	if (conn_ioctl_cleanup_reqd)
 		conn_ioctl_cleanup(connp);
 
-	tcp->tcp_cpid = -1;
+	connp->conn_cpid = NOPID;
 }
 
 static int
@@ -3799,7 +3361,7 @@ tcp_tpi_close_accept(queue_t *q)
 
 /* ARGSUSED */
 static void
-tcp_linger_interrupted(void *arg, mblk_t *mp, void *arg2)
+tcp_linger_interrupted(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t	*tcp = connp->conn_tcp;
@@ -3828,7 +3390,7 @@ tcp_linger_interrupted(void *arg, mblk_t *mp, void *arg2)
 
 /* ARGSUSED */
 static void
-tcp_close_output(void *arg, mblk_t *mp, void *arg2)
+tcp_close_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	char	*msg;
 	conn_t	*connp = (conn_t *)arg;
@@ -3847,10 +3409,6 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 	}
 	mutex_exit(&tcp->tcp_eager_lock);
 
-	connp->conn_mdt_ok = B_FALSE;
-	tcp->tcp_mdt = B_FALSE;
-
-	connp->conn_lso_ok = B_FALSE;
 	tcp->tcp_lso = B_FALSE;
 
 	msg = NULL;
@@ -3879,12 +3437,11 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 		 * If SO_LINGER has set a zero linger time, abort the
 		 * connection with a reset.
 		 */
-		if (tcp->tcp_linger && tcp->tcp_lingertime == 0) {
+		if (connp->conn_linger && connp->conn_lingertime == 0) {
 			msg = "tcp_close, zero lingertime";
 			break;
 		}
 
-		ASSERT(tcp->tcp_hard_bound || tcp->tcp_hard_binding);
 		/*
 		 * Abort connection if there is unread data queued.
 		 */
@@ -3893,9 +3450,6 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 			break;
 		}
 		/*
-		 * tcp_hard_bound is now cleared thus all packets go through
-		 * tcp_lookup. This fact is used by tcp_detach below.
-		 *
 		 * We have done a qwait() above which could have possibly
 		 * drained more messages in turn causing transition to a
 		 * different state. Check whether we have to do the rest
@@ -3915,7 +3469,7 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 		 * If lingering on close then wait until the fin is acked,
 		 * the SO_LINGER time passes, or a reset is sent/received.
 		 */
-		if (tcp->tcp_linger && tcp->tcp_lingertime > 0 &&
+		if (connp->conn_linger && connp->conn_lingertime > 0 &&
 		    !(tcp->tcp_fin_acked) &&
 		    tcp->tcp_state >= TCPS_ESTABLISHED) {
 			if (tcp->tcp_closeflags & (FNDELAY|FNONBLOCK)) {
@@ -3926,7 +3480,7 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 
 				tcp->tcp_linger_tid = TCP_TIMER(tcp,
 				    tcp_close_linger_timeout,
-				    tcp->tcp_lingertime * hz);
+				    connp->conn_lingertime * hz);
 
 				/* tcp_close_linger_timeout will finish close */
 				if (tcp->tcp_linger_tid == 0)
@@ -3944,8 +3498,8 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 		}
 
 		/*
-		 * Make sure that no other thread will access the tcp_rq of
-		 * this instance (through lookups etc.) as tcp_rq will go
+		 * Make sure that no other thread will access the conn_rq of
+		 * this instance (through lookups etc.) as conn_rq will go
 		 * away shortly.
 		 */
 		tcp_acceptor_hash_remove(tcp);
@@ -3962,8 +3516,8 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 		}
 		/*
 		 * Need to cancel those timers which will not be used when
-		 * TCP is detached.  This has to be done before the tcp_wq
-		 * is set to the global queue.
+		 * TCP is detached.  This has to be done before the conn_wq
+		 * is set to NULL.
 		 */
 		tcp_timers_stop(tcp);
 
@@ -4004,18 +3558,6 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 	ASSERT(connp->conn_ref >= 2);
 
 finish:
-	/*
-	 * Although packets are always processed on the correct
-	 * tcp's perimeter and access is serialized via squeue's,
-	 * IP still needs a queue when sending packets in time_wait
-	 * state so use WR(tcps_g_q) till ip_output() can be
-	 * changed to deal with just connp. For read side, we
-	 * could have set tcp_rq to NULL but there are some cases
-	 * in tcp_rput_data() from early days of this code which
-	 * do a putnext without checking if tcp is closed. Those
-	 * need to be identified before both tcp_rq and tcp_wq
-	 * can be set to NULL and tcps_g_q can disappear forever.
-	 */
 	mutex_enter(&tcp->tcp_closelock);
 	/*
 	 * Don't change the queues in the case of a listener that has
@@ -4024,13 +3566,8 @@ finish:
 	 */
 	if (!tcp->tcp_wait_for_eagers) {
 		tcp->tcp_detached = B_TRUE;
-		/*
-		 * When default queue is closing we set tcps_g_q to NULL
-		 * after the close is done.
-		 */
-		ASSERT(tcps->tcps_g_q != NULL);
-		tcp->tcp_rq = tcps->tcps_g_q;
-		tcp->tcp_wq = WR(tcps->tcps_g_q);
+		connp->conn_rq = NULL;
+		connp->conn_wq = NULL;
 	}
 
 	/* Signal tcp_close() to finish closing. */
@@ -4112,8 +3649,7 @@ tcp_timers_stop(tcp_t *tcp)
 static void
 tcp_closei_local(tcp_t *tcp)
 {
-	ire_t 	*ire;
-	conn_t	*connp = tcp->tcp_connp;
+	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (!TCP_IS_SOCKET(tcp))
@@ -4138,7 +3674,7 @@ tcp_closei_local(tcp_t *tcp)
 		 * this point, eager will be closed but we
 		 * leave it in listeners eager list so that
 		 * if listener decides to close without doing
-		 * accept, we can clean this up. In tcp_wput_accept
+		 * accept, we can clean this up. In tcp_tli_accept
 		 * we take care of the case of accept on closed
 		 * eager.
 		 */
@@ -4150,9 +3686,9 @@ tcp_closei_local(tcp_t *tcp)
 			 * listener queue, after we have released our
 			 * reference on the listener
 			 */
-			ASSERT(tcps->tcps_g_q != NULL);
-			tcp->tcp_rq = tcps->tcps_g_q;
-			tcp->tcp_wq = WR(tcps->tcps_g_q);
+			ASSERT(tcp->tcp_detached);
+			connp->conn_rq = NULL;
+			connp->conn_wq = NULL;
 			CONN_DEC_REF(listener->tcp_connp);
 		} else {
 			mutex_exit(&listener->tcp_eager_lock);
@@ -4185,20 +3721,16 @@ tcp_closei_local(tcp_t *tcp)
 	 */
 	if (tcp->tcp_state == TCPS_TIME_WAIT)
 		(void) tcp_time_wait_remove(tcp, NULL);
-	CL_INET_DISCONNECT(connp, tcp);
+	CL_INET_DISCONNECT(connp);
 	ipcl_hash_remove(connp);
+	ixa_cleanup(connp->conn_ixa);
 
 	/*
-	 * Delete the cached ire in conn_ire_cache and also mark
-	 * the conn as CONDEMNED
+	 * Mark the conn as CONDEMNED
 	 */
 	mutex_enter(&connp->conn_lock);
 	connp->conn_state_flags |= CONN_CONDEMNED;
-	ire = connp->conn_ire_cache;
-	connp->conn_ire_cache = NULL;
 	mutex_exit(&connp->conn_lock);
-	if (ire != NULL)
-		IRE_REFRELE_NOTR(ire);
 
 	/* Need to cleanup any pending ioctls */
 	ASSERT(tcp->tcp_time_wait_next == NULL);
@@ -4227,14 +3759,14 @@ tcp_closei_local(tcp_t *tcp)
 void
 tcp_free(tcp_t *tcp)
 {
-	mblk_t	*mp;
-	ip6_pkt_t	*ipp;
+	mblk_t		*mp;
+	conn_t		*connp = tcp->tcp_connp;
 
 	ASSERT(tcp != NULL);
 	ASSERT(tcp->tcp_ptpahn == NULL && tcp->tcp_acceptor_hash == NULL);
 
-	tcp->tcp_rq = NULL;
-	tcp->tcp_wq = NULL;
+	connp->conn_rq = NULL;
+	connp->conn_wq = NULL;
 
 	tcp_close_mpp(&tcp->tcp_xmit_head);
 	tcp_close_mpp(&tcp->tcp_reass_head);
@@ -4281,30 +3813,18 @@ tcp_free(tcp_t *tcp)
 		tcp->tcp_dstoptslen = 0;
 	}
 	ASSERT(tcp->tcp_dstoptslen == 0);
-	if (tcp->tcp_rtdstopts != NULL) {
-		mi_free(tcp->tcp_rtdstopts);
-		tcp->tcp_rtdstopts = NULL;
-		tcp->tcp_rtdstoptslen = 0;
+	if (tcp->tcp_rthdrdstopts != NULL) {
+		mi_free(tcp->tcp_rthdrdstopts);
+		tcp->tcp_rthdrdstopts = NULL;
+		tcp->tcp_rthdrdstoptslen = 0;
 	}
-	ASSERT(tcp->tcp_rtdstoptslen == 0);
+	ASSERT(tcp->tcp_rthdrdstoptslen == 0);
 	if (tcp->tcp_rthdr != NULL) {
 		mi_free(tcp->tcp_rthdr);
 		tcp->tcp_rthdr = NULL;
 		tcp->tcp_rthdrlen = 0;
 	}
 	ASSERT(tcp->tcp_rthdrlen == 0);
-
-	ipp = &tcp->tcp_sticky_ipp;
-	if (ipp->ipp_fields & (IPPF_HOPOPTS | IPPF_RTDSTOPTS | IPPF_DSTOPTS |
-	    IPPF_RTHDR))
-		ip6_pkt_free(ipp);
-
-	/*
-	 * Free memory associated with the tcp/ip header template.
-	 */
-
-	if (tcp->tcp_iphc != NULL)
-		bzero(tcp->tcp_iphc, tcp->tcp_iphc_len);
 
 	/*
 	 * Following is really a blowing away a union.
@@ -4317,17 +3837,19 @@ tcp_free(tcp_t *tcp)
 
 /*
  * Put a connection confirmation message upstream built from the
- * address information within 'iph' and 'tcph'.  Report our success or failure.
+ * address/flowid information with the conn and iph. Report our success or
+ * failure.
  */
 static boolean_t
-tcp_conn_con(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph, mblk_t *idmp,
-    mblk_t **defermp)
+tcp_conn_con(tcp_t *tcp, uchar_t *iphdr, mblk_t *idmp,
+    mblk_t **defermp, ip_recv_attr_t *ira)
 {
 	sin_t	sin;
 	sin6_t	sin6;
 	mblk_t	*mp;
 	char	*optp = NULL;
 	int	optlen = 0;
+	conn_t	*connp = tcp->tcp_connp;
 
 	if (defermp != NULL)
 		*defermp = NULL;
@@ -4352,20 +3874,19 @@ tcp_conn_con(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph, mblk_t *idmp,
 	}
 
 	if (IPH_HDR_VERSION(iphdr) == IPV4_VERSION) {
-		ipha_t *ipha = (ipha_t *)iphdr;
 
 		/* packet is IPv4 */
-		if (tcp->tcp_family == AF_INET) {
+		if (connp->conn_family == AF_INET) {
 			sin = sin_null;
-			sin.sin_addr.s_addr = ipha->ipha_src;
-			sin.sin_port = *(uint16_t *)tcph->th_lport;
+			sin.sin_addr.s_addr = connp->conn_faddr_v4;
+			sin.sin_port = connp->conn_fport;
 			sin.sin_family = AF_INET;
 			mp = mi_tpi_conn_con(NULL, (char *)&sin,
 			    (int)sizeof (sin_t), optp, optlen);
 		} else {
 			sin6 = sin6_null;
-			IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &sin6.sin6_addr);
-			sin6.sin6_port = *(uint16_t *)tcph->th_lport;
+			sin6.sin6_addr = connp->conn_faddr_v6;
+			sin6.sin6_port = connp->conn_fport;
 			sin6.sin6_family = AF_INET6;
 			mp = mi_tpi_conn_con(NULL, (char *)&sin6,
 			    (int)sizeof (sin6_t), optp, optlen);
@@ -4375,10 +3896,10 @@ tcp_conn_con(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph, mblk_t *idmp,
 		ip6_t	*ip6h = (ip6_t *)iphdr;
 
 		ASSERT(IPH_HDR_VERSION(iphdr) == IPV6_VERSION);
-		ASSERT(tcp->tcp_family == AF_INET6);
+		ASSERT(connp->conn_family == AF_INET6);
 		sin6 = sin6_null;
-		sin6.sin6_addr = ip6h->ip6_src;
-		sin6.sin6_port = *(uint16_t *)tcph->th_lport;
+		sin6.sin6_addr = connp->conn_faddr_v6;
+		sin6.sin6_port = connp->conn_fport;
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_flowinfo = ip6h->ip6_vcf & ~IPV6_VERS_AND_FLOW_MASK;
 		mp = mi_tpi_conn_con(NULL, (char *)&sin6,
@@ -4393,16 +3914,16 @@ tcp_conn_con(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph, mblk_t *idmp,
 	if (defermp == NULL) {
 		conn_t *connp = tcp->tcp_connp;
 		if (IPCL_IS_NONSTR(connp)) {
-			cred_t *cr;
-			pid_t cpid;
-
-			cr = msg_getcred(mp, &cpid);
 			(*connp->conn_upcalls->su_connected)
-			    (connp->conn_upper_handle, tcp->tcp_connid, cr,
-			    cpid);
+			    (connp->conn_upper_handle, tcp->tcp_connid,
+			    ira->ira_cred, ira->ira_cpid);
 			freemsg(mp);
 		} else {
-			putnext(tcp->tcp_rq, mp);
+			if (ira->ira_cred != NULL) {
+				/* So that getpeerucred works for TPI sockfs */
+				mblk_setcred(mp, ira->ira_cred, ira->ira_cpid);
+			}
+			putnext(connp->conn_rq, mp);
 		}
 	} else {
 		*defermp = mp;
@@ -4456,7 +3977,7 @@ tcp_drop_q0(tcp_t *tcp)
 	 */
 	MAKE_UNDROPPABLE(eager);
 
-	if (tcp->tcp_debug) {
+	if (tcp->tcp_connp->conn_debug) {
 		(void) strlog(TCP_MOD_ID, 0, 3, SL_TRACE,
 		    "tcp_drop_q0: listen half-open queue (max=%d) overflow"
 		    " (%d pending) on %s, drop one", tcps->tcps_conn_req_max_q0,
@@ -4469,18 +3990,19 @@ tcp_drop_q0(tcp_t *tcp)
 	/* Put a reference on the conn as we are enqueueing it in the sqeue */
 	CONN_INC_REF(eager->tcp_connp);
 
-	/* Mark the IRE created for this SYN request temporary */
-	tcp_ip_ire_mark_advice(eager);
 	SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, mp,
-	    tcp_clean_death_wrapper, eager->tcp_connp,
+	    tcp_clean_death_wrapper, eager->tcp_connp, NULL,
 	    SQ_FILL, SQTAG_TCP_DROP_Q0);
 
 	return (B_TRUE);
 }
 
-int
+/*
+ * Handle a SYN on an AF_INET6 socket; can be either IPv4 or IPv6
+ */
+static mblk_t *
 tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
-    tcph_t *tcph, uint_t ipvers, mblk_t *idmp)
+    ip_recv_attr_t *ira)
 {
 	tcp_t 		*ltcp = lconnp->conn_tcp;
 	tcp_t		*tcp = connp->conn_tcp;
@@ -4488,36 +4010,30 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	ipha_t		*ipha;
 	ip6_t		*ip6h;
 	sin6_t 		sin6;
-	in6_addr_t 	v6dst;
-	int		err;
-	int		ifindex = 0;
+	uint_t		ifindex = ira->ira_ruifindex;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	if (ipvers == IPV4_VERSION) {
+	if (ira->ira_flags & IRAF_IS_IPV4) {
 		ipha = (ipha_t *)mp->b_rptr;
 
-		connp->conn_send = ip_output;
-		connp->conn_recv = tcp_input;
-
-		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst,
-		    &connp->conn_bound_source_v6);
-		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &connp->conn_srcv6);
-		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &connp->conn_remv6);
+		connp->conn_ipversion = IPV4_VERSION;
+		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &connp->conn_laddr_v6);
+		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &connp->conn_faddr_v6);
+		connp->conn_saddr_v6 = connp->conn_laddr_v6;
 
 		sin6 = sin6_null;
-		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &sin6.sin6_addr);
-		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &v6dst);
-		sin6.sin6_port = *(uint16_t *)tcph->th_lport;
+		sin6.sin6_addr = connp->conn_faddr_v6;
+		sin6.sin6_port = connp->conn_fport;
 		sin6.sin6_family = AF_INET6;
-		sin6.__sin6_src_id = ip_srcid_find_addr(&v6dst,
-		    lconnp->conn_zoneid, tcps->tcps_netstack);
-		if (tcp->tcp_recvdstaddr) {
+		sin6.__sin6_src_id = ip_srcid_find_addr(&connp->conn_laddr_v6,
+		    IPCL_ZONEID(lconnp), tcps->tcps_netstack);
+
+		if (connp->conn_recv_ancillary.crb_recvdstaddr) {
 			sin6_t	sin6d;
 
 			sin6d = sin6_null;
-			IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst,
-			    &sin6d.sin6_addr);
-			sin6d.sin6_port = *(uint16_t *)tcph->th_fport;
+			sin6d.sin6_addr = connp->conn_laddr_v6;
+			sin6d.sin6_port = connp->conn_lport;
 			sin6d.sin6_family = AF_INET;
 			tpi_mp = mi_tpi_extconn_ind(NULL,
 			    (char *)&sin6d, sizeof (sin6_t),
@@ -4534,24 +4050,18 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	} else {
 		ip6h = (ip6_t *)mp->b_rptr;
 
-		connp->conn_send = ip_output_v6;
-		connp->conn_recv = tcp_input;
-
-		connp->conn_bound_source_v6 = ip6h->ip6_dst;
-		connp->conn_srcv6 = ip6h->ip6_dst;
-		connp->conn_remv6 = ip6h->ip6_src;
-
-		/* db_cksumstuff is set at ip_fanout_tcp_v6 */
-		ifindex = (int)DB_CKSUMSTUFF(mp);
-		DB_CKSUMSTUFF(mp) = 0;
+		connp->conn_ipversion = IPV6_VERSION;
+		connp->conn_laddr_v6 = ip6h->ip6_dst;
+		connp->conn_faddr_v6 = ip6h->ip6_src;
+		connp->conn_saddr_v6 = connp->conn_laddr_v6;
 
 		sin6 = sin6_null;
-		sin6.sin6_addr = ip6h->ip6_src;
-		sin6.sin6_port = *(uint16_t *)tcph->th_lport;
+		sin6.sin6_addr = connp->conn_faddr_v6;
+		sin6.sin6_port = connp->conn_fport;
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_flowinfo = ip6h->ip6_vcf & ~IPV6_VERS_AND_FLOW_MASK;
-		sin6.__sin6_src_id = ip_srcid_find_addr(&ip6h->ip6_dst,
-		    lconnp->conn_zoneid, tcps->tcps_netstack);
+		sin6.__sin6_src_id = ip_srcid_find_addr(&connp->conn_laddr_v6,
+		    IPCL_ZONEID(lconnp), tcps->tcps_netstack);
 
 		if (IN6_IS_ADDR_LINKSCOPE(&ip6h->ip6_src)) {
 			/* Pass up the scope_id of remote addr */
@@ -4559,13 +4069,16 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 		} else {
 			sin6.sin6_scope_id = 0;
 		}
-		if (tcp->tcp_recvdstaddr) {
+		if (connp->conn_recv_ancillary.crb_recvdstaddr) {
 			sin6_t	sin6d;
 
 			sin6d = sin6_null;
-			sin6.sin6_addr = ip6h->ip6_dst;
-			sin6d.sin6_port = *(uint16_t *)tcph->th_fport;
-			sin6d.sin6_family = AF_INET;
+			sin6.sin6_addr = connp->conn_laddr_v6;
+			sin6d.sin6_port = connp->conn_lport;
+			sin6d.sin6_family = AF_INET6;
+			if (IN6_IS_ADDR_LINKSCOPE(&connp->conn_laddr_v6))
+				sin6d.sin6_scope_id = ifindex;
+
 			tpi_mp = mi_tpi_extconn_ind(NULL,
 			    (char *)&sin6d, sizeof (sin6_t),
 			    (char *)&tcp, (t_scalar_t)sizeof (intptr_t),
@@ -4579,194 +4092,40 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 		}
 	}
 
-	if (tpi_mp == NULL)
-		return (ENOMEM);
-
-	connp->conn_fport = *(uint16_t *)tcph->th_lport;
-	connp->conn_lport = *(uint16_t *)tcph->th_fport;
-	connp->conn_flags |= (IPCL_TCP6|IPCL_EAGER);
-	connp->conn_fully_bound = B_FALSE;
-
-	/* Inherit information from the "parent" */
-	tcp->tcp_ipversion = ltcp->tcp_ipversion;
-	tcp->tcp_family = ltcp->tcp_family;
-
-	tcp->tcp_wq = ltcp->tcp_wq;
-	tcp->tcp_rq = ltcp->tcp_rq;
-
 	tcp->tcp_mss = tcps->tcps_mss_def_ipv6;
-	tcp->tcp_detached = B_TRUE;
-	SOCK_CONNID_INIT(tcp->tcp_connid);
-	if ((err = tcp_init_values(tcp)) != 0) {
-		freemsg(tpi_mp);
-		return (err);
-	}
-
-	if (ipvers == IPV4_VERSION) {
-		if ((err = tcp_header_init_ipv4(tcp)) != 0) {
-			freemsg(tpi_mp);
-			return (err);
-		}
-		ASSERT(tcp->tcp_ipha != NULL);
-	} else {
-		/* ifindex must be already set */
-		ASSERT(ifindex != 0);
-
-		if (ltcp->tcp_bound_if != 0)
-			tcp->tcp_bound_if = ltcp->tcp_bound_if;
-		else if (IN6_IS_ADDR_LINKSCOPE(&ip6h->ip6_src))
-			tcp->tcp_bound_if = ifindex;
-
-		tcp->tcp_ipv6_recvancillary = ltcp->tcp_ipv6_recvancillary;
-		tcp->tcp_recvifindex = 0;
-		tcp->tcp_recvhops = 0xffffffffU;
-		ASSERT(tcp->tcp_ip6h != NULL);
-	}
-
-	tcp->tcp_lport = ltcp->tcp_lport;
-
-	if (ltcp->tcp_ipversion == tcp->tcp_ipversion) {
-		if (tcp->tcp_iphc_len != ltcp->tcp_iphc_len) {
-			/*
-			 * Listener had options of some sort; eager inherits.
-			 * Free up the eager template and allocate one
-			 * of the right size.
-			 */
-			if (tcp->tcp_hdr_grown) {
-				kmem_free(tcp->tcp_iphc, tcp->tcp_iphc_len);
-			} else {
-				bzero(tcp->tcp_iphc, tcp->tcp_iphc_len);
-				kmem_cache_free(tcp_iphc_cache, tcp->tcp_iphc);
-			}
-			tcp->tcp_iphc = kmem_zalloc(ltcp->tcp_iphc_len,
-			    KM_NOSLEEP);
-			if (tcp->tcp_iphc == NULL) {
-				tcp->tcp_iphc_len = 0;
-				freemsg(tpi_mp);
-				return (ENOMEM);
-			}
-			tcp->tcp_iphc_len = ltcp->tcp_iphc_len;
-			tcp->tcp_hdr_grown = B_TRUE;
-		}
-		tcp->tcp_hdr_len = ltcp->tcp_hdr_len;
-		tcp->tcp_ip_hdr_len = ltcp->tcp_ip_hdr_len;
-		tcp->tcp_tcp_hdr_len = ltcp->tcp_tcp_hdr_len;
-		tcp->tcp_ip6_hops = ltcp->tcp_ip6_hops;
-		tcp->tcp_ip6_vcf = ltcp->tcp_ip6_vcf;
-
-		/*
-		 * Copy the IP+TCP header template from listener to eager
-		 */
-		bcopy(ltcp->tcp_iphc, tcp->tcp_iphc, ltcp->tcp_hdr_len);
-		if (tcp->tcp_ipversion == IPV6_VERSION) {
-			if (((ip6i_t *)(tcp->tcp_iphc))->ip6i_nxt ==
-			    IPPROTO_RAW) {
-				tcp->tcp_ip6h =
-				    (ip6_t *)(tcp->tcp_iphc +
-				    sizeof (ip6i_t));
-			} else {
-				tcp->tcp_ip6h =
-				    (ip6_t *)(tcp->tcp_iphc);
-			}
-			tcp->tcp_ipha = NULL;
-		} else {
-			tcp->tcp_ipha = (ipha_t *)tcp->tcp_iphc;
-			tcp->tcp_ip6h = NULL;
-		}
-		tcp->tcp_tcph = (tcph_t *)(tcp->tcp_iphc +
-		    tcp->tcp_ip_hdr_len);
-	} else {
-		/*
-		 * only valid case when ipversion of listener and
-		 * eager differ is when listener is IPv6 and
-		 * eager is IPv4.
-		 * Eager header template has been initialized to the
-		 * maximum v4 header sizes, which includes space for
-		 * TCP and IP options.
-		 */
-		ASSERT((ltcp->tcp_ipversion == IPV6_VERSION) &&
-		    (tcp->tcp_ipversion == IPV4_VERSION));
-		ASSERT(tcp->tcp_iphc_len >=
-		    TCP_MAX_COMBINED_HEADER_LENGTH);
-		tcp->tcp_tcp_hdr_len = ltcp->tcp_tcp_hdr_len;
-		/* copy IP header fields individually */
-		tcp->tcp_ipha->ipha_ttl =
-		    ltcp->tcp_ip6h->ip6_hops;
-		bcopy(ltcp->tcp_tcph->th_lport,
-		    tcp->tcp_tcph->th_lport, sizeof (ushort_t));
-	}
-
-	bcopy(tcph->th_lport, tcp->tcp_tcph->th_fport, sizeof (in_port_t));
-	bcopy(tcp->tcp_tcph->th_fport, &tcp->tcp_fport,
-	    sizeof (in_port_t));
-
-	if (ltcp->tcp_lport == 0) {
-		tcp->tcp_lport = *(in_port_t *)tcph->th_fport;
-		bcopy(tcph->th_fport, tcp->tcp_tcph->th_lport,
-		    sizeof (in_port_t));
-	}
-
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		ASSERT(ipha != NULL);
-		tcp->tcp_ipha->ipha_dst = ipha->ipha_src;
-		tcp->tcp_ipha->ipha_src = ipha->ipha_dst;
-
-		/* Source routing option copyover (reverse it) */
-		if (tcps->tcps_rev_src_routes)
-			tcp_opt_reverse(tcp, ipha);
-	} else {
-		ASSERT(ip6h != NULL);
-		tcp->tcp_ip6h->ip6_dst = ip6h->ip6_src;
-		tcp->tcp_ip6h->ip6_src = ip6h->ip6_dst;
-	}
-
-	ASSERT(tcp->tcp_conn.tcp_eager_conn_ind == NULL);
-	ASSERT(!tcp->tcp_tconnind_started);
-	/*
-	 * If the SYN contains a credential, it's a loopback packet; attach
-	 * the credential to the TPI message.
-	 */
-	mblk_copycred(tpi_mp, idmp);
-
-	tcp->tcp_conn.tcp_eager_conn_ind = tpi_mp;
-
-	/* Inherit the listener's SSL protection state */
-
-	if ((tcp->tcp_kssl_ent = ltcp->tcp_kssl_ent) != NULL) {
-		kssl_hold_ent(tcp->tcp_kssl_ent);
-		tcp->tcp_kssl_pending = B_TRUE;
-	}
-
-	/* Inherit the listener's non-STREAMS flag */
-	if (IPCL_IS_NONSTR(lconnp)) {
-		connp->conn_flags |= IPCL_NONSTR;
-	}
-
-	return (0);
+	return (tpi_mp);
 }
 
-
-int
-tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
-    tcph_t *tcph, mblk_t *idmp)
+/* Handle a SYN on an AF_INET socket */
+mblk_t *
+tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, mblk_t *mp,
+    ip_recv_attr_t *ira)
 {
 	tcp_t 		*ltcp = lconnp->conn_tcp;
 	tcp_t		*tcp = connp->conn_tcp;
 	sin_t		sin;
 	mblk_t		*tpi_mp = NULL;
-	int		err;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ipha_t		*ipha;
+
+	ASSERT(ira->ira_flags & IRAF_IS_IPV4);
+	ipha = (ipha_t *)mp->b_rptr;
+
+	connp->conn_ipversion = IPV4_VERSION;
+	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &connp->conn_laddr_v6);
+	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &connp->conn_faddr_v6);
+	connp->conn_saddr_v6 = connp->conn_laddr_v6;
 
 	sin = sin_null;
-	sin.sin_addr.s_addr = ipha->ipha_src;
-	sin.sin_port = *(uint16_t *)tcph->th_lport;
+	sin.sin_addr.s_addr = connp->conn_faddr_v4;
+	sin.sin_port = connp->conn_fport;
 	sin.sin_family = AF_INET;
-	if (ltcp->tcp_recvdstaddr) {
+	if (lconnp->conn_recv_ancillary.crb_recvdstaddr) {
 		sin_t	sind;
 
 		sind = sin_null;
-		sind.sin_addr.s_addr = ipha->ipha_dst;
-		sind.sin_port = *(uint16_t *)tcph->th_fport;
+		sind.sin_addr.s_addr = connp->conn_laddr_v4;
+		sind.sin_port = connp->conn_lport;
 		sind.sin_family = AF_INET;
 		tpi_mp = mi_tpi_extconn_ind(NULL,
 		    (char *)&sind, sizeof (sin_t), (char *)&tcp,
@@ -4779,214 +4138,8 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 		    (t_scalar_t)ltcp->tcp_conn_req_seqnum);
 	}
 
-	if (tpi_mp == NULL) {
-		return (ENOMEM);
-	}
-
-	connp->conn_flags |= (IPCL_TCP4|IPCL_EAGER);
-	connp->conn_send = ip_output;
-	connp->conn_recv = tcp_input;
-	connp->conn_fully_bound = B_FALSE;
-
-	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &connp->conn_bound_source_v6);
-	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &connp->conn_srcv6);
-	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &connp->conn_remv6);
-	connp->conn_fport = *(uint16_t *)tcph->th_lport;
-	connp->conn_lport = *(uint16_t *)tcph->th_fport;
-
-	/* Inherit information from the "parent" */
-	tcp->tcp_ipversion = ltcp->tcp_ipversion;
-	tcp->tcp_family = ltcp->tcp_family;
-	tcp->tcp_wq = ltcp->tcp_wq;
-	tcp->tcp_rq = ltcp->tcp_rq;
 	tcp->tcp_mss = tcps->tcps_mss_def_ipv4;
-	tcp->tcp_detached = B_TRUE;
-	SOCK_CONNID_INIT(tcp->tcp_connid);
-	if ((err = tcp_init_values(tcp)) != 0) {
-		freemsg(tpi_mp);
-		return (err);
-	}
-
-	/*
-	 * Let's make sure that eager tcp template has enough space to
-	 * copy IPv4 listener's tcp template. Since the conn_t structure is
-	 * preserved and tcp_iphc_len is also preserved, an eager conn_t may
-	 * have a tcp_template of total len TCP_MAX_COMBINED_HEADER_LENGTH or
-	 * more (in case of re-allocation of conn_t with tcp-IPv6 template with
-	 * extension headers or with ip6i_t struct). Note that bcopy() below
-	 * copies listener tcp's hdr_len which cannot be greater than TCP_MAX_
-	 * COMBINED_HEADER_LENGTH as this listener must be a IPv4 listener.
-	 */
-	ASSERT(tcp->tcp_iphc_len >= TCP_MAX_COMBINED_HEADER_LENGTH);
-	ASSERT(ltcp->tcp_hdr_len <= TCP_MAX_COMBINED_HEADER_LENGTH);
-
-	tcp->tcp_hdr_len = ltcp->tcp_hdr_len;
-	tcp->tcp_ip_hdr_len = ltcp->tcp_ip_hdr_len;
-	tcp->tcp_tcp_hdr_len = ltcp->tcp_tcp_hdr_len;
-	tcp->tcp_ttl = ltcp->tcp_ttl;
-	tcp->tcp_tos = ltcp->tcp_tos;
-
-	/* Copy the IP+TCP header template from listener to eager */
-	bcopy(ltcp->tcp_iphc, tcp->tcp_iphc, ltcp->tcp_hdr_len);
-	tcp->tcp_ipha = (ipha_t *)tcp->tcp_iphc;
-	tcp->tcp_ip6h = NULL;
-	tcp->tcp_tcph = (tcph_t *)(tcp->tcp_iphc +
-	    tcp->tcp_ip_hdr_len);
-
-	/* Initialize the IP addresses and Ports */
-	tcp->tcp_ipha->ipha_dst = ipha->ipha_src;
-	tcp->tcp_ipha->ipha_src = ipha->ipha_dst;
-	bcopy(tcph->th_lport, tcp->tcp_tcph->th_fport, sizeof (in_port_t));
-	bcopy(tcph->th_fport, tcp->tcp_tcph->th_lport, sizeof (in_port_t));
-
-	/* Source routing option copyover (reverse it) */
-	if (tcps->tcps_rev_src_routes)
-		tcp_opt_reverse(tcp, ipha);
-
-	ASSERT(tcp->tcp_conn.tcp_eager_conn_ind == NULL);
-	ASSERT(!tcp->tcp_tconnind_started);
-
-	/*
-	 * If the SYN contains a credential, it's a loopback packet; attach
-	 * the credential to the TPI message.
-	 */
-	mblk_copycred(tpi_mp, idmp);
-
-	tcp->tcp_conn.tcp_eager_conn_ind = tpi_mp;
-
-	/* Inherit the listener's SSL protection state */
-	if ((tcp->tcp_kssl_ent = ltcp->tcp_kssl_ent) != NULL) {
-		kssl_hold_ent(tcp->tcp_kssl_ent);
-		tcp->tcp_kssl_pending = B_TRUE;
-	}
-
-	/* Inherit the listener's non-STREAMS flag */
-	if (IPCL_IS_NONSTR(lconnp)) {
-		connp->conn_flags |= IPCL_NONSTR;
-	}
-
-	return (0);
-}
-
-/*
- * sets up conn for ipsec.
- * if the first mblk is M_CTL it is consumed and mpp is updated.
- * in case of error mpp is freed.
- */
-conn_t *
-tcp_get_ipsec_conn(tcp_t *tcp, squeue_t *sqp, mblk_t **mpp)
-{
-	conn_t 		*connp = tcp->tcp_connp;
-	conn_t 		*econnp;
-	squeue_t 	*new_sqp;
-	mblk_t 		*first_mp = *mpp;
-	mblk_t		*mp = *mpp;
-	boolean_t	mctl_present = B_FALSE;
-	uint_t		ipvers;
-
-	econnp = tcp_get_conn(sqp, tcp->tcp_tcps);
-	if (econnp == NULL) {
-		freemsg(first_mp);
-		return (NULL);
-	}
-	if (DB_TYPE(mp) == M_CTL) {
-		if (mp->b_cont == NULL ||
-		    mp->b_cont->b_datap->db_type != M_DATA) {
-			freemsg(first_mp);
-			return (NULL);
-		}
-		mp = mp->b_cont;
-		if ((mp->b_datap->db_struioflag & STRUIO_EAGER) == 0) {
-			freemsg(first_mp);
-			return (NULL);
-		}
-
-		mp->b_datap->db_struioflag &= ~STRUIO_EAGER;
-		first_mp->b_datap->db_struioflag &= ~STRUIO_POLICY;
-		mctl_present = B_TRUE;
-	} else {
-		ASSERT(mp->b_datap->db_struioflag & STRUIO_POLICY);
-		mp->b_datap->db_struioflag &= ~STRUIO_POLICY;
-	}
-
-	new_sqp = (squeue_t *)DB_CKSUMSTART(mp);
-	DB_CKSUMSTART(mp) = 0;
-
-	ASSERT(OK_32PTR(mp->b_rptr));
-	ipvers = IPH_HDR_VERSION(mp->b_rptr);
-	if (ipvers == IPV4_VERSION) {
-		uint16_t  	*up;
-		uint32_t	ports;
-		ipha_t		*ipha;
-
-		ipha = (ipha_t *)mp->b_rptr;
-		up = (uint16_t *)((uchar_t *)ipha +
-		    IPH_HDR_LENGTH(ipha) + TCP_PORTS_OFFSET);
-		ports = *(uint32_t *)up;
-		IPCL_TCP_EAGER_INIT(econnp, IPPROTO_TCP,
-		    ipha->ipha_dst, ipha->ipha_src, ports);
-	} else {
-		uint16_t  	*up;
-		uint32_t	ports;
-		uint16_t	ip_hdr_len;
-		uint8_t		*nexthdrp;
-		ip6_t 		*ip6h;
-		tcph_t		*tcph;
-
-		ip6h = (ip6_t *)mp->b_rptr;
-		if (ip6h->ip6_nxt == IPPROTO_TCP) {
-			ip_hdr_len = IPV6_HDR_LEN;
-		} else if (!ip_hdr_length_nexthdr_v6(mp, ip6h, &ip_hdr_len,
-		    &nexthdrp) || *nexthdrp != IPPROTO_TCP) {
-			CONN_DEC_REF(econnp);
-			freemsg(first_mp);
-			return (NULL);
-		}
-		tcph = (tcph_t *)&mp->b_rptr[ip_hdr_len];
-		up = (uint16_t *)tcph->th_lport;
-		ports = *(uint32_t *)up;
-		IPCL_TCP_EAGER_INIT_V6(econnp, IPPROTO_TCP,
-		    ip6h->ip6_dst, ip6h->ip6_src, ports);
-	}
-
-	/*
-	 * The caller already ensured that there is a sqp present.
-	 */
-	econnp->conn_sqp = new_sqp;
-	econnp->conn_initial_sqp = new_sqp;
-
-	if (connp->conn_policy != NULL) {
-		ipsec_in_t *ii;
-		ii = (ipsec_in_t *)(first_mp->b_rptr);
-		ASSERT(ii->ipsec_in_policy == NULL);
-		IPPH_REFHOLD(connp->conn_policy);
-		ii->ipsec_in_policy = connp->conn_policy;
-
-		first_mp->b_datap->db_type = IPSEC_POLICY_SET;
-		if (!ip_bind_ipsec_policy_set(econnp, first_mp)) {
-			CONN_DEC_REF(econnp);
-			freemsg(first_mp);
-			return (NULL);
-		}
-	}
-
-	if (ipsec_conn_cache_policy(econnp, ipvers == IPV4_VERSION) != 0) {
-		CONN_DEC_REF(econnp);
-		freemsg(first_mp);
-		return (NULL);
-	}
-
-	/*
-	 * If we know we have some policy, pass the "IPSEC"
-	 * options size TCP uses this adjust the MSS.
-	 */
-	econnp->conn_tcp->tcp_ipsec_overhead = conn_ipsec_length(econnp);
-	if (mctl_present) {
-		freeb(first_mp);
-		*mpp = mp;
-	}
-
-	return (econnp);
+	return (tpi_mp);
 }
 
 /*
@@ -5002,10 +4155,8 @@ tcp_get_ipsec_conn(tcp_t *tcp, squeue_t *sqp, mblk_t **mpp)
  * connection sitting in the freelist. Obviously, this buys us
  * performance.
  *
- * 2) Defence against DOS attack. Allocating a tcp/conn in tcp_conn_request
- * has multiple disadvantages - tying up the squeue during alloc, and the
- * fact that IPSec policy initialization has to happen here which
- * requires us sending a M_CTL and checking for it i.e. real ugliness.
+ * 2) Defence against DOS attack. Allocating a tcp/conn in tcp_input_listener
+ * has multiple disadvantages - tying up the squeue during alloc.
  * But allocating the conn/tcp in IP land is also not the best since
  * we can't check the 'q' and 'q0' which are protected by squeue and
  * blindly allocate memory which might have to be freed here if we are
@@ -5050,9 +4201,15 @@ tcp_get_conn(void *arg, tcp_stack_t *tcps)
 		ns = tcps->tcps_netstack;
 		netstack_hold(ns);
 		connp->conn_netstack = ns;
+		connp->conn_ixa->ixa_ipst = ns->netstack_ip;
 		tcp->tcp_tcps = tcps;
-		TCPS_REFHOLD(tcps);
 		ipcl_globalhash_insert(connp);
+
+		connp->conn_ixa->ixa_notify_cookie = tcp;
+		ASSERT(connp->conn_ixa->ixa_notify == tcp_notify);
+		connp->conn_recv = tcp_input_data;
+		ASSERT(connp->conn_recvicmp == tcp_icmp_input);
+		ASSERT(connp->conn_verifyicmp == tcp_verifyicmp);
 		return ((void *)connp);
 	}
 	mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
@@ -5075,62 +4232,20 @@ tcp_get_conn(void *arg, tcp_stack_t *tcps)
 	mutex_init(&tcp->tcp_rsrv_mp_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	tcp->tcp_tcps = tcps;
-	TCPS_REFHOLD(tcps);
+
+	connp->conn_recv = tcp_input_data;
+	connp->conn_recvicmp = tcp_icmp_input;
+	connp->conn_verifyicmp = tcp_verifyicmp;
+
+	/*
+	 * Register tcp_notify to listen to capability changes detected by IP.
+	 * This upcall is made in the context of the call to conn_ip_output
+	 * thus it is inside the squeue.
+	 */
+	connp->conn_ixa->ixa_notify = tcp_notify;
+	connp->conn_ixa->ixa_notify_cookie = tcp;
 
 	return ((void *)connp);
-}
-
-/*
- * Update the cached label for the given tcp_t.  This should be called once per
- * connection, and before any packets are sent or tcp_process_options is
- * invoked.  Returns B_FALSE if the correct label could not be constructed.
- */
-static boolean_t
-tcp_update_label(tcp_t *tcp, const cred_t *cr)
-{
-	conn_t *connp = tcp->tcp_connp;
-
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		uchar_t optbuf[IP_MAX_OPT_LENGTH];
-		int added;
-
-		if (tsol_compute_label(cr, tcp->tcp_remote, optbuf,
-		    tcp->tcp_tcps->tcps_netstack->netstack_ip) != 0)
-			return (B_FALSE);
-
-		added = tsol_remove_secopt(tcp->tcp_ipha, tcp->tcp_hdr_len);
-		if (added == -1)
-			return (B_FALSE);
-		tcp->tcp_hdr_len += added;
-		tcp->tcp_tcph = (tcph_t *)((uchar_t *)tcp->tcp_tcph + added);
-		tcp->tcp_ip_hdr_len += added;
-		if ((tcp->tcp_label_len = optbuf[IPOPT_OLEN]) != 0) {
-			tcp->tcp_label_len = (tcp->tcp_label_len + 3) & ~3;
-			added = tsol_prepend_option(optbuf, tcp->tcp_ipha,
-			    tcp->tcp_hdr_len);
-			if (added == -1)
-				return (B_FALSE);
-			tcp->tcp_hdr_len += added;
-			tcp->tcp_tcph = (tcph_t *)
-			    ((uchar_t *)tcp->tcp_tcph + added);
-			tcp->tcp_ip_hdr_len += added;
-		}
-	} else {
-		uchar_t optbuf[TSOL_MAX_IPV6_OPTION];
-
-		if (tsol_compute_label_v6(cr, &tcp->tcp_remote_v6, optbuf,
-		    tcp->tcp_tcps->tcps_netstack->netstack_ip) != 0)
-			return (B_FALSE);
-		if (tsol_update_sticky(&tcp->tcp_sticky_ipp,
-		    &tcp->tcp_label_len, optbuf) != 0)
-			return (B_FALSE);
-		if (tcp_build_hdrs(tcp) != 0)
-			return (B_FALSE);
-	}
-
-	connp->conn_ulp_labeled = 1;
-
-	return (B_TRUE);
 }
 
 /* BEGIN CSTYLED */
@@ -5140,7 +4255,7 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
  * =======================
  *
  * The eager is now established in its own perimeter as soon as SYN is
- * received in tcp_conn_request(). When sockfs receives conn_ind, it
+ * received in tcp_input_listener(). When sockfs receives conn_ind, it
  * completes the accept processing on the acceptor STREAM. The sending
  * of conn_ind part is common for both sockfs listener and a TLI/XTI
  * listener but a TLI/XTI listener completes the accept processing
@@ -5149,29 +4264,28 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
  * Common control flow for 3 way handshake:
  * ----------------------------------------
  *
- * incoming SYN (listener perimeter) 	-> tcp_rput_data()
- *					-> tcp_conn_request()
+ * incoming SYN (listener perimeter)	-> tcp_input_listener()
  *
- * incoming SYN-ACK-ACK (eager perim) 	-> tcp_rput_data()
+ * incoming SYN-ACK-ACK (eager perim) 	-> tcp_input_data()
  * send T_CONN_IND (listener perim)	-> tcp_send_conn_ind()
  *
  * Sockfs ACCEPT Path:
  * -------------------
  *
- * open acceptor stream (tcp_open allocates tcp_wput_accept()
+ * open acceptor stream (tcp_open allocates tcp_tli_accept()
  * as STREAM entry point)
  *
- * soaccept() sends T_CONN_RES on the acceptor STREAM to tcp_wput_accept()
+ * soaccept() sends T_CONN_RES on the acceptor STREAM to tcp_tli_accept()
  *
- * tcp_wput_accept() extracts the eager and makes the q->q_ptr <-> eager
+ * tcp_tli_accept() extracts the eager and makes the q->q_ptr <-> eager
  * association (we are not behind eager's squeue but sockfs is protecting us
  * and no one knows about this stream yet. The STREAMS entry point q->q_info
  * is changed to point at tcp_wput().
  *
- * tcp_wput_accept() sends any deferred eagers via tcp_send_pending() to
+ * tcp_accept_common() sends any deferred eagers via tcp_send_pending() to
  * listener (done on listener's perimeter).
  *
- * tcp_wput_accept() calls tcp_accept_finish() on eagers perimeter to finish
+ * tcp_tli_accept() calls tcp_accept_finish() on eagers perimeter to finish
  * accept.
  *
  * TLI/XTI client ACCEPT path:
@@ -5179,8 +4293,8 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
  *
  * soaccept() sends T_CONN_RES on the listener STREAM.
  *
- * tcp_accept() -> tcp_accept_swap() complete the processing and send
- * the bind_mp to eager perimeter to finish accept (tcp_rput_other()).
+ * tcp_tli_accept() -> tcp_accept_swap() complete the processing and send
+ * a M_SETOPS mblk to eager perimeter to finish accept (tcp_accept_finish()).
  *
  * Locks:
  * ======
@@ -5191,7 +4305,7 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
  * Referencing:
  * ============
  *
- * 1) We start out in tcp_conn_request by eager placing a ref on
+ * 1) We start out in tcp_input_listener by eager placing a ref on
  * listener and listener adding eager to listeners->tcp_eager_next_q0.
  *
  * 2) When a SYN-ACK-ACK arrives, we send the conn_ind to listener. Before
@@ -5249,51 +4363,71 @@ tcp_update_label(tcp_t *tcp, const cred_t *cr)
 
 /*
  * THIS FUNCTION IS DIRECTLY CALLED BY IP VIA SQUEUE FOR SYN.
- * tcp_rput_data will not see any SYN packets.
+ * tcp_input_data will not see any packets for listeners since the listener
+ * has conn_recv set to tcp_input_listener.
  */
 /* ARGSUSED */
 void
-tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
+tcp_input_listener(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 {
-	tcph_t		*tcph;
+	tcpha_t		*tcpha;
 	uint32_t	seg_seq;
 	tcp_t		*eager;
-	uint_t		ipvers;
-	ipha_t		*ipha;
-	ip6_t		*ip6h;
 	int		err;
 	conn_t		*econnp = NULL;
 	squeue_t	*new_sqp;
 	mblk_t		*mp1;
 	uint_t 		ip_hdr_len;
-	conn_t		*connp = (conn_t *)arg;
-	tcp_t		*tcp = connp->conn_tcp;
-	cred_t		*credp;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t	*ipst;
+	conn_t		*lconnp = (conn_t *)arg;
+	tcp_t		*listener = lconnp->conn_tcp;
+	tcp_stack_t	*tcps = listener->tcp_tcps;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
+	uint_t		flags;
+	mblk_t		*tpi_mp;
+	uint_t		ifindex = ira->ira_ruifindex;
 
-	if (tcp->tcp_state != TCPS_LISTEN)
+	ip_hdr_len = ira->ira_ip_hdr_length;
+	tcpha = (tcpha_t *)&mp->b_rptr[ip_hdr_len];
+	flags = (unsigned int)tcpha->tha_flags & 0xFF;
+
+	if (!(flags & TH_SYN)) {
+		if ((flags & TH_RST) || (flags & TH_URG)) {
+			freemsg(mp);
+			return;
+		}
+		if (flags & TH_ACK) {
+			/* Note this executes in listener's squeue */
+			tcp_xmit_listeners_reset(mp, ira, ipst, lconnp);
+			return;
+		}
+
+		freemsg(mp);
+		return;
+	}
+
+	if (listener->tcp_state != TCPS_LISTEN)
 		goto error2;
 
-	ASSERT((tcp->tcp_connp->conn_flags & IPCL_BOUND) != 0);
+	ASSERT(IPCL_IS_BOUND(lconnp));
 
-	mutex_enter(&tcp->tcp_eager_lock);
-	if (tcp->tcp_conn_req_cnt_q >= tcp->tcp_conn_req_max) {
-		mutex_exit(&tcp->tcp_eager_lock);
+	mutex_enter(&listener->tcp_eager_lock);
+	if (listener->tcp_conn_req_cnt_q >= listener->tcp_conn_req_max) {
+		mutex_exit(&listener->tcp_eager_lock);
 		TCP_STAT(tcps, tcp_listendrop);
 		BUMP_MIB(&tcps->tcps_mib, tcpListenDrop);
-		if (tcp->tcp_debug) {
+		if (lconnp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE|SL_ERROR,
-			    "tcp_conn_request: listen backlog (max=%d) "
+			    "tcp_input_listener: listen backlog (max=%d) "
 			    "overflow (%d pending) on %s",
-			    tcp->tcp_conn_req_max, tcp->tcp_conn_req_cnt_q,
-			    tcp_display(tcp, NULL, DISP_PORT_ONLY));
+			    listener->tcp_conn_req_max,
+			    listener->tcp_conn_req_cnt_q,
+			    tcp_display(listener, NULL, DISP_PORT_ONLY));
 		}
 		goto error2;
 	}
 
-	if (tcp->tcp_conn_req_cnt_q0 >=
-	    tcp->tcp_conn_req_max + tcps->tcps_conn_req_max_q0) {
+	if (listener->tcp_conn_req_cnt_q0 >=
+	    listener->tcp_conn_req_max + tcps->tcps_conn_req_max_q0) {
 		/*
 		 * Q0 is full. Drop a pending half-open req from the queue
 		 * to make room for the new SYN req. Also mark the time we
@@ -5303,83 +4437,127 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		 * be to set the "tcp_syn_defense" flag now.
 		 */
 		TCP_STAT(tcps, tcp_listendropq0);
-		tcp->tcp_last_rcv_lbolt = lbolt64;
-		if (!tcp_drop_q0(tcp)) {
-			mutex_exit(&tcp->tcp_eager_lock);
+		listener->tcp_last_rcv_lbolt = lbolt64;
+		if (!tcp_drop_q0(listener)) {
+			mutex_exit(&listener->tcp_eager_lock);
 			BUMP_MIB(&tcps->tcps_mib, tcpListenDropQ0);
-			if (tcp->tcp_debug) {
+			if (lconnp->conn_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 3, SL_TRACE,
-				    "tcp_conn_request: listen half-open queue "
-				    "(max=%d) full (%d pending) on %s",
+				    "tcp_input_listener: listen half-open "
+				    "queue (max=%d) full (%d pending) on %s",
 				    tcps->tcps_conn_req_max_q0,
-				    tcp->tcp_conn_req_cnt_q0,
-				    tcp_display(tcp, NULL,
+				    listener->tcp_conn_req_cnt_q0,
+				    tcp_display(listener, NULL,
 				    DISP_PORT_ONLY));
 			}
 			goto error2;
 		}
 	}
-	mutex_exit(&tcp->tcp_eager_lock);
+	mutex_exit(&listener->tcp_eager_lock);
 
 	/*
-	 * IP adds STRUIO_EAGER and ensures that the received packet is
-	 * M_DATA even if conn_ipv6_recvpktinfo is enabled or for ip6
-	 * link local address.  If IPSec is enabled, db_struioflag has
-	 * STRUIO_POLICY set (mutually exclusive from STRUIO_EAGER);
-	 * otherwise an error case if neither of them is set.
+	 * IP sets ira_sqp to either the senders conn_sqp (for loopback)
+	 * or based on the ring (for packets from GLD). Otherwise it is
+	 * set based on lbolt i.e., a somewhat random number.
 	 */
-	if ((mp->b_datap->db_struioflag & STRUIO_EAGER) != 0) {
-		new_sqp = (squeue_t *)DB_CKSUMSTART(mp);
-		DB_CKSUMSTART(mp) = 0;
-		mp->b_datap->db_struioflag &= ~STRUIO_EAGER;
-		econnp = (conn_t *)tcp_get_conn(arg2, tcps);
-		if (econnp == NULL)
-			goto error2;
-		ASSERT(econnp->conn_netstack == connp->conn_netstack);
-		econnp->conn_sqp = new_sqp;
-		econnp->conn_initial_sqp = new_sqp;
-	} else if ((mp->b_datap->db_struioflag & STRUIO_POLICY) != 0) {
-		/*
-		 * mp is updated in tcp_get_ipsec_conn().
-		 */
-		econnp = tcp_get_ipsec_conn(tcp, arg2, &mp);
-		if (econnp == NULL) {
-			/*
-			 * mp freed by tcp_get_ipsec_conn.
-			 */
-			return;
-		}
-		ASSERT(econnp->conn_netstack == connp->conn_netstack);
-	} else {
+	ASSERT(ira->ira_sqp != NULL);
+	new_sqp = ira->ira_sqp;
+
+	econnp = (conn_t *)tcp_get_conn(arg2, tcps);
+	if (econnp == NULL)
 		goto error2;
-	}
 
-	ASSERT(DB_TYPE(mp) == M_DATA);
+	ASSERT(econnp->conn_netstack == lconnp->conn_netstack);
+	econnp->conn_sqp = new_sqp;
+	econnp->conn_initial_sqp = new_sqp;
+	econnp->conn_ixa->ixa_sqp = new_sqp;
 
-	ipvers = IPH_HDR_VERSION(mp->b_rptr);
-	ASSERT(ipvers == IPV6_VERSION || ipvers == IPV4_VERSION);
+	econnp->conn_fport = tcpha->tha_lport;
+	econnp->conn_lport = tcpha->tha_fport;
+
+	err = conn_inherit_parent(lconnp, econnp);
+	if (err != 0)
+		goto error3;
+
 	ASSERT(OK_32PTR(mp->b_rptr));
-	if (ipvers == IPV4_VERSION) {
-		ipha = (ipha_t *)mp->b_rptr;
-		ip_hdr_len = IPH_HDR_LENGTH(ipha);
-		tcph = (tcph_t *)&mp->b_rptr[ip_hdr_len];
+	ASSERT(IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION ||
+	    IPH_HDR_VERSION(mp->b_rptr) == IPV6_VERSION);
+
+	if (lconnp->conn_family == AF_INET) {
+		ASSERT(IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION);
+		tpi_mp = tcp_conn_create_v4(lconnp, econnp, mp, ira);
 	} else {
-		ip6h = (ip6_t *)mp->b_rptr;
-		ip_hdr_len = ip_hdr_length_v6(mp, ip6h);
-		tcph = (tcph_t *)&mp->b_rptr[ip_hdr_len];
+		tpi_mp = tcp_conn_create_v6(lconnp, econnp, mp, ira);
 	}
 
-	if (tcp->tcp_family == AF_INET) {
-		ASSERT(ipvers == IPV4_VERSION);
-		err = tcp_conn_create_v4(connp, econnp, ipha, tcph, mp);
-	} else {
-		err = tcp_conn_create_v6(connp, econnp, mp, tcph, ipvers, mp);
-	}
-
-	if (err)
+	if (tpi_mp == NULL)
 		goto error3;
 
 	eager = econnp->conn_tcp;
+	eager->tcp_detached = B_TRUE;
+	SOCK_CONNID_INIT(eager->tcp_connid);
+
+	tcp_init_values(eager);
+
+	ASSERT((econnp->conn_ixa->ixa_flags &
+	    (IXAF_SET_ULP_CKSUM | IXAF_VERIFY_SOURCE |
+	    IXAF_VERIFY_PMTU | IXAF_VERIFY_LSO)) ==
+	    (IXAF_SET_ULP_CKSUM | IXAF_VERIFY_SOURCE |
+	    IXAF_VERIFY_PMTU | IXAF_VERIFY_LSO));
+
+	if (!tcps->tcps_dev_flow_ctl)
+		econnp->conn_ixa->ixa_flags |= IXAF_NO_DEV_FLOW_CTL;
+
+	/* Prepare for diffing against previous packets */
+	eager->tcp_recvifindex = 0;
+	eager->tcp_recvhops = 0xffffffffU;
+
+	if (!(ira->ira_flags & IRAF_IS_IPV4) && econnp->conn_bound_if == 0) {
+		if (IN6_IS_ADDR_LINKSCOPE(&econnp->conn_faddr_v6) ||
+		    IN6_IS_ADDR_LINKSCOPE(&econnp->conn_laddr_v6)) {
+			econnp->conn_incoming_ifindex = ifindex;
+			econnp->conn_ixa->ixa_flags |= IXAF_SCOPEID_SET;
+			econnp->conn_ixa->ixa_scopeid = ifindex;
+		}
+	}
+
+	if ((ira->ira_flags & (IRAF_IS_IPV4|IRAF_IPV4_OPTIONS)) ==
+	    (IRAF_IS_IPV4|IRAF_IPV4_OPTIONS) &&
+	    tcps->tcps_rev_src_routes) {
+		ipha_t *ipha = (ipha_t *)mp->b_rptr;
+		ip_pkt_t *ipp = &econnp->conn_xmit_ipp;
+
+		/* Source routing option copyover (reverse it) */
+		err = ip_find_hdr_v4(ipha, ipp, B_TRUE);
+		if (err != 0) {
+			freemsg(tpi_mp);
+			goto error3;
+		}
+		ip_pkt_source_route_reverse_v4(ipp);
+	}
+
+	ASSERT(eager->tcp_conn.tcp_eager_conn_ind == NULL);
+	ASSERT(!eager->tcp_tconnind_started);
+	/*
+	 * If the SYN came with a credential, it's a loopback packet or a
+	 * labeled packet; attach the credential to the TPI message.
+	 */
+	if (ira->ira_cred != NULL)
+		mblk_setcred(tpi_mp, ira->ira_cred, ira->ira_cpid);
+
+	eager->tcp_conn.tcp_eager_conn_ind = tpi_mp;
+
+	/* Inherit the listener's SSL protection state */
+	if ((eager->tcp_kssl_ent = listener->tcp_kssl_ent) != NULL) {
+		kssl_hold_ent(eager->tcp_kssl_ent);
+		eager->tcp_kssl_pending = B_TRUE;
+	}
+
+	/* Inherit the listener's non-STREAMS flag */
+	if (IPCL_IS_NONSTR(lconnp)) {
+		econnp->conn_flags |= IPCL_NONSTR;
+	}
+
 	ASSERT(eager->tcp_ordrel_mp == NULL);
 
 	if (!IPCL_IS_NONSTR(econnp)) {
@@ -5392,127 +4570,103 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		if ((eager->tcp_ordrel_mp = mi_tpi_ordrel_ind()) == NULL)
 			goto error3;
 	}
-	/* Inherit various TCP parameters from the listener */
-	eager->tcp_naglim = tcp->tcp_naglim;
-	eager->tcp_first_timer_threshold = tcp->tcp_first_timer_threshold;
-	eager->tcp_second_timer_threshold = tcp->tcp_second_timer_threshold;
+	/*
+	 * Now that the IP addresses and ports are setup in econnp we
+	 * can do the IPsec policy work.
+	 */
+	if (ira->ira_flags & IRAF_IPSEC_SECURE) {
+		if (lconnp->conn_policy != NULL) {
+			/*
+			 * Inherit the policy from the listener; use
+			 * actions from ira
+			 */
+			if (!ip_ipsec_policy_inherit(econnp, lconnp, ira)) {
+				CONN_DEC_REF(econnp);
+				freemsg(mp);
+				goto error3;
+			}
+		}
+	}
 
-	eager->tcp_first_ctimer_threshold = tcp->tcp_first_ctimer_threshold;
-	eager->tcp_second_ctimer_threshold = tcp->tcp_second_ctimer_threshold;
+	/* Inherit various TCP parameters from the listener */
+	eager->tcp_naglim = listener->tcp_naglim;
+	eager->tcp_first_timer_threshold = listener->tcp_first_timer_threshold;
+	eager->tcp_second_timer_threshold =
+	    listener->tcp_second_timer_threshold;
+	eager->tcp_first_ctimer_threshold =
+	    listener->tcp_first_ctimer_threshold;
+	eager->tcp_second_ctimer_threshold =
+	    listener->tcp_second_ctimer_threshold;
 
 	/*
-	 * tcp_adapt_ire() may change tcp_rwnd according to the ire metrics.
-	 * If it does not, the eager's receive window will be set to the
-	 * listener's receive window later in this function.
+	 * tcp_set_destination() may set tcp_rwnd according to the route
+	 * metrics. If it does not, the eager's receive window will be set
+	 * to the listener's receive window later in this function.
 	 */
 	eager->tcp_rwnd = 0;
 
 	/*
 	 * Inherit listener's tcp_init_cwnd.  Need to do this before
-	 * calling tcp_process_options() where tcp_mss_set() is called
-	 * to set the initial cwnd.
+	 * calling tcp_process_options() which set the initial cwnd.
 	 */
-	eager->tcp_init_cwnd = tcp->tcp_init_cwnd;
+	eager->tcp_init_cwnd = listener->tcp_init_cwnd;
 
-	/*
-	 * Zones: tcp_adapt_ire() and tcp_send_data() both need the
-	 * zone id before the accept is completed in tcp_wput_accept().
-	 */
-	econnp->conn_zoneid = connp->conn_zoneid;
-	econnp->conn_allzones = connp->conn_allzones;
-
-	/* Copy nexthop information from listener to eager */
-	if (connp->conn_nexthop_set) {
-		econnp->conn_nexthop_set = connp->conn_nexthop_set;
-		econnp->conn_nexthop_v4 = connp->conn_nexthop_v4;
-	}
-
-	/*
-	 * TSOL: tsol_input_proc() needs the eager's cred before the
-	 * eager is accepted
-	 */
-	econnp->conn_cred = eager->tcp_cred = credp = connp->conn_cred;
-	crhold(credp);
-
-	ASSERT(econnp->conn_effective_cred == NULL);
 	if (is_system_labeled()) {
-		cred_t *cr;
-		ts_label_t *tsl;
+		ip_xmit_attr_t *ixa = econnp->conn_ixa;
 
-		/*
-		 * If this is an MLP connection or a MAC-Exempt connection
-		 * with an unlabeled node, packets are to be
-		 * exchanged using the security label of the received
-		 * SYN packet instead of the server application's label.
-		 */
-		if ((cr = msg_getcred(mp, NULL)) != NULL &&
-		    (tsl = crgetlabel(cr)) != NULL &&
-		    (connp->conn_mlp_type != mlptSingle ||
-		    (connp->conn_mac_mode != CONN_MAC_AWARE &&
-		    (tsl->tsl_flags & TSLF_UNLABELED)))) {
-			if ((econnp->conn_effective_cred =
-			    copycred_from_tslabel(econnp->conn_cred,
-			    tsl, KM_NOSLEEP)) != NULL) {
-				DTRACE_PROBE2(
-				    syn_accept_peerlabel,
-				    conn_t *, econnp, cred_t *,
-				    econnp->conn_effective_cred);
-			} else {
-				DTRACE_PROBE3(
-				    tx__ip__log__error__set__eagercred__tcp,
-				    char *,
-				    "SYN mp(1) label on eager connp(2) failed",
-				    mblk_t *, mp, conn_t *, econnp);
-				goto error3;
-			}
+		ASSERT(ira->ira_tsl != NULL);
+		/* Discard any old label */
+		if (ixa->ixa_free_flags & IXA_FREE_TSL) {
+			ASSERT(ixa->ixa_tsl != NULL);
+			label_rele(ixa->ixa_tsl);
+			ixa->ixa_free_flags &= ~IXA_FREE_TSL;
+			ixa->ixa_tsl = NULL;
+		}
+		if ((lconnp->conn_mlp_type != mlptSingle ||
+		    lconnp->conn_mac_mode != CONN_MAC_DEFAULT) &&
+		    ira->ira_tsl != NULL) {
+			/*
+			 * If this is an MLP connection or a MAC-Exempt
+			 * connection with an unlabeled node, packets are to be
+			 * exchanged using the security label of the received
+			 * SYN packet instead of the server application's label.
+			 * tsol_check_dest called from ip_set_destination
+			 * might later update TSF_UNLABELED by replacing
+			 * ixa_tsl with a new label.
+			 */
+			label_hold(ira->ira_tsl);
+			ip_xmit_attr_replace_tsl(ixa, ira->ira_tsl);
+			DTRACE_PROBE2(mlp_syn_accept, conn_t *,
+			    econnp, ts_label_t *, ixa->ixa_tsl)
 		} else {
+			ixa->ixa_tsl = crgetlabel(econnp->conn_cred);
 			DTRACE_PROBE2(syn_accept, conn_t *,
-			    econnp, cred_t *, econnp->conn_cred)
+			    econnp, ts_label_t *, ixa->ixa_tsl)
 		}
-
 		/*
-		 * Verify the destination is allowed to receive packets
-		 * at the security label of the SYN-ACK we are generating.
-		 * tsol_check_dest() may create a new effective cred for
-		 * this connection with a modified label or label flags.
+		 * conn_connect() called from tcp_set_destination will verify
+		 * the destination is allowed to receive packets at the
+		 * security label of the SYN-ACK we are generating. As part of
+		 * that, tsol_check_dest() may create a new effective label for
+		 * this connection.
+		 * Finally conn_connect() will call conn_update_label.
+		 * All that remains for TCP to do is to call
+		 * conn_build_hdr_template which is done as part of
+		 * tcp_set_destination.
 		 */
-		if (IN6_IS_ADDR_V4MAPPED(&econnp->conn_remv6)) {
-			uint32_t dst;
-			IN6_V4MAPPED_TO_IPADDR(&econnp->conn_remv6, dst);
-			err = tsol_check_dest(CONN_CRED(econnp), &dst,
-			    IPV4_VERSION, B_FALSE, &cr);
-		} else {
-			err = tsol_check_dest(CONN_CRED(econnp),
-			    &econnp->conn_remv6, IPV6_VERSION,
-			    B_FALSE, &cr);
-		}
-		if (err != 0)
-			goto error3;
-		if (cr != NULL) {
-			if (econnp->conn_effective_cred != NULL)
-				crfree(econnp->conn_effective_cred);
-			econnp->conn_effective_cred = cr;
-		}
-
-		/*
-		 * Generate the security label to be used in the text of
-		 * this connection's outgoing packets.
-		 */
-		if (!tcp_update_label(eager, CONN_CRED(econnp))) {
-			DTRACE_PROBE3(
-			    tx__ip__log__error__connrequest__tcp,
-			    char *, "eager connp(1) label on SYN mp(2) failed",
-			    conn_t *, econnp, mblk_t *, mp);
-			goto error3;
-		}
 	}
 
+	/*
+	 * Since we will clear tcp_listener before we clear tcp_detached
+	 * in the accept code we need tcp_hard_binding aka tcp_accept_inprogress
+	 * so we can tell a TCP_DETACHED_NONEAGER apart.
+	 */
 	eager->tcp_hard_binding = B_TRUE;
 
 	tcp_bind_hash_insert(&tcps->tcps_bind_fanout[
-	    TCP_BIND_HASH(eager->tcp_lport)], eager, 0);
+	    TCP_BIND_HASH(econnp->conn_lport)], eager, 0);
 
-	CL_INET_CONNECT(connp, eager, B_FALSE, err);
+	CL_INET_CONNECT(econnp, B_FALSE, err);
 	if (err != 0) {
 		tcp_bind_hash_remove(eager);
 		goto error3;
@@ -5528,32 +4682,27 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	SOCK_CONNID_BUMP(eager->tcp_connid);
 
 	/*
-	 * There should be no ire in the mp as we are being called after
-	 * receiving the SYN.
-	 */
-	ASSERT(tcp_ire_mp(&mp) == NULL);
-
-	/*
-	 * Adapt our mss, ttl, ... according to information provided in IRE.
+	 * Adapt our mss, ttl, ... based on the remote address.
 	 */
 
-	if (tcp_adapt_ire(eager, NULL) == 0) {
+	if (tcp_set_destination(eager) != 0) {
+		BUMP_MIB(&tcps->tcps_mib, tcpAttemptFails);
 		/* Undo the bind_hash_insert */
 		tcp_bind_hash_remove(eager);
 		goto error3;
 	}
 
 	/* Process all TCP options. */
-	tcp_process_options(eager, tcph);
+	tcp_process_options(eager, tcpha);
 
 	/* Is the other end ECN capable? */
 	if (tcps->tcps_ecn_permitted >= 1 &&
-	    (tcph->th_flags[0] & (TH_ECE|TH_CWR)) == (TH_ECE|TH_CWR)) {
+	    (tcpha->tha_flags & (TH_ECE|TH_CWR)) == (TH_ECE|TH_CWR)) {
 		eager->tcp_ecn_ok = B_TRUE;
 	}
 
 	/*
-	 * listeners tcp_recv_hiwater should be the default window size or a
+	 * The listener's conn_rcvbuf should be the default window size or a
 	 * window size changed via SO_RCVBUF option. First round up the
 	 * eager's tcp_rwnd to the nearest MSS. Then find out the window
 	 * scale option value if needed. Call tcp_rwnd_set() to finish the
@@ -5563,7 +4712,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	 * we should not inherit receive window size from listener.
 	 */
 	eager->tcp_rwnd = MSS_ROUNDUP(
-	    (eager->tcp_rwnd == 0 ? tcp->tcp_recv_hiwater:
+	    (eager->tcp_rwnd == 0 ? econnp->conn_rcvbuf :
 	    eager->tcp_rwnd), eager->tcp_mss);
 	if (eager->tcp_snd_ws_ok)
 		tcp_set_ws_value(eager);
@@ -5575,77 +4724,46 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	 */
 	(void) tcp_rwnd_set(eager, eager->tcp_rwnd);
 
-	/*
-	 * We eliminate the need for sockfs to send down a T_SVR4_OPTMGMT_REQ
-	 * via soaccept()->soinheritoptions() which essentially applies
-	 * all the listener options to the new STREAM. The options that we
-	 * need to take care of are:
-	 * SO_DEBUG, SO_REUSEADDR, SO_KEEPALIVE, SO_DONTROUTE, SO_BROADCAST,
-	 * SO_USELOOPBACK, SO_OOBINLINE, SO_DGRAM_ERRIND, SO_LINGER,
-	 * SO_SNDBUF, SO_RCVBUF.
-	 *
-	 * SO_RCVBUF:	tcp_rwnd_set() above takes care of it.
-	 * SO_SNDBUF:	Set the tcp_xmit_hiwater for the eager. When
-	 *		tcp_maxpsz_set() gets called later from
-	 *		tcp_accept_finish(), the option takes effect.
-	 *
-	 */
-	/* Set the TCP options */
-	eager->tcp_recv_lowater = tcp->tcp_recv_lowater;
-	eager->tcp_xmit_hiwater = tcp->tcp_xmit_hiwater;
-	eager->tcp_dgram_errind = tcp->tcp_dgram_errind;
-	eager->tcp_oobinline = tcp->tcp_oobinline;
-	eager->tcp_reuseaddr = tcp->tcp_reuseaddr;
-	eager->tcp_broadcast = tcp->tcp_broadcast;
-	eager->tcp_useloopback = tcp->tcp_useloopback;
-	eager->tcp_dontroute = tcp->tcp_dontroute;
-	eager->tcp_debug = tcp->tcp_debug;
-	eager->tcp_linger = tcp->tcp_linger;
-	eager->tcp_lingertime = tcp->tcp_lingertime;
-	if (tcp->tcp_ka_enabled)
-		eager->tcp_ka_enabled = 1;
+	ASSERT(eager->tcp_connp->conn_rcvbuf != 0 &&
+	    eager->tcp_connp->conn_rcvbuf == eager->tcp_rwnd);
 
-	ASSERT(eager->tcp_recv_hiwater != 0 &&
-	    eager->tcp_recv_hiwater == eager->tcp_rwnd);
-
-	/* Set the IP options */
-	econnp->conn_broadcast = connp->conn_broadcast;
-	econnp->conn_loopback = connp->conn_loopback;
-	econnp->conn_dontroute = connp->conn_dontroute;
-	econnp->conn_reuseaddr = connp->conn_reuseaddr;
+	ASSERT(econnp->conn_rcvbuf != 0 &&
+	    econnp->conn_rcvbuf == eager->tcp_rwnd);
 
 	/* Put a ref on the listener for the eager. */
-	CONN_INC_REF(connp);
-	mutex_enter(&tcp->tcp_eager_lock);
-	tcp->tcp_eager_next_q0->tcp_eager_prev_q0 = eager;
-	eager->tcp_eager_next_q0 = tcp->tcp_eager_next_q0;
-	tcp->tcp_eager_next_q0 = eager;
-	eager->tcp_eager_prev_q0 = tcp;
+	CONN_INC_REF(lconnp);
+	mutex_enter(&listener->tcp_eager_lock);
+	listener->tcp_eager_next_q0->tcp_eager_prev_q0 = eager;
+	eager->tcp_eager_next_q0 = listener->tcp_eager_next_q0;
+	listener->tcp_eager_next_q0 = eager;
+	eager->tcp_eager_prev_q0 = listener;
 
 	/* Set tcp_listener before adding it to tcp_conn_fanout */
-	eager->tcp_listener = tcp;
-	eager->tcp_saved_listener = tcp;
+	eager->tcp_listener = listener;
+	eager->tcp_saved_listener = listener;
 
 	/*
 	 * Tag this detached tcp vector for later retrieval
 	 * by our listener client in tcp_accept().
 	 */
-	eager->tcp_conn_req_seqnum = tcp->tcp_conn_req_seqnum;
-	tcp->tcp_conn_req_cnt_q0++;
-	if (++tcp->tcp_conn_req_seqnum == -1) {
+	eager->tcp_conn_req_seqnum = listener->tcp_conn_req_seqnum;
+	listener->tcp_conn_req_cnt_q0++;
+	if (++listener->tcp_conn_req_seqnum == -1) {
 		/*
 		 * -1 is "special" and defined in TPI as something
 		 * that should never be used in T_CONN_IND
 		 */
-		++tcp->tcp_conn_req_seqnum;
+		++listener->tcp_conn_req_seqnum;
 	}
-	mutex_exit(&tcp->tcp_eager_lock);
+	mutex_exit(&listener->tcp_eager_lock);
 
-	if (tcp->tcp_syn_defense) {
+	if (listener->tcp_syn_defense) {
 		/* Don't drop the SYN that comes from a good IP source */
-		ipaddr_t *addr_cache = (ipaddr_t *)(tcp->tcp_ip_addr_cache);
-		if (addr_cache != NULL && eager->tcp_remote ==
-		    addr_cache[IP_ADDR_CACHE_HASH(eager->tcp_remote)]) {
+		ipaddr_t *addr_cache;
+
+		addr_cache = (ipaddr_t *)(listener->tcp_ip_addr_cache);
+		if (addr_cache != NULL && econnp->conn_faddr_v4 ==
+		    addr_cache[IP_ADDR_CACHE_HASH(econnp->conn_faddr_v4)]) {
 			eager->tcp_dontdrop = B_TRUE;
 		}
 	}
@@ -5655,14 +4773,14 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	 * as we do that, we expose the eager to the classifier and
 	 * should not touch any field outside the eager's perimeter.
 	 * So do all the work necessary before inserting the eager
-	 * in its own perimeter. Be optimistic that ipcl_conn_insert()
+	 * in its own perimeter. Be optimistic that conn_connect()
 	 * will succeed but undo everything if it fails.
 	 */
-	seg_seq = ABE32_TO_U32(tcph->th_seq);
+	seg_seq = ntohl(tcpha->tha_seq);
 	eager->tcp_irs = seg_seq;
 	eager->tcp_rack = seg_seq;
 	eager->tcp_rnxt = seg_seq + 1;
-	U32_TO_ABE32(eager->tcp_rnxt, eager->tcp_tcph->th_ack);
+	eager->tcp_tcpha->tha_ack = htonl(eager->tcp_rnxt);
 	BUMP_MIB(&tcps->tcps_mib, tcpPassiveOpens);
 	eager->tcp_state = TCPS_SYN_RCVD;
 	mp1 = tcp_xmit_mp(eager, eager->tcp_xmit_head, eager->tcp_mss,
@@ -5677,24 +4795,10 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	}
 
 	/*
-	 * Note that in theory this should use the current pid
-	 * so that getpeerucred on the client returns the actual listener
-	 * that does accept. But accept() hasn't been called yet. We could use
-	 * the pid of the process that did bind/listen on the server.
-	 * However, with common usage like inetd() the bind/listen can be done
-	 * by a different process than the accept().
-	 * Hence we do the simple thing of using the open pid here.
-	 * Note that db_credp is set later in tcp_send_data().
-	 */
-	mblk_setcred(mp1, credp, tcp->tcp_cpid);
-	eager->tcp_cpid = tcp->tcp_cpid;
-	eager->tcp_open_time = lbolt64;
-
-	/*
 	 * We need to start the rto timer. In normal case, we start
 	 * the timer after sending the packet on the wire (or at
 	 * least believing that packet was sent by waiting for
-	 * CALL_IP_WPUT() to return). Since this is the first packet
+	 * conn_ip_output() to return). Since this is the first packet
 	 * being sent on the wire for the eager, our initial tcp_rto
 	 * is at least tcp_rexmit_interval_min which is a fairly
 	 * large value to allow the algorithm to adjust slowly to large
@@ -5716,7 +4820,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	 * ensure against an eager close race.
 	 */
 
-	CONN_INC_REF(eager->tcp_connp);
+	CONN_INC_REF(econnp);
 
 	TCP_TIMER_RESTART(eager, eager->tcp_rto);
 
@@ -5724,22 +4828,16 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	 * Insert the eager in its own perimeter now. We are ready to deal
 	 * with any packets on eager.
 	 */
-	if (eager->tcp_ipversion == IPV4_VERSION) {
-		if (ipcl_conn_insert(econnp, IPPROTO_TCP, 0, 0, 0) != 0) {
-			goto error;
-		}
-	} else {
-		if (ipcl_conn_insert_v6(econnp, IPPROTO_TCP, 0, 0, 0, 0) != 0) {
-			goto error;
-		}
-	}
+	if (ipcl_conn_insert(econnp) != 0)
+		goto error;
 
-	/* mark conn as fully-bound */
-	econnp->conn_fully_bound = B_TRUE;
-
-	/* Send the SYN-ACK */
-	tcp_send_data(eager, eager->tcp_wq, mp1);
-	CONN_DEC_REF(eager->tcp_connp);
+	/*
+	 * Send the SYN-ACK. Can't use tcp_send_data since we can't update
+	 * pmtu etc; we are not on the eager's squeue
+	 */
+	ASSERT(econnp->conn_ixa->ixa_notify_cookie == econnp->conn_tcp);
+	(void) conn_ip_output(mp1, econnp->conn_ixa);
+	CONN_DEC_REF(econnp);
 	freemsg(mp);
 
 	return;
@@ -5749,7 +4847,7 @@ error:
 	TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
 	mp1 = &eager->tcp_closemp;
 	SQUEUE_ENTER_ONE(econnp->conn_sqp, mp1, tcp_eager_kill,
-	    econnp, SQ_FILL, SQTAG_TCP_CONN_REQ_2);
+	    econnp, NULL, SQ_FILL, SQTAG_TCP_CONN_REQ_2);
 
 	/*
 	 * If a connection already exists, send the mp to that connections so
@@ -5757,7 +4855,7 @@ error:
 	 */
 	ipst = tcps->tcps_netstack->netstack_ip;
 
-	if ((econnp = ipcl_classify(mp, connp->conn_zoneid, ipst)) != NULL) {
+	if ((econnp = ipcl_classify(mp, ira, ipst)) != NULL) {
 		if (!IPCL_IS_CONNECTED(econnp)) {
 			/*
 			 * Something bad happened. ipcl_conn_insert()
@@ -5772,8 +4870,8 @@ error:
 			CONN_DEC_REF(econnp);
 			freemsg(mp);
 		} else {
-			SQUEUE_ENTER_ONE(econnp->conn_sqp, mp,
-			    tcp_input, econnp, SQ_FILL, SQTAG_TCP_CONN_REQ_1);
+			SQUEUE_ENTER_ONE(econnp->conn_sqp, mp, tcp_input_data,
+			    econnp, ira, SQ_FILL, SQTAG_TCP_CONN_REQ_1);
 		}
 	} else {
 		/* Nobody wants this packet */
@@ -5803,18 +4901,21 @@ error2:
  * very first time and there is no attempt to rebind them.
  */
 void
-tcp_conn_request_unbound(void *arg, mblk_t *mp, void *arg2)
+tcp_input_listener_unbound(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *ira)
 {
 	conn_t		*connp = (conn_t *)arg;
 	squeue_t	*sqp = (squeue_t *)arg2;
 	squeue_t	*new_sqp;
 	uint32_t	conn_flags;
 
-	if ((mp->b_datap->db_struioflag & STRUIO_EAGER) != 0) {
-		new_sqp = (squeue_t *)DB_CKSUMSTART(mp);
-	} else {
-		goto done;
-	}
+	/*
+	 * IP sets ira_sqp to either the senders conn_sqp (for loopback)
+	 * or based on the ring (for packets from GLD). Otherwise it is
+	 * set based on lbolt i.e., a somewhat random number.
+	 */
+	ASSERT(ira->ira_sqp != NULL);
+	new_sqp = ira->ira_sqp;
 
 	if (connp->conn_fanout == NULL)
 		goto done;
@@ -5849,6 +4950,8 @@ tcp_conn_request_unbound(void *arg, mblk_t *mp, void *arg2)
 		if (connp->conn_sqp != new_sqp) {
 			while (connp->conn_sqp != new_sqp)
 				(void) casptr(&connp->conn_sqp, sqp, new_sqp);
+			/* No special MT issues for outbound ixa_sqp hint */
+			connp->conn_ixa->ixa_sqp = new_sqp;
 		}
 
 		do {
@@ -5860,49 +4963,47 @@ tcp_conn_request_unbound(void *arg, mblk_t *mp, void *arg2)
 
 		mutex_exit(&connp->conn_fanout->connf_lock);
 		mutex_exit(&connp->conn_lock);
+
+		/*
+		 * Assume we have picked a good squeue for the listener. Make
+		 * subsequent SYNs not try to change the squeue.
+		 */
+		connp->conn_recv = tcp_input_listener;
 	}
 
 done:
 	if (connp->conn_sqp != sqp) {
 		CONN_INC_REF(connp);
 		SQUEUE_ENTER_ONE(connp->conn_sqp, mp, connp->conn_recv, connp,
-		    SQ_FILL, SQTAG_TCP_CONN_REQ_UNBOUND);
+		    ira, SQ_FILL, SQTAG_TCP_CONN_REQ_UNBOUND);
 	} else {
-		tcp_conn_request(connp, mp, sqp);
+		tcp_input_listener(connp, mp, sqp, ira);
 	}
 }
 
 /*
  * Successful connect request processing begins when our client passes
- * a T_CONN_REQ message into tcp_wput() and ends when tcp_rput() passes
- * our T_OK_ACK reply message upstream.  The control flow looks like this:
- *   upstream -> tcp_wput() -> tcp_wput_proto() -> tcp_tpi_connect() -> IP
- *   upstream <- tcp_rput()		<- IP
+ * a T_CONN_REQ message into tcp_wput(), which performs function calls into
+ * IP and the passes a T_OK_ACK (or T_ERROR_ACK upstream).
+ *
  * After various error checks are completed, tcp_tpi_connect() lays
- * the target address and port into the composite header template,
- * preallocates the T_OK_ACK reply message, construct a full 12 byte bind
- * request followed by an IRE request, and passes the three mblk message
- * down to IP looking like this:
- *   O_T_BIND_REQ for IP  --> IRE req --> T_OK_ACK for our client
- * Processing continues in tcp_rput() when we receive the following message:
- *   T_BIND_ACK from IP --> IRE ack --> T_OK_ACK for our client
- * After consuming the first two mblks, tcp_rput() calls tcp_timer(),
- * to fire off the connection request, and then passes the T_OK_ACK mblk
- * upstream that we filled in below.  There are, of course, numerous
- * error conditions along the way which truncate the processing described
- * above.
+ * the target address and port into the composite header template.
+ * Then we ask IP for information, including a source address if we didn't
+ * already have one. Finally we prepare to send the SYN packet, and then
+ * send up the T_OK_ACK reply message.
  */
 static void
 tcp_tpi_connect(tcp_t *tcp, mblk_t *mp)
 {
 	sin_t		*sin;
-	queue_t		*q = tcp->tcp_wq;
 	struct T_conn_req	*tcr;
 	struct sockaddr	*sa;
 	socklen_t	len;
 	int		error;
 	cred_t		*cr;
 	pid_t		cpid;
+	conn_t		*connp = tcp->tcp_connp;
+	queue_t		*q = connp->conn_wq;
 
 	/*
 	 * All Solaris components should pass a db_credp
@@ -5944,7 +5045,7 @@ tcp_tpi_connect(tcp_t *tcp, mblk_t *mp)
 	 * Determine packet type based on type of address passed in
 	 * the request should contain an IPv4 or IPv6 address.
 	 * Make sure that address family matches the type of
-	 * family of the the address passed down
+	 * family of the address passed down.
 	 */
 	switch (tcr->DEST_length) {
 	default:
@@ -6022,7 +5123,7 @@ tcp_tpi_connect(tcp_t *tcp, mblk_t *mp)
 		break;
 	}
 
-	error = proto_verify_ip_addr(tcp->tcp_family, sa, len);
+	error = proto_verify_ip_addr(connp->conn_family, sa, len);
 	if (error != 0) {
 		tcp_err_ack(tcp, mp, TSYSERR, error);
 		return;
@@ -6111,7 +5212,7 @@ tcp_tpi_connect(tcp_t *tcp, mblk_t *mp)
 	/* return error ack and blow away saved option results if any */
 connect_failed:
 	if (mp != NULL)
-		putnext(tcp->tcp_rq, mp);
+		putnext(connp->conn_rq, mp);
 	else {
 		tcp_err_ack_prim(tcp, NULL, T_CONN_REQ,
 		    TSYSERR, ENOMEM);
@@ -6121,20 +5222,19 @@ connect_failed:
 /*
  * Handle connect to IPv4 destinations, including connections for AF_INET6
  * sockets connecting to IPv4 mapped IPv6 destinations.
+ * Returns zero if OK, a positive errno, or a negative TLI error.
  */
 static int
 tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
-    uint_t srcid, cred_t *cr, pid_t pid)
+    uint_t srcid)
 {
-	tcph_t	*tcph;
-	mblk_t	*mp;
-	ipaddr_t dstaddr = *dstaddrp;
-	int32_t	oldstate;
-	uint16_t lport;
-	int	error = 0;
+	ipaddr_t 	dstaddr = *dstaddrp;
+	uint16_t 	lport;
+	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	int		error;
 
-	ASSERT(tcp->tcp_ipversion == IPV4_VERSION);
+	ASSERT(connp->conn_ipversion == IPV4_VERSION);
 
 	/* Check for attempt to connect to INADDR_ANY */
 	if (dstaddr == INADDR_ANY)  {
@@ -6157,74 +5257,21 @@ tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
 	}
 
 	/* Handle __sin6_src_id if socket not bound to an IP address */
-	if (srcid != 0 && tcp->tcp_ipha->ipha_src == INADDR_ANY) {
-		ip_srcid_find_id(srcid, &tcp->tcp_ip_src_v6,
-		    tcp->tcp_connp->conn_zoneid, tcps->tcps_netstack);
-		IN6_V4MAPPED_TO_IPADDR(&tcp->tcp_ip_src_v6,
-		    tcp->tcp_ipha->ipha_src);
+	if (srcid != 0 && connp->conn_laddr_v4 == INADDR_ANY) {
+		ip_srcid_find_id(srcid, &connp->conn_laddr_v6,
+		    IPCL_ZONEID(connp), tcps->tcps_netstack);
+		connp->conn_saddr_v6 = connp->conn_laddr_v6;
 	}
 
-	/*
-	 * Don't let an endpoint connect to itself.  Note that
-	 * the test here does not catch the case where the
-	 * source IP addr was left unspecified by the user. In
-	 * this case, the source addr is set in tcp_adapt_ire()
-	 * using the reply to the T_BIND message that we send
-	 * down to IP here and the check is repeated in tcp_rput_other.
-	 */
-	if (dstaddr == tcp->tcp_ipha->ipha_src &&
-	    dstport == tcp->tcp_lport) {
-		error = -TBADADDR;
-		goto failed;
-	}
+	IN6_IPADDR_TO_V4MAPPED(dstaddr, &connp->conn_faddr_v6);
+	connp->conn_fport = dstport;
 
-	/*
-	 * Verify the destination is allowed to receive packets
-	 * at the security label of the connection we are initiating.
-	 * tsol_check_dest() may create a new effective cred for this
-	 * connection with a modified label or label flags.
-	 */
-	if (is_system_labeled()) {
-		ASSERT(tcp->tcp_connp->conn_effective_cred == NULL);
-		if ((error = tsol_check_dest(CONN_CRED(tcp->tcp_connp),
-		    &dstaddr, IPV4_VERSION, tcp->tcp_connp->conn_mac_mode,
-		    &tcp->tcp_connp->conn_effective_cred)) != 0) {
-			if (error != EHOSTUNREACH)
-				error = -TSYSERR;
-			goto failed;
-		}
-	}
-
-	tcp->tcp_ipha->ipha_dst = dstaddr;
-	IN6_IPADDR_TO_V4MAPPED(dstaddr, &tcp->tcp_remote_v6);
-
-	/*
-	 * Massage a source route if any putting the first hop
-	 * in iph_dst. Compute a starting value for the checksum which
-	 * takes into account that the original iph_dst should be
-	 * included in the checksum but that ip will include the
-	 * first hop in the source route in the tcp checksum.
-	 */
-	tcp->tcp_sum = ip_massage_options(tcp->tcp_ipha, tcps->tcps_netstack);
-	tcp->tcp_sum = (tcp->tcp_sum & 0xFFFF) + (tcp->tcp_sum >> 16);
-	tcp->tcp_sum -= ((tcp->tcp_ipha->ipha_dst >> 16) +
-	    (tcp->tcp_ipha->ipha_dst & 0xffff));
-	if ((int)tcp->tcp_sum < 0)
-		tcp->tcp_sum--;
-	tcp->tcp_sum = (tcp->tcp_sum & 0xFFFF) + (tcp->tcp_sum >> 16);
-	tcp->tcp_sum = ntohs((tcp->tcp_sum & 0xFFFF) +
-	    (tcp->tcp_sum >> 16));
-	tcph = tcp->tcp_tcph;
-	*(uint16_t *)tcph->th_fport = dstport;
-	tcp->tcp_fport = dstport;
-
-	oldstate = tcp->tcp_state;
 	/*
 	 * At this point the remote destination address and remote port fields
 	 * in the tcp-four-tuple have been filled in the tcp structure. Now we
-	 * have to see which state tcp was in so we can take apropriate action.
+	 * have to see which state tcp was in so we can take appropriate action.
 	 */
-	if (oldstate == TCPS_IDLE) {
+	if (tcp->tcp_state == TCPS_IDLE) {
 		/*
 		 * We support a quick connect capability here, allowing
 		 * clients to transition directly from IDLE to SYN_SENT
@@ -6233,203 +5280,93 @@ tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
 		 */
 		lport = tcp_update_next_port(tcps->tcps_next_port_to_try,
 		    tcp, B_TRUE);
-		lport = tcp_bindi(tcp, lport, &tcp->tcp_ip_src_v6, 0, B_TRUE,
+		lport = tcp_bindi(tcp, lport, &connp->conn_laddr_v6, 0, B_TRUE,
 		    B_FALSE, B_FALSE);
-		if (lport == 0) {
-			error = -TNOADDR;
-			goto failed;
-		}
+		if (lport == 0)
+			return (-TNOADDR);
 	}
-	tcp->tcp_state = TCPS_SYN_SENT;
-
-	mp = allocb(sizeof (ire_t), BPRI_HI);
-	if (mp == NULL) {
-		tcp->tcp_state = oldstate;
-		error = ENOMEM;
-		goto failed;
-	}
-
-	mp->b_wptr += sizeof (ire_t);
-	mp->b_datap->db_type = IRE_DB_REQ_TYPE;
-	tcp->tcp_hard_binding = 1;
 
 	/*
-	 * We need to make sure that the conn_recv is set to a non-null
-	 * value before we insert the conn_t into the classifier table.
-	 * This is to avoid a race with an incoming packet which does
-	 * an ipcl_classify().
+	 * Lookup the route to determine a source address and the uinfo.
+	 * If there was a source route we have tcp_ipha->ipha_dst as the first
+	 * hop.
+	 * Setup TCP parameters based on the metrics/DCE.
 	 */
-	tcp->tcp_connp->conn_recv = tcp_input;
+	error = tcp_set_destination(tcp);
+	if (error != 0)
+		return (error);
 
-	if (tcp->tcp_family == AF_INET) {
-		error = ip_proto_bind_connected_v4(tcp->tcp_connp, &mp,
-		    IPPROTO_TCP, &tcp->tcp_ipha->ipha_src, tcp->tcp_lport,
-		    tcp->tcp_remote, tcp->tcp_fport, B_TRUE, B_TRUE, cr);
-	} else {
-		in6_addr_t v6src;
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src, &v6src);
-		} else {
-			v6src = tcp->tcp_ip6h->ip6_src;
-		}
-		error = ip_proto_bind_connected_v6(tcp->tcp_connp, &mp,
-		    IPPROTO_TCP, &v6src, tcp->tcp_lport, &tcp->tcp_remote_v6,
-		    &tcp->tcp_sticky_ipp, tcp->tcp_fport, B_TRUE, B_TRUE, cr);
-	}
-	BUMP_MIB(&tcps->tcps_mib, tcpActiveOpens);
-	tcp->tcp_active_open = 1;
+	/*
+	 * Don't let an endpoint connect to itself.
+	 */
+	if (connp->conn_faddr_v4 == connp->conn_laddr_v4 &&
+	    connp->conn_fport == connp->conn_lport)
+		return (-TBADADDR);
 
+	tcp->tcp_state = TCPS_SYN_SENT;
 
-	return (tcp_post_ip_bind(tcp, mp, error, cr, pid));
-failed:
-	/* return error ack and blow away saved option results if any */
-	if (tcp->tcp_conn.tcp_opts_conn_req != NULL)
-		tcp_close_mpp(&tcp->tcp_conn.tcp_opts_conn_req);
-	return (error);
+	return (ipcl_conn_insert_v4(connp));
 }
 
 /*
  * Handle connect to IPv6 destinations.
+ * Returns zero if OK, a positive errno, or a negative TLI error.
  */
 static int
 tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
-    uint32_t flowinfo, uint_t srcid, uint32_t scope_id, cred_t *cr, pid_t pid)
+    uint32_t flowinfo, uint_t srcid, uint32_t scope_id)
 {
-	tcph_t	*tcph;
-	mblk_t	*mp;
-	ip6_rthdr_t *rth;
-	int32_t  oldstate;
-	uint16_t lport;
+	uint16_t 	lport;
+	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	int	error = 0;
-	conn_t	*connp = tcp->tcp_connp;
+	int		error;
 
-	ASSERT(tcp->tcp_family == AF_INET6);
+	ASSERT(connp->conn_family == AF_INET6);
 
 	/*
 	 * If we're here, it means that the destination address is a native
-	 * IPv6 address.  Return an error if tcp_ipversion is not IPv6.  A
+	 * IPv6 address.  Return an error if conn_ipversion is not IPv6.  A
 	 * reason why it might not be IPv6 is if the socket was bound to an
 	 * IPv4-mapped IPv6 address.
 	 */
-	if (tcp->tcp_ipversion != IPV6_VERSION) {
+	if (connp->conn_ipversion != IPV6_VERSION)
 		return (-TBADADDR);
-	}
 
 	/*
 	 * Interpret a zero destination to mean loopback.
 	 * Update the T_CONN_REQ (sin/sin6) since it is used to
 	 * generate the T_CONN_CON.
 	 */
-	if (IN6_IS_ADDR_UNSPECIFIED(dstaddrp)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(dstaddrp))
 		*dstaddrp = ipv6_loopback;
-	}
 
 	/* Handle __sin6_src_id if socket not bound to an IP address */
-	if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&tcp->tcp_ip6h->ip6_src)) {
-		ip_srcid_find_id(srcid, &tcp->tcp_ip6h->ip6_src,
-		    connp->conn_zoneid, tcps->tcps_netstack);
-		tcp->tcp_ip_src_v6 = tcp->tcp_ip6h->ip6_src;
+	if (srcid != 0 && IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6)) {
+		ip_srcid_find_id(srcid, &connp->conn_laddr_v6,
+		    IPCL_ZONEID(connp), tcps->tcps_netstack);
+		connp->conn_saddr_v6 = connp->conn_laddr_v6;
 	}
 
 	/*
-	 * Take care of the scope_id now and add ip6i_t
-	 * if ip6i_t is not already allocated through TCP
-	 * sticky options. At this point tcp_ip6h does not
-	 * have dst info, thus use dstaddrp.
+	 * Take care of the scope_id now.
 	 */
-	if (scope_id != 0 &&
-	    IN6_IS_ADDR_LINKSCOPE(dstaddrp)) {
-		ip6_pkt_t *ipp = &tcp->tcp_sticky_ipp;
-		ip6i_t  *ip6i;
-
-		ipp->ipp_ifindex = scope_id;
-		ip6i = (ip6i_t *)tcp->tcp_iphc;
-
-		if ((ipp->ipp_fields & IPPF_HAS_IP6I) &&
-		    ip6i != NULL && (ip6i->ip6i_nxt == IPPROTO_RAW)) {
-			/* Already allocated */
-			ip6i->ip6i_flags |= IP6I_IFINDEX;
-			ip6i->ip6i_ifindex = ipp->ipp_ifindex;
-			ipp->ipp_fields |= IPPF_SCOPE_ID;
-		} else {
-			int reterr;
-
-			ipp->ipp_fields |= IPPF_SCOPE_ID;
-			if (ipp->ipp_fields & IPPF_HAS_IP6I)
-				ip2dbg(("tcp_connect_v6: SCOPE_ID set\n"));
-			reterr = tcp_build_hdrs(tcp);
-			if (reterr != 0)
-				goto failed;
-			ip1dbg(("tcp_connect_ipv6: tcp_bld_hdrs returned\n"));
-		}
-	}
-
-	/*
-	 * Don't let an endpoint connect to itself.  Note that
-	 * the test here does not catch the case where the
-	 * source IP addr was left unspecified by the user. In
-	 * this case, the source addr is set in tcp_adapt_ire()
-	 * using the reply to the T_BIND message that we send
-	 * down to IP here and the check is repeated in tcp_rput_other.
-	 */
-	if (IN6_ARE_ADDR_EQUAL(dstaddrp, &tcp->tcp_ip6h->ip6_src) &&
-	    (dstport == tcp->tcp_lport)) {
-		error = -TBADADDR;
-		goto failed;
-	}
-
-	/*
-	 * Verify the destination is allowed to receive packets
-	 * at the security label of the connection we are initiating.
-	 * check_dest may create a new effective cred for this
-	 * connection with a modified label or label flags.
-	 */
-	if (is_system_labeled()) {
-		ASSERT(tcp->tcp_connp->conn_effective_cred == NULL);
-		if ((error = tsol_check_dest(CONN_CRED(tcp->tcp_connp),
-		    dstaddrp, IPV6_VERSION, tcp->tcp_connp->conn_mac_mode,
-		    &tcp->tcp_connp->conn_effective_cred)) != 0) {
-			if (error != EHOSTUNREACH)
-				error = -TSYSERR;
-			goto failed;
-		}
-	}
-
-	tcp->tcp_ip6h->ip6_dst = *dstaddrp;
-	tcp->tcp_remote_v6 = *dstaddrp;
-	tcp->tcp_ip6h->ip6_vcf =
-	    (IPV6_DEFAULT_VERS_AND_FLOW & IPV6_VERS_AND_FLOW_MASK) |
-	    (flowinfo & ~IPV6_VERS_AND_FLOW_MASK);
-
-	/*
-	 * Massage a routing header (if present) putting the first hop
-	 * in ip6_dst. Compute a starting value for the checksum which
-	 * takes into account that the original ip6_dst should be
-	 * included in the checksum but that ip will include the
-	 * first hop in the source route in the tcp checksum.
-	 */
-	rth = ip_find_rthdr_v6(tcp->tcp_ip6h, (uint8_t *)tcp->tcp_tcph);
-	if (rth != NULL) {
-		tcp->tcp_sum = ip_massage_options_v6(tcp->tcp_ip6h, rth,
-		    tcps->tcps_netstack);
-		tcp->tcp_sum = ntohs((tcp->tcp_sum & 0xFFFF) +
-		    (tcp->tcp_sum >> 16));
+	if (scope_id != 0 && IN6_IS_ADDR_LINKSCOPE(dstaddrp)) {
+		connp->conn_ixa->ixa_flags |= IXAF_SCOPEID_SET;
+		connp->conn_ixa->ixa_scopeid = scope_id;
 	} else {
-		tcp->tcp_sum = 0;
+		connp->conn_ixa->ixa_flags &= ~IXAF_SCOPEID_SET;
 	}
 
-	tcph = tcp->tcp_tcph;
-	*(uint16_t *)tcph->th_fport = dstport;
-	tcp->tcp_fport = dstport;
+	connp->conn_flowinfo = flowinfo;
+	connp->conn_faddr_v6 = *dstaddrp;
+	connp->conn_fport = dstport;
 
-	oldstate = tcp->tcp_state;
 	/*
 	 * At this point the remote destination address and remote port fields
 	 * in the tcp-four-tuple have been filled in the tcp structure. Now we
-	 * have to see which state tcp was in so we can take apropriate action.
+	 * have to see which state tcp was in so we can take appropriate action.
 	 */
-	if (oldstate == TCPS_IDLE) {
+	if (tcp->tcp_state == TCPS_IDLE) {
 		/*
 		 * We support a quick connect capability here, allowing
 		 * clients to transition directly from IDLE to SYN_SENT
@@ -6438,128 +5375,55 @@ tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
 		 */
 		lport = tcp_update_next_port(tcps->tcps_next_port_to_try,
 		    tcp, B_TRUE);
-		lport = tcp_bindi(tcp, lport, &tcp->tcp_ip_src_v6, 0, B_TRUE,
+		lport = tcp_bindi(tcp, lport, &connp->conn_laddr_v6, 0, B_TRUE,
 		    B_FALSE, B_FALSE);
-		if (lport == 0) {
-			error = -TNOADDR;
-			goto failed;
-		}
+		if (lport == 0)
+			return (-TNOADDR);
 	}
+
+	/*
+	 * Lookup the route to determine a source address and the uinfo.
+	 * If there was a source route we have tcp_ip6h->ip6_dst as the first
+	 * hop.
+	 * Setup TCP parameters based on the metrics/DCE.
+	 */
+	error = tcp_set_destination(tcp);
+	if (error != 0)
+		return (error);
+
+	/*
+	 * Don't let an endpoint connect to itself.
+	 */
+	if (IN6_ARE_ADDR_EQUAL(&connp->conn_faddr_v6, &connp->conn_laddr_v6) &&
+	    connp->conn_fport == connp->conn_lport)
+		return (-TBADADDR);
+
 	tcp->tcp_state = TCPS_SYN_SENT;
 
-	mp = allocb(sizeof (ire_t), BPRI_HI);
-	if (mp != NULL) {
-		in6_addr_t v6src;
-
-		mp->b_wptr += sizeof (ire_t);
-		mp->b_datap->db_type = IRE_DB_REQ_TYPE;
-
-		tcp->tcp_hard_binding = 1;
-
-		/*
-		 * We need to make sure that the conn_recv is set to a non-null
-		 * value before we insert the conn_t into the classifier table.
-		 * This is to avoid a race with an incoming packet which does
-		 * an ipcl_classify().
-		 */
-		tcp->tcp_connp->conn_recv = tcp_input;
-
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src, &v6src);
-		} else {
-			v6src = tcp->tcp_ip6h->ip6_src;
-		}
-		error = ip_proto_bind_connected_v6(connp, &mp, IPPROTO_TCP,
-		    &v6src, tcp->tcp_lport, &tcp->tcp_remote_v6,
-		    &tcp->tcp_sticky_ipp, tcp->tcp_fport, B_TRUE, B_TRUE, cr);
-		BUMP_MIB(&tcps->tcps_mib, tcpActiveOpens);
-		tcp->tcp_active_open = 1;
-
-		return (tcp_post_ip_bind(tcp, mp, error, cr, pid));
-	}
-	/* Error case */
-	tcp->tcp_state = oldstate;
-	error = ENOMEM;
-
-failed:
-	/* return error ack and blow away saved option results if any */
-	if (tcp->tcp_conn.tcp_opts_conn_req != NULL)
-		tcp_close_mpp(&tcp->tcp_conn.tcp_opts_conn_req);
-	return (error);
+	return (ipcl_conn_insert_v6(connp));
 }
 
 /*
- * We need a stream q for detached closing tcp connections
- * to use.  Our client hereby indicates that this q is the
- * one to use.
+ * Disconnect
+ * Note that unlike other functions this returns a positive tli error
+ * when it fails; it never returns an errno.
  */
-static void
-tcp_def_q_set(tcp_t *tcp, mblk_t *mp)
-{
-	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
-	queue_t	*q = tcp->tcp_wq;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-
-#ifdef NS_DEBUG
-	(void) printf("TCP_IOC_DEFAULT_Q for stack %d\n",
-	    tcps->tcps_netstack->netstack_stackid);
-#endif
-	mp->b_datap->db_type = M_IOCACK;
-	iocp->ioc_count = 0;
-	mutex_enter(&tcps->tcps_g_q_lock);
-	if (tcps->tcps_g_q != NULL) {
-		mutex_exit(&tcps->tcps_g_q_lock);
-		iocp->ioc_error = EALREADY;
-	} else {
-		int error = 0;
-		conn_t *connp = tcp->tcp_connp;
-		ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
-
-		tcps->tcps_g_q = tcp->tcp_rq;
-		mutex_exit(&tcps->tcps_g_q_lock);
-		iocp->ioc_error = 0;
-		iocp->ioc_rval = 0;
-		/*
-		 * We are passing tcp_sticky_ipp as NULL
-		 * as it is not useful for tcp_default queue
-		 *
-		 * Set conn_recv just in case.
-		 */
-		tcp->tcp_connp->conn_recv = tcp_conn_request;
-
-		ASSERT(connp->conn_af_isv6);
-		connp->conn_ulp = IPPROTO_TCP;
-
-		if (ipst->ips_ipcl_proto_fanout_v6[IPPROTO_TCP].connf_head !=
-		    NULL || (connp->conn_mac_mode != CONN_MAC_DEFAULT)) {
-			error = -TBADADDR;
-		} else {
-			connp->conn_srcv6 = ipv6_all_zeros;
-			ipcl_proto_insert_v6(connp, IPPROTO_TCP);
-		}
-
-		(void) tcp_post_ip_bind(tcp, NULL, error, NULL, 0);
-	}
-	qreply(q, mp);
-}
-
 static int
 tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 {
 	tcp_t	*ltcp = NULL;
-	conn_t	*connp;
+	conn_t		*lconnp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
 	/*
 	 * Right now, upper modules pass down a T_DISCON_REQ to TCP,
 	 * when the stream is in BOUND state. Do not send a reset,
 	 * since the destination IP address is not valid, and it can
 	 * be the initialized value of all zeros (broadcast address).
-	 *
-	 * XXX There won't be any pending bind request to IP.
 	 */
-	if (tcp->tcp_state <= TCPS_BOUND) {
-		if (tcp->tcp_debug) {
+	if (tcp->tcp_state <= TCPS_BOUND || tcp->tcp_hard_binding) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
 			    "tcp_disconnect: bad state, %d", tcp->tcp_state);
 		}
@@ -6595,19 +5459,23 @@ tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 		 * If it used to be a listener, check to make sure no one else
 		 * has taken the port before switching back to LISTEN state.
 		 */
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			connp = ipcl_lookup_listener_v4(tcp->tcp_lport,
-			    tcp->tcp_ipha->ipha_src,
-			    tcp->tcp_connp->conn_zoneid, ipst);
-			if (connp != NULL)
-				ltcp = connp->conn_tcp;
+		if (connp->conn_ipversion == IPV4_VERSION) {
+			lconnp = ipcl_lookup_listener_v4(connp->conn_lport,
+			    connp->conn_laddr_v4, IPCL_ZONEID(connp), ipst);
+			if (lconnp != NULL)
+				ltcp = lconnp->conn_tcp;
 		} else {
-			/* Allow tcp_bound_if listeners? */
-			connp = ipcl_lookup_listener_v6(tcp->tcp_lport,
-			    &tcp->tcp_ip6h->ip6_src, 0,
-			    tcp->tcp_connp->conn_zoneid, ipst);
-			if (connp != NULL)
-				ltcp = connp->conn_tcp;
+			uint_t ifindex = 0;
+
+			if (connp->conn_ixa->ixa_flags & IXAF_SCOPEID_SET)
+				ifindex = connp->conn_ixa->ixa_scopeid;
+
+			/* Allow conn_bound_if listeners? */
+			lconnp = ipcl_lookup_listener_v6(connp->conn_lport,
+			    &connp->conn_laddr_v6, ifindex, IPCL_ZONEID(connp),
+			    ipst);
+			if (lconnp != NULL)
+				ltcp = lconnp->conn_tcp;
 		}
 		if (tcp->tcp_conn_req_max && ltcp == NULL) {
 			tcp->tcp_state = TCPS_LISTEN;
@@ -6616,7 +5484,7 @@ tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 			tcp->tcp_state = TCPS_BOUND;
 		}
 		if (ltcp != NULL)
-			CONN_DEC_REF(ltcp->tcp_connp);
+			CONN_DEC_REF(lconnp);
 		if (old_state == TCPS_SYN_SENT || old_state == TCPS_SYN_RCVD) {
 			BUMP_MIB(&tcps->tcps_mib, tcpAttemptFails);
 		} else if (old_state == TCPS_ESTABLISHED ||
@@ -6648,7 +5516,7 @@ tcp_disconnect_common(tcp_t *tcp, t_scalar_t seqnum)
 
 /*
  * Our client hereby directs us to reject the connection request
- * that tcp_conn_request() marked with 'seqnum'.  Rejection consists
+ * that tcp_input_listener() marked with 'seqnum'.  Rejection consists
  * of sending the appropriate RST, not an ICMP error.
  */
 static void
@@ -6656,6 +5524,7 @@ tcp_disconnect(tcp_t *tcp, mblk_t *mp)
 {
 	t_scalar_t seqnum;
 	int	error;
+	conn_t	*connp = tcp->tcp_connp;
 
 	ASSERT((uintptr_t)(mp->b_wptr - mp->b_rptr) <= (uintptr_t)INT_MAX);
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (struct T_discon_req)) {
@@ -6669,11 +5538,11 @@ tcp_disconnect(tcp_t *tcp, mblk_t *mp)
 	else {
 		if (tcp->tcp_state >= TCPS_ESTABLISHED) {
 			/* Send M_FLUSH according to TPI */
-			(void) putnextctl1(tcp->tcp_rq, M_FLUSH, FLUSHRW);
+			(void) putnextctl1(connp->conn_rq, M_FLUSH, FLUSHRW);
 		}
 		mp = mi_tpi_ok_ack_alloc(mp);
-		if (mp)
-			putnext(tcp->tcp_rq, mp);
+		if (mp != NULL)
+			putnext(connp->conn_rq, mp);
 	}
 }
 
@@ -6695,6 +5564,7 @@ tcp_display(tcp_t *tcp, char *sup_buf, char format)
 	in6_addr_t	local, remote;
 	char		local_addrbuf[INET6_ADDRSTRLEN];
 	char		remote_addrbuf[INET6_ADDRSTRLEN];
+	conn_t		*connp;
 
 	if (sup_buf != NULL)
 		buf = sup_buf;
@@ -6703,6 +5573,8 @@ tcp_display(tcp_t *tcp, char *sup_buf, char format)
 
 	if (tcp == NULL)
 		return ("NULL_TCP");
+
+	connp = tcp->tcp_connp;
 	switch (tcp->tcp_state) {
 	case TCPS_CLOSED:
 		cp = "TCP_CLOSED";
@@ -6750,32 +5622,32 @@ tcp_display(tcp_t *tcp, char *sup_buf, char format)
 	}
 	switch (format) {
 	case DISP_ADDR_AND_PORT:
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
+		if (connp->conn_ipversion == IPV4_VERSION) {
 			/*
 			 * Note that we use the remote address in the tcp_b
 			 * structure.  This means that it will print out
 			 * the real destination address, not the next hop's
 			 * address if source routing is used.
 			 */
-			IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ip_src, &local);
-			IN6_IPADDR_TO_V4MAPPED(tcp->tcp_remote, &remote);
+			IN6_IPADDR_TO_V4MAPPED(connp->conn_laddr_v4, &local);
+			IN6_IPADDR_TO_V4MAPPED(connp->conn_faddr_v4, &remote);
 
 		} else {
-			local = tcp->tcp_ip_src_v6;
-			remote = tcp->tcp_remote_v6;
+			local = connp->conn_laddr_v6;
+			remote = connp->conn_faddr_v6;
 		}
 		(void) inet_ntop(AF_INET6, &local, local_addrbuf,
 		    sizeof (local_addrbuf));
 		(void) inet_ntop(AF_INET6, &remote, remote_addrbuf,
 		    sizeof (remote_addrbuf));
 		(void) mi_sprintf(buf, "[%s.%u, %s.%u] %s",
-		    local_addrbuf, ntohs(tcp->tcp_lport), remote_addrbuf,
-		    ntohs(tcp->tcp_fport), cp);
+		    local_addrbuf, ntohs(connp->conn_lport), remote_addrbuf,
+		    ntohs(connp->conn_fport), cp);
 		break;
 	case DISP_PORT_ONLY:
 	default:
 		(void) mi_sprintf(buf, "[%u, %u] %s",
-		    ntohs(tcp->tcp_lport), ntohs(tcp->tcp_fport), cp);
+		    ntohs(connp->conn_lport), ntohs(connp->conn_fport), cp);
 		break;
 	}
 
@@ -6788,26 +5660,24 @@ tcp_display(tcp_t *tcp, char *sup_buf, char format)
  * eager to disappear either by means of tcp_eager_blowoff() or
  * tcp_eager_cleanup() being called. tcp_eager_kill() can also be
  * called (via squeue) if the eager cannot be inserted in the
- * fanout table in tcp_conn_request().
+ * fanout table in tcp_input_listener().
  */
 /* ARGSUSED */
 void
-tcp_eager_kill(void *arg, mblk_t *mp, void *arg2)
+tcp_eager_kill(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	conn_t	*econnp = (conn_t *)arg;
 	tcp_t	*eager = econnp->conn_tcp;
 	tcp_t	*listener = eager->tcp_listener;
-	tcp_stack_t	*tcps = eager->tcp_tcps;
 
 	/*
 	 * We could be called because listener is closing. Since
-	 * the eager is using listener's queue's, its not safe.
-	 * Better use the default queue just to send the TH_RST
-	 * out.
+	 * the eager was using listener's queue's, we avoid
+	 * using the listeners queues from now on.
 	 */
-	ASSERT(tcps->tcps_g_q != NULL);
-	eager->tcp_rq = tcps->tcps_g_q;
-	eager->tcp_wq = WR(tcps->tcps_g_q);
+	ASSERT(eager->tcp_detached);
+	econnp->conn_rq = NULL;
+	econnp->conn_wq = NULL;
 
 	/*
 	 * An eager's conn_fanout will be NULL if it's a duplicate
@@ -6828,7 +5698,7 @@ tcp_eager_kill(void *arg, mblk_t *mp, void *arg2)
 			 * The eager has sent a conn_ind up to the
 			 * listener but listener decides to close
 			 * instead. We need to drop the extra ref
-			 * placed on eager in tcp_rput_data() before
+			 * placed on eager in tcp_input_data() before
 			 * sending the conn_ind to listener.
 			 */
 			CONN_DEC_REF(econnp);
@@ -6873,7 +5743,7 @@ tcp_eager_blowoff(tcp_t	*listener, t_scalar_t seqnum)
 	mutex_exit(&listener->tcp_eager_lock);
 	mp = &eager->tcp_closemp;
 	SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, mp, tcp_eager_kill,
-	    eager->tcp_connp, SQ_FILL, SQTAG_TCP_EAGER_BLOWOFF);
+	    eager->tcp_connp, NULL, SQ_FILL, SQTAG_TCP_EAGER_BLOWOFF);
 	return (B_TRUE);
 }
 
@@ -6901,7 +5771,7 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 				CONN_INC_REF(eager->tcp_connp);
 				mp = &eager->tcp_closemp;
 				SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, mp,
-				    tcp_eager_kill, eager->tcp_connp,
+				    tcp_eager_kill, eager->tcp_connp, NULL,
 				    SQ_FILL, SQTAG_TCP_EAGER_CLEANUP);
 			}
 			eager = eager->tcp_eager_next_q;
@@ -6917,7 +5787,7 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 			CONN_INC_REF(eager->tcp_connp);
 			mp = &eager->tcp_closemp;
 			SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, mp,
-			    tcp_eager_kill, eager->tcp_connp, SQ_FILL,
+			    tcp_eager_kill, eager->tcp_connp, NULL, SQ_FILL,
 			    SQTAG_TCP_EAGER_CLEANUP_Q0);
 		}
 		eager = eager->tcp_eager_next_q0;
@@ -7008,7 +5878,7 @@ static void
 tcp_err_ack(tcp_t *tcp, mblk_t *mp, int t_error, int sys_error)
 {
 	if ((mp = mi_tpi_err_ack_alloc(mp, t_error, sys_error)) != NULL)
-		putnext(tcp->tcp_rq, mp);
+		putnext(tcp->tcp_connp->conn_rq, mp);
 }
 
 /* Shorthand to generate and send TPI error acks to our client */
@@ -7024,7 +5894,7 @@ tcp_err_ack_prim(tcp_t *tcp, mblk_t *mp, int primitive,
 		teackp->ERROR_prim = primitive;
 		teackp->TLI_error = t_error;
 		teackp->UNIX_error = sys_error;
-		putnext(tcp->tcp_rq, mp);
+		putnext(tcp->tcp_connp->conn_rq, mp);
 	}
 }
 
@@ -7194,8 +6064,9 @@ static void
 tcp_copy_info(struct T_info_ack *tia, tcp_t *tcp)
 {
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
-	if (tcp->tcp_family == AF_INET6)
+	if (connp->conn_family == AF_INET6)
 		*tia = tcp_g_t_info_ack_v6;
 	else
 		*tia = tcp_g_t_info_ack;
@@ -7203,7 +6074,7 @@ tcp_copy_info(struct T_info_ack *tia, tcp_t *tcp)
 	tia->OPT_size = tcp_max_optsize;
 	if (tcp->tcp_mss == 0) {
 		/* Not yet set - tcp_open does not set mss */
-		if (tcp->tcp_ipversion == IPV4_VERSION)
+		if (connp->conn_ipversion == IPV4_VERSION)
 			tia->TIDU_size = tcps->tcps_mss_def_ipv4;
 		else
 			tia->TIDU_size = tcps->tcps_mss_def_ipv6;
@@ -7258,7 +6129,7 @@ tcp_capability_req(tcp_t *tcp, mblk_t *mp)
 	tcap = (struct T_capability_ack *)mp->b_rptr;
 	tcp_do_capability_ack(tcp, tcap, cap_bits1);
 
-	putnext(tcp->tcp_rq, mp);
+	putnext(tcp->tcp_connp->conn_rq, mp);
 }
 
 /*
@@ -7276,16 +6147,18 @@ tcp_info_req(tcp_t *tcp, mblk_t *mp)
 		return;
 	}
 	tcp_copy_info((struct T_info_ack *)mp->b_rptr, tcp);
-	putnext(tcp->tcp_rq, mp);
+	putnext(tcp->tcp_connp->conn_rq, mp);
 }
 
 /* Respond to the TPI addr request */
 static void
 tcp_addr_req(tcp_t *tcp, mblk_t *mp)
 {
-	sin_t	*sin;
+	struct sockaddr *sa;
 	mblk_t	*ackmp;
 	struct T_addr_ack *taa;
+	conn_t	*connp = tcp->tcp_connp;
+	uint_t	addrlen;
 
 	/* Make it large enough for worst case */
 	ackmp = reallocb(mp, sizeof (struct T_addr_ack) +
@@ -7295,10 +6168,6 @@ tcp_addr_req(tcp_t *tcp, mblk_t *mp)
 		return;
 	}
 
-	if (tcp->tcp_ipversion == IPV6_VERSION) {
-		tcp_addr_req_ipv6(tcp, ackmp);
-		return;
-	}
 	taa = (struct T_addr_ack *)ackmp->b_rptr;
 
 	bzero(taa, sizeof (struct T_addr_ack));
@@ -7306,6 +6175,11 @@ tcp_addr_req(tcp_t *tcp, mblk_t *mp)
 
 	taa->PRIM_type = T_ADDR_ACK;
 	ackmp->b_datap->db_type = M_PCPROTO;
+
+	if (connp->conn_family == AF_INET)
+		addrlen = sizeof (sin_t);
+	else
+		addrlen = sizeof (sin6_t);
 
 	/*
 	 * Note: Following code assumes 32 bit alignment of basic
@@ -7313,104 +6187,27 @@ tcp_addr_req(tcp_t *tcp, mblk_t *mp)
 	 */
 	if (tcp->tcp_state >= TCPS_BOUND) {
 		/*
-		 * Fill in local address
+		 * Fill in local address first
 		 */
-		taa->LOCADDR_length = sizeof (sin_t);
 		taa->LOCADDR_offset = sizeof (*taa);
-
-		sin = (sin_t *)&taa[1];
-
-		/* Fill zeroes and then intialize non-zero fields */
-		*sin = sin_null;
-
-		sin->sin_family = AF_INET;
-
-		sin->sin_addr.s_addr = tcp->tcp_ipha->ipha_src;
-		sin->sin_port = *(uint16_t *)tcp->tcp_tcph->th_lport;
-
-		ackmp->b_wptr = (uchar_t *)&sin[1];
-
-		if (tcp->tcp_state >= TCPS_SYN_RCVD) {
-			/*
-			 * Fill in Remote address
-			 */
-			taa->REMADDR_length = sizeof (sin_t);
-			taa->REMADDR_offset = ROUNDUP32(taa->LOCADDR_offset +
-			    taa->LOCADDR_length);
-
-			sin = (sin_t *)(ackmp->b_rptr + taa->REMADDR_offset);
-			*sin = sin_null;
-			sin->sin_family = AF_INET;
-			sin->sin_addr.s_addr = tcp->tcp_remote;
-			sin->sin_port = tcp->tcp_fport;
-
-			ackmp->b_wptr = (uchar_t *)&sin[1];
-		}
+		taa->LOCADDR_length = addrlen;
+		sa = (struct sockaddr *)&taa[1];
+		(void) conn_getsockname(connp, sa, &addrlen);
+		ackmp->b_wptr += addrlen;
 	}
-	putnext(tcp->tcp_rq, ackmp);
-}
-
-/* Assumes that tcp_addr_req gets enough space and alignment */
-static void
-tcp_addr_req_ipv6(tcp_t *tcp, mblk_t *ackmp)
-{
-	sin6_t	*sin6;
-	struct T_addr_ack *taa;
-
-	ASSERT(tcp->tcp_ipversion == IPV6_VERSION);
-	ASSERT(OK_32PTR(ackmp->b_rptr));
-	ASSERT(ackmp->b_wptr - ackmp->b_rptr >= sizeof (struct T_addr_ack) +
-	    2 * sizeof (sin6_t));
-
-	taa = (struct T_addr_ack *)ackmp->b_rptr;
-
-	bzero(taa, sizeof (struct T_addr_ack));
-	ackmp->b_wptr = (uchar_t *)&taa[1];
-
-	taa->PRIM_type = T_ADDR_ACK;
-	ackmp->b_datap->db_type = M_PCPROTO;
-
-	/*
-	 * Note: Following code assumes 32 bit alignment of basic
-	 * data structures like sin6_t and struct T_addr_ack.
-	 */
-	if (tcp->tcp_state >= TCPS_BOUND) {
+	if (tcp->tcp_state >= TCPS_SYN_RCVD) {
 		/*
-		 * Fill in local address
+		 * Fill in Remote address
 		 */
-		taa->LOCADDR_length = sizeof (sin6_t);
-		taa->LOCADDR_offset = sizeof (*taa);
-
-		sin6 = (sin6_t *)&taa[1];
-		*sin6 = sin6_null;
-
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_addr = tcp->tcp_ip6h->ip6_src;
-		sin6->sin6_port = tcp->tcp_lport;
-
-		ackmp->b_wptr = (uchar_t *)&sin6[1];
-
-		if (tcp->tcp_state >= TCPS_SYN_RCVD) {
-			/*
-			 * Fill in Remote address
-			 */
-			taa->REMADDR_length = sizeof (sin6_t);
-			taa->REMADDR_offset = ROUNDUP32(taa->LOCADDR_offset +
-			    taa->LOCADDR_length);
-
-			sin6 = (sin6_t *)(ackmp->b_rptr + taa->REMADDR_offset);
-			*sin6 = sin6_null;
-			sin6->sin6_family = AF_INET6;
-			sin6->sin6_flowinfo =
-			    tcp->tcp_ip6h->ip6_vcf &
-			    ~IPV6_VERS_AND_FLOW_MASK;
-			sin6->sin6_addr = tcp->tcp_remote_v6;
-			sin6->sin6_port = tcp->tcp_fport;
-
-			ackmp->b_wptr = (uchar_t *)&sin6[1];
-		}
+		taa->REMADDR_length = addrlen;
+		/* assumed 32-bit alignment */
+		taa->REMADDR_offset = taa->LOCADDR_offset + taa->LOCADDR_length;
+		sa = (struct sockaddr *)(ackmp->b_rptr + taa->REMADDR_offset);
+		(void) conn_getpeername(connp, sa, &addrlen);
+		ackmp->b_wptr += addrlen;
 	}
-	putnext(tcp->tcp_rq, ackmp);
+	ASSERT(ackmp->b_wptr <= ackmp->b_datap->db_lim);
+	putnext(tcp->tcp_connp->conn_rq, ackmp);
 }
 
 /*
@@ -7420,19 +6217,19 @@ tcp_addr_req_ipv6(tcp_t *tcp, mblk_t *ackmp)
 static void
 tcp_reinit(tcp_t *tcp)
 {
-	mblk_t	*mp;
-	int 	err;
+	mblk_t		*mp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp  = tcp->tcp_connp;
 
 	TCP_STAT(tcps, tcp_reinit_calls);
 
 	/* tcp_reinit should never be called for detached tcp_t's */
 	ASSERT(tcp->tcp_listener == NULL);
-	ASSERT((tcp->tcp_family == AF_INET &&
-	    tcp->tcp_ipversion == IPV4_VERSION) ||
-	    (tcp->tcp_family == AF_INET6 &&
-	    (tcp->tcp_ipversion == IPV4_VERSION ||
-	    tcp->tcp_ipversion == IPV6_VERSION)));
+	ASSERT((connp->conn_family == AF_INET &&
+	    connp->conn_ipversion == IPV4_VERSION) ||
+	    (connp->conn_family == AF_INET6 &&
+	    (connp->conn_ipversion == IPV4_VERSION ||
+	    connp->conn_ipversion == IPV6_VERSION)));
 
 	/* Cancel outstanding timers */
 	tcp_timers_stop(tcp);
@@ -7453,7 +6250,7 @@ tcp_reinit(tcp_t *tcp)
 	tcp->tcp_unsent = tcp->tcp_xmit_tail_unsent = 0;
 	mutex_enter(&tcp->tcp_non_sq_lock);
 	if (tcp->tcp_flow_stopped &&
-	    TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
+	    TCP_UNSENT_BYTES(tcp) <= connp->conn_sndlowat) {
 		tcp_clrqfull(tcp);
 	}
 	mutex_exit(&tcp->tcp_non_sq_lock);
@@ -7494,7 +6291,7 @@ tcp_reinit(tcp_t *tcp)
 	 */
 	tcp_close_mpp(&tcp->tcp_conn.tcp_eager_conn_ind);
 
-	CL_INET_DISCONNECT(tcp->tcp_connp, tcp);
+	CL_INET_DISCONNECT(connp);
 
 	/*
 	 * The connection can't be on the tcp_time_wait_head list
@@ -7522,14 +6319,12 @@ tcp_reinit(tcp_t *tcp)
 	 * Reset/preserve other values
 	 */
 	tcp_reinit_values(tcp);
-	ipcl_hash_remove(tcp->tcp_connp);
-	conn_delete_ire(tcp->tcp_connp, NULL);
+	ipcl_hash_remove(connp);
+	ixa_cleanup(connp->conn_ixa);
 	tcp_ipsec_cleanup(tcp);
 
-	if (tcp->tcp_connp->conn_effective_cred != NULL) {
-		crfree(tcp->tcp_connp->conn_effective_cred);
-		tcp->tcp_connp->conn_effective_cred = NULL;
-	}
+	connp->conn_laddr_v6 = connp->conn_bound_addr_v6;
+	connp->conn_saddr_v6 = connp->conn_bound_addr_v6;
 
 	if (tcp->tcp_conn_req_max != 0) {
 		/*
@@ -7553,44 +6348,31 @@ tcp_reinit(tcp_t *tcp)
 		tcp->tcp_eager_next_q0 = tcp->tcp_eager_prev_q0 = tcp;
 		tcp->tcp_eager_next_drop_q0 = tcp;
 		tcp->tcp_eager_prev_drop_q0 = tcp;
-		tcp->tcp_connp->conn_recv = tcp_conn_request;
-		if (tcp->tcp_family == AF_INET6) {
-			ASSERT(tcp->tcp_connp->conn_af_isv6);
-			(void) ipcl_bind_insert_v6(tcp->tcp_connp, IPPROTO_TCP,
-			    &tcp->tcp_ip6h->ip6_src, tcp->tcp_lport);
-		} else {
-			ASSERT(!tcp->tcp_connp->conn_af_isv6);
-			(void) ipcl_bind_insert(tcp->tcp_connp, IPPROTO_TCP,
-			    tcp->tcp_ipha->ipha_src, tcp->tcp_lport);
-		}
+		/*
+		 * Initially set conn_recv to tcp_input_listener_unbound to try
+		 * to pick a good squeue for the listener when the first SYN
+		 * arrives. tcp_input_listener_unbound sets it to
+		 * tcp_input_listener on that first SYN.
+		 */
+		connp->conn_recv = tcp_input_listener_unbound;
+
+		connp->conn_proto = IPPROTO_TCP;
+		connp->conn_faddr_v6 = ipv6_all_zeros;
+		connp->conn_fport = 0;
+
+		(void) ipcl_bind_insert(connp);
 	} else {
 		tcp->tcp_state = TCPS_BOUND;
 	}
 
 	/*
 	 * Initialize to default values
-	 * Can't fail since enough header template space already allocated
-	 * at open().
 	 */
-	err = tcp_init_values(tcp);
-	ASSERT(err == 0);
-	/* Restore state in tcp_tcph */
-	bcopy(&tcp->tcp_lport, tcp->tcp_tcph->th_lport, TCP_PORT_LEN);
-	if (tcp->tcp_ipversion == IPV4_VERSION)
-		tcp->tcp_ipha->ipha_src = tcp->tcp_bound_source;
-	else
-		tcp->tcp_ip6h->ip6_src = tcp->tcp_bound_source_v6;
-	/*
-	 * Copy of the src addr. in tcp_t is needed in tcp_t
-	 * since the lookup funcs can only lookup on tcp_t
-	 */
-	tcp->tcp_ip_src_v6 = tcp->tcp_bound_source_v6;
+	tcp_init_values(tcp);
 
 	ASSERT(tcp->tcp_ptpbhn != NULL);
-	tcp->tcp_recv_hiwater = tcps->tcps_recv_hiwat;
-	tcp->tcp_recv_lowater = tcp_rinfo.mi_lowat;
-	tcp->tcp_rwnd = tcps->tcps_recv_hiwat;
-	tcp->tcp_mss = tcp->tcp_ipversion != IPV4_VERSION ?
+	tcp->tcp_rwnd = connp->conn_rcvbuf;
+	tcp->tcp_mss = connp->conn_ipversion != IPV4_VERSION ?
 	    tcps->tcps_mss_def_ipv6 : tcps->tcps_mss_def_ipv4;
 }
 
@@ -7606,6 +6388,7 @@ tcp_reinit_values(tcp)
 	tcp_t *tcp;
 {
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
 #ifndef	lint
 #define	DONTCARE(x)
@@ -7626,8 +6409,8 @@ tcp_reinit_values(tcp)
 	ASSERT(tcp->tcp_time_wait_prev == NULL);
 	ASSERT(tcp->tcp_time_wait_expire == 0);
 	PRESERVE(tcp->tcp_state);
-	PRESERVE(tcp->tcp_rq);
-	PRESERVE(tcp->tcp_wq);
+	PRESERVE(connp->conn_rq);
+	PRESERVE(connp->conn_wq);
 
 	ASSERT(tcp->tcp_xmit_head == NULL);
 	ASSERT(tcp->tcp_xmit_last == NULL);
@@ -7638,26 +6421,32 @@ tcp_reinit_values(tcp)
 	tcp->tcp_snxt = 0;			/* Displayed in mib */
 	tcp->tcp_suna = 0;			/* Displayed in mib */
 	tcp->tcp_swnd = 0;
-	DONTCARE(tcp->tcp_cwnd);		/* Init in tcp_mss_set */
+	DONTCARE(tcp->tcp_cwnd);	/* Init in tcp_process_options */
 
 	ASSERT(tcp->tcp_ibsegs == 0);
 	ASSERT(tcp->tcp_obsegs == 0);
 
-	if (tcp->tcp_iphc != NULL) {
-		ASSERT(tcp->tcp_iphc_len >= TCP_MAX_COMBINED_HEADER_LENGTH);
-		bzero(tcp->tcp_iphc, tcp->tcp_iphc_len);
+	if (connp->conn_ht_iphc != NULL) {
+		kmem_free(connp->conn_ht_iphc, connp->conn_ht_iphc_allocated);
+		connp->conn_ht_iphc = NULL;
+		connp->conn_ht_iphc_allocated = 0;
+		connp->conn_ht_iphc_len = 0;
+		connp->conn_ht_ulp = NULL;
+		connp->conn_ht_ulp_len = 0;
+		tcp->tcp_ipha = NULL;
+		tcp->tcp_ip6h = NULL;
+		tcp->tcp_tcpha = NULL;
 	}
 
+	/* We clear any IP_OPTIONS and extension headers */
+	ip_pkt_free(&connp->conn_xmit_ipp);
+
 	DONTCARE(tcp->tcp_naglim);		/* Init in tcp_init_values */
-	DONTCARE(tcp->tcp_hdr_len);		/* Init in tcp_init_values */
 	DONTCARE(tcp->tcp_ipha);
 	DONTCARE(tcp->tcp_ip6h);
-	DONTCARE(tcp->tcp_ip_hdr_len);
-	DONTCARE(tcp->tcp_tcph);
-	DONTCARE(tcp->tcp_tcp_hdr_len);		/* Init in tcp_init_values */
+	DONTCARE(tcp->tcp_tcpha);
 	tcp->tcp_valid_bits = 0;
 
-	DONTCARE(tcp->tcp_xmit_hiwater);	/* Init in tcp_init_values */
 	DONTCARE(tcp->tcp_timer_backoff);	/* Init in tcp_init_values */
 	DONTCARE(tcp->tcp_last_recv_time);	/* Init in tcp_init_values */
 	tcp->tcp_last_rcv_lbolt = 0;
@@ -7666,38 +6455,19 @@ tcp_reinit_values(tcp)
 
 	tcp->tcp_urp_last_valid = 0;
 	tcp->tcp_hard_binding = 0;
-	tcp->tcp_hard_bound = 0;
-	PRESERVE(tcp->tcp_cred);
-	PRESERVE(tcp->tcp_cpid);
-	PRESERVE(tcp->tcp_open_time);
-	PRESERVE(tcp->tcp_exclbind);
 
 	tcp->tcp_fin_acked = 0;
 	tcp->tcp_fin_rcvd = 0;
 	tcp->tcp_fin_sent = 0;
 	tcp->tcp_ordrel_done = 0;
 
-	tcp->tcp_debug = 0;
-	tcp->tcp_dontroute = 0;
-	tcp->tcp_broadcast = 0;
-
-	tcp->tcp_useloopback = 0;
-	tcp->tcp_reuseaddr = 0;
-	tcp->tcp_oobinline = 0;
-	tcp->tcp_dgram_errind = 0;
-
 	tcp->tcp_detached = 0;
-	tcp->tcp_bind_pending = 0;
-	tcp->tcp_unbind_pending = 0;
 
 	tcp->tcp_snd_ws_ok = B_FALSE;
 	tcp->tcp_snd_ts_ok = B_FALSE;
-	tcp->tcp_linger = 0;
-	tcp->tcp_ka_enabled = 0;
 	tcp->tcp_zero_win_probe = 0;
 
 	tcp->tcp_loopback = 0;
-	tcp->tcp_refuse = 0;
 	tcp->tcp_localnet = 0;
 	tcp->tcp_syn_defense = 0;
 	tcp->tcp_set_timer = 0;
@@ -7707,19 +6477,12 @@ tcp_reinit_values(tcp)
 	tcp->tcp_xmit_zc_clean = B_FALSE;
 
 	tcp->tcp_snd_sack_ok = B_FALSE;
-	PRESERVE(tcp->tcp_recvdstaddr);
 	tcp->tcp_hwcksum = B_FALSE;
 
-	tcp->tcp_ire_ill_check_done = B_FALSE;
-	DONTCARE(tcp->tcp_maxpsz);		/* Init in tcp_init_values */
-
-	tcp->tcp_mdt = B_FALSE;
-	tcp->tcp_mdt_hdr_head = 0;
-	tcp->tcp_mdt_hdr_tail = 0;
+	DONTCARE(tcp->tcp_maxpsz_multiplier);	/* Init in tcp_init_values */
 
 	tcp->tcp_conn_def_q0 = 0;
 	tcp->tcp_ip_forward_progress = B_FALSE;
-	tcp->tcp_anon_priv_bind = 0;
 	tcp->tcp_ecn_ok = B_FALSE;
 
 	tcp->tcp_cwr = B_FALSE;
@@ -7740,7 +6503,7 @@ tcp_reinit_values(tcp)
 	tcp->tcp_ts_recent = 0;
 	tcp->tcp_rnxt = 0;			/* Displayed in mib */
 	DONTCARE(tcp->tcp_rwnd);		/* Set in tcp_reinit() */
-	tcp->tcp_if_mtu = 0;
+	tcp->tcp_initial_pmtu = 0;
 
 	ASSERT(tcp->tcp_reass_head == NULL);
 	ASSERT(tcp->tcp_reass_tail == NULL);
@@ -7752,7 +6515,7 @@ tcp_reinit_values(tcp)
 	ASSERT(tcp->tcp_rcv_last_tail == NULL);
 	ASSERT(tcp->tcp_rcv_cnt == 0);
 
-	DONTCARE(tcp->tcp_cwnd_ssthresh);	/* Init in tcp_adapt_ire */
+	DONTCARE(tcp->tcp_cwnd_ssthresh); /* Init in tcp_set_destination */
 	DONTCARE(tcp->tcp_cwnd_max);		/* Init in tcp_init_values */
 	tcp->tcp_csuna = 0;
 
@@ -7773,8 +6536,6 @@ tcp_reinit_values(tcp)
 
 	ASSERT(tcp->tcp_listener == NULL);
 
-	DONTCARE(tcp->tcp_xmit_lowater);	/* Init in tcp_init_values */
-
 	DONTCARE(tcp->tcp_irs);			/* tcp_valid_bits cleared */
 	DONTCARE(tcp->tcp_iss);			/* tcp_valid_bits cleared */
 	DONTCARE(tcp->tcp_fss);			/* tcp_valid_bits cleared */
@@ -7785,13 +6546,10 @@ tcp_reinit_values(tcp)
 	PRESERVE(tcp->tcp_conn_req_max);
 	PRESERVE(tcp->tcp_conn_req_seqnum);
 
-	DONTCARE(tcp->tcp_ip_hdr_len);		/* Init in tcp_init_values */
 	DONTCARE(tcp->tcp_first_timer_threshold); /* Init in tcp_init_values */
 	DONTCARE(tcp->tcp_second_timer_threshold); /* Init in tcp_init_values */
 	DONTCARE(tcp->tcp_first_ctimer_threshold); /* Init in tcp_init_values */
 	DONTCARE(tcp->tcp_second_ctimer_threshold); /* in tcp_init_values */
-
-	tcp->tcp_lingertime = 0;
 
 	DONTCARE(tcp->tcp_urp_last);	/* tcp_urp_last_valid is cleared */
 	ASSERT(tcp->tcp_urp_mp == NULL);
@@ -7811,16 +6569,16 @@ tcp_reinit_values(tcp)
 
 	tcp->tcp_client_errno = 0;
 
-	DONTCARE(tcp->tcp_sum);			/* Init in tcp_init_values */
+	DONTCARE(connp->conn_sum);		/* Init in tcp_init_values */
 
-	tcp->tcp_remote_v6 = ipv6_all_zeros;	/* Displayed in MIB */
+	connp->conn_faddr_v6 = ipv6_all_zeros;	/* Displayed in MIB */
 
-	PRESERVE(tcp->tcp_bound_source_v6);
+	PRESERVE(connp->conn_bound_addr_v6);
 	tcp->tcp_last_sent_len = 0;
 	tcp->tcp_dupack_cnt = 0;
 
-	tcp->tcp_fport = 0;			/* Displayed in MIB */
-	PRESERVE(tcp->tcp_lport);
+	connp->conn_fport = 0;			/* Displayed in MIB */
+	PRESERVE(connp->conn_lport);
 
 	PRESERVE(tcp->tcp_acceptor_lockp);
 
@@ -7828,16 +6586,18 @@ tcp_reinit_values(tcp)
 	PRESERVE(tcp->tcp_acceptor_id);
 	DONTCARE(tcp->tcp_ipsec_overhead);
 
-	PRESERVE(tcp->tcp_family);
-	if (tcp->tcp_family == AF_INET6) {
+	PRESERVE(connp->conn_family);
+	/* Remove any remnants of mapped address binding */
+	if (connp->conn_family == AF_INET6) {
+		connp->conn_ipversion = IPV6_VERSION;
 		tcp->tcp_mss = tcps->tcps_mss_def_ipv6;
 	} else {
+		connp->conn_ipversion = IPV4_VERSION;
 		tcp->tcp_mss = tcps->tcps_mss_def_ipv4;
 	}
-	PRESERVE(tcp->tcp_ipversion);		/* Init in tcp_init_values */
 
-	tcp->tcp_bound_if = 0;
-	tcp->tcp_ipv6_recvancillary = 0;
+	connp->conn_bound_if = 0;
+	connp->conn_recv_ancillary.crb_all = 0;
 	tcp->tcp_recvifindex = 0;
 	tcp->tcp_recvhops = 0;
 	tcp->tcp_closed = 0;
@@ -7854,19 +6614,18 @@ tcp_reinit_values(tcp)
 		tcp->tcp_dstoptslen = 0;
 	}
 	ASSERT(tcp->tcp_dstoptslen == 0);
-	if (tcp->tcp_rtdstopts != NULL) {
-		mi_free(tcp->tcp_rtdstopts);
-		tcp->tcp_rtdstopts = NULL;
-		tcp->tcp_rtdstoptslen = 0;
+	if (tcp->tcp_rthdrdstopts != NULL) {
+		mi_free(tcp->tcp_rthdrdstopts);
+		tcp->tcp_rthdrdstopts = NULL;
+		tcp->tcp_rthdrdstoptslen = 0;
 	}
-	ASSERT(tcp->tcp_rtdstoptslen == 0);
+	ASSERT(tcp->tcp_rthdrdstoptslen == 0);
 	if (tcp->tcp_rthdr != NULL) {
 		mi_free(tcp->tcp_rthdr);
 		tcp->tcp_rthdr = NULL;
 		tcp->tcp_rthdrlen = 0;
 	}
 	ASSERT(tcp->tcp_rthdrlen == 0);
-	PRESERVE(tcp->tcp_drop_opt_ack_cnt);
 
 	/* Reset fusion-related fields */
 	tcp->tcp_fused = B_FALSE;
@@ -7902,35 +6661,17 @@ tcp_reinit_values(tcp)
 #undef	PRESERVE
 }
 
-/*
- * Allocate necessary resources and initialize state vector.
- * Guaranteed not to fail so that when an error is returned,
- * the caller doesn't need to do any additional cleanup.
- */
-int
-tcp_init(tcp_t *tcp, queue_t *q)
-{
-	int	err;
-
-	tcp->tcp_rq = q;
-	tcp->tcp_wq = WR(q);
-	tcp->tcp_state = TCPS_IDLE;
-	if ((err = tcp_init_values(tcp)) != 0)
-		tcp_timers_stop(tcp);
-	return (err);
-}
-
-static int
+static void
 tcp_init_values(tcp_t *tcp)
 {
-	int	err;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
-	ASSERT((tcp->tcp_family == AF_INET &&
-	    tcp->tcp_ipversion == IPV4_VERSION) ||
-	    (tcp->tcp_family == AF_INET6 &&
-	    (tcp->tcp_ipversion == IPV4_VERSION ||
-	    tcp->tcp_ipversion == IPV6_VERSION)));
+	ASSERT((connp->conn_family == AF_INET &&
+	    connp->conn_ipversion == IPV4_VERSION) ||
+	    (connp->conn_family == AF_INET6 &&
+	    (connp->conn_ipversion == IPV4_VERSION ||
+	    connp->conn_ipversion == IPV6_VERSION)));
 
 	/*
 	 * Initialize tcp_rtt_sa and tcp_rtt_sd so that the calculated RTO
@@ -7953,7 +6694,7 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_cwnd_ssthresh = TCP_MAX_LARGEWIN;
 	tcp->tcp_snd_burst = TCP_CWND_INFINITE;
 
-	tcp->tcp_maxpsz = tcps->tcps_maxpsz_multiplier;
+	tcp->tcp_maxpsz_multiplier = tcps->tcps_maxpsz_multiplier;
 
 	tcp->tcp_first_timer_threshold = tcps->tcps_ip_notify_interval;
 	tcp->tcp_first_ctimer_threshold = tcps->tcps_ip_notify_cinterval;
@@ -7966,10 +6707,7 @@ tcp_init_values(tcp_t *tcp)
 
 	tcp->tcp_naglim = tcps->tcps_naglim_def;
 
-	/* NOTE:  ISS is now set in tcp_adapt_ire(). */
-
-	tcp->tcp_mdt_hdr_head = 0;
-	tcp->tcp_mdt_hdr_tail = 0;
+	/* NOTE:  ISS is now set in tcp_set_destination(). */
 
 	/* Reset fusion-related fields */
 	tcp->tcp_fused = B_FALSE;
@@ -7977,280 +6715,84 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_fused_sigurg = B_FALSE;
 	tcp->tcp_loopback_peer = NULL;
 
-	/* Initialize the header template */
-	if (tcp->tcp_family == AF_INET) {
-		err = tcp_header_init_ipv4(tcp);
-	} else {
-		err = tcp_header_init_ipv6(tcp);
-	}
-	if (err)
-		return (err);
+	/* We rebuild the header template on the next connect/conn_request */
+
+	connp->conn_mlp_type = mlptSingle;
 
 	/*
 	 * Init the window scale to the max so tcp_rwnd_set() won't pare
-	 * down tcp_rwnd. tcp_adapt_ire() will set the right value later.
+	 * down tcp_rwnd. tcp_set_destination() will set the right value later.
 	 */
 	tcp->tcp_rcv_ws = TCP_MAX_WINSHIFT;
-	tcp->tcp_xmit_lowater = tcps->tcps_xmit_lowat;
-	tcp->tcp_xmit_hiwater = tcps->tcps_xmit_hiwat;
-	tcp->tcp_recv_hiwater = tcps->tcps_recv_hiwat;
-	tcp->tcp_rwnd = tcps->tcps_recv_hiwat;
-	tcp->tcp_recv_lowater = tcp_rinfo.mi_lowat;
+	tcp->tcp_rwnd = connp->conn_rcvbuf;
 
 	tcp->tcp_cork = B_FALSE;
 	/*
-	 * Init the tcp_debug option.  This value determines whether TCP
+	 * Init the tcp_debug option if it wasn't already set.  This value
+	 * determines whether TCP
 	 * calls strlog() to print out debug messages.  Doing this
 	 * initialization here means that this value is not inherited thru
 	 * tcp_reinit().
 	 */
-	tcp->tcp_debug = tcps->tcps_dbg;
+	if (!connp->conn_debug)
+		connp->conn_debug = tcps->tcps_dbg;
 
 	tcp->tcp_ka_interval = tcps->tcps_keepalive_interval;
 	tcp->tcp_ka_abort_thres = tcps->tcps_keepalive_abort_interval;
-
-	return (0);
-}
-
-/*
- * Initialize the IPv4 header. Loses any record of any IP options.
- */
-static int
-tcp_header_init_ipv4(tcp_t *tcp)
-{
-	tcph_t		*tcph;
-	uint32_t	sum;
-	conn_t		*connp;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-
-	/*
-	 * This is a simple initialization. If there's
-	 * already a template, it should never be too small,
-	 * so reuse it.  Otherwise, allocate space for the new one.
-	 */
-	if (tcp->tcp_iphc == NULL) {
-		ASSERT(tcp->tcp_iphc_len == 0);
-		tcp->tcp_iphc_len = TCP_MAX_COMBINED_HEADER_LENGTH;
-		tcp->tcp_iphc = kmem_cache_alloc(tcp_iphc_cache, KM_NOSLEEP);
-		if (tcp->tcp_iphc == NULL) {
-			tcp->tcp_iphc_len = 0;
-			return (ENOMEM);
-		}
-	}
-
-	/* options are gone; may need a new label */
-	connp = tcp->tcp_connp;
-	connp->conn_mlp_type = mlptSingle;
-	connp->conn_ulp_labeled = !is_system_labeled();
-	ASSERT(tcp->tcp_iphc_len >= TCP_MAX_COMBINED_HEADER_LENGTH);
-
-	/*
-	 * tcp_do_get{sock,peer}name constructs the sockaddr from the
-	 * ip header, and decides which header to use based on ip version.
-	 * That operation happens outside the squeue, so we hold the lock
-	 * here to ensure that the ip version and header remain consistent.
-	 */
-	mutex_enter(&connp->conn_lock);
-	tcp->tcp_ipversion = IPV4_VERSION;
-	tcp->tcp_ipha = (ipha_t *)tcp->tcp_iphc;
-	tcp->tcp_ip6h = NULL;
-	mutex_exit(&connp->conn_lock);
-
-	tcp->tcp_hdr_len = sizeof (ipha_t) + sizeof (tcph_t);
-	tcp->tcp_tcp_hdr_len = sizeof (tcph_t);
-	tcp->tcp_ip_hdr_len = sizeof (ipha_t);
-	tcp->tcp_ipha->ipha_length = htons(sizeof (ipha_t) + sizeof (tcph_t));
-	tcp->tcp_ipha->ipha_version_and_hdr_length
-	    = (IP_VERSION << 4) | IP_SIMPLE_HDR_LENGTH_IN_WORDS;
-	tcp->tcp_ipha->ipha_ident = 0;
-
-	tcp->tcp_ttl = (uchar_t)tcps->tcps_ipv4_ttl;
-	tcp->tcp_tos = 0;
-	tcp->tcp_ipha->ipha_fragment_offset_and_flags = 0;
-	tcp->tcp_ipha->ipha_ttl = (uchar_t)tcps->tcps_ipv4_ttl;
-	tcp->tcp_ipha->ipha_protocol = IPPROTO_TCP;
-
-	tcph = (tcph_t *)(tcp->tcp_iphc + sizeof (ipha_t));
-	tcp->tcp_tcph = tcph;
-	tcph->th_offset_and_rsrvd[0] = (5 << 4);
-	/*
-	 * IP wants our header length in the checksum field to
-	 * allow it to perform a single pseudo-header+checksum
-	 * calculation on behalf of TCP.
-	 * Include the adjustment for a source route once IP_OPTIONS is set.
-	 */
-	sum = sizeof (tcph_t) + tcp->tcp_sum;
-	sum = (sum >> 16) + (sum & 0xFFFF);
-	U16_TO_ABE16(sum, tcph->th_sum);
-	return (0);
-}
-
-/*
- * Initialize the IPv6 header. Loses any record of any IPv6 extension headers.
- */
-static int
-tcp_header_init_ipv6(tcp_t *tcp)
-{
-	tcph_t	*tcph;
-	uint32_t	sum;
-	conn_t	*connp;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-
-	/*
-	 * This is a simple initialization. If there's
-	 * already a template, it should never be too small,
-	 * so reuse it. Otherwise, allocate space for the new one.
-	 * Ensure that there is enough space to "downgrade" the tcp_t
-	 * to an IPv4 tcp_t. This requires having space for a full load
-	 * of IPv4 options, as well as a full load of TCP options
-	 * (TCP_MAX_COMBINED_HEADER_LENGTH, 120 bytes); this is more space
-	 * than a v6 header and a TCP header with a full load of TCP options
-	 * (IPV6_HDR_LEN is 40 bytes; TCP_MAX_HDR_LENGTH is 60 bytes).
-	 * We want to avoid reallocation in the "downgraded" case when
-	 * processing outbound IPv4 options.
-	 */
-	if (tcp->tcp_iphc == NULL) {
-		ASSERT(tcp->tcp_iphc_len == 0);
-		tcp->tcp_iphc_len = TCP_MAX_COMBINED_HEADER_LENGTH;
-		tcp->tcp_iphc = kmem_cache_alloc(tcp_iphc_cache, KM_NOSLEEP);
-		if (tcp->tcp_iphc == NULL) {
-			tcp->tcp_iphc_len = 0;
-			return (ENOMEM);
-		}
-	}
-
-	/* options are gone; may need a new label */
-	connp = tcp->tcp_connp;
-	connp->conn_mlp_type = mlptSingle;
-	connp->conn_ulp_labeled = !is_system_labeled();
-
-	ASSERT(tcp->tcp_iphc_len >= TCP_MAX_COMBINED_HEADER_LENGTH);
-	tcp->tcp_hdr_len = IPV6_HDR_LEN + sizeof (tcph_t);
-	tcp->tcp_tcp_hdr_len = sizeof (tcph_t);
-	tcp->tcp_ip_hdr_len = IPV6_HDR_LEN;
-
-	/*
-	 * tcp_do_get{sock,peer}name constructs the sockaddr from the
-	 * ip header, and decides which header to use based on ip version.
-	 * That operation happens outside the squeue, so we hold the lock
-	 * here to ensure that the ip version and header remain consistent.
-	 */
-	mutex_enter(&connp->conn_lock);
-	tcp->tcp_ipversion = IPV6_VERSION;
-	tcp->tcp_ip6h = (ip6_t *)tcp->tcp_iphc;
-	tcp->tcp_ipha = NULL;
-	mutex_exit(&connp->conn_lock);
-
-	/* Initialize the header template */
-
-	tcp->tcp_ip6h->ip6_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
-	tcp->tcp_ip6h->ip6_plen = ntohs(sizeof (tcph_t));
-	tcp->tcp_ip6h->ip6_nxt = IPPROTO_TCP;
-	tcp->tcp_ip6h->ip6_hops = (uint8_t)tcps->tcps_ipv6_hoplimit;
-
-	tcph = (tcph_t *)(tcp->tcp_iphc + IPV6_HDR_LEN);
-	tcp->tcp_tcph = tcph;
-	tcph->th_offset_and_rsrvd[0] = (5 << 4);
-	/*
-	 * IP wants our header length in the checksum field to
-	 * allow it to perform a single psuedo-header+checksum
-	 * calculation on behalf of TCP.
-	 * Include the adjustment for a source route when IPV6_RTHDR is set.
-	 */
-	sum = sizeof (tcph_t) + tcp->tcp_sum;
-	sum = (sum >> 16) + (sum & 0xFFFF);
-	U16_TO_ABE16(sum, tcph->th_sum);
-	return (0);
 }
 
 /* At minimum we need 8 bytes in the TCP header for the lookup */
 #define	ICMP_MIN_TCP_HDR	8
 
 /*
- * tcp_icmp_error is called by tcp_rput_other to process ICMP error messages
+ * tcp_icmp_input is called as conn_recvicmp to process ICMP error messages
  * passed up by IP. The message is always received on the correct tcp_t.
  * Assumes that IP has pulled up everything up to and including the ICMP header.
  */
-void
-tcp_icmp_error(tcp_t *tcp, mblk_t *mp)
+/* ARGSUSED2 */
+static void
+tcp_icmp_input(void *arg1, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 {
-	icmph_t *icmph;
-	ipha_t	*ipha;
-	int	iph_hdr_length;
-	tcph_t	*tcph;
-	boolean_t ipsec_mctl = B_FALSE;
-	boolean_t secure;
-	mblk_t *first_mp = mp;
-	int32_t new_mss;
-	uint32_t ratio;
-	size_t mp_size = MBLKL(mp);
-	uint32_t seg_seq;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
+	conn_t		*connp = (conn_t *)arg1;
+	icmph_t		*icmph;
+	ipha_t		*ipha;
+	int		iph_hdr_length;
+	tcpha_t		*tcpha;
+	uint32_t	seg_seq;
+	tcp_t		*tcp = connp->conn_tcp;
 
-	/* Assume IP provides aligned packets - otherwise toss */
-	if (!OK_32PTR(mp->b_rptr)) {
-		freemsg(mp);
-		return;
-	}
+	/* Assume IP provides aligned packets */
+	ASSERT(OK_32PTR(mp->b_rptr));
+	ASSERT((MBLKL(mp) >= sizeof (ipha_t)));
 
-	/*
-	 * Since ICMP errors are normal data marked with M_CTL when sent
-	 * to TCP or UDP, we have to look for a IPSEC_IN value to identify
-	 * packets starting with an ipsec_info_t, see ipsec_info.h.
-	 */
-	if ((mp_size == sizeof (ipsec_info_t)) &&
-	    (((ipsec_info_t *)mp->b_rptr)->ipsec_info_type == IPSEC_IN)) {
-		ASSERT(mp->b_cont != NULL);
-		mp = mp->b_cont;
-		/* IP should have done this */
-		ASSERT(OK_32PTR(mp->b_rptr));
-		mp_size = MBLKL(mp);
-		ipsec_mctl = B_TRUE;
-	}
-
-	/*
-	 * Verify that we have a complete outer IP header. If not, drop it.
-	 */
-	if (mp_size < sizeof (ipha_t)) {
-noticmpv4:
-		freemsg(first_mp);
-		return;
-	}
-
-	ipha = (ipha_t *)mp->b_rptr;
 	/*
 	 * Verify IP version. Anything other than IPv4 or IPv6 packet is sent
 	 * upstream. ICMPv6 is handled in tcp_icmp_error_ipv6.
 	 */
-	switch (IPH_HDR_VERSION(ipha)) {
-	case IPV6_VERSION:
-		tcp_icmp_error_ipv6(tcp, first_mp, ipsec_mctl);
+	if (!(ira->ira_flags & IRAF_IS_IPV4)) {
+		tcp_icmp_error_ipv6(tcp, mp, ira);
 		return;
-	case IPV4_VERSION:
-		break;
-	default:
-		goto noticmpv4;
 	}
 
 	/* Skip past the outer IP and ICMP headers */
-	iph_hdr_length = IPH_HDR_LENGTH(ipha);
+	iph_hdr_length = ira->ira_ip_hdr_length;
 	icmph = (icmph_t *)&mp->b_rptr[iph_hdr_length];
 	/*
-	 * If we don't have the correct outer IP header length or if the ULP
-	 * is not IPPROTO_ICMP or if we don't have a complete inner IP header
-	 * send it upstream.
+	 * If we don't have the correct outer IP header length
+	 * or if we don't have a complete inner IP header
+	 * drop it.
 	 */
 	if (iph_hdr_length < sizeof (ipha_t) ||
-	    ipha->ipha_protocol != IPPROTO_ICMP ||
 	    (ipha_t *)&icmph[1] + 1 > (ipha_t *)mp->b_wptr) {
-		goto noticmpv4;
+noticmpv4:
+		freemsg(mp);
+		return;
 	}
 	ipha = (ipha_t *)&icmph[1];
 
 	/* Skip past the inner IP and find the ULP header */
 	iph_hdr_length = IPH_HDR_LENGTH(ipha);
-	tcph = (tcph_t *)((char *)ipha + iph_hdr_length);
+	tcpha = (tcpha_t *)((char *)ipha + iph_hdr_length);
 	/*
 	 * If we don't have the correct inner IP header length or if the ULP
 	 * is not IPPROTO_TCP or if we don't have at least ICMP_MIN_TCP_HDR
@@ -8258,166 +6800,20 @@ noticmpv4:
 	 */
 	if (iph_hdr_length < sizeof (ipha_t) ||
 	    ipha->ipha_protocol != IPPROTO_TCP ||
-	    (uchar_t *)tcph + ICMP_MIN_TCP_HDR > mp->b_wptr) {
+	    (uchar_t *)tcpha + ICMP_MIN_TCP_HDR > mp->b_wptr) {
 		goto noticmpv4;
 	}
 
-	if (TCP_IS_DETACHED_NONEAGER(tcp)) {
-		if (ipsec_mctl) {
-			secure = ipsec_in_is_secure(first_mp);
-		} else {
-			secure = B_FALSE;
-		}
-		if (secure) {
-			/*
-			 * If we are willing to accept this in clear
-			 * we don't have to verify policy.
-			 */
-			if (!ipsec_inbound_accept_clear(mp, ipha, NULL)) {
-				if (!tcp_check_policy(tcp, first_mp,
-				    ipha, NULL, secure, ipsec_mctl)) {
-					/*
-					 * tcp_check_policy called
-					 * ip_drop_packet() on failure.
-					 */
-					return;
-				}
-			}
-		}
-	} else if (ipsec_mctl) {
-		/*
-		 * This is a hard_bound connection. IP has already
-		 * verified policy. We don't have to do it again.
-		 */
-		freeb(first_mp);
-		first_mp = mp;
-		ipsec_mctl = B_FALSE;
-	}
-
-	seg_seq = ABE32_TO_U32(tcph->th_seq);
-	/*
-	 * TCP SHOULD check that the TCP sequence number contained in
-	 * payload of the ICMP error message is within the range
-	 * SND.UNA <= SEG.SEQ < SND.NXT.
-	 */
-	if (SEQ_LT(seg_seq, tcp->tcp_suna) || SEQ_GEQ(seg_seq, tcp->tcp_snxt)) {
-		/*
-		 * The ICMP message is bogus, just drop it.  But if this is
-		 * an ICMP too big message, IP has already changed
-		 * the ire_max_frag to the bogus value.  We need to change
-		 * it back.
-		 */
-		if (icmph->icmph_type == ICMP_DEST_UNREACHABLE &&
-		    icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED) {
-			conn_t *connp = tcp->tcp_connp;
-			ire_t *ire;
-			int flag;
-
-			if (tcp->tcp_ipversion == IPV4_VERSION) {
-				flag = tcp->tcp_ipha->
-				    ipha_fragment_offset_and_flags;
-			} else {
-				flag = 0;
-			}
-			mutex_enter(&connp->conn_lock);
-			if ((ire = connp->conn_ire_cache) != NULL) {
-				mutex_enter(&ire->ire_lock);
-				mutex_exit(&connp->conn_lock);
-				ire->ire_max_frag = tcp->tcp_if_mtu;
-				ire->ire_frag_flag |= flag;
-				mutex_exit(&ire->ire_lock);
-			} else {
-				mutex_exit(&connp->conn_lock);
-			}
-		}
-		goto noticmpv4;
-	}
-
+	seg_seq = ntohl(tcpha->tha_seq);
 	switch (icmph->icmph_type) {
 	case ICMP_DEST_UNREACHABLE:
 		switch (icmph->icmph_code) {
 		case ICMP_FRAGMENTATION_NEEDED:
 			/*
-			 * Reduce the MSS based on the new MTU.  This will
-			 * eliminate any fragmentation locally.
-			 * N.B.  There may well be some funny side-effects on
-			 * the local send policy and the remote receive policy.
-			 * Pending further research, we provide
-			 * tcp_ignore_path_mtu just in case this proves
-			 * disastrous somewhere.
-			 *
-			 * After updating the MSS, retransmit part of the
-			 * dropped segment using the new mss by calling
-			 * tcp_wput_data().  Need to adjust all those
-			 * params to make sure tcp_wput_data() work properly.
+			 * Update Path MTU, then try to send something out.
 			 */
-			if (tcps->tcps_ignore_path_mtu ||
-			    tcp->tcp_ipha->ipha_fragment_offset_and_flags == 0)
-				break;
-
-			/*
-			 * Decrease the MSS by time stamp options
-			 * IP options and IPSEC options. tcp_hdr_len
-			 * includes time stamp option and IP option
-			 * length.  Note that new_mss may be negative
-			 * if tcp_ipsec_overhead is large and the
-			 * icmph_du_mtu is the minimum value, which is 68.
-			 */
-			new_mss = ntohs(icmph->icmph_du_mtu) -
-			    tcp->tcp_hdr_len - tcp->tcp_ipsec_overhead;
-
-			DTRACE_PROBE2(tcp__pmtu__change, tcp_t *, tcp, int,
-			    new_mss);
-
-			/*
-			 * Only update the MSS if the new one is
-			 * smaller than the previous one.  This is
-			 * to avoid problems when getting multiple
-			 * ICMP errors for the same MTU.
-			 */
-			if (new_mss >= tcp->tcp_mss)
-				break;
-
-			/*
-			 * Note that we are using the template header's DF
-			 * bit in the fast path sending.  So we need to compare
-			 * the new mss with both tcps_mss_min and ip_pmtu_min.
-			 * And stop doing IPv4 PMTUd if new_mss is less than
-			 * MAX(tcps_mss_min, ip_pmtu_min).
-			 */
-			if (new_mss < tcps->tcps_mss_min ||
-			    new_mss < ipst->ips_ip_pmtu_min) {
-				tcp->tcp_ipha->ipha_fragment_offset_and_flags =
-				    0;
-			}
-
-			ratio = tcp->tcp_cwnd / tcp->tcp_mss;
-			ASSERT(ratio >= 1);
-			tcp_mss_set(tcp, new_mss, B_TRUE);
-
-			/*
-			 * Make sure we have something to
-			 * send.
-			 */
-			if (SEQ_LT(tcp->tcp_suna, tcp->tcp_snxt) &&
-			    (tcp->tcp_xmit_head != NULL)) {
-				/*
-				 * Shrink tcp_cwnd in
-				 * proportion to the old MSS/new MSS.
-				 */
-				tcp->tcp_cwnd = ratio * tcp->tcp_mss;
-				if ((tcp->tcp_valid_bits & TCP_FSS_VALID) &&
-				    (tcp->tcp_unsent == 0)) {
-					tcp->tcp_rexmit_max = tcp->tcp_fss;
-				} else {
-					tcp->tcp_rexmit_max = tcp->tcp_snxt;
-				}
-				tcp->tcp_rexmit_nxt = tcp->tcp_suna;
-				tcp->tcp_rexmit = B_TRUE;
-				tcp->tcp_dupack_cnt = 0;
-				tcp->tcp_snd_burst = TCP_CWND_SS;
-				tcp_ss_rexmit(tcp);
-			}
+			tcp_update_pmtu(tcp, B_TRUE);
+			tcp_rexmit_after_error(tcp);
 			break;
 		case ICMP_PORT_UNREACHABLE:
 		case ICMP_PROTOCOL_UNREACHABLE:
@@ -8451,7 +6847,6 @@ noticmpv4:
 					 * Ditch the half-open connection if we
 					 * suspect a SYN attack is under way.
 					 */
-					tcp_ip_ire_mark_advice(tcp);
 					(void) tcp_clean_death(tcp,
 					    tcp->tcp_client_errno, 7);
 				}
@@ -8483,67 +6878,191 @@ noticmpv4:
 		break;
 	}
 	}
-	freemsg(first_mp);
+	freemsg(mp);
 }
 
 /*
- * tcp_icmp_error_ipv6 is called by tcp_rput_other to process ICMPv6
+ * CALLED OUTSIDE OF SQUEUE! It can not follow any pointers that tcp might
+ * change. But it can refer to fields like tcp_suna and tcp_snxt.
+ *
+ * Function tcp_verifyicmp is called as conn_verifyicmp to verify the ICMP
+ * error messages received by IP. The message is always received on the correct
+ * tcp_t.
+ */
+/* ARGSUSED */
+static boolean_t
+tcp_verifyicmp(conn_t *connp, void *arg2, icmph_t *icmph, icmp6_t *icmp6,
+    ip_recv_attr_t *ira)
+{
+	tcpha_t		*tcpha = (tcpha_t *)arg2;
+	uint32_t	seq = ntohl(tcpha->tha_seq);
+	tcp_t		*tcp = connp->conn_tcp;
+
+	/*
+	 * TCP sequence number contained in payload of the ICMP error message
+	 * should be within the range SND.UNA <= SEG.SEQ < SND.NXT. Otherwise,
+	 * the message is either a stale ICMP error, or an attack from the
+	 * network. Fail the verification.
+	 */
+	if (SEQ_LT(seq, tcp->tcp_suna) || SEQ_GEQ(seq, tcp->tcp_snxt))
+		return (B_FALSE);
+
+	/* For "too big" we also check the ignore flag */
+	if (ira->ira_flags & IRAF_IS_IPV4) {
+		ASSERT(icmph != NULL);
+		if (icmph->icmph_type == ICMP_DEST_UNREACHABLE &&
+		    icmph->icmph_code == ICMP_FRAGMENTATION_NEEDED &&
+		    tcp->tcp_tcps->tcps_ignore_path_mtu)
+			return (B_FALSE);
+	} else {
+		ASSERT(icmp6 != NULL);
+		if (icmp6->icmp6_type == ICMP6_PACKET_TOO_BIG &&
+		    tcp->tcp_tcps->tcps_ignore_path_mtu)
+			return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+/*
+ * Update the TCP connection according to change of PMTU.
+ *
+ * Path MTU might have changed by either increase or decrease, so need to
+ * adjust the MSS based on the value of ixa_pmtu. No need to handle tiny
+ * or negative MSS, since tcp_mss_set() will do it.
+ */
+static void
+tcp_update_pmtu(tcp_t *tcp, boolean_t decrease_only)
+{
+	uint32_t	pmtu;
+	int32_t		mss;
+	conn_t		*connp = tcp->tcp_connp;
+	ip_xmit_attr_t	*ixa = connp->conn_ixa;
+	iaflags_t	ixaflags;
+
+	if (tcp->tcp_tcps->tcps_ignore_path_mtu)
+		return;
+
+	if (tcp->tcp_state < TCPS_ESTABLISHED)
+		return;
+
+	/*
+	 * Always call ip_get_pmtu() to make sure that IP has updated
+	 * ixa_flags properly.
+	 */
+	pmtu = ip_get_pmtu(ixa);
+	ixaflags = ixa->ixa_flags;
+
+	/*
+	 * Calculate the MSS by decreasing the PMTU by conn_ht_iphc_len and
+	 * IPsec overhead if applied. Make sure to use the most recent
+	 * IPsec information.
+	 */
+	mss = pmtu - connp->conn_ht_iphc_len - conn_ipsec_length(connp);
+
+	/*
+	 * Nothing to change, so just return.
+	 */
+	if (mss == tcp->tcp_mss)
+		return;
+
+	/*
+	 * Currently, for ICMP errors, only PMTU decrease is handled.
+	 */
+	if (mss > tcp->tcp_mss && decrease_only)
+		return;
+
+	DTRACE_PROBE2(tcp_update_pmtu, int32_t, tcp->tcp_mss, uint32_t, mss);
+
+	/*
+	 * Update ixa_fragsize and ixa_pmtu.
+	 */
+	ixa->ixa_fragsize = ixa->ixa_pmtu = pmtu;
+
+	/*
+	 * Adjust MSS and all relevant variables.
+	 */
+	tcp_mss_set(tcp, mss);
+
+	/*
+	 * If the PMTU is below the min size maintained by IP, then ip_get_pmtu
+	 * has set IXAF_PMTU_TOO_SMALL and cleared IXAF_PMTU_IPV4_DF. Since TCP
+	 * has a (potentially different) min size we do the same. Make sure to
+	 * clear IXAF_DONTFRAG, which is used by IP to decide whether to
+	 * fragment the packet.
+	 *
+	 * LSO over IPv6 can not be fragmented. So need to disable LSO
+	 * when IPv6 fragmentation is needed.
+	 */
+	if (mss < tcp->tcp_tcps->tcps_mss_min)
+		ixaflags |= IXAF_PMTU_TOO_SMALL;
+
+	if (ixaflags & IXAF_PMTU_TOO_SMALL)
+		ixaflags &= ~(IXAF_DONTFRAG | IXAF_PMTU_IPV4_DF);
+
+	if ((connp->conn_ipversion == IPV4_VERSION) &&
+	    !(ixaflags & IXAF_PMTU_IPV4_DF)) {
+		tcp->tcp_ipha->ipha_fragment_offset_and_flags = 0;
+	}
+	ixa->ixa_flags = ixaflags;
+}
+
+/*
+ * Do slow start retransmission after ICMP errors of PMTU changes.
+ */
+static void
+tcp_rexmit_after_error(tcp_t *tcp)
+{
+	/*
+	 * All sent data has been acknowledged or no data left to send, just
+	 * to return.
+	 */
+	if (!SEQ_LT(tcp->tcp_suna, tcp->tcp_snxt) ||
+	    (tcp->tcp_xmit_head == NULL))
+		return;
+
+	if ((tcp->tcp_valid_bits & TCP_FSS_VALID) && (tcp->tcp_unsent == 0))
+		tcp->tcp_rexmit_max = tcp->tcp_fss;
+	else
+		tcp->tcp_rexmit_max = tcp->tcp_snxt;
+
+	tcp->tcp_rexmit_nxt = tcp->tcp_suna;
+	tcp->tcp_rexmit = B_TRUE;
+	tcp->tcp_dupack_cnt = 0;
+	tcp->tcp_snd_burst = TCP_CWND_SS;
+	tcp_ss_rexmit(tcp);
+}
+
+/*
+ * tcp_icmp_error_ipv6 is called from tcp_icmp_input to process ICMPv6
  * error messages passed up by IP.
  * Assumes that IP has pulled up all the extension headers as well
  * as the ICMPv6 header.
  */
 static void
-tcp_icmp_error_ipv6(tcp_t *tcp, mblk_t *mp, boolean_t ipsec_mctl)
+tcp_icmp_error_ipv6(tcp_t *tcp, mblk_t *mp, ip_recv_attr_t *ira)
 {
-	icmp6_t *icmp6;
-	ip6_t	*ip6h;
-	uint16_t	iph_hdr_length;
-	tcpha_t	*tcpha;
-	uint8_t	*nexthdrp;
-	uint32_t new_mss;
-	uint32_t ratio;
-	boolean_t secure;
-	mblk_t *first_mp = mp;
-	size_t mp_size;
-	uint32_t seg_seq;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	icmp6_t		*icmp6;
+	ip6_t		*ip6h;
+	uint16_t	iph_hdr_length = ira->ira_ip_hdr_length;
+	tcpha_t		*tcpha;
+	uint8_t		*nexthdrp;
+	uint32_t	seg_seq;
 
 	/*
-	 * The caller has determined if this is an IPSEC_IN packet and
-	 * set ipsec_mctl appropriately (see tcp_icmp_error).
+	 * Verify that we have a complete IP header.
 	 */
-	if (ipsec_mctl)
-		mp = mp->b_cont;
+	ASSERT((MBLKL(mp) >= sizeof (ip6_t)));
 
-	mp_size = MBLKL(mp);
-
-	/*
-	 * Verify that we have a complete IP header. If not, send it upstream.
-	 */
-	if (mp_size < sizeof (ip6_t)) {
-noticmpv6:
-		freemsg(first_mp);
-		return;
-	}
-
-	/*
-	 * Verify this is an ICMPV6 packet, else send it upstream.
-	 */
-	ip6h = (ip6_t *)mp->b_rptr;
-	if (ip6h->ip6_nxt == IPPROTO_ICMPV6) {
-		iph_hdr_length = IPV6_HDR_LEN;
-	} else if (!ip_hdr_length_nexthdr_v6(mp, ip6h, &iph_hdr_length,
-	    &nexthdrp) ||
-	    *nexthdrp != IPPROTO_ICMPV6) {
-		goto noticmpv6;
-	}
 	icmp6 = (icmp6_t *)&mp->b_rptr[iph_hdr_length];
 	ip6h = (ip6_t *)&icmp6[1];
 	/*
 	 * Verify if we have a complete ICMP and inner IP header.
 	 */
-	if ((uchar_t *)&ip6h[1] > mp->b_wptr)
-		goto noticmpv6;
+	if ((uchar_t *)&ip6h[1] > mp->b_wptr) {
+noticmpv6:
+		freemsg(mp);
+		return;
+	}
 
 	if (!ip_hdr_length_nexthdr_v6(mp, ip6h, &iph_hdr_length, &nexthdrp))
 		goto noticmpv6;
@@ -8558,130 +7077,15 @@ noticmpv6:
 		goto noticmpv6;
 	}
 
-	/*
-	 * ICMP errors come on the right queue or come on
-	 * listener/global queue for detached connections and
-	 * get switched to the right queue. If it comes on the
-	 * right queue, policy check has already been done by IP
-	 * and thus free the first_mp without verifying the policy.
-	 * If it has come for a non-hard bound connection, we need
-	 * to verify policy as IP may not have done it.
-	 */
-	if (!tcp->tcp_hard_bound) {
-		if (ipsec_mctl) {
-			secure = ipsec_in_is_secure(first_mp);
-		} else {
-			secure = B_FALSE;
-		}
-		if (secure) {
-			/*
-			 * If we are willing to accept this in clear
-			 * we don't have to verify policy.
-			 */
-			if (!ipsec_inbound_accept_clear(mp, NULL, ip6h)) {
-				if (!tcp_check_policy(tcp, first_mp,
-				    NULL, ip6h, secure, ipsec_mctl)) {
-					/*
-					 * tcp_check_policy called
-					 * ip_drop_packet() on failure.
-					 */
-					return;
-				}
-			}
-		}
-	} else if (ipsec_mctl) {
-		/*
-		 * This is a hard_bound connection. IP has already
-		 * verified policy. We don't have to do it again.
-		 */
-		freeb(first_mp);
-		first_mp = mp;
-		ipsec_mctl = B_FALSE;
-	}
-
 	seg_seq = ntohl(tcpha->tha_seq);
-	/*
-	 * TCP SHOULD check that the TCP sequence number contained in
-	 * payload of the ICMP error message is within the range
-	 * SND.UNA <= SEG.SEQ < SND.NXT.
-	 */
-	if (SEQ_LT(seg_seq, tcp->tcp_suna) || SEQ_GEQ(seg_seq, tcp->tcp_snxt)) {
-		/*
-		 * If the ICMP message is bogus, should we kill the
-		 * connection, or should we just drop the bogus ICMP
-		 * message? It would probably make more sense to just
-		 * drop the message so that if this one managed to get
-		 * in, the real connection should not suffer.
-		 */
-		goto noticmpv6;
-	}
-
 	switch (icmp6->icmp6_type) {
 	case ICMP6_PACKET_TOO_BIG:
 		/*
-		 * Reduce the MSS based on the new MTU.  This will
-		 * eliminate any fragmentation locally.
-		 * N.B.  There may well be some funny side-effects on
-		 * the local send policy and the remote receive policy.
-		 * Pending further research, we provide
-		 * tcp_ignore_path_mtu just in case this proves
-		 * disastrous somewhere.
-		 *
-		 * After updating the MSS, retransmit part of the
-		 * dropped segment using the new mss by calling
-		 * tcp_wput_data().  Need to adjust all those
-		 * params to make sure tcp_wput_data() work properly.
+		 * Update Path MTU, then try to send something out.
 		 */
-		if (tcps->tcps_ignore_path_mtu)
-			break;
-
-		/*
-		 * Decrease the MSS by time stamp options
-		 * IP options and IPSEC options. tcp_hdr_len
-		 * includes time stamp option and IP option
-		 * length.
-		 */
-		new_mss = ntohs(icmp6->icmp6_mtu) - tcp->tcp_hdr_len -
-		    tcp->tcp_ipsec_overhead;
-
-		/*
-		 * Only update the MSS if the new one is
-		 * smaller than the previous one.  This is
-		 * to avoid problems when getting multiple
-		 * ICMP errors for the same MTU.
-		 */
-		if (new_mss >= tcp->tcp_mss)
-			break;
-
-		ratio = tcp->tcp_cwnd / tcp->tcp_mss;
-		ASSERT(ratio >= 1);
-		tcp_mss_set(tcp, new_mss, B_TRUE);
-
-		/*
-		 * Make sure we have something to
-		 * send.
-		 */
-		if (SEQ_LT(tcp->tcp_suna, tcp->tcp_snxt) &&
-		    (tcp->tcp_xmit_head != NULL)) {
-			/*
-			 * Shrink tcp_cwnd in
-			 * proportion to the old MSS/new MSS.
-			 */
-			tcp->tcp_cwnd = ratio * tcp->tcp_mss;
-			if ((tcp->tcp_valid_bits & TCP_FSS_VALID) &&
-			    (tcp->tcp_unsent == 0)) {
-				tcp->tcp_rexmit_max = tcp->tcp_fss;
-			} else {
-				tcp->tcp_rexmit_max = tcp->tcp_snxt;
-			}
-			tcp->tcp_rexmit_nxt = tcp->tcp_suna;
-			tcp->tcp_rexmit = B_TRUE;
-			tcp->tcp_dupack_cnt = 0;
-			tcp->tcp_snd_burst = TCP_CWND_SS;
-			tcp_ss_rexmit(tcp);
-		}
+		tcp_update_pmtu(tcp, B_TRUE);
+		tcp_rexmit_after_error(tcp);
 		break;
-
 	case ICMP6_DST_UNREACH:
 		switch (icmp6->icmp6_code) {
 		case ICMP6_DST_UNREACH_NOPORT:
@@ -8692,7 +7096,6 @@ noticmpv6:
 				    ECONNREFUSED, 8);
 			}
 			break;
-
 		case ICMP6_DST_UNREACH_ADMIN:
 		case ICMP6_DST_UNREACH_NOROUTE:
 		case ICMP6_DST_UNREACH_BEYONDSCOPE:
@@ -8708,7 +7111,6 @@ noticmpv6:
 					 * Ditch the half-open connection if we
 					 * suspect a SYN attack is under way.
 					 */
-					tcp_ip_ire_mark_advice(tcp);
 					(void) tcp_clean_death(tcp,
 					    tcp->tcp_client_errno, 9);
 				}
@@ -8720,7 +7122,6 @@ noticmpv6:
 			break;
 		}
 		break;
-
 	case ICMP6_PARAM_PROB:
 		/* If this corresponds to an ICMP_PROTOCOL_UNREACHABLE */
 		if (icmp6->icmp6_code == ICMP6_PARAMPROB_NEXTHEADER &&
@@ -8739,82 +7140,41 @@ noticmpv6:
 	default:
 		break;
 	}
-	freemsg(first_mp);
+	freemsg(mp);
 }
 
 /*
  * Notify IP that we are having trouble with this connection.  IP should
- * blow the IRE away and start over.
+ * make note so it can potentially use a different IRE.
  */
 static void
 tcp_ip_notify(tcp_t *tcp)
 {
-	struct iocblk	*iocp;
-	ipid_t	*ipid;
-	mblk_t	*mp;
+	conn_t		*connp = tcp->tcp_connp;
+	ire_t		*ire;
 
-	/* IPv6 has NUD thus notification to delete the IRE is not needed */
-	if (tcp->tcp_ipversion == IPV6_VERSION)
-		return;
-
-	mp = mkiocb(IP_IOCTL);
-	if (mp == NULL)
-		return;
-
-	iocp = (struct iocblk *)mp->b_rptr;
-	iocp->ioc_count = sizeof (ipid_t) + sizeof (tcp->tcp_ipha->ipha_dst);
-
-	mp->b_cont = allocb(iocp->ioc_count, BPRI_HI);
-	if (!mp->b_cont) {
-		freeb(mp);
-		return;
-	}
-
-	ipid = (ipid_t *)mp->b_cont->b_rptr;
-	mp->b_cont->b_wptr += iocp->ioc_count;
-	bzero(ipid, sizeof (*ipid));
-	ipid->ipid_cmd = IP_IOC_IRE_DELETE_NO_REPLY;
-	ipid->ipid_ire_type = IRE_CACHE;
-	ipid->ipid_addr_offset = sizeof (ipid_t);
-	ipid->ipid_addr_length = sizeof (tcp->tcp_ipha->ipha_dst);
 	/*
 	 * Note: in the case of source routing we want to blow away the
 	 * route to the first source route hop.
 	 */
-	bcopy(&tcp->tcp_ipha->ipha_dst, &ipid[1],
-	    sizeof (tcp->tcp_ipha->ipha_dst));
-
-	CALL_IP_WPUT(tcp->tcp_connp, tcp->tcp_wq, mp);
-}
-
-/* Unlink and return any mblk that looks like it contains an ire */
-static mblk_t *
-tcp_ire_mp(mblk_t **mpp)
-{
-	mblk_t 	*mp = *mpp;
-	mblk_t	*prev_mp = NULL;
-
-	for (;;) {
-		switch (DB_TYPE(mp)) {
-		case IRE_DB_TYPE:
-		case IRE_DB_REQ_TYPE:
-			if (mp == *mpp) {
-				*mpp = mp->b_cont;
-			} else {
-				prev_mp->b_cont = mp->b_cont;
-			}
-			mp->b_cont = NULL;
-			return (mp);
-		default:
-			break;
+	ire = connp->conn_ixa->ixa_ire;
+	if (ire != NULL && !(ire->ire_flags & (RTF_REJECT|RTF_BLACKHOLE))) {
+		if (ire->ire_ipversion == IPV4_VERSION) {
+			/*
+			 * As per RFC 1122, we send an RTM_LOSING to inform
+			 * routing protocols.
+			 */
+			ip_rts_change(RTM_LOSING, ire->ire_addr,
+			    ire->ire_gateway_addr, ire->ire_mask,
+			    connp->conn_laddr_v4,  0, 0, 0,
+			    (RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA),
+			    ire->ire_ipst);
 		}
-		prev_mp = mp;
-		mp = mp->b_cont;
-		if (mp == NULL)
-			break;
+		(void) ire_no_good(ire);
 	}
-	return (mp);
 }
+
+#pragma inline(tcp_send_data)
 
 /*
  * Timer callback routine for keepalive probe.  We do a fake resend of
@@ -8890,7 +7250,7 @@ tcp_keepalive_killer(void *arg)
 			 * timer back.
 			 */
 			if (mp != NULL) {
-				tcp_send_data(tcp, tcp->tcp_wq, mp);
+				tcp_send_data(tcp, mp);
 				BUMP_MIB(&tcps->tcps_mib,
 				    tcpTimKeepaliveProbe);
 				if (tcp->tcp_ka_last_intrvl != 0) {
@@ -8930,17 +7290,17 @@ tcp_keepalive_killer(void *arg)
 int
 tcp_maxpsz_set(tcp_t *tcp, boolean_t set_maxblk)
 {
-	queue_t	*q = tcp->tcp_rq;
+	conn_t	*connp = tcp->tcp_connp;
+	queue_t	*q = connp->conn_rq;
 	int32_t	mss = tcp->tcp_mss;
 	int	maxpsz;
-	conn_t	*connp = tcp->tcp_connp;
 
 	if (TCP_IS_DETACHED(tcp))
 		return (mss);
 	if (tcp->tcp_fused) {
 		maxpsz = tcp_fuse_maxpsz(tcp);
 		mss = INFPSZ;
-	} else if (tcp->tcp_mdt || tcp->tcp_lso || tcp->tcp_maxpsz == 0) {
+	} else if (tcp->tcp_maxpsz_multiplier == 0) {
 		/*
 		 * Set the sd_qn_maxpsz according to the socket send buffer
 		 * size, and sd_maxblk to INFPSZ (-1).  This will essentially
@@ -8948,7 +7308,7 @@ tcp_maxpsz_set(tcp_t *tcp, boolean_t set_maxblk)
 		 * kernel-allocated buffers without breaking it up into smaller
 		 * chunks.  We round up the buffer size to the nearest SMSS.
 		 */
-		maxpsz = MSS_ROUNDUP(tcp->tcp_xmit_hiwater, mss);
+		maxpsz = MSS_ROUNDUP(connp->conn_sndbuf, mss);
 		if (tcp->tcp_kssl_ctx == NULL)
 			mss = INFPSZ;
 		else
@@ -8960,21 +7320,17 @@ tcp_maxpsz_set(tcp_t *tcp, boolean_t set_maxblk)
 		 * head to break down larger than SMSS writes into SMSS-
 		 * size mblks, up to tcp_maxpsz_multiplier mblks at a time.
 		 */
-		/* XXX tune this with ndd tcp_maxpsz_multiplier */
-		maxpsz = tcp->tcp_maxpsz * mss;
-		if (maxpsz > tcp->tcp_xmit_hiwater/2) {
-			maxpsz = tcp->tcp_xmit_hiwater/2;
+		maxpsz = tcp->tcp_maxpsz_multiplier * mss;
+		if (maxpsz > connp->conn_sndbuf / 2) {
+			maxpsz = connp->conn_sndbuf / 2;
 			/* Round up to nearest mss */
 			maxpsz = MSS_ROUNDUP(maxpsz, mss);
 		}
 	}
 
 	(void) proto_set_maxpsz(q, connp, maxpsz);
-	if (!(IPCL_IS_NONSTR(connp))) {
-		/* XXX do it in set_maxpsz()? */
-		tcp->tcp_wq->q_maxpsz = maxpsz;
-	}
-
+	if (!(IPCL_IS_NONSTR(connp)))
+		connp->conn_wq->q_maxpsz = maxpsz;
 	if (set_maxblk)
 		(void) proto_set_tx_maxblk(q, connp, mss);
 	return (mss);
@@ -8985,18 +7341,18 @@ tcp_maxpsz_set(tcp_t *tcp, boolean_t set_maxblk)
  * tcpopt struct and return a bitmask saying which options were found.
  */
 static int
-tcp_parse_options(tcph_t *tcph, tcp_opt_t *tcpopt)
+tcp_parse_options(tcpha_t *tcpha, tcp_opt_t *tcpopt)
 {
 	uchar_t		*endp;
 	int		len;
 	uint32_t	mss;
-	uchar_t		*up = (uchar_t *)tcph;
+	uchar_t		*up = (uchar_t *)tcpha;
 	int		found = 0;
 	int32_t		sack_len;
 	tcp_seq		sack_begin, sack_end;
 	tcp_t		*tcp;
 
-	endp = up + TCP_HDR_LENGTH(tcph);
+	endp = up + TCP_HDR_LENGTH(tcpha);
 	up += TCP_MIN_HEADER_LENGTH;
 	while (up < endp) {
 		len = endp - up;
@@ -9135,28 +7491,20 @@ tcp_parse_options(tcph_t *tcph, tcp_opt_t *tcpopt)
 }
 
 /*
- * Set the mss associated with a particular tcp based on its current value,
- * and a new one passed in. Observe minimums and maximums, and reset
- * other state variables that we want to view as multiples of mss.
+ * Set the MSS associated with a particular tcp based on its current value,
+ * and a new one passed in. Observe minimums and maximums, and reset other
+ * state variables that we want to view as multiples of MSS.
  *
- * This function is called mainly because values like tcp_mss, tcp_cwnd,
- * highwater marks etc. need to be initialized or adjusted.
- * 1) From tcp_process_options() when the other side's SYN/SYN-ACK
- *    packet arrives.
- * 2) We need to set a new MSS when ICMP_FRAGMENTATION_NEEDED or
- *    ICMP6_PACKET_TOO_BIG arrives.
- * 3) From tcp_paws_check() if the other side stops sending the timestamp,
- *    to increase the MSS to use the extra bytes available.
- *
- * Callers except tcp_paws_check() ensure that they only reduce mss.
+ * The value of MSS could be either increased or descreased.
  */
 static void
-tcp_mss_set(tcp_t *tcp, uint32_t mss, boolean_t do_ss)
+tcp_mss_set(tcp_t *tcp, uint32_t mss)
 {
 	uint32_t	mss_max;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
-	if (tcp->tcp_ipversion == IPV4_VERSION)
+	if (connp->conn_ipversion == IPV4_VERSION)
 		mss_max = tcps->tcps_mss_max_ipv4;
 	else
 		mss_max = tcps->tcps_mss_max_ipv6;
@@ -9176,34 +7524,22 @@ tcp_mss_set(tcp_t *tcp, uint32_t mss, boolean_t do_ss)
 	 * TCP should be able to buffer at least 4 MSS data for obvious
 	 * performance reason.
 	 */
-	if ((mss << 2) > tcp->tcp_xmit_hiwater)
-		tcp->tcp_xmit_hiwater = mss << 2;
+	if ((mss << 2) > connp->conn_sndbuf)
+		connp->conn_sndbuf = mss << 2;
 
 	/*
-	 * Set the xmit_lowater to at least twice of MSS.
+	 * Set the send lowater to at least twice of MSS.
 	 */
-	if ((mss << 1) > tcp->tcp_xmit_lowater)
-		tcp->tcp_xmit_lowater = mss << 1;
+	if ((mss << 1) > connp->conn_sndlowat)
+		connp->conn_sndlowat = mss << 1;
 
-	if (do_ss) {
-		/*
-		 * Either the tcp_cwnd is as yet uninitialized, or mss is
-		 * changing due to a reduction in MTU, presumably as a
-		 * result of a new path component, reset cwnd to its
-		 * "initial" value, as a multiple of the new mss.
-		 */
-		SET_TCP_INIT_CWND(tcp, mss, tcps->tcps_slow_start_initial);
-	} else {
-		/*
-		 * Called by tcp_paws_check(), the mss increased
-		 * marginally to allow use of space previously taken
-		 * by the timestamp option. It would be inappropriate
-		 * to apply slow start or tcp_init_cwnd values to
-		 * tcp_cwnd, simply adjust to a multiple of the new mss.
-		 */
-		tcp->tcp_cwnd = (tcp->tcp_cwnd / tcp->tcp_mss) * mss;
-		tcp->tcp_cwnd_cnt = 0;
-	}
+	/*
+	 * Update tcp_cwnd according to the new value of MSS. Keep the
+	 * previous ratio to preserve the transmit rate.
+	 */
+	tcp->tcp_cwnd = (tcp->tcp_cwnd / tcp->tcp_mss) * mss;
+	tcp->tcp_cwnd_cnt = 0;
+
 	tcp->tcp_mss = mss;
 	(void) tcp_maxpsz_set(tcp, B_TRUE);
 }
@@ -9223,12 +7559,11 @@ tcp_openv6(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 }
 
 static conn_t *
-tcp_create_common(queue_t *q, cred_t *credp, boolean_t isv6,
-    boolean_t issocket, int *errorp)
+tcp_create_common(cred_t *credp, boolean_t isv6, boolean_t issocket,
+    int *errorp)
 {
 	tcp_t		*tcp = NULL;
 	conn_t		*connp;
-	int		err;
 	zoneid_t	zoneid;
 	tcp_stack_t	*tcps;
 	squeue_t	*sqp;
@@ -9265,15 +7600,6 @@ tcp_create_common(queue_t *q, cred_t *credp, boolean_t isv6,
 		else
 			zoneid = crgetzoneid(credp);
 	}
-	/*
-	 * For stackid zero this is done from strplumb.c, but
-	 * non-zero stackids are handled here.
-	 */
-	if (tcps->tcps_g_q == NULL &&
-	    tcps->tcps_netstack->netstack_stackid !=
-	    GLOBAL_NETSTACKID) {
-		tcp_g_q_setup(tcps);
-	}
 
 	sqp = IP_SQUEUE_GET((uint_t)gethrtime());
 	connp = (conn_t *)tcp_get_conn(sqp, tcps);
@@ -9286,41 +7612,50 @@ tcp_create_common(queue_t *q, cred_t *credp, boolean_t isv6,
 		*errorp = ENOSR;
 		return (NULL);
 	}
+	ASSERT(connp->conn_ixa->ixa_protocol == connp->conn_proto);
+
 	connp->conn_sqp = sqp;
 	connp->conn_initial_sqp = connp->conn_sqp;
+	connp->conn_ixa->ixa_sqp = connp->conn_sqp;
 	tcp = connp->conn_tcp;
 
-	if (isv6) {
-		connp->conn_flags |= IPCL_TCP6;
-		connp->conn_send = ip_output_v6;
-		connp->conn_af_isv6 = B_TRUE;
-		connp->conn_pkt_isv6 = B_TRUE;
-		connp->conn_src_preferences = IPV6_PREFER_SRC_DEFAULT;
-		tcp->tcp_ipversion = IPV6_VERSION;
-		tcp->tcp_family = AF_INET6;
-		tcp->tcp_mss = tcps->tcps_mss_def_ipv6;
-	} else {
-		connp->conn_flags |= IPCL_TCP4;
-		connp->conn_send = ip_output;
-		connp->conn_af_isv6 = B_FALSE;
-		connp->conn_pkt_isv6 = B_FALSE;
-		tcp->tcp_ipversion = IPV4_VERSION;
-		tcp->tcp_family = AF_INET;
-		tcp->tcp_mss = tcps->tcps_mss_def_ipv4;
-	}
-
 	/*
-	 * TCP keeps a copy of cred for cache locality reasons but
-	 * we put a reference only once. If connp->conn_cred
-	 * becomes invalid, tcp_cred should also be set to NULL.
+	 * Besides asking IP to set the checksum for us, have conn_ip_output
+	 * to do the following checks when necessary:
+	 *
+	 * IXAF_VERIFY_SOURCE: drop packets when our outer source goes invalid
+	 * IXAF_VERIFY_PMTU: verify PMTU changes
+	 * IXAF_VERIFY_LSO: verify LSO capability changes
 	 */
-	tcp->tcp_cred = connp->conn_cred = credp;
-	crhold(connp->conn_cred);
-	tcp->tcp_cpid = curproc->p_pid;
-	tcp->tcp_open_time = lbolt64;
+	connp->conn_ixa->ixa_flags |= IXAF_SET_ULP_CKSUM | IXAF_VERIFY_SOURCE |
+	    IXAF_VERIFY_PMTU | IXAF_VERIFY_LSO;
+
+	if (!tcps->tcps_dev_flow_ctl)
+		connp->conn_ixa->ixa_flags |= IXAF_NO_DEV_FLOW_CTL;
+
+	if (isv6) {
+		connp->conn_ixa->ixa_src_preferences = IPV6_PREFER_SRC_DEFAULT;
+		connp->conn_ipversion = IPV6_VERSION;
+		connp->conn_family = AF_INET6;
+		tcp->tcp_mss = tcps->tcps_mss_def_ipv6;
+		connp->conn_default_ttl = tcps->tcps_ipv6_hoplimit;
+	} else {
+		connp->conn_ipversion = IPV4_VERSION;
+		connp->conn_family = AF_INET;
+		tcp->tcp_mss = tcps->tcps_mss_def_ipv4;
+		connp->conn_default_ttl = tcps->tcps_ipv4_ttl;
+	}
+	connp->conn_xmit_ipp.ipp_unicast_hops = connp->conn_default_ttl;
+
+	crhold(credp);
+	connp->conn_cred = credp;
+	connp->conn_cpid = curproc->p_pid;
+	connp->conn_open_time = lbolt64;
+
 	connp->conn_zoneid = zoneid;
+	/* conn_allzones can not be set this early, hence no IPCL_ZONEID */
+	connp->conn_ixa->ixa_zoneid = zoneid;
 	connp->conn_mlp_type = mlptSingle;
-	connp->conn_ulp_labeled = !is_system_labeled();
 	ASSERT(connp->conn_netstack == tcps->tcps_netstack);
 	ASSERT(tcp->tcp_tcps == tcps);
 
@@ -9331,38 +7666,22 @@ tcp_create_common(queue_t *q, cred_t *credp, boolean_t isv6,
 	if (getpflags(NET_MAC_AWARE, credp) != 0)
 		connp->conn_mac_mode = CONN_MAC_AWARE;
 
-	connp->conn_dev = NULL;
+	connp->conn_zone_is_global = (crgetzoneid(credp) == GLOBAL_ZONEID);
+
 	if (issocket) {
-		connp->conn_flags |= IPCL_SOCKET;
 		tcp->tcp_issocket = 1;
 	}
 
-	/* Non-zero default values */
-	connp->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
-
-	if (q == NULL) {
-		/*
-		 * Create a helper stream for non-STREAMS socket.
-		 */
-		err = ip_create_helper_stream(connp, tcps->tcps_ldi_ident);
-		if (err != 0) {
-			ip1dbg(("tcp_create_common: create of IP helper stream "
-			    "failed\n"));
-			CONN_DEC_REF(connp);
-			*errorp = err;
-			return (NULL);
-		}
-		q = connp->conn_rq;
-	}
+	connp->conn_rcvbuf = tcps->tcps_recv_hiwat;
+	connp->conn_sndbuf = tcps->tcps_xmit_hiwat;
+	connp->conn_sndlowat = tcps->tcps_xmit_lowat;
+	connp->conn_so_type = SOCK_STREAM;
+	connp->conn_wroff = connp->conn_ht_iphc_allocated +
+	    tcps->tcps_wroff_xtra;
 
 	SOCK_CONNID_INIT(tcp->tcp_connid);
-	err = tcp_init(tcp, q);
-	if (err != 0) {
-		CONN_DEC_REF(connp);
-		*errorp = err;
-		return (NULL);
-	}
-
+	tcp->tcp_state = TCPS_IDLE;
+	tcp_init_values(tcp);
 	return (connp);
 }
 
@@ -9415,7 +7734,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 		q->q_qinfo = &tcp_acceptor_rinit;
 		/*
 		 * the conn_dev and minor_arena will be subsequently used by
-		 * tcp_wput_accept() and tcp_tpi_close_accept() to figure out
+		 * tcp_tli_accept() and tcp_tpi_close_accept() to figure out
 		 * the minor device number for this connection from the q_ptr.
 		 */
 		RD(q)->q_ptr = (void *)conn_dev;
@@ -9426,7 +7745,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	}
 
 	issocket = flag & SO_SOCKSTR;
-	connp = tcp_create_common(q, credp, isv6, issocket, &err);
+	connp = tcp_create_common(credp, isv6, issocket, &err);
 
 	if (connp == NULL) {
 		inet_minor_free(minor_arena, conn_dev);
@@ -9434,6 +7753,8 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 		return (err);
 	}
 
+	connp->conn_rq = q;
+	connp->conn_wq = WR(q);
 	q->q_ptr = WR(q)->q_ptr = connp;
 
 	connp->conn_dev = conn_dev;
@@ -9500,7 +7821,7 @@ tcp_allow_connopt_set(int level, int name)
 }
 
 /*
- * this routine gets default values of certain options whose default
+ * This routine gets default values of certain options whose default
  * values are maintained by protocol specific code
  */
 /* ARGSUSED */
@@ -9553,321 +7874,102 @@ tcp_opt_default(queue_t *q, int level, int name, uchar_t *ptr)
 	return (sizeof (int));
 }
 
+/*
+ * TCP routine to get the values of options.
+ */
 static int
 tcp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 {
 	int		*i1 = (int *)ptr;
 	tcp_t		*tcp = connp->conn_tcp;
-	ip6_pkt_t	*ipp = &tcp->tcp_sticky_ipp;
+	conn_opt_arg_t	coas;
+	int		retval;
+
+	coas.coa_connp = connp;
+	coas.coa_ixa = connp->conn_ixa;
+	coas.coa_ipp = &connp->conn_xmit_ipp;
+	coas.coa_ancillary = B_FALSE;
+	coas.coa_changed = 0;
 
 	switch (level) {
 	case SOL_SOCKET:
 		switch (name) {
-		case SO_LINGER:	{
-			struct linger *lgr = (struct linger *)ptr;
-
-			lgr->l_onoff = tcp->tcp_linger ? SO_LINGER : 0;
-			lgr->l_linger = tcp->tcp_lingertime;
-			}
-			return (sizeof (struct linger));
-		case SO_DEBUG:
-			*i1 = tcp->tcp_debug ? SO_DEBUG : 0;
-			break;
-		case SO_KEEPALIVE:
-			*i1 = tcp->tcp_ka_enabled ? SO_KEEPALIVE : 0;
-			break;
-		case SO_DONTROUTE:
-			*i1 = tcp->tcp_dontroute ? SO_DONTROUTE : 0;
-			break;
-		case SO_USELOOPBACK:
-			*i1 = tcp->tcp_useloopback ? SO_USELOOPBACK : 0;
-			break;
-		case SO_BROADCAST:
-			*i1 = tcp->tcp_broadcast ? SO_BROADCAST : 0;
-			break;
-		case SO_REUSEADDR:
-			*i1 = tcp->tcp_reuseaddr ? SO_REUSEADDR : 0;
-			break;
-		case SO_OOBINLINE:
-			*i1 = tcp->tcp_oobinline ? SO_OOBINLINE : 0;
-			break;
-		case SO_DGRAM_ERRIND:
-			*i1 = tcp->tcp_dgram_errind ? SO_DGRAM_ERRIND : 0;
-			break;
-		case SO_TYPE:
-			*i1 = SOCK_STREAM;
-			break;
-		case SO_SNDBUF:
-			*i1 = tcp->tcp_xmit_hiwater;
-			break;
-		case SO_RCVBUF:
-			*i1 = tcp->tcp_recv_hiwater;
-			break;
 		case SO_SND_COPYAVOID:
 			*i1 = tcp->tcp_snd_zcopy_on ?
 			    SO_SND_COPYAVOID : 0;
-			break;
-		case SO_ALLZONES:
-			*i1 = connp->conn_allzones ? 1 : 0;
-			break;
-		case SO_ANON_MLP:
-			*i1 = connp->conn_anon_mlp;
-			break;
-		case SO_MAC_EXEMPT:
-			*i1 = (connp->conn_mac_mode == CONN_MAC_AWARE);
-			break;
-		case SO_MAC_IMPLICIT:
-			*i1 = (connp->conn_mac_mode == CONN_MAC_IMPLICIT);
-			break;
-		case SO_EXCLBIND:
-			*i1 = tcp->tcp_exclbind ? SO_EXCLBIND : 0;
-			break;
-		case SO_PROTOTYPE:
-			*i1 = IPPROTO_TCP;
-			break;
-		case SO_DOMAIN:
-			*i1 = tcp->tcp_family;
-			break;
+			return (sizeof (int));
 		case SO_ACCEPTCONN:
 			*i1 = (tcp->tcp_state == TCPS_LISTEN);
-		default:
-			return (-1);
+			return (sizeof (int));
 		}
 		break;
 	case IPPROTO_TCP:
 		switch (name) {
 		case TCP_NODELAY:
 			*i1 = (tcp->tcp_naglim == 1) ? TCP_NODELAY : 0;
-			break;
+			return (sizeof (int));
 		case TCP_MAXSEG:
 			*i1 = tcp->tcp_mss;
-			break;
+			return (sizeof (int));
 		case TCP_NOTIFY_THRESHOLD:
 			*i1 = (int)tcp->tcp_first_timer_threshold;
-			break;
+			return (sizeof (int));
 		case TCP_ABORT_THRESHOLD:
 			*i1 = tcp->tcp_second_timer_threshold;
-			break;
+			return (sizeof (int));
 		case TCP_CONN_NOTIFY_THRESHOLD:
 			*i1 = tcp->tcp_first_ctimer_threshold;
-			break;
+			return (sizeof (int));
 		case TCP_CONN_ABORT_THRESHOLD:
 			*i1 = tcp->tcp_second_ctimer_threshold;
-			break;
-		case TCP_RECVDSTADDR:
-			*i1 = tcp->tcp_recvdstaddr;
-			break;
-		case TCP_ANONPRIVBIND:
-			*i1 = tcp->tcp_anon_priv_bind;
-			break;
-		case TCP_EXCLBIND:
-			*i1 = tcp->tcp_exclbind ? TCP_EXCLBIND : 0;
-			break;
+			return (sizeof (int));
 		case TCP_INIT_CWND:
 			*i1 = tcp->tcp_init_cwnd;
-			break;
+			return (sizeof (int));
 		case TCP_KEEPALIVE_THRESHOLD:
 			*i1 = tcp->tcp_ka_interval;
-			break;
+			return (sizeof (int));
 		case TCP_KEEPALIVE_ABORT_THRESHOLD:
 			*i1 = tcp->tcp_ka_abort_thres;
-			break;
+			return (sizeof (int));
 		case TCP_CORK:
 			*i1 = tcp->tcp_cork;
-			break;
-		default:
-			return (-1);
+			return (sizeof (int));
 		}
 		break;
 	case IPPROTO_IP:
-		if (tcp->tcp_family != AF_INET)
+		if (connp->conn_family != AF_INET)
 			return (-1);
 		switch (name) {
 		case IP_OPTIONS:
-		case T_IP_OPTIONS: {
-			/*
-			 * This is compatible with BSD in that in only return
-			 * the reverse source route with the final destination
-			 * as the last entry. The first 4 bytes of the option
-			 * will contain the final destination.
-			 */
-			int	opt_len;
-
-			opt_len = (char *)tcp->tcp_tcph - (char *)tcp->tcp_ipha;
-			opt_len -= tcp->tcp_label_len + IP_SIMPLE_HDR_LENGTH;
-			ASSERT(opt_len >= 0);
+		case T_IP_OPTIONS:
 			/* Caller ensures enough space */
-			if (opt_len > 0) {
-				/*
-				 * TODO: Do we have to handle getsockopt on an
-				 * initiator as well?
-				 */
-				return (ip_opt_get_user(tcp->tcp_ipha, ptr));
-			}
-			return (0);
-			}
-		case IP_TOS:
-		case T_IP_TOS:
-			*i1 = (int)tcp->tcp_ipha->ipha_type_of_service;
-			break;
-		case IP_TTL:
-			*i1 = (int)tcp->tcp_ipha->ipha_ttl;
-			break;
-		case IP_NEXTHOP:
-			/* Handled at IP level */
-			return (-EINVAL);
+			return (ip_opt_get_user(connp, ptr));
 		default:
-			return (-1);
+			break;
 		}
 		break;
+
 	case IPPROTO_IPV6:
 		/*
 		 * IPPROTO_IPV6 options are only supported for sockets
 		 * that are using IPv6 on the wire.
 		 */
-		if (tcp->tcp_ipversion != IPV6_VERSION) {
+		if (connp->conn_ipversion != IPV6_VERSION) {
 			return (-1);
 		}
 		switch (name) {
-		case IPV6_UNICAST_HOPS:
-			*i1 = (unsigned int) tcp->tcp_ip6h->ip6_hops;
-			break;	/* goto sizeof (int) option return */
-		case IPV6_BOUND_IF:
-			/* Zero if not set */
-			*i1 = tcp->tcp_bound_if;
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVPKTINFO:
-			if (tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVPKTINFO)
-				*i1 = 1;
-			else
-				*i1 = 0;
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVTCLASS:
-			if (tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVTCLASS)
-				*i1 = 1;
-			else
-				*i1 = 0;
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVHOPLIMIT:
-			if (tcp->tcp_ipv6_recvancillary &
-			    TCP_IPV6_RECVHOPLIMIT)
-				*i1 = 1;
-			else
-				*i1 = 0;
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVHOPOPTS:
-			if (tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVHOPOPTS)
-				*i1 = 1;
-			else
-				*i1 = 0;
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVDSTOPTS:
-			if (tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVDSTOPTS)
-				*i1 = 1;
-			else
-				*i1 = 0;
-			break;	/* goto sizeof (int) option return */
-		case _OLD_IPV6_RECVDSTOPTS:
-			if (tcp->tcp_ipv6_recvancillary &
-			    TCP_OLD_IPV6_RECVDSTOPTS)
-				*i1 = 1;
-			else
-				*i1 = 0;
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVRTHDR:
-			if (tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVRTHDR)
-				*i1 = 1;
-			else
-				*i1 = 0;
-			break;	/* goto sizeof (int) option return */
-		case IPV6_RECVRTHDRDSTOPTS:
-			if (tcp->tcp_ipv6_recvancillary &
-			    TCP_IPV6_RECVRTDSTOPTS)
-				*i1 = 1;
-			else
-				*i1 = 0;
-			break;	/* goto sizeof (int) option return */
-		case IPV6_PKTINFO: {
-			/* XXX assumes that caller has room for max size! */
-			struct in6_pktinfo *pkti;
-
-			pkti = (struct in6_pktinfo *)ptr;
-			if (ipp->ipp_fields & IPPF_IFINDEX)
-				pkti->ipi6_ifindex = ipp->ipp_ifindex;
-			else
-				pkti->ipi6_ifindex = 0;
-			if (ipp->ipp_fields & IPPF_ADDR)
-				pkti->ipi6_addr = ipp->ipp_addr;
-			else
-				pkti->ipi6_addr = ipv6_all_zeros;
-			return (sizeof (struct in6_pktinfo));
-		}
-		case IPV6_TCLASS:
-			if (ipp->ipp_fields & IPPF_TCLASS)
-				*i1 = ipp->ipp_tclass;
-			else
-				*i1 = IPV6_FLOW_TCLASS(
-				    IPV6_DEFAULT_VERS_AND_FLOW);
-			break;	/* goto sizeof (int) option return */
-		case IPV6_NEXTHOP: {
-			sin6_t *sin6 = (sin6_t *)ptr;
-
-			if (!(ipp->ipp_fields & IPPF_NEXTHOP))
-				return (0);
-			*sin6 = sin6_null;
-			sin6->sin6_family = AF_INET6;
-			sin6->sin6_addr = ipp->ipp_nexthop;
-			return (sizeof (sin6_t));
-		}
-		case IPV6_HOPOPTS:
-			if (!(ipp->ipp_fields & IPPF_HOPOPTS))
-				return (0);
-			if (ipp->ipp_hopoptslen <= tcp->tcp_label_len)
-				return (0);
-			bcopy((char *)ipp->ipp_hopopts + tcp->tcp_label_len,
-			    ptr, ipp->ipp_hopoptslen - tcp->tcp_label_len);
-			if (tcp->tcp_label_len > 0) {
-				ptr[0] = ((char *)ipp->ipp_hopopts)[0];
-				ptr[1] = (ipp->ipp_hopoptslen -
-				    tcp->tcp_label_len + 7) / 8 - 1;
-			}
-			return (ipp->ipp_hopoptslen - tcp->tcp_label_len);
-		case IPV6_RTHDRDSTOPTS:
-			if (!(ipp->ipp_fields & IPPF_RTDSTOPTS))
-				return (0);
-			bcopy(ipp->ipp_rtdstopts, ptr, ipp->ipp_rtdstoptslen);
-			return (ipp->ipp_rtdstoptslen);
-		case IPV6_RTHDR:
-			if (!(ipp->ipp_fields & IPPF_RTHDR))
-				return (0);
-			bcopy(ipp->ipp_rthdr, ptr, ipp->ipp_rthdrlen);
-			return (ipp->ipp_rthdrlen);
-		case IPV6_DSTOPTS:
-			if (!(ipp->ipp_fields & IPPF_DSTOPTS))
-				return (0);
-			bcopy(ipp->ipp_dstopts, ptr, ipp->ipp_dstoptslen);
-			return (ipp->ipp_dstoptslen);
-		case IPV6_SRC_PREFERENCES:
-			return (ip6_get_src_preferences(connp,
-			    (uint32_t *)ptr));
-		case IPV6_PATHMTU: {
-			struct ip6_mtuinfo *mtuinfo = (struct ip6_mtuinfo *)ptr;
-
+		case IPV6_PATHMTU:
 			if (tcp->tcp_state < TCPS_ESTABLISHED)
 				return (-1);
-
-			return (ip_fill_mtuinfo(&connp->conn_remv6,
-			    connp->conn_fport, mtuinfo,
-			    connp->conn_netstack));
-		}
-		default:
-			return (-1);
+			break;
 		}
 		break;
-	default:
-		return (-1);
 	}
-	return (sizeof (int));
+	mutex_enter(&connp->conn_lock);
+	retval = conn_opt_get(&coas, level, name, ptr);
+	mutex_exit(&connp->conn_lock);
+	return (retval);
 }
 
 /*
@@ -9896,7 +7998,6 @@ tcp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 	error = proto_opt_check(level, option_name, *optlen, &max_optbuf_len,
 	    tcp_opt_obj.odb_opt_des_arr,
 	    tcp_opt_obj.odb_opt_arr_cnt,
-	    tcp_opt_obj.odb_topmost_tpiprovider,
 	    B_FALSE, B_TRUE, cr);
 	if (error != 0) {
 		if (error < 0) {
@@ -9909,30 +8010,28 @@ tcp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 
 	error = squeue_synch_enter(sqp, connp, NULL);
 	if (error == ENOMEM) {
+		kmem_free(optvalp_buf, max_optbuf_len);
 		return (ENOMEM);
 	}
 
 	len = tcp_opt_get(connp, level, option_name, optvalp_buf);
 	squeue_synch_exit(sqp, connp);
 
-	if (len < 0) {
-		/*
-		 * Pass on to IP
-		 */
+	if (len == -1) {
 		kmem_free(optvalp_buf, max_optbuf_len);
-		return (ip_get_options(connp, level, option_name,
-		    optvalp, optlen, cr));
-	} else {
-		/*
-		 * update optlen and copy option value
-		 */
-		t_uscalar_t size = MIN(len, *optlen);
-		bcopy(optvalp_buf, optvalp, size);
-		bcopy(&size, optlen, sizeof (size));
-
-		kmem_free(optvalp_buf, max_optbuf_len);
-		return (0);
+		return (EINVAL);
 	}
+
+	/*
+	 * update optlen and copy option value
+	 */
+	t_uscalar_t size = MIN(len, *optlen);
+
+	bcopy(optvalp_buf, optvalp, size);
+	bcopy(&size, optlen, sizeof (size));
+
+	kmem_free(optvalp_buf, max_optbuf_len);
+	return (0);
 }
 
 /*
@@ -9943,7 +8042,7 @@ tcp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 int
 tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
     uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
-    void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
+    void *thisdg_attrs, cred_t *cr)
 {
 	tcp_t	*tcp = connp->conn_tcp;
 	int	*i1 = (int *)invalp;
@@ -9951,6 +8050,13 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 	boolean_t checkonly;
 	int	reterr;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_opt_arg_t	coas;
+
+	coas.coa_connp = connp;
+	coas.coa_ixa = connp->conn_ixa;
+	coas.coa_ipp = &connp->conn_xmit_ipp;
+	coas.coa_ancillary = B_FALSE;
+	coas.coa_changed = 0;
 
 	switch (optset_context) {
 	case SETFN_OPTCOM_CHECKONLY:
@@ -10016,37 +8122,6 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 	switch (level) {
 	case SOL_SOCKET:
 		switch (name) {
-		case SO_LINGER: {
-			struct linger *lgr = (struct linger *)invalp;
-
-			if (!checkonly) {
-				if (lgr->l_onoff) {
-					tcp->tcp_linger = 1;
-					tcp->tcp_lingertime = lgr->l_linger;
-				} else {
-					tcp->tcp_linger = 0;
-					tcp->tcp_lingertime = 0;
-				}
-				/* struct copy */
-				*(struct linger *)outvalp = *lgr;
-			} else {
-				if (!lgr->l_onoff) {
-					((struct linger *)
-					    outvalp)->l_onoff = 0;
-					((struct linger *)
-					    outvalp)->l_linger = 0;
-				} else {
-					/* struct copy */
-					*(struct linger *)outvalp = *lgr;
-				}
-			}
-			*outlenp = sizeof (struct linger);
-			return (0);
-		}
-		case SO_DEBUG:
-			if (!checkonly)
-				tcp->tcp_debug = onoff;
-			break;
 		case SO_KEEPALIVE:
 			if (checkonly) {
 				/* check only case */
@@ -10054,64 +8129,24 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			}
 
 			if (!onoff) {
-				if (tcp->tcp_ka_enabled) {
+				if (connp->conn_keepalive) {
 					if (tcp->tcp_ka_tid != 0) {
 						(void) TCP_TIMER_CANCEL(tcp,
 						    tcp->tcp_ka_tid);
 						tcp->tcp_ka_tid = 0;
 					}
-					tcp->tcp_ka_enabled = 0;
+					connp->conn_keepalive = 0;
 				}
 				break;
 			}
-			if (!tcp->tcp_ka_enabled) {
+			if (!connp->conn_keepalive) {
 				/* Crank up the keepalive timer */
 				tcp->tcp_ka_last_intrvl = 0;
 				tcp->tcp_ka_tid = TCP_TIMER(tcp,
 				    tcp_keepalive_killer,
 				    MSEC_TO_TICK(tcp->tcp_ka_interval));
-				tcp->tcp_ka_enabled = 1;
+				connp->conn_keepalive = 1;
 			}
-			break;
-		case SO_DONTROUTE:
-			/*
-			 * SO_DONTROUTE, SO_USELOOPBACK, and SO_BROADCAST are
-			 * only of interest to IP.  We track them here only so
-			 * that we can report their current value.
-			 */
-			if (!checkonly) {
-				tcp->tcp_dontroute = onoff;
-				tcp->tcp_connp->conn_dontroute = onoff;
-			}
-			break;
-		case SO_USELOOPBACK:
-			if (!checkonly) {
-				tcp->tcp_useloopback = onoff;
-				tcp->tcp_connp->conn_loopback = onoff;
-			}
-			break;
-		case SO_BROADCAST:
-			if (!checkonly) {
-				tcp->tcp_broadcast = onoff;
-				tcp->tcp_connp->conn_broadcast = onoff;
-			}
-			break;
-		case SO_REUSEADDR:
-			if (!checkonly) {
-				tcp->tcp_reuseaddr = onoff;
-				tcp->tcp_connp->conn_reuseaddr = onoff;
-			}
-			break;
-		case SO_OOBINLINE:
-			if (!checkonly) {
-				tcp->tcp_oobinline = onoff;
-				if (IPCL_IS_NONSTR(tcp->tcp_connp))
-					proto_set_rx_oob_opt(connp, onoff);
-			}
-			break;
-		case SO_DGRAM_ERRIND:
-			if (!checkonly)
-				tcp->tcp_dgram_errind = onoff;
 			break;
 		case SO_SNDBUF: {
 			if (*i1 > tcps->tcps_max_buf) {
@@ -10121,11 +8156,11 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			if (checkonly)
 				break;
 
-			tcp->tcp_xmit_hiwater = *i1;
-			if (tcps->tcps_snd_lowat_fraction != 0)
-				tcp->tcp_xmit_lowater =
-				    tcp->tcp_xmit_hiwater /
+			connp->conn_sndbuf = *i1;
+			if (tcps->tcps_snd_lowat_fraction != 0) {
+				connp->conn_sndlowat = connp->conn_sndbuf /
 				    tcps->tcps_snd_lowat_fraction;
+			}
 			(void) tcp_maxpsz_set(tcp, B_TRUE);
 			/*
 			 * If we are flow-controlled, recheck the condition.
@@ -10135,11 +8170,12 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			 */
 			mutex_enter(&tcp->tcp_non_sq_lock);
 			if (tcp->tcp_flow_stopped &&
-			    TCP_UNSENT_BYTES(tcp) < tcp->tcp_xmit_hiwater) {
+			    TCP_UNSENT_BYTES(tcp) < connp->conn_sndbuf) {
 				tcp_clrqfull(tcp);
 			}
 			mutex_exit(&tcp->tcp_non_sq_lock);
-			break;
+			*outlenp = inlen;
+			return (0);
 		}
 		case SO_RCVBUF:
 			if (*i1 > tcps->tcps_max_buf) {
@@ -10155,43 +8191,20 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			 * XXX should we return the rwnd here
 			 * and tcp_opt_get ?
 			 */
-			break;
+			*outlenp = inlen;
+			return (0);
 		case SO_SND_COPYAVOID:
 			if (!checkonly) {
-				/* we only allow enable at most once for now */
 				if (tcp->tcp_loopback ||
 				    (tcp->tcp_kssl_ctx != NULL) ||
-				    (!tcp->tcp_snd_zcopy_aware &&
-				    (onoff != 1 || !tcp_zcopy_check(tcp)))) {
+				    (onoff != 1) || !tcp_zcopy_check(tcp)) {
 					*outlenp = 0;
 					return (EOPNOTSUPP);
 				}
 				tcp->tcp_snd_zcopy_aware = 1;
 			}
-			break;
-		case SO_RCVTIMEO:
-		case SO_SNDTIMEO:
-			/*
-			 * Pass these two options in order for third part
-			 * protocol usage. Here just return directly.
-			 */
+			*outlenp = inlen;
 			return (0);
-		case SO_ALLZONES:
-			/* Pass option along to IP level for handling */
-			return (-EINVAL);
-		case SO_ANON_MLP:
-			/* Pass option along to IP level for handling */
-			return (-EINVAL);
-		case SO_MAC_EXEMPT:
-			/* Pass option along to IP level for handling */
-			return (-EINVAL);
-		case SO_EXCLBIND:
-			if (!checkonly)
-				tcp->tcp_exclbind = onoff;
-			break;
-		default:
-			*outlenp = 0;
-			return (EINVAL);
 		}
 		break;
 	case IPPROTO_TCP:
@@ -10217,25 +8230,12 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 				tcp->tcp_second_ctimer_threshold = *i1;
 			break;
 		case TCP_RECVDSTADDR:
-			if (tcp->tcp_state > TCPS_LISTEN)
-				return (EOPNOTSUPP);
-			if (!checkonly)
-				tcp->tcp_recvdstaddr = onoff;
-			break;
-		case TCP_ANONPRIVBIND:
-			if ((reterr = secpolicy_net_privaddr(cr, 0,
-			    IPPROTO_TCP)) != 0) {
+			if (tcp->tcp_state > TCPS_LISTEN) {
 				*outlenp = 0;
-				return (reterr);
+				return (EOPNOTSUPP);
 			}
-			if (!checkonly) {
-				tcp->tcp_anon_priv_bind = onoff;
-			}
+			/* Setting done in conn_opt_set */
 			break;
-		case TCP_EXCLBIND:
-			if (!checkonly)
-				tcp->tcp_exclbind = onoff;
-			break;	/* goto sizeof (int) option return */
 		case TCP_INIT_CWND: {
 			uint32_t init_cwnd = *((uint32_t *)invalp);
 
@@ -10278,7 +8278,7 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 				 * keepalive timer.
 				 */
 				if (tcp->tcp_ka_tid != 0) {
-					ASSERT(tcp->tcp_ka_enabled);
+					ASSERT(connp->conn_keepalive);
 					(void) TCP_TIMER_CANCEL(tcp,
 					    tcp->tcp_ka_tid);
 					tcp->tcp_ka_last_intrvl = 0;
@@ -10318,49 +8318,15 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			}
 			break;
 		default:
-			*outlenp = 0;
-			return (EINVAL);
+			break;
 		}
 		break;
 	case IPPROTO_IP:
-		if (tcp->tcp_family != AF_INET) {
+		if (connp->conn_family != AF_INET) {
 			*outlenp = 0;
-			return (ENOPROTOOPT);
+			return (EINVAL);
 		}
 		switch (name) {
-		case IP_OPTIONS:
-		case T_IP_OPTIONS:
-			reterr = tcp_opt_set_header(tcp, checkonly,
-			    invalp, inlen);
-			if (reterr) {
-				*outlenp = 0;
-				return (reterr);
-			}
-			/* OK return - copy input buffer into output buffer */
-			if (invalp != outvalp) {
-				/* don't trust bcopy for identical src/dst */
-				bcopy(invalp, outvalp, inlen);
-			}
-			*outlenp = inlen;
-			return (0);
-		case IP_TOS:
-		case T_IP_TOS:
-			if (!checkonly) {
-				tcp->tcp_ipha->ipha_type_of_service =
-				    (uchar_t)*i1;
-				tcp->tcp_tos = (uchar_t)*i1;
-			}
-			break;
-		case IP_TTL:
-			if (!checkonly) {
-				tcp->tcp_ipha->ipha_ttl = (uchar_t)*i1;
-				tcp->tcp_ttl = (uchar_t)*i1;
-			}
-			break;
-		case IP_BOUND_IF:
-		case IP_NEXTHOP:
-			/* Handled at the IP level */
-			return (-EINVAL);
 		case IP_SEC_OPT:
 			/*
 			 * We should not allow policy setting after
@@ -10368,166 +8334,42 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			 */
 			if (tcp->tcp_state == TCPS_LISTEN) {
 				return (EINVAL);
-			} else {
-				/* Handled at the IP level */
-				return (-EINVAL);
 			}
-		default:
-			*outlenp = 0;
-			return (EINVAL);
+			break;
 		}
 		break;
-	case IPPROTO_IPV6: {
-		ip6_pkt_t		*ipp;
-
+	case IPPROTO_IPV6:
 		/*
 		 * IPPROTO_IPV6 options are only supported for sockets
 		 * that are using IPv6 on the wire.
 		 */
-		if (tcp->tcp_ipversion != IPV6_VERSION) {
+		if (connp->conn_ipversion != IPV6_VERSION) {
 			*outlenp = 0;
-			return (ENOPROTOOPT);
+			return (EINVAL);
 		}
-		/*
-		 * Only sticky options; no ancillary data
-		 */
-		ipp = &tcp->tcp_sticky_ipp;
 
 		switch (name) {
-		case IPV6_UNICAST_HOPS:
-			/* -1 means use default */
-			if (*i1 < -1 || *i1 > IPV6_MAX_HOPS) {
-				*outlenp = 0;
-				return (EINVAL);
-			}
-			if (!checkonly) {
-				if (*i1 == -1) {
-					tcp->tcp_ip6h->ip6_hops =
-					    ipp->ipp_unicast_hops =
-					    (uint8_t)tcps->tcps_ipv6_hoplimit;
-					ipp->ipp_fields &= ~IPPF_UNICAST_HOPS;
-					/* Pass modified value to IP. */
-					*i1 = tcp->tcp_ip6h->ip6_hops;
-				} else {
-					tcp->tcp_ip6h->ip6_hops =
-					    ipp->ipp_unicast_hops =
-					    (uint8_t)*i1;
-					ipp->ipp_fields |= IPPF_UNICAST_HOPS;
-				}
-				reterr = tcp_build_hdrs(tcp);
-				if (reterr != 0)
-					return (reterr);
-			}
-			break;
-		case IPV6_BOUND_IF:
-			if (!checkonly) {
-				tcp->tcp_bound_if = *i1;
-				PASS_OPT_TO_IP(connp);
-			}
-			break;
-		/*
-		 * Set boolean switches for ancillary data delivery
-		 */
 		case IPV6_RECVPKTINFO:
 			if (!checkonly) {
-				if (onoff)
-					tcp->tcp_ipv6_recvancillary |=
-					    TCP_IPV6_RECVPKTINFO;
-				else
-					tcp->tcp_ipv6_recvancillary &=
-					    ~TCP_IPV6_RECVPKTINFO;
 				/* Force it to be sent up with the next msg */
 				tcp->tcp_recvifindex = 0;
-				PASS_OPT_TO_IP(connp);
 			}
 			break;
 		case IPV6_RECVTCLASS:
 			if (!checkonly) {
-				if (onoff)
-					tcp->tcp_ipv6_recvancillary |=
-					    TCP_IPV6_RECVTCLASS;
-				else
-					tcp->tcp_ipv6_recvancillary &=
-					    ~TCP_IPV6_RECVTCLASS;
-				PASS_OPT_TO_IP(connp);
+				/* Force it to be sent up with the next msg */
+				tcp->tcp_recvtclass = 0xffffffffU;
 			}
 			break;
 		case IPV6_RECVHOPLIMIT:
 			if (!checkonly) {
-				if (onoff)
-					tcp->tcp_ipv6_recvancillary |=
-					    TCP_IPV6_RECVHOPLIMIT;
-				else
-					tcp->tcp_ipv6_recvancillary &=
-					    ~TCP_IPV6_RECVHOPLIMIT;
 				/* Force it to be sent up with the next msg */
 				tcp->tcp_recvhops = 0xffffffffU;
-				PASS_OPT_TO_IP(connp);
-			}
-			break;
-		case IPV6_RECVHOPOPTS:
-			if (!checkonly) {
-				if (onoff)
-					tcp->tcp_ipv6_recvancillary |=
-					    TCP_IPV6_RECVHOPOPTS;
-				else
-					tcp->tcp_ipv6_recvancillary &=
-					    ~TCP_IPV6_RECVHOPOPTS;
-				PASS_OPT_TO_IP(connp);
-			}
-			break;
-		case IPV6_RECVDSTOPTS:
-			if (!checkonly) {
-				if (onoff)
-					tcp->tcp_ipv6_recvancillary |=
-					    TCP_IPV6_RECVDSTOPTS;
-				else
-					tcp->tcp_ipv6_recvancillary &=
-					    ~TCP_IPV6_RECVDSTOPTS;
-				PASS_OPT_TO_IP(connp);
-			}
-			break;
-		case _OLD_IPV6_RECVDSTOPTS:
-			if (!checkonly) {
-				if (onoff)
-					tcp->tcp_ipv6_recvancillary |=
-					    TCP_OLD_IPV6_RECVDSTOPTS;
-				else
-					tcp->tcp_ipv6_recvancillary &=
-					    ~TCP_OLD_IPV6_RECVDSTOPTS;
-			}
-			break;
-		case IPV6_RECVRTHDR:
-			if (!checkonly) {
-				if (onoff)
-					tcp->tcp_ipv6_recvancillary |=
-					    TCP_IPV6_RECVRTHDR;
-				else
-					tcp->tcp_ipv6_recvancillary &=
-					    ~TCP_IPV6_RECVRTHDR;
-				PASS_OPT_TO_IP(connp);
-			}
-			break;
-		case IPV6_RECVRTHDRDSTOPTS:
-			if (!checkonly) {
-				if (onoff)
-					tcp->tcp_ipv6_recvancillary |=
-					    TCP_IPV6_RECVRTDSTOPTS;
-				else
-					tcp->tcp_ipv6_recvancillary &=
-					    ~TCP_IPV6_RECVRTDSTOPTS;
-				PASS_OPT_TO_IP(connp);
 			}
 			break;
 		case IPV6_PKTINFO:
-			if (inlen != 0 && inlen != sizeof (struct in6_pktinfo))
-				return (EINVAL);
-			if (checkonly)
-				break;
-
-			if (inlen == 0) {
-				ipp->ipp_fields &= ~(IPPF_IFINDEX|IPPF_ADDR);
-			} else {
+			/* This is an extra check for TCP */
+			if (inlen == sizeof (struct in6_pktinfo)) {
 				struct in6_pktinfo *pkti;
 
 				pkti = (struct in6_pktinfo *)invalp;
@@ -10539,218 +8381,7 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 				 */
 				if (!IN6_IS_ADDR_UNSPECIFIED(&pkti->ipi6_addr))
 					return (EINVAL);
-				/*
-				 * IP will validate the source address and
-				 * interface index.
-				 */
-				if (IPCL_IS_NONSTR(tcp->tcp_connp)) {
-					reterr = ip_set_options(tcp->tcp_connp,
-					    level, name, invalp, inlen, cr);
-				} else {
-					reterr = ip6_set_pktinfo(cr,
-					    tcp->tcp_connp, pkti);
-				}
-				if (reterr != 0)
-					return (reterr);
-				ipp->ipp_ifindex = pkti->ipi6_ifindex;
-				ipp->ipp_addr = pkti->ipi6_addr;
-				if (ipp->ipp_ifindex != 0)
-					ipp->ipp_fields |= IPPF_IFINDEX;
-				else
-					ipp->ipp_fields &= ~IPPF_IFINDEX;
-				if (!IN6_IS_ADDR_UNSPECIFIED(&ipp->ipp_addr))
-					ipp->ipp_fields |= IPPF_ADDR;
-				else
-					ipp->ipp_fields &= ~IPPF_ADDR;
 			}
-			reterr = tcp_build_hdrs(tcp);
-			if (reterr != 0)
-				return (reterr);
-			break;
-		case IPV6_TCLASS:
-			if (inlen != 0 && inlen != sizeof (int))
-				return (EINVAL);
-			if (checkonly)
-				break;
-
-			if (inlen == 0) {
-				ipp->ipp_fields &= ~IPPF_TCLASS;
-			} else {
-				if (*i1 > 255 || *i1 < -1)
-					return (EINVAL);
-				if (*i1 == -1) {
-					ipp->ipp_tclass = 0;
-					*i1 = 0;
-				} else {
-					ipp->ipp_tclass = *i1;
-				}
-				ipp->ipp_fields |= IPPF_TCLASS;
-			}
-			reterr = tcp_build_hdrs(tcp);
-			if (reterr != 0)
-				return (reterr);
-			break;
-		case IPV6_NEXTHOP:
-			/*
-			 * IP will verify that the nexthop is reachable
-			 * and fail for sticky options.
-			 */
-			if (inlen != 0 && inlen != sizeof (sin6_t))
-				return (EINVAL);
-			if (checkonly)
-				break;
-
-			if (inlen == 0) {
-				ipp->ipp_fields &= ~IPPF_NEXTHOP;
-			} else {
-				sin6_t *sin6 = (sin6_t *)invalp;
-
-				if (sin6->sin6_family != AF_INET6)
-					return (EAFNOSUPPORT);
-				if (IN6_IS_ADDR_V4MAPPED(
-				    &sin6->sin6_addr))
-					return (EADDRNOTAVAIL);
-				ipp->ipp_nexthop = sin6->sin6_addr;
-				if (!IN6_IS_ADDR_UNSPECIFIED(
-				    &ipp->ipp_nexthop))
-					ipp->ipp_fields |= IPPF_NEXTHOP;
-				else
-					ipp->ipp_fields &= ~IPPF_NEXTHOP;
-			}
-			reterr = tcp_build_hdrs(tcp);
-			if (reterr != 0)
-				return (reterr);
-			PASS_OPT_TO_IP(connp);
-			break;
-		case IPV6_HOPOPTS: {
-			ip6_hbh_t *hopts = (ip6_hbh_t *)invalp;
-
-			/*
-			 * Sanity checks - minimum size, size a multiple of
-			 * eight bytes, and matching size passed in.
-			 */
-			if (inlen != 0 &&
-			    inlen != (8 * (hopts->ip6h_len + 1)))
-				return (EINVAL);
-
-			if (checkonly)
-				break;
-
-			reterr = optcom_pkt_set(invalp, inlen, B_TRUE,
-			    (uchar_t **)&ipp->ipp_hopopts,
-			    &ipp->ipp_hopoptslen, tcp->tcp_label_len);
-			if (reterr != 0)
-				return (reterr);
-			if (ipp->ipp_hopoptslen == 0)
-				ipp->ipp_fields &= ~IPPF_HOPOPTS;
-			else
-				ipp->ipp_fields |= IPPF_HOPOPTS;
-			reterr = tcp_build_hdrs(tcp);
-			if (reterr != 0)
-				return (reterr);
-			break;
-		}
-		case IPV6_RTHDRDSTOPTS: {
-			ip6_dest_t *dopts = (ip6_dest_t *)invalp;
-
-			/*
-			 * Sanity checks - minimum size, size a multiple of
-			 * eight bytes, and matching size passed in.
-			 */
-			if (inlen != 0 &&
-			    inlen != (8 * (dopts->ip6d_len + 1)))
-				return (EINVAL);
-
-			if (checkonly)
-				break;
-
-			reterr = optcom_pkt_set(invalp, inlen, B_TRUE,
-			    (uchar_t **)&ipp->ipp_rtdstopts,
-			    &ipp->ipp_rtdstoptslen, 0);
-			if (reterr != 0)
-				return (reterr);
-			if (ipp->ipp_rtdstoptslen == 0)
-				ipp->ipp_fields &= ~IPPF_RTDSTOPTS;
-			else
-				ipp->ipp_fields |= IPPF_RTDSTOPTS;
-			reterr = tcp_build_hdrs(tcp);
-			if (reterr != 0)
-				return (reterr);
-			break;
-		}
-		case IPV6_DSTOPTS: {
-			ip6_dest_t *dopts = (ip6_dest_t *)invalp;
-
-			/*
-			 * Sanity checks - minimum size, size a multiple of
-			 * eight bytes, and matching size passed in.
-			 */
-			if (inlen != 0 &&
-			    inlen != (8 * (dopts->ip6d_len + 1)))
-				return (EINVAL);
-
-			if (checkonly)
-				break;
-
-			reterr = optcom_pkt_set(invalp, inlen, B_TRUE,
-			    (uchar_t **)&ipp->ipp_dstopts,
-			    &ipp->ipp_dstoptslen, 0);
-			if (reterr != 0)
-				return (reterr);
-			if (ipp->ipp_dstoptslen == 0)
-				ipp->ipp_fields &= ~IPPF_DSTOPTS;
-			else
-				ipp->ipp_fields |= IPPF_DSTOPTS;
-			reterr = tcp_build_hdrs(tcp);
-			if (reterr != 0)
-				return (reterr);
-			break;
-		}
-		case IPV6_RTHDR: {
-			ip6_rthdr_t *rt = (ip6_rthdr_t *)invalp;
-
-			/*
-			 * Sanity checks - minimum size, size a multiple of
-			 * eight bytes, and matching size passed in.
-			 */
-			if (inlen != 0 &&
-			    inlen != (8 * (rt->ip6r_len + 1)))
-				return (EINVAL);
-
-			if (checkonly)
-				break;
-
-			reterr = optcom_pkt_set(invalp, inlen, B_TRUE,
-			    (uchar_t **)&ipp->ipp_rthdr,
-			    &ipp->ipp_rthdrlen, 0);
-			if (reterr != 0)
-				return (reterr);
-			if (ipp->ipp_rthdrlen == 0)
-				ipp->ipp_fields &= ~IPPF_RTHDR;
-			else
-				ipp->ipp_fields |= IPPF_RTHDR;
-			reterr = tcp_build_hdrs(tcp);
-			if (reterr != 0)
-				return (reterr);
-			break;
-		}
-		case IPV6_V6ONLY:
-			if (!checkonly) {
-				tcp->tcp_connp->conn_ipv6_v6only = onoff;
-			}
-			break;
-		case IPV6_USE_MIN_MTU:
-			if (inlen != sizeof (int))
-				return (EINVAL);
-
-			if (*i1 < -1 || *i1 > 1)
-				return (EINVAL);
-
-			if (checkonly)
-				break;
-
-			ipp->ipp_fields |= IPPF_USE_MIN_MTU;
-			ipp->ipp_use_min_mtu = *i1;
 			break;
 		case IPV6_SEC_OPT:
 			/*
@@ -10759,30 +8390,18 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			 */
 			if (tcp->tcp_state == TCPS_LISTEN) {
 				return (EINVAL);
-			} else {
-				/* Handled at the IP level */
-				return (-EINVAL);
-			}
-		case IPV6_SRC_PREFERENCES:
-			if (inlen != sizeof (uint32_t))
-				return (EINVAL);
-			reterr = ip6_set_src_preferences(tcp->tcp_connp,
-			    *(uint32_t *)invalp);
-			if (reterr != 0) {
-				*outlenp = 0;
-				return (reterr);
 			}
 			break;
-		default:
-			*outlenp = 0;
-			return (EINVAL);
 		}
 		break;
-	}		/* end IPPROTO_IPV6 */
-	default:
-		*outlenp = 0;
-		return (EINVAL);
 	}
+	reterr = conn_opt_set(&coas, level, name, inlen, invalp,
+	    checkonly, cr);
+	if (reterr != 0) {
+		*outlenp = 0;
+		return (reterr);
+	}
+
 	/*
 	 * Common case of OK return with outval same as inval
 	 */
@@ -10791,6 +8410,45 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 		(void) bcopy(invalp, outvalp, inlen);
 	}
 	*outlenp = inlen;
+
+	if (coas.coa_changed & COA_HEADER_CHANGED) {
+		reterr = tcp_build_hdrs(tcp);
+		if (reterr != 0)
+			return (reterr);
+	}
+	if (coas.coa_changed & COA_ROUTE_CHANGED) {
+		in6_addr_t nexthop;
+
+		/*
+		 * If we are connected we re-cache the information.
+		 * We ignore errors to preserve BSD behavior.
+		 * Note that we don't redo IPsec policy lookup here
+		 * since the final destination (or source) didn't change.
+		 */
+		ip_attr_nexthop(&connp->conn_xmit_ipp, connp->conn_ixa,
+		    &connp->conn_faddr_v6, &nexthop);
+
+		if (!IN6_IS_ADDR_UNSPECIFIED(&connp->conn_faddr_v6) &&
+		    !IN6_IS_ADDR_V4MAPPED_ANY(&connp->conn_faddr_v6)) {
+			(void) ip_attr_connect(connp, connp->conn_ixa,
+			    &connp->conn_laddr_v6, &connp->conn_faddr_v6,
+			    &nexthop, connp->conn_fport, NULL, NULL,
+			    IPDF_VERIFY_DST);
+		}
+	}
+	if ((coas.coa_changed & COA_SNDBUF_CHANGED) && !IPCL_IS_NONSTR(connp)) {
+		connp->conn_wq->q_hiwat = connp->conn_sndbuf;
+	}
+	if (coas.coa_changed & COA_WROFF_CHANGED) {
+		connp->conn_wroff = connp->conn_ht_iphc_allocated +
+		    tcps->tcps_wroff_xtra;
+		(void) proto_set_tx_wroff(connp->conn_rq, connp,
+		    connp->conn_wroff);
+	}
+	if (coas.coa_changed & COA_OOBINLINE_CHANGED) {
+		if (IPCL_IS_NONSTR(connp))
+			proto_set_rx_oob_opt(connp, onoff);
+	}
 	return (0);
 }
 
@@ -10798,12 +8456,12 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 int
 tcp_tpi_opt_set(queue_t *q, uint_t optset_context, int level, int name,
     uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
-    void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
+    void *thisdg_attrs, cred_t *cr)
 {
 	conn_t	*connp =  Q_TO_CONN(q);
 
 	return (tcp_opt_set(connp, optset_context, level, name, inlen, invalp,
-	    outlenp, outvalp, thisdg_attrs, cr, mblk));
+	    outlenp, outvalp, thisdg_attrs, cr));
 }
 
 int
@@ -10843,7 +8501,6 @@ tcp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 	error = proto_opt_check(level, option_name, optlen, NULL,
 	    tcp_opt_obj.odb_opt_des_arr,
 	    tcp_opt_obj.odb_opt_arr_cnt,
-	    tcp_opt_obj.odb_topmost_tpiprovider,
 	    B_TRUE, B_FALSE, cr);
 
 	if (error != 0) {
@@ -10856,292 +8513,75 @@ tcp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 
 	error = tcp_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, level, option_name,
 	    optlen, (uchar_t *)optvalp, (uint_t *)&optlen, (uchar_t *)optvalp,
-	    NULL, cr, NULL);
+	    NULL, cr);
 	squeue_synch_exit(sqp, connp);
 
-	if (error < 0) {
-		/*
-		 * Pass on to ip
-		 */
-		error = ip_set_options(connp, level, option_name, optvalp,
-		    optlen, cr);
-	}
+	ASSERT(error >= 0);
+
 	return (error);
 }
 
 /*
- * Update tcp_sticky_hdrs based on tcp_sticky_ipp.
- * The headers include ip6i_t (if needed), ip6_t, any sticky extension
+ * Build/update the tcp header template (in conn_ht_iphc) based on
+ * conn_xmit_ipp. The headers include ip6_t, any extension
  * headers, and the maximum size tcp header (to avoid reallocation
  * on the fly for additional tcp options).
+ *
+ * Assumes the caller has already set conn_{faddr,laddr,fport,lport,flowinfo}.
  * Returns failure if can't allocate memory.
  */
 static int
 tcp_build_hdrs(tcp_t *tcp)
 {
-	char	*hdrs;
-	uint_t	hdrs_len;
-	ip6i_t	*ip6i;
-	char	buf[TCP_MAX_HDR_LENGTH];
-	ip6_pkt_t *ipp = &tcp->tcp_sticky_ipp;
-	in6_addr_t src, dst;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	conn_t *connp = tcp->tcp_connp;
+	conn_t		*connp = tcp->tcp_connp;
+	tcpha_t		*tcpha;
+	uint32_t	cksum;
+	int		error;
+
+	/* Grab lock to satisfy ASSERT; TCP is serialized using squeue */
+	mutex_enter(&connp->conn_lock);
+	error = conn_build_hdr_template(connp, TCP_MIN_HEADER_LENGTH,
+	    TCP_MAX_TCP_OPTIONS_LENGTH, &connp->conn_laddr_v6,
+	    &connp->conn_faddr_v6, connp->conn_flowinfo);
+	mutex_exit(&connp->conn_lock);
+	if (error != 0)
+		return (error);
 
 	/*
-	 * save the existing tcp header and source/dest IP addresses
+	 * Any routing header/option has been massaged. The checksum difference
+	 * is stored in conn_sum for later use.
 	 */
-	bcopy(tcp->tcp_tcph, buf, tcp->tcp_tcp_hdr_len);
-	src = tcp->tcp_ip6h->ip6_src;
-	dst = tcp->tcp_ip6h->ip6_dst;
-	hdrs_len = ip_total_hdrs_len_v6(ipp) + TCP_MAX_HDR_LENGTH;
-	ASSERT(hdrs_len != 0);
-	if (hdrs_len > tcp->tcp_iphc_len) {
-		/* Need to reallocate */
-		hdrs = kmem_zalloc(hdrs_len, KM_NOSLEEP);
-		if (hdrs == NULL)
-			return (ENOMEM);
-		if (tcp->tcp_iphc != NULL) {
-			if (tcp->tcp_hdr_grown) {
-				kmem_free(tcp->tcp_iphc, tcp->tcp_iphc_len);
-			} else {
-				bzero(tcp->tcp_iphc, tcp->tcp_iphc_len);
-				kmem_cache_free(tcp_iphc_cache, tcp->tcp_iphc);
-			}
-			tcp->tcp_iphc_len = 0;
-		}
-		ASSERT(tcp->tcp_iphc_len == 0);
-		tcp->tcp_iphc = hdrs;
-		tcp->tcp_iphc_len = hdrs_len;
-		tcp->tcp_hdr_grown = B_TRUE;
-	}
-	ip_build_hdrs_v6((uchar_t *)tcp->tcp_iphc,
-	    hdrs_len - TCP_MAX_HDR_LENGTH, ipp, IPPROTO_TCP);
+	tcpha = (tcpha_t *)connp->conn_ht_ulp;
+	tcp->tcp_tcpha = tcpha;
 
-	/* Set header fields not in ipp */
-	if (ipp->ipp_fields & IPPF_HAS_IP6I) {
-		ip6i = (ip6i_t *)tcp->tcp_iphc;
-		tcp->tcp_ip6h = (ip6_t *)&ip6i[1];
-	} else {
-		tcp->tcp_ip6h = (ip6_t *)tcp->tcp_iphc;
-	}
-	/*
-	 * tcp->tcp_ip_hdr_len will include ip6i_t if there is one.
-	 *
-	 * tcp->tcp_tcp_hdr_len doesn't change here.
-	 */
-	tcp->tcp_ip_hdr_len = hdrs_len - TCP_MAX_HDR_LENGTH;
-	tcp->tcp_tcph = (tcph_t *)(tcp->tcp_iphc + tcp->tcp_ip_hdr_len);
-	tcp->tcp_hdr_len = tcp->tcp_ip_hdr_len + tcp->tcp_tcp_hdr_len;
-
-	bcopy(buf, tcp->tcp_tcph, tcp->tcp_tcp_hdr_len);
-
-	tcp->tcp_ip6h->ip6_src = src;
-	tcp->tcp_ip6h->ip6_dst = dst;
+	tcpha->tha_lport = connp->conn_lport;
+	tcpha->tha_fport = connp->conn_fport;
+	tcpha->tha_sum = 0;
+	tcpha->tha_offset_and_reserved = (5 << 4);
 
 	/*
-	 * If the hop limit was not set by ip_build_hdrs_v6(), set it to
-	 * the default value for TCP.
+	 * IP wants our header length in the checksum field to
+	 * allow it to perform a single pseudo-header+checksum
+	 * calculation on behalf of TCP.
+	 * Include the adjustment for a source route once IP_OPTIONS is set.
 	 */
-	if (!(ipp->ipp_fields & IPPF_UNICAST_HOPS))
-		tcp->tcp_ip6h->ip6_hops = tcps->tcps_ipv6_hoplimit;
+	cksum = sizeof (tcpha_t) + connp->conn_sum;
+	cksum = (cksum >> 16) + (cksum & 0xFFFF);
+	ASSERT(cksum < 0x10000);
+	tcpha->tha_sum = htons(cksum);
 
-	/*
-	 * If we're setting extension headers after a connection
-	 * has been established, and if we have a routing header
-	 * among the extension headers, call ip_massage_options_v6 to
-	 * manipulate the routing header/ip6_dst set the checksum
-	 * difference in the tcp header template.
-	 * (This happens in tcp_connect_ipv6 if the routing header
-	 * is set prior to the connect.)
-	 * Set the tcp_sum to zero first in case we've cleared a
-	 * routing header or don't have one at all.
-	 */
-	tcp->tcp_sum = 0;
-	if ((tcp->tcp_state >= TCPS_SYN_SENT) &&
-	    (tcp->tcp_ipp_fields & IPPF_RTHDR)) {
-		ip6_rthdr_t *rth = ip_find_rthdr_v6(tcp->tcp_ip6h,
-		    (uint8_t *)tcp->tcp_tcph);
-		if (rth != NULL) {
-			tcp->tcp_sum = ip_massage_options_v6(tcp->tcp_ip6h,
-			    rth, tcps->tcps_netstack);
-			tcp->tcp_sum = ntohs((tcp->tcp_sum & 0xFFFF) +
-			    (tcp->tcp_sum >> 16));
-		}
-	}
+	if (connp->conn_ipversion == IPV4_VERSION)
+		tcp->tcp_ipha = (ipha_t *)connp->conn_ht_iphc;
+	else
+		tcp->tcp_ip6h = (ip6_t *)connp->conn_ht_iphc;
 
-	/* Try to get everything in a single mblk */
-	(void) proto_set_tx_wroff(tcp->tcp_rq, connp,
-	    hdrs_len + tcps->tcps_wroff_xtra);
-	return (0);
-}
-
-/*
- * Transfer any source route option from ipha to buf/dst in reversed form.
- */
-static int
-tcp_opt_rev_src_route(ipha_t *ipha, char *buf, uchar_t *dst)
-{
-	ipoptp_t	opts;
-	uchar_t		*opt;
-	uint8_t		optval;
-	uint8_t		optlen;
-	uint32_t	len = 0;
-
-	for (optval = ipoptp_first(&opts, ipha);
-	    optval != IPOPT_EOL;
-	    optval = ipoptp_next(&opts)) {
-		opt = opts.ipoptp_cur;
-		optlen = opts.ipoptp_len;
-		switch (optval) {
-			int	off1, off2;
-		case IPOPT_SSRR:
-		case IPOPT_LSRR:
-
-			/* Reverse source route */
-			/*
-			 * First entry should be the next to last one in the
-			 * current source route (the last entry is our
-			 * address.)
-			 * The last entry should be the final destination.
-			 */
-			buf[IPOPT_OPTVAL] = (uint8_t)optval;
-			buf[IPOPT_OLEN] = (uint8_t)optlen;
-			off1 = IPOPT_MINOFF_SR - 1;
-			off2 = opt[IPOPT_OFFSET] - IP_ADDR_LEN - 1;
-			if (off2 < 0) {
-				/* No entries in source route */
-				break;
-			}
-			bcopy(opt + off2, dst, IP_ADDR_LEN);
-			/*
-			 * Note: use src since ipha has not had its src
-			 * and dst reversed (it is in the state it was
-			 * received.
-			 */
-			bcopy(&ipha->ipha_src, buf + off2,
-			    IP_ADDR_LEN);
-			off2 -= IP_ADDR_LEN;
-
-			while (off2 > 0) {
-				bcopy(opt + off2, buf + off1,
-				    IP_ADDR_LEN);
-				off1 += IP_ADDR_LEN;
-				off2 -= IP_ADDR_LEN;
-			}
-			buf[IPOPT_OFFSET] = IPOPT_MINOFF_SR;
-			buf += optlen;
-			len += optlen;
-			break;
-		}
-	}
-done:
-	/* Pad the resulting options */
-	while (len & 0x3) {
-		*buf++ = IPOPT_EOL;
-		len++;
-	}
-	return (len);
-}
-
-
-/*
- * Extract and revert a source route from ipha (if any)
- * and then update the relevant fields in both tcp_t and the standard header.
- */
-static void
-tcp_opt_reverse(tcp_t *tcp, ipha_t *ipha)
-{
-	char	buf[TCP_MAX_HDR_LENGTH];
-	uint_t	tcph_len;
-	int	len;
-
-	ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
-	len = IPH_HDR_LENGTH(ipha);
-	if (len == IP_SIMPLE_HDR_LENGTH)
-		/* Nothing to do */
-		return;
-	if (len > IP_SIMPLE_HDR_LENGTH + TCP_MAX_IP_OPTIONS_LENGTH ||
-	    (len & 0x3))
-		return;
-
-	tcph_len = tcp->tcp_tcp_hdr_len;
-	bcopy(tcp->tcp_tcph, buf, tcph_len);
-	tcp->tcp_sum = (tcp->tcp_ipha->ipha_dst >> 16) +
-	    (tcp->tcp_ipha->ipha_dst & 0xffff);
-	len = tcp_opt_rev_src_route(ipha, (char *)tcp->tcp_ipha +
-	    IP_SIMPLE_HDR_LENGTH, (uchar_t *)&tcp->tcp_ipha->ipha_dst);
-	len += IP_SIMPLE_HDR_LENGTH;
-	tcp->tcp_sum -= ((tcp->tcp_ipha->ipha_dst >> 16) +
-	    (tcp->tcp_ipha->ipha_dst & 0xffff));
-	if ((int)tcp->tcp_sum < 0)
-		tcp->tcp_sum--;
-	tcp->tcp_sum = (tcp->tcp_sum & 0xFFFF) + (tcp->tcp_sum >> 16);
-	tcp->tcp_sum = ntohs((tcp->tcp_sum & 0xFFFF) + (tcp->tcp_sum >> 16));
-	tcp->tcp_tcph = (tcph_t *)((char *)tcp->tcp_ipha + len);
-	bcopy(buf, tcp->tcp_tcph, tcph_len);
-	tcp->tcp_ip_hdr_len = len;
-	tcp->tcp_ipha->ipha_version_and_hdr_length =
-	    (IP_VERSION << 4) | (len >> 2);
-	len += tcph_len;
-	tcp->tcp_hdr_len = len;
-}
-
-/*
- * Copy the standard header into its new location,
- * lay in the new options and then update the relevant
- * fields in both tcp_t and the standard header.
- */
-static int
-tcp_opt_set_header(tcp_t *tcp, boolean_t checkonly, uchar_t *ptr, uint_t len)
-{
-	uint_t	tcph_len;
-	uint8_t	*ip_optp;
-	tcph_t	*new_tcph;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	conn_t	*connp = tcp->tcp_connp;
-
-	if ((len > TCP_MAX_IP_OPTIONS_LENGTH) || (len & 0x3))
-		return (EINVAL);
-
-	if (len > IP_MAX_OPT_LENGTH - tcp->tcp_label_len)
-		return (EINVAL);
-
-	if (checkonly) {
-		/*
-		 * do not really set, just pretend to - T_CHECK
-		 */
-		return (0);
-	}
-
-	ip_optp = (uint8_t *)tcp->tcp_ipha + IP_SIMPLE_HDR_LENGTH;
-	if (tcp->tcp_label_len > 0) {
-		int padlen;
-		uint8_t opt;
-
-		/* convert list termination to no-ops */
-		padlen = tcp->tcp_label_len - ip_optp[IPOPT_OLEN];
-		ip_optp += ip_optp[IPOPT_OLEN];
-		opt = len > 0 ? IPOPT_NOP : IPOPT_EOL;
-		while (--padlen >= 0)
-			*ip_optp++ = opt;
-	}
-	tcph_len = tcp->tcp_tcp_hdr_len;
-	new_tcph = (tcph_t *)(ip_optp + len);
-	ovbcopy(tcp->tcp_tcph, new_tcph, tcph_len);
-	tcp->tcp_tcph = new_tcph;
-	bcopy(ptr, ip_optp, len);
-
-	len += IP_SIMPLE_HDR_LENGTH + tcp->tcp_label_len;
-
-	tcp->tcp_ip_hdr_len = len;
-	tcp->tcp_ipha->ipha_version_and_hdr_length =
-	    (IP_VERSION << 4) | (len >> 2);
-	tcp->tcp_hdr_len = len + tcph_len;
-	if (!TCP_IS_DETACHED(tcp)) {
-		/* Always allocate room for all options. */
-		(void) proto_set_tx_wroff(tcp->tcp_rq, connp,
-		    TCP_MAX_COMBINED_HEADER_LENGTH + tcps->tcps_wroff_xtra);
+	if (connp->conn_ht_iphc_allocated + tcps->tcps_wroff_xtra >
+	    connp->conn_wroff) {
+		connp->conn_wroff = connp->conn_ht_iphc_allocated +
+		    tcps->tcps_wroff_xtra;
+		(void) proto_set_tx_wroff(connp->conn_rq, connp,
+		    connp->conn_wroff);
 	}
 	return (0);
 }
@@ -11184,36 +8624,6 @@ tcp_param_register(IDP *ndp, tcpparam_t *tcppa, int cnt, tcp_stack_t *tcps)
 		nd_free(ndp);
 		return (B_FALSE);
 	}
-	tcps->tcps_mdt_head_param = kmem_zalloc(sizeof (tcpparam_t),
-	    KM_SLEEP);
-	bcopy(&lcl_tcp_mdt_head_param, tcps->tcps_mdt_head_param,
-	    sizeof (tcpparam_t));
-	if (!nd_load(ndp, tcps->tcps_mdt_head_param->tcp_param_name,
-	    tcp_param_get, tcp_param_set_aligned,
-	    (caddr_t)tcps->tcps_mdt_head_param)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	tcps->tcps_mdt_tail_param = kmem_zalloc(sizeof (tcpparam_t),
-	    KM_SLEEP);
-	bcopy(&lcl_tcp_mdt_tail_param, tcps->tcps_mdt_tail_param,
-	    sizeof (tcpparam_t));
-	if (!nd_load(ndp, tcps->tcps_mdt_tail_param->tcp_param_name,
-	    tcp_param_get, tcp_param_set_aligned,
-	    (caddr_t)tcps->tcps_mdt_tail_param)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
-	tcps->tcps_mdt_max_pbufs_param = kmem_zalloc(sizeof (tcpparam_t),
-	    KM_SLEEP);
-	bcopy(&lcl_tcp_mdt_max_pbufs_param, tcps->tcps_mdt_max_pbufs_param,
-	    sizeof (tcpparam_t));
-	if (!nd_load(ndp, tcps->tcps_mdt_max_pbufs_param->tcp_param_name,
-	    tcp_param_get, tcp_param_set_aligned,
-	    (caddr_t)tcps->tcps_mdt_max_pbufs_param)) {
-		nd_free(ndp);
-		return (B_FALSE);
-	}
 	if (!nd_load(ndp, "tcp_extra_priv_ports",
 	    tcp_extra_priv_ports_get, NULL, NULL)) {
 		nd_free(ndp);
@@ -11248,7 +8658,7 @@ tcp_param_register(IDP *ndp, tcpparam_t *tcppa, int cnt, tcp_stack_t *tcps)
 	return (B_TRUE);
 }
 
-/* ndd set routine for tcp_wroff_xtra, tcp_mdt_hdr_{head,tail}_min. */
+/* ndd set routine for tcp_wroff_xtra. */
 /* ARGSUSED */
 static int
 tcp_param_set_aligned(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
@@ -11306,6 +8716,7 @@ tcp_reass(tcp_t *tcp, mblk_t *mp, uint32_t start)
 	mblk_t		*next_mp;
 	uint32_t	u1;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+
 
 	/* Walk through all the new pieces. */
 	do {
@@ -11433,9 +8844,10 @@ tcp_rwnd_reopen(tcp_t *tcp)
 {
 	uint_t ret = 0;
 	uint_t thwin;
+	conn_t *connp = tcp->tcp_connp;
 
 	/* Learn the latest rwnd information that we sent to the other side. */
-	thwin = ((uint_t)BE16_TO_U16(tcp->tcp_tcph->th_win))
+	thwin = ((uint_t)ntohs(tcp->tcp_tcpha->tha_win))
 	    << tcp->tcp_rcv_ws;
 	/* This is peer's calculated send window (our receive window). */
 	thwin -= tcp->tcp_rnxt - tcp->tcp_rack;
@@ -11444,7 +8856,7 @@ tcp_rwnd_reopen(tcp_t *tcp)
 	 * SWS avoidance.  This means that we need to check the increase of
 	 * of receive window is at least 1 MSS.
 	 */
-	if (tcp->tcp_recv_hiwater - thwin >= tcp->tcp_mss) {
+	if (connp->conn_rcvbuf - thwin >= tcp->tcp_mss) {
 		/*
 		 * If the window that the other side knows is less than max
 		 * deferred acks segments, send an update immediately.
@@ -11453,7 +8865,7 @@ tcp_rwnd_reopen(tcp_t *tcp)
 			BUMP_MIB(&tcp->tcp_tcps->tcps_mib, tcpOutWinUpdate);
 			ret = TH_ACK_NEEDED;
 		}
-		tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
+		tcp->tcp_rwnd = connp->conn_rcvbuf;
 	}
 	return (ret);
 }
@@ -11469,7 +8881,7 @@ tcp_rcv_drain(tcp_t *tcp)
 #ifdef DEBUG
 	uint_t cnt = 0;
 #endif
-	queue_t	*q = tcp->tcp_rq;
+	queue_t	*q = tcp->tcp_connp->conn_rq;
 
 	/* Can't drain on an eager connection */
 	if (tcp->tcp_listener != NULL)
@@ -11511,7 +8923,7 @@ tcp_rcv_drain(tcp_t *tcp)
 		if ((tcp->tcp_kssl_ctx != NULL) && (DB_TYPE(mp) == M_DATA)) {
 			DTRACE_PROBE1(kssl_mblk__ksslinput_rcvdrain,
 			    mblk_t *, mp);
-			tcp_kssl_input(tcp, mp);
+			tcp_kssl_input(tcp, mp, NULL);
 			continue;
 		}
 		putnext(q, mp);
@@ -11538,10 +8950,21 @@ tcp_rcv_drain(tcp_t *tcp)
  * Other messages are added as new (b_next) elements.
  */
 void
-tcp_rcv_enqueue(tcp_t *tcp, mblk_t *mp, uint_t seg_len)
+tcp_rcv_enqueue(tcp_t *tcp, mblk_t *mp, uint_t seg_len, cred_t *cr)
 {
 	ASSERT(seg_len == msgdsize(mp));
 	ASSERT(tcp->tcp_rcv_list == NULL || tcp->tcp_rcv_last_head != NULL);
+
+	if (is_system_labeled()) {
+		ASSERT(cr != NULL || msg_getcred(mp, NULL) != NULL);
+		/*
+		 * Provide for protocols above TCP such as RPC. NOPID leaves
+		 * db_cpid unchanged.
+		 * The cred could have already been set.
+		 */
+		if (cr != NULL)
+			mblk_setcred(mp, cr, NOPID);
+	}
 
 	if (tcp->tcp_rcv_list == NULL) {
 		ASSERT(tcp->tcp_rcv_last_head == NULL);
@@ -11561,176 +8984,6 @@ tcp_rcv_enqueue(tcp_t *tcp, mblk_t *mp, uint_t seg_len)
 	tcp->tcp_rcv_cnt += seg_len;
 	tcp->tcp_rwnd -= seg_len;
 }
-
-/*
- * DEFAULT TCP ENTRY POINT via squeue on READ side.
- *
- * This is the default entry function into TCP on the read side. TCP is
- * always entered via squeue i.e. using squeue's for mutual exclusion.
- * When classifier does a lookup to find the tcp, it also puts a reference
- * on the conn structure associated so the tcp is guaranteed to exist
- * when we come here. We still need to check the state because it might
- * as well has been closed. The squeue processing function i.e. squeue_enter,
- * is responsible for doing the CONN_DEC_REF.
- *
- * Apart from the default entry point, IP also sends packets directly to
- * tcp_rput_data for AF_INET fast path and tcp_conn_request for incoming
- * connections.
- */
-boolean_t tcp_outbound_squeue_switch = B_FALSE;
-void
-tcp_input(void *arg, mblk_t *mp, void *arg2)
-{
-	conn_t	*connp = (conn_t *)arg;
-	tcp_t	*tcp = (tcp_t *)connp->conn_tcp;
-
-	/* arg2 is the sqp */
-	ASSERT(arg2 != NULL);
-	ASSERT(mp != NULL);
-
-	/*
-	 * Don't accept any input on a closed tcp as this TCP logically does
-	 * not exist on the system. Don't proceed further with this TCP.
-	 * For eg. this packet could trigger another close of this tcp
-	 * which would be disastrous for tcp_refcnt. tcp_close_detached /
-	 * tcp_clean_death / tcp_closei_local must be called at most once
-	 * on a TCP. In this case we need to refeed the packet into the
-	 * classifier and figure out where the packet should go. Need to
-	 * preserve the recv_ill somehow. Until we figure that out, for
-	 * now just drop the packet if we can't classify the packet.
-	 */
-	if (tcp->tcp_state == TCPS_CLOSED ||
-	    tcp->tcp_state == TCPS_BOUND) {
-		conn_t	*new_connp;
-		ip_stack_t *ipst = tcp->tcp_tcps->tcps_netstack->netstack_ip;
-
-		new_connp = ipcl_classify(mp, connp->conn_zoneid, ipst);
-		if (new_connp != NULL) {
-			tcp_reinput(new_connp, mp, arg2);
-			return;
-		}
-		/* We failed to classify. For now just drop the packet */
-		freemsg(mp);
-		return;
-	}
-
-	if (DB_TYPE(mp) != M_DATA) {
-		tcp_rput_common(tcp, mp);
-		return;
-	}
-
-	if (mp->b_datap->db_struioflag & STRUIO_CONNECT) {
-		squeue_t	*final_sqp;
-
-		mp->b_datap->db_struioflag &= ~STRUIO_CONNECT;
-		final_sqp = (squeue_t *)DB_CKSUMSTART(mp);
-		DB_CKSUMSTART(mp) = 0;
-		if (tcp->tcp_state == TCPS_SYN_SENT &&
-		    connp->conn_final_sqp == NULL &&
-		    tcp_outbound_squeue_switch) {
-			ASSERT(connp->conn_initial_sqp == connp->conn_sqp);
-			connp->conn_final_sqp = final_sqp;
-			if (connp->conn_final_sqp != connp->conn_sqp) {
-				CONN_INC_REF(connp);
-				SQUEUE_SWITCH(connp, connp->conn_final_sqp);
-				SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
-				    tcp_rput_data, connp, ip_squeue_flag,
-				    SQTAG_CONNECT_FINISH);
-				return;
-			}
-		}
-	}
-	tcp_rput_data(connp, mp, arg2);
-}
-
-/*
- * The read side put procedure.
- * The packets passed up by ip are assume to be aligned according to
- * OK_32PTR and the IP+TCP headers fitting in the first mblk.
- */
-static void
-tcp_rput_common(tcp_t *tcp, mblk_t *mp)
-{
-	/*
-	 * tcp_rput_data() does not expect M_CTL except for the case
-	 * where tcp_ipv6_recvancillary is set and we get a IN_PKTINFO
-	 * type. Need to make sure that any other M_CTLs don't make
-	 * it to tcp_rput_data since it is not expecting any and doesn't
-	 * check for it.
-	 */
-	if (DB_TYPE(mp) == M_CTL) {
-		switch (*(uint32_t *)(mp->b_rptr)) {
-		case TCP_IOC_ABORT_CONN:
-			/*
-			 * Handle connection abort request.
-			 */
-			tcp_ioctl_abort_handler(tcp, mp);
-			return;
-		case IPSEC_IN:
-			/*
-			 * Only secure icmp arrive in TCP and they
-			 * don't go through data path.
-			 */
-			tcp_icmp_error(tcp, mp);
-			return;
-		case IN_PKTINFO:
-			/*
-			 * Handle IPV6_RECVPKTINFO socket option on AF_INET6
-			 * sockets that are receiving IPv4 traffic. tcp
-			 */
-			ASSERT(tcp->tcp_family == AF_INET6);
-			ASSERT(tcp->tcp_ipv6_recvancillary &
-			    TCP_IPV6_RECVPKTINFO);
-			tcp_rput_data(tcp->tcp_connp, mp,
-			    tcp->tcp_connp->conn_sqp);
-			return;
-		case MDT_IOC_INFO_UPDATE:
-			/*
-			 * Handle Multidata information update; the
-			 * following routine will free the message.
-			 */
-			if (tcp->tcp_connp->conn_mdt_ok) {
-				tcp_mdt_update(tcp,
-				    &((ip_mdt_info_t *)mp->b_rptr)->mdt_capab,
-				    B_FALSE);
-			}
-			freemsg(mp);
-			return;
-		case LSO_IOC_INFO_UPDATE:
-			/*
-			 * Handle LSO information update; the following
-			 * routine will free the message.
-			 */
-			if (tcp->tcp_connp->conn_lso_ok) {
-				tcp_lso_update(tcp,
-				    &((ip_lso_info_t *)mp->b_rptr)->lso_capab);
-			}
-			freemsg(mp);
-			return;
-		default:
-			/*
-			 * tcp_icmp_err() will process the M_CTL packets.
-			 * Non-ICMP packets, if any, will be discarded in
-			 * tcp_icmp_err(). We will process the ICMP packet
-			 * even if we are TCP_IS_DETACHED_NONEAGER as the
-			 * incoming ICMP packet may result in changing
-			 * the tcp_mss, which we would need if we have
-			 * packets to retransmit.
-			 */
-			tcp_icmp_error(tcp, mp);
-			return;
-		}
-	}
-
-	/* No point processing the message if tcp is already closed */
-	if (TCP_IS_DETACHED_NONEAGER(tcp)) {
-		freemsg(mp);
-		return;
-	}
-
-	tcp_rput_other(tcp, mp);
-}
-
 
 /* The minimum of smoothed mean deviation in RTO calculation. */
 #define	TCP_SD_MIN	400
@@ -11885,12 +9138,12 @@ tcp_get_seg_mp(tcp_t *tcp, uint32_t seq, int32_t *off)
  * segments.  A segment is eligible if sack_cnt for that segment is greater
  * than or equal tcp_dupack_fast_retransmit.  After it has retransmitted
  * all eligible segments, it checks to see if TCP can send some new segments
- * (fast recovery).  If it can, set the appropriate flag for tcp_rput_data().
+ * (fast recovery).  If it can, set the appropriate flag for tcp_input_data().
  *
  * Parameters:
  *	tcp_t *tcp: the tcp structure of the connection.
  *	uint_t *flags: in return, appropriate value will be set for
- *	tcp_rput_data().
+ *	tcp_input_data().
  */
 static void
 tcp_sack_rxmit(tcp_t *tcp, uint_t *flags)
@@ -11988,7 +9241,7 @@ tcp_sack_rxmit(tcp_t *tcp, uint_t *flags)
 		tcp->tcp_pipe += seg_len;
 		tcp->tcp_sack_snxt = begin + seg_len;
 
-		tcp_send_data(tcp, tcp->tcp_wq, xmit_mp);
+		tcp_send_data(tcp, xmit_mp);
 
 		/*
 		 * Update the send timestamp to avoid false retransmission.
@@ -12012,96 +9265,8 @@ tcp_sack_rxmit(tcp_t *tcp, uint_t *flags)
 }
 
 /*
- * This function handles policy checking at TCP level for non-hard_bound/
- * detached connections.
- */
-static boolean_t
-tcp_check_policy(tcp_t *tcp, mblk_t *first_mp, ipha_t *ipha, ip6_t *ip6h,
-    boolean_t secure, boolean_t mctl_present)
-{
-	ipsec_latch_t *ipl = NULL;
-	ipsec_action_t *act = NULL;
-	mblk_t *data_mp;
-	ipsec_in_t *ii;
-	const char *reason;
-	kstat_named_t *counter;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ipsec_stack_t	*ipss;
-	ip_stack_t	*ipst;
-
-	ASSERT(mctl_present || !secure);
-
-	ASSERT((ipha == NULL && ip6h != NULL) ||
-	    (ip6h == NULL && ipha != NULL));
-
-	/*
-	 * We don't necessarily have an ipsec_in_act action to verify
-	 * policy because of assymetrical policy where we have only
-	 * outbound policy and no inbound policy (possible with global
-	 * policy).
-	 */
-	if (!secure) {
-		if (act == NULL || act->ipa_act.ipa_type == IPSEC_ACT_BYPASS ||
-		    act->ipa_act.ipa_type == IPSEC_ACT_CLEAR)
-			return (B_TRUE);
-		ipsec_log_policy_failure(IPSEC_POLICY_MISMATCH,
-		    "tcp_check_policy", ipha, ip6h, secure,
-		    tcps->tcps_netstack);
-		ipss = tcps->tcps_netstack->netstack_ipsec;
-
-		ip_drop_packet(first_mp, B_TRUE, NULL, NULL,
-		    DROPPER(ipss, ipds_tcp_clear),
-		    &tcps->tcps_dropper);
-		return (B_FALSE);
-	}
-
-	/*
-	 * We have a secure packet.
-	 */
-	if (act == NULL) {
-		ipsec_log_policy_failure(IPSEC_POLICY_NOT_NEEDED,
-		    "tcp_check_policy", ipha, ip6h, secure,
-		    tcps->tcps_netstack);
-		ipss = tcps->tcps_netstack->netstack_ipsec;
-
-		ip_drop_packet(first_mp, B_TRUE, NULL, NULL,
-		    DROPPER(ipss, ipds_tcp_secure),
-		    &tcps->tcps_dropper);
-		return (B_FALSE);
-	}
-
-	/*
-	 * XXX This whole routine is currently incorrect.  ipl should
-	 * be set to the latch pointer, but is currently not set, so
-	 * we initialize it to NULL to avoid picking up random garbage.
-	 */
-	if (ipl == NULL)
-		return (B_TRUE);
-
-	data_mp = first_mp->b_cont;
-
-	ii = (ipsec_in_t *)first_mp->b_rptr;
-
-	ipst = tcps->tcps_netstack->netstack_ip;
-
-	if (ipsec_check_ipsecin_latch(ii, data_mp, ipl, ipha, ip6h, &reason,
-	    &counter, tcp->tcp_connp)) {
-		BUMP_MIB(&ipst->ips_ip_mib, ipsecInSucceeded);
-		return (B_TRUE);
-	}
-	(void) strlog(TCP_MOD_ID, 0, 0, SL_ERROR|SL_WARN|SL_CONSOLE,
-	    "tcp inbound policy mismatch: %s, packet dropped\n",
-	    reason);
-	BUMP_MIB(&ipst->ips_ip_mib, ipsecInFailed);
-
-	ip_drop_packet(first_mp, B_TRUE, NULL, NULL, counter,
-	    &tcps->tcps_dropper);
-	return (B_FALSE);
-}
-
-/*
- * tcp_ss_rexmit() is called in tcp_rput_data() to do slow start
- * retransmission after a timeout.
+ * tcp_ss_rexmit() is called to do slow start retransmission after a timeout
+ * or ICMP errors.
  *
  * To limit the number of duplicate segments, we limit the number of segment
  * to be sent in one time to tcp_snd_burst, the burst variable.
@@ -12150,7 +9315,7 @@ tcp_ss_rexmit(tcp_t *tcp)
 			if (xmit_mp == NULL)
 				return;
 
-			tcp_send_data(tcp, tcp->tcp_wq, xmit_mp);
+			tcp_send_data(tcp, xmit_mp);
 
 			snxt += cnt;
 			win -= cnt;
@@ -12184,7 +9349,7 @@ tcp_ss_rexmit(tcp_t *tcp)
 
 /*
  * Process all TCP option in SYN segment.  Note that this function should
- * be called after tcp_adapt_ire() is called so that the necessary info
+ * be called after tcp_set_destination() is called so that the necessary info
  * from IRE is already set in the tcp structure.
  *
  * This function sets up the correct tcp_mss value according to the
@@ -12194,16 +9359,17 @@ tcp_ss_rexmit(tcp_t *tcp)
  * should do the appropriate change.
  */
 void
-tcp_process_options(tcp_t *tcp, tcph_t *tcph)
+tcp_process_options(tcp_t *tcp, tcpha_t *tcpha)
 {
 	int options;
 	tcp_opt_t tcpopt;
 	uint32_t mss_max;
 	char *tmp_tcph;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
 	tcpopt.tcp = NULL;
-	options = tcp_parse_options(tcph, &tcpopt);
+	options = tcp_parse_options(tcpha, &tcpopt);
 
 	/*
 	 * Process MSS option.  Note that MSS option value does not account
@@ -12212,12 +9378,12 @@ tcp_process_options(tcp_t *tcp, tcph_t *tcph)
 	 * IPv6.
 	 */
 	if (!(options & TCP_OPT_MSS_PRESENT)) {
-		if (tcp->tcp_ipversion == IPV4_VERSION)
+		if (connp->conn_ipversion == IPV4_VERSION)
 			tcpopt.tcp_opt_mss = tcps->tcps_mss_def_ipv4;
 		else
 			tcpopt.tcp_opt_mss = tcps->tcps_mss_def_ipv6;
 	} else {
-		if (tcp->tcp_ipversion == IPV4_VERSION)
+		if (connp->conn_ipversion == IPV4_VERSION)
 			mss_max = tcps->tcps_mss_max_ipv4;
 		else
 			mss_max = tcps->tcps_mss_max_ipv6;
@@ -12240,23 +9406,23 @@ tcp_process_options(tcp_t *tcp, tcph_t *tcph)
 	/* Process Timestamp option. */
 	if ((options & TCP_OPT_TSTAMP_PRESENT) &&
 	    (tcp->tcp_snd_ts_ok || TCP_IS_DETACHED(tcp))) {
-		tmp_tcph = (char *)tcp->tcp_tcph;
+		tmp_tcph = (char *)tcp->tcp_tcpha;
 
 		tcp->tcp_snd_ts_ok = B_TRUE;
 		tcp->tcp_ts_recent = tcpopt.tcp_opt_ts_val;
 		tcp->tcp_last_rcv_lbolt = lbolt64;
 		ASSERT(OK_32PTR(tmp_tcph));
-		ASSERT(tcp->tcp_tcp_hdr_len == TCP_MIN_HEADER_LENGTH);
+		ASSERT(connp->conn_ht_ulp_len == TCP_MIN_HEADER_LENGTH);
 
 		/* Fill in our template header with basic timestamp option. */
-		tmp_tcph += tcp->tcp_tcp_hdr_len;
+		tmp_tcph += connp->conn_ht_ulp_len;
 		tmp_tcph[0] = TCPOPT_NOP;
 		tmp_tcph[1] = TCPOPT_NOP;
 		tmp_tcph[2] = TCPOPT_TSTAMP;
 		tmp_tcph[3] = TCPOPT_TSTAMP_LEN;
-		tcp->tcp_hdr_len += TCPOPT_REAL_TS_LEN;
-		tcp->tcp_tcp_hdr_len += TCPOPT_REAL_TS_LEN;
-		tcp->tcp_tcph->th_offset_and_rsrvd[0] += (3 << 4);
+		connp->conn_ht_iphc_len += TCPOPT_REAL_TS_LEN;
+		connp->conn_ht_ulp_len += TCPOPT_REAL_TS_LEN;
+		tcp->tcp_tcpha->tha_offset_and_reserved += (3 << 4);
 	} else {
 		tcp->tcp_snd_ts_ok = B_FALSE;
 	}
@@ -12266,12 +9432,11 @@ tcp_process_options(tcp_t *tcp, tcph_t *tcph)
 	 * then allocate the SACK info structure.  Note the following ways
 	 * when tcp_snd_sack_ok is set to true.
 	 *
-	 * For active connection: in tcp_adapt_ire() called in
-	 * tcp_rput_other(), or in tcp_rput_other() when tcp_sack_permitted
-	 * is checked.
+	 * For active connection: in tcp_set_destination() called in
+	 * tcp_connect().
 	 *
-	 * For passive connection: in tcp_adapt_ire() called in
-	 * tcp_accept_comm().
+	 * For passive connection: in tcp_set_destination() called in
+	 * tcp_input_listener().
 	 *
 	 * That's the reason why the extra TCP_IS_DETACHED() check is there.
 	 * That check makes sure that if we did not send a SACK OK option,
@@ -12320,7 +9485,8 @@ tcp_process_options(tcp_t *tcp, tcph_t *tcph)
 	 * Now we know the exact TCP/IP header length, subtract
 	 * that from tcp_mss to get our side's MSS.
 	 */
-	tcp->tcp_mss -= tcp->tcp_hdr_len;
+	tcp->tcp_mss -= connp->conn_ht_iphc_len;
+
 	/*
 	 * Here we assume that the other side's header size will be equal to
 	 * our header size.  We calculate the real MSS accordingly.  Need to
@@ -12328,22 +9494,29 @@ tcp_process_options(tcp_t *tcp, tcph_t *tcph)
 	 *
 	 * Real MSS = Opt.MSS - (our TCP/IP header - min TCP/IP header)
 	 */
-	tcpopt.tcp_opt_mss -= tcp->tcp_hdr_len + tcp->tcp_ipsec_overhead -
-	    ((tcp->tcp_ipversion == IPV4_VERSION ?
+	tcpopt.tcp_opt_mss -= connp->conn_ht_iphc_len +
+	    tcp->tcp_ipsec_overhead -
+	    ((connp->conn_ipversion == IPV4_VERSION ?
 	    IP_SIMPLE_HDR_LENGTH : IPV6_HDR_LEN) + TCP_MIN_HEADER_LENGTH);
 
 	/*
 	 * Set MSS to the smaller one of both ends of the connection.
 	 * We should not have called tcp_mss_set() before, but our
 	 * side of the MSS should have been set to a proper value
-	 * by tcp_adapt_ire().  tcp_mss_set() will also set up the
+	 * by tcp_set_destination().  tcp_mss_set() will also set up the
 	 * STREAM head parameters properly.
 	 *
 	 * If we have a larger-than-16-bit window but the other side
 	 * didn't want to do window scale, tcp_rwnd_set() will take
 	 * care of that.
 	 */
-	tcp_mss_set(tcp, MIN(tcpopt.tcp_opt_mss, tcp->tcp_mss), B_TRUE);
+	tcp_mss_set(tcp, MIN(tcpopt.tcp_opt_mss, tcp->tcp_mss));
+
+	/*
+	 * Initialize tcp_cwnd value. After tcp_mss_set(), tcp_mss has been
+	 * updated properly.
+	 */
+	SET_TCP_INIT_CWND(tcp, tcp->tcp_mss, tcps->tcps_slow_start_initial);
 }
 
 /*
@@ -12410,7 +9583,7 @@ tcp_send_conn_ind(void *arg, mblk_t *mp, void *arg2)
 		tcp_t *tail;
 
 		/*
-		 * The eager already has an extra ref put in tcp_rput_data
+		 * The eager already has an extra ref put in tcp_input_data
 		 * so that it stays till accept comes back even though it
 		 * might get into TCPS_CLOSED as a result of a TH_RST etc.
 		 */
@@ -12496,8 +9669,8 @@ tcp_send_conn_ind(void *arg, mblk_t *mp, void *arg2)
 		 * remote host. This proves the IP addr is good.
 		 * Cache it!
 		 */
-		addr_cache[IP_ADDR_CACHE_HASH(
-		    tcp->tcp_remote)] = tcp->tcp_remote;
+		addr_cache[IP_ADDR_CACHE_HASH(tcp->tcp_connp->conn_faddr_v4)] =
+		    tcp->tcp_connp->conn_faddr_v4;
 	}
 	mutex_exit(&listener->tcp_eager_lock);
 	if (need_send_conn_ind)
@@ -12513,17 +9686,16 @@ tcp_ulp_newconn(conn_t *lconnp, conn_t *econnp, mblk_t *mp)
 {
 	if (IPCL_IS_NONSTR(lconnp)) {
 		cred_t	*cr;
-		pid_t	cpid;
-
-		cr = msg_getcred(mp, &cpid);
+		pid_t	cpid = NOPID;
 
 		ASSERT(econnp->conn_tcp->tcp_listener == lconnp->conn_tcp);
 		ASSERT(econnp->conn_tcp->tcp_saved_listener ==
 		    lconnp->conn_tcp);
 
+		cr = msg_getcred(mp, &cpid);
+
 		/* Keep the message around in case of a fallback to TPI */
 		econnp->conn_tcp->tcp_conn.tcp_eager_conn_ind = mp;
-
 		/*
 		 * Notify the ULP about the newconn. It is guaranteed that no
 		 * tcp_accept() call will be made for the eager if the
@@ -12545,177 +9717,83 @@ tcp_ulp_newconn(conn_t *lconnp, conn_t *econnp, mblk_t *mp)
 			    econnp->conn_tcp->tcp_conn_req_seqnum);
 		}
 	} else {
-		putnext(lconnp->conn_tcp->tcp_rq, mp);
+		putnext(lconnp->conn_rq, mp);
 	}
-}
-
-mblk_t *
-tcp_find_pktinfo(tcp_t *tcp, mblk_t *mp, uint_t *ipversp, uint_t *ip_hdr_lenp,
-    uint_t *ifindexp, ip6_pkt_t *ippp)
-{
-	ip_pktinfo_t	*pinfo;
-	ip6_t		*ip6h;
-	uchar_t		*rptr;
-	mblk_t		*first_mp = mp;
-	boolean_t	mctl_present = B_FALSE;
-	uint_t 		ifindex = 0;
-	ip6_pkt_t	ipp;
-	uint_t		ipvers;
-	uint_t		ip_hdr_len;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-
-	rptr = mp->b_rptr;
-	ASSERT(OK_32PTR(rptr));
-	ASSERT(tcp != NULL);
-	ipp.ipp_fields = 0;
-
-	switch DB_TYPE(mp) {
-	case M_CTL:
-		mp = mp->b_cont;
-		if (mp == NULL) {
-			freemsg(first_mp);
-			return (NULL);
-		}
-		if (DB_TYPE(mp) != M_DATA) {
-			freemsg(first_mp);
-			return (NULL);
-		}
-		mctl_present = B_TRUE;
-		break;
-	case M_DATA:
-		break;
-	default:
-		cmn_err(CE_NOTE, "tcp_find_pktinfo: unknown db_type");
-		freemsg(mp);
-		return (NULL);
-	}
-	ipvers = IPH_HDR_VERSION(rptr);
-	if (ipvers == IPV4_VERSION) {
-		if (tcp == NULL) {
-			ip_hdr_len = IPH_HDR_LENGTH(rptr);
-			goto done;
-		}
-
-		ipp.ipp_fields |= IPPF_HOPLIMIT;
-		ipp.ipp_hoplimit = ((ipha_t *)rptr)->ipha_ttl;
-
-		/*
-		 * If we have IN_PKTINFO in an M_CTL and tcp_ipv6_recvancillary
-		 * has TCP_IPV6_RECVPKTINFO set, pass I/F index along in ipp.
-		 */
-		if ((tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVPKTINFO) &&
-		    mctl_present) {
-			pinfo = (ip_pktinfo_t *)first_mp->b_rptr;
-			if ((MBLKL(first_mp) == sizeof (ip_pktinfo_t)) &&
-			    (pinfo->ip_pkt_ulp_type == IN_PKTINFO) &&
-			    (pinfo->ip_pkt_flags & IPF_RECVIF)) {
-				ipp.ipp_fields |= IPPF_IFINDEX;
-				ipp.ipp_ifindex = pinfo->ip_pkt_ifindex;
-				ifindex = pinfo->ip_pkt_ifindex;
-			}
-			freeb(first_mp);
-			mctl_present = B_FALSE;
-		}
-		ip_hdr_len = IPH_HDR_LENGTH(rptr);
-	} else {
-		ip6h = (ip6_t *)rptr;
-
-		ASSERT(ipvers == IPV6_VERSION);
-		ipp.ipp_fields = IPPF_HOPLIMIT | IPPF_TCLASS;
-		ipp.ipp_tclass = (ip6h->ip6_flow & 0x0FF00000) >> 20;
-		ipp.ipp_hoplimit = ip6h->ip6_hops;
-
-		if (ip6h->ip6_nxt != IPPROTO_TCP) {
-			uint8_t	nexthdrp;
-			ip_stack_t *ipst = tcps->tcps_netstack->netstack_ip;
-
-			/* Look for ifindex information */
-			if (ip6h->ip6_nxt == IPPROTO_RAW) {
-				ip6i_t *ip6i = (ip6i_t *)ip6h;
-				if ((uchar_t *)&ip6i[1] > mp->b_wptr) {
-					BUMP_MIB(&ipst->ips_ip_mib, tcpInErrs);
-					freemsg(first_mp);
-					return (NULL);
-				}
-
-				if (ip6i->ip6i_flags & IP6I_IFINDEX) {
-					ASSERT(ip6i->ip6i_ifindex != 0);
-					ipp.ipp_fields |= IPPF_IFINDEX;
-					ipp.ipp_ifindex = ip6i->ip6i_ifindex;
-					ifindex = ip6i->ip6i_ifindex;
-				}
-				rptr = (uchar_t *)&ip6i[1];
-				mp->b_rptr = rptr;
-				if (rptr == mp->b_wptr) {
-					mblk_t *mp1;
-					mp1 = mp->b_cont;
-					freeb(mp);
-					mp = mp1;
-					rptr = mp->b_rptr;
-				}
-				if (MBLKL(mp) < IPV6_HDR_LEN +
-				    sizeof (tcph_t)) {
-					BUMP_MIB(&ipst->ips_ip_mib, tcpInErrs);
-					freemsg(first_mp);
-					return (NULL);
-				}
-				ip6h = (ip6_t *)rptr;
-			}
-
-			/*
-			 * Find any potentially interesting extension headers
-			 * as well as the length of the IPv6 + extension
-			 * headers.
-			 */
-			ip_hdr_len = ip_find_hdr_v6(mp, ip6h, &ipp, &nexthdrp);
-			/* Verify if this is a TCP packet */
-			if (nexthdrp != IPPROTO_TCP) {
-				BUMP_MIB(&ipst->ips_ip_mib, tcpInErrs);
-				freemsg(first_mp);
-				return (NULL);
-			}
-		} else {
-			ip_hdr_len = IPV6_HDR_LEN;
-		}
-	}
-
-done:
-	if (ipversp != NULL)
-		*ipversp = ipvers;
-	if (ip_hdr_lenp != NULL)
-		*ip_hdr_lenp = ip_hdr_len;
-	if (ippp != NULL)
-		*ippp = ipp;
-	if (ifindexp != NULL)
-		*ifindexp = ifindex;
-	if (mctl_present) {
-		freeb(first_mp);
-	}
-	return (mp);
 }
 
 /*
+ * Handle a packet that has been reclassified by TCP.
+ * This function drops the ref on connp that the caller had.
+ */
+static void
+tcp_reinput(conn_t *connp, mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst)
+{
+	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
+
+	if (connp->conn_incoming_ifindex != 0 &&
+	    connp->conn_incoming_ifindex != ira->ira_ruifindex) {
+		freemsg(mp);
+		CONN_DEC_REF(connp);
+		return;
+	}
+
+	if (CONN_INBOUND_POLICY_PRESENT_V6(connp, ipss) ||
+	    (ira->ira_flags & IRAF_IPSEC_SECURE)) {
+		ip6_t *ip6h;
+		ipha_t *ipha;
+
+		if (ira->ira_flags & IRAF_IS_IPV4) {
+			ipha = (ipha_t *)mp->b_rptr;
+			ip6h = NULL;
+		} else {
+			ipha = NULL;
+			ip6h = (ip6_t *)mp->b_rptr;
+		}
+		mp = ipsec_check_inbound_policy(mp, connp, ipha, ip6h, ira);
+		if (mp == NULL) {
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
+			/* Note that mp is NULL */
+			ip_drop_input("ipIfStatsInDiscards", mp, NULL);
+			CONN_DEC_REF(connp);
+			return;
+		}
+	}
+
+	if (IPCL_IS_TCP(connp)) {
+		/*
+		 * do not drain, certain use cases can blow
+		 * the stack
+		 */
+		SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
+		    connp->conn_recv, connp, ira,
+		    SQ_NODRAIN, SQTAG_IP_TCP_INPUT);
+	} else {
+		/* Not TCP; must be SOCK_RAW, IPPROTO_TCP */
+		(connp->conn_recv)(connp, mp, NULL,
+		    ira);
+		CONN_DEC_REF(connp);
+	}
+
+}
+
+boolean_t tcp_outbound_squeue_switch = B_FALSE;
+
+/*
  * Handle M_DATA messages from IP. Its called directly from IP via
- * squeue for AF_INET type sockets fast path. No M_CTL are expected
- * in this path.
- *
- * For everything else (including AF_INET6 sockets with 'tcp_ipversion'
- * v4 and v6), we are called through tcp_input() and a M_CTL can
- * be present for options but tcp_find_pktinfo() deals with it. We
- * only expect M_DATA packets after tcp_find_pktinfo() is done.
+ * squeue for received IP packets.
  *
  * The first argument is always the connp/tcp to which the mp belongs.
  * There are no exceptions to this rule. The caller has already put
- * a reference on this connp/tcp and once tcp_rput_data() returns,
+ * a reference on this connp/tcp and once tcp_input_data() returns,
  * the squeue will do the refrele.
  *
- * The TH_SYN for the listener directly go to tcp_conn_request via
- * squeue.
+ * The TH_SYN for the listener directly go to tcp_input_listener via
+ * squeue. ICMP errors go directly to tcp_icmp_input().
  *
  * sqp: NULL = recursive, sqp != NULL means called from squeue
  */
 void
-tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
+tcp_input_data(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *ira)
 {
 	int32_t		bytes_acked;
 	int32_t		gap;
@@ -12729,11 +9807,10 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 	int		seg_len;
 	uint_t		ip_hdr_len;
 	uint32_t	seg_seq;
-	tcph_t		*tcph;
+	tcpha_t		*tcpha;
 	int		urp;
 	tcp_opt_t	tcpopt;
-	uint_t		ipvers;
-	ip6_pkt_t	ipp;
+	ip_pkt_t	ipp;
 	boolean_t	ofo_seg = B_FALSE; /* Out of order segment */
 	uint32_t	cwnd;
 	uint32_t	add;
@@ -12756,33 +9833,43 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 	rptr = mp->b_rptr;
 	ASSERT(OK_32PTR(rptr));
 
-	/*
-	 * An AF_INET socket is not capable of receiving any pktinfo. Do inline
-	 * processing here. For rest call tcp_find_pktinfo to fill up the
-	 * necessary information.
-	 */
-	if (IPCL_IS_TCP4(connp)) {
-		ipvers = IPV4_VERSION;
-		ip_hdr_len = IPH_HDR_LENGTH(rptr);
-	} else {
-		mp = tcp_find_pktinfo(tcp, mp, &ipvers, &ip_hdr_len,
-		    NULL, &ipp);
-		if (mp == NULL) {
-			TCP_STAT(tcps, tcp_rput_v6_error);
-			return;
+	ip_hdr_len = ira->ira_ip_hdr_length;
+	if (connp->conn_recv_ancillary.crb_all != 0) {
+		/*
+		 * Record packet information in the ip_pkt_t
+		 */
+		ipp.ipp_fields = 0;
+		if (ira->ira_flags & IRAF_IS_IPV4) {
+			(void) ip_find_hdr_v4((ipha_t *)rptr, &ipp,
+			    B_FALSE);
+		} else {
+			uint8_t nexthdrp;
+
+			/*
+			 * IPv6 packets can only be received by applications
+			 * that are prepared to receive IPv6 addresses.
+			 * The IP fanout must ensure this.
+			 */
+			ASSERT(connp->conn_family == AF_INET6);
+
+			(void) ip_find_hdr_v6(mp, (ip6_t *)rptr, B_TRUE, &ipp,
+			    &nexthdrp);
+			ASSERT(nexthdrp == IPPROTO_TCP);
+
+			/* Could have caused a pullup? */
+			iphdr = mp->b_rptr;
+			rptr = mp->b_rptr;
 		}
-		iphdr = mp->b_rptr;
-		rptr = mp->b_rptr;
 	}
 	ASSERT(DB_TYPE(mp) == M_DATA);
 	ASSERT(mp->b_next == NULL);
 
-	tcph = (tcph_t *)&rptr[ip_hdr_len];
-	seg_seq = ABE32_TO_U32(tcph->th_seq);
-	seg_ack = ABE32_TO_U32(tcph->th_ack);
+	tcpha = (tcpha_t *)&rptr[ip_hdr_len];
+	seg_seq = ntohl(tcpha->tha_seq);
+	seg_ack = ntohl(tcpha->tha_ack);
 	ASSERT((uintptr_t)(mp->b_wptr - rptr) <= (uintptr_t)INT_MAX);
 	seg_len = (int)(mp->b_wptr - rptr) -
-	    (ip_hdr_len + TCP_HDR_LENGTH(tcph));
+	    (ip_hdr_len + TCP_HDR_LENGTH(tcpha));
 	if ((mp1 = mp->b_cont) != NULL && mp1->b_datap->db_type == M_DATA) {
 		do {
 			ASSERT((uintptr_t)(mp1->b_wptr - mp1->b_rptr) <=
@@ -12794,7 +9881,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 
 	if (tcp->tcp_state == TCPS_TIME_WAIT) {
 		tcp_time_wait_processing(tcp, mp, seg_seq, seg_ack,
-		    seg_len, tcph);
+		    seg_len, tcpha, ira);
 		return;
 	}
 
@@ -12809,7 +9896,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		tcp->tcp_last_recv_time = lbolt;
 	}
 
-	flags = (unsigned int)tcph->th_flags[0] & 0xFF;
+	flags = (unsigned int)tcpha->tha_flags & 0xFF;
 
 	BUMP_LOCAL(tcp->tcp_ibsegs);
 	DTRACE_PROBE2(tcp__trace__recv, mblk_t *, mp, tcp_t *, tcp);
@@ -12840,7 +9927,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		}
 		/* Update pointers into message */
 		iphdr = rptr = mp->b_rptr;
-		tcph = (tcph_t *)&rptr[ip_hdr_len];
+		tcpha = (tcpha_t *)&rptr[ip_hdr_len];
 		if (SEQ_GT(seg_seq, tcp->tcp_rnxt)) {
 			/*
 			 * Since we can't handle any data with this urgent
@@ -12849,13 +9936,29 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 			 * the urgent mark and generate the M_PCSIG,
 			 * which we can do.
 			 */
-			mp->b_wptr = (uchar_t *)tcph + TCP_HDR_LENGTH(tcph);
+			mp->b_wptr = (uchar_t *)tcpha + TCP_HDR_LENGTH(tcpha);
 			seg_len = 0;
 		}
 	}
 
 	switch (tcp->tcp_state) {
 	case TCPS_SYN_SENT:
+		if (connp->conn_final_sqp == NULL &&
+		    tcp_outbound_squeue_switch && sqp != NULL) {
+			ASSERT(connp->conn_initial_sqp == connp->conn_sqp);
+			connp->conn_final_sqp = sqp;
+			if (connp->conn_final_sqp != connp->conn_sqp) {
+				DTRACE_PROBE1(conn__final__sqp__switch,
+				    conn_t *, connp);
+				CONN_INC_REF(connp);
+				SQUEUE_SWITCH(connp, connp->conn_final_sqp);
+				SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
+				    tcp_input_data, connp, ira, ip_squeue_flag,
+				    SQTAG_CONNECT_FINISH);
+				return;
+			}
+			DTRACE_PROBE1(conn__final__sqp__same, conn_t *, connp);
+		}
 		if (flags & TH_ACK) {
 			/*
 			 * Note that our stack cannot send data before a
@@ -12887,13 +9990,13 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		}
 
 		/* Process all TCP options. */
-		tcp_process_options(tcp, tcph);
+		tcp_process_options(tcp, tcpha);
 		/*
 		 * The following changes our rwnd to be a multiple of the
 		 * MIN(peer MSS, our MSS) for performance reason.
 		 */
-		(void) tcp_rwnd_set(tcp,
-		    MSS_ROUNDUP(tcp->tcp_recv_hiwater, tcp->tcp_mss));
+		(void) tcp_rwnd_set(tcp, MSS_ROUNDUP(connp->conn_rcvbuf,
+		    tcp->tcp_mss));
 
 		/* Is the other end ECN capable? */
 		if (tcp->tcp_ecn_ok) {
@@ -12910,21 +10013,17 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		tcp->tcp_irs = seg_seq;
 		tcp->tcp_rack = seg_seq;
 		tcp->tcp_rnxt = seg_seq + 1;
-		U32_TO_ABE32(tcp->tcp_rnxt, tcp->tcp_tcph->th_ack);
+		tcp->tcp_tcpha->tha_ack = htonl(tcp->tcp_rnxt);
 		if (!TCP_IS_DETACHED(tcp)) {
 			/* Allocate room for SACK options if needed. */
-			if (tcp->tcp_snd_sack_ok) {
-				(void) proto_set_tx_wroff(tcp->tcp_rq, connp,
-				    tcp->tcp_hdr_len +
-				    TCPOPT_MAX_SACK_LEN +
-				    (tcp->tcp_loopback ? 0 :
-				    tcps->tcps_wroff_xtra));
-			} else {
-				(void) proto_set_tx_wroff(tcp->tcp_rq, connp,
-				    tcp->tcp_hdr_len +
-				    (tcp->tcp_loopback ? 0 :
-				    tcps->tcps_wroff_xtra));
-			}
+			connp->conn_wroff = connp->conn_ht_iphc_len;
+			if (tcp->tcp_snd_sack_ok)
+				connp->conn_wroff += TCPOPT_MAX_SACK_LEN;
+			if (!tcp->tcp_loopback)
+				connp->conn_wroff += tcps->tcps_wroff_xtra;
+
+			(void) proto_set_tx_wroff(connp->conn_rq, connp,
+			    connp->conn_wroff);
 		}
 		if (flags & TH_ACK) {
 			/*
@@ -12944,15 +10043,14 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 			 * sending up connection confirmation
 			 */
 			tcp->tcp_state = TCPS_ESTABLISHED;
-			if (!tcp_conn_con(tcp, iphdr, tcph, mp,
-			    tcp->tcp_loopback ? &mp1 : NULL)) {
+			if (!tcp_conn_con(tcp, iphdr, mp,
+			    tcp->tcp_loopback ? &mp1 : NULL, ira)) {
 				tcp->tcp_state = TCPS_SYN_SENT;
 				freemsg(mp);
 				return;
 			}
 			/* SYN was acked - making progress */
-			if (tcp->tcp_ipversion == IPV6_VERSION)
-				tcp->tcp_ip_forward_progress = B_TRUE;
+			tcp->tcp_ip_forward_progress = B_TRUE;
 
 			/* One for the SYN */
 			tcp->tcp_suna = tcp->tcp_iss + 1;
@@ -12983,7 +10081,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 			tcp->tcp_swl1 = seg_seq;
 			tcp->tcp_swl2 = seg_ack;
 
-			new_swnd = BE16_TO_U16(tcph->th_win);
+			new_swnd = ntohs(tcpha->tha_win);
 			tcp->tcp_swnd = new_swnd;
 			if (new_swnd > tcp->tcp_max_swnd)
 				tcp->tcp_max_swnd = new_swnd;
@@ -13022,22 +10120,25 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 						    tcp->tcp_ack_tid);
 						tcp->tcp_ack_tid = 0;
 					}
-					tcp_send_data(tcp, tcp->tcp_wq, ack_mp);
+					tcp_send_data(tcp, ack_mp);
 					BUMP_LOCAL(tcp->tcp_obsegs);
 					BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
 
 					if (!IPCL_IS_NONSTR(connp)) {
 						/* Send up T_CONN_CON */
-						putnext(tcp->tcp_rq, mp1);
+						if (ira->ira_cred != NULL) {
+							mblk_setcred(mp1,
+							    ira->ira_cred,
+							    ira->ira_cpid);
+						}
+						putnext(connp->conn_rq, mp1);
 					} else {
-						cred_t	*cr;
-						pid_t	cpid;
-
-						cr = msg_getcred(mp1, &cpid);
 						(*connp->conn_upcalls->
 						    su_connected)
 						    (connp->conn_upper_handle,
-						    tcp->tcp_connid, cr, cpid);
+						    tcp->tcp_connid,
+						    ira->ira_cred,
+						    ira->ira_cpid);
 						freemsg(mp1);
 					}
 
@@ -13054,15 +10155,16 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 				TCP_STAT(tcps, tcp_fusion_unfusable);
 				tcp->tcp_unfusable = B_TRUE;
 				if (!IPCL_IS_NONSTR(connp)) {
-					putnext(tcp->tcp_rq, mp1);
+					if (ira->ira_cred != NULL) {
+						mblk_setcred(mp1, ira->ira_cred,
+						    ira->ira_cpid);
+					}
+					putnext(connp->conn_rq, mp1);
 				} else {
-					cred_t	*cr;
-					pid_t	cpid;
-
-					cr = msg_getcred(mp1, &cpid);
 					(*connp->conn_upcalls->su_connected)
 					    (connp->conn_upper_handle,
-					    tcp->tcp_connid, cr, cpid);
+					    tcp->tcp_connid, ira->ira_cred,
+					    ira->ira_cpid);
 					freemsg(mp1);
 				}
 			}
@@ -13089,13 +10191,8 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		tcp->tcp_state = TCPS_SYN_RCVD;
 		mp1 = tcp_xmit_mp(tcp, tcp->tcp_xmit_head, tcp->tcp_mss,
 		    NULL, NULL, tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
-		if (mp1) {
-			/*
-			 * See comment in tcp_conn_request() for why we use
-			 * the open() time pid here.
-			 */
-			DB_CPID(mp1) = tcp->tcp_cpid;
-			tcp_send_data(tcp, tcp->tcp_wq, mp1);
+		if (mp1 != NULL) {
+			tcp_send_data(tcp, mp1);
 			TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
 		}
 		freemsg(mp);
@@ -13146,9 +10243,20 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		conn_t	*new_connp;
 		ip_stack_t *ipst = tcps->tcps_netstack->netstack_ip;
 
-		new_connp = ipcl_classify(mp, connp->conn_zoneid, ipst);
+		/*
+		 * Don't accept any input on a closed tcp as this TCP logically
+		 * does not exist on the system. Don't proceed further with
+		 * this TCP. For instance, this packet could trigger another
+		 * close of this tcp which would be disastrous for tcp_refcnt.
+		 * tcp_close_detached / tcp_clean_death / tcp_closei_local must
+		 * be called at most once on a TCP. In this case we need to
+		 * refeed the packet into the classifier and figure out where
+		 * the packet should go.
+		 */
+		new_connp = ipcl_classify(mp, ira, ipst);
 		if (new_connp != NULL) {
-			tcp_reinput(new_connp, mp, connp->conn_sqp);
+			/* Drops ref on new_connp */
+			tcp_reinput(new_connp, mp, ira, ipst);
 			return;
 		}
 		/* We failed to classify. For now just drop the packet */
@@ -13194,7 +10302,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 			tcp->tcp_kssl_ctx = NULL;
 
 			tcp->tcp_rnxt += seg_len;
-			U32_TO_ABE32(tcp->tcp_rnxt, tcp->tcp_tcph->th_ack);
+			tcp->tcp_tcpha->tha_ack = htonl(tcp->tcp_rnxt);
 			flags |= TH_ACK_NEEDED;
 			goto ack_check;
 		}
@@ -13205,13 +10313,13 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		return;
 	}
 
-	mp->b_rptr = (uchar_t *)tcph + TCP_HDR_LENGTH(tcph);
-	urp = BE16_TO_U16(tcph->th_urp) - TCP_OLD_URP_INTERPRETATION;
-	new_swnd = BE16_TO_U16(tcph->th_win) <<
-	    ((tcph->th_flags[0] & TH_SYN) ? 0 : tcp->tcp_snd_ws);
+	mp->b_rptr = (uchar_t *)tcpha + TCP_HDR_LENGTH(tcpha);
+	urp = ntohs(tcpha->tha_urp) - TCP_OLD_URP_INTERPRETATION;
+	new_swnd = ntohs(tcpha->tha_win) <<
+	    ((tcpha->tha_flags & TH_SYN) ? 0 : tcp->tcp_snd_ws);
 
 	if (tcp->tcp_snd_ts_ok) {
-		if (!tcp_paws_check(tcp, tcph, &tcpopt)) {
+		if (!tcp_paws_check(tcp, tcpha, &tcpopt)) {
 			/*
 			 * This segment is not acceptable.
 			 * Drop it and send back an ACK.
@@ -13227,7 +10335,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		 * SACK info in already updated in tcp_parse_options.  Ignore
 		 * all other TCP options...
 		 */
-		(void) tcp_parse_options(tcph, &tcpopt);
+		(void) tcp_parse_options(tcpha, &tcpopt);
 	}
 try_again:;
 	mss = tcp->tcp_mss;
@@ -13289,7 +10397,7 @@ try_again:;
 			 * Adjust seg_len to the original value for tracing.
 			 */
 			seg_len -= gap;
-			if (tcp->tcp_debug) {
+			if (connp->conn_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE,
 				    "tcp_rput: unacceptable, gap %d, rgap %d, "
 				    "flags 0x%x, seg_seq %u, seg_ack %u, "
@@ -13436,7 +10544,7 @@ try_again:;
 						return;
 					}
 					if (!TCP_IS_DETACHED(tcp) &&
-					    !putnextctl1(tcp->tcp_rq,
+					    !putnextctl1(connp->conn_rq,
 					    M_PCSIG, SIGURG)) {
 						/* Try again on the rexmit. */
 						freemsg(mp1);
@@ -13505,7 +10613,7 @@ ok:;
 		 * same segment.  In this case, we once again turn
 		 * on ECN_ECHO.
 		 */
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
+		if (connp->conn_ipversion == IPV4_VERSION) {
 			uchar_t tos = ((ipha_t *)rptr)->ipha_type_of_service;
 
 			if ((tos & IPH_ECN_CE) == IPH_ECN_CE) {
@@ -13705,7 +10813,7 @@ ok:;
 					return;
 				}
 				if (!TCP_IS_DETACHED(tcp) &&
-				    !putnextctl1(tcp->tcp_rq, M_PCSIG,
+				    !putnextctl1(connp->conn_rq, M_PCSIG,
 				    SIGURG)) {
 					/* Try again on the rexmit. */
 					freemsg(mp1);
@@ -13739,7 +10847,7 @@ ok:;
 		} else if (tcp->tcp_urp_mark_mp != NULL) {
 			/*
 			 * An allocation failure prevented the previous
-			 * tcp_rput_data from sending up the allocated
+			 * tcp_input_data from sending up the allocated
 			 * MSG*MARKNEXT message - send it up this time
 			 * around.
 			 */
@@ -13775,14 +10883,14 @@ ok:;
 						 */
 						(void) adjmsg(mp,
 						    urp - seg_len);
-						tcp_rput_data(connp,
-						    mp, NULL);
+						tcp_input_data(connp,
+						    mp, NULL, ira);
 						return;
 					}
 					(void) adjmsg(mp1, urp - seg_len);
 					/* Feed this piece back in. */
 					tmp_rnxt = tcp->tcp_rnxt;
-					tcp_rput_data(connp, mp1, NULL);
+					tcp_input_data(connp, mp1, NULL, ira);
 					/*
 					 * If the data passed back in was not
 					 * processed (ie: bad ACK) sending
@@ -13811,13 +10919,13 @@ ok:;
 						 */
 						(void) adjmsg(mp,
 						    urp + 1 - seg_len);
-						tcp_rput_data(connp,
-						    mp, NULL);
+						tcp_input_data(connp,
+						    mp, NULL, ira);
 						return;
 					}
 					(void) adjmsg(mp1, urp + 1 - seg_len);
 					tmp_rnxt = tcp->tcp_rnxt;
-					tcp_rput_data(connp, mp1, NULL);
+					tcp_input_data(connp, mp1, NULL, ira);
 					/*
 					 * If the data passed back in was not
 					 * processed (ie: bad ACK) sending
@@ -13831,7 +10939,7 @@ ok:;
 						return;
 					}
 				}
-				tcp_rput_data(connp, mp, NULL);
+				tcp_input_data(connp, mp, NULL, ira);
 				return;
 			}
 			/*
@@ -13960,7 +11068,7 @@ process_ack:
 	}
 	bytes_acked = (int)(seg_ack - tcp->tcp_suna);
 
-	if (tcp->tcp_ipversion == IPV6_VERSION && bytes_acked > 0)
+	if (bytes_acked > 0)
 		tcp->tcp_ip_forward_progress = B_TRUE;
 	if (tcp->tcp_state == TCPS_SYN_RCVD) {
 		if ((tcp->tcp_conn.tcp_eager_conn_ind != NULL) &&
@@ -13983,7 +11091,7 @@ process_ack:
 
 			/*
 			 * The listener also exists because of the refhold
-			 * done in tcp_conn_request. Its possible that it
+			 * done in tcp_input_listener. Its possible that it
 			 * might have closed. We will check that once we
 			 * get inside listeners context.
 			 */
@@ -14005,12 +11113,12 @@ process_ack:
 			} else if (!tcp->tcp_loopback) {
 				SQUEUE_ENTER_ONE(listener->tcp_connp->conn_sqp,
 				    mp, tcp_send_conn_ind,
-				    listener->tcp_connp, SQ_FILL,
+				    listener->tcp_connp, NULL, SQ_FILL,
 				    SQTAG_TCP_CONN_IND);
 			} else {
 				SQUEUE_ENTER_ONE(listener->tcp_connp->conn_sqp,
 				    mp, tcp_send_conn_ind,
-				    listener->tcp_connp, SQ_PROCESS,
+				    listener->tcp_connp, NULL, SQ_PROCESS,
 				    SQTAG_TCP_CONN_IND);
 			}
 		}
@@ -14026,7 +11134,7 @@ process_ack:
 		 */
 		tcp->tcp_state = TCPS_ESTABLISHED;
 		if (tcp->tcp_active_open) {
-			if (!tcp_conn_con(tcp, iphdr, tcph, mp, NULL)) {
+			if (!tcp_conn_con(tcp, iphdr, mp, NULL, ira)) {
 				freemsg(mp);
 				tcp->tcp_state = TCPS_SYN_RCVD;
 				return;
@@ -14044,8 +11152,7 @@ process_ack:
 		tcp->tcp_suna = tcp->tcp_iss + 1;	/* One for the SYN */
 		bytes_acked--;
 		/* SYN was acked - making progress */
-		if (tcp->tcp_ipversion == IPV6_VERSION)
-			tcp->tcp_ip_forward_progress = B_TRUE;
+		tcp->tcp_ip_forward_progress = B_TRUE;
 
 		/*
 		 * If SYN was retransmitted, need to reset all
@@ -14083,7 +11190,7 @@ process_ack:
 
 		/* Fuse when both sides are in ESTABLISHED state */
 		if (tcp->tcp_loopback && do_tcp_fusion)
-			tcp_fuse(tcp, iphdr, tcph);
+			tcp_fuse(tcp, iphdr, tcpha);
 
 	}
 	/* This code follows 4.4BSD-Lite2 mostly. */
@@ -14388,7 +11495,7 @@ process_ack:
 			if (mp != NULL) {
 				BUMP_LOCAL(tcp->tcp_obsegs);
 				BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
-				tcp_send_data(tcp, tcp->tcp_wq, mp);
+				tcp_send_data(tcp, mp);
 			}
 			return;
 		}
@@ -14487,7 +11594,6 @@ process_ack:
 				}
 			} else {
 				tcp->tcp_rexmit = B_FALSE;
-				tcp->tcp_xmit_zc_clean = B_FALSE;
 				tcp->tcp_rexmit_nxt = tcp->tcp_snxt;
 				tcp->tcp_snd_burst = tcp->tcp_localnet ?
 				    TCP_CWND_INFINITE : TCP_CWND_NORMAL;
@@ -14662,8 +11768,7 @@ fin_acked:
 			tcp->tcp_xmit_tail = NULL;
 			if (tcp->tcp_fin_sent) {
 				/* FIN was acked - making progress */
-				if (tcp->tcp_ipversion == IPV6_VERSION &&
-				    !tcp->tcp_fin_acked)
+				if (!tcp->tcp_fin_acked)
 					tcp->tcp_ip_forward_progress = B_TRUE;
 				tcp->tcp_fin_acked = B_TRUE;
 				if (tcp->tcp_linger_tid != 0 &&
@@ -14781,7 +11886,7 @@ est:
 				 * bit so this TIME-WAIT connection won't
 				 * interfere with new ones.
 				 */
-				tcp->tcp_exclbind = 0;
+				connp->conn_exclbind = 0;
 				if (!TCP_IS_DETACHED(tcp)) {
 					TCP_TIMER_RESTART(tcp,
 					    tcps->tcps_time_wait_interval);
@@ -14805,8 +11910,8 @@ est:
 		if (!tcp->tcp_fin_rcvd) {
 			tcp->tcp_fin_rcvd = B_TRUE;
 			tcp->tcp_rnxt++;
-			tcph = tcp->tcp_tcph;
-			U32_TO_ABE32(tcp->tcp_rnxt, tcph->th_ack);
+			tcpha = tcp->tcp_tcpha;
+			tcpha->tha_ack = htonl(tcp->tcp_rnxt);
 
 			/*
 			 * Generate the ordrel_ind at the end unless we
@@ -14815,7 +11920,7 @@ est:
 			 * after tcp_accept is done.
 			 */
 			if (tcp->tcp_listener == NULL &&
-			    !TCP_IS_DETACHED(tcp) && (!tcp->tcp_hard_binding))
+			    !TCP_IS_DETACHED(tcp) && !tcp->tcp_hard_binding)
 				flags |= TH_ORDREL_NEEDED;
 			switch (tcp->tcp_state) {
 			case TCPS_SYN_RCVD:
@@ -14836,7 +11941,7 @@ est:
 				 * bit so this TIME-WAIT connection won't
 				 * interfere with new ones.
 				 */
-				tcp->tcp_exclbind = 0;
+				connp->conn_exclbind = 0;
 				if (!TCP_IS_DETACHED(tcp)) {
 					TCP_TIMER_RESTART(tcp,
 					    tcps->tcps_time_wait_interval);
@@ -14872,7 +11977,7 @@ est:
 		freeb(mp1);
 	}
 update_ack:
-	tcph = tcp->tcp_tcph;
+	tcpha = tcp->tcp_tcpha;
 	tcp->tcp_rack_cnt++;
 	{
 		uint32_t cur_max;
@@ -14915,7 +12020,7 @@ update_ack:
 		}
 	}
 	tcp->tcp_rnxt += seg_len;
-	U32_TO_ABE32(tcp->tcp_rnxt, tcph->th_ack);
+	tcpha->tha_ack = htonl(tcp->tcp_rnxt);
 
 	if (mp == NULL)
 		goto xmit_check;
@@ -14942,12 +12047,13 @@ update_ack:
 	/*
 	 * Check for ancillary data changes compared to last segment.
 	 */
-	if (tcp->tcp_ipv6_recvancillary != 0) {
-		mp = tcp_rput_add_ancillary(tcp, mp, &ipp);
-		ASSERT(mp != NULL);
+	if (connp->conn_recv_ancillary.crb_all != 0) {
+		mp = tcp_input_add_ancillary(tcp, mp, &ipp, ira);
+		if (mp == NULL)
+			return;
 	}
 
-	if (tcp->tcp_listener || tcp->tcp_hard_binding) {
+	if (tcp->tcp_listener != NULL || tcp->tcp_hard_binding) {
 		/*
 		 * Side queue inbound data until the accept happens.
 		 * tcp_accept/tcp_rput drains this when the accept happens.
@@ -14961,9 +12067,9 @@ update_ack:
 		if (tcp->tcp_kssl_pending) {
 			DTRACE_PROBE1(kssl_mblk__ksslinput_pending,
 			    mblk_t *, mp);
-			tcp_kssl_input(tcp, mp);
+			tcp_kssl_input(tcp, mp, ira->ira_cred);
 		} else {
-			tcp_rcv_enqueue(tcp, mp, seg_len);
+			tcp_rcv_enqueue(tcp, mp, seg_len, ira->ira_cred);
 		}
 	} else if (IPCL_IS_NONSTR(connp)) {
 		/*
@@ -15015,19 +12121,22 @@ update_ack:
 			    (DB_TYPE(mp) == M_DATA)) {
 				DTRACE_PROBE1(kssl_mblk__ksslinput_data1,
 				    mblk_t *, mp);
-				tcp_kssl_input(tcp, mp);
+				tcp_kssl_input(tcp, mp, ira->ira_cred);
 			} else {
-				putnext(tcp->tcp_rq, mp);
-				if (!canputnext(tcp->tcp_rq))
+				if (is_system_labeled())
+					tcp_setcred_data(mp, ira);
+
+				putnext(connp->conn_rq, mp);
+				if (!canputnext(connp->conn_rq))
 					tcp->tcp_rwnd -= seg_len;
 			}
 		} else if ((tcp->tcp_kssl_ctx != NULL) &&
 		    (DB_TYPE(mp) == M_DATA)) {
 			/* Does this need SSL processing first? */
 			DTRACE_PROBE1(kssl_mblk__ksslinput_data2, mblk_t *, mp);
-			tcp_kssl_input(tcp, mp);
+			tcp_kssl_input(tcp, mp, ira->ira_cred);
 		} else if ((flags & (TH_PUSH|TH_FIN)) ||
-		    tcp->tcp_rcv_cnt + seg_len >= tcp->tcp_recv_hiwater >> 3) {
+		    tcp->tcp_rcv_cnt + seg_len >= connp->conn_rcvbuf >> 3) {
 			if (tcp->tcp_rcv_list != NULL) {
 				/*
 				 * Enqueue the new segment first and then
@@ -15042,11 +12151,15 @@ update_ack:
 				 * canputnext() as tcp_rcv_drain() needs to
 				 * call canputnext().
 				 */
-				tcp_rcv_enqueue(tcp, mp, seg_len);
+				tcp_rcv_enqueue(tcp, mp, seg_len,
+				    ira->ira_cred);
 				flags |= tcp_rcv_drain(tcp);
 			} else {
-				putnext(tcp->tcp_rq, mp);
-				if (!canputnext(tcp->tcp_rq))
+				if (is_system_labeled())
+					tcp_setcred_data(mp, ira);
+
+				putnext(connp->conn_rq, mp);
+				if (!canputnext(connp->conn_rq))
 					tcp->tcp_rwnd -= seg_len;
 			}
 		} else {
@@ -15054,7 +12167,7 @@ update_ack:
 			 * Enqueue all packets when processing an mblk
 			 * from the co queue and also enqueue normal packets.
 			 */
-			tcp_rcv_enqueue(tcp, mp, seg_len);
+			tcp_rcv_enqueue(tcp, mp, seg_len, ira->ira_cred);
 		}
 		/*
 		 * Make sure the timer is running if we have data waiting
@@ -15103,7 +12216,7 @@ xmit_check:
 				BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
 				UPDATE_MIB(&tcps->tcps_mib,
 				    tcpRetransBytes, snd_size);
-				tcp_send_data(tcp, tcp->tcp_wq, mp1);
+				tcp_send_data(tcp, mp1);
 			}
 		}
 		if (flags & TH_NEED_SACK_REXMIT) {
@@ -15155,7 +12268,10 @@ ack_check:
 		ASSERT(tcp->tcp_rcv_list == NULL || tcp->tcp_fused_sigurg);
 		mp1 = tcp->tcp_urp_mark_mp;
 		tcp->tcp_urp_mark_mp = NULL;
-		putnext(tcp->tcp_rq, mp1);
+		if (is_system_labeled())
+			tcp_setcred_data(mp1, ira);
+
+		putnext(connp->conn_rq, mp1);
 #ifdef DEBUG
 		(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE,
 		    "tcp_rput: sending zero-length %s %s",
@@ -15172,7 +12288,7 @@ ack_check:
 		mp1 = tcp_ack_mp(tcp);
 
 		if (mp1 != NULL) {
-			tcp_send_data(tcp, tcp->tcp_wq, mp1);
+			tcp_send_data(tcp, mp1);
 			BUMP_LOCAL(tcp->tcp_obsegs);
 			BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
 		}
@@ -15200,6 +12316,7 @@ ack_check:
 		 * after tcp_accept is done.
 		 */
 		ASSERT(tcp->tcp_listener == NULL);
+		ASSERT(!tcp->tcp_detached);
 
 		if (IPCL_IS_NONSTR(connp)) {
 			ASSERT(tcp->tcp_ordrel_mp == NULL);
@@ -15220,7 +12337,7 @@ ack_check:
 		mp1 = tcp->tcp_ordrel_mp;
 		tcp->tcp_ordrel_mp = NULL;
 		tcp->tcp_ordrel_done = B_TRUE;
-		putnext(tcp->tcp_rq, mp1);
+		putnext(connp->conn_rq, mp1);
 	}
 done:
 	ASSERT(!(flags & TH_MARKNEXT_NEEDED));
@@ -15251,21 +12368,22 @@ tcp_update_xmit_tail(tcp_t *tcp, uint32_t snxt)
  * segment passes the PAWS test, else returns B_FALSE.
  */
 boolean_t
-tcp_paws_check(tcp_t *tcp, tcph_t *tcph, tcp_opt_t *tcpoptp)
+tcp_paws_check(tcp_t *tcp, tcpha_t *tcpha, tcp_opt_t *tcpoptp)
 {
 	uint8_t	flags;
 	int	options;
 	uint8_t *up;
+	conn_t	*connp = tcp->tcp_connp;
 
-	flags = (unsigned int)tcph->th_flags[0] & 0xFF;
+	flags = (unsigned int)tcpha->tha_flags & 0xFF;
 	/*
 	 * If timestamp option is aligned nicely, get values inline,
 	 * otherwise call general routine to parse.  Only do that
 	 * if timestamp is the only option.
 	 */
-	if (TCP_HDR_LENGTH(tcph) == (uint32_t)TCP_MIN_HEADER_LENGTH +
+	if (TCP_HDR_LENGTH(tcpha) == (uint32_t)TCP_MIN_HEADER_LENGTH +
 	    TCPOPT_REAL_TS_LEN &&
-	    OK_32PTR((up = ((uint8_t *)tcph) +
+	    OK_32PTR((up = ((uint8_t *)tcpha) +
 	    TCP_MIN_HEADER_LENGTH)) &&
 	    *(uint32_t *)up == TCPOPT_NOP_NOP_TSTAMP) {
 		tcpoptp->tcp_opt_ts_val = ABE32_TO_U32((up+4));
@@ -15278,7 +12396,7 @@ tcp_paws_check(tcp_t *tcp, tcph_t *tcph, tcp_opt_t *tcpoptp)
 		} else {
 			tcpoptp->tcp = NULL;
 		}
-		options = tcp_parse_options(tcph, tcpoptp);
+		options = tcp_parse_options(tcpha, tcpoptp);
 	}
 
 	if (options & TCP_OPT_TSTAMP_PRESENT) {
@@ -15311,16 +12429,15 @@ tcp_paws_check(tcp_t *tcp, tcph_t *tcph, tcp_opt_t *tcpoptp)
 		 */
 		tcp->tcp_snd_ts_ok = B_FALSE;
 
-		tcp->tcp_hdr_len -= TCPOPT_REAL_TS_LEN;
-		tcp->tcp_tcp_hdr_len -= TCPOPT_REAL_TS_LEN;
-		tcp->tcp_tcph->th_offset_and_rsrvd[0] -= (3 << 4);
+		connp->conn_ht_iphc_len -= TCPOPT_REAL_TS_LEN;
+		connp->conn_ht_ulp_len -= TCPOPT_REAL_TS_LEN;
+		tcp->tcp_tcpha->tha_offset_and_reserved -= (3 << 4);
 		/*
-		 * Adjust the tcp_mss accordingly. We also need to
-		 * adjust tcp_cwnd here in accordance with the new mss.
-		 * But we avoid doing a slow start here so as to not
-		 * to lose on the transfer rate built up so far.
+		 * Adjust the tcp_mss and tcp_cwnd accordingly. We avoid
+		 * doing a slow start here so as to not to lose on the
+		 * transfer rate built up so far.
 		 */
-		tcp_mss_set(tcp, tcp->tcp_mss + TCPOPT_REAL_TS_LEN, B_FALSE);
+		tcp_mss_set(tcp, tcp->tcp_mss + TCPOPT_REAL_TS_LEN);
 		if (tcp->tcp_snd_sack_ok) {
 			ASSERT(tcp->tcp_sack_info != NULL);
 			tcp->tcp_max_sack_blk = 4;
@@ -15338,38 +12455,37 @@ tcp_paws_check(tcp_t *tcp, tcph_t *tcph, tcp_opt_t *tcpoptp)
  * when memory allocation fails we can just wait for the next data segment.
  */
 static mblk_t *
-tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
+tcp_input_add_ancillary(tcp_t *tcp, mblk_t *mp, ip_pkt_t *ipp,
+    ip_recv_attr_t *ira)
 {
 	struct T_optdata_ind *todi;
 	int optlen;
 	uchar_t *optptr;
 	struct T_opthdr *toh;
-	uint_t addflag;	/* Which pieces to add */
+	crb_t addflag;	/* Which pieces to add */
 	mblk_t *mp1;
+	conn_t	*connp = tcp->tcp_connp;
 
 	optlen = 0;
-	addflag = 0;
+	addflag.crb_all = 0;
 	/* If app asked for pktinfo and the index has changed ... */
-	if ((ipp->ipp_fields & IPPF_IFINDEX) &&
-	    ipp->ipp_ifindex != tcp->tcp_recvifindex &&
-	    (tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVPKTINFO)) {
+	if (connp->conn_recv_ancillary.crb_ip_recvpktinfo &&
+	    ira->ira_ruifindex != tcp->tcp_recvifindex) {
 		optlen += sizeof (struct T_opthdr) +
 		    sizeof (struct in6_pktinfo);
-		addflag |= TCP_IPV6_RECVPKTINFO;
+		addflag.crb_ip_recvpktinfo = 1;
 	}
 	/* If app asked for hoplimit and it has changed ... */
-	if ((ipp->ipp_fields & IPPF_HOPLIMIT) &&
-	    ipp->ipp_hoplimit != tcp->tcp_recvhops &&
-	    (tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVHOPLIMIT)) {
+	if (connp->conn_recv_ancillary.crb_ipv6_recvhoplimit &&
+	    ipp->ipp_hoplimit != tcp->tcp_recvhops) {
 		optlen += sizeof (struct T_opthdr) + sizeof (uint_t);
-		addflag |= TCP_IPV6_RECVHOPLIMIT;
+		addflag.crb_ipv6_recvhoplimit = 1;
 	}
 	/* If app asked for tclass and it has changed ... */
-	if ((ipp->ipp_fields & IPPF_TCLASS) &&
-	    ipp->ipp_tclass != tcp->tcp_recvtclass &&
-	    (tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVTCLASS)) {
+	if (connp->conn_recv_ancillary.crb_ipv6_recvtclass &&
+	    ipp->ipp_tclass != tcp->tcp_recvtclass) {
 		optlen += sizeof (struct T_opthdr) + sizeof (uint_t);
-		addflag |= TCP_IPV6_RECVTCLASS;
+		addflag.crb_ipv6_recvtclass = 1;
 	}
 	/*
 	 * If app asked for hopbyhop headers and it has changed ...
@@ -15377,51 +12493,51 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 	 * a connected socket at all, (2) we're connected to at most one peer,
 	 * (3) if anything changes, then it must be some other extra option.
 	 */
-	if ((tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVHOPOPTS) &&
+	if (connp->conn_recv_ancillary.crb_ipv6_recvhopopts &&
 	    ip_cmpbuf(tcp->tcp_hopopts, tcp->tcp_hopoptslen,
 	    (ipp->ipp_fields & IPPF_HOPOPTS),
 	    ipp->ipp_hopopts, ipp->ipp_hopoptslen)) {
-		optlen += sizeof (struct T_opthdr) + ipp->ipp_hopoptslen -
-		    tcp->tcp_label_len;
-		addflag |= TCP_IPV6_RECVHOPOPTS;
+		optlen += sizeof (struct T_opthdr) + ipp->ipp_hopoptslen;
+		addflag.crb_ipv6_recvhopopts = 1;
 		if (!ip_allocbuf((void **)&tcp->tcp_hopopts,
 		    &tcp->tcp_hopoptslen, (ipp->ipp_fields & IPPF_HOPOPTS),
 		    ipp->ipp_hopopts, ipp->ipp_hopoptslen))
 			return (mp);
 	}
 	/* If app asked for dst headers before routing headers ... */
-	if ((tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVRTDSTOPTS) &&
-	    ip_cmpbuf(tcp->tcp_rtdstopts, tcp->tcp_rtdstoptslen,
-	    (ipp->ipp_fields & IPPF_RTDSTOPTS),
-	    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen)) {
+	if (connp->conn_recv_ancillary.crb_ipv6_recvrthdrdstopts &&
+	    ip_cmpbuf(tcp->tcp_rthdrdstopts, tcp->tcp_rthdrdstoptslen,
+	    (ipp->ipp_fields & IPPF_RTHDRDSTOPTS),
+	    ipp->ipp_rthdrdstopts, ipp->ipp_rthdrdstoptslen)) {
 		optlen += sizeof (struct T_opthdr) +
-		    ipp->ipp_rtdstoptslen;
-		addflag |= TCP_IPV6_RECVRTDSTOPTS;
-		if (!ip_allocbuf((void **)&tcp->tcp_rtdstopts,
-		    &tcp->tcp_rtdstoptslen, (ipp->ipp_fields & IPPF_RTDSTOPTS),
-		    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen))
+		    ipp->ipp_rthdrdstoptslen;
+		addflag.crb_ipv6_recvrthdrdstopts = 1;
+		if (!ip_allocbuf((void **)&tcp->tcp_rthdrdstopts,
+		    &tcp->tcp_rthdrdstoptslen,
+		    (ipp->ipp_fields & IPPF_RTHDRDSTOPTS),
+		    ipp->ipp_rthdrdstopts, ipp->ipp_rthdrdstoptslen))
 			return (mp);
 	}
 	/* If app asked for routing headers and it has changed ... */
-	if ((tcp->tcp_ipv6_recvancillary & TCP_IPV6_RECVRTHDR) &&
+	if (connp->conn_recv_ancillary.crb_ipv6_recvrthdr &&
 	    ip_cmpbuf(tcp->tcp_rthdr, tcp->tcp_rthdrlen,
 	    (ipp->ipp_fields & IPPF_RTHDR),
 	    ipp->ipp_rthdr, ipp->ipp_rthdrlen)) {
 		optlen += sizeof (struct T_opthdr) + ipp->ipp_rthdrlen;
-		addflag |= TCP_IPV6_RECVRTHDR;
+		addflag.crb_ipv6_recvrthdr = 1;
 		if (!ip_allocbuf((void **)&tcp->tcp_rthdr,
 		    &tcp->tcp_rthdrlen, (ipp->ipp_fields & IPPF_RTHDR),
 		    ipp->ipp_rthdr, ipp->ipp_rthdrlen))
 			return (mp);
 	}
 	/* If app asked for dest headers and it has changed ... */
-	if ((tcp->tcp_ipv6_recvancillary &
-	    (TCP_IPV6_RECVDSTOPTS | TCP_OLD_IPV6_RECVDSTOPTS)) &&
+	if ((connp->conn_recv_ancillary.crb_ipv6_recvdstopts ||
+	    connp->conn_recv_ancillary.crb_old_ipv6_recvdstopts) &&
 	    ip_cmpbuf(tcp->tcp_dstopts, tcp->tcp_dstoptslen,
 	    (ipp->ipp_fields & IPPF_DSTOPTS),
 	    ipp->ipp_dstopts, ipp->ipp_dstoptslen)) {
 		optlen += sizeof (struct T_opthdr) + ipp->ipp_dstoptslen;
-		addflag |= TCP_IPV6_RECVDSTOPTS;
+		addflag.crb_ipv6_recvdstopts = 1;
 		if (!ip_allocbuf((void **)&tcp->tcp_dstopts,
 		    &tcp->tcp_dstoptslen, (ipp->ipp_fields & IPPF_DSTOPTS),
 		    ipp->ipp_dstopts, ipp->ipp_dstoptslen))
@@ -15454,9 +12570,11 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 	 * If app asked for pktinfo and the index has changed ...
 	 * Note that the local address never changes for the connection.
 	 */
-	if (addflag & TCP_IPV6_RECVPKTINFO) {
+	if (addflag.crb_ip_recvpktinfo) {
 		struct in6_pktinfo *pkti;
+		uint_t ifindex;
 
+		ifindex = ira->ira_ruifindex;
 		toh = (struct T_opthdr *)optptr;
 		toh->level = IPPROTO_IPV6;
 		toh->name = IPV6_PKTINFO;
@@ -15464,19 +12582,15 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 		toh->status = 0;
 		optptr += sizeof (*toh);
 		pkti = (struct in6_pktinfo *)optptr;
-		if (tcp->tcp_ipversion == IPV6_VERSION)
-			pkti->ipi6_addr = tcp->tcp_ip6h->ip6_src;
-		else
-			IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src,
-			    &pkti->ipi6_addr);
-		pkti->ipi6_ifindex = ipp->ipp_ifindex;
+		pkti->ipi6_addr = connp->conn_laddr_v6;
+		pkti->ipi6_ifindex = ifindex;
 		optptr += sizeof (*pkti);
 		ASSERT(OK_32PTR(optptr));
 		/* Save as "last" value */
-		tcp->tcp_recvifindex = ipp->ipp_ifindex;
+		tcp->tcp_recvifindex = ifindex;
 	}
 	/* If app asked for hoplimit and it has changed ... */
-	if (addflag & TCP_IPV6_RECVHOPLIMIT) {
+	if (addflag.crb_ipv6_recvhoplimit) {
 		toh = (struct T_opthdr *)optptr;
 		toh->level = IPPROTO_IPV6;
 		toh->name = IPV6_HOPLIMIT;
@@ -15490,7 +12604,7 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 		tcp->tcp_recvhops = ipp->ipp_hoplimit;
 	}
 	/* If app asked for tclass and it has changed ... */
-	if (addflag & TCP_IPV6_RECVTCLASS) {
+	if (addflag.crb_ipv6_recvtclass) {
 		toh = (struct T_opthdr *)optptr;
 		toh->level = IPPROTO_IPV6;
 		toh->name = IPV6_TCLASS;
@@ -15503,40 +12617,38 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 		/* Save as "last" value */
 		tcp->tcp_recvtclass = ipp->ipp_tclass;
 	}
-	if (addflag & TCP_IPV6_RECVHOPOPTS) {
+	if (addflag.crb_ipv6_recvhopopts) {
 		toh = (struct T_opthdr *)optptr;
 		toh->level = IPPROTO_IPV6;
 		toh->name = IPV6_HOPOPTS;
-		toh->len = sizeof (*toh) + ipp->ipp_hopoptslen -
-		    tcp->tcp_label_len;
+		toh->len = sizeof (*toh) + ipp->ipp_hopoptslen;
 		toh->status = 0;
 		optptr += sizeof (*toh);
-		bcopy((uchar_t *)ipp->ipp_hopopts + tcp->tcp_label_len, optptr,
-		    ipp->ipp_hopoptslen - tcp->tcp_label_len);
-		optptr += ipp->ipp_hopoptslen - tcp->tcp_label_len;
+		bcopy((uchar_t *)ipp->ipp_hopopts, optptr, ipp->ipp_hopoptslen);
+		optptr += ipp->ipp_hopoptslen;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
 		ip_savebuf((void **)&tcp->tcp_hopopts, &tcp->tcp_hopoptslen,
 		    (ipp->ipp_fields & IPPF_HOPOPTS),
 		    ipp->ipp_hopopts, ipp->ipp_hopoptslen);
 	}
-	if (addflag & TCP_IPV6_RECVRTDSTOPTS) {
+	if (addflag.crb_ipv6_recvrthdrdstopts) {
 		toh = (struct T_opthdr *)optptr;
 		toh->level = IPPROTO_IPV6;
 		toh->name = IPV6_RTHDRDSTOPTS;
-		toh->len = sizeof (*toh) + ipp->ipp_rtdstoptslen;
+		toh->len = sizeof (*toh) + ipp->ipp_rthdrdstoptslen;
 		toh->status = 0;
 		optptr += sizeof (*toh);
-		bcopy(ipp->ipp_rtdstopts, optptr, ipp->ipp_rtdstoptslen);
-		optptr += ipp->ipp_rtdstoptslen;
+		bcopy(ipp->ipp_rthdrdstopts, optptr, ipp->ipp_rthdrdstoptslen);
+		optptr += ipp->ipp_rthdrdstoptslen;
 		ASSERT(OK_32PTR(optptr));
 		/* Save as last value */
-		ip_savebuf((void **)&tcp->tcp_rtdstopts,
-		    &tcp->tcp_rtdstoptslen,
-		    (ipp->ipp_fields & IPPF_RTDSTOPTS),
-		    ipp->ipp_rtdstopts, ipp->ipp_rtdstoptslen);
+		ip_savebuf((void **)&tcp->tcp_rthdrdstopts,
+		    &tcp->tcp_rthdrdstoptslen,
+		    (ipp->ipp_fields & IPPF_RTHDRDSTOPTS),
+		    ipp->ipp_rthdrdstopts, ipp->ipp_rthdrdstoptslen);
 	}
-	if (addflag & TCP_IPV6_RECVRTHDR) {
+	if (addflag.crb_ipv6_recvrthdr) {
 		toh = (struct T_opthdr *)optptr;
 		toh->level = IPPROTO_IPV6;
 		toh->name = IPV6_RTHDR;
@@ -15551,7 +12663,7 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 		    (ipp->ipp_fields & IPPF_RTHDR),
 		    ipp->ipp_rthdr, ipp->ipp_rthdrlen);
 	}
-	if (addflag & (TCP_IPV6_RECVDSTOPTS | TCP_OLD_IPV6_RECVDSTOPTS)) {
+	if (addflag.crb_ipv6_recvdstopts) {
 		toh = (struct T_opthdr *)optptr;
 		toh->level = IPPROTO_IPV6;
 		toh->name = IPV6_DSTOPTS;
@@ -15570,99 +12682,13 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 	return (mp);
 }
 
-/*
- * tcp_rput_other is called by tcp_rput to handle everything other than M_DATA
- * messages.
- */
-void
-tcp_rput_other(tcp_t *tcp, mblk_t *mp)
-{
-	uchar_t	*rptr = mp->b_rptr;
-	queue_t	*q = tcp->tcp_rq;
-	struct T_error_ack *tea;
-
-	switch (mp->b_datap->db_type) {
-	case M_PROTO:
-	case M_PCPROTO:
-		ASSERT((uintptr_t)(mp->b_wptr - rptr) <= (uintptr_t)INT_MAX);
-		if ((mp->b_wptr - rptr) < sizeof (t_scalar_t))
-			break;
-		tea = (struct T_error_ack *)rptr;
-		ASSERT(tea->PRIM_type != T_BIND_ACK);
-		ASSERT(tea->ERROR_prim != O_T_BIND_REQ &&
-		    tea->ERROR_prim != T_BIND_REQ);
-		switch (tea->PRIM_type) {
-		case T_ERROR_ACK:
-			if (tcp->tcp_debug) {
-				(void) strlog(TCP_MOD_ID, 0, 1,
-				    SL_TRACE|SL_ERROR,
-				    "tcp_rput_other: case T_ERROR_ACK, "
-				    "ERROR_prim == %d",
-				    tea->ERROR_prim);
-			}
-			switch (tea->ERROR_prim) {
-			case T_SVR4_OPTMGMT_REQ:
-				if (tcp->tcp_drop_opt_ack_cnt > 0) {
-					/* T_OPTMGMT_REQ generated by TCP */
-					printf("T_SVR4_OPTMGMT_REQ failed "
-					    "%d/%d - dropped (cnt %d)\n",
-					    tea->TLI_error, tea->UNIX_error,
-					    tcp->tcp_drop_opt_ack_cnt);
-					freemsg(mp);
-					tcp->tcp_drop_opt_ack_cnt--;
-					return;
-				}
-				break;
-			}
-			if (tea->ERROR_prim == T_SVR4_OPTMGMT_REQ &&
-			    tcp->tcp_drop_opt_ack_cnt > 0) {
-				printf("T_SVR4_OPTMGMT_REQ failed %d/%d "
-				    "- dropped (cnt %d)\n",
-				    tea->TLI_error, tea->UNIX_error,
-				    tcp->tcp_drop_opt_ack_cnt);
-				freemsg(mp);
-				tcp->tcp_drop_opt_ack_cnt--;
-				return;
-			}
-			break;
-		case T_OPTMGMT_ACK:
-			if (tcp->tcp_drop_opt_ack_cnt > 0) {
-				/* T_OPTMGMT_REQ generated by TCP */
-				freemsg(mp);
-				tcp->tcp_drop_opt_ack_cnt--;
-				return;
-			}
-			break;
-		default:
-			ASSERT(tea->ERROR_prim != T_UNBIND_REQ);
-			break;
-		}
-		break;
-	case M_FLUSH:
-		if (*rptr & FLUSHR)
-			flushq(q, FLUSHDATA);
-		break;
-	default:
-		/* M_CTL will be directly sent to tcp_icmp_error() */
-		ASSERT(DB_TYPE(mp) != M_CTL);
-		break;
-	}
-	/*
-	 * Make sure we set this bit before sending the ACK for
-	 * bind. Otherwise accept could possibly run and free
-	 * this tcp struct.
-	 */
-	ASSERT(q != NULL);
-	putnext(q, mp);
-}
-
 /* ARGSUSED */
 static void
-tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
+tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t	*tcp = connp->conn_tcp;
-	queue_t	*q = tcp->tcp_rq;
+	queue_t	*q = connp->conn_rq;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	ASSERT(!IPCL_IS_NONSTR(connp));
@@ -15683,7 +12709,7 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 
 	if (canputnext(q)) {
 		/* Not flow-controlled, open rwnd */
-		tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
+		tcp->tcp_rwnd = connp->conn_rcvbuf;
 
 		/*
 		 * Send back a window update immediately if TCP is above
@@ -15712,15 +12738,9 @@ tcp_rsrv(queue_t *q)
 	conn_t		*connp = Q_TO_CONN(q);
 	tcp_t		*tcp = connp->conn_tcp;
 	mblk_t		*mp;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	/* No code does a putq on the read side */
 	ASSERT(q->q_first == NULL);
-
-	/* Nothing to do for the default queue */
-	if (q == tcps->tcps_g_q) {
-		return;
-	}
 
 	/*
 	 * If tcp->tcp_rsrv_mp == NULL, it means that tcp_rsrv() has already
@@ -15736,7 +12756,7 @@ tcp_rsrv(queue_t *q)
 
 	CONN_INC_REF(connp);
 	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_rsrv_input, connp,
-	    SQ_PROCESS, SQTAG_TCP_RSRV);
+	    NULL, SQ_PROCESS, SQTAG_TCP_RSRV);
 }
 
 /*
@@ -15746,8 +12766,8 @@ tcp_rsrv(queue_t *q)
  *
  * This function is called in 2 cases:
  *
- * 1) Before data transfer begins, in tcp_accept_comm() for accepting a
- *    connection (passive open) and in tcp_rput_data() for active connect.
+ * 1) Before data transfer begins, in tcp_input_listener() for accepting a
+ *    connection (passive open) and in tcp_input_data() for active connect.
  *    This is called after tcp_mss_set() when the desired MSS value is known.
  *    This makes sure that our window size is a mutiple of the other side's
  *    MSS.
@@ -15766,6 +12786,7 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 	uint32_t	max_transmittable_rwnd;
 	boolean_t	tcp_detached = TCP_IS_DETACHED(tcp);
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
 	/*
 	 * Insist on a receive window that is at least
@@ -15782,7 +12803,7 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 		ASSERT(peer_tcp != NULL);
 		sth_hiwat = tcp_fuse_set_rcv_hiwat(tcp, rwnd);
 		if (!tcp_detached) {
-			(void) proto_set_rx_hiwat(tcp->tcp_rq, tcp->tcp_connp,
+			(void) proto_set_rx_hiwat(connp->conn_rq, connp,
 			    sth_hiwat);
 			tcp_set_recv_threshold(tcp, sth_hiwat >> 3);
 		}
@@ -15797,11 +12818,10 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 		return (sth_hiwat);
 	}
 
-	if (tcp_detached) {
+	if (tcp_detached)
 		old_max_rwnd = tcp->tcp_rwnd;
-	} else {
-		old_max_rwnd = tcp->tcp_recv_hiwater;
-	}
+	else
+		old_max_rwnd = connp->conn_rcvbuf;
 
 
 	/*
@@ -15854,9 +12874,14 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 	 * connection.)
 	 */
 	tcp->tcp_rwnd += rwnd - old_max_rwnd;
-	tcp->tcp_recv_hiwater = rwnd;
+	connp->conn_rcvbuf = rwnd;
 
-	U32_TO_ABE16(tcp->tcp_rwnd >> tcp->tcp_rcv_ws, tcp->tcp_tcph->th_win);
+	/* Are we already connected? */
+	if (tcp->tcp_tcpha != NULL) {
+		tcp->tcp_tcpha->tha_win =
+		    htons(tcp->tcp_rwnd >> tcp->tcp_rcv_ws);
+	}
+
 	if ((tcp->tcp_rcv_ws > 0) && rwnd > tcp->tcp_cwnd_max)
 		tcp->tcp_cwnd_max = rwnd;
 
@@ -15865,7 +12890,7 @@ tcp_rwnd_set(tcp_t *tcp, uint32_t rwnd)
 
 	tcp_set_recv_threshold(tcp, rwnd >> 3);
 
-	(void) proto_set_rx_hiwat(tcp->tcp_rq, tcp->tcp_connp, rwnd);
+	(void) proto_set_rx_hiwat(connp->conn_rq, connp, rwnd);
 	return (rwnd);
 }
 
@@ -15944,7 +12969,7 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 		connp = NULL;
 
 		while ((connp =
-		    ipcl_get_next_conn(connfp, connp, IPCL_TCP)) != NULL) {
+		    ipcl_get_next_conn(connfp, connp, IPCL_TCPCONN)) != NULL) {
 			tcp_t *tcp;
 			boolean_t needattr;
 
@@ -15992,11 +13017,10 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 				needattr = B_TRUE;
 				break;
 			}
-			if (connp->conn_fully_bound &&
-			    connp->conn_effective_cred != NULL) {
+			if (connp->conn_ixa->ixa_tsl != NULL) {
 				ts_label_t *tsl;
 
-				tsl = crgetlabel(connp->conn_effective_cred);
+				tsl = connp->conn_ixa->ixa_tsl;
 				mlp.tme_flags |= MIB2_TMEF_IS_LABELED;
 				mlp.tme_doi = label2doi(tsl);
 				mlp.tme_label = *label2bslabel(tsl);
@@ -16004,12 +13028,17 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 			}
 
 			/* Create a message to report on IPv6 entries */
-			if (tcp->tcp_ipversion == IPV6_VERSION) {
-			tce6.tcp6ConnLocalAddress = tcp->tcp_ip_src_v6;
-			tce6.tcp6ConnRemAddress = tcp->tcp_remote_v6;
-			tce6.tcp6ConnLocalPort = ntohs(tcp->tcp_lport);
-			tce6.tcp6ConnRemPort = ntohs(tcp->tcp_fport);
-			tce6.tcp6ConnIfIndex = tcp->tcp_bound_if;
+			if (connp->conn_ipversion == IPV6_VERSION) {
+			tce6.tcp6ConnLocalAddress = connp->conn_laddr_v6;
+			tce6.tcp6ConnRemAddress = connp->conn_faddr_v6;
+			tce6.tcp6ConnLocalPort = ntohs(connp->conn_lport);
+			tce6.tcp6ConnRemPort = ntohs(connp->conn_fport);
+			if (connp->conn_ixa->ixa_flags & IXAF_SCOPEID_SET) {
+				tce6.tcp6ConnIfIndex =
+				    connp->conn_ixa->ixa_scopeid;
+			} else {
+				tce6.tcp6ConnIfIndex = connp->conn_bound_if;
+			}
 			/* Don't want just anybody seeing these... */
 			if (ispriv) {
 				tce6.tcp6ConnEntryInfo.ce_snxt =
@@ -16041,9 +13070,9 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 			tce6.tcp6ConnEntryInfo.ce_state = tcp->tcp_state;
 
 			tce6.tcp6ConnCreationProcess =
-			    (tcp->tcp_cpid < 0) ? MIB2_UNKNOWN_PROCESS :
-			    tcp->tcp_cpid;
-			tce6.tcp6ConnCreationTime = tcp->tcp_open_time;
+			    (connp->conn_cpid < 0) ? MIB2_UNKNOWN_PROCESS :
+			    connp->conn_cpid;
+			tce6.tcp6ConnCreationTime = connp->conn_open_time;
 
 			(void) snmp_append_data2(mp6_conn_ctl->b_cont,
 			    &mp6_conn_tail, (char *)&tce6, sizeof (tce6));
@@ -16059,21 +13088,21 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 			 * but don't have IPV6_V6ONLY set.
 			 * (i.e. anything an IPv4 peer could connect to)
 			 */
-			if (tcp->tcp_ipversion == IPV4_VERSION ||
+			if (connp->conn_ipversion == IPV4_VERSION ||
 			    (tcp->tcp_state <= TCPS_LISTEN &&
-			    !tcp->tcp_connp->conn_ipv6_v6only &&
-			    IN6_IS_ADDR_UNSPECIFIED(&tcp->tcp_ip_src_v6))) {
-				if (tcp->tcp_ipversion == IPV6_VERSION) {
+			    !connp->conn_ipv6_v6only &&
+			    IN6_IS_ADDR_UNSPECIFIED(&connp->conn_laddr_v6))) {
+				if (connp->conn_ipversion == IPV6_VERSION) {
 					tce.tcpConnRemAddress = INADDR_ANY;
 					tce.tcpConnLocalAddress = INADDR_ANY;
 				} else {
 					tce.tcpConnRemAddress =
-					    tcp->tcp_remote;
+					    connp->conn_faddr_v4;
 					tce.tcpConnLocalAddress =
-					    tcp->tcp_ip_src;
+					    connp->conn_laddr_v4;
 				}
-				tce.tcpConnLocalPort = ntohs(tcp->tcp_lport);
-				tce.tcpConnRemPort = ntohs(tcp->tcp_fport);
+				tce.tcpConnLocalPort = ntohs(connp->conn_lport);
+				tce.tcpConnRemPort = ntohs(connp->conn_fport);
 				/* Don't want just anybody seeing these... */
 				if (ispriv) {
 					tce.tcpConnEntryInfo.ce_snxt =
@@ -16107,9 +13136,10 @@ tcp_snmp_get(queue_t *q, mblk_t *mpctl)
 				    tcp->tcp_state;
 
 				tce.tcpConnCreationProcess =
-				    (tcp->tcp_cpid < 0) ? MIB2_UNKNOWN_PROCESS :
-				    tcp->tcp_cpid;
-				tce.tcpConnCreationTime = tcp->tcp_open_time;
+				    (connp->conn_cpid < 0) ?
+				    MIB2_UNKNOWN_PROCESS :
+				    connp->conn_cpid;
+				tce.tcpConnCreationTime = connp->conn_open_time;
 
 				(void) snmp_append_data2(mp_conn_ctl->b_cont,
 				    &mp_conn_tail, (char *)&tce, sizeof (tce));
@@ -16273,7 +13303,6 @@ tcp_timer(void *arg)
 		tcp_t	*listener = tcp->tcp_listener;
 
 		if (tcp->tcp_syn_rcvd_timeout == 0 && (listener != NULL)) {
-			ASSERT(tcp->tcp_rq == listener->tcp_rq);
 			/* it's our first timeout */
 			tcp->tcp_syn_rcvd_timeout = 1;
 			mutex_enter(&listener->tcp_eager_lock);
@@ -16295,7 +13324,7 @@ tcp_timer(void *arg)
 				cmn_err(CE_WARN, "High TCP connect timeout "
 				    "rate! System (port %d) may be under a "
 				    "SYN flood attack!",
-				    BE16_TO_U16(listener->tcp_tcph->th_lport));
+				    ntohs(listener->tcp_connp->conn_lport));
 
 				listener->tcp_ip_addr_cache = kmem_zalloc(
 				    IP_ADDR_CACHE_SIZE * sizeof (ipaddr_t),
@@ -16363,7 +13392,7 @@ tcp_timer(void *arg)
 			 * backoff.
 			 */
 			if (tcp->tcp_swnd == 0 || tcp->tcp_zero_win_probe) {
-				if (tcp->tcp_debug) {
+				if (connp->conn_debug) {
 					(void) strlog(TCP_MOD_ID, 0, 1,
 					    SL_TRACE, "tcp_timer: zero win");
 				}
@@ -16415,6 +13444,13 @@ tcp_timer(void *arg)
 		 * 3.  But 1 and 3 are exclusive.
 		 */
 		if (tcp->tcp_unsent != 0) {
+			/*
+			 * Should not hold the zero-copy messages for too long.
+			 */
+			if (tcp->tcp_snd_zcopy_aware && !tcp->tcp_xmit_zc_clean)
+				tcp->tcp_xmit_head = tcp_zcopy_backoff(tcp,
+				    tcp->tcp_xmit_head, B_TRUE);
+
 			if (tcp->tcp_cwnd == 0) {
 				/*
 				 * Set tcp_cwnd to 1 MSS so that a
@@ -16477,7 +13513,7 @@ tcp_timer(void *arg)
 		(void) tcp_clean_death(tcp, 0, 24);
 		return;
 	default:
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE|SL_ERROR,
 			    "tcp_timer: strange state (%d) %s",
 			    tcp->tcp_state, tcp_display(tcp, NULL,
@@ -16485,7 +13521,15 @@ tcp_timer(void *arg)
 		}
 		return;
 	}
+
 	if ((ms = tcp->tcp_ms_we_have_waited) > second_threshold) {
+		/*
+		 * Should not hold the zero-copy messages for too long.
+		 */
+		if (tcp->tcp_snd_zcopy_aware && !tcp->tcp_xmit_zc_clean)
+			tcp->tcp_xmit_head = tcp_zcopy_backoff(tcp,
+			    tcp->tcp_xmit_head, B_TRUE);
+
 		/*
 		 * For zero window probe, we need to send indefinitely,
 		 * unless we have not heard from the other side for some
@@ -16529,11 +13573,13 @@ tcp_timer(void *arg)
 			tcp->tcp_ms_we_have_waited = second_threshold;
 		}
 	} else if (ms > first_threshold) {
-		if (tcp->tcp_snd_zcopy_aware && (!tcp->tcp_xmit_zc_clean) &&
-		    tcp->tcp_xmit_head != NULL) {
-			tcp->tcp_xmit_head =
-			    tcp_zcopy_backoff(tcp, tcp->tcp_xmit_head, 1);
-		}
+		/*
+		 * Should not hold the zero-copy messages for too long.
+		 */
+		if (tcp->tcp_snd_zcopy_aware && !tcp->tcp_xmit_zc_clean)
+			tcp->tcp_xmit_head = tcp_zcopy_backoff(tcp,
+			    tcp->tcp_xmit_head, B_TRUE);
+
 		/*
 		 * We have been retransmitting for too long...  The RTT
 		 * we calculated is probably incorrect.  Reinitialize it.
@@ -16618,20 +13664,11 @@ tcp_timer(void *arg)
 	if (mp == NULL) {
 		return;
 	}
-	/*
-	 * Attach credentials to retransmitted initial SYNs.
-	 * In theory we should use the credentials from the connect()
-	 * call to ensure that getpeerucred() on the peer will be correct.
-	 * But we assume that SYN's are not dropped for loopback connections.
-	 */
-	if (tcp->tcp_state == TCPS_SYN_SENT) {
-		mblk_setcred(mp, CONN_CRED(tcp->tcp_connp), tcp->tcp_cpid);
-	}
 
 	tcp->tcp_csuna = tcp->tcp_snxt;
 	BUMP_MIB(&tcps->tcps_mib, tcpRetransSegs);
 	UPDATE_MIB(&tcps->tcps_mib, tcpRetransBytes, mss);
-	tcp_send_data(tcp, tcp->tcp_wq, mp);
+	tcp_send_data(tcp, mp);
 
 }
 
@@ -16639,7 +13676,6 @@ static int
 tcp_do_unbind(conn_t *connp)
 {
 	tcp_t *tcp = connp->conn_tcp;
-	int error = 0;
 
 	switch (tcp->tcp_state) {
 	case TCPS_BOUND:
@@ -16659,41 +13695,36 @@ tcp_do_unbind(conn_t *connp)
 	}
 	mutex_exit(&tcp->tcp_eager_lock);
 
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		tcp->tcp_ipha->ipha_src = 0;
-	} else {
-		V6_SET_ZERO(tcp->tcp_ip6h->ip6_src);
-	}
-	V6_SET_ZERO(tcp->tcp_ip_src_v6);
-	bzero(tcp->tcp_tcph->th_lport, sizeof (tcp->tcp_tcph->th_lport));
+	connp->conn_laddr_v6 = ipv6_all_zeros;
+	connp->conn_saddr_v6 = ipv6_all_zeros;
 	tcp_bind_hash_remove(tcp);
 	tcp->tcp_state = TCPS_IDLE;
-	tcp->tcp_mdt = B_FALSE;
 
-	connp = tcp->tcp_connp;
-	connp->conn_mdt_ok = B_FALSE;
-	ipcl_hash_remove(connp);
+	ip_unbind(connp);
 	bzero(&connp->conn_ports, sizeof (connp->conn_ports));
 
-	return (error);
+	return (0);
 }
 
 /* tcp_unbind is called by tcp_wput_proto to handle T_UNBIND_REQ messages. */
 static void
 tcp_tpi_unbind(tcp_t *tcp, mblk_t *mp)
 {
-	int error = tcp_do_unbind(tcp->tcp_connp);
+	conn_t *connp = tcp->tcp_connp;
+	int error;
 
+	error = tcp_do_unbind(connp);
 	if (error > 0) {
 		tcp_err_ack(tcp, mp, TSYSERR, error);
 	} else if (error < 0) {
 		tcp_err_ack(tcp, mp, -error, 0);
 	} else {
 		/* Send M_FLUSH according to TPI */
-		(void) putnextctl1(tcp->tcp_rq, M_FLUSH, FLUSHRW);
+		(void) putnextctl1(connp->conn_rq, M_FLUSH, FLUSHRW);
 
 		mp = mi_tpi_ok_ack_alloc(mp);
-		putnext(tcp->tcp_rq, mp);
+		if (mp != NULL)
+			putnext(connp->conn_rq, mp);
 	}
 }
 
@@ -16764,7 +13795,7 @@ retry:
 		}
 	}
 	if (is_system_labeled() &&
-	    (i = tsol_next_port(crgetzone(tcp->tcp_cred), port,
+	    (i = tsol_next_port(crgetzone(tcp->tcp_connp->conn_cred), port,
 	    IPPROTO_TCP, B_TRUE)) != 0) {
 		port = i;
 		goto retry;
@@ -16796,7 +13827,7 @@ retry:
 		restart = B_TRUE;
 	}
 	if (is_system_labeled() &&
-	    (nextport = tsol_next_port(crgetzone(tcp->tcp_cred),
+	    (nextport = tsol_next_port(crgetzone(tcp->tcp_connp->conn_cred),
 	    next_priv_port, IPPROTO_TCP, B_FALSE)) != 0) {
 		next_priv_port = nextport;
 		goto retry;
@@ -16820,11 +13851,10 @@ struct {
  */
 /* ARGSUSED */
 static void
-tcp_wput_nondata(void *arg, mblk_t *mp, void *arg2)
+tcp_wput_nondata(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	conn_t	*connp = (conn_t *)arg;
 	tcp_t	*tcp = connp->conn_tcp;
-	queue_t	*q = tcp->tcp_wq;
 
 	ASSERT(DB_TYPE(mp) != M_IOCTL);
 	/*
@@ -16851,7 +13881,7 @@ tcp_wput_nondata(void *arg, mblk_t *mp, void *arg2)
 		tcp_wput_flush(tcp, mp);
 		break;
 	default:
-		CALL_IP_WPUT(connp, q, mp);
+		ip_wput_nondata(connp->conn_wq, mp);
 		break;
 	}
 }
@@ -16862,7 +13892,7 @@ tcp_wput_nondata(void *arg, mblk_t *mp, void *arg2)
  */
 /* ARGSUSED */
 void
-tcp_output(void *arg, mblk_t *mp, void *arg2)
+tcp_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	int		len;
 	int		hdrlen;
@@ -16870,7 +13900,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	mblk_t		*mp1;
 	uchar_t		*rptr;
 	uint32_t	snxt;
-	tcph_t		*tcph;
+	tcpha_t		*tcpha;
 	struct datab	*db;
 	uint32_t	suna;
 	uint32_t	mss;
@@ -16882,7 +13912,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	tcp_t		*tcp = connp->conn_tcp;
 	uint32_t	msize;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
+	ip_xmit_attr_t	*ixa;
 
 	/*
 	 * Try and ASSERT the minimum possible references on the
@@ -16903,25 +13933,18 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	tcp->tcp_squeue_bytes -= msize;
 	mutex_exit(&tcp->tcp_non_sq_lock);
 
-	/* Check to see if this connection wants to be re-fused. */
-	if (tcp->tcp_refuse) {
-		if (tcp->tcp_ipversion == IPV4_VERSION &&
-		    !ipst->ips_ip4_observe.he_interested) {
-			tcp_fuse(tcp, (uchar_t *)&tcp->tcp_saved_ipha,
-			    &tcp->tcp_saved_tcph);
-		} else if (tcp->tcp_ipversion == IPV6_VERSION &&
-		    !ipst->ips_ip6_observe.he_interested) {
-			tcp_fuse(tcp, (uchar_t *)&tcp->tcp_saved_ip6h,
-			    &tcp->tcp_saved_tcph);
-		}
-	}
 	/* Bypass tcp protocol for fused tcp loopback */
 	if (tcp->tcp_fused && tcp_fuse_output(tcp, mp, msize))
 		return;
 
 	mss = tcp->tcp_mss;
-	if (tcp->tcp_xmit_zc_clean)
-		mp = tcp_zcopy_backoff(tcp, mp, 0);
+	/*
+	 * If ZEROCOPY has turned off, try not to send any zero-copy message
+	 * down. Do backoff, now.
+	 */
+	if (tcp->tcp_snd_zcopy_aware && !tcp->tcp_snd_zcopy_on)
+		mp = tcp_zcopy_backoff(tcp, mp, B_FALSE);
+
 
 	ASSERT((uintptr_t)(mp->b_wptr - mp->b_rptr) <= (uintptr_t)INT_MAX);
 	len = (int)(mp->b_wptr - mp->b_rptr);
@@ -16977,8 +14000,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	 * start again to get back the connection's "self-clock" as
 	 * described in VJ's paper.
 	 *
-	 * Refer to the comment in tcp_mss_set() for the calculation
-	 * of tcp_cwnd after idle.
+	 * Reinitialize tcp_cwnd after idle.
 	 */
 	if ((tcp->tcp_suna == snxt) && !tcp->tcp_localnet &&
 	    (TICK_TO_MSEC(lbolt - tcp->tcp_last_recv_time) >= tcp->tcp_rto)) {
@@ -16999,7 +14021,7 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 
 	mutex_enter(&tcp->tcp_non_sq_lock);
 	if (tcp->tcp_flow_stopped &&
-	    TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
+	    TCP_UNSENT_BYTES(tcp) <= connp->conn_sndlowat) {
 		tcp_clrqfull(tcp);
 	}
 	mutex_exit(&tcp->tcp_non_sq_lock);
@@ -17046,43 +14068,43 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	mp->b_next = (mblk_t *)(uintptr_t)snxt;
 
 	/* adjust tcp header information */
-	tcph = tcp->tcp_tcph;
-	tcph->th_flags[0] = (TH_ACK|TH_PUSH);
+	tcpha = tcp->tcp_tcpha;
+	tcpha->tha_flags = (TH_ACK|TH_PUSH);
 
-	sum = len + tcp->tcp_tcp_hdr_len + tcp->tcp_sum;
+	sum = len + connp->conn_ht_ulp_len + connp->conn_sum;
 	sum = (sum >> 16) + (sum & 0xFFFF);
-	U16_TO_ABE16(sum, tcph->th_sum);
+	tcpha->tha_sum = htons(sum);
 
-	U32_TO_ABE32(snxt, tcph->th_seq);
+	tcpha->tha_seq = htonl(snxt);
 
 	BUMP_MIB(&tcps->tcps_mib, tcpOutDataSegs);
 	UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, len);
 	BUMP_LOCAL(tcp->tcp_obsegs);
 
 	/* Update the latest receive window size in TCP header. */
-	U32_TO_ABE16(tcp->tcp_rwnd >> tcp->tcp_rcv_ws,
-	    tcph->th_win);
+	tcpha->tha_win = htons(tcp->tcp_rwnd >> tcp->tcp_rcv_ws);
 
 	tcp->tcp_last_sent_len = (ushort_t)len;
 
-	plen = len + tcp->tcp_hdr_len;
+	plen = len + connp->conn_ht_iphc_len;
 
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
+	ixa = connp->conn_ixa;
+	ixa->ixa_pktlen = plen;
+
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
 		tcp->tcp_ipha->ipha_length = htons(plen);
 	} else {
-		tcp->tcp_ip6h->ip6_plen = htons(plen -
-		    ((char *)&tcp->tcp_ip6h[1] - tcp->tcp_iphc));
+		tcp->tcp_ip6h->ip6_plen = htons(plen - IPV6_HDR_LEN);
 	}
 
 	/* see if we need to allocate a mblk for the headers */
-	hdrlen = tcp->tcp_hdr_len;
+	hdrlen = connp->conn_ht_iphc_len;
 	rptr = mp1->b_rptr - hdrlen;
 	db = mp1->b_datap;
 	if ((db->db_ref != 2) || rptr < db->db_base ||
 	    (!OK_32PTR(rptr))) {
 		/* NOTE: we assume allocb returns an OK_32PTR */
-		mp = allocb(tcp->tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH +
-		    tcps->tcps_wroff_xtra, BPRI_MED);
+		mp = allocb(hdrlen + tcps->tcps_wroff_xtra, BPRI_MED);
 		if (!mp) {
 			freemsg(mp1);
 			goto no_memory;
@@ -17090,7 +14112,6 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 		mp->b_cont = mp1;
 		mp1 = mp;
 		/* Leave room for Link Level header */
-		/* hdrlen = tcp->tcp_hdr_len; */
 		rptr = &mp1->b_rptr[tcps->tcps_wroff_xtra];
 		mp1->b_wptr = &rptr[hdrlen];
 	}
@@ -17099,16 +14120,16 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	/* Fill in the timestamp option. */
 	if (tcp->tcp_snd_ts_ok) {
 		U32_TO_BE32((uint32_t)lbolt,
-		    (char *)tcph+TCP_MIN_HEADER_LENGTH+4);
+		    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);
 		U32_TO_BE32(tcp->tcp_ts_recent,
-		    (char *)tcph+TCP_MIN_HEADER_LENGTH+8);
+		    (char *)tcpha + TCP_MIN_HEADER_LENGTH+8);
 	} else {
-		ASSERT(tcp->tcp_tcp_hdr_len == TCP_MIN_HEADER_LENGTH);
+		ASSERT(connp->conn_ht_ulp_len == TCP_MIN_HEADER_LENGTH);
 	}
 
 	/* copy header into outgoing packet */
 	dst = (ipaddr_t *)rptr;
-	src = (ipaddr_t *)tcp->tcp_iphc;
+	src = (ipaddr_t *)connp->conn_ht_iphc;
 	dst[0] = src[0];
 	dst[1] = src[1];
 	dst[2] = src[2];
@@ -17135,21 +14156,22 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	if (tcp->tcp_ecn_ok) {
 		SET_ECT(tcp, rptr);
 
-		tcph = (tcph_t *)(rptr + tcp->tcp_ip_hdr_len);
+		tcpha = (tcpha_t *)(rptr + ixa->ixa_ip_hdr_length);
 		if (tcp->tcp_ecn_echo_on)
-			tcph->th_flags[0] |= TH_ECE;
+			tcpha->tha_flags |= TH_ECE;
 		if (tcp->tcp_cwr && !tcp->tcp_ecn_cwr_sent) {
-			tcph->th_flags[0] |= TH_CWR;
+			tcpha->tha_flags |= TH_CWR;
 			tcp->tcp_ecn_cwr_sent = B_TRUE;
 		}
 	}
 
 	if (tcp->tcp_ip_forward_progress) {
-		ASSERT(tcp->tcp_ipversion == IPV6_VERSION);
-		*(uint32_t *)mp1->b_rptr  |= IP_FORWARD_PROG;
 		tcp->tcp_ip_forward_progress = B_FALSE;
+		connp->conn_ixa->ixa_flags |= IXAF_REACH_CONF;
+	} else {
+		connp->conn_ixa->ixa_flags &= ~IXAF_REACH_CONF;
 	}
-	tcp_send_data(tcp, tcp->tcp_wq, mp1);
+	tcp_send_data(tcp, mp1);
 	return;
 
 	/*
@@ -17166,29 +14188,27 @@ slow:
 	tcp_wput_data(tcp, NULL, B_FALSE);
 }
 
+/*
+ * This runs at the tail end of accept processing on the squeue of the
+ * new connection.
+ */
 /* ARGSUSED */
 void
-tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
+tcp_accept_finish(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	conn_t			*connp = (conn_t *)arg;
 	tcp_t			*tcp = connp->conn_tcp;
-	queue_t			*q = tcp->tcp_rq;
-	struct tcp_options	*tcpopt;
+	queue_t			*q = connp->conn_rq;
 	tcp_stack_t		*tcps = tcp->tcp_tcps;
-
 	/* socket options */
-	uint_t 			sopp_flags;
-	ssize_t			sopp_rxhiwat;
-	ssize_t			sopp_maxblk;
-	ushort_t		sopp_wroff;
-	ushort_t		sopp_tail;
-	ushort_t		sopp_copyopt;
+	struct sock_proto_props	sopp;
 
-	tcpopt = (struct tcp_options *)mp->b_rptr;
+	/* We should just receive a single mblk that fits a T_discon_ind */
+	ASSERT(mp->b_cont == NULL);
 
 	/*
 	 * Drop the eager's ref on the listener, that was placed when
-	 * this eager began life in tcp_conn_request.
+	 * this eager began life in tcp_input_listener.
 	 */
 	CONN_DEC_REF(tcp->tcp_saved_listener->tcp_connp);
 	if (IPCL_IS_NONSTR(connp)) {
@@ -17227,15 +14247,12 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 				 * memory allocation failure problems. We know
 				 * that the size of the incoming mblk i.e.
 				 * stroptions is greater than sizeof
-				 * T_discon_ind. So the reallocb below can't
-				 * fail.
+				 * T_discon_ind.
 				 */
-				freemsg(mp->b_cont);
-				mp->b_cont = NULL;
 				ASSERT(DB_REF(mp) == 1);
-				mp = reallocb(mp, sizeof (struct T_discon_ind),
-				    B_FALSE);
-				ASSERT(mp != NULL);
+				ASSERT(MBLKSIZE(mp) >=
+				    sizeof (struct T_discon_ind));
+
 				DB_TYPE(mp) = M_PROTO;
 				((union T_primitives *)mp->b_rptr)->type =
 				    T_DISCON_IND;
@@ -17251,41 +14268,21 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 				mp->b_wptr = mp->b_rptr +
 				    sizeof (struct T_discon_ind);
 				putnext(q, mp);
-				return;
 			}
 		}
-		if (tcp->tcp_hard_binding) {
-			tcp->tcp_hard_binding = B_FALSE;
-			tcp->tcp_hard_bound = B_TRUE;
-		}
+		tcp->tcp_hard_binding = B_FALSE;
 		return;
 	}
 
-	if (tcpopt->to_flags & TCPOPT_BOUNDIF) {
-		int boundif = tcpopt->to_boundif;
-		uint_t len = sizeof (int);
-
-		(void) tcp_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, IPPROTO_IPV6,
-		    IPV6_BOUND_IF, len, (uchar_t *)&boundif, &len,
-		    (uchar_t *)&boundif, NULL, tcp->tcp_cred, NULL);
-	}
-	if (tcpopt->to_flags & TCPOPT_RECVPKTINFO) {
-		uint_t on = 1;
-		uint_t len = sizeof (uint_t);
-		(void) tcp_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, IPPROTO_IPV6,
-		    IPV6_RECVPKTINFO, len, (uchar_t *)&on, &len,
-		    (uchar_t *)&on, NULL, tcp->tcp_cred, NULL);
-	}
-
 	/*
-	 * Set max window size (tcp_recv_hiwater) of the acceptor.
+	 * Set max window size (conn_rcvbuf) of the acceptor.
 	 */
 	if (tcp->tcp_rcv_list == NULL) {
 		/*
 		 * Recv queue is empty, tcp_rwnd should not have changed.
 		 * That means it should be equal to the listener's tcp_rwnd.
 		 */
-		tcp->tcp_recv_hiwater = tcp->tcp_rwnd;
+		connp->conn_rcvbuf = tcp->tcp_rwnd;
 	} else {
 #ifdef DEBUG
 		mblk_t *tmp;
@@ -17300,19 +14297,19 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		ASSERT(cnt != 0 && tcp->tcp_rcv_cnt == cnt);
 #endif
 		/* There is some data, add them back to get the max. */
-		tcp->tcp_recv_hiwater = tcp->tcp_rwnd + tcp->tcp_rcv_cnt;
+		connp->conn_rcvbuf = tcp->tcp_rwnd + tcp->tcp_rcv_cnt;
 	}
 	/*
 	 * This is the first time we run on the correct
 	 * queue after tcp_accept. So fix all the q parameters
 	 * here.
 	 */
-	sopp_flags = SOCKOPT_RCVHIWAT | SOCKOPT_MAXBLK | SOCKOPT_WROFF;
-	sopp_maxblk = tcp_maxpsz_set(tcp, B_FALSE);
+	sopp.sopp_flags = SOCKOPT_RCVHIWAT | SOCKOPT_MAXBLK | SOCKOPT_WROFF;
+	sopp.sopp_maxblk = tcp_maxpsz_set(tcp, B_FALSE);
 
-	sopp_rxhiwat = tcp->tcp_fused ?
-	    tcp_fuse_set_rcv_hiwat(tcp, tcp->tcp_recv_hiwater) :
-	    tcp->tcp_recv_hiwater;
+	sopp.sopp_rxhiwat = tcp->tcp_fused ?
+	    tcp_fuse_set_rcv_hiwat(tcp, connp->conn_rcvbuf) :
+	    connp->conn_rcvbuf;
 
 	/*
 	 * Determine what write offset value to use depending on SACK and
@@ -17328,18 +14325,18 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		 * since it would reduce the amount of work done by kmem.
 		 * Non-fused tcp loopback case is handled separately below.
 		 */
-		sopp_wroff = 0;
+		sopp.sopp_wroff = 0;
 		/*
 		 * Update the peer's transmit parameters according to
 		 * our recently calculated high water mark value.
 		 */
 		(void) tcp_maxpsz_set(tcp->tcp_loopback_peer, B_TRUE);
 	} else if (tcp->tcp_snd_sack_ok) {
-		sopp_wroff = tcp->tcp_hdr_len + TCPOPT_MAX_SACK_LEN +
+		sopp.sopp_wroff = connp->conn_ht_iphc_allocated +
 		    (tcp->tcp_loopback ? 0 : tcps->tcps_wroff_xtra);
 	} else {
-		sopp_wroff = tcp->tcp_hdr_len + (tcp->tcp_loopback ? 0 :
-		    tcps->tcps_wroff_xtra);
+		sopp.sopp_wroff = connp->conn_ht_iphc_len +
+		    (tcp->tcp_loopback ? 0 : tcps->tcps_wroff_xtra);
 	}
 
 	/*
@@ -17354,30 +14351,22 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 	 * costs.
 	 */
 	if (tcp->tcp_kssl_ctx != NULL) {
-		sopp_wroff += SSL3_WROFFSET;
+		sopp.sopp_wroff += SSL3_WROFFSET;
 
-		sopp_flags |= SOCKOPT_TAIL;
-		sopp_tail = SSL3_MAX_TAIL_LEN;
+		sopp.sopp_flags |= SOCKOPT_TAIL;
+		sopp.sopp_tail = SSL3_MAX_TAIL_LEN;
 
-		sopp_flags |= SOCKOPT_ZCOPY;
-		sopp_copyopt = ZCVMUNSAFE;
+		sopp.sopp_flags |= SOCKOPT_ZCOPY;
+		sopp.sopp_zcopyflag = ZCVMUNSAFE;
 
-		sopp_maxblk = SSL3_MAX_RECORD_LEN;
+		sopp.sopp_maxblk = SSL3_MAX_RECORD_LEN;
 	}
 
 	/* Send the options up */
 	if (IPCL_IS_NONSTR(connp)) {
-		struct sock_proto_props sopp;
-
-		sopp.sopp_flags = sopp_flags;
-		sopp.sopp_wroff = sopp_wroff;
-		sopp.sopp_maxblk = sopp_maxblk;
-		sopp.sopp_rxhiwat = sopp_rxhiwat;
-		if (sopp_flags & SOCKOPT_TAIL) {
+		if (sopp.sopp_flags & SOCKOPT_TAIL) {
 			ASSERT(tcp->tcp_kssl_ctx != NULL);
-			ASSERT(sopp_flags & SOCKOPT_ZCOPY);
-			sopp.sopp_tail = sopp_tail;
-			sopp.sopp_zcopyflag = sopp_copyopt;
+			ASSERT(sopp.sopp_flags & SOCKOPT_ZCOPY);
 		}
 		if (tcp->tcp_loopback) {
 			sopp.sopp_flags |= SOCKOPT_LOOPBACK;
@@ -17385,34 +14374,40 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		}
 		(*connp->conn_upcalls->su_set_proto_props)
 		    (connp->conn_upper_handle, &sopp);
+		freemsg(mp);
 	} else {
+		/*
+		 * Let us reuse the incoming mblk to avoid
+		 * memory allocation failure problems. We know
+		 * that the size of the incoming mblk is at least
+		 * stroptions
+		 */
 		struct stroptions *stropt;
-		mblk_t *stropt_mp = allocb(sizeof (struct stroptions), BPRI_HI);
-		if (stropt_mp == NULL) {
-			tcp_err_ack(tcp, mp, TSYSERR, ENOMEM);
-			return;
-		}
-		DB_TYPE(stropt_mp) = M_SETOPTS;
-		stropt = (struct stroptions *)stropt_mp->b_rptr;
-		stropt_mp->b_wptr += sizeof (struct stroptions);
-		stropt->so_flags = SO_HIWAT | SO_WROFF | SO_MAXBLK;
-		stropt->so_hiwat = sopp_rxhiwat;
-		stropt->so_wroff = sopp_wroff;
-		stropt->so_maxblk = sopp_maxblk;
 
-		if (sopp_flags & SOCKOPT_TAIL) {
+		ASSERT(DB_REF(mp) == 1);
+		ASSERT(MBLKSIZE(mp) >= sizeof (struct stroptions));
+
+		DB_TYPE(mp) = M_SETOPTS;
+		stropt = (struct stroptions *)mp->b_rptr;
+		mp->b_wptr = mp->b_rptr + sizeof (struct stroptions);
+		stropt = (struct stroptions *)mp->b_rptr;
+		stropt->so_flags = SO_HIWAT | SO_WROFF | SO_MAXBLK;
+		stropt->so_hiwat = sopp.sopp_rxhiwat;
+		stropt->so_wroff = sopp.sopp_wroff;
+		stropt->so_maxblk = sopp.sopp_maxblk;
+
+		if (sopp.sopp_flags & SOCKOPT_TAIL) {
 			ASSERT(tcp->tcp_kssl_ctx != NULL);
 
 			stropt->so_flags |= SO_TAIL | SO_COPYOPT;
-			stropt->so_tail = sopp_tail;
-			stropt->so_copyopt = sopp_copyopt;
+			stropt->so_tail = sopp.sopp_tail;
+			stropt->so_copyopt = sopp.sopp_zcopyflag;
 		}
 
 		/* Send the options up */
-		putnext(q, stropt_mp);
+		putnext(q, mp);
 	}
 
-	freemsg(mp);
 	/*
 	 * Pass up any data and/or a fin that has been received.
 	 *
@@ -17432,7 +14427,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 			if (!tcp->tcp_fused && (*connp->conn_upcalls->su_recv)
 			    (connp->conn_upper_handle, NULL, 0, 0, &error,
 			    &push) >= 0) {
-				tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
+				tcp->tcp_rwnd = connp->conn_rcvbuf;
 				if (tcp->tcp_state >= TCPS_ESTABLISHED &&
 				    tcp_rwnd_reopen(tcp) == TH_ACK_NEEDED) {
 					tcp_xmit_ctl(NULL,
@@ -17463,7 +14458,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 			/* We drain directly in case of fused tcp loopback */
 
 			if (!tcp->tcp_fused && canputnext(q)) {
-				tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
+				tcp->tcp_rwnd = connp->conn_rcvbuf;
 				if (tcp->tcp_state >= TCPS_ESTABLISHED &&
 				    tcp_rwnd_reopen(tcp) == TH_ACK_NEEDED) {
 					tcp_xmit_ctl(NULL,
@@ -17508,12 +14503,9 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 			putnext(q, mp);
 		}
 	}
-	if (tcp->tcp_hard_binding) {
-		tcp->tcp_hard_binding = B_FALSE;
-		tcp->tcp_hard_bound = B_TRUE;
-	}
+	tcp->tcp_hard_binding = B_FALSE;
 
-	if (tcp->tcp_ka_enabled) {
+	if (connp->conn_keepalive) {
 		tcp->tcp_ka_last_intrvl = 0;
 		tcp->tcp_ka_tid = TCP_TIMER(tcp, tcp_keepalive_killer,
 		    MSEC_TO_TICK(tcp->tcp_ka_interval));
@@ -17535,14 +14527,14 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 
 /*
  * The function called through squeue to get behind listener's perimeter to
- * send a deffered conn_ind.
+ * send a deferred conn_ind.
  */
 /* ARGSUSED */
 void
-tcp_send_pending(void *arg, mblk_t *mp, void *arg2)
+tcp_send_pending(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
-	conn_t	*connp = (conn_t *)arg;
-	tcp_t *listener = connp->conn_tcp;
+	conn_t	*lconnp = (conn_t *)arg;
+	tcp_t *listener = lconnp->conn_tcp;
 	struct T_conn_ind *conn_ind;
 	tcp_t *tcp;
 
@@ -17560,29 +14552,34 @@ tcp_send_pending(void *arg, mblk_t *mp, void *arg2)
 		return;
 	}
 
-	tcp_ulp_newconn(connp, tcp->tcp_connp, mp);
+	tcp_ulp_newconn(lconnp, tcp->tcp_connp, mp);
 }
 
-/* ARGSUSED */
+/*
+ * Common to TPI and sockfs accept code.
+ */
+/* ARGSUSED2 */
 static int
 tcp_accept_common(conn_t *lconnp, conn_t *econnp, cred_t *cr)
 {
 	tcp_t *listener, *eager;
-	mblk_t *opt_mp;
-	struct tcp_options *tcpopt;
+	mblk_t *discon_mp;
 
 	listener = lconnp->conn_tcp;
 	ASSERT(listener->tcp_state == TCPS_LISTEN);
 	eager = econnp->conn_tcp;
 	ASSERT(eager->tcp_listener != NULL);
 
-	ASSERT(eager->tcp_rq != NULL);
+	/*
+	 * Pre allocate the discon_ind mblk also. tcp_accept_finish will
+	 * use it if something failed.
+	 */
+	discon_mp = allocb(MAX(sizeof (struct T_discon_ind),
+	    sizeof (struct stroptions)), BPRI_HI);
 
-	opt_mp = allocb(sizeof (struct tcp_options), BPRI_HI);
-	if (opt_mp == NULL) {
+	if (discon_mp == NULL) {
 		return (-TPROTO);
 	}
-	bzero((char *)opt_mp->b_rptr, sizeof (struct tcp_options));
 	eager->tcp_issocket = B_TRUE;
 
 	econnp->conn_zoneid = listener->tcp_connp->conn_zoneid;
@@ -17606,24 +14603,6 @@ tcp_accept_common(conn_t *lconnp, conn_t *econnp, cred_t *cr)
 	 * assert that reference.
 	 */
 	ASSERT(econnp->conn_ref >= 3);
-
-	opt_mp->b_datap->db_type = M_SETOPTS;
-	opt_mp->b_wptr += sizeof (struct tcp_options);
-
-	/*
-	 * Prepare for inheriting IPV6_BOUND_IF and IPV6_RECVPKTINFO
-	 * from listener to acceptor.
-	 */
-	tcpopt = (struct tcp_options *)opt_mp->b_rptr;
-	tcpopt->to_flags = 0;
-
-	if (listener->tcp_bound_if != 0) {
-		tcpopt->to_flags |= TCPOPT_BOUNDIF;
-		tcpopt->to_boundif = listener->tcp_bound_if;
-	}
-	if (listener->tcp_ipv6_recvancillary & TCP_IPV6_RECVPKTINFO) {
-		tcpopt->to_flags |= TCPOPT_RECVPKTINFO;
-	}
 
 	mutex_enter(&listener->tcp_eager_lock);
 	if (listener->tcp_eager_prev_q0->tcp_conn_def_q0) {
@@ -17686,7 +14665,7 @@ tcp_accept_common(conn_t *lconnp, conn_t *econnp, cred_t *cr)
 		/* Need to get inside the listener perimeter */
 		CONN_INC_REF(listener->tcp_connp);
 		SQUEUE_ENTER_ONE(listener->tcp_connp->conn_sqp, mp1,
-		    tcp_send_pending, listener->tcp_connp, SQ_FILL,
+		    tcp_send_pending, listener->tcp_connp, NULL, SQ_FILL,
 		    SQTAG_TCP_SEND_PENDING);
 	}
 no_more_eagers:
@@ -17700,8 +14679,8 @@ no_more_eagers:
 	 * before sending the conn_ind in tcp_send_conn_ind.
 	 * The ref will be dropped in tcp_accept_finish().
 	 */
-	SQUEUE_ENTER_ONE(econnp->conn_sqp, opt_mp, tcp_accept_finish,
-	    econnp, SQ_NODRAIN, SQTAG_TCP_ACCEPT_FINISH_Q0);
+	SQUEUE_ENTER_ONE(econnp->conn_sqp, discon_mp, tcp_accept_finish,
+	    econnp, NULL, SQ_NODRAIN, SQTAG_TCP_ACCEPT_FINISH_Q0);
 	return (0);
 }
 
@@ -17712,7 +14691,6 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 {
 	conn_t *lconnp, *econnp;
 	tcp_t *listener, *eager;
-	tcp_stack_t	*tcps;
 
 	lconnp = (conn_t *)lproto_handle;
 	listener = lconnp->conn_tcp;
@@ -17720,7 +14698,6 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 	econnp = (conn_t *)eproto_handle;
 	eager = econnp->conn_tcp;
 	ASSERT(eager->tcp_listener != NULL);
-	tcps = eager->tcp_tcps;
 
 	/*
 	 * It is OK to manipulate these fields outside the eager's squeue
@@ -17732,19 +14709,6 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 	econnp->conn_upper_handle = sock_handle;
 	econnp->conn_upcalls = lconnp->conn_upcalls;
 	ASSERT(IPCL_IS_NONSTR(econnp));
-	/*
-	 * Create helper stream if it is a non-TPI TCP connection.
-	 */
-	if (ip_create_helper_stream(econnp, tcps->tcps_ldi_ident)) {
-		ip1dbg(("tcp_accept: create of IP helper stream"
-		    " failed\n"));
-		return (EPROTO);
-	}
-	eager->tcp_rq = econnp->conn_rq;
-	eager->tcp_wq = econnp->conn_wq;
-
-	ASSERT(eager->tcp_rq != NULL);
-
 	return (tcp_accept_common(lconnp, econnp, cr));
 }
 
@@ -17752,7 +14716,7 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 /*
  * This is the STREAMS entry point for T_CONN_RES coming down on
  * Acceptor STREAM when  sockfs listener does accept processing.
- * Read the block comment on top of tcp_conn_request().
+ * Read the block comment on top of tcp_input_listener().
  */
 void
 tcp_tpi_accept(queue_t *q, mblk_t *mp)
@@ -17815,8 +14779,8 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 		econnp = eager->tcp_connp;
 		econnp->conn_dev = (dev_t)RD(q)->q_ptr;
 		econnp->conn_minor_arena = (vmem_t *)(WR(q)->q_ptr);
-		eager->tcp_rq = rq;
-		eager->tcp_wq = q;
+		econnp->conn_rq = rq;
+		econnp->conn_wq = q;
 		rq->q_ptr = econnp;
 		rq->q_qinfo = &tcp_rinitv4;	/* No open - same as rinitv6 */
 		q->q_ptr = econnp;
@@ -17836,7 +14800,7 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 		 * should already be enough space in the mp that came
 		 * down from soaccept().
 		 */
-		if (eager->tcp_family == AF_INET) {
+		if (econnp->conn_family == AF_INET) {
 			sin_t *sin;
 
 			ASSERT((mp->b_datap->db_lim - mp->b_datap->db_base) >=
@@ -17844,8 +14808,8 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 			sin = (sin_t *)mp->b_wptr;
 			mp->b_wptr += sizeof (sin_t);
 			sin->sin_family = AF_INET;
-			sin->sin_port = eager->tcp_lport;
-			sin->sin_addr.s_addr = eager->tcp_ipha->ipha_src;
+			sin->sin_port = econnp->conn_lport;
+			sin->sin_addr.s_addr = econnp->conn_laddr_v4;
 		} else {
 			sin6_t *sin6;
 
@@ -17854,20 +14818,23 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 			sin6 = (sin6_t *)mp->b_wptr;
 			mp->b_wptr += sizeof (sin6_t);
 			sin6->sin6_family = AF_INET6;
-			sin6->sin6_port = eager->tcp_lport;
-			if (eager->tcp_ipversion == IPV4_VERSION) {
+			sin6->sin6_port = econnp->conn_lport;
+			sin6->sin6_addr = econnp->conn_laddr_v6;
+			if (econnp->conn_ipversion == IPV4_VERSION) {
 				sin6->sin6_flowinfo = 0;
-				IN6_IPADDR_TO_V4MAPPED(
-				    eager->tcp_ipha->ipha_src,
-				    &sin6->sin6_addr);
 			} else {
 				ASSERT(eager->tcp_ip6h != NULL);
 				sin6->sin6_flowinfo =
 				    eager->tcp_ip6h->ip6_vcf &
 				    ~IPV6_VERS_AND_FLOW_MASK;
-				sin6->sin6_addr = eager->tcp_ip6h->ip6_src;
 			}
-			sin6->sin6_scope_id = 0;
+			if (IN6_IS_ADDR_LINKSCOPE(&econnp->conn_laddr_v6) &&
+			    (econnp->conn_ixa->ixa_flags & IXAF_SCOPEID_SET)) {
+				sin6->sin6_scope_id =
+				    econnp->conn_ixa->ixa_scopeid;
+			} else {
+				sin6->sin6_scope_id = 0;
+			}
 			sin6->__sin6_src_id = 0;
 		}
 
@@ -17881,97 +14848,6 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 	}
 }
 
-static int
-tcp_do_getsockname(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
-{
-	sin_t *sin = (sin_t *)sa;
-	sin6_t *sin6 = (sin6_t *)sa;
-
-	switch (tcp->tcp_family) {
-	case AF_INET:
-		ASSERT(tcp->tcp_ipversion == IPV4_VERSION);
-
-		if (*salenp < sizeof (sin_t))
-			return (EINVAL);
-
-		*sin = sin_null;
-		sin->sin_family = AF_INET;
-		if (tcp->tcp_state >= TCPS_BOUND) {
-			sin->sin_port = tcp->tcp_lport;
-			sin->sin_addr.s_addr = tcp->tcp_ipha->ipha_src;
-		}
-		*salenp = sizeof (sin_t);
-		break;
-
-	case AF_INET6:
-		if (*salenp < sizeof (sin6_t))
-			return (EINVAL);
-
-		*sin6 = sin6_null;
-		sin6->sin6_family = AF_INET6;
-		if (tcp->tcp_state >= TCPS_BOUND) {
-			sin6->sin6_port = tcp->tcp_lport;
-			mutex_enter(&tcp->tcp_connp->conn_lock);
-			if (tcp->tcp_ipversion == IPV4_VERSION) {
-				IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src,
-				    &sin6->sin6_addr);
-			} else {
-				sin6->sin6_addr = tcp->tcp_ip6h->ip6_src;
-			}
-			mutex_exit(&tcp->tcp_connp->conn_lock);
-		}
-		*salenp = sizeof (sin6_t);
-		break;
-	}
-
-	return (0);
-}
-
-static int
-tcp_do_getpeername(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
-{
-	sin_t *sin = (sin_t *)sa;
-	sin6_t *sin6 = (sin6_t *)sa;
-
-	if (tcp->tcp_state < TCPS_SYN_RCVD)
-		return (ENOTCONN);
-
-	switch (tcp->tcp_family) {
-	case AF_INET:
-		ASSERT(tcp->tcp_ipversion == IPV4_VERSION);
-
-		if (*salenp < sizeof (sin_t))
-			return (EINVAL);
-
-		*sin = sin_null;
-		sin->sin_family = AF_INET;
-		sin->sin_port = tcp->tcp_fport;
-		IN6_V4MAPPED_TO_IPADDR(&tcp->tcp_remote_v6,
-		    sin->sin_addr.s_addr);
-		*salenp = sizeof (sin_t);
-		break;
-
-	case AF_INET6:
-		if (*salenp < sizeof (sin6_t))
-			return (EINVAL);
-
-		*sin6 = sin6_null;
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_port = tcp->tcp_fport;
-		sin6->sin6_addr = tcp->tcp_remote_v6;
-		mutex_enter(&tcp->tcp_connp->conn_lock);
-		if (tcp->tcp_ipversion == IPV6_VERSION) {
-			sin6->sin6_flowinfo = tcp->tcp_ip6h->ip6_vcf &
-			    ~IPV6_VERS_AND_FLOW_MASK;
-		}
-		mutex_exit(&tcp->tcp_connp->conn_lock);
-		*salenp = sizeof (sin6_t);
-		break;
-	}
-
-	return (0);
-}
-
 /*
  * Handle special out-of-band ioctl requests (see PSARC/2008/265).
  */
@@ -17980,7 +14856,8 @@ tcp_wput_cmdblk(queue_t *q, mblk_t *mp)
 {
 	void	*data;
 	mblk_t	*datamp = mp->b_cont;
-	tcp_t	*tcp = Q_TO_TCP(q);
+	conn_t	*connp = Q_TO_CONN(q);
+	tcp_t	*tcp = connp->conn_tcp;
 	cmdblk_t *cmdp = (cmdblk_t *)mp->b_rptr;
 
 	if (datamp == NULL || MBLKL(datamp) < cmdp->cb_len) {
@@ -17993,10 +14870,14 @@ tcp_wput_cmdblk(queue_t *q, mblk_t *mp)
 
 	switch (cmdp->cb_cmd) {
 	case TI_GETPEERNAME:
-		cmdp->cb_error = tcp_do_getpeername(tcp, data, &cmdp->cb_len);
+		if (tcp->tcp_state < TCPS_SYN_RCVD)
+			cmdp->cb_error = ENOTCONN;
+		else
+			cmdp->cb_error = conn_getpeername(connp, data,
+			    &cmdp->cb_len);
 		break;
 	case TI_GETMYNAME:
-		cmdp->cb_error = tcp_do_getsockname(tcp, data, &cmdp->cb_len);
+		cmdp->cb_error = conn_getsockname(connp, data, &cmdp->cb_len);
 		break;
 	default:
 		cmdp->cb_error = EINVAL;
@@ -18029,14 +14910,14 @@ tcp_wput(queue_t *q, mblk_t *mp)
 
 		mutex_enter(&tcp->tcp_non_sq_lock);
 		tcp->tcp_squeue_bytes += size;
-		if (TCP_UNSENT_BYTES(tcp) > tcp->tcp_xmit_hiwater) {
+		if (TCP_UNSENT_BYTES(tcp) > connp->conn_sndbuf) {
 			tcp_setqfull(tcp);
 		}
 		mutex_exit(&tcp->tcp_non_sq_lock);
 
 		CONN_INC_REF(connp);
 		SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_output, connp,
-		    tcp_squeue_flag, SQTAG_TCP_OUTPUT);
+		    NULL, tcp_squeue_flag, SQTAG_TCP_OUTPUT);
 		return;
 
 	case M_CMD:
@@ -18053,7 +14934,7 @@ tcp_wput(queue_t *q, mblk_t *mp)
 		if ((mp->b_wptr - rptr) >= sizeof (t_scalar_t)) {
 			type = ((union T_primitives *)rptr)->type;
 		} else {
-			if (tcp->tcp_debug) {
+			if (connp->conn_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1,
 				    SL_ERROR|SL_TRACE,
 				    "tcp_wput_proto, dropping one...");
@@ -18093,7 +14974,7 @@ tcp_wput(queue_t *q, mblk_t *mp)
 		/*
 		 * Most ioctls can be processed right away without going via
 		 * squeues - process them right here. Those that do require
-		 * squeue (currently TCP_IOC_DEFAULT_Q and _SIOCSOCKFALLBACK)
+		 * squeue (currently _SIOCSOCKFALLBACK)
 		 * are processed by tcp_wput_ioctl().
 		 */
 		iocp = (struct iocblk *)mp->b_rptr;
@@ -18111,26 +14992,13 @@ tcp_wput(queue_t *q, mblk_t *mp)
 		case ND_SET:
 			/* nd_getset does the necessary checks */
 		case ND_GET:
-			if (!nd_getset(q, tcps->tcps_g_nd, mp)) {
-				CALL_IP_WPUT(connp, q, mp);
-				return;
-			}
-			qreply(q, mp);
-			return;
-		case TCP_IOC_DEFAULT_Q:
-			/*
-			 * Wants to be the default wq. Check the credentials
-			 * first, the rest is executed via squeue.
-			 */
-			if (secpolicy_ip_config(iocp->ioc_cr, B_FALSE) != 0) {
-				iocp->ioc_error = EPERM;
-				iocp->ioc_count = 0;
-				mp->b_datap->db_type = M_IOCACK;
+			if (nd_getset(q, tcps->tcps_g_nd, mp)) {
 				qreply(q, mp);
 				return;
 			}
-			output_proc = tcp_wput_ioctl;
-			break;
+			ip_wput_nondata(q, mp);
+			return;
+
 		default:
 			output_proc = tcp_wput_ioctl;
 			break;
@@ -18143,7 +15011,7 @@ tcp_wput(queue_t *q, mblk_t *mp)
 
 	CONN_INC_REF(connp);
 	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, output_proc, connp,
-	    tcp_squeue_flag, SQTAG_TCP_WPUT_OTHER);
+	    NULL, tcp_squeue_flag, SQTAG_TCP_WPUT_OTHER);
 }
 
 /*
@@ -18188,52 +15056,32 @@ tcp_wput_fallback(queue_t *wq, mblk_t *mp)
 	freemsg(mp);
 }
 
+/*
+ * Check the usability of ZEROCOPY. It's instead checking the flag set by IP.
+ */
 static boolean_t
 tcp_zcopy_check(tcp_t *tcp)
 {
-	conn_t	*connp = tcp->tcp_connp;
-	ire_t	*ire;
+	conn_t		*connp = tcp->tcp_connp;
+	ip_xmit_attr_t	*ixa = connp->conn_ixa;
 	boolean_t	zc_enabled = B_FALSE;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	if (do_tcpzcopy == 2)
 		zc_enabled = B_TRUE;
-	else if (tcp->tcp_ipversion == IPV4_VERSION &&
-	    IPCL_IS_CONNECTED(connp) &&
-	    (connp->conn_flags & IPCL_CHECK_POLICY) == 0 &&
-	    connp->conn_dontroute == 0 &&
-	    !connp->conn_nexthop_set &&
-	    connp->conn_outgoing_ill == NULL &&
-	    do_tcpzcopy == 1) {
-		/*
-		 * the checks above  closely resemble the fast path checks
-		 * in tcp_send_data().
-		 */
-		mutex_enter(&connp->conn_lock);
-		ire = connp->conn_ire_cache;
-		ASSERT(!(connp->conn_state_flags & CONN_INCIPIENT));
-		if (ire != NULL && !(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-			IRE_REFHOLD(ire);
-			if (ire->ire_stq != NULL) {
-				ill_t	*ill = (ill_t *)ire->ire_stq->q_ptr;
+	else if ((do_tcpzcopy == 1) && (ixa->ixa_flags & IXAF_ZCOPY_CAPAB))
+		zc_enabled = B_TRUE;
 
-				zc_enabled = ill && (ill->ill_capabilities &
-				    ILL_CAPAB_ZEROCOPY) &&
-				    (ill->ill_zerocopy_capab->
-				    ill_zerocopy_flags != 0);
-			}
-			IRE_REFRELE(ire);
-		}
-		mutex_exit(&connp->conn_lock);
-	}
 	tcp->tcp_snd_zcopy_on = zc_enabled;
 	if (!TCP_IS_DETACHED(tcp)) {
 		if (zc_enabled) {
-			(void) proto_set_tx_copyopt(tcp->tcp_rq, connp,
+			ixa->ixa_flags |= IXAF_VERIFY_ZCOPY;
+			(void) proto_set_tx_copyopt(connp->conn_rq, connp,
 			    ZCVMSAFE);
 			TCP_STAT(tcps, tcp_zcopy_on);
 		} else {
-			(void) proto_set_tx_copyopt(tcp->tcp_rq, connp,
+			ixa->ixa_flags &= ~IXAF_VERIFY_ZCOPY;
+			(void) proto_set_tx_copyopt(connp->conn_rq, connp,
 			    ZCVMUNSAFE);
 			TCP_STAT(tcps, tcp_zcopy_off);
 		}
@@ -18241,99 +15089,84 @@ tcp_zcopy_check(tcp_t *tcp)
 	return (zc_enabled);
 }
 
-static mblk_t *
-tcp_zcopy_disable(tcp_t *tcp, mblk_t *bp)
-{
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-
-	if (do_tcpzcopy == 2)
-		return (bp);
-	else if (tcp->tcp_snd_zcopy_on) {
-		tcp->tcp_snd_zcopy_on = B_FALSE;
-		if (!TCP_IS_DETACHED(tcp)) {
-			(void) proto_set_tx_copyopt(tcp->tcp_rq, tcp->tcp_connp,
-			    ZCVMUNSAFE);
-			TCP_STAT(tcps, tcp_zcopy_disable);
-		}
-	}
-	return (tcp_zcopy_backoff(tcp, bp, 0));
-}
-
 /*
- * Backoff from a zero-copy mblk by copying data to a new mblk and freeing
- * the original desballoca'ed segmapped mblk.
+ * Backoff from a zero-copy message by copying data to a new allocated
+ * message and freeing the original desballoca'ed segmapped message.
+ *
+ * This function is called by following two callers:
+ * 1. tcp_timer: fix_xmitlist is set to B_TRUE, because it's safe to free
+ *    the origial desballoca'ed message and notify sockfs. This is in re-
+ *    transmit state.
+ * 2. tcp_output: fix_xmitlist is set to B_FALSE. Flag STRUIO_ZCNOTIFY need
+ *    to be copied to new message.
  */
 static mblk_t *
-tcp_zcopy_backoff(tcp_t *tcp, mblk_t *bp, int fix_xmitlist)
+tcp_zcopy_backoff(tcp_t *tcp, mblk_t *bp, boolean_t fix_xmitlist)
 {
-	mblk_t *head, *tail, *nbp;
+	mblk_t		*nbp;
+	mblk_t		*head = NULL;
+	mblk_t		*tail = NULL;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	if (IS_VMLOANED_MBLK(bp)) {
-		TCP_STAT(tcps, tcp_zcopy_backoff);
-		if ((head = copyb(bp)) == NULL) {
-			/* fail to backoff; leave it for the next backoff */
-			tcp->tcp_xmit_zc_clean = B_FALSE;
-			return (bp);
-		}
-		if (bp->b_datap->db_struioflag & STRUIO_ZCNOTIFY) {
-			if (fix_xmitlist)
-				tcp_zcopy_notify(tcp);
-			else
-				head->b_datap->db_struioflag |= STRUIO_ZCNOTIFY;
-		}
-		nbp = bp->b_cont;
-		if (fix_xmitlist) {
-			head->b_prev = bp->b_prev;
-			head->b_next = bp->b_next;
-			if (tcp->tcp_xmit_tail == bp)
-				tcp->tcp_xmit_tail = head;
-		}
-		bp->b_next = NULL;
-		bp->b_prev = NULL;
-		freeb(bp);
-	} else {
-		head = bp;
-		nbp = bp->b_cont;
-	}
-	tail = head;
-	while (nbp) {
-		if (IS_VMLOANED_MBLK(nbp)) {
+	ASSERT(bp != NULL);
+	while (bp != NULL) {
+		if (IS_VMLOANED_MBLK(bp)) {
 			TCP_STAT(tcps, tcp_zcopy_backoff);
-			if ((tail->b_cont = copyb(nbp)) == NULL) {
+			if ((nbp = copyb(bp)) == NULL) {
 				tcp->tcp_xmit_zc_clean = B_FALSE;
-				tail->b_cont = nbp;
-				return (head);
+				if (tail != NULL)
+					tail->b_cont = bp;
+				return ((head == NULL) ? bp : head);
 			}
-			tail = tail->b_cont;
-			if (nbp->b_datap->db_struioflag & STRUIO_ZCNOTIFY) {
+
+			if (bp->b_datap->db_struioflag & STRUIO_ZCNOTIFY) {
 				if (fix_xmitlist)
 					tcp_zcopy_notify(tcp);
 				else
-					tail->b_datap->db_struioflag |=
+					nbp->b_datap->db_struioflag |=
 					    STRUIO_ZCNOTIFY;
 			}
-			bp = nbp;
-			nbp = nbp->b_cont;
+			nbp->b_cont = bp->b_cont;
+
+			/*
+			 * Copy saved information and adjust tcp_xmit_tail
+			 * if needed.
+			 */
 			if (fix_xmitlist) {
-				tail->b_prev = bp->b_prev;
-				tail->b_next = bp->b_next;
+				nbp->b_prev = bp->b_prev;
+				nbp->b_next = bp->b_next;
+
 				if (tcp->tcp_xmit_tail == bp)
-					tcp->tcp_xmit_tail = tail;
+					tcp->tcp_xmit_tail = nbp;
 			}
-			bp->b_next = NULL;
+
+			/* Free the original message. */
 			bp->b_prev = NULL;
+			bp->b_next = NULL;
 			freeb(bp);
-		} else {
-			tail->b_cont = nbp;
-			tail = nbp;
-			nbp = nbp->b_cont;
+
+			bp = nbp;
 		}
+
+		if (head == NULL) {
+			head = bp;
+		}
+		if (tail == NULL) {
+			tail = bp;
+		} else {
+			tail->b_cont = bp;
+			tail = bp;
+		}
+
+		/* Move forward. */
+		bp = bp->b_cont;
 	}
+
 	if (fix_xmitlist) {
 		tcp->tcp_xmit_last = tail;
 		tcp->tcp_xmit_zc_clean = B_TRUE;
 	}
+
 	return (head);
 }
 
@@ -18341,7 +15174,7 @@ static void
 tcp_zcopy_notify(tcp_t *tcp)
 {
 	struct stdata	*stp;
-	conn_t *connp;
+	conn_t		*connp;
 
 	if (tcp->tcp_detached)
 		return;
@@ -18351,323 +15184,149 @@ tcp_zcopy_notify(tcp_t *tcp)
 		    (connp->conn_upper_handle);
 		return;
 	}
-	stp = STREAM(tcp->tcp_rq);
+	stp = STREAM(connp->conn_rq);
 	mutex_enter(&stp->sd_lock);
 	stp->sd_flag |= STZCNOTIFY;
 	cv_broadcast(&stp->sd_zcopy_wait);
 	mutex_exit(&stp->sd_lock);
 }
 
-static boolean_t
-tcp_send_find_ire(tcp_t *tcp, ipaddr_t *dst, ire_t **irep)
+/*
+ * Update the TCP connection according to change of LSO capability.
+ */
+static void
+tcp_update_lso(tcp_t *tcp, ip_xmit_attr_t *ixa)
 {
-	ire_t	*ire;
-	conn_t	*connp = tcp->tcp_connp;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
+	/*
+	 * We check against IPv4 header length to preserve the old behavior
+	 * of only enabling LSO when there are no IP options.
+	 * But this restriction might not be necessary at all. Before removing
+	 * it, need to verify how LSO is handled for source routing case, with
+	 * which IP does software checksum.
+	 *
+	 * For IPv6, whenever any extension header is needed, LSO is supressed.
+	 */
+	if (ixa->ixa_ip_hdr_length != ((ixa->ixa_flags & IXAF_IS_IPV4) ?
+	    IP_SIMPLE_HDR_LENGTH : IPV6_HDR_LEN))
+		return;
 
-	mutex_enter(&connp->conn_lock);
-	ire = connp->conn_ire_cache;
-	ASSERT(!(connp->conn_state_flags & CONN_INCIPIENT));
+	/*
+	 * Either the LSO capability newly became usable, or it has changed.
+	 */
+	if (ixa->ixa_flags & IXAF_LSO_CAPAB) {
+		ill_lso_capab_t	*lsoc = &ixa->ixa_lso_capab;
 
-	if ((ire != NULL) &&
-	    (((dst != NULL) && (ire->ire_addr == *dst)) || ((dst == NULL) &&
-	    IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6, &tcp->tcp_ip6h->ip6_dst))) &&
-	    !(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-		IRE_REFHOLD(ire);
-		mutex_exit(&connp->conn_lock);
-	} else {
-		boolean_t cached = B_FALSE;
-		ts_label_t *tsl;
+		ASSERT(lsoc->ill_lso_max > 0);
+		tcp->tcp_lso_max = MIN(TCP_MAX_LSO_LENGTH, lsoc->ill_lso_max);
 
-		/* force a recheck later on */
-		tcp->tcp_ire_ill_check_done = B_FALSE;
-
-		TCP_DBGSTAT(tcps, tcp_ire_null1);
-		connp->conn_ire_cache = NULL;
-		mutex_exit(&connp->conn_lock);
-
-		if (ire != NULL)
-			IRE_REFRELE_NOTR(ire);
-
-		tsl = crgetlabel(CONN_CRED(connp));
-		ire = (dst ?
-		    ire_cache_lookup(*dst, connp->conn_zoneid, tsl, ipst) :
-		    ire_cache_lookup_v6(&tcp->tcp_ip6h->ip6_dst,
-		    connp->conn_zoneid, tsl, ipst));
-
-		if (ire == NULL) {
-			TCP_STAT(tcps, tcp_ire_null);
-			return (B_FALSE);
-		}
-
-		IRE_REFHOLD_NOTR(ire);
-
-		mutex_enter(&connp->conn_lock);
-		if (CONN_CACHE_IRE(connp)) {
-			rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
-			if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
-				TCP_CHECK_IREINFO(tcp, ire);
-				connp->conn_ire_cache = ire;
-				cached = B_TRUE;
-			}
-			rw_exit(&ire->ire_bucket->irb_lock);
-		}
-		mutex_exit(&connp->conn_lock);
+		DTRACE_PROBE3(tcp_update_lso, boolean_t, tcp->tcp_lso,
+		    boolean_t, B_TRUE, uint32_t, tcp->tcp_lso_max);
 
 		/*
-		 * We can continue to use the ire but since it was
-		 * not cached, we should drop the extra reference.
+		 * If LSO to be enabled, notify the STREAM header with larger
+		 * data block.
 		 */
-		if (!cached)
-			IRE_REFRELE_NOTR(ire);
+		if (!tcp->tcp_lso)
+			tcp->tcp_maxpsz_multiplier = 0;
+
+		tcp->tcp_lso = B_TRUE;
+		TCP_STAT(tcp->tcp_tcps, tcp_lso_enabled);
+	} else { /* LSO capability is not usable any more. */
+		DTRACE_PROBE3(tcp_update_lso, boolean_t, tcp->tcp_lso,
+		    boolean_t, B_FALSE, uint32_t, tcp->tcp_lso_max);
 
 		/*
-		 * Rampart note: no need to select a new label here, since
-		 * labels are not allowed to change during the life of a TCP
-		 * connection.
+		 * If LSO to be disabled, notify the STREAM header with smaller
+		 * data block. And need to restore fragsize to PMTU.
 		 */
+		if (tcp->tcp_lso) {
+			tcp->tcp_maxpsz_multiplier =
+			    tcp->tcp_tcps->tcps_maxpsz_multiplier;
+			ixa->ixa_fragsize = ixa->ixa_pmtu;
+			tcp->tcp_lso = B_FALSE;
+			TCP_STAT(tcp->tcp_tcps, tcp_lso_disabled);
+		}
 	}
 
-	*irep = ire;
-
-	return (B_TRUE);
+	(void) tcp_maxpsz_set(tcp, B_TRUE);
 }
 
 /*
- * Called from tcp_send() or tcp_send_data() to find workable IRE.
- *
- * 0 = success;
- * 1 = failed to find ire and ill.
+ * Update the TCP connection according to change of ZEROCOPY capability.
  */
-static boolean_t
-tcp_send_find_ire_ill(tcp_t *tcp, mblk_t *mp, ire_t **irep, ill_t **illp)
+static void
+tcp_update_zcopy(tcp_t *tcp)
 {
-	ipha_t		*ipha;
-	ipaddr_t	dst;
-	ire_t		*ire;
-	ill_t		*ill;
-	mblk_t		*ire_fp_mp;
+	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
-	if (mp != NULL)
-		ipha = (ipha_t *)mp->b_rptr;
-	else
-		ipha = tcp->tcp_ipha;
-	dst = ipha->ipha_dst;
-
-	if (!tcp_send_find_ire(tcp, &dst, &ire))
-		return (B_FALSE);
-
-	if ((ire->ire_flags & RTF_MULTIRT) ||
-	    (ire->ire_stq == NULL) ||
-	    (ire->ire_nce == NULL) ||
-	    ((ire_fp_mp = ire->ire_nce->nce_fp_mp) == NULL) ||
-	    ((mp != NULL) && (ire->ire_max_frag < ntohs(ipha->ipha_length) ||
-	    MBLKL(ire_fp_mp) > MBLKHEAD(mp)))) {
-		TCP_STAT(tcps, tcp_ip_ire_send);
-		IRE_REFRELE(ire);
-		return (B_FALSE);
+	if (tcp->tcp_snd_zcopy_on) {
+		tcp->tcp_snd_zcopy_on = B_FALSE;
+		if (!TCP_IS_DETACHED(tcp)) {
+			(void) proto_set_tx_copyopt(connp->conn_rq, connp,
+			    ZCVMUNSAFE);
+			TCP_STAT(tcps, tcp_zcopy_off);
+		}
+	} else {
+		tcp->tcp_snd_zcopy_on = B_TRUE;
+		if (!TCP_IS_DETACHED(tcp)) {
+			(void) proto_set_tx_copyopt(connp->conn_rq, connp,
+			    ZCVMSAFE);
+			TCP_STAT(tcps, tcp_zcopy_on);
+		}
 	}
+}
 
-	ill = ire_to_ill(ire);
-	ASSERT(ill != NULL);
+/*
+ * Notify function registered with ip_xmit_attr_t. It's called in the squeue
+ * so it's safe to update the TCP connection.
+ */
+/* ARGSUSED1 */
+static void
+tcp_notify(void *arg, ip_xmit_attr_t *ixa, ixa_notify_type_t ntype,
+    ixa_notify_arg_t narg)
+{
+	tcp_t		*tcp = (tcp_t *)arg;
+	conn_t		*connp = tcp->tcp_connp;
 
-	if (!tcp->tcp_ire_ill_check_done) {
-		tcp_ire_ill_check(tcp, ire, ill, B_TRUE);
-		tcp->tcp_ire_ill_check_done = B_TRUE;
+	switch (ntype) {
+	case IXAN_LSO:
+		tcp_update_lso(tcp, connp->conn_ixa);
+		break;
+	case IXAN_PMTU:
+		tcp_update_pmtu(tcp, B_FALSE);
+		break;
+	case IXAN_ZCOPY:
+		tcp_update_zcopy(tcp);
+		break;
+	default:
+		break;
 	}
-
-	*irep = ire;
-	*illp = ill;
-
-	return (B_TRUE);
 }
 
 static void
-tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
+tcp_send_data(tcp_t *tcp, mblk_t *mp)
 {
-	ipha_t		*ipha;
-	ipaddr_t	src;
-	ipaddr_t	dst;
-	uint32_t	cksum;
-	ire_t		*ire;
-	uint16_t	*up;
-	ill_t		*ill;
 	conn_t		*connp = tcp->tcp_connp;
-	uint32_t	hcksum_txflags = 0;
-	mblk_t		*ire_fp_mp;
-	uint_t		ire_fp_mp_len;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
-	cred_t		*cr;
-	pid_t		cpid;
-
-	ASSERT(DB_TYPE(mp) == M_DATA);
 
 	/*
-	 * Here we need to handle the overloading of the cred_t for
-	 * both getpeerucred and TX.
-	 * If this is a SYN then the caller already set db_credp so
-	 * that getpeerucred will work. But if TX is in use we might have
-	 * a conn_effective_cred which is different, and we need to use that
-	 * cred to make TX use the correct label and label dependent route.
+	 * Check here to avoid sending zero-copy message down to IP when
+	 * ZEROCOPY capability has turned off. We only need to deal with
+	 * the race condition between sockfs and the notification here.
+	 * Since we have tried to backoff the tcp_xmit_head when turning
+	 * zero-copy off and new messages in tcp_output(), we simply drop
+	 * the dup'ed packet here and let tcp retransmit, if tcp_xmit_zc_clean
+	 * is not true.
 	 */
-	if (is_system_labeled()) {
-		cr = msg_getcred(mp, &cpid);
-		if (cr == NULL || connp->conn_effective_cred != NULL)
-			mblk_setcred(mp, CONN_CRED(connp), cpid);
-	}
-
-	ipha = (ipha_t *)mp->b_rptr;
-	src = ipha->ipha_src;
-	dst = ipha->ipha_dst;
-
-	ASSERT(q != NULL);
-	DTRACE_PROBE2(tcp__trace__send, mblk_t *, mp, tcp_t *, tcp);
-
-	/*
-	 * Drop off fast path for IPv6 and also if options are present or
-	 * we need to resolve a TS label.
-	 */
-	if (tcp->tcp_ipversion != IPV4_VERSION ||
-	    !IPCL_IS_CONNECTED(connp) ||
-	    !CONN_IS_LSO_MD_FASTPATH(connp) ||
-	    (connp->conn_flags & IPCL_CHECK_POLICY) != 0 ||
-	    !connp->conn_ulp_labeled ||
-	    ipha->ipha_ident == IP_HDR_INCLUDED ||
-	    ipha->ipha_version_and_hdr_length != IP_SIMPLE_HDR_VERSION ||
-	    IPP_ENABLED(IPP_LOCAL_OUT, ipst)) {
-		if (tcp->tcp_snd_zcopy_aware)
-			mp = tcp_zcopy_disable(tcp, mp);
-		TCP_STAT(tcps, tcp_ip_send);
-		CALL_IP_WPUT(connp, q, mp);
+	if (tcp->tcp_snd_zcopy_aware && !tcp->tcp_snd_zcopy_on &&
+	    !tcp->tcp_xmit_zc_clean) {
+		ip_drop_output("TCP ZC was disabled but not clean", mp, NULL);
+		freemsg(mp);
 		return;
 	}
 
-	if (!tcp_send_find_ire_ill(tcp, mp, &ire, &ill)) {
-		if (tcp->tcp_snd_zcopy_aware)
-			mp = tcp_zcopy_backoff(tcp, mp, 0);
-		CALL_IP_WPUT(connp, q, mp);
-		return;
-	}
-	ire_fp_mp = ire->ire_nce->nce_fp_mp;
-	ire_fp_mp_len = MBLKL(ire_fp_mp);
-
-	ASSERT(ipha->ipha_ident == 0 || ipha->ipha_ident == IP_HDR_INCLUDED);
-	ipha->ipha_ident = (uint16_t)atomic_add_32_nv(&ire->ire_ident, 1);
-#ifndef _BIG_ENDIAN
-	ipha->ipha_ident = (ipha->ipha_ident << 8) | (ipha->ipha_ident >> 8);
-#endif
-
-	/*
-	 * Check to see if we need to re-enable LSO/MDT for this connection
-	 * because it was previously disabled due to changes in the ill;
-	 * note that by doing it here, this re-enabling only applies when
-	 * the packet is not dispatched through CALL_IP_WPUT().
-	 *
-	 * That means for IPv4, it is worth re-enabling LSO/MDT for the fastpath
-	 * case, since that's how we ended up here.  For IPv6, we do the
-	 * re-enabling work in ip_xmit_v6(), albeit indirectly via squeue.
-	 */
-	if (connp->conn_lso_ok && !tcp->tcp_lso && ILL_LSO_TCP_USABLE(ill)) {
-		/*
-		 * Restore LSO for this connection, so that next time around
-		 * it is eligible to go through tcp_lsosend() path again.
-		 */
-		TCP_STAT(tcps, tcp_lso_enabled);
-		tcp->tcp_lso = B_TRUE;
-		ip1dbg(("tcp_send_data: reenabling LSO for connp %p on "
-		    "interface %s\n", (void *)connp, ill->ill_name));
-	} else if (connp->conn_mdt_ok && !tcp->tcp_mdt && ILL_MDT_USABLE(ill)) {
-		/*
-		 * Restore MDT for this connection, so that next time around
-		 * it is eligible to go through tcp_multisend() path again.
-		 */
-		TCP_STAT(tcps, tcp_mdt_conn_resumed1);
-		tcp->tcp_mdt = B_TRUE;
-		ip1dbg(("tcp_send_data: reenabling MDT for connp %p on "
-		    "interface %s\n", (void *)connp, ill->ill_name));
-	}
-
-	if (tcp->tcp_snd_zcopy_aware) {
-		if ((ill->ill_capabilities & ILL_CAPAB_ZEROCOPY) == 0 ||
-		    (ill->ill_zerocopy_capab->ill_zerocopy_flags == 0))
-			mp = tcp_zcopy_disable(tcp, mp);
-		/*
-		 * we shouldn't need to reset ipha as the mp containing
-		 * ipha should never be a zero-copy mp.
-		 */
-	}
-
-	if (ILL_HCKSUM_CAPABLE(ill) && dohwcksum) {
-		ASSERT(ill->ill_hcksum_capab != NULL);
-		hcksum_txflags = ill->ill_hcksum_capab->ill_hcksum_txflags;
-	}
-
-	/* pseudo-header checksum (do it in parts for IP header checksum) */
-	cksum = (dst >> 16) + (dst & 0xFFFF) + (src >> 16) + (src & 0xFFFF);
-
-	ASSERT(ipha->ipha_version_and_hdr_length == IP_SIMPLE_HDR_VERSION);
-	up = IPH_TCPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
-
-	IP_CKSUM_XMIT_FAST(ire->ire_ipversion, hcksum_txflags, mp, ipha, up,
-	    IPPROTO_TCP, IP_SIMPLE_HDR_LENGTH, ntohs(ipha->ipha_length), cksum);
-
-	/* Software checksum? */
-	if (DB_CKSUMFLAGS(mp) == 0) {
-		TCP_STAT(tcps, tcp_out_sw_cksum);
-		TCP_STAT_UPDATE(tcps, tcp_out_sw_cksum_bytes,
-		    ntohs(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH);
-	}
-
-	/* Calculate IP header checksum if hardware isn't capable */
-	if (!(DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM)) {
-		IP_HDR_CKSUM(ipha, cksum, ((uint32_t *)ipha)[0],
-		    ((uint16_t *)ipha)[4]);
-	}
-
-	ASSERT(DB_TYPE(ire_fp_mp) == M_DATA);
-	mp->b_rptr = (uchar_t *)ipha - ire_fp_mp_len;
-	bcopy(ire_fp_mp->b_rptr, mp->b_rptr, ire_fp_mp_len);
-
-	UPDATE_OB_PKT_COUNT(ire);
-	ire->ire_last_used_time = lbolt;
-
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests);
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits);
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
-	    ntohs(ipha->ipha_length));
-
-	DTRACE_PROBE4(ip4__physical__out__start,
-	    ill_t *, NULL, ill_t *, ill, ipha_t *, ipha, mblk_t *, mp);
-	FW_HOOKS(ipst->ips_ip4_physical_out_event,
-	    ipst->ips_ipv4firewall_physical_out,
-	    NULL, ill, ipha, mp, mp, 0, ipst);
-	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-	DTRACE_IP_FASTPATH(mp, ipha, ill, ipha, NULL);
-
-	if (mp != NULL) {
-		if (ipst->ips_ip4_observe.he_interested) {
-			zoneid_t szone;
-
-			/*
-			 * Both of these functions expect b_rptr to be
-			 * where the IP header starts, so advance past the
-			 * link layer header if present.
-			 */
-			mp->b_rptr += ire_fp_mp_len;
-			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
-			    ipst, ALL_ZONES);
-			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
-			    ALL_ZONES, ill, ipst);
-			mp->b_rptr -= ire_fp_mp_len;
-		}
-
-		ILL_SEND_TX(ill, ire, connp, mp, 0, NULL);
-	}
-
-	IRE_REFRELE(ire);
+	ASSERT(connp->conn_ixa->ixa_notify_cookie == connp->conn_tcp);
+	(void) conn_ip_output(mp, connp->conn_ixa);
 }
 
 /*
@@ -18731,15 +15390,13 @@ tcp_wput_data(tcp_t *tcp, mblk_t *mp, boolean_t urgent)
 	int		tcpstate;
 	int		usable = 0;
 	mblk_t		*xmit_tail;
-	queue_t		*q = tcp->tcp_wq;
 	int32_t		mss;
 	int32_t		num_sack_blk = 0;
+	int32_t		total_hdr_len;
 	int32_t		tcp_hdr_len;
-	int32_t		tcp_tcp_hdr_len;
-	int		mdt_thres;
 	int		rc;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t	*ipst;
+	conn_t		*connp = tcp->tcp_connp;
 
 	tcpstate = tcp->tcp_state;
 	if (mp == NULL) {
@@ -18771,7 +15428,7 @@ tcp_wput_data(tcp_t *tcp, mblk_t *mp, boolean_t urgent)
 			    tcp_display(tcp, NULL,
 			    DISP_ADDR_AND_PORT));
 #else
-			if (tcp->tcp_debug) {
+			if (connp->conn_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1,
 				    SL_TRACE|SL_ERROR,
 				    "tcp_wput_data: data after ordrel, %s\n",
@@ -18781,12 +15438,12 @@ tcp_wput_data(tcp_t *tcp, mblk_t *mp, boolean_t urgent)
 #endif /* DEBUG */
 		}
 		if (tcp->tcp_snd_zcopy_aware &&
-		    (mp->b_datap->db_struioflag & STRUIO_ZCNOTIFY) != 0)
+		    (mp->b_datap->db_struioflag & STRUIO_ZCNOTIFY))
 			tcp_zcopy_notify(tcp);
 		freemsg(mp);
 		mutex_enter(&tcp->tcp_non_sq_lock);
 		if (tcp->tcp_flow_stopped &&
-		    TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
+		    TCP_UNSENT_BYTES(tcp) <= connp->conn_sndlowat) {
 			tcp_clrqfull(tcp);
 		}
 		mutex_exit(&tcp->tcp_non_sq_lock);
@@ -18886,12 +15543,12 @@ data_null:
 		opt_len = num_sack_blk * sizeof (sack_blk_t) + TCPOPT_NOP_LEN *
 		    2 + TCPOPT_HEADER_LEN;
 		mss = tcp->tcp_mss - opt_len;
-		tcp_hdr_len = tcp->tcp_hdr_len + opt_len;
-		tcp_tcp_hdr_len = tcp->tcp_tcp_hdr_len + opt_len;
+		total_hdr_len = connp->conn_ht_iphc_len + opt_len;
+		tcp_hdr_len = connp->conn_ht_ulp_len + opt_len;
 	} else {
 		mss = tcp->tcp_mss;
-		tcp_hdr_len = tcp->tcp_hdr_len;
-		tcp_tcp_hdr_len = tcp->tcp_tcp_hdr_len;
+		total_hdr_len = connp->conn_ht_iphc_len;
+		tcp_hdr_len = connp->conn_ht_ulp_len;
 	}
 
 	if ((tcp->tcp_suna == snxt) && !tcp->tcp_localnet &&
@@ -18913,7 +15570,7 @@ data_null:
 		 * In the special case when cwnd is zero, which can only
 		 * happen if the connection is ECN capable, return now.
 		 * New segments is sent using tcp_timer().  The timer
-		 * is set in tcp_rput_data().
+		 * is set in tcp_input_data().
 		 */
 		if (tcp->tcp_cwnd == 0) {
 			/*
@@ -19023,66 +15680,12 @@ data_null:
 	}
 
 	/* Update the latest receive window size in TCP header. */
-	U32_TO_ABE16(tcp->tcp_rwnd >> tcp->tcp_rcv_ws,
-	    tcp->tcp_tcph->th_win);
+	tcp->tcp_tcpha->tha_win = htons(tcp->tcp_rwnd >> tcp->tcp_rcv_ws);
 
-	/*
-	 * Determine if it's worthwhile to attempt LSO or MDT, based on:
-	 *
-	 * 1. Simple TCP/IP{v4,v6} (no options).
-	 * 2. IPSEC/IPQoS processing is not needed for the TCP connection.
-	 * 3. If the TCP connection is in ESTABLISHED state.
-	 * 4. The TCP is not detached.
-	 *
-	 * If any of the above conditions have changed during the
-	 * connection, stop using LSO/MDT and restore the stream head
-	 * parameters accordingly.
-	 */
-	ipst = tcps->tcps_netstack->netstack_ip;
-
-	if ((tcp->tcp_lso || tcp->tcp_mdt) &&
-	    ((tcp->tcp_ipversion == IPV4_VERSION &&
-	    tcp->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH) ||
-	    (tcp->tcp_ipversion == IPV6_VERSION &&
-	    tcp->tcp_ip_hdr_len != IPV6_HDR_LEN) ||
-	    tcp->tcp_state != TCPS_ESTABLISHED ||
-	    TCP_IS_DETACHED(tcp) || !CONN_IS_LSO_MD_FASTPATH(tcp->tcp_connp) ||
-	    CONN_IPSEC_OUT_ENCAPSULATED(tcp->tcp_connp) ||
-	    IPP_ENABLED(IPP_LOCAL_OUT, ipst))) {
-		if (tcp->tcp_lso) {
-			tcp->tcp_connp->conn_lso_ok = B_FALSE;
-			tcp->tcp_lso = B_FALSE;
-		} else {
-			tcp->tcp_connp->conn_mdt_ok = B_FALSE;
-			tcp->tcp_mdt = B_FALSE;
-		}
-
-		/* Anything other than detached is considered pathological */
-		if (!TCP_IS_DETACHED(tcp)) {
-			if (tcp->tcp_lso)
-				TCP_STAT(tcps, tcp_lso_disabled);
-			else
-				TCP_STAT(tcps, tcp_mdt_conn_halted1);
-			(void) tcp_maxpsz_set(tcp, B_TRUE);
-		}
-	}
-
-	/* Use MDT if sendable amount is greater than the threshold */
-	if (tcp->tcp_mdt &&
-	    (mdt_thres = mss << tcp_mdt_smss_threshold, usable > mdt_thres) &&
-	    (tail_unsent > mdt_thres || (xmit_tail->b_cont != NULL &&
-	    MBLKL(xmit_tail->b_cont) > mdt_thres)) &&
-	    (tcp->tcp_valid_bits == 0 ||
-	    tcp->tcp_valid_bits == TCP_FSS_VALID)) {
-		ASSERT(tcp->tcp_connp->conn_mdt_ok);
-		rc = tcp_multisend(q, tcp, mss, tcp_hdr_len, tcp_tcp_hdr_len,
-		    num_sack_blk, &usable, &snxt, &tail_unsent, &xmit_tail,
-		    local_time, mdt_thres);
-	} else {
-		rc = tcp_send(q, tcp, mss, tcp_hdr_len, tcp_tcp_hdr_len,
-		    num_sack_blk, &usable, &snxt, &tail_unsent, &xmit_tail,
-		    local_time, INT_MAX);
-	}
+	/* Send the packet. */
+	rc = tcp_send(tcp, mss, total_hdr_len, tcp_hdr_len,
+	    num_sack_blk, &usable, &snxt, &tail_unsent, &xmit_tail,
+	    local_time);
 
 	/* Pretend that all we were trying to send really got sent */
 	if (rc < 0 && tail_unsent < 0) {
@@ -19131,39 +15734,41 @@ done:;
 	tcp->tcp_unsent += len;
 	mutex_enter(&tcp->tcp_non_sq_lock);
 	if (tcp->tcp_flow_stopped) {
-		if (TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
+		if (TCP_UNSENT_BYTES(tcp) <= connp->conn_sndlowat) {
 			tcp_clrqfull(tcp);
 		}
-	} else if (TCP_UNSENT_BYTES(tcp) >= tcp->tcp_xmit_hiwater) {
-		tcp_setqfull(tcp);
+	} else if (TCP_UNSENT_BYTES(tcp) >= connp->conn_sndbuf) {
+		if (!(tcp->tcp_detached))
+			tcp_setqfull(tcp);
 	}
 	mutex_exit(&tcp->tcp_non_sq_lock);
 }
 
 /*
- * tcp_fill_header is called by tcp_send() and tcp_multisend() to fill the
- * outgoing TCP header with the template header, as well as other
- * options such as time-stamp, ECN and/or SACK.
+ * tcp_fill_header is called by tcp_send() to fill the outgoing TCP header
+ * with the template header, as well as other options such as time-stamp,
+ * ECN and/or SACK.
  */
 static void
 tcp_fill_header(tcp_t *tcp, uchar_t *rptr, clock_t now, int num_sack_blk)
 {
-	tcph_t *tcp_tmpl, *tcp_h;
+	tcpha_t *tcp_tmpl, *tcpha;
 	uint32_t *dst, *src;
 	int hdrlen;
+	conn_t *connp = tcp->tcp_connp;
 
 	ASSERT(OK_32PTR(rptr));
 
 	/* Template header */
-	tcp_tmpl = tcp->tcp_tcph;
+	tcp_tmpl = tcp->tcp_tcpha;
 
 	/* Header of outgoing packet */
-	tcp_h = (tcph_t *)(rptr + tcp->tcp_ip_hdr_len);
+	tcpha = (tcpha_t *)(rptr + connp->conn_ixa->ixa_ip_hdr_length);
 
 	/* dst and src are opaque 32-bit fields, used for copying */
 	dst = (uint32_t *)rptr;
-	src = (uint32_t *)tcp->tcp_iphc;
-	hdrlen = tcp->tcp_hdr_len;
+	src = (uint32_t *)connp->conn_ht_iphc;
+	hdrlen = connp->conn_ht_iphc_len;
 
 	/* Fill time-stamp option if needed */
 	if (tcp->tcp_snd_ts_ok) {
@@ -19172,7 +15777,7 @@ tcp_fill_header(tcp_t *tcp, uchar_t *rptr, clock_t now, int num_sack_blk)
 		U32_TO_BE32(tcp->tcp_ts_recent,
 		    (char *)tcp_tmpl + TCP_MIN_HEADER_LENGTH + 8);
 	} else {
-		ASSERT(tcp->tcp_tcp_hdr_len == TCP_MIN_HEADER_LENGTH);
+		ASSERT(connp->conn_ht_ulp_len == TCP_MIN_HEADER_LENGTH);
 	}
 
 	/*
@@ -19208,16 +15813,16 @@ tcp_fill_header(tcp_t *tcp, uchar_t *rptr, clock_t now, int num_sack_blk)
 		SET_ECT(tcp, rptr);
 
 		if (tcp->tcp_ecn_echo_on)
-			tcp_h->th_flags[0] |= TH_ECE;
+			tcpha->tha_flags |= TH_ECE;
 		if (tcp->tcp_cwr && !tcp->tcp_ecn_cwr_sent) {
-			tcp_h->th_flags[0] |= TH_CWR;
+			tcpha->tha_flags |= TH_CWR;
 			tcp->tcp_ecn_cwr_sent = B_TRUE;
 		}
 	}
 
 	/* Fill in SACK options */
 	if (num_sack_blk > 0) {
-		uchar_t *wptr = rptr + tcp->tcp_hdr_len;
+		uchar_t *wptr = rptr + connp->conn_ht_iphc_len;
 		sack_blk_t *tmp;
 		int32_t	i;
 
@@ -19235,1536 +15840,62 @@ tcp_fill_header(tcp_t *tcp, uchar_t *rptr, clock_t now, int num_sack_blk)
 			U32_TO_BE32(tmp[i].end, wptr);
 			wptr += sizeof (tcp_seq);
 		}
-		tcp_h->th_offset_and_rsrvd[0] +=
+		tcpha->tha_offset_and_reserved +=
 		    ((num_sack_blk * 2 + 1) << 4);
 	}
 }
 
 /*
- * tcp_mdt_add_attrs() is called by tcp_multisend() in order to attach
- * the destination address and SAP attribute, and if necessary, the
- * hardware checksum offload attribute to a Multidata message.
- */
-static int
-tcp_mdt_add_attrs(multidata_t *mmd, const mblk_t *dlmp, const boolean_t hwcksum,
-    const uint32_t start, const uint32_t stuff, const uint32_t end,
-    const uint32_t flags, tcp_stack_t *tcps)
-{
-	/* Add global destination address & SAP attribute */
-	if (dlmp == NULL || !ip_md_addr_attr(mmd, NULL, dlmp)) {
-		ip1dbg(("tcp_mdt_add_attrs: can't add global physical "
-		    "destination address+SAP\n"));
-
-		if (dlmp != NULL)
-			TCP_STAT(tcps, tcp_mdt_allocfail);
-		return (-1);
-	}
-
-	/* Add global hwcksum attribute */
-	if (hwcksum &&
-	    !ip_md_hcksum_attr(mmd, NULL, start, stuff, end, flags)) {
-		ip1dbg(("tcp_mdt_add_attrs: can't add global hardware "
-		    "checksum attribute\n"));
-
-		TCP_STAT(tcps, tcp_mdt_allocfail);
-		return (-1);
-	}
-
-	return (0);
-}
-
-/*
- * Smaller and private version of pdescinfo_t used specifically for TCP,
- * which allows for only two payload spans per packet.
- */
-typedef struct tcp_pdescinfo_s PDESCINFO_STRUCT(2) tcp_pdescinfo_t;
-
-/*
- * tcp_multisend() is called by tcp_wput_data() for Multidata Transmit
- * scheme, and returns one the following:
+ * tcp_send() is called by tcp_wput_data() and returns one of the following:
  *
  * -1 = failed allocation.
  *  0 = success; burst count reached, or usable send window is too small,
  *      and that we'd rather wait until later before sending again.
  */
 static int
-tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
-    const int tcp_tcp_hdr_len, const int num_sack_blk, int *usable,
-    uint_t *snxt, int *tail_unsent, mblk_t **xmit_tail, mblk_t *local_time,
-    const int mdt_thres)
+tcp_send(tcp_t *tcp, const int mss, const int total_hdr_len,
+    const int tcp_hdr_len, const int num_sack_blk, int *usable,
+    uint_t *snxt, int *tail_unsent, mblk_t **xmit_tail, mblk_t *local_time)
 {
-	mblk_t		*md_mp_head, *md_mp, *md_pbuf, *md_pbuf_nxt, *md_hbuf;
-	multidata_t	*mmd;
-	uint_t		obsegs, obbytes, hdr_frag_sz;
-	uint_t		cur_hdr_off, cur_pld_off, base_pld_off, first_snxt;
-	int		num_burst_seg, max_pld;
-	pdesc_t		*pkt;
-	tcp_pdescinfo_t	tcp_pkt_info;
-	pdescinfo_t	*pkt_info;
-	int		pbuf_idx, pbuf_idx_nxt;
-	int		seg_len, len, spill, af;
-	boolean_t	add_buffer, zcopy, clusterwide;
-	boolean_t	rconfirm = B_FALSE;
-	boolean_t	done = B_FALSE;
-	uint32_t	cksum;
-	uint32_t	hwcksum_flags;
-	ire_t		*ire = NULL;
-	ill_t		*ill;
-	ipha_t		*ipha;
-	ip6_t		*ip6h;
-	ipaddr_t	src, dst;
-	ill_zerocopy_capab_t *zc_cap = NULL;
-	uint16_t	*up;
-	int		err;
-	conn_t		*connp;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t 	*ipst = tcps->tcps_netstack->netstack_ip;
-	int		usable_mmd, tail_unsent_mmd;
-	uint_t		snxt_mmd, obsegs_mmd, obbytes_mmd;
-	mblk_t		*xmit_tail_mmd;
-	netstackid_t	stack_id;
-
-#ifdef	_BIG_ENDIAN
-#define	IPVER(ip6h)	((((uint32_t *)ip6h)[0] >> 28) & 0x7)
-#else
-#define	IPVER(ip6h)	((((uint32_t *)ip6h)[0] >> 4) & 0x7)
-#endif
-
-#define	PREP_NEW_MULTIDATA() {			\
-	mmd = NULL;				\
-	md_mp = md_hbuf = NULL;			\
-	cur_hdr_off = 0;			\
-	max_pld = tcp->tcp_mdt_max_pld;		\
-	pbuf_idx = pbuf_idx_nxt = -1;		\
-	add_buffer = B_TRUE;			\
-	zcopy = B_FALSE;			\
-}
-
-#define	PREP_NEW_PBUF() {			\
-	md_pbuf = md_pbuf_nxt = NULL;		\
-	pbuf_idx = pbuf_idx_nxt = -1;		\
-	cur_pld_off = 0;			\
-	first_snxt = *snxt;			\
-	ASSERT(*tail_unsent > 0);		\
-	base_pld_off = MBLKL(*xmit_tail) - *tail_unsent; \
-}
-
-	ASSERT(mdt_thres >= mss);
-	ASSERT(*usable > 0 && *usable > mdt_thres);
-	ASSERT(tcp->tcp_state == TCPS_ESTABLISHED);
-	ASSERT(!TCP_IS_DETACHED(tcp));
-	ASSERT(tcp->tcp_valid_bits == 0 ||
-	    tcp->tcp_valid_bits == TCP_FSS_VALID);
-	ASSERT((tcp->tcp_ipversion == IPV4_VERSION &&
-	    tcp->tcp_ip_hdr_len == IP_SIMPLE_HDR_LENGTH) ||
-	    (tcp->tcp_ipversion == IPV6_VERSION &&
-	    tcp->tcp_ip_hdr_len == IPV6_HDR_LEN));
-
-	connp = tcp->tcp_connp;
-	ASSERT(connp != NULL);
-	ASSERT(CONN_IS_LSO_MD_FASTPATH(connp));
-	ASSERT(!CONN_IPSEC_OUT_ENCAPSULATED(connp));
-
-	stack_id = connp->conn_netstack->netstack_stackid;
-
-	usable_mmd = tail_unsent_mmd = 0;
-	snxt_mmd = obsegs_mmd = obbytes_mmd = 0;
-	xmit_tail_mmd = NULL;
-	/*
-	 * Note that tcp will only declare at most 2 payload spans per
-	 * packet, which is much lower than the maximum allowable number
-	 * of packet spans per Multidata.  For this reason, we use the
-	 * privately declared and smaller descriptor info structure, in
-	 * order to save some stack space.
-	 */
-	pkt_info = (pdescinfo_t *)&tcp_pkt_info;
-
-	af = (tcp->tcp_ipversion == IPV4_VERSION) ? AF_INET : AF_INET6;
-	if (af == AF_INET) {
-		dst = tcp->tcp_ipha->ipha_dst;
-		src = tcp->tcp_ipha->ipha_src;
-		ASSERT(!CLASSD(dst));
-	}
-	ASSERT(af == AF_INET ||
-	    !IN6_IS_ADDR_MULTICAST(&tcp->tcp_ip6h->ip6_dst));
-
-	obsegs = obbytes = 0;
-	num_burst_seg = tcp->tcp_snd_burst;
-	md_mp_head = NULL;
-	PREP_NEW_MULTIDATA();
-
-	/*
-	 * Before we go on further, make sure there is an IRE that we can
-	 * use, and that the ILL supports MDT.  Otherwise, there's no point
-	 * in proceeding any further, and we should just hand everything
-	 * off to the legacy path.
-	 */
-	if (!tcp_send_find_ire(tcp, (af == AF_INET) ? &dst : NULL, &ire))
-		goto legacy_send_no_md;
-
-	ASSERT(ire != NULL);
-	ASSERT(af != AF_INET || ire->ire_ipversion == IPV4_VERSION);
-	ASSERT(af == AF_INET || !IN6_IS_ADDR_V4MAPPED(&(ire->ire_addr_v6)));
-	ASSERT(af == AF_INET || ire->ire_nce != NULL);
-	ASSERT(!(ire->ire_type & IRE_BROADCAST));
-	/*
-	 * If we do support loopback for MDT (which requires modifications
-	 * to the receiving paths), the following assertions should go away,
-	 * and we would be sending the Multidata to loopback conn later on.
-	 */
-	ASSERT(!IRE_IS_LOCAL(ire));
-	ASSERT(ire->ire_stq != NULL);
-
-	ill = ire_to_ill(ire);
-	ASSERT(ill != NULL);
-	ASSERT(!ILL_MDT_CAPABLE(ill) || ill->ill_mdt_capab != NULL);
-
-	if (!tcp->tcp_ire_ill_check_done) {
-		tcp_ire_ill_check(tcp, ire, ill, B_TRUE);
-		tcp->tcp_ire_ill_check_done = B_TRUE;
-	}
-
-	/*
-	 * If the underlying interface conditions have changed, or if the
-	 * new interface does not support MDT, go back to legacy path.
-	 */
-	if (!ILL_MDT_USABLE(ill) || (ire->ire_flags & RTF_MULTIRT) != 0) {
-		/* don't go through this path anymore for this connection */
-		TCP_STAT(tcps, tcp_mdt_conn_halted2);
-		tcp->tcp_mdt = B_FALSE;
-		ip1dbg(("tcp_multisend: disabling MDT for connp %p on "
-		    "interface %s\n", (void *)connp, ill->ill_name));
-		/* IRE will be released prior to returning */
-		goto legacy_send_no_md;
-	}
-
-	if (ill->ill_capabilities & ILL_CAPAB_ZEROCOPY)
-		zc_cap = ill->ill_zerocopy_capab;
-
-	/*
-	 * Check if we can take tcp fast-path. Note that "incomplete"
-	 * ire's (where the link-layer for next hop is not resolved
-	 * or where the fast-path header in nce_fp_mp is not available
-	 * yet) are sent down the legacy (slow) path.
-	 * NOTE: We should fix ip_xmit_v4 to handle M_MULTIDATA
-	 */
-	if (ire->ire_nce && ire->ire_nce->nce_state != ND_REACHABLE) {
-		/* IRE will be released prior to returning */
-		goto legacy_send_no_md;
-	}
-
-	/* go to legacy path if interface doesn't support zerocopy */
-	if (tcp->tcp_snd_zcopy_aware && do_tcpzcopy != 2 &&
-	    (zc_cap == NULL || zc_cap->ill_zerocopy_flags == 0)) {
-		/* IRE will be released prior to returning */
-		goto legacy_send_no_md;
-	}
-
-	/* does the interface support hardware checksum offload? */
-	hwcksum_flags = 0;
-	if (ILL_HCKSUM_CAPABLE(ill) &&
-	    (ill->ill_hcksum_capab->ill_hcksum_txflags &
-	    (HCKSUM_INET_FULL_V4 | HCKSUM_INET_FULL_V6 | HCKSUM_INET_PARTIAL |
-	    HCKSUM_IPHDRCKSUM)) && dohwcksum) {
-		if (ill->ill_hcksum_capab->ill_hcksum_txflags &
-		    HCKSUM_IPHDRCKSUM)
-			hwcksum_flags = HCK_IPV4_HDRCKSUM;
-
-		if (ill->ill_hcksum_capab->ill_hcksum_txflags &
-		    (HCKSUM_INET_FULL_V4 | HCKSUM_INET_FULL_V6))
-			hwcksum_flags |= HCK_FULLCKSUM;
-		else if (ill->ill_hcksum_capab->ill_hcksum_txflags &
-		    HCKSUM_INET_PARTIAL)
-			hwcksum_flags |= HCK_PARTIALCKSUM;
-	}
-
-	/*
-	 * Each header fragment consists of the leading extra space,
-	 * followed by the TCP/IP header, and the trailing extra space.
-	 * We make sure that each header fragment begins on a 32-bit
-	 * aligned memory address (tcp_mdt_hdr_head is already 32-bit
-	 * aligned in tcp_mdt_update).
-	 */
-	hdr_frag_sz = roundup((tcp->tcp_mdt_hdr_head + tcp_hdr_len +
-	    tcp->tcp_mdt_hdr_tail), 4);
-
-	/* are we starting from the beginning of data block? */
-	if (*tail_unsent == 0) {
-		*xmit_tail = (*xmit_tail)->b_cont;
-		ASSERT((uintptr_t)MBLKL(*xmit_tail) <= (uintptr_t)INT_MAX);
-		*tail_unsent = (int)MBLKL(*xmit_tail);
-	}
-
-	/*
-	 * Here we create one or more Multidata messages, each made up of
-	 * one header buffer and up to N payload buffers.  This entire
-	 * operation is done within two loops:
-	 *
-	 * The outer loop mostly deals with creating the Multidata message,
-	 * as well as the header buffer that gets added to it.  It also
-	 * links the Multidata messages together such that all of them can
-	 * be sent down to the lower layer in a single putnext call; this
-	 * linking behavior depends on the tcp_mdt_chain tunable.
-	 *
-	 * The inner loop takes an existing Multidata message, and adds
-	 * one or more (up to tcp_mdt_max_pld) payload buffers to it.  It
-	 * packetizes those buffers by filling up the corresponding header
-	 * buffer fragments with the proper IP and TCP headers, and by
-	 * describing the layout of each packet in the packet descriptors
-	 * that get added to the Multidata.
-	 */
-	do {
-		/*
-		 * If usable send window is too small, or data blocks in
-		 * transmit list are smaller than our threshold (i.e. app
-		 * performs large writes followed by small ones), we hand
-		 * off the control over to the legacy path.  Note that we'll
-		 * get back the control once it encounters a large block.
-		 */
-		if (*usable < mss || (*tail_unsent <= mdt_thres &&
-		    (*xmit_tail)->b_cont != NULL &&
-		    MBLKL((*xmit_tail)->b_cont) <= mdt_thres)) {
-			/* send down what we've got so far */
-			if (md_mp_head != NULL) {
-				tcp_multisend_data(tcp, ire, ill, md_mp_head,
-				    obsegs, obbytes, &rconfirm);
-			}
-			/*
-			 * Pass control over to tcp_send(), but tell it to
-			 * return to us once a large-size transmission is
-			 * possible.
-			 */
-			TCP_STAT(tcps, tcp_mdt_legacy_small);
-			if ((err = tcp_send(q, tcp, mss, tcp_hdr_len,
-			    tcp_tcp_hdr_len, num_sack_blk, usable, snxt,
-			    tail_unsent, xmit_tail, local_time,
-			    mdt_thres)) <= 0) {
-				/* burst count reached, or alloc failed */
-				IRE_REFRELE(ire);
-				return (err);
-			}
-
-			/* tcp_send() may have sent everything, so check */
-			if (*usable <= 0) {
-				IRE_REFRELE(ire);
-				return (0);
-			}
-
-			TCP_STAT(tcps, tcp_mdt_legacy_ret);
-			/*
-			 * We may have delivered the Multidata, so make sure
-			 * to re-initialize before the next round.
-			 */
-			md_mp_head = NULL;
-			obsegs = obbytes = 0;
-			num_burst_seg = tcp->tcp_snd_burst;
-			PREP_NEW_MULTIDATA();
-
-			/* are we starting from the beginning of data block? */
-			if (*tail_unsent == 0) {
-				*xmit_tail = (*xmit_tail)->b_cont;
-				ASSERT((uintptr_t)MBLKL(*xmit_tail) <=
-				    (uintptr_t)INT_MAX);
-				*tail_unsent = (int)MBLKL(*xmit_tail);
-			}
-		}
-		/*
-		 * Record current values for parameters we may need to pass
-		 * to tcp_send() or tcp_multisend_data(). We checkpoint at
-		 * each iteration of the outer loop (each multidata message
-		 * creation). If we have a failure in the inner loop, we send
-		 * any complete multidata messages we have before reverting
-		 * to using the traditional non-md path.
-		 */
-		snxt_mmd = *snxt;
-		usable_mmd = *usable;
-		xmit_tail_mmd = *xmit_tail;
-		tail_unsent_mmd = *tail_unsent;
-		obsegs_mmd = obsegs;
-		obbytes_mmd = obbytes;
-
-		/*
-		 * max_pld limits the number of mblks in tcp's transmit
-		 * queue that can be added to a Multidata message.  Once
-		 * this counter reaches zero, no more additional mblks
-		 * can be added to it.  What happens afterwards depends
-		 * on whether or not we are set to chain the Multidata
-		 * messages.  If we are to link them together, reset
-		 * max_pld to its original value (tcp_mdt_max_pld) and
-		 * prepare to create a new Multidata message which will
-		 * get linked to md_mp_head.  Else, leave it alone and
-		 * let the inner loop break on its own.
-		 */
-		if (tcp_mdt_chain && max_pld == 0)
-			PREP_NEW_MULTIDATA();
-
-		/* adding a payload buffer; re-initialize values */
-		if (add_buffer)
-			PREP_NEW_PBUF();
-
-		/*
-		 * If we don't have a Multidata, either because we just
-		 * (re)entered this outer loop, or after we branched off
-		 * to tcp_send above, setup the Multidata and header
-		 * buffer to be used.
-		 */
-		if (md_mp == NULL) {
-			int md_hbuflen;
-			uint32_t start, stuff;
-
-			/*
-			 * Calculate Multidata header buffer size large enough
-			 * to hold all of the headers that can possibly be
-			 * sent at this moment.  We'd rather over-estimate
-			 * the size than running out of space; this is okay
-			 * since this buffer is small anyway.
-			 */
-			md_hbuflen = (howmany(*usable, mss) + 1) * hdr_frag_sz;
-
-			/*
-			 * Start and stuff offset for partial hardware
-			 * checksum offload; these are currently for IPv4.
-			 * For full checksum offload, they are set to zero.
-			 */
-			if ((hwcksum_flags & HCK_PARTIALCKSUM)) {
-				if (af == AF_INET) {
-					start = IP_SIMPLE_HDR_LENGTH;
-					stuff = IP_SIMPLE_HDR_LENGTH +
-					    TCP_CHECKSUM_OFFSET;
-				} else {
-					start = IPV6_HDR_LEN;
-					stuff = IPV6_HDR_LEN +
-					    TCP_CHECKSUM_OFFSET;
-				}
-			} else {
-				start = stuff = 0;
-			}
-
-			/*
-			 * Create the header buffer, Multidata, as well as
-			 * any necessary attributes (destination address,
-			 * SAP and hardware checksum offload) that should
-			 * be associated with the Multidata message.
-			 */
-			ASSERT(cur_hdr_off == 0);
-			if ((md_hbuf = allocb(md_hbuflen, BPRI_HI)) == NULL ||
-			    ((md_hbuf->b_wptr += md_hbuflen),
-			    (mmd = mmd_alloc(md_hbuf, &md_mp,
-			    KM_NOSLEEP)) == NULL) || (tcp_mdt_add_attrs(mmd,
-			    /* fastpath mblk */
-			    ire->ire_nce->nce_res_mp,
-			    /* hardware checksum enabled */
-			    (hwcksum_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)),
-			    /* hardware checksum offsets */
-			    start, stuff, 0,
-			    /* hardware checksum flag */
-			    hwcksum_flags, tcps) != 0)) {
-legacy_send:
-				/*
-				 * We arrive here from a failure within the
-				 * inner (packetizer) loop or we fail one of
-				 * the conditionals above. We restore the
-				 * previously checkpointed values for:
-				 *    xmit_tail
-				 *    usable
-				 *    tail_unsent
-				 *    snxt
-				 *    obbytes
-				 *    obsegs
-				 * We should then be able to dispatch any
-				 * complete multidata before reverting to the
-				 * traditional path with consistent parameters
-				 * (the inner loop updates these as it
-				 * iterates).
-				 */
-				*xmit_tail = xmit_tail_mmd;
-				*usable = usable_mmd;
-				*tail_unsent = tail_unsent_mmd;
-				*snxt = snxt_mmd;
-				obbytes = obbytes_mmd;
-				obsegs = obsegs_mmd;
-				if (md_mp != NULL) {
-					/* Unlink message from the chain */
-					if (md_mp_head != NULL) {
-						err = (intptr_t)rmvb(md_mp_head,
-						    md_mp);
-						/*
-						 * We can't assert that rmvb
-						 * did not return -1, since we
-						 * may get here before linkb
-						 * happens.  We do, however,
-						 * check if we just removed the
-						 * only element in the list.
-						 */
-						if (err == 0)
-							md_mp_head = NULL;
-					}
-					/* md_hbuf gets freed automatically */
-					TCP_STAT(tcps, tcp_mdt_discarded);
-					freeb(md_mp);
-				} else {
-					/* Either allocb or mmd_alloc failed */
-					TCP_STAT(tcps, tcp_mdt_allocfail);
-					if (md_hbuf != NULL)
-						freeb(md_hbuf);
-				}
-
-				/* send down what we've got so far */
-				if (md_mp_head != NULL) {
-					tcp_multisend_data(tcp, ire, ill,
-					    md_mp_head, obsegs, obbytes,
-					    &rconfirm);
-				}
-legacy_send_no_md:
-				if (ire != NULL)
-					IRE_REFRELE(ire);
-				/*
-				 * Too bad; let the legacy path handle this.
-				 * We specify INT_MAX for the threshold, since
-				 * we gave up with the Multidata processings
-				 * and let the old path have it all.
-				 */
-				TCP_STAT(tcps, tcp_mdt_legacy_all);
-				return (tcp_send(q, tcp, mss, tcp_hdr_len,
-				    tcp_tcp_hdr_len, num_sack_blk, usable,
-				    snxt, tail_unsent, xmit_tail, local_time,
-				    INT_MAX));
-			}
-
-			/* link to any existing ones, if applicable */
-			TCP_STAT(tcps, tcp_mdt_allocd);
-			if (md_mp_head == NULL) {
-				md_mp_head = md_mp;
-			} else if (tcp_mdt_chain) {
-				TCP_STAT(tcps, tcp_mdt_linked);
-				linkb(md_mp_head, md_mp);
-			}
-		}
-
-		ASSERT(md_mp_head != NULL);
-		ASSERT(tcp_mdt_chain || md_mp_head->b_cont == NULL);
-		ASSERT(md_mp != NULL && mmd != NULL);
-		ASSERT(md_hbuf != NULL);
-
-		/*
-		 * Packetize the transmittable portion of the data block;
-		 * each data block is essentially added to the Multidata
-		 * as a payload buffer.  We also deal with adding more
-		 * than one payload buffers, which happens when the remaining
-		 * packetized portion of the current payload buffer is less
-		 * than MSS, while the next data block in transmit queue
-		 * has enough data to make up for one.  This "spillover"
-		 * case essentially creates a split-packet, where portions
-		 * of the packet's payload fragments may span across two
-		 * virtually discontiguous address blocks.
-		 */
-		seg_len = mss;
-		do {
-			len = seg_len;
-
-			/* one must remain NULL for DTRACE_IP_FASTPATH */
-			ipha = NULL;
-			ip6h = NULL;
-
-			ASSERT(len > 0);
-			ASSERT(max_pld >= 0);
-			ASSERT(!add_buffer || cur_pld_off == 0);
-
-			/*
-			 * First time around for this payload buffer; note
-			 * in the case of a spillover, the following has
-			 * been done prior to adding the split-packet
-			 * descriptor to Multidata, and we don't want to
-			 * repeat the process.
-			 */
-			if (add_buffer) {
-				ASSERT(mmd != NULL);
-				ASSERT(md_pbuf == NULL);
-				ASSERT(md_pbuf_nxt == NULL);
-				ASSERT(pbuf_idx == -1 && pbuf_idx_nxt == -1);
-
-				/*
-				 * Have we reached the limit?  We'd get to
-				 * this case when we're not chaining the
-				 * Multidata messages together, and since
-				 * we're done, terminate this loop.
-				 */
-				if (max_pld == 0)
-					break; /* done */
-
-				if ((md_pbuf = dupb(*xmit_tail)) == NULL) {
-					TCP_STAT(tcps, tcp_mdt_allocfail);
-					goto legacy_send; /* out_of_mem */
-				}
-
-				if (IS_VMLOANED_MBLK(md_pbuf) && !zcopy &&
-				    zc_cap != NULL) {
-					if (!ip_md_zcopy_attr(mmd, NULL,
-					    zc_cap->ill_zerocopy_flags)) {
-						freeb(md_pbuf);
-						TCP_STAT(tcps,
-						    tcp_mdt_allocfail);
-						/* out_of_mem */
-						goto legacy_send;
-					}
-					zcopy = B_TRUE;
-				}
-
-				md_pbuf->b_rptr += base_pld_off;
-
-				/*
-				 * Add a payload buffer to the Multidata; this
-				 * operation must not fail, or otherwise our
-				 * logic in this routine is broken.  There
-				 * is no memory allocation done by the
-				 * routine, so any returned failure simply
-				 * tells us that we've done something wrong.
-				 *
-				 * A failure tells us that either we're adding
-				 * the same payload buffer more than once, or
-				 * we're trying to add more buffers than
-				 * allowed (max_pld calculation is wrong).
-				 * None of the above cases should happen, and
-				 * we panic because either there's horrible
-				 * heap corruption, and/or programming mistake.
-				 */
-				pbuf_idx = mmd_addpldbuf(mmd, md_pbuf);
-				if (pbuf_idx < 0) {
-					cmn_err(CE_PANIC, "tcp_multisend: "
-					    "payload buffer logic error "
-					    "detected for tcp %p mmd %p "
-					    "pbuf %p (%d)\n",
-					    (void *)tcp, (void *)mmd,
-					    (void *)md_pbuf, pbuf_idx);
-				}
-
-				ASSERT(max_pld > 0);
-				--max_pld;
-				add_buffer = B_FALSE;
-			}
-
-			ASSERT(md_mp_head != NULL);
-			ASSERT(md_pbuf != NULL);
-			ASSERT(md_pbuf_nxt == NULL);
-			ASSERT(pbuf_idx != -1);
-			ASSERT(pbuf_idx_nxt == -1);
-			ASSERT(*usable > 0);
-
-			/*
-			 * We spillover to the next payload buffer only
-			 * if all of the following is true:
-			 *
-			 *   1. There is not enough data on the current
-			 *	payload buffer to make up `len',
-			 *   2. We are allowed to send `len',
-			 *   3. The next payload buffer length is large
-			 *	enough to accomodate `spill'.
-			 */
-			if ((spill = len - *tail_unsent) > 0 &&
-			    *usable >= len &&
-			    MBLKL((*xmit_tail)->b_cont) >= spill &&
-			    max_pld > 0) {
-				md_pbuf_nxt = dupb((*xmit_tail)->b_cont);
-				if (md_pbuf_nxt == NULL) {
-					TCP_STAT(tcps, tcp_mdt_allocfail);
-					goto legacy_send; /* out_of_mem */
-				}
-
-				if (IS_VMLOANED_MBLK(md_pbuf_nxt) && !zcopy &&
-				    zc_cap != NULL) {
-					if (!ip_md_zcopy_attr(mmd, NULL,
-					    zc_cap->ill_zerocopy_flags)) {
-						freeb(md_pbuf_nxt);
-						TCP_STAT(tcps,
-						    tcp_mdt_allocfail);
-						/* out_of_mem */
-						goto legacy_send;
-					}
-					zcopy = B_TRUE;
-				}
-
-				/*
-				 * See comments above on the first call to
-				 * mmd_addpldbuf for explanation on the panic.
-				 */
-				pbuf_idx_nxt = mmd_addpldbuf(mmd, md_pbuf_nxt);
-				if (pbuf_idx_nxt < 0) {
-					panic("tcp_multisend: "
-					    "next payload buffer logic error "
-					    "detected for tcp %p mmd %p "
-					    "pbuf %p (%d)\n",
-					    (void *)tcp, (void *)mmd,
-					    (void *)md_pbuf_nxt, pbuf_idx_nxt);
-				}
-
-				ASSERT(max_pld > 0);
-				--max_pld;
-			} else if (spill > 0) {
-				/*
-				 * If there's a spillover, but the following
-				 * xmit_tail couldn't give us enough octets
-				 * to reach "len", then stop the current
-				 * Multidata creation and let the legacy
-				 * tcp_send() path take over.  We don't want
-				 * to send the tiny segment as part of this
-				 * Multidata for performance reasons; instead,
-				 * we let the legacy path deal with grouping
-				 * it with the subsequent small mblks.
-				 */
-				if (*usable >= len &&
-				    MBLKL((*xmit_tail)->b_cont) < spill) {
-					max_pld = 0;
-					break;	/* done */
-				}
-
-				/*
-				 * We can't spillover, and we are near
-				 * the end of the current payload buffer,
-				 * so send what's left.
-				 */
-				ASSERT(*tail_unsent > 0);
-				len = *tail_unsent;
-			}
-
-			/* tail_unsent is negated if there is a spillover */
-			*tail_unsent -= len;
-			*usable -= len;
-			ASSERT(*usable >= 0);
-
-			if (*usable < mss)
-				seg_len = *usable;
-			/*
-			 * Sender SWS avoidance; see comments in tcp_send();
-			 * everything else is the same, except that we only
-			 * do this here if there is no more data to be sent
-			 * following the current xmit_tail.  We don't check
-			 * for 1-byte urgent data because we shouldn't get
-			 * here if TCP_URG_VALID is set.
-			 */
-			if (*usable > 0 && *usable < mss &&
-			    ((md_pbuf_nxt == NULL &&
-			    (*xmit_tail)->b_cont == NULL) ||
-			    (md_pbuf_nxt != NULL &&
-			    (*xmit_tail)->b_cont->b_cont == NULL)) &&
-			    seg_len < (tcp->tcp_max_swnd >> 1) &&
-			    (tcp->tcp_unsent -
-			    ((*snxt + len) - tcp->tcp_snxt)) > seg_len &&
-			    !tcp->tcp_zero_win_probe) {
-				if ((*snxt + len) == tcp->tcp_snxt &&
-				    (*snxt + len) == tcp->tcp_suna) {
-					TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
-				}
-				done = B_TRUE;
-			}
-
-			/*
-			 * Prime pump for IP's checksumming on our behalf;
-			 * include the adjustment for a source route if any.
-			 * Do this only for software/partial hardware checksum
-			 * offload, as this field gets zeroed out later for
-			 * the full hardware checksum offload case.
-			 */
-			if (!(hwcksum_flags & HCK_FULLCKSUM)) {
-				cksum = len + tcp_tcp_hdr_len + tcp->tcp_sum;
-				cksum = (cksum >> 16) + (cksum & 0xFFFF);
-				U16_TO_ABE16(cksum, tcp->tcp_tcph->th_sum);
-			}
-
-			U32_TO_ABE32(*snxt, tcp->tcp_tcph->th_seq);
-			*snxt += len;
-
-			tcp->tcp_tcph->th_flags[0] = TH_ACK;
-			/*
-			 * We set the PUSH bit only if TCP has no more buffered
-			 * data to be transmitted (or if sender SWS avoidance
-			 * takes place), as opposed to setting it for every
-			 * last packet in the burst.
-			 */
-			if (done ||
-			    (tcp->tcp_unsent - (*snxt - tcp->tcp_snxt)) == 0)
-				tcp->tcp_tcph->th_flags[0] |= TH_PUSH;
-
-			/*
-			 * Set FIN bit if this is our last segment; snxt
-			 * already includes its length, and it will not
-			 * be adjusted after this point.
-			 */
-			if (tcp->tcp_valid_bits == TCP_FSS_VALID &&
-			    *snxt == tcp->tcp_fss) {
-				if (!tcp->tcp_fin_acked) {
-					tcp->tcp_tcph->th_flags[0] |= TH_FIN;
-					BUMP_MIB(&tcps->tcps_mib,
-					    tcpOutControl);
-				}
-				if (!tcp->tcp_fin_sent) {
-					tcp->tcp_fin_sent = B_TRUE;
-					/*
-					 * tcp state must be ESTABLISHED
-					 * in order for us to get here in
-					 * the first place.
-					 */
-					tcp->tcp_state = TCPS_FIN_WAIT_1;
-
-					/*
-					 * Upon returning from this routine,
-					 * tcp_wput_data() will set tcp_snxt
-					 * to be equal to snxt + tcp_fin_sent.
-					 * This is essentially the same as
-					 * setting it to tcp_fss + 1.
-					 */
-				}
-			}
-
-			tcp->tcp_last_sent_len = (ushort_t)len;
-
-			len += tcp_hdr_len;
-			if (tcp->tcp_ipversion == IPV4_VERSION)
-				tcp->tcp_ipha->ipha_length = htons(len);
-			else
-				tcp->tcp_ip6h->ip6_plen = htons(len -
-				    ((char *)&tcp->tcp_ip6h[1] -
-				    tcp->tcp_iphc));
-
-			pkt_info->flags = (PDESC_HBUF_REF | PDESC_PBUF_REF);
-
-			/* setup header fragment */
-			PDESC_HDR_ADD(pkt_info,
-			    md_hbuf->b_rptr + cur_hdr_off,	/* base */
-			    tcp->tcp_mdt_hdr_head,		/* head room */
-			    tcp_hdr_len,			/* len */
-			    tcp->tcp_mdt_hdr_tail);		/* tail room */
-
-			ASSERT(pkt_info->hdr_lim - pkt_info->hdr_base ==
-			    hdr_frag_sz);
-			ASSERT(MBLKIN(md_hbuf,
-			    (pkt_info->hdr_base - md_hbuf->b_rptr),
-			    PDESC_HDRSIZE(pkt_info)));
-
-			/* setup first payload fragment */
-			PDESC_PLD_INIT(pkt_info);
-			PDESC_PLD_SPAN_ADD(pkt_info,
-			    pbuf_idx,				/* index */
-			    md_pbuf->b_rptr + cur_pld_off,	/* start */
-			    tcp->tcp_last_sent_len);		/* len */
-
-			/* create a split-packet in case of a spillover */
-			if (md_pbuf_nxt != NULL) {
-				ASSERT(spill > 0);
-				ASSERT(pbuf_idx_nxt > pbuf_idx);
-				ASSERT(!add_buffer);
-
-				md_pbuf = md_pbuf_nxt;
-				md_pbuf_nxt = NULL;
-				pbuf_idx = pbuf_idx_nxt;
-				pbuf_idx_nxt = -1;
-				cur_pld_off = spill;
-
-				/* trim out first payload fragment */
-				PDESC_PLD_SPAN_TRIM(pkt_info, 0, spill);
-
-				/* setup second payload fragment */
-				PDESC_PLD_SPAN_ADD(pkt_info,
-				    pbuf_idx,			/* index */
-				    md_pbuf->b_rptr,		/* start */
-				    spill);			/* len */
-
-				if ((*xmit_tail)->b_next == NULL) {
-					/*
-					 * Store the lbolt used for RTT
-					 * estimation. We can only record one
-					 * timestamp per mblk so we do it when
-					 * we reach the end of the payload
-					 * buffer.  Also we only take a new
-					 * timestamp sample when the previous
-					 * timed data from the same mblk has
-					 * been ack'ed.
-					 */
-					(*xmit_tail)->b_prev = local_time;
-					(*xmit_tail)->b_next =
-					    (mblk_t *)(uintptr_t)first_snxt;
-				}
-
-				first_snxt = *snxt - spill;
-
-				/*
-				 * Advance xmit_tail; usable could be 0 by
-				 * the time we got here, but we made sure
-				 * above that we would only spillover to
-				 * the next data block if usable includes
-				 * the spilled-over amount prior to the
-				 * subtraction.  Therefore, we are sure
-				 * that xmit_tail->b_cont can't be NULL.
-				 */
-				ASSERT((*xmit_tail)->b_cont != NULL);
-				*xmit_tail = (*xmit_tail)->b_cont;
-				ASSERT((uintptr_t)MBLKL(*xmit_tail) <=
-				    (uintptr_t)INT_MAX);
-				*tail_unsent = (int)MBLKL(*xmit_tail) - spill;
-			} else {
-				cur_pld_off += tcp->tcp_last_sent_len;
-			}
-
-			/*
-			 * Fill in the header using the template header, and
-			 * add options such as time-stamp, ECN and/or SACK,
-			 * as needed.
-			 */
-			tcp_fill_header(tcp, pkt_info->hdr_rptr,
-			    (clock_t)local_time, num_sack_blk);
-
-			/* take care of some IP header businesses */
-			if (af == AF_INET) {
-				ipha = (ipha_t *)pkt_info->hdr_rptr;
-
-				ASSERT(OK_32PTR((uchar_t *)ipha));
-				ASSERT(PDESC_HDRL(pkt_info) >=
-				    IP_SIMPLE_HDR_LENGTH);
-				ASSERT(ipha->ipha_version_and_hdr_length ==
-				    IP_SIMPLE_HDR_VERSION);
-
-				/*
-				 * Assign ident value for current packet; see
-				 * related comments in ip_wput_ire() about the
-				 * contract private interface with clustering
-				 * group.
-				 */
-				clusterwide = B_FALSE;
-				if (cl_inet_ipident != NULL) {
-					ASSERT(cl_inet_isclusterwide != NULL);
-					if ((*cl_inet_isclusterwide)(stack_id,
-					    IPPROTO_IP, AF_INET,
-					    (uint8_t *)(uintptr_t)src, NULL)) {
-						ipha->ipha_ident =
-						    (*cl_inet_ipident)(stack_id,
-						    IPPROTO_IP, AF_INET,
-						    (uint8_t *)(uintptr_t)src,
-						    (uint8_t *)(uintptr_t)dst,
-						    NULL);
-						clusterwide = B_TRUE;
-					}
-				}
-
-				if (!clusterwide) {
-					ipha->ipha_ident = (uint16_t)
-					    atomic_add_32_nv(
-						&ire->ire_ident, 1);
-				}
-#ifndef _BIG_ENDIAN
-				ipha->ipha_ident = (ipha->ipha_ident << 8) |
-				    (ipha->ipha_ident >> 8);
-#endif
-			} else {
-				ip6h = (ip6_t *)pkt_info->hdr_rptr;
-
-				ASSERT(OK_32PTR((uchar_t *)ip6h));
-				ASSERT(IPVER(ip6h) == IPV6_VERSION);
-				ASSERT(ip6h->ip6_nxt == IPPROTO_TCP);
-				ASSERT(PDESC_HDRL(pkt_info) >=
-				    (IPV6_HDR_LEN + TCP_CHECKSUM_OFFSET +
-				    TCP_CHECKSUM_SIZE));
-				ASSERT(tcp->tcp_ipversion == IPV6_VERSION);
-
-				if (tcp->tcp_ip_forward_progress) {
-					rconfirm = B_TRUE;
-					tcp->tcp_ip_forward_progress = B_FALSE;
-				}
-			}
-
-			/* at least one payload span, and at most two */
-			ASSERT(pkt_info->pld_cnt > 0 && pkt_info->pld_cnt < 3);
-
-			/* add the packet descriptor to Multidata */
-			if ((pkt = mmd_addpdesc(mmd, pkt_info, &err,
-			    KM_NOSLEEP)) == NULL) {
-				/*
-				 * Any failure other than ENOMEM indicates
-				 * that we have passed in invalid pkt_info
-				 * or parameters to mmd_addpdesc, which must
-				 * not happen.
-				 *
-				 * EINVAL is a result of failure on boundary
-				 * checks against the pkt_info contents.  It
-				 * should not happen, and we panic because
-				 * either there's horrible heap corruption,
-				 * and/or programming mistake.
-				 */
-				if (err != ENOMEM) {
-					cmn_err(CE_PANIC, "tcp_multisend: "
-					    "pdesc logic error detected for "
-					    "tcp %p mmd %p pinfo %p (%d)\n",
-					    (void *)tcp, (void *)mmd,
-					    (void *)pkt_info, err);
-				}
-				TCP_STAT(tcps, tcp_mdt_addpdescfail);
-				goto legacy_send; /* out_of_mem */
-			}
-			ASSERT(pkt != NULL);
-
-			/* calculate IP header and TCP checksums */
-			if (af == AF_INET) {
-				/* calculate pseudo-header checksum */
-				cksum = (dst >> 16) + (dst & 0xFFFF) +
-				    (src >> 16) + (src & 0xFFFF);
-
-				/* offset for TCP header checksum */
-				up = IPH_TCPH_CHECKSUMP(ipha,
-				    IP_SIMPLE_HDR_LENGTH);
-			} else {
-				up = (uint16_t *)&ip6h->ip6_src;
-
-				/* calculate pseudo-header checksum */
-				cksum = up[0] + up[1] + up[2] + up[3] +
-				    up[4] + up[5] + up[6] + up[7] +
-				    up[8] + up[9] + up[10] + up[11] +
-				    up[12] + up[13] + up[14] + up[15];
-
-				/* Fold the initial sum */
-				cksum = (cksum & 0xffff) + (cksum >> 16);
-
-				up = (uint16_t *)(((uchar_t *)ip6h) +
-				    IPV6_HDR_LEN + TCP_CHECKSUM_OFFSET);
-			}
-
-			if (hwcksum_flags & HCK_FULLCKSUM) {
-				/* clear checksum field for hardware */
-				*up = 0;
-			} else if (hwcksum_flags & HCK_PARTIALCKSUM) {
-				uint32_t sum;
-
-				/* pseudo-header checksumming */
-				sum = *up + cksum + IP_TCP_CSUM_COMP;
-				sum = (sum & 0xFFFF) + (sum >> 16);
-				*up = (sum & 0xFFFF) + (sum >> 16);
-			} else {
-				/* software checksumming */
-				TCP_STAT(tcps, tcp_out_sw_cksum);
-				TCP_STAT_UPDATE(tcps, tcp_out_sw_cksum_bytes,
-				    tcp->tcp_hdr_len + tcp->tcp_last_sent_len);
-				*up = IP_MD_CSUM(pkt, tcp->tcp_ip_hdr_len,
-				    cksum + IP_TCP_CSUM_COMP);
-				if (*up == 0)
-					*up = 0xFFFF;
-			}
-
-			/* IPv4 header checksum */
-			if (af == AF_INET) {
-				if (hwcksum_flags & HCK_IPV4_HDRCKSUM) {
-					ipha->ipha_hdr_checksum = 0;
-				} else {
-					IP_HDR_CKSUM(ipha, cksum,
-					    ((uint32_t *)ipha)[0],
-					    ((uint16_t *)ipha)[4]);
-				}
-			}
-
-			if (af == AF_INET &&
-			    HOOKS4_INTERESTED_PHYSICAL_OUT(ipst) ||
-			    af == AF_INET6 &&
-			    HOOKS6_INTERESTED_PHYSICAL_OUT(ipst)) {
-				mblk_t	*mp, *mp1;
-				uchar_t	*hdr_rptr, *hdr_wptr;
-				uchar_t	*pld_rptr, *pld_wptr;
-
-				/*
-				 * We reconstruct a pseudo packet for the hooks
-				 * framework using mmd_transform_link().
-				 * If it is a split packet we pullup the
-				 * payload. FW_HOOKS expects a pkt comprising
-				 * of two mblks: a header and the payload.
-				 */
-				if ((mp = mmd_transform_link(pkt)) == NULL) {
-					TCP_STAT(tcps, tcp_mdt_allocfail);
-					goto legacy_send;
-				}
-
-				if (pkt_info->pld_cnt > 1) {
-					/* split payload, more than one pld */
-					if ((mp1 = msgpullup(mp->b_cont, -1)) ==
-					    NULL) {
-						freemsg(mp);
-						TCP_STAT(tcps,
-						    tcp_mdt_allocfail);
-						goto legacy_send;
-					}
-					freemsg(mp->b_cont);
-					mp->b_cont = mp1;
-				} else {
-					mp1 = mp->b_cont;
-				}
-				ASSERT(mp1 != NULL && mp1->b_cont == NULL);
-
-				/*
-				 * Remember the message offsets. This is so we
-				 * can detect changes when we return from the
-				 * FW_HOOKS callbacks.
-				 */
-				hdr_rptr = mp->b_rptr;
-				hdr_wptr = mp->b_wptr;
-				pld_rptr = mp->b_cont->b_rptr;
-				pld_wptr = mp->b_cont->b_wptr;
-
-				if (af == AF_INET) {
-					DTRACE_PROBE4(
-					    ip4__physical__out__start,
-					    ill_t *, NULL,
-					    ill_t *, ill,
-					    ipha_t *, ipha,
-					    mblk_t *, mp);
-					FW_HOOKS(
-					    ipst->ips_ip4_physical_out_event,
-					    ipst->ips_ipv4firewall_physical_out,
-					    NULL, ill, ipha, mp, mp, 0, ipst);
-					DTRACE_PROBE1(
-					    ip4__physical__out__end,
-					    mblk_t *, mp);
-				} else {
-					DTRACE_PROBE4(
-					    ip6__physical__out_start,
-					    ill_t *, NULL,
-					    ill_t *, ill,
-					    ip6_t *, ip6h,
-					    mblk_t *, mp);
-					FW_HOOKS6(
-					    ipst->ips_ip6_physical_out_event,
-					    ipst->ips_ipv6firewall_physical_out,
-					    NULL, ill, ip6h, mp, mp, 0, ipst);
-					DTRACE_PROBE1(
-					    ip6__physical__out__end,
-					    mblk_t *, mp);
-				}
-
-				if (mp == NULL ||
-				    (mp1 = mp->b_cont) == NULL ||
-				    mp->b_rptr != hdr_rptr ||
-				    mp->b_wptr != hdr_wptr ||
-				    mp1->b_rptr != pld_rptr ||
-				    mp1->b_wptr != pld_wptr ||
-				    mp1->b_cont != NULL) {
-					/*
-					 * We abandon multidata processing and
-					 * return to the normal path, either
-					 * when a packet is blocked, or when
-					 * the boundaries of header buffer or
-					 * payload buffer have been changed by
-					 * FW_HOOKS[6].
-					 */
-					if (mp != NULL)
-						freemsg(mp);
-					goto legacy_send;
-				}
-				/* Finished with the pseudo packet */
-				freemsg(mp);
-			}
-			DTRACE_IP_FASTPATH(md_hbuf, pkt_info->hdr_rptr,
-			    ill, ipha, ip6h);
-			/* advance header offset */
-			cur_hdr_off += hdr_frag_sz;
-
-			obbytes += tcp->tcp_last_sent_len;
-			++obsegs;
-		} while (!done && *usable > 0 && --num_burst_seg > 0 &&
-		    *tail_unsent > 0);
-
-		if ((*xmit_tail)->b_next == NULL) {
-			/*
-			 * Store the lbolt used for RTT estimation. We can only
-			 * record one timestamp per mblk so we do it when we
-			 * reach the end of the payload buffer. Also we only
-			 * take a new timestamp sample when the previous timed
-			 * data from the same mblk has been ack'ed.
-			 */
-			(*xmit_tail)->b_prev = local_time;
-			(*xmit_tail)->b_next = (mblk_t *)(uintptr_t)first_snxt;
-		}
-
-		ASSERT(*tail_unsent >= 0);
-		if (*tail_unsent > 0) {
-			/*
-			 * We got here because we broke out of the above
-			 * loop due to of one of the following cases:
-			 *
-			 *   1. len < adjusted MSS (i.e. small),
-			 *   2. Sender SWS avoidance,
-			 *   3. max_pld is zero.
-			 *
-			 * We are done for this Multidata, so trim our
-			 * last payload buffer (if any) accordingly.
-			 */
-			if (md_pbuf != NULL)
-				md_pbuf->b_wptr -= *tail_unsent;
-		} else if (*usable > 0) {
-			*xmit_tail = (*xmit_tail)->b_cont;
-			ASSERT((uintptr_t)MBLKL(*xmit_tail) <=
-			    (uintptr_t)INT_MAX);
-			*tail_unsent = (int)MBLKL(*xmit_tail);
-			add_buffer = B_TRUE;
-		}
-	} while (!done && *usable > 0 && num_burst_seg > 0 &&
-	    (tcp_mdt_chain || max_pld > 0));
-
-	if (md_mp_head != NULL) {
-		/* send everything down */
-		tcp_multisend_data(tcp, ire, ill, md_mp_head, obsegs, obbytes,
-		    &rconfirm);
-	}
-
-#undef PREP_NEW_MULTIDATA
-#undef PREP_NEW_PBUF
-#undef IPVER
-
-	IRE_REFRELE(ire);
-	return (0);
-}
-
-/*
- * A wrapper function for sending one or more Multidata messages down to
- * the module below ip; this routine does not release the reference of the
- * IRE (caller does that).  This routine is analogous to tcp_send_data().
- */
-static void
-tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
-    const uint_t obsegs, const uint_t obbytes, boolean_t *rconfirm)
-{
-	uint64_t delta;
-	nce_t *nce;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
-
-	ASSERT(ire != NULL && ill != NULL);
-	ASSERT(ire->ire_stq != NULL);
-	ASSERT(md_mp_head != NULL);
-	ASSERT(rconfirm != NULL);
-
-	/* adjust MIBs and IRE timestamp */
-	DTRACE_PROBE2(tcp__trace__send, mblk_t *, md_mp_head, tcp_t *, tcp);
-	tcp->tcp_obsegs += obsegs;
-	UPDATE_MIB(&tcps->tcps_mib, tcpOutDataSegs, obsegs);
-	UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, obbytes);
-	TCP_STAT_UPDATE(tcps, tcp_mdt_pkt_out, obsegs);
-
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		TCP_STAT_UPDATE(tcps, tcp_mdt_pkt_out_v4, obsegs);
-	} else {
-		TCP_STAT_UPDATE(tcps, tcp_mdt_pkt_out_v6, obsegs);
-	}
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests, obsegs);
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits, obsegs);
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets, obbytes);
-
-	ire->ire_ob_pkt_count += obsegs;
-	if (ire->ire_ipif != NULL)
-		atomic_add_32(&ire->ire_ipif->ipif_ob_pkt_count, obsegs);
-	ire->ire_last_used_time = lbolt;
-
-	if ((tcp->tcp_ipversion == IPV4_VERSION &&
-	    ipst->ips_ip4_observe.he_interested) ||
-	    (tcp->tcp_ipversion == IPV6_VERSION &&
-	    ipst->ips_ip6_observe.he_interested)) {
-		multidata_t *dlmdp = mmd_getmultidata(md_mp_head);
-		pdesc_t *dl_pkt;
-		pdescinfo_t pinfo;
-		mblk_t *nmp;
-		zoneid_t szone = tcp->tcp_connp->conn_zoneid;
-
-		for (dl_pkt = mmd_getfirstpdesc(dlmdp, &pinfo);
-		    (dl_pkt != NULL);
-		    dl_pkt = mmd_getnextpdesc(dl_pkt, &pinfo)) {
-			if ((nmp = mmd_transform_link(dl_pkt)) == NULL)
-				continue;
-			ipobs_hook(nmp, IPOBS_HOOK_OUTBOUND, szone,
-			    ALL_ZONES, ill, ipst);
-			freemsg(nmp);
-		}
-	}
-
-	/* send it down */
-	putnext(ire->ire_stq, md_mp_head);
-
-	/* we're done for TCP/IPv4 */
-	if (tcp->tcp_ipversion == IPV4_VERSION)
-		return;
-
-	nce = ire->ire_nce;
-
-	ASSERT(nce != NULL);
-	ASSERT(!(nce->nce_flags & (NCE_F_NONUD|NCE_F_PERMANENT)));
-	ASSERT(nce->nce_state != ND_INCOMPLETE);
-
-	/* reachability confirmation? */
-	if (*rconfirm) {
-		nce->nce_last = TICK_TO_MSEC(lbolt64);
-		if (nce->nce_state != ND_REACHABLE) {
-			mutex_enter(&nce->nce_lock);
-			nce->nce_state = ND_REACHABLE;
-			nce->nce_pcnt = ND_MAX_UNICAST_SOLICIT;
-			mutex_exit(&nce->nce_lock);
-			(void) untimeout(nce->nce_timeout_id);
-			if (ip_debug > 2) {
-				/* ip1dbg */
-				pr_addr_dbg("tcp_multisend_data: state "
-				    "for %s changed to REACHABLE\n",
-				    AF_INET6, &ire->ire_addr_v6);
-			}
-		}
-		/* reset transport reachability confirmation */
-		*rconfirm = B_FALSE;
-	}
-
-	delta =  TICK_TO_MSEC(lbolt64) - nce->nce_last;
-	ip1dbg(("tcp_multisend_data: delta = %" PRId64
-	    " ill_reachable_time = %d \n", delta, ill->ill_reachable_time));
-
-	if (delta > (uint64_t)ill->ill_reachable_time) {
-		mutex_enter(&nce->nce_lock);
-		switch (nce->nce_state) {
-		case ND_REACHABLE:
-		case ND_STALE:
-			/*
-			 * ND_REACHABLE is identical to ND_STALE in this
-			 * specific case. If reachable time has expired for
-			 * this neighbor (delta is greater than reachable
-			 * time), conceptually, the neighbor cache is no
-			 * longer in REACHABLE state, but already in STALE
-			 * state.  So the correct transition here is to
-			 * ND_DELAY.
-			 */
-			nce->nce_state = ND_DELAY;
-			mutex_exit(&nce->nce_lock);
-			NDP_RESTART_TIMER(nce,
-			    ipst->ips_delay_first_probe_time);
-			if (ip_debug > 3) {
-				/* ip2dbg */
-				pr_addr_dbg("tcp_multisend_data: state "
-				    "for %s changed to DELAY\n",
-				    AF_INET6, &ire->ire_addr_v6);
-			}
-			break;
-		case ND_DELAY:
-		case ND_PROBE:
-			mutex_exit(&nce->nce_lock);
-			/* Timers have already started */
-			break;
-		case ND_UNREACHABLE:
-			/*
-			 * ndp timer has detected that this nce is
-			 * unreachable and initiated deleting this nce
-			 * and all its associated IREs. This is a race
-			 * where we found the ire before it was deleted
-			 * and have just sent out a packet using this
-			 * unreachable nce.
-			 */
-			mutex_exit(&nce->nce_lock);
-			break;
-		default:
-			ASSERT(0);
-		}
-	}
-}
-
-/*
- * Derived from tcp_send_data().
- */
-static void
-tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
-    int num_lso_seg)
-{
-	ipha_t		*ipha;
-	mblk_t		*ire_fp_mp;
-	uint_t		ire_fp_mp_len;
-	uint32_t	hcksum_txflags = 0;
-	ipaddr_t	src;
-	ipaddr_t	dst;
-	uint32_t	cksum;
-	uint16_t	*up;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
-
-	ASSERT(DB_TYPE(mp) == M_DATA);
-	ASSERT(tcp->tcp_state == TCPS_ESTABLISHED);
-	ASSERT(tcp->tcp_ipversion == IPV4_VERSION);
-	ASSERT(tcp->tcp_connp != NULL);
-	ASSERT(CONN_IS_LSO_MD_FASTPATH(tcp->tcp_connp));
-
-	ipha = (ipha_t *)mp->b_rptr;
-	src = ipha->ipha_src;
-	dst = ipha->ipha_dst;
-
-	DTRACE_PROBE2(tcp__trace__send, mblk_t *, mp, tcp_t *, tcp);
-
-	ASSERT(ipha->ipha_ident == 0 || ipha->ipha_ident == IP_HDR_INCLUDED);
-	ipha->ipha_ident = (uint16_t)atomic_add_32_nv(&ire->ire_ident,
-	    num_lso_seg);
-#ifndef _BIG_ENDIAN
-	ipha->ipha_ident = (ipha->ipha_ident << 8) | (ipha->ipha_ident >> 8);
-#endif
-	if (tcp->tcp_snd_zcopy_aware) {
-		if ((ill->ill_capabilities & ILL_CAPAB_ZEROCOPY) == 0 ||
-		    (ill->ill_zerocopy_capab->ill_zerocopy_flags == 0))
-			mp = tcp_zcopy_disable(tcp, mp);
-	}
-
-	if (ILL_HCKSUM_CAPABLE(ill) && dohwcksum) {
-		ASSERT(ill->ill_hcksum_capab != NULL);
-		hcksum_txflags = ill->ill_hcksum_capab->ill_hcksum_txflags;
-	}
-
-	/*
-	 * Since the TCP checksum should be recalculated by h/w, we can just
-	 * zero the checksum field for HCK_FULLCKSUM, or calculate partial
-	 * pseudo-header checksum for HCK_PARTIALCKSUM.
-	 * The partial pseudo-header excludes TCP length, that was calculated
-	 * in tcp_send(), so to zero *up before further processing.
-	 */
-	cksum = (dst >> 16) + (dst & 0xFFFF) + (src >> 16) + (src & 0xFFFF);
-
-	up = IPH_TCPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
-	*up = 0;
-
-	IP_CKSUM_XMIT_FAST(ire->ire_ipversion, hcksum_txflags, mp, ipha, up,
-	    IPPROTO_TCP, IP_SIMPLE_HDR_LENGTH, ntohs(ipha->ipha_length), cksum);
-
-	/*
-	 * Append LSO flags and mss to the mp.
-	 */
-	lso_info_set(mp, mss, HW_LSO);
-
-	ipha->ipha_fragment_offset_and_flags |=
-	    (uint32_t)htons(ire->ire_frag_flag);
-
-	ire_fp_mp = ire->ire_nce->nce_fp_mp;
-	ire_fp_mp_len = MBLKL(ire_fp_mp);
-	ASSERT(DB_TYPE(ire_fp_mp) == M_DATA);
-	mp->b_rptr = (uchar_t *)ipha - ire_fp_mp_len;
-	bcopy(ire_fp_mp->b_rptr, mp->b_rptr, ire_fp_mp_len);
-
-	UPDATE_OB_PKT_COUNT(ire);
-	ire->ire_last_used_time = lbolt;
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests);
-	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutTransmits);
-	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
-	    ntohs(ipha->ipha_length));
-
-	DTRACE_PROBE4(ip4__physical__out__start,
-	    ill_t *, NULL, ill_t *, ill, ipha_t *, ipha, mblk_t *, mp);
-	FW_HOOKS(ipst->ips_ip4_physical_out_event,
-	    ipst->ips_ipv4firewall_physical_out, NULL,
-	    ill, ipha, mp, mp, 0, ipst);
-	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-	DTRACE_IP_FASTPATH(mp, ipha, ill, ipha, NULL);
-
-	if (mp != NULL) {
-		if (ipst->ips_ip4_observe.he_interested) {
-			zoneid_t szone;
-
-			if (ire_fp_mp_len != 0)
-				mp->b_rptr += ire_fp_mp_len;
-			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
-			    ipst, ALL_ZONES);
-			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
-			    ALL_ZONES, ill, ipst);
-			if (ire_fp_mp_len != 0)
-				mp->b_rptr -= ire_fp_mp_len;
-		}
-
-		ILL_SEND_TX(ill, ire, tcp->tcp_connp, mp, 0, NULL);
-	}
-}
-
-/*
- * tcp_send() is called by tcp_wput_data() for non-Multidata transmission
- * scheme, and returns one of the following:
- *
- * -1 = failed allocation.
- *  0 = success; burst count reached, or usable send window is too small,
- *      and that we'd rather wait until later before sending again.
- *  1 = success; we are called from tcp_multisend(), and both usable send
- *      window and tail_unsent are greater than the MDT threshold, and thus
- *      Multidata Transmit should be used instead.
- */
-static int
-tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
-    const int tcp_tcp_hdr_len, const int num_sack_blk, int *usable,
-    uint_t *snxt, int *tail_unsent, mblk_t **xmit_tail, mblk_t *local_time,
-    const int mdt_thres)
-{
-	int num_burst_seg = tcp->tcp_snd_burst;
-	ire_t		*ire = NULL;
-	ill_t		*ill = NULL;
-	mblk_t		*ire_fp_mp = NULL;
-	uint_t		ire_fp_mp_len = 0;
+	int		num_burst_seg = tcp->tcp_snd_burst;
 	int		num_lso_seg = 1;
 	uint_t		lso_usable;
 	boolean_t	do_lso_send = B_FALSE;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
+	ip_xmit_attr_t	*ixa = connp->conn_ixa;
 
 	/*
-	 * Check LSO capability before any further work. And the similar check
-	 * need to be done in for(;;) loop.
-	 * LSO will be deployed when therer is more than one mss of available
-	 * data and a burst transmission is allowed.
+	 * Check LSO possibility. The value of tcp->tcp_lso indicates whether
+	 * the underlying connection is LSO capable. Will check whether having
+	 * enough available data to initiate LSO transmission in the for(){}
+	 * loops.
 	 */
-	if (tcp->tcp_lso &&
-	    (tcp->tcp_valid_bits == 0 ||
-	    tcp->tcp_valid_bits == TCP_FSS_VALID) &&
-	    num_burst_seg >= 2 && (*usable - 1) / mss >= 1) {
-		/*
-		 * Try to find usable IRE/ILL and do basic check to the ILL.
-		 * Double check LSO usability before going further, since the
-		 * underlying interface could have been changed. In case of any
-		 * change of LSO capability, set tcp_ire_ill_check_done to
-		 * B_FALSE to force to check the ILL with the next send.
-		 */
-		if (tcp_send_find_ire_ill(tcp, NULL, &ire, &ill) &&
-		    tcp->tcp_lso && ILL_LSO_TCP_USABLE(ill)) {
-			/*
-			 * Enable LSO with this transmission.
-			 * Since IRE has been hold in tcp_send_find_ire_ill(),
-			 * IRE_REFRELE(ire) should be called before return.
-			 */
+	if (tcp->tcp_lso && (tcp->tcp_valid_bits & ~TCP_FSS_VALID) == 0)
 			do_lso_send = B_TRUE;
-			ire_fp_mp = ire->ire_nce->nce_fp_mp;
-			ire_fp_mp_len = MBLKL(ire_fp_mp);
-			/* Round up to multiple of 4 */
-			ire_fp_mp_len = ((ire_fp_mp_len + 3) / 4) * 4;
-		} else {
-			tcp->tcp_lso = B_FALSE;
-			tcp->tcp_ire_ill_check_done = B_FALSE;
-			do_lso_send = B_FALSE;
-			ill = NULL;
-		}
-	}
 
 	for (;;) {
 		struct datab	*db;
-		tcph_t		*tcph;
+		tcpha_t		*tcpha;
 		uint32_t	sum;
 		mblk_t		*mp, *mp1;
 		uchar_t		*rptr;
 		int		len;
 
 		/*
-		 * If we're called by tcp_multisend(), and the amount of
-		 * sendable data as well as the size of current xmit_tail
-		 * is beyond the MDT threshold, return to the caller and
-		 * let the large data transmit be done using MDT.
+		 * Burst count reached, return successfully.
 		 */
-		if (*usable > 0 && *usable > mdt_thres &&
-		    (*tail_unsent > mdt_thres || (*tail_unsent == 0 &&
-		    MBLKL((*xmit_tail)->b_cont) > mdt_thres))) {
-			ASSERT(tcp->tcp_mdt);
-			return (1);	/* success; do large send */
-		}
-
 		if (num_burst_seg == 0)
-			break;		/* success; burst count reached */
+			break;
 
 		/*
-		 * Calculate the maximum payload length we can send in *one*
+		 * Calculate the maximum payload length we can send at one
 		 * time.
 		 */
 		if (do_lso_send) {
 			/*
-			 * Check whether need to do LSO any more.
+			 * Check whether be able to to do LSO for the current
+			 * available data.
 			 */
 			if (num_burst_seg >= 2 && (*usable - 1) / mss >= 1) {
 				lso_usable = MIN(tcp->tcp_lso_max, *usable);
@@ -20787,7 +15918,10 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 		}
 
 		ASSERT(num_lso_seg <= IP_MAXPACKET / mss + 1);
-
+#ifdef DEBUG
+		DTRACE_PROBE2(tcp_send_lso, int, num_lso_seg, boolean_t,
+		    do_lso_send);
+#endif
 		/*
 		 * Adjust num_burst_seg here.
 		 */
@@ -20817,7 +15951,7 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 				/*
 				 * If the retransmit timer is not running
 				 * we start it so that we will retransmit
-				 * in the case when the the receiver has
+				 * in the case when the receiver has
 				 * decremented the window.
 				 */
 				if (*snxt == tcp->tcp_snxt &&
@@ -20838,7 +15972,7 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			}
 		}
 
-		tcph = tcp->tcp_tcph;
+		tcpha = tcp->tcp_tcpha;
 
 		/*
 		 * The reason to adjust len here is that we need to set flags
@@ -20849,19 +15983,25 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 
 		*usable -= len; /* Approximate - can be adjusted later */
 		if (*usable > 0)
-			tcph->th_flags[0] = TH_ACK;
+			tcpha->tha_flags = TH_ACK;
 		else
-			tcph->th_flags[0] = (TH_ACK | TH_PUSH);
+			tcpha->tha_flags = (TH_ACK | TH_PUSH);
 
 		/*
-		 * Prime pump for IP's checksumming on our behalf
+		 * Prime pump for IP's checksumming on our behalf.
 		 * Include the adjustment for a source route if any.
+		 * In case of LSO, the partial pseudo-header checksum should
+		 * exclusive TCP length, so zero tha_sum before IP calculate
+		 * pseudo-header checksum for partial checksum offload.
 		 */
-		sum = len + tcp_tcp_hdr_len + tcp->tcp_sum;
-		sum = (sum >> 16) + (sum & 0xFFFF);
-		U16_TO_ABE16(sum, tcph->th_sum);
-
-		U32_TO_ABE32(*snxt, tcph->th_seq);
+		if (do_lso_send) {
+			sum = 0;
+		} else {
+			sum = len + tcp_hdr_len + connp->conn_sum;
+			sum = (sum >> 16) + (sum & 0xFFFF);
+		}
+		tcpha->tha_sum = htons(sum);
+		tcpha->tha_seq = htonl(*snxt);
 
 		/*
 		 * Branch off to tcp_xmit_mp() if any of the VALID bits is
@@ -20907,8 +16047,6 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 				(*xmit_tail)->b_rptr = prev_rptr;
 
 			if (mp == NULL) {
-				if (ire != NULL)
-					IRE_REFRELE(ire);
 				return (-1);
 			}
 			mp1 = mp->b_cont;
@@ -20927,7 +16065,7 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 			BUMP_LOCAL(tcp->tcp_obsegs);
 			BUMP_MIB(&tcps->tcps_mib, tcpOutDataSegs);
 			UPDATE_MIB(&tcps->tcps_mib, tcpOutDataBytes, len);
-			tcp_send_data(tcp, q, mp);
+			tcp_send_data(tcp, mp);
 			continue;
 		}
 
@@ -20942,18 +16080,18 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 				*tail_unsent -= len;
 				if (len <= mss) /* LSO is unusable */
 					tcp->tcp_last_sent_len = (ushort_t)len;
-				len += tcp_hdr_len;
-				if (tcp->tcp_ipversion == IPV4_VERSION)
+				len += total_hdr_len;
+				ixa->ixa_pktlen = len;
+
+				if (ixa->ixa_flags & IXAF_IS_IPV4) {
 					tcp->tcp_ipha->ipha_length = htons(len);
-				else
+				} else {
 					tcp->tcp_ip6h->ip6_plen =
-					    htons(len -
-					    ((char *)&tcp->tcp_ip6h[1] -
-					    tcp->tcp_iphc));
+					    htons(len - IPV6_HDR_LEN);
+				}
+
 				mp = dupb(*xmit_tail);
 				if (mp == NULL) {
-					if (ire != NULL)
-						IRE_REFRELE(ire);
 					return (-1);	/* out_of_mem */
 				}
 				mp->b_rptr = rptr;
@@ -20983,21 +16121,21 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 		if (len <= mss) /* LSO is unusable (!do_lso_send) */
 			tcp->tcp_last_sent_len = (ushort_t)len;
 
-		len += tcp_hdr_len;
-		if (tcp->tcp_ipversion == IPV4_VERSION)
+		len += total_hdr_len;
+		ixa->ixa_pktlen = len;
+
+		if (ixa->ixa_flags & IXAF_IS_IPV4) {
 			tcp->tcp_ipha->ipha_length = htons(len);
-		else
-			tcp->tcp_ip6h->ip6_plen = htons(len -
-			    ((char *)&tcp->tcp_ip6h[1] - tcp->tcp_iphc));
+		} else {
+			tcp->tcp_ip6h->ip6_plen = htons(len - IPV6_HDR_LEN);
+		}
 
 		mp = dupb(*xmit_tail);
 		if (mp == NULL) {
-			if (ire != NULL)
-				IRE_REFRELE(ire);
 			return (-1);	/* out_of_mem */
 		}
 
-		len = tcp_hdr_len;
+		len = total_hdr_len;
 		/*
 		 * There are four reasons to allocate a new hdr mblk:
 		 *  1) The bytes above us are in use by another packet
@@ -21008,24 +16146,21 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 		rptr = mp->b_rptr - len;
 		if (!OK_32PTR(rptr) ||
 		    ((db = mp->b_datap), db->db_ref != 2) ||
-		    rptr < db->db_base + ire_fp_mp_len) {
+		    rptr < db->db_base) {
 			/* NOTE: we assume allocb returns an OK_32PTR */
 
 		must_alloc:;
-			mp1 = allocb(tcp->tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH +
-			    tcps->tcps_wroff_xtra + ire_fp_mp_len, BPRI_MED);
+			mp1 = allocb(connp->conn_ht_iphc_allocated +
+			    tcps->tcps_wroff_xtra, BPRI_MED);
 			if (mp1 == NULL) {
 				freemsg(mp);
-				if (ire != NULL)
-					IRE_REFRELE(ire);
 				return (-1);	/* out_of_mem */
 			}
 			mp1->b_cont = mp;
 			mp = mp1;
 			/* Leave room for Link Level header */
-			len = tcp_hdr_len;
-			rptr =
-			    &mp->b_rptr[tcps->tcps_wroff_xtra + ire_fp_mp_len];
+			len = total_hdr_len;
+			rptr = &mp->b_rptr[tcps->tcps_wroff_xtra];
 			mp->b_wptr = &rptr[len];
 		}
 
@@ -21057,18 +16192,17 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 
 				/*
 				 * Excess data in mblk; can we split it?
-				 * If MDT is enabled for the connection,
+				 * If LSO is enabled for the connection,
 				 * keep on splitting as this is a transient
 				 * send path.
 				 */
-				if (!do_lso_send && !tcp->tcp_mdt &&
-				    (spill + nmpsz > 0)) {
+				if (!do_lso_send && (spill + nmpsz > 0)) {
 					/*
 					 * Don't split if stream head was
 					 * told to break up larger writes
 					 * into smaller ones.
 					 */
-					if (tcp->tcp_maxpsz > 0)
+					if (tcp->tcp_maxpsz_multiplier > 0)
 						break;
 
 					/*
@@ -21096,8 +16230,6 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 				if (mp1 == NULL) {
 					*tail_unsent = spill;
 					freemsg(mp);
-					if (ire != NULL)
-						IRE_REFRELE(ire);
 					return (-1);	/* out_of_mem */
 				}
 			}
@@ -21119,11 +16251,12 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 				/*
 				 * Adjust the checksum
 				 */
-				tcph = (tcph_t *)(rptr + tcp->tcp_ip_hdr_len);
+				tcpha = (tcpha_t *)(rptr +
+				    ixa->ixa_ip_hdr_length);
 				sum += spill;
 				sum = (sum >> 16) + (sum & 0xFFFF);
-				U16_TO_ABE16(sum, tcph->th_sum);
-				if (tcp->tcp_ipversion == IPV4_VERSION) {
+				tcpha->tha_sum = htons(sum);
+				if (connp->conn_ipversion == IPV4_VERSION) {
 					sum = ntohs(
 					    ((ipha_t *)rptr)->ipha_length) +
 					    spill;
@@ -21136,302 +16269,45 @@ tcp_send(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 					((ip6_t *)rptr)->ip6_plen =
 					    htons(sum);
 				}
+				ixa->ixa_pktlen += spill;
 				*tail_unsent = 0;
 			}
 		}
 		if (tcp->tcp_ip_forward_progress) {
-			ASSERT(tcp->tcp_ipversion == IPV6_VERSION);
-			*(uint32_t *)mp->b_rptr  |= IP_FORWARD_PROG;
 			tcp->tcp_ip_forward_progress = B_FALSE;
+			ixa->ixa_flags |= IXAF_REACH_CONF;
+		} else {
+			ixa->ixa_flags &= ~IXAF_REACH_CONF;
 		}
 
+		/*
+		 * Append LSO information, both flags and mss, to the mp.
+		 */
 		if (do_lso_send) {
-			tcp_lsosend_data(tcp, mp, ire, ill, mss,
-			    num_lso_seg);
-			tcp->tcp_obsegs += num_lso_seg;
+			lso_info_set(mp, mss, HW_LSO);
+			ixa->ixa_fragsize = IP_MAXPACKET;
+			ixa->ixa_extra_ident = num_lso_seg - 1;
 
+			DTRACE_PROBE2(tcp_send_lso, int, num_lso_seg,
+			    boolean_t, B_TRUE);
+
+			tcp_send_data(tcp, mp);
+
+			/*
+			 * Restore values of ixa_fragsize and ixa_extra_ident.
+			 */
+			ixa->ixa_fragsize = ixa->ixa_pmtu;
+			ixa->ixa_extra_ident = 0;
+			tcp->tcp_obsegs += num_lso_seg;
 			TCP_STAT(tcps, tcp_lso_times);
 			TCP_STAT_UPDATE(tcps, tcp_lso_pkt_out, num_lso_seg);
 		} else {
-			tcp_send_data(tcp, q, mp);
+			tcp_send_data(tcp, mp);
 			BUMP_LOCAL(tcp->tcp_obsegs);
 		}
 	}
 
-	if (ire != NULL)
-		IRE_REFRELE(ire);
 	return (0);
-}
-
-/* Unlink and return any mblk that looks like it contains a MDT info */
-static mblk_t *
-tcp_mdt_info_mp(mblk_t *mp)
-{
-	mblk_t	*prev_mp;
-
-	for (;;) {
-		prev_mp = mp;
-		/* no more to process? */
-		if ((mp = mp->b_cont) == NULL)
-			break;
-
-		switch (DB_TYPE(mp)) {
-		case M_CTL:
-			if (*(uint32_t *)mp->b_rptr != MDT_IOC_INFO_UPDATE)
-				continue;
-			ASSERT(prev_mp != NULL);
-			prev_mp->b_cont = mp->b_cont;
-			mp->b_cont = NULL;
-			return (mp);
-		default:
-			break;
-		}
-	}
-	return (mp);
-}
-
-/* MDT info update routine, called when IP notifies us about MDT */
-static void
-tcp_mdt_update(tcp_t *tcp, ill_mdt_capab_t *mdt_capab, boolean_t first)
-{
-	boolean_t prev_state;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-
-	/*
-	 * IP is telling us to abort MDT on this connection?  We know
-	 * this because the capability is only turned off when IP
-	 * encounters some pathological cases, e.g. link-layer change
-	 * where the new driver doesn't support MDT, or in situation
-	 * where MDT usage on the link-layer has been switched off.
-	 * IP would not have sent us the initial MDT_IOC_INFO_UPDATE
-	 * if the link-layer doesn't support MDT, and if it does, it
-	 * will indicate that the feature is to be turned on.
-	 */
-	prev_state = tcp->tcp_mdt;
-	tcp->tcp_mdt = (mdt_capab->ill_mdt_on != 0);
-	if (!tcp->tcp_mdt && !first) {
-		TCP_STAT(tcps, tcp_mdt_conn_halted3);
-		ip1dbg(("tcp_mdt_update: disabling MDT for connp %p\n",
-		    (void *)tcp->tcp_connp));
-	}
-
-	/*
-	 * We currently only support MDT on simple TCP/{IPv4,IPv6},
-	 * so disable MDT otherwise.  The checks are done here
-	 * and in tcp_wput_data().
-	 */
-	if (tcp->tcp_mdt &&
-	    (tcp->tcp_ipversion == IPV4_VERSION &&
-	    tcp->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH) ||
-	    (tcp->tcp_ipversion == IPV6_VERSION &&
-	    tcp->tcp_ip_hdr_len != IPV6_HDR_LEN))
-		tcp->tcp_mdt = B_FALSE;
-
-	if (tcp->tcp_mdt) {
-		if (mdt_capab->ill_mdt_version != MDT_VERSION_2) {
-			cmn_err(CE_NOTE, "tcp_mdt_update: unknown MDT "
-			    "version (%d), expected version is %d",
-			    mdt_capab->ill_mdt_version, MDT_VERSION_2);
-			tcp->tcp_mdt = B_FALSE;
-			return;
-		}
-
-		/*
-		 * We need the driver to be able to handle at least three
-		 * spans per packet in order for tcp MDT to be utilized.
-		 * The first is for the header portion, while the rest are
-		 * needed to handle a packet that straddles across two
-		 * virtually non-contiguous buffers; a typical tcp packet
-		 * therefore consists of only two spans.  Note that we take
-		 * a zero as "don't care".
-		 */
-		if (mdt_capab->ill_mdt_span_limit > 0 &&
-		    mdt_capab->ill_mdt_span_limit < 3) {
-			tcp->tcp_mdt = B_FALSE;
-			return;
-		}
-
-		/* a zero means driver wants default value */
-		tcp->tcp_mdt_max_pld = MIN(mdt_capab->ill_mdt_max_pld,
-		    tcps->tcps_mdt_max_pbufs);
-		if (tcp->tcp_mdt_max_pld == 0)
-			tcp->tcp_mdt_max_pld = tcps->tcps_mdt_max_pbufs;
-
-		/* ensure 32-bit alignment */
-		tcp->tcp_mdt_hdr_head = roundup(MAX(tcps->tcps_mdt_hdr_head_min,
-		    mdt_capab->ill_mdt_hdr_head), 4);
-		tcp->tcp_mdt_hdr_tail = roundup(MAX(tcps->tcps_mdt_hdr_tail_min,
-		    mdt_capab->ill_mdt_hdr_tail), 4);
-
-		if (!first && !prev_state) {
-			TCP_STAT(tcps, tcp_mdt_conn_resumed2);
-			ip1dbg(("tcp_mdt_update: reenabling MDT for connp %p\n",
-			    (void *)tcp->tcp_connp));
-		}
-	}
-}
-
-/* Unlink and return any mblk that looks like it contains a LSO info */
-static mblk_t *
-tcp_lso_info_mp(mblk_t *mp)
-{
-	mblk_t	*prev_mp;
-
-	for (;;) {
-		prev_mp = mp;
-		/* no more to process? */
-		if ((mp = mp->b_cont) == NULL)
-			break;
-
-		switch (DB_TYPE(mp)) {
-		case M_CTL:
-			if (*(uint32_t *)mp->b_rptr != LSO_IOC_INFO_UPDATE)
-				continue;
-			ASSERT(prev_mp != NULL);
-			prev_mp->b_cont = mp->b_cont;
-			mp->b_cont = NULL;
-			return (mp);
-		default:
-			break;
-		}
-	}
-
-	return (mp);
-}
-
-/* LSO info update routine, called when IP notifies us about LSO */
-static void
-tcp_lso_update(tcp_t *tcp, ill_lso_capab_t *lso_capab)
-{
-	tcp_stack_t *tcps = tcp->tcp_tcps;
-
-	/*
-	 * IP is telling us to abort LSO on this connection?  We know
-	 * this because the capability is only turned off when IP
-	 * encounters some pathological cases, e.g. link-layer change
-	 * where the new NIC/driver doesn't support LSO, or in situation
-	 * where LSO usage on the link-layer has been switched off.
-	 * IP would not have sent us the initial LSO_IOC_INFO_UPDATE
-	 * if the link-layer doesn't support LSO, and if it does, it
-	 * will indicate that the feature is to be turned on.
-	 */
-	tcp->tcp_lso = (lso_capab->ill_lso_on != 0);
-	TCP_STAT(tcps, tcp_lso_enabled);
-
-	/*
-	 * We currently only support LSO on simple TCP/IPv4,
-	 * so disable LSO otherwise.  The checks are done here
-	 * and in tcp_wput_data().
-	 */
-	if (tcp->tcp_lso &&
-	    (tcp->tcp_ipversion == IPV4_VERSION &&
-	    tcp->tcp_ip_hdr_len != IP_SIMPLE_HDR_LENGTH) ||
-	    (tcp->tcp_ipversion == IPV6_VERSION)) {
-		tcp->tcp_lso = B_FALSE;
-		TCP_STAT(tcps, tcp_lso_disabled);
-	} else {
-		tcp->tcp_lso_max = MIN(TCP_MAX_LSO_LENGTH,
-		    lso_capab->ill_lso_max);
-	}
-}
-
-static void
-tcp_ire_ill_check(tcp_t *tcp, ire_t *ire, ill_t *ill, boolean_t check_lso_mdt)
-{
-	conn_t *connp = tcp->tcp_connp;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
-
-	ASSERT(ire != NULL);
-
-	/*
-	 * We may be in the fastpath here, and although we essentially do
-	 * similar checks as in ip_bind_connected{_v6}/ip_xxinfo_return,
-	 * we try to keep things as brief as possible.  After all, these
-	 * are only best-effort checks, and we do more thorough ones prior
-	 * to calling tcp_send()/tcp_multisend().
-	 */
-	if ((ipst->ips_ip_lso_outbound || ipst->ips_ip_multidata_outbound) &&
-	    check_lso_mdt && !(ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK)) &&
-	    ill != NULL && !CONN_IPSEC_OUT_ENCAPSULATED(connp) &&
-	    !(ire->ire_flags & RTF_MULTIRT) &&
-	    !IPP_ENABLED(IPP_LOCAL_OUT, ipst) &&
-	    CONN_IS_LSO_MD_FASTPATH(connp)) {
-		if (ipst->ips_ip_lso_outbound && ILL_LSO_CAPABLE(ill)) {
-			/* Cache the result */
-			connp->conn_lso_ok = B_TRUE;
-
-			ASSERT(ill->ill_lso_capab != NULL);
-			if (!ill->ill_lso_capab->ill_lso_on) {
-				ill->ill_lso_capab->ill_lso_on = 1;
-				ip1dbg(("tcp_ire_ill_check: connp %p enables "
-				    "LSO for interface %s\n", (void *)connp,
-				    ill->ill_name));
-			}
-			tcp_lso_update(tcp, ill->ill_lso_capab);
-		} else if (ipst->ips_ip_multidata_outbound &&
-		    ILL_MDT_CAPABLE(ill)) {
-			/* Cache the result */
-			connp->conn_mdt_ok = B_TRUE;
-
-			ASSERT(ill->ill_mdt_capab != NULL);
-			if (!ill->ill_mdt_capab->ill_mdt_on) {
-				ill->ill_mdt_capab->ill_mdt_on = 1;
-				ip1dbg(("tcp_ire_ill_check: connp %p enables "
-				    "MDT for interface %s\n", (void *)connp,
-				    ill->ill_name));
-			}
-			tcp_mdt_update(tcp, ill->ill_mdt_capab, B_TRUE);
-		}
-	}
-
-	/*
-	 * The goal is to reduce the number of generated tcp segments by
-	 * setting the maxpsz multiplier to 0; this will have an affect on
-	 * tcp_maxpsz_set().  With this behavior, tcp will pack more data
-	 * into each packet, up to SMSS bytes.  Doing this reduces the number
-	 * of outbound segments and incoming ACKs, thus allowing for better
-	 * network and system performance.  In contrast the legacy behavior
-	 * may result in sending less than SMSS size, because the last mblk
-	 * for some packets may have more data than needed to make up SMSS,
-	 * and the legacy code refused to "split" it.
-	 *
-	 * We apply the new behavior on following situations:
-	 *
-	 *   1) Loopback connections,
-	 *   2) Connections in which the remote peer is not on local subnet,
-	 *   3) Local subnet connections over the bge interface (see below).
-	 *
-	 * Ideally, we would like this behavior to apply for interfaces other
-	 * than bge.  However, doing so would negatively impact drivers which
-	 * perform dynamic mapping and unmapping of DMA resources, which are
-	 * increased by setting the maxpsz multiplier to 0 (more mblks per
-	 * packet will be generated by tcp).  The bge driver does not suffer
-	 * from this, as it copies the mblks into pre-mapped buffers, and
-	 * therefore does not require more I/O resources than before.
-	 *
-	 * Otherwise, this behavior is present on all network interfaces when
-	 * the destination endpoint is non-local, since reducing the number
-	 * of packets in general is good for the network.
-	 *
-	 * TODO We need to remove this hard-coded conditional for bge once
-	 *	a better "self-tuning" mechanism, or a way to comprehend
-	 *	the driver transmit strategy is devised.  Until the solution
-	 *	is found and well understood, we live with this hack.
-	 */
-	if (!tcp_static_maxpsz &&
-	    (tcp->tcp_loopback || !tcp->tcp_localnet ||
-	    (ill->ill_name_length > 3 && bcmp(ill->ill_name, "bge", 3) == 0))) {
-		/* override the default value */
-		tcp->tcp_maxpsz = 0;
-
-		ip3dbg(("tcp_ire_ill_check: connp %p tcp_maxpsz %d on "
-		    "interface %s\n", (void *)connp, tcp->tcp_maxpsz,
-		    ill != NULL ? ill->ill_name : ipif_loopback_name));
-	}
-
-	/* set the stream head parameters accordingly */
-	(void) tcp_maxpsz_set(tcp, B_TRUE);
 }
 
 /* tcp_wput_flush is called by tcp_wput_nondata to handle M_FLUSH messages. */
@@ -21440,7 +16316,8 @@ tcp_wput_flush(tcp_t *tcp, mblk_t *mp)
 {
 	uchar_t	fval = *mp->b_rptr;
 	mblk_t	*tail;
-	queue_t	*q = tcp->tcp_wq;
+	conn_t	*connp = tcp->tcp_connp;
+	queue_t	*q = connp->conn_wq;
 
 	/* TODO: How should flush interact with urgent data? */
 	if ((fval & FLUSHW) && tcp->tcp_xmit_head &&
@@ -21473,7 +16350,7 @@ tcp_wput_flush(tcp_t *tcp, mblk_t *mp)
 		}
 		/*
 		 * We have no unsent data, so unsent must be less than
-		 * tcp_xmit_lowater, so re-enable flow.
+		 * conn_sndlowat, so re-enable flow.
 		 */
 		mutex_enter(&tcp->tcp_non_sq_lock);
 		if (tcp->tcp_flow_stopped) {
@@ -21501,12 +16378,12 @@ tcp_wput_flush(tcp_t *tcp, mblk_t *mp)
 static void
 tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 {
-	mblk_t	*mp1;
-	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
+	mblk_t		*mp1;
+	struct iocblk	*iocp = (struct iocblk *)mp->b_rptr;
 	STRUCT_HANDLE(strbuf, sb);
-	queue_t *q = tcp->tcp_wq;
-	int	error;
-	uint_t	addrlen;
+	uint_t		addrlen;
+	conn_t		*connp = tcp->tcp_connp;
+	queue_t 	*q = connp->conn_wq;
 
 	/* Make sure it is one of ours. */
 	switch (iocp->ioc_cmd) {
@@ -21514,7 +16391,7 @@ tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 	case TI_GETPEERNAME:
 		break;
 	default:
-		CALL_IP_WPUT(tcp->tcp_connp, q, mp);
+		ip_wput_nondata(q, mp);
 		return;
 	}
 	switch (mi_copy_state(q, mp, &mp1)) {
@@ -21541,43 +16418,56 @@ tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 	}
 
 	STRUCT_SET_HANDLE(sb, iocp->ioc_flag, (void *)mp1->b_rptr);
-	addrlen = tcp->tcp_family == AF_INET ? sizeof (sin_t) : sizeof (sin6_t);
+
+	if (connp->conn_family == AF_INET)
+		addrlen = sizeof (sin_t);
+	else
+		addrlen = sizeof (sin6_t);
+
 	if (STRUCT_FGET(sb, maxlen) < addrlen) {
 		mi_copy_done(q, mp, EINVAL);
 		return;
 	}
 
-	mp1 = mi_copyout_alloc(q, mp, STRUCT_FGETP(sb, buf), addrlen, B_TRUE);
-	if (mp1 == NULL)
-		return;
-
 	switch (iocp->ioc_cmd) {
 	case TI_GETMYNAME:
-		error = tcp_do_getsockname(tcp, (void *)mp1->b_rptr, &addrlen);
 		break;
 	case TI_GETPEERNAME:
-		error = tcp_do_getpeername(tcp, (void *)mp1->b_rptr, &addrlen);
+		if (tcp->tcp_state < TCPS_SYN_RCVD) {
+			mi_copy_done(q, mp, ENOTCONN);
+			return;
+		}
 		break;
 	}
+	mp1 = mi_copyout_alloc(q, mp, STRUCT_FGETP(sb, buf), addrlen, B_TRUE);
+	if (!mp1)
+		return;
 
-	if (error != 0) {
-		mi_copy_done(q, mp, error);
-	} else {
-		mp1->b_wptr += addrlen;
-		STRUCT_FSET(sb, len, addrlen);
-
-		/* Copy out the address */
-		mi_copyout(q, mp);
+	STRUCT_FSET(sb, len, addrlen);
+	switch (((struct iocblk *)mp->b_rptr)->ioc_cmd) {
+	case TI_GETMYNAME:
+		(void) conn_getsockname(connp, (struct sockaddr *)mp1->b_wptr,
+		    &addrlen);
+		break;
+	case TI_GETPEERNAME:
+		(void) conn_getpeername(connp, (struct sockaddr *)mp1->b_wptr,
+		    &addrlen);
+		break;
 	}
+	mp1->b_wptr += addrlen;
+	/* Copy out the address */
+	mi_copyout(q, mp);
 }
 
 static void
 tcp_use_pure_tpi(tcp_t *tcp)
 {
+	conn_t		*connp = tcp->tcp_connp;
+
 #ifdef	_ILP32
-	tcp->tcp_acceptor_id = (t_uscalar_t)tcp->tcp_rq;
+	tcp->tcp_acceptor_id = (t_uscalar_t)connp->conn_rq;
 #else
-	tcp->tcp_acceptor_id = tcp->tcp_connp->conn_dev;
+	tcp->tcp_acceptor_id = connp->conn_dev;
 #endif
 	/*
 	 * Insert this socket into the acceptor hash.
@@ -21595,11 +16485,11 @@ tcp_use_pure_tpi(tcp_t *tcp)
  */
 /* ARGSUSED */
 static void
-tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2)
+tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
-	conn_t 	*connp = (conn_t *)arg;
-	tcp_t	*tcp = connp->conn_tcp;
-	queue_t	*q = tcp->tcp_wq;
+	conn_t 		*connp = (conn_t *)arg;
+	tcp_t		*tcp = connp->conn_tcp;
+	queue_t		*q = connp->conn_wq;
 	struct iocblk	*iocp;
 
 	ASSERT(DB_TYPE(mp) == M_IOCTL);
@@ -21617,17 +16507,6 @@ tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2)
 
 	iocp = (struct iocblk *)mp->b_rptr;
 	switch (iocp->ioc_cmd) {
-	case TCP_IOC_DEFAULT_Q:
-		/* Wants to be the default wq. */
-		if (secpolicy_ip_config(iocp->ioc_cr, B_FALSE) != 0) {
-			iocp->ioc_error = EPERM;
-			iocp->ioc_count = 0;
-			mp->b_datap->db_type = M_IOCACK;
-			qreply(q, mp);
-			return;
-		}
-		tcp_def_q_set(tcp, mp);
-		return;
 	case _SIOCSOCKFALLBACK:
 		/*
 		 * Either sockmod is about to be popped and the socket
@@ -21650,7 +16529,7 @@ tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2)
 		qreply(q, mp);
 		return;
 	}
-	CALL_IP_WPUT(connp, q, mp);
+	ip_wput_nondata(q, mp);
 }
 
 /*
@@ -21658,14 +16537,14 @@ tcp_wput_ioctl(void *arg, mblk_t *mp, void *arg2)
  */
 /* ARGSUSED */
 static void
-tcp_wput_proto(void *arg, mblk_t *mp, void *arg2)
+tcp_wput_proto(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
-	conn_t 	*connp = (conn_t *)arg;
-	tcp_t	*tcp = connp->conn_tcp;
+	conn_t		*connp = (conn_t *)arg;
+	tcp_t		*tcp = connp->conn_tcp;
 	union T_primitives *tprim = (union T_primitives *)mp->b_rptr;
-	uchar_t *rptr;
-	t_scalar_t type;
-	cred_t *cr;
+	uchar_t		*rptr;
+	t_scalar_t	type;
+	cred_t		*cr;
 
 	/*
 	 * Try and ASSERT the minimum possible references on the
@@ -21684,7 +16563,7 @@ tcp_wput_proto(void *arg, mblk_t *mp, void *arg2)
 	if ((mp->b_wptr - rptr) >= sizeof (t_scalar_t)) {
 		type = ((union T_primitives *)rptr)->type;
 		if (type == T_EXDATA_REQ) {
-			tcp_output_urgent(connp, mp, arg2);
+			tcp_output_urgent(connp, mp, arg2, NULL);
 		} else if (type != T_DATA_REQ) {
 			goto non_urgent_data;
 		} else {
@@ -21695,7 +16574,7 @@ tcp_wput_proto(void *arg, mblk_t *mp, void *arg2)
 		}
 		return;
 	} else {
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
 			    "tcp_wput_proto, dropping one...");
 		}
@@ -21776,17 +16655,10 @@ non_urgent_data:
 		 * for subsequent processing by ip_restart_optmgmt(), which
 		 * will do the CONN_DEC_REF().
 		 */
-		CONN_INC_REF(connp);
 		if ((int)tprim->type == T_SVR4_OPTMGMT_REQ) {
-			if (svr4_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj,
-			    B_TRUE) != EINPROGRESS) {
-				CONN_DEC_REF(connp);
-			}
+			svr4_optcom_req(connp->conn_wq, mp, cr, &tcp_opt_obj);
 		} else {
-			if (tpi_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj,
-			    B_TRUE) != EINPROGRESS) {
-				CONN_DEC_REF(connp);
-			}
+			tpi_optcom_req(connp->conn_wq, mp, cr, &tcp_opt_obj);
 		}
 		break;
 
@@ -21804,7 +16676,7 @@ non_urgent_data:
 			 * We were crossing FINs and got a reset from
 			 * the other side. Just ignore it.
 			 */
-			if (tcp->tcp_debug) {
+			if (connp->conn_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1,
 				    SL_ERROR|SL_TRACE,
 				    "tcp_wput_proto, T_ORDREL_REQ out of "
@@ -21818,7 +16690,7 @@ non_urgent_data:
 		tcp_addr_req(tcp, mp);
 		break;
 	default:
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
 			    "tcp_wput_proto, bogus TPI msg, type %d",
 			    tprim->type);
@@ -21844,19 +16716,6 @@ tcp_wsrv(queue_t *q)
 	TCP_STAT(tcps, tcp_wsrv_called);
 }
 
-/* Non overlapping byte exchanger */
-static void
-tcp_xchg(uchar_t *a, uchar_t *b, int len)
-{
-	uchar_t	uch;
-
-	while (len-- > 0) {
-		uch = a[len];
-		a[len] = b[len];
-		b[len] = uch;
-	}
-}
-
 /*
  * Send out a control packet on the tcp connection specified.  This routine
  * is typically called where we need a simple ACK or RST generated.
@@ -21865,50 +16724,51 @@ static void
 tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 {
 	uchar_t		*rptr;
-	tcph_t		*tcph;
+	tcpha_t		*tcpha;
 	ipha_t		*ipha = NULL;
 	ip6_t		*ip6h = NULL;
 	uint32_t	sum;
-	int		tcp_hdr_len;
-	int		tcp_ip_hdr_len;
+	int		total_hdr_len;
+	int		ip_hdr_len;
 	mblk_t		*mp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
+	ip_xmit_attr_t	*ixa = connp->conn_ixa;
 
 	/*
 	 * Save sum for use in source route later.
 	 */
-	ASSERT(tcp != NULL);
-	sum = tcp->tcp_tcp_hdr_len + tcp->tcp_sum;
-	tcp_hdr_len = tcp->tcp_hdr_len;
-	tcp_ip_hdr_len = tcp->tcp_ip_hdr_len;
+	sum = connp->conn_ht_ulp_len + connp->conn_sum;
+	total_hdr_len = connp->conn_ht_iphc_len;
+	ip_hdr_len = ixa->ixa_ip_hdr_length;
 
 	/* If a text string is passed in with the request, pass it to strlog. */
-	if (str != NULL && tcp->tcp_debug) {
+	if (str != NULL && connp->conn_debug) {
 		(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE,
 		    "tcp_xmit_ctl: '%s', seq 0x%x, ack 0x%x, ctl 0x%x",
 		    str, seq, ack, ctl);
 	}
-	mp = allocb(tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH + tcps->tcps_wroff_xtra,
+	mp = allocb(connp->conn_ht_iphc_allocated + tcps->tcps_wroff_xtra,
 	    BPRI_MED);
 	if (mp == NULL) {
 		return;
 	}
 	rptr = &mp->b_rptr[tcps->tcps_wroff_xtra];
 	mp->b_rptr = rptr;
-	mp->b_wptr = &rptr[tcp_hdr_len];
-	bcopy(tcp->tcp_iphc, rptr, tcp_hdr_len);
+	mp->b_wptr = &rptr[total_hdr_len];
+	bcopy(connp->conn_ht_iphc, rptr, total_hdr_len);
 
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
+	ixa->ixa_pktlen = total_hdr_len;
+
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
 		ipha = (ipha_t *)rptr;
-		ipha->ipha_length = htons(tcp_hdr_len);
+		ipha->ipha_length = htons(total_hdr_len);
 	} else {
 		ip6h = (ip6_t *)rptr;
-		ASSERT(tcp != NULL);
-		ip6h->ip6_plen = htons(tcp->tcp_hdr_len -
-		    ((char *)&tcp->tcp_ip6h[1] - tcp->tcp_iphc));
+		ip6h->ip6_plen = htons(total_hdr_len - IPV6_HDR_LEN);
 	}
-	tcph = (tcph_t *)&rptr[tcp_ip_hdr_len];
-	tcph->th_flags[0] = (uint8_t)ctl;
+	tcpha = (tcpha_t *)&rptr[ip_hdr_len];
+	tcpha->tha_flags = (uint8_t)ctl;
 	if (ctl & TH_RST) {
 		BUMP_MIB(&tcps->tcps_mib, tcpOutRsts);
 		BUMP_MIB(&tcps->tcps_mib, tcpOutControl);
@@ -21917,43 +16777,45 @@ tcp_xmit_ctl(char *str, tcp_t *tcp, uint32_t seq, uint32_t ack, int ctl)
 		 */
 		if (tcp->tcp_snd_ts_ok &&
 		    tcp->tcp_state > TCPS_SYN_SENT) {
-			mp->b_wptr = &rptr[tcp_hdr_len - TCPOPT_REAL_TS_LEN];
+			mp->b_wptr = &rptr[total_hdr_len - TCPOPT_REAL_TS_LEN];
 			*(mp->b_wptr) = TCPOPT_EOL;
-			if (tcp->tcp_ipversion == IPV4_VERSION) {
-				ipha->ipha_length = htons(tcp_hdr_len -
+
+			ixa->ixa_pktlen = total_hdr_len - TCPOPT_REAL_TS_LEN;
+
+			if (connp->conn_ipversion == IPV4_VERSION) {
+				ipha->ipha_length = htons(total_hdr_len -
 				    TCPOPT_REAL_TS_LEN);
 			} else {
-				ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) -
-				    TCPOPT_REAL_TS_LEN);
+				ip6h->ip6_plen = htons(total_hdr_len -
+				    IPV6_HDR_LEN - TCPOPT_REAL_TS_LEN);
 			}
-			tcph->th_offset_and_rsrvd[0] -= (3 << 4);
+			tcpha->tha_offset_and_reserved -= (3 << 4);
 			sum -= TCPOPT_REAL_TS_LEN;
 		}
 	}
 	if (ctl & TH_ACK) {
 		if (tcp->tcp_snd_ts_ok) {
 			U32_TO_BE32(lbolt,
-			    (char *)tcph+TCP_MIN_HEADER_LENGTH+4);
+			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);
 			U32_TO_BE32(tcp->tcp_ts_recent,
-			    (char *)tcph+TCP_MIN_HEADER_LENGTH+8);
+			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+8);
 		}
 
 		/* Update the latest receive window size in TCP header. */
-		U32_TO_ABE16(tcp->tcp_rwnd >> tcp->tcp_rcv_ws,
-		    tcph->th_win);
+		tcpha->tha_win = htons(tcp->tcp_rwnd >> tcp->tcp_rcv_ws);
 		tcp->tcp_rack = ack;
 		tcp->tcp_rack_cnt = 0;
 		BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
 	}
 	BUMP_LOCAL(tcp->tcp_obsegs);
-	U32_TO_BE32(seq, tcph->th_seq);
-	U32_TO_BE32(ack, tcph->th_ack);
+	tcpha->tha_seq = htonl(seq);
+	tcpha->tha_ack = htonl(ack);
 	/*
 	 * Include the adjustment for a source route if any.
 	 */
 	sum = (sum >> 16) + (sum & 0xFFFF);
-	U16_TO_BE16(sum, tcph->th_sum);
-	tcp_send_data(tcp, tcp->tcp_wq, mp);
+	tcpha->tha_sum = htons(sum);
+	tcp_send_data(tcp, mp);
 }
 
 /*
@@ -21991,115 +16853,32 @@ tcp_send_rst_chk(tcp_stack_t *tcps)
 }
 
 /*
- * Send down the advice IP ioctl to tell IP to mark an IRE temporary.
- */
-static void
-tcp_ip_ire_mark_advice(tcp_t *tcp)
-{
-	mblk_t *mp;
-	ipic_t *ipic;
-
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		mp = tcp_ip_advise_mblk(&tcp->tcp_ipha->ipha_dst, IP_ADDR_LEN,
-		    &ipic);
-	} else {
-		mp = tcp_ip_advise_mblk(&tcp->tcp_ip6h->ip6_dst, IPV6_ADDR_LEN,
-		    &ipic);
-	}
-	if (mp == NULL)
-		return;
-	ipic->ipic_ire_marks |= IRE_MARK_TEMPORARY;
-	CALL_IP_WPUT(tcp->tcp_connp, tcp->tcp_wq, mp);
-}
-
-/*
- * Return an IP advice ioctl mblk and set ipic to be the pointer
- * to the advice structure.
- */
-static mblk_t *
-tcp_ip_advise_mblk(void *addr, int addr_len, ipic_t **ipic)
-{
-	struct iocblk *ioc;
-	mblk_t *mp, *mp1;
-
-	mp = allocb(sizeof (ipic_t) + addr_len, BPRI_HI);
-	if (mp == NULL)
-		return (NULL);
-	bzero(mp->b_rptr, sizeof (ipic_t) + addr_len);
-	*ipic = (ipic_t *)mp->b_rptr;
-	(*ipic)->ipic_cmd = IP_IOC_IRE_ADVISE_NO_REPLY;
-	(*ipic)->ipic_addr_offset = sizeof (ipic_t);
-
-	bcopy(addr, *ipic + 1, addr_len);
-
-	(*ipic)->ipic_addr_length = addr_len;
-	mp->b_wptr = &mp->b_rptr[sizeof (ipic_t) + addr_len];
-
-	mp1 = mkiocb(IP_IOCTL);
-	if (mp1 == NULL) {
-		freemsg(mp);
-		return (NULL);
-	}
-	mp1->b_cont = mp;
-	ioc = (struct iocblk *)mp1->b_rptr;
-	ioc->ioc_count = sizeof (ipic_t) + addr_len;
-
-	return (mp1);
-}
-
-/*
  * Generate a reset based on an inbound packet, connp is set by caller
  * when RST is in response to an unexpected inbound packet for which
  * there is active tcp state in the system.
  *
  * IPSEC NOTE : Try to send the reply with the same protection as it came
- * in.  We still have the ipsec_mp that the packet was attached to. Thus
- * the packet will go out at the same level of protection as it came in by
- * converting the IPSEC_IN to IPSEC_OUT.
+ * in.  We have the ip_recv_attr_t which is reversed to form the ip_xmit_attr_t.
+ * That way the packet will go out at the same level of protection as it
+ * came in with.
  */
 static void
-tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
-    uint32_t ack, int ctl, uint_t ip_hdr_len, zoneid_t zoneid,
-    tcp_stack_t *tcps, conn_t *connp)
+tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq, uint32_t ack, int ctl,
+    ip_recv_attr_t *ira, ip_stack_t *ipst, conn_t *connp)
 {
 	ipha_t		*ipha = NULL;
 	ip6_t		*ip6h = NULL;
 	ushort_t	len;
-	tcph_t		*tcph;
+	tcpha_t		*tcpha;
 	int		i;
-	mblk_t		*ipsec_mp;
-	boolean_t	mctl_present;
-	ipic_t		*ipic;
 	ipaddr_t	v4addr;
 	in6_addr_t	v6addr;
-	int		addr_len;
-	void		*addr;
-	queue_t		*q = tcps->tcps_g_q;
-	tcp_t		*tcp;
-	cred_t		*cr;
-	pid_t		pid;
-	mblk_t		*nmp;
-	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
-
-	if (tcps->tcps_g_q == NULL) {
-		/*
-		 * For non-zero stackids the default queue isn't created
-		 * until the first open, thus there can be a need to send
-		 * a reset before then. But we can't do that, hence we just
-		 * drop the packet. Later during boot, when the default queue
-		 * has been setup, a retransmitted packet from the peer
-		 * will result in a reset.
-		 */
-		ASSERT(tcps->tcps_netstack->netstack_stackid !=
-		    GLOBAL_NETSTACKID);
-		freemsg(mp);
-		return;
-	}
-
-	if (connp != NULL)
-		tcp = connp->conn_tcp;
-	else
-		tcp = Q_TO_TCP(q);
+	netstack_t	*ns = ipst->ips_netstack;
+	tcp_stack_t	*tcps = ns->netstack_tcp;
+	ip_xmit_attr_t	ixas, *ixa;
+	uint_t		ip_hdr_len = ira->ira_ip_hdr_length;
+	boolean_t	need_refrele = B_FALSE;		/* ixa_refrele(ixa) */
+	ushort_t	port;
 
 	if (!tcp_send_rst_chk(tcps)) {
 		tcps->tcps_rst_unsent++;
@@ -22107,16 +16886,41 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		return;
 	}
 
-	if (mp->b_datap->db_type == M_CTL) {
-		ipsec_mp = mp;
-		mp = mp->b_cont;
-		mctl_present = B_TRUE;
+	/*
+	 * If connp != NULL we use conn_ixa to keep IP_NEXTHOP and other
+	 * options from the listener. In that case the caller must ensure that
+	 * we are running on the listener = connp squeue.
+	 *
+	 * We get a safe copy of conn_ixa so we don't need to restore anything
+	 * we or ip_output_simple might change in the ixa.
+	 */
+	if (connp != NULL) {
+		ASSERT(connp->conn_on_sqp);
+
+		ixa = conn_get_ixa_exclusive(connp);
+		if (ixa == NULL) {
+			tcps->tcps_rst_unsent++;
+			freemsg(mp);
+			return;
+		}
+		need_refrele = B_TRUE;
 	} else {
-		ipsec_mp = mp;
-		mctl_present = B_FALSE;
+		bzero(&ixas, sizeof (ixas));
+		ixa = &ixas;
+		/*
+		 * IXAF_VERIFY_SOURCE is overkill since we know the
+		 * packet was for us.
+		 */
+		ixa->ixa_flags |= IXAF_SET_ULP_CKSUM | IXAF_VERIFY_SOURCE;
+		ixa->ixa_protocol = IPPROTO_TCP;
+		ixa->ixa_zoneid = ira->ira_zoneid;
+		ixa->ixa_ifindex = 0;
+		ixa->ixa_ipst = ipst;
+		ixa->ixa_cred = kcred;
+		ixa->ixa_cpid = NOPID;
 	}
 
-	if (str && q && tcps->tcps_dbg) {
+	if (str && tcps->tcps_dbg) {
 		(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE,
 		    "tcp_xmit_early_reset: '%s', seq 0x%x, ack 0x%x, "
 		    "flags 0x%x",
@@ -22126,20 +16930,12 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		mblk_t *mp1 = copyb(mp);
 		freemsg(mp);
 		mp = mp1;
-		if (!mp) {
-			if (mctl_present)
-				freeb(ipsec_mp);
-			return;
-		} else {
-			if (mctl_present) {
-				ipsec_mp->b_cont = mp;
-			} else {
-				ipsec_mp = mp;
-			}
-		}
+		if (mp == NULL)
+			goto done;
 	} else if (mp->b_cont) {
 		freemsg(mp->b_cont);
 		mp->b_cont = NULL;
+		DB_CKSUMFLAGS(mp) = 0;
 	}
 	/*
 	 * We skip reversing source route here.
@@ -22159,18 +16955,20 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		 */
 		if (ipha->ipha_src == 0 || ipha->ipha_src == INADDR_BROADCAST ||
 		    CLASSD(ipha->ipha_src)) {
-			freemsg(ipsec_mp);
 			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
-			return;
+			ip_drop_input("ipIfStatsInDiscards", mp, NULL);
+			freemsg(mp);
+			goto done;
 		}
 	} else {
 		ip6h = (ip6_t *)mp->b_rptr;
 
 		if (IN6_IS_ADDR_UNSPECIFIED(&ip6h->ip6_src) ||
 		    IN6_IS_ADDR_MULTICAST(&ip6h->ip6_src)) {
-			freemsg(ipsec_mp);
 			BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsInDiscards);
-			return;
+			ip_drop_input("ipIfStatsInDiscards", mp, NULL);
+			freemsg(mp);
+			goto done;
 		}
 
 		/* Remove any extension headers assuming partial overlay */
@@ -22185,13 +16983,13 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 			ip6h->ip6_nxt = IPPROTO_TCP;
 		}
 	}
-	tcph = (tcph_t *)&mp->b_rptr[ip_hdr_len];
-	if (tcph->th_flags[0] & TH_RST) {
-		freemsg(ipsec_mp);
-		return;
+	tcpha = (tcpha_t *)&mp->b_rptr[ip_hdr_len];
+	if (tcpha->tha_flags & TH_RST) {
+		freemsg(mp);
+		goto done;
 	}
-	tcph->th_offset_and_rsrvd[0] = (5 << 4);
-	len = ip_hdr_len + sizeof (tcph_t);
+	tcpha->tha_offset_and_reserved = (5 << 4);
+	len = ip_hdr_len + sizeof (tcpha_t);
 	mp->b_wptr = &mp->b_rptr[len];
 	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
 		ipha->ipha_length = htons(len);
@@ -22201,108 +16999,79 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 		ipha->ipha_dst = v4addr;
 		ipha->ipha_ident = 0;
 		ipha->ipha_ttl = (uchar_t)tcps->tcps_ipv4_ttl;
-		addr_len = IP_ADDR_LEN;
-		addr = &v4addr;
+		ixa->ixa_flags |= IXAF_IS_IPV4;
+		ixa->ixa_ip_hdr_length = ip_hdr_len;
 	} else {
-		/* No ip6i_t in this case */
 		ip6h->ip6_plen = htons(len - IPV6_HDR_LEN);
 		/* Swap addresses */
 		v6addr = ip6h->ip6_src;
 		ip6h->ip6_src = ip6h->ip6_dst;
 		ip6h->ip6_dst = v6addr;
 		ip6h->ip6_hops = (uchar_t)tcps->tcps_ipv6_hoplimit;
-		addr_len = IPV6_ADDR_LEN;
-		addr = &v6addr;
+		ixa->ixa_flags &= ~IXAF_IS_IPV4;
+
+		if (IN6_IS_ADDR_LINKSCOPE(&ip6h->ip6_dst)) {
+			ixa->ixa_flags |= IXAF_SCOPEID_SET;
+			ixa->ixa_scopeid = ira->ira_ruifindex;
+		}
+		ixa->ixa_ip_hdr_length = IPV6_HDR_LEN;
 	}
-	tcp_xchg(tcph->th_fport, tcph->th_lport, 2);
-	U32_TO_BE32(ack, tcph->th_ack);
-	U32_TO_BE32(seq, tcph->th_seq);
-	U16_TO_BE16(0, tcph->th_win);
-	U16_TO_BE16(sizeof (tcph_t), tcph->th_sum);
-	tcph->th_flags[0] = (uint8_t)ctl;
+	ixa->ixa_pktlen = len;
+
+	/* Swap the ports */
+	port = tcpha->tha_fport;
+	tcpha->tha_fport = tcpha->tha_lport;
+	tcpha->tha_lport = port;
+
+	tcpha->tha_ack = htonl(ack);
+	tcpha->tha_seq = htonl(seq);
+	tcpha->tha_win = 0;
+	tcpha->tha_sum = htons(sizeof (tcpha_t));
+	tcpha->tha_flags = (uint8_t)ctl;
 	if (ctl & TH_RST) {
 		BUMP_MIB(&tcps->tcps_mib, tcpOutRsts);
 		BUMP_MIB(&tcps->tcps_mib, tcpOutControl);
 	}
 
-	/* IP trusts us to set up labels when required. */
-	if (is_system_labeled() && (cr = msg_getcred(mp, &pid)) != NULL &&
-	    crgetlabel(cr) != NULL) {
-		int err;
-
-		if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION)
-			err = tsol_check_label(cr, &mp,
-			    tcp->tcp_connp->conn_mac_mode,
-			    tcps->tcps_netstack->netstack_ip, pid);
-		else
-			err = tsol_check_label_v6(cr, &mp,
-			    tcp->tcp_connp->conn_mac_mode,
-			    tcps->tcps_netstack->netstack_ip, pid);
-		if (mctl_present)
-			ipsec_mp->b_cont = mp;
-		else
-			ipsec_mp = mp;
-		if (err != 0) {
-			freemsg(ipsec_mp);
-			return;
-		}
-		if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
-			ipha = (ipha_t *)mp->b_rptr;
-		} else {
-			ip6h = (ip6_t *)mp->b_rptr;
-		}
+	/* Discard any old label */
+	if (ixa->ixa_free_flags & IXA_FREE_TSL) {
+		ASSERT(ixa->ixa_tsl != NULL);
+		label_rele(ixa->ixa_tsl);
+		ixa->ixa_free_flags &= ~IXA_FREE_TSL;
 	}
+	ixa->ixa_tsl = ira->ira_tsl;	/* Behave as a multi-level responder */
 
-	if (mctl_present) {
-		ipsec_in_t *ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-
-		ASSERT(ii->ipsec_in_type == IPSEC_IN);
-		if (!ipsec_in_to_out(ipsec_mp, ipha, ip6h, zoneid)) {
-			return;
+	if (ira->ira_flags & IRAF_IPSEC_SECURE) {
+		/*
+		 * Apply IPsec based on how IPsec was applied to
+		 * the packet that caused the RST.
+		 */
+		if (!ipsec_in_to_out(ira, ixa, mp, ipha, ip6h)) {
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
+			/* Note: mp already consumed and ip_drop_packet done */
+			goto done;
 		}
+	} else {
+		/*
+		 * This is in clear. The RST message we are building
+		 * here should go out in clear, independent of our policy.
+		 */
+		ixa->ixa_flags |= IXAF_NO_IPSEC;
 	}
-	if (zoneid == ALL_ZONES)
-		zoneid = GLOBAL_ZONEID;
-
-	/* Add the zoneid so ip_output routes it properly */
-	if ((nmp = ip_prepend_zoneid(ipsec_mp, zoneid, ipst)) == NULL) {
-		freemsg(ipsec_mp);
-		return;
-	}
-	ipsec_mp = nmp;
 
 	/*
 	 * NOTE:  one might consider tracing a TCP packet here, but
 	 * this function has no active TCP state and no tcp structure
 	 * that has a trace buffer.  If we traced here, we would have
 	 * to keep a local trace buffer in tcp_record_trace().
-	 *
-	 * TSol note: The mblk that contains the incoming packet was
-	 * reused by tcp_xmit_listener_reset, so it already contains
-	 * the right credentials and we don't need to call mblk_setcred.
-	 * Also the conn's cred is not right since it is associated
-	 * with tcps_g_q.
 	 */
-	CALL_IP_WPUT(tcp->tcp_connp, tcp->tcp_wq, ipsec_mp);
 
-	/*
-	 * Tell IP to mark the IRE used for this destination temporary.
-	 * This way, we can limit our exposure to DoS attack because IP
-	 * creates an IRE for each destination.  If there are too many,
-	 * the time to do any routing lookup will be extremely long.  And
-	 * the lookup can be in interrupt context.
-	 *
-	 * Note that in normal circumstances, this marking should not
-	 * affect anything.  It would be nice if only 1 message is
-	 * needed to inform IP that the IRE created for this RST should
-	 * not be added to the cache table.  But there is currently
-	 * not such communication mechanism between TCP and IP.  So
-	 * the best we can do now is to send the advice ioctl to IP
-	 * to mark the IRE temporary.
-	 */
-	if ((mp = tcp_ip_advise_mblk(addr, addr_len, &ipic)) != NULL) {
-		ipic->ipic_ire_marks |= IRE_MARK_TEMPORARY;
-		CALL_IP_WPUT(tcp->tcp_connp, tcp->tcp_wq, mp);
+	(void) ip_output_simple(mp, ixa);
+done:
+	ixa_cleanup(ixa);
+	if (need_refrele) {
+		ASSERT(ixa != &ixas);
+		ixa_refrele(ixa);
 	}
 }
 
@@ -22313,9 +17082,11 @@ tcp_xmit_early_reset(char *str, mblk_t *mp, uint32_t seq,
 static int
 tcp_xmit_end(tcp_t *tcp)
 {
-	ipic_t	*ipic;
-	mblk_t	*mp;
+	mblk_t		*mp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	iulp_t		uinfo;
+	ip_stack_t	*ipst = tcps->tcps_netstack->netstack_ip;
+	conn_t		*connp = tcp->tcp_connp;
 
 	if (tcp->tcp_state < TCPS_SYN_RCVD ||
 	    tcp->tcp_state > TCPS_CLOSE_WAIT) {
@@ -22337,7 +17108,7 @@ tcp_xmit_end(tcp_t *tcp)
 		    tcp->tcp_fss, B_FALSE, NULL, B_FALSE);
 
 		if (mp) {
-			tcp_send_data(tcp, tcp->tcp_wq, mp);
+			tcp_send_data(tcp, mp);
 		} else {
 			/*
 			 * Couldn't allocate msg.  Pretend we got it out.
@@ -22373,66 +17144,49 @@ tcp_xmit_end(tcp_t *tcp)
 		return (0);
 
 	/*
-	 * NOTE: should not update if source routes i.e. if tcp_remote if
-	 * different from the destination.
-	 */
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
-		if (tcp->tcp_remote !=  tcp->tcp_ipha->ipha_dst) {
-			return (0);
-		}
-		mp = tcp_ip_advise_mblk(&tcp->tcp_ipha->ipha_dst, IP_ADDR_LEN,
-		    &ipic);
-	} else {
-		if (!(IN6_ARE_ADDR_EQUAL(&tcp->tcp_remote_v6,
-		    &tcp->tcp_ip6h->ip6_dst))) {
-			return (0);
-		}
-		mp = tcp_ip_advise_mblk(&tcp->tcp_ip6h->ip6_dst, IPV6_ADDR_LEN,
-		    &ipic);
-	}
-
-	/* Record route attributes in the IRE for use by future connections. */
-	if (mp == NULL)
-		return (0);
-
-	/*
 	 * We do not have a good algorithm to update ssthresh at this time.
 	 * So don't do any update.
 	 */
-	ipic->ipic_rtt = tcp->tcp_rtt_sa;
-	ipic->ipic_rtt_sd = tcp->tcp_rtt_sd;
+	bzero(&uinfo, sizeof (uinfo));
+	uinfo.iulp_rtt = tcp->tcp_rtt_sa;
+	uinfo.iulp_rtt_sd = tcp->tcp_rtt_sd;
 
-	CALL_IP_WPUT(tcp->tcp_connp, tcp->tcp_wq, mp);
+	/*
+	 * Note that uinfo is kept for conn_faddr in the DCE. Could update even
+	 * if source routed but we don't.
+	 */
+	if (connp->conn_ipversion == IPV4_VERSION) {
+		if (connp->conn_faddr_v4 !=  tcp->tcp_ipha->ipha_dst) {
+			return (0);
+		}
+		(void) dce_update_uinfo_v4(connp->conn_faddr_v4, &uinfo, ipst);
+	} else {
+		uint_t ifindex;
 
-	return (0);
-}
+		if (!(IN6_ARE_ADDR_EQUAL(&connp->conn_faddr_v6,
+		    &tcp->tcp_ip6h->ip6_dst))) {
+			return (0);
+		}
+		ifindex = 0;
+		if (IN6_IS_ADDR_LINKSCOPE(&connp->conn_faddr_v6)) {
+			ip_xmit_attr_t *ixa = connp->conn_ixa;
 
-/* ARGSUSED */
-void
-tcp_xmit_reset(void *arg, mblk_t *mp, void *arg2)
-{
-	conn_t *connp = (conn_t *)arg;
-	mblk_t *mp1;
-	tcp_t *tcp = connp->conn_tcp;
-	tcp_xmit_reset_event_t *eventp;
+			/*
+			 * If we are going to create a DCE we'd better have
+			 * an ifindex
+			 */
+			if (ixa->ixa_nce != NULL) {
+				ifindex = ixa->ixa_nce->nce_common->ncec_ill->
+				    ill_phyint->phyint_ifindex;
+			} else {
+				return (0);
+			}
+		}
 
-	ASSERT(mp->b_datap->db_type == M_PROTO &&
-	    MBLKL(mp) == sizeof (tcp_xmit_reset_event_t));
-
-	if (tcp->tcp_state != TCPS_LISTEN) {
-		freemsg(mp);
-		return;
+		(void) dce_update_uinfo(&connp->conn_faddr_v6, ifindex, &uinfo,
+		    ipst);
 	}
-
-	mp1 = mp->b_cont;
-	mp->b_cont = NULL;
-	eventp = (tcp_xmit_reset_event_t *)mp->b_rptr;
-	ASSERT(eventp->tcp_xre_tcps->tcps_netstack ==
-	    connp->conn_netstack);
-
-	tcp_xmit_listeners_reset(mp1, eventp->tcp_xre_iphdrlen,
-	    eventp->tcp_xre_zoneid, eventp->tcp_xre_tcps, connp);
-	freemsg(mp);
+	return (0);
 }
 
 /*
@@ -22442,44 +17196,24 @@ tcp_xmit_reset(void *arg, mblk_t *mp, void *arg2)
  * Note that we are reusing the incoming mp to construct the outgoing RST.
  */
 void
-tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid,
-    tcp_stack_t *tcps, conn_t *connp)
+tcp_xmit_listeners_reset(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst,
+    conn_t *connp)
 {
 	uchar_t		*rptr;
 	uint32_t	seg_len;
-	tcph_t		*tcph;
+	tcpha_t		*tcpha;
 	uint32_t	seg_seq;
 	uint32_t	seg_ack;
 	uint_t		flags;
-	mblk_t		*ipsec_mp;
 	ipha_t 		*ipha;
 	ip6_t 		*ip6h;
-	boolean_t	mctl_present = B_FALSE;
-	boolean_t	check = B_TRUE;
 	boolean_t	policy_present;
+	netstack_t	*ns = ipst->ips_netstack;
+	tcp_stack_t	*tcps = ns->netstack_tcp;
 	ipsec_stack_t	*ipss = tcps->tcps_netstack->netstack_ipsec;
+	uint_t		ip_hdr_len = ira->ira_ip_hdr_length;
 
 	TCP_STAT(tcps, tcp_no_listener);
-
-	ipsec_mp = mp;
-
-	if (mp->b_datap->db_type == M_CTL) {
-		ipsec_in_t *ii;
-
-		mctl_present = B_TRUE;
-		mp = mp->b_cont;
-
-		ii = (ipsec_in_t *)ipsec_mp->b_rptr;
-		ASSERT(ii->ipsec_in_type == IPSEC_IN);
-		if (ii->ipsec_in_dont_check) {
-			check = B_FALSE;
-			if (!ii->ipsec_in_secure) {
-				freeb(ipsec_mp);
-				mctl_present = B_FALSE;
-				ipsec_mp = mp;
-			}
-		}
-	}
 
 	if (IPH_HDR_VERSION(mp->b_rptr) == IPV4_VERSION) {
 		policy_present = ipss->ipsec_inbound_v4_policy_present;
@@ -22491,41 +17225,39 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid,
 		ip6h = (ip6_t *)mp->b_rptr;
 	}
 
-	if (check && policy_present) {
+	if (policy_present) {
 		/*
 		 * The conn_t parameter is NULL because we already know
 		 * nobody's home.
 		 */
-		ipsec_mp = ipsec_check_global_policy(
-		    ipsec_mp, (conn_t *)NULL, ipha, ip6h, mctl_present,
-		    tcps->tcps_netstack);
-		if (ipsec_mp == NULL)
+		mp = ipsec_check_global_policy(mp, (conn_t *)NULL, ipha, ip6h,
+		    ira, ns);
+		if (mp == NULL)
 			return;
 	}
-	if (is_system_labeled() && !tsol_can_reply_error(mp)) {
+	if (is_system_labeled() && !tsol_can_reply_error(mp, ira)) {
 		DTRACE_PROBE2(
 		    tx__ip__log__error__nolistener__tcp,
 		    char *, "Could not reply with RST to mp(1)",
 		    mblk_t *, mp);
 		ip2dbg(("tcp_xmit_listeners_reset: not permitted to reply\n"));
-		freemsg(ipsec_mp);
+		freemsg(mp);
 		return;
 	}
 
 	rptr = mp->b_rptr;
 
-	tcph = (tcph_t *)&rptr[ip_hdr_len];
-	seg_seq = BE32_TO_U32(tcph->th_seq);
-	seg_ack = BE32_TO_U32(tcph->th_ack);
-	flags = tcph->th_flags[0];
+	tcpha = (tcpha_t *)&rptr[ip_hdr_len];
+	seg_seq = ntohl(tcpha->tha_seq);
+	seg_ack = ntohl(tcpha->tha_ack);
+	flags = tcpha->tha_flags;
 
-	seg_len = msgdsize(mp) - (TCP_HDR_LENGTH(tcph) + ip_hdr_len);
+	seg_len = msgdsize(mp) - (TCP_HDR_LENGTH(tcpha) + ip_hdr_len);
 	if (flags & TH_RST) {
-		freemsg(ipsec_mp);
+		freemsg(mp);
 	} else if (flags & TH_ACK) {
-		tcp_xmit_early_reset("no tcp, reset",
-		    ipsec_mp, seg_ack, 0, TH_RST, ip_hdr_len, zoneid, tcps,
-		    connp);
+		tcp_xmit_early_reset("no tcp, reset", mp, seg_ack, 0, TH_RST,
+		    ira, ipst, connp);
 	} else {
 		if (flags & TH_SYN) {
 			seg_len++;
@@ -22537,14 +17269,13 @@ tcp_xmit_listeners_reset(mblk_t *mp, uint_t ip_hdr_len, zoneid_t zoneid,
 			 * segment is neither.  Just drop it on the
 			 * floor.
 			 */
-			freemsg(ipsec_mp);
+			freemsg(mp);
 			tcps->tcps_rst_unsent++;
 			return;
 		}
 
-		tcp_xmit_early_reset("no tcp, reset/ack",
-		    ipsec_mp, 0, seg_seq + seg_len,
-		    TH_RST | TH_ACK, ip_hdr_len, zoneid, tcps, connp);
+		tcp_xmit_early_reset("no tcp, reset/ack", mp, 0,
+		    seg_seq + seg_len, TH_RST | TH_ACK, ira, ipst, connp);
 	}
 }
 
@@ -22573,14 +17304,16 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 	mblk_t	*mp1;
 	mblk_t	*mp2;
 	uchar_t	*rptr;
-	tcph_t	*tcph;
+	tcpha_t	*tcpha;
 	int32_t	num_sack_blk = 0;
 	int32_t	sack_opt_len = 0;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
+	ip_xmit_attr_t	*ixa = connp->conn_ixa;
 
 	/* Allocate for our maximum TCP header + link-level */
-	mp1 = allocb(tcp->tcp_ip_hdr_len + TCP_MAX_HDR_LENGTH +
-	    tcps->tcps_wroff_xtra, BPRI_MED);
+	mp1 = allocb(connp->conn_ht_iphc_allocated + tcps->tcps_wroff_xtra,
+	    BPRI_MED);
 	if (!mp1)
 		return (NULL);
 	data_length = 0;
@@ -22646,15 +17379,14 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 	}
 
 	/* Update the latest receive window size in TCP header. */
-	U32_TO_ABE16(tcp->tcp_rwnd >> tcp->tcp_rcv_ws,
-	    tcp->tcp_tcph->th_win);
+	tcp->tcp_tcpha->tha_win = htons(tcp->tcp_rwnd >> tcp->tcp_rcv_ws);
 
 	rptr = mp1->b_rptr + tcps->tcps_wroff_xtra;
 	mp1->b_rptr = rptr;
-	mp1->b_wptr = rptr + tcp->tcp_hdr_len + sack_opt_len;
-	bcopy(tcp->tcp_iphc, rptr, tcp->tcp_hdr_len);
-	tcph = (tcph_t *)&rptr[tcp->tcp_ip_hdr_len];
-	U32_TO_ABE32(seq, tcph->th_seq);
+	mp1->b_wptr = rptr + connp->conn_ht_iphc_len + sack_opt_len;
+	bcopy(connp->conn_ht_iphc, rptr, connp->conn_ht_iphc_len);
+	tcpha = (tcpha_t *)&rptr[ixa->ixa_ip_hdr_length];
+	tcpha->tha_seq = htonl(seq);
 
 	/*
 	 * Use tcp_unsent to determine if the PUSH bit should be used assumes
@@ -22729,14 +17461,14 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 			wptr[0] = TCPOPT_MAXSEG;
 			wptr[1] = TCPOPT_MAXSEG_LEN;
 			wptr += 2;
-			u1 = tcp->tcp_if_mtu -
-			    (tcp->tcp_ipversion == IPV4_VERSION ?
+			u1 = tcp->tcp_initial_pmtu -
+			    (connp->conn_ipversion == IPV4_VERSION ?
 			    IP_SIMPLE_HDR_LENGTH : IPV6_HDR_LEN) -
 			    TCP_MIN_HEADER_LENGTH;
 			U16_TO_BE16(u1, wptr);
 			mp1->b_wptr = wptr + 2;
 			/* Update the offset to cover the additional word */
-			tcph->th_offset_and_rsrvd[0] += (1 << 4);
+			tcpha->tha_offset_and_reserved += (1 << 4);
 
 			/*
 			 * Note that the following way of filling in
@@ -22763,7 +17495,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 					ASSERT(tcp->tcp_ts_recent == 0);
 					U32_TO_BE32(0L, wptr);
 					mp1->b_wptr += TCPOPT_REAL_TS_LEN;
-					tcph->th_offset_and_rsrvd[0] +=
+					tcpha->tha_offset_and_reserved +=
 					    (3 << 4);
 				}
 
@@ -22819,7 +17551,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 				wptr[2] =  TCPOPT_WS_LEN;
 				wptr[3] = (uchar_t)tcp->tcp_rcv_ws;
 				mp1->b_wptr += TCPOPT_REAL_WS_LEN;
-				tcph->th_offset_and_rsrvd[0] += (1 << 4);
+				tcpha->tha_offset_and_reserved += (1 << 4);
 			}
 
 			if (tcp->tcp_snd_sack_ok) {
@@ -22829,7 +17561,7 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 				wptr[2] = TCPOPT_SACK_PERMITTED;
 				wptr[3] = TCPOPT_SACK_OK_LEN;
 				mp1->b_wptr += TCPOPT_REAL_SACK_OK_LEN;
-				tcph->th_offset_and_rsrvd[0] += (1 << 4);
+				tcpha->tha_offset_and_reserved += (1 << 4);
 			}
 
 			/* allocb() of adequate mblk assures space */
@@ -22840,9 +17572,9 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 			 * Get IP set to checksum on our behalf
 			 * Include the adjustment for a source route if any.
 			 */
-			u1 += tcp->tcp_sum;
+			u1 += connp->conn_sum;
 			u1 = (u1 >> 16) + (u1 & 0xFFFF);
-			U16_TO_BE16(u1, tcph->th_sum);
+			tcpha->tha_sum = htons(u1);
 			BUMP_MIB(&tcps->tcps_mib, tcpOutControl);
 		}
 		if ((tcp->tcp_valid_bits & TCP_FSS_VALID) &&
@@ -22878,10 +17610,10 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 		    u1 < (uint32_t)(64 * 1024)) {
 			flags |= TH_URG;
 			BUMP_MIB(&tcps->tcps_mib, tcpOutUrg);
-			U32_TO_ABE16(u1, tcph->th_urp);
+			tcpha->tha_urp = htons(u1);
 		}
 	}
-	tcph->th_flags[0] = (uchar_t)flags;
+	tcpha->tha_flags = (uchar_t)flags;
 	tcp->tcp_rack = tcp->tcp_rnxt;
 	tcp->tcp_rack_cnt = 0;
 
@@ -22890,14 +17622,14 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 			uint32_t llbolt = (uint32_t)lbolt;
 
 			U32_TO_BE32(llbolt,
-			    (char *)tcph+TCP_MIN_HEADER_LENGTH+4);
+			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);
 			U32_TO_BE32(tcp->tcp_ts_recent,
-			    (char *)tcph+TCP_MIN_HEADER_LENGTH+8);
+			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+8);
 		}
 	}
 
 	if (num_sack_blk > 0) {
-		uchar_t *wptr = (uchar_t *)tcph + tcp->tcp_tcp_hdr_len;
+		uchar_t *wptr = (uchar_t *)tcpha + connp->conn_ht_ulp_len;
 		sack_blk_t *tmp;
 		int32_t	i;
 
@@ -22915,33 +17647,34 @@ tcp_xmit_mp(tcp_t *tcp, mblk_t *mp, int32_t max_to_send, int32_t *offset,
 			U32_TO_BE32(tmp[i].end, wptr);
 			wptr += sizeof (tcp_seq);
 		}
-		tcph->th_offset_and_rsrvd[0] += ((num_sack_blk * 2 + 1) << 4);
+		tcpha->tha_offset_and_reserved += ((num_sack_blk * 2 + 1) << 4);
 	}
 	ASSERT((uintptr_t)(mp1->b_wptr - rptr) <= (uintptr_t)INT_MAX);
 	data_length += (int)(mp1->b_wptr - rptr);
-	if (tcp->tcp_ipversion == IPV4_VERSION) {
+
+	ixa->ixa_pktlen = data_length;
+
+	if (ixa->ixa_flags & IXAF_IS_IPV4) {
 		((ipha_t *)rptr)->ipha_length = htons(data_length);
 	} else {
-		ip6_t *ip6 = (ip6_t *)(rptr +
-		    (((ip6_t *)rptr)->ip6_nxt == IPPROTO_RAW ?
-		    sizeof (ip6i_t) : 0));
+		ip6_t *ip6 = (ip6_t *)rptr;
 
-		ip6->ip6_plen = htons(data_length -
-		    ((char *)&tcp->tcp_ip6h[1] - tcp->tcp_iphc));
+		ip6->ip6_plen = htons(data_length - IPV6_HDR_LEN);
 	}
 
 	/*
 	 * Prime pump for IP
 	 * Include the adjustment for a source route if any.
 	 */
-	data_length -= tcp->tcp_ip_hdr_len;
-	data_length += tcp->tcp_sum;
+	data_length -= ixa->ixa_ip_hdr_length;
+	data_length += connp->conn_sum;
 	data_length = (data_length >> 16) + (data_length & 0xFFFF);
-	U16_TO_ABE16(data_length, tcph->th_sum);
+	tcpha->tha_sum = htons(data_length);
 	if (tcp->tcp_ip_forward_progress) {
-		ASSERT(tcp->tcp_ipversion == IPV6_VERSION);
-		*(uint32_t *)mp1->b_rptr  |= IP_FORWARD_PROG;
 		tcp->tcp_ip_forward_progress = B_FALSE;
+		connp->conn_ixa->ixa_flags |= IXAF_REACH_CONF;
+	} else {
+		connp->conn_ixa->ixa_flags &= ~IXAF_REACH_CONF;
 	}
 	return (mp1);
 }
@@ -23012,7 +17745,7 @@ tcp_ack_timer(void *arg)
 		BUMP_LOCAL(tcp->tcp_obsegs);
 		BUMP_MIB(&tcps->tcps_mib, tcpOutAck);
 		BUMP_MIB(&tcps->tcps_mib, tcpOutAckDelayed);
-		tcp_send_data(tcp, tcp->tcp_wq, mp);
+		tcp_send_data(tcp, mp);
 	}
 }
 
@@ -23023,6 +17756,7 @@ tcp_ack_mp(tcp_t *tcp)
 {
 	uint32_t	seq_no;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
 	/*
 	 * There are a few cases to be considered while setting the sequence no.
@@ -23058,12 +17792,13 @@ tcp_ack_mp(tcp_t *tcp)
 		/* Generate a simple ACK */
 		int	data_length;
 		uchar_t	*rptr;
-		tcph_t	*tcph;
+		tcpha_t	*tcpha;
 		mblk_t	*mp1;
+		int32_t	total_hdr_len;
 		int32_t	tcp_hdr_len;
-		int32_t	tcp_tcp_hdr_len;
 		int32_t	num_sack_blk = 0;
 		int32_t sack_opt_len;
+		ip_xmit_attr_t *ixa = connp->conn_ixa;
 
 		/*
 		 * Allocate space for TCP + IP headers
@@ -23074,34 +17809,34 @@ tcp_ack_mp(tcp_t *tcp)
 			    tcp->tcp_num_sack_blk);
 			sack_opt_len = num_sack_blk * sizeof (sack_blk_t) +
 			    TCPOPT_NOP_LEN * 2 + TCPOPT_HEADER_LEN;
-			tcp_hdr_len = tcp->tcp_hdr_len + sack_opt_len;
-			tcp_tcp_hdr_len = tcp->tcp_tcp_hdr_len + sack_opt_len;
+			total_hdr_len = connp->conn_ht_iphc_len + sack_opt_len;
+			tcp_hdr_len = connp->conn_ht_ulp_len + sack_opt_len;
 		} else {
-			tcp_hdr_len = tcp->tcp_hdr_len;
-			tcp_tcp_hdr_len = tcp->tcp_tcp_hdr_len;
+			total_hdr_len = connp->conn_ht_iphc_len;
+			tcp_hdr_len = connp->conn_ht_ulp_len;
 		}
-		mp1 = allocb(tcp_hdr_len + tcps->tcps_wroff_xtra, BPRI_MED);
+		mp1 = allocb(total_hdr_len + tcps->tcps_wroff_xtra, BPRI_MED);
 		if (!mp1)
 			return (NULL);
 
 		/* Update the latest receive window size in TCP header. */
-		U32_TO_ABE16(tcp->tcp_rwnd >> tcp->tcp_rcv_ws,
-		    tcp->tcp_tcph->th_win);
+		tcp->tcp_tcpha->tha_win =
+		    htons(tcp->tcp_rwnd >> tcp->tcp_rcv_ws);
 		/* copy in prototype TCP + IP header */
 		rptr = mp1->b_rptr + tcps->tcps_wroff_xtra;
 		mp1->b_rptr = rptr;
-		mp1->b_wptr = rptr + tcp_hdr_len;
-		bcopy(tcp->tcp_iphc, rptr, tcp->tcp_hdr_len);
+		mp1->b_wptr = rptr + total_hdr_len;
+		bcopy(connp->conn_ht_iphc, rptr, connp->conn_ht_iphc_len);
 
-		tcph = (tcph_t *)&rptr[tcp->tcp_ip_hdr_len];
+		tcpha = (tcpha_t *)&rptr[ixa->ixa_ip_hdr_length];
 
 		/* Set the TCP sequence number. */
-		U32_TO_ABE32(seq_no, tcph->th_seq);
+		tcpha->tha_seq = htonl(seq_no);
 
 		/* Set up the TCP flag field. */
-		tcph->th_flags[0] = (uchar_t)TH_ACK;
+		tcpha->tha_flags = (uchar_t)TH_ACK;
 		if (tcp->tcp_ecn_echo_on)
-			tcph->th_flags[0] |= TH_ECE;
+			tcpha->tha_flags |= TH_ECE;
 
 		tcp->tcp_rack = tcp->tcp_rnxt;
 		tcp->tcp_rack_cnt = 0;
@@ -23111,14 +17846,15 @@ tcp_ack_mp(tcp_t *tcp)
 			uint32_t llbolt = (uint32_t)lbolt;
 
 			U32_TO_BE32(llbolt,
-			    (char *)tcph+TCP_MIN_HEADER_LENGTH+4);
+			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+4);
 			U32_TO_BE32(tcp->tcp_ts_recent,
-			    (char *)tcph+TCP_MIN_HEADER_LENGTH+8);
+			    (char *)tcpha + TCP_MIN_HEADER_LENGTH+8);
 		}
 
 		/* Fill in SACK options */
 		if (num_sack_blk > 0) {
-			uchar_t *wptr = (uchar_t *)tcph + tcp->tcp_tcp_hdr_len;
+			uchar_t *wptr = (uchar_t *)tcpha +
+			    connp->conn_ht_ulp_len;
 			sack_blk_t *tmp;
 			int32_t	i;
 
@@ -23136,34 +17872,33 @@ tcp_ack_mp(tcp_t *tcp)
 				U32_TO_BE32(tmp[i].end, wptr);
 				wptr += sizeof (tcp_seq);
 			}
-			tcph->th_offset_and_rsrvd[0] += ((num_sack_blk * 2 + 1)
-			    << 4);
+			tcpha->tha_offset_and_reserved +=
+			    ((num_sack_blk * 2 + 1) << 4);
 		}
 
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			((ipha_t *)rptr)->ipha_length = htons(tcp_hdr_len);
-		} else {
-			/* Check for ip6i_t header in sticky hdrs */
-			ip6_t *ip6 = (ip6_t *)(rptr +
-			    (((ip6_t *)rptr)->ip6_nxt == IPPROTO_RAW ?
-			    sizeof (ip6i_t) : 0));
+		ixa->ixa_pktlen = total_hdr_len;
 
-			ip6->ip6_plen = htons(tcp_hdr_len -
-			    ((char *)&tcp->tcp_ip6h[1] - tcp->tcp_iphc));
+		if (ixa->ixa_flags & IXAF_IS_IPV4) {
+			((ipha_t *)rptr)->ipha_length = htons(total_hdr_len);
+		} else {
+			ip6_t *ip6 = (ip6_t *)rptr;
+
+			ip6->ip6_plen = htons(total_hdr_len - IPV6_HDR_LEN);
 		}
 
 		/*
 		 * Prime pump for checksum calculation in IP.  Include the
 		 * adjustment for a source route if any.
 		 */
-		data_length = tcp_tcp_hdr_len + tcp->tcp_sum;
+		data_length = tcp_hdr_len + connp->conn_sum;
 		data_length = (data_length >> 16) + (data_length & 0xFFFF);
-		U16_TO_ABE16(data_length, tcph->th_sum);
+		tcpha->tha_sum = htons(data_length);
 
 		if (tcp->tcp_ip_forward_progress) {
-			ASSERT(tcp->tcp_ipversion == IPV6_VERSION);
-			*(uint32_t *)mp1->b_rptr  |= IP_FORWARD_PROG;
 			tcp->tcp_ip_forward_progress = B_FALSE;
+			connp->conn_ixa->ixa_flags |= IXAF_REACH_CONF;
+		} else {
+			connp->conn_ixa->ixa_flags &= ~IXAF_REACH_CONF;
 		}
 		return (mp1);
 	}
@@ -23183,6 +17918,8 @@ tcp_bind_hash_insert(tf_t *tbf, tcp_t *tcp, int caller_holds_lock)
 	tcp_t	**tcpp;
 	tcp_t	*tcpnext;
 	tcp_t	*tcphash;
+	conn_t	*connp = tcp->tcp_connp;
+	conn_t	*connext;
 
 	if (tcp->tcp_ptpbhn != NULL) {
 		ASSERT(!caller_holds_lock);
@@ -23199,7 +17936,7 @@ tcp_bind_hash_insert(tf_t *tbf, tcp_t *tcp, int caller_holds_lock)
 	if (tcphash != NULL) {
 		/* Look for an entry using the same port */
 		while ((tcphash = tcpp[0]) != NULL &&
-		    tcp->tcp_lport != tcphash->tcp_lport)
+		    connp->conn_lport != tcphash->tcp_connp->conn_lport)
 			tcpp = &(tcphash->tcp_bind_hash);
 
 		/* The port was not found, just add to the end */
@@ -23219,14 +17956,19 @@ tcp_bind_hash_insert(tf_t *tbf, tcp_t *tcp, int caller_holds_lock)
 		 * INADDR_ANY.
 		 */
 		tcpnext = tcphash;
+		connext = tcpnext->tcp_connp;
 		tcphash = NULL;
-		if (V6_OR_V4_INADDR_ANY(tcp->tcp_bound_source_v6) &&
-		    !V6_OR_V4_INADDR_ANY(tcpnext->tcp_bound_source_v6)) {
-			while ((tcpnext = tcpp[0]) != NULL &&
-			    !V6_OR_V4_INADDR_ANY(tcpnext->tcp_bound_source_v6))
-				tcpp = &(tcpnext->tcp_bind_hash_port);
-
-			if (tcpnext) {
+		if (V6_OR_V4_INADDR_ANY(connp->conn_bound_addr_v6) &&
+		    !V6_OR_V4_INADDR_ANY(connext->conn_bound_addr_v6)) {
+			while ((tcpnext = tcpp[0]) != NULL) {
+				connext = tcpnext->tcp_connp;
+				if (!V6_OR_V4_INADDR_ANY(
+				    connext->conn_bound_addr_v6))
+					tcpp = &(tcpnext->tcp_bind_hash_port);
+				else
+					break;
+			}
+			if (tcpnext != NULL) {
 				tcpnext->tcp_ptpbhn = &tcp->tcp_bind_hash_port;
 				tcphash = tcpnext->tcp_bind_hash;
 				if (tcphash != NULL) {
@@ -23263,6 +18005,7 @@ tcp_bind_hash_remove(tcp_t *tcp)
 	tcp_t	*tcpnext;
 	kmutex_t *lockp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
 	if (tcp->tcp_ptpbhn == NULL)
 		return;
@@ -23271,8 +18014,9 @@ tcp_bind_hash_remove(tcp_t *tcp)
 	 * Extract the lock pointer in case there are concurrent
 	 * hash_remove's for this instance.
 	 */
-	ASSERT(tcp->tcp_lport != 0);
-	lockp = &tcps->tcps_bind_fanout[TCP_BIND_HASH(tcp->tcp_lport)].tf_lock;
+	ASSERT(connp->conn_lport != 0);
+	lockp = &tcps->tcps_bind_fanout[TCP_BIND_HASH(
+	    connp->conn_lport)].tf_lock;
 
 	ASSERT(lockp != NULL);
 	mutex_enter(lockp);
@@ -23548,7 +18292,7 @@ tcp_conprim_opt_process(tcp_t *tcp, mblk_t *mp, int *do_disconnectp,
 	*sys_errorp = 0;
 	*do_disconnectp = 0;
 
-	error = tpi_optcom_buf(tcp->tcp_wq, mp, opt_lenp,
+	error = tpi_optcom_buf(tcp->tcp_connp->conn_wq, mp, opt_lenp,
 	    opt_offset, cr, &tcp_opt_obj,
 	    NULL, &is_absreq_failure);
 
@@ -23663,238 +18407,6 @@ tcp_sack_info_constructor(void *buf, void *cdrarg, int kmflags)
 	return (0);
 }
 
-/* ARGSUSED */
-static int
-tcp_iphc_constructor(void *buf, void *cdrarg, int kmflags)
-{
-	bzero(buf, TCP_MAX_COMBINED_HEADER_LENGTH);
-	return (0);
-}
-
-/*
- * Make sure we wait until the default queue is setup, yet allow
- * tcp_g_q_create() to open a TCP stream.
- * We need to allow tcp_g_q_create() do do an open
- * of tcp, hence we compare curhread.
- * All others have to wait until the tcps_g_q has been
- * setup.
- */
-void
-tcp_g_q_setup(tcp_stack_t *tcps)
-{
-	mutex_enter(&tcps->tcps_g_q_lock);
-	if (tcps->tcps_g_q != NULL) {
-		mutex_exit(&tcps->tcps_g_q_lock);
-		return;
-	}
-	if (tcps->tcps_g_q_creator == NULL) {
-		/* This thread will set it up */
-		tcps->tcps_g_q_creator = curthread;
-		mutex_exit(&tcps->tcps_g_q_lock);
-		tcp_g_q_create(tcps);
-		mutex_enter(&tcps->tcps_g_q_lock);
-		ASSERT(tcps->tcps_g_q_creator == curthread);
-		tcps->tcps_g_q_creator = NULL;
-		cv_signal(&tcps->tcps_g_q_cv);
-		ASSERT(tcps->tcps_g_q != NULL);
-		mutex_exit(&tcps->tcps_g_q_lock);
-		return;
-	}
-	/* Everybody but the creator has to wait */
-	if (tcps->tcps_g_q_creator != curthread) {
-		while (tcps->tcps_g_q == NULL)
-			cv_wait(&tcps->tcps_g_q_cv, &tcps->tcps_g_q_lock);
-	}
-	mutex_exit(&tcps->tcps_g_q_lock);
-}
-
-#define	IP	"ip"
-
-#define	TCP6DEV		"/devices/pseudo/tcp6@0:tcp6"
-
-/*
- * Create a default tcp queue here instead of in strplumb
- */
-void
-tcp_g_q_create(tcp_stack_t *tcps)
-{
-	int error;
-	ldi_handle_t	lh = NULL;
-	ldi_ident_t	li = NULL;
-	int		rval;
-	cred_t		*cr;
-	major_t IP_MAJ;
-
-#ifdef NS_DEBUG
-	(void) printf("tcp_g_q_create()\n");
-#endif
-
-	IP_MAJ = ddi_name_to_major(IP);
-
-	ASSERT(tcps->tcps_g_q_creator == curthread);
-
-	error = ldi_ident_from_major(IP_MAJ, &li);
-	if (error) {
-#ifdef DEBUG
-		printf("tcp_g_q_create: lyr ident get failed error %d\n",
-		    error);
-#endif
-		return;
-	}
-
-	cr = zone_get_kcred(netstackid_to_zoneid(
-	    tcps->tcps_netstack->netstack_stackid));
-	ASSERT(cr != NULL);
-	/*
-	 * We set the tcp default queue to IPv6 because IPv4 falls
-	 * back to IPv6 when it can't find a client, but
-	 * IPv6 does not fall back to IPv4.
-	 */
-	error = ldi_open_by_name(TCP6DEV, FREAD|FWRITE, cr, &lh, li);
-	if (error) {
-#ifdef DEBUG
-		printf("tcp_g_q_create: open of TCP6DEV failed error %d\n",
-		    error);
-#endif
-		goto out;
-	}
-
-	/*
-	 * This ioctl causes the tcp framework to cache a pointer to
-	 * this stream, so we don't want to close the stream after
-	 * this operation.
-	 * Use the kernel credentials that are for the zone we're in.
-	 */
-	error = ldi_ioctl(lh, TCP_IOC_DEFAULT_Q,
-	    (intptr_t)0, FKIOCTL, cr, &rval);
-	if (error) {
-#ifdef DEBUG
-		printf("tcp_g_q_create: ioctl TCP_IOC_DEFAULT_Q failed "
-		    "error %d\n", error);
-#endif
-		goto out;
-	}
-	tcps->tcps_g_q_lh = lh;	/* For tcp_g_q_close */
-	lh = NULL;
-out:
-	/* Close layered handles */
-	if (li)
-		ldi_ident_release(li);
-	/* Keep cred around until _inactive needs it */
-	tcps->tcps_g_q_cr = cr;
-}
-
-/*
- * We keep tcp_g_q set until all other tcp_t's in the zone
- * has gone away, and then when tcp_g_q_inactive() is called
- * we clear it.
- */
-void
-tcp_g_q_destroy(tcp_stack_t *tcps)
-{
-#ifdef NS_DEBUG
-	(void) printf("tcp_g_q_destroy()for stack %d\n",
-	    tcps->tcps_netstack->netstack_stackid);
-#endif
-
-	if (tcps->tcps_g_q == NULL) {
-		return;	/* Nothing to cleanup */
-	}
-	/*
-	 * Drop reference corresponding to the default queue.
-	 * This reference was added from tcp_open when the default queue
-	 * was created, hence we compensate for this extra drop in
-	 * tcp_g_q_close. If the refcnt drops to zero here it means
-	 * the default queue was the last one to be open, in which
-	 * case, then tcp_g_q_inactive will be
-	 * called as a result of the refrele.
-	 */
-	TCPS_REFRELE(tcps);
-}
-
-/*
- * Called when last tcp_t drops reference count using TCPS_REFRELE.
- * Run by tcp_q_q_inactive using a taskq.
- */
-static void
-tcp_g_q_close(void *arg)
-{
-	tcp_stack_t *tcps = arg;
-	int error;
-	ldi_handle_t	lh = NULL;
-	ldi_ident_t	li = NULL;
-	cred_t		*cr;
-	major_t IP_MAJ;
-
-	IP_MAJ = ddi_name_to_major(IP);
-
-#ifdef NS_DEBUG
-	(void) printf("tcp_g_q_inactive() for stack %d refcnt %d\n",
-	    tcps->tcps_netstack->netstack_stackid,
-	    tcps->tcps_netstack->netstack_refcnt);
-#endif
-	lh = tcps->tcps_g_q_lh;
-	if (lh == NULL)
-		return;	/* Nothing to cleanup */
-
-	ASSERT(tcps->tcps_refcnt == 1);
-	ASSERT(tcps->tcps_g_q != NULL);
-
-	error = ldi_ident_from_major(IP_MAJ, &li);
-	if (error) {
-#ifdef DEBUG
-		printf("tcp_g_q_inactive: lyr ident get failed error %d\n",
-		    error);
-#endif
-		return;
-	}
-
-	cr = tcps->tcps_g_q_cr;
-	tcps->tcps_g_q_cr = NULL;
-	ASSERT(cr != NULL);
-
-	/*
-	 * Make sure we can break the recursion when tcp_close decrements
-	 * the reference count causing g_q_inactive to be called again.
-	 */
-	tcps->tcps_g_q_lh = NULL;
-
-	/* close the default queue */
-	(void) ldi_close(lh, FREAD|FWRITE, cr);
-	/*
-	 * At this point in time tcps and the rest of netstack_t might
-	 * have been deleted.
-	 */
-	tcps = NULL;
-
-	/* Close layered handles */
-	ldi_ident_release(li);
-	crfree(cr);
-}
-
-/*
- * Called when last tcp_t drops reference count using TCPS_REFRELE.
- *
- * Have to ensure that the ldi routines are not used by an
- * interrupt thread by using a taskq.
- */
-void
-tcp_g_q_inactive(tcp_stack_t *tcps)
-{
-	if (tcps->tcps_g_q_lh == NULL)
-		return;	/* Nothing to cleanup */
-
-	ASSERT(tcps->tcps_refcnt == 0);
-	TCPS_REFHOLD(tcps); /* Compensate for what g_q_destroy did */
-
-	if (servicing_interrupt()) {
-		(void) taskq_dispatch(tcp_taskq, tcp_g_q_close,
-		    (void *) tcps, TQ_SLEEP);
-	} else {
-		tcp_g_q_close(tcps);
-	}
-}
-
 /*
  * Called by IP when IP is loaded into the kernel
  */
@@ -23909,10 +18421,6 @@ tcp_ddi_g_init(void)
 	    sizeof (tcp_sack_info_t), 0,
 	    tcp_sack_info_constructor, NULL, NULL, NULL, NULL, 0);
 
-	tcp_iphc_cache = kmem_cache_create("tcp_iphc_cache",
-	    TCP_MAX_COMBINED_HEADER_LENGTH, 0,
-	    tcp_iphc_constructor, NULL, NULL, NULL, NULL, 0);
-
 	mutex_init(&tcp_random_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	/* Initialize the random number generator */
@@ -23923,9 +18431,6 @@ tcp_ddi_g_init(void)
 
 	tcp_g_kstat = tcp_g_kstat_init(&tcp_g_statistics);
 
-	tcp_taskq = taskq_create("tcp_taskq", 1, minclsyspri, 1, 1,
-	    TASKQ_PREPOPULATE);
-
 	tcp_squeue_flag = tcp_squeue_switch(tcp_squeue_wput);
 
 	/*
@@ -23933,8 +18438,7 @@ tcp_ddi_g_init(void)
 	 * destroyed in the kernel, so we can maintain the
 	 * set of tcp_stack_t's.
 	 */
-	netstack_register(NS_TCP, tcp_stack_init, tcp_stack_shutdown,
-	    tcp_stack_fini);
+	netstack_register(NS_TCP, tcp_stack_init, NULL, tcp_stack_fini);
 }
 
 
@@ -23956,8 +18460,6 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	tcps->tcps_netstack = ns;
 
 	/* Initialize locks */
-	mutex_init(&tcps->tcps_g_q_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&tcps->tcps_g_q_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&tcps->tcps_iss_key_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&tcps->tcps_epriv_port_lock, NULL, MUTEX_DEFAULT, NULL);
 
@@ -24018,6 +18520,11 @@ tcp_stack_init(netstackid_t stackid, netstack_t *ns)
 	major = mod_name_to_major(INET_NAME);
 	error = ldi_ident_from_major(major, &tcps->tcps_ldi_ident);
 	ASSERT(error == 0);
+	tcps->tcps_ixa_cleanup_mp = allocb_wait(0, BPRI_MED, STR_NOSIG, NULL);
+	ASSERT(tcps->tcps_ixa_cleanup_mp != NULL);
+	cv_init(&tcps->tcps_ixa_cleanup_cv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&tcps->tcps_ixa_cleanup_lock, NULL, MUTEX_DEFAULT, NULL);
+
 	return (tcps);
 }
 
@@ -24035,22 +18542,8 @@ tcp_ddi_g_destroy(void)
 
 	kmem_cache_destroy(tcp_timercache);
 	kmem_cache_destroy(tcp_sack_info_cache);
-	kmem_cache_destroy(tcp_iphc_cache);
 
 	netstack_unregister(NS_TCP);
-	taskq_destroy(tcp_taskq);
-}
-
-/*
- * Shut down the TCP stack instance.
- */
-/* ARGSUSED */
-static void
-tcp_stack_shutdown(netstackid_t stackid, void *arg)
-{
-	tcp_stack_t *tcps = (tcp_stack_t *)arg;
-
-	tcp_g_q_destroy(tcps);
 }
 
 /*
@@ -24062,17 +18555,16 @@ tcp_stack_fini(netstackid_t stackid, void *arg)
 	tcp_stack_t *tcps = (tcp_stack_t *)arg;
 	int i;
 
+	freeb(tcps->tcps_ixa_cleanup_mp);
+	tcps->tcps_ixa_cleanup_mp = NULL;
+	cv_destroy(&tcps->tcps_ixa_cleanup_cv);
+	mutex_destroy(&tcps->tcps_ixa_cleanup_lock);
+
 	nd_free(&tcps->tcps_g_nd);
 	kmem_free(tcps->tcps_params, sizeof (lcl_tcp_param_arr));
 	tcps->tcps_params = NULL;
 	kmem_free(tcps->tcps_wroff_xtra_param, sizeof (tcpparam_t));
 	tcps->tcps_wroff_xtra_param = NULL;
-	kmem_free(tcps->tcps_mdt_head_param, sizeof (tcpparam_t));
-	tcps->tcps_mdt_head_param = NULL;
-	kmem_free(tcps->tcps_mdt_tail_param, sizeof (tcpparam_t));
-	tcps->tcps_mdt_tail_param = NULL;
-	kmem_free(tcps->tcps_mdt_max_pbufs_param, sizeof (tcpparam_t));
-	tcps->tcps_mdt_max_pbufs_param = NULL;
 
 	for (i = 0; i < TCP_BIND_FANOUT_SIZE; i++) {
 		ASSERT(tcps->tcps_bind_fanout[i].tf_tcp == NULL);
@@ -24091,8 +18583,6 @@ tcp_stack_fini(netstackid_t stackid, void *arg)
 	tcps->tcps_acceptor_fanout = NULL;
 
 	mutex_destroy(&tcps->tcps_iss_key_lock);
-	mutex_destroy(&tcps->tcps_g_q_lock);
-	cv_destroy(&tcps->tcps_g_q_cv);
 	mutex_destroy(&tcps->tcps_epriv_port_lock);
 
 	ip_drop_unregister(&tcps->tcps_dropper);
@@ -24120,6 +18610,7 @@ tcp_iss_init(tcp_t *tcp)
 	struct { uint32_t ports; in6_addr_t src; in6_addr_t dst; } arg;
 	uint32_t answer[4];
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	conn_t		*connp = tcp->tcp_connp;
 
 	tcps->tcps_iss_incr_extra += (ISS_INCR >> 1);
 	tcp->tcp_iss = tcps->tcps_iss_incr_extra;
@@ -24128,16 +18619,9 @@ tcp_iss_init(tcp_t *tcp)
 		mutex_enter(&tcps->tcps_iss_key_lock);
 		context = tcps->tcps_iss_key;
 		mutex_exit(&tcps->tcps_iss_key_lock);
-		arg.ports = tcp->tcp_ports;
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src,
-			    &arg.src);
-			IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_dst,
-			    &arg.dst);
-		} else {
-			arg.src = tcp->tcp_ip6h->ip6_src;
-			arg.dst = tcp->tcp_ip6h->ip6_dst;
-		}
+		arg.ports = connp->conn_ports;
+		arg.src = connp->conn_laddr_v6;
+		arg.dst = connp->conn_faddr_v6;
 		MD5Update(&context, (uchar_t *)&arg, sizeof (arg));
 		MD5Final((uchar_t *)answer, &context);
 		tcp->tcp_iss += answer[0] ^ answer[1] ^ answer[2] ^ answer[3];
@@ -24220,27 +18704,16 @@ cl_tcp_walk_list_stack(int (*callback)(cl_tcp_info_t *, void *), void *arg,
 		connp = NULL;
 
 		while ((connp =
-		    ipcl_get_next_conn(connfp, connp, IPCL_TCP)) != NULL) {
+		    ipcl_get_next_conn(connfp, connp, IPCL_TCPCONN)) != NULL) {
 
 			tcp = connp->conn_tcp;
 			cl_tcpi.cl_tcpi_version = CL_TCPI_V1;
-			cl_tcpi.cl_tcpi_ipversion = tcp->tcp_ipversion;
+			cl_tcpi.cl_tcpi_ipversion = connp->conn_ipversion;
 			cl_tcpi.cl_tcpi_state = tcp->tcp_state;
-			cl_tcpi.cl_tcpi_lport = tcp->tcp_lport;
-			cl_tcpi.cl_tcpi_fport = tcp->tcp_fport;
-			/*
-			 * The macros tcp_laddr and tcp_faddr give the IPv4
-			 * addresses. They are copied implicitly below as
-			 * mapped addresses.
-			 */
-			cl_tcpi.cl_tcpi_laddr_v6 = tcp->tcp_ip_src_v6;
-			if (tcp->tcp_ipversion == IPV4_VERSION) {
-				cl_tcpi.cl_tcpi_faddr =
-				    tcp->tcp_ipha->ipha_dst;
-			} else {
-				cl_tcpi.cl_tcpi_faddr_v6 =
-				    tcp->tcp_ip6h->ip6_dst;
-			}
+			cl_tcpi.cl_tcpi_lport = connp->conn_lport;
+			cl_tcpi.cl_tcpi_fport = connp->conn_fport;
+			cl_tcpi.cl_tcpi_laddr_v6 = connp->conn_laddr_v6;
+			cl_tcpi.cl_tcpi_faddr_v6 = connp->conn_faddr_v6;
 
 			/*
 			 * If the callback returns non-zero
@@ -24302,35 +18775,35 @@ cl_tcp_walk_list_stack(int (*callback)(cl_tcp_info_t *, void *), void *arg,
 /*
  * Check if a tcp structure matches the info in acp.
  */
-#define	TCP_AC_ADDR_MATCH(acp, tcp)					\
+#define	TCP_AC_ADDR_MATCH(acp, connp, tcp)			\
 	(((acp)->ac_local.ss_family == AF_INET) ?		\
 	((TCP_AC_V4LOCAL((acp)) == INADDR_ANY ||		\
-	TCP_AC_V4LOCAL((acp)) == (tcp)->tcp_ip_src) &&	\
+	TCP_AC_V4LOCAL((acp)) == (connp)->conn_laddr_v4) &&	\
 	(TCP_AC_V4REMOTE((acp)) == INADDR_ANY ||		\
-	TCP_AC_V4REMOTE((acp)) == (tcp)->tcp_remote) &&	\
+	TCP_AC_V4REMOTE((acp)) == (connp)->conn_faddr_v4) &&	\
 	(TCP_AC_V4LPORT((acp)) == 0 ||				\
-	TCP_AC_V4LPORT((acp)) == (tcp)->tcp_lport) &&		\
+	TCP_AC_V4LPORT((acp)) == (connp)->conn_lport) &&	\
 	(TCP_AC_V4RPORT((acp)) == 0 ||				\
-	TCP_AC_V4RPORT((acp)) == (tcp)->tcp_fport) &&		\
-	(acp)->ac_start <= (tcp)->tcp_state &&	\
-	(acp)->ac_end >= (tcp)->tcp_state) :		\
+	TCP_AC_V4RPORT((acp)) == (connp)->conn_fport) &&	\
+	(acp)->ac_start <= (tcp)->tcp_state &&			\
+	(acp)->ac_end >= (tcp)->tcp_state) :			\
 	((IN6_IS_ADDR_UNSPECIFIED(&TCP_AC_V6LOCAL((acp))) ||	\
 	IN6_ARE_ADDR_EQUAL(&TCP_AC_V6LOCAL((acp)),		\
-	&(tcp)->tcp_ip_src_v6)) &&				\
+	&(connp)->conn_laddr_v6)) &&				\
 	(IN6_IS_ADDR_UNSPECIFIED(&TCP_AC_V6REMOTE((acp))) ||	\
 	IN6_ARE_ADDR_EQUAL(&TCP_AC_V6REMOTE((acp)),		\
-	&(tcp)->tcp_remote_v6)) &&				\
+	&(connp)->conn_faddr_v6)) &&				\
 	(TCP_AC_V6LPORT((acp)) == 0 ||				\
-	TCP_AC_V6LPORT((acp)) == (tcp)->tcp_lport) &&		\
+	TCP_AC_V6LPORT((acp)) == (connp)->conn_lport) &&	\
 	(TCP_AC_V6RPORT((acp)) == 0 ||				\
-	TCP_AC_V6RPORT((acp)) == (tcp)->tcp_fport) &&		\
-	(acp)->ac_start <= (tcp)->tcp_state &&	\
+	TCP_AC_V6RPORT((acp)) == (connp)->conn_fport) &&	\
+	(acp)->ac_start <= (tcp)->tcp_state &&			\
 	(acp)->ac_end >= (tcp)->tcp_state))
 
-#define	TCP_AC_MATCH(acp, tcp)					\
+#define	TCP_AC_MATCH(acp, connp, tcp)				\
 	(((acp)->ac_zoneid == ALL_ZONES ||			\
-	(acp)->ac_zoneid == tcp->tcp_connp->conn_zoneid) ?	\
-	TCP_AC_ADDR_MATCH(acp, tcp) : 0)
+	(acp)->ac_zoneid == (connp)->conn_zoneid) ?		\
+	TCP_AC_ADDR_MATCH(acp, connp, tcp) : 0)
 
 /*
  * Build a message containing a tcp_ioc_abort_conn_t structure
@@ -24346,8 +18819,6 @@ tcp_ioctl_abort_build_msg(tcp_ioc_abort_conn_t *acp, tcp_t *tp)
 	if (mp == NULL)
 		return (NULL);
 
-	mp->b_datap->db_type = M_CTL;
-
 	*((uint32_t *)mp->b_rptr) = TCP_IOC_ABORT_CONN;
 	tacp = (tcp_ioc_abort_conn_t *)((uchar_t *)mp->b_rptr +
 	    sizeof (uint32_t));
@@ -24359,17 +18830,17 @@ tcp_ioctl_abort_build_msg(tcp_ioc_abort_conn_t *acp, tcp_t *tp)
 	if (acp->ac_local.ss_family == AF_INET) {
 		tacp->ac_local.ss_family = AF_INET;
 		tacp->ac_remote.ss_family = AF_INET;
-		TCP_AC_V4LOCAL(tacp) = tp->tcp_ip_src;
-		TCP_AC_V4REMOTE(tacp) = tp->tcp_remote;
-		TCP_AC_V4LPORT(tacp) = tp->tcp_lport;
-		TCP_AC_V4RPORT(tacp) = tp->tcp_fport;
+		TCP_AC_V4LOCAL(tacp) = tp->tcp_connp->conn_laddr_v4;
+		TCP_AC_V4REMOTE(tacp) = tp->tcp_connp->conn_faddr_v4;
+		TCP_AC_V4LPORT(tacp) = tp->tcp_connp->conn_lport;
+		TCP_AC_V4RPORT(tacp) = tp->tcp_connp->conn_fport;
 	} else {
 		tacp->ac_local.ss_family = AF_INET6;
 		tacp->ac_remote.ss_family = AF_INET6;
-		TCP_AC_V6LOCAL(tacp) = tp->tcp_ip_src_v6;
-		TCP_AC_V6REMOTE(tacp) = tp->tcp_remote_v6;
-		TCP_AC_V6LPORT(tacp) = tp->tcp_lport;
-		TCP_AC_V6RPORT(tacp) = tp->tcp_fport;
+		TCP_AC_V6LOCAL(tacp) = tp->tcp_connp->conn_laddr_v6;
+		TCP_AC_V6REMOTE(tacp) = tp->tcp_connp->conn_faddr_v6;
+		TCP_AC_V6LPORT(tacp) = tp->tcp_connp->conn_lport;
+		TCP_AC_V6RPORT(tacp) = tp->tcp_connp->conn_fport;
 	}
 	mp->b_wptr = (uchar_t *)mp->b_rptr + sizeof (uint32_t) + sizeof (*acp);
 	return (mp);
@@ -24419,14 +18890,32 @@ tcp_ioctl_abort_dump(tcp_ioc_abort_conn_t *acp)
 }
 
 /*
- * Called inside tcp_rput when a message built using
+ * Called using SQ_FILL when a message built using
  * tcp_ioctl_abort_build_msg is put into a queue.
  * Note that when we get here there is no wildcard in acp any more.
  */
+/* ARGSUSED2 */
 static void
-tcp_ioctl_abort_handler(tcp_t *tcp, mblk_t *mp)
+tcp_ioctl_abort_handler(void *arg, mblk_t *mp, void *arg2,
+    ip_recv_attr_t *dummy)
 {
-	tcp_ioc_abort_conn_t *acp;
+	conn_t			*connp = (conn_t *)arg;
+	tcp_t			*tcp = connp->conn_tcp;
+	tcp_ioc_abort_conn_t	*acp;
+
+	/*
+	 * Don't accept any input on a closed tcp as this TCP logically does
+	 * not exist on the system. Don't proceed further with this TCP.
+	 * For eg. this packet could trigger another close of this tcp
+	 * which would be disastrous for tcp_refcnt. tcp_close_detached /
+	 * tcp_clean_death / tcp_closei_local must be called at most once
+	 * on a TCP.
+	 */
+	if (tcp->tcp_state == TCPS_CLOSED ||
+	    tcp->tcp_state == TCPS_BOUND) {
+		freemsg(mp);
+		return;
+	}
 
 	acp = (tcp_ioc_abort_conn_t *)(mp->b_rptr + sizeof (uint32_t));
 	if (tcp->tcp_state <= acp->ac_end) {
@@ -24468,12 +18957,17 @@ startover:
 	for (tconnp = connfp->connf_head; tconnp != NULL;
 	    tconnp = tconnp->conn_next) {
 		tcp = tconnp->conn_tcp;
-		if (TCP_AC_MATCH(acp, tcp)) {
-			CONN_INC_REF(tcp->tcp_connp);
+		/*
+		 * We are missing a check on sin6_scope_id for linklocals here,
+		 * but current usage is just for aborting based on zoneid
+		 * for shared-IP zones.
+		 */
+		if (TCP_AC_MATCH(acp, tconnp, tcp)) {
+			CONN_INC_REF(tconnp);
 			mp = tcp_ioctl_abort_build_msg(acp, tcp);
 			if (mp == NULL) {
 				err = ENOMEM;
-				CONN_DEC_REF(tcp->tcp_connp);
+				CONN_DEC_REF(tconnp);
 				break;
 			}
 			mp->b_prev = (mblk_t *)tcp;
@@ -24501,8 +18995,9 @@ startover:
 		listhead = listhead->b_next;
 		tcp = (tcp_t *)mp->b_prev;
 		mp->b_next = mp->b_prev = NULL;
-		SQUEUE_ENTER_ONE(tcp->tcp_connp->conn_sqp, mp, tcp_input,
-		    tcp->tcp_connp, SQ_FILL, SQTAG_TCP_ABORT_BUCKET);
+		SQUEUE_ENTER_ONE(tcp->tcp_connp->conn_sqp, mp,
+		    tcp_ioctl_abort_handler, tcp->tcp_connp, NULL,
+		    SQ_FILL, SQTAG_TCP_ABORT_BUCKET);
 	}
 
 	*count += nmatch;
@@ -24669,7 +19164,7 @@ out:
  */
 void
 tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
-    uint32_t seg_ack, int seg_len, tcph_t *tcph)
+    uint32_t seg_ack, int seg_len, tcpha_t *tcpha, ip_recv_attr_t *ira)
 {
 	int32_t		bytes_acked;
 	int32_t		gap;
@@ -24677,17 +19172,18 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 	tcp_opt_t	tcpopt;
 	uint_t		flags;
 	uint32_t	new_swnd = 0;
-	conn_t		*connp;
+	conn_t		*nconnp;
+	conn_t		*connp = tcp->tcp_connp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
 	BUMP_LOCAL(tcp->tcp_ibsegs);
 	DTRACE_PROBE2(tcp__trace__recv, mblk_t *, mp, tcp_t *, tcp);
 
-	flags = (unsigned int)tcph->th_flags[0] & 0xFF;
-	new_swnd = BE16_TO_U16(tcph->th_win) <<
-	    ((tcph->th_flags[0] & TH_SYN) ? 0 : tcp->tcp_snd_ws);
+	flags = (unsigned int)tcpha->tha_flags & 0xFF;
+	new_swnd = ntohs(tcpha->tha_win) <<
+	    ((tcpha->tha_flags & TH_SYN) ? 0 : tcp->tcp_snd_ws);
 	if (tcp->tcp_snd_ts_ok) {
-		if (!tcp_paws_check(tcp, tcph, &tcpopt)) {
+		if (!tcp_paws_check(tcp, tcpha, &tcpopt)) {
 			tcp_xmit_ctl(NULL, tcp, tcp->tcp_snxt,
 			    tcp->tcp_rnxt, TH_ACK);
 			goto done;
@@ -24770,17 +19266,10 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 			mutex_enter(&tcps->tcps_iss_key_lock);
 			context = tcps->tcps_iss_key;
 			mutex_exit(&tcps->tcps_iss_key_lock);
-			arg.ports = tcp->tcp_ports;
+			arg.ports = connp->conn_ports;
 			/* We use MAPPED addresses in tcp_iss_init */
-			arg.src = tcp->tcp_ip_src_v6;
-			if (tcp->tcp_ipversion == IPV4_VERSION) {
-				IN6_IPADDR_TO_V4MAPPED(
-				    tcp->tcp_ipha->ipha_dst,
-				    &arg.dst);
-			} else {
-				arg.dst =
-				    tcp->tcp_ip6h->ip6_dst;
-			}
+			arg.src = connp->conn_laddr_v6;
+			arg.dst = connp->conn_faddr_v6;
 			MD5Update(&context, (uchar_t *)&arg,
 			    sizeof (arg));
 			MD5Final((uchar_t *)answer, &context);
@@ -24813,21 +19302,11 @@ tcp_time_wait_processing(tcp_t *tcp, mblk_t *mp, uint32_t seg_seq,
 		 */
 		if (tcp_clean_death(tcp, 0, 27) == -1)
 			goto done;
-		/*
-		 * We will come back to tcp_rput_data
-		 * on the global queue. Packets destined
-		 * for the global queue will be checked
-		 * with global policy. But the policy for
-		 * this packet has already been checked as
-		 * this was destined for the detached
-		 * connection. We need to bypass policy
-		 * check this time by attaching a dummy
-		 * ipsec_in with ipsec_in_dont_check set.
-		 */
-		connp = ipcl_classify(mp, tcp->tcp_connp->conn_zoneid, ipst);
-		if (connp != NULL) {
+		nconnp = ipcl_classify(mp, ira, ipst);
+		if (nconnp != NULL) {
 			TCP_STAT(tcps, tcp_time_wait_syn_success);
-			tcp_reinput(connp, mp, tcp->tcp_connp->conn_sqp);
+			/* Drops ref on nconnp */
+			tcp_reinput(nconnp, mp, ira, ipst);
 			return;
 		}
 		goto done;
@@ -24905,11 +19384,6 @@ process_ack:
 		    tcp->tcp_rnxt, TH_ACK);
 	}
 done:
-	if ((mp->b_datap->db_struioflag & STRUIO_EAGER) != 0) {
-		DB_CKSUMSTART(mp) = 0;
-		mp->b_datap->db_struioflag &= ~STRUIO_EAGER;
-		TCP_STAT(tcps, tcp_time_wait_syn_fail);
-	}
 	freemsg(mp);
 }
 
@@ -24965,11 +19439,12 @@ tcp_timer_callback(void *arg)
 	tcpt = (tcp_timer_t *)mp->b_rptr;
 	connp = tcpt->connp;
 	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_timer_handler, connp,
-	    SQ_FILL, SQTAG_TCP_TIMER);
+	    NULL, SQ_FILL, SQTAG_TCP_TIMER);
 }
 
+/* ARGSUSED */
 static void
-tcp_timer_handler(void *arg, mblk_t *mp, void *arg2)
+tcp_timer_handler(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	tcp_timer_t *tcpt;
 	conn_t *connp = (conn_t *)arg;
@@ -24983,7 +19458,7 @@ tcp_timer_handler(void *arg, mblk_t *mp, void *arg2)
 	 * If the TCP has reached the closed state, don't proceed any
 	 * further. This TCP logically does not exist on the system.
 	 * tcpt_proc could for example access queues, that have already
-	 * been qprocoff'ed off. Also see comments at the start of tcp_input
+	 * been qprocoff'ed off.
 	 */
 	if (tcp->tcp_state != TCPS_CLOSED) {
 		(*tcpt->tcpt_proc)(connp);
@@ -25148,26 +19623,9 @@ tcp_setqfull(tcp_t *tcp)
 	if (tcp->tcp_closed)
 		return;
 
-	if (IPCL_IS_NONSTR(connp)) {
-		(*connp->conn_upcalls->su_txq_full)
-		    (tcp->tcp_connp->conn_upper_handle, B_TRUE);
-		tcp->tcp_flow_stopped = B_TRUE;
-	} else {
-		queue_t *q = tcp->tcp_wq;
-
-		if (!(q->q_flag & QFULL)) {
-			mutex_enter(QLOCK(q));
-			if (!(q->q_flag & QFULL)) {
-				/* still need to set QFULL */
-				q->q_flag |= QFULL;
-				tcp->tcp_flow_stopped = B_TRUE;
-				mutex_exit(QLOCK(q));
-				TCP_STAT(tcps, tcp_flwctl_on);
-			} else {
-				mutex_exit(QLOCK(q));
-			}
-		}
-	}
+	conn_setqfull(connp, &tcp->tcp_flow_stopped);
+	if (tcp->tcp_flow_stopped)
+		TCP_STAT(tcps, tcp_flwctl_on);
 }
 
 void
@@ -25177,27 +19635,7 @@ tcp_clrqfull(tcp_t *tcp)
 
 	if (tcp->tcp_closed)
 		return;
-
-	if (IPCL_IS_NONSTR(connp)) {
-		(*connp->conn_upcalls->su_txq_full)
-		    (tcp->tcp_connp->conn_upper_handle, B_FALSE);
-		tcp->tcp_flow_stopped = B_FALSE;
-	} else {
-		queue_t *q = tcp->tcp_wq;
-
-		if (q->q_flag & QFULL) {
-			mutex_enter(QLOCK(q));
-			if (q->q_flag & QFULL) {
-				q->q_flag &= ~QFULL;
-				tcp->tcp_flow_stopped = B_FALSE;
-				mutex_exit(QLOCK(q));
-				if (q->q_flag & QWANTW)
-					qbackenable(q, 0);
-			} else {
-				mutex_exit(QLOCK(q));
-			}
-		}
-	}
+	conn_clrqfull(connp, &tcp->tcp_flow_stopped);
 }
 
 /*
@@ -25246,10 +19684,7 @@ tcp_kstat2_init(netstackid_t stackid, tcp_stat_t *tcps_statisticsp)
 	tcp_stat_t template = {
 		{ "tcp_time_wait",		KSTAT_DATA_UINT64 },
 		{ "tcp_time_wait_syn",		KSTAT_DATA_UINT64 },
-		{ "tcp_time_wait_success",	KSTAT_DATA_UINT64 },
-		{ "tcp_time_wait_fail",		KSTAT_DATA_UINT64 },
-		{ "tcp_reinput_syn",		KSTAT_DATA_UINT64 },
-		{ "tcp_ip_output",		KSTAT_DATA_UINT64 },
+		{ "tcp_time_wait_syn_success",	KSTAT_DATA_UINT64 },
 		{ "tcp_detach_non_time_wait",	KSTAT_DATA_UINT64 },
 		{ "tcp_detach_time_wait",	KSTAT_DATA_UINT64 },
 		{ "tcp_time_wait_reap",		KSTAT_DATA_UINT64 },
@@ -25287,37 +19722,14 @@ tcp_kstat2_init(netstackid_t stackid, tcp_stat_t *tcps_statisticsp)
 		{ "tcp_timermp_freed",		KSTAT_DATA_UINT64 },
 		{ "tcp_push_timer_cnt",		KSTAT_DATA_UINT64 },
 		{ "tcp_ack_timer_cnt",		KSTAT_DATA_UINT64 },
-		{ "tcp_ire_null1",		KSTAT_DATA_UINT64 },
-		{ "tcp_ire_null",		KSTAT_DATA_UINT64 },
-		{ "tcp_ip_send",		KSTAT_DATA_UINT64 },
-		{ "tcp_ip_ire_send",		KSTAT_DATA_UINT64 },
 		{ "tcp_wsrv_called",		KSTAT_DATA_UINT64 },
 		{ "tcp_flwctl_on",		KSTAT_DATA_UINT64 },
 		{ "tcp_timer_fire_early",	KSTAT_DATA_UINT64 },
 		{ "tcp_timer_fire_miss",	KSTAT_DATA_UINT64 },
 		{ "tcp_rput_v6_error",		KSTAT_DATA_UINT64 },
-		{ "tcp_out_sw_cksum",		KSTAT_DATA_UINT64 },
-		{ "tcp_out_sw_cksum_bytes",	KSTAT_DATA_UINT64 },
 		{ "tcp_zcopy_on",		KSTAT_DATA_UINT64 },
 		{ "tcp_zcopy_off",		KSTAT_DATA_UINT64 },
 		{ "tcp_zcopy_backoff",		KSTAT_DATA_UINT64 },
-		{ "tcp_zcopy_disable",		KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_pkt_out",		KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_pkt_out_v4",		KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_pkt_out_v6",		KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_discarded",		KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_conn_halted1",	KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_conn_halted2",	KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_conn_halted3",	KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_conn_resumed1",	KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_conn_resumed2",	KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_legacy_small",	KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_legacy_all",		KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_legacy_ret",		KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_allocfail",		KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_addpdescfail",	KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_allocd",		KSTAT_DATA_UINT64 },
-		{ "tcp_mdt_linked",		KSTAT_DATA_UINT64 },
 		{ "tcp_fusion_flowctl",		KSTAT_DATA_UINT64 },
 		{ "tcp_fusion_backenabled",	KSTAT_DATA_UINT64 },
 		{ "tcp_fusion_urg",		KSTAT_DATA_UINT64 },
@@ -25490,7 +19902,7 @@ tcp_kstat_update(kstat_t *kp, int rw)
 		connfp = &ipst->ips_ipcl_globalhash_fanout[i];
 		connp = NULL;
 		while ((connp =
-		    ipcl_get_next_conn(connfp, connp, IPCL_TCP)) != NULL) {
+		    ipcl_get_next_conn(connfp, connp, IPCL_TCPCONN)) != NULL) {
 			tcp = connp->conn_tcp;
 			switch (tcp_snmp_state(tcp)) {
 			case MIB2_TCP_established:
@@ -25565,48 +19977,6 @@ tcp_kstat_update(kstat_t *kp, int rw)
 	return (0);
 }
 
-void
-tcp_reinput(conn_t *connp, mblk_t *mp, squeue_t *sqp)
-{
-	uint16_t	hdr_len;
-	ipha_t		*ipha;
-	uint8_t		*nexthdrp;
-	tcph_t		*tcph;
-	tcp_stack_t	*tcps = connp->conn_tcp->tcp_tcps;
-
-	/* Already has an eager */
-	if ((mp->b_datap->db_struioflag & STRUIO_EAGER) != 0) {
-		TCP_STAT(tcps, tcp_reinput_syn);
-		SQUEUE_ENTER_ONE(connp->conn_sqp, mp, connp->conn_recv, connp,
-		    SQ_PROCESS, SQTAG_TCP_REINPUT_EAGER);
-		return;
-	}
-
-	switch (IPH_HDR_VERSION(mp->b_rptr)) {
-	case IPV4_VERSION:
-		ipha = (ipha_t *)mp->b_rptr;
-		hdr_len = IPH_HDR_LENGTH(ipha);
-		break;
-	case IPV6_VERSION:
-		if (!ip_hdr_length_nexthdr_v6(mp, (ip6_t *)mp->b_rptr,
-		    &hdr_len, &nexthdrp)) {
-			CONN_DEC_REF(connp);
-			freemsg(mp);
-			return;
-		}
-		break;
-	}
-
-	tcph = (tcph_t *)&mp->b_rptr[hdr_len];
-	if ((tcph->th_flags[0] & (TH_SYN|TH_ACK|TH_RST|TH_URG)) == TH_SYN) {
-		mp->b_datap->db_struioflag |= STRUIO_EAGER;
-		DB_CKSUMSTART(mp) = (intptr_t)sqp;
-	}
-
-	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, connp->conn_recv, connp,
-	    SQ_FILL, SQTAG_TCP_REINPUT);
-}
-
 static int
 tcp_squeue_switch(int val)
 {
@@ -25653,278 +20023,20 @@ tcp_squeue_add(squeue_t *sqp)
 	tcp_time_wait->tcp_free_list_cnt = 0;
 }
 
-static int
-tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error, cred_t *cr, pid_t pid)
+/*
+ * On a labeled system we have some protocols above TCP, such as RPC, which
+ * appear to assume that every mblk in a chain has a db_credp.
+ */
+static void
+tcp_setcred_data(mblk_t *mp, ip_recv_attr_t *ira)
 {
-	mblk_t	*ire_mp = NULL;
-	mblk_t	*syn_mp;
-	mblk_t	*mdti;
-	mblk_t	*lsoi;
-	int	retval;
-	tcph_t	*tcph;
-	cred_t	*ecr;
-	ts_label_t	*tsl;
-	uint32_t	mss;
-	conn_t	*connp = tcp->tcp_connp;
-	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	ASSERT(is_system_labeled());
+	ASSERT(ira->ira_cred != NULL);
 
-	if (error == 0) {
-		/*
-		 * Adapt Multidata information, if any.  The
-		 * following tcp_mdt_update routine will free
-		 * the message.
-		 */
-		if (mp != NULL && ((mdti = tcp_mdt_info_mp(mp)) != NULL)) {
-			tcp_mdt_update(tcp, &((ip_mdt_info_t *)mdti->
-			    b_rptr)->mdt_capab, B_TRUE);
-			freemsg(mdti);
-		}
-
-		/*
-		 * Check to update LSO information with tcp, and
-		 * tcp_lso_update routine will free the message.
-		 */
-		if (mp != NULL && ((lsoi = tcp_lso_info_mp(mp)) != NULL)) {
-			tcp_lso_update(tcp, &((ip_lso_info_t *)lsoi->
-			    b_rptr)->lso_capab);
-			freemsg(lsoi);
-		}
-
-		/* Get the IRE, if we had requested for it */
-		if (mp != NULL)
-			ire_mp = tcp_ire_mp(&mp);
-
-		if (tcp->tcp_hard_binding) {
-			tcp->tcp_hard_binding = B_FALSE;
-			tcp->tcp_hard_bound = B_TRUE;
-			CL_INET_CONNECT(tcp->tcp_connp, tcp, B_TRUE, retval);
-			if (retval != 0) {
-				error = EADDRINUSE;
-				goto bind_failed;
-			}
-		} else {
-			if (ire_mp != NULL)
-				freeb(ire_mp);
-			goto after_syn_sent;
-		}
-
-		retval = tcp_adapt_ire(tcp, ire_mp);
-		if (ire_mp != NULL)
-			freeb(ire_mp);
-		if (retval == 0) {
-			error = (int)((tcp->tcp_state >= TCPS_SYN_SENT) ?
-			    ENETUNREACH : EADDRNOTAVAIL);
-			goto ipcl_rm;
-		}
-		/*
-		 * Don't let an endpoint connect to itself.
-		 * Also checked in tcp_connect() but that
-		 * check can't handle the case when the
-		 * local IP address is INADDR_ANY.
-		 */
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			if ((tcp->tcp_ipha->ipha_dst ==
-			    tcp->tcp_ipha->ipha_src) &&
-			    (BE16_EQL(tcp->tcp_tcph->th_lport,
-			    tcp->tcp_tcph->th_fport))) {
-				error = EADDRNOTAVAIL;
-				goto ipcl_rm;
-			}
-		} else {
-			if (IN6_ARE_ADDR_EQUAL(
-			    &tcp->tcp_ip6h->ip6_dst,
-			    &tcp->tcp_ip6h->ip6_src) &&
-			    (BE16_EQL(tcp->tcp_tcph->th_lport,
-			    tcp->tcp_tcph->th_fport))) {
-				error = EADDRNOTAVAIL;
-				goto ipcl_rm;
-			}
-		}
-		ASSERT(tcp->tcp_state == TCPS_SYN_SENT);
-		/*
-		 * This should not be possible!  Just for
-		 * defensive coding...
-		 */
-		if (tcp->tcp_state != TCPS_SYN_SENT)
-			goto after_syn_sent;
-
-		if (is_system_labeled() &&
-		    !tcp_update_label(tcp, CONN_CRED(tcp->tcp_connp))) {
-			error = EHOSTUNREACH;
-			goto ipcl_rm;
-		}
-
-		/*
-		 * tcp_adapt_ire() does not adjust
-		 * for TCP/IP header length.
-		 */
-		mss = tcp->tcp_mss - tcp->tcp_hdr_len;
-
-		/*
-		 * Just make sure our rwnd is at
-		 * least tcp_recv_hiwat_mss * MSS
-		 * large, and round up to the nearest
-		 * MSS.
-		 *
-		 * We do the round up here because
-		 * we need to get the interface
-		 * MTU first before we can do the
-		 * round up.
-		 */
-		tcp->tcp_rwnd = MAX(MSS_ROUNDUP(tcp->tcp_rwnd, mss),
-		    tcps->tcps_recv_hiwat_minmss * mss);
-		tcp->tcp_recv_hiwater = tcp->tcp_rwnd;
-		tcp_set_ws_value(tcp);
-		U32_TO_ABE16((tcp->tcp_rwnd >> tcp->tcp_rcv_ws),
-		    tcp->tcp_tcph->th_win);
-		if (tcp->tcp_rcv_ws > 0 || tcps->tcps_wscale_always)
-			tcp->tcp_snd_ws_ok = B_TRUE;
-
-		/*
-		 * Set tcp_snd_ts_ok to true
-		 * so that tcp_xmit_mp will
-		 * include the timestamp
-		 * option in the SYN segment.
-		 */
-		if (tcps->tcps_tstamp_always ||
-		    (tcp->tcp_rcv_ws && tcps->tcps_tstamp_if_wscale)) {
-			tcp->tcp_snd_ts_ok = B_TRUE;
-		}
-
-		/*
-		 * tcp_snd_sack_ok can be set in
-		 * tcp_adapt_ire() if the sack metric
-		 * is set.  So check it here also.
-		 */
-		if (tcps->tcps_sack_permitted == 2 ||
-		    tcp->tcp_snd_sack_ok) {
-			if (tcp->tcp_sack_info == NULL) {
-				tcp->tcp_sack_info =
-				    kmem_cache_alloc(tcp_sack_info_cache,
-				    KM_SLEEP);
-			}
-			tcp->tcp_snd_sack_ok = B_TRUE;
-		}
-
-		/*
-		 * Should we use ECN?  Note that the current
-		 * default value (SunOS 5.9) of tcp_ecn_permitted
-		 * is 1.  The reason for doing this is that there
-		 * are equipments out there that will drop ECN
-		 * enabled IP packets.  Setting it to 1 avoids
-		 * compatibility problems.
-		 */
-		if (tcps->tcps_ecn_permitted == 2)
-			tcp->tcp_ecn_ok = B_TRUE;
-
-		TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
-		syn_mp = tcp_xmit_mp(tcp, NULL, 0, NULL, NULL,
-		    tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
-		if (syn_mp) {
-			/*
-			 * cr contains the cred from the thread calling
-			 * connect().
-			 *
-			 * If no thread cred is available, use the
-			 * socket creator's cred instead. If still no
-			 * cred, drop the request rather than risk a
-			 * panic on production systems.
-			 */
-			if (cr == NULL) {
-				cr = CONN_CRED(connp);
-				pid = tcp->tcp_cpid;
-				ASSERT(cr != NULL);
-				if (cr != NULL) {
-					mblk_setcred(syn_mp, cr, pid);
-				} else {
-					error = ECONNABORTED;
-					goto ipcl_rm;
-				}
-
-			/*
-			 * If an effective security label exists for
-			 * the connection, create a copy of the thread's
-			 * cred but with the effective label attached.
-			 */
-			} else if (is_system_labeled() &&
-			    connp->conn_effective_cred != NULL &&
-			    (tsl = crgetlabel(connp->
-			    conn_effective_cred)) != NULL) {
-				if ((ecr = copycred_from_tslabel(cr,
-				    tsl, KM_NOSLEEP)) == NULL) {
-					error = ENOMEM;
-					goto ipcl_rm;
-				}
-				mblk_setcred(syn_mp, ecr, pid);
-				crfree(ecr);
-
-			/*
-			 * Default to using the thread's cred unchanged.
-			 */
-			} else {
-				mblk_setcred(syn_mp, cr, pid);
-			}
-
-			/*
-			 * We must bump the generation before sending the syn
-			 * to ensure that we use the right generation in case
-			 * this thread issues a "connected" up call.
-			 */
-			SOCK_CONNID_BUMP(tcp->tcp_connid);
-
-			tcp_send_data(tcp, tcp->tcp_wq, syn_mp);
-		}
-	after_syn_sent:
-		if (mp != NULL) {
-			ASSERT(mp->b_cont == NULL);
-			freeb(mp);
-		}
-		return (error);
-	} else {
-		/* error */
-		if (tcp->tcp_debug) {
-			(void) strlog(TCP_MOD_ID, 0, 1, SL_TRACE|SL_ERROR,
-			    "tcp_post_ip_bind: error == %d", error);
-		}
-		if (mp != NULL) {
-			freeb(mp);
-		}
+	while (mp != NULL) {
+		mblk_setcred(mp, ira->ira_cred, NOPID);
+		mp = mp->b_cont;
 	}
-
-ipcl_rm:
-	/*
-	 * Need to unbind with classifier since we were just
-	 * told that our bind succeeded. a.k.a error == 0 at the entry.
-	 */
-	tcp->tcp_hard_bound = B_FALSE;
-	tcp->tcp_hard_binding = B_FALSE;
-
-	ipcl_hash_remove(connp);
-
-bind_failed:
-	tcp->tcp_state = TCPS_IDLE;
-	if (tcp->tcp_ipversion == IPV4_VERSION)
-		tcp->tcp_ipha->ipha_src = 0;
-	else
-		V6_SET_ZERO(tcp->tcp_ip6h->ip6_src);
-	/*
-	 * Copy of the src addr. in tcp_t is needed since
-	 * the lookup funcs. can only look at tcp_t
-	 */
-	V6_SET_ZERO(tcp->tcp_ip_src_v6);
-
-	tcph = tcp->tcp_tcph;
-	tcph->th_lport[0] = 0;
-	tcph->th_lport[1] = 0;
-	tcp_bind_hash_remove(tcp);
-	bzero(&connp->u_port, sizeof (connp->u_port));
-	/* blow away saved option results if any */
-	if (tcp->tcp_conn.tcp_opts_conn_req != NULL)
-		tcp_close_mpp(&tcp->tcp_conn.tcp_opts_conn_req);
-
-	conn_delete_ire(tcp->tcp_connp, NULL);
-
-	return (error);
 }
 
 static int
@@ -25936,16 +20048,16 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 	boolean_t	user_specified;
 	in_port_t	allocated_port;
 	in_port_t	requested_port = *requested_port_ptr;
-	conn_t		*connp;
+	conn_t		*connp = tcp->tcp_connp;
 	zone_t		*zone;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
-	in6_addr_t	v6addr = tcp->tcp_ip_src_v6;
+	in6_addr_t	v6addr = connp->conn_laddr_v6;
 
 	/*
 	 * XXX It's up to the caller to specify bind_to_req_port_only or not.
 	 */
-	if (cr == NULL)
-		cr = tcp->tcp_cred;
+	ASSERT(cr != NULL);
+
 	/*
 	 * Get a valid port (within the anonymous range and should not
 	 * be a privileged one) to use if the user has not given a port.
@@ -25961,7 +20073,7 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 	mlptype = mlptSingle;
 	mlp_port = requested_port;
 	if (requested_port == 0) {
-		requested_port = tcp->tcp_anon_priv_bind ?
+		requested_port = connp->conn_anon_priv_bind ?
 		    tcp_get_next_priv_port(tcp) :
 		    tcp_update_next_port(tcps->tcps_next_port_to_try,
 		    tcp, B_TRUE);
@@ -25975,7 +20087,6 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 		 * this socket and RPC is MLP in this zone, then give him an
 		 * anonymous MLP.
 		 */
-		connp = tcp->tcp_connp;
 		if (connp->conn_anon_mlp && is_system_labeled()) {
 			zone = crgetzone(cr);
 			addrtype = tsol_mlp_addr_type(
@@ -26016,7 +20127,7 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 		if (priv) {
 			if (secpolicy_net_privaddr(cr, requested_port,
 			    IPPROTO_TCP) != 0) {
-				if (tcp->tcp_debug) {
+				if (connp->conn_debug) {
 					(void) strlog(TCP_MOD_ID, 0, 1,
 					    SL_ERROR|SL_TRACE,
 					    "tcp_bind: no priv for port %d",
@@ -26044,7 +20155,7 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 
 	if (mlptype != mlptSingle) {
 		if (secpolicy_net_bindmlp(cr) != 0) {
-			if (tcp->tcp_debug) {
+			if (connp->conn_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1,
 				    SL_ERROR|SL_TRACE,
 				    "tcp_bind: no priv for multilevel port %d",
@@ -26068,7 +20179,7 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 			mlpzone = tsol_mlp_findzone(IPPROTO_TCP,
 			    htons(mlp_port));
 			if (connp->conn_zoneid != mlpzone) {
-				if (tcp->tcp_debug) {
+				if (connp->conn_debug) {
 					(void) strlog(TCP_MOD_ID, 0, 1,
 					    SL_ERROR|SL_TRACE,
 					    "tcp_bind: attempt to bind port "
@@ -26083,10 +20194,10 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 
 		if (!user_specified) {
 			int err;
-			err = tsol_mlp_anon(zone, mlptype, connp->conn_ulp,
+			err = tsol_mlp_anon(zone, mlptype, connp->conn_proto,
 			    requested_port, B_TRUE);
 			if (err != 0) {
-				if (tcp->tcp_debug) {
+				if (connp->conn_debug) {
 					(void) strlog(TCP_MOD_ID, 0, 1,
 					    SL_ERROR|SL_TRACE,
 					    "tcp_bind: cannot establish anon "
@@ -26101,17 +20212,18 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 	}
 
 	allocated_port = tcp_bindi(tcp, requested_port, &v6addr,
-	    tcp->tcp_reuseaddr, B_FALSE, bind_to_req_port_only, user_specified);
+	    connp->conn_reuseaddr, B_FALSE, bind_to_req_port_only,
+	    user_specified);
 
 	if (allocated_port == 0) {
 		connp->conn_mlp_type = mlptSingle;
 		if (connp->conn_anon_port) {
 			connp->conn_anon_port = B_FALSE;
-			(void) tsol_mlp_anon(zone, mlptype, connp->conn_ulp,
+			(void) tsol_mlp_anon(zone, mlptype, connp->conn_proto,
 			    requested_port, B_FALSE);
 		}
 		if (bind_to_req_port_only) {
-			if (tcp->tcp_debug) {
+			if (connp->conn_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1,
 				    SL_ERROR|SL_TRACE,
 				    "tcp_bind: requested addr busy");
@@ -26119,7 +20231,7 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 			return (-TADDRBUSY);
 		} else {
 			/* If we are out of ports, fail the bind. */
-			if (tcp->tcp_debug) {
+			if (connp->conn_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1,
 				    SL_ERROR|SL_TRACE,
 				    "tcp_bind: out of ports?");
@@ -26133,6 +20245,9 @@ tcp_bind_select_lport(tcp_t *tcp, in_port_t *requested_port_ptr,
 	return (0);
 }
 
+/*
+ * Check the address and check/pick a local port number.
+ */
 static int
 tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
     boolean_t bind_to_req_port_only)
@@ -26140,18 +20255,22 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 	tcp_t	*tcp = connp->conn_tcp;
 	sin_t	*sin;
 	sin6_t  *sin6;
-	in_port_t requested_port;
+	in_port_t	requested_port;
 	ipaddr_t	v4addr;
 	in6_addr_t	v6addr;
-	uint_t	ipversion;
-	int	error = 0;
+	ip_laddr_t	laddr_type = IPVL_UNICAST_UP;	/* INADDR_ANY */
+	zoneid_t	zoneid = IPCL_ZONEID(connp);
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
+	uint_t		scopeid = 0;
+	int		error = 0;
+	ip_xmit_attr_t	*ixa = connp->conn_ixa;
 
 	ASSERT((uintptr_t)len <= (uintptr_t)INT_MAX);
 
 	if (tcp->tcp_state == TCPS_BOUND) {
 		return (0);
 	} else if (tcp->tcp_state > TCPS_BOUND) {
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
 			    "tcp_bind: bad state, %d", tcp->tcp_state);
 		}
@@ -26161,7 +20280,7 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 	ASSERT(sa != NULL && len != 0);
 
 	if (!OK_32PTR((char *)sa)) {
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1,
 			    SL_ERROR|SL_TRACE,
 			    "tcp_bind: bad address parameter, "
@@ -26171,38 +20290,48 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 		return (-TPROTO);
 	}
 
+	error = proto_verify_ip_addr(connp->conn_family, sa, len);
+	if (error != 0) {
+		return (error);
+	}
+
 	switch (len) {
 	case sizeof (sin_t):	/* Complete IPv4 address */
 		sin = (sin_t *)sa;
-		/*
-		 * With sockets sockfs will accept bogus sin_family in
-		 * bind() and replace it with the family used in the socket
-		 * call.
-		 */
-		if (sin->sin_family != AF_INET ||
-		    tcp->tcp_family != AF_INET) {
-			return (EAFNOSUPPORT);
-		}
 		requested_port = ntohs(sin->sin_port);
-		ipversion = IPV4_VERSION;
 		v4addr = sin->sin_addr.s_addr;
 		IN6_IPADDR_TO_V4MAPPED(v4addr, &v6addr);
+		if (v4addr != INADDR_ANY) {
+			laddr_type = ip_laddr_verify_v4(v4addr, zoneid, ipst,
+			    B_FALSE);
+		}
 		break;
 
 	case sizeof (sin6_t): /* Complete IPv6 address */
 		sin6 = (sin6_t *)sa;
-		if (sin6->sin6_family != AF_INET6 ||
-		    tcp->tcp_family != AF_INET6) {
-			return (EAFNOSUPPORT);
-		}
-		requested_port = ntohs(sin6->sin6_port);
-		ipversion = IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr) ?
-		    IPV4_VERSION : IPV6_VERSION;
 		v6addr = sin6->sin6_addr;
+		requested_port = ntohs(sin6->sin6_port);
+		if (IN6_IS_ADDR_V4MAPPED(&v6addr)) {
+			if (connp->conn_ipv6_v6only)
+				return (EADDRNOTAVAIL);
+
+			IN6_V4MAPPED_TO_IPADDR(&v6addr, v4addr);
+			if (v4addr != INADDR_ANY) {
+				laddr_type = ip_laddr_verify_v4(v4addr,
+				    zoneid, ipst, B_FALSE);
+			}
+		} else {
+			if (!IN6_IS_ADDR_UNSPECIFIED(&v6addr)) {
+				if (IN6_IS_ADDR_LINKSCOPE(&v6addr))
+					scopeid = sin6->sin6_scope_id;
+				laddr_type = ip_laddr_verify_v6(&v6addr,
+				    zoneid, ipst, B_FALSE, scopeid);
+			}
+		}
 		break;
 
 	default:
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
 			    "tcp_bind: bad address length, %d", len);
 		}
@@ -26210,34 +20339,32 @@ tcp_bind_check(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 		/* return (-TBADADDR); */
 	}
 
-	tcp->tcp_bound_source_v6 = v6addr;
+	/* Is the local address a valid unicast address? */
+	if (laddr_type == IPVL_BAD)
+		return (EADDRNOTAVAIL);
 
-	/* Check for change in ipversion */
-	if (tcp->tcp_ipversion != ipversion) {
-		ASSERT(tcp->tcp_family == AF_INET6);
-		error = (ipversion == IPV6_VERSION) ?
-		    tcp_header_init_ipv6(tcp) : tcp_header_init_ipv4(tcp);
-		if (error) {
-			return (ENOMEM);
-		}
-	}
-
-	/*
-	 * Initialize family specific fields. Copy of the src addr.
-	 * in tcp_t is needed for the lookup funcs.
-	 */
-	if (tcp->tcp_ipversion == IPV6_VERSION) {
-		tcp->tcp_ip6h->ip6_src = v6addr;
+	connp->conn_bound_addr_v6 = v6addr;
+	if (scopeid != 0) {
+		ixa->ixa_flags |= IXAF_SCOPEID_SET;
+		ixa->ixa_scopeid = scopeid;
+		connp->conn_incoming_ifindex = scopeid;
 	} else {
-		IN6_V4MAPPED_TO_IPADDR(&v6addr, tcp->tcp_ipha->ipha_src);
+		ixa->ixa_flags &= ~IXAF_SCOPEID_SET;
+		connp->conn_incoming_ifindex = connp->conn_bound_if;
 	}
-	tcp->tcp_ip_src_v6 = v6addr;
+
+	connp->conn_laddr_v6 = v6addr;
+	connp->conn_saddr_v6 = v6addr;
 
 	bind_to_req_port_only = requested_port != 0 && bind_to_req_port_only;
 
 	error = tcp_bind_select_lport(tcp, &requested_port,
 	    bind_to_req_port_only, cr);
-
+	if (error != 0) {
+		connp->conn_laddr_v6 = ipv6_all_zeros;
+		connp->conn_saddr_v6 = ipv6_all_zeros;
+		connp->conn_bound_addr_v6 = ipv6_all_zeros;
+	}
 	return (error);
 }
 
@@ -26253,7 +20380,7 @@ tcp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 	tcp_t *tcp = connp->conn_tcp;
 
 	if (tcp->tcp_state >= TCPS_BOUND) {
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
 			    "tcp_bind: bad state, %d", tcp->tcp_state);
 		}
@@ -26265,19 +20392,8 @@ tcp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 		return (error);
 
 	ASSERT(tcp->tcp_state == TCPS_BOUND);
-
 	tcp->tcp_conn_req_max = 0;
-
-	if (tcp->tcp_family == AF_INET6) {
-		ASSERT(tcp->tcp_connp->conn_af_isv6);
-		error = ip_proto_bind_laddr_v6(connp, NULL, IPPROTO_TCP,
-		    &tcp->tcp_bound_source_v6, 0, B_FALSE);
-	} else {
-		ASSERT(!tcp->tcp_connp->conn_af_isv6);
-		error = ip_proto_bind_laddr_v4(connp, NULL, IPPROTO_TCP,
-		    tcp->tcp_ipha->ipha_src, 0, B_FALSE);
-	}
-	return (tcp_post_ip_bind(tcp, NULL, error, NULL, 0));
+	return (0);
 }
 
 int
@@ -26337,7 +20453,14 @@ tcp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	ipaddr_t	*dstaddrp;
 	in_port_t	dstport;
 	uint_t		srcid;
-	int		error = 0;
+	int		error;
+	uint32_t	mss;
+	mblk_t		*syn_mp;
+	tcp_stack_t	*tcps = tcp->tcp_tcps;
+	int32_t		oldstate;
+	ip_xmit_attr_t	*ixa = connp->conn_ixa;
+
+	oldstate = tcp->tcp_state;
 
 	switch (len) {
 	default:
@@ -26351,7 +20474,7 @@ tcp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 		if (sin->sin_port == 0) {
 			return (-TBADADDR);
 		}
-		if (tcp->tcp_connp && tcp->tcp_connp->conn_ipv6_v6only) {
+		if (connp->conn_ipv6_v6only) {
 			return (EAFNOSUPPORT);
 		}
 		break;
@@ -26365,23 +20488,18 @@ tcp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 	}
 	/*
 	 * If we're connecting to an IPv4-mapped IPv6 address, we need to
-	 * make sure that the template IP header in the tcp structure is an
-	 * IPv4 header, and that the tcp_ipversion is IPV4_VERSION.  We
+	 * make sure that the conn_ipversion is IPV4_VERSION.  We
 	 * need to this before we call tcp_bindi() so that the port lookup
 	 * code will look for ports in the correct port space (IPv4 and
 	 * IPv6 have separate port spaces).
 	 */
-	if (tcp->tcp_family == AF_INET6 && tcp->tcp_ipversion == IPV6_VERSION &&
+	if (connp->conn_family == AF_INET6 &&
+	    connp->conn_ipversion == IPV6_VERSION &&
 	    IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		int err = 0;
+		if (connp->conn_ipv6_v6only)
+			return (EADDRNOTAVAIL);
 
-		err = tcp_header_init_ipv4(tcp);
-			if (err != 0) {
-				error = ENOMEM;
-				goto connect_failed;
-			}
-		if (tcp->tcp_lport != 0)
-			*(uint16_t *)tcp->tcp_tcph->th_lport = tcp->tcp_lport;
+		connp->conn_ipversion = IPV4_VERSION;
 	}
 
 	switch (tcp->tcp_state) {
@@ -26399,43 +20517,147 @@ tcp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len,
 		 */
 		/* FALLTHRU */
 	case TCPS_BOUND:
-		if (tcp->tcp_family == AF_INET6) {
-			if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-				return (tcp_connect_ipv6(tcp,
-				    &sin6->sin6_addr,
-				    sin6->sin6_port, sin6->sin6_flowinfo,
-				    sin6->__sin6_src_id, sin6->sin6_scope_id,
-				    cr, pid));
-			}
+		break;
+	default:
+		return (-TOUTSTATE);
+	}
+
+	/*
+	 * We update our cred/cpid based on the caller of connect
+	 */
+	if (connp->conn_cred != cr) {
+		crhold(cr);
+		crfree(connp->conn_cred);
+		connp->conn_cred = cr;
+	}
+	connp->conn_cpid = pid;
+
+	/* Cache things in the ixa without any refhold */
+	ixa->ixa_cred = cr;
+	ixa->ixa_cpid = pid;
+	if (is_system_labeled()) {
+		/* We need to restart with a label based on the cred */
+		ip_xmit_attr_restore_tsl(ixa, ixa->ixa_cred);
+	}
+
+	if (connp->conn_family == AF_INET6) {
+		if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+			error = tcp_connect_ipv6(tcp, &sin6->sin6_addr,
+			    sin6->sin6_port, sin6->sin6_flowinfo,
+			    sin6->__sin6_src_id, sin6->sin6_scope_id);
+		} else {
 			/*
 			 * Destination adress is mapped IPv6 address.
 			 * Source bound address should be unspecified or
 			 * IPv6 mapped address as well.
 			 */
 			if (!IN6_IS_ADDR_UNSPECIFIED(
-			    &tcp->tcp_bound_source_v6) &&
-			    !IN6_IS_ADDR_V4MAPPED(&tcp->tcp_bound_source_v6)) {
+			    &connp->conn_bound_addr_v6) &&
+			    !IN6_IS_ADDR_V4MAPPED(&connp->conn_bound_addr_v6)) {
 				return (EADDRNOTAVAIL);
 			}
 			dstaddrp = &V4_PART_OF_V6((sin6->sin6_addr));
 			dstport = sin6->sin6_port;
 			srcid = sin6->__sin6_src_id;
-		} else {
-			dstaddrp = &sin->sin_addr.s_addr;
-			dstport = sin->sin_port;
-			srcid = 0;
+			error = tcp_connect_ipv4(tcp, dstaddrp, dstport,
+			    srcid);
 		}
-
-		error = tcp_connect_ipv4(tcp, dstaddrp, dstport, srcid, cr,
-		    pid);
-		break;
-	default:
-		return (-TOUTSTATE);
+	} else {
+		dstaddrp = &sin->sin_addr.s_addr;
+		dstport = sin->sin_port;
+		srcid = 0;
+		error = tcp_connect_ipv4(tcp, dstaddrp, dstport, srcid);
 	}
+
+	if (error != 0)
+		goto connect_failed;
+
+	CL_INET_CONNECT(connp, B_TRUE, error);
+	if (error != 0)
+		goto connect_failed;
+
+	/* connect succeeded */
+	BUMP_MIB(&tcps->tcps_mib, tcpActiveOpens);
+	tcp->tcp_active_open = 1;
+
 	/*
-	 * Note: Code below is the "failure" case
+	 * tcp_set_destination() does not adjust for TCP/IP header length.
 	 */
+	mss = tcp->tcp_mss - connp->conn_ht_iphc_len;
+
+	/*
+	 * Just make sure our rwnd is at least rcvbuf * MSS large, and round up
+	 * to the nearest MSS.
+	 *
+	 * We do the round up here because we need to get the interface MTU
+	 * first before we can do the round up.
+	 */
+	tcp->tcp_rwnd = connp->conn_rcvbuf;
+	tcp->tcp_rwnd = MAX(MSS_ROUNDUP(tcp->tcp_rwnd, mss),
+	    tcps->tcps_recv_hiwat_minmss * mss);
+	connp->conn_rcvbuf = tcp->tcp_rwnd;
+	tcp_set_ws_value(tcp);
+	tcp->tcp_tcpha->tha_win = htons(tcp->tcp_rwnd >> tcp->tcp_rcv_ws);
+	if (tcp->tcp_rcv_ws > 0 || tcps->tcps_wscale_always)
+		tcp->tcp_snd_ws_ok = B_TRUE;
+
+	/*
+	 * Set tcp_snd_ts_ok to true
+	 * so that tcp_xmit_mp will
+	 * include the timestamp
+	 * option in the SYN segment.
+	 */
+	if (tcps->tcps_tstamp_always ||
+	    (tcp->tcp_rcv_ws && tcps->tcps_tstamp_if_wscale)) {
+		tcp->tcp_snd_ts_ok = B_TRUE;
+	}
+
+	/*
+	 * tcp_snd_sack_ok can be set in
+	 * tcp_set_destination() if the sack metric
+	 * is set.  So check it here also.
+	 */
+	if (tcps->tcps_sack_permitted == 2 ||
+	    tcp->tcp_snd_sack_ok) {
+		if (tcp->tcp_sack_info == NULL) {
+			tcp->tcp_sack_info = kmem_cache_alloc(
+			    tcp_sack_info_cache, KM_SLEEP);
+		}
+		tcp->tcp_snd_sack_ok = B_TRUE;
+	}
+
+	/*
+	 * Should we use ECN?  Note that the current
+	 * default value (SunOS 5.9) of tcp_ecn_permitted
+	 * is 1.  The reason for doing this is that there
+	 * are equipments out there that will drop ECN
+	 * enabled IP packets.  Setting it to 1 avoids
+	 * compatibility problems.
+	 */
+	if (tcps->tcps_ecn_permitted == 2)
+		tcp->tcp_ecn_ok = B_TRUE;
+
+	TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
+	syn_mp = tcp_xmit_mp(tcp, NULL, 0, NULL, NULL,
+	    tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
+	if (syn_mp != NULL) {
+		/*
+		 * We must bump the generation before sending the syn
+		 * to ensure that we use the right generation in case
+		 * this thread issues a "connected" up call.
+		 */
+		SOCK_CONNID_BUMP(tcp->tcp_connid);
+		tcp_send_data(tcp, syn_mp);
+	}
+
+	if (tcp->tcp_conn.tcp_opts_conn_req != NULL)
+		tcp_close_mpp(&tcp->tcp_conn.tcp_opts_conn_req);
+	return (0);
+
 connect_failed:
+	connp->conn_faddr_v6 = ipv6_all_zeros;
+	connp->conn_fport = 0;
+	tcp->tcp_state = oldstate;
 	if (tcp->tcp_conn.tcp_opts_conn_req != NULL)
 		tcp_close_mpp(&tcp->tcp_conn.tcp_opts_conn_req);
 	return (error);
@@ -26446,7 +20668,6 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
     socklen_t len, sock_connid_t *id, cred_t *cr)
 {
 	conn_t		*connp = (conn_t *)proto_handle;
-	tcp_t		*tcp = connp->conn_tcp;
 	squeue_t	*sqp = connp->conn_sqp;
 	int		error;
 
@@ -26455,7 +20676,7 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
 
-	error = proto_verify_ip_addr(tcp->tcp_family, sa, len);
+	error = proto_verify_ip_addr(connp->conn_family, sa, len);
 	if (error != 0) {
 		return (error);
 	}
@@ -26493,7 +20714,7 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 		}
 	}
 
-	if (tcp->tcp_loopback) {
+	if (connp->conn_tcp->tcp_loopback) {
 		struct sock_proto_props sopp;
 
 		sopp.sopp_flags = SOCKOPT_LOOPBACK;
@@ -26521,7 +20742,7 @@ tcp_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
 		return (NULL);
 	}
 
-	connp = tcp_create_common(NULL, credp, isv6, B_TRUE, errorp);
+	connp = tcp_create_common(credp, isv6, B_TRUE, errorp);
 	if (connp == NULL) {
 		return (NULL);
 	}
@@ -26578,8 +20799,8 @@ tcp_activate(sock_lower_handle_t proto_handle, sock_upper_handle_t sock_handle,
 	connp->conn_upcalls = sock_upcalls;
 	connp->conn_upper_handle = sock_handle;
 
-	ASSERT(connp->conn_tcp->tcp_recv_hiwater != 0 &&
-	    connp->conn_tcp->tcp_recv_hiwater == connp->conn_tcp->tcp_rwnd);
+	ASSERT(connp->conn_rcvbuf != 0 &&
+	    connp->conn_rcvbuf == connp->conn_tcp->tcp_rwnd);
 	(*sock_upcalls->su_set_proto_props)(sock_handle, &sopp);
 }
 
@@ -26663,7 +20884,7 @@ tcp_sendmsg(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 		/*
 		 * Squeue Flow Control
 		 */
-		if (TCP_UNSENT_BYTES(tcp) > tcp->tcp_xmit_hiwater) {
+		if (TCP_UNSENT_BYTES(tcp) > connp->conn_sndbuf) {
 			tcp_setqfull(tcp);
 		}
 		mutex_exit(&tcp->tcp_non_sq_lock);
@@ -26680,12 +20901,11 @@ tcp_sendmsg(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 		CONN_INC_REF(connp);
 
 		if (msg->msg_flags & MSG_OOB) {
-			SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
-			    tcp_output_urgent, connp, tcp_squeue_flag,
-			    SQTAG_TCP_OUTPUT);
+			SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_output_urgent,
+			    connp, NULL, tcp_squeue_flag, SQTAG_TCP_OUTPUT);
 		} else {
 			SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_output,
-			    connp, tcp_squeue_flag, SQTAG_TCP_OUTPUT);
+			    connp, NULL, tcp_squeue_flag, SQTAG_TCP_OUTPUT);
 		}
 
 		return (0);
@@ -26698,9 +20918,9 @@ tcp_sendmsg(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 	return (0);
 }
 
-/* ARGSUSED */
+/* ARGSUSED2 */
 void
-tcp_output_urgent(void *arg, mblk_t *mp, void *arg2)
+tcp_output_urgent(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	int len;
 	uint32_t msize;
@@ -26739,7 +20959,7 @@ tcp_output_urgent(void *arg, mblk_t *mp, void *arg2)
 	tcp_wput_data(tcp, mp, B_TRUE);
 }
 
-/* ARGSUSED */
+/* ARGSUSED3 */
 int
 tcp_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *addr,
     socklen_t *addrlenp, cred_t *cr)
@@ -26752,24 +20972,24 @@ tcp_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *addr,
 	ASSERT(cr != NULL);
 
 	ASSERT(tcp != NULL);
+	if (tcp->tcp_state < TCPS_SYN_RCVD)
+		return (ENOTCONN);
 
-	return (tcp_do_getpeername(tcp, addr, addrlenp));
+	return (conn_getpeername(connp, addr, addrlenp));
 }
 
-/* ARGSUSED */
+/* ARGSUSED3 */
 int
 tcp_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *addr,
     socklen_t *addrlenp, cred_t *cr)
 {
 	conn_t	*connp = (conn_t *)proto_handle;
-	tcp_t	*tcp = connp->conn_tcp;
 
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
 
 	ASSERT(connp->conn_upper_handle != NULL);
-
-	return (tcp_do_getsockname(tcp, addr, addrlenp));
+	return (conn_getsockname(connp, addr, addrlenp));
 }
 
 /*
@@ -26809,8 +21029,8 @@ tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
 
 	RD(q)->q_ptr = WR(q)->q_ptr = connp;
 
-	connp->conn_tcp->tcp_rq = connp->conn_rq = RD(q);
-	connp->conn_tcp->tcp_wq = connp->conn_wq = WR(q);
+	connp->conn_rq = RD(q);
+	connp->conn_wq = WR(q);
 
 	WR(q)->q_qinfo = &tcp_sock_winit;
 
@@ -26830,11 +21050,11 @@ tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
 	stropt_mp->b_wptr += sizeof (struct stroptions);
 	stropt->so_flags = SO_HIWAT | SO_WROFF | SO_MAXBLK;
 
-	stropt->so_wroff = tcp->tcp_hdr_len + (tcp->tcp_loopback ? 0 :
+	stropt->so_wroff = connp->conn_ht_iphc_len + (tcp->tcp_loopback ? 0 :
 	    tcp->tcp_tcps->tcps_wroff_xtra);
 	if (tcp->tcp_snd_sack_ok)
 		stropt->so_wroff += TCPOPT_MAX_SACK_LEN;
-	stropt->so_hiwat = tcp->tcp_recv_hiwater;
+	stropt->so_hiwat = connp->conn_rcvbuf;
 	stropt->so_maxblk = tcp_maxpsz_set(tcp, B_FALSE);
 
 	putnext(RD(q), stropt_mp);
@@ -26845,15 +21065,17 @@ tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
 	tcp_do_capability_ack(tcp, &tca, TC1_INFO|TC1_ACCEPTOR_ID);
 
 	laddrlen = faddrlen = sizeof (sin6_t);
-	(void) tcp_do_getsockname(tcp, (struct sockaddr *)&laddr, &laddrlen);
-	error = tcp_do_getpeername(tcp, (struct sockaddr *)&faddr, &faddrlen);
+	(void) tcp_getsockname((sock_lower_handle_t)connp,
+	    (struct sockaddr *)&laddr, &laddrlen, CRED());
+	error = tcp_getpeername((sock_lower_handle_t)connp,
+	    (struct sockaddr *)&faddr, &faddrlen, CRED());
 	if (error != 0)
 		faddrlen = 0;
 
 	opts = 0;
-	if (tcp->tcp_oobinline)
+	if (connp->conn_oobinline)
 		opts |= SO_OOBINLINE;
-	if (tcp->tcp_dontroute)
+	if (connp->conn_ixa->ixa_flags & IXAF_DONTROUTE)
 		opts |= SO_DONTROUTE;
 
 	/*
@@ -26868,6 +21090,7 @@ tcp_fallback_noneager(tcp_t *tcp, mblk_t *stropt_mp, queue_t *q,
 	while ((mp = tcp->tcp_rcv_list) != NULL) {
 		tcp->tcp_rcv_list = mp->b_next;
 		mp->b_next = NULL;
+		/* We never do fallback for kernel RPC */
 		putnext(q, mp);
 	}
 	tcp->tcp_rcv_last_head = NULL;
@@ -26908,7 +21131,7 @@ tcp_fallback_eager(tcp_t *eager, boolean_t direct_sockfs)
 	 * Sockfs guarantees that the listener will not be closed
 	 * during fallback. So we can safely use the listener's queue.
 	 */
-	putnext(listener->tcp_rq, mp);
+	putnext(listener->tcp_connp->conn_rq, mp);
 }
 
 int
@@ -26987,7 +21210,7 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 
 /* ARGSUSED */
 static void
-tcp_shutdown_output(void *arg, mblk_t *mp, void *arg2)
+tcp_shutdown_output(void *arg, mblk_t *mp, void *arg2, ip_recv_attr_t *dummy)
 {
 	conn_t 	*connp = (conn_t *)arg;
 	tcp_t	*tcp = connp->conn_tcp;
@@ -27002,7 +21225,7 @@ tcp_shutdown_output(void *arg, mblk_t *mp, void *arg2)
 		 * We were crossing FINs and got a reset from
 		 * the other side. Just ignore it.
 		 */
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1,
 			    SL_ERROR|SL_TRACE,
 			    "tcp_shutdown_output() out of state %s",
@@ -27036,7 +21259,7 @@ tcp_shutdown(sock_lower_handle_t proto_handle, int how, cred_t *cr)
 		bp = allocb_wait(0, BPRI_HI, STR_NOSIG, NULL);
 		CONN_INC_REF(connp);
 		SQUEUE_ENTER_ONE(connp->conn_sqp, bp, tcp_shutdown_output,
-		    connp, SQ_NODRAIN, SQTAG_TCP_SHUTDOWN_OUTPUT);
+		    connp, NULL, SQ_NODRAIN, SQTAG_TCP_SHUTDOWN_OUTPUT);
 
 		(*connp->conn_upcalls->su_opctl)(connp->conn_upper_handle,
 		    SOCK_OPCTL_SHUT_SEND, 0);
@@ -27109,7 +21332,7 @@ tcp_do_listen(conn_t *connp, struct sockaddr *sa, socklen_t len,
 			 */
 			goto do_listen;
 		}
-		if (tcp->tcp_debug) {
+		if (connp->conn_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
 			    "tcp_listen: bad state, %d", tcp->tcp_state);
 		}
@@ -27121,15 +21344,14 @@ tcp_do_listen(conn_t *connp, struct sockaddr *sa, socklen_t len,
 			sin6_t *sin6;
 
 			ASSERT(IPCL_IS_NONSTR(connp));
-
 			/* Do an implicit bind: Request for a generic port. */
-			if (tcp->tcp_family == AF_INET) {
+			if (connp->conn_family == AF_INET) {
 				len = sizeof (sin_t);
 				sin = (sin_t *)&addr;
 				*sin = sin_null;
 				sin->sin_family = AF_INET;
 			} else {
-				ASSERT(tcp->tcp_family == AF_INET6);
+				ASSERT(connp->conn_family == AF_INET6);
 				len = sizeof (sin6_t);
 				sin6 = (sin6_t *)&addr;
 				*sin6 = sin6_null;
@@ -27171,23 +21393,42 @@ do_listen:
 	}
 
 	/*
-	 * We can call ip_bind directly, the processing continues
-	 * in tcp_post_ip_bind().
-	 *
 	 * We need to make sure that the conn_recv is set to a non-null
 	 * value before we insert the conn into the classifier table.
 	 * This is to avoid a race with an incoming packet which does an
 	 * ipcl_classify().
+	 * We initially set it to tcp_input_listener_unbound to try to
+	 * pick a good squeue for the listener when the first SYN arrives.
+	 * tcp_input_listener_unbound sets it to tcp_input_listener on that
+	 * first SYN.
 	 */
-	connp->conn_recv = tcp_conn_request;
-	if (tcp->tcp_family == AF_INET) {
-		error = ip_proto_bind_laddr_v4(connp, NULL,
-		    IPPROTO_TCP, tcp->tcp_bound_source, tcp->tcp_lport, B_TRUE);
-	} else {
-		error = ip_proto_bind_laddr_v6(connp, NULL, IPPROTO_TCP,
-		    &tcp->tcp_bound_source_v6, tcp->tcp_lport, B_TRUE);
+	connp->conn_recv = tcp_input_listener_unbound;
+
+	/* Insert the listener in the classifier table */
+	error = ip_laddr_fanout_insert(connp);
+	if (error != 0) {
+		/* Undo the bind - release the port number */
+		tcp->tcp_state = TCPS_IDLE;
+		connp->conn_bound_addr_v6 = ipv6_all_zeros;
+
+		connp->conn_laddr_v6 = ipv6_all_zeros;
+		connp->conn_saddr_v6 = ipv6_all_zeros;
+		connp->conn_ports = 0;
+
+		if (connp->conn_anon_port) {
+			zone_t		*zone;
+
+			zone = crgetzone(cr);
+			connp->conn_anon_port = B_FALSE;
+			(void) tsol_mlp_anon(zone, connp->conn_mlp_type,
+			    connp->conn_proto, connp->conn_lport, B_FALSE);
+		}
+		connp->conn_mlp_type = mlptSingle;
+
+		tcp_bind_hash_remove(tcp);
+		return (error);
 	}
-	return (tcp_post_ip_bind(tcp, NULL, error, NULL, 0));
+	return (error);
 }
 
 void
@@ -27222,7 +21463,7 @@ tcp_clr_flowctrl(sock_lower_handle_t proto_handle)
 	if (tcp->tcp_fused) {
 		tcp_fuse_backenable(tcp);
 	} else {
-		tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
+		tcp->tcp_rwnd = connp->conn_rcvbuf;
 		/*
 		 * Send back a window update immediately if TCP is above
 		 * ESTABLISHED state and the increase of the rcv window
@@ -27253,10 +21494,28 @@ tcp_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 	/* All Solaris components should pass a cred for this operation. */
 	ASSERT(cr != NULL);
 
+	/*
+	 * If we don't have a helper stream then create one.
+	 * ip_create_helper_stream takes care of locking the conn_t,
+	 * so this check for NULL is just a performance optimization.
+	 */
+	if (connp->conn_helper_info == NULL) {
+		tcp_stack_t *tcps = connp->conn_tcp->tcp_tcps;
+
+		/*
+		 * Create a helper stream for non-STREAMS socket.
+		 */
+		error = ip_create_helper_stream(connp, tcps->tcps_ldi_ident);
+		if (error != 0) {
+			ip0dbg(("tcp_ioctl: create of IP helper stream "
+			    "failed %d\n", error));
+			return (error);
+		}
+	}
+
 	switch (cmd) {
 		case ND_SET:
 		case ND_GET:
-		case TCP_IOC_DEFAULT_Q:
 		case _SIOCSOCKFALLBACK:
 		case TCP_IOC_ABORT_CONN:
 		case TI_GETPEERNAME:

@@ -83,9 +83,9 @@ extern int sctp_bindx(struct sctp_s *conn, const void *addrs, int addrcnt,
     int flags);
 extern void sctp_close(struct sctp_s *conn);
 extern int sctp_connect(struct sctp_s *conn, const struct sockaddr *dst,
-    socklen_t addrlen);
+    socklen_t addrlen, cred_t *cr, pid_t pid);
 extern struct sctp_s *sctp_create(void *newhandle, struct sctp_s *parent,
-    int family, int flags, struct sock_upcalls_s *su,
+    int family, int type, int flags, struct sock_upcalls_s *su,
     sctp_sockbuf_limits_t *sbl, cred_t *cr);
 extern int sctp_disconnect(struct sctp_s *conn);
 extern int sctp_get_opt(struct sctp_s *conn, int level, int opt, void *opts,

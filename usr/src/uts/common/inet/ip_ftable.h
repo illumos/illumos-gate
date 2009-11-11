@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,7 @@ struct rt_entry {
  *
  * The comment below (and for other netstack_t references) refers
  * to the fact that we only do netstack_hold in particular cases,
- * such as the references from open streams (ill_t and conn_t's
+ * such as the references from open endpoints (ill_t and conn_t's
  * pointers). Internally within IP we rely on IP's ability to cleanup e.g.
  * ire_t's when an ill goes away.
  */
@@ -74,26 +74,8 @@ int rtfunc(struct radix_node *, void *);
 typedef struct rt_entry rt_t;
 typedef struct rtfuncarg rtf_t;
 
-/* For ire_forward() */
-enum ire_forward_action {
-	Forward_ok,			/* OK to use this IRE to forward */
-	Forward_check_multirt,		/* CGTP multirt check required */
-	Forward_ret_icmp_err,		/* Callers to return an ICMP error */
-	Forward_blackhole		/* Packet is silently discarded */
-};
-
 struct ts_label_s;
-extern	ire_t	*ire_ftable_lookup(ipaddr_t, ipaddr_t, ipaddr_t, int,
-    const ipif_t *, ire_t **, zoneid_t, uint32_t,
-    const struct ts_label_s *, int, ip_stack_t *);
-extern	ire_t *ire_lookup_multi(ipaddr_t, zoneid_t, ip_stack_t *);
-extern	ire_t *ipif_lookup_multi_ire(ipif_t *, ipaddr_t);
 extern	void ire_delete_host_redirects(ipaddr_t, ip_stack_t *);
-extern	ire_t *ire_ihandle_lookup_onlink(ire_t *);
-extern	ire_t *ire_forward(ipaddr_t, enum ire_forward_action *, ire_t *,
-    ire_t *, const struct ts_label_s *, ip_stack_t *);
-extern	ire_t *ire_forward_simple(ipaddr_t, enum ire_forward_action *,
-    ip_stack_t *);
 extern irb_t	*ire_get_bucket(ire_t *);
 extern uint_t ifindex_lookup(const struct sockaddr *, zoneid_t);
 extern int ipfil_sendpkt(const struct sockaddr *, mblk_t *, uint_t, zoneid_t);

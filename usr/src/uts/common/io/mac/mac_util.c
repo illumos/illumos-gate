@@ -476,7 +476,7 @@ mac_ip_hdr_length_v6(mblk_t *mp, ip6_t *ip6h, uint16_t *hdr_length,
 	endptr = mp->b_wptr;
 	if (((uchar_t *)ip6h + IPV6_HDR_LEN) > endptr)
 		return (B_FALSE);
-	ASSERT((IPH_HDR_VERSION(ip6h) & ~IP_FORWARD_PROG_BIT) == IPV6_VERSION);
+	ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
 	length = IPV6_HDR_LEN;
 	whereptr = ((uint8_t *)&ip6h[1]); /* point to next hdr */
 

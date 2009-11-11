@@ -42,9 +42,6 @@ typedef struct tcp_stat {
 	kstat_named_t	tcp_time_wait;
 	kstat_named_t	tcp_time_wait_syn;
 	kstat_named_t	tcp_time_wait_syn_success;
-	kstat_named_t	tcp_time_wait_syn_fail;
-	kstat_named_t	tcp_reinput_syn;
-	kstat_named_t	tcp_ip_output;
 	kstat_named_t	tcp_detach_non_time_wait;
 	kstat_named_t	tcp_detach_time_wait;
 	kstat_named_t	tcp_time_wait_reap;
@@ -82,37 +79,14 @@ typedef struct tcp_stat {
 	kstat_named_t	tcp_timermp_freed;
 	kstat_named_t	tcp_push_timer_cnt;
 	kstat_named_t	tcp_ack_timer_cnt;
-	kstat_named_t	tcp_ire_null1;
-	kstat_named_t	tcp_ire_null;
-	kstat_named_t	tcp_ip_send;
-	kstat_named_t	tcp_ip_ire_send;
 	kstat_named_t   tcp_wsrv_called;
 	kstat_named_t   tcp_flwctl_on;
 	kstat_named_t	tcp_timer_fire_early;
 	kstat_named_t	tcp_timer_fire_miss;
 	kstat_named_t	tcp_rput_v6_error;
-	kstat_named_t	tcp_out_sw_cksum;
-	kstat_named_t	tcp_out_sw_cksum_bytes;
 	kstat_named_t	tcp_zcopy_on;
 	kstat_named_t	tcp_zcopy_off;
 	kstat_named_t	tcp_zcopy_backoff;
-	kstat_named_t	tcp_zcopy_disable;
-	kstat_named_t	tcp_mdt_pkt_out;
-	kstat_named_t	tcp_mdt_pkt_out_v4;
-	kstat_named_t	tcp_mdt_pkt_out_v6;
-	kstat_named_t	tcp_mdt_discarded;
-	kstat_named_t	tcp_mdt_conn_halted1;
-	kstat_named_t	tcp_mdt_conn_halted2;
-	kstat_named_t	tcp_mdt_conn_halted3;
-	kstat_named_t	tcp_mdt_conn_resumed1;
-	kstat_named_t	tcp_mdt_conn_resumed2;
-	kstat_named_t	tcp_mdt_legacy_small;
-	kstat_named_t	tcp_mdt_legacy_all;
-	kstat_named_t	tcp_mdt_legacy_ret;
-	kstat_named_t	tcp_mdt_allocfail;
-	kstat_named_t	tcp_mdt_addpdescfail;
-	kstat_named_t	tcp_mdt_allocd;
-	kstat_named_t	tcp_mdt_linked;
 	kstat_named_t	tcp_fusion_flowctl;
 	kstat_named_t	tcp_fusion_backenabled;
 	kstat_named_t	tcp_fusion_urg;
@@ -154,15 +128,6 @@ struct tcp_stack {
 
 	mib2_tcp_t	tcps_mib;
 
-	/* Protected by tcps_g_q_lock */
-	queue_t		*tcps_g_q;	/* Default queue */
-	uint_t		tcps_refcnt;	/* Total number of tcp_t's */
-	kmutex_t	tcps_g_q_lock;
-	kcondvar_t	tcps_g_q_cv;
-	kthread_t	*tcps_g_q_creator;
-	struct __ldi_handle *tcps_g_q_lh;
-	cred_t		*tcps_g_q_cr;    /* For _inactive close call */
-
 	/*
 	 * Extra privileged ports. In host byte order.
 	 * Protected by tcp_epriv_port_lock.
@@ -182,9 +147,6 @@ struct tcp_stack {
 	caddr_t		tcps_g_nd;
 	struct tcpparam_s *tcps_params;	/* ndd parameters */
 	struct tcpparam_s *tcps_wroff_xtra_param;
-	struct tcpparam_s *tcps_mdt_head_param;
-	struct tcpparam_s *tcps_mdt_tail_param;
-	struct tcpparam_s *tcps_mdt_max_pbufs_param;
 
 	/* Hint not protected by any lock */
 	uint_t		tcps_next_port_to_try;
@@ -222,6 +184,11 @@ struct tcp_stack {
 	/* The number of RST not sent because of the rate limit. */
 	uint32_t	tcps_rst_unsent;
 	ldi_ident_t	tcps_ldi_ident;
+
+	/* Used to synchronize access when reclaiming memory */
+	mblk_t		*tcps_ixa_cleanup_mp;
+	kmutex_t	tcps_ixa_cleanup_lock;
+	kcondvar_t	tcps_ixa_cleanup_cv;
 };
 typedef struct tcp_stack tcp_stack_t;
 

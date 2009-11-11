@@ -571,7 +571,8 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	 * it is the clustering module's responsibility to free the lists.
 	 */
 	if (cl_sctp_assoc_change != NULL) {
-		(*cl_sctp_assoc_change)(sctp->sctp_family, alist, asize,
+		(*cl_sctp_assoc_change)(sctp->sctp_connp->conn_family,
+		    alist, asize,
 		    acount, dlist, dsize, dcount, SCTP_CL_PADDR,
 		    (cl_sctp_handle_t)sctp);
 		/* alist and dlist will be freed by the clustering module */
@@ -586,9 +587,10 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 		ach->sch_len = htons(msgdsize(hmp) - sctp->sctp_hdr_len);
 	else
 		ach->sch_len = htons(msgdsize(hmp) - sctp->sctp_hdr6_len);
-	sctp_set_iplen(sctp, hmp);
 
-	sctp_add_sendq(sctp, hmp);
+	sctp_set_iplen(sctp, hmp, fp->ixa);
+	(void) conn_ip_output(hmp, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 	sctp_validate_peer(sctp);
 }
 
@@ -809,7 +811,7 @@ sctp_input_asconf_ack(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 		mp->b_prev = NULL;
 		ainfo->sctp_cl_alist = NULL;
 		ainfo->sctp_cl_dlist = NULL;
-		(*cl_sctp_assoc_change)(sctp->sctp_family, alist,
+		(*cl_sctp_assoc_change)(sctp->sctp_connp->conn_family, alist,
 		    ainfo->sctp_cl_asize, acount, dlist, ainfo->sctp_cl_dsize,
 		    dcount, SCTP_CL_LADDR, (cl_sctp_handle_t)sctp);
 		/* alist and dlist will be freed by the clustering module */
@@ -1010,12 +1012,13 @@ sctp_wput_asconf(sctp_t *sctp, sctp_faddr_t *fp)
 	fp->suna += MBLKL(mp);
 	/* Attach the header and send the chunk */
 	ipmp->b_cont = mp;
-	sctp_set_iplen(sctp, ipmp);
 	sctp->sctp_cchunk_pend = 1;
 
 	SCTP_SET_SENT_FLAG(sctp->sctp_cxmit_list);
 	SCTP_SET_CHUNK_DEST(sctp->sctp_cxmit_list, fp);
-	sctp_add_sendq(sctp, ipmp);
+	sctp_set_iplen(sctp, ipmp, fp->ixa);
+	(void) conn_ip_output(ipmp, fp->ixa);
+	BUMP_LOCAL(sctp->sctp_opkts);
 	SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, fp->rto);
 #undef	SCTP_SET_SENT_FLAG
 }
@@ -1418,6 +1421,7 @@ sctp_add_ip(sctp_t *sctp, const void *addrs, uint32_t cnt)
 	uint16_t		type = htons(PARM_ADD_IP);
 	boolean_t		v4mapped = B_FALSE;
 	sctp_cl_ainfo_t		*ainfo = NULL;
+	conn_t			*connp = sctp->sctp_connp;
 
 	/* Does the peer understand ASCONF and Add-IP? */
 	if (!sctp->sctp_understands_asconf || !sctp->sctp_understands_addip)
@@ -1453,7 +1457,7 @@ sctp_add_ip(sctp_t *sctp, const void *addrs, uint32_t cnt)
 	 *   o Must be part of the association
 	 */
 	for (i = 0; i < cnt; i++) {
-		switch (sctp->sctp_family) {
+		switch (connp->conn_family) {
 		case AF_INET:
 			sin4 = (struct sockaddr_in *)addrs + i;
 			v4mapped = B_TRUE;
@@ -1538,6 +1542,7 @@ sctp_del_ip(sctp_t *sctp, const void *addrs, uint32_t cnt, uchar_t *ulist,
 	uchar_t			*p = ulist;
 	boolean_t		check_lport = B_FALSE;
 	sctp_stack_t		*sctps = sctp->sctp_sctps;
+	conn_t			*connp = sctp->sctp_connp;
 
 	/* Does the peer understand ASCONF and Add-IP? */
 	if (sctp->sctp_state <= SCTPS_LISTEN || !sctps->sctps_addip_enabled ||
@@ -1577,10 +1582,11 @@ sctp_del_ip(sctp_t *sctp, const void *addrs, uint32_t cnt, uchar_t *ulist,
 	for (i = 0; i < cnt; i++) {
 		ifindex = 0;
 
-		switch (sctp->sctp_family) {
+		switch (connp->conn_family) {
 		case AF_INET:
 			sin4 = (struct sockaddr_in *)addrs + i;
-			if (check_lport && sin4->sin_port != sctp->sctp_lport) {
+			if (check_lport &&
+			    sin4->sin_port != connp->conn_lport) {
 				error = EINVAL;
 				goto fail;
 			}
@@ -1591,7 +1597,7 @@ sctp_del_ip(sctp_t *sctp, const void *addrs, uint32_t cnt, uchar_t *ulist,
 		case AF_INET6:
 			sin6 = (struct sockaddr_in6 *)addrs + i;
 			if (check_lport &&
-			    sin6->sin6_port != sctp->sctp_lport) {
+			    sin6->sin6_port != connp->conn_lport) {
 				error = EINVAL;
 				goto fail;
 			}
@@ -1675,7 +1681,7 @@ fail:
 	for (i = 0; i < addrcnt; i++) {
 		ifindex = 0;
 
-		switch (sctp->sctp_family) {
+		switch (connp->conn_family) {
 		case AF_INET:
 			sin4 = (struct sockaddr_in *)addrs + i;
 			IN6_INADDR_TO_V4MAPPED(&(sin4->sin_addr), &addr);
@@ -1697,7 +1703,7 @@ fail:
 }
 
 int
-sctp_set_peerprim(sctp_t *sctp, const void *inp, uint_t inlen)
+sctp_set_peerprim(sctp_t *sctp, const void *inp)
 {
 	const struct sctp_setprim	*prim = inp;
 	const struct sockaddr_storage	*ss;
@@ -1716,9 +1722,6 @@ sctp_set_peerprim(sctp_t *sctp, const void *inp, uint_t inlen)
 	if (!sctp->sctp_understands_asconf || !sctp->sctp_understands_addip) {
 		return (EOPNOTSUPP);
 	}
-
-	if (inlen < sizeof (*prim))
-		return (EINVAL);
 
 	/* Don't do anything if we are not connected */
 	if (sctp->sctp_state != SCTPS_ESTABLISHED)

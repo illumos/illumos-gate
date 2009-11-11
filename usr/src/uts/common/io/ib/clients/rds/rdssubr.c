@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/clients/rds/rds.h>
 #include <sys/ib/clients/rds/rds_kstat.h>
@@ -135,9 +133,9 @@ rds_init()
 	 * kstats
 	 */
 	rds_kstatsp = kstat_create("rds", 0,
-		"rds_kstat", "misc", KSTAT_TYPE_NAMED,
-		sizeof (rds_kstat) / sizeof (kstat_named_t),
-		KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_WRITABLE);
+	    "rds_kstat", "misc", KSTAT_TYPE_NAMED,
+	    sizeof (rds_kstat) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_WRITABLE);
 	if (rds_kstatsp != NULL) {
 		rds_kstatsp->ks_lock = &rds_kstat_mutex;
 		rds_kstatsp->ks_data = (void *)&rds_kstat;
@@ -298,17 +296,14 @@ rds_fanout(ipaddr_t local_addr, ipaddr_t rem_addr,
 boolean_t
 rds_islocal(ipaddr_t addr)
 {
-	ire_t *ire;
 	ip_stack_t *ipst;
 
 	ipst = netstack_find_by_zoneid(GLOBAL_ZONEID)->netstack_ip;
 	ASSERT(ipst != NULL);
-
-	ire = ire_ctable_lookup(addr, NULL, IRE_LOCAL | IRE_LOOPBACK |
-	    IRE_BROADCAST, NULL, ALL_ZONES, NULL, MATCH_IRE_TYPE, ipst);
-	netstack_rele(ipst->ips_netstack);
-	if (ire == NULL)
+	if (ip_laddr_verify_v4(addr, ALL_ZONES, ipst, B_FALSE) == IPVL_BAD) {
+		netstack_rele(ipst->ips_netstack);
 		return (B_FALSE);
-	ire_refrele(ire);
+	}
+	netstack_rele(ipst->ips_netstack);
 	return (B_TRUE);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -92,9 +92,6 @@ ip_cksum(mblk_t *mp, int offset, uint_t sum)
 		return (0xffff);
 #endif
 	ASSERT(dp);
-
-	TRACE_2(TR_FAC_IP, TR_IP_CKSUM_START,
-	    "ip_cksum_start:%p (%X)", mp, sum);
 
 	if (mp->b_cont == NULL) {
 		/*
@@ -276,9 +273,6 @@ slow1:
 		snorm:
 			mlen = mp->b_wptr - (uchar_t *)w;
 		}
-
-		TRACE_2(TR_FAC_IP, TR_IP_CKSUM_START,
-		    "ip_cksum_start:%p (%X)", mp, sum)
 
 		mp = mp->b_cont;
 		if (mlen > 0 && pmlen == -1) {

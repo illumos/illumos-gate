@@ -159,6 +159,7 @@ static int moptions;			/* multicast options */
 int npackets;				/* number of packets to send */
 static ushort_t tos;			/* type-of-service value */
 static int hoplimit = -1;		/* time-to-live value */
+static int dontfrag;			/* IP*_DONTFRAG */
 static int timeout = TIMEOUT;		/* timeout value (sec) for probes */
 static struct if_entry out_if;		/* interface argument */
 int ident;				/* ID for this ping run */
@@ -268,7 +269,7 @@ main(int argc, char *argv[])
 	setbuf(stdout, (char *)0);
 
 	while ((c = getopt(argc, argv,
-	    "abA:c:dF:G:g:I:i:LlnN:P:p:rRSsTt:UvX:x:Y0123?")) != -1) {
+	    "abA:c:dDF:G:g:I:i:LlnN:P:p:rRSsTt:UvX:x:Y0123?")) != -1) {
 		switch ((char)c) {
 		case 'A':
 			if (strcmp(optarg, "inet") == 0) {
@@ -299,6 +300,10 @@ main(int argc, char *argv[])
 
 		case 'd':
 			options |= SO_DEBUG;
+			break;
+
+		case 'D':
+			dontfrag = 1;
 			break;
 
 		case 'b':
@@ -1303,8 +1308,6 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 		}
 	}
 
-	if (nexthop != NULL && !use_udp)
-		set_nexthop(family, ai_nexthop, recv_sock);
 	/*
 	 * We always receive on raw icmp socket. But the sending socket can be
 	 * raw icmp or udp, depending on the use of -U flag.
@@ -1331,9 +1334,6 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 				exit(EXIT_FAILURE);
 			}
 		}
-
-		if (nexthop != NULL)
-			set_nexthop(family, ai_nexthop, send_sock);
 
 		/*
 		 * In order to distinguish replies to our UDP probes from
@@ -1367,6 +1367,9 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 	} else {
 		send_sock = recv_sock;
 	}
+
+	if (nexthop != NULL)
+		set_nexthop(family, ai_nexthop, send_sock);
 
 	int_op = 48 * 1024;
 	if (int_op < datalen)
@@ -1431,6 +1434,7 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 	if (moptions & MULTICAST_TTL) {
 		char_op = hoplimit;
 
+		/* Applies to unicast and multicast. */
 		if (family == AF_INET) {
 			if (setsockopt(send_sock, IPPROTO_IP, IP_MULTICAST_TTL,
 			    (char *)&char_op, sizeof (char)) == -1) {
@@ -1454,7 +1458,10 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 		 */
 	}
 
-	/* did the user specify an interface? */
+	/*
+	 * did the user specify an interface?
+	 * Applies to unicast, broadcast and multicast.
+	 */
 	if (moptions & MULTICAST_IF) {
 		struct ifaddrlist *al = NULL;		/* interface list */
 		struct ifaddrlist *my_if;
@@ -1496,11 +1503,22 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 		}
 
 		if (family == AF_INET) {
+			struct in_pktinfo pktinfo;
+
 			if (setsockopt(send_sock, IPPROTO_IP, IP_MULTICAST_IF,
 			    (char *)&my_if->addr.addr,
 			    sizeof (struct in_addr)) == -1) {
 				Fprintf(stderr, "%s: setsockopt "
 				    "IP_MULTICAST_IF %s\n", progname,
+				    strerror(errno));
+				exit(EXIT_FAILURE);
+			}
+			bzero(&pktinfo, sizeof (pktinfo));
+			pktinfo.ipi_ifindex = my_if->index;
+			if (setsockopt(send_sock, IPPROTO_IP, IP_PKTINFO,
+			    (char *)&pktinfo, sizeof (pktinfo)) == -1) {
+				Fprintf(stderr, "%s: setsockopt "
+				    "IP_PKTINFO %s\n", progname,
 				    strerror(errno));
 				exit(EXIT_FAILURE);
 			}
@@ -1520,6 +1538,23 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 		if (setsockopt(send_sock, IPPROTO_IP, IP_TOS, (char *)&int_op,
 		    sizeof (int_op)) == -1) {
 			Fprintf(stderr, "%s: setsockopt IP_TOS %s\n",
+			    progname, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	/* We enable or disable to not depend on the kernel default */
+	if (family == AF_INET) {
+		if (setsockopt(send_sock, IPPROTO_IP, IP_DONTFRAG,
+		    (char *)&dontfrag, sizeof (dontfrag)) == -1) {
+			Fprintf(stderr, "%s: setsockopt IP_DONTFRAG %s\n",
+			    progname, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		if (setsockopt(send_sock, IPPROTO_IPV6, IPV6_DONTFRAG,
+		    (char *)&dontfrag, sizeof (dontfrag)) == -1) {
+			Fprintf(stderr, "%s: setsockopt IPV6_DONTFRAG %s\n",
 			    progname, strerror(errno));
 			exit(EXIT_FAILURE);
 		}
@@ -2336,7 +2371,7 @@ usage(char *cmdname)
 	Fprintf(stderr, "usage: %s host [timeout]\n", cmdname);
 	Fprintf(stderr,
 /* CSTYLED */
-"usage: %s -s [-l | U] [abdLnRrv] [-A addr_family] [-c traffic_class]\n\t"
+"usage: %s -s [-l | U] [abdDLnRrv] [-A addr_family] [-c traffic_class]\n\t"
 "[-g gateway [-g gateway ...]] [-N nexthop] [-F flow_label] [-I interval]\n\t"
 "[-i interface] [-P tos] [-p port] [-t ttl] host [data_size] [npackets]\n",
 	    cmdname);
