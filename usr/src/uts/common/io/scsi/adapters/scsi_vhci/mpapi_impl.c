@@ -125,6 +125,8 @@ static int vhci_mpapi_ioctl(dev_t dev, struct scsi_vhci *, void *,
 static int vhci_mpapi_add_to_list(mpapi_list_header_t *, mpapi_item_list_t *);
 static mpapi_item_list_t *vhci_mpapi_create_item(struct scsi_vhci *,
     uint8_t, void *);
+static mpapi_item_list_t *vhci_mpapi_get_alua_item(struct scsi_vhci *,
+    void *, void *, void *);
 static mpapi_item_list_t *vhci_mpapi_get_tpg_item(struct scsi_vhci *,
     uint32_t, void *, char *, void *);
 static mpapi_list_header_t *vhci_mpapi_create_list_head();
@@ -3084,6 +3086,69 @@ vhci_update_mpapi_data(struct scsi_vhci *vhci, scsi_vhci_lun_t *vlun,
 
 /*
  * Routine to search (& return if found) a TPG object with a specified
+ * tpg_id and rel_tp_id for a specified vlun structure. Returns NULL
+ * if either TPG object or the lu item is not found.
+ * This routine is used for TPGS(ALUA) devices.
+ */
+/* ARGSUSED */
+static mpapi_item_list_t *
+vhci_mpapi_get_alua_item(struct scsi_vhci *vhci, void *vlun, void *tpg_id,
+    void *tp)
+{
+	mpapi_list_header_t	*this_tpghdr;
+	mpapi_item_list_t	*tpglist, *this_lulist, *this_tpglist;
+	mpapi_tpg_data_t	*tpgdata, *this_tpgdata;
+
+	VHCI_DEBUG(6, (CE_NOTE, NULL, "vhci_mpapi_get_alua_item: ENTER: vlun="
+	    "%p, tpg_id=%s, tp=%s\n",
+	    (void *)vlun, (char *)tpg_id, (char *)tp));
+
+	/*
+	 * Check if target port is already in any existing group
+	 */
+	tpglist = vhci->mp_priv->obj_hdr_list[MP_OBJECT_TYPE_TARGET_PORT_GROUP]
+	    ->head;
+	while (tpglist != NULL) {
+		tpgdata = tpglist->item->idata;
+
+		if ((tpgdata) &&
+		    (vhci_mpapi_check_tp_in_tpg(tpgdata, tp) == 1) &&
+		    (strcmp(tpgdata->resp, tpg_id) == 0)) {
+			return (tpglist);
+		} else {
+			tpglist = tpglist->next;
+		}
+	}
+
+	/*
+	 * If target port is not existed, search TPG associated
+	 * with this LU to see if this LU has a TPG with the same
+	 * tpg_id.
+	 */
+	this_lulist = vhci_get_mpapi_item(vhci, NULL,
+	    MP_OBJECT_TYPE_MULTIPATH_LU, vlun);
+	if (this_lulist != NULL) {
+		this_tpghdr = ((mpapi_lu_data_t *)(this_lulist->item->idata))
+		    ->tpg_list;
+		this_tpglist = this_tpghdr->head;
+		while (this_tpglist != NULL) {
+			this_tpgdata = this_tpglist->item->idata;
+			if ((this_tpgdata) &&
+			    (strcmp(this_tpgdata->resp, tpg_id) == 0)) {
+				return (this_tpglist);
+			} else {
+				this_tpglist = this_tpglist->next;
+			}
+		}
+	}
+
+	VHCI_DEBUG(4, (CE_WARN, NULL, "vhci_mpapi_get_tpg_item: Returns NULL"));
+
+	return (NULL);
+}
+
+/*
+ * Routine to search (& return if found) a TPG object with a specified
  * accessState for a specified vlun structure. Returns NULL if either
  * TPG object or the lu item is not found.
  * This routine is used for NON-TPGS devices.
@@ -3564,12 +3629,23 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr,
 	}
 
 	/*
-	 * Create Level 1 & Level 2 data structures
-	 * Parse REPORT_TARGET_PORT_GROUP data & update mpapi database.
+	 * Building Target Port list is different here.
+	 * For each different Relative Target Port. we have a new MPAPI
+	 * Target Port OID generated.
+	 * Just find out the main Target Port property here.
 	 */
+	tgt_port = NULL;
+	if (mdi_prop_lookup_string(pip, SCSI_ADDR_PROP_TARGET_PORT,
+	    &tgt_port) != DDI_PROP_SUCCESS) {
+		/* XXX: target-port prop not found */
+		tgt_port = (char *)mdi_pi_get_addr(pip);
+		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_mpapi_update_tpg_data: "
+		    "mdi_prop_lookup_string() returned failure; "
+		    "Hence tgt_port = %p", (void *)tgt_port));
+	}
 
-	tpg_list = vhci_get_mpapi_item(vhci, NULL,
-	    MP_OBJECT_TYPE_TARGET_PORT_GROUP, &tpg_id);
+	/* Search for existing group that contains this target port */
+	tpg_list = vhci_mpapi_get_alua_item(vhci, vlun, &tpg_id, tgt_port);
 	if (tpg_list == NULL) {
 		tpg_list = vhci_mpapi_create_item(vhci,
 		    MP_OBJECT_TYPE_TARGET_PORT_GROUP, &tpg_id);
@@ -3618,22 +3694,6 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr,
 		lu_tpg_list->item = tpg_list->item;
 		(void) vhci_mpapi_add_to_list(((mpapi_lu_data_t *)
 		    (lu_list->item->idata))->tpg_list, lu_tpg_list);
-	}
-
-	/*
-	 * Building Target Port list is different here.
-	 * For each different Relative Target Port. we have a new MPAPI
-	 * Target Port OID generated.
-	 * Just find out the main Target Port property here.
-	 */
-	tgt_port = NULL;
-	if (mdi_prop_lookup_string(pip, SCSI_ADDR_PROP_TARGET_PORT,
-	    &tgt_port) != DDI_PROP_SUCCESS) {
-		/* XXX: target-port prop not found */
-		tgt_port = (char *)mdi_pi_get_addr(pip);
-		VHCI_DEBUG(1, (CE_WARN, NULL, "vhci_mpapi_update_tpg_data: "
-		    "mdi_prop_lookup_string() returned failure; "
-		    "Hence tgt_port = %p", (void *)tgt_port));
 	}
 
 	/*

@@ -4904,7 +4904,6 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	int				rval = MDI_FAILURE;
 	mpapi_item_list_t		*list_ptr;
 	mpapi_lu_data_t			*ld;
-	int				ce_type;
 
 	ASSERT(vdip != NULL);
 	ASSERT(pip != NULL);
@@ -4981,12 +4980,7 @@ vhci_pathinfo_online(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 		VHCI_DEBUG(1, (CE_NOTE, vhci->vhci_dip,
 		    "!vhci_pathinfo_online: dev (path 0x%p) contradiction\n",
 		    (void *)pip));
-#ifdef	DEBUG
-		ce_type = CE_PANIC;
-#else	/* DEBUG */
-		ce_type = CE_WARN;
-#endif	/* DEBUG */
-		cmn_err(ce_type, "scsi_vhci: failover contradiction: "
+		cmn_err(CE_WARN, "scsi_vhci: failover contradiction: "
 		    "'%s'.vs.'%s': path %s\n",
 		    vlun->svl_fops ? vlun->svl_fops->sfo_name : "NULL",
 		    sfo ? sfo->sfo_name : "NULL", mdi_pi_pathname(pip));
