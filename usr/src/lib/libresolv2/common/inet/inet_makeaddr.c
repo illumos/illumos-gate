@@ -1,9 +1,4 @@
 /*
- * Copyright (c) 1997-2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-/*
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -36,8 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
 static const char sccsid[] = "@(#)inet_makeaddr.c	8.1 (Berkeley) 6/4/93";
 #endif /* LIBC_SCCS and not lint */
@@ -50,38 +43,26 @@ static const char sccsid[] = "@(#)inet_makeaddr.c	8.1 (Berkeley) 6/4/93";
 
 #include "port_after.h"
 
-/*
+/*%
  * Formulate an Internet address from network + host.  Used in
  * building addresses stored in the ifnet structure.
  */
 struct in_addr
 inet_makeaddr(net, host)
-#ifdef	ORIGINAL_ISC_CODE
 	u_long net, host;
-#else
-	in_addr_t net, host;
-#endif
 {
-#ifdef	ORIGINAL_ISC_CODE
-	u_long addr;
-#else
-	in_addr_t addr;
-	struct in_addr inaddr;
-#endif
+	struct in_addr a;
 
-	if (net < 128)
-		addr = (net << IN_CLASSA_NSHIFT) | (host & IN_CLASSA_HOST);
-	else if (net < 65536)
-		addr = (net << IN_CLASSB_NSHIFT) | (host & IN_CLASSB_HOST);
+	if (net < 128U)
+		a.s_addr = (net << IN_CLASSA_NSHIFT) | (host & IN_CLASSA_HOST);
+	else if (net < 65536U)
+		a.s_addr = (net << IN_CLASSB_NSHIFT) | (host & IN_CLASSB_HOST);
 	else if (net < 16777216L)
-		addr = (net << IN_CLASSC_NSHIFT) | (host & IN_CLASSC_HOST);
+		a.s_addr = (net << IN_CLASSC_NSHIFT) | (host & IN_CLASSC_HOST);
 	else
-		addr = net | host;
-#ifdef	ORIGINAL_ISC_CODE
-	addr = htonl(addr);
-	return (*(struct in_addr *)&addr);
-#else
-	inaddr.s_addr = htonl(addr);
-	return (inaddr);
-#endif
+		a.s_addr = net | host;
+	a.s_addr = htonl(a.s_addr);
+	return (a);
 }
+
+/*! \file */

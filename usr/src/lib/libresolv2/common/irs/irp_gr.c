@@ -1,29 +1,22 @@
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Portions Copyright(c) 1996, 1998 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: irp_gr.c,v 8.3 2001/05/29 05:48:57 marka Exp $";
+static const char rcsid[] = "$Id: irp_gr.c,v 1.4 2005/04/27 04:56:27 sra Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 /* extern */
@@ -61,16 +54,17 @@ static int __bind_irs_gr_unneeded;
 
 /* Types. */
 
-/*
+/*! \file 
+ * \brief
  * Module for the getnetgrent(3) family to use when connected to a
  * remote irp daemon.
- *
+ * \brief
  * See irpd.c for justification of caching done here.
  *
  */
 
 struct pvt {
-	struct irp_p   *girpdata;	/* global IRP data */
+	struct irp_p   *girpdata;	/*%< global IRP data */
 	int		warned;
 	struct group	group;
 };
@@ -90,20 +84,8 @@ static void		free_group(struct group *gr);
 
 /* Public. */
 
-
-
-
-
-/*
- * struct irs_gr * irs_irp_gr(struct irs_acc *this)
- *
- * Notes:
- *
+/*%
  *	Initialize the group sub-module.
- *
- * Notes:
- *
- *	Module data.
  *
  */
 
@@ -139,13 +121,7 @@ irs_irp_gr(struct irs_acc *this) {
 
 /* Methods. */
 
-
-
-/*
- * void gr_close(struct irs_gr *this)
- *
- * Notes:
- *
+/*%
  *	Close the sub-module.
  *
  */
@@ -160,14 +136,7 @@ gr_close(struct irs_gr *this) {
 	memput(this, sizeof *this);
 }
 
-
-
-
-/*
- * struct group * gr_next(struct irs_gr *this)
- *
- * Notes:
- *
+/*%
  *	Gets the next group out of the cached data and returns it.
  *
  */
@@ -214,15 +183,7 @@ gr_next(struct irs_gr *this) {
 	return (gr);
 }
 
-
-
-
-
-/*
- * struct group * gr_byname(struct irs_gr *this, const char *name)
- *
- * Notes:
- *
+/*%
  *	Gets a group by name from irpd and returns it.
  *
  */
@@ -270,15 +231,7 @@ gr_byname(struct irs_gr *this, const char *name) {
 	return (gr);
 }
 
-
-
-
-
-/*
- * struct group * gr_bygid(struct irs_gr *this, gid_t gid)
- *
- * Notes:
- *
+/*%
  *	Gets a group by gid from irpd and returns it.
  *
  */
@@ -325,10 +278,7 @@ gr_bygid(struct irs_gr *this, gid_t gid) {
 	return (gr);
 }
 
-
-
-
-/*
+/*%
  * void gr_rewind(struct irs_gr *this)
  *
  */
@@ -357,14 +307,7 @@ gr_rewind(struct irs_gr *this) {
 	return;
 }
 
-
-
-
-/*
- * void gr_minimize(struct irs_gr *this)
- *
- * Notes:
- *
+/*%
  *	Frees up cached data and disconnects(if necessary) from the remote.
  *
  */
@@ -379,9 +322,7 @@ gr_minimize(struct irs_gr *this) {
 
 /* Private. */
 
-
-
-/*
+/*%
  * static void free_group(struct group *gr);
  *
  *	Deallocate all the memory irp_unmarshall_gr allocated.
@@ -413,3 +354,4 @@ free_group(struct group *gr) {
 
 
 #endif /* WANT_IRS_GR */
+/*! \file */

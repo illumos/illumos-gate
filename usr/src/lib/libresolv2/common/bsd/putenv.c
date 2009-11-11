@@ -1,19 +1,11 @@
-/*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
 #ifndef LINT
-static const char rcsid[] = "$Id: putenv.c,v 8.4 1999/10/13 16:39:21 vixie Exp $";
+static const char rcsid[] = "$Id: putenv.c,v 1.2 2005/04/27 04:56:11 sra Exp $";
 #endif
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "port_before.h"
 #include "port_after.h"
 
-/*
+/*%
  * To give a little credit to Sun, SGI,
  * and many vendors in the SysV world.
  */
@@ -31,3 +23,5 @@ putenv(char *str) {
 	return (setenv(str, tmp, 1));
 }
 #endif
+
+/*! \file */

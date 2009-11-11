@@ -1,29 +1,22 @@
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
- * Copyright (c) 1996, 1998 by Internet Software Consortium.
+ * Copyright (C) 2004-2006, 2008  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 1996, 1998-2001, 2003  Internet Software Consortium.
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: irp.c,v 8.8 2001/09/25 04:50:29 marka Exp $";
+static const char rcsid[] = "$Id: irp.c,v 1.12 2008/11/14 02:36:51 marka Exp $";
 #endif
 
 /* Imports */
@@ -73,7 +66,7 @@ static void		irp_close(struct irs_acc *);
 /* send errors to syslog if true. */
 int irp_log_errors = 1;
 
-/*
+/*%
  * This module handles the irp module connection to irpd.
  *
  * The client expects a synchronous interface to functions like
@@ -81,7 +74,7 @@ int irp_log_errors = 1;
  * the wire (it's used in the server).
  */
 
-/*
+/*%
  * irs_acc *irs_irp_acc(const char *options);
  *
  *	Initialize the irp module.
@@ -144,8 +137,7 @@ irs_irp_connection_setup(struct irp_p *cxndata, int *warned) {
 	return (0);
 }
 
-
-/*
+/*%
  * int irs_irp_connect(void);
  *
  *	Sets up the connection to the remote irpd server.
@@ -252,9 +244,7 @@ irs_irp_connect(struct irp_p *pvt) {
 	return (0);
 }
 
-
-
-/*
+/*%
  * int	irs_irp_is_connected(struct irp_p *pvt);
  *
  * Returns:
@@ -268,9 +258,7 @@ irs_irp_is_connected(struct irp_p *pvt) {
 	return (pvt->fdCxn >= 0);
 }
 
-
-
-/*
+/*%
  * void
  * irs_irp_disconnect(struct irp_p *pvt);
  *
@@ -362,11 +350,7 @@ irs_irp_read_line(struct irp_p *pvt, char *buffer, int len) {
 	return (buffpos);
 }
 
-
-
-
-
-/*
+/*%
  * int irp_read_response(struct irp_p *pvt);
  *
  * Returns:
@@ -394,7 +378,7 @@ irs_irp_read_response(struct irp_p *pvt, char *text, size_t textlen) {
 
 	if (sscanf(line, "%d", &code) != 1) {
 		code = 0;
-	} else if (text != NULL && textlen > 0) {
+	} else if (text != NULL && textlen > 0U) {
 		p = line;
 		while (isspace((unsigned char)*p)) p++;
 		while (isdigit((unsigned char)*p)) p++;
@@ -406,9 +390,7 @@ irs_irp_read_response(struct irp_p *pvt, char *text, size_t textlen) {
 	return (code);
 }
 
-
-
-/*
+/*%
  * char *irp_read_body(struct irp_p *pvt, size_t *size);
  *
  *	Read in the body of a response. Terminated by a line with
@@ -431,6 +413,9 @@ irs_irp_read_body(struct irp_p *pvt, size_t *size) {
 	size_t len = LINEINCR;
 	char *buffer = memget(len);
 	int idx = 0;
+
+	if (buffer == NULL)
+		return (NULL);
 
 	for (;;) {
 		if (irs_irp_read_line(pvt, line, sizeof line) <= 0 ||
@@ -475,8 +460,7 @@ irs_irp_read_body(struct irp_p *pvt, size_t *size) {
 	return (NULL);
 }
 
-
-/*
+/*%
  * int irs_irp_get_full_response(struct irp_p *pvt, int *code,
  *			char **body, size_t *bodylen);
  *
@@ -519,12 +503,11 @@ irs_irp_get_full_response(struct irp_p *pvt, int *code, char *text,
 	return (0);
 }
 
-
-/*
+/*%
  * int irs_irp_send_command(struct irp_p *pvt, const char *fmt, ...);
  *
  *	Sends command to remote connected via the PVT
- *	struture. FMT and args after it are fprintf-like
+ *	structure. FMT and args after it are fprintf-like
  *	arguments for formatting.
  *
  * Returns:
@@ -545,7 +528,8 @@ irs_irp_send_command(struct irp_p *pvt, const char *fmt, ...) {
 	}
 
 	va_start(ap, fmt);
-	todo = vsprintf(buffer, fmt, ap);
+	(void) vsprintf(buffer, fmt, ap);
+	todo = strlen(buffer);
 	va_end(ap);
 	if (todo > (int)sizeof(buffer) - 3) {
 		syslog(LOG_CRIT, "memory overrun in irs_irp_send_command()");
@@ -576,9 +560,7 @@ irs_irp_send_command(struct irp_p *pvt, const char *fmt, ...) {
 
 /* Methods */
 
-
-
-/*
+/*%
  * void irp_close(struct irs_acc *this)
  *
  */
@@ -597,3 +579,5 @@ irp_close(struct irs_acc *this) {
 
 
 
+
+/*! \file */

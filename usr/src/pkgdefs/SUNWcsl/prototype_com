@@ -60,12 +60,6 @@ f none usr/lib/cfgadm/usb.so.1 755 root bin
 s none usr/lib/cfgadm/usb.so=./usb.so.1
 f none usr/lib/cfgadm/ib.so.1 755 root bin
 s none usr/lib/cfgadm/ib.so=./ib.so.1
-d none usr/lib/dns 755 root bin
-# EXPORT DELETE START
-f none usr/lib/dns/cylink.so.1 755 root bin
-f none usr/lib/dns/dnssafe.so.1 755 root bin
-# EXPORT DELETE END
-f none usr/lib/dns/irs.so.1 755 root bin
 f none usr/lib/extendedFILE.so.1 755 root bin
 f none usr/lib/lib.b 444 root bin
 s none usr/lib/libadm.so=../../lib/libadm.so.1

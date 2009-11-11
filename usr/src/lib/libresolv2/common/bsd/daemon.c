@@ -1,11 +1,6 @@
-/*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
 #if defined(LIBC_SCCS) && !defined(lint)
 static const char sccsid[] = "@(#)daemon.c	8.1 (Berkeley) 6/4/93";
-static const char rcsid[] = "$Id: daemon.c,v 8.2 1999/10/13 16:39:20 vixie Exp $";
+static const char rcsid[] = "$Id: daemon.c,v 1.2 2005/04/27 04:56:10 sra Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 /*
@@ -40,8 +35,6 @@ static const char rcsid[] = "$Id: daemon.c,v 8.2 1999/10/13 16:39:20 vixie Exp $
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "port_before.h"
 
@@ -84,3 +77,5 @@ daemon(int nochdir, int noclose) {
 	return (0);
 }
 #endif
+
+/*! \file */

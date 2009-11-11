@@ -1,11 +1,3 @@
-/*
- * Copyright (c) 1997, by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "port_before.h"
 
 #include <stdlib.h>
@@ -24,3 +16,5 @@ strdup(const char *src) {
 	return (dst);
 }
 #endif
+
+/*! \file */

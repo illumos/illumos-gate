@@ -1,30 +1,22 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1998-1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] =
-	"$Id: getpwent_r.c,v 8.6 2001/11/01 08:02:15 marka Exp $";
+static const char rcsid[] = "$Id: getpwent_r.c,v 1.8 2005/04/27 04:56:26 sra Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <port_before.h>
@@ -40,9 +32,9 @@ static const char rcsid[] =
 	/* turn off solaris remapping in <grp.h> */
 #undef _POSIX_PTHREAD_SEMANTICS
 #include <pwd.h>
-#define	_POSIX_PTHREAD_SEMANTICS 1
+#define _POSIX_PTHREAD_SEMANTICS 1
 #else
-#define	_UNIX95 1
+#define _UNIX95 1
 #include <pwd.h>
 #endif
 #else
@@ -52,7 +44,7 @@ static const char rcsid[] =
 
 #ifdef PASS_R_RETURN
 
-static int
+static int 
 copy_passwd(struct passwd *, struct passwd *, char *buf, int buflen);
 
 /* POSIX 1003.1c */
@@ -96,7 +88,7 @@ getpwnam_r(const char *login,  struct passwd *pwptr, char *buf, int buflen) {
 #ifdef POSIX_GETPWUID_R
 int
 __posix_getpwuid_r(uid_t uid, struct passwd *pwptr,
-		char *buf, size_t buflen, struct passwd **result) {
+		char *buf, int buflen, struct passwd **result) {
 #else
 int
 getpwuid_r(uid_t uid, struct passwd *pwptr,
@@ -129,7 +121,7 @@ getpwuid_r(uid_t uid,  struct passwd *pwptr, char *buf, int buflen) {
 }
 #endif
 
-/*
+/*%
  *	These assume a single context is in operation per thread.
  *	If this is not the case we will need to call irs directly
  *	rather than through the base functions.
@@ -138,7 +130,7 @@ getpwuid_r(uid_t uid,  struct passwd *pwptr, char *buf, int buflen) {
 PASS_R_RETURN
 getpwent_r(struct passwd *pwptr, PASS_R_ARGS) {
 	struct passwd *pw = getpwent();
-	int res;
+	int res = 0;
 
 	if (pw == NULL)
 		return (PASS_R_BAD);
@@ -192,13 +184,13 @@ endpwent_r(void)
 PASS_R_RETURN
 fgetpwent_r(FILE *f, struct passwd *pwptr, PASS_R_COPY_ARGS) {
 	struct passwd *pw = fgetpwent(f);
-	int res;
+	int res = 0;
 
 	if (pw == NULL)
 		return (PASS_R_BAD);
 
 	res = copy_passwd(pw, pwptr, PASS_R_COPY);
-	return (res ? PASS_R_BAD : PASS_R_OK);
+	return (res ? PASS_R_BAD : PASS_R_OK );
 }
 #endif
 
@@ -219,13 +211,13 @@ copy_passwd(struct passwd *pw, struct passwd *pwptr, char *buf, int buflen) {
 	len += strlen(pw->pw_gecos) + 1;
 	len += strlen(pw->pw_dir) + 1;
 	len += strlen(pw->pw_shell) + 1;
-
+	
 	if (len > buflen) {
 		errno = ERANGE;
 		return (ERANGE);
 	}
 
-	/* copy fixed atomic values */
+	/* copy fixed atomic values*/
 	pwptr->pw_uid = pw->pw_uid;
 	pwptr->pw_gid = pw->pw_gid;
 #ifdef HAVE_PW_CHANGE
@@ -281,3 +273,4 @@ copy_passwd(struct passwd *pw, struct passwd *pwptr, char *buf, int buflen) {
 	static int getpwent_r_unknown_system = 0;
 #endif /* PASS_R_RETURN */
 #endif /* !def(_REENTRANT) || !def(DO_PTHREADS) || !def(WANT_IRS_PW) */
+/*! \file */

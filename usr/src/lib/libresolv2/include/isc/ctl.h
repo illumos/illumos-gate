@@ -1,33 +1,28 @@
-/*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #ifndef ISC_CTL_H
 #define ISC_CTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1998,1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 /*
- * $Id: ctl.h,v 8.11 2001/08/10 02:40:49 marka Exp $
+ * $Id: ctl.h,v 1.5 2005/04/27 04:56:17 sra Exp $
  */
+
+/*! \file */
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -36,10 +31,9 @@
 
 /* Macros. */
 
-#define	CTL_MORE	0x0001	/* More will be / should be sent. */
-#define	CTL_EXIT	0x0002	/* Close connection after this. */
-#define	CTL_DATA	0x0004	/* Go into / this is DATA mode. */
-
+#define	CTL_MORE	0x0001	/*%< More will be / should be sent. */
+#define	CTL_EXIT	0x0002	/*%< Close connection after this. */
+#define	CTL_DATA	0x0004	/*%< Go into / this is DATA mode. */
 /* Types. */
 
 struct ctl_cctx;
@@ -49,11 +43,11 @@ struct ctl_verb;
 
 enum ctl_severity { ctl_debug, ctl_warning, ctl_error };
 
-typedef void (*ctl_logfunc)(enum ctl_severity, const char *fmt, ...);
+typedef void (*ctl_logfunc)(enum ctl_severity, const char *, ...);
 
 typedef void (*ctl_verbfunc)(struct ctl_sctx *, struct ctl_sess *,
-			     const struct ctl_verb *, const char *rest,
-			     u_int respflags, const void *respctx, void *uctx);
+			     const struct ctl_verb *, const char *,
+			     u_int, const void *, void *);
 
 typedef void (*ctl_srvrdone)(struct ctl_sctx *, struct ctl_sess *, void *);
 
@@ -114,3 +108,5 @@ void *			ctl_getcsctx(struct ctl_sess *);
 void *			ctl_setcsctx(struct ctl_sess *, void *);
 
 #endif /*ISC_CTL_H*/
+
+/*! \file */

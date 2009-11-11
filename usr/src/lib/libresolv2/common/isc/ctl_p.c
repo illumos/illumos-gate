@@ -1,30 +1,23 @@
-/*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #if !defined(lint) && !defined(SABER)
-static const char rcsid[] = "$Id: ctl_p.c,v 8.8 2001/05/29 05:49:26 marka Exp $";
+static const char rcsid[] = "$Id: ctl_p.c,v 1.4 2005/04/27 04:56:35 sra Exp $";
 #endif /* not lint */
 
 /*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1998,1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Extern. */
 
@@ -63,7 +56,7 @@ const char * const ctl_sevnames[] = {
 
 /* Public. */
 
-/*
+/*%
  * ctl_logger()
  *	if ctl_startup()'s caller didn't specify a logger, this one
  *	is used.  this pollutes stderr with all kinds of trash so it will
@@ -85,7 +78,7 @@ int
 ctl_bufget(struct ctl_buf *buf, ctl_logfunc logger) {
 	static const char me[] = "ctl_bufget";
 
-	REQUIRE(!allocated_p(*buf) && buf->used == 0);
+	REQUIRE(!allocated_p(*buf) && buf->used == 0U);
 	buf->text = memget(MAX_LINELEN);
 	if (!allocated_p(*buf)) {
 		(*logger)(ctl_error, "%s: getmem: %s", me, strerror(errno));
@@ -191,3 +184,5 @@ ctl_sa_copy(const struct sockaddr *src, struct sockaddr *dst) {
 		break;
 	}
 }
+
+/*! \file */

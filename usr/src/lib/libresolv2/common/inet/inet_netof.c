@@ -1,9 +1,4 @@
 /*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-/*
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -36,8 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
 static const char sccsid[] = "@(#)inet_netof.c	8.1 (Berkeley) 6/4/93";
 #endif /* LIBC_SCCS and not lint */
@@ -50,23 +43,15 @@ static const char sccsid[] = "@(#)inet_netof.c	8.1 (Berkeley) 6/4/93";
 
 #include "port_after.h"
 
-/*
+/*%
  * Return the network number from an internet
  * address; handles class a/b/c network #'s.
  */
-#ifdef	ORIGINAL_ISC_CODE
 u_long
-#else
-in_addr_t
-#endif
 inet_netof(in)
 	struct in_addr in;
 {
-#ifdef	ORIGINAL_ISC_CODE
 	register u_long i = ntohl(in.s_addr);
-#else
-	register in_addr_t i = ntohl(in.s_addr);
-#endif
 
 	if (IN_CLASSA(i))
 		return (((i)&IN_CLASSA_NET) >> IN_CLASSA_NSHIFT);
@@ -75,3 +60,5 @@ inet_netof(in)
 	else
 		return (((i)&IN_CLASSC_NET) >> IN_CLASSC_NSHIFT);
 }
+
+/*! \file */

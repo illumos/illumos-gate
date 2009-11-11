@@ -1,29 +1,22 @@
 /*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
- * Copyright (c) 1997-1999 by Internet Software Consortium.
+ * Copyright (C) 2004, 2005, 2008  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 1997-2001  Internet Software Consortium.
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * $Id: assertions.h,v 8.4 2001/05/29 05:47:07 marka Exp $
+ * $Id: assertions.h,v 1.5 2008/11/14 02:36:51 marka Exp $
  */
 
 #ifndef ASSERTIONS_H
@@ -36,18 +29,19 @@ typedef enum {
 typedef void (*assertion_failure_callback)(const char *, int, assertion_type,
 					   const char *, int);
 
+/* coverity[+kill] */
 extern assertion_failure_callback __assertion_failed;
 void set_assertion_failure_callback(assertion_failure_callback f);
 const char *assertion_type_to_text(assertion_type type);
 
-#ifdef CHECK_ALL
+#if defined(CHECK_ALL) || defined(__COVERITY__)
 #define CHECK_REQUIRE		1
 #define CHECK_ENSURE		1
 #define CHECK_INSIST		1
 #define CHECK_INVARIANT		1
 #endif
 
-#ifdef CHECK_NONE
+#if defined(CHECK_NONE) && !defined(__COVERITY__)
 #define CHECK_REQUIRE		0
 #define CHECK_ENSURE		0
 #define CHECK_INSIST		0
@@ -125,5 +119,5 @@ const char *assertion_type_to_text(assertion_type type);
 #define INVARIANT(cond)		((void) (cond))
 #define INVARIANT_ERR(cond)	((void) (cond))
 #endif /* CHECK_INVARIANT */
-
 #endif /* ASSERTIONS_H */
+/*! \file */

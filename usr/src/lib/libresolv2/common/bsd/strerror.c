@@ -1,11 +1,6 @@
-/*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #if defined(LIBC_SCCS) && !defined(lint)
 static const char sccsid[] = "@(#)strerror.c	8.1 (Berkeley) 6/4/93";
-static const char rcsid[] = "$Id: strerror.c,v 8.7 2001/08/28 11:48:10 marka Exp $";
+static const char rcsid[] = "$Id: strerror.c,v 1.6 2008/02/18 03:49:08 marka Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 /*
@@ -41,8 +36,6 @@ static const char rcsid[] = "$Id: strerror.c,v 8.7 2001/08/28 11:48:10 marka Exp
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "port_before.h"
 
 #include <sys/param.h>
@@ -64,19 +57,21 @@ extern char *sys_errlist[];
 const char *
 isc_strerror(int num) {
 #define	UPREFIX	"Unknown error: "
-	static char ebuf[40] = UPREFIX;		/* 64-bit number + slop */
+	static char ebuf[40] = UPREFIX;		/*%< 64-bit number + slop */
 	u_int errnum;
 	char *p, *t;
+#ifndef USE_SYSERROR_LIST
 	const char *ret;
+#endif
 	char tmp[40];
 
-	errnum = num;				/* convert to unsigned */
+	errnum = num;				/*%< convert to unsigned */
 #ifdef USE_SYSERROR_LIST
-	if (errnum < sys_nerr)
+	if (errnum < (u_int)sys_nerr)
 		return (sys_errlist[errnum]);
 #else
 #undef strerror
-	ret = strerror(num);			/* call strerror() in libc */
+	ret = strerror(num);			/*%< call strerror() in libc */
 	if (ret != NULL)
 		return(ret);
 #endif
@@ -95,3 +90,5 @@ isc_strerror(int num) {
 }
 
 #endif /*NEED_STRERROR*/
+
+/*! \file */

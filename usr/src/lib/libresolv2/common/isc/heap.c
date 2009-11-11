@@ -1,28 +1,21 @@
 /*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1997,1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
+/*%
  * Heap implementation of priority queues adapted from the following:
  *
  *	_Introduction to Algorithms_, Cormen, Leiserson, and Rivest,
@@ -33,7 +26,7 @@
  */
 
 #if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: heap.c,v 8.7 1999/10/13 16:39:34 vixie Exp $";
+static const char rcsid[] = "$Id: heap.c,v 1.4 2006/03/09 23:57:56 marka Exp $";
 #endif /* not lint */
 
 #include "port_before.h"
@@ -46,7 +39,7 @@ static const char rcsid[] = "$Id: heap.c,v 8.7 1999/10/13 16:39:34 vixie Exp $";
 
 #include <isc/heap.h>
 
-/*
+/*%
  * Note: to make heap_parent and heap_left easy to compute, the first
  * element of the heap array is not used; i.e. heap subscripts are 1-based,
  * not 0-based.
@@ -61,9 +54,13 @@ heap_new(heap_higher_priority_func higher_priority, heap_index_func index,
 	 int array_size_increment) {
 	heap_context ctx;
 
-	ctx = (heap_context)malloc(sizeof (struct heap_context));
-	if (ctx == NULL || higher_priority == NULL)
+	if (higher_priority == NULL)
 		return (NULL);
+
+	ctx = (heap_context)malloc(sizeof (struct heap_context));
+	if (ctx == NULL)
+		return (NULL);
+
 	ctx->array_size = 0;
 	if (array_size_increment == 0)
 		ctx->array_size_increment = ARRAY_SIZE_INCREMENT;
@@ -166,15 +163,24 @@ heap_insert(heap_context ctx, void *elt) {
 int
 heap_delete(heap_context ctx, int i) {
 	void *elt;
+	int less;
 
 	if (ctx == NULL || i < 1 || i > ctx->heap_size) {
 		errno = EINVAL;
 		return (-1);
 	}
 
-	elt = ctx->heap[ctx->heap_size];
-	if (--ctx->heap_size > 0)
-		sink_down(ctx, i, elt);
+	if (i == ctx->heap_size) {
+		ctx->heap_size--;
+	} else {
+		elt = ctx->heap[ctx->heap_size--];
+		less = ctx->higher_priority(elt, ctx->heap[i]);
+		ctx->heap[i] = elt;
+		if (less)
+			float_up(ctx, i, ctx->heap[i]);
+		else
+			sink_down(ctx, i, ctx->heap[i]);
+	}
 
 	return (0);
 }
@@ -226,3 +232,5 @@ heap_for_each(heap_context ctx, heap_for_each_func action, void *uap) {
 		(action)(ctx->heap[i], uap);
 	return (0);
 }
+
+/*! \file */

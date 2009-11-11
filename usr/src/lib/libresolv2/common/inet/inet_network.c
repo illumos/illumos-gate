@@ -1,9 +1,4 @@
 /*
- * Copyright 1997-2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -36,8 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
 static const char sccsid[] = "@(#)inet_network.c	8.1 (Berkeley) 6/4/93";
 #endif /* LIBC_SCCS and not lint */
@@ -51,30 +44,18 @@ static const char sccsid[] = "@(#)inet_network.c	8.1 (Berkeley) 6/4/93";
 
 #include "port_after.h"
 
-/*
+/*%
  * Internet network address interpretation routine.
  * The library routines call this routine to interpret
  * network numbers.
  */
-#ifdef	ORIGINAL_ISC_CODE
 u_long
-#else
-in_addr_t
-#endif
 inet_network(cp)
 	register const char *cp;
 {
-#ifdef	ORIGINAL_ISC_CODE
 	register u_long val, base, n, i;
-#else
-	register in_addr_t val, base, n, i;
-#endif
 	register char c;
-#ifdef	ORIGINAL_ISC_CODE
 	u_long parts[4], *pp = parts;
-#else
-	in_addr_t parts[4], *pp = parts;
-#endif
 	int digit;
 
 again:
@@ -85,16 +66,16 @@ again:
 		base = 16, cp++;
 	while ((c = *cp) != 0) {
 		if (isdigit((unsigned char)c)) {
-			if (base == 8 && (c == '8' || c == '9'))
+			if (base == 8U && (c == '8' || c == '9'))
 				return (INADDR_NONE);
 			val = (val * base) + (c - '0');
 			cp++;
 			digit = 1;
 			continue;
 		}
-		if (base == 16 && isxdigit((unsigned char)c)) {
+		if (base == 16U && isxdigit((unsigned char)c)) {
 			val = (val << 4) +
-			(c + 10 - (islower((unsigned char)c) ? 'a' : 'A'));
+			      (c + 10 - (islower((unsigned char)c) ? 'a' : 'A'));
 			cp++;
 			digit = 1;
 			continue;
@@ -103,15 +84,9 @@ again:
 	}
 	if (!digit)
 		return (INADDR_NONE);
-#ifdef ORIGINAL_ISC_CODE
-	if (*cp == '.') {
-		if (pp >= parts + 4 || val > 0xff)
-			return (INADDR_NONE);
-#else
-	if (pp >= parts + 4 || val > 0xff)
+	if (pp >= parts + 4 || val > 0xffU)
 		return (INADDR_NONE);
 	if (*cp == '.') {
-#endif
 		*pp++ = val, cp++;
 		goto again;
 	}
@@ -119,7 +94,7 @@ again:
 		return (INADDR_NONE);
 	*pp++ = val;
 	n = pp - parts;
-	if (n > 4)
+	if (n > 4U)
 		return (INADDR_NONE);
 	for (val = 0, i = 0; i < n; i++) {
 		val <<= 8;
@@ -127,3 +102,5 @@ again:
 	}
 	return (val);
 }
+
+/*! \file */

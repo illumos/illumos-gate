@@ -70,12 +70,6 @@ f none usr/lib/cfgadm/sparcv9/usb.so.1 755 root bin
 s none usr/lib/cfgadm/sparcv9/usb.so=./usb.so.1
 f none usr/lib/cfgadm/sparcv9/ib.so.1 755 root bin
 s none usr/lib/cfgadm/sparcv9/ib.so=./ib.so.1
-d none usr/lib/dns/sparcv9 755 root bin
-# EXPORT DELETE START
-f none usr/lib/dns/sparcv9/cylink.so.1 755 root bin
-f none usr/lib/dns/sparcv9/dnssafe.so.1 755 root bin
-# EXPORT DELETE END
-f none usr/lib/dns/sparcv9/irs.so.1 755 root bin
 d none usr/lib/iconv/sparcv9 755 root bin
 d none usr/lib/lwp/sparcv9 755 root bin
 s none usr/lib/lwp/64=sparcv9

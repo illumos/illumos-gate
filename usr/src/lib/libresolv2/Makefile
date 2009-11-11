@@ -24,6 +24,7 @@
 #
 #
 
+
 include		../../Makefile.master
 include		../Makefile.lib
 
@@ -37,13 +38,6 @@ CHKMANIFEST=	$(MANIFEST:%.xml=%.xmlchk)
 
 SUBDIRS=	include $(MACH)
 $(BUILD64)SUBDIRS +=	$(MACH64)
-SUBDIRS +=	.WAIT irs
-
-# EXPORT DELETE START
-# CRYPT DELETE START
-SUBDIRS +=	cylink dnssafe
-# CRYPT DELETE END
-# EXPORT DELETE END
 
 all :=		TARGET= all
 clean :=	TARGET= clean
@@ -83,31 +77,6 @@ install_h: $(ROOTHDRS)
 
 check: $(CHECKHDRS) $(CHKMANIFEST)
 
-# EXPORT DELETE START
-# CRYPT DELETE START
-# Special targets to clean up the source tree for export distribution
-# Warning: These target change the source tree
-EXPORT_SRC:
-	$(RM) Makefile+
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-	/usr/bin/find cylink dnssafe common/cylink common/dnssafe \
-		-name SCCS -prune -o -type f -exec $(RM) {} \;
-
-CRYPT_SRC:
-	$(RM) Makefile+
-	$(SED) -e "/^# CRYPT DELETE START/,/^# CRYPT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-	/usr/bin/find cylink dnssafe common/cylink common/dnssafe \
-		-name SCCS -prune -o -type f -exec $(RM) {} \;
-
-# CRYPT DELETE END
-# EXPORT DELETE END
-
 _msg:	$(MSGDOMAIN) $(POFILE)
 	$(RM) $(MSGDOMAIN)/$(POFILE)
 	$(CP) $(POFILE) $(MSGDOMAIN)
@@ -126,3 +95,4 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET); echo
 
 FRC:
+

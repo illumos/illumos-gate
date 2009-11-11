@@ -1,17 +1,11 @@
-/*
- * Copyright 2003 by Sun Microsystems, Inc.	All rights reserved.
- * Use is subject to license terms.
- */
-
 /* tree.h - declare structures used by tree library
  *
  * vix 22jan93 [revisited; uses RCS, ANSI, POSIX; has bug fixes]
  * vix 27jun86 [broken out of tree.c]
  *
- * $Id: tree.h,v 8.3 2002/12/03 05:26:48 marka Exp $
+ * $Id: tree.h,v 1.3 2005/04/27 04:56:18 sra Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_TREE_H_INCLUDED
 #define	_TREE_H_INCLUDED
@@ -25,7 +19,7 @@
 # endif
 #endif
 
-/*
+/*%
  * tree_t is our package-specific anonymous pointer.
  */
 #if defined(__STDC__) || defined(__GNUC__)
@@ -34,8 +28,7 @@ typedef	void *tree_t;
 typedef	char *tree_t;
 #endif
 
-#ifdef	ORIGINAL_ISC_CODE
-/*
+/*%
  * Do not taint namespace
  */
 #define	tree_add	__tree_add
@@ -44,8 +37,7 @@ typedef	char *tree_t;
 #define	tree_mung	__tree_mung
 #define	tree_srch	__tree_srch
 #define	tree_trav	__tree_trav
-#else
-#endif
+
 
 typedef	struct tree_s {
 		tree_t		data;
@@ -64,3 +56,4 @@ void	tree_mung	__P((tree **, void (*)()));
 
 
 #endif	/* _TREE_H_INCLUDED */
+/*! \file */

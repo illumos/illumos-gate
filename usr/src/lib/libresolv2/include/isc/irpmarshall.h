@@ -1,33 +1,26 @@
 /*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 /*
- * $Id: irpmarshall.h,v 8.2 2001/05/29 05:47:10 marka Exp $
+ * $Id: irpmarshall.h,v 1.4 2005/04/27 04:56:17 sra Exp $
  */
 
 #ifndef _IRPMARSHALL_H_INCLUDED
 #define _IRPMARSHALL_H_INCLUDED
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Hide function names */
 #define irp_marshall_gr __irp_marshall_gr
@@ -52,26 +45,26 @@
 		       (x == AF_INET6 ? "AF_INET6" : "UNKNOWN"))
 
 /* See comment below on usage */
-int irp_marshall_pw(const struct passwd *pw, char **buffer, size_t *len);
-int irp_unmarshall_pw(struct passwd *pw, char *buffer);
-int irp_marshall_gr(const struct group *gr, char **buffer, size_t *len);
-int irp_unmarshall_gr(struct group *gr, char *buffer);
-int irp_marshall_sv(const struct servent *sv, char **buffer, size_t *len);
-int irp_unmarshall_sv(struct servent *sv, char *buffer);
-int irp_marshall_pr(struct protoent *pr, char **buffer, size_t *len);
-int irp_unmarshall_pr(struct protoent *pr, char *buffer);
-int irp_marshall_ho(struct hostent *ho, char **buffer, size_t *len);
-int irp_unmarshall_ho(struct hostent *ho, char *buffer);
-int irp_marshall_ng(const char *host, const char *user, const char *domain,
-		    char **buffer, size_t *len);
-int irp_unmarshall_ng(const char **host, const char **user,
-		      const char **domain, char *buffer);
-int irp_marshall_nw(struct nwent *ne, char **buffer, size_t *len);
-int irp_unmarshall_nw(struct nwent *ne, char *buffer);
-int irp_marshall_ne(struct netent *ne, char **buffer, size_t *len);
-int irp_unmarshall_ne(struct netent *ne, char *buffer);
+int irp_marshall_pw(const struct passwd *, char **, size_t *);
+int irp_unmarshall_pw(struct passwd *, char *);
+int irp_marshall_gr(const struct group *, char **, size_t *);
+int irp_unmarshall_gr(struct group *, char *);
+int irp_marshall_sv(const struct servent *, char **, size_t *);
+int irp_unmarshall_sv(struct servent *, char *);
+int irp_marshall_pr(struct protoent *, char **, size_t *);
+int irp_unmarshall_pr(struct protoent *, char *);
+int irp_marshall_ho(struct hostent *, char **, size_t *);
+int irp_unmarshall_ho(struct hostent *, char *);
+int irp_marshall_ng(const char *, const char *, const char *,
+		    char **, size_t *);
+int irp_unmarshall_ng(const char **, const char **, const char **, char *);
+int irp_marshall_nw(struct nwent *, char **, size_t *);
+int irp_unmarshall_nw(struct nwent *, char *);
+int irp_marshall_ne(struct netent *, char **, size_t *);
+int irp_unmarshall_ne(struct netent *, char *);
 
-/*
+/*! \file
+ * \brief
  * Functions to marshall and unmarshall various system data structures. We
  * use a printable ascii format that is as close to various system config
  * files as reasonable (e.g. /etc/passwd format).
@@ -87,9 +80,7 @@ int irp_unmarshall_ne(struct netent *ne, char *buffer);
  *
  * The following description is true for all the marshalling functions:
  *
- */
-
-/* int irp_marshall_XX(struct yyyy *XX, char **buffer, size_t *len);
+ * int irp_marshall_XX(struct yyyy *XX, char **buffer, size_t *len);
  *
  * The argument XX (of type struct passwd for example) is marshalled in the
  * buffer pointed at by *BUFFER, which is of length *LEN. Returns 0
@@ -109,9 +100,7 @@ int irp_unmarshall_ne(struct netent *ne, char *buffer);
  * to separate fields). Fields that have multiple subfields (like the
  * gr_mem field in struct group) have their subparts separated by
  * commas.
- */
-
-/*
+ *
  * int irp_unmarshall_XX(struct YYYYY *XX, char *buffer);
  *
  * The unmashalling functions break apart the buffer and store the

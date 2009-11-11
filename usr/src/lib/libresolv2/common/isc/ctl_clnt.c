@@ -1,30 +1,23 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#if !defined(lint) && !defined(SABER)
-static const char rcsid[] = "$Id: ctl_clnt.c,v 8.18 2002/07/08 05:10:23 marka Exp $";
-#endif /* not lint */
-
-/*
- * Copyright (c) 1998,1999 by Internet Software Consortium.
+ * Copyright (C) 2004, 2005, 2007, 2008  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 1998-2003  Internet Software Consortium.
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#if !defined(lint) && !defined(SABER)
+static const char rcsid[] = "$Id: ctl_clnt.c,v 1.11 2008/11/14 02:36:51 marka Exp $";
+#endif /* not lint */
 
 /* Extern. */
 
@@ -45,6 +38,9 @@ static const char rcsid[] = "$Id: ctl_clnt.c,v 8.18 2002/07/08 05:10:23 marka Ex
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef HAVE_MEMORY_H
+#include <memory.h>
+#endif
 
 #include <isc/assertions.h>
 #include <isc/ctl.h>
@@ -121,6 +117,19 @@ static void		touch_timer(struct ctl_cctx *);
 static void		timer(evContext, void *,
 			      struct timespec, struct timespec);
 
+#ifndef HAVE_MEMCHR
+static void *
+memchr(const void *b, int c, size_t len) {
+	const unsigned char *p = b;
+	size_t i;
+
+	for (i = 0; i < len; i++, p++)
+		if (*p == (unsigned char)c)
+			return ((void *)p);
+	return (NULL);
+}
+#endif
+
 /* Private data. */
 
 static const char * const state_names[] = {
@@ -129,7 +138,7 @@ static const char * const state_names[] = {
 
 /* Public. */
 
-/*
+/*%
  * void
  * ctl_client()
  *	create, condition, and connect to a listener on the control port.
@@ -205,7 +214,7 @@ ctl_client(evContext lev, const struct sockaddr *cap, size_t cap_len,
 	return (ctx);
 }
 
-/*
+/*%
  * void
  * ctl_endclient(ctx)
  *	close a client and release all of its resources.
@@ -217,7 +226,7 @@ ctl_endclient(struct ctl_cctx *ctx) {
 	memput(ctx, sizeof *ctx);
 }
 
-/*
+/*%
  * int
  * ctl_command(ctx, cmd, len, donefunc, uap)
  *	Queue a transaction, which will begin with sending cmd
@@ -241,7 +250,7 @@ ctl_command(struct ctl_cctx *ctx, const char *cmd, size_t len,
 	default:
 		abort();
 	}
-	if (len >= MAX_LINELEN) {
+	if (len >= (size_t)MAX_LINELEN) {
 		errno = EMSGSIZE;
 		return (-1);
 	}
@@ -535,7 +544,7 @@ readable(evContext ev, void *uap, int fd, int evmask) {
 		(*tran->donefunc)(ctx, tran->uap, ctx->inbuf.text,
 				  (done ? 0 : CTL_MORE));
 		ctx->inbuf.used -= ((eos - ctx->inbuf.text) + 1);
-		if (ctx->inbuf.used == 0)
+		if (ctx->inbuf.used == 0U)
 			ctl_bufput(&ctx->inbuf);
 		else
 			memmove(ctx->inbuf.text, eos + 1, ctx->inbuf.used);
@@ -550,7 +559,7 @@ readable(evContext ev, void *uap, int fd, int evmask) {
 			goto again;
 		return;
 	}
-	if (ctx->inbuf.used == MAX_LINELEN) {
+	if (ctx->inbuf.used == (size_t)MAX_LINELEN) {
 		(*ctx->logger)(ctl_error, "%s: line too long (%-10s...)", me,
 			       ctx->inbuf.text);
 		error(ctx);
@@ -607,3 +616,5 @@ timer(evContext ev, void *uap, struct timespec due, struct timespec itv) {
 		       ctx->timeout.tv_sec, state_names[ctx->state]);
 	error(ctx);
 }
+
+/*! \file */

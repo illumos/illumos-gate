@@ -1,39 +1,33 @@
 /*
- * Copyright 2003 by Sun Microsystems, Inc.	All rights reserved.
- * Use is subject to license terms.
- * 
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 /*
- * $Id: irp.h,v 8.4 2003/05/02 05:56:21 marka Exp $
+ * $Id: irp.h,v 1.4 2005/04/27 04:56:15 sra Exp $
  */
 
 #ifndef _IRP_H_INCLUDED
 #define _IRP_H_INCLUDED
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*! \file */
 
-#define IRPD_TIMEOUT 30			/* seconds */
-#define IRPD_MAXSESS 50			/* number of simultaneous sessions. */
-#define IRPD_PORT 6660			/* 10 times the number of the beast. */
-#define IRPD_PATH "/var/run/irpd"	/* af_unix socket path */
+#define IRPD_TIMEOUT 30			/*%< seconds */
+#define IRPD_MAXSESS 50			/*%< number of simultaneous sessions. */
+#define IRPD_PORT 6660			/*%< 10 times the number of the beast. */
+#define IRPD_PATH "/var/run/irpd"	/*%< af_unix socket path */
 
 /* If sets the environment variable IRPDSERVER to an IP address
    (e.g. "192.5.5.1"), then that's the host the client expects irpd to be
@@ -92,21 +86,22 @@
 
 struct irp_p;
 
-char   *irs_irp_read_body(struct irp_p *pvt, size_t *size);
-int	irs_irp_read_response(struct irp_p *pvt, char *text, size_t len);
-void	irs_irp_disconnect(struct irp_p *pvt);
-int	irs_irp_connect(struct irp_p *pvt);
-int	irs_irp_is_connected(struct irp_p *pvt);
-int	irs_irp_connection_setup(struct irp_p *cxndata, int *warned);
-#ifdef	__GNUC__
+char   *irs_irp_read_body(struct irp_p *, size_t *);
+int	irs_irp_read_response(struct irp_p *, char *, size_t);
+void	irs_irp_disconnect(struct irp_p *);
+int	irs_irp_connect(struct irp_p *);
+int	irs_irp_is_connected(struct irp_p *);
+int	irs_irp_connection_setup(struct irp_p *, int *);
+#ifdef __GNUC__
 int	irs_irp_send_command(struct irp_p *, const char *, ...)
-			__attribute__((__format__(__printf__, 2, 3)));
+			     __attribute__((__format__(__printf__, 2, 3)));
 #else
-int	irs_irp_send_command(struct irp_p *pvt, const char *fmt, ...);
+int	irs_irp_send_command(struct irp_p *, const char *, ...);
 #endif
-int	irs_irp_get_full_response(struct irp_p *pvt, int *code, char *text,
-				  size_t textlen, char **body,
-				  size_t *bodylen);
-int	irs_irp_read_line(struct irp_p *pvt, char *buffer, int len);
+int	irs_irp_get_full_response(struct irp_p *, int *, char *, size_t,
+				  char **, size_t *);
+int	irs_irp_read_line(struct irp_p *, char *, int);
 
 #endif
+
+/*! \file */

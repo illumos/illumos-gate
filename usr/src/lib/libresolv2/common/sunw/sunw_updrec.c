@@ -1,9 +1,7 @@
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * As of BIND 8.2.2, ISC (a) removed res_mkupdate(), res_update(), and
@@ -25,18 +23,24 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 
+/* get the Solaris ns_updrec before any renaming happens */
+#include <arpa/nameser.h>
+
+/* get the __ISC_ns_updrec */
 #include <res_update.h>
+
+#include <port_after.h>
+
+/* un-rename ns_updrec and res_* functions so we can wrap them */
 #undef	ns_updrec
 #undef	res_mkupdate
 #undef	res_update
 #undef	res_mkupdrec
 #undef	res_freeupdrec
-#include <arpa/nameser.h>
-
-#include <port_after.h>
+#undef	res_nmkupdate
+#undef	res_nupdate
 
 void	res_freeupdrec(ns_updrec *);
-
 
 static int
 old2new(ns_updrec *old, __ISC_ns_updrec *new) {
@@ -106,7 +110,7 @@ delete_list(__ISC_ns_updrec *list) {
 
 
 static __ISC_ns_updrec *
-copy_list(ns_updrec *old) {
+copy_list(ns_updrec *old, int do_glink) {
 
 	__ISC_ns_updrec *list = 0, *r, *p;
 
@@ -122,26 +126,53 @@ copy_list(ns_updrec *old) {
 		}
 		r->r_link.prev = p;
 		r->r_link.next = 0;
-		if (p != 0)
+		/* res_update and res_nupdate want r_glink set up like this */
+		if (do_glink) {
+			r->r_glink.prev = p;
+			r->r_glink.next = 0;
+		} else {
+			r->r_glink.prev = (void *)-1;
+			r->r_glink.next = (void *)-1;
+		}
+		if (p != 0) {
 			p->r_link.next = r;
-		else
+			if (do_glink) {
+				p->r_glink.next = r;
+			}
+		} else {
 			list = r;
+		}
 	}
-
 	return (list);
 }
 
 
 int
-res_mkupdate(ns_updrec  *rrecp_in, u_char *buf, int length) {
+res_mkupdate(ns_updrec  *rrecp_in, uchar_t *buf, int length) {
 
 	__ISC_ns_updrec	*r;
 	int		ret;
 
-	if ((r = copy_list(rrecp_in)) == 0)
+	if ((r = copy_list(rrecp_in, 1)) == 0)
 		return (-1);
 
 	ret = __ISC_res_mkupdate(r, buf, length);
+
+	delete_list(r);
+
+	return (ret);
+}
+
+int
+res_nmkupdate(res_state statp, ns_updrec  *rrecp_in, uchar_t *buf, int length) {
+
+	__ISC_ns_updrec	*r;
+	int		ret;
+
+	if ((r = copy_list(rrecp_in, 1)) == 0)
+		return (-1);
+
+	ret = __ISC_res_nmkupdate(statp, r, buf, length);
 
 	delete_list(r);
 
@@ -155,10 +186,26 @@ res_update(ns_updrec *rrecp_in) {
 	__ISC_ns_updrec	*r;
 	int		ret;
 
-	if ((r = copy_list(rrecp_in)) == 0)
+	if ((r = copy_list(rrecp_in, 0)) == 0)
 		return (-1);
 
 	ret = __ISC_res_update(r);
+
+	delete_list(r);
+
+	return (ret);
+}
+
+int
+res_nupdate(res_state statp, ns_updrec *rrecp_in, ns_tsig_key *key) {
+
+	__ISC_ns_updrec	*r;
+	int		ret;
+
+	if ((r = copy_list(rrecp_in, 0)) == 0)
+		return (-1);
+
+	ret = __ISC_res_nupdate(statp, r, key);
 
 	delete_list(r);
 

@@ -1,29 +1,22 @@
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996, 1998 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: irp_ng.c,v 8.3 2001/05/29 05:49:00 marka Exp $";
+static const char rcsid[] = "$Id: irp_ng.c,v 1.4 2006/12/07 04:46:27 marka Exp $";
 #endif
 
 /* Imports */
@@ -69,13 +62,7 @@ static void		ng_minimize(struct irs_ng *);
 
 /* Public */
 
-
-
-/*
- * struct irs_ng * irs_irp_ng(struct irs_acc *this)
- *
- * Notes:
- *
+/*%
  *	Intialize the irp netgroup module.
  *
  */
@@ -162,15 +149,7 @@ ng_rewind(struct irs_ng *this, const char *group) {
 	return;
 }
 
-
-
-
 /*
- * int ng_next(struct irs_ng *this, const char **host, const char **user,
- *	       const char **domain)
- *
- * Notes:
- *
  *	Get the next netgroup item from the cache.
  *
  */
@@ -212,14 +191,7 @@ ng_next(struct irs_ng *this, const char **host, const char **user,
 	return (rval);
 }
 
-
-
 /*
- * int ng_test(struct irs_ng *this, const char *name, const char *host,
- *		const char *user, const char *domain)
- *
- * Notes:
- *
  *	Search for a match in a netgroup.
  *
  */
@@ -246,13 +218,13 @@ ng_test(struct irs_ng *this, const char *name,
 	}
 
 	if (irs_irp_send_command(pvt->girpdata, "innetgr %s", body) == 0) {
-		memput(body, bodylen);
-
 		code = irs_irp_read_response(pvt->girpdata, text, sizeof text);
 		if (code == IRPD_GETNETGR_MATCHES) {
 			rval = 1;
 		}
 	}
+
+	memput(body, bodylen);
 
 	return (rval);
 }
@@ -277,3 +249,5 @@ ng_minimize(struct irs_ng *this) {
 
 /* Private */
 
+
+/*! \file */

@@ -1,30 +1,23 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#if !defined(lint) && !defined(SABER)
-static const char rcsid[] = "$Id: ctl_srvr.c,v 8.26 2002/07/08 05:10:25 marka Exp $";
-#endif /* not lint */
-
-/*
- * Copyright (c) 1998,1999 by Internet Software Consortium.
+ * Copyright (C) 2004-2006, 2008  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 1998-2003  Internet Software Consortium.
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#if !defined(lint) && !defined(SABER)
+static const char rcsid[] = "$Id: ctl_srvr.c,v 1.10 2008/11/14 02:36:51 marka Exp $";
+#endif /* not lint */
 
 /* Extern. */
 
@@ -47,6 +40,9 @@ static const char rcsid[] = "$Id: ctl_srvr.c,v 8.26 2002/07/08 05:10:25 marka Ex
 #include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#ifdef HAVE_MEMORY_H
+#include <memory.h>
+#endif
 
 #include <isc/assertions.h>
 #include <isc/ctl.h>
@@ -165,7 +161,7 @@ static const struct ctl_verb	fakehelpverb = {
 
 /* Public. */
 
-/*
+/*%
  * void
  * ctl_server()
  *	create, condition, and start a listener on the control port.
@@ -270,7 +266,7 @@ ctl_server(evContext lev, const struct sockaddr *sap, size_t sap_len,
 	return (ctx);
 }
 
-/*
+/*%
  * void
  * ctl_endserver(ctx)
  *	if the control listener is open, close it.  clean out all eventlib
@@ -298,7 +294,7 @@ ctl_endserver(struct ctl_sctx *ctx) {
 	memput(ctx, sizeof *ctx);
 }
 
-/*
+/*%
  * If body is non-NULL then it we add a "." line after it.
  * Caller must have  escaped lines with leading ".".
  */
@@ -328,7 +324,7 @@ ctl_response(struct ctl_sess *sess, u_int code, const char *text,
 			       me, address_expr);
 		goto untimely;
 	}
-	if (sizeof "000-\r\n" + strlen(text) > MAX_LINELEN) {
+	if (sizeof "000-\r\n" + strlen(text) > (size_t)MAX_LINELEN) {
 		(*ctx->logger)(ctl_error, "%s: %s: output buffer ovf, closing",
 			       me, address_expr);
 		goto untimely;
@@ -571,7 +567,7 @@ static void
 ctl_readable(evContext lev, void *uap, int fd, int evmask) {
 	static const char me[] = "ctl_readable";
 	struct ctl_sess *sess = uap;
-	struct ctl_sctx *ctx = sess->ctx;
+	struct ctl_sctx *ctx;
 	char *eos, tmp[MAX_NTOP];
 	ssize_t n;
 
@@ -579,6 +575,8 @@ ctl_readable(evContext lev, void *uap, int fd, int evmask) {
 	REQUIRE(fd >= 0);
 	REQUIRE(evmask == EV_READ);
 	REQUIRE(sess->state == reading || sess->state == reading_data);
+
+	ctx = sess->ctx;
 	evTouchIdleTimer(lev, sess->rdtiID);
 	if (!allocated_p(sess->inbuf) &&
 	    ctl_bufget(&sess->inbuf, ctx->logger) < 0) {
@@ -611,13 +609,13 @@ ctl_readable(evContext lev, void *uap, int fd, int evmask) {
 			ctl_docommand(sess);
 		}
 		sess->inbuf.used -= ((eos - sess->inbuf.text) + 1);
-		if (sess->inbuf.used == 0)
+		if (sess->inbuf.used == 0U)
 			ctl_bufput(&sess->inbuf);
 		else
 			memmove(sess->inbuf.text, eos + 1, sess->inbuf.used);
 		return;
 	}
-	if (sess->inbuf.used == MAX_LINELEN) {
+	if (sess->inbuf.used == (size_t)MAX_LINELEN) {
 		(*ctx->logger)(ctl_error, "%s: %s: line too long, closing",
 			       me, address_expr);
 		ctl_close(sess);
@@ -633,7 +631,7 @@ ctl_wrtimeout(evContext lev, void *uap,
 	struct ctl_sess *sess = uap;
 	struct ctl_sctx *ctx = sess->ctx;
 	char tmp[MAX_NTOP];
-	
+
 	UNUSED(lev);
 	UNUSED(due);
 	UNUSED(itv);
@@ -785,3 +783,5 @@ ctl_signal_done(struct ctl_sctx *ctx, struct ctl_sess *sess) {
 		sess->donefunc = NULL;
 	}
 }
+
+/*! \file */

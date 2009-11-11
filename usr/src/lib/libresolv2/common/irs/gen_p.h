@@ -1,32 +1,26 @@
 /*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996,1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * $Id: gen_p.h,v 1.11 2001/05/29 05:48:39 marka Exp $
+ * $Id: gen_p.h,v 1.3 2005/04/27 04:56:23 sra Exp $
  */
 
-/* Notes:
+/*! \file
+ *  Notes:
  *	We hope to create a complete set of thread-safe entry points someday,
  *	which will mean a set of getXbyY() functions that take as an argument
  *	a pointer to the map class, which will have a pointer to the private
@@ -43,32 +37,32 @@
 #ifndef _GEN_P_H_INCLUDED
 #define _GEN_P_H_INCLUDED
 
-/*
+/*%
  * These are the access methods.
  */
 enum irs_acc_id {
-	irs_lcl,	/* Local. */
-	irs_dns,	/* DNS or Hesiod. */
-	irs_nis,	/* Sun NIS ("YP"). */
-	irs_irp,	/* IR protocol.  */
+	irs_lcl,	/*%< Local. */
+	irs_dns,	/*%< DNS or Hesiod. */
+	irs_nis,	/*%< Sun NIS ("YP"). */
+	irs_irp,	/*%< IR protocol. */
 	irs_nacc
 };
 
-/*
+/*%
  * These are the map types.
  */
 enum irs_map_id {
-	irs_gr,		/* "group" */
-	irs_pw,		/* "passwd" */
-	irs_sv,		/* "services" */
-	irs_pr,		/* "protocols" */
-	irs_ho,		/* "hosts" */
-	irs_nw,		/* "networks" */
-	irs_ng,		/* "netgroup" */
+	irs_gr,		/*%< "group" */
+	irs_pw,		/*%< "passwd" */
+	irs_sv,		/*%< "services" */
+	irs_pr,		/*%< "protocols" */
+	irs_ho,		/*%< "hosts" */
+	irs_nw,		/*%< "networks" */
+	irs_ng,		/*%< "netgroup" */
 	irs_nmap
 };
 
-/*
+/*%
  * This is an accessor instance.
  */
 struct irs_inst {
@@ -82,7 +76,7 @@ struct irs_inst {
 	struct irs_ng *	ng;
 };
 
-/*
+/*%
  * This is a search rule for some map type.
  */
 struct irs_rule {
@@ -90,9 +84,8 @@ struct irs_rule {
 	struct irs_inst *	inst;
 	int			flags;
 };
-#define IRS_MERGE		0x0001	/* Don't stop if acc. has data? */
-#define	IRS_CONTINUE		0x0002	/* Don't stop if acc. has no data? */
-
+#define IRS_MERGE		0x0001	/*%< Don't stop if acc. has data? */
+#define	IRS_CONTINUE		0x0002	/*%< Don't stop if acc. has no data? */
 /*
  * This is the private data for a search access class.
  */

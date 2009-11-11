@@ -215,18 +215,6 @@
 # Ignore files originally supplied by ISC (Internet Software Consortium) 
 # as part of a BIND release.
 #
-./usr/src/lib/libresolv2/common/cylink/bn68000.c
-./usr/src/lib/libresolv2/common/cylink/bn8086.c
-./usr/src/lib/libresolv2/common/cylink/lbn68000.c
-./usr/src/lib/libresolv2/common/cylink/lbn68000.h
-./usr/src/lib/libresolv2/common/cylink/lbn68020.c
-./usr/src/lib/libresolv2/common/cylink/lbn68020.h
-./usr/src/lib/libresolv2/common/cylink/lbn80386.h
-./usr/src/lib/libresolv2/common/cylink/lbn8086.h
-./usr/src/lib/libresolv2/common/cylink/lbnppc.c
-./usr/src/lib/libresolv2/common/cylink/lbnppc.h
-./usr/src/lib/libresolv2/common/cylink/ppcasm.h
-./usr/src/lib/libresolv2/common/cylink/sizetest.c
 ./usr/src/lib/libresolv2/common/irs/getaddrinfo.c
 ./usr/src/lib/libresolv2/common/irs/nis_p.h
 ./usr/src/lib/libresolv2/common/resolv/res_mkupdate.h

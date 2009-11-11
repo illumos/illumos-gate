@@ -1,14 +1,6 @@
-/*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
 #ifndef LINT
-static const char rcsid[] = "$Id: setitimer.c,v 8.4 1999/10/13 16:39:21 vixie Exp $";
+static const char rcsid[] = "$Id: setitimer.c,v 1.2 2005/04/27 04:56:12 sra Exp $";
 #endif
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "port_before.h"
 
@@ -16,7 +8,7 @@ static const char rcsid[] = "$Id: setitimer.c,v 8.4 1999/10/13 16:39:21 vixie Ex
 
 #include "port_after.h"
 
-/*
+/*%
  * Setitimer emulation routine.
  */
 #ifndef NEED_SETITIMER
@@ -33,3 +25,5 @@ __setitimer(int which, const struct itimerval *value,
 		return (-1);
 }
 #endif
+
+/*! \file */

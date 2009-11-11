@@ -1,31 +1,25 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2005 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1995-1999 by Internet Software Consortium
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/* eventlib_p.h - private interfaces for eventlib
- * vix 09sep95 [initial]
+/*! \file 
+ * \brief private interfaces for eventlib
+ * \author vix 09sep95 [initial]
  *
- * $Id: eventlib_p.h,v 1.31 2003/04/03 05:37:56 marka Exp $
+ * $Id: eventlib_p.h,v 1.9 2006/03/09 23:57:56 marka Exp $
  */
 
 #ifndef _EVENTLIB_P_H
@@ -52,6 +46,8 @@
 #define	EV_MASK_ALL	(EV_READ | EV_WRITE | EV_EXCEPT)
 #define EV_ERR(e)		return (errno = (e), -1)
 #define OK(x)		if ((x) < 0) EV_ERR(errno); else (void)NULL
+#define OKFREE(x, y)	if ((x) < 0) { FREE((y)); EV_ERR(errno); } \
+			else (void)NULL
 
 #define	NEW(p)		if (((p) = memget(sizeof *(p))) != NULL) \
 				FILL(p); \
@@ -70,19 +66,21 @@
 #define FILL(p)
 #endif
 
-#ifdef SUNW_POLL
+#ifdef USE_POLL
+#ifdef HAVE_STROPTS_H
 #include <stropts.h>
-#include <poll.h>
 #endif
+#include <poll.h>
+#endif /* USE_POLL */
 
 typedef struct evConn {
 	evConnFunc	func;
 	void *		uap;
 	int		fd;
 	int		flags;
-#define EV_CONN_LISTEN		0x0001		/* Connection is a listener. */
-#define EV_CONN_SELECTED	0x0002		/* evSelectFD(conn->file). */
-#define EV_CONN_BLOCK		0x0004		/* Listener fd was blocking. */
+#define EV_CONN_LISTEN		0x0001		/*%< Connection is a listener. */
+#define EV_CONN_SELECTED	0x0002		/*%< evSelectFD(conn->file). */
+#define EV_CONN_BLOCK		0x0004		/*%< Listener fd was blocking. */
 	evFileID	file;
 	struct evConn *	prev;
 	struct evConn *	next;
@@ -129,7 +127,7 @@ typedef struct evStream {
 	evFileID	file;
 	evTimerID	timer;
 	int		flags;
-#define EV_STR_TIMEROK	0x0001	/* IFF timer valid. */
+#define EV_STR_TIMEROK	0x0001	/*%< IFF timer valid. */
 	int		fd;
 	struct iovec *	iovOrig;
 	int		iovOrigCount;
@@ -147,6 +145,8 @@ typedef struct evTimer {
 	void *		uap;
 	struct timespec	due, inter;
 	int		index;
+	int		mode;
+#define EV_TMR_RATE	1
 } evTimer;
 
 typedef struct evWait {
@@ -176,42 +176,39 @@ typedef struct evEvent_p {
 	} u;
 } evEvent_p;
 
-#ifdef	SUNW_POLL
-typedef struct {
-	void		*ctx;		/* Pointer to the evContext_p	*/
-	uint32_t	type;		/* READ, WRITE, EXCEPT, nonblk	*/
-	uint32_t	result;		/* 1 => revents, 0 => events	*/
-} __evEmulMask;
+#ifdef USE_POLL
+typedef struct { 
+	void		*ctx;	/* pointer to the evContext_p   */ 
+	uint32_t	type;	/* READ, WRITE, EXCEPT, nonblk  */ 
+	uint32_t	result;	/* 1 => revents, 0 => events    */ 
+} __evEmulMask; 
 
-#define	emulMaskInit(ctx, field, ev, lastnext) \
+#define emulMaskInit(ctx, field, ev, lastnext) \
 	ctx->field.ctx = ctx; \
 	ctx->field.type = ev; \
-	ctx->field.result = lastnext;
+	ctx->field.result = lastnext; 
+  
+extern short	*__fd_eventfield(int fd, __evEmulMask *maskp); 
+extern short	__poll_event(__evEmulMask *maskp); 
+extern void		__fd_clr(int fd, __evEmulMask *maskp); 
+extern void		__fd_set(int fd, __evEmulMask *maskp); 
 
-/* Any value other than EV_* values from <isc/eventlib.h> will do */
-#define	EV_WASNONBLOCKING	4000000001U
+#undef  FD_ZERO 
+#define FD_ZERO(maskp) 
+  
+#undef  FD_SET 
+#define FD_SET(fd, maskp) \
+	__fd_set(fd, maskp) 
 
-extern short	*__fd_eventfield(int fd, __evEmulMask *maskp);
-extern short	__poll_event(__evEmulMask *maskp);
-extern void	__fd_clr(int fd, __evEmulMask *maskp);
-extern void	__fd_set(int fd, __evEmulMask *maskp);
+#undef  FD_CLR 
+#define FD_CLR(fd, maskp) \
+	__fd_clr(fd, maskp) 
 
-#undef	FD_ZERO
-#define	FD_ZERO(maskp)
+#undef  FD_ISSET 
+#define FD_ISSET(fd, maskp) \
+	((*__fd_eventfield(fd, maskp) & __poll_event(maskp)) != 0) 
 
-#undef	FD_SET
-#define	FD_SET(fd, maskp) \
-	__fd_set(fd, maskp)
-
-#undef	FD_CLR
-#define	FD_CLR(fd, maskp) \
-	__fd_clr(fd, maskp)
-
-#undef	FD_ISSET
-#define	FD_ISSET(fd, maskp) \
-	((*__fd_eventfield(fd, maskp) & __poll_event(maskp)) != 0)
-
-#endif	/* SUNW_POLL */
+#endif /* USE_POLL */
 
 typedef struct {
 	/* Global. */
@@ -224,26 +221,26 @@ typedef struct {
 	LIST(evAccept)	accepts;
 	/* Files. */
 	evFile		*files, *fdNext;
-#ifdef SUNW_POLL
-	struct pollfd	*pollfds;		/* Allocated as needed	*/
-	evFile		**fdTable;		/* Ditto		*/
-	int		maxnfds;		/* # elements in above	*/
-	int		firstfd;		/* First active fd	*/
-	int		fdMax;			/* Last active fd	*/
-	int		fdCount;		/* # fd:s with I/O	*/
-	int		highestFD;		/* Max fd allowed by OS	*/
-	__evEmulMask	rdLast, rdNext;
-	__evEmulMask	wrLast, wrNext;
-	__evEmulMask	exLast, exNext;
-	__evEmulMask	nonblockBefore;
-#else
+#ifndef USE_POLL
 	fd_set		rdLast, rdNext;
 	fd_set		wrLast, wrNext;
 	fd_set		exLast, exNext;
 	fd_set		nonblockBefore;
 	int		fdMax, fdCount, highestFD;
 	evFile		*fdTable[FD_SETSIZE];
-#endif
+#else
+	struct pollfd	*pollfds;	/* Allocated as needed  */ 
+	evFile		**fdTable;	/* Ditto                */ 
+	int		maxnfds;	/* # elements in above  */ 
+	int		firstfd;	/* First active fd      */ 
+	int		fdMax;		/* Last active fd       */ 
+	int		fdCount;	/* # fd:s with I/O      */ 
+	int		highestFD;	/* max fd allowed by OS */ 
+	__evEmulMask	rdLast, rdNext; 
+	__evEmulMask	wrLast, wrNext; 
+	__evEmulMask	exLast, exNext; 
+	__evEmulMask	nonblockBefore; 
+#endif /* USE_POLL */
 #ifdef EVENTLIB_TIME_CHECKS
 	struct timespec	lastSelectTime;
 	int		lastFdCount;
@@ -264,9 +261,9 @@ typedef struct {
 void evPrintf(const evContext_p *ctx, int level, const char *fmt, ...)
      ISC_FORMAT_PRINTF(3, 4);
 
-#ifdef	SUNW_POLL
-extern void evPollfdRealloc(evContext_p *ctx, int pollfd_chunk_size, int fd);
-#endif	/* SUNW_POLL */
+#ifdef USE_POLL
+extern int evPollfdRealloc(evContext_p *ctx, int pollfd_chunk_size, int fd);
+#endif /* USE_POLL */
 
 /* ev_timers.c */
 #define evCreateTimers __evCreateTimers
@@ -277,5 +274,8 @@ void evDestroyTimers(const evContext_p *);
 /* ev_waits.c */
 #define evFreeWait __evFreeWait
 evWait *evFreeWait(evContext_p *ctx, evWait *old);
+
+/* Global options */
+extern int	__evOptMonoTime;
 
 #endif /*_EVENTLIB_P_H*/

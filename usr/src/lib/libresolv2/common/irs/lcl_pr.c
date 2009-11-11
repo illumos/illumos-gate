@@ -1,9 +1,4 @@
 /*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-/*
  * Copyright (c) 1989, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -37,26 +32,24 @@
  */
 
 /*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Portions Copyright (c) 1996,1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: lcl_pr.c,v 1.18 1999/10/13 17:11:20 vixie Exp $";
+static const char rcsid[] = "$Id: lcl_pr.c,v 1.4 2006/03/09 23:57:56 marka Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 /* extern */
@@ -92,6 +85,7 @@ static const char rcsid[] = "$Id: lcl_pr.c,v 1.18 1999/10/13 17:11:20 vixie Exp 
 struct pvt {
 	FILE *		fp;
 	char		line[BUFSIZ+1];
+	char *		dbuf;
 	struct protoent	proto;
 	char *		proto_aliases[MAXALIASES];
 };
@@ -148,6 +142,8 @@ pr_close(struct irs_pr *this) {
 
 	if (pvt->fp)
 		(void) fclose(pvt->fp);
+	if (pvt->dbuf)
+		free(pvt->dbuf);
 	memput(pvt, sizeof *pvt);
 	memput(this, sizeof *this);
 }
@@ -209,6 +205,10 @@ pr_next(struct irs_pr *this) {
 		pr_rewind(this);
 	if (!pvt->fp)
 		return (NULL);
+	if (pvt->dbuf) {
+		free(pvt->dbuf);
+		pvt->dbuf = NULL;
+	}
 	bufp = pvt->line;
 	bufsiz = BUFSIZ;
 	offset = 0;
@@ -277,6 +277,7 @@ pr_next(struct irs_pr *this) {
 		}
 	}
 	*q = NULL;
+	pvt->dbuf = dbuf;
 	return (&pvt->proto);
 }
 
@@ -289,3 +290,5 @@ pr_minimize(struct irs_pr *this) {
 		pvt->fp = NULL;
 	}
 }
+
+/*! \file */

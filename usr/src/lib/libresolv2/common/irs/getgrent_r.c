@@ -1,30 +1,22 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1998-1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] =
-	"$Id: getgrent_r.c,v 8.7 2001/11/01 08:02:08 marka Exp $";
+static const char rcsid[] = "$Id: getgrent_r.c,v 1.7 2005/04/27 04:56:24 sra Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <port_before.h>
@@ -38,10 +30,10 @@ static const char rcsid[] =
 #if (defined(POSIX_GETGRNAM_R) || defined(POSIX_GETGRGID_R)) && \
     defined(_POSIX_PTHREAD_SEMANTICS)
 	/* turn off solaris remapping in <grp.h> */
-#define	_UNIX95
+#define _UNIX95
 #undef _POSIX_PTHREAD_SEMANTICS
 #include <grp.h>
-#define	_POSIX_PTHREAD_SEMANTICS 1
+#define _POSIX_PTHREAD_SEMANTICS 1
 #else
 #include <grp.h>
 #endif
@@ -57,7 +49,7 @@ copy_group(struct group *, struct group *, char *buf, int buflen);
 #ifdef POSIX_GETGRNAM_R
 int
 __posix_getgrnam_r(const char *name,  struct group *gptr,
-		char *buf, size_t buflen, struct group **result) {
+		char *buf, int buflen, struct group **result) {
 #else
 int
 getgrnam_r(const char *name,  struct group *gptr,
@@ -94,7 +86,7 @@ getgrnam_r(const char *name,  struct group *gptr,
 #ifdef POSIX_GETGRGID_R
 int
 __posix_getgrgid_r(gid_t gid, struct group *gptr,
-		char *buf, size_t buflen, struct group **result) {
+		char *buf, int buflen, struct group **result) {
 #else /* POSIX_GETGRGID_R */
 int
 getgrgid_r(gid_t gid, struct group *gptr,
@@ -128,7 +120,7 @@ getgrgid_r(gid_t gid, struct group *gptr,
 }
 #endif
 
-/*
+/*%
  *	These assume a single context is in operation per thread.
  *	If this is not the case we will need to call irs directly
  *	rather than through the base functions.
@@ -188,15 +180,15 @@ copy_group(struct group *ge, struct group *gptr, char *buf, int buflen) {
 	int numptr, len;
 
 	/* Find out the amount of space required to store the answer. */
-	numptr = 1; /* NULL ptr */
+	numptr = 1; /*%< NULL ptr */
 	len = (char *)ALIGN(buf) - buf;
 	for (i = 0; ge->gr_mem[i]; i++, numptr++) {
 		len += strlen(ge->gr_mem[i]) + 1;
 	}
 	len += strlen(ge->gr_name) + 1;
 	len += strlen(ge->gr_passwd) + 1;
-	len += numptr * sizeof (char *);
-
+	len += numptr * sizeof(char*);
+	
 	if (len > buflen) {
 		errno = ERANGE;
 		return (ERANGE);
@@ -205,7 +197,7 @@ copy_group(struct group *ge, struct group *gptr, char *buf, int buflen) {
 	/* copy group id */
 	gptr->gr_gid = ge->gr_gid;
 
-	cp = (char *)ALIGN(buf) + numptr * sizeof (char *);
+	cp = (char *)ALIGN(buf) + numptr * sizeof(char *);
 
 	/* copy official name */
 	n = strlen(ge->gr_name) + 1;
@@ -215,7 +207,7 @@ copy_group(struct group *ge, struct group *gptr, char *buf, int buflen) {
 
 	/* copy member list */
 	gptr->gr_mem = (char **)ALIGN(buf);
-	for (i = 0; ge->gr_mem[i]; i++) {
+	for (i = 0 ; ge->gr_mem[i]; i++) {
 		n = strlen(ge->gr_mem[i]) + 1;
 		strcpy(cp, ge->gr_mem[i]);
 		gptr->gr_mem[i] = cp;
@@ -235,3 +227,4 @@ copy_group(struct group *ge, struct group *gptr, char *buf, int buflen) {
 	static int getgrent_r_unknown_system = 0;
 #endif /* GROUP_R_RETURN */
 #endif /* !def(_REENTRANT) || !def(DO_PTHREADS) || !def(WANT_IRS_PW) */
+/*! \file */

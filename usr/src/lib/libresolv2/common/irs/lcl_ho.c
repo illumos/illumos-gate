@@ -1,9 +1,4 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * Copyright (c) 1985, 1988, 1993
  *    The Regents of the University of California.  All rights reserved.
  * 
@@ -37,29 +32,27 @@
  */
 
 /*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Portions Copyright (c) 1996-1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* from gethostnamadr.c	8.1 (Berkeley) 6/4/93 */
 /* BIND Id: gethnamaddr.c,v 8.15 1996/05/22 04:56:30 vixie Exp $ */
 
 #if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: lcl_ho.c,v 1.26 2001/05/29 05:49:04 marka Exp $";
+static const char rcsid[] = "$Id: lcl_ho.c,v 1.5 2006/03/09 23:57:56 marka Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 /* Imports. */
@@ -116,7 +109,7 @@ struct pvt {
 	char *		h_addr_ptrs[MAXADDRS + 1];
 	char *		host_aliases[MAXALIASES];
 	char		hostbuf[8*1024];
-	u_char		host_addr[16];	/* IPv4 or IPv6 */
+	u_char		host_addr[16];	/*%< IPv4 or IPv6 */
 	struct __res_state  *res;
 	void		(*free_res)(void *);
 };
@@ -440,11 +433,7 @@ ho_rewind(struct irs_ho *this) {
 			return;
 		(void)fclose(pvt->fp);
 	}
-#ifdef SUNW_AVOIDSTDIO_FDLIMIT
-	if (!(pvt->fp = fopen(_PATH_HOSTS, "rF")))
-#else
 	if (!(pvt->fp = fopen(_PATH_HOSTS, "r")))
-#endif
 		return;
 	if (fcntl(fileno(pvt->fp), F_SETFD, 1) < 0) {
 		(void)fclose(pvt->fp);
@@ -519,7 +508,7 @@ ho_addrinfo(struct irs_ho *this, const char *name, const struct addrinfo *pai)
 	cur = &sentinel;
 
 	switch(pai->ai_family) {
-	case AF_UNSPEC:		/* INET6 then INET4 */
+	case AF_UNSPEC:		/*%< INET6 then INET4 */
 		q.family = AF_INET6;
 		q.next = &q2;
 		q2.family = AF_INET;
@@ -531,7 +520,7 @@ ho_addrinfo(struct irs_ho *this, const char *name, const struct addrinfo *pai)
 		q.family = AF_INET;
 		break;
 	default:
-		RES_SET_H_ERRNO(pvt->res, NO_RECOVERY); /* ??? */
+		RES_SET_H_ERRNO(pvt->res, NO_RECOVERY); /*%< ??? */
 		return(NULL);
 	}
 
@@ -552,7 +541,7 @@ ho_addrinfo(struct irs_ho *this, const char *name, const struct addrinfo *pai)
 		ai = hostent2addrinfo(hp, pai);
 		if (ai) {
 			cur->ai_next = ai;
-			while (cur && cur->ai_next)
+			while (cur->ai_next)
 				cur = cur->ai_next;
 		}
 	}
@@ -580,8 +569,10 @@ init(struct irs_ho *this) {
 	
 	if (!pvt->res && !ho_res_get(this))
 		return (-1);
-	if (((pvt->res->options & RES_INIT) == 0) &&
+	if (((pvt->res->options & RES_INIT) == 0U) &&
 	    res_ninit(pvt->res) == -1)
 		return (-1);
 	return (0);
 }
+
+/*! \file */

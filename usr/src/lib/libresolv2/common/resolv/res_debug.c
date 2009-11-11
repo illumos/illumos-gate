@@ -1,12 +1,30 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+
+/*
+ * Portions Copyright (C) 2004, 2005, 2008, 2009  Internet Systems Consortium, Inc. ("ISC")
+ * Portions Copyright (C) 1996-2003  Internet Software Consortium.
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
  */
 
 /*
  * Copyright (c) 1985
  *    The Regents of the University of California.  All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -22,7 +40,7 @@
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -38,14 +56,14 @@
 
 /*
  * Portions Copyright (c) 1993 by Digital Equipment Corporation.
- * 
+ *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies, and that
  * the name of Digital Equipment Corporation not be used in advertising or
  * publicity pertaining to distribution of the document or software without
  * specific, written prior permission.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS" AND DIGITAL EQUIPMENT CORP. DISCLAIMS ALL
  * WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS.   IN NO EVENT SHALL DIGITAL EQUIPMENT
@@ -81,28 +99,9 @@
  * IF IBM IS APPRISED OF THE POSSIBILITY OF SUCH DAMAGES.
  */
 
-/*
- * Portions Copyright (c) 1996-1999 by Internet Software Consortium.
- *
- * Permission to use, copy, modify, and distribute this software for any
- * purpose with or without fee is hereby granted, provided that the above
- * copyright notice and this permission notice appear in all copies.
- *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
 static const char sccsid[] = "@(#)res_debug.c	8.1 (Berkeley) 6/4/93";
-static const char rcsid[] = "$Id: res_debug.c,v 8.50 2003/04/16 04:55:40 marka Exp $";
+static const char rcsid[] = "$Id: res_debug.c,v 1.19 2009/02/26 11:20:20 tbox Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include "port_before.h"
@@ -120,6 +119,7 @@ static const char rcsid[] = "$Id: res_debug.c,v 8.50 2003/04/16 04:55:40 marka E
 #include <math.h>
 #include <netdb.h>
 #include <resolv.h>
+#include <resolv_mt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -136,15 +136,13 @@ static const char rcsid[] = "$Id: res_debug.c,v 8.50 2003/04/16 04:55:40 marka E
 extern const char *_res_opcodes[];
 extern const char *_res_sectioncodes[];
 
-#ifdef	ORIGINAL_ISC_CODE
-#else
+#ifndef	ORIGINAL_ISC_CODE
 #pragma weak	__dn_count_labels	=	dn_count_labels
 #pragma weak	__fp_resstat		=	fp_resstat
 #pragma weak	__loc_aton		=	loc_aton
 #pragma weak	__loc_ntoa		=	loc_ntoa
 #pragma weak	__p_cdname		=	p_cdname
 #pragma weak	__p_class		=	p_class
-#pragma weak	__p_secstodate		=	p_secstodate
 #pragma weak	__p_section		=	p_section
 #pragma weak	__p_time		=	p_time
 #pragma weak	__p_type		=	p_type
@@ -153,7 +151,7 @@ extern const char *_res_sectioncodes[];
 #pragma weak	__sym_ston		=	sym_ston
 #endif	/* ORIGINAL_ISC_CODE */
 
-/*
+/*%
  * Print the current options.
  */
 void
@@ -161,7 +159,7 @@ fp_resstat(const res_state statp, FILE *file) {
 	u_long mask;
 
 	fprintf(file, ";; res options:");
-	for (mask = 1;  mask != 0;  mask <<= 1)
+	for (mask = 1;  mask != 0U;  mask <<= 1)
 		if (statp->options & mask)
 			fprintf(file, " %s", p_option(mask));
 	putc('\n', file);
@@ -212,10 +210,56 @@ do_section(const res_state statp,
 				p_type(ns_rr_type(rr)),
 				p_class(ns_rr_class(rr)));
 		else if (section == ns_s_ar && ns_rr_type(rr) == ns_t_opt) {
+			u_int16_t optcode, optlen, rdatalen = ns_rr_rdlen(rr);
 			u_int32_t ttl = ns_rr_ttl(rr);
+
 			fprintf(file,
 				"; EDNS: version: %u, udp=%u, flags=%04x\n",
 				(ttl>>16)&0xff, ns_rr_class(rr), ttl&0xffff);
+
+			while (rdatalen >= 4) {
+				const u_char *cp = ns_rr_rdata(rr);
+				int i;
+
+				GETSHORT(optcode, cp);
+				GETSHORT(optlen, cp);
+
+				if (optcode == NS_OPT_NSID) {
+					fputs("; NSID: ", file);
+					if (optlen == 0) {
+						fputs("; NSID\n", file);
+					} else {
+						fputs("; NSID: ", file);
+						for (i = 0; i < optlen; i++)
+							fprintf(file, "%02x ",
+								cp[i]);
+						fputs(" (",file);
+						for (i = 0; i < optlen; i++)
+							fprintf(file, "%c",
+								isprint(cp[i])?
+								cp[i] : '.');
+						fputs(")\n", file);
+					}
+				} else {
+					if (optlen == 0) {
+						fprintf(file, "; OPT=%u\n",
+							optcode);
+					} else {
+						fprintf(file, "; OPT=%u: ",
+							optcode);
+						for (i = 0; i < optlen; i++)
+							fprintf(file, "%02x ",
+								cp[i]);
+						fputs(" (",file);
+						for (i = 0; i < optlen; i++)
+							fprintf(file, "%c",
+								isprint(cp[i]) ?
+									cp[i] : '.');
+						fputs(")\n", file);
+					}
+				}
+				rdatalen -= 4 + optlen;
+			}
 		} else {
 			n = ns_sprintrr(handle, &rr, NULL, NULL,
 					buf, buflen);
@@ -227,7 +271,7 @@ do_section(const res_state statp,
 						buf = malloc(buflen += 1024);
 					if (buf == NULL) {
 						fprintf(file,
-				              ";; memory allocation failure\n");
+					      ";; memory allocation failure\n");
 					      return;
 					}
 					continue;
@@ -246,7 +290,7 @@ do_section(const res_state statp,
 		free(buf);
 }
 
-/*
+/*%
  * Print the contents of a query.
  * This is intended to be primarily a debugging routine.
  */
@@ -306,7 +350,7 @@ res_pquery(const res_state statp, const u_char *msg, int len, FILE *file) {
 		fprintf(file, ", %s: %d",
 			p_section(ns_s_ar, opcode), arcount);
 	}
-	if ((!statp->pfcode) || (statp->pfcode & 
+	if ((!statp->pfcode) || (statp->pfcode &
 		(RES_PRF_HEADX | RES_PRF_HEAD2 | RES_PRF_HEAD1))) {
 		putc('\n',file);
 	}
@@ -341,7 +385,8 @@ p_cdname(const u_char *cp, const u_char *msg, FILE *file) {
 	return (p_cdnname(cp, msg, PACKETSZ, file));
 }
 
-/* Return a fully-qualified domain name from a compressed name (with
+/*%
+ * Return a fully-qualified domain name from a compressed name (with
    length supplied).  */
 
 const u_char *
@@ -357,7 +402,7 @@ p_fqnname(cp, msg, msglen, name, namelen)
 		return (NULL);
 	newlen = strlen(name);
 	if (newlen == 0 || name[newlen - 1] != '.') {
-		if (newlen + 1 >= namelen)	/* Lack space for final dot */
+		if (newlen + 1 >= namelen)	/*%< Lack space for final dot */
 			return (NULL);
 		else
 			strcpy(name + newlen, ".");
@@ -379,13 +424,14 @@ p_fqname(const u_char *cp, const u_char *msg, FILE *file) {
 	return (n);
 }
 
-/*
+/*%
  * Names of RR classes and qclasses.  Classes and qclasses are the same, except
  * that C_ANY is a qclass but not a class.  (You can ask for records of class
  * C_ANY, but you can't have any records of that class in the database.)
  */
 const struct res_sym __p_class_syms[] = {
 	{C_IN,		"IN",		(char *)0},
+	{C_CHAOS,	"CH",		(char *)0},
 	{C_CHAOS,	"CHAOS",	(char *)0},
 	{C_HS,		"HS",		(char *)0},
 	{C_HS,		"HESIOD",	(char *)0},
@@ -394,7 +440,7 @@ const struct res_sym __p_class_syms[] = {
 	{C_IN, 		(char *)0,	(char *)0}
 };
 
-/*
+/*%
  * Names of message sections.
  */
 const struct res_sym __p_default_section_syms[] = {
@@ -402,7 +448,7 @@ const struct res_sym __p_default_section_syms[] = {
 	{ns_s_an,	"ANSWER",	(char *)0},
 	{ns_s_ns,	"AUTHORITY",	(char *)0},
 	{ns_s_ar,	"ADDITIONAL",	(char *)0},
-	{0,             (char *)0,	(char *)0}
+	{0,		(char *)0,	(char *)0}
 };
 
 const struct res_sym __p_update_section_syms[] = {
@@ -410,7 +456,7 @@ const struct res_sym __p_update_section_syms[] = {
 	{S_PREREQ,	"PREREQUISITE",	(char *)0},
 	{S_UPDATE,	"UPDATE",	(char *)0},
 	{S_ADDT,	"ADDITIONAL",	(char *)0},
-	{0,             (char *)0,	(char *)0}
+	{0,		(char *)0,	(char *)0}
 };
 
 const struct res_sym __p_key_syms[] = {
@@ -431,7 +477,7 @@ const struct res_sym __p_cert_syms[] = {
 	{0,		NULL,		NULL}
 };
 
-/*
+/*%
  * Names of RR types and qtypes.  Types and qtypes are the same, except
  * that T_ANY is a qtype but not a type.  (You can ask for records of type
  * T_ANY, but you can't have any records of that type in the database.)
@@ -471,6 +517,24 @@ const struct res_sym __p_type_syms[] = {
 	{ns_t_nimloc,	"NIMLOC",	"NIMROD locator (unimplemented)"},
 	{ns_t_srv,	"SRV",		"server selection"},
 	{ns_t_atma,	"ATMA",		"ATM address (unimplemented)"},
+	{ns_t_naptr,	"NAPTR",	"naptr"},
+	{ns_t_kx,	"KX",		"key exchange"},
+	{ns_t_cert,	"CERT",		"certificate"},
+	{ns_t_a6,	"A",		"IPv6 address (experminental)"},
+	{ns_t_dname,	"DNAME",	"non-terminal redirection"},
+	{ns_t_opt,	"OPT",		"opt"},
+	{ns_t_apl,	"apl",		"apl"},
+	{ns_t_ds,	"DS",		"delegation signer"},
+	{ns_t_sshfp,	"SSFP",		"SSH fingerprint"},
+	{ns_t_ipseckey,	"IPSECKEY",	"IPSEC key"},
+	{ns_t_rrsig,	"RRSIG",	"rrsig"},
+	{ns_t_nsec,	"NSEC",		"nsec"},
+	{ns_t_dnskey,	"DNSKEY",	"DNS key"},
+	{ns_t_dhcid,	"DHCID",       "dynamic host configuration identifier"},
+	{ns_t_nsec3,	"NSEC3",	"nsec3"},
+	{ns_t_nsec3param, "NSEC3PARAM", "NSEC3 parameters"},
+	{ns_t_hip,	"HIP",		"host identity protocol"},
+	{ns_t_spf,	"SPF",		"sender policy framework"},
 	{ns_t_tkey,	"TKEY",		"tkey"},
 	{ns_t_tsig,	"TSIG",		"transaction signature"},
 	{ns_t_ixfr,	"IXFR",		"incremental zone transfer"},
@@ -486,10 +550,11 @@ const struct res_sym __p_type_syms[] = {
 	{ns_t_sink,	"SINK",		"Kitchen Sink (experimental)"},
 	{ns_t_opt,	"OPT",		"EDNS Options"},
 	{ns_t_any,	"ANY",		"\"any\""},
+	{ns_t_dlv,	"DLV",		"DNSSEC look-aside validation"},
 	{0, 		NULL,		NULL}
 };
 
-/*
+/*%
  * Names of DNS rcodes.
  */
 const struct res_sym __p_rcode_syms[] = {
@@ -522,16 +587,12 @@ sym_ston(const struct res_sym *syms, const char *name, int *success) {
 	}
 	if (success)
 		*success = 0;
-	return (syms->number);		/* The default value. */
+	return (syms->number);		/*%< The default value. */
 }
 
 const char *
 sym_ntos(const struct res_sym *syms, int number, int *success) {
-#ifdef	SUNW_MT_RESOLVER
-	char	*unname = sym_ntos_unname;
-#else
-	static char unname[20];
-#endif	/* SUNW_MT_RESOLVER */
+	char *unname = sym_ntos_unname;
 
 	for ((void)NULL; syms->name != 0; syms++) {
 		if (number == syms->number) {
@@ -541,7 +602,7 @@ sym_ntos(const struct res_sym *syms, int number, int *success) {
 		}
 	}
 
-	sprintf(unname, "%d", number);		/* XXX nonreentrant */
+	sprintf(unname, "%d", number);		/*%< XXX nonreentrant */
 	if (success)
 		*success = 0;
 	return (unname);
@@ -549,11 +610,7 @@ sym_ntos(const struct res_sym *syms, int number, int *success) {
 
 const char *
 sym_ntop(const struct res_sym *syms, int number, int *success) {
-#ifdef	SUNW_MT_RESOLVER
-	char	*unname = sym_ntop_unname;
-#else
-	static char unname[20];
-#endif	/* SUNW_MT_RESOLVER */
+	char *unname = sym_ntop_unname;
 
 	for ((void)NULL; syms->name != 0; syms++) {
 		if (number == syms->number) {
@@ -562,13 +619,13 @@ sym_ntop(const struct res_sym *syms, int number, int *success) {
 			return (syms->humanname);
 		}
 	}
-	sprintf(unname, "%d", number);		/* XXX nonreentrant */
+	sprintf(unname, "%d", number);		/*%< XXX nonreentrant */
 	if (success)
 		*success = 0;
 	return (unname);
 }
 
-/*
+/*%
  * Return a string for the type.
  */
 const char *
@@ -580,13 +637,13 @@ p_type(int type) {
 	result = sym_ntos(__p_type_syms, type, &success);
 	if (success)
 		return (result);
-	if (type < 0 || type > 0xfff)
+	if (type < 0 || type > 0xffff)
 		return ("BADTYPE");
 	sprintf(typebuf, "TYPE%d", type);
 	return (typebuf);
 }
 
-/*
+/*%
  * Return a string for the type.
  */
 const char *
@@ -604,7 +661,7 @@ p_section(int section, int opcode) {
 	return (sym_ntos(symbols, section, (int *)0));
 }
 
-/*
+/*%
  * Return a mnemonic for class.
  */
 const char *
@@ -616,26 +673,18 @@ p_class(int class) {
 	result = sym_ntos(__p_class_syms, class, &success);
 	if (success)
 		return (result);
-	if (class < 0 || class > 0xfff)
+	if (class < 0 || class > 0xffff)
 		return ("BADCLASS");
 	sprintf(classbuf, "CLASS%d", class);
 	return (classbuf);
 }
 
-/*
+/*%
  * Return a mnemonic for an option
  */
 const char *
-#ifdef	ORIGINAL_ISC_CODE
 p_option(u_long option) {
-#else
-p_option(u_int option) {
-#endif
-#ifdef	SUNW_MT_RESOLVER
-	char	*nbuf = p_option_nbuf;
-#else
-	static char nbuf[40];
-#endif	/* SUNW_MT_RESOLVER */
+	char *nbuf = p_option_nbuf;
 
 	switch (option) {
 	case RES_INIT:		return "init";
@@ -652,8 +701,9 @@ p_option(u_int option) {
 	case RES_INSECURE2:	return "insecure2";
 	case RES_NOALIASES:	return "noaliases";
 	case RES_USE_INET6:	return "inet6";
-#ifdef RES_USE_EDNS0	/* KAME extension */
+#ifdef RES_USE_EDNS0	/*%< KAME extension */
 	case RES_USE_EDNS0:	return "edns0";
+	case RES_NSID:		return "nsid";
 #endif
 #ifdef RES_USE_DNAME
 	case RES_USE_DNAME:	return "dname";
@@ -664,33 +714,28 @@ p_option(u_int option) {
 #ifdef RES_NOTLDQUERY
 	case RES_NOTLDQUERY:	return "no-tld-query";
 #endif
-#ifdef	ORIGINAL_ISC_CODE
+#ifdef RES_NO_NIBBLE2
+	case RES_NO_NIBBLE2:	return "no-nibble2";
+#endif
 				/* XXX nonreentrant */
 	default:		sprintf(nbuf, "?0x%lx?", (u_long)option);
-#else
-	default:		sprintf(nbuf, "?0x%x?", (u_int)option);
-#endif
 				return (nbuf);
 	}
 }
 
-/*
+/*%
  * Return a mnemonic for a time to live.
  */
 const char *
 p_time(u_int32_t value) {
-#ifdef	SUNW_MT_RESOLVER
-	char	*nbuf = p_time_nbuf;
-#else
-	static char nbuf[40];		/* XXX nonreentrant */
-#endif	/* SUNW_MT_RESOLVER */
+	char *nbuf = p_time_nbuf;
 
 	if (ns_format_ttl(value, nbuf, sizeof nbuf) < 0)
 		sprintf(nbuf, "%u", value);
 	return (nbuf);
 }
 
-/*
+/*%
  * Return a string for the rcode.
  */
 const char *
@@ -698,7 +743,7 @@ p_rcode(int rcode) {
 	return (sym_ntos(__p_rcode_syms, rcode, (int *)0));
 }
 
-/*
+/*%
  * Return a string for a res_sockaddr_union.
  */
 const char *
@@ -718,14 +763,14 @@ p_sockun(union res_sockaddr_union u, char *buf, size_t size) {
 		sprintf(ret, "[af%d]", u.sin.sin_family);
 		break;
 	}
-	if (size > 0) {
+	if (size > 0U) {
 		strncpy(buf, ret, size - 1);
 		buf[size - 1] = '0';
 	}
 	return (buf);
 }
 
-/*
+/*%
  * routines to convert between on-the-wire RR format and zone file format.
  * Does not contain conversion to/from decimal degrees; divide or multiply
  * by 60*60*1000 for that.
@@ -734,16 +779,12 @@ p_sockun(union res_sockaddr_union u, char *buf, size_t size) {
 static unsigned int poweroften[10] = {1, 10, 100, 1000, 10000, 100000,
 				      1000000,10000000,100000000,1000000000};
 
-/* takes an XeY precision/size value, returns a string representation. */
+/*% takes an XeY precision/size value, returns a string representation. */
 static const char *
 precsize_ntoa(prec)
 	u_int8_t prec;
 {
-#ifdef	SUNW_MT_RESOLVER
-	char	*retbuf = precsize_ntoa_retbuf;
-#else
-	static char retbuf[sizeof "90000000.00"];	/* XXX nonreentrant */
-#endif	/* SUNW_MT_RESOLVER */
+	char *retbuf = precsize_ntoa_retbuf;
 	unsigned long val;
 	int mantissa, exponent;
 
@@ -756,7 +797,7 @@ precsize_ntoa(prec)
 	return (retbuf);
 }
 
-/* converts ascii size/precision X * 10**Y(cm) to 0xXY.  moves pointer. */
+/*% converts ascii size/precision X * 10**Y(cm) to 0xXY.  moves pointer.  */
 static u_int8_t
 precsize_aton(const char **strptr) {
 	unsigned int mval = 0, cmval = 0;
@@ -770,7 +811,7 @@ precsize_aton(const char **strptr) {
 	while (isdigit((unsigned char)*cp))
 		mval = mval * 10 + (*cp++ - '0');
 
-	if (*cp == '.') {		/* centimeters */
+	if (*cp == '.') {		/*%< centimeters */
 		cp++;
 		if (isdigit((unsigned char)*cp)) {
 			cmval = (*cp++ - '0') * 10;
@@ -796,7 +837,7 @@ precsize_aton(const char **strptr) {
 	return (retval);
 }
 
-/* converts ascii lat/lon to unsigned encoded 32-bit number.  moves pointer. */
+/*% converts ascii lat/lon to unsigned encoded 32-bit number.  moves pointer. */
 static u_int32_t
 latlon2ul(const char **latlonstrptr, int *which) {
 	const char *cp;
@@ -826,7 +867,7 @@ latlon2ul(const char **latlonstrptr, int *which) {
 	while (isdigit((unsigned char)*cp))
 		secs = secs * 10 + (*cp++ - '0');
 
-	if (*cp == '.') {		/* decimal seconds */
+	if (*cp == '.') {		/*%< decimal seconds */
 		cp++;
 		if (isdigit((unsigned char)*cp)) {
 			secsfrac = (*cp++ - '0') * 100;
@@ -839,7 +880,7 @@ latlon2ul(const char **latlonstrptr, int *which) {
 		}
 	}
 
-	while (!isspace((unsigned char)*cp))	/* if any trailing garbage */
+	while (!isspace((unsigned char)*cp))	/*%< if any trailing garbage */
 		cp++;
 
 	while (isspace((unsigned char)*cp))
@@ -860,30 +901,29 @@ latlon2ul(const char **latlonstrptr, int *which) {
 			- secsfrac;
 		break;
 	default:
-		retval = 0;	/* invalid value -- indicates error */
+		retval = 0;	/*%< invalid value -- indicates error */
 		break;
 	}
 
 	switch (*cp) {
 	case 'N': case 'n':
 	case 'S': case 's':
-		*which = 1;	/* latitude */
+		*which = 1;	/*%< latitude */
 		break;
 	case 'E': case 'e':
 	case 'W': case 'w':
-		*which = 2;	/* longitude */
+		*which = 2;	/*%< longitude */
 		break;
 	default:
-		*which = 0;	/* error */
+		*which = 0;	/*%< error */
 		break;
 	}
 
-	cp++;			/* skip the hemisphere */
-
-	while (!isspace((unsigned char)*cp))	/* if any trailing garbage */
+	cp++;			/*%< skip the hemisphere */
+	while (!isspace((unsigned char)*cp))	/*%< if any trailing garbage */
 		cp++;
 
-	while (isspace((unsigned char)*cp))	/* move to next field */
+	while (isspace((unsigned char)*cp))	/*%< move to next field */
 		cp++;
 
 	*latlonstrptr = cp;
@@ -891,7 +931,8 @@ latlon2ul(const char **latlonstrptr, int *which) {
 	return (retval);
 }
 
-/* converts a zone file representation in a string to an RDATA on-the-wire
+/*%
+ * converts a zone file representation in a string to an RDATA on-the-wire
  * representation. */
 int
 loc_aton(ascii, binary)
@@ -904,9 +945,9 @@ loc_aton(ascii, binary)
 	u_int32_t latit = 0, longit = 0, alt = 0;
 	u_int32_t lltemp1 = 0, lltemp2 = 0;
 	int altmeters = 0, altfrac = 0, altsign = 1;
-	u_int8_t hp = 0x16;	/* default = 1e6 cm = 10000.00m = 10km */
-	u_int8_t vp = 0x13;	/* default = 1e3 cm = 10.00m */
-	u_int8_t siz = 0x12;	/* default = 1e2 cm = 1.00m */
+	u_int8_t hp = 0x16;	/*%< default = 1e6 cm = 10000.00m = 10km */
+	u_int8_t vp = 0x13;	/*%< default = 1e3 cm = 10.00m */
+	u_int8_t siz = 0x12;	/*%< default = 1e2 cm = 1.00m */
 	int which1 = 0, which2 = 0;
 
 	cp = ascii;
@@ -917,18 +958,18 @@ loc_aton(ascii, binary)
 	lltemp2 = latlon2ul(&cp, &which2);
 
 	switch (which1 + which2) {
-	case 3:			/* 1 + 2, the only valid combination */
-		if ((which1 == 1) && (which2 == 2)) { /* normal case */
+	case 3:			/*%< 1 + 2, the only valid combination */
+		if ((which1 == 1) && (which2 == 2)) { /*%< normal case */
 			latit = lltemp1;
 			longit = lltemp2;
-		} else if ((which1 == 2) && (which2 == 1)) { /* reversed */
+		} else if ((which1 == 2) && (which2 == 1)) { /*%< reversed */
 			longit = lltemp1;
 			latit = lltemp2;
-		} else {	/* some kind of brokenness */
+		} else {	/*%< some kind of brokenness */
 			return (0);
 		}
 		break;
-	default:		/* we didn't get one of each */
+	default:		/*%< we didn't get one of each */
 		return (0);
 	}
 
@@ -937,14 +978,14 @@ loc_aton(ascii, binary)
 		altsign = -1;
 		cp++;
 	}
-    
+
 	if (*cp == '+')
 		cp++;
 
 	while (isdigit((unsigned char)*cp))
 		altmeters = altmeters * 10 + (*cp++ - '0');
 
-	if (*cp == '.') {		/* decimal meters */
+	if (*cp == '.') {		/*%< decimal meters */
 		cp++;
 		if (isdigit((unsigned char)*cp)) {
 			altfrac = (*cp++ - '0') * 10;
@@ -956,7 +997,7 @@ loc_aton(ascii, binary)
 
 	alt = (10000000 + (altsign * (altmeters * 100 + altfrac)));
 
-	while (!isspace((unsigned char)*cp) && (cp < maxcp)) /* if trailing garbage or m */
+	while (!isspace((unsigned char)*cp) && (cp < maxcp)) /*%< if trailing garbage or m */
 		cp++;
 
 	while (isspace((unsigned char)*cp) && (cp < maxcp))
@@ -966,8 +1007,8 @@ loc_aton(ascii, binary)
 		goto defaults;
 
 	siz = precsize_aton(&cp);
-	
-	while (!isspace((unsigned char)*cp) && (cp < maxcp))	/* if trailing garbage or m */
+
+	while (!isspace((unsigned char)*cp) && (cp < maxcp))	/*%< if trailing garbage or m */
 		cp++;
 
 	while (isspace((unsigned char)*cp) && (cp < maxcp))
@@ -978,7 +1019,7 @@ loc_aton(ascii, binary)
 
 	hp = precsize_aton(&cp);
 
-	while (!isspace((unsigned char)*cp) && (cp < maxcp))	/* if trailing garbage or m */
+	while (!isspace((unsigned char)*cp) && (cp < maxcp))	/*%< if trailing garbage or m */
 		cp++;
 
 	while (isspace((unsigned char)*cp) && (cp < maxcp))
@@ -992,30 +1033,26 @@ loc_aton(ascii, binary)
  defaults:
 
 	bcp = binary;
-	*bcp++ = (u_int8_t) 0;	/* version byte */
+	*bcp++ = (u_int8_t) 0;	/*%< version byte */
 	*bcp++ = siz;
 	*bcp++ = hp;
 	*bcp++ = vp;
 	PUTLONG(latit,bcp);
 	PUTLONG(longit,bcp);
 	PUTLONG(alt,bcp);
-    
-	return (16);		/* size of RR in octets */
+
+	return (16);		/*%< size of RR in octets */
 }
 
-/* takes an on-the-wire LOC RR and formats it in a human readable format. */
+/*% takes an on-the-wire LOC RR and formats it in a human readable format. */
 const char *
 loc_ntoa(binary, ascii)
 	const u_char *binary;
 	char *ascii;
 {
 	static const char *error = "?";
-#ifdef	SUNW_MT_RESOLVER
-	char	*tmpbuf = loc_ntoa_tmpbuf;
-#else
 	static char tmpbuf[sizeof
 "1000 60 60.000 N 1000 60 60.000 W -12345678.00m 90000000.00m 90000000.00m 90000000.00m"];
-#endif	/* SUNW_MT_RESOLVER */
 	const u_char *cp = binary;
 
 	int latdeg, latmin, latsec, latsecfrac;
@@ -1029,7 +1066,7 @@ loc_ntoa(binary, ascii)
 	int32_t latval, longval, altval;
 	u_int32_t templ;
 	u_int8_t sizeval, hpval, vpval, versionval;
-    
+
 	char *sizestr, *hpstr, *vpstr;
 
 	versionval = *cp++;
@@ -1054,7 +1091,7 @@ loc_ntoa(binary, ascii)
 	longval = (templ - ((unsigned)1<<31));
 
 	GETLONG(templ, cp);
-	if (templ < referencealt) { /* below WGS 84 spheroid */
+	if (templ < referencealt) { /*%< below WGS 84 spheroid */
 		altval = referencealt - templ;
 		altsign = "-";
 	} else {
@@ -1117,7 +1154,7 @@ loc_ntoa(binary, ascii)
 }
 
 
-/* Return the number of DNS hierarchy levels in the name. */
+/*% Return the number of DNS hierarchy levels in the name. */
 int
 dn_count_labels(const char *name) {
 	int i, len, count;
@@ -1142,28 +1179,19 @@ dn_count_labels(const char *name) {
 	return (count);
 }
 
-
-/* 
- * Make dates expressed in seconds-since-Jan-1-1970 easy to read.  
+/*%
+ * Make dates expressed in seconds-since-Jan-1-1970 easy to read.
  * SIG records are required to be printed like this, by the Secure DNS RFC.
  */
 char *
-#ifdef	ORIGINAL_ISC_CODE
 p_secstodate (u_long secs) {
-#else
-p_secstodate (u_int secs) {
-#endif
-#ifdef	SUNW_MT_RESOLVER
-	char	*output = p_secstodate_output;
-#else
-	/* XXX nonreentrant */
-	static char output[15];		/* YYYYMMDDHHMMSS and null */
-#endif	/* SUNW_MT_RESOLVER */
+	char *output = p_secstodate_output;
 	time_t clock = secs;
 	struct tm *time;
-	
 #ifdef HAVE_TIME_R
-	gmtime_r(&clock, &time);
+	struct tm res;
+
+	time = gmtime_r(&clock, &res);
 #else
 	time = gmtime(&clock);
 #endif
@@ -1190,7 +1218,7 @@ res_nametoclass(const char *buf, int *successp) {
 		goto done;
 	errno = 0;
 	result = strtoul(buf + 5, &endptr, 10);
-	if (errno == 0 && *endptr == '\0' && result <= 0xffff)
+	if (errno == 0 && *endptr == '\0' && result <= 0xffffU)
 		success = 1;
  done:
 	if (successp)
@@ -1213,10 +1241,12 @@ res_nametotype(const char *buf, int *successp) {
 		goto done;
 	errno = 0;
 	result = strtoul(buf + 4, &endptr, 10);
-	if (errno == 0 && *endptr == '\0' && result <= 0xffff)
+	if (errno == 0 && *endptr == '\0' && result <= 0xffffU)
 		success = 1;
  done:
 	if (successp)
 		*successp = success;
 	return (result);
 }
+
+/*! \file */

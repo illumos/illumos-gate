@@ -1,10 +1,3 @@
-/*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef res_private_h
 #define res_private_h
 
@@ -25,3 +18,5 @@ extern int
 res_ourserver_p(const res_state statp, const struct sockaddr *sa);
 
 #endif
+
+/*! \file */

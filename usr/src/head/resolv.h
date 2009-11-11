@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
@@ -95,8 +95,6 @@
 #ifndef _RESOLV_H_
 #define	_RESOLV_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 
 #include <stdio.h>
@@ -115,7 +113,7 @@ extern "C" {
  * is new enough to contain a certain feature.
  */
 
-#define	__RES	20030124
+#define	__RES	20090302
 
 #define	RES_SET_H_ERRNO(r, x)	__h_errno_set(r, x)
 struct __res_state;					/* forward */
@@ -228,6 +226,7 @@ struct __res_state {
 			uint16_t		nstimes[MAXNS];	/* ms. */
 			int			nssocks[MAXNS];
 			struct __res_state_ext *ext;	/* extention for IPv6 */
+			uchar_t	_rnd[16];	/* PRIVATE: random state */
 		} _ext;
 	} _u;
 };
@@ -383,7 +382,9 @@ int		dn_comp __P((const char *, uchar_t *, int,
 				uchar_t **, uchar_t **));
 int		dn_expand __P((const uchar_t *, const uchar_t *,
 			const uchar_t *, char *, int));
+void		res_rndinit __P((res_state));
 uint_t		res_randomid __P((void));
+uint_t		res_nrandomid __P((res_state));
 int		res_nameinquery __P((const char *, int, int,
 				const uchar_t *, const uchar_t *));
 int		res_queriesmatch __P((const uchar_t *, const uchar_t *,
@@ -420,6 +421,8 @@ int		res_findzonecut2 __P((res_state, const char *, ns_class, int,
 				int));
 void		res_nclose __P((res_state));
 int		res_nopt __P((res_state, int, uchar_t *, int, int));
+int		res_nopt_rdata __P((res_state, int, uchar_t *, int, uchar_t *,
+				    ushort_t, ushort_t, uchar_t *));
 void		res_send_setqhook __P((res_send_qhook hook));
 void		res_send_setrhook __P((res_send_rhook hook));
 int		__res_vinit __P((res_state, int));

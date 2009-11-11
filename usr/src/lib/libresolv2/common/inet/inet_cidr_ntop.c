@@ -1,29 +1,22 @@
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1998,1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: inet_cidr_ntop.c,v 8.7 2001/09/28 05:19:36 marka Exp $";
+static const char rcsid[] = "$Id: inet_cidr_ntop.c,v 1.7 2006/10/11 02:18:18 marka Exp $";
 #endif
 
 #include "port_before.h"
@@ -47,12 +40,12 @@ static const char rcsid[] = "$Id: inet_cidr_ntop.c,v 8.7 2001/09/28 05:19:36 mar
 # define SPRINTF(x) ((size_t)sprintf x)
 #endif
 
-static char *	inet_cidr_ntop_ipv4 __P((const u_char *src, int bits,
-					 char *dst, size_t size));
-static char *	inet_cidr_ntop_ipv6 __P((const u_char *src, int bits,
-					 char *dst, size_t size));
+static char *
+inet_cidr_ntop_ipv4(const u_char *src, int bits, char *dst, size_t size);
+static char *
+inet_cidr_ntop_ipv6(const u_char *src, int bits, char *dst, size_t size);
 
-/*
+/*%
  * char *
  * inet_cidr_ntop(af, src, bits, dst, size)
  *	convert network address from network to presentation format.
@@ -99,7 +92,7 @@ decoct(const u_char *src, int bytes, char *dst, size_t size) {
 	return (dst - odst);
 }
 
-/*
+/*%
  * static char *
  * inet_cidr_ntop_ipv4(src, bits, dst, size)
  *	convert IPv4 network address from network to presentation format.
@@ -128,7 +121,7 @@ inet_cidr_ntop_ipv4(const u_char *src, int bits, char *dst, size_t size) {
 	if (bits == -1)
 		len = 4;
 	else
-		for (len = 1, b = 1 ; b < 4; b++)
+		for (len = 1, b = 1 ; b < 4U; b++)
 			if (*(src + b))
 				len = b + 1;
 
@@ -137,7 +130,7 @@ inet_cidr_ntop_ipv4(const u_char *src, int bits, char *dst, size_t size) {
 	if (len > bytes)
 		bytes = len;
 	b = decoct(src, bytes, dst, size);
-	if (b == 0)
+	if (b == 0U)
 		goto emsgsize;
 	dst += b;
 	size -= b;
@@ -185,7 +178,9 @@ inet_cidr_ntop_ipv6(const u_char *src, int bits, char *dst, size_t size) {
 	for (i = 0; i < NS_IN6ADDRSZ; i++)
 		words[i / 2] |= (src[i] << ((1 - (i % 2)) << 3));
 	best.base = -1;
+	best.len = 0;
 	cur.base = -1;
+	cur.len = 0;
 	for (i = 0; i < (NS_IN6ADDRSZ / NS_INT16SZ); i++) {
 		if (words[i] == 0) {
 			if (cur.base == -1)
@@ -264,3 +259,5 @@ inet_cidr_ntop_ipv6(const u_char *src, int bits, char *dst, size_t size) {
 	strcpy(dst, tmp);
 	return (dst);
 }
+
+/*! \file */

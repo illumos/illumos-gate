@@ -1,29 +1,22 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1995,1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 #ifndef lint
-static const char rcsid[] = "$Id: ns_samedomain.c,v 8.11 2003/04/14 14:52:48 vixie Exp $";
+static const char rcsid[] = "$Id: ns_samedomain.c,v 1.6 2005/04/27 04:56:40 sra Exp $";
 #endif
 
 #include "port_before.h"
@@ -35,21 +28,22 @@ static const char rcsid[] = "$Id: ns_samedomain.c,v 8.11 2003/04/14 14:52:48 vix
 
 #include "port_after.h"
 
-/*
- * int
- * ns_samedomain(a, b)
+/*%
  *	Check whether a name belongs to a domain.
+ *
  * Inputs:
- *	a - the domain whose ancestory is being verified
- *	b - the potential ancestor we're checking against
+ *\li	a - the domain whose ancestory is being verified
+ *\li	b - the potential ancestor we're checking against
+ *
  * Return:
- *	boolean - is a at or below b?
+ *\li	boolean - is a at or below b?
+ *
  * Notes:
- *	Trailing dots are first removed from name and domain.
+ *\li	Trailing dots are first removed from name and domain.
  *	Always compare complete subdomains, not only whether the
  *	domain name is the trailing string of the given name.
  *
- *	"host.foobar.top" lies in "foobar.top" and in "top" and in ""
+ *\li	"host.foobar.top" lies in "foobar.top" and in "top" and in ""
  *	but NOT in "bar.top"
  */
 
@@ -63,7 +57,7 @@ ns_samedomain(const char *a, const char *b) {
 	lb = strlen(b);
 
 	/* Ignore a trailing label separator (i.e. an unescaped dot) in 'a'. */
-	if (la != 0 && a[la - 1] == '.') {
+	if (la != 0U && a[la - 1] == '.') {
 		escaped = 0;
 		/* Note this loop doesn't get executed if la==1. */
 		for (i = la - 2; i >= 0; i--)
@@ -79,7 +73,7 @@ ns_samedomain(const char *a, const char *b) {
 	}
 
 	/* Ignore a trailing label separator (i.e. an unescaped dot) in 'b'. */
-	if (lb != 0 && b[lb - 1] == '.') {
+	if (lb != 0U && b[lb - 1] == '.') {
 		escaped = 0;
 		/* note this loop doesn't get executed if lb==1 */
 		for (i = lb - 2; i >= 0; i--)
@@ -95,7 +89,7 @@ ns_samedomain(const char *a, const char *b) {
 	}
 
 	/* lb == 0 means 'b' is the root domain, so 'a' must be in 'b'. */
-	if (lb == 0)
+	if (lb == 0U)
 		return (1);
 
 	/* 'b' longer than 'a' means 'a' can't be in 'b'. */
@@ -147,9 +141,7 @@ ns_samedomain(const char *a, const char *b) {
 	return (strncasecmp(cp, b, lb) == 0);
 }
 
-/*
- * int
- * ns_subdomain(a, b)
+/*%
  *	is "a" a subdomain of "b"?
  */
 int
@@ -157,30 +149,31 @@ ns_subdomain(const char *a, const char *b) {
 	return (ns_samename(a, b) != 1 && ns_samedomain(a, b));
 }
 
-/*
- * int
- * ns_makecanon(src, dst, dstsize)
+/*%
  *	make a canonical copy of domain name "src"
+ *
  * notes:
+ * \code
  *	foo -> foo.
  *	foo. -> foo.
  *	foo.. -> foo.
  *	foo\. -> foo\..
  *	foo\\. -> foo\\.
+ * \endcode
  */
 
 int
 ns_makecanon(const char *src, char *dst, size_t dstsize) {
 	size_t n = strlen(src);
 
-	if (n + sizeof "." > dstsize) {			/* Note: sizeof == 2 */
+	if (n + sizeof "." > dstsize) {			/*%< Note: sizeof == 2 */
 		errno = EMSGSIZE;
 		return (-1);
 	}
 	strcpy(dst, src);
-	while (n >= 1 && dst[n - 1] == '.')		/* Ends in "." */
-		if (n >= 2 && dst[n - 2] == '\\' &&	/* Ends in "\." */
-		    (n < 3 || dst[n - 3] != '\\'))	/* But not "\\." */
+	while (n >= 1U && dst[n - 1] == '.')		/*%< Ends in "." */
+		if (n >= 2U && dst[n - 2] == '\\' &&	/*%< Ends in "\." */
+		    (n < 3U || dst[n - 3] != '\\'))	/*%< But not "\\." */
 			break;
 		else
 			dst[--n] = '\0';
@@ -189,14 +182,13 @@ ns_makecanon(const char *src, char *dst, size_t dstsize) {
 	return (0);
 }
 
-/*
- * int
- * ns_samename(a, b)
+/*%
  *	determine whether domain name "a" is the same as domain name "b"
+ *
  * return:
- *	-1 on error
- *	0 if names differ
- *	1 if names are the same
+ *\li	-1 on error
+ *\li	0 if names differ
+ *\li	1 if names are the same
  */
 
 int
@@ -211,3 +203,5 @@ ns_samename(const char *a, const char *b) {
 	else
 		return (0);
 }
+
+/*! \file */

@@ -1,33 +1,26 @@
 /*
- * Copyright 2003 by Sun Microsystems, Inc. All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996-1999 by Internet Software Consortium
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* ev_waits.c - implement deferred function calls for the eventlib
  * vix 05dec95 [initial]
  */
 
 #if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: ev_waits.c,v 8.12 2002/07/08 05:50:10 marka Exp $";
+static const char rcsid[] = "$Id: ev_waits.c,v 1.4 2005/04/27 04:56:36 sra Exp $";
 #endif
 
 #include "port_before.h"
@@ -51,7 +44,7 @@ static evWaitList *	evGetWaitList(evContext_p *, const void *, int);
 
 /* Public. */
 
-/*
+/*%
  * Enter a new wait function on the queue.
  */
 int
@@ -79,7 +72,7 @@ evWaitFor(evContext opaqueCtx, const void *tag,
 	return (0);
 }
 
-/*
+/*%
  * Mark runnable all waiting functions having a certain tag.
  */
 int
@@ -106,7 +99,7 @@ evDo(evContext opaqueCtx, const void *tag) {
 	return (0);
 }
 
-/*
+/*%
  * Remove a waiting (or ready to run) function from the queue.
  */
 int
@@ -250,3 +243,5 @@ evGetWaitList(evContext_p *ctx, const void *tag, int should_create) {
 		this = evNewWaitList(ctx);
 	return (this);
 }
+
+/*! \file */

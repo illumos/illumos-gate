@@ -1,12 +1,17 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * Issues to be discussed:
  * - Thread safe-ness must be checked
  */
+
+#if ( defined(__linux__) || defined(__linux) || defined(LINUX) )
+#ifndef IF_NAMESIZE
+# ifdef IFNAMSIZ
+#  define IF_NAMESIZE  IFNAMSIZ
+# else
+#  define IF_NAMESIZE 16
+# endif
+#endif
+#endif
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,8 +46,6 @@
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <port_before.h>
 
 #include <sys/types.h>
@@ -60,7 +63,7 @@
 
 #include <port_after.h>
 
-/*
+/*%
  * Note that a_off will be dynamically adjusted so that to be consistent
  * with the definition of sockaddr_in{,6}.
  * The value presented below is just a guess.
@@ -96,23 +99,11 @@ static int ip6_sa2str __P((const struct sockaddr_in6 *, char *, size_t, int));
 int
 getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	const struct sockaddr *sa;
-#ifdef	ORIGINAL_ISC_CODE
 	size_t salen;
-#else
-	socklen_t salen;
-#endif
 	char *host;
-#ifdef	ORIGINAL_ISC_CODE
 	size_t hostlen;
-#else
-	socklen_t hostlen;
-#endif
 	char *serv;
-#ifdef	ORIGINAL_ISC_CODE
 	size_t servlen;
-#else
-	socklen_t servlen;
-#endif
 	int flags;
 {
 	struct afd *afd;
@@ -148,10 +139,10 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
  found:
 	if (salen != afd->a_socklen) return EAI_FAIL;
 
-	port = ((const struct sockinet *)sa)->si_port; /* network byte order */
+	port = ((const struct sockinet *)sa)->si_port; /*%< network byte order */
 	addr = (const char *)sa + afd->a_off;
 
-	if (serv == NULL || servlen == 0) {
+	if (serv == NULL || servlen == 0U) {
 		/*
 		 * rfc2553bis says that serv == NULL or servlen == 0 means that
 		 * the caller does not want the result.
@@ -173,7 +164,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 
 	switch (sa->sa_family) {
 	case AF_INET:
-		if (ntohl(*(const u_long *)addr) >> IN_CLASSA_NSHIFT == 0)
+		if (ntohl(*(const u_int32_t *)addr) >> IN_CLASSA_NSHIFT == 0)
 			flags |= NI_NUMERICHOST;			
 		break;
 	case AF_INET6:
@@ -196,7 +187,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		}
 		break;
 	}
-	if (host == NULL || hostlen == 0) {
+	if (host == NULL || hostlen == 0U) {
 		/*
 		 * rfc2553bis says that host == NULL or hostlen == 0 means that
 		 * the caller does not want the result.
@@ -260,13 +251,13 @@ ip6_parsenumeric(const struct sockaddr *sa, const char *addr, char *host,
 		return EAI_SYSTEM;
 
 	numaddrlen = strlen(numaddr);
-	if (numaddrlen + 1 > hostlen) /* don't forget terminator */
+	if (numaddrlen + 1 > hostlen) /*%< don't forget terminator */
 		return EAI_MEMORY;
 	strcpy(host, numaddr);
 
 #ifdef HAVE_SIN6_SCOPE_ID
 	if (((const struct sockaddr_in6 *)sa)->sin6_scope_id) {
-		char scopebuf[MAXHOSTNAMELEN]; /* XXX */
+		char scopebuf[MAXHOSTNAMELEN]; /*%< XXX */
 		int scopelen;
 
 		/* ip6_sa2str never fails */
@@ -302,7 +293,7 @@ ip6_sa2str(const struct sockaddr_in6 *sa6, char *buf,
 #ifdef NI_NUMERICSCOPE
 	if (flags & NI_NUMERICSCOPE) {
 		sprintf(tmp, "%u", sa6->sin6_scope_id);
-		if (bufsiz != 0) {
+		if (bufsiz != 0U) {
 			strncpy(buf, tmp, bufsiz - 1);
 			buf[bufsiz - 1] = '\0';
 		}
@@ -332,10 +323,12 @@ ip6_sa2str(const struct sockaddr_in6 *sa6, char *buf,
 
 	/* last resort */
 	sprintf(tmp, "%u", sa6->sin6_scope_id);
-	if (bufsiz != 0) {
+	if (bufsiz != 0U) {
 		strncpy(buf, tmp, bufsiz - 1);
 		buf[bufsiz - 1] = '\0';
 	}
 	return(strlen(tmp));
 }
 #endif
+
+/*! \file */

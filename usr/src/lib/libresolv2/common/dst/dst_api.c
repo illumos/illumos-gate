@@ -1,13 +1,6 @@
 #ifndef LINT
-static const char rcsid[] = "$Header: /proj/cvs/isc/bind8/src/lib/dst/dst_api.c,v 1.21 2002/06/28 06:58:19 marka Exp $";
+static const char rcsid[] = "$Header: /proj/cvs/prod/libbind/dst/dst_api.c,v 1.17 2007/09/24 17:18:25 each Exp $";
 #endif
-
-/*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Portions Copyright (c) 1995-1998 by Trusted Information Systems, Inc.
@@ -85,7 +78,7 @@ static DST_KEY *dst_s_get_key_struct(const char *name, const int alg,
 				     const int flags, const int protocol,
 				     const int bits);
 
-/*
+/*%
  *  dst_init
  *	This function initializes the Digital Signature Toolkit.
  *	Right now, it just checks the DSTKEYPATH environment variable.
@@ -128,14 +121,10 @@ dst_init()
 	}
 	memset(dst_t_func, 0, sizeof(dst_t_func));
 	/* first one is selected */
-	dst_bsafe_init();
-	dst_rsaref_init(); 
 	dst_hmac_md5_init();
-	dst_eay_dss_init();
-	dst_cylink_init();
 }
 
-/*
+/*%
  *  dst_check_algorithm
  *	This function determines if the crypto system for the specified
  *	algorithm is present.
@@ -154,7 +143,7 @@ dst_check_algorithm(const int alg)
 	return (dst_t_func[alg] != NULL);
 }
 
-/* 
+/*%
  * dst_s_get_key_struct 
  *	This function allocates key structure and fills in some of the 
  *	fields of the structure. 
@@ -174,13 +163,17 @@ dst_s_get_key_struct(const char *name, const int alg, const int flags,
 {
 	DST_KEY *new_key = NULL; 
 
-	if (dst_check_algorithm(alg)) /* make sure alg is available */
+	if (dst_check_algorithm(alg)) /*%< make sure alg is available */
 		new_key = (DST_KEY *) malloc(sizeof(*new_key));
 	if (new_key == NULL)
 		return (NULL);
 
 	memset(new_key, 0, sizeof(*new_key));
 	new_key->dk_key_name = strdup(name);
+	if (new_key->dk_key_name == NULL) {
+		free(new_key);
+		return (NULL);
+	}
 	new_key->dk_alg = alg;
 	new_key->dk_flags = flags;
 	new_key->dk_proto = protocol;
@@ -190,7 +183,7 @@ dst_s_get_key_struct(const char *name, const int alg, const int flags,
 	return (new_key);
 }
 
-/*
+/*%
  *  dst_compare_keys
  *	Compares two keys for equality.
  *  Parameters
@@ -216,15 +209,13 @@ dst_compare_keys(const DST_KEY *key1, const DST_KEY *key2)
 	return (key1->dk_func->compare(key1, key2));
 }
 
-
-/*
+/*%
  * dst_sign_data
  *	An incremental signing function.  Data is signed in steps.
  *	First the context must be initialized (SIG_MODE_INIT).
  *	Then data is hashed (SIG_MODE_UPDATE).  Finally the signature
  *	itself is created (SIG_MODE_FINAL).  This function can be called
  *	once with INIT, UPDATE and FINAL modes all set, or it can be
-
  *	called separately with a different mode set for each step.  The
  *	UPDATE step can be repeated.
  * Parameters
@@ -244,8 +235,8 @@ dst_compare_keys(const DST_KEY *key1, const DST_KEY *key2)
  *	sig_len Length of the signature field in bytes.
  * Return
  *	 0      Successfull INIT or Update operation
- *	>0      success FINAL (sign) operation
- *	<0      failure
+ *	&gt;0      success FINAL (sign) operation
+ *	&lt;0      failure
  */
 
 int
@@ -265,8 +256,7 @@ dst_sign_data(const int mode, DST_KEY *in_key, void **context,
 	return (UNKNOWN_KEYALG);
 }
 
-
-/*
+/*%
  *  dst_verify_data
  *	An incremental verify function.  Data is verified in steps.
  *	First the context must be initialized (SIG_MODE_INIT).
@@ -308,8 +298,7 @@ dst_verify_data(const int mode, DST_KEY *in_key, void **context,
 					signature, sig_len));
 }
 
-
-/*
+/*%
  *  dst_read_private_key
  *	Access a private key.  First the list of private keys that have
  *	already been read in is searched, then the key accessed on disk.
@@ -338,7 +327,7 @@ dst_read_key(const char *in_keyname, const u_int16_t in_id,
 	char keyname[PATH_MAX];
 	DST_KEY *dg_key = NULL, *pubkey = NULL;
 
-	if (!dst_check_algorithm(in_alg)) { /* make sure alg is available */
+	if (!dst_check_algorithm(in_alg)) { /*%< make sure alg is available */
 		EREPORT(("dst_read_private_key(): Algorithm %d not suppored\n",
 			 in_alg));
 		return (NULL);
@@ -348,7 +337,10 @@ dst_read_key(const char *in_keyname, const u_int16_t in_id,
 	if (in_keyname == NULL) {
 		EREPORT(("dst_read_private_key(): Null key name passed in\n"));
 		return (NULL);
-	} else
+	} else if (strlen(in_keyname) >= sizeof(keyname)) {
+		EREPORT(("dst_read_private_key(): keyname too big\n"));
+		return (NULL);
+	} else 
 		strcpy(keyname, in_keyname);
 
 	/* before I read in the public key, check if it is allowed to sign */
@@ -359,7 +351,7 @@ dst_read_key(const char *in_keyname, const u_int16_t in_id,
 		return pubkey; 
 
 	if (!(dg_key = dst_s_get_key_struct(keyname, pubkey->dk_alg,
-					 pubkey->dk_flags, pubkey->dk_proto,
+					    pubkey->dk_flags, pubkey->dk_proto,
 					    0)))
 		return (dg_key);
 	/* Fill in private key and some fields in the general key structure */
@@ -367,7 +359,7 @@ dst_read_key(const char *in_keyname, const u_int16_t in_id,
 					pubkey->dk_alg) == 0)
 		dg_key = dst_free_key(dg_key);
 
-	pubkey = dst_free_key(pubkey);
+	(void)dst_free_key(pubkey);
 	return (dg_key);
 }
 
@@ -378,7 +370,7 @@ dst_write_key(const DST_KEY *key, const int type)
 
 	if (key == NULL) 
 		return (0);
-	if (!dst_check_algorithm(key->dk_alg)) { /* make sure alg is available */
+	if (!dst_check_algorithm(key->dk_alg)) { /*%< make sure alg is available */
 		EREPORT(("dst_write_key(): Algorithm %d not suppored\n", 
 			 key->dk_alg));
 		return (UNSUPPORTED_KEYALG);
@@ -395,19 +387,19 @@ dst_write_key(const DST_KEY *key, const int type)
 	return (priv+pub);
 }
 
-/*
+/*%
  *  dst_write_private_key
  *	Write a private key to disk.  The filename will be of the form:
- *	K<key->dk_name>+<key->dk_alg>+<key->dk_id>.<private key suffix>.
+ *	K&lt;key-&gt;dk_name&gt;+&lt;key-&gt;dk_alg+&gt;&lt;key-d&gt;k_id.&gt;&lt;private key suffix&gt;.
  *	If there is already a file with this name, an error is returned.
  *
  *  Parameters
  *	key     A DST managed key structure that contains
  *	      all information needed about a key.
  *  Return
- *	>= 0    Correct behavior.  Returns length of encoded key value
+ *	&gt;= 0    Correct behavior.  Returns length of encoded key value
  *		  written to disk.
- *	<  0    error.
+ *	&lt;  0    error.
  */
 
 static int
@@ -422,8 +414,7 @@ dst_s_write_private_key(const DST_KEY *key)
 	if (key == NULL)
 		return (-1);
 	if (key->dk_KEY_struct == NULL)
-		return (0);	/* null key has no private key */
-
+		return (0);	/*%< null key has no private key */
 	if (key->dk_func == NULL || key->dk_func->to_file_fmt == NULL) {
 		EREPORT(("dst_write_private_key(): Unsupported operation %d\n",
 			 key->dk_alg));
@@ -443,6 +434,7 @@ dst_s_write_private_key(const DST_KEY *key)
 		if ((nn = fwrite(encoded_block, 1, len, fp)) != len) {
 			EREPORT(("dst_write_private_key(): Write failure on %s %d != %d errno=%d\n",
 				 file, len, nn, errno));
+			fclose(fp);
 			return (-5);
 		}
 		fclose(fp);
@@ -455,12 +447,12 @@ dst_s_write_private_key(const DST_KEY *key)
 	return (len);
 }
 
-/*
+/*%
 *
  *  dst_read_public_key
  *	Read a public key from disk and store in a DST key structure.
  *  Parameters
- *	in_name	 K<in_name><in_id>.<public key suffix> is the
+ *	in_name	 K&lt;in_name&gt;&lt;in_id&gt;.&lt;public key suffix&gt; is the
  *		      filename of the key file to be read.
  *  Returns
  *	NULL	    If the key does not exist or no name is supplied.
@@ -489,7 +481,7 @@ dst_s_read_public_key(const char *in_name, const u_int16_t in_id, int in_alg)
 	/*
 	 * Open the file and read it's formatted contents up to key
 	 * File format:
-	 *    domain.name [ttl] [IN] KEY  <flags> <protocol> <algorithm> <key>
+	 *    domain.name [ttl] [IN] KEY  &lt;flags&gt; &lt;protocol&gt; &lt;algorithm&gt; &lt;key&gt;
 	 * flags, proto, alg stored as decimal (or hex numbers FIXME).
 	 * (FIXME: handle parentheses for line continuation.)
 	 */
@@ -536,7 +528,7 @@ dst_s_read_public_key(const char *in_name, const u_int16_t in_id, int in_alg)
 	while ((c = getc(fp)) != EOF)
 		if (!isspace(c))
 			break;
-	ungetc(c, fp);		/* return the charcter to the input field */
+	ungetc(c, fp);		/*%< return the charcter to the input field */
 	/* Handle hex!! FIXME.  */
 
 	if (fscanf(fp, "%d %d %d", &flags, &proto, &alg) != 3) {
@@ -579,8 +571,7 @@ dst_s_read_public_key(const char *in_name, const u_int16_t in_id, int in_alg)
 	return dst_buffer_to_key(in_name, alg, flags, proto, deckey, dlen);
 }
 
-
-/*
+/*%
  *  dst_write_public_key
  *	Write a key to disk in DNS format.
  *  Parameters
@@ -634,8 +625,7 @@ dst_s_write_public_key(const DST_KEY *key)
 	return (1);
 }
 
-
-/*
+/*%
  *  dst_dnskey_to_public_key
  *	This function converts the contents of a DNS KEY RR into a DST
  *	key structure.
@@ -656,19 +646,21 @@ dst_dnskey_to_key(const char *in_name, const u_char *rdata, const int len)
 	int alg ;
 	int start = DST_KEY_START;
 
-	if (rdata == NULL || len <= DST_KEY_ALG) /* no data */
+	if (rdata == NULL || len <= DST_KEY_ALG) /*%< no data */
 		return (NULL);
 	alg = (u_int8_t) rdata[DST_KEY_ALG];
-	if (!dst_check_algorithm(alg)) { /* make sure alg is available */
+	if (!dst_check_algorithm(alg)) { /*%< make sure alg is available */
 		EREPORT(("dst_dnskey_to_key(): Algorithm %d not suppored\n",
 			 alg));
 		return (NULL);
 	}
-	if ((key_st = dst_s_get_key_struct(in_name, alg, 0, 0, 0)) == NULL)
-		return (NULL);
 
 	if (in_name == NULL)
 		return (NULL);
+
+	if ((key_st = dst_s_get_key_struct(in_name, alg, 0, 0, 0)) == NULL)
+		return (NULL);
+
 	key_st->dk_id = dst_s_dns_key_id(rdata, len);
 	key_st->dk_flags = dst_s_get_int16(rdata);
 	key_st->dk_proto = (u_int16_t) rdata[DST_KEY_PROT];
@@ -694,8 +686,7 @@ dst_dnskey_to_key(const char *in_name, const u_char *rdata, const int len)
 	return (key_st);
 }
 
-
-/*
+/*%
  *  dst_public_key_to_dnskey
  *	Function to encode a public key into DNS KEY wire format 
  *  Parameters
@@ -717,7 +708,7 @@ dst_key_to_dnskey(const DST_KEY *key, u_char *out_storage,
 	if (key == NULL)
 		return (-1);
 
-	if (!dst_check_algorithm(key->dk_alg)) { /* make sure alg is available */
+	if (!dst_check_algorithm(key->dk_alg)) { /*%< make sure alg is available */
 		EREPORT(("dst_key_to_dnskey(): Algorithm %d not suppored\n",
 			 key->dk_alg));
 		return (UNSUPPORTED_KEYALG);
@@ -730,7 +721,7 @@ dst_key_to_dnskey(const DST_KEY *key, u_char *out_storage,
 	out_storage[loc++] = (u_char) key->dk_proto;
 	out_storage[loc++] = (u_char) key->dk_alg;
 
-	if (key->dk_flags > 0xffff) {	/* Extended flags */
+	if (key->dk_flags > 0xffff) {	/*%< Extended flags */
 		val = (u_int16_t)((key->dk_flags >> 16) & 0xffff);
 		dst_s_put_int16(&out_storage[loc], val);
 		loc += 2;
@@ -751,8 +742,7 @@ dst_key_to_dnskey(const DST_KEY *key, u_char *out_storage,
 	return (-1);
 }
 
-
-/*
+/*%
  *  dst_buffer_to_key
  *	Function to encode a string of raw data into a DST key
  *  Parameters
@@ -764,30 +754,28 @@ dst_key_to_dnskey(const DST_KEY *key, u_char *out_storage,
  *	NON-NULL	the DST key
  */
 DST_KEY *
-dst_buffer_to_key(const char *key_name,		/* name of the key */
-		  const int alg,		/* algorithm */
-		  const int flags,		/* dns flags */
-		  const int protocol,		/* dns protocol */
-		  const u_char *key_buf,	/* key in dns wire fmt */
-		  const int key_len)		/* size of key */
+dst_buffer_to_key(const char *key_name,		/*!< name of the key  */
+		  const int alg,		/*!< algorithm  */
+		  const int flags,		/*!< dns flags  */
+		  const int protocol,		/*!< dns protocol  */
+		  const u_char *key_buf,	/*!< key in dns wire fmt  */
+		  const int key_len)		/*!< size of key  */
 {
 	
 	DST_KEY *dkey = NULL; 
 	int dnslen;
 	u_char dns[2048];
 
-	if (!dst_check_algorithm(alg)) { /* make sure alg is available */
+	if (!dst_check_algorithm(alg)) { /*%< make sure alg is available */
 		EREPORT(("dst_buffer_to_key(): Algorithm %d not suppored\n", alg));
 		return (NULL);
 	}
 
-	dkey = dst_s_get_key_struct(key_name, alg, flags, 
-					     protocol, -1);
+	dkey = dst_s_get_key_struct(key_name, alg, flags, protocol, -1);
 
-	if (dkey == NULL)
-		return (NULL);
-	if (dkey->dk_func == NULL || dkey->dk_func->from_dns_key == NULL)
-		return NULL;
+	if (dkey == NULL || dkey->dk_func == NULL ||
+	    dkey->dk_func->from_dns_key == NULL) 
+		return (dst_free_key(dkey));
 
 	if (dkey->dk_func->from_dns_key(dkey, key_buf, key_len) < 0) {
 		EREPORT(("dst_buffer_to_key(): dst_buffer_to_hmac failed\n"));
@@ -815,8 +803,7 @@ dst_key_to_buffer(DST_KEY *key, u_char *out_buff, int buf_len)
 	return (0);
 }
 
-
-/*
+/*%
  * dst_s_read_private_key_file
  *     Function reads in private key from a file.
  *     Fills out the KEY structure.
@@ -873,7 +860,8 @@ dst_s_read_private_key_file(char *name, DST_KEY *pk_key, u_int16_t in_id,
 	len = cnt;
 	p = in_buff;
 
-	if (!dst_s_verify_str((const char **) &p, "Private-key-format: v")) {
+	if (!dst_s_verify_str((const char **) (void *)&p,
+			       "Private-key-format: v")) {
 		EREPORT(("dst_s_read_private_key_file(): Not a Key file/Decrypt failed %s\n", name));
 		goto fail;
 	}
@@ -889,14 +877,14 @@ dst_s_read_private_key_file(char *name, DST_KEY *pk_key, u_int16_t in_id,
 				"dst_s_read_private_key_file(): Keyfile %s version higher than mine %d.%d MAY FAIL\n",
 				name, file_major, file_minor));
 
-	while (*p++ != '\n') ;	/* skip to end of line */
+	while (*p++ != '\n') ;	/*%< skip to end of line */
 
-	if (!dst_s_verify_str((const char **) &p, "Algorithm: "))
+	if (!dst_s_verify_str((const char **) (void *)&p, "Algorithm: "))
 		goto fail;
 
 	if (sscanf((char *)p, "%d", &alg) != 1)
 		goto fail;
-	while (*p++ != '\n') ;	/* skip to end of line */
+	while (*p++ != '\n') ;	/*%< skip to end of line */
 
 	if (pk_key->dk_key_name && !strcmp(pk_key->dk_key_name, name))
 		SAFE_FREE2(pk_key->dk_key_name, strlen(pk_key->dk_key_name));
@@ -929,34 +917,34 @@ dst_s_read_private_key_file(char *name, DST_KEY *pk_key, u_int16_t in_id,
 	return (0);
 }
 
-
-/*
- *  dst_generate_key
+/*%
  *	Generate and store a public/private keypair.
  *	Keys will be stored in formatted files.
+ *
  *  Parameters
- *	name    Name of the new key.  Used to create key files
- *		  K<name>+<alg>+<id>.public and K<name>+<alg>+<id>.private.
- *	bits    Size of the new key in bits.
- *	exp     What exponent to use:
- *		  0	   use exponent 3
- *		  non-zero    use Fermant4
- *	flags   The default value of the DNS Key flags.
- *		  The DNS Key RR Flag field is defined in RFC 2065,
+ &
+ *\par	name    Name of the new key.  Used to create key files
+ *\li		  K&lt;name&gt;+&lt;alg&gt;+&lt;id&gt;.public and K&lt;name&gt;+&lt;alg&gt;+&lt;id&gt;.private.
+ *\par	bits    Size of the new key in bits.
+ *\par	exp     What exponent to use:
+ *\li		  0	   use exponent 3
+ *\li		  non-zero    use Fermant4
+ *\par	flags   The default value of the DNS Key flags.
+ *\li		  The DNS Key RR Flag field is defined in RFC2065,
  *		  section 3.3.  The field has 16 bits.
- *	protocol
- *	      Default value of the DNS Key protocol field.
- *		  The DNS Key protocol field is defined in RFC 2065,
+ *\par	protocol
+ *\li	      Default value of the DNS Key protocol field.
+ *\li		  The DNS Key protocol field is defined in RFC2065,
  *		  section 3.4.  The field has 8 bits.
- *	alg     What algorithm to use.  Currently defined:
- *		  KEY_RSA       1
- *		  KEY_DSA       3
- *		  KEY_HMAC    157
- *	out_id The key tag is returned.
+ *\par	alg     What algorithm to use.  Currently defined:
+ *\li		  KEY_RSA       1
+ *\li		  KEY_DSA       3
+ *\li		  KEY_HMAC    157
+ *\par	out_id The key tag is returned.
  *
  *  Return
- *	NULL		Failure
- *	non-NULL 	the generated key pair
+ *\li	NULL		Failure
+ *\li	non-NULL 	the generated key pair
  *			Caller frees the result, and its dk_name pointer.
  */
 DST_KEY *
@@ -964,14 +952,13 @@ dst_generate_key(const char *name, const int bits, const int exp,
 		 const int flags, const int protocol, const int alg)
 {
 	DST_KEY *new_key = NULL;
-	int res;
 	int dnslen;
 	u_char dns[2048];
 
 	if (name == NULL)
 		return (NULL);
 
-	if (!dst_check_algorithm(alg)) { /* make sure alg is available */
+	if (!dst_check_algorithm(alg)) { /*%< make sure alg is available */
 		EREPORT(("dst_generate_key(): Algorithm %d not suppored\n", alg));
 		return (NULL);
 	}
@@ -979,14 +966,14 @@ dst_generate_key(const char *name, const int bits, const int exp,
 	new_key = dst_s_get_key_struct(name, alg, flags, protocol, bits);
 	if (new_key == NULL)
 		return (NULL);
-	if (bits == 0) /* null key we are done */
+	if (bits == 0) /*%< null key we are done */
 		return (new_key);
 	if (new_key->dk_func == NULL || new_key->dk_func->generate == NULL) {
 		EREPORT(("dst_generate_key_pair():Unsupported algorithm %d\n",
 			 alg));
 		return (dst_free_key(new_key));
 	}
-	if ((res = new_key->dk_func->generate(new_key, exp)) <= 0) {
+	if (new_key->dk_func->generate(new_key, exp) <= 0) {
 		EREPORT(("dst_generate_key_pair(): Key generation failure %s %d %d %d\n",
 			 new_key->dk_key_name, new_key->dk_alg,
 			 new_key->dk_key_size, exp));
@@ -1002,12 +989,11 @@ dst_generate_key(const char *name, const int bits, const int exp,
 	return (new_key);
 }
 
-
-/*
- *  dst_free_key
+/*%
  *	Release all data structures pointed to by a key structure.
+ *
  *  Parameters
- *	f_key   Key structure to be freed.
+ *\li	f_key   Key structure to be freed.
  */
 
 DST_KEY *
@@ -1022,7 +1008,6 @@ dst_free_key(DST_KEY *f_key)
 	else {
 		EREPORT(("dst_free_key(): Unknown key alg %d\n",
 			 f_key->dk_alg));
-		free(f_key->dk_KEY_struct);	/* SHOULD NOT happen */
 	}
 	if (f_key->dk_KEY_struct) {
 		free(f_key->dk_KEY_struct);
@@ -1034,13 +1019,14 @@ dst_free_key(DST_KEY *f_key)
 	return (NULL);
 }
 
-/*
- * dst_sig_size
+/*%
  *	Return the maximim size of signature from the key specified in bytes
+ *
  * Parameters
- *      key 
+ *\li      key 
+ *
  * Returns
- *     bytes
+ *  \li   bytes
  */
 int
 dst_sig_size(DST_KEY *key) {
@@ -1059,42 +1045,4 @@ dst_sig_size(DST_KEY *key) {
 	}
 }
 
-/* 
- * dst_random 
- *  function that multiplexes number of random number generators
- * Parameters  
- *   mode: select the random number generator
- *   wanted is how many bytes of random data are requested 
- *   outran is a buffer of size at least wanted for the output data
- *
- * Returns
- *    number of bytes written to outran
- */
-int 
-dst_random(const int mode, int wanted, u_char *outran)
-{
-	u_int32_t *buff = NULL, *bp = NULL;
-	int i;
-	if (wanted <= 0 || outran == NULL) 
-		return (0);
-
-	switch (mode) {
-	case DST_RAND_SEMI: 
-		bp = buff = (u_int32_t *) malloc(wanted+sizeof(u_int32_t));
-		for (i = 0; i < wanted; i+= sizeof(u_int32_t), bp++) {
-			*bp = dst_s_quick_random(i);
-		}
-		memcpy(outran, buff, wanted);
-		SAFE_FREE(buff);
-		return (wanted);
-	case DST_RAND_STD:
-		return (dst_s_semi_random(outran, wanted));
-	case DST_RAND_KEY:
-		return (dst_s_random(outran, wanted));
-	case DST_RAND_DSS:
-	default:
-		/* need error case here XXX OG */
-		return (0);
-	}
-}
-
+/*! \file */

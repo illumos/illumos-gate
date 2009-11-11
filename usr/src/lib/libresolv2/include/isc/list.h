@@ -1,26 +1,19 @@
 /*
- * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1997,1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef LIST_H
 #define LIST_H 1
@@ -38,7 +31,8 @@
 	} while (0)
 #define INIT_LINK(elt, link) \
 	INIT_LINK_TYPE(elt, link, void)
-#define LINKED(elt, link) ((void *)((elt)->link.prev) != (void *)(-1))
+#define LINKED(elt, link) ((void *)((elt)->link.prev) != (void *)(-1) && \
+			   (void *)((elt)->link.next) != (void *)(-1))
 
 #define HEAD(list) ((list).head)
 #define TAIL(list) ((list).tail)
@@ -73,12 +67,16 @@
 		INSIST(LINKED(elt, link));\
 		if ((elt)->link.next != NULL) \
 			(elt)->link.next->link.prev = (elt)->link.prev; \
-		else \
+		else { \
+			INSIST((list).tail == (elt)); \
 			(list).tail = (elt)->link.prev; \
+		} \
 		if ((elt)->link.prev != NULL) \
 			(elt)->link.prev->link.next = (elt)->link.next; \
-		else \
+		else { \
+			INSIST((list).head == (elt)); \
 			(list).head = (elt)->link.next; \
+		} \
 		INIT_LINK_TYPE(elt, link, type); \
 	} while (0)
 #define UNLINK(list, elt, link) \
@@ -117,3 +115,4 @@
 #define DEQUEUE(list, elt, link) UNLINK(list, elt, link)
 
 #endif /* LIST_H */
+/*! \file */

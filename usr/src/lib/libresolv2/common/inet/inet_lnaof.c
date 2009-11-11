@@ -1,9 +1,4 @@
 /*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-/*
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -35,7 +30,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static const char sccsid[] = "@(#)inet_lnaof.c	8.1 (Berkeley) 6/4/93";
@@ -49,24 +43,16 @@ static const char sccsid[] = "@(#)inet_lnaof.c	8.1 (Berkeley) 6/4/93";
 
 #include "port_after.h"
 
-/*
+/*%
  * Return the local network address portion of an
  * internet address; handles class a/b/c network
  * number formats.
  */
-#ifdef	ORIGINAL_ISC_CODE
 u_long
-#else
-in_addr_t
-#endif
 inet_lnaof(in)
 	struct in_addr in;
 {
-#ifdef	ORIGINAL_ISC_CODE
-	u_long i = ntohl(in.s_addr);
-#else
-	in_addr_t i = ntohl(in.s_addr);
-#endif
+	register u_long i = ntohl(in.s_addr);
 
 	if (IN_CLASSA(i))
 		return ((i)&IN_CLASSA_HOST);
@@ -75,3 +61,5 @@ inet_lnaof(in)
 	else
 		return ((i)&IN_CLASSC_HOST);
 }
+
+/*! \file */

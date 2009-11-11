@@ -1,15 +1,9 @@
-/*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
 #ifndef LINT
-static const char rcsid[] = "$Id: ftruncate.c,v 8.4 1999/10/13 16:39:21 vixie Exp $";
+static const char rcsid[] = "$Id: ftruncate.c,v 1.3 2005/04/27 18:16:45 sra Exp $";
 #endif
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
+/*! \file
+ * \brief
  * ftruncate - set file size, BSD Style
  *
  * shortens or enlarges the file as neeeded

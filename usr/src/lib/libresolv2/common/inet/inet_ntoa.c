@@ -1,9 +1,4 @@
 /*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-/*
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -36,11 +31,9 @@
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
 static const char sccsid[] = "@(#)inet_ntoa.c	8.1 (Berkeley) 6/4/93";
-static const char rcsid[] = "$Id: inet_ntoa.c,v 1.7 1999/05/14 18:16:55 vixie Exp $";
+static const char rcsid[] = "$Id: inet_ntoa.c,v 1.2 2005/04/27 04:56:21 sra Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include "port_before.h"
@@ -55,11 +48,10 @@ static const char rcsid[] = "$Id: inet_ntoa.c,v 1.7 1999/05/14 18:16:55 vixie Ex
 
 #include "port_after.h"
 
-/*
+/*%
  * Convert network-format internet address
  * to base 256 d.d.d.d representation.
  */
-#ifndef SUNW_LIBNSL /* We don't need this if linked with libnsl */
 /*const*/ char *
 inet_ntoa(struct in_addr in) {
 	static char ret[18];
@@ -68,4 +60,5 @@ inet_ntoa(struct in_addr in) {
 	(void) inet_ntop(AF_INET, &in, ret, sizeof ret);
 	return (ret);
 }
-#endif	/* SUNW_LIBNSL */
+
+/*! \file */

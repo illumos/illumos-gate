@@ -1,8 +1,7 @@
 /*
- * Copyright (c) 1998-2000 by Sun Microsystems, Inc.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <port_before.h>
 #include <thread.h>
@@ -14,106 +13,11 @@
 #include <irs.h>
 #include <port_after.h>
 
-static int		thr_keycreate_ret = 0;
-
-static thread_key_t	key;
-static int		mt_key_initialized = 0;
-
-static mtctxres_t	sharedctx;
-
-static int		__res_init_ctx(thread_key_t);
-static void		__res_destroy_ctx(void *);
-
-#pragma init	(_mtctxres_init)
-
 /*
- * Initialize the TSD key. By doing this at library load time, we're
- * implicitly running without interference from other threads, so there's
- * no need for locking.
+ * much of the original version of sunw_mtxtxres.c was incorporated into
+ * ISC libbind as resolv/mtctxres.c. The following bits have not yet made
+ * it into ISC libbind.
  */
-static void
-_mtctxres_init(void) {
-
-	if ((thr_keycreate_ret = thr_keycreate(&key, __res_destroy_ctx)) == 0) {
-		mt_key_initialized = 1;
-	}
-}
-
-
-/*
- * To support binaries that used the private MT-safe interface in
- * on998 or on28, we still need to provide the __res_enable_mt()
- * and __res_disable_mt() entry points. They're do-nothing routines.
- */
-int
-__res_enable_mt(void) {
-	return (-1);
-}
-
-int
-__res_disable_mt(void) {
-	return (0);
-}
-
-
-static int
-__res_init_ctx(thread_key_t key) {
-
-	mtctxres_t	*mt;
-	int		ret;
-
-
-	if (thr_getspecific(key, (void **)&mt) == 0 && mt != 0) {
-		/* Already exists */
-		return (0);
-	}
-
-	if ((mt = malloc(sizeof (mtctxres_t))) == 0) {
-		errno = ENOMEM;
-		return (-1);
-	}
-
-	memset(mt, 0, sizeof (*mt));
-
-	if ((ret = thr_setspecific(key, mt)) != 0) {
-		errno = ret;
-		free(mt);
-		return (-1);
-	}
-
-	return (0);
-
-}
-
-
-static void
-__res_destroy_ctx(void *value) {
-
-	mtctxres_t	*mt = (mtctxres_t *)value;
-
-	if (mt != 0) {
-		free(mt);
-	}
-}
-
-
-mtctxres_t *
-___mtctxres() {
-
-	mtctxres_t	*mt;
-
-
-	if (mt_key_initialized) {
-		if ((thr_getspecific(key, (void **)&mt) == 0 &&	mt != 0) ||
-			(__res_init_ctx(key) == 0 &&
-			thr_getspecific(key, (void **)&mt) == 0 && mt != 0)) {
-			return (mt);
-		}
-	}
-
-	return (&sharedctx);
-}
-
 
 /*
  * There used to be a private, MT-safe resolver interface that used TSD

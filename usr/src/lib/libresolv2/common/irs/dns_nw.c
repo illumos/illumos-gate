@@ -1,29 +1,22 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996-1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: dns_nw.c,v 1.25 2002/07/18 02:07:43 marka Exp $";
+static const char rcsid[] = "$Id: dns_nw.c,v 1.12 2005/04/27 04:56:22 sra Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 /* Imports. */
@@ -339,7 +332,7 @@ get1101answer(struct irs_nw *this,
 
 	/* Prepare a return structure. */
 	bp = pvt->buf;
-	ep = pvt->buf + sizeof (pvt->buf);
+	ep = pvt->buf + sizeof(pvt->buf);
 	pvt->net.n_name = NULL;
 	pvt->net.n_aliases = pvt->ali;
 	pvt->net.n_addrtype = af;
@@ -356,12 +349,7 @@ get1101answer(struct irs_nw *this,
 				RES_SET_H_ERRNO(pvt->res, NO_RECOVERY);
 				return (NULL);
 			}
-#ifdef HAVE_STRLCPY
-			strlcpy(bp, name, ep - bp);
-			pvt->net.n_name = bp;
-#else
-			pvt->net.n_name = strcpy(bp, name);
-#endif
+			pvt->net.n_name = strcpy(bp, name);	/* (checked) */
 			bp += n;
 		}
 		break;
@@ -389,16 +377,16 @@ get1101answer(struct irs_nw *this,
 	while (--ancount >= 0 && cp < eom) {
 		int n = dn_expand(ansbuf, eom, cp, bp, ep - bp);
 
-		cp += n;		/* Owner */
+		cp += n;		/*%< Owner */
 		if (n < 0 || !maybe_dnok(pvt->res, bp) ||
 		    cp + 3 * INT16SZ + INT32SZ > eom) {
 			RES_SET_H_ERRNO(pvt->res, NO_RECOVERY);
 			return (NULL);
 		}
-		GETSHORT(type, cp);	/* Type */
-		GETSHORT(class, cp);	/* Class */
-		cp += INT32SZ;		/* TTL */
-		GETSHORT(n, cp);	/* RDLENGTH */
+		GETSHORT(type, cp);	/*%< Type */
+		GETSHORT(class, cp);	/*%< Class */
+		cp += INT32SZ;		/*%< TTL */
+		GETSHORT(n, cp);	/*%< RDLENGTH */
 		if (class == C_IN && type == T_PTR) {
 			int nn;
 
@@ -442,7 +430,7 @@ get1101answer(struct irs_nw *this,
 			    }
 			}
 		}
-		cp += n;		/* RDATA */
+		cp += n;		/*%< RDATA */
 	}
 	if (!haveanswer) {
 		RES_SET_H_ERRNO(pvt->res, TRY_AGAIN);
@@ -503,13 +491,13 @@ get1101mask(struct irs_nw *this, struct nwent *nwent) {
 
 		if (n < 0 || !maybe_dnok(pvt->res, owner))
 			break;
-		cp += n;		/* Owner */
+		cp += n;		/*%< Owner */
 		if (cp + 3 * INT16SZ + INT32SZ > eom)
 			break;
-		GETSHORT(type, cp);	/* Type */
-		GETSHORT(class, cp);	/* Class */
-		cp += INT32SZ;		/* TTL */
-		GETSHORT(n, cp);	/* RDLENGTH */
+		GETSHORT(type, cp);	/*%< Type */
+		GETSHORT(class, cp);	/*%< Class */
+		cp += INT32SZ;		/*%< TTL */
+		GETSHORT(n, cp);	/*%< RDLENGTH */
 		if (cp + n > eom)
 			break;
 		if (n == INADDRSZ && class == C_IN && type == T_A &&
@@ -525,7 +513,7 @@ get1101mask(struct irs_nw *this, struct nwent *nwent) {
 					else
 						break;
 		}
-		cp += n;		/* RDATA */
+		cp += n;		/*%< RDATA */
 	}
 	memput(ansbuf, MAXPACKET);
 	return (nwent);
@@ -581,7 +569,7 @@ normalize_name(char *name) {
 	/* Make lower case. */
 	for (t = name; *t; t++)
 		if (isascii((unsigned char)*t) && isupper((unsigned char)*t))
-			*t = tolower(*t);
+			*t = tolower((*t)&0xff);
 
 	/* Remove trailing dots. */
 	while (t > name && t[-1] == '.')
@@ -594,8 +582,10 @@ init(struct irs_nw *this) {
 	
 	if (!pvt->res && !nw_res_get(this))
 		return (-1);
-	if (((pvt->res->options & RES_INIT) == 0) &&
+	if (((pvt->res->options & RES_INIT) == 0U) &&
 	    res_ninit(pvt->res) == -1)
 		return (-1);
 	return (0);
 }
+
+/*! \file */

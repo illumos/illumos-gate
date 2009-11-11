@@ -1,13 +1,8 @@
-/*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #ifndef LINT
-static const char rcsid[] = "$Id: tree.c,v 8.10 2001/11/01 05:33:46 marka Exp $";
+static const char rcsid[] = "$Id: tree.c,v 1.4 2005/04/27 04:56:39 sra Exp $";
 #endif
 
-/*
+/*%
  * tree - balanced binary tree library
  *
  * vix 05apr94 [removed vixie.h dependencies; cleaned up formatting, names]
@@ -19,7 +14,7 @@ static const char rcsid[] = "$Id: tree.c,v 8.10 2001/11/01 05:33:46 marka Exp $"
  * vix 14dec85 [written]
  */
 
-/*
+/*%
  * This program text was created by Paul Vixie using examples from the book:
  * "Algorithms & Data Structures," Niklaus Wirth, Prentice-Hall, 1986, ISBN
  * 0-13-022005-1.  Any errors in the conversion from Modula-2 to C are Paul
@@ -27,23 +22,21 @@ static const char rcsid[] = "$Id: tree.c,v 8.10 2001/11/01 05:33:46 marka Exp $"
  */
 
 /*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Portions Copyright (c) 1996-1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*#define		DEBUG	"tree"*/
 
@@ -209,11 +202,7 @@ sprout(tree **ppr, tree_t p_data, int *pi_balance,
 			(*ppr)->data = p_data;
 			*pi_balance = TRUE;
 		}
-#ifdef	ORIGINAL_ISC_CODE
 		RET(*ppr);
-#else
-		RET(*ppr)
-#endif
 	}
 
 	/* compare the data using routine passed by caller.
@@ -226,7 +215,7 @@ sprout(tree **ppr, tree_t p_data, int *pi_balance,
 		MSG("LESS. sprouting left.")
 		sub = sprout(&(*ppr)->left, p_data, pi_balance,
 			     pfi_compare, pfv_delete);
-		if (sub && *pi_balance) {	/* left branch has grown */
+		if (sub && *pi_balance) {	/*%< left branch has grown */
 			MSG("LESS: left branch has grown")
 			switch ((*ppr)->bal) {
 			case 1:
@@ -244,13 +233,13 @@ sprout(tree **ppr, tree_t p_data, int *pi_balance,
 				/* left branch was already too long. rebal */
 				MSG("LESS: case -1: rebalancing")
 				p1 = (*ppr)->left;
-				if (p1->bal == -1) {		/* LL */
+				if (p1->bal == -1) {		/*%< LL */
 					MSG("LESS: single LL")
 					(*ppr)->left = p1->right;
 					p1->right = *ppr;
 					(*ppr)->bal = 0;
 					*ppr = p1;
-				} else {			/* double LR */
+				} else {			/*%< double LR */
 					MSG("LESS: double LR")
 
 					p2 = p1->right;
@@ -300,13 +289,13 @@ sprout(tree **ppr, tree_t p_data, int *pi_balance,
 			case 1:
 				MSG("MORE: balance was off, need to rebalance")
 				p1 = (*ppr)->right;
-				if (p1->bal == 1) {		/* RR */
+				if (p1->bal == 1) {		/*%< RR */
 					MSG("MORE: single RR")
 					(*ppr)->right = p1->left;
 					p1->left = *ppr;
 					(*ppr)->bal = 0;
 					*ppr = p1;
-				} else {			/* double RL */
+				} else {			/*%< double RL */
 					MSG("MORE: double RL")
 
 					p2 = p1->left;
@@ -541,3 +530,5 @@ bal_R(tree **ppr_p, int *pi_balance) {
 	}
 	RETV
 }
+
+/*! \file */

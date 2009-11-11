@@ -1,14 +1,6 @@
-/*
- * Copyright (c) 1997-2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
 #ifndef LINT
-static const char rcsid[] = "$Id: readv.c,v 8.2 1999/10/13 16:39:21 vixie Exp $";
+static const char rcsid[] = "$Id: readv.c,v 1.2 2005/04/27 04:56:11 sra Exp $";
 #endif
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "port_before.h"
 
@@ -44,3 +36,4 @@ __readv(fd, vp, vpcount)
 	return (count);
 }
 #endif /* NEED_READV */
+/*! \file */

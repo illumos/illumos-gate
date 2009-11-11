@@ -1,29 +1,22 @@
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1998-1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: getservent_r.c,v 8.5 2001/11/01 08:02:16 marka Exp $";
+static const char rcsid[] = "$Id: getservent_r.c,v 1.6 2006/08/01 01:14:16 marka Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <port_before.h>
@@ -86,7 +79,7 @@ getservbyport_r(int port, const char *proto,
 #endif
 }
 
-/*
+/*%
  *	These assume a single context is in operation per thread.
  *	If this is not the case we will need to call irs directly
  *	rather than through the base functions.
@@ -119,7 +112,9 @@ setservent_r(int stay_open, SERV_R_ENT_ARGS)
 setservent_r(int stay_open)
 #endif
 {
-
+#ifdef SERV_R_ENT_UNUSED
+	SERV_R_ENT_UNUSED;
+#endif
 	setservent(stay_open);
 #ifdef SERV_R_SET_RESULT
 	return (SERV_R_SET_RESULT);
@@ -133,7 +128,9 @@ endservent_r(SERV_R_ENT_ARGS)
 endservent_r()
 #endif
 {
-
+#ifdef SERV_R_ENT_UNUSED
+	SERV_R_ENT_UNUSED;
+#endif
 	endservent();
 	SERV_R_END_RESULT(SERV_R_OK);
 }
@@ -148,7 +145,7 @@ copy_servent(struct servent *se, struct servent *sptr, SERV_R_COPY_ARGS) {
 	int numptr, len;
 
 	/* Find out the amount of space required to store the answer. */
-	numptr = 1; /* NULL ptr */
+	numptr = 1; /*%< NULL ptr */
 	len = (char *)ALIGN(buf) - buf;
 	for (i = 0; se->s_aliases[i]; i++, numptr++) {
 		len += strlen(se->s_aliases[i]) + 1;
@@ -201,8 +198,8 @@ copy_servent(struct servent *se, struct servent *sptr, SERV_R_COPY_ARGS) {
 	sptr->s_port = se->s_port;
 
 	/* copy official name */
-	cp = ndptr->line;
-	eob = ndptr->line + sizeof(ndptr->line);
+	cp = sdptr->line;
+	eob = sdptr->line + sizeof(sdptr->line);
 	if ((n = strlen(se->s_name) + 1) < (eob - cp)) {
 		strcpy(cp, se->s_name);
 		sptr->s_name = cp;
@@ -213,7 +210,7 @@ copy_servent(struct servent *se, struct servent *sptr, SERV_R_COPY_ARGS) {
 
 	/* copy aliases */
 	i = 0;
-	sptr->s_aliases = ndptr->serv_aliases;
+	sptr->s_aliases = sdptr->serv_aliases;
 	while (se->s_aliases[i] && i < (_MAXALIASES-1)) {
 		if ((n = strlen(se->s_aliases[i]) + 1) < (eob - cp)) {
 			strcpy(cp, se->s_aliases[i]);
@@ -242,3 +239,4 @@ copy_servent(struct servent *se, struct servent *sptr, SERV_R_COPY_ARGS) {
 	static int getservent_r_unknown_system = 0;
 #endif /*SERV_R_RETURN */
 #endif /* !defined(_REENTRANT) || !defined(DO_PTHREADS) */
+/*! \file */

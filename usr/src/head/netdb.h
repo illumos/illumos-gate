@@ -120,6 +120,8 @@ struct addrinfo {
 	struct sockaddr *ai_addr;	/* binary address */
 	struct addrinfo *ai_next;	/* next structure in linked list */
 };
+
+
 /* addrinfo flags */
 #define	AI_PASSIVE	0x0008	/* intended for bind() + listen() */
 #define	AI_CANONNAME	0x0010	/* return canonical version of host */
@@ -130,6 +132,7 @@ struct addrinfo {
 #define	AI_V4MAPPED	0x0001	/* IPv4 mapped addresses if no IPv6 */
 #define	AI_ALL		0x0002	/* IPv6 and IPv4 mapped addresses */
 #define	AI_ADDRCONFIG	0x0004	/* AAAA or A records only if IPv6/IPv4 cnfg'd */
+
 
 /*
  * These were defined in RFC 2553 but not SUSv3
@@ -152,6 +155,8 @@ struct addrinfo {
 #define	EAI_SOCKTYPE	10	/* ai_socktype not supported */
 #define	EAI_SYSTEM	11	/* system error in errno */
 #define	EAI_OVERFLOW	12	/* argument buffer overflow */
+#define	EAI_PROTOCOL	13
+#define	EAI_MAX		14
 
 /* getnameinfo flags */
 #define	NI_NOFQDN	0x0001
@@ -170,6 +175,12 @@ struct addrinfo {
 #define	NI_MAXSERV	32
 #endif /* !defined(_XPG6) || defined(__EXTENSIONS__) */
 #endif /* !defined(_XPG4_2) || defined(_XPG6) || defined(__EXTENSIONS__) */
+
+/*
+ * Scope delimit character
+ */
+#define	SCOPE_DELIMITER	'%'
+
 
 /*
  * Algorithm entry for /etc/inet/ipsecalgs which defines IPsec protocols
@@ -438,6 +449,10 @@ extern int	*__h_errno();
 #endif	/* NO_H_ERRNO_DEFINE */
 #endif	/* _REENTRANT */
 
+/*
+ * Error return codes from gethostbyname() and gethostbyaddr()
+ * (left in extern int h_errno).
+ */
 #define	HOST_NOT_FOUND	1 /* Authoritive Answer Host not found */
 #define	TRY_AGAIN	2 /* Non-Authoritive Host not found, or SERVERFAIL */
 #define	NO_RECOVERY	3 /* Non recoverable errors, FORMERR, REFUSED, NOTIMP */

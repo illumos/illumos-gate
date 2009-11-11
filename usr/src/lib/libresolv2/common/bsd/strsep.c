@@ -1,11 +1,6 @@
-/*
- * Copyright (c) 1997, by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
 #if defined(LIBC_SCCS) && !defined(lint)
 static const char sccsid[] = "strsep.c	8.1 (Berkeley) 6/4/93";
-static const char rcsid[] = "$Id: strsep.c,v 8.5 1996/11/18 09:09:04 vixie Exp $";
+static const char rcsid[] = "$Id: strsep.c,v 1.2 2005/04/27 04:56:12 sra Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 /*
@@ -41,8 +36,6 @@ static const char rcsid[] = "$Id: strsep.c,v 8.5 1996/11/18 09:09:04 vixie Exp $
  * SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "port_before.h"
 #include <sys/cdefs.h>
 #include <string.h>
@@ -53,7 +46,7 @@ static const char rcsid[] = "$Id: strsep.c,v 8.5 1996/11/18 09:09:04 vixie Exp $
 int __strsep_unneeded__;
 #else
 
-/*
+/*%
  * Get next token from string *stringp, where tokens are possibly-empty
  * strings separated by characters from delim.  
  *
@@ -91,3 +84,5 @@ strsep(char **stringp, const char *delim) {
 }
 
 #endif /*NEED_STRSEP*/
+
+/*! \file */

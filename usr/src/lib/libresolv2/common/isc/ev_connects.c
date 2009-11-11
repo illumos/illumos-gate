@@ -1,33 +1,26 @@
 /*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1995-1999 by Internet Software Consortium
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* ev_connects.c - implement asynch connect/accept for the eventlib
  * vix 16sep96 [initial]
  */
 
 #if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: ev_connects.c,v 8.32 2001/07/03 13:26:35 marka Exp $";
+static const char rcsid[] = "$Id: ev_connects.c,v 1.8 2006/03/09 23:57:56 marka Exp $";
 #endif
 
 /* Import. */
@@ -76,7 +69,7 @@ evListen(evContext opaqueCtx, int fd, int maxconn,
 
 	OKNEW(new);
 	new->flags = EV_CONN_LISTEN;
-	OK(mode = fcntl(fd, F_GETFL, NULL));	/* side effect: validate fd. */
+	OKFREE(mode = fcntl(fd, F_GETFL, NULL), new);	/*%< side effect: validate fd. */
 	/*
 	 * Remember the nonblocking status.  We assume that either evSelectFD
 	 * has not been done to this fd, or that if it has then the caller
@@ -87,13 +80,13 @@ evListen(evContext opaqueCtx, int fd, int maxconn,
 	if ((mode & PORT_NONBLOCK) == 0) {
 #ifdef USE_FIONBIO_IOCTL
 		int on = 1;
-		OK(ioctl(fd, FIONBIO, (char *)&on));
+		OKFREE(ioctl(fd, FIONBIO, (char *)&on), new);
 #else
-		OK(fcntl(fd, F_SETFL, mode | PORT_NONBLOCK));
+		OKFREE(fcntl(fd, F_SETFL, mode | PORT_NONBLOCK), new);
 #endif
 		new->flags |= EV_CONN_BLOCK;
 	}
-	OK(listen(fd, maxconn));
+	OKFREE(listen(fd, maxconn), new);
 	if (evSelectFD(opaqueCtx, fd, EV_READ, listener, new, &new->file) < 0){
 		int save = errno;
 
@@ -175,10 +168,10 @@ evCancelConn(evContext opaqueCtx, evConnID id) {
 				return (-1);
 		} else {
 #ifdef USE_FIONBIO_IOCTL
-			int on = 1;
-			OK(ioctl(this->fd, FIONBIO, (char *)&on));
+			int off = 0;
+			OK(ioctl(this->fd, FIONBIO, (char *)&off));
 #else
-			OK(fcntl(this->fd, F_SETFL, mode | PORT_NONBLOCK));
+			OK(fcntl(this->fd, F_SETFL, mode & ~PORT_NONBLOCK));
 #endif
 		}
 	}
@@ -330,7 +323,9 @@ connector(evContext opaqueCtx, void *uap, int fd, int evmask) {
 #endif
 	} la, ra;
 	ISC_SOCKLEN_T lalen, ralen;
+#ifndef NETREAD_BROKEN
 	char buf[1];
+#endif
 	void *conn_uap;
 	evConnFunc conn_func;
 	evConnID id;
@@ -364,9 +359,11 @@ connector(evContext opaqueCtx, void *uap, int fd, int evmask) {
 	    GETXXXNAME(getpeername, fd, ra.sa, ralen) < 0) {
 		int save = errno;
 
-		(void) close(fd);	/* XXX closing caller's fd */
+		(void) close(fd);	/*%< XXX closing caller's fd */
 		errno = save;
 		fd = -1;
 	}
 	(*conn_func)(opaqueCtx, conn_uap, fd, &la.sa, lalen, &ra.sa, ralen);
 }
+
+/*! \file */

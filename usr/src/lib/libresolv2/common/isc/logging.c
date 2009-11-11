@@ -1,29 +1,22 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
- * Copyright (c) 1996-1999 by Internet Software Consortium.
+ * Copyright (C) 2004, 2005, 2008  Internet Systems Consortium, Inc. ("ISC")
+ * Copyright (C) 1996-1999, 2001, 2003  Internet Software Consortium.
  *
- * Permission to use, copy, modify, and distribute this software for any
+ * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH
+ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
+ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: logging.c,v 8.32 2003/01/02 00:35:42 marka Exp $";
+static const char rcsid[] = "$Id: logging.c,v 1.9 2008/11/14 02:36:51 marka Exp $";
 #endif /* not lint */
 
 #include "port_before.h"
@@ -50,12 +43,6 @@ static const char rcsid[] = "$Id: logging.c,v 8.32 2003/01/02 00:35:42 marka Exp
 
 #include "port_after.h"
 
-#ifdef VSPRINTF_CHAR
-# define VSPRINTF(x) strlen(vsprintf/**/x)
-#else
-# define VSPRINTF(x) ((size_t)vsprintf x)
-#endif
-
 #include "logging_p.h"
 
 static const int syslog_priority[] = { LOG_DEBUG, LOG_INFO, LOG_NOTICE,
@@ -73,7 +60,7 @@ version_rename(log_channel chan) {
 	unsigned int ver;
 	char old_name[PATH_MAX+1];
 	char new_name[PATH_MAX+1];
-	
+
 	ver = chan->out.file.versions;
 	if (ver < 1)
 		return;
@@ -82,15 +69,15 @@ version_rename(log_channel chan) {
 	/*
 	 * Need to have room for '.nn' (XXX assumes LOG_MAX_VERSIONS < 100)
 	 */
-	if (strlen(chan->out.file.name) > (PATH_MAX-3))
+	if (strlen(chan->out.file.name) > (size_t)(PATH_MAX-3))
 		return;
 	for (ver--; ver > 0; ver--) {
 		sprintf(old_name, "%s.%d", chan->out.file.name, ver-1);
 		sprintf(new_name, "%s.%d", chan->out.file.name, ver);
-		(void)rename(old_name, new_name);
+		(void)isc_movefile(old_name, new_name);
 	}
 	sprintf(new_name, "%s.0", chan->out.file.name);
-	(void)rename(chan->out.file.name, new_name);
+	(void)isc_movefile(chan->out.file.name, new_name);
 }
 
 FILE *
@@ -104,7 +91,7 @@ log_open_stream(log_channel chan) {
 		errno = EINVAL;
 		return (NULL);
 	}
-	
+
 	/*
 	 * Don't open already open streams
 	 */
@@ -121,7 +108,7 @@ log_open_stream(log_channel chan) {
 		}
 		regular = 1;
 	} else
-		regular = S_ISREG(sb.st_mode);
+		regular = (sb.st_mode & S_IFREG);
 
 	if (chan->out.file.versions) {
 		if (!regular) {
@@ -158,11 +145,7 @@ log_open_stream(log_channel chan) {
 		chan->flags |= LOG_CHANNEL_BROKEN;
 		return (NULL);
 	}
-#ifdef SUNW_AVOIDSTDIO_FDLIMIT
-	stream = fdopen(fd, "aF");
-#else
 	stream = fdopen(fd, "a");
-#endif
 	if (stream == NULL) {
 		syslog(LOG_ERR, "log_open_stream: fdopen() failed");
 		chan->flags |= LOG_CHANNEL_BROKEN;
@@ -253,7 +236,7 @@ log_check_channel(log_context lc, int level, log_channel chan) {
 	return (1);
 }
 
-int 
+int
 log_check(log_context lc, int category, int level) {
 	log_channel_list lcl;
 	int debugging;
@@ -269,7 +252,7 @@ log_check(log_context lc, int category, int level) {
 		return (0);
 
 	if (category < 0 || category > lc->num_categories)
-		category = 0;		/* use default */
+		category = 0;		/*%< use default */
 	lcl = lc->categories[category];
 	if (lcl == NULL) {
 		category = 0;
@@ -284,7 +267,7 @@ log_check(log_context lc, int category, int level) {
 }
 
 void
-log_vwrite(log_context lc, int category, int level, const char *format, 
+log_vwrite(log_context lc, int category, int level, const char *format,
 	   va_list args) {
 	log_channel_list lcl;
 	int pri, debugging, did_vsprintf = 0;
@@ -313,7 +296,7 @@ log_vwrite(log_context lc, int category, int level, const char *format,
 		return;
 
 	if (category < 0 || category > lc->num_categories)
-		category = 0;		/* use default */
+		category = 0;		/*%< use default */
 	original_category = category;
 	lcl = lc->categories[category];
 	if (lcl == NULL) {
@@ -374,8 +357,8 @@ log_vwrite(log_context lc, int category, int level, const char *format,
 			continue;
 
 		if (!did_vsprintf) {
-			if (VSPRINTF((lc->buffer, format, args)) >
-			    LOG_BUFFER_SIZE) {
+			(void)vsprintf(lc->buffer, format, args);
+			if (strlen(lc->buffer) > (size_t)LOG_BUFFER_SIZE) {
 				syslog(LOG_CRIT,
 				       "memory overrun in log_vwrite()");
 				exit(1);
@@ -407,7 +390,7 @@ log_vwrite(log_context lc, int category, int level, const char *format,
 			}
 			if (chan->out.file.max_size != ULONG_MAX) {
 				long pos;
-				
+
 				pos = ftell(stream);
 				if (pos >= 0 &&
 				    (unsigned long)pos >
@@ -425,7 +408,7 @@ log_vwrite(log_context lc, int category, int level, const char *format,
 						break;
 				}
 			}
-			fprintf(stream, "%s%s%s%s\n", 
+			fprintf(stream, "%s%s%s%s\n",
 				(chan->flags & LOG_TIMESTAMP) ?	time_buf : "",
 				(chan->flags & LOG_PRINT_CATEGORY) ?
 				category_name : "",
@@ -452,7 +435,7 @@ log_write(log_context lc, int category, int level, const char *format, ...) {
 	va_end(args);
 }
 
-/*
+/*%
  * Functions to create, set, or destroy contexts
  */
 
@@ -626,9 +609,9 @@ log_new_file_channel(unsigned int flags, int level,
 	chan->level = level;
 	if (name != NULL) {
 		size_t len;
-		
+
 		len = strlen(name);
-		/* 
+		/*
 		 * Quantize length to a multiple of 256.  There's space for the
 		 * NUL, since if len is a multiple of 256, the size chosen will
 		 * be the next multiple.
@@ -705,7 +688,7 @@ log_dec_references(log_channel chan) {
 log_channel_type
 log_get_channel_type(log_channel chan) {
 	REQUIRE(chan != NULL);
-	
+
 	return (chan->type);
 }
 
@@ -729,3 +712,5 @@ log_free_channel(log_channel chan) {
 	}
 	return (0);
 }
+
+/*! \file */

@@ -1,10 +1,3 @@
-/*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef DST_INTERNAL_H
 #define DST_INTERNAL_H
 
@@ -36,19 +29,19 @@
 # ifdef POSIX_PATH_MAX
 #  define PATH_MAX POSIX_PATH_MAX
 # else
-#  define PATH_MAX 255 /* this is the value of POSIX_PATH_MAX */
+#  define PATH_MAX 255 /*%< this is the value of POSIX_PATH_MAX */
 # endif
 #endif 
 
 typedef struct dst_key {
-	char	*dk_key_name;   /* name of the key */
-	int	dk_key_size;    /* this is the size of the key in bits */
-	int	dk_proto;       /* what protocols this key can be used for */
-	int	dk_alg;         /* algorithm number from key record */
-	u_int32_t dk_flags;     /* and the flags of the public key */
-	u_int16_t dk_id;        /* identifier of the key */
-	void	*dk_KEY_struct; /* pointer to key in crypto pkg fmt */
-	struct dst_func *dk_func; /* point to cryptto pgk specific function table */
+	char	*dk_key_name;   /*%< name of the key */
+	int	dk_key_size;    /*%< this is the size of the key in bits */
+	int	dk_proto;       /*%< what protocols this key can be used for */
+	int	dk_alg;         /*%< algorithm number from key record */
+	u_int32_t dk_flags;     /*%< and the flags of the public key */
+	u_int16_t dk_id;        /*%< identifier of the key */
+	void	*dk_KEY_struct; /*%< pointer to key in crypto pkg fmt */
+	struct dst_func *dk_func; /*%< point to cryptto pgk specific function table */
 } DST_KEY;
 #define HAS_DST_KEY 
 
@@ -80,7 +73,7 @@ typedef struct dst_key {
 #ifndef SAFE_FREE
 #define SAFE_FREE(a) \
 do{if(a != NULL){memset(a,0, sizeof(*a)); free(a); a=NULL;}} while (0)
-#define SAFE_FREE2(a,s) if (a != NULL && s > 0){memset(a,0, s);free(a); a=NULL;}
+#define SAFE_FREE2(a,s) if (a != NULL && (long)s > 0){memset(a,0, s);free(a); a=NULL;}
 #endif
 
 typedef struct dst_func {
@@ -110,7 +103,7 @@ extern const char *key_file_fmt_str;
 extern const char *dst_path;
 
 #ifndef DST_HASH_SIZE
-#define DST_HASH_SIZE 20	/* RIPEMD160 and SHA-1 are 20 bytes MD5 is 16 */
+#define DST_HASH_SIZE 20	/*%< RIPEMD160 and SHA-1 are 20 bytes MD5 is 16 */
 #endif
 
 int dst_bsafe_init(void);
@@ -123,14 +116,6 @@ int dst_cylink_init(void);
 
 int dst_eay_dss_init(void);
 
-/* support functions */
-/* base64 to bignum conversion routines */
-int       dst_s_conv_bignum_u8_to_b64( char *out_buf, const int out_len, 
-			               const char *header,
-				       const u_int8_t *bin_data,
-				       const int bin_len);
-int       dst_s_conv_bignum_b64_to_u8( const char **buf, u_int8_t *loc,
-				       const int loclen) ;
 /* from higher level support routines */
 int       dst_s_calculate_bits( const u_int8_t *str, const int max_bits); 
 int       dst_s_verify_str( const char **buf, const char *str);
@@ -144,13 +129,7 @@ int       dst_s_build_filename(  char *filename, const char *name,
 
 FILE      *dst_s_fopen (const char *filename, const char *mode, int perm);
 
-/* from file prandom.c */
-int       dst_s_random( u_int8_t *output, int size);
-int       dst_s_semi_random( u_int8_t *output, int size);
-u_int32_t dst_s_quick_random( int inc);
-void	  dst_s_quick_random_set( u_int32_t val, u_int32_t cnt);
-
-/* 
+/*%
  * read and write network byte order into u_int?_t  
  *  all of these should be retired
  */
@@ -173,3 +152,4 @@ dst_s_dump(const int mode, const u_char *data, const int size,
 
 
 #endif /* DST_INTERNAL_H */
+/*! \file */

@@ -1,29 +1,22 @@
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Portions Copyright (c) 1996,1998 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: irp_sv.c,v 8.1 1999/01/18 07:46:54 vixie Exp $";
+static const char rcsid[] = "$Id: irp_sv.c,v 1.3 2005/04/27 04:56:29 sra Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 /* extern */
@@ -80,9 +73,7 @@ static void			free_service(struct servent *sv);
 
 /* Public */
 
-
-
-/*
+/*%
  * struct irs_sv * irs_irp_sv(struct irs_acc *this)
  *
  */
@@ -119,9 +110,7 @@ irs_irp_sv(struct irs_acc *this) {
 
 /* Methods */
 
-
-
-/*
+/*%
  * void sv_close(struct irs_sv *this)
  *
  */
@@ -138,14 +127,7 @@ sv_close(struct irs_sv *this) {
 	memput(this, sizeof *this);
 }
 
-
-
-
-/*
- * struct servent * sv_next(struct irs_sv *this)
- *
- * Notes:
- *
+/*%
  *	Fills the cache if necessary and returns the next item from it.
  *
  */
@@ -189,10 +171,7 @@ sv_next(struct irs_sv *this) {
 	return (sv);
 }
 
-
-
-
-/*
+/*%
  * struct servent * sv_byname(struct irs_sv *this, const char *name,
  *				const char *proto)
  *
@@ -243,10 +222,7 @@ sv_byname(struct irs_sv *this, const char *name, const char *proto) {
 	return (sv);
 }
 
-
-
-
-/*
+/*%
  * struct servent * sv_byport(struct irs_sv *this, int port,
  *				const char *proto)
  *
@@ -298,11 +274,7 @@ sv_byport(struct irs_sv *this, int port, const char *proto) {
 	return (sv);
 }
 
-
-
-
-
-/*
+/*%
  * void sv_rewind(struct irs_sv *this)
  *
  */
@@ -331,11 +303,7 @@ sv_rewind(struct irs_sv *this) {
 	return;
 }
 
-
-
-
-
-/*
+/*%
  * void sv_minimize(struct irs_sv *this)
  *
  */
@@ -374,3 +342,5 @@ free_service(struct servent *sv) {
 }
 
 
+
+/*! \file */

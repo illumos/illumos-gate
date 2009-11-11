@@ -1,14 +1,6 @@
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #ifndef LINT
-static const char rcsid[] = "$Id: writev.c,v 8.6 2003/04/30 05:21:18 marka Exp $";
+static const char rcsid[] = "$Id: writev.c,v 1.3 2005/04/27 04:56:13 sra Exp $";
 #endif
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "port_before.h"
 
@@ -36,7 +28,7 @@ __writev(int fd, struct iovec *iov, int iovlen)
 	/*
 	 * Allow for atomic writes to network.
 	 */
-	if (S_ISSOCK(statbuf.st_mode)) {
+	if (statbuf.st_mode & S_IFSOCK) {
 		struct msghdr   mesg;		
 
 		memset(&mesg, 0, sizeof(mesg));
@@ -93,3 +85,5 @@ __writev(fd, vp, vpcount)
 #endif /*_CRAY*/
 
 #endif /*NEED_WRITEV*/
+
+/*! \file */

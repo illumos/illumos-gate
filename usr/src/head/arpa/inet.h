@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,8 +33,6 @@
 
 #ifndef _ARPA_INET_H
 #define	_ARPA_INET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/feature_tests.h>
 
@@ -76,8 +74,18 @@ extern struct in_addr inet_makeaddr(in_addr_t, in_addr_t);
 extern in_addr_t inet_netof(struct in_addr);
 extern in_addr_t inet_network(const char *);
 
+
+extern char *inet_neta(ulong_t, char *, size_t);
+extern char *inet_net_ntop(int, const void *, int, char *, size_t);
+
+extern char *inet_cidr_ntop(int, const void *, int, char *, size_t);
+extern int inet_cidr_pton(int, const char *, void *, int *);
 extern char *inet_ntoa(struct in_addr);
 extern int inet_aton(const char *, struct in_addr *);
+
+extern uint_t inet_nsap_addr(const char *, uchar_t *, int);
+extern char *inet_nsap_ntoa(int, const uchar_t *, char *);
+
 #else
 unsigned long inet_addr();
 char	*inet_ntoa();
@@ -93,6 +101,7 @@ extern unsigned long inet_netof();
 extern int inet_pton();
 extern const char *inet_ntop();
 extern int inet_aton();
+
 #endif
 
 #ifdef	__cplusplus

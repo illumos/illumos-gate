@@ -3,25 +3,26 @@
  * Use is subject to license terms.
  */
 
+
 /*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996-1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
 #if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: gethostent.c,v 1.34 2003/05/29 00:05:18 marka Exp $";
+static const char rcsid[] = "$Id: gethostent.c,v 1.8 2006/01/10 05:06:00 marka Exp $";
 #endif
 
 /* Imports */
@@ -77,6 +78,7 @@ extern int	__res_retry(int);
 extern int	__res_retry_reset(void);
 #endif	/* SUNW_OVERRIDE_RETRY */
 
+
 /* Public */
 
 struct hostent *
@@ -94,11 +96,7 @@ gethostbyname2(const char *name, int af) {
 }
 
 struct hostent *
-#ifdef ORIGINAL_ISC_CODE
 gethostbyaddr(const char *addr, int len, int af) {
-#else
-gethostbyaddr(const void *addr, socklen_t len, int af) {
-#endif /* ORIGINAL_ISC_CODE */
 	struct net_data *net_data = init();
 
 	return (gethostbyaddr_p(addr, len, af, net_data));
@@ -111,33 +109,17 @@ gethostent() {
 	return (gethostent_p(net_data));
 }
 
-#ifdef	ORIGINAL_ISC_CODE
 void
-#else
-int
-#endif
 sethostent(int stayopen) {
 	struct net_data *net_data = init();
 	sethostent_p(stayopen, net_data);
-#ifdef	ORIGINAL_ISC_CODE
-#else
-	return (0);
-#endif
 }
 
 
-#ifdef	ORIGINAL_ISC_CODE
 void
-#else
-int
-#endif
 endhostent() {
 	struct net_data *net_data = init();
 	endhostent_p(net_data);
-#ifdef	ORIGINAL_ISC_CODE
-#else
-	return (0);
-#endif
 }
 
 /* Shared private. */
@@ -147,18 +129,7 @@ gethostbyname_p(const char *name, struct net_data *net_data) {
 	struct hostent *hp;
 
 	if (!net_data)
-#ifdef	SUNW_SETHERRNO
-	{
-		/*
-		*  Should set the context h_errno, but since net_data
-		 * is NULL, we don't have a context.
-		 */
-		h_errno = NETDB_INTERNAL;
 		return (NULL);
-	}
-#else
-		return (NULL);
-#endif	/* SUNW_SETHERRNO */
 
 	if (net_data->res->options & RES_USE_INET6) {
 		hp = gethostbyname2_p(name, AF_INET6, net_data);
@@ -177,16 +148,9 @@ gethostbyname2_p(const char *name, int af, struct net_data *net_data) {
 	char **hap;
 
 	if (!net_data || !(ho = net_data->ho))
-#ifdef	SUNW_SETHERRNO
-	{
-		h_errno = NETDB_INTERNAL;
 		return (NULL);
-	}
-#else
-		return (NULL);
-#endif	/* SUNW_SETHERRNO */
 	if (net_data->ho_stayopen && net_data->ho_last &&
-	net_data->ho_last->h_addrtype == af) {
+	    net_data->ho_last->h_addrtype == af) {
 		if (ns_samename(name, net_data->ho_last->h_name) == 1)
 			return (net_data->ho_last);
 		for (hap = net_data->ho_last->h_aliases; hap && *hap; hap++)
@@ -216,14 +180,7 @@ gethostbyaddr_p(const char *addr, int len, int af, struct net_data *net_data) {
 	char **hap;
 
 	if (!net_data || !(ho = net_data->ho))
-#ifdef	SUNW_SETHERRNO
-	{
-		h_errno = NETDB_INTERNAL;
 		return (NULL);
-	}
-#else
-		return (NULL);
-#endif	/* SUNW_SETHERRNO */
 	if (net_data->ho_stayopen && net_data->ho_last &&
 	    net_data->ho_last->h_length == len)
 		for (hap = net_data->ho_last->h_addr_list;
@@ -244,17 +201,10 @@ gethostent_p(struct net_data *net_data) {
 	struct hostent *hp;
 
 	if (!net_data || !(ho = net_data->ho))
-#ifdef	SUNW_SETHERRNO
-	{
-		h_errno = NETDB_INTERNAL;
 		return (NULL);
-	}
-#else
-		return (NULL);
-#endif	/* SUNW_SETHERRNO */
 	while ((hp = (*ho->next)(ho)) != NULL &&
 	       hp->h_addrtype == AF_INET6 &&
-	       (net_data->res->options & RES_USE_INET6) == 0)
+	       (net_data->res->options & RES_USE_INET6) == 0U)
 		continue;
 	net_data->ho_last = hp;
 	return (net_data->ho_last);
@@ -302,11 +252,11 @@ static const unsigned char in6addr_mapped[12] = {
 static int scan_interfaces(int *, int *);
 static struct hostent *copyandmerge(struct hostent *, struct hostent *, int, int *);
 
-/*
+/*%
  *	Public functions
  */
 
-/*
+/*%
  *	AI_V4MAPPED + AF_INET6
  *	If no IPv6 address then a query for IPv4 and map returned values.
  *
@@ -416,20 +366,25 @@ getipnodebyaddr(const void *src, size_t len, int af, int *error_num) {
 	struct net_data *net_data = init();
 
 	/* Sanity Checks. */
-	if (src == NULL || net_data == NULL) {
+#ifdef       ORIGINAL_ISC_CODE
+	if (src == NULL) {
+#else
+	/* this change was added circa May 2009, but not in ISC libbind 6.0 */
+	if (src == NULL|| net_data == NULL) {
+#endif       /* ORIGINAL_ISC_CODE */
 		*error_num = NO_RECOVERY;
 		return (NULL);
 	}
-		
+	
 	switch (af) {
 	case AF_INET:
-		if (len != INADDRSZ) {
+		if (len != (size_t)INADDRSZ) {
 			*error_num = NO_RECOVERY;
 			return (NULL);
 		}
 		break;
 	case AF_INET6:
-		if (len != IN6ADDRSZ) {
+		if (len != (size_t)IN6ADDRSZ) {
 			*error_num = NO_RECOVERY;
 			return (NULL);
 		}
@@ -512,11 +467,11 @@ freehostent(struct hostent *he) {
 	memput(he, sizeof *he);
 }
 
-/*
+/*%
  * Private
  */
 
-/*
+/*%
  * Scan the interface table and set have_v4 and have_v6 depending
  * upon whether there are IPv4 and IPv6 interface addresses.
  *
@@ -528,9 +483,26 @@ freehostent(struct hostent *he) {
 #if defined(SIOCGLIFCONF) && defined(SIOCGLIFADDR) && \
     !defined(IRIX_EMUL_IOCTL_SIOCGIFCONF) 
 
+#ifdef __hpux
+#define lifc_len iflc_len
+#define lifc_buf iflc_buf
+#define lifc_req iflc_req
+#define LIFCONF if_laddrconf
+#else
 #define SETFAMILYFLAGS
 #define LIFCONF lifconf
+#endif
+ 
+#ifdef __hpux
+#define lifr_addr iflr_addr
+#define lifr_name iflr_name
+#define lifr_dstaddr iflr_dstaddr
+#define lifr_flags iflr_flags
+#define ss_family sa_family
+#define LIFREQ if_laddrreq
+#else
 #define LIFREQ lifreq
+#endif
 
 static void
 scan_interfaces6(int *have_v4, int *have_v6) {
@@ -555,7 +527,7 @@ scan_interfaces6(int *have_v4, int *have_v6) {
 		if (buf == NULL)
 			goto cleanup;
 #ifdef SETFAMILYFLAGS
-		lifc.lifc_family = AF_UNSPEC;	/* request all families */
+		lifc.lifc_family = AF_UNSPEC;	/*%< request all families */
 		lifc.lifc_flags = 0;
 #endif
 		lifc.lifc_len = bufsiz;
@@ -583,7 +555,7 @@ scan_interfaces6(int *have_v4, int *have_v6) {
 	}
 
 	/* Parse system's interface list. */
-	cplim = buf + lifc.lifc_len;    /* skip over if's with big ifr_addr's */
+	cplim = buf + lifc.lifc_len;    /*%< skip over if's with big ifr_addr's */
 	for (cp = buf;
 	     (*have_v4 == 0 || *have_v6 == 0) && cp < cplim;
 	     cp += cpsize) {
@@ -658,11 +630,38 @@ scan_interfaces6(int *have_v4, int *have_v6) {
 }
 #endif
 
+#if ( defined(__linux__) || defined(__linux) || defined(LINUX) )
+#ifndef IF_NAMESIZE
+# ifdef IFNAMSIZ
+#  define IF_NAMESIZE  IFNAMSIZ
+# else
+#  define IF_NAMESIZE 16
+# endif
+#endif
+static void
+scan_linux6(int *have_v6) {
+	FILE *proc = NULL;
+	char address[33];
+	char name[IF_NAMESIZE+1];
+	int ifindex, prefix, flag3, flag4;
+	
+	proc = fopen("/proc/net/if_inet6", "r");
+	if (proc == NULL)
+		return;
+
+	if (fscanf(proc, "%32[a-f0-9] %x %x %x %x %16s\n",
+		   address, &ifindex, &prefix, &flag3, &flag4, name) == 6)
+		*have_v6 = 1;
+	fclose(proc);
+	return;
+}
+#endif
+
 static int
 scan_interfaces(int *have_v4, int *have_v6) {
 	struct ifconf ifc;
 	union {
-		char _pad[256];		/* leave space for IPv6 addresses */
+		char _pad[256];		/*%< leave space for IPv6 addresses */
 		struct ifreq ifreq;
 	} u;
 	struct in_addr in4;
@@ -683,6 +682,9 @@ scan_interfaces(int *have_v4, int *have_v6) {
 	scan_interfaces6(have_v4, have_v6);
 	if (*have_v4 != 0 && *have_v6 != 0)
 		return (0);
+#endif
+#ifdef __linux
+	scan_linux6(have_v6);
 #endif
 
 	/* Get interface list from system. */
@@ -732,7 +734,7 @@ scan_interfaces(int *have_v4, int *have_v6) {
 	}
 
 	/* Parse system's interface list. */
-	cplim = buf + ifc.ifc_len;    /* skip over if's with big ifr_addr's */
+	cplim = buf + ifc.ifc_len;    /*%< skip over if's with big ifr_addr's */
 	for (cp = buf;
 	     (*have_v4 == 0 || *have_v6 == 0) && cp < cplim;
 	     cp += cpsize) {
@@ -812,8 +814,8 @@ scan_interfaces(int *have_v4, int *have_v6) {
 static struct hostent *
 copyandmerge(struct hostent *he1, struct hostent *he2, int af, int *error_num) {
 	struct hostent *he = NULL;
-	int addresses = 1;	/* NULL terminator */
-	int names = 1;		/* NULL terminator */
+	int addresses = 1;	/*%< NULL terminator */
+	int names = 1;		/*%< NULL terminator */
 	int len = 0;
 	char **cpp, **npp;
 
@@ -972,6 +974,10 @@ init() {
 		if (!net_data->ho || !net_data->res) {
   error:
 			errno = EIO;
+
+#ifdef	SUNW_SETHERRNO
+			h_errno = NETDB_INTERNAL;
+#endif	/* SUNW_SETHERRNO */
 			if (net_data && net_data->res)
 				RES_SET_H_ERRNO(net_data->res, NETDB_INTERNAL);
 			return (NULL);
@@ -1027,7 +1033,7 @@ fakeaddr(const char *name, int af, struct net_data *net_data) {
 	}
 	strncpy(pvt->name, name, NS_MAXDNAME);
 	pvt->name[NS_MAXDNAME] = '\0';
-	if (af == AF_INET && (net_data->res->options & RES_USE_INET6) != 0) {
+	if (af == AF_INET && (net_data->res->options & RES_USE_INET6) != 0U) {
 		map_v4v6_address(pvt->addr, pvt->addr);
 		af = AF_INET6;
 	}
@@ -1054,7 +1060,7 @@ fakeaddr(const char *name, int af, struct net_data *net_data) {
 	return (&pvt->host);
 }
 
-#ifdef grot	/* for future use in gethostbyaddr(), for "SUNSECURITY" */
+#ifdef grot	/*%< for future use in gethostbyaddr(), for "SUNSECURITY" */
 	struct hostent *rhp;
 	char **haddr;
 	u_long old_options;
@@ -1085,5 +1091,6 @@ fakeaddr(const char *name, int af, struct net_data *net_data) {
 	    }
 	}
 #endif /* grot */
-
 #endif /*__BIND_NOSTATIC*/
+
+/*! \file */

@@ -1,29 +1,22 @@
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Portions Copyright (c) 1996,1998 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if defined(LIBC_SCCS) && !defined(lint)
-static const char rcsid[] = "$Id: irp_nw.c,v 8.1 1999/01/18 07:46:54 vixie Exp $";
+static const char rcsid[] = "$Id: irp_nw.c,v 1.4 2006/03/09 23:57:56 marka Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #if 0
@@ -86,9 +79,7 @@ static void		free_nw(struct nwent *nw);
 
 /* Public */
 
-
-
-/*
+/*%
  * struct irs_nw * irs_irp_nw(struct irs_acc *this) 
  *
  */
@@ -124,9 +115,7 @@ irs_irp_nw(struct irs_acc *this) {
 
 /* Methods */
 
-
-
-/*
+/*%
  * void nw_close(struct irs_nw *this) 
  *
  */
@@ -143,10 +132,7 @@ nw_close(struct irs_nw *this) {
 	memput(this, sizeof *this);
 }
 
-
-
-
-/*
+/*%
  * struct nwent * nw_byaddr(struct irs_nw *this, void *net, 
  * 				int length, int type) 
  *
@@ -159,7 +145,7 @@ nw_byaddr(struct irs_nw *this, void *net, int length, int type) {
 	char *body = NULL;
 	size_t bodylen;
 	int code;
-	char paddr[24];			/* bigenough for ip4 w/ cidr spec. */
+	char paddr[24];			/*%< bigenough for ip4 w/ cidr spec. */
 	char text[256];
 
 	if (inet_net_ntop(type, net, length, paddr, sizeof paddr) == NULL) {
@@ -196,10 +182,7 @@ nw_byaddr(struct irs_nw *this, void *net, int length, int type) {
 	return (nw);
 }
 
-
-
-
-/*
+/*%
  * struct nwent * nw_byname(struct irs_nw *this, const char *name, int type) 
  *
  */
@@ -248,10 +231,7 @@ nw_byname(struct irs_nw *this, const char *name, int type) {
 	return (nw);
 }
 
-
-
-
-/*
+/*%
  * void nw_rewind(struct irs_nw *this) 
  *
  */
@@ -280,16 +260,7 @@ nw_rewind(struct irs_nw *this) {
 	return;
 }
 
-
-
-
-
-
-/*
- * struct nwent * nw_next(struct irs_nw *this) 
- *
- * Notes:
- * 	
+/*%
  * 	Prepares the cache if necessary and returns the first, or 
  * 	next item from it.
  */
@@ -326,15 +297,12 @@ nw_next(struct irs_nw *this) {
 		nw = NULL;
 	}
 
+	if (body != NULL)
+		memput(body, bodylen);
 	return (nw);
 }
 
-
-
-
-
-
-/*
+/*%
  * void nw_minimize(struct irs_nw *this) 
  *
  */
@@ -351,11 +319,7 @@ nw_minimize(struct irs_nw *this) {
 
 /* private. */
 
-
-
-/*
- * static void free_passwd(struct passwd *pw);
- *
+/*%
  *	deallocate all the memory irp_unmarshall_pw allocated.
  *
  */
@@ -380,3 +344,5 @@ free_nw(struct nwent *nw) {
 	if (nw->n_addr != NULL)
 		free(nw->n_addr);
 }
+
+/*! \file */

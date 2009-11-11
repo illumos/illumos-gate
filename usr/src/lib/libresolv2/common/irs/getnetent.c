@@ -1,29 +1,22 @@
 /*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
+ * Copyright (c) 2004 by Internet Systems Consortium, Inc. ("ISC")
  * Copyright (c) 1996,1999 by Internet Software Consortium.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
  * copyright notice and this permission notice appear in all copies.
  *
- * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
- * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
- * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
- * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
- * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
- * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
- * SOFTWARE.
+ * THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL ISC BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(LINT) && !defined(CODECENTER)
-static const char rcsid[] = "$Id: getnetent.c,v 1.19 2001/05/29 05:48:47 marka Exp $";
+static const char rcsid[] = "$Id: getnetent.c,v 1.7 2005/04/27 04:56:25 sra Exp $";
 #endif
 
 /* Imports */
@@ -91,45 +84,25 @@ getnetbyname(const char *name) {
 }
 
 struct netent *
-#ifdef	ORIGINAL_ISC_CODE
 getnetbyaddr(unsigned long net, int type) {
-#else
-getnetbyaddr(in_addr_t net, int type) {
-#endif
 	struct net_data *net_data = init();
 
 	return (getnetbyaddr_p(net, type, net_data));
 }
 
-#ifdef	ORIGINAL_ISC_CODE
 void
-#else
-int
-#endif
 setnetent(int stayopen) {
 	struct net_data *net_data = init();
 
 	setnetent_p(stayopen, net_data);
-#ifdef	ORIGINAL_ISC_CODE
-#else
-	return (0);
-#endif
 }
 
 
-#ifdef	ORIGINAL_ISC_CODE
 void
-#else
-int
-#endif
 endnetent() {
 	struct net_data *net_data = init();
 
 	endnetent_p(net_data);
-#ifdef	ORIGINAL_ISC_CODE
-#else
-	return (0);
-#endif
 }
 
 /* Shared private. */
@@ -183,13 +156,13 @@ getnetbyaddr_p(unsigned long net, int type, struct net_data *net_data) {
 			return (net_data->nw_last);
 
 	/* cannonize net(host order) */
-	if (net < 256) {
+	if (net < 256UL) {
 		net <<= 24;
 		bits = 8;
-	} else if (net < 65536) {
+	} else if (net < 65536UL) {
 		net <<= 16;
 		bits = 16;
-	} else if (net < 16777216) {
+	} else if (net < 16777216UL) {
 		net <<= 8;
 		bits = 24;
 	} else
@@ -348,7 +321,7 @@ nw_to_net(struct nwent *nwent, struct net_data *net_data) {
 	pvt->netent.n_aliases = nwent->n_aliases;
 	pvt->netent.n_addrtype = nwent->n_addrtype;
 
-/*
+/*%
  * What this code does: Converts net addresses from network to host form.
  *
  * msbyte: the index of the most significant byte in the n_addr array.
@@ -368,3 +341,5 @@ nw_to_net(struct nwent *nwent, struct net_data *net_data) {
 }
 
 #endif /*__BIND_NOSTATIC*/
+
+/*! \file */

@@ -45,7 +45,6 @@ cmd/cmd-inet/usr.sbin/bootconfchk
 ../closed/uts/common/io/ib/clients/sdpib
 ../closed/uts/common/sys/ib/clients/sdpib
 lib/libresolv2/cylink
-lib/libresolv2/dnssafe
 ../closed/lib/gss_mechs/mech_dh/backend/Makefile.export
 ../closed/lib/gss_mechs/mech_dh/backend/mapfile-vers-export
 ../closed/lib/gss_mechs/mech_dh/dh1024/Makefile.export
