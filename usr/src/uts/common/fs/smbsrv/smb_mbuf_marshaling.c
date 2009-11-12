@@ -1350,7 +1350,7 @@ mbc_marshal_get_uio(mbuf_chain_t *mbc, struct uio *uio)
 	 * request) this function is called with a residual count of zero
 	 * bytes.
 	 */
-	if (bytes) {
+	if (bytes != 0) {
 		iov = uio->uio_iov;
 		uio->uio_segflg = UIO_SYSSPACE;
 
@@ -1373,7 +1373,8 @@ mbc_marshal_get_uio(mbuf_chain_t *mbc, struct uio *uio)
 			if (remainder >= bytes) {
 				iov[i].iov_len = bytes;
 				mbc->chain_offset += bytes;
-				break;
+				uio->uio_iovcnt = i + 1;
+				return (0);
 			}
 			iov[i].iov_len = remainder;
 			mbc->chain_offset += remainder;
@@ -1381,10 +1382,7 @@ mbc_marshal_get_uio(mbuf_chain_t *mbc, struct uio *uio)
 			m = m->m_next;
 			offset = 0;
 		}
-		if (i == uio->uio_iovcnt) {
-			return (DECODE_NO_MORE_DATA);
-		}
-		uio->uio_iovcnt = i;
+		return (DECODE_NO_MORE_DATA);
 	}
 	return (0);
 }
