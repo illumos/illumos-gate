@@ -10798,11 +10798,10 @@ sdmin(struct buf *bp)
 	ASSERT(un != NULL);
 
 	/*
-	 * We depend on DMA partial or buf breakup to restrict
-	 * IO size if any of them enabled.
+	 * We depend on buf breakup to restrict
+	 * IO size if it is enabled.
 	 */
-	if (un->un_partial_dma_supported ||
-	    un->un_buf_breakup_supported) {
+	if (un->un_buf_breakup_supported) {
 		return;
 	}
 
