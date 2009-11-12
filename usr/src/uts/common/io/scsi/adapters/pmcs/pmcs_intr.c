@@ -41,7 +41,7 @@
 	}
 #define	WRONG_OBID_CHECK(pwp, w, q)	\
 	if (((w & PMCS_IOMB_OBID_MASK) >> PMCS_IOMB_OBID_SHIFT) != q) {	\
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,				\
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,		\
 		    "%s: COMPLETION WITH WRONG OBID (0x%x)", __func__,	\
 		    (w & PMCS_IOMB_OBID_MASK) >> PMCS_IOMB_OBID_SHIFT);	\
 	}
@@ -52,7 +52,7 @@
 
 #define	OQLIM_CHECK(p, l)				\
 	if (++l == (p)->ioq_depth) {			\
-		pmcs_prt(p, PMCS_PRT_DEBUG,		\
+		pmcs_prt(p, PMCS_PRT_DEBUG, NULL, NULL,	\
 		    "%s: possible ob queue overflow",	\
 		    __func__);				\
 		break;					\
@@ -67,12 +67,12 @@
 		(void) memcpy(&l[PMCS_QENTRY_SIZE],			\
 		    GET_OQ_ENTRY(p, q, c, 1), PMCS_QENTRY_SIZE);	\
 	}								\
-	pmcs_prt(p, PMCS_PRT_DEBUG3,					\
+	pmcs_prt(p, PMCS_PRT_DEBUG3, NULL, NULL,			\
 	    "%s: ptr %p ci %d w0 %x nbuf %d",				\
 	    __func__, (void *)x, ci, w0, n)
 
 #define	EVT_PRT(hwp, msg, phy)	\
-	pmcs_prt(hwp, PMCS_PRT_INFO, "Phy 0x%x: %s", phy, # msg)
+	pmcs_prt(hwp, PMCS_PRT_INFO, NULL, NULL, "Phy 0x%x: %s", phy, # msg)
 
 
 /*
@@ -139,12 +139,12 @@ pmcs_work_not_found(pmcs_hw_t *pwp, uint32_t htag, uint32_t *iomb)
 	for (i = 0; i < 256; i++) {
 		mutex_enter(&pwp->dbglock);
 		if (pwp->ltags[i] == htag) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "same tag already completed (%llu us ago)",
 			    (unsigned long long) (now - pwp->ltime[i]));
 		}
 		if (pwp->ftags[i] == htag) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "same tag started (line %d) (%llu ns ago)",
 			    pwp->ftag_lines[i], (unsigned long long)
 			    (now - pwp->ftime[i]));
@@ -282,7 +282,7 @@ pmcs_kill_port(pmcs_hw_t *pwp, int portid)
 	pmcs_unlock_phy(pptr);
 
 	RESTART_DISCOVERY(pwp);
-	pmcs_prt(pwp, PMCS_PRT_INFO, "PortID 0x%x Cleared", portid);
+	pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL, "PortID 0x%x Cleared", portid);
 }
 
 void
@@ -301,12 +301,12 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	switch (IOP_EVENT_EVENT(w1)) {
 	case IOP_EVENT_PHY_STOP_STATUS:
 		if (IOP_EVENT_STATUS(w1)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "PORT %d failed to stop (0x%x)",
 			    phynum, IOP_EVENT_STATUS(w1));
 		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "PHY 0x%x Stopped",
-			    phynum);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+			    "PHY 0x%x Stopped", phynum);
 			mutex_enter(&pwp->lock);
 			pptr = pwp->root_phys + phynum;
 			pmcs_lock_phy(pptr);
@@ -365,9 +365,9 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 					pmcs_unlock_phy(rp);
 				}
 				pmcs_unlock_phy(pptr);
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, "PortID 0x%x"
-				    ": PHY 0x%x SAS LINK UP IS FOR A "
-				    "DIFFERENT PORTID 0x%x", rp->portid,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
+				    "PortID 0x%x: PHY 0x%x SAS LINK UP IS FOR "
+				    "A DIFFERENT PORTID 0x%x", rp->portid,
 				    phynum, portid);
 				break;
 			}
@@ -397,7 +397,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			    pwp->sas_wwns[0],
 			    pmcs_barray2wwn(pptr->sas_address)) !=
 			    DDI_SUCCESS) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 				    "Unable to add phy %u for 0x%" PRIx64 ".0x%"
 				    PRIx64, phynum, pwp->sas_wwns[rp->phynum],
 				    pmcs_barray2wwn(pptr->sas_address));
@@ -423,9 +423,9 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 				pmcs_rele_iport(iport);
 			}
 
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "PortID 0x%x: PHY"
-			    " 0x%x SAS LINK UP WIDENS PORT TO %d PHYS",
-			    portid, phynum, rp->width);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+			    "PortID 0x%x: PHY 0x%x SAS LINK UP WIDENS PORT "
+			    "TO %d PHYS", portid, phynum, rp->width);
 
 			if (pptr != rp) {
 				pmcs_unlock_phy(pptr);
@@ -439,15 +439,15 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		 */
 		if (pptr->dtype != NOTHING && pptr->configured) {
 			pmcs_unlock_phy(pptr);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
-			    "PortID 0x%x: SAS PHY 0x%x "
-			    "UP HITS EXISTING CONFIGURED TREE", portid, phynum);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
+			    "PortID 0x%x: SAS PHY 0x%x UP HITS EXISTING "
+			    "CONFIGURED TREE", portid, phynum);
 			break;
 		}
 
 		if (af.address_frame_type != SAS_AF_IDENTIFY) {
 			pmcs_unlock_phy(pptr);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "SAS link up on phy 0x%x, "
 			    "but unexpected frame type 0x%x found", phynum,
 			    af.address_frame_type);
@@ -472,7 +472,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			pptr->dtype = EXPANDER;
 			break;
 		default:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "unknown device type 0x%x", af.device_type);
 			pptr->pend_dtype = NOTHING;
 			pptr->dtype = NOTHING;
@@ -486,17 +486,19 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		if (pptr->dtype == SAS) {
 			pptr->spinup_hold = 1;
 			pmcs_spinup_release(pwp, pptr);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
 			    "Release spinup hold on PHY 0x%x", phynum);
 		}
 
 		pmcs_set_changed(pwp, pptr, B_TRUE, 0);
 		if (pptr->width > 1) {
-			pmcs_prt(pwp, PMCS_PRT_INFO, "PortID 0x%x: PHY 0x%x SAS"
+			pmcs_prt(pwp, PMCS_PRT_INFO, pptr, NULL,
+			    "PortID 0x%x: PHY 0x%x SAS"
 			    " LINK UP @ %s Gb with %d phys/s", portid, phynum,
 			    pmcs_get_rate(pptr->link_rate), pptr->width);
 		} else {
-			pmcs_prt(pwp, PMCS_PRT_INFO, "PortID 0x%x: PHY 0x%x SAS"
+			pmcs_prt(pwp, PMCS_PRT_INFO, pptr, NULL,
+			    "PortID 0x%x: PHY 0x%x SAS"
 			    " LINK UP @ %s Gb/s", portid, phynum,
 			    pmcs_get_rate(pptr->link_rate));
 		}
@@ -506,7 +508,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		if (sas_phymap_phy_add(pwp->hss_phymap, phynum,
 		    pwp->sas_wwns[0],
 		    pmcs_barray2wwn(pptr->sas_address)) != DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "Unable to add phy %u for 0x%" PRIx64 ".0x%"
 			    PRIx64, phynum, pwp->sas_wwns[pptr->phynum],
 			    pmcs_barray2wwn(pptr->sas_address));
@@ -560,7 +562,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 		if (pptr->dtype != NOTHING && pptr->configured) {
 			pmcs_unlock_phy(pptr);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "PortID 0x%x: SATA PHY 0x%x"
 			    " UP HITS EXISTING CONFIGURED TREE",
 			    portid, phynum);
@@ -590,7 +592,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		pptr->link_rate = pmcs_link_rate(IOP_EVENT_LINK_RATE(w1));
 		pptr->dtype = SATA;
 		pmcs_set_changed(pwp, pptr, B_TRUE, 0);
-		pmcs_prt(pwp, PMCS_PRT_INFO,
+		pmcs_prt(pwp, PMCS_PRT_INFO, pptr, NULL,
 		    "PortID 0x%x: PHY 0x%x SATA LINK UP @ %s Gb/s",
 		    pptr->portid, phynum, pmcs_get_rate(pptr->link_rate));
 		pmcs_unlock_phy(pptr);
@@ -599,7 +601,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		if (sas_phymap_phy_add(pwp->hss_phymap, phynum,
 		    pwp->sas_wwns[0],
 		    pmcs_barray2wwn(pptr->sas_address)) != DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "Unable to add phy %u for 0x%" PRIx64 ".0x%"
 			    PRIx64, phynum, pwp->sas_wwns[pptr->phynum],
 			    pmcs_barray2wwn(pptr->sas_address));
@@ -664,25 +666,26 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		mutex_exit(&pwp->lock);
 
 		if (pptr == NULL) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, "PortID 0x%x: PHY 0x%x "
-			    "LINK DOWN- no portid pointer", portid, phynum);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "PortID 0x%x: PHY 0x%x LINK DOWN- no portid ptr",
+			    portid, phynum);
 			break;
 		}
 		if (IOP_EVENT_PORT_STATE(w3) == IOP_EVENT_PS_NIL) {
-			pmcs_prt(pwp, PMCS_PRT_INFO,
+			pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
 			    "PortID 0x%x: PHY 0x%x NOT VALID YET",
 			    portid, phynum);
 			need_ack = 1;
 			break;
 		}
 		if (IOP_EVENT_PORT_STATE(w3) == IOP_EVENT_PS_IN_RESET) {
-			pmcs_prt(pwp, PMCS_PRT_INFO,
+			pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
 			    "PortID 0x%x: PHY 0x%x IN RESET",
 			    portid, phynum);
 			break;
 		}
 		if (IOP_EVENT_PORT_STATE(w3) == IOP_EVENT_PS_LOSTCOMM) {
-			pmcs_prt(pwp, PMCS_PRT_INFO,
+			pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
 			    "PortID 0x%x: PHY 0x%x TEMPORARILY DOWN",
 			    portid, phynum);
 			need_ack = 1;
@@ -722,7 +725,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			/* Remove this PHY from the phymap */
 			if (sas_phymap_phy_rem(pwp->hss_phymap, phynum) !=
 			    DDI_SUCCESS) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 				    "Unable to remove phy %u for 0x%" PRIx64
 				    ".0x%" PRIx64, phynum,
 				    pwp->sas_wwns[pptr->phynum],
@@ -730,22 +733,23 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 				    pptr->phynum)-> sas_address));
 			}
 
-			pmcs_prt(pwp, PMCS_PRT_INFO, "PortID 0x%x: PHY 0x%x "
-			    "LINK DOWN NARROWS PORT TO %d PHYS",
-			    portid, phynum, pptr->width);
+			pmcs_prt(pwp, PMCS_PRT_INFO, pptr, NULL,
+			    "PortID 0x%x: PHY 0x%x LINK DOWN NARROWS PORT "
+			    "TO %d PHYS", portid, phynum, pptr->width);
 			break;
 		}
 		if (IOP_EVENT_PORT_STATE(w3) != IOP_EVENT_PS_INVALID) {
-			pmcs_prt(pwp, PMCS_PRT_INFO, "PortID 0x%x: PHY 0x"
-			    "%x LINK DOWN NOT HANDLED (state 0x%x)",
-			    portid, phynum, IOP_EVENT_PORT_STATE(w3));
+			pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
+			    "PortID 0x%x: PHY 0x%x LINK DOWN NOT HANDLED "
+			    "(state 0x%x)", portid, phynum,
+			    IOP_EVENT_PORT_STATE(w3));
 			need_ack = 1;
 			break;
 		}
 		/* Remove this PHY from the phymap */
 		if (sas_phymap_phy_rem(pwp->hss_phymap, phynum) !=
 		    DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "Unable to remove phy %u for 0x%" PRIx64
 			    ".0x%" PRIx64, phynum,
 			    pwp->sas_wwns[pptr->phynum],
@@ -753,7 +757,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			    (pwp->root_phys + pptr->phynum)->sas_address));
 		}
 
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "PortID 0x%x: PHY 0x%x LINK DOWN (port invalid)",
 		    portid, phynum);
 
@@ -803,7 +807,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 		break;
 	case IOP_EVENT_BROADCAST_CHANGE:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 		    "PortID 0x%x: PHY 0x%x Broadcast Change", portid, phynum);
 		need_ack = 1;
 		mutex_enter(&pwp->lock);
@@ -846,7 +850,7 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		EVT_PRT(pwp, IOP_EVENT_EVENT_ID_FRAME_TIMO, phynum);
 		break;
 	case IOP_EVENT_BROADCAST_EXP:
-		pmcs_prt(pwp, PMCS_PRT_INFO,
+		pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
 		    "PortID 0x%x: PHY 0x%x Broadcast Exp Change",
 		    portid, phynum);
 		/*
@@ -867,24 +871,25 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	case IOP_EVENT_PHY_START_STATUS:
 		switch (IOP_EVENT_STATUS(w1)) {
 		case IOP_PHY_START_OK:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "PHY 0x%x Started",
-			    phynum);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+			    "PHY 0x%x Started", phynum);
 			break;
 		case IOP_PHY_START_ALREADY:
-			pmcs_prt(pwp, PMCS_PRT_INFO,
+			pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
 			    "PHY 0x%x Started (Already)", phynum);
 			break;
 		case IOP_PHY_START_INVALID:
-			pmcs_prt(pwp, PMCS_PRT_WARN,
+			pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
 			    "PHY 0x%x failed to start (invalid phy)", phynum);
 			break;
 		case IOP_PHY_START_ERROR:
-			pmcs_prt(pwp, PMCS_PRT_WARN,
+			pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
 			    "PHY 0x%x Start Error", phynum);
 			break;
 		default:
-			pmcs_prt(pwp, PMCS_PRT_WARN, "PHY 0x%x failed to start "
-			    "(0x%x)", phynum, IOP_EVENT_STATUS(w1));
+			pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+			    "PHY 0x%x failed to start (0x%x)", phynum,
+			    IOP_EVENT_STATUS(w1));
 			break;
 		}
 		/* Reposition htag to the 'expected' position. */
@@ -925,8 +930,8 @@ pmcs_process_sas_hw_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		}
 		mutex_exit(&pwp->lock);
 		pmcs_kill_port(pwp, portid);
-		pmcs_prt(pwp, PMCS_PRT_INFO, "PortID 0x%x: PORT Now Invalid",
-		    portid);
+		pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
+		    "PortID 0x%x: PORT Now Invalid", portid);
 		break;
 	case IOP_EVENT_PORT_RESET_TIMER_TMO:
 		EVT_PRT(pwp, IOP_EVENT_PORT_RESET_TIMER_TMO, phynum);
@@ -996,6 +1001,7 @@ pmcs_process_ssp_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	_NOTE(ARGUNUSED(amt));
 	uint32_t status, htag, *w;
 	pmcwork_t *pwrk;
+	pmcs_phy_t *phyp = NULL;
 	char *path;
 
 	w = iomb;
@@ -1007,6 +1013,7 @@ pmcs_process_ssp_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	if (pwrk == NULL) {
 		path = "????";
 	} else {
+		phyp = pwrk->phy;
 		path = pwrk->phy->path;
 	}
 
@@ -1019,8 +1026,8 @@ pmcs_process_ssp_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			    status);
 			emsg = buf;
 		}
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Bad SAS Status (tag 0x%x) "
-		    "%s on %s", __func__, htag, emsg, path);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL, "%s: Bad SAS Status "
+		    "(tag 0x%x) %s on %s", __func__, htag, emsg, path);
 		if (pwrk != NULL) {
 			/*
 			 * There may be pending command on a target device.
@@ -1029,7 +1036,7 @@ pmcs_process_ssp_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			pmcs_start_ssp_event_recovery(pwp, pwrk, iomb, amt);
 		}
 	} else {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, phyp, NULL,
 		    "%s: tag %x put onto the wire for %s",
 		    __func__, htag, path);
 		if (pwrk) {
@@ -1101,8 +1108,9 @@ pmcs_process_sata_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		} else {
 			pptr->abort_pending = 1;
 		}
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Bad SATA Status (tag 0x%x) "
-		    "%s on %s", __func__, htag, emsg, path);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
+		    "%s: Bad SATA Status (tag 0x%x) %s on %s",
+		    __func__, htag, emsg, path);
 		SCHEDULE_WORK(pwp, PMCS_WORK_ABORT_HANDLE);
 		/*
 		 * Unlike SSP devices, we let the abort we
@@ -1113,7 +1121,7 @@ pmcs_process_sata_event(pmcs_hw_t *pwp, void *iomb, size_t amt)
 			mutex_exit(&pwrk->lock);
 		}
 	} else if (status == PMCOUT_STATUS_XFER_CMD_FRAME_ISSUED) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, NULL,
 		    "%s: tag %x put onto the wire for %s",
 		    __func__, htag, path);
 		if (pwrk) {
@@ -1132,7 +1140,6 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 {
 	pmcs_phy_t *pptr;
 	struct pmcwork *pwrk;
-	uint32_t rtag;
 	uint32_t htag = LE_32(((uint32_t *)iomb)[1]);
 	uint32_t status = LE_32(((uint32_t *)iomb)[2]);
 	uint32_t scp = LE_32(((uint32_t *)iomb)[3]) & 0x1;
@@ -1140,14 +1147,9 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 
 	pwrk = pmcs_tag2wp(pwp, htag);
 	if (pwrk == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: cannot find work structure for ABORT", __func__);
 		return;
-	}
-	if (pwrk->ptr) {
-		rtag = *((uint32_t *)pwrk->ptr);
-	} else {
-		rtag = 0;
 	}
 
 	pptr = pwrk->phy;
@@ -1173,24 +1175,24 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 	switch (status) {
 	case PMCOUT_STATUS_OK:
 		if (scp) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "%s: abort all succeeded for %s. (htag=0x%x)",
 			    __func__, path, htag);
 		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "%s: abort tag 0x%x succeeded for %s. (htag=0x%x)",
-			    __func__, rtag, path, htag);
+			    __func__, pwrk->abt_htag, path, htag);
 		}
 		break;
 
 	case PMCOUT_STATUS_IO_NOT_VALID:
 		if (scp) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "%s: ABORT %s failed (DEV NOT VALID) for %s. "
 			    "(htag=0x%x)", __func__, scp ? "all" : "tag",
 			    path, htag);
 		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 			    "%s: ABORT %s failed (I/O NOT VALID) for %s. "
 			    "(htag=0x%x)", __func__, scp ? "all" : "tag",
 			    path, htag);
@@ -1198,14 +1200,14 @@ pmcs_process_abort_completion(pmcs_hw_t *pwp, void *iomb, size_t amt)
 		break;
 
 	case PMCOUT_STATUS_IO_ABORT_IN_PROGRESS:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: ABORT %s failed for "
-		    "%s, htag 0x%x (ABORT IN PROGRESS)", __func__,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, "%s: ABORT %s failed "
+		    "for %s, htag 0x%x (ABORT IN PROGRESS)", __func__,
 		    scp ? "all" : "tag", path, htag);
 		break;
 
 	default:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Unknown status %d for ABORT"
-		    " %s, htag 0x%x, PHY %s", __func__, status,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL, "%s: Unknown status "
+		    "%d for ABORT %s, htag 0x%x, PHY %s", __func__, status,
 		    scp ? "all" : "tag", htag, path);
 		break;
 	}
@@ -1298,7 +1300,7 @@ pmcs_general_intr(pmcs_hw_t *pwp)
 			break;
 		case PMCOUT_SAS_HW_EVENT_ACK_ACK:
 			if (LE_32(ptr[2]) != SAS_HW_EVENT_ACK_OK) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 				    "SAS H/W EVENT ACK/ACK Status=0x%b",
 				    LE_32(ptr[2]), "\020\4InvParm\3"
 				    "InvPort\2InvPhy\1InvSEA");
@@ -1306,8 +1308,8 @@ pmcs_general_intr(pmcs_hw_t *pwp)
 			pmcs_process_completion(pwp, local, amt);
 			break;
 		case PMCOUT_SKIP_ENTRIES:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG3, "%s: skip %d entries",
-			    __func__, nbuf);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, NULL,
+			    "%s: skip %d entries", __func__, nbuf);
 			break;
 		default:
 			(void) snprintf(local, sizeof (local),
@@ -1485,8 +1487,8 @@ pmcs_iodone_intr(pmcs_hw_t *pwp)
 			ioccb =
 			    kmem_cache_alloc(pwp->iocomp_cb_cache, KM_NOSLEEP);
 			if (ioccb == NULL) {
-				pmcs_prt(pwp, PMCS_PRT_WARN, "%s: "
-				    "kmem_cache_alloc failed", __func__);
+				pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+				    "%s: kmem_cache_alloc failed", __func__);
 				break;
 			}
 
@@ -1510,7 +1512,7 @@ pmcs_iodone_intr(pmcs_hw_t *pwp)
 				pmcs_process_ssp_event(pwp, local, amt);
 				break;
 			case PMCOUT_SKIP_ENTRIES:
-				pmcs_prt(pwp, PMCS_PRT_DEBUG3,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, NULL,
 				    "%s: skip %d entries", __func__, nbuf);
 				break;
 			default:
@@ -1594,13 +1596,13 @@ pmcs_event_intr(pmcs_hw_t *pwp)
 		{
 			uint32_t port = IOP_EVENT_PORTID(LE_32(ptr[1]));
 			uint32_t did = LE_32(ptr[2]);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "PortID 0x%x device_id 0x%x removed", port, did);
 			break;
 		}
 		case PMCOUT_SAS_HW_EVENT:
 			if (nbuf > 1) {
-				pmcs_prt(pwp, PMCS_PRT_INFO,
+				pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL,
 				    "multiple SAS HW_EVENT (%d) responses "
 				    "in EVENT OQ", nbuf);
 			}
@@ -1614,8 +1616,8 @@ pmcs_event_intr(pmcs_hw_t *pwp)
 			pmcs_process_completion(pwp, local, amt);
 			break;
 		case PMCOUT_SKIP_ENTRIES:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG3, "%s: skip %d entries",
-			    __func__, nbuf);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, NULL,
+			    "%s: skip %d entries", __func__, nbuf);
 			break;
 		default:
 			(void) snprintf(local, sizeof (local),
@@ -1639,7 +1641,7 @@ pmcs_timed_out(pmcs_hw_t *pwp, uint32_t htag, const char *func)
 
 	for (i = 0; i < 256; i++) {
 		if (pwp->ftags[i] == htag) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "Inbound msg (tag 0x%8x) timed out - "
 			    "was started %llu ns ago in %s:%d",
 			    htag, (unsigned long long) (now - pwp->ftime[i]),
@@ -1648,7 +1650,7 @@ pmcs_timed_out(pmcs_hw_t *pwp, uint32_t htag, const char *func)
 		}
 	}
 #endif
-	pmcs_prt(pwp, PMCS_PRT_DEBUG,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 	    "Inbound Message (tag 0x%08x) timed out- was started in %s",
 	    htag, func);
 }

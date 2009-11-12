@@ -71,12 +71,13 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	uint8_t status = STATUS_GOOD;
 
 	if (xp->actv_cnt) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG1, "%s: target %p actv count %u",
+		pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, xp,
+		    "%s: target %p actv count %u",
 		    __func__, (void *)xp, xp->actv_cnt);
 		return (-1);
 	}
 	if (xp->special_running) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
 		    "%s: target %p special running already",
 		    __func__, (void *)xp);
 		return (-1);
@@ -96,7 +97,7 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	}
 
 	pkt = CMD2PKT(sp);
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
 	    "%s: target %p cmd %p cdb0 %x with actv_cnt %u",
 	    __func__, (void *)xp, (void *)sp, pkt->pkt_cdbp[0], xp->actv_cnt);
 
@@ -118,7 +119,7 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 			pmcs_release_scratch(pwp);
 			xp->special_running = 0;
 
-			pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
 			    "%s: target %p identify failed %x",
 			    __func__, (void *)xp, retval);
 			/*
@@ -128,7 +129,7 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 			 * fail current command.
 			 */
 			if (retval == ENOMEM) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 				    "%s: sata identify failed (ENOMEM) for "
 				    "cmd %p", __func__, (void *)sp);
 				return (-1);
@@ -167,7 +168,7 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 			    (LE_16(id->word76) & (1 << 8))) {
 				xp->ncq = 1;
 				xp->qdepth = (LE_16(id->word75) & 0x1f) + 1;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, xp,
 				    "%s: device %s supports NCQ %u deep",
 				    __func__, xp->phy->path, xp->qdepth);
 			} else {
@@ -179,7 +180,7 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 				 * not NCQ it's safest to assume PIO.
 				 */
 				xp->pio = 1;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, xp,
 				    "%s: device %s assumed PIO",
 				    __func__, xp->phy->path);
 			}
@@ -322,8 +323,8 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 			if (xp->actv_cnt) {
 				xp->special_needed = 1;
 				xp->special_running = 0;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: @ line %d",
-				    __func__, __LINE__);
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
+				    "%s: @ line %d", __func__, __LINE__);
 				if (saq) {
 					pmcs_release_scratch(pwp);
 				}
@@ -375,8 +376,8 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 			if (xp->actv_cnt) {
 				xp->special_needed = 1;
 				xp->special_running = 0;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: @ line %d",
-				    __func__, __LINE__);
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
+				    "%s: @ line %d", __func__, __LINE__);
 				if (saq) {
 					pmcs_release_scratch(pwp);
 				}
@@ -407,8 +408,8 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 			if (xp->actv_cnt) {
 				xp->special_needed = 1;
 				xp->special_running = 0;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: @ line %d",
-				    __func__, __LINE__);
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
+				    "%s: @ line %d", __func__, __LINE__);
 				if (saq) {
 					pmcs_release_scratch(pwp);
 				}
@@ -434,8 +435,8 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 			if (xp->actv_cnt) {
 				xp->special_needed = 1;
 				xp->special_running = 0;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: @ line %d",
-				    __func__, __LINE__);
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
+				    "%s: @ line %d", __func__, __LINE__);
 				if (saq) {
 					pmcs_release_scratch(pwp);
 				}
@@ -496,7 +497,7 @@ pmcs_sata_special_work(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 
 out:
 	STAILQ_REMOVE_HEAD(&xp->sq, cmd_next);
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
 	    "%s: pkt %p tgt %u done reason=%x state=%x resid=%ld status=%x",
 	    __func__, (void *)pkt, xp->target_num, pkt->pkt_reason,
 	    pkt->pkt_state, pkt->pkt_resid, status);
@@ -506,7 +507,7 @@ out:
 	}
 
 	if (xp->draining) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 		    "%s: waking up drain waiters", __func__);
 		cv_signal(&pwp->drain_cv);
 	}
@@ -573,7 +574,7 @@ pmcs_sata_work(pmcs_hw_t *pwp)
 		}
 		if (xp->actv_cnt) {
 			xp->special_needed = 1;
-			pmcs_prt(pwp, PMCS_PRT_DEBUG1,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, xp,
 			    "%s: deferring until drained", __func__);
 			spinagain++;
 		} else {
@@ -643,8 +644,9 @@ pmcs_run_sata_cmd(pmcs_hw_t *pwp, pmcs_phy_t *pptr, fis_t fis, uint32_t mode,
 		if (ddir == PMCIN_DATADIR_2_DEV) {
 			if (ddi_dma_sync(pwp->cip_handles, 0, 0,
 			    DDI_DMA_SYNC_FORDEV) != DDI_SUCCESS) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, "Condition check "
-				    "failed at %s():%d", __func__, __LINE__);
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
+				    "Condition check failed at %s():%d",
+				    __func__, __LINE__);
 			}
 		}
 		msg[12] = LE_32(DWORD0(pwp->scratch_dma));
@@ -701,8 +703,9 @@ pmcs_run_sata_cmd(pmcs_hw_t *pwp, pmcs_phy_t *pptr, fis_t fis, uint32_t mode,
 	if (dlen && ddir == PMCIN_DATADIR_2_INI) {
 		if (ddi_dma_sync(pwp->cip_handles, 0, 0,
 		    DDI_DMA_SYNC_FORKERNEL) != DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, "Condition check "
-			    "failed at %s():%d", __func__, __LINE__);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
+			    "Condition check failed at %s():%d",
+			    __func__, __LINE__);
 		}
 	}
 	return (0);

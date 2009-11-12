@@ -39,20 +39,21 @@ pmcs_smhba_add_hba_prop(pmcs_hw_t *pwp, data_type_t dt,
 	case DATA_TYPE_INT32:
 		if (ddi_prop_update_int(DDI_DEV_T_NONE, pwp->dip,
 		    prop_name, *(int *)prop_val)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: %s prop update failed", __func__, prop_name);
 		}
 		break;
 	case DATA_TYPE_STRING:
 		if (ddi_prop_update_string(DDI_DEV_T_NONE, pwp->dip,
 		    prop_name, (char *)prop_val)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: %s prop update failed", __func__, prop_name);
 		}
 		break;
 	default:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Unhandled datatype(%d) for "
-		    "(%s). Skipping prop update.", __func__, dt, prop_name);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: "
+		    "Unhandled datatype(%d) for (%s). Skipping prop update.",
+		    __func__, dt, prop_name);
 	}
 }
 
@@ -67,20 +68,20 @@ pmcs_smhba_add_iport_prop(pmcs_iport_t *iport, data_type_t dt,
 	case DATA_TYPE_INT32:
 		if (ddi_prop_update_int(DDI_DEV_T_NONE, iport->dip,
 		    prop_name, *(int *)prop_val)) {
-			pmcs_prt(iport->pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(iport->pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: %s prop update failed", __func__, prop_name);
 		}
 		break;
 	case DATA_TYPE_STRING:
 		if (ddi_prop_update_string(DDI_DEV_T_NONE, iport->dip,
 		    prop_name, (char *)prop_val)) {
-			pmcs_prt(iport->pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(iport->pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: %s prop update failed", __func__, prop_name);
 		}
 		break;
 	default:
-		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG, "%s: Unhandled "
-		    "datatype(%d) for(%s). Skipping prop update.",
+		pmcs_prt(iport->pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: "
+		    "Unhandled datatype(%d) for(%s). Skipping prop update.",
 		    __func__, dt, prop_name);
 	}
 }
@@ -96,20 +97,21 @@ pmcs_smhba_add_tgt_prop(pmcs_xscsi_t *tgt, data_type_t dt,
 	case DATA_TYPE_INT32:
 		if (ddi_prop_update_int(DDI_DEV_T_NONE, tgt->dip,
 		    prop_name, *(int *)prop_val)) {
-			pmcs_prt(tgt->pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(tgt->pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: %s prop update failed", __func__, prop_name);
 		}
 		break;
 	case DATA_TYPE_STRING:
 		if (ddi_prop_update_string(DDI_DEV_T_NONE, tgt->dip,
 		    prop_name, (char *)prop_val)) {
-			pmcs_prt(tgt->pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(tgt->pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: %s prop update failed", __func__, prop_name);
 		}
 		break;
 	default:
-		pmcs_prt(tgt->pwp, PMCS_PRT_DEBUG, "%s: Unhandled datatype(%d) "
-		    "for (%s). Skipping prop update.", __func__, dt, prop_name);
+		pmcs_prt(tgt->pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: "
+		    "Unhandled datatype(%d) for (%s). Skipping prop update.",
+		    __func__, dt, prop_name);
 	}
 }
 
@@ -162,8 +164,8 @@ pmcs_smhba_set_phy_props(pmcs_iport_t *iport)
 	}
 
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: nvlist_alloc() failed",
-		    __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: nvlist_alloc() failed", __func__);
 	}
 
 	phy_props = kmem_zalloc(sizeof (nvlist_t *) * iport->nphy, KM_SLEEP);
@@ -251,8 +253,8 @@ pmcs_smhba_log_sysevent(pmcs_hw_t *pwp, char *subclass, char *etype,
 	}
 
 	if (nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE, 0) != 0) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Failed to post sysevent",
-		    __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: Failed to post sysevent", __func__);
 		kmem_free(pname, MAXPATHLEN);
 		return;
 	}

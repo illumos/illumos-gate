@@ -192,6 +192,7 @@ struct pmcwork {
 	pmcs_phy_t 		*phy;	/* phy who owns this command */
 	pmcs_xscsi_t		*xp;	/* Back pointer to xscsi struct */
 	volatile uint32_t	htag;	/* tag for this structure */
+	uint32_t		abt_htag; /* Tag of command to be aborted */
 	uint32_t
 			timer	:	27,
 			onwire	:	1,
@@ -357,13 +358,13 @@ typedef struct {
 	SCHEDULE_WORK(pwp, PMCS_WORK_DISCOVER);
 
 #define	PHY_CHANGED(pwp, p)						\
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "%s changed in %s line %d", \
-	    p->path, __func__, __LINE__);				\
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, p, NULL, "%s changed in "  \
+	    "%s line %d", p->path, __func__, __LINE__); 		\
 	p->changed = 1
 
 #define	PHY_CHANGED_AT_LOCATION(pwp, p, func, line)			\
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "%s changed in %s line %d", \
-	    p->path, func, line);					\
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, p, NULL, "%s changed in "  \
+	    "%s line %d", p->path, func, line);				\
 	p->changed = 1
 
 #define	PHY_TYPE(pptr)					\
@@ -485,7 +486,16 @@ typedef void (*pmcs_cb_t) (pmcs_hw_t *, pmcwork_t *, uint32_t *);
 #define	PMCS_TBUF_NUM_ELEMS_DEF	15000
 #endif
 
+#define	PMCS_TBUF_UA_MAX_SIZE	32
 typedef struct {
+	/* Target-specific data */
+	uint16_t	target_num;
+	char		target_ua[PMCS_TBUF_UA_MAX_SIZE];
+	/* PHY-specific data */
+	uint8_t 	phy_sas_address[8];
+	char		phy_path[32];
+	pmcs_dtype_t	phy_dtype;
+	/* Log data */
 	timespec_t	timestamp;
 	char		buf[PMCS_TBUF_ELEM_SIZE];
 } pmcs_tbuf_t;

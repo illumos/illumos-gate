@@ -59,7 +59,7 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	 * If updating is disabled, we're done.
 	 */
 	if (pwp->fw_disable_update) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "Firmware update disabled by conf file");
 		return (0);
 	}
@@ -72,17 +72,17 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 			return (0);
 		}
 
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "Firmware version matches, but still forcing update");
 	} else {
-		pmcs_prt(pwp, PMCS_PRT_WARN,
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
 		    "Upgrading firmware on card from 0x%x to 0x%x",
 		    pwp->fw, PMCS_FIRMWARE_VERSION);
 	}
 
 	modhp = ddi_modopen(PMCS_FIRMWARE_FILENAME, KRTLD_MODE_FIRST, &errno);
 	if (errno) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: Firmware module not available; will not upgrade",
 		    __func__);
 		return (defret);
@@ -90,7 +90,8 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 
 	fwvp = ddi_modsym(modhp, PMCS_FIRMWARE_VERSION_NAME, &errno);
 	if (errno) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: unable to find symbol '%s'",
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: unable to find symbol '%s'",
 		    __func__, PMCS_FIRMWARE_VERSION_NAME);
 		(void) ddi_modclose(modhp);
 		return (defret);
@@ -103,13 +104,13 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	 */
 	if (*fwvp != PMCS_FIRMWARE_VERSION) {
 		if (pwp->fw_force_update == 0) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: firmware module version wrong (0x%x)",
 			    __func__, *fwvp);
 			(void) ddi_modclose(modhp);
 			return (defret);
 		}
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: firmware module version wrong (0x%x) - update forced",
 		    __func__, *fwvp);
 	}
@@ -118,8 +119,8 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	    PMCS_FIRMWARE_CODE_NAME PMCS_FIRMWARE_START_SUF);
 	cstart = ddi_modsym(modhp, buf, &errno);
 	if (errno) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: unable to find symbol '%s'",
-		    __func__, buf);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: unable to find symbol '%s'", __func__, buf);
 		(void) ddi_modclose(modhp);
 		return (defret);
 	}
@@ -128,8 +129,8 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	    PMCS_FIRMWARE_CODE_NAME PMCS_FIRMWARE_END_SUF);
 	cend = ddi_modsym(modhp, buf, &errno);
 	if (errno) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: unable to find symbol '%s'",
-		    __func__, buf);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: unable to find symbol '%s'", __func__, buf);
 		(void) ddi_modclose(modhp);
 		return (defret);
 	}
@@ -138,8 +139,8 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	    PMCS_FIRMWARE_ILA_NAME PMCS_FIRMWARE_START_SUF);
 	istart = ddi_modsym(modhp, buf, &errno);
 	if (errno) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: unable to find symbol '%s'",
-		    __func__, buf);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: unable to find symbol '%s'", __func__, buf);
 		(void) ddi_modclose(modhp);
 		return (defret);
 	}
@@ -148,8 +149,8 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	    PMCS_FIRMWARE_ILA_NAME PMCS_FIRMWARE_END_SUF);
 	iend = ddi_modsym(modhp, buf, &errno);
 	if (errno) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: unable to find symbol '%s'",
-		    __func__, buf);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: unable to find symbol '%s'", __func__, buf);
 		(void) ddi_modclose(modhp);
 		return (defret);
 	}
@@ -158,8 +159,8 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	    PMCS_FIRMWARE_SPCBOOT_NAME PMCS_FIRMWARE_START_SUF);
 	sstart = ddi_modsym(modhp, buf, &errno);
 	if (errno) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: unable to find symbol '%s'",
-		    __func__, buf);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: unable to find symbol '%s'", __func__, buf);
 		(void) ddi_modclose(modhp);
 		return (defret);
 	}
@@ -168,8 +169,8 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	    PMCS_FIRMWARE_SPCBOOT_NAME PMCS_FIRMWARE_END_SUF);
 	send = ddi_modsym(modhp, buf, &errno);
 	if (errno) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: unable to find symbol '%s'",
-		    __func__, buf);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: unable to find symbol '%s'", __func__, buf);
 		(void) ddi_modclose(modhp);
 		return (defret);
 	}
@@ -180,7 +181,7 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	 */
 	if (pmcs_set_nvmd(pwp, PMCS_NVMD_SPCBOOT, sstart,
 	    (size_t)((size_t)send - (size_t)sstart)) == B_FALSE) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: unable to flash '%s' segment",
 		    __func__, PMCS_FIRMWARE_SPCBOOT_NAME);
 		(void) ddi_modclose(modhp);
@@ -189,7 +190,7 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 
 	if (pmcs_fw_flash(pwp, (void *)istart,
 	    (uint32_t)((size_t)iend - (size_t)istart))) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: unable to flash '%s' segment",
 		    __func__, PMCS_FIRMWARE_ILA_NAME);
 		(void) ddi_modclose(modhp);
@@ -198,7 +199,7 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 
 	if (pmcs_fw_flash(pwp, (void *)cstart,
 	    (uint32_t)((size_t)cend - (size_t)cstart))) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: unable to flash '%s' segment",
 		    __func__, PMCS_FIRMWARE_CODE_NAME);
 		(void) ddi_modclose(modhp);
@@ -208,11 +209,11 @@ pmcs_firmware_update(pmcs_hw_t *pwp)
 	(void) ddi_modclose(modhp);
 
 	if (pmcs_soft_reset(pwp, B_FALSE)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: soft reset after flash update failed", __func__);
 		return (-1);
 	} else {
-		pmcs_prt(pwp, PMCS_PRT_WARN,
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
 		    "%s: Firmware successfully upgraded.", __func__);
 	}
 	return (0);
@@ -235,11 +236,11 @@ pmcs_fw_flash(pmcs_hw_t *pwp, pmcs_fw_hdr_t *hdr, uint32_t length)
 	wrk = (uint8_t *)hdr;
 	base = wrk;
 	for (;;) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG1,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, NULL,
 		    "%s: partition 0x%x, Length 0x%x", __func__,
 		    hp->destination_partition, ntohl(hp->firmware_length));
 		if (ntohl(hp->firmware_length) == 0) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: bad firmware length 0x%x",
 			    __func__, ntohl(hp->firmware_length));
 			return (EINVAL);
@@ -249,7 +250,7 @@ pmcs_fw_flash(pmcs_hw_t *pwp, pmcs_fw_hdr_t *hdr, uint32_t length)
 			break;
 		}
 		if (wrk > base + length) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: out of bounds firmware length", __func__);
 			return (EINVAL);
 		}
@@ -299,7 +300,7 @@ pmcs_flash_chunk(pmcs_hw_t *pwp, uint8_t *chunk)
 		if (off + amt > len) {
 			amt = len - off;
 		}
-		pmcs_prt(pwp, PMCS_PRT_DEBUG1,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, NULL,
 		    "%s: segment %d offset %u length %u",
 		    __func__, seg, off, amt);
 		(void) memcpy(pwp->scratch, &chunk[off], amt);
@@ -334,7 +335,8 @@ pmcs_flash_chunk(pmcs_hw_t *pwp, uint8_t *chunk)
 		if (ptr == NULL) {
 			mutex_exit(&pwp->iqp_lock[PMCS_IQ_OTHER]);
 			pmcs_pwork(pwp, pwrk);
-			pmcs_prt(pwp, PMCS_PRT_ERR, pmcs_nomsg, __func__);
+			pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+			    pmcs_nomsg, __func__);
 			return (ENOMEM);
 		}
 		COPY_MESSAGE(ptr, msg, PMCS_MSG_SIZE);
@@ -344,51 +346,52 @@ pmcs_flash_chunk(pmcs_hw_t *pwp, uint8_t *chunk)
 		WAIT_FOR(pwrk, 5000, result);
 		pmcs_pwork(pwp, pwrk);
 		if (result) {
-			pmcs_prt(pwp, PMCS_PRT_ERR, pmcs_timeo, __func__);
+			pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+			    pmcs_timeo, __func__);
 			return (EIO);
 		}
 		switch (LE_32(msg[2])) {
 		case FLASH_UPDATE_COMPLETE_PENDING_REBOOT:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG1,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, NULL,
 			    "%s: segment %d complete pending reboot",
 			    __func__, seg);
 			break;
 		case FLASH_UPDATE_IN_PROGRESS:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG1,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, NULL,
 			    "%s: segment %d downloaded", __func__, seg);
 			break;
 		case FLASH_UPDATE_HDR_ERR:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: segment %d header error", __func__, seg);
 			return (EIO);
 		case FLASH_UPDATE_OFFSET_ERR:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: segment %d offset error", __func__, seg);
 			return (EIO);
 		case FLASH_UPDATE_UPDATE_CRC_ERR:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: segment %d update crc error", __func__, seg);
 			return (EIO);
 		case FLASH_UPDATE_LENGTH_ERR:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: segment %d length error", __func__, seg);
 			return (EIO);
 		case FLASH_UPDATE_HW_ERR:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: segment %d hw error", __func__, seg);
 			return (EIO);
 		case FLASH_UPDATE_DNLD_NOT_SUPPORTED:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: segment %d download not supported error",
 			    __func__, seg);
 			return (EIO);
 		case FLASH_UPDATE_DISABLED:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: segment %d update disabled error",
 			    __func__, seg);
 			return (EIO);
 		default:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: segment %d unknown error %x",
 			    __func__, seg, msg[2]);
 			return (EIO);
@@ -424,14 +427,14 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 	 */
 
 	if (vpd_header->eeprom_version < PMCS_VPD_VERSION) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: VPD version(%d) out-of-date; (%d) required."
 		    " Thebe card needs to be flashed.",
 		    __func__, vpd_header->eeprom_version, PMCS_VPD_VERSION);
 	}
 	if ((vpd_header->eeprom_version != PMCS_VPD_VERSION) &&
 	    (vpd_header->eeprom_version != (PMCS_VPD_VERSION - 1))) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: VPD version mismatch (%d != %d)",
 		    __func__, vpd_header->eeprom_version, PMCS_VPD_VERSION);
 		return (B_FALSE);
@@ -441,7 +444,7 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 	 * Do we have a valid SAS WWID?
 	 */
 	if (((vpd_header->hba_sas_wwid[0] & 0xf0) >> 4) != NAA_IEEE_REG) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: SAS WWN has invalid NAA (%d)", __func__,
 		    ((vpd_header->hba_sas_wwid[0] & 0xf0) >> 4));
 		return (B_FALSE);
@@ -452,7 +455,7 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 	}
 
 	if (vpd_header->vpd_start_byte != PMCS_VPD_START) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: Didn't see VPD start byte", __func__);
 		return (B_FALSE);
 	}
@@ -478,8 +481,8 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 	}
 	ASSERT (*chksump == PMCS_VPD_END);
 	if (chksum) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: VPD checksum(%d) non-zero."
-		    " Checksum validation failed.", __func__, chksum);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: VPD checksum(%d)"
+		    " non-zero. Checksum validation failed.", __func__, chksum);
 	}
 
 	/*
@@ -500,7 +503,7 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 	bcopy(bufp, tbuf, strid_length);
 	tbuf[strid_length] = 0;
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL,
 	    "%s: Product Name: '%s'", __func__, tbuf);
 	pmcs_smhba_add_hba_prop(pwp, DATA_TYPE_STRING, PMCS_MODEL_NAME, tbuf);
 
@@ -527,7 +530,8 @@ pmcs_validate_vpd(pmcs_hw_t *pwp, uint8_t *data)
 		str_len += kv_len;
 		tbuf[str_len] = '>';
 		tbuf[str_len + 1] = 0;
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2, "%s (Len: 0x%x)", tbuf, kv_len);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "%s (Len: 0x%x)",
+		    tbuf, kv_len);
 
 		/* Keyword is Manufacturer */
 		if ((vkvp->keyword[0] == 'M') && (vkvp->keyword[1] == 'N')) {
@@ -611,14 +615,14 @@ pmcs_get_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type, uint8_t nvmd,
 		doa[2] = (offset >> 16) & 0xff;
 		break;
 	default:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: Invalid nvmd type: %d", __func__, nvmd_type);
 		return (-1);
 	}
 
 	workp = pmcs_gwork(pwp, PMCS_TAG_TYPE_WAIT, NULL);
 	if (workp == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_WARN,
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
 		    "%s: Unable to get work struct", __func__);
 		return (-1);
 	}
@@ -644,8 +648,8 @@ pmcs_get_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type, uint8_t nvmd,
 	 */
 	GET_IO_IQ_ENTRY(pwp, ptr, 0, ibq);
 	if (ptr == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, "!%s: Unable to get IQ entry",
-		    __func__);
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "!%s: Unable to get IQ entry", __func__);
 		pmcs_pwork(pwp, workp);
 		return (-1);
 	}
@@ -665,8 +669,8 @@ pmcs_get_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type, uint8_t nvmd,
 	}
 	status = LE_32(*(ptr + 3)) & 0xffff;
 	if (status != PMCS_NVMD_STAT_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Error, status = 0x%04x",
-		    __func__, status);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: Error, status = 0x%04x", __func__, status);
 		pmcs_pwork(pwp, workp);
 		return (-1);
 	}
@@ -675,8 +679,8 @@ pmcs_get_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type, uint8_t nvmd,
 
 	if (ddi_dma_sync(pwp->cip_handles, 0, 0,
 	    DDI_DMA_SYNC_FORKERNEL) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "Condition check failed at "
-		    "%s():%d", __func__, __LINE__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "Condition check failed at %s():%d", __func__, __LINE__);
 	}
 	chunkp = (uint8_t *)pwp->flash_chunkp;
 
@@ -706,7 +710,8 @@ pmcs_get_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type, uint8_t nvmd,
 		result = i;
 		break;
 	default:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "UNKNOWN NVMD DEVICE");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "UNKNOWN NVMD DEVICE");
 		return (-1);
 	}
 
@@ -748,17 +753,17 @@ pmcs_set_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type, uint8_t *buf,
 		dlen = LE_32(len);
 		break;
 	default:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: Invalid nvmd type: %d", __func__, nvmd_type);
 		return (B_FALSE);
 	}
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_DEVEL, "%s: Request for nvmd type: %d",
-	    __func__, nvmd_type);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_DEVEL, NULL, NULL,
+	    "%s: Request for nvmd type: %d", __func__, nvmd_type);
 
 	workp = pmcs_gwork(pwp, PMCS_TAG_TYPE_WAIT, NULL);
 	if (workp == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_WARN,
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
 		    "%s: Unable to get work struct", __func__);
 		return (B_FALSE);
 	}
@@ -781,8 +786,8 @@ pmcs_set_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type, uint8_t *buf,
 	bcopy(buf, pwp->flash_chunkp, len);
 	if (ddi_dma_sync(pwp->cip_handles, 0, 0,
 	    DDI_DMA_SYNC_FORDEV) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "Condition check failed at "
-		    "%s():%d", __func__, __LINE__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "Condition check failed at %s():%d", __func__, __LINE__);
 	}
 
 	/*
@@ -790,8 +795,8 @@ pmcs_set_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type, uint8_t *buf,
 	 */
 	GET_IO_IQ_ENTRY(pwp, ptr, 0, ibq);
 	if (ptr == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, "!%s: Unable to get IQ entry",
-		    __func__);
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "!%s: Unable to get IQ entry", __func__);
 		pmcs_pwork(pwp, workp);
 		return (B_FALSE);
 	}
@@ -814,8 +819,8 @@ pmcs_set_nvmd(pmcs_hw_t *pwp, pmcs_nvmd_type_t nvmd_type, uint8_t *buf,
 
 	status = LE_32(*(ptr + 3)) & 0xffff;
 	if (status != PMCS_NVMD_STAT_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Error, status = 0x%04x",
-		    __func__, status);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: Error, status = 0x%04x", __func__, status);
 		return (B_FALSE);
 	}
 

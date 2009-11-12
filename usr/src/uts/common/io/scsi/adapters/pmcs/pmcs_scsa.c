@@ -85,7 +85,8 @@ pmcs_scsa_init(pmcs_hw_t *pwp, const ddi_dma_attr_t *ap)
 	 */
 	tran = scsi_hba_tran_alloc(pwp->dip, SCSI_HBA_CANSLEEP);
 	if (tran == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "scsi_hba_tran_alloc failed");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "scsi_hba_tran_alloc failed");
 		return (DDI_FAILURE);
 	}
 
@@ -114,7 +115,8 @@ pmcs_scsa_init(pmcs_hw_t *pwp, const ddi_dma_attr_t *ap)
 
 	if (scsi_hba_attach_setup(pwp->dip, &pmcs_scsa_dattr, tran, flags)) {
 		scsi_hba_tran_free(tran);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "scsi_hba_attach failed");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "scsi_hba_attach failed");
 		return (DDI_FAILURE);
 	}
 	pwp->tran = tran;
@@ -131,7 +133,8 @@ pmcs_scsa_init(pmcs_hw_t *pwp, const ddi_dma_attr_t *ap)
 	pwp->smp_tran->tran_smp_free = pmcs_smp_free;
 
 	if (sas_hba_attach_setup(pwp->dip, pwp->smp_tran) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "sas_hba_attach failed");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "sas_hba_attach failed");
 		sas_hba_tran_free(pwp->smp_tran);
 		pwp->smp_tran = NULL;
 		scsi_hba_tran_free(tran);
@@ -165,7 +168,7 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	 * node's softstate
 	 */
 	if (scsi_hba_iport_unit_address(hba_dip) == NULL) {
-		pmcs_prt(TRAN2PMC(tran), PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(TRAN2PMC(tran), PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 		    "%s: We don't enumerate devices on the HBA node", __func__);
 		goto tgt_init_fail;
 	}
@@ -179,17 +182,19 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	rval = scsi_device_prop_lookup_string(sd, SCSI_DEVICE_PROP_PATH,
 	    SCSI_ADDR_PROP_TARGET_PORT, &tgt_port);
 	if (rval != DDI_PROP_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "Couldn't get target UA");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+		    "Couldn't get target UA");
 		pwp = NULL;
 		goto tgt_init_fail;
 	}
-	pmcs_prt(pwp, PMCS_PRT_DEBUG3, "got tgt_port '%s'", tgt_port);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, NULL,
+	    "got tgt_port '%s'", tgt_port);
 
 	/*
 	 * Validate that this tran_tgt_init is for an active iport.
 	 */
 	if (iport->ua_state == UA_INACTIVE) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: Got tran_tgt_init on inactive iport for '%s'",
 		    __func__, tgt_port);
 		pwp = NULL;
@@ -220,7 +225,7 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	}
 	ASSERT(mutex_owned(&phyp->phy_lock));
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2, "tgt = 0x%p, dip = 0x%p",
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, phyp, tgt, "tgt = 0x%p, dip = 0x%p",
 	    (void *)tgt, (void *)tgt_dip);
 
 	/*
@@ -228,34 +233,34 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	 */
 	ua = scsi_device_unit_address(sd);
 	if (ua == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
 		    "Couldn't get LU unit address");
 		goto tgt_init_fail;
 	}
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2, "got lun ua '%s'", ua);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, tgt, "got lun ua '%s'", ua);
 
 	lun_num = scsi_device_prop_get_int64(sd, SCSI_DEVICE_PROP_PATH,
 	    SCSI_ADDR_PROP_LUN64, SCSI_LUN64_ILLEGAL);
 	if (lun_num == SCSI_LUN64_ILLEGAL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "No LUN for tgt %p",
-		    (void *)tgt);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
+		    "No LUN for tgt %p", (void *)tgt);
 		goto tgt_init_fail;
 	}
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "%s: @%s tgt 0x%p phy 0x%p (%s)",
-	    __func__, ua, (void *)tgt, (void *)phyp, phyp->path);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt, "%s: @%s tgt 0x%p phy "
+	    "0x%p (%s)", __func__, ua, (void *)tgt, (void *)phyp, phyp->path);
 
 	mutex_enter(&tgt->statlock);
 	tgt->dtype = phyp->dtype;
 	if (tgt->dtype != SAS && tgt->dtype != SATA) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "PHY 0x%p went away?",
-		    (void *)phyp);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
+		    "PHY 0x%p went away?", (void *)phyp);
 		goto tgt_init_fail;
 	}
 
 	/* We don't support SATA devices at LUN > 0. */
 	if ((tgt->dtype == SATA) && (lun_num > 0)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
 		    "%s: No support for SATA devices at LUN > 0 "
 		    "(target = 0x%p)", __func__, (void *)tgt);
 		goto tgt_init_fail;
@@ -268,14 +273,15 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	 * structures with the same unit-address at the same time.
 	 */
 	if (ddi_soft_state_bystr_zalloc(tgt->lun_sstate, ua) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, phyp, tgt,
 		    "Couldn't allocate LU soft state");
 		goto tgt_init_fail;
 	}
 
 	lun = ddi_soft_state_bystr_get(tgt->lun_sstate, ua);
 	if (lun == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2, "Couldn't get LU soft state");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, phyp, tgt,
+		    "Couldn't get LU soft state");
 		goto tgt_init_fail;
 	}
 	scsi_device_hba_private_set(sd, lun);
@@ -305,7 +311,7 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		}
 
 		if (target == pwp->max_dev) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
 			    "Target list full.");
 			goto tgt_init_fail;
 		}
@@ -318,7 +324,7 @@ pmcs_scsa_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		pwp->targets[tgt->target_num] = NULL;
 		tgt->target_num = PMCS_INVALID_TARGET_NUM;
 		tgt->phy = NULL;
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
 		    "%s: pmcs_assign_device failed for target 0x%p",
 		    __func__, (void *)tgt);
 		goto tgt_init_fail;
@@ -397,7 +403,7 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	if (scsi_hba_iport_unit_address(hba_dip) == NULL) {
 		pwp = TRAN2PMC(tran);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 		    "%s: We don't enumerate devices on the HBA node", __func__);
 		return;
 	}
@@ -434,7 +440,7 @@ pmcs_scsa_tran_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		 * with the hardware unless/until we're told the device
 		 * physically went away.
 		 */
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, target,
 		    "%s: Free target 0x%p (vtgt %d)", __func__, (void *)target,
 		    target->target_num);
 		pwp->targets[target->target_num] = NULL;
@@ -463,13 +469,14 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	boolean_t blocked;
 	uint32_t hba_state;
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2, "%s: pkt %p sd %p cdb0=0x%02x dl=%lu",
-	    __func__, (void *)pkt,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL,
+	    "%s: pkt %p sd %p cdb0=0x%02x dl=%lu", __func__, (void *)pkt,
 	    (void *)scsi_address_device(&pkt->pkt_address),
 	    pkt->pkt_cdbp[0] & 0xff, pkt->pkt_dma_len);
 
 	if (pkt->pkt_flags & FLAG_NOINTR) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG3, "%s: nointr pkt", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, NULL,
+		    "%s: nointr pkt", __func__);
 		return (TRAN_BADPKT);
 	}
 
@@ -483,13 +490,14 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	mutex_exit(&pwp->lock);
 
 	if (hba_state != STATE_RUNNING) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: hba dead", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: hba dead", __func__);
 		return (TRAN_FATAL_ERROR);
 	}
 
 	xp = pmcs_addr2xp(ap, NULL, sp);
 	if (xp == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL,
 		    "%s: dropping due to null target", __func__);
 		goto dead_target;
 	}
@@ -500,7 +508,7 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 */
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG3,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, xp,
 		    "%s: dropping due to dead target 0x%p",
 		    __func__, (void *)xp);
 		goto dead_target;
@@ -510,7 +518,8 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * If we're blocked (quiesced) just return.
 	 */
 	if (blocked) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: hba blocked", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: hba blocked", __func__);
 		mutex_exit(&xp->statlock);
 		mutex_enter(&xp->wqlock);
 		STAILQ_INSERT_TAIL(&xp->wq, sp, cmd_next);
@@ -526,7 +535,7 @@ pmcs_scsa_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		mutex_enter(&xp->wqlock);
 		STAILQ_INSERT_TAIL(&xp->wq, sp, cmd_next);
 		mutex_exit(&xp->wqlock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG1,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, xp,
 		    "%s: draining/resetting/recovering (cnt %u)",
 		    __func__, xp->actv_cnt);
 		/*
@@ -580,7 +589,8 @@ pmcs_scsa_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 	mutex_enter(&pwp->lock);
 	if (pwp->state != STATE_RUNNING) {
 		mutex_exit(&pwp->lock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: hba dead", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: hba dead", __func__);
 		return (0);
 	}
 	mutex_exit(&pwp->lock);
@@ -674,7 +684,8 @@ pmcs_scsa_reset(struct scsi_address *ap, int level)
 	mutex_enter(&pwp->lock);
 	if (pwp->state != STATE_RUNNING) {
 		mutex_exit(&pwp->lock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: hba dead", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: hba dead", __func__);
 		return (0);
 	}
 	mutex_exit(&pwp->lock);
@@ -693,14 +704,14 @@ pmcs_scsa_reset(struct scsi_address *ap, int level)
 	case RESET_TARGET:
 		xp = pmcs_addr2xp(ap, lp, NULL);
 		if (xp == NULL) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: no xp found for this scsi address", __func__);
 			return (0);
 		}
 
 		if (xp->dev_gone) {
 			mutex_exit(&xp->statlock);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
 			    "%s: Target 0x%p has gone away", __func__,
 			    (void *)xp);
 			return (0);
@@ -835,7 +846,7 @@ pmcs_cap(struct scsi_address *ap, char *cap, int val, int tonly, int set)
 		break;
 	}
 	mutex_exit(&xp->statlock);
-	pmcs_prt(ADDR2PMC(ap), PMCS_PRT_DEBUG3,
+	pmcs_prt(ADDR2PMC(ap), PMCS_PRT_DEBUG3, NULL, NULL,
 	    "%s: cap %s val %d set %d rval %d",
 	    __func__, cap, val, set, rval);
 	return (rval);
@@ -952,8 +963,8 @@ pmcs_smp_start(struct smp_pkt *pktp)
 
 	bcopy(pktp->pkt_address->a_wwn, &wwn, SAS_WWN_BYTE_SIZE);
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG1, "%s: starting for wwn 0x%" PRIx64,
-	    __func__, wwn);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, NULL,
+	    "%s: starting for wwn 0x%" PRIx64, __func__, wwn);
 
 	will_retry = pktp->pkt_will_retry;
 
@@ -983,8 +994,8 @@ pmcs_smp_start(struct smp_pkt *pktp)
 			pmcs_unlock_phy(pptr);
 		}
 		pmcs_release_scratch(pwp);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: could not find phy",
-		    __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: could not find phy", __func__);
 		pktp->pkt_reason = ENXIO;
 		return (DDI_FAILURE);
 	}
@@ -993,7 +1004,7 @@ pmcs_smp_start(struct smp_pkt *pktp)
 	if (pwrk == NULL) {
 		pmcs_unlock_phy(pptr);
 		pmcs_release_scratch(pwp);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 		    "%s: could not get work structure", __func__);
 		pktp->pkt_reason = will_retry ? EAGAIN :EBUSY;
 		return (DDI_FAILURE);
@@ -1008,8 +1019,8 @@ pmcs_smp_start(struct smp_pkt *pktp)
 		mutex_exit(&pwp->iqp_lock[PMCS_IQ_OTHER]);
 		pmcs_unlock_phy(pptr);
 		pmcs_release_scratch(pwp);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: could not get IQ entry",
-		    __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: could not get IQ entry", __func__);
 		pktp->pkt_reason = will_retry ? EAGAIN :EBUSY;
 		return (DDI_FAILURE);
 	}
@@ -1039,11 +1050,11 @@ pmcs_smp_start(struct smp_pkt *pktp)
 	if (result) {
 		pmcs_timed_out(pwp, htag, __func__);
 		if (pmcs_abort(pwp, pptr, htag, 0, 0)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
 			    "%s: Unable to issue SMP ABORT for htag 0x%08x",
 			    __func__, htag);
 		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, NULL,
 			    "%s: Issuing SMP ABORT for htag 0x%08x",
 			    __func__, htag);
 		}
@@ -1060,10 +1071,10 @@ pmcs_smp_start(struct smp_pkt *pktp)
 	if (status != PMCOUT_STATUS_OK) {
 		const char *emsg = pmcs_status_str(status);
 		if (emsg == NULL) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 			    "SMP operation failed (0x%x)", status);
 		} else {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 			    "SMP operation failed (%s)", emsg);
 		}
 
@@ -1083,7 +1094,7 @@ pmcs_smp_start(struct smp_pkt *pktp)
 			    PMCS_DEVICE_STATE_NON_OPERATIONAL) {
 				xp->dev_state =
 				    PMCS_DEVICE_STATE_NON_OPERATIONAL;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, xp,
 				    "%s: Got _IT_NEXUS_LOSS SMP status. "
 				    "Tgt(0x%p) dev_state set to "
 				    "_NON_OPERATIONAL", __func__,
@@ -1136,15 +1147,15 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 	ASSERT(pwp);
 	if (pwp == NULL)
 		return (DDI_FAILURE);
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "%s: %s", __func__,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL, "%s: %s", __func__,
 	    ddi_get_name(child));
 
 	/* Get "target-port" prop from devinfo node */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    SCSI_ADDR_PROP_TARGET_PORT, &tgt_port) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Failed to lookup prop ("
-		    SCSI_ADDR_PROP_TARGET_PORT")", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: Failed to "
+		    "lookup prop ("SCSI_ADDR_PROP_TARGET_PORT")", __func__);
 		/* Dont fail _smp_init() because we couldnt get/set a prop */
 		return (DDI_SUCCESS);
 	}
@@ -1153,9 +1164,8 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 	 * Validate that this tran_tgt_init is for an active iport.
 	 */
 	if (iport->ua_state == UA_INACTIVE) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
-		    "%s: Init on inactive iport for '%s'",
-		    __func__, tgt_port);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: Init on inactive iport for '%s'", __func__, tgt_port);
 		ddi_prop_free(tgt_port);
 		return (DDI_FAILURE);
 	}
@@ -1165,8 +1175,8 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 	/* Retrieve softstate using unit-address */
 	tgt = pmcs_get_target(iport, tgt_port);
 	if (tgt == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: tgt softstate not found",
-		    __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: tgt softstate not found", __func__);
 		ddi_prop_free(tgt_port);
 		mutex_exit(&pwp->lock);
 		return (DDI_FAILURE);
@@ -1213,7 +1223,7 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 		}
 
 		if (target == pwp->max_dev) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 			    "Target list full.");
 			goto smp_init_fail;
 		}
@@ -1221,7 +1231,7 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 
 	if (!pmcs_assign_device(pwp, tgt)) {
 		pwp->targets[tgt->target_num] = NULL;
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, tgt,
 		    "%s: pmcs_assign_device failed for target 0x%p",
 		    __func__, (void *)tgt);
 		goto smp_init_fail;
@@ -1237,8 +1247,8 @@ pmcs_smp_init(dev_info_t *self, dev_info_t *child,
 	/* XXX: Update smp devinfo node using ndi_xxx */
 	if (ndi_prop_update_string(DDI_DEV_T_NONE, child,
 	    SCSI_ADDR_PROP_ATTACHED_PORT, addr) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Failed to set prop ("
-		    SCSI_ADDR_PROP_ATTACHED_PORT")", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: Failed to set "
+		    "prop ("SCSI_ADDR_PROP_ATTACHED_PORT")", __func__);
 	}
 	(void) scsi_free_wwnstr(addr);
 	ddi_prop_free(tgt_port);
@@ -1278,15 +1288,15 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 	if (pwp == NULL)
 		return;
 	ASSERT(pwp);
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "%s: %s", __func__,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL, "%s: %s", __func__,
 	    ddi_get_name(child));
 
 	/* Get "target-port" prop from devinfo node */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
 	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    SCSI_ADDR_PROP_TARGET_PORT, &tgt_port) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Failed to lookup prop ("
-		    SCSI_ADDR_PROP_TARGET_PORT")", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s: Failed to "
+		    "lookup prop ("SCSI_ADDR_PROP_TARGET_PORT")", __func__);
 		return;
 	}
 	/* Retrieve softstate using unit-address */
@@ -1294,8 +1304,8 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 	ddi_prop_free(tgt_port);
 
 	if (tgt == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: tgt softstate not found",
-		    __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: tgt softstate not found", __func__);
 		return;
 	}
 
@@ -1314,7 +1324,7 @@ pmcs_smp_free(dev_info_t *self, dev_info_t *child,
 		 * with the hardware unless/until we're told that the
 		 * device physically went away.
 		 */
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, tgt,
 		    "Removing target 0x%p (vtgt %d) from target list",
 		    (void *)tgt, tgt->target_num);
 		pwp->targets[tgt->target_num] = NULL;
@@ -1348,7 +1358,7 @@ pmcs_scsi_quiesce(dev_info_t *dip)
 		return (-1);
 	}
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s called", __func__);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s called", __func__);
 	pwp->blocked = 1;
 	while (totactive) {
 		totactive = 0;
@@ -1385,7 +1395,8 @@ pmcs_scsi_quiesce(dev_info_t *dip)
 
 	mutex_exit(&pwp->lock);
 	if (totactive == 0) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s drain complete", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
+		    "%s drain complete", __func__);
 	}
 	return (0);
 }
@@ -1407,7 +1418,7 @@ pmcs_scsi_unquiesce(dev_info_t *dip)
 		mutex_exit(&pwp->lock);
 		return (-1);
 	}
-	pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s called", __func__);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL, "%s called", __func__);
 	pwp->blocked = 0;
 	mutex_exit(&pwp->lock);
 
@@ -1480,7 +1491,7 @@ pmcs_scsa_wq_run_one(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	 * Next, check to see if the target is gone.
 	 */
 	if (xp->dev_gone) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
 		    "%s: Flushing wait queue for dead tgt 0x%p", __func__,
 		    (void *)xp);
 		pmcs_flush_target_queues(pwp, xp, PMCS_TGT_WAIT_QUEUE);
@@ -1502,7 +1513,7 @@ pmcs_scsa_wq_run_one(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	while ((sp = STAILQ_FIRST(&xp->wq)) != NULL) {
 		pwrk = pmcs_gwork(pwp, PMCS_TAG_TYPE_CBACK, phyp);
 		if (pwrk == NULL) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: out of work structures", __func__);
 			SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
 			break;
@@ -1672,7 +1683,7 @@ pmcs_scsa_cq_run(void *arg)
 		while (sp) {
 			nxt = STAILQ_NEXT(sp, cmd_next);
 			pkt = CMD2PKT(sp);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG3,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, sp->cmd_target,
 			    "%s: calling completion on %p for tgt %p", __func__,
 			    (void *)sp, (void *)sp->cmd_target);
 			scsi_hba_pkt_comp(pkt);
@@ -1729,7 +1740,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 		mutex_enter(&xp->wqlock);
 		STAILQ_INSERT_HEAD(&xp->wq, sp, cmd_next);
 		mutex_exit(&xp->wqlock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
 		    "%s: Failed to get IO IQ entry for tgt %d",
 		    __func__, xp->target_num);
 		return (PMCS_WQ_RUN_FAIL_RES);
@@ -1765,7 +1776,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 				mutex_enter(&pwp->cq_lock);
 				STAILQ_INSERT_TAIL(&pwp->cq, sp, cmd_next);
 				mutex_exit(&pwp->cq_lock);
-				pmcs_prt(pwp, PMCS_PRT_DEBUG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
 				    "%s: Failed to dma_load for tgt %d (QF)",
 				    __func__, xp->target_num);
 			}
@@ -1778,8 +1789,8 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	xp->actv_cnt++;
 	if (xp->actv_cnt > xp->maxdepth) {
 		xp->maxdepth = xp->actv_cnt;
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2, "%s: max depth now %u",
-		    pwrk->phy->path, xp->maxdepth);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, pwrk->phy, xp, "%s: max depth "
+		    "now %u", pwrk->phy->path, xp->maxdepth);
 	}
 	mutex_exit(&xp->statlock);
 
@@ -1815,7 +1826,7 @@ pmcs_SAS_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	(void) memcpy(&ptr[5], &sc, sizeof (sas_ssp_cmd_iu_t));
 	pwrk->state = PMCS_WORK_STATE_ONCHIP;
 	mutex_exit(&pwrk->lock);
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL,
 	    "%s: giving pkt %p (tag %x) to the hardware", __func__,
 	    (void *)pkt, pwrk->htag);
 #ifdef DEBUG
@@ -1875,8 +1886,8 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 	}
 
 	if (dead != 0) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: dead cmd tag 0x%x for %s",
-		    __func__, pwrk->htag, pptr->path);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp, "%s: dead cmd tag "
+		    "0x%x for %s", __func__, pwrk->htag, pptr->path);
 		goto out;
 	}
 
@@ -1885,7 +1896,7 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 	}
 
 	if (pwrk->state == PMCS_WORK_STATE_TIMED_OUT) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 		    "%s: cmd 0x%p (tag 0x%x) timed out for %s",
 		    __func__, (void *)sp, pwrk->htag, pptr->path);
 		goto out;
@@ -1908,14 +1919,14 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 	case PMCOUT_STATUS_OPEN_CNX_ERROR_IT_NEXUS_LOSS:
 	case PMCOUT_STATUS_IO_DS_NON_OPERATIONAL:
 	case PMCOUT_STATUS_IO_DS_IN_RECOVERY:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 		    "%s: PHY %s requires device state recovery (status=%d)",
 		    __func__, pptr->path, sts);
 		do_ds_recovery = B_TRUE;
 		break;
 	case PMCOUT_STATUS_UNDERFLOW:
 		(void) pmcs_set_resid(pkt, pkt->pkt_dma_len, LE_32(msg[3]));
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_UNDERFLOW,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_UNDERFLOW, NULL, NULL,
 		    "%s: underflow %u for cdb 0x%x",
 		    __func__, LE_32(msg[3]), pkt->pkt_cdbp[0] & 0xff);
 		sts = PMCOUT_STATUS_OK;
@@ -1966,13 +1977,13 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 				 * here is an INVALID FRAME response code.
 				 */
 				if (sts == SAS_RSP_INVALID_FRAME) {
-					pmcs_prt(pwp, PMCS_PRT_DEBUG,
+					pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 					    "%s: pkt %p tgt %u path %s "
 					    "completed: INVALID FRAME response",
 					    __func__, (void *)pkt,
 					    xp->target_num, pptr->path);
 				} else {
-					pmcs_prt(pwp, PMCS_PRT_DEBUG,
+					pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 					    "%s: pkt %p tgt %u path %s "
 					    "completed: illegal response 0x%x",
 					    __func__, (void *)pkt,
@@ -2009,13 +2020,13 @@ pmcs_SAS_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 			pkt->pkt_state |= STATE_XFERRED_DATA;
 		}
 	}
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
 	    "%s: pkt %p tgt %u done reason=%x state=%x resid=%ld status=%x",
 	    __func__, (void *)pkt, xp->target_num, pkt->pkt_reason,
 	    pkt->pkt_state, pkt->pkt_resid, pkt->pkt_scbp[0]);
 
 	if (pwrk->state == PMCS_WORK_STATE_ABORTED) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 		    "%s: scsi_pkt 0x%p aborted for PHY %s; work = 0x%p",
 		    __func__, (void *)pkt, pptr->path, (void *)pwrk);
 		aborted = B_TRUE;
@@ -2028,7 +2039,7 @@ out:
 	mutex_enter(&xp->statlock);
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
 		    "%s: Completing command for dead target 0x%p", __func__,
 		    (void *)xp);
 		return;
@@ -2037,7 +2048,7 @@ out:
 	ASSERT(xp->actv_cnt > 0);
 	if (--(xp->actv_cnt) == 0) {
 		if (xp->draining) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG1,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, xp,
 			    "%s: waking up drain waiters", __func__);
 			cv_signal(&pwp->drain_cv);
 		}
@@ -2058,7 +2069,7 @@ out:
 #endif
 		STAILQ_REMOVE(&xp->aq, sp, pmcs_cmd, cmd_next);
 		if (aborted) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 			    "%s: Aborted cmd for tgt 0x%p, signaling waiters",
 			    __func__, (void *)xp);
 			cv_signal(&xp->abort_cv);
@@ -2075,9 +2086,9 @@ out:
 		mutex_enter(&xp->statlock);
 		pmcs_start_dev_state_recovery(xp, pptr);
 		mutex_exit(&xp->statlock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG1, "%s: Putting cmd 0x%p back on "
-		    "wq during recovery for tgt 0x%p", __func__, (void *)sp,
-		    (void *)xp);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, xp, "%s: Putting cmd 0x%p "
+		    "back on wq during recovery for tgt 0x%p", __func__,
+		    (void *)sp, (void *)xp);
 		mutex_enter(&xp->wqlock);
 		if (xp->wq_recovery_tail == NULL) {
 			STAILQ_INSERT_HEAD(&xp->wq, sp, cmd_next);
@@ -2135,8 +2146,8 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	 */
 	cdb_base = pkt->pkt_cdbp[0] & 0x1f;
 	if (cdb_base != SCMD_READ && cdb_base != SCMD_WRITE) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG1, "%s: special SATA cmd %p",
-		    __func__, (void *)sp);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, NULL,
+		    "%s: special SATA cmd %p", __func__, (void *)sp);
 
 		ASSERT(xp->phy != NULL);
 		pmcs_pwork(pwp, pwrk);
@@ -2153,7 +2164,7 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 		return (PMCS_WQ_RUN_SUCCESS);
 	}
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2, "%s: regular cmd", __func__);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL, "%s: regular cmd", __func__);
 
 	mutex_enter(&xp->statlock);
 	if (!xp->assigned) {
@@ -2232,7 +2243,7 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 		mutex_exit(&xp->wqlock);
 		pmcs_dma_unload(pwp, sp);
 		SCHEDULE_WORK(pwp, PMCS_WORK_RUN_QUEUES);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
 		    "%s: Failed to get IO IQ entry for tgt %d",
 		    __func__, xp->target_num);
 		return (PMCS_WQ_RUN_FAIL_RES);
@@ -2326,7 +2337,7 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 		mutex_enter(&xp->wqlock);
 		STAILQ_INSERT_HEAD(&xp->wq, sp, cmd_next);
 		mutex_exit(&xp->wqlock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, xp,
 		    "%s: Failed to dma_load for tgt %d",
 		    __func__, xp->target_num);
 		return (PMCS_WQ_RUN_FAIL_RES);
@@ -2339,15 +2350,15 @@ pmcs_SATA_run(pmcs_cmd_t *sp, pmcwork_t *pwrk)
 	xp->actv_cnt++;
 	if (xp->actv_cnt > xp->maxdepth) {
 		xp->maxdepth = xp->actv_cnt;
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2, "%s: max depth now %u",
-		    pwrk->phy->path, xp->maxdepth);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, pwrk->phy, xp,
+		    "%s: max depth now %u", pwrk->phy->path, xp->maxdepth);
 	}
 	mutex_exit(&xp->statlock);
 	mutex_enter(&xp->aqlock);
 	STAILQ_INSERT_TAIL(&xp->aq, sp, cmd_next);
 	mutex_exit(&xp->aqlock);
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2, "%s: giving pkt %p to hardware",
-	    __func__, (void *)pkt);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, NULL, NULL,
+	    "%s: giving pkt %p to hardware", __func__, (void *)pkt);
 #ifdef DEBUG
 	pmcs_print_entry(pwp, PMCS_PRT_DEBUG3, "SATA INI Message", ptr);
 #endif
@@ -2386,13 +2397,13 @@ pmcs_SATA_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 	}
 
 	if (dead != 0) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: dead cmd tag 0x%x for %s",
-		    __func__, pwrk->htag, pptr->path);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp, "%s: dead cmd tag "
+		    "0x%x for %s", __func__, pwrk->htag, pptr->path);
 		goto out;
 	}
 	if ((pwrk->state == PMCS_WORK_STATE_TIMED_OUT) &&
 	    (sts != PMCOUT_STATUS_ABORTED)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 		    "%s: cmd 0x%p (tag 0x%x) timed out for %s",
 		    __func__, (void *)sp, pwrk->htag, pptr->path);
 		CMD2PKT(sp)->pkt_scbp[0] = STATUS_GOOD;
@@ -2404,7 +2415,7 @@ pmcs_SATA_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 		goto out;
 	}
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2, "%s: pkt %p tgt %u done",
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp, "%s: pkt %p tgt %u done",
 	    __func__, (void *)pkt, xp->target_num);
 
 	/*
@@ -2434,10 +2445,10 @@ pmcs_SATA_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 				mutex_exit(&xp->statlock);
 				if (pmcs_reset_phy(pwp, pptr,
 				    PMCS_PHYOP_LINK_RESET) != 0) {
-					pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: PHY "
-					    "(%s) Local Control/Link Reset "
-					    "FAILED as part of error recovery",
-					    __func__, pptr->path);
+					pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
+					    "%s: PHY (%s) Local Control/Link "
+					    "Reset FAILED as part of error "
+					    "recovery", __func__, pptr->path);
 				}
 				mutex_enter(&xp->statlock);
 			}
@@ -2453,13 +2464,13 @@ pmcs_SATA_done(pmcs_hw_t *pwp, pmcwork_t *pwrk, uint32_t *msg)
 		pkt->pkt_resid = 0;
 	}
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
 	    "%s: pkt %p tgt %u done reason=%x state=%x resid=%ld status=%x",
 	    __func__, (void *)pkt, xp->target_num, pkt->pkt_reason,
 	    pkt->pkt_state, pkt->pkt_resid, pkt->pkt_scbp[0]);
 
 	if (pwrk->state == PMCS_WORK_STATE_ABORTED) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 		    "%s: scsi_pkt 0x%p aborted for PHY %s; work = 0x%p",
 		    __func__, (void *)pkt, pptr->path, (void *)pwrk);
 		aborted = B_TRUE;
@@ -2474,7 +2485,7 @@ out:
 
 	if (xp->dev_gone) {
 		mutex_exit(&xp->statlock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, pptr, xp,
 		    "%s: Completing command for dead target 0x%p", __func__,
 		    (void *)xp);
 		return;
@@ -2483,7 +2494,7 @@ out:
 	ASSERT(xp->actv_cnt > 0);
 	if (--(xp->actv_cnt) == 0) {
 		if (xp->draining) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG1,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG1, pptr, xp,
 			    "%s: waking up drain waiters", __func__);
 			cv_signal(&pwp->drain_cv);
 		} else if (xp->special_needed) {
@@ -2507,7 +2518,7 @@ out:
 #endif
 		STAILQ_REMOVE(&xp->aq, sp, pmcs_cmd, cmd_next);
 		if (aborted) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
 			    "%s: Aborted cmd for tgt 0x%p, signaling waiters",
 			    __func__, (void *)xp);
 			cv_signal(&xp->abort_cv);
@@ -2630,7 +2641,7 @@ pmcs_ioerror(pmcs_hw_t *pwp, pmcs_dtype_t t, pmcwork_t *pwrk, uint32_t *w)
 	}
 
 	if (status != PMCOUT_STATUS_OK) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG2,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG2, phyp, NULL,
 		    "%s: device %s tag 0x%x status %s @ %llu", __func__,
 		    phyp->path, pwrk->htag, msg,
 		    (unsigned long long)gethrtime());
@@ -2647,10 +2658,11 @@ pmcs_ioerror(pmcs_hw_t *pwp, pmcs_dtype_t t, pmcwork_t *pwrk, uint32_t *w)
 				fis[i] = LE_32(w[4+i]);
 			}
 			if ((fis[0] & 0xff) != FIS_REG_D2H) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL,
 				    "unexpected fis code 0x%x", fis[0] & 0xff);
 			} else {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, "FIS ERROR");
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL,
+				    "FIS ERROR");
 				pmcs_fis_dump(pwp, fis);
 			}
 			pkt->pkt_reason = CMD_TRAN_ERR;
@@ -2814,8 +2826,8 @@ pmcs_latch_status(pmcs_hw_t *pwp, pmcs_cmd_t *sp, uint8_t status,
 		if (amt > snslen) {
 			amt = snslen;
 		}
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_SCSI_STATUS, c1, path, status,
-		    CMD2PKT(sp)->pkt_cdbp[0] & 0xff, key, asc, ascq,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_SCSI_STATUS, NULL, NULL, c1, path,
+		    status, CMD2PKT(sp)->pkt_cdbp[0] & 0xff, key, asc, ascq,
 		    sp->cmd_tag, (unsigned long long)gethrtime());
 		CMD2PKT(sp)->pkt_state |= STATE_ARQ_DONE;
 		(*(uint8_t *)&aqp->sts_rqpkt_status) = STATUS_GOOD;
@@ -2835,7 +2847,7 @@ pmcs_latch_status(pmcs_hw_t *pwp, pmcs_cmd_t *sp, uint8_t status,
 			    sizeof (struct scsi_extended_sense) - amt;
 		}
 	} else if (status) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_SCSI_STATUS, c2,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_SCSI_STATUS, NULL, NULL, c2,
 		    path, status, CMD2PKT(sp)->pkt_cdbp[0] & 0xff,
 		    sp->cmd_tag, (unsigned long long)gethrtime());
 	}
@@ -2880,8 +2892,8 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port)
 	 */
 	phyp = pmcs_find_phy_by_sas_address(pwp, iport, NULL, tgt_port);
 	if (phyp == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG3, "%s: No PHY for target @ %s",
-		    __func__, tgt_port);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG3, NULL, NULL,
+		    "%s: No PHY for target @ %s", __func__, tgt_port);
 		return (NULL);
 	}
 
@@ -2893,7 +2905,7 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port)
 		 * if we need to clear the old linkages
 		 */
 		if (tgt->phy && (tgt->phy != phyp)) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
 			    "%s: Target PHY updated from %p to %p", __func__,
 			    (void *)tgt->phy, (void *)phyp);
 			if (!IS_ROOT_PHY(tgt->phy)) {
@@ -2912,7 +2924,7 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port)
 	 * Make sure the PHY we found is on the correct iport
 	 */
 	if (phyp->iport != iport) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL,
 		    "%s: No target at %s on this iport", __func__, tgt_port);
 		pmcs_unlock_phy(phyp);
 		return (NULL);
@@ -2926,7 +2938,7 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port)
 
 	if (ddi_soft_state_bystr_zalloc(iport->tgt_sstate, unit_address) !=
 	    DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
 		    "%s: Couldn't alloc softstate for device at %s",
 		    __func__, unit_address);
 		pmcs_unlock_phy(phyp);
@@ -2965,7 +2977,7 @@ pmcs_get_target(pmcs_iport_t *iport, char *tgt_port)
 
 	if (ddi_soft_state_bystr_init(&tgt->lun_sstate,
 	    sizeof (pmcs_lun_t), PMCS_LUN_SSTATE_SZ) != 0) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, phyp, tgt,
 		    "%s: LUN soft_state_bystr_init failed", __func__);
 		ddi_soft_state_bystr_free(iport->tgt_sstate, tgt_port);
 		pmcs_unlock_phy(phyp);

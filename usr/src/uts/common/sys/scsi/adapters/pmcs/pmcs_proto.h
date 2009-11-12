@@ -50,18 +50,18 @@ typedef enum {
 	PMCS_PRT_ERR
 } pmcs_prt_level_t;
 
-#define	pmcs_prt(pwp, level, fmt...) {			\
-	int lvl = level;				\
-	if (((pwp->debug_mask & (1 << lvl)) != 0) ||	\
-	    (lvl > PMCS_PRT_DEBUG_DEVEL)) {		\
-		pmcs_prt_impl(pwp, lvl, fmt);		\
-	}						\
+#define	pmcs_prt(pwp, level, phy, tgt, fmt...) {		\
+	int lvl = level;					\
+	if (((pwp->debug_mask & (1 << lvl)) != 0) ||		\
+	    (lvl > PMCS_PRT_DEBUG_DEVEL)) {			\
+		pmcs_prt_impl(pwp, lvl, phy, tgt, fmt);	\
+	}							\
 }
 
-/*PRINTFLIKE3*/
+/*PRINTFLIKE5*/
 void
-pmcs_prt_impl(pmcs_hw_t *, pmcs_prt_level_t, const char *, ...)
-    __KPRINTFLIKE(3);
+pmcs_prt_impl(pmcs_hw_t *, pmcs_prt_level_t, pmcs_phy_t *, pmcs_xscsi_t *,
+    const char *, ...) __KPRINTFLIKE(5);
 
 boolean_t pmcs_assign_device(pmcs_hw_t *, pmcs_xscsi_t *);
 void pmcs_remove_device(pmcs_hw_t *, pmcs_phy_t *);

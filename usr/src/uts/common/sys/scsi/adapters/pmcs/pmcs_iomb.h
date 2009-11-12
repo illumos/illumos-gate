@@ -651,14 +651,14 @@ typedef struct {
 	INCQI(hwp->shadow_iqpi[qnum], hwp->ioq_depth);			\
 	if (ddi_dma_sync(hwp->cip_handles, 0, 0,			\
 	    DDI_DMA_SYNC_FORDEV) != DDI_SUCCESS) {			\
-		pmcs_prt(hwp, PMCS_PRT_DEBUG, "Condition failed at "	\
-		    " %s():%d", __func__, __LINE__);			\
+		pmcs_prt(hwp, PMCS_PRT_DEBUG, NULL, NULL, "Condition "	\
+		    "failed at %s():%d", __func__, __LINE__);		\
 	}								\
+	hwp->ftime[hwp->fti] = gethrtime();				\
 	pmcs_wr_iqpi(hwp, qnum, hwp->shadow_iqpi[qnum]);		\
 	mutex_exit(&(hwp)->iqp_lock[qnum]);				\
 	mutex_enter(&(hwp)->dbglock);					\
 	hwp->ftag_lines[hwp->fti] = __LINE__;				\
-	hwp->ftime[hwp->fti] = gethrtime();				\
 	hwp->ftags[hwp->fti++] = htag;					\
 	mutex_exit(&(hwp)->dbglock);					\
 }
@@ -667,8 +667,8 @@ typedef struct {
 	INCQI(hwp->shadow_iqpi[qnum], hwp->ioq_depth);			\
 	if (ddi_dma_sync(hwp->cip_handles, 0, 0,			\
 	    DDI_DMA_SYNC_FORDEV) != DDI_SUCCESS) {			\
-		pmcs_prt(hwp, PMCS_PRT_DEBUG, "Condition failed at "	\
-		    " %s():%d", __func__, __LINE__);			\
+		pmcs_prt(hwp, PMCS_PRT_DEBUG, NULL, NULL, "Condition "	\
+		    "failed at %s():%d", __func__, __LINE__);		\
 	}								\
 	pmcs_wr_iqpi(hwp, qnum, hwp->shadow_iqpi[qnum]);		\
 	mutex_exit(&(hwp)->iqp_lock[qnum])

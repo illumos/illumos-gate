@@ -53,16 +53,16 @@ pmcs_register_dump_int(pmcs_hw_t *pwp)
 	uint8_t slice = 0;
 	caddr_t buf = NULL;
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG, "pmcs%d: Internal register dump",
-	    ddi_get_instance(pwp->dip));
+	pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+	    "pmcs%d: Internal register dump", ddi_get_instance(pwp->dip));
 	ASSERT(mutex_owned(&pwp->lock));
 
 	if (pwp->regdumpp == NULL) {
 		pwp->regdumpp =
 		    kmem_zalloc(PMCS_REG_DUMP_SIZE, KM_NOSLEEP);
 		if (pwp->regdumpp == NULL) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: register"
-			    " dump memory not allocated", __func__);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "%s: register dump memory not allocated", __func__);
 			return;
 		}
 	}
@@ -239,7 +239,7 @@ pmcs_dump_fwlog(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 			log_is_current = B_TRUE;
 		} else {
 			++retries;
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: event log is still being updated... waiting",
 			    __func__);
 			evlog_latest_idx = evl_hdr->fw_el_latest_idx;
@@ -806,7 +806,8 @@ pmcs_shift_axil(pmcs_hw_t *pwp, uint32_t offset)
 
 	if (ddi_get32(pwp->top_acc_handle,
 	    &pwp->top_regs[PMCS_AXI_TRANS >> 2]) != newaxil) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "AXIL register update failed");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "AXIL register update failed");
 		return (B_FALSE);
 	}
 	return (B_TRUE);
@@ -833,7 +834,8 @@ pmcs_restore_axil(pmcs_hw_t *pwp, uint32_t oldaxil)
 
 	if (ddi_get32(pwp->top_acc_handle,
 	    &pwp->top_regs[PMCS_AXI_TRANS >> 2]) != oldaxil) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "AXIL register restore failed");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "AXIL register restore failed");
 	}
 	mutex_exit(&pwp->axil_lock);
 }
@@ -852,7 +854,7 @@ pmcs_dump_gsm(pmcs_hw_t *pwp, caddr_t buf, uint32_t size_left)
 
 	local_buf = kmem_zalloc(GSM_SM_BLKSZ, KM_NOSLEEP);
 	if (local_buf == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: local_buf memory not allocated", __func__);
 		return (0);
 	}
@@ -956,7 +958,8 @@ pmcs_iqp_trace(pmcs_hw_t *pwp, uint32_t qnum)
 	uint32_t size_left = pwp->iqpt->size_left;
 
 	if (tbuf == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: trace buffer is not ready,"
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: trace buffer is not ready,"
 		    " Inbound Message from host to SPC is not traced",
 		    __func__);
 		return;
@@ -1010,8 +1013,8 @@ pmcs_dump_feregs(pmcs_hw_t *pwp, uint32_t *addr, uint8_t nvmd,
 			length = pmcs_rd_mpi_tbl(pwp, PMCS_FERDLIOP);
 			break;
 		default:
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, "UNKNOWN NVMD DEVICE"
-			    "%s():%d", __func__, __LINE__);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "UNKNOWN NVMD DEVICE %s():%d", __func__, __LINE__);
 			return (0);
 	}
 

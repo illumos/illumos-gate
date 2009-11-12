@@ -26,6 +26,7 @@
 #include <limits.h>
 #include <sys/mdb_modapi.h>
 #include <sys/sysinfo.h>
+#include <sys/byteorder.h>
 #include <sys/scsi/scsi.h>
 #include <sys/scsi/adapters/pmcs/pmcs.h>
 
@@ -206,6 +207,52 @@ display_iport(struct pmcs_hw m, uintptr_t addr, int verbose)
 	}
 
 	mdb_printf("\n");
+}
+
+/* ARGSUSED */
+static int
+pmcs_utarget_walk_cb(uintptr_t addr, const void *wdata, void *priv)
+{
+	pmcs_phy_t phy;
+
+	if (mdb_vread(&phy, sizeof (pmcs_phy_t), (uintptr_t)addr) == -1) {
+		mdb_warn("pmcs_utarget_walk_cb: Failed to read PHY at %p",
+		    (void *)addr);
+		return (DCMD_ERR);
+	}
+
+	if (phy.configured && (phy.target == NULL)) {
+		mdb_printf("SAS address: ");
+		print_sas_address(&phy);
+		mdb_printf("  DType: ");
+		switch (phy.dtype) {
+		case SAS:
+			mdb_printf("%4s", "SAS");
+			break;
+		case SATA:
+			mdb_printf("%4s", "SATA");
+			break;
+		case EXPANDER:
+			mdb_printf("%4s", "SMP");
+			break;
+		default:
+			mdb_printf("%4s", "N/A");
+			break;
+		}
+		mdb_printf("  Path: %s\n", phy.path);
+	}
+
+	return (0);
+}
+
+static void
+display_unconfigured_targets(uintptr_t addr)
+{
+	mdb_printf("Unconfigured target SAS address:\n\n");
+
+	if (mdb_pwalk("pmcs_phys", pmcs_utarget_walk_cb, NULL, addr) == -1) {
+		mdb_warn("pmcs phys walk failed");
+	}
 }
 
 static void
@@ -1427,6 +1474,10 @@ display_phys(struct pmcs_hw ss, int verbose, struct pmcs_phy *parent, int level,
 }
 
 /*
+ * filter is used to indicate whether we are filtering log messages based
+ * on "instance".  The other filtering (based on options) depends on the
+ * values that are passed in for "sas_addr" and "phy_path".
+ *
  * MAX_INST_STRLEN is the largest string size from which we will attempt
  * to convert to an instance number.  The string will be formed up as
  * "0t<inst>\0" so that mdb_strtoull can parse it properly.
@@ -1434,7 +1485,8 @@ display_phys(struct pmcs_hw ss, int verbose, struct pmcs_phy *parent, int level,
 #define	MAX_INST_STRLEN	8
 
 static int
-pmcs_dump_tracelog(boolean_t filter, int instance)
+pmcs_dump_tracelog(boolean_t filter, int instance, const char *phy_path,
+    uint64_t sas_address)
 {
 	pmcs_tbuf_t *tbuf_addr;
 	uint_t tbuf_idx;
@@ -1443,6 +1495,8 @@ pmcs_dump_tracelog(boolean_t filter, int instance)
 	uint_t start_idx, elems_to_print, idx, tbuf_num_elems;
 	char *bufp;
 	char elem_inst[MAX_INST_STRLEN], ei_idx;
+	uint64_t sas_addr;
+	uint8_t *sas_addressp;
 
 	/* Get the address of the first element */
 	if (mdb_readvar(&tbuf_addr, "pmcs_tbuf") == -1) {
@@ -1468,6 +1522,24 @@ pmcs_dump_tracelog(boolean_t filter, int instance)
 		return (DCMD_ERR);
 	}
 
+	/*
+	 * On little-endian systems, the SAS address passed in will be
+	 * byte swapped.  Take care of that here.
+	 */
+#if defined(_LITTLE_ENDIAN)
+	sas_addr = ((sas_address << 56) |
+	    ((sas_address << 40) & 0xff000000000000ULL) |
+	    ((sas_address << 24) & 0xff0000000000ULL) |
+	    ((sas_address << 8)  & 0xff00000000ULL) |
+	    ((sas_address >> 8)  & 0xff000000ULL) |
+	    ((sas_address >> 24) & 0xff0000ULL) |
+	    ((sas_address >> 40) & 0xff00ULL) |
+	    (sas_address  >> 56));
+#else
+	sas_addr = sas_address;
+#endif
+	sas_addressp = (uint8_t *)&sas_addr;
+
 	/* Figure out where we start and stop */
 	if (wrap) {
 		start_idx = tbuf_idx;
@@ -1487,6 +1559,9 @@ pmcs_dump_tracelog(boolean_t filter, int instance)
 			return (DCMD_ERR);
 		}
 
+		/*
+		 * Check for filtering on HBA instance
+		 */
 		elem_filtered = B_FALSE;
 
 		if (filter) {
@@ -1508,6 +1583,30 @@ pmcs_dump_tracelog(boolean_t filter, int instance)
 			/* Get the instance */
 			if ((int)mdb_strtoull(elem_inst) != instance) {
 				elem_filtered = B_TRUE;
+			}
+		}
+
+		if (!elem_filtered && (phy_path || sas_address)) {
+			/*
+			 * This message is not being filtered by HBA instance.
+			 * Now check to see if we're filtering based on
+			 * PHY path or SAS address.
+			 * Filtering is an "OR" operation.  So, if any of the
+			 * criteria matches, this message will be printed.
+			 */
+			elem_filtered = B_TRUE;
+
+			if (phy_path != NULL) {
+				if (strncmp(phy_path, tbuf.phy_path,
+				    PMCS_TBUF_UA_MAX_SIZE) == 0) {
+					elem_filtered = B_FALSE;
+				}
+			}
+			if (sas_address != 0) {
+				if (memcmp(sas_addressp, tbuf.phy_sas_address,
+				    8) == 0) {
+					elem_filtered = B_FALSE;
+				}
 			}
 		}
 
@@ -1900,9 +1999,60 @@ pmcs_tag(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 }
 
 static int
+pmcs_log(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	void		*pmcs_state;
+	struct pmcs_hw	ss;
+	struct dev_info	dip;
+	const char	*match_phy_path = NULL;
+	uint64_t 	match_sas_address = 0;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		pmcs_state = NULL;
+		if (mdb_readvar(&pmcs_state, "pmcs_softc_state") == -1) {
+			mdb_warn("can't read pmcs_softc_state");
+			return (DCMD_ERR);
+		}
+		if (mdb_pwalk_dcmd("genunix`softstate", "pmcs`pmcs_log", argc,
+		    argv, (uintptr_t)pmcs_state) == -1) {
+			mdb_warn("mdb_pwalk_dcmd failed for pmcs_log");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (mdb_getopts(argc, argv,
+	    'p', MDB_OPT_STR, &match_phy_path,
+	    's', MDB_OPT_UINT64, &match_sas_address,
+	    NULL) != argc) {
+		return (DCMD_USAGE);
+	}
+
+	if (MDB_RD(&ss, sizeof (ss), addr) == -1) {
+		NOREAD(pmcs_hw_t, addr);
+		return (DCMD_ERR);
+	}
+
+	if (MDB_RD(&dip, sizeof (struct dev_info), ss.dip) == -1) {
+		NOREAD(pmcs_hw_t, addr);
+		return (DCMD_ERR);
+	}
+
+	if (!(flags & DCMD_LOOP)) {
+		return (pmcs_dump_tracelog(B_TRUE, dip.devi_instance,
+		    match_phy_path, match_sas_address));
+	} else if (flags & DCMD_LOOPFIRST) {
+		return (pmcs_dump_tracelog(B_FALSE, 0, match_phy_path,
+		    match_sas_address));
+	} else {
+		return (DCMD_OK);
+	}
+}
+
+static int
 pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	struct	pmcs_hw		ss;
+	struct pmcs_hw		ss;
 	uint_t			verbose = FALSE;
 	uint_t			phy_info = FALSE;
 	uint_t			hw_info = FALSE;
@@ -1911,11 +2061,11 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t			ic_info = FALSE;
 	uint_t			iport_info = FALSE;
 	uint_t			waitqs_info = FALSE;
-	uint_t			tracelog = FALSE;
 	uint_t			ibq = FALSE;
 	uint_t			obq = FALSE;
 	uint_t			tgt_phy_count = FALSE;
 	uint_t			compq = FALSE;
+	uint_t			unconfigured = FALSE;
 	int			rv = DCMD_OK;
 	void			*pmcs_state;
 	char			*state_str;
@@ -1940,12 +2090,12 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'h', MDB_OPT_SETBITS, TRUE, &hw_info,
 	    'i', MDB_OPT_SETBITS, TRUE, &ic_info,
 	    'I', MDB_OPT_SETBITS, TRUE, &iport_info,
-	    'l', MDB_OPT_SETBITS, TRUE, &tracelog,
 	    'p', MDB_OPT_SETBITS, TRUE, &phy_info,
 	    'q', MDB_OPT_SETBITS, TRUE, &ibq,
 	    'Q', MDB_OPT_SETBITS, TRUE, &obq,
 	    't', MDB_OPT_SETBITS, TRUE, &target_info,
 	    'T', MDB_OPT_SETBITS, TRUE, &tgt_phy_count,
+	    'u', MDB_OPT_SETBITS, TRUE, &unconfigured,
 	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
 	    'w', MDB_OPT_SETBITS, TRUE, &work_info,
 	    'W', MDB_OPT_SETBITS, TRUE, &waitqs_info,
@@ -1962,32 +2112,12 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	/*
-	 * Dumping the trace log is special.  It's global, not per-HBA.
-	 * Thus, a provided address is ignored.  In addition, other options
-	 * cannot be specified at the same time.
-	 */
-	if (tracelog) {
-		if (hw_info || ic_info || iport_info || phy_info || work_info ||
-		    target_info || waitqs_info || ibq || obq || tgt_phy_count ||
-		    compq) {
-			return (DCMD_USAGE);
-		}
-
-		if ((flags & DCMD_ADDRSPEC) && !(flags & DCMD_LOOP)) {
-			return (pmcs_dump_tracelog(B_TRUE, dip.devi_instance));
-		} else if (flags & DCMD_LOOPFIRST) {
-			return (pmcs_dump_tracelog(B_FALSE, 0));
-		} else {
-			return (DCMD_OK);
-		}
-	}
-
 	/* processing completed */
 
 	if (((flags & DCMD_ADDRSPEC) && !(flags & DCMD_LOOP)) ||
 	    (flags & DCMD_LOOPFIRST) || phy_info || target_info || hw_info ||
-	    work_info || waitqs_info || ibq || obq || tgt_phy_count || compq) {
+	    work_info || waitqs_info || ibq || obq || tgt_phy_count || compq ||
+	    unconfigured) {
 		if ((flags & DCMD_LOOP) && !(flags & DCMD_LOOPFIRST))
 			mdb_printf("\n");
 		mdb_printf("%16s %9s %4s B C  WorkFlags wserno DbgMsk %16s\n",
@@ -2051,6 +2181,9 @@ pmcs_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (compq)
 		display_completion_queue(ss);
 
+	if (unconfigured)
+		display_unconfigured_targets(addr);
+
 	mdb_dec_indent(4);
 
 	return (rv);
@@ -2068,13 +2201,24 @@ pmcs_help()
 	    "    -p: Print information about each attached PHY\n"
 	    "    -q: Dump inbound queues\n"
 	    "    -Q: Dump outbound queues\n"
-	    "    -t: Print information about each known target\n"
+	    "    -t: Print information about each configured target\n"
 	    "    -T: Print target and PHY count summary\n"
+	    "    -u: Show SAS address of all unconfigured targets\n"
 	    "    -w: Dump work structures\n"
 	    "    -W: List pmcs cmds waiting on various queues\n"
 	    "    -v: Add verbosity to the above options\n");
 }
 
+void
+pmcs_log_help()
+{
+	mdb_printf("Dump the pmcs log buffer, possibly with filtering.\n"
+	    "    -p PHY_PATH:            Dump messages matching PHY_PATH\n"
+	    "    -s SAS_ADDRESS:         Dump messages matching SAS_ADDRESS\n\n"
+	    "Where: PHY_PATH can be found with ::pmcs -p (e.g. pp04.18.18.01)\n"
+	    "       SAS_ADDRESS can be found with ::pmcs -t "
+	    "(e.g. 5000c5000358c221)\n");
+}
 void
 pmcs_tag_help()
 {
@@ -2086,8 +2230,12 @@ pmcs_tag_help()
 }
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "pmcs", "?[-chiIpQqtTwWv] | -l", "print pmcs information",
+	{ "pmcs", "?[-chiIpQqtTuwWv]", "print pmcs information",
 	    pmcs_dcmd, pmcs_help
+	},
+	{ "pmcs_log",
+	    "?[-p PHY_PATH | -s SAS_ADDRESS]",
+	    "dump pmcs log file", pmcs_log, pmcs_log_help
 	},
 	{ "pmcs_tag", "?[-t tagtype|-s serialnum|-i index]",
 	    "Find work structures by tag type, serial number or index",

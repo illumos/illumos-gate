@@ -263,7 +263,7 @@ pmcs_iport_attach(dev_info_t *dip)
 
 	pwp = ddi_get_soft_state(pmcs_softc_state, hba_inst);
 	if (pwp == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: iport%d attach invoked with NULL parent (HBA) node)",
 		    __func__, inst);
 		return (DDI_FAILURE);
@@ -274,21 +274,21 @@ pmcs_iport_attach(dev_info_t *dip)
 	}
 
 	if ((iport_ua = scsi_hba_iport_unit_address(dip)) == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: invoked with NULL unit address, inst (%d)",
 		    __func__, inst);
 		return (DDI_FAILURE);
 	}
 
 	if (ddi_soft_state_zalloc(pmcs_iport_softstate, inst) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "Failed to alloc soft state for iport %d", inst);
 		return (DDI_FAILURE);
 	}
 
 	iport = ddi_get_soft_state(pmcs_iport_softstate, inst);
 	if (iport == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "cannot get iport soft state");
 		goto iport_attach_fail1;
 	}
@@ -322,7 +322,8 @@ pmcs_iport_attach(dev_info_t *dip)
 		/* Non-NULL private data indicates the unit address is active */
 		iport->ua_state = UA_ACTIVE;
 		if (pmcs_iport_configure_phys(iport) != DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "%s: failed to "
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
+			    "%s: failed to "
 			    "configure phys on iport handle (0x%p), "
 			    " unit address [%s]", __func__,
 			    (void *)iport, iport_ua);
@@ -338,14 +339,14 @@ pmcs_iport_attach(dev_info_t *dip)
 	iport->tgt_sstate = NULL;
 	if (ddi_soft_state_bystr_init(&iport->tgt_sstate,
 	    sizeof (pmcs_xscsi_t), PMCS_TGT_SSTATE_SZ) != 0) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "cannot get iport tgt soft state");
 		goto iport_attach_fail2;
 	}
 
 	/* Create this iport's target map */
 	if (pmcs_iport_tgtmap_create(iport) == B_FALSE) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "Failed to create tgtmap on iport %d", inst);
 		goto iport_attach_fail3;
 	}
@@ -353,8 +354,8 @@ pmcs_iport_attach(dev_info_t *dip)
 	/* Set up the 'initiator-port' DDI property on this iport */
 	init_port = kmem_zalloc(PMCS_MAX_UA_SIZE, KM_SLEEP);
 	if (pwp->separate_ports) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: separate ports not "
-		    "supported", __func__);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: separate ports not supported", __func__);
 	} else {
 		/* Set initiator-port value to the HBA's base WWN */
 		(void) scsi_wwn_to_wwnstr(pwp->sas_wwns[0], 1,
@@ -382,7 +383,8 @@ pmcs_iport_attach(dev_info_t *dip)
 	pwp->num_iports++;
 	rw_exit(&pwp->iports_lock);
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_IPORT, "iport%d attached", inst);
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+	    "iport%d attached", inst);
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
 
@@ -573,7 +575,8 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Map registers
 	 */
 	if (pci_config_setup(dip, &pwp->pci_acc_handle)) {
-		pmcs_prt(pwp, PMCS_PRT_WARN, "pci config setup failed");
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+		    "pci config setup failed");
 		ddi_soft_state_free(pmcs_softc_state, inst);
 		return (DDI_FAILURE);
 	}
@@ -582,7 +585,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Get the size of register set 3.
 	 */
 	if (ddi_dev_regsize(dip, PMCS_REGSET_3, &set3size) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "unable to get size of register set %d", PMCS_REGSET_3);
 		pci_config_teardown(&pwp->pci_acc_handle);
 		ddi_soft_state_free(pmcs_softc_state, inst);
@@ -596,7 +599,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (ddi_regs_map_setup(dip, PMCS_REGSET_0, (caddr_t *)&pwp->msg_regs,
 	    0, 0, &pwp->reg_acc_attr, &pwp->msg_acc_handle)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "failed to map Message Unit registers");
 		pci_config_teardown(&pwp->pci_acc_handle);
 		ddi_soft_state_free(pmcs_softc_state, inst);
@@ -605,7 +608,8 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (ddi_regs_map_setup(dip, PMCS_REGSET_1, (caddr_t *)&pwp->top_regs,
 	    0, 0, &pwp->reg_acc_attr, &pwp->top_acc_handle)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "failed to map TOP registers");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "failed to map TOP registers");
 		ddi_regs_map_free(&pwp->msg_acc_handle);
 		pci_config_teardown(&pwp->pci_acc_handle);
 		ddi_soft_state_free(pmcs_softc_state, inst);
@@ -614,7 +618,8 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (ddi_regs_map_setup(dip, PMCS_REGSET_2, (caddr_t *)&pwp->gsm_regs,
 	    0, 0, &pwp->reg_acc_attr, &pwp->gsm_acc_handle)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "failed to map GSM registers");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "failed to map GSM registers");
 		ddi_regs_map_free(&pwp->top_acc_handle);
 		ddi_regs_map_free(&pwp->msg_acc_handle);
 		pci_config_teardown(&pwp->pci_acc_handle);
@@ -624,7 +629,8 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (ddi_regs_map_setup(dip, PMCS_REGSET_3, (caddr_t *)&pwp->mpi_regs,
 	    0, 0, &pwp->reg_acc_attr, &pwp->mpi_acc_handle)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "failed to map MPI registers");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "failed to map MPI registers");
 		ddi_regs_map_free(&pwp->top_acc_handle);
 		ddi_regs_map_free(&pwp->gsm_acc_handle);
 		ddi_regs_map_free(&pwp->msg_acc_handle);
@@ -643,13 +649,13 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	switch (pwp->chiprev) {
 	case PMCS_PM8001_REV_A:
 	case PMCS_PM8001_REV_B:
-		pmcs_prt(pwp, PMCS_PRT_ERR,
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
 		    "Rev A/B Card no longer supported");
 		goto failure;
 	case PMCS_PM8001_REV_C:
 		break;
 	default:
-		pmcs_prt(pwp, PMCS_PRT_ERR,
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
 		    "Unknown chip revision (%d)", pwp->chiprev);
 		goto failure;
 	}
@@ -662,7 +668,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (pmcs_dma_setup(pwp, &pwp->cip_dma_attr, &pwp->cip_acchdls,
 	    &pwp->cip_handles, ptob(1), (caddr_t *)&pwp->cip,
 	    &pwp->ciaddr) == B_FALSE) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "Failed to setup DMA for index/scratch");
 		goto failure;
 	}
@@ -689,7 +695,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    &pwp->fwlog_hndl, PMCS_FWLOG_SIZE,
 		    (caddr_t *)&pwp->fwlogp,
 		    &pwp->fwaddr) == B_FALSE) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "Failed to setup DMA for fwlog area");
 			pwp->fwlog = 0;
 		} else {
@@ -704,7 +710,7 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    &pwp->regdump_hndl, PMCS_FLASH_CHUNK_SIZE,
 		    (caddr_t *)&pwp->flash_chunkp, &pwp->flash_chunk_addr) ==
 		    B_FALSE) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "Failed to setup DMA for register dump area");
 			goto failure;
 		}
@@ -716,7 +722,8 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	pwp->tq = ddi_taskq_create(dip, "_tq", 4, TASKQ_DEFAULTPRI, 0);
 	if (pwp->tq == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "unable to create worker taskq");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "unable to create worker taskq");
 		goto failure;
 	}
 
@@ -891,7 +898,8 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Read VPD - if it exists */
 	if (pmcs_get_nvmd(pwp, PMCS_NVMD_VPD, PMCIN_NVMD_VPD, 0, NULL, 0)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: Unable to read VPD: "
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: Unable to read VPD: "
 		    "attempting to fabricate", __func__);
 		/*
 		 * When we release, this must goto failure and the call
@@ -913,8 +921,8 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * if needed and reset.
 	 */
 	if (pmcs_firmware_update(pwp)) {
-		pmcs_prt(pwp, PMCS_PRT_WARN, "%s: Firmware update failed",
-		    __func__);
+		pmcs_prt(pwp, PMCS_PRT_WARN, NULL, NULL,
+		    "%s: Firmware update failed", __func__);
 		goto failure;
 	}
 
@@ -965,8 +973,8 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (sas_phymap_create(dip, phymap_usec, PHYMAP_MODE_SIMPLE, NULL,
 	    pwp, pmcs_phymap_activate, pmcs_phymap_deactivate,
 	    &pwp->hss_phymap) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: pmcs%d phymap_create failed",
-		    __func__, inst);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: pmcs%d phymap_create failed", __func__, inst);
 		goto failure;
 	}
 	ASSERT(pwp->hss_phymap);
@@ -976,8 +984,8 @@ pmcs_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	if (scsi_hba_iportmap_create(dip, iportmap_usec, pwp->nphy,
 	    &pwp->hss_iportmap) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: pmcs%d iportmap_create "
-		    "failed", __func__, inst);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "%s: pmcs%d iportmap_create failed", __func__, inst);
 		goto failure;
 	}
 	ASSERT(pwp->hss_iportmap);
@@ -1083,7 +1091,8 @@ pmcs_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			if (pmcs_iport_unattach(iport)) {
 				return (DDI_FAILURE);
 			}
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, "iport%d detached", inst);
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "iport%d detached", inst);
 			return (DDI_SUCCESS);
 		} else {
 			/* HBA detach */
@@ -1118,7 +1127,7 @@ pmcs_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 		pwp->suspended = 1;
 		mutex_exit(&pwp->lock);
-		pmcs_prt(pwp, PMCS_PRT_INFO, "PMC8X6G suspending");
+		pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL, "PMC8X6G suspending");
 		return (DDI_SUCCESS);
 
 	default:
@@ -1136,8 +1145,9 @@ pmcs_iport_unattach(pmcs_iport_t *iport)
 	 * iport.  If so, we fail detach.
 	 */
 	if (pmcs_iport_has_targets(pwp, iport)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_IPORT, "iport%d detach failure: "
-		    "iport has targets (luns)", ddi_get_instance(iport->dip));
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+		    "iport%d detach failure: iport has targets (luns)",
+		    ddi_get_instance(iport->dip));
 		return (DDI_FAILURE);
 	}
 
@@ -1150,7 +1160,8 @@ pmcs_iport_unattach(pmcs_iport_t *iport)
 	if (iport->ua_state == UA_ACTIVE) {
 		mutex_exit(&iport->lock);
 		rw_exit(&pwp->iports_lock);
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_IPORT, "iport%d detach failure: "
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_IPORT, NULL, NULL,
+		    "iport%d detach failure: "
 		    "iport unit address active in phymap",
 		    ddi_get_instance(iport->dip));
 		return (DDI_FAILURE);
@@ -1386,7 +1397,8 @@ pmcs_unattach(pmcs_hw_t *pwp)
 	 */
 	if (pwp->regdump_hndl) {
 		if (ddi_dma_unbind_handle(pwp->regdump_hndl) != DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, "Condition check failed "
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "Condition check failed "
 			    "at %s():%d", __func__, __LINE__);
 		}
 		ddi_dma_free_handle(&pwp->regdump_hndl);
@@ -1395,7 +1407,8 @@ pmcs_unattach(pmcs_hw_t *pwp)
 	}
 	if (pwp->fwlog_hndl) {
 		if (ddi_dma_unbind_handle(pwp->fwlog_hndl) != DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, "Condition check failed "
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "Condition check failed "
 			    "at %s():%d", __func__, __LINE__);
 		}
 		ddi_dma_free_handle(&pwp->fwlog_hndl);
@@ -1404,7 +1417,8 @@ pmcs_unattach(pmcs_hw_t *pwp)
 	}
 	if (pwp->cip_handles) {
 		if (ddi_dma_unbind_handle(pwp->cip_handles) != DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, "Condition check failed "
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "Condition check failed "
 			    "at %s():%d", __func__, __LINE__);
 		}
 		ddi_dma_free_handle(&pwp->cip_handles);
@@ -1415,8 +1429,9 @@ pmcs_unattach(pmcs_hw_t *pwp)
 		if (pwp->oqp_handles[i]) {
 			if (ddi_dma_unbind_handle(pwp->oqp_handles[i]) !=
 			    DDI_SUCCESS) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, "Condition check "
-				    "failed at %s():%d", __func__, __LINE__);
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+				    "Condition check failed at %s():%d",
+				    __func__, __LINE__);
 			}
 			ddi_dma_free_handle(&pwp->oqp_handles[i]);
 			ddi_dma_mem_free(&pwp->oqp_acchdls[i]);
@@ -1427,8 +1442,9 @@ pmcs_unattach(pmcs_hw_t *pwp)
 		if (pwp->iqp_handles[i]) {
 			if (ddi_dma_unbind_handle(pwp->iqp_handles[i]) !=
 			    DDI_SUCCESS) {
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, "Condition check "
-				    "failed at %s():%d", __func__, __LINE__);
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+				    "Condition check failed at %s():%d",
+				    __func__, __LINE__);
 			}
 			ddi_dma_free_handle(&pwp->iqp_handles[i]);
 			ddi_dma_mem_free(&pwp->iqp_acchdls[i]);
@@ -1647,7 +1663,8 @@ pmcs_add_sata_device(pmcs_hw_t *pwp, pmcs_xscsi_t *xp)
 	if ((u.nsa[0] >> 4) == 5) {
 		(void) memcpy(pptr->sas_address, u.nsa, 8);
 	}
-	pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: %s has SAS ADDRESS " SAS_ADDR_FMT,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, xp,
+	    "%s: %s has SAS ADDRESS " SAS_ADDR_FMT,
 	    __func__, pptr->path, SAS_ADDR_PRT(pptr->sas_address));
 	return (0);
 }
@@ -1659,14 +1676,14 @@ static boolean_t
 pmcs_add_new_device(pmcs_hw_t *pwp, pmcs_xscsi_t *target)
 {
 	ASSERT(target != NULL);
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, "%s: target = 0x%p",
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, target, "%s: target = 0x%p",
 	    __func__, (void *) target);
 
 	switch (target->phy->dtype) {
 	case SATA:
 		if (pmcs_add_sata_device(pwp, target) != 0) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
-			    "%s: add_sata_device failed for tgt 0x%p",
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, target->phy,
+			    target, "%s: add_sata_device failed for tgt 0x%p",
 			    __func__, (void *) target);
 			return (B_FALSE);
 		}
@@ -1769,7 +1786,7 @@ pmcs_add_more_chunks(pmcs_hw_t *pwp, unsigned long nsize)
 
 	pchunk = kmem_zalloc(sizeof (pmcs_chunk_t), KM_SLEEP);
 	if (pchunk == NULL) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "Not enough memory for DMA chunks");
 		return (-1);
 	}
@@ -1777,7 +1794,8 @@ pmcs_add_more_chunks(pmcs_hw_t *pwp, unsigned long nsize)
 	if (pmcs_dma_setup(pwp, &pwp->cip_dma_attr, &pchunk->acc_handle,
 	    &pchunk->dma_handle, nsize, (caddr_t *)&pchunk->addrp,
 	    &pchunk->dma_addr) == B_FALSE) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "Failed to setup DMA for chunks");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "Failed to setup DMA for chunks");
 		kmem_free(pchunk, sizeof (pmcs_chunk_t));
 		return (-1);
 	}
@@ -1856,7 +1874,7 @@ pmcs_check_commands(pmcs_hw_t *pwp)
 		 * with it any more.
 		 */
 		if (pwrk->phy == NULL) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "dead command with gone phy being recycled");
 			ASSERT(pwrk->xp == NULL);
 			pmcs_pwork(pwp, pwrk);
@@ -1873,7 +1891,7 @@ pmcs_check_commands(pmcs_hw_t *pwp)
 		 * the WAIT_FOR macro.
 		 */
 		if (pwrk->xp == NULL) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "%s: non-SCSA cmd tag 0x%x timed out",
 			    path, pwrk->htag);
 			mutex_exit(&pwrk->lock);
@@ -1889,11 +1907,11 @@ pmcs_check_commands(pmcs_hw_t *pwp)
 		CMD2PKT(sp)->pkt_reason = CMD_TIMEOUT;
 		CMD2PKT(sp)->pkt_statistics |= STAT_TIMEOUT;
 #ifdef	DEBUG
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pwrk->phy, pwrk->xp,
 		    "%s: SCSA cmd tag 0x%x timed out (state %x) onwire=%d",
 		    path, pwrk->htag, pwrk->state, pwrk->onwire);
 #else
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, pwrk->phy, pwrk->xp,
 		    "%s: SCSA cmd tag 0x%x timed out (state %x)",
 		    path, pwrk->htag, pwrk->state);
 #endif
@@ -1914,15 +1932,15 @@ pmcs_check_commands(pmcs_hw_t *pwp)
 		if (pwrk->xp->dev_gone) {
 			mutex_exit(&target->statlock);
 			pmcs_unlock_phy(phyp);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, target,
 			    "%s: tgt(0x%p) is gone. Returning CMD_DEV_GONE "
 			    "for htag 0x%08x", __func__,
 			    (void *)pwrk->xp, pwrk->htag);
 			mutex_enter(&pwrk->lock);
 			if (!PMCS_COMMAND_DONE(pwrk)) {
 				/* Complete this command here */
-				pmcs_prt(pwp, PMCS_PRT_DEBUG, "%s: "
-				    "Completing cmd (htag 0x%08x) "
+				pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, target,
+				    "%s: Completing cmd (htag 0x%08x) "
 				    "anyway", __func__, pwrk->htag);
 				pwrk->dead = 1;
 				CMD2PKT(sp)->pkt_reason = CMD_DEV_GONE;
@@ -1938,7 +1956,7 @@ pmcs_check_commands(pmcs_hw_t *pwp)
 		 * See if we're already waiting for device state recovery
 		 */
 		if (target->recover_wait) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG_DEV_STATE, phyp, target,
 			    "%s: Target %p already in recovery", __func__,
 			    (void *)target);
 			mutex_exit(&target->statlock);
@@ -1974,7 +1992,7 @@ pmcs_watchdog(void *arg)
 	if (atomic_cas_ulong(&pwp->work_flags, 0, 0) != 0) {
 		if (ddi_taskq_dispatch(pwp->tq, pmcs_worker, pwp,
 		    DDI_NOSLEEP) != DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "Could not dispatch to worker thread");
 		}
 	}
@@ -1994,7 +2012,7 @@ pmcs_remove_ihandlers(pmcs_hw_t *pwp, int icnt)
 		if (r == DDI_SUCCESS) {
 			continue;
 		}
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: unable to remove interrupt handler %d", __func__, i);
 		rslt = -1;
 		break;
@@ -2009,7 +2027,7 @@ pmcs_disable_intrs(pmcs_hw_t *pwp, int icnt)
 		int r = ddi_intr_block_disable(&pwp->ih_table[0],
 		    pwp->intr_cnt);
 		if (r != DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "unable to disable interrupt block");
 			return (-1);
 		}
@@ -2019,7 +2037,7 @@ pmcs_disable_intrs(pmcs_hw_t *pwp, int icnt)
 			if (ddi_intr_disable(pwp->ih_table[i]) == DDI_SUCCESS) {
 				continue;
 			}
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "unable to disable interrupt %d", i);
 			return (-1);
 		}
@@ -2035,7 +2053,8 @@ pmcs_free_intrs(pmcs_hw_t *pwp, int icnt)
 		if (ddi_intr_free(pwp->ih_table[i]) == DDI_SUCCESS) {
 			continue;
 		}
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "unable to free interrupt %d", i);
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "unable to free interrupt %d", i);
 		return (-1);
 	}
 	kmem_free(pwp->ih_table, pwp->ih_table_size);
@@ -2054,24 +2073,24 @@ pmcs_setup_intr_impl(pmcs_hw_t *pwp, int type, int min)
 
 	rval = ddi_intr_get_nintrs(pwp->dip, type, &count);
 	if ((rval != DDI_SUCCESS) || (count < min)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 		    "%s: get_nintrs failed; type: %d rc: %d count: %d min: %d",
 		    __func__, type, rval, count, min);
 		return;
 	}
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 	    "%s: nintrs = %d for type: %d", __func__, count, type);
 
 	rval = ddi_intr_get_navail(pwp->dip, type, &avail);
 	if ((rval != DDI_SUCCESS) || (avail < min)) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 		    "%s: get_navail failed; type: %d rc: %d avail: %d min: %d",
 		    __func__, type, rval, avail, min);
 		return;
 	}
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 	    "%s: navail = %d for type: %d", __func__, avail, type);
 
 	pwp->ih_table_size = avail * sizeof (ddi_intr_handle_t);
@@ -2096,7 +2115,7 @@ pmcs_setup_intr_impl(pmcs_hw_t *pwp, int type, int min)
 	rval = ddi_intr_alloc(pwp->dip, pwp->ih_table, type, 0, max, &actual,
 	    DDI_INTR_ALLOC_NORMAL);
 	if (rval != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, NULL, NULL,
 		    "%s: ddi_intr_alloc failed; type: %d rc: %d",
 		    __func__, type, rval);
 		kmem_free(pwp->ih_table, pwp->ih_table_size);
@@ -2129,7 +2148,8 @@ pmcs_setup_intr(pmcs_hw_t *pwp)
 	uint_t pri;
 
 	if (ddi_intr_get_supported_types(pwp->dip, &itypes) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "cannot get interrupt types");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "cannot get interrupt types");
 		return (EAGAIN);
 	}
 
@@ -2173,7 +2193,8 @@ pmcs_setup_intr(pmcs_hw_t *pwp)
 	}
 
 	if (pwp->intr_cnt == 0) {
-		pmcs_prt(pwp, PMCS_PRT_ERR, "No interrupts available");
+		pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL,
+		    "No interrupts available");
 		return (EAGAIN);
 	}
 
@@ -2198,7 +2219,7 @@ pmcs_setup_intr(pmcs_hw_t *pwp)
 		iv_table[PMCS_MSIX_FATAL] = pmcs_fatal_ix;
 		break;
 	default:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: intr_cnt = %d - unexpected", __func__, pwp->intr_cnt);
 		kmem_free(iv_table, iv_table_size);
 		return (EAGAIN);
@@ -2223,7 +2244,8 @@ pmcs_setup_intr(pmcs_hw_t *pwp)
 	kmem_free(iv_table, iv_table_size);
 
 	if (ddi_intr_get_cap(pwp->ih_table[0], &pwp->intr_cap) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG, "unable to get int capabilities");
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+		    "unable to get int capabilities");
 		if (pmcs_remove_ihandlers(pwp, pwp->intr_cnt)) {
 			return (EIO);
 		}
@@ -2237,7 +2259,8 @@ pmcs_setup_intr(pmcs_hw_t *pwp)
 	if (pwp->intr_cap & DDI_INTR_FLAG_BLOCK) {
 		r = ddi_intr_block_enable(&pwp->ih_table[0], pwp->intr_cnt);
 		if (r != DDI_SUCCESS) {
-			pmcs_prt(pwp, PMCS_PRT_DEBUG, "intr blk enable failed");
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
+			    "intr blk enable failed");
 			if (pmcs_remove_ihandlers(pwp, pwp->intr_cnt)) {
 				return (EIO);
 			}
@@ -2253,7 +2276,7 @@ pmcs_setup_intr(pmcs_hw_t *pwp)
 			if (r == DDI_SUCCESS) {
 				continue;
 			}
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 			    "unable to enable interrupt %d", i);
 			if (pmcs_disable_intrs(pwp, i)) {
 				return (EIO);
@@ -2273,7 +2296,7 @@ pmcs_setup_intr(pmcs_hw_t *pwp)
 	 * Set up locks.
 	 */
 	if (ddi_intr_get_pri(pwp->ih_table[0], &pri) != DDI_SUCCESS) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "unable to get interrupt priority");
 		if (pmcs_disable_intrs(pwp, pwp->intr_cnt)) {
 			return (EIO);
@@ -2316,7 +2339,7 @@ pmcs_setup_intr(pmcs_hw_t *pwp)
 		    CV_DRIVER, NULL);
 	}
 
-	pmcs_prt(pwp, PMCS_PRT_INFO, "%d %s interrup%s configured",
+	pmcs_prt(pwp, PMCS_PRT_INFO, NULL, NULL, "%d %s interrup%s configured",
 	    pwp->intr_cnt, (pwp->int_type == PMCS_INT_MSIX)? "MSI-X" :
 	    ((pwp->int_type == PMCS_INT_MSI)? "MSI" : "INT-X"),
 	    pwp->intr_cnt == 1? "t" : "ts");
@@ -2483,7 +2506,7 @@ pmcs_all_intr(caddr_t arg1, caddr_t arg2)
 		pmcs_event_intr(pwp);
 	}
 	if (obdb) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "interrupt bits not handled (0x%x)", obdb);
 		pmcs_wr_msgunit(pwp, PMCS_MSGU_OBDB_CLEAR, obdb);
 		handled++;
@@ -2497,7 +2520,7 @@ pmcs_all_intr(caddr_t arg1, caddr_t arg2)
 void
 pmcs_fatal_handler(pmcs_hw_t *pwp)
 {
-	pmcs_prt(pwp, PMCS_PRT_ERR, "Fatal Interrupt caught");
+	pmcs_prt(pwp, PMCS_PRT_ERR, NULL, NULL, "Fatal Interrupt caught");
 	mutex_enter(&pwp->lock);
 	pwp->state = STATE_DEAD;
 	pmcs_register_dump_int(pwp);
@@ -2528,7 +2551,7 @@ pmcs_assign_device(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt)
 		tgt->ca = 1;
 		break;
 	default:
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, tgt,
 		    "%s: Target %p has PHY %p with invalid dtype",
 		    __func__, (void *)tgt, (void *)pptr);
 		return (B_FALSE);
@@ -2538,12 +2561,12 @@ pmcs_assign_device(pmcs_hw_t *pwp, pmcs_xscsi_t *tgt)
 	tgt->dev_gone = 0;
 	tgt->recover_wait = 0;
 
-	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+	pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, tgt,
 	    "%s: config %s vtgt %u for " SAS_ADDR_FMT, __func__,
 	    pptr->path, tgt->target_num, SAS_ADDR_PRT(pptr->sas_address));
 
 	if (pmcs_add_new_device(pwp, tgt) != B_TRUE) {
-		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, tgt,
 		    "%s: Failed for vtgt %u / WWN " SAS_ADDR_FMT, __func__,
 		    tgt->target_num, SAS_ADDR_PRT(pptr->sas_address));
 		mutex_destroy(&tgt->statlock);
@@ -2576,11 +2599,11 @@ pmcs_remove_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 		if (xp->phy == pptr) {
 			if (xp->new) {
 				xp->new = 0;
-				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, xp,
 				    "cancel config of vtgt %u", vtgt);
 			} else {
 				pmcs_clear_xp(pwp, xp);
-				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG,
+				pmcs_prt(pwp, PMCS_PRT_DEBUG_CONFIG, pptr, xp,
 				    "Removed tgt 0x%p vtgt %u",
 				    (void *)xp, vtgt);
 			}
@@ -2592,7 +2615,8 @@ pmcs_remove_device(pmcs_hw_t *pwp, pmcs_phy_t *pptr)
 }
 
 void
-pmcs_prt_impl(pmcs_hw_t *pwp, pmcs_prt_level_t level, const char *fmt, ...)
+pmcs_prt_impl(pmcs_hw_t *pwp, pmcs_prt_level_t level,
+    pmcs_phy_t *phyp, pmcs_xscsi_t *target, const char *fmt, ...)
 {
 	va_list	ap;
 	int written = 0;
@@ -2635,6 +2659,30 @@ pmcs_prt_impl(pmcs_hw_t *pwp, pmcs_prt_level_t level, const char *fmt, ...)
 	mutex_enter(&pmcs_trace_lock);
 	gethrestime(&pmcs_tbuf_ptr->timestamp);
 	ptr = pmcs_tbuf_ptr->buf;
+
+	/*
+	 * Store the pertinent PHY and target information if there is any
+	 */
+	if (target == NULL) {
+		pmcs_tbuf_ptr->target_num = PMCS_INVALID_TARGET_NUM;
+		pmcs_tbuf_ptr->target_ua[0] = '\0';
+	} else {
+		pmcs_tbuf_ptr->target_num = target->target_num;
+		(void) strncpy(pmcs_tbuf_ptr->target_ua, target->ua,
+		    PMCS_TBUF_UA_MAX_SIZE);
+	}
+
+	if (phyp == NULL) {
+		(void) memset(pmcs_tbuf_ptr->phy_sas_address, 0, 8);
+		pmcs_tbuf_ptr->phy_path[0] = '\0';
+		pmcs_tbuf_ptr->phy_dtype = NOTHING;
+	} else {
+		(void) memcpy(pmcs_tbuf_ptr->phy_sas_address,
+		    phyp->sas_address, 8);
+		(void) strncpy(pmcs_tbuf_ptr->phy_path, phyp->path, 32);
+		pmcs_tbuf_ptr->phy_dtype = phyp->dtype;
+	}
+
 	written += snprintf(ptr, elem_size, "pmcs%d:%d: ",
 	    ddi_get_instance(pwp->dip), level);
 	ptr += strlen(ptr);
@@ -2773,7 +2821,7 @@ pmcs_create_phy_stats(pmcs_iport_t *iport)
 
 		if (phyp->phy_stats == NULL) {
 			pmcs_unlock_phy(phyp);
-			pmcs_prt(pwp, PMCS_PRT_DEBUG,
+			pmcs_prt(pwp, PMCS_PRT_DEBUG, phyp, NULL,
 			    "%s: Failed to create %s kstats", __func__,
 			    ks_name);
 			continue;
@@ -2972,7 +3020,7 @@ pmcs_fabricate_wwid(pmcs_hw_t *pwp)
 	if (adr == 0) {
 		static const char foo[] = __DATE__ __TIME__;
 		/* Oh, dear, we're toast */
-		pmcs_prt(pwp, PMCS_PRT_DEBUG,
+		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: No serial number available to fabricate WWN",
 		    __func__);
 		for (i = 0; foo[i]; i++) {
