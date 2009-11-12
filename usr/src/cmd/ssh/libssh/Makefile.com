@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -26,6 +26,7 @@ LIBRARY =	libssh.a
 VERS =		.1
 
 OBJECTS =	\
+		addrmatch.o \
 		atomicio.o \
 		authfd.o \
 		authfile.o \
@@ -42,10 +43,9 @@ OBJECTS =	\
 		dh.o \
 		dispatch.o \
 		engine.o \
+		entropy.o \
 		fatal.o \
 		g11n.o \
-		mac.o \
-		msg.o \
 		hostfile.o \
 		key.o \
 		kex.o \
@@ -58,16 +58,20 @@ OBJECTS =	\
 		kexgssc.o \
 		kexgsss.o \
 		log.o \
+		mac.o \
 		match.o \
 		misc.o \
 		mpaux.o \
+		msg.o \
 		nchan.o \
 		packet.o \
 		progressmeter.o \
+		proxy-io.o \
 		radix.o \
-		entropy.o \
+		readconf.o \
 		readpass.o \
 		rsa.o \
+		sftp-common.o \
 		ssh-dss.o \
 		ssh-gss.o \
 		ssh-rsa.o \
@@ -76,10 +80,7 @@ OBJECTS =	\
 		uidswap.o \
 		uuencode.o \
 		xlist.o \
-		xmalloc.o \
-		readconf.o \
-		sftp-common.o \
-		proxy-io.o
+		xmalloc.o
 
 include $(SRC)/lib/Makefile.lib
 

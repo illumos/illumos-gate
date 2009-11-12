@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,11 +44,11 @@ RCSID("$OpenBSD: auth.c,v 1.45 2002/09/20 18:41:29 stevesk Exp $");
 #include "match.h"
 #include "groupaccess.h"
 #include "log.h"
+#include "buffer.h"
 #include "servconf.h"
 #include "auth.h"
 #include "auth-options.h"
 #include "canohost.h"
-#include "buffer.h"
 #include "bufaux.h"
 #include "uidswap.h"
 #include "tildexpand.h"
@@ -581,6 +581,9 @@ getpwnamallow(const char *user)
 
 	if (user == NULL || *user == '\0')
 		return (NULL); /* implicit user, will be set later */
+
+	parse_server_match_config(&options, user,
+	    get_canonical_hostname(options.verify_reverse_mapping), get_remote_ipaddr());
 
 	pw = getpwnam(user);
 	if (pw == NULL) {

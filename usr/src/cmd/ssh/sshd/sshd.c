@@ -223,6 +223,9 @@ u_int utmp_len = MAXHOSTNAMELEN;
 static int *startup_pipes = NULL;
 static int startup_pipe = -1;	/* in child */
 
+/* sshd_config buffer */
+Buffer cfg;
+
 #ifdef GSSAPI
 static gss_OID_set mechs = GSS_C_NULL_OID_SET;
 #endif /* GSSAPI */
@@ -939,7 +942,7 @@ main(int ac, char **av)
 			break;
 		case 'o':
 			if (process_server_config_line(&options, optarg,
-			    "command-line", 0) != 0)
+			    "command-line", 0, NULL, NULL, NULL, NULL) != 0)
 				exit(1);
 			break;
 		case '?':
@@ -974,8 +977,10 @@ main(int ac, char **av)
 	drop_cray_privs();
 #endif
 
-	/* Read server configuration options from the configuration file. */
-	read_server_config(&options, config_file_name);
+	/* Fetch our configuration */
+	buffer_init(&cfg);
+	load_server_config(config_file_name, &cfg);
+	parse_server_config(&options, config_file_name, &cfg, NULL, NULL, NULL);
 
 	/* Fill in default values for those options not explicitly set. */
 	fill_default_server_options(&options);

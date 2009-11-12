@@ -25,8 +25,6 @@
 #include "includes.h"
 RCSID("$OpenBSD: groupaccess.c,v 1.5 2002/03/04 17:27:39 stevesk Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "groupaccess.h"
 #include "xmalloc.h"
 #include "match.h"
@@ -72,6 +70,30 @@ ga_match(char * const *groups, int n)
 			if (match_pattern(groups_byname[i], groups[j]))
 				return 1;
 	return 0;
+}
+
+/*
+ * Return 1 if one of user's groups matches group_pattern list.
+ * Return 0 on negated or no match.
+ */
+int
+ga_match_pattern_list(const char *group_pattern)
+{
+	int i, found = 0;
+	size_t len = strlen(group_pattern);
+
+	for (i = 0; i < ngroups; i++) {
+		switch (match_pattern_list(groups_byname[i],
+		    group_pattern, len, 0)) {
+		case -1:
+			return 0;	/* Negated match wins */
+		case 0:
+			continue;
+		case 1:
+			found = 1;
+		}
+	}
+	return found;
 }
 
 /*

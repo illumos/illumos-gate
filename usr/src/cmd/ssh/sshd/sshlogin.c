@@ -47,6 +47,7 @@ RCSID("$OpenBSD: sshlogin.c,v 1.5 2002/08/29 15:57:25 stevesk Exp $");
 
 #include "loginrec.h"
 #include "log.h"
+#include "buffer.h"
 #include "servconf.h"
 #include "canohost.h"
 #include "packet.h"

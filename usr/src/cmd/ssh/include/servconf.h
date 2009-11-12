@@ -167,9 +167,15 @@ typedef struct {
 }       ServerOptions;
 
 void	 initialize_server_options(ServerOptions *);
-void	 read_server_config(ServerOptions *, const char *);
 void	 fill_default_server_options(ServerOptions *);
-int	 process_server_config_line(ServerOptions *, char *, const char *, int);
+int	 process_server_config_line(ServerOptions *, char *, const char *, int,
+	     int *, const char *, const char *, const char *);
+void	 load_server_config(const char *, Buffer *);
+void	 parse_server_config(ServerOptions *, const char *, Buffer *,
+	     const char *, const char *, const char *);
+void	 parse_server_match_config(ServerOptions *, const char *, const char *,
+	     const char *);
+void	 copy_set_server_options(ServerOptions *, ServerOptions *, int);
 int	 chroot_requested(char *chroot_directory);
 
 #ifdef __cplusplus

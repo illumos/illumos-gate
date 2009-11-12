@@ -3,8 +3,6 @@
 #ifndef	_MATCH_H
 #define	_MATCH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -28,6 +26,9 @@ int	 match_hostname(const char *, const char *, u_int);
 int	 match_host_and_ip(const char *, const char *, const char *);
 int	 match_user(const char *, const char *, const char *, const char *);
 char	*match_list(const char *, const char *, u_int *);
+
+/* addrmatch.c */
+int	 addr_match_list(const char *, const char *);
 
 #ifdef __cplusplus
 }
