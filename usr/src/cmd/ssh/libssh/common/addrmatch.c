@@ -81,7 +81,9 @@ masklen_valid(int af, u_int masklen)
 static int
 addr_sa_to_xaddr(struct sockaddr *sa, socklen_t slen, struct xaddr *xa)
 {
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	struct sockaddr_in *in4 = (struct sockaddr_in *)sa;
+	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	struct sockaddr_in6 *in6 = (struct sockaddr_in6 *)sa;
 
 	memset(xa, '\0', sizeof(*xa));

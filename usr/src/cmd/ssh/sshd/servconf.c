@@ -660,7 +660,7 @@ match_cfg_line(char **condition, int line, const char *user, const char *host,
 		    user ? user : "(null)", host ? host : "(null)",
 		    address ? address : "(null)");
 
-	while ((attrib = strdelim(&cp)) && *attrib != '\0') {
+	while ((attrib = strdelim(&cp)) != NULL && *attrib != '\0') {
 		if ((arg = strdelim(&cp)) == NULL || *arg == '\0') {
 			error("Missing Match criteria for %s", attrib);
 			return -1;
