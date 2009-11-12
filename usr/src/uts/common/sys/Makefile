@@ -884,13 +884,14 @@ SCSIIMPLHDRS=		\
 	commands.h	\
 	inquiry.h	\
 	mode.h		\
-	sas_transport.h	\
+	scsi_reset_notify.h \
+	scsi_sas.h	\
 	sense.h		\
 	services.h	\
+	smp_transport.h	\
+	spc3_types.h	\
 	status.h	\
 	transport.h	\
-	scsi_reset_notify.h \
-	spc3_types.h	\
 	types.h		\
 	uscsi.h		\
 	usmp.h

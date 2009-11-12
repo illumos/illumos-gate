@@ -102,9 +102,12 @@ devi_probe(dev_info_t *devi)
 	 * away with not writing one of these .. so we
 	 * pretend we're 'nulldev' if we don't find one (sigh).
 	 */
-	if ((fn = ops->devo_probe) == NULL)
-		rv = DDI_PROBE_DONTCARE;
-	else
+	if ((fn = ops->devo_probe) == NULL) {
+		if (ddi_dev_is_sid(devi) == DDI_SUCCESS)
+			rv = DDI_PROBE_DONTCARE;
+		else
+			rv = DDI_PROBE_FAILURE;
+	} else
 		rv = (*fn)(devi);
 
 	switch (rv) {

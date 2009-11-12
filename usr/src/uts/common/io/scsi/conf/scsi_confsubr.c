@@ -58,7 +58,6 @@ static struct modlinkage modlinkage = {
 };
 
 static void create_inquiry_props(struct scsi_device *);
-static int get_inquiry_prop_len(char *, size_t);
 
 static int scsi_check_ss2_LUN_limit(struct scsi_device *);
 static void scsi_establish_LUN_limit(struct scsi_device *);
@@ -924,7 +923,7 @@ scsi_hba_ua_get(struct scsi_device *sd, char *ua, int len)
 	return (1);
 }
 
-void
+static void
 create_inquiry_props(struct scsi_device *sd)
 {
 	struct scsi_inquiry *inq = sd->sd_inq;
@@ -939,10 +938,14 @@ create_inquiry_props(struct scsi_device *sd)
 	 * inquiry-product-id	Product id (INQUIRY data bytes 16-31)
 	 * inquiry-revision-id	Product Rev level (INQUIRY data bytes 32-35)
 	 *
-	 * Note we don't support creation of these properties for scsi-1
+	 * NOTE: We don't support creation of these properties for scsi-1
 	 * devices (as the vid, pid and revision were not defined) and we
 	 * don't create the property if they are of zero length when
 	 * stripped of Nulls and spaces.
+	 *
+	 * NOTE: The first definition of these properties sticks. This gives
+	 * a transport the ability to provide a higher-quality definition
+	 * than the standard SCSI INQUIRY data.
 	 */
 	if (inq->inq_ansi != 1) {
 		if (ddi_prop_exists(DDI_DEV_T_NONE, sd->sd_dev,
@@ -977,7 +980,7 @@ scsi_device_prop_update_inqstring(struct scsi_device *sd,
 	char	*data_string;
 	int	rv;
 
-	ilen = get_inquiry_prop_len(data, len);
+	ilen = scsi_ascii_inquiry_len(data, len);
 	ASSERT(ilen <= (int)len);
 	if (ilen <= 0)
 		return (DDI_PROP_INVAL_ARG);
@@ -989,57 +992,6 @@ scsi_device_prop_update_inqstring(struct scsi_device *sd,
 	    sd->sd_dev, name, data_string);
 	kmem_free(data_string, ilen + 1);
 	return (rv);
-}
-
-/*
- * This routine returns the true length of the inquiry properties that are to
- * be created by removing the padded spaces at the end of the inquiry data.
- * This routine was designed for trimming spaces from the vid, pid and revision
- * which are defined as being left aligned.  In addition, we return 0 length
- * if the property is full of all 0's or spaces, indicating to the caller that
- * the device was not ready to return the proper inquiry data as per note 65 in
- * the scsi-2 spec.
- */
-static int
-get_inquiry_prop_len(char *property, size_t length)
-{
-	int retval;
-	int trailer;
-	char *p;
-
-	retval = length;
-
-	/*
-	 * The vid, pid and revision are left-aligned ascii fields within the
-	 * inquiry data.  Here we trim the end of these fields by discounting
-	 * length associated with trailing spaces or NULL bytes.  The remaining
-	 * bytes shall be only graphics codes - 0x20 through 0x7e as per the
-	 * scsi spec definition.  If we have all 0's or spaces, we return 0
-	 * length.  For devices that store inquiry data on the device, they
-	 * can return 0's or spaces in these fields until the data is avail-
-	 * able from the device (See NOTE 65 in the scsi-2 specification
-	 * around the inquiry command.)  We don't want to create a property in
-	 * the case of a device not able to return valid data.
-	 */
-	trailer = 1;
-	for (p = property + length - 1; p >= property; p--) {
-		if (trailer) {
-			if ((*p == ' ') || (*p == '\0')) {
-				retval--;
-				continue;
-			}
-			trailer = 0;
-		}
-
-		/* each char must be within 0x20 - 0x7e */
-		if (*p < 0x20 || *p > 0x7e) {
-			retval = -1;
-			break;
-		}
-
-	}
-
-	return (retval);
 }
 
 /*
@@ -1115,8 +1067,8 @@ scsi_check_ss2_LUN_limit(struct scsi_device *sd)
 	 * if LUN>7 -- if the property is found, look to see if our
 	 * target ID is on that list
 	 */
-	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY,
-	    pdevi, DDI_PROP_DONTPASS, SS2_LUN0_TGT_LIST_PROP,
+	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, pdevi,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, SS2_LUN0_TGT_LIST_PROP,
 	    &tgt_list, &tgt_nelements) != DDI_PROP_SUCCESS) {
 		/*
 		 * no list, so it must be okay to probe this target.LUN
@@ -1205,19 +1157,22 @@ scsi_establish_LUN_limit(struct scsi_device *sd)
 	 * first we have to get the VID/PID/REV INQUIRY properties for
 	 * comparison
 	 */
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, devi,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    INQUIRY_VENDOR_ID, &vid) != DDI_PROP_SUCCESS) {
 		SCSI_PROBE_DEBUG1(2, "SCSA post-probe: prop \"%s\" missing\n",
 		    INQUIRY_VENDOR_ID);
 		goto dun;
 	}
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, devi,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    INQUIRY_PRODUCT_ID, &pid) != DDI_PROP_SUCCESS) {
 		SCSI_PROBE_DEBUG1(2, "SCSA post-probe: prop \"%s\" missing\n",
 		    INQUIRY_PRODUCT_ID);
 		goto dun;
 	}
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, devi,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    INQUIRY_REVISION_ID, &rev) != DDI_PROP_SUCCESS) {
 		SCSI_PROBE_DEBUG1(2, "SCSA post-probe: prop \"%s\" missing\n",
 		    INQUIRY_REVISION_ID);
@@ -1303,7 +1258,8 @@ scsi_update_parent_ss2_prop(dev_info_t *devi, int tgt, int add_tgt)
 	    "SCSA post-probe: updating parent=%s property to %s tgt=%d\n",
 	    ddi_node_name(pdevi), add_tgt ? "add" : "remove", tgt);
 
-	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, pdevi, DDI_PROP_DONTPASS,
+	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, pdevi,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    SS2_LUN0_TGT_LIST_PROP, &tgt_list, &nelements) ==
 	    DDI_PROP_SUCCESS) {
 

@@ -585,7 +585,7 @@ typedef struct mptsas {
 	struct mptsas *m_next;
 
 	scsi_hba_tran_t		*m_tran;
-	sas_hba_tran_t		*m_smptran;
+	smp_hba_tran_t		*m_smptran;
 	kmutex_t		m_mutex;
 	kcondvar_t		m_cv;
 	kcondvar_t		m_passthru_cv;

@@ -145,6 +145,7 @@ GENUNIX_OBJS +=	\
 		devid.o		\
 		devid_cache.o	\
 		devid_scsi.o	\
+		devid_smp.o	\
 		devpolicy.o	\
 		disp_lock.o	\
 		dnlc.o		\
@@ -771,7 +772,7 @@ VCONS_CONF_OBJS += vcons_conf.o
 SCSI_OBJS +=	scsi_capabilities.o scsi_confsubr.o scsi_control.o \
 		scsi_data.o scsi_fm.o scsi_hba.o scsi_reset_notify.o \
 		scsi_resource.o scsi_subr.o scsi_transport.o scsi_watch.o \
-		sas_transport.o
+		smp_transport.o
 
 SCSI_VHCI_OBJS +=		scsi_vhci.o mpapi_impl.o scsi_vhci_tpgs.o
 

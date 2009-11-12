@@ -2049,6 +2049,11 @@ ddi_devid_scsi_encode(int version, char *driver_name,
     uchar_t *inq, size_t inq_len, uchar_t *inq80, size_t inq80_len,
     uchar_t *inq83, size_t inq83_len, ddi_devid_t *ret_devid);
 
+int
+ddi_devid_smp_encode(int version, char *driver_name,
+    char *wwnstr, uchar_t *srmir_buf, size_t srmir_len,
+    ddi_devid_t *ret_devid);
+
 char
 *ddi_devid_to_guid(ddi_devid_t devid);
 

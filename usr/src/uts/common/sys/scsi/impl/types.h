@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_IMPL_TYPES_H
 #define	_SYS_SCSI_IMPL_TYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Local Types for SCSI subsystems
@@ -49,7 +47,8 @@
 
 #include <sys/scsi/impl/services.h>
 #include <sys/scsi/impl/transport.h>
-#include <sys/scsi/impl/sas_transport.h>
+#include <sys/scsi/impl/smp_transport.h>
+#include <sys/scsi/impl/scsi_sas.h>
 
 #endif	/* _KERNEL */
 

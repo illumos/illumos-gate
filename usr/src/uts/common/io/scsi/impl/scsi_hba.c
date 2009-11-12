@@ -960,7 +960,7 @@ scsa_nexus_setup(dev_info_t *self, scsi_hba_tran_t *tran)
 	 */
 	if (tran->tran_fm_capable == DDI_FM_NOT_CAPABLE)
 		tran->tran_fm_capable = ddi_prop_get_int(DDI_DEV_T_ANY, self,
-		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 		    "fm-capable", scsi_fm_capable);
 
 	/*
@@ -1135,7 +1135,7 @@ scsa_tran_setup(dev_info_t *self, scsi_hba_tran_t *tran)
 	 * this correctly at this point in time.
 	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, self,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "scsi-binding-set",
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "scsi-binding-set",
 	    &scsi_binding_set) == DDI_PROP_SUCCESS) {
 		SCSI_HBA_LOG((_LOG(2), NULL, self,
 		    "external 'scsi-binding-set' \"%s\"", scsi_binding_set));
@@ -1382,24 +1382,24 @@ scsi_hba_fini(struct modlinkage *modlp)
 /*
  * SAS specific functions
  */
-sas_hba_tran_t *
-sas_hba_tran_alloc(dev_info_t *self)
+smp_hba_tran_t *
+smp_hba_tran_alloc(dev_info_t *self)
 {
 	/* allocate SCSA flavors for self */
 	ndi_flavorv_alloc(self, SCSA_NFLAVORS);
-	return (kmem_zalloc(sizeof (sas_hba_tran_t), KM_SLEEP));
+	return (kmem_zalloc(sizeof (smp_hba_tran_t), KM_SLEEP));
 }
 
 void
-sas_hba_tran_free(sas_hba_tran_t *tran)
+smp_hba_tran_free(smp_hba_tran_t *tran)
 {
-	kmem_free(tran, sizeof (sas_hba_tran_t));
+	kmem_free(tran, sizeof (smp_hba_tran_t));
 }
 
 int
-sas_hba_attach_setup(
+smp_hba_attach_setup(
 	dev_info_t		*self,
-	sas_hba_tran_t		*tran)
+	smp_hba_tran_t		*tran)
 {
 	ASSERT(scsi_hba_iport_unit_address(self) == NULL);
 	if (scsi_hba_iport_unit_address(self))
@@ -1415,7 +1415,7 @@ sas_hba_attach_setup(
 }
 
 int
-sas_hba_detach(dev_info_t *self)
+smp_hba_detach(dev_info_t *self)
 {
 	ASSERT(scsi_hba_iport_unit_address(self) == NULL);
 	if (scsi_hba_iport_unit_address(self))
@@ -1497,10 +1497,10 @@ static int
 smp_busctl_initchild(dev_info_t *child)
 {
 	dev_info_t		*self = ddi_get_parent(child);
-	sas_hba_tran_t		*tran;
+	smp_hba_tran_t		*tran;
 	dev_info_t		*dup;
 	char			addr[SCSI_MAXNAMELEN];
-	struct smp_device	*smp;
+	struct smp_device	*smp_sd;
 	uint64_t		wwn;
 
 	tran = ndi_flavorv_get(self, SCSA_FLAVOR_SMP);
@@ -1537,22 +1537,22 @@ smp_busctl_initchild(dev_info_t *child)
 	ddi_set_name_addr(child, addr);
 
 	/* Allocate and initialize smp_device. */
-	smp = kmem_zalloc(sizeof (struct smp_device), KM_SLEEP);
-	smp->dip = child;
-	smp->smp_addr.a_hba_tran = tran;
-	bcopy(&wwn, smp->smp_addr.a_wwn, SAS_WWN_BYTE_SIZE);
+	smp_sd = kmem_zalloc(sizeof (struct smp_device), KM_SLEEP);
+	smp_sd->smp_sd_dev = child;
+	smp_sd->smp_sd_address.smp_a_hba_tran = tran;
+	bcopy(&wwn, smp_sd->smp_sd_address.smp_a_wwn, SAS_WWN_BYTE_SIZE);
 
-	ddi_set_driver_private(child, smp);
+	ddi_set_driver_private(child, smp_sd);
 
-	if (tran->tran_smp_init &&
-	    ((*tran->tran_smp_init)(self, child, tran, smp) != DDI_SUCCESS)) {
-		kmem_free(smp, sizeof (struct smp_device));
+	if (tran->smp_tran_init && ((*tran->smp_tran_init)(self, child,
+	    tran, smp_sd) != DDI_SUCCESS)) {
+		kmem_free(smp_sd, sizeof (struct smp_device));
 		if (ndi_dev_is_hotplug_node(child))
 			SCSI_HBA_LOG((_LOG(WARN), NULL, child,
-			    "enumeration failed during tran_smp_init"));
+			    "enumeration failed during smp_tran_init"));
 		else
 			SCSI_HBA_LOG((_LOG(2), NULL, child,
-			    "enumeration failed during tran_smp_init"));
+			    "enumeration failed during smp_tran_init"));
 		ddi_set_driver_private(child, NULL);
 		ddi_set_name_addr(child, NULL);
 		return (DDI_FAILURE);
@@ -1566,18 +1566,18 @@ static int
 smp_busctl_uninitchild(dev_info_t *child)
 {
 	dev_info_t		*self = ddi_get_parent(child);
-	struct smp_device	*smp = ddi_get_driver_private(child);
-	sas_hba_tran_t		*tran;
+	struct smp_device	*smp_sd = ddi_get_driver_private(child);
+	smp_hba_tran_t		*tran;
 
 	tran = ndi_flavorv_get(self, SCSA_FLAVOR_SMP);
-	ASSERT(smp && tran);
-	if ((smp == NULL) || (tran == NULL))
+	ASSERT(smp_sd && tran);
+	if ((smp_sd == NULL) || (tran == NULL))
 		return (DDI_FAILURE);
 
-	if (tran->tran_smp_free) {
-		(*tran->tran_smp_free) (self, child, tran, smp);
-	}
-	kmem_free(smp, sizeof (*smp));
+	if (tran->smp_tran_free)
+		(*tran->smp_tran_free) (self, child, tran, smp_sd);
+
+	kmem_free(smp_sd, sizeof (*smp_sd));
 	ddi_set_driver_private(child, NULL);
 	ddi_set_name_addr(child, NULL);
 	return (DDI_SUCCESS);
@@ -1654,8 +1654,15 @@ smp_hba_bus_config(dev_info_t *self, char *addr, dev_info_t **childp)
 int
 smp_hba_bus_config_taddr(dev_info_t *self, char *addr)
 {
-	dev_info_t	*child;
-	int		circ;
+	dev_info_t		*child;
+	int			circ;
+
+	/*
+	 * NOTE: If we ever uses a generic node name (.vs. a driver name)
+	 * or define a 'compatible' property, this code will need to use
+	 * a 'probe' node (ala scsi_device support) to obtain identity
+	 * information from the device.
+	 */
 
 	/* Search for "smp" child. */
 	scsi_hba_devi_enter(self, &circ);
@@ -1672,6 +1679,7 @@ smp_hba_bus_config_taddr(dev_info_t *self, char *addr)
 
 	/* Allocate "smp" child devinfo node and establish flavor of child. */
 	ndi_devi_alloc_sleep(self, "smp", DEVI_SID_HP_NODEID, &child);
+	ASSERT(child);
 	ndi_flavor_set(child, SCSA_FLAVOR_SMP);
 
 	/* Add unit-address property to child. */
@@ -1848,7 +1856,7 @@ scsi_busctl_initchild(dev_info_t *child)
 
 	/* get legacy SPI addressing properties */
 	if ((tgt = ddi_prop_get_int(DDI_DEV_T_ANY, child,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    SCSI_ADDR_PROP_TARGET, -1)) == -1) {
 		tgt = 0;
 		/*
@@ -1867,9 +1875,9 @@ scsi_busctl_initchild(dev_info_t *child)
 		}
 	}
 	lun = ddi_prop_get_int(DDI_DEV_T_ANY, child,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, SCSI_ADDR_PROP_LUN, 0);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, SCSI_ADDR_PROP_LUN, 0);
 	sfunc = ddi_prop_get_int(DDI_DEV_T_ANY, child,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, SCSI_ADDR_PROP_SFUNC, -1);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, SCSI_ADDR_PROP_SFUNC, -1);
 
 	/*
 	 * The scsi_address structure may not specify all the addressing
@@ -1968,7 +1976,7 @@ scsi_busctl_initchild(dev_info_t *child)
 	 * This is done so that parent= driver.conf nodes have class.
 	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "class",
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "class",
 	    &class) == DDI_PROP_SUCCESS) {
 		ddi_prop_free(class);
 	} else if (ndi_prop_update_string(DDI_DEV_T_NONE, child,
@@ -2326,14 +2334,14 @@ iport_preattach_tran_scsi_device(dev_info_t *child)
 static void
 iport_postdetach_tran_smp_device(dev_info_t *child)
 {
-	sas_hba_tran_t	*tran;
+	smp_hba_tran_t	*tran;
 
 	tran = ndi_flavorv_get(child, SCSA_FLAVOR_SMP);
 	if (tran == NULL)
 		return;
 
 	ndi_flavorv_set(child, SCSA_FLAVOR_SMP, NULL);
-	sas_hba_tran_free(tran);
+	smp_hba_tran_free(tran);
 }
 
 /* Initialize smp_device flavor of transport on SCSA iport 'child' node. */
@@ -2341,8 +2349,8 @@ static void
 iport_preattach_tran_smp_device(dev_info_t *child)
 {
 	dev_info_t	*hba = ddi_get_parent(child);
-	sas_hba_tran_t	*htran;
-	sas_hba_tran_t	*tran;
+	smp_hba_tran_t	*htran;
+	smp_hba_tran_t	*tran;
 
 	/* parent HBA node smp_device tran is optional */
 	htran = ndi_flavorv_get(hba, SCSA_FLAVOR_SMP);
@@ -2352,7 +2360,7 @@ iport_preattach_tran_smp_device(dev_info_t *child)
 	}
 
 	/* Allocate iport child's smp_device transport vector */
-	tran = sas_hba_tran_alloc(child);
+	tran = smp_hba_tran_alloc(child);
 
 	/* Structure-copy smp_device transport of HBA to iport. */
 	*tran = *htran;
@@ -3602,7 +3610,7 @@ scsi_hba_ident_nodename_compatible_get(struct scsi_inquiry *inq,
 	char		vid[sizeof (inq->inq_vid) + 1 ];
 	char		pid[sizeof (inq->inq_pid) + 1];
 	char		rev[sizeof (inq->inq_revision) + 1];
-	char		gf[sizeof ("R\0")];
+	char		gf[sizeof ("RS\0")];
 	char		ff[sizeof ("EGI\0")];
 	int		dtype_device;
 	int		ncompat;		/* number of compatible */
@@ -4190,7 +4198,7 @@ scsi_device_prop_get_int(struct scsi_device *sd, uint_t flags,
 			v = data;
 	} else
 		v = ddi_prop_get_int(DDI_DEV_T_ANY, sd->sd_dev,
-		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, name, v);
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, name, v);
 	return (v);
 }
 
@@ -4216,7 +4224,7 @@ scsi_device_prop_get_int64(struct scsi_device *sd, uint_t flags,
 			v = data;
 	} else
 		v = ddi_prop_get_int64(DDI_DEV_T_ANY, sd->sd_dev,
-		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, name, v);
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, name, v);
 	return (v);
 }
 
@@ -4237,7 +4245,7 @@ scsi_device_prop_lookup_byte_array(struct scsi_device *sd, uint_t flags,
 		rv = mdi_prop_lookup_byte_array(pip, name, data, nelements);
 	else
 		rv = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, sd->sd_dev,
-		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 		    name, data, nelements);
 	return (rv);
 }
@@ -4259,7 +4267,7 @@ scsi_device_prop_lookup_int_array(struct scsi_device *sd, uint_t flags,
 		rv = mdi_prop_lookup_int_array(pip, name, data, nelements);
 	else
 		rv = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, sd->sd_dev,
-		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 		    name, data, nelements);
 	return (rv);
 }
@@ -4282,7 +4290,7 @@ scsi_device_prop_lookup_string(struct scsi_device *sd, uint_t flags,
 		rv = mdi_prop_lookup_string(pip, name, data);
 	else
 		rv = ddi_prop_lookup_string(DDI_DEV_T_ANY, sd->sd_dev,
-		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 		    name, data);
 	return (rv);
 }
@@ -4304,7 +4312,7 @@ scsi_device_prop_lookup_string_array(struct scsi_device *sd, uint_t flags,
 		rv = mdi_prop_lookup_string_array(pip, name, data, nelements);
 	else
 		rv = ddi_prop_lookup_string_array(DDI_DEV_T_ANY, sd->sd_dev,
-		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 		    name, data, nelements);
 	return (rv);
 }
@@ -4902,7 +4910,7 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 
 	/* Get "scsi-binding-set" property (if there is one). */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, self,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    "scsi-binding-set", &binding_set) == DDI_PROP_SUCCESS)
 		SCSI_HBA_LOG((_LOG(2), NULL, probe,
 		    "binding_set '%s'", binding_set));
@@ -4982,6 +4990,7 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 		    (se == SE_HP) ? DEVI_SID_HP_NODEID : DEVI_SID_NODEID,
 		    &dchild);
 		ASSERT(dchild);
+		ndi_flavor_set(dchild, SCSA_FLAVOR_SCSI_DEVICE);
 
 		/*
 		 * Decorate new node with addressing properties (via
@@ -5019,10 +5028,11 @@ scsi_device_createchild(dev_info_t *self, char *addr, scsi_enum_t se,
 		if (have_devid) {
 			if (ddi_devid_register(dchild, devid) == DDI_FAILURE)
 				SCSI_HBA_LOG((_LOG(1), NULL, dchild,
-				    "devinfo @%s created, devid failed", addr));
+				    "devinfo @%s created, "
+				    "devid register failed", addr));
 			else
 				SCSI_HBA_LOG((_LOG(2), NULL, dchild,
-				    "devinfo @%s created devid", addr));
+				    "devinfo @%s created with devid", addr));
 		} else
 			SCSI_HBA_LOG((_LOG(2), NULL, dchild,
 			    "devinfo @%s created, no devid", addr));
@@ -5995,6 +6005,7 @@ scsi_device_config(dev_info_t *self, char *name, char *addr, scsi_enum_t se,
 	    (se == SE_HP) ? DEVI_SID_HP_HIDDEN_NODEID : DEVI_SID_HIDDEN_NODEID,
 	    &probe);
 	ASSERT(probe);
+	ndi_flavor_set(probe, SCSA_FLAVOR_SCSI_DEVICE);
 
 	/*
 	 * Decorate the probe node with the property representation of @addr
@@ -7190,7 +7201,7 @@ scsi_hba_bus_configall_spi(dev_info_t *self, int mt)
 	 * SCSI_OPTIONS_WIDE setting.
 	 */
 	options = ddi_prop_get_int(DDI_DEV_T_ANY, self,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "scsi-options", -1);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "scsi-options", -1);
 	if ((options != -1) && ((options & SCSI_OPTIONS_WIDE) == 0))
 		ntargets = NTARGETS;			/* 8 */
 	else
@@ -7203,7 +7214,7 @@ scsi_hba_bus_configall_spi(dev_info_t *self, int mt)
 	 * fail gracefully when asked to enumerate itself.
 	 */
 	id = ddi_prop_get_int(DDI_DEV_T_ANY, self,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "scsi-initiator-id", -1);
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "scsi-initiator-id", -1);
 	if (id > ntargets) {
 		SCSI_HBA_LOG((_LOG(1), self, NULL,
 		    "'scsi-initiator-id' bogus for %d target bus: %d",
@@ -7359,7 +7370,7 @@ scsi_hba_bus_configone(dev_info_t *self, uint_t flags, char *arg,
 		 */
 		if (*(lcp + 1) == '*') {
 			mt = ddi_prop_get_int(DDI_DEV_T_ANY, self,
-			    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+			    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 			    "scsi-enumeration", scsi_enumeration);
 			SCSI_HBA_LOG((_LOG(2), self, NULL,
 			    "%s@%s lun enumeration triggered", name, addr));
@@ -7382,8 +7393,8 @@ scsi_hba_bus_configone(dev_info_t *self, uint_t flags, char *arg,
 			sc2 = *(lcp + 2);
 			*(lcp + 1) = '0';
 			*(lcp + 2) = '\0';
-			sd0 = scsi_device_config(self, NULL, addr,
-			    SE_BUSCONFIG, &circ, NULL);
+			sd0 = scsi_device_config(self,
+			    NULL, addr, SE_BUSCONFIG, &circ, NULL);
 
 			/* restore original lun */
 			*(lcp + 1) = sc1;
@@ -7415,8 +7426,8 @@ scsi_hba_bus_configone(dev_info_t *self, uint_t flags, char *arg,
 	 * exists.
 	 */
 	if (sd0) {
-		sd = scsi_device_config(self, name, addr,
-		    SE_BUSCONFIG, &circ, NULL);
+		sd = scsi_device_config(self,
+		    name, addr, SE_BUSCONFIG, &circ, NULL);
 	} else {
 		sd = NULL;
 		SCSI_HBA_LOG((_LOG(2), self, NULL,
@@ -7494,7 +7505,7 @@ scsi_hba_bus_config_spi(dev_info_t *self, uint_t flags,
 	 * knob then use the global scsi_enumeration knob.
 	 */
 	mt = ddi_prop_get_int(DDI_DEV_T_ANY, self,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    "scsi-enumeration", scsi_enumeration);
 	if ((mt & SCSI_ENUMERATION_ENABLE) == 0) {
 		/*
@@ -7563,7 +7574,7 @@ scsi_hba_bus_unconfig_spi(dev_info_t *self, uint_t flags,
 	 * scsi_enumeration knob.
 	 */
 	mt = ddi_prop_get_int(DDI_DEV_T_ANY, self,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    "scsi-enumeration", scsi_enumeration);
 	if ((mt & SCSI_ENUMERATION_ENABLE) == 0)
 		return (ndi_busop_bus_unconfig(self, flags, op, arg));
@@ -7848,7 +7859,7 @@ scsi_tgtmap_scsi_config(void *arg, damap_t *mapp, damap_id_list_t id_list)
 
 	tgtmap = (impl_scsi_tgtmap_t *)tran->tran_tgtmap;
 	mt = ddi_prop_get_int(DDI_DEV_T_ANY, self,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 	    "scsi-enumeration", scsi_enumeration);
 
 	/* count the number of targets we need to config */
@@ -8125,7 +8136,7 @@ scsi_hba_tgtmap_create(dev_info_t *self, scsi_tgtmap_mode_t mode,
 	 * property.
 	 */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, self,
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "scsi-binding-set",
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "scsi-binding-set",
 	    &scsi_binding_set) == DDI_PROP_SUCCESS) {
 		if (strcmp(scsi_binding_set, scsi_binding_set_spi) == 0)
 			(void) ndi_prop_remove(DDI_DEV_T_NONE, self,
@@ -8659,7 +8670,7 @@ scsi_hba_bus_config_prom_node(dev_info_t *self, uint_t flags,
 		/* Prepend the iport name */
 		(void) snprintf(addr, SCSI_MAXNAMELEN, "iport@%s",
 		    iports[i]);
-		if (pdip = scsi_hba_bus_config_port(self, addr, SE_HP)) {
+		if (pdip = scsi_hba_bus_config_port(self, addr, SE_BUSCONFIG)) {
 			if (ndi_busop_bus_config(self, NDI_NO_EVENT,
 			    BUS_CONFIG_ONE, addr, &pdip, 0) !=
 			    NDI_SUCCESS) {

@@ -46,6 +46,10 @@ extern int	devid_scsi_encode(int version, char *driver_name, uchar_t *inq,
 		    size_t inq_len, uchar_t *inq80, size_t inq80_len,
 		    uchar_t *inq83, size_t inq83_len, ddi_devid_t *devid);
 
+extern int	devid_smp_encode(int version, char *driver_name,
+		    char *wwnstr, uchar_t *srmir_buf, size_t srmir_len,
+		    ddi_devid_t *devid);
+
 extern char	*devid_to_guid(ddi_devid_t devid);
 extern void	devid_free_guid(char *guid);
 
@@ -60,6 +64,8 @@ extern void	scsi_free_wwnstr(char *wwnstr);
 extern scsi_lun64_t	scsi_lun_to_lun64(scsi_lun_t lun);
 extern scsi_lun_t	scsi_lun64_to_lun(scsi_lun64_t lun64);
 #endif	/* SCSI_ADDR_PROP_LUN64 */
+
+extern int	scsi_ascii_inquiry_len(char *field, size_t length);
 
 #ifdef	__cplusplus
 }

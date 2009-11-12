@@ -43,8 +43,6 @@
  */
 static int smp_attach(dev_info_t *, ddi_attach_cmd_t);
 static int smp_detach(dev_info_t *, ddi_detach_cmd_t);
-static int smp_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
-static int smp_probe(dev_info_t *);
 static int smp_open(dev_t *, int, int, cred_t *);
 static int smp_close(dev_t, int, int, cred_t *);
 static int smp_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
@@ -95,9 +93,9 @@ static struct cb_ops smp_cb_ops = {
 static struct dev_ops smp_dev_ops = {
 	DEVO_REV,		/* devo_rev, */
 	0,			/* refcnt  */
-	smp_getinfo,		/* info */
+	ddi_getinfo_1to1,	/* info */
 	nulldev,		/* identify */
-	smp_probe,		/* probe */
+	NULL,			/* probe */
 	smp_attach,		/* attach */
 	smp_detach,		/* detach */
 	nodev,			/* reset */
@@ -177,7 +175,6 @@ smp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		smp_log(NULL, CE_NOTE, "!smp_attach(), "
 		    "device unit-address @%s failed",
 		    ddi_get_name_addr(dip));
-
 	}
 	return (err);
 }
@@ -189,16 +186,52 @@ smp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 smp_do_attach(dev_info_t *dip)
 {
-	int instance;
-	struct smp_device *smp_devp;
-	smp_state_t *smp_state;
+	int			instance;
+	struct smp_device	*smp_sd;
+	uchar_t			*srmir = NULL;
+	uint_t			srmirlen = 0;
+	ddi_devid_t		devid = NULL;
+	smp_state_t		*smp_state;
 
 	instance = ddi_get_instance(dip);
-	smp_devp = ddi_get_driver_private(dip);
-	ASSERT(smp_devp != NULL);
+	smp_sd = ddi_get_driver_private(dip);
+	ASSERT(smp_sd != NULL);
 
 	DTRACE_PROBE2(smp__attach__detach, int, instance, char *,
 	    ddi_get_name_addr(dip));
+
+	/* make sure device is there, and establish srmir identity property */
+	if (smp_probe(smp_sd) != DDI_PROBE_SUCCESS) {
+		smp_log(NULL, CE_NOTE,
+		    "!smp_do_attach: failed smp_probe, "
+		    "device unit-address @%s", ddi_get_name_addr(dip));
+		return (DDI_FAILURE);
+	}
+
+	/* if we have not already registered a devid, then do so now  */
+	if (ddi_devid_get(dip, &devid) != DDI_SUCCESS) {
+		/* get the srmir identity information for use in devid */
+		(void) ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+		    SMP_PROP_REPORT_MANUFACTURER, &srmir, &srmirlen);
+
+		/* Convert smp unit-address and srmir into devid */
+		if (ddi_devid_smp_encode(DEVID_SMP_ENCODE_VERSION_LATEST,
+		    (char *)ddi_driver_name(dip), ddi_get_name_addr(dip),
+		    srmir, srmirlen, &devid) == DDI_SUCCESS) {
+			/* register the devid */
+			(void) ddi_devid_register(dip, devid);
+		}
+		ddi_prop_free(srmir);
+	}
+
+	/* We don't need the devid for our own operation, so free now. */
+	if (devid)
+		ddi_devid_free(devid);
+
+	/* we are now done with srmir identity property defined by smp_probe */
+	(void) ndi_prop_remove(DDI_DEV_T_NONE,
+	    dip, SMP_PROP_REPORT_MANUFACTURER);
 
 	if (ddi_soft_state_zalloc(smp_soft_state, instance) != DDI_SUCCESS) {
 		smp_log(NULL, CE_NOTE,
@@ -208,7 +241,7 @@ smp_do_attach(dev_info_t *dip)
 	}
 
 	smp_state = ddi_get_soft_state(smp_soft_state, instance);
-	smp_state->smp_dev = smp_devp;
+	smp_state->smp_sd = smp_sd;
 
 	/*
 	 * For simplicity, the minor number == the instance number
@@ -280,49 +313,6 @@ smp_do_detach(dev_info_t *dip)
 	ddi_soft_state_free(smp_soft_state, instance);
 	ddi_remove_minor_node(dip, NULL);
 	return (DDI_SUCCESS);
-}
-
-static int
-smp_probe(dev_info_t *dip)
-{
-	struct smp_device *smpdevp;
-
-	smpdevp = ddi_get_driver_private(dip);
-
-	return (sas_hba_probe_smp(smpdevp));
-}
-
-/*
- * smp_getinfo()
- *	getinfo(9e) entrypoint.
- */
-/*ARGSUSED*/
-static int
-smp_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
-{
-	dev_t dev;
-	smp_state_t *smp_state;
-	int instance, error;
-	switch (infocmd) {
-	case DDI_INFO_DEVT2DEVINFO:
-		dev = (dev_t)arg;
-		instance = getminor(dev);
-		if ((smp_state = ddi_get_soft_state(smp_soft_state, instance))
-		    == NULL)
-			return (DDI_FAILURE);
-		*result = (void *) smp_state->smp_dev->dip;
-		error = DDI_SUCCESS;
-		break;
-	case DDI_INFO_DEVT2INSTANCE:
-		dev = (dev_t)arg;
-		instance = getminor(dev);
-		*result = (void *)(uintptr_t)instance;
-		error = DDI_SUCCESS;
-		break;
-	default:
-		error = DDI_FAILURE;
-	}
-	return (error);
 }
 
 /*ARGSUSED*/
@@ -444,41 +434,41 @@ smp_handle_func(dev_t dev,
 		goto done;
 	}
 
-	smp_pkt->pkt_reqsize = usmp_cmd->usmp_reqsize;
-	smp_pkt->pkt_rspsize = usmp_cmd->usmp_rspsize;
+	smp_pkt->smp_pkt_reqsize = usmp_cmd->usmp_reqsize;
+	smp_pkt->smp_pkt_rspsize = usmp_cmd->usmp_rspsize;
 
 	/* allocate memory space for smp request and response frame in kernel */
-	smp_pkt->pkt_req = kmem_zalloc((size_t)usmp_cmd->usmp_reqsize,
+	smp_pkt->smp_pkt_req = kmem_zalloc((size_t)usmp_cmd->usmp_reqsize,
 	    KM_SLEEP);
 	cmd_flags |= SMP_FLAG_REQBUF;
 
-	smp_pkt->pkt_rsp = kmem_zalloc((size_t)usmp_cmd->usmp_rspsize,
+	smp_pkt->smp_pkt_rsp = kmem_zalloc((size_t)usmp_cmd->usmp_rspsize,
 	    KM_SLEEP);
 	cmd_flags |= SMP_FLAG_RSPBUF;
 
 	/* copy smp request frame to kernel space */
-	if (ddi_copyin(usmp_cmd->usmp_req, smp_pkt->pkt_req,
+	if (ddi_copyin(usmp_cmd->usmp_req, smp_pkt->smp_pkt_req,
 	    (size_t)usmp_cmd->usmp_reqsize, flag) != 0) {
 		rval = EFAULT;
 		goto done;
 	}
 
-	DTRACE_PROBE1(smp__transport__start, caddr_t, smp_pkt->pkt_req);
+	DTRACE_PROBE1(smp__transport__start, caddr_t, smp_pkt->smp_pkt_req);
 
-	smp_pkt->pkt_address = &smp_state->smp_dev->smp_addr;
+	smp_pkt->smp_pkt_address = &smp_state->smp_sd->smp_sd_address;
 	if (usmp_cmd->usmp_timeout <= 0) {
-		smp_pkt->pkt_timeout = SMP_DEFAULT_TIMEOUT;
+		smp_pkt->smp_pkt_timeout = SMP_DEFAULT_TIMEOUT;
 	} else {
-		smp_pkt->pkt_timeout = usmp_cmd->usmp_timeout;
+		smp_pkt->smp_pkt_timeout = usmp_cmd->usmp_timeout;
 	}
 
-	/* call sas_smp_transport entry and send smp_pkt to HBA driver */
+	/* call smp_transport entry and send smp_pkt to HBA driver */
 	cmd_flags |= SMP_FLAG_XFER;
 	for (retrycount = 0; retrycount <= smp_retry_times; retrycount++) {
 
 		/*
 		 * To improve transport reliability, only allow one command
-		 * outstanding at a time in sas_smp_transport().
+		 * outstanding at a time in smp_transport().
 		 *
 		 * NOTE: Some expanders have issues with heavy smp load.
 		 */
@@ -492,11 +482,11 @@ smp_handle_func(dev_t dev,
 		}
 
 		/* Let the transport know if more retries are possible. */
-		smp_pkt->pkt_will_retry =
+		smp_pkt->smp_pkt_will_retry =
 		    (retrycount < smp_retry_times) ? 1 : 0;
 
-		smp_pkt->pkt_reason = 0;
-		rval = sas_smp_transport(smp_pkt);	/* put on the wire */
+		smp_pkt->smp_pkt_reason = 0;
+		rval = smp_transport(smp_pkt);	/* put on the wire */
 
 		if (smp_delay_cmd)
 			delay(drv_usectohz(smp_delay_cmd));
@@ -515,10 +505,10 @@ smp_handle_func(dev_t dev,
 			break;
 		}
 
-		switch (smp_pkt->pkt_reason) {
+		switch (smp_pkt->smp_pkt_reason) {
 		case EAGAIN:
 			if (retrycount < smp_retry_times) {
-				bzero(smp_pkt->pkt_rsp,
+				bzero(smp_pkt->smp_pkt_rsp,
 				    (size_t)usmp_cmd->usmp_rspsize);
 				if (smp_retry_delay)
 					delay(drv_usectohz(smp_retry_delay));
@@ -526,37 +516,37 @@ smp_handle_func(dev_t dev,
 			} else {
 				smp_retry_failed++;
 				smp_log(smp_state, CE_NOTE,
-				    "!sas_smp_transport failed, pkt_reason %d",
-				    smp_pkt->pkt_reason);
-				rval = smp_pkt->pkt_reason;
+				    "!smp_transport failed, smp_pkt_reason %d",
+				    smp_pkt->smp_pkt_reason);
+				rval = smp_pkt->smp_pkt_reason;
 				goto copyout;
 			}
 		default:
 			smp_log(smp_state, CE_NOTE,
-			    "!sas_smp_transport failed, pkt_reason %d",
-			    smp_pkt->pkt_reason);
-			rval = smp_pkt->pkt_reason;
+			    "!smp_transport failed, smp_pkt_reason %d",
+			    smp_pkt->smp_pkt_reason);
+			rval = smp_pkt->smp_pkt_reason;
 			goto copyout;
 		}
 	}
 
 copyout:
 	/* copy out smp response to user process */
-	if (ddi_copyout(smp_pkt->pkt_rsp, usmp_cmd->usmp_rsp,
+	if (ddi_copyout(smp_pkt->smp_pkt_rsp, usmp_cmd->usmp_rsp,
 	    (size_t)usmp_cmd->usmp_rspsize, flag) != 0) {
 		rval = EFAULT;
 	}
 
 done:
 	if ((cmd_flags & SMP_FLAG_XFER) != 0) {
-		DTRACE_PROBE2(smp__transport__done, caddr_t, smp_pkt->pkt_rsp,
-		    uchar_t, smp_pkt->pkt_reason);
+		DTRACE_PROBE2(smp__transport__done, caddr_t,
+		    smp_pkt->smp_pkt_rsp, uchar_t, smp_pkt->smp_pkt_reason);
 	}
 	if ((cmd_flags & SMP_FLAG_REQBUF) != 0) {
-		kmem_free(smp_pkt->pkt_req, smp_pkt->pkt_reqsize);
+		kmem_free(smp_pkt->smp_pkt_req, smp_pkt->smp_pkt_reqsize);
 	}
 	if ((cmd_flags & SMP_FLAG_RSPBUF) != 0) {
-		kmem_free(smp_pkt->pkt_rsp, smp_pkt->pkt_rspsize);
+		kmem_free(smp_pkt->smp_pkt_rsp, smp_pkt->smp_pkt_rspsize);
 	}
 
 	if (rval)
@@ -595,7 +585,7 @@ smp_log(smp_state_t *smp_state, int level, const char *fmt, ...)
 	if (smp_state == (smp_state_t *)NULL) {
 		dip = NULL;
 	} else {
-		dip = smp_state->smp_dev->dip;
+		dip = smp_state->smp_sd->smp_sd_dev;
 	}
 
 	va_start(ap, fmt);

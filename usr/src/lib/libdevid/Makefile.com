@@ -19,21 +19,19 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 LIBRARY=	libdevid.a
 VERS=		.1
-OBJECTS=	deviceid.o devid.o devid_scsi.o
+OBJECTS=	deviceid.o devid.o devid_scsi.o devid_smp.o
 
 include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 SRCS =		../deviceid.c $(SRC)/common/devid/devid.c \
-		$(SRC)/common/devid/devid_scsi.c
+		$(SRC)/common/devid/devid_scsi.c \
+		$(SRC)/common/devid/devid_smp.c
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 LIBS =		$(DYNLIB) $(LINTLIB)
 #
@@ -57,4 +55,8 @@ pics/devid.o:	 $(SRC)/common/devid/devid.c
 
 pics/devid_scsi.o:	 $(SRC)/common/devid/devid_scsi.c
 	$(COMPILE.c) -o $@ $(SRC)/common/devid/devid_scsi.c
+	$(POST_PROCESS_O)
+
+pics/devid_smp.o:	 $(SRC)/common/devid/devid_smp.c
+	$(COMPILE.c) -o $@ $(SRC)/common/devid/devid_smp.c
 	$(POST_PROCESS_O)

@@ -45,7 +45,7 @@ extern "C" {
 #define	SMP_EXOPENED	2
 
 typedef struct smp_state {
-	struct smp_device	*smp_dev;	/* pointer to smp_device */
+	struct smp_device	*smp_sd;	/* pointer to smp_device */
 	kmutex_t		smp_mutex;	/* mutex */
 	uint32_t		smp_open_flag;	/* open flag */
 	kcondvar_t		smp_cv;		/* condition variable */

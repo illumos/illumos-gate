@@ -164,8 +164,6 @@ static int mptsas_bus_config(dev_info_t *pdip, uint_t flags,
  * SMP functions
  */
 static int mptsas_smp_start(struct smp_pkt *smp_pkt);
-static int mptsas_getcap(struct sas_addr *ap, char *cap);
-static int mptsas_capchk(char *cap, int tgtonly, int *cidxp);
 
 /*
  * internal function prototypes.
@@ -187,6 +185,7 @@ static int mptsas_do_detach(dev_info_t *dev);
 static int mptsas_do_scsi_reset(mptsas_t *mpt, uint16_t devhdl);
 static int mptsas_do_scsi_abort(mptsas_t *mpt, int target, int lun,
     struct scsi_pkt *pkt);
+static int mptsas_scsi_capchk(char *cap, int tgtonly, int *cidxp);
 
 static void mptsas_handle_qfull(mptsas_t *mpt, mptsas_cmd_t *cmd);
 static void mptsas_handle_event(void *args);
@@ -490,7 +489,7 @@ static struct dev_ops mptsas_ops = {
 };
 
 
-#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.19"
+#define	MPTSAS_MOD_STRING "MPTSAS HBA Driver 00.00.00.20"
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module. This one is a driver */
@@ -781,7 +780,7 @@ mptsas_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	char			map_setup = 0;
 	char			config_setup = 0;
 	char			hba_attach_setup = 0;
-	char			sas_attach_setup = 0;
+	char			smp_attach_setup = 0;
 	char			mutex_init_done = 0;
 	char			event_taskq_create = 0;
 	char			dr_taskq_create = 0;
@@ -1239,16 +1238,16 @@ intr_done:
 	}
 	hba_attach_setup++;
 
-	mpt->m_smptran = sas_hba_tran_alloc(dip);
+	mpt->m_smptran = smp_hba_tran_alloc(dip);
 	ASSERT(mpt->m_smptran != NULL);
-	mpt->m_smptran->tran_hba_private = mpt;
-	mpt->m_smptran->tran_smp_start = mptsas_smp_start;
-	mpt->m_smptran->tran_sas_getcap = mptsas_getcap;
-	if (sas_hba_attach_setup(dip, mpt->m_smptran) != DDI_SUCCESS) {
+	mpt->m_smptran->smp_tran_hba_private = mpt;
+	mpt->m_smptran->smp_tran_start = mptsas_smp_start;
+	if (smp_hba_attach_setup(dip, mpt->m_smptran) != DDI_SUCCESS) {
 		mptsas_log(mpt, CE_WARN, "smp attach setup failed");
 		goto fail;
 	}
-	sas_attach_setup++;
+	smp_attach_setup++;
+
 	/*
 	 * Initialize smp hash table
 	 */
@@ -1417,8 +1416,8 @@ fail:
 		if (hba_attach_setup) {
 			(void) scsi_hba_detach(dip);
 		}
-		if (sas_attach_setup) {
-			(void) sas_hba_detach(dip);
+		if (smp_attach_setup) {
+			(void) smp_hba_detach(dip);
 		}
 		if (intr_added) {
 			mptsas_rem_intrs(mpt);
@@ -1475,7 +1474,7 @@ fail:
 			mpt->m_tran = NULL;
 		}
 		if (mpt->m_smptran) {
-			sas_hba_tran_free(mpt->m_smptran);
+			smp_hba_tran_free(mpt->m_smptran);
 			mpt->m_smptran = NULL;
 		}
 		mptsas_fm_fini(mpt);
@@ -1858,7 +1857,7 @@ mptsas_do_detach(dev_info_t *dip)
 	kmem_cache_destroy(mpt->m_kmem_cache);
 
 	(void) scsi_hba_detach(dip);
-	(void) sas_hba_detach(dip);
+	(void) smp_hba_detach(dip);
 	mptsas_free_handshake_msg(mpt);
 	mptsas_hba_fini(mpt);
 	mptsas_cfg_fini(mpt);
@@ -1886,7 +1885,7 @@ mptsas_do_detach(dev_info_t *dip)
 	}
 
 	if (mpt->m_smptran) {
-		sas_hba_tran_free(mpt->m_smptran);
+		smp_hba_tran_free(mpt->m_smptran);
 		mpt->m_smptran = NULL;
 	}
 
@@ -8605,7 +8604,7 @@ mptsas_scsi_getcap(struct scsi_address *ap, char *cap, int tgtonly)
 
 	mutex_enter(&mpt->m_mutex);
 
-	if ((mptsas_capchk(cap, tgtonly, &ckey)) != TRUE) {
+	if ((mptsas_scsi_capchk(cap, tgtonly, &ckey)) != TRUE) {
 		mutex_exit(&mpt->m_mutex);
 		return (UNDEFINED);
 	}
@@ -8683,7 +8682,7 @@ mptsas_scsi_setcap(struct scsi_address *ap, char *cap, int value, int tgtonly)
 
 	mutex_enter(&mpt->m_mutex);
 
-	if ((mptsas_capchk(cap, tgtonly, &ckey)) != TRUE) {
+	if ((mptsas_scsi_capchk(cap, tgtonly, &ckey)) != TRUE) {
 		mutex_exit(&mpt->m_mutex);
 		return (UNDEFINED);
 	}
@@ -8741,9 +8740,9 @@ mptsas_scsi_setcap(struct scsi_address *ap, char *cap, int value, int tgtonly)
  */
 /*ARGSUSED*/
 static int
-mptsas_capchk(char *cap, int tgtonly, int *cidxp)
+mptsas_scsi_capchk(char *cap, int tgtonly, int *cidxp)
 {
-	NDBG24(("mptsas_capchk: cap=%s", cap));
+	NDBG24(("mptsas_scsi_capchk: cap=%s", cap));
 
 	if (!cap)
 		return (FALSE);
@@ -12614,15 +12613,16 @@ phys_create_done:
 static int
 mptsas_probe_smp(dev_info_t *pdip, uint64_t wwn)
 {
-	struct smp_device smp;
+	mptsas_t	*mpt = DIP2MPT(pdip);
+	struct smp_device smp_sd;
 
-	bzero(&smp, sizeof (struct smp_device));
-	smp.smp_addr.a_hba_tran = ndi_flavorv_get(pdip, SCSA_FLAVOR_SMP);
-	bcopy(&wwn, smp.smp_addr.a_wwn, SAS_WWN_BYTE_SIZE);
+	/* XXX An HBA driver should not be allocating an smp_device. */
+	bzero(&smp_sd, sizeof (struct smp_device));
+	smp_sd.smp_sd_address.smp_a_hba_tran = mpt->m_smptran;
+	bcopy(&wwn, smp_sd.smp_sd_address.smp_a_wwn, SAS_WWN_BYTE_SIZE);
 
-	if (sas_hba_probe_smp(&smp) != DDI_PROBE_SUCCESS) {
+	if (smp_probe(&smp_sd) != DDI_PROBE_SUCCESS)
 		return (NDI_FAILURE);
-	}
 	return (NDI_SUCCESS);
 }
 
@@ -12731,34 +12731,8 @@ smp_create_done:
 	return ((ndi_rtn == NDI_SUCCESS) ? DDI_SUCCESS : DDI_FAILURE);
 }
 
-/*ARGSUSED*/
-static int mptsas_getcap(struct sas_addr *ap, char *cap)
-{
-	int	ckey = -1;
-	int	ret = EINVAL;
-
-	ckey = sas_hba_lookup_capstr(cap);
-	if (ckey == -1)
-		return (EINVAL);
-
-	switch (ckey) {
-	case SAS_CAP_SMP_CRC:
-		/*
-		 * mpt controller support generate CRC for
-		 * SMP passthrough frame and handle CRC by
-		 * IOC itself.
-		 */
-		ret = 0;
-		break;
-	default:
-		ret = EINVAL;
-		break;
-	}
-	return (ret);
-}
-
 /* smp transport routine */
-static int mptsas_smp_start(struct smp_pkt *pktp)
+static int mptsas_smp_start(struct smp_pkt *smp_pkt)
 {
 	uint64_t			wwn;
 	Mpi2SmpPassthroughRequest_t	req;
@@ -12768,9 +12742,10 @@ static int mptsas_smp_start(struct smp_pkt *pktp)
 	int				ret;
 	uint64_t			tmp64;
 
-	mpt = (mptsas_t *)pktp->pkt_address->a_hba_tran->tran_hba_private;
+	mpt = (mptsas_t *)smp_pkt->smp_pkt_address->
+	    smp_a_hba_tran->smp_tran_hba_private;
 
-	bcopy(pktp->pkt_address->a_wwn, &wwn, SAS_WWN_BYTE_SIZE);
+	bcopy(smp_pkt->smp_pkt_address->smp_a_wwn, &wwn, SAS_WWN_BYTE_SIZE);
 	/*
 	 * Need to compose a SMP request message
 	 * and call mptsas_do_passthru() function
@@ -12782,50 +12757,51 @@ static int mptsas_smp_start(struct smp_pkt *pktp)
 	req.ChainOffset = 0;
 	req.Function = MPI2_FUNCTION_SMP_PASSTHROUGH;
 
-	if ((pktp->pkt_reqsize & 0xffff0000ul) != 0) {
-		pktp->pkt_reason = ERANGE;
+	if ((smp_pkt->smp_pkt_reqsize & 0xffff0000ul) != 0) {
+		smp_pkt->smp_pkt_reason = ERANGE;
 		return (DDI_FAILURE);
 	}
-	req.RequestDataLength = LE_16((uint16_t)(pktp->pkt_reqsize - 4));
+	req.RequestDataLength = LE_16((uint16_t)(smp_pkt->smp_pkt_reqsize - 4));
 
 	req.MsgFlags = 0;
 	tmp64 = LE_64(wwn);
 	bcopy(&tmp64, &req.SASAddress, SAS_WWN_BYTE_SIZE);
-	if (pktp->pkt_rspsize > 0) {
+	if (smp_pkt->smp_pkt_rspsize > 0) {
 		direction |= MPTSAS_PASS_THRU_DIRECTION_READ;
 	}
-	if (pktp->pkt_reqsize > 0) {
+	if (smp_pkt->smp_pkt_reqsize > 0) {
 		direction |= MPTSAS_PASS_THRU_DIRECTION_WRITE;
 	}
 
 	mutex_enter(&mpt->m_mutex);
 	ret = mptsas_do_passthru(mpt, (uint8_t *)&req, (uint8_t *)&rep,
-	    (uint8_t *)pktp->pkt_rsp, offsetof(Mpi2SmpPassthroughRequest_t,
-	    SGL), sizeof (rep), pktp->pkt_rspsize - 4, direction,
-	    (uint8_t *)pktp->pkt_req, pktp->pkt_reqsize - 4,
-	    pktp->pkt_timeout, FKIOCTL);
+	    (uint8_t *)smp_pkt->smp_pkt_rsp,
+	    offsetof(Mpi2SmpPassthroughRequest_t, SGL), sizeof (rep),
+	    smp_pkt->smp_pkt_rspsize - 4, direction,
+	    (uint8_t *)smp_pkt->smp_pkt_req, smp_pkt->smp_pkt_reqsize - 4,
+	    smp_pkt->smp_pkt_timeout, FKIOCTL);
 	mutex_exit(&mpt->m_mutex);
 	if (ret != 0) {
 		cmn_err(CE_WARN, "smp_start do passthru error %d", ret);
-		pktp->pkt_reason = (uchar_t)(ret);
+		smp_pkt->smp_pkt_reason = (uchar_t)(ret);
 		return (DDI_FAILURE);
 	}
 	/* do passthrough success, check the smp status */
 	if (LE_16(rep.IOCStatus) != MPI2_IOCSTATUS_SUCCESS) {
 		switch (LE_16(rep.IOCStatus)) {
 		case MPI2_IOCSTATUS_SCSI_DEVICE_NOT_THERE:
-			pktp->pkt_reason = ENODEV;
+			smp_pkt->smp_pkt_reason = ENODEV;
 			break;
 		case MPI2_IOCSTATUS_SAS_SMP_DATA_OVERRUN:
-			pktp->pkt_reason = EOVERFLOW;
+			smp_pkt->smp_pkt_reason = EOVERFLOW;
 			break;
 		case MPI2_IOCSTATUS_SAS_SMP_REQUEST_FAILED:
-			pktp->pkt_reason = EIO;
+			smp_pkt->smp_pkt_reason = EIO;
 			break;
 		default:
 			mptsas_log(mpt, CE_NOTE, "smp_start: get unknown ioc"
 			    "status:%x", LE_16(rep.IOCStatus));
-			pktp->pkt_reason = EIO;
+			smp_pkt->smp_pkt_reason = EIO;
 			break;
 		}
 		return (DDI_FAILURE);
@@ -12833,7 +12809,7 @@ static int mptsas_smp_start(struct smp_pkt *pktp)
 	if (rep.SASStatus != MPI2_SASSTATUS_SUCCESS) {
 		mptsas_log(mpt, CE_NOTE, "smp_start: get error SAS status:%x",
 		    rep.SASStatus);
-		pktp->pkt_reason = EIO;
+		smp_pkt->smp_pkt_reason = EIO;
 		return (DDI_FAILURE);
 	}
 

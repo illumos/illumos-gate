@@ -18,14 +18,13 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_SCSI_IMPL_SAS_TRANSPORT_H
-#define	_SYS_SCSI_IMPL_SAS_TRANSPORT_H
+#ifndef _SYS_SCSI_IMPL_SCSI_SAS_H
+#define	_SYS_SCSI_IMPL_SCSI_SAS_H
 
 #include <sys/types.h>
 #include <sys/scsi/impl/usmp.h>
@@ -35,87 +34,6 @@ extern "C" {
 #endif
 
 #if defined(_KERNEL)
-
-/*
- * Properties for smp device
- */
-#define	SMP_PROP		"smp-device"
-#define	SMP_WWN			"smp-wwn"
-
-/*
- * Common Capability Strings Array for SAS
- */
-/*
- * SAS_CAP_SMP_CRC represent if the HBA has the
- * capability to generate CRC for SMP frame and
- * check the CRC of the reply frame
- */
-#define	SAS_CAP_SMP_CRC		1
-#define	SAS_CAP_ASCII		{					\
-		"smp-crc", NULL }
-
-typedef struct sas_hba_tran	sas_hba_tran_t;
-
-typedef struct sas_addr {
-	uint8_t		a_wwn[SAS_WWN_BYTE_SIZE];	/* expander wwn */
-	sas_hba_tran_t	*a_hba_tran;			/* Transport vector */
-} sas_addr_t;
-
-typedef struct smp_pkt {
-	caddr_t		pkt_req;
-	caddr_t		pkt_rsp;
-	size_t		pkt_reqsize;
-	size_t		pkt_rspsize;
-	int		pkt_timeout;
-	uchar_t		pkt_reason;		/* code from errno.h */
-	uchar_t		pkt_will_retry;		/* will retry on EAGAIN */
-	sas_addr_t	*pkt_address;
-} smp_pkt_t;
-
-typedef struct smp_device {
-	dev_info_t	*dip;
-	sas_addr_t	smp_addr;
-} smp_device_t;
-
-
-struct sas_hba_tran {
-	void		*tran_hba_private;
-
-	int		(*tran_sas_getcap)(
-				sas_addr_t		*ap,
-				char			*cap);
-
-	int		(*tran_smp_start)(
-				struct smp_pkt		*pkt);
-
-	int		(*tran_smp_init)(
-				dev_info_t		*self,
-				dev_info_t		*child,
-				sas_hba_tran_t		*tran,
-				smp_device_t		*smp);
-
-	void		(*tran_smp_free)(
-				dev_info_t		*self,
-				dev_info_t		*child,
-				sas_hba_tran_t		*tran,
-				smp_device_t		*smp);
-};
-
-extern sas_hba_tran_t *sas_hba_tran_alloc(dev_info_t *dip);
-extern int	sas_hba_attach_setup(dev_info_t *dip, sas_hba_tran_t *smp);
-extern int	sas_hba_detach(dev_info_t *self);
-extern void	sas_hba_tran_free(sas_hba_tran_t *smp);
-
-extern int	smp_hba_bus_config(dev_info_t *, char *, dev_info_t **);
-extern int	smp_hba_bus_config_taddr(dev_info_t *, char *);
-
-
-extern int	sas_smp_transport(struct smp_pkt *pkt);
-extern int	sas_ifgetcap(struct sas_addr *ap, char *cap);
-
-extern int	sas_hba_probe_smp(struct smp_device *smp_devp);
-extern int	sas_hba_lookup_capstr(char *capstr);
-
 /*
  * Phymap support
  */
@@ -134,41 +52,38 @@ extern int	sas_phymap_create(dev_info_t		*hba_dip,
 				sas_phymap_activate_cb_t activate_cb,
 				sas_phymap_deactivate_cb_t deactivate_cb,
 				sas_phymap_t		**phymapp);
-
 void		sas_phymap_destroy(sas_phymap_t		*phymap);
 
 extern int	sas_phymap_phy_add(sas_phymap_t		*phymap,
 				int			phy,
 				uint64_t		local_sas_address,
 				uint64_t		remote_sas_address);
-
 extern int	sas_phymap_phy_rem(sas_phymap_t		*phymap,
 				int			phy);
 
 extern char	*sas_phymap_lookup_ua(sas_phymap_t	*phymap,
 				uint64_t		local_sas_address,
 				uint64_t		remote_sas_address);
-
 extern void	*sas_phymap_lookup_uapriv(sas_phymap_t	*phymap,
 				char			*ua);
+
+extern char	*sas_phymap_phy2ua(sas_phymap_t		*phymap,
+				int			phy);
+void		sas_phymap_ua_free(char	*);
 
 extern int	sas_phymap_uahasphys(sas_phymap_t	*phymap,
 				char			*ua);
 
 typedef struct __sas_phymap_phys	sas_phymap_phys_t;
-extern sas_phymap_phys_t *sas_phymap_ua2phys(sas_phymap_t *, char *ua);
-extern int	sas_phymap_phys_next(sas_phymap_phys_t *);
-void		sas_phymap_phys_free(sas_phymap_phys_t *);
-
-extern char	*sas_phymap_phy2ua(sas_phymap_t	*, int);
-void		sas_phymap_ua_free(char	*);
-
-
+extern sas_phymap_phys_t *sas_phymap_ua2phys(sas_phymap_t *phymap,
+				char			*ua);
+extern int	sas_phymap_phys_next(sas_phymap_phys_t	*phys);
+void		sas_phymap_phys_free(sas_phymap_phys_t	*phys);
 #endif /* defined(_KERNEL) */
 
 
-#define	KSTAT_SAS_PHY_CLASS	"SAS_phy_stat"
 
+#define	KSTAT_SAS_PHY_CLASS	"SAS_phy_stat"
 /*
  * Format of the ks_name field for SAS Phy Stat
  *
@@ -177,16 +92,18 @@ void		sas_phymap_ua_free(char	*);
  *
  * driver_name:
  *     driver name from di_driver_name() on SAS initiator port devinfo node.
+ *
  * initiator_port_SAS_address:
  *     SAS address of the initiator port that phy stat is reported for.
+ *
  * initiator_port_instance_number:
  *     instance number of the initiator port that phy stat is reported for.
+ *
  * phyid:
  *     prop phyIdentifier under initiator port node.
  */
 
 /* Port Protocol - kstat structure definition */
-
 typedef struct sas_port_protocol_stats {
 	kstat_named_t	seconds_since_last_reset;
 	kstat_named_t	input_requests;
@@ -197,7 +114,6 @@ typedef struct sas_port_protocol_stats {
 } sas_port_protocol_stats_t;
 
 /* Port - kstat structure definition */
-
 typedef struct sas_port_stats {
 	kstat_named_t	seconds_since_last_reset;
 	kstat_named_t	tx_frames;
@@ -207,7 +123,6 @@ typedef struct sas_port_stats {
 } sas_port_stats_t;
 
 /* PHY - kstat structure definition */
-
 typedef struct sas_phy_stats {
 	kstat_named_t	seconds_since_last_reset;
 	kstat_named_t	tx_frames;
@@ -219,7 +134,6 @@ typedef struct sas_phy_stats {
 	kstat_named_t	loss_of_dword_sync_count;
 	kstat_named_t	phy_reset_problem_count;
 } sas_phy_stats_t;
-
 
 /*
  * Supported Protocol property
@@ -236,7 +150,6 @@ typedef struct sas_phy_stats {
  * constants represent "Negotiated physical link rate"
  * (and implicitly the State of the phy).
  */
-
 #define	SAS_LINK_RATE_UNKNOWN		0x0 /* Phy is enabled. */
 					    /* Speed is unknown */
 #define	SAS_LINK_RATE_DISABLED		0x1 /* Phy is disabled. */
@@ -287,7 +200,6 @@ typedef struct sas_phy_stats {
 
 /* Event Sub-Class */
 #define	ESC_SAS_HBA_PORT_BROADCAST	"ESC_sas_hba_port_broadcast"
-
 /* Event Types for above Subclass */
 #define	SAS_PORT_BROADCAST_CHANGE	"port_broadcast_change"
 #define	SAS_PORT_BROADCAST_SES		"port_broadcast_ses"
@@ -300,7 +212,6 @@ typedef struct sas_phy_stats {
 
 /* Event Sub-Class */
 #define	ESC_SAS_PHY_EVENT		"ESC_sas_phy_event"
-
 /* Event Types for above Subclass */
 #define	SAS_PHY_ONLINE			"port_online"
 #define	SAS_PHY_OFFLINE			"port_offline"
@@ -314,10 +225,8 @@ typedef struct sas_phy_stats {
 #define	SAS_LINK_RATE			"link_rate"
 /* SAS_PHY_ID - Defined Above */
 
-
-
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _SYS_SCSI_IMPL_SAS_TRANSPORT_H */
+#endif	/* _SYS_SCSI_IMPL_SCSI_SAS_H */

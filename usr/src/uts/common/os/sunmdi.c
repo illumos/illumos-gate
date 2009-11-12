@@ -82,6 +82,7 @@ static void i_mdi_log(int, const char *, dev_info_t *, const char *, ...);
 #define	MDI_DEBUG(dbglevel, pargs)
 #endif	/* DEBUG */
 int	mdi_debug_consoleonly = 0;
+int	mdi_delay = 3;
 
 extern pri_t	minclsyspri;
 extern int	modrootloaded;
@@ -835,7 +836,7 @@ mdi_devi_enter(dev_info_t *phci_dip, int *circular)
 			ndi_devi_enter(vdip, &vcircular);
 			break;
 		} else {
-			delay_random(2);
+			delay_random(mdi_delay);
 		}
 	}
 
@@ -1068,7 +1069,7 @@ i_mdi_phci_lock(mdi_phci_t *ph, mdi_pathinfo_t *pip)
 				 */
 				MDI_PI_HOLD(pip);
 				MDI_PI_UNLOCK(pip);
-				delay_random(2);
+				delay_random(mdi_delay);
 				MDI_PI_LOCK(pip);
 				MDI_PI_RELE(pip);
 			}
@@ -1292,7 +1293,7 @@ i_mdi_client_lock(mdi_client_t *ct, mdi_pathinfo_t *pip)
 				 */
 				MDI_PI_HOLD(pip);
 				MDI_PI_UNLOCK(pip);
-				delay_random(2);
+				delay_random(mdi_delay);
 				MDI_PI_LOCK(pip);
 				MDI_PI_RELE(pip);
 			}
@@ -5204,7 +5205,7 @@ i_mdi_phci_offline(dev_info_t *dip, uint_t flags)
 	/*
 	 * Give a chance for any pending commands to execute
 	 */
-	delay_random(5);
+	delay_random(mdi_delay);
 	MDI_PHCI_LOCK(ph);
 	pip = ph->ph_path_head;
 	while (pip != NULL) {
@@ -5482,7 +5483,7 @@ mdi_phci_retire_finalize(dev_info_t *dip, int phci_only)
 	/*
 	 * Give a chance for any pending commands to execute
 	 */
-	delay_random(5);
+	delay_random(mdi_delay);
 	MDI_PHCI_LOCK(ph);
 	pip = ph->ph_path_head;
 	while (pip != NULL) {
@@ -7474,7 +7475,7 @@ stop_vhcache_async_threads(mdi_vhci_config_t *vhc)
 	while ((vhc->vhc_flags & MDI_VHC_VHCACHE_FLUSH_THREAD) ||
 	    vhc->vhc_acc_thrcount != 0) {
 		mutex_exit(&vhc->vhc_lock);
-		delay_random(5);
+		delay_random(mdi_delay);
 		mutex_enter(&vhc->vhc_lock);
 	}
 
@@ -7519,7 +7520,7 @@ stop_vhcache_flush_thread(void *arg, int code)
 
 	while (vhc->vhc_flags & MDI_VHC_VHCACHE_FLUSH_THREAD) {
 		mutex_exit(&vhc->vhc_lock);
-		delay_random(5);
+		delay_random(mdi_delay);
 		mutex_enter(&vhc->vhc_lock);
 	}
 

@@ -1025,7 +1025,7 @@ encode_sun_serialnum(int version, uchar_t *inq,
 	    SCSI_INQUIRY_VID_SUN, SCSI_INQUIRY_VID_SUN_LEN) == 0)) {
 		/*
 		 * VPD pages 0x83 and 0x80 are unavailable. This
-		 * is a Sun qualified disks as indicated by
+		 * is a Sun qualified disk as indicated by
 		 * "SUN" in bytes 25-27 of the inquiry data
 		 * (bytes 9-11 of the pid).  Devid's are created
 		 * for Sun qualified disks by combining the
@@ -1046,16 +1046,19 @@ encode_sun_serialnum(int version, uchar_t *inq,
 		/* copy the vid at the beginning */
 		bcopy(&inq_std->inq_vid, *id,
 		    sizeof (inq_std->inq_vid));
-			/* copy the pid after the vid */
+
+		/* copy the pid after the vid */
 		bcopy(&inq_std->inq_pid,
 		    &(*id)[sizeof (inq_std->inq_vid)],
 		    sizeof (inq_std->inq_pid));
-			/* copy the serial number after the vid and pid */
+
+		/* copy the serial number after the vid and pid */
 		bcopy(&inq_std->inq_serial,
 		    &(*id)[sizeof (inq_std->inq_vid) +
 		    sizeof (inq_std->inq_pid)],
 		    sizeof (inq_std->inq_serial));
-			/* devid formed from inquiry data */
+
+		/* devid formed from inquiry data */
 		*id_type = DEVID_SCSI_SERIAL;
 	}
 }
@@ -1467,4 +1470,55 @@ scsi_lun64_to_lun(scsi_lun64_t lun64)
 		lun.sl_lun4_lsb = (uchar_t)(lun64);
 	}
 	return (lun);
+}
+
+/*
+ * This routine returns the true length of the ascii inquiry fields that are to
+ * be created by removing the padded spaces at the end of the inquiry data.
+ * This routine was designed for trimming spaces from the vid, pid and revision
+ * which are defined as being left aligned.  In addition, we return 0 length
+ * if the field is full of all 0's or spaces, indicating to the caller that
+ * the device was not ready to return the inquiry data as per note 65 in
+ * the scsi-2 spec.
+ */
+int
+scsi_ascii_inquiry_len(char *field, size_t length)
+{
+	int retval;
+	int trailer;
+	char *p;
+
+	retval = length;
+
+	/*
+	 * The vid, pid and revision are left-aligned ascii fields within the
+	 * inquiry data.  Here we trim the end of these fields by discounting
+	 * length associated with trailing spaces or NULL bytes.  The remaining
+	 * bytes shall be only graphics codes - 0x20 through 0x7e as per the
+	 * scsi spec definition.  If we have all 0's or spaces, we return 0
+	 * length.  For devices that store inquiry data on the device, they
+	 * can return 0's or spaces in these fields until the data is avail-
+	 * able from the device (See NOTE 65 in the scsi-2 specification
+	 * around the inquiry command.)  We don't want to create a field in
+	 * the case of a device not able to return valid data.
+	 */
+	trailer = 1;
+	for (p = field + length - 1; p >= field; p--) {
+		if (trailer) {
+			if ((*p == ' ') || (*p == '\0')) {
+				retval--;
+				continue;
+			}
+			trailer = 0;
+		}
+
+		/* each char must be within 0x20 - 0x7e */
+		if (*p < 0x20 || *p > 0x7e) {
+			retval = -1;
+			break;
+		}
+
+	}
+
+	return (retval);
 }

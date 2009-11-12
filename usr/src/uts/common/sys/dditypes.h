@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_DDITYPES_H
 #define	_SYS_DDITYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
 #ifndef	_ASM
@@ -168,11 +166,17 @@ typedef struct __ddi_devid *ddi_devid_t;
 #define	DEVID_MAXTYPE		8
 
 /*
- * Device id scsi encode versions
+ * Device id scsi encode versions (version of encode interface, not devid)
  */
 #define	DEVID_SCSI_ENCODE_VERSION1		0
 #define	DEVID_SCSI_ENCODE_VERSION2		1
 #define	DEVID_SCSI_ENCODE_VERSION_LATEST	DEVID_SCSI_ENCODE_VERSION2
+
+/*
+ * Device id smp encode versions (version of encode interface, not devid)
+ */
+#define	DEVID_SMP_ENCODE_VERSION1		0
+#define	DEVID_SMP_ENCODE_VERSION_LATEST		DEVID_SMP_ENCODE_VERSION1
 
 /* minor name values for devid lookup interfaces */
 #define	DEVID_MINOR_NAME_ALL		((char *)0)

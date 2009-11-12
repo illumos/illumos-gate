@@ -43,12 +43,12 @@ static int pmcs_scsa_getcap(struct scsi_address *, char *, int);
 static int pmcs_scsa_setcap(struct scsi_address *, char *, int, int);
 static int pmcs_scsa_setup_pkt(struct scsi_pkt *, int (*)(caddr_t), caddr_t);
 static void pmcs_scsa_teardown_pkt(struct scsi_pkt *);
+
+static int pmcs_smp_init(dev_info_t *, dev_info_t *, smp_hba_tran_t *,
+    smp_device_t *);
+static void pmcs_smp_free(dev_info_t *, dev_info_t *, smp_hba_tran_t *,
+    smp_device_t *);
 static int pmcs_smp_start(struct smp_pkt *);
-static int pmcs_smp_getcap(struct sas_addr *, char *);
-static int pmcs_smp_init(dev_info_t *, dev_info_t *, sas_hba_tran_t *,
-    smp_device_t *);
-static void pmcs_smp_free(dev_info_t *, dev_info_t *, sas_hba_tran_t *,
-    smp_device_t *);
 
 static int pmcs_scsi_quiesce(dev_info_t *);
 static int pmcs_scsi_unquiesce(dev_info_t *);
@@ -124,18 +124,17 @@ pmcs_scsa_init(pmcs_hw_t *pwp, const ddi_dma_attr_t *ap)
 	/*
 	 * Attach the SMP part of this hba
 	 */
-	pwp->smp_tran = sas_hba_tran_alloc(pwp->dip);
+	pwp->smp_tran = smp_hba_tran_alloc(pwp->dip);
 	ASSERT(pwp->smp_tran != NULL);
-	pwp->smp_tran->tran_hba_private = pwp;
-	pwp->smp_tran->tran_smp_start = pmcs_smp_start;
-	pwp->smp_tran->tran_sas_getcap = pmcs_smp_getcap;
-	pwp->smp_tran->tran_smp_init = pmcs_smp_init;
-	pwp->smp_tran->tran_smp_free = pmcs_smp_free;
+	pwp->smp_tran->smp_tran_hba_private = pwp;
+	pwp->smp_tran->smp_tran_init = pmcs_smp_init;
+	pwp->smp_tran->smp_tran_free = pmcs_smp_free;
+	pwp->smp_tran->smp_tran_start = pmcs_smp_start;
 
-	if (sas_hba_attach_setup(pwp->dip, pwp->smp_tran) != DDI_SUCCESS) {
+	if (smp_hba_attach_setup(pwp->dip, pwp->smp_tran) != DDI_SUCCESS) {
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
-		    "sas_hba_attach failed");
-		sas_hba_tran_free(pwp->smp_tran);
+		    "smp_hba_attach failed");
+		smp_hba_tran_free(pwp->smp_tran);
 		pwp->smp_tran = NULL;
 		scsi_hba_tran_free(tran);
 		return (DDI_FAILURE);
@@ -927,55 +926,34 @@ pmcs_scsa_teardown_pkt(struct scsi_pkt *pkt)
 }
 
 static int
-pmcs_smp_getcap(struct sas_addr *ap, char *cap)
-{
-	_NOTE(ARGUNUSED(ap));
-	int ckey = -1;
-	int ret = EINVAL;
-
-	ckey = sas_hba_lookup_capstr(cap);
-	if (ckey == -1)
-		return (EINVAL);
-
-	switch (ckey) {
-	case SAS_CAP_SMP_CRC:
-		ret = 0;
-		break;
-	default:
-		ret = EINVAL;
-		break;
-	}
-	return (ret);
-}
-
-static int
-pmcs_smp_start(struct smp_pkt *pktp)
+pmcs_smp_start(struct smp_pkt *smp_pkt)
 {
 	struct pmcwork *pwrk;
 	const uint_t rdoff = SAS_SMP_MAX_PAYLOAD;
 	uint32_t msg[PMCS_MSG_SIZE], *ptr, htag, status;
 	uint64_t wwn;
-	pmcs_hw_t *pwp = pktp->pkt_address->a_hba_tran->tran_hba_private;
+	pmcs_hw_t *pwp;
 	pmcs_phy_t *pptr;
 	pmcs_xscsi_t *xp;
 	uint_t reqsz, rspsz, will_retry;
 	int result;
 
-	bcopy(pktp->pkt_address->a_wwn, &wwn, SAS_WWN_BYTE_SIZE);
+	pwp = smp_pkt->smp_pkt_address->smp_a_hba_tran->smp_tran_hba_private;
+	bcopy(smp_pkt->smp_pkt_address->smp_a_wwn, &wwn, SAS_WWN_BYTE_SIZE);
 
 	pmcs_prt(pwp, PMCS_PRT_DEBUG1, NULL, NULL,
 	    "%s: starting for wwn 0x%" PRIx64, __func__, wwn);
 
-	will_retry = pktp->pkt_will_retry;
+	will_retry = smp_pkt->smp_pkt_will_retry;
 
 	(void) pmcs_acquire_scratch(pwp, B_TRUE);
-	reqsz = pktp->pkt_reqsize;
+	reqsz = smp_pkt->smp_pkt_reqsize;
 	if (reqsz > SAS_SMP_MAX_PAYLOAD) {
 		reqsz = SAS_SMP_MAX_PAYLOAD;
 	}
-	(void) memcpy(pwp->scratch, pktp->pkt_req, reqsz);
+	(void) memcpy(pwp->scratch, smp_pkt->smp_pkt_req, reqsz);
 
-	rspsz = pktp->pkt_rspsize;
+	rspsz = smp_pkt->smp_pkt_rspsize;
 	if (rspsz > SAS_SMP_MAX_PAYLOAD) {
 		rspsz = SAS_SMP_MAX_PAYLOAD;
 	}
@@ -996,7 +974,7 @@ pmcs_smp_start(struct smp_pkt *pktp)
 		pmcs_release_scratch(pwp);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: could not find phy", __func__);
-		pktp->pkt_reason = ENXIO;
+		smp_pkt->smp_pkt_reason = ENXIO;
 		return (DDI_FAILURE);
 	}
 
@@ -1006,7 +984,7 @@ pmcs_smp_start(struct smp_pkt *pktp)
 		pmcs_release_scratch(pwp);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, pptr, NULL,
 		    "%s: could not get work structure", __func__);
-		pktp->pkt_reason = will_retry ? EAGAIN :EBUSY;
+		smp_pkt->smp_pkt_reason = will_retry ? EAGAIN : EBUSY;
 		return (DDI_FAILURE);
 	}
 
@@ -1021,7 +999,7 @@ pmcs_smp_start(struct smp_pkt *pktp)
 		pmcs_release_scratch(pwp);
 		pmcs_prt(pwp, PMCS_PRT_DEBUG, NULL, NULL,
 		    "%s: could not get IQ entry", __func__);
-		pktp->pkt_reason = will_retry ? EAGAIN :EBUSY;
+		smp_pkt->smp_pkt_reason = will_retry ? EAGAIN :EBUSY;
 		return (DDI_FAILURE);
 	}
 	msg[0] = LE_32(PMCS_HIPRI(pwp, PMCS_OQ_GENERAL, PMCIN_SMP_REQUEST));
@@ -1043,7 +1021,7 @@ pmcs_smp_start(struct smp_pkt *pktp)
 	INC_IQ_ENTRY(pwp, PMCS_IQ_OTHER);
 
 	pmcs_unlock_phy(pptr);
-	WAIT_FOR(pwrk, pktp->pkt_timeout * 1000, result);
+	WAIT_FOR(pwrk, smp_pkt->smp_pkt_timeout * 1000, result);
 	pmcs_pwork(pwp, pwrk);
 	pmcs_lock_phy(pptr);
 
@@ -1060,13 +1038,13 @@ pmcs_smp_start(struct smp_pkt *pktp)
 		}
 		pmcs_unlock_phy(pptr);
 		pmcs_release_scratch(pwp);
-		pktp->pkt_reason = ETIMEDOUT;
+		smp_pkt->smp_pkt_reason = ETIMEDOUT;
 		return (DDI_FAILURE);
 	}
 	status = LE_32(msg[2]);
 	if (status == PMCOUT_STATUS_OVERFLOW) {
 		status = PMCOUT_STATUS_OK;
-		pktp->pkt_reason = EOVERFLOW;
+		smp_pkt->smp_pkt_reason = EOVERFLOW;
 	}
 	if (status != PMCOUT_STATUS_OK) {
 		const char *emsg = pmcs_status_str(status);
@@ -1080,13 +1058,14 @@ pmcs_smp_start(struct smp_pkt *pktp)
 
 		if ((status == PMCOUT_STATUS_ERROR_HW_TIMEOUT) ||
 		    (status == PMCOUT_STATUS_IO_XFER_OPEN_RETRY_TIMEOUT)) {
-			pktp->pkt_reason = will_retry ? EAGAIN : ETIMEDOUT;
+			smp_pkt->smp_pkt_reason =
+			    will_retry ? EAGAIN : ETIMEDOUT;
 			result = DDI_FAILURE;
 		} else if (status ==
 		    PMCOUT_STATUS_OPEN_CNX_ERROR_IT_NEXUS_LOSS) {
 			xp = pptr->target;
 			if (xp == NULL) {
-				pktp->pkt_reason = EIO;
+				smp_pkt->smp_pkt_reason = EIO;
 				result = DDI_FAILURE;
 				goto out;
 			}
@@ -1103,17 +1082,17 @@ pmcs_smp_start(struct smp_pkt *pktp)
 			/* ABORT any pending commands related to this device */
 			if (pmcs_abort(pwp, pptr, pptr->device_id, 1, 1) != 0) {
 				pptr->abort_pending = 1;
-				pktp->pkt_reason = EIO;
+				smp_pkt->smp_pkt_reason = EIO;
 				result = DDI_FAILURE;
 			}
 		} else {
-			pktp->pkt_reason = will_retry ? EAGAIN : EIO;
+			smp_pkt->smp_pkt_reason = will_retry ? EAGAIN : EIO;
 			result = DDI_FAILURE;
 		}
 	} else {
-		(void) memcpy(pktp->pkt_rsp,
+		(void) memcpy(smp_pkt->smp_pkt_rsp,
 		    &((uint8_t *)pwp->scratch)[rdoff], rspsz);
-		if (pktp->pkt_reason == EOVERFLOW) {
+		if (smp_pkt->smp_pkt_reason == EOVERFLOW) {
 			result = DDI_FAILURE;
 		} else {
 			result = DDI_SUCCESS;
@@ -1127,9 +1106,9 @@ out:
 
 static int
 pmcs_smp_init(dev_info_t *self, dev_info_t *child,
-    sas_hba_tran_t *tran, smp_device_t *smp)
+    smp_hba_tran_t *tran, smp_device_t *smp_sd)
 {
-	_NOTE(ARGUNUSED(tran, smp));
+	_NOTE(ARGUNUSED(tran, smp_sd));
 	pmcs_iport_t *iport;
 	pmcs_hw_t *pwp;
 	pmcs_xscsi_t *tgt;
@@ -1270,7 +1249,7 @@ smp_init_fail:
 
 static void
 pmcs_smp_free(dev_info_t *self, dev_info_t *child,
-    sas_hba_tran_t *tran, smp_device_t *smp)
+    smp_hba_tran_t *tran, smp_device_t *smp)
 {
 	_NOTE(ARGUNUSED(tran, smp));
 	pmcs_iport_t *iport;

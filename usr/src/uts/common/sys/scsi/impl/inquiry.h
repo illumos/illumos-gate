@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SCSI_IMPL_INQUIRY_H
 #define	_SYS_SCSI_IMPL_INQUIRY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -68,6 +66,10 @@ extern "C" {
 #define	INQUIRY_PRODUCT_ID	"inquiry-product-id"	/* string */
 #define	INQUIRY_REVISION_ID	"inquiry-revision-id"	/* string */
 #define	INQUIRY_SERIAL_NO	"inquiry-serial-no"	/* string */
+
+#ifdef	_KERNEL
+int	scsi_ascii_inquiry_len(char *field, size_t length);
+#endif	/* _KERNEL */
 
 #ifdef	__cplusplus
 }

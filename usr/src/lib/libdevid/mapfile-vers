@@ -60,6 +60,7 @@ SUNWprivate_1.1 {
     global:
 	devid_free_guid;
 	devid_scsi_encode;
+	devid_smp_encode;
 	devid_str_compare;
 	devid_to_guid;
 	scsi_free_wwnstr;
@@ -69,6 +70,7 @@ SUNWprivate_1.1 {
 	scsi_wwnstr_hexcase;
 	scsi_wwnstr_skip_ua_prefix;
 	scsi_wwnstr_to_wwn;
+	scsi_ascii_inquiry_len;
     local:
 	*;
 };

@@ -43,8 +43,10 @@ extern "C" {
 #include <sys/mdi_impldefs.h>
 #include <sys/scsi/scsi.h>
 #include <sys/scsi/impl/scsi_reset_notify.h>
-#include <sys/scsi/impl/sas_transport.h>
+#include <sys/scsi/impl/scsi_sas.h>
+#include <sys/scsi/impl/smp_transport.h>
 #include <sys/scsi/generic/sas.h>
+#include <sys/scsi/generic/smp_frames.h>
 #include <sys/atomic.h>
 #include <sys/byteorder.h>
 #include <sys/bitmap.h>
@@ -75,7 +77,6 @@ typedef struct pmcs_chunk pmcs_chunk_t;
 #include <sys/scsi/adapters/pmcs/pmcs_iomb.h>
 #include <sys/scsi/adapters/pmcs/pmcs_sgl.h>
 
-#include <sys/scsi/adapters/pmcs/smp_defs.h>
 #include <sys/scsi/adapters/pmcs/ata.h>
 #include <sys/scsi/adapters/pmcs/pmcs_def.h>
 #include <sys/scsi/adapters/pmcs/pmcs_proto.h>
@@ -560,7 +561,7 @@ struct pmcs_hw {
 	 * Solaris/SCSA items.
 	 */
 	scsi_hba_tran_t		*tran;
-	sas_hba_tran_t		*smp_tran;
+	smp_hba_tran_t		*smp_tran;
 	struct scsi_reset_notify_entry	*reset_notify_listf;
 
 	/*
