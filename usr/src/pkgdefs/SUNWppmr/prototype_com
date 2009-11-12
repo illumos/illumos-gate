@@ -36,7 +36,10 @@
 i pkginfo
 i copyright
 i depend
-
+i postinstall
+i preinstall
+i i.manifest
+i r.manifest
 #
 # source locations relative to the prototype file
 #
