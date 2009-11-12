@@ -305,6 +305,7 @@ gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
 	off_t	mem_offset;
 	char	*cons;
 	int pci_pcie_bus = 0;
+	int value;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -433,6 +434,14 @@ gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
 
 	gfxp_check_for_console(devi, softc, pci_pcie_bus);
 
+	value = GFXP_IS_CONSOLE(softc) ? 1 : 0;
+	if (ddi_prop_update_int(DDI_DEV_T_NONE, devi,
+	    "primary-controller", value) != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+		    "Can not %s primary-controller "
+		    "property for driver", value ? "set" : "clear");
+	}
+
 	/* only do this if not in graphics mode */
 	if ((vgatext_silent == 0) && (GFXP_IS_CONSOLE(softc))) {
 		vgatext_init(softc);
@@ -454,6 +463,8 @@ gfxp_vgatext_detach(dev_info_t *devi, ddi_detach_cmd_t cmd,
 	gfxp_vgatext_softc_ptr_t ptr)
 {
 	struct vgatext_softc *softc = (struct vgatext_softc *)ptr;
+
+	(void) ddi_prop_remove(DDI_DEV_T_ANY, devi, "primary-controller");
 
 	switch (cmd) {
 
