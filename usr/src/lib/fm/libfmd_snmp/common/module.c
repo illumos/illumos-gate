@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/fmd_adm.h>
 #include <fm/fmd_snmp.h>
@@ -185,8 +183,9 @@ modinfo_update_one(const fmd_adm_modinfo_t *modinfo, void *arg)
 		DEBUGMSGTL((MODNAME_STR, "found new fmd module %s\n",
 		    modinfo->ami_name));
 		if ((data = SNMP_MALLOC_TYPEDEF(sunFmModule_data_t)) == NULL) {
-			snmp_log(LOG_ERR, MODNAME_STR ": Out of memory for "
-			    "new module data at %s:%d\n", __FILE__, __LINE__);
+			(void) snmp_log(LOG_ERR, MODNAME_STR ": Out of memory "
+			    "for new module data at %s:%d\n", __FILE__,
+			    __LINE__);
 			return (1);
 		}
 		/*
@@ -252,15 +251,15 @@ modinfo_update(sunFmModule_update_ctx_t *update_ctx)
 
 	if ((adm = fmd_adm_open(update_ctx->uc_host, update_ctx->uc_prog,
 	    update_ctx->uc_version)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": Communication with fmd "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": Communication with fmd "
 		    "failed: %s\n", strerror(errno));
 		return (SNMP_ERR_RESOURCEUNAVAILABLE);
 	}
 
 	++valid_stamp;
 	if (fmd_adm_module_iter(adm, modinfo_update_one, update_ctx) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": fmd module information update "
-		    "failed: %s\n", fmd_adm_errmsg(adm));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": fmd module information "
+		    "update failed: %s\n", fmd_adm_errmsg(adm));
 		fmd_adm_close(adm);
 		return (SNMP_ERR_RESOURCEUNAVAILABLE);
 	}
@@ -348,19 +347,19 @@ sunFmModuleTable_init(void)
 	int err;
 
 	if ((err = pthread_mutex_init(&update_lock, NULL)) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": mutex_init failure: %s\n",
-		    strerror(err));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": mutex_init failure: "
+		    "%s\n", strerror(err));
 		return (MIB_REGISTRATION_FAILED);
 	}
 	if ((err = pthread_cond_init(&update_cv, NULL)) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": cond_init failure: %s\n",
-		    strerror(err));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": cond_init failure: "
+		    "%s\n", strerror(err));
 		return (MIB_REGISTRATION_FAILED);
 	}
 
 	if ((err = pthread_create(NULL, NULL, (void *(*)(void *))update_thread,
 	    NULL)) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": error creating update "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": error creating update "
 		    "thread: %s\n", strerror(err));
 		return (MIB_REGISTRATION_FAILED);
 	}
@@ -400,7 +399,7 @@ sunFmModuleTable_init(void)
 
 	if ((mod_name_avl = uu_avl_create(mod_name_avl_pool, NULL,
 	    UU_AVL_DEBUG)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": mod_name_avl creation "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": mod_name_avl creation "
 		    "failed: %s\n", uu_strerror(uu_error()));
 		snmp_free_varbind(table_info->indexes);
 		SNMP_FREE(table_info);
@@ -422,7 +421,7 @@ sunFmModuleTable_init(void)
 
 	if ((mod_index_avl = uu_avl_create(mod_index_avl_pool, NULL,
 	    UU_AVL_DEBUG)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": mod_index_avl creation "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": mod_index_avl creation "
 		    "failed: %s\n", uu_strerror(uu_error()));
 		snmp_free_varbind(table_info->indexes);
 		SNMP_FREE(table_info);
@@ -477,8 +476,8 @@ sunFmModuleTable_nextmod(netsnmp_handler_registration *reginfo,
 
 		DEBUGMSGTL((MODNAME_STR, "nextmod: no indexes given\n"));
 		var = SNMP_MALLOC_TYPEDEF(netsnmp_variable_list);
-		snmp_set_var_typed_value(var, ASN_UNSIGNED, (uchar_t *)&index,
-		    sizeof (index));
+		(void) snmp_set_var_typed_value(var, ASN_UNSIGNED,
+		    (uchar_t *)&index, sizeof (index));
 		(void) memcpy(tmpoid, reginfo->rootoid,
 		    reginfo->rootoid_len * sizeof (oid));
 		tmpoid[reginfo->rootoid_len] = 1;	/* Entry is .1 */
@@ -617,7 +616,7 @@ sunFmModuleTable_return(unsigned int reg, void *arg)
 		}
 		break;
 	default:
-		snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request "
 		    "mode %d\n", reqinfo->mode);
 		netsnmp_free_delegated_cache(cache);
 		(void) pthread_mutex_unlock(&update_lock);
@@ -626,24 +625,24 @@ sunFmModuleTable_return(unsigned int reg, void *arg)
 
 	switch (table_info->colnum) {
 	case SUNFMMODULE_COL_NAME:
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)data->d_ami_name,
 		    strlen(data->d_ami_name));
 		break;
 	case SUNFMMODULE_COL_VERSION:
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)data->d_ami_vers,
 		    strlen(data->d_ami_vers));
 		break;
 	case SUNFMMODULE_COL_STATUS:
 		modstate = (data->d_ami_flags & FMD_ADM_MOD_FAILED) ?
 		    SUNFMMODULE_STATE_FAILED : SUNFMMODULE_STATE_ACTIVE;
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_INTEGER, (uchar_t *)&modstate,
 		    sizeof (modstate));
 		break;
 	case SUNFMMODULE_COL_DESCRIPTION:
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)data->d_ami_desc,
 		    strlen(data->d_ami_desc));
 		break;

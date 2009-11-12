@@ -445,7 +445,7 @@ get_fmri_label(char *fru)
 		twp = topo_walk_init(topo_handle, FM_FMRI_SCHEME_HC,
 		    tgetlabel, &td, &err);
 		if (twp) {
-			topo_walk_step(twp, TOPO_WALK_CHILD);
+			(void) topo_walk_step(twp, TOPO_WALK_CHILD);
 			topo_walk_fini(twp);
 		}
 	}
@@ -1832,7 +1832,7 @@ cmd_faulty(fmd_adm_t *adm, int argc, char *argv[])
 			rt = FMADM_EXIT_ERROR;
 			opt_p = 0;
 		} else {
-			dup2(fileno(fp), 1);
+			(void) dup2(fileno(fp), 1);
 			setbuf(stdout, NULL);
 			(void) fclose(fp);
 		}

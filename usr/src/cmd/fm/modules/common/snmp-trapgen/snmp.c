@@ -279,7 +279,7 @@ _fmd_fini(fmd_hdl_t *hdl)
 	 */
 	snmp_store(SNMP_SUPPCONF);
 	snmp_alarm_unregister_all();
-	snmp_close_sessions();
+	(void) snmp_close_sessions();
 	shutdown_mib();
 	unregister_all_config_handlers();
 	netsnmp_ds_shutdown();

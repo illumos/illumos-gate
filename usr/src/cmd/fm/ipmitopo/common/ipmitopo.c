@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libipmi.h>
 #include <stdio.h>
@@ -109,7 +107,8 @@ entity_print(ipmi_handle_t *ihp, ipmi_entity_t *ep, void *data)
 		(void) printf("%*s%-*s  %s\n", indentation, "",
 		    24 - indentation, name, present ? "present" : "absent");
 	}
-	ipmi_entity_iter_sdr(ihp, ep, sdr_print, (void *)(indentation + 2));
+	(void) ipmi_entity_iter_sdr(ihp, ep, sdr_print,
+	    (void *)(indentation + 2));
 
 	if (ep->ie_children != 0)
 		(void) ipmi_entity_iter_children(ihp, ep, entity_print,

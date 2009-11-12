@@ -287,7 +287,7 @@ print_prop_nameval(topo_hdl_t *thp, tnode_t *node, nvlist_t *nvl)
 		default: tstr = "unknown type";
 	}
 
-	printf("    %-17s %-8s ", propn, tstr);
+	(void) printf("    %-17s %-8s ", propn, tstr);
 
 	/*
 	 * Get property value
@@ -496,14 +496,15 @@ print_pgroup(topo_hdl_t *thp, tnode_t *node, const char *pgn, char *dstab,
 	}
 
 	if (dstab == NULL || nstab == NULL || version == -1) {
-		printf("  group: %-30s version: - stability: -/-\n", pgn);
+		(void) printf("  group: %-30s version: - stability: -/-\n",
+		    pgn);
 	} else if (!opt_V && strlen(pgn) > 30) {
 		(void) snprintf(buf, 26, "%s", pgn);
 		(void) snprintf(&buf[27], 4, "%s", DOTS);
-		printf("  group: %-30s version: %-3d stability: %s/%s\n",
+		(void) printf("  group: %-30s version: %-3d stability: %s/%s\n",
 		    buf, version, nstab, dstab);
 	} else {
-		printf("  group: %-30s version: %-3d stability: %s/%s\n",
+		(void) printf("  group: %-30s version: %-3d stability: %s/%s\n",
 		    pgn, version, nstab, dstab);
 	}
 
@@ -872,7 +873,7 @@ walk_node(topo_hdl_t *thp, tnode_t *node, void *arg)
 	} else if (pcnt > 0)
 		print_props(thp, node);
 
-	printf("\n");
+	(void) printf("\n");
 
 	return (TOPO_WALK_NEXT);
 }
@@ -974,7 +975,7 @@ walk_topo(topo_hdl_t *thp, char *uuid)
 		char buf[32];
 		time_t tod = time(NULL);
 
-		printf("TIME                 UUID\n");
+		(void) printf("TIME                 UUID\n");
 		(void) strftime(buf, sizeof (buf), "%b %d %T", localtime(&tod));
 		(void) printf("%-15s %-32s\n", buf, uuid);
 		(void) printf("\n");
@@ -1095,7 +1096,7 @@ print_fmri(topo_hdl_t *thp, char *uuid)
 		return;
 	}
 
-	printf("TIME                 UUID\n");
+	(void) printf("TIME                 UUID\n");
 	(void) strftime(buf, sizeof (buf), "%b %d %T", localtime(&tod));
 	(void) printf("%-15s %-32s\n", buf, uuid);
 	(void) printf("\n");
@@ -1199,7 +1200,7 @@ main(int argc, char *argv[])
 				opt_b++;
 				break;
 			case 'C':
-				atexit(abort);
+				(void) atexit(abort);
 				break;
 			case 'd':
 				opt_d++;

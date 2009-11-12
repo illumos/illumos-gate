@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
@@ -34,7 +32,7 @@
 void
 sunFm_vpanic(const char *format, va_list ap)
 {
-	snmp_vlog(LOG_ERR, format, ap);
+	(void) snmp_vlog(LOG_ERR, format, ap);
 #ifdef DEBUG
 	abort();
 	exit(1);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * eftwrite.c -- routines for writing .eft files
@@ -28,8 +28,6 @@
  * source files.  this code done nothing unless the -o option
  * was given on the command line.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -85,7 +83,7 @@ ident_printer(const char *s, void *rhs, void *arg)
 {
 	FILE *fp = (FILE *)arg;
 
-	fwrite(s, strlen(s) + 1, 1, fp);
+	(void) fwrite(s, strlen(s) + 1, 1, fp);
 }
 
 /*ARGSUSED*/
@@ -94,7 +92,7 @@ dict_printer(const char *s, void *rhs, void *arg)
 {
 	FILE *fp = (FILE *)arg;
 
-	fwrite(s, strlen(s) + 1, 1, fp);
+	(void) fwrite(s, strlen(s) + 1, 1, fp);
 }
 
 void
@@ -161,7 +159,7 @@ eftwrite(const char *fname)
 	hdr.dictlen = htonl(hdr.dictlen);
 	hdr.csum = htonl(hdr.csum);
 
-	fwrite(&hdr, sizeof (hdr), 1, fp);
+	(void) fwrite(&hdr, sizeof (hdr), 1, fp);
 	if (ferror(fp))
 		out(O_DIE|O_SYS, "%s: can't write header", fname);
 	stats_counter_add(Outbytes, sizeof (hdr));
@@ -182,6 +180,6 @@ eftwrite(const char *fname)
 	}
 	if (ferror(tfp))
 		out(O_DIE|O_SYS, "fread on tmpfile");
-	fclose(tfp);
-	fclose(fp);
+	(void) fclose(tfp);
+	(void) fclose(fp);
 }

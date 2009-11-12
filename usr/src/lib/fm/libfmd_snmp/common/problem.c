@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
 #include <fm/fmd_adm.h>
@@ -163,14 +161,15 @@ problem_update_one(const fmd_adm_caseinfo_t *acp, void *arg)
 		DEBUGMSGTL((MODNAME_STR, "found new problem %s\n",
 		    acp->aci_uuid));
 		if ((data = SNMP_MALLOC_TYPEDEF(sunFmProblem_data_t)) == NULL) {
-			snmp_log(LOG_ERR, MODNAME_STR ": Out of memory for "
-			    "new problem data at %s:%d\n", __FILE__, __LINE__);
+			(void) snmp_log(LOG_ERR, MODNAME_STR ": Out of memory "
+			    "for new problem data at %s:%d\n", __FILE__,
+			    __LINE__);
 			return (0);
 		}
 		if ((err = nvlist_dup(acp->aci_event, &data->d_aci_event, 0))
 		    != 0) {
-			snmp_log(LOG_ERR, MODNAME_STR ": Problem data setup "
-			    "failed: %s\n", strerror(err));
+			(void) snmp_log(LOG_ERR, MODNAME_STR ": Problem data "
+			    "setup failed: %s\n", strerror(err));
 			SNMP_FREE(data);
 			return (0);
 		}
@@ -255,7 +254,7 @@ problem_update(sunFmProblem_update_ctx_t *update_ctx)
 
 	if ((adm = fmd_adm_open(update_ctx->uc_host, update_ctx->uc_prog,
 	    update_ctx->uc_version)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": Communication with fmd "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": Communication with fmd "
 		    "failed: %s\n", strerror(errno));
 		return (SNMP_ERR_RESOURCEUNAVAILABLE);
 	}
@@ -263,8 +262,8 @@ problem_update(sunFmProblem_update_ctx_t *update_ctx)
 	++valid_stamp;
 	if (fmd_adm_case_iter(adm, SNMP_URL_MSG, problem_update_one,
 	    update_ctx) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": fmd case information update "
-		    "failed: %s\n", fmd_adm_errmsg(adm));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": fmd case information "
+		    "update failed: %s\n", fmd_adm_errmsg(adm));
 		fmd_adm_close(adm);
 		return (SNMP_ERR_RESOURCEUNAVAILABLE);
 	}
@@ -339,19 +338,19 @@ sunFmProblemTable_init(void)
 	int err;
 
 	if ((err = pthread_mutex_init(&update_lock, NULL)) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": mutex_init failure: %s\n",
-		    strerror(err));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": mutex_init failure: "
+		    "%s\n", strerror(err));
 		return (MIB_REGISTRATION_FAILED);
 	}
 	if ((err = pthread_cond_init(&update_cv, NULL)) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": cond_init failure: %s\n",
-		    strerror(err));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": cond_init failure: "
+		    "%s\n", strerror(err));
 		return (MIB_REGISTRATION_FAILED);
 	}
 
 	if ((err = pthread_create(NULL, NULL, (void *(*)(void *))update_thread,
 	    NULL)) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": error creating update "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": error creating update "
 		    "thread: %s\n", strerror(err));
 		return (MIB_REGISTRATION_FAILED);
 	}
@@ -384,7 +383,7 @@ sunFmProblemTable_init(void)
 	    sizeof (sunFmProblem_data_t),
 	    offsetof(sunFmProblem_data_t, d_uuid_avl), problem_compare_uuid,
 	    UU_AVL_DEBUG)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": problem_uuid avl pool "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": problem_uuid avl pool "
 		    "creation failed: %s\n", uu_strerror(uu_error()));
 		snmp_free_varbind(table_info->indexes);
 		SNMP_FREE(table_info);
@@ -394,8 +393,8 @@ sunFmProblemTable_init(void)
 
 	if ((problem_uuid_avl = uu_avl_create(problem_uuid_avl_pool, NULL,
 	    UU_AVL_DEBUG)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": problem_uuid avl creation "
-		    "failed: %s\n", uu_strerror(uu_error()));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": problem_uuid avl "
+		    "creation failed: %s\n", uu_strerror(uu_error()));
 		snmp_free_varbind(table_info->indexes);
 		SNMP_FREE(table_info);
 		SNMP_FREE(handler);
@@ -487,8 +486,8 @@ sunFmProblemTable_nextpr(netsnmp_handler_registration *reginfo,
 		snmp_free_varbind(table_info->indexes);
 		table_info->indexes =
 		    SNMP_MALLOC_TYPEDEF(netsnmp_variable_list);
-		snmp_set_var_typed_value(table_info->indexes, ASN_OCTET_STR,
-		    (const uchar_t *)uuid, 0);
+		(void) snmp_set_var_typed_value(table_info->indexes,
+		    ASN_OCTET_STR, (const uchar_t *)uuid, 0);
 		(void) memcpy(tmpoid, reginfo->rootoid,
 		    reginfo->rootoid_len * sizeof (oid));
 		tmpoid[reginfo->rootoid_len] = 1;
@@ -549,7 +548,7 @@ sunFmProblemTable_nextpr(netsnmp_handler_registration *reginfo,
 		}
 	}
 
-	snmp_set_var_typed_value(table_info->indexes, ASN_OCTET_STR,
+	(void) snmp_set_var_typed_value(table_info->indexes, ASN_OCTET_STR,
 	    (uchar_t *)data->d_aci_uuid, strlen(data->d_aci_uuid));
 	table_info->number_indexes = 1;
 
@@ -612,7 +611,7 @@ sunFmFaultEventTable_nextfe(netsnmp_handler_registration *reginfo,
 			    index)) != 0 &&
 			    (rv = faultevent_lookup_index_exact(data, index)) !=
 			    NULL) {
-				snmp_set_var_typed_value(
+				(void) snmp_set_var_typed_value(
 				    table_info->indexes->next_variable,
 				    ASN_UNSIGNED, (uchar_t *)&index,
 				    sizeof (index));
@@ -634,8 +633,9 @@ sunFmFaultEventTable_nextfe(netsnmp_handler_registration *reginfo,
 				DEBUGMSG((MODNAME_STR, "\n"));
 				var =
 				    SNMP_MALLOC_TYPEDEF(netsnmp_variable_list);
-				snmp_set_var_typed_value(var, ASN_UNSIGNED,
-				    (uchar_t *)&index, sizeof (index));
+				(void) snmp_set_var_typed_value(var,
+				    ASN_UNSIGNED, (uchar_t *)&index,
+				    sizeof (index));
 				(void) memcpy(tmpoid, reginfo->rootoid,
 				    reginfo->rootoid_len * sizeof (oid));
 				tmpoid[reginfo->rootoid_len] = 1;
@@ -760,8 +760,8 @@ sunFmProblemTable_return(unsigned int reg, void *arg)
 		}
 		break;
 	default:
-		snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request mode %d\n",
-		    reqinfo->mode);
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request "
+		    "mode %d\n", reqinfo->mode);
 		netsnmp_free_delegated_cache(cache);
 		(void) pthread_mutex_unlock(&update_lock);
 		return;
@@ -770,28 +770,28 @@ sunFmProblemTable_return(unsigned int reg, void *arg)
 	switch (table_info->colnum) {
 	case SUNFMPROBLEM_COL_UUID:
 	{
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)data->d_aci_uuid,
 		    strlen(data->d_aci_uuid));
 		break;
 	}
 	case SUNFMPROBLEM_COL_CODE:
 	{
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)data->d_aci_code,
 		    strlen(data->d_aci_code));
 		break;
 	}
 	case SUNFMPROBLEM_COL_URL:
 	{
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)data->d_aci_url,
 		    strlen(data->d_aci_url));
 		break;
 	}
 	case SUNFMPROBLEM_COL_DIAGENGINE:
 	{
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)data->d_diag_engine,
 		    strlen(data->d_diag_engine));
 		break;
@@ -807,13 +807,13 @@ sunFmProblemTable_return(unsigned int reg, void *arg)
 		time_t	dt_time = (time_t)data->d_diag_time.tv_sec;
 		uchar_t	*dt = date_n_time(&dt_time, &dt_size);
 
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, dt, dt_size);
 		break;
 	}
 	case SUNFMPROBLEM_COL_SUSPECTCOUNT:
 	{
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_UNSIGNED, (uchar_t *)&data->d_nsuspects,
 		    sizeof (data->d_nsuspects));
 		break;
@@ -928,8 +928,8 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 		}
 		break;
 	default:
-		snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request mode %d\n",
-		    reqinfo->mode);
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request "
+		    "mode %d\n", reqinfo->mode);
 		netsnmp_free_delegated_cache(cache);
 		(void) pthread_mutex_unlock(&update_lock);
 		return;
@@ -940,11 +940,11 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 	{
 		if ((pdata = sunFmProblemTable_pr(reginfo, table_info))
 		    == NULL) {
-			netsnmp_table_build_result(reginfo, request, table_info,
-			    ASN_OCTET_STR, NULL, 0);
+			(void) netsnmp_table_build_result(reginfo, request,
+			    table_info, ASN_OCTET_STR, NULL, 0);
 			break;
 		}
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)pdata->d_aci_uuid,
 		    strlen(pdata->d_aci_uuid));
 		break;
@@ -954,7 +954,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 		char	*class = "-";
 
 		(void) nvlist_lookup_string(data, FM_CLASS, &class);
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)class, strlen(class));
 		break;
 	}
@@ -966,7 +966,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 		(void) nvlist_lookup_uint8(data, FM_FAULT_CERTAINTY,
 		    &pct);
 		pl = (ulong_t)pct;
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_UNSIGNED, (uchar_t *)&pl, sizeof (pl));
 		break;
 	}
@@ -981,7 +981,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 		else
 			fmri = str;
 
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)fmri, strlen(fmri));
 		free(str);
 		break;
@@ -997,7 +997,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 		else
 			fmri = str;
 
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)fmri, strlen(fmri));
 		free(str);
 		break;
@@ -1013,7 +1013,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 		else
 			fmri = str;
 
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)fmri, strlen(fmri));
 		free(str);
 		break;
@@ -1032,7 +1032,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 			pl = SUNFMFAULTEVENT_STATE_REPAIRED;
 		else if (status & FM_SUSPECT_ACQUITTED)
 			pl = SUNFMFAULTEVENT_STATE_ACQUITTED;
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_INTEGER, (uchar_t *)&pl, sizeof (pl));
 		break;
 	}
@@ -1041,7 +1041,7 @@ sunFmFaultEventTable_return(unsigned int reg, void *arg)
 		char	*location = "-";
 
 		(void) nvlist_lookup_string(data, FM_FAULT_LOCATION, &location);
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)location, strlen(location));
 		break;
 	}

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/fmd_snmp.h>
 #include <net-snmp/net-snmp-config.h>
@@ -73,7 +71,7 @@ init_sunFM(void)
 			    "registration failure\n", table->t_name);
 			break;
 		default:
-			snmp_log(LOG_ERR, MODNAME_STR
+			(void) snmp_log(LOG_ERR, MODNAME_STR
 			    ": table %s initialization failed: "
 			    "unknown reason\n", table->t_name);
 		}

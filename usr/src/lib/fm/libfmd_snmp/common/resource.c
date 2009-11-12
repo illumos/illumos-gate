@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/fmd_adm.h>
 #include <fm/fmd_snmp.h>
@@ -172,8 +170,9 @@ rsrcinfo_update_one(const fmd_adm_rsrcinfo_t *rsrcinfo, void *arg)
 		    rsrcinfo->ari_fmri));
 		if ((data = SNMP_MALLOC_TYPEDEF(sunFmResource_data_t)) ==
 		    NULL) {
-			snmp_log(LOG_ERR, MODNAME_STR ": Out of memory for "
-			    "new resource data at %s:%d\n", __FILE__, __LINE__);
+			(void) snmp_log(LOG_ERR, MODNAME_STR ": Out of memory "
+			    "for new resource data at %s:%d\n", __FILE__,
+			    __LINE__);
 			return (1);
 		}
 		/*
@@ -240,7 +239,7 @@ rsrcinfo_update(sunFmResource_update_ctx_t *update_ctx)
 
 	if ((adm = fmd_adm_open(update_ctx->uc_host, update_ctx->uc_prog,
 	    update_ctx->uc_version)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": Communication with fmd "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": Communication with fmd "
 		    "failed: %s\n", strerror(errno));
 		return (SNMP_ERR_RESOURCEUNAVAILABLE);
 	}
@@ -258,8 +257,8 @@ rsrcinfo_update(sunFmResource_update_ctx_t *update_ctx)
 	fmd_adm_close(adm);
 
 	if (err != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": fmd resource information "
-		    "update failed: %s\n", fmd_adm_errmsg(adm));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": fmd resource "
+		    "information update failed: %s\n", fmd_adm_errmsg(adm));
 		return (SNMP_ERR_RESOURCEUNAVAILABLE);
 	}
 
@@ -345,19 +344,19 @@ sunFmResourceTable_init(void)
 	int err;
 
 	if ((err = pthread_mutex_init(&update_lock, NULL)) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": mutex_init failure: %s\n",
-		    strerror(err));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": mutex_init failure: "
+		    "%s\n", strerror(err));
 		return (MIB_REGISTRATION_FAILED);
 	}
 	if ((err = pthread_cond_init(&update_cv, NULL)) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": cond_init failure: %s\n",
-		    strerror(err));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": cond_init failure: "
+		    "%s\n", strerror(err));
 		return (MIB_REGISTRATION_FAILED);
 	}
 
 	if ((err = pthread_create(NULL, NULL, (void *(*)(void *))update_thread,
 	    NULL)) != 0) {
-		snmp_log(LOG_ERR, MODNAME_STR ": error creating update "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": error creating update "
 		    "thread: %s\n", strerror(err));
 		return (MIB_REGISTRATION_FAILED);
 	}
@@ -390,8 +389,8 @@ sunFmResourceTable_init(void)
 	    sizeof (sunFmResource_data_t),
 	    offsetof(sunFmResource_data_t, d_fmri_avl), resource_compare_fmri,
 	    UU_AVL_DEBUG)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": rsrc_fmri avl pool creation "
-		    "failed: %s\n", uu_strerror(uu_error()));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": rsrc_fmri avl pool "
+		    "creation failed: %s\n", uu_strerror(uu_error()));
 		snmp_free_varbind(table_info->indexes);
 		SNMP_FREE(table_info);
 		SNMP_FREE(handler);
@@ -399,7 +398,7 @@ sunFmResourceTable_init(void)
 
 	if ((rsrc_fmri_avl = uu_avl_create(rsrc_fmri_avl_pool, NULL,
 	    UU_AVL_DEBUG)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": rsrc_fmri avl creation "
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": rsrc_fmri avl creation "
 		    "failed: %s\n", uu_strerror(uu_error()));
 		snmp_free_varbind(table_info->indexes);
 		SNMP_FREE(table_info);
@@ -412,8 +411,8 @@ sunFmResourceTable_init(void)
 	    sizeof (sunFmResource_data_t),
 	    offsetof(sunFmResource_data_t, d_index_avl),
 	    resource_compare_index, UU_AVL_DEBUG)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": rsrc_index avl pool creation "
-		    "failed: %s\n", uu_strerror(uu_error()));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": rsrc_index avl pool "
+		    "creation failed: %s\n", uu_strerror(uu_error()));
 		snmp_free_varbind(table_info->indexes);
 		SNMP_FREE(table_info);
 		SNMP_FREE(handler);
@@ -423,8 +422,8 @@ sunFmResourceTable_init(void)
 
 	if ((rsrc_index_avl = uu_avl_create(rsrc_index_avl_pool, NULL,
 	    UU_AVL_DEBUG)) == NULL) {
-		snmp_log(LOG_ERR, MODNAME_STR ": rsrc_index avl creation "
-		    "failed: %s\n", uu_strerror(uu_error()));
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": rsrc_index avl "
+		    "creation failed: %s\n", uu_strerror(uu_error()));
 		snmp_free_varbind(table_info->indexes);
 		SNMP_FREE(table_info);
 		SNMP_FREE(handler);
@@ -448,8 +447,8 @@ sunFmResourceTable_init(void)
 
 	if ((err = netsnmp_register_read_only_instance(
 	    netsnmp_create_handler_registration("sunFmResourceCount",
-		sunFmResourceCount_handler, sunFmResourceCount_oid,
-		OID_LENGTH(sunFmResourceCount_oid), HANDLER_CAN_RONLY))) !=
+	    sunFmResourceCount_handler, sunFmResourceCount_oid,
+	    OID_LENGTH(sunFmResourceCount_oid), HANDLER_CAN_RONLY))) !=
 	    MIB_REGISTERED_OK) {
 		/*
 		 * There's no way to unregister the table handler, so we
@@ -490,8 +489,8 @@ sunFmResourceTable_nextrsrc(netsnmp_handler_registration *reginfo,
 
 		DEBUGMSGTL((MODNAME_STR, "nextrsrc: no indexes given\n"));
 		var = SNMP_MALLOC_TYPEDEF(netsnmp_variable_list);
-		snmp_set_var_typed_value(var, ASN_UNSIGNED, (uchar_t *)&index,
-		    sizeof (index));
+		(void) snmp_set_var_typed_value(var, ASN_UNSIGNED,
+		    (uchar_t *)&index, sizeof (index));
 		(void) memcpy(tmpoid, reginfo->rootoid,
 		    reginfo->rootoid_len * sizeof (oid));
 		tmpoid[reginfo->rootoid_len] = 1;
@@ -630,8 +629,8 @@ sunFmResourceTable_return(unsigned int reg, void *arg)
 		}
 		break;
 	default:
-		snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request mode %d\n",
-		    reqinfo->mode);
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request "
+		    "mode %d\n", reqinfo->mode);
 		netsnmp_free_delegated_cache(cache);
 		(void) pthread_mutex_unlock(&update_lock);
 		return;
@@ -639,7 +638,7 @@ sunFmResourceTable_return(unsigned int reg, void *arg)
 
 	switch (table_info->colnum) {
 	case SUNFMRESOURCE_COL_FMRI:
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)data->d_ari_fmri,
 		    strlen(data->d_ari_fmri));
 		break;
@@ -659,12 +658,12 @@ sunFmResourceTable_return(unsigned int reg, void *arg)
 			rsrcstate = SUNFMRESOURCE_STATE_FAULTED;
 			break;
 		}
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_INTEGER, (uchar_t *)&rsrcstate,
 		    sizeof (rsrcstate));
 		break;
 	case SUNFMRESOURCE_COL_DIAGNOSISUUID:
-		netsnmp_table_build_result(reginfo, request, table_info,
+		(void) netsnmp_table_build_result(reginfo, request, table_info,
 		    ASN_OCTET_STR, (uchar_t *)data->d_ari_case,
 		    strlen(data->d_ari_case));
 		break;
@@ -749,12 +748,12 @@ sunFmResourceCount_return(unsigned int reg, void *arg)
 	case MODE_GETNEXT:
 		DEBUGMSGTL((MODNAME_STR, "resource count is %u\n", rsrc_count));
 		rsrc_count_long = (ulong_t)rsrc_count;
-		snmp_set_var_typed_value(request->requestvb, ASN_GAUGE,
+		(void) snmp_set_var_typed_value(request->requestvb, ASN_GAUGE,
 		    (uchar_t *)&rsrc_count_long, sizeof (rsrc_count_long));
 		break;
 	default:
-		snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request mode %d\n",
-		    reqinfo->mode);
+		(void) snmp_log(LOG_ERR, MODNAME_STR ": Unsupported request "
+		    "mode %d\n", reqinfo->mode);
 	}
 
 	netsnmp_free_delegated_cache(cache);

@@ -580,7 +580,7 @@ disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 
 	/* Establish the devinfo dpath */
 	if ((path = di_devfs_path(node)) == NULL) {
-		topo_mod_seterrno(mod, errno);
+		(void) topo_mod_seterrno(mod, errno);
 		goto error;
 	}
 
@@ -662,7 +662,7 @@ disk_di_node_add(di_node_t node, char *devid, disk_cbdata_t *cbp)
 		while ((pnode = di_path_client_next_path(node,
 		    pnode)) != NULL) {
 			if ((path = di_path_devfs_path(pnode)) == NULL) {
-				topo_mod_seterrno(mod, errno);
+				(void) topo_mod_seterrno(mod, errno);
 				goto error;
 			}
 

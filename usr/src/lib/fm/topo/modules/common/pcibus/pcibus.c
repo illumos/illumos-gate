@@ -90,7 +90,10 @@ _topo_init(topo_mod_t *modhdl, topo_version_t version)
 	if (version != PCI_ENUMR_VERS)
 		return (topo_mod_seterrno(modhdl, EMOD_VER_NEW));
 
-	topo_mod_register(modhdl, &Pci_info, TOPO_VERSION);
+	if (topo_mod_register(modhdl, &Pci_info, TOPO_VERSION) != 0) {
+		topo_mod_dprintf(modhdl, "failed to register module");
+		return (-1);
+	}
 	topo_mod_dprintf(modhdl, "PCI Enumr initd\n");
 
 	return (0);
@@ -502,7 +505,7 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 				    NULL) {
 					topo_mod_dprintf(mod, "pcibus enum "
 					    "could not load xaui enum\n");
-					topo_mod_seterrno(mod,
+					(void) topo_mod_seterrno(mod,
 					    EMOD_PARTIAL_ENUM);
 					return;
 				} else {

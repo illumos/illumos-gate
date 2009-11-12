@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mdb_modapi.h>
 
@@ -231,8 +229,10 @@ ipath_node(uintptr_t addr, const void *data, void *arg)
 	struct ipath *ipath = (struct ipath *)data;
 	char buf[128];
 
-	mdb_readstr(buf, (size_t)sizeof (buf), (uintptr_t)ipath->s);
-	buf[sizeof (buf) - 1] = 0;
+	if (mdb_readstr(buf, (size_t)sizeof (buf), (uintptr_t)ipath->s) < 0)
+		(void) mdb_snprintf(buf, (size_t)sizeof (buf), "<%p>",
+		    ipath->s);
+
 	mdb_printf("/%s=%d", buf, ipath->i);
 	return (DCMD_OK);
 }
@@ -291,8 +291,11 @@ eft_count(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-	mdb_readstr(buf, (size_t)sizeof (buf), (uintptr_t)istat_entry.ename);
-	buf[sizeof (buf) - 1] = 0;
+	if (mdb_readstr(buf, (size_t)sizeof (buf),
+	    (uintptr_t)istat_entry.ename) < 0)
+		(void) mdb_snprintf(buf, (size_t)sizeof (buf), "<%p>",
+		    istat_entry.ename);
+
 	mdb_printf("%s@", buf);
 	(void) ipath((uintptr_t)istat_entry.ipath, DCMD_ADDRSPEC, 0, NULL);
 	mdb_printf(" %d\n", count.fmd_stats.fmds_value.i32);
@@ -377,8 +380,11 @@ eft_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 	if (opt_v) {
-		mdb_readstr(buf, (size_t)sizeof (buf), (uintptr_t)node.file);
-		buf[sizeof (buf) - 1] = 0;
+		if (mdb_readstr(buf, (size_t)sizeof (buf),
+		    (uintptr_t)node.file) < 0)
+			(void) mdb_snprintf(buf, (size_t)sizeof (buf), "<%p>",
+			    node.file);
+
 		mdb_printf("%s len %d\n", buf, node.line);
 	}
 	switch (node.t) {
@@ -386,9 +392,11 @@ eft_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("nothing");
 		break;
 	case T_NAME:			/* identifiers, sometimes chained */
-		mdb_readstr(buf, (size_t)sizeof (buf),
-		    (uintptr_t)node.u.name.s);
-		buf[sizeof (buf) - 1] = 0;
+		if (mdb_readstr(buf, (size_t)sizeof (buf),
+		    (uintptr_t)node.u.name.s) < 0)
+			(void) mdb_snprintf(buf, (size_t)sizeof (buf), "<%p>",
+			    node.u.name.s);
+
 		mdb_printf("%s", buf);
 		if (node.u.name.cp) {
 			struct config cp;
@@ -424,9 +432,11 @@ eft_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 		break;
 	case T_GLOBID:			/* globals (e.g. $a) */
-		mdb_readstr(buf, (size_t)sizeof (buf),
-		    (uintptr_t)node.u.globid.s);
-		buf[sizeof (buf) - 1] = 0;
+		if (mdb_readstr(buf, (size_t)sizeof (buf),
+		    (uintptr_t)node.u.globid.s) < 0)
+			(void) mdb_snprintf(buf, (size_t)sizeof (buf), "<%p>",
+			    node.u.globid.s);
+
 		mdb_printf("$%s", buf);
 		break;
 	case T_EVENT:			/* class@path{expr} */
@@ -483,15 +493,19 @@ eft_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%llu", node.u.ull);
 		break;
 	case T_QUOTE:			/* quoted string */
-		mdb_readstr(buf, (size_t)sizeof (buf),
-		    (uintptr_t)node.u.quote.s);
-		buf[sizeof (buf) - 1] = 0;
+		if (mdb_readstr(buf, (size_t)sizeof (buf),
+		    (uintptr_t)node.u.quote.s) < 0)
+			(void) mdb_snprintf(buf, (size_t)sizeof (buf), "<%p>",
+			    node.u.quote.s);
+
 		mdb_printf("\"%s\"", buf);
 		break;
 	case T_FUNC:			/* func(arglist) */
-		mdb_readstr(buf, (size_t)sizeof (buf),
-		    (uintptr_t)node.u.func.s);
-		buf[sizeof (buf) - 1] = 0;
+		if (mdb_readstr(buf, (size_t)sizeof (buf),
+		    (uintptr_t)node.u.func.s) < 0)
+			(void) mdb_snprintf(buf, (size_t)sizeof (buf), "<%p>",
+			    node.u.func.s);
+
 		mdb_printf("%s(", buf);
 		(void) eft_node((uintptr_t)node.u.func.arglist, DCMD_ADDRSPEC,
 		    0, NULL);

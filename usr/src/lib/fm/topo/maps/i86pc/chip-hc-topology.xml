@@ -78,7 +78,8 @@
         </set> 
         <set type='product'
 	    setlist='Sun-Fire-V20z|Sun-Fire-V40z'>
-	    
+
+	    <fac-enum provider='fac_prov_ipmi' />
             <propgroup name='protocol' version='1'
                 name-stability='Private' data-stability='Private' >
 
@@ -347,6 +348,7 @@
         </set> 
         <set type='product'
 	    setlist='Sun-Fire-X4450|SUN-FIRE-X4450'>
+	    <fac-enum provider='fac_prov_ipmi' />
 	    <!--
 	       chip FRU label
 	    -->
@@ -652,6 +654,7 @@
                 </set> 
                 <set type='product' setlist='Sun-Fire-V20z|Sun-Fire-V40z'>
 		    
+		    <fac-enum provider='fac_prov_ipmi' />
                     <propgroup name='protocol' version='1'
                                name-stability='Private'
 			       data-stability='Private' >

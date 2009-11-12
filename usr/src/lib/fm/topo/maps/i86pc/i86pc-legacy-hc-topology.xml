@@ -58,7 +58,9 @@
         </propgroup>
         <propgroup name='ipmi' version='1'
             name-stability='Private' data-stability='Private' >
-            <propval name='entity_ref' type='string' value='MB' />
+            <propval name='entity_ref' type='string_array' >
+	        <propitem value='MB' />
+	    </propval>
         </propgroup>
 
       </set>

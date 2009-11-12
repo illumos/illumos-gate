@@ -149,13 +149,13 @@ mod_binary_path_get(topo_mod_t *mp, const char *objpath)
 		}
 		break;
 	}
-	elf_end(elf);
+	(void) elf_end(elf);
 	(void) close(fd);
 	return (0);
 
 mbpg_bail:
 	if (elf != NULL)
-		elf_end(elf);
+		(void) elf_end(elf);
 	if (fd >= 0)
 		(void) close(fd);
 	(void) topo_mod_seterrno(mp, EMOD_METHOD_INVAL);
