@@ -200,7 +200,8 @@ clock_t ldc_delay = LDC_DELAY;
 #define	LDC_DEVCLASS_BIT(dc)		(0x1 << (dc))
 #define	LDC_DEVCLASS_PROM_RESET(dc)	\
 	(LDC_DEVCLASS_BIT(dc) & ldc_debug_reset_mask)
-static uint64_t ldc_debug_reset_mask = LDC_DEVCLASS_BIT(LDC_DEV_BLK_SVC);
+static uint64_t ldc_debug_reset_mask = LDC_DEVCLASS_BIT(LDC_DEV_BLK_SVC) |
+    LDC_DEVCLASS_BIT(LDC_DEV_GENERIC);
 
 /*
  * delay between each retry of channel unregistration in
