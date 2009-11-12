@@ -171,21 +171,25 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 		name = "Intel HD Audio";
 		vers = "ICH9";
 		break;
-	case 0x10de0371:
-		name = "NVIDIA HD Audio";
-		vers = "MCP55";
-		break;
-	case 0x10de03f0:
-		name = "NVIDIA HD Audio";
-		vers = "MCP61A";
+	case 0x80863a3e:
+		name = "Intel HD Audio";
+		vers = "ICH10";
 		break;
 	case 0x10de026c:
 		name = "NVIDIA HD Audio";
 		vers = "MCP51";
 		break;
+	case 0x10de0371:
+		name = "NVIDIA HD Audio";
+		vers = "MCP55";
+		break;
 	case 0x10de03e4:
 		name = "NVIDIA HD Audio";
 		vers = "MCP61";
+		break;
+	case 0x10de03f0:
+		name = "NVIDIA HD Audio";
+		vers = "MCP61A";
 		break;
 	case 0x10de044a:
 		name = "NVIDIA HD Audio";
@@ -194,6 +198,10 @@ audiohd_set_chipset_info(audiohd_state_t *statep)
 	case 0x10de055c:
 		name = "NVIDIA HD Audio";
 		vers = "MCP67";
+		break;
+	case 0x10de0774:
+		name = "NVIDIA HD Audio";
+		vers = "MCP78S";
 		break;
 	case 0x10de0ac0:
 		name = "NVIDIA HD Audio";
@@ -1020,7 +1028,6 @@ audiohd_start_port(audiohd_port_t *port)
 	audiohd_state_t	*statep = port->statep;
 
 	ASSERT(mutex_owned(&statep->hda_mutex));
-
 	/* if suspended, then do nothing else */
 	if (statep->suspended) {
 		return;
@@ -1082,20 +1089,18 @@ audiohd_update_port(audiohd_port_t *port)
 	audiohd_state_t		*statep = port->statep;
 
 	pos = AUDIOHD_REG_GET32(port->regoff + AUDIOHD_SDREG_OFFSET_LPIB);
-	pos &= AUDIOHD_POS_MASK;
-	if (pos > port->curpos)
-		len = (pos - port->curpos) & AUDIOHD_POS_MASK;
+	/* Convert the position into a frame count */
+	pos /= (port->nchan * 2);
+
+	if (pos >= port->curpos)
+		len = (pos - port->curpos);
 	else {
-		len = pos + port->samp_size * AUDIOHD_BDLE_NUMS - port->curpos;
-		len &= AUDIOHD_POS_MASK;
+		len = pos + port->nframes - port->curpos;
 	}
-	port->curpos += len;
-	if (port->curpos >= port->samp_size * AUDIOHD_BDLE_NUMS)
-		port->curpos -= port->samp_size * AUDIOHD_BDLE_NUMS;
 
-	port->count += len / (port->nchan * 2);
-
-
+	ASSERT(len <= port->nframes);
+	port->curpos = pos;
+	port->count += len;
 }
 
 static uint64_t
@@ -1106,7 +1111,8 @@ audiohd_engine_count(void *arg)
 	uint64_t	val;
 
 	mutex_enter(&statep->hda_mutex);
-	audiohd_update_port(port);
+	if (port->started && !statep->suspended)
+		audiohd_update_port(port);
 	val = port->count;
 	mutex_exit(&statep->hda_mutex);
 	return (val);
@@ -2325,6 +2331,9 @@ audiohd_beep_off(void *arg)
 static void
 audiohd_beep_freq(void *arg, int freq)
 {
+	hda_codec_t 	*codec = ((audiohd_widget_t *)arg)->codec;
+	uint32_t	vid = codec->vid >> 16;
+
 	_NOTE(ARGUNUSED(arg));
 	if (freq == 0) {
 		audiohd_beep_divider = 0;
@@ -2333,7 +2342,20 @@ audiohd_beep_freq(void *arg, int freq)
 			freq = AUDIOHDC_MAX_BEEP_GEN;
 		else if (freq < AUDIOHDC_MIX_BEEP_GEN)
 			freq = AUDIOHDC_MIX_BEEP_GEN;
-		audiohd_beep_divider = AUDIOHDC_SAMPR48000 / freq;
+
+		switch (vid) {
+		case AUDIOHD_VID_SIGMATEL:
+			/*
+			 * Sigmatel HD codec specification:
+			 * frequency = 48000 * (257 - Divider) / 1024
+			 */
+			audiohd_beep_divider = 257 - freq * 1024 /
+			    AUDIOHDC_SAMPR48000;
+			break;
+		default:
+			audiohd_beep_divider = AUDIOHDC_SAMPR48000 / freq;
+			break;
+		}
 	}
 
 	if (audiohd_beep_vol == 0)
@@ -2791,7 +2813,6 @@ audiohd_init_controller(audiohd_state_t *statep)
 		return (DDI_FAILURE);
 	}
 
-
 	AUDIOHD_REG_SET32(AUDIOHD_REG_SYNC, 0); /* needn't sync stream */
 
 	/* Initialize RIRB */
@@ -3199,6 +3220,9 @@ audiohd_set_codec_info(hda_codec_t *codec)
 	char buf[256];
 
 	switch (codec->vid) {
+	case 0x10134206:
+		(void) snprintf(buf, sizeof (buf), "Cirrus HD codec: CS4206");
+		break;
 	case 0x10ec0260:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC260");
 		break;
@@ -3207,6 +3231,9 @@ audiohd_set_codec_info(hda_codec_t *codec)
 		break;
 	case 0x10ec0268:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC268");
+		break;
+	case 0x10ec0272:
+		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC272");
 		break;
 	case 0x10ec0662:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC662");
@@ -3234,6 +3261,10 @@ audiohd_set_codec_info(hda_codec_t *codec)
 		break;
 	case 0x10ec0888:
 		(void) snprintf(buf, sizeof (buf), "Realtek HD codec: ALC888");
+		break;
+	case 0x10de0002:
+		(void) snprintf(buf, sizeof (buf),
+		    "nVidia HD codec: MCP78 HDMI");
 		break;
 	case 0x10de0007:
 		(void) snprintf(buf, sizeof (buf),
@@ -3268,6 +3299,13 @@ audiohd_set_codec_info(hda_codec_t *codec)
 	case 0x11d4198b:
 		(void) snprintf(buf, sizeof (buf),
 		    "Analog Devices HD codec: AD1988B");
+		break;
+	case 0x14f15051:
+		(void) snprintf(buf, sizeof (buf),
+		    "Conexant HD codec: CX20561");
+		break;
+	case 0x80862802:
+		(void) snprintf(buf, sizeof (buf), "Intel HD codec: HDMI");
 		break;
 	case 0x83847690:
 		(void) snprintf(buf, sizeof (buf),
@@ -3453,6 +3491,9 @@ audiohd_create_codec(audiohd_state_t *statep)
 		codec->vid = audioha_codec_verb_get(statep, i,
 		    AUDIOHDC_NODE_ROOT, AUDIOHDC_VERB_GET_PARAM,
 		    AUDIOHDC_PAR_VENDOR_ID);
+		if (codec->vid == -1)
+			continue;
+
 		codec->revid =
 		    audioha_codec_verb_get(statep, i,
 		    AUDIOHDC_NODE_ROOT, AUDIOHDC_VERB_GET_PARAM,
@@ -5368,12 +5409,13 @@ audiohd_allocate_port(audiohd_state_t *statep)
 
 		port->format = AUDIOHD_FMT_PCM;
 		port->fragfr = 48000 / port->intrs;
-		port->fragfr = (port->fragfr + AUDIOHD_FRAGFR_ALIGN - 1) & ~
-		    (AUDIOHD_FRAGFR_ALIGN - 1);
+		port->fragfr = AUDIOHD_ROUNDUP(port->fragfr,
+		    AUDIOHD_FRAGFR_ALIGN);
 		port->samp_size = port->fragfr * port->nchan * 2;
-		port->samp_size = (port->samp_size +
-		    AUDIOHD_BDLE_BUF_ALIGN - 1) & ~
-		    (AUDIOHD_BDLE_BUF_ALIGN - 1);
+		port->samp_size = AUDIOHD_ROUNDUP(port->samp_size,
+		    AUDIOHD_BDLE_BUF_ALIGN);
+		port->nframes = port->samp_size * AUDIOHD_BDLE_NUMS /
+		    (port->nchan * 2);
 
 		/* allocate dma handle */
 		rc = ddi_dma_alloc_handle(dip, &dma_attr, DDI_DMA_SLEEP,
@@ -5383,6 +5425,7 @@ audiohd_allocate_port(audiohd_state_t *statep)
 			    rc);
 			return (DDI_FAILURE);
 		}
+
 		/*
 		 * Warning: please be noted that allocating the dma memory
 		 * with the flag IOMEM_DATA_UNCACHED is a hack due
@@ -6288,9 +6331,11 @@ audioha_codec_verb_get(void *arg, uint8_t caddr, uint8_t wid,
 		return (resp);
 	}
 
-	audio_dev_warn(statep->adev, "timeout when get "
-	    "response from codec: wid=%d, verb=0x%04x, param=0x%04x",
-	    wid, verb, param);
+	if (wid != AUDIOHDC_NODE_ROOT && param != AUDIOHDC_PAR_VENDOR_ID) {
+		audio_dev_warn(statep->adev,  "timeout when get "
+		    "response from codec: wid=%d, verb=0x%04x, param=0x%04x",
+		    wid, verb, param);
+	}
 
 	return ((uint32_t)(-1));
 
@@ -6330,7 +6375,7 @@ audioha_codec_4bit_verb_get(void *arg, uint8_t caddr, uint8_t wid,
 	}
 
 	audio_dev_warn(statep->adev,  "timeout when get "
-	    " response from codec: wid=%d, verb=0x%04x, param=0x%04x",
+	    "response from codec: wid=%d, verb=0x%04x, param=0x%04x",
 	    wid, verb, param);
 
 	return ((uint32_t)(-1));
