@@ -3491,7 +3491,7 @@ audiohd_create_codec(audiohd_state_t *statep)
 		codec->vid = audioha_codec_verb_get(statep, i,
 		    AUDIOHDC_NODE_ROOT, AUDIOHDC_VERB_GET_PARAM,
 		    AUDIOHDC_PAR_VENDOR_ID);
-		if (codec->vid == -1)
+		if (codec->vid == (uint32_t)(-1))
 			continue;
 
 		codec->revid =
