@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # This script runs within the scratch zone and updates the dependent files and
@@ -257,6 +256,9 @@ create_admin_file()
 # 2) Build the list of files to remove.
 # Similar structure to get_ed_cp_list() but we're processing the NGZ contents
 # file.
+# Entries in the rmlist file will be in format filepath:class:pkgname
+# class and pkgname are used in remove_files() if requires to run any class
+# action script.
 get_rm_list()
 {
 	nawk '
@@ -268,6 +270,7 @@ get_rm_list()
 	}
 	{
 		# fld is the field where the pkg names begin.
+		# cls is the class name for the file
 		# nm is the file/dir entry name.
 		# rm is set if we should remove the entry.
 		if ($2 == "e" || $2 == "v") {
@@ -276,14 +279,17 @@ get_rm_list()
 			rm=0;
 		} else if ($2 == "f") {
 			fld=10;
+			cls=$3;
 			nm=$1;
 			rm=1;
 		} else if ($2 == "d") {
 			fld=7;
+			cls=$3;
 			nm=$1;
 			rm=1;
 		} else if ($2 == "s" || $2 == "l") {
 			fld=4;
+			cls=$3;
 			split($1, a, "=");
 			nm=a[1];
 			rm=1;
@@ -308,7 +314,7 @@ get_rm_list()
 		}
 
 		if (rm == 1)
-			printf("/a%s\n", nm) >>"/tmp/rmlist";
+			printf("/a%s:%s:%s\n", nm, cls, pname) >>"/tmp/rmlist";
 		else
 			printf("/a%s\n", nm) >>"/tmp/ngz_ed_list";
 
@@ -360,23 +366,41 @@ get_rm_list()
 	# comm assumes the files are sorted.  Since the contents file is
 	# sorted and we wrote the files as we processed the contents file,
 	# these files are already sorted.
-	comm -13 /tmp/gz_ed_list /tmp/ngz_ed_list >>/tmp/rmlist || \
-	    fatal "get_rm_list"
+	comm -13 /tmp/gz_ed_list /tmp/ngz_ed_list | \
+	    sed -e 's,$,::,' >>/tmp/rmlist || fatal "get_rm_list"
 }
 
 remove_files()
 {
-	for path in `cat /tmp/rmlist`
+	for line in `cat /tmp/rmlist`
 	do
+		path=`echo $line | cut -d':' -f1`
+		class=`echo $line | cut -d':' -f2`
+		PKGINST=`echo $line | cut -d':' -f3`
+
 		if [ "$path" != "" ] ; then
-			# Check for symlink first since -d follows links.
-			if [ -h $path ]; then
-				rm -f $path || fatal "remove_files"
-			elif [ -d $path ]; then
-				# ignore errs since dir might not be empty
-				rmdir $path >/dev/null 2>&1
+			if [ "$class" = "none" -o "$class" = "" ] ; then
+				# Check for symlink first since -d follows links.
+				if [ -h $path ]; then
+					rm -f $path || fatal "remove_files"
+				elif [ -d $path ]; then
+					# ignore errs since dir might not be empty
+					rmdir $path >/dev/null 2>&1
+				else
+					rm -f $path || fatal "remove_files"
+				fi
 			else
-				rm -f $path || fatal "remove_files"
+				cas1=/a/var/sadm/pkg/$PKGINST/install/r\.$class
+				cas2=/a/usr/sadm/install/scripts/r\.$class
+				if [ -f $cas1 ]; then
+					echo $path | PKG_INSTALL_ROOT=/a \
+					    PKGINST=$PKGINST /bin/sh $cas1
+				elif [ -f $cas2 ]; then
+					echo $path | PKG_INSTALL_ROOT=/a \
+					    PKGINST=$PKGINST /bin/sh $cas2
+				else
+					rm -f $path || fatal "remove_files"
+				fi
 			fi
 		fi
 	done
